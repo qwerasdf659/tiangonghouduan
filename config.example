@@ -1,0 +1,81 @@
+# 餐厅积分抽奖系统 - 环境变量配置
+# 🔴 重要：生产环境部署前必须修改所有配置
+
+# 服务器配置
+NODE_ENV=development
+PORT=3000
+WS_PORT=8080
+
+# 🔴 数据库配置 - 根据文档提供的连接信息
+# 内网数据库（开发环境）
+DB_HOST=test-db-mysql.ns-br0za7uc.svc
+DB_PORT=3306
+DB_USER=root
+DB_PASSWORD=mc6r9cgb
+DB_NAME=restaurant_points_dev
+
+# 外网数据库（生产环境）  
+# DB_HOST=dbconn.sealosbja.site
+# DB_PORT=42182
+# DB_USER=root
+# DB_PASSWORD=mc6r9cgb
+# DB_NAME=restaurant_points_prod
+
+# 🔴 JWT配置 - 生产环境必须更换
+JWT_SECRET=your_jwt_secret_key_change_in_production
+JWT_REFRESH_SECRET=your_refresh_secret_key_change_in_production
+JWT_EXPIRES_IN=2h
+JWT_REFRESH_EXPIRES_IN=7d
+
+# 🔴 加密配置 - 生产环境必须更换
+ENCRYPTION_KEY=your_32_bytes_hex_encryption_key_change_in_production
+
+# 🔴 Redis配置（缓存和会话）
+REDIS_HOST=localhost
+REDIS_PORT=6379
+REDIS_PASSWORD=
+REDIS_DB=0
+
+# 🔴 Sealos对象存储配置 - 用户提供的真实配置
+SEALOS_ENDPOINT=https://objectstorageapi.bja.sealos.run
+SEALOS_INTERNAL_ENDPOINT=http://object-storage.objectstorage-system.svc.cluster.local
+SEALOS_BUCKET=tiangong
+SEALOS_ACCESS_KEY=br0za7uc
+SEALOS_SECRET_KEY=skxg8mk5gqfhf9xz
+
+# 🔴 OCR服务配置（图片识别）
+OCR_PROVIDER=baidu
+OCR_API_KEY=your_ocr_api_key
+OCR_SECRET_KEY=your_ocr_secret_key
+
+# 🔴 短信验证码服务配置
+SMS_PROVIDER=aliyun
+SMS_ACCESS_KEY=your_sms_access_key
+SMS_SECRET_KEY=your_sms_secret_key
+SMS_SIGN_NAME=餐厅积分系统
+SMS_TEMPLATE_CODE=SMS_123456789
+
+# 🔴 服务器地址配置 - 根据文档配置
+# 内网地址
+INTERNAL_BASE_URL=http://devbox1.ns-br0za7uc.svc.cluster.local:3000
+INTERNAL_WS_URL=ws://devbox1.ns-br0za7uc.svc.cluster.local:8080
+
+# 公网地址  
+PUBLIC_BASE_URL=https://rqchrlqndora.sealosbja.site
+PUBLIC_WS_URL=wss://rqchrlqndora.sealosbja.site/ws
+
+# 系统配置
+LOG_LEVEL=info
+MAX_FILE_SIZE=10485760
+ENABLE_CORS=true
+ENABLE_RATE_LIMIT=true
+
+# 抽奖系统配置
+LOTTERY_COST_POINTS=100
+DAILY_LOTTERY_LIMIT=10
+NEW_USER_POINTS=1000
+
+# 积分系统配置  
+PHOTO_POINTS_RATE=10
+MIN_POINTS_AWARD=50
+MAX_POINTS_AWARD=2000 
