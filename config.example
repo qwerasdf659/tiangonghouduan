@@ -22,13 +22,13 @@ DB_NAME=restaurant_points_dev
 # DB_NAME=restaurant_points_prod
 
 # 🔴 JWT配置 - 生产环境必须更换
-JWT_SECRET=your_jwt_secret_key_change_in_production
-JWT_REFRESH_SECRET=your_refresh_secret_key_change_in_production
+JWT_SECRET=restaurant_points_jwt_secret_key_development_only_32_chars
+JWT_REFRESH_SECRET=restaurant_points_refresh_secret_development_64_chars
 JWT_EXPIRES_IN=2h
 JWT_REFRESH_EXPIRES_IN=7d
 
 # 🔴 加密配置 - 生产环境必须更换
-ENCRYPTION_KEY=your_32_bytes_hex_encryption_key_change_in_production
+ENCRYPTION_KEY=abcdef1234567890abcdef1234567890
 
 # 🔴 Redis配置（缓存和会话）
 REDIS_HOST=localhost
@@ -36,20 +36,21 @@ REDIS_PORT=6379
 REDIS_PASSWORD=
 REDIS_DB=0
 
-# 🔴 Sealos对象存储配置 - 用户提供的真实配置
+# 🔴 Sealos对象存储配置 - 修复endpoint配置
 SEALOS_ENDPOINT=https://objectstorageapi.bja.sealos.run
 SEALOS_INTERNAL_ENDPOINT=http://object-storage.objectstorage-system.svc.cluster.local
 SEALOS_BUCKET=tiangong
 SEALOS_ACCESS_KEY=br0za7uc
 SEALOS_SECRET_KEY=skxg8mk5gqfhf9xz
+SEALOS_REGION=bja
 
 # 🔴 OCR服务配置（图片识别）
-OCR_PROVIDER=baidu
+OCR_PROVIDER=mock
 OCR_API_KEY=your_ocr_api_key
 OCR_SECRET_KEY=your_ocr_secret_key
 
-# 🔴 短信验证码服务配置
-SMS_PROVIDER=aliyun
+# 🔴 短信验证码服务配置（可选）
+SMS_PROVIDER=mock
 SMS_ACCESS_KEY=your_sms_access_key
 SMS_SECRET_KEY=your_sms_secret_key
 SMS_SIGN_NAME=餐厅积分系统
@@ -78,4 +79,10 @@ NEW_USER_POINTS=1000
 # 积分系统配置  
 PHOTO_POINTS_RATE=10
 MIN_POINTS_AWARD=50
-MAX_POINTS_AWARD=2000 
+MAX_POINTS_AWARD=2000
+
+# 🔴 安全警告和使用说明：
+# 1. 复制此文件为 .env: cp config.example .env
+# 2. 生产环境必须修改JWT_SECRET和ENCRYPTION_KEY
+# 3. Sealos配置已使用用户提供的真实配置
+# 4. OCR和SMS服务设置为mock模式，生产环境需要真实配置 

@@ -48,3 +48,7 @@ images/uploads/
 # 操作系统生成的文件
 *.pid
 *.lock
+
+# 应用日志文件
+app.log
+server.log

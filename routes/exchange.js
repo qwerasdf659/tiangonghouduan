@@ -61,11 +61,11 @@ router.post('/submit', authenticateToken, async (req, res) => {
   const transaction = await sequelize.transaction();
   
   try {
-    const { commodity_id, quantity = 1, delivery_info } = req.body;
+    const { product_id, quantity = 1, delivery_info } = req.body;
     const userId = req.user.user_id;
     
     // 🔴 参数验证
-    if (!commodity_id || quantity <= 0) {
+    if (!product_id || quantity <= 0) {
       await transaction.rollback();
       return res.json({
         code: 4001,
@@ -75,7 +75,7 @@ router.post('/submit', authenticateToken, async (req, res) => {
     }
     
     // 🔴 获取商品信息并锁定库存
-    const product = await CommodityPool.findByPk(commodity_id, {
+    const product = await CommodityPool.findByPk(product_id, {
       transaction,
       lock: transaction.LOCK.UPDATE
     });
@@ -135,7 +135,7 @@ router.post('/submit', authenticateToken, async (req, res) => {
     
     // 🔴 扣减库存（原子性操作）
     const newStock = await CommodityPool.decreaseStock(
-      commodity_id, 
+      product_id, 
       quantity, 
       transaction
     );
@@ -165,7 +165,7 @@ router.post('/submit', authenticateToken, async (req, res) => {
     const orderRecord = await createExchangeOrder({
       order_id: orderId,
       user_id: userId,
-      commodity_id,
+      product_id,
       commodity_name: product.name,
       quantity,
       unit_points: product.exchange_points,
@@ -177,7 +177,7 @@ router.post('/submit', authenticateToken, async (req, res) => {
     await transaction.commit();
     
     // 🔴 WebSocket推送库存变更（实时更新所有用户）
-    webSocketService.notifyStockUpdate(commodity_id, newStock, 'purchase');
+    webSocketService.notifyStockUpdate(product_id, newStock, 'purchase');
     
     // 🔴 WebSocket推送积分变更（当前用户）
     webSocketService.notifyPointsUpdate(

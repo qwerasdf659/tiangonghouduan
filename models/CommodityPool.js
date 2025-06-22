@@ -1,5 +1,5 @@
 /**
- * 商品库存模型 - CommodityPool
+ * 商品库存模型 - CommodityPool (对应products表)
  * 🔴 前端对接要点：
  * - stock: 实时库存显示，WebSocket同步
  * - exchange_points: 兑换所需积分（前端价格显示）
@@ -10,9 +10,9 @@
 const { DataTypes } = require('sequelize');
 const { sequelize } = require('../config/database');
 
-const CommodityPool = sequelize.define('commodity_pool', {
+const CommodityPool = sequelize.define('products', {
   // 🔴 商品ID - 前端兑换标识
-  commodity_id: {
+  id: {
     type: DataTypes.INTEGER,
     primaryKey: true,
     autoIncrement: true,
@@ -115,7 +115,7 @@ const CommodityPool = sequelize.define('commodity_pool', {
     comment: '销量（前端排序用）'
   }
 }, {
-  tableName: 'commodity_pool',
+  tableName: 'products',
   timestamps: true,
   createdAt: 'created_at',
   updatedAt: 'updated_at',
@@ -171,7 +171,7 @@ CommodityPool.prototype.getFrontendStatus = function() {
 // 🔴 实例方法 - 获取前端商品信息
 CommodityPool.prototype.getFrontendInfo = function() {
   return {
-    id: this.commodity_id,
+    id: this.id,
     name: this.name,
     description: this.description,
     category: this.category,
@@ -244,8 +244,8 @@ CommodityPool.getProductsForFrontend = async function(options = {}) {
 };
 
 // 🔴 类方法 - 扣减库存（事务安全）
-CommodityPool.decreaseStock = async function(commodityId, quantity, transaction) {
-  const product = await CommodityPool.findByPk(commodityId, { 
+CommodityPool.decreaseStock = async function(productId, quantity, transaction) {
+  const product = await CommodityPool.findByPk(productId, { 
     transaction,
     lock: transaction ? transaction.LOCK.UPDATE : undefined
   });

@@ -5,52 +5,72 @@
 
 const { sequelize } = require('../config/database');
 
-// 导入所有模型
+// 🔴 导入数据模型
 const User = require('./User');
 const PointsRecord = require('./PointsRecord');
 const LotterySetting = require('./LotterySetting');
+const LotteryPity = require('./LotteryPity');
 const CommodityPool = require('./CommodityPool');
 const PhotoReview = require('./PhotoReview');
 
 // 🔴 设置模型关联关系 - 确保外键约束
-// 用户与积分记录的关联
-User.hasMany(PointsRecord, {
-  foreignKey: 'user_id',
-  as: 'pointsRecords',
-  onDelete: 'CASCADE'
-});
-PointsRecord.belongsTo(User, {
-  foreignKey: 'user_id',
-  as: 'user'
-});
+function setupAssociations() {
+  try {
+    // 用户与积分记录的关联
+    User.hasMany(PointsRecord, {
+      foreignKey: 'user_id',
+      as: 'pointsRecords',
+      onDelete: 'CASCADE'
+    });
+    PointsRecord.belongsTo(User, {
+      foreignKey: 'user_id',
+      as: 'user'
+    });
+    
+    // 用户与照片审核的关联
+    User.hasMany(PhotoReview, {
+      foreignKey: 'user_id',
+      as: 'photoReviews',
+      onDelete: 'CASCADE'
+    });
+    PhotoReview.belongsTo(User, {
+      foreignKey: 'user_id',
+      as: 'user'
+    });
+    
+    // 照片审核员关联（管理员审核）
+    PhotoReview.belongsTo(User, {
+      foreignKey: 'reviewer_id',
+      as: 'reviewer'
+    });
+    
+    // 用户与抽奖保底的关联
+    User.hasOne(LotteryPity, {
+      foreignKey: 'user_id',
+      as: 'lotteryPity',
+      onDelete: 'CASCADE'
+    });
+    LotteryPity.belongsTo(User, {
+      foreignKey: 'user_id',
+      as: 'user'
+    });
+    
+    console.log('✅ 模型关联配置完成');
+  } catch (error) {
+    console.error('❌ 模型关联配置失败:', error);
+    throw error;
+  }
+}
 
-// 用户与拍照审核的关联
-User.hasMany(PhotoReview, {
-  foreignKey: 'user_id',
-  as: 'photoReviews',
-  onDelete: 'CASCADE'
-});
-PhotoReview.belongsTo(User, {
-  foreignKey: 'user_id',
-  as: 'user'
-});
-
-// 审核员与拍照审核的关联
-User.hasMany(PhotoReview, {
-  foreignKey: 'reviewer_id',
-  as: 'reviewedPhotos',
-  onDelete: 'SET NULL'
-});
-PhotoReview.belongsTo(User, {
-  foreignKey: 'reviewer_id',
-  as: 'reviewer'
-});
+// 立即执行关联配置
+setupAssociations();
 
 // 导出所有模型
 const models = {
   User,
   PointsRecord,
   LotterySetting,
+  LotteryPity,
   CommodityPool,
   PhotoReview,
   sequelize
@@ -80,91 +100,91 @@ async function syncModels(force = false) {
   }
 }
 
-// 🔴 初始化基础数据 - 根据数据库开发文档
+// 🔴 初始化基础数据 - 根据前端文档客户需求更新
 async function initializeData() {
   try {
     console.log('开始初始化基础数据...');
     
-    // 初始化抽奖转盘配置（8个奖品）
+    // 🔴 根据前端文档要求更新抽奖转盘配置（8个奖品）
     await LotterySetting.bulkCreate([
       {
         prize_name: '八八折券',
         prize_type: 'coupon',
         prize_value: 88.00,
         angle: 0,
-        color: '#FF6B6B',
-        probability: 0.05,
+        color: '#FF6B35',
+        probability: 0.10,  // 10%
         is_activity: true,
         cost_points: 100
       },
       {
-        prize_name: '50积分',
-        prize_type: 'points',
-        prize_value: 50.00,
+        prize_name: '九八折券',
+        prize_type: 'coupon',
+        prize_value: 98.00,
         angle: 45,
         color: '#4ECDC4',
-        probability: 0.20,
-        is_activity: false,
+        probability: 0.10,  // 10%
+        is_activity: true,
         cost_points: 100
       },
       {
-        prize_name: '九九折券',
-        prize_type: 'coupon',
-        prize_value: 99.00,
-        angle: 90,
-        color: '#45B7D1',
-        probability: 0.10,
-        is_activity: false,
-        cost_points: 100
-      },
-      {
-        prize_name: '100积分',
-        prize_type: 'points',
-        prize_value: 100.00,
-        angle: 135,
-        color: '#96CEB4',
-        probability: 0.15,
-        is_activity: false,
-        cost_points: 100
-      },
-      {
-        prize_name: '免费咖啡',
+        prize_name: '甜品1份',
         prize_type: 'physical',
         prize_value: 25.00,
+        angle: 90,
+        color: '#45B7D1',
+        probability: 0.20,  // 20%
+        is_activity: false,
+        cost_points: 100
+      },
+      {
+        prize_name: '青菜1份',
+        prize_type: 'physical',
+        prize_value: 15.00,
+        angle: 135,
+        color: '#96CEB4',
+        probability: 0.30,  // 30%
+        is_activity: false,
+        cost_points: 100
+      },
+      {
+        prize_name: '虾1份',
+        prize_type: 'physical',
+        prize_value: 35.00,
         angle: 180,
         color: '#FFEAA7',
-        probability: 0.08,
+        probability: 0.05,  // 5%
         is_activity: true,
         cost_points: 100
       },
       {
-        prize_name: '30积分',
-        prize_type: 'points',
-        prize_value: 30.00,
+        prize_name: '花甲1份',
+        prize_type: 'physical',
+        prize_value: 28.00,
         angle: 225,
         color: '#DDA0DD',
-        probability: 0.25,
+        probability: 0.10,  // 10%
         is_activity: false,
         cost_points: 100
       },
       {
-        prize_name: '神秘大奖',
+        prize_name: '鱿鱼1份',
         prize_type: 'physical',
-        prize_value: 500.00,
+        prize_value: 45.00,
         angle: 270,
         color: '#FF7675',
-        probability: 0.02,
+        probability: 0.05,  // 5%
         is_activity: true,
         cost_points: 100
       },
       {
-        prize_name: '谢谢参与',
-        prize_type: 'empty',
-        prize_value: 0.00,
+        prize_name: '生腌拼盘158',
+        prize_type: 'physical',
+        prize_value: 158.00,
         angle: 315,
         color: '#74B9FF',
-        probability: 0.15,
-        is_activity: false,
+        probability: 0.10,  // 10%
+        is_activity: true,
         cost_points: 100
       }
     ]);
@@ -235,7 +255,7 @@ async function healthCheck() {
     
     // 检查核心表是否存在
     const tables = await sequelize.getQueryInterface().showAllTables();
-    const requiredTables = ['users', 'points_records', 'lottery_settings', 'commodity_pool', 'photo_reviews'];
+    const requiredTables = ['users', 'points_records', 'lottery_prizes', 'products', 'upload_reviews', 'lottery_pity'];
     
     const missingTables = requiredTables.filter(table => !tables.includes(table));
     

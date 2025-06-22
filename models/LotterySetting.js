@@ -1,5 +1,5 @@
 /**
- * 抽奖配置模型 - LotterySetting
+ * 抽奖配置模型 - LotterySetting (对应lottery_prizes表)
  * 🔴 前端对接要点：
  * - angle: Canvas转盘角度映射（0-315度，45度间隔）
  * - is_activity: 触发特殊动效标记（差点中奖动画）
@@ -10,7 +10,7 @@
 const { DataTypes } = require('sequelize');
 const { sequelize } = require('../config/database');
 
-const LotterySetting = sequelize.define('lottery_settings', {
+const LotterySetting = sequelize.define('lottery_prizes', {
   // 🔴 奖品ID - 前端抽奖结果匹配
   prize_id: {
     type: DataTypes.INTEGER,

@@ -2,10 +2,9 @@
  * 商家管理路由
  * 🔴 前端对接说明：
  * - POST /api/merchant/apply - 申请商家权限
- * - GET /api/merchant/reviews/pending - 获取待审核列表
- * - POST /api/merchant/reviews/:id/approve - 审核通过
- * - POST /api/merchant/reviews/:id/reject - 审核拒绝
- * - POST /api/merchant/reviews/batch - 批量审核
+ * - GET /api/merchant/pending-reviews - 获取待审核列表
+ * - POST /api/merchant/review - 执行审核操作
+ * - POST /api/merchant/batch-review - 批量审核
  * - GET /api/merchant/statistics - 审核统计数据
  * 🔴 权限说明：需要商家权限(is_merchant=true)才能访问审核功能
  */
@@ -93,110 +92,30 @@ router.post('/apply', authenticateToken, async (req, res) => {
 
 /**
  * 🔴 获取待审核列表 - 商家专用
- * GET /api/merchant/reviews/pending?page=1&limit=10
+ * GET /api/merchant/pending-reviews?page=1&limit=10
  * 商家可以查看所有待审核的拍照
  */
-router.get('/reviews/pending', authenticateToken, requireMerchant, async (req, res) => {
+router.get('/pending-reviews', authenticateToken, requireMerchant, async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
     const limit = Math.min(parseInt(req.query.limit) || 20, 100);
-    const sort = req.query.sort || 'newest'; // newest | oldest
-    const offset = (page - 1) * limit;
     
-    // 构建排序条件
-    const order = sort === 'oldest' 
-      ? [['created_at', 'ASC']] 
-      : [['created_at', 'DESC']];
-    
-    // 🔴 查询待审核记录
-    const { count, rows } = await PhotoReview.findAndCountAll({
-      where: {
-        review_status: 'pending'
-      },
-      include: [
-        {
-          model: User,
-          as: 'user',
-          attributes: ['user_id', 'username', 'nickname', 'avatar', 'total_points']
-        }
-      ],
-      order,
-      limit,
-      offset,
-      attributes: [
-        'review_id',
-        'user_id',
-        'image_url',
-        'original_filename',
-        'file_size',
-        'upload_ip',
-        'ocr_text',
-        'ocr_confidence',
-        'detected_amount',
-        'detected_merchant',
-        'detected_date',
-        'estimated_points',
-        'auto_review_passed',
-        'created_at'
-      ]
+    // 🔴 使用PhotoReview模型的方法获取待审核列表
+    const result = await PhotoReview.getPendingReviews({
+      page,
+      limit
     });
     
-    // 🔴 格式化数据供前端使用
-    const formattedRecords = rows.map(record => ({
-      reviewId: record.review_id,
-      userId: record.user_id,
-      user: {
-        nickname: record.user.nickname,
-        avatar: record.user.avatar,
-        totalPoints: record.user.total_points
-      },
-      image: {
-        url: record.image_url,
-        filename: record.original_filename,
-        size: record.file_size
-      },
-      upload: {
-        ip: record.upload_ip,
-        time: record.created_at
-      },
-      ocr: {
-        text: record.ocr_text,
-        confidence: record.ocr_confidence,
-        amount: record.detected_amount,
-        merchant: record.detected_merchant,
-        date: record.detected_date
-      },
-      points: {
-        estimated: record.estimated_points
-      },
-      autoReviewPassed: record.auto_review_passed,
-      waitingTime: Math.floor((new Date() - new Date(record.created_at)) / (1000 * 60)) // 等待分钟数
-    }));
-    
     res.json({
-      code: 200,
-      msg: '获取待审核列表成功',
-      data: {
-        reviews: formattedRecords,
-        pagination: {
-          page,
-          limit,
-          total: count,
-          pages: Math.ceil(count / limit)
-        },
-        summary: {
-          totalPending: count,
-          avgWaitingTime: count > 0 ? Math.floor(
-            formattedRecords.reduce((sum, r) => sum + r.waitingTime, 0) / count
-          ) : 0
-        }
-      }
+      code: 0,
+      msg: 'success',
+      data: result
     });
     
   } catch (error) {
     console.error('❌ 获取待审核列表失败:', error);
     res.json({
-      code: 5000,
+      code: 4000,
       msg: '获取待审核列表失败',
       data: null
     });
@@ -204,202 +123,93 @@ router.get('/reviews/pending', authenticateToken, requireMerchant, async (req, r
 });
 
 /**
- * 🔴 审核通过 - 商家操作
- * POST /api/merchant/reviews/:id/approve
- * 前端需要传递：实际积分和审核备注
+ * 🔴 执行审核操作 - 统一接口
+ * POST /api/merchant/review
+ * Body: { upload_id, action: 'approved'|'rejected', points, reason }
  */
-router.post('/reviews/:id/approve', authenticateToken, requireMerchant, async (req, res) => {
+router.post('/review', authenticateToken, requireMerchant, async (req, res) => {
   const transaction = await sequelize.transaction();
   
   try {
-    const reviewId = req.params.id;
-    const reviewerId = req.merchant.user_id;
-    const { actual_points, reviewer_note = '' } = req.body;
+    const { upload_id, action, points, reason } = req.body;
+    const reviewerId = req.user.user_id;
     
     // 🔴 参数验证
-    if (!actual_points || actual_points < 0) {
+    if (!upload_id || !action || !['approved', 'rejected'].includes(action)) {
+      await transaction.rollback();
       return res.json({
-        code: 1001,
-        msg: '请输入有效的积分数量',
+        code: 4001,
+        msg: '参数错误',
         data: null
       });
     }
     
-    // 查找审核记录
-    const review = await PhotoReview.findOne({
-      where: {
-        review_id: reviewId,
-        review_status: 'pending'
-      },
-      include: [
-        {
-          model: User,
-          as: 'user',
-          attributes: ['user_id', 'nickname']
-        }
-      ]
-    });
-    
-    if (!review) {
+    if (action === 'approved' && (!points || points <= 0)) {
+      await transaction.rollback();
       return res.json({
-        code: 1002,
-        msg: '审核记录不存在或已处理',
+        code: 4002,
+        msg: '审核通过时必须设置积分',
         data: null
       });
     }
     
-    console.log(`✅ 商家 ${reviewerId} 审核通过拍照 ${reviewId}，积分: ${actual_points}`);
-    
-    // 🔴 更新审核记录
-    await review.update({
-      review_status: 'approved',
-      actual_points: parseInt(actual_points),
-      reviewer_id: reviewerId,
-      reviewer_note: reviewer_note || '审核通过',
-      reviewed_at: new Date()
-    }, { transaction });
-    
-    // 🔴 给用户增加积分
-    await PointsRecord.create({
-      user_id: review.user_id,
-      points: parseInt(actual_points),
-      change_type: 'earn',
-      source: 'photo_upload',
-      description: `拍照获得积分 - ${review.detected_merchant || '消费'} (商家审核)`,
-      reference_id: reviewId,
-      created_at: new Date()
-    }, { transaction });
-    
-    // 更新用户总积分
-    await User.increment('total_points', {
-      by: parseInt(actual_points),
-      where: { user_id: review.user_id },
+    // 🔴 执行审核
+    const review = await PhotoReview.performReview(
+      upload_id, 
+      action, 
+      points, 
+      reason, 
+      reviewerId, 
       transaction
-    });
+    );
+    
+    // 🔴 如果审核通过，增加用户积分
+    if (action === 'approved') {
+      const newBalance = await User.updatePoints(
+        review.user_id, 
+        parseInt(points), 
+        transaction
+      );
+      
+      // 🔴 记录积分变动
+      await PointsRecord.createRecord({
+        user_id: review.user_id,
+        points: parseInt(points),
+        description: `照片审核通过奖励`,
+        source: 'photo_review',
+        balance_after: newBalance,
+        related_id: upload_id
+      }, transaction);
+    }
     
     await transaction.commit();
     
-    // 🔴 WebSocket推送审核结果给用户
-    webSocketService.sendToUser(review.user_id, 'review_result', {
-      reviewId: reviewId,
-      status: 'approved',
-      points: parseInt(actual_points),
-      message: `您的拍照已审核通过，获得 ${actual_points} 积分！`,
-      reviewerNote: reviewer_note
-    });
-    
-    // 推送积分更新
-    const updatedUser = await User.findByPk(review.user_id);
-    webSocketService.sendToUser(review.user_id, 'points_update', {
-      totalPoints: updatedUser.total_points,
-      change: parseInt(actual_points)
-    });
+    // 🔴 WebSocket推送审核结果
+    webSocketService.notifyReviewResult(
+      review.user_id,
+      upload_id,
+      action,
+      action === 'approved' ? parseInt(points) : 0,
+      reason
+    );
     
     res.json({
-      code: 200,
-      msg: '审核通过成功',
+      code: 0,
+      msg: 'success',
       data: {
-        reviewId: reviewId,
-        status: 'approved',
-        actualPoints: parseInt(actual_points),
-        userId: review.user_id,
-        userNickname: review.user.nickname,
-        reviewedAt: new Date().toISOString()
+        upload_id,
+        action,
+        points_awarded: action === 'approved' ? parseInt(points) : 0,
+        review_time: new Date()
       }
     });
     
   } catch (error) {
     await transaction.rollback();
-    console.error('❌ 审核通过失败:', error);
+    console.error('❌ 审核操作失败:', error);
     res.json({
-      code: 5000,
-      msg: '审核处理失败',
-      data: null
-    });
-  }
-});
-
-/**
- * 🔴 审核拒绝 - 商家操作
- * POST /api/merchant/reviews/:id/reject
- * 前端需要传递：拒绝原因
- */
-router.post('/reviews/:id/reject', authenticateToken, requireMerchant, async (req, res) => {
-  try {
-    const reviewId = req.params.id;
-    const reviewerId = req.merchant.user_id;
-    const { reason = '' } = req.body;
-    
-    // 🔴 参数验证
-    if (!reason || reason.trim().length < 5) {
-      return res.json({
-        code: 1001,
-        msg: '请填写拒绝原因（至少5个字符）',
-        data: null
-      });
-    }
-    
-    // 查找审核记录
-    const review = await PhotoReview.findOne({
-      where: {
-        review_id: reviewId,
-        review_status: 'pending'
-      },
-      include: [
-        {
-          model: User,
-          as: 'user',
-          attributes: ['user_id', 'nickname']
-        }
-      ]
-    });
-    
-    if (!review) {
-      return res.json({
-        code: 1002,
-        msg: '审核记录不存在或已处理',
-        data: null
-      });
-    }
-    
-    console.log(`❌ 商家 ${reviewerId} 审核拒绝拍照 ${reviewId}，原因: ${reason}`);
-    
-    // 🔴 更新审核记录
-    await review.update({
-      review_status: 'rejected',
-      actual_points: 0,
-      reviewer_id: reviewerId,
-      reviewer_note: reason,
-      reviewed_at: new Date()
-    });
-    
-    // 🔴 WebSocket推送审核结果给用户
-    webSocketService.sendToUser(review.user_id, 'review_result', {
-      reviewId: reviewId,
-      status: 'rejected',
-      points: 0,
-      message: '很抱歉，您的拍照未通过审核',
-      reviewerNote: reason
-    });
-    
-    res.json({
-      code: 200,
-      msg: '审核拒绝成功',
-      data: {
-        reviewId: reviewId,
-        status: 'rejected',
-        reason: reason,
-        userId: review.user_id,
-        userNickname: review.user.nickname,
-        reviewedAt: new Date().toISOString()
-      }
-    });
-    
-  } catch (error) {
-    console.error('❌ 审核拒绝失败:', error);
-    res.json({
-      code: 5000,
-      msg: '审核处理失败',
+      code: 4000,
+      msg: error.message || '审核操作失败',
       data: null
     });
   }
@@ -407,10 +217,10 @@ router.post('/reviews/:id/reject', authenticateToken, requireMerchant, async (re
 
 /**
  * 🔴 批量审核 - 商家操作
- * POST /api/merchant/reviews/batch
+ * POST /api/merchant/batch-review
  * 前端需要传递：审核ID列表和操作类型
  */
-router.post('/reviews/batch', authenticateToken, requireMerchant, async (req, res) => {
+router.post('/batch-review', authenticateToken, requireMerchant, async (req, res) => {
   const transaction = await sequelize.transaction();
   
   try {

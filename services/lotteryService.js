@@ -4,9 +4,11 @@
  * - 提供抽奖核心算法和业务逻辑
  * - 确保抽奖公平性和数据一致性
  * - 处理复杂的概率计算和奖品分配
+ * - 实现10次保底九八折券机制
  */
 
-const { LotterySetting, PointsRecord, User, sequelize } = require('../models');
+const { LotterySetting, PointsRecord, User, LotteryPity, sequelize } = require('../models');
+const { Op } = require('sequelize');
 const { BusinessLogicError } = require('../middleware/errorHandler');
 const webSocketService = require('./websocket');
 
@@ -19,10 +21,10 @@ class LotteryService {
   static async getFrontendConfig() {
     try {
       const settings = await LotterySetting.findAll({
-        where: { is_active: true },
+        where: { status: 'active' },
         order: [['angle', 'ASC']],
         attributes: [
-          'setting_id',
+          'prize_id',
           'prize_name', 
           'prize_type',
           'prize_value',
@@ -30,8 +32,7 @@ class LotteryService {
           'color',
           'probability',
           'is_activity',
-          'cost_points',
-          'description'
+          'cost_points'
         ]
       });
       
@@ -47,7 +48,7 @@ class LotteryService {
       
       // 🔴 格式化前端数据
       const prizes = settings.map(setting => ({
-        id: setting.setting_id,
+        id: setting.prize_id,
         name: setting.prize_name,
         type: setting.prize_type,
         value: setting.prize_value,
@@ -55,22 +56,18 @@ class LotteryService {
         color: setting.color,
         probability: setting.probability,
         isActivity: setting.is_activity,
-        costPoints: setting.cost_points,
-        description: setting.description
+        costPoints: setting.cost_points
       }));
-      
-      // 🔴 系统配置
-      const systemConfig = {
-        costPoints: parseInt(process.env.LOTTERY_COST_POINTS) || 100,
-        dailyLimit: parseInt(process.env.DAILY_LOTTERY_LIMIT) || 10,
-        isEnabled: true
-      };
       
       return {
         prizes,
-        config: systemConfig,
+        costPerDraw: 100,
         totalPrizes: prizes.length,
-        lastUpdated: new Date().toISOString()
+        pitySystem: {
+          enabled: true,
+          pityLimit: 10,
+          pityPrizeName: '九八折券'
+        }
       };
       
     } catch (error) {
@@ -80,7 +77,7 @@ class LotteryService {
   }
   
   /**
-   * 🔴 执行抽奖核心算法
+   * 🔴 执行抽奖核心算法（含保底机制）
    * @param {number} userId - 用户ID
    * @param {string} drawType - 抽奖类型 (points|item)
    * @param {object} transaction - 数据库事务
@@ -115,69 +112,98 @@ class LotteryService {
       const todayDrawCount = await PointsRecord.count({
         where: {
           user_id: userId,
-          source: 'lottery_draw',
-          change_type: 'spend',
+          source: 'lottery',
+          type: 'spend',
           created_at: {
-            [sequelize.Op.gte]: today
+            [Op.gte]: today
           }
         },
         transaction
       });
       
-      const dailyLimit = parseInt(process.env.DAILY_LOTTERY_LIMIT) || 10;
+      const dailyLimit = parseInt(process.env.DAILY_LOTTERY_LIMIT) || 50;
       if (todayDrawCount >= dailyLimit) {
         throw new BusinessLogicError(`今日抽奖次数已达上限 ${dailyLimit} 次`, 3003);
       }
+      
+      // 🔴 获取用户保底信息
+      const pityRecord = await LotteryPity.getOrCreateUserPity(userId);
       
       // 🔴 获取抽奖配置
       const lotteryConfig = await this.getFrontendConfig();
       const prizes = lotteryConfig.prizes;
       
-      // 🔴 执行抽奖算法
-      const selectedPrize = this.calculateProbability(prizes);
-      console.log(`🎰 用户 ${userId} 抽奖结果:`, selectedPrize.name);
+      // 🔴 执行抽奖算法（含保底逻辑）
+      let selectedPrize;
+      let isPityTriggered = false;
       
-      // 🔴 扣除抽奖积分
-      await PointsRecord.create({
-        user_id: userId,
-        points: costPoints,
-        change_type: 'spend',
-        source: 'lottery_draw',
-        description: `抽奖消费 - ${selectedPrize.name}`,
-        reference_id: selectedPrize.id,
-        created_at: new Date()
-      }, { transaction });
+      // 检查下一次抽奖是否会触发保底
+      if (pityRecord.willTriggerPityOnNext()) {
+        // 保底触发，直接给九八折券
+        selectedPrize = prizes.find(p => p.id === 2); // 九八折券ID为2
+        isPityTriggered = true;
+        console.log(`🎯 用户 ${userId} 触发保底机制，获得九八折券`);
+        
+        // 重置保底计数
+        await pityRecord.resetPity();
+      } else {
+        // 正常抽奖
+        selectedPrize = this.calculateProbability(prizes);
+        console.log(`🎰 用户 ${userId} 正常抽奖结果:`, selectedPrize.name);
+        console.log(`🔍 调试 - selectedPrize:`, JSON.stringify(selectedPrize, null, 2));
+        
+        // 增加保底计数
+        await pityRecord.incrementDraw();
+        
+        // 如果抽到九八折券，重置保底计数
+        if (selectedPrize.id === 2) {
+          await pityRecord.resetPity();
+        }
+      }
       
-      // 更新用户积分
+      console.log(`🔍 调试 - 最终 selectedPrize:`, JSON.stringify(selectedPrize, null, 2));
+      
+      // 🔴 扣除抽奖积分 - 先更新用户积分，再记录
       await User.decrement('total_points', {
         by: costPoints,
         where: { user_id: userId },
         transaction
       });
       
-      await User.increment('used_points', {
-        by: costPoints,
-        where: { user_id: userId },
-        transaction
-      });
+      // 获取更新后的用户积分
+      const updatedUser = await User.findByPk(userId, { transaction });
+      console.log(`🔍 调试 - updatedUser:`, updatedUser ? {
+        user_id: updatedUser.user_id,
+        total_points: updatedUser.total_points,
+        type: typeof updatedUser.total_points
+      } : 'null');
+      
+      const balanceAfterCost = updatedUser ? updatedUser.total_points : 0;
+      console.log(`🔍 调试 - balanceAfterCost:`, balanceAfterCost, typeof balanceAfterCost);
+      
+      // 🔴 防护逻辑：确保balance_after不为null
+      if (balanceAfterCost === null || balanceAfterCost === undefined) {
+        console.error('❌ 用户积分为null，使用默认值0');
+        throw new Error('用户积分计算错误');
+      }
+
+      await PointsRecord.createRecord({
+        user_id: userId,
+        points: -costPoints,
+        description: `抽奖消费 - ${selectedPrize.name}${isPityTriggered ? ' (保底)' : ''}`,
+        source: 'lottery',
+        balance_after: balanceAfterCost,
+        related_id: selectedPrize.id.toString()
+      }, transaction);
       
       // 🔴 处理奖品发放
       let rewardPoints = 0;
       let rewardMessage = '';
+      let finalBalance = balanceAfterCost;
       
       if (selectedPrize.type === 'points') {
         // 积分奖励直接发放
-        rewardPoints = selectedPrize.value;
-        
-        await PointsRecord.create({
-          user_id: userId,
-          points: rewardPoints,
-          change_type: 'earn',
-          source: 'lottery_reward',
-          description: `抽奖获得积分 - ${selectedPrize.name}`,
-          reference_id: selectedPrize.id,
-          created_at: new Date()
-        }, { transaction });
+        rewardPoints = parseInt(selectedPrize.value);
         
         await User.increment('total_points', {
           by: rewardPoints,
@@ -185,20 +211,37 @@ class LotteryService {
           transaction
         });
         
+        finalBalance = balanceAfterCost + rewardPoints;
+        
+        await PointsRecord.createRecord({
+          user_id: userId,
+          points: rewardPoints,
+          description: `抽奖获得积分 - ${selectedPrize.name}`,
+          source: 'lottery',
+          balance_after: finalBalance,
+          related_id: selectedPrize.id.toString()
+        }, transaction);
+        
         rewardMessage = `恭喜获得 ${rewardPoints} 积分！`;
         
       } else if (selectedPrize.type === 'coupon') {
-        // 优惠券奖励（这里可以扩展优惠券系统）
+        // 优惠券奖励
         rewardMessage = `恭喜获得${selectedPrize.name}！请到店使用`;
+        if (isPityTriggered) {
+          rewardMessage += ' (保底奖励)';
+        }
         
       } else if (selectedPrize.type === 'physical') {
-        // 实物奖励（需要后续兑换流程）
+        // 实物奖励
         rewardMessage = `恭喜获得${selectedPrize.name}！请联系客服兑换`;
         
       } else if (selectedPrize.type === 'empty') {
         // 谢谢参与
         rewardMessage = '谢谢参与，下次再来哦！';
       }
+      
+      // 获取更新后的保底信息
+      const updatedPityInfo = await LotteryPity.getUserPityInfo(userId);
       
       // 🔴 返回抽奖结果
       const drawResult = {
@@ -209,8 +252,7 @@ class LotteryService {
           type: selectedPrize.type,
           value: selectedPrize.value,
           angle: selectedPrize.angle,
-          color: selectedPrize.color,
-          description: selectedPrize.description
+          color: selectedPrize.color
         },
         reward: {
           points: rewardPoints,
@@ -220,9 +262,15 @@ class LotteryService {
           points: costPoints
         },
         user: {
-          remainingPoints: user.total_points - costPoints + rewardPoints,
+          remainingPoints: finalBalance,
           todayDrawCount: todayDrawCount + 1,
           remainingDraws: dailyLimit - todayDrawCount - 1
+        },
+        pity: {
+          isPityTriggered: isPityTriggered,
+          currentCount: updatedPityInfo.current_count,
+          remainingDraws: updatedPityInfo.remaining_draws,
+          nextPityAt: updatedPityInfo.remaining_draws === 0 ? 0 : updatedPityInfo.remaining_draws
         },
         timestamp: new Date().toISOString()
       };
@@ -231,7 +279,9 @@ class LotteryService {
         prize: selectedPrize.name,
         costPoints,
         rewardPoints,
-        remainingPoints: drawResult.user.remainingPoints
+        remainingPoints: finalBalance,
+        pityTriggered: isPityTriggered,
+        pityRemaining: updatedPityInfo.remaining_draws
       });
       
       return drawResult;
@@ -297,10 +347,10 @@ class LotteryService {
       const drawRecords = await PointsRecord.findAll({
         where: {
           user_id: userId,
-          source: 'lottery_draw',
-          change_type: 'spend',
+          source: 'lottery',
+          type: 'spend',
           created_at: {
-            [sequelize.Op.gte]: startDate
+            [Op.gte]: startDate
           }
         },
         order: [['created_at', 'DESC']],
@@ -311,10 +361,10 @@ class LotteryService {
       const rewardRecords = await PointsRecord.findAll({
         where: {
           user_id: userId,
-          source: 'lottery_reward',
-          change_type: 'earn',
+          source: 'lottery',
+          type: 'earn',
           created_at: {
-            [sequelize.Op.gte]: startDate
+            [Op.gte]: startDate
           }
         }
       });
@@ -372,9 +422,9 @@ class LotteryService {
       const [totalDraws, totalUsers, totalCost, totalReward] = await Promise.all([
         PointsRecord.count({
           where: {
-            source: 'lottery_draw',
-            change_type: 'spend',
-            created_at: { [sequelize.Op.gte]: startDate }
+            source: 'lottery',
+            type: 'spend',
+            created_at: { [Op.gte]: startDate }
           }
         }),
         
@@ -382,25 +432,25 @@ class LotteryService {
           distinct: true,
           col: 'user_id',
           where: {
-            source: 'lottery_draw',
-            change_type: 'spend',
-            created_at: { [sequelize.Op.gte]: startDate }
+            source: 'lottery',
+            type: 'spend',
+            created_at: { [Op.gte]: startDate }
           }
         }),
         
         PointsRecord.sum('points', {
           where: {
-            source: 'lottery_draw',
-            change_type: 'spend',
-            created_at: { [sequelize.Op.gte]: startDate }
+            source: 'lottery',
+            type: 'spend',
+            created_at: { [Op.gte]: startDate }
           }
         }) || 0,
         
         PointsRecord.sum('points', {
           where: {
-            source: 'lottery_reward',
-            change_type: 'earn',
-            created_at: { [sequelize.Op.gte]: startDate }
+            source: 'lottery',
+            type: 'earn',
+            created_at: { [Op.gte]: startDate }
           }
         }) || 0
       ]);
@@ -411,11 +461,11 @@ class LotteryService {
           ls.prize_name,
           ls.prize_type,
           COUNT(pr.record_id) as draw_count,
-          SUM(CASE WHEN pr.source = 'lottery_reward' THEN pr.points ELSE 0 END) as total_reward
+          SUM(CASE WHEN pr.source = 'lottery' THEN pr.points ELSE 0 END) as total_reward
         FROM lottery_settings ls
         LEFT JOIN points_records pr ON pr.reference_id = ls.setting_id 
           AND pr.created_at >= :startDate
-          AND pr.source IN ('lottery_draw', 'lottery_reward')
+          AND pr.source IN ('lottery', 'lottery')
         WHERE ls.is_active = 1
         GROUP BY ls.setting_id, ls.prize_name, ls.prize_type
         ORDER BY draw_count DESC

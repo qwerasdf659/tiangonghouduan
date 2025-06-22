@@ -7,8 +7,9 @@
  */
 
 const express = require('express');
-const { User, LotterySetting, PointsRecord, sequelize } = require('../models');
+const { User, LotterySetting, PointsRecord, LotteryPity, sequelize } = require('../models');
 const { authenticateToken } = require('../middleware/auth');
+const LotteryService = require('../services/lotteryService');
 const webSocketService = require('../services/websocket');
 const { v4: uuidv4 } = require('uuid');
 
@@ -18,12 +19,18 @@ const router = express.Router();
 router.get('/config', authenticateToken, async (req, res) => {
   try {
     // 🔴 获取转盘配置 - Canvas渲染必需
-    const config = await LotterySetting.getFrontendConfig();
+    const config = await LotteryService.getFrontendConfig();
+    
+    // 🔴 获取用户保底信息
+    const pityInfo = await LotteryPity.getUserPityInfo(req.user.user_id);
     
     res.json({
       code: 0,
       msg: 'success',
-      data: config
+      data: {
+        ...config,
+        user_pity: pityInfo
+      }
     });
     
   } catch (error) {
@@ -36,15 +43,15 @@ router.get('/config', authenticateToken, async (req, res) => {
   }
 });
 
-// 🔴 前端对接点8：执行抽奖（支持批量）
+// 🔴 前端对接点8：执行抽奖（含保底机制）
 router.post('/draw', authenticateToken, async (req, res) => {
   const transaction = await sequelize.transaction();
   
   try {
-    const { draw_type, count } = req.body;
+    const { draw_type = 'single' } = req.body;
     const userId = req.user.user_id;
     
-    // 🔴 验证抽奖次数和类型
+    // 🔴 验证抽奖类型
     const drawCounts = {
       'single': 1,
       'triple': 3, 
@@ -53,109 +60,48 @@ router.post('/draw', authenticateToken, async (req, res) => {
     };
     
     const actualCount = drawCounts[draw_type] || 1;
-    const costPerDraw = 100; // 每次抽奖消耗100积分
-    const totalCost = actualCount * costPerDraw;
     
-    // 🔴 检查积分余额 - 前端需要实时显示
-    const user = await User.findByPk(userId, { 
-      transaction,
-      lock: transaction.LOCK.UPDATE
-    });
-    
-    if (user.total_points < totalCost) {
-      await transaction.rollback();
-      return res.json({
-        code: 3001,
-        msg: '积分余额不足',
-        data: { 
-          required: totalCost, 
-          current: user.total_points,
-          shortage: totalCost - user.total_points
-        }
-      });
-    }
-    
-    // 🔴 执行抽奖算法
+    // 🔴 执行抽奖（使用新的保底系统）
     const results = [];
-    const drawId = uuidv4();
     
     for (let i = 0; i < actualCount; i++) {
-      const result = await LotterySetting.performDraw();
+      const result = await LotteryService.performDraw(userId, 'points', transaction);
       results.push({
         ...result,
-        draw_sequence: i + 1,
-        draw_id: drawId
+        draw_sequence: i + 1
       });
-    }
-    
-    // 🔴 扣除积分 - 原子性操作
-    await user.decrement('total_points', {
-      by: totalCost,
-      transaction
-    });
-    
-    const newBalance = user.total_points - totalCost;
-    
-    // 🔴 记录积分变动
-    await PointsRecord.createRecord({
-      user_id: userId,
-      points: -totalCost,
-      description: `${draw_type}抽奖（${actualCount}次）`,
-      source: 'lottery',
-      balance_after: newBalance,
-      related_id: drawId
-    }, transaction);
-    
-    // 🔴 记录抽奖历史
-    for (const result of results) {
-      await createLotteryRecord({
-        user_id: userId,
-        draw_id: drawId,
-        ...result,
-        draw_type,
-        points_cost: costPerDraw
-      }, transaction);
     }
     
     await transaction.commit();
-    
-    // 🔴 WebSocket推送积分变更
-    webSocketService.notifyPointsUpdate(
-      userId, 
-      newBalance, 
-      -totalCost, 
-      `${draw_type}抽奖`
-    );
     
     // 🔴 返回前端所需的抽奖结果格式
     res.json({
       code: 0,
       msg: 'success',
       data: {
-        draw_id: drawId,
         draw_type,
         results: results.map(result => ({
-          prize_id: result.prize_id,
-          prize_name: result.prize_name,
-          prize_type: result.prize_type,
-          prize_value: result.prize_value,
-          angle: result.angle, // 🔴 Canvas转盘停止角度
-          is_near_miss: result.is_near_miss, // 🔴 触发差点中奖动画
+          prize: result.prize,
+          pity: result.pity,
+          reward: result.reward,
           draw_sequence: result.draw_sequence
         })),
-        points_cost: totalCost,
-        remaining_points: newBalance
+        total_cost: actualCount * 100,
+        user_info: {
+          remaining_points: results[results.length - 1]?.user?.remainingPoints || 0,
+          pity_info: results[results.length - 1]?.pity || {}
+        }
       }
     });
     
-    console.log(`🎰 用户 ${userId} 执行${draw_type}抽奖，消耗${totalCost}积分，剩余${newBalance}积分`);
+    console.log(`🎰 用户 ${userId} 执行${draw_type}抽奖，共${actualCount}次`);
     
   } catch (error) {
     await transaction.rollback();
     console.error('抽奖失败:', error);
     res.json({
       code: 3000,
-      msg: '抽奖失败，请稍后重试',
+      msg: error.message || '抽奖失败，请稍后重试',
       data: null
     });
   }
