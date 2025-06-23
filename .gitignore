@@ -52,3 +52,7 @@ images/uploads/
 # 应用日志文件
 app.log
 server.log
+
+# 临时打包文件
+*.tar.gz
+*.bundle
