@@ -1,97 +1,93 @@
 /**
  * 数据库模型索引文件
- * 🔴 设置所有模型的关联关系，确保前后端数据一致性
+ * 🔴 前端对接要点：
+ * - 确保所有表名和字段符合前端文档要求
+ * - 提供初始化数据的方法
+ * - 统一的数据库连接和模型管理
  */
 
 const { sequelize } = require('../config/database');
 
-// 🔴 导入数据模型
+// 🔴 导入所有模型
 const User = require('./User');
+const LotterySetting = require('./LotterySetting');  // 🔴 使用lottery_prizes表
+const CommodityPool = require('./CommodityPool');    // 🔴 使用products表，主键commodity_id
+const PhotoReview = require('./PhotoReview');        // 🔴 使用upload_reviews表
 const PointsRecord = require('./PointsRecord');
-const LotterySetting = require('./LotterySetting');
 const LotteryPity = require('./LotteryPity');
-const CommodityPool = require('./CommodityPool');
-const PhotoReview = require('./PhotoReview');
 
-// 🔴 设置模型关联关系 - 确保外键约束
-function setupAssociations() {
-  try {
-    // 用户与积分记录的关联
-    User.hasMany(PointsRecord, {
-      foreignKey: 'user_id',
-      as: 'pointsRecords',
-      onDelete: 'CASCADE'
-    });
-    PointsRecord.belongsTo(User, {
-      foreignKey: 'user_id',
-      as: 'user'
-    });
-    
-    // 用户与照片审核的关联
-    User.hasMany(PhotoReview, {
-      foreignKey: 'user_id',
-      as: 'photoReviews',
-      onDelete: 'CASCADE'
-    });
-    PhotoReview.belongsTo(User, {
-      foreignKey: 'user_id',
-      as: 'user'
-    });
-    
-    // 照片审核员关联（管理员审核）
-    PhotoReview.belongsTo(User, {
-      foreignKey: 'reviewer_id',
-      as: 'reviewer'
-    });
-    
-    // 用户与抽奖保底的关联
-    User.hasOne(LotteryPity, {
-      foreignKey: 'user_id',
-      as: 'lotteryPity',
-      onDelete: 'CASCADE'
-    });
-    LotteryPity.belongsTo(User, {
-      foreignKey: 'user_id',
-      as: 'user'
-    });
-    
-    console.log('✅ 模型关联配置完成');
-  } catch (error) {
-    console.error('❌ 模型关联配置失败:', error);
-    throw error;
-  }
+// 🔴 定义模型关联关系
+function defineAssociations() {
+  // 用户和积分记录
+  User.hasMany(PointsRecord, { 
+    foreignKey: 'user_id',
+    as: 'pointsRecords'
+  });
+  PointsRecord.belongsTo(User, { 
+    foreignKey: 'user_id',
+    as: 'user'
+  });
+
+  // 用户和上传审核
+  User.hasMany(PhotoReview, { 
+    foreignKey: 'user_id',
+    as: 'photoReviews'
+  });
+  PhotoReview.belongsTo(User, { 
+    foreignKey: 'user_id',
+    as: 'user'
+  });
+
+  // 用户和抽奖保底
+  User.hasOne(LotteryPity, { 
+    foreignKey: 'user_id',
+    as: 'lotteryPity'
+  });
+  LotteryPity.belongsTo(User, { 
+    foreignKey: 'user_id',
+    as: 'user'
+  });
+
+  console.log('✅ 数据库模型关联关系定义完成');
 }
 
-// 立即执行关联配置
-setupAssociations();
-
-// 导出所有模型
-const models = {
-  User,
-  PointsRecord,
-  LotterySetting,
-  LotteryPity,
-  CommodityPool,
-  PhotoReview,
-  sequelize
-};
-
-// 🔴 同步数据库函数 - 开发对接时使用
-async function syncModels(force = false) {
+// 🔴 同步数据库模型（遵循工作区规则：不使用force: true）
+async function syncModels(options = {}) {
   try {
-    console.log('开始同步数据库模型...');
+    const { alter = false, force = false } = options;
     
-    if (force) {
-      console.log('⚠️ 强制同步模式：将删除现有表');
+    // 🔴 遵循工作区规则：生产环境禁止使用alter: true或force: true
+    if (process.env.NODE_ENV === 'production' && (alter || force)) {
+      throw new Error('❌ 生产环境禁止使用sequelize.sync({ alter: true })或force: true');
     }
     
-    await sequelize.sync({ force, alter: !force });
-    console.log('✅ 数据库模型同步完成');
+    console.log('🔄 开始同步数据库模型...');
     
-    // 如果是强制同步，初始化基础数据
-    if (force) {
-      await initializeData();
-    }
+    // 定义关联关系
+    defineAssociations();
+    
+    // 🔴 按顺序同步模型，避免外键约束错误
+    const syncOptions = { alter, force };
+    
+    await User.sync(syncOptions);
+    console.log('✅ 用户表(users)同步完成');
+    
+    await LotterySetting.sync(syncOptions);
+    console.log('✅ 抽奖配置表(lottery_prizes)同步完成');
+    
+    await CommodityPool.sync(syncOptions);
+    console.log('✅ 商品表(products)同步完成');
+    
+    await PhotoReview.sync(syncOptions);
+    console.log('✅ 上传审核表(upload_reviews)同步完成');
+    
+    await PointsRecord.sync(syncOptions);
+    console.log('✅ 积分记录表同步完成');
+    
+    await LotteryPity.sync(syncOptions);
+    console.log('✅ 抽奖保底表同步完成');
+    
+    console.log('🎉 所有数据库模型同步完成！');
     
     return true;
   } catch (error) {
@@ -100,173 +96,74 @@ async function syncModels(force = false) {
   }
 }
 
-// 🔴 初始化基础数据 - 根据前端文档客户需求更新
+// 🔴 初始化示例数据（符合前端文档要求）
 async function initializeData() {
   try {
-    console.log('开始初始化基础数据...');
+    console.log('🔄 开始初始化示例数据...');
     
-    // 🔴 根据前端文档要求更新抽奖转盘配置（8个奖品）
-    await LotterySetting.bulkCreate([
-      {
-        prize_name: '八八折券',
-        prize_type: 'coupon',
-        prize_value: 88.00,
-        angle: 0,
-        color: '#FF6B35',
-        probability: 0.10,  // 10%
-        is_activity: true,
-        cost_points: 100
-      },
-      {
-        prize_name: '九八折券',
-        prize_type: 'coupon',
-        prize_value: 98.00,
-        angle: 45,
-        color: '#4ECDC4',
-        probability: 0.10,  // 10%
-        is_activity: true,
-        cost_points: 100
-      },
-      {
-        prize_name: '甜品1份',
-        prize_type: 'physical',
-        prize_value: 25.00,
-        angle: 90,
-        color: '#45B7D1',
-        probability: 0.20,  // 20%
-        is_activity: false,
-        cost_points: 100
-      },
-      {
-        prize_name: '青菜1份',
-        prize_type: 'physical',
-        prize_value: 15.00,
-        angle: 135,
-        color: '#96CEB4',
-        probability: 0.30,  // 30%
-        is_activity: false,
-        cost_points: 100
-      },
-      {
-        prize_name: '虾1份',
-        prize_type: 'physical',
-        prize_value: 35.00,
-        angle: 180,
-        color: '#FFEAA7',
-        probability: 0.05,  // 5%
-        is_activity: true,
-        cost_points: 100
-      },
-      {
-        prize_name: '花甲1份',
-        prize_type: 'physical',
-        prize_value: 28.00,
-        angle: 225,
-        color: '#DDA0DD',
-        probability: 0.10,  // 10%
-        is_activity: false,
-        cost_points: 100
-      },
-      {
-        prize_name: '鱿鱼1份',
-        prize_type: 'physical',
-        prize_value: 45.00,
-        angle: 270,
-        color: '#FF7675',
-        probability: 0.05,  // 5%
-        is_activity: true,
-        cost_points: 100
-      },
-      {
-        prize_name: '生腌拼盘158',
-        prize_type: 'physical',
-        prize_value: 158.00,
-        angle: 315,
-        color: '#74B9FF',
-        probability: 0.10,  // 10%
-        is_activity: true,
-        cost_points: 100
-      }
-    ]);
+    // 🔴 初始化标准转盘配置（0-315度，45度间隔）
+    await LotterySetting.initializeStandardConfig();
     
-    // 初始化商品库存（部分示例数据）
-    await CommodityPool.bulkCreate([
-      {
-        name: '星巴克拿铁',
-        description: '经典拿铁咖啡，香醇浓郁',
-        category: '饮品',
-        exchange_points: 800,
-        stock: 50,
-        image: '/images/starbucks-latte.jpg',
-        is_hot: true,
-        sort_order: 1,
-        rating: 4.8,
-        sales_count: 156
-      },
-      {
-        name: '喜茶芝芝莓莓',
-        description: '新鲜草莓与芝士的完美结合',
-        category: '饮品',
-        exchange_points: 600,
-        stock: 30,
-        image: '/images/heytea-berry.jpg',
-        is_hot: true,
-        sort_order: 2,
-        rating: 4.9,
-        sales_count: 203
-      },
-      {
-        name: '肯德基全家桶',
-        description: '8块原味鸡+薯条+汽水',
-        category: '美食',
-        exchange_points: 1500,
-        stock: 20,
-        image: '/images/kfc-bucket.jpg',
-        is_hot: true,
-        sort_order: 4,
-        rating: 4.6,
-        sales_count: 78
-      },
-      {
-        name: '三只松鼠坚果',
-        description: '每日坚果混合装',
-        category: '零食',
-        exchange_points: 300,
-        stock: 100,
-        image: '/images/squirrel-nuts.jpg',
-        is_hot: false,
-        sort_order: 7,
-        rating: 4.4,
-        sales_count: 312
-      }
-    ]);
+    // 🔴 初始化示例商品
+    await CommodityPool.initializeSampleProducts();
     
-    console.log('✅ 基础数据初始化完成');
+    // 🔴 创建测试用户
+    const testUsers = [
+      { mobile: '13800138001', nickname: '测试用户1', total_points: 2000, is_merchant: false },
+      { mobile: '13800138002', nickname: '测试用户2', total_points: 1500, is_merchant: false },
+      { mobile: '13800138003', nickname: '商家用户', total_points: 5000, is_merchant: true }
+    ];
+    
+    for (const userData of testUsers) {
+      await User.findOrCreate({
+        where: { mobile: userData.mobile },
+        defaults: userData
+      });
+    }
+    
+    console.log('✅ 测试用户创建完成');
+    console.log('🎉 示例数据初始化完成！');
+    
+    return true;
   } catch (error) {
-    console.error('❌ 基础数据初始化失败:', error);
+    console.error('❌ 示例数据初始化失败:', error);
     throw error;
   }
 }
 
-// 🔴 数据库健康检查 - 运维监控使用
+// 🔴 数据库健康检查
 async function healthCheck() {
   try {
+    // 测试数据库连接
     await sequelize.authenticate();
     
-    // 检查核心表是否存在
-    const tables = await sequelize.getQueryInterface().showAllTables();
-    const requiredTables = ['users', 'points_records', 'lottery_prizes', 'products', 'upload_reviews', 'lottery_pity'];
+    // 检查关键表是否存在
+    const tableNames = ['users', 'lottery_prizes', 'products', 'upload_reviews'];
+    const results = {};
     
-    const missingTables = requiredTables.filter(table => !tables.includes(table));
-    
-    if (missingTables.length > 0) {
-      throw new Error(`缺少必要的数据表: ${missingTables.join(', ')}`);
+    for (const tableName of tableNames) {
+      try {
+        const [results] = await sequelize.query(`SHOW TABLES LIKE '${tableName}'`);
+        results[tableName] = results.length > 0;
+      } catch (error) {
+        results[tableName] = false;
+      }
     }
+    
+    // 检查用户数量
+    const userCount = await User.count();
+    const lotteryCount = await LotterySetting.count();
+    const productCount = await CommodityPool.count();
     
     return {
       status: 'healthy',
-      database: 'connected',
-      tables: tables.length,
+      connection: 'ok',
+      tables: results,
+      data_counts: {
+        users: userCount,
+        lottery_prizes: lotteryCount,
+        products: productCount
+      },
       timestamp: new Date().toISOString()
     };
   } catch (error) {
@@ -278,9 +175,54 @@ async function healthCheck() {
   }
 }
 
+// 🔴 获取数据库统计信息
+async function getStatistics() {
+  try {
+    const stats = {
+      users: {
+        total: await User.count(),
+        active: await User.count({ where: { status: 'active' } }),
+        merchants: await User.count({ where: { is_merchant: true } })
+      },
+      lottery: {
+        total_prizes: await LotterySetting.count(),
+        active_prizes: await LotterySetting.count({ where: { status: 'active' } })
+      },
+      products: {
+        total: await CommodityPool.count(),
+        active: await CommodityPool.count({ where: { status: 'active' } }),
+        in_stock: await CommodityPool.count({ 
+          where: { 
+            status: 'active',
+            stock: { [sequelize.Op.gt]: 0 }
+          }
+        })
+      },
+      reviews: {
+        total: await PhotoReview.count(),
+        pending: await PhotoReview.count({ where: { review_status: 'pending' } }),
+        approved: await PhotoReview.count({ where: { review_status: 'approved' } })
+      }
+    };
+    
+    return stats;
+  } catch (error) {
+    console.error('获取统计信息失败:', error);
+    throw error;
+  }
+}
+
 module.exports = {
-  ...models,
+  sequelize,
+  User,
+  LotterySetting,     // 🔴 对应lottery_prizes表
+  CommodityPool,      // 🔴 对应products表，主键commodity_id
+  PhotoReview,        // 🔴 对应upload_reviews表
+  PointsRecord,
+  LotteryPity,
   syncModels,
   initializeData,
-  healthCheck
+  healthCheck,
+  getStatistics,
+  defineAssociations
 }; 

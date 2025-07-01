@@ -105,13 +105,10 @@ const User = sequelize.define('users', {
   charset: 'utf8mb4',
   collate: 'utf8mb4_unicode_ci',
   
-  // 索引配置
+  // 🔴 精简索引配置 - 遵循工作区规则：避免重复索引，确保不超过64个限制
   indexes: [
-    {
-      name: 'idx_mobile',
-      fields: ['mobile'],
-      unique: true
-    },
+    // 不需要手动定义mobile和wx_openid索引，因为unique: true会自动创建
+    // 只定义业务查询必需的索引
     {
       name: 'idx_status',
       fields: ['status']
@@ -120,17 +117,10 @@ const User = sequelize.define('users', {
       name: 'idx_is_merchant',
       fields: ['is_merchant']
     },
+    // 🔴 复合索引 - 用于商家权限查询优化
     {
-      name: 'idx_last_login',
-      fields: ['last_login']
-    },
-    {
-      name: 'idx_openid', 
-      fields: ['wx_openid']
-    },
-    {
-      name: 'idx_created_at',
-      fields: ['created_at']
+      name: 'idx_merchant_status',
+      fields: ['is_merchant', 'status']
     }
   ]
 });

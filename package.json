@@ -9,11 +9,13 @@
     "test": "jest",
     "build": "echo 'No build required for Node.js'",
     "deploy": "bash deploy.sh",
-    "db:sync": "node -e \"require('./models').syncModels(false)\"",
-    "db:init": "node -e \"require('./models').syncModels(true)\"",
+    "db:sync": "node scripts/init-database.js",
+    "db:init": "node scripts/init-database.js --with-data",
+    "db:reset": "node scripts/init-database.js --force --with-data",
+    "db:prod": "node scripts/init-database.js --prod",
     "db:test": "node scripts/test-db.js",
     "api:test": "node scripts/test-apis.js",
-    "init": "node scripts/init-db.js --seed"
+    "init": "node scripts/init-database.js --with-data"
   },
   "keywords": [
     "restaurant",

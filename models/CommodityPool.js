@@ -11,8 +11,8 @@ const { DataTypes } = require('sequelize');
 const { sequelize } = require('../config/database');
 
 const CommodityPool = sequelize.define('products', {
-  // 🔴 商品ID - 前端兑换标识
-  id: {
+  // 🔴 商品ID - 前端兑换标识（前端文档要求字段名：commodity_id）
+  commodity_id: {
     type: DataTypes.INTEGER,
     primaryKey: true,
     autoIncrement: true,
@@ -168,15 +168,16 @@ CommodityPool.prototype.getFrontendStatus = function() {
   return this.status === 'active' ? 'available' : 'unavailable';
 };
 
-// 🔴 实例方法 - 获取前端商品信息
+// 🔴 实例方法 - 获取前端商品信息（符合前端文档字段映射）
 CommodityPool.prototype.getFrontendInfo = function() {
   return {
-    id: this.id,
+    id: this.commodity_id,          // 🔴 前端文档字段映射：commodity_id -> id
+    commodity_id: this.commodity_id, // 🔴 保留原字段供后端使用
     name: this.name,
     description: this.description,
     category: this.category,
     exchange_points: this.exchange_points,
-    stock: this.stock, // 🔴 实时库存
+    stock: this.stock,              // 🔴 实时库存
     image: this.image,
     is_hot: this.is_hot,
     rating: this.rating,
@@ -201,20 +202,22 @@ CommodityPool.getProductsForFrontend = async function(options = {}) {
   // 构建查询条件
   const whereClause = { status: 'active' };
   
-  if (category && category !== '全部') {
+  if (category) {
     whereClause.category = category;
   }
   
   if (min_points) {
-    whereClause.exchange_points = { [sequelize.Op.gte]: parseInt(min_points) };
+    whereClause.exchange_points = {
+      ...whereClause.exchange_points,
+      [sequelize.Op.gte]: parseInt(min_points)
+    };
   }
   
   if (max_points) {
-    if (whereClause.exchange_points) {
-      whereClause.exchange_points[sequelize.Op.lte] = parseInt(max_points);
-    } else {
-      whereClause.exchange_points = { [sequelize.Op.lte]: parseInt(max_points) };
-    }
+    whereClause.exchange_points = {
+      ...whereClause.exchange_points,
+      [sequelize.Op.lte]: parseInt(max_points)
+    };
   }
   
   if (stock_status === 'in_stock') {
@@ -223,8 +226,10 @@ CommodityPool.getProductsForFrontend = async function(options = {}) {
     whereClause.stock = 0;
   }
   
-  // 分页查询
+  // 计算分页参数
   const offset = (parseInt(page) - 1) * parseInt(limit);
+  
+  // 执行查询
   const { count, rows } = await CommodityPool.findAndCountAll({
     where: whereClause,
     order: [[sort_by, sort_order.toUpperCase()]],
@@ -232,20 +237,32 @@ CommodityPool.getProductsForFrontend = async function(options = {}) {
     offset: offset
   });
   
+  // 🔴 返回前端所需的数据格式
   return {
     products: rows.map(product => product.getFrontendInfo()),
-    pagination: {
-      total: count,
-      page: parseInt(page),
-      limit: parseInt(limit),
-      total_pages: Math.ceil(count / parseInt(limit))
-    }
+    total: count,
+    page: parseInt(page),
+    limit: parseInt(limit),
+    has_more: (parseInt(page) * parseInt(limit)) < count,
+    categories: await CommodityPool.getAvailableCategories()
   };
 };
 
-// 🔴 类方法 - 扣减库存（事务安全）
-CommodityPool.decreaseStock = async function(productId, quantity, transaction) {
-  const product = await CommodityPool.findByPk(productId, { 
+// 🔴 类方法 - 获取可用商品分类
+CommodityPool.getAvailableCategories = async function() {
+  const categories = await CommodityPool.findAll({
+    attributes: ['category'],
+    where: { status: 'active' },
+    group: ['category'],
+    raw: true
+  });
+  
+  return categories.map(item => item.category);
+};
+
+// 🔴 类方法 - 库存扣减（原子性操作）
+CommodityPool.decreaseStock = async function(commodityId, quantity, transaction) {
+  const product = await CommodityPool.findByPk(commodityId, {
     transaction,
     lock: transaction ? transaction.LOCK.UPDATE : undefined
   });
@@ -255,22 +272,60 @@ CommodityPool.decreaseStock = async function(productId, quantity, transaction) {
   }
   
   if (product.stock < quantity) {
-    throw new Error(`库存不足，当前库存：${product.stock}，需要：${quantity}`);
+    throw new Error('库存不足');
   }
   
-  // 原子性扣减库存
-  await product.decrement('stock', { by: quantity, transaction });
-  
-  // 增加销量
-  await product.increment('sales_count', { by: quantity, transaction });
-  
-  // 更新状态
   const newStock = product.stock - quantity;
-  if (newStock <= 0) {
-    await product.update({ status: 'sold_out' }, { transaction });
-  }
+  
+  await product.update({ 
+    stock: newStock,
+    sales_count: product.sales_count + quantity,
+    status: newStock === 0 ? 'sold_out' : product.status
+  }, { transaction });
   
   return newStock;
+};
+
+// 🔴 类方法 - 库存增加（补货）
+CommodityPool.increaseStock = async function(commodityId, quantity, transaction) {
+  const product = await CommodityPool.findByPk(commodityId, {
+    transaction,
+    lock: transaction ? transaction.LOCK.UPDATE : undefined
+  });
+  
+  if (!product) {
+    throw new Error('商品不存在');
+  }
+  
+  const newStock = product.stock + quantity;
+  
+  await product.update({ 
+    stock: newStock,
+    status: newStock > 0 && product.status === 'sold_out' ? 'active' : product.status
+  }, { transaction });
+  
+  return newStock;
+};
+
+// 🔴 类方法 - 初始化示例商品
+CommodityPool.initializeSampleProducts = async function() {
+  const sampleProducts = [
+    { name: '星巴克券', description: '星巴克任意饮品券', category: '优惠券', exchange_points: 300, stock: 100, is_hot: true, sort_order: 10 },
+    { name: '肯德基券', description: '肯德基汉堡套餐券', category: '优惠券', exchange_points: 250, stock: 80, is_hot: true, sort_order: 9 },
+    { name: '电影票券', description: '万达影城电影票', category: '优惠券', exchange_points: 400, stock: 50, is_hot: false, sort_order: 8 },
+    { name: '京东购物卡', description: '京东100元购物卡', category: '购物卡', exchange_points: 1000, stock: 20, is_hot: true, sort_order: 7 },
+    { name: '话费充值卡', description: '移动联通电信50元话费', category: '充值卡', exchange_points: 500, stock: 200, is_hot: false, sort_order: 6 },
+    { name: '小米充电宝', description: '小米10000mAh移动电源', category: '数码产品', exchange_points: 1500, stock: 30, is_hot: false, sort_order: 5 }
+  ];
+  
+  for (const product of sampleProducts) {
+    await CommodityPool.findOrCreate({
+      where: { name: product.name },
+      defaults: product
+    });
+  }
+  
+  console.log('✅ 示例商品初始化完成');
 };
 
 module.exports = CommodityPool; 
