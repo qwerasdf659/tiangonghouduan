@@ -22,6 +22,7 @@ class WebSocketService {
   initialize(server) {
     this.wss = new WebSocket.Server({ 
       server,
+      path: '/ws', // 🔴 添加WebSocket路径
       verifyClient: this.verifyClient.bind(this)
     });
 
@@ -30,7 +31,8 @@ class WebSocketService {
     // 心跳检查定时器
     this.startHeartbeat();
     
-    console.log('🌐 WebSocket服务器启动成功');
+    console.log('🌐 WebSocket服务器启动成功 - 路径: /ws');
+    console.log('🔗 WebSocket连接地址: wss://rqchrlqndora.sealosbja.site/ws');
   }
 
   // 🔴 验证客户端连接 - Token认证

@@ -1,11 +1,12 @@
 /**
  * 上传审核模型 - PhotoReview (对应upload_reviews表)
+ * 🔴 v2.1.2更新：移除OCR和AI自动识别功能，改为纯人工审核模式
  * 🔴 前端对接要点：
  * - upload_id: 上传标识（前端追踪用）
  * - points_awarded: 积分奖励（审核通过时奖励）
  * - review_status: 审核状态（前端状态显示）
- * - amount: 消费金额（用户输入）
- * - estimated_amount: AI识别金额（可选）
+ * - amount: 消费金额（用户手动输入）
+ * - actual_amount: 商家确认的实际消费金额
  */
 
 const { DataTypes } = require('sequelize');
@@ -33,24 +34,38 @@ const PhotoReview = sequelize.define('upload_reviews', {
     comment: '图片URL（Sealos存储）'
   },
   
-  // 🔴 消费金额 - 前端文档要求字段名为amount
-  amount: {
-    type: DataTypes.DECIMAL(10, 2),
+  // 原始文件名
+  original_filename: {
+    type: DataTypes.STRING(255),
     allowNull: true,
-    validate: {
-      min: 0
-    },
-    comment: '消费金额'
+    comment: '原始文件名'
   },
   
-  // 🔴 AI识别金额 - 前端文档要求字段名为estimated_amount
-  estimated_amount: {
+  // 文件大小
+  file_size: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    comment: '文件大小(字节)'
+  },
+  
+  // 🔴 v2.1.2新增：用户手动输入的消费金额
+  amount: {
+    type: DataTypes.DECIMAL(10, 2),
+    allowNull: false,
+    validate: {
+      min: 0
+    },
+    comment: '用户输入的消费金额'
+  },
+  
+  // 🔴 v2.1.2新增：商家确认的实际消费金额
+  actual_amount: {
     type: DataTypes.DECIMAL(10, 2),
     allowNull: true,
     validate: {
       min: 0
     },
-    comment: 'AI识别金额（可选）'
+    comment: '商家确认的实际消费金额'
   },
   
   // 🔴 奖励积分 - 前端显示
@@ -152,7 +167,7 @@ PhotoReview.prototype.getFrontendInfo = function() {
     upload_id: this.upload_id,
     image_url: this.image_url,
     amount: this.amount,
-    estimated_amount: this.estimated_amount,
+    actual_amount: this.actual_amount,
     points_awarded: this.points_awarded,
     review_status: this.review_status,
     review_reason: this.review_reason,
@@ -161,150 +176,133 @@ PhotoReview.prototype.getFrontendInfo = function() {
   };
 };
 
-// 🔴 类方法 - 计算积分奖励
+// 🔴 类方法 - 计算积分奖励（基于实际金额）
 PhotoReview.calculatePoints = function(amount) {
   if (!amount) return 0;
   const points = Math.floor(amount * 10); // 金额×10
   return Math.max(50, Math.min(2000, points)); // 限制在50-2000之间
 };
 
-// 🔴 类方法 - 判断匹配状态
-PhotoReview.determineMatchStatus = function(inputAmount, recognizedAmount) {
-  if (!recognizedAmount) {
-    return 'unclear';
-  }
-  
-  const difference = Math.abs(recognizedAmount - inputAmount);
-  if (difference <= 0.5) {
-    return 'matched';
-  } else {
-    return 'mismatched';
-  }
-};
-
-// 🔴 类方法 - 创建上传记录
+// 🔴 类方法 - 创建上传记录（v2.1.2纯人工审核版本）
 PhotoReview.createUploadRecord = async function(data) {
   const {
     user_id,
     upload_id,
     image_url,
-    amount,
-    estimated_amount
+    original_filename,
+    file_size,
+    amount  // 🔴 用户手动输入的消费金额
   } = data;
-  
-  const points_awarded = PhotoReview.calculatePoints(amount);
   
   return await PhotoReview.create({
     user_id,
     upload_id,
     image_url,
-    amount,
-    estimated_amount,
-    points_awarded,
+    original_filename,
+    file_size,
+    amount,  // 🔴 用户输入金额
+    actual_amount: null,  // 🔴 等待商家确认
+    points_awarded: 0,    // 🔴 审核通过后才设置
     review_status: 'pending',
     created_at: new Date()
   });
 };
 
-// 🔴 类方法 - 获取用户上传记录
-PhotoReview.getUserRecords = async function(userId, options = {}) {
-  const {
-    status, // 'pending' | 'approved' | 'rejected' | 'all'
-    page = 1,
-    limit = 20
-  } = options;
-  
-  const whereClause = { user_id: userId };
-  
-  if (status && status !== 'all') {
-    whereClause.review_status = status;
-  }
-  
-  const offset = (parseInt(page) - 1) * parseInt(limit);
-  const { count, rows } = await PhotoReview.findAndCountAll({
-    where: whereClause,
-    order: [['created_at', 'DESC']],
-    limit: parseInt(limit),
-    offset: offset
-  });
-  
-  return {
-    records: rows.map(record => record.getFrontendInfo()),
-    pagination: {
-      total: count,
-      page: parseInt(page),
-      limit: parseInt(limit),
-      total_pages: Math.ceil(count / parseInt(limit))
-    }
-  };
-};
-
-// 🔴 类方法 - 获取待审核列表（商家使用）
-PhotoReview.getPendingReviews = async function(options = {}) {
-  const {
-    page = 1,
-    limit = 20
-  } = options;
-  
-  const offset = (parseInt(page) - 1) * parseInt(limit);
-  const { count, rows } = await PhotoReview.findAndCountAll({
-    where: { review_status: 'pending' },
-    include: [{
-      model: User,
-      as: 'user',
-      attributes: ['user_id', 'mobile', 'nickname']
-    }],
-    order: [['created_at', 'ASC']], // 先上传的先审核
-    limit: parseInt(limit),
-    offset: offset
-  });
-  
-  return {
-    reviews: rows.map(review => ({
-      upload_id: review.upload_id,
-      user_phone: review.user ? review.user.getMaskedMobile() : '',
-      image_url: review.image_url,
-      amount: review.amount,
-      estimated_amount: review.estimated_amount,
-      expected_points: review.points_awarded,
-      created_at: review.created_at,
-      status: review.review_status
-    })),
-    pagination: {
-      total: count,
-      page: parseInt(page),
-      limit: parseInt(limit),
-      total_pages: Math.ceil(count / parseInt(limit)),
-      has_more: count > (parseInt(page) * parseInt(limit))
-    }
-  };
-};
-
-// 🔴 类方法 - 审核操作（approve/reject）
-PhotoReview.performReview = async function(uploadId, action, points, reason, reviewerId, transaction) {
-  const review = await PhotoReview.findByPk(uploadId, {
-    transaction,
-    lock: transaction ? transaction.LOCK.UPDATE : undefined
-  });
+// 🔴 类方法 - 执行人工审核（替代自动审核）
+PhotoReview.performReview = async function(upload_id, action, actual_amount, reason, reviewer_id, transaction) {
+  const review = await PhotoReview.findByPk(upload_id, { transaction });
   
   if (!review) {
-    throw new Error('审核记录不存在');
+    throw new Error('上传记录不存在');
   }
   
   if (review.review_status !== 'pending') {
     throw new Error('该记录已经审核过了');
   }
   
-  // 更新审核状态
+  // 🔴 审核通过时计算积分奖励
+  let points_awarded = 0;
+  if (action === 'approved') {
+    const finalAmount = actual_amount || review.amount;
+    points_awarded = PhotoReview.calculatePoints(finalAmount);
+  }
+  
+  // 🔴 更新审核结果
   await review.update({
     review_status: action,
-    points_awarded: action === 'approved' ? parseInt(points) : 0,
+    actual_amount: actual_amount || review.amount,
+    points_awarded: points_awarded,
     review_reason: reason,
-    reviewer_id: reviewerId,
+    reviewer_id: reviewer_id,
     review_time: new Date()
   }, { transaction });
   
   return review;
+};
+
+// 🔴 类方法 - 获取待审核列表（商家使用）
+PhotoReview.getPendingReviews = async function(options = {}) {
+  const { page = 1, limit = 20 } = options;
+  const offset = (page - 1) * limit;
+  
+  const { count, rows } = await PhotoReview.findAndCountAll({
+    where: { review_status: 'pending' },
+    include: [
+      {
+        model: sequelize.model('users'),
+        as: 'user',
+        attributes: ['user_id', 'nickname', 'mobile']
+      }
+    ],
+    order: [['created_at', 'ASC']], // 按提交时间排序
+    limit,
+    offset
+  });
+  
+  return {
+    reviews: rows.map(review => ({
+      ...review.getFrontendInfo(),
+      user_info: {
+        user_id: review.user.user_id,
+        nickname: review.user.nickname,
+        mobile: review.user.getMaskedMobile()
+      }
+    })),
+    pagination: {
+      total: count,
+      page,
+      limit,
+      totalPages: Math.ceil(count / limit)
+    }
+  };
+};
+
+// 🔴 类方法 - 获取用户上传历史
+PhotoReview.getUserHistory = async function(user_id, options = {}) {
+  const { page = 1, limit = 10, status = 'all' } = options;
+  const offset = (page - 1) * limit;
+  
+  const whereCondition = { user_id };
+  if (status !== 'all') {
+    whereCondition.review_status = status;
+  }
+  
+  const { count, rows } = await PhotoReview.findAndCountAll({
+    where: whereCondition,
+    order: [['created_at', 'DESC']],
+    limit,
+    offset
+  });
+  
+  return {
+    history: rows.map(review => review.getFrontendInfo()),
+    pagination: {
+      total: count,
+      page,
+      limit,
+      totalPages: Math.ceil(count / limit)
+    }
+  };
 };
 
 module.exports = PhotoReview; 
