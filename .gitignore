@@ -56,6 +56,3 @@ server.log
 # 临时打包文件
 *.tar.gz
 *.bundle
-
-# Cursor IDE配置
-.cursor/
