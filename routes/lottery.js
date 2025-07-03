@@ -75,6 +75,10 @@ router.post('/draw', authenticateToken, async (req, res) => {
     await transaction.commit();
     
     // 🔴 返回前端所需的抽奖结果格式
+    const lastResult = results[results.length - 1];
+    const userRemainingPoints = lastResult?.user?.remainingPoints || 0;
+    const todayDrawCount = lastResult?.user?.todayDrawCount || 0;
+    
     res.json({
       code: 0,
       msg: 'success',
@@ -87,9 +91,18 @@ router.post('/draw', authenticateToken, async (req, res) => {
           draw_sequence: result.draw_sequence
         })),
         total_cost: actualCount * 100,
+        // ✅ 前端直接需要的积分字段
+        user_points: userRemainingPoints,
+        remaining_points: userRemainingPoints,
+        balance: userRemainingPoints,
+        points: userRemainingPoints,
+        // ✅ 今日抽奖次数
+        today_count: todayDrawCount,
+        // ✅ 保留原有的嵌套结构（兼容性）
         user_info: {
-          remaining_points: results[results.length - 1]?.user?.remainingPoints || 0,
-          pity_info: results[results.length - 1]?.pity || {}
+          remaining_points: userRemainingPoints,
+          today_count: todayDrawCount,
+          pity_info: lastResult?.pity || {}
         }
       }
     });

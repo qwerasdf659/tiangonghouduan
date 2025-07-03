@@ -227,3 +227,112 @@ alwaysApply: true
 - 定期培训团队成员编码处理最佳实践
 
 **核心原则**：用户授权优先、安全优先、效率并重、错误可控、操作可追溯、预防优于修复、标准化优于临时处理、自动化优于手动操作、兼容性优于特定平台优化
+
+## Git分页器和长输出命令卡死专项规范
+
+### Git分页器卡死问题识别和预防
+- Git命令卡在(END)...skipping...状态超过30秒时立即判定为分页器卡死
+- 高风险命令清单：git log、git show、git diff、git blame、git help等
+- 自动化环境中禁止使用交互式分页器，所有输出必须直接显示
+- 分页器卡死的典型特征：命令行光标消失、无法输入、显示(END)提示
+- 建立分页器问题的快速识别和解决机制
+
+### Git命令防卡死标准配置
+- 全局配置禁用分页器：git config --global core.pager ""
+- 单次命令禁用分页器：git --no-pager log 或 git log | cat
+- 限制输出长度的标准模式：git log --oneline -N（N为具体数字）
+- 安全的Git命令格式模板：
+  * git log --oneline -10 | cat
+  * git show --name-only COMMIT | cat  
+  * git diff --name-only | cat
+  * git branch -a | cat
+  * git remote -v | cat
+
+### Git输出控制和性能优化
+- 所有可能产生长输出的Git命令必须设置输出限制
+- 大型仓库操作使用timeout包装：timeout 60s git command | cat
+- Git历史查询优化：使用--since、--until、--max-count等参数限制范围
+- 分支和标签查询优化：git branch --merged、git tag --merged等
+- 建立Git命令执行时间监控和预警机制
+
+## 中文编码显示问题专项诊断规范
+
+### Git中文显示问题诊断流程
+- Git提交信息显示为<E6><B7><BB>格式时确认为编码显示问题
+- 第一步：检查Terminal编码环境：echo $LANG
+- 第二步：检查Git编码配置：git config --list | grep -E "(quotepath|encoding)"
+- 第三步：验证系统locale支持：locale -a | grep -E "(zh_CN|UTF-8)"
+- 第四步：测试中文输出：echo "中文测试"
+
+### 中文编码显示标准修复流程
+- 修复步骤1：设置Terminal编码环境
+  ```bash
+  export LANG=zh_CN.UTF-8
+  export LC_ALL=zh_CN.UTF-8
+  ```
+- 修复步骤2：配置Git中文支持
+  ```bash
+  git config --global core.quotepath false
+  git config --global i18n.commitencoding utf-8
+  git config --global i18n.logoutputencoding utf-8
+  ```
+- 修复步骤3：验证修复效果
+  ```bash
+  git log --oneline -3 | cat
+  echo "中文测试" | od -c
+  ```
+
+### 编码问题预防和兼容性处理
+- 项目初始化时建立标准编码配置检查清单
+- .gitattributes文件配置：`* text=auto eol=lf`
+- 文档创建时强制UTF-8无BOM编码
+- 跨平台协作时统一编码标准和配置
+- 建立编码问题的自动检测和修复脚本
+
+## Git操作环境稳定性保证规范
+
+### Git命令执行环境检查
+- 执行Git操作前验证.git目录完整性：ls -la .git/
+- 检查Git版本兼容性：git --version
+- 验证Git配置有效性：git config --list | head -10
+- 确认工作目录权限：test -w . && echo "可写"
+- 检查磁盘空间充足：df -h . | tail -1
+
+### Git操作超时和中断处理
+- 所有Git网络操作设置合理超时：git config --global http.timeout 30
+- 长时间Git操作使用timeout包装：timeout 300s git clone URL
+- Git操作中断后的状态检查：git status --porcelain
+- 中断恢复机制：git fsck --full 检查仓库完整性
+- 建立Git操作的失败重试和降级策略
+
+### Git仓库健康状态监控
+- 定期检查仓库完整性：git fsck --no-reflogs
+- 监控仓库大小增长：du -sh .git/objects/
+- 清理临时文件：git gc --prune=now
+- 检查远程连接状态：git ls-remote origin > /dev/null
+- 建立Git仓库维护和优化的定期任务
+
+## Terminal编码环境标准化规范
+
+### Terminal编码配置检查清单
+- 验证LANG环境变量：echo $LANG | grep -E "(zh_CN|UTF-8)"
+- 检查locale设置：locale | grep -E "(LANG|LC_ALL)"
+- 测试中文输入输出：echo "测试中文" && read -p "输入中文: " input
+- 验证文件系统编码支持：touch "中文测试.txt" && ls -la | grep 中文
+- 检查SSH连接编码保持：ssh连接时验证编码环境变量传递
+
+### 跨环境编码一致性保证
+- 本地开发环境编码标准化：统一使用UTF-8
+- 容器环境编码配置：Dockerfile中设置LANG=zh_CN.UTF-8
+- SSH连接编码保持：配置SendEnv LANG LC_*
+- CI/CD环境编码配置：确保构建环境支持UTF-8
+- 建立编码环境的自动检测和配置脚本
+
+### 编码问题应急处理预案
+- 编码显示异常时的快速诊断命令集
+- 常见编码问题的标准修复脚本
+- 编码转换工具的备选方案映射
+- 编码问题导致的操作中断的恢复流程
+- 建立编码问题的知识库和解决方案文档
+
+**Git和编码专项核心原则**：标准化配置、主动预防、快速诊断、自动修复、兼容优先
