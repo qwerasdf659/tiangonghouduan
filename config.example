@@ -4,22 +4,22 @@
 # 服务器配置
 NODE_ENV=development
 PORT=3000
-WS_PORT=8080
+WS_PORT=10081
 
-# 🔴 数据库配置 - 根据文档提供的连接信息
-# 内网数据库（开发环境）
-DB_HOST=test-db-mysql.ns-br0za7uc.svc
-DB_PORT=3306
+# 🔴 数据库配置 - 使用外网数据库修复连接问题
+# 外网数据库（生产环境）  
+DB_HOST=dbconn.sealosbja.site
+DB_PORT=42182
 DB_USER=root
 DB_PASSWORD=mc6r9cgb
 DB_NAME=restaurant_points_dev
 
-# 外网数据库（生产环境）  
-# DB_HOST=dbconn.sealosbja.site
-# DB_PORT=42182
+# 内网数据库（开发环境 - 当前无法连接）
+# DB_HOST=test-db-mysql.ns-br0za7uc.svc
+# DB_PORT=3306
 # DB_USER=root
 # DB_PASSWORD=mc6r9cgb
-# DB_NAME=restaurant_points_prod
+# DB_NAME=restaurant_points_dev
 
 # 🔴 JWT配置 - 生产环境必须更换
 JWT_SECRET=restaurant_points_jwt_secret_key_development_only_32_chars

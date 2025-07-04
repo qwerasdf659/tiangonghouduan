@@ -125,6 +125,33 @@ app.get('/health', async (req, res) => {
   }
 });
 
+// 🔴 API健康检查接口 - 前端专用
+app.get('/api/health', async (req, res) => {
+  try {
+    const dbHealth = await healthCheck();
+    const wsStats = webSocketService.getConnectionStats();
+    
+    res.json({
+      status: 'healthy',
+      timestamp: new Date().toISOString(),
+      version: '1.0.0',
+      environment: process.env.NODE_ENV,
+      database: dbHealth,
+      websocket: {
+        status: 'running',
+        connections: wsStats.total
+      },
+      uptime: process.uptime()
+    });
+  } catch (error) {
+    res.status(500).json({
+      status: 'unhealthy',
+      error: error.message,
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
 // 🔴 API路由配置
 app.use('/api/auth', authRoutes);        // 认证授权
 app.use('/api/lottery', lotteryRoutes);  // 抽奖系统
@@ -132,6 +159,10 @@ app.use('/api/exchange', exchangeRoutes); // 商品兑换
 app.use('/api/user', userRoutes);        // 🔴 用户管理
 app.use('/api/photo', photoRoutes);      // 🔴 拍照上传 - 已启用
 app.use('/api/merchant', merchantRoutes); // 🔴 商家管理 - 已启用
+
+// 🔴 添加upload路由兼容性 - 修复前端路径不匹配问题
+app.use('/upload', photoRoutes);         // 🔴 兼容前端的/upload路径请求
+app.use('/api/upload', photoRoutes);     // 🔴 兼容前端的/api/upload路径请求
 
 // 🔴 静态文件服务（图片等）
 app.use('/uploads', express.static('uploads'));
@@ -167,7 +198,8 @@ if (process.env.NODE_ENV === 'development') {
           'POST /api/photo/upload': '拍照上传',
           'GET /api/photo/history': '拍照历史',
           'GET /api/photo/review/:id': '审核详情',
-          'GET /api/photo/statistics': '拍照统计'
+          'GET /api/photo/statistics': '拍照统计',
+          'GET /upload/records': '上传记录（兼容路径）'
         },
         merchant: {
           'POST /api/merchant/apply': '申请商家权限',

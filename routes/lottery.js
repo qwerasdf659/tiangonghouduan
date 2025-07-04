@@ -51,28 +51,77 @@ router.post('/draw', authenticateToken, async (req, res) => {
     const { draw_type = 'single' } = req.body;
     const userId = req.user.user_id;
     
-    // 🔴 验证抽奖类型
+    // 🔴 验证抽奖类型 - 支持前端传入的各种格式
     const drawCounts = {
       'single': 1,
       'triple': 3, 
       'quintuple': 5,
-      'decade': 10
+      'five': 5,        // 🔴 新增：支持前端传入"five"
+      'decade': 10,
+      'ten': 10         // 🔴 新增：支持前端传入"ten"
     };
     
     const actualCount = drawCounts[draw_type] || 1;
     
-    // 🔴 执行抽奖（使用新的保底系统）
+    // 🔴 修复积分扣除逻辑：在开始抽奖前一次性扣除所有积分
+    const costPoints = parseInt(process.env.LOTTERY_COST_POINTS) || 100;
+    const totalCost = actualCount * costPoints;
+    
+    // 🔴 获取用户信息并检查积分是否足够
+    const user = await User.findByPk(userId, { transaction });
+    if (!user) {
+      throw new Error('用户不存在');
+    }
+    
+    if (user.total_points < totalCost) {
+      throw new Error(`积分不足，需要 ${totalCost} 积分，当前只有 ${user.total_points} 积分`);
+    }
+    
+    // 🔴 一次性扣除所有抽奖积分
+    await User.decrement('total_points', {
+      by: totalCost,
+      where: { user_id: userId },
+      transaction
+    });
+    
+    // 🔴 记录积分扣除
+    const userAfterDeduct = await User.findByPk(userId, { transaction });
+    await PointsRecord.createRecord({
+      user_id: userId,
+      points: -totalCost,
+      description: `${draw_type}抽奖消费 - ${actualCount}次`,
+      source: 'lottery',
+      balance_after: userAfterDeduct.total_points,
+      related_id: draw_type
+    }, transaction);
+    
+    // 🔴 执行抽奖（不再扣除积分，只执行抽奖算法）
     const results = [];
     
     for (let i = 0; i < actualCount; i++) {
-      const result = await LotteryService.performDraw(userId, 'points', transaction);
-      results.push({
+      const result = await LotteryService.performDrawWithoutCost(userId, 'points', transaction, i + 1);
+      
+      // 🔴 确保每个结果都包含draw_sequence
+      const resultWithSequence = {
         ...result,
-        draw_sequence: i + 1
-      });
+        draw_sequence: i + 1  // 从1开始的序号
+      };
+      
+      results.push(resultWithSequence);
     }
     
     await transaction.commit();
+    
+    // 🔴 构建完整的抽奖结果数组，确保draw_sequence字段存在
+    const formattedResults = results.map((result, index) => ({
+      prize: result.prize,
+      pity: result.pity,
+      reward: result.reward,
+      draw_sequence: result.draw_sequence || (index + 1)  // 🔴 确保draw_sequence存在
+    }));
+    
+    // 🔴 获取最后一次抽奖的用户信息
+    const lastResult = results[results.length - 1];
     
     // 🔴 返回前端所需的抽奖结果格式
     res.json({
@@ -80,21 +129,19 @@ router.post('/draw', authenticateToken, async (req, res) => {
       msg: 'success',
       data: {
         draw_type,
-        results: results.map(result => ({
-          prize: result.prize,
-          pity: result.pity,
-          reward: result.reward,
-          draw_sequence: result.draw_sequence
-        })),
-        total_cost: actualCount * 100,
+        results: formattedResults,          // 🔴 确保draw_sequence在每个结果中
+        total_cost: totalCost,              // 🔴 修复：返回正确的总消费
         user_info: {
-          remaining_points: results[results.length - 1]?.user?.remainingPoints || 0,
-          pity_info: results[results.length - 1]?.pity || {}
+          remaining_points: lastResult?.user?.remainingPoints || 0,  // 🔴 修复路径
+          total_points: lastResult?.user?.remainingPoints || 0,      // 🔴 增加兼容字段
+          today_draw_count: lastResult?.user?.todayDrawCount || 0,
+          remaining_draws: lastResult?.user?.remainingDraws || 0,
+          pity_info: lastResult?.pity || {}
         }
       }
     });
     
-    console.log(`🎰 用户 ${userId} 执行${draw_type}抽奖，共${actualCount}次`);
+    console.log(`🎰 用户 ${userId} 执行${draw_type}抽奖，共${actualCount}次，消费${totalCost}积分，剩余积分: ${lastResult?.user?.remainingPoints || 0}`);
     
   } catch (error) {
     await transaction.rollback();

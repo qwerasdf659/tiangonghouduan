@@ -193,6 +193,38 @@ router.get('/history', authenticateToken, async (req, res) => {
 });
 
 /**
+ * 🔴 获取上传记录 - 兼容前端/upload/records路径
+ * GET /upload/records?page=1&limit=10&status=all
+ * 这是history的别名路由，用于兼容前端请求路径
+ */
+router.get('/records', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.user_id;
+    const { page = 1, limit = 10, status = 'all' } = req.query;
+    
+    const result = await PhotoReview.getUserHistory(userId, {
+      page: parseInt(page),
+      limit: Math.min(parseInt(limit), 50), // 最多50条
+      status
+    });
+    
+    res.json({
+      code: 0,
+      msg: 'success',
+      data: result
+    });
+    
+  } catch (error) {
+    console.error('❌ 获取上传记录失败:', error);
+    res.json({
+      code: 4000,
+      msg: '获取历史记录失败',
+      data: null
+    });
+  }
+});
+
+/**
  * 🔴 获取单个审核结果详情
  * GET /api/photo/review/:upload_id
  */

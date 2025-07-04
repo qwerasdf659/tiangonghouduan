@@ -57,5 +57,6 @@ server.log
 *.tar.gz
 *.bundle
 
-# Cursor IDE配置
+# Cursor IDE配置（但保留规则文档）
 .cursor/
+!.cursor/rules/

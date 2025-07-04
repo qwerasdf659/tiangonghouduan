@@ -293,6 +293,187 @@ class LotteryService {
   }
   
   /**
+   * 🔴 执行抽奖核心算法（不扣除积分版本 - 用于批量抽奖）
+   * @param {number} userId - 用户ID
+   * @param {string} drawType - 抽奖类型 (points|item)
+   * @param {object} transaction - 数据库事务
+   * @param {number} drawSequence - 当前抽奖序号（用于今日次数计算）
+   */
+  static async performDrawWithoutCost(userId, drawType = 'points', transaction = null, drawSequence = 1) {
+    try {
+      // 🔴 参数验证
+      if (!userId) {
+        throw new BusinessLogicError('用户ID不能为空', 1001);
+      }
+      
+      if (!['points', 'item'].includes(drawType)) {
+        throw new BusinessLogicError('抽奖类型无效', 1002);
+      }
+      
+      // 🔴 获取用户信息
+      const user = await User.findByPk(userId, { transaction });
+      if (!user) {
+        throw new BusinessLogicError('用户不存在', 4001);
+      }
+      
+      // 🔴 检查今日抽奖次数限制（基于当前序号）
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      
+      const todayDrawCount = await PointsRecord.count({
+        where: {
+          user_id: userId,
+          source: 'lottery',
+          type: 'spend',
+          created_at: {
+            [Op.gte]: today
+          }
+        },
+        transaction
+      });
+      
+      const dailyLimit = parseInt(process.env.DAILY_LOTTERY_LIMIT) || 50;
+      if (todayDrawCount + drawSequence > dailyLimit) {
+        throw new BusinessLogicError(`今日抽奖次数已达上限 ${dailyLimit} 次`, 3003);
+      }
+      
+      // 🔴 获取用户保底信息
+      const pityRecord = await LotteryPity.getOrCreateUserPity(userId);
+      
+      // 🔴 获取抽奖配置
+      const lotteryConfig = await this.getFrontendConfig();
+      const prizes = lotteryConfig.prizes;
+      
+      // 🔴 执行抽奖算法（含保底逻辑）
+      let selectedPrize;
+      let isPityTriggered = false;
+      
+      // 检查下一次抽奖是否会触发保底
+      if (pityRecord.willTriggerPityOnNext()) {
+        // 保底触发，直接给九八折券
+        selectedPrize = prizes.find(p => p.id === 2); // 九八折券ID为2
+        isPityTriggered = true;
+        console.log(`🎯 用户 ${userId} 触发保底机制，获得九八折券`);
+        
+        // 重置保底计数
+        await pityRecord.resetPity();
+      } else {
+        // 正常抽奖
+        selectedPrize = this.calculateProbability(prizes);
+        console.log(`🎰 用户 ${userId} 正常抽奖结果:`, selectedPrize.name);
+        console.log(`🔍 调试 - selectedPrize:`, JSON.stringify(selectedPrize, null, 2));
+        
+        // 增加保底计数
+        await pityRecord.incrementDraw();
+        
+        // 如果抽到九八折券，重置保底计数
+        if (selectedPrize.id === 2) {
+          await pityRecord.resetPity();
+        }
+      }
+      
+      console.log(`🔍 调试 - 最终 selectedPrize:`, JSON.stringify(selectedPrize, null, 2));
+      
+      // 🔴 获取当前用户积分（不扣除积分，只获取当前余额）
+      const currentUser = await User.findByPk(userId, { transaction });
+      const currentBalance = currentUser ? currentUser.total_points : 0;
+      
+      // 🔴 处理奖品发放
+      let rewardPoints = 0;
+      let rewardMessage = '';
+      let finalBalance = currentBalance;
+      
+      if (selectedPrize.type === 'points') {
+        // 积分奖励直接发放
+        rewardPoints = parseInt(selectedPrize.value);
+        
+        await User.increment('total_points', {
+          by: rewardPoints,
+          where: { user_id: userId },
+          transaction
+        });
+        
+        finalBalance = currentBalance + rewardPoints;
+        
+        await PointsRecord.createRecord({
+          user_id: userId,
+          points: rewardPoints,
+          description: `抽奖获得积分 - ${selectedPrize.name}${isPityTriggered ? ' (保底)' : ''}`,
+          source: 'lottery',
+          balance_after: finalBalance,
+          related_id: selectedPrize.id.toString()
+        }, transaction);
+        
+        rewardMessage = `恭喜获得 ${rewardPoints} 积分！`;
+        
+      } else if (selectedPrize.type === 'coupon') {
+        // 优惠券奖励
+        rewardMessage = `恭喜获得${selectedPrize.name}！请到店使用`;
+        if (isPityTriggered) {
+          rewardMessage += ' (保底奖励)';
+        }
+        
+      } else if (selectedPrize.type === 'physical') {
+        // 实物奖励
+        rewardMessage = `恭喜获得${selectedPrize.name}！请联系客服兑换`;
+        
+      } else if (selectedPrize.type === 'empty') {
+        // 谢谢参与
+        rewardMessage = '谢谢参与，下次再来哦！';
+      }
+      
+      // 获取更新后的保底信息
+      const updatedPityInfo = await LotteryPity.getUserPityInfo(userId);
+      
+      // 🔴 返回抽奖结果
+      const drawResult = {
+        success: true,
+        prize: {
+          id: selectedPrize.id,
+          name: selectedPrize.name,
+          type: selectedPrize.type,
+          value: selectedPrize.value,
+          angle: selectedPrize.angle,
+          color: selectedPrize.color
+        },
+        reward: {
+          points: rewardPoints,
+          message: rewardMessage
+        },
+        cost: {
+          points: 0  // 这个方法不扣除积分，所以成本为0
+        },
+        user: {
+          remainingPoints: finalBalance,
+          todayDrawCount: todayDrawCount + drawSequence,
+          remainingDraws: dailyLimit - todayDrawCount - drawSequence
+        },
+        pity: {
+          isPityTriggered: isPityTriggered,
+          currentCount: updatedPityInfo.current_count,
+          remainingDraws: updatedPityInfo.remaining_draws,
+          nextPityAt: updatedPityInfo.remaining_draws === 0 ? 0 : updatedPityInfo.remaining_draws
+        },
+        timestamp: new Date().toISOString()
+      };
+      
+      console.log(`✅ 用户 ${userId} 抽奖完成(不扣费):`, {
+        prize: selectedPrize.name,
+        rewardPoints,
+        remainingPoints: finalBalance,
+        pityTriggered: isPityTriggered,
+        pityRemaining: updatedPityInfo.remaining_draws
+      });
+      
+      return drawResult;
+      
+    } catch (error) {
+      console.error('❌ 抽奖执行失败:', error);
+      throw error;
+    }
+  }
+  
+  /**
    * 🔴 抽奖概率计算核心算法
    * @param {Array} prizes - 奖品列表
    * @returns {Object} 选中的奖品
@@ -382,7 +563,7 @@ class LotteryService {
         new Date(record.created_at) >= today
       ).length;
       
-      const dailyLimit = parseInt(process.env.DAILY_LOTTERY_LIMIT) || 10;
+      const dailyLimit = parseInt(process.env.DAILY_LOTTERY_LIMIT) || 50;
       
       return {
         period: `${days}天`,
