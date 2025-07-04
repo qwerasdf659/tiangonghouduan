@@ -211,7 +211,7 @@ if (process.env.NODE_ENV === 'development') {
         }
       },
       websocket: {
-        url: 'ws://localhost:8080',
+        url: 'ws://localhost:3000/ws',
         events: [
           'connected',
           'points_update',
