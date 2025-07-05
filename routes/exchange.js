@@ -248,6 +248,87 @@ router.get('/orders', authenticateToken, async (req, res) => {
   }
 });
 
+// 🔴 前端对接点：兑换记录查询（前端期望的接口）
+// GET /api/exchange/records
+router.get('/records', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.user_id;
+    const {
+      page = 1,
+      limit = 20,
+      status = 'all'
+    } = req.query;
+    
+    console.log(`📋 用户 ${userId} 查询兑换记录: page=${page}, limit=${limit}, status=${status}`);
+    
+    // 🔴 构建查询条件
+    const whereClause = {
+      user_id: userId,
+      source: 'exchange',
+      type: 'spend'  // 兑换都是消费类型
+    };
+    
+    // 🔴 分页查询兑换记录
+    const offset = (page - 1) * limit;
+    const { count, rows } = await PointsRecord.findAndCountAll({
+      where: whereClause,
+      order: [['created_at', 'DESC']],
+      limit: parseInt(limit),
+      offset,
+      attributes: ['id', 'points', 'description', 'created_at', 'related_id', 'balance_after']
+    });
+    
+    // 🔴 格式化兑换记录数据
+    const records = rows.map(record => ({
+      id: record.id,
+      order_id: record.related_id,
+      description: record.description,
+      points_spent: Math.abs(record.points),
+      exchange_time: record.created_at,
+      status: 'completed', // 兑换记录都是已完成状态
+      balance_after: record.balance_after
+    }));
+    
+    // 🔴 统计信息
+    const totalSpent = await PointsRecord.sum('points', {
+      where: {
+        user_id: userId,
+        source: 'exchange',
+        type: 'spend'
+      }
+    }) || 0;
+    
+    res.json({
+      code: 0,
+      msg: 'success',
+      data: {
+        records,
+        pagination: {
+          total: count,
+          page: parseInt(page),
+          limit: parseInt(limit),
+          total_pages: Math.ceil(count / limit),
+          has_more: count > page * limit
+        },
+        statistics: {
+          total_exchanges: count,
+          total_points_spent: Math.abs(totalSpent)
+        }
+      }
+    });
+    
+    console.log(`✅ 兑换记录查询成功: ${count}条记录, 总消费${Math.abs(totalSpent)}积分`);
+    
+  } catch (error) {
+    console.error('获取兑换记录失败:', error);
+    res.json({
+      code: 4000,
+      msg: '获取兑换记录失败',
+      data: null
+    });
+  }
+});
+
 // 🔴 前端对接点13：商品分类列表
 router.get('/categories', async (req, res) => {
   try {

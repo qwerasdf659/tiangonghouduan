@@ -316,7 +316,8 @@ class LotteryService {
         throw new BusinessLogicError('用户不存在', 4001);
       }
       
-      // 🔴 检查今日抽奖次数限制（基于当前序号）
+      // 🔴 批量抽奖的限制检查已在上层接口完成，这里不再重复检查
+      // 获取今日抽奖次数用于返回结果
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       
@@ -333,9 +334,6 @@ class LotteryService {
       });
       
       const dailyLimit = parseInt(process.env.DAILY_LOTTERY_LIMIT) || 50;
-      if (todayDrawCount + drawSequence > dailyLimit) {
-        throw new BusinessLogicError(`今日抽奖次数已达上限 ${dailyLimit} 次`, 3003);
-      }
       
       // 🔴 获取用户保底信息
       const pityRecord = await LotteryPity.getOrCreateUserPity(userId);

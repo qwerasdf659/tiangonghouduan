@@ -63,6 +63,28 @@ router.post('/draw', authenticateToken, async (req, res) => {
     
     const actualCount = drawCounts[draw_type] || 1;
     
+    // 🔴 检查今日抽奖次数限制（批量抽奖整体检查）
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    const todayDrawCount = await PointsRecord.count({
+      where: {
+        user_id: userId,
+        source: 'lottery',
+        type: 'spend',
+        created_at: {
+          [require('sequelize').Op.gte]: today
+        }
+      },
+      transaction
+    });
+    
+    const dailyLimit = parseInt(process.env.DAILY_LOTTERY_LIMIT) || 50;
+    console.log('🎯 每日限制检查:', { todayDrawCount, actualCount, dailyLimit, willExceed: todayDrawCount + actualCount > dailyLimit });
+    if (todayDrawCount + actualCount > dailyLimit) {
+      throw new Error(`今日抽奖次数不足，已抽${todayDrawCount}次，再抽${actualCount}次将超过限制${dailyLimit}次`);
+    }
+    
     // 🔴 修复积分扣除逻辑：在开始抽奖前一次性扣除所有积分
     const costPoints = parseInt(process.env.LOTTERY_COST_POINTS) || 100;
     const totalCost = actualCount * costPoints;
@@ -162,23 +184,28 @@ router.get('/records', authenticateToken, async (req, res) => {
       page = 1, 
       limit = 20,
       draw_type, // 筛选抽奖类型
-      prize_type // 筛选奖品类型
+      type = 'spend' // 筛选积分类型
     } = req.query;
     
-    // 构建查询条件
-    const whereClause = { user_id: userId };
+    // 🔴 修复：使用PointsRecord查询抽奖记录
+    const whereClause = { 
+      user_id: userId,
+      source: 'lottery'  // 只查询抽奖相关记录
+    };
     
+    // 如果指定了抽奖类型，添加到筛选条件
     if (draw_type) {
-      whereClause.draw_type = draw_type;
+      whereClause.related_id = draw_type;
     }
     
-    if (prize_type) {
-      whereClause.prize_type = prize_type;
+    // 如果指定了积分类型（spend/earn），添加到筛选条件
+    if (type) {
+      whereClause.type = type;
     }
     
     // 分页查询抽奖记录
     const offset = (parseInt(page) - 1) * parseInt(limit);
-    const { count, rows } = await LotteryRecord.findAndCountAll({
+    const { count, rows } = await PointsRecord.findAndCountAll({
       where: whereClause,
       order: [['created_at', 'DESC']],
       limit: parseInt(limit),
@@ -188,13 +215,12 @@ router.get('/records', authenticateToken, async (req, res) => {
     // 🔴 格式化前端显示数据
     const records = rows.map(record => ({
       id: record.id,
-      draw_id: record.draw_id,
-      prize_name: record.prize_name,
-      prize_type: record.prize_type,
-      prize_value: record.prize_value,
-      draw_type: record.draw_type,
-      points_cost: record.points_cost,
-      is_near_miss: record.is_near_miss,
+      type: record.type,
+      points: record.points,
+      description: record.description,
+      source: record.source,
+      balance_after: record.balance_after,
+      draw_type: record.related_id || 'unknown', // related_id存储抽奖类型
       created_at: record.created_at
     }));
     

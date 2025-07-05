@@ -182,14 +182,12 @@ router.post('/review', authenticateToken, requireMerchant, async (req, res) => {
       // 🔴 记录积分变动
       await PointsRecord.create({
         user_id: review.user_id,
+        type: 'earn',                    // ✅ 修复：正确的字段名
         points: review.points_awarded,
-        change_type: 'earn',
         source: 'photo_review',
         description: `拍照审核通过奖励 - 消费${actual_amount}元`,
-        reference_id: upload_id,
-        balance_before: newBalance - review.points_awarded,
-        balance_after: newBalance,
-        created_at: new Date()
+        related_id: upload_id,           // ✅ 修复：正确的字段名
+        balance_after: newBalance
       }, { transaction });
     }
     
@@ -312,14 +310,12 @@ router.post('/batch-review', authenticateToken, requireMerchant, async (req, res
           
           await PointsRecord.create({
             user_id: review.user_id,
+            type: 'earn',                    // ✅ 修复：正确的字段名
             points: review.points_awarded,
-            change_type: 'earn',
             source: 'photo_review',
             description: `批量审核通过奖励 - 消费${actual_amount}元`,
-            reference_id: upload_id,
-            balance_before: newBalance - review.points_awarded,
-            balance_after: newBalance,
-            created_at: new Date()
+            related_id: upload_id,           // ✅ 修复：正确的字段名
+            balance_after: newBalance
           }, { transaction });
         }
         

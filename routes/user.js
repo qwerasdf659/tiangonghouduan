@@ -183,6 +183,106 @@ router.get('/points/statistics', authenticateToken, async (req, res) => {
   }
 });
 
+// 🔴 获取用户统计信息（为前端兼容性添加）
+// GET /api/user/statistics
+router.get('/statistics', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.user_id;
+    
+    // 获取用户基本信息
+    const user = await User.findByPk(userId);
+    if (!user) {
+      return res.json({
+        code: 1001,
+        msg: '用户不存在',
+        data: null
+      });
+    }
+    
+    // 统计积分收入和支出
+    const earnRecords = await PointsRecord.findAll({
+      where: { user_id: userId, type: 'earn' },
+      attributes: ['points', 'source']
+    });
+    
+    const spendRecords = await PointsRecord.findAll({
+      where: { user_id: userId, type: 'spend' },
+      attributes: ['points', 'source']
+    });
+    
+    // 计算总收入和支出
+    const totalEarned = earnRecords.reduce((sum, record) => sum + record.points, 0);
+    const totalSpent = Math.abs(spendRecords.reduce((sum, record) => sum + record.points, 0));
+    
+    // 按来源统计
+    const earnBySource = {};
+    const spendBySource = {};
+    
+    earnRecords.forEach(record => {
+      earnBySource[record.source] = (earnBySource[record.source] || 0) + record.points;
+    });
+    
+    spendRecords.forEach(record => {
+      spendBySource[record.source] = (spendBySource[record.source] || 0) + Math.abs(record.points);
+    });
+    
+    // 计算用户活跃天数
+    const registrationDays = Math.floor((new Date() - new Date(user.created_at)) / (1000 * 60 * 60 * 24));
+    
+    // 统计今日活动
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    const todayRecords = await PointsRecord.count({
+      where: {
+        user_id: userId,
+        created_at: {
+          [require('sequelize').Op.gte]: today
+        }
+      }
+    });
+    
+    res.json({
+      code: 0,
+      msg: 'success',
+      data: {
+        // 用户基本信息
+        user_info: {
+          user_id: user.user_id,
+          nickname: user.nickname,
+          avatar: user.avatar,
+          status: user.status,
+          is_merchant: user.is_merchant,
+          registration_days: registrationDays,
+          last_login: user.last_login
+        },
+        // 积分统计
+        points_statistics: {
+          current_points: user.total_points,
+          total_earned: totalEarned,
+          total_spent: totalSpent,
+          earn_by_source: earnBySource,
+          spend_by_source: spendBySource
+        },
+        // 活动统计
+        activity_statistics: {
+          today_activities: todayRecords,
+          total_records: earnRecords.length + spendRecords.length,
+          earn_records_count: earnRecords.length,
+          spend_records_count: spendRecords.length
+        }
+      }
+    });
+  } catch (error) {
+    console.error('获取用户统计失败:', error);
+    res.json({
+      code: 1000,
+      msg: '获取用户统计失败',
+      data: null
+    });
+  }
+});
+
 // 🔴 检查用户状态
 // GET /api/user/status
 router.get('/status', authenticateToken, async (req, res) => {
