@@ -15,6 +15,7 @@ const CommodityPool = require('./CommodityPool');    // 🔴 使用products表�
 const PhotoReview = require('./PhotoReview');        // 🔴 使用upload_reviews表
 const PointsRecord = require('./PointsRecord');
 const LotteryPity = require('./LotteryPity');
+const LotteryRecord = require('./LotteryRecord');    // 🔴 新增：抽奖记录表
 
 // 🔴 定义模型关联关系
 function defineAssociations() {
@@ -46,6 +47,26 @@ function defineAssociations() {
   LotteryPity.belongsTo(User, { 
     foreignKey: 'user_id',
     as: 'user'
+  });
+
+  // 🔴 新增：用户和抽奖记录
+  User.hasMany(LotteryRecord, { 
+    foreignKey: 'user_id',
+    as: 'lotteryRecords'
+  });
+  LotteryRecord.belongsTo(User, { 
+    foreignKey: 'user_id',
+    as: 'user'
+  });
+
+  // 🔴 新增：抽奖配置和抽奖记录
+  LotterySetting.hasMany(LotteryRecord, { 
+    foreignKey: 'prize_id',
+    as: 'lotteryRecords'
+  });
+  LotteryRecord.belongsTo(LotterySetting, { 
+    foreignKey: 'prize_id',
+    as: 'prize'
   });
 
   console.log('✅ 数据库模型关联关系定义完成');
@@ -86,6 +107,9 @@ async function syncModels(options = {}) {
     
     await LotteryPity.sync(syncOptions);
     console.log('✅ 抽奖保底表同步完成');
+    
+    await LotteryRecord.sync(syncOptions);
+    console.log('✅ 抽奖记录表(lottery_records)同步完成');
     
     console.log('🎉 所有数据库模型同步完成！');
     
@@ -154,6 +178,7 @@ async function healthCheck() {
     const userCount = await User.count();
     const lotteryCount = await LotterySetting.count();
     const productCount = await CommodityPool.count();
+    const lotteryRecordCount = await LotteryRecord.count();
     
     return {
       status: 'healthy',
@@ -162,7 +187,8 @@ async function healthCheck() {
       data_counts: {
         users: userCount,
         lottery_prizes: lotteryCount,
-        products: productCount
+        products: productCount,
+        lottery_records: lotteryRecordCount  // 🔴 新增：抽奖记录表统计
       },
       timestamp: new Date().toISOString()
     };
@@ -202,6 +228,17 @@ async function getStatistics() {
         total: await PhotoReview.count(),
         pending: await PhotoReview.count({ where: { review_status: 'pending' } }),
         approved: await PhotoReview.count({ where: { review_status: 'approved' } })
+      },
+      lottery_records: {
+        total: await LotteryRecord.count(),
+        today: await LotteryRecord.count({
+          where: {
+            created_at: {
+              [sequelize.Op.gte]: new Date(new Date().setHours(0, 0, 0, 0))
+            }
+          }
+        }),
+        pity_triggered: await LotteryRecord.count({ where: { is_pity: true } })
       }
     };
     
@@ -220,6 +257,7 @@ module.exports = {
   PhotoReview,        // 🔴 对应upload_reviews表
   PointsRecord,
   LotteryPity,
+  LotteryRecord,      // 🔴 新增：对应lottery_records表
   syncModels,
   initializeData,
   healthCheck,

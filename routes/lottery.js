@@ -7,7 +7,7 @@
  */
 
 const express = require('express');
-const { User, LotterySetting, PointsRecord, LotteryPity, sequelize } = require('../models');
+const { User, LotterySetting, PointsRecord, LotteryPity, LotteryRecord, sequelize } = require('../models');
 const { authenticateToken } = require('../middleware/auth');
 const LotteryService = require('../services/lotteryService');
 const webSocketService = require('../services/websocket');
@@ -176,66 +176,27 @@ router.post('/draw', authenticateToken, async (req, res) => {
   }
 });
 
-// 🔴 前端对接点9：抽奖记录查询
+// 🔴 前端对接点9：抽奖记录查询 - 使用新的LotteryRecord表
 router.get('/records', authenticateToken, async (req, res) => {
   try {
     const userId = req.user.user_id;
     const { 
       page = 1, 
       limit = 20,
-      draw_type, // 筛选抽奖类型
-      type = 'spend' // 筛选积分类型
+      draw_type // 筛选抽奖类型
     } = req.query;
     
-    // 🔴 修复：使用PointsRecord查询抽奖记录
-    const whereClause = { 
-      user_id: userId,
-      source: 'lottery'  // 只查询抽奖相关记录
-    };
-    
-    // 如果指定了抽奖类型，添加到筛选条件
-    if (draw_type) {
-      whereClause.related_id = draw_type;
-    }
-    
-    // 如果指定了积分类型（spend/earn），添加到筛选条件
-    if (type) {
-      whereClause.type = type;
-    }
-    
-    // 分页查询抽奖记录
-    const offset = (parseInt(page) - 1) * parseInt(limit);
-    const { count, rows } = await PointsRecord.findAndCountAll({
-      where: whereClause,
-      order: [['created_at', 'DESC']],
-      limit: parseInt(limit),
-      offset: offset
+    // 🔴 使用新的LotteryRecord表查询抽奖记录
+    const result = await LotteryRecord.getUserRecords(userId, {
+      draw_type,
+      page,
+      limit
     });
-    
-    // 🔴 格式化前端显示数据
-    const records = rows.map(record => ({
-      id: record.id,
-      type: record.type,
-      points: record.points,
-      description: record.description,
-      source: record.source,
-      balance_after: record.balance_after,
-      draw_type: record.related_id || 'unknown', // related_id存储抽奖类型
-      created_at: record.created_at
-    }));
     
     res.json({
       code: 0,
       msg: 'success',
-      data: {
-        records,
-        pagination: {
-          total: count,
-          page: parseInt(page),
-          limit: parseInt(limit),
-          total_pages: Math.ceil(count / parseInt(limit))
-        }
-      }
+      data: result
     });
     
   } catch (error) {
@@ -254,7 +215,7 @@ router.get('/statistics', authenticateToken, async (req, res) => {
     const userId = req.user.user_id;
     
     // 获取用户抽奖统计
-    const stats = await getLotteryStatistics(userId);
+    const stats = await LotteryService.getUserLotteryStats(userId);
     
     res.json({
       code: 0,
@@ -267,6 +228,34 @@ router.get('/statistics', authenticateToken, async (req, res) => {
     res.json({
       code: 3000,
       msg: '获取统计失败',
+      data: null
+    });
+  }
+});
+
+// 🔴 新增：用户抽奖历史详情API
+router.get('/history', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.user_id;
+    const { limit = 20 } = req.query;
+    
+    // 获取用户抽奖历史
+    const history = await LotteryRecord.getUserHistory(userId, parseInt(limit));
+    
+    res.json({
+      code: 0,
+      msg: 'success',
+      data: {
+        history: history.map(record => record.getFrontendInfo()),
+        total: history.length
+      }
+    });
+    
+  } catch (error) {
+    console.error('获取抽奖历史失败:', error);
+    res.json({
+      code: 3000,
+      msg: '获取历史失败',
       data: null
     });
   }

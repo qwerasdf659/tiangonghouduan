@@ -44,11 +44,6 @@ SEALOS_ACCESS_KEY=br0za7uc
 SEALOS_SECRET_KEY=skxg8mk5gqfhf9xz
 SEALOS_REGION=bja
 
-# 🔴 OCR服务配置（图片识别）
-OCR_PROVIDER=mock
-OCR_API_KEY=your_ocr_api_key
-OCR_SECRET_KEY=your_ocr_secret_key
-
 # 🔴 短信验证码服务配置（可选）
 SMS_PROVIDER=mock
 SMS_ACCESS_KEY=your_sms_access_key
@@ -71,9 +66,9 @@ MAX_FILE_SIZE=10485760
 ENABLE_CORS=true
 ENABLE_RATE_LIMIT=true
 
-# 抽奖系统配置
+# 🔴 抽奖系统配置 - 修正为符合最新规范的值
 LOTTERY_COST_POINTS=100
-DAILY_LOTTERY_LIMIT=10
+DAILY_LOTTERY_LIMIT=50
 NEW_USER_POINTS=1000
 
 # 积分系统配置  
@@ -85,4 +80,5 @@ MAX_POINTS_AWARD=2000
 # 1. 复制此文件为 .env: cp config.example .env
 # 2. 生产环境必须修改JWT_SECRET和ENCRYPTION_KEY
 # 3. Sealos配置已使用用户提供的真实配置
-# 4. OCR和SMS服务设置为mock模式，生产环境需要真实配置 
+# 4. SMS服务设置为mock模式，生产环境需要真实配置
+# 5. 🔴 v2.1.2更新：移除OCR配置，改为纯人工审核模式 

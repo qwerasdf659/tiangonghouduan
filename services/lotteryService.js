@@ -7,7 +7,7 @@
  * - 实现10次保底九八折券机制
  */
 
-const { LotterySetting, PointsRecord, User, LotteryPity, sequelize } = require('../models');
+const { LotterySetting, PointsRecord, User, LotteryPity, LotteryRecord, sequelize } = require('../models');
 const { Op } = require('sequelize');
 const { BusinessLogicError } = require('../middleware/errorHandler');
 const webSocketService = require('./websocket');
@@ -240,6 +240,22 @@ class LotteryService {
         rewardMessage = '谢谢参与，下次再来哦！';
       }
       
+      // 🔴 创建抽奖记录
+      const drawId = `draw_${userId}_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+      await LotteryRecord.createRecord({
+        draw_id: drawId,
+        user_id: userId,
+        prize_id: selectedPrize.id,
+        prize_name: selectedPrize.name,
+        prize_type: selectedPrize.type,
+        prize_value: selectedPrize.value,
+        draw_type: 'single',
+        draw_sequence: 1,
+        is_pity: isPityTriggered,
+        cost_points: costPoints,
+        stop_angle: selectedPrize.angle
+      }, transaction);
+      
       // 获取更新后的保底信息
       const updatedPityInfo = await LotteryPity.getUserPityInfo(userId);
       
@@ -419,6 +435,22 @@ class LotteryService {
         // 谢谢参与
         rewardMessage = '谢谢参与，下次再来哦！';
       }
+      
+      // 🔴 创建抽奖记录
+      const drawId = `draw_${userId}_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+      await LotteryRecord.createRecord({
+        draw_id: drawId,
+        user_id: userId,
+        prize_id: selectedPrize.id,
+        prize_name: selectedPrize.name,
+        prize_type: selectedPrize.type,
+        prize_value: selectedPrize.value,
+        draw_type: 'single',
+        draw_sequence: drawSequence,
+        is_pity: isPityTriggered,
+        cost_points: 0, // 这个方法不扣费
+        stop_angle: selectedPrize.angle
+      }, transaction);
       
       // 获取更新后的保底信息
       const updatedPityInfo = await LotteryPity.getUserPityInfo(userId);
