@@ -367,6 +367,75 @@ function generateOrderId() {
   return `EX${timestamp}${random}`;
 }
 
+// 🔴 前端对接点：兑换统计接口 - 修复前端getStatistics调用
+// GET /api/exchange/statistics
+router.get('/statistics', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.user_id;
+    
+    console.log(`📊 用户 ${userId} 查询兑换统计`);
+    
+    // 🔴 查询用户兑换相关的积分记录
+    const exchangeRecords = await PointsRecord.findAll({
+      where: {
+        user_id: userId,
+        source: 'exchange',
+        type: 'spend'
+      },
+      order: [['created_at', 'DESC']],
+      attributes: ['points', 'description', 'created_at', 'related_id']
+    });
+    
+    // 🔴 计算统计数据
+    const totalExchanges = exchangeRecords.length;
+    const totalPointsSpent = exchangeRecords.reduce((sum, record) => sum + Math.abs(record.points), 0);
+    
+    // 🔴 最近兑换记录
+    const recentExchanges = exchangeRecords.slice(0, 5).map(record => ({
+      order_id: record.related_id,
+      description: record.description,
+      points: Math.abs(record.points),
+      exchange_time: record.created_at
+    }));
+    
+    // 🔴 按月统计兑换数据
+    const monthlyStats = {};
+    exchangeRecords.forEach(record => {
+      const month = record.created_at.toISOString().slice(0, 7); // YYYY-MM
+      if (!monthlyStats[month]) {
+        monthlyStats[month] = { count: 0, points: 0 };
+      }
+      monthlyStats[month].count++;
+      monthlyStats[month].points += Math.abs(record.points);
+    });
+    
+    const statistics = {
+      total_exchanges: totalExchanges,
+      total_points_spent: totalPointsSpent,
+      average_points_per_exchange: totalExchanges > 0 ? Math.round(totalPointsSpent / totalExchanges) : 0,
+      recent_exchanges: recentExchanges,
+      monthly_stats: monthlyStats,
+      last_exchange_time: exchangeRecords[0]?.created_at || null
+    };
+    
+    res.json({
+      code: 0,
+      msg: 'success',
+      data: statistics
+    });
+    
+    console.log(`✅ 兑换统计查询成功: 总兑换${totalExchanges}次, 总消费${totalPointsSpent}积分`);
+    
+  } catch (error) {
+    console.error('获取兑换统计失败:', error);
+    res.json({
+      code: 4000,
+      msg: '获取兑换统计失败',
+      data: null
+    });
+  }
+});
+
 // 🔴 创建兑换订单记录
 async function createExchangeOrder(orderData, transaction) {
   // 暂时使用积分记录表存储，实际应该创建专门的订单表

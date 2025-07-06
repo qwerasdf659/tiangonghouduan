@@ -1,18 +1,21 @@
 /**
- * 拍照上传路由 - v2.1.2纯人工审核版本
- * 🔴 重要更新：移除OCR和AI自动识别功能，改为纯人工审核模式
- * 🔴 前端对接说明：
- * - POST /api/photo/upload - 上传拍照图片（用户手动输入金额）
- * - GET /api/photo/history - 获取拍照历史
- * - GET /api/photo/review/:id - 获取审核结果
- * 🔴 WebSocket推送：审核结果会通过WebSocket实时推送
+ * 照片上传审核API路由 - v2.1.2纯人工审核版本
+ * 🔴 前端对接要点：
+ * - POST /api/photo/upload - 图片上传和消费金额提交
+ * - GET /api/photo/history - 获取用户上传历史
+ * - GET /api/photo/review/:id - 获取具体审核结果
+ * - GET /api/photo/statistics - 获取上传统计数据（已修复）
  */
 
 const express = require('express');
 const multer = require('multer');
 const path = require('path');
+const fs = require('fs');
+
+// 🔴 修复：正确导入所有需要的模型
+const { User, PhotoReview, PointsRecord } = require('../models');
 const { authenticateToken } = require('../middleware/auth');
-const { PhotoReview, PointsRecord, User, sequelize } = require('../models');
+const { sequelize } = require('../models'); // Keep sequelize for transaction
 const sealosStorage = require('../services/sealosStorage');
 const webSocketService = require('../services/websocket');
 
@@ -225,24 +228,24 @@ router.get('/records', authenticateToken, async (req, res) => {
 });
 
 /**
- * 🔴 获取单个审核结果详情
- * GET /api/photo/review/:upload_id
+ * 🔴 获取上传审核详情 - 根据upload_id查询具体审核结果
+ * GET /api/photo/review/:id
  */
-router.get('/review/:upload_id', authenticateToken, async (req, res) => {
+router.get('/review/:id', authenticateToken, async (req, res) => {
   try {
+    const { id } = req.params;
     const userId = req.user.user_id;
-    const { upload_id } = req.params;
     
     const review = await PhotoReview.findOne({
       where: {
-        upload_id,
-        user_id: userId  // 确保用户只能查看自己的记录
+        upload_id: id,
+        user_id: userId  // 确保用户只能查看自己的审核记录
       }
     });
     
     if (!review) {
       return res.json({
-        code: 4001,
+        code: 1004,
         msg: '审核记录不存在',
         data: null
       });
@@ -251,81 +254,98 @@ router.get('/review/:upload_id', authenticateToken, async (req, res) => {
     res.json({
       code: 0,
       msg: 'success',
-      data: review.getFrontendInfo()
+      data: review.getReviewResult()
     });
     
   } catch (error) {
     console.error('❌ 获取审核详情失败:', error);
     res.json({
-      code: 4000,
+      code: 5000,
       msg: '获取审核详情失败',
       data: null
     });
   }
 });
 
-/**
- * 🔴 获取拍照统计信息
- * GET /api/photo/statistics
- */
+// 🔴 前端对接点：上传统计接口 - 修复前端getStatistics调用
+// GET /api/photo/statistics
 router.get('/statistics', authenticateToken, async (req, res) => {
   try {
     const userId = req.user.user_id;
     
-    // 统计用户的拍照情况
-    const totalUploads = await PhotoReview.count({
-      where: { user_id: userId }
+    console.log(`📊 用户 ${userId} 查询上传统计`);
+    
+    // 🔴 查询用户上传记录 - 修复字段名：review_status而不是status
+    const uploadRecords = await PhotoReview.findAll({
+      where: { user_id: userId },
+      order: [['created_at', 'DESC']],
+      attributes: ['upload_id', 'review_status', 'amount', 'points_awarded', 'created_at', 'review_time']
     });
     
-    const approvedUploads = await PhotoReview.count({
-      where: { 
-        user_id: userId,
-        review_status: 'approved'
+    // 🔴 计算统计数据
+    const totalUploads = uploadRecords.length;
+    const approvedUploads = uploadRecords.filter(record => record.review_status === 'approved').length;
+    const rejectedUploads = uploadRecords.filter(record => record.review_status === 'rejected').length;
+    const pendingUploads = uploadRecords.filter(record => record.review_status === 'pending').length;
+    
+    const totalPointsEarned = uploadRecords
+      .filter(record => record.review_status === 'approved')
+      .reduce((sum, record) => sum + (record.points_awarded || 0), 0);
+    
+    const totalAmountUploaded = uploadRecords.reduce((sum, record) => sum + (record.amount || 0), 0);
+    
+    // 🔴 最近上传记录
+    const recentUploads = uploadRecords.slice(0, 5).map(record => ({
+      upload_id: record.upload_id,
+      status: record.review_status,
+      amount: record.amount,
+      points_awarded: record.points_awarded,
+      upload_time: record.created_at,
+      review_time: record.review_time
+    }));
+    
+    // 🔴 按月统计上传数据
+    const monthlyStats = {};
+    uploadRecords.forEach(record => {
+      const month = record.created_at.toISOString().slice(0, 7); // YYYY-MM
+      if (!monthlyStats[month]) {
+        monthlyStats[month] = { count: 0, approved: 0, points: 0, amount: 0 };
       }
-    });
-    
-    const pendingUploads = await PhotoReview.count({
-      where: { 
-        user_id: userId,
-        review_status: 'pending'
+      monthlyStats[month].count++;
+      if (record.review_status === 'approved') {
+        monthlyStats[month].approved++;
+        monthlyStats[month].points += record.points_awarded || 0;
       }
+      monthlyStats[month].amount += record.amount || 0;
     });
     
-    const rejectedUploads = await PhotoReview.count({
-      where: { 
-        user_id: userId,
-        review_status: 'rejected'
-      }
-    });
-    
-    // 计算总获得积分
-    const totalPointsResult = await PhotoReview.sum('points_awarded', {
-      where: { 
-        user_id: userId,
-        review_status: 'approved'
-      }
-    });
-    
-    const totalPointsFromPhotos = totalPointsResult || 0;
+    const statistics = {
+      total_uploads: totalUploads,
+      approved_uploads: approvedUploads,
+      rejected_uploads: rejectedUploads,
+      pending_uploads: pendingUploads,
+      approval_rate: totalUploads > 0 ? Math.round((approvedUploads / totalUploads) * 100) : 0,
+      total_points_earned: totalPointsEarned,
+      total_amount_uploaded: totalAmountUploaded,
+      average_points_per_upload: approvedUploads > 0 ? Math.round(totalPointsEarned / approvedUploads) : 0,
+      recent_uploads: recentUploads,
+      monthly_stats: monthlyStats,
+      last_upload_time: uploadRecords[0]?.created_at || null
+    };
     
     res.json({
       code: 0,
       msg: 'success',
-      data: {
-        total_uploads: totalUploads,
-        approved_uploads: approvedUploads,
-        pending_uploads: pendingUploads,
-        rejected_uploads: rejectedUploads,
-        total_points_earned: totalPointsFromPhotos,
-        approval_rate: totalUploads > 0 ? (approvedUploads / totalUploads * 100).toFixed(1) : '0.0'
-      }
+      data: statistics
     });
     
+    console.log(`✅ 上传统计查询成功: 总上传${totalUploads}次, 通过${approvedUploads}次, 获得${totalPointsEarned}积分`);
+    
   } catch (error) {
-    console.error('❌ 获取拍照统计失败:', error);
+    console.error('获取上传统计失败:', error);
     res.json({
       code: 4000,
-      msg: '获取统计信息失败',
+      msg: '获取上传统计失败',
       data: null
     });
   }

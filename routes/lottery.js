@@ -221,9 +221,15 @@ router.get('/records', authenticateToken, async (req, res) => {
       source: record.source,
       balance_after: record.balance_after,
       draw_type: record.related_id || 'unknown', // related_id存储抽奖类型
-      created_at: record.created_at
+      created_at: record.created_at,
+      // 🔴 添加前端需要的方法和状态信息
+      status: record.type === 'spend' ? 'completed' : 'rewarded',
+      status_text: getStatusText(record.type),
+      getStatusText: function() {
+        return getStatusText(this.type);
+      }
     }));
-    
+
     res.json({
       code: 0,
       msg: 'success',
@@ -237,7 +243,7 @@ router.get('/records', authenticateToken, async (req, res) => {
         }
       }
     });
-    
+
   } catch (error) {
     console.error('获取抽奖记录失败:', error);
     res.json({
@@ -271,6 +277,15 @@ router.get('/statistics', authenticateToken, async (req, res) => {
     });
   }
 });
+
+// 🔴 辅助函数 - 获取抽奖记录状态文本
+function getStatusText(type) {
+  const statusMap = {
+    'spend': '抽奖消费',
+    'earn': '抽奖奖励'
+  };
+  return statusMap[type] || '未知状态';
+}
 
 // 🔴 创建抽奖记录（内部函数）
 async function createLotteryRecord(data, transaction) {
