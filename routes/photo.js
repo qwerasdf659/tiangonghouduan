@@ -52,7 +52,7 @@ router.post('/upload', authenticateToken, upload.single('photo'), async (req, re
   try {
     const userId = req.user.user_id;
     const file = req.file;
-    const { amount } = req.body; // 🔴 用户手动输入的消费金额
+    const { amount } = req.body; // 🔴 用户手动输入的消费金额（可选）
     
     // 🔴 参数验证
     if (!file) {
@@ -64,23 +64,18 @@ router.post('/upload', authenticateToken, upload.single('photo'), async (req, re
       });
     }
     
-    if (!amount || parseFloat(amount) <= 0) {
-      await transaction.rollback();
-      return res.json({
-        code: 1002,
-        msg: '请输入有效的消费金额',
-        data: null
-      });
-    }
-    
-    const parsedAmount = parseFloat(amount);
-    if (parsedAmount > 10000) {
-      await transaction.rollback();
-      return res.json({
-        code: 1003,
-        msg: '消费金额不能超过10000元',
-        data: null
-      });
+    // 🔴 消费金额验证（可选参数，允许为0）
+    let parsedAmount = 0; // 默认值
+    if (amount && parseFloat(amount) > 0) {
+      parsedAmount = parseFloat(amount);
+      if (parsedAmount > 10000) {
+        await transaction.rollback();
+        return res.json({
+          code: 1003,
+          msg: '消费金额不能超过10000元',
+          data: null
+        });
+      }
     }
     
     console.log(`📸 用户 ${userId} 上传拍照，文件大小: ${file.size} bytes，消费金额: ${parsedAmount}元`);
@@ -102,8 +97,8 @@ router.post('/upload', authenticateToken, upload.single('photo'), async (req, re
     let uploadResult;
     
     try {
-      uploadResult = await sealosStorage.uploadBuffer(file.buffer, fileName, file.mimetype);
-      console.log('☁️ 图片上传到Sealos成功:', uploadResult.url);
+      uploadResult = await sealosStorage.uploadImage(file.buffer, file.originalname);
+      console.log('☁️ 图片上传到Sealos成功:', uploadResult);
     } catch (error) {
       console.error('❌ 图片上传失败:', error);
       await transaction.rollback();
@@ -121,7 +116,7 @@ router.post('/upload', authenticateToken, upload.single('photo'), async (req, re
     const reviewRecord = await PhotoReview.createUploadRecord({
       user_id: userId,
       upload_id: uploadId,
-      image_url: uploadResult.url,
+      image_url: uploadResult,
       original_filename: file.originalname,
       file_size: file.size,
       amount: parsedAmount  // 🔴 用户手动输入的金额
@@ -134,7 +129,7 @@ router.post('/upload', authenticateToken, upload.single('photo'), async (req, re
       upload_id: uploadId,
       user_id: userId,
       amount: parsedAmount,
-      image_url: uploadResult.url,
+      image_url: uploadResult,
       uploaded_at: new Date().toISOString()
     });
     
@@ -379,5 +374,123 @@ function generateSafeFileName(originalName, userId) {
   const randomStr = Math.random().toString(36).substr(2, 8);
   return `photo_${userId}_${timestamp}_${randomStr}${ext}`;
 }
+
+// 🔴 兼容性路由：支持直接访问根路径的上传接口
+// POST /api/upload (根路径)
+// 这是为了兼容前端调用 /api/upload 而不是 /api/upload/upload
+router.post('/', authenticateToken, upload.single('photo'), async (req, res) => {
+  const transaction = await sequelize.transaction();
+  
+  try {
+    const userId = req.user.user_id;
+    const file = req.file;
+    const { amount } = req.body; // 🔴 用户手动输入的消费金额（可选）
+    
+    console.log(`📸 兼容性上传接口：用户 ${userId} 通过根路径上传拍照`);
+    
+    // 🔴 参数验证
+    if (!file) {
+      await transaction.rollback();
+      return res.json({
+        code: 1001,
+        msg: '请选择要上传的图片',
+        data: null
+      });
+    }
+    
+    // 🔴 消费金额验证（可选参数，允许为0）
+    let parsedAmount = 0; // 默认值
+    if (amount && parseFloat(amount) > 0) {
+      parsedAmount = parseFloat(amount);
+      if (parsedAmount > 10000) {
+        await transaction.rollback();
+        return res.json({
+          code: 1003,
+          msg: '消费金额不能超过10000元',
+          data: null
+        });
+      }
+    }
+    
+    console.log(`📸 用户 ${userId} 上传拍照，文件大小: ${file.size} bytes，消费金额: ${parsedAmount}元`);
+    
+    // 🔴 基础图片验证
+    if (file.size > 5 * 1024 * 1024) { // 5MB限制
+      await transaction.rollback();
+      return res.json({
+        code: 1004,
+        msg: '图片文件过大，请选择小于5MB的图片',
+        data: null
+      });
+    }
+    
+    console.log(`🖼️ 图片验证通过，大小: ${file.size} bytes，类型: ${file.mimetype}`);
+    
+    // 🔴 上传到Sealos对象存储
+    const fileName = `photos/${userId}/${Date.now()}_${Math.random().toString(36).substr(2, 9)}.${file.mimetype.split('/')[1]}`;
+    let uploadResult;
+    
+    try {
+      uploadResult = await sealosStorage.uploadImage(file.buffer, file.originalname);
+      console.log('☁️ 图片上传到Sealos成功:', uploadResult);
+    } catch (error) {
+      console.error('❌ 图片上传失败:', error);
+      await transaction.rollback();
+      return res.json({
+        code: 1005,
+        msg: '图片上传失败，请重试',
+        data: null
+      });
+    }
+    
+    // 🔴 生成唯一上传ID
+    const uploadId = `upload_${userId}_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
+    
+    // 🔴 创建审核记录 - 纯人工审核模式
+    const reviewRecord = await PhotoReview.createUploadRecord({
+      user_id: userId,
+      upload_id: uploadId,
+      image_url: uploadResult,
+      original_filename: file.originalname,
+      file_size: file.size,
+      amount: parsedAmount  // 🔴 用户手动输入的金额
+    }, transaction);
+    
+    await transaction.commit();
+    
+    // 🔴 WebSocket通知商家有新的待审核图片
+    webSocketService.notifyMerchants('new_review', {
+      upload_id: uploadId,
+      user_id: userId,
+      amount: parsedAmount,
+      image_url: uploadResult,
+      uploaded_at: new Date().toISOString()
+    });
+    
+    // 🔴 返回成功结果 - 等待人工审核
+    res.json({
+      code: 0,
+      msg: '图片上传成功，等待商家审核',
+      data: {
+        upload_id: uploadId,
+        status: 'pending',
+        amount: parsedAmount,
+        message: '您的消费凭证已提交，商家将在24小时内完成审核，请耐心等待',
+        estimated_review_time: '24小时内'
+      }
+    });
+    
+    console.log(`✅ 用户 ${userId} 拍照上传成功（兼容性路由），等待人工审核，upload_id: ${uploadId}`);
+    
+  } catch (error) {
+    await transaction.rollback();
+    console.error('❌ 拍照上传失败（兼容性路由）:', error);
+    res.json({
+      code: 5000,
+      msg: '上传失败，请重试',
+      data: null
+    });
+  }
+});
 
 module.exports = router; 

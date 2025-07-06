@@ -9,12 +9,10 @@ const path = require('path');
 
 class SealosStorageService {
   constructor() {
-    // 🔴 使用用户提供的真实Sealos配置
+    // 🔴 使用用户提供的真实Sealos配置 - 强制使用正确桶名
     this.config = {
-      endpoint: process.env.NODE_ENV === 'production' 
-        ? process.env.SEALOS_ENDPOINT 
-        : process.env.SEALOS_INTERNAL_ENDPOINT || process.env.SEALOS_ENDPOINT,
-      bucket: process.env.SEALOS_BUCKET || 'tiangong',
+      endpoint: process.env.SEALOS_ENDPOINT || 'https://objectstorageapi.bja.sealos.run',
+      bucket: 'br0za7uc-tiangong', // 强制使用正确的桶名
       accessKeyId: process.env.SEALOS_ACCESS_KEY || 'br0za7uc',
       secretAccessKey: process.env.SEALOS_SECRET_KEY || 'skxg8mk5gqfhf9xz'
     };
@@ -24,6 +22,7 @@ class SealosStorageService {
       endpoint: this.config.endpoint,
       accessKeyId: this.config.accessKeyId,
       secretAccessKey: this.config.secretAccessKey,
+      region: process.env.SEALOS_REGION || 'bja',
       s3ForcePathStyle: true, // Sealos需要path-style访问
       signatureVersion: 'v4'
     });

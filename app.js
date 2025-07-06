@@ -199,7 +199,8 @@ if (process.env.NODE_ENV === 'development') {
           'GET /api/photo/history': '拍照历史',
           'GET /api/photo/review/:id': '审核详情',
           'GET /api/photo/statistics': '拍照统计',
-          'GET /upload/records': '上传记录（兼容路径）'
+          'GET /upload/records': '上传记录（兼容路径）',
+          'POST /api/upload': '拍照上传（兼容路径）'  // 🔴 新增兼容路径说明
         },
         merchant: {
           'POST /api/merchant/apply': '申请商家权限',
@@ -224,7 +225,7 @@ if (process.env.NODE_ENV === 'development') {
   });
 }
 
-// 🔴 404处理 - 使用统一错误处理
+// 🔴 404处理 - 必须放在所有API路由配置之后
 app.use('/api/*', notFoundHandler);
 
 // 🔴 全局错误处理 - 使用统一错误处理中间件
