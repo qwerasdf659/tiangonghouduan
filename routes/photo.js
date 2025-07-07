@@ -149,7 +149,10 @@ router.post('/upload', authenticateToken, upload.single('photo'), async (req, re
     console.log(`✅ 用户 ${userId} 拍照上传成功，等待人工审核，upload_id: ${uploadId}`);
     
   } catch (error) {
+    // 🔴 修复事务处理错误：只有当事务还没有完成时才进行回滚
+    if (transaction && !transaction.finished) {
     await transaction.rollback();
+    }
     console.error('❌ 拍照上传失败:', error);
     res.json({
       code: 5000,
@@ -483,7 +486,10 @@ router.post('/', authenticateToken, upload.single('photo'), async (req, res) => 
     console.log(`✅ 用户 ${userId} 拍照上传成功（兼容性路由），等待人工审核，upload_id: ${uploadId}`);
     
   } catch (error) {
+    // 🔴 修复事务处理错误：只有当事务还没有完成时才进行回滚
+    if (transaction && !transaction.finished) {
     await transaction.rollback();
+    }
     console.error('❌ 拍照上传失败（兼容性路由）:', error);
     res.json({
       code: 5000,
