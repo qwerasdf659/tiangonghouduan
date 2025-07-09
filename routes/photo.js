@@ -290,7 +290,7 @@ router.get('/statistics', authenticateToken, async (req, res) => {
       .filter(record => record.review_status === 'approved')
       .reduce((sum, record) => sum + (record.points_awarded || 0), 0);
     
-    const totalAmountUploaded = uploadRecords.reduce((sum, record) => sum + (record.amount || 0), 0);
+    const totalAmountUploaded = uploadRecords.reduce((sum, record) => sum + (parseFloat(record.amount) || 0), 0);
     
     // 🔴 最近上传记录
     const recentUploads = uploadRecords.slice(0, 5).map(record => ({
@@ -314,7 +314,7 @@ router.get('/statistics', authenticateToken, async (req, res) => {
         monthlyStats[month].approved++;
         monthlyStats[month].points += record.points_awarded || 0;
       }
-      monthlyStats[month].amount += record.amount || 0;
+      monthlyStats[month].amount += parseFloat(record.amount) || 0;
     });
     
     const statistics = {
