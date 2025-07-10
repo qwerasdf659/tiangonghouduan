@@ -133,37 +133,20 @@ async function syncModels(options = {}) {
   }
 }
 
-// 🔴 初始化示例数据（符合前端文档要求）
+// 🔴 初始化生产数据（仅初始化必要的系统配置）
 async function initializeData() {
   try {
-    console.log('🔄 开始初始化示例数据...');
+    console.log('🔄 开始初始化生产数据...');
     
     // 🔴 初始化标准转盘配置（0-315度，45度间隔）
     await LotterySetting.initializeStandardConfig();
     
-    // 🔴 初始化示例商品
-    await CommodityPool.initializeSampleProducts();
-    
-    // 🔴 创建测试用户
-    const testUsers = [
-      { mobile: '13800138001', nickname: '测试用户1', total_points: 2000, is_merchant: false },
-      { mobile: '13800138002', nickname: '测试用户2', total_points: 1500, is_merchant: false },
-      { mobile: '13800138003', nickname: '商家用户', total_points: 5000, is_merchant: true }
-    ];
-    
-    for (const userData of testUsers) {
-      await User.findOrCreate({
-        where: { mobile: userData.mobile },
-        defaults: userData
-      });
-    }
-    
-    console.log('✅ 测试用户创建完成');
-    console.log('🎉 示例数据初始化完成！');
+    // 🔴 已清除所有模拟数据 - 仅使用真实商品和用户数据
+    console.log('🎉 生产数据初始化完成！');
     
     return true;
   } catch (error) {
-    console.error('❌ 示例数据初始化失败:', error);
+    console.error('❌ 生产数据初始化失败:', error);
     throw error;
   }
 }

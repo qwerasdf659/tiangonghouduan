@@ -12,7 +12,7 @@
 
 const express = require('express');
 const { Op } = require('sequelize');
-const { User, LotteryRecord, LotterySetting, ExchangeOrder, PointsRecord, CommodityPool } = require('../models');
+const { User, LotteryRecord, LotterySetting, ExchangeOrder, PointsRecord, CommodityPool, PhotoReview } = require('../models');
 const { requireAdmin, requireMerchant, authenticateToken } = require('../middleware/auth');
 const LotteryService = require('../services/lotteryService');
 
@@ -780,6 +780,279 @@ router.get('/product-stats', authenticateToken, requireAdmin, async (req, res) =
     res.json({
       code: 5000,
       msg: '获取商品统计失败',
+      data: null
+    });
+  }
+});
+
+// 🔴 新增：图片审核管理 - 修复管理员看不到待审核图片的问题
+// GET /api/merchant/reviews/pending - 获取待审核图片列表
+router.get('/reviews/pending', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const { page = 1, limit = 20 } = req.query;
+    
+    console.log(`📋 管理员 ${req.user.user_id} 查询待审核图片列表`);
+    
+    // 🔴 调用PhotoReview模型的getPendingReviews方法
+    const result = await PhotoReview.getPendingReviews({
+      page: parseInt(page),
+      limit: parseInt(limit)
+    });
+    
+    res.json({
+      code: 0,
+      msg: 'success',
+      data: {
+        total: result.pagination.total,
+        page: result.pagination.page,
+        limit: result.pagination.limit,
+        list: result.reviews,
+        pagination: result.pagination
+      }
+    });
+    
+    console.log(`✅ 返回 ${result.reviews.length} 条待审核图片，总计 ${result.pagination.total} 条`);
+    
+  } catch (error) {
+    console.error('❌ 获取待审核图片列表失败:', error);
+    res.json({
+      code: 5000,
+      msg: '获取待审核列表失败',
+      data: null
+    });
+  }
+});
+
+// 🔴 新增：审核图片 - 通过/拒绝图片审核
+// POST /api/merchant/reviews/:upload_id/approve - 审核通过
+router.post('/reviews/:upload_id/approve', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const { upload_id } = req.params;
+    const { actual_amount, reason } = req.body;
+    
+    console.log(`✅ 管理员 ${req.user.user_id} 审核通过图片: ${upload_id}`);
+    
+    // 🔴 开启数据库事务确保数据一致性
+    const transaction = await PhotoReview.sequelize.transaction();
+    
+    try {
+      // 🔴 执行审核通过操作
+      const review = await PhotoReview.performReview(
+        upload_id, 
+        'approved', 
+        actual_amount, 
+        reason, 
+        req.user.user_id, 
+        transaction
+      );
+      
+      // 🔴 如果审核通过，需要给用户增加积分
+      if (review.points_awarded > 0) {
+        const { PointsRecord } = require('../models');
+        
+        // 增加用户积分
+        await req.user.sequelize.query(
+          'UPDATE users SET points = points + ? WHERE user_id = ?',
+          {
+            replacements: [review.points_awarded, review.user_id],
+            transaction
+          }
+        );
+        
+        // 创建积分记录
+        await PointsRecord.create({
+          user_id: review.user_id,
+          points: review.points_awarded,
+          source: 'photo_upload',
+          description: `图片审核通过奖励 - ${upload_id}`,
+          related_id: upload_id
+        }, { transaction });
+      }
+      
+      await transaction.commit();
+      
+      res.json({
+        code: 0,
+        msg: '审核通过成功',
+        data: {
+          upload_id,
+          action: 'approved',
+          actual_amount: review.actual_amount,
+          points_awarded: review.points_awarded,
+          review_time: review.review_time
+        }
+      });
+      
+      console.log(`✅ 图片审核通过: ${upload_id}, 奖励积分: ${review.points_awarded}`);
+      
+    } catch (error) {
+      await transaction.rollback();
+      throw error;
+    }
+    
+  } catch (error) {
+    console.error('❌ 审核通过操作失败:', error);
+    res.json({
+      code: 5000,
+      msg: '审核操作失败',
+      data: null
+    });
+  }
+});
+
+// 🔴 新增：拒绝图片审核
+// POST /api/merchant/reviews/:upload_id/reject - 审核拒绝
+router.post('/reviews/:upload_id/reject', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const { upload_id } = req.params;
+    const { reason } = req.body;
+    
+    if (!reason) {
+      return res.json({
+        code: 1001,
+        msg: '拒绝原因不能为空',
+        data: null
+      });
+    }
+    
+    console.log(`❌ 管理员 ${req.user.user_id} 审核拒绝图片: ${upload_id}, 原因: ${reason}`);
+    
+    // 🔴 执行审核拒绝操作
+    const review = await PhotoReview.performReview(
+      upload_id, 
+      'rejected', 
+      null, 
+      reason, 
+      req.user.user_id
+    );
+    
+    res.json({
+      code: 0,
+      msg: '审核拒绝成功',
+      data: {
+        upload_id,
+        action: 'rejected',
+        reason: review.review_reason,
+        review_time: review.review_time
+      }
+    });
+    
+    console.log(`❌ 图片审核拒绝: ${upload_id}`);
+    
+  } catch (error) {
+    console.error('❌ 审核拒绝操作失败:', error);
+    res.json({
+      code: 5000,
+      msg: '审核操作失败',
+      data: null
+    });
+  }
+});
+
+// 🔴 新增：批量审核图片
+// POST /api/merchant/reviews/batch - 批量审核图片
+router.post('/reviews/batch', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const { upload_ids, action, reason, actual_amount } = req.body;
+    
+    if (!Array.isArray(upload_ids) || upload_ids.length === 0 || !['approve', 'reject'].includes(action)) {
+      return res.json({
+        code: 1001,
+        msg: '参数错误',
+        data: null
+      });
+    }
+    
+    if (action === 'reject' && !reason) {
+      return res.json({
+        code: 1002,
+        msg: '拒绝时必须提供原因',
+        data: null
+      });
+    }
+    
+    console.log(`📦 管理员 ${req.user.user_id} 批量审核: ${action}, 数量: ${upload_ids.length}`);
+    
+    const results = [];
+    const errors = [];
+    
+    // 🔴 逐个处理审核（确保事务安全）
+    for (const upload_id of upload_ids) {
+      try {
+        const transaction = await PhotoReview.sequelize.transaction();
+        
+        try {
+          const review = await PhotoReview.performReview(
+            upload_id,
+            action === 'approve' ? 'approved' : 'rejected',
+            actual_amount,
+            reason,
+            req.user.user_id,
+            transaction
+          );
+          
+          // 🔴 审核通过时增加积分
+          if (action === 'approve' && review.points_awarded > 0) {
+            const { PointsRecord } = require('../models');
+            
+            await req.user.sequelize.query(
+              'UPDATE users SET points = points + ? WHERE user_id = ?',
+              {
+                replacements: [review.points_awarded, review.user_id],
+                transaction
+              }
+            );
+            
+            await PointsRecord.create({
+              user_id: review.user_id,
+              points: review.points_awarded,
+              source: 'photo_upload',
+              description: `批量图片审核通过奖励 - ${upload_id}`,
+              related_id: upload_id
+            }, { transaction });
+          }
+          
+          await transaction.commit();
+          
+          results.push({
+            upload_id,
+            status: 'success',
+            action: review.review_status,
+            points_awarded: review.points_awarded || 0
+          });
+          
+        } catch (error) {
+          await transaction.rollback();
+          throw error;
+        }
+        
+      } catch (error) {
+        errors.push({
+          upload_id,
+          error: error.message
+        });
+      }
+    }
+    
+    res.json({
+      code: 0,
+      msg: `批量审核完成`,
+      data: {
+        total: upload_ids.length,
+        success: results.length,
+        failed: errors.length,
+        results,
+        errors
+      }
+    });
+    
+    console.log(`📦 批量审核完成: 成功 ${results.length}, 失败 ${errors.length}`);
+    
+  } catch (error) {
+    console.error('❌ 批量审核失败:', error);
+    res.json({
+      code: 5000,
+      msg: '批量审核失败',
       data: null
     });
   }

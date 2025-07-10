@@ -247,13 +247,6 @@ PhotoReview.getPendingReviews = async function(options = {}) {
   
   const { count, rows } = await PhotoReview.findAndCountAll({
     where: { review_status: 'pending' },
-    include: [
-      {
-        model: sequelize.model('users'),
-        as: 'user',
-        attributes: ['user_id', 'nickname', 'mobile']
-      }
-    ],
     order: [['created_at', 'ASC']], // 按提交时间排序
     limit,
     offset
@@ -263,9 +256,9 @@ PhotoReview.getPendingReviews = async function(options = {}) {
     reviews: rows.map(review => ({
       ...review.getFrontendInfo(),
       user_info: {
-        user_id: review.user.user_id,
-        nickname: review.user.nickname,
-        mobile: review.user.getMaskedMobile()
+        user_id: review.user_id,
+        nickname: `用户${review.user_id}`,
+        mobile: '***'
       }
     })),
     pagination: {

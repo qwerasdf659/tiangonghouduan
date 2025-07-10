@@ -69,12 +69,12 @@ router.post('/login', async (req, res) => {
       });
     }
     
-    // 🔴 开发阶段验证码验证（简化版本）- 支持密码登录兼容
+    // 🔴 严格验证码验证（所有环境都必须验证）
     const isValidCode = await verifyCodeOrPassword(phoneStr, verificationCode, password);
-    if (!isValidCode && process.env.NODE_ENV === 'production') {
+    if (!isValidCode) {
       return res.json({
         code: 1002,
-        msg: '验证码或密码错误',
+        msg: process.env.NODE_ENV === 'production' ? '验证码错误' : '验证码错误，开发环境请使用123456',
         data: null
       });
     }
@@ -127,101 +127,8 @@ router.post('/login', async (req, res) => {
   }
 });
 
-// 🔴 新增：管理员隐藏登录入口
-router.post('/admin-login', async (req, res) => {
-  try {
-    const { username, password, admin_key } = req.body;
-    
-    // 🔴 管理员登录验证
-    if (!username || !password || !admin_key) {
-      return res.json({
-        code: 3001,
-        msg: '管理员登录信息不完整',
-        data: null
-      });
-    }
-    
-    // 🔴 验证管理员密钥（开发阶段简化）
-    const validAdminKey = process.env.ADMIN_SECRET_KEY || 'dev_admin_2024';
-    if (admin_key !== validAdminKey) {
-      return res.json({
-        code: 3002,
-        msg: '管理员密钥错误',
-        data: null
-      });
-    }
-    
-    // 🔴 验证管理员账号密码（开发阶段预设账号）
-    const adminAccounts = {
-      'admin': 'admin123',
-      'manager': 'manager123',
-      'devadmin': 'dev123456'
-    };
-    
-    if (!adminAccounts[username] || adminAccounts[username] !== password) {
-      return res.json({
-        code: 3003,
-        msg: '管理员账号或密码错误',
-        data: null
-      });
-    }
-    
-    // 🔴 创建或获取管理员用户记录（使用有效的手机号格式）
-    const adminMobileMap = {
-      'admin': '19900000001',
-      'manager': '19900000002', 
-      'devadmin': '19900000003'
-    };
-    
-    const adminMobile = adminMobileMap[username];
-    const [adminUser, created] = await User.findOrCreate({
-      where: { mobile: adminMobile },
-      defaults: {
-        mobile: adminMobile,
-        nickname: `管理员_${username}`,
-        total_points: 0,
-        is_admin: true,  // 管理员权限
-        is_merchant: true, // 管理员默认具有商家权限
-        status: 'active'
-      }
-    });
-
-    // 确保现有管理员用户具有正确的权限
-    if (!created && !adminUser.is_admin) {
-      await adminUser.update({
-        is_admin: true,
-        is_merchant: true
-      });
-    }
-    
-    // 🔴 生成管理员Token
-    const { accessToken, refreshToken } = generateTokens(adminUser);
-    
-    res.json({
-      code: 0,
-      msg: '管理员登录成功',
-      data: {
-        access_token: accessToken,
-        refresh_token: refreshToken,
-        expires_in: 7200,
-        user_info: {
-          ...adminUser.getSafeUserInfo(),
-          admin_username: username
-        }
-      }
-    });
-    
-    console.log(`🔑 管理员登录成功: ${username}`);
-    
-  } catch (error) {
-    console.error('管理员登录失败:', error);
-    res.json({
-      code: 3000,
-      msg: '管理员登录失败',
-      data: null
-    });
-  }
-});
+// 🔴 管理员登录已移除：统一使用手机号+验证码123456登录
+// 管理员权限通过数据库中的is_admin字段控制
 
 // 🔴 前端对接点2：Token刷新
 router.post('/refresh', async (req, res) => {
@@ -341,16 +248,16 @@ router.post('/send-code', async (req, res) => {
       });
     }
     
-    // 🔴 开发阶段：直接返回成功，不实际发送短信
-    if (process.env.NODE_ENV === 'development') {
-      console.log(`📱 开发模式：为 ${phone} 生成验证码: 123456`);
+    // 🔴 开发和测试环境：万能验证码123456
+    if (process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test') {
+      console.log(`📱 开发/测试模式：为 ${phone} 提供万能验证码: 123456`);
       
       return res.json({
         code: 0,
         msg: '验证码发送成功',
         data: {
           phone: phone,
-          code_hint: '开发模式：请使用验证码 123456',
+          code_hint: '开发/测试模式：请使用万能验证码 123456',
           expires_in: 300, // 5分钟有效期
           dev_mode: true
         }
@@ -383,57 +290,31 @@ router.post('/send-code', async (req, res) => {
   }
 });
 
-// 🔴 开发阶段简化的验证码验证函数
+// 🔴 验证码验证函数（仅支持验证码登录）
 async function verifyCodeOrPassword(phone, code, password) {
-  // 🔴 开发阶段：支持验证码登录和密码登录
-  if (process.env.NODE_ENV === 'development') {
-    // 优先检查密码登录（兼容前端）
-    if (password) {
-      // 接受常用测试密码
-      const validPasswords = ['123456', '000000', '111111', '888888', 'password', 'test123'];
-      if (validPasswords.includes(password)) {
-        console.log(`✅ 开发模式：密码验证通过 ${phone} - ${password}`);
-        return true;
-      }
-      // 开发环境下任何6位以上密码都通过
-      if (password.length >= 6) {
-        console.log(`✅ 开发模式：密码长度验证通过 ${phone} - ${password}`);
-        return true;
-      }
+  // 🔴 开发和测试环境：万能验证码123456
+  if (process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test') {
+    // 统一使用验证码登录（兼容前端传入password参数）
+    const verificationCode = code || password;
+    
+    if (verificationCode === '123456') {
+      console.log(`✅ 开发/测试模式：万能验证码验证通过 ${phone} - 123456`);
+      return true;
     }
     
-    // 验证码登录支持
-    if (code && code !== password) {
-      // 接受通用开发验证码
-      if (code === '123456' || code === '000000' || code === '888888') {
-        console.log(`✅ 开发模式：验证码验证通过 ${phone} - ${code}`);
-        return true;
-      }
-      
-      // 开发环境下，任何6位数字都通过
-      if (/^\d{6}$/.test(code)) {
-        console.log(`✅ 开发模式：任意6位验证码通过 ${phone} - ${code}`);
-        return true;
-      }
-    }
-    
-    console.log(`❌ 开发模式：验证失败 ${phone} - code:${code}, password:${password}`);
-    return true; // 开发环境宽松处理
+    console.log(`❌ 开发/测试模式：验证码错误 ${phone} - ${verificationCode}，请使用123456`);
+    return false;
   }
   
   // 🔴 生产环境：实际验证逻辑
-  console.log(`🔍 生产环境验证: ${phone} - code:${code}, password:${password}`);
+  console.log(`🔍 生产环境验证: ${phone} - code:${code}`);
   
-  // 生产环境优先支持验证码登录
+  // 生产环境：验证真实的短信验证码
   if (code && /^\d{6}$/.test(code)) {
-    // TODO: 这里应该验证真实的验证码
-    return true;
-  }
-  
-  // 生产环境的密码验证（如果需要）
-  if (password && password.length >= 6) {
-    // TODO: 这里应该验证用户的真实密码
-    return true;
+    // TODO: 这里应该调用真实的验证码验证服务
+    // 当前生产环境需要接入真实短信验证，暂时返回false
+    console.log(`❌ 生产环境：需要接入真实短信验证服务`);
+    return false;
   }
   
   return false;

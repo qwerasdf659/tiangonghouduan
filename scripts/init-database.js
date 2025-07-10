@@ -9,7 +9,7 @@
  * 
  * 参数说明：
  * --force      强制重建表（开发环境）
- * --with-data  初始化示例数据
+ * --with-data  初始化生产数据
  * --prod       生产环境模式（只创建表结构）
  */
 
@@ -56,14 +56,13 @@ async function main() {
     
     // 🔴 初始化数据（如果需要）
     if (withData || force) {
-      console.log('\n⭐ 第二步：初始化示例数据');
+      console.log('\n⭐ 第二步：初始化生产数据');
       console.log('📋 将创建以下数据：');
       console.log('  - 标准转盘配置（8个奖品，0-315度45度间隔）');
-      console.log('  - 示例商品（6个商品，不同分类）');
-      console.log('  - 测试用户（3个用户，包含商家用户）');
+      console.log('  - 仅保留真实商品和用户数据');
       
       await initializeData();
-      console.log('✅ 示例数据初始化完成');
+      console.log('✅ 生产数据初始化完成');
     }
     
     // 🔴 数据库健康检查
@@ -125,9 +124,9 @@ async function main() {
     
     // 验证商品字段
     const { CommodityPool } = require('../models');
-    const sampleProduct = await CommodityPool.findOne();
-    if (sampleProduct) {
-      const frontendInfo = sampleProduct.getFrontendInfo();
+    const firstProduct = await CommodityPool.findOne();
+    if (firstProduct) {
+      const frontendInfo = firstProduct.getFrontendInfo();
       if (frontendInfo.commodity_id && frontendInfo.exchange_points !== undefined) {
         console.log('✅ 商品字段映射正确（commodity_id, exchange_points）');
       } else {

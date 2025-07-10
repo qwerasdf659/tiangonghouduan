@@ -345,7 +345,7 @@ class SessionTracker {
      */
     async collectSessionData() {
         // 这里应该实现真实的会话数据收集
-        // 目前返回模拟数据
+        // 会话数据收集待实现
         
         // 分析日志文件获取工具调用信息
         await this.analyzeLogFiles();

@@ -9,34 +9,33 @@ async function setupAdminUser() {
   try {
     console.log('🔄 开始设置超级管理员用户...');
     
-    // 查找或创建测试用户
-    const testMobile = '13800000031';
-    const [user, created] = await User.findOrCreate({
-      where: { mobile: testMobile },
-      defaults: {
-        mobile: testMobile,
-        nickname: '超级管理员',
-        total_points: 10000,
-        is_admin: true,
-        is_merchant: true,
-        status: 'active'
-      }
-    });
+    // 设置现有用户为超级管理员（仅使用真实用户）
+    const targetMobile = process.argv[2]; // 从命令行参数获取手机号
     
-    if (!created) {
-      // 如果用户已存在，更新权限
-      await user.update({
-        is_admin: true,
-        is_merchant: true,
-        status: 'active'
-      });
-      console.log(`✅ 用户权限已更新: ${testMobile}`);
-    } else {
-      console.log(`✅ 新用户已创建: ${testMobile}`);
+    if (!targetMobile) {
+      console.log('❌ 请提供要设置为管理员的用户手机号');
+      console.log('使用方法: node scripts/setup-admin-user.js 手机号');
+      process.exit(1);
     }
     
+    const user = await User.findOne({ where: { mobile: targetMobile } });
+    
+    if (!user) {
+      console.log(`❌ 用户不存在: ${targetMobile}`);
+      console.log('请先让用户通过手机号+验证码123456注册登录');
+      process.exit(1);
+    }
+    
+    // 设置用户为超级管理员
+    await user.update({
+      is_admin: true,
+      is_merchant: true,
+      status: 'active'
+    });
+    console.log(`✅ 用户权限已更新: ${targetMobile}`);
+    
     // 验证权限
-    const updatedUser = await User.findOne({ where: { mobile: testMobile } });
+    const updatedUser = await User.findOne({ where: { mobile: targetMobile } });
     console.log('👤 用户信息:', {
       user_id: updatedUser.user_id,
       mobile: updatedUser.mobile,

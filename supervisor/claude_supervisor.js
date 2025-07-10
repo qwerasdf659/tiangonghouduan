@@ -776,33 +776,9 @@ class ClaudeSupervisor {
 if (require.main === module) {
     const supervisor = new ClaudeSupervisor();
     
-    // 示例数据 - 实际使用时应该从会话中收集数据
-    const sampleSessionData = {
-        toolCalls: [
-            { tool: 'read_file', parameters: { target_file: 'app.js' }, timestamp: Date.now() },
-            { tool: 'read_file', parameters: { target_file: 'app.js' }, timestamp: Date.now() + 1000 },
-            { tool: 'run_terminal_cmd', parameters: { command: 'git status' }, timestamp: Date.now() + 2000 }
-        ],
-        responses: [
-            { content: '这是一个测试回答，包含中文内容。Meta思考：这个问题需要深度分析。' }
-        ],
-        gitOperations: [
-            { command: 'git push origin main', userAuthorized: true }
-        ],
-        codeChanges: [
-            { file: 'test.js', content: '// 测试代码\ntry { } catch(e) { }', description: '添加错误处理' }
-        ]
-    };
-    
-    supervisor.runSupervision(sampleSessionData)
-        .then(report => {
-            console.log('✅ 监督检查完成');
-            process.exit(0);
-        })
-        .catch(error => {
-            console.error('❌ 监督检查失败:', error);
-            process.exit(1);
-        });
+    // 🔴 已清除示例数据 - 实际使用时从真实会话中收集数据
+    console.log('⚠️ 请提供真实的会话数据进行监督检查');
+    console.log('使用方法: supervisor.runSupervision(realSessionData)');
 }
 
 module.exports = ClaudeSupervisor; 

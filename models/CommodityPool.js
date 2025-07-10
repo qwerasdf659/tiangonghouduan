@@ -307,25 +307,6 @@ CommodityPool.increaseStock = async function(commodityId, quantity, transaction)
   return newStock;
 };
 
-// 🔴 类方法 - 初始化示例商品
-CommodityPool.initializeSampleProducts = async function() {
-  const sampleProducts = [
-    { name: '星巴克券', description: '星巴克任意饮品券', category: '优惠券', exchange_points: 300, stock: 100, is_hot: true, sort_order: 10 },
-    { name: '肯德基券', description: '肯德基汉堡套餐券', category: '优惠券', exchange_points: 250, stock: 80, is_hot: true, sort_order: 9 },
-    { name: '电影票券', description: '万达影城电影票', category: '优惠券', exchange_points: 400, stock: 50, is_hot: false, sort_order: 8 },
-    { name: '京东购物卡', description: '京东100元购物卡', category: '购物卡', exchange_points: 1000, stock: 20, is_hot: true, sort_order: 7 },
-    { name: '话费充值卡', description: '移动联通电信50元话费', category: '充值卡', exchange_points: 500, stock: 200, is_hot: false, sort_order: 6 },
-    { name: '小米充电宝', description: '小米10000mAh移动电源', category: '数码产品', exchange_points: 1500, stock: 30, is_hot: false, sort_order: 5 }
-  ];
-  
-  for (const product of sampleProducts) {
-    await CommodityPool.findOrCreate({
-      where: { name: product.name },
-      defaults: product
-    });
-  }
-  
-  console.log('✅ 示例商品初始化完成');
-};
+// 🔴 注意：已清除所有模拟数据，只使用真实商品数据
 
 module.exports = CommodityPool; 
