@@ -1,0 +1,141 @@
+{
+  "supervisor_config": {
+    "version": "1.0.0",
+    "name": "Claude Rules Compliance Supervisor",
+    "description": "自动监督Claude是否遵守全局规则和项目规则",
+    "monitoring_interval": 300,
+    "auto_run": true,
+    "log_level": "INFO",
+    "max_violations_threshold": 5
+  },
+  
+  "rule_categories": {
+    "core_development": {
+      "weight": 10,
+      "file": ".cursor/rules/01-core-development-standards.mdc",
+      "critical_rules": [
+        "数据库表结构和索引管理规范",
+        "统一测试数据管理",
+        "强制数据存在性检查",
+        "Node.js应用开发规范",
+        "端口占用和进程管理规范"
+      ]
+    },
+    "tool_optimization": {
+      "weight": 9,
+      "file": ".cursor/rules/02-tool-optimization-standards.mdc",
+      "critical_rules": [
+        "严禁重复工具调用",
+        "强制并行化操作",
+        "工具调用效率监控",
+        "智能重试策略规范"
+      ]
+    },
+    "encoding_git": {
+      "weight": 8,
+      "file": ".cursor/rules/03-encoding-git-management.mdc",
+      "critical_rules": [
+        "Git操作用户授权控制规范",
+        "Git分页器卡死问题预防",
+        "文档编码处理规范"
+      ]
+    },
+    "session_workflow": {
+      "weight": 9,
+      "file": ".cursor/rules/04-session-workflow-standards.mdc",
+      "critical_rules": [
+        "5分钟快速诊断法",
+        "信息收集标准化流程",
+        "文档长度控制规范"
+      ]
+    },
+    "problem_diagnosis": {
+      "weight": 8,
+      "file": ".cursor/rules/05-problem-diagnosis-state-management.mdc",
+      "critical_rules": [
+        "快速问题分类系统",
+        "状态缓存机制",
+        "重复检查防止机制"
+      ]
+    },
+    "document_generation": {
+      "weight": 7,
+      "file": ".cursor/rules/06-document-generation-caching.mdc",
+      "critical_rules": [
+        "文档长度控制规范",
+        "工具调用次数控制",
+        "并行工具调用最大化"
+      ]
+    }
+  },
+  
+  "user_rules": {
+    "weight": 10,
+    "critical_rules": [
+      "编写代码前先判断文件存在性",
+      "代码出错时提供友好提示和加载状态",
+      "完成任务后删除旧功能代码",
+      "统一测试数据管理和强制数据存在性检查",
+      "深度思考和meta-思考要求",
+      "前端适配后端API接口",
+      "使用中文回答",
+      "检查项目运行状态并及时修复问题"
+    ]
+  },
+  
+  "monitoring_targets": {
+    "tool_calls": {
+      "max_calls_per_session": 20,
+      "max_duplicate_calls": 2,
+      "required_parallel_ratio": 0.7,
+      "forbidden_patterns": [
+        "重复状态检查",
+        "重复文件读取",
+        "串行独立操作"
+      ]
+    },
+    "response_quality": {
+      "max_response_length": 2000,
+      "required_chinese_ratio": 0.9,
+      "required_thinking_depth": true,
+      "must_include_task_list": true
+    },
+    "git_operations": {
+      "require_user_authorization": true,
+      "forbidden_auto_push": true,
+      "require_meaningful_commits": true
+    },
+    "code_quality": {
+      "require_existence_check": true,
+      "require_error_handling": true,
+      "require_chinese_comments": true,
+      "require_cleanup_old_code": true
+    }
+  },
+  
+  "violation_levels": {
+    "CRITICAL": {
+      "score": -10,
+      "action": "immediate_alert"
+    },
+    "HIGH": {
+      "score": -5,
+      "action": "warning"
+    },
+    "MEDIUM": {
+      "score": -2,
+      "action": "note"
+    },
+    "LOW": {
+      "score": -1,
+      "action": "log"
+    }
+  },
+  
+  "reporting": {
+    "generate_daily_report": true,
+    "include_suggestions": true,
+    "include_trend_analysis": true,
+    "save_violation_history": true
+  }
+} 

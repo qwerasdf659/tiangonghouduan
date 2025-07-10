@@ -15,6 +15,8 @@ const CommodityPool = require('./CommodityPool');    // 🔴 使用products表�
 const PhotoReview = require('./PhotoReview');        // 🔴 使用upload_reviews表
 const PointsRecord = require('./PointsRecord');
 const LotteryPity = require('./LotteryPity');
+const LotteryRecord = require('./LotteryRecord');    // 🔴 抽奖记录模型
+const ExchangeOrder = require('./ExchangeOrder');    // 🔴 兑换订单模型
 
 // 🔴 定义模型关联关系
 function defineAssociations() {
@@ -46,6 +48,36 @@ function defineAssociations() {
   LotteryPity.belongsTo(User, { 
     foreignKey: 'user_id',
     as: 'user'
+  });
+
+  // 用户和抽奖记录
+  User.hasMany(LotteryRecord, { 
+    foreignKey: 'user_id',
+    as: 'lotteryRecords'
+  });
+  LotteryRecord.belongsTo(User, { 
+    foreignKey: 'user_id',
+    as: 'user'
+  });
+
+  // 用户和兑换订单
+  User.hasMany(ExchangeOrder, { 
+    foreignKey: 'user_id',
+    as: 'exchangeOrders'
+  });
+  ExchangeOrder.belongsTo(User, { 
+    foreignKey: 'user_id',
+    as: 'user'
+  });
+
+  // 商品和兑换订单
+  CommodityPool.hasMany(ExchangeOrder, { 
+    foreignKey: 'product_id',
+    as: 'exchangeOrders'
+  });
+  ExchangeOrder.belongsTo(CommodityPool, { 
+    foreignKey: 'product_id',
+    as: 'product'
   });
 
   console.log('✅ 数据库模型关联关系定义完成');
@@ -86,6 +118,12 @@ async function syncModels(options = {}) {
     
     await LotteryPity.sync(syncOptions);
     console.log('✅ 抽奖保底表同步完成');
+    
+    await LotteryRecord.sync(syncOptions);
+    console.log('✅ 抽奖记录表(lottery_records)同步完成');
+    
+    await ExchangeOrder.sync(syncOptions);
+    console.log('✅ 兑换订单表(exchange_orders)同步完成');
     
     console.log('🎉 所有数据库模型同步完成！');
     
@@ -194,7 +232,7 @@ async function getStatistics() {
         in_stock: await CommodityPool.count({ 
           where: { 
             status: 'active',
-            stock: { [sequelize.Op.gt]: 0 }
+            stock: { [require('sequelize').Op.gt]: 0 }
           }
         })
       },
@@ -212,6 +250,9 @@ async function getStatistics() {
   }
 }
 
+// 🔴 立即定义关联关系，确保导入时关联关系生效
+defineAssociations();
+
 module.exports = {
   sequelize,
   User,
@@ -220,6 +261,8 @@ module.exports = {
   PhotoReview,        // 🔴 对应upload_reviews表
   PointsRecord,
   LotteryPity,
+  LotteryRecord,      // 🔴 抽奖记录模型
+  ExchangeOrder,      // 🔴 兑换订单模型
   syncModels,
   initializeData,
   healthCheck,

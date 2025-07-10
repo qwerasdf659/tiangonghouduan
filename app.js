@@ -238,7 +238,7 @@ async function startServer() {
     
     // 🔴 同步数据库模型
     console.log('📊 初始化数据库...');
-    await syncModels(false); // 生产环境不要使用force: true
+    await syncModels({ alter: false }); // 暂时禁用alter模式，解决索引问题
     
     // 🔴 启动HTTP服务器
     const PORT = process.env.PORT || 3000;

@@ -1,372 +1,260 @@
 /**
- * 商家管理路由 - v2.1.2纯人工审核版本
- * 🔴 重要更新：完全基于人工审核模式，商家确认用户输入的消费金额
- * 🔴 前端对接说明：
- * - POST /api/merchant/apply - 申请商家权限
- * - GET /api/merchant/pending-reviews - 获取待审核列表
- * - POST /api/merchant/review - 执行审核操作
+ * 商家管理API路由 - 超级管理员专用
+ * 🔴 前端对接要点：
+ * - POST /api/merchant/apply - 商家申请
+ * - GET /api/merchant/pending-reviews - 待审核商家列表
+ * - POST /api/merchant/review - 审核商家申请
  * - POST /api/merchant/batch-review - 批量审核
- * - GET /api/merchant/statistics - 审核统计数据
- * 🔴 权限说明：需要商家权限(is_merchant=true)才能访问审核功能
+ * - GET /api/merchant/statistics - 商家统计
+ * - GET /api/merchant/lottery/config - 商家抽奖配置管理
+ * - GET /api/merchant/lottery/stats - 商家抽奖运营统计
  */
 
 const express = require('express');
 const { Op } = require('sequelize');
-const { authenticateToken, requireMerchant } = require('../middleware/auth');
-const { PhotoReview, User, PointsRecord, sequelize } = require('../models');
-const webSocketService = require('../services/websocket');
+const { User, LotteryRecord, LotterySetting, ExchangeOrder, PointsRecord } = require('../models');
+const { requireSuperAdmin, requireMerchant, authenticateToken } = require('../middleware/auth');
+const LotteryService = require('../services/lotteryService');
 
 const router = express.Router();
 
-/**
- * 🔴 申请成为商家
- * POST /api/merchant/apply
- * 前端需要传递：申请信息
- */
+// 🔴 前端对接点1：商家申请接口
 router.post('/apply', authenticateToken, async (req, res) => {
   try {
-    const userId = req.user.user_id;
-    const { 
-      business_name, 
-      business_license, 
-      contact_person, 
-      contact_phone, 
-      business_address, 
-      reason 
-    } = req.body;
+    const { business_name, business_license, contact_person, contact_phone, business_address, business_type } = req.body;
     
-    // 🔴 参数验证
+    // 参数验证
     if (!business_name || !contact_person || !contact_phone) {
       return res.json({
         code: 1001,
-        msg: '请填写完整的申请信息',
+        msg: '必填信息不完整',
         data: null
       });
     }
     
-    // 检查用户是否已经是商家
-    const user = await User.findByPk(userId);
-    if (user.is_merchant) {
+    // 检查是否已申请过
+    if (req.user.merchant_status === 'pending') {
       return res.json({
-        code: 3002,
-        msg: '您已经具备商家权限',
+        code: 1002,
+        msg: '商家申请正在审核中，请耐心等待',
         data: null
       });
     }
     
-    // 🔴 创建商家申请记录
-    console.log(`📝 用户 ${userId} 申请商家权限:`, {
+    if (req.user.is_merchant) {
+      return res.json({
+        code: 1003,
+        msg: '您已经是认证商家',
+        data: null
+      });
+    }
+    
+    // 更新用户信息为待审核状态
+    await req.user.update({
+      merchant_status: 'pending',
       business_name,
+      business_license,
       contact_person,
       contact_phone,
       business_address,
-      reason
-    });
-    
-    // 🔴 开发阶段自动通过商家申请（生产环境应该需要管理员审核）
-    await user.update({
-      is_merchant: true,
-      updated_at: new Date()
+      business_type,
+      apply_time: new Date()
     });
     
     res.json({
       code: 0,
-      msg: '商家权限申请成功，您现在可以进行审核管理',
+      msg: '商家申请提交成功，请等待审核',
       data: {
-        user_id: userId,
-        is_merchant: true,
-        business_name: business_name,
-        applied_at: new Date().toISOString()
+        status: 'pending',
+        apply_time: new Date()
       }
     });
     
+    console.log(`🏪 商家申请: ${req.user.user_id} - ${business_name}`);
+    
   } catch (error) {
-    console.error('❌ 申请商家权限失败:', error);
+    console.error('商家申请失败:', error);
     res.json({
       code: 5000,
-      msg: '申请提交失败，请重试',
+      msg: '申请提交失败，请稍后重试',
       data: null
     });
   }
 });
 
-/**
- * 🔴 获取待审核列表 - 商家专用
- * GET /api/merchant/pending-reviews?page=1&limit=10
- * 商家可以查看所有待审核的拍照
- */
-router.get('/pending-reviews', authenticateToken, requireMerchant, async (req, res) => {
+// 🔴 前端对接点2：获取待审核商家列表
+router.get('/pending-reviews', requireSuperAdmin, async (req, res) => {
   try {
-    const page = parseInt(req.query.page) || 1;
-    const limit = Math.min(parseInt(req.query.limit) || 20, 100);
+    const { page = 1, limit = 20 } = req.query;
+    const offset = (page - 1) * limit;
     
-    // 🔴 获取待审核列表
-    const result = await PhotoReview.getPendingReviews({
-      page,
-      limit
+    const { count, rows } = await User.findAndCountAll({
+      where: {
+        merchant_status: 'pending'
+      },
+      attributes: [
+        'user_id', 'mobile', 'nickname', 'business_name', 'business_license',
+        'contact_person', 'contact_phone', 'business_address', 'business_type',
+        'apply_time', 'created_at'
+      ],
+      order: [['apply_time', 'DESC']],
+      limit: parseInt(limit),
+      offset
     });
     
     res.json({
       code: 0,
       msg: 'success',
-      data: result
+      data: {
+        total: count,
+        page: parseInt(page),
+        limit: parseInt(limit),
+        list: rows.map(user => ({
+          user_id: user.user_id,
+          mobile: user.getMaskedMobile(),
+          nickname: user.nickname,
+          business_info: {
+            name: user.business_name,
+            license: user.business_license,
+            contact_person: user.contact_person,
+            contact_phone: user.contact_phone,
+            address: user.business_address,
+            type: user.business_type
+          },
+          apply_time: user.apply_time,
+          created_at: user.created_at
+        }))
+      }
     });
     
   } catch (error) {
-    console.error('❌ 获取待审核列表失败:', error);
+    console.error('获取待审核商家列表失败:', error);
     res.json({
-      code: 4000,
-      msg: '获取待审核列表失败',
+      code: 5000,
+      msg: '获取列表失败',
       data: null
     });
   }
 });
 
-/**
- * 🔴 执行审核操作 - v2.1.2纯人工审核版本
- * POST /api/merchant/review
- * Body: { 
- *   upload_id, 
- *   action: 'approved'|'rejected', 
- *   actual_amount?: number,  // 商家确认的实际消费金额
- *   reason?: string 
- * }
- */
-router.post('/review', authenticateToken, requireMerchant, async (req, res) => {
-  const transaction = await sequelize.transaction();
-  
+// 🔴 前端对接点3：审核商家申请
+router.post('/review', requireSuperAdmin, async (req, res) => {
   try {
-    const { upload_id, action, actual_amount, reason } = req.body;
-    const reviewerId = req.user.user_id;
+    const { user_id, action, reason } = req.body;
     
-    // 🔴 参数验证
-    if (!upload_id || !action || !['approved', 'rejected'].includes(action)) {
-      await transaction.rollback();
+    if (!user_id || !action || !['approve', 'reject'].includes(action)) {
       return res.json({
-        code: 4001,
+        code: 1001,
         msg: '参数错误',
         data: null
       });
     }
     
-    // 🔴 审核通过时必须确认金额
-    if (action === 'approved' && (!actual_amount || actual_amount <= 0)) {
-      await transaction.rollback();
+    const applicant = await User.findByPk(user_id);
+    if (!applicant) {
       return res.json({
-        code: 4002,
-        msg: '审核通过时必须确认实际消费金额',
+        code: 1002,
+        msg: '申请用户不存在',
         data: null
       });
     }
     
-    // 🔴 执行人工审核
-    const review = await PhotoReview.performReview(
-      upload_id, 
-      action, 
-      actual_amount, 
-      reason, 
-      reviewerId, 
-      transaction
-    );
-    
-    let newBalance = null;
-    
-    // 🔴 如果审核通过，增加用户积分
-    if (action === 'approved') {
-      newBalance = await User.updatePoints(
-        review.user_id, 
-        review.points_awarded, 
-        transaction
-      );
-      
-      // 🔴 记录积分变动
-      await PointsRecord.create({
-        user_id: review.user_id,
-        type: 'earn',                    // ✅ 修复：正确的字段名
-        points: review.points_awarded,
-        source: 'photo_review',
-        description: `拍照审核通过奖励 - 消费${actual_amount}元`,
-        related_id: upload_id,           // ✅ 修复：正确的字段名
-        balance_after: newBalance
-      }, { transaction });
+    if (applicant.merchant_status !== 'pending') {
+      return res.json({
+        code: 1003,
+        msg: '该申请不在待审核状态',
+        data: null
+      });
     }
     
-    await transaction.commit();
-    
-    // 🔴 WebSocket推送审核结果
-    webSocketService.notifyReviewResult(
-      review.user_id,
-      upload_id,
-      action,
-      action === 'approved' ? review.points_awarded : 0,
-      reason || (action === 'approved' ? '审核通过' : '审核拒绝'),
-      action === 'approved' ? newBalance : null
-    );
+    // 执行审核
+    if (action === 'approve') {
+      await applicant.update({
+        is_merchant: true,
+        merchant_status: 'approved',
+        review_time: new Date(),
+        reviewer_id: req.user.user_id
+      });
+      
+      console.log(`✅ 商家审核通过: ${applicant.user_id} - ${applicant.business_name}`);
+    } else {
+      await applicant.update({
+        merchant_status: 'rejected',
+        review_time: new Date(),
+        reviewer_id: req.user.user_id,
+        reject_reason: reason
+      });
+      
+      console.log(`❌ 商家审核拒绝: ${applicant.user_id} - ${reason}`);
+    }
     
     res.json({
       code: 0,
-      msg: 'success',
+      msg: `审核${action === 'approve' ? '通过' : '拒绝'}`,
       data: {
-        upload_id,
+        user_id,
         action,
-        actual_amount: actual_amount || review.amount,
-        points_awarded: action === 'approved' ? review.points_awarded : 0,
-        user_new_balance: action === 'approved' ? newBalance : null,
-        reviewed_at: new Date().toISOString()
+        review_time: new Date()
       }
     });
     
-    console.log(`✅ 商家 ${reviewerId} 审核${action === 'approved' ? '通过' : '拒绝'}了 ${upload_id}，积分: ${review.points_awarded}`);
-    
   } catch (error) {
-    await transaction.rollback();
-    console.error('❌ 审核操作失败:', error);
+    console.error('商家审核失败:', error);
     res.json({
       code: 5000,
-      msg: error.message || '审核操作失败',
+      msg: '审核操作失败',
       data: null
     });
   }
 });
 
-/**
- * 🔴 批量审核操作
- * POST /api/merchant/batch-review
- * Body: { 
- *   reviews: [{ upload_id, action, actual_amount?, reason? }],
- *   batch_reason?: string
- * }
- */
-router.post('/batch-review', authenticateToken, requireMerchant, async (req, res) => {
-  const transaction = await sequelize.transaction();
-  
+// 🔴 前端对接点4：批量审核
+router.post('/batch-review', requireSuperAdmin, async (req, res) => {
   try {
-    const { reviews, batch_reason } = req.body;
-    const reviewerId = req.user.user_id;
+    const { user_ids, action, reason } = req.body;
     
-    if (!reviews || !Array.isArray(reviews) || reviews.length === 0) {
-      await transaction.rollback();
+    if (!Array.isArray(user_ids) || user_ids.length === 0 || !['approve', 'reject'].includes(action)) {
       return res.json({
-        code: 4001,
-        msg: '批量审核数据不能为空',
+        code: 1001,
+        msg: '参数错误',
         data: null
       });
     }
     
-    if (reviews.length > 50) {
-      await transaction.rollback();
-      return res.json({
-        code: 4002,
-        msg: '单次批量审核不能超过50条',
-        data: null
-      });
+    const updateData = {
+      review_time: new Date(),
+      reviewer_id: req.user.user_id
+    };
+    
+    if (action === 'approve') {
+      updateData.is_merchant = true;
+      updateData.merchant_status = 'approved';
+    } else {
+      updateData.merchant_status = 'rejected';
+      updateData.reject_reason = reason;
     }
     
-    const results = [];
-    
-    // 🔴 逐个处理审核
-    for (const reviewData of reviews) {
-      try {
-        const { upload_id, action, actual_amount, reason } = reviewData;
-        
-        // 参数验证
-        if (!upload_id || !action || !['approved', 'rejected'].includes(action)) {
-          results.push({
-            upload_id,
-            success: false,
-            error: '参数错误'
-          });
-          continue;
-        }
-        
-        if (action === 'approved' && (!actual_amount || actual_amount <= 0)) {
-          results.push({
-            upload_id,
-            success: false,
-            error: '审核通过时必须确认实际消费金额'
-          });
-          continue;
-        }
-        
-        // 执行审核
-        const review = await PhotoReview.performReview(
-          upload_id,
-          action,
-          actual_amount,
-          reason || batch_reason,
-          reviewerId,
-          transaction
-        );
-        
-        let newBalance = null;
-        
-        // 如果审核通过，增加积分
-        if (action === 'approved') {
-          newBalance = await User.updatePoints(
-            review.user_id,
-            review.points_awarded,
-            transaction
-          );
-          
-          await PointsRecord.create({
-            user_id: review.user_id,
-            type: 'earn',                    // ✅ 修复：正确的字段名
-            points: review.points_awarded,
-            source: 'photo_review',
-            description: `批量审核通过奖励 - 消费${actual_amount}元`,
-            related_id: upload_id,           // ✅ 修复：正确的字段名
-            balance_after: newBalance
-          }, { transaction });
-        }
-        
-        // WebSocket通知用户
-        webSocketService.notifyReviewResult(
-          review.user_id,
-          upload_id,
-          action,
-          action === 'approved' ? review.points_awarded : 0,
-          reason || batch_reason || (action === 'approved' ? '批量审核通过' : '批量审核拒绝'),
-          action === 'approved' ? newBalance : null
-        );
-        
-        results.push({
-          upload_id,
-          success: true,
-          action,
-          points_awarded: action === 'approved' ? review.points_awarded : 0
-        });
-        
-      } catch (error) {
-        console.error(`❌ 批量审核单条记录失败 ${reviewData.upload_id}:`, error);
-        results.push({
-          upload_id: reviewData.upload_id,
-          success: false,
-          error: error.message
-        });
-      }
-    }
-    
-    await transaction.commit();
-    
-    const successCount = results.filter(r => r.success).length;
-    const failCount = results.length - successCount;
-    
-    res.json({
-      code: 0,
-      msg: `批量审核完成，成功${successCount}条，失败${failCount}条`,
-      data: {
-        total: results.length,
-        success_count: successCount,
-        fail_count: failCount,
-        results
+    const [affectedCount] = await User.update(updateData, {
+      where: {
+        user_id: { [Op.in]: user_ids },
+        merchant_status: 'pending'
       }
     });
     
-    console.log(`✅ 商家 ${reviewerId} 批量审核完成，成功${successCount}条，失败${failCount}条`);
+    res.json({
+      code: 0,
+      msg: `批量${action === 'approve' ? '通过' : '拒绝'}成功`,
+      data: {
+        affected_count: affectedCount,
+        action,
+        review_time: new Date()
+      }
+    });
+    
+    console.log(`📦 批量审核: ${action} - ${affectedCount}个申请`);
     
   } catch (error) {
-    await transaction.rollback();
-    console.error('❌ 批量审核失败:', error);
+    console.error('批量审核失败:', error);
     res.json({
       code: 5000,
       msg: '批量审核失败',
@@ -375,164 +263,248 @@ router.post('/batch-review', authenticateToken, requireMerchant, async (req, res
   }
 });
 
-/**
- * 🔴 获取审核统计数据
- * GET /api/merchant/statistics
- */
-router.get('/statistics', authenticateToken, requireMerchant, async (req, res) => {
+// 🔴 前端对接点5：商家统计数据
+router.get('/statistics', requireSuperAdmin, async (req, res) => {
   try {
-    // 🔴 基础统计数据
-    const totalReviews = await PhotoReview.count();
-    const pendingReviews = await PhotoReview.count({
-      where: { review_status: 'pending' }
-    });
-    const approvedReviews = await PhotoReview.count({
-      where: { review_status: 'approved' }
-    });
-    const rejectedReviews = await PhotoReview.count({
-      where: { review_status: 'rejected' }
-    });
-    
-    // 🔴 本月统计
-    const thisMonth = new Date();
-    thisMonth.setDate(1);
-    thisMonth.setHours(0, 0, 0, 0);
-    
-    const monthlyReviews = await PhotoReview.count({
+    // 商家申请统计
+    const merchantStats = await User.findAll({
+      attributes: [
+        'merchant_status',
+        [User.sequelize.fn('COUNT', User.sequelize.col('user_id')), 'count']
+      ],
       where: {
-        created_at: {
-          [Op.gte]: thisMonth
-        }
+        merchant_status: { [Op.ne]: null }
+      },
+      group: ['merchant_status'],
+      raw: true
+    });
+    
+    // 活跃商家数量
+    const activeMerchants = await User.count({
+      where: {
+        is_merchant: true,
+        status: 'active'
       }
     });
     
-    const monthlyApproved = await PhotoReview.count({
+    // 商家业务统计
+    const businessStats = await User.findAll({
+      attributes: [
+        'business_type',
+        [User.sequelize.fn('COUNT', User.sequelize.col('user_id')), 'count']
+      ],
       where: {
-        review_status: 'approved',
-        review_time: {
-          [Op.gte]: thisMonth
-        }
-      }
+        is_merchant: true,
+        business_type: { [Op.ne]: null }
+      },
+      group: ['business_type'],
+      raw: true
     });
-    
-    // 🔴 今日统计
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    
-    const todayReviews = await PhotoReview.count({
-      where: {
-        created_at: {
-          [Op.gte]: today
-        }
-      }
-    });
-    
-    const todayPending = await PhotoReview.count({
-      where: {
-        review_status: 'pending',
-        created_at: {
-          [Op.gte]: today
-        }
-      }
-    });
-    
-    // 🔴 积分发放统计
-    const totalPointsAwarded = await PhotoReview.sum('points_awarded', {
-      where: { review_status: 'approved' }
-    }) || 0;
     
     res.json({
       code: 0,
       msg: 'success',
       data: {
-        overall: {
-          total_reviews: totalReviews,
-          pending_reviews: pendingReviews,
-          approved_reviews: approvedReviews,
-          rejected_reviews: rejectedReviews,
-          approval_rate: totalReviews > 0 ? (approvedReviews / totalReviews * 100).toFixed(1) : '0.0'
-        },
-        monthly: {
-          reviews: monthlyReviews,
-          approved: monthlyApproved,
-          approval_rate: monthlyReviews > 0 ? (monthlyApproved / monthlyReviews * 100).toFixed(1) : '0.0'
-        },
-        today: {
-          reviews: todayReviews,
-          pending: todayPending,
-          completion_rate: todayReviews > 0 ? ((todayReviews - todayPending) / todayReviews * 100).toFixed(1) : '0.0'
-        },
-        points: {
-          total_awarded: totalPointsAwarded,
-          average_per_approval: approvedReviews > 0 ? Math.round(totalPointsAwarded / approvedReviews) : 0
-        }
+        merchant_status: merchantStats.reduce((acc, item) => {
+          acc[item.merchant_status] = parseInt(item.count);
+          return acc;
+        }, {}),
+        active_merchants: activeMerchants,
+        business_types: businessStats.reduce((acc, item) => {
+          acc[item.business_type] = parseInt(item.count);
+          return acc;
+        }, {}),
+        generated_at: new Date()
       }
     });
     
   } catch (error) {
-    console.error('❌ 获取审核统计失败:', error);
+    console.error('获取商家统计失败:', error);
     res.json({
-      code: 4000,
+      code: 5000,
       msg: '获取统计数据失败',
       data: null
     });
   }
 });
 
-/**
- * 🔴 获取商家个人审核记录
- * GET /api/merchant/my-reviews?page=1&limit=20
- */
-router.get('/my-reviews', authenticateToken, requireMerchant, async (req, res) => {
+// 🔴 前端对接点6：商家抽奖配置管理
+router.get('/lottery/config', requireSuperAdmin, async (req, res) => {
   try {
-    const reviewerId = req.user.user_id;
-    const page = parseInt(req.query.page) || 1;
-    const limit = Math.min(parseInt(req.query.limit) || 20, 100);
-    const offset = (page - 1) * limit;
+    // 获取当前抽奖配置
+    const lotteryConfig = await LotterySetting.findOne({
+      order: [['created_at', 'DESC']]
+    });
     
-    const { count, rows } = await PhotoReview.findAndCountAll({
-      where: { reviewer_id: reviewerId },
-      include: [
-        {
-          model: sequelize.model('users'),
-          as: 'user',
-          attributes: ['user_id', 'nickname']
+    if (!lotteryConfig) {
+      return res.json({
+        code: 1001,
+        msg: '抽奖配置不存在',
+        data: null
+      });
+    }
+    
+    // 获取抽奖系统统计数据
+    const totalDraws = await LotteryRecord.count();
+    const todayDraws = await LotteryRecord.count({
+      where: {
+        created_at: {
+          [Op.gte]: new Date().setHours(0, 0, 0, 0)
         }
+      }
+    });
+    
+    // 奖品分布统计
+    const prizeDistribution = await LotteryRecord.findAll({
+      attributes: [
+        'prize_name',
+        [LotteryRecord.sequelize.fn('COUNT', LotteryRecord.sequelize.col('id')), 'count']
       ],
-      order: [['review_time', 'DESC']],
-      limit,
-      offset
+      group: ['prize_name'],
+      raw: true
     });
     
     res.json({
       code: 0,
       msg: 'success',
       data: {
-        reviews: rows.map(review => ({
-          upload_id: review.upload_id,
-          user_nickname: review.user.nickname,
-          amount: review.amount,
-          actual_amount: review.actual_amount,
-          points_awarded: review.points_awarded,
-          review_status: review.review_status,
-          review_reason: review.review_reason,
-          reviewed_at: review.review_time,
-          created_at: review.created_at
-        })),
-        pagination: {
-          total: count,
-          page,
-          limit,
-          totalPages: Math.ceil(count / limit)
+        config: {
+          cost_points: lotteryConfig.cost_points,
+          daily_limit: lotteryConfig.daily_limit,
+          guarantee_threshold: lotteryConfig.guarantee_threshold,
+          is_active: lotteryConfig.is_active,
+          created_at: lotteryConfig.created_at,
+          updated_at: lotteryConfig.updated_at
+        },
+        statistics: {
+          total_draws: totalDraws,
+          today_draws: todayDraws,
+          prize_distribution: prizeDistribution.map(item => ({
+            prize_name: item.prize_name,
+            count: parseInt(item.count)
+          }))
         }
       }
     });
     
   } catch (error) {
-    console.error('❌ 获取个人审核记录失败:', error);
+    console.error('获取抽奖配置失败:', error);
     res.json({
-      code: 4000,
-      msg: '获取审核记录失败',
+      code: 5000,
+      msg: '获取配置失败',
+      data: null
+    });
+  }
+});
+
+// 🔴 前端对接点7：商家抽奖运营统计
+router.get('/lottery/stats', requireSuperAdmin, async (req, res) => {
+  try {
+    const { period = 'today' } = req.query;
+    
+    let dateFilter = {};
+    const now = new Date();
+    
+    switch (period) {
+      case 'today':
+        dateFilter = {
+          created_at: {
+            [Op.gte]: new Date(now.getFullYear(), now.getMonth(), now.getDate())
+          }
+        };
+        break;
+      case 'week':
+        const weekStart = new Date(now.setDate(now.getDate() - now.getDay()));
+        dateFilter = {
+          created_at: {
+            [Op.gte]: weekStart
+          }
+        };
+        break;
+      case 'month':
+        dateFilter = {
+          created_at: {
+            [Op.gte]: new Date(now.getFullYear(), now.getMonth(), 1)
+          }
+        };
+        break;
+      case 'all':
+      default:
+        dateFilter = {};
+        break;
+    }
+    
+    // 抽奖次数统计
+    const drawCount = await LotteryRecord.count({
+      where: dateFilter
+    });
+    
+    // 参与用户统计
+    const uniqueUsers = await LotteryRecord.findAll({
+      attributes: [
+        [LotteryRecord.sequelize.fn('COUNT', LotteryRecord.sequelize.fn('DISTINCT', LotteryRecord.sequelize.col('user_id'))), 'count']
+      ],
+      where: dateFilter,
+      raw: true
+    });
+    
+    // 积分消耗统计
+    const pointsConsumed = await LotteryRecord.sum('cost_points', {
+      where: dateFilter
+    });
+    
+    // 奖品发放统计
+    const prizeStats = await LotteryRecord.findAll({
+      attributes: [
+        'prize_type',
+        'prize_name',
+        [LotteryRecord.sequelize.fn('COUNT', LotteryRecord.sequelize.col('id')), 'count']
+      ],
+      where: dateFilter,
+      group: ['prize_type', 'prize_name'],
+      raw: true
+    });
+    
+    // 时段分布（按小时统计）
+    const hourlyStats = await LotteryRecord.findAll({
+      attributes: [
+        [LotteryRecord.sequelize.fn('HOUR', LotteryRecord.sequelize.col('created_at')), 'hour'],
+        [LotteryRecord.sequelize.fn('COUNT', LotteryRecord.sequelize.col('id')), 'count']
+      ],
+      where: dateFilter,
+      group: [LotteryRecord.sequelize.fn('HOUR', LotteryRecord.sequelize.col('created_at'))],
+      raw: true
+    });
+    
+    res.json({
+      code: 0,
+      msg: 'success',
+      data: {
+        period,
+        overview: {
+          total_draws: drawCount,
+          unique_users: parseInt(uniqueUsers[0]?.count || 0),
+          points_consumed: pointsConsumed || 0,
+          avg_draws_per_user: drawCount > 0 ? (drawCount / (parseInt(uniqueUsers[0]?.count || 1))).toFixed(2) : 0
+        },
+        prize_distribution: prizeStats.map(item => ({
+          type: item.prize_type,
+          name: item.prize_name,
+          count: parseInt(item.count)
+        })),
+        hourly_distribution: hourlyStats.map(item => ({
+          hour: parseInt(item.hour),
+          count: parseInt(item.count)
+        })),
+        generated_at: new Date()
+      }
+    });
+    
+  } catch (error) {
+    console.error('获取抽奖统计失败:', error);
+    res.json({
+      code: 5000,
+      msg: '获取统计数据失败',
       data: null
     });
   }

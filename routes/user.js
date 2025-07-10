@@ -9,8 +9,7 @@
 const express = require('express');
 const router = express.Router();
 const { authenticateToken } = require('../middleware/auth');
-const User = require('../models/User');
-const PointsRecord = require('../models/PointsRecord');
+const { User, PointsRecord } = require('../models');
 
 // 🔴 获取用户信息
 // GET /api/user/info
