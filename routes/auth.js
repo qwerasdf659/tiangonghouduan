@@ -166,17 +166,33 @@ router.post('/admin-login', async (req, res) => {
       });
     }
     
-    // 🔴 创建或获取管理员用户记录
+    // 🔴 创建或获取管理员用户记录（使用有效的手机号格式）
+    const adminMobileMap = {
+      'admin': '19900000001',
+      'manager': '19900000002', 
+      'devadmin': '19900000003'
+    };
+    
+    const adminMobile = adminMobileMap[username];
     const [adminUser, created] = await User.findOrCreate({
-      where: { mobile: `admin_${username}` },
+      where: { mobile: adminMobile },
       defaults: {
-        mobile: `admin_${username}`,
+        mobile: adminMobile,
         nickname: `管理员_${username}`,
         total_points: 0,
+        is_admin: true,  // 管理员权限
         is_merchant: true, // 管理员默认具有商家权限
         status: 'active'
       }
     });
+
+    // 确保现有管理员用户具有正确的权限
+    if (!created && !adminUser.is_admin) {
+      await adminUser.update({
+        is_admin: true,
+        is_merchant: true
+      });
+    }
     
     // 🔴 生成管理员Token
     const { accessToken, refreshToken } = generateTokens(adminUser);
@@ -190,7 +206,6 @@ router.post('/admin-login', async (req, res) => {
         expires_in: 7200,
         user_info: {
           ...adminUser.getSafeUserInfo(),
-          is_admin: true,
           admin_username: username
         }
       }

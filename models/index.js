@@ -95,8 +95,7 @@ async function syncModels(options = {}) {
     
     console.log('🔄 开始同步数据库模型...');
     
-    // 定义关联关系
-    defineAssociations();
+    // 🔴 关联关系已在模块导入时定义，这里不再重复定义
     
     // 🔴 按顺序同步模型，避免外键约束错误
     const syncOptions = { alter, force };

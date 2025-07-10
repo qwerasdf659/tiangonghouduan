@@ -12,8 +12,8 @@
 
 const express = require('express');
 const { Op } = require('sequelize');
-const { User, LotteryRecord, LotterySetting, ExchangeOrder, PointsRecord } = require('../models');
-const { requireSuperAdmin, requireMerchant, authenticateToken } = require('../middleware/auth');
+const { User, LotteryRecord, LotterySetting, ExchangeOrder, PointsRecord, CommodityPool } = require('../models');
+const { requireAdmin, requireMerchant, authenticateToken } = require('../middleware/auth');
 const LotteryService = require('../services/lotteryService');
 
 const router = express.Router();
@@ -83,7 +83,7 @@ router.post('/apply', authenticateToken, async (req, res) => {
 });
 
 // 🔴 前端对接点2：获取待审核商家列表
-router.get('/pending-reviews', requireSuperAdmin, async (req, res) => {
+router.get('/pending-reviews', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const { page = 1, limit = 20 } = req.query;
     const offset = (page - 1) * limit;
@@ -138,7 +138,7 @@ router.get('/pending-reviews', requireSuperAdmin, async (req, res) => {
 });
 
 // 🔴 前端对接点3：审核商家申请
-router.post('/review', requireSuperAdmin, async (req, res) => {
+router.post('/review', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const { user_id, action, reason } = req.body;
     
@@ -209,7 +209,7 @@ router.post('/review', requireSuperAdmin, async (req, res) => {
 });
 
 // 🔴 前端对接点4：批量审核
-router.post('/batch-review', requireSuperAdmin, async (req, res) => {
+router.post('/batch-review', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const { user_ids, action, reason } = req.body;
     
@@ -264,7 +264,7 @@ router.post('/batch-review', requireSuperAdmin, async (req, res) => {
 });
 
 // 🔴 前端对接点5：商家统计数据
-router.get('/statistics', requireSuperAdmin, async (req, res) => {
+router.get('/statistics', authenticateToken, requireAdmin, async (req, res) => {
   try {
     // 商家申请统计
     const merchantStats = await User.findAll({
@@ -329,7 +329,7 @@ router.get('/statistics', requireSuperAdmin, async (req, res) => {
 });
 
 // 🔴 前端对接点6：商家抽奖配置管理
-router.get('/lottery/config', requireSuperAdmin, async (req, res) => {
+router.get('/lottery/config', authenticateToken, requireAdmin, async (req, res) => {
   try {
     // 获取当前抽奖配置
     const lotteryConfig = await LotterySetting.findOne({
@@ -398,7 +398,7 @@ router.get('/lottery/config', requireSuperAdmin, async (req, res) => {
 });
 
 // 🔴 前端对接点7：商家抽奖运营统计
-router.get('/lottery/stats', requireSuperAdmin, async (req, res) => {
+router.get('/lottery/stats', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const { period = 'today' } = req.query;
     
@@ -505,6 +505,281 @@ router.get('/lottery/stats', requireSuperAdmin, async (req, res) => {
     res.json({
       code: 5000,
       msg: '获取统计数据失败',
+      data: null
+    });
+  }
+});
+
+// 🔴 前端对接点8：商品管理列表
+router.get('/products', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const { 
+      page = 1, 
+      page_size = 20,  // 修复：使用前端期望的参数名
+      limit = 20,      // 保留向后兼容
+      category = 'all',
+      status = 'all',
+      stock_status,
+      sort_by = 'created_at',
+      sort_order = 'DESC'
+    } = req.query;
+    
+    // 统一参数处理
+    const actualLimit = parseInt(page_size || limit);
+    const actualPage = parseInt(page);
+    const offset = (actualPage - 1) * actualLimit;
+    
+    // 构建查询条件
+    const whereClause = {};
+    
+    if (category && category !== 'all') {
+      whereClause.category = category;
+    }
+    
+    if (status && status !== 'all') {
+      whereClause.status = status;
+    }
+    
+    if (stock_status === 'in_stock') {
+      whereClause.stock = { [Op.gt]: 0 };
+    } else if (stock_status === 'out_of_stock') {
+      whereClause.stock = 0;
+    }
+    
+    // 查询商品列表
+    const { count, rows } = await CommodityPool.findAndCountAll({
+      where: whereClause,
+      order: [[sort_by, sort_order.toUpperCase()]],
+      limit: actualLimit,
+      offset: offset,
+      attributes: [
+        'commodity_id', 'name', 'description', 'category', 
+        'exchange_points', 'stock', 'image', 'status', 
+        'is_hot', 'sort_order', 'rating', 'sales_count',
+        'created_at', 'updated_at'
+      ]
+    });
+    
+    // 获取商品分类列表
+    const categories = await CommodityPool.findAll({
+      attributes: ['category'],
+      group: ['category'],
+      raw: true
+    });
+    
+    res.json({
+      code: 0,
+      msg: 'success',
+      data: {
+        products: rows.map(product => ({
+          id: product.commodity_id,
+          commodity_id: product.commodity_id,
+          name: product.name,
+          description: product.description,
+          category: product.category,
+          exchange_points: product.exchange_points,
+          stock: product.stock,
+          image: product.image,
+          status: product.status,
+          is_hot: product.is_hot,
+          sort_order: product.sort_order,
+          rating: parseFloat(product.rating || 0),
+          sales_count: product.sales_count,
+          stock_status: product.stock > 0 ? 'in_stock' : 'out_of_stock',
+          created_at: product.created_at,
+          updated_at: product.updated_at
+        })),
+        pagination: {
+          total: count,
+          page: actualPage,
+          page_size: actualLimit,  // 使用前端期望的字段名
+          limit: actualLimit,      // 保留兼容性
+          total_pages: Math.ceil(count / actualLimit),
+          has_more: (actualPage * actualLimit) < count
+        },
+        categories: categories.map(item => item.category),
+        generated_at: new Date()
+      }
+    });
+    
+    console.log(`📦 管理员 ${req.user.user_id} 查询商品列表，共${count}个商品`);
+    
+  } catch (error) {
+    console.error('获取商品列表失败:', error);
+    res.json({
+      code: 5000,
+      msg: '获取商品列表失败',
+      data: null
+    });
+  }
+});
+
+// 🔴 前端对接点9：商品统计数据  
+router.get('/product-stats', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const { period = 'all' } = req.query;
+    
+    // 构建时间过滤条件
+    let dateFilter = {};
+    const now = new Date();
+    
+    switch (period) {
+      case 'today':
+        dateFilter = {
+          created_at: {
+            [Op.gte]: new Date(now.getFullYear(), now.getMonth(), now.getDate())
+          }
+        };
+        break;
+      case 'week':
+        const weekStart = new Date(now.setDate(now.getDate() - now.getDay()));
+        dateFilter = {
+          created_at: {
+            [Op.gte]: weekStart
+          }
+        };
+        break;
+      case 'month':
+        dateFilter = {
+          created_at: {
+            [Op.gte]: new Date(now.getFullYear(), now.getMonth(), 1)
+          }
+        };
+        break;
+      case 'all':
+      default:
+        dateFilter = {};
+        break;
+    }
+    
+    // 商品总体统计
+    const totalProducts = await CommodityPool.count();
+    const activeProducts = await CommodityPool.count({
+      where: { status: 'active' }
+    });
+    const inStockProducts = await CommodityPool.count({
+      where: { 
+        status: 'active',
+        stock: { [Op.gt]: 0 }
+      }
+    });
+    const outOfStockProducts = await CommodityPool.count({
+      where: { stock: 0 }
+    });
+    
+    // 分类统计
+    const categoryStats = await CommodityPool.findAll({
+      attributes: [
+        'category',
+        [CommodityPool.sequelize.fn('COUNT', CommodityPool.sequelize.col('commodity_id')), 'count'],
+        [CommodityPool.sequelize.fn('SUM', CommodityPool.sequelize.col('stock')), 'total_stock'],
+        [CommodityPool.sequelize.fn('SUM', CommodityPool.sequelize.col('sales_count')), 'total_sales']
+      ],
+      where: { status: 'active' },
+      group: ['category'],
+      raw: true
+    });
+    
+    // 库存统计
+    const stockStats = await CommodityPool.findAll({
+      attributes: [
+        [CommodityPool.sequelize.fn('SUM', CommodityPool.sequelize.col('stock')), 'total_stock'],
+        [CommodityPool.sequelize.fn('SUM', CommodityPool.sequelize.col('sales_count')), 'total_sales'],
+        [CommodityPool.sequelize.fn('AVG', CommodityPool.sequelize.col('exchange_points')), 'avg_points']
+      ],
+      where: { status: 'active' },
+      raw: true
+    });
+    
+    // 热门商品统计
+    const hotProducts = await CommodityPool.findAll({
+      where: { 
+        is_hot: true,
+        status: 'active'
+      },
+      order: [['sales_count', 'DESC']],
+      limit: 5,
+      attributes: ['commodity_id', 'name', 'sales_count', 'stock', 'exchange_points']
+    });
+    
+    // 库存预警商品（库存低于10的商品）
+    const lowStockProducts = await CommodityPool.findAll({
+      where: {
+        status: 'active',
+        stock: { [Op.between]: [1, 10] }
+      },
+      order: [['stock', 'ASC']],
+      limit: 10,
+      attributes: ['commodity_id', 'name', 'stock', 'category']
+    });
+    
+    // 兑换订单统计（如果有ExchangeOrder模型）
+    let exchangeStats = null;
+    try {
+      const totalExchanges = await ExchangeOrder.count({
+        where: dateFilter
+      });
+      
+      const totalPointsUsed = await ExchangeOrder.sum('total_points', {
+        where: {
+          ...dateFilter,
+          status: { [Op.in]: ['confirmed', 'shipped', 'delivered'] }
+        }
+      });
+      
+      exchangeStats = {
+        total_exchanges: totalExchanges,
+        total_points_used: totalPointsUsed || 0
+      };
+    } catch (error) {
+      console.log('兑换订单统计暂不可用:', error.message);
+    }
+    
+    res.json({
+      code: 0,
+      msg: 'success',
+      data: {
+        period,
+        overview: {
+          total_products: totalProducts,
+          active_products: activeProducts,
+          in_stock_products: inStockProducts,
+          out_of_stock_products: outOfStockProducts,
+          total_stock: parseInt(stockStats[0]?.total_stock || 0),
+          total_sales: parseInt(stockStats[0]?.total_sales || 0),
+          avg_points: parseFloat((stockStats[0]?.avg_points || 0)).toFixed(2)
+        },
+        category_distribution: categoryStats.map(item => ({
+          category: item.category,
+          count: parseInt(item.count),
+          total_stock: parseInt(item.total_stock || 0),
+          total_sales: parseInt(item.total_sales || 0)
+        })),
+        hot_products: hotProducts.map(product => ({
+          id: product.commodity_id,
+          name: product.name,
+          sales_count: product.sales_count,
+          stock: product.stock,
+          points: product.exchange_points
+        })),
+        low_stock_alert: lowStockProducts.map(product => ({
+          id: product.commodity_id,
+          name: product.name,
+          stock: product.stock,
+          category: product.category
+        })),
+        exchange_statistics: exchangeStats,
+        generated_at: new Date()
+      }
+    });
+    
+    console.log(`📊 管理员 ${req.user.user_id} 查询商品统计数据`);
+    
+  } catch (error) {
+    console.error('获取商品统计失败:', error);
+    res.json({
+      code: 5000,
+      msg: '获取商品统计失败',
       data: null
     });
   }
