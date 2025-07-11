@@ -251,7 +251,7 @@ router.get('/statistics', authenticateToken, async (req, res) => {
           nickname: user.nickname,
           avatar: user.avatar,
           status: user.status,
-          is_merchant: user.is_merchant,
+          // is_merchant字段已移除，权限简化为用户/管理员
           registration_days: registrationDays,
           last_login: user.last_login
         },
@@ -316,7 +316,7 @@ router.get('/status', authenticateToken, async (req, res) => {
       data: {
         user_id: user.user_id,
         status: user.status,
-        is_merchant: user.is_merchant,
+        // is_merchant字段已移除，权限简化为用户/管理员
         total_points: user.total_points,
         today_activities: todayRecords,
         registration_days: Math.floor((new Date() - new Date(user.created_at)) / (1000 * 60 * 60 * 24)),

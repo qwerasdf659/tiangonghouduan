@@ -86,7 +86,7 @@ async function main() {
       console.log('  👥 用户统计:');
       console.log(`    - 总用户: ${stats.users.total}`);
       console.log(`    - 活跃用户: ${stats.users.active}`);
-      console.log(`    - 商家用户: ${stats.users.merchants}`);
+      console.log(`    - 管理员用户: ${stats.users.admins}`);
       console.log('  🎰 抽奖统计:');
       console.log(`    - 总奖品: ${stats.lottery.total_prizes}`);
       console.log(`    - 活跃奖品: ${stats.lottery.active_prizes}`);

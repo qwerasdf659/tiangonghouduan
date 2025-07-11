@@ -3,8 +3,178 @@ description:
 globs: 
 alwaysApply: true
 ---
-# 工具调用优化规范
-# 并行化处理、重复任务识别、效率优化等综合规范
+# 工具调用优化规范（基于实际问题分析版 v2.0）
+
+## 🔴 基于实际超标案例的优化规范（2025年01月12日）
+
+### 实际工具调用浪费统计（需要严格避免的模式）
+
+#### 发现的严重超标案例
+**cursor_1.md工具调用分析**：
+- **实际调用次数**：180+次（严重超标）
+- **应该控制在**：<50次  
+- **超标比例**：260%
+- **主要浪费源**：
+  * 健康检查重复8次（应该1次缓存5分钟）
+  * 端口检查重复6次（应该并行执行）
+  * 文件读取重复10+次（应该缓存内容）
+  * 状态验证重复15+次（应该批量并行）
+
+#### 严重低效模式识别
+```bash
+# ❌ 发现的低效串行模式（实际文档中的反面案例）
+curl http://localhost:3000/health  # 调用1
+# 等待响应...
+pm2 status                        # 调用2  
+# 等待响应...
+netstat -tlnp | grep :3000       # 调用3
+# 等待响应...
+ps aux | grep node               # 调用4
+# 继续5分钟后又重复同样检查...   # 调用5-8
+
+# ✅ 正确的并行优化模式
+{
+  curl -m 5 http://localhost:3000/health &
+  pm2 status &
+  netstat -tlnp | grep :3000 &
+  ps aux | grep node &
+  wait
+} # 1次并行调用替代8次串行调用，节省85%时间
+```
+
+### 工具调用预算强制执行（解决180+次超标问题）
+
+#### 动态预算分配算法
+```javascript
+// 基于任务复杂度动态分配预算
+function calculateToolBudget(taskType, taskComplexity) {
+  const BASE_BUDGETS = {
+    'status_check': 5,      // 状态检查：5次工具调用
+    'simple_fix': 15,       // 简单修复：15次工具调用
+    'medium_debug': 35,     // 中等调试：35次工具调用
+    'complex_refactor': 80  // 复杂重构：80次工具调用
+  };
+  
+  const complexityMultiplier = {
+    'simple': 1.0,
+    'medium': 1.5,  
+    'complex': 2.0
+  };
+  
+  return Math.min(
+    BASE_BUDGETS[taskType] * complexityMultiplier[taskComplexity],
+    100 // 绝对上限100次
+  );
+}
+
+// 实时预算监控
+let toolCallTracker = {
+  count: 0,
+  budget: 0,
+  history: [],
+  violations: []
+};
+
+function beforeToolCall(toolName, params) {
+  toolCallTracker.count++;
+  
+  if (toolCallTracker.count > toolCallTracker.budget) {
+    toolCallTracker.violations.push({
+      call: toolCallTracker.count,
+      tool: toolName,
+      params: params,
+      timestamp: Date.now()
+    });
+    
+    throw new Error(`🚫 工具调用超预算：${toolCallTracker.count}/${toolCallTracker.budget}`);
+  }
+  
+  // 记录调用历史
+  toolCallTracker.history.push({
+    tool: toolName,
+    timestamp: Date.now(),
+    fingerprint: generateFingerprint(toolName, params)
+  });
+}
+```
+
+### 重复工具调用智能防止机制
+
+#### 工具调用指纹识别算法
+```javascript
+// 生成工具调用唯一指纹
+function generateFingerprint(toolName, params) {
+  const key = `${toolName}_${JSON.stringify(params)}`;
+  return require('crypto').createHash('md5').update(key).digest('hex').substring(0, 8);
+}
+
+// 检测重复调用
+function detectDuplicateCall(toolName, params) {
+  const fingerprint = generateFingerprint(toolName, params);
+  const recentCalls = toolCallTracker.history.filter(
+    call => call.fingerprint === fingerprint && 
+    Date.now() - call.timestamp < 300000 // 5分钟内
+  );
+  
+  if (recentCalls.length > 0) {
+    console.log(`🚫 检测到重复工具调用：${toolName}，跳过执行`);
+    return recentCalls[0].result; // 返回缓存结果
+  }
+  
+  return null; // 允许执行
+}
+
+// 特殊重复模式检测
+const FORBIDDEN_REPEAT_PATTERNS = {
+  'curl_health_check': {
+    pattern: /curl.*localhost:3000\/health/,
+    ttl: 300000, // 5分钟内禁止重复
+    message: '健康检查结果已缓存，禁止重复执行'
+  },
+  'port_check': {
+    pattern: /netstat.*grep.*3000/,
+    ttl: 300000,
+    message: '端口检查结果已缓存，禁止重复执行'
+  },
+  'process_check': {
+    pattern: /ps aux.*grep.*node/,
+    ttl: 180000, // 3分钟内禁止重复
+    message: '进程检查结果已缓存，禁止重复执行'
+  }
+};
+```
+
+### 并行工具调用强制最大化（解决串行浪费）
+
+#### 并行化率监控和强制执行
+```javascript
+// 并行化率计算
+function calculateParallelizationRate() {
+  const totalCalls = toolCallTracker.history.length;
+  const parallelBatches = groupCallsByTimestamp(toolCallTracker.history);
+  const parallelCalls = parallelBatches.reduce((sum, batch) => sum + batch.length - 1, 0);
+  
+  return totalCalls > 0 ? parallelCalls / totalCalls : 0;
+}
+
+// 强制并行化要求
+const PARALLELIZATION_TARGETS = {
+  'status_check': 0.9,     // 状态检查90%并行化
+  'file_operations': 0.8,   // 文件操作80%并行化
+  'api_testing': 0.85,     // API测试85%并行化
+  'system_analysis': 0.75  // 系统分析75%并行化
+};
+
+function enforceParallelization(taskType) {
+  const currentRate = calculateParallelizationRate();
+  const targetRate = PARALLELIZATION_TARGETS[taskType] || 0.7;
+  
+  if (currentRate < targetRate) {
+    console.warn(`⚠️ 并行化率不足：${(currentRate*100).toFixed(1)}% < ${(targetRate*100).toFixed(1)}%`);
+    console.warn('建议优化：将更多独立操作改为并行执行');
+  }
+}
+```
 
 ## 工具调用和工作流程优化规范
 

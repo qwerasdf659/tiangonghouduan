@@ -1,11 +1,6 @@
 /**
- * 认证中间件 - JWT Token验证和权限管理
- * 🔴 核心功能：
- * - JWT Token生成和验证
- * - 用户身份认证
- * - 管理员权限检查
- * - 商家权限检查
- * - 请求日志记录
+ * 认证授权中间件 - 简化权限版本
+ * 🔴 权限级别：用户(default) | 管理员(is_admin: true)
  */
 
 const jwt = require('jsonwebtoken');
@@ -13,64 +8,49 @@ const { User } = require('../models');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret_key_change_in_production';
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '2h';
-const REFRESH_TOKEN_EXPIRES_IN = '7d';
+const REFRESH_TOKEN_EXPIRES_IN = process.env.REFRESH_TOKEN_EXPIRES_IN || '7d';
 
 /**
  * 生成JWT Token
- * @param {Object} user - 用户对象
- * @returns {Object} - 包含accessToken和refreshToken
  */
 function generateTokens(user) {
   const payload = {
     user_id: user.user_id,
     mobile: user.mobile,
-    is_merchant: user.is_merchant || false,
     is_admin: user.is_admin || false
   };
 
   const accessToken = jwt.sign(payload, JWT_SECRET, { 
     expiresIn: JWT_EXPIRES_IN,
-    issuer: 'lottery-system'
+    issuer: 'restaurant-points-system'
   });
 
-  const refreshToken = jwt.sign(
-    { user_id: user.user_id, type: 'refresh' }, 
-    JWT_SECRET, 
-    { 
-      expiresIn: REFRESH_TOKEN_EXPIRES_IN,
-      issuer: 'lottery-system'
-    }
-  );
+  const refreshToken = jwt.sign(payload, JWT_SECRET, { 
+    expiresIn: REFRESH_TOKEN_EXPIRES_IN,
+    issuer: 'restaurant-points-system'
+  });
 
   return { accessToken, refreshToken };
 }
 
 /**
- * 验证访问Token
- * @param {string} token - JWT Token
- * @returns {Object|null} - 解码后的payload或null
+ * 验证Access Token
  */
 function verifyAccessToken(token) {
   try {
     return jwt.verify(token, JWT_SECRET);
   } catch (error) {
-    console.log('Token验证失败:', error.message);
+    console.log('Access Token验证失败:', error.message);
     return null;
   }
 }
 
 /**
- * 验证刷新Token
- * @param {string} token - 刷新Token
- * @returns {Object|null} - 解码后的payload或null
+ * 验证Refresh Token
  */
 function verifyRefreshToken(token) {
   try {
-    const decoded = jwt.verify(token, JWT_SECRET);
-    if (decoded.type !== 'refresh') {
-      return null;
-    }
-    return decoded;
+    return jwt.verify(token, JWT_SECRET);
   } catch (error) {
     console.log('刷新Token验证失败:', error.message);
     return null;
@@ -186,53 +166,6 @@ const requireAdmin = (req, res, next) => {
 };
 
 /**
- * 商家权限检查中间件
- */
-const requireMerchant = (req, res, next) => {
-  if (!req.user) {
-    return res.status(401).json({
-      code: 4001,
-      msg: '需要登录访问',
-      data: null
-    });
-  }
-
-  // 检查是否具有商家权限或管理员权限
-  if (!req.user.is_merchant && !req.user.is_admin) {
-    return res.status(403).json({
-      code: 4006,
-      msg: '需要商家权限',
-      data: null
-    });
-  }
-
-  next();
-};
-
-/**
- * 超级管理员权限检查中间件（需要同时具有admin和merchant权限）
- */
-const requireSuperAdmin = (req, res, next) => {
-  if (!req.user) {
-    return res.status(401).json({
-      code: 4001,
-      msg: '需要登录访问',
-      data: null
-    });
-  }
-
-  if (!req.user.is_admin || !req.user.is_merchant) {
-    return res.status(403).json({
-      code: 4007,
-      msg: '需要超级管理员权限',
-      data: null
-    });
-  }
-
-  next();
-};
-
-/**
  * 请求日志中间件
  */
 const requestLogger = (req, res, next) => {
@@ -266,8 +199,6 @@ module.exports = {
   authenticateToken,
   optionalAuth,
   requireAdmin,
-  requireMerchant,
-  requireSuperAdmin,
   requireUser,
   requestLogger
 }; 

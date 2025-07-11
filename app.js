@@ -26,7 +26,7 @@ const lotteryRoutes = require('./routes/lottery');
 const exchangeRoutes = require('./routes/exchange');
 const userRoutes = require('./routes/user');        // 🔴 新增用户路由
 const photoRoutes = require('./routes/photo');      // 🔴 启用拍照上传路由
-const merchantRoutes = require('./routes/merchant'); // 🔴 启用商家管理路由
+const merchantRoutes = require('./routes/merchant'); // 🔴 商家管理路由（仅管理员可访问）
 
 const app = express();
 const server = http.createServer(app);
@@ -158,7 +158,7 @@ app.use('/api/lottery', lotteryRoutes);  // 抽奖系统
 app.use('/api/exchange', exchangeRoutes); // 商品兑换
 app.use('/api/user', userRoutes);        // 🔴 用户管理
 app.use('/api/photo', photoRoutes);      // 🔴 拍照上传 - 已启用
-app.use('/api/merchant', merchantRoutes); // 🔴 商家管理 - 已启用
+app.use('/api/merchant', merchantRoutes); // 🔴 商家管理（仅管理员可访问）
 
 // 🔴 添加upload路由兼容性 - 修复前端路径不匹配问题
 app.use('/upload', photoRoutes);         // 🔴 兼容前端的/upload路径请求
@@ -201,14 +201,6 @@ if (process.env.NODE_ENV === 'development') {
           'GET /api/photo/statistics': '拍照统计',
           'GET /upload/records': '上传记录（兼容路径）',
           'POST /api/upload': '拍照上传（兼容路径）'  // 🔴 新增兼容路径说明
-        },
-        merchant: {
-          'POST /api/merchant/apply': '申请商家权限',
-          'GET /api/merchant/reviews/pending': '待审核列表',
-          'POST /api/merchant/reviews/:id/approve': '审核通过',
-          'POST /api/merchant/reviews/:id/reject': '审核拒绝',
-          'POST /api/merchant/reviews/batch': '批量审核',
-          'GET /api/merchant/statistics': '审核统计'
         }
       },
       websocket: {

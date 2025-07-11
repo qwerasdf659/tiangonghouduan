@@ -124,24 +124,15 @@ router.post('/upload', authenticateToken, upload.single('photo'), async (req, re
     
     await transaction.commit();
     
-    // 🔴 WebSocket通知商家有新的待审核图片
-    webSocketService.notifyMerchants('new_review', {
-      upload_id: uploadId,
-      user_id: userId,
-      amount: parsedAmount,
-      image_url: uploadResult,
-      uploaded_at: new Date().toISOString()
-    });
-    
     // 🔴 返回成功结果 - 等待人工审核
     res.json({
       code: 0,
-      msg: '图片上传成功，等待商家审核',
+      msg: '图片上传成功，等待管理员审核',
       data: {
         upload_id: uploadId,
         status: 'pending',
         amount: parsedAmount,
-        message: '您的消费凭证已提交，商家将在24小时内完成审核，请耐心等待',
+        message: '您的消费凭证已提交，管理员将在24小时内完成审核，请耐心等待',
         estimated_review_time: '24小时内'
       }
     });
@@ -461,24 +452,15 @@ router.post('/', authenticateToken, upload.single('photo'), async (req, res) => 
     
     await transaction.commit();
     
-    // 🔴 WebSocket通知商家有新的待审核图片
-    webSocketService.notifyMerchants('new_review', {
-      upload_id: uploadId,
-      user_id: userId,
-      amount: parsedAmount,
-      image_url: uploadResult,
-      uploaded_at: new Date().toISOString()
-    });
-    
     // 🔴 返回成功结果 - 等待人工审核
     res.json({
       code: 0,
-      msg: '图片上传成功，等待商家审核',
+      msg: '图片上传成功，等待管理员审核',
       data: {
         upload_id: uploadId,
         status: 'pending',
         amount: parsedAmount,
-        message: '您的消费凭证已提交，商家将在24小时内完成审核，请耐心等待',
+        message: '您的消费凭证已提交，管理员将在24小时内完成审核，请耐心等待',
         estimated_review_time: '24小时内'
       }
     });

@@ -6,7 +6,7 @@
  * - points_awarded: 积分奖励（审核通过时奖励）
  * - review_status: 审核状态（前端状态显示）
  * - amount: 消费金额（用户手动输入）
- * - actual_amount: 商家确认的实际消费金额
+ * - actual_amount: 管理员确认的实际消费金额
  */
 
 const { DataTypes } = require('sequelize');
@@ -58,14 +58,14 @@ const PhotoReview = sequelize.define('upload_reviews', {
     comment: '用户输入的消费金额'
   },
   
-  // 🔴 v2.1.2新增：商家确认的实际消费金额
+      // 🔴 v2.1.2新增：管理员确认的实际消费金额
   actual_amount: {
     type: DataTypes.DECIMAL(10, 2),
     allowNull: true,
     validate: {
       min: 0
     },
-    comment: '商家确认的实际消费金额'
+          comment: '管理员确认的实际消费金额'
   },
   
   // 🔴 奖励积分 - 前端显示
@@ -201,7 +201,7 @@ PhotoReview.createUploadRecord = async function(data) {
     original_filename,
     file_size,
     amount,  // 🔴 用户输入金额
-    actual_amount: null,  // 🔴 等待商家确认
+          actual_amount: null,  // 🔴 等待管理员确认
     points_awarded: 0,    // 🔴 审核通过后才设置
     review_status: 'pending',
     created_at: new Date()
@@ -240,7 +240,7 @@ PhotoReview.performReview = async function(upload_id, action, actual_amount, rea
   return review;
 };
 
-// 🔴 类方法 - 获取待审核列表（商家使用）
+  // 🔴 类方法 - 获取待审核列表（管理员使用）
 PhotoReview.getPendingReviews = async function(options = {}) {
   const { page = 1, limit = 20 } = options;
   const offset = (page - 1) * limit;

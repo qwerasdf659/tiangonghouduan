@@ -2,10 +2,9 @@
  * 用户模型 - 系统核心模型
  * 🔴 前端对接要点：
  * - 用户基础信息管理
- * - 权限控制（is_admin, is_merchant）
+ * - 权限控制（只分用户和管理员）
  * - 积分系统集成
  * - 安全信息脱敏
- * - 商家信息扩展
  */
 
 const { DataTypes } = require('sequelize');
@@ -56,19 +55,12 @@ const User = sequelize.define('User', {
     }
   },
   
-  // 🔴 权限管理
+  // 🔴 权限管理 - 简化为只有管理员权限
   is_admin: {
     type: DataTypes.BOOLEAN,
     allowNull: false,
     defaultValue: false,
     comment: '是否管理员'
-  },
-  
-  is_merchant: {
-    type: DataTypes.BOOLEAN,
-    allowNull: false,
-    defaultValue: false,
-    comment: '是否商家'
   },
   
   // 🔴 状态管理
@@ -91,77 +83,6 @@ const User = sequelize.define('User', {
     allowNull: false,
     defaultValue: 0,
     comment: '登录次数'
-  },
-  
-  // 🔴 商家信息扩展字段
-  merchant_status: {
-    type: DataTypes.ENUM('pending', 'approved', 'rejected'),
-    allowNull: true,
-    comment: '商家申请状态'
-  },
-  
-  business_name: {
-    type: DataTypes.STRING(100),
-    allowNull: true,
-    comment: '商家名称'
-  },
-  
-  business_license: {
-    type: DataTypes.STRING(100),
-    allowNull: true,
-    comment: '营业执照号'
-  },
-  
-  contact_person: {
-    type: DataTypes.STRING(50),
-    allowNull: true,
-    comment: '联系人'
-  },
-  
-  contact_phone: {
-    type: DataTypes.STRING(20),
-    allowNull: true,
-    comment: '联系电话'
-  },
-  
-  business_address: {
-    type: DataTypes.TEXT,
-    allowNull: true,
-    comment: '营业地址'
-  },
-  
-  business_type: {
-    type: DataTypes.STRING(50),
-    allowNull: true,
-    comment: '商家类型'
-  },
-  
-  apply_time: {
-    type: DataTypes.DATE,
-    allowNull: true,
-    comment: '申请时间'
-  },
-  
-  review_time: {
-    type: DataTypes.DATE,
-    allowNull: true,
-    comment: '审核时间'
-  },
-  
-  reviewer_id: {
-    type: DataTypes.INTEGER,
-    allowNull: true,
-    comment: '审核人ID',
-    references: {
-      model: 'users',
-      key: 'user_id'
-    }
-  },
-  
-  reject_reason: {
-    type: DataTypes.TEXT,
-    allowNull: true,
-    comment: '拒绝原因'
   }
 }, {
   tableName: 'users',
@@ -174,7 +95,7 @@ const User = sequelize.define('User', {
       fields: ['mobile']
     },
     {
-      fields: ['is_merchant', 'status']
+      fields: ['is_admin', 'status']
     }
   ]
 });
@@ -188,15 +109,9 @@ User.prototype.getSafeUserInfo = function() {
     avatar_url: this.avatar_url,
     total_points: this.total_points,
     is_admin: this.is_admin,
-    is_merchant: this.is_merchant,
     status: this.status,
     last_login: this.last_login,
-    created_at: this.created_at,
-    business_info: this.is_merchant ? {
-      name: this.business_name,
-      type: this.business_type,
-      status: this.merchant_status
-    } : null
+    created_at: this.created_at
   };
 };
 
@@ -208,20 +123,11 @@ User.prototype.getMaskedMobile = function() {
   return this.mobile.substring(0, 3) + '****' + this.mobile.substring(7);
 };
 
-// 🔴 实例方法：检查是否具有超级管理员权限
-User.prototype.isSuperAdmin = function() {
-  return this.is_admin === true && this.is_merchant === true;
-};
-
-// 🔴 实例方法：检查权限
+// 🔴 实例方法：检查权限 - 简化为只检查管理员权限
 User.prototype.hasPermission = function(permission) {
   switch (permission) {
     case 'admin':
       return this.is_admin;
-    case 'merchant':
-      return this.is_merchant;
-    case 'super_admin':
-      return this.isSuperAdmin();
     default:
       return false;
   }
@@ -255,21 +161,10 @@ User.updatePoints = async function(userId, pointsChange, description = '') {
   }
   
   await user.update({ total_points: newPoints });
-  
-  // 记录积分变更
-  const { PointsRecord } = require('./index');
-  await PointsRecord.create({
-    user_id: userId,
-    type: pointsChange > 0 ? 'earn' : 'spend',
-    points: Math.abs(pointsChange),
-    description,
-    balance_after: newPoints
-  });
-  
-  return user;
+  return newPoints;
 };
 
-// 🔴 类方法：批量更新用户权限
+// 🔴 类方法：批量更新用户权限 - 简化为只管理管理员权限
 User.batchUpdatePermissions = async function(userIds, permissions) {
   const updateData = {};
   
@@ -277,65 +172,29 @@ User.batchUpdatePermissions = async function(userIds, permissions) {
     updateData.is_admin = permissions.is_admin;
   }
   
-  if (permissions.is_merchant !== undefined) {
-    updateData.is_merchant = permissions.is_merchant;
+  if (Object.keys(updateData).length === 0) {
+    throw new Error('没有有效的权限更新数据');
   }
   
   const [affectedCount] = await this.update(updateData, {
-    where: {
-      user_id: userIds
-    }
+    where: { user_id: userIds }
   });
   
   return affectedCount;
 };
 
-// 🔴 类方法：获取商家统计信息
-User.getMerchantStats = async function() {
-  const { Op } = require('sequelize');
+// 🔴 类方法：获取权限统计
+User.getPermissionStats = async function() {
+  const [total, admins] = await Promise.all([
+    this.count({ where: { status: 'active' } }),
+    this.count({ where: { is_admin: true, status: 'active' } })
+  ]);
   
-  const stats = await this.findAll({
-    attributes: [
-      'merchant_status',
-      [sequelize.fn('COUNT', sequelize.col('user_id')), 'count']
-    ],
-    where: {
-      merchant_status: { [Op.ne]: null }
-    },
-    group: ['merchant_status'],
-    raw: true
-  });
-  
-  return stats.reduce((acc, item) => {
-    acc[item.merchant_status] = parseInt(item.count);
-    return acc;
-  }, {});
+  return {
+    total_users: total,
+    normal_users: total - admins,
+    admins: admins
+  };
 };
-
-// 🔴 钩子：创建用户前的验证
-User.beforeCreate(async (user, options) => {
-  // 验证手机号格式
-  if (!/^1[3-9]\d{9}$/.test(user.mobile)) {
-    throw new Error('手机号格式不正确');
-  }
-  
-  // 设置默认昵称
-  if (!user.nickname) {
-    user.nickname = `用户${user.mobile.substring(7)}`;
-  }
-});
-
-// 🔴 钩子：更新用户前的验证
-User.beforeUpdate(async (user, options) => {
-  // 如果修改了手机号，验证格式
-  if (user.changed('mobile') && !/^1[3-9]\d{9}$/.test(user.mobile)) {
-    throw new Error('手机号格式不正确');
-  }
-  
-  // 积分不能为负数
-  if (user.changed('total_points') && user.total_points < 0) {
-    throw new Error('积分不能为负数');
-  }
-});
 
 module.exports = User; 

@@ -3,6 +3,143 @@ description:
 globs: 
 alwaysApply: true
 ---
+# 问题诊断和状态管理规范（基于实际案例优化版）
+
+## 基于实际问题的诊断优化规范
+
+### 实际诊断效率问题统计
+从cursor_*.md文档分析发现：
+- **诊断方向错误率**：30%的时间浪费在错误方向上
+- **症状与根因混淆**：多次治标不治本的尝试
+- **状态检查重复**：同一状态被检查3-8次
+- **诊断时间过长**：平均15-20分钟（目标：5分钟内）
+
+### 快速问题分类系统（基于实际案例）
+
+#### A类问题：配置问题（实际案例分析）
+**典型案例**：API路径不匹配问题
+- 症状：404错误，接口不存在
+- 特征：错误信息明确，影响范围局限
+- 实际诊断时间：2分钟（应该30秒完成）
+- 根因：前端调用/api/upload，后端实际是/api/photo/upload
+
+**优化后诊断流程**：
+```bash
+# 30秒快速检查
+grep -r "POST.*upload" routes/ &
+curl -I http://localhost:3000/api/upload &
+wait
+# 立即发现路由不匹配，直接修复
+```
+
+#### B类问题：服务问题（实际案例分析）  
+**典型案例**：后端服务状态检查
+- 症状：服务无响应，连接失败
+- 实际检查次数：8次健康检查（严重浪费）
+- 应该：1次并行检查确定状态
+
+**优化后检查**：
+```bash
+# 1分钟并行状态检查
+curl -m 5 http://localhost:3000/health &
+pm2 status &
+netstat -tlnp | grep :3000 &
+ps aux | grep node &
+wait
+# 所有状态一次性确定
+```
+
+### 状态缓存机制（解决重复检查问题）
+
+#### 实际重复检查问题统计
+发现的重复模式：
+- 健康检查：8次（cursor_1.md）
+- 端口检查：6次（cursor_2.md）
+- 进程检查：7次（cursor_3.md）
+- 数据库检查：5次（cursor_5.md）
+
+#### 状态缓存实施规则
+```javascript
+// 状态缓存结构
+const statusCache = {
+  'health_check': {
+    result: 'healthy',
+    timestamp: Date.now(),
+    ttl: 300000  // 5分钟有效
+  },
+  'port_check_3000': {
+    result: 'listening',
+    timestamp: Date.now(),
+    ttl: 300000
+  }
+}
+
+// 检查前验证缓存
+function shouldSkipCheck(checkType) {
+  const cache = statusCache[checkType];
+  if (cache && (Date.now() - cache.timestamp) < cache.ttl) {
+    console.log(`跳过重复检查：${checkType}，使用缓存结果：${cache.result}`);
+    return true;
+  }
+  return false;
+}
+```
+
+### 症状与根因快速区分规范
+
+#### 实际混淆案例分析
+**案例1**：API缺失误判
+- 表面症状：前端请求失败，认为API不存在
+- 错误诊断：以为后端缺少API实现  
+- 实际根因：认证权限问题，API存在但需要管理员权限
+- 浪费时间：20分钟（应该2分钟定位）
+
+**案例2**：服务状态误判
+- 表面症状：健康检查失败
+- 错误诊断：认为服务没有启动
+- 实际根因：服务正常，网络或配置问题
+- 浪费时间：15分钟（应该1分钟定位）
+
+#### 根因分析标准流程
+```bash
+# 1. 症状确认（30秒）
+echo "症状：API返回404错误"
+
+# 2. 直接检查根因（60秒）
+grep -r "GET.*pending-reviews" routes/ &  # 检查路由是否存在
+curl -H "Authorization: Bearer admin_token" http://localhost:3000/api/merchant/pending-reviews &  # 检查权限
+wait
+
+# 3. 根因确定（30秒）
+echo "根因：路由存在，但需要管理员权限，前端使用了普通用户token"
+```
+
+### 常见问题快速解决方案库
+
+#### A类配置问题解决方案
+```bash
+# API路径不匹配 → 添加兼容路由（2分钟解决）
+echo "app.use('/api/upload', photoRoutes);" >> app.js
+
+# 参数验证过严 → 放宽验证（1分钟解决）  
+sed -i 's/!amount ||/amount &&/' routes/photo.js
+
+# 环境变量缺失 → 设置默认值（1分钟解决）
+echo "NODE_ENV=development" >> .env
+```
+
+#### B类服务问题解决方案
+```bash
+# 服务未启动 → 启动服务（30秒解决）
+pm2 start app.js --name restaurant-backend
+
+# 端口被占用 → 杀死占用进程（30秒解决）
+pkill -f "node.*app.js"
+
+# 数据库连接失败 → 检查配置（1分钟解决）
+mysql -h test-db-mysql.ns-br0za7uc.svc -u root -p
+```
+
 # 问题诊断和状态管理规范
 # 解决问题定位缓慢、状态重复检查和缓存管理问题
 

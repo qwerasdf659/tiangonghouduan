@@ -244,7 +244,7 @@ const notFoundHandler = (req, res) => {
         'GET /api/lottery/config - 抽奖配置',
         'GET /api/exchange/products - 商品列表',
         'POST /api/photo/upload - 拍照上传',
-        'GET /api/merchant/reviews/pending - 待审核列表'
+        '管理员功能已简化，无需商家审核'
       ]
     }
   };

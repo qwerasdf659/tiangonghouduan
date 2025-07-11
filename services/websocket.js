@@ -259,28 +259,7 @@ class WebSocketService {
     }
   }
 
-  // 🔴 商家通知推送 - 新的审核任务
-  notifyMerchants(event, data) {
-    const message = {
-      type: 'merchant_notification',
-      event: event, // new_review, review_update, etc.
-      data: {
-        ...data,
-        timestamp: new Date().toISOString()
-      }
-    };
-
-    // 广播给所有连接的商家用户（is_merchant = true）
-    this.userConnections.forEach((ws, userId) => {
-      if (ws.readyState === WebSocket.OPEN) {
-        // 这里可以添加商家身份验证逻辑
-        // 暂时广播给所有用户，后续可以优化为只给商家
-        this.sendToConnection(ws, message);
-      }
-    });
-
-    console.log(`🏪 商家通知推送: 事件${event} 数据:`, data);
-  }
+  // 商家功能已移除
 
   // 🔴 心跳检查 - 清理僵尸连接
   startHeartbeat() {

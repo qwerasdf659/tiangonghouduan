@@ -1,6 +1,6 @@
 /**
  * 设置超级管理员用户权限脚本
- * 用于恢复用户的超级管理员权限（is_admin: true, is_merchant: true）
+ * 用于恢复用户的超级管理员权限（is_admin: true）
  */
 
 const { User } = require('../models');
@@ -29,7 +29,6 @@ async function setupAdminUser() {
     // 设置用户为超级管理员
     await user.update({
       is_admin: true,
-      is_merchant: true,
       status: 'active'
     });
     console.log(`✅ 用户权限已更新: ${targetMobile}`);
@@ -40,8 +39,7 @@ async function setupAdminUser() {
       user_id: updatedUser.user_id,
       mobile: updatedUser.mobile,
       nickname: updatedUser.nickname,
-      is_admin: updatedUser.is_admin,
-      is_merchant: updatedUser.is_merchant,
+              is_admin: updatedUser.is_admin,
       total_points: updatedUser.total_points,
       status: updatedUser.status,
       is_super_admin: updatedUser.isSuperAdmin()

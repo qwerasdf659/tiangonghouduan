@@ -3,6 +3,476 @@ description:
 globs: 
 alwaysApply: true
 ---
+# 文档生成和缓存管理规范（基于实际冗余问题优化版 v2.0）
+
+## 🔴 基于cursor_1.md超标案例的紧急优化（2025年01月12日）
+
+### 严重文档膨胀实际案例分析
+
+#### cursor_1.md超标问题统计
+- **实际大小**: 213KB, 7258行（史上最严重膨胀案例）
+- **任务性质**: 后端服务状态检查（应该是简单任务）
+- **应该大小**: 2KB, 50行以内
+- **超标比例**: 10650%（106倍超标）
+- **信息重复率**: 300-500%（极其严重）
+
+#### 具体膨胀内容分析
+```markdown
+# cursor_1.md中发现的重复内容模式：
+
+## 健康检查记录重复8次
+✅ 服务：运行中（进程40469）
+✅ 端口：3000正常监听  
+✅ 数据库：连接正常
+✅ 健康检查：正常响应
+# ... 以上内容在文档中重复了8次！
+
+## 相同的curl命令输出重复记录
+curl http://localhost:3000/health
+{"status":"healthy","timestamp":"..."}
+# ... 相同的输出被记录了8次！
+
+## 重复的验证确认
+**任务完成** - 后端服务完全正常运行。
+# ... 类似的确认重复出现15+次！
+```
+
+#### 信息密度计算
+```javascript
+// cursor_1.md信息密度分析
+const docAnalysis = {
+  totalLines: 7258,
+  uniqueInformation: 50,      // 实际有用信息只有50行
+  redundantRate: 99.3,        // 99.3%都是冗余信息
+  repeatCount: {
+    healthCheck: 8,           // 健康检查重复8次
+    statusConfirm: 15,        // 状态确认重复15次
+    commandOutput: 12,        // 命令输出重复12次
+    taskComplete: 18          // 任务完成重复18次
+  }
+};
+
+// 信息密度 = 有用信息 / 总信息 = 50 / 7258 = 0.7%
+console.log(`信息密度：${(docAnalysis.uniqueInformation / docAnalysis.totalLines * 100).toFixed(1)}%`);
+```
+
+### 文档长度硬性限制和超标处罚
+
+#### 按任务复杂度强制控制（基于实际案例）
+```javascript
+// 基于cursor_1.md案例制定的硬性限制
+const DOC_LENGTH_CONTROLS = {
+  status_check: {
+    maxLines: 50,           // cursor_1.md应该控制在50行内
+    maxSize: '2KB',         // 而不是213KB
+    penalty: 'SEVERE',      // 超标处罚级别
+    template: 'status_simple.md'
+  },
+  
+  simple_debug: {
+    maxLines: 100,
+    maxSize: '5KB',
+    penalty: 'MODERATE',
+    template: 'debug_simple.md'
+  },
+  
+  medium_task: {
+    maxLines: 200,
+    maxSize: '10KB', 
+    penalty: 'WARNING',
+    template: 'task_medium.md'
+  },
+  
+  complex_task: {
+    maxLines: 500,          // 绝对上限
+    maxSize: '25KB',        // 绝对上限
+    penalty: 'CRITICAL',
+    template: 'task_complex.md'
+  }
+};
+
+// 文档长度验证和自动截断
+function validateAndTruncateDoc(content, taskType) {
+  const lines = content.split('\n');
+  const limit = DOC_LENGTH_CONTROLS[taskType];
+  
+  if (lines.length > limit.maxLines) {
+    console.error(`🚫 文档超长：${lines.length}行 > ${limit.maxLines}行限制`);
+    
+    // 自动截断到限制长度
+    const truncated = lines.slice(0, limit.maxLines);
+    truncated.push('', '--- 文档已截断，超出长度限制 ---');
+    
+    return {
+      content: truncated.join('\n'),
+      truncated: true,
+      originalLength: lines.length,
+      newLength: limit.maxLines
+    };
+  }
+  
+  return { content, truncated: false };
+}
+```
+
+### 重复内容智能检测和清理
+
+#### 基于cursor_1.md的重复模式检测算法
+```javascript
+// 重复内容检测算法（基于实际发现的模式）
+function detectRepeatPatterns(content) {
+  const lines = content.split('\n');
+  const patterns = {
+    healthCheck: /curl.*localhost:3000\/health/,
+    statusConfirm: /✅.*服务.*运行中/,
+    taskComplete: /任务完成.*后端服务.*正常/,
+    commandOutput: /\{"status":"healthy"/
+  };
+  
+  const detectedRepeats = {};
+  
+  Object.keys(patterns).forEach(patternName => {
+    const matches = lines.filter(line => patterns[patternName].test(line));
+    if (matches.length > 1) {
+      detectedRepeats[patternName] = {
+        count: matches.length,
+        firstLine: lines.indexOf(matches[0]) + 1,
+        lines: matches
+      };
+    }
+  });
+  
+  return detectedRepeats;
+}
+
+// 自动去重算法
+function autoDeduplication(content) {
+  const repeats = detectRepeatPatterns(content);
+  let cleanedContent = content;
+  
+  Object.keys(repeats).forEach(patternName => {
+    const pattern = repeats[patternName];
+    if (pattern.count > 2) {
+      console.log(`🧹 清理重复内容：${patternName} (${pattern.count}次 -> 1次)`);
+      
+      // 保留第一个，删除其余
+      const firstLine = pattern.lines[0];
+      const regex = new RegExp(escapeRegExp(firstLine), 'g');
+      let matchCount = 0;
+      
+      cleanedContent = cleanedContent.replace(regex, (match) => {
+        matchCount++;
+        return matchCount === 1 ? match : ''; // 只保留第一个匹配
+      });
+    }
+  });
+  
+  return cleanedContent;
+}
+```
+
+### 信息密度强制要求（解决0.7%密度问题）
+
+#### 信息密度量化标准
+```javascript
+// 基于cursor_1.md的负面案例制定标准
+const INFO_DENSITY_STANDARDS = {
+  minimum_density: 0.4,      // 最低40%信息密度
+  target_density: 0.7,       // 目标70%信息密度
+  excellent_density: 0.9,    // 优秀90%信息密度
+  
+  // cursor_1.md实际密度: 0.007 (0.7%) - 严重不合格
+  failure_threshold: 0.1     // 低于10%视为严重失败
+};
+
+function calculateInfoDensity(content) {
+  const lines = content.split('\n').filter(line => line.trim());
+  const meaningfulLines = lines.filter(line => {
+    // 排除空行、重复行、装饰行
+    return !isDecorative(line) && 
+           !isRepeat(line) && 
+           hasMeaningfulContent(line);
+  });
+  
+  const density = meaningfulLines.length / lines.length;
+  
+  if (density < INFO_DENSITY_STANDARDS.failure_threshold) {
+    throw new Error(`🚫 信息密度严重不足：${(density*100).toFixed(1)}% < ${(INFO_DENSITY_STANDARDS.failure_threshold*100)}%`);
+  }
+  
+  return density;
+}
+
+function hasMeaningfulContent(line) {
+  const meaninglessPatterns = [
+    /^#{1,6}\s*$/,                    // 空标题
+    /^-{3,}$/,                        // 分割线
+    /^✅.*正常.*$/,                   // 重复的状态确认
+    /^.*任务完成.*$/,                 // 重复的完成确认
+    /^\s*```\s*$/,                    // 空代码块
+    /^.*已完成.*$/                    // 重复的完成标记
+  ];
+  
+  return !meaninglessPatterns.some(pattern => pattern.test(line));
+}
+```
+
+### 标准文档模板强制使用（防止cursor_1.md式膨胀）
+
+#### 状态检查标准模板（最大50行）
+```markdown
+# 后端服务状态检查
+
+## 检查结果（5秒并行检查）
+✅ 服务状态：运行中 (PID: 40469)
+✅ 端口监听：3000端口正常
+✅ 数据库连接：healthy
+✅ 健康检查：正常响应
+
+## 核心数据
+- 用户：33个 | 奖品：8个 | 商品：11个
+- 内存：76MB | 响应时间：30ms
+
+## 总结
+后端服务完全正常，无需任何修复。
+
+**任务完成**
+```
+
+#### 模板强制验证
+```javascript
+// 强制使用模板验证
+function enforceTemplate(content, taskType) {
+  const templates = {
+    status_check: {
+      requiredSections: ['检查结果', '总结'],
+      maxSections: 4,
+      forbiddenPatterns: [
+        /重复.*检查/,           // 禁止重复检查描述
+        /.*已完成.*已完成/,     // 禁止重复完成确认
+        /curl.*curl/           // 禁止重复命令记录
+      ]
+    }
+  };
+  
+  const template = templates[taskType];
+  if (!template) return true;
+  
+  // 检查禁止模式
+  template.forbiddenPatterns.forEach(pattern => {
+    if (pattern.test(content)) {
+      throw new Error(`🚫 检测到禁止模式：${pattern.source}`);
+    }
+  });
+  
+  return true;
+}
+```
+
+### 实时文档质量监控
+
+#### 文档质量评分系统
+```javascript
+function calculateDocQuality(content, taskType) {
+  const metrics = {
+    length: calculateLengthScore(content, taskType),
+    density: calculateInfoDensity(content),
+    repetition: calculateRepetitionScore(content),
+    structure: calculateStructureScore(content)
+  };
+  
+  const weights = {
+    length: 0.3,      // 长度控制30%
+    density: 0.4,     // 信息密度40%
+    repetition: 0.2,  // 重复控制20%
+    structure: 0.1    // 结构质量10%
+  };
+  
+  const totalScore = Object.keys(metrics).reduce((sum, key) => {
+    return sum + metrics[key] * weights[key];
+  }, 0);
+  
+  return {
+    score: totalScore,
+    grade: getGrade(totalScore),
+    metrics: metrics,
+    suggestions: generateSuggestions(metrics)
+  };
+}
+
+function getGrade(score) {
+  if (score >= 0.9) return 'A';
+  if (score >= 0.8) return 'B';  
+  if (score >= 0.7) return 'C';
+  if (score >= 0.6) return 'D';
+  return 'F'; // cursor_1.md级别的失败
+}
+```
+
+## 严重文档冗余问题分析
+
+### 实际文档膨胀统计
+基于实际文档分析：
+- **cursor_1.md**：213KB，7258行（严重膨胀）
+- **cursor_5.md**：38KB，1375行（中度膨胀）  
+- **cursor_.md**：91KB，2956行（中度膨胀）
+- **信息重复率**：300-500%（极其严重）
+
+### 文档长度控制强制规范
+
+#### 按问题复杂度严格控制
+```javascript
+// 文档长度控制算法
+const DOC_LIMITS = {
+  simple: {
+    maxLines: 50,        // 配置修复、状态检查等
+    maxSize: '2KB',
+    examples: ['API路径修复', '服务重启', '配置调整']
+  },
+  medium: {
+    maxLines: 200,       // 代码逻辑修复、功能调试等  
+    maxSize: '8KB',
+    examples: ['接口调试', '权限修复', '数据库问题']
+  },
+  complex: {
+    maxLines: 500,       // 系统重构、架构调整等
+    maxSize: '20KB', 
+    examples: ['系统升级', '架构重构', '大型功能开发']
+  }
+}
+
+// 超出限制自动截断
+if (docLines > DOC_LIMITS[complexity].maxLines) {
+  throw new Error(`文档超出${complexity}问题限制：${docLines}行 > ${DOC_LIMITS[complexity].maxLines}行`);
+}
+```
+
+#### 实际超标案例分析
+**cursor_1.md问题分析**：
+- 实际内容：后端服务启动检查
+- 问题复杂度：简单（应该50行）
+- 实际长度：7258行（超标14416%）
+- 主要冗余：重复的状态检查记录
+
+**优化后应该的格式**：
+```markdown
+# 后端服务启动
+
+## 状态检查
+✅ 服务：运行中（进程40469）
+✅ 端口：3000正常监听  
+✅ 数据库：连接正常
+✅ 健康检查：正常响应
+
+## 解决方案
+无需修复，所有服务正常。
+
+## 验证结果
+curl http://localhost:3000/health → {"status":"healthy"}
+
+**任务完成** - 后端服务完全正常运行。
+```
+
+### 信息重复检测和清理
+
+#### 实际重复信息模式
+发现的重复模式：
+1. **状态检查结果重复**：健康检查结果记录8次
+2. **命令执行重复**：相同命令重复记录6-7次
+3. **分析过程重复**：相同的思考过程重复描述
+4. **验证结果重复**：相同的验证结果重复确认
+
+#### 重复信息自动清理算法
+```javascript
+// 重复内容检测
+function detectDuplicates(content) {
+  const blocks = content.split('\n\n');
+  const duplicates = [];
+  
+  for (let i = 0; i < blocks.length; i++) {
+    for (let j = i + 1; j < blocks.length; j++) {
+      const similarity = calculateSimilarity(blocks[i], blocks[j]);
+      if (similarity > 0.8) {  // 80%相似度阈值
+        duplicates.push({ index: j, similarity, original: i });
+      }
+    }
+  }
+  
+  return duplicates;
+}
+
+// 自动删除重复内容
+function removeDuplicates(content) {
+  const duplicates = detectDuplicates(content);
+  const blocks = content.split('\n\n');
+  
+  // 从后往前删除，避免索引变化
+  duplicates.sort((a, b) => b.index - a.index);
+  duplicates.forEach(dup => {
+    blocks.splice(dup.index, 1);
+    console.log(`删除重复内容（相似度${dup.similarity}）`);
+  });
+  
+  return blocks.join('\n\n');
+}
+```
+
+### 工具调用效率优化（详细规则见02-tool-optimization-standards.mdc）
+
+#### 效率优化核心指标
+- **目标工具调用数**：简单任务<20次，中等任务<50次，复杂任务<100次
+- **cursor_1.md教训**：180+次调用严重超标，主要浪费在重复状态检查
+- **优化重点**：重复检测、并行化、结果缓存
+
+> 详细的工具调用预算算法、重复检测机制和并行化策略请参考 `02-tool-optimization-standards.mdc`
+
+### 缓存管理效率优化
+
+#### 实际缓存问题分析
+发现的缓存问题：
+- **文件状态缓存**：list_dir显示与实际不符3次
+- **服务状态缓存**：健康检查结果未缓存，重复检查8次
+- **API响应缓存**：相同请求重复执行5次
+
+#### 智能缓存策略
+```javascript
+// 分层缓存策略
+const cacheStrategy = {
+  // 1分钟缓存：快速变化的状态
+  short: {
+    ttl: 60000,
+    items: ['process_status', 'port_status', 'memory_usage']
+  },
+  
+  // 5分钟缓存：相对稳定的状态  
+  medium: {
+    ttl: 300000,
+    items: ['health_check', 'service_status', 'database_connection']
+  },
+  
+  // 30分钟缓存：基本不变的信息
+  long: {
+    ttl: 1800000,
+    items: ['project_structure', 'config_files', 'dependencies']
+  }
+}
+
+// 缓存失效策略
+function invalidateCache(operation) {
+  const invalidationRules = {
+    'file_edit': ['file_content', 'project_structure'],
+    'service_restart': ['health_check', 'process_status', 'port_status'],
+    'config_change': ['config_files', 'service_status']
+  };
+  
+  const toInvalidate = invalidationRules[operation] || [];
+  toInvalidate.forEach(cacheKey => {
+    delete cache[cacheKey];
+    console.log(`缓存失效：${cacheKey}`);
+  });
+}
+```
+
 # 文档生成和缓存管理规范
 # 解决文档冗余、信息过载和工具调用效率问题
 

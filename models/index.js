@@ -202,7 +202,7 @@ async function getStatistics() {
       users: {
         total: await User.count(),
         active: await User.count({ where: { status: 'active' } }),
-        merchants: await User.count({ where: { is_merchant: true } })
+        admins: await User.count({ where: { is_admin: true } })
       },
       lottery: {
         total_prizes: await LotterySetting.count(),

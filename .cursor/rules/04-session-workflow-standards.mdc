@@ -3,7 +3,256 @@ description:
 globs: 
 alwaysApply: true
 ---
-# 会话工作流程标准
+# 会话工作流程标准（基于实际问题诊断优化版 v2.0）
+
+## 🔴 基于实际运行时间违规的紧急优化（2025年01月12日）
+
+### 实际运行时间违规问题统计
+
+#### 发现的严重超时案例
+基于用户明确投诉分析：
+- **"运行时间这么长"投诉**：5次明确记录
+- **"违反120秒规则"问题**：多次未使用timeout包装
+- **实际耗时统计**：
+  * 5分钟问题花费30-40分钟解决（超时600-800%）
+  * 简单状态检查耗时15-20分钟（应该2分钟内完成）
+  * 后端服务启动确认耗时1小时+（应该5分钟完成）
+
+#### 时间超标根本原因分析
+1. **重复状态检查**：健康检查重复8次，浪费10-15分钟
+2. **串行操作过多**：独立检查串行执行，浪费等待时间
+3. **缺乏timeout控制**：命令卡住无自动重试机制
+4. **文档生成冗余**：7258行文档生成耗时过长
+
+### 2分钟快速诊断强制规范（替代5分钟规范）
+
+**第1分钟：并行信息收集（30秒完成）**
+```bash
+# 强制并行执行，严禁串行
+{
+  curl -m 10 http://localhost:3000/health &
+  pm2 status &
+  netstat -tlnp | grep :3000 &
+  ps aux | grep node &
+} | tee system_status.log
+wait  # 等待所有并行命令完成
+```
+
+**第2分钟：根因定位和解决方案（90秒完成）**
+```bash
+# 根据第1分钟结果快速决策
+if [[ $health_status == "healthy" ]]; then
+  echo "✅ 系统正常，无需修复"
+  exit 0
+fi
+
+# 快速修复策略（禁止复杂诊断）
+case $error_type in
+  "port_occupied") pkill -f "node.*app.js" && npm start ;;
+  "service_down") pm2 restart all ;;
+  "config_error") cp config.backup config.json && npm start ;;
+  *) echo "使用标准重启方案" && npm start ;;
+esac
+```
+
+### 强制timeout包装机制（解决卡住问题）
+
+#### 所有命令强制timeout包装
+```bash
+# 🔴 强制要求：所有可能超时的命令必须包装
+timeout 120s npm install                    # 依赖安装
+timeout 60s mysql -h host -u user -p       # 数据库连接
+timeout 30s curl http://localhost:3000     # HTTP请求
+timeout 180s node scripts/init-database.js # 数据库初始化
+
+# 自动重试机制
+for i in {1..3}; do
+  if timeout 120s npm start; then
+    echo "✅ 服务启动成功"
+    break
+  else
+    echo "❌ 第${i}次启动失败，重试中..."
+    pkill -f "node.*app.js"
+    sleep 2
+  fi
+done
+```
+
+#### 网络请求强制超时控制
+```bash
+# HTTP请求统一格式
+curl -m 30 -f --retry 2 --retry-delay 1 \
+  --connect-timeout 10 --max-time 30 \
+  http://localhost:3000/health
+
+# WebSocket连接测试
+timeout 15s wscat -c ws://localhost:3000/ws
+
+# 数据库连接测试  
+timeout 10s mysql -h host -u user -p -e "SELECT 1"
+```
+
+### 文档长度强制控制（解决7258行膨胀问题）
+
+#### 实际文档膨胀案例分析
+- **cursor_1.md**: 213KB, 7258行（超标14416%）
+- **实际内容**: 后端服务状态检查（应该50行内完成）
+- **主要冗余**: 重复的状态检查记录、重复的命令输出
+
+#### 文档长度硬性限制
+```javascript
+const DOC_LENGTH_LIMITS = {
+  status_check: {
+    maxLines: 50,
+    maxSize: '2KB',
+    template: 'status_template.md'
+  },
+  simple_fix: {
+    maxLines: 100,
+    maxSize: '5KB', 
+    template: 'fix_template.md'
+  },
+  complex_task: {
+    maxLines: 300,
+    maxSize: '15KB',
+    template: 'complex_template.md'
+  }
+};
+
+// 文档长度检查
+function validateDocLength(content, taskType) {
+  const lines = content.split('\n').length;
+  const size = Buffer.byteLength(content, 'utf8');
+  const limit = DOC_LENGTH_LIMITS[taskType];
+  
+  if (lines > limit.maxLines) {
+    throw new Error(`文档超长：${lines}行 > ${limit.maxLines}行限制`);
+  }
+  
+  if (size > parseSize(limit.maxSize)) {
+    throw new Error(`文档过大：${(size/1024).toFixed(1)}KB > ${limit.maxSize}限制`);
+  }
+}
+```
+
+#### 标准文档模板（强制使用）
+```markdown
+# 标准状态检查模板（最大50行）
+
+## 任务概述
+- 目标：确认后端服务状态
+- 预期时间：2分钟内完成
+
+## 检查结果
+✅/❌ 服务状态：[正常/异常]
+✅/❌ 端口监听：[3000端口状态]  
+✅/❌ 数据库连接：[连接状态]
+✅/❌ 健康检查：[响应状态]
+
+## 解决方案（如需要）
+[具体修复步骤]
+
+## 验证结果
+[最终状态确认]
+
+**任务完成**：[总结一句话]
+```
+
+### 重复状态检查防止（详细规则见05-problem-diagnosis-state-management.mdc）
+
+#### 核心防重原则
+- **5分钟缓存规则**：相同状态检查5分钟内禁止重复
+- **并行检查优先**：将相关状态检查合并为一次并行操作
+- **缓存结果复用**：优先使用已缓存的检查结果
+
+```bash
+# ✅ 正确的并行状态检查模式
+{
+  curl -m 5 http://localhost:3000/health &
+  pm2 status &
+  netstat -tlnp | grep :3000 &
+  ps aux | grep node &
+} | tee status_check.log
+wait
+```
+
+> 详细的状态检查防重算法和缓存机制请参考 `05-problem-diagnosis-state-management.mdc`
+
+## 基于实际问题的流程优化规范
+
+### 实际会话效率问题统计
+基于cursor_1.md(213KB)、cursor_5.md(38KB)等文档分析：
+- **信息重复率**：300-500%（严重超标）
+- **简单问题复杂化**：50行问题生成1000+行文档
+- **工具调用浪费**：180次调用应控制在50次内
+- **诊断时间过长**：5分钟问题花费30-40分钟解决
+
+### 5分钟快速诊断强制规范
+**第1分钟：问题类型快速识别**
+```bash
+# 并行执行基础检查
+curl -m 10 http://localhost:3000/health &
+pm2 status &
+netstat -tlnp | grep :3000 &
+wait
+```
+
+**第2-3分钟：根因定位**
+- A类问题（配置）：检查配置文件和环境变量
+- B类问题（服务）：检查进程状态和端口占用  
+- C类问题（代码）：检查日志和API响应
+- D类问题（环境）：检查依赖和系统状态
+
+**第4-5分钟：解决方案确定**
+- 标准解决方案优先（重启、配置修复）
+- 避免复杂诊断和试错
+- 预设解决方案模板匹配
+
+### 重复状态检查严格防止
+
+#### 实际发现的重复模式（需要避免）
+```bash
+# ❌ 错误模式：重复检查（在cursor_1.md中发现8次）
+curl http://localhost:3000/health
+# 等待5分钟后又检查
+curl http://localhost:3000/health
+# 又再次检查
+curl http://localhost:3000/health
+```
+
+#### 状态检查去重机制
+- **检查历史记录**：维护已完成检查的清单和时间戳
+- **5分钟缓存规则**：相同检查5分钟内禁止重复执行
+- **状态变更触发**：只有在相关操作完成后才重新检查
+- **批量检查要求**：相关状态必须一次性并行检查完成
+
+### 工作流程时机优化（基于实际问题）
+
+#### 实际发现的低效模式
+- **阶段混乱**：诊断中穿插修复，修复中又重新诊断
+- **重点不明**：核心问题被大量细节掩盖
+- **进度不清**：用户无法了解当前进度和剩余时间
+
+#### 标准化工作流程
+- **阶段1**：快速诊断（5分钟内完成）
+- **阶段2**：问题修复（专注解决，避免重复检查）
+- **阶段3**：效果验证（一次性验证所有修复项）
+- **阶段4**：文档生成（简洁记录，避免冗余）
+
+### 文档长度强制控制
+
+#### 实际文档膨胀问题
+- cursor_1.md：213KB，7258行（严重超标）
+- cursor_5.md：38KB，1375行（中度超标）
+- 简单问题变成复杂文档
+
+#### 文档长度控制机制
+- **简单问题**：不超过50行
+- **中等问题**：不超过200行  
+- **复杂问题**：不超过500行
+- **信息密度要求**：每行至少1个有效信息点
+
+## 会话工作流程标准
 # 基于实际会话分析，解决信息重复和流程混乱问题
 
 ## 核心问题分析
