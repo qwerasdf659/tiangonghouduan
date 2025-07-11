@@ -1,10 +1,17 @@
 /**
  * 商家管理API路由 - 仅管理员可访问
  * 🔴 权限要求：所有接口都需要管理员权限（is_admin = true）
+ * 
  * 🔴 前端对接要点：
  * - 普通用户登录时不显示商家管理入口
  * - 管理员登录时显示商家管理入口
  * - 所有商家管理功能由管理员执行
+ * 
+ * 🔴 照片审核权限说明：
+ * - 管理员可以审核所有用户（普通用户+管理员）上传的照片
+ * - 管理员可以审核自己上传的照片
+ * - 无用户类型限制，审核对象包括：普通用户、管理员用户
+ * - 审核功能：approve(通过) / reject(拒绝)
  */
 
 const express = require('express');
@@ -32,7 +39,7 @@ router.get('/pending-reviews', authenticateToken, requireAdmin, async (req, res)
       include: [{
         model: User,
         as: 'user',  // 🔴 修复：添加别名，与模型关联定义一致
-        attributes: ['user_id', 'mobile', 'nickname', 'total_points']
+        attributes: ['user_id', 'mobile', 'nickname', 'total_points', 'is_admin']  // 🔴 添加is_admin字段
       }],
       order: [['created_at', 'DESC']],
       limit: parseInt(limit),
@@ -46,7 +53,8 @@ router.get('/pending-reviews', authenticateToken, requireAdmin, async (req, res)
         user_id: review.user.user_id,
         nickname: review.user.nickname,
         mobile: review.user.getMaskedMobile(),
-        total_points: review.user.total_points
+        total_points: review.user.total_points,
+        is_admin: review.user.is_admin  // 🔴 添加管理员状态显示
       },
       image_url: review.image_url,
       original_filename: review.original_filename,
@@ -509,6 +517,394 @@ router.get('/review/:upload_id', authenticateToken, requireAdmin, async (req, re
     res.json({
       code: 5000,
       msg: '获取详情失败',
+      data: null
+    });
+  }
+});
+
+// 🔴 商品管理接口（仅管理员）- 新增商品管理功能
+const { CommodityPool } = require('../models');
+
+// 🔴 获取商品统计数据（仅管理员）
+router.get('/product-stats', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    // 并行查询商品统计数据
+    const [
+      activeCount,
+      offlineCount,
+      lowStockCount,
+      totalCount,
+      outOfStockCount
+    ] = await Promise.all([
+      CommodityPool.count({ where: { status: 'active' } }),
+      CommodityPool.count({ where: { status: 'inactive' } }),
+      CommodityPool.count({ 
+        where: { 
+          status: 'active',
+          stock: { [Op.lte]: 5 } 
+        } 
+      }),
+      CommodityPool.count(),
+      CommodityPool.count({ 
+        where: { 
+          status: 'active',
+          stock: 0 
+        } 
+      })
+    ]);
+    
+    res.json({
+      code: 0,
+      msg: 'success',
+      data: {
+        activeCount,           // 上架商品数量
+        offlineCount,          // 下架商品数量
+        lowStockCount,         // 低库存商品数量（库存≤5）
+        totalCount,            // 总商品数量
+        outOfStockCount        // 零库存商品数量
+      }
+    });
+    
+  } catch (error) {
+    console.error('获取商品统计失败:', error);
+    res.json({
+      code: 5000,
+      msg: '获取商品统计失败',
+      data: null
+    });
+  }
+});
+
+// 🔴 获取商品列表（仅管理员）
+router.get('/products', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const {
+      page = 1,
+      page_size = 20,
+      category = 'all',
+      status = 'all',
+      sort_by = 'sort_order',
+      sort_order = 'ASC'
+    } = req.query;
+    
+    const offset = (page - 1) * page_size;
+    
+    // 构建查询条件
+    const whereCondition = {};
+    
+    if (category !== 'all') {
+      whereCondition.category = category;
+    }
+    
+    if (status !== 'all') {
+      whereCondition.status = status;
+    }
+    
+    // 查询商品列表
+    const { count, rows } = await CommodityPool.findAndCountAll({
+      where: whereCondition,
+      order: [[sort_by, sort_order.toUpperCase()]],
+      limit: parseInt(page_size),
+      offset
+    });
+    
+    // 格式化返回数据
+    const products = rows.map(product => ({
+      commodity_id: product.commodity_id,
+      name: product.name,
+      description: product.description,
+      category: product.category,
+      exchange_points: product.exchange_points,
+      stock: product.stock,
+      image: product.image_url,
+      status: product.status,
+      is_hot: product.is_hot || false,
+      sort_order: product.sort_order || 0,
+      rating: product.rating || 5.0,
+      sales_count: product.sales_count || 0,
+      created_at: product.created_at,
+      updated_at: product.updated_at
+    }));
+    
+    res.json({
+      code: 0,
+      msg: 'success',
+      data: {
+        products,
+        pagination: {
+          total: count,
+          page: parseInt(page),
+          page_size: parseInt(page_size),
+          totalPages: Math.ceil(count / page_size)
+        }
+      }
+    });
+    
+  } catch (error) {
+    console.error('获取商品列表失败:', error);
+    res.json({
+      code: 5000,
+      msg: '获取商品列表失败',
+      data: null
+    });
+  }
+});
+
+// 🔴 创建商品（仅管理员）
+router.post('/products', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const {
+      name,
+      description,
+      category,
+      exchange_points,
+      stock,
+      image_url,
+      is_hot = false,
+      sort_order = 0
+    } = req.body;
+    
+    // 参数验证
+    if (!name || !category || !exchange_points || exchange_points <= 0) {
+      return res.json({
+        code: 1001,
+        msg: '商品名称、分类和积分不能为空，积分必须大于0',
+        data: null
+      });
+    }
+    
+    if (stock < 0) {
+      return res.json({
+        code: 1002,
+        msg: '库存数量不能为负数',
+        data: null
+      });
+    }
+    
+    // 创建商品
+    const newProduct = await CommodityPool.create({
+      name,
+      description,
+      category,
+      exchange_points: parseInt(exchange_points),
+      stock: parseInt(stock) || 0,
+      image_url,
+      status: 'active',
+      is_hot: Boolean(is_hot),
+      sort_order: parseInt(sort_order) || 0,
+      created_at: new Date(),
+      updated_at: new Date()
+    });
+    
+    res.json({
+      code: 0,
+      msg: 'success',
+      data: {
+        commodity_id: newProduct.commodity_id,
+        name: newProduct.name,
+        message: '商品创建成功'
+      }
+    });
+    
+  } catch (error) {
+    console.error('创建商品失败:', error);
+    res.json({
+      code: 5000,
+      msg: '创建商品失败',
+      data: null
+    });
+  }
+});
+
+// 🔴 更新商品（仅管理员）
+router.put('/products/:id', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const updateData = req.body;
+    
+    // 查找商品
+    const product = await CommodityPool.findByPk(id);
+    if (!product) {
+      return res.json({
+        code: 1001,
+        msg: '商品不存在',
+        data: null
+      });
+    }
+    
+    // 验证更新字段
+    const allowedFields = [
+      'name', 'description', 'category', 'exchange_points', 
+      'stock', 'image_url', 'status', 'is_hot', 'sort_order'
+    ];
+    
+    const filteredData = {};
+    allowedFields.forEach(field => {
+      if (updateData[field] !== undefined) {
+        filteredData[field] = updateData[field];
+      }
+    });
+    
+    if (Object.keys(filteredData).length === 0) {
+      return res.json({
+        code: 1002,
+        msg: '没有可更新的字段',
+        data: null
+      });
+    }
+    
+    // 添加更新时间
+    filteredData.updated_at = new Date();
+    
+    // 更新商品
+    await product.update(filteredData);
+    
+    res.json({
+      code: 0,
+      msg: 'success',
+      data: {
+        commodity_id: product.commodity_id,
+        message: '商品更新成功'
+      }
+    });
+    
+  } catch (error) {
+    console.error('更新商品失败:', error);
+    res.json({
+      code: 5000,
+      msg: '更新商品失败',
+      data: null
+    });
+  }
+});
+
+// 🔴 删除商品（仅管理员）
+router.delete('/products/:id', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // 查找商品
+    const product = await CommodityPool.findByPk(id);
+    if (!product) {
+      return res.json({
+        code: 1001,
+        msg: '商品不存在',
+        data: null
+      });
+    }
+    
+    // 软删除：将状态设置为 inactive
+    await product.update({
+      status: 'inactive',
+      updated_at: new Date()
+    });
+    
+    res.json({
+      code: 0,
+      msg: 'success',
+      data: {
+        commodity_id: product.commodity_id,
+        message: '商品删除成功'
+      }
+    });
+    
+  } catch (error) {
+    console.error('删除商品失败:', error);
+    res.json({
+      code: 5000,
+      msg: '删除商品失败',
+      data: null
+    });
+  }
+});
+
+// 🔴 批量更新商品（仅管理员）
+router.post('/products/batch-update', authenticateToken, requireAdmin, async (req, res) => {
+  const transaction = await sequelize.transaction();
+  
+  try {
+    const { products } = req.body;
+    
+    if (!Array.isArray(products) || products.length === 0) {
+      await transaction.rollback();
+      return res.json({
+        code: 1001,
+        msg: '商品列表不能为空',
+        data: null
+      });
+    }
+    
+    const results = [];
+    let successCount = 0;
+    let failedCount = 0;
+    
+    for (const productUpdate of products) {
+      try {
+        const { commodity_id, ...updateData } = productUpdate;
+        
+        if (!commodity_id) {
+          results.push({
+            commodity_id,
+            success: false,
+            error: '商品ID不能为空'
+          });
+          failedCount++;
+          continue;
+        }
+        
+        const product = await CommodityPool.findByPk(commodity_id, { transaction });
+        if (!product) {
+          results.push({
+            commodity_id,
+            success: false,
+            error: '商品不存在'
+          });
+          failedCount++;
+          continue;
+        }
+        
+        // 添加更新时间
+        updateData.updated_at = new Date();
+        
+        await product.update(updateData, { transaction });
+        
+        results.push({
+          commodity_id,
+          success: true,
+          message: '更新成功'
+        });
+        successCount++;
+        
+      } catch (error) {
+        results.push({
+          commodity_id: productUpdate.commodity_id,
+          success: false,
+          error: error.message
+        });
+        failedCount++;
+      }
+    }
+    
+    await transaction.commit();
+    
+    res.json({
+      code: 0,
+      msg: 'success',
+      data: {
+        success_count: successCount,
+        failed_count: failedCount,
+        results
+      }
+    });
+    
+  } catch (error) {
+    if (!transaction.finished) {
+      await transaction.rollback();
+    }
+    console.error('批量更新商品失败:', error);
+    res.json({
+      code: 5000,
+      msg: '批量更新失败',
       data: null
     });
   }
