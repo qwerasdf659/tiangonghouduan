@@ -28,9 +28,6 @@
    - 📍 **用途**：前端技术标准、代码规范
    - 🎯 **适用场景**：代码风格、组件设计、性能优化
 
-4. **🗄️ [数据库设计规范文档标准.md](./数据库设计规范文档标准.md)**
-   - 📍 **用途**：数据结构理解（仅供参考，前端不直接操作数据库）
-   - 🎯 **适用场景**：理解数据关系、字段含义
 
 ---
 
@@ -61,7 +58,11 @@ Body: {
 | **照片上传** | `POST /api/photo/upload` | 接口文档 第5.1节 |
 | **管理员审核** | `GET /api/merchant/pending-reviews` | 接口文档 第6.1节 |
 | **🔴 商品统计** | `GET /api/merchant/product-stats` | 接口文档 第8.1节 |
-| **🔴 商品管理** | `GET /api/merchant/products` | 接口文档 第8.2节 |
+| **🔴 商品列表** | `GET /api/merchant/products` | 接口文档 第8.2节 |
+| **🔴 商品创建** | `POST /api/merchant/products` | 接口文档 第8.3节 |
+| **🔴 商品更新** | `PUT /api/merchant/products/:id` | 接口文档 第8.4节 |
+| **🔴 商品删除** | `DELETE /api/merchant/products/:id` | 接口文档 第8.4节 |
+| **🔴 批量更新** | `POST /api/merchant/products/batch-update` | 接口文档 第8.5节 |
 
 ### 第三步：开发环境特殊说明
 - 🔑 **万能验证码**：`123456`（适用于所有用户登录）
@@ -103,9 +104,9 @@ Body: {
   - 照片审核管理
   - 抽奖概率调整
   - 活动控制管理
-  - **🔴 商品统计分析**（新增）
-  - **🔴 商品库存管理**（新增）
-  - **🔴 商品信息维护**（新增）
+  - **🔴 商品统计分析**（商品数量、库存状态统计）
+  - **🔴 商品库存管理**（商品列表、库存监控、状态管理）
+  - **🔴 商品信息维护**（创建、更新、删除、批量操作）
 
 ---
 
@@ -141,6 +142,13 @@ GET /merchant/product-stats
     "is_admin": true  // 必须为true才能访问商品管理接口
   }
 }
+
+// 所有商品管理接口都需要管理员权限
+GET /api/merchant/product-stats    // 商品统计
+GET /api/merchant/products         // 商品列表
+POST /api/merchant/products        // 创建商品
+PUT /api/merchant/products/:id     // 更新商品
+DELETE /api/merchant/products/:id  // 删除商品
 ```
 
 ### Q3: 数据格式错误？

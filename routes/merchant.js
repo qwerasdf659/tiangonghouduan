@@ -404,7 +404,6 @@ router.get('/statistics', authenticateToken, requireAdmin, async (req, res) => {
     
     // 并行查询统计数据
     const [
-      totalReviews,
       pendingReviews,
       approvedReviews,
       rejectedReviews,
@@ -413,8 +412,8 @@ router.get('/statistics', authenticateToken, requireAdmin, async (req, res) => {
       adminUsers,
       totalPointsAwarded
     ] = await Promise.all([
-      PhotoReview.count({ where: timeCondition }),
-      PhotoReview.count({ where: { ...timeCondition, review_status: 'pending' } }),
+      // 🔴 修复：pending状态不受时间限制，显示所有待审核记录
+      PhotoReview.count({ where: { review_status: 'pending' } }),
       PhotoReview.count({ where: { ...timeCondition, review_status: 'approved' } }),
       PhotoReview.count({ where: { ...timeCondition, review_status: 'rejected' } }),
       User.count(),
@@ -422,6 +421,9 @@ router.get('/statistics', authenticateToken, requireAdmin, async (req, res) => {
       User.count({ where: { is_admin: true } }),
       PhotoReview.sum('points_awarded', { where: { ...timeCondition, review_status: 'approved' } }) || 0
     ]);
+    
+    // 🔴 修复：total应该是pending + approved + rejected的总和
+    const totalReviews = pendingReviews + approvedReviews + rejectedReviews;
     
     // 审核效率统计
     const approvalRate = totalReviews > 0 ? Math.round((approvedReviews / totalReviews) * 100) : 0;
