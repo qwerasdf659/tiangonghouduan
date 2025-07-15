@@ -333,4 +333,71 @@ router.get('/status', authenticateToken, async (req, res) => {
   }
 });
 
+// 🔴 新增接口：获取用户今日积分趋势
+// GET /api/user/points/today-trend
+// 前端需求：用户今日获得积分和消费积分统计
+router.get('/points/today-trend', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.user_id;
+    const { Op } = require('sequelize');
+    
+    // 获取今日开始时间（00:00:00）
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    // 获取明日开始时间（23:59:59）
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    
+    // 查询今日所有积分记录
+    const todayRecords = await PointsRecord.findAll({
+      where: {
+        user_id: userId,
+        created_at: {
+          [Op.gte]: today,
+          [Op.lt]: tomorrow
+        }
+      },
+      order: [['created_at', 'ASC']]
+    });
+    
+    // 统计今日获得积分（earn类型的记录）
+    let todayEarned = 0;
+    // 统计今日消费积分（spend类型的记录）
+    let todayConsumed = 0;
+    
+    todayRecords.forEach(record => {
+      if (record.type === 'earn') {
+        todayEarned += Math.abs(record.points); // 确保为正数
+      } else if (record.type === 'spend') {
+        todayConsumed += Math.abs(record.points); // 确保为正数
+      }
+    });
+    
+    // 获取最后更新时间
+    const lastRecord = todayRecords[todayRecords.length - 1];
+    const lastUpdateTime = lastRecord ? lastRecord.created_at : today;
+    
+    res.json({
+      code: 0,
+      msg: 'success',
+      data: {
+        today_earned: todayEarned,      // 今日获得积分
+        today_consumed: todayConsumed,  // 今日消费积分
+        last_update: lastUpdateTime.toISOString().slice(0, 19).replace('T', ' '), // 格式化时间
+        query_date: today.toISOString().slice(0, 10), // 查询日期 YYYY-MM-DD
+        total_records: todayRecords.length // 今日积分记录数量
+      }
+    });
+    
+  } catch (error) {
+    console.error('获取今日积分趋势失败:', error);
+    res.json({
+      code: 1000,
+      msg: '获取今日积分趋势失败',
+      data: null
+    });
+  }
+});
+
 module.exports = router; 

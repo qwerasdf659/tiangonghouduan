@@ -164,6 +164,9 @@ app.use('/api/merchant', merchantRoutes); // 🔴 商家管理（仅管理员可
 app.use('/upload', photoRoutes);         // 🔴 兼容前端的/upload路径请求
 app.use('/api/upload', photoRoutes);     // 🔴 兼容前端的/api/upload路径请求
 
+// 🔴 添加photo路由兼容性 - 修复前端/photo/history路径404问题
+app.use('/photo', photoRoutes);          // 🔴 兼容前端的/photo/history路径请求
+
 // 🔴 静态文件服务（图片等）
 app.use('/uploads', express.static('uploads'));
 app.use('/images', express.static('images'));

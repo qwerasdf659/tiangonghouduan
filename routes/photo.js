@@ -226,6 +226,44 @@ router.get('/records', authenticateToken, async (req, res) => {
 });
 
 /**
+ * 🔴 获取用户上传历史 - 兼容前端/photo/history路径
+ * GET /api/photo/history (兼容前端期望的路径)
+ * 这是/records接口的兼容版本，完全相同的功能
+ * 参数：page, limit, status (pending|approved|rejected|all)
+ * 🔴 解决前端调用/photo/history返回404的问题
+ */
+router.get('/history', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.user_id;
+    const { page = 1, limit = 10, status = 'all' } = req.query;
+    
+    console.log(`📚 用户 ${userId} 请求上传历史 (兼容路径 /history)，page=${page}, limit=${limit}, status=${status}`);
+    
+    const result = await PhotoReview.getUserHistory(userId, {
+      page: parseInt(page),
+      limit: Math.min(parseInt(limit), 50), // 最多50条
+      status
+    });
+    
+    res.json({
+      code: 0,
+      msg: 'success',
+      data: result
+    });
+    
+    console.log(`✅ 用户 ${userId} 上传历史返回成功，共 ${result.pagination.total} 条记录`);
+    
+  } catch (error) {
+    console.error('❌ 获取上传历史失败 (兼容路径):', error);
+    res.json({
+      code: 4000,
+      msg: '获取历史记录失败',
+      data: null
+    });
+  }
+});
+
+/**
  * 🔴 获取上传审核详情 - 根据upload_id查询具体审核结果
  * GET /api/photo/review/:id
  */

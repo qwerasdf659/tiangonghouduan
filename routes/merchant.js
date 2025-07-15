@@ -170,12 +170,12 @@ router.post('/review', authenticateToken, requireAdmin, async (req, res) => {
       // 记录积分变动
       await PointsRecord.create({
         user_id: reviewRecord.user_id,
-        points_change: pointsAwarded,
-        change_type: 'earned',
+        type: 'earn',                                                    // 🔴 修复：change_type -> type
+        points: pointsAwarded,                                          // 🔴 修复：points_change -> points
         description: `拍照上传审核通过，消费金额${amount}元`,
-        reference_type: 'photo_review',
-        reference_id: upload_id,
-        balance_after: reviewRecord.user.total_points + pointsAwarded  // 🔴 修复：User -> user
+        source: 'photo_upload',                                         // 🔴 修复：reference_type -> source
+        balance_after: reviewRecord.user.total_points + pointsAwarded,
+        related_id: upload_id                                           // 🔴 修复：reference_id -> related_id
       }, { transaction });
       
     } else {
@@ -228,9 +228,13 @@ router.post('/review', authenticateToken, requireAdmin, async (req, res) => {
       await transaction.rollback();
     }
     console.error('审核失败:', error);
+    console.error('错误堆栈:', error.stack);
+    console.error('请求参数:', req.body);
+    console.error('用户信息:', req.user);
+    
     res.json({
       code: 5000,
-      msg: '审核操作失败',
+      msg: `审核操作失败: ${error.message}`,
       data: null
     });
   }
@@ -298,12 +302,12 @@ router.post('/batch-review', authenticateToken, requireAdmin, async (req, res) =
           
           await PointsRecord.create({
             user_id: reviewRecord.user_id,
-            points_change: pointsAwarded,
-            change_type: 'earned',
+            type: 'earn',                                                    // 🔴 修复：change_type -> type
+            points: pointsAwarded,                                          // 🔴 修复：points_change -> points
             description: `批量审核通过，消费金额${amount}元`,
-            reference_type: 'photo_review',
-            reference_id: upload_id,
-            balance_after: reviewRecord.user.total_points + pointsAwarded  // 🔴 修复：User -> user
+            source: 'photo_upload',                                         // 🔴 修复：reference_type -> source
+            balance_after: reviewRecord.user.total_points + pointsAwarded,
+            related_id: upload_id                                           // 🔴 修复：reference_id -> related_id
           }, { transaction });
           
         } else {

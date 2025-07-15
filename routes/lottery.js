@@ -24,12 +24,42 @@ router.get('/config', authenticateToken, async (req, res) => {
     // 🔴 获取用户保底信息
     const pityInfo = await LotteryPity.getUserPityInfo(req.user.user_id);
     
+    // 🚨 修复：管理员抽奖次数权限配置
+    const isAdmin = req.user.is_admin;
+    const baseDailyLimit = parseInt(process.env.DAILY_LOTTERY_LIMIT) || 50;
+    const dailyLimit = isAdmin ? 999999 : baseDailyLimit; // 管理员无限制
+    
+    // 🚨 修复：获取今日抽奖次数（管理员不计次数）
+    let todayDrawCount = 0;
+    if (!isAdmin) {
+      const today = new Date().toISOString().split('T')[0] + ' 00:00:00';
+      todayDrawCount = await PointsRecord.count({
+        where: {
+          user_id: req.user.user_id,
+          source: 'lottery',
+          created_at: {
+            [require('sequelize').Op.gte]: today
+          }
+        }
+      });
+    }
+    
     res.json({
       code: 0,
       msg: 'success',
       data: {
         ...config,
-        user_pity: pityInfo
+        user_pity: pityInfo,
+        // 🚨 新增：前端需要的配置字段
+        lottery_config: {
+          daily_limit: dailyLimit,
+          cost_points: 100
+        },
+        user_status: {
+          today_draw_count: todayDrawCount,
+          remaining_draws: isAdmin ? 999999 : Math.max(0, dailyLimit - todayDrawCount),
+          is_admin: isAdmin
+        }
       }
     });
     
@@ -51,14 +81,19 @@ router.post('/draw', authenticateToken, async (req, res) => {
     const { draw_type = 'single' } = req.body;
     const userId = req.user.user_id;
     
-    // 🔴 验证抽奖类型 - 支持前端传入的各种格式
+    // 🔴 验证抽奖类型 - 支持前端传入的各种格式（修复中文类型映射）
     const drawCounts = {
       'single': 1,
       'triple': 3, 
       'quintuple': 5,
       'five': 5,        // 🔴 新增：支持前端传入"five"
       'decade': 10,
-      'ten': 10         // 🔴 新增：支持前端传入"ten"
+      'ten': 10,        // 🔴 新增：支持前端传入"ten"
+      // 🚨 修复：添加中文抽奖类型映射
+      '单抽': 1,
+      '三连抽': 3,
+      '五连抽': 5,
+      '十连抽': 10
     };
     
     const actualCount = drawCounts[draw_type] || 1;
@@ -79,9 +114,22 @@ router.post('/draw', authenticateToken, async (req, res) => {
       transaction
     });
     
-    const dailyLimit = parseInt(process.env.DAILY_LOTTERY_LIMIT) || 50;
-    console.log('🎯 每日限制检查:', { todayDrawCount, actualCount, dailyLimit, willExceed: todayDrawCount + actualCount > dailyLimit });
-    if (todayDrawCount + actualCount > dailyLimit) {
+    // 🚨 修复：管理员权限检查
+    const isAdmin = req.user.is_admin;
+    const baseDailyLimit = parseInt(process.env.DAILY_LOTTERY_LIMIT) || 50;
+    const dailyLimit = isAdmin ? 999999 : baseDailyLimit; // 管理员无限制
+    
+    console.log('🎯 每日限制检查:', { 
+      userId: req.user.user_id, 
+      isAdmin, 
+      todayDrawCount, 
+      actualCount, 
+      dailyLimit, 
+      willExceed: !isAdmin && (todayDrawCount + actualCount > dailyLimit) 
+    });
+    
+    // 🚨 修复：只对普通用户进行次数限制检查
+    if (!isAdmin && todayDrawCount + actualCount > dailyLimit) {
       throw new Error(`今日抽奖次数不足，已抽${todayDrawCount}次，再抽${actualCount}次将超过限制${dailyLimit}次`);
     }
     
