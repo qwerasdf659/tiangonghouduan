@@ -22,11 +22,28 @@ router.get('/products', authenticateToken, async (req, res) => {
       min_points,      // 最低积分筛选
       max_points,      // 最高积分筛选
       stock_status,    // 库存状态筛选
-      sort_by = 'sort_order',  // 排序字段
-      sort_order = 'ASC',      // 排序方向
+      sort = 'default', // 🔴 前端传递的sort参数
       page = 1,
       limit = 20
     } = req.query;
+    
+    // 🔴 修复：将前端的sort参数映射为数据库字段
+    let sort_by = 'sort_order';
+    let sort_order = 'ASC';
+    
+    if (sort === 'default') {
+      sort_by = 'sort_order';
+      sort_order = 'ASC';
+    } else if (sort === 'points-asc') {
+      sort_by = 'exchange_points';
+      sort_order = 'ASC';
+    } else if (sort === 'points-desc') {
+      sort_by = 'exchange_points';
+      sort_order = 'DESC';
+    } else if (sort === 'newest') {
+      sort_by = 'created_at';
+      sort_order = 'DESC';
+    }
     
     // 🔴 调用模型方法获取商品列表
     const result = await CommodityPool.getProductsForFrontend({

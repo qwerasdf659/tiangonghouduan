@@ -202,7 +202,8 @@ CommodityPool.getProductsForFrontend = async function(options = {}) {
   // 构建查询条件
   const whereClause = { status: 'active' };
   
-  if (category) {
+  // 🔴 修复：category为'all'时表示查询所有分类，不添加过滤条件
+  if (category && category !== 'all') {
     whereClause.category = category;
   }
   
