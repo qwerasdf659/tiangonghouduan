@@ -142,6 +142,7 @@ async function initializeData() {
     await LotterySetting.initializeStandardConfig();
     
     // 🔴 已清除所有模拟数据 - 仅使用真实商品和用户数据
+    
     console.log('🎉 生产数据初始化完成！');
     
     return true;

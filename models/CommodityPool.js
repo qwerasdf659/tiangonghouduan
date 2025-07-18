@@ -7,7 +7,7 @@
  * - status: 商品状态（前端可用性判断）
  */
 
-const { DataTypes } = require('sequelize');
+const { DataTypes, Op } = require('sequelize');
 const { sequelize } = require('../config/database');
 
 const CommodityPool = sequelize.define('products', {
@@ -210,19 +210,19 @@ CommodityPool.getProductsForFrontend = async function(options = {}) {
   if (min_points) {
     whereClause.exchange_points = {
       ...whereClause.exchange_points,
-      [sequelize.Op.gte]: parseInt(min_points)
+      [Op.gte]: parseInt(min_points)
     };
   }
   
   if (max_points) {
     whereClause.exchange_points = {
       ...whereClause.exchange_points,
-      [sequelize.Op.lte]: parseInt(max_points)
+      [Op.lte]: parseInt(max_points)
     };
   }
   
   if (stock_status === 'in_stock') {
-    whereClause.stock = { [sequelize.Op.gt]: 0 };
+    whereClause.stock = { [Op.gt]: 0 };
   } else if (stock_status === 'out_of_stock') {
     whereClause.stock = 0;
   }

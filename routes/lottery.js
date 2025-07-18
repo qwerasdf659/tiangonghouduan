@@ -116,7 +116,8 @@ router.post('/draw', authenticateToken, async (req, res) => {
     
     // 🚨 修复：管理员权限检查
     const isAdmin = req.user.is_admin;
-    const baseDailyLimit = parseInt(process.env.DAILY_LOTTERY_LIMIT) || 50;
+    // 🔴 修复每日抽奖限制：提高到合理的值，支持多次10连抽
+    const baseDailyLimit = parseInt(process.env.DAILY_LOTTERY_LIMIT) || 100; // 增加到100次
     const dailyLimit = isAdmin ? 999999 : baseDailyLimit; // 管理员无限制
     
     console.log('🎯 每日限制检查:', { 
