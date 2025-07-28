@@ -1,142 +1,159 @@
 /**
- * 抽奖记录模型 - 完全兼容现有表结构
- * 🔴 严格按照现有表字段定义，避免索引错误
+ * 抽奖记录管理模型
+ * 解决抽奖业务记录追踪问题
+ * 创建时间：2025年01月28日
  */
 
-const { DataTypes } = require('sequelize');
-const { sequelize } = require('../config/database');
+const { DataTypes } = require('sequelize')
+const { v4: uuidv4 } = require('uuid')
 
-const LotteryRecord = sequelize.define('LotteryRecord', {
-  // 🔴 主键字段（使用现有表结构）
-  draw_id: {
-    type: DataTypes.STRING(50), // 按照实际表结构
-    primaryKey: true,
-    comment: '抽奖记录ID'
-  },
-  
-  // 🔴 用户信息
-  user_id: {
-    type: DataTypes.INTEGER,
-    allowNull: false,
-    comment: '用户ID'
-  },
-  
-  // 🔴 奖品信息
-  prize_id: {
-    type: DataTypes.INTEGER,
-    allowNull: true,
-    comment: '奖品ID'
-  },
-  
-  prize_name: {
-    type: DataTypes.STRING(100),
-    allowNull: true,
-    comment: '奖品名称'
-  },
-  
-  prize_type: {
-    type: DataTypes.ENUM('points', 'product', 'coupon', 'special'),
-    allowNull: true,
-    comment: '奖品类型'
-  },
-  
-  prize_value: {
-    type: DataTypes.INTEGER,
-    allowNull: true,
-    comment: '奖品价值'
-  },
-  
-  // 🔴 抽奖信息
-  draw_type: {
-    type: DataTypes.ENUM('single', 'triple', 'quintuple', 'five', 'decade', 'ten'),
-    allowNull: true,
-    comment: '抽奖类型'
-  },
-  
-  draw_sequence: {
-    type: DataTypes.INTEGER,
-    allowNull: true,
-    comment: '抽奖序号'
-  },
-  
-  // 🔴 保底相关
-  is_pity: {
-    type: DataTypes.BOOLEAN,
-    allowNull: false,
-    defaultValue: false,
-    comment: '是否保底'
-  },
-  
-  // 🔴 消费信息
-  cost_points: {
-    type: DataTypes.INTEGER,
-    allowNull: true,
-    comment: '消耗积分'
-  },
-  
-  // 🔴 其他字段
-  stop_angle: {
-    type: DataTypes.DECIMAL(5, 2),
-    allowNull: true,
-    comment: '停止角度'
-  },
-  
-  batch_id: {
-    type: DataTypes.STRING(50),
-    allowNull: true,
-    comment: '批次ID'
-  },
-  
-  draw_count: {
-    type: DataTypes.INTEGER,
-    allowNull: true,
-    comment: '抽奖次数'
-  },
-  
-  prize_description: {
-    type: DataTypes.TEXT,
-    allowNull: true,
-    comment: '奖品描述'
-  },
-  
-  prize_image: {
-    type: DataTypes.STRING(500),
-    allowNull: true,
-    comment: '奖品图片'
+module.exports = (sequelize) => {
+  const LotteryRecord = sequelize.define('LotteryRecord', {
+    lottery_id: {
+      type: DataTypes.UUID,
+      defaultValue: () => uuidv4(),
+      primaryKey: true,
+      comment: '抽奖记录唯一标识'
+    },
+
+    user_id: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      comment: '用户ID',
+      references: {
+        model: 'users',
+        key: 'user_id'
+      }
+    },
+
+    prize_id: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      comment: '中奖奖品ID',
+      references: {
+        model: 'prizes',
+        key: 'prize_id'
+      }
+    },
+
+    draw_type: {
+      type: DataTypes.ENUM('single', 'triple', 'quintuple', 'decade'),
+      allowNull: false,
+      comment: '抽奖类型'
+    },
+
+    cost_points: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      comment: '消耗积分'
+    },
+
+    is_winner: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: false,
+      comment: '是否中奖'
+    },
+
+    prize_type: {
+      type: DataTypes.ENUM('points', 'physical', 'virtual', 'coupon', 'none'),
+      allowNull: true,
+      comment: '奖品类型'
+    },
+
+    prize_value: {
+      type: DataTypes.DECIMAL(10, 2),
+      defaultValue: 0,
+      comment: '奖品价值'
+    },
+
+    draw_sequence: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      comment: '抽奖顺序（批量抽奖时）'
+    },
+
+    batch_id: {
+      type: DataTypes.UUID,
+      allowNull: true,
+      comment: '批量抽奖批次ID'
+    },
+
+    guarantee_triggered: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: false,
+      comment: '是否触发保底机制'
+    },
+
+    remaining_guarantee: {
+      type: DataTypes.INTEGER,
+      defaultValue: 0,
+      comment: '剩余保底次数'
+    },
+
+    draw_config: {
+      type: DataTypes.JSON,
+      allowNull: true,
+      comment: '抽奖配置快照'
+    },
+
+    result_metadata: {
+      type: DataTypes.JSON,
+      allowNull: true,
+      comment: '抽奖结果元数据'
+    },
+
+    ip_address: {
+      type: DataTypes.STRING(45),
+      allowNull: true,
+      comment: '用户IP地址'
+    },
+
+    user_agent: {
+      type: DataTypes.TEXT,
+      allowNull: true,
+      comment: '用户代理'
+    }
+  }, {
+    tableName: 'lottery_records',
+    timestamps: true,
+    underscored: true,
+    indexes: [
+      {
+        fields: ['user_id', 'created_at']
+      },
+      {
+        fields: ['prize_id']
+      },
+      {
+        fields: ['draw_type', 'created_at']
+      },
+      {
+        fields: ['is_winner', 'created_at']
+      },
+      {
+        fields: ['batch_id']
+      },
+      {
+        fields: ['guarantee_triggered']
+      }
+    ],
+    comment: '抽奖记录表'
+  })
+
+  // 定义关联关系
+  LotteryRecord.associate = function (models) {
+    // 用户关联
+    LotteryRecord.belongsTo(models.User, {
+      foreignKey: 'user_id',
+      as: 'user'
+    })
+
+    // 奖品关联
+    LotteryRecord.belongsTo(models.Prize, {
+      foreignKey: 'prize_id',
+      as: 'prize'
+    })
   }
 
-}, {
-  tableName: 'lottery_records',
-  timestamps: true,
-  createdAt: 'created_at',
-  updatedAt: 'updated_at',
-  // 🔴 只定义确实需要的索引，避免引用不存在的字段
-  indexes: [
-    {
-      fields: ['user_id']
-    },
-    {
-      fields: ['draw_type']
-    },
-    {
-      fields: ['is_pity']
-    },
-    {
-      fields: ['created_at']
-    }
-  ]
-});
-
-// 🔴 基础方法
-LotteryRecord.prototype.getPrizeInfo = function() {
-  return {
-    type: this.prize_type,
-    name: this.prize_name,
-    value: this.prize_value,
-    description: this.prize_description,
-    image: this.prize_image,
-    is_pity: this.is_pity
-  };
-};
-
-module.exports = LotteryRecord; 
+  return LotteryRecord
+} 

@@ -296,7 +296,5 @@ class SealosStorageService {
   }
 }
 
-// 导出单例
-const sealosStorage = new SealosStorageService();
-
-module.exports = sealosStorage; 
+// 导出类本身，而不是实例，以便继承
+module.exports = SealosStorageService; 

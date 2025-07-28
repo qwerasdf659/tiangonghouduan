@@ -4,7 +4,7 @@
  */
 
 const jwt = require('jsonwebtoken');
-const { User } = require('../models');
+const { sequelize } = require('../models');  // 只引用sequelize实例
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret_key_change_in_production';
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '2h';
@@ -82,8 +82,13 @@ const authenticateToken = async (req, res, next) => {
       });
     }
 
-    // 从数据库获取用户信息
-    const user = await User.findByPk(decoded.user_id);
+    // 从数据库获取用户信息（使用原生SQL查询）
+    const users = await sequelize.query(
+      'SELECT user_id, mobile, nickname, status, is_admin FROM users WHERE user_id = ?',
+      { replacements: [decoded.user_id], type: sequelize.QueryTypes.SELECT }
+    );
+    
+    const user = users[0];
     if (!user) {
       return res.status(401).json({
         code: 4003,
@@ -127,7 +132,12 @@ const optionalAuth = async (req, res, next) => {
     if (token) {
       const decoded = verifyAccessToken(token);
       if (decoded) {
-        const user = await User.findByPk(decoded.user_id);
+        const users = await sequelize.query(
+          'SELECT user_id, mobile, nickname, status, is_admin FROM users WHERE user_id = ?',
+          { replacements: [decoded.user_id], type: sequelize.QueryTypes.SELECT }
+        );
+        
+        const user = users[0];
         if (user && user.status !== 'banned') {
           req.user = user;
           req.token = decoded;
