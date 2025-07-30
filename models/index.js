@@ -36,7 +36,9 @@ const sequelize = new Sequelize(
   }
 )
 
-console.log(`🔗 数据库连接配置: ${process.env.DB_HOST}:${process.env.DB_PORT}/${process.env.DB_NAME}`)
+console.log(
+  `🔗 数据库连接配置: ${process.env.DB_HOST}:${process.env.DB_PORT}/${process.env.DB_NAME}`
+)
 
 // 🔴 导入所有模型 (v2.0架构 + 新增核心业务模型)
 const ImageResources = require('./ImageResources')(sequelize)
@@ -45,6 +47,10 @@ const User = require('./User')(sequelize)
 const Prize = require('./Prize')(sequelize)
 const LotteryRecord = require('./LotteryRecord')(sequelize)
 const PointsRecord = require('./PointsRecord')(sequelize)
+const Product = require('./Product')(sequelize)
+const ExchangeRecord = require('./ExchangeRecord')(sequelize)
+const PremiumSpaceAccess = require('./PremiumSpaceAccess')(sequelize)
+const TradeRecord = require('./TradeRecord')(sequelize)
 
 // 🔴 定义完整的模型关联关系
 function defineAssociations () {
@@ -103,6 +109,70 @@ function defineAssociations () {
   PointsRecord.belongsTo(User, {
     foreignKey: 'admin_id',
     as: 'admin'
+  })
+
+  // Product 关联关系
+  Product.belongsTo(User, {
+    foreignKey: 'created_by',
+    as: 'creator'
+  })
+
+  Product.hasMany(ExchangeRecord, {
+    foreignKey: 'product_id',
+    as: 'exchangeRecords'
+  })
+
+  // ExchangeRecord 关联关系
+  ExchangeRecord.belongsTo(User, {
+    foreignKey: 'user_id',
+    as: 'user'
+  })
+
+  ExchangeRecord.belongsTo(Product, {
+    foreignKey: 'product_id',
+    as: 'product'
+  })
+
+  // PremiumSpaceAccess 关联关系
+  PremiumSpaceAccess.belongsTo(User, {
+    foreignKey: 'user_id',
+    as: 'user'
+  })
+
+  User.hasOne(PremiumSpaceAccess, {
+    foreignKey: 'user_id',
+    as: 'premiumAccess'
+  })
+
+  User.hasMany(ExchangeRecord, {
+    foreignKey: 'user_id',
+    as: 'exchangeRecords'
+  })
+
+  // TradeRecord 关联关系
+  TradeRecord.belongsTo(User, {
+    foreignKey: 'from_user_id',
+    as: 'fromUser'
+  })
+
+  TradeRecord.belongsTo(User, {
+    foreignKey: 'to_user_id',
+    as: 'toUser'
+  })
+
+  TradeRecord.belongsTo(User, {
+    foreignKey: 'operator_id',
+    as: 'operator'
+  })
+
+  User.hasMany(TradeRecord, {
+    foreignKey: 'from_user_id',
+    as: 'sentTrades'
+  })
+
+  User.hasMany(TradeRecord, {
+    foreignKey: 'to_user_id',
+    as: 'receivedTrades'
   })
 
   console.log('✅ 数据库模型关联关系定义完成 (v2.0 架构 + 核心业务模型)')
@@ -216,6 +286,10 @@ module.exports = {
   Prize,
   LotteryRecord,
   PointsRecord,
+  Product,
+  ExchangeRecord,
+  PremiumSpaceAccess,
+  TradeRecord,
 
   // 工具函数
   testConnection,
@@ -231,6 +305,10 @@ module.exports = {
     User,
     Prize,
     LotteryRecord,
-    PointsRecord
+    PointsRecord,
+    Product,
+    ExchangeRecord,
+    PremiumSpaceAccess,
+    TradeRecord
   }
-} 
+}

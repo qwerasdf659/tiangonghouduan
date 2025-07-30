@@ -6,108 +6,112 @@
 
 const { DataTypes } = require('sequelize')
 
-module.exports = (sequelize) => {
-  const User = sequelize.define('User', {
-    user_id: {
-      type: DataTypes.INTEGER,
-      primaryKey: true,
-      autoIncrement: true,
-      comment: '用户唯一标识'
-    },
+module.exports = sequelize => {
+  const User = sequelize.define(
+    'User',
+    {
+      user_id: {
+        type: DataTypes.INTEGER,
+        primaryKey: true,
+        autoIncrement: true,
+        comment: '用户唯一标识'
+      },
 
-    mobile: {
-      type: DataTypes.STRING(20),
-      allowNull: false,
-      unique: true,
-      comment: '手机号'
-    },
-
-    nickname: {
-      type: DataTypes.STRING(50),
-      allowNull: true,
-      comment: '用户昵称'
-    },
-
-    avatar_url: {
-      type: DataTypes.STRING(500),
-      allowNull: true,
-      comment: '头像URL'
-    },
-
-    is_admin: {
-      type: DataTypes.BOOLEAN,
-      defaultValue: false,
-      comment: '是否管理员'
-    },
-
-    total_points: {
-      type: DataTypes.INTEGER,
-      defaultValue: 0,
-      comment: '总积分'
-    },
-
-    available_points: {
-      type: DataTypes.INTEGER,
-      defaultValue: 0,
-      comment: '可用积分'
-    },
-
-    used_points: {
-      type: DataTypes.INTEGER,
-      defaultValue: 0,
-      comment: '已使用积分'
-    },
-
-    status: {
-      type: DataTypes.ENUM('active', 'inactive', 'banned'),
-      defaultValue: 'active',
-      comment: '用户状态'
-    },
-
-    last_login: {
-      type: DataTypes.DATE,
-      allowNull: true,
-      comment: '最后登录时间'
-    },
-
-    login_count: {
-      type: DataTypes.INTEGER,
-      defaultValue: 0,
-      comment: '登录次数'
-    },
-
-    registration_date: {
-      type: DataTypes.DATE,
-      defaultValue: DataTypes.NOW,
-      comment: '注册时间'
-    },
-
-    preferences: {
-      type: DataTypes.JSON,
-      allowNull: true,
-      comment: '用户偏好设置'
-    }
-  }, {
-    tableName: 'users',
-    timestamps: true,
-    underscored: true,
-    indexes: [
-      {
+      mobile: {
+        type: DataTypes.STRING(20),
+        allowNull: false,
         unique: true,
-        fields: ['mobile']
+        comment: '手机号'
       },
-      {
-        fields: ['status', 'is_admin']
+
+      nickname: {
+        type: DataTypes.STRING(50),
+        allowNull: true,
+        comment: '用户昵称'
       },
-      {
-        fields: ['total_points']
+
+      avatar_url: {
+        type: DataTypes.STRING(500),
+        allowNull: true,
+        comment: '头像URL'
       },
-      {
-        fields: ['last_login']
+
+      is_admin: {
+        type: DataTypes.BOOLEAN,
+        defaultValue: false,
+        comment: '是否管理员'
+      },
+
+      total_points: {
+        type: DataTypes.INTEGER,
+        defaultValue: 0,
+        comment: '总积分'
+      },
+
+      available_points: {
+        type: DataTypes.INTEGER,
+        defaultValue: 0,
+        comment: '可用积分'
+      },
+
+      used_points: {
+        type: DataTypes.INTEGER,
+        defaultValue: 0,
+        comment: '已使用积分'
+      },
+
+      status: {
+        type: DataTypes.ENUM('active', 'inactive', 'banned'),
+        defaultValue: 'active',
+        comment: '用户状态'
+      },
+
+      last_login: {
+        type: DataTypes.DATE,
+        allowNull: true,
+        comment: '最后登录时间'
+      },
+
+      login_count: {
+        type: DataTypes.INTEGER,
+        defaultValue: 0,
+        comment: '登录次数'
+      },
+
+      registration_date: {
+        type: DataTypes.DATE,
+        defaultValue: DataTypes.NOW,
+        comment: '注册时间'
+      },
+
+      preferences: {
+        type: DataTypes.JSON,
+        allowNull: true,
+        comment: '用户偏好设置'
       }
-    ],
-    comment: '用户信息表'
-  })
+    },
+    {
+      tableName: 'users',
+      timestamps: true,
+      underscored: true,
+      indexes: [
+        {
+          unique: true,
+          fields: ['mobile']
+        },
+        {
+          fields: ['status', 'is_admin']
+        },
+        {
+          fields: ['total_points']
+        },
+        {
+          fields: ['last_login']
+        }
+      ],
+      comment: '用户信息表'
+    }
+  )
 
   // 定义关联关系
   User.associate = function (models) {
@@ -133,11 +137,11 @@ module.exports = (sequelize) => {
       })
     }
 
-    // 用户的兑换订单
-    if (models.ExchangeOrder) {
-      User.hasMany(models.ExchangeOrder, {
+    // 用户的兑换记录
+    if (models.ExchangeRecord) {
+      User.hasMany(models.ExchangeRecord, {
         foreignKey: 'user_id',
-        as: 'exchangeOrders'
+        as: 'exchangeRecords'
       })
     }
   }

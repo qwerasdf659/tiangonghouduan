@@ -27,37 +27,41 @@ router.post('/login', async (req, res) => {
 
     // 参数验证
     if (!mobile || !code) {
-      return res.status(400).json(
-        ApiResponse.error('手机号和验证码不能为空', 'MISSING_PARAMS')
-      )
+      return res.status(400).json(ApiResponse.error('手机号和验证码不能为空', 'MISSING_PARAMS'))
     }
 
     // 手机号格式验证
     const mobileRegex = /^1[3-9]\d{9}$/
     if (!mobileRegex.test(mobile)) {
-      return res.status(400).json(
-        ApiResponse.error('手机号格式不正确', 'INVALID_MOBILE')
-      )
+      return res.status(400).json(ApiResponse.error('手机号格式不正确', 'INVALID_MOBILE'))
     }
 
     // 开发阶段：验证万能验证码
     if (process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test') {
       if (code !== '123456') {
-        return res.status(400).json(
-          ApiResponse.error('验证码错误（开发阶段请使用123456）', 'INVALID_CODE')
-        )
+        return res
+          .status(400)
+          .json(ApiResponse.error('验证码错误（开发阶段请使用123456）', 'INVALID_CODE'))
       }
     } else {
       // 生产环境需要实现真实的短信验证
-      return res.status(501).json(
-        ApiResponse.error('生产环境短信验证功能待实现', 'SMS_NOT_IMPLEMENTED')
-      )
+      return res
+        .status(501)
+        .json(ApiResponse.error('生产环境短信验证功能待实现', 'SMS_NOT_IMPLEMENTED'))
     }
 
     // 查找或创建用户
     let user = await User.findOne({
       where: { mobile },
-      attributes: ['user_id', 'mobile', 'nickname', 'avatar_url', 'is_admin', 'total_points', 'available_points', 'status']
+      attributes: [
+        'user_id',
+        'mobile',
+        'nickname',
+        'avatar_url',
+        'is_admin',
+        'total_points',
+        'status'
+      ]
     })
 
     // 如果用户不存在，创建新用户
@@ -67,7 +71,7 @@ router.post('/login', async (req, res) => {
         nickname: `用户${mobile.slice(-4)}`,
         is_admin: false,
         total_points: parseInt(process.env.NEW_USER_POINTS) || 1000,
-        available_points: parseInt(process.env.NEW_USER_POINTS) || 1000,
+        // available_points: parseInt(process.env.NEW_USER_POINTS) || 1000, // 暂时注释，等数据库字段就绪
         status: 'active',
         login_count: 1,
         last_login: new Date()
@@ -77,9 +81,7 @@ router.post('/login', async (req, res) => {
     } else {
       // 检查用户状态
       if (user.status === 'banned') {
-        return res.status(403).json(
-          ApiResponse.error('用户已被禁用', 'USER_BANNED')
-        )
+        return res.status(403).json(ApiResponse.error('用户已被禁用', 'USER_BANNED'))
       }
 
       // 更新登录信息
@@ -102,30 +104,30 @@ router.post('/login', async (req, res) => {
 
     // 返回登录成功信息
     res.json(
-      ApiResponse.success({
-        token,
-        userInfo: {
-          userId: user.user_id,
-          mobile: user.mobile,
-          nickname: user.nickname,
-          avatarUrl: user.avatar_url || '',
-          isAdmin: user.is_admin,
-          totalPoints: user.total_points,
-          availablePoints: user.available_points,
-          status: user.status
+      ApiResponse.success(
+        {
+          token,
+          userInfo: {
+            userId: user.user_id,
+            mobile: user.mobile,
+            nickname: user.nickname,
+            avatarUrl: user.avatar_url || '',
+            isAdmin: user.is_admin,
+            totalPoints: user.total_points,
+            availablePoints: user.total_points, // 暂时使用total_points
+            status: user.status
+          },
+          expiresIn: JWT_EXPIRES_IN
         },
-        expiresIn: JWT_EXPIRES_IN
-      }, '登录成功')
+        '登录成功'
+      )
     )
 
     // 记录登录日志
     console.log(`🔐 用户登录: ${mobile}, 管理员: ${user.is_admin ? '是' : '否'}, IP: ${req.ip}`)
-
   } catch (error) {
     console.error('❌ 用户登录失败:', error.message)
-    res.status(500).json(
-      ApiResponse.error('登录失败，请稍后重试', 'LOGIN_FAILED', error.message)
-    )
+    res.status(500).json(ApiResponse.error('登录失败，请稍后重试', 'LOGIN_FAILED', error.message))
   }
 })
 
@@ -137,36 +139,45 @@ router.post('/login', async (req, res) => {
 router.get('/profile', authenticateToken, async (req, res) => {
   try {
     const user = await User.findByPk(req.user.user_id, {
-      attributes: ['user_id', 'mobile', 'nickname', 'avatar_url', 'is_admin', 'total_points', 'available_points', 'status', 'login_count', 'last_login', 'registration_date']
+      attributes: [
+        'user_id',
+        'mobile',
+        'nickname',
+        'avatar_url',
+        'is_admin',
+        'total_points',
+        'status',
+        'login_count',
+        'last_login',
+        'registration_date'
+      ]
     })
 
     if (!user) {
-      return res.status(404).json(
-        ApiResponse.error('用户不存在', 'USER_NOT_FOUND')
-      )
+      return res.status(404).json(ApiResponse.error('用户不存在', 'USER_NOT_FOUND'))
     }
 
     res.json(
-      ApiResponse.success({
-        userId: user.user_id,
-        mobile: user.mobile,
-        nickname: user.nickname,
-        avatarUrl: user.avatar_url || '',
-        isAdmin: user.is_admin,
-        totalPoints: user.total_points,
-        availablePoints: user.available_points,
-        status: user.status,
-        loginCount: user.login_count,
-        lastLogin: user.last_login,
-        registrationDate: user.registration_date
-      }, '获取用户信息成功')
+      ApiResponse.success(
+        {
+          userId: user.user_id,
+          mobile: user.mobile,
+          nickname: user.nickname,
+          avatarUrl: user.avatar_url || '',
+          isAdmin: user.is_admin,
+          totalPoints: user.total_points,
+          availablePoints: user.total_points, // 暂时使用total_points
+          status: user.status,
+          loginCount: user.login_count,
+          lastLogin: user.last_login,
+          registrationDate: user.registration_date
+        },
+        '获取用户信息成功'
+      )
     )
-
   } catch (error) {
     console.error('❌ 获取用户信息失败:', error.message)
-    res.status(500).json(
-      ApiResponse.error('获取用户信息失败', 'GET_PROFILE_FAILED', error.message)
-    )
+    res.status(500).json(ApiResponse.error('获取用户信息失败', 'GET_PROFILE_FAILED', error.message))
   }
 })
 
@@ -189,17 +200,17 @@ router.post('/refresh', authenticateToken, async (req, res) => {
     })
 
     res.json(
-      ApiResponse.success({
-        token: newToken,
-        expiresIn: JWT_EXPIRES_IN
-      }, 'Token刷新成功')
+      ApiResponse.success(
+        {
+          token: newToken,
+          expiresIn: JWT_EXPIRES_IN
+        },
+        'Token刷新成功'
+      )
     )
-
   } catch (error) {
     console.error('❌ Token刷新失败:', error.message)
-    res.status(500).json(
-      ApiResponse.error('Token刷新失败', 'REFRESH_TOKEN_FAILED', error.message)
-    )
+    res.status(500).json(ApiResponse.error('Token刷新失败', 'REFRESH_TOKEN_FAILED', error.message))
   }
 })
 
@@ -214,15 +225,10 @@ router.post('/logout', authenticateToken, async (req, res) => {
     // 这里可以记录登出日志
     console.log(`🔐 用户登出: ${req.user.mobile}, IP: ${req.ip}`)
 
-    res.json(
-      ApiResponse.success(null, '登出成功')
-    )
-
+    res.json(ApiResponse.success(null, '登出成功'))
   } catch (error) {
     console.error('❌ 用户登出失败:', error.message)
-    res.status(500).json(
-      ApiResponse.error('登出失败', 'LOGOUT_FAILED', error.message)
-    )
+    res.status(500).json(ApiResponse.error('登出失败', 'LOGOUT_FAILED', error.message))
   }
 })
 
@@ -234,12 +240,15 @@ router.post('/logout', authenticateToken, async (req, res) => {
 router.get('/verify', authenticateToken, (req, res) => {
   // 如果中间件通过，说明Token有效
   res.json(
-    ApiResponse.success({
-      valid: true,
-      userId: req.user.user_id,
-      mobile: req.user.mobile,
-      isAdmin: req.user.is_admin
-    }, 'Token验证成功')
+    ApiResponse.success(
+      {
+        valid: true,
+        userId: req.user.user_id,
+        mobile: req.user.mobile,
+        isAdmin: req.user.is_admin
+      },
+      'Token验证成功'
+    )
   )
 })
 
@@ -250,12 +259,15 @@ router.get('/verify', authenticateToken, (req, res) => {
  */
 router.get('/admin/check', requireAdmin, (req, res) => {
   res.json(
-    ApiResponse.success({
-      isAdmin: true,
-      userId: req.user.user_id,
-      mobile: req.user.mobile
-    }, '管理员权限验证通过')
+    ApiResponse.success(
+      {
+        isAdmin: true,
+        userId: req.user.user_id,
+        mobile: req.user.mobile
+      },
+      '管理员权限验证通过'
+    )
   )
 })
 
-module.exports = router 
+module.exports = router

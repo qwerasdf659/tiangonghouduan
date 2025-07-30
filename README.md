@@ -31,6 +31,7 @@
 ### 核心数据表
 
 #### 1. ImageResources - 统一图片资源表
+
 ```sql
 CREATE TABLE image_resources (
   resource_id UUID PRIMARY KEY,
@@ -65,6 +66,7 @@ CREATE TABLE image_resources (
 ```
 
 #### 2. BusinessConfigs - 业务配置表
+
 ```sql
 CREATE TABLE business_configs (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
@@ -95,7 +97,7 @@ Sealos存储桶结构:
 │   └── uploads/
 │       └── pending_review/    # 待审核图片
 │
-├── standard/                   # 标准数据层 (30天-3年)  
+├── standard/                   # 标准数据层 (30天-3年)
 │   ├── users/                 # 用户分片存储
 │   │   ├── shard_000000-009999/
 │   │   │   └── u{user_id}/
@@ -118,24 +120,24 @@ Sealos存储桶结构:
 ```javascript
 // 存储层选择逻辑
 function selectStorageLayer(businessType, category, options) {
-  const { uploadTime, isActive, priority } = options;
-  const config = getBusinessConfig(businessType);
-  
+  const { uploadTime, isActive, priority } = options
+  const config = getBusinessConfig(businessType)
+
   // 高优先级 → 热存储
   if (priority === 'high' || isActive === true) {
-    return 'hot';
+    return 'hot'
   }
-  
+
   // 业务特定逻辑
   if (businessType === 'uploads' && category === 'pending_review') {
-    return 'hot'; // 待审核图片需要快速访问
+    return 'hot' // 待审核图片需要快速访问
   }
-  
+
   // 基于文件年龄判断
-  const fileAge = (Date.now() - uploadTime) / (1000 * 60 * 60 * 24);
-  if (fileAge <= config.hotDays) return 'hot';
-  if (fileAge <= config.standardDays) return 'standard';
-  return 'archive';
+  const fileAge = (Date.now() - uploadTime) / (1000 * 60 * 60 * 24)
+  if (fileAge <= config.hotDays) return 'hot'
+  if (fileAge <= config.standardDays) return 'standard'
+  return 'archive'
 }
 ```
 
@@ -151,29 +153,34 @@ function selectStorageLayer(businessType, category, options) {
 ### 安装步骤
 
 1. **克隆项目**
+
 ```bash
 git clone https://github.com/your-org/restaurant-lottery-system-v2.git
 cd restaurant-lottery-system-v2
 ```
 
 2. **安装依赖**
+
 ```bash
 npm install
 ```
 
 3. **环境配置**
+
 ```bash
 cp .env.example .env
 # 编辑 .env 文件配置数据库和存储信息
 ```
 
 4. **数据库初始化**
+
 ```bash
 npm run db:migrate
 npm run db:seed
 ```
 
 5. **启动服务**
+
 ```bash
 # 开发环境
 npm run dev
@@ -231,6 +238,7 @@ Authorization: Bearer <your-jwt-token>
 #### 1. 统一资源管理 `/api/v2/resources`
 
 **上传图片资源**
+
 ```http
 POST /api/v2/resources
 Content-Type: multipart/form-data
@@ -239,7 +247,7 @@ Authorization: Bearer <token>
 {
   "image": <file>,
   "businessType": "lottery",
-  "category": "prizes", 
+  "category": "prizes",
   "contextId": "1",
   "isActive": "true",
   "priority": "high"
@@ -247,12 +255,14 @@ Authorization: Bearer <token>
 ```
 
 **查询资源列表**
+
 ```http
 GET /api/v2/resources?businessType=lottery&category=prizes&limit=20&page=1
 Authorization: Bearer <token>
 ```
 
 **批量审核（管理员）**
+
 ```http
 POST /api/v2/resources/reviews/batch
 Authorization: Bearer <admin-token>
@@ -271,13 +281,15 @@ Authorization: Bearer <admin-token>
 
 #### 2. 抽奖业务 `/api/v2/lottery`
 
-**获取奖品图片**  
+**获取奖品图片**
+
 ```http
 GET /api/v2/lottery/prizes/1
 Authorization: Bearer <token>
 ```
 
 **上传奖品图片（管理员）**
+
 ```http
 POST /api/v2/lottery/prizes/1/images
 Content-Type: multipart/form-data
@@ -292,6 +304,7 @@ Authorization: Bearer <admin-token>
 ```
 
 **获取抽奖统计（管理员）**
+
 ```http
 GET /api/v2/lottery/stats
 Authorization: Bearer <admin-token>
@@ -315,6 +328,7 @@ Authorization: Bearer <admin-token>
 ```
 
 错误响应：
+
 ```json
 {
   "success": false,
@@ -356,25 +370,27 @@ Authorization: Bearer <admin-token>
 ### 新增业务线
 
 1. **创建业务路由**
+
 ```javascript
 // routes/v2/newbusiness.js
-const express = require('express');
-const ImageResourceService = require('../../services/ImageResourceService');
-const router = express.Router();
-const imageService = new ImageResourceService();
+const express = require('express')
+const ImageResourceService = require('../../services/ImageResourceService')
+const router = express.Router()
+const imageService = new ImageResourceService()
 
 router.get('/', async (req, res) => {
   const result = await imageService.queryResources({
     businessType: 'newbusiness',
     ...req.query
-  });
-  res.json(ApiResponse.success(result.resources));
-});
+  })
+  res.json(ApiResponse.success(result.resources))
+})
 
-module.exports = router;
+module.exports = router
 ```
 
 2. **更新业务配置**
+
 ```javascript
 // 在BusinessConfigs中添加新业务类型
 const newBusinessConfig = {
@@ -389,14 +405,15 @@ const newBusinessConfig = {
     allowedTypes: ['jpg', 'jpeg', 'png', 'webp'],
     categories: ['category1', 'category2']
   }
-};
+}
 ```
 
 3. **注册路由**
+
 ```javascript
 // app-v2.js
-const newBusinessRouter = require('./routes/v2/newbusiness');
-app.use('/api/v2/newbusiness', newBusinessRouter);
+const newBusinessRouter = require('./routes/v2/newbusiness')
+app.use('/api/v2/newbusiness', newBusinessRouter)
 ```
 
 ### 测试
@@ -429,11 +446,13 @@ npm run lint:fix
 ### Docker部署
 
 1. **构建镜像**
+
 ```bash
 npm run docker:build
 ```
 
 2. **运行容器**
+
 ```bash
 npm run docker:run
 ```
@@ -459,18 +478,18 @@ spec:
         app: restaurant-lottery-v2
     spec:
       containers:
-      - name: app
-        image: restaurant-lottery-v2:latest
-        ports:
-        - containerPort: 3000
-        env:
-        - name: NODE_ENV
-          value: "production"
-        - name: DB_HOST
-          valueFrom:
-            secretKeyRef:
-              name: db-secret
-              key: host
+        - name: app
+          image: restaurant-lottery-v2:latest
+          ports:
+            - containerPort: 3000
+          env:
+            - name: NODE_ENV
+              value: 'production'
+            - name: DB_HOST
+              valueFrom:
+                secretKeyRef:
+                  name: db-secret
+                  key: host
 ```
 
 ### 性能监控
@@ -478,7 +497,7 @@ spec:
 系统提供多个监控端点：
 
 - **健康检查**: `GET /health`
-- **API文档**: `GET /api/v2/docs`  
+- **API文档**: `GET /api/v2/docs`
 - **系统概览**: `GET /api/v2/admin/overview` (管理员)
 - **存储统计**: `GET /api/v2/resources/stats/storage` (管理员)
 
@@ -486,14 +505,14 @@ spec:
 
 ### 目标性能
 
-| 指标 | 目标值 | 说明 |
-|------|--------|------|
-| API响应时间 | < 100ms | 平均响应时间 |
-| 文件上传时间 | < 2s | 10MB文件上传 |
-| 数据库查询时间 | < 50ms | 复杂查询 |
-| 系统可用性 | > 99.95% | 年度可用性 |
-| 并发用户数 | 1000+ | 同时在线用户 |
-| 存储容量 | 2000万+ | 图片存储能力 |
+| 指标           | 目标值   | 说明         |
+| -------------- | -------- | ------------ |
+| API响应时间    | < 100ms  | 平均响应时间 |
+| 文件上传时间   | < 2s     | 10MB文件上传 |
+| 数据库查询时间 | < 50ms   | 复杂查询     |
+| 系统可用性     | > 99.95% | 年度可用性   |
+| 并发用户数     | 1000+    | 同时在线用户 |
+| 存储容量       | 2000万+  | 图片存储能力 |
 
 ### 性能优化
 
@@ -533,11 +552,11 @@ spec:
 ### 技术收益
 
 - **性能提升**: 80% API响应速度提升
-- **存储优化**: 40% 存储成本节省  
+- **存储优化**: 40% 存储成本节省
 - **开发效率**: 100% 开发效率提升
 - **维护成本**: 60% 维护成本降低
 
-### 架构优势  
+### 架构优势
 
 - **完全现代化**: 无历史包袱，全新设计
 - **云原生**: 充分利用容器化平台
@@ -576,8 +595,8 @@ spec:
 ✅ **架构清晰化** - 多业务线分离，统一资源管理  
 ✅ **性能高效化** - 智能存储分层，40%成本节省  
 ✅ **开发高效化** - RESTful API，标准化设计  
-✅ **运维简单化** - 云原生架构，容器化部署  
+✅ **运维简单化** - 云原生架构，容器化部署
 
 通过这次架构升级，系统将能够支撑**2000万张图片存储**、**100万并发用户访问**，为餐厅积分抽奖业务提供强大而稳定的技术支撑。
 
-**🚀 开始使用新架构，体验技术升级带来的效率提升！** 
+**🚀 开始使用新架构，体验技术升级带来的效率提升！**

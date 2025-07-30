@@ -15,7 +15,7 @@ module.exports = {
     performanceMonitoring: true,
     slowTransformationThreshold: 10 // 开发环境设置更低的阈值来发现性能问题
   },
-  
+
   test: {
     enableFieldTransform: true,
     enableDebugLog: false,
@@ -25,14 +25,14 @@ module.exports = {
     performanceMonitoring: false,
     slowTransformationThreshold: 50
   },
-  
+
   production: {
     enableFieldTransform: true,
     enableDebugLog: false,
-    enableCompatibilityMode: false,  // 生产环境完全切换，不需要兼容模式
+    enableCompatibilityMode: false, // 生产环境完全切换，不需要兼容模式
     logTransformations: false,
-    cacheTransformations: true,      // 生产环境启用缓存提升性能
-    performanceMonitoring: true,     // 生产环境监控性能
+    cacheTransformations: true, // 生产环境启用缓存提升性能
+    performanceMonitoring: true, // 生产环境监控性能
     slowTransformationThreshold: 50 // 超过50ms记录日志
   }
-}; 
+}

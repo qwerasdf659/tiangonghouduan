@@ -16,17 +16,16 @@ const transformer = new FieldTransformer({
  * API响应字段转换中间件
  * 将数据库格式自动转换为前端格式
  */
-function createResponseTransformMiddleware(options = {}) {
-  const localTransformer = options.useGlobalTransformer !== false 
-    ? transformer 
-    : new FieldTransformer(options)
-  
+function createResponseTransformMiddleware (options = {}) {
+  const localTransformer =
+    options.useGlobalTransformer !== false ? transformer : new FieldTransformer(options)
+
   return (req, res, next) => {
     // 保存原始的res.json方法
     const originalJson = res.json.bind(res)
-    
+
     // 重写res.json方法
-    res.json = function(data) {
+    res.json = function (data) {
       try {
         if (data && typeof data === 'object') {
           // 检查是否有data字段（标准ApiResponse格式）
@@ -41,7 +40,7 @@ function createResponseTransformMiddleware(options = {}) {
             // 直接转换整个数据对象
             data = localTransformer.dbToFrontend(data)
           }
-          
+
           if (options.logTransformations && process.env.NODE_ENV === 'development') {
             console.log('✅ API响应数据已自动转换为前端格式')
           }
@@ -60,10 +59,10 @@ function createResponseTransformMiddleware(options = {}) {
           })
         }
       }
-      
+
       return originalJson(data)
     }
-    
+
     next()
   }
 }
@@ -72,17 +71,16 @@ function createResponseTransformMiddleware(options = {}) {
  * API请求字段转换中间件
  * 将前端格式自动转换为数据库格式
  */
-function createRequestTransformMiddleware(options = {}) {
-  const localTransformer = options.useGlobalTransformer !== false 
-    ? transformer 
-    : new FieldTransformer(options)
-  
+function createRequestTransformMiddleware (options = {}) {
+  const localTransformer =
+    options.useGlobalTransformer !== false ? transformer : new FieldTransformer(options)
+
   return (req, res, next) => {
     try {
       // 转换请求体数据
       if (req.body && typeof req.body === 'object') {
         req.body = localTransformer.frontendToDb(req.body)
-        
+
         if (options.logTransformations && process.env.NODE_ENV === 'development') {
           console.log('✅ API请求数据已自动转换为数据库格式')
         }
@@ -97,7 +95,6 @@ function createRequestTransformMiddleware(options = {}) {
       if (options.transformParams && req.params) {
         req.params = localTransformer.frontendToDb(req.params)
       }
-      
     } catch (error) {
       console.error('❌ 请求数据转换失败:', error)
       if (options.strictMode) {
@@ -112,7 +109,7 @@ function createRequestTransformMiddleware(options = {}) {
         })
       }
     }
-    
+
     next()
   }
 }
@@ -121,9 +118,9 @@ function createRequestTransformMiddleware(options = {}) {
  * Sequelize查询结果转换中间件
  * 专门处理数据库查询结果的转换
  */
-function transformSequelizeResult(result, options = {}) {
+function transformSequelizeResult (result, _options = {}) {
   if (!result) return result
-  
+
   try {
     if (Array.isArray(result)) {
       return transformer.batchTransform(result, 'toFrontend')
@@ -139,7 +136,7 @@ function transformSequelizeResult(result, options = {}) {
 /**
  * 获取转换器统计信息中间件
  */
-function getTransformStats(req, res, next) {
+function getTransformStats (req, res, next) {
   if (req.path === '/api/v2/transform/stats' && req.method === 'GET') {
     const stats = transformer.getStats()
     return res.json({
@@ -160,7 +157,7 @@ function getTransformStats(req, res, next) {
 /**
  * 重置转换器统计信息中间件
  */
-function resetTransformStats(req, res, next) {
+function resetTransformStats (req, res, next) {
   if (req.path === '/api/v2/transform/reset' && req.method === 'POST') {
     transformer.resetStats()
     return res.json({
@@ -180,4 +177,4 @@ module.exports = {
   getTransformStats,
   resetTransformStats,
   transformer
-} 
+}

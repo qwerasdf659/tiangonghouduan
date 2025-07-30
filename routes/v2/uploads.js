@@ -31,27 +31,29 @@ const upload = multer({
  * @access 公开
  */
 router.get('/', (req, res) => {
-  res.json(ApiResponse.success({
-    module: 'uploads',
-    description: '用户上传图片审核管理API',
-    version: '2.0.0',
-    endpoints: {
-      'POST /submit': '用户提交图片审核（需要认证）',
-      'GET /pending': '获取待审核图片列表（管理员）',
-      'PUT /:uploadId/approve': '批准用户上传的图片（管理员）',
-      'PUT /:uploadId/reject': '拒绝用户上传的图片（管理员）',
-      'GET /:uploadId': '获取特定上传记录详情',
-      'GET /user/:userId': '获取特定用户的上传记录（需要认证）',
-      'GET /stats/review': '获取审核统计数据（管理员）',
-      'POST /batch/review': '批量审核用户上传（管理员）',
-      'GET /categories': '获取上传分类信息'
-    },
-    businessType: 'uploads',
-    supportedCategories: ['user_photo', 'review', 'feedback'],
-    maxFileSize: '20MB',
-    maxFiles: 3,
-    reviewStates: ['pending', 'approved', 'rejected']
-  }))
+  res.json(
+    ApiResponse.success({
+      module: 'uploads',
+      description: '用户上传图片审核管理API',
+      version: '2.0.0',
+      endpoints: {
+        'POST /submit': '用户提交图片审核（需要认证）',
+        'GET /pending': '获取待审核图片列表（管理员）',
+        'PUT /:uploadId/approve': '批准用户上传的图片（管理员）',
+        'PUT /:uploadId/reject': '拒绝用户上传的图片（管理员）',
+        'GET /:uploadId': '获取特定上传记录详情',
+        'GET /user/:userId': '获取特定用户的上传记录（需要认证）',
+        'GET /stats/review': '获取审核统计数据（管理员）',
+        'POST /batch/review': '批量审核用户上传（管理员）',
+        'GET /categories': '获取上传分类信息'
+      },
+      businessType: 'uploads',
+      supportedCategories: ['user_photo', 'review', 'feedback'],
+      maxFileSize: '20MB',
+      maxFiles: 3,
+      reviewStates: ['pending', 'approved', 'rejected']
+    })
+  )
 })
 
 /**
@@ -65,9 +67,7 @@ router.post('/submit', authenticateToken, upload.array('images', 3), async (req,
 
     // 验证文件
     if (!req.files || req.files.length === 0) {
-      return res.status(400).json(
-        ApiResponse.error('未上传图片文件', 'NO_FILES')
-      )
+      return res.status(400).json(ApiResponse.error('未上传图片文件', 'NO_FILES'))
     }
 
     const uploadResults = []
@@ -96,11 +96,7 @@ router.post('/submit', authenticateToken, upload.array('images', 3), async (req,
           priority: 'high' // 待审核图片优先处理
         }
 
-        const resource = await imageService.createResource(
-          resourceData,
-          file.buffer,
-          uploadOptions
-        )
+        const resource = await imageService.createResource(resourceData, file.buffer, uploadOptions)
 
         uploadResults.push(resource)
       } catch (error) {
@@ -108,14 +104,14 @@ router.post('/submit', authenticateToken, upload.array('images', 3), async (req,
       }
     }
 
-    res.status(201).json(
-      ApiResponse.success(uploadResults, `图片提交成功: ${uploadResults.length}个文件，等待审核`)
-    )
+    res
+      .status(201)
+      .json(
+        ApiResponse.success(uploadResults, `图片提交成功: ${uploadResults.length}个文件，等待审核`)
+      )
   } catch (error) {
     console.error('❌ 用户图片提交失败:', error.message)
-    res.status(500).json(
-      ApiResponse.error('图片提交失败', 'SUBMIT_IMAGES_FAILED', error.message)
-    )
+    res.status(500).json(ApiResponse.error('图片提交失败', 'SUBMIT_IMAGES_FAILED', error.message))
   }
 })
 
@@ -152,9 +148,9 @@ router.get('/my-submissions', authenticateToken, async (req, res) => {
     )
   } catch (error) {
     console.error('❌ 获取用户提交记录失败:', error.message)
-    res.status(500).json(
-      ApiResponse.error('获取提交记录失败', 'GET_USER_SUBMISSIONS_FAILED', error.message)
-    )
+    res
+      .status(500)
+      .json(ApiResponse.error('获取提交记录失败', 'GET_USER_SUBMISSIONS_FAILED', error.message))
   }
 })
 
@@ -186,9 +182,9 @@ router.get('/pending-reviews', requireAdmin, async (req, res) => {
     )
   } catch (error) {
     console.error('❌ 获取待审核列表失败:', error.message)
-    res.status(500).json(
-      ApiResponse.error('获取待审核列表失败', 'GET_PENDING_REVIEWS_FAILED', error.message)
-    )
+    res
+      .status(500)
+      .json(ApiResponse.error('获取待审核列表失败', 'GET_PENDING_REVIEWS_FAILED', error.message))
   }
 })
 
@@ -203,9 +199,9 @@ router.post('/review/:resourceId', requireAdmin, async (req, res) => {
     const { action, reason, points } = req.body
 
     if (!['approve', 'reject'].includes(action)) {
-      return res.status(400).json(
-        ApiResponse.error('审核动作必须是 approve 或 reject', 'INVALID_ACTION')
-      )
+      return res
+        .status(400)
+        .json(ApiResponse.error('审核动作必须是 approve 或 reject', 'INVALID_ACTION'))
     }
 
     const updateData = {
@@ -229,20 +225,14 @@ router.post('/review/:resourceId', requireAdmin, async (req, res) => {
 
     const resource = await imageService.updateResource(resourceId, updateData)
 
-    res.json(
-      ApiResponse.success(resource, `图片${action === 'approve' ? '审核通过' : '审核拒绝'}`)
-    )
+    res.json(ApiResponse.success(resource, `图片${action === 'approve' ? '审核通过' : '审核拒绝'}`))
   } catch (error) {
     if (error.message.includes('不存在')) {
-      return res.status(404).json(
-        ApiResponse.error('图片资源不存在', 'RESOURCE_NOT_FOUND')
-      )
+      return res.status(404).json(ApiResponse.error('图片资源不存在', 'RESOURCE_NOT_FOUND'))
     }
 
     console.error('❌ 审核图片失败:', error.message)
-    res.status(500).json(
-      ApiResponse.error('审核图片失败', 'REVIEW_IMAGE_FAILED', error.message)
-    )
+    res.status(500).json(ApiResponse.error('审核图片失败', 'REVIEW_IMAGE_FAILED', error.message))
   }
 })
 
@@ -256,22 +246,22 @@ router.post('/batch-review', requireAdmin, async (req, res) => {
     const { resourceIds, action, reason } = req.body
 
     if (!Array.isArray(resourceIds) || resourceIds.length === 0) {
-      return res.status(400).json(
-        ApiResponse.error('resourceIds必须是非空数组', 'INVALID_RESOURCE_IDS')
-      )
+      return res
+        .status(400)
+        .json(ApiResponse.error('resourceIds必须是非空数组', 'INVALID_RESOURCE_IDS'))
     }
 
     if (!['approve', 'reject'].includes(action)) {
-      return res.status(400).json(
-        ApiResponse.error('审核动作必须是 approve 或 reject', 'INVALID_ACTION')
-      )
+      return res
+        .status(400)
+        .json(ApiResponse.error('审核动作必须是 approve 或 reject', 'INVALID_ACTION'))
     }
 
     const results = []
     const errors = []
 
     // 并行处理批量审核
-    const reviewPromises = resourceIds.map(async (resourceId) => {
+    const reviewPromises = resourceIds.map(async resourceId => {
       try {
         const updateData = {
           review_status: action === 'approve' ? 'approved' : 'rejected',
@@ -297,7 +287,7 @@ router.post('/batch-review', requireAdmin, async (req, res) => {
     })
 
     const reviewResults = await Promise.all(reviewPromises)
-    
+
     reviewResults.forEach(result => {
       if (result.success) {
         results.push(result.resource)
@@ -307,22 +297,23 @@ router.post('/batch-review', requireAdmin, async (req, res) => {
     })
 
     res.json(
-      ApiResponse.success({
-        reviewed: results,
-        errors: errors,
-        summary: {
-          total: resourceIds.length,
-          success: results.length,
-          failed: errors.length,
-          action: action
-        }
-      }, `批量审核完成: ${results.length}成功, ${errors.length}失败`)
+      ApiResponse.success(
+        {
+          reviewed: results,
+          errors,
+          summary: {
+            total: resourceIds.length,
+            success: results.length,
+            failed: errors.length,
+            action
+          }
+        },
+        `批量审核完成: ${results.length}成功, ${errors.length}失败`
+      )
     )
   } catch (error) {
     console.error('❌ 批量审核失败:', error.message)
-    res.status(500).json(
-      ApiResponse.error('批量审核失败', 'BATCH_REVIEW_FAILED', error.message)
-    )
+    res.status(500).json(ApiResponse.error('批量审核失败', 'BATCH_REVIEW_FAILED', error.message))
   }
 })
 
@@ -367,9 +358,9 @@ router.get('/review-history', requireAdmin, async (req, res) => {
     )
   } catch (error) {
     console.error('❌ 获取审核历史失败:', error.message)
-    res.status(500).json(
-      ApiResponse.error('获取审核历史失败', 'GET_REVIEW_HISTORY_FAILED', error.message)
-    )
+    res
+      .status(500)
+      .json(ApiResponse.error('获取审核历史失败', 'GET_REVIEW_HISTORY_FAILED', error.message))
   }
 })
 
@@ -386,16 +377,19 @@ router.get('/stats', requireAdmin, async (req, res) => {
     const reviewStats = await imageService.getReviewStats()
 
     res.json(
-      ApiResponse.success({
-        ...stats,
-        review: reviewStats
-      }, '获取上传审核统计成功')
+      ApiResponse.success(
+        {
+          ...stats,
+          review: reviewStats
+        },
+        '获取上传审核统计成功'
+      )
     )
   } catch (error) {
     console.error('❌ 获取上传审核统计失败:', error.message)
-    res.status(500).json(
-      ApiResponse.error('获取统计信息失败', 'GET_UPLOAD_STATS_FAILED', error.message)
-    )
+    res
+      .status(500)
+      .json(ApiResponse.error('获取统计信息失败', 'GET_UPLOAD_STATS_FAILED', error.message))
   }
 })
 
@@ -410,30 +404,22 @@ router.delete('/:resourceId', authenticateToken, async (req, res) => {
 
     // 检查资源是否属于当前用户
     const resource = await imageService.getResourceById(resourceId)
-    
+
     if (!resource) {
-      return res.status(404).json(
-        ApiResponse.error('图片资源不存在', 'RESOURCE_NOT_FOUND')
-      )
+      return res.status(404).json(ApiResponse.error('图片资源不存在', 'RESOURCE_NOT_FOUND'))
     }
 
     if (resource.user_id !== req.user.id && !req.user.is_admin) {
-      return res.status(403).json(
-        ApiResponse.error('无权删除此图片', 'FORBIDDEN')
-      )
+      return res.status(403).json(ApiResponse.error('无权删除此图片', 'FORBIDDEN'))
     }
 
     await imageService.deleteResource(resourceId)
 
-    res.json(
-      ApiResponse.success(null, '图片删除成功')
-    )
+    res.json(ApiResponse.success(null, '图片删除成功'))
   } catch (error) {
     console.error('❌ 删除用户上传图片失败:', error.message)
-    res.status(500).json(
-      ApiResponse.error('删除图片失败', 'DELETE_UPLOAD_FAILED', error.message)
-    )
+    res.status(500).json(ApiResponse.error('删除图片失败', 'DELETE_UPLOAD_FAILED', error.message))
   }
 })
 
-module.exports = router 
+module.exports = router

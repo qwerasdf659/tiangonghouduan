@@ -38,13 +38,7 @@
   "trend_analysis": {
     "compliance_trend": "improving",
     "violation_frequency": "decreasing",
-    "most_improved_areas": [
-      "工具调用优化",
-      "Git操作规范"
-    ],
-    "areas_need_attention": [
-      "深度思考",
-      "并行化处理"
-    ]
+    "most_improved_areas": ["工具调用优化", "Git操作规范"],
+    "areas_need_attention": ["深度思考", "并行化处理"]
   }
 }

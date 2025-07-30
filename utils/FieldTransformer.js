@@ -23,7 +23,7 @@ class FieldTransformer {
       customRules: this.buildProjectRules(),
       ...options
     }
-    
+
     this.stats = {
       totalTransformations: 0,
       dbToFrontendCount: 0,
@@ -90,12 +90,12 @@ class FieldTransformer {
 
     try {
       const result = this._transformData(data, 'toFrontend', depth)
-      
+
       if (depth === 0) {
         this.endPerformanceTimer()
         this.stats.dbToFrontendCount++
       }
-      
+
       return result
     } catch (error) {
       this.stats.errors++
@@ -113,12 +113,12 @@ class FieldTransformer {
 
     try {
       const result = this._transformData(data, 'toDb', depth)
-      
+
       if (depth === 0) {
         this.endPerformanceTimer()
         this.stats.frontendToDbCount++
       }
-      
+
       return result
     } catch (error) {
       this.stats.errors++
@@ -151,7 +151,7 @@ class FieldTransformer {
     }
 
     const transformed = {}
-    
+
     for (const [key, value] of Object.entries(data)) {
       if (this.options.skipKeys.includes(key)) {
         transformed[key] = value
@@ -187,12 +187,10 @@ class FieldTransformer {
     }
 
     const startTime = Date.now()
-    
+
     const result = dataList.map(item => {
       try {
-        return direction === 'toFrontend' 
-          ? this.dbToFrontend(item)
-          : this.frontendToDb(item)
+        return direction === 'toFrontend' ? this.dbToFrontend(item) : this.frontendToDb(item)
       } catch (error) {
         this.stats.errors++
         if (this.options.logTransformations) {
@@ -218,7 +216,8 @@ class FieldTransformer {
     if (this._startTime) {
       const duration = Date.now() - this._startTime
       this.performanceStats.totalTime += duration
-      this.performanceStats.averageTime = this.performanceStats.totalTime / 
+      this.performanceStats.averageTime =
+        this.performanceStats.totalTime /
         (this.stats.dbToFrontendCount + this.stats.frontendToDbCount)
       this.performanceStats.maxTime = Math.max(this.performanceStats.maxTime, duration)
       this.performanceStats.minTime = Math.min(this.performanceStats.minTime, duration)
@@ -230,8 +229,14 @@ class FieldTransformer {
       ...this.stats,
       performance: this.performanceStats,
       totalOperations: this.stats.dbToFrontendCount + this.stats.frontendToDbCount,
-      successRate: this.stats.errors === 0 ? 100 : 
-        ((this.stats.totalTransformations - this.stats.errors) / this.stats.totalTransformations * 100).toFixed(2)
+      successRate:
+        this.stats.errors === 0
+          ? 100
+          : (
+            ((this.stats.totalTransformations - this.stats.errors) /
+                this.stats.totalTransformations) *
+              100
+          ).toFixed(2)
     }
   }
 
@@ -252,4 +257,4 @@ class FieldTransformer {
   }
 }
 
-module.exports = FieldTransformer 
+module.exports = FieldTransformer
