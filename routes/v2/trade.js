@@ -49,10 +49,10 @@ router.get('/', (req, res) => {
  */
 router.post('/transfer', authenticateToken, async (req, res) => {
   try {
-    const { toUserId, amount, reason, tradePassword, clientInfo = {} } = req.body
+    const { to_user_id, amount, reason, trade_password, client_info = {} } = req.body
 
     // 参数验证
-    if (!toUserId || !amount || !reason) {
+    if (!to_user_id || !amount || !reason) {
       return res.json(ApiResponse.error('缺少必需参数', 400))
     }
 
@@ -60,17 +60,17 @@ router.post('/transfer', authenticateToken, async (req, res) => {
       return res.json(ApiResponse.error('转账金额必须在1-100000之间', 400))
     }
 
-    if (toUserId === req.user.id) {
+    if (to_user_id === req.user.id) {
       return res.json(ApiResponse.error('不能向自己转账', 400))
     }
 
     const result = await tradeService.transferPoints({
       fromUserId: req.user.id,
-      toUserId,
+      toUserId: to_user_id,
       amount,
       reason,
-      tradePassword,
-      clientInfo
+      tradePassword: trade_password,
+      clientInfo: client_info
     })
 
     res.json(ApiResponse.success(result, '转账成功'))

@@ -109,13 +109,13 @@ router.post('/unlock-premium', authenticateToken, async (req, res) => {
 router.post('/redeem', authenticateToken, async (req, res) => {
   try {
     const userId = req.user.user_id
-    const { productId, quantity = 1 } = req.body
+    const { product_id, quantity = 1 } = req.body
 
-    if (!productId) {
+    if (!product_id) {
       return res.status(400).json(ApiResponse.error('缺少商品ID', 'MISSING_PRODUCT_ID'))
     }
 
-    const result = await exchangeService.redeemProduct(userId, productId, quantity)
+    const result = await exchangeService.redeemProduct(userId, product_id, quantity)
 
     res.json(ApiResponse.success(result, '商品兑换成功'))
   } catch (error) {

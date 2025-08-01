@@ -79,7 +79,9 @@ class FieldTransformer {
       refresh_token: 'refreshToken',
       expires_in: 'expiresIn',
       user_info: 'userInfo',
-      is_background: 'isBackground'
+      is_background: 'isBackground',
+      // 🔧 修复登录接口2002错误：添加验证码字段映射
+      verification_code: 'code' // 将前端的code字段映射为后端的verification_code字段
     }
   }
 

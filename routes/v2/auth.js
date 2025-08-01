@@ -23,31 +23,32 @@ const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '7d'
  */
 router.post('/login', async (req, res) => {
   try {
-    const { mobile, code } = req.body
+    // 使用字段转换中间件转换后的标准字段名
+    const { mobile, verification_code } = req.body
 
     // 参数验证
-    if (!mobile || !code) {
-      return res.status(400).json(ApiResponse.error('手机号和验证码不能为空', 'MISSING_PARAMS'))
+    if (!mobile || !verification_code) {
+      return res.status(200).json(ApiResponse.error('手机号和验证码不能为空', 'MISSING_PARAMS', null, 2002))
     }
 
     // 手机号格式验证
     const mobileRegex = /^1[3-9]\d{9}$/
     if (!mobileRegex.test(mobile)) {
-      return res.status(400).json(ApiResponse.error('手机号格式不正确', 'INVALID_MOBILE'))
+      return res.status(200).json(ApiResponse.error('手机号格式不正确', 'INVALID_MOBILE', null, 2001))
     }
 
     // 开发阶段：验证万能验证码
     if (process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test') {
-      if (code !== '123456') {
+      if (verification_code !== '123456') {
         return res
-          .status(400)
-          .json(ApiResponse.error('验证码错误（开发阶段请使用123456）', 'INVALID_CODE'))
+          .status(200)
+          .json(ApiResponse.error('验证码错误（开发阶段请使用123456）', 'INVALID_CODE', null, 1002))
       }
     } else {
       // 生产环境需要实现真实的短信验证
       return res
-        .status(501)
-        .json(ApiResponse.error('生产环境短信验证功能待实现', 'SMS_NOT_IMPLEMENTED'))
+        .status(200)
+        .json(ApiResponse.error('生产环境短信验证功能待实现', 'SMS_NOT_IMPLEMENTED', null, 5001))
     }
 
     // 查找或创建用户
@@ -81,7 +82,7 @@ router.post('/login', async (req, res) => {
     } else {
       // 检查用户状态
       if (user.status === 'banned') {
-        return res.status(403).json(ApiResponse.error('用户已被禁用', 'USER_BANNED'))
+        return res.status(200).json(ApiResponse.error('用户已被禁用', 'USER_BANNED', null, 4004))
       }
 
       // 更新登录信息
@@ -127,7 +128,7 @@ router.post('/login', async (req, res) => {
     console.log(`🔐 用户登录: ${mobile}, 管理员: ${user.is_admin ? '是' : '否'}, IP: ${req.ip}`)
   } catch (error) {
     console.error('❌ 用户登录失败:', error.message)
-    res.status(500).json(ApiResponse.error('登录失败，请稍后重试', 'LOGIN_FAILED', error.message))
+    res.status(200).json(ApiResponse.error('登录失败，请稍后重试', 'LOGIN_FAILED', error.message, 5001))
   }
 })
 
@@ -154,7 +155,7 @@ router.get('/profile', authenticateToken, async (req, res) => {
     })
 
     if (!user) {
-      return res.status(404).json(ApiResponse.error('用户不存在', 'USER_NOT_FOUND'))
+      return res.status(200).json(ApiResponse.error('用户不存在', 'USER_NOT_FOUND', null, 4001))
     }
 
     res.json(
@@ -177,7 +178,7 @@ router.get('/profile', authenticateToken, async (req, res) => {
     )
   } catch (error) {
     console.error('❌ 获取用户信息失败:', error.message)
-    res.status(500).json(ApiResponse.error('获取用户信息失败', 'GET_PROFILE_FAILED', error.message))
+    res.status(200).json(ApiResponse.error('获取用户信息失败', 'GET_PROFILE_FAILED', error.message, 5001))
   }
 })
 

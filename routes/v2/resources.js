@@ -66,8 +66,8 @@ router.post('/', authenticateToken, upload.single('image'), async (req, res) => 
     const startTime = Date.now()
 
     // 验证必需参数
-    const { businessType, category, contextId } = req.body
-    if (!businessType || !category || !contextId) {
+    const { business_type, category, context_id } = req.body
+    if (!business_type || !category || !context_id) {
       return res
         .status(400)
         .json(
@@ -82,9 +82,9 @@ router.post('/', authenticateToken, upload.single('image'), async (req, res) => 
 
     // 准备资源数据
     const resourceData = {
-      businessType,
+      businessType: business_type,
       category,
-      contextId: parseInt(contextId),
+      contextId: parseInt(context_id),
       userId: req.user.id,
       originalFilename: req.file.originalname,
       mimeType: req.file.mimetype,
@@ -97,7 +97,7 @@ router.post('/', authenticateToken, upload.single('image'), async (req, res) => 
 
     // 上传选项
     const uploadOptions = {
-      isActive: req.body.isActive === 'true',
+      isActive: req.body.is_active === 'true',
       priority: req.body.priority || 'normal'
     }
 
@@ -141,8 +141,8 @@ router.post('/batch', authenticateToken, upload.array('images', 5), async (req, 
     const startTime = Date.now()
 
     // 验证必需参数
-    const { businessType, category, contextId } = req.body
-    if (!businessType || !category || !contextId) {
+    const { business_type, category, context_id } = req.body
+    if (!business_type || !category || !context_id) {
       return res
         .status(400)
         .json(
@@ -165,9 +165,9 @@ router.post('/batch', authenticateToken, upload.array('images', 5), async (req, 
     const uploadPromises = req.files.map(async (file, index) => {
       try {
         const resourceData = {
-          businessType,
+          businessType: business_type,
           category,
-          contextId: parseInt(contextId),
+          contextId: parseInt(context_id),
           userId: req.user.id,
           originalFilename: file.originalname,
           mimeType: file.mimetype,

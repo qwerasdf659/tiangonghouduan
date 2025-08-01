@@ -58,12 +58,12 @@ SMS_TEMPLATE_CODE=SMS_123456789
 
 # 🔴 服务器地址配置 - 根据文档配置
 # 内网地址
-INTERNAL_BASE_URL=http://devbox1.ns-br0za7uc.svc.cluster.local:3000
-INTERNAL_WS_URL=ws://devbox1.ns-br0za7uc.svc.cluster.local:8080
+INTERNAL_BASE_URL=http://devbox2.ns-br0za7uc.svc.cluster.local:3000
+INTERNAL_WS_URL=ws://devbox2.ns-br0za7uc.svc.cluster.local:8080
 
 # 公网地址  
-PUBLIC_BASE_URL=https://rqchrlqndora.sealosbja.site
-PUBLIC_WS_URL=wss://rqchrlqndora.sealosbja.site/ws
+PUBLIC_BASE_URL=https://omqktqrtntnn.sealosbja.site
+PUBLIC_WS_URL=wss://omqktqrtntnn.sealosbja.site/ws
 
 # 系统配置
 LOG_LEVEL=info

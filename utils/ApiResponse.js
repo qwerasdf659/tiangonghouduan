@@ -8,19 +8,14 @@ class ApiResponse {
    * 成功响应
    * @param {any} data - 响应数据
    * @param {string} message - 响应消息
-   * @param {object} meta - 元数据
    * @returns {object} 格式化的成功响应
    */
-  static success (data = null, message = 'Success', meta = {}) {
+  static success (data = null, message = 'Success') {
     return {
-      success: true,
-      code: 200,
-      message,
+      code: 0, // ✅ 修正：使用业务状态码0表示成功，不是HTTP状态码200
+      msg: message, // ✅ 修正：使用msg字段名，符合前端标准
       data,
-      meta: {
-        timestamp: new Date().toISOString(),
-        ...meta
-      }
+      timestamp: new Date().toISOString()
     }
   }
 
@@ -29,24 +24,21 @@ class ApiResponse {
    * @param {string} message - 错误消息
    * @param {string} errorCode - 错误代码
    * @param {any} details - 错误详情
-   * @param {number} httpStatus - HTTP状态码
+   * @param {number} businessCode - 业务状态码（非0表示失败）
    * @returns {object} 格式化的错误响应
    */
-  static error (message = 'Error', errorCode = 'UNKNOWN_ERROR', details = null, httpStatus = 500) {
+  static error (message = 'Error', errorCode = 'UNKNOWN_ERROR', details = null, businessCode = -1) {
     const response = {
-      success: false,
-      code: httpStatus,
-      message,
-      error: {
-        code: errorCode,
-        message,
-        timestamp: new Date().toISOString()
-      }
+      code: businessCode, // ✅ 修正：使用业务状态码，非0表示失败
+      msg: message, // ✅ 修正：使用msg字段名，符合前端标准
+      data: null,
+      timestamp: new Date().toISOString()
     }
 
-    // 只在开发环境或详情不为空时添加详情
+    // 只在开发环境添加错误详情
     if (details && (process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test')) {
-      response.error.details = details
+      response.details = details
+      response.errorCode = errorCode
     }
 
     return response
@@ -57,14 +49,12 @@ class ApiResponse {
    * @param {Array} data - 数据数组
    * @param {object} pagination - 分页信息
    * @param {string} message - 响应消息
-   * @param {object} meta - 元数据
    * @returns {object} 格式化的分页响应
    */
-  static paginated (data = [], pagination = {}, message = 'Success', meta = {}) {
+  static paginated (data = [], pagination = {}, message = 'Success') {
     return {
-      success: true,
-      code: 200,
-      message,
+      code: 0, // ✅ 修正：使用业务状态码0表示成功
+      msg: message, // ✅ 修正：使用msg字段名，符合前端标准
       data,
       pagination: {
         total: pagination.total || 0,
@@ -75,10 +65,7 @@ class ApiResponse {
         hasPrev: pagination.hasPrev || false,
         ...pagination
       },
-      meta: {
-        timestamp: new Date().toISOString(),
-        ...meta
-      }
+      timestamp: new Date().toISOString()
     }
   }
 
@@ -86,19 +73,14 @@ class ApiResponse {
    * 创建响应 (201 Created)
    * @param {any} data - 创建的数据
    * @param {string} message - 响应消息
-   * @param {object} meta - 元数据
    * @returns {object} 格式化的创建响应
    */
-  static created (data = null, message = 'Created successfully', meta = {}) {
+  static created (data = null, message = 'Created successfully') {
     return {
-      success: true,
-      code: 201,
-      message,
+      code: 0, // ✅ 修正：创建成功也使用业务状态码0
+      msg: message, // ✅ 修正：使用msg字段名，符合前端标准
       data,
-      meta: {
-        timestamp: new Date().toISOString(),
-        ...meta
-      }
+      timestamp: new Date().toISOString()
     }
   }
 
@@ -109,13 +91,10 @@ class ApiResponse {
    */
   static noContent (message = 'No content') {
     return {
-      success: true,
-      code: 204,
-      message,
+      code: 0, // ✅ 修正：无内容成功也使用业务状态码0
+      msg: message, // ✅ 修正：使用msg字段名，符合前端标准
       data: null,
-      meta: {
-        timestamp: new Date().toISOString()
-      }
+      timestamp: new Date().toISOString()
     }
   }
 
@@ -127,7 +106,7 @@ class ApiResponse {
    * @returns {object} 格式化的客户端错误响应
    */
   static badRequest (message = 'Bad Request', errorCode = 'BAD_REQUEST', details = null) {
-    return this.error(message, errorCode, details, 400)
+    return this.error(message, errorCode, details, 2001)
   }
 
   /**
@@ -137,7 +116,7 @@ class ApiResponse {
    * @returns {object} 格式化的未授权响应
    */
   static unauthorized (message = 'Unauthorized', errorCode = 'UNAUTHORIZED') {
-    return this.error(message, errorCode, null, 401)
+    return this.error(message, errorCode, null, 4001)
   }
 
   /**
@@ -147,7 +126,7 @@ class ApiResponse {
    * @returns {object} 格式化的禁止访问响应
    */
   static forbidden (message = 'Forbidden', errorCode = 'FORBIDDEN') {
-    return this.error(message, errorCode, null, 403)
+    return this.error(message, errorCode, null, 4003)
   }
 
   /**
@@ -157,7 +136,7 @@ class ApiResponse {
    * @returns {object} 格式化的未找到响应
    */
   static notFound (message = 'Not Found', errorCode = 'NOT_FOUND') {
-    return this.error(message, errorCode, null, 404)
+    return this.error(message, errorCode, null, 4004)
   }
 
   /**
@@ -167,13 +146,9 @@ class ApiResponse {
    * @returns {object} 格式化的方法不允许响应
    */
   static methodNotAllowed (message = 'Method Not Allowed', allowedMethods = []) {
-    return {
-      ...this.error(message, 'METHOD_NOT_ALLOWED', null, 405),
-      meta: {
-        allowedMethods,
-        timestamp: new Date().toISOString()
-      }
-    }
+    const response = this.error(message, 'METHOD_NOT_ALLOWED', null, 4005)
+    response.allowedMethods = allowedMethods
+    return response
   }
 
   /**
@@ -184,7 +159,7 @@ class ApiResponse {
    * @returns {object} 格式化的冲突响应
    */
   static conflict (message = 'Conflict', errorCode = 'CONFLICT', details = null) {
-    return this.error(message, errorCode, details, 409)
+    return this.error(message, errorCode, details, 4009)
   }
 
   /**
@@ -194,12 +169,9 @@ class ApiResponse {
    * @returns {object} 格式化的实体过大响应
    */
   static payloadTooLarge (message = 'Payload Too Large', maxSize = null) {
-    const response = this.error(message, 'PAYLOAD_TOO_LARGE', null, 413)
+    const response = this.error(message, 'PAYLOAD_TOO_LARGE', null, 4013)
     if (maxSize) {
-      response.meta = {
-        maxSize,
-        timestamp: new Date().toISOString()
-      }
+      response.maxSize = maxSize
     }
     return response
   }
@@ -211,13 +183,9 @@ class ApiResponse {
    * @returns {object} 格式化的不支持媒体类型响应
    */
   static unsupportedMediaType (message = 'Unsupported Media Type', supportedTypes = []) {
-    return {
-      ...this.error(message, 'UNSUPPORTED_MEDIA_TYPE', null, 415),
-      meta: {
-        supportedTypes,
-        timestamp: new Date().toISOString()
-      }
-    }
+    const response = this.error(message, 'UNSUPPORTED_MEDIA_TYPE', null, 4015)
+    response.supportedTypes = supportedTypes
+    return response
   }
 
   /**
@@ -227,13 +195,9 @@ class ApiResponse {
    * @returns {object} 格式化的请求频率过高响应
    */
   static tooManyRequests (message = 'Too Many Requests', retryAfter = 60) {
-    return {
-      ...this.error(message, 'TOO_MANY_REQUESTS', null, 429),
-      meta: {
-        retryAfter,
-        timestamp: new Date().toISOString()
-      }
-    }
+    const response = this.error(message, 'TOO_MANY_REQUESTS', null, 4029)
+    response.retryAfter = retryAfter
+    return response
   }
 
   /**
@@ -248,7 +212,7 @@ class ApiResponse {
     errorCode = 'INTERNAL_ERROR',
     details = null
   ) {
-    return this.error(message, errorCode, details, 500)
+    return this.error(message, errorCode, details, 5001)
   }
 
   /**
@@ -258,13 +222,9 @@ class ApiResponse {
    * @returns {object} 格式化的服务不可用响应
    */
   static serviceUnavailable (message = 'Service Unavailable', retryAfter = 300) {
-    return {
-      ...this.error(message, 'SERVICE_UNAVAILABLE', null, 503),
-      meta: {
-        retryAfter,
-        timestamp: new Date().toISOString()
-      }
-    }
+    const response = this.error(message, 'SERVICE_UNAVAILABLE', null, 5003)
+    response.retryAfter = retryAfter
+    return response
   }
 
   /**
@@ -273,7 +233,7 @@ class ApiResponse {
    * @returns {object} 格式化的网关超时响应
    */
   static gatewayTimeout (message = 'Gateway Timeout') {
-    return this.error(message, 'GATEWAY_TIMEOUT', null, 504)
+    return this.error(message, 'GATEWAY_TIMEOUT', null, 5004)
   }
 
   /**
@@ -281,21 +241,24 @@ class ApiResponse {
    * @param {string} message - 错误消息
    * @param {string} errorCode - 业务错误代码
    * @param {any} details - 错误详情
+   * @param {number} businessCode - 业务状态码（非0表示失败）
    * @returns {object} 格式化的业务错误响应
    */
-  static businessError (message, errorCode, details = null) {
-    return {
-      success: false,
-      code: 400,
-      message,
-      error: {
-        code: errorCode,
-        type: 'BUSINESS_ERROR',
-        message,
-        details,
-        timestamp: new Date().toISOString()
-      }
+  static businessError (message, errorCode, details = null, businessCode = 3001) {
+    const response = {
+      code: businessCode, // ✅ 修正：使用业务状态码，非0表示失败
+      msg: message, // ✅ 修正：使用msg字段名，符合前端标准
+      data: null,
+      timestamp: new Date().toISOString()
     }
+
+    // 只在开发环境添加错误详情
+    if (details && (process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test')) {
+      response.details = details
+      response.errorCode = errorCode
+    }
+
+    return response
   }
 
   /**
@@ -306,16 +269,11 @@ class ApiResponse {
    */
   static validationError (message = 'Validation failed', errors = []) {
     return {
-      success: false,
-      code: 422,
-      message,
-      error: {
-        code: 'VALIDATION_ERROR',
-        type: 'VALIDATION_ERROR',
-        message,
-        errors,
-        timestamp: new Date().toISOString()
-      }
+      code: 2001, // ✅ 修正：使用业务状态码2001表示验证错误
+      msg: message, // ✅ 修正：使用msg字段名，符合前端标准
+      data: null,
+      errors, // 验证错误详情
+      timestamp: new Date().toISOString()
     }
   }
 
@@ -332,9 +290,8 @@ class ApiResponse {
     const failureCount = totalCount - successCount
 
     return {
-      success: failureCount === 0,
-      code: 200,
-      message,
+      code: failureCount === 0 ? 0 : 1, // ✅ 修正：全部成功使用0，有失败使用1
+      msg: message, // ✅ 修正：使用msg字段名，符合前端标准
       data: results,
       summary: {
         total: totalCount,
@@ -343,9 +300,7 @@ class ApiResponse {
         successRate: totalCount > 0 ? ((successCount / totalCount) * 100).toFixed(1) + '%' : '0%',
         ...summary
       },
-      meta: {
-        timestamp: new Date().toISOString()
-      }
+      timestamp: new Date().toISOString()
     }
   }
 
@@ -356,7 +311,8 @@ class ApiResponse {
    * @returns {object} Express响应
    */
   static send (res, apiResponse) {
-    return res.status(apiResponse.code).json(apiResponse)
+    // ✅ 修正：固定使用HTTP 200状态码，业务状态通过response.code字段表示
+    return res.status(200).json(apiResponse)
   }
 
   /**
