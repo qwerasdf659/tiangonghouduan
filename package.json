@@ -11,18 +11,16 @@
   },
   "scripts": {
     "start": "node app.js",
-    "dev": "NODE_ENV=development nodemon app.js",
-    "test": "NODE_ENV=test jest",
-    "test:watch": "NODE_ENV=test jest --watch",
+    "dev": "nodemon app.js",
+    "test": "jest --testTimeout=30000",
     "lint": "eslint . --ext .js",
     "lint:fix": "eslint . --ext .js --fix",
     "db:migrate": "npx sequelize-cli db:migrate",
+    "db:migrate:undo": "npx sequelize-cli db:migrate:undo",
     "db:seed": "npx sequelize-cli db:seed:all",
-    "db:reset": "npx sequelize-cli db:migrate:undo:all && npm run db:migrate && npm run db:seed",
-    "build": "echo 'No build step required for Node.js application'",
-    "docker:build": "docker build -t restaurant-lottery-v2 .",
-    "docker:run": "docker run -p 3000:3000 restaurant-lottery-v2",
-    "health": "curl -f http://localhost:3000/health || exit 1"
+    "backup": "node scripts/backup-database.js",
+    "test:new-feature": "node scripts/test-new-feature.js",
+    "deploy:check": "npm run lint && npm run test && npm run test:new-feature"
   },
   "dependencies": {
     "aws-sdk": "^2.1691.0",

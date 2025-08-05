@@ -543,12 +543,48 @@ class AdminReviewService {
   /**
    * 更新审核员统计
    */
-  async _updateReviewerStats (reviewerId, processedCount, _transaction) {
-    // 这里可以实现审核员统计逻辑
-    // 暂时返回模拟数据
-    return {
-      today_processed: processedCount,
-      total_processed: processedCount
+  async _updateReviewerStats (reviewerId, processedCount, transaction) {
+    try {
+      // 🔴 使用真实数据库查询替代模拟数据
+      const today = new Date()
+      today.setHours(0, 0, 0, 0)
+
+      // 查询今日处理数量
+      const todayProcessed = await this.sequelize.query(`
+        SELECT COUNT(*) as count
+        FROM upload_reviews
+        WHERE reviewer_id = :reviewerId
+        AND DATE(updated_at) = DATE(:today)
+        AND review_status IN ('approved', 'rejected')
+      `, {
+        replacements: { reviewerId, today },
+        type: this.sequelize.QueryTypes.SELECT,
+        transaction
+      })
+
+      // 查询总处理数量
+      const totalProcessed = await this.sequelize.query(`
+        SELECT COUNT(*) as count
+        FROM upload_reviews
+        WHERE reviewer_id = :reviewerId
+        AND review_status IN ('approved', 'rejected')
+      `, {
+        replacements: { reviewerId },
+        type: this.sequelize.QueryTypes.SELECT,
+        transaction
+      })
+
+      return {
+        today_processed: todayProcessed[0]?.count || 0,
+        total_processed: totalProcessed[0]?.count || 0
+      }
+    } catch (error) {
+      console.error('❌ 更新审核员统计失败:', error.message)
+      // 发生错误时返回默认值，但不返回模拟数据
+      return {
+        today_processed: 0,
+        total_processed: 0
+      }
     }
   }
 

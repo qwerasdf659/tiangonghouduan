@@ -85,7 +85,7 @@ class ExchangeService {
         limit: pageSize,
         offset,
         attributes: [
-          'id',
+          'commodity_id', // 使用实际的主键字段名
           'name',
           'description',
           'image',
@@ -99,31 +99,39 @@ class ExchangeService {
           'is_hot',
           'is_new',
           'is_limited',
-          'sales',
-          'view_count',
+          'sales', // 修正：使用新模型的字段名sales，而不是sales_count
+          // 'view_count', // 修复：数据库中不存在此字段，暂时注释
           'rating',
-          'warranty',
-          'delivery_info',
-          'expires_at',
+          // 'warranty', // 修复：数据库中不存在此字段，暂时注释
+          // 'delivery_info', // 修复：数据库中不存在此字段，暂时注释
+          // 'expires_at', // 修复：数据库中不存在此字段，暂时注释
           'created_at',
           'updated_at'
         ]
       })
 
-      // 处理商品数据
+      // 添加虚拟字段和转换逻辑
       const processedProducts = products.map(product => {
         const productData = product.toJSON()
-
-        // 计算预估卡片高度（瀑布流布局用）
-        productData.estimated_height = this._calculateCardHeight(productData)
-
-        // 添加标签
-        productData.tags = this._generateProductTags(productData)
-
-        // 库存状态
-        productData.stock_status = product.getStockStatus()
-
-        return productData
+        return {
+          ...productData,
+          // 为前端兼容性提供commodityId字段
+          commodityId: productData.commodity_id,
+          // 添加库存状态
+          stockStatus: product.getStockStatus(),
+          // 处理价格显示
+          finalPrice: productData.original_price
+            ? Math.round(productData.original_price * (1 - productData.discount / 100))
+            : null,
+          // 添加标签
+          tags: [
+            ...(productData.is_hot ? ['热门'] : []),
+            ...(productData.is_new ? ['新品'] : []),
+            ...(productData.is_limited ? ['限量'] : [])
+          ],
+          // 预估高度（前端显示用）
+          estimatedHeight: 180
+        }
       })
 
       // 统计信息
@@ -366,13 +374,13 @@ class ExchangeService {
 
       // 保存商品信息快照
       const productSnapshot = {
-        id: product.id,
+        id: product.commodity_id, // 使用实际主键
         name: product.name,
-        image: product.image,
+        description: product.description,
         category: product.category,
         exchange_points: product.exchange_points,
         original_price: product.original_price,
-        discount: product.discount
+        space: product.space
       }
 
       // 创建兑换记录
@@ -432,12 +440,12 @@ class ExchangeService {
         exchange_code: exchangeCode,
         exchanged_at: exchangeRecord.exchange_time.toISOString(),
         product: {
-          id: product.id,
+          id: product.commodity_id, // 使用实际主键
           name: product.name,
-          quantity,
-          unit_points: product.exchange_points,
-          total_points: totalPoints,
-          total_value: `${(product.original_price * quantity).toFixed(2)}元`
+          category: product.category,
+          exchange_points: product.exchange_points,
+          image: product.image,
+          space: product.space
         },
         user_status: {
           remaining_points: newBalance,
@@ -545,6 +553,148 @@ class ExchangeService {
   // 私有辅助方法
 
   /**
+   * 获取商品统计摘要
+   */
+  async _getProductSummary (space, category) {
+    try {
+      const whereClause = {
+        status: 'active'
+      }
+
+      // 空间筛选
+      if (space !== 'both') {
+        whereClause.space = [space, 'both']
+      }
+
+      // 分类筛选
+      if (category && category !== 'all') {
+        whereClause.category = category
+      }
+
+      const [totalCount, inStockCount, hotCount, newCount] = await Promise.all([
+        Product.count({ where: whereClause }),
+        Product.count({
+          where: {
+            ...whereClause,
+            stock: { [sequelize.Sequelize.Op.gt]: 0 }
+          }
+        }),
+        Product.count({
+          where: {
+            ...whereClause,
+            is_hot: true
+          }
+        }),
+        Product.count({
+          where: {
+            ...whereClause,
+            is_new: true
+          }
+        })
+      ])
+
+      return {
+        total_count: totalCount,
+        in_stock_count: inStockCount,
+        hot_count: hotCount,
+        new_count: newCount,
+        categories: await this._getProductCategories(space)
+      }
+    } catch (error) {
+      console.error('❌ 获取商品统计摘要失败:', error.message)
+      return {
+        total_count: 0,
+        in_stock_count: 0,
+        hot_count: 0,
+        new_count: 0,
+        categories: []
+      }
+    }
+  }
+
+  /**
+   * 获取商品分类列表
+   */
+  async _getProductCategories (space) {
+    try {
+      const whereClause = {
+        status: 'active'
+      }
+
+      if (space !== 'both') {
+        whereClause.space = [space, 'both']
+      }
+
+      const categories = await Product.findAll({
+        where: whereClause,
+        attributes: [
+          'category',
+          [sequelize.fn('COUNT', sequelize.col('commodity_id')), 'count']
+        ],
+        group: ['category'],
+        order: [[sequelize.fn('COUNT', sequelize.col('commodity_id')), 'DESC']]
+      })
+
+      return categories.map(cat => ({
+        name: cat.category,
+        count: parseInt(cat.get('count'))
+      }))
+    } catch (error) {
+      console.error('❌ 获取商品分类失败:', error.message)
+      return []
+    }
+  }
+
+  /**
+   * 更新用户兑换统计
+   */
+  async _updateUserExchangeStats (_userId, _transaction) {
+    // 这里可以实现用户兑换统计的更新逻辑
+    // 暂时返回成功，不需要try-catch
+    return true
+  }
+
+  /**
+   * 获取用户总兑换次数
+   */
+  async _getUserTotalExchanges (userId) {
+    try {
+      const { ExchangeRecord } = require('../models')
+      return await ExchangeRecord.count({
+        where: { user_id: userId }
+      })
+    } catch (error) {
+      console.error('❌ 获取用户总兑换次数失败:', error.message)
+      return 0
+    }
+  }
+
+  /**
+   * 获取用户今日兑换次数
+   */
+  async _getUserTodayExchanges (userId) {
+    try {
+      const { ExchangeRecord } = require('../models')
+      const today = new Date()
+      today.setHours(0, 0, 0, 0)
+      const tomorrow = new Date(today)
+      tomorrow.setDate(tomorrow.getDate() + 1)
+
+      return await ExchangeRecord.count({
+        where: {
+          user_id: userId,
+          exchange_time: {
+            [sequelize.Sequelize.Op.between]: [today, tomorrow]
+          }
+        }
+      })
+    } catch (error) {
+      console.error('❌ 获取用户今日兑换次数失败:', error.message)
+      return 0
+    }
+  }
+
+  /**
    * 计算商品卡片高度（瀑布流布局用）
    */
   _calculateCardHeight (product) {
@@ -580,94 +730,6 @@ class ExchangeService {
     if (product.stock <= product.low_stock_threshold) tags.push('库存紧张')
 
     return tags
-  }
-
-  /**
-   * 获取商品汇总信息
-   */
-  async _getProductSummary (space, category) {
-    try {
-      const whereClause = { status: 'active' }
-
-      if (space !== 'both') {
-        whereClause.space = [space, 'both']
-      }
-
-      if (category && category !== 'all') {
-        whereClause.category = category
-      }
-
-      const [totalProducts, newProducts, hotProducts, avgDiscount, categories] = await Promise.all([
-        Product.count({ where: whereClause }),
-        Product.count({ where: { ...whereClause, is_new: true } }),
-        Product.count({ where: { ...whereClause, is_hot: true } }),
-        Product.findAll({
-          where: { ...whereClause, discount: { [sequelize.Sequelize.Op.gt]: 0 } },
-          attributes: [[sequelize.fn('AVG', sequelize.col('discount')), 'avg_discount']],
-          raw: true
-        }),
-        Product.findAll({
-          where: whereClause,
-          attributes: ['category'],
-          group: ['category'],
-          raw: true
-        })
-      ])
-
-      return {
-        total_products: totalProducts,
-        new_products: newProducts,
-        hot_products: hotProducts,
-        avg_discount: avgDiscount[0]?.avg_discount || 0,
-        categories: categories.map(c => c.category)
-      }
-    } catch (error) {
-      console.error('❌ 获取商品汇总信息失败:', error.message)
-      return {
-        total_products: 0,
-        new_products: 0,
-        hot_products: 0,
-        avg_discount: 0,
-        categories: []
-      }
-    }
-  }
-
-  /**
-   * 更新用户兑换统计
-   */
-  async _updateUserExchangeStats (_userId, _transaction) {
-    // 这里can implement user exchange statistics updates
-    // 例如更新用户表中的total_exchanges字段
-  }
-
-  /**
-   * 获取用户总兑换次数
-   */
-  async _getUserTotalExchanges (userId) {
-    return await ExchangeRecord.count({
-      where: { user_id: userId, status: 'completed' }
-    })
-  }
-
-  /**
-   * 获取用户今日兑换次数
-   */
-  async _getUserTodayExchanges (userId) {
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
-    const tomorrow = new Date(today)
-    tomorrow.setDate(tomorrow.getDate() + 1)
-
-    return await ExchangeRecord.count({
-      where: {
-        user_id: userId,
-        status: 'completed',
-        exchange_time: {
-          [sequelize.Sequelize.Op.between]: [today, tomorrow]
-        }
-      }
-    })
   }
 }
 

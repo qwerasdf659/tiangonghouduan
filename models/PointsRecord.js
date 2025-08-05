@@ -1,21 +1,21 @@
 /**
- * 积分记录管理模型
- * 解决用户积分变动追踪问题
- * 创建时间：2025年01月28日
+ * 积分记录管理模型 - v2.0
+ * 完全匹配实际数据库表结构
+ * 更新时间：2025年8月4日
  */
 
 const { DataTypes } = require('sequelize')
-const { v4: uuidv4 } = require('uuid')
 
 module.exports = sequelize => {
   const PointsRecord = sequelize.define(
     'PointsRecord',
     {
-      record_id: {
-        type: DataTypes.UUID,
-        defaultValue: () => uuidv4(),
+      // 🔴 修复主键匹配问题 - 使用实际表的主键结构
+      id: {
+        type: DataTypes.INTEGER,
         primaryKey: true,
-        comment: '积分记录唯一标识'
+        autoIncrement: true,
+        comment: '积分记录唯一ID'
       },
 
       user_id: {
@@ -28,121 +28,73 @@ module.exports = sequelize => {
         }
       },
 
-      operation_type: {
-        type: DataTypes.ENUM('earn', 'spend', 'refund', 'admin_adjust'),
+      // 🔴 修复字段名匹配实际表结构
+      type: {
+        type: DataTypes.ENUM('earn', 'spend'),
         allowNull: false,
-        comment: '操作类型'
+        comment: '操作类型：earn-获得积分，spend-消费积分'
       },
 
-      points_change: {
+      // 🔴 匹配实际表字段名
+      points: {
         type: DataTypes.INTEGER,
         allowNull: false,
-        comment: '积分变动数量（正数为增加，负数为减少）'
+        comment: '积分变动数量'
       },
 
-      points_before: {
-        type: DataTypes.INTEGER,
+      description: {
+        type: DataTypes.STRING(255),
         allowNull: false,
-        comment: '操作前积分余额'
+        comment: '变动描述'
       },
 
-      points_after: {
+      // 🔴 修复枚举值匹配实际表结构
+      source: {
+        type: DataTypes.ENUM('photo_upload', 'lottery', 'exchange', 'check_in', 'admin', 'register'),
+        allowNull: false,
+        comment: '积分来源：photo_upload-图片上传，lottery-抽奖，exchange-兑换，check_in-签到，admin-管理员操作，register-注册奖励'
+      },
+
+      balance_after: {
         type: DataTypes.INTEGER,
         allowNull: false,
         comment: '操作后积分余额'
       },
 
-      source_type: {
-        type: DataTypes.ENUM('lottery', 'exchange', 'upload', 'admin', 'refund', 'bonus'),
-        allowNull: false,
-        comment: '积分来源类型'
-      },
-
-      source_id: {
-        type: DataTypes.STRING(100),
+      related_id: {
+        type: DataTypes.STRING(50),
         allowNull: true,
-        comment: '来源记录ID'
-      },
-
-      description: {
-        type: DataTypes.STRING(200),
-        allowNull: false,
-        comment: '变动描述'
-      },
-
-      metadata: {
-        type: DataTypes.JSON,
-        allowNull: true,
-        comment: '扩展信息'
-      },
-
-      admin_id: {
-        type: DataTypes.INTEGER,
-        allowNull: true,
-        comment: '管理员ID（管理员操作时）',
-        references: {
-          model: 'users',
-          key: 'user_id'
-        }
-      },
-
-      admin_reason: {
-        type: DataTypes.TEXT,
-        allowNull: true,
-        comment: '管理员操作原因'
-      },
-
-      ip_address: {
-        type: DataTypes.STRING(45),
-        allowNull: true,
-        comment: '操作IP地址'
-      },
-
-      expires_at: {
-        type: DataTypes.DATE,
-        allowNull: true,
-        comment: '积分过期时间（如适用）'
+        comment: '关联业务ID'
       }
     },
     {
       tableName: 'points_records',
       timestamps: true,
+      createdAt: 'created_at',
+      updatedAt: false, // 🔧 修复：禁用updated_at字段，因为表中不存在
       underscored: true,
+      // 🔴 修复索引配置匹配实际表结构
       indexes: [
         {
-          fields: ['user_id', 'created_at']
+          name: 'idx_user_id',
+          fields: ['user_id']
         },
         {
-          fields: ['operation_type', 'created_at']
+          name: 'idx_type',
+          fields: ['type']
         },
         {
-          fields: ['source_type', 'source_id']
+          name: 'idx_source',
+          fields: ['source']
         },
         {
-          fields: ['admin_id']
-        },
-        {
-          fields: ['expires_at']
+          name: 'idx_created_at',
+          fields: ['created_at']
         }
       ],
-      comment: '积分记录表'
+      comment: '积分记录表 - 完全匹配数据库结构'
     }
   )
-
-  // 定义关联关系
-  PointsRecord.associate = function (models) {
-    // 用户关联
-    PointsRecord.belongsTo(models.User, {
-      foreignKey: 'user_id',
-      as: 'user'
-    })
-
-    // 管理员关联
-    PointsRecord.belongsTo(models.User, {
-      foreignKey: 'admin_id',
-      as: 'admin'
-    })
-  }
 
   return PointsRecord
 }

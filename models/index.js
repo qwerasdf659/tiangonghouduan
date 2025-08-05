@@ -51,6 +51,9 @@ const Product = require('./Product')(sequelize)
 const ExchangeRecord = require('./ExchangeRecord')(sequelize)
 const PremiumSpaceAccess = require('./PremiumSpaceAccess')(sequelize)
 const TradeRecord = require('./TradeRecord')(sequelize)
+// 🔴 新增模型 - 为孤立表创建对应模型
+const LotteryPity = require('./LotteryPity')(sequelize)
+const UploadReview = require('./UploadReview')(sequelize)
 
 // 🔴 定义完整的模型关联关系
 function defineAssociations () {
@@ -131,6 +134,56 @@ function defineAssociations () {
   ExchangeRecord.belongsTo(Product, {
     foreignKey: 'product_id',
     as: 'product'
+  })
+
+  // 🔴 新增模型关联关系
+  // LotteryPity 关联关系
+  LotteryPity.belongsTo(User, {
+    foreignKey: 'user_id',
+    as: 'user'
+  })
+
+  LotteryPity.belongsTo(Prize, {
+    foreignKey: 'pity_prize_id',
+    as: 'pityPrize'
+  })
+
+  // UploadReview 关联关系
+  UploadReview.belongsTo(User, {
+    foreignKey: 'user_id',
+    as: 'user'
+  })
+
+  UploadReview.belongsTo(User, {
+    foreignKey: 'reviewer_id',
+    as: 'reviewer'
+  })
+
+  UploadReview.belongsTo(ImageResources, {
+    foreignKey: 'image_id',
+    as: 'image'
+  })
+
+  // 添加到User的关联
+  User.hasMany(LotteryPity, {
+    foreignKey: 'user_id',
+    as: 'lotteryPities'
+  })
+
+  User.hasMany(UploadReview, {
+    foreignKey: 'user_id',
+    as: 'uploadReviews'
+  })
+
+  User.hasMany(UploadReview, {
+    foreignKey: 'reviewer_id',
+    as: 'reviewedUploads'
+  })
+
+  // 添加到ImageResources的关联
+  ImageResources.hasMany(UploadReview, {
+    foreignKey: 'image_id',
+    as: 'reviews'
   })
 
   // PremiumSpaceAccess 关联关系
@@ -290,6 +343,8 @@ module.exports = {
   ExchangeRecord,
   PremiumSpaceAccess,
   TradeRecord,
+  LotteryPity,
+  UploadReview,
 
   // 工具函数
   testConnection,
@@ -309,6 +364,8 @@ module.exports = {
     Product,
     ExchangeRecord,
     PremiumSpaceAccess,
-    TradeRecord
+    TradeRecord,
+    LotteryPity,
+    UploadReview
   }
 }

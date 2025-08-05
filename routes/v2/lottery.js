@@ -28,49 +28,120 @@ router.get('/config', authenticateToken, async (req, res) => {
 /**
  * @route POST /api/v2/lottery/draw
  * @desc 执行抽奖（支持单抽和连抽）
+ * @param {string} drawType - 抽奖类型：'single'|'triple'|'five'|'ten'|'multi'
+ * @param {number} drawCount - 抽奖次数：1|3|5|10
+ * @param {number} costPoints - 消费积分
+ * @param {object} clientInfo - 客户端信息（可选）
  * @access 认证用户
  */
 router.post('/draw', authenticateToken, async (req, res) => {
   try {
     const userId = req.user.user_id
+
+    // 🔧 字段转换中间件已自动处理，使用转换后的字段名
+    // 由于中间件将前端驼峰命名转换为数据库下划线命名，这里使用转换后的字段名
     const {
-      draw_type, // 'single', 'triple', 'five', 'ten'
-      draw_count,
-      cost_points,
-      user_timestamp
+      draw_type: drawType,
+      draw_count: drawCount,
+      cost_points: costPoints,
+      client_info: clientInfo,
+      client_timestamp: clientTimestamp
     } = req.body
 
+    console.log('✅ 抽奖参数（字段转换后）:', {
+      userId,
+      drawType,
+      drawCount,
+      costPoints,
+      clientTimestamp: clientTimestamp || (clientInfo && clientInfo.timestamp),
+      原始Body: req.body
+    })
+
     // 验证请求参数
-    if (!draw_type || !draw_count || !cost_points) {
-      return res.status(400).json(ApiResponse.error('缺少必需参数', 'MISSING_REQUIRED_PARAMS'))
+    if (!drawType || !drawCount || !costPoints) {
+      console.log('❌ 抽奖参数验证失败:', {
+        drawType,
+        drawCount,
+        costPoints,
+        转换后字段: { draw_type: req.body.draw_type, draw_count: req.body.draw_count, cost_points: req.body.cost_points },
+        原始Body: req.body
+      })
+      return res.status(400).json(
+        ApiResponse.error('缺少必需参数', 'MISSING_REQUIRED_PARAMS', {
+          received: {
+            drawType,
+            drawCount,
+            costPoints
+          },
+          required: ['drawType', 'drawCount', 'costPoints'],
+          receivedFields: Object.keys(req.body),
+          原始请求: req.body
+        })
+      )
     }
 
     // 验证抽奖类型和次数的匹配
+    // 支持前端兼容性：同时支持具体类型和通用multi类型
     const typeCountMap = {
       single: 1,
       triple: 3,
       five: 5,
-      ten: 10
+      ten: 10,
+      multi: null // multi类型通过drawCount动态判断
     }
 
-    if (typeCountMap[draw_type] !== draw_count) {
-      return res
-        .status(400)
-        .json(ApiResponse.error('抽奖类型与次数不匹配', 'DRAW_TYPE_COUNT_MISMATCH'))
+    // 兼容性验证逻辑
+    let isValidTypeCount = false
+
+    if (drawType === 'multi') {
+      // multi类型：支持任意有效的抽奖次数（1, 3, 5, 10）
+      isValidTypeCount = [1, 3, 5, 10].includes(drawCount)
+    } else {
+      // 具体类型：必须匹配对应次数
+      isValidTypeCount = typeCountMap[drawType] === drawCount
     }
 
-    // 执行抽奖
+    if (!isValidTypeCount) {
+      console.log('❌ 抽奖类型与次数不匹配:', {
+        drawType,
+        drawCount,
+        supportedTypes: Object.keys(typeCountMap),
+        supportedCounts: [1, 3, 5, 10]
+      })
+      return res.status(400).json(
+        ApiResponse.error('抽奖类型与次数不匹配', 'DRAW_TYPE_COUNT_MISMATCH', {
+          drawType,
+          drawCount,
+          supportedTypes: Object.keys(typeCountMap),
+          supportedCounts: [1, 3, 5, 10],
+          suggestion: drawType === 'multi'
+            ? 'drawType=\'multi\' 支持 drawCount=[1,3,5,10]'
+            : `drawType='${drawType}' 需要 drawCount=${typeCountMap[drawType]}`
+        })
+      )
+    }
+
+    console.log('✅ 抽奖参数验证通过:', {
+      userId,
+      drawType,
+      drawCount,
+      costPoints,
+      timestamp: clientTimestamp || (clientInfo && clientInfo.timestamp)
+    })
+
+    // 执行抽奖 - 传递驼峰命名参数，服务层会处理
     const result = await lotteryService.executeLottery(
       userId,
-      draw_type,
-      draw_count,
-      cost_points,
-      user_timestamp
+      drawType,
+      drawCount,
+      costPoints,
+      clientTimestamp || (clientInfo && clientInfo.timestamp)
     )
 
     res.json(ApiResponse.success(result, '抽奖成功'))
   } catch (error) {
     console.error('❌ 抽奖执行失败:', error.message)
+    console.error('❌ 错误堆栈:', error.stack)
 
     // 根据错误类型返回不同的错误码
     let errorCode = 'LOTTERY_FAILED'
@@ -82,7 +153,11 @@ router.post('/draw', authenticateToken, async (req, res) => {
       errorCode = 'SYSTEM_MAINTENANCE'
     }
 
-    res.status(400).json(ApiResponse.error(error.message, errorCode))
+    res.status(400).json(
+      ApiResponse.error(error.message, errorCode, {
+        errorDetails: process.env.NODE_ENV === 'development' ? error.stack : undefined
+      })
+    )
   }
 })
 

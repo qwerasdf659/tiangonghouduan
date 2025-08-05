@@ -42,14 +42,27 @@ class FieldTransformer {
 
   buildProjectRules () {
     return {
+      // 用户相关字段
       user_id: 'userId',
       total_points: 'totalPoints',
+      available_points: 'availablePoints',
+      used_points: 'usedPoints',
       is_admin: 'isAdmin',
       avatar_url: 'avatarUrl',
       last_login: 'lastLogin',
       phone_number: 'phoneNumber',
       created_at: 'createdAt',
       updated_at: 'updatedAt',
+      registration_date: 'registrationDate',
+      login_count: 'loginCount',
+
+      // 认证相关字段 - 🔧 完善认证字段映射
+      verification_code: 'code', // 前端发送code，后端接收verification_code
+      access_token: 'accessToken',
+      refresh_token: 'refreshToken',
+      expires_in: 'expiresIn',
+
+      // 抽奖相关字段
       prize_id: 'prizeId',
       prize_name: 'prizeName',
       prize_type: 'prizeType',
@@ -57,31 +70,101 @@ class FieldTransformer {
       total_draws: 'totalDraws',
       total_cost: 'totalCost',
       draw_type: 'drawType',
+      draw_count: 'drawCount',
       cost_points: 'costPoints',
+      user_timestamp: 'clientTimestamp',
+      client_info: 'clientInfo',
       win_rate: 'winRate',
-      batch_id: 'batchId',
+
+      // 交易相关字段 - 🔧 新增交易模块字段映射
+      to_user_id: 'toUserId',
+      from_user_id: 'fromUserId',
+      trade_password: 'tradePassword',
+      trade_id: 'tradeId',
+      trade_type: 'tradeType',
+      trade_status: 'tradeStatus',
+      trade_amount: 'tradeAmount',
+      trade_reason: 'tradeReason',
+      transaction_id: 'transactionId',
+
+      // 兑换相关字段 - 🔧 新增兑换模块字段映射
+      product_id: 'productId',
+      exchange_id: 'exchangeId',
+      exchange_points: 'exchangePoints',
+      exchange_status: 'exchangeStatus',
+      exchange_type: 'exchangeType',
+      exchange_reason: 'exchangeReason',
+      commodity_id: 'commodityId',
+      sort_order: 'sortOrder',
+      is_hot: 'isHot',
+      sales_count: 'salesCount',
+
+      // 上传相关字段 - 🔧 新增上传模块字段映射
       upload_id: 'uploadId',
+      batch_id: 'batchId',
       image_url: 'imageUrl',
       file_size: 'fileSize',
+      file_name: 'fileName',
       original_filename: 'originalFilename',
       uploaded_at: 'uploadedAt',
       reviewed_at: 'reviewedAt',
       points_awarded: 'pointsAwarded',
       review_reason: 'reviewReason',
-      commodity_id: 'commodityId',
-      exchange_points: 'exchangePoints',
-      sort_order: 'sortOrder',
-      is_hot: 'isHot',
-      sales_count: 'salesCount',
-      page_size: 'pageSize',
-      total_pages: 'totalPages',
-      access_token: 'accessToken',
-      refresh_token: 'refreshToken',
-      expires_in: 'expiresIn',
-      user_info: 'userInfo',
+      review_status: 'reviewStatus',
       is_background: 'isBackground',
-      // 🔧 修复登录接口2002错误：添加验证码字段映射
-      verification_code: 'code' // 将前端的code字段映射为后端的verification_code字段
+
+      // 资源相关字段 - 🔧 新增资源模块字段映射
+      business_type: 'businessType',
+      context_id: 'contextId',
+      resource_id: 'resourceId',
+      resource_type: 'resourceType',
+      resource_url: 'resourceUrl',
+      resource_size: 'resourceSize',
+      storage_path: 'storagePath',
+      is_active: 'isActive',
+      priority_level: 'priorityLevel',
+      category_name: 'categoryName',
+
+      // 分页相关字段
+      page_size: 'pageSize',
+      page_number: 'pageNumber',
+      total_pages: 'totalPages',
+      total_count: 'totalCount',
+      has_more: 'hasMore',
+
+      // 积分记录相关字段 - 🔧 新增积分记录字段映射
+      points_record_id: 'pointsRecordId',
+      balance_after: 'balanceAfter',
+      balance_before: 'balanceBefore',
+      related_id: 'relatedId',
+      operation_type: 'operationType',
+
+      // 臻选空间相关字段 - 🔧 新增臻选空间字段映射
+      premium_space_id: 'premiumSpaceId',
+      unlock_time: 'unlockTime',
+      expiry_time: 'expiryTime',
+      is_unlocked: 'isUnlocked',
+      unlock_cost_points: 'unlockCostPoints',
+      required_cumulative_points: 'requiredCumulativePoints',
+      unlock_duration_hours: 'unlockDurationHours',
+      unlock_count: 'unlockCount',
+      total_cost_points: 'totalCostPoints',
+      last_unlock_client: 'lastUnlockClient',
+
+      // 通用状态字段
+      created_by: 'createdBy',
+      updated_by: 'updatedBy',
+      deleted_at: 'deletedAt',
+      is_deleted: 'isDeleted',
+      status_code: 'statusCode',
+      error_code: 'errorCode',
+      error_message: 'errorMessage',
+
+      // 客户端信息字段
+      user_info: 'userInfo',
+      client_version: 'clientVersion',
+      platform_info: 'platformInfo',
+      device_info: 'deviceInfo'
     }
   }
 

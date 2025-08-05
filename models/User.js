@@ -88,6 +88,13 @@ module.exports = sequelize => {
         type: DataTypes.JSON,
         allowNull: true,
         comment: '用户偏好设置'
+      },
+
+      // 🔧 修复抽奖功能：添加连续未中奖次数字段（保底机制）
+      consecutive_fail_count: {
+        type: DataTypes.INTEGER,
+        defaultValue: 0,
+        comment: '连续未中奖次数（用于保底机制）'
       }
     },
     {

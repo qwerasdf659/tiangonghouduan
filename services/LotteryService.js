@@ -122,10 +122,19 @@ class LotteryService {
       // 2. 验证用户状态和积分
       await this._validateUserForLottery(user, drawCount, costPoints, config, transaction)
 
-      // 3. 检查今日抽奖次数
+      // 3. 检查今日抽奖次数（管理员无限制）
       const todayDrawCount = await this._getTodayDrawCount(userId, transaction)
-      if (todayDrawCount + drawCount > config.system_config.daily_limit) {
+
+      // 🔧 管理员无限制抽奖特权
+      if (!user.is_admin && todayDrawCount + drawCount > config.system_config.daily_limit) {
         throw new Error(`今日抽奖次数已达上限${config.system_config.daily_limit}次`)
+      }
+
+      // 管理员抽奖日志记录
+      if (user.is_admin) {
+        console.log(`👑 管理员抽奖 - 用户${userId}(${user.mobile})，今日已抽奖${todayDrawCount}次，本次抽奖${drawCount}次，无限制模式`)
+      } else {
+        console.log(`👤 普通用户抽奖 - 用户${userId}，今日已抽奖${todayDrawCount}次，本次抽奖${drawCount}次，限制${config.system_config.daily_limit}次/天`)
       }
 
       // 4. 获取用户保底信息
@@ -166,8 +175,13 @@ class LotteryService {
       await this._updateConsecutiveFailCount(userId, updatedConsecutiveFailCount, transaction)
 
       // 7. 记录抽奖历史
+      const drawId = `draw_${userId}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+      const lotteryId = require('crypto').randomUUID()
+
       await LotteryRecord.create(
         {
+          draw_id: drawId, // 🔧 修复：添加必需的draw_id主键
+          lottery_id: lotteryId, // 🔧 修复：添加必需的lottery_id字段
           user_id: userId,
           draw_type: drawType,
           draw_count: drawCount,
@@ -325,16 +339,15 @@ class LotteryService {
     // 更新用户积分
     await user.decrement('total_points', { by: points, transaction })
 
-    // 记录积分变动
+    // 🔧 修复PointsRecord字段名匹配实际表结构
     await PointsRecord.create(
       {
         user_id: user.user_id,
-        change_type: 'deduct',
-        change_amount: -points,
-        change_reason: reason,
-        operation_type: 'lottery',
-        before_balance: user.total_points,
-        after_balance: user.total_points - points
+        type: 'spend', // 修复：使用正确的字段名和枚举值
+        points, // 修复：使用正确的字段名
+        description: reason, // 修复：使用正确的字段名
+        source: 'lottery', // 修复：使用正确的字段名和枚举值
+        balance_after: user.total_points - points // 修复：使用正确的字段名
       },
       { transaction }
     )

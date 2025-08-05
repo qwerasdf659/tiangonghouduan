@@ -1,0 +1,48 @@
+{
+  "development": {
+    "host": "dbconn.sealosbja.site",
+    "port": 42182,
+    "username": "root",
+    "password": "mc6r9cgb",
+    "database": "restaurant_points_dev",
+    "dialect": "mysql",
+    "timezone": "+08:00",
+    "logging": true,
+    "pool": {
+      "max": 20,
+      "min": 0,
+      "acquire": 30000,
+      "idle": 10000
+    },
+    "define": {
+      "charset": "utf8mb4",
+      "collate": "utf8mb4_unicode_ci",
+      "timestamps": true,
+      "underscored": false,
+      "freezeTableName": true
+    }
+  },
+  "production": {
+    "host": "dbconn.sealosbja.site",
+    "port": 42182,
+    "username": "root", 
+    "password": "mc6r9cgb",
+    "database": "restaurant_points_prod",
+    "dialect": "mysql",
+    "timezone": "+08:00",
+    "logging": false,
+    "pool": {
+      "max": 50,
+      "min": 5,
+      "acquire": 60000,
+      "idle": 10000
+    },
+    "define": {
+      "charset": "utf8mb4",
+      "collate": "utf8mb4_unicode_ci",
+      "timestamps": true,
+      "underscored": false,
+      "freezeTableName": true
+    }
+  }
+} 

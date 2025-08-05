@@ -462,68 +462,71 @@
         }
 
         async fetchDashboardData() {
-          // 模拟数据 - 实际应用中应该从auto_runner.js获取数据
-          return new Promise(resolve => {
-            setTimeout(() => {
-              resolve({
+          // 🔴 从后端API获取真实数据，替代模拟数据
+          try {
+            const response = await fetch('/api/supervisor/status', {
+              method: 'GET',
+              headers: {
+                'Content-Type': 'application/json'
+              }
+            })
+            
+            if (response.ok) {
+              const data = await response.json()
+              return data
+            } else {
+              // API调用失败时使用基础状态数据
+              console.warn('⚠️ 无法获取supervisor状态数据，使用基础数据')
+              return {
                 current_status: {
-                  is_running: true,
+                  is_running: false,
                   last_check: new Date().toISOString(),
-                  compliance_score: 85,
-                  violations_count: 3,
-                  uptime: 7200000 // 2小时
+                  compliance_score: 0,
+                  violations_count: 0,
+                  uptime: 0
                 },
-                recent_reports: [
-                  { date: '2024-01-01', score: 90, violations: 2 },
-                  { date: '2024-01-02', score: 88, violations: 3 },
-                  { date: '2024-01-03', score: 85, violations: 3 }
-                ],
+                recent_reports: [],
                 trends: {
-                  score_trend: 'declining',
-                  violations_trend: 'stable',
-                  score_change: -5,
+                  score_trend: 'unknown',
+                  violations_trend: 'unknown',
+                  score_change: 0,
                   violations_change: 0
                 },
-                alerts: [
-                  {
-                    timestamp: new Date().toISOString(),
-                    level: 'CRITICAL',
-                    message: '违规次数超过阈值',
-                    violations_count: 6,
-                    threshold: 5
-                  }
-                ],
-                violations: [
-                  {
-                    type: 'HIGH',
-                    rule: '严禁重复工具调用',
-                    description: '发现3个重复工具调用',
-                    suggestion: '建立工具调用缓存机制，避免重复操作'
-                  },
-                  {
-                    type: 'MEDIUM',
-                    rule: '并行化操作',
-                    description: '并行化比例过低: 45.2%',
-                    suggestion: '增加独立操作的并行执行，目标比例70%以上'
-                  }
-                ],
-                recommendations: [
-                  {
-                    priority: 'HIGH',
-                    category: '工具调用优化',
-                    suggestion: '实施工具调用缓存机制，建立已完成检查清单',
-                    impact: '可减少30-50%的重复调用'
-                  },
-                  {
-                    priority: 'MEDIUM',
-                    category: '效率优化',
-                    suggestion: '增加独立操作的并行执行，目标并行化比例70%以上',
-                    impact: '可提升整体执行效率2-3倍'
-                  }
-                ]
-              })
-            }, 1000)
-          })
+                alerts: [],
+                violations: [],
+                recommendations: []
+              }
+            }
+          } catch (error) {
+            console.error('❌ 获取dashboard数据失败:', error.message)
+            // 网络错误时返回错误状态
+            return {
+              current_status: {
+                is_running: false,
+                last_check: new Date().toISOString(),
+                compliance_score: 0,
+                violations_count: 0,
+                uptime: 0,
+                error: '无法连接到后端服务'
+              },
+              recent_reports: [],
+              trends: {
+                score_trend: 'error',
+                violations_trend: 'error',
+                score_change: 0,
+                violations_change: 0
+              },
+              alerts: [{
+                timestamp: new Date().toISOString(),
+                level: 'ERROR',
+                message: '无法获取系统状态数据',
+                violations_count: 0,
+                threshold: 0
+              }],
+              violations: [],
+              recommendations: []
+            }
+          }
         }
 
         updateUI() {

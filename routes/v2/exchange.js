@@ -45,7 +45,9 @@ router.get('/products', authenticateToken, async (req, res) => {
   try {
     const { space = 'lucky', page = 1, pageSize = 20 } = req.query
 
-    const result = await exchangeService.getProducts(space, {
+    // 修复：将所有参数合并到一个options对象中
+    const result = await exchangeService.getProducts({
+      space,
       page: parseInt(page),
       pageSize: parseInt(pageSize)
     })
