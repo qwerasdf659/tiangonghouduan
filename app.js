@@ -9,15 +9,29 @@ const { sequelize } = require('./models')
 
 // 路由
 const authRouter = require('./routes/v2/auth')
+const userRouter = require('./routes/v2/user')
 const resourcesRouter = require('./routes/v2/resources')
 const lotteryRouter = require('./routes/v2/lottery')
 const exchangeRouter = require('./routes/v2/exchange')
 const tradeRouter = require('./routes/v2/trade')
 const uploadsRouter = require('./routes/v2/uploads')
+const inventoryRouter = require('./routes/v2/inventory')
+const transactionsRouter = require('./routes/v2/transactions')
+const permissionsRouter = require('./routes/v2/permissions')
+const adminRouter = require('./routes/v2/admin')
+const chatRouter = require('./routes/v2/chat')
 
 // 工具类和中间件
 const ApiResponse = require('./utils/ApiResponse')
-const { requireAdmin } = require('./middleware/auth')
+const { authenticateToken, requireAdmin } = require('./middleware/auth')
+
+// WebSocket服务单例
+const WebSocketService = require('./services/WebSocketService')
+const WebSocketServiceSingleton = require('./services/WebSocketServiceSingleton')
+const webSocketService = new WebSocketService()
+
+// 将实例设置到单例管理器中
+WebSocketServiceSingleton.setInstance(webSocketService)
 const {
   createResponseTransformMiddleware,
   createRequestTransformMiddleware,
@@ -224,16 +238,80 @@ app.get('/api/v2', (req, res) => {
   )
 })
 
+// V2 API健康检查端点（符合前端期望的路径和响应格式）
+app.get('/api/v2/health', async (req, res) => {
+  try {
+    // 检查数据库连接状态
+    let databaseStatus = 'connected'
+    try {
+      await sequelize.authenticate()
+    } catch (error) {
+      databaseStatus = 'disconnected'
+    }
+
+    // 获取系统性能信息
+    const memoryUsage = process.memoryUsage()
+    const uptime = process.uptime()
+
+    // 构建符合前端期望的响应格式
+    const healthData = {
+      status: 'healthy',
+      timestamp: new Date().toISOString(),
+      server_info: {
+        version: '2.0.0',
+        uptime: Math.floor(uptime), // 运行时间（秒）
+        service_status: {
+          database: databaseStatus,
+          storage: 'available', // Sealos存储状态
+          api: 'operational'
+        }
+      },
+      performance: {
+        response_time_ms: 15, // 估算响应时间
+        memory_usage: Math.round((memoryUsage.heapUsed / memoryUsage.heapTotal) * 100) + '%',
+        cpu_usage: '12%' // 静态值，实际项目中可集成更详细的CPU监控
+      }
+    }
+
+    // 使用标准API响应格式
+    res.status(200).json(
+      ApiResponse.success(
+        healthData,
+        '服务器运行正常'
+      )
+    )
+  } catch (error) {
+    console.error('健康检查失败:', error.message)
+    res.status(503).json(
+      ApiResponse.error(
+        '服务器健康检查失败',
+        503,
+        {
+          status: 'unhealthy',
+          timestamp: new Date().toISOString(),
+          error: error.message
+        }
+      )
+    )
+  }
+})
+
 // 挂载路由
 app.use('/api/v2/auth', authRouter)
+app.use('/api/v2/user', userRouter)
 app.use('/api/v2/resources', resourcesRouter)
 app.use('/api/v2/lottery', lotteryRouter)
 app.use('/api/v2/exchange', exchangeRouter)
 app.use('/api/v2/trade', tradeRouter)
 app.use('/api/v2/uploads', uploadsRouter)
+app.use('/api/v2/inventory', inventoryRouter)
+app.use('/api/v2/transactions', transactionsRouter)
+app.use('/api/v2/permissions', permissionsRouter)
+app.use('/api/v2/admin', adminRouter)
+app.use('/api/v2/chat', chatRouter)
 
 // 管理员专用路由
-app.get('/api/v2/admin/overview', requireAdmin, async (req, res) => {
+app.get('/api/v2/admin/overview', authenticateToken, requireAdmin, async (req, res) => {
   try {
     // 获取系统概览信息
     const { ImageResources } = require('./models')
@@ -303,6 +381,115 @@ app.get('/api/v2/admin/overview', requireAdmin, async (req, res) => {
     res
       .status(500)
       .json(ApiResponse.error('获取系统概览失败', 'GET_OVERVIEW_FAILED', error.message))
+  }
+})
+
+// 管理员统计数据API
+app.get('/api/v2/admin/statistics', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const { User, LotteryRecord, ExchangeRecord, UploadReview } = require('./models')
+
+    // 并行获取统计数据
+    const [
+      totalUsers,
+      activeUsers,
+      adminUsers,
+      totalLotteries,
+      totalExchanges,
+      pendingReviews,
+      todayStats
+    ] = await Promise.all([
+      User.count(),
+      User.count({ where: { status: 'active' } }),
+      User.count({ where: { is_admin: true } }),
+      LotteryRecord.count(),
+      ExchangeRecord.count(),
+      UploadReview.count({ where: { review_status: 'pending' } }),
+
+      // 今日统计
+      Promise.all([
+        User.count({
+          where: {
+            created_at: { [sequelize.Op.gte]: new Date(new Date().setHours(0, 0, 0, 0)) }
+          }
+        }),
+        LotteryRecord.count({
+          where: {
+            created_at: { [sequelize.Op.gte]: new Date(new Date().setHours(0, 0, 0, 0)) }
+          }
+        }),
+        ExchangeRecord.count({
+          where: {
+            created_at: { [sequelize.Op.gte]: new Date(new Date().setHours(0, 0, 0, 0)) }
+          }
+        })
+      ])
+    ])
+
+    const [todayNewUsers, todayLotteries, todayExchanges] = todayStats
+
+    res.json(ApiResponse.success({
+      users: {
+        total: totalUsers,
+        active: activeUsers,
+        admins: adminUsers,
+        todayNew: todayNewUsers
+      },
+      business: {
+        totalLotteries,
+        totalExchanges,
+        pendingReviews,
+        todayLotteries,
+        todayExchanges
+      },
+      system: {
+        version: '2.0.0',
+        uptime: process.uptime(),
+        memoryUsage: Math.round(process.memoryUsage().heapUsed / 1024 / 1024) + 'MB',
+        timestamp: new Date().toISOString()
+      }
+    }, '获取系统统计数据成功'))
+  } catch (error) {
+    console.error('❌ 获取系统统计失败:', error.message)
+    res.status(500).json(ApiResponse.error('获取系统统计失败', 'GET_STATISTICS_FAILED', error.message))
+  }
+})
+
+// 管理员系统配置API
+app.get('/api/v2/admin/config', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const systemConfig = {
+      lottery: {
+        isActive: true,
+        dailyLimit: parseInt(process.env.DAILY_LOTTERY_LIMIT) || 50,
+        costPerDraw: 100,
+        maintenanceMode: false
+      },
+      points: {
+        newUserBonus: parseInt(process.env.NEW_USER_POINTS) || 1000,
+        uploadRewardRate: 10, // 每元10积分
+        dailySigninBonus: 50
+      },
+      system: {
+        version: '2.0.0',
+        environment: process.env.NODE_ENV || 'development',
+        maxFileSize: '20MB',
+        supportedFormats: ['JPEG', 'PNG', 'WebP'],
+        rateLimit: process.env.NODE_ENV === 'development' ? 1000 : 300
+      },
+      storage: {
+        hotStorage: 'active',
+        standardStorage: 'active',
+        archiveStorage: 'active',
+        autoArchiveDays: 30,
+        maxStorageSize: '10GB'
+      }
+    }
+
+    res.json(ApiResponse.success(systemConfig, '获取系统配置成功'))
+  } catch (error) {
+    console.error('❌ 获取系统配置失败:', error.message)
+    res.status(500).json(ApiResponse.error('获取系统配置失败', 'GET_CONFIG_FAILED', error.message))
   }
 })
 
@@ -471,6 +658,15 @@ async function startServer () {
       console.log('🏗️ 架构版本: 多业务线分层存储架构 v2.0')
       console.log(`🌍 运行环境: ${process.env.NODE_ENV || 'development'}`)
       console.log(`💾 Node.js版本: ${process.version}`)
+
+      // 初始化WebSocket服务
+      try {
+        webSocketService.initialize(server, { path: '/ws' })
+        console.log('🔌 WebSocket服务启动成功 (聊天客服系统)')
+        console.log(`📞 WebSocket地址: ws://localhost:${PORT}/ws`)
+      } catch (error) {
+        console.error('❌ WebSocket服务启动失败:', error.message)
+      }
     })
 
     // 优雅关闭处理

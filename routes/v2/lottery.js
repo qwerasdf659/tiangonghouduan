@@ -38,15 +38,13 @@ router.post('/draw', authenticateToken, async (req, res) => {
   try {
     const userId = req.user.user_id
 
-    // 🔧 字段转换中间件已自动处理，使用转换后的字段名
-    // 由于中间件将前端驼峰命名转换为数据库下划线命名，这里使用转换后的字段名
-    const {
-      draw_type: drawType,
-      draw_count: drawCount,
-      cost_points: costPoints,
-      client_info: clientInfo,
-      client_timestamp: clientTimestamp
-    } = req.body
+    // 🔧 字段转换中间件修复：直接获取转换后的字段名
+    // 字段转换中间件将前端驼峰命名转换为数据库下划线命名
+    const drawType = req.body.draw_type
+    const drawCount = req.body.draw_count
+    const costPoints = req.body.cost_points
+    const clientInfo = req.body.client_info
+    const clientTimestamp = req.body.client_timestamp
 
     console.log('✅ 抽奖参数（字段转换后）:', {
       userId,
@@ -56,6 +54,16 @@ router.post('/draw', authenticateToken, async (req, res) => {
       clientTimestamp: clientTimestamp || (clientInfo && clientInfo.timestamp),
       原始Body: req.body
     })
+
+    // 🔧 网络环境优化：为真机调试环境提供特殊处理
+    const isHighCountDraw = drawCount >= 10
+
+    if (isHighCountDraw) {
+      console.log(`🔄 10连抽请求检测 - 用户${userId}，优化响应处理`)
+      // 设置更长的响应超时，确保10连抽能完整处理
+      req.setTimeout(30000) // 30秒超时
+      res.setTimeout(30000)
+    }
 
     // 验证请求参数
     if (!drawType || !drawCount || !costPoints) {
@@ -130,6 +138,7 @@ router.post('/draw', authenticateToken, async (req, res) => {
     })
 
     // 执行抽奖 - 传递驼峰命名参数，服务层会处理
+    const startTime = Date.now()
     const result = await lotteryService.executeLottery(
       userId,
       drawType,
@@ -138,10 +147,42 @@ router.post('/draw', authenticateToken, async (req, res) => {
       clientTimestamp || (clientInfo && clientInfo.timestamp)
     )
 
-    res.json(ApiResponse.success(result, '抽奖成功'))
+    // 🔧 网络环境优化：为10连抽提供响应优化
+    if (isHighCountDraw) {
+      const processingTime = Date.now() - startTime
+      console.log(`✅ 10连抽处理完成 - 用户${userId}，耗时${processingTime}ms`)
+
+      // 为真机调试环境优化响应格式，减少不必要的数据传输
+      const optimizedResult = {
+        ...result,
+        // 确保响应结构完整，但优化数据传输
+        networkOptimized: true,
+        processingTime
+      }
+
+      res.json(ApiResponse.success(optimizedResult, '抽奖成功'))
+    } else {
+      res.json(ApiResponse.success(result, '抽奖成功'))
+    }
   } catch (error) {
     console.error('❌ 抽奖执行失败:', error.message)
     console.error('❌ 错误堆栈:', error.stack)
+
+    // 🔧 特殊处理10连抽的错误，提供更详细的调试信息
+    const drawType = req.body.draw_type
+    const drawCount = req.body.draw_count
+    const isHighCountDraw = drawCount >= 10
+
+    if (isHighCountDraw) {
+      console.error(`💥 10连抽失败详情 - 用户${req.user.user_id}:`, {
+        drawType,
+        drawCount,
+        error: error.message,
+        timestamp: new Date().toISOString(),
+        userAgent: req.get('User-Agent'),
+        clientIP: req.ip
+      })
+    }
 
     // 根据错误类型返回不同的错误码
     let errorCode = 'LOTTERY_FAILED'
@@ -153,11 +194,22 @@ router.post('/draw', authenticateToken, async (req, res) => {
       errorCode = 'SYSTEM_MAINTENANCE'
     }
 
-    res.status(400).json(
-      ApiResponse.error(error.message, errorCode, {
-        errorDetails: process.env.NODE_ENV === 'development' ? error.stack : undefined
-      })
-    )
+    // 为10连抽提供特殊的错误响应格式，便于前端调试
+    const errorResponse = {
+      errorDetails: process.env.NODE_ENV === 'development' ? error.stack : undefined,
+      // 为真机调试提供额外的调试信息
+      debugInfo: isHighCountDraw
+        ? {
+          drawType,
+          drawCount,
+          isHighCountDraw: true,
+          timestamp: new Date().toISOString(),
+          suggestion: '10连抽在真机环境可能受网络条件影响，建议检查网络连接'
+        }
+        : undefined
+    }
+
+    res.status(400).json(ApiResponse.error(error.message, errorCode, errorResponse))
   }
 })
 

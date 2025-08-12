@@ -258,7 +258,7 @@ router.get('/verify', authenticateToken, (req, res) => {
  * @desc 检查管理员权限
  * @access 需要管理员权限
  */
-router.get('/admin/check', requireAdmin, (req, res) => {
+router.get('/admin/check', authenticateToken, requireAdmin, (req, res) => {
   res.json(
     ApiResponse.success(
       {

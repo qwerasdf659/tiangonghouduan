@@ -159,7 +159,7 @@ router.get('/my-submissions', authenticateToken, async (req, res) => {
  * @desc 获取待审核图片列表
  * @access 管理员
  */
-router.get('/pending-reviews', requireAdmin, async (req, res) => {
+router.get('/pending-reviews', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const { limit = 50, page = 1 } = req.query
 
@@ -193,7 +193,7 @@ router.get('/pending-reviews', requireAdmin, async (req, res) => {
  * @desc 审核单个图片
  * @access 管理员
  */
-router.post('/review/:resourceId', requireAdmin, async (req, res) => {
+router.post('/review/:resourceId', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const { resourceId } = req.params
     const { action, reason, points } = req.body
@@ -241,7 +241,7 @@ router.post('/review/:resourceId', requireAdmin, async (req, res) => {
  * @desc 批量审核图片
  * @access 管理员
  */
-router.post('/batch-review', requireAdmin, async (req, res) => {
+router.post('/batch-review', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const { resourceIds, action, reason } = req.body
 
@@ -322,7 +322,7 @@ router.post('/batch-review', requireAdmin, async (req, res) => {
  * @desc 获取审核历史
  * @access 管理员
  */
-router.get('/review-history', requireAdmin, async (req, res) => {
+router.get('/review-history', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const { reviewerId, status, limit = 50, page = 1 } = req.query
 
@@ -369,7 +369,7 @@ router.get('/review-history', requireAdmin, async (req, res) => {
  * @desc 获取上传审核统计
  * @access 管理员
  */
-router.get('/stats', requireAdmin, async (req, res) => {
+router.get('/stats', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const stats = await imageService.getBusinessStats('uploads')
 

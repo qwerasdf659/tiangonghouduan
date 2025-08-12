@@ -99,7 +99,7 @@ class ExchangeService {
           'is_hot',
           'is_new',
           'is_limited',
-          'sales', // 修正：使用新模型的字段名sales，而不是sales_count
+          'sales_count', // 修正：使用数据库中实际的字段名sales_count
           // 'view_count', // 修复：数据库中不存在此字段，暂时注释
           'rating',
           // 'warranty', // 修复：数据库中不存在此字段，暂时注释
@@ -113,8 +113,18 @@ class ExchangeService {
       // 添加虚拟字段和转换逻辑
       const processedProducts = products.map(product => {
         const productData = product.toJSON()
+
+        // 🔧 处理商品图片逻辑：管理员上传的图片 vs 默认图片
+        let imageUrl = productData.image
+        if (!imageUrl) {
+          // 如果管理员没有上传图片，使用默认图片
+          imageUrl = 'https://dummyimage.com/300x300/4CAF50/white?text=Product'
+        }
+
         return {
           ...productData,
+          // 🖼️ 返回处理后的图片URL（管理员上传的或默认的）
+          image: imageUrl,
           // 为前端兼容性提供commodityId字段
           commodityId: productData.commodity_id,
           // 添加库存状态

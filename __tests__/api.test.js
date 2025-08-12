@@ -23,6 +23,30 @@ describe('API功能测试', () => {
     })
   })
 
+  // V2 API健康检查测试
+  describe('GET /api/v2/health', () => {
+    it('应该返回V2健康状态（符合前端期望格式）', async () => {
+      const response = await request(app)
+        .get('/api/v2/health')
+        .expect(200)
+
+      expect(response.body).toHaveProperty('code', 0)
+      expect(response.body).toHaveProperty('msg', '服务器运行正常')
+      expect(response.body.data).toHaveProperty('status', 'healthy')
+      expect(response.body.data).toHaveProperty('serverInfo')
+      expect(response.body.data.serverInfo).toHaveProperty('version', '2.0.0')
+      expect(response.body.data.serverInfo).toHaveProperty('uptime')
+      expect(response.body.data.serverInfo).toHaveProperty('serviceStatus')
+      expect(response.body.data.serverInfo.serviceStatus).toHaveProperty('database', 'connected')
+      expect(response.body.data.serverInfo.serviceStatus).toHaveProperty('storage', 'available')
+      expect(response.body.data.serverInfo.serviceStatus).toHaveProperty('api', 'operational')
+      expect(response.body.data).toHaveProperty('performance')
+      expect(response.body.data.performance).toHaveProperty('responseTimeMs')
+      expect(response.body.data.performance).toHaveProperty('memoryUsage')
+      expect(response.body.data.performance).toHaveProperty('cpuUsage')
+    })
+  })
+
   // API版本信息测试
   describe('GET /api/v2', () => {
     it('应该返回API版本信息', async () => {

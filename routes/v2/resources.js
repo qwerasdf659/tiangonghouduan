@@ -391,7 +391,7 @@ router.delete('/:resourceId', authenticateToken, async (req, res) => {
  * @desc 获取待审核资源列表
  * @access 管理员
  */
-router.get('/reviews/pending', requireAdmin, async (req, res) => {
+router.get('/reviews/pending', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const { limit = 50, businessType = 'uploads' } = req.query
 
@@ -419,7 +419,7 @@ router.get('/reviews/pending', requireAdmin, async (req, res) => {
  * @desc 批量审核资源
  * @access 管理员
  */
-router.post('/reviews/batch', requireAdmin, async (req, res) => {
+router.post('/reviews/batch', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const { reviews } = req.body
 
@@ -464,7 +464,7 @@ router.post('/reviews/batch', requireAdmin, async (req, res) => {
  * @desc 获取存储统计信息
  * @access 管理员
  */
-router.get('/stats/storage', requireAdmin, async (req, res) => {
+router.get('/stats/storage', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const { businessType, dateFrom, dateTo } = req.query
 

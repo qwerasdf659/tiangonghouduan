@@ -206,6 +206,11 @@ const requestLogger = (req, res, next) => {
  */
 const requireUser = authenticateToken
 
+/**
+ * 管理员权限中间件别名（向后兼容）
+ */
+const isAdmin = requireAdmin
+
 module.exports = {
   generateTokens,
   verifyAccessToken,
@@ -213,6 +218,7 @@ module.exports = {
   authenticateToken,
   optionalAuth,
   requireAdmin,
+  isAdmin,
   requireUser,
   requestLogger
 }

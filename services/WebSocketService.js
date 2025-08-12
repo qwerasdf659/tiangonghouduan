@@ -74,7 +74,7 @@ class WebSocketService {
 
       // 验证JWT Token
       const decoded = jwt.verify(token, process.env.JWT_SECRET)
-      const user = await User.findByPk(decoded.userId)
+      const user = await User.findByPk(decoded.user_id)
 
       if (!user) {
         ws.close(1008, 'Invalid user')
@@ -82,32 +82,32 @@ class WebSocketService {
       }
 
       // 设置连接属性
-      ws.userId = user.id
+      ws.userId = user.user_id
       ws.userInfo = {
-        id: user.id,
+        id: user.user_id,
         nickname: user.nickname,
         isAdmin: user.is_admin,
-        phone: user.phone
+        mobile: user.mobile
       }
       ws.isAlive = true
       ws.connectedAt = new Date()
 
       // 存储连接
-      this.addConnection(user.id, ws)
+      this.addConnection(user.user_id, ws)
 
       // 发送连接确认消息
       this.sendToConnection(ws, {
         type: 'connection_established',
         data: {
-          userId: user.id,
+          userId: user.user_id,
           serverTime: new Date().toISOString(),
-          queuedMessages: this.messageQueue.get(user.id)?.length || 0,
+          queuedMessages: this.messageQueue.get(user.user_id)?.length || 0,
           connectionId: this.generateConnectionId(ws)
         }
       })
 
       // 发送离线消息
-      this.sendOfflineMessages(user.id)
+      this.sendOfflineMessages(user.user_id)
 
       // 设置心跳机制
       this.setupHeartbeat(ws)
@@ -124,13 +124,13 @@ class WebSocketService {
 
       // 监听连接错误
       ws.on('error', error => {
-        console.error(`❌ WebSocket连接错误 (用户${user.id}):`, error.message)
+        console.error(`❌ WebSocket连接错误 (用户${user.user_id}):`, error.message)
       })
 
       this.statistics.totalConnections++
       this.statistics.currentConnections++
 
-      console.log(`✅ 用户${user.id}(${user.nickname})建立WebSocket连接`)
+      console.log(`✅ 用户${user.user_id}(${user.nickname})建立WebSocket连接`)
     } catch (error) {
       console.error('❌ WebSocket连接处理失败:', error.message)
       ws.close(1011, 'Internal server error')
@@ -157,6 +157,15 @@ class WebSocketService {
 
       case 'unsubscribe':
         // TODO: 实现取消订阅功能
+        break
+
+      // 🔥 新增：聊天客服系统消息处理
+      case 'subscribe_session':
+      case 'chat_message':
+      case 'typing_start':
+      case 'typing_stop':
+      case 'mark_read':
+        this.handleChatMessage(ws, message)
         break
 
       default:
@@ -534,6 +543,529 @@ class WebSocketService {
    */
   generateMessageId () {
     return `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+  }
+
+  /**
+   * 聊天功能扩展 - 通知管理员有新会话
+   * @param {Object} session - 会话信息
+   */
+  notifyNewSession (session) {
+    const message = {
+      type: 'new_session',
+      data: {
+        sessionId: session.session_id,
+        userId: session.user_id,
+        userInfo: session.user
+          ? {
+            userId: session.user.user_id,
+            nickname: session.user.nickname,
+            avatar: session.user.avatar_url,
+            mobile: session.user.mobile
+          }
+          : null,
+        priority: session.priority,
+        source: session.source,
+        createdAt: session.created_at
+      }
+    }
+
+    return this.broadcastToAdmins(message)
+  }
+
+  /**
+   * 通知会话关闭
+   * @param {Object} session - 会话信息
+   */
+  notifySessionClosed (session) {
+    const message = {
+      type: 'session_closed',
+      data: {
+        sessionId: session.session_id,
+        userId: session.user_id,
+        adminId: session.admin_id,
+        status: session.status,
+        closedAt: session.closed_at || new Date().toISOString(),
+        satisfactionScore: session.satisfaction_score
+      }
+    }
+
+    // 通知用户会话已关闭
+    this.sendToUser(session.user_id, message)
+
+    // 通知分配的管理员会话已关闭
+    if (session.admin_id) {
+      this.sendToUser(session.admin_id, message)
+    }
+
+    return true
+  }
+
+  /**
+   * 发送聊天消息给指定会话的所有参与者
+   * @param {string} sessionId - 会话ID
+   * @param {Object} message - 消息信息
+   * @param {number} excludeUserId - 排除的用户ID（通常是发送者）
+   */
+  sendChatMessage (sessionId, message, excludeUserId = null) {
+    const chatMessage = {
+      type: 'new_message',
+      data: {
+        sessionId,
+        messageId: message.message_id,
+        senderId: message.sender_id,
+        senderType: message.sender_type,
+        content: message.content,
+        messageType: message.message_type,
+        createdAt: message.created_at,
+        metadata: message.metadata
+      }
+    }
+
+    // 发送给参与会话的用户（如果不是发送者）
+    if (message.sender_type === 'admin' || excludeUserId !== message.sender_id) {
+      // TODO: 根据session获取用户ID列表
+      // 这里简化处理，实际需要根据session获取参与用户
+      this.sendToUser(message.sender_id, chatMessage)
+    }
+
+    return true
+  }
+
+  /**
+   * 发送用户输入状态给管理员
+   * @param {string} sessionId - 会话ID
+   * @param {number} userId - 用户ID
+   * @param {boolean} isTyping - 是否正在输入
+   */
+  sendTypingStatus (sessionId, userId, isTyping) {
+    const message = {
+      type: 'user_typing',
+      data: {
+        sessionId,
+        userId,
+        typing: isTyping
+      }
+    }
+
+    this.broadcastToAdmins(message)
+  }
+
+  /**
+   * 发送管理员输入状态给用户
+   * @param {string} sessionId - 会话ID
+   * @param {number} adminId - 管理员ID
+   * @param {boolean} isTyping - 是否正在输入
+   * @param {number} targetUserId - 目标用户ID
+   */
+  sendAdminTypingStatus (sessionId, adminId, isTyping, targetUserId) {
+    const message = {
+      type: 'admin_typing',
+      data: {
+        sessionId,
+        adminId,
+        typing: isTyping,
+        adminName: '客服' // TODO: 获取管理员昵称
+      }
+    }
+
+    this.sendToUser(targetUserId, message)
+  }
+
+  /**
+   * 通知会话状态变更
+   * @param {Object} session - 会话信息
+   * @param {string} oldStatus - 旧状态
+   */
+  notifySessionStatusChange (session, oldStatus) {
+    const message = {
+      type: 'session_status',
+      data: {
+        sessionId: session.session_id,
+        status: session.status,
+        oldStatus,
+        adminInfo: session.admin
+          ? {
+            adminId: session.admin.user_id,
+            name: session.admin.nickname,
+            avatar: session.admin.avatar_url
+          }
+          : null
+      }
+    }
+
+    // 通知用户
+    this.sendToUser(session.user_id, message)
+
+    // 通知管理员
+    if (session.admin_id) {
+      this.sendToUser(session.admin_id, message)
+    }
+  }
+
+  /**
+   * 处理聊天相关的WebSocket消息
+   * @param {WebSocket} ws - WebSocket连接
+   * @param {Object} message - 消息对象
+   */
+  async handleChatMessage (ws, message) {
+    try {
+      switch (message.type) {
+      case 'subscribe_session':
+        // 订阅会话消息
+        this.subscribeToSession(ws, message.data.sessionId)
+        break
+
+      case 'chat_message':
+        // 转发聊天消息
+        await this.forwardChatMessage(ws, message.data)
+        break
+
+      case 'typing_start':
+      case 'typing_stop':
+        // 处理输入状态
+        await this.handleTyping(ws, message.type, message.data)
+        break
+
+      case 'mark_read':
+        // 标记消息已读
+        await this.handleMarkRead(ws, message.data)
+        break
+
+      default:
+        console.warn(`⚠️ 未知聊天消息类型: ${message.type}`)
+      }
+    } catch (error) {
+      console.error('❌ 处理聊天WebSocket消息失败:', error.message)
+    }
+  }
+
+  /**
+   * 订阅会话消息
+   * @param {WebSocket} ws - WebSocket连接
+   * @param {string} sessionId - 会话ID
+   */
+  subscribeToSession (ws, sessionId) {
+    if (!ws.subscribedSessions) {
+      ws.subscribedSessions = new Set()
+    }
+    ws.subscribedSessions.add(sessionId)
+
+    this.sendToConnection(ws, {
+      type: 'session_subscribed',
+      data: { sessionId }
+    })
+  }
+
+  /**
+   * 转发聊天消息
+   * @param {WebSocket} ws - 发送者WebSocket连接
+   * @param {Object} data - 消息数据
+   */
+  async forwardChatMessage (ws, data) {
+    try {
+      const { sessionId, content, messageType = 'text', tempMessageId } = data
+
+      if (!sessionId || !content) {
+        console.warn('⚠️ 聊天消息数据不完整:', data)
+        return
+      }
+
+      // 获取会话信息
+      const { CustomerSession, ChatMessage, User } = require('../models')
+      const session = await CustomerSession.findOne({
+        where: { session_id: sessionId },
+        include: [
+          { model: User, as: 'user', attributes: ['user_id', 'nickname', 'avatar_url'] },
+          { model: User, as: 'admin', attributes: ['user_id', 'nickname', 'avatar_url'] }
+        ]
+      })
+
+      if (!session) {
+        console.warn('⚠️ 会话不存在:', sessionId)
+        this.sendToConnection(ws, {
+          type: 'error',
+          data: { message: '会话不存在', tempMessageId }
+        })
+        return
+      }
+
+      // 验证用户权限（用户只能在自己的会话中发消息，管理员只能在分配的会话中发消息）
+      const isUser = session.user_id === ws.userId
+      const isAssignedAdmin = session.admin_id === ws.userId && ws.userInfo?.isAdmin
+
+      if (!isUser && !isAssignedAdmin) {
+        console.warn('⚠️ 用户无权限访问会话:', { sessionId, userId: ws.userId })
+        this.sendToConnection(ws, {
+          type: 'error',
+          data: { message: '无权限访问此会话', tempMessageId }
+        })
+        return
+      }
+
+      // 创建消息记录
+      const messageId = `msg_${Date.now()}_${require('uuid').v4().substr(0, 8)}`
+      const senderType = ws.userInfo?.isAdmin ? 'admin' : 'user'
+
+      const message = await ChatMessage.create({
+        message_id: messageId,
+        session_id: sessionId,
+        sender_id: ws.userId,
+        sender_type: senderType,
+        content,
+        message_type: messageType,
+        temp_message_id: tempMessageId,
+        status: 'sent'
+      })
+
+      // 更新会话最后消息时间
+      await session.update({
+        last_message_at: new Date(),
+        status: session.status === 'waiting' ? 'active' : session.status
+      })
+
+      // 构建转发消息
+      const forwardMessage = {
+        type: 'new_message',
+        data: {
+          sessionId,
+          messageId: message.message_id,
+          senderId: ws.userId,
+          senderType,
+          content,
+          messageType,
+          tempMessageId,
+          createdAt: message.created_at,
+          sender: {
+            userId: ws.userId,
+            nickname: ws.userInfo?.nickname,
+            isAdmin: ws.userInfo?.isAdmin
+          }
+        }
+      }
+
+      // 发送确认消息给发送者
+      this.sendToConnection(ws, {
+        type: 'message_sent',
+        data: {
+          messageId: message.message_id,
+          tempMessageId,
+          status: 'sent',
+          createdAt: message.created_at
+        }
+      })
+
+      // 转发消息给会话中的其他参与者
+      let forwarded = false
+
+      // 如果发送者是用户，转发给分配的管理员
+      if (senderType === 'user' && session.admin_id) {
+        if (this.sendToUser(session.admin_id, forwardMessage)) {
+          forwarded = true
+        }
+      } else if (senderType === 'admin' && session.user_id) {
+        // 如果发送者是管理员，转发给用户
+        if (this.sendToUser(session.user_id, forwardMessage)) {
+          forwarded = true
+        }
+      }
+
+      if (forwarded) {
+        console.log(`📨 聊天消息转发成功: ${sessionId} - ${senderType} -> ${content.substring(0, 50)}...`)
+      } else {
+        console.log(`📨 聊天消息已发送，但接收者不在线: ${sessionId}`)
+      }
+    } catch (error) {
+      console.error('❌ 转发聊天消息失败:', error.message)
+      this.sendToConnection(ws, {
+        type: 'error',
+        data: {
+          message: '发送消息失败',
+          tempMessageId: data.tempMessageId,
+          error: error.message
+        }
+      })
+    }
+  }
+
+  /**
+   * 处理输入状态
+   * @param {WebSocket} ws - WebSocket连接
+   * @param {string} type - 消息类型 (typing_start/typing_stop)
+   * @param {Object} data - 消息数据
+   */
+  async handleTyping (ws, type, data) {
+    try {
+      const { sessionId } = data
+      const isTyping = type === 'typing_start'
+
+      if (!sessionId) {
+        console.warn('⚠️ 输入状态消息缺少sessionId:', data)
+        return
+      }
+
+      // 获取会话信息
+      const { CustomerSession } = require('../models')
+      const session = await CustomerSession.findOne({
+        where: { session_id: sessionId }
+      })
+
+      if (!session) {
+        console.warn('⚠️ 会话不存在:', sessionId)
+        return
+      }
+
+      // 验证用户权限
+      const isUser = session.user_id === ws.userId
+      const isAssignedAdmin = session.admin_id === ws.userId && ws.userInfo?.isAdmin
+
+      if (!isUser && !isAssignedAdmin) {
+        console.warn('⚠️ 用户无权限访问会话:', { sessionId, userId: ws.userId })
+        return
+      }
+
+      // 构建输入状态消息
+      const typingMessage = {
+        type: 'user_typing',
+        data: {
+          sessionId,
+          userId: ws.userId,
+          typing: isTyping,
+          senderType: ws.userInfo?.isAdmin ? 'admin' : 'user',
+          timestamp: new Date().toISOString()
+        }
+      }
+
+      // 转发输入状态给会话中的其他参与者
+      const senderType = ws.userInfo?.isAdmin ? 'admin' : 'user'
+      let forwarded = false
+
+      // 如果发送者是用户，转发给分配的管理员
+      if (senderType === 'user' && session.admin_id) {
+        if (this.sendToUser(session.admin_id, typingMessage)) {
+          forwarded = true
+        }
+      } else if (senderType === 'admin' && session.user_id) {
+        // 如果发送者是管理员，转发给用户
+        if (this.sendToUser(session.user_id, typingMessage)) {
+          forwarded = true
+        }
+      }
+
+      if (forwarded) {
+        console.log(`⌨️ 输入状态转发: 用户${ws.userId} ${isTyping ? '开始' : '停止'}输入 - 会话${sessionId}`)
+      }
+    } catch (error) {
+      console.error('❌ 处理输入状态失败:', error.message)
+    }
+  }
+
+  /**
+   * 处理消息已读标记
+   * @param {WebSocket} ws - WebSocket连接
+   * @param {Object} data - 消息数据
+   */
+  async handleMarkRead (ws, data) {
+    try {
+      const { sessionId, messageId, allMessages = false } = data
+
+      if (!sessionId) {
+        console.warn('⚠️ 已读标记消息缺少sessionId:', data)
+        return
+      }
+
+      // 获取会话信息
+      const { CustomerSession, ChatMessage } = require('../models')
+      const session = await CustomerSession.findOne({
+        where: { session_id: sessionId }
+      })
+
+      if (!session) {
+        console.warn('⚠️ 会话不存在:', sessionId)
+        return
+      }
+
+      // 验证用户权限
+      const isUser = session.user_id === ws.userId
+      const isAssignedAdmin = session.admin_id === ws.userId && ws.userInfo?.isAdmin
+
+      if (!isUser && !isAssignedAdmin) {
+        console.warn('⚠️ 用户无权限访问会话:', { sessionId, userId: ws.userId })
+        return
+      }
+
+      const receiverType = ws.userInfo?.isAdmin ? 'admin' : 'user'
+      const senderTypeToMarkRead = receiverType === 'admin' ? 'user' : 'admin'
+
+      let updatedCount = 0
+
+      if (allMessages) {
+        // 标记会话中所有未读消息为已读
+        const [affected] = await ChatMessage.update(
+          { status: 'read' },
+          {
+            where: {
+              session_id: sessionId,
+              sender_type: senderTypeToMarkRead, // 只标记对方发送的消息
+              status: ['sent', 'delivered']
+            }
+          }
+        )
+        updatedCount = affected
+      } else if (messageId) {
+        // 标记特定消息为已读
+        const [affected] = await ChatMessage.update(
+          { status: 'read' },
+          {
+            where: {
+              message_id: messageId,
+              session_id: sessionId,
+              sender_type: senderTypeToMarkRead,
+              status: ['sent', 'delivered']
+            }
+          }
+        )
+        updatedCount = affected
+      }
+
+      if (updatedCount > 0) {
+        // 通知发送者消息已被阅读
+        const readNotification = {
+          type: 'message_read',
+          data: {
+            sessionId,
+            messageId: allMessages ? null : messageId,
+            allMessages,
+            readById: ws.userId,
+            readByType: receiverType,
+            readAt: new Date().toISOString(),
+            updatedCount
+          }
+        }
+
+        // 通知会话中的其他参与者
+        let notified = false
+
+        if (receiverType === 'user' && session.admin_id) {
+          // 用户读了管理员的消息，通知管理员
+          if (this.sendToUser(session.admin_id, readNotification)) {
+            notified = true
+          }
+        } else if (receiverType === 'admin' && session.user_id) {
+          // 管理员读了用户的消息，通知用户
+          if (this.sendToUser(session.user_id, readNotification)) {
+            notified = true
+          }
+        }
+
+        console.log(`👀 消息已读标记完成: 用户${ws.userId} 标记了${updatedCount}条消息 - 会话${sessionId}`)
+
+        if (notified) {
+          console.log(`📬 已读通知已发送: 会话${sessionId}`)
+        }
+      }
+    } catch (error) {
+      console.error('❌ 处理消息已读标记失败:', error.message)
+    }
   }
 
   /**

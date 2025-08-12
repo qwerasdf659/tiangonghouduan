@@ -10,7 +10,7 @@ module.exports = sequelize => {
     'Product',
     {
       // 基础信息
-      id: {
+      commodity_id: {
         type: DataTypes.INTEGER,
         primaryKey: true,
         autoIncrement: true,
@@ -108,7 +108,7 @@ module.exports = sequelize => {
       },
 
       // 业务信息
-      sales: {
+      sales_count: {
         type: DataTypes.INTEGER,
         allowNull: false,
         defaultValue: 0,
