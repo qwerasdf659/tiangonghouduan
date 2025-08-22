@@ -25,7 +25,8 @@ async function getTableStatistics () {
     })
 
     // 2. 获取表大小信息
-    const tableSizes = await sequelize.query(`
+    const tableSizes = await sequelize.query(
+      `
       SELECT 
         TABLE_NAME as table_name,
         ROUND(((DATA_LENGTH + INDEX_LENGTH) / 1024 / 1024), 2) as size_mb,
@@ -33,7 +34,9 @@ async function getTableStatistics () {
       FROM INFORMATION_SCHEMA.TABLES 
       WHERE TABLE_SCHEMA = DATABASE()
       ORDER BY (DATA_LENGTH + INDEX_LENGTH) DESC
-    `, { type: QueryTypes.SELECT })
+    `,
+      { type: QueryTypes.SELECT }
+    )
 
     console.log('\n📊 表大小统计 (前10个):')
     tableSizes.slice(0, 10).forEach((table, index) => {
@@ -45,12 +48,15 @@ async function getTableStatistics () {
     console.log(`\n💾 数据库总大小: ${totalSize.toFixed(2)}MB`)
 
     // 4. 获取缓存配置
-    const cacheInfo = await sequelize.query(`
+    const cacheInfo = await sequelize.query(
+      `
       SELECT 
         @@table_definition_cache as definition_cache,
         @@table_open_cache as open_cache,
         @@innodb_file_per_table as file_per_table
-    `, { type: QueryTypes.SELECT })
+    `,
+      { type: QueryTypes.SELECT }
+    )
 
     console.log('\n🔧 缓存配置:')
     console.log(`  - 表定义缓存: ${cacheInfo[0].definition_cache}`)
@@ -59,7 +65,7 @@ async function getTableStatistics () {
 
     // 5. 安全评估
     const safeLimit = 1000
-    const usageRate = (tables.length / safeLimit * 100).toFixed(1)
+    const usageRate = ((tables.length / safeLimit) * 100).toFixed(1)
     const remainingSpace = safeLimit - tables.length
 
     console.log('\n🎯 容量评估:')

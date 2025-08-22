@@ -1,5 +1,5 @@
 /**
- * 餐厅积分抽奖系统 v2.0 - 库存管理服务
+ * 餐厅积分抽奖系统 v3.0 - 库存管理服务
  * 处理用户库存物品的管理和操作
  * 创建时间：2025年01月28日
  */
@@ -177,10 +177,13 @@ class InventoryService {
       }
 
       // 更新物品状态
-      await item.update({
-        status: 'used',
-        used_at: new Date()
-      }, { transaction })
+      await item.update(
+        {
+          status: 'used',
+          used_at: new Date()
+        },
+        { transaction }
+      )
 
       await transaction.commit()
 
@@ -233,34 +236,40 @@ class InventoryService {
 
       // 创建新的库存记录给目标用户
       const transferId = crypto.randomUUID().replace(/-/g, '').substring(0, 12)
-      await UserInventory.create({
-        id: `inv_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-        user_id: targetUserId,
-        name: item.name,
-        description: item.description,
-        type: item.type,
-        value: item.value,
-        status: 'available',
-        source_type: '用户转让',
-        source_id: item.id,
-        acquired_at: new Date(),
-        expires_at: item.expires_at,
-        icon: item.icon,
-        metadata: {
-          ...item.metadata,
-          transferFromUserId: userId,
-          transferMessage: message,
-          originalItemId: item.id
-        }
-      }, { transaction })
+      await UserInventory.create(
+        {
+          id: `inv_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          user_id: targetUserId,
+          name: item.name,
+          description: item.description,
+          type: item.type,
+          value: item.value,
+          status: 'available',
+          source_type: '用户转让',
+          source_id: item.id,
+          acquired_at: new Date(),
+          expires_at: item.expires_at,
+          icon: item.icon,
+          metadata: {
+            ...item.metadata,
+            transferFromUserId: userId,
+            transferMessage: message,
+            originalItemId: item.id
+          }
+        },
+        { transaction }
+      )
 
       // 更新原物品状态
-      await item.update({
-        status: 'transferred',
-        transfer_to_user_id: targetUserId,
-        transfer_at: new Date(),
-        transfer_message: message
-      }, { transaction })
+      await item.update(
+        {
+          status: 'transferred',
+          transfer_to_user_id: targetUserId,
+          transfer_at: new Date(),
+          transfer_message: message
+        },
+        { transaction }
+      )
 
       await transaction.commit()
 
@@ -318,10 +327,13 @@ class InventoryService {
 
       // 更新物品核销码
       const expiresAt = moment().add(24, 'hours').toDate()
-      await item.update({
-        verification_code: verificationCode,
-        verification_expires_at: expiresAt
-      }, { transaction })
+      await item.update(
+        {
+          verification_code: verificationCode,
+          verification_expires_at: expiresAt
+        },
+        { transaction }
+      )
 
       await transaction.commit()
 
@@ -476,10 +488,7 @@ class InventoryService {
           user_id: userId,
           status: 'available'
         },
-        attributes: [
-          'type',
-          [sequelize.fn('COUNT', '*'), 'count']
-        ],
+        attributes: ['type', [sequelize.fn('COUNT', '*'), 'count']],
         group: ['type']
       })
 

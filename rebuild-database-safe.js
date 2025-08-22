@@ -13,10 +13,9 @@ async function safeRebuildDatabase () {
 
     // 步骤1：备份现有数据
     console.log('📦 步骤1：备份现有数据...')
-    const [existingData] = await sequelize.query(
-      'SELECT * FROM products ORDER BY commodity_id',
-      { transaction }
-    )
+    const [existingData] = await sequelize.query('SELECT * FROM products ORDER BY commodity_id', {
+      transaction
+    })
     console.log(`✅ 成功备份 ${existingData.length} 条商品数据`)
 
     // 步骤2：重命名现有表为备份表
@@ -34,7 +33,8 @@ async function safeRebuildDatabase () {
 
     // 步骤4：按新模型创建表
     console.log('🏗️ 步骤4：按新模型创建表...')
-    await sequelize.query(`
+    await sequelize.query(
+      `
       CREATE TABLE products (
         commodity_id INT AUTO_INCREMENT PRIMARY KEY COMMENT '商品唯一ID',
         name VARCHAR(200) NOT NULL COMMENT '商品名称',
@@ -77,14 +77,17 @@ async function safeRebuildDatabase () {
         INDEX idx_products_stock (stock),
         INDEX idx_products_sort_order (sort_order)
       ) COMMENT '商品表 - 支持幸运空间和臻选空间'
-    `, { transaction })
+    `,
+      { transaction }
+    )
     console.log('✅ 新表结构创建成功')
 
     // 步骤5：迁移数据（处理字段映射）
     console.log('📋 步骤5：迁移现有数据...')
     if (existingData.length > 0) {
       for (const item of existingData) {
-        await sequelize.query(`
+        await sequelize.query(
+          `
           INSERT INTO products (
             commodity_id, name, description, image, category, space,
             exchange_points, stock, original_price, discount, low_stock_threshold,
@@ -98,31 +101,33 @@ async function safeRebuildDatabase () {
             :sales_count, 0, :rating, NULL, NULL, NULL,
             NULL, NULL, :created_at, :updated_at
           )
-        `, {
-          replacements: {
-            commodity_id: item.commodity_id,
-            name: item.name,
-            description: item.description,
-            image: item.image,
-            category: item.category,
-            space: item.space || 'lucky',
-            exchange_points: item.exchange_points,
-            stock: item.stock,
-            original_price: item.original_price,
-            discount: item.discount || 0,
-            low_stock_threshold: item.low_stock_threshold || 5,
-            status: item.status || 'active',
-            is_hot: item.is_hot || false,
-            is_new: item.is_new || false,
-            is_limited: item.is_limited || false,
-            sort_order: item.sort_order || 0,
-            sales_count: item.sales_count || 0, // 映射：sales_count -> sales
-            rating: item.rating,
-            created_at: item.created_at,
-            updated_at: item.updated_at
-          },
-          transaction
-        })
+        `,
+          {
+            replacements: {
+              commodity_id: item.commodity_id,
+              name: item.name,
+              description: item.description,
+              image: item.image,
+              category: item.category,
+              space: item.space || 'lucky',
+              exchange_points: item.exchange_points,
+              stock: item.stock,
+              original_price: item.original_price,
+              discount: item.discount || 0,
+              low_stock_threshold: item.low_stock_threshold || 5,
+              status: item.status || 'active',
+              is_hot: item.is_hot || false,
+              is_new: item.is_new || false,
+              is_limited: item.is_limited || false,
+              sort_order: item.sort_order || 0,
+              sales_count: item.sales_count || 0, // 映射：sales_count -> sales
+              rating: item.rating,
+              created_at: item.created_at,
+              updated_at: item.updated_at
+            },
+            transaction
+          }
+        )
       }
       console.log(`✅ 成功迁移 ${existingData.length} 条商品数据`)
     }
@@ -140,7 +145,10 @@ async function safeRebuildDatabase () {
       if (!originalItem) {
         throw new Error(`找不到商品ID ${newItem.commodity_id} 的原始数据`)
       }
-      if (originalItem.name !== newItem.name || originalItem.exchange_points !== newItem.exchange_points) {
+      if (
+        originalItem.name !== newItem.name ||
+        originalItem.exchange_points !== newItem.exchange_points
+      ) {
         throw new Error(`商品ID ${newItem.commodity_id} 的关键数据不匹配`)
       }
     }
@@ -155,7 +163,9 @@ async function safeRebuildDatabase () {
     console.log(`  - 原有数据: ${existingData.length} 条商品`)
     console.log(`  - 迁移成功: ${newData.length} 条商品`)
     console.log('  - 数据丢失: 0 条')
-    console.log('  - 新增字段: view_count, warranty, delivery_info, expires_at, created_by, updated_by')
+    console.log(
+      '  - 新增字段: view_count, warranty, delivery_info, expires_at, created_by, updated_by'
+    )
     console.log('  - 字段重命名: sales_count -> sales')
     console.log('')
     console.log('✅ 商品兑换功能可以正常使用')

@@ -180,7 +180,9 @@ async function testExistingApis () {
 
     for (const api of criticalApis) {
       try {
-        const { stdout } = await execAsync(`curl -f -s -o /dev/null -w "%{http_code}" http://localhost:3000${api}`)
+        const { stdout } = await execAsync(
+          `curl -f -s -o /dev/null -w "%{http_code}" http://localhost:3000${api}`
+        )
         const statusCode = parseInt(stdout.trim())
 
         // 200-299 或 401(需要认证) 都算正常
@@ -215,12 +217,15 @@ async function testExistingApis () {
 async function testResponseTime () {
   console.log('🔄 测试API响应时间...')
   try {
-    const { stdout } = await execAsync('curl -f -s -o /dev/null -w "%{time_total}" http://localhost:3000/health')
+    const { stdout } = await execAsync(
+      'curl -f -s -o /dev/null -w "%{time_total}" http://localhost:3000/health'
+    )
     const responseTime = parseFloat(stdout.trim()) * 1000 // 转换为毫秒
 
     console.log(`📊 API响应时间: ${responseTime.toFixed(2)}ms`)
 
-    if (responseTime < 1000) { // 小于1秒
+    if (responseTime < 1000) {
+      // 小于1秒
       console.log('✅ 响应时间测试通过')
       return true
     } else {
@@ -287,7 +292,7 @@ async function runFullTestSuite () {
     })
   })
 
-  const passRate = (passedTests / totalTests * 100).toFixed(1)
+  const passRate = ((passedTests / totalTests) * 100).toFixed(1)
   console.log(`\n🎯 总体通过率: ${passedTests}/${totalTests} (${passRate}%)`)
 
   if (passRate >= 80) {

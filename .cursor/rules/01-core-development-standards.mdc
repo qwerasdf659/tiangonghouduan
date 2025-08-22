@@ -1,930 +1,910 @@
 ---
-description: 
-globs: 
-alwaysApply: true
+name: 核心开发标准
 ---
-# 核心开发规范
 
-## 🔴 基于实际问题分析的效率优化规范（2025年01月21日更新）
+# 核心开发标准（基于实际cursor_3.md等问题分析优化版）
 
-### 重复状态检查严格防止机制（量化要求）
+## 🔴 基于实际发现的开发质量问题
 
-#### 实际发现的严重重复问题
-基于cursor_*.md文档深度分析发现：
-- **健康检查重复30+次**：单次会话中curl http://localhost:3000/health重复执行8次
-- **端口检查重复20+次**：netstat -tlnp | grep :3000重复执行6次
-- **进程检查重复15+次**：ps aux | grep node重复执行7次
-- **服务状态重复12+次**：pm2 status重复执行5次
+### 实际问题案例统计
+从11个cursor文档深度分析发现：
+- **WebSocket功能缺失**: cursor_3.md中发现WebSocket服务被注释 `// webSocketService.notifyNewSession(session)`
+- **数据库事务错误**: cursor_5.md中发现大量事务回滚处理问题
+- **前端API缺失**: cursor_5.md中发现 `TypeError: API.getUserInventory is not a function`
+- **配置文件问题**: cursor_9.md中发现.env配置缺失导致服务启动失败
+- **依赖版本冲突**: 多个文档中发现npm包版本不兼容问题
 
-#### 强制防重规则
+## API接口开发强制规范
+
+### 基于实际问题的API完整性检查
 ```javascript
-// 状态检查防重机制
-const STATUS_CHECK_CACHE = {
-  'health_check': { result: null, timestamp: 0, ttl: 300000 }, // 5分钟缓存
-  'port_check_3000': { result: null, timestamp: 0, ttl: 300000 },
-  'process_check': { result: null, timestamp: 0, ttl: 300000 },
-  'pm2_status': { result: null, timestamp: 0, ttl: 300000 }
-};
-
-function shouldSkipStatusCheck(checkType) {
-  const cache = STATUS_CHECK_CACHE[checkType];
-  if (cache.result && (Date.now() - cache.timestamp) < cache.ttl) {
-    console.log(`🚫 跳过重复检查：${checkType}，使用缓存结果：${cache.result}`);
-    return cache.result;
-  }
-  return false;
-}
-
-// 强制执行规则
-const FORBIDDEN_REPEAT_PATTERNS = [
-  'curl.*localhost:3000/health', // 禁止5分钟内重复健康检查
-  'netstat.*grep.*3000',         // 禁止重复端口检查
-  'ps aux.*grep node',           // 禁止重复进程检查
-  'pm2 status'                   // 禁止重复PM2状态检查
-];
-```
-
-#### 批量状态验证强制要求
-```bash
-# ✅ 正确：并行执行所有状态检查（5秒内完成）
-curl -m 5 http://localhost:3000/health &
-pm2 status &
-netstat -tlnp | grep :3000 &
-ps aux | grep node &
-wait
-
-# ❌ 错误：串行重复检查（浪费30-60秒）
-curl http://localhost:3000/health
-# 等待...
-pm2 status  
-# 等待...
-netstat -tlnp | grep :3000
-# 等待...
-ps aux | grep node
-```
-
-### 工具调用预算控制（详细规则见02-tool-optimization-standards.mdc）
-
-#### 快速预算控制
-- **简单任务**：最多20次工具调用
-- **中等任务**：最多50次工具调用  
-- **复杂任务**：最多100次工具调用
-- **绝对上限**：150次（超出立即停止）
-
-> 详细的工具调用预算算法和监控机制请参考 `02-tool-optimization-standards.mdc`
-
-### 120秒超时强制执行机制（基于运行时间投诉）
-
-#### 实际超时问题分析
-发现多次"运行时间这么长"的明确投诉，违反了120秒自动重试规则：
-- 长时间运行命令未使用timeout包装
-- 网络请求未设置超时限制
-- 数据库连接检查卡住未自动重试
-
-#### 强制超时控制
-```bash
-# 所有可能长时间运行的命令必须包装
-timeout 120s npm install
-timeout 60s mysql -h host -u user -p
-timeout 30s curl -m 25 http://localhost:3000/health
-
-# 网络请求强制超时
-curl -m 30 -f --retry 2 http://localhost:3000/api/health
-
-# 数据库操作强制限制
-mysql -h host -u user -p --connect-timeout=5 --read-timeout=10
-```
-
-## 核心开发规范
-# 数据库管理、Node.js应用开发、测试数据等基础规范
-
-## 数据库表结构和索引管理规范
-- 禁止在生产环境频繁使用sequelize.sync({ alter: true })或force: true，表结构变更必须通过手动SQL脚本或迁移工具完成
-- 每张表的索引总数不得超过MySQL的64个限制，如需新增索引，必须先评估和清理无用索引
-- 初始化脚本必须加超时和详细日志，如遇长时间无响应，需立即排查数据库连接和表结构问题
-- 大批量数据插入必须分批处理，每批不超过100条，避免单次SQL阻塞
-- 所有表结构和索引变更需在代码评审时重点检查，防止上线后阻塞数据库
-
-### 数据库长时间初始化处理
-- 当数据库初始化脚本运行超过2分钟时，应该先检查数据库状态和表结构，验证数据是否已成功初始化
-- 使用timeout命令限制脚本运行时间：`timeout 120s node scripts/init-database.js`
-- 避免在生产环境使用force模式重建数据库
-- 优先使用ALTER TABLE而不是DROP TABLE处理表结构变更
-
-### 数据库迁移规范
-- 所有表结构变更必须通过迁移脚本完成，禁止直接修改数据库
-- 迁移脚本必须包含up和down操作，支持回滚
-- 重要迁移操作前必须备份数据库
-- 迁移脚本执行前必须在测试环境验证
-- 迁移操作必须在维护窗口期间执行，避免影响正常业务
-
-## 测试数据一致性规范
-
-### 统一测试数据管理
-- 所有测试用户数据必须定义在统一的配置文件中（如 config/test-data.js）
-- 禁止在多个文件中硬编码相同的测试数据
-- 初始化脚本和测试脚本必须引用同一个数据源
-- 只保留一个主要的初始化脚本，其他过时脚本必须删除或明确标记
-
-### 强制数据存在性检查
-- 测试脚本必须包含数据存在性检查，避免空指针异常
-- 所有数据库操作前必须验证依赖数据是否存在
-- 所有数据库查询必须检查返回结果是否为null/undefined
-- 使用 try-catch 包装可能失败的操作
-- 提供有意义的错误消息，便于快速定位问题
-
-### 测试数据处理示例代码
-```javascript
-// ✅ 正确模式 - 统一配置 + 错误检查  
-const TEST_CONFIG = require('./config/test-data.js');
-const testUser = await User.findOne({ where: { mobile: TEST_CONFIG.TEST_USER_MOBILE } });
-if (!testUser) {
-  console.error(`测试用户不存在: ${TEST_CONFIG.TEST_USER_MOBILE}`);
-  console.log('请运行: node scripts/init-database.js');
-  process.exit(1);
-}
-const { accessToken } = generateTokens(testUser);
-```
-
-## Node.js应用开发规范
-
-### 内存管理规范
-- 开发环境必须设置合理的内存限制，避免内存使用率超过80%
-- 使用 NODE_OPTIONS="--max-old-space-size=512" 控制堆内存大小
-- PM2配置中设置 max_memory_restart 低于实际内存限制
-- 实施内存监控告警，超过75%时自动重启进程
-- 避免在开发环境使用集群模式，优先使用fork模式
-
-### API路径规范
-- 健康检查端点必须同时提供 /health 和 /api/health 两个路径
-- 所有API端点必须有对应的错误处理机制
-- API路径变更时必须同步更新文档和测试用例
-- 实施API版本控制和向后兼容策略
-
-### 服务监控规范
-- 所有服务组件必须实现 isHealthy() 方法
-- WebSocket等实时服务需要实现连接计数和状态检查
-- 健康检查端点必须返回详细的服务状态信息
-- 实施服务依赖检查和故障隔离机制
-
-### 进程管理规范
-- 开发环境使用单进程模式，生产环境可使用集群模式
-- 配置合理的进程重启策略和超时时间
-- 实施优雅关闭机制，确保数据一致性
-- 配置日志轮转和存储策略
-
-### 错误处理规范
-- 所有异步操作必须有错误处理
-- 实施全局错误捕获和处理机制
-- 错误信息必须包含上下文和解决建议
-- 建立错误分类和优先级体系
-
-## 命令执行和环境检查规范
-
-### 环境依赖完整性检查
-- 在开始任何开发任务前必须执行环境检查
-- 检查Node.js版本和PM2安装状态
-- 验证package.json中的依赖是否已安装
-- 确认数据库连接配置的正确性
-- 验证环境变量文件的完整性
-
-### 应用启动状态验证
-- 应用启动后必须进行完整的健康检查
-- 检查端口监听状态：netstat -tlnp | grep :PORT
-- 验证健康检查端点：curl -f http://localhost:PORT/api/health
-- 确认PM2进程状态：pm2 status
-- 检查应用日志：pm2 logs --lines 20
-
-### 命令执行标准化
-- 所有长时间运行的命令必须设置超时和限制参数
-- 使用timeout命令限制执行时间：timeout 120s command
-- 日志查看命令必须限制行数：--lines N
-- 网络请求必须设置超时：curl -m 30
-- 大文件操作需要进度显示和分段处理
-
-## 端口占用和进程管理规范
-
-### 端口占用检查和处理
-- 启动Node.js应用前必须检查端口占用状态：netstat -tlnp | grep :PORT
-- 发现端口被占用时必须先终止占用进程：pkill -f "node.*app.js"
-- 应用重启必须等待前一进程完全终止（至少2秒间隔）
-- 使用PM2等进程管理工具时要检查进程状态：pm2 status
-- 开发环境建议使用nodemon等热重载工具减少重启频率
-
-### 应用开发和调试规范
-- 代码修改后重启应用前必须检查当前运行状态
-- 使用curl -f http://localhost:PORT/health验证应用健康状态
-- 重启失败时立即分析错误原因，不要盲目重试
-- 开发环境配置文件监听和自动重启机制
-- 关键修改后必须验证核心功能正常运行
-
-### 错误处理和恢复机制规范
-- 每个关键操作必须有自动化的错误恢复流程
-- 端口占用错误：自动终止占用进程 → 等待2秒 → 重新启动
-- 应用启动失败：检查配置文件 → 检查依赖 → 检查端口 → 重试
-- 数据库连接失败：检查服务状态 → 检查配置 → 重试连接
-- 错误恢复失败时提供详细的诊断信息和手动解决方案
-
-## 资源使用监控规范
-
-### 系统资源监控
-- 定期检查系统资源使用情况（内存、CPU、磁盘）
-- 监控Node.js进程的内存使用，避免内存泄漏
-- 检查数据库连接池状态，避免连接泄漏
-- 监控端口使用情况，及时清理僵尸进程
-- 设置资源使用告警阈值
-
-### WebSocket服务监控
-- WebSocket服务必须实现完整的健康检查
-- 实现isHealthy()方法检查连接状态
-- 监控活跃连接数和连接质量
-- 提供连接重连机制和故障转移
-- 记录详细的连接和断开日志
-
-### 开发环境一致性
-- 开发环境配置必须标准化
-- 所有开发者使用相同的Node.js版本
-- 统一的依赖管理和版本锁定
-- 标准化的启动和停止脚本
-- 一致的环境变量配置模板
-
-## 部署配置规范
-
-### 环境配置管理
-- 环境配置必须区分开发、测试、生产环境
-- 敏感信息必须通过环境变量管理
-- 实施配置验证和兼容性检查
-- 建立配置变更追踪机制
-
-### 部署流程标准化
-- 建立自动化的持续集成/持续部署流程
-- 部署前进行完整的回归测试
-- 配置蓝绿部署或滚动发布策略
-- 建立快速回滚机制
-
-### 监控和告警体系
-- 实施全方位的应用性能监控
-- 配置关键指标的告警机制
-- 建立日志聚合和分析系统
-- 实施健康检查和故障自愈机制
-
-## 抽奖业务逻辑规范
-
-### 批量抽奖积分扣除规范
-- **统一扣费时机**：批量抽奖（如5连抽、10连抽）必须在开始前一次性扣除所有积分，禁止循环中重复扣除
-- **事务完整性**：整个批量抽奖过程必须在单个数据库事务中完成，确保数据一致性
-- **积分计算公式**：totalCost = actualCount * costPoints，必须正确计算总消费
-- **积分不足检查**：扣除积分前必须检查用户积分是否足够，不足时立即返回错误
-- **扣费记录完整**：每次积分扣除都必须记录到PointsRecord表，包含描述、来源、余额等信息
-
-### 抽奖类型参数映射规范
-- **参数兼容性**：后端必须支持前端常用的抽奖类型参数映射：
-  * 'single': 1次
-  * 'triple': 3次
-  * 'quintuple': 5次, 'five': 5次
-  * 'decade': 10次, 'ten': 10次
-- **参数验证**：对不支持的抽奖类型返回明确错误信息
-- **默认值处理**：未指定抽奖类型时默认为'single'单次抽奖
-- **向后兼容**：新增抽奖类型时必须保持对现有类型的支持
-
-### 抽奖结果数据规范
-- **序号字段完整性**：每个抽奖结果必须包含draw_sequence字段，从1开始递增
-- **用户信息路径**：确保user_info.remaining_points等字段路径正确，避免undefined
-- **响应格式一致性**：保持与前端约定的响应格式，包含所有必要字段
-- **保底机制准确性**：正确实现和返回保底触发状态和剩余次数
-
-### 每日限制配置规范
-- **默认值一致性**：确保代码中所有地方的每日限制默认值保持一致
-- **环境变量优先级**：明确DAILY_LOTTERY_LIMIT环境变量优先于代码默认值
-- **配置验证**：启动时验证限制配置的合理性（通常50次/天）
-- **限制范围检查**：基于用户ID进行每日限制，不是全局限制
-- **时区处理**：正确处理每日重置的时间边界，考虑服务器时区设置
-
-## WebSocket服务配置和管理规范
-
-### WebSocket服务初始化配置规范
-- **路径配置标准化**：WebSocket服务必须配置明确的路径：path: '/ws'
-- **跨域配置**：正确配置CORS，支持小程序和Web端访问
-- **连接认证**：实现Token验证机制确保连接安全性
-- **心跳机制**：配置合理的心跳间隔维持连接稳定性
-- **连接数限制**：设置合理的并发连接数限制
-
-### WebSocket域名配置管理
-- **小程序域名要求**：微信小程序socket合法域名必须配置为：wss://domain.com
-- **协议要求**：生产环境强制使用wss://加密连接，开发环境支持ws://
-- **路径一致性**：确保前后端WebSocket路径配置一致
-- **域名变更管理**：域名变更时同步更新前端配置和文档
-- **SSL证书管理**：确保wss://连接的SSL证书有效
-
-### WebSocket服务重启和恢复
-- **优雅重启**：服务重启前正确关闭现有WebSocket连接
-- **配置热加载**：支持WebSocket配置的热加载，减少重启需求
-- **连接状态管理**：维护连接状态，支持断线重连
-- **消息队列处理**：处理重启期间的消息队列和数据恢复
-- **监控告警**：WebSocket服务异常时及时告警和处理
-
-**核心原则**：数据安全优先、性能兼顾、可维护性保证、测试覆盖完整、稳定性优先、监控全面
-
-## 🔴 基于实际问题分析的新增规范（2025年01月21日）
-
-### API接口对接一致性规范（解决接口不匹配问题）
-
-#### 实际发现的接口不匹配问题
-基于cursor_git4.md、cursor_6.md、cursor_7.md等文档深度分析发现：
-- **前端调用 `/api/upload`，后端实际是 `/api/photo/upload`**：导致404错误15+次，累计浪费40-60分钟
-- **前端调用 `/api/auth/verify`，后端接口不存在**：导致认证失败10+次，累计浪费20-30分钟
-- **前端调用 `/api/exchange/statistics` 返回404**：导致兑换统计功能失败8次
-- **WebSocket服务缺少 `notifyMerchants` 方法**：导致通知功能失败8次，累计浪费15-25分钟
-- **模型关联别名不一致**：User vs user，导致查询失败6次，累计浪费10-15分钟
-
-#### 接口不匹配根本原因分析
-- **前后端开发不同步**：前端基于旧版API文档开发
-- **接口变更通知缺失**：后端修改接口路径未及时通知前端
-- **接口文档管理混乱**：缺乏统一的接口文档管理
-- **测试覆盖不足**：缺少前后端接口对接的自动化测试
-
-#### 强制接口对接规范
-```javascript
-// API路径兼容性强制要求（基于实际发现的接口不匹配问题）
-const API_COMPATIBILITY_RULES = {
-  // 🔴 强制要求：所有前端可能调用的路径都必须有兼容路由
-  upload_paths: [
-    '/api/upload',        // 前端期望路径 - cursor_git4.md中发现
-    '/api/photo/upload'   // 后端实际路径
-  ],
-  
-  auth_paths: [
-    '/api/auth/verify',   // 前端期望路径 - cursor_6.md中发现
-    '/api/auth/verify-token' // 后端实际路径
-  ],
-  
-  exchange_paths: [
-    '/api/exchange/statistics',  // 前端期望路径 - cursor_7.md中发现
-    '/api/merchant/statistics'   // 后端实际路径
-  ],
-  
-  // 兼容路由自动添加
-  auto_compatibility: true,
-  
-  // 路由顺序检查（防止404处理器拦截）
-  route_order_check: true
-};
-
-// 自动添加兼容路由（解决cursor_6.md中发现的路由顺序问题）
-function addCompatibilityRoutes(app, routes) {
-  // 🔴 重要：兼容路由必须在404处理器之前注册
-  
-  // 上传接口兼容
-  app.use('/api/upload', routes.photoRoutes);
-  app.use('/upload', routes.photoRoutes);
-  
-  // 认证接口兼容
-  if (!routes.authRoutes.has('/api/auth/verify')) {
-    app.get('/api/auth/verify', routes.authRoutes.verifyToken);
-  }
-  
-  // 兑换统计接口兼容
-  app.get('/api/exchange/statistics', routes.merchantRoutes.getStatistics);
-  
-  // 确保404处理器在最后注册
-  app.use('/api/*', notFoundHandler);
-}
-
-// 接口存在性预检查机制
-function checkApiExists(path) {
-  const startTime = Date.now();
-  
-  // 1. 先检查路由定义
-  const routeExists = checkRouteDefinition(path);
-  if (!routeExists) {
-    console.warn(`🚫 路由不存在：${path}，建议添加兼容路由`);
-    return false;
-  }
-  
-  // 2. 再检查API响应
-  curl(`-f -m 5 http://localhost:3000${path}`, (error, response) => {
-    const checkTime = Date.now() - startTime;
-    if (error) {
-      console.error(`❌ API检查失败：${path}，耗时${checkTime}ms`);
-      return false;
-    }
-    console.log(`✅ API检查成功：${path}，耗时${checkTime}ms`);
-    return true;
-  });
-}
-```
-
-#### 模型关联别名一致性规范
-```javascript
-// 🔴 强制要求：模型关联别名必须在定义和使用中保持完全一致
-// 基于cursor_backend_database_issue_resolutio.md中发现的实际错误
-const MODEL_ALIAS_CONSISTENCY = {
-  PhotoReview: {
-    user: 'user',           // 必须使用 as: 'user'
-    merchant: 'merchant'    // 必须使用 as: 'merchant'
-  },
-  
-  User: {
-    photoReviews: 'photoReviews',  // 必须使用 as: 'photoReviews'
-    pointsRecords: 'pointsRecords' // 必须使用 as: 'pointsRecords'
-  },
-  
-  // 使用时强制检查
-  include: [{
-    model: User,
-    as: 'user',  // 🔴 强制要求：必须使用别名
-    attributes: ['user_id', 'mobile', 'nickname']
-  }]
-};
-
-// 查询中访问关联数据（基于实际错误修复）
-const userData = review.user;  // 🔴 正确：使用别名
-// const userData = review.User;  // ❌ 错误：大写形式，会导致 "User is associated using an alias" 错误
-
-// 关联别名检查机制
-function validateModelAssociations() {
-  const associations = sequelize.models;
-  
-  Object.keys(associations).forEach(modelName => {
-    const model = associations[modelName];
-    const modelAssociations = model.associations;
+// 🔴 基于cursor_5.md中发现的API缺失问题
+const API_COMPLETENESS_VALIDATOR = {
+  // 必需的API端点检查
+  requiredEndpoints: {
+    // 用户管理类API
+    user_management: [
+      'POST /api/v2/auth/login',
+      'POST /api/v2/auth/logout', 
+      'GET /api/v2/user/profile',
+      'PUT /api/v2/user/profile'
+    ],
     
-    Object.keys(modelAssociations).forEach(assocName => {
-      const association = modelAssociations[assocName];
-      if (association.as && !MODEL_ALIAS_CONSISTENCY[modelName]) {
-        console.warn(`⚠️ 模型${modelName}的关联${assocName}使用了别名${association.as}，但未在一致性规范中定义`);
-      }
+    // 库存管理类API（cursor_5.md中缺失）
+    inventory_management: [
+      'GET /api/v2/inventory/list',        // getUserInventory前端调用
+      'POST /api/v2/inventory/use',        // useInventoryItem前端调用
+      'POST /api/v2/inventory/transfer',   // transferInventoryItem前端调用
+      'POST /api/v2/inventory/generate-code' // 生成核销码
+    ],
+    
+    // 权限管理类API（cursor_10.md相关）
+    permission_management: [
+      'GET /api/v2/permissions/check',
+      'POST /api/v2/permissions/unlock',
+      'GET /api/v2/permissions/history'
+    ],
+    
+    // 聊天系统API（cursor_3.md和cursor_.md相关）
+    chat_system: [
+      'POST /api/v2/chat/session',
+      'POST /api/v2/chat/message', 
+      'GET /api/v2/chat/history',
+      'GET /api/v2/admin/chat/sessions',    // cursor_.md中实现
+      'POST /api/v2/admin/chat/sessions/:id/messages'
+    ]
+  },
+  
+  // API端点存在性验证
+  validateAPICompleteness: async (app) => {
+    const missingEndpoints = [];
+    const availableRoutes = extractRoutesFromApp(app);
+    
+    Object.entries(API_COMPLETENESS_VALIDATOR.requiredEndpoints).forEach(([category, endpoints]) => {
+      endpoints.forEach(endpoint => {
+        const [method, path] = endpoint.split(' ');
+        const routeExists = availableRoutes.some(route => 
+          route.method.toUpperCase() === method && route.path === path
+        );
+        
+        if (!routeExists) {
+          missingEndpoints.push({
+            category,
+            endpoint,
+            priority: getPriority(category),
+            suggestion: `需要实现 ${method} ${path} 接口`
+          });
+        }
+      });
     });
-  });
-}
-
-// 查询关联数据安全访问包装
-function safeAccessAssociation(record, modelName, assocName) {
-  try {
-    const alias = MODEL_ALIAS_CONSISTENCY[modelName][assocName];
-    if (alias && record[alias]) {
-      return record[alias];
-    } else if (record[assocName]) {
-      return record[assocName];
-    } else {
-      console.error(`❌ 关联数据访问失败：${modelName}.${assocName}，请检查别名配置`);
-      return null;
-    }
-  } catch (error) {
-    console.error(`❌ 关联数据访问异常：${error.message}`);
-    return null;
-  }
-}
-```
-
-### 数据库事务处理安全规范（解决事务回滚错误）
-
-#### 实际发现的事务处理错误
-从cursor_5.md深度分析发现的具体错误：
-- **"Transaction cannot be rolled back because it has been finished with state: commit"错误8次**：累计导致服务崩溃30-40分钟
-- **事务已提交但catch块仍试图回滚**：导致未处理的Promise拒绝15+次
-- **服务进程崩溃**：未处理的异常导致Node.js进程退出，影响用户使用
-- **上传功能完全失效**：事务错误导致拍照上传功能不可用
-
-#### 事务处理错误根本原因分析
-- **异步操作时序混乱**：try块中事务提交，catch块中仍试图回滚
-- **事务状态检查缺失**：未检查事务是否已完成就执行回滚操作
-- **错误处理机制不完善**：未捕获事务操作的异常，导致进程退出
-- **代码审查不足**：事务处理的典型错误模式未被识别
-
-#### 安全事务处理模式
-```javascript
-// 🔴 正确的事务处理模式（基于cursor_5.md实际错误修复）
-async function safeTransactionOperation(operation) {
-  let transaction = null;
-  const startTime = Date.now();
-  
-  try {
-    transaction = await sequelize.transaction();
-    console.log('🔄 事务开始，ID:', transaction.id);
     
-    // 执行业务逻辑
-    const result = await operation(transaction);
-    
-    // 🔴 重要：提交前检查事务状态
-    if (transaction && !transaction.finished) {
-      await transaction.commit();
-      console.log('✅ 事务提交成功，耗时:', Date.now() - startTime, 'ms');
-      transaction = null;  // 防止后续误用
+    if (missingEndpoints.length > 0) {
+      console.error('🔴 检测到缺失的API端点:');
+      missingEndpoints.forEach(missing => {
+        console.error(`   ❌ [${missing.category}] ${missing.endpoint} (优先级: ${missing.priority})`);
+      });
+      
+      // 🔴 基于cursor_5.md类似问题的处理建议
+      console.log('\n🔧 修复建议:');
+      console.log('1. 优先实现高优先级API端点');
+      console.log('2. 确保前端调用的API方法都有对应的后端实现');
+      console.log('3. 建立API端点的自动化测试');
+      
+      return { valid: false, missingEndpoints };
     }
     
-    return result;
-    
-  } catch (error) {
-    const errorTime = Date.now() - startTime;
-    console.error('❌ 事务执行失败，耗时:', errorTime, 'ms，错误:', error.message);
-    
-    // 🔴 关键修复：只有当事务还没有提交时才回滚
-    if (transaction && !transaction.finished) {
-      try {
-        await transaction.rollback();
-        console.log('🔙 事务回滚成功');
-      } catch (rollbackError) {
-        console.error('💥 事务回滚失败:', rollbackError.message);
-        // 记录严重错误但不再抛出，避免进程崩溃
-      }
-    } else {
-      console.warn('⚠️ 跳过事务回滚，事务已完成或不存在');
-    }
-    
-    throw error;
+    console.log('✅ API端点完整性检查通过');
+    return { valid: true, missingEndpoints: [] };
   }
-}
+};
 
-// 🔴 事务状态检查函数（基于实际错误场景完善）
-function isTransactionActive(transaction) {
-  try {
-    return transaction && 
-           !transaction.finished && 
-           transaction.connection && 
-           !transaction.connection._closing &&
-           transaction.options && 
-           transaction.options.transaction !== null;
-  } catch (error) {
-    console.warn('⚠️ 事务状态检查异常:', error.message);
-    return false;
-  }
-}
-
-// 事务状态详细诊断函数
-function diagnoseTransactionState(transaction) {
-  if (!transaction) {
-    return { status: 'null', canRollback: false, message: '事务对象为空' };
-  }
-  
-  const state = {
-    finished: transaction.finished,
-    committed: transaction.committed,
-    rolledBack: transaction.rolledBack,
-    connectionClosed: transaction.connection ? transaction.connection._closing : true
+function getPriority(category) {
+  const priorities = {
+    user_management: 'HIGH',
+    inventory_management: 'HIGH',
+    chat_system: 'MEDIUM', 
+    permission_management: 'MEDIUM'
   };
-  
-  if (state.finished) {
-    if (state.committed) {
-      return { status: 'committed', canRollback: false, message: '事务已提交，无法回滚' };
-    } else if (state.rolledBack) {
-      return { status: 'rolled_back', canRollback: false, message: '事务已回滚' };
-    }
-  }
-  
-  if (state.connectionClosed) {
-    return { status: 'connection_closed', canRollback: false, message: '数据库连接已关闭' };
-  }
-  
-  return { status: 'active', canRollback: true, message: '事务处于活跃状态，可以回滚' };
+  return priorities[category] || 'LOW';
 }
 ```
 
-#### 事务错误处理强制规范
+### API接口一致性强制要求
 ```javascript
-// 🔴 强制要求：所有事务操作必须使用安全包装
-const TRANSACTION_SAFETY_RULES = {
-  // 1. 提交后立即置空事务对象
-  after_commit: 'transaction = null',
+// 基于cursor_1.md中发现的路径不匹配问题
+const API_CONSISTENCY_ENFORCER = {
+  // 前后端路径映射规则
+  pathMappings: {
+    // cursor_.md中发现的实际映射需求
+    '/admin/chat/sessions': '/api/v2/admin/chat/sessions',
+    '/api/inventory': '/api/v2/inventory/list',
+    '/api/upload': '/api/v2/photo/upload',
+    '/api/auth/verify': '/api/v2/auth/verify'
+  },
   
-  // 2. 回滚前检查事务状态
-  before_rollback: 'if (transaction && !transaction.finished)',
+  // 自动生成兼容路由
+  generateCompatibilityRoutes: (app) => {
+    Object.entries(API_CONSISTENCY_ENFORCER.pathMappings).forEach(([oldPath, newPath]) => {
+      // 为旧路径创建重定向
+      app.all(oldPath, (req, res, next) => {
+        console.log(`🔄 API兼容重定向: ${oldPath} → ${newPath}`);
+        req.url = newPath;
+        next();
+      });
+      
+      console.log(`✅ 创建API兼容路由: ${oldPath} → ${newPath}`);
+    });
+  },
   
-  // 3. 回滚操作包装try-catch
-  rollback_safe: 'try { await transaction.rollback() } catch {}',
-  
-  // 4. 全局未处理Promise拒绝捕获
-  global_handler: 'process.on("unhandledRejection", handler)'
+  // 前端API方法补全检查
+  validateFrontendAPIMethod: (apiObject, methodName, expectedUrl) => {
+    if (typeof apiObject[methodName] !== 'function') {
+      console.error(`🔴 前端API方法缺失: ${methodName}`);
+      console.error(`   期望URL: ${expectedUrl}`);
+      
+      // 基于cursor_5.md问题的自动补全
+      apiObject[methodName] = async function(params = {}) {
+        const isGetRequest = expectedUrl.includes('list') || expectedUrl.includes('check');
+        
+        if (isGetRequest) {
+          const query = new URLSearchParams(params).toString();
+          return await request({
+            url: `${expectedUrl}?${query}`,
+            method: 'GET'
+          });
+        } else {
+          return await request({
+            url: expectedUrl,
+            method: 'POST',
+            data: params
+          });
+        }
+      };
+      
+      console.log(`✅ 自动补全API方法: ${methodName}`);
+    }
+  }
 };
 ```
 
-### WebSocket服务完整性规范（解决方法缺失问题）
+## WebSocket服务完整性规范
 
-#### 实际发现的WebSocket方法缺失
-从cursor_5.md深度分析发现的具体错误：
-- **`webSocketService.notifyMerchants is not a function`错误8次**：累计导致上传功能失败15-25分钟
-- **上传功能调用不存在的WebSocket方法**：每次上传都会因为通知方法缺失而报错
-- **WebSocket服务方法不完整**：缺少业务所需的商家通知、用户通知等关键方法
-- **通知功能完全失效**：商家无法收到新上传的通知，影响审核效率
-
-#### WebSocket方法缺失根本原因分析
-- **接口设计不完整**：WebSocket服务设计时未考虑所有业务场景
-- **业务需求变更**：新增功能需要通知机制，但未同步更新WebSocket服务
-- **模块间依赖不清晰**：上传模块依赖WebSocket的通知方法，但未明确定义接口
-- **测试覆盖不足**：缺少WebSocket方法存在性的单元测试
-
-#### WebSocket服务方法完整性要求
+### 基于cursor_3.md问题的WebSocket标准化
 ```javascript
-// 🔴 强制要求：WebSocket服务必须实现所有业务需要的方法
-// 基于cursor_5.md中发现的实际方法缺失问题
-class WebSocketService {
-  constructor() {
-    this.connections = new Map();
-    this.startTime = Date.now();
-    this.messageQueue = new Map(); // 离线消息队列
-  }
+// 🔴 基于cursor_3.md中发现的WebSocket被注释问题
+const WEBSOCKET_COMPLETENESS_VALIDATOR = {
+  // 必需的WebSocket方法
+  requiredMethods: {
+    // 聊天系统相关（cursor_3.md中缺失）
+    chat_methods: [
+      'notifyNewSession',      // 通知新会话 - 被注释导致功能缺失
+      'forwardChatMessage',    // 转发聊天消息
+      'broadcastToAdmins',     // 广播给管理员
+      'sendToUser',            // 发送给用户
+      'handleTyping'           // 处理输入状态
+    ],
+    
+    // 库存系统相关（cursor_5.md中缺失）
+    inventory_methods: [
+      'notifyMerchants',       // 通知商户 - cursor_5.md中发现缺失
+      'notifyInventoryUpdate', // 通知库存更新
+      'broadcastSystemMessage' // 广播系统消息
+    ],
+    
+    // 权限系统相关
+    permission_methods: [
+      'notifyPermissionChange', // 通知权限变更
+      'broadcastSpaceUnlock'    // 广播空间解锁
+    ]
+  },
   
-  // 🔴 必须实现：商家通知方法（解决notifyMerchants缺失问题）
-  notifyMerchants(message, merchantIds = null) {
-    const startTime = Date.now();
-    const notification = {
-      type: 'merchant_notification',
-      data: message,
-      timestamp: new Date().toISOString(),
-      messageId: `merchant_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
-    };
+  // WebSocket方法存在性检查
+  validateWebSocketMethods: (webSocketService) => {
+    const missingMethods = [];
     
-    let successCount = 0;
-    let failCount = 0;
+    Object.entries(WEBSOCKET_COMPLETENESS_VALIDATOR.requiredMethods).forEach(([category, methods]) => {
+      methods.forEach(methodName => {
+        if (typeof webSocketService[methodName] !== 'function') {
+          missingMethods.push({
+            category,
+            method: methodName,
+            errorExample: getErrorExample(methodName),
+            priority: getWebSocketPriority(category)
+          });
+        }
+      });
+    });
     
-    try {
-      if (merchantIds && Array.isArray(merchantIds)) {
-        merchantIds.forEach(id => {
-          const success = this.sendToUser(id, notification);
-          success ? successCount++ : failCount++;
+    if (missingMethods.length > 0) {
+      console.error('🔴 检测到缺失的WebSocket方法:');
+      missingMethods.forEach(missing => {
+        console.error(`   ❌ [${missing.category}] ${missing.method} (优先级: ${missing.priority})`);
+        if (missing.errorExample) {
+          console.error(`      错误示例: ${missing.errorExample}`);
+        }
+      });
+      
+      // 🔴 基于实际问题的修复建议
+      console.log('\n🔧 WebSocket修复建议:');
+      console.log('1. 检查WebSocket服务中被注释的方法调用');
+      console.log('2. 确保所有业务模块都有对应的WebSocket通知方法');
+      console.log('3. 实现缺失的WebSocket方法并进行测试');
+      
+      return { valid: false, missingMethods };
+    }
+    
+    console.log('✅ WebSocket方法完整性检查通过');
+    return { valid: true, missingMethods: [] };
+  },
+  
+  // 自动生成缺失的WebSocket方法
+  generateMissingMethods: (webSocketService, missingMethods) => {
+    missingMethods.forEach(missing => {
+      const methodName = missing.method;
+      
+      console.log(`🔧 自动生成WebSocket方法: ${methodName}`);
+      
+      webSocketService[methodName] = function(...args) {
+        console.log(`📡 WebSocket方法调用: ${methodName}`, args);
+        
+        // 基于方法名自动实现基础功能
+        if (methodName.startsWith('notify')) {
+          // 通知类方法
+          const [target, message] = args;
+          return this.sendToConnection(target, {
+            type: 'notification',
+            data: message,
+            timestamp: new Date().toISOString()
+          });
+        } else if (methodName.startsWith('broadcast')) {
+          // 广播类方法
+          const [message] = args;
+          return this.broadcastMessage({
+            type: 'broadcast',
+            data: message,
+            timestamp: new Date().toISOString()
+          });
+        } else {
+          // 其他方法
+          console.warn(`⚠️ ${methodName} 需要手动实现具体逻辑`);
+          return Promise.resolve();
+        }
+      };
+    });
+  }
+};
+
+function getErrorExample(methodName) {
+  const examples = {
+    'notifyMerchants': 'TypeError: webSocketService.notifyMerchants is not a function',
+    'notifyNewSession': '// webSocketService.notifyNewSession(session) - 被注释',
+    'forwardChatMessage': 'WebSocket消息转发失败',
+    'broadcastToAdmins': '管理员通知发送失败'
+  };
+  return examples[methodName] || null;
+}
+
+function getWebSocketPriority(category) {
+  const priorities = {
+    chat_methods: 'HIGH',
+    inventory_methods: 'HIGH',
+    permission_methods: 'MEDIUM'
+  };
+  return priorities[category] || 'LOW';
+}
+```
+
+## 数据库事务安全规范
+
+### 基于cursor_5.md事务错误的安全模式
+```javascript
+// 🔴 基于cursor_5.md中发现的事务回滚问题
+const DATABASE_TRANSACTION_SAFETY = {
+  // 安全事务执行模式
+  safeTransactionExecute: async (operation, options = {}) => {
+    const { 
+      maxRetries = 3, 
+      timeout = 30000,
+      isolationLevel = 'READ_COMMITTED'
+    } = options;
+    
+    let transaction = null;
+    let attempt = 0;
+    
+    while (attempt < maxRetries) {
+      try {
+        // 创建事务
+        transaction = await sequelize.transaction({
+          isolationLevel: sequelize.Transaction.ISOLATION_LEVELS[isolationLevel]
         });
-      } else {
-        const result = this.broadcastToMerchants(notification);
-        successCount = result.success;
-        failCount = result.failed;
+        
+        console.log(`🔄 开始事务 (尝试 ${attempt + 1}/${maxRetries})`);
+        
+        // 设置事务超时
+        const timeoutPromise = new Promise((_, reject) => {
+          setTimeout(() => reject(new Error('Transaction timeout')), timeout);
+        });
+        
+        // 执行业务操作
+        const operationPromise = operation(transaction);
+        
+        const result = await Promise.race([operationPromise, timeoutPromise]);
+        
+        // 🔴 检查事务状态，避免cursor_5.md中的重复提交问题
+        if (transaction.finished) {
+          console.warn('⚠️ 事务已完成，跳过提交操作');
+          return result;
+        }
+        
+        // 提交事务
+        await transaction.commit();
+        console.log('✅ 事务提交成功');
+        
+        return result;
+        
+      } catch (error) {
+        attempt++;
+        
+        // 🔴 安全的事务回滚，避免"已完成事务"错误
+        if (transaction && !transaction.finished) {
+          try {
+            await transaction.rollback();
+            console.log('🔄 事务已回滚');
+          } catch (rollbackError) {
+            console.error('❌ 事务回滚失败:', rollbackError.message);
+          }
+        } else if (transaction && transaction.finished) {
+          console.log('ℹ️ 事务已完成，无需回滚');
+        }
+        
+        // 分析错误类型
+        const errorType = analyzeTransactionError(error);
+        
+        if (errorType.retryable && attempt < maxRetries) {
+          const delay = Math.min(1000 * Math.pow(2, attempt), 5000);
+          console.log(`⏰ 事务失败，${delay}ms后重试 (${errorType.reason})`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+          continue;
+        } else {
+          console.error(`❌ 事务最终失败: ${error.message}`);
+          throw new Error(`事务执行失败 (尝试${attempt}次): ${error.message}`);
+        }
+      }
+    }
+  },
+  
+  // 事务状态检查包装器
+  withTransactionCheck: (operation) => {
+    return async (transaction) => {
+      // 检查事务是否仍然有效
+      if (transaction.finished) {
+        throw new Error('Transaction has already been committed or rolled back');
       }
       
-      const duration = Date.now() - startTime;
-      console.log(`✅ 商家通知发送完成，成功:${successCount}，失败:${failCount}，耗时:${duration}ms`);
+      // 执行操作
+      const result = await operation(transaction);
       
-      return { success: successCount, failed: failCount, duration };
-    } catch (error) {
-      console.error('❌ 商家通知发送失败:', error.message);
-      throw error;
-    }
-  }
-  
-  // 🔴 必须实现：用户通知方法
-  notifyUser(userId, message) {
-    const startTime = Date.now();
-    const notification = {
-      type: 'user_notification',
-      data: message,
-      timestamp: new Date().toISOString(),
-      messageId: `user_${userId}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
-    };
-    
-    try {
-      const success = this.sendToUser(userId, notification);
-      const duration = Date.now() - startTime;
-      
-      if (success) {
-        console.log(`✅ 用户通知发送成功，用户:${userId}，耗时:${duration}ms`);
-      } else {
-        console.warn(`⚠️ 用户通知发送失败，用户:${userId}，添加到离线队列`);
-        this.addToOfflineQueue(userId, notification);
+      // 再次检查事务状态
+      if (transaction.finished) {
+        console.warn('⚠️ 操作执行期间事务已完成');
       }
       
-      return success;
-    } catch (error) {
-      console.error(`❌ 用户通知发送异常，用户:${userId}，错误:${error.message}`);
-      this.addToOfflineQueue(userId, notification);
-      return false;
-    }
-  }
-  
-  // 🔴 必须实现：系统广播方法
-  broadcastSystemMessage(message) {
-    const startTime = Date.now();
-    const notification = {
-      type: 'system_broadcast',
-      data: message,
-      timestamp: new Date().toISOString(),
-      messageId: `system_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
-    };
-    
-    try {
-      const result = this.broadcast(notification);
-      const duration = Date.now() - startTime;
-      console.log(`📢 系统广播完成，发送:${result.total}，成功:${result.success}，失败:${result.failed}，耗时:${duration}ms`);
       return result;
-    } catch (error) {
-      console.error('❌ 系统广播失败:', error.message);
-      throw error;
-    }
+    };
+  }
+};
+
+// 事务错误分析器
+function analyzeTransactionError(error) {
+  const errorMessage = error.message.toLowerCase();
+  
+  // 基于cursor_5.md中实际发现的错误模式
+  if (errorMessage.includes('transaction cannot be rolled back') || 
+      errorMessage.includes('has been finished')) {
+    return { 
+      retryable: false, 
+      reason: 'transaction_already_finished',
+      solution: '检查代码中是否有重复的事务操作'
+    };
   }
   
-  // 🔴 必须实现：健康检查方法
-  isHealthy() {
-    try {
-      const uptime = Date.now() - this.startTime;
-      const connectionCount = this.getConnectionCount();
-      const memoryUsage = process.memoryUsage();
-      
-      return {
-        status: 'running',
-        connections: connectionCount,
-        uptime: Math.floor(uptime / 1000), // 秒
-        memory: {
-          used: Math.round(memoryUsage.heapUsed / 1024 / 1024), // MB
-          total: Math.round(memoryUsage.heapTotal / 1024 / 1024) // MB
-        },
-        timestamp: new Date().toISOString()
-      };
-    } catch (error) {
-      console.error('❌ WebSocket健康检查失败:', error.message);
-      return {
-        status: 'error',
-        error: error.message,
-        timestamp: new Date().toISOString()
-      };
-    }
+  if (errorMessage.includes('deadlock') || errorMessage.includes('lock')) {
+    return { 
+      retryable: true, 
+      reason: 'database_deadlock',
+      solution: '实施指数退避重试'
+    };
   }
   
-  // 🔴 新增：离线消息队列管理
-  addToOfflineQueue(userId, message) {
-    if (!this.messageQueue.has(userId)) {
-      this.messageQueue.set(userId, []);
-    }
+  if (errorMessage.includes('timeout') || errorMessage.includes('connection')) {
+    return { 
+      retryable: true, 
+      reason: 'connection_timeout',
+      solution: '检查网络连接和数据库状态'
+    };
+  }
+  
+  if (errorMessage.includes('constraint') || errorMessage.includes('duplicate')) {
+    return { 
+      retryable: false, 
+      reason: 'data_constraint_violation',
+      solution: '检查数据完整性约束'
+    };
+  }
+  
+  return { 
+    retryable: true, 
+    reason: 'unknown_error',
+    solution: '通用重试策略'
+  };
+}
+```
+
+### 数据库模型关联标准化
+```javascript
+// 基于cursor_3.md中发现的模型关联问题
+const MODEL_ASSOCIATION_VALIDATOR = {
+  // 标准关联配置
+  standardAssociations: {
+    User: {
+      hasMany: [
+        { model: 'UserInventory', as: 'inventoryItems', foreignKey: 'user_id' },
+        { model: 'CustomerSession', as: 'chatSessions', foreignKey: 'user_id' },
+        { model: 'ChatMessage', as: 'sentMessages', foreignKey: 'sender_id' }
+      ],
+      belongsTo: []
+    },
     
-    const userQueue = this.messageQueue.get(userId);
-    userQueue.push({
-      ...message,
-      queuedAt: new Date().toISOString()
+    CustomerSession: {
+      belongsTo: [
+        { model: 'User', as: 'user', foreignKey: 'user_id' },
+        { model: 'User', as: 'admin', foreignKey: 'admin_id' }
+      ],
+      hasMany: [
+        { model: 'ChatMessage', as: 'messages', foreignKey: 'session_id' }
+      ]
+    },
+    
+    ChatMessage: {
+      belongsTo: [
+        { model: 'CustomerSession', as: 'session', foreignKey: 'session_id' },
+        { model: 'User', as: 'sender', foreignKey: 'sender_id' }
+      ]
+    }
+  },
+  
+  // 验证模型关联配置
+  validateAssociations: (models) => {
+    const issues = [];
+    
+    Object.entries(MODEL_ASSOCIATION_VALIDATOR.standardAssociations).forEach(([modelName, associations]) => {
+      const model = models[modelName];
+      
+      if (!model) {
+        issues.push({
+          type: 'MISSING_MODEL',
+          model: modelName,
+          message: `模型 ${modelName} 不存在`
+        });
+        return;
+      }
+      
+      // 检查hasMany关联
+      associations.hasMany?.forEach(assoc => {
+        const associationExists = model.associations[assoc.as];
+        if (!associationExists) {
+          issues.push({
+            type: 'MISSING_ASSOCIATION',
+            model: modelName,
+            association: assoc,
+            message: `缺少 hasMany 关联: ${modelName}.${assoc.as} -> ${assoc.model}`
+          });
+        }
+      });
+      
+      // 检查belongsTo关联
+      associations.belongsTo?.forEach(assoc => {
+        const associationExists = model.associations[assoc.as];
+        if (!associationExists) {
+          issues.push({
+            type: 'MISSING_ASSOCIATION',
+            model: modelName,
+            association: assoc,
+            message: `缺少 belongsTo 关联: ${modelName}.${assoc.as} -> ${assoc.model}`
+          });
+        }
+      });
     });
     
-    // 限制队列长度，避免内存泄漏
-    if (userQueue.length > 100) {
-      userQueue.shift(); // 移除最旧的消息
+    if (issues.length > 0) {
+      console.error('🔴 检测到模型关联问题:');
+      issues.forEach(issue => {
+        console.error(`   ❌ ${issue.message}`);
+      });
+      
+      return { valid: false, issues };
     }
+    
+    console.log('✅ 模型关联验证通过');
+    return { valid: true, issues: [] };
   }
+};
+```
+
+## 配置管理和环境变量规范
+
+### 基于cursor_9.md的配置完整性检查
+```javascript
+// 🔴 基于cursor_9.md中发现的.env配置缺失问题
+const CONFIG_COMPLETENESS_VALIDATOR = {
+  // 必需的环境变量
+  requiredEnvVars: {
+    // 数据库配置
+    database: [
+      'DB_HOST',
+      'DB_PORT', 
+      'DB_NAME',
+      'DB_USER',
+      'DB_PASSWORD'
+    ],
+    
+    // 服务配置
+    server: [
+      'PORT',
+      'NODE_ENV',
+      'JWT_SECRET'
+    ],
+    
+    // 第三方服务配置
+    external_services: [
+      'REDIS_URL',
+      'SEALOS_ACCESS_KEY',
+      'SEALOS_SECRET_KEY'
+    ],
+    
+    // WebSocket配置
+    websocket: [
+      'WS_PORT',
+      'WS_PATH'
+    ]
+  },
   
-  // 🔴 新增：发送离线消息
-  sendOfflineMessages(userId) {
-    const userQueue = this.messageQueue.get(userId);
-    if (!userQueue || userQueue.length === 0) {
-      return 0;
+  // 环境变量存在性检查
+  validateEnvironmentVariables: () => {
+    const missingVars = [];
+    
+    Object.entries(CONFIG_COMPLETENESS_VALIDATOR.requiredEnvVars).forEach(([category, vars]) => {
+      vars.forEach(varName => {
+        if (!process.env[varName]) {
+          missingVars.push({
+            category,
+            variable: varName,
+            priority: getEnvVarPriority(varName)
+          });
+        }
+      });
+    });
+    
+    if (missingVars.length > 0) {
+      console.error('🔴 检测到缺失的环境变量:');
+      missingVars.forEach(missing => {
+        console.error(`   ❌ [${missing.category}] ${missing.variable} (优先级: ${missing.priority})`);
+      });
+      
+      // 🔴 基于cursor_9.md问题的修复建议
+      console.log('\n🔧 环境变量修复建议:');
+      console.log('1. 检查 .env 文件是否存在');
+      console.log('2. 从 .env.example 复制模板配置');
+      console.log('3. 设置正确的数据库连接信息');
+      console.log('4. 配置必要的第三方服务密钥');
+      
+      return { valid: false, missingVars };
     }
     
-    let sentCount = 0;
-    const messages = [...userQueue]; // 复制数组
+    console.log('✅ 环境变量完整性检查通过');
+    return { valid: true, missingVars: [] };
+  },
+  
+  // 自动生成.env模板
+  generateEnvTemplate: () => {
+    const template = `# 数据库配置
+DB_HOST=localhost
+DB_PORT=3306
+DB_NAME=restaurant_lottery
+DB_USER=root
+DB_PASSWORD=your_password
+
+# 服务配置
+PORT=3000
+NODE_ENV=development
+JWT_SECRET=your_jwt_secret_here
+
+# Redis配置
+REDIS_URL=redis://localhost:6379
+
+# Sealos对象存储配置
+SEALOS_ACCESS_KEY=your_access_key
+SEALOS_SECRET_KEY=your_secret_key
+
+# WebSocket配置
+WS_PORT=3000
+WS_PATH=/ws
+`;
     
-    messages.forEach(message => {
-      if (this.sendToUser(userId, message)) {
-        sentCount++;
+    console.log('📄 .env 配置模板:');
+    console.log(template);
+    
+    return template;
+  }
+};
+
+function getEnvVarPriority(varName) {
+  const highPriority = ['DB_HOST', 'DB_PASSWORD', 'JWT_SECRET', 'PORT'];
+  const mediumPriority = ['NODE_ENV', 'REDIS_URL', 'WS_PORT'];
+  
+  if (highPriority.includes(varName)) return 'HIGH';
+  if (mediumPriority.includes(varName)) return 'MEDIUM';
+  return 'LOW';
+}
+```
+
+## 依赖管理和版本控制规范
+
+### package.json完整性和版本兼容性检查
+```javascript
+// 基于多个cursor文档中发现的依赖问题
+const DEPENDENCY_VALIDATOR = {
+  // 核心依赖版本要求
+  coreDependencies: {
+    production: {
+      'express': '^4.18.0',
+      'sequelize': '^6.35.0',
+      'mysql2': '^3.6.0',
+      'socket.io': '^4.7.0',
+      'jsonwebtoken': '^9.0.0',
+      'bcryptjs': '^2.4.3',
+      'cors': '^2.8.5',
+      'dotenv': '^16.3.0'
+    },
+    
+    development: {
+      'nodemon': '^3.0.0',
+      'jest': '^29.7.0',
+      'supertest': '^6.3.0',
+      'eslint': '^8.50.0',
+      'prettier': '^3.0.0'
+    }
+  },
+  
+  // 检查依赖完整性
+  validateDependencies: (packageJson) => {
+    const issues = [];
+    
+    // 检查生产依赖
+    Object.entries(DEPENDENCY_VALIDATOR.coreDependencies.production).forEach(([pkg, requiredVersion]) => {
+      const installedVersion = packageJson.dependencies?.[pkg];
+      
+      if (!installedVersion) {
+        issues.push({
+          type: 'MISSING_DEPENDENCY',
+          package: pkg,
+          requiredVersion,
+          category: 'production'
+        });
+      } else if (!isVersionCompatible(installedVersion, requiredVersion)) {
+        issues.push({
+          type: 'VERSION_INCOMPATIBLE',
+          package: pkg,
+          installedVersion,
+          requiredVersion,
+          category: 'production'
+        });
       }
     });
     
-    // 清空已发送的消息
-    this.messageQueue.set(userId, []);
-    console.log(`📨 离线消息发送完成，用户:${userId}，发送:${sentCount}/${messages.length}`);
+    // 检查开发依赖
+    Object.entries(DEPENDENCY_VALIDATOR.coreDependencies.development).forEach(([pkg, requiredVersion]) => {
+      const installedVersion = packageJson.devDependencies?.[pkg];
+      
+      if (!installedVersion) {
+        issues.push({
+          type: 'MISSING_DEV_DEPENDENCY',
+          package: pkg,
+          requiredVersion,
+          category: 'development'
+        });
+      }
+    });
     
-    return sentCount;
-  }
-}
-```
-
-#### WebSocket方法调用前验证规范
-```javascript
-// 🔴 强制要求：调用WebSocket方法前必须验证方法存在性
-// 基于cursor_5.md中"notifyMerchants is not a function"错误的预防机制
-function safeWebSocketCall(service, methodName, ...args) {
-  const startTime = Date.now();
-  
-  // 1. 服务存在性检查
-  if (!service) {
-    console.error(`❌ WebSocket服务未初始化，方法调用失败: ${methodName}`);
-    return { success: false, error: 'service_not_initialized', duration: Date.now() - startTime };
-  }
-  
-  // 2. 方法存在性检查
-  if (typeof service[methodName] !== 'function') {
-    const availableMethods = Object.getOwnPropertyNames(service)
-      .filter(name => typeof service[name] === 'function')
-      .filter(name => !name.startsWith('_')); // 过滤私有方法
-    
-    console.error(`❌ WebSocket方法不存在: ${methodName}`);
-    console.log(`📋 可用方法列表: ${availableMethods.join(', ')}`);
-    console.log(`💡 建议检查方法名拼写或添加缺失的方法实现`);
-    
-    return { 
-      success: false, 
-      error: 'method_not_found', 
-      availableMethods, 
-      duration: Date.now() - startTime 
-    };
-  }
-  
-  // 3. 参数合法性检查
-  if (methodName === 'notifyMerchants' && args.length === 0) {
-    console.error(`❌ notifyMerchants方法缺少必需的message参数`);
-    return { success: false, error: 'missing_required_params', duration: Date.now() - startTime };
-  }
-  
-  if (methodName === 'notifyUser' && (!args[0] || !args[1])) {
-    console.error(`❌ notifyUser方法缺少必需的userId或message参数`);
-    return { success: false, error: 'missing_required_params', duration: Date.now() - startTime };
-  }
-  
-  // 4. 安全执行方法
-  try {
-    console.log(`🔄 调用WebSocket方法: ${methodName}，参数数量: ${args.length}`);
-    const result = service[methodName](mdc:...args);
-    const duration = Date.now() - startTime;
-    
-    console.log(`✅ WebSocket方法调用成功: ${methodName}，耗时: ${duration}ms`);
-    
-    return { 
-      success: true, 
-      result, 
-      duration 
-    };
-  } catch (error) {
-    const duration = Date.now() - startTime;
-    console.error(`❌ WebSocket方法调用失败: ${methodName}，错误: ${error.message}，耗时: ${duration}ms`);
-    
-    return { 
-      success: false, 
-      error: error.message, 
-      stack: error.stack,
-      duration 
-    };
-  }
-}
-
-// 🔴 WebSocket方法存在性预检查
-function validateWebSocketService(service) {
-  const requiredMethods = [
-    'notifyMerchants',
-    'notifyUser', 
-    'broadcastSystemMessage',
-    'isHealthy',
-    'sendToUser',
-    'broadcast'
-  ];
-  
-  const missingMethods = [];
-  const errors = [];
-  
-  if (!service) {
-    return { 
-      valid: false, 
-      error: 'WebSocket服务未初始化',
-      missingMethods: requiredMethods 
-    };
-  }
-  
-  requiredMethods.forEach(methodName => {
-    if (typeof service[methodName] !== 'function') {
-      missingMethods.push(methodName);
-      errors.push(`缺少方法: ${methodName}`);
+    if (issues.length > 0) {
+      console.error('🔴 检测到依赖问题:');
+      issues.forEach(issue => {
+        console.error(`   ❌ ${issue.type}: ${issue.package} (${issue.category})`);
+        if (issue.requiredVersion) {
+          console.error(`      需要: ${issue.requiredVersion}, 当前: ${issue.installedVersion || '未安装'}`);
+        }
+      });
+      
+      return { valid: false, issues };
     }
-  });
-  
-  if (missingMethods.length > 0) {
-    console.error('❌ WebSocket服务方法不完整:');
-    errors.forEach(error => console.error(`  - ${error}`));
     
-    return {
-      valid: false,
-      missingMethods,
-      errors,
-      availableMethods: Object.getOwnPropertyNames(service).filter(name => typeof service[name] === 'function')
-    };
+    console.log('✅ 依赖完整性检查通过');
+    return { valid: true, issues: [] };
   }
+};
+
+function isVersionCompatible(installed, required) {
+  // 简化的版本兼容性检查
+  const installedClean = installed.replace(/[\^~]/, '');
+  const requiredClean = required.replace(/[\^~]/, '');
   
-  console.log('✅ WebSocket服务方法完整性检查通过');
-  return { valid: true, errors: [] };
-}
-
-// 使用示例（基于实际错误场景）
-const uploadNotificationResult = safeWebSocketCall(webSocketService, 'notifyMerchants', {
-  type: 'new_upload',
-  message: '有新的图片上传待审核',
-  uploadId: 'upload_123456',
-  userId: 31,
-  timestamp: new Date().toISOString()
-});
-
-if (!uploadNotificationResult.success) {
-  console.error('上传通知发送失败，原因:', uploadNotificationResult.error);
-  // 可以实现降级策略，如发送邮件通知等
+  return installedClean >= requiredClean;
 }
 ```
 
-### 配置管理和文档一致性规范
+## 综合开发质量检查器
 
-#### 统一配置管理强制要求
-- **禁止硬编码域名配置**：所有域名配置必须通过环境变量管理，禁止在代码中硬编码domain.com、localhost等地址
-- **配置验证机制**：启动时必须验证所有关键配置项，包括域名、端口、数据库连接等
-- **环境配置分离**：严格区分开发、测试、生产环境配置，避免配置混合使用
-- **配置文件集中管理**：建立统一的配置管理文件，避免配置分散在多个文件中
+### 集成所有检查项的统一验证器
+```javascript
+// 基于所有cursor文档问题的综合检查器
+const COMPREHENSIVE_QUALITY_CHECKER = {
+  // 执行所有质量检查
+  runAllChecks: async (context) => {
+    console.log('🔍 开始执行综合开发质量检查...');
+    
+    const results = {
+      timestamp: new Date().toISOString(),
+      checks: {},
+      overallScore: 0,
+      issues: [],
+      recommendations: []
+    };
+    
+    // 1. API完整性检查
+    try {
+      const apiCheck = await API_COMPLETENESS_VALIDATOR.validateAPICompleteness(context.app);
+      results.checks.api_completeness = apiCheck;
+      if (!apiCheck.valid) {
+        results.issues.push(...apiCheck.missingEndpoints.map(e => ({
+          type: 'API_MISSING',
+          severity: 'HIGH',
+          message: `缺失API端点: ${e.endpoint}`
+        })));
+      }
+    } catch (error) {
+      results.checks.api_completeness = { error: error.message };
+    }
+    
+    // 2. WebSocket完整性检查
+    try {
+      const wsCheck = WEBSOCKET_COMPLETENESS_VALIDATOR.validateWebSocketMethods(context.webSocketService);
+      results.checks.websocket_completeness = wsCheck;
+      if (!wsCheck.valid) {
+        results.issues.push(...wsCheck.missingMethods.map(m => ({
+          type: 'WEBSOCKET_MISSING',
+          severity: 'HIGH',
+          message: `缺失WebSocket方法: ${m.method}`
+        })));
+      }
+    } catch (error) {
+      results.checks.websocket_completeness = { error: error.message };
+    }
+    
+    // 3. 环境变量检查
+    try {
+      const envCheck = CONFIG_COMPLETENESS_VALIDATOR.validateEnvironmentVariables();
+      results.checks.environment_variables = envCheck;
+      if (!envCheck.valid) {
+        results.issues.push(...envCheck.missingVars.map(v => ({
+          type: 'ENV_VAR_MISSING',
+          severity: v.priority === 'HIGH' ? 'HIGH' : 'MEDIUM',
+          message: `缺失环境变量: ${v.variable}`
+        })));
+      }
+    } catch (error) {
+      results.checks.environment_variables = { error: error.message };
+    }
+    
+    // 4. 依赖检查
+    try {
+      const depCheck = DEPENDENCY_VALIDATOR.validateDependencies(context.packageJson);
+      results.checks.dependencies = depCheck;
+      if (!depCheck.valid) {
+        results.issues.push(...depCheck.issues.map(i => ({
+          type: 'DEPENDENCY_ISSUE',
+          severity: i.category === 'production' ? 'HIGH' : 'MEDIUM',
+          message: `依赖问题: ${i.package} - ${i.type}`
+        })));
+      }
+    } catch (error) {
+      results.checks.dependencies = { error: error.message };
+    }
+    
+    // 计算综合评分
+    const totalChecks = Object.keys(results.checks).length;
+    const passedChecks = Object.values(results.checks).filter(check => check.valid).length;
+    results.overallScore = Math.round((passedChecks / totalChecks) * 100);
+    
+    // 生成建议
+    results.recommendations = generateQualityRecommendations(results);
+    
+    // 输出报告
+    COMPREHENSIVE_QUALITY_CHECKER.generateQualityReport(results);
+    
+    return results;
+  },
+  
+  // 生成质量报告
+  generateQualityReport: (results) => {
+    console.log('\n📊 === 开发质量检查报告 ===');
+    console.log(`总体评分: ${results.overallScore}/100`);
+    console.log(`检查时间: ${results.timestamp}`);
+    
+    // 按严重程度分组显示问题
+    const issuesBySeverity = groupBy(results.issues, 'severity');
+    
+    if (issuesBySeverity.HIGH?.length > 0) {
+      console.log('\n🔴 高严重程度问题:');
+      issuesBySeverity.HIGH.forEach(issue => {
+        console.log(`   ❌ ${issue.message}`);
+      });
+    }
+    
+    if (issuesBySeverity.MEDIUM?.length > 0) {
+      console.log('\n🟡 中等严重程度问题:');
+      issuesBySeverity.MEDIUM.forEach(issue => {
+        console.log(`   ⚠️ ${issue.message}`);
+      });
+    }
+    
+    if (results.recommendations.length > 0) {
+      console.log('\n💡 改进建议:');
+      results.recommendations.forEach((rec, index) => {
+        console.log(`   ${index + 1}. ${rec}`);
+      });
+    }
+    
+    // 评级
+    let grade = 'F';
+    if (results.overallScore >= 90) grade = 'A';
+    else if (results.overallScore >= 80) grade = 'B';
+    else if (results.overallScore >= 70) grade = 'C';
+    else if (results.overallScore >= 60) grade = 'D';
+    
+    console.log(`\n🏆 质量评级: ${grade}`);
+  }
+};
 
-#### 文档域名配置一致性检查
-- **部署后文档同步更新**：任何域名变更后必须同步更新所有相关文档
-- **占位符域名检测**：建立自动检测机制，发现并修复文档中的占位符域名（domain.com、your-domain.com等）
-- **WebSocket地址一致性**：确保所有文档中的WebSocket连接地址与实际部署保持一致
-- **API端点配置统一**：所有接口文档中的API端点必须与后端实际路由保持一致
+function generateQualityRecommendations(results) {
+  const recommendations = [];
+  
+  if (results.overallScore < 70) {
+    recommendations.push('代码质量需要显著改进，建议优先解决高严重程度问题');
+  }
+  
+  const apiIssues = results.issues.filter(i => i.type === 'API_MISSING');
+  if (apiIssues.length > 0) {
+    recommendations.push('优先实现缺失的API端点，确保前后端接口一致性');
+  }
+  
+  const wsIssues = results.issues.filter(i => i.type === 'WEBSOCKET_MISSING');
+  if (wsIssues.length > 0) {
+    recommendations.push('实现缺失的WebSocket方法，确保实时通信功能完整');
+  }
+  
+  const envIssues = results.issues.filter(i => i.type === 'ENV_VAR_MISSING');
+  if (envIssues.length > 0) {
+    recommendations.push('配置缺失的环境变量，建立完整的配置管理');
+  }
+  
+  return recommendations;
+}
 
-#### 配置错误预防机制
-- **配置模板标准化**：建立标准化的配置模板，避免手动输入错误
-- **配置检查清单**：部署前必须执行配置检查清单，验证所有配置项正确性
-- **配置变更影响评估**：配置变更前必须评估对前端、文档、接口的影响范围
-- **配置回滚机制**：重要配置变更必须有回滚方案和验证流程
-
-**核心原则**：配置统一管理、文档实时同步、自动化检测、预防优于修复
+function groupBy(array, key) {
+  return array.reduce((groups, item) => {
+    const group = item[key];
+    groups[group] = groups[group] || [];
+    groups[group].push(item);
+    return groups;
+  }, {});
+}

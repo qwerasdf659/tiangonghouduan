@@ -11,7 +11,7 @@ let instance = null
  * 获取WebSocket服务实例
  * @returns {WebSocketService} WebSocket服务实例
  */
-function getInstance() {
+function getInstance () {
   if (!instance) {
     instance = new WebSocketService()
   }
@@ -22,7 +22,7 @@ function getInstance() {
  * 设置WebSocket服务实例（主要用于app.js初始化时设置）
  * @param {WebSocketService} serviceInstance - WebSocket服务实例
  */
-function setInstance(serviceInstance) {
+function setInstance (serviceInstance) {
   instance = serviceInstance
 }
 
@@ -30,7 +30,7 @@ function setInstance(serviceInstance) {
  * 检查实例是否已初始化
  * @returns {boolean} 是否已初始化
  */
-function isInitialized() {
+function isInitialized () {
   return instance !== null
 }
 
@@ -38,4 +38,4 @@ module.exports = {
   getInstance,
   setInstance,
   isInitialized
-} 
+}

@@ -38,8 +38,8 @@ module.exports = sequelize => {
 
       max_sessions: {
         type: DataTypes.INTEGER,
-        defaultValue: 5,
-        comment: '最大处理会话数'
+        defaultValue: 9999999,
+        comment: '最大处理会话数（9999999表示无限制）'
       },
 
       last_active_at: {
@@ -88,7 +88,8 @@ module.exports = sequelize => {
   }
 
   AdminStatus.prototype.isAvailable = function () {
-    return this.status === 'online' && this.current_sessions < this.max_sessions
+    // 🔧 修改：在线的管理员总是可用（无会话数限制）
+    return this.status === 'online'
   }
 
   AdminStatus.prototype.canTakeNewSession = function () {
@@ -124,7 +125,10 @@ module.exports = sequelize => {
           attributes: ['user_id', 'nickname', 'avatar_url']
         }
       ],
-      order: [['current_sessions', 'ASC'], ['last_active_at', 'ASC']]
+      order: [
+        ['current_sessions', 'ASC'],
+        ['last_active_at', 'ASC']
+      ]
     })
   }
 
@@ -141,7 +145,7 @@ module.exports = sequelize => {
         }
       ],
       order: [
-        [sequelize.literal('current_sessions < max_sessions'), 'DESC'],
+        // 🔧 修改：去除max_sessions限制，只按会话数排序
         ['current_sessions', 'ASC'],
         ['last_active_at', 'ASC']
       ]
@@ -155,7 +159,7 @@ module.exports = sequelize => {
         admin_id: adminId,
         status: 'offline',
         current_sessions: 0,
-        max_sessions: 5,
+        max_sessions: 9999999,
         last_active_at: new Date()
       }
     })

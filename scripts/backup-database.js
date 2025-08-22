@@ -81,7 +81,8 @@ function cleanOldBackups () {
       return
     }
 
-    const files = fs.readdirSync(backupDir)
+    const files = fs
+      .readdirSync(backupDir)
       .filter(file => file.startsWith('backup_') && file.endsWith('.sql'))
       .map(file => ({
         name: file,

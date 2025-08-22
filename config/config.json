@@ -25,7 +25,7 @@
   "production": {
     "host": "dbconn.sealosbja.site",
     "port": 42182,
-    "username": "root", 
+    "username": "root",
     "password": "mc6r9cgb",
     "database": "restaurant_points_prod",
     "dialect": "mysql",
@@ -45,4 +45,4 @@
       "freezeTableName": true
     }
   }
-} 
+}

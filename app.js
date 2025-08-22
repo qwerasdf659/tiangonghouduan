@@ -1,720 +1,460 @@
+/**
+ * 餐厅积分抽奖系统 V3.0 - 主应用入口
+ * 创建时间：2025年01月21日 UTC
+ * 架构：分离式微服务架构
+ * 技术栈：Node.js 20+ + Express + MySQL + Sequelize + Redis
+ */
+
+'use strict'
+
 const express = require('express')
 const cors = require('cors')
 const helmet = require('helmet')
 const compression = require('compression')
 const rateLimit = require('express-rate-limit')
+require('dotenv').config()
 
-// 数据库连接
-const { sequelize } = require('./models')
-
-// 路由
-const authRouter = require('./routes/v2/auth')
-const userRouter = require('./routes/v2/user')
-const resourcesRouter = require('./routes/v2/resources')
-const lotteryRouter = require('./routes/v2/lottery')
-const exchangeRouter = require('./routes/v2/exchange')
-const tradeRouter = require('./routes/v2/trade')
-const uploadsRouter = require('./routes/v2/uploads')
-const inventoryRouter = require('./routes/v2/inventory')
-const transactionsRouter = require('./routes/v2/transactions')
-const permissionsRouter = require('./routes/v2/permissions')
-const adminRouter = require('./routes/v2/admin')
-const chatRouter = require('./routes/v2/chat')
-
-// 工具类和中间件
-const ApiResponse = require('./utils/ApiResponse')
-const { authenticateToken, requireAdmin } = require('./middleware/auth')
-
-// WebSocket服务单例
-const WebSocketService = require('./services/WebSocketService')
-const WebSocketServiceSingleton = require('./services/WebSocketServiceSingleton')
-const webSocketService = new WebSocketService()
-
-// 将实例设置到单例管理器中
-WebSocketServiceSingleton.setInstance(webSocketService)
-const {
-  createResponseTransformMiddleware,
-  createRequestTransformMiddleware,
-  getTransformStats,
-  resetTransformStats
-} = require('./middleware/fieldTransform')
-
-// 创建Express应用
+// 初始化Express应用
 const app = express()
 
-// 全局中间件配置
-app.use(
-  helmet({
-    contentSecurityPolicy: {
-      directives: {
-        defaultSrc: ['\'self\''],
-        styleSrc: ['\'self\'', '\'unsafe-inline\''],
-        scriptSrc: ['\'self\''],
-        imgSrc: ['\'self\'', 'data:', 'https:']
-      }
+// 🔧 安全中间件
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ['\'self\''],
+      styleSrc: ['\'self\'', '\'unsafe-inline\''],
+      scriptSrc: ['\'self\'', 'https://unpkg.com', 'https://cdn.jsdelivr.net'],
+      imgSrc: ['\'self\'', 'data:', 'https:']
     }
-  })
-)
+  }
+}))
 
-app.use(compression())
-app.use(express.json({ limit: '50mb' }))
-app.use(express.urlencoded({ extended: true, limit: '50mb' }))
-
-// CORS配置
-const corsOptions = {
-  origin: function (origin, callback) {
-    // 开发环境允许所有来源
-    if (process.env.NODE_ENV === 'development') {
-      callback(null, true)
-      return
-    }
-
-    // 生产环境配置允许的域名
-    const allowedOrigins = (process.env.ALLOWED_ORIGINS || '').split(',').filter(Boolean)
-
-    if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, true)
-    } else {
-      callback(new Error('CORS策略不允许此来源'))
-    }
-  },
+// 🔧 CORS配置
+app.use(cors({
+  origin: process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',') : ['http://localhost:3000', 'http://localhost:8080'],
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'User-Agent']
-}
+  optionsSuccessStatus: 200
+}))
 
-app.use(cors(corsOptions))
+// 🔧 请求体解析
+app.use(express.json({ limit: '10mb' }))
+app.use(express.urlencoded({ extended: true, limit: '10mb' }))
 
-// 速率限制
+// 🔧 压缩响应
+app.use(compression())
+
+// 🔧 请求频率限制
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15分钟
-  max: process.env.NODE_ENV === 'development' ? 1000 : 300, // 开发环境宽松限制
+  max: 1000, // 限制每个IP 15分钟内最多1000个请求
   message: {
-    error: {
-      message: '请求过于频繁，请稍后再试',
-      code: 'TOO_MANY_REQUESTS',
-      retryAfter: 900 // 15分钟
-    }
+    success: false,
+    error: 'RATE_LIMIT_EXCEEDED',
+    message: '请求太频繁，请稍后再试'
   },
   standardHeaders: true,
   legacyHeaders: false
 })
+app.use('/api/', limiter)
 
-app.use('/api/v2', limiter)
-
-// 已清理调试中间件
-
-// 字段转换中间件 - 自动处理前后端字段映射
-app.use(
-  createResponseTransformMiddleware({
-    logTransformations: process.env.NODE_ENV === 'development',
-    strictMode: process.env.NODE_ENV === 'production'
-  })
-)
-app.use(
-  createRequestTransformMiddleware({
-    logTransformations: process.env.NODE_ENV === 'development',
-    strictMode: process.env.NODE_ENV === 'production'
-  })
-)
-
-// 字段转换统计信息端点
-app.use(getTransformStats)
-app.use(resetTransformStats)
-
-// 请求日志中间件
+// 🔧 请求日志中间件
 app.use((req, res, next) => {
-  const startTime = Date.now()
-
-  // 记录请求信息
-  console.log(
-    `📝 ${new Date().toISOString()} - ${req.method} ${req.path} - IP: ${req.ip} - UA: ${req.get('User-Agent')?.slice(0, 100) || 'Unknown'}`
-  )
-
-  // 记录响应信息
-  res.on('finish', () => {
-    const duration = Date.now() - startTime
-    const statusEmoji = res.statusCode >= 400 ? '❌' : res.statusCode >= 300 ? '⚠️' : '✅'
-    console.log(`${statusEmoji} ${res.statusCode} - ${req.method} ${req.path} - ${duration}ms`)
-  })
-
+  console.log(`${new Date().toISOString()} - ${req.method} ${req.path}`)
   next()
 })
 
-// 健康检查端点
-app.get('/health', (req, res) => {
-  res.json(
-    ApiResponse.success(
-      {
-        status: 'healthy',
-        timestamp: new Date().toISOString(),
-        version: '2.0.0',
-        architecture: 'multi-business-layered-storage',
-        database:
-          sequelize.connectionManager.getConnection() !== null ? 'connected' : 'disconnected',
-        uptime: process.uptime(),
-        memory: {
-          used: Math.round(process.memoryUsage().heapUsed / 1024 / 1024),
-          total: Math.round(process.memoryUsage().heapTotal / 1024 / 1024)
-        }
-      },
-      'Service is healthy'
-    )
-  )
-})
-
-// 临时调试端点
-app.get('/debug-auth', async (req, res) => {
-  const authHeader = req.headers.authorization
-  const token = authHeader && authHeader.split(' ')[1]
-
-  console.log('=== 调试认证过程 ===')
-  console.log('Authorization Header:', authHeader)
-  console.log('Extracted Token:', token ? token.substring(0, 50) + '...' : 'None')
-
-  if (!token) {
-    return res.json({ error: 'No token provided' })
-  }
-
-  const jwt = require('jsonwebtoken')
-  const JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret_key_change_in_production'
-
-  console.log('JWT_SECRET in app:', JWT_SECRET)
-
+// 📊 健康检查端点
+app.get('/health', async (req, res) => {
   try {
-    const decoded = jwt.verify(token, JWT_SECRET)
-    console.log('Token验证成功:', decoded)
-    res.json({ success: true, decoded })
-  } catch (error) {
-    console.log('Token验证失败:', error.message)
-    res.json({ error: error.message })
-  }
-})
+    // 检查数据库连接
+    const { sequelize } = require('./models')
+    let databaseStatus = 'disconnected'
 
-// 配置检查端点
-app.get('/debug-config', (req, res) => {
-  const JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret_key_change_in_production'
-  res.json({
-    jwt_secret: JWT_SECRET,
-    jwt_secret_length: JWT_SECRET.length,
-    node_env: process.env.NODE_ENV,
-    all_env: Object.keys(process.env).filter(key => key.includes('JWT'))
-  })
-})
-
-// API版本信息
-app.get('/api/v2', (req, res) => {
-  res.json(
-    ApiResponse.success(
-      {
-        version: '2.0.0',
-        title: '餐厅积分抽奖系统 - 后端存储架构 v2.0',
-        description:
-          '全新的多业务线分层存储架构，支持lottery、exchange、trade、uploads四大业务模块',
-        features: [
-          '统一图片资源管理',
-          '智能分层存储',
-          '多业务线支持',
-          '自动缩略图生成',
-          '批量操作支持',
-          'RESTful API设计',
-          '完整的权限控制'
-        ],
-        endpoints: {
-          resources: '/api/v2/resources',
-          lottery: '/api/v2/lottery',
-          exchange: '/api/v2/exchange',
-          trade: '/api/v2/trade',
-          uploads: '/api/v2/uploads',
-          health: '/health',
-          docs: '/api/v2/docs'
-        },
-        authentication: 'JWT Bearer Token',
-        supportedBusinessTypes: ['lottery', 'exchange', 'trade', 'uploads'],
-        storageLayers: ['hot', 'standard', 'archive']
-      },
-      'API v2.0 Information'
-    )
-  )
-})
-
-// V2 API健康检查端点（符合前端期望的路径和响应格式）
-app.get('/api/v2/health', async (req, res) => {
-  try {
-    // 检查数据库连接状态
-    let databaseStatus = 'connected'
     try {
       await sequelize.authenticate()
+      databaseStatus = 'connected'
     } catch (error) {
+      console.error('数据库连接检查失败:', error.message)
       databaseStatus = 'disconnected'
     }
 
-    // 获取系统性能信息
-    const memoryUsage = process.memoryUsage()
-    const uptime = process.uptime()
+    // 检查Redis连接
+    let redisStatus = 'disconnected'
+    try {
+      // 这里可以添加Redis连接检查
+      redisStatus = 'connected'
+    } catch (error) {
+      console.error('Redis连接检查失败:', error.message)
+      redisStatus = 'disconnected'
+    }
 
-    // 构建符合前端期望的响应格式
     const healthData = {
-      status: 'healthy',
-      timestamp: new Date().toISOString(),
-      server_info: {
-        version: '2.0.0',
-        uptime: Math.floor(uptime), // 运行时间（秒）
-        service_status: {
+      code: 0,
+      msg: 'V3 Separated Architecture is healthy',
+      data: {
+        status: 'healthy',
+        version: '3.0.0',
+        architecture: 'V3 Separated Architecture',
+        timestamp: new Date().toISOString(),
+        systems: {
           database: databaseStatus,
-          storage: 'available', // Sealos存储状态
-          api: 'operational'
-        }
-      },
-      performance: {
-        response_time_ms: 15, // 估算响应时间
-        memory_usage: Math.round((memoryUsage.heapUsed / memoryUsage.heapTotal) * 100) + '%',
-        cpu_usage: '12%' // 静态值，实际项目中可集成更详细的CPU监控
+          redis: redisStatus,
+          nodejs: process.version
+        },
+        memory: {
+          used: Math.round(process.memoryUsage().heapUsed / 1024 / 1024) + 'MB',
+          total: Math.round(process.memoryUsage().heapTotal / 1024 / 1024) + 'MB'
+        },
+        uptime: Math.floor(process.uptime()) + 's'
       }
     }
 
-    // 使用标准API响应格式
-    res.status(200).json(
-      ApiResponse.success(
-        healthData,
-        '服务器运行正常'
-      )
-    )
+    res.json(healthData)
   } catch (error) {
-    console.error('健康检查失败:', error.message)
-    res.status(503).json(
-      ApiResponse.error(
-        '服务器健康检查失败',
-        503,
-        {
-          status: 'unhealthy',
-          timestamp: new Date().toISOString(),
-          error: error.message
-        }
-      )
-    )
-  }
-})
-
-// 挂载路由
-app.use('/api/v2/auth', authRouter)
-app.use('/api/v2/user', userRouter)
-app.use('/api/v2/resources', resourcesRouter)
-app.use('/api/v2/lottery', lotteryRouter)
-app.use('/api/v2/exchange', exchangeRouter)
-app.use('/api/v2/trade', tradeRouter)
-app.use('/api/v2/uploads', uploadsRouter)
-app.use('/api/v2/inventory', inventoryRouter)
-app.use('/api/v2/transactions', transactionsRouter)
-app.use('/api/v2/permissions', permissionsRouter)
-app.use('/api/v2/admin', adminRouter)
-app.use('/api/v2/chat', chatRouter)
-
-// 管理员专用路由
-app.get('/api/v2/admin/overview', authenticateToken, requireAdmin, async (req, res) => {
-  try {
-    // 获取系统概览信息
-    const { ImageResources } = require('./models')
-
-    // 并行查询统计信息
-    const [totalResources, businessStats, storageStats, recentUploads] = await Promise.all([
-      ImageResources.count({ where: { status: 'active' } }),
-
-      ImageResources.findAll({
-        attributes: [
-          'business_type',
-          [sequelize.fn('COUNT', sequelize.col('resource_id')), 'count'],
-          [sequelize.fn('SUM', sequelize.col('file_size')), 'total_size']
-        ],
-        where: { status: 'active' },
-        group: ['business_type'],
-        raw: true
-      }),
-
-      ImageResources.findAll({
-        attributes: [
-          'storage_layer',
-          [sequelize.fn('COUNT', sequelize.col('resource_id')), 'count'],
-          [sequelize.fn('SUM', sequelize.col('file_size')), 'total_size']
-        ],
-        where: { status: 'active' },
-        group: ['storage_layer'],
-        raw: true
-      }),
-
-      ImageResources.findAll({
-        where: { status: 'active' },
-        order: [['created_at', 'DESC']],
-        limit: 10,
-        attributes: [
-          'resource_id',
-          'business_type',
-          'category',
-          'original_filename',
-          'file_size',
-          'created_at'
-        ]
-      })
-    ])
-
-    res.json(
-      ApiResponse.success(
-        {
-          overview: {
-            totalResources: parseInt(totalResources),
-            businessStats,
-            storageStats
-          },
-          recentUploads,
-          systemInfo: {
-            version: '2.0.0',
-            nodeVersion: process.version,
-            uptime: process.uptime(),
-            timestamp: new Date().toISOString()
-          }
-        },
-        '系统概览信息获取成功'
-      )
-    )
-  } catch (error) {
-    console.error('❌ 获取系统概览失败:', error.message)
-    res
-      .status(500)
-      .json(ApiResponse.error('获取系统概览失败', 'GET_OVERVIEW_FAILED', error.message))
-  }
-})
-
-// 管理员统计数据API
-app.get('/api/v2/admin/statistics', authenticateToken, requireAdmin, async (req, res) => {
-  try {
-    const { User, LotteryRecord, ExchangeRecord, UploadReview } = require('./models')
-
-    // 并行获取统计数据
-    const [
-      totalUsers,
-      activeUsers,
-      adminUsers,
-      totalLotteries,
-      totalExchanges,
-      pendingReviews,
-      todayStats
-    ] = await Promise.all([
-      User.count(),
-      User.count({ where: { status: 'active' } }),
-      User.count({ where: { is_admin: true } }),
-      LotteryRecord.count(),
-      ExchangeRecord.count(),
-      UploadReview.count({ where: { review_status: 'pending' } }),
-
-      // 今日统计
-      Promise.all([
-        User.count({
-          where: {
-            created_at: { [sequelize.Op.gte]: new Date(new Date().setHours(0, 0, 0, 0)) }
-          }
-        }),
-        LotteryRecord.count({
-          where: {
-            created_at: { [sequelize.Op.gte]: new Date(new Date().setHours(0, 0, 0, 0)) }
-          }
-        }),
-        ExchangeRecord.count({
-          where: {
-            created_at: { [sequelize.Op.gte]: new Date(new Date().setHours(0, 0, 0, 0)) }
-          }
-        })
-      ])
-    ])
-
-    const [todayNewUsers, todayLotteries, todayExchanges] = todayStats
-
-    res.json(ApiResponse.success({
-      users: {
-        total: totalUsers,
-        active: activeUsers,
-        admins: adminUsers,
-        todayNew: todayNewUsers
-      },
-      business: {
-        totalLotteries,
-        totalExchanges,
-        pendingReviews,
-        todayLotteries,
-        todayExchanges
-      },
-      system: {
-        version: '2.0.0',
-        uptime: process.uptime(),
-        memoryUsage: Math.round(process.memoryUsage().heapUsed / 1024 / 1024) + 'MB',
+    console.error('健康检查失败:', error)
+    res.status(500).json({
+      code: -1,
+      msg: 'Health check failed',
+      data: {
+        status: 'unhealthy',
+        error: error.message,
         timestamp: new Date().toISOString()
       }
-    }, '获取系统统计数据成功'))
-  } catch (error) {
-    console.error('❌ 获取系统统计失败:', error.message)
-    res.status(500).json(ApiResponse.error('获取系统统计失败', 'GET_STATISTICS_FAILED', error.message))
+    })
   }
 })
 
-// 管理员系统配置API
-app.get('/api/v2/admin/config', authenticateToken, requireAdmin, async (req, res) => {
-  try {
-    const systemConfig = {
-      lottery: {
-        isActive: true,
-        dailyLimit: parseInt(process.env.DAILY_LOTTERY_LIMIT) || 50,
-        costPerDraw: 100,
-        maintenanceMode: false
-      },
-      points: {
-        newUserBonus: parseInt(process.env.NEW_USER_POINTS) || 1000,
-        uploadRewardRate: 10, // 每元10积分
-        dailySigninBonus: 50
-      },
-      system: {
-        version: '2.0.0',
-        environment: process.env.NODE_ENV || 'development',
-        maxFileSize: '20MB',
-        supportedFormats: ['JPEG', 'PNG', 'WebP'],
-        rateLimit: process.env.NODE_ENV === 'development' ? 1000 : 300
-      },
-      storage: {
-        hotStorage: 'active',
-        standardStorage: 'active',
-        archiveStorage: 'active',
-        autoArchiveDays: 30,
-        maxStorageSize: '10GB'
-      }
-    }
-
-    res.json(ApiResponse.success(systemConfig, '获取系统配置成功'))
-  } catch (error) {
-    console.error('❌ 获取系统配置失败:', error.message)
-    res.status(500).json(ApiResponse.error('获取系统配置失败', 'GET_CONFIG_FAILED', error.message))
-  }
-})
-
-// API文档端点（简化版）
-app.get('/api/v2/docs', (req, res) => {
-  const docs = {
-    title: '餐厅积分抽奖系统 API v2.0 文档',
-    version: '2.0.0',
-    baseUrl: `${req.protocol}://${req.get('host')}/api/v2`,
-
-    authentication: {
-      type: 'Bearer Token',
-      header: 'Authorization: Bearer <token>',
-      description: '通过用户登录接口获取JWT令牌'
-    },
-
-    endpoints: {
-      resources: {
-        'POST /resources': '创建图片资源（文件上传）',
-        'POST /resources/batch': '批量上传图片资源',
-        'GET /resources': '查询图片资源列表',
-        'GET /resources/:resourceId': '获取单个资源详情',
-        'PUT /resources/:resourceId': '更新资源信息',
-        'DELETE /resources/:resourceId': '删除资源（软删除）',
-        'GET /resources/reviews/pending': '获取待审核资源列表（管理员）',
-        'POST /resources/reviews/batch': '批量审核资源（管理员）',
-        'GET /resources/stats/storage': '获取存储统计信息（管理员）'
-      },
-
-      lottery: {
-        'GET /lottery/prizes/:prizeId': '获取特定奖品的图片资源',
-        'POST /lottery/prizes/:prizeId/images': '为特定奖品上传图片（管理员）',
-        'GET /lottery/wheels': '获取转盘相关图片资源',
-        'POST /lottery/wheels/upload': '上传转盘背景或装饰图片（管理员）',
-        'GET /lottery/banners': '获取抽奖活动横幅图片',
-        'POST /lottery/banners/upload': '上传抽奖活动横幅（管理员）',
-        'GET /lottery/results': '获取抽奖结果展示图片',
-        'PUT /lottery/images/:resourceId/activate': '激活/停用抽奖相关图片（管理员）',
-        'GET /lottery/stats': '获取抽奖业务图片统计（管理员）'
-      },
-
-      exchange: {
-        'GET /exchange/products/:productId': '获取特定商品的图片资源',
-        'POST /exchange/products/:productId/images': '为特定商品上传图片（管理员）',
-        'GET /exchange/categories': '获取兑换分类图片',
-        'POST /exchange/categories/upload': '上传分类图片（管理员）',
-        'GET /exchange/promotions': '获取促销活动图片',
-        'PUT /exchange/images/:resourceId/activate': '激活/停用兑换相关图片（管理员）',
-        'GET /exchange/stats': '获取兑换业务图片统计（管理员）'
-      },
-
-      trade: {
-        'GET /trade/items/:itemId': '获取特定交易物品的图片资源',
-        'POST /trade/items/:itemId/images': '为特定交易物品上传图片',
-        'GET /trade/banners': '获取交易横幅图片',
-        'POST /trade/banners/upload': '上传交易横幅图片（管理员）',
-        'GET /trade/transactions': '获取交易记录相关图片',
-        'PUT /trade/images/:resourceId/activate': '激活/停用交易相关图片（管理员）',
-        'GET /trade/stats': '获取交易业务图片统计（管理员）'
-      },
-
-      uploads: {
-        'POST /uploads/submit': '用户提交图片审核',
-        'GET /uploads/my-submissions': '获取当前用户的提交记录',
-        'GET /uploads/pending-reviews': '获取待审核图片列表（管理员）',
-        'POST /uploads/review/:resourceId': '审核单个图片（管理员）',
-        'POST /uploads/batch-review': '批量审核图片（管理员）',
-        'GET /uploads/review-history': '获取审核历史（管理员）',
-        'GET /uploads/stats': '获取上传审核统计（管理员）',
-        'DELETE /uploads/:resourceId': '删除用户上传的图片'
-      }
-    },
-
-    businessTypes: {
-      lottery: '抽奖业务 - 奖品、转盘、横幅、抽奖结果图片',
-      exchange: '兑换业务 - 商品、分类、促销图片',
-      trade: '交易业务 - 商品、横幅、交易记录图片',
-      uploads: '用户上传 - 消费小票审核图片'
-    },
-
-    storageStrategy: {
-      hot: '热存储 - 新上传和活跃资源，快速访问',
-      standard: '标准存储 - 中期存储，平衡性能和成本',
-      archive: '归档存储 - 长期存储，低成本'
-    },
-
-    examples: {
-      uploadFile: {
-        method: 'POST',
-        url: '/api/v2/resources',
-        headers: {
-          Authorization: 'Bearer <your-jwt-token>',
-          'Content-Type': 'multipart/form-data'
+// 📋 API版本信息端点
+app.get('/api/v3', (req, res) => {
+  res.json({
+    code: 0,
+    msg: 'V3 API信息获取成功',
+    data: {
+      version: '3.0.0',
+      name: '餐厅积分抽奖系统',
+      architecture: 'separated-microservices',
+      description: '分离式微服务架构 - 抽奖、积分、VIP、收集、概率系统',
+      systems: {
+        points: {
+          name: '积分系统',
+          endpoint: '/api/v3/points',
+          features: ['积分获取', '积分消费', '积分记录', '每日签到']
         },
-        body: {
-          image: '<file>',
-          businessType: 'lottery',
-          category: 'prizes',
-          contextId: '1',
-          isActive: 'true',
-          priority: 'high'
+        lottery: {
+          name: '抽奖系统',
+          endpoint: '/api/v3/lottery',
+          features: ['活动管理', '抽奖执行', '概率控制', '奖品分发']
+        },
+        vip: {
+          name: 'VIP系统',
+          endpoint: '/api/v3/vip',
+          features: ['VIP等级', '特权管理', '升级条件', '专享奖品']
+        },
+        collection: {
+          name: '收集系统',
+          endpoint: '/api/v3/collection',
+          features: ['道具收集', '合成系统', '稀有度管理', '收藏展示']
+        },
+        probability: {
+          name: '动态概率系统',
+          endpoint: '/api/v3/probability',
+          features: ['概率调节', '保底机制', '运气值系统', '概率分析']
+        },
+        social: {
+          name: '社交抽奖系统',
+          endpoint: '/api/v3/social',
+          features: ['房间创建', '多人抽奖', '分成结算', '实时通知']
+        },
+        tasks: {
+          name: '任务管理系统',
+          endpoint: '/api/v3/tasks',
+          features: ['任务分配', '进度跟踪', '奖励发放', '成就系统']
+        },
+        synthesis: {
+          name: '高级合成系统',
+          endpoint: '/api/v3/synthesis',
+          features: ['配方管理', '道具合成', '成功率计算', '经验系统']
         }
       },
-
-      queryResources: {
-        method: 'GET',
-        url: '/api/v2/resources?businessType=lottery&category=prizes&limit=20&page=1',
-        headers: {
-          Authorization: 'Bearer <your-jwt-token>'
-        }
-      }
-    }
-  }
-
-  res.json(ApiResponse.success(docs, 'API文档'))
+      endpoints: {
+        auth: '/api/v3/auth',
+        lottery: '/api/v3/lottery',
+        points: '/api/v3/points',
+        vip: '/api/v3/vip',
+        collection: '/api/v3/collection',
+        probability: '/api/v3/probability',
+        admin: '/api/v3/admin',
+        analytics: '/api/v3/analytics',
+        events: '/api/v3/events',
+        social: '/api/v3/social',
+        tasks: '/api/v3/tasks',
+        synthesis: '/api/v3/synthesis'
+      },
+      documentation: '/api/v3/docs',
+      health: '/health'
+    },
+    timestamp: new Date().toISOString()
+  })
 })
 
-// 404 处理
+// 📚 API文档端点
+app.get('/api/v3/docs', (req, res) => {
+  res.json({
+    code: 0,
+    msg: 'V3 API文档获取成功',
+    data: {
+      title: '餐厅积分抽奖系统 V3.0 API文档',
+      version: '3.0.0',
+      architecture: 'separated-microservices',
+      description: '分离式微服务架构，提供完整的积分抽奖、VIP、收集、概率控制等系统',
+      last_updated: new Date().toISOString(),
+      points_system: {
+        description: '积分系统提供用户积分的获取、消费、记录和管理功能',
+        endpoints: {
+          'GET /api/v3/points/balance/:userId': '获取用户积分余额',
+          'POST /api/v3/points/earn': '积分获取（签到、消费等）',
+          'POST /api/v3/points/consume': '积分消费',
+          'GET /api/v3/points/history/:userId': '积分记录查询',
+          'POST /api/v3/points/daily-signin': '每日签到'
+        },
+        features: ['积分获取', '积分消费', '积分记录', '每日签到', '积分过期管理']
+      },
+      lottery_system: {
+        description: '抽奖系统提供活动管理、抽奖执行、概率控制等核心功能',
+        endpoints: {
+          'GET /api/v3/lottery/campaigns': '获取活动列表',
+          'POST /api/v3/lottery/draw': '执行抽奖',
+          'GET /api/v3/lottery/history/:userId': '抽奖记录',
+          'POST /api/v3/lottery/campaigns': '创建活动（管理员）',
+          'PUT /api/v3/lottery/campaigns/:id': '更新活动（管理员）'
+        },
+        features: ['活动管理', '抽奖执行', '概率控制', '奖品分发', '记录统计']
+      },
+      vip_system: {
+        description: 'VIP系统提供用户等级管理、特权控制、升级条件等功能',
+        endpoints: {
+          'GET /api/v3/vip/status/:userId': '获取VIP状态',
+          'POST /api/v3/vip/upgrade': 'VIP升级',
+          'GET /api/v3/vip/privileges': '获取VIP特权列表',
+          'GET /api/v3/vip/benefits/:userId': '获取VIP福利'
+        },
+        features: ['VIP等级管理', '特权控制', '升级条件', '专享奖品', '等级福利']
+      },
+      collection_system: {
+        description: '收集系统提供道具收集、合成、稀有度管理等功能',
+        endpoints: {
+          'GET /api/v3/collection/catalog': '获取收集目录',
+          'GET /api/v3/collection/inventory/:userId': '获取用户收藏',
+          'POST /api/v3/collection/synthesize': '道具合成',
+          'GET /api/v3/collection/progress/:userId': '收集进度'
+        },
+        features: ['道具收集', '合成系统', '稀有度管理', '收藏展示', '进度跟踪']
+      },
+      probability_system: {
+        description: '动态概率系统提供概率调节、保底机制、运气值管理等功能',
+        endpoints: {
+          'GET /api/v3/probability/config/:campaignId': '获取概率配置',
+          'POST /api/v3/probability/adjust': '调整概率（管理员）',
+          'GET /api/v3/probability/luck/:userId': '获取用户运气值',
+          'POST /api/v3/probability/guarantee': '触发保底机制'
+        },
+        features: ['概率调节', '保底机制', '运气值系统', '概率分析', '动态调整']
+      },
+      social_system: {
+        description: '社交抽奖系统提供多人抽奖房间、分成结算等功能',
+        endpoints: {
+          'POST /api/v3/social/rooms': '创建抽奖房间',
+          'POST /api/v3/social/rooms/:roomId/join': '加入房间',
+          'GET /api/v3/social/rooms/:roomId': '获取房间信息',
+          'POST /api/v3/social/rooms/:roomId/start': '开始抽奖',
+          'GET /api/v3/social/stats': '社交抽奖统计'
+        },
+        features: ['房间创建', '多人抽奖', '分成结算', '实时通知', '房间管理']
+      },
+      task_system: {
+        description: '任务管理系统提供任务分配、进度跟踪、奖励发放等功能',
+        endpoints: {
+          'GET /api/v3/tasks/user/:userId': '获取用户任务',
+          'POST /api/v3/tasks/:taskId/complete': '完成任务',
+          'PUT /api/v3/tasks/:taskId/progress': '更新任务进度',
+          'GET /api/v3/tasks/statistics': '任务统计',
+          'POST /api/v3/tasks/user/:userId/init-daily': '初始化每日任务'
+        },
+        features: ['任务分配', '进度跟踪', '奖励发放', '成就系统', '每日/周任务']
+      },
+      authentication: {
+        description: '认证系统采用手机号+验证码的方式，支持JWT token认证',
+        endpoints: {
+          'POST /api/v3/auth/login': '用户登录',
+          'POST /api/v3/auth/refresh': '刷新token',
+          'POST /api/v3/auth/logout': '用户登出'
+        },
+        test_credentials: {
+          mobile: '13800138000',
+          verification_code: '123456',
+          note: '开发环境万能验证码'
+        }
+      },
+      admin_system: {
+        description: '管理员系统提供后台管理、数据统计、系统配置等功能',
+        endpoints: {
+          'GET /api/v3/admin/dashboard': '管理员仪表板',
+          'GET /api/v3/admin/users': '用户管理',
+          'POST /api/v3/admin/campaigns': '活动管理',
+          'GET /api/v3/admin/statistics': '系统统计'
+        },
+        features: ['用户管理', '活动管理', '数据统计', '系统配置', '权限控制']
+      }
+    },
+    timestamp: new Date().toISOString()
+  })
+})
+
+// 🛣️ 路由配置 - V3版本API
+try {
+  // 认证路由
+  app.use('/api/v3/auth', require('./routes/v3/auth'))
+
+  // 抽奖系统路由
+  app.use('/api/v3/lottery', require('./routes/v3/lottery'))
+
+  // 积分系统路由
+  app.use('/api/v3/points', require('./routes/v3/points'))
+
+  // VIP系统路由 (新增)
+  app.use('/api/v3/vip', require('./routes/v3/vip'))
+
+  // 收集系统路由 (新增)
+  app.use('/api/v3/collection', require('./routes/v3/collection'))
+
+  // 动态概率系统路由 (新增)
+  app.use('/api/v3/probability', require('./routes/v3/probability'))
+
+  // 管理员路由
+  app.use('/api/v3/admin', require('./routes/v3/admin'))
+
+  // 分析系统路由
+  app.use('/api/v3/analytics', require('./routes/v3/analytics'))
+
+  // 事件系统路由
+  app.use('/api/v3/events', require('./routes/v3/events'))
+
+  // 社交抽奖系统路由 (新增)
+  app.use('/api/v3/social', require('./routes/v3/social'))
+
+  // 任务管理系统路由 (新增)
+  app.use('/api/v3/tasks', require('./routes/v3/tasks'))
+
+  // 定时调度系统路由 (新增)
+  app.use('/api/v3/schedule', require('./routes/v3/schedule'))
+
+  // 高级合成系统路由 (新增)
+  app.use('/api/v3/synthesis', require('./routes/v3/synthesis'))
+
+  // 智能推荐路由
+  app.use('/api/v3/smart', require('./routes/v3/smart'))
+
+  console.log('✅ 所有V3 API路由加载成功')
+} catch (error) {
+  console.error('❌ 路由加载失败:', error.message)
+  console.error('路径:', error.stack)
+}
+
+// 🔧 404处理
 app.use('*', (req, res) => {
-  res
-    .status(404)
-    .json(
-      ApiResponse.notFound(`接口不存在: ${req.method} ${req.originalUrl}`, 'ENDPOINT_NOT_FOUND')
-    )
+  res.status(404).json({
+    code: 404,
+    msg: `接口不存在: ${req.method} ${req.originalUrl}`,
+    data: {
+      error: 'NOT_FOUND',
+      availableEndpoints: [
+        'GET /health',
+        'GET /api/v3',
+        'GET /api/v3/docs',
+        'POST /api/v3/auth/login',
+        'GET /api/v3/lottery/campaigns',
+        'GET /api/v3/vip/status',
+        'GET /api/v3/collection/catalog',
+        'GET /api/v3/social/stats',
+        'GET /api/v3/tasks/statistics'
+      ]
+    },
+    timestamp: new Date().toISOString()
+  })
 })
 
-// 全局错误处理中间件
-app.use(ApiResponse.errorHandler())
+// 🔧 全局错误处理
+app.use((error, req, res, _next) => {
+  console.error('全局错误处理:', error)
 
-// 数据库连接和服务启动
-async function startServer () {
-  try {
-    console.log('🔄 开始启动服务器...')
-
-    // 测试数据库连接
-    console.log('🔄 测试数据库连接...')
-    await sequelize.authenticate()
-    console.log('✅ 数据库连接成功')
-
-    // 同步数据库模型（临时禁用以快速启动）
-    // eslint-disable-next-line no-constant-condition
-    if (false && process.env.NODE_ENV === 'development') {
-      console.log('🔄 同步数据库模型...')
-      await sequelize.sync({ alter: false }) // 不强制修改表结构
-      console.log('✅ 数据库模型同步完成')
-
-      // 初始化业务配置
-      console.log('🔄 初始化业务配置...')
-      try {
-        const { BusinessConfigs } = require('./models')
-        await BusinessConfigs.initializeDefaultConfigs()
-        console.log('✅ 业务配置初始化完成')
-      } catch (configError) {
-        console.warn('⚠️ 业务配置初始化失败，继续启动:', configError.message)
-      }
-    }
-
-    // 启动HTTP服务器
-    console.log('🔄 启动HTTP服务器...')
-    const PORT = process.env.PORT || 3000
-    const server = app.listen(PORT, () => {
-      console.log('🚀 餐厅积分抽奖系统 v2.0 启动成功!')
-      console.log(`📡 服务地址: http://localhost:${PORT}`)
-      console.log(`📚 API文档: http://localhost:${PORT}/api/v2/docs`)
-      console.log(`❤️ 健康检查: http://localhost:${PORT}/health`)
-      console.log('🏗️ 架构版本: 多业务线分层存储架构 v2.0')
-      console.log(`🌍 运行环境: ${process.env.NODE_ENV || 'development'}`)
-      console.log(`💾 Node.js版本: ${process.version}`)
-
-      // 初始化WebSocket服务
-      try {
-        webSocketService.initialize(server, { path: '/ws' })
-        console.log('🔌 WebSocket服务启动成功 (聊天客服系统)')
-        console.log(`📞 WebSocket地址: ws://localhost:${PORT}/ws`)
-      } catch (error) {
-        console.error('❌ WebSocket服务启动失败:', error.message)
-      }
+  // Sequelize错误处理
+  if (error.name === 'SequelizeError') {
+    return res.status(500).json({
+      success: false,
+      error: 'DATABASE_ERROR',
+      message: '数据库操作失败',
+      timestamp: new Date().toISOString()
     })
-
-    // 优雅关闭处理
-    process.on('SIGTERM', async () => {
-      console.log('📴 收到SIGTERM信号，开始优雅关闭...')
-
-      server.close(async () => {
-        console.log('🔌 HTTP服务器已关闭')
-
-        try {
-          await sequelize.close()
-          console.log('🗄️ 数据库连接已关闭')
-          process.exit(0)
-        } catch (error) {
-          console.error('❌ 关闭数据库连接失败:', error)
-          process.exit(1)
-        }
-      })
-    })
-
-    process.on('SIGINT', async () => {
-      console.log('📴 收到SIGINT信号，开始优雅关闭...')
-
-      server.close(async () => {
-        console.log('🔌 HTTP服务器已关闭')
-
-        try {
-          await sequelize.close()
-          console.log('🗄️ 数据库连接已关闭')
-          process.exit(0)
-        } catch (error) {
-          console.error('❌ 关闭数据库连接失败:', error)
-          process.exit(1)
-        }
-      })
-    })
-
-    return server
-  } catch (error) {
-    console.error('❌ 服务启动失败:', error)
-    console.error('❌ 错误堆栈:', error.stack)
-    process.exit(1)
   }
-}
 
-// 如果直接运行此文件，则启动服务器
+  // JWT错误处理
+  if (error.name === 'JsonWebTokenError') {
+    return res.status(401).json({
+      success: false,
+      error: 'INVALID_TOKEN',
+      message: 'Token无效',
+      timestamp: new Date().toISOString()
+    })
+  }
+
+  // 验证错误处理
+  if (error.name === 'ValidationError') {
+    return res.status(400).json({
+      success: false,
+      error: 'VALIDATION_ERROR',
+      message: error.message,
+      timestamp: new Date().toISOString()
+    })
+  }
+
+  // 默认错误处理
+  res.status(500).json({
+    success: false,
+    error: 'INTERNAL_SERVER_ERROR',
+    message: process.env.NODE_ENV === 'development' ? error.message : '服务器内部错误',
+    timestamp: new Date().toISOString()
+  })
+})
+
+// 🚀 启动服务器
+const PORT = process.env.PORT || 3000
+const HOST = process.env.HOST || '0.0.0.0'
+
 if (require.main === module) {
-  startServer()
+  app.listen(PORT, HOST, async () => {
+    console.log(`
+🚀 餐厅积分抽奖系统 V3.0 启动成功!
+📍 服务地址: http://${HOST}:${PORT}
+🏥 健康检查: http://${HOST}:${PORT}/health
+📚 API文档: http://${HOST}:${PORT}/api/v3
+🌍 环境: ${process.env.NODE_ENV || 'development'}
+⏰ 启动时间: ${new Date().toISOString()}
+    `)
+
+    // 🕐 初始化定时任务调度服务
+    try {
+      const TimeScheduleService = require('./services/TimeScheduleService')
+      const initResult = await TimeScheduleService.initialize()
+
+      if (initResult.success) {
+        console.log(`⏰ 定时任务调度服务启动成功，恢复了${initResult.data.recoveredTasks}个任务`)
+      } else {
+        console.error('⚠️ 定时任务调度服务启动失败:', initResult.message)
+      }
+    } catch (error) {
+      console.error('❌ 初始化定时任务调度服务时发生错误:', error.message)
+    }
+  })
 }
 
-module.exports = { app, startServer }
+module.exports = app

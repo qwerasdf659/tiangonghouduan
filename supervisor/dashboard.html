@@ -450,7 +450,7 @@
 
         async loadData() {
           try {
-            // 模拟API调用 - 实际应用中应该调用真实的API
+            // 🔄 调用真实的后端API获取监控数据
             const response = await this.fetchDashboardData()
             this.data = response
             this.updateUI()
@@ -462,7 +462,7 @@
         }
 
         async fetchDashboardData() {
-          // 🔴 从后端API获取真实数据，替代模拟数据
+          // ✅ 从后端API获取真实监控数据
           try {
             const response = await fetch('/api/supervisor/status', {
               method: 'GET',
@@ -470,7 +470,7 @@
                 'Content-Type': 'application/json'
               }
             })
-            
+
             if (response.ok) {
               const data = await response.json()
               return data
@@ -516,13 +516,15 @@
                 score_change: 0,
                 violations_change: 0
               },
-              alerts: [{
-                timestamp: new Date().toISOString(),
-                level: 'ERROR',
-                message: '无法获取系统状态数据',
-                violations_count: 0,
-                threshold: 0
-              }],
+              alerts: [
+                {
+                  timestamp: new Date().toISOString(),
+                  level: 'ERROR',
+                  message: '无法获取系统状态数据',
+                  violations_count: 0,
+                  threshold: 0
+                }
+              ],
               violations: [],
               recommendations: []
             }

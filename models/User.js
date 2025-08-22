@@ -2,6 +2,7 @@
  * 用户信息管理模型
  * 解决核心用户数据管理和认证问题
  * 创建时间：2025年01月28日
+ * 更新时间：2025年08月20日 - 移除冗余积分字段，统一使用UserPointsAccount管理
  */
 
 const { DataTypes } = require('sequelize')
@@ -42,22 +43,11 @@ module.exports = sequelize => {
         comment: '是否管理员'
       },
 
-      total_points: {
+      // 🔧 新增：历史累计总积分字段（用于臻选空间解锁条件检查）
+      history_total_points: {
         type: DataTypes.INTEGER,
         defaultValue: 0,
-        comment: '总积分'
-      },
-
-      available_points: {
-        type: DataTypes.INTEGER,
-        defaultValue: 0,
-        comment: '可用积分'
-      },
-
-      used_points: {
-        type: DataTypes.INTEGER,
-        defaultValue: 0,
-        comment: '已使用积分'
+        comment: '历史累计总积分（只增不减，用于解锁条件）'
       },
 
       status: {
@@ -110,7 +100,7 @@ module.exports = sequelize => {
           fields: ['status', 'is_admin']
         },
         {
-          fields: ['total_points']
+          fields: ['history_total_points']
         },
         {
           fields: ['last_login']
@@ -128,27 +118,126 @@ module.exports = sequelize => {
       as: 'uploadedImages'
     })
 
-    // 用户的积分记录
-    if (models.PointsRecord) {
-      User.hasMany(models.PointsRecord, {
-        foreignKey: 'user_id',
-        as: 'pointsRecords'
-      })
-    }
+    // 🔥 用户的积分账户（一对一关系）
+    User.hasOne(models.UserPointsAccount, {
+      foreignKey: 'user_id',
+      as: 'pointsAccount',
+      comment: '用户积分账户'
+    })
+
+    // 🔥 用户的积分交易记录（一对多关系）
+    User.hasMany(models.PointsTransaction, {
+      foreignKey: 'user_id',
+      as: 'pointsTransactions',
+      comment: '积分交易记录'
+    })
 
     // 用户的抽奖记录
-    if (models.LotteryRecord) {
-      User.hasMany(models.LotteryRecord, {
+    if (models.LotteryDraw) {
+      User.hasMany(models.LotteryDraw, {
         foreignKey: 'user_id',
-        as: 'lotteryRecords'
+        as: 'lotteryDraws'
       })
     }
 
-    // 用户的兑换记录
-    if (models.ExchangeRecord) {
-      User.hasMany(models.ExchangeRecord, {
+    // 用户的业务事件
+    if (models.BusinessEvent) {
+      User.hasMany(models.BusinessEvent, {
         foreignKey: 'user_id',
-        as: 'exchangeRecords'
+        as: 'businessEvents'
+      })
+    }
+
+    // 用户的行为分析
+    if (models.AnalyticsBehavior) {
+      User.hasMany(models.AnalyticsBehavior, {
+        foreignKey: 'user_id',
+        as: 'behaviors'
+      })
+    }
+
+    // 用户画像
+    if (models.AnalyticsUserProfile) {
+      User.hasOne(models.AnalyticsUserProfile, {
+        foreignKey: 'user_id',
+        as: 'profile'
+      })
+    }
+
+    // 用户推荐
+    if (models.AnalyticsRecommendation) {
+      User.hasMany(models.AnalyticsRecommendation, {
+        foreignKey: 'user_id',
+        as: 'recommendations'
+      })
+    }
+
+    // 用户库存
+    if (models.UserInventory) {
+      User.hasOne(models.UserInventory, {
+        foreignKey: 'user_id',
+        as: 'inventory'
+      })
+    }
+
+    // 客户服务会话
+    if (models.CustomerSession) {
+      User.hasMany(models.CustomerSession, {
+        foreignKey: 'user_id',
+        as: 'customerSessions'
+      })
+    }
+
+    // 臻选空间访问记录
+    if (models.PremiumSpaceAccess) {
+      User.hasMany(models.PremiumSpaceAccess, {
+        foreignKey: 'user_id',
+        as: 'premiumAccess'
+      })
+    }
+
+    // 产品相关
+    if (models.Product) {
+      User.hasMany(models.Product, {
+        foreignKey: 'creator_id',
+        as: 'createdProducts'
+      })
+    }
+
+    // 交易记录
+    if (models.TradeRecord) {
+      User.hasMany(models.TradeRecord, {
+        foreignKey: 'from_user_id',
+        as: 'sentTrades'
+      })
+
+      User.hasMany(models.TradeRecord, {
+        foreignKey: 'to_user_id',
+        as: 'receivedTrades'
+      })
+    }
+
+    // 上传审核
+    if (models.UploadReview) {
+      User.hasMany(models.UploadReview, {
+        foreignKey: 'user_id',
+        as: 'uploadReviews'
+      })
+
+      User.hasMany(models.UploadReview, {
+        foreignKey: 'reviewer_id',
+        as: 'reviewedUploads'
+      })
+    }
+
+    // 用户图片
+    if (models.ImageResources) {
+      User.hasOne(models.ImageResources, {
+        foreignKey: 'user_id',
+        as: 'userImage',
+        scope: {
+          image_type: 'user_avatar'
+        }
       })
     }
   }

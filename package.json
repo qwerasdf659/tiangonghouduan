@@ -1,29 +1,34 @@
 {
-  "name": "restaurant-lottery-system-v2",
-  "version": "2.0.0",
-  "description": "餐厅积分抽奖系统 - 全新多业务线分层存储架构 v2.0",
+  "name": "restaurant-lottery-system-v3",
+  "version": "3.0.0",
+  "description": "餐厅积分抽奖系统 - 分离式微服务架构 v3.0",
   "main": "app.js",
   "author": "Restaurant Lottery Team",
   "license": "MIT",
   "engines": {
-    "node": ">=16.0.0",
+    "node": ">=20.18.0",
     "npm": ">=8.0.0"
   },
   "scripts": {
     "start": "node app.js",
     "dev": "nodemon app.js",
-    "test": "jest --testTimeout=30000",
+    "test": "jest --testTimeout=30000 --setupFilesAfterEnv=./jest.setup.js",
+    "test:coverage": "jest --coverage --testTimeout=30000",
     "lint": "eslint . --ext .js",
     "lint:fix": "eslint . --ext .js --fix",
     "db:migrate": "npx sequelize-cli db:migrate",
     "db:migrate:undo": "npx sequelize-cli db:migrate:undo",
     "db:seed": "npx sequelize-cli db:seed:all",
+    "db:reset": "npx sequelize-cli db:migrate:undo:all && npx sequelize-cli db:migrate && npx sequelize-cli db:seed:all",
     "backup": "node scripts/backup-database.js",
     "test:new-feature": "node scripts/test-new-feature.js",
-    "deploy:check": "npm run lint && npm run test && npm run test:new-feature"
+    "deploy:check": "npm run lint && npm run test && npm run test:new-feature",
+    "health:check": "node scripts/health-check.js"
   },
   "dependencies": {
     "aws-sdk": "^2.1691.0",
+    "axios": "^1.11.0",
+    "bcrypt": "^6.0.0",
     "bcryptjs": "^2.4.3",
     "compression": "^1.7.4",
     "cors": "^2.8.5",

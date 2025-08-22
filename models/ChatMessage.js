@@ -2,6 +2,7 @@
  * 聊天消息模型
  * 管理聊天会话中的消息
  * 创建时间：2025年01月28日
+ * 最后更新：2025年08月14日 - 添加message_source字段支持前端来源区分
  */
 
 const { DataTypes } = require('sequelize')
@@ -40,6 +41,12 @@ module.exports = sequelize => {
         type: DataTypes.ENUM('user', 'admin'),
         allowNull: false,
         comment: '发送者类型'
+      },
+
+      message_source: {
+        type: DataTypes.ENUM('user_client', 'admin_client', 'system'),
+        allowNull: false,
+        comment: '消息来源：user_client=用户端，admin_client=管理员端，system=系统消息'
       },
 
       content: {
@@ -100,6 +107,9 @@ module.exports = sequelize => {
         },
         {
           fields: ['temp_message_id']
+        },
+        {
+          fields: ['message_source', 'sender_type']
         }
       ],
       comment: '聊天消息表'
@@ -141,6 +151,18 @@ module.exports = sequelize => {
 
   ChatMessage.prototype.isFromAdmin = function () {
     return this.sender_type === 'admin'
+  }
+
+  ChatMessage.prototype.isFromUserClient = function () {
+    return this.message_source === 'user_client'
+  }
+
+  ChatMessage.prototype.isFromAdminClient = function () {
+    return this.message_source === 'admin_client'
+  }
+
+  ChatMessage.prototype.isSystemMessage = function () {
+    return this.message_source === 'system'
   }
 
   ChatMessage.prototype.isRead = function () {
@@ -193,10 +215,7 @@ module.exports = sequelize => {
       status: ['sent', 'delivered']
     }
 
-    return this.update(
-      { status: 'read' },
-      { where }
-    )
+    return this.update({ status: 'read' }, { where })
   }
 
   return ChatMessage

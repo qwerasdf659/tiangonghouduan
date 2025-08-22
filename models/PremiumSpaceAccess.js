@@ -1,5 +1,5 @@
 /**
- * 餐厅积分抽奖系统 v2.0 - 臻选空间访问模型
+ * 餐厅积分抽奖系统 v3.0 - 臻选空间访问模型
  * 管理用户臻选空间的解锁状态和访问权限
  */
 
@@ -44,19 +44,19 @@ module.exports = sequelize => {
       required_cumulative_points: {
         type: DataTypes.INTEGER,
         allowNull: false,
-        defaultValue: 500000,
+        defaultValue: 100000, // 🔧 修复：改为10万积分（需求文档要求）
         comment: '需要的累计积分'
       },
       unlock_cost_points: {
         type: DataTypes.INTEGER,
         allowNull: false,
-        defaultValue: 100,
+        defaultValue: 1000, // 🔧 修复：改为1000积分（需求文档要求）
         comment: '单次解锁消耗积分'
       },
       unlock_duration_hours: {
         type: DataTypes.INTEGER,
         allowNull: false,
-        defaultValue: 24,
+        defaultValue: 48, // 🔧 修复：改为48小时（需求文档要求）
         comment: '解锁有效时长（小时）'
       },
 
@@ -160,9 +160,9 @@ module.exports = sequelize => {
       defaults: {
         user_id: userId,
         is_unlocked: false,
-        required_cumulative_points: 500000,
-        unlock_cost_points: 100,
-        unlock_duration_hours: 24,
+        required_cumulative_points: 100000, // 🔧 修复：改为10万积分
+        unlock_cost_points: 1000, // 🔧 修复：改为1000积分
+        unlock_duration_hours: 48, // 🔧 修复：改为48小时
         unlock_count: 0,
         total_cost_points: 0
       }

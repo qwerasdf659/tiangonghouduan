@@ -45,14 +45,16 @@ SEALOS_SECRET_KEY=skxg8mk5gqfhf9xz
 SEALOS_REGION=bja
 
 # 🔴 OCR服务配置（图片识别）
-OCR_PROVIDER=mock
-OCR_API_KEY=your_ocr_api_key
-OCR_SECRET_KEY=your_ocr_secret_key
+# 生产环境请配置真实的OCR服务提供商
+OCR_PROVIDER=baidu_ocr
+OCR_API_KEY=your_baidu_ocr_api_key
+OCR_SECRET_KEY=your_baidu_ocr_secret_key
 
-# 🔴 短信验证码服务配置（可选）
-SMS_PROVIDER=mock
-SMS_ACCESS_KEY=your_sms_access_key
-SMS_SECRET_KEY=your_sms_secret_key
+# 🔴 短信验证码服务配置（生产环境必须配置真实短信服务）
+# 开发环境可暂时跳过短信发送，使用万能验证码123456
+SMS_PROVIDER=aliyun_sms
+SMS_ACCESS_KEY=your_aliyun_sms_access_key
+SMS_SECRET_KEY=your_aliyun_sms_secret_key
 SMS_SIGN_NAME=餐厅积分系统
 SMS_TEMPLATE_CODE=SMS_123456789
 

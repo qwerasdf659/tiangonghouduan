@@ -114,7 +114,10 @@ module.exports = {
         })
         console.log('✅ lottery_records 用户时间复合索引已添加')
       } catch (error) {
-        if (error.name === 'SequelizeDatabaseError' && error.message.includes('Duplicate key name')) {
+        if (
+          error.name === 'SequelizeDatabaseError' &&
+          error.message.includes('Duplicate key name')
+        ) {
           console.log('✅ lottery_records 用户时间复合索引已存在')
         } else {
           console.log('⚠️ lottery_records 索引添加失败:', error.message)
@@ -129,7 +132,10 @@ module.exports = {
         })
         console.log('✅ exchange_records 状态时间索引已添加')
       } catch (error) {
-        if (error.name === 'SequelizeDatabaseError' && error.message.includes('Duplicate key name')) {
+        if (
+          error.name === 'SequelizeDatabaseError' &&
+          error.message.includes('Duplicate key name')
+        ) {
           console.log('✅ exchange_records 状态时间索引已存在')
         } else {
           console.log('⚠️ exchange_records 索引添加失败:', error.message)
@@ -148,12 +154,20 @@ module.exports = {
 
     try {
       // 删除添加的索引
-      await queryInterface.removeIndex('lottery_records', 'idx_lottery_records_user_time').catch(() => {})
-      await queryInterface.removeIndex('exchange_records', 'idx_exchange_records_status_time').catch(() => {})
+      await queryInterface
+        .removeIndex('lottery_records', 'idx_lottery_records_user_time')
+        .catch(() => {})
+      await queryInterface
+        .removeIndex('exchange_records', 'idx_exchange_records_status_time')
+        .catch(() => {})
 
       // 删除添加的外键约束
-      await queryInterface.removeConstraint('exchange_records', 'fk_exchange_records_product_id').catch(() => {})
-      await queryInterface.removeConstraint('lottery_records', 'fk_lottery_records_prize_id').catch(() => {})
+      await queryInterface
+        .removeConstraint('exchange_records', 'fk_exchange_records_product_id')
+        .catch(() => {})
+      await queryInterface
+        .removeConstraint('lottery_records', 'fk_lottery_records_prize_id')
+        .catch(() => {})
 
       // 注意：不删除主键约束，因为这可能会破坏数据完整性
       console.log('✅ 数据库一致性修复回滚完成')

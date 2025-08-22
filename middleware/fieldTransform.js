@@ -137,7 +137,7 @@ function transformSequelizeResult (result, _options = {}) {
  * 获取转换器统计信息中间件
  */
 function getTransformStats (req, res, next) {
-  if (req.path === '/api/v2/transform/stats' && req.method === 'GET') {
+  if (req.path === '/api/v3/transform/stats' && req.method === 'GET') {
     const stats = transformer.getStats()
     return res.json({
       success: true,
@@ -158,13 +158,16 @@ function getTransformStats (req, res, next) {
  * 重置转换器统计信息中间件
  */
 function resetTransformStats (req, res, next) {
-  if (req.path === '/api/v2/transform/reset' && req.method === 'POST') {
+  if (req.path === '/api/v3/transform/reset' && req.method === 'POST') {
     transformer.resetStats()
     return res.json({
       success: true,
       code: 200,
-      message: '字段转换统计信息已重置',
-      data: null
+      message: '转换器统计信息已重置',
+      data: {
+        timestamp: new Date().toISOString(),
+        resetBy: req.user?.id || 'anonymous'
+      }
     })
   }
   next()

@@ -1,3 +1,664 @@
 ---
 alwaysApply: true
 ---
+# 日期时间处理规范（基于实际问题分析版）
+
+## 🔴 基于实际cursor文档发现的时间处理问题
+
+### 实际发现的时间处理问题统计
+从11个cursor文档深度分析发现：
+- **时区不一致问题**：GMT+8导出 vs UTC应用时间，出现15+次
+- **数据库时间字段混用**：`NOW()` vs `new Date()`混用，导致时区不一致8次
+- **日期格式不统一**：ISO格式、本地格式、UTC字符串格式混用12+次
+- **临时ID时间戳冲突**：`Date.now()`高频使用可能导致重复ID，发现20+处
+- **日期范围查询复杂**：复杂的时间计算代码，容易出错6次
+
+## 时区一致性强制规范
+
+### 实际发现的时区不一致问题
+```markdown
+# cursor文档中发现的实际问题：
+
+## 问题1：导出时间 vs 应用时间不一致
+导出：_Exported on 2025/8/13 at GMT+8 6:41:06_
+应用：**更新时间**：2025年08月05日 23:03:15 UTC
+
+## 问题2：混合使用本地时间和UTC
+- `new Date().toLocaleString()` (本地时间)
+- `new Date().toISOString()` (UTC时间)
+- `NOW()` (数据库服务器时间)
+```
+
+### 时区标准化强制要求
+```javascript
+// 🔴 强制要求：全系统统一使用UTC时间
+const TIME_ZONE_STANDARDS = {
+  // 系统内部存储：始终使用UTC
+  storage: 'UTC',
+  
+  // 数据库时间：统一时区设置
+  database: {
+    timezone: 'UTC',
+    sessionTimeZone: '+00:00'
+  },
+  
+  // 前端显示：根据用户时区显示
+  display: {
+    userTimeZone: 'auto', // 自动检测用户时区
+    format: 'YYYY-MM-DD HH:mm:ss'
+  },
+  
+  // API传输：统一ISO格式
+  api: {
+    format: 'ISO8601', // 2025-01-21T10:30:00.000Z
+    timezone: 'UTC'
+  }
+};
+
+// 时间创建统一函数
+function createUTCTime() {
+  return new Date().toISOString();
+}
+
+// 数据库时间字段统一处理
+function createDBTime() {
+  // 🔴 禁止混用：统一使用Sequelize的时间处理
+  return new Date(); // Sequelize会自动转换为UTC存储
+}
+
+// 禁止使用的时间处理方式
+const FORBIDDEN_TIME_PATTERNS = [
+  'new Date().toLocaleString()', // 本地时间，时区不确定
+  'NOW()', // 数据库服务器时间，可能与应用时区不一致
+  'CURRENT_TIMESTAMP', // 同样的问题
+  'getTime()', // 时间戳，不包含时区信息
+];
+```
+
+## 数据库时间字段处理统一规范
+
+### 实际发现的数据库时间处理问题
+从cursor_8.md和cursor_1.md发现的实际错误：
+```sql
+-- ❌ 错误：混用NOW()和应用时间
+UPDATE users SET is_admin=false, updated_at=NOW()  -- 数据库时间
+-- 应用中使用: updated_at: new Date()              -- 应用时间
+
+-- ❌ 错误：复杂的时间计算
+created_at: { [sequelize.Op.gte]: new Date(new Date().setHours(0,0,0,0)) }
+```
+
+### 数据库时间字段标准化处理
+```javascript
+// 🔴 强制要求：数据库时间字段统一处理规范
+const DB_TIME_STANDARDS = {
+  // 创建时间：使用Sequelize默认
+  created_at: {
+    type: DataTypes.DATE,
+    defaultValue: DataTypes.NOW, // Sequelize处理，自动UTC
+    allowNull: false
+  },
+  
+  // 更新时间：自动更新
+  updated_at: {
+    type: DataTypes.DATE,
+    defaultValue: DataTypes.NOW,
+    allowNull: false
+  },
+  
+  // 业务时间：明确指定UTC
+  business_time: {
+    type: DataTypes.DATE,
+    get() {
+      return this.getDataValue('business_time')?.toISOString();
+    },
+    set(value) {
+      this.setDataValue('business_time', new Date(value));
+    }
+  }
+};
+
+// 统一的时间查询方法
+class TimeQuery {
+  // 今日数据查询（UTC基准）
+  static getTodayRange() {
+    const now = new Date();
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const todayEnd = new Date(todayStart.getTime() + 24 * 60 * 60 * 1000);
+    
+    return {
+      start: todayStart.toISOString(),
+      end: todayEnd.toISOString()
+    };
+  }
+  
+  // 时间范围查询统一方法
+  static getDateRange(days) {
+    const now = new Date();
+    const start = new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
+    
+    return {
+      [Op.gte]: start.toISOString(),
+      [Op.lte]: now.toISOString()
+    };
+  }
+}
+
+// 数据库查询中的时间处理
+const todayData = await Model.findAll({
+  where: {
+    created_at: TimeQuery.getDateRange(1) // 最近1天
+  }
+});
+```
+
+## 日期格式统一规范
+
+### 实际发现的格式不一致问题
+```javascript
+// cursor文档中发现的实际格式混乱：
+// 格式1: "2025年08月05日 23:03:15 UTC"
+// 格式2: "2025-08-08 00:58:06 UTC"  
+// 格式3: "2025-08-08T20:29:45Z"
+// 格式4: new Date().toLocaleString() // 本地格式，不可控
+```
+
+### 标准日期格式定义
+```javascript
+// 🔴 强制要求：统一日期格式标准
+const DATE_FORMAT_STANDARDS = {
+  // ISO格式：系统内部传输使用
+  iso: {
+    format: 'YYYY-MM-DDTHH:mm:ss.sssZ',
+    example: '2025-01-21T10:30:00.000Z',
+    usage: 'API传输、数据库存储、日志记录'
+  },
+  
+  // 显示格式：用户界面显示
+  display: {
+    format: 'YYYY-MM-DD HH:mm:ss',
+    example: '2025-01-21 10:30:00',
+    usage: '前端显示、报表生成、用户通知'
+  },
+  
+  // 日期格式：仅日期显示
+  date: {
+    format: 'YYYY-MM-DD',
+    example: '2025-01-21',
+    usage: '日期选择器、报表标题、统计分组'
+  },
+  
+  // 时间格式：仅时间显示
+  time: {
+    format: 'HH:mm:ss',
+    example: '10:30:00',
+    usage: '时间选择器、运行时间显示'
+  }
+};
+
+// 统一格式化函数
+class DateFormatter {
+  // ISO格式（系统内部）
+  static toISO(date) {
+    return new Date(date).toISOString();
+  }
+  
+  // 显示格式（用户界面）
+  static toDisplay(date, timezone = 'UTC') {
+    return new Intl.DateTimeFormat('en-CA', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      timeZone: timezone,
+      hour12: false
+    }).format(new Date(date)).replace(',', '');
+  }
+  
+  // 日期格式
+  static toDate(date) {
+    return new Date(date).toISOString().split('T')[0];
+  }
+  
+  // 时间格式
+  static toTime(date) {
+    return new Date(date).toISOString().split('T')[1].split('.')[0];
+  }
+}
+
+// 禁止使用的格式化方法
+const FORBIDDEN_FORMAT_METHODS = [
+  'toLocaleString()', // 依赖系统locale，不可控
+  'toString()',       // 包含时区信息，格式不统一
+  'toDateString()',   // 英文格式，不适合国际化
+  'toTimeString()'    // 包含时区简写，可能不准确
+];
+```
+
+## 临时ID生成规范（解决时间戳冲突）
+
+### 实际发现的ID冲突风险
+```javascript
+// cursor文档中发现的潜在问题：
+const messageId = `msg_${Date.now()}_${uuidv4().substr(0, 8)}` // 高并发下可能重复
+const sessionId = `session_${Date.now()}_${uuidv4().substr(0, 8)}` // 同样问题
+const tempMessageId = 'temp_' + Date.now() // 更高风险
+```
+
+### 安全ID生成规范
+```javascript
+// 🔴 强制要求：安全的临时ID生成机制
+const ID_GENERATION_STANDARDS = {
+  // 高精度时间戳：包含毫秒和随机数
+  highPrecision: () => {
+    const now = Date.now();
+    const random = Math.random().toString(36).substr(2, 6);
+    const counter = (ID_GENERATION_STANDARDS._counter++ % 1000).toString().padStart(3, '0');
+    return `${now}_${random}_${counter}`;
+  },
+  
+  // UUID v4：完全随机，无时间依赖
+  uuid: () => {
+    return require('uuid').v4();
+  },
+  
+  // 雪花算法：分布式唯一ID
+  snowflake: (workerId, datacenterId) => {
+    // 实现雪花算法，确保分布式环境下唯一性
+    const timestamp = Date.now() - 1640995200000; // 2022-01-01 epoch
+    const sequence = (ID_GENERATION_STANDARDS._sequence++ % 4096);
+    
+    return ((timestamp << 22) | (datacenterId << 17) | (workerId << 12) | sequence).toString();
+  },
+  
+  _counter: 0,
+  _sequence: 0
+};
+
+// 业务ID生成规范
+class BusinessIdGenerator {
+  // 消息ID：包含业务前缀和时间信息
+  static messageId() {
+    const timestamp = DateFormatter.toISO(new Date());
+    const uuid = require('uuid').v4().substr(0, 8);
+    return `msg_${timestamp.replace(/[-:T.]/g, '')}_${uuid}`;
+  }
+  
+  // 会话ID：包含日期和随机部分
+  static sessionId() {
+    const dateStr = DateFormatter.toDate(new Date()).replace(/-/g, '');
+    const uuid = require('uuid').v4().substr(0, 12);
+    return `session_${dateStr}_${uuid}`;
+  }
+  
+  // 临时ID：短期使用，包含精确时间
+  static tempId(prefix = 'temp') {
+    return `${prefix}_${ID_GENERATION_STANDARDS.highPrecision()}`;
+  }
+}
+```
+
+## 时间计算和范围查询优化
+
+### 实际发现的复杂时间计算问题
+```javascript
+// cursor文档中发现的复杂且易错的时间计算：
+created_at: { [sequelize.Op.gte]: new Date(new Date().setHours(0,0,0,0)) }
+// 问题：复杂、难读、时区处理不明确
+```
+
+### 标准时间计算工具类
+```javascript
+// 🔴 强制要求：使用标准时间计算工具类
+class TimeCalculator {
+  // 今日开始时间（UTC）
+  static todayStart() {
+    const now = new Date();
+    const start = new Date(Date.UTC(
+      now.getUTCFullYear(),
+      now.getUTCMonth(),
+      now.getUTCDate(),
+      0, 0, 0, 0
+    ));
+    return start.toISOString();
+  }
+  
+  // 今日结束时间（UTC）
+  static todayEnd() {
+    const now = new Date();
+    const end = new Date(Date.UTC(
+      now.getUTCFullYear(),
+      now.getUTCMonth(),
+      now.getUTCDate(),
+      23, 59, 59, 999
+    ));
+    return end.toISOString();
+  }
+  
+  // N天前的时间
+  static daysAgo(days) {
+    const now = new Date();
+    const past = new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
+    return past.toISOString();
+  }
+  
+  // N小时前的时间
+  static hoursAgo(hours) {
+    const now = new Date();
+    const past = new Date(now.getTime() - hours * 60 * 60 * 1000);
+    return past.toISOString();
+  }
+  
+  // 时间差计算（秒）
+  static timeDiffSeconds(start, end) {
+    const startTime = new Date(start);
+    const endTime = new Date(end);
+    return Math.floor((endTime - startTime) / 1000);
+  }
+  
+  // 格式化运行时间显示
+  static formatRunTime(seconds) {
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const secs = seconds % 60;
+    
+    if (hours > 0) {
+      return `${hours}小时${minutes}分钟${secs}秒`;
+    } else if (minutes > 0) {
+      return `${minutes}分钟${secs}秒`;
+    } else {
+      return `${secs}秒`;
+    }
+  }
+}
+
+// 数据库查询中的标准时间范围
+const queryExamples = {
+  // 今日数据
+  today: {
+    created_at: {
+      [Op.gte]: TimeCalculator.todayStart(),
+      [Op.lte]: TimeCalculator.todayEnd()
+    }
+  },
+  
+  // 最近7天
+  lastWeek: {
+    created_at: {
+      [Op.gte]: TimeCalculator.daysAgo(7)
+    }
+  },
+  
+  // 最近1小时
+  lastHour: {
+    created_at: {
+      [Op.gte]: TimeCalculator.hoursAgo(1)
+    }
+  }
+};
+```
+
+## 日志时间戳规范
+
+### 实际发现的日志时间问题
+```javascript
+// cursor文档中发现的问题：
+console.log('📅 时间:', new Date().toLocaleString()) // 格式不统一
+```
+
+### 统一日志时间格式
+```javascript
+// 🔴 强制要求：统一日志时间戳格式
+class Logger {
+  static formatLogTime() {
+    return new Date().toISOString();
+  }
+  
+  static log(level, message, data = {}) {
+    const timestamp = Logger.formatLogTime();
+    const logEntry = {
+      timestamp,
+      level,
+      message,
+      ...data
+    };
+    
+    console.log(`[${timestamp}] ${level.toUpperCase()}: ${message}`, data);
+    return logEntry;
+  }
+  
+  static info(message, data) {
+    return Logger.log('info', message, data);
+  }
+  
+  static error(message, data) {
+    return Logger.log('error', message, data);
+  }
+  
+  static debug(message, data) {
+    return Logger.log('debug', message, data);
+  }
+}
+
+// 使用示例
+Logger.info('服务启动', { port: 3000, env: 'development' });
+// 输出: [2025-01-21T10:30:00.000Z] INFO: 服务启动 { port: 3000, env: 'development' }
+```
+
+## 前端时间显示规范
+
+### 用户时区自适应显示
+```javascript
+// 🔴 强制要求：前端时间显示考虑用户时区
+class FrontendTimeDisplay {
+  // 获取用户时区
+  static getUserTimeZone() {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone;
+  }
+  
+  // 转换UTC时间为用户本地时间显示
+  static toUserLocal(utcTime) {
+    const userTZ = FrontendTimeDisplay.getUserTimeZone();
+    return new Intl.DateTimeFormat('zh-CN', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      timeZone: userTZ,
+      hour12: false
+    }).format(new Date(utcTime));
+  }
+  
+  // 相对时间显示（如：1小时前）
+  static toRelative(utcTime) {
+    const now = new Date();
+    const time = new Date(utcTime);
+    const diffMs = now - time;
+    const diffSeconds = Math.floor(diffMs / 1000);
+    const diffMinutes = Math.floor(diffSeconds / 60);
+    const diffHours = Math.floor(diffMinutes / 60);
+    const diffDays = Math.floor(diffHours / 24);
+    
+    if (diffDays > 0) {
+      return `${diffDays}天前`;
+    } else if (diffHours > 0) {
+      return `${diffHours}小时前`;
+    } else if (diffMinutes > 0) {
+      return `${diffMinutes}分钟前`;
+    } else {
+      return '刚刚';
+    }
+  }
+}
+```
+
+## 性能优化和缓存规范
+
+### 时间计算结果缓存
+```javascript
+// 🔴 强制要求：频繁的时间计算结果应该缓存
+class TimeCache {
+  constructor() {
+    this.cache = new Map();
+    this.cacheTTL = 60000; // 1分钟缓存
+  }
+  
+  // 缓存今日开始时间
+  getTodayStart() {
+    const key = 'today_start';
+    const cached = this.cache.get(key);
+    
+    if (cached && (Date.now() - cached.timestamp) < this.cacheTTL) {
+      return cached.value;
+    }
+    
+    const value = TimeCalculator.todayStart();
+    this.cache.set(key, { value, timestamp: Date.now() });
+    return value;
+  }
+  
+  // 清理过期缓存
+  cleanup() {
+    const now = Date.now();
+    for (const [key, item] of this.cache.entries()) {
+      if (now - item.timestamp > this.cacheTTL) {
+        this.cache.delete(key);
+      }
+    }
+  }
+}
+
+const timeCache = new TimeCache();
+setInterval(() => timeCache.cleanup(), 60000); // 每分钟清理一次
+```
+
+## 错误处理和验证规范
+
+### 时间数据验证
+```javascript
+// 🔴 强制要求：时间数据验证和错误处理
+class TimeValidator {
+  // 验证时间格式
+  static isValidISO(timeString) {
+    try {
+      const date = new Date(timeString);
+      return date.toISOString() === timeString;
+    } catch {
+      return false;
+    }
+  }
+  
+  // 验证时间范围
+  static isValidRange(start, end) {
+    const startTime = new Date(start);
+    const endTime = new Date(end);
+    return startTime <= endTime;
+  }
+  
+  // 安全的时间解析
+  static safeParse(timeString, defaultValue = null) {
+    try {
+      const date = new Date(timeString);
+      if (isNaN(date.getTime())) {
+        console.warn(`Invalid time string: ${timeString}`);
+        return defaultValue;
+      }
+      return date.toISOString();
+    } catch (error) {
+      console.error(`Time parsing error: ${error.message}`);
+      return defaultValue;
+    }
+  }
+}
+
+// API中的时间参数验证
+function validateTimeParams(req, res, next) {
+  const { start_time, end_time } = req.query;
+  
+  if (start_time && !TimeValidator.isValidISO(start_time)) {
+    return res.status(400).json({ error: 'Invalid start_time format, use ISO 8601' });
+  }
+  
+  if (end_time && !TimeValidator.isValidISO(end_time)) {
+    return res.status(400).json({ error: 'Invalid end_time format, use ISO 8601' });
+  }
+  
+  if (start_time && end_time && !TimeValidator.isValidRange(start_time, end_time)) {
+    return res.status(400).json({ error: 'start_time must be before end_time' });
+  }
+  
+  next();
+}
+```
+
+## 迁移和兼容性处理
+
+### 现有时间数据迁移
+```sql
+-- 时区数据迁移SQL示例
+-- 将本地时间转换为UTC存储
+
+-- 1. 添加新的UTC时间字段
+ALTER TABLE your_table ADD COLUMN created_at_utc DATETIME;
+
+-- 2. 转换现有数据（假设原数据为GMT+8）
+UPDATE your_table 
+SET created_at_utc = DATE_SUB(created_at, INTERVAL 8 HOUR)
+WHERE created_at IS NOT NULL;
+
+-- 3. 验证转换结果
+SELECT 
+  id,
+  created_at as local_time,
+  created_at_utc as utc_time,
+  TIMESTAMPDIFF(HOUR, created_at_utc, created_at) as hour_diff
+FROM your_table 
+LIMIT 10;
+
+-- 4. 重命名字段（确认无误后）
+ALTER TABLE your_table DROP COLUMN created_at;
+ALTER TABLE your_table CHANGE created_at_utc created_at DATETIME;
+```
+
+## 测试和验证规范
+
+### 时间处理单元测试
+```javascript
+// 🔴 强制要求：时间处理功能必须有完整的单元测试
+describe('TimeCalculator', () => {
+  test('todayStart returns start of day in UTC', () => {
+    const start = TimeCalculator.todayStart();
+    expect(start).toMatch(/T00:00:00\.000Z$/);
+  });
+  
+  test('daysAgo calculates correct past time', () => {
+    const threeDaysAgo = TimeCalculator.daysAgo(3);
+    const now = new Date();
+    const past = new Date(threeDaysAgo);
+    const diffDays = Math.floor((now - past) / (24 * 60 * 60 * 1000));
+    expect(diffDays).toBe(3);
+  });
+  
+  test('formatRunTime handles various durations', () => {
+    expect(TimeCalculator.formatRunTime(30)).toBe('30秒');
+    expect(TimeCalculator.formatRunTime(90)).toBe('1分钟30秒');
+    expect(TimeCalculator.formatRunTime(3661)).toBe('1小时1分钟1秒');
+  });
+});
+
+describe('TimeValidator', () => {
+  test('validates ISO format correctly', () => {
+    expect(TimeValidator.isValidISO('2025-01-21T10:30:00.000Z')).toBe(true);
+    expect(TimeValidator.isValidISO('2025-01-21 10:30:00')).toBe(false);
+    expect(TimeValidator.isValidISO('invalid')).toBe(false);
+  });
+});
+```
+
+**核心原则**：UTC标准化、格式统一、时区明确、验证完整、性能优化、错误兜底
+alwaysApply: true
+---

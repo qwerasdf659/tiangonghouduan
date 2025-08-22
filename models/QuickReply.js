@@ -129,15 +129,15 @@ module.exports = sequelize => {
     }
 
     if (adminId !== null) {
-      where[sequelize.Op.or] = [
-        { admin_id: null },
-        { admin_id: adminId }
-      ]
+      where[sequelize.Op.or] = [{ admin_id: null }, { admin_id: adminId }]
     }
 
     return this.findAll({
       where,
-      order: [['usage_count', 'DESC'], ['created_at', 'DESC']]
+      order: [
+        ['usage_count', 'DESC'],
+        ['created_at', 'DESC']
+      ]
     })
   }
 
@@ -145,10 +145,7 @@ module.exports = sequelize => {
     const where = { is_active: true }
 
     if (adminId !== null) {
-      where[sequelize.Op.or] = [
-        { admin_id: null },
-        { admin_id: adminId }
-      ]
+      where[sequelize.Op.or] = [{ admin_id: null }, { admin_id: adminId }]
     }
 
     return this.findAll({
@@ -176,17 +173,11 @@ module.exports = sequelize => {
     const where = { is_active: true, category: { [sequelize.Op.ne]: null } }
 
     if (adminId !== null) {
-      where[sequelize.Op.or] = [
-        { admin_id: null },
-        { admin_id: adminId }
-      ]
+      where[sequelize.Op.or] = [{ admin_id: null }, { admin_id: adminId }]
     }
 
     const categories = await this.findAll({
-      attributes: [
-        'category',
-        [sequelize.fn('COUNT', sequelize.col('id')), 'count']
-      ],
+      attributes: ['category', [sequelize.fn('COUNT', sequelize.col('id')), 'count']],
       where,
       group: ['category'],
       order: [['category', 'ASC']]

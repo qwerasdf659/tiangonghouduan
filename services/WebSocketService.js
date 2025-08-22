@@ -1,5 +1,5 @@
 /**
- * 餐厅积分抽奖系统 v2.0 - WebSocket实时通信服务
+ * 餐厅积分抽奖系统 v3.0 - WebSocket实时通信服务
  * 实现WebSocket连接管理和消息推送功能
  */
 
@@ -29,31 +29,41 @@ class WebSocketService {
    * @param {Object} options - WebSocket配置选项
    */
   initialize (server, options = {}) {
-    const wsOptions = {
-      server,
-      path: '/ws',
-      clientTracking: true,
-      maxPayload: 16 * 1024, // 16KB最大消息大小
-      ...options
+    try {
+      const wsOptions = {
+        server,
+        path: '/ws',
+        clientTracking: true,
+        maxPayload: 16 * 1024, // 16KB最大消息大小
+        perMessageDeflate: false, // 禁用压缩以提高性能
+        ...options
+      }
+
+      this.wss = new WebSocket.Server(wsOptions)
+
+      this.wss.on('connection', (ws, req) => {
+        // 异步处理连接，避免阻塞
+        setImmediate(() => {
+          this.handleConnection(ws, req)
+        })
+      })
+
+      this.wss.on('error', error => {
+        console.error('❌ WebSocket服务器错误:', error.message)
+        // 记录错误但不中断服务
+      })
+
+      // 优化：使用更长的清理间隔，减少系统负载
+      this.cleanupIntervalId = setInterval(() => {
+        this.cleanupConnections()
+      }, 60000) // 改为60秒清理一次
+
+      console.log(`✅ WebSocket服务器启动成功，路径: ${wsOptions.path}`)
+      return this.wss
+    } catch (error) {
+      console.error('❌ WebSocket服务器初始化失败:', error.message)
+      throw error
     }
-
-    this.wss = new WebSocket.Server(wsOptions)
-
-    this.wss.on('connection', (ws, req) => {
-      this.handleConnection(ws, req)
-    })
-
-    this.wss.on('error', error => {
-      console.error('❌ WebSocket服务器错误:', error.message)
-    })
-
-    // 定期清理断开的连接
-    setInterval(() => {
-      this.cleanupConnections()
-    }, 30000) // 30秒清理一次
-
-    console.log(`✅ WebSocket服务器启动成功，路径: ${wsOptions.path}`)
-    return this.wss
   }
 
   /**
@@ -159,7 +169,7 @@ class WebSocketService {
         // TODO: 实现取消订阅功能
         break
 
-      // 🔥 新增：聊天客服系统消息处理
+        // 🔥 新增：聊天客服系统消息处理
       case 'subscribe_session':
       case 'chat_message':
       case 'typing_start':
@@ -870,7 +880,9 @@ class WebSocketService {
       }
 
       if (forwarded) {
-        console.log(`📨 聊天消息转发成功: ${sessionId} - ${senderType} -> ${content.substring(0, 50)}...`)
+        console.log(
+          `📨 聊天消息转发成功: ${sessionId} - ${senderType} -> ${content.substring(0, 50)}...`
+        )
       } else {
         console.log(`📨 聊天消息已发送，但接收者不在线: ${sessionId}`)
       }
@@ -952,7 +964,9 @@ class WebSocketService {
       }
 
       if (forwarded) {
-        console.log(`⌨️ 输入状态转发: 用户${ws.userId} ${isTyping ? '开始' : '停止'}输入 - 会话${sessionId}`)
+        console.log(
+          `⌨️ 输入状态转发: 用户${ws.userId} ${isTyping ? '开始' : '停止'}输入 - 会话${sessionId}`
+        )
       }
     } catch (error) {
       console.error('❌ 处理输入状态失败:', error.message)
@@ -1057,7 +1071,9 @@ class WebSocketService {
           }
         }
 
-        console.log(`👀 消息已读标记完成: 用户${ws.userId} 标记了${updatedCount}条消息 - 会话${sessionId}`)
+        console.log(
+          `👀 消息已读标记完成: 用户${ws.userId} 标记了${updatedCount}条消息 - 会话${sessionId}`
+        )
 
         if (notified) {
           console.log(`📬 已读通知已发送: 会话${sessionId}`)
@@ -1089,6 +1105,12 @@ class WebSocketService {
       clearTimeout(timeoutId)
     }
     this.heartbeatTimeouts.clear()
+
+    // 清理清理间隔定时器
+    if (this.cleanupIntervalId) {
+      clearInterval(this.cleanupIntervalId)
+      this.cleanupIntervalId = null
+    }
   }
 }
 

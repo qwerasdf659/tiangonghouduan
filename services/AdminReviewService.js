@@ -550,29 +550,35 @@ class AdminReviewService {
       today.setHours(0, 0, 0, 0)
 
       // 查询今日处理数量
-      const todayProcessed = await this.sequelize.query(`
+      const todayProcessed = await this.sequelize.query(
+        `
         SELECT COUNT(*) as count
         FROM upload_reviews
         WHERE reviewer_id = :reviewerId
         AND DATE(updated_at) = DATE(:today)
         AND review_status IN ('approved', 'rejected')
-      `, {
-        replacements: { reviewerId, today },
-        type: this.sequelize.QueryTypes.SELECT,
-        transaction
-      })
+      `,
+        {
+          replacements: { reviewerId, today },
+          type: this.sequelize.QueryTypes.SELECT,
+          transaction
+        }
+      )
 
       // 查询总处理数量
-      const totalProcessed = await this.sequelize.query(`
+      const totalProcessed = await this.sequelize.query(
+        `
         SELECT COUNT(*) as count
         FROM upload_reviews
         WHERE reviewer_id = :reviewerId
         AND review_status IN ('approved', 'rejected')
-      `, {
-        replacements: { reviewerId },
-        type: this.sequelize.QueryTypes.SELECT,
-        transaction
-      })
+      `,
+        {
+          replacements: { reviewerId },
+          type: this.sequelize.QueryTypes.SELECT,
+          transaction
+        }
+      )
 
       return {
         today_processed: todayProcessed[0]?.count || 0,

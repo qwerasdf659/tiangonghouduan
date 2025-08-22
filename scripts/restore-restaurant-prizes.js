@@ -31,7 +31,7 @@ async function restoreRestaurantPrizes () {
         prize_name: '八八折券',
         prize_type: 'coupon',
         prize_value: 0, // 暂时停用，概率为0%
-        win_rate: 0.00, // 0%
+        win_rate: 0.0, // 0%
         display_order: 1,
         description: '全场八八折优惠券（暂时停用）',
         is_active: false, // 概率为0的奖品设为不活跃
@@ -41,7 +41,7 @@ async function restoreRestaurantPrizes () {
         prize_name: '九八折券',
         prize_type: 'coupon',
         prize_value: 10,
-        win_rate: 0.10, // 10%
+        win_rate: 0.1, // 10%
         display_order: 2,
         description: '全场九八折优惠券，满100可用',
         is_active: true,
@@ -51,7 +51,7 @@ async function restoreRestaurantPrizes () {
         prize_name: '甜品1份',
         prize_type: 'physical',
         prize_value: 25,
-        win_rate: 0.30, // 30%
+        win_rate: 0.3, // 30%
         display_order: 3,
         description: '免费获得精选甜品一份',
         is_active: true,
@@ -61,7 +61,7 @@ async function restoreRestaurantPrizes () {
         prize_name: '青菜1份',
         prize_type: 'physical',
         prize_value: 15,
-        win_rate: 0.30, // 30%
+        win_rate: 0.3, // 30%
         display_order: 4,
         description: '免费获得新鲜青菜一份',
         is_active: true,
@@ -81,7 +81,7 @@ async function restoreRestaurantPrizes () {
         prize_name: '花甲1份',
         prize_type: 'physical',
         prize_value: 28,
-        win_rate: 0.20, // 20%
+        win_rate: 0.2, // 20%
         display_order: 6,
         description: '免费获得花甲一份',
         is_active: true,
@@ -101,7 +101,7 @@ async function restoreRestaurantPrizes () {
         prize_name: '生腌拼盘',
         prize_type: 'physical',
         prize_value: 0, // 暂时停用，概率为0%
-        win_rate: 0.00, // 0%
+        win_rate: 0.0, // 0%
         display_order: 8,
         description: '精品生腌拼盘（暂时停用）',
         is_active: false, // 概率为0的奖品设为不活跃
@@ -131,7 +131,9 @@ async function restoreRestaurantPrizes () {
     console.log('📝 完整奖品配置详情:')
     allPrizes.forEach(prize => {
       const status = prize.is_active ? '✅' : '❌'
-      console.log(`  ${status} ${prize.display_order}. ${prize.prize_name} (${(prize.win_rate * 100).toFixed(1)}%)`)
+      console.log(
+        `  ${status} ${prize.display_order}. ${prize.prize_name} (${(prize.win_rate * 100).toFixed(1)}%)`
+      )
     })
 
     const activeCount = allPrizes.filter(p => p.is_active).length

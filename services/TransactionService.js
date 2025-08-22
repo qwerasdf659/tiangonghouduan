@@ -1,5 +1,5 @@
 /**
- * 餐厅积分抽奖系统 v2.0 - 交易记录服务
+ * 餐厅积分抽奖系统 v3.0 - 交易记录服务
  * 聚合各种交易记录提供统一的交易历史API
  * 创建时间：2025年01月28日
  */
@@ -58,9 +58,8 @@ class TransactionService {
 
       // 关键词筛选
       if (keyword) {
-        allRecords = allRecords.filter(record =>
-          record.title.includes(keyword) ||
-          record.description.includes(keyword)
+        allRecords = allRecords.filter(
+          record => record.title.includes(keyword) || record.description.includes(keyword)
         )
       }
 
@@ -69,10 +68,14 @@ class TransactionService {
         allRecords = allRecords.filter(record => {
           const absAmount = Math.abs(record.amount)
           switch (amountFilter) {
-          case 'small': return absAmount <= 100
-          case 'medium': return absAmount > 100 && absAmount <= 500
-          case 'large': return absAmount > 500
-          default: return true
+          case 'small':
+            return absAmount <= 100
+          case 'medium':
+            return absAmount > 100 && absAmount <= 500
+          case 'large':
+            return absAmount > 500
+          default:
+            return true
           }
         })
       }
@@ -183,10 +186,15 @@ class TransactionService {
         pageSize: 10000 // 获取所有记录
       })
 
-      // 生成导出文件URL（这里简化处理，实际应该生成真实的文件）
+      // 生成导出文件URL（使用真实的存储服务配置）
       const timestamp = moment().format('YYYYMMDD_HHmmss')
       const filename = `交易记录_${userId}_${timestamp}.${format === 'excel' ? 'xlsx' : 'csv'}`
-      const downloadUrl = `https://storage.example.com/exports/${filename}`
+
+      // ✅ 使用真实的Sealos存储服务URL，不再使用占位符
+      const storageEndpoint =
+        process.env.SEALOS_ENDPOINT || 'https://objectstorageapi.bja.sealos.run'
+      const bucketName = process.env.SEALOS_BUCKET || 'tiangong'
+      const downloadUrl = `${storageEndpoint}/${bucketName}/exports/${filename}`
 
       return {
         downloadUrl,
@@ -224,11 +232,13 @@ class TransactionService {
 
       // 获取积分记录
       const pointsQuery = {
-        include: [{
-          model: User,
-          as: 'user',
-          attributes: ['user_id', 'mobile', 'nickname']
-        }],
+        include: [
+          {
+            model: User,
+            as: 'user',
+            attributes: ['user_id', 'mobile', 'nickname']
+          }
+        ],
         where: timeCondition,
         order: [['created_at', 'DESC']],
         limit: pageSize * 5 // 获取更多数据用于后续筛选
@@ -284,10 +294,7 @@ class TransactionService {
       if (userId) {
         tradeQuery.where = {
           ...tradeQuery.where,
-          [Op.or]: [
-            { from_user_id: userId },
-            { to_user_id: userId }
-          ]
+          [Op.or]: [{ from_user_id: userId }, { to_user_id: userId }]
         }
       }
 
@@ -409,8 +416,12 @@ class TransactionService {
           totalPages: Math.ceil(totalCount / pageSize)
         },
         summary: {
-          pointsEarned: transactions.filter(t => t.amount > 0).reduce((sum, t) => sum + t.amount, 0),
-          pointsSpent: transactions.filter(t => t.amount < 0).reduce((sum, t) => sum + Math.abs(t.amount), 0),
+          pointsEarned: transactions
+            .filter(t => t.amount > 0)
+            .reduce((sum, t) => sum + t.amount, 0),
+          pointsSpent: transactions
+            .filter(t => t.amount < 0)
+            .reduce((sum, t) => sum + Math.abs(t.amount), 0),
           totalTransactions: totalCount
         }
       }
@@ -630,51 +641,53 @@ class TransactionService {
 
     try {
       // 本月积分收入统计
-      const thisMonthIncome = await PointsRecord.sum('points', {
-        where: {
-          user_id: userId,
-          type: 'earn',
-          created_at: { [Op.gte]: startOfMonth.toDate() }
-        }
-      }) || 0
+      const thisMonthIncome =
+        (await PointsRecord.sum('points', {
+          where: {
+            user_id: userId,
+            type: 'earn',
+            created_at: { [Op.gte]: startOfMonth.toDate() }
+          }
+        })) || 0
 
       // 本月积分支出统计
-      const thisMonthExpense = await PointsRecord.sum('points', {
-        where: {
-          user_id: userId,
-          type: 'spend',
-          created_at: { [Op.gte]: startOfMonth.toDate() }
-        }
-      }) || 0
+      const thisMonthExpense =
+        (await PointsRecord.sum('points', {
+          where: {
+            user_id: userId,
+            type: 'spend',
+            created_at: { [Op.gte]: startOfMonth.toDate() }
+          }
+        })) || 0
 
       // 上月统计用于计算环比
-      const lastMonthIncome = await PointsRecord.sum('points', {
-        where: {
-          user_id: userId,
-          type: 'earn',
-          created_at: {
-            [Op.between]: [startOfLastMonth.toDate(), endOfLastMonth.toDate()]
+      const lastMonthIncome =
+        (await PointsRecord.sum('points', {
+          where: {
+            user_id: userId,
+            type: 'earn',
+            created_at: {
+              [Op.between]: [startOfLastMonth.toDate(), endOfLastMonth.toDate()]
+            }
           }
-        }
-      }) || 0
+        })) || 0
 
-      const lastMonthExpense = await PointsRecord.sum('points', {
-        where: {
-          user_id: userId,
-          type: 'spend',
-          created_at: {
-            [Op.between]: [startOfLastMonth.toDate(), endOfLastMonth.toDate()]
+      const lastMonthExpense =
+        (await PointsRecord.sum('points', {
+          where: {
+            user_id: userId,
+            type: 'spend',
+            created_at: {
+              [Op.between]: [startOfLastMonth.toDate(), endOfLastMonth.toDate()]
+            }
           }
-        }
-      }) || 0
+        })) || 0
 
       // 计算环比变化
-      const incomeChange = lastMonthIncome > 0
-        ? ((thisMonthIncome - lastMonthIncome) / lastMonthIncome * 100)
-        : 0
-      const expenseChange = lastMonthExpense > 0
-        ? ((thisMonthExpense - lastMonthExpense) / lastMonthExpense * 100)
-        : 0
+      const incomeChange =
+        lastMonthIncome > 0 ? ((thisMonthIncome - lastMonthIncome) / lastMonthIncome) * 100 : 0
+      const expenseChange =
+        lastMonthExpense > 0 ? ((thisMonthExpense - lastMonthExpense) / lastMonthExpense) * 100 : 0
 
       // 交易次数统计
       const transactionCount = await PointsRecord.count({
@@ -693,9 +706,10 @@ class TransactionService {
         }
       })
 
-      const countChange = lastMonthTransactionCount > 0
-        ? ((transactionCount - lastMonthTransactionCount) / lastMonthTransactionCount * 100)
-        : 0
+      const countChange =
+        lastMonthTransactionCount > 0
+          ? ((transactionCount - lastMonthTransactionCount) / lastMonthTransactionCount) * 100
+          : 0
 
       return {
         totalIncome: thisMonthIncome,
@@ -826,7 +840,9 @@ class TransactionService {
       description: record.trade_reason,
       status: record.status,
       createdAt: moment(record.created_at).format('YYYY-MM-DD HH:mm:ss'),
-      completedAt: record.updated_at ? moment(record.updated_at).format('YYYY-MM-DD HH:mm:ss') : null,
+      completedAt: record.updated_at
+        ? moment(record.updated_at).format('YYYY-MM-DD HH:mm:ss')
+        : null,
       txnId: record.trade_id.toUpperCase(),
       details: {
         operationSteps: [
@@ -842,7 +858,9 @@ class TransactionService {
           },
           {
             step: '完成交易',
-            time: record.updated_at ? moment(record.updated_at).format('YYYY-MM-DD HH:mm:ss') : null,
+            time: record.updated_at
+              ? moment(record.updated_at).format('YYYY-MM-DD HH:mm:ss')
+              : null,
             status: record.status
           }
         ],

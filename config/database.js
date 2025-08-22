@@ -58,6 +58,29 @@ const dbConfig = {
       underscored: false,
       freezeTableName: true
     }
+  },
+  test: {
+    host: process.env.DB_HOST || 'test-db-mysql.ns-br0za7uc.svc',
+    port: process.env.DB_PORT || 3306,
+    username: process.env.DB_USER || 'root',
+    password: process.env.DB_PASSWORD || 'mc6r9cgb',
+    database: process.env.DB_NAME || 'restaurant_points_dev',
+    dialect: 'mysql',
+    timezone: '+08:00',
+    logging: false,
+    pool: {
+      max: 10,
+      min: 0,
+      acquire: 30000,
+      idle: 10000
+    },
+    define: {
+      charset: 'utf8mb4',
+      collate: 'utf8mb4_unicode_ci',
+      timestamps: true,
+      underscored: false,
+      freezeTableName: true
+    }
   }
 }
 
