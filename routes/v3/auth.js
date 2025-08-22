@@ -1,6 +1,7 @@
 /**
  * 🔥 认证API接口 v3 - 用户认证
- * 创建时间：2025年08月19日 UTC
+ * 创建时间：2025年08月22日 北京时间
+ * 适用区域：中国 (使用北京时间)
  * 特点：用户认证 + 权限管理 + 会话管理 + 安全增强
  * 路径：/api/v3/auth
  * 🔧 修复：统一JWT密钥配置，增强验证码安全性
@@ -15,6 +16,7 @@ const { User } = require('../../models')
 const { requireUser, generateTokens } = require('../../middleware/auth')
 const validationMiddleware = require('../../middleware/validation')
 const EventBusService = require('../../services/EventBusService')
+const BeijingTime = require('../../utils/timeHelper')
 
 // 🔧 修复：统一JWT配置，确保安全性
 const JWT_SECRET = process.env.JWT_SECRET
@@ -60,7 +62,7 @@ router.post(
             success: false,
             error: 'INVALID_VERIFICATION_CODE',
             message: '验证码错误（开发环境请使用123456）',
-            timestamp: new Date().toISOString()
+            timestamp: BeijingTime.apiTimestamp()
           })
         }
         console.log(`🔓 开发环境验证码验证通过: 手机号=${mobile}`)
@@ -70,7 +72,7 @@ router.post(
           success: false,
           error: 'NOT_IMPLEMENTED',
           message: '生产环境验证码功能待实现',
-          timestamp: new Date().toISOString()
+          timestamp: BeijingTime.apiTimestamp()
         })
       }
 
@@ -131,7 +133,7 @@ router.post(
           expires_in: JWT_EXPIRES_IN
         },
         message: '登录成功',
-        timestamp: new Date().toISOString()
+        timestamp: BeijingTime.apiTimestamp()
       })
     } catch (error) {
       console.error('用户登录失败:', error)
@@ -139,7 +141,7 @@ router.post(
         success: false,
         error: 'LOGIN_FAILED',
         message: '登录失败，请稍后重试',
-        timestamp: new Date().toISOString()
+        timestamp: BeijingTime.apiTimestamp()
       })
     }
   }
@@ -173,7 +175,7 @@ router.post(
             development_code: '123456'
           },
           message: '验证码发送成功（开发环境使用123456）',
-          timestamp: new Date().toISOString()
+          timestamp: BeijingTime.apiTimestamp()
         })
       } else {
         // 🔥 生产环境：这里将来实现真实的短信发送
@@ -181,7 +183,7 @@ router.post(
           success: false,
           error: 'NOT_IMPLEMENTED',
           message: '生产环境短信功能待实现',
-          timestamp: new Date().toISOString()
+          timestamp: BeijingTime.apiTimestamp()
         })
       }
     } catch (error) {
@@ -190,7 +192,7 @@ router.post(
         success: false,
         error: 'SEND_CODE_FAILED',
         message: '发送验证码失败',
-        timestamp: new Date().toISOString()
+        timestamp: BeijingTime.apiTimestamp()
       })
     }
   }
@@ -227,7 +229,7 @@ router.get('/profile', requireUser, async (req, res) => {
         success: false,
         error: 'USER_NOT_FOUND',
         message: '用户不存在',
-        timestamp: new Date().toISOString()
+        timestamp: BeijingTime.apiTimestamp()
       })
     }
 
@@ -237,7 +239,7 @@ router.get('/profile', requireUser, async (req, res) => {
         user: user.toJSON()
       },
       message: '获取用户信息成功',
-      timestamp: new Date().toISOString()
+      timestamp: BeijingTime.apiTimestamp()
     })
   } catch (error) {
     console.error('获取用户信息失败:', error)
@@ -245,7 +247,7 @@ router.get('/profile', requireUser, async (req, res) => {
       success: false,
       error: 'GET_PROFILE_FAILED',
       message: '获取用户信息失败',
-      timestamp: new Date().toISOString()
+      timestamp: BeijingTime.apiTimestamp()
     })
   }
 })
@@ -273,7 +275,7 @@ router.put(
           success: false,
           error: 'USER_NOT_FOUND',
           message: '用户不存在',
-          timestamp: new Date().toISOString()
+          timestamp: BeijingTime.apiTimestamp()
         })
       }
 
@@ -298,7 +300,7 @@ router.put(
           }
         },
         message: '用户信息更新成功',
-        timestamp: new Date().toISOString()
+        timestamp: BeijingTime.apiTimestamp()
       })
     } catch (error) {
       console.error('更新用户信息失败:', error)
@@ -306,7 +308,7 @@ router.put(
         success: false,
         error: 'UPDATE_PROFILE_FAILED',
         message: '更新用户信息失败',
-        timestamp: new Date().toISOString()
+        timestamp: BeijingTime.apiTimestamp()
       })
     }
   }
@@ -345,7 +347,7 @@ router.post('/refresh', requireUser, async (req, res) => {
         expires_in: '7d'
       },
       message: 'Token刷新成功',
-      timestamp: new Date().toISOString()
+      timestamp: BeijingTime.apiTimestamp()
     })
   } catch (error) {
     console.error('刷新Token失败:', error)
@@ -353,7 +355,7 @@ router.post('/refresh', requireUser, async (req, res) => {
       success: false,
       error: 'REFRESH_TOKEN_FAILED',
       message: 'Token刷新失败',
-      timestamp: new Date().toISOString()
+      timestamp: BeijingTime.apiTimestamp()
     })
   }
 })
@@ -377,7 +379,7 @@ router.post('/logout', requireUser, async (req, res) => {
     res.json({
       success: true,
       message: '登出成功',
-      timestamp: new Date().toISOString()
+      timestamp: BeijingTime.apiTimestamp()
     })
   } catch (error) {
     console.error('用户登出失败:', error)
@@ -385,7 +387,7 @@ router.post('/logout', requireUser, async (req, res) => {
       success: false,
       error: 'LOGOUT_FAILED',
       message: '登出失败',
-      timestamp: new Date().toISOString()
+      timestamp: BeijingTime.apiTimestamp()
     })
   }
 })
@@ -414,7 +416,7 @@ router.get('/verify', requireUser, async (req, res) => {
         }
       },
       message: 'Token验证成功',
-      timestamp: new Date().toISOString()
+      timestamp: BeijingTime.apiTimestamp()
     })
   } catch (error) {
     console.error('Token验证失败:', error)
@@ -422,7 +424,7 @@ router.get('/verify', requireUser, async (req, res) => {
       success: false,
       error: 'TOKEN_VERIFICATION_FAILED',
       message: 'Token验证失败',
-      timestamp: new Date().toISOString()
+      timestamp: BeijingTime.apiTimestamp()
     })
   }
 })

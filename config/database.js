@@ -1,11 +1,13 @@
 /**
  * 餐厅积分抽奖系统 - 数据库配置
  * 🔴 根据数据库开发文档配置MySQL连接
+ * 🕐 时区设置：北京时间 (UTC+8) - 适用于中国区域
  *
  * 对接要点：
  * - 内网地址：test-db-mysql.ns-br0za7uc.svc:3306
  * - 外网地址：dbconn.sealosbja.site:42182
  * - 用户名：root，密码：mc6r9cgb
+ * - 时区：+08:00 (北京时间)
  */
 
 const { Sequelize } = require('sequelize')
@@ -20,7 +22,7 @@ const dbConfig = {
     password: process.env.DB_PASSWORD || 'mc6r9cgb',
     database: process.env.DB_NAME || 'restaurant_points_dev',
     dialect: 'mysql',
-    timezone: '+08:00',
+    timezone: '+08:00', // 🕐 北京时间 (Asia/Shanghai)
     logging: process.env.NODE_ENV === 'development' ? console.log : false,
     pool: {
       max: 20,
@@ -43,7 +45,7 @@ const dbConfig = {
     password: process.env.DB_PASSWORD || 'mc6r9cgb',
     database: process.env.DB_NAME || 'restaurant_points_prod',
     dialect: 'mysql',
-    timezone: '+08:00',
+    timezone: '+08:00', // 🕐 北京时间 (Asia/Shanghai)
     logging: false,
     pool: {
       max: 50,
@@ -66,7 +68,7 @@ const dbConfig = {
     password: process.env.DB_PASSWORD || 'mc6r9cgb',
     database: process.env.DB_NAME || 'restaurant_points_dev',
     dialect: 'mysql',
-    timezone: '+08:00',
+    timezone: '+08:00', // 🕐 北京时间 (Asia/Shanghai)
     logging: false,
     pool: {
       max: 10,

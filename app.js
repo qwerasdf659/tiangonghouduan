@@ -1,11 +1,15 @@
 /**
  * 餐厅积分抽奖系统 V3.0 - 主应用入口
- * 创建时间：2025年01月21日 UTC
+ * 创建时间：2025年08月22日 22:49 北京时间
+ * 适用区域：中国 (使用北京时间 Asia/Shanghai)
  * 架构：分离式微服务架构
  * 技术栈：Node.js 20+ + Express + MySQL + Sequelize + Redis
  */
 
 'use strict'
+
+// 🔴 设置应用程序时区为北京时间 (中国区域)
+process.env.TZ = 'Asia/Shanghai'
 
 const express = require('express')
 const cors = require('cors')
@@ -13,6 +17,9 @@ const helmet = require('helmet')
 const compression = require('compression')
 const rateLimit = require('express-rate-limit')
 require('dotenv').config()
+
+// 确保Node.js使用北京时间
+console.log(`🕐 应用启动时间: ${new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })} (北京时间)`)
 
 // 初始化Express应用
 const app = express()
