@@ -15,6 +15,24 @@ class LotteryPrize extends Model {
       as: 'draws'
     })
 
+    // 🔥 关联到抽奖记录（LotteryRecord - 主要使用）
+    if (models.LotteryRecord) {
+      LotteryPrize.hasMany(models.LotteryRecord, {
+        foreignKey: 'prize_id',
+        as: 'lotteryRecords',
+        comment: '中奖记录'
+      })
+    }
+
+    // 🔥 关联到奖品分发记录
+    if (models.PrizeDistribution) {
+      LotteryPrize.hasMany(models.PrizeDistribution, {
+        foreignKey: 'prize_id',
+        as: 'distributions',
+        comment: '奖品分发记录'
+      })
+    }
+
     // 关联到图片资源
     if (models.ImageResources) {
       LotteryPrize.belongsTo(models.ImageResources, {
@@ -188,7 +206,7 @@ module.exports = sequelize => {
         type: DataTypes.DECIMAL(6, 4),
         allowNull: false,
         defaultValue: 0.0,
-        comment: '中奖概率（旧字段，保持兼容）'
+        comment: '中奖概率'
       },
       is_activity: {
         type: DataTypes.BOOLEAN,
@@ -266,6 +284,8 @@ module.exports = sequelize => {
       modelName: 'LotteryPrize',
       tableName: 'lottery_prizes',
       timestamps: true,
+      createdAt: 'created_at',
+      updatedAt: 'updated_at',
       underscored: true,
       comment: '抽奖奖品配置表',
       indexes: [

@@ -1,5 +1,5 @@
 /**
- * 登录日志模型 - V3安全版本
+ * 登录日志模型 - V4统一架构版本
  * 记录用户和管理员的登录活动，支持安全审计
  * 创建时间：2025年01月21日
  */
@@ -160,8 +160,8 @@ module.exports = sequelize => {
       user_agent,
       result,
       fail_reason = null,
-      sms_sent = 0,
-      sms_verified = 0,
+      _sms_sent = 0,
+      _sms_verified = 0,
       device_info = null
     } = adminData
 
@@ -173,8 +173,8 @@ module.exports = sequelize => {
       user_agent,
       login_result: result,
       fail_reason,
-      sms_sent,
-      sms_verified,
+      sms_sent: _sms_sent,
+      sms_verified: _sms_verified,
       device_info
     })
   }
@@ -224,14 +224,18 @@ module.exports = sequelize => {
         [sequelize.fn('DATE', sequelize.col('created_at')), 'date'],
         [sequelize.fn('COUNT', '*'), 'total_logins'],
         [
-          sequelize.fn('SUM',
+          sequelize.fn(
+            'SUM',
             sequelize.literal('CASE WHEN login_result = \'success\' THEN 1 ELSE 0 END')
-          ), 'successful_logins'
+          ),
+          'successful_logins'
         ],
         [
-          sequelize.fn('SUM',
+          sequelize.fn(
+            'SUM',
             sequelize.literal('CASE WHEN login_result = \'fail\' THEN 1 ELSE 0 END')
-          ), 'failed_logins'
+          ),
+          'failed_logins'
         ]
       ],
       group: [sequelize.fn('DATE', sequelize.col('created_at'))],

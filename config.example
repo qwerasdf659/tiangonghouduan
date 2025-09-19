@@ -5,6 +5,7 @@
 NODE_ENV=development
 PORT=3000
 WS_PORT=10081
+TZ=Asia/Shanghai  # 🕐 时区设置：北京时间（中国区域）
 
 # 🔴 数据库配置 - 使用外网数据库修复连接问题
 # 外网数据库（生产环境）  

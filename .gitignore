@@ -60,3 +60,6 @@ server.log
 # Cursor IDE配置（但保留规则文档）
 .cursor/
 !.cursor/rules/
+
+# Environment variables
+.env

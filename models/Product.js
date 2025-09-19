@@ -1,5 +1,5 @@
 /**
- * 餐厅积分抽奖系统 v3.0 - 商品模型
+ * 餐厅积分抽奖系统 V4.0统一引擎架构 - 商品模型
  * 支持幸运空间和臻选空间的商品管理
  */
 
@@ -202,12 +202,12 @@ module.exports = sequelize => {
   // 类方法
   Product.getProductsBySpace = async function (space, options = {}) {
     const {
-      category = null,
-      limit = 20,
-      offset = 0,
+      _category = null,
+      _limit = 20,
+      _offset = 0,
       sortBy = 'sort_order',
       order = 'DESC',
-      includeOutOfStock = false
+      _includeOutOfStock = false
     } = options
 
     const whereClause = {
@@ -220,20 +220,20 @@ module.exports = sequelize => {
     }
 
     // 分类筛选
-    if (category) {
-      whereClause.category = category
+    if (_category) {
+      whereClause.category = _category
     }
 
     // 库存筛选
-    if (!includeOutOfStock) {
+    if (!_includeOutOfStock) {
       whereClause.stock = { [sequelize.Sequelize.Op.gt]: 0 }
     }
 
     return await Product.findAll({
       where: whereClause,
       order: [[sortBy, order]],
-      limit,
-      offset
+      limit: _limit,
+      offset: _offset
     })
   }
 

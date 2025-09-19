@@ -7,10 +7,12 @@
  *   3xxx: 业务逻辑错误
  *   4xxx: 资源不存在错误
  *   5xxx: 系统内部错误
+ * 🕐 时区：北京时间 (UTC+8) - 中国区域专用
  */
 
 const fs = require('fs')
 const path = require('path')
+const BeijingTimeHelper = require('../utils/timeHelper') // 🕐 北京时间工具
 
 // 🔴 创建日志目录
 const logDir = path.join(__dirname, '../logs')
@@ -20,7 +22,7 @@ if (!fs.existsSync(logDir)) {
 
 // 🔴 错误日志记录器
 function logError (error, req, additionalInfo = {}) {
-  const timestamp = new Date().toISOString()
+  const timestamp = BeijingTimeHelper.apiTimestamp() // 🕐 北京时间API时间戳
   const logEntry = {
     timestamp,
     error: {
@@ -61,7 +63,7 @@ function logError (error, req, additionalInfo = {}) {
 
   // 写入错误日志文件
   try {
-    const logFile = path.join(logDir, `error-${new Date().toISOString().split('T')[0]}.log`)
+    const logFile = path.join(logDir, `error-${BeijingTimeHelper.apiTimestamp().split('T')[0]}.log`) // 🕐 北京时间日期
     const logLine = JSON.stringify(logEntry) + '\n'
     fs.appendFileSync(logFile, logLine)
   } catch (logWriteError) {

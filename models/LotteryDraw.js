@@ -22,14 +22,9 @@ class LotteryDraw extends Model {
     })
   }
 
-  // 获取抽奖结果名称
+  // ✅ 修复：使用is_winner业务标准字段
   getDrawResultName () {
-    const results = {
-      win: '中奖',
-      lose: '未中奖',
-      pending: '待开奖'
-    }
-    return results[this.draw_result] || '未知结果'
+    return this.is_winner ? '中奖' : '未中奖'
   }
 
   // 获取奖品发放状态名称
@@ -44,9 +39,9 @@ class LotteryDraw extends Model {
     return statuses[this.prize_status] || '未知状态'
   }
 
-  // 检查是否中奖
-  isWin () {
-    return this.draw_result === 'win'
+  // ✅ 业务标准：检查是否中奖
+  isWinner () {
+    return this.is_winner
   }
 
   // 检查奖品是否已发放
@@ -56,7 +51,7 @@ class LotteryDraw extends Model {
 
   // 检查奖品是否可领取
   isPrizeClaimable () {
-    return this.isWin() && this.prize_status === 'delivered'
+    return this.isWinner() && this.prize_status === 'delivered'
   }
 
   // 更新奖品发放状态
@@ -79,25 +74,24 @@ class LotteryDraw extends Model {
     await this.update(updateData, { transaction })
   }
 
-  // 获取抽奖摘要信息
+  // ✅ 业务标准：输出统一格式
   toSummary () {
     return {
       draw_id: this.draw_id,
       user_id: this.user_id,
       campaign_id: this.campaign_id,
       prize_id: this.prize_id,
-      draw_result: this.draw_result,
-      draw_result_name: this.getDrawResultName(),
+      is_winner: this.is_winner, // ✅ 业务标准字段
+      winner_status_text: this.getDrawResultName(), // ✅ 优化字段名，更清晰的业务含义
       prize_status: this.prize_status,
       prize_status_name: this.getPrizeStatusName(),
       draw_time: this.draw_time,
-      is_win: this.isWin(),
       is_prize_delivered: this.isPrizeDelivered(),
       is_prize_claimable: this.isPrizeClaimable()
     }
   }
 
-  // 验证抽奖记录数据
+  // ✅ 修复：使用is_winner业务标准字段验证抽奖记录数据
   static validateDraw (data) {
     const errors = []
 
@@ -109,18 +103,18 @@ class LotteryDraw extends Model {
       errors.push('活动ID无效')
     }
 
-    if (!data.draw_result || !['win', 'lose', 'pending'].includes(data.draw_result)) {
-      errors.push('抽奖结果无效')
+    if (typeof data.is_winner !== 'boolean') {
+      errors.push('中奖状态无效，必须是布尔值')
     }
 
-    if (data.draw_result === 'win' && (!data.prize_id || data.prize_id <= 0)) {
+    if (data.is_winner && (!data.prize_id || data.prize_id <= 0)) {
       errors.push('中奖记录必须指定奖品ID')
     }
 
     return errors
   }
 
-  // 批量统计抽奖数据
+  // ✅ 修复：使用is_winner业务标准字段批量统计抽奖数据
   static async batchAnalyze (conditions = {}) {
     const baseWhere = { ...conditions }
 
@@ -128,18 +122,18 @@ class LotteryDraw extends Model {
       // 总抽奖次数
       LotteryDraw.count({ where: baseWhere }),
 
-      // 中奖次数
+      // ✅ 修复：使用is_winner业务标准字段统计中奖次数
       LotteryDraw.count({
-        where: { ...baseWhere, draw_result: 'win' }
+        where: { ...baseWhere, is_winner: true }
       }),
 
-      // 奖品发放统计
+      // ✅ 修复：使用is_winner业务标准字段统计奖品发放状态
       LotteryDraw.findAll({
         attributes: [
           'prize_status',
           [LotteryDraw.sequelize.fn('COUNT', LotteryDraw.sequelize.col('*')), 'count']
         ],
-        where: { ...baseWhere, draw_result: 'win' },
+        where: { ...baseWhere, is_winner: true },
         group: ['prize_status'],
         raw: true
       })
@@ -192,10 +186,7 @@ module.exports = sequelize => {
         allowNull: false,
         comment: '消耗的积分数量'
       },
-      draw_result: {
-        type: DataTypes.JSON,
-        comment: '抽奖结果详情（JSON格式）'
-      },
+      // ✅ draw_result字段已删除，统一使用is_winner业务标准字段
       draw_time: {
         type: DataTypes.DATE,
         allowNull: false,
@@ -272,6 +263,8 @@ module.exports = sequelize => {
       modelName: 'LotteryDraw',
       tableName: 'lottery_draws',
       timestamps: true,
+      createdAt: 'created_at',
+      updatedAt: 'updated_at',
       underscored: true,
       comment: '抽奖记录表',
       indexes: [
@@ -280,7 +273,7 @@ module.exports = sequelize => {
           name: 'idx_ld_user_time'
         },
         {
-          fields: ['campaign_id', 'draw_result'],
+          fields: ['campaign_id', 'is_winner'], // ✅ 修复：使用业务标准字段
           name: 'idx_ld_campaign_result'
         },
         {
@@ -288,7 +281,7 @@ module.exports = sequelize => {
           name: 'idx_ld_prize_status'
         },
         {
-          fields: ['draw_result', 'draw_time'],
+          fields: ['is_winner', 'draw_time'], // ✅ 修复：使用业务标准字段
           name: 'idx_ld_result_time'
         },
         {

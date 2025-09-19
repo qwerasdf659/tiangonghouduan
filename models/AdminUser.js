@@ -1,7 +1,13 @@
 /**
- * 管理员用户模型 - V3安全版本
+ * 管理员用户模型 - V4统一架构版本
  * 支持BCrypt密码加密、账号锁定、MFA等安全功能
  * 创建时间：2025年01月21日
+ *
+ * 🔧 架构说明：
+ * - User.is_admin：简单权限控制，用于API访问权限判断
+ * - AdminUser：复杂管理员功能，包含密码管理、安全策略等
+ * - 当前V4架构主要使用User.is_admin进行权限控制
+ * - AdminUser模型保留用于未来高级管理员功能扩展
  */
 
 const { DataTypes } = require('sequelize')
@@ -62,9 +68,10 @@ module.exports = sequelize => {
       },
 
       status: {
-        type: DataTypes.TINYINT,
-        defaultValue: 1,
-        comment: '状态：1正常 0锁定 -1禁用'
+        type: DataTypes.ENUM('active', 'inactive', 'banned'),
+        allowNull: false,
+        defaultValue: 'active',
+        comment: '管理员状态：active-正常，inactive-锁定，banned-禁用'
       },
 
       // 多因素认证相关
@@ -120,6 +127,8 @@ module.exports = sequelize => {
     {
       tableName: 'admin_users',
       timestamps: true,
+      createdAt: 'created_at',
+      updatedAt: 'updated_at',
       underscored: true,
       indexes: [
         {
@@ -171,7 +180,7 @@ module.exports = sequelize => {
   }
 
   AdminUser.prototype.isActive = function () {
-    return this.status === 1 && !this.isLocked()
+    return this.status === 'active' && !this.isLocked()
   }
 
   AdminUser.prototype.isSuperAdmin = function () {
@@ -226,11 +235,7 @@ module.exports = sequelize => {
     const hasNumbers = /\d/.test(password)
     const hasSpecial = /[!@#$%^&*(),.?":{}|<>]/.test(password)
 
-    return password.length >= minLength &&
-           hasUpperCase &&
-           hasLowerCase &&
-           hasNumbers &&
-           hasSpecial
+    return password.length >= minLength && hasUpperCase && hasLowerCase && hasNumbers && hasSpecial
   }
 
   AdminUser.findByUsername = function (username) {
@@ -246,7 +251,7 @@ module.exports = sequelize => {
     return this.findOne({
       where: {
         username,
-        status: 1
+        status: 'active'
       }
     })
   }
@@ -271,7 +276,7 @@ module.exports = sequelize => {
       phone,
       email,
       role,
-      status: 1
+      status: 'active'
     })
   }
 

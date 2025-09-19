@@ -36,6 +36,17 @@ class LotteryCampaign extends Model {
       comment: '抽奖记录'
     })
 
+    // 🔥 一对多：一个活动有多个抽奖记录（LotteryRecord - 主要使用）
+    if (models.LotteryRecord) {
+      LotteryCampaign.hasMany(models.LotteryRecord, {
+        foreignKey: 'lottery_id',
+        sourceKey: 'campaign_id',
+        as: 'lotteryRecords',
+        onDelete: 'CASCADE',
+        comment: '抽奖记录'
+      })
+    }
+
     // 关联业务事件
     LotteryCampaign.hasMany(models.BusinessEvent, {
       foreignKey: 'user_id',
@@ -82,7 +93,9 @@ class LotteryCampaign extends Model {
    */
   isActive () {
     const now = new Date()
-    return this.status === 'active' && this.start_time <= now && this.end_time >= now
+    const startTime = new Date(this.start_time)
+    const endTime = new Date(this.end_time)
+    return this.status === 'active' && startTime <= now && endTime >= now
   }
 
   /**
@@ -574,6 +587,8 @@ module.exports = sequelize => {
       modelName: 'LotteryCampaign',
       tableName: 'lottery_campaigns',
       timestamps: true,
+      createdAt: 'created_at',
+      updatedAt: 'updated_at',
       underscored: true,
       comment: '抽奖活动配置表',
       indexes: [

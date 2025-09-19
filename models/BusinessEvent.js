@@ -354,6 +354,8 @@ module.exports = sequelize => {
       modelName: 'BusinessEvent',
       tableName: 'business_events',
       timestamps: true,
+      createdAt: 'created_at',
+      updatedAt: 'updated_at',
       underscored: true,
       comment: '业务事件表',
       indexes: [

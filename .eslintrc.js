@@ -13,6 +13,9 @@ module.exports = {
   // 继承标准配置
   extends: ['standard'],
 
+  // 插件配置（本地规则通过npm scripts运行）
+  // plugins: ['local-rules'], // 暂时禁用，通过质量检查脚本运行
+
   // 解析器选项
   parserOptions: {
     ecmaVersion: 12,
@@ -58,8 +61,42 @@ module.exports = {
     // 🔒 安全相关规则
     'no-eval': 'error',
     'no-implied-eval': 'error',
-    'no-new-func': 'error'
+    'no-new-func': 'error',
+
+    // 🚨 测试与实现一致性规则 - 防止"测试适配错误实现"
+    'no-business-semantic-mismatch': 'off', // 自定义规则，检测业务语义不匹配
+    'no-test-lowering-standards': 'off' // 自定义规则，检测测试标准降低
   },
+
+  // 🎯 自定义规则配置
+  overrides: [
+    {
+      // 测试文件特殊规则
+      files: ['tests/**/*.js', '**/*.test.js', '**/*.spec.js'],
+      rules: {
+        // 测试文件中禁止的模式
+        'no-console': 'warn', // 测试中允许console但建议使用专门的断言
+        'max-len': ['warn', { code: 120 }], // 测试描述可以较长
+        'no-magic-numbers': 'off' // 测试中允许魔术数字
+      }
+    },
+    {
+      // 模型文件特殊规则
+      files: ['models/**/*.js'],
+      rules: {
+        camelcase: 'off', // 模型字段允许下划线
+        'quote-props': ['error', 'consistent'] // 属性引号一致性
+      }
+    },
+    {
+      // 路由文件特殊规则
+      files: ['routes/**/*.js'],
+      rules: {
+        'no-console': 'off', // 路由中允许console用于日志
+        'consistent-return': 'error' // 强制一致的返回格式
+      }
+    }
+  ],
 
   // 忽略特定文件
   ignorePatterns: ['node_modules/', 'logs/', '*.config.js', 'supervisor/', '.cursor/']

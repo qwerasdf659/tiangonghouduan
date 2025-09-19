@@ -1,6 +1,6 @@
 /**
  * PM2进程管理配置文件
- * 餐厅积分抽奖系统 v3.0
+ * 餐厅积分抽奖系统 V4.0统一引擎架构
  * 创建时间：2025年08月10日
  */
 
@@ -16,6 +16,9 @@ module.exports = {
       // 运行目录
       cwd: '/home/devbox/project',
 
+      // 🔧 加载.env文件
+      env_file: '.env',
+
       // 启动模式
       exec_mode: 'fork', // 单进程模式（开发环境推荐）
       instances: 1, // 进程实例数量
@@ -23,7 +26,22 @@ module.exports = {
       // 环境变量
       env: {
         NODE_ENV: 'development',
-        PORT: 3000
+        PORT: 3000,
+        // 🕐 时区设置 - 确保所有时间显示为北京时间
+        TZ: 'Asia/Shanghai',
+        JWT_SECRET:
+          'd40eea7e85733495336cd79fa57f20032259d262483732ae0687dbb3ed5eda4eaf0826f20e55f25975686fa9b1cb978509f51819f840758e658ca09029259c2b',
+        JWT_REFRESH_SECRET:
+          '197f92d1b1a24fba5db3227d2b1f25419499880dd95c332d2904eab13fdfabccfc775391992cf6bee6d5822c56699b59f876d2108dd00d93df1d838b377a01e0',
+        JWT_EXPIRES_IN: '2h',
+        JWT_REFRESH_EXPIRES_IN: '7d',
+        DB_HOST: 'dbconn.sealosbja.site',
+        DB_PORT: '42182',
+        DB_NAME: 'restaurant_points_dev',
+        DB_USER: 'root',
+        DB_PASSWORD: 'mc6r9cgb',
+        DB_TIMEZONE: '+08:00',
+        REDIS_URL: 'redis://localhost:6379'
       },
 
       // 生产环境变量
@@ -36,11 +54,11 @@ module.exports = {
       watch: false, // 禁用文件监控（避免开发时频繁重启）
       ignore_watch: ['node_modules', 'logs', '*.log'],
 
-      // 日志配置
+      // 日志配置 - 使用北京时间
       log_file: './logs/combined.log',
       out_file: './logs/out.log',
       error_file: './logs/error.log',
-      log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
+      log_date_format: 'YYYY-MM-DD HH:mm:ss [+08:00]', // 🕐 北京时间格式
 
       // 自动重启配置
       autorestart: true, // 自动重启

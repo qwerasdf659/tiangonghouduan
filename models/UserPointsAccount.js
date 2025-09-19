@@ -8,6 +8,7 @@
 'use strict'
 
 const { Model, DataTypes } = require('sequelize')
+const BeijingTimeHelper = require('../utils/timeHelper') // 🕐 北京时间工具
 
 /**
  * 用户积分账户模型
@@ -171,7 +172,7 @@ class UserPointsAccount extends Model {
   updatePreferenceTags (tags) {
     this.preference_tags = {
       tags,
-      updated_at: new Date().toISOString(),
+      updated_at: BeijingTimeHelper.apiTimestamp(), // 🕐 北京时间API时间戳
       confidence: 0.8
     }
   }
@@ -268,7 +269,7 @@ class UserPointsAccount extends Model {
     return {
       enabled: true,
       recommendations,
-      generated_at: new Date().toISOString()
+      generated_at: BeijingTimeHelper.apiTimestamp() // 🕐 北京时间API时间戳
     }
   }
 
@@ -455,6 +456,8 @@ module.exports = sequelize => {
       modelName: 'UserPointsAccount',
       tableName: 'user_points_accounts',
       timestamps: true,
+      createdAt: 'created_at',
+      updatedAt: 'updated_at',
       underscored: true,
       comment: '用户积分账户表',
       indexes: [

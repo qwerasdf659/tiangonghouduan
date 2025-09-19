@@ -31,16 +31,11 @@ module.exports = sequelize => {
         comment: '用户昵称'
       },
 
-      avatar_url: {
-        type: DataTypes.STRING(500),
-        allowNull: true,
-        comment: '头像URL'
-      },
-
       is_admin: {
         type: DataTypes.BOOLEAN,
         defaultValue: false,
-        comment: '是否管理员'
+        comment:
+          '是否管理员 - 🔧 注意：V4架构使用此字段进行简单权限控制，复杂管理员功能请参考AdminUser模型'
       },
 
       // 🔧 新增：历史累计总积分字段（用于臻选空间解锁条件检查）
@@ -90,6 +85,8 @@ module.exports = sequelize => {
     {
       tableName: 'users',
       timestamps: true,
+      createdAt: 'created_at',
+      updatedAt: 'updated_at',
       underscored: true,
       indexes: [
         {
@@ -132,11 +129,29 @@ module.exports = sequelize => {
       comment: '积分交易记录'
     })
 
+    // 🔥 用户的抽奖记录（LotteryRecord - 主要使用）
+    if (models.LotteryRecord) {
+      User.hasMany(models.LotteryRecord, {
+        foreignKey: 'user_id',
+        as: 'lotteryRecords',
+        comment: '用户抽奖记录'
+      })
+    }
+
     // 用户的抽奖记录
     if (models.LotteryDraw) {
       User.hasMany(models.LotteryDraw, {
         foreignKey: 'user_id',
         as: 'lotteryDraws'
+      })
+    }
+
+    // 🔥 用户的奖品分发记录
+    if (models.PrizeDistribution) {
+      User.hasMany(models.PrizeDistribution, {
+        foreignKey: 'user_id',
+        as: 'prizeDistributions',
+        comment: '用户奖品分发记录'
       })
     }
 
@@ -164,80 +179,51 @@ module.exports = sequelize => {
       })
     }
 
-    // 用户推荐
-    if (models.AnalyticsRecommendation) {
-      User.hasMany(models.AnalyticsRecommendation, {
+    // 用户登录记录
+    if (models.LoginLog) {
+      User.hasMany(models.LoginLog, {
         foreignKey: 'user_id',
-        as: 'recommendations'
+        as: 'loginLogs'
+      })
+    }
+
+    // 用户会话
+    if (models.UserSession) {
+      User.hasMany(models.UserSession, {
+        foreignKey: 'user_id',
+        as: 'sessions'
+      })
+    }
+
+    // 社交抽奖参与记录
+    if (models.SocialLotteryMember) {
+      User.hasMany(models.SocialLotteryMember, {
+        foreignKey: 'user_id',
+        as: 'socialLotteryMembers'
       })
     }
 
     // 用户库存
     if (models.UserInventory) {
-      User.hasOne(models.UserInventory, {
+      User.hasMany(models.UserInventory, {
         foreignKey: 'user_id',
         as: 'inventory'
       })
     }
 
-    // 客户服务会话
-    if (models.CustomerSession) {
-      User.hasMany(models.CustomerSession, {
+    // 用户任务
+    if (models.UserTask) {
+      User.hasMany(models.UserTask, {
         foreignKey: 'user_id',
-        as: 'customerSessions'
+        as: 'tasks'
       })
     }
 
-    // 臻选空间访问记录
-    if (models.PremiumSpaceAccess) {
-      User.hasMany(models.PremiumSpaceAccess, {
-        foreignKey: 'user_id',
-        as: 'premiumAccess'
-      })
-    }
-
-    // 产品相关
-    if (models.Product) {
-      User.hasMany(models.Product, {
-        foreignKey: 'creator_id',
-        as: 'createdProducts'
-      })
-    }
-
-    // 交易记录
-    if (models.TradeRecord) {
-      User.hasMany(models.TradeRecord, {
-        foreignKey: 'from_user_id',
-        as: 'sentTrades'
-      })
-
-      User.hasMany(models.TradeRecord, {
-        foreignKey: 'to_user_id',
-        as: 'receivedTrades'
-      })
-    }
-
-    // 上传审核
-    if (models.UploadReview) {
-      User.hasMany(models.UploadReview, {
-        foreignKey: 'user_id',
-        as: 'uploadReviews'
-      })
-
-      User.hasMany(models.UploadReview, {
-        foreignKey: 'reviewer_id',
-        as: 'reviewedUploads'
-      })
-    }
-
-    // 用户图片
-    if (models.ImageResources) {
-      User.hasOne(models.ImageResources, {
-        foreignKey: 'user_id',
-        as: 'userImage',
-        scope: {
-          image_type: 'user_avatar'
-        }
+    // VIP等级关联
+    if (models.VipLevel) {
+      User.belongsTo(models.VipLevel, {
+        foreignKey: 'vip_level_id',
+        as: 'vipLevel'
       })
     }
   }

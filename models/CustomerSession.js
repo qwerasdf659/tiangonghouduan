@@ -75,6 +75,8 @@ module.exports = sequelize => {
     {
       tableName: 'customer_sessions',
       timestamps: true,
+      createdAt: 'created_at',
+      updatedAt: 'updated_at',
       underscored: true,
       indexes: [
         {
@@ -156,7 +158,7 @@ module.exports = sequelize => {
         {
           model: sequelize.models.User,
           as: 'user',
-          attributes: ['user_id', 'nickname', 'avatar_url', 'mobile']
+          attributes: ['user_id', 'nickname', 'mobile']
         }
       ],
       order: [['updated_at', 'DESC']]

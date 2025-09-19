@@ -187,7 +187,7 @@ module.exports = sequelize => {
         {
           model: sequelize.models.User,
           as: 'sender',
-          attributes: ['user_id', 'nickname', 'avatar_url']
+          attributes: ['user_id', 'nickname']
         }
       ],
       order: [['created_at', 'DESC']],

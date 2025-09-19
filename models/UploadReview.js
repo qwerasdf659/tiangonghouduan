@@ -1,5 +1,5 @@
 /**
- * 餐厅积分抽奖系统 v3.0 - 图片上传审核模型
+ * 餐厅积分抽奖系统 V4.0统一引擎架构 - 图片上传审核模型
  * 管理用户上传图片的审核流程和状态
  */
 
@@ -57,7 +57,7 @@ module.exports = sequelize => {
         comment: '图片URL'
       },
       image_type: {
-        type: DataTypes.ENUM('avatar', 'photo', 'document', 'other'),
+        type: DataTypes.ENUM('photo', 'document', 'other'),
         allowNull: false,
         defaultValue: 'photo',
         comment: '图片类型'
@@ -164,21 +164,21 @@ module.exports = sequelize => {
 
   // 类方法
   UploadReview.getPendingReviews = async function (options = {}) {
-    const { limit = 20, offset = 0, imageType = null } = options
+    const { _limit = 20, _offset = 0, _imageType = null } = options
 
     const whereClause = {
       review_status: 'pending'
     }
 
-    if (imageType) {
-      whereClause.image_type = imageType
+    if (_imageType) {
+      whereClause.image_type = _imageType
     }
 
     return await UploadReview.findAll({
       where: whereClause,
       order: [['created_at', 'ASC']],
-      limit,
-      offset,
+      limit: _limit,
+      offset: _offset,
       include: [
         {
           model: sequelize.models.User,
@@ -195,18 +195,18 @@ module.exports = sequelize => {
   }
 
   UploadReview.getReviewStats = async function (options = {}) {
-    const { startDate = null, endDate = null, reviewerId = null } = options
+    const { _startDate = null, _endDate = null, _reviewerId = null } = options
 
     const whereClause = {}
 
-    if (startDate && endDate) {
+    if (_startDate && _endDate) {
       whereClause.created_at = {
-        [sequelize.Sequelize.Op.between]: [startDate, endDate]
+        [sequelize.Sequelize.Op.between]: [_startDate, _endDate]
       }
     }
 
-    if (reviewerId) {
-      whereClause.reviewer_id = reviewerId
+    if (_reviewerId) {
+      whereClause.reviewer_id = _reviewerId
     }
 
     const [totalReviews, statusStats, avgPoints] = await Promise.all([

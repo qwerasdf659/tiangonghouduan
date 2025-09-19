@@ -177,20 +177,25 @@ module.exports = sequelize => {
 
   // 批量初始化配置
   BusinessConfigs.initializeDefaultConfigs = async function () {
-    const businessTypes = ['lottery', 'exchange', 'trade', 'uploads']
+    const _businessTypes = ['lottery', 'exchange', 'trade', 'uploads']
     const results = []
 
-    for (const businessType of businessTypes) {
-      const existing = await this.findOne({
-        where: { business_type: businessType }
-      })
+    // 🚀 性能优化：并发执行替代循环中await
+    await Promise.all(
+      _businessTypes.map(async businessType => {
+        const existing = await this.findOne({
+          where: { business_type: businessType }
+        })
 
-      if (!existing) {
-        const defaultConfig = this.getDefaultConfig(businessType)
-        const created = await this.create(defaultConfig)
-        results.push(created)
-      }
-    }
+        if (!existing) {
+          await this.create({
+            business_type: businessType,
+            config_data: {},
+            status: 'active'
+          })
+        }
+      })
+    )
 
     return results
   }

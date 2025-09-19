@@ -1,5 +1,5 @@
 /**
- * 餐厅积分抽奖系统 v3.0 - 交易记录模型
+ * 餐厅积分抽奖系统 V4.0统一引擎架构 - 交易记录模型
  * 记录用户间的积分交易和相关交易活动
  */
 
@@ -83,6 +83,53 @@ module.exports = sequelize => {
         defaultValue: 'pending',
         comment: '交易状态'
       },
+      /**
+       * ✅ 交易是否成功的业务标准字段（扩展is_winner模式）
+       *
+       * 🎯 业务含义：
+       * - true: 交易成功完成，积分已到账，可以进行后续业务操作
+       * - false: 交易未成功（pending/processing/failed/cancelled/refunded状态）
+       *
+       * 📋 业务逻辑：
+       * - 仅当 status === 'completed' 时返回 true
+       * - 其他所有状态（pending/processing/failed/cancelled/refunded）均返回 false
+       *
+       * 🔍 使用场景：
+       * - 统计成功交易数量：WHERE is_successful = true
+       * - 计算用户成功交易率：COUNT(is_successful = true) / COUNT(*)
+       * - 前端显示交易结果状态
+       * - 业务规则判断：只有成功交易才能进行某些操作
+       *
+       * ⚠️ 重要说明：
+       * - 这是计算字段，不能直接设置
+       * - 要改变结果，请修改 status 字段
+       * - 与 is_winner 标准保持一致的业务语义
+       *
+       * 📝 使用示例：
+       * ```javascript
+       * // 查询成功交易
+       * const successfulTrades = await TradeRecord.findAll({
+       *   where: sequelize.where(
+       *     sequelize.col('is_successful'), true
+       *   )
+       * })
+       *
+       * // 检查交易是否成功
+       * if (tradeRecord.is_successful) {
+       *   // 执行成功后的业务逻辑
+       * }
+       * ```
+       */
+      is_successful: {
+        type: DataTypes.VIRTUAL,
+        get () {
+          return this.status === 'completed'
+        },
+        set (_value) {
+          throw new Error('is_successful是计算字段，请设置status字段')
+        }
+      },
+
       verification_status: {
         type: DataTypes.ENUM('none', 'required', 'verified', 'rejected'),
         allowNull: false,
@@ -249,10 +296,10 @@ module.exports = sequelize => {
     const {
       type = 'all',
       status = 'all',
-      page = 1,
-      pageSize = 20,
-      startDate = null,
-      endDate = null
+      _page = 1,
+      _pageSize = 20,
+      _startDate = null,
+      _endDate = null
     } = options
 
     const whereClause = {
@@ -267,17 +314,17 @@ module.exports = sequelize => {
       whereClause.status = status
     }
 
-    if (startDate && endDate) {
+    if (_startDate && _endDate) {
       whereClause.trade_time = {
-        [sequelize.Sequelize.Op.between]: [startDate, endDate]
+        [sequelize.Sequelize.Op.between]: [_startDate, _endDate]
       }
     }
 
-    const offset = (page - 1) * pageSize
+    const offset = (_page - 1) * _pageSize
 
     return await TradeRecord.findAndCountAll({
       where: whereClause,
-      limit: pageSize,
+      limit: _pageSize,
       offset,
       order: [['trade_time', 'DESC']],
       include: [

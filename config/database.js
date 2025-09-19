@@ -1,102 +1,92 @@
 /**
- * 餐厅积分抽奖系统 - 数据库配置
- * 🔴 根据数据库开发文档配置MySQL连接
+ * 餐厅积分抽奖系统 - 统一数据库配置
+ * 🔴 统一配置架构 - 完全从环境变量读取，消除硬编码
  * 🕐 时区设置：北京时间 (UTC+8) - 适用于中国区域
  *
- * 对接要点：
- * - 内网地址：test-db-mysql.ns-br0za7uc.svc:3306
- * - 外网地址：dbconn.sealosbja.site:42182
- * - 用户名：root，密码：mc6r9cgb
- * - 时区：+08:00 (北京时间)
+ * 配置统一架构：
+ * .env (主配置源) → config/database.js (读取.env) → 应用使用
  */
 
 const { Sequelize } = require('sequelize')
 require('dotenv').config()
 
-// 🔴 数据库连接配置 - 根据文档配置信息
+// 🔴 从环境变量读取所有数据库配置 - 零硬编码
 const dbConfig = {
-  development: {
-    host: process.env.DB_HOST || 'test-db-mysql.ns-br0za7uc.svc',
-    port: process.env.DB_PORT || 3306,
-    username: process.env.DB_USER || 'root',
-    password: process.env.DB_PASSWORD || 'mc6r9cgb',
-    database: process.env.DB_NAME || 'restaurant_points_dev',
-    dialect: 'mysql',
-    timezone: '+08:00', // 🕐 北京时间 (Asia/Shanghai)
-    logging: process.env.NODE_ENV === 'development' ? console.log : false,
-    pool: {
-      max: 20,
-      min: 0,
-      acquire: 30000,
-      idle: 10000
-    },
-    define: {
-      charset: 'utf8mb4',
-      collate: 'utf8mb4_unicode_ci',
-      timestamps: true,
-      underscored: false,
-      freezeTableName: true
-    }
+  host: process.env.DB_HOST,
+  port: parseInt(process.env.DB_PORT),
+  username: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+  database: process.env.DB_NAME,
+  dialect: 'mysql',
+  timezone: process.env.DB_TIMEZONE || '+08:00',
+  logging: process.env.NODE_ENV === 'development' ? console.log : false,
+  pool: {
+    max: 50, // 🚀 提升最大连接数以支持高并发
+    min: 5, // 🚀 保持最小连接数，避免冷启动延迟
+    acquire: 60000, // 🚀 增加获取连接超时时间
+    idle: 300000, // 🚀 延长空闲连接时间，减少频繁创建/销毁
+    evict: 60000, // 🚀 连接池清理间隔
+    handleDisconnects: true // 🚀 自动处理连接断开
   },
-  production: {
-    host: process.env.DB_HOST || 'dbconn.sealosbja.site',
-    port: process.env.DB_PORT || 42182,
-    username: process.env.DB_USER || 'root',
-    password: process.env.DB_PASSWORD || 'mc6r9cgb',
-    database: process.env.DB_NAME || 'restaurant_points_prod',
-    dialect: 'mysql',
-    timezone: '+08:00', // 🕐 北京时间 (Asia/Shanghai)
-    logging: false,
-    pool: {
-      max: 50,
-      min: 5,
-      acquire: 60000,
-      idle: 10000
-    },
-    define: {
-      charset: 'utf8mb4',
-      collate: 'utf8mb4_unicode_ci',
-      timestamps: true,
-      underscored: false,
-      freezeTableName: true
-    }
+  define: {
+    charset: 'utf8mb4',
+    collate: 'utf8mb4_unicode_ci',
+    timestamps: true,
+    underscored: false,
+    freezeTableName: true
   },
+  dialectOptions: {
+    charset: 'utf8mb4',
+    // 移除collation配置 - MySQL2不支持此选项，会产生警告
+    // collation通过charset自动设置为utf8mb4_unicode_ci
+    supportBigNumbers: true,
+    bigNumberStrings: true,
+    dateStrings: true,
+    typeCast: true
+  }
+}
+
+// 🔴 配置验证 - 确保所有必需的环境变量都存在
+function validateDatabaseConfig () {
+  const requiredVars = ['DB_HOST', 'DB_PORT', 'DB_USER', 'DB_PASSWORD', 'DB_NAME']
+  const missingVars = requiredVars.filter(varName => !process.env[varName])
+
+  if (missingVars.length > 0) {
+    throw new Error(`缺少必需的环境变量: ${missingVars.join(', ')}`)
+  }
+
+  // 验证端口号是否为有效数字
+  if (isNaN(parseInt(process.env.DB_PORT))) {
+    throw new Error('DB_PORT 必须是有效的数字')
+  }
+}
+
+// 执行配置验证
+validateDatabaseConfig()
+
+// 🔴 所有环境使用相同配置 - 统一架构
+const unifiedConfig = {
+  development: { ...dbConfig },
+  production: { ...dbConfig },
   test: {
-    host: process.env.DB_HOST || 'test-db-mysql.ns-br0za7uc.svc',
-    port: process.env.DB_PORT || 3306,
-    username: process.env.DB_USER || 'root',
-    password: process.env.DB_PASSWORD || 'mc6r9cgb',
-    database: process.env.DB_NAME || 'restaurant_points_dev',
-    dialect: 'mysql',
-    timezone: '+08:00', // 🕐 北京时间 (Asia/Shanghai)
-    logging: false,
-    pool: {
-      max: 10,
-      min: 0,
-      acquire: 30000,
-      idle: 10000
-    },
-    define: {
-      charset: 'utf8mb4',
-      collate: 'utf8mb4_unicode_ci',
-      timestamps: true,
-      underscored: false,
-      freezeTableName: true
-    }
+    ...dbConfig,
+    logging: false // 测试时关闭日志输出
   }
 }
 
 const env = process.env.NODE_ENV || 'development'
-const config = dbConfig[env]
+const config = unifiedConfig[env]
+
+console.log(`🔗 统一数据库配置: ${config.host}:${config.port}/${config.database} (环境: ${env})`)
 
 // 创建Sequelize实例
 const sequelize = new Sequelize(config.database, config.username, config.password, config)
 
-// 🔴 数据库连接测试函数 - 对接时必须验证连接
+// 🔴 数据库连接测试函数
 async function testConnection () {
   try {
     await sequelize.authenticate()
-    console.log('✅ 数据库连接成功:', config.host + ':' + config.port)
+    console.log('✅ 数据库连接成功:', config.host + ':' + config.port + '/' + config.database)
     return true
   } catch (error) {
     console.error('❌ 数据库连接失败:', error.message)
@@ -104,7 +94,7 @@ async function testConnection () {
   }
 }
 
-// 🔴 数据库同步函数 - 根据模型创建表结构
+// 🔴 数据库同步函数
 async function syncDatabase (force = false) {
   try {
     console.log('开始同步数据库...')
@@ -121,5 +111,11 @@ module.exports = {
   sequelize,
   testConnection,
   syncDatabase,
-  config
+  config,
+  // 🔴 导出统一配置供其他工具使用
+  unifiedConfig,
+  // Sequelize CLI配置导出
+  development: unifiedConfig.development,
+  production: unifiedConfig.production,
+  test: unifiedConfig.test
 }

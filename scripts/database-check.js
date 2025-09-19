@@ -1,236 +1,126 @@
+#!/usr/bin/env node
+
 /**
- * 餐厅积分抽奖系统 v3.0 - 数据库连接和表结构检查脚本
- * 作用：验证数据库连接、检查表结构、验证索引状态
+ * 统一数据库检查脚本 - 使用统一数据库助手
+ * 调用 UnifiedDatabaseHelper 的完整检查功能
+ * 集成了简单检查和详细检查两种模式
  */
 
-'use strict'
-
-// 加载环境变量
 require('dotenv').config()
+const { getDatabaseHelper } = require('../utils/UnifiedDatabaseHelper')
 
-const { sequelize } = require('../models')
+// 解析命令行参数
+const args = process.argv.slice(2)
+const isVerbose = args.includes('--verbose') || args.includes('-v')
+const isSimple = args.includes('--simple') || args.includes('-s')
 
-/**
- * 检查数据库连接
- */
-async function checkDatabaseConnection () {
+async function simpleCheck () {
+  console.log('🔍 执行简单数据库检查...')
+
+  const db = getDatabaseHelper()
+
   try {
-    console.log('🔗 正在检查数据库连接...')
-    await sequelize.authenticate()
-    console.log('✅ 数据库连接成功!')
+    // 1. 测试连接
+    console.log('📡 测试数据库连接...')
+    await db.ensureConnection()
+    console.log('✅ 数据库连接成功')
 
-    // 获取数据库版本信息
-    const [results] = await sequelize.query('SELECT VERSION() as version')
-    console.log(`📊 MySQL版本: ${results[0].version}`)
+    // 2. 检查数据库名称
+    const results = await db.query('SELECT DATABASE() as current_db')
+    console.log(`📊 当前数据库: ${results[0].current_db}`)
 
-    return true
-  } catch (error) {
-    console.error('❌ 数据库连接失败:', error.message)
-    return false
-  }
-}
+    // 3. 检查表数量
+    const tables = await db.query('SHOW TABLES')
+    console.log(`📊 总表数: ${tables.length}`)
 
-/**
- * 检查数据库表结构
- */
-async function checkTableStructure () {
-  try {
-    console.log('\n📋 正在检查数据库表结构...')
+    // 4. 检查关键表的记录数
+    console.log('\n📊 关键表记录数统计:')
+    const keyTables = [
+      'users',
+      'lottery_campaigns',
+      'lottery_draws',
+      'lottery_prizes',
+      'points_transactions'
+    ]
 
-    // 获取所有表
-    const [tables] = await sequelize.query('SHOW TABLES')
-    console.log(`📊 数据库表总数: ${tables.length}`)
-
-    const tableNames = tables.map(table => Object.values(table)[0])
-
-    // 按业务模块分类
-    const businessTables = {
-      core: [],
-      points: [],
-      lottery: [],
-      analytics: [],
-      system: []
-    }
-
-    tableNames.forEach(tableName => {
-      if (tableName.includes('points') || tableName.includes('transaction')) {
-        businessTables.points.push(tableName)
-      } else if (
-        tableName.includes('lottery') ||
-        tableName.includes('campaign') ||
-        tableName.includes('prize') ||
-        tableName.includes('draw')
-      ) {
-        businessTables.lottery.push(tableName)
-      } else if (tableName.includes('analytics')) {
-        businessTables.analytics.push(tableName)
-      } else if (
-        tableName.includes('user') ||
-        tableName.includes('chat') ||
-        tableName.includes('business_event')
-      ) {
-        businessTables.core.push(tableName)
-      } else {
-        businessTables.system.push(tableName)
+    for (const table of keyTables) {
+      try {
+        const [count] = await db.query(`SELECT COUNT(*) as count FROM ${table}`)
+        console.log(`  ${table}: ${count[0].count} 条记录`)
+      } catch (error) {
+        console.log(`  ${table}: 表不存在或查询失败`)
       }
-    })
+    }
 
-    console.log('\n📊 按业务模块分类:')
-    console.log(`🔥 核心业务表 (${businessTables.core.length}个):`, businessTables.core)
-    console.log(`💰 积分系统表 (${businessTables.points.length}个):`, businessTables.points)
-    console.log(`🎲 抽奖系统表 (${businessTables.lottery.length}个):`, businessTables.lottery)
-    console.log(`📊 分析系统表 (${businessTables.analytics.length}个):`, businessTables.analytics)
-    console.log(`⚙️ 系统管理表 (${businessTables.system.length}个):`, businessTables.system)
-
-    return businessTables
+    console.log('\n✅ 简单数据库检查完成')
   } catch (error) {
-    console.error('❌ 表结构检查失败:', error.message)
-    return null
+    console.error('❌ 数据库检查失败:', error.message)
+    process.exit(1)
+  } finally {
+    await db.disconnect()
   }
 }
 
-/**
- * 检查索引状态
- */
-async function checkIndexes () {
+async function detailedCheck () {
   try {
-    console.log('\n🔍 正在检查数据库索引...')
+    const db = getDatabaseHelper()
 
-    // 获取所有索引信息
-    const [indexes] = await sequelize.query(`
-      SELECT 
-        TABLE_NAME,
-        INDEX_NAME,
-        COLUMN_NAME,
-        NON_UNIQUE,
-        INDEX_TYPE
-      FROM information_schema.STATISTICS 
-      WHERE TABLE_SCHEMA = '${process.env.DB_NAME}'
-      ORDER BY TABLE_NAME, INDEX_NAME, SEQ_IN_INDEX
-    `)
+    // 使用扩展后的完整检查功能
+    const checkResult = await db.performCompleteCheck({ verbose: isVerbose })
 
-    // 按表分组统计索引
-    const indexByTable = {}
-    indexes.forEach(index => {
-      if (!indexByTable[index.TABLE_NAME]) {
-        indexByTable[index.TABLE_NAME] = []
-      }
-      indexByTable[index.TABLE_NAME].push(index)
-    })
+    if (!isVerbose) {
+      // 简化输出模式
+      console.log('\n📋 数据库检查摘要:')
+      console.log(`   数据库: ${checkResult.database.name}`)
+      console.log(`   连接状态: ${checkResult.connection.status}`)
+      console.log(`   总表数: ${checkResult.summary.totalTables}`)
+      console.log(`   总记录数: ${checkResult.summary.totalRecords}`)
+      console.log(`   总索引数: ${checkResult.summary.totalIndexes}`)
+    }
 
-    console.log('\n📊 索引统计:')
-    let totalIndexes = 0
-    Object.keys(indexByTable).forEach(tableName => {
-      const tableIndexes = indexByTable[tableName]
-      const uniqueIndexNames = [...new Set(tableIndexes.map(idx => idx.INDEX_NAME))]
-      totalIndexes += uniqueIndexNames.length
-      console.log(`📋 ${tableName}: ${uniqueIndexNames.length}个索引`)
-    })
-
-    console.log(`🔢 总索引数: ${totalIndexes}`)
-
-    return indexByTable
+    await db.disconnect()
   } catch (error) {
-    console.error('❌ 索引检查失败:', error.message)
-    return null
+    console.error('❌ 详细数据库检查失败:', error.message)
+    process.exit(1)
   }
 }
 
-/**
- * 检查关键字段的数据完整性
- */
-async function checkDataIntegrity () {
-  try {
-    console.log('\n🔍 正在检查数据完整性...')
-
-    // 检查用户表
-    const [userCount] = await sequelize.query('SELECT COUNT(*) as count FROM users')
-    console.log(`👥 用户总数: ${userCount[0].count}`)
-
-    // 检查积分账户表
-    try {
-      const [pointsAccountCount] = await sequelize.query(
-        'SELECT COUNT(*) as count FROM user_points_accounts'
-      )
-      console.log(`💰 积分账户总数: ${pointsAccountCount[0].count}`)
-    } catch (error) {
-      console.log('⚠️  积分账户表不存在或无法访问')
-    }
-
-    // 检查抽奖活动表
-    try {
-      const [campaignCount] = await sequelize.query(
-        'SELECT COUNT(*) as count FROM lottery_campaigns'
-      )
-      console.log(`🎲 抽奖活动总数: ${campaignCount[0].count}`)
-    } catch (error) {
-      console.log('⚠️  抽奖活动表不存在或无法访问')
-    }
-
-    // 检查分析表
-    try {
-      const [behaviorCount] = await sequelize.query(
-        'SELECT COUNT(*) as count FROM analytics_behaviors'
-      )
-      console.log(`📊 行为记录总数: ${behaviorCount[0].count}`)
-    } catch (error) {
-      console.log('⚠️  行为分析表不存在或无法访问')
-    }
-
-    return true
-  } catch (error) {
-    console.error('❌ 数据完整性检查失败:', error.message)
-    return false
-  }
+function showHelp () {
+  console.log('数据库检查脚本使用说明:')
+  console.log('')
+  console.log('用法: node database-check.js [选项]')
+  console.log('')
+  console.log('选项:')
+  console.log('  -s, --simple    执行简单检查（快速检查连接和基本表信息）')
+  console.log('  -v, --verbose   详细模式（显示详细的检查信息）')
+  console.log('  -h, --help      显示此帮助信息')
+  console.log('')
+  console.log('示例:')
+  console.log('  node database-check.js            # 默认详细检查')
+  console.log('  node database-check.js --simple   # 简单快速检查')
+  console.log('  node database-check.js --verbose  # 详细模式检查')
 }
 
-/**
- * 主函数
- */
 async function main () {
-  console.log('🚀 餐厅积分抽奖系统 v3.0 - 数据库诊断工具')
-  console.log('='.repeat(60))
+  if (args.includes('--help') || args.includes('-h')) {
+    showHelp()
+    return
+  }
 
-  // 1. 检查数据库连接
-  const connectionOk = await checkDatabaseConnection()
-  if (!connectionOk) {
+  try {
+    if (isSimple) {
+      await simpleCheck()
+    } else {
+      await detailedCheck()
+    }
+  } catch (error) {
+    console.error('数据库检查失败:', error.message)
     process.exit(1)
   }
-
-  // 2. 检查表结构
-  const tableStructure = await checkTableStructure()
-  if (!tableStructure) {
-    process.exit(1)
-  }
-
-  // 3. 检查索引
-  const _indexes = await checkIndexes()
-
-  // 4. 检查数据完整性
-  const dataIntegrityOk = await checkDataIntegrity()
-
-  console.log('\n' + '='.repeat(60))
-
-  if (connectionOk && tableStructure && dataIntegrityOk) {
-    console.log('✅ 数据库检查完成 - 一切正常!')
-  } else {
-    console.log('⚠️  数据库检查完成 - 发现一些问题，请查看上方详情')
-  }
-
-  await sequelize.close()
 }
 
-// 运行检查
 if (require.main === module) {
-  main().catch(error => {
-    console.error('💥 脚本执行失败:', error)
-    process.exit(1)
-  })
+  main()
 }
 
-module.exports = {
-  checkDatabaseConnection,
-  checkTableStructure,
-  checkIndexes,
-  checkDataIntegrity
-}
+module.exports = { main, simpleCheck, detailedCheck }

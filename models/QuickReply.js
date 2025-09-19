@@ -56,6 +56,8 @@ module.exports = sequelize => {
     {
       tableName: 'quick_replies',
       timestamps: true,
+      createdAt: 'created_at',
+      updatedAt: 'updated_at',
       underscored: true,
       indexes: [
         {

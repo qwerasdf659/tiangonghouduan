@@ -27,7 +27,7 @@ module.exports = sequelize => {
       },
 
       context_id: {
-        type: DataTypes.INTEGER, // 修复：与现有数据库兼容
+        type: DataTypes.INTEGER,
         allowNull: false,
         comment: '上下文ID：用户ID/奖品ID/商品ID等'
       },
@@ -271,8 +271,8 @@ module.exports = sequelize => {
   // 类方法
   ImageResources.findByBusiness = function (businessType, category, options = {}) {
     const {
-      limit = 20,
-      offset = 0,
+      _limit = 20,
+      _offset = 0,
       status = 'active',
       orderBy = 'created_at',
       order = 'DESC'
@@ -284,8 +284,8 @@ module.exports = sequelize => {
         category,
         status
       },
-      limit: parseInt(limit),
-      offset: parseInt(offset),
+      limit: parseInt(_limit),
+      offset: parseInt(_offset),
       order: [[orderBy, order]],
       attributes: {
         exclude: ['file_path', 'metadata']
@@ -304,7 +304,7 @@ module.exports = sequelize => {
         {
           model: sequelize.models.User,
           as: 'uploader',
-          attributes: ['id', 'phone', 'nickname', 'avatar_url']
+          attributes: ['id', 'phone', 'nickname']
         }
       ],
       order: [['created_at', 'ASC']],

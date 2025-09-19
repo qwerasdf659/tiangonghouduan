@@ -1,5 +1,5 @@
 /**
- * 用户会话管理模型 - V3安全版本
+ * 用户会话管理模型 - V4统一架构版本
  * 管理JWT Token的生命周期，支持会话控制和安全管理
  * 创建时间：2025年01月21日
  */
@@ -76,6 +76,8 @@ module.exports = sequelize => {
     {
       tableName: 'user_sessions',
       timestamps: true,
+      createdAt: 'created_at',
+      updatedAt: 'updated_at',
       underscored: true,
       indexes: [
         {
@@ -201,10 +203,7 @@ module.exports = sequelize => {
       }
     }
 
-    const affectedCount = await this.update(
-      { is_active: false },
-      { where: whereCondition }
-    )
+    const affectedCount = await this.update({ is_active: false }, { where: whereCondition })
 
     console.log(`🔒 已失效 ${affectedCount[0]} 个用户会话: ${user_type}:${user_id}`)
     return affectedCount[0]

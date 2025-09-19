@@ -52,6 +52,8 @@ module.exports = sequelize => {
     {
       tableName: 'admin_status',
       timestamps: true,
+      createdAt: 'created_at',
+      updatedAt: 'updated_at',
       underscored: true,
       indexes: [
         {
@@ -122,7 +124,7 @@ module.exports = sequelize => {
           model: sequelize.models.User,
           as: 'admin',
           where: { is_admin: true },
-          attributes: ['user_id', 'nickname', 'avatar_url']
+          attributes: ['user_id', 'nickname']
         }
       ],
       order: [

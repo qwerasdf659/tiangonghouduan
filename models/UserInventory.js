@@ -1,5 +1,5 @@
 /**
- * 餐厅积分抽奖系统 v3.0 - 用户库存模型
+ * 餐厅积分抽奖系统 V4.0统一引擎架构 - 用户库存模型
  * 管理用户获得的奖品、商品和优惠券
  * 创建时间：2025年01月28日
  */
@@ -144,6 +144,8 @@ module.exports = sequelize => {
     {
       tableName: 'user_inventory',
       timestamps: true,
+      createdAt: 'created_at',
+      updatedAt: 'updated_at',
       underscored: true,
       indexes: [
         {
@@ -210,6 +212,7 @@ module.exports = sequelize => {
     let isUnique = false
 
     // 确保生成唯一的核销码
+    // TODO: 性能优化 - 考虑重构避免循环中await
     while (!isUnique) {
       code = crypto.randomBytes(4).toString('hex').toUpperCase()
       const existing = await UserInventory.findOne({

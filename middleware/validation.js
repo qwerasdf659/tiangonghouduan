@@ -1,9 +1,12 @@
 /**
  * 参数验证中间件
  * 用于验证API请求参数
+ * 🕐 时区：北京时间 (UTC+8) - 中国区域专用
  */
 
 'use strict'
+
+const BeijingTimeHelper = require('../utils/timeHelper') // 🕐 北京时间工具
 
 /**
  * 创建验证中间件
@@ -95,7 +98,7 @@ function validationMiddleware (rules) {
         error: 'VALIDATION_ERROR',
         message: '参数验证失败',
         errors,
-        timestamp: new Date().toISOString()
+        timestamp: BeijingTimeHelper.apiTimestamp() // 🕐 北京时间API时间戳
       })
     }
 

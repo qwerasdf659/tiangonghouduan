@@ -1,51 +1,60 @@
 /**
  * API响应标准化工具类
  * 提供统一的响应格式和错误处理
+ * 🕐 时区：北京时间 (UTC+8) - 中国区域专用
  */
+
+const BeijingTimeHelper = require('./timeHelper') // 🕐 北京时间工具
 
 class ApiResponse {
   /**
-   * 成功响应
+   * 成功响应 - 符合接口规范文档标准
    * @param {any} data - 响应数据
    * @param {string} message - 响应消息
+   * @param {string} code - 业务代码，默认SUCCESS
    * @returns {object} 格式化的成功响应
    */
-  static success (data = null, message = 'Success') {
+  static success (data = null, message = 'Success', code = 'SUCCESS') {
     return {
-      code: 0, // ✅ 修正：使用业务状态码0表示成功，不是HTTP状态码200
-      msg: message, // ✅ 修正：使用msg字段名，符合前端标准
+      success: true,
+      code,
+      message,
       data,
-      timestamp: new Date().toISOString()
+      timestamp: BeijingTimeHelper.apiTimestamp(),
+      version: 'v4.0'
     }
   }
 
   /**
-   * 错误响应
+   * 错误响应 - 符合接口规范文档标准
    * @param {string} message - 错误消息
    * @param {string} errorCode - 错误代码
    * @param {any} details - 错误详情
-   * @param {number} businessCode - 业务状态码（非0表示失败）
+   * @param {number} httpStatus - HTTP状态码（用于设置响应状态）
    * @returns {object} 格式化的错误响应
    */
-  static error (message = 'Error', errorCode = 'UNKNOWN_ERROR', details = null, businessCode = -1) {
+  static error (message = 'Error', errorCode = 'UNKNOWN_ERROR', details = null, httpStatus = null) {
     const response = {
-      code: businessCode, // ✅ 修正：使用业务状态码，非0表示失败
-      msg: message, // ✅ 修正：使用msg字段名，符合前端标准
-      data: null,
-      timestamp: new Date().toISOString()
+      success: false,
+      code: errorCode,
+      message,
+      data: details || {},
+      timestamp: BeijingTimeHelper.apiTimestamp(),
+      version: 'v4.0'
     }
 
-    // 只在开发环境添加错误详情
-    if (details && (process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test')) {
-      response.details = details
-      response.errorCode = errorCode
+    // 在开发环境添加更多调试信息
+    if (process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test') {
+      if (httpStatus) {
+        response.httpStatus = httpStatus
+      }
     }
 
     return response
   }
 
   /**
-   * 分页成功响应
+   * 分页成功响应 - 符合接口规范文档标准
    * @param {Array} data - 数据数组
    * @param {object} pagination - 分页信息
    * @param {string} message - 响应消息
@@ -53,8 +62,9 @@ class ApiResponse {
    */
   static paginated (data = [], pagination = {}, message = 'Success') {
     return {
-      code: 0, // ✅ 修正：使用业务状态码0表示成功
-      msg: message, // ✅ 修正：使用msg字段名，符合前端标准
+      success: true,
+      code: 'PAGINATION_SUCCESS',
+      message,
       data,
       pagination: {
         total: pagination.total || 0,
@@ -65,36 +75,41 @@ class ApiResponse {
         hasPrev: pagination.hasPrev || false,
         ...pagination
       },
-      timestamp: new Date().toISOString()
+      timestamp: BeijingTimeHelper.apiTimestamp(),
+      version: 'v4.0'
     }
   }
 
   /**
-   * 创建响应 (201 Created)
+   * 创建响应 (201 Created) - 符合接口规范文档标准
    * @param {any} data - 创建的数据
    * @param {string} message - 响应消息
    * @returns {object} 格式化的创建响应
    */
   static created (data = null, message = 'Created successfully') {
     return {
-      code: 0, // ✅ 修正：创建成功也使用业务状态码0
-      msg: message, // ✅ 修正：使用msg字段名，符合前端标准
+      success: true,
+      code: 'CREATED',
+      message,
       data,
-      timestamp: new Date().toISOString()
+      timestamp: BeijingTimeHelper.apiTimestamp(),
+      version: 'v4.0'
     }
   }
 
   /**
-   * 无内容响应 (204 No Content)
+   * 无内容响应 (204 No Content) - 符合接口规范文档标准
    * @param {string} message - 响应消息
    * @returns {object} 格式化的无内容响应
    */
   static noContent (message = 'No content') {
     return {
-      code: 0, // ✅ 修正：无内容成功也使用业务状态码0
-      msg: message, // ✅ 修正：使用msg字段名，符合前端标准
+      success: true,
+      code: 'NO_CONTENT',
+      message,
       data: null,
-      timestamp: new Date().toISOString()
+      timestamp: BeijingTimeHelper.apiTimestamp(),
+      version: 'v4.0'
     }
   }
 
@@ -237,44 +252,25 @@ class ApiResponse {
   }
 
   /**
-   * 业务逻辑错误响应
+   * 业务逻辑错误响应 - 符合接口规范文档标准
    * @param {string} message - 错误消息
    * @param {string} errorCode - 业务错误代码
    * @param {any} details - 错误详情
-   * @param {number} businessCode - 业务状态码（非0表示失败）
+   * @param {number} httpStatus - HTTP状态码
    * @returns {object} 格式化的业务错误响应
    */
-  static businessError (message, errorCode, details = null, businessCode = 3001) {
-    const response = {
-      code: businessCode, // ✅ 修正：使用业务状态码，非0表示失败
-      msg: message, // ✅ 修正：使用msg字段名，符合前端标准
-      data: null,
-      timestamp: new Date().toISOString()
-    }
-
-    // 只在开发环境添加错误详情
-    if (details && (process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test')) {
-      response.details = details
-      response.errorCode = errorCode
-    }
-
-    return response
+  static businessError (message, errorCode, details = null, httpStatus = 400) {
+    return this.error(message, errorCode, details, httpStatus)
   }
 
   /**
-   * 验证错误响应
+   * 验证错误响应 - 符合接口规范文档标准
    * @param {string} message - 错误消息
-   * @param {Array} errors - 验证错误列表
+   * @param {Array} errors - 详细验证错误列表
    * @returns {object} 格式化的验证错误响应
    */
-  static validationError (message = 'Validation failed', errors = []) {
-    return {
-      code: 2001, // ✅ 修正：使用业务状态码2001表示验证错误
-      msg: message, // ✅ 修正：使用msg字段名，符合前端标准
-      data: null,
-      errors, // 验证错误详情
-      timestamp: new Date().toISOString()
-    }
+  static validationError (message = '数据验证失败', errors = []) {
+    return this.error(message, 'VALIDATION_ERROR', { errors }, 422)
   }
 
   /**
@@ -300,7 +296,7 @@ class ApiResponse {
         successRate: totalCount > 0 ? ((successCount / totalCount) * 100).toFixed(1) + '%' : '0%',
         ...summary
       },
-      timestamp: new Date().toISOString()
+      timestamp: BeijingTimeHelper.apiTimestamp() // 🕐 北京时间API时间戳
     }
   }
 
@@ -323,6 +319,101 @@ class ApiResponse {
   static asyncHandler (handler) {
     return (req, res, next) => {
       Promise.resolve(handler(req, res, next)).catch(next)
+    }
+  }
+
+  /**
+   * 创建Express中间件，将ApiResponse方法注入到res对象中
+   * 符合接口规范文档的业务标准格式
+   * @returns {function} Express中间件
+   */
+  static middleware () {
+    return (req, res, next) => {
+      // 生成或获取请求追踪ID - 符合业务标准
+      const requestId =
+        req.headers['x-request-id'] ||
+        req.headers['request-id'] ||
+        `req_${Date.now()}_${Math.random().toString(36).substr(2, 8)}`
+
+      // 注入统一的成功响应方法 - 符合接口规范文档标准
+      res.apiSuccess = (data = null, message = '操作成功', code = 'SUCCESS') => {
+        const response = this.success(data, message, code)
+        response.request_id = requestId
+        return this.send(res, response)
+      }
+
+      // 注入统一的错误响应方法 - 符合接口规范文档标准
+      res.apiError = (
+        message = '操作失败',
+        errorCode = 'ERROR',
+        details = null,
+        httpStatus = 400
+      ) => {
+        const response = this.error(message, errorCode, details, httpStatus)
+        response.request_id = requestId
+        return this.send(res, response)
+      }
+
+      // 注入分页响应方法 - 符合业务标准
+      res.apiPaginated = (data = [], pagination = {}, message = '查询成功') => {
+        const response = this.paginated(data, pagination, message)
+        response.request_id = requestId
+        return this.send(res, response)
+      }
+
+      // 注入创建响应方法 - 符合业务标准
+      res.apiCreated = (data = null, message = '创建成功') => {
+        const response = this.created(data, message)
+        response.request_id = requestId
+        return this.send(res, response)
+      }
+
+      // 注入业务错误响应方法 - 符合业务标准
+      res.apiBusinessError = (message, errorCode, details = null, httpStatus = 400) => {
+        const response = this.businessError(message, errorCode, details, httpStatus)
+        response.request_id = requestId
+        return this.send(res, response)
+      }
+
+      // 注入验证错误响应方法 - 符合业务标准
+      res.apiValidationError = (message = '数据验证失败', errors = []) => {
+        const response = this.validationError(message, errors)
+        response.request_id = requestId
+        return this.send(res, response)
+      }
+
+      // 注入快捷错误方法 - 符合业务标准
+      res.apiBadRequest = (message = '请求参数错误', details = null) => {
+        const response = this.badRequest(message, 'BAD_REQUEST', details)
+        response.request_id = requestId
+        return this.send(res, response)
+      }
+
+      res.apiUnauthorized = (message = '未授权访问') => {
+        const response = this.unauthorized(message, 'UNAUTHORIZED')
+        response.request_id = requestId
+        return this.send(res, response)
+      }
+
+      res.apiForbidden = (message = '禁止访问') => {
+        const response = this.forbidden(message, 'FORBIDDEN')
+        response.request_id = requestId
+        return this.send(res, response)
+      }
+
+      res.apiNotFound = (message = '资源不存在') => {
+        const response = this.notFound(message, 'NOT_FOUND')
+        response.request_id = requestId
+        return this.send(res, response)
+      }
+
+      res.apiInternalError = (message = '服务器内部错误') => {
+        const response = this.internalError(message, 'INTERNAL_ERROR')
+        response.request_id = requestId
+        return this.send(res, response)
+      }
+
+      next()
     }
   }
 

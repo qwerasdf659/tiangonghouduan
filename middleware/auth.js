@@ -1,11 +1,13 @@
 /**
- * 认证授权中间件 - V3统一安全版本
+ * 认证授权中间件 - V4统一架构版本
  * 🔴 权限级别：用户(default) | 管理员(is_admin: true)
  * 🔧 修复：统一JWT密钥配置，增强安全性
+ * 🕐 时区：北京时间 (UTC+8) - 中国区域专用
  */
 
 const jwt = require('jsonwebtoken')
 const { sequelize } = require('../models') // 只引用sequelize实例
+const BeijingTimeHelper = require('../utils/timeHelper') // 🕐 北京时间工具
 
 // 🔧 修复：统一JWT密钥配置，确保安全性
 const JWT_SECRET = process.env.JWT_SECRET
@@ -32,7 +34,7 @@ function generateTokens (user) {
     mobile: user.mobile,
     is_admin: user.is_admin || false,
     type: 'access', // 🔧 新增：token类型标识
-    iat: Math.floor(Date.now() / 1000)
+    iat: Math.floor(BeijingTimeHelper.timestamp() / 1000) // 🕐 使用北京时间时间戳
   }
 
   const refreshPayload = {
@@ -114,7 +116,7 @@ const authenticateToken = async (req, res, next) => {
         success: false,
         error: 'MISSING_TOKEN',
         message: '缺少访问令牌',
-        timestamp: new Date().toISOString()
+        timestamp: BeijingTimeHelper.apiTimestamp() // 🕐 北京时间API时间戳
       })
     }
 
@@ -124,7 +126,7 @@ const authenticateToken = async (req, res, next) => {
         success: false,
         error: 'INVALID_TOKEN',
         message: '访问令牌无效或已过期',
-        timestamp: new Date().toISOString()
+        timestamp: BeijingTimeHelper.apiTimestamp() // 🕐 北京时间API时间戳
       })
     }
 
@@ -140,7 +142,7 @@ const authenticateToken = async (req, res, next) => {
         success: false,
         error: 'USER_NOT_FOUND',
         message: '用户不存在',
-        timestamp: new Date().toISOString()
+        timestamp: BeijingTimeHelper.apiTimestamp() // 🕐 北京时间API时间戳
       })
     }
 
@@ -150,7 +152,7 @@ const authenticateToken = async (req, res, next) => {
         success: false,
         error: 'USER_BANNED',
         message: '用户已被禁用',
-        timestamp: new Date().toISOString()
+        timestamp: BeijingTimeHelper.apiTimestamp() // 🕐 北京时间API时间戳
       })
     }
 
@@ -159,7 +161,7 @@ const authenticateToken = async (req, res, next) => {
         success: false,
         error: 'USER_INACTIVE',
         message: '用户已被暂停',
-        timestamp: new Date().toISOString()
+        timestamp: BeijingTimeHelper.apiTimestamp() // 🕐 北京时间API时间戳
       })
     }
 
@@ -176,7 +178,7 @@ const authenticateToken = async (req, res, next) => {
       success: false,
       error: 'AUTH_SERVICE_ERROR',
       message: '认证服务异常',
-      timestamp: new Date().toISOString()
+      timestamp: BeijingTimeHelper.apiTimestamp() // 🕐 北京时间API时间戳
     })
   }
 }
@@ -223,7 +225,7 @@ const requireAdmin = (req, res, next) => {
       success: false,
       error: 'LOGIN_REQUIRED',
       message: '需要登录访问',
-      timestamp: new Date().toISOString()
+      timestamp: BeijingTimeHelper.apiTimestamp() // 🕐 北京时间API时间戳
     })
   }
 
@@ -232,7 +234,7 @@ const requireAdmin = (req, res, next) => {
       success: false,
       error: 'ADMIN_REQUIRED',
       message: '需要管理员权限',
-      timestamp: new Date().toISOString()
+      timestamp: BeijingTimeHelper.apiTimestamp() // 🕐 北京时间API时间戳
     })
   }
 
@@ -241,36 +243,31 @@ const requireAdmin = (req, res, next) => {
 
 /**
  * 请求日志中间件 - 修复：增强日志格式
+ * 🕐 使用北京时间记录日志
  */
 const requestLogger = (req, res, next) => {
-  const start = Date.now()
+  const start = BeijingTimeHelper.timestamp() // 🕐 使用北京时间时间戳
   const { method, path, ip } = req
   const userAgent = req.get('User-Agent')
   const userId = req.user ? req.user.user_id : 'anonymous'
 
-  // 记录请求开始
-  console.log(`📥 [${new Date().toISOString()}] ${method} ${path} - User:${userId} - ${ip} - ${userAgent}`)
+  // 记录请求开始 - 使用北京时间
+  console.log(
+    `📥 [${BeijingTimeHelper.apiTimestamp()}] ${method} ${path} - User:${userId} - ${ip} - ${userAgent}`
+  )
 
   // 监听响应结束
   res.on('finish', () => {
-    const duration = Date.now() - start
+    const duration = BeijingTimeHelper.timestamp() - start // 🕐 计算持续时间
     const { statusCode } = res
 
-    console.log(`📤 [${new Date().toISOString()}] ${method} ${path} - ${statusCode} - ${duration}ms - User:${userId}`)
+    console.log(
+      `📤 [${BeijingTimeHelper.apiTimestamp()}] ${method} ${path} - ${statusCode} - ${duration}ms - User:${userId}`
+    )
   })
 
   next()
 }
-
-/**
- * 用户身份验证中间件（仅验证用户身份，不检查权限）
- */
-const requireUser = authenticateToken
-
-/**
- * 管理员权限中间件别名（向后兼容）
- */
-const isAdmin = requireAdmin
 
 module.exports = {
   generateTokens,
@@ -279,7 +276,5 @@ module.exports = {
   authenticateToken,
   optionalAuth,
   requireAdmin,
-  isAdmin,
-  requireUser,
   requestLogger
 }

@@ -1,6 +1,6 @@
 /**
  * Sealos对象存储服务
- * 基于AWS S3 SDK实现，兼容Sealos对象存储API
+ * 基于AWS S3 SDK实现，适配Sealos对象存储API
  */
 
 const AWS = require('aws-sdk')

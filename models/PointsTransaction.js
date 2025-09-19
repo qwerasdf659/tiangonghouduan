@@ -572,6 +572,68 @@ module.exports = sequelize => {
         defaultValue: 'completed',
         comment: '交易状态'
       },
+
+      /**
+       * ✅ 积分交易是否成功的业务标准字段（扩展is_winner模式）
+       *
+       * 🎯 业务含义：
+       * - true: 积分交易成功完成，积分已正确变更到用户账户
+       * - false: 积分交易未成功（处理中或失败状态）
+       *
+       * 📋 业务逻辑：
+       * - 仅当 status === 'completed' 时返回 true
+       * - 其他所有状态均返回 false（pending/processing/failed等）
+       *
+       * 🔍 使用场景：
+       * - 统计成功积分交易：WHERE is_successful = true
+       * - 计算积分交易成功率：COUNT(is_successful = true) / COUNT(*)
+       * - 财务对账：只统计成功完成的积分交易
+       * - 用户积分变更审计：验证积分变更的有效性
+       *
+       * 💡 业务理解：
+       * - completed: 积分已成功变更，用户账户余额已更新
+       * - pending: 交易提交但未处理完成
+       * - processing: 正在处理中，尚未确认
+       * - failed: 处理失败，积分未变更
+       *
+       * 🔄 与其他业务标准的一致性：
+       * - TradeRecord.is_successful: 同样使用 completed 状态判断
+       * - ExchangeRecords.is_successful: 使用 distributed/used 状态判断
+       * - LotteryRecord.is_winner: 直接Boolean字段表示抽奖结果
+       *
+       * ⚠️ 重要说明：
+       * - 这是计算字段，不能直接设置
+       * - 要改变结果，请修改 status 字段
+       * - 积分变更的最终确认依据
+       *
+       * 📝 使用示例：
+       * ```javascript
+       * // 查询用户成功的积分交易
+       * const successfulTransactions = await PointsTransaction.findAll({
+       *   where: {
+       *     user_id: userId,
+       *     [Op.and]: sequelize.where(
+       *       sequelize.col('is_successful'), true
+       *     )
+       *   }
+       * })
+       *
+       * // 检查积分交易是否成功
+       * if (pointsTransaction.is_successful) {
+       *   console.log('积分交易成功，余额已更新')
+       * }
+       * ```
+       */
+      is_successful: {
+        type: DataTypes.VIRTUAL,
+        get () {
+          return this.status === 'completed'
+        },
+        set (_value) {
+          throw new Error('is_successful是计算字段，请设置status字段')
+        }
+      },
+
       failure_reason: {
         type: DataTypes.TEXT,
         allowNull: true,
@@ -583,6 +645,8 @@ module.exports = sequelize => {
       modelName: 'PointsTransaction',
       tableName: 'points_transactions',
       timestamps: true,
+      createdAt: 'created_at',
+      updatedAt: 'updated_at',
       underscored: true,
       comment: '积分交易记录表',
       indexes: [
