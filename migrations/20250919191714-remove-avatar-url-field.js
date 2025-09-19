@@ -84,39 +84,38 @@ module.exports = {
       console.log('✅ 成功恢复 users.avatar_url 字段')
 
       // 2. 恢复 upload_review 表中的 image_type 枚举
-      const uploadReviewTableExists = await queryInterface.tableExists('upload_review');
-      
+      const uploadReviewTableExists = await queryInterface.tableExists('upload_review')
+
       if (uploadReviewTableExists) {
-        console.log('恢复 upload_review.image_type 枚举类型...');
-        
+        console.log('恢复 upload_review.image_type 枚举类型...')
+
         // 2.1 添加包含avatar的新枚举字段
         await queryInterface.addColumn('upload_review', 'image_type_restored', {
           type: Sequelize.ENUM('avatar', 'photo', 'document', 'other'),
           allowNull: false,
           defaultValue: 'photo',
           comment: '图片类型'
-        });
-        
+        })
+
         // 2.2 将现有数据迁移到新字段
         await queryInterface.sequelize.query(`
           UPDATE upload_review 
           SET image_type_restored = image_type
-        `);
-        
+        `)
+
         // 2.3 删除旧字段
-        await queryInterface.removeColumn('upload_review', 'image_type');
-        
+        await queryInterface.removeColumn('upload_review', 'image_type')
+
         // 2.4 重命名新字段
-        await queryInterface.renameColumn('upload_review', 'image_type_restored', 'image_type');
-        
-        console.log('✅ 成功恢复 upload_review.image_type 枚举类型');
+        await queryInterface.renameColumn('upload_review', 'image_type_restored', 'image_type')
+
+        console.log('✅ 成功恢复 upload_review.image_type 枚举类型')
       }
 
-      console.log('🎉 头像功能回滚完成！');
-
+      console.log('🎉 头像功能回滚完成！')
     } catch (error) {
-      console.error('❌ 回滚执行失败:', error.message);
-      throw error;
+      console.error('❌ 回滚执行失败:', error.message)
+      throw error
     }
   }
-}; 
+}

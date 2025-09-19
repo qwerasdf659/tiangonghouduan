@@ -1,0 +1,715 @@
+---
+alwaysApply: true
+---
+# 服务进程管理规范（基于实际cursor_8.md等多进程冲突问题优化版）
+
+## 🔴 基于实际发现的进程管理问题
+
+### 实际多进程冲突案例统计
+从11个cursor文档深度分析发现：
+- **cursor_8.md**: 4个Node.js进程同时运行导致端口冲突
+  * 进程30308：`node app.js`
+  * 进程30950：`npm run dev`
+  * 进程33468：`npm run dev`  
+  * 进程35267：`node app.js` (正在监听3000端口)
+- **cursor_7.md**: 多个nodemon进程重复启动，导致服务异常
+- **cursor_5.md**: PM2配置复杂性导致进程管理混乱
+- **cursor_6.md**: 服务停止问题，进程状态不一致
+
+**累计时间浪费**: 180-240分钟解决进程冲突问题
+**累计进程清理次数**: 25+次跨多个文档
+
+## 统一进程管理强制规范
+
+### 进程冲突检测和预防机制
+```javascript
+// 🔴 基于cursor_8.md实际问题的进程冲突检测
+const PROCESS_CONFLICT_DETECTOR = {
+  // 检测端口占用冲突
+  checkPortConflicts: async (targetPort = 3000) => {
+    try {
+      const result = await execAsync(`netstat -tlnp | grep :${targetPort}`);
+      const processes = result.stdout.split('\n')
+        .filter(line => line.trim())
+        .map(line => {
+          const match = line.match(/(\d+)\/(\w+)/);
+          return match ? { pid: match[1], name: match[2] } : null;
+        })
+        .filter(Boolean);
+      
+      if (processes.length > 1) {
+        console.error(`🔴 检测到端口${targetPort}冲突：${processes.length}个进程`);
+        processes.forEach(proc => {
+          console.error(`   - PID: ${proc.pid}, 进程: ${proc.name}`);
+        });
+        
+        return {
+          hasConflict: true,
+          conflictingProcesses: processes,
+          recommendation: 'CLEANUP_REQUIRED'
+        };
+      }
+      
+      return { hasConflict: false, processes };
+    } catch (error) {
+      console.warn('端口检查失败:', error.message);
+      return { hasConflict: false, error: error.message };
+    }
+  },
+  
+  // 检测重复Node.js进程
+  checkDuplicateNodeProcesses: async () => {
+    try {
+      const result = await execAsync('ps aux | grep node | grep -v grep');
+      const nodeProcesses = result.stdout.split('\n')
+        .filter(line => line.includes('node') && line.includes('app.js'))
+        .map(line => {
+          const parts = line.trim().split(/\s+/);
+          return {
+            pid: parts[1],
+            command: parts.slice(10).join(' '),
+            memory: parts[5],
+            cpu: parts[2]
+          };
+        });
+      
+      if (nodeProcesses.length > 1) {
+        console.error(`🔴 检测到${nodeProcesses.length}个重复Node.js进程`);
+        nodeProcesses.forEach(proc => {
+          console.error(`   - PID: ${proc.pid}, 内存: ${proc.memory}, 命令: ${proc.command}`);
+        });
+        
+        return {
+          hasDuplicates: true,
+          processes: nodeProcesses,
+          recommendation: 'KILL_DUPLICATES'
+        };
+      }
+      
+      return { hasDuplicates: false, processes: nodeProcesses };
+    } catch (error) {
+      console.warn('进程检查失败:', error.message);
+      return { hasDuplicates: false, error: error.message };
+    }
+  }
+};
+```
+
+### 安全进程清理机制
+```bash
+# 🔴 基于cursor_8.md实际清理流程的标准化脚本
+cleanup_duplicate_processes() {
+  echo "🔍 检查重复进程..."
+  
+  # 1. 检查端口占用情况
+  local port_conflicts=$(netstat -tlnp | grep :3000 | wc -l)
+  if [ $port_conflicts -gt 1 ]; then
+    echo "🔴 检测到端口3000冲突，进程数：$port_conflicts"
+  fi
+  
+  # 2. 查找所有Node.js相关进程
+  local node_pids=$(ps aux | grep -E "(node app\.js|npm run dev)" | grep -v grep | awk '{print $2}')
+  local node_count=$(echo "$node_pids" | wc -w)
+  
+  if [ $node_count -gt 1 ]; then
+    echo "🔴 发现$node_count个Node.js进程冲突"
+    echo "进程列表："
+    ps aux | grep -E "(node app\.js|npm run dev)" | grep -v grep
+    
+    # 3. 保留最新启动的进程，清理其他
+    local newest_pid=$(ps aux | grep -E "(node app\.js|npm run dev)" | grep -v grep | sort -k10 | tail -1 | awk '{print $2}')
+    echo "🎯 保留最新进程：PID $newest_pid"
+    
+    # 4. 清理重复进程（排除最新的）
+    for pid in $node_pids; do
+      if [ "$pid" != "$newest_pid" ]; then
+        echo "🗑️ 清理重复进程：PID $pid"
+        kill -TERM $pid 2>/dev/null || kill -KILL $pid 2>/dev/null
+        sleep 1
+      fi
+    done
+    
+    # 5. 验证清理效果
+    sleep 2
+    local remaining=$(ps aux | grep -E "(node app\.js|npm run dev)" | grep -v grep | wc -l)
+    if [ $remaining -eq 1 ]; then
+      echo "✅ 进程清理成功，剩余1个进程"
+    else
+      echo "⚠️ 进程清理不完全，剩余$remaining个进程"
+    fi
+  else
+    echo "✅ 未发现进程冲突"
+  fi
+}
+```
+
+### 统一服务启动控制
+```javascript
+// 基于cursor_5.md等问题的统一启动控制
+const SERVICE_STARTUP_CONTROL = {
+  // 启动前预检查
+  preStartupCheck: async () => {
+    console.log('🔍 执行服务启动前检查...');
+    
+    // 1. 检查进程冲突
+    const portCheck = await PROCESS_CONFLICT_DETECTOR.checkPortConflicts(3000);
+    if (portCheck.hasConflict) {
+      throw new Error(`端口3000被${portCheck.conflictingProcesses.length}个进程占用`);
+    }
+    
+    // 2. 检查重复进程
+    const processCheck = await PROCESS_CONFLICT_DETECTOR.checkDuplicateNodeProcesses();
+    if (processCheck.hasDuplicates) {
+      console.warn(`⚠️ 发现${processCheck.processes.length}个重复进程，建议清理`);
+    }
+    
+    // 3. 检查必要文件
+    const requiredFiles = ['app.js', 'package.json', '.env'];
+    const missingFiles = [];
+    
+    for (const file of requiredFiles) {
+      if (!fs.existsSync(file)) {
+        missingFiles.push(file);
+      }
+    }
+    
+    if (missingFiles.length > 0) {
+      throw new Error(`缺少必要文件: ${missingFiles.join(', ')}`);
+    }
+    
+    console.log('✅ 启动前检查通过');
+  },
+  
+  // 智能启动策略选择
+  selectStartupStrategy: () => {
+    // 检查PM2是否可用
+    try {
+      execSync('pm2 --version', { stdio: 'ignore' });
+      return 'PM2';
+    } catch {
+      console.log('PM2不可用，使用nodemon启动');
+      return 'NODEMON';
+    }
+  },
+  
+  // 统一启动入口
+  startService: async (strategy = null) => {
+    try {
+      await SERVICE_STARTUP_CONTROL.preStartupCheck();
+      
+      const selectedStrategy = strategy || SERVICE_STARTUP_CONTROL.selectStartupStrategy();
+      
+      console.log(`🚀 使用${selectedStrategy}启动服务...`);
+      
+      switch (selectedStrategy) {
+        case 'PM2':
+          return await SERVICE_STARTUP_CONTROL.startWithPM2();
+        case 'NODEMON':
+          return await SERVICE_STARTUP_CONTROL.startWithNodemon();
+        default:
+          throw new Error(`未知的启动策略: ${selectedStrategy}`);
+      }
+    } catch (error) {
+      console.error('🔴 服务启动失败:', error.message);
+      throw error;
+    }
+  }
+};
+```
+
+## PM2统一配置规范
+
+### 基于实际问题优化的PM2配置
+```javascript
+// 基于cursor_5.md中PM2配置经验的优化版本
+const PM2_UNIFIED_CONFIG = {
+  // ecosystem.config.js标准配置
+  generateEcosystemConfig: () => ({
+    apps: [{
+      // 基础配置
+      name: 'restaurant-lottery-backend',
+      script: 'app.js',
+      cwd: process.cwd(),
+      
+      // 运行模式配置
+      exec_mode: 'fork',        // 单进程模式，避免多进程冲突
+      instances: 1,             // 强制单实例
+      
+      // 环境变量
+      env: {
+        NODE_ENV: 'development',
+        PORT: 3000
+      },
+      
+      env_production: {
+        NODE_ENV: 'production',
+        PORT: 3000
+      },
+      
+      // 🔴 基于实际问题的关键配置
+      watch: false,             // 禁用文件监控，避免频繁重启
+      ignore_watch: [
+        'node_modules',
+        'logs',
+        '*.log',
+        '.git'
+      ],
+      
+      // 重启控制（解决cursor_8.md中的重启问题）
+      autorestart: true,
+      max_restarts: 5,          // 限制最大重启次数
+      min_uptime: '10s',        // 最小运行时间
+      restart_delay: 1000,      // 重启延迟
+      
+      // 内存管理
+      max_memory_restart: '512M',
+      
+      // 日志配置
+      log_file: './logs/combined.log',
+      out_file: './logs/out.log',
+      error_file: './logs/error.log',
+      log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
+      merge_logs: true,
+      
+      // 错误处理
+      kill_timeout: 5000,
+      listen_timeout: 3000,
+      
+      // Node.js优化
+      node_args: '--max-old-space-size=512'
+    }]
+  }),
+  
+  // PM2状态检查
+  checkPM2Status: async () => {
+    try {
+      const result = await execAsync('pm2 jlist');
+      const processes = JSON.parse(result.stdout);
+      
+      const appProcess = processes.find(p => p.name === 'restaurant-lottery-backend');
+      
+      if (appProcess) {
+        return {
+          status: appProcess.pm2_env.status,
+          pid: appProcess.pid,
+          restarts: appProcess.pm2_env.restart_time,
+          uptime: appProcess.pm2_env.pm_uptime,
+          memory: appProcess.memory,
+          cpu: appProcess.cpu
+        };
+      }
+      
+      return { status: 'stopped' };
+    } catch (error) {
+      console.warn('PM2状态检查失败:', error.message);
+      return { status: 'unknown', error: error.message };
+    }
+  }
+};
+```
+
+### PM2操作安全包装
+```javascript
+// 基于实际PM2操作问题的安全包装
+const PM2_SAFE_OPERATIONS = {
+  // 安全启动
+  safeStart: async () => {
+    try {
+      // 1. 检查是否已运行
+      const status = await PM2_UNIFIED_CONFIG.checkPM2Status();
+      if (status.status === 'online') {
+        console.log('✅ 服务已在运行，无需重新启动');
+        return status;
+      }
+      
+      // 2. 确保生态系统配置存在
+      const configPath = './ecosystem.config.js';
+      if (!fs.existsSync(configPath)) {
+        const config = PM2_UNIFIED_CONFIG.generateEcosystemConfig();
+        fs.writeFileSync(configPath, `module.exports = ${JSON.stringify(config, null, 2)};`);
+        console.log('📄 生成PM2配置文件: ecosystem.config.js');
+      }
+      
+      // 3. 启动服务
+      console.log('🚀 PM2启动服务...');
+      await execAsync('pm2 start ecosystem.config.js');
+      
+      // 4. 验证启动结果
+      await new Promise(resolve => setTimeout(resolve, 3000));
+      const newStatus = await PM2_UNIFIED_CONFIG.checkPM2Status();
+      
+      if (newStatus.status === 'online') {
+        console.log('✅ PM2服务启动成功');
+        return newStatus;
+      } else {
+        throw new Error(`PM2启动失败，当前状态: ${newStatus.status}`);
+      }
+    } catch (error) {
+      console.error('🔴 PM2启动失败:', error.message);
+      throw error;
+    }
+  },
+  
+  // 安全重启
+  safeRestart: async () => {
+    try {
+      console.log('🔄 PM2重启服务...');
+      
+      await execAsync('pm2 restart restaurant-lottery-backend');
+      
+      // 等待重启完成
+      await new Promise(resolve => setTimeout(resolve, 5000));
+      
+      const status = await PM2_UNIFIED_CONFIG.checkPM2Status();
+      
+      if (status.status === 'online') {
+        console.log('✅ PM2服务重启成功');
+        return status;
+      } else {
+        throw new Error(`PM2重启失败，当前状态: ${status.status}`);
+      }
+    } catch (error) {
+      console.error('🔴 PM2重启失败:', error.message);
+      throw error;
+    }
+  },
+  
+  // 安全停止
+  safeStop: async () => {
+    try {
+      console.log('🛑 PM2停止服务...');
+      
+      const status = await PM2_UNIFIED_CONFIG.checkPM2Status();
+      if (status.status === 'stopped') {
+        console.log('✅ 服务已处于停止状态');
+        return status;
+      }
+      
+      await execAsync('pm2 stop restaurant-lottery-backend');
+      
+      // 验证停止结果
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      const newStatus = await PM2_UNIFIED_CONFIG.checkPM2Status();
+      
+      console.log(`✅ PM2服务已停止，状态: ${newStatus.status}`);
+      return newStatus;
+    } catch (error) {
+      console.error('🔴 PM2停止失败:', error.message);
+      throw error;
+    }
+  }
+};
+```
+
+## 开发环境启动规范
+
+### Nodemon配置优化
+```javascript
+// 基于cursor_7.md等问题的nodemon配置优化
+const NODEMON_CONFIG = {
+  // nodemon.json标准配置
+  generateNodemonConfig: () => ({
+    watch: [
+      'app.js',
+      'routes/',
+      'models/',
+      'services/',
+      'middleware/',
+      'config/'
+    ],
+    ignore: [
+      'node_modules/',
+      'logs/',
+      '*.log',
+      '.git/',
+      'public/',
+      'uploads/'
+    ],
+    ext: 'js,json',
+    exec: 'node app.js',
+    env: {
+      NODE_ENV: 'development',
+      PORT: 3000
+    },
+    delay: 1000,              // 延迟重启，避免频繁重启
+    restartable: 'rs',        // 手动重启命令
+    verbose: true,            // 详细日志
+    colours: true             // 彩色输出
+  }),
+  
+  // 安全启动nodemon
+  safeStart: async () => {
+    try {
+      // 1. 检查端口冲突
+      const portCheck = await PROCESS_CONFLICT_DETECTOR.checkPortConflicts(3000);
+      if (portCheck.hasConflict) {
+        console.error('🔴 端口冲突，正在清理...');
+        await cleanup_duplicate_processes();
+      }
+      
+      // 2. 生成nodemon配置
+      const configPath = './nodemon.json';
+      if (!fs.existsSync(configPath)) {
+        const config = NODEMON_CONFIG.generateNodemonConfig();
+        fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
+        console.log('📄 生成nodemon配置文件: nodemon.json');
+      }
+      
+      // 3. 启动nodemon
+      console.log('🚀 Nodemon启动服务...');
+      const child = spawn('npx', ['nodemon'], {
+        stdio: 'inherit',
+        detached: false
+      });
+      
+      // 4. 监听进程事件
+      child.on('error', (error) => {
+        console.error('🔴 Nodemon启动失败:', error.message);
+      });
+      
+      child.on('exit', (code) => {
+        if (code !== 0) {
+          console.error(`🔴 Nodemon异常退出，代码: ${code}`);
+        }
+      });
+      
+      return child;
+    } catch (error) {
+      console.error('🔴 Nodemon启动失败:', error.message);
+      throw error;
+    }
+  }
+};
+```
+
+## 服务健康监控规范
+
+### 实时健康检查机制
+```javascript
+// 基于实际服务问题的健康监控
+const SERVICE_HEALTH_MONITOR = {
+  // 综合健康检查
+  performHealthCheck: async () => {
+    const results = {
+      timestamp: new Date().toISOString(),
+      checks: {}
+    };
+    
+    // 1. 进程状态检查
+    try {
+      const processCheck = await PROCESS_CONFLICT_DETECTOR.checkDuplicateNodeProcesses();
+      results.checks.process = {
+        status: processCheck.hasDuplicates ? 'WARNING' : 'HEALTHY',
+        processes: processCheck.processes,
+        message: processCheck.hasDuplicates ? 
+          `发现${processCheck.processes.length}个重复进程` : '进程状态正常'
+      };
+    } catch (error) {
+      results.checks.process = {
+        status: 'ERROR',
+        error: error.message
+      };
+    }
+    
+    // 2. 端口监听检查
+    try {
+      const portCheck = await PROCESS_CONFLICT_DETECTOR.checkPortConflicts(3000);
+      results.checks.port = {
+        status: portCheck.hasConflict ? 'ERROR' : 'HEALTHY',
+        conflicts: portCheck.conflictingProcesses || [],
+        message: portCheck.hasConflict ? 
+          `端口3000被${portCheck.conflictingProcesses.length}个进程占用` : '端口监听正常'
+      };
+    } catch (error) {
+      results.checks.port = {
+        status: 'ERROR',
+        error: error.message
+      };
+    }
+    
+    // 3. API响应检查
+    try {
+      const startTime = Date.now();
+      const response = await fetch('http://localhost:3000/health', {
+        timeout: 5000
+      });
+      const responseTime = Date.now() - startTime;
+      
+      results.checks.api = {
+        status: response.ok ? 'HEALTHY' : 'ERROR',
+        responseTime: responseTime,
+        statusCode: response.status,
+        message: response.ok ? `API响应正常 (${responseTime}ms)` : `API响应异常 (HTTP ${response.status})`
+      };
+    } catch (error) {
+      results.checks.api = {
+        status: 'ERROR',
+        error: error.message,
+        message: 'API无响应或连接失败'
+      };
+    }
+    
+    // 4. 总体健康状态
+    const allChecks = Object.values(results.checks);
+    const hasError = allChecks.some(check => check.status === 'ERROR');
+    const hasWarning = allChecks.some(check => check.status === 'WARNING');
+    
+    results.overallStatus = hasError ? 'UNHEALTHY' : 
+                           hasWarning ? 'WARNING' : 'HEALTHY';
+    
+    return results;
+  },
+  
+  // 生成健康报告
+  generateHealthReport: (healthData) => {
+    console.log(`\n🏥 服务健康检查报告 (${healthData.timestamp})`);
+    console.log(`📊 总体状态: ${getStatusEmoji(healthData.overallStatus)} ${healthData.overallStatus}`);
+    console.log('');
+    
+    Object.entries(healthData.checks).forEach(([checkName, result]) => {
+      const emoji = getStatusEmoji(result.status);
+      console.log(`${emoji} ${checkName.toUpperCase()}: ${result.message}`);
+      
+      if (result.responseTime) {
+        console.log(`   响应时间: ${result.responseTime}ms`);
+      }
+      
+      if (result.processes && result.processes.length > 0) {
+        console.log(`   进程列表: ${result.processes.length}个进程`);
+      }
+      
+      if (result.conflicts && result.conflicts.length > 0) {
+        console.log(`   冲突进程: ${result.conflicts.map(p => `PID ${p.pid}`).join(', ')}`);
+      }
+    });
+    
+    // 提供修复建议
+    if (healthData.overallStatus !== 'HEALTHY') {
+      console.log('\n🔧 修复建议:');
+      
+      if (healthData.checks.process?.status === 'WARNING') {
+        console.log('1. 清理重复进程: cleanup_duplicate_processes()');
+      }
+      
+      if (healthData.checks.port?.status === 'ERROR') {
+        console.log('2. 解决端口冲突: 停止冲突进程或更换端口');
+      }
+      
+      if (healthData.checks.api?.status === 'ERROR') {
+        console.log('3. 重启服务: PM2_SAFE_OPERATIONS.safeRestart()');
+      }
+    }
+  }
+};
+
+function getStatusEmoji(status) {
+  switch (status) {
+    case 'HEALTHY': return '✅';
+    case 'WARNING': return '⚠️';
+    case 'ERROR': return '🔴';
+    case 'UNHEALTHY': return '❌';
+    default: return '❓';
+  }
+}
+```
+
+## 服务启动脚本标准化
+
+### 一键启动管理脚本
+```bash
+#!/bin/bash
+# 基于实际问题的统一服务管理脚本
+
+# 服务管理主函数
+manage_service() {
+  local action=$1
+  local strategy=${2:-"auto"}
+  
+  case $action in
+    "start")
+      start_service $strategy
+      ;;
+    "stop") 
+      stop_service
+      ;;
+    "restart")
+      restart_service $strategy
+      ;;
+    "status")
+      check_service_status
+      ;;
+    "health")
+      perform_health_check
+      ;;
+    "cleanup")
+      cleanup_duplicate_processes
+      ;;
+    *)
+      echo "使用方法: $0 {start|stop|restart|status|health|cleanup} [pm2|nodemon]"
+      exit 1
+      ;;
+  esac
+}
+
+# 智能启动服务
+start_service() {
+  local strategy=$1
+  
+  echo "🚀 启动服务 (策略: $strategy)"
+  
+  # 启动前检查
+  cleanup_duplicate_processes
+  
+  # 选择启动策略
+  if [ "$strategy" = "auto" ]; then
+    if command -v pm2 &> /dev/null; then
+      strategy="pm2"
+    else
+      strategy="nodemon"
+    fi
+  fi
+  
+  case $strategy in
+    "pm2")
+      echo "使用PM2启动..."
+      if [ ! -f "ecosystem.config.js" ]; then
+        echo "生成PM2配置文件..."
+        # 生成配置文件的逻辑
+      fi
+      pm2 start ecosystem.config.js
+      ;;
+    "nodemon")
+      echo "使用Nodemon启动..."
+      if [ ! -f "nodemon.json" ]; then
+        echo "生成Nodemon配置文件..."
+        # 生成配置文件的逻辑
+      fi
+      npm run dev
+      ;;
+    *)
+      echo "❌ 未知的启动策略: $strategy"
+      exit 1
+      ;;
+  esac
+  
+  # 验证启动结果
+  sleep 3
+  check_service_status
+}
+
+# 主程序入口
+if [ $# -eq 0 ]; then
+  echo "使用方法: $0 {start|stop|restart|status|health|cleanup} [pm2|nodemon]"
+  exit 1
+fi
+
+manage_service "$@"
+```
+
+---
+
+**核心原则**: 统一进程管理、冲突检测预防、安全操作包装、实时健康监控
+description:
+globs:
+alwaysApply: false
+---
