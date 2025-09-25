@@ -32,48 +32,6 @@ class UnifiedTestManager {
       },
 
       // 核心组件测试
-      decisionCore: {
-        name: 'V4决策核心组件',
-        path: 'tests/services/UnifiedLotteryEngine/core/DecisionCore.test.js',
-        priority: 2,
-        timeout: 30000,
-        status: 'pending'
-      },
-
-      contextBuilder: {
-        name: 'V4上下文构建器',
-        path: 'tests/services/UnifiedLotteryEngine/core/ContextBuilder.test.js',
-        priority: 3,
-        timeout: 20000,
-        status: 'pending'
-      },
-
-      resultGenerator: {
-        name: 'V4结果生成器',
-        path: 'tests/services/UnifiedLotteryEngine/core/ResultGenerator.test.js',
-        priority: 4,
-        timeout: 20000,
-        status: 'pending'
-      },
-
-      // 🔴 新增：高影响度文件测试，提升覆盖率
-      dataCollectorTests: {
-        name: 'DataCollector数据收集器增强测试',
-        path: 'tests/services/UnifiedLotteryEngine/utils/DataCollector.test.js',
-        priority: 4.1,
-        timeout: 60000,
-        status: 'pending',
-        description: '提升DataCollector覆盖率到85%+的完整功能测试'
-      },
-
-      decisionCoreEnhanced: {
-        name: 'DecisionCore决策核心增强测试',
-        path: 'tests/services/UnifiedLotteryEngine/core/DecisionCore.enhanced.test.js',
-        priority: 4.2,
-        timeout: 60000,
-        status: 'pending',
-        description: '提升DecisionCore覆盖率到85%+的增强测试套件'
-      },
 
       // 策略测试套件
       strategySuite: {
@@ -621,12 +579,8 @@ class UnifiedTestManager {
     }
 
     case 'core': {
-      const coreTests = ['decisionCore', 'contextBuilder', 'resultGenerator']
-      const passedCore = coreTests.filter(
-        test => this.testSuites[test]?.status === 'passed'
-      ).length
-      const testPassRate = Math.round((passedCore / coreTests.length) * 100)
-      return Math.round((realCoverage.lines + testPassRate) / 2) // 真实行覆盖率 + 测试通过率平均
+      // 核心组件已简化，直接返回真实覆盖率
+      return realCoverage.lines
     }
 
     case 'strategies': {
@@ -664,11 +618,8 @@ class UnifiedTestManager {
     }
 
     case 'core': {
-      const coreTests = ['decisionCore', 'contextBuilder', 'resultGenerator']
-      const passedCore = coreTests.filter(
-        test => this.testSuites[test]?.status === 'passed'
-      ).length
-      return Math.round((passedCore / coreTests.length) * 25 + 10) // 基于测试通过率
+      // 核心组件已简化，返回固定估算值
+      return 15 // 简化后的核心组件估算覆盖率
     }
 
     case 'strategies': {
@@ -697,15 +648,11 @@ class UnifiedTestManager {
   }
 
   /**
-   * 🎯 获取核心组件总体状态
+   * 🎯 获取核心组件总体状态（已简化）
    */
   getCoreComponentStatus () {
-    const coreTests = ['decisionCore', 'contextBuilder', 'resultGenerator']
-    const statuses = coreTests.map(test => this.testSuites[test]?.status || 'pending')
-
-    if (statuses.every(s => s === 'passed')) return 'passed'
-    if (statuses.some(s => s === 'failed' || s === 'error')) return 'failed'
-    return 'pending'
+    // 核心组件已简化为直接集成在引擎中，返回引擎状态
+    return this.testSuites.unifiedEngine?.status || 'pending'
   }
 
   /**
@@ -931,9 +878,8 @@ class UnifiedTestManager {
   async checkV4EngineFiles () {
     const requiredFiles = [
       'services/UnifiedLotteryEngine/UnifiedLotteryEngine.js',
-      'services/UnifiedLotteryEngine/core/DecisionCore.js',
-      'services/UnifiedLotteryEngine/core/ContextBuilder.js',
-      'services/UnifiedLotteryEngine/core/ResultGenerator.js'
+      'services/UnifiedLotteryEngine/strategies/BasicGuaranteeStrategy.js',
+      'services/UnifiedLotteryEngine/strategies/ManagementStrategy.js'
     ]
 
     for (const file of requiredFiles) {

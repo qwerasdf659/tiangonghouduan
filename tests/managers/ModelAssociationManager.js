@@ -55,8 +55,8 @@ class ModelAssociationManager {
           { model: 'LotteryRecord', foreignKey: 'user_id', as: 'lotteryRecords' },
           { model: 'PrizeDistribution', foreignKey: 'user_id', as: 'prizeDistributions' },
           { model: 'PointsTransaction', foreignKey: 'user_id', as: 'pointsTransactions' },
-          { model: 'UserInventory', foreignKey: 'user_id', as: 'inventory' },
-          { model: 'BusinessEvent', foreignKey: 'user_id', as: 'businessEvents' }
+          { model: 'UserInventory', foreignKey: 'user_id', as: 'inventory' }
+          // 🗑️ BusinessEvent 关联已删除 - 模型已删除 - 2025年01月21日
         ],
         hasOne: [{ model: 'UserPointsAccount', foreignKey: 'user_id', as: 'pointsAccount' }],
         belongsTo: []

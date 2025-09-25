@@ -3,16 +3,15 @@
  * 重构时间：2025-09-15T22:33:05.564+08:00
  */
 
-const { getDatabaseHelper } = require('../utils/UnifiedDatabaseHelper')
-const BeijingTimeHelper = require('../utils/timeHelper')
+const { getDatabaseHelper } = require('../utils/database')
 
 // 获取统一数据库助手
 const db = getDatabaseHelper()
 
 /**
- * 修复lottery_records表 - 添加campaign_id字段
+ * 修复lottery_draws表 - 添加campaign_id字段
  *
- * 问题：lottery_records表缺少campaign_id字段，无法与lottery_campaigns表关联
+ * 问题：lottery_draws表缺少campaign_id字段，无法与lottery_campaigns表关联
  * 解决：添加campaign_id字段并设置默认值
  *
  * @version 4.0.0
@@ -22,7 +21,7 @@ const db = getDatabaseHelper()
 // 数据库连接
 
 /**
- * 修复lottery_records表结构
+ * 修复lottery_draws表结构
  */
 async function fixLotteryRecordsCampaignLink () {
   try {
@@ -30,12 +29,12 @@ async function fixLotteryRecordsCampaignLink () {
     console.log('✅ 数据库连接成功')
 
     // 1. 检查campaign_id字段是否已存在
-    console.log('🔍 检查lottery_records表结构...')
+    console.log('🔍 检查lottery_draws表结构...')
     const [columns] = await db.query(`
       SELECT COLUMN_NAME
       FROM INFORMATION_SCHEMA.COLUMNS
       WHERE TABLE_SCHEMA = '${process.env.DB_NAME}'
-        AND TABLE_NAME = 'lottery_records'
+        AND TABLE_NAME = 'lottery_draws'
         AND COLUMN_NAME = 'campaign_id'
     `)
 
@@ -45,7 +44,7 @@ async function fixLotteryRecordsCampaignLink () {
     }
 
     // 2. 检查当前有多少条抽奖记录
-    const [recordCount] = await db.query('SELECT COUNT(*) as total FROM lottery_records')
+    const [recordCount] = await db.query('SELECT COUNT(*) as total FROM lottery_draws')
     console.log(`📊 当前抽奖记录数量: ${recordCount[0].total}`)
 
     // 3. 检查可用的活动
@@ -72,7 +71,7 @@ async function fixLotteryRecordsCampaignLink () {
     // 5. 添加campaign_id字段
     console.log('⚙️ 添加campaign_id字段...')
     await db.query(`
-      ALTER TABLE lottery_records
+      ALTER TABLE lottery_draws
       ADD COLUMN campaign_id INT NOT NULL DEFAULT ${defaultCampaignId} COMMENT '活动ID'
       AFTER user_id
     `)
@@ -82,8 +81,8 @@ async function fixLotteryRecordsCampaignLink () {
     console.log('🔗 添加外键约束...')
     try {
       await db.query(`
-        ALTER TABLE lottery_records
-        ADD CONSTRAINT fk_lottery_records_campaign
+        ALTER TABLE lottery_draws
+        ADD CONSTRAINT fk_lottery_draws_campaign
         FOREIGN KEY (campaign_id) REFERENCES lottery_campaigns(campaign_id)
         ON DELETE RESTRICT ON UPDATE CASCADE
       `)
@@ -97,7 +96,7 @@ async function fixLotteryRecordsCampaignLink () {
     try {
       await db.query(`
         CREATE INDEX idx_user_campaign_time
-        ON lottery_records(user_id, campaign_id, created_at)
+        ON lottery_draws(user_id, campaign_id, created_at)
       `)
       console.log('✅ 复合索引创建成功')
     } catch (indexError) {
@@ -110,7 +109,7 @@ async function fixLotteryRecordsCampaignLink () {
 
     // 8. 验证修复结果
     console.log('\n🔍 验证修复结果:')
-    const [updatedStructure] = await db.query('DESCRIBE lottery_records')
+    const [updatedStructure] = await db.query('DESCRIBE lottery_draws')
 
     const campaignField = updatedStructure.find(field => field.Field === 'campaign_id')
     if (campaignField) {
@@ -128,7 +127,7 @@ async function fixLotteryRecordsCampaignLink () {
     // 9. 验证数据
     const [sampleData] = await db.query(`
       SELECT lottery_id, user_id, campaign_id, prize_id, created_at
-      FROM lottery_records
+      FROM lottery_draws
       ORDER BY created_at DESC
       LIMIT 5
     `)
@@ -140,7 +139,7 @@ async function fixLotteryRecordsCampaignLink () {
       console.log('⚠️ 暂无抽奖记录数据')
     }
 
-    console.log('\n✅ lottery_records表修复完成！')
+    console.log('\n✅ lottery_draws表修复完成！')
     console.log('🎯 修复内容:')
     console.log(`   - 添加campaign_id字段，默认值: ${defaultCampaignId}`)
     console.log('   - 添加外键约束到lottery_campaigns表')

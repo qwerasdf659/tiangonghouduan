@@ -11,13 +11,13 @@
  * 5. 安全性测试
  */
 
-const BaseAPITester = require('./BaseAPITester')
+const UnifiedAPITestManager = require('./UnifiedAPITestManager')
 
 describe('用户API完整测试', () => {
   let tester
 
   beforeAll(async () => {
-    tester = new BaseAPITester()
+    tester = new UnifiedAPITestManager()
     // 等待服务启动
     await new Promise(resolve => {
       setTimeout(resolve, 2000)

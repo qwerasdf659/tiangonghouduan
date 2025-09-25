@@ -130,6 +130,42 @@ class UnifiedAPITestManager {
   }
 
   /**
+   * V4用户认证 - 兼容方法
+   * @param {string} userType 用户类型
+   * @returns {Promise<Object>} 用户信息和token
+   */
+  async authenticateV4User (userType = 'regular') {
+    try {
+      // 根据用户类型选择不同的测试账号
+      const testAccounts = {
+        regular: '13612227930',
+        admin: '13612227930',
+        superAdmin: '13612227930'
+      }
+
+      const phone = testAccounts[userType] || testAccounts.regular
+      const actualUserType = userType === 'regular' ? 'user' : userType
+
+      const token = await this.authenticate(phone, '123456', actualUserType)
+
+      // 返回兼容的用户信息结构
+      return {
+        success: true,
+        user: {
+          user_id: phone === '13612227930' ? 10 : 1, // 测试账号的真实user_id
+          mobile: phone,
+          display_name: `测试用户_${userType}`,
+          is_admin: userType !== 'regular'
+        },
+        token: token
+      }
+    } catch (error) {
+      console.error(`[V4用户认证失败] ${userType}:`, error.message)
+      throw error
+    }
+  }
+
+  /**
    * 带认证的请求
    * @param {string} method HTTP方法
    * @param {string} url 请求路径
@@ -306,65 +342,44 @@ class UnifiedAPITestManager {
   }
 
   /**
-   * 性能测试
-   * @param {string} method HTTP方法
-   * @param {string} url 请求URL
-   * @param {any} data 请求数据
-   * @param {Object} options 测试选项
-   * @returns {Promise<Object>} 性能测试结果
+   * 🔧 性能测试
    */
   async performanceTest (method, url, data, options = {}) {
-    const { concurrent = 5, iterations = 10, maxResponseTime = 1000 } = options
+    const { iterations = 10, _maxResponseTime = 5000 } = options // 用下划线标记未使用的变量
+    const _results = [] // 用下划线标记未使用的变量
+    const times = []
 
-    const startTime = performance.now()
-    const promises = []
-    const results = []
-
-    // 并发测试
-    for (let i = 0; i < concurrent; i++) {
-      for (let j = 0; j < iterations; j++) {
-        promises.push(
-          this.makeAuthenticatedRequest(method, url, data)
-            .then(response => ({ success: true, response }))
-            .catch(error => ({ success: false, error: error.message }))
-        )
+    for (let i = 0; i < iterations; i++) {
+      const startTime = performance.now()
+      try {
+        await this.makeAuthenticatedRequest(method, url, data)
+        const endTime = performance.now()
+        times.push(endTime - startTime)
+      } catch (error) {
+        console.error(`Performance test iteration ${i} failed:`, error.message)
       }
     }
 
-    const responses = await Promise.allSettled(promises)
-    const endTime = performance.now()
+    const averageTime = times.reduce((sum, time) => sum + time, 0) / times.length
+    const maxTime = Math.max(...times)
+    const minTime = Math.min(...times)
 
-    const stats = {
-      totalTime: Math.round(endTime - startTime),
-      totalRequests: concurrent * iterations,
-      successful: 0,
-      failed: 0,
-      averageResponseTime: 0,
-      maxResponseTime: 0,
-      minResponseTime: Infinity
+    const performanceReport = {
+      averageTime,
+      maxTime,
+      minTime,
+      iterations: times.length,
+      successRate: (times.length / iterations) * 100
     }
 
-    // 计算统计信息
-    this.performanceData.slice(-promises.length).forEach(perf => {
-      if (perf.duration) {
-        stats.averageResponseTime += perf.duration
-        stats.maxResponseTime = Math.max(stats.maxResponseTime, perf.duration)
-        stats.minResponseTime = Math.min(stats.minResponseTime, perf.duration)
-      }
+    this.performanceData.push({
+      method,
+      url,
+      timestamp: new Date().toISOString(),
+      report: performanceReport
     })
 
-    responses.forEach(result => {
-      if (result.status === 'fulfilled' && result.value.success) {
-        stats.successful++
-      } else {
-        stats.failed++
-      }
-    })
-
-    stats.averageResponseTime = Math.round(stats.averageResponseTime / stats.totalRequests)
-    stats.successRate = Math.round((stats.successful / stats.totalRequests) * 100)
-
-    return stats
+    return performanceReport
   }
 
   /**
@@ -493,6 +508,428 @@ class UnifiedAPITestManager {
       `[测试报告] 生成完成 - 总请求: ${stats.totalRequests}, 成功率: ${stats.successRate}%`
     )
     return report
+  }
+
+  /**
+   * 🔧 参数验证测试 - 来自BaseAPITester
+   */
+  async testParameterValidation (endpoint, method, validParams, invalidParams, userType = 'user') {
+    const testName = `参数验证-${endpoint}`
+    const results = []
+
+    try {
+      // 测试有效参数
+      const validResponse = await this.makeAuthenticatedRequest(method, endpoint, validParams, userType)
+      if (validResponse.status >= 200 && validResponse.status < 300) {
+        results.push({ type: 'valid_params', status: 'success', response: validResponse })
+      } else {
+        results.push({ type: 'valid_params', status: 'warning', response: validResponse })
+      }
+
+      // 测试无效参数组合
+      for (const [paramName, invalidValue] of Object.entries(invalidParams)) {
+        const testParams = { ...validParams, [paramName]: invalidValue }
+        try {
+          const invalidResponse = await this.makeAuthenticatedRequest(method, endpoint, testParams, userType)
+          if (invalidResponse.status >= 400) {
+            results.push({
+              type: 'invalid_param',
+              param: paramName,
+              status: 'success',
+              response: invalidResponse
+            })
+          } else {
+            results.push({
+              type: 'invalid_param',
+              param: paramName,
+              status: 'warning',
+              message: '应该返回错误但返回成功',
+              response: invalidResponse
+            })
+          }
+        } catch (error) {
+          results.push({
+            type: 'invalid_param',
+            param: paramName,
+            status: 'success',
+            message: '正确拒绝无效参数',
+            error: error.message
+          })
+        }
+      }
+    } catch (error) {
+      results.push({
+        type: 'test_error',
+        status: 'error',
+        message: error.message
+      })
+    }
+
+    this.testResults.push({
+      test: testName,
+      timestamp: new Date().toISOString(),
+      results
+    })
+
+    return results
+  }
+
+  /**
+   * 🔧 授权级别测试 - 来自BaseAPITester
+   */
+  async testAuthorizationLevels (endpoint, method, params = null, requiredUserTypes = ['user']) {
+    const results = []
+    const userTypes = ['guest', 'user', 'admin']
+
+    for (const userType of userTypes) {
+      try {
+        let response
+        if (userType === 'guest') {
+          response = await this.makeRequest(method, endpoint, params)
+        } else {
+          response = await this.makeAuthenticatedRequest(method, endpoint, params, userType)
+        }
+
+        const shouldHaveAccess = requiredUserTypes.includes(userType)
+        const hasAccess = response.status >= 200 && response.status < 300
+
+        results.push({
+          userType,
+          shouldHaveAccess,
+          hasAccess,
+          status: response.status,
+          success: shouldHaveAccess === hasAccess
+        })
+      } catch (error) {
+        const shouldHaveAccess = requiredUserTypes.includes(userType)
+        results.push({
+          userType,
+          shouldHaveAccess,
+          hasAccess: false,
+          error: error.message,
+          success: !shouldHaveAccess
+        })
+      }
+    }
+
+    return results
+  }
+
+  /**
+   * 🔧 并发请求测试 - 来自BaseAPITester
+   */
+  async testConcurrentRequests (endpoint, method, params, concurrency = 5, iterations = 10) {
+    const promises = []
+    const startTime = performance.now()
+
+    for (let i = 0; i < concurrency; i++) {
+      for (let j = 0; j < iterations; j++) {
+        promises.push(
+          this.makeAuthenticatedRequest(method, endpoint, params)
+            .then(response => ({ success: true, response, iteration: j, worker: i }))
+            .catch(error => ({ success: false, error: error.message, iteration: j, worker: i }))
+        )
+      }
+    }
+
+    const results = await Promise.all(promises)
+    const endTime = performance.now()
+
+    const summary = {
+      totalRequests: concurrency * iterations,
+      successCount: results.filter(r => r.success).length,
+      failureCount: results.filter(r => !r.success).length,
+      totalTime: endTime - startTime,
+      averageTime: (endTime - startTime) / (concurrency * iterations),
+      concurrency,
+      iterations
+    }
+
+    this.performanceData.push({
+      test: `并发测试-${endpoint}`,
+      timestamp: new Date().toISOString(),
+      summary,
+      details: results
+    })
+
+    return summary
+  }
+
+  /**
+   * 🔧 V4引擎抽奖方法 - 来自V4UnifiedEngineAPITester
+   */
+  async drawLotteryV4 (campaignId, drawType = 'single', options = {}) {
+    const drawData = {
+      campaign_id: campaignId,
+      draw_type: drawType,
+      draw_count: options.count || 1,
+      use_guarantee: options.guarantee || false,
+      pool_id: options.poolId || null,
+      ...options
+    }
+
+    return await this.makeV4EngineRequest(
+      'POST',
+      '/api/v4/unified-engine/lottery/draw',
+      drawData,
+      options.userType || 'user'
+    )
+  }
+
+  /**
+   * 🔧 获取V4抽奖活动列表 - 来自V4UnifiedEngineAPITester
+   */
+  async getV4Campaigns (filters = {}) {
+    return await this.makeV4EngineRequest(
+      'GET',
+      '/api/v4/unified-engine/lottery/campaigns',
+      filters,
+      'user'
+    )
+  }
+
+  /**
+   * 🔧 获取V4抽奖历史 - 来自V4UnifiedEngineAPITester
+   */
+  async getV4LotteryHistory (userId, limit = 10) {
+    return await this.makeV4EngineRequest(
+      'GET',
+      '/api/v4/unified-engine/lottery/history',
+      { user_id: userId, limit },
+      'user'
+    )
+  }
+
+  /**
+   * 🔧 执行V4基础抽奖 - 来自V4UnifiedEngineAPITester
+   */
+  async executeV4BasicLottery (userId, campaignId = 2) {
+    // 先获取用户token
+    await this.authenticate(userId, '123456', 'user')
+
+    // 执行抽奖
+    const response = await this.drawLotteryV4(campaignId, 'single', {
+      userType: 'user',
+      count: 1
+    })
+
+    // 记录测试数据
+    this.testData[`lottery_${userId}_${campaignId}`] = {
+      response,
+      timestamp: new Date().toISOString()
+    }
+
+    return response
+  }
+
+  /**
+   * 🔧 创建测试活动 - 来自V4UnifiedEngineAPITester
+   */
+  async createTestCampaign (campaignData = {}) {
+    const defaultData = {
+      name: `测试活动_${Date.now()}`,
+      description: '自动化测试活动',
+      start_time: new Date().toISOString(),
+      end_time: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), // 7天后
+      status: 'active',
+      lottery_type: 'random',
+      total_quota: 1000,
+      single_quota: 1,
+      ...campaignData
+    }
+
+    return await this.makeV4EngineRequest(
+      'POST',
+      '/api/v4/unified-engine/lottery/campaigns',
+      defaultData,
+      'admin'
+    )
+  }
+
+  /**
+    * 🔧 等待V4引擎准备就绪 - 来自V4UnifiedEngineAPITester
+    */
+  async waitForV4Engine (timeout = 30000) {
+    const startTime = Date.now()
+
+    while (Date.now() - startTime < timeout) {
+      try {
+        const response = await this.makeRequest('GET', '/api/v4/unified-engine/health')
+        if (response.status === 200 && response.data?.status === 'healthy') {
+          return true
+        }
+      } catch (error) {
+        // 继续等待
+      }
+
+      await new Promise(resolve => setTimeout(resolve, 1000))
+    }
+
+    throw new Error(`V4引擎在${timeout}ms内未准备就绪`)
+  }
+
+  /**
+   * 🔧 V4并发测试 - 来自V4UnifiedEngineAPITester
+   */
+  async performConcurrentV4Test (testFunction, concurrency = 5, iterations = 10) {
+    const promises = []
+    const startTime = performance.now()
+
+    for (let i = 0; i < concurrency; i++) {
+      for (let j = 0; j < iterations; j++) {
+        promises.push(
+          testFunction(i, j)
+            .then(result => ({ success: true, result, worker: i, iteration: j }))
+            .catch(error => ({ success: false, error: error.message, worker: i, iteration: j }))
+        )
+      }
+    }
+
+    const results = await Promise.all(promises)
+    const endTime = performance.now()
+
+    return {
+      totalTests: concurrency * iterations,
+      successCount: results.filter(r => r.success).length,
+      failureCount: results.filter(r => !r.success).length,
+      totalTime: endTime - startTime,
+      averageTime: (endTime - startTime) / (concurrency * iterations),
+      results
+    }
+  }
+
+  /**
+   * 🔧 权限API测试 - 来自V4UnifiedEngineAPITester
+   */
+  async testUserPermissionsAPI (userId = '13612227930') {
+    const testResults = []
+
+    try {
+      // 测试获取用户权限
+      const permissionResponse = await this.makeV4EngineRequest(
+        'GET',
+        `/api/v4/unified-engine/permissions/user/${userId}`,
+        null,
+        'admin'
+      )
+
+      testResults.push({
+        test: 'get_user_permissions',
+        success: permissionResponse.status === 200,
+        response: permissionResponse
+      })
+    } catch (error) {
+      testResults.push({
+        test: 'get_user_permissions',
+        success: false,
+        error: error.message
+      })
+    }
+
+    return testResults
+  }
+
+  /**
+   * 🔧 权限检查API测试 - 来自V4UnifiedEngineAPITester
+   */
+  async testPermissionCheckAPI () {
+    const testResults = []
+
+    try {
+      const checkResponse = await this.makeV4EngineRequest(
+        'POST',
+        '/api/v4/unified-engine/permissions/check',
+        { permission: 'lottery_draw', resource_id: 'campaign_1' },
+        'user'
+      )
+
+      testResults.push({
+        test: 'permission_check',
+        success: checkResponse.status === 200,
+        response: checkResponse
+      })
+    } catch (error) {
+      testResults.push({
+        test: 'permission_check',
+        success: false,
+        error: error.message
+      })
+    }
+
+    return testResults
+  }
+
+  /**
+   * 🔧 数据一致性测试 - 来自BaseAPITester
+   */
+  async testDataConsistency (writeEndpoint, readEndpoint, writeData, userType = 'user') {
+    const results = []
+
+    try {
+      // 执行写操作
+      const writeResponse = await this.makeAuthenticatedRequest(
+        'POST',
+        writeEndpoint,
+        writeData,
+        userType
+      )
+
+      if (writeResponse.status >= 200 && writeResponse.status < 300) {
+        // 等待一小段时间确保数据同步
+        await new Promise(resolve => setTimeout(resolve, 500))
+
+        // 执行读操作验证
+        const readResponse = await this.makeAuthenticatedRequest(
+          'GET',
+          readEndpoint,
+          null,
+          userType
+        )
+
+        results.push({
+          type: 'consistency_check',
+          writeSuccess: true,
+          readSuccess: readResponse.status >= 200 && readResponse.status < 300,
+          writeResponse,
+          readResponse
+        })
+      } else {
+        results.push({
+          type: 'consistency_check',
+          writeSuccess: false,
+          writeResponse
+        })
+      }
+    } catch (error) {
+      results.push({
+        type: 'consistency_check',
+        error: error.message
+      })
+    }
+
+    return results
+  }
+
+  /**
+   * 清理测试资源
+   */
+  async cleanup () {
+    try {
+      console.log('🧹 开始清理测试资源...')
+
+      // 清理tokens
+      this.tokens = {}
+
+      // 清理测试数据
+      if (this.testData && Object.keys(this.testData).length > 0) {
+        console.log(`清理 ${Object.keys(this.testData).length} 个测试数据`)
+        this.testData = {}
+      }
+
+      console.log('✅ 测试资源清理完成')
+    } catch (error) {
+      console.warn('⚠️ 测试资源清理失败:', error.message)
+    }
   }
 }
 

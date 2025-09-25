@@ -31,7 +31,7 @@ const sequelize = new Sequelize(process.env.DB_NAME, process.env.DB_USER, proces
  */
 const CRITICAL_FOREIGN_KEYS = [
   {
-    table: 'lottery_records',
+    table: 'lottery_draws',
     column: 'user_id',
     references: 'users(user_id)',
     business_rule: '抽奖记录必须关联有效用户',
@@ -39,7 +39,7 @@ const CRITICAL_FOREIGN_KEYS = [
     priority: 'HIGH'
   },
   {
-    table: 'lottery_records',
+    table: 'lottery_draws',
     column: 'campaign_id',
     references: 'lottery_campaigns(campaign_id)', // 🔧 修正：实际表名是lottery_campaigns
     business_rule: '抽奖记录必须关联有效活动',

@@ -3,13 +3,13 @@
  * 测试事件发布、订阅、处理等功能
  */
 
-const BaseAPITester = require('./BaseAPITester')
+const UnifiedAPITestManager = require('./UnifiedAPITestManager')
 
 describe('事件系统API测试', () => {
   let tester
 
   beforeAll(async () => {
-    tester = new BaseAPITester()
+    tester = new UnifiedAPITestManager()
     await new Promise(resolve => {
       setTimeout(resolve, 2000)
     })

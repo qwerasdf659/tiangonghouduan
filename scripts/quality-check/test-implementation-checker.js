@@ -298,7 +298,6 @@ class ComprehensiveQualityChecker {
     // 检查关键业务模型的字段一致性
     const criticalModels = [
       { file: 'models/User.js', fields: ['status', 'is_admin', 'mobile'] },
-      { file: 'models/AdminUser.js', fields: ['status'] },
       { file: 'models/LotteryRecords.js', fields: ['status', 'is_winner'] }
     ]
 

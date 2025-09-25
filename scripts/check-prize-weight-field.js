@@ -1,9 +1,4 @@
-/**
- * 检查lottery_prizes表的prize_weight字段
- * 解决基础抽奖策略中的数据库字段不匹配问题
- */
-
-'use strict'
+-+'use strict'
 
 const { sequelize } = require('../models')
 

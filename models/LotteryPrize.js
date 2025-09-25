@@ -15,21 +15,15 @@ class LotteryPrize extends Model {
       as: 'draws'
     })
 
-    // 🔥 关联到抽奖记录（LotteryRecord - 主要使用）
-    if (models.LotteryRecord) {
-      LotteryPrize.hasMany(models.LotteryRecord, {
-        foreignKey: 'prize_id',
-        as: 'lotteryRecords',
-        comment: '中奖记录'
-      })
-    }
+    // 🔥 关联到抽奖记录（已合并到LotteryDraw）
+    // LotteryRecord已合并到LotteryDraw，使用draws关联即可
 
-    // 🔥 关联到奖品分发记录
-    if (models.PrizeDistribution) {
-      LotteryPrize.hasMany(models.PrizeDistribution, {
+    // 🎯 关联到抽奖预设记录
+    if (models.LotteryPreset) {
+      LotteryPrize.hasMany(models.LotteryPreset, {
         foreignKey: 'prize_id',
-        as: 'distributions',
-        comment: '奖品分发记录'
+        as: 'presets',
+        comment: '抽奖预设记录'
       })
     }
 

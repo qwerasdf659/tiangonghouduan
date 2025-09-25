@@ -36,26 +36,10 @@ class LotteryCampaign extends Model {
       comment: '抽奖记录'
     })
 
-    // 🔥 一对多：一个活动有多个抽奖记录（LotteryRecord - 主要使用）
-    if (models.LotteryRecord) {
-      LotteryCampaign.hasMany(models.LotteryRecord, {
-        foreignKey: 'lottery_id',
-        sourceKey: 'campaign_id',
-        as: 'lotteryRecords',
-        onDelete: 'CASCADE',
-        comment: '抽奖记录'
-      })
-    }
+    // 🔥 LotteryRecord已合并到LotteryDraw，使用draws关联即可
+    // 注意：新合并模型中lottery_id字段对应campaign_id关联
 
-    // 关联业务事件
-    LotteryCampaign.hasMany(models.BusinessEvent, {
-      foreignKey: 'user_id',
-      as: 'businessEvents',
-      scope: {
-        event_source: 'lottery_system'
-      },
-      comment: '相关业务事件'
-    })
+    // 🗑️ 关联业务事件已删除 - BusinessEvent模型已删除 - 2025年01月21日
   }
 
   /**
@@ -371,7 +355,6 @@ class LotteryCampaign extends Model {
       },
       prize_pool: poolStats,
       health: healthStatus,
-      is_featured: this.is_featured,
       created_at: this.created_at,
       updated_at: this.updated_at
     }
@@ -383,7 +366,7 @@ class LotteryCampaign extends Model {
    * @returns {Promise<Array>} 活跃活动列表
    */
   static async getActiveCampaigns (options = {}) {
-    const { limit = 10, featured_only = false } = options
+    const { limit = 10 } = options
     const now = new Date()
 
     const whereClause = {
@@ -392,14 +375,9 @@ class LotteryCampaign extends Model {
       end_time: { [this.sequelize.Sequelize.Op.gte]: now }
     }
 
-    if (featured_only) {
-      whereClause.is_featured = true
-    }
-
     return await this.findAll({
       where: whereClause,
       order: [
-        ['is_featured', 'DESC'],
         ['start_time', 'ASC']
       ],
       limit,
@@ -552,16 +530,10 @@ module.exports = sequelize => {
         comment: '活动规则说明'
       },
       status: {
-        type: DataTypes.ENUM('draft', 'active', 'paused', 'ended', 'cancelled'),
+        type: DataTypes.ENUM('draft', 'active', 'paused', 'completed'),
         allowNull: false,
         defaultValue: 'draft',
         comment: '活动状态'
-      },
-      is_featured: {
-        type: DataTypes.BOOLEAN,
-        allowNull: false,
-        defaultValue: false,
-        comment: '是否为特色活动'
       },
       total_participants: {
         type: DataTypes.INTEGER,
@@ -595,8 +567,7 @@ module.exports = sequelize => {
         { fields: ['campaign_code'], unique: true, name: 'unique_campaign_code' },
         { fields: ['status'], name: 'idx_lc_status' },
         { fields: ['campaign_type'], name: 'idx_lc_campaign_type' },
-        { fields: ['start_time', 'end_time'], name: 'idx_lc_time_range' },
-        { fields: ['is_featured'], name: 'idx_lc_is_featured' }
+        { fields: ['start_time', 'end_time'], name: 'idx_lc_time_range' }
       ]
     }
   )

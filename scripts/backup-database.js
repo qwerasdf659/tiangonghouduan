@@ -114,7 +114,7 @@ async function validateBackup (backupFile) {
 
     // 检查文件是否包含关键表结构
     const content = fs.readFileSync(backupFile, 'utf8')
-    const requiredTables = ['users', 'products', 'lottery_records', 'points_records']
+    const requiredTables = ['users', 'products', 'lottery_draws', 'points_records']
 
     for (const table of requiredTables) {
       if (!content.includes(`CREATE TABLE \`${table}\``)) {

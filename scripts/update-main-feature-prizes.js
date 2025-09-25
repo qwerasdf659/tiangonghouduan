@@ -3,7 +3,7 @@
  * 重构时间：2025-09-15T22:33:05.564+08:00
  */
 
-const { getDatabaseHelper } = require('../utils/UnifiedDatabaseHelper')
+const { getDatabaseHelper } = require('../utils/database')
 const { Sequelize } = require('sequelize')
 
 // 获取统一数据库助手

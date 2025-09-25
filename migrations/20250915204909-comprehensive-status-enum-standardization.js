@@ -17,56 +17,76 @@ module.exports = {
     const transaction = await queryInterface.sequelize.transaction()
 
     try {
-      // 1. 更新user_specific_prize_queues表
-      console.log('🔄 更新user_specific_prize_queues状态枚举...')
+      // 1. 更新user_specific_prize_queues表 (检查表是否存在)
+      console.log('🔄 检查user_specific_prize_queues表...')
 
-      await queryInterface.changeColumn('user_specific_prize_queues', 'status', {
-        type: Sequelize.ENUM('pending', 'distributed', 'expired', 'cancelled'),
-        allowNull: false,
-        defaultValue: 'pending',
-        comment: '队列状态：待发放/已分发/已过期/已取消'
-      }, { transaction })
+      try {
+        await queryInterface.describeTable('user_specific_prize_queues')
+        console.log('🔄 更新user_specific_prize_queues状态枚举...')
+        await queryInterface.changeColumn('user_specific_prize_queues', 'status', {
+          type: Sequelize.ENUM('pending', 'distributed', 'expired', 'cancelled'),
+          allowNull: false,
+          defaultValue: 'pending',
+          comment: '队列状态：待发放/已分发/已过期/已取消'
+        }, { transaction })
 
-      await queryInterface.sequelize.query(
-        `UPDATE user_specific_prize_queues 
-         SET status = 'distributed' 
-         WHERE status = 'completed'`,
-        { transaction }
-      )
+        await queryInterface.sequelize.query(
+          `UPDATE user_specific_prize_queues 
+           SET status = 'distributed' 
+           WHERE status = 'completed'`,
+          { transaction }
+        )
+      } catch (error) {
+        console.log('⚠️ 表user_specific_prize_queues不存在，跳过更新')
+      }
 
-      // 2. 更新prize_distributions表
-      console.log('🔄 更新prize_distributions状态枚举...')
+      // 2. 更新prize_distributions表 (检查表是否存在)
+      console.log('🔄 检查prize_distributions表...')
 
-      await queryInterface.changeColumn('prize_distributions', 'distribution_status', {
-        type: Sequelize.ENUM('pending', 'processing', 'distributed', 'failed', 'cancelled'),
-        allowNull: false,
-        defaultValue: 'pending',
-        comment: '分发状态：pending-待分发，processing-分发中，distributed-已分发，failed-失败，cancelled-已取消'
-      }, { transaction })
+      try {
+        await queryInterface.describeTable('prize_distributions')
+        console.log('🔄 更新prize_distributions状态枚举...')
 
-      await queryInterface.sequelize.query(
-        `UPDATE prize_distributions 
-         SET distribution_status = 'distributed' 
-         WHERE distribution_status = 'completed'`,
-        { transaction }
-      )
+        await queryInterface.changeColumn('prize_distributions', 'distribution_status', {
+          type: Sequelize.ENUM('pending', 'processing', 'distributed', 'failed', 'cancelled'),
+          allowNull: false,
+          defaultValue: 'pending',
+          comment: '分发状态：pending-待分发，processing-分发中，distributed-已分发，failed-失败，cancelled-已取消'
+        }, { transaction })
 
-      // 3. 更新exchange_records表
-      console.log('🔄 更新exchange_records状态枚举...')
+        await queryInterface.sequelize.query(
+          `UPDATE prize_distributions 
+           SET distribution_status = 'distributed' 
+           WHERE distribution_status = 'completed'`,
+          { transaction }
+        )
+      } catch (error) {
+        console.log('⚠️ 表prize_distributions不存在，跳过更新')
+      }
 
-      await queryInterface.changeColumn('exchange_records', 'status', {
-        type: Sequelize.ENUM('pending', 'distributed', 'used', 'expired', 'cancelled'),
-        allowNull: false,
-        defaultValue: 'distributed',
-        comment: '兑换状态：pending-待处理，distributed-已分发，used-已使用，expired-已过期，cancelled-已取消'
-      }, { transaction })
+      // 3. 更新exchange_records表 (检查表是否存在)
+      console.log('🔄 检查exchange_records表...')
 
-      await queryInterface.sequelize.query(
-        `UPDATE exchange_records 
-         SET status = 'distributed' 
-         WHERE status = 'completed'`,
-        { transaction }
-      )
+      try {
+        await queryInterface.describeTable('exchange_records')
+        console.log('🔄 更新exchange_records状态枚举...')
+
+        await queryInterface.changeColumn('exchange_records', 'status', {
+          type: Sequelize.ENUM('pending', 'distributed', 'used', 'expired', 'cancelled'),
+          allowNull: false,
+          defaultValue: 'distributed',
+          comment: '兑换状态：pending-待处理，distributed-已分发，used-已使用，expired-已过期，cancelled-已取消'
+        }, { transaction })
+
+        await queryInterface.sequelize.query(
+          `UPDATE exchange_records 
+           SET status = 'distributed' 
+           WHERE status = 'completed'`,
+          { transaction }
+        )
+      } catch (error) {
+        console.log('⚠️ 表exchange_records不存在，跳过更新')
+      }
 
       await transaction.commit()
       console.log('✅ 状态枚举综合标准化完成')

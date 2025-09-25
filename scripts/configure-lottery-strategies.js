@@ -13,8 +13,7 @@ class LotteryStrategyConfigurator {
 
     // 当前启用的策略（根据用户要求）
     this.enabledStrategies = [
-      'basic', // 基础抽奖策略 - 标准概率抽奖
-      'guarantee', // 保底抽奖策略 - 连续失败保底机制
+      'basic_guarantee', // 基础+保底组合策略 - V4架构优化
       'management' // 管理抽奖策略 - 管理员预设奖品功能
     ]
 

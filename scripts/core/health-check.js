@@ -237,7 +237,7 @@ class SystemHealthChecker {
         // 检查用户积分账户
         const [pointsResult] = await sequelize.query(
           `
-           SELECT available_points, total_earned, account_level
+           SELECT available_points, total_earned
            FROM user_points_accounts 
            WHERE user_id = ?
          `,
@@ -267,7 +267,6 @@ class SystemHealthChecker {
         console.log(`  📅 创建时间: ${user.created_at_bj}`)
         if (pointsResult.length > 0) {
           console.log(`  💰 可用积分: ${pointsResult[0].available_points}`)
-          console.log(`  🎯 账户等级: ${pointsResult[0].account_level}`)
         }
       } else {
         this.results.testAccount = {

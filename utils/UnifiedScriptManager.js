@@ -12,7 +12,7 @@
  * 5. 执行结果统计
  */
 
-const { getDatabaseHelper } = require('./UnifiedDatabaseHelper')
+const { getDatabaseHelper } = require('./database')
 const { getRawClient } = require('./UnifiedRedisClient')
 const BeijingTimeHelper = require('./timeHelper')
 const fs = require('fs').promises
@@ -35,15 +35,37 @@ class UnifiedScriptManager {
 
     // 脚本依赖配置
     this.scriptDependencies = {
+      // 基础脚本
       'sync-database.js': [],
       'backup-database.js': [],
       'v4_environment_check.js': [],
+
+      // 系统检查脚本组
       'test-system-manager.js': ['sync-database.js'],
       'verify-main-features.js': ['v4_environment_check.js'],
       'quick-api-check.js': ['v4_environment_check.js'],
-      'fix-database-field-mismatches.js': ['backup-database.js'],
-      'fix-lottery-records-campaign-link.js': ['backup-database.js'],
+
+      // 业务逻辑脚本组
       'update-main-feature-prizes.js': ['backup-database.js'],
+      'fix-lottery-records-campaign-link.js': ['backup-database.js'],
+      'update-prize-probabilities.js': ['backup-database.js'],
+      'configure-lottery-strategies.js': ['backup-database.js'],
+      'fix-exchange-records-timestamps.js': ['backup-database.js'],
+
+      // 测试验证脚本组
+      'test-fix-engine.js': ['v4_environment_check.js'],
+      'test-v4-auth.js': ['v4_environment_check.js'],
+      'run-integrated-tests.js': ['v4_environment_check.js'],
+
+      // 数据验证脚本组
+      'check-prize-weight-field.js': ['sync-database.js'],
+      'check-real-users.js': ['sync-database.js'],
+      'check-foreign-keys.js': ['sync-database.js'],
+      'unified-model-field-manager.js': ['backup-database.js'],
+      'fix-v4-models.js': ['backup-database.js'],
+
+      // 其他维护脚本
+      'fix-database-field-mismatches.js': ['backup-database.js'],
       'create-user-specific-prize-queue-table.js': ['sync-database.js']
     }
 
@@ -359,6 +381,159 @@ class UnifiedScriptManager {
 
     console.log(`[检查完成] 成功: ${summary.success}, 失败: ${summary.failed}`)
     return summary
+  }
+
+  /**
+   * 执行业务逻辑脚本组
+   * 包含奖品更新、概率调整、彩票记录修复等业务逻辑操作
+   * @param {Object} options 执行选项
+   * @returns {Promise<Object>} 业务逻辑执行结果
+   */
+  async runBusinessLogicScripts (options = {}) {
+    const businessLogicScripts = [
+      'update-main-feature-prizes.js',
+      'fix-lottery-records-campaign-link.js',
+      'update-prize-probabilities.js',
+      'configure-lottery-strategies.js',
+      'fix-exchange-records-timestamps.js'
+    ]
+
+    console.log('[业务逻辑] 开始执行业务逻辑脚本组')
+
+    const results = await this.executeBatch(businessLogicScripts, {
+      ...options,
+      parallel: false, // 业务逻辑脚本需要串行执行，避免数据竞争
+      stopOnError: true // 业务逻辑出错应立即停止
+    })
+
+    const summary = {
+      total: results.length,
+      success: results.filter(r => r.success).length,
+      failed: results.filter(r => !r.success).length,
+      results,
+      timestamp: BeijingTimeHelper.apiTimestamp(),
+      scriptGroup: 'business-logic'
+    }
+
+    console.log(`[业务逻辑完成] 成功: ${summary.success}, 失败: ${summary.failed}`)
+    return summary
+  }
+
+  /**
+   * 执行测试验证脚本组
+   * 包含功能验证、认证测试、修复引擎测试等
+   * @param {Object} options 执行选项
+   * @returns {Promise<Object>} 测试验证结果
+   */
+  async runTestingScripts (options = {}) {
+    const testingScripts = [
+      'verify-main-features.js',
+      'test-fix-engine.js',
+      'test-v4-auth.js',
+      'test-system-manager.js',
+      'run-integrated-tests.js'
+    ]
+
+    console.log('[测试验证] 开始执行测试验证脚本组')
+
+    const results = await this.executeBatch(testingScripts, {
+      ...options,
+      parallel: true, // 测试脚本可以并行执行
+      stopOnError: false // 继续执行所有测试，收集完整报告
+    })
+
+    const summary = {
+      total: results.length,
+      success: results.filter(r => r.success).length,
+      failed: results.filter(r => !r.success).length,
+      results,
+      timestamp: BeijingTimeHelper.apiTimestamp(),
+      scriptGroup: 'testing-validation',
+      testCoverage: this.calculateTestCoverage(results)
+    }
+
+    console.log(`[测试验证完成] 成功: ${summary.success}, 失败: ${summary.failed}`)
+    console.log(`[测试覆盖率] ${summary.testCoverage.toFixed(1)}%`)
+    return summary
+  }
+
+  /**
+   * 执行数据验证脚本组
+   * 包含数据完整性检查、外键验证、用户数据验证等
+   * @param {Object} options 执行选项
+   * @returns {Promise<Object>} 数据验证结果
+   */
+  async runDataValidationScripts (options = {}) {
+    const dataValidationScripts = [
+      'check-prize-weight-field.js',
+      'check-real-users.js',
+      'check-foreign-keys.js',
+      'unified-model-field-manager.js',
+      'fix-v4-models.js'
+    ]
+
+    console.log('[数据验证] 开始执行数据验证脚本组')
+
+    const results = await this.executeBatch(dataValidationScripts, {
+      ...options,
+      parallel: true, // 数据检查可以并行执行
+      stopOnError: false // 继续执行所有检查，收集完整报告
+    })
+
+    // 分析数据验证结果
+    const dataIntegrityScore = this.calculateDataIntegrityScore(results)
+    const summary = {
+      total: results.length,
+      success: results.filter(r => r.success).length,
+      failed: results.filter(r => !r.success).length,
+      results,
+      timestamp: BeijingTimeHelper.apiTimestamp(),
+      scriptGroup: 'data-validation',
+      dataIntegrityScore
+    }
+
+    console.log(`[数据验证完成] 成功: ${summary.success}, 失败: ${summary.failed}`)
+    console.log(`[数据完整性评分] ${dataIntegrityScore.toFixed(1)}/100`)
+    return summary
+  }
+
+  /**
+   * 计算测试覆盖率
+   * @param {Array} testResults 测试结果数组
+   * @returns {number} 覆盖率百分比
+   */
+  calculateTestCoverage (testResults) {
+    const totalTests = testResults.length
+    const passedTests = testResults.filter(r => r.success).length
+    return totalTests > 0 ? (passedTests / totalTests) * 100 : 0
+  }
+
+  /**
+   * 计算数据完整性评分
+   * @param {Array} validationResults 验证结果数组
+   * @returns {number} 完整性评分 (0-100)
+   */
+  calculateDataIntegrityScore (validationResults) {
+    const weights = {
+      'check-foreign-keys.js': 30,
+      'check-real-users.js': 25,
+      'check-prize-weight-field.js': 20,
+      'unified-model-field-manager.js': 15,
+      'fix-v4-models.js': 10
+    }
+
+    let totalScore = 0
+    let totalWeight = 0
+
+    validationResults.forEach(result => {
+      const weight = weights[result.scriptName] || 10
+      totalWeight += weight
+      if (result.success) {
+        totalScore += weight
+      }
+    })
+
+    return totalWeight > 0 ? (totalScore / totalWeight) * 100 : 0
   }
 
   /**
@@ -1007,11 +1182,44 @@ async function runSystemCheck (options = {}) {
   return await manager.runSystemChecks(options)
 }
 
+/**
+ * 快速执行业务逻辑脚本
+ * @param {Object} options 执行选项
+ * @returns {Promise<Object>} 业务逻辑执行结果
+ */
+async function runBusinessLogic (options = {}) {
+  const manager = getScriptManager()
+  return await manager.runBusinessLogicScripts(options)
+}
+
+/**
+ * 快速执行测试验证脚本
+ * @param {Object} options 执行选项
+ * @returns {Promise<Object>} 测试验证结果
+ */
+async function runTesting (options = {}) {
+  const manager = getScriptManager()
+  return await manager.runTestingScripts(options)
+}
+
+/**
+ * 快速执行数据验证脚本
+ * @param {Object} options 执行选项
+ * @returns {Promise<Object>} 数据验证结果
+ */
+async function runDataValidation (options = {}) {
+  const manager = getScriptManager()
+  return await manager.runDataValidationScripts(options)
+}
+
 // 导出接口
 module.exports = {
   UnifiedScriptManager,
   getScriptManager,
   runScript,
   runMaintenance,
-  runSystemCheck
+  runSystemCheck,
+  runBusinessLogic,
+  runTesting,
+  runDataValidation
 }

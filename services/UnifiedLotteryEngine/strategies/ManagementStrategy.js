@@ -93,11 +93,11 @@ class ManagementStrategy {
         return false
       }
 
-      // 获取管理员信息
+      // V4.1简化权限：使用User模型获取管理员信息
       const models = require('../../../models')
-      const admin = await models.AdminUser.findByPk(adminId)
-      if (!admin || admin.status !== 'active') {
-        this.logError('管理员不存在或已停用', { adminId })
+      const admin = await models.User.findByPk(adminId)
+      if (!admin || !admin.is_admin || admin.status !== 'active') {
+        this.logError('管理员不存在或已停用', { adminId, is_admin: admin?.is_admin })
         return false
       }
 
@@ -302,16 +302,23 @@ class ManagementStrategy {
         selectedPrize = availablePrizes[Math.floor(Math.random() * availablePrizes.length)]
       }
 
-      // 创建抽奖记录
-      const lotteryRecord = await models.LotteryRecord.create({
+      // 创建抽奖记录（使用合并后的LotteryDraw模型）
+      const lotteryRecord = await models.LotteryDraw.create({
+        draw_id: `admin_${Date.now()}_${Math.random().toString(36).substr(2, 8)}`,
         user_id: userId,
         campaign_id: campaignId,
+        prize_id: selectedPrize?.prize_id || null,
+        prize_name: selectedPrize?.prize_name || null,
+        prize_type: selectedPrize?.prize_type || null,
+        prize_value: selectedPrize?.prize_value || null,
         is_winner: true, // 修复：使用is_winner字段
-        probability_used: 1.0,
-        random_value: 0,
-        admin_intervention: true,
-        admin_id: adminInfo.admin_id,
-        intervention_reason: reason || '管理员强制中奖',
+        algorithm_type: 'simple',
+        algorithm_version: 'v1.0',
+        algorithm_data: {
+          admin_intervention: true,
+          admin_id: adminInfo.admin_id,
+          intervention_reason: reason || '管理员强制中奖'
+        },
         created_at: new Date()
       })
 
@@ -377,8 +384,9 @@ class ManagementStrategy {
         throw new Error('抽奖活动不存在')
       }
 
-      // ✅ 修复：创建抽奖记录使用业务标准字段
-      const lotteryRecord = await models.LotteryRecord.create({
+      // ✅ 修复：创建抽奖记录使用业务标准字段（合并后的LotteryDraw模型）
+      const lotteryRecord = await models.LotteryDraw.create({
+        draw_id: `admin_lose_${Date.now()}_${Math.random().toString(36).substr(2, 8)}`,
         user_id: userId,
         campaign_id: campaignId,
         is_winner: false, // ✅ 修复：使用业务标准字段
@@ -419,60 +427,19 @@ class ManagementStrategy {
    * 执行概率调整
    */
   async executeProbabilityAdjust (userId, params, adminInfo, context = {}) {
-    const models = require('../../../models')
+    // 🗑️ models 变量已删除 - DecisionRecord 模型已删除，不再需要 - 2025年01月21日
 
     try {
-      const { probabilityAdjustment, factor, duration, reason } = params
+      const { probabilityAdjustment, duration, reason } = params
       const campaignId = params.campaignId || context.campaignId || 2 // 使用唯一真实活动ID作为默认值
-      const adjustmentValue = probabilityAdjustment || factor || 1.0 // 兼容不同的参数名
+      // 🗑️ adjustmentValue 变量已删除 - 不再需要记录到 DecisionRecord - 2025年01月21日
 
       // 生成决策ID用于关联
-      const { v4: uuidv4 } = require('uuid')
-      const decisionId = uuidv4()
+      // 🗑️ DecisionRecord 模型已删除 - 餐厅抽奖系统不需要决策过程分析 - 2025年01月21日
+      // 管理员概率调整操作不再记录到决策记录表，现有的抽奖记录足够满足业务需求
 
-      // ✅ 修复：创建决策记录使用新的字段标准
-      await models.DecisionRecord.create({
-        decision_id: decisionId,
-        user_id: userId,
-        campaign_id: campaignId,
-        strategy_type: 'management', // ✅ 修复：使用策略类型枚举
-        user_context: {
-          admin_intervention: true,
-          admin_id: adminInfo.admin_id,
-          reason: reason || '管理员概率调整'
-        },
-        probability_data: {
-          adjustment_type: 'probability_adjustment',
-          adjustment_value: adjustmentValue
-        },
-        is_winner: false, // ✅ 修复：概率调整操作，未产生抽奖结果
-        decision_metadata: {
-          strategy_name: 'ManagementStrategy',
-          operation_type: 'probability_adjustment',
-          admin_id: adminInfo.admin_id
-        }
-      })
-
-      // 再创建概率调整记录
-      const adjustment = await models.ProbabilityLog.create({
-        decision_id: decisionId,
-        user_id: userId,
-        campaign_id: campaignId,
-        calculation_step: 'admin_override',
-        step_order: 1,
-        input_probability: 0, // 将由实际抽奖时填入
-        output_probability: adjustmentValue,
-        adjustment_factor: adjustmentValue,
-        factor_type: 'force_win',
-        factor_details: {
-          admin_id: adminInfo.admin_id,
-          reason: reason || '管理员概率调整',
-          duration,
-          expires_at: duration ? moment().add(duration, 'minutes').toDate() : null
-        },
-        calculation_reason: reason || '管理员概率调整',
-        created_at: new Date()
-      })
+      // 🗑️ 概率调整记录功能已简化 - 餐厅抽奖系统不需要详细的概率分析 - 2025年01月21日
+      // ProbabilityLog 模型已临时禁用，跳过概率日志记录
 
       // 记录管理日志
       await this.logManagementAction(adminInfo.admin_id, 'probability_adjust', {
@@ -491,10 +458,10 @@ class ManagementStrategy {
       })
 
       return {
-        adjustmentId: adjustment.id,
+        adjustmentId: null, // 🗑️ DecisionRecord模型已删除，不返回调整记录ID
         probabilityAdjustment,
         duration,
-        expiresAt: adjustment.expires_at,
+        expiresAt: duration ? moment().add(duration, 'minutes').toDate() : null, // 计算过期时间
         message: `概率调整为 ${(probabilityAdjustment * 100).toFixed(1)}%，${duration ? `持续${duration}分钟` : '永久有效'}`
       }
     } catch (error) {
@@ -535,14 +502,14 @@ class ManagementStrategy {
       }
 
       // 基础统计数据
-      const totalDraws = await models.LotteryRecord.count({ where: baseWhere })
-      const totalWins = await models.LotteryRecord.count({
+      const totalDraws = await models.LotteryDraw.count({ where: baseWhere })
+      const totalWins = await models.LotteryDraw.count({
         where: { ...baseWhere, is_winner: true } // 修复：使用is_winner字段
       })
       const winRate = totalDraws > 0 ? totalWins / totalDraws : 0
 
       // 活跃用户统计
-      const activeUsers = await models.LotteryRecord.count({
+      const activeUsers = await models.LotteryDraw.count({
         where: baseWhere,
         distinct: true,
         col: 'user_id'
@@ -566,7 +533,7 @@ class ManagementStrategy {
       })
 
       // 每日统计
-      const dailyStats = await models.LotteryRecord.findAll({
+      const dailyStats = await models.LotteryDraw.findAll({
         where: baseWhere,
         attributes: [
           [models.Sequelize.fn('DATE', models.Sequelize.col('created_at')), 'date'],
@@ -641,10 +608,10 @@ class ManagementStrategy {
       // 实时活动数据
       const realtimeStats = {
         active_campaigns: await models.LotteryCampaign.count({ where: { status: 'active' } }), // 修复：使用实际存在的status字段
-        recent_draws: await models.LotteryRecord.count({
+        recent_draws: await models.LotteryDraw.count({
           where: { created_at: { [models.Sequelize.Op.gte]: oneHourAgo } }
         }),
-        online_users: await models.LotteryRecord.count({
+        online_users: await models.LotteryDraw.count({
           where: { created_at: { [models.Sequelize.Op.gte]: oneHourAgo } },
           distinct: true,
           col: 'user_id'
@@ -757,16 +724,23 @@ class ManagementStrategy {
    * 记录管理操作日志
    */
   async logManagementAction (adminId, actionType, details) {
-    const models = require('../../../models')
-
     try {
-      await models.SystemMetrics.create({
-        metric_type: 'admin_action',
-        metric_name: actionType,
-        metric_value: JSON.stringify(details),
-        admin_id: adminId,
-        created_at: new Date()
+      // ℹ️ SystemMetrics模型已删除 - 过度设计，改为简单日志记录
+      console.log(`📊 管理操作记录: ${actionType}`, {
+        adminId,
+        actionType,
+        details,
+        timestamp: new Date().toISOString()
       })
+
+      // 原SystemMetrics.create代码已删除
+      // await models.SystemMetrics.create({
+      //   metric_type: 'admin_action',
+      //   metric_name: actionType,
+      //   metric_value: JSON.stringify(details),
+      //   admin_id: adminId,
+      //   created_at: new Date()
+      // })
     } catch (error) {
       this.logError('管理操作日志记录失败', { adminId, actionType, error: error.message })
     }
@@ -830,219 +804,51 @@ class ManagementStrategy {
   }
 
   /**
-   * 检查用户预设奖品队列
-   * 核心功能：实现管理员预设奖品的优先抽取
+   * 检查用户预设奖品队列（已废弃）
+   * 🗑️ V4.2简化：UserSpecificPrizeQueue模型已删除 - 2025年01月21日
    */
   async checkUserSpecificPrizeQueue (userId, campaignId) {
-    try {
-      const models = require('../../../models')
-
-      // 获取用户的下一个待发放预设奖品
-      const nextPrize = await models.UserSpecificPrizeQueue.getNextPrizeForUser(userId, campaignId)
-
-      if (nextPrize) {
-        this.logInfo('发现用户预设奖品', {
-          userId,
-          campaignId,
-          queueId: nextPrize.queue_id,
-          prizeNumber: nextPrize.prize_number,
-          prizeName: nextPrize.prize?.prize_name
-        })
-
-        return {
-          hasPredefinedPrize: true,
-          queueItem: nextPrize,
-          prize: nextPrize.prize,
-          queueOrder: nextPrize.queue_order,
-          prizeNumber: nextPrize.prize_number
-        }
-      }
-
-      this.logInfo('用户无预设奖品，执行正常抽奖', { userId, campaignId })
-      return {
-        hasPredefinedPrize: false
-      }
-    } catch (error) {
-      this.logError('检查用户预设奖品队列失败', {
-        userId,
-        campaignId,
-        error: error.message
-      })
-      return {
-        hasPredefinedPrize: false,
-        error: error.message
-      }
+    // 🗑️ 功能已删除：预设奖品队列功能过于复杂，已简化
+    this.logInfo('用户预设奖品功能已简化，执行正常抽奖', { userId, campaignId })
+    return {
+      hasPredefinedPrize: false
     }
   }
 
   /**
-   * 执行预设奖品发放
-   * 核心功能：将预设奖品标记为已发放，更新队列状态
-   * 🔴 重要：特定奖品也需要检查和扣除积分
+   * 执行预设奖品发放（已废弃）
+   * 🗑️ V4.2简化：UserSpecificPrizeQueue模型已删除 - 2025年01月21日
    */
   async executePredefinedPrizeAward (queueItem, userId) {
-    const transaction = await require('../../../models').sequelize.transaction()
-
-    try {
-      const models = require('../../../models')
-
-      // 🔴 第一步：检查用户积分是否足够（特定奖品也需要积分）
-      const pointsCost = 100 // 每次抽奖消耗积分（与BasicLotteryStrategy保持一致）
-      const userAccount = await models.UserPointsAccount.findOne({
-        where: { user_id: userId },
-        transaction
-      })
-
-      if (!userAccount || userAccount.available_points < pointsCost) {
-        await transaction.rollback()
-
-        this.logError('用户积分不足，无法发放特定奖品', {
-          userId,
-          currentPoints: userAccount?.available_points || 0,
-          requiredPoints: pointsCost,
-          queueId: queueItem.queue_id,
-          prizeNumber: queueItem.prize_number
-        })
-
-        return {
-          success: false,
-          error: 'INSUFFICIENT_POINTS',
-          message: `积分不足，需要${pointsCost}积分，当前只有${userAccount?.available_points || 0}积分`,
-          currentPoints: userAccount?.available_points || 0,
-          requiredPoints: pointsCost
-        }
-      }
-
-      // 🔴 第二步：扣除用户积分
-      await models.UserPointsAccount.decrement('available_points', {
-        by: pointsCost,
-        where: { user_id: userId },
-        transaction
-      })
-
-      this.logInfo('特定奖品积分扣除成功', {
-        userId,
-        pointsCost,
-        remainingPoints: userAccount.available_points - pointsCost
-      })
-
-      // 🔴 第三步：标记奖品为已发放
-      const updated = await models.UserSpecificPrizeQueue.markAsAwarded(
-        queueItem.queue_id,
-        transaction
-      )
-
-      if (!updated) {
-        await transaction.rollback()
-        throw new Error('更新预设奖品队列状态失败')
-      }
-
-      // 🔴 第四步：记录抽奖记录（包含积分消耗信息）
-      await models.LotteryRecord.create(
-        {
-          user_id: userId,
-          campaign_id: queueItem.campaign_id,
-          prize_id: queueItem.prize_id,
-          is_winner: true, // 修复：使用is_winner字段,
-          result_type: 'management_predefined', // 标记为管理预设奖品
-          points_cost: pointsCost,
-          points_balance_after: userAccount.available_points - pointsCost,
-          prize_details: JSON.stringify({
-            prize_number: queueItem.prize_number,
-            prize_name: queueItem.prize?.prize_name,
-            queue_id: queueItem.queue_id,
-            queue_order: queueItem.queue_order,
-            source: 'management_allocation'
-          }),
-          created_at: new Date()
-        },
-        { transaction }
-      )
-
-      await transaction.commit()
-
-      this.logInfo('预设奖品发放成功（含积分扣除）', {
-        userId,
-        queueId: queueItem.queue_id,
-        prizeNumber: queueItem.prize_number,
-        prizeName: queueItem.prize?.prize_name,
-        pointsCost,
-        remainingPoints: userAccount.available_points - pointsCost
-      })
-
-      return {
-        success: true,
-        awarded: true,
-        prize: queueItem.prize,
-        queueOrder: queueItem.queue_order,
-        prizeNumber: queueItem.prize_number,
-        pointsCost, // 🔴 返回积分消耗信息
-        remainingPoints: userAccount.available_points - pointsCost,
-        message: `成功获得${queueItem.prize_number}号奖品：${queueItem.prize?.prize_name}（消耗${pointsCost}积分）`
-      }
-    } catch (error) {
-      await transaction.rollback()
-      this.logError('预设奖品发放失败', {
-        userId,
-        queueId: queueItem.queue_id,
-        error: error.message
-      })
-
-      return {
-        success: false,
-        error: error.message
-      }
+    // 🗑️ 功能已删除：预设奖品功能过于复杂，已简化
+    this.logInfo('预设奖品功能已简化，执行标准抽奖流程', { userId })
+    return {
+      success: false,
+      error: 'FUNCTION_DEPRECATED',
+      message: '预设奖品功能已简化，请使用标准抽奖流程'
     }
   }
 
   /**
-   * 管理策略核心抽奖逻辑
-   * 优先检查预设奖品，如无预设则执行正常抽奖
+   * 管理策略核心抽奖逻辑（已简化）
+   * 🗑️ V4.2简化：预设奖品功能已删除，直接使用正常抽奖流程 - 2025年01月21日
    */
   async executeManagedLottery (context) {
     try {
       const { userId, campaignId } = context
 
-      this.logInfo('开始执行管理抽奖策略', { userId, campaignId })
+      this.logInfo('开始执行管理抽奖策略（已简化）', { userId, campaignId })
 
-      // 1. 检查用户预设奖品队列
-      const queueCheck = await this.checkUserSpecificPrizeQueue(userId, campaignId)
+      // 🗑️ 预设奖品功能已删除，直接返回让其他策略处理
+      this.logInfo('管理策略已简化，交由标准抽奖策略处理', { userId, campaignId })
 
-      if (queueCheck.hasPredefinedPrize) {
-        // 用户有预设奖品，直接发放
-        this.logInfo('用户有预设奖品，执行预设奖品发放', {
-          userId,
-          prizeNumber: queueCheck.prizeNumber,
-          queueOrder: queueCheck.queueOrder
-        })
-
-        const awardResult = await this.executePredefinedPrizeAward(queueCheck.queueItem, userId)
-
-        return {
-          success: true,
-          executedStrategy: 'management',
-          method: 'predefined_prize',
-          userExperience: 'normal_lottery', // 用户感受与正常抽奖一致
-          result: awardResult,
-          isManaged: true,
-          queueInfo: {
-            queueOrder: queueCheck.queueOrder,
-            prizeNumber: queueCheck.prizeNumber,
-            totalQueue: await this.getUserQueueStats(userId, campaignId)
-          }
-        }
-      } else {
-        // 用户无预设奖品，返回信息让其他策略处理
-        this.logInfo('用户无预设奖品，交由其他策略处理', { userId, campaignId })
-
-        return {
-          success: true,
-          executedStrategy: 'management',
-          method: 'no_predefined_prize',
-          shouldContinue: true, // 指示应该继续使用其他策略
-          isManaged: false,
-          message: '用户无预设奖品，使用正常抽奖流程'
-        }
+      return {
+        success: true,
+        executedStrategy: 'management',
+        method: 'simplified',
+        shouldContinue: true, // 指示应该继续使用其他策略
+        isManaged: false,
+        message: '管理策略已简化，使用标准抽奖流程'
       }
     } catch (error) {
       this.logError('管理抽奖策略执行失败', {
@@ -1061,21 +867,18 @@ class ManagementStrategy {
   }
 
   /**
-   * 获取用户队列统计信息
+   * 获取用户队列统计信息（已废弃）
+   * 🗑️ V4.2简化：UserSpecificPrizeQueue模型已删除 - 2025年01月21日
    */
   async getUserQueueStats (userId, campaignId) {
-    try {
-      const models = require('../../../models')
-      return await models.UserSpecificPrizeQueue.getUserQueueStats(userId, campaignId)
-    } catch (error) {
-      this.logError('获取用户队列统计失败', { userId, campaignId, error: error.message })
-      return {
-        total: 0,
-        pending: 0,
-        completed: 0,
-        expired: 0,
-        cancelled: 0
-      }
+    // 🗑️ 功能已删除：用户队列统计功能已简化
+    this.logInfo('用户队列统计功能已简化', { userId, campaignId })
+    return {
+      total: 0,
+      pending: 0,
+      completed: 0,
+      expired: 0,
+      cancelled: 0
     }
   }
 }

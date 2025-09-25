@@ -4,14 +4,14 @@
  * 创建时间：2025年08月23日 北京时间
  */
 
-const BaseAPITester = require('./BaseAPITester')
+const UnifiedAPITestManager = require('./UnifiedAPITestManager')
 
 describe('积分系统API完整测试', () => {
   let tester
   let testUserId
 
   beforeAll(async () => {
-    tester = new BaseAPITester()
+    tester = new UnifiedAPITestManager()
     await new Promise(resolve => {
       setTimeout(resolve, 2000)
     })

@@ -122,23 +122,11 @@ module.exports = sequelize => {
         comment: '转让时间'
       },
 
-      transfer_message: {
-        type: DataTypes.STRING(200),
-        allowNull: true,
-        comment: '转让留言'
-      },
-
       // 额外属性
       icon: {
         type: DataTypes.STRING(10),
         allowNull: true,
         comment: '显示图标'
-      },
-
-      metadata: {
-        type: DataTypes.JSON,
-        allowNull: true,
-        comment: '扩展元数据'
       }
     },
     {

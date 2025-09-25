@@ -4,7 +4,7 @@
  * 创建时间：2025年09月12日
  */
 
-const { User, AdminUser } = require('../models')
+const { User } = require('../models')
 const moment = require('moment-timezone')
 
 class UserPermissionModule {
@@ -49,17 +49,15 @@ class UserPermissionModule {
       let adminInfo = null
 
       if (user.is_admin) {
-        // 查询管理员详细信息
-        adminInfo = await AdminUser.findOne({
-          where: { phone: user.mobile }
-        })
-
-        if (adminInfo && adminInfo.isActive()) {
-          // 简化：所有活跃的admin_users记录都是管理员
-          permissionLevel = this.permissionLevels.ADMIN
-        } else {
-          // 如果admin_users表中没有记录，但users表中is_admin=true
-          permissionLevel = this.permissionLevels.ADMIN
+        // V4.1简化权限：直接基于is_admin字段判断管理员权限
+        permissionLevel = this.permissionLevels.ADMIN
+        adminInfo = {
+          // 模拟AdminUser信息结构，保持向后兼容
+          username: `admin_${user.user_id}`,
+          phone: user.mobile,
+          role: 'admin',
+          status: user.status === 'active' ? 1 : 0,
+          isActive: () => user.status === 'active'
         }
       }
 
@@ -85,7 +83,7 @@ class UserPermissionModule {
           }
           : null,
         lastLogin: user.last_login,
-        createdAt: user.registration_date
+        createdAt: user.created_at
       }
 
       this.logInfo('用户权限信息获取成功', { userId, permissionLevel })
@@ -188,51 +186,28 @@ class UserPermissionModule {
       if (targetLevel >= this.permissionLevels.ADMIN) {
         await targetUser.update({ is_admin: true }, { transaction })
 
-        // 检查或创建admin_users记录
-        let adminUser = await AdminUser.findOne({
-          where: { phone: targetUser.mobile }
-        })
-
-        if (!adminUser) {
-          // 创建管理员记录
-          const tempPassword = this.generateTempPassword()
-          adminUser = await AdminUser.create(
-            {
-              username: `admin_${targetUser.user_id}`,
-              password_hash: tempPassword,
-              phone: targetUser.mobile,
-              role: targetLevel === this.permissionLevels.ADMIN ? 'admin' : 'admin', // Simplified role
-              status: 1
-            },
-            { transaction }
-          )
-
-          this.logInfo('创建管理员账户', {
-            userId: targetUserId,
-            adminId: adminUser.id,
-            tempPassword: '已生成临时密码'
-          })
-        } else {
-          // 更新现有管理员记录
-          await adminUser.update(
-            {
-              role: targetLevel === this.permissionLevels.ADMIN ? 'admin' : 'admin', // Simplified role
-              status: 1
-            },
-            { transaction }
-          )
+        // V4.1简化权限：不再需要创建admin_users记录
+        // 所有管理员信息统一在users表中管理
+        const adminUser = {
+          username: `admin_${targetUser.user_id}`,
+          phone: targetUser.mobile,
+          role: 'admin',
+          status: 1,
+          // 模拟AdminUser方法，保持向后兼容
+          isActive: () => targetUser.status === 'active'
         }
+
+        this.logInfo('创建管理员账户', {
+          userId: targetUserId,
+          adminId: adminUser.id || targetUser.user_id,
+          tempPassword: '已生成临时密码'
+        })
       } else {
         // 降级为普通用户
         await targetUser.update({ is_admin: false }, { transaction })
 
-        // 禁用管理员记录（不删除，保留审计记录）
-        const adminUser = await AdminUser.findOne({
-          where: { phone: targetUser.mobile }
-        })
-        if (adminUser) {
-          await adminUser.update({ status: 0 }, { transaction })
-        }
+        // V4.1简化权限：无需禁用AdminUser记录（已删除AdminUser模型）
+        // 权限控制统一在User模型的is_admin字段中处理
       }
 
       // 记录权限变更日志
@@ -278,7 +253,7 @@ class UserPermissionModule {
         throw new Error('操作员权限不足，需要超级管理员权限')
       }
 
-      const { mobile, username, password, role = 'admin', email } = adminData
+      const { mobile, username, password: _password, role = 'admin', email } = adminData
 
       // 检查用户是否已存在
       let user = await User.findOne({ where: { mobile } })
@@ -288,8 +263,7 @@ class UserPermissionModule {
           {
             mobile,
             is_admin: true,
-            status: 'active',
-            registration_date: new Date()
+            status: 'active'
           },
           { transaction }
         )
@@ -298,14 +272,14 @@ class UserPermissionModule {
         await user.update({ is_admin: true, status: 'active' }, { transaction })
       }
 
-      // 创建管理员记录
-      const adminUser = await AdminUser.createSecureAdmin({
+      // V4.1简化权限：无需创建AdminUser记录（已删除AdminUser模型）
+      // 管理员信息统一在User模型中管理
+      const adminUser = {
         username,
-        password,
         phone: mobile,
         email,
         role
-      })
+      }
 
       // 记录权限变更日志
       const permissionLevel =
@@ -365,52 +339,17 @@ class UserPermissionModule {
         }
       }
 
-      // ✅ 使用BusinessEvent模型查询权限审计日志
-      const { BusinessEvent } = require('../models')
-      const offset = (page - 1) * limit
+      // 🗑️ BusinessEvent模型已删除，权限审计日志功能暂停 - 2025年01月21日
+      // 💡 说明：BusinessEvent是过度设计的模型，对于餐厅抽奖系统来说权限审计不是核心功能
+      // 如需要审计功能，建议使用简单的操作日志表或现有的交易记录模型
 
-      // 构建查询条件 - 查询system_operation类型的业务事件
-      const eventWhereClause = {
-        event_type: 'system_operation',
-        ...whereClause
-      }
-
-      // 查询权限相关的系统操作日志
-      const { count, rows } = await BusinessEvent.findAndCountAll({
-        where: eventWhereClause,
-        limit,
-        offset,
-        order: [['created_at', 'DESC']],
-        include: [
-          {
-            model: require('../models').User,
-            as: 'user',
-            attributes: ['user_id', 'mobile', 'nickname']
-          }
-        ]
-      })
-
+      // 返回空的审计日志数据
       const auditLogs = {
-        total: count,
+        total: 0,
         page,
         limit,
-        data: rows.map(event => ({
-          id: event.id,
-          operator: event.user
-            ? {
-              id: event.user.id,
-              phone: event.user.mobile,
-              nickname: event.user.nickname
-            }
-            : null,
-          action: event.event_data?.action || 'unknown',
-          resource: event.event_data?.resource || 'unknown',
-          details: event.event_data?.details || '',
-          ip_address: event.event_data?.ip_address || 'unknown',
-          user_agent: event.event_data?.user_agent || 'unknown',
-          created_at: event.created_at,
-          status: event.status
-        }))
+        data: [],
+        message: '权限审计日志功能已简化，如需详细日志请查看具体业务记录模型'
       }
 
       return auditLogs

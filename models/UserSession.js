@@ -36,22 +36,10 @@ module.exports = sequelize => {
         comment: '用户ID'
       },
 
-      login_ip: {
+      ip_address: {
         type: DataTypes.STRING(45),
         allowNull: true,
         comment: '登录IP'
-      },
-
-      user_agent: {
-        type: DataTypes.TEXT,
-        allowNull: true,
-        comment: '用户代理'
-      },
-
-      device_fingerprint: {
-        type: DataTypes.STRING(64),
-        allowNull: true,
-        comment: '设备指纹'
       },
 
       is_active: {
@@ -135,8 +123,6 @@ module.exports = sequelize => {
       user_type,
       user_id,
       login_ip,
-      user_agent,
-      device_fingerprint,
       expires_in_minutes = 120 // 默认2小时
     } = sessionData
 
@@ -147,8 +133,6 @@ module.exports = sequelize => {
       user_type,
       user_id,
       login_ip,
-      user_agent,
-      device_fingerprint,
       expires_at,
       is_active: true,
       last_activity: new Date()
@@ -274,13 +258,14 @@ module.exports = sequelize => {
       }
     })
 
-    // 管理员会话
-    UserSession.belongsTo(models.AdminUser, {
+    // V4.1简化权限：管理员会话也使用User模型
+    // 管理员信息通过User.is_admin字段区分
+    UserSession.belongsTo(models.User, {
       foreignKey: 'user_id',
       as: 'admin',
       constraints: false,
       scope: {
-        user_type: 'admin'
+        is_admin: true // 只关联管理员用户
       }
     })
   }

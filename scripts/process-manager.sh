@@ -106,10 +106,10 @@ check_pm2_status() {
     log_info "检查PM2状态..."
     
     if command -v pm2 &> /dev/null; then
-        local pm2_list=$(pm2 jlist 2>/dev/null || echo "[]")
-        local app_count=$(echo "$pm2_list" | jq ". | length" 2>/dev/null || echo "0")
+        # 使用pm2 list命令代替jq解析JSON
+        local pm2_output=$(pm2 list 2>/dev/null || echo "")
         
-        if [ "$app_count" -gt 0 ]; then
+        if echo "$pm2_output" | grep -q "online\|stopped\|error"; then
             log_warning "发现PM2管理的应用:"
             pm2 status
             return 1
@@ -237,7 +237,7 @@ main() {
     local command=${1:-"status"}
     
     echo "=================================="
-    echo "  统一进程管理工具 v1.0"
+    echo "  统一进程管理工具 V4.0.0"
     echo "  解决端口冲突和进程管理问题"
     echo "=================================="
     echo ""

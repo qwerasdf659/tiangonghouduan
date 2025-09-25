@@ -36,7 +36,6 @@ class UnifiedDistributedLock {
   async acquireLock (resource, ttl = this.defaultTTL, maxRetries = 3, retryDelay = 100) {
     const lockKey = `${this.lockPrefix}${resource}`
     const lockValue = uuidv4()
-    const expireTime = Math.ceil(ttl / 1000) // 转换为秒
 
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
       try {

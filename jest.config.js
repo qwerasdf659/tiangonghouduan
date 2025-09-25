@@ -81,7 +81,7 @@ module.exports = {
   moduleFileExtensions: ['js', 'json', 'node'],
 
   // 转换忽略模式
-  transformIgnorePatterns: ['/node_modules/(?!(@faker-js|uuid)/)'],
+  transformIgnorePatterns: ['/node_modules/(?!(uuid)/)'],
 
   // 全局设置
   globals: {

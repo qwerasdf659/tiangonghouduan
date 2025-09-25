@@ -223,7 +223,7 @@ class MySQLSpecializedTests {
         'users',
         'user_points_accounts',
         'lottery_campaigns',
-        'lottery_records'
+        'lottery_draws'
       ]
       const missingTables = requiredTables.filter(table => !tableNames.includes(table))
 

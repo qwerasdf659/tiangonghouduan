@@ -75,14 +75,13 @@ describe('V4统一引擎抽奖API测试', () => {
       const classNames = strategies.map(s => s.className)
 
       // 验证内部名称
-      expect(strategyNames).toContain('basic')
-      expect(strategyNames).toContain('guarantee')
+      expect(strategyNames).toContain('basic_guarantee')
+      // guarantee策略已合并到basic_guarantee中
       expect(strategyNames).toContain('management')
 
       // 验证类名
-      expect(classNames).toContain('BasicLotteryStrategy')
-      expect(classNames).toContain('GuaranteeStrategy')
-      expect(classNames).toContain('ManagementStrategy')
+      expect(classNames).toContain('BasicGuaranteeStrategy') // 基础+保底合并策略
+      expect(classNames).toContain('ManagementStrategy') // 管理策略
     })
 
     test('获取引擎运行指标', async () => {
@@ -122,7 +121,7 @@ describe('V4统一引擎抽奖API测试', () => {
         userId: testUser.userId,
         campaignId: 2,
         drawType: 'single',
-        strategy: 'basic',
+        strategy: 'basic_guarantee',
         pointsCost: 100
       }
 
@@ -147,7 +146,7 @@ describe('V4统一引擎抽奖API测试', () => {
       if (response.body.code === 0) {
         expect(response.body.data).toHaveProperty('drawResult')
         expect(response.body.data).toHaveProperty('strategy')
-        expect(response.body.data.strategy).toBe('basic')
+        expect(response.body.data.strategy).toBe('basic_guarantee')
       } else {
         // 即使失败，也要有明确的错误信息
         expect(response.body).toHaveProperty('message')
@@ -160,7 +159,7 @@ describe('V4统一引擎抽奖API测试', () => {
         userId: testUser.userId,
         campaignId: 2,
         drawType: 'single',
-        strategy: 'guarantee',
+        strategy: 'basic_guarantee',
         forceGuarantee: false
       }
 
@@ -177,7 +176,7 @@ describe('V4统一引擎抽奖API测试', () => {
       if (response.body.success) {
         expect(response.body.data).toHaveProperty('drawResult')
         expect(response.body.data).toHaveProperty('strategy')
-        expect(response.body.data.strategy).toBe('guarantee')
+        expect(response.body.data.strategy).toBe('basic_guarantee')
       }
     })
 
@@ -217,7 +216,7 @@ describe('V4统一引擎抽奖API测试', () => {
         userId: testUser.userId,
         campaignId: 2,
         drawType: 'single',
-        strategy: 'basic'
+        strategy: 'basic_guarantee'
       }
 
       const response = await request(app)
@@ -243,7 +242,7 @@ describe('V4统一引擎抽奖API测试', () => {
           userId: testUser.userId,
           campaignId: 2,
           drawType: 'single',
-          strategy: 'basic',
+          strategy: 'basic_guarantee',
           requestId: `concurrent_${i}_${Date.now()}`
         }
 
@@ -312,11 +311,11 @@ describe('V4统一引擎抽奖API测试', () => {
       const guaranteeData = {
         userId: testUser.userId,
         campaignId: 1,
-        strategyType: 'guarantee'
+        strategyType: 'basic_guarantee'
       }
 
       const response = await request(app)
-        .post('/api/v4/unified-engine/lottery/guarantee')
+        .post('/api/v4/unified-engine/lottery/draw')
         .set('Authorization', `Bearer ${authToken}`)
         .send(guaranteeData)
 

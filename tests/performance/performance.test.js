@@ -19,7 +19,7 @@ describe('⚡ V4架构性能测试', () => {
     test('健康检查API响应时间', async () => {
       const startTime = Date.now()
 
-      const response = await request(app)
+      const _response = await request(app)
         .get('/health')
         .expect(200)
 
@@ -32,7 +32,7 @@ describe('⚡ V4架构性能测试', () => {
     test('V4抽奖引擎API响应时间', async () => {
       const startTime = Date.now()
 
-      const response = await request(app)
+      const _response = await request(app)
         .get('/api/v4/unified-engine/lottery/strategies')
         .expect(200)
 
@@ -45,15 +45,16 @@ describe('⚡ V4架构性能测试', () => {
     test('用户认证API响应时间', async () => {
       const startTime = Date.now()
 
-      const response = await request(app)
+      const _response = await request(app)
         .post('/api/auth/verify')
         .send({
-          mobile: '13612227930',
-          verificationCode: '123456'
+          phone: '13612227930',
+          code: '123456'
         })
+        .expect(200)
 
       const responseTime = Date.now() - startTime
-      testLogger.info(`认证API响应时间: ${responseTime}ms`)
+      testLogger.info(`用户认证API响应时间: ${responseTime}ms`)
 
       expect(responseTime).toBeLessThan(PERFORMANCE_THRESHOLDS.apiResponseTime)
     })
@@ -104,14 +105,14 @@ describe('⚡ V4架构性能测试', () => {
 
   describe('💾 数据库性能测试', () => {
     test('数据库查询性能测试', async () => {
-      const { getDatabaseHelper } = require('../../utils/UnifiedDatabaseHelper')
+      const { getDatabaseHelper } = require('../../utils/database')
       const dbHelper = getDatabaseHelper()
 
       const startTime = Date.now()
 
       // 执行常用查询
       await dbHelper.query('SELECT COUNT(*) as count FROM users')
-      await dbHelper.query('SELECT COUNT(*) as count FROM lottery_records')
+      await dbHelper.query('SELECT COUNT(*) as count FROM lottery_draws')
       await dbHelper.query('SELECT COUNT(*) as count FROM lottery_campaigns')
 
       const queryTime = Date.now() - startTime
@@ -121,7 +122,7 @@ describe('⚡ V4架构性能测试', () => {
     })
 
     test('大数据量查询性能', async () => {
-      const { getDatabaseHelper } = require('../../utils/UnifiedDatabaseHelper')
+      const { getDatabaseHelper } = require('../../utils/database')
       const dbHelper = getDatabaseHelper()
 
       const startTime = Date.now()
@@ -129,7 +130,7 @@ describe('⚡ V4架构性能测试', () => {
       // 执行复杂查询
       await dbHelper.query(`
         SELECT lr.user_id, COUNT(*) as draw_count, AVG(lr.cost_points) as avg_cost
-        FROM lottery_records lr 
+        FROM lottery_draws lr 
         WHERE lr.created_at > DATE_SUB(NOW(), INTERVAL 30 DAY)
         GROUP BY lr.user_id 
         LIMIT 100
@@ -216,7 +217,7 @@ describe('⚡ V4架构性能测试', () => {
       benchmarks.apiResponseTime = Date.now() - start
 
       // 数据库查询基准
-      const { getDatabaseHelper } = require('../../utils/UnifiedDatabaseHelper')
+      const { getDatabaseHelper } = require('../../utils/database')
       const dbHelper = getDatabaseHelper()
       start = Date.now()
       await dbHelper.query('SELECT 1')

@@ -1,98 +1,92 @@
-const { DataTypes, Model } = require('sequelize')
+/**
+ * 抽奖记录模型（重构版）
+ * 专注于数据定义、关联关系和基础实例方法
+ * 业务逻辑已迁移至LotteryDrawService
+ * 数据访问已迁移至LotteryDrawRepository
+ * 数据格式化已迁移至LotteryDrawFormatter
+ */
 
-// 🔥 抽奖记录模型 - 分离式架构设计
+const { DataTypes, Model } = require('sequelize')
+const LotteryDrawFormatter = require('../utils/formatters/LotteryDrawFormatter')
+
 class LotteryDraw extends Model {
   static associate (models) {
     // 关联到用户
     LotteryDraw.belongsTo(models.User, {
       foreignKey: 'user_id',
-      as: 'user'
+      as: 'user',
+      comment: '抽奖用户'
     })
 
     // 关联到抽奖活动
     LotteryDraw.belongsTo(models.LotteryCampaign, {
       foreignKey: 'campaign_id',
-      as: 'campaign'
+      as: 'campaign',
+      comment: '关联的抽奖活动'
     })
 
-    // 关联到奖品
+    // 关联到奖品（可能为空）
     LotteryDraw.belongsTo(models.LotteryPrize, {
       foreignKey: 'prize_id',
-      as: 'prize'
+      as: 'prize',
+      comment: '中奖奖品'
     })
+
+    // 🎯 注释掉分发记录关联 - 新的简化预设系统不需要此关联
+    // 简化设计：抽奖记录就是最终结果，不需要额外的分发管理
+    // LotteryDraw.hasMany(models.LotteryPreset, {
+    //   foreignKey: 'draw_id',
+    //   sourceKey: 'draw_id',
+    //   as: 'presets',
+    //   comment: '关联的预设记录（已简化，不再使用）'
+    // })
   }
 
-  // ✅ 修复：使用is_winner业务标准字段
+  /**
+   * 基础实例方法 - 保留简单的数据访问方法
+   */
+
+  // 获取抽奖结果显示文本
   getDrawResultName () {
-    return this.is_winner ? '中奖' : '未中奖'
+    return LotteryDrawFormatter.getDrawResultText(this.is_winner)
   }
 
   // 获取奖品发放状态名称
   getPrizeStatusName () {
-    const statuses = {
-      pending: '待发放',
-      delivered: '已发放',
-      received: '已领取',
-      expired: '已过期',
-      cancelled: '已取消'
-    }
-    return statuses[this.prize_status] || '未知状态'
+    return LotteryDrawFormatter.getPrizeStatusText(this.prize_status)
   }
 
-  // ✅ 业务标准：检查是否中奖
+  // 检查是否中奖
   isWinner () {
     return this.is_winner
   }
 
   // 检查奖品是否已发放
   isPrizeDelivered () {
-    return ['delivered', 'received'].includes(this.prize_status)
+    return LotteryDrawFormatter.isPrizeDelivered(this.prize_status)
   }
 
   // 检查奖品是否可领取
   isPrizeClaimable () {
-    return this.isWinner() && this.prize_status === 'delivered'
+    return LotteryDrawFormatter.isPrizeClaimable(this.is_winner, this.prize_status)
   }
 
-  // 更新奖品发放状态
-  async updatePrizeStatus (status, notes = null, transaction = null) {
-    const updateData = {
-      prize_status: status,
-      updated_at: new Date()
-    }
-
-    if (notes) {
-      updateData.delivery_notes = notes
-    }
-
-    if (status === 'delivered') {
-      updateData.delivery_time = new Date()
-    } else if (status === 'received') {
-      updateData.received_time = new Date()
-    }
-
-    await this.update(updateData, { transaction })
-  }
-
-  // ✅ 业务标准：输出统一格式
+  // 输出摘要格式（使用Formatter）
   toSummary () {
-    return {
-      draw_id: this.draw_id,
-      user_id: this.user_id,
-      campaign_id: this.campaign_id,
-      prize_id: this.prize_id,
-      is_winner: this.is_winner, // ✅ 业务标准字段
-      winner_status_text: this.getDrawResultName(), // ✅ 优化字段名，更清晰的业务含义
-      prize_status: this.prize_status,
-      prize_status_name: this.getPrizeStatusName(),
-      draw_time: this.draw_time,
-      is_prize_delivered: this.isPrizeDelivered(),
-      is_prize_claimable: this.isPrizeClaimable()
-    }
+    return LotteryDrawFormatter.formatToSummary(this)
   }
 
-  // ✅ 修复：使用is_winner业务标准字段验证抽奖记录数据
-  static validateDraw (data) {
+  // 重写toJSON方法（使用Formatter）
+  toJSON () {
+    return LotteryDrawFormatter.formatToJSON(this)
+  }
+
+  /**
+   * 静态方法 - 保留基础验证方法
+   */
+
+  // 基础数据验证
+  static validateBasicData (data) {
     const errors = []
 
     if (!data.user_id || data.user_id <= 0) {
@@ -107,186 +101,225 @@ class LotteryDraw extends Model {
       errors.push('中奖状态无效，必须是布尔值')
     }
 
-    if (data.is_winner && (!data.prize_id || data.prize_id <= 0)) {
-      errors.push('中奖记录必须指定奖品ID')
-    }
-
     return errors
-  }
-
-  // ✅ 修复：使用is_winner业务标准字段批量统计抽奖数据
-  static async batchAnalyze (conditions = {}) {
-    const baseWhere = { ...conditions }
-
-    const [totalDraws, winDraws, prizeStats] = await Promise.all([
-      // 总抽奖次数
-      LotteryDraw.count({ where: baseWhere }),
-
-      // ✅ 修复：使用is_winner业务标准字段统计中奖次数
-      LotteryDraw.count({
-        where: { ...baseWhere, is_winner: true }
-      }),
-
-      // ✅ 修复：使用is_winner业务标准字段统计奖品发放状态
-      LotteryDraw.findAll({
-        attributes: [
-          'prize_status',
-          [LotteryDraw.sequelize.fn('COUNT', LotteryDraw.sequelize.col('*')), 'count']
-        ],
-        where: { ...baseWhere, is_winner: true },
-        group: ['prize_status'],
-        raw: true
-      })
-    ])
-
-    const winRate = totalDraws > 0 ? ((winDraws / totalDraws) * 100).toFixed(2) : '0.00'
-
-    return {
-      total_draws: totalDraws,
-      win_draws: winDraws,
-      win_rate: winRate,
-      prize_delivery_stats: prizeStats.reduce((acc, stat) => {
-        acc[stat.prize_status] = parseInt(stat.count)
-        return acc
-      }, {})
-    }
   }
 }
 
 module.exports = sequelize => {
   LotteryDraw.init(
     {
+      // 记录标识
       draw_id: {
-        type: DataTypes.BIGINT,
+        type: DataTypes.STRING(50),
         primaryKey: true,
-        autoIncrement: true,
-        comment: '抽奖记录唯一标识'
+        comment: '抽奖记录唯一ID'
       },
       user_id: {
         type: DataTypes.INTEGER,
         allowNull: false,
-        comment: '抽奖用户ID'
+        comment: '参与抽奖的用户ID',
+        references: {
+          model: 'users',
+          key: 'user_id'
+        }
       },
       campaign_id: {
         type: DataTypes.INTEGER,
         allowNull: false,
-        comment: '抽奖活动ID'
+        defaultValue: 2,
+        comment: '关联的抽奖活动ID'
       },
+      lottery_id: {
+        type: DataTypes.CHAR(36),
+        allowNull: true,
+        comment: '抽奖标识ID'
+      },
+
+      // 奖品信息
       prize_id: {
         type: DataTypes.INTEGER,
-        comment: '中奖奖品ID（未中奖为NULL）'
+        allowNull: true,
+        comment: '获得的奖品ID',
+        references: {
+          model: 'lottery_prizes',
+          key: 'prize_id'
+        }
       },
+      prize_name: {
+        type: DataTypes.STRING(100),
+        allowNull: true,
+        comment: '奖品名称'
+      },
+      prize_type: {
+        type: DataTypes.ENUM('points', 'product', 'coupon', 'special'),
+        allowNull: true,
+        comment: '奖品类型'
+      },
+      prize_value: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+        comment: '奖品价值'
+      },
+      prize_description: {
+        type: DataTypes.TEXT,
+        allowNull: true,
+        comment: '奖品详细描述'
+      },
+      prize_image: {
+        type: DataTypes.STRING(500),
+        allowNull: true,
+        comment: '奖品图片URL'
+      },
+
+      // 抽奖行为
+      draw_type: {
+        type: DataTypes.ENUM('single', 'triple', 'five', 'ten'),
+        allowNull: true,
+        comment: '抽奖类型'
+      },
+      draw_sequence: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+        comment: '抽奖序号'
+      },
+      draw_count: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+        comment: '本次抽奖包含的次数'
+      },
+      batch_id: {
+        type: DataTypes.STRING(50),
+        allowNull: true,
+        comment: '批次ID'
+      },
+
+      // 核心业务字段
+      /**
+       * 是否中奖的业务标准字段（核心业务标准）
+       *
+       * 业务含义：
+       * - true: 本次抽奖中获得有价值奖品（非空奖、非谢谢参与）
+       * - false: 本次抽奖未中奖或获得无价值奖励
+       *
+       * 业务逻辑：
+       * - 直接Boolean字段，由抽奖引擎根据抽奖结果设置
+       * - 中奖判断标准：获得的奖品具有实际价值（积分>0、实物商品、优惠券等）
+       * - 保底机制触发时，通常设置为true
+       *
+       * 使用场景：
+       * - 中奖统计：COUNT(*) WHERE is_winner = true
+       * - 中奖率计算：AVG(is_winner) * 100%
+       * - 保底机制触发条件：连续N次is_winner = false
+       * - 前端显示抽奖结果："恭喜中奖" vs "谢谢参与"
+       * - 奖品发放流程：只有is_winner = true才发放奖品
+       */
       is_winner: {
         type: DataTypes.BOOLEAN,
         allowNull: false,
-        comment: '是否中奖'
+        defaultValue: false,
+        comment: '是否中奖（获得有价值奖品）'
       },
-      points_consumed: {
-        type: DataTypes.DECIMAL(10, 2),
-        allowNull: false,
-        comment: '消耗的积分数量'
+      guarantee_triggered: {
+        type: DataTypes.BOOLEAN,
+        allowNull: true,
+        defaultValue: false,
+        comment: '是否触发保底'
       },
-      // ✅ draw_result字段已删除，统一使用is_winner业务标准字段
-      draw_time: {
+      remaining_guarantee: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+        defaultValue: 0,
+        comment: '抽奖后剩余的保底次数'
+      },
+
+      // 成本和技术数据
+      cost_points: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+        comment: '消耗积分'
+      },
+      stop_angle: {
+        type: DataTypes.DECIMAL(5, 2),
+        allowNull: true,
+        comment: '转盘停止角度'
+      },
+      draw_config: {
+        type: DataTypes.JSON,
+        allowNull: true,
+        comment: '抽奖配置参数'
+      },
+      result_metadata: {
+        type: DataTypes.JSON,
+        allowNull: true,
+        comment: '抽奖结果元数据'
+      },
+
+      // 审计信息
+      ip_address: {
+        type: DataTypes.STRING(45),
+        allowNull: true,
+        comment: '用户IP地址'
+      },
+
+      // 时间戳
+      created_at: {
         type: DataTypes.DATE,
         allowNull: false,
         defaultValue: DataTypes.NOW,
         comment: '抽奖时间'
       },
-      algorithm_type: {
-        type: DataTypes.ENUM('simple', 'guaranteed', 'dynamic', 'multi_stage', 'group'),
-        allowNull: false,
-        defaultValue: 'simple',
-        comment: '抽奖算法类型'
-      },
-      algorithm_version: {
-        type: DataTypes.STRING(20),
-        allowNull: false,
-        defaultValue: 'v1.0',
-        comment: '算法版本'
-      },
-      algorithm_data: {
-        type: DataTypes.JSON,
-        comment: '算法相关数据'
-      },
-      user_context: {
-        type: DataTypes.JSON,
-        comment: '用户上下文信息'
-      },
-      draw_metadata: {
-        type: DataTypes.JSON,
-        comment: '抽奖元数据'
-      },
-      is_hot_data: {
-        type: DataTypes.BOOLEAN,
-        defaultValue: true,
-        comment: '是否为热数据'
-      },
-      prize_status: {
-        type: DataTypes.ENUM('pending', 'delivered', 'received', 'expired', 'cancelled'),
-        defaultValue: 'pending',
-        comment: '奖品发放状态'
-      },
-      delivery_time: {
-        type: DataTypes.DATE,
-        comment: '奖品发放时间'
-      },
-      received_time: {
-        type: DataTypes.DATE,
-        comment: '奖品领取时间'
-      },
-      delivery_notes: {
-        type: DataTypes.TEXT,
-        comment: '发放备注'
-      },
-      draw_ip: {
-        type: DataTypes.STRING(45),
-        comment: '抽奖IP地址'
-      },
-      draw_device: {
-        type: DataTypes.STRING(255),
-        comment: '抽奖设备信息'
-      },
-      created_at: {
-        type: DataTypes.DATE,
-        allowNull: false,
-        defaultValue: DataTypes.NOW
-      },
       updated_at: {
         type: DataTypes.DATE,
         allowNull: false,
-        defaultValue: DataTypes.NOW
+        defaultValue: DataTypes.NOW,
+        comment: '记录更新时间'
       }
     },
     {
       sequelize,
       modelName: 'LotteryDraw',
-      tableName: 'lottery_draws',
+      tableName: 'lottery_draws', // 表名和模型名保持一致
       timestamps: true,
       createdAt: 'created_at',
       updatedAt: 'updated_at',
       underscored: true,
-      comment: '抽奖记录表',
+      comment: '抽奖记录表（重构版 - 仅数据定义）',
       indexes: [
         {
-          fields: ['user_id', 'draw_time'],
-          name: 'idx_ld_user_time'
+          name: 'idx_user_id',
+          fields: ['user_id']
         },
         {
-          fields: ['campaign_id', 'is_winner'], // ✅ 修复：使用业务标准字段
-          name: 'idx_ld_campaign_result'
+          name: 'idx_prize_id',
+          fields: ['prize_id']
         },
         {
-          fields: ['prize_id', 'prize_status'],
-          name: 'idx_ld_prize_status'
+          name: 'idx_prize_type',
+          fields: ['prize_type']
         },
         {
-          fields: ['is_winner', 'draw_time'], // ✅ 修复：使用业务标准字段
-          name: 'idx_ld_result_time'
+          name: 'idx_draw_type',
+          fields: ['draw_type']
         },
         {
-          fields: ['draw_ip'],
-          name: 'idx_ld_ip'
+          name: 'idx_batch_id',
+          fields: ['batch_id']
+        },
+        {
+          name: 'idx_created_at',
+          fields: ['created_at']
+        },
+        {
+          name: 'idx_user_created',
+          fields: ['user_id', 'created_at']
+        },
+        {
+          name: 'idx_campaign_result',
+          fields: ['campaign_id', 'is_winner']
+        },
+        {
+          name: 'idx_result_time',
+          fields: ['is_winner', 'created_at']
         }
       ]
     }

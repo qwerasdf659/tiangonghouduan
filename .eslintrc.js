@@ -93,7 +93,19 @@ module.exports = {
       files: ['routes/**/*.js'],
       rules: {
         'no-console': 'off', // 路由中允许console用于日志
-        'consistent-return': 'error' // 强制一致的返回格式
+        'consistent-return': 'error', // 强制一致的返回格式
+        // 🔴 V4统一API响应格式规则 - 禁止直接使用res.json()
+        'no-restricted-syntax': [
+          'error',
+          {
+            selector: 'CallExpression[callee.type=\'MemberExpression\'][callee.object.name=\'res\'][callee.property.name=\'json\']',
+            message: '❌ 禁止在路由中直接使用res.json()！请使用统一的res.apiSuccess()或res.apiError()方法以确保响应格式一致性。'
+          },
+          {
+            selector: 'CallExpression[callee.type=\'MemberExpression\'][callee.object.type=\'CallExpression\'][callee.object.callee.property.name=\'status\'][callee.property.name=\'json\']',
+            message: '❌ 禁止使用res.status().json()！请使用res.apiError(message, code, details, statusCode)方法。'
+          }
+        ]
       }
     }
   ],

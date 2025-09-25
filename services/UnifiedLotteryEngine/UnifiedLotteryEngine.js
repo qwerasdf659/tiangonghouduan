@@ -8,11 +8,7 @@
  * @timezone Asia/Shanghai (北京时间)
  */
 
-const DecisionCore = require('./core/DecisionCore')
-const ContextBuilder = require('./core/ContextBuilder')
-const ResultGenerator = require('./core/ResultGenerator')
-const BasicLotteryStrategy = require('./strategies/BasicLotteryStrategy')
-const GuaranteeStrategy = require('./strategies/GuaranteeStrategy')
+const BasicGuaranteeStrategy = require('./strategies/BasicGuaranteeStrategy')
 const ManagementStrategy = require('./strategies/ManagementStrategy')
 const PerformanceMonitor = require('./utils/PerformanceMonitor')
 const CacheManager = require('./utils/CacheManager')
@@ -31,9 +27,6 @@ class UnifiedLotteryEngine {
     }
 
     // 核心组件初始化
-    this.decisionCore = new DecisionCore()
-    this.contextBuilder = new ContextBuilder()
-    this.resultGenerator = new ResultGenerator()
     this.performanceMonitor = new PerformanceMonitor()
     this.cacheManager = new CacheManager()
     this.logger = new Logger()
@@ -63,24 +56,20 @@ class UnifiedLotteryEngine {
   }
 
   /**
-   * 初始化V4三种策略
+   * 初始化V4两种策略
    */
   initializeStrategies () {
     try {
-      // 基础抽奖策略
-      const basicStrategy = new BasicLotteryStrategy()
-      this.strategies.set('basic', basicStrategy)
-
-      // 保底策略
-      const guaranteeStrategy = new GuaranteeStrategy()
-      this.strategies.set('guarantee', guaranteeStrategy)
+      // 基础抽奖保底策略（合并了基础抽奖和保底功能）
+      const basicGuaranteeStrategy = new BasicGuaranteeStrategy()
+      this.strategies.set('basic_guarantee', basicGuaranteeStrategy)
 
       // 管理策略
       const managementStrategy = new ManagementStrategy()
       this.strategies.set('management', managementStrategy)
 
       this.logInfo('V4抽奖策略初始化完成', {
-        strategies: ['basic', 'guarantee', 'management']
+        strategies: ['basic_guarantee', 'management']
       })
     } catch (error) {
       this.logError('策略初始化失败', { error: error.message })
@@ -104,19 +93,13 @@ class UnifiedLotteryEngine {
         campaignId: context?.campaign_id || context?.campaignId
       })
 
-      // 上下文验证和标准化
-      const normalizedContext = this.normalizeRequestFormat(context)
-      const validationResult = this.validateLotteryContext(normalizedContext)
-
-      if (!validationResult.valid) {
-        return this.createEngineError('参数验证失败', {
-          validation: validationResult.error,
-          executionTime: Date.now() - startTime
-        })
+      // 直接使用传入的上下文，添加执行信息
+      const executionContext = {
+        execution_id: executionId,
+        timestamp: this.getBeijingTimestamp(),
+        engine_version: this.version,
+        ...context
       }
-
-      // 构建执行上下文
-      const executionContext = this.buildExecutionContext(normalizedContext, executionId)
 
       // 获取策略执行链
       const strategyChain = this.getExecutionChain(executionContext)
@@ -212,81 +195,6 @@ class UnifiedLotteryEngine {
   }
 
   /**
-   * 验证抽奖上下文
-   */
-  validateLotteryContext (context) {
-    if (!context) {
-      return { valid: false, error: '抽奖上下文不能为空' }
-    }
-
-    if (!context.user_id && !context.userId) {
-      return { valid: false, error: '用户ID是必需的' }
-    }
-
-    if (!context.campaign_id && !context.campaignId) {
-      return { valid: false, error: '活动ID是必需的' }
-    }
-
-    return { valid: true }
-  }
-
-  /**
-   * 标准化请求格式（驼峰转下划线）
-   */
-  normalizeRequestFormat (request) {
-    if (!request || typeof request !== 'object') {
-      return request
-    }
-
-    const normalized = {}
-
-    // 字段映射规则
-    const fieldMapping = {
-      userId: 'user_id',
-      campaignId: 'campaign_id',
-      requestId: 'request_id',
-      strategyType: 'strategy_type',
-      operationType: 'operation_type',
-      adminInfo: 'admin_info',
-      operationParams: 'operation_params',
-      userStatus: 'user_status',
-      campaignConfig: 'campaign_config'
-    }
-
-    // 应用字段映射
-    Object.keys(request).forEach(key => {
-      const mappedKey = fieldMapping[key] || key
-      normalized[mappedKey] = request[key]
-    })
-
-    return normalized
-  }
-
-  /**
-   * 构建执行上下文
-   */
-  buildExecutionContext (request, executionId) {
-    const context = {
-      execution_id: executionId,
-      user_id: request.user_id,
-      campaign_id: request.campaign_id,
-      strategy_type: request.strategy_type || 'auto',
-      timestamp: this.getBeijingTimestamp(),
-      engine_version: this.version,
-      ...request
-    }
-
-    // 管理员操作特殊处理
-    if (request.operation_type === 'admin_preset') {
-      context.operation_type = request.operation_type
-      context.admin_info = request.admin_info
-      context.operation_params = request.operation_params
-    }
-
-    return context
-  }
-
-  /**
    * 获取策略执行链
    */
   getExecutionChain (context) {
@@ -295,8 +203,8 @@ class UnifiedLotteryEngine {
       return ['management']
     }
 
-    // 默认策略链：保底策略 -> 基础策略
-    return ['guarantee', 'basic']
+    // 默认策略链：基础抽奖保底策略（合并了保底和基础抽奖功能）
+    return ['basic_guarantee']
   }
 
   /**

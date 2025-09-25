@@ -291,6 +291,14 @@ const TestConfig = {
       campaignId: 2, // 默认测试活动ID (餐厅积分抽奖)
       campaignName: '餐厅积分抽奖活动' // 测试活动名称
     }
+  },
+
+  // V4抽奖策略配置验证
+  strategyValidation: {
+    // 实际存在的策略类（V4架构）
+    correct: ['BasicGuaranteeStrategy', 'ManagementStrategy'],
+    // 期待的策略数量
+    expectedCount: 2
   }
 }
 

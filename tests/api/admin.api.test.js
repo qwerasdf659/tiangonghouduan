@@ -6,13 +6,13 @@
  * 测试覆盖：实际存在的15个Admin API端点
  */
 
-const BaseAPITester = require('./BaseAPITester')
+const UnifiedAPITestManager = require('./UnifiedAPITestManager')
 
-describe('管理员API测试 - 修复版', () => {
+describe('管理员API测试', () => {
   let tester
 
   beforeAll(async () => {
-    tester = new BaseAPITester()
+    tester = new UnifiedAPITestManager()
     // 等待服务启动
     await new Promise(resolve => {
       setTimeout(resolve, 2000)

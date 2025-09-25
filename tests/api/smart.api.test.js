@@ -2,13 +2,13 @@
  * 智能系统API完整测试套件
  */
 
-const BaseAPITester = require('./BaseAPITester')
+const UnifiedAPITestManager = require('./UnifiedAPITestManager')
 
 describe('智能系统API测试', () => {
   let tester
 
   beforeAll(async () => {
-    tester = new BaseAPITester()
+    tester = new UnifiedAPITestManager()
     await new Promise(resolve => {
       setTimeout(resolve, 2000)
     })

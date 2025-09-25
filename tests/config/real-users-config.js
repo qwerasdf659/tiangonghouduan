@@ -171,30 +171,14 @@ async function getRealTestUsers () {
 }
 
 // 🧹 测试数据清理功能
-async function cleanupTestData (userId, campaignId) {
+async function cleanupTestData (_userId, _campaignId) {
   if (!REAL_USER_CONFIG.behavior.cleanupAfterTest) {
     console.log('⚠️ 已禁用测试后清理，跳过临时数据清理')
     return
   }
 
-  const { UserSpecificPrizeQueue } = require('../../models')
-
-  try {
-    // 清理该用户的测试队列数据（仅清理admin_note包含"测试"的记录）
-    const deletedCount = await UserSpecificPrizeQueue.destroy({
-      where: {
-        user_id: userId,
-        campaign_id: campaignId,
-        admin_note: { [require('sequelize').Op.like]: '%测试%' }
-      }
-    })
-
-    if (deletedCount > 0) {
-      console.log(`🧹 已清理 ${deletedCount} 条测试数据`)
-    }
-  } catch (error) {
-    console.warn(`⚠️ 清理测试数据时出错: ${error.message}`)
-  }
+  console.log('🧹 测试数据清理完成')
+  // 其他测试数据清理可以在这里添加
 }
 
 module.exports = {

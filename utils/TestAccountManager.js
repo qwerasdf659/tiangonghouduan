@@ -6,7 +6,7 @@
  * 创建时间：2025年01月21日 北京时间
  */
 
-const { getDatabaseHelper } = require('./UnifiedDatabaseHelper')
+const { getDatabaseHelper } = require('./database')
 const BeijingTimeHelper = require('./timeHelper')
 
 class TestAccountManager {

@@ -16,7 +16,7 @@
  * 数据库：restaurant_points_dev (统一数据库)
  */
 
-const V4UnifiedEngineAPITester = require('./V4UnifiedEngineAPITester')
+const UnifiedAPITestManager = require('./UnifiedAPITestManager')
 const moment = require('moment-timezone')
 const { getRealTestUsers } = require('../config/real-users-config')
 
@@ -38,7 +38,7 @@ describe('V4统一引擎完整测试套件', () => {
     console.log(`👤 测试账号: ${testAccount.phone} (用户ID: ${testAccount.userId})`)
     console.log('🗄️ 数据库: restaurant_points_dev (统一数据库)')
 
-    tester = new V4UnifiedEngineAPITester()
+    tester = new UnifiedAPITestManager()
 
     // 等待V4引擎启动
     try {
@@ -142,51 +142,38 @@ describe('V4统一引擎完整测试套件', () => {
   })
 
   describe('2️⃣ V4三种抽奖策略完整测试', () => {
-    test('✅ 基础抽奖策略 - POST /api/v4/unified-engine/lottery/basic', async () => {
-      console.log('\n🎰 测试基础抽奖策略...')
+    test('✅ 基础保底抽奖策略 - POST /api/v4/unified-engine/lottery/draw', async () => {
+      console.log('\n🎰 测试基础保底抽奖策略...')
 
       const response = await tester.executeV4BasicLottery(authUser.user.user_id)
 
       if (response.status === 200) {
-        tester.validateV4Response(response, ['strategy', 'result'])
-        expect(response.data.data.strategy).toBe('basic')
-        expect(response.data.data.result).toHaveProperty('prize_id')
-        console.log('✅ 基础抽奖策略执行成功')
-        console.log(`  策略: ${response.data.data.strategy}`)
-        console.log(`  奖品ID: ${response.data.data.result.prize_id}`)
+        tester.validateV4Response(response, ['success', 'is_winner'])
+        expect(response.data.data).toHaveProperty('is_winner')
+        expect(response.data.data).toHaveProperty('pointsCost', 100)
+        console.log('✅ 基础保底抽奖策略执行成功')
+        console.log(`  中奖结果: ${response.data.data.is_winner ? '中奖' : '未中奖'}`)
+        console.log(`  积分消耗: ${response.data.data.pointsCost}`)
+        if (response.data.data.is_winner && response.data.data.prize) {
+          console.log(`  奖品: ${response.data.data.prize.prizeName}`)
+        }
       } else {
-        console.log(`⚠️ 基础抽奖策略接口未实现 (状态码: ${response.status})`)
-      }
-    })
-
-    test('✅ 保底抽奖策略 - POST /api/v4/unified-engine/lottery/guarantee', async () => {
-      console.log('\n🛡️ 测试保底抽奖策略...')
-
-      const response = await tester.makeAuthenticatedRequest(
-        'POST',
-        '/api/v4/unified-engine/lottery/guarantee',
-        { user_id: authUser.user.user_id, campaign_id: 2 },
-        'regular'
-      )
-
-      if (response.status === 200) {
-        expect(response.data.data.strategy).toBe('guarantee')
-        console.log('✅ 保底抽奖策略执行成功')
-      } else {
-        console.log(`⚠️ 保底抽奖策略接口未实现 (状态码: ${response.status})`)
+        console.log(`⚠️ 基础保底抽奖策略接口未实现 (状态码: ${response.status})`)
       }
     })
 
     test('✅ 管理抽奖策略 - POST /api/v4/unified-engine/lottery/management', async () => {
-      console.log('\n👑 测试管理抽奖策略 (需要管理员权限)...')
+      console.log('\n👨‍💼 测试管理抽奖策略...')
 
       const response = await tester.makeAuthenticatedRequest(
         'POST',
-        '/api/v4/unified-engine/lottery/management',
+        '/api/v4/unified-engine/lottery/admin-preset',
         {
-          user_id: authUser.user.user_id,
-          campaign_id: 2,
-          force_prize_id: 1 // 管理员强制指定奖品
+          target_user_id: authUser.user.user_id,
+          preset_config: {
+            force_prize_id: 9,
+            strategy_type: 'management'
+          }
         },
         'admin'
       )
@@ -195,7 +182,7 @@ describe('V4统一引擎完整测试套件', () => {
         expect(response.data.data.strategy).toBe('management')
         console.log('✅ 管理抽奖策略执行成功')
       } else if (response.status === 403) {
-        console.log('⚠️ 管理抽奖策略需要管理员权限')
+        console.log(`⚠️ 管理抽奖策略需要管理员权限 (状态码: ${response.status})`)
       } else {
         console.log(`⚠️ 管理抽奖策略接口未实现 (状态码: ${response.status})`)
       }

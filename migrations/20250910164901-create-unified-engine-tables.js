@@ -175,6 +175,8 @@ module.exports = {
 
     console.log('✅ 统一决策记录表创建完成')
 
+    // ⚠️ 概率计算日志表创建已禁用 - 过度设计功能，已删除模型 - 2025年01月21日
+    /*
     // 创建概率计算日志表
     await queryInterface.createTable(
       'unified_probability_logs',
@@ -310,45 +312,43 @@ module.exports = {
 
         created_at: {
           type: DataTypes.DATE,
-          defaultValue: Sequelize.fn('NOW'),
+          defaultValue: DataTypes.NOW,
           comment: '创建时间'
         }
       },
       {
-        comment: '统一决策引擎概率计算日志表',
-        charset: 'utf8mb4',
-        collate: 'utf8mb4_unicode_ci'
+        comment: '统一决策引擎概率计算日志表'
       }
     )
 
-    // 创建概率日志表的索引
+    // 添加概率日志表索引
     await queryInterface.addIndex('unified_probability_logs', {
       fields: ['decision_id', 'step_order'],
       name: 'idx_decision_step'
     })
-
     await queryInterface.addIndex('unified_probability_logs', {
       fields: ['user_id', 'factor_type', 'created_at'],
       name: 'idx_user_factor_type'
     })
-
     await queryInterface.addIndex('unified_probability_logs', {
       fields: ['campaign_id', 'created_at'],
       name: 'idx_campaign_calc_time'
     })
-
     await queryInterface.addIndex('unified_probability_logs', {
       fields: ['factor_type', 'calculation_time_ms'],
       name: 'idx_factor_performance'
     })
-
     await queryInterface.addIndex('unified_probability_logs', {
       fields: ['output_probability', 'created_at'],
       name: 'idx_probability_range'
     })
 
     console.log('✅ 概率计算日志表创建完成')
+    */
+    console.log('ℹ️ 概率计算日志表创建已跳过（模型已删除）')
 
+    // ⚠️ 系统指标监控表创建已禁用 - 过度设计功能，已删除模型 - 2025年01月21日
+    /*
     // 创建系统指标监控表
     await queryInterface.createTable(
       'unified_system_metrics',
@@ -503,62 +503,59 @@ module.exports = {
 
         created_at: {
           type: DataTypes.DATE,
-          defaultValue: Sequelize.fn('NOW'),
+          defaultValue: DataTypes.NOW,
           comment: '记录创建时间'
         }
       },
       {
-        comment: '统一决策引擎系统指标监控表',
-        charset: 'utf8mb4',
-        collate: 'utf8mb4_unicode_ci'
+        comment: '统一决策引擎系统指标监控表'
       }
     )
 
-    // 创建系统指标表的索引
+    // 添加系统指标表索引
     await queryInterface.addIndex('unified_system_metrics', {
       fields: ['metric_type', 'measurement_time'],
       name: 'idx_metric_type_time'
     })
-
     await queryInterface.addIndex('unified_system_metrics', {
       fields: ['metric_name', 'measurement_time'],
       name: 'idx_metric_name_time'
     })
-
     await queryInterface.addIndex('unified_system_metrics', {
       fields: ['alert_level', 'measurement_time'],
       name: 'idx_alert_level_time'
     })
-
     await queryInterface.addIndex('unified_system_metrics', {
       fields: ['campaign_id', 'metric_type', 'measurement_time'],
       name: 'idx_campaign_metrics'
     })
-
     await queryInterface.addIndex('unified_system_metrics', {
       fields: ['metric_name', 'metric_value', 'measurement_time'],
       name: 'idx_performance_trend'
     })
-
     await queryInterface.addIndex('unified_system_metrics', {
       fields: ['engine_version', 'alert_triggered', 'measurement_time'],
       name: 'idx_system_health'
     })
 
     console.log('✅ 系统指标监控表创建完成')
+    */
+    console.log('ℹ️ 系统指标监控表创建已跳过（模型已删除）')
     console.log('🎯 统一决策引擎V4.0数据表创建成功！')
   },
 
   down: async (queryInterface, _Sequelize) => {
     console.log('🗑️ 开始删除统一决策引擎数据表...')
 
-    // 删除系统指标监控表
-    await queryInterface.dropTable('unified_system_metrics')
-    console.log('✅ 删除系统指标监控表')
+    // ⚠️ 删除系统指标监控表已禁用 - 模型已删除
+    // await queryInterface.dropTable('unified_system_metrics')
+    // console.log('✅ 删除系统指标监控表')
+    console.log('ℹ️ 系统指标监控表删除已跳过（模型已删除）')
 
-    // 删除概率计算日志表
-    await queryInterface.dropTable('unified_probability_logs')
-    console.log('✅ 删除概率计算日志表')
+    // ⚠️ 删除概率计算日志表已禁用 - 模型已删除
+    // await queryInterface.dropTable('unified_probability_logs')
+    // console.log('✅ 删除概率计算日志表')
+    console.log('ℹ️ 概率计算日志表删除已跳过（模型已删除）')
 
     // 删除统一决策记录表
     await queryInterface.dropTable('unified_decision_records')

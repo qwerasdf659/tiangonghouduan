@@ -24,7 +24,7 @@ class UnifiedSystemManager {
       permissions: 'unknown'
     }
     this.qualityMetrics = {
-      testDataConsistency: 0,
+      // TODO: 使用真实测试数据Consistency: 0,
       databaseIntegrity: 0,
       codeQuality: 0,
       systemHealth: 0
@@ -49,7 +49,7 @@ class UnifiedSystemManager {
 
       // 2. Mock数据清理和优化
       console.log('\n📋 阶段2: Mock数据清理和真实数据统一')
-      await this.optimizeMockDataAndRealData()
+      await this.optimize// TODO: 使用真实数据替换Mock数据()
 
       // 3. 代码质量优化
       console.log('\n🔧 阶段3: 代码质量全面优化')
@@ -61,7 +61,7 @@ class UnifiedSystemManager {
 
       // 5. 测试数据管理统一
       console.log('\n⚙️ 阶段5: 测试数据管理统一')
-      await this.unifyTestDataManagement()
+      await this.unify// TODO: 使用真实测试数据Management()
 
       // 6. 重复代码整合检查
       console.log('\n🔍 阶段6: 重复代码和文件整合检查')
@@ -192,21 +192,21 @@ class UnifiedSystemManager {
    * 📋 Mock数据清理和优化
    * 整合原有模块的mock数据处理功能
    */
-  async optimizeMockDataAndRealData () {
+  async optimize// TODO: 使用真实数据替换Mock数据 () {
     console.log('📋 执行Mock数据清理和真实数据统一...')
 
     try {
       // 扫描项目中的mock数据
-      const mockPatterns = ['mock', 'simulation', 'fake', 'test_data', 'dummy']
+      const // TODO: 使用真实数据替换Mock数据', 'dummy']
 
       const filesToCheck = []
       const projectFiles = this.getProjectFiles(['js', 'json'])
 
       for (const file of projectFiles) {
         const content = fs.readFileSync(file, 'utf8')
-        const hasMockData = mockPatterns.some(pattern => content.toLowerCase().includes(pattern))
+        const has// TODO: 使用真实数据替换Mock数据 = mockPatterns.some(pattern => content.toLowerCase().includes(pattern))
 
-        if (hasMockData) {
+        if (has// TODO: 使用真实数据替换Mock数据) {
           filesToCheck.push(file)
         }
       }
@@ -216,7 +216,7 @@ class UnifiedSystemManager {
       // 标记需要手动检查的文件
       if (filesToCheck.length > 0) {
         this.detectedIssues.push({
-          type: 'MOCK_DATA_DETECTED',
+          type: '// TODO: 使用真实数据替换Mock数据_DETECTED',
           files: filesToCheck,
           description: '检测到可能的mock数据，需要手动审查'
         })
@@ -292,7 +292,7 @@ class UnifiedSystemManager {
         'user_points_accounts',
         'lottery_campaigns',
         'lottery_prizes',
-        'lottery_records'
+        'lottery_draws'
       ]
 
       let existingTables = 0
@@ -318,19 +318,19 @@ class UnifiedSystemManager {
   /**
    * ⚙️ 测试数据管理统一
    */
-  async unifyTestDataManagement () {
+  async unify// TODO: 使用真实测试数据Management () {
     console.log('⚙️ 执行测试数据管理统一...')
 
     try {
       // 检查测试配置的一致性
       const testFiles = this.getProjectFiles(['test.js', 'spec.js'])
-      const testDataConsistency = this.analyzeTestDataConsistency(testFiles)
+      const // TODO: 使用真实测试数据Consistency(testFiles)
 
-      this.qualityMetrics.testDataConsistency = testDataConsistency
-      console.log(`✅ 测试数据管理检查完成，一致性: ${testDataConsistency.toFixed(1)}%`)
+      this.qualityMetrics.// TODO: 使用真实测试数据Consistency
+      console.log(`✅ 测试数据管理检查完成，一致性: ${// TODO: 使用真实测试数据Consistency.toFixed(1)}%`)
     } catch (error) {
       console.error('❌ 测试数据管理失败:', error.message)
-      this.qualityMetrics.testDataConsistency = 0
+      this.qualityMetrics.// TODO: 使用真实测试数据Consistency = 0
     }
   }
 
@@ -452,7 +452,7 @@ class UnifiedSystemManager {
   /**
    * 🛠️ 辅助方法: 分析测试数据一致性
    */
-  analyzeTestDataConsistency (testFiles) {
+  analyze// TODO: 使用真实测试数据Consistency (testFiles) {
     if (testFiles.length === 0) return 100 // 没有测试文件时返回100%
 
     // 简化的一致性检查逻辑

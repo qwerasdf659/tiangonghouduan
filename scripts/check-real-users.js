@@ -11,7 +11,7 @@
  * @date 2025-01-21
  */
 
-const { User, UserPointsAccount, UserSpecificPrizeQueue, LotteryCampaign } = require('../models')
+const { User, UserPointsAccount, LotteryCampaign } = require('../models')
 
 async function checkRealUsers () {
   try {
@@ -99,47 +99,10 @@ async function checkRealUsers () {
       )
     })
 
-    // 5. 查看已有的用户特定奖品队列
-    console.log('\n🎪 现有的用户特定奖品队列:')
+    // 🗑️ V4.2简化：UserSpecificPrizeQueue功能已删除 - 2025年01月21日
+    console.log('\n🎪 用户特定奖品队列功能已删除:')
     console.log('=====================================')
-
-    const existingQueues = await UserSpecificPrizeQueue.findAll({
-      include: [
-        {
-          model: User,
-          attributes: ['mobile', 'nickname']
-        }
-      ],
-      attributes: ['user_id', 'campaign_id', 'status', 'admin_note'],
-      order: [['created_at', 'DESC']],
-      limit: 10
-    })
-
-    if (existingQueues.length === 0) {
-      console.log('📭 暂无用户特定奖品队列')
-    } else {
-      const queueStats = {}
-      existingQueues.forEach(queue => {
-        const key = `${queue.user_id}-${queue.campaign_id}`
-        if (!queueStats[key]) {
-          queueStats[key] = {
-            user: queue.User,
-            userId: queue.user_id,
-            campaignId: queue.campaign_id,
-            pending: 0,
-            awarded: 0,
-            expired: 0
-          }
-        }
-        queueStats[key][queue.status]++
-      })
-
-      Object.values(queueStats).forEach((stat, index) => {
-        console.log(
-          `${index + 1}.  🎪 用户: ${stat.user.nickname}(${stat.user.mobile}) | 活动: ${stat.campaignId} | 待发放: ${stat.pending} | 已发放: ${stat.awarded} | 已过期: ${stat.expired}`
-        )
-      })
-    }
+    console.log('📭 V4.2版本已简化，不再支持用户特定奖品队列功能')
 
     // 6. 提供配置建议
     console.log('\n💡 配置建议:')
@@ -181,7 +144,7 @@ async function checkRealUsers () {
       if (suggestedAdmin) console.log(`   export TEST_ADMIN_MOBILE="${suggestedAdmin.mobile}"`)
 
       console.log('\n🚀 运行真实用户测试:')
-      console.log('   npm test -- tests/models/UserSpecificPrizeQueue-RealUser.test.js')
+      console.log('   # 🗑️ UserSpecificPrizeQueue测试已删除')
     } else {
       console.log('⚠️ 数据库中用户不足，建议先创建一些测试用户')
     }

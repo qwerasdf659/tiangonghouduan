@@ -57,16 +57,16 @@ module.exports = sequelize => {
         allowNull: false,
         comment: '交易积分数量'
       },
-      fee_points: {
+      fee_points_amount: {
         type: DataTypes.INTEGER,
         allowNull: false,
         defaultValue: 0,
-        comment: '交易手续费（积分）'
+        comment: '交易手续积分数量'
       },
-      net_amount: {
+      net_points_amount: {
         type: DataTypes.INTEGER,
         allowNull: false,
-        comment: '实际到账积分（扣除手续费后）'
+        comment: '实际到账积分数量（扣除手续积分后）'
       },
 
       // 交易状态
@@ -172,23 +172,13 @@ module.exports = sequelize => {
         allowNull: true,
         comment: '安全验证码'
       },
-      risk_level: {
-        type: DataTypes.ENUM('low', 'medium', 'high', 'critical'),
-        allowNull: false,
-        defaultValue: 'low',
-        comment: '风险等级'
-      },
+      // 🗑️ risk_level 字段已删除 - 2025年01月21日
 
       // 交易环境信息
       client_ip: {
         type: DataTypes.STRING(45),
         allowNull: true,
         comment: '客户端IP地址'
-      },
-      user_agent: {
-        type: DataTypes.STRING(500),
-        allowNull: true,
-        comment: '用户代理信息'
       },
       device_info: {
         type: DataTypes.JSON,

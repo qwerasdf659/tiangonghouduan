@@ -20,7 +20,7 @@ const modelMappings = {
   Prize: 'LotteryPrize',
 
   // 确保其他模型名称正确
-  LotteryRecord: 'LotteryRecord', // 已经正确
+  LotteryDraw: 'LotteryDraw', // 已合并LotteryRecord到LotteryDraw
   User: 'User', // 已经正确
   UserPointsAccount: 'UserPointsAccount' // 已经正确
 }

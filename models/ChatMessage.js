@@ -90,7 +90,7 @@ module.exports = sequelize => {
       timestamps: true,
       underscored: true,
       createdAt: 'created_at',
-      updatedAt: false, // 消息不需要更新时间
+      updatedAt: 'updated_at', // 消息修改时间追踪（数据库中100%使用）
       indexes: [
         {
           unique: true,

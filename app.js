@@ -21,12 +21,20 @@ require('dotenv').config()
 // 🕐 北京时间工具导入
 const BeijingTimeHelper = require('./utils/timeHelper')
 
+// 📝 统一日志系统导入
+const Logger = require('./services/UnifiedLotteryEngine/utils/Logger')
+const appLogger = Logger.create('Application')
+
 // 🔧 导入API响应统一中间件 - 解决API格式不一致问题
 const ApiResponse = require('./utils/ApiResponse')
 const ApiStandardManager = require('./utils/ApiStandardManager')
 
 // 确保Node.js使用北京时间
-console.log(`🕐 应用启动时间: ${BeijingTimeHelper.formatChinese()} (北京时间)`)
+appLogger.info('应用启动', {
+  start_time: BeijingTimeHelper.formatChinese(),
+  timezone: 'Asia/Shanghai',
+  node_version: process.version
+})
 
 // 初始化Express应用
 const app = express()
@@ -84,7 +92,13 @@ app.use('/api/', ApiResponse.middleware())
 
 // 🔧 请求日志中间件
 app.use((req, res, next) => {
-  console.log(`${BeijingTimeHelper.apiTimestamp()} - ${req.method} ${req.path}`) // 🕐 北京时间日志
+  appLogger.debug('API请求', {
+    method: req.method,
+    path: req.path,
+    ip: req.ip,
+    // 🗑️ user_agent 字段已删除 - 2025年01月21日
+    timestamp: BeijingTimeHelper.apiTimestamp()
+  })
   next()
 })
 
@@ -99,7 +113,7 @@ app.get('/health', async (req, res) => {
       await sequelize.authenticate()
       databaseStatus = 'connected'
     } catch (error) {
-      console.error('数据库连接检查失败:', error.message)
+      appLogger.error('数据库连接检查失败', { error: error.message })
       databaseStatus = 'disconnected'
     }
 
@@ -109,7 +123,7 @@ app.get('/health', async (req, res) => {
       // 这里可以添加Redis连接检查
       redisStatus = 'connected'
     } catch (error) {
-      console.error('Redis连接检查失败:', error.message)
+      appLogger.error('Redis连接检查失败', { error: error.message })
       redisStatus = 'disconnected'
     }
 
@@ -168,19 +182,16 @@ app.get('/api/v4', (req, res) => {
       version: '4.0.0',
       name: '餐厅积分抽奖系统 V4统一引擎',
       architecture: 'unified-lottery-engine',
-      description: 'V4统一抽奖引擎架构 - 3种策略统一管理',
+      description: 'V4统一抽奖引擎架构 - 2种策略统一管理',
       engine: {
         name: 'UnifiedLotteryEngine',
         version: '4.0.0',
         strategies: [
-          'BasicLotteryStrategy - 基础抽奖策略',
-          'GuaranteeStrategy - 保底抽奖策略',
+          'BasicGuaranteeStrategy - 基础抽奖保底策略',
           'ManagementStrategy - 管理抽奖策略'
         ],
         core: {
-          DecisionCore: '决策核心',
-          ContextBuilder: '上下文构建器',
-          ResultGenerator: '结果生成器',
+          UnifiedLotteryEngine: '统一抽奖引擎 - 集成式设计',
           LotteryStrategy: '策略基类'
         }
       },
@@ -215,8 +226,7 @@ app.get('/api/v4/docs', (req, res) => {
           'POST /api/v4/unified-engine/lottery/validate': '验证抽奖条件'
         },
         strategies: [
-          'BasicLotteryStrategy - 基础抽奖策略',
-          'GuaranteeStrategy - 保底抽奖策略',
+          'BasicGuaranteeStrategy - 基础抽奖保底策略',
           'ManagementStrategy - 管理抽奖策略'
         ]
       },
@@ -312,24 +322,35 @@ app.get('/api', (req, res) => {
 try {
   // V4统一认证引擎路由
   app.use('/api/v4/unified-engine/auth', require('./routes/v4/unified-engine/auth'))
-  console.log('✅ V4统一认证引擎加载成功: /api/v4/unified-engine/auth')
+  appLogger.info('V4统一认证引擎加载成功', { route: '/api/v4/unified-engine/auth' })
 
   // V4统一抽奖引擎路由
   app.use('/api/v4/unified-engine/lottery', require('./routes/v4/unified-engine/lottery'))
-  console.log('✅ V4统一抽奖引擎加载成功: /api/v4/unified-engine/lottery')
+  appLogger.info('V4统一抽奖引擎加载成功', { route: '/api/v4/unified-engine/lottery' })
 
   // V4统一管理引擎路由
   app.use('/api/v4/unified-engine/admin', require('./routes/v4/unified-engine/admin'))
-  console.log('✅ V4统一管理引擎加载成功: /api/v4/unified-engine/admin')
+  appLogger.info('V4统一管理引擎加载成功', { route: '/api/v4/unified-engine/admin' })
 
   // V4权限管理路由
   app.use('/api/v4/permissions', require('./routes/v4/permissions'))
-  console.log('✅ V4权限管理系统加载成功: /api/v4/permissions')
+  appLogger.info('V4权限管理系统加载成功', { route: '/api/v4/permissions' })
 
-  console.log('🎯 统一决策引擎V4.0架构已完全启用 - 所有旧版API已弃用')
+  // V4抽奖预设管理路由
+  app.use('/api/v4/lottery-preset', require('./routes/v4/unified-engine/lottery-preset'))
+  appLogger.info('V4抽奖预设管理系统加载成功', { route: '/api/v4/lottery-preset' })
+
+  // V4用户库存管理路由
+  app.use('/api/v4/inventory', require('./routes/v4/unified-engine/inventory'))
+  appLogger.info('V4用户库存管理系统加载成功', { route: '/api/v4/inventory' })
+
+  // V4图片上传管理路由
+  app.use('/api/v4/photo', require('./routes/v4/unified-engine/photo'))
+  appLogger.info('V4图片上传管理系统加载成功', { route: '/api/v4/photo' })
+
+  appLogger.info('统一决策引擎V4.0架构已完全启用', { message: '所有旧版API已弃用' })
 } catch (error) {
-  console.error('❌ V4统一决策引擎加载失败:', error.message)
-  console.error('错误详情:', error.stack)
+  appLogger.error('V4统一决策引擎加载失败', { error: error.message, stack: error.stack })
   process.exit(1) // 如果核心引擎加载失败，应用无法继续运行
 }
 
@@ -368,7 +389,12 @@ app.use(apiStandardManager.createStandardizationMiddleware())
 
 // 🔧 全局错误处理
 app.use((error, req, res, _next) => {
-  console.error('全局错误处理:', error)
+  appLogger.error('全局错误处理', {
+    error: error.message,
+    stack: error.stack,
+    url: req.url,
+    method: req.method
+  })
 
   // Sequelize错误处理
   if (error.name === 'SequelizeError') {
@@ -415,19 +441,37 @@ const HOST = process.env.HOST || '0.0.0.0'
 
 if (require.main === module) {
   app.listen(PORT, HOST, async () => {
+    // 初始化Service层
+    try {
+      const models = require('./models')
+      const { initializeServices } = require('./services')
+      const services = initializeServices(models)
+
+      // 将Service容器添加到app实例中，供路由使用
+      app.locals.services = services
+
+      appLogger.info('Service层初始化完成', {
+        services: Array.from(services.getAllServices().keys())
+      })
+    } catch (error) {
+      appLogger.error('Service层初始化失败', { error: error.message })
+    }
+
     // V4统一决策引擎启动完成
-    console.log(`
-🚀 餐厅积分抽奖系统 V4.0 统一引擎启动成功!
-📍 服务地址: http://${HOST}:${PORT}
-🏥 健康检查: http://${HOST}:${PORT}/health
-🎰 V4抽奖引擎: http://${HOST}:${PORT}/api/v4/unified-engine/lottery
-👨‍💼 V4管理后台: http://${HOST}:${PORT}/api/v4/unified-engine/admin
-🌍 环境: ${process.env.NODE_ENV || 'development'}
-⏰ 启动时间: ${BeijingTimeHelper.apiTimestamp()} (北京时间)
-    `)
+    appLogger.info('餐厅积分抽奖系统V4.0统一引擎启动成功', {
+      host: HOST,
+      port: PORT,
+      environment: process.env.NODE_ENV || 'development',
+      start_time: BeijingTimeHelper.apiTimestamp(),
+      endpoints: {
+        health: `http://${HOST}:${PORT}/health`,
+        lottery: `http://${HOST}:${PORT}/api/v4/unified-engine/lottery`,
+        admin: `http://${HOST}:${PORT}/api/v4/unified-engine/admin`
+      }
+    })
 
     // ✅ V4架构已完全启用，无需传统定时任务服务
-    console.log('✅ V4统一决策引擎架构完全就绪 - 采用现代化微服务架构')
+    appLogger.info('V4统一决策引擎架构完全就绪', { architecture: '现代化微服务架构' })
   })
 }
 

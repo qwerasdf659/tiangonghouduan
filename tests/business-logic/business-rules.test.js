@@ -12,7 +12,7 @@
  * 6. 异常处理验证
  */
 
-const BaseAPITester = require('../api/BaseAPITester')
+const UnifiedAPITestManager = require('../api/UnifiedAPITestManager')
 
 // 辅助函数
 async function getUserPoints (tester, userId) {
@@ -58,13 +58,13 @@ describe('🧮 核心业务逻辑测试', () => {
   let _initialUserData
 
   beforeAll(async () => {
-    tester = new BaseAPITester()
+    tester = new UnifiedAPITestManager()
     await new Promise(resolve => setTimeout(resolve, 3000))
 
     // 获取测试用户数据
     const userData = await tester.authenticateUser('regular')
     testUserId = userData.user.user_id
-    initialUserData = userData.user
+    _initialUserData = userData.user
 
     // 确保管理员权限
     await tester.authenticateUser('admin')

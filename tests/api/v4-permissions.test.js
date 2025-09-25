@@ -7,13 +7,13 @@
  * 符合用户规则：扩展现有功能而非创建重复文件
  */
 
-const V4UnifiedEngineAPITester = require('./V4UnifiedEngineAPITester')
+const UnifiedAPITestManager = require('./UnifiedAPITestManager')
 
 describe('V4权限API测试 - 使用扩展的测试器', () => {
   let tester
 
   beforeAll(async () => {
-    tester = new V4UnifiedEngineAPITester()
+    tester = new UnifiedAPITestManager()
 
     // 等待服务启动
     await new Promise(resolve => {

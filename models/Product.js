@@ -31,6 +31,15 @@ module.exports = sequelize => {
         allowNull: true,
         comment: '商品图片URL'
       },
+      primary_image_id: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+        references: {
+          model: 'image_resources',
+          key: 'id'
+        },
+        comment: '商品主图片ID（关联image_resources表，用于多图片管理中的主图指定）'
+      },
       category: {
         type: DataTypes.STRING(50),
         allowNull: false,
@@ -235,6 +244,18 @@ module.exports = sequelize => {
       limit: _limit,
       offset: _offset
     })
+  }
+
+  // 定义模型关联
+  Product.associate = function (models) {
+    // 关联到主图片资源
+    if (models.ImageResources) {
+      Product.belongsTo(models.ImageResources, {
+        foreignKey: 'primary_image_id',
+        as: 'primaryImage',
+        comment: '商品主图片关联'
+      })
+    }
   }
 
   return Product

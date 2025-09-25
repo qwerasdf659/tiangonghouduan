@@ -13,7 +13,7 @@
  * 7. 并发抽奖测试
  */
 
-const BaseAPITester = require('./BaseAPITester')
+const UnifiedAPITestManager = require('./UnifiedAPITestManager')
 
 describe('抽奖API完整测试', () => {
   let tester
@@ -21,7 +21,7 @@ describe('抽奖API完整测试', () => {
   let testCampaignId
 
   beforeAll(async () => {
-    tester = new BaseAPITester()
+    tester = new UnifiedAPITestManager()
     // 等待服务启动
     await new Promise(resolve => {
       setTimeout(resolve, 2000)

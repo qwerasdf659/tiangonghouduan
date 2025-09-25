@@ -206,8 +206,13 @@ module.exports = sequelize => {
       }
     },
     {
+      sequelize,
+      modelName: 'ExchangeRecords',
       tableName: 'exchange_records',
       timestamps: true,
+      createdAt: 'created_at',
+      updatedAt: 'updated_at',
+      underscored: true,
       indexes: [
         {
           name: 'idx_exchange_records_user_id',

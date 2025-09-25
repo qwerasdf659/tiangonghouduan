@@ -74,7 +74,6 @@
     "ws": "^8.18.3"
   },
   "devDependencies": {
-    "@faker-js/faker": "^9.9.0",
     "eslint": "^8.55.0",
     "eslint-config-standard": "^17.1.0",
     "eslint-plugin-import": "^2.29.0",
@@ -105,12 +104,12 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/your-org/restaurant-lottery-system-v2.git"
+    "url": "https://github.com/your-org/restaurant-lottery-system-v4.git"
   },
   "bugs": {
-    "url": "https://github.com/your-org/restaurant-lottery-system-v2/issues"
+    "url": "https://github.com/your-org/restaurant-lottery-system-v4/issues"
   },
-  "homepage": "https://github.com/your-org/restaurant-lottery-system-v2#readme",
+  "homepage": "https://github.com/your-org/restaurant-lottery-system-v4#readme",
   "eslintConfig": {
     "env": {
       "node": true,
@@ -173,10 +172,7 @@
       "ManagementStrategy - 管理抽奖策略"
     ],
     "engineCore": {
-      "UnifiedLotteryEngine": "统一抽奖引擎主管理器",
-      "DecisionCore": "决策核心，负责策略选择和执行",
-      "ContextBuilder": "上下文构建器，构建抽奖执行环境",
-      "ResultGenerator": "结果生成器，处理抽奖结果"
+      "UnifiedLotteryEngine": "统一抽奖引擎主管理器 - 简化集成式设计，包含策略选择、上下文构建和结果处理"
     },
     "techStack": [
       "Node.js 20+ + Express",

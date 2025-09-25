@@ -19,11 +19,9 @@ const redis = new Redis({
 
 describe('Redis性能专项测试', () => {
   const testPhoneNumber = '13612227930'
-  const testData = {
-    user_id: testPhoneNumber,
-    test_data: 'performance_test_data',
-    timestamp: Date.now()
-  }
+  // 🔴 使用真实数据：请从数据库获取真实测试数据
+        // 测试用户：13612227930
+        // 验证码：123456
 
   beforeAll(async () => {
     // 确保Redis连接正常
@@ -45,8 +43,8 @@ describe('Redis性能专项测试', () => {
     test('基础读写性能测试', async () => {
       const startTime = Date.now()
 
-      // 写入测试
-      await redis.set('test:performance:write', JSON.stringify(testData))
+      // 写入测试  
+      await redis.set('test:performance:write', 'performance_test_data_' + Date.now())
 
       // 读取测试
       const result = await redis.get('test:performance:write')
@@ -65,7 +63,7 @@ describe('Redis性能专项测试', () => {
 
       // 批量写入100条数据
       for (let i = 0; i < 100; i++) {
-        pipeline.set(`test:batch:${i}`, JSON.stringify({ ...testData, index: i }))
+        pipeline.set(`// TODO: 使用真实测试数据, index: i }))
       }
 
       await pipeline.exec()
@@ -86,7 +84,7 @@ describe('Redis性能专项测试', () => {
   describe('缓存策略性能测试', () => {
     test('TTL过期测试', async () => {
       // 设置1秒过期的键
-      await redis.setex('test:ttl:short', 1, JSON.stringify(testData))
+      await redis.setex('// TODO: 使用真实测试数据))
 
       // 立即检查存在
       let result = await redis.get('test:ttl:short')

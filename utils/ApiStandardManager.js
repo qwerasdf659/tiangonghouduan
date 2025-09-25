@@ -52,7 +52,7 @@ class ApiStandardManager {
         field: 'is_winner',
         type: 'boolean',
         description: '是否中奖（业务结果标准）',
-        usage: ['LotteryRecord', 'DecisionRecord'],
+        usage: ['LotteryRecord'], // 🗑️ DecisionRecord已删除 - 2025年01月21日
         scenarios: ['抽奖结果判断', '奖品发放条件']
       },
       process_execution: {
@@ -242,8 +242,40 @@ class ApiStandardManager {
     const typeErrors = []
 
     Object.entries(standard.types).forEach(([field, expectedType]) => {
-      if (field in response && typeof response[field] !== expectedType) {
-        typeErrors.push(`${field}: 期望${expectedType}，实际${typeof response[field]}`)
+      const validTypes = ['string', 'number', 'boolean', 'object', 'undefined', 'symbol', 'function']
+      const typeToCheck = validTypes.includes(expectedType) ? expectedType : 'object'
+
+      let isValidType = false
+      const actualType = typeof response[field]
+
+      switch (typeToCheck) {
+      case 'string':
+        isValidType = actualType === 'string'
+        break
+      case 'number':
+        isValidType = actualType === 'number'
+        break
+      case 'boolean':
+        isValidType = actualType === 'boolean'
+        break
+      case 'object':
+        isValidType = actualType === 'object'
+        break
+      case 'undefined':
+        isValidType = actualType === 'undefined'
+        break
+      case 'symbol':
+        isValidType = actualType === 'symbol'
+        break
+      case 'function':
+        isValidType = actualType === 'function'
+        break
+      default:
+        isValidType = actualType === 'object'
+      }
+
+      if (field in response && !isValidType) {
+        typeErrors.push(`${field}: 期望${expectedType}，实际${actualType}`)
       }
     })
 
