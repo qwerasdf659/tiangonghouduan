@@ -1,280 +1,502 @@
 /**
- * 认证授权中间件 - V4统一架构版本
- * 🔴 权限级别：用户(default) | 管理员(is_admin: true)
- * 🔧 修复：统一JWT密钥配置，增强安全性
- * 🕐 时区：北京时间 (UTC+8) - 中国区域专用
+ * 统一认证中间件 - V4.0 统一架构版本
+ * 🛡️ 权限认证：完全使用UUID角色系统，移除is_admin字段依赖
+ * 🚀 性能优化：集成内存+Redis双层缓存，智能降级
+ * 创建时间：2025年01月21日
+ * 更新时间：2025年01月28日
  */
 
 const jwt = require('jsonwebtoken')
-const { sequelize } = require('../models') // 只引用sequelize实例
-const BeijingTimeHelper = require('../utils/timeHelper') // 🕐 北京时间工具
+const { User, Role } = require('../models')
 
-// 🔧 修复：统一JWT密钥配置，确保安全性
-const JWT_SECRET = process.env.JWT_SECRET
-const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET
-const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '2h'
-const REFRESH_TOKEN_EXPIRES_IN = process.env.JWT_REFRESH_EXPIRES_IN || '7d'
+// 尝试导入Redis客户端，如果失败则使用纯内存缓存
+let redisClient = null
+try {
+  const { getRawClient } = require('../utils/UnifiedRedisClient')
+  redisClient = getRawClient()
+  console.log('🚀 [Auth] Redis缓存已启用')
+} catch (error) {
+  console.warn('⚠️ [Auth] Redis不可用，使用纯内存缓存:', error.message)
+}
 
-// 🔧 启动时检查JWT密钥安全性
-if (!JWT_SECRET || JWT_SECRET.length < 32) {
-  console.error('❌ JWT_SECRET未配置或长度不足32位，存在安全风险')
-  if (process.env.NODE_ENV === 'production') {
-    console.error('🚨 生产环境必须配置强JWT密钥，程序退出')
-    process.exit(1)
-  }
-  console.warn('⚠️ 开发环境检测到弱JWT密钥，建议配置更强密钥')
+// 内存缓存管理
+const memoryCache = new Map()
+const MEMORY_TTL = 5 * 60 * 1000 // 5分钟
+const REDIS_TTL = 30 * 60 // 30分钟（秒）
+const REDIS_PREFIX = 'auth:permissions:'
+
+// 性能统计
+const cacheStats = {
+  memoryHits: 0,
+  redisHits: 0,
+  databaseQueries: 0,
+  totalQueries: 0
 }
 
 /**
- * 生成JWT Token - 修复：区分access和refresh token
+ * 🚀 从缓存获取用户权限
  */
-function generateTokens (user) {
-  const payload = {
-    user_id: user.user_id,
-    mobile: user.mobile,
-    is_admin: user.is_admin || false,
-    type: 'access', // 🔧 新增：token类型标识
-    iat: Math.floor(BeijingTimeHelper.timestamp() / 1000) // 🕐 使用北京时间时间戳
+async function getUserPermissionsFromCache (userId) {
+  cacheStats.totalQueries++
+
+  // 1. 检查内存缓存
+  const memoryKey = `permissions_${userId}`
+  const memoryItem = memoryCache.get(memoryKey)
+
+  if (memoryItem && (Date.now() - memoryItem.timestamp) < MEMORY_TTL) {
+    cacheStats.memoryHits++
+    return memoryItem.data
   }
 
-  const refreshPayload = {
-    ...payload,
-    type: 'refresh' // 🔧 新增：刷新token标识
+  // 2. 检查Redis缓存
+  if (redisClient) {
+    try {
+      const redisKey = `${REDIS_PREFIX}${userId}`
+      const cached = await redisClient.get(redisKey)
+
+      if (cached) {
+        cacheStats.redisHits++
+        const data = JSON.parse(cached)
+
+        // 更新内存缓存
+        memoryCache.set(memoryKey, {
+          data,
+          timestamp: Date.now()
+        })
+
+        return data
+      }
+    } catch (error) {
+      console.warn('⚠️ [Auth] Redis读取失败:', error.message)
+    }
   }
 
-  const accessToken = jwt.sign(payload, JWT_SECRET, {
-    expiresIn: JWT_EXPIRES_IN,
-    issuer: 'restaurant-points-system',
-    audience: 'restaurant-app'
+  return null
+}
+
+/**
+ * 🚀 设置用户权限缓存
+ */
+async function setUserPermissionsCache (userId, data) {
+  // 设置内存缓存
+  const memoryKey = `permissions_${userId}`
+  memoryCache.set(memoryKey, {
+    data,
+    timestamp: Date.now()
   })
 
-  const refreshToken = jwt.sign(refreshPayload, JWT_REFRESH_SECRET, {
-    expiresIn: REFRESH_TOKEN_EXPIRES_IN,
-    issuer: 'restaurant-points-system',
-    audience: 'restaurant-app'
-  })
-
-  return { accessToken, refreshToken }
-}
-
-/**
- * 验证Access Token - 修复：增强验证逻辑
- */
-function verifyAccessToken (token) {
-  try {
-    const decoded = jwt.verify(token, JWT_SECRET, {
-      issuer: 'restaurant-points-system',
-      audience: 'restaurant-app'
-    })
-
-    // 🔧 新增：验证token类型
-    if (decoded.type && decoded.type !== 'access') {
-      console.log('Token类型验证失败: 期望access，收到', decoded.type)
-      return null
+  // 设置Redis缓存
+  if (redisClient) {
+    try {
+      const redisKey = `${REDIS_PREFIX}${userId}`
+      await redisClient.setex(redisKey, REDIS_TTL, JSON.stringify(data))
+    } catch (error) {
+      console.warn('⚠️ [Auth] Redis写入失败:', error.message)
     }
-
-    return decoded
-  } catch (error) {
-    console.log('Access Token验证失败:', error.message)
-    return null
   }
 }
 
 /**
- * 验证Refresh Token - 修复：使用专用密钥
+ * 🗑️ 清除用户权限缓存
  */
-function verifyRefreshToken (token) {
-  try {
-    const decoded = jwt.verify(token, JWT_REFRESH_SECRET, {
-      issuer: 'restaurant-points-system',
-      audience: 'restaurant-app'
-    })
+async function invalidateUserPermissions (userId, reason = 'unknown') {
+  // 清除内存缓存
+  const memoryKey = `permissions_${userId}`
+  memoryCache.delete(memoryKey)
 
-    // 🔧 新增：验证token类型
-    if (decoded.type && decoded.type !== 'refresh') {
-      console.log('Refresh Token类型验证失败: 期望refresh，收到', decoded.type)
-      return null
+  // 清除Redis缓存
+  if (redisClient) {
+    try {
+      const redisKey = `${REDIS_PREFIX}${userId}`
+      await redisClient.del(redisKey)
+    } catch (error) {
+      console.warn('⚠️ [Auth] Redis删除失败:', error.message)
+    }
+  }
+
+  console.log(`🔄 [Auth] 清除用户权限缓存: ${userId} (原因: ${reason})`)
+}
+
+/**
+ * 🛡️ 获取用户角色信息（基于UUID角色系统，支持缓存）
+ * @param {number} userId - 用户ID
+ * @param {boolean} forceRefresh - 强制刷新缓存
+ * @returns {Promise<Object>} 用户角色信息
+ */
+async function getUserRoles (userId, forceRefresh = false) {
+  try {
+    // 如果不强制刷新，先尝试从缓存获取
+    if (!forceRefresh) {
+      const cached = await getUserPermissionsFromCache(userId)
+      if (cached) {
+        return cached
+      }
     }
 
-    return decoded
+    cacheStats.databaseQueries++
+
+    const user = await User.findOne({
+      where: { user_id: userId, status: 'active' },
+      include: [{
+        model: Role,
+        as: 'roles',
+        through: {
+          where: { is_active: true }
+        },
+        attributes: ['id', 'role_uuid', 'role_name', 'role_level', 'permissions']
+      }]
+    })
+
+    if (!user || !user.roles) {
+      const emptyResult = {
+        isAdmin: false,
+        roleLevel: 0,
+        roles: [],
+        permissions: []
+      }
+      // 缓存空结果，避免重复查询
+      await setUserPermissionsCache(userId, emptyResult)
+      return emptyResult
+    }
+
+    // 计算最高权限级别
+    const maxRoleLevel = user.roles.length > 0
+      ? Math.max(...user.roles.map(role => role.role_level))
+      : 0
+
+    // 合并所有角色权限
+    const allPermissions = new Set()
+    user.roles.forEach(role => {
+      if (role.permissions) {
+        Object.entries(role.permissions).forEach(([resource, actions]) => {
+          if (Array.isArray(actions)) {
+            actions.forEach(action => {
+              allPermissions.add(`${resource}:${action}`)
+            })
+          }
+        })
+      }
+    })
+
+    const result = {
+      isAdmin: maxRoleLevel >= 100, // 🛡️ 基于角色级别计算管理员权限
+      roleLevel: maxRoleLevel,
+      roles: user.roles.map(role => ({
+        role_uuid: role.role_uuid,
+        role_name: role.role_name,
+        role_level: role.role_level
+      })),
+      permissions: Array.from(allPermissions)
+    }
+
+    // 缓存结果
+    await setUserPermissionsCache(userId, result)
+
+    return result
   } catch (error) {
-    console.log('刷新Token验证失败:', error.message)
-    return null
+    console.error('❌ 获取用户角色失败:', error.message)
+    return {
+      isAdmin: false,
+      roleLevel: 0,
+      roles: [],
+      permissions: []
+    }
   }
 }
 
 /**
- * JWT Token认证中间件 - 修复：统一错误响应格式
+ * 🛡️ 生成JWT Token（基于UUID角色系统）
+ * @param {Object} user - 用户对象
+ * @returns {Promise<Object>} Token信息
  */
-const authenticateToken = async (req, res, next) => {
+async function generateTokens (user) {
+  try {
+    // 获取用户角色信息
+    const userRoles = await getUserRoles(user.user_id)
+
+    const payload = {
+      user_id: user.user_id,
+      mobile: user.mobile,
+      nickname: user.nickname,
+      status: user.status,
+      role_level: userRoles.roleLevel, // 🛡️ 基于角色计算
+      iat: Math.floor(Date.now() / 1000)
+    }
+
+    const accessToken = jwt.sign(payload, process.env.JWT_SECRET, {
+      expiresIn: process.env.JWT_EXPIRES_IN || '24h'
+    })
+
+    const refreshToken = jwt.sign(
+      { user_id: user.user_id, type: 'refresh' },
+      process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET,
+      { expiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '7d' }
+    )
+
+    return {
+      access_token: accessToken,
+      refresh_token: refreshToken,
+      expires_in: 24 * 60 * 60, // 24小时
+      token_type: 'Bearer',
+      user: {
+        user_id: user.user_id,
+        mobile: user.mobile,
+        nickname: user.nickname,
+        status: user.status,
+        role_level: userRoles.roleLevel,
+        roles: userRoles.roles
+      }
+    }
+  } catch (error) {
+    console.error('❌ 生成Token失败:', error.message)
+    throw error
+  }
+}
+
+/**
+ * 🛡️ 验证刷新Token
+ * @param {string} refreshToken - 刷新Token
+ * @returns {Promise<Object>} 验证结果
+ */
+async function verifyRefreshToken (refreshToken) {
+  try {
+    const decoded = jwt.verify(
+      refreshToken,
+      process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET
+    )
+
+    if (decoded.type !== 'refresh') {
+      throw new Error('无效的刷新Token类型')
+    }
+
+    // 从数据库获取最新用户信息
+    const user = await User.findOne({
+      where: { user_id: decoded.user_id, status: 'active' }
+    })
+
+    if (!user) {
+      throw new Error('用户不存在或已被禁用')
+    }
+
+    // 🛡️ 获取用户角色信息
+    const userRoles = await getUserRoles(user.user_id)
+
+    return {
+      valid: true,
+      user: {
+        user_id: user.user_id,
+        mobile: user.mobile,
+        nickname: user.nickname,
+        status: user.status,
+        role_level: userRoles.roleLevel,
+        roles: userRoles.roles
+      }
+    }
+  } catch (error) {
+    return {
+      valid: false,
+      error: error.message
+    }
+  }
+}
+
+/**
+ * 🛡️ Token认证中间件（基于UUID角色系统）
+ * @param {Object} req - 请求对象
+ * @param {Object} res - 响应对象
+ * @param {Function} next - 下一个中间件
+ */
+async function authenticateToken (req, res, next) {
   try {
     const authHeader = req.headers.authorization
-    const token = authHeader && authHeader.split(' ')[1] // Bearer TOKEN
+    const token = authHeader && authHeader.split(' ')[1]
 
     if (!token) {
       return res.status(401).json({
         success: false,
         error: 'MISSING_TOKEN',
-        message: '缺少访问令牌',
-        timestamp: BeijingTimeHelper.apiTimestamp() // 🕐 北京时间API时间戳
+        message: '缺少认证Token'
       })
     }
 
-    const decoded = verifyAccessToken(token)
-    if (!decoded) {
-      return res.status(401).json({
-        success: false,
-        error: 'INVALID_TOKEN',
-        message: '访问令牌无效或已过期',
-        timestamp: BeijingTimeHelper.apiTimestamp() // 🕐 北京时间API时间戳
-      })
-    }
+    // 验证Token
+    const decoded = jwt.verify(token, process.env.JWT_SECRET)
 
-    // 从数据库获取用户信息（使用原生SQL查询）
-    const users = await sequelize.query(
-      'SELECT user_id, mobile, nickname, status, is_admin FROM users WHERE user_id = ?',
-      { replacements: [decoded.user_id], type: sequelize.QueryTypes.SELECT }
-    )
+    // 从数据库获取最新用户信息
+    const user = await User.findOne({
+      where: { user_id: decoded.user_id, status: 'active' }
+    })
 
-    const user = users[0]
     if (!user) {
       return res.status(401).json({
         success: false,
         error: 'USER_NOT_FOUND',
-        message: '用户不存在',
-        timestamp: BeijingTimeHelper.apiTimestamp() // 🕐 北京时间API时间戳
+        message: '用户不存在或已被禁用'
       })
     }
 
-    // 检查用户状态
-    if (user.status === 'banned') {
-      return res.status(403).json({
-        success: false,
-        error: 'USER_BANNED',
-        message: '用户已被禁用',
-        timestamp: BeijingTimeHelper.apiTimestamp() // 🕐 北京时间API时间戳
-      })
+    // 🛡️ 获取用户角色信息
+    const userRoles = await getUserRoles(user.user_id)
+
+    // 构建用户信息对象
+    const userInfo = {
+      user_id: user.user_id,
+      mobile: user.mobile,
+      nickname: user.nickname,
+      status: user.status,
+      role_level: userRoles.roleLevel,
+      roles: userRoles.roles,
+      permissions: userRoles.permissions
     }
 
-    if (user.status === 'inactive') {
-      return res.status(403).json({
-        success: false,
-        error: 'USER_INACTIVE',
-        message: '用户已被暂停',
-        timestamp: BeijingTimeHelper.apiTimestamp() // 🕐 北京时间API时间戳
-      })
-    }
-
-    // 将用户信息添加到请求对象
+    // 一次性设置用户信息，避免竞态条件
     // eslint-disable-next-line require-atomic-updates
-    req.user = user
-    // eslint-disable-next-line require-atomic-updates
-    req.token = decoded
+    req.user = userInfo
 
     next()
   } catch (error) {
-    console.error('认证中间件错误:', error)
-    res.status(500).json({
-      success: false,
-      error: 'AUTH_SERVICE_ERROR',
-      message: '认证服务异常',
-      timestamp: BeijingTimeHelper.apiTimestamp() // 🕐 北京时间API时间戳
-    })
+    if (error.name === 'JsonWebTokenError') {
+      return res.status(401).json({
+        success: false,
+        error: 'INVALID_TOKEN',
+        message: '无效的Token'
+      })
+    } else if (error.name === 'TokenExpiredError') {
+      return res.status(401).json({
+        success: false,
+        error: 'TOKEN_EXPIRED',
+        message: 'Token已过期'
+      })
+    } else {
+      console.error('❌ Token认证失败:', error.message)
+      return res.status(401).json({
+        success: false,
+        error: 'AUTH_FAILED',
+        message: '认证失败'
+      })
+    }
   }
 }
 
 /**
- * 可选认证中间件 - 修复：统一错误处理格式
+ * 🛡️ 管理员权限验证中间件（基于UUID角色系统）
+ * @param {Object} req - 请求对象
+ * @param {Object} res - 响应对象
+ * @param {Function} next - 下一个中间件
  */
-const optionalAuth = async (req, res, next) => {
+async function requireAdmin (req, res, next) {
   try {
-    const authHeader = req.headers.authorization
-    const token = authHeader && authHeader.split(' ')[1]
+    if (!req.user) {
+      return res.status(401).json({
+        success: false,
+        error: 'UNAUTHENTICATED',
+        message: '未认证用户'
+      })
+    }
 
-    if (token) {
-      const decoded = verifyAccessToken(token)
-      if (decoded) {
-        const users = await sequelize.query(
-          'SELECT user_id, mobile, nickname, status, is_admin FROM users WHERE user_id = ?',
-          { replacements: [decoded.user_id], type: sequelize.QueryTypes.SELECT }
-        )
-
-        const user = users[0]
-        if (user && user.status === 'active') {
-          // eslint-disable-next-line require-atomic-updates
-          req.user = user
-          // eslint-disable-next-line require-atomic-updates
-          req.token = decoded
-        }
-      }
+    if (req.user.role_level < 100) {
+      return res.status(403).json({
+        success: false,
+        error: 'INSUFFICIENT_PERMISSION',
+        message: '需要管理员权限'
+      })
     }
 
     next()
   } catch (error) {
-    console.error('可选认证中间件错误:', error)
-    next() // 即使出错也继续执行
+    console.error('❌ 管理员权限验证失败:', error.message)
+    return res.status(500).json({
+      success: false,
+      error: 'PERMISSION_CHECK_FAILED',
+      message: '权限验证失败'
+    })
   }
 }
 
 /**
- * 管理员权限检查中间件 - 修复：统一错误响应格式
+ * 🛡️ 权限检查中间件（基于UUID角色系统）
+ * @param {string} requiredPermission - 需要的权限
+ * @returns {Function} 中间件函数
  */
-const requireAdmin = (req, res, next) => {
-  if (!req.user) {
-    return res.status(401).json({
-      success: false,
-      error: 'LOGIN_REQUIRED',
-      message: '需要登录访问',
-      timestamp: BeijingTimeHelper.apiTimestamp() // 🕐 北京时间API时间戳
-    })
-  }
+function requirePermission (requiredPermission) {
+  return async (req, res, next) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({
+          success: false,
+          error: 'UNAUTHENTICATED',
+          message: '未认证用户'
+        })
+      }
 
-  if (!req.user.is_admin) {
-    return res.status(403).json({
-      success: false,
-      error: 'ADMIN_REQUIRED',
-      message: '需要管理员权限',
-      timestamp: BeijingTimeHelper.apiTimestamp() // 🕐 北京时间API时间戳
-    })
-  }
+      // 超级管理员拥有所有权限
+      if (req.user.role_level >= 100) {
+        return next()
+      }
 
-  next()
+      // 检查具体权限
+      const [resource] = requiredPermission.split(':')
+
+      // 检查通配符权限
+      if (req.user.permissions.includes('*:*') ||
+          req.user.permissions.includes(`${resource}:*`) ||
+          req.user.permissions.includes(requiredPermission)) {
+        return next()
+      }
+
+      return res.status(403).json({
+        success: false,
+        error: 'INSUFFICIENT_PERMISSION',
+        message: '权限不足',
+        data: {
+          required: requiredPermission,
+          user_permissions: req.user.permissions
+        }
+      })
+    } catch (error) {
+      console.error('❌ 权限检查失败:', error.message)
+      return res.status(500).json({
+        success: false,
+        error: 'PERMISSION_CHECK_FAILED',
+        message: '权限验证失败'
+      })
+    }
+  }
 }
 
 /**
- * 请求日志中间件 - 修复：增强日志格式
- * 🕐 使用北京时间记录日志
+ * 🎯 权限管理工具
  */
-const requestLogger = (req, res, next) => {
-  const start = BeijingTimeHelper.timestamp() // 🕐 使用北京时间时间戳
-  const { method, path, ip } = req
-  const userAgent = req.get('User-Agent')
-  const userId = req.user ? req.user.user_id : 'anonymous'
+const PermissionManager = {
+  // 清除用户缓存
+  invalidateUser: invalidateUserPermissions,
 
-  // 记录请求开始 - 使用北京时间
-  console.log(
-    `📥 [${BeijingTimeHelper.apiTimestamp()}] ${method} ${path} - User:${userId} - ${ip} - ${userAgent}`
-  )
+  // 获取缓存统计
+  getStats: () => ({
+    ...cacheStats,
+    memoryCacheSize: memoryCache.size,
+    hitRate: cacheStats.totalQueries > 0
+      ? (((cacheStats.memoryHits + cacheStats.redisHits) / cacheStats.totalQueries) * 100).toFixed(1) + '%'
+      : '0%',
+    redisAvailable: !!redisClient
+  }),
 
-  // 监听响应结束
-  res.on('finish', () => {
-    const duration = BeijingTimeHelper.timestamp() - start // 🕐 计算持续时间
-    const { statusCode } = res
+  // 强制刷新用户权限
+  forceRefreshUser: (userId) => getUserRoles(userId, true),
 
-    console.log(
-      `📤 [${BeijingTimeHelper.apiTimestamp()}] ${method} ${path} - ${statusCode} - ${duration}ms - User:${userId}`
-    )
-  })
-
-  next()
+  // 批量清除缓存
+  invalidateMultipleUsers: async (userIds, reason = 'batch_operation') => {
+    await Promise.all(userIds.map(userId => invalidateUserPermissions(userId, reason)))
+  }
 }
 
 module.exports = {
+  getUserRoles,
   generateTokens,
-  verifyAccessToken,
   verifyRefreshToken,
   authenticateToken,
-  optionalAuth,
   requireAdmin,
-  requestLogger
+  requirePermission,
+  PermissionManager,
+  invalidateUserPermissions
 }

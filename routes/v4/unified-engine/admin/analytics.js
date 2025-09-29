@@ -282,7 +282,7 @@ router.get('/lottery/trends', adminAuthMiddleware, asyncHandler(async (req, res)
         attributes: [
           [models.sequelize.fn('DATE_FORMAT', models.sequelize.col('last_login_at'), dateFormat), 'period'],
           [models.sequelize.fn('COUNT', '*'), 'active_users'],
-          [models.sequelize.fn('COUNT', models.sequelize.literal('CASE WHEN is_admin THEN 1 END')), 'admin_users']
+          [models.sequelize.fn('COUNT', models.sequelize.literal('CASE WHEN roles.role_level >= 100 THEN 1 END')), 'admin_users']
         ],
         group: [models.sequelize.fn('DATE_FORMAT', models.sequelize.col('last_login_at'), dateFormat)],
         order: [[models.sequelize.fn('DATE_FORMAT', models.sequelize.col('last_login_at'), dateFormat), 'ASC']],

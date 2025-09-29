@@ -4,7 +4,7 @@
  *
  * @description 基于餐厅积分抽奖系统的真实业务需求设计
  * @version 4.0.0
- * @date 2025-09-19
+ * @date 2025-01-21
  * @timezone Asia/Shanghai (北京时间)
  */
 
@@ -60,7 +60,7 @@ class UnifiedLotteryEngine {
    */
   initializeStrategies () {
     try {
-      // 基础抽奖保底策略（合并了基础抽奖和保底功能）
+      // 基础抽奖保底策略（合并了基础抽奖和保底机制）
       const basicGuaranteeStrategy = new BasicGuaranteeStrategy()
       this.strategies.set('basic_guarantee', basicGuaranteeStrategy)
 

@@ -1,147 +1,163 @@
 /**
- * 抽奖用户服务 - 处理用户积分和资料相关业务逻辑
- * 从 routes/v4/unified-engine/lottery.js 中提取的用户相关业务逻辑
- *
- * @description 基于snake_case命名格式的用户服务
- * @version 4.0.0
- * @date 2025-09-24
+ * 抽奖用户服务 - V4.0 统一架构版本
+ * 🛡️ 基于UUID角色系统的用户权限判断
+ * 创建时间：2025年01月21日
+ * 更新时间：2025年01月28日
  */
 
-const models = require('../../models')
-const Logger = require('../UnifiedLotteryEngine/utils/Logger')
+const { User, Role } = require('../../models')
+const { getUserRoles } = require('../../middleware/auth')
 
 class LotteryUserService {
-  constructor () {
-    this.logger = Logger.create('LotteryUserService')
-  }
-
   /**
-   * 获取用户积分账户信息
-   * @param {number} user_id - 用户ID
-   * @returns {Object} 积分账户信息
+   * 🛡️ 获取用户详细信息 - 使用UUID角色系统
    */
-  async get_user_points (user_id) {
+  async getUserInfo (userId) {
     try {
-      const points_account = await models.UserPointsAccount.findOne({
-        where: { user_id, is_active: 1 }
-      })
-
-      if (!points_account) {
-        // 如果没有积分账户，创建一个默认的
-        const _new_account = await models.UserPointsAccount.create({
-          user_id,
-          available_points: 0,
-          total_earned: 0,
-          total_consumed: 0
-        })
-        return {
-          available_points: 0,
-          total_earned: 0,
-          total_consumed: 0
-        }
-      }
-
-      return {
-        available_points: parseFloat(points_account.available_points) || 0,
-        total_earned: parseFloat(points_account.total_earned) || 0,
-        total_consumed: parseFloat(points_account.total_consumed) || 0
-      }
-    } catch (error) {
-      this.logger.error('获取用户积分失败', { user_id, error: error.message })
-      return {
-        available_points: 0,
-        total_earned: 0,
-        total_consumed: 0
-      }
-    }
-  }
-
-  /**
-   * 扣除用户积分
-   * @param {number} user_id - 用户ID
-   * @param {number} amount - 扣除金额
-   * @returns {Object} 更新后的积分账户
-   */
-  async deduct_user_points (user_id, amount) {
-    const points_account = await models.UserPointsAccount.findOne({
-      where: { user_id, is_active: 1 }
-    })
-
-    if (!points_account) {
-      throw new Error('用户积分账户不存在')
-    }
-
-    if (points_account.available_points < amount) {
-      throw new Error('积分不足')
-    }
-
-    await points_account.update({
-      available_points: points_account.available_points - amount,
-      total_consumed: points_account.total_consumed + amount
-    })
-
-    return points_account
-  }
-
-  /**
-   * 获取用户基本信息
-   * @param {number} user_id - 用户ID
-   * @returns {Object} 用户信息
-   */
-  async get_user_profile (user_id) {
-    try {
-      const user = await models.User.findOne({
-        where: { id: user_id },
-        attributes: ['id', 'phone', 'nickname', 'avatar', 'is_admin', 'created_at', 'updated_at']
+      const user = await User.findByPk(userId, {
+        attributes: ['id', 'phone', 'nickname', 'avatar', 'created_at', 'updated_at', 'status'],
+        include: [{
+          model: Role,
+          as: 'roles',
+          where: { is_active: true },
+          through: { where: { is_active: true } },
+          required: false,
+          attributes: ['role_uuid', 'role_name', 'role_level', 'permissions']
+        }]
       })
 
       if (!user) {
-        throw new Error('用户不存在')
+        return null
       }
 
-      // 获取用户积分信息
-      const points_info = await this.get_user_points(user_id)
+      // 🛡️ 计算用户权限
+      const userRoles = await getUserRoles(userId)
 
       return {
-        ...user.toJSON(),
-        points_info
+        id: user.id,
+        phone: user.phone,
+        nickname: user.nickname,
+        avatar: user.avatar,
+        status: user.status,
+        is_admin: userRoles.isAdmin, // 🛡️ 基于角色计算
+        roles: userRoles.roles,
+        created_at: user.created_at,
+        updated_at: user.updated_at
       }
     } catch (error) {
-      this.logger.error('获取用户资料失败', { user_id, error: error.message })
+      console.error('获取用户信息失败:', error)
       throw error
     }
   }
 
   /**
-   * 验证用户是否存在且有效
-   * @param {number} user_id - 用户ID
-   * @returns {boolean} 是否有效
+   * 🛡️ 检查用户是否为管理员 - 使用UUID角色系统
    */
-  async validate_user (user_id) {
+  async isAdmin (userId) {
     try {
-      const user = await models.User.findOne({
-        where: { id: user_id }
-      })
-      return !!user
+      const userRoles = await getUserRoles(userId)
+      return userRoles.isAdmin
     } catch (error) {
-      this.logger.error('验证用户失败', { user_id, error: error.message })
+      console.error('检查管理员权限失败:', error)
       return false
     }
   }
 
   /**
-   * 检查用户是否有足够积分
-   * @param {number} user_id - 用户ID
-   * @param {number} required_points - 需要的积分
-   * @returns {boolean} 是否有足够积分
+   * 🛡️ 检查用户权限 - 使用UUID角色系统
    */
-  async check_user_points (user_id, required_points) {
+  async hasPermission (userId, resource, action = 'read') {
     try {
-      const points_info = await this.get_user_points(user_id)
-      return points_info.available_points >= required_points
+      const user = await User.findByPk(userId)
+      if (!user) return false
+
+      return await user.hasPermission(resource, action)
     } catch (error) {
-      this.logger.error('检查用户积分失败', { user_id, required_points, error: error.message })
+      console.error('检查用户权限失败:', error)
       return false
+    }
+  }
+
+  /**
+   * 🛡️ 获取用户角色信息 - 使用UUID角色系统
+   */
+  async getUserRoles (userId) {
+    try {
+      return await getUserRoles(userId)
+    } catch (error) {
+      console.error('获取用户角色失败:', error)
+      return { roles: [], isAdmin: false }
+    }
+  }
+
+  /**
+   * 批量获取用户信息
+   */
+  async getBatchUserInfo (userIds) {
+    try {
+      const users = await User.findAll({
+        where: { id: userIds },
+        attributes: ['id', 'phone', 'nickname', 'avatar', 'created_at', 'updated_at', 'status'],
+        include: [{
+          model: Role,
+          as: 'roles',
+          where: { is_active: true },
+          through: { where: { is_active: true } },
+          required: false,
+          attributes: ['role_uuid', 'role_name', 'role_level']
+        }]
+      })
+
+      // 🛡️ 为每个用户计算权限
+      const result = []
+      for (const user of users) {
+        const userRoles = await getUserRoles(user.id)
+        result.push({
+          id: user.id,
+          phone: user.phone,
+          nickname: user.nickname,
+          avatar: user.avatar,
+          status: user.status,
+          is_admin: userRoles.isAdmin, // 🛡️ 基于角色计算
+          roles: userRoles.roles,
+          created_at: user.created_at,
+          updated_at: user.updated_at
+        })
+      }
+
+      return result
+    } catch (error) {
+      console.error('批量获取用户信息失败:', error)
+      throw error
+    }
+  }
+
+  /**
+   * 🛡️ 验证用户状态和权限
+   */
+  async validateUserAccess (userId, requiredPermission = null) {
+    try {
+      const user = await User.findByPk(userId)
+
+      if (!user) {
+        return { valid: false, reason: 'USER_NOT_FOUND' }
+      }
+
+      if (user.status !== 'active') {
+        return { valid: false, reason: 'USER_INACTIVE' }
+      }
+
+      if (requiredPermission) {
+        const hasPermission = await this.hasPermission(userId, requiredPermission.resource, requiredPermission.action)
+        if (!hasPermission) {
+          return { valid: false, reason: 'PERMISSION_DENIED' }
+        }
+      }
+
+      return { valid: true, user }
+    } catch (error) {
+      console.error('验证用户访问权限失败:', error)
+      return { valid: false, reason: 'VALIDATION_ERROR' }
     }
   }
 }

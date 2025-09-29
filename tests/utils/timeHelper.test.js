@@ -12,8 +12,9 @@ describe('TimeHelper工具类测试', () => {
   })
 
   test('应该正确格式化时间', () => {
-    const formatted = timeHelper.format(new Date())
+    const formatted = timeHelper.formatChinese(new Date())
     expect(formatted).toBeDefined()
     expect(typeof formatted).toBe('string')
+    expect(formatted).toContain('年')
   })
 })

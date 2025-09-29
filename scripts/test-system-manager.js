@@ -6,7 +6,7 @@
  */
 
 require('dotenv').config()
-const UnifiedSystemManager = require('./core/UnifiedSystemManager')
+const UnifiedSystemManager = require('../modules/UnifiedSystemManager')
 
 async function testSystemManager () {
   console.log('=== 测试V4系统管理模块 ===')

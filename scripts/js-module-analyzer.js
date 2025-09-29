@@ -6,7 +6,7 @@
  * @date 2025-01-21
  */
 
-const fs = require('fs')
+const fs = require('fs').promises
 const path = require('path')
 
 class JSModuleAnalyzer {
@@ -16,8 +16,16 @@ class JSModuleAnalyzer {
     this.duplicates = new Map()
     this.functionalGroups = new Map()
     this.skipDirectories = new Set([
-      'node_modules', '.git', 'coverage', 'logs', 'reports',
-      'backups', 'backup', '.vscode', '.cursor', '.husky'
+      'node_modules',
+      '.git',
+      'coverage',
+      'logs',
+      'reports',
+      'backups',
+      'backup',
+      '.vscode',
+      '.cursor',
+      '.husky'
     ])
 
     // 🆕 扩展：Mock数据检测配置
@@ -35,7 +43,7 @@ class JSModuleAnalyzer {
     // 🆕 扩展：V3兼容代码检测配置
     this.v3CompatPatterns = [
       /\/\*\*.*?V3.*?\*\//gi,
-      /\/\/.*?V3.*$/gmi,
+      /\/\/.*?V3.*$/gim,
       /_v3|v3_/gi,
       /legacy.*?support/gi,
       /backward.*?compatibility/gi
@@ -272,7 +280,7 @@ class JSModuleAnalyzer {
     const deps = new Set()
 
     // 外部模块依赖
-    const requires = content.match(/require\(['"`]([^'"`\.][^'"`]+)['"`]\)/g)
+    const requires = content.match(/require\(['"`]([^'"`]+)['"`]\)/g)
     if (requires) {
       requires.forEach(r => {
         const dep = r.match(/['"`]([^'"`]+)['"`]/)[1]
@@ -289,7 +297,7 @@ class JSModuleAnalyzer {
    * 分类模块
    */
   categorizeModules () {
-    for (const [path, module] of this.modules) {
+    for (const [_path, module] of this.modules) {
       const category = module.category
 
       if (!this.functionalGroups.has(category)) {
@@ -309,7 +317,7 @@ class JSModuleAnalyzer {
     // 按功能用途分组检测
     const purposeGroups = new Map()
 
-    for (const [path, module] of this.modules) {
+    for (const [_path, module] of this.modules) {
       module.purpose.forEach(purpose => {
         if (!purposeGroups.has(purpose)) {
           purposeGroups.set(purpose, [])
@@ -338,7 +346,8 @@ class JSModuleAnalyzer {
     for (let i = 0; i < modules.length; i++) {
       for (let j = i + 1; j < modules.length; j++) {
         const similarity = this.calculateSimilarity(modules[i], modules[j])
-        if (similarity > 0.3) { // 30%相似度阈值
+        if (similarity > 0.3) {
+          // 30%相似度阈值
           similar.push({
             modules: [modules[i], modules[j]],
             similarity,
@@ -359,7 +368,8 @@ class JSModuleAnalyzer {
 
     // 用途相似度
     const commonPurposes = module1.purpose.filter(p => module2.purpose.includes(p))
-    score += (commonPurposes.length / Math.max(module1.purpose.length, module2.purpose.length)) * 0.4
+    score +=
+      (commonPurposes.length / Math.max(module1.purpose.length, module2.purpose.length)) * 0.4
 
     // 导出相似度
     const commonExports = module1.exports.filter(e => module2.exports.includes(e))
@@ -367,7 +377,8 @@ class JSModuleAnalyzer {
 
     // 函数名相似度
     const commonFunctions = module1.functions.filter(f => module2.functions.includes(f))
-    score += (commonFunctions.length / Math.max(module1.functions.length, module2.functions.length)) * 0.3
+    score +=
+      (commonFunctions.length / Math.max(module1.functions.length, module2.functions.length)) * 0.3
 
     return score
   }
@@ -417,10 +428,14 @@ class JSModuleAnalyzer {
       modules.forEach(module => {
         const sizeKB = (module.size / 1024).toFixed(1)
         const complexity = module.complexity.score
-        console.log(`    - ${module.relativePath} (${sizeKB}KB, ${module.lines}行, 复杂度:${complexity})`)
+        console.log(
+          `    - ${module.relativePath} (${sizeKB}KB, ${module.lines}行, 复杂度:${complexity})`
+        )
         console.log(`      用途: ${module.purpose.join(', ')}`)
         if (module.exports.length > 0) {
-          console.log(`      导出: ${module.exports.slice(0, 3).join(', ')}${module.exports.length > 3 ? '...' : ''}`)
+          console.log(
+            `      导出: ${module.exports.slice(0, 3).join(', ')}${module.exports.length > 3 ? '...' : ''}`
+          )
         }
       })
     }
@@ -468,7 +483,7 @@ class JSModuleAnalyzer {
 
         // 排序：优先保留更大、更复杂的文件
         const sortedModules = group.modules.sort((a, b) => {
-          return (b.complexity.score + b.size / 1024) - (a.complexity.score + a.size / 1024)
+          return b.complexity.score + b.size / 1024 - (a.complexity.score + a.size / 1024)
         })
 
         const keepFile = sortedModules[0]
@@ -497,14 +512,12 @@ class JSModuleAnalyzer {
 
     const mockFiles = []
     for (const [filePath, moduleInfo] of this.modules) {
-      const hasMockData = this.mockDataPatterns.some(pattern =>
-        pattern.test(moduleInfo.content)
-      )
+      const hasMockData = this.mockDataPatterns.some(pattern => pattern.test(moduleInfo.content))
 
       if (hasMockData) {
-        const mockMatches = this.mockDataPatterns.map(pattern =>
-          (moduleInfo.content.match(pattern) || []).length
-        ).reduce((a, b) => a + b, 0)
+        const mockMatches = this.mockDataPatterns
+          .map(pattern => (moduleInfo.content.match(pattern) || []).length)
+          .reduce((a, b) => a + b, 0)
 
         mockFiles.push({
           path: filePath,
@@ -527,14 +540,12 @@ class JSModuleAnalyzer {
 
     const v3Files = []
     for (const [filePath, moduleInfo] of this.modules) {
-      const hasV3Code = this.v3CompatPatterns.some(pattern =>
-        pattern.test(moduleInfo.content)
-      )
+      const hasV3Code = this.v3CompatPatterns.some(pattern => pattern.test(moduleInfo.content))
 
       if (hasV3Code) {
-        const v3Matches = this.v3CompatPatterns.map(pattern =>
-          (moduleInfo.content.match(pattern) || []).length
-        ).reduce((a, b) => a + b, 0)
+        const v3Matches = this.v3CompatPatterns
+          .map(pattern => (moduleInfo.content.match(pattern) || []).length)
+          .reduce((a, b) => a + b, 0)
 
         v3Files.push({
           path: filePath,
@@ -625,7 +636,8 @@ class JSModuleAnalyzer {
 // 执行分析
 if (require.main === module) {
   const analyzer = new JSModuleAnalyzer()
-  analyzer.analyzeAllModules()
+  analyzer
+    .analyzeAllModules()
     .then(() => {
       console.log('\n🎉 JS模块分析完成！')
       console.log('💡 请根据分析报告进行模块整理和优化')

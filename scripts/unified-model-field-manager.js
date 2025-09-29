@@ -26,8 +26,8 @@
 require('dotenv').config()
 const { sequelize } = require('../models')
 const models = require('../models')
-const fs = require('fs')
-const path = require('path')
+const _fs = require('fs')
+const _path = require('path')
 
 class UnifiedModelFieldManager {
   constructor (options = {}) {

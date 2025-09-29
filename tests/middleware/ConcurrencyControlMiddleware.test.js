@@ -18,7 +18,7 @@ describe('ConcurrencyControlMiddleware 中间件测试 - 真实业务逻辑', ()
     middleware = new ConcurrencyControlMiddleware()
   })
 
-  afterEach(async () => {
+  afterAll(async () => {
     // 清理测试后的并发状态
     if (middleware && middleware.cleanup) {
       await middleware.cleanup()
@@ -67,6 +67,10 @@ describe('ConcurrencyControlMiddleware 中间件测试 - 真实业务逻辑', ()
         json: function (data) {
           this.jsonData = data
           return this
+        },
+        on: function (_event, _callback) {
+          // Mock EventEmitter方法
+          return this
         }
       }
       let nextCalled = false
@@ -93,6 +97,10 @@ describe('ConcurrencyControlMiddleware 中间件测试 - 真实业务逻辑', ()
         },
         json: function (data) {
           this.jsonData = data
+          return this
+        },
+        on: function (_event, _callback) {
+          // Mock EventEmitter方法
           return this
         }
       })
@@ -133,18 +141,20 @@ describe('ConcurrencyControlMiddleware 中间件测试 - 真实业务逻辑', ()
       const ttl = 1000 // 1秒
 
       const lockAcquired = await middleware.lockManager.acquireLock(lockKey, ttl)
-      expect(lockAcquired).toBe(true)
+      expect(lockAcquired).toBeTruthy()
+      expect(lockAcquired.resource).toBe('test_resource')
 
       // 尝试再次获取相同的锁应该失败
       const secondLock = await middleware.lockManager.acquireLock(lockKey, ttl)
-      expect(secondLock).toBe(false)
+      expect(secondLock).toBeFalsy()
 
       // 释放锁
       await middleware.lockManager.releaseLock(lockKey)
 
       // 释放后应该能再次获取
       const thirdLock = await middleware.lockManager.acquireLock(lockKey, ttl)
-      expect(thirdLock).toBe(true)
+      expect(thirdLock).toBeTruthy()
+      expect(thirdLock.resource).toBe('test_resource')
 
       // 清理
       await middleware.lockManager.releaseLock(lockKey)
@@ -155,7 +165,8 @@ describe('ConcurrencyControlMiddleware 中间件测试 - 真实业务逻辑', ()
       const ttl = 100 // 100ms
 
       const lockAcquired = await middleware.lockManager.acquireLock(lockKey, ttl)
-      expect(lockAcquired).toBe(true)
+      expect(lockAcquired).toBeTruthy()
+      expect(lockAcquired.resource).toBe('test_expiry')
 
       // 等待锁过期
       await new Promise(resolve => {
@@ -164,7 +175,8 @@ describe('ConcurrencyControlMiddleware 中间件测试 - 真实业务逻辑', ()
 
       // 锁过期后应该能再次获取
       const secondLock = await middleware.lockManager.acquireLock(lockKey, ttl)
-      expect(secondLock).toBe(true)
+      expect(secondLock).toBeTruthy()
+      expect(secondLock.resource).toBe('test_expiry')
 
       // 清理
       await middleware.lockManager.releaseLock(lockKey)
@@ -185,6 +197,10 @@ describe('ConcurrencyControlMiddleware 中间件测试 - 真实业务逻辑', ()
         },
         json: function (data) {
           this.jsonData = data
+          return this
+        },
+        on: function (_event, _callback) {
+          // Mock EventEmitter方法
           return this
         }
       }

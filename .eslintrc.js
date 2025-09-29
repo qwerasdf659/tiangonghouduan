@@ -75,9 +75,11 @@ module.exports = {
       files: ['tests/**/*.js', '**/*.test.js', '**/*.spec.js'],
       rules: {
         // 测试文件中禁止的模式
-        'no-console': 'warn', // 测试中允许console但建议使用专门的断言
-        'max-len': ['warn', { code: 120 }], // 测试描述可以较长
-        'no-magic-numbers': 'off' // 测试中允许魔术数字
+        'no-console': 'off', // 测试中允许console用于调试
+        'max-len': 'off', // 测试描述可以较长
+        'no-magic-numbers': 'off', // 测试中允许魔术数字
+        'no-await-in-loop': 'off', // 测试中允许循环中的await
+        'no-promise-executor-return': 'off' // 测试中允许Promise executor返回值
       }
     },
     {

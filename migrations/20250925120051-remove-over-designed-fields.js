@@ -2,7 +2,7 @@
 
 /** @type {import('sequelize-cli').Migration} */
 module.exports = {
-  async up (queryInterface, Sequelize) {
+  async up (_queryInterface, _Sequelize) {
     /**
      * Add altering commands here.
      *
@@ -11,7 +11,7 @@ module.exports = {
      */
   },
 
-  async down (queryInterface, Sequelize) {
+  async down (_queryInterface, _Sequelize) {
     /**
      * Add reverting commands here.
      *

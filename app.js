@@ -27,7 +27,7 @@ const appLogger = Logger.create('Application')
 
 // 🔧 导入API响应统一中间件 - 解决API格式不一致问题
 const ApiResponse = require('./utils/ApiResponse')
-const ApiStandardManager = require('./utils/ApiStandardManager')
+// const ApiStandardManager = require('./utils/ApiStandardManager') // 已合并到ApiResponse中，删除冗余引用
 
 // 确保Node.js使用北京时间
 appLogger.info('应用启动', {
@@ -38,6 +38,9 @@ appLogger.info('应用启动', {
 
 // 初始化Express应用
 const app = express()
+
+// 🔧 信任代理配置 - Sealos部署环境必需
+app.set('trust proxy', true)
 
 // 🔧 安全中间件
 app.use(
@@ -53,14 +56,38 @@ app.use(
   })
 )
 
-// 🔧 CORS配置
+// 🔧 CORS配置 - 支持微信小程序跨域访问
 app.use(
   cors({
-    origin: process.env.ALLOWED_ORIGINS
-      ? process.env.ALLOWED_ORIGINS.split(',')
-      : ['http://localhost:3000', 'http://localhost:8080'],
+    origin: function (origin, callback) {
+      // 允许的源列表
+      const allowedOrigins = process.env.ALLOWED_ORIGINS
+        ? process.env.ALLOWED_ORIGINS.split(',')
+        : [
+          'http://localhost:3000',
+          'http://localhost:8080',
+          'https://omqktqrtntnn.sealosbja.site'
+        ]
+
+      // 微信小程序请求没有origin，允许通过
+      if (!origin) return callback(null, true)
+
+      // 检查是否在允许列表中
+      if (allowedOrigins.indexOf(origin) !== -1) {
+        callback(null, true)
+      } else {
+        // 允许微信小程序域名
+        if (origin.includes('servicewechat.com') || origin.includes('weixin.qq.com')) {
+          callback(null, true)
+        } else {
+          callback(new Error('Not allowed by CORS'))
+        }
+      }
+    },
     credentials: true,
-    optionsSuccessStatus: 200
+    optionsSuccessStatus: 200,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
   })
 )
 
@@ -135,7 +162,7 @@ app.get('/health', async (req, res) => {
         status: 'healthy',
         version: '4.0.0',
         architecture: 'V4 Unified Lottery Engine',
-        timestamp: BeijingTimeHelper.apiTimestamp(), // 🕐 北京时间API时间戳
+        timestamp: BeijingTimeHelper.apiTimestamp(), // �� 北京时间API时间戳
         systems: {
           database: databaseStatus,
           redis: redisStatus,
@@ -187,7 +214,7 @@ app.get('/api/v4', (req, res) => {
         name: 'UnifiedLotteryEngine',
         version: '4.0.0',
         strategies: [
-          'BasicGuaranteeStrategy - 基础抽奖保底策略',
+          'BasicGuaranteeStrategy - 基础抽奖保底策略, ManagementStrategy - 管理策略',
           'ManagementStrategy - 管理抽奖策略'
         ],
         core: {
@@ -226,7 +253,7 @@ app.get('/api/v4/docs', (req, res) => {
           'POST /api/v4/unified-engine/lottery/validate': '验证抽奖条件'
         },
         strategies: [
-          'BasicGuaranteeStrategy - 基础抽奖保底策略',
+          'BasicGuaranteeStrategy - 基础抽奖保底策略, ManagementStrategy - 管理策略',
           'ManagementStrategy - 管理抽奖策略'
         ]
       },
@@ -348,6 +375,10 @@ try {
   app.use('/api/v4/photo', require('./routes/v4/unified-engine/photo'))
   appLogger.info('V4图片上传管理系统加载成功', { route: '/api/v4/photo' })
 
+  // V4积分管理路由
+  app.use('/api/v4/unified-engine/points', require('./routes/v4/unified-engine/points'))
+  appLogger.info('V4积分管理系统加载成功', { route: '/api/v4/unified-engine/points' })
+
   appLogger.info('统一决策引擎V4.0架构已完全启用', { message: '所有旧版API已弃用' })
 } catch (error) {
   appLogger.error('V4统一决策引擎加载失败', { error: error.message, stack: error.stack })
@@ -384,8 +415,8 @@ app.use('*', (req, res) => {
 })
 
 // 🔧 API标准化中间件 - 统一所有API响应格式
-const apiStandardManager = new ApiStandardManager()
-app.use(apiStandardManager.createStandardizationMiddleware())
+// const apiStandardManager = new ApiStandardManager() // 已合并到ApiResponse中，删除冗余引用
+// app.use(apiStandardManager.createStandardizationMiddleware())
 
 // 🔧 全局错误处理
 app.use((error, req, res, _next) => {
@@ -441,6 +472,8 @@ const HOST = process.env.HOST || '0.0.0.0'
 
 if (require.main === module) {
   app.listen(PORT, HOST, async () => {
+    console.log('🔄 [DEBUG] 服务器启动监听完成')
+
     // 初始化Service层
     try {
       const models = require('./models')

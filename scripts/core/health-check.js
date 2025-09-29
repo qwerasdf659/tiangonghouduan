@@ -224,7 +224,7 @@ class SystemHealthChecker {
     try {
       const [userResult] = await sequelize.query(`
         SELECT
-          user_id, mobile, status, is_admin,
+          user_id, mobile, status,
           CONVERT_TZ(created_at, '+00:00', '+08:00') as created_at_bj,
           CONVERT_TZ(last_login, '+00:00', '+08:00') as last_login_bj
         FROM users
@@ -246,24 +246,41 @@ class SystemHealthChecker {
           }
         )
 
+        // 检查用户角色（使用UUID角色系统）
+        const [roleResult] = await sequelize.query(`
+          SELECT r.role_level, r.role_name
+          FROM user_roles ur
+          JOIN roles r ON ur.role_id = r.id
+          WHERE ur.user_id = ? AND ur.is_active = 1 AND r.is_active = 1
+          ORDER BY r.role_level DESC
+          LIMIT 1
+        `, {
+          replacements: [user.user_id]
+        })
+
+        const isAdmin = roleResult.length > 0 && roleResult[0].role_level >= 100
+
         this.results.testAccount = {
           status: 'healthy',
           details: {
             exists: true,
             userId: user.user_id,
             mobile: user.mobile,
-            isAdmin: user.is_admin === 1,
+            isAdmin,
             status: user.status,
             createdAt: user.created_at_bj,
             lastLogin: user.last_login_bj,
-            points: pointsResult.length > 0 ? pointsResult[0] : null
+            points: pointsResult.length > 0 ? pointsResult[0] : null,
+            roleLevel: roleResult.length > 0 ? roleResult[0].role_level : 0,
+            roleName: roleResult.length > 0 ? roleResult[0].role_name : 'user'
           }
         }
 
         console.log('  ✅ 测试账号存在')
         console.log(`  👤 用户ID: ${user.user_id}`)
         console.log(`  🏷️ 状态: ${user.status}`)
-        console.log(`  👑 管理员权限: ${user.is_admin === 1 ? '是' : '否'}`)
+        console.log(`  👑 管理员权限: ${isAdmin ? '是' : '否'}`)
+        console.log(`  🎭 角色: ${roleResult.length > 0 ? roleResult[0].role_name : 'user'}`)
         console.log(`  📅 创建时间: ${user.created_at_bj}`)
         if (pointsResult.length > 0) {
           console.log(`  💰 可用积分: ${pointsResult[0].available_points}`)

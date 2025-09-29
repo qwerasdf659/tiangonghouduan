@@ -1,7 +1,7 @@
 /**
- * 餐厅积分抽奖系统 V4.0 - 模型统一导出（V14.1合并优化版）
+ * 餐厅积分抽奖系统 V4.0 - 模型统一导出（V15.0 UUID角色系统版）
  * 清理了无效的模型引用，只保留实际存在的模型
- * V14.1更新：ImageResources和UploadReview合并为统一资源管理模型
+ * V15.0更新：集成UUID角色系统，移除is_admin字段依赖
  */
 
 const { Sequelize, DataTypes } = require('sequelize')
@@ -12,7 +12,10 @@ const models = {}
 
 // 🔴 导入所有实际存在的数据模型
 models.User = require('./User')(sequelize, DataTypes)
-// V4.1优化：AdminUser模型已删除，权限管理简化到User.is_admin字段
+// V15.0新增：UUID角色系统模型
+models.Role = require('./Role')(sequelize, DataTypes)
+models.UserRole = require('./UserRole')(sequelize, DataTypes)
+
 models.UserSession = require('./UserSession')(sequelize, DataTypes)
 // ✅ LoginLog模型已删除 - 过度设计，改用User.last_login字段统计活跃用户 - 2025年09月22日
 
@@ -74,9 +77,9 @@ models.sequelize = sequelize
 models.Sequelize = Sequelize
 
 console.log(
-  '✅ V14.1 Models loaded:',
+  '✅ V15.0 Models loaded:',
   Object.keys(models).filter(key => key !== 'sequelize' && key !== 'Sequelize').length,
-  'models (ImageResources+UploadReview合并优化后)'
+  'models (UUID角色系统集成版)'
 )
 
 module.exports = models

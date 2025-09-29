@@ -6,29 +6,30 @@
  * 测试覆盖：
  * 1. 抽奖业务规则验证
  * 2. 积分计算逻辑验证
- * 3. VIP等级业务规则
- * 4. 数据一致性验证
- * 5. 业务约束检查
- * 6. 异常处理验证
+ * 3. 数据一致性验证
+ * 4. 业务约束检查
+ * 5. 异常处理验证
  */
+
+/* eslint-disable no-console */
 
 const UnifiedAPITestManager = require('../api/UnifiedAPITestManager')
 
 // 辅助函数
-async function getUserPoints (tester, userId) {
+async function getUserPoints (tester, user_id) {
   const response = await tester.makeAuthenticatedRequest(
     'GET',
-    `/api/v4/unified-engine/points/balance/${userId}`,
+    `/api/v4/unified-engine/points/balance/${user_id}`,
     null,
     'regular'
   )
   return response.status === 200 ? response.data.data?.available_points || 0 : 0
 }
 
-async function getUserInventory (tester, userId) {
+async function getUserInventory (tester, user_id) {
   const response = await tester.makeAuthenticatedRequest(
     'GET',
-    `/api/v4/unified-engine/user/inventory/${userId}`,
+    `/api/v4/unified-engine/user/inventory/${user_id}`,
     null,
     'regular'
   )
@@ -45,25 +46,22 @@ async function getAvailableCampaign (tester) {
   return null
 }
 
-function calculateVIPLevel (points) {
-  if (points >= 10000) return 'DIAMOND'
-  if (points >= 5000) return 'GOLD'
-  if (points >= 1000) return 'SILVER'
-  return 'BRONZE'
-}
+// 已移除calculateVIPLevel函数 - VIP功能已废弃
 
 describe('🧮 核心业务逻辑测试', () => {
   let tester
-  let testUserId
+  let test_user_id
   let _initialUserData
 
   beforeAll(async () => {
     tester = new UnifiedAPITestManager()
-    await new Promise(resolve => setTimeout(resolve, 3000))
+    await new Promise(resolve => {
+      setTimeout(resolve, 3000)
+    })
 
     // 获取测试用户数据
     const userData = await tester.authenticateUser('regular')
-    testUserId = userData.user.user_id
+    test_user_id = userData.user.user_id
     _initialUserData = userData.user
 
     // 确保管理员权限
@@ -92,12 +90,12 @@ describe('🧮 核心业务逻辑测试', () => {
       }
 
       const campaign = campaignsResponse.data.data[0]
-      const campaignId = campaign.campaign_id
+      const campaign_id = campaign.campaign_id
 
       // 获取今日抽奖记录
       const historyResponse = await tester.makeAuthenticatedRequest(
         'GET',
-        `/api/v4/unified-engine/lottery/history/${testUserId}`,
+        `/api/v4/unified-engine/lottery/history/${test_user_id}`,
         null,
         'regular'
       )
@@ -124,7 +122,7 @@ describe('🧮 核心业务逻辑测试', () => {
         const drawResponse = await tester.makeAuthenticatedRequest(
           'POST',
           '/api/v4/unified-engine/lottery/draw',
-          { campaign_id: campaignId, draw_type: 'single' },
+          { campaign_id, draw_type: 'single' },
           'regular'
         )
 
@@ -150,21 +148,21 @@ describe('🧮 核心业务逻辑测试', () => {
       console.log(`📊 抽奖所需积分: ${requiredPoints}`)
 
       // 🎯 使用积分不足的用户进行测试（用户ID 39，0积分）
-      const lowPointsUserId = 39
-      const currentPoints = await getUserPoints(tester, lowPointsUserId)
-      console.log(`📊 测试用户(${lowPointsUserId})积分余额: ${currentPoints}`)
+      const low_points_user_id = 39
+      const currentPoints = await getUserPoints(tester, low_points_user_id)
+      console.log(`📊 测试用户(${low_points_user_id})积分余额: ${currentPoints}`)
 
       if (currentPoints < requiredPoints) {
         // 积分不足，应该拒绝抽奖
         console.log('🔍 发送请求: POST /api/v4/unified-engine/lottery/draw')
         console.log(
-          `📋 请求数据: user_id=${lowPointsUserId}, campaign_id=${campaign.campaign_id}, draw_count=1`
+          `📋 请求数据: user_id=${low_points_user_id}, campaign_id=${campaign.campaign_id}, draw_count=1`
         )
 
         const drawResponse = await tester.makeAuthenticatedRequest(
           'POST',
           '/api/v4/unified-engine/lottery/draw',
-          { user_id: lowPointsUserId, campaign_id: campaign.campaign_id, draw_count: 1 },
+          { user_id: low_points_user_id, campaign_id: campaign.campaign_id, draw_count: 1 },
           'regular'
         )
 
@@ -186,8 +184,8 @@ describe('🧮 核心业务逻辑测试', () => {
       console.log('📋 测试抽奖成功后的数据一致性...')
 
       // 获取抽奖前状态
-      const beforePoints = await getUserPoints(tester, testUserId)
-      const beforeInventory = await getUserInventory(tester, testUserId)
+      const beforePoints = await getUserPoints(tester, test_user_id)
+      const beforeInventory = await getUserInventory(tester, test_user_id)
 
       // 获取可用活动
       const campaign = await getAvailableCampaign(tester)
@@ -214,11 +212,13 @@ describe('🧮 核心业务逻辑测试', () => {
         console.log('🎯 抽奖执行成功，验证数据一致性...')
 
         // 等待数据处理
-        await new Promise(resolve => setTimeout(resolve, 2000))
+        await new Promise(resolve => {
+          setTimeout(resolve, 2000)
+        })
 
         // 获取抽奖后状态
-        const afterPoints = await getUserPoints(tester, testUserId)
-        const afterInventory = await getUserInventory(tester, testUserId)
+        const afterPoints = await getUserPoints(tester, test_user_id)
+        const afterInventory = await getUserInventory(tester, test_user_id)
 
         // 验证积分正确扣除
         const expectedPointsAfter = beforePoints - (campaign.points_cost || 50)
@@ -228,7 +228,7 @@ describe('🧮 核心业务逻辑测试', () => {
         // 验证抽奖记录存在
         const historyResponse = await tester.makeAuthenticatedRequest(
           'GET',
-          `/api/v4/unified-engine/lottery/history/${testUserId}`,
+          `/api/v4/unified-engine/lottery/history/${test_user_id}`,
           null,
           'regular'
         )
@@ -242,8 +242,8 @@ describe('🧮 核心业务逻辑测试', () => {
 
         // 如果中奖，验证奖品发放
         if (drawResponse.data.data?.prize_id) {
-          const prizeId = drawResponse.data.data.prize_id
-          console.log(`🎁 中奖奖品ID: ${prizeId}`)
+          const prize_id = drawResponse.data.data.prize_id
+          console.log(`🎁 中奖奖品ID: ${prize_id}`)
 
           // 验证用户库存增加
           const inventoryIncrease = afterInventory.length - beforeInventory.length
@@ -272,8 +272,8 @@ describe('🧮 核心业务逻辑测试', () => {
           'POST',
           '/api/v4/unified-engine/lottery/execute',
           {
-            userId: testUserId,
-            campaignId: campaign.campaign_id,
+            user_id: test_user_id,
+            campaign_id: campaign.campaign_id,
             strategy: 'basic',
             drawType: 'single'
           },
@@ -296,7 +296,7 @@ describe('🧮 核心业务逻辑测试', () => {
           // ✅ 验证数据库记录使用is_winner字段
           const historyResponse = await tester.makeAuthenticatedRequest(
             'GET',
-            `/api/v4/unified-engine/lottery/history/${testUserId}`,
+            `/api/v4/unified-engine/lottery/history/${test_user_id}`,
             null,
             'regular'
           )
@@ -322,7 +322,7 @@ describe('🧮 核心业务逻辑测试', () => {
         // 获取多条抽奖历史记录验证业务语义
         const historyResponse = await tester.makeAuthenticatedRequest(
           'GET',
-          `/api/v4/unified-engine/lottery/history/${testUserId}`,
+          `/api/v4/unified-engine/lottery/history/${test_user_id}`,
           null,
           'regular'
         )
@@ -363,7 +363,7 @@ describe('🧮 核心业务逻辑测试', () => {
         // ✅ 验证积分交易记录的is_successful字段
         const pointsResponse = await tester.makeAuthenticatedRequest(
           'GET',
-          `/api/v4/unified-engine/points/transactions/${testUserId}`,
+          `/api/v4/unified-engine/points/transactions/${test_user_id}`,
           null,
           'regular'
         )
@@ -384,7 +384,7 @@ describe('🧮 核心业务逻辑测试', () => {
         }
 
         // ✅ 验证用户库存(兑换记录)的is_successful概念
-        const inventoryResponse = await getUserInventory(tester, testUserId)
+        const inventoryResponse = await getUserInventory(tester, test_user_id)
         if (inventoryResponse.length > 0) {
           console.log(`📊 检查${inventoryResponse.length}条库存物品的状态语义`)
 
@@ -406,81 +406,20 @@ describe('🧮 核心业务逻辑测试', () => {
     })
   })
 
-  describe('💎 VIP等级业务规则验证', () => {
-    test('✅ VIP等级计算规则验证', async () => {
-      console.log('📋 测试VIP等级计算业务规则...')
-
-      // 获取用户VIP状态
-      const vipResponse = await tester.makeAuthenticatedRequest(
-        'GET',
-        `/api/v4/unified-engine/vip/status/${testUserId}`,
-        null,
-        'regular'
-      )
-
-      if (vipResponse.status !== 200) {
-        console.log('⚠️ 跳过测试：无法获取VIP状态')
-        return
-      }
-
-      const vipData = vipResponse.data.data
-      console.log(`📊 当前VIP等级: ${vipData.level}, 积分: ${vipData.points}`)
-
-      // 验证VIP等级计算规则
-      const expectedLevel = calculateVIPLevel(vipData.points)
-
-      // VIP等级应该与积分匹配
-      if (expectedLevel !== vipData.level) {
-        console.log(`⚠️ VIP等级不匹配: 实际${vipData.level}, 预期${expectedLevel}`)
-      } else {
-        console.log('✅ VIP等级计算正确')
-      }
-
-      // 验证下一等级所需积分
-      if (vipData.nextLevel) {
-        const nextLevelPoints = vipData.nextLevel.required_points
-        expect(nextLevelPoints).toBeGreaterThan(vipData.points)
-        console.log(`📈 升级需要积分: ${nextLevelPoints - vipData.points}`)
-      }
-    })
-
-    test('🎁 VIP权益验证', async () => {
-      console.log('📋 测试VIP权益业务规则...')
-
-      // 获取VIP权益列表
-      const benefitsResponse = await tester.makeRequest(
-        'GET',
-        '/api/v4/unified-engine/vip/benefits'
-      )
-
-      if (benefitsResponse.status === 200) {
-        const benefits = benefitsResponse.data.data
-        console.log(`📋 可用VIP权益数: ${benefits.length}`)
-
-        // 验证权益结构
-        benefits.forEach(benefit => {
-          expect(benefit).toHaveProperty('type')
-          expect(benefit).toHaveProperty('level_required')
-          expect(benefit).toHaveProperty('description')
-        })
-
-        console.log('✅ VIP权益结构验证通过')
-      }
-    })
-  })
+  // 💎 VIP等级业务规则验证 - 已废弃功能，移除相关测试代码
 
   describe('🔢 积分计算逻辑验证', () => {
     test('➕ 积分获得计算规则', async () => {
       console.log('📋 测试积分获得计算规则...')
 
       // 🎯 使用明确存在的用户ID进行积分获得测试
-      const pointsTestUserId = 39 // 使用积分较少的用户进行测试
-      const initialPoints = await getUserPoints(tester, pointsTestUserId)
+      const points_test_user_id = 39 // 使用积分较少的用户进行测试
+      const initialPoints = await getUserPoints(tester, points_test_user_id)
       console.log(`📊 初始积分: ${initialPoints}`)
 
       // 模拟积分获得操作（如完成任务）
       const earnData = {
-        user_id: pointsTestUserId,
+        user_id: points_test_user_id,
         points: 100,
         reason: '业务逻辑测试-完成任务',
         operation: 'add'
@@ -498,9 +437,11 @@ describe('🧮 核心业务逻辑测试', () => {
 
       if (earnResponse.status === 200) {
         // 等待积分处理
-        await new Promise(resolve => setTimeout(resolve, 1000))
+        await new Promise(resolve => {
+          setTimeout(resolve, 1000)
+        })
 
-        const finalPoints = await getUserPoints(tester, testUserId)
+        const finalPoints = await getUserPoints(tester, test_user_id)
         const pointsIncrease = finalPoints - initialPoints
 
         // 验证积分正确增加
@@ -514,7 +455,7 @@ describe('🧮 核心业务逻辑测试', () => {
     test('➖ 积分消费计算规则', async () => {
       console.log('📋 测试积分消费计算规则...')
 
-      const initialPoints = await getUserPoints(tester, testUserId)
+      const initialPoints = await getUserPoints(tester, test_user_id)
 
       if (initialPoints < 50) {
         console.log('⚠️ 跳过测试：积分余额不足')
@@ -536,9 +477,11 @@ describe('🧮 核心业务逻辑测试', () => {
       )
 
       if (spendResponse.status === 200) {
-        await new Promise(resolve => setTimeout(resolve, 1000))
+        await new Promise(resolve => {
+          setTimeout(resolve, 1000)
+        })
 
-        const finalPoints = await getUserPoints(tester, testUserId)
+        const finalPoints = await getUserPoints(tester, test_user_id)
         const pointsDecrease = initialPoints - finalPoints
 
         // 验证积分正确扣除
@@ -620,7 +563,7 @@ describe('🧮 核心业务逻辑测试', () => {
     test('⚡ 并发操作数据一致性', async () => {
       console.log('📋 测试并发操作数据一致性...')
 
-      const initialPoints = await getUserPoints(tester, testUserId)
+      const initialPoints = await getUserPoints(tester, test_user_id)
 
       if (initialPoints < 100) {
         console.log('⚠️ 跳过测试：积分余额不足并发测试')
@@ -640,8 +583,10 @@ describe('🧮 核心业务逻辑测试', () => {
       const results = await Promise.all(spendPromises)
       const successCount = results.filter(r => r.status === 200).length
 
-      await new Promise(resolve => setTimeout(resolve, 2000))
-      const finalPoints = await getUserPoints(tester, testUserId)
+      await new Promise(resolve => {
+        setTimeout(resolve, 2000)
+      })
+      const finalPoints = await getUserPoints(tester, test_user_id)
 
       // 验证最终积分是否正确
       const expectedDeduction = successCount * 10
@@ -669,7 +614,7 @@ describe('🧮 核心业务逻辑测试', () => {
       console.log('='.repeat(60))
       console.log('🎯 业务逻辑覆盖:')
       console.log('   ✅ 抽奖业务规则验证')
-      console.log('   ✅ VIP等级计算验证')
+      console.log('   ✅ 权限系统验证')
       console.log('   ✅ 积分计算逻辑验证')
       console.log('   ✅ 业务约束检查')
       console.log('   ✅ 数据一致性验证')

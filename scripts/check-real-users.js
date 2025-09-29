@@ -1,25 +1,43 @@
 #!/usr/bin/env node
 
 /**
- * 真实用户查看工具
- * 帮助用户查看数据库中的真实用户，选择合适的测试账户
- *
- * 使用方法：
- * node scripts/check-real-users.js
- *
- * @version 4.0.0
- * @date 2025-01-21
+ * 真实用户数据检查脚本
+ * 真实用户查看工具 - V4.0 统一架构版本
+ * 🛡️ 基于UUID角色系统的用户数据分析
+ * 创建时间：2025年01月21日
  */
 
-const { User, UserPointsAccount, LotteryCampaign } = require('../models')
+const { User, UserPointsAccount, LotteryCampaign, Role } = require('../models')
+
+/**
+ * 🛡️ 检查用户是否有管理员角色
+ * @param {Object} user - 用户对象
+ * @returns {boolean} 是否为管理员
+ */
+function hasAdminRole (user) {
+  // 兼容性检查：如果用户对象包含roles信息
+  if (user.roles && Array.isArray(user.roles)) {
+    return user.roles.some(role => role.role_name === 'admin' && role.role_level >= 100)
+  }
+
+  // 向后兼容：如果仍有is_admin字段
+  return user.is_admin === 1 || user.is_admin === true
+}
 
 async function checkRealUsers () {
   try {
     console.log('🔍 查看数据库中的真实用户信息...\n')
 
-    // 1. 查看所有用户概览
+    // 1. 查看所有用户概览（包含角色信息）
     const allUsers = await User.findAll({
-      attributes: ['user_id', 'mobile', 'nickname', 'status', 'is_admin', 'created_at'],
+      attributes: ['user_id', 'mobile', 'nickname', 'status', 'created_at'],
+      include: [{
+        model: Role,
+        as: 'roles',
+        through: { where: { is_active: true } },
+        attributes: ['role_name', 'role_level'],
+        required: false
+      }],
       order: [['created_at', 'DESC']],
       limit: 20 // 只显示最近20个用户
     })
@@ -27,7 +45,7 @@ async function checkRealUsers () {
     console.log('👥 最近注册的用户 (前20个):')
     console.log('=====================================')
     allUsers.forEach((user, index) => {
-      const roleIcon = user.is_admin ? '👑' : '👤'
+      const roleIcon = hasAdminRole(user) ? '👑' : '👤'
       const statusIcon = user.status === 'active' ? '✅' : '❌'
       const createdDate = new Date(user.created_at).toISOString().slice(0, 10)
       console.log(
@@ -93,7 +111,7 @@ async function checkRealUsers () {
     })
 
     campaigns.forEach((campaign, index) => {
-      const statusIcon = campaign.status === 'active' ? '🟢' : '🔴'
+      const statusIcon = campaign.status === 'active' ? '🟢' : '��'
       console.log(
         `${index + 1}.  ${statusIcon} ID: ${campaign.campaign_id} | 名称: ${campaign.campaign_name} | 状态: ${campaign.status}`
       )
@@ -109,10 +127,11 @@ async function checkRealUsers () {
     console.log('=====================================')
 
     if (allUsers.length >= 2) {
-      const suggestedUser1 = allUsers.find(u => !u.is_admin) || allUsers[0]
+      // 🛡️ 基于UUID角色系统查找用户
+      const suggestedUser1 = allUsers.find(u => !hasAdminRole(u)) || allUsers[0]
       const suggestedUser2 =
-        allUsers.find(u => !u.is_admin && u.user_id !== suggestedUser1.user_id) || allUsers[1]
-      const suggestedAdmin = adminUsers.length > 0 ? adminUsers[0] : allUsers.find(u => u.is_admin)
+        allUsers.find(u => !hasAdminRole(u) && u.user_id !== suggestedUser1.user_id) || allUsers[1]
+      const suggestedAdmin = adminUsers.length > 0 ? adminUsers[0] : allUsers.find(u => hasAdminRole(u))
 
       console.log('📋 推荐的测试用户配置:')
 
@@ -133,7 +152,7 @@ async function checkRealUsers () {
           `   管理员用户: ${suggestedAdmin.mobile} (ID: ${suggestedAdmin.user_id}, 昵称: ${suggestedAdmin.nickname})`
         )
       } else {
-        console.log('   ⚠️ 未找到管理员用户，建议将其中一个用户设置为管理员 (is_admin=1)')
+        console.log('   ⚠️ 未找到管理员用户，建议使用角色系统分配admin角色')
       }
 
       console.log('\n🔧 配置方法:')

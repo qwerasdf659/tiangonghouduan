@@ -13,13 +13,13 @@
  */
 
 const { getDatabaseHelper } = require('../utils/database')
-const ApiStandardManager = require('../utils/ApiStandardManager')
+const ApiResponse = require('../utils/ApiResponse') // 使用合并后的ApiResponse
 const BeijingTimeHelper = require('../utils/timeHelper')
 
 class BusinessStandardsFixer {
   constructor () {
     this.db = getDatabaseHelper()
-    this.apiManager = new ApiStandardManager()
+    // this.apiManager = new ApiStandardManager() // 已合并到ApiResponse中，不再需要实例
     this.fixResults = {
       businessStatus: [],
       foreignKeys: [],
@@ -167,7 +167,7 @@ class BusinessStandardsFixer {
 
         // 模拟状态数据验证
         const testData = this.generateTestStatusData(validation.context)
-        const validationResult = this.apiManager.validateBusinessStatus(
+        const validationResult = ApiResponse.validateBusinessStatus(
           testData,
           validation.context
         )

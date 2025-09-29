@@ -52,7 +52,7 @@ class ModelAssociationManager {
     return {
       User: {
         hasMany: [
-          { model: 'LotteryRecord', foreignKey: 'user_id', as: 'lotteryRecords' },
+          { model: 'LotteryDraw', foreignKey: 'user_id', as: 'lotteryDraws' },
           { model: 'PrizeDistribution', foreignKey: 'user_id', as: 'prizeDistributions' },
           { model: 'PointsTransaction', foreignKey: 'user_id', as: 'pointsTransactions' },
           { model: 'UserInventory', foreignKey: 'user_id', as: 'inventory' }
@@ -61,7 +61,7 @@ class ModelAssociationManager {
         hasOne: [{ model: 'UserPointsAccount', foreignKey: 'user_id', as: 'pointsAccount' }],
         belongsTo: []
       },
-      LotteryRecord: {
+      LotteryDraw: {
         hasMany: [
           {
             model: 'PrizeDistribution',
@@ -84,7 +84,7 @@ class ModelAssociationManager {
       },
       LotteryPrize: {
         hasMany: [
-          { model: 'LotteryRecord', foreignKey: 'prize_id', as: 'lotteryRecords' },
+          { model: 'LotteryDraw', foreignKey: 'prize_id', as: 'lotteryDraws' },
           { model: 'PrizeDistribution', foreignKey: 'prize_id', as: 'distributions' }
         ],
         hasOne: [],
@@ -94,10 +94,10 @@ class ModelAssociationManager {
         hasMany: [
           { model: 'LotteryPrize', foreignKey: 'campaign_id', as: 'prizes' },
           {
-            model: 'LotteryRecord',
+            model: 'LotteryDraw',
             foreignKey: 'lottery_id',
             sourceKey: 'campaign_id',
-            as: 'lotteryRecords'
+            as: 'lotteryDraws'
           }
         ],
         hasOne: [],
@@ -109,10 +109,10 @@ class ModelAssociationManager {
         belongsTo: [
           { model: 'User', foreignKey: 'user_id', as: 'user' },
           {
-            model: 'LotteryRecord',
+            model: 'LotteryDraw',
             foreignKey: 'draw_id',
             targetKey: 'draw_id',
-            as: 'lotteryRecord'
+            as: 'lotteryDraw'
           },
           { model: 'LotteryPrize', foreignKey: 'prize_id', as: 'prize' }
         ]
@@ -243,7 +243,6 @@ class ModelAssociationManager {
       `models/${modelName.charAt(0).toLowerCase() + modelName.slice(1)}.js`
     ]
 
-    // TODO: 性能优化 - 考虑使用Promise.all并发执行
     // 🚀 性能优化：并发执行替代循环中await
     const validPaths = await Promise.all(
       possiblePaths.map(async filePath => {
@@ -524,7 +523,6 @@ class ModelAssociationManager {
     logger.info('🔧 开始自动修复关联关系...')
     let fixedCount = 0
 
-    // TODO: 性能优化 - 考虑使用Promise.all并发执行
     // 🚀 性能优化：并发执行替代循环中await
     await Promise.all(
       suggestions.map(async suggestion => {

@@ -222,4 +222,4 @@ class ThumbnailService {
   }
 }
 
-module.exports = new ThumbnailService()
+module.exports = ThumbnailService

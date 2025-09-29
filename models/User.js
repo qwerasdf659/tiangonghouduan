@@ -1,17 +1,17 @@
 /**
- * 用户信息管理模型 - V4.2最终版本
- * 合并AdminUser功能，保留核心字段，专注抽奖业务需求
- * 创建时间：2025年01月28日
- * 最终优化时间：2025年09月21日 20:26:04 UTC - 按需求保留7个核心字段
- *
- * 🔧 V4.2最终优化内容：
- * ⭐⭐⭐⭐⭐ 核心字段（6个）：
+ * 用户信息管理模型 - V4.0 统一架构版本
+ * 🛡️ 完全基于UUID角色系统的用户权限管理
+ * 🗑️ 移除is_admin字段依赖，使用roles表关联
+ * 
+ * 🔧 V4.0 UUID角色系统优化内容：
+ * ⭐⭐⭐⭐⭐ 核心字段（5个）：
  * - user_id: 核心主键，必需，极高优先级
  * - mobile: 唯一标识+登录，必需，极高优先级
  * - consecutive_fail_count: 保底机制核心，必需，高优先级
-  * - history_total_points: 臻选空间解锁，必需，高优先级
- * - is_admin: 权限控制，必需，高优先级
+ * - history_total_points: 臻选空间解锁，必需，高优先级
  * - nickname: 用户昵称，可选，中优先级
+ *
+ * 🛡️ 权限管理：通过UUID角色系统实现，替代is_admin字段
  */
 
 const { DataTypes } = require('sequelize')
@@ -51,13 +51,6 @@ module.exports = sequelize => {
         comment: '历史累计总积分（臻选空间解锁条件）'
       },
 
-      // ⭐⭐⭐⭐ 权限控制 - 必需，高优先级
-      is_admin: {
-        type: DataTypes.BOOLEAN,
-        defaultValue: false,
-        comment: '是否管理员 - 统一权限控制'
-      },
-
       // 用户昵称 - 可选，中优先级
       nickname: {
         type: DataTypes.STRING(50),
@@ -65,9 +58,7 @@ module.exports = sequelize => {
         comment: '用户昵称'
       },
 
-      // 🗑️ password_hash 字段已删除 - 使用手机号验证码登录，不需要密码哈希 - 2025年01月21日
-
-      // 🗑️ pool_access_level 字段已删除 - 数据库中不存在此字段，简化奖池访问控制 - 2025年01月21日
+      // 🗑️ is_admin 字段已删除 - 使用UUID角色系统替代 - 2025年01月21日
 
       // 🔧 保留的业务辅助字段
       status: {
@@ -100,7 +91,7 @@ module.exports = sequelize => {
           fields: ['mobile']
         },
         {
-          fields: ['status', 'is_admin']
+          fields: ['status']
         },
         {
           fields: ['history_total_points']
@@ -115,6 +106,14 @@ module.exports = sequelize => {
 
   // 定义关联关系
   User.associate = function (models) {
+    // 🛡️ UUID角色系统关联 - 用户与角色的多对多关系
+    User.belongsToMany(models.Role, {
+      through: models.UserRole,
+      foreignKey: 'user_id',
+      otherKey: 'role_id',
+      as: 'roles'
+    })
+
     // 用户上传的图片资源
     User.hasMany(models.ImageResources, {
       foreignKey: 'user_id',
@@ -153,8 +152,6 @@ module.exports = sequelize => {
       })
     }
 
-    // 🗑️ 用户的业务事件关联已删除 - BusinessEvent模型已删除 - 2025年01月21日
-
     // 用户的行为分析
     if (models.AnalyticsBehavior) {
       User.hasMany(models.AnalyticsBehavior, {
@@ -170,10 +167,6 @@ module.exports = sequelize => {
         as: 'profile'
       })
     }
-
-    // 💾 关联关系优化 - 必要的关联关系，支持联查需求
-    // ⚠️ 注意：仅保留核心业务需要的关联，避免过度复杂化
-    // 💡 pointsAccount关联已在前面定义（第139-143行），此处不重复定义
 
     // 用户会话
     if (models.UserSession) {
@@ -199,8 +192,6 @@ module.exports = sequelize => {
       })
     }
 
-    // 用户任务模型已删除 - UserTask与抽奖系统无关
-
     // VIP等级关联
     if (models.VipLevel) {
       User.belongsTo(models.VipLevel, {
@@ -210,25 +201,68 @@ module.exports = sequelize => {
     }
   }
 
-  // 🔥 实例方法 - V4.1优化版本的简化权限检查
-  User.prototype.isAdmin = function () {
-    return this.is_admin === true || this.is_admin === 1
+  // 🛡️ UUID角色系统方法 - 替代原有的is_admin检查
+  User.prototype.hasRole = async function (roleName) {
+    const userRoles = await this.getRoles({
+      where: { is_active: true },
+      include: [{
+        model: sequelize.models.Role,
+        where: { role_name: roleName, is_active: true }
+      }]
+    })
+    return userRoles.length > 0
   }
 
-  User.prototype.canAccess = function (resource) {
-    // 简单权限检查逻辑，替代复杂的AdminUser权限系统
+  User.prototype.hasPermission = async function (resource, action = 'read') {
+    const userRoles = await this.getRoles({
+      where: { is_active: true },
+      include: [{
+        model: sequelize.models.Role,
+        where: { is_active: true }
+      }]
+    })
+
+    for (const userRole of userRoles) {
+      const role = userRole.Role
+
+      // 超级管理员拥有所有权限
+      if (role.role_level >= 100) return true
+
+      // 检查具体权限
+      const permissions = role.permissions || {}
+      if (permissions['*'] && permissions['*'].includes('*')) return true
+      if (permissions[resource] &&
+          (permissions[resource].includes(action) || permissions[resource].includes('*'))) {
+        return true
+      }
+    }
+
+    return false
+  }
+
+  User.prototype.isAdmin = async function () {
+    return await this.hasRole('admin')
+  }
+
+  User.prototype.canAccess = async function (resource) {
+    // 检查用户状态
+    if (this.status !== 'active') return false
+
+    // 管理员资源需要admin角色
     const adminResources = ['admin', 'statistics', 'management', 'users']
     if (adminResources.includes(resource)) {
-      return this.isAdmin()
+      return await this.hasRole('admin')
     }
-    return this.status === 'active'
+
+    // 普通资源只需要活跃状态
+    return true
   }
 
   User.prototype.isActive = function () {
     return this.status === 'active'
   }
 
-  // 🔥 类方法 - 常用查询方法
+  // 🔥 类方法 - 常用查询方法（更新为UUID角色系统）
   User.findByMobile = function (mobile) {
     return this.findOne({
       where: { mobile, status: 'active' }
@@ -237,7 +271,13 @@ module.exports = sequelize => {
 
   User.findAdmins = function () {
     return this.findAll({
-      where: { is_admin: true, status: 'active' }
+      where: { status: 'active' },
+      include: [{
+        model: sequelize.models.Role,
+        as: 'roles',
+        where: { role_name: 'admin', is_active: true },
+        through: { where: { is_active: true } }
+      }]
     })
   }
 
@@ -245,6 +285,20 @@ module.exports = sequelize => {
     return this.findAll({
       where: { status: 'active' },
       order: [['last_login', 'DESC']],
+      limit
+    })
+  }
+
+  // 🛡️ 根据角色查找用户
+  User.findByRole = function (roleName, limit = 50) {
+    return this.findAll({
+      where: { status: 'active' },
+      include: [{
+        model: sequelize.models.Role,
+        as: 'roles',
+        where: { role_name: roleName, is_active: true },
+        through: { where: { is_active: true } }
+      }],
       limit
     })
   }

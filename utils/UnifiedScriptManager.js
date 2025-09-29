@@ -91,9 +91,8 @@ class UnifiedScriptManager {
 
       // 关键策略权重
       strategyWeights: {
-        'BasicLotteryStrategy.js': 0.4,
-        'GuaranteeStrategy.js': 0.3,
-        'ManagementStrategy.js': 0.3
+        'BasicGuaranteeStrategy.js': 0.7, // 基础抽奖+保底策略
+        'ManagementStrategy.js': 0.3 // 管理策略
       }
     }
 
@@ -646,22 +645,10 @@ class UnifiedScriptManager {
       }
 
       // 解析策略覆盖率
-      if (line.includes('BasicLotteryStrategy.js')) {
+      if (line.includes('BasicGuaranteeStrategy.js')) {
         const match = line.match(/(\d+\.?\d*)/g)
         if (match && match.length >= 4) {
-          coverageData.strategies.BasicLotteryStrategy = {
-            statements: parseFloat(match[0]),
-            branches: parseFloat(match[1]),
-            functions: parseFloat(match[2]),
-            lines: parseFloat(match[3])
-          }
-        }
-      }
-
-      if (line.includes('GuaranteeStrategy.js')) {
-        const match = line.match(/(\d+\.?\d*)/g)
-        if (match && match.length >= 4) {
-          coverageData.strategies.GuaranteeStrategy = {
+          coverageData.strategies.BasicGuaranteeStrategy = {
             statements: parseFloat(match[0]),
             branches: parseFloat(match[1]),
             functions: parseFloat(match[2]),

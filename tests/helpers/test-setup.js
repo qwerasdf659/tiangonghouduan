@@ -22,8 +22,10 @@ if (!process.env.DB_HOST) {
   process.env.DB_NAME = process.env.DB_NAME || 'restaurant_points_dev'
 }
 
-// 🔧 设置测试超时时间
-jest.setTimeout(30000)
+// 🔧 设置测试超时时间（仅在jest环境中）
+if (typeof jest !== 'undefined') {
+  jest.setTimeout(30000)
+}
 
 // 🔧 禁用Redis连接（测试环境可选）
 process.env.DISABLE_REDIS = 'false' // 启用Redis，因为我们有真实的Redis
@@ -101,7 +103,7 @@ class TestAssertions {
       },
       // 策略名称
       strategy_names: {
-        correct: ['BasicLotteryStrategy', 'GuaranteeStrategy', 'ManagementStrategy'],
+        correct: ['BasicGuaranteeStrategy', 'ManagementStrategy'],
         incorrect: ['basic', 'guarantee', 'management'],
         message: '策略名称应使用完整类名，不应降低测试标准'
       }
@@ -277,18 +279,18 @@ const TestConfig = {
     // ✅ 统一测试用户信息 - 使用13612227930测试账号
     testUser: {
       mobile: '13612227930', // 统一测试用户手机号
-      userId: 31 // 统一测试用户ID (需要从数据库确认)
+      user_id: 31 // 统一测试用户ID (需要从数据库确认)
     },
 
     // ✅ 统一管理员信息 - 同一账号既是用户也是管理员
     adminUser: {
       mobile: '13612227930', // 统一管理员手机号
-      userId: 31 // 统一管理员用户ID (需要从数据库确认)
+      user_id: 31 // 统一管理员用户ID (需要从数据库确认)
     },
 
     // ✅ 测试活动信息 - 使用主体功能文档中的活动
     testCampaign: {
-      campaignId: 2, // 默认测试活动ID (餐厅积分抽奖)
+      campaign_id: 2, // 默认测试活动ID (餐厅积分抽奖)
       campaignName: '餐厅积分抽奖活动' // 测试活动名称
     }
   },

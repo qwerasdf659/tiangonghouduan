@@ -9,8 +9,8 @@
 
 // V4 核心服务
 const UnifiedLotteryEngine = require('./UnifiedLotteryEngine/UnifiedLotteryEngine')
-const UserInventoryService = require('./UserInventoryService')
-const PhotoUploadService = require('./PhotoUploadService')
+// const UserInventoryService = require('./UserInventoryService') // TODO: 待实现
+// const PhotoUploadService = require('./PhotoUploadService') // TODO: 待实现
 const ThumbnailService = require('./ThumbnailService')
 
 // V4 模块化服务
@@ -41,8 +41,8 @@ class ServiceManager {
       this._services.set('unifiedLotteryEngine', new UnifiedLotteryEngine(this.models))
 
       // 注册其他核心服务
-      this._services.set('userInventory', new UserInventoryService(this.models))
-      this._services.set('photoUpload', new PhotoUploadService(this.models))
+      // this._services.set('userInventory', new UserInventoryService(this.models)) // TODO: 待实现
+      // this._services.set('photoUpload', new PhotoUploadService(this.models)) // TODO: 待实现
       this._services.set('thumbnail', new ThumbnailService(this.models))
 
       // 注册模块化抽奖服务容器
@@ -153,4 +153,30 @@ class ServiceManager {
 // 创建单例实例
 const serviceManager = new ServiceManager()
 
+/**
+ * 初始化服务并返回服务容器
+ * @param {Object} _models - 数据库模型
+ * @returns {Object} 服务容器
+ */
+function initializeServices (_models) {
+  const container = {
+    // 提供getService方法来获取服务
+    getService: (serviceName) => serviceManager.getService(serviceName),
+
+    // 提供getAllServices方法
+    getAllServices: () => serviceManager._services,
+
+    // 提供服务健康状态
+    getHealthStatus: () => serviceManager.getHealthStatus()
+  }
+
+  // 异步初始化
+  serviceManager.initialize().catch(error => {
+    console.error('服务管理器初始化失败:', error)
+  })
+
+  return container
+}
+
 module.exports = serviceManager
+module.exports.initializeServices = initializeServices

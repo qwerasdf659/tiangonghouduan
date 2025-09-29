@@ -1,12 +1,10 @@
 /**
- * 测试账号统一管理工具 V4
- * 🎯 目标：固定测试账号13612227930，防止被意外修改
- * 🔐 核心：建立不可变的测试配置保护机制
- * 📊 数据驱动：基于真实数据库验证的配置
- * 创建时间：2025年01月21日 北京时间
+ * 测试账号管理器 - V4.0 统一架构版本
+ * 🛡️ 使用UUID角色系统替代is_admin字段
+ * 创建时间：2025年01月21日
+ * 更新时间：2025年01月28日
  */
 
-const { getDatabaseHelper } = require('./database')
 const BeijingTimeHelper = require('./timeHelper')
 
 class TestAccountManager {
@@ -15,21 +13,21 @@ class TestAccountManager {
       return TestAccountManager.instance
     }
 
-    this.db = getDatabaseHelper()
-
     // 🔒 不可变的测试账号配置
     this.IMMUTABLE_TEST_CONFIG = Object.freeze({
       MAIN_TEST_ACCOUNT: Object.freeze({
         mobile: '13612227930',
         user_id: 31,
         verification_code: '123456',
-        is_admin: true,
+        role_name: 'admin',
+        role_level: 100,
+        is_admin: true, // 保持兼容性
         available_points: 393580,
-        description: '主要测试账号 - 用户和管理员双重身份',
+        description: '主要测试账号 - 超级管理员身份',
         created_by: 'USER_SPECIFICATION',
         verification_date: '2025-01-21',
         data_source: 'DATABASE_VERIFIED',
-        // 🎯 V4新增：测试权限配置
+        // 🎯 V5新增：简化的测试权限配置
         test_privileges: Object.freeze({
           unlimited_lottery: true, // 无限次抽奖
           bypass_daily_limit: true, // 绕过每日限制
@@ -47,14 +45,16 @@ class TestAccountManager {
       VALIDATION_REQUIREMENTS: Object.freeze({
         mobile: '13612227930',
         user_id: 31,
-        is_admin: true,
+        role_name: 'admin',
+        role_level: 100,
+        is_admin: true, // 保持兼容性
         min_points: 1000,
         status: 'active'
       }),
 
-      VERSION: '1.0.0',
+      VERSION: '4.0.0',
       LAST_UPDATED: BeijingTimeHelper.nowLocale(),
-      CHECKSUM: 'test_account_13612227930_user_31'
+      CHECKSUM: 'test_account_13612227930_user_31_admin'
     })
 
     TestAccountManager.instance = this

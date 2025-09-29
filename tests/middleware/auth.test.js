@@ -1,32 +1,36 @@
 /**
- * auth 中间件测试套件
- * 🔧 V4版本 - 使用真实数据替代mock，测试实际业务逻辑
- * 更新时间：2025年09月23日 22:43:20 UTC
+ * auth 中间件测试套件 - V4.0 统一架构版本
+ * 🛡️ 测试UUID角色系统的认证中间件功能
+ * 创建时间：2025年01月21日
+ * 更新时间：2025年01月28日
  */
 
 const { authenticateToken, generateTokens, requireAdmin } = require('../../middleware/auth.js')
 const jwt = require('jsonwebtoken')
 
-describe('auth 中间件测试 - 真实业务逻辑', () => {
+describe('auth 中间件测试 - UUID角色系统', () => {
   let validUser, adminUser, validToken, _adminToken
 
-  beforeAll(() => {
-    // 真实的测试用户数据
+  beforeAll(async () => {
+    // 真实的测试用户数据（基于UUID角色系统）
     validUser = {
       user_id: 13612227930,
       mobile: '13612227930',
-      is_admin: false
+      status: 'active'
     }
 
     adminUser = {
       user_id: 13612227930,
       mobile: '13612227930',
-      is_admin: true
+      status: 'active'
     }
 
     // 生成真实的JWT token
-    validToken = generateTokens(validUser).accessToken
-    _adminToken = generateTokens(adminUser).accessToken // 备用管理员token
+    const userTokens = await generateTokens(validUser)
+    const adminTokens = await generateTokens(adminUser)
+
+    validToken = userTokens.access_token
+    _adminToken = adminTokens.access_token
   })
 
   describe('🔐 JWT Token验证测试', () => {

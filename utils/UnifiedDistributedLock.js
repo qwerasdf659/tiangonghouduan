@@ -136,7 +136,10 @@ class UnifiedDistributedLock {
       const success = result === 1
 
       if (success) {
-        lock.expiresAt = Date.now() + extendTTL
+        // 原子操作：直接计算新的过期时间
+        const newExpiresAt = Date.now() + extendTTL
+        // eslint-disable-next-line require-atomic-updates
+        lock.expiresAt = newExpiresAt
         console.log(`[UnifiedDistributedLock] 成功续期锁: ${lock.resource}, 延长${extendTTL}ms`)
       } else {
         console.warn(`[UnifiedDistributedLock] 续期锁失败，锁可能已过期: ${lock.resource}`)
@@ -367,7 +370,9 @@ class UnifiedDistributedLock {
    * @returns {Promise<void>}
    */
   sleep (ms) {
-    return new Promise(resolve => setTimeout(resolve, ms))
+    return new Promise(resolve => {
+      setTimeout(resolve, ms)
+    })
   }
 
   /**
@@ -413,6 +418,21 @@ class UnifiedDistributedLock {
     } catch (error) {
       console.error('[UnifiedDistributedLock] 获取统计信息异常:', error)
       throw error
+    }
+  }
+
+  /**
+   * 🧹 断开连接和清理资源
+   */
+  async disconnect () {
+    try {
+      console.log('[UnifiedDistributedLock] 正在断开连接...')
+      if (this.redis && typeof this.redis.disconnect === 'function') {
+        await this.redis.disconnect()
+      }
+      console.log('[UnifiedDistributedLock] 连接已断开')
+    } catch (error) {
+      console.warn('[UnifiedDistributedLock] 断开连接异常:', error.message)
     }
   }
 }

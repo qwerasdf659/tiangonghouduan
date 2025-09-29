@@ -1,10 +1,11 @@
 /**
  * 餐厅积分抽奖系统 - 统一数据库配置
  * 🔴 统一配置架构 - 完全从环境变量读取，消除硬编码
- * 🕐 时区设置：北京时间 (UTC+8) - 适用于中国区域
+ * 🕐 时区设置：全系统统一使用北京时间 (UTC+8)
  *
  * 配置统一架构：
  * .env (主配置源) → config/database.js (读取.env) → 应用使用
+ * 更新时间：2025年09月29日 北京时间
  */
 
 const { Sequelize } = require('sequelize')
@@ -18,7 +19,7 @@ const dbConfig = {
   password: process.env.DB_PASSWORD,
   database: process.env.DB_NAME,
   dialect: 'mysql',
-  timezone: process.env.DB_TIMEZONE || '+08:00',
+  timezone: '+08:00', // 全系统统一使用北京时间
   logging: process.env.NODE_ENV === 'development' ? console.log : false,
   pool: {
     max: 50, // 🚀 提升最大连接数以支持高并发

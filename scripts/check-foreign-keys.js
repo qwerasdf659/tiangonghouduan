@@ -12,18 +12,17 @@
  * - 业务逻辑外键关系验证
  * - 性能索引分析
  * - 自动修复SQL生成
+ *
+ * 更新时间：2025年09月29日 UTC时间 - 使用统一数据库连接
  */
 
 require('dotenv').config()
-const { Sequelize } = require('sequelize')
+const { getDatabaseHelper } = require('../utils/database')
 const BeijingTimeHelper = require('../utils/timeHelper')
 
-const sequelize = new Sequelize(process.env.DB_NAME, process.env.DB_USER, process.env.DB_PASSWORD, {
-  host: process.env.DB_HOST,
-  port: process.env.DB_PORT,
-  dialect: 'mysql',
-  logging: false
-})
+// 使用统一数据库助手
+const dbHelper = getDatabaseHelper()
+const sequelize = dbHelper.getSequelize()
 
 /**
  * 🎯 业务关键外键关系定义（基于真实业务需求）
@@ -399,7 +398,7 @@ async function checkForeignKeyConstraints () {
     console.error('❌ 外键检查失败:', error.message)
     console.error('🔍 详细错误:', error.stack)
   } finally {
-    await sequelize.close()
+    // 关闭数据库连接由dbHelper管理
   }
 }
 

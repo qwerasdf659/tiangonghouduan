@@ -1,10 +1,7 @@
 /**
- * Jest测试质量报告器
- * 自动检测"测试适配错误实现"问题
- * 基于现有TestAssertions扩展，不重复创建功能
+ * 测试质量报告器
+ * 用于生成测试执行报告和质量分析
  */
-
-const { TestAssertions } = require('./test-setup')
 
 class TestQualityReporter {
   constructor (globalConfig, options) {

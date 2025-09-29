@@ -68,7 +68,7 @@ class V4SystemCleanup {
       console.log('🔍 检查抽奖策略配置...')
 
       // 实际策略架构: BasicGuaranteeStrategy + ManagementStrategy
-      const actualStrategies = ['basic_guarantee', 'management']
+      const _actualStrategies = ['basic_guarantee', 'management']
 
       // 1. 更新configure-lottery-strategies.js
       const configPath = 'scripts/configure-lottery-strategies.js'
@@ -131,7 +131,7 @@ class V4SystemCleanup {
       const filesToClean = []
 
       // 扫描需要清理的文件
-      const scanDirectory = (dir) => {
+      const scanDirectory = dir => {
         const items = fs.readdirSync(dir)
 
         for (const item of items) {
@@ -151,7 +151,7 @@ class V4SystemCleanup {
                 const matches = content.match(pattern)
                 if (matches) {
                   // 排除13612227930（这是真实测试用户）
-                  return !matches.some(match => content.includes('13612227930'))
+                  return !matches.some(_match => content.includes('13612227930'))
                 }
                 return false
               })
@@ -350,7 +350,8 @@ class V4SystemCleanup {
 // 运行清理脚本
 if (require.main === module) {
   const cleanup = new V4SystemCleanup()
-  cleanup.runCompleteCleanup()
+  cleanup
+    .runCompleteCleanup()
     .then(() => {
       console.log('\n🎉 V4系统清理脚本执行完成!')
       process.exit(0)

@@ -8,7 +8,7 @@
  */
 
 const LotteryStrategy = require('../core/LotteryStrategy')
-const { LotteryRecord, UserPointsAccount } = require('../../../models')
+const { LotteryDraw, UserPointsAccount } = require('../../../models')
 const moment = require('moment-timezone')
 // 🎯 V4新增：集成测试账号权限管理
 const { hasTestPrivilege } = require('../../../utils/TestAccountManager')
@@ -70,7 +70,7 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
 
       // 验证今日抽奖次数是否超限
       const today = moment().tz('Asia/Shanghai').startOf('day').toDate()
-      const todayDrawCount = await LotteryRecord.count({
+      const todayDrawCount = await LotteryDraw.count({
         where: {
           user_id,
           campaign_id,
@@ -413,7 +413,7 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
     try {
       const models = require('../../../models')
 
-      const totalDraws = await models.LotteryRecord.count({
+      const totalDraws = await models.LotteryDraw.count({
         where: {
           user_id: userId,
           campaign_id: campaignId
@@ -483,7 +483,7 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
       })
 
       // 4. 创建抽奖记录
-      const lotteryRecord = await models.LotteryRecord.create(
+      const lotteryRecord = await models.LotteryDraw.create(
         {
           draw_id: `draw_${Date.now()}_${userId}_${Math.random().toString(36).substr(2, 6)}`,
           user_id: userId,
@@ -594,7 +594,7 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
 
       // 调用其他验证逻辑（排除积分检查，避免重复）
       const today = moment().tz('Asia/Shanghai').startOf('day').toDate()
-      const todayDrawCount = await LotteryRecord.count({
+      const todayDrawCount = await LotteryDraw.count({
         where: {
           user_id,
           campaign_id,
@@ -887,7 +887,7 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
     // ✅ 统一业务标准：使用snake_case参数解构
     const { user_id, campaign_id } = context
 
-    await LotteryRecord.create({
+    await LotteryDraw.create({
       draw_id: `draw_${Date.now()}_${user_id}_${Math.random().toString(36).substr(2, 6)}`,
       user_id,
       lottery_id: campaign_id,

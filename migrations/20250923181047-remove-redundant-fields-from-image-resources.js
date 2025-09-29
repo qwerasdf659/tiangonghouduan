@@ -8,7 +8,7 @@
  */
 
 module.exports = {
-  async up (queryInterface, Sequelize) {
+  async up (queryInterface, _Sequelize) {
     const transaction = await queryInterface.sequelize.transaction()
 
     try {
@@ -134,7 +134,7 @@ module.exports = {
     }
   },
 
-  async down (queryInterface, Sequelize) {
+  async down (queryInterface, _Sequelize) {
     const transaction = await queryInterface.sequelize.transaction()
 
     try {
@@ -145,72 +145,72 @@ module.exports = {
 
       // 1. 恢复时间管理字段
       await queryInterface.addColumn('image_resources', 'updated_at', {
-        type: Sequelize.DATE,
-        defaultValue: Sequelize.NOW,
+        type: _Sequelize.DATE,
+        defaultValue: _Sequelize.NOW,
         allowNull: false,
         comment: '更新时间'
       }, { transaction })
 
       await queryInterface.addColumn('image_resources', 'deleted_at', {
-        type: Sequelize.DATE,
+        type: _Sequelize.DATE,
         allowNull: true,
         comment: '软删除时间'
       }, { transaction })
 
       // 2. 恢复客户端追踪字段
       await queryInterface.addColumn('image_resources', 'client_info', {
-        type: Sequelize.STRING(200),
+        type: _Sequelize.STRING(200),
         allowNull: true,
         comment: '客户端信息'
       }, { transaction })
 
       // 3. 恢复审核相关字段
       await queryInterface.addColumn('image_resources', 'actual_amount', {
-        type: Sequelize.DECIMAL(10, 2),
+        type: _Sequelize.DECIMAL(10, 2),
         allowNull: true,
         comment: '实际金额'
       }, { transaction })
 
       await queryInterface.addColumn('image_resources', 'consumption_amount', {
-        type: Sequelize.DECIMAL(10, 2),
+        type: _Sequelize.DECIMAL(10, 2),
         allowNull: true,
         comment: '消费金额（用于上传审核）'
       }, { transaction })
 
       await queryInterface.addColumn('image_resources', 'auto_review', {
-        type: Sequelize.BOOLEAN,
+        type: _Sequelize.BOOLEAN,
         defaultValue: false,
         allowNull: false,
         comment: '是否自动审核'
       }, { transaction })
 
       await queryInterface.addColumn('image_resources', 'reject_reason', {
-        type: Sequelize.ENUM('inappropriate', 'duplicate', 'quality', 'spam', 'other'),
+        type: _Sequelize.ENUM('inappropriate', 'duplicate', 'quality', 'spam', 'other'),
         allowNull: true,
         comment: '拒绝原因'
       }, { transaction })
 
       // 4. 恢复统计字段
       await queryInterface.addColumn('image_resources', 'metadata', {
-        type: Sequelize.JSON,
+        type: _Sequelize.JSON,
         allowNull: true,
         comment: '扩展元数据：颜色、标签、GPS等'
       }, { transaction })
 
       await queryInterface.addColumn('image_resources', 'dimensions', {
-        type: Sequelize.JSON,
+        type: _Sequelize.JSON,
         allowNull: true,
         comment: '图片尺寸：{width: 1920, height: 1080}'
       }, { transaction })
 
       await queryInterface.addColumn('image_resources', 'last_accessed_at', {
-        type: Sequelize.DATE,
+        type: _Sequelize.DATE,
         allowNull: true,
         comment: '最后访问时间'
       }, { transaction })
 
       await queryInterface.addColumn('image_resources', 'access_count', {
-        type: Sequelize.INTEGER,
+        type: _Sequelize.INTEGER,
         defaultValue: 0,
         allowNull: false,
         comment: '访问次数'
@@ -218,20 +218,20 @@ module.exports = {
 
       // 5. 恢复兼容性字段
       await queryInterface.addColumn('image_resources', 'image_type', {
-        type: Sequelize.ENUM('photo', 'document', 'other'),
+        type: _Sequelize.ENUM('photo', 'document', 'other'),
         allowNull: true,
         defaultValue: 'photo',
         comment: '图片类型'
       }, { transaction })
 
       await queryInterface.addColumn('image_resources', 'file_hash', {
-        type: Sequelize.STRING(64),
+        type: _Sequelize.STRING(64),
         allowNull: true,
         comment: '文件哈希值（防重复上传）'
       }, { transaction })
 
       await queryInterface.addColumn('image_resources', 'upload_user_id', {
-        type: Sequelize.INTEGER,
+        type: _Sequelize.INTEGER,
         allowNull: true,
         comment: '上传用户ID（兼容字段）'
       }, { transaction })

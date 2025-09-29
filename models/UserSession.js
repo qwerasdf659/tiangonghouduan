@@ -36,7 +36,7 @@ module.exports = sequelize => {
         comment: '用户ID'
       },
 
-      ip_address: {
+      login_ip: {
         type: DataTypes.STRING(45),
         allowNull: true,
         comment: '登录IP'

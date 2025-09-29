@@ -470,4 +470,161 @@ class ApiResponse {
   }
 }
 
+// =============== 业务错误码和验证功能（从ApiStandardManager合并） ===============
+
+/**
+ * 业务错误码标准化配置
+ * 统一业务错误码，避免分散定义
+ */
+ApiResponse.BusinessErrorCodes = {
+  // 用户相关错误 (1xxx)
+  USER_NOT_FOUND: 1001,
+  USER_DISABLED: 1002,
+  INSUFFICIENT_POINTS: 1003,
+
+  // 抽奖相关错误 (2xxx)
+  LOTTERY_NOT_AVAILABLE: 2001,
+  INVALID_STRATEGY: 2002,
+  DRAW_LIMIT_EXCEEDED: 2003,
+  CAMPAIGN_NOT_FOUND: 2004,
+  PRIZE_NOT_AVAILABLE: 2005,
+
+  // 系统错误 (3xxx)
+  DATABASE_ERROR: 3001,
+  CACHE_ERROR: 3002,
+  EXTERNAL_SERVICE_ERROR: 3003,
+
+  // 权限错误 (4xxx)
+  UNAUTHORIZED: 4001,
+  FORBIDDEN: 4002,
+  TOKEN_EXPIRED: 4003,
+
+  // 验证错误 (5xxx)
+  VALIDATION_ERROR: 5001,
+  INVALID_PARAMS: 5002,
+  REQUIRED_FIELD_MISSING: 5003,
+
+  // 业务状态相关错误 (6xxx)
+  BUSINESS_STATUS_INVALID: 6001,
+  FIELD_NAMING_VIOLATION: 6002,
+  STATUS_TRANSITION_INVALID: 6003,
+
+  // 业务契约相关错误 (7xxx)
+  API_CONTRACT_MISMATCH: 7001,
+  REQUIRED_API_MISSING: 7002
+}
+
+/**
+ * 业务状态字段标准化配置
+ * 统一业务状态字段的命名和取值
+ */
+ApiResponse.BusinessStatusStandards = {
+  inventory_item_status: {
+    field: 'status',
+    type: 'enum',
+    values: ['available', 'used', 'expired'],
+    description: '库存物品状态枚举',
+    usage: ['UserInventory'],
+    scenarios: ['物品可用性判断', '使用状态追踪']
+  },
+  prize_queue_status: {
+    field: 'status',
+    type: 'enum',
+    values: ['pending', 'distributed', 'expired', 'cancelled'],
+    description: '奖品队列状态（注意：distributed而非completed）',
+    usage: ['UserSpecificPrizeQueue'],
+    scenarios: ['管理员预设奖品发放', '队列式奖品管理']
+  }
+}
+
+/**
+ * 验证业务状态字段标准化
+ * @param {object} data - 待验证的数据对象
+ * @param {string} context - 业务上下文
+ * @returns {object} 验证结果
+ */
+ApiResponse.validateBusinessStatus = function (data, context) {
+  const standard = ApiResponse.BusinessStatusStandards[context]
+  if (!standard) {
+    return {
+      valid: false,
+      error: 'UNKNOWN_BUSINESS_CONTEXT',
+      message: `未知的业务上下文: ${context}`
+    }
+  }
+
+  const fieldName = standard.field
+  const fieldValue = data[fieldName]
+
+  // 检查字段是否存在
+  if (fieldValue === undefined) {
+    return {
+      valid: false,
+      error: 'REQUIRED_FIELD_MISSING',
+      message: `缺少必需的业务状态字段: ${fieldName}`,
+      expected: standard
+    }
+  }
+
+  // 验证字段类型和值
+  if (standard.type === 'enum' && !standard.values.includes(fieldValue)) {
+    return {
+      valid: false,
+      error: 'INVALID_ENUM_VALUE',
+      message: `业务状态字段 ${fieldName} 值无效: ${fieldValue}`,
+      expected: standard.values,
+      actual: fieldValue
+    }
+  }
+
+  return {
+    valid: true,
+    message: `业务状态字段 ${fieldName} 验证通过`,
+    standard
+  }
+}
+
+/**
+ * 根据业务错误码创建标准化错误响应
+ * @param {string|number} errorCode - 业务错误码
+ * @param {string} customMessage - 自定义错误消息（可选）
+ * @param {any} details - 错误详情（可选）
+ * @returns {object} 标准化错误响应
+ */
+ApiResponse.businessError = function (errorCode, customMessage = null, details = null) {
+  // 查找错误码对应的标准消息
+  const errorCodeName = Object.keys(ApiResponse.BusinessErrorCodes).find(
+    key => ApiResponse.BusinessErrorCodes[key] === errorCode
+  )
+
+  const defaultMessages = {
+    [ApiResponse.BusinessErrorCodes.USER_NOT_FOUND]: '用户不存在',
+    [ApiResponse.BusinessErrorCodes.USER_DISABLED]: '用户已被禁用',
+    [ApiResponse.BusinessErrorCodes.INSUFFICIENT_POINTS]: '积分不足',
+    [ApiResponse.BusinessErrorCodes.LOTTERY_NOT_AVAILABLE]: '抽奖暂不可用',
+    [ApiResponse.BusinessErrorCodes.INVALID_STRATEGY]: '无效的抽奖策略',
+    [ApiResponse.BusinessErrorCodes.DRAW_LIMIT_EXCEEDED]: '抽奖次数已达上限',
+    [ApiResponse.BusinessErrorCodes.CAMPAIGN_NOT_FOUND]: '活动不存在',
+    [ApiResponse.BusinessErrorCodes.PRIZE_NOT_AVAILABLE]: '奖品不可用',
+    [ApiResponse.BusinessErrorCodes.DATABASE_ERROR]: '数据库操作失败',
+    [ApiResponse.BusinessErrorCodes.CACHE_ERROR]: '缓存服务异常',
+    [ApiResponse.BusinessErrorCodes.EXTERNAL_SERVICE_ERROR]: '外部服务异常',
+    [ApiResponse.BusinessErrorCodes.UNAUTHORIZED]: '未授权访问',
+    [ApiResponse.BusinessErrorCodes.FORBIDDEN]: '禁止访问',
+    [ApiResponse.BusinessErrorCodes.TOKEN_EXPIRED]: '令牌已过期',
+    [ApiResponse.BusinessErrorCodes.VALIDATION_ERROR]: '数据验证失败',
+    [ApiResponse.BusinessErrorCodes.INVALID_PARAMS]: '参数无效',
+    [ApiResponse.BusinessErrorCodes.REQUIRED_FIELD_MISSING]: '缺少必需字段',
+    [ApiResponse.BusinessErrorCodes.BUSINESS_STATUS_INVALID]: '业务状态无效',
+    [ApiResponse.BusinessErrorCodes.FIELD_NAMING_VIOLATION]: '字段命名不规范',
+    [ApiResponse.BusinessErrorCodes.STATUS_TRANSITION_INVALID]: '状态转换无效',
+    [ApiResponse.BusinessErrorCodes.API_CONTRACT_MISMATCH]: 'API契约不匹配',
+    [ApiResponse.BusinessErrorCodes.REQUIRED_API_MISSING]: '必需API缺失'
+  }
+
+  const message = customMessage || defaultMessages[errorCode] || '未知业务错误'
+
+  return ApiResponse.error(message, errorCodeName || `BUSINESS_ERROR_${errorCode}`, details)
+}
+
 module.exports = ApiResponse
