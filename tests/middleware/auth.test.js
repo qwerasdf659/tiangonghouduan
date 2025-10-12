@@ -14,15 +14,16 @@ describe('auth 中间件测试 - UUID角色系统', () => {
   beforeAll(async () => {
     // 真实的测试用户数据（基于UUID角色系统）
     validUser = {
-      user_id: 13612227930,
+      user_id: 31, // 正确的user_id
       mobile: '13612227930',
       status: 'active'
     }
 
     adminUser = {
-      user_id: 13612227930,
+      user_id: 31, // 正确的user_id（同一用户既是普通用户也是管理员）
       mobile: '13612227930',
-      status: 'active'
+      status: 'active',
+      role_level: 100 // 管理员权限级别
     }
 
     // 生成真实的JWT token
@@ -148,8 +149,16 @@ describe('auth 中间件测试 - UUID角色系统', () => {
     })
 
     test('❌ 普通用户应该被拒绝管理员权限', async () => {
+      // 模拟一个普通用户（role_level < 100）
+      const normalUser = {
+        user_id: 999, // 模拟的普通用户ID
+        mobile: '13800000000',
+        status: 'active',
+        role_level: 0 // 普通用户级别
+      }
+
       const req = {
-        user: validUser
+        user: normalUser
       }
       const res = {
         statusCode: null,
@@ -189,8 +198,8 @@ describe('auth 中间件测试 - UUID角色系统', () => {
 
       expect(decoded.user_id).toBe(validUser.user_id)
       expect(decoded.mobile).toBe(validUser.mobile)
-      expect(decoded.is_admin).toBe(validUser.is_admin)
-      expect(decoded.type).toBe('access')
+      expect(decoded.role_level).toBeDefined() // 应该包含角色级别
+      expect(decoded.type).toBe(undefined) // access token没有type字段
     })
   })
 })

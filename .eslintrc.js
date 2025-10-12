@@ -96,7 +96,7 @@ module.exports = {
       rules: {
         'no-console': 'off', // 路由中允许console用于日志
         'consistent-return': 'error', // 强制一致的返回格式
-        // 🔴 V4统一API响应格式规则 - 禁止直接使用res.json()
+        // 🔴 V4统一API响应格式规则 - 禁止直接使用res.json()和ApiResponse.send()
         'no-restricted-syntax': [
           'error',
           {
@@ -106,6 +106,10 @@ module.exports = {
           {
             selector: 'CallExpression[callee.type=\'MemberExpression\'][callee.object.type=\'CallExpression\'][callee.object.callee.property.name=\'status\'][callee.property.name=\'json\']',
             message: '❌ 禁止使用res.status().json()！请使用res.apiError(message, code, details, statusCode)方法。'
+          },
+          {
+            selector: 'CallExpression[callee.object.name=\'ApiResponse\'][callee.property.name=\'send\']',
+            message: '❌ 禁止使用ApiResponse.send()！请使用res.apiSuccess()等中间件方法以保持代码简洁和一致性。'
           }
         ]
       }

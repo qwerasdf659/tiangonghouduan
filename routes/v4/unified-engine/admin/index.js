@@ -6,6 +6,7 @@
  * @date 2025-09-24
  */
 
+const BeijingTimeHelper = require('../../../../utils/timeHelper')
 const express = require('express')
 const router = express.Router()
 
@@ -17,6 +18,8 @@ const prizePoolRoutes = require('./prize_pool')
 const userManagementRoutes = require('./user_management')
 const lotteryManagementRoutes = require('./lottery_management')
 const analyticsRoutes = require('./analytics')
+const auditRoutes = require('./audit') // 🆕 兑换审核管理
+const campaignPermissionsRoutes = require('./campaign-permissions') // 🆕 活动权限管理
 
 // 挂载子模块路由
 router.use('/auth', authRoutes)
@@ -26,6 +29,8 @@ router.use('/prize-pool', prizePoolRoutes)
 router.use('/user-management', userManagementRoutes)
 router.use('/lottery-management', lotteryManagementRoutes)
 router.use('/analytics', analyticsRoutes)
+router.use('/audit', auditRoutes) // 🆕 兑换审核路由
+router.use('/campaign-permissions', campaignPermissionsRoutes) // 🆕 活动权限路由
 
 /**
  * GET / - Admin API根路径信息
@@ -54,7 +59,11 @@ router.get('/', (req, res) => {
       },
       prize_pool: {
         description: '奖品池管理',
-        endpoints: ['/prize-pool/batch-add', '/prize-pool/:campaign_id', '/prize-pool/prize/:prize_id']
+        endpoints: [
+          '/prize-pool/batch-add',
+          '/prize-pool/:campaign_id',
+          '/prize-pool/prize/:prize_id'
+        ]
       },
       user_management: {
         description: '用户管理',
@@ -74,10 +83,18 @@ router.get('/', (req, res) => {
       analytics: {
         description: '数据分析',
         endpoints: ['/decisions/analytics', '/lottery/trends', '/performance/report']
+      },
+      audit: {
+        description: '兑换审核管理',
+        endpoints: ['/pending', '/:exchange_id/approve', '/:exchange_id/reject', '/history']
+      },
+      campaign_permissions: {
+        description: '活动权限管理',
+        endpoints: ['/assign', '/revoke', '/list', '/check']
       }
     },
     documentation: '请参考各模块的API文档',
-    timestamp: new Date().toISOString()
+    timestamp: BeijingTimeHelper.now()
   }
 
   res.apiSuccess(adminInfo, 'Admin API模块信息')

@@ -14,15 +14,25 @@ describe('MySQL数据约束和参照完整性专项测试', () => {
   beforeAll(async () => {
     // 确保测试用户存在
     const existingUser = await User.findOne({ where: { mobile: testPhoneNumber } })
-    if (!existingUser) {
+    if (existingUser) {
+      testUser = existingUser
+    } else {
       testUser = await User.create({
         mobile: testPhoneNumber,
         nickname: '测试用户',
-        is_admin: true,
         history_total_points: 1000
       })
-    } else {
-      testUser = existingUser
+
+      // 🛡️ 为测试用户分配管理员角色
+      const { Role, UserRole } = require('../../models')
+      const adminRole = await Role.findOne({ where: { role_name: 'admin' } })
+      if (adminRole) {
+        await UserRole.create({
+          user_id: testUser.user_id,
+          role_id: adminRole.id,
+          is_active: true
+        })
+      }
     }
   })
 
@@ -92,7 +102,7 @@ describe('MySQL数据约束和参照完整性专项测试', () => {
       if (pointsAccount) {
         // 历史总积分应该大于等于当前积分
         expect(user.history_total_points).toBeGreaterThanOrEqual(0)
-        expect(pointsAccount.current_points).toBeGreaterThanOrEqual(0)
+        expect(pointsAccount.available_points).toBeGreaterThanOrEqual(0)
         expect(pointsAccount.total_earned).toBeGreaterThanOrEqual(pointsAccount.total_consumed)
       }
     })

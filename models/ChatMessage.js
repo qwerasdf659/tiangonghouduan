@@ -11,30 +11,23 @@ module.exports = sequelize => {
   const ChatMessage = sequelize.define(
     'ChatMessage',
     {
-      id: {
+      message_id: {
         type: DataTypes.BIGINT,
         primaryKey: true,
         autoIncrement: true,
-        comment: '消息ID'
-      },
-
-      message_id: {
-        type: DataTypes.STRING(64),
-        allowNull: false,
-        unique: true,
-        comment: '消息标识符'
+        comment: '主键ID'
       },
 
       session_id: {
-        type: DataTypes.STRING(64),
+        type: DataTypes.BIGINT,
         allowNull: false,
-        comment: '会话标识符'
+        comment: '会话ID(外键关联customer_sessions)'
       },
 
       sender_id: {
         type: DataTypes.INTEGER,
-        allowNull: false,
-        comment: '发送者ID'
+        allowNull: true, // ✅ 允许NULL，系统消息sender_id为NULL
+        comment: '发送者ID（系统消息为NULL）'
       },
 
       sender_type: {
@@ -89,8 +82,8 @@ module.exports = sequelize => {
       tableName: 'chat_messages',
       timestamps: true,
       underscored: true,
-      createdAt: 'created_at',
-      updatedAt: 'updated_at', // 消息修改时间追踪（数据库中100%使用）
+      created_at: 'created_at',
+      updated_at: 'updated_at', // 消息修改时间追踪（数据库中100%使用）
       indexes: [
         {
           unique: true,
@@ -124,10 +117,9 @@ module.exports = sequelize => {
       as: 'sender'
     })
 
-    // 消息属于会话
+    // 消息属于会话 - 标准外键关联
     ChatMessage.belongsTo(models.CustomerSession, {
       foreignKey: 'session_id',
-      targetKey: 'session_id',
       as: 'session'
     })
 

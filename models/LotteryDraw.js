@@ -7,6 +7,7 @@
  */
 
 const { DataTypes, Model } = require('sequelize')
+const BeijingTimeHelper = require('../utils/timeHelper')
 const LotteryDrawFormatter = require('../utils/formatters/LotteryDrawFormatter')
 
 class LotteryDraw extends Model {
@@ -265,13 +266,13 @@ module.exports = sequelize => {
       created_at: {
         type: DataTypes.DATE,
         allowNull: false,
-        defaultValue: DataTypes.NOW,
+        defaultValue: () => BeijingTimeHelper.createDatabaseTime(),
         comment: '抽奖时间'
       },
       updated_at: {
         type: DataTypes.DATE,
         allowNull: false,
-        defaultValue: DataTypes.NOW,
+        defaultValue: () => BeijingTimeHelper.createDatabaseTime(),
         comment: '记录更新时间'
       }
     },
@@ -280,8 +281,8 @@ module.exports = sequelize => {
       modelName: 'LotteryDraw',
       tableName: 'lottery_draws', // 表名和模型名保持一致
       timestamps: true,
-      createdAt: 'created_at',
-      updatedAt: 'updated_at',
+      created_at: 'created_at',
+      updated_at: 'updated_at',
       underscored: true,
       comment: '抽奖记录表（重构版 - 仅数据定义）',
       indexes: [

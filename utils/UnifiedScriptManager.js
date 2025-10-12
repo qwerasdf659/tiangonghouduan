@@ -12,9 +12,9 @@
  * 5. 执行结果统计
  */
 
+const BeijingTimeHelper = require('./timeHelper')
 const { getDatabaseHelper } = require('./database')
 const { getRawClient } = require('./UnifiedRedisClient')
-const BeijingTimeHelper = require('./timeHelper')
 const fs = require('fs').promises
 const path = require('path')
 
@@ -609,7 +609,7 @@ class UnifiedScriptManager {
         strategies: coverageData.strategies || {},
         apiLayer: apiCoverage,
         overall: coverageData.overall || { statements: 0, branches: 0, functions: 0, lines: 0 },
-        timestamp: new Date().toISOString()
+        timestamp: BeijingTimeHelper.now()
       }
     } catch (error) {
       console.warn('⚠️ 无法获取完整覆盖率数据，使用基础检查:', error.message)
@@ -725,7 +725,7 @@ class UnifiedScriptManager {
       },
       apiLayer: { statements: 45, branches: 40, functions: 50, lines: 45 },
       overall: { statements: 43.67, branches: 41.16, functions: 49.79, lines: 44.22 },
-      timestamp: new Date().toISOString(),
+      timestamp: BeijingTimeHelper.now(),
       source: 'basic_analysis'
     }
   }

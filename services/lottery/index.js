@@ -12,6 +12,7 @@ const LotteryHistoryService = require('./LotteryHistoryService')
 
 class LotteryServiceContainer {
   constructor () {
+    // LotteryUserService 和 LotteryHistoryService 都是类，需要实例化
     this.user_service = new LotteryUserService()
     this.history_service = new LotteryHistoryService()
   }

@@ -4,6 +4,7 @@
  * 提供管理员使用的抽奖控制功能
  */
 
+const BeijingTimeHelper = require('../../../utils/timeHelper')
 const { User } = require('../../../models')
 const { getUserRoles } = require('../../../middleware/auth')
 const Logger = require('../utils/Logger')
@@ -39,7 +40,7 @@ class ManagementStrategy {
         targetUserId,
         prizeId,
         reason,
-        timestamp: new Date().toISOString()
+        timestamp: BeijingTimeHelper.now()
       })
 
       return {
@@ -49,7 +50,7 @@ class ManagementStrategy {
         user_id: targetUserId,
         admin_id: adminId,
         reason,
-        timestamp: new Date().toISOString()
+        timestamp: BeijingTimeHelper.now()
       }
     } catch (error) {
       this.logError('管理员强制中奖失败', { adminId, targetUserId, prizeId, error: error.message })
@@ -72,7 +73,7 @@ class ManagementStrategy {
         adminId,
         targetUserId,
         reason,
-        timestamp: new Date().toISOString()
+        timestamp: BeijingTimeHelper.now()
       })
 
       return {
@@ -81,7 +82,7 @@ class ManagementStrategy {
         user_id: targetUserId,
         admin_id: adminId,
         reason,
-        timestamp: new Date().toISOString()
+        timestamp: BeijingTimeHelper.now()
       }
     } catch (error) {
       this.logError('管理员强制不中奖失败', { adminId, targetUserId, error: error.message })
@@ -236,10 +237,10 @@ class ManagementStrategy {
           let result
           switch (operation) {
           case 'force_win':
-            result = await this.forceWin(adminId, target.userId, target.prizeId, reason)
+            result = await this.forceWin(adminId, target.user_id, target.prizeId, reason)
             break
           case 'force_no_win':
-            result = await this.forceNoWin(adminId, target.userId, reason)
+            result = await this.forceNoWin(adminId, target.user_id, reason)
             break
           default:
             throw new Error(`不支持的操作类型: ${operation}`)

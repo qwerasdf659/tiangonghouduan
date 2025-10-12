@@ -5,6 +5,7 @@
  * 使用模型：Claude Sonnet 4
  */
 
+const BeijingTimeHelper = require('../../../utils/timeHelper')
 const BaseTestManager = require('../core/base_test_manager')
 const { sequelize } = require('../../../config/database')
 const { performance } = require('perf_hooks')
@@ -87,7 +88,7 @@ class MySQLTestSuite extends BaseTestManager {
         database: sequelize.config.database,
         host: sequelize.config.host,
         port: sequelize.config.port,
-        timestamp: new Date().toISOString()
+        timestamp: BeijingTimeHelper.now()
       }
 
       console.log(`✅ MySQL连接测试通过 - 连接时间: ${connection_time}ms`)
@@ -95,7 +96,7 @@ class MySQLTestSuite extends BaseTestManager {
       this.mysql_test_results.connection = {
         status: 'failed',
         error: error.message,
-        timestamp: new Date().toISOString()
+        timestamp: BeijingTimeHelper.now()
       }
       console.error('❌ MySQL连接测试失败:', error.message)
       throw error
@@ -134,7 +135,7 @@ class MySQLTestSuite extends BaseTestManager {
           existing: existing_tables,
           missing: missing_tables
         },
-        timestamp: new Date().toISOString()
+        timestamp: BeijingTimeHelper.now()
       }
 
       if (missing_tables.length > 0) {
@@ -146,7 +147,7 @@ class MySQLTestSuite extends BaseTestManager {
       this.mysql_test_results.structure = {
         status: 'failed',
         error: error.message,
-        timestamp: new Date().toISOString()
+        timestamp: BeijingTimeHelper.now()
       }
       console.error('❌ 数据库结构测试失败:', error.message)
       throw error
@@ -222,7 +223,7 @@ class MySQLTestSuite extends BaseTestManager {
         status: 'success',
         tests: results,
         average_query_time: Math.round(average_time || 0),
-        timestamp: new Date().toISOString()
+        timestamp: BeijingTimeHelper.now()
       }
 
       console.log(`✅ 查询性能测试通过，平均响应时间: ${Math.round(average_time || 0)}ms`)
@@ -230,7 +231,7 @@ class MySQLTestSuite extends BaseTestManager {
       this.mysql_test_results.performance = {
         status: 'failed',
         error: error.message,
-        timestamp: new Date().toISOString()
+        timestamp: BeijingTimeHelper.now()
       }
       console.error('❌ 查询性能测试失败:', error.message)
       throw error
@@ -298,7 +299,7 @@ class MySQLTestSuite extends BaseTestManager {
         status: failed_checks.length === 0 ? 'success' : 'warning',
         checks: consistency_checks,
         failed_count: failed_checks.length,
-        timestamp: new Date().toISOString()
+        timestamp: BeijingTimeHelper.now()
       }
 
       if (failed_checks.length === 0) {
@@ -310,7 +311,7 @@ class MySQLTestSuite extends BaseTestManager {
       this.mysql_test_results.consistency = {
         status: 'failed',
         error: error.message,
-        timestamp: new Date().toISOString()
+        timestamp: BeijingTimeHelper.now()
       }
       console.error('❌ 数据一致性测试失败:', error.message)
     }
@@ -357,7 +358,7 @@ class MySQLTestSuite extends BaseTestManager {
       this.mysql_test_results.indexing = {
         status: 'success',
         tests: index_tests,
-        timestamp: new Date().toISOString()
+        timestamp: BeijingTimeHelper.now()
       }
 
       console.log(`✅ 索引效率测试完成，检查${tables_to_check.length}个表`)
@@ -365,7 +366,7 @@ class MySQLTestSuite extends BaseTestManager {
       this.mysql_test_results.indexing = {
         status: 'failed',
         error: error.message,
-        timestamp: new Date().toISOString()
+        timestamp: BeijingTimeHelper.now()
       }
       console.error('❌ 索引效率测试失败:', error.message)
     }
@@ -385,7 +386,7 @@ class MySQLTestSuite extends BaseTestManager {
         total_tests: Object.keys(this.mysql_test_results).length,
         passed_tests: Object.values(this.mysql_test_results).filter(r => r.status === 'success')
           .length,
-        generated_at: new Date().toISOString()
+        generated_at: BeijingTimeHelper.now()
       }
     }
 

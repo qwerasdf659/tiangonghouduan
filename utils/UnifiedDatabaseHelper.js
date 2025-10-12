@@ -6,6 +6,7 @@
  * 更新时间：2025年09月29日 北京时间
  */
 
+const BeijingTimeHelper = require('../utils/timeHelper')
 const { Sequelize, QueryTypes } = require('sequelize')
 
 class UnifiedDatabaseHelper {
@@ -51,7 +52,7 @@ class UnifiedDatabaseHelper {
     this.standardSchema = {
       users: {
         primaryKey: 'user_id',
-        requiredFields: ['mobile', 'nickname', 'is_admin', 'status'],
+        requiredFields: ['mobile', 'nickname', 'status'],
         fieldMappings: {
           phone_number: 'mobile',
           phone: 'mobile'
@@ -148,7 +149,7 @@ class UnifiedDatabaseHelper {
    * @returns {Promise<Object>} 健康检查结果
    */
   async healthCheck () {
-    const checkTime = new Date().toISOString()
+    const checkTime = BeijingTimeHelper.now()
 
     try {
       await this.ensureConnection()
@@ -326,7 +327,7 @@ class UnifiedDatabaseHelper {
    */
   async getStats () {
     const stats = {
-      timestamp: new Date().toISOString(),
+      timestamp: BeijingTimeHelper.now(),
       tables: [],
       totalRecords: 0,
       databaseSize: 0

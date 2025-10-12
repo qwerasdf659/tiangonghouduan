@@ -2,7 +2,7 @@
  * 用户信息管理模型 - V4.0 统一架构版本
  * 🛡️ 完全基于UUID角色系统的用户权限管理
  * 🗑️ 移除is_admin字段依赖，使用roles表关联
- * 
+ *
  * 🔧 V4.0 UUID角色系统优化内容：
  * ⭐⭐⭐⭐⭐ 核心字段（5个）：
  * - user_id: 核心主键，必需，极高优先级
@@ -82,8 +82,8 @@ module.exports = sequelize => {
     {
       tableName: 'users',
       timestamps: true,
-      createdAt: 'created_at',
-      updatedAt: 'updated_at',
+      created_at: 'created_at',
+      updated_at: 'updated_at',
       underscored: true,
       indexes: [
         {
@@ -205,10 +205,12 @@ module.exports = sequelize => {
   User.prototype.hasRole = async function (roleName) {
     const userRoles = await this.getRoles({
       where: { is_active: true },
-      include: [{
-        model: sequelize.models.Role,
-        where: { role_name: roleName, is_active: true }
-      }]
+      include: [
+        {
+          model: sequelize.models.Role,
+          where: { role_name: roleName, is_active: true }
+        }
+      ]
     })
     return userRoles.length > 0
   }
@@ -216,10 +218,12 @@ module.exports = sequelize => {
   User.prototype.hasPermission = async function (resource, action = 'read') {
     const userRoles = await this.getRoles({
       where: { is_active: true },
-      include: [{
-        model: sequelize.models.Role,
-        where: { is_active: true }
-      }]
+      include: [
+        {
+          model: sequelize.models.Role,
+          where: { is_active: true }
+        }
+      ]
     })
 
     for (const userRole of userRoles) {
@@ -231,8 +235,10 @@ module.exports = sequelize => {
       // 检查具体权限
       const permissions = role.permissions || {}
       if (permissions['*'] && permissions['*'].includes('*')) return true
-      if (permissions[resource] &&
-          (permissions[resource].includes(action) || permissions[resource].includes('*'))) {
+      if (
+        permissions[resource] &&
+        (permissions[resource].includes(action) || permissions[resource].includes('*'))
+      ) {
         return true
       }
     }
@@ -272,12 +278,14 @@ module.exports = sequelize => {
   User.findAdmins = function () {
     return this.findAll({
       where: { status: 'active' },
-      include: [{
-        model: sequelize.models.Role,
-        as: 'roles',
-        where: { role_name: 'admin', is_active: true },
-        through: { where: { is_active: true } }
-      }]
+      include: [
+        {
+          model: sequelize.models.Role,
+          as: 'roles',
+          where: { role_name: 'admin', is_active: true },
+          through: { where: { is_active: true } }
+        }
+      ]
     })
   }
 
@@ -293,12 +301,14 @@ module.exports = sequelize => {
   User.findByRole = function (roleName, limit = 50) {
     return this.findAll({
       where: { status: 'active' },
-      include: [{
-        model: sequelize.models.Role,
-        as: 'roles',
-        where: { role_name: roleName, is_active: true },
-        through: { where: { is_active: true } }
-      }],
+      include: [
+        {
+          model: sequelize.models.Role,
+          as: 'roles',
+          where: { role_name: roleName, is_active: true },
+          through: { where: { is_active: true } }
+        }
+      ],
       limit
     })
   }

@@ -217,8 +217,8 @@ module.exports = sequelize => {
       modelName: 'UserPointsAccount',
       tableName: 'user_points_accounts',
       timestamps: true,
-      createdAt: 'created_at',
-      updatedAt: 'updated_at',
+      created_at: 'created_at',
+      updated_at: 'updated_at',
       underscored: true,
       comment: '用户积分账户表',
       indexes: [

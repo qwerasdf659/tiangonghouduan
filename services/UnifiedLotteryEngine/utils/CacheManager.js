@@ -6,6 +6,7 @@
  * @date 2025-09-10
  */
 
+const BeijingTimeHelper = require('../../../utils/timeHelper')
 class CacheManager {
   constructor () {
     this.cache = new Map()
@@ -28,7 +29,7 @@ class CacheManager {
    * 设置缓存
    */
   async set (key, value, ttl = 300) {
-    const expireAt = Date.now() + ttl * 1000
+    const expireAt = BeijingTimeHelper.timestamp() + ttl * 1000
     this.cache.set(key, {
       value,
       expireAt
@@ -48,7 +49,7 @@ class CacheManager {
       return null
     }
 
-    if (Date.now() > item.expireAt) {
+    if (BeijingTimeHelper.timestamp() > item.expireAt) {
       this.cache.delete(key)
       this.stats.misses++
       return null
@@ -73,7 +74,7 @@ class CacheManager {
    * 清理过期缓存
    */
   cleanup () {
-    const now = Date.now()
+    const now = BeijingTimeHelper.timestamp()
     let cleaned = 0
 
     for (const [key, item] of this.cache.entries()) {

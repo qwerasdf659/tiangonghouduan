@@ -9,12 +9,12 @@ module.exports = sequelize => {
   const Product = sequelize.define(
     'Product',
     {
-      // 基础信息
-      commodity_id: {
+      // 基础信息 - 符合{table_name}_id命名规范
+      product_id: {
         type: DataTypes.INTEGER,
         primaryKey: true,
         autoIncrement: true,
-        comment: '商品唯一ID'
+        comment: '商品唯一ID（主键）'
       },
       name: {
         type: DataTypes.STRING(200),
@@ -36,7 +36,7 @@ module.exports = sequelize => {
         allowNull: true,
         references: {
           model: 'image_resources',
-          key: 'id'
+          key: 'image_id'
         },
         comment: '商品主图片ID（关联image_resources表，用于多图片管理中的主图指定）'
       },
@@ -167,6 +167,7 @@ module.exports = sequelize => {
       timestamps: true,
       createdAt: 'created_at',
       updatedAt: 'updated_at',
+      underscored: true,
       indexes: [
         {
           name: 'idx_products_space_status',

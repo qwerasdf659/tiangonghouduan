@@ -39,7 +39,7 @@ describe('V4统一完整API测试套件 - 重构整合版', () => {
   const test_account = {
     phone: '13612227930',
     user_id: 31,
-    is_admin: true
+    role_based_admin: true
   }
 
   beforeAll(async () => {
@@ -82,8 +82,8 @@ describe('V4统一完整API测试套件 - 重构整合版', () => {
 
   // ========== 第一部分：V4引擎核心功能 ==========
   describe('V4统一引擎核心功能', () => {
-    test('✅ V4引擎健康检查 - GET /api/v4/unified-engine/health', async () => {
-      const response = await tester.makeRequest('GET', '/api/v4/unified-engine/health')
+    test('✅ V4引擎健康检查 - GET /api/v4/unified-engine/lottery/health', async () => {
+      const response = await tester.makeRequest('GET', '/api/v4/unified-engine/lottery/health')
 
       expect([200, 503]).toContain(response.status)
       if (response.status === 200) {
@@ -863,7 +863,7 @@ describe('V4统一完整API测试套件 - 重构整合版', () => {
     test('🚀 API响应时间性能测试', async () => {
       const start_time = Date.now()
 
-      const _response = await tester.makeRequest('GET', '/api/v4/unified-engine/health')
+      const _response = await tester.makeRequest('GET', '/api/v4/unified-engine/lottery/health')
 
       const response_time = Date.now() - start_time
       expect(response_time).toBeLessThan(5000) // 5秒内响应
@@ -902,7 +902,7 @@ describe('V4统一完整API测试套件 - 重构整合版', () => {
     })
 
     test('🏁 引擎最终健康检查', async () => {
-      const response = await tester.makeRequest('GET', '/api/v4/unified-engine/health')
+      const response = await tester.makeRequest('GET', '/api/v4/unified-engine/lottery/health')
 
       expect([200, 503]).toContain(response.status)
       if (response.status === 200) {

@@ -6,6 +6,7 @@
 const AWS = require('aws-sdk')
 const crypto = require('crypto')
 const path = require('path')
+const BeijingTimeHelper = require('../utils/timeHelper')
 
 class SealosStorageService {
   constructor () {
@@ -44,7 +45,7 @@ class SealosStorageService {
   async uploadImage (fileBuffer, originalName, folder = 'photos') {
     try {
       // 生成唯一文件名
-      const timestamp = Date.now()
+      const timestamp = BeijingTimeHelper.timestamp()
       const hash = crypto.randomBytes(8).toString('hex')
       const ext = path.extname(originalName) || '.jpg'
       const fileName = `${folder}/${timestamp}_${hash}${ext}`

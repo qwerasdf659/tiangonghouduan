@@ -4,6 +4,7 @@
  * 更新时间：2025/01/21
  */
 
+const BeijingTimeHelper = require('../utils/timeHelper')
 const UnifiedDistributedLock = require('../utils/UnifiedDistributedLock')
 const ApiResponse = require('../utils/ApiResponse')
 
@@ -29,14 +30,14 @@ class ConcurrencyControlMiddleware {
    */
   limitUserConcurrency (maxConcurrent = 5) {
     return async (req, res, next) => {
-      const userId = req.user?.user_id
+      const user_id = req.user?.user_id
 
       // 如果没有用户信息，直接通过
-      if (!userId) {
+      if (!user_id) {
         return next()
       }
 
-      const userKey = `user_concurrency:${userId}`
+      const userKey = `user_concurrency:${user_id}`
       const currentCount = this.activeRequests.get(userKey) || 0
 
       // 检查并发数限制
@@ -230,7 +231,7 @@ class ConcurrencyControlMiddleware {
     for (const [key, count] of this.activeRequests.entries()) {
       if (key.startsWith('user_concurrency:')) {
         userConcurrency.push({
-          userId: key.replace('user_concurrency:', ''),
+          user_id: key.replace('user_concurrency:', ''),
           concurrentRequests: count
         })
       } else if (key.startsWith('ip_concurrency:')) {
@@ -245,7 +246,7 @@ class ConcurrencyControlMiddleware {
       totalActiveRequests: this.activeRequests.size,
       userConcurrency,
       ipConcurrency,
-      timestamp: new Date().toISOString()
+      timestamp: BeijingTimeHelper.now()
     }
   }
 

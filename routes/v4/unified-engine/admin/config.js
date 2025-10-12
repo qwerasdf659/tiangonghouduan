@@ -46,7 +46,7 @@ router.put('/config', adminAuthMiddleware, asyncHandler(async (req, res) => {
     if (result.success) {
       sharedComponents.logger.info('引擎配置更新成功', {
         config,
-        updated_by: req.user?.id,
+        updated_by: req.user?.user_id,
         updated_at: BeijingTimeHelper.getCurrentTime()
       })
 

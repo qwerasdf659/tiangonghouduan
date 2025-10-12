@@ -5,6 +5,7 @@
  * 使用模型：Claude Sonnet 4
  */
 
+const BeijingTimeHelper = require('../../../utils/timeHelper')
 const BaseTestManager = require('../core/base_test_manager')
 const { exec } = require('child_process')
 const { promisify } = require('util')
@@ -117,7 +118,7 @@ class CodeQualityChecker extends BaseTestManager {
         warnings: total_warnings,
         files: eslint_results.length,
         details: eslint_results.slice(0, 5), // 只保留前5个文件的详情
-        timestamp: new Date().toISOString()
+        timestamp: BeijingTimeHelper.now()
       }
 
       this.quality_metrics.eslint_errors = total_errors
@@ -133,7 +134,7 @@ class CodeQualityChecker extends BaseTestManager {
         status: 'error',
         error: error.message,
         stderr: error.stderr,
-        timestamp: new Date().toISOString()
+        timestamp: BeijingTimeHelper.now()
       }
       console.warn('⚠️ ESLint检查失败:', error.message)
     }
@@ -154,7 +155,7 @@ class CodeQualityChecker extends BaseTestManager {
       this.quality_results.prettier = {
         status: 'passed',
         message: '代码格式符合Prettier规范',
-        timestamp: new Date().toISOString()
+        timestamp: BeijingTimeHelper.now()
       }
       console.log('✅ Prettier检查通过')
     } catch (error) {
@@ -162,7 +163,7 @@ class CodeQualityChecker extends BaseTestManager {
         status: 'failed',
         error: error.message,
         stderr: error.stderr,
-        timestamp: new Date().toISOString()
+        timestamp: BeijingTimeHelper.now()
       }
       console.warn('⚠️ Prettier检查发现格式问题')
     }
@@ -193,7 +194,7 @@ class CodeQualityChecker extends BaseTestManager {
         passed_tests: jest_results.numPassedTests || 0,
         failed_tests: jest_results.numFailedTests || 0,
         coverage: jest_results.coverageMap ? 'available' : 'unavailable',
-        timestamp: new Date().toISOString()
+        timestamp: BeijingTimeHelper.now()
       }
 
       this.quality_metrics.test_coverage = jest_results.coverageMap ? 80 : 0 // 简化处理
@@ -205,7 +206,7 @@ class CodeQualityChecker extends BaseTestManager {
       this.quality_results.jest = {
         status: 'error',
         error: error.message,
-        timestamp: new Date().toISOString()
+        timestamp: BeijingTimeHelper.now()
       }
       console.warn('⚠️ Jest测试失败:', error.message)
     }
@@ -218,13 +219,13 @@ class CodeQualityChecker extends BaseTestManager {
     try {
       console.log('🏥 开始健康检查...')
 
-      const response = await this.make_request('GET', '/health')
+      const response = await this.health_check_with_cache()
 
       this.quality_results.health_check = {
         status: response.status === 200 ? 'passed' : 'failed',
         response_time: Date.now(),
         data: response.data,
-        timestamp: new Date().toISOString()
+        timestamp: BeijingTimeHelper.now()
       }
 
       if (response.status === 200) {
@@ -236,7 +237,7 @@ class CodeQualityChecker extends BaseTestManager {
       this.quality_results.health_check = {
         status: 'failed',
         error: error.message,
-        timestamp: new Date().toISOString()
+        timestamp: BeijingTimeHelper.now()
       }
       console.warn('⚠️ 健康检查失败:', error.message)
     }
@@ -275,9 +276,9 @@ class CodeQualityChecker extends BaseTestManager {
         status_checks.push({ check: 'node_modules', status: 'missing' })
       }
 
-      // 检查数据库连接
+      // 检查数据库连接（使用缓存的健康检查）
       try {
-        const db_response = await this.make_request('GET', '/health')
+        const db_response = await this.health_check_with_cache()
         status_checks.push({
           check: '数据库连接',
           status: db_response.status === 200 ? 'connected' : 'disconnected'
@@ -294,7 +295,7 @@ class CodeQualityChecker extends BaseTestManager {
         status: failed_checks.length === 0 ? 'healthy' : 'issues',
         checks: status_checks,
         failed_count: failed_checks.length,
-        timestamp: new Date().toISOString()
+        timestamp: BeijingTimeHelper.now()
       }
 
       if (failed_checks.length === 0) {
@@ -306,7 +307,7 @@ class CodeQualityChecker extends BaseTestManager {
       this.quality_results.project_status = {
         status: 'error',
         error: error.message,
-        timestamp: new Date().toISOString()
+        timestamp: BeijingTimeHelper.now()
       }
       console.warn('⚠️ 项目状态检查失败:', error.message)
     }
@@ -328,7 +329,7 @@ class CodeQualityChecker extends BaseTestManager {
         passed_checks: Object.values(this.quality_results).filter(
           r => r && ['passed', 'healthy'].includes(r.status)
         ).length,
-        generated_at: new Date().toISOString()
+        generated_at: BeijingTimeHelper.now()
       }
     }
 

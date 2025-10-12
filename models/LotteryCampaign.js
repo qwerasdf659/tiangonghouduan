@@ -6,6 +6,7 @@
  */
 
 'use strict'
+const BeijingTimeHelper = require('../utils/timeHelper')
 
 const { Model, DataTypes } = require('sequelize')
 
@@ -76,7 +77,7 @@ class LotteryCampaign extends Model {
    * @returns {boolean} 是否进行中
    */
   isActive () {
-    const now = new Date()
+    const now = BeijingTimeHelper.createBeijingTime()
     const startTime = new Date(this.start_time)
     const endTime = new Date(this.end_time)
     return this.status === 'active' && startTime <= now && endTime >= now
@@ -87,7 +88,7 @@ class LotteryCampaign extends Model {
    * @returns {boolean} 是否即将开始
    */
   isUpcoming () {
-    const now = new Date()
+    const now = BeijingTimeHelper.createBeijingTime()
     return this.status === 'active' && this.start_time > now
   }
 
@@ -96,7 +97,7 @@ class LotteryCampaign extends Model {
    * @returns {boolean} 是否已结束
    */
   isEnded () {
-    const now = new Date()
+    const now = BeijingTimeHelper.createBeijingTime()
     return this.status === 'ended' || this.end_time < now
   }
 
@@ -107,7 +108,7 @@ class LotteryCampaign extends Model {
   getRemainingTimeMinutes () {
     if (this.isEnded()) return null
 
-    const now = new Date()
+    const now = BeijingTimeHelper.createBeijingTime()
     const endTime = new Date(this.end_time)
     const diffMs = endTime - now
 
@@ -119,7 +120,7 @@ class LotteryCampaign extends Model {
    * @returns {number} 进度百分比 (0-100)
    */
   getProgress () {
-    const now = new Date()
+    const now = BeijingTimeHelper.createBeijingTime()
     const startTime = new Date(this.start_time)
     const endTime = new Date(this.end_time)
 
@@ -134,12 +135,12 @@ class LotteryCampaign extends Model {
 
   /**
    * 检查用户是否可以参与抽奖
-   * @param {number} userId - 用户ID
+   * @param {number} user_id - 用户ID
    * @param {number} userDrawsToday - 用户今日已抽奖次数
    * @param {number} userDrawsTotal - 用户总抽奖次数
    * @returns {Object} 检查结果
    */
-  canUserParticipate (userId, userDrawsToday = 0, userDrawsTotal = 0) {
+  canUserParticipate (user_id, userDrawsToday = 0, userDrawsTotal = 0) {
     const issues = []
 
     // 检查活动状态
@@ -367,7 +368,7 @@ class LotteryCampaign extends Model {
    */
   static async getActiveCampaigns (options = {}) {
     const { limit = 10 } = options
-    const now = new Date()
+    const now = BeijingTimeHelper.createBeijingTime()
 
     const whereClause = {
       status: 'active',
@@ -377,9 +378,7 @@ class LotteryCampaign extends Model {
 
     return await this.findAll({
       where: whereClause,
-      order: [
-        ['start_time', 'ASC']
-      ],
+      order: [['start_time', 'ASC']],
       limit,
       include: ['prizes']
     })
@@ -390,7 +389,7 @@ class LotteryCampaign extends Model {
    * @returns {Promise<Object>} 更新结果
    */
   static async batchUpdateStatus () {
-    const now = new Date()
+    const now = BeijingTimeHelper.createBeijingTime()
 
     // 自动开始符合条件的活动
     const startResult = await this.update(
@@ -559,8 +558,8 @@ module.exports = sequelize => {
       modelName: 'LotteryCampaign',
       tableName: 'lottery_campaigns',
       timestamps: true,
-      createdAt: 'created_at',
-      updatedAt: 'updated_at',
+      created_at: 'created_at',
+      updated_at: 'updated_at',
       underscored: true,
       comment: '抽奖活动配置表',
       indexes: [

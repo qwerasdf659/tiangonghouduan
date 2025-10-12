@@ -5,6 +5,7 @@
  * 更新时间：2025年01月28日
  */
 
+const BeijingTimeHelper = require('../../../../utils/timeHelper')
 const express = require('express')
 const router = express.Router()
 const { User, Role, UserRole } = require('../../../../models')
@@ -96,14 +97,14 @@ router.get('/users', async (req, res) => {
 
 /**
  * 🛡️ 获取单个用户详情（基于UUID角色系统）
- * GET /api/v4/admin/user_management/users/:userId
+ * GET /api/v4/admin/user_management/users/:user_id
  */
-router.get('/users/:userId', async (req, res) => {
+router.get('/users/:user_id', async (req, res) => {
   try {
-    const { userId } = req.params
+    const { user_id } = req.params
 
     const user = await User.findOne({
-      where: { user_id: userId },
+      where: { user_id },
       include: [{
         model: Role,
         as: 'roles',
@@ -154,13 +155,13 @@ router.get('/users/:userId', async (req, res) => {
 
 /**
  * 🛡️ 更新用户角色（基于UUID角色系统）
- * PUT /api/v4/admin/user_management/users/:userId/role
+ * PUT /api/v4/admin/user_management/users/:user_id/role
  */
-router.put('/users/:userId/role', async (req, res) => {
+router.put('/users/:user_id/role', async (req, res) => {
   const transaction = await User.sequelize.transaction()
 
   try {
-    const { userId } = req.params
+    const { user_id } = req.params
     const { role_name, reason = '' } = req.body
 
     if (!role_name) {
@@ -168,7 +169,7 @@ router.put('/users/:userId/role', async (req, res) => {
     }
 
     // 验证目标用户
-    const targetUser = await User.findByPk(userId, { transaction })
+    const targetUser = await User.findByPk(user_id, { transaction })
     if (!targetUser) {
       await transaction.rollback()
       return res.apiError('用户不存在', 'USER_NOT_FOUND', null, 404)
@@ -187,15 +188,15 @@ router.put('/users/:userId/role', async (req, res) => {
 
     // 移除用户现有角色
     await UserRole.destroy({
-      where: { user_id: userId },
+      where: { user_id },
       transaction
     })
 
     // 分配新角色
     await UserRole.create({
-      user_id: userId,
+      user_id,
       role_id: targetRole.id,
-      assigned_at: new Date(),
+      assigned_at: BeijingTimeHelper.createBeijingTime(),
       assigned_by: req.user.user_id,
       is_active: true
     }, { transaction })
@@ -203,12 +204,12 @@ router.put('/users/:userId/role', async (req, res) => {
     await transaction.commit()
 
     // 获取更新后的用户角色信息
-    const updatedUserRoles = await getUserRoles(userId)
+    const updatedUserRoles = await getUserRoles(user_id)
 
-    console.log(`✅ 用户角色更新成功: ${userId} -> ${role_name} (操作者: ${req.user.user_id})`)
+    console.log(`✅ 用户角色更新成功: ${user_id} -> ${role_name} (操作者: ${req.user.user_id})`)
 
     return res.apiSuccess('用户角色更新成功', {
-      user_id: userId,
+      user_id,
       new_role: role_name,
       new_role_level: targetRole.role_level,
       roles: updatedUserRoles.roles,
@@ -224,18 +225,18 @@ router.put('/users/:userId/role', async (req, res) => {
 
 /**
  * 🛡️ 更新用户状态
- * PUT /api/v4/admin/user_management/users/:userId/status
+ * PUT /api/v4/admin/user_management/users/:user_id/status
  */
-router.put('/users/:userId/status', async (req, res) => {
+router.put('/users/:user_id/status', async (req, res) => {
   try {
-    const { userId } = req.params
+    const { user_id } = req.params
     const { status, reason = '' } = req.body
 
     if (!status || !['active', 'inactive', 'banned'].includes(status)) {
       return res.apiError('无效的用户状态', 'INVALID_STATUS', null, 400)
     }
 
-    const user = await User.findByPk(userId)
+    const user = await User.findByPk(user_id)
     if (!user) {
       return res.apiError('用户不存在', 'USER_NOT_FOUND', null, 404)
     }
@@ -243,10 +244,10 @@ router.put('/users/:userId/status', async (req, res) => {
     // 更新用户状态
     await user.update({ status })
 
-    console.log(`✅ 用户状态更新成功: ${userId} -> ${status} (操作者: ${req.user.user_id})`)
+    console.log(`✅ 用户状态更新成功: ${user_id} -> ${status} (操作者: ${req.user.user_id})`)
 
     return res.apiSuccess('用户状态更新成功', {
-      user_id: userId,
+      user_id,
       old_status: user.status,
       new_status: status,
       operator_id: req.user.user_id,
@@ -266,7 +267,7 @@ router.get('/roles', async (req, res) => {
   try {
     const roles = await Role.findAll({
       where: { is_active: true },
-      attributes: ['id', 'role_uuid', 'role_name', 'role_level', 'description'],
+      attributes: ['role_id', 'role_uuid', 'role_name', 'role_level', 'description'],
       order: [['role_level', 'DESC']]
     })
 

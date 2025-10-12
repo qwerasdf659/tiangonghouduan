@@ -5,16 +5,18 @@
  */
 
 const { DataTypes } = require('sequelize')
+const BeijingTimeHelper = require('../utils/timeHelper')
 
 module.exports = sequelize => {
   const UserInventory = sequelize.define(
     'UserInventory',
     {
       // 主键
-      id: {
-        type: DataTypes.STRING(32),
+      inventory_id: {
+        type: DataTypes.INTEGER,
         primaryKey: true,
-        comment: '库存物品唯一标识'
+        autoIncrement: true,
+        comment: '主键ID'
       },
 
       // 基础信息
@@ -79,7 +81,7 @@ module.exports = sequelize => {
       acquired_at: {
         type: DataTypes.DATE,
         allowNull: false,
-        defaultValue: DataTypes.NOW,
+        defaultValue: () => BeijingTimeHelper.createDatabaseTime(),
         comment: '获得时间'
       },
 
@@ -132,8 +134,8 @@ module.exports = sequelize => {
     {
       tableName: 'user_inventory',
       timestamps: true,
-      createdAt: 'created_at',
-      updatedAt: 'updated_at',
+      created_at: 'created_at',
+      updated_at: 'updated_at',
       underscored: true,
       indexes: [
         {
@@ -180,7 +182,7 @@ module.exports = sequelize => {
   // 实例方法
   UserInventory.prototype.isExpired = function () {
     if (!this.expires_at) return false
-    return new Date() > this.expires_at
+    return BeijingTimeHelper.isExpired(this.expires_at)
   }
 
   UserInventory.prototype.isUsable = function () {
@@ -189,7 +191,7 @@ module.exports = sequelize => {
 
   UserInventory.prototype.getTimeRemaining = function () {
     if (!this.expires_at) return null
-    const remaining = this.expires_at - new Date()
+    const remaining = BeijingTimeHelper.timeDiff(BeijingTimeHelper.createDatabaseTime(), this.expires_at)
     return remaining > 0 ? remaining : 0
   }
 
@@ -210,7 +212,7 @@ module.exports = sequelize => {
     }
 
     this.verification_code = code
-    this.verification_expires_at = new Date(Date.now() + 24 * 60 * 60 * 1000) // 24小时后过期
+    this.verification_expires_at = BeijingTimeHelper.futureTime(24 * 60 * 60 * 1000) // 24小时后过期
     await this.save()
 
     return code

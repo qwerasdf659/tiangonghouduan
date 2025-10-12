@@ -21,7 +21,7 @@ class TestAccountManager {
         verification_code: '123456',
         role_name: 'admin',
         role_level: 100,
-        is_admin: true, // 保持兼容性
+        // is_admin字段已迁移到UUID角色系统
         available_points: 393580,
         description: '主要测试账号 - 超级管理员身份',
         created_by: 'USER_SPECIFICATION',
@@ -47,7 +47,7 @@ class TestAccountManager {
         user_id: 31,
         role_name: 'admin',
         role_level: 100,
-        is_admin: true, // 保持兼容性
+        // is_admin字段已迁移到UUID角色系统
         min_points: 1000,
         status: 'active'
       }),
@@ -109,7 +109,7 @@ class TestAccountManager {
     console.log('🛡️ 创建受保护测试配置:')
     console.log(`   📱 手机号: ${protectedConfig.testAccount.mobile}`)
     console.log(`   👤 用户ID: ${protectedConfig.testAccount.user_id}`)
-    console.log(`   👨‍💼 管理员: ${protectedConfig.testAccount.is_admin ? '是' : '否'}`)
+    console.log(`   👨‍💼 管理员: ${protectedConfig.testAccount.role_based_admin ? '是' : '否'}`)
     console.log(`   💰 积分: ${protectedConfig.testAccount.available_points}`)
 
     return protectedConfig
@@ -177,7 +177,7 @@ class TestAccountManager {
       main_account: {
         mobile: config.MAIN_TEST_ACCOUNT.mobile,
         user_id: config.MAIN_TEST_ACCOUNT.user_id,
-        is_admin: config.MAIN_TEST_ACCOUNT.is_admin,
+        role_based_admin: config.MAIN_TEST_ACCOUNT.role_based_admin,
         // 🎯 V4新增：测试权限报告
         test_privileges: config.MAIN_TEST_ACCOUNT.test_privileges
       },

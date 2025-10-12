@@ -6,6 +6,7 @@
  * @enhancement 修复接口不匹配，完善缺失方法，移除过度设计的数据库集成
  */
 
+const BeijingTimeHelper = require('../../../utils/timeHelper')
 const Logger = require('./Logger')
 
 class PerformanceMonitor {
@@ -87,7 +88,7 @@ class PerformanceMonitor {
       memory: process.memoryUsage(),
       data,
       // ✅ 添加测试期望的字段
-      timestamp: new Date().toISOString(),
+      timestamp: BeijingTimeHelper.now(),
       metadata: data
     }
 
@@ -155,7 +156,7 @@ class PerformanceMonitor {
           ? totalDuration / monitor.checkpoints.length
           : 0
       },
-      timestamp: new Date().toISOString()
+      timestamp: BeijingTimeHelper.now()
     }
 
     // 记录性能数据
@@ -353,9 +354,9 @@ class PerformanceMonitor {
    * @returns {Object} 实时指标
    */
   getRealTimeMetrics () {
-    const now = Date.now()
+    const now = BeijingTimeHelper.timestamp()
     const metrics = {
-      timestamp: new Date().toISOString(),
+      timestamp: BeijingTimeHelper.now(),
       activeMonitors: this.metrics.size,
       systemMemory: this.formatMemoryUsage(process.memoryUsage()),
       // ✅ 添加测试期望的字段
@@ -386,7 +387,7 @@ class PerformanceMonitor {
    * @param {number} maxAge - 最大保留时间（毫秒）
    */
   cleanupExpiredMetrics (maxAge = 300000) { // 默认5分钟
-    const now = Date.now()
+    const now = BeijingTimeHelper.timestamp()
     let cleanedCount = 0
 
     for (const [key, value] of this.metrics.entries()) {
@@ -481,7 +482,7 @@ class PerformanceMonitor {
         duration,
         threshold,
         exceedPercentage: (((duration - threshold) / threshold) * 100).toFixed(1),
-        timestamp: new Date().toISOString()
+        timestamp: BeijingTimeHelper.now()
       }
 
       this.logger.warn('⚠️ 性能告警', alert)
@@ -549,7 +550,7 @@ class PerformanceMonitor {
     existing.maxTime = Math.max(existing.maxTime, report.totalDuration)
     existing.minTime = Math.min(existing.minTime, report.totalDuration)
     existing.avgTime = existing.totalTime / existing.count
-    existing.lastUpdate = new Date().toISOString()
+    existing.lastUpdate = BeijingTimeHelper.now()
 
     this.metrics.set(key, existing)
   }
@@ -580,7 +581,7 @@ class PerformanceMonitor {
    * @returns {string} 唯一监控ID
    */
   generateMonitorId () {
-    return `monitor_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+    return `monitor_${BeijingTimeHelper.generateIdTimestamp()}_${Math.random().toString(36).substr(2, 9)}`
   }
 
   /**

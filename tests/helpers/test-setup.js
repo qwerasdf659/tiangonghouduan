@@ -6,6 +6,7 @@
  */
 
 // 🔧 修复：测试环境变量配置 - 解决环境变量缺失问题
+const BeijingTimeHelper = require('../../utils/timeHelper')
 require('dotenv').config()
 
 // 🔧 修复：设置必需的环境变量
@@ -219,7 +220,7 @@ class TestAssertions {
  */
 class TestTimeHelper {
   static getCurrentBeijingTime () {
-    return new Date().toISOString()
+    return BeijingTimeHelper.now()
   }
 
   static isValidTimestamp (timestamp) {

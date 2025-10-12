@@ -84,29 +84,37 @@ router.post('/batch-add', adminAuthMiddleware, asyncHandler(async (req, res) => 
 }))
 
 /**
- * GET /:campaign_id - 获取指定活动的奖品池
+ * GET /:campaign_code - 获取指定活动的奖品池
  *
  * @description 获取指定活动的所有奖品信息
- * @route GET /api/v4/unified-engine/admin/prize-pool/:campaign_id
+ * @route GET /api/v4/unified-engine/admin/prize-pool/:campaign_code
  * @access Private (需要管理员权限)
+ * 🎯 V4.2: 使用campaign_code标识符（方案2实施）
  */
-router.get('/:campaign_id', adminAuthMiddleware, asyncHandler(async (req, res) => {
+router.get('/:campaign_code', adminAuthMiddleware, asyncHandler(async (req, res) => {
   try {
-    const { campaign_id } = req.params
+    const { campaign_code } = req.params
 
-    if (!campaign_id || isNaN(parseInt(campaign_id))) {
-      return res.apiError('无效的活动ID', 'INVALID_CAMPAIGN_ID')
+    if (!campaign_code) {
+      return res.apiError('缺少活动代码', 'MISSING_CAMPAIGN_CODE')
     }
 
-    // 查找活动信息
-    const campaign = await models.LotteryCampaign.findByPk(campaign_id)
+    // 通过campaign_code查找活动信息
+    const campaign = await models.LotteryCampaign.findOne({
+      where: { campaign_code }
+    })
+
     if (!campaign) {
-      return res.apiError('活动不存在', 'CAMPAIGN_NOT_FOUND')
+      return res.apiError(
+        `活动不存在: ${campaign_code}`,
+        'CAMPAIGN_NOT_FOUND',
+        { campaign_code }
+      )
     }
 
-    // 获取奖品列表
+    // 获取奖品列表（内部使用campaign_id）
     const prizes = await models.Prize.findAll({
-      where: { campaign_id: parseInt(campaign_id) },
+      where: { campaign_id: campaign.campaign_id },
       order: [['created_at', 'DESC']]
     })
 
@@ -118,8 +126,8 @@ router.get('/:campaign_id', adminAuthMiddleware, asyncHandler(async (req, res) =
 
     const prizePoolInfo = {
       campaign: {
-        id: campaign.id,
-        name: campaign.name,
+        campaign_code: campaign.campaign_code,
+        campaign_name: campaign.campaign_name,
         status: campaign.status
       },
       statistics: {

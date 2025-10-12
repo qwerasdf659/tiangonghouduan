@@ -17,11 +17,11 @@ module.exports = sequelize => {
     'Role',
     {
       // 主键ID
-      id: {
+      role_id: {
         type: DataTypes.INTEGER,
         primaryKey: true,
         autoIncrement: true,
-        allowNull: false
+        comment: '主键ID'
       },
 
       // 🛡️ 核心：UUID角色标识（不可推测）
@@ -74,8 +74,8 @@ module.exports = sequelize => {
     {
       tableName: 'roles',
       timestamps: true,
-      createdAt: 'created_at',
-      updatedAt: 'updated_at',
+      created_at: 'created_at',
+      updated_at: 'updated_at',
       underscored: true,
       indexes: [
         {

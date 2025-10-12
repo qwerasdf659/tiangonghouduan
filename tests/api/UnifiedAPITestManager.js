@@ -366,7 +366,7 @@ class UnifiedAPITestManager extends BaseTestManager {
 
     try {
       const health_results = await Promise.all([
-        this.make_request('GET', '/health'),
+        this.health_check_with_cache(),
         this.mysql_suite.test_mysql_connection(),
         this.quality_checker.run_health_check()
       ])
@@ -468,8 +468,8 @@ class UnifiedAPITestManager extends BaseTestManager {
   async authenticate_test_users () {
     console.log('🔑 开始认证测试用户...')
     try {
-      // 简化版认证测试
-      const response = await this.make_request('GET', '/api/v4/unified-engine/health')
+      // 简化版认证测试 - 修复路径
+      const response = await this.make_request('GET', '/api/v4/unified-engine/lottery/health')
       console.log('✅ 测试用户认证完成')
       return { success: response.status === 200 }
     } catch (error) {
@@ -484,7 +484,7 @@ class UnifiedAPITestManager extends BaseTestManager {
   async test_mysql_connection () {
     console.log('🗄️ 开始MySQL连接测试...')
     try {
-      const result = await this.mysql_suite.test_database_connection()
+      const result = await this.mysql_suite.test_mysql_connection()
       console.log('✅ MySQL连接测试完成')
       return result
     } catch (error) {

@@ -8,10 +8,10 @@
  */
 
 // V4 核心服务
-const UnifiedLotteryEngine = require('./UnifiedLotteryEngine/UnifiedLotteryEngine')
+const { UnifiedLotteryEngine } = require('./UnifiedLotteryEngine/UnifiedLotteryEngine')
+const { ThumbnailService } = require('./ThumbnailService') // 🎯 导入类
 // const UserInventoryService = require('./UserInventoryService') // TODO: 待实现
 // const PhotoUploadService = require('./PhotoUploadService') // TODO: 待实现
-const ThumbnailService = require('./ThumbnailService')
 
 // V4 模块化服务
 const { lottery_service_container } = require('./lottery')

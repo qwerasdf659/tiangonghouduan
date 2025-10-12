@@ -14,13 +14,17 @@
 class BeijingTimeHelper {
   /**
    * 获取当前北京时间的ISO字符串
-   * @returns {string} 北京时间的ISO格式字符串
+   * @returns {string} 北京时间的ISO格式字符串 (格式: 2025-10-01T23:49:00.000+08:00)
    */
   static now () {
     const now = new Date()
     // 转换为北京时间
-    const beijingTime = new Date(now.getTime() + 8 * 60 * 60 * 1000)
-    return beijingTime.toISOString()
+    const beijingOffset = 8 * 60 // 北京时间偏移量（分钟）
+    const utc = now.getTime() + now.getTimezoneOffset() * 60000
+    const beijingTime = new Date(utc + beijingOffset * 60000)
+
+    // 返回符合ISO格式但显示北京时间的字符串，格式: 2025-10-01T23:49:00.000+08:00
+    return beijingTime.toISOString().replace('Z', '+08:00')
   }
 
   /**
@@ -260,6 +264,99 @@ class BeijingTimeHelper {
       return isoPattern.test(timestamp)
     } catch (error) {
       return false
+    }
+  }
+
+  /**
+   * 🆕 创建数据库存储用的Date对象（北京时间）
+   * 替代 new Date() 和 DataTypes.NOW
+   * @returns {Date} 当前北京时间的Date对象
+   */
+  static createDatabaseTime () {
+    // 返回当前时间的Date对象，数据库会自动处理时区
+    // 由于数据库配置了timezone: '+08:00'，会正确存储为北京时间
+    return new Date()
+  }
+
+  /**
+   * 🆕 获取未来某个时间点（北京时间）
+   * 用于设置过期时间等场景
+   * @param {number} milliseconds - 毫秒数
+   * @returns {Date} 未来时间的Date对象
+   */
+  static futureTime (milliseconds) {
+    return new Date(Date.now() + milliseconds)
+  }
+
+  /**
+   * 🆕 检查时间是否已过期（北京时间）
+   * @param {Date|string} expiryTime - 过期时间
+   * @returns {boolean} 是否已过期
+   */
+  static isExpired (expiryTime) {
+    if (!expiryTime) return false
+    const expiry = new Date(expiryTime)
+    return new Date() > expiry
+  }
+
+  /**
+   * 🆕 计算时间差（毫秒）
+   * @param {Date|string} startTime - 开始时间
+   * @param {Date|string} endTime - 结束时间（默认当前时间）
+   * @returns {number} 时间差（毫秒）
+   */
+  static timeDiff (startTime, endTime = new Date()) {
+    const start = new Date(startTime)
+    const end = new Date(endTime)
+    return end.getTime() - start.getTime()
+  }
+
+  /**
+   * 🆕 格式化时间差为友好显示
+   * @param {number} milliseconds - 毫秒数
+   * @returns {string} 友好的时间差显示
+   */
+  static formatDuration (milliseconds) {
+    if (milliseconds < 1000) {
+      return `${milliseconds}毫秒`
+    }
+    const seconds = Math.floor(milliseconds / 1000)
+    if (seconds < 60) {
+      return `${seconds}秒`
+    }
+    const minutes = Math.floor(seconds / 60)
+    if (minutes < 60) {
+      return `${minutes}分钟${seconds % 60}秒`
+    }
+    const hours = Math.floor(minutes / 60)
+    if (hours < 24) {
+      return `${hours}小时${minutes % 60}分钟`
+    }
+    const days = Math.floor(hours / 24)
+    return `${days}天${hours % 24}小时`
+  }
+
+  /**
+   * 🆕 生成唯一ID用的时间戳字符串
+   * @returns {string} 36进制时间戳字符串
+   */
+  static generateIdTimestamp () {
+    return Date.now().toString(36)
+  }
+
+  /**
+   * 🆕 标准化API响应时间格式
+   * 确保所有API返回的时间格式一致
+   * @param {Date|string} date - 输入时间
+   * @returns {Object} 包含多种格式的时间对象
+   */
+  static formatForAPI (date = new Date()) {
+    const inputDate = new Date(date)
+    return {
+      iso: inputDate.toISOString(),
+      beijing: BeijingTimeHelper.toBeijingTime(inputDate),
+      timestamp: inputDate.getTime(),
+      relative: BeijingTimeHelper.formatRelativeTime(inputDate)
     }
   }
 

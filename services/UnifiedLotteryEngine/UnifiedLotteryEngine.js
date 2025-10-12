@@ -8,6 +8,7 @@
  * @timezone Asia/Shanghai (北京时间)
  */
 
+const BeijingTimeHelper = require('../../utils/timeHelper')
 const BasicGuaranteeStrategy = require('./strategies/BasicGuaranteeStrategy')
 const ManagementStrategy = require('./strategies/ManagementStrategy')
 const PerformanceMonitor = require('./utils/PerformanceMonitor')
@@ -42,11 +43,11 @@ class UnifiedLotteryEngine {
       averageExecutionTime: 0,
       executionTimes: [],
       strategiesUsed: {},
-      lastResetTime: new Date().toISOString()
+      lastResetTime: BeijingTimeHelper.now()
     }
 
     // 启动时间戳
-    this.startTime = Date.now()
+    this.startTime = BeijingTimeHelper.timestamp()
 
     this.logInfo('V4统一抽奖引擎初始化完成', {
       version: this.version,
@@ -83,13 +84,13 @@ class UnifiedLotteryEngine {
    * @returns {Object} 抽奖结果
    */
   async executeLottery (context) {
-    const startTime = Date.now()
+    const startTime = BeijingTimeHelper.timestamp()
     const executionId = this.generateExecutionId()
 
     try {
       this.logInfo('开始执行抽奖', {
         executionId,
-        userId: context?.user_id || context?.userId,
+        user_id: context?.user_id || context?.user_id,
         campaignId: context?.campaign_id || context?.campaignId
       })
 
@@ -161,7 +162,7 @@ class UnifiedLotteryEngine {
 
       // 检查是否有成功的结果
       if (!finalResult) {
-        const executionTime = Date.now() - startTime
+        const executionTime = BeijingTimeHelper.timestamp() - startTime
         this.updateMetrics(startTime, false, null)
         return this.createEngineError('所有策略执行失败', {
           availableStrategies: strategyChain,
@@ -176,12 +177,12 @@ class UnifiedLotteryEngine {
         executionId,
         success: finalResult.success,
         strategy: finalResult.strategy_used,
-        executionTime: Date.now() - startTime
+        executionTime: BeijingTimeHelper.timestamp() - startTime
       })
 
       return finalResult
     } catch (error) {
-      const executionTime = Date.now() - startTime
+      const executionTime = BeijingTimeHelper.timestamp() - startTime
       this.updateMetrics(startTime, false, null)
 
       this.logError('抽奖执行异常', {
@@ -268,6 +269,7 @@ class UnifiedLotteryEngine {
             prize_name: result.prize?.name || null,
             prize_type: result.prize?.type || null,
             prize_value: result.prize?.value || null,
+            sort_order: result.prize?.sort_order || null, // 🎯 方案3：传递sort_order字段
             probability: result.probability || 0,
             points_cost: result.pointsCost || 0,
             remaining_points: result.remainingPoints || 0
@@ -317,7 +319,7 @@ class UnifiedLotteryEngine {
    * 更新性能指标
    */
   updateMetrics (startTime, success, strategyUsed) {
-    const executionTime = Math.max(Date.now() - startTime, 1) // 最小1ms
+    const executionTime = Math.max(BeijingTimeHelper.timestamp() - startTime, 1) // 最小1ms
 
     this.metrics.totalExecutions++
     if (success) {
@@ -370,7 +372,7 @@ class UnifiedLotteryEngine {
       strategyType,
       status: strategy.enabled !== false ? 'enabled' : 'disabled',
       config,
-      lastChecked: new Date().toISOString()
+      lastChecked: BeijingTimeHelper.now()
     }
   }
 
@@ -404,7 +406,7 @@ class UnifiedLotteryEngine {
    * 获取性能指标
    */
   getMetrics () {
-    const uptime = Date.now() - this.startTime
+    const uptime = BeijingTimeHelper.timestamp() - this.startTime
     const successRate = this.metrics.totalExecutions > 0
       ? (this.metrics.successfulExecutions / this.metrics.totalExecutions) * 100
       : 0
@@ -476,7 +478,7 @@ class UnifiedLotteryEngine {
         enabledStrategies: enabledStrategies.length,
         totalExecutions: this.metrics.totalExecutions,
         successRate: this.getMetrics().successRate,
-        uptime: this.formatUptime(Date.now() - this.startTime),
+        uptime: this.formatUptime(BeijingTimeHelper.timestamp() - this.startTime),
         timestamp: this.getBeijingTimestamp(),
         version: this.version
       }
@@ -496,7 +498,7 @@ class UnifiedLotteryEngine {
    * 异步健康检查
    */
   async healthCheck () {
-    const startTime = Date.now()
+    const startTime = BeijingTimeHelper.timestamp()
 
     try {
       const strategies = {}
@@ -509,7 +511,7 @@ class UnifiedLotteryEngine {
         }
       }
 
-      const checkTime = Date.now() - startTime
+      const checkTime = BeijingTimeHelper.timestamp() - startTime
 
       return {
         status: 'healthy',
@@ -539,7 +541,7 @@ class UnifiedLotteryEngine {
    * 生成执行ID
    */
   generateExecutionId () {
-    const timestamp = Date.now()
+    const timestamp = BeijingTimeHelper.timestamp()
     const random = Math.random().toString(36).substr(2, 6)
     return `exec_${timestamp}_${random}`
   }
@@ -548,7 +550,7 @@ class UnifiedLotteryEngine {
    * 获取北京时间戳
    */
   getBeijingTimestamp () {
-    return new Date().toISOString()
+    return BeijingTimeHelper.now()
   }
 
   /**
@@ -581,6 +583,567 @@ class UnifiedLotteryEngine {
   logWarn (message, data = {}) {
     this.log('warn', message, data)
   }
+
+  /**
+   * ============================================
+   * 🔥 业务API方法（路由层调用）
+   * 以下方法为路由层提供直接的业务功能支持
+   * ============================================
+   */
+
+  /**
+   * 获取活动的奖品列表
+   * @param {number} campaign_id - 活动ID
+   * @returns {Promise<Array>} 奖品列表
+   */
+  async get_campaign_prizes (campaign_id) {
+    try {
+      const models = require('../../models')
+
+      const prizes = await models.LotteryPrize.findAll({
+        where: {
+          campaign_id,
+          status: 'active'
+        },
+        attributes: [
+          'prize_id',
+          'prize_name',
+          'prize_type',
+          'prize_value',
+          'prize_description',
+          'image_id',
+          'win_probability',
+          'stock_quantity',
+          'max_daily_wins',
+          'daily_win_count',
+          'status',
+          'sort_order',
+          'created_at'
+        ],
+        order: [
+          ['sort_order', 'ASC'],
+          ['prize_id', 'ASC']
+        ]
+      })
+
+      this.logInfo('获取活动奖品列表', {
+        campaign_id,
+        prizesCount: prizes.length
+      })
+
+      return prizes
+    } catch (error) {
+      this.logError('获取活动奖品列表失败', {
+        campaign_id,
+        error: error.message
+      })
+      throw new Error(`获取活动奖品失败: ${error.message}`)
+    }
+  }
+
+  /**
+   * 获取活动配置信息
+   * @param {number} campaign_id - 活动ID
+   * @returns {Promise<Object>} 活动配置
+   */
+  async get_campaign_config (campaign_id) {
+    try {
+      const models = require('../../models')
+
+      const campaign = await models.LotteryCampaign.findOne({
+        where: { campaign_id },
+        attributes: [
+          'campaign_id',
+          'campaign_name',
+          'campaign_code',
+          'campaign_type',
+          'cost_per_draw',
+          'max_draws_per_user_daily',
+          'max_draws_per_user_total',
+          'status',
+          'start_time',
+          'end_time',
+          'total_prize_pool',
+          'remaining_prize_pool',
+          'created_at',
+          'updated_at'
+        ]
+      })
+
+      if (!campaign) {
+        throw new Error('活动不存在')
+      }
+
+      // 🎯 整合保底规则配置（从BasicGuaranteeStrategy获取）
+      const basicGuaranteeStrategy = this.strategies.get('basic_guarantee')
+      const guaranteeRule = basicGuaranteeStrategy?.config?.guaranteeRule || null
+
+      this.logInfo('获取活动配置', {
+        campaign_id,
+        campaign_name: campaign.campaign_name,
+        status: campaign.status
+      })
+
+      return {
+        ...campaign.toJSON(),
+        guarantee_rule: guaranteeRule // 添加保底规则信息
+      }
+    } catch (error) {
+      this.logError('获取活动配置失败', {
+        campaign_id,
+        error: error.message
+      })
+      throw new Error(`获取活动配置失败: ${error.message}`)
+    }
+  }
+
+  /**
+   * 执行抽奖（路由层调用接口）
+   * @param {number} user_id - 用户ID
+   * @param {number} campaign_id - 活动ID
+   * @param {number} draw_count - 抽奖次数（默认1次）
+   * @returns {Promise<Object>} 抽奖结果
+   */
+  async execute_draw (user_id, campaign_id, draw_count = 1) {
+    try {
+      this.logInfo('开始执行抽奖（路由层调用）', {
+        user_id,
+        campaign_id,
+        draw_count
+      })
+
+      // 🔴 参数验证
+      if (!user_id || !campaign_id) {
+        throw new Error('缺少必需参数：user_id或campaign_id')
+      }
+
+      if (draw_count < 1 || draw_count > 10) {
+        throw new Error('抽奖次数必须在1-10之间')
+      }
+
+      // 获取用户积分信息
+      const models = require('../../models')
+      const userAccount = await models.UserPointsAccount.findOne({
+        where: { user_id }
+      })
+
+      if (!userAccount) {
+        throw new Error('用户积分账户不存在')
+      }
+
+      const results = []
+      let totalPointsCost = 0
+
+      // 执行多次抽奖
+      for (let i = 0; i < draw_count; i++) {
+        const context = {
+          user_id,
+          campaign_id,
+          draw_number: i + 1,
+          total_draws: draw_count,
+          user_status: {
+            available_points: userAccount.available_points - totalPointsCost
+          }
+        }
+
+        // 调用统一抽奖引擎
+        const drawResult = await this.executeLottery(context)
+
+        if (drawResult.success) {
+          results.push({
+            draw_number: i + 1,
+            is_winner: drawResult.data?.draw_result?.is_winner || false,
+            prize: drawResult.data?.draw_result?.prize_id
+              ? {
+                id: drawResult.data.draw_result.prize_id,
+                name: drawResult.data.draw_result.prize_name,
+                type: drawResult.data.draw_result.prize_type,
+                value: drawResult.data.draw_result.prize_value,
+                sort_order: drawResult.data.draw_result.sort_order // 🎯 方案3：传递sort_order给路由层
+              }
+              : null,
+            points_cost: drawResult.data?.draw_result?.points_cost || 0
+          })
+
+          totalPointsCost += (drawResult.data?.draw_result?.points_cost || 0)
+        } else {
+          // 抽奖失败，停止后续抽奖
+          throw new Error(drawResult.message || '抽奖执行失败')
+        }
+      }
+
+      // 计算最终积分余额
+      const remainingPoints = userAccount.available_points - totalPointsCost
+
+      this.logInfo('抽奖执行完成', {
+        user_id,
+        campaign_id,
+        draw_count,
+        totalPointsCost,
+        remainingPoints,
+        winners: results.filter(r => r.is_winner).length
+      })
+
+      return {
+        success: true,
+        prizes: results,
+        draw_count,
+        total_points_cost: totalPointsCost,
+        remaining_balance: remainingPoints
+      }
+    } catch (error) {
+      this.logError('抽奖执行失败', {
+        user_id,
+        campaign_id,
+        draw_count,
+        error: error.message
+      })
+      throw new Error(`抽奖执行失败: ${error.message}`)
+    }
+  }
+
+  /**
+   * 获取用户抽奖历史
+   * @param {number} user_id - 用户ID
+   * @param {Object} options - 查询选项 {page, limit, campaign_id}
+   * @returns {Promise<Object>} 抽奖历史记录
+   */
+  async get_user_history (user_id, options = {}) {
+    try {
+      const models = require('../../models')
+      const { page = 1, limit = 20, campaign_id } = options
+
+      const offset = (page - 1) * limit
+
+      // 构建查询条件
+      const whereClause = { user_id }
+      if (campaign_id) {
+        whereClause.campaign_id = campaign_id
+      }
+
+      // 查询抽奖记录
+      const { rows: records, count: total } = await models.LotteryDraw.findAndCountAll({
+        where: whereClause,
+        include: [
+          {
+            model: models.LotteryCampaign,
+            as: 'campaign',
+            attributes: ['campaign_id', 'campaign_name', 'campaign_type']
+          },
+          {
+            model: models.LotteryPrize,
+            as: 'prize',
+            attributes: ['prize_id', 'prize_name', 'prize_type', 'prize_value', 'image_id', 'win_probability'], // 🎯 从奖品中获取概率
+            required: false
+          }
+        ],
+        attributes: [
+          'draw_id',
+          'user_id',
+          'campaign_id',
+          'prize_id',
+          'is_winner',
+          'draw_type',
+          'cost_points',
+          // 🎯 移除win_probability（LotteryDraw中不存在此字段）
+          'guarantee_triggered',
+          'created_at'
+        ],
+        order: [['created_at', 'DESC']],
+        limit: parseInt(limit),
+        offset: parseInt(offset)
+      })
+
+      const totalPages = Math.ceil(total / limit)
+
+      this.logInfo('获取用户抽奖历史', {
+        user_id,
+        page,
+        limit,
+        total,
+        recordsCount: records.length
+      })
+
+      return {
+        records: records.map(record => ({
+          draw_id: record.draw_id,
+          campaign_id: record.campaign_id,
+          campaign_name: record.campaign?.campaign_name || '未知活动',
+          is_winner: record.is_winner,
+          prize: record.prize
+            ? {
+              id: record.prize.prize_id,
+              name: record.prize.prize_name,
+              type: record.prize.prize_type,
+              value: record.prize.prize_value,
+              image_id: record.prize.image_id
+            }
+            : null,
+          points_cost: record.cost_points,
+          probability: record.prize?.win_probability || 0, // 🎯 从关联的奖品中获取概率
+          is_guarantee: record.guarantee_triggered || false,
+          draw_time: record.created_at
+        })),
+        pagination: {
+          current_page: parseInt(page),
+          page_size: parseInt(limit),
+          total_records: total,
+          total_pages: totalPages
+        }
+      }
+    } catch (error) {
+      this.logError('获取用户抽奖历史失败', {
+        user_id,
+        options,
+        error: error.message
+      })
+      throw new Error(`获取抽奖历史失败: ${error.message}`)
+    }
+  }
+
+  /**
+   * 获取活动列表
+   * @param {Object} options - 查询选项 {status, user_id}
+   * @returns {Promise<Array>} 活动列表
+   */
+  async get_campaigns (options = {}) {
+    try {
+      const models = require('../../models')
+      const { status = 'active', user_id } = options
+
+      // 构建查询条件
+      const whereClause = {}
+      if (status) {
+        whereClause.status = status
+      }
+
+      // 查询活动列表
+      const campaigns = await models.LotteryCampaign.findAll({
+        where: whereClause,
+        attributes: [
+          'campaign_id',
+          'campaign_name',
+          'campaign_code',
+          'campaign_type',
+          'cost_per_draw',
+          'max_draws_per_user_daily',
+          'status',
+          'start_time',
+          'end_time',
+          'total_prize_pool',
+          'remaining_prize_pool'
+        ],
+        order: [
+          ['status', 'DESC'], // active优先
+          ['start_time', 'DESC']
+        ]
+      })
+
+      // 如果提供了user_id，查询用户今日抽奖次数
+      const userDrawCounts = {}
+      if (user_id) {
+        const today = require('moment-timezone')().tz('Asia/Shanghai').startOf('day').toDate()
+
+        for (const campaign of campaigns) {
+          const drawCount = await models.LotteryDraw.count({
+            where: {
+              user_id,
+              campaign_id: campaign.campaign_id,
+              created_at: {
+                [require('sequelize').Op.gte]: today
+              }
+            }
+          })
+          userDrawCounts[campaign.campaign_id] = drawCount
+        }
+      }
+
+      this.logInfo('获取活动列表', {
+        status,
+        user_id,
+        campaignsCount: campaigns.length
+      })
+
+      return campaigns.map(campaign => ({
+        campaign_id: campaign.campaign_id,
+        campaign_name: campaign.campaign_name,
+        campaign_code: campaign.campaign_code,
+        campaign_type: campaign.campaign_type,
+        cost_per_draw: campaign.cost_per_draw,
+        max_draws_per_day: campaign.max_draws_per_user_daily,
+        status: campaign.status,
+        start_time: campaign.start_time,
+        end_time: campaign.end_time,
+        total_prize_pool: campaign.total_prize_pool,
+        remaining_prize_pool: campaign.remaining_prize_pool,
+        user_today_draws: user_id
+          ? (userDrawCounts[campaign.campaign_id] || 0)
+          : undefined,
+        can_draw: user_id
+          ? (userDrawCounts[campaign.campaign_id] || 0) < campaign.max_draws_per_user_daily
+          : undefined
+      }))
+    } catch (error) {
+      this.logError('获取活动列表失败', {
+        options,
+        error: error.message
+      })
+      throw new Error(`获取活动列表失败: ${error.message}`)
+    }
+  }
+
+  /**
+   * 获取用户抽奖统计信息
+   * @param {number} user_id - 用户ID
+   * @returns {Promise<Object>} 统计信息
+   */
+  async get_user_statistics (user_id) {
+    try {
+      const models = require('../../models')
+      const { Op } = require('sequelize')
+
+      // 统计总抽奖次数
+      const totalDraws = await models.LotteryDraw.count({
+        where: { user_id }
+      })
+
+      // 统计中奖次数
+      const totalWins = await models.LotteryDraw.count({
+        where: {
+          user_id,
+          is_winner: true
+        }
+      })
+
+      // 统计保底中奖次数
+      const guaranteeWins = await models.LotteryDraw.count({
+        where: {
+          user_id,
+          is_winner: true,
+          guarantee_triggered: true
+        }
+      })
+
+      // 统计今日抽奖次数
+      const today = require('moment-timezone')().tz('Asia/Shanghai').startOf('day').toDate()
+      const todayDraws = await models.LotteryDraw.count({
+        where: {
+          user_id,
+          created_at: {
+            [Op.gte]: today
+          }
+        }
+      })
+
+      // 统计今日中奖次数
+      const todayWins = await models.LotteryDraw.count({
+        where: {
+          user_id,
+          is_winner: true,
+          created_at: {
+            [Op.gte]: today
+          }
+        }
+      })
+
+      // 统计总消耗积分
+      const totalPointsCost = await models.LotteryDraw.sum('cost_points', {
+        where: { user_id }
+      }) || 0
+
+      // 统计各类奖品中奖次数
+      const prizeTypeStats = await models.LotteryDraw.findAll({
+        where: {
+          user_id,
+          is_winner: true,
+          prize_type: { [Op.ne]: null }
+        },
+        attributes: [
+          'prize_type',
+          [models.sequelize.fn('COUNT', '*'), 'count']
+        ],
+        group: ['prize_type'],
+        raw: true
+      })
+
+      // 查询最近一次中奖记录
+      const lastWin = await models.LotteryDraw.findOne({
+        where: {
+          user_id,
+          is_winner: true
+        },
+        include: [
+          {
+            model: models.LotteryPrize,
+            as: 'prize',
+            attributes: ['prize_id', 'prize_name', 'prize_type', 'prize_value']
+          }
+        ],
+        attributes: ['draw_id', 'campaign_id', 'created_at', 'guarantee_triggered'],
+        order: [['created_at', 'DESC']]
+      })
+
+      // 计算中奖率
+      const winRate = totalDraws > 0
+        ? ((totalWins / totalDraws) * 100).toFixed(2)
+        : 0
+      const todayWinRate = todayDraws > 0
+        ? ((todayWins / todayDraws) * 100).toFixed(2)
+        : 0
+
+      this.logInfo('获取用户抽奖统计', {
+        user_id,
+        totalDraws,
+        totalWins,
+        winRate
+      })
+
+      return {
+        user_id,
+        total_draws: totalDraws,
+        total_wins: totalWins,
+        guarantee_wins: guaranteeWins,
+        normal_wins: totalWins - guaranteeWins,
+        win_rate: parseFloat(winRate),
+        today_draws: todayDraws,
+        today_wins: todayWins,
+        today_win_rate: parseFloat(todayWinRate),
+        total_points_cost: parseInt(totalPointsCost),
+        prize_type_distribution: prizeTypeStats.reduce((acc, stat) => {
+          acc[stat.prize_type] = parseInt(stat.count)
+          return acc
+        }, {}),
+        last_win: lastWin
+          ? {
+            draw_id: lastWin.draw_id,
+            campaign_id: lastWin.campaign_id,
+            prize: lastWin.prize
+              ? {
+                id: lastWin.prize.prize_id,
+                name: lastWin.prize.prize_name,
+                type: lastWin.prize.prize_type,
+                value: lastWin.prize.prize_value
+              }
+              : null,
+            is_guarantee: lastWin.guarantee_triggered || false,
+            win_time: lastWin.created_at
+          }
+          : null,
+        timestamp: BeijingTimeHelper.now()
+      }
+    } catch (error) {
+      this.logError('获取用户抽奖统计失败', {
+        user_id,
+        error: error.message
+      })
+      throw new Error(`获取用户统计失败: ${error.message}`)
+    }
+  }
 }
 
-module.exports = UnifiedLotteryEngine
+// 🔥 导出单例实例（供路由层直接调用）
+const engineInstance = new UnifiedLotteryEngine()
+
+// 同时导出类（供需要自定义配置的场景）
+module.exports = engineInstance
+module.exports.UnifiedLotteryEngine = UnifiedLotteryEngine

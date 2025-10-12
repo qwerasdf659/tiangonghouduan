@@ -13,12 +13,14 @@
  * 使用 Claude Sonnet 4 模型
  */
 
+const BeijingTimeHelper = require('../../../utils/timeHelper')
 const express = require('express')
 const router = express.Router()
 const models = require('../../../models')
 const ApiResponse = require('../../../utils/ApiResponse')
 const { authenticateToken, requireAdmin } = require('../../../middleware/auth')
 const Logger = require('../../../services/UnifiedLotteryEngine/utils/Logger')
+const { Op } = require('sequelize')
 
 const logger = new Logger('InventoryAPI')
 
@@ -99,7 +101,7 @@ router.get('/user/:user_id', authenticateToken, async (req, res) => {
 
       // 添加过期状态
       if (itemData.expires_at) {
-        itemData.is_expired = new Date() > new Date(itemData.expires_at)
+        itemData.is_expired = BeijingTimeHelper.createBeijingTime() > new Date(itemData.expires_at)
       }
 
       return itemData
@@ -112,15 +114,19 @@ router.get('/user/:user_id', authenticateToken, async (req, res) => {
       filters: { status, type }
     })
 
-    return ApiResponse.success(res, {
-      inventory: processedInventory,
-      pagination: {
-        total: count,
-        page: parseInt(page),
-        limit: parseInt(limit),
-        total_pages: Math.ceil(count / limit)
-      }
-    }, '获取库存列表成功')
+    return ApiResponse.success(
+      res,
+      {
+        inventory: processedInventory,
+        pagination: {
+          total: count,
+          page: parseInt(page),
+          limit: parseInt(limit),
+          total_pages: Math.ceil(count / limit)
+        }
+      },
+      '获取库存列表成功'
+    )
   } catch (error) {
     logger.error('获取用户库存失败', { error: error.message, user_id: req.params.user_id })
     return ApiResponse.error(res, '获取库存列表失败', 500)
@@ -136,7 +142,7 @@ router.get('/item/:item_id', authenticateToken, async (req, res) => {
     const { item_id } = req.params
 
     const item = await models.UserInventory.findOne({
-      where: { id: item_id },
+      where: { inventory_id: item_id },
       include: [
         {
           model: models.User,
@@ -188,7 +194,7 @@ router.post('/use/:item_id', authenticateToken, async (req, res) => {
     const { verification_code } = req.body
 
     const item = await models.UserInventory.findOne({
-      where: { id: item_id }
+      where: { inventory_id: item_id }
     })
 
     if (!item) {
@@ -201,7 +207,7 @@ router.post('/use/:item_id', authenticateToken, async (req, res) => {
     }
 
     // 检查是否过期
-    if (item.expires_at && new Date() > new Date(item.expires_at)) {
+    if (item.expires_at && BeijingTimeHelper.createDatabaseTime() > new Date(item.expires_at)) {
       await item.update({ status: 'expired' })
       return ApiResponse.error(res, '物品已过期', 400)
     }
@@ -214,7 +220,7 @@ router.post('/use/:item_id', authenticateToken, async (req, res) => {
     // 使用物品
     await item.update({
       status: 'used',
-      used_at: new Date()
+      used_at: BeijingTimeHelper.createBeijingTime()
     })
 
     logger.info('库存物品使用成功', {
@@ -237,32 +243,22 @@ router.post('/use/:item_id', authenticateToken, async (req, res) => {
 router.get('/admin/statistics', requireAdmin, async (req, res) => {
   try {
     // 获取库存统计数据
-    const [
-      totalItems,
-      availableItems,
-      usedItems,
-      expiredItems,
-      typeStats,
-      recentItems
-    ] = await Promise.all([
-      models.UserInventory.count(),
-      models.UserInventory.count({ where: { status: 'available' } }),
-      models.UserInventory.count({ where: { status: 'used' } }),
-      models.UserInventory.count({ where: { status: 'expired' } }),
-      models.UserInventory.findAll({
-        attributes: [
-          'type',
-          'icon',
-          [models.sequelize.fn('COUNT', '*'), 'count']
-        ],
-        group: ['type', 'icon']
-      }),
-      models.UserInventory.findAll({
-        attributes: ['id', 'name', 'type', 'icon', 'status', 'created_at'],
-        order: [['created_at', 'DESC']],
-        limit: 10
-      })
-    ])
+    const [totalItems, availableItems, usedItems, expiredItems, typeStats, recentItems] =
+      await Promise.all([
+        models.UserInventory.count(),
+        models.UserInventory.count({ where: { status: 'available' } }),
+        models.UserInventory.count({ where: { status: 'used' } }),
+        models.UserInventory.count({ where: { status: 'expired' } }),
+        models.UserInventory.findAll({
+          attributes: ['type', 'icon', [models.sequelize.fn('COUNT', '*'), 'count']],
+          group: ['type', 'icon']
+        }),
+        models.UserInventory.findAll({
+          attributes: ['id', 'name', 'type', 'icon', 'status', 'created_at'],
+          order: [['created_at', 'DESC']],
+          limit: 10
+        })
+      ])
 
     const statistics = {
       total_items: totalItems,
@@ -291,6 +287,304 @@ router.get('/admin/statistics', requireAdmin, async (req, res) => {
 })
 
 /**
+ * 获取商品列表（兑换商品）
+ * GET /api/v4/inventory/products
+ */
+router.get('/products', authenticateToken, async (req, res) => {
+  try {
+    const { space = 'lucky', category, page = 1, limit = 20 } = req.query
+    const { getUserRoles } = require('../../../middleware/auth')
+    const DataSanitizer = require('../../../services/DataSanitizer')
+
+    // 获取用户权限
+    const userRoles = await getUserRoles(req.user.user_id)
+    const dataLevel = userRoles.isAdmin ? 'full' : 'public'
+
+    // 构建查询条件
+    const whereClause = {
+      is_active: true,
+      status: 'active'
+    }
+
+    // 空间过滤
+    if (space !== 'all') {
+      whereClause.space = [space, 'both']
+    }
+
+    // 分类过滤
+    if (category && category !== 'all') {
+      whereClause.category = category
+    }
+
+    const offset = (page - 1) * limit
+
+    // 查询商品
+    const { count, rows: products } = await models.Product.findAndCountAll({
+      where: whereClause,
+      order: [
+        ['sort_order', 'ASC'],
+        ['created_at', 'DESC']
+      ],
+      limit: parseInt(limit),
+      offset
+    })
+
+    // 数据脱敏处理
+    const sanitizedProducts = DataSanitizer.sanitizeExchangeProducts(
+      products.map(p => p.toJSON()),
+      dataLevel
+    )
+
+    logger.info('获取商品列表成功', {
+      user_id: req.user.user_id,
+      space,
+      category,
+      total: count,
+      returned: products.length
+    })
+
+    return ApiResponse.success(
+      res,
+      {
+        products: sanitizedProducts,
+        pagination: {
+          total: count,
+          page: parseInt(page),
+          limit: parseInt(limit),
+          total_pages: Math.ceil(count / limit)
+        }
+      },
+      '获取商品列表成功'
+    )
+  } catch (error) {
+    logger.error('获取商品列表失败', { error: error.message })
+    return ApiResponse.error(res, '获取商品列表失败', 500)
+  }
+})
+
+/**
+ * 兑换商品
+ * POST /api/v4/inventory/exchange
+ */
+router.post('/exchange', authenticateToken, async (req, res) => {
+  try {
+    const { product_id, quantity = 1 } = req.body
+    const user_id = req.user.user_id
+    const PointsService = require('../../../services/PointsService')
+
+    // 参数验证
+    if (!product_id) {
+      return ApiResponse.error(res, '商品ID不能为空', 400)
+    }
+
+    if (quantity <= 0 || quantity > 10) {
+      return ApiResponse.error(res, '兑换数量必须在1-10之间', 400)
+    }
+
+    // 执行兑换
+    const result = await PointsService.exchangeProduct(user_id, product_id, quantity)
+
+    logger.info('商品兑换成功', {
+      user_id,
+      product_id,
+      quantity,
+      exchange_id: result.exchange_id,
+      total_points: result.total_points
+    })
+
+    return ApiResponse.success(res, result, '商品兑换成功')
+  } catch (error) {
+    logger.error('商品兑换失败', {
+      error: error.message,
+      user_id: req.user.user_id,
+      product_id: req.body.product_id
+    })
+    return ApiResponse.error(res, error.message, 500)
+  }
+})
+
+/**
+ * 获取兑换记录
+ * GET /api/v4/inventory/exchange-records
+ */
+router.get('/exchange-records', authenticateToken, async (req, res) => {
+  try {
+    const { page = 1, limit = 20, status, space } = req.query
+    const user_id = req.user.user_id
+    const PointsService = require('../../../services/PointsService')
+    const DataSanitizer = require('../../../services/DataSanitizer')
+    const { getUserRoles } = require('../../../middleware/auth')
+
+    // 获取用户权限
+    const userRoles = await getUserRoles(user_id)
+    const dataLevel = userRoles.isAdmin ? 'full' : 'public'
+
+    // 获取兑换记录
+    const result = await PointsService.getExchangeRecords(user_id, {
+      page: parseInt(page),
+      limit: parseInt(limit),
+      status,
+      space
+    })
+
+    // 数据脱敏处理
+    const sanitizedRecords = DataSanitizer.sanitizeExchangeRecords(
+      result.records.map(r => r.toJSON()),
+      dataLevel
+    )
+
+    logger.info('获取兑换记录成功', {
+      user_id,
+      total: result.pagination.total,
+      returned: result.records.length
+    })
+
+    return ApiResponse.success(
+      res,
+      {
+        records: sanitizedRecords,
+        pagination: result.pagination
+      },
+      '获取兑换记录成功'
+    )
+  } catch (error) {
+    logger.error('获取兑换记录失败', { error: error.message, user_id: req.user.user_id })
+    return ApiResponse.error(res, '获取兑换记录失败', 500)
+  }
+})
+
+/**
+ * 生成核销码
+ * POST /api/v4/inventory/generate-code/:item_id
+ */
+router.post('/generate-code/:item_id', authenticateToken, async (req, res) => {
+  try {
+    const { item_id } = req.params
+    const PointsService = require('../../../services/PointsService')
+
+    // 查找库存物品
+    const item = await models.UserInventory.findOne({
+      where: { inventory_id: item_id, user_id: req.user.user_id }
+    })
+
+    if (!item) {
+      return ApiResponse.error(res, '库存物品不存在', 404)
+    }
+
+    if (item.status !== 'available') {
+      return ApiResponse.error(res, '物品状态不允许生成核销码', 400)
+    }
+
+    // 生成新的核销码
+    const verificationCode = PointsService.generateVerificationCode()
+    const expiresAt = BeijingTimeHelper.futureTime(24 * 60 * 60 * 1000) // 24小时后过期
+
+    await item.update({
+      verification_code: verificationCode,
+      verification_expires_at: expiresAt
+    })
+
+    logger.info('生成核销码成功', {
+      item_id,
+      user_id: req.user.user_id,
+      verification_code: verificationCode
+    })
+
+    return ApiResponse.success(
+      res,
+      {
+        verification_code: verificationCode,
+        expires_at: expiresAt
+      },
+      '核销码生成成功'
+    )
+  } catch (error) {
+    logger.error('生成核销码失败', { error: error.message, item_id: req.params.item_id })
+    return ApiResponse.error(res, '生成核销码失败', 500)
+  }
+})
+
+/**
+ * 取消兑换记录（仅限pending状态）
+ * POST /api/v4/inventory/exchange-records/:id/cancel
+ *
+ * 业务规则（基于严格人工审核模式）：
+ * - 只能取消pending（待审核）状态的订单
+ * - 已审核通过（distributed）的订单不能取消
+ * - 取消后自动退回积分和恢复库存
+ */
+router.post('/exchange-records/:id/cancel', authenticateToken, async (req, res) => {
+  try {
+    const { id: exchange_id } = req.params
+    const { reason } = req.body
+    const user_id = req.user.user_id
+
+    // 1. 参数验证
+    if (!reason || reason.trim().length === 0) {
+      return ApiResponse.error(res, '取消原因不能为空', 400)
+    }
+
+    if (reason.length > 200) {
+      return ApiResponse.error(res, '取消原因不能超过200字符', 400)
+    }
+
+    // 2. 查找兑换记录
+    const exchangeRecord = await models.ExchangeRecords.findByPk(exchange_id)
+
+    if (!exchangeRecord) {
+      return ApiResponse.error(res, '兑换记录不存在', 404)
+    }
+
+    // 3. 验证权限：只允许用户取消自己的兑换记录
+    if (exchangeRecord.user_id !== user_id) {
+      return ApiResponse.error(res, '无权限取消此兑换记录', 403)
+    }
+
+    // 4. 验证兑换状态：只允许取消pending状态的记录（严格人工审核模式）
+    if (exchangeRecord.status !== 'pending' || exchangeRecord.audit_status !== 'pending') {
+      const statusText = {
+        distributed: '已审核通过',
+        used: '已使用',
+        expired: '已过期',
+        cancelled: '已取消'
+      }[exchangeRecord.status] || '当前状态'
+
+      return ApiResponse.error(res, `${statusText}的兑换记录无法取消`, 400)
+    }
+
+    // 5. 使用模型的cancel()方法（保证业务逻辑一致性，内部已处理事务）
+    await exchangeRecord.cancel(reason)
+
+    logger.info('兑换取消成功', {
+      exchange_id,
+      user_id: exchangeRecord.user_id,
+      refunded_points: exchangeRecord.total_points,
+      reason,
+      cancelled_at: exchangeRecord.audited_at
+    })
+
+    return ApiResponse.success(
+      res,
+      {
+        exchange_id: exchangeRecord.exchange_id,
+        status: exchangeRecord.status,
+        cancelled_at: exchangeRecord.audited_at,
+        refunded_points: exchangeRecord.total_points,
+        reason: exchangeRecord.audit_reason
+      },
+      '兑换已取消，积分已退回'
+    )
+  } catch (error) {
+    logger.error('兑换取消失败', {
+      error: error.message,
+      exchange_id: req.params.id,
+      user_id: req.user.user_id
+    })
+    return ApiResponse.error(res, error.message || '兑换取消失败', 500)
+  }
+})
+
+/**
  * 辅助函数：获取状态描述
  */
 function getStatusDescription (status) {
@@ -313,7 +607,691 @@ function getDefaultIcon (type) {
     product: '🎁',
     service: '🔧'
   }
-  return iconMap[type] || '📦'
+  return iconMap[type] || '��'
 }
+
+/**
+ * 简化版交易市场功能
+ * GET /api/v4/inventory/market/products
+ */
+router.get('/market/products', authenticateToken, async (req, res) => {
+  try {
+    const { page = 1, limit = 20, category = null, sort = 'newest' } = req.query
+
+    const offset = (page - 1) * limit
+
+    // 查询在售商品（从用户库存中查找）
+    const whereClause = {
+      market_status: 'on_sale',
+      is_available: true
+    }
+
+    if (category && category !== 'all') {
+      whereClause.item_type = category
+    }
+
+    // 排序规则
+    let order = [['created_at', 'DESC']]
+    switch (sort) {
+    case 'price_low':
+      order = [['selling_points', 'ASC']]
+      break
+    case 'price_high':
+      order = [['selling_points', 'DESC']]
+      break
+    case 'newest':
+      order = [['created_at', 'DESC']]
+      break
+    }
+
+    const { count, rows: marketProducts } = await models.UserInventory.findAndCountAll({
+      where: whereClause,
+      order,
+      limit: parseInt(limit),
+      offset
+    })
+
+    // 转换为市场商品格式
+    const formattedProducts = marketProducts.map(item => ({
+      id: item.id,
+      seller_id: item.user_id,
+      name: item.item_name || item.name,
+      description: item.description || '暂无描述',
+      selling_points: item.selling_points || 0,
+      condition: item.condition || 'good',
+      category: item.item_type || 'other',
+      is_available: item.is_available,
+      created_at: item.created_at
+    }))
+
+    // 使用DataSanitizer进行数据脱敏
+    const DataSanitizer = require('../../../services/DataSanitizer')
+    const sanitizedProducts = DataSanitizer.sanitizeMarketProducts(
+      formattedProducts,
+      req.user.isAdmin ? 'full' : 'public'
+    )
+
+    logger.info('获取交易市场商品成功', {
+      user_id: req.user.user_id,
+      total: count,
+      returned: marketProducts.length
+    })
+
+    return ApiResponse.success(
+      res,
+      {
+        products: sanitizedProducts,
+        pagination: {
+          current_page: parseInt(page),
+          total_pages: Math.ceil(count / limit),
+          total_count: count,
+          has_next: count > page * limit
+        }
+      },
+      '获取交易市场商品成功'
+    )
+  } catch (error) {
+    logger.error('获取交易市场商品失败', { error: error.message })
+    return ApiResponse.error(res, '获取交易市场商品失败', 500)
+  }
+})
+
+/**
+ * 转让库存物品
+ * POST /api/v4/inventory/transfer
+ */
+router.post('/transfer', authenticateToken, async (req, res) => {
+  try {
+    const { item_id, target_user_id, transfer_note } = req.body
+    const currentUserId = req.user.user_id
+
+    // 参数验证
+    if (!item_id || !target_user_id) {
+      return ApiResponse.error(res, '物品ID和目标用户ID不能为空', 400)
+    }
+
+    if (currentUserId === parseInt(target_user_id)) {
+      return ApiResponse.error(res, '不能转让给自己', 400)
+    }
+
+    // 查找库存物品
+    const item = await models.UserInventory.findOne({
+      where: {
+        id: item_id,
+        user_id: currentUserId,
+        status: 'available'
+      }
+    })
+
+    if (!item) {
+      return ApiResponse.error(res, '库存物品不存在或不可转让', 404)
+    }
+
+    // 检查物品是否可以转让
+    if (item.can_transfer === false) {
+      return ApiResponse.error(res, '该物品不支持转让', 400)
+    }
+
+    // 检查物品是否已过期
+    if (item.expires_at && BeijingTimeHelper.createDatabaseTime() > new Date(item.expires_at)) {
+      await item.update({ status: 'expired' })
+      return ApiResponse.error(res, '物品已过期，无法转让', 400)
+    }
+
+    // 检查目标用户是否存在
+    const targetUser = await models.User.findByPk(target_user_id)
+    if (!targetUser) {
+      return ApiResponse.error(res, '目标用户不存在', 404)
+    }
+
+    // 检查转让次数限制（如果有的话）
+    const maxTransferCount = 3 // 最大转让次数
+    if (item.transfer_count >= maxTransferCount) {
+      return ApiResponse.error(res, `该物品已达到最大转让次数(${maxTransferCount}次)`, 400)
+    }
+
+    // 开始数据库事务
+    const transaction = await models.sequelize.transaction()
+
+    try {
+      // 记录转让历史（如果有TradeRecord模型）
+      if (models.TradeRecord) {
+        await models.TradeRecord.create(
+          {
+            from_user_id: currentUserId,
+            to_user_id: target_user_id,
+            item_type: 'inventory_item',
+            item_id,
+            item_name: item.name || item.item_name,
+            transaction_type: 'transfer',
+            status: 'completed',
+            transfer_note: transfer_note || '库存物品转让',
+            created_at: BeijingTimeHelper.createBeijingTime()
+          },
+          { transaction }
+        )
+      }
+
+      // 更新物品所有者
+      await item.update(
+        {
+          user_id: target_user_id,
+          transfer_count: (item.transfer_count || 0) + 1,
+          last_transfer_at: BeijingTimeHelper.createBeijingTime(),
+          last_transfer_from: currentUserId,
+          updated_at: BeijingTimeHelper.createBeijingTime()
+        },
+        { transaction }
+      )
+
+      // 提交事务
+      await transaction.commit()
+
+      logger.info('库存物品转让成功', {
+        item_id,
+        from_user_id: currentUserId,
+        to_user_id: target_user_id,
+        item_name: item.name || item.item_name,
+        transfer_count: item.transfer_count + 1
+      })
+
+      // 构建转让响应数据（已脱敏）
+      const sanitizedTransferData = {
+        transfer_id: `tf_${BeijingTimeHelper.generateIdTimestamp()}_${Math.random().toString(36).substr(2, 8)}`,
+        item_id,
+        item_name: item.name || item.item_name,
+        from_user_id: currentUserId,
+        to_user_id: target_user_id,
+        transfer_note: transfer_note || '库存物品转让',
+        transfer_count: item.transfer_count + 1,
+        transferred_at: BeijingTimeHelper.createBeijingTime()
+      }
+
+      return ApiResponse.success(res, sanitizedTransferData, '物品转让成功')
+    } catch (transactionError) {
+      // 回滚事务
+      await transaction.rollback()
+      throw transactionError
+    }
+  } catch (error) {
+    logger.error('转让库存物品失败', {
+      error: error.message,
+      item_id: req.body.item_id,
+      current_user: req.user.user_id,
+      target_user: req.body.target_user_id
+    })
+    return ApiResponse.error(res, '物品转让失败', 500)
+  }
+})
+
+/**
+ * 获取物品转让历史记录
+ * GET /api/v4/inventory/transfer-history
+ */
+router.get('/transfer-history', authenticateToken, async (req, res) => {
+  try {
+    const { page = 1, limit = 20, type = 'all' } = req.query
+    const user_id = req.user.user_id
+
+    if (!models.TradeRecord) {
+      return ApiResponse.error(res, '转让历史功能暂未开放', 503)
+    }
+
+    // 构建查询条件
+    const whereClause = {
+      transaction_type: 'transfer',
+      item_type: 'inventory_item'
+    }
+
+    if (type === 'sent') {
+      whereClause.from_user_id = user_id
+    } else if (type === 'received') {
+      whereClause.to_user_id = user_id
+    } else {
+      // type === 'all'
+      whereClause[Op.or] = [{ from_user_id: user_id }, { to_user_id: user_id }]
+    }
+
+    // 获取转让历史记录
+    const { count, rows: transferHistory } = await models.TradeRecord.findAndCountAll({
+      where: whereClause,
+      include: [
+        {
+          model: models.User,
+          as: 'fromUser',
+          attributes: ['id', 'display_name'],
+          required: false
+        },
+        {
+          model: models.User,
+          as: 'toUser',
+          attributes: ['id', 'display_name'],
+          required: false
+        }
+      ],
+      order: [['created_at', 'DESC']],
+      limit: parseInt(limit),
+      offset: (parseInt(page) - 1) * parseInt(limit)
+    })
+
+    // 格式化转让历史数据
+    const formattedHistory = transferHistory.map(record => ({
+      transfer_id: record.id,
+      item_id: record.item_id,
+      item_name: record.item_name,
+      from_user_id: record.from_user_id,
+      from_user_name: record.fromUser?.display_name || '未知用户',
+      to_user_id: record.to_user_id,
+      to_user_name: record.toUser?.display_name || '未知用户',
+      transfer_note: record.transfer_note,
+      status: record.status,
+      created_at: record.created_at,
+      direction: record.from_user_id === user_id ? 'sent' : 'received'
+    }))
+
+    logger.info('获取转让历史成功', {
+      user_id,
+      total: count,
+      type,
+      page: parseInt(page)
+    })
+
+    return ApiResponse.success(
+      res,
+      {
+        transfer_history: formattedHistory,
+        pagination: {
+          current_page: parseInt(page),
+          total_pages: Math.ceil(count / parseInt(limit)),
+          total_count: count,
+          has_next: count > parseInt(page) * parseInt(limit)
+        },
+        filter: {
+          type
+        }
+      },
+      '转让历史获取成功'
+    )
+  } catch (error) {
+    logger.error('获取转让历史失败', {
+      error: error.message,
+      user_id: req.user.user_id
+    })
+    return ApiResponse.error(res, '获取转让历史失败', 500)
+  }
+})
+
+/**
+ * 核销验证
+ * POST /api/v4/inventory/verification/verify
+ */
+router.post('/verification/verify', authenticateToken, async (req, res) => {
+  try {
+    const { verification_code } = req.body
+
+    // 参数验证
+    if (!verification_code || verification_code.trim().length === 0) {
+      return ApiResponse.error(res, '核销码不能为空', 400)
+    }
+
+    // 查找库存物品
+    const item = await models.UserInventory.findOne({
+      where: { verification_code: verification_code.trim().toUpperCase() },
+      include: [
+        {
+          model: models.User,
+          as: 'user',
+          attributes: ['user_id', 'mobile', 'nickname']
+        }
+      ]
+    })
+
+    if (!item) {
+      logger.warn('核销码不存在', { verification_code, operator_id: req.user.user_id })
+      return ApiResponse.error(res, '核销码不存在或无效', 404)
+    }
+
+    // 检查核销码状态
+    if (item.status === 'used') {
+      return ApiResponse.error(res, '该核销码已使用', 400)
+    }
+
+    // 检查是否过期
+    if (item.verification_expires_at && BeijingTimeHelper.createDatabaseTime() > item.verification_expires_at) {
+      return ApiResponse.error(res, '核销码已过期', 400)
+    }
+
+    // 核销验证通过，标记为已使用
+    await item.update({
+      status: 'used',
+      used_at: BeijingTimeHelper.createBeijingTime()
+    })
+
+    logger.info('核销验证成功', {
+      verification_code,
+      inventory_id: item.inventory_id,
+      user_id: item.user_id,
+      operator_id: req.user.user_id
+    })
+
+    return ApiResponse.success(
+      res,
+      {
+        inventory_id: item.inventory_id,
+        item_name: item.name,
+        item_type: item.type,
+        value: item.value,
+        used_at: item.used_at,
+        user: item.user
+          ? {
+            user_id: item.user.user_id,
+            mobile: item.user.mobile,
+            nickname: item.user.nickname
+          }
+          : null
+      },
+      '核销成功'
+    )
+  } catch (error) {
+    logger.error('核销验证失败', {
+      error: error.message,
+      verification_code: req.body.verification_code,
+      operator_id: req.user.user_id
+    })
+    return ApiResponse.error(res, '核销验证失败', 500)
+  }
+})
+
+/**
+ * 获取市场商品详情
+ * GET /api/v4/inventory/market/products/:id
+ */
+router.get('/market/products/:id', authenticateToken, async (req, res) => {
+  try {
+    const { id: product_id } = req.params
+    const { getUserRoles } = require('../../../middleware/auth')
+    const DataSanitizer = require('../../../services/DataSanitizer')
+
+    // 获取用户权限
+    const userRoles = await getUserRoles(req.user.user_id)
+    const dataLevel = userRoles.isAdmin ? 'full' : 'public'
+
+    // 查找市场商品
+    const marketProduct = await models.UserInventory.findOne({
+      where: {
+        id: product_id,
+        market_status: 'on_sale',
+        is_available: true
+      },
+      include: [
+        {
+          model: models.User,
+          as: 'owner',
+          attributes: ['user_id', 'mobile', 'nickname', 'created_at']
+        }
+      ]
+    })
+
+    if (!marketProduct) {
+      return ApiResponse.error(res, '市场商品不存在或已下架', 404)
+    }
+
+    // 格式化商品详情
+    const productDetail = {
+      id: marketProduct.id,
+      seller_id: marketProduct.user_id,
+      seller_info: marketProduct.owner
+        ? {
+          user_id: marketProduct.owner.user_id,
+          nickname: marketProduct.owner.nickname || '匿名用户',
+          // 对于非管理员，隐藏敏感信息
+          mobile: dataLevel === 'full'
+            ? marketProduct.owner.mobile
+            : '****',
+          registration_time: marketProduct.owner.created_at
+        }
+        : null,
+
+      // 商品基础信息
+      name: marketProduct.item_name || marketProduct.name,
+      description: marketProduct.description || '暂无描述',
+      item_type: marketProduct.item_type || marketProduct.type,
+
+      // 市场相关信息
+      selling_points: marketProduct.selling_points,
+      condition: marketProduct.condition || 'good',
+      market_status: marketProduct.market_status,
+
+      // 商品状态和历史
+      acquisition_method: marketProduct.acquisition_method,
+      acquisition_cost: marketProduct.acquisition_cost,
+      transfer_count: marketProduct.transfer_count || 0,
+
+      // 交易限制
+      can_purchase: marketProduct.user_id !== req.user.user_id, // 不能购买自己的商品
+      can_withdraw: marketProduct.user_id === req.user.user_id, // 只能撤回自己的商品
+
+      // 时间信息
+      listed_at: marketProduct.created_at,
+      updated_at: marketProduct.updated_at
+    }
+
+    // 数据脱敏处理（使用复数方法处理单个商品）
+    const sanitizedDetail = DataSanitizer.sanitizeMarketProducts([productDetail], dataLevel)[0]
+
+    logger.info('获取市场商品详情成功', {
+      product_id,
+      seller_id: marketProduct.user_id,
+      buyer_id: req.user.user_id
+    })
+
+    return ApiResponse.success(res, sanitizedDetail, '获取商品详情成功')
+  } catch (error) {
+    logger.error('获取市场商品详情失败', {
+      error: error.message,
+      product_id: req.params.id,
+      user_id: req.user.user_id
+    })
+    return ApiResponse.error(res, '获取商品详情失败', 500)
+  }
+})
+
+/**
+ * 购买市场商品
+ * POST /api/v4/inventory/market/products/:id/purchase
+ */
+router.post('/market/products/:id/purchase', authenticateToken, async (req, res) => {
+  const transaction = await models.sequelize.transaction()
+
+  try {
+    const { id: product_id } = req.params
+    const buyer_id = req.user.user_id
+    const { purchase_note } = req.body
+
+    // 1. 查找市场商品
+    const marketProduct = await models.UserInventory.findOne({
+      where: {
+        id: product_id,
+        market_status: 'on_sale',
+        is_available: true
+      },
+      include: [
+        {
+          model: models.User,
+          as: 'owner',
+          attributes: ['user_id', 'mobile', 'nickname']
+        }
+      ],
+      transaction
+    })
+
+    if (!marketProduct) {
+      await transaction.rollback()
+      return ApiResponse.error(res, '商品不存在或已售出', 404)
+    }
+
+    // 2. 验证购买权限
+    if (marketProduct.user_id === buyer_id) {
+      await transaction.rollback()
+      return ApiResponse.error(res, '不能购买自己的商品', 400)
+    }
+
+    // 3. 检查商品是否可转让
+    if (marketProduct.can_transfer === false) {
+      await transaction.rollback()
+      return ApiResponse.error(res, '该商品不支持转让', 400)
+    }
+
+    // 4. 检查买家积分是否足够
+    const PointsService = require('../../../services/PointsService')
+    const buyerAccount = await PointsService.getPointsAccount(buyer_id)
+
+    if (buyerAccount.balance < marketProduct.selling_points) {
+      await transaction.rollback()
+      return ApiResponse.error(res, `积分不足，需要${marketProduct.selling_points}积分，当前${buyerAccount.balance}积分`, 400)
+    }
+
+    // 5. 扣除买家积分
+    await PointsService.consumePoints(buyer_id, marketProduct.selling_points, {
+      business_type: 'market_purchase',
+      source_type: 'buy_from_market',
+      title: `购买市场商品：${marketProduct.name}`,
+      description: `从${marketProduct.owner?.nickname || '用户'}购买商品`,
+      transaction
+    })
+
+    // 6. 给卖家增加积分（扣除5%手续费）
+    const feeRate = 0.05 // 5%手续费
+    const fee = Math.floor(marketProduct.selling_points * feeRate)
+    const sellerReceived = marketProduct.selling_points - fee
+
+    await PointsService.addPoints(marketProduct.user_id, sellerReceived, {
+      business_type: 'market_sale',
+      source_type: 'sell_on_market',
+      title: `出售市场商品：${marketProduct.name}`,
+      description: `出售给${req.user.nickname || '买家'}，手续费${fee}积分`,
+      transaction
+    })
+
+    // 7. 转移商品所有权
+    await marketProduct.update({
+      user_id: buyer_id,
+      market_status: 'sold',
+      selling_points: null,
+      transfer_count: (marketProduct.transfer_count || 0) + 1,
+      acquisition_method: 'market_purchase',
+      acquisition_cost: marketProduct.selling_points
+    }, { transaction })
+
+    await transaction.commit()
+
+    logger.info('市场商品购买成功', {
+      product_id,
+      seller_id: marketProduct.user_id,
+      buyer_id,
+      selling_points: marketProduct.selling_points,
+      seller_received: sellerReceived,
+      transaction_fee: fee
+    })
+
+    return ApiResponse.success(
+      res,
+      {
+        product_id: parseInt(product_id),
+        product_name: marketProduct.name,
+        seller_id: marketProduct.user_id,
+        buyer_id,
+        transaction_amount: marketProduct.selling_points,
+        seller_received: sellerReceived,
+        transaction_fee: fee,
+        purchased_at: BeijingTimeHelper.createDatabaseTime(),
+        purchase_note: purchase_note || null
+      },
+      '购买成功'
+    )
+  } catch (error) {
+    await transaction.rollback()
+    logger.error('购买市场商品失败', {
+      error: error.message,
+      product_id: req.params.id,
+      buyer_id: req.user.user_id
+    })
+    return ApiResponse.error(res, error.message || '购买失败', 500)
+  }
+})
+
+/**
+ * 撤回市场商品
+ * POST /api/v4/inventory/market/products/:id/withdraw
+ */
+router.post('/market/products/:id/withdraw', authenticateToken, async (req, res) => {
+  const transaction = await models.sequelize.transaction()
+
+  try {
+    const { id: product_id } = req.params
+    const seller_id = req.user.user_id
+    const { withdraw_reason } = req.body
+
+    // 1. 查找市场商品
+    const marketProduct = await models.UserInventory.findOne({
+      where: {
+        id: product_id,
+        user_id: seller_id, // 只能撤回自己的商品
+        market_status: 'on_sale'
+      },
+      transaction
+    })
+
+    if (!marketProduct) {
+      await transaction.rollback()
+      return ApiResponse.error(res, '商品不存在或无权限撤回', 404)
+    }
+
+    // 2. 检查撤回条件
+    if (marketProduct.market_status !== 'on_sale') {
+      await transaction.rollback()
+      return ApiResponse.error(res, '只能撤回在售状态的商品', 400)
+    }
+
+    // 3. 撤回商品（恢复为普通库存状态）
+    await marketProduct.update({
+      market_status: 'withdrawn',
+      selling_points: null,
+      condition: null,
+      // 保留原有的基本信息
+      is_available: true
+    }, { transaction })
+
+    await transaction.commit()
+
+    logger.info('市场商品撤回成功', {
+      product_id,
+      seller_id,
+      product_name: marketProduct.name,
+      withdraw_reason: withdraw_reason || '用户主动撤回'
+    })
+
+    return ApiResponse.success(
+      res,
+      {
+        product_id: parseInt(product_id),
+        product_name: marketProduct.name,
+        original_market_status: 'on_sale',
+        new_status: 'withdrawn',
+        withdrawn_at: BeijingTimeHelper.createDatabaseTime(),
+        withdraw_reason: withdraw_reason || '用户主动撤回'
+      },
+      '商品撤回成功'
+    )
+  } catch (error) {
+    await transaction.rollback()
+    logger.error('撤回市场商品失败', {
+      error: error.message,
+      product_id: req.params.id,
+      seller_id: req.user.user_id
+    })
+    return ApiResponse.error(res, error.message || '撤回失败', 500)
+  }
+})
 
 module.exports = router

@@ -5,6 +5,7 @@
  * 更新时间：2025年01月28日
  */
 
+const BeijingTimeHelper = require('../../../../utils/timeHelper')
 const express = require('express')
 const router = express.Router()
 const { User } = require('../../../../models')
@@ -23,9 +24,20 @@ router.post('/login', async (req, res) => {
       return res.apiError('手机号不能为空', 'MOBILE_REQUIRED', null, 400)
     }
 
-    // 开发环境万能验证码
-    if (process.env.NODE_ENV === 'development' && verification_code !== '123456') {
-      return res.apiError('验证码错误', 'INVALID_VERIFICATION_CODE', null, 400)
+    // ✅ 验证码必填验证（修复缺陷）
+    if (!verification_code || verification_code.trim() === '') {
+      return res.apiError('验证码不能为空', 'VERIFICATION_CODE_REQUIRED', null, 400)
+    }
+
+    // ✅ 开发环境万能验证码（修复验证逻辑）
+    if (process.env.NODE_ENV === 'development') {
+      if (verification_code !== '123456') {
+        return res.apiError('验证码错误（开发环境使用123456）', 'INVALID_VERIFICATION_CODE', null, 400)
+      }
+    } else {
+      // 生产环境验证码验证逻辑（待实现）
+      // TODO: 实现短信验证码验证
+      return res.apiError('生产环境验证码验证未实现', 'VERIFICATION_NOT_IMPLEMENTED', null, 501)
     }
 
     // 查找用户
@@ -47,7 +59,7 @@ router.post('/login', async (req, res) => {
 
     // 更新最后登录时间
     await user.update({
-      last_login: new Date(),
+      last_login: BeijingTimeHelper.createBeijingTime(),
       login_count: user.login_count + 1
     })
 

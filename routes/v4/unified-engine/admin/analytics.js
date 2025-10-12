@@ -32,7 +32,7 @@ router.get('/decisions/analytics', adminAuthMiddleware, asyncHandler(async (req,
     const dayCount = Math.min(Math.max(parseInt(days) || 7, 1), 90) // 限制1-90天
 
     // 计算时间范围
-    const endDate = new Date()
+    const endDate = BeijingTimeHelper.createBeijingTime()
     const startDate = new Date(endDate.getTime() - dayCount * 24 * 60 * 60 * 1000)
 
     // 构建查询条件
@@ -200,7 +200,7 @@ router.get('/decisions/analytics', adminAuthMiddleware, asyncHandler(async (req,
     sharedComponents.logger.info('决策分析数据生成成功', {
       period_days: dayCount,
       total_draws: totalDraws,
-      admin_id: req.user?.id
+      admin_id: req.user?.user_id
     })
 
     return res.apiSuccess(analyticsData, '决策分析数据获取成功')
@@ -240,7 +240,7 @@ router.get('/lottery/trends', adminAuthMiddleware, asyncHandler(async (req, res)
       days = 7
     }
 
-    const endDate = new Date()
+    const endDate = BeijingTimeHelper.createBeijingTime()
     const startDate = new Date(endDate.getTime() - days * 24 * 60 * 60 * 1000)
 
     // 设置聚合粒度
@@ -437,6 +437,270 @@ router.get('/performance/report', adminAuthMiddleware, asyncHandler(async (req, 
   } catch (error) {
     sharedComponents.logger.error('性能报告获取失败', { error: error.message })
     return res.apiInternalError('性能报告获取失败', error.message, 'PERFORMANCE_REPORT_ERROR')
+  }
+}))
+
+/**
+ * GET /stats/today - 获取管理员今日统计数据
+ *
+ * @description 获取今日系统运营数据统计，包括用户活动、抽奖数据、积分数据等
+ * @route GET /api/v4/unified-engine/admin/analytics/stats/today
+ * @access Private (需要管理员权限)
+ */
+router.get('/stats/today', adminAuthMiddleware, asyncHandler(async (req, res) => {
+  try {
+    // 获取今日时间范围（北京时间）
+    const todayStart = BeijingTimeHelper.getStartOfDay()
+    const todayEnd = BeijingTimeHelper.getEndOfDay()
+    const nowBeijing = BeijingTimeHelper.getCurrentTime()
+
+    sharedComponents.logger.info('管理员请求今日统计数据', {
+      admin_id: req.user.user_id,
+      date_range: { start: todayStart, end: todayEnd }
+    })
+
+    // 并行获取各类统计数据
+    const [
+      // 用户数据
+      totalUsers,
+      todayNewUsers,
+      todayActiveUsers,
+
+      // 抽奖数据
+      todayLotteryDraws,
+      todayWinningDraws,
+      todayTotalPointsConsumed,
+
+      // 积分系统数据
+      todayPointsTransactions,
+      todayPointsEarned,
+      todayPointsSpent,
+
+      // 库存和兑换数据
+      todayInventoryItems,
+      todayUsedItems,
+
+      // 聊天和客服数据
+      todayChatSessions,
+      todayMessages,
+
+      // 系统活动数据
+      todayLogins,
+      todayUploads
+    ] = await Promise.all([
+      // 用户统计
+      models.User.count(),
+      models.User.count({
+        where: {
+          created_at: {
+            [Op.gte]: todayStart,
+            [Op.lte]: todayEnd
+          }
+        }
+      }),
+      models.User.count({
+        where: {
+          last_login: {
+            [Op.gte]: todayStart,
+            [Op.lte]: todayEnd
+          }
+        }
+      }),
+
+      // 抽奖统计
+      models.LotteryDraw.count({
+        where: {
+          created_at: {
+            [Op.gte]: todayStart,
+            [Op.lte]: todayEnd
+          }
+        }
+      }),
+      models.LotteryDraw.count({
+        where: {
+          created_at: {
+            [Op.gte]: todayStart,
+            [Op.lte]: todayEnd
+          },
+          is_winner: true
+        }
+      }),
+      models.LotteryDraw.sum('points_consumed', {
+        where: {
+          created_at: {
+            [Op.gte]: todayStart,
+            [Op.lte]: todayEnd
+          }
+        }
+      }) || 0,
+
+      // 积分交易统计
+      models.PointsTransaction.count({
+        where: {
+          created_at: {
+            [Op.gte]: todayStart,
+            [Op.lte]: todayEnd
+          }
+        }
+      }),
+      models.PointsTransaction.sum('points_amount', {
+        where: {
+          created_at: {
+            [Op.gte]: todayStart,
+            [Op.lte]: todayEnd
+          },
+          transaction_type: 'earn'
+        }
+      }) || 0,
+      models.PointsTransaction.sum('points_amount', {
+        where: {
+          created_at: {
+            [Op.gte]: todayStart,
+            [Op.lte]: todayEnd
+          },
+          transaction_type: 'consume'
+        }
+      }) || 0,
+
+      // 库存统计
+      models.UserInventory.count({
+        where: {
+          created_at: {
+            [Op.gte]: todayStart,
+            [Op.lte]: todayEnd
+          }
+        }
+      }),
+      models.UserInventory.count({
+        where: {
+          used_at: {
+            [Op.gte]: todayStart,
+            [Op.lte]: todayEnd
+          },
+          status: 'used'
+        }
+      }),
+
+      // 聊天统计
+      models.CustomerSession.count({
+        where: {
+          created_at: {
+            [Op.gte]: todayStart,
+            [Op.lte]: todayEnd
+          }
+        }
+      }),
+      models.ChatMessage.count({
+        where: {
+          created_at: {
+            [Op.gte]: todayStart,
+            [Op.lte]: todayEnd
+          }
+        }
+      }),
+
+      // 活动统计
+      models.UserSession.count({
+        where: {
+          login_time: {
+            [Op.gte]: todayStart,
+            [Op.lte]: todayEnd
+          }
+        }
+      }),
+      models.PhotoUpload
+        ? models.PhotoUpload.count({
+          where: {
+            created_at: {
+              [Op.gte]: todayStart,
+              [Op.lte]: todayEnd
+            }
+          }
+        })
+        : 0
+    ])
+
+    // 计算统计指标
+    const winRate = todayLotteryDraws > 0 ? (todayWinningDraws / todayLotteryDraws * 100).toFixed(2) : 0
+    const avgPointsPerDraw = todayLotteryDraws > 0 ? (todayTotalPointsConsumed / todayLotteryDraws).toFixed(1) : 0
+    const activeUserRate = totalUsers > 0 ? (todayActiveUsers / totalUsers * 100).toFixed(2) : 0
+
+    // 构建响应数据
+    const todayStats = {
+      date: BeijingTimeHelper.formatDate(nowBeijing),
+      timestamp: nowBeijing,
+
+      // 用户相关统计
+      user_stats: {
+        total_users: totalUsers,
+        new_users_today: todayNewUsers,
+        active_users_today: todayActiveUsers,
+        active_rate: parseFloat(activeUserRate),
+        total_logins_today: todayLogins
+      },
+
+      // 抽奖系统统计
+      lottery_stats: {
+        draws_today: todayLotteryDraws,
+        winning_draws_today: todayWinningDraws,
+        win_rate: parseFloat(winRate),
+        total_points_consumed: todayTotalPointsConsumed,
+        avg_points_per_draw: parseFloat(avgPointsPerDraw)
+      },
+
+      // 积分系统统计
+      points_stats: {
+        transactions_today: todayPointsTransactions,
+        points_earned_today: Math.abs(todayPointsEarned),
+        points_spent_today: Math.abs(todayPointsSpent),
+        net_points_change: todayPointsEarned + todayPointsSpent // spent是负数
+      },
+
+      // 库存和物品统计
+      inventory_stats: {
+        new_items_today: todayInventoryItems,
+        used_items_today: todayUsedItems,
+        uploads_today: todayUploads
+      },
+
+      // 客服和聊天统计
+      communication_stats: {
+        new_chat_sessions_today: todayChatSessions,
+        total_messages_today: todayMessages,
+        avg_messages_per_session: todayChatSessions > 0 ? (todayMessages / todayChatSessions).toFixed(1) : 0
+      },
+
+      // 系统健康指标
+      system_health: {
+        status: 'healthy',
+        response_time: BeijingTimeHelper.timestamp() - new Date(req.start_time || BeijingTimeHelper.timestamp()),
+        last_updated: nowBeijing
+      }
+    }
+
+    // 使用DataSanitizer进行数据脱敏（管理员看完整数据）
+    const DataSanitizer = require('../../../../services/DataSanitizer')
+    const sanitizedStats = DataSanitizer.sanitizeAdminTodayStats
+      ? DataSanitizer.sanitizeAdminTodayStats(todayStats, 'full')
+      : todayStats
+
+    sharedComponents.logger.info('管理员今日统计数据获取成功', {
+      admin_id: req.user.user_id,
+      stats_summary: {
+        new_users: todayNewUsers,
+        draws: todayLotteryDraws,
+        active_users: todayActiveUsers
+      }
+    })
+
+    return res.apiSuccess(sanitizedStats, '今日统计数据获取成功')
+  } catch (error) {
+    sharedComponents.logger.error('管理员今日统计获取失败', {
+      admin_id: req.user.user_id,
+      error: error.message,
+      stack: error.stack
+    })
+    return res.apiInternalError('今日统计数据获取失败', error.message, 'ADMIN_TODAY_STATS_ERROR')
   }
 }))
 

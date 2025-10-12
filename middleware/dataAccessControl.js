@@ -9,13 +9,12 @@
 
 const dataAccessControl = (req, res, next) => {
   try {
-    // 检查用户是否已认证
+    // 对于公开接口，允许未认证用户访问，但设置为公开数据级别
     if (!req.user) {
-      return res.status(401).json({
-        success: false,
-        message: '用户未认证',
-        code: 'UNAUTHORIZED'
-      })
+      req.dataLevel = 'public'
+      req.roleBasedAdmin = false
+      console.log('[DataAccess] Anonymous user accessing with level: public')
+      return next()
     }
 
     // 🛡️ 基于UUID角色系统判断用户数据访问级别
@@ -23,7 +22,7 @@ const dataAccessControl = (req, res, next) => {
 
     // 设置数据访问级别标识
     req.dataLevel = isSuperAdmin ? 'full' : 'public'
-    req.isAdmin = isSuperAdmin
+    req.roleBasedAdmin = isSuperAdmin
 
     // 记录访问日志（脱敏处理）
     console.log(`[DataAccess] User ${req.user.user_id} accessing with level: ${req.dataLevel}`)

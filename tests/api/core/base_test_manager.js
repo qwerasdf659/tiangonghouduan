@@ -26,6 +26,13 @@ class BaseTestManager {
     this.test_results = []
     this.performance_data = []
 
+    // 健康检查缓存机制 - 解决重复调用问题
+    this.health_check_cache = {
+      result: null,
+      timestamp: 0,
+      ttl: 300000 // 5分钟缓存
+    }
+
     // 创建axios实例
     this.axios_instance = axios.create({
       baseURL: this.baseUrl,
@@ -108,9 +115,17 @@ class BaseTestManager {
       })
 
       if (response.data.success === true && response.data.data?.access_token) {
+        // 保存token
         this.tokens[user_type] = response.data.data.access_token
+
+        // 保存完整的用户数据（包含user对象）- 修复测试兼容性问题
+        this.user_data = this.user_data || {}
+        this.user_data[user_type] = response.data.data
+
         console.log(`[认证成功] ${user_type}: ${phone}`)
-        return this.tokens[user_type]
+
+        // 返回完整的登录数据，包含user对象
+        return response.data.data
       }
 
       throw new Error(`认证失败: ${response.data.message || '未知错误'}`)
@@ -278,7 +293,8 @@ class BaseTestManager {
   }
 
   // ============================================
-  // 向后兼容性方法 - 支持旧版测试文件
+  // V4兼容性方法 - 支持现有测试文件，避免大规模重构
+  // 注意：这些方法仅为向后兼容，新测试应使用snake_case方法
   // ============================================
 
   /**
@@ -290,10 +306,25 @@ class BaseTestManager {
 
   /**
    * 兼容旧版authenticateUser方法
+   * 保留原始userType作为token key，避免'regular'和'user'不匹配问题
    */
   async authenticateUser (userType = 'regular') {
     const mobile = userType === 'admin' ? '13612227930' : '13612227930'
-    return await this.authenticate(mobile, '123456', userType === 'admin' ? 'admin' : 'user')
+    const result = await this.authenticate(
+      mobile,
+      '123456',
+      userType === 'admin' ? 'admin' : userType
+    )
+
+    // 如果是'regular'，同时保存一份到'user' key，保持向后兼容
+    if (userType === 'regular' && this.tokens[userType]) {
+      this.tokens.user = this.tokens[userType]
+      if (this.user_data && this.user_data[userType]) {
+        this.user_data.user = this.user_data[userType]
+      }
+    }
+
+    return result
   }
 
   /**
@@ -407,6 +438,55 @@ class BaseTestManager {
   }
 
   /**
+   * 🏥 带缓存的健康检查方法 - 解决重复调用问题
+   */
+  async health_check_with_cache (force_refresh = false) {
+    const now = Date.now()
+
+    // 检查缓存是否有效
+    if (
+      !force_refresh &&
+      this.health_check_cache.result &&
+      now - this.health_check_cache.timestamp < this.health_check_cache.ttl
+    ) {
+      console.log('✅ 使用缓存的健康检查结果')
+      return this.health_check_cache.result
+    }
+
+    console.log('🔄 执行新的健康检查...')
+
+    try {
+      const result = await this.make_request('GET', '/health')
+
+      // 更新缓存
+      this.health_check_cache = {
+        result,
+        timestamp: now,
+        ttl: 300000 // 5分钟
+      }
+
+      console.log('✅ 健康检查完成，结果已缓存')
+      return result
+    } catch (error) {
+      console.error('❌ 健康检查失败:', error.message)
+      // 如果检查失败，不缓存结果
+      throw error
+    }
+  }
+
+  /**
+   * 🧹 清理健康检查缓存
+   */
+  clear_health_cache () {
+    this.health_check_cache = {
+      result: null,
+      timestamp: 0,
+      ttl: 300000
+    }
+    console.log('🧹 健康检查缓存已清理')
+  }
+
+  /**
    * 兼容旧版generateTestReport方法
    */
   generateTestReport () {
@@ -418,7 +498,7 @@ class BaseTestManager {
       },
       results: this.test_results,
       performance: this.performance_data,
-      generated_at: new Date().toISOString()
+      generated_at: BeijingTimeHelper.now()
     }
   }
 }

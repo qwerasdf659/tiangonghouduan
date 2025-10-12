@@ -6,6 +6,7 @@
  */
 
 'use strict'
+const BeijingTimeHelper = require('../utils/timeHelper')
 
 const { Model, DataTypes } = require('sequelize')
 
@@ -147,11 +148,11 @@ class PointsTransaction extends Model {
     }
 
     // 检查时间逻辑
-    if (this.effective_time && this.effective_time > new Date()) {
+    if (this.effective_time && this.effective_time > BeijingTimeHelper.createBeijingTime()) {
       warnings.push('生效时间在未来')
     }
 
-    if (this.expire_time && this.expire_time < new Date()) {
+    if (this.expire_time && this.expire_time < BeijingTimeHelper.createBeijingTime()) {
       warnings.push('过期时间已过期')
     }
 
@@ -304,7 +305,7 @@ module.exports = sequelize => {
       points_amount: {
         type: DataTypes.DECIMAL(10, 2),
         allowNull: false,
-        comment: '积分数量(正数=获得,负数=消耗)',
+        comment: '积分数量(统一存储正数，类型由transaction_type区分)',
         get () {
           const value = this.getDataValue('points_amount')
           return value ? parseFloat(value) : 0
@@ -391,7 +392,7 @@ module.exports = sequelize => {
       transaction_time: {
         type: DataTypes.DATE(3),
         allowNull: false,
-        defaultValue: DataTypes.NOW,
+        defaultValue: () => BeijingTimeHelper.createDatabaseTime(),
         comment: '交易时间(毫秒精度)'
       },
       effective_time: {
@@ -411,67 +412,6 @@ module.exports = sequelize => {
         comment: '交易状态'
       },
 
-      /**
-       * ✅ 积分交易是否成功的业务标准字段（扩展is_winner模式）
-       *
-       * 🎯 业务含义：
-       * - true: 积分交易成功完成，积分已正确变更到用户账户
-       * - false: 积分交易未成功（处理中或失败状态）
-       *
-       * 📋 业务逻辑：
-       * - 仅当 status === 'completed' 时返回 true
-       * - 其他所有状态均返回 false（pending/processing/failed等）
-       *
-       * 🔍 使用场景：
-       * - 统计成功积分交易：WHERE is_successful = true
-       * - 计算积分交易成功率：COUNT(is_successful = true) / COUNT(*)
-       * - 财务对账：只统计成功完成的积分交易
-       * - 用户积分变更审计：验证积分变更的有效性
-       *
-       * 💡 业务理解：
-       * - completed: 积分已成功变更，用户账户余额已更新
-       * - pending: 交易提交但未处理完成
-       * - processing: 正在处理中，尚未确认
-       * - failed: 处理失败，积分未变更
-       *
-       * 🔄 与其他业务标准的一致性：
-       * - TradeRecord.is_successful: 同样使用 completed 状态判断
-       * - ExchangeRecords.is_successful: 使用 distributed/used 状态判断
-       * - LotteryRecord.is_winner: 直接Boolean字段表示抽奖结果
-       *
-       * ⚠️ 重要说明：
-       * - 这是计算字段，不能直接设置
-       * - 要改变结果，请修改 status 字段
-       * - 积分变更的最终确认依据
-       *
-       * 📝 使用示例：
-       * ```javascript
-       * // 查询用户成功的积分交易
-       * const successfulTransactions = await PointsTransaction.findAll({
-       *   where: {
-       *     user_id: userId,
-       *     [Op.and]: sequelize.where(
-       *       sequelize.col('is_successful'), true
-       *     )
-       *   }
-       * })
-       *
-       * // 检查积分交易是否成功
-       * if (pointsTransaction.is_successful) {
-       *   console.log('积分交易成功，余额已更新')
-       * }
-       * ```
-       */
-      is_successful: {
-        type: DataTypes.VIRTUAL,
-        get () {
-          return this.status === 'completed'
-        },
-        set (_value) {
-          throw new Error('is_successful是计算字段，请设置status字段')
-        }
-      },
-
       failure_reason: {
         type: DataTypes.TEXT,
         allowNull: true,
@@ -483,8 +423,8 @@ module.exports = sequelize => {
       modelName: 'PointsTransaction',
       tableName: 'points_transactions',
       timestamps: true,
-      createdAt: 'created_at',
-      updatedAt: 'updated_at',
+      created_at: 'created_at',
+      updated_at: 'updated_at',
       underscored: true,
       comment: '积分交易记录表',
       indexes: [
@@ -497,6 +437,45 @@ module.exports = sequelize => {
       ]
     }
   )
+
+  // ========== Sequelize Scope 定义 ==========
+  // 基于实际业务需求，避免过度设计
+
+  /**
+   * Scope: successful
+   * 业务含义：查询成功的积分交易
+   * 等价SQL: WHERE status = 'completed'
+   *
+   * 使用示例：
+   * await PointsTransaction.scope('successful').findAll()
+   */
+  PointsTransaction.addScope('successful', {
+    where: { status: 'completed' }
+  })
+
+  /**
+   * Scope: byUser
+   * 业务含义：查询指定用户的积分交易
+   *
+   * 使用示例：
+   * await PointsTransaction.scope({ method: ['byUser', user_id] }).findAll()
+   * await PointsTransaction.scope('successful', { method: ['byUser', user_id] }).findAll()
+   */
+  PointsTransaction.addScope('byUser', user_id => ({
+    where: { user_id }
+  }))
+
+  /**
+   * Scope: byType
+   * 业务含义：按交易类型查询
+   * 支持：earn(获得), consume(消耗), expire(过期), refund(退还)
+   *
+   * 使用示例：
+   * await PointsTransaction.scope({ method: ['byType', 'earn'] }).findAll()
+   */
+  PointsTransaction.addScope('byType', transactionType => ({
+    where: { transaction_type: transactionType }
+  }))
 
   return PointsTransaction
 }

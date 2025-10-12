@@ -1,4 +1,5 @@
 const { DataTypes, Model } = require('sequelize')
+const BeijingTimeHelper = require('../utils/timeHelper')
 
 // 🔥 抽奖奖品配置模型 - 分离式架构设计
 class LotteryPrize extends Model {
@@ -265,12 +266,12 @@ module.exports = sequelize => {
       created_at: {
         type: DataTypes.DATE,
         allowNull: false,
-        defaultValue: DataTypes.NOW
+        defaultValue: () => BeijingTimeHelper.createDatabaseTime()
       },
       updated_at: {
         type: DataTypes.DATE,
         allowNull: false,
-        defaultValue: DataTypes.NOW
+        defaultValue: () => BeijingTimeHelper.createDatabaseTime()
       }
     },
     {
@@ -278,8 +279,8 @@ module.exports = sequelize => {
       modelName: 'LotteryPrize',
       tableName: 'lottery_prizes',
       timestamps: true,
-      createdAt: 'created_at',
-      updatedAt: 'updated_at',
+      created_at: 'created_at',
+      updated_at: 'updated_at',
       underscored: true,
       comment: '抽奖奖品配置表',
       indexes: [

@@ -3,19 +3,19 @@
  * 移除过度设计的功能，保留核心业务需求
  */
 
+const BeijingTimeHelper = require('../utils/timeHelper')
 const { DataTypes } = require('sequelize')
-const { v4: uuidv4 } = require('uuid')
 
 module.exports = sequelize => {
   const ImageResources = sequelize.define(
     'ImageResources',
     {
       // 基础标识
-      resource_id: {
-        type: DataTypes.UUID,
-        defaultValue: () => uuidv4(),
+      image_id: {
+        type: DataTypes.INTEGER,
         primaryKey: true,
-        comment: '资源唯一标识符'
+        autoIncrement: true,
+        comment: '主键ID'
       },
 
       // 业务分类字段
@@ -156,16 +156,14 @@ module.exports = sequelize => {
       // 时间戳
       created_at: {
         type: DataTypes.DATE,
-        defaultValue: DataTypes.NOW,
+        defaultValue: () => BeijingTimeHelper.createDatabaseTime(),
         allowNull: false,
         comment: '创建时间'
       }
     },
     {
       tableName: 'image_resources',
-      timestamps: true,
-      createdAt: 'created_at',
-      updatedAt: false,
+      timestamps: false,
       comment: '简化图片资源管理表',
 
       indexes: [
@@ -232,7 +230,9 @@ module.exports = sequelize => {
       thumbnails: values.thumbnail_paths
         ? {
           small: values.thumbnail_paths.small ? `/uploads/${values.thumbnail_paths.small}` : null,
-          medium: values.thumbnail_paths.medium ? `/uploads/${values.thumbnail_paths.medium}` : null,
+          medium: values.thumbnail_paths.medium
+            ? `/uploads/${values.thumbnail_paths.medium}`
+            : null,
           large: values.thumbnail_paths.large ? `/uploads/${values.thumbnail_paths.large}` : null
         }
         : {},
@@ -273,15 +273,17 @@ module.exports = sequelize => {
 
   // 检查是否有缩略图
   ImageResources.prototype.hasThumbnails = function () {
-    return this.thumbnail_paths &&
-           (this.thumbnail_paths.small || this.thumbnail_paths.medium || this.thumbnail_paths.large)
+    return (
+      this.thumbnail_paths &&
+      (this.thumbnail_paths.small || this.thumbnail_paths.medium || this.thumbnail_paths.large)
+    )
   }
 
   // 审核实例方法（保留，核心业务功能）
   ImageResources.prototype.approve = function (reviewerId, pointsAwarded = 0, notes = null) {
     this.review_status = 'approved'
     this.reviewer_id = reviewerId
-    this.reviewed_at = new Date()
+    this.reviewed_at = BeijingTimeHelper.createBeijingTime()
     this.points_awarded = pointsAwarded
     this.review_reason = notes
     return this.save()
@@ -290,7 +292,7 @@ module.exports = sequelize => {
   ImageResources.prototype.reject = function (reviewerId, reason, notes = null) {
     this.review_status = 'rejected'
     this.reviewer_id = reviewerId
-    this.reviewed_at = new Date()
+    this.reviewed_at = BeijingTimeHelper.createBeijingTime()
     this.review_reason = notes || reason
     return this.save()
   }

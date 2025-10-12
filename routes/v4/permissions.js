@@ -1,40 +1,39 @@
 /**
- * 权限管理路由 - V4.0 统一版本
- * 🛡️ 权限管理：只有超级管理员(admin)和普通用户(user)两种角色
+ * V4权限管理路由 - 基于UUID角色系统
+ * 🛡️ 权限管理：移除is_admin依赖，使用UUID角色系统
  * 创建时间：2025年01月21日
  * 更新时间：2025年01月28日
  */
 
+const BeijingTimeHelper = require('../../utils/timeHelper')
 const express = require('express')
 const router = express.Router()
 const { authenticateToken, getUserRoles } = require('../../middleware/auth')
 const permission_module = require('../../modules/UserPermissionModule')
 
 /**
- * 🛡️ 获取用户权限信息
- * GET /api/v4/permissions/user/:userId
+ * 🛡️ 获取指定用户权限信息
+ * GET /api/v4/permissions/user/:user_id
  */
-router.get('/user/:userId', authenticateToken, async (req, res) => {
+router.get('/user/:user_id', authenticateToken, async (req, res) => {
   try {
-    const { userId } = req.params
+    const { user_id } = req.params
     const request_user_id = req.user.user_id
 
     // 🛡️ 检查是否有权限查看指定用户的权限信息
-    // 1. 用户只能查看自己的权限
-    // 2. 超级管理员可以查看所有用户的权限
     const request_user_roles = await getUserRoles(request_user_id)
-    if (parseInt(userId) !== request_user_id && !request_user_roles.isAdmin) {
+    if (parseInt(user_id) !== request_user_id && !request_user_roles.isAdmin) {
       return res.apiError('无权限查看其他用户权限信息', 'FORBIDDEN', {}, 403)
     }
 
     // 🛡️ 获取用户角色和权限信息
-    const user_roles = await getUserRoles(parseInt(userId))
-    const permissions = await permission_module.getUserPermissions(parseInt(userId))
+    const user_roles = await getUserRoles(parseInt(user_id))
+    const permissions = await permission_module.getUserPermissions(parseInt(user_id))
 
     const response_data = {
-      user_id: parseInt(userId),
+      user_id: parseInt(user_id),
       roles: user_roles.roles,
-      is_admin: user_roles.isAdmin,
+      role_based_admin: user_roles.isAdmin,
       role_level: user_roles.maxRoleLevel,
       permissions,
       // 🛡️ 简化的权限检查结果
@@ -72,7 +71,7 @@ router.get('/current', authenticateToken, async (req, res) => {
     const response_data = {
       user_id: parseInt(user_id),
       roles: user_roles.roles,
-      is_admin: user_roles.isAdmin,
+      role_based_admin: user_roles.isAdmin,
       role_level: user_roles.maxRoleLevel,
       permissions,
       // 🛡️ 简化的权限检查结果
@@ -83,136 +82,107 @@ router.get('/current', authenticateToken, async (req, res) => {
 
     return res.apiSuccess(response_data, '当前用户权限信息获取成功')
   } catch (error) {
-    console.error('获取当前用户权限失败:', error)
+    console.error('❌ 获取当前用户权限失败:', error)
     return res.apiInternalError('获取当前用户权限信息失败', error.message)
   }
 })
 
 /**
- * 🛡️ 检查用户是否有管理员权限
- * GET /api/v4/permissions/check-admin/:userId
+ * 🛡️ 检查权限
+ * POST /api/v4/permissions/check
  */
-router.get('/check-admin/:userId', authenticateToken, async (req, res) => {
+router.post('/check', authenticateToken, async (req, res) => {
   try {
-    const { userId } = req.params
-    const request_user_id = req.user.user_id
+    const { resource, action = 'read' } = req.body
+    const user_id = req.user.user_id
 
-    // 🛡️ 只有超级管理员可以检查其他用户的管理员权限
-    const request_user_roles = await getUserRoles(request_user_id)
-    if (!request_user_roles.isAdmin) {
-      return res.apiError('无权限执行此操作', 'FORBIDDEN', {}, 403)
+    if (!resource) {
+      return res.apiError('缺少必需参数: resource', 'MISSING_REQUIRED_PARAMETER', {}, 400)
     }
 
-    const user_roles = await getUserRoles(parseInt(userId))
+    // 🛡️ 获取用户角色信息
+    const user_roles = await getUserRoles(user_id)
+
+    // 🛡️ 检查权限
+    const has_permission = await permission_module.checkUserPermission(user_id, resource, action)
 
     const response_data = {
-      user_id: parseInt(userId),
-      is_admin: user_roles.isAdmin,
+      user_id,
+      resource,
+      action,
+      has_permission,
+      role_based_admin: user_roles.isAdmin,
       role_level: user_roles.maxRoleLevel,
-      roles: user_roles.roles,
-      can_manage_lottery: user_roles.isAdmin,
-      can_view_admin_panel: user_roles.isAdmin
+      checked_at: BeijingTimeHelper.now()
     }
 
-    return res.apiSuccess(response_data, '管理员权限检查完成')
+    return res.apiSuccess(response_data, '权限检查完成')
   } catch (error) {
-    console.error('检查管理员权限失败:', error)
-    return res.apiInternalError('检查管理员权限失败', error.message)
+    console.error('❌ 权限检查失败:', error)
+    return res.apiInternalError('权限检查失败', error.message)
   }
 })
 
 /**
- * 🛡️ 设置用户管理员权限
- * POST /api/v4/permissions/set-admin
- */
-router.post('/set-admin', authenticateToken, async (req, res) => {
-  try {
-    const { user_id, is_admin } = req.body
-    const operator_id = req.user.user_id
-
-    // 🛡️ 只有超级管理员可以设置其他用户的管理员权限
-    const operator_roles = await getUserRoles(operator_id)
-    if (!operator_roles.isAdmin) {
-      return res.apiError('无权限执行此操作', 'FORBIDDEN', {}, 403)
-    }
-
-    // 🛡️ 通过角色系统设置管理员权限
-    const result = await permission_module.setUserAdminRole(user_id, is_admin, operator_id)
-
-    return res.apiSuccess(result, '用户权限设置成功')
-  } catch (error) {
-    console.error('设置用户权限失败:', error)
-    return res.apiInternalError('设置用户权限失败', error.message)
-  }
-})
-
-/**
- * 🛡️ 获取所有管理员列表
+ * 🛡️ 获取管理员列表
  * GET /api/v4/permissions/admins
  */
 router.get('/admins', authenticateToken, async (req, res) => {
   try {
     const request_user_id = req.user.user_id
 
-    // 🛡️ 只有超级管理员可以查看管理员列表
+    // 🛡️ 检查管理员权限
     const request_user_roles = await getUserRoles(request_user_id)
     if (!request_user_roles.isAdmin) {
-      return res.apiError('无权限查看管理员列表', 'FORBIDDEN', {}, 403)
+      return res.apiError('需要管理员权限', 'ADMIN_REQUIRED', {}, 403)
     }
 
+    // 🛡️ 获取所有管理员
     const admins = await permission_module.getAllAdmins()
 
-    return res.apiSuccess({ admins, total: admins.length }, '管理员列表获取成功')
+    const response_data = {
+      total_count: admins.length,
+      admins: admins.map(admin => ({
+        ...admin,
+        role_based_admin: admin.role_based_admin
+      })),
+      retrieved_at: BeijingTimeHelper.now()
+    }
+
+    return res.apiSuccess(response_data, '管理员列表获取成功')
   } catch (error) {
-    console.error('获取管理员列表失败:', error)
+    console.error('❌ 获取管理员列表失败:', error)
     return res.apiInternalError('获取管理员列表失败', error.message)
   }
 })
 
 /**
- * 🛡️ 批量权限检查
- * POST /api/v4/permissions/batch-check
+ * 🛡️ 获取权限统计信息
+ * GET /api/v4/permissions/statistics
  */
-router.post('/batch-check', authenticateToken, async (req, res) => {
+router.get('/statistics', authenticateToken, async (req, res) => {
   try {
-    const { user_ids } = req.body
     const request_user_id = req.user.user_id
 
-    // 🛡️ 只有超级管理员可以批量检查权限
+    // 🛡️ 检查管理员权限
     const request_user_roles = await getUserRoles(request_user_id)
     if (!request_user_roles.isAdmin) {
-      return res.apiError('无权限执行批量权限检查', 'FORBIDDEN', {}, 403)
+      return res.apiError('需要管理员权限', 'ADMIN_REQUIRED', {}, 403)
     }
 
-    if (!Array.isArray(user_ids) || user_ids.length === 0) {
-      return res.apiError('user_ids 必须是非空数组', 'INVALID_PARAMS')
+    // 🛡️ 获取权限统计
+    const statistics = await permission_module.getPermissionStatistics()
+
+    const response_data = {
+      ...statistics,
+      role_based_admin: request_user_roles.isAdmin,
+      retrieved_by: request_user_id
     }
 
-    // 🛡️ 批量获取用户权限信息
-    const results = []
-    for (const userId of user_ids) {
-      try {
-        const user_roles = await getUserRoles(parseInt(userId))
-        results.push({
-          user_id: parseInt(userId),
-          is_admin: user_roles.isAdmin,
-          role_level: user_roles.maxRoleLevel,
-          roles: user_roles.roles,
-          status: 'success'
-        })
-      } catch (error) {
-        results.push({
-          user_id: parseInt(userId),
-          status: 'error',
-          error: error.message
-        })
-      }
-    }
-
-    return res.apiSuccess(results, '批量权限检查完成')
+    return res.apiSuccess(response_data, '权限统计信息获取成功')
   } catch (error) {
-    console.error('批量权限检查失败:', error)
-    return res.apiInternalError('批量权限检查失败', error.message)
+    console.error('❌ 获取权限统计失败:', error)
+    return res.apiInternalError('获取权限统计信息失败', error.message)
   }
 })
 

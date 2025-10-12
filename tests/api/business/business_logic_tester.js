@@ -5,6 +5,7 @@
  * 使用模型：Claude Sonnet 4
  */
 
+const BeijingTimeHelper = require('../../../utils/timeHelper')
 const BaseTestManager = require('../core/base_test_manager')
 const request = require('supertest')
 const app = require('../../../app')
@@ -94,14 +95,14 @@ class BusinessLogicTester extends BaseTestManager {
             name: business_test.name,
             status: 'passed',
             result,
-            timestamp: new Date().toISOString()
+            timestamp: BeijingTimeHelper.now()
           })
         } catch (error) {
           this.business_logic_tests.push({
             name: business_test.name,
             status: 'failed',
             error: error.message,
-            timestamp: new Date().toISOString()
+            timestamp: BeijingTimeHelper.now()
           })
         }
       })
@@ -252,14 +253,14 @@ class BusinessLogicTester extends BaseTestManager {
           name: test_case.name,
           status: 'passed',
           result,
-          timestamp: new Date().toISOString()
+          timestamp: BeijingTimeHelper.now()
         })
       } catch (error) {
         this.boundary_tests.push({
           name: test_case.name,
           status: 'failed',
           error: error.message,
-          timestamp: new Date().toISOString()
+          timestamp: BeijingTimeHelper.now()
         })
       }
     }
@@ -364,14 +365,14 @@ class BusinessLogicTester extends BaseTestManager {
           name: test_case.name,
           status: 'passed',
           result,
-          timestamp: new Date().toISOString()
+          timestamp: BeijingTimeHelper.now()
         })
       } catch (error) {
         this.exception_tests.push({
           name: test_case.name,
           status: 'failed',
           error: error.message,
-          timestamp: new Date().toISOString()
+          timestamp: BeijingTimeHelper.now()
         })
       }
     }

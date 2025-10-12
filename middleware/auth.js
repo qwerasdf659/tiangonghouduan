@@ -8,6 +8,7 @@
 
 const jwt = require('jsonwebtoken')
 const { User, Role } = require('../models')
+const BeijingTimeHelper = require('../utils/timeHelper')
 
 // 尝试导入Redis客户端，如果失败则使用纯内存缓存
 let redisClient = null
@@ -36,14 +37,14 @@ const cacheStats = {
 /**
  * 🚀 从缓存获取用户权限
  */
-async function getUserPermissionsFromCache (userId) {
+async function getUserPermissionsFromCache (user_id) {
   cacheStats.totalQueries++
 
   // 1. 检查内存缓存
-  const memoryKey = `permissions_${userId}`
+  const memoryKey = `permissions_${user_id}`
   const memoryItem = memoryCache.get(memoryKey)
 
-  if (memoryItem && (Date.now() - memoryItem.timestamp) < MEMORY_TTL) {
+  if (memoryItem && (BeijingTimeHelper.timestamp() - memoryItem.timestamp) < MEMORY_TTL) {
     cacheStats.memoryHits++
     return memoryItem.data
   }
@@ -51,7 +52,7 @@ async function getUserPermissionsFromCache (userId) {
   // 2. 检查Redis缓存
   if (redisClient) {
     try {
-      const redisKey = `${REDIS_PREFIX}${userId}`
+      const redisKey = `${REDIS_PREFIX}${user_id}`
       const cached = await redisClient.get(redisKey)
 
       if (cached) {
@@ -61,7 +62,7 @@ async function getUserPermissionsFromCache (userId) {
         // 更新内存缓存
         memoryCache.set(memoryKey, {
           data,
-          timestamp: Date.now()
+          timestamp: BeijingTimeHelper.timestamp()
         })
 
         return data
@@ -77,18 +78,18 @@ async function getUserPermissionsFromCache (userId) {
 /**
  * 🚀 设置用户权限缓存
  */
-async function setUserPermissionsCache (userId, data) {
+async function setUserPermissionsCache (user_id, data) {
   // 设置内存缓存
-  const memoryKey = `permissions_${userId}`
+  const memoryKey = `permissions_${user_id}`
   memoryCache.set(memoryKey, {
     data,
-    timestamp: Date.now()
+    timestamp: BeijingTimeHelper.timestamp()
   })
 
   // 设置Redis缓存
   if (redisClient) {
     try {
-      const redisKey = `${REDIS_PREFIX}${userId}`
+      const redisKey = `${REDIS_PREFIX}${user_id}`
       await redisClient.setex(redisKey, REDIS_TTL, JSON.stringify(data))
     } catch (error) {
       console.warn('⚠️ [Auth] Redis写入失败:', error.message)
@@ -99,35 +100,35 @@ async function setUserPermissionsCache (userId, data) {
 /**
  * 🗑️ 清除用户权限缓存
  */
-async function invalidateUserPermissions (userId, reason = 'unknown') {
+async function invalidateUserPermissions (user_id, reason = 'unknown') {
   // 清除内存缓存
-  const memoryKey = `permissions_${userId}`
+  const memoryKey = `permissions_${user_id}`
   memoryCache.delete(memoryKey)
 
   // 清除Redis缓存
   if (redisClient) {
     try {
-      const redisKey = `${REDIS_PREFIX}${userId}`
+      const redisKey = `${REDIS_PREFIX}${user_id}`
       await redisClient.del(redisKey)
     } catch (error) {
       console.warn('⚠️ [Auth] Redis删除失败:', error.message)
     }
   }
 
-  console.log(`🔄 [Auth] 清除用户权限缓存: ${userId} (原因: ${reason})`)
+  console.log(`🔄 [Auth] 清除用户权限缓存: ${user_id} (原因: ${reason})`)
 }
 
 /**
  * 🛡️ 获取用户角色信息（基于UUID角色系统，支持缓存）
- * @param {number} userId - 用户ID
+ * @param {number} user_id - 用户ID
  * @param {boolean} forceRefresh - 强制刷新缓存
  * @returns {Promise<Object>} 用户角色信息
  */
-async function getUserRoles (userId, forceRefresh = false) {
+async function getUserRoles (user_id, forceRefresh = false) {
   try {
     // 如果不强制刷新，先尝试从缓存获取
     if (!forceRefresh) {
-      const cached = await getUserPermissionsFromCache(userId)
+      const cached = await getUserPermissionsFromCache(user_id)
       if (cached) {
         return cached
       }
@@ -136,14 +137,14 @@ async function getUserRoles (userId, forceRefresh = false) {
     cacheStats.databaseQueries++
 
     const user = await User.findOne({
-      where: { user_id: userId, status: 'active' },
+      where: { user_id, status: 'active' },
       include: [{
         model: Role,
         as: 'roles',
         through: {
           where: { is_active: true }
         },
-        attributes: ['id', 'role_uuid', 'role_name', 'role_level', 'permissions']
+        attributes: ['role_id', 'role_uuid', 'role_name', 'role_level', 'permissions']
       }]
     })
 
@@ -155,7 +156,7 @@ async function getUserRoles (userId, forceRefresh = false) {
         permissions: []
       }
       // 缓存空结果，避免重复查询
-      await setUserPermissionsCache(userId, emptyResult)
+      await setUserPermissionsCache(user_id, emptyResult)
       return emptyResult
     }
 
@@ -190,7 +191,7 @@ async function getUserRoles (userId, forceRefresh = false) {
     }
 
     // 缓存结果
-    await setUserPermissionsCache(userId, result)
+    await setUserPermissionsCache(user_id, result)
 
     return result
   } catch (error) {
@@ -214,28 +215,34 @@ async function generateTokens (user) {
     // 获取用户角色信息
     const userRoles = await getUserRoles(user.user_id)
 
+    // 🔐 确定主要角色名称（用于前端显示）
+    const primaryRole = userRoles.roles.find(r => r.role_level === userRoles.roleLevel)
+    const userRole = primaryRole ? primaryRole.role_name : 'user'
+
     const payload = {
       user_id: user.user_id,
       mobile: user.mobile,
       nickname: user.nickname,
       status: user.status,
       role_level: userRoles.roleLevel, // 🛡️ 基于角色计算
-      iat: Math.floor(Date.now() / 1000)
+      is_admin: userRoles.isAdmin, // 🔐 管理员标识
+      user_role: userRole, // 🔐 角色名称
+      iat: Math.floor(BeijingTimeHelper.timestamp() / 1000)
     }
 
-    const accessToken = jwt.sign(payload, process.env.JWT_SECRET, {
+    const access_token = jwt.sign(payload, process.env.JWT_SECRET, {
       expiresIn: process.env.JWT_EXPIRES_IN || '24h'
     })
 
-    const refreshToken = jwt.sign(
+    const refresh_token = jwt.sign(
       { user_id: user.user_id, type: 'refresh' },
       process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET,
       { expiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '7d' }
     )
 
     return {
-      access_token: accessToken,
-      refresh_token: refreshToken,
+      access_token,
+      refresh_token,
       expires_in: 24 * 60 * 60, // 24小时
       token_type: 'Bearer',
       user: {
@@ -244,6 +251,8 @@ async function generateTokens (user) {
         nickname: user.nickname,
         status: user.status,
         role_level: userRoles.roleLevel,
+        is_admin: userRoles.isAdmin,
+        user_role: userRole,
         roles: userRoles.roles
       }
     }
@@ -255,13 +264,13 @@ async function generateTokens (user) {
 
 /**
  * 🛡️ 验证刷新Token
- * @param {string} refreshToken - 刷新Token
+ * @param {string} refresh_token - 刷新Token
  * @returns {Promise<Object>} 验证结果
  */
-async function verifyRefreshToken (refreshToken) {
+async function verifyRefreshToken (refresh_token) {
   try {
     const decoded = jwt.verify(
-      refreshToken,
+      refresh_token,
       process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET
     )
 
@@ -482,11 +491,11 @@ const PermissionManager = {
   }),
 
   // 强制刷新用户权限
-  forceRefreshUser: (userId) => getUserRoles(userId, true),
+  forceRefreshUser: (user_id) => getUserRoles(user_id, true),
 
   // 批量清除缓存
   invalidateMultipleUsers: async (userIds, reason = 'batch_operation') => {
-    await Promise.all(userIds.map(userId => invalidateUserPermissions(userId, reason)))
+    await Promise.all(userIds.map(user_id => invalidateUserPermissions(user_id, reason)))
   }
 }
 

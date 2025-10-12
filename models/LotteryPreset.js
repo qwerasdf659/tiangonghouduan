@@ -15,7 +15,7 @@ module.exports = (sequelize, DataTypes) => {
       preset_id: {
         type: DataTypes.STRING(50),
         primaryKey: true,
-        defaultValue: () => `preset_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
+        defaultValue: () => `preset_${BeijingTimeHelper.generateIdTimestamp()}_${Math.random().toString(36).substr(2, 6)}`,
         comment: '预设记录唯一标识'
       },
 
@@ -71,7 +71,7 @@ module.exports = (sequelize, DataTypes) => {
       created_at: {
         type: DataTypes.DATE,
         allowNull: false,
-        defaultValue: DataTypes.NOW,
+        defaultValue: () => BeijingTimeHelper.createDatabaseTime(),
         comment: '创建时间',
         get () {
           return BeijingTimeHelper.formatChinese(this.getDataValue('created_at'))
@@ -138,13 +138,13 @@ module.exports = (sequelize, DataTypes) => {
 
   /**
    * 获取用户的下一个未使用预设
-   * @param {number} userId - 用户ID
+   * @param {number} user_id - 用户ID
    * @returns {Object|null} 下一个预设或null
    */
-  LotteryPreset.getNextPreset = async function (userId) {
+  LotteryPreset.getNextPreset = async function (user_id) {
     return await LotteryPreset.findOne({
       where: {
-        user_id: userId,
+        user_id,
         status: 'pending'
       },
       order: [['queue_order', 'ASC']],
@@ -152,7 +152,7 @@ module.exports = (sequelize, DataTypes) => {
         {
           model: sequelize.models.LotteryPrize,
           as: 'prize',
-          attributes: ['prize_id', 'name', 'prize_type', 'prize_value', 'description']
+          attributes: ['prize_id', 'prize_name', 'prize_type', 'prize_value', 'prize_description', 'sort_order'] // 🎯 方案3：添加sort_order字段
         }
       ]
     })
@@ -160,24 +160,27 @@ module.exports = (sequelize, DataTypes) => {
 
   /**
    * 为用户创建预设队列
-   * @param {number} userId - 用户ID
+   * @param {number} user_id - 用户ID
    * @param {Array} presets - 预设配置数组 [{prize_id, queue_order}, ...]
    * @param {number} adminId - 管理员ID
    * @returns {Array} 创建的预设记录
    */
-  LotteryPreset.createPresetQueue = async function (userId, presets, adminId) {
+  LotteryPreset.createPresetQueue = async function (user_id, presets, adminId) {
     const transaction = await sequelize.transaction()
 
     try {
       const createdPresets = []
 
       for (const preset of presets) {
-        const newPreset = await LotteryPreset.create({
-          user_id: userId,
-          prize_id: preset.prize_id,
-          queue_order: preset.queue_order,
-          created_by: adminId
-        }, { transaction })
+        const newPreset = await LotteryPreset.create(
+          {
+            user_id,
+            prize_id: preset.prize_id,
+            queue_order: preset.queue_order,
+            created_by: adminId
+          },
+          { transaction }
+        )
 
         createdPresets.push(newPreset)
       }
@@ -192,16 +195,16 @@ module.exports = (sequelize, DataTypes) => {
 
   /**
    * 获取用户的预设统计
-   * @param {number} userId - 用户ID
+   * @param {number} user_id - 用户ID
    * @returns {Object} 统计信息
    */
-  LotteryPreset.getUserPresetStats = async function (userId) {
+  LotteryPreset.getUserPresetStats = async function (user_id) {
     const [pendingCount, usedCount] = await Promise.all([
       LotteryPreset.count({
-        where: { user_id: userId, status: 'pending' }
+        where: { user_id, status: 'pending' }
       }),
       LotteryPreset.count({
-        where: { user_id: userId, status: 'used' }
+        where: { user_id, status: 'used' }
       })
     ])
 
@@ -214,12 +217,12 @@ module.exports = (sequelize, DataTypes) => {
 
   /**
    * 清理用户的所有预设
-   * @param {number} userId - 用户ID
+   * @param {number} user_id - 用户ID
    * @returns {number} 删除的记录数
    */
-  LotteryPreset.clearUserPresets = async function (userId) {
+  LotteryPreset.clearUserPresets = async function (user_id) {
     return await LotteryPreset.destroy({
-      where: { user_id: userId }
+      where: { user_id }
     })
   }
 

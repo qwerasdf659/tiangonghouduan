@@ -6,9 +6,9 @@
  * @date 2025-09-24
  */
 
-const models = require('../../../../../models')
 const BeijingTimeHelper = require('../../../../../utils/timeHelper')
-const UnifiedLotteryEngine = require('../../../../../services/UnifiedLotteryEngine/UnifiedLotteryEngine')
+const models = require('../../../../../models')
+const { UnifiedLotteryEngine } = require('../../../../../services/UnifiedLotteryEngine/UnifiedLotteryEngine')
 const ManagementStrategy = require('../../../../../services/UnifiedLotteryEngine/strategies/ManagementStrategy')
 const PerformanceMonitor = require('../../../../../services/UnifiedLotteryEngine/utils/PerformanceMonitor')
 const Logger = require('../../../../../services/UnifiedLotteryEngine/utils/Logger')
@@ -32,7 +32,7 @@ async function getSimpleSystemStats () {
   const os = require('os')
 
   try {
-    const today = new Date()
+    const today = BeijingTimeHelper.createBeijingTime()
     const todayStart = new Date(today.setHours(0, 0, 0, 0))
 
     // 并行获取基础统计
@@ -41,7 +41,7 @@ async function getSimpleSystemStats () {
       User.count({
         where: {
           last_login_at: {
-            [Op.gte]: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) // 30天内活跃
+            [Op.gte]: new Date(BeijingTimeHelper.timestamp() - 30 * 24 * 60 * 60 * 1000) // 30天内活跃
           }
         }
       }),
@@ -107,11 +107,11 @@ const validators = {
   /**
    * 验证用户ID
    */
-  validateUserId: (userId) => {
-    if (!userId || isNaN(parseInt(userId))) {
+  validateUserId: (user_id) => {
+    if (!user_id || isNaN(parseInt(user_id))) {
       throw new Error('无效的用户ID')
     }
-    return parseInt(userId)
+    return parseInt(user_id)
   },
 
   /**

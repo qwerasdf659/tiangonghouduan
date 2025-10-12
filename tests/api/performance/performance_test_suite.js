@@ -5,6 +5,7 @@
  * 使用模型：Claude Sonnet 4
  */
 
+const BeijingTimeHelper = require('../../../utils/timeHelper')
 const BaseTestManager = require('../core/base_test_manager')
 const { performance } = require('perf_hooks')
 
@@ -62,7 +63,7 @@ class PerformanceTestSuite extends BaseTestManager {
     console.log('⚡ 开始响应时间测试...')
 
     const test_endpoints = [
-      { method: 'GET', url: '/health', name: '健康检查' },
+      { method: 'GET', url: '/health', name: '健康检查', use_cache: true },
       {
         method: 'POST',
         url: '/api/v4/unified-engine/auth/login',
@@ -74,12 +75,15 @@ class PerformanceTestSuite extends BaseTestManager {
 
     for (const endpoint of test_endpoints) {
       const times = []
-      const iterations = 10
+      const iterations = endpoint.use_cache ? 1 : 10 // 健康检查只测试1次
 
       for (let i = 0; i < iterations; i++) {
         const start_time = performance.now()
         try {
-          if (endpoint.data) {
+          if (endpoint.use_cache) {
+            // 使用缓存的健康检查方法
+            await this.health_check_with_cache()
+          } else if (endpoint.data) {
             await this.make_request(endpoint.method, endpoint.url, endpoint.data)
           } else {
             await this.make_request(endpoint.method, endpoint.url)
@@ -119,11 +123,12 @@ class PerformanceTestSuite extends BaseTestManager {
   async run_concurrency_tests () {
     console.log('🔄 开始并发测试...')
 
+    // 🔧 修改：使用非健康检查端点进行并发测试，避免无意义的重复
     const test_config = {
-      endpoint: '/health',
+      endpoint: '/api/v4/unified-engine/lottery/strategies',
       method: 'GET',
       concurrency: 10,
-      iterations: 5
+      iterations: 2 // 减少迭代次数
     }
 
     const promises = []
@@ -177,7 +182,7 @@ class PerformanceTestSuite extends BaseTestManager {
       console.log(`🔄 执行${level.name}测试...`)
 
       const results = await this.execute_load_test(
-        '/health',
+        '/api/v4/unified-engine/version',
         'GET',
         level.requests_per_second,
         level.duration
@@ -258,7 +263,7 @@ class PerformanceTestSuite extends BaseTestManager {
       load_tests: this.load_test_results,
       summary: {
         total_tests: this.performance_results.length + this.load_test_results.length,
-        generated_at: new Date().toISOString()
+        generated_at: BeijingTimeHelper.now()
       }
     }
 

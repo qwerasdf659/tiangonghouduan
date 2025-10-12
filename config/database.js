@@ -11,6 +11,19 @@
 const { Sequelize } = require('sequelize')
 require('dotenv').config()
 
+// ⚡ 慢查询监控配置（2025年01月21日新增）
+const SLOW_QUERY_THRESHOLD = 1000 // 1秒阈值
+const slowQueryLogger = (sql, timing) => {
+  if (timing >= SLOW_QUERY_THRESHOLD) {
+    console.warn('🐌 慢查询检测:', {
+      sql: sql.substring(0, 200), // 只记录前200字符
+      timing: `${timing}ms`,
+      threshold: `${SLOW_QUERY_THRESHOLD}ms`,
+      timestamp: new Date().toISOString()
+    })
+  }
+}
+
 // 🔴 从环境变量读取所有数据库配置 - 零硬编码
 const dbConfig = {
   host: process.env.DB_HOST,
@@ -20,14 +33,26 @@ const dbConfig = {
   database: process.env.DB_NAME,
   dialect: 'mysql',
   timezone: '+08:00', // 全系统统一使用北京时间
-  logging: process.env.NODE_ENV === 'development' ? console.log : false,
+  // ⚡ 使用慢查询监控日志（2025年01月21日优化）
+  logging:
+    process.env.NODE_ENV === 'development'
+      ? (sql, timing) => {
+        // 开发环境：记录所有查询和慢查询
+        console.log(sql)
+        if (timing) slowQueryLogger(sql, timing)
+      }
+      : (sql, timing) => {
+        // 生产环境：只记录慢查询
+        if (timing) slowQueryLogger(sql, timing)
+      },
+  benchmark: true, // ⚡ 启用查询时间记录（必需）
   pool: {
-    max: 50, // 🚀 提升最大连接数以支持高并发
-    min: 5, // 🚀 保持最小连接数，避免冷启动延迟
-    acquire: 60000, // 🚀 增加获取连接超时时间
-    idle: 300000, // 🚀 延长空闲连接时间，减少频繁创建/销毁
-    evict: 60000, // 🚀 连接池清理间隔
-    handleDisconnects: true // 🚀 自动处理连接断开
+    max: 40, // ⭐ 最大连接数（优化：从50降到40）- 支持多实例部署
+    min: 5, // ✅ 最小连接数 - 避免冷启动延迟
+    acquire: 10000, // ✅ 获取连接超时10秒 - 避免长时间等待
+    idle: 180000, // ⭐ 空闲连接3分钟（优化：从5分钟改为3分钟）- 平衡性能和资源
+    evict: 60000, // ✅ 连接池清理间隔1分钟
+    handleDisconnects: true // ✅ 自动处理连接断开
   },
   define: {
     charset: 'utf8mb4',

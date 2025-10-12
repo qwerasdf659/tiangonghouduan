@@ -5,6 +5,7 @@
  * 更新时间：2025年01月28日
  */
 
+const BeijingTimeHelper = require('../utils/timeHelper')
 const { User, Role, UserRole } = require('../models')
 
 class UserPermissionModule {
@@ -12,7 +13,7 @@ class UserPermissionModule {
     this.name = 'UserPermissionModule'
     this.version = '4.0.0'
 
-    // 🛡️ 简化的角色系统配置
+    // 🛡️ 简化的角色系统配置 - 只区分普通用户和管理员
     this.roleConfig = {
       user: { level: 0, permissions: ['lottery:read', 'lottery:participate', 'profile:read', 'profile:update'] },
       admin: { level: 100, permissions: ['*:*'] }
@@ -36,14 +37,14 @@ class UserPermissionModule {
           through: {
             where: { is_active: true }
           },
-          attributes: ['id', 'role_uuid', 'role_name', 'role_level', 'permissions']
+          attributes: ['role_id', 'role_uuid', 'role_name', 'role_level', 'permissions']
         }]
       })
 
       if (!user) {
         return {
           exists: false,
-          is_admin: false,
+          role_based_admin: false,
           role_level: 0,
           permissions: [],
           roles: []
@@ -75,7 +76,7 @@ class UserPermissionModule {
         mobile: user.mobile,
         nickname: user.nickname,
         status: user.status,
-        is_admin: maxRoleLevel >= 100, // 🛡️ 基于角色级别计算管理员权限
+        role_based_admin: maxRoleLevel >= 100, // 🛡️ 基于角色级别计算管理员权限
         role_level: maxRoleLevel,
         permissions: Array.from(allPermissions),
         roles: user.roles.map(role => ({
@@ -88,7 +89,7 @@ class UserPermissionModule {
       console.error('❌ 获取用户权限失败:', error.message)
       return {
         exists: false,
-        is_admin: false,
+        role_based_admin: false,
         role_level: 0,
         permissions: [],
         roles: []
@@ -103,7 +104,7 @@ class UserPermissionModule {
    * @param {string} action - 操作类型
    * @returns {Promise<boolean>} 是否有权限
    */
-  async checkPermission (userId, resource, action = 'read') {
+  async checkUserPermission (userId, resource, action = 'read') {
     try {
       const userPermissions = await this.getUserPermissions(userId)
 
@@ -111,32 +112,139 @@ class UserPermissionModule {
         return false
       }
 
-      // 🛡️ 超级管理员拥有所有权限
-      if (userPermissions.is_admin) {
+      // 管理员拥有所有权限
+      if (userPermissions.role_based_admin) {
         return true
       }
 
       // 检查具体权限
-      const requiredPermission = `${resource}:${action}`
-      const hasWildcard = userPermissions.permissions.includes('*:*')
-      const hasResourceWildcard = userPermissions.permissions.includes(`${resource}:*`)
-      const hasSpecificPermission = userPermissions.permissions.includes(requiredPermission)
-
-      return hasWildcard || hasResourceWildcard || hasSpecificPermission
+      const permissionKey = `${resource}:${action}`
+      return userPermissions.permissions.includes(permissionKey) ||
+             userPermissions.permissions.includes(`${resource}:*`) ||
+             userPermissions.permissions.includes('*:*')
     } catch (error) {
-      console.error('❌ 权限检查失败:', error.message)
+      console.error('❌ 检查用户权限失败:', error.message)
       return false
     }
   }
 
   /**
-   * 🛡️ 设置用户管理员角色
+   * 🛡️ 验证操作权限（统一权限验证入口）
+   * @param {number} operatorId - 操作者ID
+   * @param {string} requiredLevel - 必需权限级别 (user|admin)
+   * @param {string} resource - 资源名称
+   * @param {string} action - 操作类型
+   * @returns {Promise<Object>} 验证结果
+   */
+  async validateOperation (operatorId, requiredLevel = 'user', resource = null, action = 'read') {
+    try {
+      const operatorPermissions = await this.getUserPermissions(operatorId)
+
+      if (!operatorPermissions.exists) {
+        return { valid: false, reason: 'USER_NOT_FOUND' }
+      }
+
+      // 检查管理员权限要求
+      if (requiredLevel === 'admin' && !operatorPermissions.role_based_admin) {
+        return { valid: false, reason: 'ADMIN_REQUIRED' }
+      }
+
+      // 如果指定了具体资源权限，进行检查
+      if (resource) {
+        const hasPermission = await this.checkUserPermission(operatorId, resource, action)
+        if (!hasPermission) {
+          return { valid: false, reason: 'PERMISSION_DENIED' }
+        }
+      }
+
+      return {
+        valid: true,
+        role_based_admin: operatorPermissions.role_based_admin,
+        role_level: operatorPermissions.role_level,
+        permissions: operatorPermissions.permissions
+      }
+    } catch (error) {
+      console.error('❌ 验证操作权限失败:', error.message)
+      return { valid: false, reason: 'VALIDATION_ERROR' }
+    }
+  }
+
+  /**
+   * 🛡️ 快速管理员权限检查
    * @param {number} userId - 用户ID
-   * @param {boolean} isAdmin - 是否设为管理员
+   * @returns {Promise<boolean>} 是否为管理员
+   */
+  async isAdmin (userId) {
+    try {
+      const permissions = await this.getUserPermissions(userId)
+      return permissions.role_based_admin
+    } catch (error) {
+      console.error('❌ 管理员权限检查失败:', error.message)
+      return false
+    }
+  }
+
+  /**
+   * 🛡️ 批量权限检查
+   * @param {Array} userPermissionChecks - 权限检查列表
+   * @returns {Promise<Object>} 批量检查结果
+   */
+  async batchPermissionCheck (userPermissionChecks) {
+    try {
+      const results = {}
+
+      for (const check of userPermissionChecks) {
+        const { userId, resource, action } = check
+        results[userId] = await this.checkUserPermission(userId, resource, action)
+      }
+
+      return { success: true, results }
+    } catch (error) {
+      console.error('❌ 批量权限检查失败:', error.message)
+      return { success: false, error: error.message }
+    }
+  }
+
+  /**
+   * 🛡️ 获取管理员信息（基于角色系统）
+   * @param {number} adminId - 管理员ID
+   * @returns {Promise<Object>} 管理员信息
+   */
+  async getAdminInfo (adminId) {
+    try {
+      const userPermissions = await this.getUserPermissions(adminId)
+
+      if (!userPermissions.exists) {
+        return { valid: false, reason: 'ADMIN_NOT_FOUND' }
+      }
+
+      if (!userPermissions.role_based_admin) {
+        return { valid: false, reason: 'NOT_ADMIN' }
+      }
+
+      return {
+        valid: true,
+        admin_id: userPermissions.user_id,
+        mobile: userPermissions.mobile,
+        nickname: userPermissions.nickname,
+        role_based_admin: true,
+        role_level: userPermissions.role_level,
+        roles: userPermissions.roles
+      }
+    } catch (error) {
+      console.error('❌ 获取管理员信息失败:', error.message)
+      return { valid: false, reason: 'SYSTEM_ERROR' }
+    }
+  }
+
+  /**
+   * 🛡️ 设置用户角色（只支持user/admin两种角色）
+   * @param {number} userId - 用户ID
+   * @param {boolean} isAdmin - 是否为管理员
    * @param {number} operatorId - 操作者ID
    * @returns {Promise<Object>} 操作结果
    */
-  async setUserAdminRole (userId, isAdmin, operatorId) {
+  async setUserRole (userId, isAdmin, operatorId) {
     try {
       // 验证用户是否存在
       const user = await User.findByPk(userId)
@@ -169,10 +277,10 @@ class UserPermissionModule {
       return {
         user_id: userId,
         role_name: targetRoleName,
-        is_admin: isAdmin,
+        role_based_admin: isAdmin,
         role_level: targetRole.role_level,
         assigned_by: operatorId,
-        timestamp: new Date().toISOString()
+        timestamp: BeijingTimeHelper.now()
       }
     } catch (error) {
       console.error('❌ 设置用户角色失败:', error.message)
@@ -203,90 +311,13 @@ class UserPermissionModule {
         mobile: user.mobile,
         nickname: user.nickname,
         status: user.status,
-        is_admin: true,
+        role_based_admin: true,
         role_level: 100,
         created_at: user.created_at,
         last_login: user.last_login
       }))
     } catch (error) {
       console.error('❌ 获取管理员列表失败:', error.message)
-      throw error
-    }
-  }
-
-  /**
-   * 🛡️ 验证操作者权限
-   * @param {number} operatorId - 操作者ID
-   * @param {string} requiredLevel - 需要的权限级别
-   * @returns {Promise<Object>} 验证结果
-   */
-  async validateOperatorPermission (operatorId, requiredLevel = 'admin') {
-    try {
-      const operatorPermissions = await this.getUserPermissions(operatorId)
-
-      if (!operatorPermissions.exists) {
-        return {
-          valid: false,
-          reason: '操作者不存在或已停用'
-        }
-      }
-
-      if (requiredLevel === 'admin' && !operatorPermissions.is_admin) {
-        return {
-          valid: false,
-          reason: '需要超级管理员权限'
-        }
-      }
-
-      return {
-        valid: true,
-        operator: operatorPermissions
-      }
-    } catch (error) {
-      console.error('❌ 验证操作者权限失败:', error.message)
-      return {
-        valid: false,
-        reason: '权限验证失败'
-      }
-    }
-  }
-
-  /**
-   * 🛡️ 批量权限检查
-   * @param {Array} userIds - 用户ID列表
-   * @param {string} resource - 资源名称
-   * @param {string} action - 操作类型
-   * @returns {Promise<Object>} 批量检查结果
-   */
-  async batchCheckPermissions (userIds, resource, action = 'read') {
-    try {
-      const results = {}
-
-      for (const userId of userIds) {
-        try {
-          const hasPermission = await this.checkPermission(userId, resource, action)
-          results[userId] = {
-            user_id: userId,
-            has_permission: hasPermission,
-            resource,
-            action
-          }
-        } catch (error) {
-          results[userId] = {
-            user_id: userId,
-            has_permission: false,
-            error: error.message
-          }
-        }
-      }
-
-      return {
-        total: userIds.length,
-        results,
-        timestamp: new Date().toISOString()
-      }
-    } catch (error) {
-      console.error('❌ 批量权限检查失败:', error.message)
       throw error
     }
   }
@@ -319,17 +350,17 @@ class UserPermissionModule {
         include: [{
           model: Role,
           as: 'roles',
-          where: { role_name: 'admin' },
+          where: { role_name: 'admin', is_active: true },
           through: { where: { is_active: true } }
         }]
       })
 
       return {
         total_users: totalUsers,
-        admin_users: adminCount,
-        regular_users: totalUsers - adminCount,
+        admin_count: adminCount,
+        user_count: totalUsers - adminCount,
         role_distribution: userStats,
-        timestamp: new Date().toISOString()
+        timestamp: BeijingTimeHelper.now()
       }
     } catch (error) {
       console.error('❌ 获取权限统计失败:', error.message)
@@ -338,4 +369,5 @@ class UserPermissionModule {
   }
 }
 
+// 导出类而不是实例，支持单例模式
 module.exports = new UserPermissionModule()

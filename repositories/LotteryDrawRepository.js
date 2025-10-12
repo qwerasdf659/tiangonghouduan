@@ -3,6 +3,7 @@
  * 负责复杂查询、统计分析和数据聚合操作
  * 从LotteryDraw模型中抽取的数据访问职责
  */
+const BeijingTimeHelper = require('../utils/timeHelper')
 const { Op } = require('sequelize')
 
 class LotteryDrawRepository {
@@ -249,10 +250,10 @@ class LotteryDrawRepository {
    * @returns {Object} 今日统计数据
    */
   async getTodayStats () {
-    const todayStart = new Date()
+    const todayStart = BeijingTimeHelper.createBeijingTime()
     todayStart.setHours(0, 0, 0, 0)
 
-    const todayEnd = new Date()
+    const todayEnd = BeijingTimeHelper.createBeijingTime()
     todayEnd.setHours(23, 59, 59, 999)
 
     const [totalDraws, totalWins] = await Promise.all([

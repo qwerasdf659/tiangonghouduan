@@ -9,9 +9,9 @@ const ConcurrencyControlMiddleware = require('../../middleware/ConcurrencyContro
 describe('ConcurrencyControlMiddleware 中间件测试 - 真实业务逻辑', () => {
   let middleware
   const testUser = {
-    user_id: 13612227930,
+    user_id: 31, // 正确的user_id（手机号13612227930对应的用户ID）
     mobile: '13612227930',
-    is_admin: false
+    role_based_admin: false
   }
 
   beforeEach(() => {

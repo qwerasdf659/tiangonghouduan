@@ -98,8 +98,32 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }))
 // 🔧 压缩响应
 app.use(compression())
 
-// 🔧 请求频率限制
-const limiter = rateLimit({
+// 🔧 API请求频率限制 V4 - Redis滑动窗口限流
+// 创建时间：2025年10月12日
+// 功能：防止恶意刷接口，保护服务器资源
+const { getRateLimiter } = require('./middleware/RateLimiterMiddleware')
+const rateLimiter = getRateLimiter()
+
+// 🔧 全局API限流 - 100次/分钟/IP（基于Redis）
+const globalRateLimiter = rateLimiter.createLimiter({
+  windowMs: 60 * 1000, // 1分钟窗口
+  max: 100, // 最多100个请求
+  keyPrefix: 'rate_limit:global:api:',
+  keyGenerator: 'ip', // 按IP限流
+  message: '请求过于频繁，请稍后再试',
+  onLimitReached: (req, key, count) => {
+    appLogger.warn('全局API限流触发', {
+      ip: req.ip,
+      path: req.path,
+      count,
+      limit: 100
+    })
+  }
+})
+app.use('/api/', globalRateLimiter)
+
+// 🔧 后备限流器（当Redis不可用时） - 1000次/15分钟
+const fallbackLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15分钟
   max: 1000, // 限制每个IP 15分钟内最多1000个请求
   message: {
@@ -108,9 +132,16 @@ const limiter = rateLimit({
     message: '请求太频繁，请稍后再试'
   },
   standardHeaders: true,
-  legacyHeaders: false
+  legacyHeaders: false,
+  skip: () => {
+    // 当Redis可用时跳过后备限流器
+    return rateLimiter.redisClient.isConnected
+  },
+  keyGenerator: (req) => {
+    return req.ip || req.connection.remoteAddress || 'unknown'
+  }
 })
-app.use('/api/', limiter)
+app.use('/api/', fallbackLimiter)
 
 // 字段转换器功能已删除 - 使用统一的snake_case命名格式
 
@@ -126,6 +157,41 @@ app.use((req, res, next) => {
     // 🗑️ user_agent 字段已删除 - 2025年01月21日
     timestamp: BeijingTimeHelper.apiTimestamp()
   })
+  next()
+})
+
+// 🔧 全局API超时保护中间件（30秒）
+// 功能：防止长时间无响应的请求占用连接资源
+// 创建时间：2025年01月21日
+app.use('/api/', (req, res, next) => {
+  const API_TIMEOUT = 30000 // 30秒超时
+
+  // 设置请求超时
+  req.setTimeout(API_TIMEOUT, () => {
+    if (!res.headersSent) {
+      appLogger.warn('API请求超时', {
+        method: req.method,
+        path: req.path,
+        timeout: API_TIMEOUT,
+        ip: req.ip
+      })
+
+      res.status(504).json({
+        success: false,
+        code: 'REQUEST_TIMEOUT',
+        message: '请求处理超时，请稍后重试',
+        data: {
+          timeout: `${API_TIMEOUT / 1000}秒`,
+          suggestion: '如果问题持续，请联系技术支持'
+        },
+        timestamp: BeijingTimeHelper.apiTimestamp()
+      })
+    }
+  })
+
+  // 设置响应超时
+  res.setTimeout(API_TIMEOUT)
+
   next()
 })
 
@@ -379,6 +445,14 @@ try {
   app.use('/api/v4/unified-engine/points', require('./routes/v4/unified-engine/points'))
   appLogger.info('V4积分管理系统加载成功', { route: '/api/v4/unified-engine/points' })
 
+  // V4系统功能路由（公告、反馈等）
+  app.use('/api/v4/system', require('./routes/v4/system'))
+  appLogger.info('V4系统功能模块加载成功', { route: '/api/v4/system' })
+
+  // V4审核管理路由（批量审核、超时告警）
+  app.use('/api/v4/audit-management', require('./routes/audit-management'))
+  appLogger.info('V4审核管理系统加载成功', { route: '/api/v4/audit-management' })
+
   appLogger.info('统一决策引擎V4.0架构已完全启用', { message: '所有旧版API已弃用' })
 } catch (error) {
   appLogger.error('V4统一决策引擎加载失败', { error: error.message, stack: error.stack })
@@ -471,7 +545,11 @@ const PORT = process.env.PORT || 3000
 const HOST = process.env.HOST || '0.0.0.0'
 
 if (require.main === module) {
-  app.listen(PORT, HOST, async () => {
+  // 🔌 使用http.createServer创建服务器实例（支持WebSocket）
+  const http = require('http')
+  const server = http.createServer(app)
+
+  server.listen(PORT, HOST, async () => {
     console.log('🔄 [DEBUG] 服务器启动监听完成')
 
     // 初始化Service层
@@ -490,6 +568,27 @@ if (require.main === module) {
       appLogger.error('Service层初始化失败', { error: error.message })
     }
 
+    // 🔌 初始化聊天WebSocket服务（新增）
+    try {
+      const ChatWebSocketService = require('./services/ChatWebSocketService')
+      ChatWebSocketService.initialize(server)
+      appLogger.info('聊天WebSocket服务已启动', {
+        path: '/socket.io',
+        transports: ['websocket', 'polling']
+      })
+    } catch (error) {
+      appLogger.error('聊天WebSocket服务初始化失败', { error: error.message })
+    }
+
+    // 初始化定时任务
+    try {
+      const ScheduledTasks = require('./scripts/scheduled-tasks')
+      ScheduledTasks.initialize()
+      appLogger.info('定时任务初始化完成')
+    } catch (error) {
+      appLogger.error('定时任务初始化失败', { error: error.message })
+    }
+
     // V4统一决策引擎启动完成
     appLogger.info('餐厅积分抽奖系统V4.0统一引擎启动成功', {
       host: HOST,
@@ -499,12 +598,16 @@ if (require.main === module) {
       endpoints: {
         health: `http://${HOST}:${PORT}/health`,
         lottery: `http://${HOST}:${PORT}/api/v4/unified-engine/lottery`,
-        admin: `http://${HOST}:${PORT}/api/v4/unified-engine/admin`
+        admin: `http://${HOST}:${PORT}/api/v4/unified-engine/admin`,
+        websocket: `ws://${HOST}:${PORT}/socket.io` // 新增WebSocket端点
       }
     })
 
     // ✅ V4架构已完全启用，无需传统定时任务服务
-    appLogger.info('V4统一决策引擎架构完全就绪', { architecture: '现代化微服务架构' })
+    appLogger.info('V4统一决策引擎架构完全就绪', {
+      architecture: '现代化微服务架构',
+      websocket: '实时通信已启用'
+    })
   })
 }
 

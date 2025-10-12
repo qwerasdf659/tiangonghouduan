@@ -170,7 +170,7 @@ router.post('/probability-adjust', adminAuthMiddleware, asyncHandler(async (req,
     }
 
     // 计算过期时间
-    const expiresAt = new Date(Date.now() + parseInt(duration_minutes) * 60 * 1000)
+    const expiresAt = BeijingTimeHelper.futureTime(parseInt(duration_minutes) * 60 * 1000)
 
     // 调用管理策略设置概率调整
     const result = await sharedComponents.managementStrategy.adjustProbability({
@@ -257,7 +257,7 @@ router.post('/user-specific-queue', adminAuthMiddleware, asyncHandler(async (req
     }
 
     // 计算过期时间
-    const expiresAt = new Date(Date.now() + parseInt(duration_minutes) * 60 * 1000)
+    const expiresAt = BeijingTimeHelper.futureTime(parseInt(duration_minutes) * 60 * 1000)
 
     // 调用管理策略设置用户特定队列
     const result = await sharedComponents.managementStrategy.setUserQueue({

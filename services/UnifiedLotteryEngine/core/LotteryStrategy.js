@@ -32,7 +32,7 @@ class LotteryStrategy {
    * 策略执行核心方法 - 必须由子类实现
    *
    * @param {Object} _context - 执行上下文
-   * @param {number} _context.userId - 用户ID
+   * @param {number} _context.user_id - 用户ID
    * @param {number} _context.activityId - 活动ID
    * @param {string} _context.lotteryType - 抽奖类型
    * @param {Object} _context.userProfile - 用户画像信息
@@ -76,6 +76,26 @@ class LotteryStrategy {
       name: this.strategyName,
       enabled: this.enabled,
       config: this.config,
+      metrics: this.metrics
+    }
+  }
+
+  /**
+   * 获取策略信息（包含策略名称和类型）
+   *
+   * @returns {Object} 策略信息
+   */
+  getStrategyInfo () {
+    return {
+      name: this.constructor.name,
+      strategyName: this.strategyName,
+      enabled: this.enabled,
+      config: this.config,
+      type: this.strategyName.includes('guarantee')
+        ? 'basic_guarantee'
+        : this.strategyName.includes('management') ? 'management' : 'unknown',
+      description: this.config.description || `${this.constructor.name}策略`,
+      version: this.config.version || '4.0.0',
       metrics: this.metrics
     }
   }
@@ -219,6 +239,13 @@ class LotteryStrategy {
    */
   logDebug (message, data = {}) {
     this.log('DEBUG', message, data)
+  }
+
+  /**
+   * Warn级别日志
+   */
+  logWarn (message, data = {}) {
+    this.log('WARN', message, data)
   }
 }
 

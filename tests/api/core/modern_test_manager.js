@@ -5,6 +5,7 @@
  * 使用模型：Claude Sonnet 4
  */
 
+const BeijingTimeHelper = require('../../../utils/timeHelper')
 const BaseTestManager = require('./base_test_manager')
 
 class ModernTestManager extends BaseTestManager {
@@ -158,7 +159,7 @@ class ModernTestManager extends BaseTestManager {
 
     return {
       metadata: {
-        generated_at: new Date().toISOString(),
+        generated_at: BeijingTimeHelper.now(),
         generator: 'ModernTestManager',
         version: '1.0.0'
       },
@@ -207,19 +208,19 @@ class ModernTestManager extends BaseTestManager {
    */
   async quickHealthCheck () {
     try {
-      const response = await this.make_request('GET', '/health')
+      const response = await this.health_check_with_cache()
       return {
         healthy: response.status === 200,
         status: response.status,
         data: response.data,
         response_time: response.responseTime || 0,
-        timestamp: new Date().toISOString()
+        timestamp: BeijingTimeHelper.now()
       }
     } catch (error) {
       return {
         healthy: false,
         error: error.message,
-        timestamp: new Date().toISOString()
+        timestamp: BeijingTimeHelper.now()
       }
     }
   }

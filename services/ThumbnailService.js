@@ -222,4 +222,9 @@ class ThumbnailService {
   }
 }
 
-module.exports = ThumbnailService
+// 🔥 导出单例实例（供路由层和模型直接调用）
+const thumbnailServiceInstance = new ThumbnailService()
+
+// 同时导出类（供ServiceManager需要自定义配置的场景）
+module.exports = thumbnailServiceInstance
+module.exports.ThumbnailService = ThumbnailService

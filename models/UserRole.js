@@ -5,17 +5,18 @@
  */
 
 const { DataTypes } = require('sequelize')
+const BeijingTimeHelper = require('../utils/timeHelper')
 
 module.exports = sequelize => {
   const UserRole = sequelize.define(
     'UserRole',
     {
       // 主键ID
-      id: {
+      user_role_id: {
         type: DataTypes.INTEGER,
         primaryKey: true,
         autoIncrement: true,
-        allowNull: false
+        comment: '主键ID'
       },
 
       // 用户ID
@@ -35,7 +36,7 @@ module.exports = sequelize => {
         allowNull: false,
         references: {
           model: 'roles',
-          key: 'id'
+          key: 'role_id'
         },
         comment: '角色ID'
       },
@@ -43,7 +44,7 @@ module.exports = sequelize => {
       // 分配时间
       assigned_at: {
         type: DataTypes.DATE,
-        defaultValue: DataTypes.NOW,
+        defaultValue: () => BeijingTimeHelper.createDatabaseTime(),
         comment: '角色分配时间'
       },
 
@@ -68,8 +69,8 @@ module.exports = sequelize => {
     {
       tableName: 'user_roles',
       timestamps: true,
-      createdAt: 'created_at',
-      updatedAt: 'updated_at',
+      created_at: 'created_at',
+      updated_at: 'updated_at',
       underscored: true,
       indexes: [
         {
