@@ -30,7 +30,7 @@
  * 数据库：restaurant_points_dev (统一数据库)
  */
 
-const UnifiedAPITestManager = require('./UnifiedAPITestManager')
+const TestCoordinator = require('./TestCoordinator')
 const moment = require('moment-timezone')
 
 describe('V4统一完整API测试套件 - 重构整合版', () => {
@@ -52,7 +52,7 @@ describe('V4统一完整API测试套件 - 重构整合版', () => {
     console.log('🗄️ 数据库: restaurant_points_dev (统一数据库)')
     console.log('🔄 整合内容: V4引擎+业务API完整覆盖（去重后）')
 
-    tester = new UnifiedAPITestManager()
+    tester = new TestCoordinator()
 
     // 等待V4引擎启动
     try {

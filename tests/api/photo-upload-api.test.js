@@ -12,7 +12,7 @@
  * 数据库：restaurant_points_dev
  */
 
-const UnifiedAPITestManager = require('./UnifiedAPITestManager')
+const TestCoordinator = require('./TestCoordinator')
 const moment = require('moment-timezone')
 
 describe('图片上传API测试套件', () => {
@@ -32,7 +32,7 @@ describe('图片上传API测试套件', () => {
     console.log(`🆔 用户ID: ${test_account.user_id}`)
     console.log('='.repeat(70))
 
-    tester = new UnifiedAPITestManager()
+    tester = new TestCoordinator()
 
     // 等待V4引擎启动
     try {
@@ -63,21 +63,23 @@ describe('图片上传API测试套件', () => {
     test('GET /api/v4/photo/my-uploads - 获取用户上传记录列表（默认分页）', async () => {
       console.log('\n📋 测试：获取用户上传记录列表（默认分页）')
 
-      const response = await tester.request
-        .get('/api/v4/photo/my-uploads')
-        .query({ user_id: test_account.user_id })
-        .set('Authorization', `Bearer ${tester.access_token}`)
+      const response = await tester.makeAuthenticatedRequest(
+        'GET',
+        '/api/v4/photo/my-uploads',
+        { user_id: test_account.user_id },
+        'regular'
+      )
 
       console.log('响应状态:', response.status)
-      console.log('响应数据:', JSON.stringify(response.body, null, 2))
+      console.log('响应数据:', JSON.stringify(response.data, null, 2))
 
       expect(response.status).toBe(200)
-      expect(response.body.success).toBe(true)
-      expect(response.body.data).toHaveProperty('uploads')
-      expect(response.body.data).toHaveProperty('pagination')
+      expect(response.data.success).toBe(true)
+      expect(response.data.data).toHaveProperty('uploads')
+      expect(response.data.data).toHaveProperty('pagination')
 
       // 验证分页信息
-      const { pagination } = response.body.data
+      const { pagination } = response.data.data
       expect(pagination).toHaveProperty('page')
       expect(pagination).toHaveProperty('limit')
       expect(pagination).toHaveProperty('total')
@@ -85,50 +87,54 @@ describe('图片上传API测试套件', () => {
       expect(pagination).toHaveProperty('has_next')
       expect(pagination).toHaveProperty('has_prev')
 
-      console.log(`✅ 返回${response.body.data.uploads.length}条上传记录`)
+      console.log(`✅ 返回${response.data.data.uploads.length}条上传记录`)
       console.log(`📊 总记录数: ${pagination.total}`)
     })
 
     test('GET /api/v4/photo/my-uploads - 自定义分页参数', async () => {
       console.log('\n📋 测试：自定义分页参数（page=1, limit=5）')
 
-      const response = await tester.request
-        .get('/api/v4/photo/my-uploads')
-        .query({
+      const response = await tester.makeAuthenticatedRequest(
+        'GET',
+        '/api/v4/photo/my-uploads',
+        {
           user_id: test_account.user_id,
           page: 1,
           limit: 5
-        })
-        .set('Authorization', `Bearer ${tester.access_token}`)
+        },
+        'regular'
+      )
 
       expect(response.status).toBe(200)
-      expect(response.body.success).toBe(true)
+      expect(response.data.success).toBe(true)
 
-      const { pagination } = response.body.data
+      const { pagination } = response.data.data
       expect(pagination.page).toBe(1)
       expect(pagination.limit).toBe(5)
-      expect(response.body.data.uploads.length).toBeLessThanOrEqual(5)
+      expect(response.data.data.uploads.length).toBeLessThanOrEqual(5)
 
-      console.log(`✅ 返回${response.body.data.uploads.length}条记录（限制5条）`)
+      console.log(`✅ 返回${response.data.data.uploads.length}条记录（限制5条）`)
     })
 
     test('GET /api/v4/photo/my-uploads - 按审核状态筛选（pending）', async () => {
       console.log('\n📋 测试：按审核状态筛选（pending）')
 
-      const response = await tester.request
-        .get('/api/v4/photo/my-uploads')
-        .query({
+      const response = await tester.makeAuthenticatedRequest(
+        'GET',
+        '/api/v4/photo/my-uploads',
+        {
           user_id: test_account.user_id,
           review_status: 'pending',
           limit: 10
-        })
-        .set('Authorization', `Bearer ${tester.access_token}`)
+        },
+        'regular'
+      )
 
       expect(response.status).toBe(200)
-      expect(response.body.success).toBe(true)
+      expect(response.data.success).toBe(true)
 
       // 验证所有返回的记录都是pending状态
-      const uploads = response.body.data.uploads
+      const uploads = response.data.data.uploads
       uploads.forEach(upload => {
         expect(upload.review_status).toBe('pending')
       })
@@ -139,20 +145,22 @@ describe('图片上传API测试套件', () => {
     test('GET /api/v4/photo/my-uploads - 按审核状态筛选（approved）', async () => {
       console.log('\n📋 测试：按审核状态筛选（approved）')
 
-      const response = await tester.request
-        .get('/api/v4/photo/my-uploads')
-        .query({
+      const response = await tester.makeAuthenticatedRequest(
+        'GET',
+        '/api/v4/photo/my-uploads',
+        {
           user_id: test_account.user_id,
           review_status: 'approved',
           limit: 10
-        })
-        .set('Authorization', `Bearer ${tester.access_token}`)
+        },
+        'regular'
+      )
 
       expect(response.status).toBe(200)
-      expect(response.body.success).toBe(true)
+      expect(response.data.success).toBe(true)
 
       // 验证所有返回的记录都是approved状态
-      const uploads = response.body.data.uploads
+      const uploads = response.data.data.uploads
       uploads.forEach(upload => {
         expect(upload.review_status).toBe('approved')
       })
@@ -163,20 +171,22 @@ describe('图片上传API测试套件', () => {
     test('GET /api/v4/photo/my-uploads - 排序测试（按创建时间倒序）', async () => {
       console.log('\n📋 测试：排序（按创建时间倒序）')
 
-      const response = await tester.request
-        .get('/api/v4/photo/my-uploads')
-        .query({
+      const response = await tester.makeAuthenticatedRequest(
+        'GET',
+        '/api/v4/photo/my-uploads',
+        {
           user_id: test_account.user_id,
           sort_by: 'created_at',
           order: 'DESC',
           limit: 5
-        })
-        .set('Authorization', `Bearer ${tester.access_token}`)
+        },
+        'regular'
+      )
 
       expect(response.status).toBe(200)
-      expect(response.body.success).toBe(true)
+      expect(response.data.success).toBe(true)
 
-      const uploads = response.body.data.uploads
+      const uploads = response.data.data.uploads
       if (uploads.length > 1) {
         // 验证时间顺序
         for (let i = 0; i < uploads.length - 1; i++) {
@@ -191,13 +201,16 @@ describe('图片上传API测试套件', () => {
     test('GET /api/v4/photo/my-uploads - 缺少user_id参数（应返回400错误）', async () => {
       console.log('\n❌ 测试：缺少user_id参数（应返回400错误）')
 
-      const response = await tester.request
-        .get('/api/v4/photo/my-uploads')
-        .set('Authorization', `Bearer ${tester.access_token}`)
+      const response = await tester.makeAuthenticatedRequest(
+        'GET',
+        '/api/v4/photo/my-uploads',
+        {},
+        'regular'
+      )
 
       expect(response.status).toBe(400)
-      expect(response.body.success).toBe(false)
-      expect(response.body.code).toBe('MISSING_USER_ID')
+      expect(response.data.success).toBe(false)
+      expect(response.data.code).toBe('MISSING_USER_ID')
 
       console.log('✅ 正确返回400错误')
     })
@@ -205,14 +218,16 @@ describe('图片上传API测试套件', () => {
     test('GET /api/v4/photo/my-uploads - 用户不存在（应返回404错误）', async () => {
       console.log('\n❌ 测试：用户不存在（应返回404错误）')
 
-      const response = await tester.request
-        .get('/api/v4/photo/my-uploads')
-        .query({ user_id: 999999 }) // 不存在的用户ID
-        .set('Authorization', `Bearer ${tester.access_token}`)
+      const response = await tester.makeAuthenticatedRequest(
+        'GET',
+        '/api/v4/photo/my-uploads',
+        { user_id: 999999 }, // 不存在的用户ID
+        'regular'
+      )
 
       expect(response.status).toBe(404)
-      expect(response.body.success).toBe(false)
-      expect(response.body.code).toBe('USER_NOT_FOUND')
+      expect(response.data.success).toBe(false)
+      expect(response.data.code).toBe('USER_NOT_FOUND')
 
       console.log('✅ 正确返回404错误')
     })
@@ -220,18 +235,20 @@ describe('图片上传API测试套件', () => {
     test('GET /api/v4/photo/my-uploads - 验证返回数据结构完整性', async () => {
       console.log('\n📋 测试：验证返回数据结构完整性')
 
-      const response = await tester.request
-        .get('/api/v4/photo/my-uploads')
-        .query({
+      const response = await tester.makeAuthenticatedRequest(
+        'GET',
+        '/api/v4/photo/my-uploads',
+        {
           user_id: test_account.user_id,
           limit: 1
-        })
-        .set('Authorization', `Bearer ${tester.access_token}`)
+        },
+        'regular'
+      )
 
       expect(response.status).toBe(200)
 
-      if (response.body.data.uploads.length > 0) {
-        const upload = response.body.data.uploads[0]
+      if (response.data.data.uploads.length > 0) {
+        const upload = response.data.data.uploads[0]
 
         // 验证必要字段
         expect(upload).toHaveProperty('image_id')
@@ -254,39 +271,43 @@ describe('图片上传API测试套件', () => {
     test('GET /api/v4/photo/my-stats - 获取用户上传统计信息', async () => {
       console.log('\n📊 测试：获取用户上传统计信息')
 
-      const response = await tester.request
-        .get('/api/v4/photo/my-stats')
-        .query({ user_id: test_account.user_id })
-        .set('Authorization', `Bearer ${tester.access_token}`)
+      const response = await tester.makeAuthenticatedRequest(
+        'GET',
+        '/api/v4/photo/my-stats',
+        { user_id: test_account.user_id },
+        'regular'
+      )
 
       console.log('响应状态:', response.status)
-      console.log('响应数据:', JSON.stringify(response.body, null, 2))
+      console.log('响应数据:', JSON.stringify(response.data, null, 2))
 
       expect(response.status).toBe(200)
-      expect(response.body.success).toBe(true)
-      expect(response.body.data).toHaveProperty('total_uploads')
-      expect(response.body.data).toHaveProperty('pending_count')
-      expect(response.body.data).toHaveProperty('approved_count')
-      expect(response.body.data).toHaveProperty('rejected_count')
-      expect(response.body.data).toHaveProperty('reviewing_count')
+      expect(response.data.success).toBe(true)
+      expect(response.data.data).toHaveProperty('total_uploads')
+      expect(response.data.data).toHaveProperty('pending_count')
+      expect(response.data.data).toHaveProperty('approved_count')
+      expect(response.data.data).toHaveProperty('rejected_count')
+      expect(response.data.data).toHaveProperty('reviewing_count')
 
-      console.log(`✅ 总上传数: ${response.body.data.total_uploads}`)
-      console.log(`📋 待审核: ${response.body.data.pending_count}`)
-      console.log(`✅ 已通过: ${response.body.data.approved_count}`)
-      console.log(`❌ 已拒绝: ${response.body.data.rejected_count}`)
+      console.log(`✅ 总上传数: ${response.data.data.total_uploads}`)
+      console.log(`📋 待审核: ${response.data.data.pending_count}`)
+      console.log(`✅ 已通过: ${response.data.data.approved_count}`)
+      console.log(`❌ 已拒绝: ${response.data.data.rejected_count}`)
     })
 
     test('GET /api/v4/photo/my-stats - 验证审核率计算', async () => {
       console.log('\n📊 测试：验证审核率计算')
 
-      const response = await tester.request
-        .get('/api/v4/photo/my-stats')
-        .query({ user_id: test_account.user_id })
-        .set('Authorization', `Bearer ${tester.access_token}`)
+      const response = await tester.makeAuthenticatedRequest(
+        'GET',
+        '/api/v4/photo/my-stats',
+        { user_id: test_account.user_id },
+        'regular'
+      )
 
       expect(response.status).toBe(200)
 
-      const data = response.body.data
+      const data = response.data.data
       expect(data).toHaveProperty('approval_rate')
       expect(data).toHaveProperty('rejection_rate')
 
@@ -305,14 +326,16 @@ describe('图片上传API测试套件', () => {
     test('GET /api/v4/photo/my-stats - 验证时间维度统计', async () => {
       console.log('\n📊 测试：验证时间维度统计')
 
-      const response = await tester.request
-        .get('/api/v4/photo/my-stats')
-        .query({ user_id: test_account.user_id })
-        .set('Authorization', `Bearer ${tester.access_token}`)
+      const response = await tester.makeAuthenticatedRequest(
+        'GET',
+        '/api/v4/photo/my-stats',
+        { user_id: test_account.user_id },
+        'regular'
+      )
 
       expect(response.status).toBe(200)
 
-      const data = response.body.data
+      const data = response.data.data
       expect(data).toHaveProperty('this_month_count')
       expect(data).toHaveProperty('this_week_count')
       expect(data).toHaveProperty('today_count')
@@ -331,14 +354,16 @@ describe('图片上传API测试套件', () => {
     test('GET /api/v4/photo/my-stats - 验证积分统计', async () => {
       console.log('\n📊 测试：验证积分统计')
 
-      const response = await tester.request
-        .get('/api/v4/photo/my-stats')
-        .query({ user_id: test_account.user_id })
-        .set('Authorization', `Bearer ${tester.access_token}`)
+      const response = await tester.makeAuthenticatedRequest(
+        'GET',
+        '/api/v4/photo/my-stats',
+        { user_id: test_account.user_id },
+        'regular'
+      )
 
       expect(response.status).toBe(200)
 
-      const data = response.body.data
+      const data = response.data.data
       expect(data).toHaveProperty('total_points_awarded')
       expect(data).toHaveProperty('avg_points_per_upload')
 
@@ -355,14 +380,16 @@ describe('图片上传API测试套件', () => {
     test('GET /api/v4/photo/my-stats - 验证用户等级评估', async () => {
       console.log('\n📊 测试：验证用户等级评估')
 
-      const response = await tester.request
-        .get('/api/v4/photo/my-stats')
-        .query({ user_id: test_account.user_id })
-        .set('Authorization', `Bearer ${tester.access_token}`)
+      const response = await tester.makeAuthenticatedRequest(
+        'GET',
+        '/api/v4/photo/my-stats',
+        { user_id: test_account.user_id },
+        'regular'
+      )
 
       expect(response.status).toBe(200)
 
-      const data = response.body.data
+      const data = response.data.data
       expect(data).toHaveProperty('user_level')
       expect(data.user_level).toHaveProperty('level')
       expect(data.user_level).toHaveProperty('text')
@@ -381,14 +408,16 @@ describe('图片上传API测试套件', () => {
     test('GET /api/v4/photo/my-stats - 验证提示信息', async () => {
       console.log('\n📊 测试：验证提示信息')
 
-      const response = await tester.request
-        .get('/api/v4/photo/my-stats')
-        .query({ user_id: test_account.user_id })
-        .set('Authorization', `Bearer ${tester.access_token}`)
+      const response = await tester.makeAuthenticatedRequest(
+        'GET',
+        '/api/v4/photo/my-stats',
+        { user_id: test_account.user_id },
+        'regular'
+      )
 
       expect(response.status).toBe(200)
 
-      const data = response.body.data
+      const data = response.data.data
       expect(data).toHaveProperty('tips')
       expect(Array.isArray(data.tips)).toBe(true)
       expect(data.tips.length).toBeGreaterThan(0)
@@ -404,14 +433,16 @@ describe('图片上传API测试套件', () => {
     test('GET /api/v4/photo/my-stats - 验证最近上传信息', async () => {
       console.log('\n📊 测试：验证最近上传信息')
 
-      const response = await tester.request
-        .get('/api/v4/photo/my-stats')
-        .query({ user_id: test_account.user_id })
-        .set('Authorization', `Bearer ${tester.access_token}`)
+      const response = await tester.makeAuthenticatedRequest(
+        'GET',
+        '/api/v4/photo/my-stats',
+        { user_id: test_account.user_id },
+        'regular'
+      )
 
       expect(response.status).toBe(200)
 
-      const data = response.body.data
+      const data = response.data.data
       expect(data).toHaveProperty('latest_upload')
 
       if (data.latest_upload) {
@@ -431,13 +462,16 @@ describe('图片上传API测试套件', () => {
     test('GET /api/v4/photo/my-stats - 缺少user_id参数（应返回400错误）', async () => {
       console.log('\n❌ 测试：缺少user_id参数（应返回400错误）')
 
-      const response = await tester.request
-        .get('/api/v4/photo/my-stats')
-        .set('Authorization', `Bearer ${tester.access_token}`)
+      const response = await tester.makeAuthenticatedRequest(
+        'GET',
+        '/api/v4/photo/my-stats',
+        {},
+        'regular'
+      )
 
       expect(response.status).toBe(400)
-      expect(response.body.success).toBe(false)
-      expect(response.body.code).toBe('MISSING_USER_ID')
+      expect(response.data.success).toBe(false)
+      expect(response.data.code).toBe('MISSING_USER_ID')
 
       console.log('✅ 正确返回400错误')
     })
@@ -445,14 +479,16 @@ describe('图片上传API测试套件', () => {
     test('GET /api/v4/photo/my-stats - 用户不存在（应返回404错误）', async () => {
       console.log('\n❌ 测试：用户不存在（应返回404错误）')
 
-      const response = await tester.request
-        .get('/api/v4/photo/my-stats')
-        .query({ user_id: 999999 }) // 不存在的用户ID
-        .set('Authorization', `Bearer ${tester.access_token}`)
+      const response = await tester.makeAuthenticatedRequest(
+        'GET',
+        '/api/v4/photo/my-stats',
+        { user_id: 999999 }, // 不存在的用户ID
+        'regular'
+      )
 
       expect(response.status).toBe(404)
-      expect(response.body.success).toBe(false)
-      expect(response.body.code).toBe('USER_NOT_FOUND')
+      expect(response.data.success).toBe(false)
+      expect(response.data.code).toBe('USER_NOT_FOUND')
 
       console.log('✅ 正确返回404错误')
     })
@@ -463,25 +499,29 @@ describe('图片上传API测试套件', () => {
       console.log('\n🔍 测试：验证上传记录数与统计数据一致')
 
       // 获取统计数据
-      const statsResponse = await tester.request
-        .get('/api/v4/photo/my-stats')
-        .query({ user_id: test_account.user_id })
-        .set('Authorization', `Bearer ${tester.access_token}`)
+      const statsResponse = await tester.makeAuthenticatedRequest(
+        'GET',
+        '/api/v4/photo/my-stats',
+        { user_id: test_account.user_id },
+        'regular'
+      )
 
       expect(statsResponse.status).toBe(200)
-      const stats = statsResponse.body.data
+      const stats = statsResponse.data.data
 
       // 获取所有上传记录（不分页）
-      const uploadsResponse = await tester.request
-        .get('/api/v4/photo/my-uploads')
-        .query({
+      const uploadsResponse = await tester.makeAuthenticatedRequest(
+        'GET',
+        '/api/v4/photo/my-uploads',
+        {
           user_id: test_account.user_id,
           limit: 100
-        })
-        .set('Authorization', `Bearer ${tester.access_token}`)
+        },
+        'regular'
+      )
 
       expect(uploadsResponse.status).toBe(200)
-      const { pagination } = uploadsResponse.body.data
+      const { pagination } = uploadsResponse.data.data
 
       // 验证总数一致
       expect(stats.total_uploads).toBe(pagination.total)
@@ -495,28 +535,32 @@ describe('图片上传API测试套件', () => {
       console.log('\n🔍 测试：验证各状态数量与实际记录一致')
 
       // 获取统计数据
-      const statsResponse = await tester.request
-        .get('/api/v4/photo/my-stats')
-        .query({ user_id: test_account.user_id })
-        .set('Authorization', `Bearer ${tester.access_token}`)
+      const statsResponse = await tester.makeAuthenticatedRequest(
+        'GET',
+        '/api/v4/photo/my-stats',
+        { user_id: test_account.user_id },
+        'regular'
+      )
 
-      const stats = statsResponse.body.data
+      const stats = statsResponse.data.data
 
       // 获取各状态的记录数
       const statuses = ['pending', 'approved', 'rejected', 'reviewing']
       const statusCounts = {}
 
       for (const status of statuses) {
-        const response = await tester.request
-          .get('/api/v4/photo/my-uploads')
-          .query({
+        const response = await tester.makeAuthenticatedRequest(
+          'GET',
+          '/api/v4/photo/my-uploads',
+          {
             user_id: test_account.user_id,
             review_status: status,
             limit: 100
-          })
-          .set('Authorization', `Bearer ${tester.access_token}`)
+          },
+          'regular'
+        )
 
-        statusCounts[status] = response.body.data.pagination.total
+        statusCounts[status] = response.data.data.pagination.total
       }
 
       // 验证数量一致

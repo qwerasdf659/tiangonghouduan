@@ -36,7 +36,7 @@ module.exports = {
         JWT_EXPIRES_IN: '2h',
         JWT_REFRESH_EXPIRES_IN: '7d',
         DB_HOST: 'dbconn.sealosbja.site',
-        DB_PORT: '42182',
+        DB_PORT: '38380',
         DB_NAME: 'restaurant_points_dev',
         DB_USER: 'root',
         DB_PASSWORD: 'mc6r9cgb',

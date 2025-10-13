@@ -1,0 +1,635 @@
+---
+alwaysApply: true
+lastUpdated: 2025年10月03日 17:05:11
+---
+
+# 📝 编码处理和Git管理规范（统一技术规范体系）
+
+## 🔐 **Git操作安全控制规范**
+
+### **敏感Git操作强制授权机制**
+- **禁止未经授权的Git操作**: 任何git push、git commit、git merge、git rebase等操作前必须明确征得用户同意
+- **操作风险评估**: 执行前说明操作可能的影响范围和潜在风险
+- **授权范围限制**: 严格按照用户明确授权的范围执行git操作
+- **操作确认模板**: 使用标准化的确认询问格式
+- **拒绝执行机制**: 用户拒绝或未明确同意时立即停止操作
+
+### **Git操作风险等级分类**
+- **高风险操作**: push、force-push、merge、rebase - 强制确认
+- **中风险操作**: commit、branch创建、tag创建 - 建议确认  
+- **低风险操作**: status、log、diff、show - 可直接执行
+- **只读操作**: fetch、clone（新仓库）、remote -v - 可直接执行
+
+### **标准确认流程模板**
+```bash
+# Git操作确认模板脚本
+confirm_git_operation() {
+  local operation="$1"
+  local risk_level="$2"
+  local impact_description="$3"
+  
+  echo "🚨 Git操作确认请求"
+  echo "📋 操作类型: $operation"
+  echo "⚠️ 风险等级: $risk_level"
+  echo "📊 影响范围: $impact_description"
+  echo ""
+  echo "❓ 是否确认执行此Git操作? (y/N)"
+  
+  read -r confirmation
+  case $confirmation in
+    [Yy]|[Yy][Ee][Ss])
+      echo "✅ 用户已确认，执行Git操作"
+      return 0
+      ;;
+    *)
+      echo "❌ 用户未确认，取消Git操作"
+      return 1
+      ;;
+  esac
+}
+```
+
+## 🌟 **Git分支冲突处理规范**
+
+### **分支状态检查和冲突解决**
+```bash
+# Git分支冲突智能处理脚本
+handle_git_conflicts() {
+  echo "🔍 检查Git分支状态..."
+  
+  # 并行检查本地和远程状态
+  {
+    git status --porcelain &
+    git remote -v &
+    git branch -vv &
+  } | tee /tmp/git_status.log
+  wait
+  
+  # 分析分支状态
+  if grep -q "ahead\|behind" /tmp/git_status.log; then
+    echo "⚠️ 检测到分支分歧"
+    
+    # 评估冲突程度
+    local ahead_count=$(git rev-list --count @{u}.. 2>/dev/null || echo "0")
+    local behind_count=$(git rev-list --count ..@{u} 2>/dev/null || echo "0")
+    
+    echo "📊 分支状态: 领先${ahead_count}个提交，落后${behind_count}个提交"
+    
+    # 选择合适的解决策略
+    if [ $behind_count -eq 0 ]; then
+      echo "🚀 仅领先提交，可以直接推送"
+      CONFLICT_STRATEGY="direct_push"
+    elif [ $ahead_count -eq 0 ]; then
+      echo "📥 仅落后提交，执行拉取更新"
+      CONFLICT_STRATEGY="pull_update"
+    else
+      echo "🔄 双向分歧，需要合并处理"
+      CONFLICT_STRATEGY="merge_required"
+    fi
+  else
+    echo "✅ 分支状态同步，无需处理"
+    CONFLICT_STRATEGY="no_action"
+  fi
+  
+  rm -f /tmp/git_status.log
+}
+```
+
+## 🔧 **Git命令执行优化规范**
+
+### **防止分页器卡死的命令标准化**
+```bash
+# Git命令安全执行包装器
+safe_git_command() {
+  local cmd="$1"
+  shift
+  local args="$@"
+  
+  # 高风险命令列表（容易卡在分页器）
+  local high_risk_commands=("log" "show" "diff" "blame" "help")
+  
+  # 检查是否为高风险命令
+  local is_high_risk=false
+  for risk_cmd in "${high_risk_commands[@]}"; do
+    if [ "$cmd" = "$risk_cmd" ]; then
+      is_high_risk=true
+      break
+    fi
+  done
+  
+  if [ "$is_high_risk" = true ]; then
+    echo "⚠️ 高风险Git命令，使用安全模式执行"
+    
+    case $cmd in
+      "log")
+        # 限制输出并禁用分页器
+        timeout 30s git --no-pager log --oneline -10 "$@" | cat
+        ;;
+      "show"|"diff")
+        timeout 30s git --no-pager "$cmd" --name-only "$@" | cat
+        ;;
+      "blame")
+        timeout 60s git --no-pager blame "$@" | head -50
+        ;;
+      *)
+        timeout 30s git --no-pager "$cmd" "$@" | cat
+        ;;
+    esac
+  else
+    # 低风险命令直接执行
+    git "$cmd" "$@"
+  fi
+}
+
+# Git命令批量执行优化
+batch_git_info() {
+  echo "🔍 批量获取Git信息..."
+  
+  # 并行执行多个Git查询
+  {
+    git status --short &
+    git remote -v &
+    git --no-pager log --oneline -5 &
+    git branch -a | head -10 &
+  } | tee /tmp/git_info.log
+  wait
+  
+  echo "✅ Git信息收集完成"
+  cat /tmp/git_info.log
+  rm -f /tmp/git_info.log
+}
+```
+
+## 📄 **文档编码处理规范**
+
+### **UTF-8编码标准化和BOM处理**
+```bash
+# 文档编码标准化脚本
+standardize_document_encoding() {
+  local file="$1"
+  
+  echo "🔍 检查文档编码: $file"
+  
+  # 1. 检测当前编码
+  local encoding=$(python3 -c "
+import chardet
+with open('$file', 'rb') as f:
+    result = chardet.detect(f.read())
+    print(result['encoding'])
+" 2>/dev/null || echo "unknown")
+  
+  echo "📋 当前编码: $encoding"
+  
+  # 2. 检测BOM标记
+  local has_bom=$(python3 -c "
+with open('$file', 'rb') as f:
+    data = f.read(3)
+    print('YES' if data == b'\\xef\\xbb\\xbf' else 'NO')
+" 2>/dev/null)
+  
+  if [ "$has_bom" = "YES" ]; then
+    echo "🔧 清理BOM标记..."
+    python3 -c "
+with open('$file', 'rb') as f:
+    data = f.read()
+    if data[:3] == b'\\xef\\xbb\\xbf':
+        data = data[3:]
+    with open('$file', 'wb') as f2:
+        f2.write(data)
+"
+    echo "✅ BOM标记已清理"
+  fi
+  
+  # 3. 转换为UTF-8（如需要）
+  if [ "$encoding" != "utf-8" ] && [ "$encoding" != "UTF-8" ] && [ "$encoding" != "unknown" ]; then
+    echo "🔄 转换编码: $encoding → UTF-8"
+    
+    python3 -c "
+try:
+    with open('$file', 'r', encoding='$encoding') as f:
+        content = f.read()
+    with open('$file', 'w', encoding='utf-8') as f:
+        f.write(content)
+    print('✅ 编码转换成功')
+except Exception as e:
+    print('❌ 编码转换失败:', e)
+"
+  fi
+  
+  # 4. 验证最终编码
+  local final_encoding=$(file -i "$file" | grep -o "charset=[^;]*" | cut -d= -f2)
+  echo "🎯 最终编码: $final_encoding"
+  
+  if [ "$final_encoding" = "utf-8" ]; then
+    echo "✅ 文档编码标准化完成"
+  else
+    echo "⚠️ 编码标准化可能未完全成功"
+  fi
+}
+
+# 批量文档编码检查
+check_all_documents_encoding() {
+  echo "🔍 批量检查文档编码..."
+  
+  find . -name "*.md" -type f | while read -r file; do
+    echo "检查: $file"
+    standardize_document_encoding "$file"
+    echo ""
+  done
+  
+  echo "✅ 批量编码检查完成"
+}
+```
+
+## 🔤 **中文编码显示问题专项解决**
+
+### **Terminal和Git中文支持配置**
+```bash
+# 中文显示问题一键修复脚本
+fix_chinese_display() {
+  echo "🇨🇳 修复中文显示问题..."
+  
+  # 1. 设置Terminal编码环境
+  echo "🖥️ 配置Terminal编码环境..."
+  export LANG=zh_CN.UTF-8
+  export LC_ALL=zh_CN.UTF-8
+  echo "export LANG=zh_CN.UTF-8" >> ~/.bashrc
+  echo "export LC_ALL=zh_CN.UTF-8" >> ~/.bashrc
+  
+  # 2. 配置Git中文支持
+  echo "🔧 配置Git中文支持..."
+  git config --global core.quotepath false
+  git config --global i18n.commitencoding utf-8
+  git config --global i18n.logoutputencoding utf-8
+  
+  # 3. 验证修复效果
+  echo "✅ 验证修复效果..."
+  echo "🧪 中文测试" | od -c > /tmp/chinese_test.log
+  
+  if grep -q "\\u4e2d\\|\\u6587" /tmp/chinese_test.log; then
+    echo "⚠️ 中文显示仍然存在编码问题"
+  else
+    echo "✅ 中文显示正常"
+  fi
+  
+  # 4. Git中文显示测试
+  git --no-pager log --oneline -3 | cat > /tmp/git_chinese_test.log 2>&1
+  
+  if grep -q "<[A-F0-9][A-F0-9]>" /tmp/git_chinese_test.log; then
+    echo "⚠️ Git中文显示仍然存在编码问题"
+    echo "建议检查系统locale配置: locale -a | grep UTF-8"
+  else
+    echo "✅ Git中文显示正常"
+  fi
+  
+  rm -f /tmp/chinese_test.log /tmp/git_chinese_test.log
+}
+```
+
+## 🗂️ **文件操作状态验证规范**
+
+### **缓存数据一致性检测系统**
+```bash
+# 文件操作结果验证脚本
+verify_file_operation() {
+  local operation="$1"
+  local target_file="$2"
+  local expected_content="$3"
+  
+  echo "🔍 验证文件操作: $operation ($target_file)"
+  
+  # 等待文件系统同步（避免缓存问题）
+  sleep 3
+  
+  # 1. 验证文件是否存在
+  if [ ! -f "$target_file" ]; then
+    echo "❌ 文件不存在: $target_file"
+    return 1
+  fi
+  
+  # 2. 检查文件实际内容（不依赖元数据）
+  local actual_lines=$(wc -l < "$target_file")
+  local actual_size=$(stat -c%s "$target_file" 2>/dev/null || echo "0")
+  
+  echo "📋 文件实际状态:"
+  echo "   📏 行数: $actual_lines"
+  echo "   📊 大小: $actual_size 字节"
+  
+  # 3. 内容完整性验证
+  if [ -n "$expected_content" ]; then
+    if grep -q "$expected_content" "$target_file"; then
+      echo "✅ 内容验证通过: 找到预期内容"
+    else
+      echo "❌ 内容验证失败: 未找到预期内容"
+      echo "🔍 文件头部内容:"
+      head -5 "$target_file"
+      return 1
+    fi
+  fi
+  
+  # 4. 编码格式验证
+  local file_encoding=$(file -i "$target_file" | grep -o "charset=[^;]*" | cut -d= -f2)
+  if [ "$file_encoding" = "utf-8" ]; then
+    echo "✅ 编码格式正确: UTF-8"
+  else
+    echo "⚠️ 编码格式异常: $file_encoding"
+  fi
+  
+  echo "✅ 文件操作验证完成"
+  return 0
+}
+
+# 批量文件状态验证
+verify_multiple_files() {
+  local files=("$@")
+  local failed_count=0
+  
+  echo "🔍 批量验证${#files[@]}个文件..."
+  
+  for file in "${files[@]}"; do
+    if ! verify_file_operation "check" "$file"; then
+      ((failed_count++))
+    fi
+  done
+  
+  if [ $failed_count -eq 0 ]; then
+    echo "✅ 所有文件验证通过"
+  else
+    echo "⚠️ ${failed_count}个文件验证失败"
+  fi
+  
+  return $failed_count
+}
+```
+
+## 🔤 **跨平台编码兼容性规范**
+
+### **Windows与Linux编码环境统一**
+```bash
+# 跨平台编码环境标准化脚本
+setup_cross_platform_encoding() {
+  echo "🌍 设置跨平台编码环境..."
+  
+  # 检测操作系统
+  if [[ "$OSTYPE" == "linux-gnu"* ]]; then
+    PLATFORM="Linux"
+  elif [[ "$OSTYPE" == "darwin"* ]]; then
+    PLATFORM="macOS" 
+  elif [[ "$OSTYPE" == "msys" ]] || [[ "$OSTYPE" == "cygwin" ]]; then
+    PLATFORM="Windows"
+  else
+    PLATFORM="Unknown"
+  fi
+  
+  echo "📋 检测到平台: $PLATFORM"
+  
+  case $PLATFORM in
+    "Linux"|"macOS")
+      # Unix-like系统编码配置
+      echo "🐧 配置Unix-like编码环境..."
+      
+      # 验证locale设置
+      if locale | grep -q "UTF-8"; then
+        echo "✅ Locale配置正确"
+      else
+        echo "⚠️ Locale配置异常，尝试修复..."
+        export LANG=zh_CN.UTF-8
+        export LC_ALL=zh_CN.UTF-8
+      fi
+      
+      # 验证终端编码支持
+      if echo "中文测试" | od -c | grep -q "u4e2d"; then
+        echo "✅ 终端中文支持正常"
+      else
+        echo "⚠️ 终端中文支持异常"
+      fi
+      ;;
+      
+    "Windows")
+      echo "🪟 Windows环境编码配置..."
+      echo "建议在PowerShell中执行: chcp 65001"
+      echo "建议设置Git配置: git config --global core.autocrlf false"
+      ;;
+      
+    *)
+      echo "❓ 未知平台，使用通用配置"
+      ;;
+  esac
+  
+  # 通用Git编码配置
+  echo "🔧 配置Git编码设置..."
+  git config --global core.quotepath false
+  git config --global i18n.commitencoding utf-8
+  git config --global i18n.logoutputencoding utf-8
+  
+  # 设置.gitattributes
+  if [ ! -f .gitattributes ]; then
+    cat > .gitattributes << EOF
+*.md text eol=lf
+*.js text eol=lf
+*.json text eol=lf
+*.yml text eol=lf
+EOF
+    echo "📄 创建.gitattributes文件"
+  fi
+  
+  echo "✅ 跨平台编码环境配置完成"
+}
+```
+
+## 🛠️ **系统工具兼容性检查规范**
+
+### **编码处理工具可用性验证**
+```bash
+# 系统工具可用性检查和备选方案
+check_encoding_tools() {
+  echo "🔍 检查编码处理工具可用性..."
+  
+  # 工具优先级列表
+  declare -A tool_alternatives=(
+    ["file"]="python3 -c \"import magic; print(magic.from_file('$1'))\""
+    ["hexdump"]="od -t x1"
+    ["xxd"]="od -t x1"
+    ["chardet"]="python3 -c \"import chardet; print(chardet.detect(open('$1','rb').read()))\""
+  )
+  
+  # 检查每个工具的可用性
+  for tool in "${!tool_alternatives[@]}"; do
+    if command -v "$tool" &> /dev/null; then
+      echo "✅ $tool: 可用"
+    else
+      echo "⚠️ $tool: 不可用，备选方案: ${tool_alternatives[$tool]}"
+    fi
+  done
+  
+  # 设置统一的编码检查函数
+  check_file_encoding() {
+    local file="$1"
+    
+    if command -v file &> /dev/null; then
+      file -i "$file"
+    elif command -v python3 &> /dev/null; then
+      python3 -c "
+import os
+try:
+    import chardet
+    with open('$file', 'rb') as f:
+        result = chardet.detect(f.read())
+        print(f'charset={result[\"encoding\"]}')
+except ImportError:
+    print('charset=unknown (chardet not available)')
+except Exception as e:
+    print(f'charset=error ({e})')
+"
+    else
+      echo "charset=unknown (no tools available)"
+    fi
+  }
+  
+  echo "🔧 编码检查函数已设置"
+}
+```
+
+## 🔄 **Git操作并行优化规范**
+
+### **Git信息查询并行化**
+```bash
+# Git操作并行化执行脚本
+parallel_git_operations() {
+  echo "🚀 并行执行Git操作..."
+  
+  # 定义并行Git操作组
+  local git_operations=(
+    "git status --short"
+    "git remote -v" 
+    "git --no-pager log --oneline -5"
+    "git branch -a | head -10"
+    "git tag --list | head -10"
+  )
+  
+  # 并行执行所有操作
+  local pids=()
+  for i in "${!git_operations[@]}"; do
+    {
+      echo "=== ${git_operations[$i]} ==="
+      timeout 30s ${git_operations[$i]}
+      echo ""
+    } > "/tmp/git_op_$i.log" &
+    pids+=($!)
+  done
+  
+  # 等待所有操作完成
+  echo "⏳ 等待${#pids[@]}个Git操作完成..."
+  for pid in "${pids[@]}"; do
+    wait $pid
+  done
+  
+  # 汇总结果
+  echo "📊 Git操作结果汇总:"
+  for i in "${!git_operations[@]}"; do
+    if [ -f "/tmp/git_op_$i.log" ]; then
+      cat "/tmp/git_op_$i.log"
+    fi
+  done
+  
+  # 清理临时文件
+  rm -f /tmp/git_op_*.log
+  
+  echo "✅ 并行Git操作完成"
+}
+```
+
+## 🚨 **Git错误处理和恢复规范**
+
+### **标准错误处理流程**
+```bash
+# Git错误智能处理脚本
+handle_git_error() {
+  local error_message="$1"
+  local failed_command="$2"
+  
+  echo "🚨 Git错误处理: $failed_command"
+  echo "📄 错误信息: $error_message"
+  
+  # 错误类型分析和处理
+  case "$error_message" in
+    *"divergent"*|*"分歧"*)
+      echo "🔄 处理分支分歧..."
+      echo "建议解决方案:"
+      echo "1. git pull --rebase (变基合并)"
+      echo "2. git pull --no-rebase (合并提交)"
+      echo "3. git fetch && git merge (手动合并)"
+      ;;
+      
+    *"permission"*|*"权限"*)
+      echo "🔐 处理权限问题..."
+      echo "建议检查:"
+      echo "1. SSH密钥配置: ssh -T git@github.com"
+      echo "2. 仓库访问权限: git remote -v"
+      echo "3. 本地文件权限: ls -la .git/"
+      ;;
+      
+    *"network"*|*"网络"*)
+      echo "🌐 处理网络问题..."
+      echo "建议操作:"
+      echo "1. 检查网络连接: ping github.com"
+      echo "2. 重试Git操作: $failed_command"
+      echo "3. 使用代理或镜像源"
+      ;;
+      
+    *"conflict"*|*"冲突"*)
+      echo "⚔️ 处理合并冲突..."
+      echo "处理步骤:"
+      echo "1. 查看冲突文件: git status"
+      echo "2. 手动编辑解决冲突"
+      echo "3. 标记为已解决: git add <file>"
+      echo "4. 完成合并: git commit"
+      ;;
+      
+    *)
+      echo "❓ 未知Git错误类型"
+      echo "通用解决方案:"
+      echo "1. 检查Git状态: git status"
+      echo "2. 查看详细错误: git log --oneline -3"
+      echo "3. 重置到安全状态: git stash"
+      ;;
+  esac
+  
+  # 提供回滚选项
+  echo ""
+  echo "🔄 如需回滚，可执行:"
+  echo "   git reflog --oneline -5  # 查看操作历史"
+  echo "   git reset --hard HEAD~1  # 回退一个提交（谨慎使用）"
+  echo "   git stash                # 暂存当前更改"
+}
+```
+
+## 📋 **编码Git管理实施检查清单**
+
+### **每次Git操作前**
+- [ ] 检查操作风险等级和授权要求
+- [ ] 并行执行Git状态和远程仓库检查
+- [ ] 验证本地编码环境配置
+- [ ] 确认文件编码格式一致性
+
+### **文档操作时**
+- [ ] 验证文档使用UTF-8无BOM编码
+- [ ] 检查中文内容显示是否正常
+- [ ] 使用标准化的文件名和路径
+- [ ] 操作后验证文件实际内容
+
+### **Git提交时**
+- [ ] 检查提交信息的编码格式
+- [ ] 验证.gitignore文件完整性
+- [ ] 确认临时文件已排除
+- [ ] 使用有意义的提交描述
+
+### **跨平台协作时**
+- [ ] 统一使用UTF-8编码标准
+- [ ] 配置一致的行结束符（LF）
+- [ ] 验证不同环境下的编码兼容性
+- [ ] 建立编码问题的快速诊断机制
+
+---
+
+**核心原则**: 用户授权优先、编码标准统一、Git安全操作、跨平台兼容、自动验证确认

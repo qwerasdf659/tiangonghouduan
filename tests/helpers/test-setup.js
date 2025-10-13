@@ -17,7 +17,7 @@ process.env.JWT_SECRET = process.env.JWT_SECRET || 'test-jwt-secret-key-for-deve
 if (!process.env.DB_HOST) {
   console.log('🔧 设置测试环境数据库配置...')
   process.env.DB_HOST = process.env.DB_HOST || 'dbconn.sealosbja.site'
-  process.env.DB_PORT = process.env.DB_PORT || '42182'
+  process.env.DB_PORT = process.env.DB_PORT || '38380'
   process.env.DB_USER = process.env.DB_USER || 'root'
   process.env.DB_PASSWORD = process.env.DB_PASSWORD || 'mc6r9cgb'
   process.env.DB_NAME = process.env.DB_NAME || 'restaurant_points_dev'

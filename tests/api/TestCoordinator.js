@@ -1,12 +1,13 @@
 /**
- * 统一API测试管理器 V4 - 重构版
- * 整合所有API测试功能的主协调器
+ * 测试协调器 (Test Coordinator) V4 - 重构版
+ * 协调管理所有测试套件的主协调器
  * 创建时间：2025年01月21日 北京时间
+ * 更新时间：2025年10月12日 北京时间
  * 使用模型：Claude Sonnet 4
- * 重构说明：拆分为模块化测试套件，提高代码可维护性和重复代码控制
+ * 重构说明：按方案A优化，删除重复包装层，简化测试管理器层次
  *
  * 核心功能：
- * 1. 协调各个专项测试套件
+ * 1. 协调各个专项测试套件（安全、性能、业务、数据库、质量）
  * 2. 统一测试结果收集和报告
  * 3. 提供简化的测试接口
  * 4. 管理测试执行流程
@@ -22,7 +23,7 @@ const CodeQualityChecker = require('./quality/code_quality_checker')
 
 const BeijingTimeHelper = require('../../utils/timeHelper')
 
-class UnifiedAPITestManager extends BaseTestManager {
+class TestCoordinator extends BaseTestManager {
   constructor (baseUrl = 'http://localhost:3000') {
     super(baseUrl)
 
@@ -43,7 +44,7 @@ class UnifiedAPITestManager extends BaseTestManager {
       summary: null
     }
 
-    console.log('[UnifiedAPITestManager] 统一API测试管理器初始化完成')
+    console.log('[TestCoordinator] 测试协调器初始化完成')
     console.log('📊 已加载测试套件: 安全、性能、业务、数据库、质量')
   }
 
@@ -294,7 +295,7 @@ class UnifiedAPITestManager extends BaseTestManager {
     const report = {
       metadata: {
         generated_at: BeijingTimeHelper.now(),
-        generator: 'UnifiedAPITestManager V4',
+        generator: 'TestCoordinator V4',
         version: '4.0.0'
       },
       summary: this.unified_results.summary,
@@ -509,4 +510,4 @@ class UnifiedAPITestManager extends BaseTestManager {
   }
 }
 
-module.exports = UnifiedAPITestManager
+module.exports = TestCoordinator

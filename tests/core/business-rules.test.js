@@ -14,7 +14,7 @@
 /* eslint-disable no-console */
 
 const BeijingTimeHelper = require('../../utils/timeHelper')
-const UnifiedAPITestManager = require('../api/UnifiedAPITestManager')
+const TestCoordinator = require('../api/TestCoordinator')
 
 // 辅助函数
 async function getUserPoints (tester, user_id) {
@@ -61,7 +61,7 @@ describe('🧮 核心业务逻辑测试', () => {
   let _initialUserData
 
   beforeAll(async () => {
-    tester = new UnifiedAPITestManager()
+    tester = new TestCoordinator()
     await new Promise(resolve => {
       setTimeout(resolve, 3000)
     })

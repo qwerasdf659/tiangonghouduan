@@ -1,0 +1,728 @@
+---
+alwaysApply: true
+lastUpdated: 2025年10月03日 17:05:11
+---
+
+# ⚡ 工具调用优化系统（基于cursor文档重复检查问题的系统化解决方案）
+
+## 🔴 **基于实际浪费的效率优化体系**
+
+### **实际效率损失量化分析**
+从11个cursor文档深度统计发现：
+- **累计工具调用浪费**: 1380+次（预期200-300次）
+- **累计时间浪费**: 450-665分钟（7.5-11小时）
+- **重复检查率**: 70-80%（严重超标，应控制在<10%）
+- **最严重案例**: cursor_8.md健康检查重复12+次
+
+### **典型重复模式统计**
+- **健康检查重复**: cursor_8.md (12次), cursor_6.md (8次)
+- **服务状态验证重复**: cursor_7.md (6次), cursor_1.md (10次)  
+- **进程状态检查重复**: cursor_3.md (7次), cursor_5.md (5次)
+- **数据库连接验证重复**: 多个文档共25+次
+
+## 🏃‍♂️ **智能状态检查缓存系统**
+
+### **统一缓存机制（解决重复检查核心问题）**
+```javascript
+// 🔴 基于cursor_8.md等实际重复模式的统一缓存系统
+const UNIFIED_STATUS_CACHE_SYSTEM = {
+  // 状态缓存配置（基于实际检查频率优化）
+  cacheConfigs: {
+    'health_check_3000': {
+      command: 'curl http://localhost:3000/health',
+      ttl: 300000,  // 5分钟缓存
+      maxRetries: 3
+    },
+    'pm2_status': {
+      command: 'pm2 status', 
+      ttl: 300000,  // 5分钟缓存
+      maxRetries: 2
+    },
+    'port_check_3000': {
+      command: 'netstat -tlnp | grep :3000',
+      ttl: 300000,  // 5分钟缓存
+      maxRetries: 2
+    },
+    'process_check': {
+      command: 'ps aux | grep node',
+      ttl: 180000,  // 3分钟缓存
+      maxRetries: 2
+    },
+    'database_status': {
+      command: 'database connection check',
+      ttl: 600000,  // 10分钟缓存
+      maxRetries: 1
+    }
+  },
+
+  // 缓存存储
+  cache: new Map(),
+
+  // 智能缓存检查（预防重复调用的核心机制）
+  checkWithCache: async (checkType, executeFunction) => {
+    const config = UNIFIED_STATUS_CACHE_SYSTEM.cacheConfigs[checkType];
+    if (!config) {
+      console.warn(`⚠️ 未知检查类型: ${checkType}，直接执行`);
+      return await executeFunction();
+    }
+
+    const now = Date.now();
+    const cached = UNIFIED_STATUS_CACHE_SYSTEM.cache.get(checkType);
+    
+    // 检查缓存有效性
+    if (cached && (now - cached.timestamp) < config.ttl) {
+      console.log(`✅ 使用缓存结果: ${checkType} (${Math.round((now-cached.timestamp)/1000)}秒前)`);
+      return cached.result;
+    }
+
+    // 执行检查并更新缓存
+    console.log(`🔄 执行检查: ${checkType}`);
+    try {
+      const result = await executeFunction();
+      UNIFIED_STATUS_CACHE_SYSTEM.cache.set(checkType, {
+        result: result,
+        timestamp: now,
+        command: config.command
+      });
+      
+      console.log(`💾 缓存已更新: ${checkType}`);
+      return result;
+    } catch (error) {
+      console.error(`❌ 检查失败: ${checkType}`, error.message);
+      throw error;
+    }
+  },
+
+  // 强制清除缓存（仅在状态确实变更后）
+  invalidateCache: (checkTypes, reason = '状态变更') => {
+    checkTypes.forEach(checkType => {
+      if (UNIFIED_STATUS_CACHE_SYSTEM.cache.has(checkType)) {
+        UNIFIED_STATUS_CACHE_SYSTEM.cache.delete(checkType);
+        console.log(`🗑️ 清除缓存: ${checkType} (原因: ${reason})`);
+      }
+    });
+  }
+};
+```
+
+## 🚫 **重复检查强制拦截器**
+
+### **基于实际重复模式的拦截机制**
+```javascript
+// 🔴 防止cursor_8.md中12次重复健康检查的拦截器
+const DUPLICATE_CHECK_INTERCEPTOR = {
+  // 检查执行历史
+  checkHistory: new Map(),
+  
+  // 检查前拦截验证
+  beforeCheck: (checkType, command) => {
+    const record = DUPLICATE_CHECK_INTERCEPTOR.checkHistory.get(checkType) || { count: 0, lastTime: 0 };
+    const now = Date.now();
+    const timeSinceLastCheck = now - record.lastTime;
+    
+    // 🔴 强制时间间隔限制（5分钟内禁止重复）
+    if (timeSinceLastCheck < 300000 && record.count > 0) {
+      throw new Error(`🚫 重复检查拦截: ${checkType} 距离上次检查仅${Math.round(timeSinceLastCheck/1000)}秒`);
+    }
+    
+    // 🔴 强制次数限制（单次会话最多3次）
+    if (record.count >= 3) {
+      throw new Error(`🚫 检查次数超限: ${checkType} 已执行${record.count}次，超过限制(3次)`);
+    }
+
+    // 记录本次检查
+    DUPLICATE_CHECK_INTERCEPTOR.checkHistory.set(checkType, {
+      count: record.count + 1,
+      lastTime: now,
+      command: command
+    });
+
+    if (record.count > 0) {
+      console.warn(`⚠️ 重复检查警告: ${checkType} 第${record.count + 1}次执行`);
+    }
+
+    return { allowed: true, count: record.count + 1 };
+  },
+
+  // 重置检查历史（仅在确实需要时）
+  reset: (checkType, reason) => {
+    DUPLICATE_CHECK_INTERCEPTOR.checkHistory.delete(checkType);
+    console.log(`🔄 重置检查历史: ${checkType} (${reason})`);
+  }
+};
+```
+
+## 🎯 **工具调用预算控制系统**
+
+### **基于实际浪费的智能预算分配**
+```javascript
+// 🔴 基于11个cursor文档实际统计的预算控制系统
+const TOOL_CALL_BUDGET_SYSTEM = {
+  // 任务复杂度预算配置（基于实际观察数据）
+  budgetConfigs: {
+    simple_status_check: {
+      maxCalls: 20,        // cursor_8.md实际200+次，效率仅10%
+      timeLimit: 300000,   // 5分钟限制
+      description: '简单状态检查和配置修复'
+    },
+    medium_debug_task: {
+      maxCalls: 50,        // cursor_3.md实际180+次，效率28%
+      timeLimit: 900000,   // 15分钟限制  
+      description: '中等复杂度调试和功能修复'
+    },
+    complex_system_task: {
+      maxCalls: 100,       // cursor_5.md实际140+次，效率71%
+      timeLimit: 1800000,  // 30分钟限制
+      description: '复杂系统改造和架构调整'
+    }
+  },
+
+  // 当前会话统计
+  currentSession: {
+    totalCalls: 0,
+    callsByType: new Map(),
+    startTime: Date.now(),
+    allocatedBudget: 50,
+    allocatedTime: 600000  // 默认10分钟
+  },
+
+  // 动态预算分配
+  allocate: (taskComplexity) => {
+    const config = TOOL_CALL_BUDGET_SYSTEM.budgetConfigs[taskComplexity];
+    if (config) {
+      TOOL_CALL_BUDGET_SYSTEM.currentSession.allocatedBudget = config.maxCalls;
+      TOOL_CALL_BUDGET_SYSTEM.currentSession.allocatedTime = config.timeLimit;
+      
+      console.log(`💰 分配预算: ${config.maxCalls}次调用, ${config.timeLimit/60000}分钟 (${taskComplexity})`);
+    }
+  },
+
+  // 预算使用检查（超限自动中断）
+  checkBudget: (toolType) => {
+    const session = TOOL_CALL_BUDGET_SYSTEM.currentSession;
+    session.totalCalls++;
+    session.callsByType.set(toolType, (session.callsByType.get(toolType) || 0) + 1);
+
+    const usagePercentage = (session.totalCalls / session.allocatedBudget * 100).toFixed(1);
+    const timeUsed = Date.now() - session.startTime;
+    const timePercentage = (timeUsed / session.allocatedTime * 100).toFixed(1);
+
+    console.log(`📊 预算使用: ${session.totalCalls}/${session.allocatedBudget} (${usagePercentage}%), 时间: ${timePercentage}%`);
+
+    // 🔴 预算超限强制控制
+    if (session.totalCalls > session.allocatedBudget) {
+      throw new Error(`🚫 工具调用预算耗尽 (${session.totalCalls}/${session.allocatedBudget})`);
+    }
+
+    if (timeUsed > session.allocatedTime) {
+      throw new Error(`🚫 时间预算耗尽 (${timeUsed/60000}/${session.allocatedTime/60000}分钟)`);
+    }
+
+    return { 
+      remaining: session.allocatedBudget - session.totalCalls,
+      percentage: parseFloat(usagePercentage)
+    };
+  }
+};
+```
+
+## 🔀 **并行工具调用强制优化系统**
+
+### **最大化并行执行的智能调度器**
+```javascript
+// 🔴 基于串行浪费模式的强制并行化系统
+const PARALLEL_EXECUTION_OPTIMIZER = {
+  // 可并行操作模式库（基于实际发现的浪费模式）
+  parallelPatterns: {
+    system_status_check: [
+      'curl http://localhost:3000/health',
+      'pm2 status',
+      'netstat -tlnp | grep :3000', 
+      'ps aux | grep node'
+    ],
+    file_operations: [
+      'read package.json',
+      'read app.js',
+      'read .env',
+      'check file existence'
+    ],
+    database_operations: [
+      'connection check',
+      'table structure',
+      'data integrity'
+    ]
+  },
+
+  // 智能并行分组和执行
+  optimizeExecution: async (operations) => {
+    const parallelGroups = PARALLEL_EXECUTION_OPTIMIZER.groupOperations(operations);
+    const results = [];
+
+    for (const group of parallelGroups) {
+      if (group.type === 'parallel') {
+        // 并行执行
+        console.log(`🚀 并行执行 ${group.operations.length} 个操作...`);
+        const startTime = Date.now();
+        
+        const parallelResults = await Promise.allSettled(
+          group.operations.map(op => op.execute())
+        );
+
+        const successCount = parallelResults.filter(r => r.status === 'fulfilled').length;
+        const totalTime = Date.now() - startTime;
+        
+        console.log(`📊 并行执行完成: ${successCount}/${group.operations.length} 成功, 耗时 ${totalTime}ms`);
+        
+        results.push(...parallelResults);
+      } else {
+        // 串行执行（仅在有依赖关系时）
+        console.log(`🔗 串行执行 ${group.operations.length} 个相关操作...`);
+        for (const operation of group.operations) {
+          const result = await operation.execute();
+          results.push({ status: 'fulfilled', value: result });
+        }
+      }
+    }
+
+    return results;
+  },
+
+  // 操作分组算法
+  groupOperations: (operations) => {
+    const groups = [];
+    const processed = new Set();
+
+    operations.forEach((op, index) => {
+      if (processed.has(index)) return;
+
+      const relatedOps = [op];
+      processed.add(index);
+
+      // 查找可并行的操作
+      for (let i = index + 1; i < operations.length; i++) {
+        if (processed.has(i)) continue;
+        
+        if (PARALLEL_EXECUTION_OPTIMIZER.canParallel(op, operations[i])) {
+          relatedOps.push(operations[i]);
+          processed.add(i);
+        }
+      }
+
+      groups.push({
+        type: relatedOps.length > 1 ? 'parallel' : 'sequential',
+        operations: relatedOps,
+        estimatedTime: relatedOps.length > 1 ? 
+          Math.max(...relatedOps.map(o => o.estimatedTime || 2000)) :
+          relatedOps.reduce((sum, o) => sum + (o.estimatedTime || 2000), 0)
+      });
+    });
+
+    // 并行化率统计
+    const parallelOps = groups.filter(g => g.type === 'parallel').reduce((sum, g) => sum + g.operations.length, 0);
+    const parallelizationRate = parallelOps / operations.length;
+    
+    if (parallelizationRate < 0.6) {
+      console.warn(`⚠️ 并行化率过低: ${(parallelizationRate * 100).toFixed(1)}% < 60%`);
+    } else {
+      console.log(`✅ 并行化率: ${(parallelizationRate * 100).toFixed(1)}%`);
+    }
+
+    return groups;
+  },
+
+  // 判断两个操作是否可以并行
+  canParallel: (op1, op2) => {
+    // 检查是否属于同一并行模式
+    for (const [pattern, commands] of Object.entries(PARALLEL_EXECUTION_OPTIMIZER.parallelPatterns)) {
+      const op1Match = commands.some(cmd => op1.command?.includes(cmd) || cmd.includes(op1.type || ''));
+      const op2Match = commands.some(cmd => op2.command?.includes(cmd) || cmd.includes(op2.type || ''));
+      
+      if (op1Match && op2Match) {
+        return true;
+      }
+    }
+
+    // 检查操作间是否有依赖关系
+    return !PARALLEL_EXECUTION_OPTIMIZER.hasDependency(op1, op2);
+  },
+
+  // 依赖关系检查
+  hasDependency: (op1, op2) => {
+    const dependencies = [
+      { pre: 'file_edit', post: 'file_read' },
+      { pre: 'service_start', post: 'health_check' },
+      { pre: 'process_kill', post: 'process_check' }
+    ];
+
+    return dependencies.some(dep => 
+      (op1.type?.includes(dep.pre) && op2.type?.includes(dep.post)) ||
+      (op2.type?.includes(dep.pre) && op1.type?.includes(dep.post))
+    );
+  }
+};
+```
+
+## 🔄 **智能重试和故障转移系统**
+
+### **基于实际失败模式的重试策略**
+```javascript
+// 🔴 基于cursor文档发现的失败模式优化重试系统
+const INTELLIGENT_RETRY_SYSTEM = {
+  // 失败模式分析库（基于实际观察数据）
+  failurePatterns: {
+    network_timeout: {
+      pattern: /timeout|ECONNREFUSED|ETIMEDOUT/i,
+      retryCount: 3,
+      retryDelays: [1000, 2000, 4000], // 指数退避
+      alternatives: ['local_cache', 'fallback_endpoint']
+    },
+    permission_denied: {
+      pattern: /EACCES|permission denied|403/i,
+      retryCount: 1,
+      retryDelays: [500],
+      alternatives: ['alternative_method']
+    },
+    resource_busy: {
+      pattern: /EBUSY|resource busy|locked/i,
+      retryCount: 5,
+      retryDelays: [500, 1000, 1500, 2000, 3000],
+      alternatives: ['wait_and_retry', 'force_unlock']
+    },
+    service_unavailable: {
+      pattern: /503|service unavailable|connection refused/i,
+      retryCount: 3,
+      retryDelays: [2000, 5000, 10000],
+      alternatives: ['restart_service']
+    }
+  },
+
+  // 智能重试执行器
+  executeWithRetry: async (operation, context = {}) => {
+    let lastError = null;
+    
+    for (let attempt = 0; attempt <= 3; attempt++) {
+      try {
+        if (attempt > 0) {
+          console.log(`🔄 重试第${attempt}次: ${operation.name}`);
+        }
+        
+        const result = await operation.execute(context);
+        
+        if (attempt > 0) {
+          console.log(`✅ 重试成功: ${operation.name} (第${attempt}次重试)`);
+        }
+        
+        return result;
+      } catch (error) {
+        lastError = error;
+        
+        const failurePattern = INTELLIGENT_RETRY_SYSTEM.analyzeFailure(error);
+        
+        if (failurePattern && attempt < failurePattern.retryCount) {
+          const delay = failurePattern.retryDelays[attempt] || 1000;
+          console.log(`⏰ 识别失败模式: ${failurePattern.name}，${delay}ms后重试...`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+          continue;
+        }
+        
+        // 尝试替代方案
+        if (failurePattern?.alternatives?.length > 0) {
+          for (const alternative of failurePattern.alternatives) {
+            try {
+              console.log(`🔄 尝试替代方案: ${alternative}`);
+              const result = await INTELLIGENT_RETRY_SYSTEM.tryAlternative(alternative, operation, context);
+              console.log(`✅ 替代方案成功: ${alternative}`);
+              return result;
+            } catch (altError) {
+              console.warn(`⚠️ 替代方案失败: ${alternative}`);
+            }
+          }
+        }
+        
+        break;
+      }
+    }
+    
+    throw new Error(`操作最终失败: ${lastError.message}`);
+  },
+
+  // 失败模式分析
+  analyzeFailure: (error) => {
+    const errorMessage = error.message || error.toString();
+    
+    for (const [name, pattern] of Object.entries(INTELLIGENT_RETRY_SYSTEM.failurePatterns)) {
+      if (pattern.pattern.test(errorMessage)) {
+        return { name, ...pattern };
+      }
+    }
+    
+    return null;
+  },
+
+  // 替代方案执行
+  tryAlternative: async (alternative, originalOperation, context) => {
+    switch (alternative) {
+      case 'local_cache':
+        return await UNIFIED_STATUS_CACHE_SYSTEM.checkWithCache(
+          originalOperation.type, 
+          () => { throw new Error('Using cached fallback'); }
+        );
+      
+      case 'restart_service':
+        console.log('🔄 重启服务作为替代方案...');
+        await context.restartService?.();
+        return await originalOperation.execute(context);
+      
+      default:
+        throw new Error(`未实现的替代方案: ${alternative}`);
+    }
+  }
+};
+```
+
+## 📊 **工具调用效率监控仪表板**
+
+### **实时效率监控和分析**
+```javascript
+// 基于实际效率问题的监控仪表板
+const EFFICIENCY_MONITOR_DASHBOARD = {
+  // 实时统计指标
+  metrics: {
+    totalCalls: 0,
+    successfulCalls: 0,
+    cachedCalls: 0,
+    parallelCalls: 0,
+    totalTime: 0,
+    efficiency: 0
+  },
+
+  // 记录工具调用
+  recordCall: (toolType, duration, success, cached = false, parallel = false) => {
+    const m = EFFICIENCY_MONITOR_DASHBOARD.metrics;
+    
+    m.totalCalls++;
+    m.totalTime += duration;
+    
+    if (success) m.successfulCalls++;
+    if (cached) m.cachedCalls++;
+    if (parallel) m.parallelCalls++;
+
+    // 计算综合效率指标
+    m.efficiency = (m.successfulCalls / m.totalCalls) * 
+                  (m.cachedCalls / m.totalCalls * 0.3 + 0.7) *
+                  (m.parallelCalls / m.totalCalls * 0.2 + 0.8);
+
+    // 每10次调用报告一次
+    if (m.totalCalls % 10 === 0) {
+      EFFICIENCY_MONITOR_DASHBOARD.generateReport();
+    }
+  },
+
+  // 效率报告生成
+  generateReport: () => {
+    const m = EFFICIENCY_MONITOR_DASHBOARD.metrics;
+    const avgTime = m.totalTime / m.totalCalls;
+    
+    console.log('\n📊 工具调用效率报告');
+    console.log('='.repeat(40));
+    console.log(`总调用: ${m.totalCalls}, 成功率: ${(m.successfulCalls/m.totalCalls*100).toFixed(1)}%`);
+    console.log(`缓存率: ${(m.cachedCalls/m.totalCalls*100).toFixed(1)}%, 并行率: ${(m.parallelCalls/m.totalCalls*100).toFixed(1)}%`);
+    console.log(`平均耗时: ${avgTime.toFixed(0)}ms, 综合效率: ${(m.efficiency*100).toFixed(1)}%`);
+    
+    // 效率评级
+    let grade = 'F', suggestion = '';
+    if (m.efficiency >= 0.9) { grade = 'A'; suggestion = '效率优秀，继续保持'; }
+    else if (m.efficiency >= 0.8) { grade = 'B'; suggestion = '效率良好，可优化并行化'; }
+    else if (m.efficiency >= 0.7) { grade = 'C'; suggestion = '效率一般，需增加缓存'; }
+    else if (m.efficiency >= 0.6) { grade = 'D'; suggestion = '效率较低，减少重复调用'; }
+    else { grade = 'F'; suggestion = '效率严重不足，全面优化'; }
+    
+    console.log(`评级: ${grade} | 建议: ${suggestion}`);
+    console.log('='.repeat(40));
+  },
+
+  // 与cursor基准数据对比
+  compareWithBaseline: () => {
+    const m = EFFICIENCY_MONITOR_DASHBOARD.metrics;
+    
+    // 基于实际cursor文档的基准数据
+    const baseline = { calls: 173, time: 4800000, efficiency: 0.21 }; // 平均值
+    
+    const improvement = {
+      calls: (baseline.calls - m.totalCalls) / baseline.calls,
+      time: (baseline.time - m.totalTime) / baseline.time,  
+      efficiency: (m.efficiency - baseline.efficiency) / baseline.efficiency
+    };
+
+    console.log('\n📈 与cursor基准对比');
+    console.log(`调用优化: ${(improvement.calls * 100).toFixed(1)}%`);
+    console.log(`时间优化: ${(improvement.time * 100).toFixed(1)}%`);
+    console.log(`效率提升: ${(improvement.efficiency * 100).toFixed(1)}%`);
+  }
+};
+```
+
+## 🛠️ **工具选择智能优化**
+
+### **基于效率数据的最优工具选择**
+```javascript
+const SMART_TOOL_SELECTOR = {
+  // 工具效率统计数据库
+  toolStats: {
+    'curl_health_check': { successRate: 0.90, avgTime: 1500, cacheability: 'HIGH' },
+    'pm2_status': { successRate: 0.95, avgTime: 1000, cacheability: 'HIGH' },
+    'process_check': { successRate: 0.95, avgTime: 1000, cacheability: 'MEDIUM' },
+    'file_read': { successRate: 0.99, avgTime: 500, cacheability: 'LOW' },
+    'database_check': { successRate: 0.85, avgTime: 3000, cacheability: 'HIGH' }
+  },
+
+  // 智能工具选择算法
+  selectOptimal: (purpose, constraints = {}) => {
+    const candidates = Object.entries(SMART_TOOL_SELECTOR.toolStats)
+      .filter(([tool, stats]) => {
+        // 根据用途过滤工具
+        if (purpose === 'health_check' && !tool.includes('health')) return false;
+        if (purpose === 'process_status' && !tool.includes('process')) return false;
+        return true;
+      })
+      .map(([tool, stats]) => {
+        // 计算综合评分
+        const score = stats.successRate * 0.5 + 
+                     (4000 - stats.avgTime) / 4000 * 0.3 +
+                     (stats.cacheability === 'HIGH' ? 0.2 : stats.cacheability === 'MEDIUM' ? 0.1 : 0);
+        
+        return { tool, stats, score };
+      })
+      .sort((a, b) => b.score - a.score);
+
+    const selected = candidates[0];
+    console.log(`🎯 最优工具选择: ${selected.tool} (评分: ${selected.score.toFixed(2)})`);
+    
+    return selected;
+  }
+};
+```
+
+## 📈 **工具调用效率自动化脚本**
+
+### **一键效率优化执行脚本**
+```bash
+#!/bin/bash
+# 工具调用效率优化自动执行脚本
+
+echo "⚡ 启动工具调用效率优化..."
+
+# 1. 设置会话预算（根据任务复杂度）
+TASK_COMPLEXITY=${1:-"medium_debug_task"}
+echo "💰 设置预算: $TASK_COMPLEXITY"
+
+# 2. 启动并行状态检查（替代串行检查）
+echo "🚀 执行并行状态检查..."
+{
+  timeout 30s curl -s http://localhost:3000/health &
+  timeout 10s pm2 status &
+  timeout 10s netstat -tlnp | grep :3000 &
+  timeout 10s ps aux | grep node &
+} | tee parallel_check_results.log
+wait
+
+# 3. 分析检查结果并缓存
+echo "💾 缓存检查结果..."
+HEALTH_STATUS=$(grep '"status"' parallel_check_results.log | head -1)
+PM2_STATUS=$(grep -E "(online|stopped)" parallel_check_results.log | head -1)
+
+# 4. 基于结果智能决策（避免额外工具调用）
+if [[ $HEALTH_STATUS =~ "healthy" && $PM2_STATUS =~ "online" ]]; then
+  echo "✅ 系统状态正常，无需额外检查"
+  NEED_REPAIR=false
+else
+  echo "⚠️ 检测到问题，需要修复"
+  NEED_REPAIR=true
+fi
+
+# 5. 清理临时文件
+rm -f parallel_check_results.log
+
+echo "📊 效率优化完成，已避免重复检查"
+```
+
+## 🎛️ **效率控制参数配置**
+
+### **关键效率指标和阈值设定**
+```javascript
+const EFFICIENCY_CONTROL_CONFIG = {
+  // 效率指标阈值
+  thresholds: {
+    maxToolCalls: {
+      simple: 20,      // 简单任务最多20次调用
+      medium: 50,      // 中等任务最多50次调用  
+      complex: 100     // 复杂任务最多100次调用
+    },
+    maxRepeatRate: 0.1,        // 重复率不超过10%
+    minParallelRate: 0.6,      // 并行率不低于60%
+    minCacheHitRate: 0.3,      // 缓存命中率不低于30%
+    maxSingleCallTime: 30000   // 单次调用不超过30秒
+  },
+
+  // 实时监控和告警
+  monitor: () => {
+    const m = EFFICIENCY_MONITOR_DASHBOARD.metrics;
+    const config = EFFICIENCY_CONTROL_CONFIG.thresholds;
+    
+    // 检查各项指标
+    const alerts = [];
+    
+    if (m.totalCalls > config.maxToolCalls.medium) {
+      alerts.push(`⚠️ 工具调用次数超标: ${m.totalCalls} > ${config.maxToolCalls.medium}`);
+    }
+    
+    const repeatRate = 1 - (m.cachedCalls / m.totalCalls);
+    if (repeatRate > config.maxRepeatRate) {
+      alerts.push(`⚠️ 重复率过高: ${(repeatRate*100).toFixed(1)}% > ${config.maxRepeatRate*100}%`);
+    }
+
+    const parallelRate = m.parallelCalls / m.totalCalls;
+    if (parallelRate < config.minParallelRate) {
+      alerts.push(`⚠️ 并行率过低: ${(parallelRate*100).toFixed(1)}% < ${config.minParallelRate*100}%`);
+    }
+
+    // 输出告警信息
+    if (alerts.length > 0) {
+      console.warn('🚨 效率告警:');
+      alerts.forEach(alert => console.warn(`   ${alert}`));
+    }
+
+    return alerts;
+  }
+};
+```
+
+## 📋 **工具调用优化实施检查清单**
+
+### **每次会话开始前**
+- [ ] 根据任务复杂度分配工具调用预算
+- [ ] 启用状态检查缓存系统
+- [ ] 识别可并行执行的操作类型
+- [ ] 设置效率监控指标阈值
+
+### **每次工具调用前**  
+- [ ] 检查是否有缓存结果可用
+- [ ] 评估是否可与其他操作并行
+- [ ] 验证调用的必要性和唯一性
+- [ ] 设置合理的超时限制
+
+### **每次工具调用后**
+- [ ] 记录调用结果和性能数据
+- [ ] 更新相关缓存信息
+- [ ] 检查预算使用情况
+- [ ] 分析是否需要优化策略
+
+### **每次会话结束后**
+- [ ] 生成效率报告和对比分析
+- [ ] 识别重复和低效调用模式
+- [ ] 记录优化建议和改进机会
+- [ ] 更新工具效率统计数据
+
+---
+
+**核心原则**: 缓存优先复用、并行执行最大化、智能重试策略、效率实时监控、预算严格控制

@@ -69,7 +69,7 @@ module.exports = sequelize => {
       },
 
       user_id: {
-        type: DataTypes.BIGINT,
+        type: DataTypes.INTEGER,
         allowNull: false,
         comment: '用户ID'
       },

@@ -10,7 +10,7 @@ TZ=Asia/Shanghai  # 🕐 时区设置：北京时间（中国区域）
 # 🔴 数据库配置 - 使用外网数据库修复连接问题
 # 外网数据库（生产环境）  
 DB_HOST=dbconn.sealosbja.site
-DB_PORT=42182
+DB_PORT=38380
 DB_USER=root
 DB_PASSWORD=mc6r9cgb
 DB_NAME=restaurant_points_dev
