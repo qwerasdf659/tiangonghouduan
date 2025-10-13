@@ -174,7 +174,7 @@ module.exports = {
         },
         assigned_at: {
           type: Sequelize.DATE,
-          defaultValue: () => BeijingTimeHelper.createDatabaseTime(),
+          defaultValue: Sequelize.NOW,
           comment: '角色分配时间'
         },
         assigned_by: {
@@ -247,7 +247,7 @@ module.exports = {
         last_activity: {
           type: Sequelize.DATE,
           allowNull: false,
-          defaultValue: () => BeijingTimeHelper.createDatabaseTime(),
+          defaultValue: Sequelize.NOW,
           comment: '最后活动时间'
         },
         expires_at: {
@@ -436,7 +436,7 @@ module.exports = {
         transaction_time: {
           type: Sequelize.DATE,
           allowNull: false,
-          defaultValue: () => BeijingTimeHelper.createDatabaseTime(),
+          defaultValue: Sequelize.NOW,
           comment: '交易时间(毫秒精度)'
         },
         effective_time: {
@@ -730,12 +730,12 @@ module.exports = {
         created_at: {
           type: Sequelize.DATE,
           allowNull: false,
-          defaultValue: () => BeijingTimeHelper.createDatabaseTime()
+          defaultValue: Sequelize.NOW
         },
         updated_at: {
           type: Sequelize.DATE,
           allowNull: false,
-          defaultValue: () => BeijingTimeHelper.createDatabaseTime()
+          defaultValue: Sequelize.NOW
         },
         createdAt: {
           type: Sequelize.DATE,
@@ -863,13 +863,13 @@ module.exports = {
         created_at: {
           type: Sequelize.DATE,
           allowNull: false,
-          defaultValue: () => BeijingTimeHelper.createDatabaseTime(),
+          defaultValue: Sequelize.NOW,
           comment: '抽奖时间'
         },
         updated_at: {
           type: Sequelize.DATE,
           allowNull: false,
-          defaultValue: () => BeijingTimeHelper.createDatabaseTime(),
+          defaultValue: Sequelize.NOW,
           comment: '记录更新时间'
         },
         createdAt: {
@@ -917,7 +917,6 @@ module.exports = {
         preset_id: {
           type: Sequelize.STRING(50),
           primaryKey: true,
-          defaultValue: () => `preset_${BeijingTimeHelper.generateIdTimestamp()}_${Math.random().toString(36).substr(2, 6)}`,
           comment: '预设记录唯一标识'
         },
         user_id: {
@@ -948,7 +947,7 @@ module.exports = {
         created_at: {
           type: Sequelize.DATE,
           allowNull: false,
-          defaultValue: () => BeijingTimeHelper.createDatabaseTime(),
+          defaultValue: Sequelize.NOW,
           comment: '创建时间'
         }
       })
@@ -1175,7 +1174,7 @@ module.exports = {
         acquired_at: {
           type: Sequelize.DATE,
           allowNull: false,
-          defaultValue: () => BeijingTimeHelper.createDatabaseTime(),
+          defaultValue: Sequelize.NOW,
           comment: '获得时间'
         },
         expires_at: {
@@ -1325,7 +1324,7 @@ module.exports = {
         trade_time: {
           type: Sequelize.DATE,
           allowNull: false,
-          defaultValue: () => BeijingTimeHelper.createDatabaseTime(),
+          defaultValue: Sequelize.NOW,
           comment: '交易发起时间'
         },
         processed_time: {
@@ -1592,13 +1591,13 @@ module.exports = {
         created_at: {
           type: Sequelize.DATE,
           allowNull: false,
-          defaultValue: () => BeijingTimeHelper.createDatabaseTime(),
+          defaultValue: Sequelize.NOW,
           comment: '创建时间'
         },
         updated_at: {
           type: Sequelize.DATE,
           allowNull: false,
-          defaultValue: () => BeijingTimeHelper.createDatabaseTime(),
+          defaultValue: Sequelize.NOW,
           comment: '更新时间'
         },
         createdAt: {
@@ -1694,13 +1693,13 @@ module.exports = {
         created_at: {
           type: Sequelize.DATE,
           allowNull: false,
-          defaultValue: () => BeijingTimeHelper.createDatabaseTime(),
+          defaultValue: Sequelize.NOW,
           comment: '创建时间'
         },
         updated_at: {
           type: Sequelize.DATE,
           allowNull: false,
-          defaultValue: () => BeijingTimeHelper.createDatabaseTime(),
+          defaultValue: Sequelize.NOW,
           comment: '更新时间'
         },
         createdAt: {
@@ -1830,7 +1829,7 @@ module.exports = {
         created_at: {
           type: Sequelize.DATE,
           allowNull: false,
-          defaultValue: () => BeijingTimeHelper.createDatabaseTime(),
+          defaultValue: Sequelize.NOW,
           comment: '创建时间'
         }
       })
@@ -1910,7 +1909,7 @@ module.exports = {
         exchange_time: {
           type: Sequelize.DATE,
           allowNull: false,
-          defaultValue: () => BeijingTimeHelper.createDatabaseTime(),
+          defaultValue: Sequelize.NOW,
           comment: '兑换时间'
         },
         expires_at: {
@@ -1960,12 +1959,12 @@ module.exports = {
         created_at: {
           type: Sequelize.DATE,
           allowNull: false,
-          defaultValue: () => BeijingTimeHelper.createDatabaseTime()
+          defaultValue: Sequelize.NOW
         },
         updated_at: {
           type: Sequelize.DATE,
           allowNull: false,
-          defaultValue: () => BeijingTimeHelper.createDatabaseTime()
+          defaultValue: Sequelize.NOW
         },
         createdAt: {
           type: Sequelize.DATE,
@@ -2052,13 +2051,13 @@ module.exports = {
         created_at: {
           type: Sequelize.DATE,
           allowNull: false,
-          defaultValue: () => BeijingTimeHelper.createDatabaseTime(),
+          defaultValue: Sequelize.NOW,
           comment: '创建时间'
         },
         updated_at: {
           type: Sequelize.DATE,
           allowNull: false,
-          defaultValue: () => BeijingTimeHelper.createDatabaseTime(),
+          defaultValue: Sequelize.NOW,
           comment: '更新时间'
         }
       })
@@ -2145,7 +2144,7 @@ module.exports = {
         created_at: {
           type: Sequelize.DATE,
           allowNull: false,
-          defaultValue: () => BeijingTimeHelper.createDatabaseTime(),
+          defaultValue: Sequelize.NOW,
           comment: '操作时间'
         }
       })
@@ -2223,7 +2222,7 @@ module.exports = {
     }
   },
 
-  down: async (queryInterface, Sequelize) => {
+  down: async (queryInterface, _Sequelize) => {
     console.log('🔄 开始回滚基准迁移...')
 
     // 按照外键依赖顺序删除表（逆序）

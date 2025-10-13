@@ -147,6 +147,7 @@ async function verifyBackup () {
 
     // 检查表数量是否一致
     if (currentTableNames.length !== backupTableNames.length) {
+      // eslint-disable-next-line require-atomic-updates
       results.comparison.match = false
       results.comparison.differences.push('表数量不一致')
       console.log('   ⚠️ 表数量不一致')
@@ -161,6 +162,7 @@ async function verifyBackup () {
       const backupRows = jsonData.statistics[tableName] || 0
 
       if (currentRows !== backupRows) {
+        // eslint-disable-next-line require-atomic-updates
         results.comparison.match = false
         results.comparison.differences.push(`${tableName}: 当前${currentRows}条 vs 备份${backupRows}条`)
         console.log(`   ⚠️ ${tableName}: 当前${currentRows}条 ≠ 备份${backupRows}条`)
@@ -175,6 +177,7 @@ async function verifyBackup () {
     // 验证BASIC_LOTTERY活动
     const [campaigns] = await sequelize.query('SELECT campaign_id, campaign_code FROM lottery_campaigns WHERE campaign_code = "BASIC_LOTTERY"')
     if (campaigns.length === 0) {
+      // eslint-disable-next-line require-atomic-updates
       results.comparison.match = false
       results.comparison.differences.push('当前数据库缺少BASIC_LOTTERY活动')
       console.log('   ❌ 当前数据库缺少BASIC_LOTTERY活动')

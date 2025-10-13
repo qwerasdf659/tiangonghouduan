@@ -400,7 +400,7 @@ module.exports = {
     }
   },
 
-  down: async (queryInterface, Sequelize) => {
+  down: async (queryInterface, _Sequelize) => {
     console.log('🔄 开始回滚基准迁移...')
 
     const transaction = await queryInterface.sequelize.transaction()

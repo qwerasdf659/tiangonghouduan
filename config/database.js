@@ -49,7 +49,7 @@ const dbConfig = {
   pool: {
     max: 40, // ⭐ 最大连接数（优化：从50降到40）- 支持多实例部署
     min: 5, // ✅ 最小连接数 - 避免冷启动延迟
-    acquire: 10000, // ✅ 获取连接超时10秒 - 避免长时间等待
+    acquire: 30000, // ✅ 获取连接超时30秒 - 外网数据库需要更长时间
     idle: 180000, // ⭐ 空闲连接3分钟（优化：从5分钟改为3分钟）- 平衡性能和资源
     evict: 60000, // ✅ 连接池清理间隔1分钟
     handleDisconnects: true // ✅ 自动处理连接断开
@@ -68,7 +68,8 @@ const dbConfig = {
     supportBigNumbers: true,
     bigNumberStrings: true,
     dateStrings: true,
-    typeCast: true
+    typeCast: true,
+    connectTimeout: 30000 // ✅ MySQL连接超时30秒 - 外网数据库连接优化
   }
 }
 
