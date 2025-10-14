@@ -16,7 +16,7 @@ const cors = require('cors')
 const helmet = require('helmet')
 const compression = require('compression')
 const rateLimit = require('express-rate-limit')
-require('dotenv').config()
+require('dotenv').config({ override: true }) // 🔴 强制覆盖系统环境变量
 
 // 🕐 北京时间工具导入
 const BeijingTimeHelper = require('./utils/timeHelper')

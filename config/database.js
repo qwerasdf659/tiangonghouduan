@@ -58,7 +58,7 @@ const dbConfig = {
     charset: 'utf8mb4',
     collate: 'utf8mb4_unicode_ci',
     timestamps: true,
-    underscored: false,
+    underscored: true, // ✅ 修复：统一使用snake_case命名 (created_at, updated_at)
     freezeTableName: true
   },
   dialectOptions: {

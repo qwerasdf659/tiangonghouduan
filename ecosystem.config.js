@@ -35,11 +35,12 @@ module.exports = {
           '197f92d1b1a24fba5db3227d2b1f25419499880dd95c332d2904eab13fdfabccfc775391992cf6bee6d5822c56699b59f876d2108dd00d93df1d838b377a01e0',
         JWT_EXPIRES_IN: '2h',
         JWT_REFRESH_EXPIRES_IN: '7d',
-        DB_HOST: 'test-db2-mysql.ns-br0za7uc.svc',
-        DB_PORT: '3306',
-        DB_NAME: 'test-db2',
+        // 🔴 数据库配置 - 使用正确的生产数据库
+        DB_HOST: 'dbconn.sealosbja.site',
+        DB_PORT: '42569',
+        DB_NAME: 'restaurant_points_dev',
         DB_USER: 'root',
-        DB_PASSWORD: '2rd2qwng',
+        DB_PASSWORD: 'mc6r9cgb',
         DB_TIMEZONE: '+08:00',
         REDIS_URL: 'redis://localhost:6379'
       },

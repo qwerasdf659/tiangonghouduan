@@ -1,0 +1,19 @@
+# 数据库备份文件MD5校验信息
+# 备份时间: 2025年10月13日
+# 文件位置: /home/devbox/project/backups/backup_2025-10-13/
+
+# 完整SQL备份（17:19）
+1a44d89c8679d9242f7ef1fe6d9b3de3  COMPLETE_BACKUP_2025-10-13T17-19-15-446Z.sql
+
+# 完整JSON数据备份（17:19）
+2f2d5f4d9a826cc80a7be9275289d445  COMPLETE_DATA_2025-10-13T17-19-15-446Z.json
+
+# 数据备份（15:29）
+79670903e90dd96ad4c570965b540d01  data_backup_2025-10-13T15-29-37.json
+
+# 空SQL文件（18:37）- 可能是失败的备份
+d41d8cd98f00b204e9800998ecf8427e  full_2025-10-13_183701.sql
+
+# 校验方法:
+# cd /home/devbox/project/backups/backup_2025-10-13
+# md5sum -c BACKUP_MD5_2025-10-13.txt
