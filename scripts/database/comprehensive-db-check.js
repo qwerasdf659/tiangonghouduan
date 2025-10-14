@@ -9,20 +9,20 @@ const models = require('../../models')
 const { QueryTypes } = require('sequelize')
 
 // 检查命名是否符合 snake_case 规范
-function isSnakeCase(name) {
+function isSnakeCase (name) {
   return /^[a-z][a-z0-9_]*$/.test(name)
 }
 
 // 检查主键命名是否符合 {table_name}_id 格式
-function checkPrimaryKeyNaming(tableName, pkField) {
+function checkPrimaryKeyNaming (tableName, pkField) {
   const expectedPkName = `${tableName.replace(/s$/, '')}_id`
   return pkField === expectedPkName || pkField === `${tableName}_id`
 }
 
-async function comprehensiveCheck() {
+async function comprehensiveCheck () {
   try {
     console.log('🔍 开始数据库综合检查...\n')
-    console.log('=' .repeat(80))
+    console.log('='.repeat(80))
 
     const issues = {
       namingViolations: [],
@@ -59,7 +59,7 @@ async function comprehensiveCheck() {
         })
         console.log(`❌ 表名不符合 snake_case 规范: ${tableName}`)
       } else {
-        console.log(`✅ 表名符合 snake_case 规范`)
+        console.log('✅ 表名符合 snake_case 规范')
       }
 
       // 检查表是否存在
@@ -100,7 +100,7 @@ async function comprehensiveCheck() {
       const modelFields = Object.keys(modelAttributes)
       const dbFieldNames = dbFields.map(f => f.field)
 
-      console.log(`\n🔍 字段检查:`)
+      console.log('\n🔍 字段检查:')
       console.log(`   模型定义: ${modelFields.length} 个字段`)
       console.log(`   数据库实际: ${dbFieldNames.length} 个字段`)
 
@@ -110,15 +110,15 @@ async function comprehensiveCheck() {
         if (!isSnakeCase(field)) {
           issues.namingViolations.push({
             table: tableName,
-            field: field,
-            issue: `字段名不符合 snake_case 规范`
+            field,
+            issue: '字段名不符合 snake_case 规范'
           })
           console.log(`   ❌ 字段命名违规: ${field} (应使用 snake_case)`)
           fieldNamingOk = false
         }
       }
       if (fieldNamingOk) {
-        console.log(`   ✅ 所有字段名符合 snake_case 规范`)
+        console.log('   ✅ 所有字段名符合 snake_case 规范')
       }
 
       // 检查字段差异
@@ -144,7 +144,7 @@ async function comprehensiveCheck() {
       }
 
       if (missingInDB.length === 0 && extraInDB.length === 0) {
-        console.log(`   ✅ 字段完全匹配`)
+        console.log('   ✅ 字段完全匹配')
       }
 
       // 3. 检查主键命名
@@ -152,8 +152,8 @@ async function comprehensiveCheck() {
       if (pkFields.length > 0) {
         const pkField = pkFields[0].field
         const pkNameOk = checkPrimaryKeyNaming(tableName, pkField)
-        
-        console.log(`\n🔑 主键检查:`)
+
+        console.log('\n🔑 主键检查:')
         if (pkNameOk) {
           console.log(`   ✅ 主键命名符合规范: ${pkField}`)
         } else {
@@ -183,9 +183,9 @@ async function comprehensiveCheck() {
         indexGroups[idx.Key_name].push(idx)
       })
 
-      console.log(`\n📊 索引检查:`)
+      console.log('\n📊 索引检查:')
       console.log(`   数据库中存在 ${Object.keys(indexGroups).length} 个索引`)
-      
+
       for (const [idxName, idxFields] of Object.entries(indexGroups)) {
         const fieldNames = idxFields.map(f => f.Column_name).join(', ')
         const unique = idxFields[0].Non_unique === 0 ? '唯一索引' : '普通索引'
@@ -197,10 +197,10 @@ async function comprehensiveCheck() {
       if (model.options && model.options.indexes) {
         const modelIndexes = model.options.indexes
         console.log(`   模型定义了 ${modelIndexes.length} 个索引`)
-        
+
         // 简单对比（这里不做详细对比，只提示）
         if (modelIndexes.length > Object.keys(indexGroups).length - 1) { // -1 排除主键
-          console.log(`   ⚠️  模型定义的索引数量多于数据库实际索引`)
+          console.log('   ⚠️  模型定义的索引数量多于数据库实际索引')
         }
       }
 
@@ -226,7 +226,7 @@ async function comprehensiveCheck() {
         }
       )
 
-      console.log(`\n🔗 外键检查:`)
+      console.log('\n🔗 外键检查:')
       if (foreignKeys.length > 0) {
         console.log(`   数据库中存在 ${foreignKeys.length} 个外键约束`)
         foreignKeys.forEach(fk => {
@@ -234,29 +234,29 @@ async function comprehensiveCheck() {
           console.log(`     删除规则: ${fk.delete_rule}, 更新规则: ${fk.update_rule}`)
         })
       } else {
-        console.log(`   ⚠️  数据库中没有定义外键约束`)
-        
+        console.log('   ⚠️  数据库中没有定义外键约束')
+
         // 检查模型中是否定义了关联
         const associations = Object.keys(model.associations || {})
         if (associations.length > 0) {
           console.log(`   💡 模型定义了 ${associations.length} 个关联: ${associations.join(', ')}`)
-          console.log(`   ⚠️  但数据库层面没有外键约束（仅ORM层关联）`)
+          console.log('   ⚠️  但数据库层面没有外键约束（仅ORM层关联）')
           issues.missingForeignKeys.push({
             table: tableName,
-            associations: associations
+            associations
           })
         }
       }
 
       // 6. 检查时间戳字段
-      console.log(`\n⏰ 时间戳字段检查:`)
+      console.log('\n⏰ 时间戳字段检查:')
       const hasCreatedAt = dbFieldNames.includes('created_at')
       const hasUpdatedAt = dbFieldNames.includes('updated_at')
       const hasCreatedAtCamel = modelFields.includes('createdAt')
       const hasUpdatedAtCamel = modelFields.includes('updatedAt')
 
       if (hasCreatedAtCamel && !hasCreatedAt) {
-        console.log(`   ❌ 模型使用 createdAt 但数据库使用 created_at`)
+        console.log('   ❌ 模型使用 createdAt 但数据库使用 created_at')
         issues.namingViolations.push({
           table: tableName,
           field: 'createdAt/created_at',
@@ -265,7 +265,7 @@ async function comprehensiveCheck() {
       }
 
       if (hasUpdatedAtCamel && !hasUpdatedAt) {
-        console.log(`   ❌ 模型使用 updatedAt 但数据库使用 updated_at`)
+        console.log('   ❌ 模型使用 updatedAt 但数据库使用 updated_at')
         issues.namingViolations.push({
           table: tableName,
           field: 'updatedAt/updated_at',
@@ -274,7 +274,7 @@ async function comprehensiveCheck() {
       }
 
       if (hasCreatedAt && hasUpdatedAt) {
-        console.log(`   ✅ 时间戳字段使用 snake_case (created_at, updated_at)`)
+        console.log('   ✅ 时间戳字段使用 snake_case (created_at, updated_at)')
       }
     }
 
@@ -283,7 +283,7 @@ async function comprehensiveCheck() {
     console.log('📊 综合检查汇总报告')
     console.log('='.repeat(80))
 
-    console.log(`\n🔍 检查项目统计:`)
+    console.log('\n🔍 检查项目统计:')
     console.log(`   - 检查表数量: ${modelList.length}`)
     console.log(`   - 命名规范违规: ${issues.namingViolations.length} 处`)
     console.log(`   - 字段不匹配: ${issues.fieldMismatches.length} 处`)
@@ -299,7 +299,7 @@ async function comprehensiveCheck() {
     }
 
     if (issues.fieldMismatches.length > 0) {
-      console.log(`\n⚠️  字段不匹配详情:`)
+      console.log('\n⚠️  字段不匹配详情:')
       issues.fieldMismatches.forEach((issue, i) => {
         console.log(`   ${i + 1}. ${issue.table} (${issue.type}): ${issue.fields.join(', ')}`)
       })
@@ -314,37 +314,37 @@ async function comprehensiveCheck() {
     }
 
     if (issues.pkNamingIssues.length > 0) {
-      console.log(`\n⚠️  主键命名问题:`)
+      console.log('\n⚠️  主键命名问题:')
       issues.pkNamingIssues.forEach((issue, i) => {
         console.log(`   ${i + 1}. ${issue.table}: ${issue.current} → 建议: ${issue.expected}`)
       })
     }
 
     // 修复建议
-    console.log(`\n\n💡 修复建议:`)
+    console.log('\n\n💡 修复建议:')
     console.log('='.repeat(80))
 
     if (issues.namingViolations.length > 0) {
-      console.log(`\n1️⃣  修复命名规范问题:`)
-      console.log(`   - 所有时间戳字段应使用 snake_case (created_at, updated_at)`)
-      console.log(`   - 修改模型定义，统一使用 underscored: true 选项`)
-      console.log(`   - 确保 Sequelize 配置中启用 underscored`)
+      console.log('\n1️⃣  修复命名规范问题:')
+      console.log('   - 所有时间戳字段应使用 snake_case (created_at, updated_at)')
+      console.log('   - 修改模型定义，统一使用 underscored: true 选项')
+      console.log('   - 确保 Sequelize 配置中启用 underscored')
     }
 
     if (issues.fieldMismatches.length > 0) {
-      console.log(`\n2️⃣  修复字段不匹配:`)
-      console.log(`   - 创建数据库迁移脚本添加/删除字段`)
-      console.log(`   - 或修改模型定义使其与数据库一致`)
+      console.log('\n2️⃣  修复字段不匹配:')
+      console.log('   - 创建数据库迁移脚本添加/删除字段')
+      console.log('   - 或修改模型定义使其与数据库一致')
     }
 
     if (issues.missingForeignKeys.length > 0) {
-      console.log(`\n3️⃣  添加外键约束:`)
-      console.log(`   - 根据规范，所有外键必须在数据库层面定义`)
-      console.log(`   - 创建迁移脚本添加外键约束`)
-      console.log(`   - 参考格式: ALTER TABLE xxx ADD CONSTRAINT fk_xxx FOREIGN KEY (xxx_id) REFERENCES xxx(xxx_id)`)
+      console.log('\n3️⃣  添加外键约束:')
+      console.log('   - 根据规范，所有外键必须在数据库层面定义')
+      console.log('   - 创建迁移脚本添加外键约束')
+      console.log('   - 参考格式: ALTER TABLE xxx ADD CONSTRAINT fk_xxx FOREIGN KEY (xxx_id) REFERENCES xxx(xxx_id)')
     }
 
-    console.log(`\n✅ 综合检查完成`)
+    console.log('\n✅ 综合检查完成')
     console.log('='.repeat(80))
 
     process.exit(issues.namingViolations.length > 0 || issues.fieldMismatches.length > 0 ? 1 : 0)
@@ -357,4 +357,3 @@ async function comprehensiveCheck() {
 
 // 执行检查
 comprehensiveCheck()
-

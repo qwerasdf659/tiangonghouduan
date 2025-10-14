@@ -115,4 +115,3 @@ async function checkAllTablesFields () {
 }
 
 checkAllTablesFields()
-
