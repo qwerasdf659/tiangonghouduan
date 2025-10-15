@@ -281,89 +281,133 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
         }
       }
 
-      // 获取用户信息（包括积分余额）
-      const userAccount = await UserPointsAccount.findOne({ where: { user_id } })
+      // 🔥 使用事务确保积分操作的原子性和顺序正确性
+      // 问题修复：2025-10-14 - 解决积分先增加后减少的显示问题
+      const models = require('../../../models')
+      const transaction = await models.sequelize.transaction()
 
-      // 🎯 V4.1修改：移除基础中奖率判断，直接根据奖品概率分配
-      // 原逻辑：Math.random() < probability（10%基础中奖率）
-      // 新逻辑：直接从奖品池选择，每次必定选中一个奖品
-      this.logInfo('开始奖品抽取（无基础中奖率限制）', { user_id, campaignId })
+      try {
+        // 获取用户信息（包括积分余额）
+        const userAccount = await UserPointsAccount.findOne({
+          where: { user_id },
+          transaction
+        })
 
-      // ✅ 生成唯一的抽奖ID（用于幂等性控制）
-      const draw_id = `draw_${BeijingTimeHelper.generateIdTimestamp()}_${user_id}_${Math.random().toString(36).substr(2, 6)}`
+        // 🎯 V4.1修改：移除基础中奖率判断，直接根据奖品概率分配
+        // 原逻辑：Math.random() < probability（10%基础中奖率）
+        // 新逻辑：直接从奖品池选择，每次必定选中一个奖品
+        this.logInfo('开始奖品抽取（无基础中奖率限制）', { user_id, campaignId })
 
-      // 直接从奖品池中选择奖品
-      const prize = await this.selectPrize(await this.getAvailablePrizes(campaignId))
+        // ✅ 生成唯一的抽奖ID（用于幂等性控制）
+        const draw_id = `draw_${BeijingTimeHelper.generateIdTimestamp()}_${user_id}_${Math.random().toString(36).substr(2, 6)}`
 
-      if (prize) {
-        // 扣减积分（传入draw_id用于幂等性控制）
-        await this.deductPoints(user_id, this.config.pointsCostPerDraw, draw_id)
+        // 直接从奖品池中选择奖品
+        const prize = await this.selectPrize(await this.getAvailablePrizes(campaignId))
 
-        // 发放奖品
-        await this.distributePrize(user_id, prize)
+        if (prize) {
+          // 🎯 步骤1: 先扣减积分（传入draw_id和transaction用于幂等性控制和事务管理）
+          await this.deductPoints(user_id, this.config.pointsCostPerDraw, draw_id, transaction)
 
-        // 记录抽奖历史（传入draw_id）
-        await this.recordLotteryHistory(context, { is_winner: true, prize }, 1.0, draw_id)
+          // 🎯 步骤2: 再发放奖品（在事务中执行，确保顺序）
+          await this.distributePrize(user_id, prize, transaction)
+
+          // 🎯 步骤3: 记录抽奖历史（传入draw_id和transaction）
+          await this.recordLotteryHistory(context, { is_winner: true, prize }, 1.0, draw_id, transaction)
+
+          // 🎯 提交事务 - 确保所有操作原子性执行
+          await transaction.commit()
+
+          const executionTime = BeijingTimeHelper.timestamp() - startTime
+          this.logInfo('基础抽奖保底策略执行完成 - 中奖（事务已提交）', {
+            user_id,
+            campaignId,
+            prize: prize.prize_name,
+            prize_type: prize.prize_type,
+            executionTime,
+            draw_id
+          })
+
+          return {
+            success: true, // ✅ 技术字段：操作是否成功
+            is_winner: true, // ✅ 业务字段：是否中奖（符合接口规范）
+            prize: {
+              id: prize.prize_id,
+              name: prize.prize_name,
+              type: prize.prize_type,
+              value: prize.prize_value,
+              sort_order: prize.sort_order // 🎯 前端用于计算索引
+            },
+            probability: 1.0, // 移除基础中奖率后，中奖概率100%
+            pointsCost: this.config.pointsCostPerDraw,
+            remainingPoints: userAccount.available_points - this.config.pointsCostPerDraw,
+            executionTime,
+            executedStrategy: this.strategyName,
+            guaranteeTriggered: false, // 标记为非保底中奖
+            timestamp: BeijingTimeHelper.now()
+          }
+        }
+
+        // 🚨 异常情况：奖品池为空或选择失败（理论上不应发生）
+        // ✅ 生成唯一的抽奖ID（用于幂等性控制）
+        const fallback_draw_id = `draw_${BeijingTimeHelper.generateIdTimestamp()}_${user_id}_${Math.random().toString(36).substr(2, 6)}`
+        await this.deductPoints(user_id, this.config.pointsCostPerDraw, fallback_draw_id, transaction)
+        await this.recordLotteryHistory(context, { is_winner: false }, 0, fallback_draw_id, transaction)
+
+        // 提交fallback事务
+        await transaction.commit()
 
         const executionTime = BeijingTimeHelper.timestamp() - startTime
-        this.logInfo('基础抽奖保底策略执行完成 - 中奖', {
+        this.logError('奖品选择失败 - 奖品池可能为空', {
           user_id,
           campaignId,
-          prize: prize.prize_name,
-          prize_type: prize.prize_type,
-          executionTime
+          executionTime,
+          availablePrizesCount: (await this.getAvailablePrizes(campaignId)).length
         })
 
         return {
-          success: true, // ✅ 技术字段：操作是否成功
-          is_winner: true, // ✅ 业务字段：是否中奖（符合接口规范）
-          prize: {
-            id: prize.prize_id,
-            name: prize.prize_name,
-            type: prize.prize_type,
-            value: prize.prize_value,
-            sort_order: prize.sort_order // 🎯 前端用于计算索引
-          },
-          probability: 1.0, // 移除基础中奖率后，中奖概率100%
+          success: true, // ✅ 技术字段：操作成功执行
+          is_winner: false, // ✅ 业务字段：未中奖（异常情况）
+          prize: null,
+          probability: 0,
           pointsCost: this.config.pointsCostPerDraw,
           remainingPoints: userAccount.available_points - this.config.pointsCostPerDraw,
           executionTime,
           executedStrategy: this.strategyName,
-          guaranteeTriggered: false, // 标记为非保底中奖
+          guaranteeTriggered: false,
+          remainingDrawsToGuarantee: this.config.guaranteeRule.triggerCount - ((guaranteeCheck.nextDrawNumber) % this.config.guaranteeRule.triggerCount),
+          timestamp: BeijingTimeHelper.now()
+        }
+      } catch (transactionError) {
+        // 🚨 事务执行失败，回滚所有操作
+        if (transaction && !transaction.finished) {
+          await transaction.rollback()
+          this.logError('抽奖事务回滚', {
+            user_id,
+            campaignId,
+            error: transactionError.message
+          })
+        }
+
+        const executionTime = BeijingTimeHelper.timestamp() - startTime
+        this.logError('基础抽奖保底策略执行失败（事务已回滚）', {
+          user_id,
+          campaignId,
+          error: transactionError.message,
+          executionTime
+        })
+
+        return {
+          success: false,
+          result: 'error',
+          message: `抽奖执行失败: ${transactionError.message}`,
+          executionTime,
+          executedStrategy: this.strategyName,
           timestamp: BeijingTimeHelper.now()
         }
       }
-
-      // 🚨 异常情况：奖品池为空或选择失败（理论上不应发生）
-      // ✅ 生成唯一的抽奖ID（用于幂等性控制）
-      const fallback_draw_id = `draw_${BeijingTimeHelper.generateIdTimestamp()}_${user_id}_${Math.random().toString(36).substr(2, 6)}`
-      await this.deductPoints(user_id, this.config.pointsCostPerDraw, fallback_draw_id)
-      await this.recordLotteryHistory(context, { is_winner: false }, 0, fallback_draw_id)
-
-      const executionTime = BeijingTimeHelper.timestamp() - startTime
-      this.logError('奖品选择失败 - 奖品池可能为空', {
-        user_id,
-        campaignId,
-        executionTime,
-        availablePrizesCount: (await this.getAvailablePrizes(campaignId)).length
-      })
-
-      return {
-        success: true, // ✅ 技术字段：操作成功执行
-        is_winner: false, // ✅ 业务字段：未中奖（异常情况）
-        prize: null,
-        probability: 0,
-        pointsCost: this.config.pointsCostPerDraw,
-        remainingPoints: userAccount.available_points - this.config.pointsCostPerDraw,
-        executionTime,
-        executedStrategy: this.strategyName,
-        guaranteeTriggered: false,
-        remainingDrawsToGuarantee: this.config.guaranteeRule.triggerCount - ((guaranteeCheck.nextDrawNumber) % this.config.guaranteeRule.triggerCount),
-        timestamp: BeijingTimeHelper.now()
-      }
     } catch (error) {
       const executionTime = BeijingTimeHelper.timestamp() - startTime
-      this.logError('基础抽奖保底策略执行失败', {
+      this.logError('基础抽奖保底策略执行失败（外层异常）', {
         user_id: context.user_id,
         campaignId: context.campaign_id,
         error: error.message,
@@ -881,23 +925,25 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
    * @param {number} user_id - 用户ID
    * @param {Object} prize - 奖品信息
    */
-  async distributePrize (user_id, prize) {
+  async distributePrize (user_id, prize, transaction = null) {
     // 根据奖品类型进行不同的发放逻辑
     switch (prize.prize_type) {
     case 'points':
-      // 积分奖励：使用统一积分服务
+      // 积分奖励：使用统一积分服务（传入transaction确保事务一致性）
       await PointsService.addPoints(user_id, parseInt(prize.prize_value), {
+        transaction, // 🎯 传入事务对象，确保积分操作在同一事务中
         business_type: 'lottery_reward',
         source_type: 'system',
         title: `抽奖奖励：${prize.prize_name}`,
         description: `获得${prize.prize_value}积分奖励`
       })
 
-      this.logInfo('发放积分奖励（使用PointsService）', {
+      this.logInfo('发放积分奖励（使用PointsService + 事务）', {
         user_id,
         prizeId: prize.id,
         prizeName: prize.prize_name,
-        points: prize.prize_value
+        points: prize.prize_value,
+        inTransaction: !!transaction
       })
       break
 
@@ -928,7 +974,7 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
    * @param {number} probability - 中奖概率
    * @param {string} draw_id - 抽奖ID（可选，如果不提供则自动生成）
    */
-  async recordLotteryHistory (context, result, probability, draw_id = null) {
+  async recordLotteryHistory (context, result, probability, draw_id = null, transaction = null) {
     // ✅ 统一业务标准：使用snake_case参数解构
     const { user_id, campaign_id } = context
 
@@ -947,7 +993,7 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
       win_probability: probability,
       created_at: BeijingTimeHelper.createBeijingTime(),
       result_details: JSON.stringify(result)
-    })
+    }, transaction ? { transaction } : {}) // 🎯 传入事务对象
   }
 
   /**

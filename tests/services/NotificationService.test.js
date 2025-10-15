@@ -5,7 +5,7 @@
  */
 
 const NotificationService = require('../../services/NotificationService')
-const { CustomerSession, ChatMessage, User } = require('../../models')
+const { CustomerServiceSession, ChatMessage, User } = require('../../models')
 
 describe('NotificationService - 统一通知服务', () => {
   let testUser
@@ -50,7 +50,7 @@ describe('NotificationService - 统一通知服务', () => {
     })
 
     test('应该能够自动创建用户聊天会话', async () => {
-      const beforeSessionCount = await CustomerSession.count({
+      const beforeSessionCount = await CustomerServiceSession.count({
         where: { user_id: testUser.user_id }
       })
 
@@ -60,7 +60,7 @@ describe('NotificationService - 统一通知服务', () => {
         content: '测试自动创建会话功能'
       })
 
-      const afterSessionCount = await CustomerSession.count({
+      const afterSessionCount = await CustomerServiceSession.count({
         where: { user_id: testUser.user_id }
       })
 
@@ -68,7 +68,7 @@ describe('NotificationService - 统一通知服务', () => {
       expect(afterSessionCount).toBeGreaterThanOrEqual(beforeSessionCount)
 
       // 验证会话存在且状态正确
-      const session = await CustomerSession.findOne({
+      const session = await CustomerServiceSession.findOne({
         where: {
           user_id: testUser.user_id,
           status: ['waiting', 'assigned', 'active']
@@ -108,10 +108,7 @@ describe('NotificationService - 统一通知服务', () => {
         total_points: 500
       }
 
-      const result = await NotificationService.notifyExchangePending(
-        testUser.user_id,
-        exchangeData
-      )
+      const result = await NotificationService.notifyExchangePending(testUser.user_id, exchangeData)
 
       expect(result.success).toBe(true)
       expect(result.type).toBe('exchange_pending')
@@ -301,14 +298,14 @@ describe('NotificationService - 统一通知服务', () => {
   describe('会话管理', () => {
     test('应该能够获取现有活跃会话', async () => {
       // 先创建一个活跃会话
-      const session1 = await CustomerSession.create({
+      const session1 = await CustomerServiceSession.create({
         user_id: testUser.user_id,
         status: 'active',
         source: 'test'
       })
 
       // 获取会话应该返回现有会话
-      const session2 = await NotificationService.getOrCreateUserSession(testUser.user_id)
+      const session2 = await NotificationService.getOrCreateCustomerServiceSession(testUser.user_id)
 
       // ✅ 转换为字符串比较，因为BIGINT类型可能返回字符串
       expect(String(session2.session_id)).toBe(String(session1.session_id))
@@ -317,13 +314,13 @@ describe('NotificationService - 统一通知服务', () => {
 
     test('应该能够在没有活跃会话时创建新会话', async () => {
       // 关闭所有现有会话
-      await CustomerSession.update(
+      await CustomerServiceSession.update(
         { status: 'closed' },
         { where: { user_id: testUser.user_id } }
       )
 
       // 获取会话应该创建新会话
-      const session = await NotificationService.getOrCreateUserSession(testUser.user_id)
+      const session = await NotificationService.getOrCreateCustomerServiceSession(testUser.user_id)
 
       expect(session).toBeDefined()
       expect(session.status).toBe('waiting')

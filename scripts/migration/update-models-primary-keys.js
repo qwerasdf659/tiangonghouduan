@@ -27,7 +27,7 @@ const MODEL_UPDATES = [
     changes: [{ from: /id:\s*{[^}]*primaryKey:\s*true[^}]*}/, to: 'inventory_id' }]
   },
   {
-    file: 'models/CustomerSession.js',
+    file: 'models/CustomerServiceSession.js',
     changes: [{ from: /id:\s*{[^}]*primaryKey:\s*true[^}]*}/, to: 'session_id' }]
   },
   {
@@ -35,7 +35,7 @@ const MODEL_UPDATES = [
     changes: [{ from: /id:\s*{[^}]*primaryKey:\s*true[^}]*}/, to: 'message_id' }]
   },
   {
-    file: 'models/UserSession.js',
+    file: 'models/AuthenticationSession.js',
     changes: [{ from: /id:\s*{[^}]*primaryKey:\s*true[^}]*}/, to: 'user_session_id' }]
   },
   {

@@ -14,10 +14,14 @@ console.log('='.repeat(60))
 
 // 配置
 const MODELS_DIR = path.join(__dirname, '../../models')
-const OUTPUT_FILE = path.join(__dirname, '../../migrations/20251013100000-baseline-v1-clean-start.js')
+const OUTPUT_FILE = path.join(
+  __dirname,
+  '../../migrations/20251013100000-baseline-v1-clean-start.js'
+)
 
 // 获取所有模型文件
-const modelFiles = fs.readdirSync(MODELS_DIR)
+const modelFiles = fs
+  .readdirSync(MODELS_DIR)
   .filter(file => file.endsWith('.js') && file !== 'index.js')
   .sort()
 
@@ -31,7 +35,7 @@ const _tableNameMap = {
   'User.js': 'users',
   'Role.js': 'roles',
   'UserRole.js': 'user_roles',
-  'UserSession.js': 'user_sessions',
+  'AuthenticationSession.js': 'authentication_sessions',
   'UserPointsAccount.js': 'user_points_accounts',
   'PointsTransaction.js': 'points_transactions',
   'ExchangeRecords.js': 'exchange_records',
@@ -42,11 +46,11 @@ const _tableNameMap = {
   'Product.js': 'products',
   'TradeRecord.js': 'trade_records',
   'UserInventory.js': 'user_inventory',
-  'CustomerSession.js': 'customer_sessions',
+  'CustomerServiceSession.js': 'customer_service_sessions',
   'ChatMessage.js': 'chat_messages',
   'Feedback.js': 'feedbacks',
-  'AuditLog.js': 'audit_logs',
-  'AuditRecord.js': 'audit_records',
+  'AdminOperationLog.js': 'admin_operation_logs',
+  'ContentReviewRecord.js': 'content_review_records',
   'SystemAnnouncement.js': 'system_announcements',
   'ImageResources.js': 'image_resources'
 }

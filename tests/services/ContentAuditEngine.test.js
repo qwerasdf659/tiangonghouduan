@@ -13,11 +13,11 @@
  */
 
 const ContentAuditEngine = require('../../services/ContentAuditEngine')
-const { AuditRecord, User, sequelize } = require('../../models')
+const { ContentReviewRecord, User, sequelize } = require('../../models')
 const BeijingTimeHelper = require('../../utils/timeHelper')
 
 describe('ContentAuditEngine - 内容审核引擎测试', () => {
-  let testUser, testAuditRecord
+  let testUser, testContentReviewRecord
 
   beforeAll(async () => {
     // 创建测试用户（审核员）
@@ -43,29 +43,29 @@ describe('ContentAuditEngine - 内容审核引擎测试', () => {
       expect(result.audit_status).toBe('pending')
       expect(result.priority).toBe('high')
 
-      testAuditRecord = result
+      testContentReviewRecord = result
     })
 
     it('应该防止重复提交审核', async () => {
       const result = await ContentAuditEngine.submitForAudit('exchange', 1)
 
       // 应该返回已存在的审核记录（BIGINT类型转换为字符串）
-      expect(result.audit_id.toString()).toBe(testAuditRecord.audit_id.toString())
+      expect(result.audit_id.toString()).toBe(testContentReviewRecord.audit_id.toString())
     })
 
     it('应该拒绝不支持的审核类型', async () => {
-      await expect(
-        ContentAuditEngine.submitForAudit('invalid_type', 1)
-      ).rejects.toThrow('不支持的审核类型')
+      await expect(ContentAuditEngine.submitForAudit('invalid_type', 1)).rejects.toThrow(
+        '不支持的审核类型'
+      )
     })
   })
 
   describe('approve - 审核通过', () => {
-    let approveAuditRecord
+    let approveContentReviewRecord
 
     beforeAll(async () => {
       // 创建一个待审核记录用于测试审核通过
-      approveAuditRecord = await AuditRecord.create({
+      approveContentReviewRecord = await ContentReviewRecord.create({
         auditable_type: 'feedback',
         auditable_id: 999,
         audit_status: 'pending',
@@ -76,7 +76,7 @@ describe('ContentAuditEngine - 内容审核引擎测试', () => {
 
     it('应该成功审核通过', async () => {
       const result = await ContentAuditEngine.approve(
-        approveAuditRecord.audit_id,
+        approveContentReviewRecord.audit_id,
         testUser.user_id,
         '测试审核通过'
       )
@@ -88,24 +88,28 @@ describe('ContentAuditEngine - 内容审核引擎测试', () => {
     })
 
     it('应该拒绝审核不存在的记录', async () => {
-      await expect(
-        ContentAuditEngine.approve(999999, testUser.user_id, '测试')
-      ).rejects.toThrow('审核记录不存在')
+      await expect(ContentAuditEngine.approve(999999, testUser.user_id, '测试')).rejects.toThrow(
+        '审核记录不存在'
+      )
     })
 
     it('应该拒绝审核已处理的记录', async () => {
       await expect(
-        ContentAuditEngine.approve(approveAuditRecord.audit_id, testUser.user_id, '重复审核')
+        ContentAuditEngine.approve(
+          approveContentReviewRecord.audit_id,
+          testUser.user_id,
+          '重复审核'
+        )
       ).rejects.toThrow('审核记录状态不正确')
     })
   })
 
   describe('reject - 审核拒绝', () => {
-    let rejectAuditRecord
+    let rejectContentReviewRecord
 
     beforeAll(async () => {
       // 创建一个待审核记录用于测试审核拒绝
-      rejectAuditRecord = await AuditRecord.create({
+      rejectContentReviewRecord = await ContentReviewRecord.create({
         auditable_type: 'feedback',
         auditable_id: 998,
         audit_status: 'pending',
@@ -116,7 +120,7 @@ describe('ContentAuditEngine - 内容审核引擎测试', () => {
 
     it('应该成功审核拒绝', async () => {
       const result = await ContentAuditEngine.reject(
-        rejectAuditRecord.audit_id,
+        rejectContentReviewRecord.audit_id,
         testUser.user_id,
         '测试审核拒绝原因'
       )
@@ -128,7 +132,7 @@ describe('ContentAuditEngine - 内容审核引擎测试', () => {
     })
 
     it('应该要求提供拒绝原因', async () => {
-      const newRecord = await AuditRecord.create({
+      const newRecord = await ContentReviewRecord.create({
         auditable_type: 'feedback',
         auditable_id: 997,
         audit_status: 'pending',
@@ -144,7 +148,7 @@ describe('ContentAuditEngine - 内容审核引擎测试', () => {
   describe('getPendingAudits - 获取待审核记录', () => {
     beforeAll(async () => {
       // 创建多个测试审核记录
-      await AuditRecord.bulkCreate([
+      await ContentReviewRecord.bulkCreate([
         {
           auditable_type: 'exchange',
           auditable_id: 101,
@@ -210,7 +214,7 @@ describe('ContentAuditEngine - 内容审核引擎测试', () => {
   afterAll(async () => {
     // 清理测试数据
     try {
-      await AuditRecord.destroy({
+      await ContentReviewRecord.destroy({
         where: {
           auditable_type: ['exchange', 'feedback', 'image'],
           auditable_id: { [require('sequelize').Op.in]: [1, 999, 998, 997, 101, 102] }

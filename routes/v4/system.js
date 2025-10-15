@@ -20,12 +20,7 @@ const { Op } = require('sequelize')
  */
 router.get('/announcements', dataAccessControl, async (req, res) => {
   try {
-    const {
-      type = null,
-      priority = null,
-      limit = 10,
-      offset = 0
-    } = req.query
+    const { type = null, priority = null, limit = 10, offset = 0 } = req.query
 
     const dataLevel = req.isAdmin ? 'full' : 'public'
 
@@ -51,11 +46,13 @@ router.get('/announcements', dataAccessControl, async (req, res) => {
       ],
       limit: Math.min(parseInt(limit), 50), // 限制最大50条
       offset: parseInt(offset),
-      include: [{
-        model: User,
-        as: 'creator',
-        attributes: ['user_id', 'nickname']
-      }]
+      include: [
+        {
+          model: User,
+          as: 'creator',
+          attributes: ['user_id', 'nickname']
+        }
+      ]
     })
 
     // 更新查看次数（仅对前10条公告）
@@ -70,11 +67,15 @@ router.get('/announcements', dataAccessControl, async (req, res) => {
       dataLevel
     )
 
-    return ApiResponse.success(res, {
-      announcements: sanitizedData,
-      total: announcements.length,
-      has_more: announcements.length === parseInt(limit)
-    }, '获取系统公告成功')
+    return ApiResponse.success(
+      res,
+      {
+        announcements: sanitizedData,
+        total: announcements.length,
+        has_more: announcements.length === parseInt(limit)
+      },
+      '获取系统公告成功'
+    )
   } catch (error) {
     console.error('获取系统公告失败:', error)
     return ApiResponse.error(res, '获取系统公告失败', 500)
@@ -104,11 +105,13 @@ router.get('/announcements/home', dataAccessControl, async (req, res) => {
         ['created_at', 'DESC']
       ],
       limit: 5,
-      include: [{
-        model: User,
-        as: 'creator',
-        attributes: ['user_id', 'nickname']
-      }]
+      include: [
+        {
+          model: User,
+          as: 'creator',
+          attributes: ['user_id', 'nickname']
+        }
+      ]
     })
 
     // 更新查看次数
@@ -121,9 +124,13 @@ router.get('/announcements/home', dataAccessControl, async (req, res) => {
       dataLevel
     )
 
-    return ApiResponse.success(res, {
-      announcements: sanitizedData
-    }, '获取首页公告成功')
+    return ApiResponse.success(
+      res,
+      {
+        announcements: sanitizedData
+      },
+      '获取首页公告成功'
+    )
   } catch (error) {
     console.error('获取首页公告失败:', error)
     return ApiResponse.error(res, '获取首页公告失败', 500)
@@ -137,12 +144,7 @@ router.get('/announcements/home', dataAccessControl, async (req, res) => {
  */
 router.post('/feedback', authenticateToken, async (req, res) => {
   try {
-    const {
-      category = 'other',
-      content,
-      priority = 'medium',
-      attachments = null
-    } = req.body
+    const { category = 'other', content, priority = 'medium', attachments = null } = req.body
 
     // 验证必需参数
     if (!content || content.trim().length === 0) {
@@ -183,9 +185,13 @@ router.post('/feedback', authenticateToken, async (req, res) => {
     // 返回脱敏后的数据
     const sanitizedFeedback = DataSanitizer.sanitizeFeedbacks([feedback.toJSON()], 'public')[0]
 
-    return ApiResponse.success(res, {
-      feedback: sanitizedFeedback
-    }, '反馈提交成功')
+    return ApiResponse.success(
+      res,
+      {
+        feedback: sanitizedFeedback
+      },
+      '反馈提交成功'
+    )
   } catch (error) {
     console.error('提交反馈失败:', error)
     if (error.name === 'SequelizeValidationError') {
@@ -202,11 +208,7 @@ router.post('/feedback', authenticateToken, async (req, res) => {
  */
 router.get('/feedback/my', authenticateToken, async (req, res) => {
   try {
-    const {
-      status = null,
-      limit = 10,
-      offset = 0
-    } = req.query
+    const { status = null, limit = 10, offset = 0 } = req.query
 
     const whereClause = { user_id: req.user.user_id }
     if (status && status !== 'all') {
@@ -218,12 +220,14 @@ router.get('/feedback/my', authenticateToken, async (req, res) => {
       order: [['created_at', 'DESC']],
       limit: Math.min(parseInt(limit), 50),
       offset: parseInt(offset),
-      include: [{
-        model: User,
-        as: 'admin',
-        attributes: ['user_id', 'nickname'],
-        required: false
-      }]
+      include: [
+        {
+          model: User,
+          as: 'admin',
+          attributes: ['user_id', 'nickname'],
+          required: false
+        }
+      ]
     })
 
     // 数据脱敏处理
@@ -232,10 +236,14 @@ router.get('/feedback/my', authenticateToken, async (req, res) => {
       'public'
     )
 
-    return ApiResponse.success(res, {
-      feedbacks: sanitizedData,
-      total: feedbacks.length
-    }, '获取反馈列表成功')
+    return ApiResponse.success(
+      res,
+      {
+        feedbacks: sanitizedData,
+        total: feedbacks.length
+      },
+      '获取反馈列表成功'
+    )
   } catch (error) {
     console.error('获取反馈列表失败:', error)
     return ApiResponse.error(res, '获取反馈列表失败', 500)
@@ -349,11 +357,7 @@ router.get('/status', dataAccessControl, async (req, res) => {
 
     // 管理员可见的详细信息
     if (dataLevel === 'full') {
-      const [
-        totalUsers,
-        totalAnnouncements,
-        pendingFeedbacks
-      ] = await Promise.all([
+      const [totalUsers, totalAnnouncements, pendingFeedbacks] = await Promise.all([
         User.count(),
         SystemAnnouncement.count({ where: { is_active: true } }),
         Feedback.count({ where: { status: 'pending' } })
@@ -366,9 +370,13 @@ router.get('/status', dataAccessControl, async (req, res) => {
       }
     }
 
-    return ApiResponse.success(res, {
-      system: systemStatus
-    }, '获取系统状态成功')
+    return ApiResponse.success(
+      res,
+      {
+        system: systemStatus
+      },
+      '获取系统状态成功'
+    )
   } catch (error) {
     console.error('获取系统状态失败:', error)
     return ApiResponse.error(res, '获取系统状态失败', 500)
@@ -382,10 +390,10 @@ router.get('/status', dataAccessControl, async (req, res) => {
  */
 router.post('/chat/create', authenticateToken, async (req, res) => {
   try {
-    const { CustomerSession } = require('../../models')
+    const { CustomerServiceSession } = require('../../models')
 
     // 检查是否已有未关闭的会话（waiting/assigned/active状态）
-    const existingSession = await CustomerSession.findOne({
+    const existingSession = await CustomerServiceSession.findOne({
       where: {
         user_id: req.user.user_id,
         status: ['waiting', 'assigned', 'active']
@@ -394,17 +402,21 @@ router.post('/chat/create', authenticateToken, async (req, res) => {
     })
 
     if (existingSession) {
-      return ApiResponse.success(res, {
-        session_id: existingSession.session_id,
-        status: existingSession.status,
-        source: existingSession.source,
-        created_at: existingSession.created_at
-      }, '使用现有会话')
+      return ApiResponse.success(
+        res,
+        {
+          session_id: existingSession.session_id,
+          status: existingSession.status,
+          source: existingSession.source,
+          created_at: existingSession.created_at
+        },
+        '使用现有会话'
+      )
     }
 
     // 创建新会话，初始状态为waiting（等待客服接单）
     // session_id 现在是BIGINT AUTO_INCREMENT主键，不再手动赋值
-    const session = await CustomerSession.create({
+    const session = await CustomerServiceSession.create({
       user_id: req.user.user_id,
       status: 'waiting',
       source: 'mobile', // 默认来源为mobile
@@ -412,12 +424,16 @@ router.post('/chat/create', authenticateToken, async (req, res) => {
       created_at: BeijingTimeHelper.createBeijingTime()
     })
 
-    return ApiResponse.success(res, {
-      session_id: session.session_id,
-      status: session.status,
-      source: session.source,
-      created_at: session.created_at
-    }, '聊天会话创建成功')
+    return ApiResponse.success(
+      res,
+      {
+        session_id: session.session_id,
+        status: session.status,
+        source: session.source,
+        created_at: session.created_at
+      },
+      '聊天会话创建成功'
+    )
   } catch (error) {
     console.error('创建聊天会话失败:', error)
     return ApiResponse.error(res, '创建聊天会话失败', 500)
@@ -431,17 +447,19 @@ router.post('/chat/create', authenticateToken, async (req, res) => {
  */
 router.get('/chat/sessions', authenticateToken, async (req, res) => {
   try {
-    const { CustomerSession, ChatMessage } = require('../../models')
+    const { CustomerServiceSession, ChatMessage } = require('../../models')
 
-    const sessions = await CustomerSession.findAll({
+    const sessions = await CustomerServiceSession.findAll({
       where: { user_id: req.user.user_id },
-      include: [{
-        model: ChatMessage,
-        as: 'messages',
-        limit: 1,
-        order: [['created_at', 'DESC']],
-        required: false
-      }],
+      include: [
+        {
+          model: ChatMessage,
+          as: 'messages',
+          limit: 1,
+          order: [['created_at', 'DESC']],
+          required: false
+        }
+      ],
       order: [['created_at', 'DESC']],
       limit: 10
     })
@@ -464,9 +482,13 @@ router.get('/chat/sessions', authenticateToken, async (req, res) => {
       }
     })
 
-    return ApiResponse.success(res, {
-      sessions: sessionData
-    }, '获取会话列表成功')
+    return ApiResponse.success(
+      res,
+      {
+        sessions: sessionData
+      },
+      '获取会话列表成功'
+    )
   } catch (error) {
     console.error('获取会话列表失败:', error)
     return ApiResponse.error(res, '获取会话列表失败', 500)
@@ -482,10 +504,10 @@ router.get('/chat/history/:sessionId', authenticateToken, async (req, res) => {
   try {
     const { sessionId } = req.params
     const { page = 1, limit = 50 } = req.query
-    const { ChatMessage, CustomerSession } = require('../../models')
+    const { ChatMessage, CustomerServiceSession } = require('../../models')
 
     // 验证会话权限
-    const session = await CustomerSession.findOne({
+    const session = await CustomerServiceSession.findOne({
       where: {
         session_id: sessionId,
         user_id: req.user.user_id
@@ -503,23 +525,29 @@ router.get('/chat/history/:sessionId', authenticateToken, async (req, res) => {
       order: [['created_at', 'DESC']],
       limit: parseInt(limit),
       offset,
-      include: [{
-        model: User,
-        as: 'sender',
-        attributes: ['user_id', 'nickname'],
-        required: false
-      }]
+      include: [
+        {
+          model: User,
+          as: 'sender',
+          attributes: ['user_id', 'nickname'],
+          required: false
+        }
+      ]
     })
 
-    return ApiResponse.success(res, {
-      messages: messages.reverse().map(msg => msg.toJSON()),
-      pagination: {
-        total: count,
-        page: parseInt(page),
-        limit: parseInt(limit),
-        total_pages: Math.ceil(count / limit)
-      }
-    }, '获取聊天历史成功')
+    return ApiResponse.success(
+      res,
+      {
+        messages: messages.reverse().map(msg => msg.toJSON()),
+        pagination: {
+          total: count,
+          page: parseInt(page),
+          limit: parseInt(limit),
+          total_pages: Math.ceil(count / limit)
+        }
+      },
+      '获取聊天历史成功'
+    )
   } catch (error) {
     console.error('获取聊天历史失败:', error)
     return ApiResponse.error(res, '获取聊天历史失败', 500)
@@ -534,7 +562,7 @@ router.get('/chat/history/:sessionId', authenticateToken, async (req, res) => {
 router.post('/chat/send', authenticateToken, async (req, res) => {
   try {
     const { session_id, content, message_type = 'text' } = req.body
-    const { ChatMessage, CustomerSession } = require('../../models')
+    const { ChatMessage, CustomerServiceSession } = require('../../models')
 
     // 验证参数
     if (!session_id || !content) {
@@ -546,7 +574,7 @@ router.post('/chat/send', authenticateToken, async (req, res) => {
     }
 
     // 验证会话权限
-    const session = await CustomerSession.findOne({
+    const session = await CustomerServiceSession.findOne({
       where: {
         session_id,
         user_id: req.user.user_id
@@ -615,13 +643,17 @@ router.post('/chat/send', authenticateToken, async (req, res) => {
       console.log('✅ 消息已保存到数据库，稍后可通过轮询获取')
     }
 
-    return ApiResponse.success(res, {
-      message_id: message.message_id, // 使用正确的字段名message_id
-      session_id,
-      content: message.content,
-      message_type: message.message_type,
-      sent_at: message.created_at
-    }, '消息发送成功')
+    return ApiResponse.success(
+      res,
+      {
+        message_id: message.message_id, // 使用正确的字段名message_id
+        session_id,
+        content: message.content,
+        message_type: message.message_type,
+        sent_at: message.created_at
+      },
+      '消息发送成功'
+    )
   } catch (error) {
     console.error('发送消息失败:', error)
     return ApiResponse.error(res, '发送消息失败', 500)
@@ -636,7 +668,7 @@ router.post('/chat/send', authenticateToken, async (req, res) => {
 router.post('/chat/admin-reply', authenticateToken, async (req, res) => {
   try {
     const { session_id, content, message_type = 'text' } = req.body
-    const { ChatMessage, CustomerSession } = require('../../models')
+    const { ChatMessage, CustomerServiceSession } = require('../../models')
     const BeijingTimeHelper = require('../../utils/timeHelper') // ✅ 修复：正确的路径
 
     // 验证管理员权限（基于role_level）
@@ -654,7 +686,7 @@ router.post('/chat/admin-reply', authenticateToken, async (req, res) => {
     }
 
     // 验证会话是否存在
-    const session = await CustomerSession.findOne({
+    const session = await CustomerServiceSession.findOne({
       where: { session_id }
     })
 
@@ -760,69 +792,94 @@ router.get('/user/statistics/:user_id', authenticateToken, dataAccessControl, as
     const dataLevel = isAdmin ? 'full' : 'public'
 
     // 并行查询各种统计数据
-    const [
-      userInfo,
-      lotteryStats,
-      inventoryStats,
-      pointsStats,
-      exchangeStats,
-      uploadStats
-    ] = await Promise.all([
-      // 基本用户信息
-      User.findByPk(user_id, {
-        attributes: ['user_id', 'nickname', 'created_at', 'updated_at']
-      }),
+    const [userInfo, lotteryStats, inventoryStats, pointsStats, exchangeStats, uploadStats] =
+      await Promise.all([
+        // 基本用户信息
+        User.findByPk(user_id, {
+          attributes: ['user_id', 'nickname', 'created_at', 'updated_at']
+        }),
 
-      // 抽奖统计
-      require('../models').LotteryDraw.findAll({
-        where: { user_id },
-        attributes: [
-          [require('sequelize').fn('COUNT', require('sequelize').col('*')), 'total_draws'],
-          [require('sequelize').fn('COUNT', require('sequelize').literal('CASE WHEN prize_won = true THEN 1 END')), 'winning_draws']
-        ],
-        raw: true
-      }),
+        // 抽奖统计
+        require('../models').LotteryDraw.findAll({
+          where: { user_id },
+          attributes: [
+            [require('sequelize').fn('COUNT', require('sequelize').col('*')), 'total_draws'],
+            [
+              require('sequelize').fn(
+                'COUNT',
+                require('sequelize').literal('CASE WHEN prize_won = true THEN 1 END')
+              ),
+              'winning_draws'
+            ]
+          ],
+          raw: true
+        }),
 
-      // 库存统计
-      require('../models').UserInventory.findAll({
-        where: { user_id },
-        attributes: [
-          [require('sequelize').fn('COUNT', require('sequelize').col('*')), 'total_items'],
-          [require('sequelize').fn('COUNT', require('sequelize').literal('CASE WHEN status = "available" THEN 1 END')), 'available_items']
-        ],
-        raw: true
-      }),
+        // 库存统计
+        require('../models').UserInventory.findAll({
+          where: { user_id },
+          attributes: [
+            [require('sequelize').fn('COUNT', require('sequelize').col('*')), 'total_items'],
+            [
+              require('sequelize').fn(
+                'COUNT',
+                require('sequelize').literal('CASE WHEN status = "available" THEN 1 END')
+              ),
+              'available_items'
+            ]
+          ],
+          raw: true
+        }),
 
-      // 积分统计
-      require('../models').PointsTransaction.findAll({
-        where: { user_id },
-        attributes: [
-          [require('sequelize').fn('SUM', require('sequelize').literal('CASE WHEN transaction_type = "earn" THEN points ELSE 0 END')), 'total_earned'],
-          [require('sequelize').fn('SUM', require('sequelize').literal('CASE WHEN transaction_type = "consume" THEN points ELSE 0 END')), 'total_consumed'],
-          [require('sequelize').fn('COUNT', require('sequelize').col('*')), 'total_transactions']
-        ],
-        raw: true
-      }),
+        // 积分统计
+        require('../models').PointsTransaction.findAll({
+          where: { user_id },
+          attributes: [
+            [
+              require('sequelize').fn(
+                'SUM',
+                require('sequelize').literal(
+                  'CASE WHEN transaction_type = "earn" THEN points ELSE 0 END'
+                )
+              ),
+              'total_earned'
+            ],
+            [
+              require('sequelize').fn(
+                'SUM',
+                require('sequelize').literal(
+                  'CASE WHEN transaction_type = "consume" THEN points ELSE 0 END'
+                )
+              ),
+              'total_consumed'
+            ],
+            [require('sequelize').fn('COUNT', require('sequelize').col('*')), 'total_transactions']
+          ],
+          raw: true
+        }),
 
-      // 兑换统计
-      require('../models').ExchangeRecords.findAll({
-        where: { user_id },
-        attributes: [
-          [require('sequelize').fn('COUNT', require('sequelize').col('*')), 'total_exchanges'],
-          [require('sequelize').fn('SUM', require('sequelize').col('total_points')), 'total_points_spent'] // ✅ 修复：使用正确的字段名total_points
-        ],
-        raw: true
-      }),
+        // 兑换统计
+        require('../models').ExchangeRecords.findAll({
+          where: { user_id },
+          attributes: [
+            [require('sequelize').fn('COUNT', require('sequelize').col('*')), 'total_exchanges'],
+            [
+              require('sequelize').fn('SUM', require('sequelize').col('total_points')),
+              'total_points_spent'
+            ] // ✅ 修复：使用正确的字段名total_points
+          ],
+          raw: true
+        }),
 
-      // 上传统计（如果有相关表）
-      require('../models').ImageResources.findAll({
-        where: { user_id },
-        attributes: [
-          [require('sequelize').fn('COUNT', require('sequelize').col('*')), 'total_uploads']
-        ],
-        raw: true
-      })
-    ])
+        // 上传统计（如果有相关表）
+        require('../models').ImageResources.findAll({
+          where: { user_id },
+          attributes: [
+            [require('sequelize').fn('COUNT', require('sequelize').col('*')), 'total_uploads']
+          ],
+          raw: true
+        })
+      ])
 
     if (!userInfo) {
       return ApiResponse.error(res, '用户不存在', 404)
@@ -837,9 +894,12 @@ router.get('/user/statistics/:user_id', authenticateToken, dataAccessControl, as
       // 抽奖统计
       lottery_count: parseInt(lotteryStats[0]?.total_draws || 0),
       lottery_wins: parseInt(lotteryStats[0]?.winning_draws || 0),
-      lottery_win_rate: lotteryStats[0]?.total_draws > 0
-        ? ((lotteryStats[0]?.winning_draws || 0) / lotteryStats[0]?.total_draws * 100).toFixed(1) + '%'
-        : '0%',
+      lottery_win_rate:
+        lotteryStats[0]?.total_draws > 0
+          ? (((lotteryStats[0]?.winning_draws || 0) / lotteryStats[0]?.total_draws) * 100).toFixed(
+            1
+          ) + '%'
+          : '0%',
 
       // 库存统计
       inventory_total: parseInt(inventoryStats[0]?.total_items || 0),
@@ -848,7 +908,8 @@ router.get('/user/statistics/:user_id', authenticateToken, dataAccessControl, as
       // 积分统计
       total_points_earned: parseInt(pointsStats[0]?.total_earned || 0),
       total_points_consumed: parseInt(pointsStats[0]?.total_consumed || 0),
-      points_balance: (parseInt(pointsStats[0]?.total_earned || 0) - parseInt(pointsStats[0]?.total_consumed || 0)),
+      points_balance:
+        parseInt(pointsStats[0]?.total_earned || 0) - parseInt(pointsStats[0]?.total_consumed || 0),
       transaction_count: parseInt(pointsStats[0]?.total_transactions || 0),
 
       // 兑换统计
@@ -859,11 +920,14 @@ router.get('/user/statistics/:user_id', authenticateToken, dataAccessControl, as
       upload_count: parseInt(uploadStats[0]?.total_uploads || 0),
 
       // 活跃度评分（简单算法）
-      activity_score: Math.min(100, Math.floor(
-        (parseInt(lotteryStats[0]?.total_draws || 0) * 2) +
-        (parseInt(exchangeStats[0]?.total_exchanges || 0) * 3) +
-        (parseInt(uploadStats[0]?.total_uploads || 0) * 5)
-      )),
+      activity_score: Math.min(
+        100,
+        Math.floor(
+          parseInt(lotteryStats[0]?.total_draws || 0) * 2 +
+            parseInt(exchangeStats[0]?.total_exchanges || 0) * 3 +
+            parseInt(uploadStats[0]?.total_uploads || 0) * 5
+        )
+      ),
 
       // 成就徽章（示例）
       achievements: []
@@ -886,9 +950,13 @@ router.get('/user/statistics/:user_id', authenticateToken, dataAccessControl, as
     // 数据脱敏处理
     const sanitizedStatistics = DataSanitizer.sanitizeUserStatistics(statistics, dataLevel)
 
-    return ApiResponse.success(res, {
-      statistics: sanitizedStatistics
-    }, '获取用户统计成功')
+    return ApiResponse.success(
+      res,
+      {
+        statistics: sanitizedStatistics
+      },
+      '获取用户统计成功'
+    )
   } catch (error) {
     console.error('获取用户统计失败:', error)
     return ApiResponse.error(res, '获取用户统计失败', 500)
@@ -907,18 +975,27 @@ router.get('/admin/overview', authenticateToken, dataAccessControl, async (req, 
     }
 
     // 并行查询系统统计数据
-    const [
-      userStats,
-      lotteryStats,
-      pointsStats,
-      systemHealth
-    ] = await Promise.all([
+    const [userStats, lotteryStats, pointsStats, systemHealth] = await Promise.all([
       // 用户统计
       User.findAll({
         attributes: [
           [require('sequelize').fn('COUNT', require('sequelize').col('*')), 'total_users'],
-          [require('sequelize').fn('COUNT', require('sequelize').literal('CASE WHEN DATE(created_at) = CURDATE() THEN 1 END')), 'new_users_today'],
-          [require('sequelize').fn('COUNT', require('sequelize').literal('CASE WHEN updated_at >= DATE_SUB(NOW(), INTERVAL 24 HOUR) THEN 1 END')), 'active_users_24h']
+          [
+            require('sequelize').fn(
+              'COUNT',
+              require('sequelize').literal('CASE WHEN DATE(created_at) = CURDATE() THEN 1 END')
+            ),
+            'new_users_today'
+          ],
+          [
+            require('sequelize').fn(
+              'COUNT',
+              require('sequelize').literal(
+                'CASE WHEN updated_at >= DATE_SUB(NOW(), INTERVAL 24 HOUR) THEN 1 END'
+              )
+            ),
+            'active_users_24h'
+          ]
         ],
         raw: true
       }),
@@ -927,8 +1004,20 @@ router.get('/admin/overview', authenticateToken, dataAccessControl, async (req, 
       require('../models').LotteryDraw.findAll({
         attributes: [
           [require('sequelize').fn('COUNT', require('sequelize').col('*')), 'total_draws'],
-          [require('sequelize').fn('COUNT', require('sequelize').literal('CASE WHEN DATE(created_at) = CURDATE() THEN 1 END')), 'draws_today'],
-          [require('sequelize').fn('COUNT', require('sequelize').literal('CASE WHEN prize_won = true THEN 1 END')), 'total_wins']
+          [
+            require('sequelize').fn(
+              'COUNT',
+              require('sequelize').literal('CASE WHEN DATE(created_at) = CURDATE() THEN 1 END')
+            ),
+            'draws_today'
+          ],
+          [
+            require('sequelize').fn(
+              'COUNT',
+              require('sequelize').literal('CASE WHEN prize_won = true THEN 1 END')
+            ),
+            'total_wins'
+          ]
         ],
         raw: true
       }),
@@ -936,9 +1025,31 @@ router.get('/admin/overview', authenticateToken, dataAccessControl, async (req, 
       // 积分统计
       require('../models').PointsTransaction.findAll({
         attributes: [
-          [require('sequelize').fn('SUM', require('sequelize').literal('CASE WHEN transaction_type = "earn" THEN points ELSE 0 END')), 'total_points_issued'],
-          [require('sequelize').fn('SUM', require('sequelize').literal('CASE WHEN transaction_type = "consume" THEN points ELSE 0 END')), 'total_points_consumed'],
-          [require('sequelize').fn('COUNT', require('sequelize').literal('CASE WHEN DATE(created_at) = CURDATE() THEN 1 END')), 'transactions_today']
+          [
+            require('sequelize').fn(
+              'SUM',
+              require('sequelize').literal(
+                'CASE WHEN transaction_type = "earn" THEN points ELSE 0 END'
+              )
+            ),
+            'total_points_issued'
+          ],
+          [
+            require('sequelize').fn(
+              'SUM',
+              require('sequelize').literal(
+                'CASE WHEN transaction_type = "consume" THEN points ELSE 0 END'
+              )
+            ),
+            'total_points_consumed'
+          ],
+          [
+            require('sequelize').fn(
+              'COUNT',
+              require('sequelize').literal('CASE WHEN DATE(created_at) = CURDATE() THEN 1 END')
+            ),
+            'transactions_today'
+          ]
         ],
         raw: true
       }),
@@ -966,9 +1077,12 @@ router.get('/admin/overview', authenticateToken, dataAccessControl, async (req, 
         total_draws: parseInt(lotteryStats[0]?.total_draws || 0),
         draws_today: parseInt(lotteryStats[0]?.draws_today || 0),
         total_wins: parseInt(lotteryStats[0]?.total_wins || 0),
-        win_rate: lotteryStats[0]?.total_draws > 0
-          ? ((lotteryStats[0]?.total_wins || 0) / lotteryStats[0]?.total_draws * 100).toFixed(1) + '%'
-          : '0%'
+        win_rate:
+          lotteryStats[0]?.total_draws > 0
+            ? (((lotteryStats[0]?.total_wins || 0) / lotteryStats[0]?.total_draws) * 100).toFixed(
+              1
+            ) + '%'
+            : '0%'
       },
 
       // 积分数据
@@ -976,9 +1090,14 @@ router.get('/admin/overview', authenticateToken, dataAccessControl, async (req, 
         total_issued: parseInt(pointsStats[0]?.total_points_issued || 0),
         total_consumed: parseInt(pointsStats[0]?.total_points_consumed || 0),
         transactions_today: parseInt(pointsStats[0]?.transactions_today || 0),
-        circulation_rate: pointsStats[0]?.total_points_issued > 0
-          ? ((pointsStats[0]?.total_points_consumed || 0) / pointsStats[0]?.total_points_issued * 100).toFixed(1) + '%'
-          : '0%'
+        circulation_rate:
+          pointsStats[0]?.total_points_issued > 0
+            ? (
+              ((pointsStats[0]?.total_points_consumed || 0) /
+                  pointsStats[0]?.total_points_issued) *
+                100
+            ).toFixed(1) + '%'
+            : '0%'
       },
 
       // 系统状态
@@ -994,9 +1113,13 @@ router.get('/admin/overview', authenticateToken, dataAccessControl, async (req, 
     // 管理员看完整数据，无需脱敏
     const sanitizedOverview = DataSanitizer.sanitizeSystemOverview(overview, 'full')
 
-    return ApiResponse.success(res, {
-      overview: sanitizedOverview
-    }, '获取系统概览成功')
+    return ApiResponse.success(
+      res,
+      {
+        overview: sanitizedOverview
+      },
+      '获取系统概览成功'
+    )
   } catch (error) {
     console.error('获取系统概览失败:', error)
     return ApiResponse.error(res, '获取系统概览失败', 500)
@@ -1019,7 +1142,7 @@ router.get('/admin/chat/sessions', authenticateToken, async (req, res) => {
     }
 
     const { page = 1, limit = 20, status = 'all', type = 'all' } = req.query
-    const { CustomerSession, ChatMessage, User } = require('../../models')
+    const { CustomerServiceSession, ChatMessage, User } = require('../../models')
 
     // 构建查询条件
     const whereClause = {}
@@ -1031,7 +1154,7 @@ router.get('/admin/chat/sessions', authenticateToken, async (req, res) => {
     }
 
     // 获取聊天会话列表
-    const { count, rows: sessions } = await CustomerSession.findAndCountAll({
+    const { count, rows: sessions } = await CustomerServiceSession.findAndCountAll({
       where: whereClause,
       include: [
         {
@@ -1091,9 +1214,10 @@ router.get('/admin/chat/sessions', authenticateToken, async (req, res) => {
         updated_at: session.updated_at,
         last_message: lastMessage
           ? {
-            content: lastMessage.content.length > 50
-              ? lastMessage.content.substring(0, 50) + '...'
-              : lastMessage.content,
+            content:
+                lastMessage.content.length > 50
+                  ? lastMessage.content.substring(0, 50) + '...'
+                  : lastMessage.content,
             sender_type: lastMessage.sender_type,
             created_at: lastMessage.created_at
           }
@@ -1109,19 +1233,23 @@ router.get('/admin/chat/sessions', authenticateToken, async (req, res) => {
       type
     })
 
-    return ApiResponse.success(res, {
-      sessions: formattedSessions,
-      pagination: {
-        current_page: parseInt(page),
-        total_pages: Math.ceil(count / parseInt(limit)),
-        total_count: count,
-        has_next: count > parseInt(page) * parseInt(limit)
+    return ApiResponse.success(
+      res,
+      {
+        sessions: formattedSessions,
+        pagination: {
+          current_page: parseInt(page),
+          total_pages: Math.ceil(count / parseInt(limit)),
+          total_count: count,
+          has_next: count > parseInt(page) * parseInt(limit)
+        },
+        filters: {
+          status,
+          type
+        }
       },
-      filters: {
-        status,
-        type
-      }
-    }, '管理员聊天会话列表获取成功')
+      '管理员聊天会话列表获取成功'
+    )
   } catch (error) {
     console.error('管理员获取聊天会话列表失败:', error)
     return ApiResponse.error(res, '获取聊天会话列表失败', 500)
@@ -1145,10 +1273,10 @@ router.put('/admin/chat/sessions/:sessionId/assign', authenticateToken, async (r
 
     const { sessionId } = req.params
     const { admin_id } = req.body
-    const { CustomerSession } = require('../../models')
+    const { CustomerServiceSession } = require('../../models')
 
     // 查找会话
-    const session = await CustomerSession.findOne({
+    const session = await CustomerServiceSession.findOne({
       where: { session_id: sessionId }
     })
 
@@ -1165,11 +1293,15 @@ router.put('/admin/chat/sessions/:sessionId/assign', authenticateToken, async (r
 
     console.log(`管理员 ${req.user.user_id} 分配会话 ${sessionId} 给管理员 ${admin_id}`)
 
-    return ApiResponse.success(res, {
-      session_id: sessionId,
-      admin_id,
-      status: session.status
-    }, '会话分配成功')
+    return ApiResponse.success(
+      res,
+      {
+        session_id: sessionId,
+        admin_id,
+        status: session.status
+      },
+      '会话分配成功'
+    )
   } catch (error) {
     console.error('管理员分配聊天会话失败:', error)
     return ApiResponse.error(res, '分配聊天会话失败', 500)
@@ -1193,10 +1325,10 @@ router.put('/admin/chat/sessions/:sessionId/close', authenticateToken, async (re
 
     const { sessionId } = req.params
     const { close_reason = '管理员关闭' } = req.body
-    const { CustomerSession, ChatMessage } = require('../../models')
+    const { CustomerServiceSession, ChatMessage } = require('../../models')
 
     // 查找会话
-    const session = await CustomerSession.findOne({
+    const session = await CustomerServiceSession.findOne({
       where: { session_id: sessionId }
     })
 
@@ -1229,12 +1361,16 @@ router.put('/admin/chat/sessions/:sessionId/close', authenticateToken, async (re
 
     console.log(`管理员 ${req.user.user_id} 关闭会话 ${sessionId}，原因：${close_reason}`)
 
-    return ApiResponse.success(res, {
-      session_id: sessionId,
-      status: 'closed',
-      closed_at: session.closed_at,
-      close_reason
-    }, '会话关闭成功')
+    return ApiResponse.success(
+      res,
+      {
+        session_id: sessionId,
+        status: 'closed',
+        closed_at: session.closed_at,
+        close_reason
+      },
+      '会话关闭成功'
+    )
   } catch (error) {
     console.error('管理员关闭聊天会话失败:', error)
     return ApiResponse.error(res, '关闭聊天会话失败', 500)
@@ -1256,7 +1392,7 @@ router.get('/admin/chat/stats', authenticateToken, async (req, res) => {
       return ApiResponse.error(res, '权限不足，仅管理员可访问', 403)
     }
 
-    const { CustomerSession, ChatMessage } = require('../../models')
+    const { CustomerServiceSession, ChatMessage } = require('../../models')
     const BeijingTimeHelper = require('../../utils/timeHelper')
 
     // 获取今日时间范围
@@ -1273,15 +1409,15 @@ router.get('/admin/chat/stats', authenticateToken, async (req, res) => {
       sessionsByStatus
     ] = await Promise.all([
       // 总会话数
-      CustomerSession.count(),
+      CustomerServiceSession.count(),
 
       // 活跃会话数（waiting/assigned/active状态）
-      CustomerSession.count({
+      CustomerServiceSession.count({
         where: { status: ['waiting', 'assigned', 'active'] }
       }),
 
       // 今日新会话
-      CustomerSession.count({
+      CustomerServiceSession.count({
         where: {
           created_at: {
             [Op.gte]: todayStart,
@@ -1304,11 +1440,8 @@ router.get('/admin/chat/stats', authenticateToken, async (req, res) => {
       60, // TODO: 实现真实的响应时间计算
 
       // 按状态分组统计
-      CustomerSession.findAll({
-        attributes: [
-          'status',
-          [CustomerSession.sequelize.fn('COUNT', '*'), 'count']
-        ],
+      CustomerServiceSession.findAll({
+        attributes: ['status', [CustomerServiceSession.sequelize.fn('COUNT', '*'), 'count']],
         group: ['status'],
         raw: true
       })

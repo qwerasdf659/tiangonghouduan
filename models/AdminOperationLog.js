@@ -1,30 +1,30 @@
 /**
- * 餐厅积分抽奖系统 V4.0 - 操作审计日志模型（AuditLog）
+ * 餐厅积分抽奖系统 V4.0 - 管理员操作日志模型（AdminOperationLog）
  *
  * ⚠️⚠️⚠️ 重要区分说明 ⚠️⚠️⚠️
- * 本模型是 AuditLog（操作审计日志），不是 AuditRecord（内容审核记录）
+ * 本模型是 AdminOperationLog（管理员操作日志），不是 ContentReviewRecord（内容审核记录）
  *
- * 📋 AuditLog vs AuditRecord 核心区别：
+ * 📋 AdminOperationLog vs ContentReviewRecord 核心区别：
  *
- * ✅ AuditLog（本模型）：操作审计日志 - 追溯管理员操作历史
+ * ✅ AdminOperationLog（本模型）：管理员操作日志 - 追溯管理员操作历史
  *    - 概念：记录"谁在什么时候做了什么操作"的日志
  *    - 特点：只增不改，永久保存，用于安全审计和责任追溯
  *    - 数据状态：不可修改、不可删除（immutable）
  *    - 业务流程：无状态变化，写入后就是最终状态
  *    - 典型字段：operator_id（操作员）、operation_type（操作类型）、before_data/after_data（前后数据对比）
- *    - 表名：audit_logs，主键：log_id
+ *    - 表名：admin_operation_logs，主键：log_id
  *
- * ❌ AuditRecord（另一个模型）：内容审核记录 - 管理业务审核流程
+ * ❌ ContentReviewRecord（另一个模型）：内容审核记录 - 管理业务审核流程
  *    - 概念：记录"需要人工审核的业务内容"的审核状态
  *    - 特点：有状态流转，可修改状态（pending→approved/rejected）
  *    - 数据状态：可修改审核状态和审核意见
  *    - 业务流程：pending（待审核）→ approved/rejected（已审核）
  *    - 典型字段：auditor_id（审核员）、audit_status（审核状态）、audit_reason（审核意见）
- *    - 表名：audit_records，主键：audit_id
+ *    - 表名：content_review_records，主键：audit_id
  *
  * 📌 记忆口诀：
- * - AuditLog = 操作日志 = 追溯历史 = 只增不改 = 谁做了什么
- * - AuditRecord = 审核记录 = 流程管理 = 状态流转 = 待审核→已审核
+ * - AdminOperationLog = 管理员操作日志 = 追溯历史 = 只增不改 = 谁做了什么
+ * - ContentReviewRecord = 内容审核记录 = 流程管理 = 状态流转 = 待审核→已审核
  *
  * 功能说明：
  * - 记录所有敏感操作的审计日志
@@ -52,8 +52,8 @@ const { DataTypes } = require('sequelize')
 const BeijingTimeHelper = require('../utils/timeHelper')
 
 module.exports = sequelize => {
-  const AuditLog = sequelize.define(
-    'AuditLog',
+  const AdminOperationLog = sequelize.define(
+    'AdminOperationLog',
     {
       // 主键
       log_id: {
@@ -131,7 +131,8 @@ module.exports = sequelize => {
       changed_fields: {
         type: DataTypes.JSON,
         allowNull: true,
-        comment: '变更字段列表（仅包含实际变更的字段，格式: [{field: "field_name", old_value: ..., new_value: ...}]）'
+        comment:
+          '变更字段列表（仅包含实际变更的字段，格式: [{field: "field_name", old_value: ..., new_value: ...}]）'
       },
 
       // 操作原因
@@ -173,8 +174,8 @@ module.exports = sequelize => {
     },
     {
       sequelize,
-      modelName: 'AuditLog',
-      tableName: 'audit_logs',
+      modelName: 'AdminOperationLog',
+      tableName: 'admin_operation_logs',
       timestamps: false, // 只有created_at，没有updated_at（审计日志不可修改）
       underscored: true,
       comment: '操作审计日志表（记录所有敏感操作）',
@@ -227,7 +228,7 @@ module.exports = sequelize => {
   /**
    * 获取操作类型描述
    */
-  AuditLog.prototype.getOperationTypeDescription = function () {
+  AdminOperationLog.prototype.getOperationTypeDescription = function () {
     const typeMap = {
       points_adjust: '积分调整',
       exchange_audit: '兑换审核',
@@ -248,7 +249,7 @@ module.exports = sequelize => {
   /**
    * 获取操作动作描述
    */
-  AuditLog.prototype.getActionDescription = function () {
+  AdminOperationLog.prototype.getActionDescription = function () {
     const actionMap = {
       create: '创建',
       update: '修改',
@@ -266,20 +267,22 @@ module.exports = sequelize => {
   /**
    * 格式化变更字段（用于展示）
    */
-  AuditLog.prototype.formatChangedFields = function () {
+  AdminOperationLog.prototype.formatChangedFields = function () {
     if (!this.changed_fields || this.changed_fields.length === 0) {
       return '无变更'
     }
 
-    return this.changed_fields.map(change => {
-      return `${change.field}: ${JSON.stringify(change.old_value)} → ${JSON.stringify(change.new_value)}`
-    }).join('; ')
+    return this.changed_fields
+      .map(change => {
+        return `${change.field}: ${JSON.stringify(change.old_value)} → ${JSON.stringify(change.new_value)}`
+      })
+      .join('; ')
   }
 
   /**
    * 获取完整的审计描述
    */
-  AuditLog.prototype.getFullDescription = function () {
+  AdminOperationLog.prototype.getFullDescription = function () {
     const operationType = this.getOperationTypeDescription()
     const action = this.getActionDescription()
     const changes = this.formatChangedFields()
@@ -290,9 +293,9 @@ module.exports = sequelize => {
   /**
    * 关联关系定义
    */
-  AuditLog.associate = function (models) {
+  AdminOperationLog.associate = function (models) {
     // 关联操作员（用户）
-    AuditLog.belongsTo(models.User, {
+    AdminOperationLog.belongsTo(models.User, {
       foreignKey: 'operator_id',
       as: 'operator',
       onUpdate: 'CASCADE',
@@ -303,7 +306,7 @@ module.exports = sequelize => {
   /**
    * 类方法：比较两个对象并生成changed_fields
    */
-  AuditLog.compareObjects = function (beforeObj, afterObj, fieldList = null) {
+  AdminOperationLog.compareObjects = function (beforeObj, afterObj, fieldList = null) {
     const changedFields = []
 
     // 如果指定了字段列表，只比较这些字段；否则比较所有字段
@@ -329,5 +332,5 @@ module.exports = sequelize => {
     return changedFields
   }
 
-  return AuditLog
+  return AdminOperationLog
 }

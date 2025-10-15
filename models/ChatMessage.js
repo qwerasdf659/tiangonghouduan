@@ -118,7 +118,7 @@ module.exports = sequelize => {
     })
 
     // 消息属于会话 - 标准外键关联
-    ChatMessage.belongsTo(models.CustomerSession, {
+    ChatMessage.belongsTo(models.CustomerServiceSession, {
       foreignKey: 'session_id',
       as: 'session'
     })

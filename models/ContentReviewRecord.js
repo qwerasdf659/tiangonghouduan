@@ -1,35 +1,35 @@
 /**
- * 餐厅积分抽奖系统 V4.0统一引擎架构 - 内容审核记录模型（AuditRecord）
+ * 餐厅积分抽奖系统 V4.0统一引擎架构 - 内容审核记录模型（ContentReviewRecord）
  *
  * ⚠️⚠️⚠️ 重要区分说明 ⚠️⚠️⚠️
- * 本模型是 AuditRecord（内容审核记录），不是 AuditLog（操作审计日志）
+ * 本模型是 ContentReviewRecord（内容审核记录），不是 AdminOperationLog（管理员操作日志）
  *
- * 📋 AuditRecord vs AuditLog 核心区别：
+ * 📋 ContentReviewRecord vs AdminOperationLog 核心区别：
  *
- * ✅ AuditRecord（本模型）：内容审核记录 - 管理业务审核流程
+ * ✅ ContentReviewRecord（本模型）：内容审核记录 - 管理业务审核流程
  *    - 概念：记录"需要人工审核的业务内容"的审核状态
  *    - 特点：有状态流转，可修改状态（pending→approved/rejected）
  *    - 数据状态：可修改审核状态和审核意见
  *    - 业务流程：pending（待审核）→ approved/rejected（已审核）
  *    - 典型字段：auditor_id（审核员）、audit_status（审核状态）、audit_reason（审核意见）
- *    - 表名：audit_records，主键：audit_id
+ *    - 表名：content_review_records，主键：audit_id
  *
- * ❌ AuditLog（另一个模型）：操作审计日志 - 追溯管理员操作历史
+ * ❌ AdminOperationLog（另一个模型）：管理员操作日志 - 追溯管理员操作历史
  *    - 概念：记录"谁在什么时候做了什么操作"的日志
  *    - 特点：只增不改，永久保存，用于安全审计和责任追溯
  *    - 数据状态：不可修改、不可删除（immutable）
  *    - 业务流程：无状态变化，写入后就是最终状态
  *    - 典型字段：operator_id（操作员）、operation_type（操作类型）、before_data/after_data（前后数据对比）
- *    - 表名：audit_logs，主键：log_id
+ *    - 表名：admin_operation_logs，主键：log_id
  *
  * 📌 记忆口诀：
- * - AuditRecord = 审核记录 = 流程管理 = 状态流转 = 待审核→已审核
- * - AuditLog = 操作日志 = 追溯历史 = 只增不改 = 谁做了什么
+ * - ContentReviewRecord = 内容审核记录 = 流程管理 = 状态流转 = 待审核→已审核
+ * - AdminOperationLog = 管理员操作日志 = 追溯历史 = 只增不改 = 谁做了什么
  *
  * 💡 实际业务示例：
- * - 用户提交兑换申请 → 创建AuditRecord（状态：pending）
- * - 管理员审核通过申请 → 更新AuditRecord（状态：approved），同时创建AuditLog记录这个审核操作
- * - 即：AuditRecord记录"申请的审核状态"，AuditLog记录"管理员的审核操作"
+ * - 用户提交兑换申请 → 创建ContentReviewRecord（状态：pending）
+ * - 管理员审核通过申请 → 更新ContentReviewRecord（状态：approved），同时创建AdminOperationLog记录这个审核操作
+ * - 即：ContentReviewRecord记录"申请的审核状态"，AdminOperationLog记录"管理员的审核操作"
  *
  * 功能说明：
  * - 提供统一的审核记录管理功能
@@ -49,8 +49,8 @@ const { DataTypes } = require('sequelize')
 const BeijingTimeHelper = require('../utils/timeHelper')
 
 module.exports = sequelize => {
-  const AuditRecord = sequelize.define(
-    'AuditRecord',
+  const ContentReviewRecord = sequelize.define(
+    'ContentReviewRecord',
     {
       // 主键
       audit_id: {
@@ -153,8 +153,8 @@ module.exports = sequelize => {
     },
     {
       sequelize,
-      modelName: 'AuditRecord',
-      tableName: 'audit_records',
+      modelName: 'ContentReviewRecord',
+      tableName: 'content_review_records',
       timestamps: true,
       createdAt: 'created_at',
       updatedAt: 'updated_at',
@@ -211,21 +211,21 @@ module.exports = sequelize => {
   /**
    * 检查是否待审核
    */
-  AuditRecord.prototype.isPending = function () {
+  ContentReviewRecord.prototype.isPending = function () {
     return this.audit_status === 'pending'
   }
 
   /**
    * 检查是否已审核
    */
-  AuditRecord.prototype.isAudited = function () {
+  ContentReviewRecord.prototype.isAudited = function () {
     return ['approved', 'rejected', 'cancelled'].includes(this.audit_status)
   }
 
   /**
    * 获取状态描述
    */
-  AuditRecord.prototype.getStatusDescription = function () {
+  ContentReviewRecord.prototype.getStatusDescription = function () {
     const statusMap = {
       pending: '待审核',
       approved: '已通过',
@@ -238,7 +238,7 @@ module.exports = sequelize => {
   /**
    * 获取优先级描述
    */
-  AuditRecord.prototype.getPriorityDescription = function () {
+  ContentReviewRecord.prototype.getPriorityDescription = function () {
     const priorityMap = {
       high: '高',
       medium: '中',
@@ -250,9 +250,9 @@ module.exports = sequelize => {
   /**
    * 关联关系定义
    */
-  AuditRecord.associate = function (models) {
+  ContentReviewRecord.associate = function (models) {
     // 关联审核员（用户）
-    AuditRecord.belongsTo(models.User, {
+    ContentReviewRecord.belongsTo(models.User, {
       foreignKey: 'auditor_id',
       as: 'auditor',
       onUpdate: 'CASCADE',
@@ -260,5 +260,5 @@ module.exports = sequelize => {
     })
   }
 
-  return AuditRecord
+  return ContentReviewRecord
 }

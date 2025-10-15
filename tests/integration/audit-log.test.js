@@ -11,23 +11,21 @@
 
 const request = require('supertest')
 const app = require('../../app')
-const { sequelize, AuditLog, ExchangeRecords } = require('../../models')
+const { sequelize, AdminOperationLog, ExchangeRecords } = require('../../models')
 
 describe('审计日志功能测试', () => {
   let adminToken
   let adminUserId
   let testExchangeId
-  let testAuditLogId
+  let testAdminOperationLogId
 
   // 测试前准备
   beforeAll(async () => {
     // 1. 获取管理员token
-    const loginRes = await request(app)
-      .post('/api/v4/unified-engine/auth/login')
-      .send({
-        mobile: '13612227930',
-        code: '123456'
-      })
+    const loginRes = await request(app).post('/api/v4/unified-engine/auth/login').send({
+      mobile: '13612227930',
+      code: '123456'
+    })
 
     if (!loginRes.body.success || !loginRes.body.data.access_token) {
       console.log('登录失败，跳过审计日志测试')
@@ -81,7 +79,7 @@ describe('审计日志功能测试', () => {
       // 查询审计日志
       await new Promise(resolve => setTimeout(resolve, 1000)) // 等待异步日志记录完成
 
-      const auditLog = await AuditLog.findOne({
+      const auditLog = await AdminOperationLog.findOne({
         where: {
           operator_id: adminUserId,
           operation_type: 'exchange_audit',
@@ -103,7 +101,7 @@ describe('审计日志功能测试', () => {
       expect(auditLog.after_data).toBeTruthy()
       expect(auditLog.changed_fields).toBeTruthy()
 
-      testAuditLogId = auditLog.log_id
+      testAdminOperationLogId = auditLog.log_id
     })
   })
 
@@ -162,18 +160,18 @@ describe('审计日志功能测试', () => {
     })
 
     test('GET /api/v4/audit-management/audit-logs/:log_id - 应该返回审计日志详情', async () => {
-      if (!testAuditLogId) {
+      if (!testAdminOperationLogId) {
         console.log('跳过测试：没有测试审计日志ID')
         return
       }
 
       const res = await request(app)
-        .get(`/api/v4/audit-management/audit-logs/${testAuditLogId}`)
+        .get(`/api/v4/audit-management/audit-logs/${testAdminOperationLogId}`)
         .set('Authorization', `Bearer ${adminToken}`)
 
       expect(res.status).toBe(200)
       expect(res.body.success).toBe(true)
-      expect(res.body.data.log_id).toBe(testAuditLogId)
+      expect(res.body.data.log_id).toBe(testAdminOperationLogId)
       expect(res.body.data.operator).toBeTruthy()
       expect(res.body.data.operator.user_id).toBe(adminUserId)
     })
@@ -209,12 +207,10 @@ describe('审计日志功能测试', () => {
   describe('审计日志权限控制', () => {
     test('非管理员不能查询审计日志', async () => {
       // 获取普通用户token
-      const userLoginRes = await request(app)
-        .post('/api/v4/unified-engine/auth/login')
-        .send({
-          mobile: '13800000000', // 假设这是普通用户
-          code: '123456'
-        })
+      const userLoginRes = await request(app).post('/api/v4/unified-engine/auth/login').send({
+        mobile: '13800000000', // 假设这是普通用户
+        code: '123456'
+      })
 
       if (userLoginRes.status === 200 && userLoginRes.body.success) {
         const userToken = userLoginRes.body.data.access_token
@@ -231,7 +227,7 @@ describe('审计日志功能测试', () => {
 
   describe('审计日志数据完整性', () => {
     test('审计日志应该包含必要的字段', async () => {
-      const log = await AuditLog.findOne({
+      const log = await AdminOperationLog.findOne({
         order: [['created_at', 'DESC']]
       })
 
@@ -247,7 +243,7 @@ describe('审计日志功能测试', () => {
     })
 
     test('审计日志应该记录操作前后数据对比', async () => {
-      const log = await AuditLog.findOne({
+      const log = await AdminOperationLog.findOne({
         where: {
           operation_type: 'exchange_audit'
         },

@@ -169,8 +169,8 @@ module.exports = sequelize => {
     }
 
     // 用户会话
-    if (models.UserSession) {
-      User.hasMany(models.UserSession, {
+    if (models.AuthenticationSession) {
+      User.hasMany(models.AuthenticationSession, {
         foreignKey: 'user_id',
         as: 'sessions'
       })

@@ -24,11 +24,11 @@ models.UserRole = require('./UserRole')(sequelize, DataTypes)
 //    - 特点：支持角色分配、激活状态管理、分配者追溯
 
 // 🔴 会话系统：两个不同的业务概念（注意区分）
-models.UserSession = require('./UserSession')(sequelize, DataTypes)
-// ✅ UserSession：用户认证会话（JWT Token生命周期管理）
+models.AuthenticationSession = require('./AuthenticationSession')(sequelize, DataTypes)
+// ✅ AuthenticationSession：用户认证会话（JWT Token生命周期管理）
 //    - 用途：管理用户登录状态和Token有效性
 //    - 特点：存储session_token、支持过期和失效管理、记录登录IP
-//    - 表名：user_sessions，主键：user_session_id
+//    - 表名：authentication_sessions，主键：user_session_id
 //    - 业务场景：用户登录后生成Token、Token续期、退出登录时失效Token
 
 // ✅ LoginLog模型已删除 - 过度设计，改用User.last_login字段统计活跃用户 - 2025年09月22日
@@ -80,13 +80,13 @@ models.TradeRecord = require('./TradeRecord')(sequelize, DataTypes)
 //    - 表名：trade_records，主键：record_id
 
 // 🔴 管理和客服系统
-models.CustomerSession = require('./CustomerSession')(sequelize, DataTypes)
-// ✅ CustomerSession：客服聊天会话（与UserSession完全不同的概念！）
+models.CustomerServiceSession = require('./CustomerServiceSession')(sequelize, DataTypes)
+// ✅ CustomerServiceSession：客服聊天会话（与AuthenticationSession完全不同的概念！）
 //    - 用途：管理用户与客服之间的聊天对话会话
 //    - 特点：会话状态（等待/分配/活跃/关闭）、客服分配、满意度评分
-//    - 表名：customer_sessions，主键：session_id，外键：user_id、admin_id
+//    - 表名：customer_service_sessions，主键：session_id，外键：user_id、admin_id
 //    - 业务场景：用户发起咨询、客服接入、消息收发、会话关闭、满意度评价
-//    - ⚠️ 与UserSession的区别：CustomerSession是聊天会话，UserSession是认证会话
+//    - ⚠️ 与AuthenticationSession的区别：CustomerServiceSession是聊天会话，AuthenticationSession是认证会话
 
 models.ChatMessage = require('./ChatMessage')(sequelize, DataTypes)
 // ✅ ChatMessage：聊天消息
@@ -113,23 +113,23 @@ models.ImageResources = require('./ImageResources')(sequelize, DataTypes)
 models.ExchangeRecords = require('./ExchangeRecords')(sequelize, DataTypes)
 
 // 🔴 审核系统：两个完全不同的业务概念（⚠️ 最容易混淆，务必区分！）
-models.AuditRecord = require('./AuditRecord')(sequelize, DataTypes)
-// ✅ AuditRecord：内容审核记录（业务审核流程管理）
+models.ContentReviewRecord = require('./ContentReviewRecord')(sequelize, DataTypes)
+// ✅ ContentReviewRecord：内容审核记录（业务审核流程管理）
 //    - 用途：管理需要人工审核的业务内容（如：兑换申请、图片审核、反馈处理）
 //    - 特点：有审核流程，状态可变更（pending→approved/rejected），有审核员
-//    - 表名：audit_records，主键：audit_id
+//    - 表名：content_review_records，主键：audit_id
 //    - 业务场景：用户提交兑换申请 → 进入待审核状态 → 管理员审核 → 通过/拒绝
 //    - 字段特点：audit_status（状态）、auditor_id（审核员）、audit_reason（审核意见）
-//    - ⚠️ 与AuditLog的区别：AuditRecord是业务审核，AuditLog是操作追溯
+//    - ⚠️ 与AdminOperationLog的区别：ContentReviewRecord是业务审核，AdminOperationLog是操作追溯
 
-models.AuditLog = require('./AuditLog')(sequelize, DataTypes)
-// ✅ AuditLog：操作审计日志（管理员操作历史追溯）
+models.AdminOperationLog = require('./AdminOperationLog')(sequelize, DataTypes)
+// ✅ AdminOperationLog：操作审计日志（管理员操作历史追溯）
 //    - 用途：记录所有敏感操作的审计日志，用于安全审计和责任追溯
 //    - 特点：只记录不修改，不可删除，记录操作前后数据对比
-//    - 表名：audit_logs，主键：log_id
+//    - 表名：admin_operation_logs，主键：log_id
 //    - 业务场景：管理员修改积分 → 记录谁/何时/改了什么 → 用于追溯和审计
 //    - 字段特点：operator_id（操作员）、operation_type（操作类型）、before_data/after_data（前后数据）
-//    - ⚠️ 与AuditRecord的区别：AuditLog是操作追溯，AuditRecord是业务审核
+//    - ⚠️ 与ContentReviewRecord的区别：AdminOperationLog是操作追溯，ContentReviewRecord是业务审核
 
 // 🔴 统一决策引擎V4.0模型
 // 🗑️ models.DecisionRecord模型已删除 - 过度设计，餐厅抽奖系统不需要决策过程分析 - 2025年01月21日

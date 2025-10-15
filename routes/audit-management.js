@@ -121,11 +121,15 @@ router.get('/timeout-orders', authMiddleware.requireAdmin, async (req, res) => {
 
     const orders = await ExchangeOperationService.getTimeoutPendingOrders(hours)
 
-    return ApiResponse.success(res, {
-      timeout_hours: hours,
-      count: orders.length,
-      orders
-    }, '获取超时订单成功')
+    return ApiResponse.success(
+      res,
+      {
+        timeout_hours: hours,
+        count: orders.length,
+        orders
+      },
+      '获取超时订单成功'
+    )
   } catch (error) {
     console.error('[获取超时订单] 错误:', error)
     return ApiResponse.error(res, error.message, 500)
@@ -148,9 +152,7 @@ router.post('/check-timeout-alert', authMiddleware.requireAdmin, async (req, res
     return ApiResponse.success(
       res,
       result,
-      result.hasTimeout
-        ? `发现${result.count}个超时订单，已发送告警`
-        : '没有超时订单'
+      result.hasTimeout ? `发现${result.count}个超时订单，已发送告警` : '没有超时订单'
     )
   } catch (error) {
     console.error('[超时告警检查] 错误:', error)
@@ -197,10 +199,14 @@ router.get('/unified/pending', authMiddleware.requireAdmin, async (req, res) => 
       offset: parseInt(offset)
     })
 
-    return ApiResponse.success(res, {
-      count: audits.length,
-      audits
-    }, '获取待审核记录成功')
+    return ApiResponse.success(
+      res,
+      {
+        count: audits.length,
+        audits
+      },
+      '获取待审核记录成功'
+    )
   } catch (error) {
     console.error('[获取待审核记录] 错误:', error)
     return ApiResponse.error(res, error.message, 500)
@@ -339,12 +345,16 @@ router.get('/audit-logs', authMiddleware.requireAdmin, async (req, res) => {
 
     const logs = await auditLogMiddleware.queryAuditLogs(queryOptions)
 
-    return ApiResponse.success(res, {
-      count: logs.length,
-      limit: limitNum,
-      offset: offsetNum,
-      logs
-    }, '查询审计日志成功')
+    return ApiResponse.success(
+      res,
+      {
+        count: logs.length,
+        limit: limitNum,
+        offset: offsetNum,
+        logs
+      },
+      '查询审计日志成功'
+    )
   } catch (error) {
     console.error('[查询审计日志] 错误:', error)
     return ApiResponse.error(res, error.message, 500)
@@ -385,9 +395,9 @@ router.get('/audit-logs/statistics', authMiddleware.requireAdmin, async (req, re
 router.get('/audit-logs/:log_id', authMiddleware.requireAdmin, async (req, res) => {
   try {
     const { log_id } = req.params
-    const { AuditLog, User } = require('../models')
+    const { AdminOperationLog, User } = require('../models')
 
-    const log = await AuditLog.findByPk(parseInt(log_id), {
+    const log = await AdminOperationLog.findByPk(parseInt(log_id), {
       include: [
         {
           model: User,

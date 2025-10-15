@@ -1,15 +1,10 @@
 /**
- * 修复user_roles表缺失字段
+ * 修改表结构: user_roles - 添加角色管理字段
  *
  * 创建时间: 2025年10月13日 20:00:00 (北京时间)
- * 创建原因: 数据库检查发现user_roles表缺失3个字段
+ * 创建原因: 完善用户角色管理功能，增加角色分配追踪和激活状态管理
  *
- * 问题描述:
- * - UserRole模型定义了assigned_at, assigned_by, is_active字段
- * - 但数据库表user_roles中缺失这些字段
- * - 这是由于迁移使用sequelize.sync()创建表时字段未同步
- *
- * 修复内容:
+ * 变更内容:
  * 1. 添加assigned_at字段 - 记录角色分配时间
  * 2. 添加assigned_by字段 - 记录角色分配者ID
  * 3. 添加is_active字段 - 记录角色是否激活

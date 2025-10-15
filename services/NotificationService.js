@@ -101,8 +101,8 @@ class NotificationService {
     const { ChatMessage } = require('../models')
     const ChatWebSocketService = require('./ChatWebSocketService')
 
-    // 1. 获取或创建用户的聊天会话
-    const session = await this.getOrCreateUserSession(user_id)
+    // 1. 获取或创建用户的客服聊天会话
+    const session = await this.getOrCreateCustomerServiceSession(user_id)
 
     // 2. 构建系统消息内容（包含标题和内容）
     const systemMessageContent = title ? `【${title}】\n${content}` : content
@@ -172,16 +172,16 @@ class NotificationService {
   }
 
   /**
-   * 获取或创建用户的聊天会话
+   * 获取或创建用户的客服聊天会话
    *
    * @param {number} user_id - 用户ID
-   * @returns {Promise<Object>} 聊天会话对象
+   * @returns {Promise<Object>} 客服聊天会话对象
    */
-  static async getOrCreateUserSession (user_id) {
-    const { CustomerSession } = require('../models')
+  static async getOrCreateCustomerServiceSession (user_id) {
+    const { CustomerServiceSession } = require('../models')
 
     // 1. 查找用户的活跃会话（waiting/assigned/active状态）
-    let session = await CustomerSession.findOne({
+    let session = await CustomerServiceSession.findOne({
       where: {
         user_id,
         status: ['waiting', 'assigned', 'active']
@@ -191,7 +191,7 @@ class NotificationService {
 
     // 2. 如果没有活跃会话，创建新会话
     if (!session) {
-      session = await CustomerSession.create({
+      session = await CustomerServiceSession.create({
         user_id,
         status: 'waiting',
         source: 'system_notification', // 标记为系统通知创建的会话
@@ -387,9 +387,10 @@ class NotificationService {
       },
       image: {
         title: '图片审核通过',
-        content: auditData.points_awarded > 0
-          ? `您上传的图片已审核通过，奖励${auditData.points_awarded}积分`
-          : '您上传的图片已审核通过'
+        content:
+          auditData.points_awarded > 0
+            ? `您上传的图片已审核通过，奖励${auditData.points_awarded}积分`
+            : '您上传的图片已审核通过'
       },
       feedback: {
         title: '反馈审核通过',

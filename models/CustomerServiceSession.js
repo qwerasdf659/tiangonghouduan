@@ -1,35 +1,35 @@
 /**
- * 客服聊天会话模型（CustomerSession）
+ * 客服聊天会话模型（CustomerServiceSession）
  *
  * ⚠️⚠️⚠️ 重要区分说明 ⚠️⚠️⚠️
- * 本模型是 CustomerSession（客服聊天会话），不是 UserSession（用户认证会话）
+ * 本模型是 CustomerServiceSession（客服聊天会话），不是 AuthenticationSession（用户认证会话）
  *
- * 📋 CustomerSession vs UserSession 核心区别：
+ * 📋 CustomerServiceSession vs AuthenticationSession 核心区别：
  *
- * ✅ CustomerSession（本模型）：客服聊天会话 - 管理用户与客服的对话
+ * ✅ CustomerServiceSession（本模型）：客服聊天会话 - 管理用户与客服的对话
  *    - 概念：记录用户与客服之间的聊天对话会话
  *    - 用途：客服系统、用户咨询、在线客服、消息收发
  *    - 特点：包含多条聊天消息（ChatMessage）、有客服分配、有满意度评分
  *    - 状态流转：waiting（等待客服）→ assigned（已分配）→ active（活跃）→ closed（已关闭）
  *    - 典型字段：user_id（咨询用户）、admin_id（接入客服）、status（会话状态）、satisfaction_score（满意度）
- *    - 表名：customer_sessions，主键：session_id
+ *    - 表名：customer_service_sessions，主键：session_id
  *
- * ❌ UserSession（另一个模型）：用户认证会话 - 管理JWT Token
+ * ❌ AuthenticationSession（另一个模型）：用户认证会话 - 管理JWT Token
  *    - 概念：记录用户的登录认证会话和Token生命周期
  *    - 用途：用户登录验证、Token管理、会话控制、安全管理
  *    - 特点：存储JWT Token、记录登录IP、支持过期和失效管理
  *    - 状态特点：is_active（是否活跃）、expires_at（过期时间）
  *    - 典型字段：session_token（JWT Token）、user_id、user_type、is_active、expires_at
- *    - 表名：user_sessions，主键：user_session_id
+ *    - 表名：authentication_sessions，主键：user_session_id
  *
  * 📌 记忆口诀：
- * - CustomerSession = 聊天会话 = 客服对话 = 消息收发 = 用户咨询客服
- * - UserSession = 认证会话 = 登录Token = 权限验证 = 用户登录系统
+ * - CustomerServiceSession = 客服聊天会话 = 客服对话 = 消息收发 = 用户咨询客服
+ * - AuthenticationSession = 用户认证会话 = 登录Token = 权限验证 = 用户登录系统
  *
  * 💡 实际业务示例：
- * - 用户登录系统 → 创建UserSession（存储Token，验证登录状态）
- * - 用户咨询客服 → 创建CustomerSession（开启聊天对话）
- * - 即：UserSession管理"是否登录"，CustomerSession管理"聊天对话"
+ * - 用户登录系统 → 创建AuthenticationSession（存储Token，验证登录状态）
+ * - 用户咨询客服 → 创建CustomerServiceSession（开启聊天对话）
+ * - 即：AuthenticationSession管理"是否登录"，CustomerServiceSession管理"聊天对话"
  *
  * 功能说明：
  * - 管理用户与客服之间的聊天会话
@@ -44,8 +44,8 @@
 const { DataTypes } = require('sequelize')
 
 module.exports = sequelize => {
-  const CustomerSession = sequelize.define(
-    'CustomerSession',
+  const CustomerServiceSession = sequelize.define(
+    'CustomerServiceSession',
     {
       session_id: {
         type: DataTypes.BIGINT,
@@ -103,7 +103,7 @@ module.exports = sequelize => {
       }
     },
     {
-      tableName: 'customer_sessions',
+      tableName: 'customer_service_sessions',
       timestamps: true,
       created_at: 'created_at',
       updated_at: 'updated_at',
@@ -131,21 +131,21 @@ module.exports = sequelize => {
   )
 
   // 定义关联关系
-  CustomerSession.associate = function (models) {
+  CustomerServiceSession.associate = function (models) {
     // 会话属于用户
-    CustomerSession.belongsTo(models.User, {
+    CustomerServiceSession.belongsTo(models.User, {
       foreignKey: 'user_id',
       as: 'user'
     })
 
     // 会话可能被分配给管理员（管理员权限通过UUID角色系统验证）
-    CustomerSession.belongsTo(models.User, {
+    CustomerServiceSession.belongsTo(models.User, {
       foreignKey: 'admin_id',
       as: 'admin'
     })
 
     // 会话包含多条消息
-    CustomerSession.hasMany(models.ChatMessage, {
+    CustomerServiceSession.hasMany(models.ChatMessage, {
       foreignKey: 'session_id',
       sourceKey: 'session_id',
       as: 'messages'
@@ -153,20 +153,20 @@ module.exports = sequelize => {
   }
 
   // 实例方法
-  CustomerSession.prototype.canBeAssignedTo = function (adminId) {
+  CustomerServiceSession.prototype.canBeAssignedTo = function (adminId) {
     return this.status === 'waiting' || this.admin_id === adminId
   }
 
-  CustomerSession.prototype.isClosed = function () {
+  CustomerServiceSession.prototype.isClosed = function () {
     return this.status === 'closed'
   }
 
-  CustomerSession.prototype.isActive = function () {
+  CustomerServiceSession.prototype.isActive = function () {
     return ['assigned', 'active'].includes(this.status)
   }
 
   // 类方法
-  CustomerSession.findActiveByUserId = function (user_id) {
+  CustomerServiceSession.findActiveByUserId = function (user_id) {
     return this.findAll({
       where: {
         user_id,
@@ -176,7 +176,7 @@ module.exports = sequelize => {
     })
   }
 
-  CustomerSession.findByAdminId = function (adminId, status = null) {
+  CustomerServiceSession.findByAdminId = function (adminId, status = null) {
     const where = { admin_id: adminId }
     if (status) {
       where.status = status
@@ -195,5 +195,5 @@ module.exports = sequelize => {
     })
   }
 
-  return CustomerSession
+  return CustomerServiceSession
 }

@@ -23,7 +23,7 @@
  * 创建时间：2025-10-12
  */
 
-const { AuditLog } = require('../models')
+const { AdminOperationLog } = require('../models')
 const BeijingTimeHelper = require('../utils/timeHelper')
 
 /**
@@ -38,7 +38,7 @@ const BeijingTimeHelper = require('../utils/timeHelper')
  * @param {Object} afterData - 操作后数据
  * @param {string} reason - 操作原因
  * @param {Object} options - 其他选项
- * @returns {Promise<AuditLog>} 审计日志记录
+ * @returns {Promise<AdminOperationLog>} 审计日志记录
  */
 exports.logOperation = async (
   req,
@@ -80,14 +80,14 @@ exports.logOperation = async (
     }
 
     // 3. 计算变更字段
-    const changedFields = AuditLog.compareObjects(beforeData, afterData)
+    const changedFields = AdminOperationLog.compareObjects(beforeData, afterData)
 
     // 4. 获取安全信息
     const ipAddress = getClientIP(req)
     const userAgent = req.get('User-Agent') || null
 
     // 5. 创建审计日志
-    const auditLog = await AuditLog.create({
+    const auditLog = await AdminOperationLog.create({
       operator_id: req.user.user_id,
       operation_type: operationType,
       target_type: targetType,
@@ -103,7 +103,9 @@ exports.logOperation = async (
       created_at: BeijingTimeHelper.createDatabaseTime()
     })
 
-    console.log(`[审计日志] 记录成功: log_id=${auditLog.log_id}, 操作员=${req.user.user_id}, 类型=${operationType}, 动作=${action}`)
+    console.log(
+      `[审计日志] 记录成功: log_id=${auditLog.log_id}, 操作员=${req.user.user_id}, 类型=${operationType}, 动作=${action}`
+    )
 
     return auditLog
   } catch (error) {
@@ -122,7 +124,7 @@ exports.logOperation = async (
  * @param {Object} beforeAccount - 调整前账户数据
  * @param {Object} afterAccount - 调整后账户数据
  * @param {string} reason - 调整原因
- * @returns {Promise<AuditLog>}
+ * @returns {Promise<AdminOperationLog>}
  */
 exports.logPointsAdjust = async (req, userId, beforeAccount, afterAccount, reason) => {
   return exports.logOperation(
@@ -146,9 +148,16 @@ exports.logPointsAdjust = async (req, userId, beforeAccount, afterAccount, reaso
  * @param {Object} beforeExchange - 审核前数据
  * @param {Object} afterExchange - 审核后数据
  * @param {string} reason - 审核意见
- * @returns {Promise<AuditLog>}
+ * @returns {Promise<AdminOperationLog>}
  */
-exports.logExchangeAudit = async (req, exchangeId, action, beforeExchange, afterExchange, reason) => {
+exports.logExchangeAudit = async (
+  req,
+  exchangeId,
+  action,
+  beforeExchange,
+  afterExchange,
+  reason
+) => {
   return exports.logOperation(
     req,
     'exchange_audit',
@@ -171,7 +180,7 @@ exports.logExchangeAudit = async (req, exchangeId, action, beforeExchange, after
  * @param {Object} beforeProduct - 操作前数据
  * @param {Object} afterProduct - 操作后数据
  * @param {string} reason - 操作原因
- * @returns {Promise<AuditLog>}
+ * @returns {Promise<AdminOperationLog>}
  */
 exports.logProductConfig = async (req, productId, action, beforeProduct, afterProduct, reason) => {
   const operationTypeMap = {
@@ -201,7 +210,7 @@ exports.logProductConfig = async (req, productId, action, beforeProduct, afterPr
  * @param {Object} beforeUser - 操作前数据
  * @param {Object} afterUser - 操作后数据
  * @param {string} reason - 操作原因
- * @returns {Promise<AuditLog>}
+ * @returns {Promise<AdminOperationLog>}
  */
 exports.logUserStatusChange = async (req, userId, action, beforeUser, afterUser, reason) => {
   return exports.logOperation(
@@ -225,7 +234,7 @@ exports.logUserStatusChange = async (req, userId, action, beforeUser, afterUser,
  * @param {Object} beforePrize - 操作前数据
  * @param {Object} afterPrize - 操作后数据
  * @param {string} reason - 操作原因
- * @returns {Promise<AuditLog>}
+ * @returns {Promise<AdminOperationLog>}
  */
 exports.logPrizeConfig = async (req, prizeId, action, beforePrize, afterPrize, reason) => {
   const operationTypeMap = {
@@ -255,9 +264,16 @@ exports.logPrizeConfig = async (req, prizeId, action, beforePrize, afterPrize, r
  * @param {Object} beforeCampaign - 操作前数据
  * @param {Object} afterCampaign - 操作后数据
  * @param {string} reason - 操作原因
- * @returns {Promise<AuditLog>}
+ * @returns {Promise<AdminOperationLog>}
  */
-exports.logCampaignConfig = async (req, campaignId, action, beforeCampaign, afterCampaign, reason) => {
+exports.logCampaignConfig = async (
+  req,
+  campaignId,
+  action,
+  beforeCampaign,
+  afterCampaign,
+  reason
+) => {
   return exports.logOperation(
     req,
     'campaign_config',
@@ -279,7 +295,7 @@ exports.logCampaignConfig = async (req, campaignId, action, beforeCampaign, afte
  * @param {Object} beforeRoles - 操作前角色
  * @param {Object} afterRoles - 操作后角色
  * @param {string} reason - 操作原因
- * @returns {Promise<AuditLog>}
+ * @returns {Promise<AdminOperationLog>}
  */
 exports.logRoleAssign = async (req, userId, action, beforeRoles, afterRoles, reason) => {
   return exports.logOperation(
@@ -320,7 +336,7 @@ function getClientIP (req) {
 /**
  * 审计日志查询工具
  */
-exports.queryAuditLogs = async (options = {}) => {
+exports.queryAdminOperationLogs = async (options = {}) => {
   const {
     operatorId = null,
     operationType = null,
@@ -361,7 +377,7 @@ exports.queryAuditLogs = async (options = {}) => {
   }
 
   try {
-    const logs = await AuditLog.findAll({
+    const logs = await AdminOperationLog.findAll({
       where: whereClause,
       order: [['created_at', 'DESC']],
       limit,
@@ -386,11 +402,7 @@ exports.queryAuditLogs = async (options = {}) => {
  * 获取审计日志统计信息
  */
 exports.getAuditStatistics = async (options = {}) => {
-  const {
-    operatorId = null,
-    startDate = null,
-    endDate = null
-  } = options
+  const { operatorId = null, startDate = null, endDate = null } = options
 
   try {
     const whereClause = {}
@@ -411,10 +423,10 @@ exports.getAuditStatistics = async (options = {}) => {
 
     const [total, byType, byAction] = await Promise.all([
       // 总数
-      AuditLog.count({ where: whereClause }),
+      AdminOperationLog.count({ where: whereClause }),
 
       // 按操作类型统计
-      AuditLog.findAll({
+      AdminOperationLog.findAll({
         where: whereClause,
         attributes: [
           'operation_type',
@@ -424,7 +436,7 @@ exports.getAuditStatistics = async (options = {}) => {
       }),
 
       // 按操作动作统计
-      AuditLog.findAll({
+      AdminOperationLog.findAll({
         where: whereClause,
         attributes: [
           'action',

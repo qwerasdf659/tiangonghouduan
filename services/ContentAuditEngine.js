@@ -23,7 +23,7 @@
  * 创建时间：2025-10-11
  */
 
-const { AuditRecord, sequelize } = require('../models')
+const { ContentReviewRecord, sequelize } = require('../models')
 const BeijingTimeHelper = require('../utils/timeHelper')
 
 class ContentAuditEngine {
@@ -36,14 +36,10 @@ class ContentAuditEngine {
    * @param {string} options.priority - 优先级（high/medium/low）
    * @param {Object} options.auditData - 审核相关数据
    * @param {Object} options.transaction - 数据库事务
-   * @returns {Promise<AuditRecord>} 审核记录
+   * @returns {Promise<ContentReviewRecord>} 审核记录
    */
   static async submitForAudit (auditableType, auditableId, options = {}) {
-    const {
-      priority = 'medium',
-      auditData = {},
-      transaction = null
-    } = options
+    const { priority = 'medium', auditData = {}, transaction = null } = options
 
     console.log(`[审核服务] 提交审核: ${auditableType} ID=${auditableId}, 优先级=${priority}`)
 
@@ -60,7 +56,7 @@ class ContentAuditEngine {
     }
 
     // 检查是否已存在待审核记录（防止重复提交）
-    const existingAudit = await AuditRecord.findOne({
+    const existingAudit = await ContentReviewRecord.findOne({
       where: {
         auditable_type: auditableType,
         auditable_id: auditableId,
@@ -75,14 +71,17 @@ class ContentAuditEngine {
     }
 
     // 创建审核记录
-    const auditRecord = await AuditRecord.create({
-      auditable_type: auditableType,
-      auditable_id: auditableId,
-      audit_status: 'pending',
-      priority,
-      audit_data: auditData,
-      submitted_at: BeijingTimeHelper.createDatabaseTime()
-    }, { transaction })
+    const auditRecord = await ContentReviewRecord.create(
+      {
+        auditable_type: auditableType,
+        auditable_id: auditableId,
+        audit_status: 'pending',
+        priority,
+        audit_data: auditData,
+        submitted_at: BeijingTimeHelper.createDatabaseTime()
+      },
+      { transaction }
+    )
 
     console.log(`[审核服务] 审核记录已创建: audit_id=${auditRecord.audit_id}`)
 
@@ -100,13 +99,13 @@ class ContentAuditEngine {
    */
   static async approve (auditId, auditorId, reason = null, options = {}) {
     const shouldCommit = !options.transaction
-    const transaction = options.transaction || await sequelize.transaction()
+    const transaction = options.transaction || (await sequelize.transaction())
 
     try {
       console.log(`[审核服务] 审核通过: audit_id=${auditId}, auditor_id=${auditorId}`)
 
       // 1. 获取审核记录
-      const auditRecord = await AuditRecord.findByPk(auditId, { transaction })
+      const auditRecord = await ContentReviewRecord.findByPk(auditId, { transaction })
 
       if (!auditRecord) {
         throw new Error(`审核记录不存在: audit_id=${auditId}`)
@@ -114,16 +113,21 @@ class ContentAuditEngine {
 
       // 2. 验证审核状态
       if (auditRecord.audit_status !== 'pending') {
-        throw new Error(`审核记录状态不正确: 当前状态=${auditRecord.audit_status}，期望状态=pending`)
+        throw new Error(
+          `审核记录状态不正确: 当前状态=${auditRecord.audit_status}，期望状态=pending`
+        )
       }
 
       // 3. 更新审核记录
-      await auditRecord.update({
-        audit_status: 'approved',
-        auditor_id: auditorId,
-        audit_reason: reason,
-        audited_at: BeijingTimeHelper.createDatabaseTime()
-      }, { transaction })
+      await auditRecord.update(
+        {
+          audit_status: 'approved',
+          auditor_id: auditorId,
+          audit_reason: reason,
+          audited_at: BeijingTimeHelper.createDatabaseTime()
+        },
+        { transaction }
+      )
 
       // 4. 触发审核通过回调
       await this.triggerAuditCallback(auditRecord, 'approved', transaction)
@@ -163,13 +167,13 @@ class ContentAuditEngine {
     }
 
     const shouldCommit = !options.transaction
-    const transaction = options.transaction || await sequelize.transaction()
+    const transaction = options.transaction || (await sequelize.transaction())
 
     try {
       console.log(`[审核服务] 审核拒绝: audit_id=${auditId}, auditor_id=${auditorId}`)
 
       // 1. 获取审核记录
-      const auditRecord = await AuditRecord.findByPk(auditId, { transaction })
+      const auditRecord = await ContentReviewRecord.findByPk(auditId, { transaction })
 
       if (!auditRecord) {
         throw new Error(`审核记录不存在: audit_id=${auditId}`)
@@ -177,16 +181,21 @@ class ContentAuditEngine {
 
       // 2. 验证审核状态
       if (auditRecord.audit_status !== 'pending') {
-        throw new Error(`审核记录状态不正确: 当前状态=${auditRecord.audit_status}，期望状态=pending`)
+        throw new Error(
+          `审核记录状态不正确: 当前状态=${auditRecord.audit_status}，期望状态=pending`
+        )
       }
 
       // 3. 更新审核记录
-      await auditRecord.update({
-        audit_status: 'rejected',
-        auditor_id: auditorId,
-        audit_reason: reason,
-        audited_at: BeijingTimeHelper.createDatabaseTime()
-      }, { transaction })
+      await auditRecord.update(
+        {
+          audit_status: 'rejected',
+          auditor_id: auditorId,
+          audit_reason: reason,
+          audited_at: BeijingTimeHelper.createDatabaseTime()
+        },
+        { transaction }
+      )
 
       // 4. 触发审核拒绝回调
       await this.triggerAuditCallback(auditRecord, 'rejected', transaction)
@@ -225,7 +234,7 @@ class ContentAuditEngine {
     console.log(`[审核服务] 取消审核: audit_id=${auditId}`)
 
     // 1. 获取审核记录
-    const auditRecord = await AuditRecord.findByPk(auditId, { transaction })
+    const auditRecord = await ContentReviewRecord.findByPk(auditId, { transaction })
 
     if (!auditRecord) {
       throw new Error(`审核记录不存在: audit_id=${auditId}`)
@@ -237,11 +246,14 @@ class ContentAuditEngine {
     }
 
     // 3. 更新审核记录
-    await auditRecord.update({
-      audit_status: 'cancelled',
-      audit_reason: reason || '用户取消审核',
-      audited_at: BeijingTimeHelper.createDatabaseTime()
-    }, { transaction })
+    await auditRecord.update(
+      {
+        audit_status: 'cancelled',
+        audit_reason: reason || '用户取消审核',
+        audited_at: BeijingTimeHelper.createDatabaseTime()
+      },
+      { transaction }
+    )
 
     console.log(`[审核服务] 审核取消成功: audit_id=${auditId}`)
 
@@ -255,7 +267,7 @@ class ContentAuditEngine {
   /**
    * 触发审核回调
    *
-   * @param {AuditRecord} auditRecord - 审核记录
+   * @param {ContentReviewRecord} auditRecord - 审核记录
    * @param {string} result - 审核结果（approved/rejected）
    * @param {Object} transaction - 数据库事务
    * @private
@@ -309,12 +321,7 @@ class ContentAuditEngine {
    * @returns {Promise<Array>} 审核记录列表
    */
   static async getPendingAudits (options = {}) {
-    const {
-      auditableType = null,
-      priority = null,
-      limit = 20,
-      offset = 0
-    } = options
+    const { auditableType = null, priority = null, limit = 20, offset = 0 } = options
 
     const whereClause = {
       audit_status: 'pending'
@@ -328,7 +335,7 @@ class ContentAuditEngine {
       whereClause.priority = priority
     }
 
-    const audits = await AuditRecord.findAll({
+    const audits = await ContentReviewRecord.findAll({
       where: whereClause,
       order: [
         ['priority', 'DESC'], // 高优先级优先
@@ -345,10 +352,10 @@ class ContentAuditEngine {
    * 获取审核记录详情
    *
    * @param {number} auditId - 审核记录ID
-   * @returns {Promise<AuditRecord>} 审核记录
+   * @returns {Promise<ContentReviewRecord>} 审核记录
    */
   static async getAuditById (auditId) {
-    const audit = await AuditRecord.findByPk(auditId)
+    const audit = await ContentReviewRecord.findByPk(auditId)
 
     if (!audit) {
       throw new Error(`审核记录不存在: audit_id=${auditId}`)
@@ -365,7 +372,7 @@ class ContentAuditEngine {
    * @returns {Promise<Array>} 审核记录列表
    */
   static async getAuditsByAuditable (auditableType, auditableId) {
-    const audits = await AuditRecord.findAll({
+    const audits = await ContentReviewRecord.findAll({
       where: {
         auditable_type: auditableType,
         auditable_id: auditableId
@@ -386,11 +393,11 @@ class ContentAuditEngine {
     const whereClause = auditableType ? { auditable_type: auditableType } : {}
 
     const [total, pending, approved, rejected, cancelled] = await Promise.all([
-      AuditRecord.count({ where: whereClause }),
-      AuditRecord.count({ where: { ...whereClause, audit_status: 'pending' } }),
-      AuditRecord.count({ where: { ...whereClause, audit_status: 'approved' } }),
-      AuditRecord.count({ where: { ...whereClause, audit_status: 'rejected' } }),
-      AuditRecord.count({ where: { ...whereClause, audit_status: 'cancelled' } })
+      ContentReviewRecord.count({ where: whereClause }),
+      ContentReviewRecord.count({ where: { ...whereClause, audit_status: 'pending' } }),
+      ContentReviewRecord.count({ where: { ...whereClause, audit_status: 'approved' } }),
+      ContentReviewRecord.count({ where: { ...whereClause, audit_status: 'rejected' } }),
+      ContentReviewRecord.count({ where: { ...whereClause, audit_status: 'cancelled' } })
     ])
 
     return {
