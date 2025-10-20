@@ -560,7 +560,7 @@ async function main () {
       await backupPointsData()
       break
 
-    case 'tables':
+    case 'tables': {
       if (!options.tables) {
         log('❌ 请指定要备份的表名: --tables=table1,table2', 'red')
         process.exit(1)
@@ -568,6 +568,7 @@ async function main () {
       const tables = options.tables.split(',').map(t => t.trim())
       await backupSpecifiedTables(tables)
       break
+    }
 
     case 'restore':
       if (!options.file) {
