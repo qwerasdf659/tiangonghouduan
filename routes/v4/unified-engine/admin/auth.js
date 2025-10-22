@@ -35,8 +35,10 @@ router.post('/login', async (req, res) => {
         return res.apiError('验证码错误（开发环境使用123456）', 'INVALID_VERIFICATION_CODE', null, 400)
       }
     } else {
-      // 生产环境验证码验证逻辑（待实现）
-      // TODO: 实现短信验证码验证
+      /*
+       * 生产环境验证码验证逻辑（待实现）
+       * TODO: 实现短信验证码验证
+       */
       return res.apiError('生产环境验证码验证未实现', 'VERIFICATION_NOT_IMPLEMENTED', null, 501)
     }
 

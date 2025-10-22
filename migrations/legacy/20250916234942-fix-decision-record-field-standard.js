@@ -20,8 +20,10 @@ module.exports = {
 
       console.log('✅ 添加is_winner字段成功')
 
-      // 2. 数据转换：decision_result -> is_winner
-      // 处理现有数据的转换
+      /*
+       * 2. 数据转换：decision_result -> is_winner
+       * 处理现有数据的转换
+       */
       await queryInterface.sequelize.query(
         `
         UPDATE unified_decision_records 
@@ -83,8 +85,10 @@ module.exports = {
     const transaction = await queryInterface.sequelize.transaction()
 
     try {
-      // 回滚操作：恢复decision_result字段
-      // 1. 添加回decision_result字段
+      /*
+       * 回滚操作：恢复decision_result字段
+       * 1. 添加回decision_result字段
+       */
       await queryInterface.addColumn(
         'unified_decision_records',
         'decision_result',

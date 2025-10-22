@@ -32,6 +32,8 @@ router.get('/user/:user_id', authenticateToken, async (req, res) => {
   try {
     const { user_id } = req.params
     const { status, type, page = 1, limit = 20 } = req.query
+    // 🎯 分页安全保护：最大50条记录（普通用户库存列表）
+    const finalLimit = Math.min(parseInt(limit), 50)
 
     // 构建查询条件
     const whereConditions = { user_id }
@@ -45,7 +47,7 @@ router.get('/user/:user_id', authenticateToken, async (req, res) => {
     }
 
     // 分页参数
-    const offset = (page - 1) * limit
+    const offset = (page - 1) * finalLimit
 
     // 查询用户库存
     const { count, rows: inventory } = await models.UserInventory.findAndCountAll({
@@ -71,7 +73,7 @@ router.get('/user/:user_id', authenticateToken, async (req, res) => {
         'updated_at'
       ],
       order: [['acquired_at', 'DESC']],
-      limit: parseInt(limit),
+      limit: finalLimit,
       offset
     })
 
@@ -121,8 +123,8 @@ router.get('/user/:user_id', authenticateToken, async (req, res) => {
         pagination: {
           total: count,
           page: parseInt(page),
-          limit: parseInt(limit),
-          total_pages: Math.ceil(count / limit)
+          limit: finalLimit,
+          total_pages: Math.ceil(count / finalLimit)
         }
       },
       '获取库存列表成功'
@@ -293,6 +295,8 @@ router.get('/admin/statistics', requireAdmin, async (req, res) => {
 router.get('/products', authenticateToken, async (req, res) => {
   try {
     const { space = 'lucky', category, page = 1, limit = 20 } = req.query
+    // 🎯 分页安全保护：最大50条记录（普通用户商品列表）
+    const finalLimit = Math.min(parseInt(limit), 50)
     const { getUserRoles } = require('../../../middleware/auth')
     const DataSanitizer = require('../../../services/DataSanitizer')
 
@@ -316,7 +320,7 @@ router.get('/products', authenticateToken, async (req, res) => {
       whereClause.category = category
     }
 
-    const offset = (page - 1) * limit
+    const offset = (page - 1) * finalLimit
 
     // 查询商品
     const { count, rows: products } = await models.Product.findAndCountAll({
@@ -325,7 +329,7 @@ router.get('/products', authenticateToken, async (req, res) => {
         ['sort_order', 'ASC'],
         ['created_at', 'DESC']
       ],
-      limit: parseInt(limit),
+      limit: finalLimit,
       offset
     })
 
@@ -350,8 +354,8 @@ router.get('/products', authenticateToken, async (req, res) => {
         pagination: {
           total: count,
           page: parseInt(page),
-          limit: parseInt(limit),
-          total_pages: Math.ceil(count / limit)
+          limit: finalLimit,
+          total_pages: Math.ceil(count / finalLimit)
         }
       },
       '获取商品列表成功'
@@ -617,8 +621,10 @@ function getDefaultIcon (type) {
 router.get('/market/products', authenticateToken, async (req, res) => {
   try {
     const { page = 1, limit = 20, category = null, sort = 'newest' } = req.query
+    // 🎯 分页安全保护：最大50条记录（普通用户交易市场）
+    const finalLimit = Math.min(parseInt(limit), 50)
 
-    const offset = (page - 1) * limit
+    const offset = (page - 1) * finalLimit
 
     // 查询在售商品（从用户库存中查找）
     const whereClause = {
@@ -647,7 +653,7 @@ router.get('/market/products', authenticateToken, async (req, res) => {
     const { count, rows: marketProducts } = await models.UserInventory.findAndCountAll({
       where: whereClause,
       order,
-      limit: parseInt(limit),
+      limit: finalLimit,
       offset
     })
 
@@ -831,6 +837,8 @@ router.post('/transfer', authenticateToken, async (req, res) => {
 router.get('/transfer-history', authenticateToken, async (req, res) => {
   try {
     const { page = 1, limit = 20, type = 'all' } = req.query
+    // 🎯 分页安全保护：最大50条记录（普通用户转让历史）
+    const finalLimit = Math.min(parseInt(limit), 50)
     const user_id = req.user.user_id
 
     if (!models.TradeRecord) {
@@ -870,8 +878,8 @@ router.get('/transfer-history', authenticateToken, async (req, res) => {
         }
       ],
       order: [['created_at', 'DESC']],
-      limit: parseInt(limit),
-      offset: (parseInt(page) - 1) * parseInt(limit)
+      limit: finalLimit,
+      offset: (parseInt(page) - 1) * finalLimit
     })
 
     // 格式化转让历史数据

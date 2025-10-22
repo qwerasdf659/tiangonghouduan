@@ -98,8 +98,10 @@ class RateLimiterMiddleware {
         const now = Date.now()
         const windowStart = now - config.windowMs
 
-        // 使用Redis Sorted Set实现滑动窗口
-        // 1. 清理窗口外的旧记录
+        /*
+         * 使用Redis Sorted Set实现滑动窗口
+         * 1. 清理窗口外的旧记录
+         */
         await this.redisClient.zremrangebyscore(limitKey, 0, windowStart)
 
         // 2. 统计当前窗口内的请求数

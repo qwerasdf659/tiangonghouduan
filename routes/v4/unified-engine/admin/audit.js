@@ -297,6 +297,8 @@ router.post('/:exchange_id/reject', authenticateToken, requireAdmin, async (req,
 router.get('/history', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const { page = 1, limit = 20, audit_status, start_date, end_date } = req.query
+    // 🎯 分页安全保护：最大100条记录（管理员权限）
+    const finalLimit = Math.min(parseInt(limit), 100)
 
     const whereClause = {
       requires_audit: true,
@@ -321,7 +323,7 @@ router.get('/history', authenticateToken, requireAdmin, async (req, res) => {
       }
     }
 
-    const offset = (page - 1) * limit
+    const offset = (page - 1) * finalLimit
 
     const { count, rows: auditHistory } = await models.ExchangeRecords.findAndCountAll({
       where: whereClause,
@@ -344,7 +346,7 @@ router.get('/history', authenticateToken, requireAdmin, async (req, res) => {
         }
       ],
       order: [['audited_at', 'DESC']],
-      limit: parseInt(limit),
+      limit: finalLimit,
       offset
     })
 
@@ -359,7 +361,7 @@ router.get('/history', authenticateToken, requireAdmin, async (req, res) => {
       {
         total: count,
         page: parseInt(page),
-        limit: parseInt(limit),
+        limit: finalLimit,
         items: auditHistory.map(record => record.toJSON())
       },
       '审核历史获取成功'

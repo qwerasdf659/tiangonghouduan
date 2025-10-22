@@ -111,8 +111,10 @@ module.exports = {
               // 检查是否用于 .toISOString() 时间戳
               const parent = node.parent
               if (parent.type === 'MemberExpression' && parent.property.name === 'toISOString') {
-                // 这是 new Date().toISOString() 用于WebSocket消息时间戳
-                // 可以允许，但给出警告
+                /*
+                 * 这是 new Date().toISOString() 用于WebSocket消息时间戳
+                 * 可以允许，但给出警告
+                 */
                 return
               }
             }

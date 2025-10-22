@@ -16,8 +16,10 @@ class LotteryPrize extends Model {
       as: 'draws'
     })
 
-    // 🔥 关联到抽奖记录（已合并到LotteryDraw）
-    // LotteryRecord已合并到LotteryDraw，使用draws关联即可
+    /*
+     * 🔥 关联到抽奖记录（已合并到LotteryDraw）
+     * LotteryRecord已合并到LotteryDraw，使用draws关联即可
+     */
 
     // 🎯 关联到抽奖预设记录
     if (models.LotteryPreset) {

@@ -37,9 +37,10 @@ class LotteryStrategy {
    * @param {string} _context.lotteryType - 抽奖类型
    * @param {Object} _context.userProfile - 用户画像信息
    * @param {Object} _context.activityConfig - 活动配置
+   * @param {Transaction} _transaction - 外部事务对象（可选，用于连抽统一事务保护）
    * @returns {Promise<Object>} 策略执行结果
    */
-  async execute (_context) {
+  async execute (_context, _transaction = null) {
     throw new Error(`Strategy ${this.strategyName} must implement execute method`)
   }
 
@@ -93,7 +94,9 @@ class LotteryStrategy {
       config: this.config,
       type: this.strategyName.includes('guarantee')
         ? 'basic_guarantee'
-        : this.strategyName.includes('management') ? 'management' : 'unknown',
+        : this.strategyName.includes('management')
+          ? 'management'
+          : 'unknown',
       description: this.config.description || `${this.constructor.name}策略`,
       version: this.config.version || '4.0.0',
       metrics: this.metrics

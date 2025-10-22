@@ -128,20 +128,26 @@ module.exports = (sequelize, DataTypes) => {
 
   /**
    * 标记预设为已使用
+   *
+   * 🎯 2025-10-20修复：支持外部事务参数，确保连抽场景下的事务一致性
+   * @param {Transaction} transaction - 外部事务对象（可选，连抽场景传入）
    */
-  LotteryPreset.prototype.markAsUsed = async function () {
+  LotteryPreset.prototype.markAsUsed = async function (transaction = null) {
     this.status = 'used'
-    return await this.save()
+    return await this.save(transaction ? { transaction } : {})
   }
 
   // 静态方法
 
   /**
    * 获取用户的下一个未使用预设
+   *
+   * 🎯 2025-10-20修复：支持外部事务参数，确保查询在事务中执行，避免脏读
    * @param {number} user_id - 用户ID
+   * @param {Transaction} transaction - 外部事务对象（可选，连抽场景传入）
    * @returns {Object|null} 下一个预设或null
    */
-  LotteryPreset.getNextPreset = async function (user_id) {
+  LotteryPreset.getNextPreset = async function (user_id, transaction = null) {
     return await LotteryPreset.findOne({
       where: {
         user_id,
@@ -154,7 +160,8 @@ module.exports = (sequelize, DataTypes) => {
           as: 'prize',
           attributes: ['prize_id', 'prize_name', 'prize_type', 'prize_value', 'prize_description', 'sort_order'] // 🎯 方案3：添加sort_order字段
         }
-      ]
+      ],
+      transaction // 🎯 在事务中查询，避免脏读
     })
   }
 

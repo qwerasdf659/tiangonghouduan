@@ -15,9 +15,11 @@ module.exports = {
   async up (queryInterface, _Sequelize) {
     console.log('🚀 开始主键统一迁移...\n')
 
-    // ==========================================
-    // 阶段1: exchange_records (无数据,简单)
-    // ==========================================
+    /*
+     * ==========================================
+     * 阶段1: exchange_records (无数据,简单)
+     * ==========================================
+     */
     console.log('📋 阶段1: 迁移 exchange_records')
     console.log('   当前: exchange_id VARCHAR(50) PRIMARY KEY')
     console.log('   目标: exchange_id INT AUTO_INCREMENT PRIMARY KEY')
@@ -79,9 +81,11 @@ module.exports = {
       throw error
     }
 
-    // ==========================================
-    // 阶段2: customer_sessions (1条数据,中等)
-    // ==========================================
+    /*
+     * ==========================================
+     * 阶段2: customer_sessions (1条数据,中等)
+     * ==========================================
+     */
     console.log('📋 阶段2: 迁移 customer_sessions')
     console.log('   当前: session_id VARCHAR(64) PRIMARY KEY')
     console.log('   目标: session_id BIGINT AUTO_INCREMENT PRIMARY KEY')
@@ -174,9 +178,11 @@ module.exports = {
       throw error
     }
 
-    // ==========================================
-    // 阶段3: chat_messages (80条数据,复杂)
-    // ==========================================
+    /*
+     * ==========================================
+     * 阶段3: chat_messages (80条数据,复杂)
+     * ==========================================
+     */
     console.log('📋 阶段3: 迁移 chat_messages')
     console.log('   当前: message_id VARCHAR(64) PRIMARY KEY')
     console.log('   目标: message_id BIGINT AUTO_INCREMENT PRIMARY KEY')

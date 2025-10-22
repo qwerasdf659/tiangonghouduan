@@ -10,8 +10,10 @@
 // V4 核心服务
 const { UnifiedLotteryEngine } = require('./UnifiedLotteryEngine/UnifiedLotteryEngine')
 const { ThumbnailService } = require('./ThumbnailService') // 🎯 导入类
-// const UserInventoryService = require('./UserInventoryService') // TODO: 待实现
-// const PhotoUploadService = require('./PhotoUploadService') // TODO: 待实现
+/*
+ * const UserInventoryService = require('./UserInventoryService') // TODO: 待实现
+ * const PhotoUploadService = require('./PhotoUploadService') // TODO: 待实现
+ */
 
 // V4 模块化服务
 const { lottery_service_container } = require('./lottery')
@@ -40,9 +42,11 @@ class ServiceManager {
       // ✅ 注册V4统一抽奖引擎（移除旧版LotteryDrawService）
       this._services.set('unifiedLotteryEngine', new UnifiedLotteryEngine(this.models))
 
-      // 注册其他核心服务
-      // this._services.set('userInventory', new UserInventoryService(this.models)) // TODO: 待实现
-      // this._services.set('photoUpload', new PhotoUploadService(this.models)) // TODO: 待实现
+      /*
+       * 注册其他核心服务
+       * this._services.set('userInventory', new UserInventoryService(this.models)) // TODO: 待实现
+       * this._services.set('photoUpload', new PhotoUploadService(this.models)) // TODO: 待实现
+       */
       this._services.set('thumbnail', new ThumbnailService(this.models))
 
       // 注册模块化抽奖服务容器

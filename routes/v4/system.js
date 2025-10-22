@@ -384,6 +384,83 @@ router.get('/status', dataAccessControl, async (req, res) => {
 })
 
 /**
+ * @route GET /api/v4/system/business-config
+ * @desc 获取业务配置（前后端共享配置）
+ * @access Public
+ *
+ * @description
+ * 返回统一的业务配置，包括：
+ * - 连抽定价配置（单抽/3连抽/5连抽/10连抽）
+ * - 积分系统规则（上限/下限/验证规则）
+ * - 用户系统配置（昵称规则/验证码有效期）
+ * - 图片上传限制（文件大小/类型/数量）
+ * - 分页配置（用户/管理员）
+ */
+router.get('/business-config', dataAccessControl, async (req, res) => {
+  try {
+    // 读取业务配置文件
+    const businessConfig = require('../../config/business.config')
+
+    // 根据用户角色返回不同级别的配置
+    const dataLevel = req.isAdmin ? 'full' : 'public'
+
+    // 公开配置（所有用户可见）
+    const publicConfig = {
+      lottery: {
+        draw_pricing: businessConfig.lottery.drawPricing, // 连抽定价配置
+        daily_limit: businessConfig.lottery.dailyLimit.all, // 每日抽奖上限
+        free_draw_allowed: businessConfig.lottery.freeDrawAllowed // 是否允许免费抽奖
+      },
+      points: {
+        display_name: businessConfig.points.displayName, // 积分显示名称
+        max_balance: businessConfig.points.maxBalance, // 积分上限
+        min_balance: businessConfig.points.minBalance // 积分下限
+      },
+      user: {
+        nickname: {
+          min_length: businessConfig.user.nickname.minLength, // 昵称最小长度
+          max_length: businessConfig.user.nickname.maxLength // 昵称最大长度
+        },
+        verification_code: {
+          expiry_seconds: businessConfig.user.verificationCode.expirySeconds, // 验证码有效期（秒）
+          resend_interval: businessConfig.user.verificationCode.resendInterval // 重发间隔（秒）
+        }
+      },
+      upload: {
+        image: {
+          max_size_mb: businessConfig.upload.image.maxSizeMB, // 图片最大大小（MB）
+          max_count: businessConfig.upload.image.maxCount, // 单次最大上传数量
+          allowed_types: businessConfig.upload.image.allowedTypes // 允许的文件类型
+        }
+      },
+      pagination: {
+        user: businessConfig.pagination.user, // 普通用户分页配置
+        admin: dataLevel === 'full' ? businessConfig.pagination.admin : undefined // 管理员分页配置（仅管理员可见）
+      }
+    }
+
+    // 管理员可见的完整配置
+    if (dataLevel === 'full') {
+      publicConfig.points.validation = businessConfig.points.validation // 积分验证规则（仅管理员可见）
+      publicConfig.lottery.daily_limit_reset_time = businessConfig.lottery.dailyLimit.resetTime // 每日限制重置时间（仅管理员可见）
+    }
+
+    return ApiResponse.success(
+      res,
+      {
+        config: publicConfig,
+        version: '4.0.0',
+        last_updated: '2025-10-21'
+      },
+      '获取业务配置成功'
+    )
+  } catch (error) {
+    console.error('获取业务配置失败:', error)
+    return ApiResponse.error(res, '获取业务配置失败', 500)
+  }
+})
+
+/**
  * @route POST /api/v4/system/chat/create
  * @desc 创建聊天会话
  * @access Private
@@ -414,8 +491,10 @@ router.post('/chat/create', authenticateToken, async (req, res) => {
       )
     }
 
-    // 创建新会话，初始状态为waiting（等待客服接单）
-    // session_id 现在是BIGINT AUTO_INCREMENT主键，不再手动赋值
+    /*
+     * 创建新会话，初始状态为waiting（等待客服接单）
+     * session_id 现在是BIGINT AUTO_INCREMENT主键，不再手动赋值
+     */
     const session = await CustomerServiceSession.create({
       user_id: req.user.user_id,
       status: 'waiting',
@@ -504,6 +583,8 @@ router.get('/chat/history/:sessionId', authenticateToken, async (req, res) => {
   try {
     const { sessionId } = req.params
     const { page = 1, limit = 50 } = req.query
+    // 🎯 分页安全保护：最大100条记录（普通用户聊天历史）
+    const finalLimit = Math.min(parseInt(limit), 100)
     const { ChatMessage, CustomerServiceSession } = require('../../models')
 
     // 验证会话权限
@@ -518,12 +599,12 @@ router.get('/chat/history/:sessionId', authenticateToken, async (req, res) => {
       return ApiResponse.error(res, '会话不存在或无权限访问', 404)
     }
 
-    const offset = (page - 1) * limit
+    const offset = (page - 1) * finalLimit
 
     const { count, rows: messages } = await ChatMessage.findAndCountAll({
       where: { session_id: sessionId },
       order: [['created_at', 'DESC']],
-      limit: parseInt(limit),
+      limit: finalLimit,
       offset,
       include: [
         {
@@ -542,8 +623,8 @@ router.get('/chat/history/:sessionId', authenticateToken, async (req, res) => {
         pagination: {
           total: count,
           page: parseInt(page),
-          limit: parseInt(limit),
-          total_pages: Math.ceil(count / limit)
+          limit: finalLimit,
+          total_pages: Math.ceil(count / finalLimit)
         }
       },
       '获取聊天历史成功'
@@ -590,8 +671,10 @@ router.post('/chat/send', authenticateToken, async (req, res) => {
       return ApiResponse.error(res, '会话已关闭，无法发送消息', 400)
     }
 
-    // 创建消息记录
-    // message_id 现在是BIGINT AUTO_INCREMENT主键，不再手动赋值
+    /*
+     * 创建消息记录
+     * message_id 现在是BIGINT AUTO_INCREMENT主键，不再手动赋值
+     */
     const message = await ChatMessage.create({
       session_id,
       sender_id: req.user.user_id,
@@ -1142,6 +1225,8 @@ router.get('/admin/chat/sessions', authenticateToken, async (req, res) => {
     }
 
     const { page = 1, limit = 20, status = 'all', type = 'all' } = req.query
+    // 🎯 分页安全保护：最大100条记录（管理员权限）
+    const finalLimit = Math.min(parseInt(limit), 100)
     const { CustomerServiceSession, ChatMessage, User } = require('../../models')
 
     // 构建查询条件
@@ -1179,8 +1264,8 @@ router.get('/admin/chat/sessions', authenticateToken, async (req, res) => {
         }
       ],
       order: [['created_at', 'DESC']],
-      limit: parseInt(limit),
-      offset: (parseInt(page) - 1) * parseInt(limit)
+      limit: finalLimit,
+      offset: (parseInt(page) - 1) * finalLimit
     })
 
     // 使用DataSanitizer进行数据脱敏

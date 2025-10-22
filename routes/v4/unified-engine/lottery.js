@@ -14,8 +14,10 @@ const lottery_engine = require('../../../services/UnifiedLotteryEngine/UnifiedLo
 const BeijingTimeHelper = require('../../../utils/timeHelper')
 const PointsService = require('../../../services/PointsService')
 
-// 🔧 抽奖限流器 - 防止恶意频繁抽奖
-// 创建时间：2025年10月12日
+/*
+ * 🔧 抽奖限流器 - 防止恶意频繁抽奖
+ * 创建时间：2025年10月12日
+ */
 const { getRateLimiter } = require('../../../middleware/RateLimiterMiddleware')
 const rateLimiter = getRateLimiter()
 
@@ -155,7 +157,10 @@ router.get('/config/:campaignCode', authenticateToken, dataAccessControl, async 
       // 管理员获取完整配置（返回campaign_code而不是campaign_id）
       const adminConfig = {
         ...fullConfig,
-        campaign_code: campaign.campaign_code
+        campaign_code: campaign.campaign_code,
+        // ✅ 为管理员也添加符合API文档的字段映射
+        points_per_draw: fullConfig.cost_per_draw, // 映射字段以符合API文档规范
+        max_draws_per_day: fullConfig.max_draws_per_user_daily // 映射字段以符合API文档规范
       }
       return res.apiSuccess(adminConfig, '抽奖配置获取成功')
     } else {
@@ -164,8 +169,8 @@ router.get('/config/:campaignCode', authenticateToken, dataAccessControl, async 
         campaign_code: campaign.campaign_code,
         campaign_name: fullConfig.campaign_name,
         status: fullConfig.status,
-        cost_per_draw: fullConfig.cost_per_draw,
-        max_draws_per_user_daily: fullConfig.max_draws_per_user_daily,
+        points_per_draw: fullConfig.cost_per_draw, // ✅ 字段映射: cost_per_draw → points_per_draw (符合API文档规范)
+        max_draws_per_day: fullConfig.max_draws_per_user_daily, // ✅ 字段映射: max_draws_per_user_daily → max_draws_per_day (符合API文档规范)
         guarantee_info: {
           exists: !!fullConfig.guarantee_rule,
           description: '连续抽奖有惊喜哦~'
@@ -264,6 +269,7 @@ router.post('/draw', authenticateToken, lotteryRateLimiter, dataAccessControl, a
           display_value: DataSanitizer.getDisplayValue(prize.prize.value)
         }
       }),
+      total_points_cost: drawResult.total_points_cost, // 🆕 添加总积分消耗字段（测试需要）
       remaining_balance: drawResult.remaining_balance,
       draw_count: drawResult.draw_count
     }
@@ -295,6 +301,8 @@ router.get('/history/:user_id', authenticateToken, async (req, res) => {
   try {
     const user_id = parseInt(req.params.user_id)
     const { page = 1, limit = 20 } = req.query
+    // 🎯 分页安全保护：最大50条记录（普通用户抽奖历史）
+    const finalLimit = Math.min(parseInt(limit), 50)
 
     // 🛡️ 权限检查：只能查看自己的抽奖历史，除非是超级管理员
     const currentUserRoles = await getUserRoles(req.user.user_id)
@@ -305,7 +313,7 @@ router.get('/history/:user_id', authenticateToken, async (req, res) => {
     // 获取抽奖历史
     const history = await lottery_engine.get_user_history(user_id, {
       page: parseInt(page),
-      limit: parseInt(limit)
+      limit: finalLimit
     })
 
     return res.apiSuccess(history, '抽奖历史获取成功', 'HISTORY_SUCCESS')

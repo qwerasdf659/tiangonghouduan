@@ -49,8 +49,10 @@ router.post('/login', async (req, res) => {
         )
       }
     } else {
-      // 生产环境：真实验证码验证逻辑
-      // TODO: 实现短信验证码验证
+      /*
+       * 生产环境：真实验证码验证逻辑
+       * TODO: 实现短信验证码验证
+       */
       return res.apiError('生产环境验证码验证未实现', 'VERIFICATION_NOT_IMPLEMENTED', null, 501)
     }
 

@@ -63,8 +63,10 @@ const dbConfig = {
   },
   dialectOptions: {
     charset: 'utf8mb4',
-    // 移除collation配置 - MySQL2不支持此选项，会产生警告
-    // collation通过charset自动设置为utf8mb4_unicode_ci
+    /*
+     * 移除collation配置 - MySQL2不支持此选项，会产生警告
+     * collation通过charset自动设置为utf8mb4_unicode_ci
+     */
     supportBigNumbers: true,
     bigNumberStrings: true,
     dateStrings: true,

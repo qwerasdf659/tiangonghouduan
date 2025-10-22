@@ -17,7 +17,7 @@
 
 const BeijingTimeHelper = require('../utils/timeHelper')
 const { UserPointsAccount, PointsTransaction, User } = require('../models')
-const { Sequelize } = require('sequelize')
+const { Sequelize, Transaction } = require('sequelize')
 
 class PointsService {
   /**
@@ -225,7 +225,17 @@ class PointsService {
       }
     }
 
-    const account = await this.getUserPointsAccount(user_id)
+    // 🔥 在事务中查询账户，确保获取最新数据（FOR UPDATE锁）
+    const account = await UserPointsAccount.findOne({
+      where: { user_id, is_active: true },
+      transaction, // ✅ 传入事务参数，确保在事务中读取最新数据
+      lock: transaction ? Transaction.LOCK.UPDATE : undefined // 🔒 行级锁，防止并发更新
+    })
+
+    if (!account) {
+      throw new Error('用户积分账户不存在或已冻结')
+    }
+
     const oldBalance = parseFloat(account.available_points)
 
     if (oldBalance < points) {
@@ -525,8 +535,10 @@ class PointsService {
       // 7. 生成兑换码
       const exchangeCode = this.generateExchangeCode()
 
-      // 8. 创建兑换记录（✅ 严格人工审核模式：所有兑换都需要审核）
-      // exchange_id 现在是INT AUTO_INCREMENT主键，不再手动赋值
+      /*
+       * 8. 创建兑换记录（✅ 严格人工审核模式：所有兑换都需要审核）
+       * exchange_id 现在是INT AUTO_INCREMENT主键，不再手动赋值
+       */
       const exchangeRecord = await ExchangeRecords.create(
         {
           user_id,
@@ -665,7 +677,9 @@ class PointsService {
    */
   static async getUserTransactions (user_id, options = {}) {
     const { page = 1, limit = 20, type = null } = options
-    const offset = (page - 1) * limit
+    // 🎯 服务层二次保护：最大100条记录（防止内部调用风险）
+    const finalLimit = Math.min(parseInt(limit), 100)
+    const offset = (page - 1) * finalLimit
 
     const whereClause = { user_id }
     if (type) {
@@ -675,7 +689,7 @@ class PointsService {
     const { count, rows } = await PointsTransaction.findAndCountAll({
       where: whereClause,
       order: [['transaction_time', 'DESC']],
-      limit: parseInt(limit),
+      limit: finalLimit,
       offset
     })
 

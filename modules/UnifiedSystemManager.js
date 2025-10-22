@@ -468,8 +468,10 @@ class UnifiedSystemManager {
   analyzeConsistency (testFiles) {
     if (testFiles.length === 0) return 100 // 没有测试文件时返回100%
 
-    // 简化的一致性检查逻辑
-    // 实际实现中可以检查测试数据的格式、命名规范等
+    /*
+     * 简化的一致性检查逻辑
+     * 实际实现中可以检查测试数据的格式、命名规范等
+     */
     return 85 // 返回一个合理的默认值
   }
 

@@ -511,8 +511,10 @@ class PerformanceMonitor {
    */
   async recordPerformanceData (report) {
     try {
-      // ✅ 移除过度设计的SystemMetrics数据库集成
-      // 改为内存统计和日志记录
+      /*
+       * ✅ 移除过度设计的SystemMetrics数据库集成
+       * 改为内存统计和日志记录
+       */
       this.storeInMemoryStats(report)
 
       // 更新全局统计

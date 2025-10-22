@@ -37,7 +37,7 @@ process.env.DISABLE_REDIS = 'false' // 启用Redis，因为我们有真实的Red
 class TestAssertions {
   /**
    * 验证API响应格式 - 符合业务标准（接口规范文档）
-   * @param {object} response - API响应对象
+   * @param {Object} response - API响应对象
    * @param {boolean} expectSuccess - 是否期望成功响应
    */
   static validateApiResponse (response, expectSuccess = true) {

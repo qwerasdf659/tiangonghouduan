@@ -45,8 +45,10 @@ class DataSanitizer {
       display_value: this.getDisplayValue(prize.prize_type),
       status: prize.status,
       sort_order: prize.sort_order // ✅ 前端需要此字段确定奖品在转盘上的位置索引
-      // ❌ 移除敏感字段：win_probability, stock_quantity, prize_value,
-      // cost_points, max_daily_wins, daily_win_count, angle, color
+      /*
+       * ❌ 移除敏感字段：win_probability, stock_quantity, prize_value,
+       * cost_points, max_daily_wins, daily_win_count, angle, color
+       */
     }))
   }
 
@@ -70,8 +72,10 @@ class DataSanitizer {
       display_value: this.getDisplayValue(item.market_value),
       obtained_date: item.created_at ? item.created_at.split('T')[0] : null,
       transfer_count: item.transfer_count || 0
-      // ❌ 移除敏感字段：acquisition_method, acquisition_cost, market_value,
-      // transfer_history, usage_restrictions详情
+      /*
+       * ❌ 移除敏感字段：acquisition_method, acquisition_cost, market_value,
+       * transfer_history, usage_restrictions详情
+       */
     }))
   }
 
@@ -143,8 +147,10 @@ class DataSanitizer {
       filename: uploadData.public_filename,
       size_display: uploadData.size_display,
       success: uploadData.success
-      // ❌ 移除敏感字段：storage_bucket, storage_region, internal_path,
-      // cost_analysis, storage_provider, backup_info
+      /*
+       * ❌ 移除敏感字段：storage_bucket, storage_region, internal_path,
+       * cost_analysis, storage_provider, backup_info
+       */
     }
   }
 

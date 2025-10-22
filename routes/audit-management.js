@@ -11,9 +11,11 @@
 
 const express = require('express')
 const router = express.Router()
-// 服务重命名（2025-10-12）：
-// - ExchangeOperationService：兑换订单运营服务（批量审核、超时告警）
-// - ContentAuditEngine：通用内容审核引擎（支持exchange/image/feedback）
+/*
+ * 服务重命名（2025-10-12）：
+ * - ExchangeOperationService：兑换订单运营服务（批量审核、超时告警）
+ * - ContentAuditEngine：通用内容审核引擎（支持exchange/image/feedback）
+ */
 const ExchangeOperationService = require('../services/ExchangeOperationService')
 const ContentAuditEngine = require('../services/ContentAuditEngine')
 const authMiddleware = require('../middleware/auth')
@@ -191,11 +193,13 @@ router.get('/statistics', authMiddleware.requireAdmin, async (req, res) => {
 router.get('/unified/pending', authMiddleware.requireAdmin, async (req, res) => {
   try {
     const { type, priority, limit = 20, offset = 0 } = req.query
+    // 🎯 分页安全保护：最大100条记录（管理员权限）
+    const finalLimit = Math.min(parseInt(limit), 100)
 
     const audits = await ContentAuditEngine.getPendingAudits({
       auditableType: type,
       priority,
-      limit: parseInt(limit),
+      limit: finalLimit,
       offset: parseInt(offset)
     })
 

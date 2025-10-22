@@ -12,9 +12,39 @@ const PointsService = require('../../../services/PointsService')
 const BeijingTimeHelper = require('../../../utils/timeHelper')
 
 /**
- * GET /balance/:user_id - 获取用户积分余额
+ * GET /balance - 获取当前用户积分余额
  *
- * @description 获取指定用户的积分余额信息
+ * @description 从JWT token中自动获取当前用户的积分余额信息
+ * @route GET /api/v4/unified-engine/points/balance
+ * @access Private (需要认证)
+ */
+router.get('/balance', authenticateToken, async (req, res) => {
+  try {
+    const user_id = req.user.user_id
+
+    // 获取用户积分信息
+    const points_info = await PointsService.getUserPoints(user_id)
+
+    return res.apiSuccess(
+      {
+        user_id,
+        available_points: points_info.available_points,
+        total_earned: points_info.total_earned,
+        total_consumed: points_info.total_consumed,
+        timestamp: BeijingTimeHelper.apiTimestamp()
+      },
+      '积分余额查询成功'
+    )
+  } catch (error) {
+    console.error('积分余额查询失败:', error)
+    return res.apiInternalError('积分余额查询失败', error.message, 'POINTS_BALANCE_ERROR')
+  }
+})
+
+/**
+ * GET /balance/:user_id - 获取指定用户积分余额
+ *
+ * @description 获取指定用户的积分余额信息（管理员可查询任意用户）
  * @route GET /api/v4/unified-engine/points/balance/:user_id
  * @access Private (需要认证)
  */
@@ -59,6 +89,8 @@ router.get('/transactions/:user_id', authenticateToken, async (req, res) => {
   try {
     const { user_id } = req.params
     const { page = 1, limit = 20, type } = req.query
+    // 🎯 分页安全保护：最大100条记录（服务层也有保护，双重防护）
+    const finalLimit = Math.min(parseInt(limit), 100)
     const current_user_id = req.user.user_id
 
     // 🛡️ 权限检查：只能查询自己的交易记录，除非是超级管理员
@@ -70,7 +102,7 @@ router.get('/transactions/:user_id', authenticateToken, async (req, res) => {
     // 获取交易记录
     const transactions = await PointsService.getUserTransactions(parseInt(user_id), {
       page: parseInt(page),
-      limit: parseInt(limit),
+      limit: finalLimit,
       type
     })
 
@@ -80,9 +112,9 @@ router.get('/transactions/:user_id', authenticateToken, async (req, res) => {
         transactions: transactions.data,
         pagination: {
           page: parseInt(page),
-          limit: parseInt(limit),
+          limit: finalLimit,
           total: transactions.total,
-          pages: Math.ceil(transactions.total / parseInt(limit))
+          pages: Math.ceil(transactions.total / finalLimit)
         },
         timestamp: BeijingTimeHelper.apiTimestamp()
       },

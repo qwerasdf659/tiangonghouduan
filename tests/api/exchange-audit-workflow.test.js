@@ -352,19 +352,25 @@ describe('商品兑换审核流程完整测试', () => {
     })
   })
 
-  // describe('场景7: 数据一致性检查', () => {
-  //   test('执行数据一致性检查', async () => {
-  //     const results = await DataConsistencyChecker.performFullCheck()
+  /*
+   * describe('场景7: 数据一致性检查', () => {
+   *   test('执行数据一致性检查', async () => {
+   *     const results = await DataConsistencyChecker.performFullCheck()
+   */
 
-  //     expect(results).toHaveProperty('checks')
-  //     expect(results).toHaveProperty('fixes')
-  //     expect(results).toHaveProperty('errors')
+  /*
+   *     expect(results).toHaveProperty('checks')
+   *     expect(results).toHaveProperty('fixes')
+   *     expect(results).toHaveProperty('errors')
+   */
 
-  //     console.log('数据一致性检查结果:', {
-  //       checks: results.checks.length,
-  //       fixes: results.fixes.length,
-  //       errors: results.errors.length
-  //     })
-  //   })
-  // })
+  /*
+   *     console.log('数据一致性检查结果:', {
+   *       checks: results.checks.length,
+   *       fixes: results.fixes.length,
+   *       errors: results.errors.length
+   *     })
+   *   })
+   * })
+   */
 })

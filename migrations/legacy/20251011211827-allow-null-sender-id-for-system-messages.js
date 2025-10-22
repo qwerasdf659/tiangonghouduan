@@ -34,8 +34,10 @@ module.exports = {
     console.log('🔙 回滚：将sender_id恢复为NOT NULL...')
 
     try {
-      // 警告：回滚前需要确保没有NULL值
-      // 否则会失败
+      /*
+       * 警告：回滚前需要确保没有NULL值
+       * 否则会失败
+       */
       await queryInterface.changeColumn('chat_messages', 'sender_id', {
         type: Sequelize.INTEGER,
         allowNull: false,

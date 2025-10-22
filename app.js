@@ -98,9 +98,11 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }))
 // 🔧 压缩响应
 app.use(compression())
 
-// 🔧 API请求频率限制 V4 - Redis滑动窗口限流
-// 创建时间：2025年10月12日
-// 功能：防止恶意刷接口，保护服务器资源
+/*
+ * 🔧 API请求频率限制 V4 - Redis滑动窗口限流
+ * 创建时间：2025年10月12日
+ * 功能：防止恶意刷接口，保护服务器资源
+ */
 const { getRateLimiter } = require('./middleware/RateLimiterMiddleware')
 const rateLimiter = getRateLimiter()
 
@@ -160,9 +162,11 @@ app.use((req, res, next) => {
   next()
 })
 
-// 🔧 全局API超时保护中间件（30秒）
-// 功能：防止长时间无响应的请求占用连接资源
-// 创建时间：2025年01月21日
+/*
+ * 🔧 全局API超时保护中间件（30秒）
+ * 功能：防止长时间无响应的请求占用连接资源
+ * 创建时间：2025年01月21日
+ */
 app.use('/api/', (req, res, next) => {
   const API_TIMEOUT = 30000 // 30秒超时
 
@@ -366,8 +370,10 @@ app.get('/api/v4/docs', (req, res) => {
   })
 })
 
-// 🛣️ 基础路由配置
-// 根路径
+/*
+ * 🛣️ 基础路由配置
+ * 根路径
+ */
 app.get('/', (req, res) => {
   res.json({
     success: true,
@@ -488,9 +494,11 @@ app.use('*', (req, res) => {
   })
 })
 
-// 🔧 API标准化中间件 - 统一所有API响应格式
-// const apiStandardManager = new ApiStandardManager() // 已合并到ApiResponse中，删除冗余引用
-// app.use(apiStandardManager.createStandardizationMiddleware())
+/*
+ * 🔧 API标准化中间件 - 统一所有API响应格式
+ * const apiStandardManager = new ApiStandardManager() // 已合并到ApiResponse中，删除冗余引用
+ * app.use(apiStandardManager.createStandardizationMiddleware())
+ */
 
 // 🔧 全局错误处理
 app.use((error, req, res, _next) => {

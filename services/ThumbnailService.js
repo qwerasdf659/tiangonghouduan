@@ -28,8 +28,8 @@ class ThumbnailService {
   /**
    * 生成缩略图
    * @param {string} originalPath - 原始图片路径
-   * @param {object} options - 生成选项
-   * @returns {object} 缩略图路径对象
+   * @param {Object} options - 生成选项
+   * @returns {Object} 缩略图路径对象
    */
   async generateThumbnails (originalPath, options = {}) {
     const {
@@ -89,7 +89,7 @@ class ThumbnailService {
 
   /**
    * 删除缩略图文件
-   * @param {object} thumbnailPaths - 缩略图路径对象
+   * @param {Object} thumbnailPaths - 缩略图路径对象
    */
   async deleteThumbnails (thumbnailPaths) {
     if (!thumbnailPaths) return
@@ -109,7 +109,7 @@ class ThumbnailService {
 
   /**
    * 清理失败的缩略图
-   * @param {object} thumbnails - 已生成的缩略图
+   * @param {Object} thumbnails - 已生成的缩略图
    */
   async cleanupThumbnails (thumbnails) {
     for (const [, relativePath] of Object.entries(thumbnails)) {
@@ -172,7 +172,7 @@ class ThumbnailService {
 
   /**
    * 获取缩略图统计信息
-   * @returns {object} 统计信息
+   * @returns {Object} 统计信息
    */
   async getThumbnailStats () {
     try {

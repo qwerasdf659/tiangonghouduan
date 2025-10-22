@@ -75,8 +75,10 @@ class BeijingTimeHelper {
    * @returns {string} 标准时间戳
    */
   static apiTimestamp () {
-    // 对于API响应，我们返回带有时区信息的ISO字符串
-    // 但实际上是北京时间
+    /*
+     * 对于API响应，我们返回带有时区信息的ISO字符串
+     * 但实际上是北京时间
+     */
     const now = new Date()
     const beijingOffset = 8 * 60 // 北京时间偏移量（分钟）
     const utc = now.getTime() + now.getTimezoneOffset() * 60000
@@ -273,8 +275,10 @@ class BeijingTimeHelper {
    * @returns {Date} 当前北京时间的Date对象
    */
   static createDatabaseTime () {
-    // 返回当前时间的Date对象，数据库会自动处理时区
-    // 由于数据库配置了timezone: '+08:00'，会正确存储为北京时间
+    /*
+     * 返回当前时间的Date对象，数据库会自动处理时区
+     * 由于数据库配置了timezone: '+08:00'，会正确存储为北京时间
+     */
     return new Date()
   }
 

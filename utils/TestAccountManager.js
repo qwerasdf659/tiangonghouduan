@@ -149,7 +149,7 @@ class TestAccountManager {
   /**
    * 🎯 V4新增：获取测试权限配置
    * @param {number|string} userId - 用户ID
-   * @returns {object|null} 测试权限配置，非测试账号返回null
+   * @returns {Object|null} 测试权限配置，非测试账号返回null
    */
   getTestPrivileges (userId) {
     if (this.isTestAccount(userId)) {
@@ -161,7 +161,7 @@ class TestAccountManager {
   /**
    * 🔮 V4架构扩展：支持添加更多测试账号
    * 未来可以通过这个方法支持多个测试账号
-   * @param {object} _accountConfig - 新测试账号配置（预留参数）
+   * @param {Object} _accountConfig - 新测试账号配置（预留参数）
    */
   addTestAccount (_accountConfig) {
     // 预留接口，用于未来扩展多测试账号

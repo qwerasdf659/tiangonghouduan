@@ -26,8 +26,10 @@ async function fixUserRolesTable () {
     console.log('当前字段:', existingFields.join(', '))
     console.log('')
 
-    // 2. 确定需要添加的字段
-    // 注意：表已有联合主键(role_id, user_id)，不添加user_role_id
+    /*
+     * 2. 确定需要添加的字段
+     * 注意：表已有联合主键(role_id, user_id)，不添加user_role_id
+     */
     const fieldsToAdd = []
 
     if (!existingFields.includes('assigned_at')) {

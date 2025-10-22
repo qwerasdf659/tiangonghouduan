@@ -51,9 +51,11 @@ function warn (message) {
   log(`⚠️  ${message}`, 'yellow')
 }
 
-// function info (message) {
-//   log(`ℹ️  ${message}`, 'blue')
-// }
+/*
+ * function info (message) {
+ *   log(`ℹ️  ${message}`, 'blue')
+ * }
+ */
 
 // ==================== 数据备份 ====================
 

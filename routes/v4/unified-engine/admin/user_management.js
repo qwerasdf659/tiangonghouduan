@@ -23,6 +23,8 @@ router.use(requireAdmin)
 router.get('/users', async (req, res) => {
   try {
     const { page = 1, limit = 20, search, role_filter } = req.query
+    // 🎯 分页安全保护：最大100条记录（管理员权限）
+    const finalLimit = Math.min(parseInt(limit), 100)
 
     // 构建查询条件
     const whereClause = {}
@@ -39,8 +41,8 @@ router.get('/users', async (req, res) => {
     const userQuery = {
       where: whereClause,
       attributes: ['user_id', 'mobile', 'nickname', 'history_total_points', 'status', 'last_login', 'created_at'],
-      limit: parseInt(limit),
-      offset: (parseInt(page) - 1) * parseInt(limit),
+      limit: finalLimit,
+      offset: (parseInt(page) - 1) * finalLimit,
       order: [['created_at', 'DESC']],
       include: [{
         model: Role,

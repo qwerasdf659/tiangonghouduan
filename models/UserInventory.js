@@ -201,8 +201,10 @@ module.exports = sequelize => {
     let code
     let isUnique = false
 
-    // 确保生成唯一的核销码
-    // TODO: 性能优化 - 考虑重构避免循环中await
+    /*
+     * 确保生成唯一的核销码
+     * TODO: 性能优化 - 考虑重构避免循环中await
+     */
     while (!isUnique) {
       code = crypto.randomBytes(4).toString('hex').toUpperCase()
       const existing = await UserInventory.findOne({

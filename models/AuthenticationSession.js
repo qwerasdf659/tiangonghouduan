@@ -300,8 +300,10 @@ module.exports = sequelize => {
       }
     })
 
-    // V4.0简化权限：管理员会话也使用User模型
-    // 管理员信息通过UUID角色系统区分
+    /*
+     * V4.0简化权限：管理员会话也使用User模型
+     * 管理员信息通过UUID角色系统区分
+     */
     AuthenticationSession.belongsTo(models.User, {
       foreignKey: 'user_id',
       as: 'admin',

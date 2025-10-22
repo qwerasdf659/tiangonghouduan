@@ -1,6 +1,8 @@
-// .eslintrc.js - 餐厅积分抽奖系统专用ESLint配置
-// 创建时间: 2025年07月29日 20:43:18 UTC
-// 目标: 解决3030个代码质量问题，防止let const等明显语法错误
+/*
+ * .eslintrc.js - 餐厅积分抽奖系统专用ESLint配置
+ * 创建时间: 2025年07月29日 20:43:18 UTC
+ * 目标: 解决3030个代码质量问题，防止let const等明显语法错误
+ */
 
 module.exports = {
   // 环境配置
@@ -13,8 +15,10 @@ module.exports = {
   // 继承标准配置
   extends: ['standard'],
 
-  // 插件配置（本地规则通过npm scripts运行）
-  // plugins: ['local-rules'], // 暂时禁用，通过质量检查脚本运行
+  /*
+   * 插件配置（本地规则通过npm scripts运行）
+   * plugins: ['local-rules'], // 暂时禁用，通过质量检查脚本运行
+   */
 
   // 解析器选项
   parserOptions: {
@@ -24,6 +28,59 @@ module.exports = {
 
   // 针对餐厅积分抽奖系统的特定规则
   rules: {
+    /*
+     * 📝 注释规范 - 强制要求中文注释（2025年10月20日新增）
+     * 规则：提供任何技术信息时必须添加详细的中文注释
+     */
+    'require-jsdoc': [
+      'error',
+      {
+        require: {
+          FunctionDeclaration: true, // 函数声明必须有注释
+          MethodDefinition: true, // 类方法必须有注释
+          ClassDeclaration: true, // 类声明必须有注释
+          ArrowFunctionExpression: false, // 箭头函数可选（简单回调函数除外）
+          FunctionExpression: true // 函数表达式必须有注释
+        }
+      }
+    ],
+    'valid-jsdoc': [
+      'error',
+      {
+        requireReturn: true, // 要求@returns标记
+        requireReturnType: true, // 要求返回类型
+        requireParamType: true, // 要求参数类型
+        requireParamDescription: true, // 要求参数描述（强制中文说明）
+        requireReturnDescription: true, // 要求返回值描述（强制中文说明）
+        prefer: {
+          return: 'returns', // 统一使用@returns
+          arg: 'param', // 统一使用@param
+          argument: 'param'
+        },
+        preferType: {
+          object: 'Object', // 统一类型大小写
+          string: 'string',
+          number: 'number',
+          boolean: 'boolean'
+        }
+      }
+    ],
+    'multiline-comment-style': ['error', 'starred-block'], // 强制使用/** */格式的多行注释
+    'spaced-comment': [
+      'error',
+      'always',
+      {
+        line: {
+          markers: ['/', '🔴', '✅', '⚠️', '🔧', '📝'], // 允许特殊标记
+          exceptions: ['-', '+', '*', '=']
+        },
+        block: {
+          markers: ['*'], // 允许JSDoc注释
+          balanced: true
+        }
+      }
+    ],
+
     // 🔴 基础语法检查 - 防止let const这类严重错误
     'no-unexpected-multiline': 'error',
     'valid-typeof': 'error',

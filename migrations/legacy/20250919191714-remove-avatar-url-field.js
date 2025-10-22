@@ -24,15 +24,19 @@ module.exports = {
       await queryInterface.removeColumn('users', 'avatar_url')
       console.log('✅ 成功删除 users.avatar_url 字段')
 
-      // 2. 修改 upload_review 表中的 image_type 枚举
-      // 先检查表是否存在
+      /*
+       * 2. 修改 upload_review 表中的 image_type 枚举
+       * 先检查表是否存在
+       */
       const uploadReviewTableExists = await queryInterface.tableExists('upload_review')
 
       if (uploadReviewTableExists) {
         console.log('修改 upload_review.image_type 枚举类型...')
 
-        // 由于MySQL不能直接修改ENUM，需要分步操作
-        // 2.1 添加新的临时字段
+        /*
+         * 由于MySQL不能直接修改ENUM，需要分步操作
+         * 2.1 添加新的临时字段
+         */
         await queryInterface.addColumn('upload_review', 'image_type_new', {
           type: Sequelize.ENUM('photo', 'document', 'other'),
           allowNull: false,

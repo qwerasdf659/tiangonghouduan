@@ -231,8 +231,10 @@ class SealosStorageService {
    * @returns {Promise<Buffer>} 压缩后的图片
    */
   async compressImage (imageBuffer, _options = {}) {
-    // 这里可以集成图片压缩库如sharp
-    // 暂时返回原图
+    /*
+     * 这里可以集成图片压缩库如sharp
+     * 暂时返回原图
+     */
     return imageBuffer
   }
 

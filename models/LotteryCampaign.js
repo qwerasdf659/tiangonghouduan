@@ -37,8 +37,10 @@ class LotteryCampaign extends Model {
       comment: '抽奖记录'
     })
 
-    // 🔥 LotteryRecord已合并到LotteryDraw，使用draws关联即可
-    // 注意：新合并模型中lottery_id字段对应campaign_id关联
+    /*
+     * 🔥 LotteryRecord已合并到LotteryDraw，使用draws关联即可
+     * 注意：新合并模型中lottery_id字段对应campaign_id关联
+     */
 
     // 🗑️ 关联业务事件已删除 - BusinessEvent模型已删除 - 2025年01月21日
   }

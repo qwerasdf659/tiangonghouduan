@@ -25,8 +25,10 @@ const VERSION_FILE = path.join(MIGRATIONS_DIR, 'VERSION.js')
 
 // 验证规则
 const VALIDATION_RULES = {
-  // 文件名格式：{YYYYMMDD}{HHMMSS}-{action}-{target}.js
-  // 注意：baseline类型允许包含版本号（如: baseline-v1.0.0-clean-start）
+  /*
+   * 文件名格式：{YYYYMMDD}{HHMMSS}-{action}-{target}.js
+   * 注意：baseline类型允许包含版本号（如: baseline-v1.0.0-clean-start）
+   */
   fileName: {
     pattern: /^\d{14}-[a-z]+-[a-z][a-z0-9.-]*\.js$/,
     message: '文件名必须符合格式: {YYYYMMDD}{HHMMSS}-{action}-{target}.js'

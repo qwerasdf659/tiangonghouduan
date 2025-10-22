@@ -12,7 +12,7 @@ class ApiResponse {
    * @param {any} data - 响应数据
    * @param {string} message - 响应消息
    * @param {string} code - 业务代码，默认SUCCESS
-   * @returns {object} 格式化的成功响应
+   * @returns {Object} 格式化的成功响应
    */
   static success (data = null, message = 'Success', code = 'SUCCESS') {
     return {
@@ -31,7 +31,7 @@ class ApiResponse {
    * @param {string} errorCode - 错误代码
    * @param {any} details - 错误详情
    * @param {number} httpStatus - HTTP状态码（用于设置响应状态）
-   * @returns {object} 格式化的错误响应
+   * @returns {Object} 格式化的错误响应
    */
   static error (message = 'Error', errorCode = 'UNKNOWN_ERROR', details = null, httpStatus = null) {
     const response = {
@@ -56,9 +56,9 @@ class ApiResponse {
   /**
    * 分页成功响应 - 符合接口规范文档标准
    * @param {Array} data - 数据数组
-   * @param {object} pagination - 分页信息
+   * @param {Object} pagination - 分页信息
    * @param {string} message - 响应消息
-   * @returns {object} 格式化的分页响应
+   * @returns {Object} 格式化的分页响应
    */
   static paginated (data = [], pagination = {}, message = 'Success') {
     return {
@@ -84,7 +84,7 @@ class ApiResponse {
    * 创建响应 (201 Created) - 符合接口规范文档标准
    * @param {any} data - 创建的数据
    * @param {string} message - 响应消息
-   * @returns {object} 格式化的创建响应
+   * @returns {Object} 格式化的创建响应
    */
   static created (data = null, message = 'Created successfully') {
     return {
@@ -100,7 +100,7 @@ class ApiResponse {
   /**
    * 无内容响应 (204 No Content) - 符合接口规范文档标准
    * @param {string} message - 响应消息
-   * @returns {object} 格式化的无内容响应
+   * @returns {Object} 格式化的无内容响应
    */
   static noContent (message = 'No content') {
     return {
@@ -118,7 +118,7 @@ class ApiResponse {
    * @param {string} message - 错误消息
    * @param {string} errorCode - 错误代码
    * @param {any} details - 错误详情
-   * @returns {object} 格式化的客户端错误响应
+   * @returns {Object} 格式化的客户端错误响应
    */
   static badRequest (message = 'Bad Request', errorCode = 'BAD_REQUEST', details = null) {
     return this.error(message, errorCode, details, 2001)
@@ -128,7 +128,7 @@ class ApiResponse {
    * 未授权响应 (401)
    * @param {string} message - 错误消息
    * @param {string} errorCode - 错误代码
-   * @returns {object} 格式化的未授权响应
+   * @returns {Object} 格式化的未授权响应
    */
   static unauthorized (message = 'Unauthorized', errorCode = 'UNAUTHORIZED') {
     return this.error(message, errorCode, null, 4001)
@@ -138,7 +138,7 @@ class ApiResponse {
    * 禁止访问响应 (403)
    * @param {string} message - 错误消息
    * @param {string} errorCode - 错误代码
-   * @returns {object} 格式化的禁止访问响应
+   * @returns {Object} 格式化的禁止访问响应
    */
   static forbidden (message = 'Forbidden', errorCode = 'FORBIDDEN') {
     return this.error(message, errorCode, null, 4003)
@@ -148,7 +148,7 @@ class ApiResponse {
    * 未找到响应 (404)
    * @param {string} message - 错误消息
    * @param {string} errorCode - 错误代码
-   * @returns {object} 格式化的未找到响应
+   * @returns {Object} 格式化的未找到响应
    */
   static notFound (message = 'Not Found', errorCode = 'NOT_FOUND') {
     return this.error(message, errorCode, null, 4004)
@@ -158,7 +158,7 @@ class ApiResponse {
    * 方法不允许响应 (405)
    * @param {string} message - 错误消息
    * @param {Array} allowedMethods - 允许的HTTP方法
-   * @returns {object} 格式化的方法不允许响应
+   * @returns {Object} 格式化的方法不允许响应
    */
   static methodNotAllowed (message = 'Method Not Allowed', allowedMethods = []) {
     const response = this.error(message, 'METHOD_NOT_ALLOWED', null, 4005)
@@ -171,7 +171,7 @@ class ApiResponse {
    * @param {string} message - 错误消息
    * @param {string} errorCode - 错误代码
    * @param {any} details - 冲突详情
-   * @returns {object} 格式化的冲突响应
+   * @returns {Object} 格式化的冲突响应
    */
   static conflict (message = 'Conflict', errorCode = 'CONFLICT', details = null) {
     return this.error(message, errorCode, details, 4009)
@@ -181,7 +181,7 @@ class ApiResponse {
    * 实体过大响应 (413)
    * @param {string} message - 错误消息
    * @param {number} maxSize - 最大允许大小
-   * @returns {object} 格式化的实体过大响应
+   * @returns {Object} 格式化的实体过大响应
    */
   static payloadTooLarge (message = 'Payload Too Large', maxSize = null) {
     const response = this.error(message, 'PAYLOAD_TOO_LARGE', null, 4013)
@@ -195,7 +195,7 @@ class ApiResponse {
    * 不支持的媒体类型响应 (415)
    * @param {string} message - 错误消息
    * @param {Array} supportedTypes - 支持的媒体类型
-   * @returns {object} 格式化的不支持媒体类型响应
+   * @returns {Object} 格式化的不支持媒体类型响应
    */
   static unsupportedMediaType (message = 'Unsupported Media Type', supportedTypes = []) {
     const response = this.error(message, 'UNSUPPORTED_MEDIA_TYPE', null, 4015)
@@ -207,7 +207,7 @@ class ApiResponse {
    * 请求频率过高响应 (429)
    * @param {string} message - 错误消息
    * @param {number} retryAfter - 重试间隔（秒）
-   * @returns {object} 格式化的请求频率过高响应
+   * @returns {Object} 格式化的请求频率过高响应
    */
   static tooManyRequests (message = 'Too Many Requests', retryAfter = 60) {
     const response = this.error(message, 'TOO_MANY_REQUESTS', null, 4029)
@@ -220,7 +220,7 @@ class ApiResponse {
    * @param {string} message - 错误消息
    * @param {string} errorCode - 错误代码
    * @param {any} details - 错误详情
-   * @returns {object} 格式化的服务器错误响应
+   * @returns {Object} 格式化的服务器错误响应
    */
   static internalError (
     message = 'Internal Server Error',
@@ -234,7 +234,7 @@ class ApiResponse {
    * 服务不可用响应 (503)
    * @param {string} message - 错误消息
    * @param {number} retryAfter - 重试间隔（秒）
-   * @returns {object} 格式化的服务不可用响应
+   * @returns {Object} 格式化的服务不可用响应
    */
   static serviceUnavailable (message = 'Service Unavailable', retryAfter = 300) {
     const response = this.error(message, 'SERVICE_UNAVAILABLE', null, 5003)
@@ -245,7 +245,7 @@ class ApiResponse {
   /**
    * 网关超时响应 (504)
    * @param {string} message - 错误消息
-   * @returns {object} 格式化的网关超时响应
+   * @returns {Object} 格式化的网关超时响应
    */
   static gatewayTimeout (message = 'Gateway Timeout') {
     return this.error(message, 'GATEWAY_TIMEOUT', null, 5004)
@@ -257,7 +257,7 @@ class ApiResponse {
    * @param {string} errorCode - 业务错误代码
    * @param {any} details - 错误详情
    * @param {number} httpStatus - HTTP状态码
-   * @returns {object} 格式化的业务错误响应
+   * @returns {Object} 格式化的业务错误响应
    */
   static businessError (message, errorCode, details = null, httpStatus = 400) {
     return this.error(message, errorCode, details, httpStatus)
@@ -267,7 +267,7 @@ class ApiResponse {
    * 验证错误响应 - 符合接口规范文档标准
    * @param {string} message - 错误消息
    * @param {Array} errors - 详细验证错误列表
-   * @returns {object} 格式化的验证错误响应
+   * @returns {Object} 格式化的验证错误响应
    */
   static validationError (message = '数据验证失败', errors = []) {
     return this.error(message, 'VALIDATION_ERROR', { errors }, 422)
@@ -277,8 +277,8 @@ class ApiResponse {
    * 批量操作响应
    * @param {Array} results - 批量操作结果
    * @param {string} message - 响应消息
-   * @param {object} summary - 操作摘要
-   * @returns {object} 格式化的批量操作响应
+   * @param {Object} summary - 操作摘要
+   * @returns {Object} 格式化的批量操作响应
    */
   static batch (results = [], message = 'Batch operation completed', summary = {}) {
     const totalCount = results.length
@@ -302,9 +302,9 @@ class ApiResponse {
 
   /**
    * 包装Express响应的工具方法
-   * @param {object} res - Express响应对象
-   * @param {object} apiResponse - API响应对象
-   * @returns {object} Express响应
+   * @param {Object} res - Express响应对象
+   * @param {Object} apiResponse - API响应对象
+   * @returns {Object} Express响应
    */
   static send (res, apiResponse) {
     // ✅ 修正：固定使用HTTP 200状态码，业务状态通过response.code字段表示
@@ -539,9 +539,9 @@ ApiResponse.BusinessStatusStandards = {
 
 /**
  * 验证业务状态字段标准化
- * @param {object} data - 待验证的数据对象
+ * @param {Object} data - 待验证的数据对象
  * @param {string} context - 业务上下文
- * @returns {object} 验证结果
+ * @returns {Object} 验证结果
  */
 ApiResponse.validateBusinessStatus = function (data, context) {
   const standard = ApiResponse.BusinessStatusStandards[context]
@@ -589,7 +589,7 @@ ApiResponse.validateBusinessStatus = function (data, context) {
  * @param {string|number} errorCode - 业务错误码
  * @param {string} customMessage - 自定义错误消息（可选）
  * @param {any} details - 错误详情（可选）
- * @returns {object} 标准化错误响应
+ * @returns {Object} 标准化错误响应
  */
 ApiResponse.businessError = function (errorCode, customMessage = null, details = null) {
   // 查找错误码对应的标准消息

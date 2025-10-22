@@ -639,8 +639,10 @@ module.exports = sequelize => {
     })
   }
 
-  // ========== Sequelize Scope 定义 ==========
-  // 基于实际业务需求，避免过度设计
+  /*
+   * ========== Sequelize Scope 定义 ==========
+   * 基于实际业务需求，避免过度设计
+   */
 
   /**
    * Scope: successful

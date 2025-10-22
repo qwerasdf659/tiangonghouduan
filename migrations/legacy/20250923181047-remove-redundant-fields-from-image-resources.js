@@ -140,8 +140,10 @@ module.exports = {
     try {
       console.log('🔄 开始恢复ImageResources表中的字段...')
 
-      // 注意：这是回滚操作，恢复所有删除的字段
-      // 按照删除的相反顺序恢复
+      /*
+       * 注意：这是回滚操作，恢复所有删除的字段
+       * 按照删除的相反顺序恢复
+       */
 
       // 1. 恢复时间管理字段
       await queryInterface.addColumn('image_resources', 'updated_at', {

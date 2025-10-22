@@ -1,0 +1,711 @@
+{
+  "timestamp": "2025-10-21T19:48:31.957+08:00",
+  "results": {
+    "stats": {
+      "tables": [
+        {
+          "TABLE_NAME": "lottery_draws",
+          "TABLE_ROWS": "571",
+          "data_size_mb": "0.09",
+          "index_size_mb": "0.95",
+          "total_size_mb": "1.05"
+        },
+        {
+          "TABLE_NAME": "points_transactions",
+          "TABLE_ROWS": "1082",
+          "data_size_mb": "0.19",
+          "index_size_mb": "0.78",
+          "total_size_mb": "0.97"
+        },
+        {
+          "TABLE_NAME": "user_inventory",
+          "TABLE_ROWS": "0",
+          "data_size_mb": "0.02",
+          "index_size_mb": "0.27",
+          "total_size_mb": "0.28"
+        },
+        {
+          "TABLE_NAME": "exchange_records",
+          "TABLE_ROWS": "13",
+          "data_size_mb": "0.02",
+          "index_size_mb": "0.20",
+          "total_size_mb": "0.22"
+        },
+        {
+          "TABLE_NAME": "users",
+          "TABLE_ROWS": "10",
+          "data_size_mb": "0.02",
+          "index_size_mb": "0.19",
+          "total_size_mb": "0.20"
+        },
+        {
+          "TABLE_NAME": "authentication_sessions",
+          "TABLE_ROWS": "0",
+          "data_size_mb": "0.02",
+          "index_size_mb": "0.17",
+          "total_size_mb": "0.19"
+        },
+        {
+          "TABLE_NAME": "products",
+          "TABLE_ROWS": "3",
+          "data_size_mb": "0.02",
+          "index_size_mb": "0.17",
+          "total_size_mb": "0.19"
+        },
+        {
+          "TABLE_NAME": "lottery_campaigns",
+          "TABLE_ROWS": "1",
+          "data_size_mb": "0.02",
+          "index_size_mb": "0.14",
+          "total_size_mb": "0.16"
+        },
+        {
+          "TABLE_NAME": "trade_records",
+          "TABLE_ROWS": "0",
+          "data_size_mb": "0.02",
+          "index_size_mb": "0.14",
+          "total_size_mb": "0.16"
+        },
+        {
+          "TABLE_NAME": "chat_messages",
+          "TABLE_ROWS": "125",
+          "data_size_mb": "0.06",
+          "index_size_mb": "0.09",
+          "total_size_mb": "0.16"
+        },
+        {
+          "TABLE_NAME": "roles",
+          "TABLE_ROWS": "2",
+          "data_size_mb": "0.02",
+          "index_size_mb": "0.13",
+          "total_size_mb": "0.14"
+        },
+        {
+          "TABLE_NAME": "image_resources",
+          "TABLE_ROWS": "3",
+          "data_size_mb": "0.02",
+          "index_size_mb": "0.11",
+          "total_size_mb": "0.13"
+        },
+        {
+          "TABLE_NAME": "lottery_prizes",
+          "TABLE_ROWS": "9",
+          "data_size_mb": "0.02",
+          "index_size_mb": "0.11",
+          "total_size_mb": "0.13"
+        },
+        {
+          "TABLE_NAME": "user_points_accounts",
+          "TABLE_ROWS": "10",
+          "data_size_mb": "0.02",
+          "index_size_mb": "0.11",
+          "total_size_mb": "0.13"
+        },
+        {
+          "TABLE_NAME": "lottery_presets",
+          "TABLE_ROWS": "0",
+          "data_size_mb": "0.02",
+          "index_size_mb": "0.08",
+          "total_size_mb": "0.09"
+        },
+        {
+          "TABLE_NAME": "customer_service_sessions",
+          "TABLE_ROWS": "20",
+          "data_size_mb": "0.02",
+          "index_size_mb": "0.08",
+          "total_size_mb": "0.09"
+        },
+        {
+          "TABLE_NAME": "content_review_records",
+          "TABLE_ROWS": "0",
+          "data_size_mb": "0.02",
+          "index_size_mb": "0.08",
+          "total_size_mb": "0.09"
+        },
+        {
+          "TABLE_NAME": "user_roles",
+          "TABLE_ROWS": "9",
+          "data_size_mb": "0.02",
+          "index_size_mb": "0.06",
+          "total_size_mb": "0.08"
+        },
+        {
+          "TABLE_NAME": "feedbacks",
+          "TABLE_ROWS": "0",
+          "data_size_mb": "0.02",
+          "index_size_mb": "0.03",
+          "total_size_mb": "0.05"
+        },
+        {
+          "TABLE_NAME": "sequelizemeta",
+          "TABLE_ROWS": "58",
+          "data_size_mb": "0.02",
+          "index_size_mb": "0.02",
+          "total_size_mb": "0.03"
+        },
+        {
+          "TABLE_NAME": "system_announcements",
+          "TABLE_ROWS": "1",
+          "data_size_mb": "0.02",
+          "index_size_mb": "0.02",
+          "total_size_mb": "0.03"
+        },
+        {
+          "TABLE_NAME": "admin_operation_logs",
+          "TABLE_ROWS": "0",
+          "data_size_mb": "0.02",
+          "index_size_mb": "0.02",
+          "total_size_mb": "0.03"
+        },
+        {
+          "TABLE_NAME": "user_roles_backup_20251009",
+          "TABLE_ROWS": "16",
+          "data_size_mb": "0.02",
+          "index_size_mb": "0.00",
+          "total_size_mb": "0.02"
+        }
+      ],
+      "totalRows": "0571108201310031012523910020090581016",
+      "totalDataSize": 0.7400000000000003,
+      "totalIndexSize": 3.9499999999999997
+    },
+    "integrity": {
+      "orphanReport": [],
+      "totalOrphans": 0,
+      "foreignKeys": [
+        {
+          "TABLE_NAME": "admin_operation_logs",
+          "COLUMN_NAME": "operator_id",
+          "REFERENCED_TABLE_NAME": "users",
+          "REFERENCED_COLUMN_NAME": "user_id",
+          "CONSTRAINT_NAME": "admin_operation_logs_ibfk_1"
+        },
+        {
+          "TABLE_NAME": "authentication_sessions",
+          "COLUMN_NAME": "user_id",
+          "REFERENCED_TABLE_NAME": "users",
+          "REFERENCED_COLUMN_NAME": "user_id",
+          "CONSTRAINT_NAME": "authentication_sessions_ibfk_1"
+        },
+        {
+          "TABLE_NAME": "chat_messages",
+          "COLUMN_NAME": "sender_id",
+          "REFERENCED_TABLE_NAME": "users",
+          "REFERENCED_COLUMN_NAME": "user_id",
+          "CONSTRAINT_NAME": "fk_chat_messages_sender_id"
+        },
+        {
+          "TABLE_NAME": "chat_messages",
+          "COLUMN_NAME": "session_id",
+          "REFERENCED_TABLE_NAME": "customer_service_sessions",
+          "REFERENCED_COLUMN_NAME": "session_id",
+          "CONSTRAINT_NAME": "fk_chat_messages_session_id"
+        },
+        {
+          "TABLE_NAME": "content_review_records",
+          "COLUMN_NAME": "auditor_id",
+          "REFERENCED_TABLE_NAME": "users",
+          "REFERENCED_COLUMN_NAME": "user_id",
+          "CONSTRAINT_NAME": "content_review_records_ibfk_1"
+        },
+        {
+          "TABLE_NAME": "customer_service_sessions",
+          "COLUMN_NAME": "admin_id",
+          "REFERENCED_TABLE_NAME": "users",
+          "REFERENCED_COLUMN_NAME": "user_id",
+          "CONSTRAINT_NAME": "fk_customer_sessions_admin_id"
+        },
+        {
+          "TABLE_NAME": "customer_service_sessions",
+          "COLUMN_NAME": "user_id",
+          "REFERENCED_TABLE_NAME": "users",
+          "REFERENCED_COLUMN_NAME": "user_id",
+          "CONSTRAINT_NAME": "fk_customer_sessions_user_id"
+        },
+        {
+          "TABLE_NAME": "exchange_records",
+          "COLUMN_NAME": "auditor_id",
+          "REFERENCED_TABLE_NAME": "users",
+          "REFERENCED_COLUMN_NAME": "user_id",
+          "CONSTRAINT_NAME": "exchange_records_auditor_id_foreign_idx"
+        },
+        {
+          "TABLE_NAME": "exchange_records",
+          "COLUMN_NAME": "product_id",
+          "REFERENCED_TABLE_NAME": "products",
+          "REFERENCED_COLUMN_NAME": "product_id",
+          "CONSTRAINT_NAME": "fk_exchange_records_product_id"
+        },
+        {
+          "TABLE_NAME": "exchange_records",
+          "COLUMN_NAME": "user_id",
+          "REFERENCED_TABLE_NAME": "users",
+          "REFERENCED_COLUMN_NAME": "user_id",
+          "CONSTRAINT_NAME": "fk_exchange_records_user_id"
+        },
+        {
+          "TABLE_NAME": "feedbacks",
+          "COLUMN_NAME": "user_id",
+          "REFERENCED_TABLE_NAME": "users",
+          "REFERENCED_COLUMN_NAME": "user_id",
+          "CONSTRAINT_NAME": "feedbacks_ibfk_1"
+        },
+        {
+          "TABLE_NAME": "feedbacks",
+          "COLUMN_NAME": "admin_id",
+          "REFERENCED_TABLE_NAME": "users",
+          "REFERENCED_COLUMN_NAME": "user_id",
+          "CONSTRAINT_NAME": "feedbacks_ibfk_2"
+        },
+        {
+          "TABLE_NAME": "image_resources",
+          "COLUMN_NAME": "reviewer_id",
+          "REFERENCED_TABLE_NAME": "users",
+          "REFERENCED_COLUMN_NAME": "user_id",
+          "CONSTRAINT_NAME": "fk_image_resources_reviewer_id"
+        },
+        {
+          "TABLE_NAME": "image_resources",
+          "COLUMN_NAME": "user_id",
+          "REFERENCED_TABLE_NAME": "users",
+          "REFERENCED_COLUMN_NAME": "user_id",
+          "CONSTRAINT_NAME": "fk_image_resources_user_id"
+        },
+        {
+          "TABLE_NAME": "lottery_draws",
+          "COLUMN_NAME": "user_id",
+          "REFERENCED_TABLE_NAME": "users",
+          "REFERENCED_COLUMN_NAME": "user_id",
+          "CONSTRAINT_NAME": "fk_lottery_draws_user_id"
+        },
+        {
+          "TABLE_NAME": "lottery_draws",
+          "COLUMN_NAME": "campaign_id",
+          "REFERENCED_TABLE_NAME": "lottery_campaigns",
+          "REFERENCED_COLUMN_NAME": "campaign_id",
+          "CONSTRAINT_NAME": "fk_lottery_records_campaign"
+        },
+        {
+          "TABLE_NAME": "lottery_draws",
+          "COLUMN_NAME": "prize_id",
+          "REFERENCED_TABLE_NAME": "lottery_prizes",
+          "REFERENCED_COLUMN_NAME": "prize_id",
+          "CONSTRAINT_NAME": "lottery_draws_ibfk_4"
+        },
+        {
+          "TABLE_NAME": "lottery_presets",
+          "COLUMN_NAME": "created_by",
+          "REFERENCED_TABLE_NAME": "users",
+          "REFERENCED_COLUMN_NAME": "user_id",
+          "CONSTRAINT_NAME": "fk_lottery_presets_created_by"
+        },
+        {
+          "TABLE_NAME": "lottery_presets",
+          "COLUMN_NAME": "prize_id",
+          "REFERENCED_TABLE_NAME": "lottery_prizes",
+          "REFERENCED_COLUMN_NAME": "prize_id",
+          "CONSTRAINT_NAME": "fk_lottery_presets_prize_id"
+        },
+        {
+          "TABLE_NAME": "lottery_presets",
+          "COLUMN_NAME": "user_id",
+          "REFERENCED_TABLE_NAME": "users",
+          "REFERENCED_COLUMN_NAME": "user_id",
+          "CONSTRAINT_NAME": "fk_lottery_presets_user_id"
+        },
+        {
+          "TABLE_NAME": "points_transactions",
+          "COLUMN_NAME": "operator_id",
+          "REFERENCED_TABLE_NAME": "users",
+          "REFERENCED_COLUMN_NAME": "user_id",
+          "CONSTRAINT_NAME": "fk_points_transactions_operator_id"
+        },
+        {
+          "TABLE_NAME": "points_transactions",
+          "COLUMN_NAME": "user_id",
+          "REFERENCED_TABLE_NAME": "users",
+          "REFERENCED_COLUMN_NAME": "user_id",
+          "CONSTRAINT_NAME": "points_transactions_ibfk_3"
+        },
+        {
+          "TABLE_NAME": "points_transactions",
+          "COLUMN_NAME": "account_id",
+          "REFERENCED_TABLE_NAME": "user_points_accounts",
+          "REFERENCED_COLUMN_NAME": "account_id",
+          "CONSTRAINT_NAME": "points_transactions_ibfk_4"
+        },
+        {
+          "TABLE_NAME": "system_announcements",
+          "COLUMN_NAME": "admin_id",
+          "REFERENCED_TABLE_NAME": "users",
+          "REFERENCED_COLUMN_NAME": "user_id",
+          "CONSTRAINT_NAME": "system_announcements_ibfk_1"
+        },
+        {
+          "TABLE_NAME": "trade_records",
+          "COLUMN_NAME": "to_user_id",
+          "REFERENCED_TABLE_NAME": "users",
+          "REFERENCED_COLUMN_NAME": "user_id",
+          "CONSTRAINT_NAME": "fk_trade_records_to_user_id"
+        },
+        {
+          "TABLE_NAME": "trade_records",
+          "COLUMN_NAME": "from_user_id",
+          "REFERENCED_TABLE_NAME": "users",
+          "REFERENCED_COLUMN_NAME": "user_id",
+          "CONSTRAINT_NAME": "trade_records_ibfk_1"
+        },
+        {
+          "TABLE_NAME": "trade_records",
+          "COLUMN_NAME": "operator_id",
+          "REFERENCED_TABLE_NAME": "users",
+          "REFERENCED_COLUMN_NAME": "user_id",
+          "CONSTRAINT_NAME": "trade_records_ibfk_3"
+        },
+        {
+          "TABLE_NAME": "user_inventory",
+          "COLUMN_NAME": "transfer_to_user_id",
+          "REFERENCED_TABLE_NAME": "users",
+          "REFERENCED_COLUMN_NAME": "user_id",
+          "CONSTRAINT_NAME": "fk_user_inventory_transfer_to_user_id"
+        },
+        {
+          "TABLE_NAME": "user_inventory",
+          "COLUMN_NAME": "user_id",
+          "REFERENCED_TABLE_NAME": "users",
+          "REFERENCED_COLUMN_NAME": "user_id",
+          "CONSTRAINT_NAME": "fk_user_inventory_user_id"
+        },
+        {
+          "TABLE_NAME": "user_points_accounts",
+          "COLUMN_NAME": "user_id",
+          "REFERENCED_TABLE_NAME": "users",
+          "REFERENCED_COLUMN_NAME": "user_id",
+          "CONSTRAINT_NAME": "user_points_accounts_ibfk_1"
+        },
+        {
+          "TABLE_NAME": "user_roles",
+          "COLUMN_NAME": "role_id",
+          "REFERENCED_TABLE_NAME": "roles",
+          "REFERENCED_COLUMN_NAME": "role_id",
+          "CONSTRAINT_NAME": "fk_user_roles_role_id"
+        },
+        {
+          "TABLE_NAME": "user_roles",
+          "COLUMN_NAME": "user_id",
+          "REFERENCED_TABLE_NAME": "users",
+          "REFERENCED_COLUMN_NAME": "user_id",
+          "CONSTRAINT_NAME": "fk_user_roles_user_id"
+        }
+      ]
+    },
+    "foreignKeys": {
+      "constraints": [
+        {
+          "CONSTRAINT_NAME": "admin_operation_logs_ibfk_1",
+          "TABLE_NAME": "admin_operation_logs",
+          "COLUMN_NAME": "operator_id",
+          "REFERENCED_TABLE_NAME": "users",
+          "REFERENCED_COLUMN_NAME": "user_id",
+          "DELETE_RULE": "RESTRICT",
+          "UPDATE_RULE": "CASCADE"
+        },
+        {
+          "CONSTRAINT_NAME": "authentication_sessions_ibfk_1",
+          "TABLE_NAME": "authentication_sessions",
+          "COLUMN_NAME": "user_id",
+          "REFERENCED_TABLE_NAME": "users",
+          "REFERENCED_COLUMN_NAME": "user_id",
+          "DELETE_RULE": "CASCADE",
+          "UPDATE_RULE": "CASCADE"
+        },
+        {
+          "CONSTRAINT_NAME": "fk_chat_messages_sender_id",
+          "TABLE_NAME": "chat_messages",
+          "COLUMN_NAME": "sender_id",
+          "REFERENCED_TABLE_NAME": "users",
+          "REFERENCED_COLUMN_NAME": "user_id",
+          "DELETE_RULE": "SET NULL",
+          "UPDATE_RULE": "CASCADE"
+        },
+        {
+          "CONSTRAINT_NAME": "fk_chat_messages_session_id",
+          "TABLE_NAME": "chat_messages",
+          "COLUMN_NAME": "session_id",
+          "REFERENCED_TABLE_NAME": "customer_service_sessions",
+          "REFERENCED_COLUMN_NAME": "session_id",
+          "DELETE_RULE": "CASCADE",
+          "UPDATE_RULE": "CASCADE"
+        },
+        {
+          "CONSTRAINT_NAME": "content_review_records_ibfk_1",
+          "TABLE_NAME": "content_review_records",
+          "COLUMN_NAME": "auditor_id",
+          "REFERENCED_TABLE_NAME": "users",
+          "REFERENCED_COLUMN_NAME": "user_id",
+          "DELETE_RULE": "SET NULL",
+          "UPDATE_RULE": "CASCADE"
+        },
+        {
+          "CONSTRAINT_NAME": "fk_customer_sessions_admin_id",
+          "TABLE_NAME": "customer_service_sessions",
+          "COLUMN_NAME": "admin_id",
+          "REFERENCED_TABLE_NAME": "users",
+          "REFERENCED_COLUMN_NAME": "user_id",
+          "DELETE_RULE": "SET NULL",
+          "UPDATE_RULE": "CASCADE"
+        },
+        {
+          "CONSTRAINT_NAME": "fk_customer_sessions_user_id",
+          "TABLE_NAME": "customer_service_sessions",
+          "COLUMN_NAME": "user_id",
+          "REFERENCED_TABLE_NAME": "users",
+          "REFERENCED_COLUMN_NAME": "user_id",
+          "DELETE_RULE": "SET NULL",
+          "UPDATE_RULE": "CASCADE"
+        },
+        {
+          "CONSTRAINT_NAME": "exchange_records_auditor_id_foreign_idx",
+          "TABLE_NAME": "exchange_records",
+          "COLUMN_NAME": "auditor_id",
+          "REFERENCED_TABLE_NAME": "users",
+          "REFERENCED_COLUMN_NAME": "user_id",
+          "DELETE_RULE": "SET NULL",
+          "UPDATE_RULE": "CASCADE"
+        },
+        {
+          "CONSTRAINT_NAME": "fk_exchange_records_product_id",
+          "TABLE_NAME": "exchange_records",
+          "COLUMN_NAME": "product_id",
+          "REFERENCED_TABLE_NAME": "products",
+          "REFERENCED_COLUMN_NAME": "product_id",
+          "DELETE_RULE": "RESTRICT",
+          "UPDATE_RULE": "CASCADE"
+        },
+        {
+          "CONSTRAINT_NAME": "fk_exchange_records_user_id",
+          "TABLE_NAME": "exchange_records",
+          "COLUMN_NAME": "user_id",
+          "REFERENCED_TABLE_NAME": "users",
+          "REFERENCED_COLUMN_NAME": "user_id",
+          "DELETE_RULE": "CASCADE",
+          "UPDATE_RULE": "CASCADE"
+        },
+        {
+          "CONSTRAINT_NAME": "feedbacks_ibfk_1",
+          "TABLE_NAME": "feedbacks",
+          "COLUMN_NAME": "user_id",
+          "REFERENCED_TABLE_NAME": "users",
+          "REFERENCED_COLUMN_NAME": "user_id",
+          "DELETE_RULE": "SET NULL",
+          "UPDATE_RULE": "CASCADE"
+        },
+        {
+          "CONSTRAINT_NAME": "feedbacks_ibfk_2",
+          "TABLE_NAME": "feedbacks",
+          "COLUMN_NAME": "admin_id",
+          "REFERENCED_TABLE_NAME": "users",
+          "REFERENCED_COLUMN_NAME": "user_id",
+          "DELETE_RULE": "SET NULL",
+          "UPDATE_RULE": "CASCADE"
+        },
+        {
+          "CONSTRAINT_NAME": "fk_image_resources_reviewer_id",
+          "TABLE_NAME": "image_resources",
+          "COLUMN_NAME": "reviewer_id",
+          "REFERENCED_TABLE_NAME": "users",
+          "REFERENCED_COLUMN_NAME": "user_id",
+          "DELETE_RULE": "SET NULL",
+          "UPDATE_RULE": "CASCADE"
+        },
+        {
+          "CONSTRAINT_NAME": "fk_image_resources_user_id",
+          "TABLE_NAME": "image_resources",
+          "COLUMN_NAME": "user_id",
+          "REFERENCED_TABLE_NAME": "users",
+          "REFERENCED_COLUMN_NAME": "user_id",
+          "DELETE_RULE": "SET NULL",
+          "UPDATE_RULE": "CASCADE"
+        },
+        {
+          "CONSTRAINT_NAME": "fk_lottery_draws_user_id",
+          "TABLE_NAME": "lottery_draws",
+          "COLUMN_NAME": "user_id",
+          "REFERENCED_TABLE_NAME": "users",
+          "REFERENCED_COLUMN_NAME": "user_id",
+          "DELETE_RULE": "CASCADE",
+          "UPDATE_RULE": "CASCADE"
+        },
+        {
+          "CONSTRAINT_NAME": "fk_lottery_records_campaign",
+          "TABLE_NAME": "lottery_draws",
+          "COLUMN_NAME": "campaign_id",
+          "REFERENCED_TABLE_NAME": "lottery_campaigns",
+          "REFERENCED_COLUMN_NAME": "campaign_id",
+          "DELETE_RULE": "RESTRICT",
+          "UPDATE_RULE": "CASCADE"
+        },
+        {
+          "CONSTRAINT_NAME": "lottery_draws_ibfk_4",
+          "TABLE_NAME": "lottery_draws",
+          "COLUMN_NAME": "prize_id",
+          "REFERENCED_TABLE_NAME": "lottery_prizes",
+          "REFERENCED_COLUMN_NAME": "prize_id",
+          "DELETE_RULE": "SET NULL",
+          "UPDATE_RULE": "CASCADE"
+        },
+        {
+          "CONSTRAINT_NAME": "fk_lottery_presets_created_by",
+          "TABLE_NAME": "lottery_presets",
+          "COLUMN_NAME": "created_by",
+          "REFERENCED_TABLE_NAME": "users",
+          "REFERENCED_COLUMN_NAME": "user_id",
+          "DELETE_RULE": "SET NULL",
+          "UPDATE_RULE": "CASCADE"
+        },
+        {
+          "CONSTRAINT_NAME": "fk_lottery_presets_prize_id",
+          "TABLE_NAME": "lottery_presets",
+          "COLUMN_NAME": "prize_id",
+          "REFERENCED_TABLE_NAME": "lottery_prizes",
+          "REFERENCED_COLUMN_NAME": "prize_id",
+          "DELETE_RULE": "CASCADE",
+          "UPDATE_RULE": "CASCADE"
+        },
+        {
+          "CONSTRAINT_NAME": "fk_lottery_presets_user_id",
+          "TABLE_NAME": "lottery_presets",
+          "COLUMN_NAME": "user_id",
+          "REFERENCED_TABLE_NAME": "users",
+          "REFERENCED_COLUMN_NAME": "user_id",
+          "DELETE_RULE": "CASCADE",
+          "UPDATE_RULE": "CASCADE"
+        },
+        {
+          "CONSTRAINT_NAME": "fk_points_transactions_operator_id",
+          "TABLE_NAME": "points_transactions",
+          "COLUMN_NAME": "operator_id",
+          "REFERENCED_TABLE_NAME": "users",
+          "REFERENCED_COLUMN_NAME": "user_id",
+          "DELETE_RULE": "SET NULL",
+          "UPDATE_RULE": "CASCADE"
+        },
+        {
+          "CONSTRAINT_NAME": "points_transactions_ibfk_3",
+          "TABLE_NAME": "points_transactions",
+          "COLUMN_NAME": "user_id",
+          "REFERENCED_TABLE_NAME": "users",
+          "REFERENCED_COLUMN_NAME": "user_id",
+          "DELETE_RULE": "CASCADE",
+          "UPDATE_RULE": "CASCADE"
+        },
+        {
+          "CONSTRAINT_NAME": "points_transactions_ibfk_4",
+          "TABLE_NAME": "points_transactions",
+          "COLUMN_NAME": "account_id",
+          "REFERENCED_TABLE_NAME": "user_points_accounts",
+          "REFERENCED_COLUMN_NAME": "account_id",
+          "DELETE_RULE": "CASCADE",
+          "UPDATE_RULE": "CASCADE"
+        },
+        {
+          "CONSTRAINT_NAME": "system_announcements_ibfk_1",
+          "TABLE_NAME": "system_announcements",
+          "COLUMN_NAME": "admin_id",
+          "REFERENCED_TABLE_NAME": "users",
+          "REFERENCED_COLUMN_NAME": "user_id",
+          "DELETE_RULE": "RESTRICT",
+          "UPDATE_RULE": "CASCADE"
+        },
+        {
+          "CONSTRAINT_NAME": "fk_trade_records_to_user_id",
+          "TABLE_NAME": "trade_records",
+          "COLUMN_NAME": "to_user_id",
+          "REFERENCED_TABLE_NAME": "users",
+          "REFERENCED_COLUMN_NAME": "user_id",
+          "DELETE_RULE": "CASCADE",
+          "UPDATE_RULE": "CASCADE"
+        },
+        {
+          "CONSTRAINT_NAME": "trade_records_ibfk_1",
+          "TABLE_NAME": "trade_records",
+          "COLUMN_NAME": "from_user_id",
+          "REFERENCED_TABLE_NAME": "users",
+          "REFERENCED_COLUMN_NAME": "user_id",
+          "DELETE_RULE": "SET NULL",
+          "UPDATE_RULE": "CASCADE"
+        },
+        {
+          "CONSTRAINT_NAME": "trade_records_ibfk_3",
+          "TABLE_NAME": "trade_records",
+          "COLUMN_NAME": "operator_id",
+          "REFERENCED_TABLE_NAME": "users",
+          "REFERENCED_COLUMN_NAME": "user_id",
+          "DELETE_RULE": "SET NULL",
+          "UPDATE_RULE": "CASCADE"
+        },
+        {
+          "CONSTRAINT_NAME": "fk_user_inventory_transfer_to_user_id",
+          "TABLE_NAME": "user_inventory",
+          "COLUMN_NAME": "transfer_to_user_id",
+          "REFERENCED_TABLE_NAME": "users",
+          "REFERENCED_COLUMN_NAME": "user_id",
+          "DELETE_RULE": "SET NULL",
+          "UPDATE_RULE": "CASCADE"
+        },
+        {
+          "CONSTRAINT_NAME": "fk_user_inventory_user_id",
+          "TABLE_NAME": "user_inventory",
+          "COLUMN_NAME": "user_id",
+          "REFERENCED_TABLE_NAME": "users",
+          "REFERENCED_COLUMN_NAME": "user_id",
+          "DELETE_RULE": "CASCADE",
+          "UPDATE_RULE": "CASCADE"
+        },
+        {
+          "CONSTRAINT_NAME": "user_points_accounts_ibfk_1",
+          "TABLE_NAME": "user_points_accounts",
+          "COLUMN_NAME": "user_id",
+          "REFERENCED_TABLE_NAME": "users",
+          "REFERENCED_COLUMN_NAME": "user_id",
+          "DELETE_RULE": "CASCADE",
+          "UPDATE_RULE": "CASCADE"
+        },
+        {
+          "CONSTRAINT_NAME": "fk_user_roles_role_id",
+          "TABLE_NAME": "user_roles",
+          "COLUMN_NAME": "role_id",
+          "REFERENCED_TABLE_NAME": "roles",
+          "REFERENCED_COLUMN_NAME": "role_id",
+          "DELETE_RULE": "RESTRICT",
+          "UPDATE_RULE": "CASCADE"
+        },
+        {
+          "CONSTRAINT_NAME": "fk_user_roles_user_id",
+          "TABLE_NAME": "user_roles",
+          "COLUMN_NAME": "user_id",
+          "REFERENCED_TABLE_NAME": "users",
+          "REFERENCED_COLUMN_NAME": "user_id",
+          "DELETE_RULE": "CASCADE",
+          "UPDATE_RULE": "CASCADE"
+        }
+      ],
+      "recommendations": [
+        {
+          "constraint": "fk_exchange_records_user_id",
+          "table": "exchange_records",
+          "column": "user_id",
+          "current": {
+            "delete": "CASCADE",
+            "update": "CASCADE"
+          },
+          "recommended": {
+            "delete": "RESTRICT",
+            "update": "CASCADE"
+          },
+          "reason": "有兑换记录的用户不能删除（业务保护）"
+        }
+      ]
+    }
+  }
+}

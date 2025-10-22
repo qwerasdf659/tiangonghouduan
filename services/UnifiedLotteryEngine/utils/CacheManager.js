@@ -17,8 +17,10 @@ class CacheManager {
       deletes: 0
     }
 
-    // 只在非测试环境启动自动清理
-    // 避免在Jest测试中导致超时问题
+    /*
+     * 只在非测试环境启动自动清理
+     * 避免在Jest测试中导致超时问题
+     */
     if (process.env.NODE_ENV !== 'test' && typeof jest === 'undefined') {
       // 每10分钟清理一次过期缓存
       this.cleanupInterval = setInterval(() => this.cleanup(), 10 * 60 * 1000)
