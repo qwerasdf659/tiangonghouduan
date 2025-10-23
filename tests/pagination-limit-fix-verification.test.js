@@ -1,6 +1,6 @@
 /**
  * 分页限制修复验证测试
- * 
+ *
  * 测试目标：验证所有接口的分页限制是否正确实施
  * 修复内容：8个接口添加Math.min()最大限制保护
  * 测试账号：13612227930（管理员+普通用户）
@@ -39,8 +39,10 @@ describe('🔍 分页限制修复验证测试', () => {
       .set('Authorization', `Bearer ${testUserToken}`)
       .query({ limit: 999 })
 
-    // 即使请求失败（会话不存在），也应该先经过分页保护逻辑
-    // 我们主要关注的是分页参数是否被正确处理
+    /*
+     * 即使请求失败（会话不存在），也应该先经过分页保护逻辑
+     * 我们主要关注的是分页参数是否被正确处理
+     */
     console.log('聊天历史接口响应状态:', response.status)
   })
 
@@ -55,7 +57,7 @@ describe('🔍 分页限制修复验证测试', () => {
       .query({ limit: 999, page: 1 })
 
     console.log('抽奖历史接口响应:', response.status)
-    
+
     // 验证pagination信息
     if (response.body.data && response.body.data.pagination) {
       const { limit } = response.body.data.pagination
@@ -75,7 +77,7 @@ describe('🔍 分页限制修复验证测试', () => {
       .query({ limit: 999, page: 1 })
 
     console.log('用户库存接口响应:', response.status)
-    
+
     // 验证pagination信息
     if (response.body.data && response.body.data.pagination) {
       const { limit } = response.body.data.pagination
@@ -95,7 +97,7 @@ describe('🔍 分页限制修复验证测试', () => {
       .query({ limit: 999, page: 1 })
 
     console.log('商品列表接口响应:', response.status)
-    
+
     // 验证pagination信息
     if (response.body.data && response.body.data.pagination) {
       const { limit } = response.body.data.pagination
@@ -141,7 +143,7 @@ describe('🔍 分页限制修复验证测试', () => {
       .query({ limit: 999, page: 1 })
 
     console.log('积分交易接口响应:', response.status)
-    
+
     // 验证pagination信息
     if (response.body.data && response.body.data.pagination) {
       const { limit } = response.body.data.pagination
@@ -223,4 +225,3 @@ describe('🔍 分页限制修复验证测试', () => {
     }
   })
 })
-

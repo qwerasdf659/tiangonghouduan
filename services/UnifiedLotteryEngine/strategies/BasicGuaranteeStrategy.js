@@ -216,7 +216,8 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
           user_id,
           campaignId,
           guaranteeCheck.nextDrawNumber,
-          transaction // 🎯 2025-10-20修复：传入外部事务参数
+          transaction, // 🎯 2025-10-20修复：传入外部事务参数
+          context // 🔥 2025-10-23修复：传入context用于识别连抽场景
         )
 
         const executionTime = BeijingTimeHelper.timestamp() - startTime
@@ -322,13 +323,35 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
         const prize = await this.selectPrize(await this.getAvailablePrizes(campaignId))
 
         if (prize) {
-          // 🎯 步骤1: 先扣减积分（传入draw_id和transaction用于幂等性控制和事务管理）
-          await this.deductPoints(
-            user_id,
-            this.config.pointsCostPerDraw,
-            draw_id,
-            internalTransaction
-          )
+          /**
+           * 🔥 核心修复：支持连抽统一扣除积分（2025-10-23）
+           * 
+           * 问题根因：
+           * - 原逻辑：每次抽奖都调用deductPoints扣除100积分
+           * - 10连抽问题：虽然外层计算了900积分折扣，但这里每次还是扣100积分
+           * 
+           * 修复方案：
+           * - 检查context.skip_points_deduction标识
+           * - 如果为true（连抽场景），跳过积分扣除（外层已统一扣除）
+           * - 如果为false（单抽场景），正常扣除积分
+           */
+          if (!context.skip_points_deduction) {
+            // 步骤1: 单抽场景 - 扣减积分（传入draw_id和transaction用于幂等性控制和事务管理）
+            await this.deductPoints(
+              user_id,
+              this.config.pointsCostPerDraw,
+              draw_id,
+              internalTransaction
+            )
+          } else {
+            // 连抽场景 - 跳过积分扣除（外层已统一扣除折扣后的总积分）
+            this.logInfo('连抽场景：跳过单次积分扣除（外层已统一扣除）', {
+              user_id,
+              campaignId,
+              draw_id,
+              batch_draw_id: context.batch_draw_id
+            })
+          }
 
           // 🎯 步骤2: 再发放奖品（在事务中执行，确保顺序）
           await this.distributePrize(user_id, prize, internalTransaction)
@@ -385,12 +408,17 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
          * ✅ 生成唯一的抽奖ID（用于幂等性控制）
          */
         const fallback_draw_id = `draw_${BeijingTimeHelper.generateIdTimestamp()}_${user_id}_${Math.random().toString(36).substr(2, 6)}`
-        await this.deductPoints(
-          user_id,
-          this.config.pointsCostPerDraw,
-          fallback_draw_id,
-          internalTransaction
-        )
+        
+        // 🔥 修复：连抽场景跳过积分扣除
+        if (!context.skip_points_deduction) {
+          await this.deductPoints(
+            user_id,
+            this.config.pointsCostPerDraw,
+            fallback_draw_id,
+            internalTransaction
+          )
+        }
+        
         await this.recordLotteryHistory(
           context,
           { is_winner: false },
@@ -571,12 +599,14 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
    * 🔴 核心功能：发放九八折券并扣除积分
    *
    * 🎯 2025-10-20修复：支持外部事务参数，确保连抽场景下的事务一致性
+   * 🔥 2025-10-23修复：支持连抽统一扣除积分，避免重复扣除
    * @param {number} user_id - 用户ID
    * @param {number} campaignId - 活动ID
    * @param {number} drawNumber - 抽奖次数
    * @param {Transaction} transaction - 外部事务对象（可选，连抽场景传入）
+   * @param {Object} context - 执行上下文（可选，用于识别连抽场景）
    */
-  async executeGuaranteeAward (user_id, campaignId, drawNumber, transaction = null) {
+  async executeGuaranteeAward (user_id, campaignId, drawNumber, transaction = null, context = {}) {
     /*
      * 🔥 统一事务保护机制
      * - 如果有外部事务（连抽场景），使用外部事务，不提交/回滚
@@ -596,13 +626,30 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
         transaction: internalTransaction
       })
 
-      if (!userAccount || userAccount.available_points < pointsCost) {
-        if (!isExternalTransaction) {
-          await internalTransaction.rollback()
+      /**
+       * 🔥 修复：连抽场景跳过积分检查（外层已统一检查并扣除）
+       * 
+       * 原逻辑问题：
+       * - 连抽场景：外层已扣除900积分，这里检查余额会不准确
+       * - 单抽场景：需要检查用户是否有100积分
+       */
+      if (!context.skip_points_deduction) {
+        // 单抽场景 - 检查积分是否足够
+        if (!userAccount || userAccount.available_points < pointsCost) {
+          if (!isExternalTransaction) {
+            await internalTransaction.rollback()
+          }
+          throw new Error(
+            `保底抽奖积分不足：需要${pointsCost}积分，当前${userAccount?.available_points || 0}积分`
+          )
         }
-        throw new Error(
-          `保底抽奖积分不足：需要${pointsCost}积分，当前${userAccount?.available_points || 0}积分`
-        )
+      } else {
+        // 连抽场景 - 跳过积分检查（外层已统一检查和扣除）
+        this.logInfo('连抽保底场景：跳过积分检查（外层已统一检查）', {
+          user_id,
+          campaignId,
+          drawNumber
+        })
       }
 
       // 2. 生成唯一的抽奖ID（用于幂等性控制）
@@ -624,15 +671,31 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
         throw new Error('保底奖品（九八折券）不存在')
       }
 
-      // 4. 扣除用户积分（使用统一积分服务 + 幂等性控制）
-      await PointsService.consumePoints(user_id, pointsCost, {
-        transaction: internalTransaction,
-        business_id: draw_id, // ✅ 添加business_id用于幂等性控制
-        business_type: 'lottery_consume',
-        source_type: 'system',
-        title: '保底抽奖消耗积分',
-        description: `第${drawNumber}次抽奖触发保底机制，消耗${pointsCost}积分`
-      })
+      /**
+       * 🔥 核心修复：支持连抽统一扣除积分（2025-10-23）
+       * 
+       * 问题：10连抽第10次触发保底时，如果这里再扣除100积分，总共会扣除1000积分
+       * 修复：检查context.skip_points_deduction标识，连抽场景跳过积分扣除
+       */
+      if (!context.skip_points_deduction) {
+        // 4. 单抽场景 - 扣除用户积分（使用统一积分服务 + 幂等性控制）
+        await PointsService.consumePoints(user_id, pointsCost, {
+          transaction: internalTransaction,
+          business_id: draw_id, // ✅ 添加business_id用于幂等性控制
+          business_type: 'lottery_consume',
+          source_type: 'system',
+          title: '保底抽奖消耗积分',
+          description: `第${drawNumber}次抽奖触发保底机制，消耗${pointsCost}积分`
+        })
+      } else {
+        // 连抽场景 - 跳过积分扣除（外层已统一扣除折扣后的总积分）
+        this.logInfo('连抽保底场景：跳过积分扣除（外层已统一扣除）', {
+          user_id,
+          campaignId,
+          drawNumber,
+          batch_draw_id: context.batch_draw_id
+        })
+      }
 
       // 5. 创建抽奖记录
       const lotteryRecord = await models.LotteryDraw.create(
@@ -1086,7 +1149,10 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
         lottery_id: campaign_id,
         campaign_id,
         draw_type: 'single',
-        prize_id: result.prize?.id || null,
+        prize_id: result.prize?.prize_id || result.prize?.id || null,
+        prize_name: result.prize?.prize_name || result.prize?.name || null, // ✅ 修复Bug：支持两种字段名格式
+        prize_type: result.prize?.prize_type || result.prize?.type || null, // ✅ 修复Bug：支持两种字段名格式
+        prize_value: result.prize?.prize_value || result.prize?.value || null, // ✅ 修复Bug：支持两种字段名格式
         cost_points: this.config.pointsCostPerDraw, // ✅ 修复：使用正确的字段名cost_points
         is_winner: result.is_winner,
         win_probability: probability,
@@ -1161,8 +1227,11 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
       // ✅ 生成唯一的抽奖ID（用于幂等性控制）
       const draw_id = `draw_${BeijingTimeHelper.generateIdTimestamp()}_${user_id}_${Math.random().toString(36).substr(2, 6)}`
 
-      // 扣减积分（预设结果也需要消耗积分，保持抽奖流程一致性）
-      await this.deductPoints(user_id, this.config.pointsCostPerDraw, draw_id, transaction)
+      // 🔥 修复：连抽场景跳过积分扣除（预设奖品也遵循相同逻辑）
+      if (!context.skip_points_deduction) {
+        // 扣减积分（预设结果也需要消耗积分，保持抽奖流程一致性）
+        await this.deductPoints(user_id, this.config.pointsCostPerDraw, draw_id, transaction)
+      }
 
       // 🎯 发放预设奖品（在事务中执行）
       await this.distributePrize(user_id, preset.prize, transaction)

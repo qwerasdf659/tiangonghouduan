@@ -23,16 +23,19 @@ class PointsService {
   /**
    * 获取用户积分账户
    * @param {number} user_id - 用户ID
+   * @param {Object} transaction - 事务对象（可选，用于在事务中查询最新数据）
    * @returns {Object} 积分账户信息
    */
-  static async getUserPointsAccount (user_id) {
+  static async getUserPointsAccount (user_id, transaction = null) {
     let account = await UserPointsAccount.findOne({
-      where: { user_id, is_active: true }
+      where: { user_id, is_active: true },
+      transaction, // ✅ 修复Bug：支持事务查询，确保读取事务中的最新数据
+      lock: transaction ? transaction.LOCK.UPDATE : undefined // ✅ 在事务中使用悲观锁，防止并发问题
     })
 
     // 如果账户不存在，自动创建
     if (!account) {
-      account = await this.createPointsAccount(user_id)
+      account = await this.createPointsAccount(user_id, transaction)
     }
 
     return account
@@ -41,9 +44,10 @@ class PointsService {
   /**
    * 创建积分账户
    * @param {number} user_id - 用户ID
+   * @param {Object} transaction - 事务对象（可选）
    * @returns {Object} 新创建的积分账户
    */
-  static async createPointsAccount (user_id) {
+  static async createPointsAccount (user_id, transaction = null) {
     // 获取用户的历史积分作为初始值
     const user = await User.findByPk(user_id)
     if (!user) {
@@ -128,7 +132,8 @@ class PointsService {
       }
     }
 
-    const account = await this.getUserPointsAccount(user_id)
+    // ✅ 修复Bug：在事务中查询账户，确保读取到最新数据（已扣除积分后的余额）
+    const account = await this.getUserPointsAccount(user_id, transaction)
     const oldBalance = parseFloat(account.available_points)
     const newBalance = oldBalance + points
     const newTotalEarned = account.total_earned + points
@@ -261,7 +266,7 @@ class PointsService {
         user_id,
         account_id: account.account_id,
         transaction_type: 'consume',
-        points_amount: points,
+        points_amount: -points, // ✅ 修复Bug：consume类型存储负数表示扣除
         points_balance_before: oldBalance,
         points_balance_after: newBalance,
         business_type: options.business_type || 'manual',

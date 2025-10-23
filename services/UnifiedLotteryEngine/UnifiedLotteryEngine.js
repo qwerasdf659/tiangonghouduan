@@ -677,6 +677,7 @@ class UnifiedLotteryEngine {
           'end_time',
           'total_prize_pool',
           'remaining_prize_pool',
+          'prize_distribution_config', // 🔥 2025-10-23 新增：包含draw_pricing定价配置
           'created_at',
           'updated_at'
         ]
@@ -855,18 +856,55 @@ class UnifiedLotteryEngine {
         )
       }
 
-      const results = []
-      let totalPointsCost = 0
+      /**
+       * 🔥 核心修复：统一扣除折扣后的总积分（2025-10-23）
+       * 
+       * 问题根因：
+       * - 原逻辑：每次抽奖都扣除100积分，10连抽实际扣除1000积分
+       * - 折扣失效：虽然计算了900积分，但实际每次还是扣100积分
+       * 
+       * 修复方案：
+       * - 在抽奖前统一扣除折扣后的总积分（单抽100，10连抽900）
+       * - 传递skip_points_deduction标识给策略，避免重复扣除
+       * - 确保事务一致性：统一扣除 + 循环抽奖 + 发放奖品
+       */
+      const PointsService = require('../../services/PointsService')
+      const batchDrawId = `batch_${BeijingTimeHelper.generateIdTimestamp()}_${user_id}` // 批次ID用于幂等性控制
 
-      // 执行多次抽奖
+      // 步骤1：统一扣除折扣后的总积分（在事务中执行）
+      await PointsService.consumePoints(user_id, requiredPoints, {
+        transaction,
+        business_id: batchDrawId, // 使用批次ID实现幂等性
+        business_type: 'lottery_consume',
+        source_type: 'system',
+        title: draw_count === 1 ? '抽奖消耗积分' : `${draw_count}连抽消耗积分`,
+        description: draw_count === 1
+          ? `单次抽奖消耗${requiredPoints}积分`
+          : `${draw_count}连抽消耗${requiredPoints}积分（${pricing.label}，原价${draw_count * 100}积分，节省${draw_count * 100 - requiredPoints}积分）`
+      })
+
+      this.logInfo('连抽积分统一扣除成功', {
+        user_id,
+        draw_count,
+        requiredPoints,
+        pricing,
+        batchDrawId
+      })
+
+      const results = []
+      let totalPointsCost = 0 // 实际已扣除金额（用于统计）
+
+      // 步骤2：执行多次抽奖（不再重复扣除积分）
       for (let i = 0; i < draw_count; i++) {
         const context = {
           user_id,
           campaign_id,
           draw_number: i + 1,
           total_draws: draw_count,
+          skip_points_deduction: true, // 🎯 关键标识：告诉策略不要再扣除积分
+          batch_draw_id: batchDrawId, // 传递批次ID
           user_status: {
-            available_points: userAccount.available_points - totalPointsCost
+            available_points: userAccount.available_points - requiredPoints // 显示扣除后的余额
           }
         }
 
@@ -895,7 +933,8 @@ class UnifiedLotteryEngine {
             points_cost: drawResult.data?.draw_result?.points_cost || 0
           })
 
-          totalPointsCost += drawResult.data?.draw_result?.points_cost || 0
+          // 🔥 修复：连抽场景不累加points_cost（外层已统一扣除）
+          // totalPointsCost仅用于统计，实际扣除金额是requiredPoints
         } else {
           // 抽奖失败，停止后续抽奖
           throw new Error(drawResult.message || '抽奖执行失败')
@@ -915,15 +954,16 @@ class UnifiedLotteryEngine {
         where: { user_id }
       })
 
-      const remainingPoints = updatedAccount ? updatedAccount.available_points : userAccount.available_points - totalPointsCost
+      const remainingPoints = updatedAccount ? updatedAccount.available_points : userAccount.available_points - requiredPoints
 
       this.logInfo('抽奖执行完成（事务已提交）', {
         user_id,
         campaign_id,
         draw_count,
-        totalPointsCost,
+        actualPointsCost: requiredPoints, // 🔥 修复：实际扣除的积分数（含折扣）
         remainingPoints,
-        winners: results.filter(r => r.is_winner).length
+        winners: results.filter(r => r.is_winner).length,
+        pricing
       })
 
       /**

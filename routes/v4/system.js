@@ -407,42 +407,42 @@ router.get('/business-config', dataAccessControl, async (req, res) => {
     // 公开配置（所有用户可见）
     const publicConfig = {
       lottery: {
-        draw_pricing: businessConfig.lottery.drawPricing, // 连抽定价配置
-        daily_limit: businessConfig.lottery.dailyLimit.all, // 每日抽奖上限
-        free_draw_allowed: businessConfig.lottery.freeDrawAllowed // 是否允许免费抽奖
+        draw_pricing: businessConfig.lottery.draw_pricing, // 连抽定价配置（修正：使用下划线命名）
+        daily_limit: businessConfig.lottery.daily_limit.all, // 每日抽奖上限（修正：使用下划线命名）
+        free_draw_allowed: businessConfig.lottery.free_draw_allowed // 是否允许免费抽奖（修正：使用下划线命名）
       },
       points: {
-        display_name: businessConfig.points.displayName, // 积分显示名称
-        max_balance: businessConfig.points.maxBalance, // 积分上限
-        min_balance: businessConfig.points.minBalance // 积分下限
+        display_name: businessConfig.points.display_name, // 积分显示名称（修正：使用下划线命名）
+        max_balance: businessConfig.points.max_balance, // 积分上限（修正：使用下划线命名）
+        min_balance: businessConfig.points.min_balance // 积分下限（修正：使用下划线命名）
       },
       user: {
         nickname: {
-          min_length: businessConfig.user.nickname.minLength, // 昵称最小长度
-          max_length: businessConfig.user.nickname.maxLength // 昵称最大长度
+          min_length: businessConfig.user.nickname.min_length, // 昵称最小长度（修正：使用下划线命名）
+          max_length: businessConfig.user.nickname.max_length // 昵称最大长度（修正：使用下划线命名）
         },
         verification_code: {
-          expiry_seconds: businessConfig.user.verificationCode.expirySeconds, // 验证码有效期（秒）
-          resend_interval: businessConfig.user.verificationCode.resendInterval // 重发间隔（秒）
+          expiry_seconds: businessConfig.user.verification_code.expiry_seconds, // 验证码有效期（秒）（修正：使用下划线命名）
+          resend_interval: businessConfig.user.verification_code.resend_interval // 重发间隔（秒）（修正：使用下划线命名）
         }
       },
       upload: {
         image: {
-          max_size_mb: businessConfig.upload.image.maxSizeMB, // 图片最大大小（MB）
-          max_count: businessConfig.upload.image.maxCount, // 单次最大上传数量
-          allowed_types: businessConfig.upload.image.allowedTypes // 允许的文件类型
+          max_size_mb: businessConfig.upload.image.max_size_mb, // 图片最大大小（MB）（修正：使用下划线命名）
+          max_count: businessConfig.upload.image.max_count, // 单次最大上传数量（修正：使用下划线命名）
+          allowed_types: businessConfig.upload.image.allowed_types // 允许的文件类型（修正：使用下划线命名）
         }
       },
       pagination: {
-        user: businessConfig.pagination.user, // 普通用户分页配置
-        admin: dataLevel === 'full' ? businessConfig.pagination.admin : undefined // 管理员分页配置（仅管理员可见）
+        user: businessConfig.pagination.user, // 普通用户分页配置（无需修改，已是正确格式）
+        admin: dataLevel === 'full' ? businessConfig.pagination.admin : undefined // 管理员分页配置（仅管理员可见）（无需修改）
       }
     }
 
     // 管理员可见的完整配置
     if (dataLevel === 'full') {
       publicConfig.points.validation = businessConfig.points.validation // 积分验证规则（仅管理员可见）
-      publicConfig.lottery.daily_limit_reset_time = businessConfig.lottery.dailyLimit.resetTime // 每日限制重置时间（仅管理员可见）
+      publicConfig.lottery.daily_limit_reset_time = businessConfig.lottery.daily_limit.reset_time // 每日限制重置时间（仅管理员可见）（修正：使用下划线命名）
     }
 
     return ApiResponse.success(

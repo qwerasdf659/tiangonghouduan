@@ -90,7 +90,7 @@ describe('🔐 连抽事务安全保护测试', () => {
       // 🆕 验证总消耗积分（抽奖成本，不考虑积分奖品的影响）
       const totalCost = response.body.data.total_points_cost
       expect(totalCost).toBe(300)
-      
+
       // 🆕 验证响应中的余额与API查询的余额一致（关键：验证事务已提交）
       const afterResponse = await request(app)
         .get('/api/v4/unified-engine/points/balance')
@@ -99,7 +99,7 @@ describe('🔐 连抽事务安全保护测试', () => {
       const pointsAfter = afterResponse.body.data.available_points
       console.log(`\n3连抽后积分余额: ${pointsAfter}`)
       console.log(`响应中的余额: ${response.body.data.remaining_balance}`)
-      
+
       // 🎯 核心验证：响应中的余额应该等于数据库中的实际余额（事务已提交）
       expect(pointsAfter).toBe(response.body.data.remaining_balance)
 
@@ -150,7 +150,7 @@ describe('🔐 连抽事务安全保护测试', () => {
       const pointsAfter = afterResponse.body.data.available_points
       console.log(`\n5连抽后积分余额: ${pointsAfter}`)
       console.log(`响应中的余额: ${response.body.data.remaining_balance}`)
-      
+
       // 🎯 核心验证：响应中的余额应该等于数据库中的实际余额
       expect(pointsAfter).toBe(response.body.data.remaining_balance)
 
@@ -252,12 +252,14 @@ describe('🔐 连抽事务安全保护测试', () => {
 
       console.log(`\n并发测试后积分余额: ${pointsAfter}`)
 
-      // 🆕 验证每个成功的请求，其响应中的余额应该与最终数据库余额相关联
-      // 注意：由于并发执行，我们只需验证：
-      // 1. 所有请求都成功执行
-      // 2. 最终余额 <= 初始余额（考虑到积分奖品可能增加积分）
-      // 3. 每个请求的 total_points_cost 正确（3 * 100 = 300）
-      
+      /*
+       * 🆕 验证每个成功的请求，其响应中的余额应该与最终数据库余额相关联
+       * 注意：由于并发执行，我们只需验证：
+       * 1. 所有请求都成功执行
+       * 2. 最终余额 <= 初始余额（考虑到积分奖品可能增加积分）
+       * 3. 每个请求的 total_points_cost 正确（3 * 100 = 300）
+       */
+
       results.forEach((result, index) => {
         if (result.status === 'fulfilled' && result.value.body.success) {
           const totalCost = result.value.body.data.total_points_cost
@@ -265,7 +267,7 @@ describe('🔐 连抽事务安全保护测试', () => {
           console.log(`请求${index + 1}: 消耗${totalCost}积分`)
         }
       })
-      
+
       // 🎯 核心验证：至少有一个请求成功（验证并发事务保护）
       expect(successfulRequests).toBeGreaterThan(0)
 

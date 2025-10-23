@@ -94,21 +94,32 @@ router.post('/upload', upload.single('photo'), async (req, res) => {
       { transaction }
     )
 
-    // 检查是否为支持的图片格式，如果是则生成缩略图
+    /*
+     * 🔴 关键优化：先提交事务，快速响应用户
+     * 避免缩略图生成（耗时50秒+）阻塞事务，导致503超时错误
+     */
+    await transaction.commit()
+    console.log('✅ 图片记录已保存，image_id:', imageResource.image_id)
+
+    /*
+     * 🔄 异步生成缩略图（不阻塞响应）
+     * 检查是否为支持的图片格式，如果是则生成缩略图
+     */
     if (ThumbnailService.isSupportedImageType(file.mimetype)) {
-      try {
-        console.log('🖼️ 开始生成缩略图...')
-        const thumbnails = await imageResource.generateThumbnails()
-        console.log('✅ 缩略图生成成功:', thumbnails)
-      } catch (thumbnailError) {
-        console.warn('⚠️ 缩略图生成失败，但上传继续:', thumbnailError.message)
-        // 缩略图生成失败不影响主要上传流程
-      }
+      // 使用 setImmediate 异步执行，不阻塞响应
+      setImmediate(async () => {
+        try {
+          console.log('🖼️ 异步生成缩略图... image_id:', imageResource.image_id)
+          const thumbnails = await imageResource.generateThumbnails()
+          console.log('✅ 缩略图生成成功:', thumbnails)
+        } catch (thumbnailError) {
+          console.warn('⚠️ 缩略图生成失败:', thumbnailError.message)
+          // 缩略图生成失败不影响主要上传流程
+        }
+      })
     } else {
       console.log('ℹ️ 不支持的图片格式，跳过缩略图生成:', file.mimetype)
     }
-
-    await transaction.commit()
 
     // 返回安全的JSON（包含缩略图信息）
     const safeData = imageResource.toSafeJSON()
@@ -504,7 +515,11 @@ router.get('/my-stats', async (req, res) => {
           source_module: 'user_upload',
           status: 'active',
           created_at: {
-            [Op.gte]: new Date(BeijingTimeHelper.createDatabaseTime().getFullYear(), BeijingTimeHelper.createDatabaseTime().getMonth(), 1)
+            [Op.gte]: new Date(
+              BeijingTimeHelper.createDatabaseTime().getFullYear(),
+              BeijingTimeHelper.createDatabaseTime().getMonth(),
+              1
+            )
           }
         }
       }),
@@ -616,6 +631,8 @@ router.get('/my-stats', async (req, res) => {
 
 /**
  * 获取审核状态文本描述
+ * @param {string} status - 审核状态 (pending/reviewing/approved/rejected)
+ * @returns {string} 审核状态的中文描述
  */
 function getReviewStatusText (status) {
   const statusMap = {
@@ -629,6 +646,9 @@ function getReviewStatusText (status) {
 
 /**
  * 评估用户上传等级
+ * @param {number} totalCount - 总上传数量
+ * @param {string} approvalRate - 审核通过率百分比字符串
+ * @returns {Object} 用户等级对象 {level, text, description}
  */
 function getUserUploadLevel (totalCount, approvalRate) {
   const rate = parseFloat(approvalRate)
@@ -648,6 +668,10 @@ function getUserUploadLevel (totalCount, approvalRate) {
 
 /**
  * 生成上传提示信息
+ * @param {number} pendingCount - 待审核数量
+ * @param {number} rejectedCount - 已拒绝数量
+ * @param {string} approvalRate - 审核通过率百分比字符串
+ * @returns {Array<string>} 提示信息数组
  */
 function generateUploadTips (pendingCount, rejectedCount, approvalRate) {
   const tips = []
@@ -774,13 +798,16 @@ router.delete('/:id', async (req, res) => {
     }
 
     // 7. 软删除数据库记录
-    await imageResource.update({
-      status: 'deleted',
-      deleted_at: BeijingTimeHelper.createBeijingTime(),
-      // 保留原始数据用于审计
-      file_path: originalFilePath,
-      thumbnail_paths: originalThumbnailPaths
-    }, { transaction })
+    await imageResource.update(
+      {
+        status: 'deleted',
+        deleted_at: BeijingTimeHelper.createBeijingTime(),
+        // 保留原始数据用于审计
+        file_path: originalFilePath,
+        thumbnail_paths: originalThumbnailPaths
+      },
+      { transaction }
+    )
 
     await transaction.commit()
 

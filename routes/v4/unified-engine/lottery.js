@@ -154,28 +154,50 @@ router.get('/config/:campaignCode', authenticateToken, dataAccessControl, async 
     const fullConfig = await lottery_engine.get_campaign_config(campaign.campaign_id)
 
     if (req.dataLevel === 'full') {
+      /**
+       * 🔥 2025-10-23 修复：管理员也需要返回draw_pricing定价配置
+       * 
+       * 问题：管理员调用时返回fullConfig，但缺少draw_pricing字段
+       * 解决：从campaign的prize_distribution_config中提取draw_pricing并添加到返回数据
+       */
+      const drawPricing = campaign.prize_distribution_config?.draw_pricing || {}
+      
       // 管理员获取完整配置（返回campaign_code而不是campaign_id）
       const adminConfig = {
         ...fullConfig,
         campaign_code: campaign.campaign_code,
-        // ✅ 为管理员也添加符合API文档的字段映射
-        points_per_draw: fullConfig.cost_per_draw, // 映射字段以符合API文档规范
-        max_draws_per_day: fullConfig.max_draws_per_user_daily // 映射字段以符合API文档规范
+        draw_pricing: drawPricing // ✅ 添加定价配置
       }
       return res.apiSuccess(adminConfig, '抽奖配置获取成功')
     } else {
+      /**
+       * 🔥 2025-10-23 新增：返回连抽定价信息给前端
+       * 
+       * 业务需求：前端需要显示不同连抽选项的价格和折扣信息
+       * - 单抽：100积分
+       * - 三连抽：300积分
+       * - 五连抽：500积分
+       * - 十连抽：900积分（九折优惠，节省100积分）
+       * 
+       * 数据来源：campaign.prize_distribution_config.draw_pricing
+       * 安全性：定价信息属于公开信息，可以返回给前端
+       */
+      const drawPricing = campaign.prize_distribution_config?.draw_pricing || {}
+      
       // 普通用户获取脱敏配置
       const sanitizedConfig = {
         campaign_code: campaign.campaign_code,
         campaign_name: fullConfig.campaign_name,
         status: fullConfig.status,
-        points_per_draw: fullConfig.cost_per_draw, // ✅ 字段映射: cost_per_draw → points_per_draw (符合API文档规范)
-        max_draws_per_day: fullConfig.max_draws_per_user_daily, // ✅ 字段映射: max_draws_per_user_daily → max_draws_per_day (符合API文档规范)
+        cost_per_draw: fullConfig.cost_per_draw,
+        max_draws_per_user_daily: fullConfig.max_draws_per_user_daily,
         guarantee_info: {
           exists: !!fullConfig.guarantee_rule,
           description: '连续抽奖有惊喜哦~'
           // ❌ 不返回：triggerCount, guaranteePrizeId, counterResetAfterTrigger
-        }
+        },
+        // ✅ 新增：连抽定价信息（前端显示需要）
+        draw_pricing: drawPricing
       }
 
       return res.apiSuccess(sanitizedConfig, '抽奖配置获取成功')
