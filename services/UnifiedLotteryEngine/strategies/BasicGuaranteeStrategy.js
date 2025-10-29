@@ -325,11 +325,11 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
         if (prize) {
           /**
            * 🔥 核心修复：支持连抽统一扣除积分（2025-10-23）
-           * 
+           *
            * 问题根因：
            * - 原逻辑：每次抽奖都调用deductPoints扣除100积分
            * - 10连抽问题：虽然外层计算了900积分折扣，但这里每次还是扣100积分
-           * 
+           *
            * 修复方案：
            * - 检查context.skip_points_deduction标识
            * - 如果为true（连抽场景），跳过积分扣除（外层已统一扣除）
@@ -408,7 +408,7 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
          * ✅ 生成唯一的抽奖ID（用于幂等性控制）
          */
         const fallback_draw_id = `draw_${BeijingTimeHelper.generateIdTimestamp()}_${user_id}_${Math.random().toString(36).substr(2, 6)}`
-        
+
         // 🔥 修复：连抽场景跳过积分扣除
         if (!context.skip_points_deduction) {
           await this.deductPoints(
@@ -418,7 +418,7 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
             internalTransaction
           )
         }
-        
+
         await this.recordLotteryHistory(
           context,
           { is_winner: false },
@@ -628,7 +628,7 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
 
       /**
        * 🔥 修复：连抽场景跳过积分检查（外层已统一检查并扣除）
-       * 
+       *
        * 原逻辑问题：
        * - 连抽场景：外层已扣除900积分，这里检查余额会不准确
        * - 单抽场景：需要检查用户是否有100积分
@@ -673,7 +673,7 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
 
       /**
        * 🔥 核心修复：支持连抽统一扣除积分（2025-10-23）
-       * 
+       *
        * 问题：10连抽第10次触发保底时，如果这里再扣除100积分，总共会扣除1000积分
        * 修复：检查context.skip_points_deduction标识，连抽场景跳过积分扣除
        */

@@ -1,0 +1,13 @@
+# 数据库备份文件MD5校验信息
+# 备份时间: 2025年10月25日 22:08:48 (北京时间)
+# 文件位置: /home/devbox/project/backups/backup_2025-10-25/
+
+# SQL备份文件
+bd7277f566e8ee77f49d831b59deaeb0  full_backup_2025-10-25_14-08-48-545+.sql
+
+# JSON备份文件
+6af30365d95da98baae833c78f66a5d5  full_backup_2025-10-25_14-08-48-545+.json
+
+# 校验方法:
+# cd /home/devbox/project/backups/backup_2025-10-25
+# md5sum -c BACKUP_MD5_2025-10-25.txt

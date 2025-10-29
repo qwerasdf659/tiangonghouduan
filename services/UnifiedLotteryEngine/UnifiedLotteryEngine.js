@@ -858,11 +858,11 @@ class UnifiedLotteryEngine {
 
       /**
        * 🔥 核心修复：统一扣除折扣后的总积分（2025-10-23）
-       * 
+       *
        * 问题根因：
        * - 原逻辑：每次抽奖都扣除100积分，10连抽实际扣除1000积分
        * - 折扣失效：虽然计算了900积分，但实际每次还是扣100积分
-       * 
+       *
        * 修复方案：
        * - 在抽奖前统一扣除折扣后的总积分（单抽100，10连抽900）
        * - 传递skip_points_deduction标识给策略，避免重复扣除
@@ -892,7 +892,7 @@ class UnifiedLotteryEngine {
       })
 
       const results = []
-      let totalPointsCost = 0 // 实际已扣除金额（用于统计）
+      const totalPointsCost = 0 // 实际已扣除金额（用于统计）
 
       // 步骤2：执行多次抽奖（不再重复扣除积分）
       for (let i = 0; i < draw_count; i++) {
@@ -933,8 +933,10 @@ class UnifiedLotteryEngine {
             points_cost: drawResult.data?.draw_result?.points_cost || 0
           })
 
-          // 🔥 修复：连抽场景不累加points_cost（外层已统一扣除）
-          // totalPointsCost仅用于统计，实际扣除金额是requiredPoints
+          /*
+           * 🔥 修复：连抽场景不累加points_cost（外层已统一扣除）
+           * totalPointsCost仅用于统计，实际扣除金额是requiredPoints
+           */
         } else {
           // 抽奖失败，停止后续抽奖
           throw new Error(drawResult.message || '抽奖执行失败')

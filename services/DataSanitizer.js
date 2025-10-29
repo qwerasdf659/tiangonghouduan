@@ -229,21 +229,23 @@ class DataSanitizer {
     }
 
     return products.map(product => ({
-      id: product.id,
+      id: product.product_id || product.id, // 兼容product_id和id字段
       name: product.name,
       description: product.description,
-      image_url: product.image_url,
-      points_cost: product.exchange_points, // ✅ 修复：使用正确的数据库字段exchange_points
-      stock: product.stock > 0
-        ? (product.stock > 10
-          ? '充足'
-          : '紧缺')
-        : '缺货',
+      image: product.image || product.image_url, // 兼容image和image_url字段
+      exchange_points: product.exchange_points, // 保持原字段名
+      stock_status: product.stock > 0
+        ? (product.stock > 10 ? 'in_stock' : 'low_stock')
+        : 'out_of_stock', // 标准化库存状态
       category: product.category,
-      space: product.space, // lucky/premium
-      is_available: product.is_available,
+      space: product.space, // lucky/premium/both
+      is_available: product.status === 'active' && product.stock > 0, // 计算是否可用
+      is_hot: product.is_hot || false,
+      is_new: product.is_new || false,
+      is_limited: product.is_limited || false,
+      sort_order: product.sort_order || 0,
       created_at: product.created_at
-      // ❌ 移除敏感字段：cost_price, profit_margin, supplier_info
+      // ❌ 移除敏感字段：stock（具体库存数）、created_by、updated_by
     }))
   }
 

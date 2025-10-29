@@ -306,8 +306,7 @@ router.get('/products', authenticateToken, async (req, res) => {
 
     // 构建查询条件
     const whereClause = {
-      is_active: true,
-      status: 'active'
+      status: 'active' // 商品状态必须为active
     }
 
     // 空间过滤
@@ -333,9 +332,22 @@ router.get('/products', authenticateToken, async (req, res) => {
       offset
     })
 
+    // 🆕 转换为对应空间的展示信息（方案2核心逻辑）
+    const space_products = products.map(p => {
+      // 如果商品有getSpaceInfo方法，使用它获取空间特定信息
+      if (typeof p.getSpaceInfo === 'function') {
+        const space_info = p.getSpaceInfo(space)
+        if (space_info) {
+          return space_info
+        }
+      }
+      // 否则返回原始数据
+      return p.toJSON()
+    }).filter(Boolean) // 过滤掉null值（商品不在该空间）
+
     // 数据脱敏处理
     const sanitizedProducts = DataSanitizer.sanitizeExchangeProducts(
-      products.map(p => p.toJSON()),
+      space_products,
       dataLevel
     )
 
@@ -347,8 +359,8 @@ router.get('/products', authenticateToken, async (req, res) => {
       returned: products.length
     })
 
-    return ApiResponse.success(
-      res,
+    // ✅ 修复：使用正确的响应方法
+    return res.apiSuccess(
       {
         products: sanitizedProducts,
         pagination: {
@@ -362,7 +374,7 @@ router.get('/products', authenticateToken, async (req, res) => {
     )
   } catch (error) {
     logger.error('获取商品列表失败', { error: error.message })
-    return ApiResponse.error(res, '获取商品列表失败', 500)
+    return res.apiError('获取商品列表失败', 'PRODUCT_LIST_ERROR', null, 500)
   }
 })
 
@@ -372,38 +384,44 @@ router.get('/products', authenticateToken, async (req, res) => {
  */
 router.post('/exchange', authenticateToken, async (req, res) => {
   try {
-    const { product_id, quantity = 1 } = req.body
+    const { product_id, quantity = 1, space = 'lucky' } = req.body // 🆕 新增space参数（默认lucky）
     const user_id = req.user.user_id
     const PointsService = require('../../../services/PointsService')
 
     // 参数验证
-    if (!product_id) {
-      return ApiResponse.error(res, '商品ID不能为空', 400)
+    if (product_id === undefined || product_id === null) {
+      return res.apiError('商品ID不能为空', 'INVALID_PARAMETER', null, 400)
     }
 
     if (quantity <= 0 || quantity > 10) {
-      return ApiResponse.error(res, '兑换数量必须在1-10之间', 400)
+      return res.apiError('兑换数量必须在1-10之间', 'INVALID_QUANTITY', null, 400)
     }
 
-    // 执行兑换
-    const result = await PointsService.exchangeProduct(user_id, product_id, quantity)
+    // 🆕 验证空间参数（新增逻辑）
+    if (!['lucky', 'premium'].includes(space)) {
+      return res.apiError('空间参数错误，必须是lucky或premium', 'INVALID_SPACE', null, 400)
+    }
+
+    // 执行兑换（🆕 传递space参数）
+    const result = await PointsService.exchangeProduct(user_id, product_id, quantity, space)
 
     logger.info('商品兑换成功', {
       user_id,
       product_id,
+      space, // 🆕 记录兑换空间
       quantity,
       exchange_id: result.exchange_id,
       total_points: result.total_points
     })
 
-    return ApiResponse.success(res, result, '商品兑换成功')
+    return res.apiSuccess(result, '商品兑换成功')
   } catch (error) {
     logger.error('商品兑换失败', {
       error: error.message,
       user_id: req.user.user_id,
       product_id: req.body.product_id
     })
-    return ApiResponse.error(res, error.message, 500)
+    return res.apiError(error.message, 'EXCHANGE_FAILED', null, 500)
   }
 })
 

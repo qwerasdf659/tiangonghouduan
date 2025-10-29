@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-const BeijingTimeHelper = require('../utils/timeHelper')
+const BeijingTimeHelper = require('../../utils/timeHelper')
 
 /**
  * 最终项目质量检查脚本

@@ -1,23 +1,25 @@
 /**
  * 优化的微信小程序图片上传代码
  * 解决503错误和提升用户体验
- * 
+ *
  * 使用方法：
  * 1. 将此代码复制到你的 camera.js 或相关文件中
  * 2. 替换现有的上传逻辑
  * 3. 确保userId已正确存储
  */
 
-// ============================================
-// 方案1：基础优化版本（推荐）
-// ============================================
+/*
+ * ============================================
+ * 方案1：基础优化版本（推荐）
+ * ============================================
+ */
 
 /**
  * 优化的图片上传函数
  * @param {string} filePath - 图片文件路径
- * @param {object} options - 可选配置
+ * @param {Object} options - 可选配置
  */
-function uploadImageOptimized(filePath, options = {}) {
+function uploadImageOptimized (filePath, options = {}) {
   const {
     onProgress = () => {},
     onSuccess = () => {},
@@ -26,7 +28,7 @@ function uploadImageOptimized(filePath, options = {}) {
 
   // 1. 获取用户ID（必需参数）
   const userId = wx.getStorageSync('userId') || wx.getStorageSync('user_id')
-  
+
   if (!userId) {
     wx.showToast({
       title: '请先登录',
@@ -40,14 +42,13 @@ function uploadImageOptimized(filePath, options = {}) {
   wx.getNetworkType({
     success: (res) => {
       console.log('📡 网络类型:', res.networkType)
-      
+
       if (res.networkType === 'none') {
         wx.showToast({
           title: '网络未连接',
           icon: 'none'
         })
         onError({ code: 'NO_NETWORK', message: '网络未连接' })
-        return
       }
     }
   })
@@ -66,26 +67,26 @@ function uploadImageOptimized(filePath, options = {}) {
   // 4. 执行上传
   const uploadTask = wx.uploadFile({
     url: 'https://omqktqrtntnn.sealosbja.site/api/v4/photo/upload',
-    filePath: filePath,
-    name: 'photo',  // ⚠️ 必须是'photo'，不是'file'或'image'
+    filePath,
+    name: 'photo', // ⚠️ 必须是'photo'，不是'file'或'image'
     timeout: 60000, // ✅ 60秒超时
     header: {
       'Content-Type': 'multipart/form-data'
     },
     formData: {
-      user_id: userId,  // ✅ 必需参数
-      business_type: 'user_upload_review'  // 业务类型
+      user_id: userId, // ✅ 必需参数
+      business_type: 'user_upload_review' // 业务类型
     },
     success: (res) => {
       wx.hideLoading()
-      
+
       console.log('📥 上传响应:', res)
       console.log('状态码:', res.statusCode)
       console.log('响应数据:', res.data)
 
       try {
         const data = JSON.parse(res.data)
-        
+
         if (data.success) {
           console.log('✅ 上传成功')
           wx.showToast({
@@ -96,10 +97,10 @@ function uploadImageOptimized(filePath, options = {}) {
           onSuccess(data)
         } else {
           console.error('❌ 上传失败:', data.message)
-          
+
           // 根据错误代码显示不同提示
           let errorMsg = data.message || '上传失败'
-          
+
           if (data.code === 'USER_NOT_FOUND') {
             errorMsg = '用户信息已过期，请重新登录'
           } else if (data.code === 'MISSING_FILE') {
@@ -107,7 +108,7 @@ function uploadImageOptimized(filePath, options = {}) {
           } else if (data.code === 'FILE_TOO_LARGE') {
             errorMsg = '图片文件过大（最大10MB）'
           }
-          
+
           wx.showToast({
             title: errorMsg,
             icon: 'none',
@@ -126,14 +127,14 @@ function uploadImageOptimized(filePath, options = {}) {
     },
     fail: (err) => {
       wx.hideLoading()
-      
+
       console.error('❌ 上传失败:', err)
       console.error('错误码:', err.errMsg)
       console.error('状态码:', err.statusCode)
-      
+
       // 详细的错误处理
       let errorMsg = '上传失败'
-      
+
       if (err.statusCode === 503) {
         errorMsg = '服务器繁忙，请稍后重试'
         console.error('🔴 503错误 - 可能原因:')
@@ -151,13 +152,13 @@ function uploadImageOptimized(filePath, options = {}) {
       } else if (err.errMsg?.includes('fail')) {
         errorMsg = '网络连接失败'
       }
-      
+
       wx.showToast({
         title: errorMsg,
         icon: 'none',
         duration: 3000
       })
-      
+
       onError(err)
     }
   })
@@ -167,30 +168,32 @@ function uploadImageOptimized(filePath, options = {}) {
     console.log('📊 上传进度:', res.progress + '%')
     console.log('   已上传:', res.totalBytesSent)
     console.log('   总大小:', res.totalBytesExpectedToSend)
-    
+
     onProgress(res)
   })
 
   return uploadTask
 }
 
-// ============================================
-// 方案2：带自动重试版本（高级）
-// ============================================
+/*
+ * ============================================
+ * 方案2：带自动重试版本（高级）
+ * ============================================
+ */
 
 /**
  * 带自动重试的图片上传函数
  * @param {string} filePath - 图片文件路径
- * @param {object} options - 配置选项
+ * @param {Object} options - 配置选项
  * @param {number} maxRetries - 最大重试次数
  */
-function uploadImageWithRetry(filePath, options = {}, maxRetries = 3) {
+function uploadImageWithRetry (filePath, options = {}, maxRetries = 3) {
   return new Promise((resolve, reject) => {
     let retryCount = 0
-    
-    function attemptUpload() {
+
+    function attemptUpload () {
       console.log(`📤 上传尝试 ${retryCount + 1}/${maxRetries + 1}`)
-      
+
       // 使用基础上传函数
       uploadImageOptimized(filePath, {
         onSuccess: (data) => {
@@ -199,29 +202,29 @@ function uploadImageWithRetry(filePath, options = {}, maxRetries = 3) {
         },
         onError: (err) => {
           console.error(`❌ 上传失败 (尝试 ${retryCount + 1})`, err)
-          
+
           // 判断是否需要重试
           const shouldRetry = (
-            (err.statusCode === 503 || 
-             err.statusCode === 502 || 
+            (err.statusCode === 503 ||
+             err.statusCode === 502 ||
              err.errMsg?.includes('timeout') ||
              err.errMsg?.includes('fail')) &&
             retryCount < maxRetries
           )
-          
+
           if (shouldRetry) {
             retryCount++
             // 指数退避：1秒、2秒、4秒
             const delay = Math.min(1000 * Math.pow(2, retryCount - 1), 5000)
-            
+
             console.log(`⏰ ${delay}ms后重试...`)
-            
+
             wx.showToast({
-              title: `上传失败，${delay/1000}秒后重试...`,
+              title: `上传失败，${delay / 1000}秒后重试...`,
               icon: 'none',
               duration: delay
             })
-            
+
             setTimeout(attemptUpload, delay)
           } else {
             // 达到最大重试次数或其他错误
@@ -232,24 +235,26 @@ function uploadImageWithRetry(filePath, options = {}, maxRetries = 3) {
         onProgress: options.onProgress
       })
     }
-    
+
     attemptUpload()
   })
 }
 
-// ============================================
-// 使用示例
-// ============================================
+/*
+ * ============================================
+ * 使用示例
+ * ============================================
+ */
 
 // 示例1：基础使用（推荐）
-function exampleBasicUpload() {
+function exampleBasicUpload () {
   wx.chooseImage({
     count: 1,
     sizeType: ['compressed'],
     sourceType: ['album', 'camera'],
     success: (res) => {
       const tempFilePath = res.tempFilePaths[0]
-      
+
       uploadImageOptimized(tempFilePath, {
         onProgress: (progress) => {
           console.log('上传进度:', progress.progress + '%')
@@ -272,14 +277,14 @@ function exampleBasicUpload() {
 }
 
 // 示例2：带重试使用（推荐用于不稳定网络环境）
-function exampleRetryUpload() {
+function exampleRetryUpload () {
   wx.chooseImage({
     count: 1,
     sizeType: ['compressed'],
     sourceType: ['album', 'camera'],
     success: (res) => {
       const tempFilePath = res.tempFilePaths[0]
-      
+
       uploadImageWithRetry(tempFilePath, {
         onProgress: (progress) => {
           console.log('上传进度:', progress.progress + '%')
@@ -309,18 +314,18 @@ Page({
   },
 
   // 选择并上传图片
-  onChooseImage() {
+  onChooseImage () {
     const that = this
-    
+
     wx.chooseImage({
       count: 1,
       sizeType: ['compressed'],
       sourceType: ['album', 'camera'],
       success: (res) => {
         const tempFilePath = res.tempFilePaths[0]
-        
+
         that.setData({ uploading: true, uploadProgress: 0 })
-        
+
         uploadImageOptimized(tempFilePath, {
           onProgress: (progress) => {
             that.setData({
@@ -330,7 +335,7 @@ Page({
           onSuccess: (data) => {
             that.setData({ uploading: false })
             console.log('上传成功:', data)
-            
+
             // 可以将上传结果保存到页面数据中
             that.setData({
               uploadedImage: data.data.file_path
@@ -346,12 +351,13 @@ Page({
   }
 })
 
-// ============================================
-// 导出函数（如果使用模块化）
-// ============================================
+/*
+ * ============================================
+ * 导出函数（如果使用模块化）
+ * ============================================
+ */
 
 module.exports = {
   uploadImageOptimized,
   uploadImageWithRetry
 }
-

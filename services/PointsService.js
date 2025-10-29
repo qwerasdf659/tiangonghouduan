@@ -26,7 +26,7 @@ class PointsService {
    * @param {Object} transaction - 事务对象（可选，用于在事务中查询最新数据）
    * @returns {Object} 积分账户信息
    */
-  static async getUserPointsAccount (user_id, transaction = null) {
+  static async getUserPointsAccount(user_id, transaction = null) {
     let account = await UserPointsAccount.findOne({
       where: { user_id, is_active: true },
       transaction, // ✅ 修复Bug：支持事务查询，确保读取事务中的最新数据
@@ -47,7 +47,7 @@ class PointsService {
    * @param {Object} transaction - 事务对象（可选）
    * @returns {Object} 新创建的积分账户
    */
-  static async createPointsAccount (user_id, transaction = null) {
+  static async createPointsAccount(user_id, transaction = null) {
     // 获取用户的历史积分作为初始值
     const user = await User.findByPk(user_id)
     if (!user) {
@@ -99,7 +99,7 @@ class PointsService {
    * @param {number} options.operator_id - 操作员ID
    * @returns {Object} 交易结果
    */
-  static async addPoints (user_id, points, options = {}) {
+  static async addPoints(user_id, points, options = {}) {
     if (points <= 0) {
       throw new Error('积分数量必须大于0')
     }
@@ -197,7 +197,7 @@ class PointsService {
    * @param {number} options.operator_id - 操作员ID
    * @returns {Object} 交易结果
    */
-  static async consumePoints (user_id, points, options = {}) {
+  static async consumePoints(user_id, points, options = {}) {
     if (points <= 0) {
       throw new Error('积分数量必须大于0')
     }
@@ -297,7 +297,7 @@ class PointsService {
    * @param {number} user_id - 用户ID
    * @returns {Object} 积分余额信息
    */
-  static async getPointsBalance (user_id) {
+  static async getPointsBalance(user_id) {
     const account = await this.getUserPointsAccount(user_id)
 
     return {
@@ -318,7 +318,7 @@ class PointsService {
    * @param {Object} options - 查询选项
    * @returns {Object} 交易历史
    */
-  static async getPointsHistory (user_id, options = {}) {
+  static async getPointsHistory(user_id, options = {}) {
     const {
       page = 1,
       limit = 20,
@@ -376,7 +376,7 @@ class PointsService {
    * @param {number} user_id - 用户ID
    * @returns {Object} 积分统计信息
    */
-  static async getPointsStatistics (user_id) {
+  static async getPointsStatistics(user_id) {
     const account = await this.getUserPointsAccount(user_id)
 
     // 获取最近30天的交易统计
@@ -414,7 +414,9 @@ class PointsService {
         consumed: parseFloat(recentConsumed),
         net_change: parseFloat(recentEarned) - parseFloat(recentConsumed)
       },
-      account_age_days: Math.floor(BeijingTimeHelper.timeDiff(account.created_at) / (1000 * 60 * 60 * 24))
+      account_age_days: Math.floor(
+        BeijingTimeHelper.timeDiff(account.created_at) / (1000 * 60 * 60 * 24)
+      )
     }
   }
 
@@ -424,7 +426,7 @@ class PointsService {
    * @param {number} requiredPoints - 需要的积分数量
    * @returns {boolean} 是否有足够积分
    */
-  static async hasEnoughPoints (user_id, requiredPoints) {
+  static async hasEnoughPoints(user_id, requiredPoints) {
     const account = await this.getUserPointsAccount(user_id)
     return parseFloat(account.available_points) >= requiredPoints
   }
@@ -434,7 +436,7 @@ class PointsService {
    * @param {Array} operations - 操作列表
    * @returns {Object} 批量操作结果
    */
-  static async batchPointsOperation (operations) {
+  static async batchPointsOperation(operations) {
     const { sequelize } = require('../models')
     const transaction = await sequelize.transaction()
 
@@ -481,7 +483,7 @@ class PointsService {
    * @param {number} quantity - 兑换数量
    * @returns {Object} 兑换结果
    */
-  static async exchangeProduct (user_id, productId, quantity = 1) {
+  static async exchangeProduct(user_id, productId, quantity = 1, space = 'lucky') {
     const { Product, ExchangeRecords } = require('../models') // ✅ UserInventory在审核通过后才需要
     const { sequelize, Sequelize } = require('../models')
     const transaction = await sequelize.transaction()
@@ -497,51 +499,81 @@ class PointsService {
         throw new Error('商品不存在')
       }
 
+      // 🆕 2. 获取对应空间的商品信息（方案2）
+      const space_info = product.getSpaceInfo ? product.getSpaceInfo(space) : null
+      if (!space_info) {
+        throw new Error(`该商品在${space}空间不可用`)
+      }
+
       if (!product.isAvailable()) {
         throw new Error('商品暂不可兑换')
       }
 
-      // 2. 验证库存（在锁内验证）
-      if (product.stock < quantity) {
-        throw new Error('商品库存不足')
+      // 🆕 3. 检查对应空间的库存（方案2）
+      let current_stock
+      if (space === 'premium' && product.space === 'both') {
+        // 臻选空间：使用premium_stock（如果有独立库存）
+        current_stock = product.premium_stock !== null ? product.premium_stock : product.stock
+      } else {
+        // 幸运空间或单一空间商品：使用stock
+        current_stock = product.stock
       }
 
-      // 3. 计算所需积分
-      const totalPoints = product.exchange_points * quantity
+      if (current_stock < quantity) {
+        throw new Error(`商品库存不足（当前库存：${current_stock}）`)
+      }
 
-      // 4. 消费积分
+      // 🆕 4. 计算所需积分（使用对应空间的积分）
+      const totalPoints = space_info.exchange_points * quantity
+
+      // 5. 消费积分
       await this.consumePoints(user_id, totalPoints, {
         business_type: 'exchange',
         source_type: 'product_exchange',
-        title: `兑换商品：${product.name}`,
-        description: `兑换${quantity}个${product.name}`,
+        title: `兑换商品：${product.name}（${space}空间）`,
+        description: `兑换${quantity}个${product.name}（${space}空间）`,
         transaction
       })
 
-      // 5. ✅ 原子性减少商品库存（防止并发问题）
-      const [affectedRows] = await Product.update(
-        {
-          stock: sequelize.literal(`stock - ${quantity}`) // ✅ 原子操作：数据库层面计算
-        },
-        {
-          where: {
-            product_id: productId,
-            stock: { [Sequelize.Op.gte]: quantity } // ✅ 二次验证：确保库存足够
-          },
-          transaction
-        }
-      )
+      // 🆕 6. 原子性减少对应空间的库存（方案2）
+      let update_fields
+      let where_condition
 
-      // 6. ✅ 检查更新结果（如果受影响行数为0，说明库存不足或并发冲突）
+      if (space === 'premium' && product.space === 'both' && product.premium_stock !== null) {
+        // 臻选空间有独立库存：扣减premium_stock
+        update_fields = {
+          premium_stock: sequelize.literal(`premium_stock - ${quantity}`)
+        }
+        where_condition = {
+          product_id: productId,
+          premium_stock: { [Sequelize.Op.gte]: quantity }
+        }
+      } else {
+        // 幸运空间或共享库存：扣减stock
+        update_fields = {
+          stock: sequelize.literal(`stock - ${quantity}`)
+        }
+        where_condition = {
+          product_id: productId,
+          stock: { [Sequelize.Op.gte]: quantity }
+        }
+      }
+
+      const [affectedRows] = await Product.update(update_fields, {
+        where: where_condition,
+        transaction
+      })
+
+      // 7. ✅ 检查更新结果（如果受影响行数为0，说明库存不足或并发冲突）
       if (affectedRows === 0) {
         throw new Error('商品库存不足（并发冲突或库存已售罄）')
       }
 
-      // 7. 生成兑换码
+      // 8. 生成兑换码
       const exchangeCode = this.generateExchangeCode()
 
       /*
-       * 8. 创建兑换记录（✅ 严格人工审核模式：所有兑换都需要审核）
+       * 9. 创建兑换记录（✅ 严格人工审核模式：所有兑换都需要审核）
        * exchange_id 现在是INT AUTO_INCREMENT主键，不再手动赋值
        */
       const exchangeRecord = await ExchangeRecords.create(
@@ -552,15 +584,15 @@ class PointsService {
             name: product.name,
             description: product.description,
             category: product.category,
-            exchange_points: product.exchange_points,
-            space: product.space,
+            exchange_points: space_info.exchange_points, // 🆕 使用对应空间的积分
+            space, // 🆕 记录兑换空间
             requires_audit: true // ✅ 所有商品都需要审核
           },
           quantity,
           total_points: totalPoints,
           exchange_code: exchangeCode,
           status: 'pending', // 等待审核
-          space: product.space,
+          space, // 🆕 记录兑换空间
           delivery_method: product.category === '优惠券' ? 'virtual' : 'physical',
           exchange_time: BeijingTimeHelper.createBeijingTime(),
           // ✅ 审核相关字段：所有兑换都需要人工审核
@@ -570,11 +602,11 @@ class PointsService {
         { transaction }
       )
 
-      // 8.1 提交审核（不调用needsAudit，强制审核）
+      // 9.1 提交审核（不调用needsAudit，强制审核）
       console.log(`[兑换] 订单${exchangeRecord.exchange_id}已提交审核，等待管理员处理`)
       await transaction.commit()
 
-      // 8.2 发送通知
+      // 9.2 发送通知
       try {
         const NotificationService = require('../services/NotificationService')
 
@@ -600,7 +632,7 @@ class PointsService {
         console.error('[兑换] 发送通知失败:', notifyError.message)
       }
 
-      // 8.3 返回：需要审核，不立即发放库存
+      // 9.3 返回：需要审核，不立即发放库存
       return {
         success: true,
         needs_audit: true, // ✅ 标记需要审核
@@ -625,7 +657,7 @@ class PointsService {
    * @param {Object} options - 查询选项
    * @returns {Object} 兑换记录列表
    */
-  static async getExchangeRecords (user_id, options = {}) {
+  static async getExchangeRecords(user_id, options = {}) {
     const { ExchangeRecords, Product } = require('../models')
     const { page = 1, limit = 20, status = null, space = null } = options
 
@@ -665,7 +697,7 @@ class PointsService {
    * @param {number} user_id - 用户ID
    * @returns {Object} 积分信息
    */
-  static async getUserPoints (user_id) {
+  static async getUserPoints(user_id) {
     const account = await this.getUserPointsAccount(user_id)
     return {
       available_points: parseFloat(account.available_points),
@@ -680,14 +712,15 @@ class PointsService {
    * @param {Object} options - 查询选项
    * @returns {Object} 交易记录列表
    */
-  static async getUserTransactions (user_id, options = {}) {
+  static async getUserTransactions(user_id, options = {}) {
     const { page = 1, limit = 20, type = null } = options
     // 🎯 服务层二次保护：最大100条记录（防止内部调用风险）
     const finalLimit = Math.min(parseInt(limit), 100)
     const offset = (page - 1) * finalLimit
 
     const whereClause = { user_id }
-    if (type) {
+    // 🛡️ 修复Bug：type为'all'时不应该作为筛选条件
+    if (type && type !== 'all') {
       whereClause.transaction_type = type
     }
 
@@ -708,7 +741,7 @@ class PointsService {
    * 生成兑换码
    * @returns {string} 兑换码
    */
-  static generateExchangeCode () {
+  static generateExchangeCode() {
     const timestamp = BeijingTimeHelper.timestamp().toString(36)
     const random = Math.random().toString(36).substr(2, 8)
     return `EXC${timestamp}${random}`.toUpperCase()
@@ -718,7 +751,7 @@ class PointsService {
    * 生成核销码
    * @returns {string} 核销码
    */
-  static generateVerificationCode () {
+  static generateVerificationCode() {
     return Math.random().toString(36).substr(2, 8).toUpperCase()
   }
 }

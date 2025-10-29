@@ -89,18 +89,42 @@ router.get('/transactions/:user_id', authenticateToken, async (req, res) => {
   try {
     const { user_id } = req.params
     const { page = 1, limit = 20, type } = req.query
+
+    // 🛡️ 参数验证：检查user_id是否有效
+    if (!user_id || user_id === 'undefined' || user_id === 'null') {
+      return res.apiError(
+        '用户ID参数无效，请确保已登录并正确传递用户ID',
+        'INVALID_USER_ID',
+        {
+          received_user_id: user_id,
+          hint: '前端应从登录状态或JWT token中获取user_id'
+        },
+        400
+      )
+    }
+
+    const user_id_int = parseInt(user_id)
+    if (isNaN(user_id_int) || user_id_int <= 0) {
+      return res.apiError(
+        '用户ID必须是正整数',
+        'INVALID_USER_ID_FORMAT',
+        { received_user_id: user_id },
+        400
+      )
+    }
+
     // 🎯 分页安全保护：最大100条记录（服务层也有保护，双重防护）
     const finalLimit = Math.min(parseInt(limit), 100)
     const current_user_id = req.user.user_id
 
     // 🛡️ 权限检查：只能查询自己的交易记录，除非是超级管理员
     const currentUserRoles = await getUserRoles(current_user_id)
-    if (parseInt(user_id) !== current_user_id && !currentUserRoles.isAdmin) {
+    if (user_id_int !== current_user_id && !currentUserRoles.isAdmin) {
       return res.apiError('无权限查询其他用户交易记录', 'PERMISSION_DENIED', {}, 403)
     }
 
     // 获取交易记录
-    const transactions = await PointsService.getUserTransactions(parseInt(user_id), {
+    const transactions = await PointsService.getUserTransactions(user_id_int, {
       page: parseInt(page),
       limit: finalLimit,
       type
@@ -108,7 +132,7 @@ router.get('/transactions/:user_id', authenticateToken, async (req, res) => {
 
     return res.apiSuccess(
       {
-        user_id: parseInt(user_id),
+        user_id: user_id_int,
         transactions: transactions.data,
         pagination: {
           page: parseInt(page),
@@ -347,8 +371,12 @@ router.get('/user/statistics/:user_id', authenticateToken, async (req, res) => {
   }
 })
 
-// 辅助函数：获取抽奖统计
-async function getLotteryStatistics (user_id) {
+/**
+ * 辅助函数：获取抽奖统计
+ * @param {number} user_id - 用户ID
+ * @returns {Promise<Object>} 抽奖统计数据
+ */
+async function getLotteryStatistics(user_id) {
   const { LotteryDraw } = require('../../../models')
 
   const [totalCount, thisMonth] = await Promise.all([
@@ -374,8 +402,12 @@ async function getLotteryStatistics (user_id) {
   }
 }
 
-// 辅助函数：获取兑换统计
-async function getExchangeStatistics (user_id) {
+/**
+ * 辅助函数：获取兑换统计
+ * @param {number} user_id - 用户ID
+ * @returns {Promise<Object>} 兑换统计数据
+ */
+async function getExchangeStatistics(user_id) {
   const { ExchangeRecords } = require('../../../models')
 
   const [totalCount, totalPoints, thisMonth] = await Promise.all([
@@ -402,8 +434,12 @@ async function getExchangeStatistics (user_id) {
   }
 }
 
-// 辅助函数：获取上传统计
-async function getUploadStatistics (user_id) {
+/**
+ * 辅助函数：获取上传统计
+ * @param {number} user_id - 用户ID
+ * @returns {Promise<Object>} 上传统计数据
+ */
+async function getUploadStatistics(user_id) {
   const { ImageResources } = require('../../../models')
 
   const [totalCount, approvedCount, thisMonth] = await Promise.all([
@@ -434,8 +470,12 @@ async function getUploadStatistics (user_id) {
   }
 }
 
-// 辅助函数：获取库存统计
-async function getInventoryStatistics (user_id) {
+/**
+ * 辅助函数：获取库存统计
+ * @param {number} user_id - 用户ID
+ * @returns {Promise<Object>} 库存统计数据
+ */
+async function getInventoryStatistics(user_id) {
   const { UserInventory } = require('../../../models')
 
   const [totalCount, availableCount, usedCount] = await Promise.all([
@@ -452,8 +492,12 @@ async function getInventoryStatistics (user_id) {
   }
 }
 
-// 辅助函数：计算成就
-function calculateAchievements (stats) {
+/**
+ * 辅助函数：计算成就
+ * @param {Object} stats - 统计数据
+ * @returns {Array} 成就列表
+ */
+function calculateAchievements(stats) {
   const achievements = []
 
   // 抽奖相关成就

@@ -45,7 +45,7 @@ function log (message, color = 'reset') {
 // 备份目录配置
 const BACKUP_DIR = path.join(__dirname, '..', '..', 'backups')
 
-// 数据库表分类
+// 数据库表分类（2025年10月25日更新 - 基于实际数据库表结构）
 const TABLE_GROUPS = {
   // 核心业务表
   core: [
@@ -54,7 +54,8 @@ const TABLE_GROUPS = {
     'points_transactions',
     'lottery_draws',
     'lottery_prizes',
-    'lottery_campaigns'
+    'lottery_campaigns',
+    'lottery_presets'
   ],
   // 交易和库存表
   transaction: [
@@ -65,32 +66,38 @@ const TABLE_GROUPS = {
   ],
   // 客服和反馈表
   support: [
-    'customer_sessions',
+    'customer_service_sessions',
     'chat_messages',
-    'feedbacks'
+    'feedbacks',
+    'content_review_records'
   ],
   // 系统配置表
   system: [
     'roles',
     'user_roles',
-    'user_sessions',
     'system_announcements',
-    'audit_records',
-    'audit_logs'
+    'admin_operation_logs',
+    'authentication_sessions',
+    'sequelizemeta'
   ],
   // 资源表
   resource: [
     'image_resources'
+  ],
+  // 备份表（完整备份时会包含，防止数据丢失）
+  backup: [
+    'user_roles_backup_20251009'
   ]
 }
 
 // ==================== 备份功能 ====================
 
 /**
- * 完整数据库备份
+ * 完整数据库备份（包含SQL和JSON双格式）
+ * 包含：表结构、数据、索引、外键约束
  */
 async function backupFullDatabase () {
-  log('\n💾 ━━━ 完整数据库备份 ━━━', 'cyan')
+  log('\n💾 ━━━ 完整数据库备份（SQL + JSON 双格式）━━━', 'cyan')
   log(`备份时间: ${BeijingTimeHelper.nowLocale()}\n`, 'blue')
 
   try {
@@ -99,23 +106,56 @@ async function backupFullDatabase () {
 
     // 生成备份文件名
     const timestamp = BeijingTimeHelper.now().replace(/[:.]/g, '-').replace('T', '_').slice(0, -5)
-    const backupFile = path.join(BACKUP_DIR, `full_backup_${timestamp}.sql`)
+    const backupFileSQL = path.join(BACKUP_DIR, `full_backup_${timestamp}.sql`)
+    const backupFileJSON = path.join(BACKUP_DIR, `full_backup_${timestamp}.json`)
 
-    log(`📁 备份文件: ${backupFile}\n`, 'blue')
+    log(`📁 SQL备份文件: ${backupFileSQL}`, 'blue')
+    log(`📁 JSON备份文件: ${backupFileJSON}\n`, 'blue')
 
-    // 获取所有表
-    const allTables = Object.values(TABLE_GROUPS).flat()
+    // 获取所有表（包含backup组 - 确保完整备份所有表）
+    const allTables = Object.entries(TABLE_GROUPS)
+      .flatMap(([, tables]) => tables)
 
-    // 开始备份
-    let sqlContent = `-- 完整数据库备份
+    // 获取数据库版本信息
+    const [versionResult] = await sequelize.query('SELECT VERSION() as version')
+    const dbVersion = versionResult[0].version
+
+    log(`📊 数据库版本: ${dbVersion}\n`, 'blue')
+
+    // 开始备份 - SQL格式
+    let sqlContent = `-- ==========================================
+-- 完整数据库备份
+-- ==========================================
 -- 数据库: ${process.env.DB_NAME}
--- 时间: ${BeijingTimeHelper.nowLocale()}
--- 备份工具: backup-toolkit.js
+-- 主机: ${process.env.DB_HOST}:${process.env.DB_PORT}
+-- MySQL版本: ${dbVersion}
+-- 备份时间: ${BeijingTimeHelper.nowLocale()}
+-- 备份工具: backup-toolkit.js v2.0
+-- 总表数: ${allTables.length}
+-- ==========================================
 
 SET NAMES utf8mb4;
 SET FOREIGN_KEY_CHECKS = 0;
+SET SQL_MODE = 'NO_AUTO_VALUE_ON_ZERO';
+SET time_zone = '+08:00';
 
 `
+
+    // JSON备份数据结构
+    const jsonBackup = {
+      metadata: {
+        database: process.env.DB_NAME,
+        host: process.env.DB_HOST,
+        port: process.env.DB_PORT,
+        mysql_version: dbVersion,
+        backup_time: BeijingTimeHelper.now(),
+        backup_time_locale: BeijingTimeHelper.nowLocale(),
+        backup_tool: 'backup-toolkit.js v2.0',
+        total_tables: allTables.length,
+        timezone: '+08:00'
+      },
+      tables: {}
+    }
 
     let totalRows = 0
     let successCount = 0
@@ -125,58 +165,116 @@ SET FOREIGN_KEY_CHECKS = 0;
       process.stdout.write(`📋 备份表: ${tableName}...`)
 
       try {
-        // 获取表结构
+        // 1. 获取表结构
         const [createTableResult] = await sequelize.query(`SHOW CREATE TABLE ${tableName}`)
         const createTable = createTableResult[0]['Create Table']
 
-        sqlContent += `-- ----------------------------
--- Table structure for ${tableName}
--- ----------------------------
+        // 2. 获取表的列信息
+        const [columns] = await sequelize.query(`SHOW FULL COLUMNS FROM ${tableName}`)
+
+        // 3. 获取表的索引信息
+        const [indexes] = await sequelize.query(`SHOW INDEX FROM ${tableName}`)
+
+        // 4. 获取表数据
+        const [rows] = await sequelize.query(`SELECT * FROM ${tableName}`)
+        const rowCount = rows.length
+        totalRows += rowCount
+
+        // 5. 获取表状态信息
+        const [tableStatus] = await sequelize.query(`SHOW TABLE STATUS LIKE '${tableName}'`)
+
+        process.stdout.write(` ${rowCount}条记录 ✅\n`)
+
+        // SQL备份
+        sqlContent += `-- ==========================================
+-- Table: ${tableName}
+-- 记录数: ${rowCount}
+-- 引擎: ${tableStatus[0].Engine}
+-- 字符集: ${tableStatus[0].Collation}
+-- ==========================================
 DROP TABLE IF EXISTS \`${tableName}\`;
 ${createTable};
 
 `
 
-        // 获取表数据
-        const [rows] = await sequelize.query(`SELECT * FROM ${tableName}`)
-        const rowCount = rows.length
-        totalRows += rowCount
-
-        process.stdout.write(` ${rowCount}条记录\n`)
-
         if (rowCount > 0) {
           const insertStatements = generateInsertStatements(tableName, rows)
-          sqlContent += `-- ----------------------------
--- Records of ${tableName}
--- ----------------------------
+          sqlContent += `-- Records of ${tableName}
 ${insertStatements}
 
 `
+        }
+
+        // JSON备份
+        jsonBackup.tables[tableName] = {
+          structure: {
+            create_table: createTable,
+            columns: columns,
+            indexes: indexes,
+            engine: tableStatus[0].Engine,
+            collation: tableStatus[0].Collation,
+            row_format: tableStatus[0].Row_format,
+            auto_increment: tableStatus[0].Auto_increment
+          },
+          data: rows,
+          stats: {
+            row_count: rowCount,
+            data_length: tableStatus[0].Data_length,
+            index_length: tableStatus[0].Index_length,
+            avg_row_length: tableStatus[0].Avg_row_length
+          }
         }
 
         successCount++
       } catch (error) {
         process.stdout.write(` ❌ 失败: ${error.message}\n`)
         failedTables.push({ table: tableName, error: error.message })
+        
+        // 即使失败也记录到JSON
+        jsonBackup.tables[tableName] = {
+          error: error.message,
+          success: false
+        }
       }
     }
 
     sqlContent += `
 SET FOREIGN_KEY_CHECKS = 1;
 
--- 备份完成
+-- ==========================================
+-- 备份完成统计
+-- ==========================================
 -- 成功表数: ${successCount}/${allTables.length}
 -- 总记录数: ${totalRows}
+-- 备份时间: ${BeijingTimeHelper.nowLocale()}
+-- ==========================================
 `
 
+    // 添加备份统计到JSON
+    jsonBackup.summary = {
+      total_tables: allTables.length,
+      success_tables: successCount,
+      failed_tables: failedTables.length,
+      total_rows: totalRows,
+      failed_table_list: failedTables
+    }
+
     // 写入文件
-    await fs.writeFile(backupFile, sqlContent, 'utf8')
+    await fs.writeFile(backupFileSQL, sqlContent, 'utf8')
+    await fs.writeFile(backupFileJSON, JSON.stringify(jsonBackup, null, 2), 'utf8')
+
+    // 获取文件大小
+    const sqlSize = (await fs.stat(backupFileSQL)).size
+    const jsonSize = (await fs.stat(backupFileJSON)).size
 
     log('\n✅ 完整数据库备份完成', 'green')
+    log(`📊 数据库版本: ${dbVersion}`, 'blue')
     log(`📊 成功备份: ${successCount}/${allTables.length} 个表`, 'green')
     log(`📊 总记录数: ${totalRows}`, 'green')
-    log(`📁 备份文件: ${backupFile}`, 'blue')
-    log(`📦 文件大小: ${(sqlContent.length / 1024 / 1024).toFixed(2)} MB`, 'blue')
+    log(`\n📁 SQL备份文件: ${backupFileSQL}`, 'blue')
+    log(`📦 SQL文件大小: ${(sqlSize / 1024 / 1024).toFixed(2)} MB`, 'blue')
+    log(`\n📁 JSON备份文件: ${backupFileJSON}`, 'blue')
+    log(`📦 JSON文件大小: ${(jsonSize / 1024 / 1024).toFixed(2)} MB`, 'blue')
 
     if (failedTables.length > 0) {
       log('\n⚠️  以下表备份失败:', 'yellow')
@@ -185,7 +283,7 @@ SET FOREIGN_KEY_CHECKS = 1;
       })
     }
 
-    return backupFile
+    return { sql: backupFileSQL, json: backupFileJSON }
   } catch (error) {
     log(`\n❌ 备份失败: ${error.message}`, 'red')
     throw error

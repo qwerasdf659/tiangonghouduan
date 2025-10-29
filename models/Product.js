@@ -160,6 +160,26 @@ module.exports = sequelize => {
         type: DataTypes.INTEGER,
         allowNull: true,
         comment: '最后更新者用户ID'
+      },
+
+      // ===== 🆕 臻选空间差异化字段（方案2）=====
+      premium_exchange_points: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+        defaultValue: null,
+        comment: '臻选空间专属积分（NULL表示使用exchange_points，用于实现不同空间不同价格）'
+      },
+      premium_stock: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+        defaultValue: null,
+        comment: '臻选空间独立库存（NULL表示与幸运空间共享stock，用于实现独立库存管理）'
+      },
+      premium_image: {
+        type: DataTypes.STRING(500),
+        allowNull: true,
+        defaultValue: null,
+        comment: '臻选空间专属图片URL（NULL表示使用image，用于实现不同包装展示）'
       }
     },
     {
@@ -184,6 +204,14 @@ module.exports = sequelize => {
         {
           name: 'idx_products_sort_order',
           fields: ['sort_order']
+        },
+        {
+          name: 'idx_products_premium_points',
+          fields: ['premium_exchange_points']
+        },
+        {
+          name: 'idx_products_premium_stock',
+          fields: ['premium_stock']
         }
       ],
       comment: '商品表 - 支持幸运空间和臻选空间'
@@ -191,6 +219,70 @@ module.exports = sequelize => {
   )
 
   // 实例方法
+
+  /**
+   * 获取商品在指定空间的展示信息（方案2核心方法）
+   * @param {string} request_space - 请求的空间 ('lucky'|'premium')
+   * @returns {Object|null} 商品在该空间的展示信息，如果商品不在该空间则返回null
+   *
+   * 业务逻辑说明：
+   * - space='lucky': 只在幸运空间展示，使用原始字段（exchange_points, stock, image）
+   * - space='premium': 只在臻选空间展示，使用原始字段
+   * - space='both': 同时在两个空间展示，根据request_space返回对应配置
+   *   - 请求lucky空间：返回原始字段（exchange_points, stock, image）
+   *   - 请求premium空间：返回premium_*字段（如果有），否则使用原始字段
+   */
+  Product.prototype.getSpaceInfo = function (request_space) {
+    // 检查商品是否在请求的空间可用
+    if (this.space !== 'both' && this.space !== request_space) {
+      return null // 商品不在该空间，返回null
+    }
+
+    // 基础信息（所有空间共享） - 返回纯JSON对象
+    const base_info = JSON.parse(JSON.stringify({
+      product_id: this.product_id,
+      name: this.name,
+      description: this.description,
+      category: this.category,
+      status: this.status,
+      is_hot: this.is_hot,
+      is_new: this.is_new,
+      is_limited: this.is_limited,
+      sort_order: this.sort_order,
+      rating: this.rating,
+      warranty: this.warranty,
+      delivery_info: this.delivery_info,
+      expires_at: this.expires_at,
+      original_price: this.original_price,
+      discount: this.discount,
+      created_at: this.created_at,
+      updated_at: this.updated_at
+    }))
+
+    // 臻选空间且商品支持both：使用premium_*字段（如果有）
+    if (request_space === 'premium' && this.space === 'both') {
+      return {
+        ...base_info,
+        space: request_space, // 标记为premium空间
+        exchange_points: this.premium_exchange_points !== null ? this.premium_exchange_points : this.exchange_points,
+        stock: this.premium_stock !== null ? this.premium_stock : this.stock,
+        image: this.premium_image || this.image,
+        // 额外标记：是否使用了专属配置
+        using_premium_config: this.premium_exchange_points !== null || this.premium_stock !== null || this.premium_image !== null
+      }
+    }
+
+    // 幸运空间或单一空间商品：使用原始字段
+    return {
+      ...base_info,
+      space: this.space === 'both' ? request_space : this.space,
+      exchange_points: this.exchange_points,
+      stock: this.stock,
+      image: this.image,
+      using_premium_config: false
+    }
+  }
+
   Product.prototype.getStockStatus = function () {
     if (this.stock <= 0) {
       return 'out_of_stock'
@@ -234,17 +326,33 @@ module.exports = sequelize => {
       whereClause.category = _category
     }
 
-    // 库存筛选
+    // 库存筛选（需要考虑premium_stock字段）
     if (!_includeOutOfStock) {
-      whereClause.stock = { [sequelize.Sequelize.Op.gt]: 0 }
+      // 复杂查询：幸运空间检查stock>0，臻选空间检查premium_stock>0或stock>0
+      if (space === 'premium') {
+        whereClause[sequelize.Sequelize.Op.or] = [
+          { premium_stock: { [sequelize.Sequelize.Op.gt]: 0 } }, // 臻选独立库存>0
+          {
+            [sequelize.Sequelize.Op.and]: [
+              { premium_stock: null }, // 无独立库存
+              { stock: { [sequelize.Sequelize.Op.gt]: 0 } } // 共享库存>0
+            ]
+          }
+        ]
+      } else {
+        whereClause.stock = { [sequelize.Sequelize.Op.gt]: 0 } // 幸运空间检查stock>0
+      }
     }
 
-    return await Product.findAll({
+    const products = await Product.findAll({
       where: whereClause,
       order: [[sortBy, order]],
       limit: _limit,
       offset: _offset
     })
+
+    // 转换为对应空间的展示信息
+    return products.map(p => p.getSpaceInfo(space)).filter(Boolean)
   }
 
   // 定义模型关联
