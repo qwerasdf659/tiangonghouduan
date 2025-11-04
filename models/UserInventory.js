@@ -167,138 +167,142 @@ module.exports = sequelize => {
         comment: '转让时间（物品转让的北京时间，业务规则：转让操作执行时记录，用途：转让历史查询、物品流转时间分析）'
       },
 
-  // 额外属性（前端展示相关的辅助信息）
-  icon: {
-    type: DataTypes.STRING(10),
-    allowNull: true,
-    comment: '显示图标（前端展示的图标标识，如emoji或图标代码，用途：用户界面展示、物品类型可视化识别）'
-  },
+      // 额外属性（前端展示相关的辅助信息）
+      icon: {
+        type: DataTypes.STRING(10),
+        allowNull: true,
+        comment: '显示图标（前端展示的图标标识，如emoji或图标代码，用途：用户界面展示、物品类型可视化识别）'
+      },
 
-  // ========================================
-  // 市场交易相关字段（Market Trading Fields - V4.0新增功能）
-  // ========================================
-  // 业务场景：用户可以将闲置库存物品上架到市场出售，其他用户可以购买
-  // 功能模块：市场商品列表、商品上架、商品撤回、商品购买
-  // 迁移文件：20250929165731-add-market-fields-to-user-inventory.js
-  // 相关API：
-  // - GET /api/v4/inventory/market/products - 获取市场商品列表
-  // - GET /api/v4/inventory/market/products/:id - 获取商品详情
-  // - POST /api/v4/inventory/market/products/:id/withdraw - 撤回商品
-  // - POST /api/v4/inventory/market/products/:id/purchase - 购买商品
-  // ========================================
+      /*
+       * ========================================
+       * 市场交易相关字段（Market Trading Fields - V4.0新增功能）
+       * ========================================
+       * 业务场景：用户可以将闲置库存物品上架到市场出售，其他用户可以购买
+       * 功能模块：市场商品列表、商品上架、商品撤回、商品购买
+       * 迁移文件：20250929165731-add-market-fields-to-user-inventory.js
+       * 相关API：
+       * - GET /api/v4/inventory/market/products - 获取市场商品列表
+       * - GET /api/v4/inventory/market/products/:id - 获取商品详情
+       * - POST /api/v4/inventory/market/products/:id/withdraw - 撤回商品
+       * - POST /api/v4/inventory/market/products/:id/purchase - 购买商品
+       * ========================================
+       */
 
-  // 市场状态（Market Status - 商品在市场的交易状态）
-  market_status: {
-    type: DataTypes.ENUM('on_sale', 'sold', 'withdrawn'),
-    allowNull: true,
-    comment: '市场状态（Market Status - 商品在市场的交易状态）：on_sale-在售中（可被购买或撤回）| sold-已售出（终态，已被其他用户购买）| withdrawn-已撤回（终态，卖家主动下架）| null-普通库存（未上架到市场）；业务规则：只有on_sale状态可以撤回，sold和withdrawn为终态不可逆转；用途：市场商品筛选、状态流转控制、交易记录'
-  },
+      // 市场状态（Market Status - 商品在市场的交易状态）
+      market_status: {
+        type: DataTypes.ENUM('on_sale', 'sold', 'withdrawn'),
+        allowNull: true,
+        comment: '市场状态（Market Status - 商品在市场的交易状态）：on_sale-在售中（可被购买或撤回）| sold-已售出（终态，已被其他用户购买）| withdrawn-已撤回（终态，卖家主动下架）| null-普通库存（未上架到市场）；业务规则：只有on_sale状态可以撤回，sold和withdrawn为终态不可逆转；用途：市场商品筛选、状态流转控制、交易记录'
+      },
 
-  // 售价（Selling Price in Points - 用户设定的商品售价）
-  selling_points: {
-    type: DataTypes.INTEGER,
-    allowNull: true,
-    comment: '出售价格（Selling Price - 用户设定的商品售价，单位：积分）：卖家自定义价格，通常低于原value值以吸引买家；业务规则：上架时必填，撤回后清空为null；数据范围：1-10000积分；用途：市场价格排序、交易金额计算、成本收益分析'
-  },
+      // 售价（Selling Price in Points - 用户设定的商品售价）
+      selling_points: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+        comment: '出售价格（Selling Price - 用户设定的商品售价，单位：积分）：卖家自定义价格，通常低于原value值以吸引买家；业务规则：上架时必填，撤回后清空为null；数据范围：1-10000积分；用途：市场价格排序、交易金额计算、成本收益分析'
+      },
 
-  // 成色（Item Condition - 商品物理状态和使用程度）
-  condition: {
-    type: DataTypes.ENUM('new', 'excellent', 'good', 'fair', 'poor'),
-    allowNull: true,
-    defaultValue: 'good',
-    comment: '物品成色（Item Condition - 商品物理状态和使用程度）：new-全新（未使用，原包装）| excellent-优秀（轻微使用痕迹）| good-良好（正常使用痕迹，默认值）| fair-一般（明显使用痕迹）| poor-较差（严重磨损或缺陷）；业务规则：影响商品价格和吸引力，建议撤回后保留不清空（优化建议）；用途：商品质量评估、价格参考、买家筛选条件'
-  },
+      // 成色（Item Condition - 商品物理状态和使用程度）
+      condition: {
+        type: DataTypes.ENUM('new', 'excellent', 'good', 'fair', 'poor'),
+        allowNull: true,
+        defaultValue: 'good',
+        comment: '物品成色（Item Condition - 商品物理状态和使用程度）：new-全新（未使用，原包装）| excellent-优秀（轻微使用痕迹）| good-良好（正常使用痕迹，默认值）| fair-一般（明显使用痕迹）| poor-较差（严重磨损或缺陷）；业务规则：影响商品价格和吸引力，建议撤回后保留不清空（优化建议）；用途：商品质量评估、价格参考、买家筛选条件'
+      },
 
-  // 转让次数统计（Transfer Count - 商品流转次数记录）
-  transfer_count: {
-    type: DataTypes.INTEGER,
-    allowNull: false,
-    defaultValue: 0,
-    comment: '转让次数（Transfer Count - 商品被转让的累计次数）：每次市场交易成功后+1；业务规则：初始值0，每次转让后自增；用途：商品流转历史、热门商品识别、交易活跃度分析'
-  },
+      // 转让次数统计（Transfer Count - 商品流转次数记录）
+      transfer_count: {
+        type: DataTypes.INTEGER,
+        allowNull: false,
+        defaultValue: 0,
+        comment: '转让次数（Transfer Count - 商品被转让的累计次数）：每次市场交易成功后+1；业务规则：初始值0，每次转让后自增；用途：商品流转历史、热门商品识别、交易活跃度分析'
+      },
 
-  // 获得方式（Acquisition Method - 用户如何获得该物品）
-  acquisition_method: {
-    type: DataTypes.STRING(50),
-    allowNull: true,
-    comment: '获得方式（Acquisition Method - 用户如何获得该物品）：lottery-抽奖中奖 | exchange-积分兑换 | transfer-市场购买转让 | admin-管理员发放 | compensation-系统补偿；业务规则：创建时记录，不可修改；用途：来源追溯、获取渠道分析、用户行为统计'
-  },
+      // 获得方式（Acquisition Method - 用户如何获得该物品）
+      acquisition_method: {
+        type: DataTypes.STRING(50),
+        allowNull: true,
+        comment: '获得方式（Acquisition Method - 用户如何获得该物品）：lottery-抽奖中奖 | exchange-积分兑换 | transfer-市场购买转让 | admin-管理员发放 | compensation-系统补偿；业务规则：创建时记录，不可修改；用途：来源追溯、获取渠道分析、用户行为统计'
+      },
 
-  // 获得成本（Acquisition Cost - 用户获得该物品花费的积分）
-  acquisition_cost: {
-    type: DataTypes.INTEGER,
-    allowNull: true,
-    comment: '获得成本（Acquisition Cost - 用户获得该物品花费的积分）：兑换时为兑换消耗的积分，抽奖时为抽奖消耗的积分，转让时为购买支付的积分；业务规则：创建时记录，用于成本收益计算；用途：成本追溯、盈亏分析、定价参考'
-  },
+      // 获得成本（Acquisition Cost - 用户获得该物品花费的积分）
+      acquisition_cost: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+        comment: '获得成本（Acquisition Cost - 用户获得该物品花费的积分）：兑换时为兑换消耗的积分，抽奖时为抽奖消耗的积分，转让时为购买支付的积分；业务规则：创建时记录，用于成本收益计算；用途：成本追溯、盈亏分析、定价参考'
+      },
 
-  // 是否可转让（Can Transfer - 该物品是否允许转让给其他用户）
-  can_transfer: {
-    type: DataTypes.BOOLEAN,
-    allowNull: false,
-    defaultValue: true,
-    comment: '是否可转让（Can Transfer - 该物品是否允许转让给其他用户或上架到市场）：true-可转让（可上架到市场出售）| false-不可转让（如系统专属奖品、限定物品）；业务规则：创建时设定，管理员可修改；用途：物品流转控制、市场准入限制'
-  },
+      // 是否可转让（Can Transfer - 该物品是否允许转让给其他用户）
+      can_transfer: {
+        type: DataTypes.BOOLEAN,
+        allowNull: false,
+        defaultValue: true,
+        comment: '是否可转让（Can Transfer - 该物品是否允许转让给其他用户或上架到市场）：true-可转让（可上架到市场出售）| false-不可转让（如系统专属奖品、限定物品）；业务规则：创建时设定，管理员可修改；用途：物品流转控制、市场准入限制'
+      },
 
-  // 是否可使用（Can Use - 该物品是否允许核销使用）
-  can_use: {
-    type: DataTypes.BOOLEAN,
-    allowNull: false,
-    defaultValue: true,
-    comment: '是否可使用（Can Use - 该物品是否允许核销使用）：true-可使用（可通过核销码核销）| false-不可使用（如纯展示物品、收藏品）；业务规则：创建时设定，管理员可修改；用途：核销权限控制、物品分类管理'
-  },
+      // 是否可使用（Can Use - 该物品是否允许核销使用）
+      can_use: {
+        type: DataTypes.BOOLEAN,
+        allowNull: false,
+        defaultValue: true,
+        comment: '是否可使用（Can Use - 该物品是否允许核销使用）：true-可使用（可通过核销码核销）| false-不可使用（如纯展示物品、收藏品）；业务规则：创建时设定，管理员可修改；用途：核销权限控制、物品分类管理'
+      },
 
-  // 物品名称（兼容字段 - Item Name）
-  item_name: {
-    type: DataTypes.STRING(100),
-    allowNull: true,
-    comment: '物品名称（Item Name - 兼容字段，与name字段功能相同）：为了兼容不同业务模块，部分代码使用item_name字段；业务规则：与name字段保持同步；用途：兼容性支持、代码重构过渡期'
-  },
+      // 物品名称（兼容字段 - Item Name）
+      item_name: {
+        type: DataTypes.STRING(100),
+        allowNull: true,
+        comment: '物品名称（Item Name - 兼容字段，与name字段功能相同）：为了兼容不同业务模块，部分代码使用item_name字段；业务规则：与name字段保持同步；用途：兼容性支持、代码重构过渡期'
+      },
 
-  // 物品类型（兼容字段 - Item Type）
-  item_type: {
-    type: DataTypes.STRING(50),
-    allowNull: true,
-    comment: '物品类型（Item Type - 兼容字段，与type字段功能相同）：为了兼容不同业务模块，部分代码使用item_type字段；业务规则：与type字段保持同步；用途：兼容性支持、代码重构过渡期'
-  },
+      // 物品类型（兼容字段 - Item Type）
+      item_type: {
+        type: DataTypes.STRING(50),
+        allowNull: true,
+        comment: '物品类型（Item Type - 兼容字段，与type字段功能相同）：为了兼容不同业务模块，部分代码使用item_type字段；业务规则：与type字段保持同步；用途：兼容性支持、代码重构过渡期'
+      },
 
-  // 是否可用（Is Available - 商品当前是否可用）
-  is_available: {
-    type: DataTypes.BOOLEAN,
-    allowNull: false,
-    defaultValue: true,
-    comment: '是否可用（Is Available - 商品当前是否可用）：true-可用（用户可以查看、使用、转让该物品）| false-不可用（如已锁定、审核中）；业务规则：撤回商品后保持true，保证用户依然拥有该物品；用途：商品可用性控制、前端展示筛选'
-  },
+      // 是否可用（Is Available - 商品当前是否可用）
+      is_available: {
+        type: DataTypes.BOOLEAN,
+        allowNull: false,
+        defaultValue: true,
+        comment: '是否可用（Is Available - 商品当前是否可用）：true-可用（用户可以查看、使用、转让该物品）| false-不可用（如已锁定、审核中）；业务规则：撤回商品后保持true，保证用户依然拥有该物品；用途：商品可用性控制、前端展示筛选'
+      },
 
-  // ========================================
-  // 撤回追踪字段（Withdrawal Tracking Fields - V4.1优化功能）
-  // ========================================
-  // 业务场景：防止恶意用户滥用撤回功能刷新商品排序，记录撤回历史便于数据分析
-  // 功能模块：撤回冷却时间检查、撤回次数统计、撤回原因分析
-  // 相关API：POST /api/v4/inventory/market/products/:id/withdraw
-  // 推荐方案：轻量级优化（方案2）- 在UserInventory表增加字段，无需新建表
-  // ========================================
+      /*
+       * ========================================
+       * 撤回追踪字段（Withdrawal Tracking Fields - V4.1优化功能）
+       * ========================================
+       * 业务场景：防止恶意用户滥用撤回功能刷新商品排序，记录撤回历史便于数据分析
+       * 功能模块：撤回冷却时间检查、撤回次数统计、撤回原因分析
+       * 相关API：POST /api/v4/inventory/market/products/:id/withdraw
+       * 推荐方案：轻量级优化（方案2）- 在UserInventory表增加字段，无需新建表
+       * ========================================
+       */
 
-  // 撤回次数统计（Withdrawal Count - 商品被撤回的累计次数）
-  withdraw_count: {
-    type: DataTypes.INTEGER,
-    allowNull: false,
-    defaultValue: 0,
-    comment: '撤回次数统计（Withdrawal Count - 商品被撤回的累计次数）：每次撤回操作后+1；业务规则：初始值0，每次撤回自增，不可手动修改；用途：防滥用监控（超过5次可能异常）、用户行为分析、撤回率统计；建议阈值：正常用户<3次，>5次需关注'
-  },
+      // 撤回次数统计（Withdrawal Count - 商品被撤回的累计次数）
+      withdraw_count: {
+        type: DataTypes.INTEGER,
+        allowNull: false,
+        defaultValue: 0,
+        comment: '撤回次数统计（Withdrawal Count - 商品被撤回的累计次数）：每次撤回操作后+1；业务规则：初始值0，每次撤回自增，不可手动修改；用途：防滥用监控（超过5次可能异常）、用户行为分析、撤回率统计；建议阈值：正常用户<3次，>5次需关注'
+      },
 
-  // 最后撤回时间（Last Withdrawal Time - 最近一次撤回操作的时间）
-  last_withdraw_at: {
-    type: DataTypes.DATE,
-    allowNull: true,
-    comment: '最后撤回时间（Last Withdrawal Time - 最近一次撤回操作的北京时间）：记录最后撤回的精确时间；业务规则：首次撤回时设置，每次撤回后更新，用于冷却时间检查（建议4小时冷却）；用途：防滥用冷却检查、撤回时间分析、审计追溯；冷却机制：4小时内禁止再次撤回任何商品'
-  },
+      // 最后撤回时间（Last Withdrawal Time - 最近一次撤回操作的时间）
+      last_withdraw_at: {
+        type: DataTypes.DATE,
+        allowNull: true,
+        comment: '最后撤回时间（Last Withdrawal Time - 最近一次撤回操作的北京时间）：记录最后撤回的精确时间；业务规则：首次撤回时设置，每次撤回后更新，用于冷却时间检查（建议4小时冷却）；用途：防滥用冷却检查、撤回时间分析、审计追溯；冷却机制：4小时内禁止再次撤回任何商品'
+      },
 
-  // 最后撤回原因（Last Withdrawal Reason - 最近一次撤回的原因说明）
-  last_withdraw_reason: {
-    type: DataTypes.STRING(200),
-    allowNull: true,
-    comment: '最后撤回原因（Last Withdrawal Reason - 最近一次撤回的原因说明）：用户可选填写撤回原因（如"定价错误"、"暂时不卖"、"商品信息有误"）；业务规则：首次撤回时设置，每次撤回后覆盖更新；用途：撤回原因分析、用户行为研究、问题追溯；常见原因：定价错误40%、改变主意25%、信息错误15%、线下交易10%、其他10%'
-  }
+      // 最后撤回原因（Last Withdrawal Reason - 最近一次撤回的原因说明）
+      last_withdraw_reason: {
+        type: DataTypes.STRING(200),
+        allowNull: true,
+        comment: '最后撤回原因（Last Withdrawal Reason - 最近一次撤回的原因说明）：用户可选填写撤回原因（如"定价错误"、"暂时不卖"、"商品信息有误"）；业务规则：首次撤回时设置，每次撤回后覆盖更新；用途：撤回原因分析、用户行为研究、问题追溯；常见原因：定价错误40%、改变主意25%、信息错误15%、线下交易10%、其他10%'
+      }
     },
     {
       tableName: 'user_inventory',

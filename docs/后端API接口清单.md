@@ -4387,6 +4387,360 @@
 **成功响应**:
 ```json
 {
+  "code": 200,
+  "message": "决策分析数据获取成功",
+  "data": {
+    "time_range": {
+      "start_date": "2025-10-28 00:00:00",
+      "end_date": "2025-11-04 15:30:00",
+      "days": 7
+    },
+    "total_decisions": 1500,
+    "strategy_distribution": {
+      "force_win": 10,
+      "force_lose": 5,
+      "probability_adjust": 50,
+      "default": 1435
+    },
+    "success_rate": 96.5,
+    "avg_response_time": 25,
+    "peak_hour": "20:00-21:00",
+    "daily_breakdown": [
+      {
+        "date": "2025-11-04",
+        "decisions": 250,
+        "success_count": 242,
+        "avg_time": 23
+      }
+    ]
+  },
+  "timestamp": "2025-11-04 15:30:00"
+}
+```
+
+**错误响应**:
+- `403 ADMIN_REQUIRED`: 需要管理员权限
+- `500 ANALYTICS_ERROR`: 数据分析失败
+
+---
+
+#### 10.8.2 获取抽奖趋势分析 ✅
+
+**路径**: `GET /api/v4/unified-engine/admin/analytics/lottery/trends`  
+**描述**: 获取抽奖活动的趋势分析数据  
+**认证要求**: ✅ 需要Access Token  
+**权限要求**: 管理员权限
+
+**查询参数**:
+- `days`: 统计天数（可选，默认7，范围1-90）
+- `campaign_id`: 活动ID筛选（可选）
+- `group_by`: 分组维度（可选: day/week/month，默认day）
+
+**成功响应**:
+```json
+{
+  "code": 200,
+  "message": "抽奖趋势分析获取成功",
+  "data": {
+    "time_range": {
+      "start_date": "2025-10-28",
+      "end_date": "2025-11-04",
+      "days": 7
+    },
+    "total_draws": 5000,
+    "total_winners": 4850,
+    "overall_win_rate": 97.0,
+    "trends": [
+      {
+        "date": "2025-11-04",
+        "draws": 850,
+        "winners": 825,
+        "win_rate": 97.1,
+        "unique_users": 650,
+        "avg_draws_per_user": 1.3
+      }
+    ],
+    "top_prizes": [
+      {
+        "prize_name": "100积分",
+        "win_count": 2500,
+        "percentage": 50.0
+      }
+    ],
+    "user_activity": {
+      "new_users": 150,
+      "active_users": 800,
+      "retention_rate": 85.5
+    }
+  },
+  "timestamp": "2025-11-04 15:30:00"
+}
+```
+
+**错误响应**:
+- `403 ADMIN_REQUIRED`: 需要管理员权限
+- `500 TRENDS_ANALYSIS_ERROR`: 趋势分析失败
+
+---
+
+#### 10.8.3 获取性能报告 ✅
+
+**路径**: `GET /api/v4/unified-engine/admin/analytics/performance/report`  
+**描述**: 获取系统性能指标和健康状况报告  
+**认证要求**: ✅ 需要Access Token  
+**权限要求**: 管理员权限
+
+**查询参数**:
+- `days`: 统计天数（可选，默认1，范围1-30）
+
+**成功响应**:
+```json
+{
+  "code": 200,
+  "message": "性能报告获取成功",
+  "data": {
+    "system_health": {
+      "status": "healthy",
+      "uptime": "15天3小时",
+      "last_restart": "2025-10-20 10:00:00"
+    },
+    "api_performance": {
+      "total_requests": 50000,
+      "avg_response_time": 45,
+      "p95_response_time": 120,
+      "p99_response_time": 250,
+      "success_rate": 99.8,
+      "error_rate": 0.2
+    },
+    "database_performance": {
+      "avg_query_time": 15,
+      "slow_queries_count": 5,
+      "connection_pool_usage": "70%",
+      "cache_hit_rate": 95.5
+    },
+    "resource_usage": {
+      "cpu_usage": "45%",
+      "memory_usage": "2.5GB / 4GB (62.5%)",
+      "disk_usage": "15GB / 50GB (30%)"
+    },
+    "bottlenecks": [
+      {
+        "type": "slow_query",
+        "description": "用户库存查询较慢",
+        "avg_time": 250,
+        "suggestion": "考虑添加索引"
+      }
+    ]
+  },
+  "timestamp": "2025-11-04 15:30:00"
+}
+```
+
+**错误响应**:
+- `403 ADMIN_REQUIRED`: 需要管理员权限
+- `500 PERFORMANCE_REPORT_ERROR`: 性能报告生成失败
+
+---
+
+#### 10.8.4 获取用户行为分析 ✅
+
+**路径**: `GET /api/v4/unified-engine/admin/analytics/user/behavior`  
+**描述**: 获取用户行为分析数据，包括活跃度、留存率等  
+**认证要求**: ✅ 需要Access Token  
+**权限要求**: 管理员权限
+
+**查询参数**:
+- `days`: 统计天数（可选，默认7，范围1-90）
+- `user_segment`: 用户分群（可选: new/active/inactive）
+
+**成功响应**:
+```json
+{
+  "code": 200,
+  "message": "用户行为分析获取成功",
+  "data": {
+    "time_range": {
+      "start_date": "2025-10-28",
+      "end_date": "2025-11-04",
+      "days": 7
+    },
+    "user_metrics": {
+      "total_users": 1000,
+      "new_users": 150,
+      "active_users": 800,
+      "churned_users": 50
+    },
+    "engagement": {
+      "avg_session_duration": "15分钟",
+      "avg_actions_per_session": 8.5,
+      "daily_active_rate": 65.0,
+      "weekly_active_rate": 85.0
+    },
+    "retention": {
+      "day_1": 80.0,
+      "day_3": 65.0,
+      "day_7": 55.0,
+      "day_30": 40.0
+    },
+    "user_lifecycle": {
+      "new_activation_rate": 90.0,
+      "avg_lifetime_value": 5000,
+      "churn_risk_users": 120
+    },
+    "behavior_patterns": [
+      {
+        "pattern": "晚间活跃",
+        "users_count": 600,
+        "peak_hours": ["19:00-22:00"],
+        "avg_engagement": "high"
+      }
+    ]
+  },
+  "timestamp": "2025-11-04 15:30:00"
+}
+```
+
+**错误响应**:
+- `403 ADMIN_REQUIRED`: 需要管理员权限
+- `500 USER_BEHAVIOR_ERROR`: 用户行为分析失败
+
+---
+
+### 10.9 兑换审核管理 ✅
+
+**基础路径**: `/api/v4/unified-engine/admin/audit`  
+**实现文件**: `routes/v4/unified-engine/admin/audit.js`  
+**核心机制**:
+- 大额交易审核: 针对requires_audit=true的兑换记录进行人工审核
+- 事务安全: 审核操作使用数据库事务保证一致性
+- 自动退款: 审核拒绝自动退回积分给用户
+- 审计日志: 所有审核操作记录完整审计日志
+- 库存生成: 审核通过后自动生成核销码并添加到用户库存
+
+---
+
+#### 10.9.1 获取待审核列表 ✅
+
+**路径**: `GET /api/v4/unified-engine/admin/audit/pending`  
+**描述**: 获取所有待审核的兑换记录列表  
+**认证要求**: ✅ 需要Access Token  
+**权限要求**: 管理员权限
+
+**查询参数**:
+- `limit`: 返回数量限制（默认20）
+
+**成功响应**:
+```json
+{
+  "code": 200,
+  "message": "待审核列表获取成功",
+  "data": {
+    "pending_count": 5,           // 待审核总数
+    "items": [
+      {
+        "exchange_id": "exc_20251104_abc123",
+        "user": {
+          "user_id": 1,
+          "mobile": "13800138000",
+          "nickname": "用户昵称"
+        },
+        "product_name": "高级商品",
+        "product_category": "实物商品",
+        "product_points": 5000,
+        "product_snapshot": {        // 完整商品快照
+          "name": "高级商品",
+          "category": "实物商品",
+          "exchange_points": 5000,
+          "description": "商品描述"
+        },
+        "quantity": 1,
+        "total_points": 5000,
+        "exchange_code": "EXC123456",
+        "exchange_time": "2025-11-04 15:30:00",
+        "space": "premium",
+        "requires_audit": true,
+        "audit_status": "pending"
+      }
+    ]
+  },
+  "timestamp": "2025-11-04 15:30:00"
+}
+```
+
+**错误响应**:
+- `403 ADMIN_REQUIRED`: 需要管理员权限
+- `500 SERVER_ERROR`: 获取待审核列表失败
+
+---
+
+#### 10.9.2 审核通过 ✅
+
+**路径**: `POST /api/v4/unified-engine/admin/audit/:exchange_id/approve`  
+**描述**: 审核通过兑换申请，自动生成核销码并添加到用户库存  
+**认证要求**: ✅ 需要Access Token  
+**权限要求**: 管理员权限
+
+**路径参数**:
+- `exchange_id`: 兑换记录ID（必填）
+
+**请求体**:
+```json
+{
+  "reason": "审核通过原因"       // 可选，审核备注
+}
+```
+
+**成功响应**:
+```json
+{
+  "code": 200,
+  "message": "审核通过，兑换已完成",
+  "data": {
+    "exchange_id": "exc_20251104_abc123",
+    "audit_status": "approved",
+    "status": "completed",
+    "audited_at": "2025-11-04 15:30:00",
+    "inventory_items": [          // 生成的库存项
+      {
+        "inventory_id": 101,
+        "name": "高级商品",
+        "verification_code": "VER123456"  // 核销码
+      }
+    ]
+  },
+  "timestamp": "2025-11-04 15:30:00"
+}
+```
+
+**业务逻辑**:
+1. 验证兑换记录存在且状态为pending
+2. 更新审核状态为approved
+3. 为每个兑换数量生成独立的核销码
+4. 将核销码添加到用户库存（UserInventory）
+5. 核销码有效期30天
+6. 记录完整审计日志
+
+**错误响应**:
+- `404 NOT_FOUND`: 兑换记录不存在
+- `400 INVALID_STATUS`: 该记录不是待审核状态
+- `403 ADMIN_REQUIRED`: 需要管理员权限
+- `500 SERVER_ERROR`: 审核通过失败
+
+---
+
+#### 10.9.3 审核拒绝 ✅
+
+**路径**: `POST /api/v4/unified-engine/admin/audit/:exchange_id/reject`  
+**描述**: 拒绝兑换申请，自动退回积分给用户  
+**认证要求**: ✅ 需要Access Token  
+**权限要求**: 管理员权限
+
+**路径参数**:
+- `exchange_id`: 兑换记录ID（必填）
+
+**请求体**:
+```json
+{
   "reason": "审核拒绝原因"       // 必填，必须提供拒绝原因
 }
 ```
@@ -4424,7 +4778,7 @@
 
 ---
 
-#### 10.4.4 查看审核历史 ✅
+#### 10.9.4 查看审核历史 ✅
 
 **路径**: `GET /api/v4/unified-engine/admin/audit/history`  
 **描述**: 获取已审核的兑换记录历史（通过/拒绝）  
@@ -4488,16 +4842,249 @@
 
 ---
 
-### 10.5 奖品池管理 ✅
+### 10.10 活动权限管理 ✅
 
-**基础路径**: `/api/v4/unified-engine/admin/prize-pool`  
-**实现文件**: `routes/v4/unified-engine/admin/prize_pool.js`  
+**基础路径**: `/api/v4/unified-engine/admin/campaign-permissions`  
+**实现文件**: `routes/v4/unified-engine/admin/campaign-permissions.js`  
 **核心机制**:
-- 批量操作: 支持一次添加多个奖品
-- 数量管理: 自动计算剩余数量，防止超发
-- 概率配置: 支持设置奖品中奖概率
-- 使用统计: 实时跟踪奖品池使用情况
-- 活动关联: 通过campaign_code标识符关联活动
+- UUID角色系统: 基于现有角色系统，使用campaign_{id}格式的角色名
+- 软删除机制: 使用is_active标志，撤销权限不删除记录
+- 权限复用: 支持重新激活已撤销的权限
+- 完整审计: 记录assigned_by和assigned_at信息
+- 角色隔离: 仅管理以campaign_开头的活动角色
+
+---
+
+#### 10.10.1 分配活动权限 ✅
+
+**路径**: `POST /api/v4/unified-engine/admin/campaign-permissions/assign`  
+**描述**: 管理员为用户分配活动参与权限，通过分配campaign_{id}角色实现  
+**认证要求**: ✅ 需要Access Token  
+**权限要求**: 管理员权限
+
+**请求体**:
+```json
+{
+  "user_id": 1,           // 目标用户ID（必填）
+  "campaign_id": 2        // 活动ID（必填，对应campaign_2角色）
+}
+```
+
+**成功响应**（新建权限）:
+```json
+{
+  "code": 200,
+  "message": "活动权限分配成功",
+  "success_code": "ASSIGN_SUCCESS",
+  "data": {
+    "user": {
+      "user_id": 1,
+      "mobile": "13800138000",
+      "nickname": "用户昵称"
+    },
+    "campaign": {
+      "campaign_id": 2,
+      "role_name": "campaign_2"
+    },
+    "action": "created",           // created/reactivated
+    "assigned_by": 10,             // 管理员ID
+    "assigned_at": "2025-11-04 15:30:00"
+  },
+  "timestamp": "2025-11-04 15:30:00"
+}
+```
+
+**成功响应**（重新激活）:
+```json
+{
+  "code": 200,
+  "message": "活动权限已重新激活",
+  "success_code": "ASSIGN_SUCCESS",
+  "data": {
+    "user": {
+      "user_id": 1,
+      "mobile": "13800138000",
+      "nickname": "用户昵称"
+    },
+    "campaign": {
+      "campaign_id": 2,
+      "role_name": "campaign_2"
+    },
+    "action": "reactivated",
+    "assigned_by": 10,
+    "assigned_at": "2025-11-04 15:30:00"
+  },
+  "timestamp": "2025-11-04 15:30:00"
+}
+```
+
+**业务说明**: 
+- 如果权限已存在且is_active=true，返回400错误
+- 如果权限已存在但is_active=false，自动重新激活并返回action: "reactivated"
+- 自动创建campaign_{id}角色（如不存在）
+- 支持手机号关联查找用户
+
+**错误响应**:
+- `400 MISSING_PARAMS`: 缺少必需参数
+- `400 ALREADY_ASSIGNED`: 用户已拥有此活动权限且未撤销
+- `404 USER_NOT_FOUND`: 用户不存在
+- `404 ROLE_NOT_FOUND`: 活动角色不存在且自动创建失败
+- `403 ADMIN_REQUIRED`: 需要管理员权限
+- `500 ASSIGN_ERROR`: 权限分配失败
+
+---
+
+#### 10.10.2 撤销活动权限 ✅
+
+**路径**: `DELETE /api/v4/unified-engine/admin/campaign-permissions/revoke`  
+**描述**: 管理员撤销用户的活动参与权限（软删除）  
+**认证要求**: ✅ 需要Access Token  
+**权限要求**: 管理员权限
+
+**请求体**:
+```json
+{
+  "user_id": 1,           // 目标用户ID（必填）
+  "campaign_id": 2        // 活动ID（必填）
+}
+```
+
+**成功响应**:
+```json
+{
+  "code": 200,
+  "message": "活动权限已撤销",
+  "success_code": "REVOKE_SUCCESS",
+  "data": {
+    "user": {
+      "user_id": 1,
+      "mobile": "13800138000",
+      "nickname": "用户昵称"
+    },
+    "campaign": {
+      "campaign_id": 2,
+      "role_name": "campaign_2"
+    },
+    "revoked_at": "2025-11-04 15:30:00"
+  },
+  "timestamp": "2025-11-04 15:30:00"
+}
+```
+
+**业务说明**: 使用软删除（is_active=false），权限记录保留可追溯，支持后续重新激活
+
+**错误响应**:
+- `400 MISSING_PARAMS`: 缺少必需参数
+- `404 USER_NOT_FOUND`: 用户不存在
+- `404 PERMISSION_NOT_FOUND`: 用户没有此活动权限或权限已被撤销
+- `403 ADMIN_REQUIRED`: 需要管理员权限
+- `500 REVOKE_ERROR`: 撤销失败
+
+---
+
+#### 10.10.3 查看权限列表 ✅
+
+**路径**: `GET /api/v4/unified-engine/admin/campaign-permissions/list`  
+**描述**: 查询活动权限分配记录，支持按用户或活动筛选  
+**认证要求**: ✅ 需要Access Token  
+**权限要求**: 管理员权限
+
+**查询参数**:
+- `user_id`: 用户ID（可选，筛选指定用户的权限）
+- `campaign_id`: 活动ID（可选，筛选指定活动的权限）
+- `limit`: 返回数量限制（默认50，最大100）
+
+**成功响应**:
+```json
+{
+  "code": 200,
+  "message": "查询成功",
+  "success_code": "LIST_SUCCESS",
+  "data": {
+    "permissions": [
+      {
+        "permission_id": 1,
+        "user": {
+          "user_id": 1,
+          "mobile": "13800138000",
+          "nickname": "用户昵称",
+          "status": "active"
+        },
+        "campaign": {
+          "campaign_id": 2,
+          "campaign_name": "春节活动",
+          "role_name": "campaign_2"
+        },
+        "assigned_at": "2025-11-04 15:30:00",
+        "assigned_by": 10,
+        "is_active": true
+      }
+    ],
+    "total": 1,
+    "filters": {
+      "user_id": 1,
+      "campaign_id": null
+    }
+  },
+  "timestamp": "2025-11-04 15:30:00"
+}
+```
+
+**错误响应**:
+- `403 ADMIN_REQUIRED`: 需要管理员权限
+- `500 LIST_ERROR`: 查询失败
+
+---
+
+#### 10.10.4 检查用户权限 ✅
+
+**路径**: `GET /api/v4/unified-engine/admin/campaign-permissions/check`  
+**描述**: 快速检查用户是否拥有某个活动权限，用于调试和验证  
+**认证要求**: ✅ 需要Access Token  
+**权限要求**: 管理员权限
+
+**查询参数**:
+- `user_id`: 用户ID（必填）
+- `campaign_id`: 活动ID（必填）
+
+**成功响应**（有权限）:
+```json
+{
+  "code": 200,
+  "message": "用户拥有此活动权限",
+  "success_code": "CHECK_SUCCESS",
+  "data": {
+    "user_id": 1,
+    "campaign_id": 2,
+    "has_permission": true,
+    "role_name": "campaign_2",
+    "assigned_at": "2025-11-04 15:30:00"
+  },
+  "timestamp": "2025-11-04 15:30:00"
+}
+```
+
+**成功响应**（无权限）:
+```json
+{
+  "code": 200,
+  "message": "用户没有此活动权限",
+  "success_code": "CHECK_SUCCESS",
+  "data": {
+    "user_id": 1,
+    "campaign_id": 2,
+    "has_permission": false,
+    "role_name": null,
+    "assigned_at": null
+  },
+  "timestamp": "2025-11-04 15:30:00"
+}
+```
+
+**错误响应**:
+- `400 MISSING_PARAMS`: 缺少必需参数user_id或campaign_id
+- `403 ADMIN_REQUIRED`: 需要管理员权限
+- `500 CHECK_ERROR`: 检查失败
 
 ---
 

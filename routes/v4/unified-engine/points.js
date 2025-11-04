@@ -183,7 +183,7 @@ const balanceRateLimiter = rateLimiter.createLimiter({
  * @description 从JWT token中自动获取当前用户的积分余额信息
  * @route GET /api/v4/unified-engine/points/balance
  * @access Private (需要认证)
- * 
+ *
  * 优化内容（2025-11-03）：
  * - ✅ 添加API限流保护（10次/分钟/用户）
  * - ✅ 细化错误处理（区分用户不存在、账户冻结等错误类型）
@@ -194,7 +194,7 @@ const balanceRateLimiter = rateLimiter.createLimiter({
 router.get('/balance', authenticateToken, balanceRateLimiter, async (req, res) => {
   const startTime = Date.now()
   const user_id = req.user.user_id
-  
+
   try {
     // 📊 Step 1: 记录查询开始日志
     console.log(`[PointsBalance] 用户${user_id}查询积分余额`)
@@ -245,20 +245,20 @@ router.get('/balance', authenticateToken, balanceRateLimiter, async (req, res) =
         total_earned: points_overview.total_earned,
         total_consumed: points_overview.total_consumed,
         // 扩展数据（新增）
-        pending_points: points_overview.frozen_points || 0,  // 待审核积分（冻结中）
-        last_earn_time: account.last_earn_time,              // 最后获得积分时间
-        last_consume_time: account.last_consume_time,        // 最后消耗积分时间
-        is_active: account.is_active,                        // 账户激活状态
+        pending_points: points_overview.frozen_points || 0, // 待审核积分（冻结中）
+        last_earn_time: account.last_earn_time, // 最后获得积分时间
+        last_consume_time: account.last_consume_time, // 最后消耗积分时间
+        is_active: account.is_active, // 账户激活状态
         // 元数据
         timestamp: BeijingTimeHelper.apiTimestamp(),
-        query_time_ms: queryTime                             // 查询耗时（毫秒）
+        query_time_ms: queryTime // 查询耗时（毫秒）
       },
       '积分余额查询成功'
     )
   } catch (error) {
     // ❌ 细化错误类型处理
     const queryTime = Date.now() - startTime
-    
+
     // 数据库连接错误
     if (error.name === 'SequelizeConnectionError') {
       console.error(`[PointsBalance] 数据库连接失败: user_id=${user_id}, time=${queryTime}ms`, error)
@@ -268,7 +268,7 @@ router.get('/balance', authenticateToken, balanceRateLimiter, async (req, res) =
         'DATABASE_CONNECTION_ERROR'
       )
     }
-    
+
     // 数据库查询超时
     if (error.name === 'SequelizeTimeoutError') {
       console.error(`[PointsBalance] 数据库查询超时: user_id=${user_id}, time=${queryTime}ms`, error)
@@ -278,7 +278,7 @@ router.get('/balance', authenticateToken, balanceRateLimiter, async (req, res) =
         'DATABASE_TIMEOUT_ERROR'
       )
     }
-    
+
     // 其他未知错误
     console.error(`[PointsBalance] 查询失败: user_id=${user_id}, time=${queryTime}ms`, error)
     return res.apiInternalError(

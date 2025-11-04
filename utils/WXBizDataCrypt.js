@@ -27,7 +27,7 @@ class WXBizDataCrypt {
    * @param {string} appId - 微信小程序AppID
    * @param {string} sessionKey - 微信会话密钥（通过code换取）
    */
-  constructor(appId, sessionKey) {
+  constructor (appId, sessionKey) {
     this.appId = appId
     this.sessionKey = sessionKey
   }
@@ -51,7 +51,7 @@ class WXBizDataCrypt {
    *   }
    * }
    */
-  decryptData(encryptedData, iv) {
+  decryptData (encryptedData, iv) {
     try {
       /*
        * ========================================
