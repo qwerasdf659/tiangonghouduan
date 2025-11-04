@@ -233,7 +233,7 @@ const notFoundHandler = (req, res) => {
         'POST /api/auth/login - 用户登录',
         'GET /api/lottery/config - 抽奖配置',
         'GET /api/exchange/products - 商品列表',
-        'POST /api/photo/upload - 拍照上传',
+        'POST /api/v4/consumption/submit - 商家扫码录入消费',
         '管理员功能已简化，无需商家审核'
       ]
     }

@@ -38,6 +38,8 @@
     "_comment_diagnostic": "=== 诊断工具命令（V2.0 重构版）===",
     "diagnostic:toolkit": "node scripts/diagnostic/diagnostic-toolkit.js",
     "diagnostic:points": "node scripts/diagnostic/diagnostic-toolkit.js diagnose",
+    "diagnostic:503-error": "bash scripts/diagnostic/diagnose-503-error.sh",
+    "diagnostic:transactions": "node scripts/diagnostic/check_transaction_incidents.js",
     "_comment_maintenance": "=== 业务维护工具命令（V2.0 重构版）===",
     "maintenance:toolkit": "node scripts/maintenance/business-toolkit.js",
     "maintenance:analyze": "node scripts/maintenance/business-toolkit.js analyze",
@@ -70,11 +72,18 @@
     "_comment_system": "=== 系统工具命令（V2.0 重构版）===",
     "system:check": "node scripts/system/final_quality_check.js",
     "system:process": "./scripts/system/process-manager.sh status",
+    "system:env": "node scripts/check-environment.js",
     "_comment_toolkit": "=== 独立工具包命令（V2.0 重构版）===",
     "toolkit:points": "node scripts/toolkit/points-toolkit.js",
     "toolkit:timezone": "node scripts/toolkit/timezone-toolkit.js",
     "toolkit:api-docs": "node scripts/toolkit/generate-api-docs.js",
-    "toolkit:analyzer": "node scripts/toolkit/js_module_analyzer.js"
+    "toolkit:analyzer": "node scripts/toolkit/js_module_analyzer.js",
+    "_comment_sealos": "=== Sealos云平台相关命令（方案A整理）===",
+    "sealos:list-orphans": "node scripts/sealos/list-orphan-sealos-files.js",
+    "sealos:cleanup-orphans": "node scripts/sealos/cleanup-orphan-sealos-files.js",
+    "sealos:test-upload": "bash scripts/sealos/test-sealos-upload.sh",
+    "sealos:diagnose-db": "bash scripts/sealos/diagnose-sealos-database.sh",
+    "sealos:setup": "bash scripts/sealos/setup-sealos.sh"
   },
   "dependencies": {
     "aws-sdk": "^2.1691.0",

@@ -317,5 +317,33 @@ module.exports = sequelize => {
     where: { trade_type: tradeType }
   }))
 
+  /**
+   * 定义模型关联关系
+   * 业务含义：建立TradeRecord与User模型的关联，支持查询交易参与方信息
+   * @param {Object} models - Sequelize模型集合对象
+   * @returns {void}
+   */
+  TradeRecord.associate = function (models) {
+    // 发送方用户（可为空，系统操作时无发送方）
+    TradeRecord.belongsTo(models.User, {
+      foreignKey: 'from_user_id',
+      as: 'fromUser',
+      constraints: false // 允许NULL值
+    })
+
+    // 接收方用户
+    TradeRecord.belongsTo(models.User, {
+      foreignKey: 'to_user_id',
+      as: 'toUser'
+    })
+
+    // 操作员（管理员操作时）
+    TradeRecord.belongsTo(models.User, {
+      foreignKey: 'operator_id',
+      as: 'operator',
+      constraints: false // 允许NULL值
+    })
+  }
+
   return TradeRecord
 }

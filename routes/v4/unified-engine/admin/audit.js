@@ -304,7 +304,8 @@ router.get('/history', authenticateToken, requireAdmin, async (req, res) => {
       requires_audit: true,
       audit_status: {
         [Op.in]: ['approved', 'rejected']
-      }
+      },
+      is_deleted: 0 // 审核历史中排除已删除的记录
     }
 
     // 筛选审核状态

@@ -1,16 +1,118 @@
 /**
  * 抽奖用户服务 - V4.0 UUID角色系统版本
- * 🛡️ 权限管理：移除is_admin依赖，使用UUID角色系统
+ * 提供用户信息查询、权限验证、统计信息、抽奖权限验证等功能
+ *
+ * 业务场景：
+ * - 抽奖前验证用户基本信息和权限，确保用户有资格参与抽奖
+ * - 提供用户统计信息，辅助抽奖策略决策（如保底机制、连续失败次数等）
+ * - 管理员功能需要验证用户是否具有管理员权限
+ * - 更新用户连续失败次数，用于触发保底机制
+ * - 更新用户历史总积分，用于统计用户活跃度
+ *
+ * 核心功能：
+ * 1. 用户信息查询：获取用户基本信息、角色信息、连续失败次数、历史总积分
+ * 2. 权限验证：基于UUID角色系统验证用户是否为管理员、是否具有特定权限
+ * 3. 抽奖权限验证：验证用户是否可以参与抽奖（用户状态、权限等）
+ * 4. 用户统计：提供用户抽奖参与次数、中奖次数、中奖率等统计数据
+ * 5. 连续失败次数管理：更新用户连续失败次数，用于保底机制触发判断
+ * 6. 历史总积分管理：累加用户历史总积分，用于用户活跃度分析
+ *
+ * 🛡️ 权限管理升级：
+ * - 移除`is_admin`字段依赖，完全基于UUID角色系统
+ * - 使用`getUserRoles`中间件函数获取用户角色信息
+ * - 支持灵活的角色和权限验证，适应不同业务场景
+ * - 兼容旧版`is_admin`字段（通过`role_based_admin`字段提供向后兼容）
+ *
+ * 集成模型：
+ * - User：用户模型，存储用户基本信息、状态、连续失败次数、历史总积分
+ * - UserRole：用户角色关联模型，存储用户与角色的关联关系
+ * - Role：角色模型，定义系统中的各种角色（如管理员、普通用户等）
+ *
+ * 集成技术：
+ * - Sequelize ORM：数据库查询和更新操作
+ * - UUID角色系统：统一的权限管理系统，基于角色和权限的细粒度控制
+ * - middleware/auth：认证中间件，提供`getUserRoles`函数获取用户角色信息
+ *
+ * 使用方式：
+ * ```javascript
+ * const userService = new LotteryUserService()
+ *
+ * // 获取用户信息
+ * const userInfo = await userService.getUserInfo(10001)
+ * console.log('用户昵称:', userInfo.nickname)
+ * console.log('是否管理员:', userInfo.role_based_admin)
+ *
+ * // 验证用户是否为管理员
+ * const isAdmin = await userService.isAdmin(10001)
+ * if (isAdmin) {
+ *   console.log('用户是管理员，允许访问管理功能')
+ * }
+ *
+ * // 验证抽奖权限
+ * const permission = await userService.validateLotteryPermission(10001)
+ * if (permission.valid) {
+ *   console.log('用户可以参与抽奖')
+ * } else {
+ *   console.log('用户无法参与抽奖，原因:', permission.reason)
+ * }
+ *
+ * // 更新连续失败次数
+ * const newCount = await userService.updateConsecutiveFailCount(10001, true)
+ * console.log('新的连续失败次数:', newCount)
+ * ```
+ *
+ * 注意事项：
+ * - 权限验证依赖UUID角色系统，确保`getUserRoles`函数正常工作
+ * - 用户状态（`status`字段）为'inactive'时无法参与抽奖
+ * - 连续失败次数用于保底机制，需要在抽奖成功后重置为0
+ * - 历史总积分仅用于统计，不影响抽奖逻辑
+ * - 统计数据中的抽奖参与次数和中奖次数需要从`LotteryDraw`模型中查询（当前未实现）
+ *
  * 创建时间：2025年01月21日
  * 更新时间：2025年01月28日
+ * 最后更新：2025年10月30日
+ * 作者：Claude Sonnet 4.5
  */
 
 const { User } = require('../../models')
 const { getUserRoles } = require('../../middleware/auth')
 
+/**
+ * 抽奖用户服务类
+ *
+ * 提供用户信息查询、权限验证、统计信息、抽奖权限验证等功能
+ *
+ * 业务场景：
+ * - 抽奖前验证用户基本信息和权限
+ * - 提供用户统计信息辅助抽奖策略决策
+ * - 基于UUID角色系统进行权限验证
+ * - 管理用户连续失败次数和历史总积分
+ */
 class LotteryUserService {
   /**
    * 🛡️ 获取用户信息 - 使用UUID角色系统
+   *
+   * 业务场景：获取用户基本信息、角色信息、连续失败次数、历史总积分
+   *
+   * @param {number} user_id - 用户ID（users表主键）
+   * @returns {Promise<Object>} 用户信息对象
+   * @returns {number} return.user_id - 用户ID
+   * @returns {string} return.mobile - 手机号
+   * @returns {string} return.nickname - 昵称
+   * @returns {string} return.status - 用户状态（active/inactive）
+   * @returns {boolean} return.role_based_admin - 是否为管理员（基于角色计算）
+   * @returns {Array} return.roles - 用户角色列表
+   * @returns {number} return.consecutive_fail_count - 连续失败次数
+   * @returns {number} return.history_total_points - 历史总积分
+   * @returns {Date} return.created_at - 创建时间
+   * @returns {Date} return.updated_at - 更新时间
+   *
+   * @throws {Error} 当用户不存在时抛出错误
+   *
+   * @example
+   * const userInfo = await userService.getUserInfo(10001)
+   * console.log('用户昵称:', userInfo.nickname)
+   * console.log('是否管理员:', userInfo.role_based_admin)
    */
   async getUserInfo (user_id) {
     try {
@@ -42,6 +144,17 @@ class LotteryUserService {
 
   /**
    * 🛡️ 检查用户是否为管理员 - 使用UUID角色系统
+   *
+   * 业务场景：验证用户是否具有管理员权限，用于管理功能访问控制
+   *
+   * @param {number} user_id - 用户ID（users表主键）
+   * @returns {Promise<boolean>} 是否为管理员
+   *
+   * @example
+   * const isAdmin = await userService.isAdmin(10001)
+   * if (isAdmin) {
+   *   console.log('用户是管理员，允许访问管理功能')
+   * }
    */
   async isAdmin (user_id) {
     try {
@@ -55,6 +168,19 @@ class LotteryUserService {
 
   /**
    * 🛡️ 检查用户权限 - 使用UUID角色系统
+   *
+   * 业务场景：验证用户是否具有特定资源的特定操作权限
+   *
+   * @param {number} user_id - 用户ID（users表主键）
+   * @param {string} resource - 资源名称（如：lottery、prize、user等）
+   * @param {string} [action='read'] - 操作类型（read/create/update/delete）
+   * @returns {Promise<boolean>} 是否具有权限
+   *
+   * @example
+   * const canManage = await userService.hasPermission(10001, 'lottery', 'update')
+   * if (canManage) {
+   *   console.log('用户可以管理抽奖活动')
+   * }
    */
   async hasPermission (user_id, resource, action = 'read') {
     try {
@@ -70,6 +196,30 @@ class LotteryUserService {
 
   /**
    * 🛡️ 获取用户统计信息
+   *
+   * 业务场景：获取用户的统计数据，包括抽奖参与次数、中奖次数、中奖率等
+   *
+   * @param {number} user_id - 用户ID（users表主键）
+   * @returns {Promise<Object>} 用户统计信息对象
+   * @returns {number} return.user_id - 用户ID
+   * @returns {string} return.mobile - 手机号
+   * @returns {string} return.nickname - 昵称
+   * @returns {boolean} return.role_based_admin - 是否为管理员
+   * @returns {number} return.consecutive_fail_count - 连续失败次数
+   * @returns {number} return.history_total_points - 历史总积分
+   * @returns {number} return.login_count - 登录次数
+   * @returns {Date} return.last_login - 最后登录时间
+   * @returns {Date} return.created_at - 创建时间
+   * @returns {Object} return.stats - 统计数据对象
+   * @returns {number} return.stats.total_lottery_participations - 总抽奖参与次数
+   * @returns {number} return.stats.total_wins - 总中奖次数
+   * @returns {number} return.stats.win_rate - 中奖率
+   *
+   * @throws {Error} 当用户不存在时抛出错误
+   *
+   * @example
+   * const stats = await userService.getUserStats(10001)
+   * console.log('用户中奖率:', stats.stats.win_rate)
    */
   async getUserStats (user_id) {
     try {
@@ -106,6 +256,24 @@ class LotteryUserService {
 
   /**
    * 🛡️ 验证用户抽奖权限
+   *
+   * 业务场景：抽奖前验证用户是否可以参与抽奖（用户状态、权限等）
+   *
+   * @param {number} user_id - 用户ID（users表主键）
+   * @returns {Promise<Object>} 权限验证结果对象
+   * @returns {boolean} return.valid - 是否有效
+   * @returns {string} [return.reason] - 无效原因（USER_NOT_FOUND/USER_INACTIVE/VALIDATION_ERROR）
+   * @returns {number} [return.user_id] - 用户ID
+   * @returns {boolean} [return.role_based_admin] - 是否为管理员
+   * @returns {boolean} [return.can_participate] - 是否可以参与抽奖
+   *
+   * @example
+   * const permission = await userService.validateLotteryPermission(10001)
+   * if (permission.valid) {
+   *   console.log('用户可以参与抽奖')
+   * } else {
+   *   console.log('用户无法参与抽奖，原因:', permission.reason)
+   * }
    */
   async validateLotteryPermission (user_id) {
     try {
@@ -135,6 +303,22 @@ class LotteryUserService {
 
   /**
    * 🛡️ 更新用户连续失败次数
+   *
+   * 业务场景：用于保底机制，记录用户连续未中奖次数，达到阈值时触发保底
+   *
+   * @param {number} user_id - 用户ID（users表主键）
+   * @param {boolean} [increment=true] - 是否增加次数（true: +1，false: 重置为0）
+   * @returns {Promise<number>} 更新后的连续失败次数
+   *
+   * @throws {Error} 当用户不存在时抛出错误
+   *
+   * @example
+   * // 抽奖失败，增加失败次数
+   * const newCount = await userService.updateConsecutiveFailCount(10001, true)
+   * console.log('新的连续失败次数:', newCount)
+   *
+   * // 抽奖成功，重置失败次数
+   * await userService.updateConsecutiveFailCount(10001, false)
    */
   async updateConsecutiveFailCount (user_id, increment = true) {
     try {
@@ -160,6 +344,19 @@ class LotteryUserService {
 
   /**
    * 🛡️ 更新用户历史总积分
+   *
+   * 业务场景：累加用户历史总积分，用于用户活跃度分析和数据统计
+   *
+   * @param {number} user_id - 用户ID（users表主键）
+   * @param {number} points - 要增加的积分数（可以是负数表示减少）
+   * @returns {Promise<number>} 更新后的历史总积分
+   *
+   * @throws {Error} 当用户不存在时抛出错误
+   *
+   * @example
+   * // 用户获得100积分
+   * const newTotal = await userService.updateHistoryTotalPoints(10001, 100)
+   * console.log('新的历史总积分:', newTotal)
    */
   async updateHistoryTotalPoints (user_id, points) {
     try {

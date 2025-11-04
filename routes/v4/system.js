@@ -875,7 +875,7 @@ router.get('/user/statistics/:user_id', authenticateToken, dataAccessControl, as
     const dataLevel = isAdmin ? 'full' : 'public'
 
     // 并行查询各种统计数据
-    const [userInfo, lotteryStats, inventoryStats, pointsStats, exchangeStats, uploadStats] =
+    const [userInfo, lotteryStats, inventoryStats, pointsStats, exchangeStats, consumptionStats] =
       await Promise.all([
         // 基本用户信息
         User.findByPk(user_id, {
@@ -914,9 +914,12 @@ router.get('/user/statistics/:user_id', authenticateToken, dataAccessControl, as
           raw: true
         }),
 
-        // 积分统计
+        // 积分统计（过滤已删除记录）
         require('../models').PointsTransaction.findAll({
-          where: { user_id },
+          where: {
+            user_id,
+            is_deleted: 0 // 统计时排除已删除的记录
+          },
           attributes: [
             [
               require('sequelize').fn(
@@ -941,9 +944,12 @@ router.get('/user/statistics/:user_id', authenticateToken, dataAccessControl, as
           raw: true
         }),
 
-        // 兑换统计
+        // 兑换统计（过滤已删除记录）
         require('../models').ExchangeRecords.findAll({
-          where: { user_id },
+          where: {
+            user_id,
+            is_deleted: 0 // 统计时排除已删除的记录
+          },
           attributes: [
             [require('sequelize').fn('COUNT', require('sequelize').col('*')), 'total_exchanges'],
             [
@@ -954,14 +960,21 @@ router.get('/user/statistics/:user_id', authenticateToken, dataAccessControl, as
           raw: true
         }),
 
-        // 上传统计（如果有相关表）
-        require('../models').ImageResources.findAll({
-          where: { user_id },
-          attributes: [
-            [require('sequelize').fn('COUNT', require('sequelize').col('*')), 'total_uploads']
-          ],
-          raw: true
-        })
+        // 🔄 消费记录统计（新业务：商家扫码录入）（过滤已删除记录）
+        require('../models').ConsumptionRecord
+          ? require('../models').ConsumptionRecord.findAll({
+            where: {
+              user_id,
+              is_deleted: 0 // 统计时排除已删除的记录
+            },
+            attributes: [
+              [require('sequelize').fn('COUNT', require('sequelize').col('*')), 'total_consumptions'],
+              [require('sequelize').fn('SUM', require('sequelize').col('consumption_amount')), 'total_amount'],
+              [require('sequelize').fn('SUM', require('sequelize').col('points_to_award')), 'total_points']
+            ],
+            raw: true
+          })
+          : Promise.resolve([{ total_consumptions: 0, total_amount: 0, total_points: 0 }]) // 向后兼容
       ])
 
     if (!userInfo) {
@@ -999,8 +1012,10 @@ router.get('/user/statistics/:user_id', authenticateToken, dataAccessControl, as
       exchange_count: parseInt(exchangeStats[0]?.total_exchanges || 0),
       exchange_points_spent: parseInt(exchangeStats[0]?.total_points_spent || 0),
 
-      // 上传统计
-      upload_count: parseInt(uploadStats[0]?.total_uploads || 0),
+      // 🔄 消费记录统计（新业务：商家扫码录入）
+      consumption_count: parseInt(consumptionStats[0]?.total_consumptions || 0), // 消费记录数
+      consumption_amount: parseFloat(consumptionStats[0]?.total_amount || 0), // 总消费金额(元)
+      consumption_points: parseInt(consumptionStats[0]?.total_points || 0), // 总奖励积分
 
       // 活跃度评分（简单算法）
       activity_score: Math.min(
@@ -1008,7 +1023,7 @@ router.get('/user/statistics/:user_id', authenticateToken, dataAccessControl, as
         Math.floor(
           parseInt(lotteryStats[0]?.total_draws || 0) * 2 +
             parseInt(exchangeStats[0]?.total_exchanges || 0) * 3 +
-            parseInt(uploadStats[0]?.total_uploads || 0) * 5
+            parseInt(consumptionStats[0]?.total_consumptions || 0) * 5 // 🔄 使用消费记录数
         )
       ),
 
@@ -1026,8 +1041,12 @@ router.get('/user/statistics/:user_id', authenticateToken, dataAccessControl, as
     if (statistics.exchange_count >= 5) {
       statistics.achievements.push({ name: '兑换专家', icon: '🛒', unlocked: true })
     }
-    if (statistics.upload_count >= 10) {
-      statistics.achievements.push({ name: '上传高手', icon: '📸', unlocked: true })
+    // 🔄 消费记录相关成就（新业务：商家扫码录入）
+    if (statistics.consumption_count >= 10) {
+      statistics.achievements.push({ name: '消费达人', icon: '💳', unlocked: true })
+    }
+    if (statistics.consumption_amount >= 1000) {
+      statistics.achievements.push({ name: '千元大客', icon: '💰', unlocked: true })
     }
 
     // 数据脱敏处理
@@ -1105,8 +1124,11 @@ router.get('/admin/overview', authenticateToken, dataAccessControl, async (req, 
         raw: true
       }),
 
-      // 积分统计
+      // 积分统计（过滤已删除记录）
       require('../models').PointsTransaction.findAll({
+        where: {
+          is_deleted: 0 // 系统统计时排除已删除的记录
+        },
         attributes: [
           [
             require('sequelize').fn(
@@ -1598,7 +1620,45 @@ router.get('/chat/ws-status', authenticateToken, (req, res) => {
   }
 })
 
-// 工具函数
+/**
+ * 计算反馈预计响应时间（工具函数）
+ *
+ * 业务场景：
+ * - 用户提交反馈后，根据反馈优先级自动计算预计响应时间
+ * - 前端显示预计响应时间，提升用户体验和满意度
+ * - 运营团队根据优先级合理安排处理顺序，确保高优先级反馈及时响应
+ *
+ * 业务规则：
+ * - high（高优先级）：4小时内响应，适用于紧急问题（如：系统故障、账户异常）
+ * - medium（中优先级）：24小时内响应，适用于一般问题（如：功能咨询、体验反馈）
+ * - low（低优先级）：72小时内响应，适用于建议类反馈（如：功能建议、优化建议）
+ * - 未知优先级：默认72小时内响应，兜底处理
+ *
+ * 响应时间标准：
+ * - 响应时间指管理员第一次回复的时间，不是问题解决时间
+ * - 实际响应时间可能因人力资源、问题复杂度等因素有所调整
+ * - 系统会记录实际响应时间，用于服务质量分析和改进
+ *
+ * @param {string} priority - 反馈优先级（high/medium/low）
+ * @returns {string} 预计响应时间描述（如："4小时内"、"24小时内"、"72小时内"）
+ *
+ * @example
+ * // 高优先级反馈
+ * const responseTime = calculateResponseTime('high')
+ * console.log(responseTime) // 输出: "4小时内"
+ *
+ * @example
+ * // 中优先级反馈
+ * const responseTime = calculateResponseTime('medium')
+ * console.log(responseTime) // 输出: "24小时内"
+ *
+ * @example
+ * // 未知优先级（兜底处理）
+ * const responseTime = calculateResponseTime('unknown')
+ * console.log(responseTime) // 输出: "72小时内"
+ *
+ * @description 根据反馈优先级返回预计响应时间描述，提升用户体验
+ */
 function calculateResponseTime (priority) {
   const responseTimeMap = {
     high: '4小时内',

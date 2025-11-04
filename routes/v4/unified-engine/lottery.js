@@ -1,8 +1,129 @@
 /**
- * V4.0 统一抽奖引擎路由 - 统一版本
- * 🛡️ 权限管理：只有超级管理员(admin)和普通用户(user)两种角色
+ * 餐厅积分抽奖系统 V4.0统一引擎架构 - 抽奖API路由（/api/v4/unified-engine/lottery）
+ *
+ * 业务场景：提供抽奖相关的REST API接口，包括奖品查询、抽奖执行、抽奖历史等功能
+ *
+ * API清单：
+ *
+ * 【奖品管理】
+ * - GET /prizes/:campaignCode - 获取抽奖奖品列表（已脱敏，隐藏概率和库存）
+ *
+ * 【抽奖执行】
+ * - POST /draw/:campaign_code - 执行单次抽奖（使用活动代码标识）
+ * - POST /multi-draw/:campaign_code - 执行连续抽奖（支持1-10次）
+ *
+ * 【抽奖历史】
+ * - GET /my-history - 获取我的抽奖历史（支持分页、筛选）
+ * - GET /history/:draw_id - 获取单条抽奖记录详情
+ *
+ * 【活动信息】
+ * - GET /campaigns - 获取活动列表（当前进行中的活动）
+ * - GET /campaigns/:campaign_code - 获取活动详情
+ *
+ * 核心功能：
+ * 1. 奖品信息查询（数据脱敏保护，隐藏敏感商业信息）
+ * 2. 单次抽奖执行（积分扣除、概率计算、保底触发）
+ * 3. 连续抽奖执行（支持1-10次，统一事务保护）
+ * 4. 抽奖历史查询（用户自己的抽奖记录、中奖详情）
+ * 5. 活动权限控制（管理员全权限、普通用户需分配权限）
+ *
+ * 业务规则：
+ * - **权限管理**：管理员（admin角色）拥有所有活动权限，普通用户需明确分配活动角色（campaign_{campaign_id}）
+ * - **限流保护**：20次/分钟/用户，防止恶意频繁抽奖
+ * - **数据脱敏**：奖品列表隐藏概率、库存等敏感信息，防止抓包泄露
+ * - **活动标识**：统一使用campaign_code（活动代码）而非campaign_id（数字ID），防止遍历攻击
+ * - **100%中奖**：每次抽奖必定从奖品池选择一个奖品（只是价值不同）
+ * - **连抽限制**：连续抽奖最多10次，单次事务保证原子性
+ * - **积分扣除**：抽奖前检查余额，抽奖后立即扣除，使用事务保护
+ *
+ * 安全措施：
+ * - **JWT认证**：所有接口要求用户登录（authenticateToken中间件）
+ * - **数据访问控制**：应用dataAccessControl中间件，防止越权访问
+ * - **数据脱敏保护**：使用DataSanitizer统一处理敏感数据
+ * - **限流保护**：防止恶意刷接口（20次/分钟/用户）
+ * - **权限校验**：checkCampaignPermission()验证用户活动权限
+ *
+ * 响应格式：
+ * - 使用res.api*()中间件注入方法（ApiResponse统一格式）
+ * - 成功：{ success: true, code: 'XXX', message: 'xxx', data: {...} }
+ * - 失败：{ success: false, code: 'XXX', message: 'xxx', error: 'xxx' }
+ *
+ * 错误码规范：
+ * - USER_NOT_FOUND: 用户不存在
+ * - CAMPAIGN_NOT_FOUND: 活动不存在
+ * - INSUFFICIENT_POINTS: 积分余额不足
+ * - DAILY_LIMIT_EXCEEDED: 每日抽奖次数超限
+ * - CAMPAIGN_PERMISSION_DENIED: 活动权限不足
+ * - RATE_LIMIT_EXCEEDED: 限流触发
+ *
+ * 数据模型关联：
+ * - LotteryCampaign：抽奖活动表
+ * - LotteryPrize：奖品表
+ * - LotteryDraw：抽奖记录表
+ * - UserPointsAccount：用户积分账户表
+ * - User：用户表
+ * - Role：角色表（用于权限控制）
+ *
+ * 使用示例：
+ * ```javascript
+ * // 示例1：获取奖品列表（已脱敏）
+ * GET /api/v4/unified-engine/lottery/prizes/daily_lottery
+ * Authorization: Bearer <token>
+ *
+ * // 响应（已隐藏概率和库存）
+ * {
+ *   "success": true,
+ *   "data": {
+ *     "prizes": [
+ *       { "id": 1, "name": "100积分", "type": "points" },
+ *       { "id": 2, "name": "50积分", "type": "points" }
+ *     ]
+ *   }
+ * }
+ *
+ * // 示例2：执行单次抽奖
+ * POST /api/v4/unified-engine/lottery/draw/daily_lottery
+ * Authorization: Bearer <token>
+ * Content-Type: application/json
+ * {}
+ *
+ * // 响应
+ * {
+ *   "success": true,
+ *   "message": "抽奖成功",
+ *   "data": {
+ *     "draw_id": "draw_20251030_abc123",
+ *     "prize_name": "100积分",
+ *     "prize_value": 100,
+ *     "is_winner": true
+ *   }
+ * }
+ *
+ * // 示例3：连续抽奖3次
+ * POST /api/v4/unified-engine/lottery/multi-draw/daily_lottery
+ * Authorization: Bearer <token>
+ * Content-Type: application/json
+ * {
+ *   "draws_count": 3
+ * }
+ *
+ * // 响应
+ * {
+ *   "success": true,
+ *   "data": {
+ *     "total_draws": 3,
+ *     "results": [
+ *       { "draw_id": "xxx1", "prize_name": "100积分", ... },
+ *       { "draw_id": "xxx2", "prize_name": "50积分", ... },
+ *       { "draw_id": "xxx3", "prize_name": "谢谢参与", ... }
+ *     ]
+ *   }
+ * }
+ * ```
+ *
  * 创建时间：2025年01月21日
- * 更新时间：2025年01月28日
+ * 最后更新：2025年10月30日
+ * 使用模型：Claude Sonnet 4.5
  */
 
 const express = require('express')

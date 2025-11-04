@@ -18,7 +18,65 @@ const { getRawClient } = require('./UnifiedRedisClient')
 const fs = require('fs').promises
 const path = require('path')
 
+/**
+ * 统一脚本管理器 - V4版本
+ *
+ * 业务场景：
+ * - 统一管理项目中的所有数据库脚本、测试脚本、维护脚本
+ * - 提供标准化的脚本执行接口
+ * - 管理脚本依赖关系和执行顺序
+ * - 记录脚本执行历史和结果统计
+ *
+ * 核心功能：
+ * 1. 脚本执行管理：runScript、runScriptSafely、runMultipleScripts
+ * 2. 数据库操作：standardized database operations
+ * 3. 错误处理：统一的错误捕获和日志记录
+ * 4. 依赖管理：管理脚本间的依赖关系
+ * 5. 结果统计：执行历史、成功率、耗时统计
+ * 6. 测试支持：Jest测试覆盖率分析、问题诊断、解决方案生成
+ *
+ * 设计特性：
+ * - 单例模式：全局唯一实例
+ * - 统一数据库连接：使用getDatabaseHelper()
+ * - 统一Redis连接：使用getRawClient()
+ * - 脚本依赖配置：定义脚本间的依赖关系
+ *
+ * 使用方式：
+ * ```javascript
+ * const { getUnifiedScriptManager } = require('./utils/UnifiedScriptManager')
+ * const scriptManager = getUnifiedScriptManager()
+ *
+ * // 执行单个脚本
+ * await scriptManager.runScript('sync-database.js')
+ *
+ * // 执行多个脚本
+ * await scriptManager.runMultipleScripts(['script1.js', 'script2.js'])
+ * ```
+ *
+ * 创建时间：2025年01月21日
+ * 最后更新：2025年10月30日
+ *
+ * @class UnifiedScriptManager
+ */
 class UnifiedScriptManager {
+  /**
+   * 构造函数 - 初始化统一脚本管理器（单例模式）
+   *
+   * 功能说明：
+   * - 实现单例模式（如果实例已存在则返回已有实例）
+   * - 初始化数据库连接（getDatabaseHelper）
+   * - 初始化Redis连接（getRawClient）
+   * - 配置脚本路径（../scripts）
+   * - 初始化执行历史记录
+   * - 配置脚本依赖关系
+   *
+   * 设计决策：
+   * - 使用单例模式确保全局唯一实例
+   * - 统一数据库和Redis连接管理
+   * - 预定义脚本依赖关系
+   *
+   * @constructor
+   */
   constructor () {
     // 单例模式
     if (UnifiedScriptManager.instance) {
@@ -538,6 +596,7 @@ class UnifiedScriptManager {
   /**
    * 🆕 V4架构覆盖率系统性检查
    * 基于真实数据分析覆盖率问题并提供解决方案
+   * @returns {Promise<Object>} 检查结果（成功状态、覆盖率数据、问题、解决方案、报告）
    */
   async checkV4ArchitectureCoverage () {
     console.log('\n🔍 V4架构覆盖率系统性检查开始...')
@@ -582,6 +641,7 @@ class UnifiedScriptManager {
   /**
    * 🔍 收集真实覆盖率数据
    * 使用npm test获取真实的覆盖率数据，不使用模拟数据
+   * @returns {Promise<Object>} 覆盖率数据对象（主引擎、核心组件、策略、API层、整体）
    */
   async collectRealCoverageData () {
     console.log('📊 收集真实覆盖率数据...')
@@ -604,7 +664,12 @@ class UnifiedScriptManager {
       const apiCoverage = await this.getApiLayerCoverage()
 
       return {
-        mainEngine: coverageData.mainEngine || { statements: 0, branches: 0, functions: 0, lines: 0 },
+        mainEngine: coverageData.mainEngine || {
+          statements: 0,
+          branches: 0,
+          functions: 0,
+          lines: 0
+        },
         coreComponents: coverageData.coreComponents || {},
         strategies: coverageData.strategies || {},
         apiLayer: apiCoverage,
@@ -619,6 +684,8 @@ class UnifiedScriptManager {
 
   /**
    * 📈 解析npm test覆盖率输出
+   * @param {string} stdout - npm test的标准输出
+   * @returns {Object} 解析后的覆盖率数据对象
    */
   parseCoverageOutput (stdout) {
     const lines = stdout.split('\n')
@@ -688,6 +755,7 @@ class UnifiedScriptManager {
 
   /**
    * 🔍 获取API层覆盖率数据
+   * @returns {Promise<Object>} API层覆盖率对象
    */
   async getApiLayerCoverage () {
     try {
@@ -708,6 +776,7 @@ class UnifiedScriptManager {
 
   /**
    * 📊 获取基础覆盖率数据(fallback)
+   * @returns {Object} 基础覆盖率数据对象
    */
   getBasicCoverageData () {
     return {
@@ -732,6 +801,8 @@ class UnifiedScriptManager {
 
   /**
    * 🚨 分析覆盖率问题
+   * @param {Object} coverageData - 覆盖率数据对象
+   * @returns {Array} 问题列表数组
    */
   analyzeCoverageProblems (coverageData) {
     const problems = []
@@ -799,6 +870,8 @@ class UnifiedScriptManager {
 
   /**
    * 💡 生成覆盖率解决方案
+   * @param {Array} problems - 问题列表数组
+   * @returns {Promise<Array>} 解决方案列表
    */
   async generateCoverageSolutions (problems) {
     const solutions = []
@@ -859,11 +932,7 @@ class UnifiedScriptManager {
         solutions.push({
           component: problem.component,
           priority: 'high',
-          actions: [
-            '执行系统性测试用例补充',
-            '增强集成测试覆盖',
-            '完善端到端测试场景'
-          ],
+          actions: ['执行系统性测试用例补充', '增强集成测试覆盖', '完善端到端测试场景'],
           estimatedImprovement: `+${Math.round(problem.gap * 0.8)}%`,
           estimatedTime: '4-6小时'
         })
@@ -876,6 +945,10 @@ class UnifiedScriptManager {
 
   /**
    * 📋 生成覆盖率报告
+   * @param {Object} coverageData - 覆盖率数据对象
+   * @param {Array} problems - 问题列表
+   * @param {Array} solutions - 解决方案列表
+   * @returns {string} 生成的Markdown格式报告
    */
   generateCoverageReport (coverageData, problems, solutions) {
     const timestamp = BeijingTimeHelper.now().toString()
@@ -947,6 +1020,9 @@ class UnifiedScriptManager {
 
   /**
    * 🎯 获取覆盖率状态标识
+   * @param {number} coverage - 当前覆盖率百分比
+   * @param {number} threshold - 阈值百分比
+   * @returns {string} 状态标识（✅/⚠️/❌/❓）
    */
   getCoverageStatus (coverage, threshold) {
     if (!coverage) return '❓'
@@ -1045,6 +1121,7 @@ class UnifiedScriptManager {
   /**
    * 清理执行历史
    * @param {Object} options 清理选项
+   * @returns {Object} 清理结果统计
    */
   cleanupHistory (options = {}) {
     const { keepLast = 20, olderThanDays = 7 } = options

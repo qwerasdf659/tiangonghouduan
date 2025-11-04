@@ -127,12 +127,35 @@ module.exports = sequelize => {
       comment: '用户积分账户'
     })
 
+    // 🔥 用户的高级空间状态（一对一关系）
+    User.hasOne(models.UserPremiumStatus, {
+      foreignKey: 'user_id',
+      as: 'premiumStatus',
+      comment: '用户高级空间解锁状态（100积分解锁，24小时有效期）'
+    })
+
     // 🔥 用户的积分交易记录（一对多关系）
     User.hasMany(models.PointsTransaction, {
       foreignKey: 'user_id',
       as: 'pointsTransactions',
       comment: '积分交易记录'
     })
+
+    // 🔥 用户的交易记录（作为发送方）
+    if (models.TradeRecord) {
+      User.hasMany(models.TradeRecord, {
+        foreignKey: 'from_user_id',
+        as: 'sentTrades',
+        comment: '用户发送的交易记录'
+      })
+
+      // 🔥 用户的交易记录（作为接收方）
+      User.hasMany(models.TradeRecord, {
+        foreignKey: 'to_user_id',
+        as: 'receivedTrades',
+        comment: '用户接收的交易记录'
+      })
+    }
 
     // 🔥 用户的抽奖记录（LotteryRecord已合并到LotteryDraw）
     if (models.LotteryDraw) {

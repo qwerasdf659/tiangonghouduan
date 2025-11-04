@@ -593,7 +593,7 @@ router.get(
 
         // 系统活动数据
         todayLogins,
-        todayUploads
+        todayConsumptions
       ] = await Promise.all([
         // 用户统计
         models.User.count(),
@@ -715,8 +715,9 @@ router.get(
             }
           }
         }),
-        models.PhotoUpload
-          ? models.PhotoUpload.count({
+        // 消费记录统计（替代原PhotoUpload）
+        models.ConsumptionRecord
+          ? models.ConsumptionRecord.count({
             where: {
               created_at: {
                 [Op.gte]: todayStart,
@@ -769,7 +770,7 @@ router.get(
         inventory_stats: {
           new_items_today: todayInventoryItems,
           used_items_today: todayUsedItems,
-          uploads_today: todayUploads
+          consumptions_today: todayConsumptions
         },
 
         // 客服和聊天统计

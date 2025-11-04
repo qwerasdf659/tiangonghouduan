@@ -1,0 +1,28 @@
+{
+  "timestamp": "2025-10-30T19:12:59.565+08:00",
+  "summary": {
+    "totalAccounts": 1,
+    "problemAccounts": 1,
+    "healthyAccounts": 0
+  },
+  "problems": [
+    {
+      "user_id": 31,
+      "recorded": {
+        "earned": 294230,
+        "consumed": 2030,
+        "balance": null
+      },
+      "actual": {
+        "earned": 294230,
+        "consumed": -2030,
+        "balance": 296260
+      },
+      "diff": {
+        "earned": 0,
+        "consumed": -4060,
+        "balance": null
+      }
+    }
+  ]
+}

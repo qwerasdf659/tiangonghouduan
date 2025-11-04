@@ -167,6 +167,10 @@ module.exports = sequelize => {
         allowNull: false,
         defaultValue: () => BeijingTimeHelper.createDatabaseTime(),
         comment: '操作时间',
+        /**
+         * 获取北京时间格式的操作时间
+         * @returns {string} 北京时间格式的日期字符串（YYYY年MM月DD日 HH:mm:ss）
+         */
         get () {
           return BeijingTimeHelper.formatChinese(this.getDataValue('created_at'))
         }
@@ -227,6 +231,7 @@ module.exports = sequelize => {
 
   /**
    * 获取操作类型描述
+   * @returns {string} 操作类型的中文描述（积分调整/兑换审核/商品修改等）
    */
   AdminOperationLog.prototype.getOperationTypeDescription = function () {
     const typeMap = {
@@ -248,6 +253,7 @@ module.exports = sequelize => {
 
   /**
    * 获取操作动作描述
+   * @returns {string} 操作动作的中文描述（创建/修改/删除/审核通过等）
    */
   AdminOperationLog.prototype.getActionDescription = function () {
     const actionMap = {
@@ -266,6 +272,7 @@ module.exports = sequelize => {
 
   /**
    * 格式化变更字段（用于展示）
+   * @returns {string} 格式化后的变更字段描述（field: old_value → new_value）
    */
   AdminOperationLog.prototype.formatChangedFields = function () {
     if (!this.changed_fields || this.changed_fields.length === 0) {
@@ -281,6 +288,7 @@ module.exports = sequelize => {
 
   /**
    * 获取完整的审计描述
+   * @returns {string} 完整的审计日志描述（操作类型 - 操作动作: 目标对象 (变更内容)）
    */
   AdminOperationLog.prototype.getFullDescription = function () {
     const operationType = this.getOperationTypeDescription()
@@ -292,6 +300,8 @@ module.exports = sequelize => {
 
   /**
    * 关联关系定义
+   * @param {Object} models - Sequelize所有模型的集合对象
+   * @returns {void} 无返回值，仅定义关联关系
    */
   AdminOperationLog.associate = function (models) {
     // 关联操作员（用户）
@@ -305,6 +315,10 @@ module.exports = sequelize => {
 
   /**
    * 类方法：比较两个对象并生成changed_fields
+   * @param {Object} beforeObj - 变更前的对象数据
+   * @param {Object} afterObj - 变更后的对象数据
+   * @param {Array<string>|null} fieldList - 需要比较的字段列表，null则比较所有字段
+   * @returns {Array<Object>} 变更字段数组 [{field, old_value, new_value}, ...]
    */
   AdminOperationLog.compareObjects = function (beforeObj, afterObj, fieldList = null) {
     const changedFields = []

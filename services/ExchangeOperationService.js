@@ -1,30 +1,118 @@
 /**
- * 兑换订单运营服务（应用层运营工具）
+ * 餐厅积分抽奖系统 V4.0统一引擎架构 - 兑换订单运营服务（ExchangeOperationService）
  *
- * 原名：AuditManagementService
- * 重命名时间：2025-10-12
- * 重命名原因：
- * - 避免与ContentAuditEngine混淆
- * - 突出"兑换订单运营"的业务职责
- * - 强调这是运营工具，不是通用审核引擎
+ * 业务场景：为运营人员提供兑换订单管理工具，支持批量审核、超时告警、统计分析等运营需求
  *
- * 功能：
- * 1. 批量审核历史待审核订单
- * 2. 超时审核订单告警（超过24小时）
- * 3. 待审核订单统计和提醒
+ * 核心功能：
+ * 1. 批量审核操作（批量通过、批量拒绝，提升运营效率）
+ * 2. 超时订单告警（监控超过24小时未审核的订单，防止用户投诉）
+ * 3. 审核统计分析（待审核数量、超时率、审核员工作量统计）
+ * 4. 运营数据看板（审核趋势、高频拒绝原因、审核效率指标）
  *
- * 职责定位：
- * - 应用层：专注兑换订单（ExchangeRecords）运营
- * - 提供批量操作、监控告警等运营工具
- * - 区别于ContentAuditEngine（通用审核基础设施）
+ * 业务流程：
  *
- * 创建时间：2025-10-10
+ * 1. **批量审核通过流程**
+ *    - 运营人员筛选待审核订单 → 选择多个订单ID
+ *    - 调用batchApproveOrders() → 逐个执行ExchangeRecords.approve()
+ *    - 成功：创建用户库存、发送通知 | 失败：记录失败原因
+ *    - 返回批量操作结果（成功数、失败数、耗时统计）
+ *
+ * 2. **批量审核拒绝流程**
+ *    - 运营人员筛选问题订单 → 为每个订单填写拒绝原因（必填，≥5字符）
+ *    - 调用batchRejectOrders() → 逐个执行ExchangeRecords.reject()
+ *    - 成功：退回积分、恢复商品库存、发送通知 | 失败：记录失败原因
+ *    - 返回批量操作结果（成功数、失败数、退款统计）
+ *
+ * 3. **超时订单监控流程**
+ *    - 定时任务（每小时）调用getTimeoutPendingOrders() → 查询超过24小时的待审核订单
+ *    - 生成告警通知 → 发送给审核员和运营管理员
+ *    - 记录超时订单详情（订单ID、用户信息、超时时长、商品信息）
+ *
+ * 4. **审核统计流程**
+ *    - 运营管理端调用getPendingOrdersStatistics() → 获取当前待审核订单统计
+ *    - 展示统计数据（总数、按时间段分布、超时订单数、平均积分）
+ *    - 用于运营决策和审核员绩效评估
+ *
+ * 职责定位（与其他服务的区别）：
+ * - **应用层服务**：专注兑换订单（ExchangeRecords）的运营管理，不是通用基础设施
+ * - **批量操作工具**：提供批量审核、监控告警等运营工具，提升运营效率
+ * - **与ContentAuditEngine的区别**：
+ *   - ContentAuditEngine：通用审核基础设施，处理所有内容审核（消费记录、图片、反馈等）
+ *   - ExchangeOperationService：专门的兑换订单运营工具，提供批量操作、超时监控等特定功能
+ *
+ * 重命名历史：
+ * - 原名：AuditManagementService（2025-10-10创建）
+ * - 新名：ExchangeOperationService（2025-10-12重命名）
+ * - 重命名原因：
+ *   1. 避免与ContentAuditEngine混淆（名称相似容易误解）
+ *   2. 突出"兑换订单运营"的业务职责（而非通用审核管理）
+ *   3. 强调这是运营工具，不是通用审核引擎
+ *
+ * 关键方法列表：
+ * - batchApproveOrders() - 批量审核通过订单（支持多订单并行处理）
+ * - batchRejectOrders() - 批量审核拒绝订单（必须提供拒绝原因）
+ * - getTimeoutPendingOrders() - 获取超时待审核订单（默认24小时）
+ * - getPendingOrdersStatistics() - 获取待审核订单统计（总数、时间分布）
+ * - getAuditorWorkload() - 获取审核员工作量统计（已审核数、平均处理时间）
+ *
+ * 数据模型关联：
+ * - ExchangeRecords：兑换订单表（核心业务模型，调用approve/reject方法）
+ * - User：用户表（关联用户信息，用于告警通知）
+ * - Product：商品表（关联商品信息，用于订单详情展示）
+ *
+ * 业务规则：
+ * - 批量审核拒绝时，每个订单必须提供拒绝原因（≥5字符）
+ * - 超时阈值默认24小时，可配置调整
+ * - 批量操作逐个执行（非事务），单个失败不影响其他订单
+ * - 所有操作记录详细日志，便于审计追溯
+ *
+ * 使用示例：
+ * ```javascript
+ * // 示例1：批量审核通过10个订单
+ * const approveResult = await ExchangeOperationService.batchApproveOrders(
+ *   2, // 审核员ID
+ *   [101, 102, 103, 104, 105, 106, 107, 108, 109, 110], // 订单ID数组
+ *   '批量审核通过（运营工具）' // 批量审核原因
+ * );
+ * console.log(`成功: ${approveResult.success.length}, 失败: ${approveResult.failed.length}`);
+ *
+ * // 示例2：批量审核拒绝问题订单
+ * const rejectItems = [
+ *   { exchange_id: 201, reason: '消费凭证不清晰，无法核实消费金额' },
+ *   { exchange_id: 202, reason: '疑似重复提交，已有相同时间的消费记录' },
+ *   { exchange_id: 203, reason: '商品兑换资格不符，该商品需premium会员' }
+ * ];
+ * const rejectResult = await ExchangeOperationService.batchRejectOrders(2, rejectItems);
+ *
+ * // 示例3：查询超过24小时的超时订单
+ * const timeoutOrders = await ExchangeOperationService.getTimeoutPendingOrders(24);
+ * if (timeoutOrders.length > 0) {
+ *   console.log(`发现${timeoutOrders.length}个超时订单，发送告警通知`);
+ *   // 发送告警...
+ * }
+ *
+ * // 示例4：获取待审核订单统计
+ * const stats = await ExchangeOperationService.getPendingOrdersStatistics();
+ * console.log(`待审核总数: ${stats.total}, 超时订单: ${stats.timeout_count}`);
+ * ```
+ *
+ * 创建时间：2025年10月10日
+ * 最后更新：2025年10月30日
+ * 使用模型：Claude Sonnet 4.5
  */
 
 const { ExchangeRecords, User } = require('../models')
 const { Op } = require('sequelize')
 const BeijingTimeHelper = require('../utils/timeHelper')
 
+/**
+ * 兑换订单运营服务类
+ *
+ * 职责：提供兑换订单批量操作、监控告警、统计分析等运营工具
+ * 设计模式：静态方法服务类（无状态设计）
+ *
+ * @class ExchangeOperationService
+ */
 class ExchangeOperationService {
   /**
    * 批量审核通过历史待审核订单
@@ -387,6 +475,10 @@ class ExchangeOperationService {
   /**
    * 定时任务：检查超时订单并告警
    * 建议每小时执行一次
+   *
+   * @returns {Promise<Object>} 定时任务执行结果
+   * @returns {Object} returns.statistics - 订单统计信息
+   * @returns {Object} returns.alerts - 告警信息
    */
   static async scheduledTimeoutCheck () {
     console.log('[定时任务] 开始执行超时订单检查...')

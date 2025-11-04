@@ -10,7 +10,19 @@ const { DataTypes, Model } = require('sequelize')
 const BeijingTimeHelper = require('../utils/timeHelper')
 const LotteryDrawFormatter = require('../utils/formatters/LotteryDrawFormatter')
 
+/**
+ * 抽奖记录模型（重构版）
+ * 职责：记录用户的每次抽奖行为和结果
+ * 设计模式：数据模型分离 - 业务逻辑在Service层，数据定义在Model层
+ * 业务含义：每次抽奖100%从奖品池选择一个奖品，只是价值不同
+ */
 class LotteryDraw extends Model {
+  /**
+   * 静态关联定义
+   * 业务关系：抽奖记录关联用户、抽奖活动、奖品
+   * @param {Object} models - 所有模型的引用
+   * @returns {void}
+   */
   static associate (models) {
     // 关联到用户
     LotteryDraw.belongsTo(models.User, {
@@ -49,37 +61,60 @@ class LotteryDraw extends Model {
    * 基础实例方法 - 保留简单的数据访问方法
    */
 
-  // 获取抽奖结果显示文本
+  /**
+   * 获取抽奖结果显示文本
+   * @returns {string} 抽奖结果文本（如"中奖"、"未中奖"）
+   */
   getDrawResultName () {
     return LotteryDrawFormatter.getDrawResultText(this.is_winner)
   }
 
-  // 获取奖品发放状态名称
+  /**
+   * 获取奖品发放状态名称
+   * @returns {string} 奖品发放状态文本（如"待发放"、"已发放"）
+   */
   getPrizeStatusName () {
     return LotteryDrawFormatter.getPrizeStatusText(this.prize_status)
   }
 
-  // 检查是否中奖
+  /**
+   * 检查是否中奖
+   * 业务含义：是否获得有价值的奖品（非空奖）
+   * @returns {boolean} 是否中奖
+   */
   isWinner () {
     return this.is_winner
   }
 
-  // 检查奖品是否已发放
+  /**
+   * 检查奖品是否已发放
+   * @returns {boolean} 奖品是否已发放
+   */
   isPrizeDelivered () {
     return LotteryDrawFormatter.isPrizeDelivered(this.prize_status)
   }
 
-  // 检查奖品是否可领取
+  /**
+   * 检查奖品是否可领取
+   * @returns {boolean} 奖品是否可领取
+   */
   isPrizeClaimable () {
     return LotteryDrawFormatter.isPrizeClaimable(this.is_winner, this.prize_status)
   }
 
-  // 输出摘要格式（使用Formatter）
+  /**
+   * 输出摘要格式（使用Formatter）
+   * @returns {Object} 抽奖记录摘要对象
+   */
   toSummary () {
     return LotteryDrawFormatter.formatToSummary(this)
   }
 
-  // 重写toJSON方法（使用Formatter）
+  /**
+   * 重写toJSON方法（使用Formatter）
+   * 业务场景：API响应数据格式化
+   * @returns {Object} JSON格式的抽奖记录
+   */
   toJSON () {
     return LotteryDrawFormatter.formatToJSON(this)
   }
@@ -88,7 +123,15 @@ class LotteryDraw extends Model {
    * 静态方法 - 保留基础验证方法
    */
 
-  // 基础数据验证
+  /**
+   * 基础数据验证
+   * 业务场景：创建抽奖记录前验证必需字段
+   * @param {Object} data - 抽奖记录数据
+   * @param {number} data.user_id - 用户ID
+   * @param {number} data.campaign_id - 活动ID
+   * @param {boolean} data.is_winner - 是否中奖
+   * @returns {Array<string>} 错误信息数组（为空表示验证通过）
+   */
   static validateBasicData (data) {
     const errors = []
 

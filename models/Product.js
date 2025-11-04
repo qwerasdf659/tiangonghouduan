@@ -53,18 +53,18 @@ module.exports = sequelize => {
         comment: '所属空间：lucky-幸运空间，premium-臻选空间，both-两个空间都有'
       },
 
-      // 价格库存
+      // 价格库存（商品的价值体系和库存管理）
       exchange_points: {
         type: DataTypes.INTEGER,
         allowNull: false,
         defaultValue: 0,
-        comment: '兑换所需积分'
+        comment: '兑换所需积分（单个商品的积分价格，业务规则：根据商品价值定价，1积分≈1元人民币价值，用途：用户兑换时扣除积分、计算total_points、显示商品价格，范围：0-99999，定价建议：参考市场价格和商品成本）'
       },
       stock: {
         type: DataTypes.INTEGER,
         allowNull: false,
         defaultValue: 0,
-        comment: '库存数量'
+        comment: '库存数量（商品的可兑换数量，业务规则：用户兑换时扣减、审核拒绝/取消时恢复、库存为0时不可兑换，库存管理：低于low_stock_threshold时预警，用途：兑换前验证、库存统计、补货提醒，更新方式：使用Product.increment/decrement原子操作）'
       },
       original_price: {
         type: DataTypes.DECIMAL(10, 2),

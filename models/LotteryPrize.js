@@ -1,8 +1,19 @@
 const { DataTypes, Model } = require('sequelize')
 const BeijingTimeHelper = require('../utils/timeHelper')
 
-// 🔥 抽奖奖品配置模型 - 分离式架构设计
+/**
+ * 抽奖奖品配置模型 - 分离式架构设计
+ * 职责：管理抽奖奖品的配置、库存、概率、状态等
+ * 设计模式：状态机模式 + 库存管理模式
+ * 业务含义：定义可以抽到的奖品类型、价值、概率和库存
+ */
 class LotteryPrize extends Model {
+  /**
+   * 静态关联定义
+   * 业务关系：奖品关联抽奖活动、抽奖记录、预设记录、图片资源
+   * @param {Object} models - 所有模型的引用
+   * @returns {void}
+   */
   static associate (models) {
     // 关联到抽奖活动
     LotteryPrize.belongsTo(models.LotteryCampaign, {
@@ -39,7 +50,10 @@ class LotteryPrize extends Model {
     }
   }
 
-  // 获取奖品类型名称
+  /**
+   * 获取奖品类型名称
+   * @returns {string} 奖品类型的友好显示名称
+   */
   getPrizeTypeName () {
     const types = {
       points: '积分奖励',
@@ -51,7 +65,10 @@ class LotteryPrize extends Model {
     return types[this.prize_type] || '未知类型'
   }
 
-  // 获取奖品状态名称
+  /**
+   * 获取奖品状态名称
+   * @returns {string} 奖品状态的友好显示名称
+   */
   getStatusName () {
     const statuses = {
       active: '激活中',
@@ -62,7 +79,11 @@ class LotteryPrize extends Model {
     return statuses[this.status] || '未知状态'
   }
 
-  // 检查奖品是否可用
+  /**
+   * 检查奖品是否可用
+   * 业务规则：必须同时满足状态激活、有库存、未达到每日中奖上限
+   * @returns {boolean} 奖品是否可用
+   */
   isAvailable () {
     if (this.status !== 'active') return false
     if (this.stock_quantity !== null && this.stock_quantity <= 0) return false
@@ -70,17 +91,29 @@ class LotteryPrize extends Model {
     return true
   }
 
-  // 检查奖品是否缺货
+  /**
+   * 检查奖品是否缺货
+   * @returns {boolean} 奖品是否缺货
+   */
   isOutOfStock () {
     return this.stock_quantity !== null && this.stock_quantity <= 0
   }
 
-  // 获取中奖概率百分比
+  /**
+   * 获取中奖概率百分比
+   * @returns {string} 中奖概率百分比字符串（保留2位小数）
+   */
   getWinProbabilityPercent () {
     return (this.win_probability * 100).toFixed(2)
   }
 
-  // 更新库存
+  /**
+   * 更新库存
+   * 业务场景：中奖后扣减库存，退款时恢复库存
+   * @param {number} change - 库存变化量（正数增加，负数减少）
+   * @param {Object} transaction - Sequelize事务对象
+   * @returns {Promise<boolean>} 是否更新成功
+   */
   async updateStock (change, transaction = null) {
     if (this.stock_quantity === null) return true // 无限库存
 
@@ -98,17 +131,30 @@ class LotteryPrize extends Model {
     return true
   }
 
-  // 增加中奖次数
+  /**
+   * 增加中奖次数
+   * 业务场景：每次中奖后更新总中奖次数和今日中奖次数
+   * @param {Object} transaction - Sequelize事务对象
+   * @returns {Promise<void>} 无返回值
+   */
   async incrementWinCount (transaction = null) {
     await this.increment(['total_win_count', 'daily_win_count'], { transaction })
   }
 
-  // 重置每日中奖次数
+  /**
+   * 重置每日中奖次数（静态方法）
+   * 业务场景：每日凌晨定时任务执行，重置所有奖品的今日中奖次数
+   * @returns {Promise<void>} 无返回值
+   */
   static async resetDailyWinCount () {
     await LotteryPrize.update({ daily_win_count: 0 }, { where: {} })
   }
 
-  // 获取奖品摘要信息
+  /**
+   * 获取奖品摘要信息
+   * 业务场景：API响应、管理后台展示
+   * @returns {Object} 奖品摘要对象
+   */
   toSummary () {
     return {
       prize_id: this.prize_id,
@@ -125,7 +171,16 @@ class LotteryPrize extends Model {
     }
   }
 
-  // 验证奖品数据
+  /**
+   * 验证奖品数据（静态方法）
+   * 业务场景：创建或更新奖品前进行数据验证
+   * @param {Object} data - 奖品数据
+   * @param {string} data.prize_name - 奖品名称
+   * @param {string} data.prize_type - 奖品类型
+   * @param {number} data.prize_value - 奖品价值
+   * @param {number} data.win_probability - 中奖概率
+   * @returns {Array<string>} 错误信息数组（为空表示验证通过）
+   */
   static validatePrize (data) {
     const errors = []
 

@@ -14,6 +14,24 @@ const moment = require('moment-timezone')
  * 所有具体策略都必须继承此类并实现核心方法
  */
 class LotteryStrategy {
+  /**
+   * 构造函数
+   *
+   * 业务场景：创建策略实例，初始化策略名称、配置和性能指标
+   *
+   * @param {string} strategyName - 策略名称（如：basic_guarantee、management）
+   * @param {Object} [config={}] - 策略配置对象
+   * @param {boolean} [config.enabled=true] - 是否启用策略
+   * @param {string} [config.description] - 策略描述
+   * @param {string} [config.version] - 策略版本
+   *
+   * @example
+   * const strategy = new LotteryStrategy('basic_guarantee', {
+   *   enabled: true,
+   *   description: '基础保底策略',
+   *   version: '4.0.0'
+   * })
+   */
   constructor (strategyName, config = {}) {
     this.strategyName = strategyName
     this.config = config
@@ -106,7 +124,15 @@ class LotteryStrategy {
   /**
    * 更新策略配置
    *
-   * @param {Object} newConfig - 新配置
+   * 业务场景：动态修改策略配置，如启用/禁用策略、更新策略参数
+   *
+   * @param {Object} newConfig - 新配置对象
+   * @param {boolean} [newConfig.enabled] - 是否启用
+   * @param {string} [newConfig.description] - 策略描述
+   * @returns {void}
+   *
+   * @example
+   * strategy.updateConfig({ enabled: false, description: '暂停策略' })
    */
   updateConfig (newConfig) {
     this.config = { ...this.config, ...newConfig }
@@ -118,8 +144,17 @@ class LotteryStrategy {
   /**
    * 记录执行指标
    *
+   * 业务场景：每次策略执行后记录性能指标，用于监控和统计
+   *
    * @param {number} executionTime - 执行时间（毫秒）
    * @param {boolean} success - 是否成功
+   * @returns {void}
+   *
+   * @example
+   * const startTime = Date.now()
+   * // 执行策略...
+   * const duration = Date.now() - startTime
+   * strategy.recordMetrics(duration, true)
    */
   recordMetrics (executionTime, success) {
     this.metrics.executionCount++
@@ -206,9 +241,15 @@ class LotteryStrategy {
   /**
    * 日志记录方法
    *
-   * @param {string} level - 日志级别
+   * 业务场景：记录策略执行日志，包含时间戳、级别、策略名称、消息和数据
+   *
+   * @param {string} level - 日志级别（INFO/ERROR/DEBUG/WARN）
    * @param {string} message - 日志消息
-   * @param {Object} data - 日志数据
+   * @param {Object} [data={}] - 日志数据对象
+   * @returns {void}
+   *
+   * @example
+   * strategy.log('INFO', '策略执行成功', { duration: 150, result: 'win' })
    */
   log (level, message, data = {}) {
     const timestamp = this.getBeijingTime()
@@ -225,6 +266,15 @@ class LotteryStrategy {
 
   /**
    * Info级别日志
+   *
+   * 业务场景：记录策略执行的一般信息，如执行开始、执行完成等
+   *
+   * @param {string} message - 日志消息
+   * @param {Object} [data={}] - 日志数据
+   * @returns {void}
+   *
+   * @example
+   * strategy.logInfo('开始执行抽奖策略', { user_id: 10001 })
    */
   logInfo (message, data = {}) {
     this.log('INFO', message, data)
@@ -232,6 +282,15 @@ class LotteryStrategy {
 
   /**
    * Error级别日志
+   *
+   * 业务场景：记录策略执行错误，如参数错误、执行失败等
+   *
+   * @param {string} message - 错误消息
+   * @param {Object} [data={}] - 错误数据（包含错误详情和堆栈）
+   * @returns {void}
+   *
+   * @example
+   * strategy.logError('策略执行失败', { error: err.message, user_id: 10001 })
    */
   logError (message, data = {}) {
     this.log('ERROR', message, data)
@@ -239,6 +298,15 @@ class LotteryStrategy {
 
   /**
    * Debug级别日志
+   *
+   * 业务场景：记录策略执行的调试信息，用于开发和问题排查
+   *
+   * @param {string} message - 调试消息
+   * @param {Object} [data={}] - 调试数据
+   * @returns {void}
+   *
+   * @example
+   * strategy.logDebug('计算中奖概率', { probability: 0.15, pools: [1, 2, 3] })
    */
   logDebug (message, data = {}) {
     this.log('DEBUG', message, data)
@@ -246,6 +314,15 @@ class LotteryStrategy {
 
   /**
    * Warn级别日志
+   *
+   * 业务场景：记录策略执行的警告信息，如配置异常、性能问题等
+   *
+   * @param {string} message - 警告消息
+   * @param {Object} [data={}] - 警告数据
+   * @returns {void}
+   *
+   * @example
+   * strategy.logWarn('策略执行时间过长', { duration: 3500, threshold: 3000 })
    */
   logWarn (message, data = {}) {
     this.log('WARN', message, data)

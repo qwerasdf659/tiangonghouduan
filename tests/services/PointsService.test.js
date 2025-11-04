@@ -266,6 +266,96 @@ describe('PointsService 积分服务测试', () => {
     })
   })
 
+  describe('积分概览功能（消费记录奖励）', () => {
+    test('应该能获取用户积分概览（包含冻结积分）', async () => {
+      const overview = await PointsService.getUserPointsOverview(test_user_id)
+
+      expect(overview).toBeDefined()
+      expect(typeof overview.available_points).toBe('number')
+      expect(typeof overview.frozen_points).toBe('number')
+      expect(typeof overview.total_earned).toBe('number')
+      expect(typeof overview.total_consumed).toBe('number')
+      expect(Array.isArray(overview.frozen_transactions)).toBe(true)
+      expect(overview.message).toBeDefined()
+
+      // 验证frozen_points >= 0
+      expect(overview.frozen_points).toBeGreaterThanOrEqual(0)
+
+      // 验证available_points >= 0
+      expect(overview.available_points).toBeGreaterThanOrEqual(0)
+
+      // 如果有冻结交易，验证其结构
+      if (overview.frozen_transactions.length > 0) {
+        const frozenTx = overview.frozen_transactions[0]
+        expect(frozenTx).toHaveProperty('transaction_id')
+        expect(frozenTx).toHaveProperty('points_amount')
+        expect(frozenTx).toHaveProperty('status')
+        expect(frozenTx.status).toBe('pending')
+        expect(frozenTx).toHaveProperty('consumption_record')
+        expect(frozenTx.business_type).toBe('consumption_reward')
+      }
+    })
+
+    test('应该能获取用户冻结积分明细（分页）', async () => {
+      const frozenDetails = await PointsService.getUserFrozenPoints(test_user_id, {
+        page: 1,
+        page_size: 10
+      })
+
+      expect(frozenDetails).toBeDefined()
+      expect(typeof frozenDetails.total_count).toBe('number')
+      expect(frozenDetails.current_page).toBe(1)
+      expect(frozenDetails.page_size).toBe(10)
+      expect(typeof frozenDetails.total_pages).toBe('number')
+      expect(typeof frozenDetails.total_frozen_points).toBe('number')
+      expect(Array.isArray(frozenDetails.frozen_transactions)).toBe(true)
+
+      // 验证分页逻辑
+      expect(frozenDetails.frozen_transactions.length).toBeLessThanOrEqual(10)
+
+      // 验证total_frozen_points >= 0
+      expect(frozenDetails.total_frozen_points).toBeGreaterThanOrEqual(0)
+
+      // 如果有冻结交易，验证其结构
+      if (frozenDetails.frozen_transactions.length > 0) {
+        const frozenTx = frozenDetails.frozen_transactions[0]
+        expect(frozenTx).toHaveProperty('transaction_id')
+        expect(frozenTx).toHaveProperty('points_amount')
+        expect(frozenTx).toHaveProperty('status')
+        expect(frozenTx.status).toBe('pending')
+        expect(frozenTx).toHaveProperty('consumption_record')
+        expect(frozenTx.business_type).toBe('consumption_reward')
+
+        // 验证关联的消费记录
+        if (frozenTx.consumption_record) {
+          expect(frozenTx.consumption_record).toHaveProperty('record_id')
+          expect(frozenTx.consumption_record).toHaveProperty('consumption_amount')
+          expect(frozenTx.consumption_record).toHaveProperty('status')
+        }
+      }
+    })
+
+    test('应该正确处理分页参数', async () => {
+      // 测试第2页
+      const page2 = await PointsService.getUserFrozenPoints(test_user_id, {
+        page: 2,
+        page_size: 5
+      })
+
+      expect(page2.current_page).toBe(2)
+      expect(page2.page_size).toBe(5)
+      expect(page2.frozen_transactions.length).toBeLessThanOrEqual(5)
+
+      // 测试最大page_size限制（应该限制在50）
+      const largePage = await PointsService.getUserFrozenPoints(test_user_id, {
+        page: 1,
+        page_size: 100
+      })
+
+      expect(largePage.page_size).toBeLessThanOrEqual(50)
+    })
+  })
+
   describe('错误处理', () => {
     test('应该处理不存在的用户', async () => {
       await expect(PointsService.createPointsAccount(99999)).rejects.toThrow('用户不存在')

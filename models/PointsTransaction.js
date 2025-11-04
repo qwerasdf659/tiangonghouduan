@@ -18,7 +18,9 @@ const { Model, DataTypes } = require('sequelize')
 class PointsTransaction extends Model {
   /**
    * 静态关联定义
+   * 业务关系：积分交易关联用户、积分账户、操作员、消费记录（多态）
    * @param {Object} models - 所有模型的引用
+   * @returns {void}
    */
   static associate (models) {
     // 多对一：多个交易记录属于一个用户
@@ -40,6 +42,20 @@ class PointsTransaction extends Model {
       foreignKey: 'operator_id',
       as: 'operator',
       comment: '操作员信息'
+    })
+
+    /**
+     * 多态关联：关联消费记录（用于消费奖励积分）
+     * 通过reference_type和reference_id实现多态关联
+     */
+    PointsTransaction.belongsTo(models.ConsumptionRecord, {
+      foreignKey: 'reference_id',
+      constraints: false, // 多态关联不使用外键约束
+      as: 'consumption_record',
+      scope: {
+        reference_type: 'consumption' // 仅关联reference_type为'consumption'的记录
+      },
+      comment: '关联的消费记录（用于消费奖励积分）'
     })
 
     // 🗑️ 关联业务事件已删除 - BusinessEvent模型已删除 - 2025年01月21日
@@ -72,7 +88,8 @@ class PointsTransaction extends Model {
       expire: '积分过期',
       behavior_reward: '行为奖励',
       recommendation_bonus: '推荐奖励',
-      activity_bonus: '活动奖励'
+      activity_bonus: '活动奖励',
+      consumption_reward: '消费奖励'
     }
     return businessNames[this.business_type] || '其他'
   }
@@ -306,6 +323,10 @@ module.exports = sequelize => {
         type: DataTypes.DECIMAL(10, 2),
         allowNull: false,
         comment: '积分数量(统一存储正数，类型由transaction_type区分)',
+        /**
+         * 获取积分数量（自动转换为浮点数）
+         * @returns {number} 积分数量
+         */
         get () {
           const value = this.getDataValue('points_amount')
           return value ? parseFloat(value) : 0
@@ -315,6 +336,10 @@ module.exports = sequelize => {
         type: DataTypes.DECIMAL(10, 2),
         allowNull: false,
         comment: '交易前余额',
+        /**
+         * 获取交易前余额（自动转换为浮点数）
+         * @returns {number} 交易前积分余额
+         */
         get () {
           const value = this.getDataValue('points_balance_before')
           return value ? parseFloat(value) : 0
@@ -324,6 +349,10 @@ module.exports = sequelize => {
         type: DataTypes.DECIMAL(10, 2),
         allowNull: false,
         comment: '交易后余额',
+        /**
+         * 获取交易后余额（自动转换为浮点数）
+         * @returns {number} 交易后积分余额
+         */
         get () {
           const value = this.getDataValue('points_balance_after')
           return value ? parseFloat(value) : 0
@@ -338,8 +367,10 @@ module.exports = sequelize => {
           'expire',
           'behavior_reward',
           'recommendation_bonus',
-          'activity_bonus'
-        ),
+          'activity_bonus',
+          'consumption_reward',
+          'premium_unlock'
+        ), // 高级空间解锁（用于记录高级空间解锁的积分交易）
         allowNull: false,
         comment: '业务类型'
       },
@@ -353,6 +384,16 @@ module.exports = sequelize => {
         type: DataTypes.STRING(64),
         allowNull: true,
         comment: '关联业务ID'
+      },
+      reference_type: {
+        type: DataTypes.STRING(50),
+        allowNull: true,
+        comment: '关联业务类型（如：consumption_record、lottery_draw等）'
+      },
+      reference_id: {
+        type: DataTypes.BIGINT,
+        allowNull: true,
+        comment: '关联业务ID（如：consumption_records.record_id）'
       },
       reference_data: {
         type: DataTypes.JSON,
@@ -416,6 +457,27 @@ module.exports = sequelize => {
         type: DataTypes.TEXT,
         allowNull: true,
         comment: '失败原因'
+      },
+
+      /*
+       * ========================================
+       * 软删除字段（API#7统一软删除机制）
+       * ========================================
+       */
+      // 软删除标记（0=未删除，1=已删除）
+      is_deleted: {
+        type: DataTypes.TINYINT(1),
+        allowNull: false,
+        defaultValue: 0,
+        comment: '软删除标记：0=未删除（默认），1=已删除（用户端隐藏）'
+      },
+
+      // 删除时间（软删除时记录，管理员恢复时清空）
+      deleted_at: {
+        type: DataTypes.DATE(3),
+        allowNull: true,
+        defaultValue: null,
+        comment: '删除时间（软删除时记录，管理员恢复时清空），时区：北京时间（GMT+8）'
       }
     },
     {

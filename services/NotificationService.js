@@ -18,6 +18,12 @@
 
 const BeijingTimeHelper = require('../utils/timeHelper')
 
+/**
+ * 通知服务类
+ * 业务职责：统一管理用户通知和管理员通知，集成客服聊天系统
+ * 实现方式：在线用户WebSocket实时推送 + 离线用户消息持久化
+ * 设计模式：通知服务层，支持多种通知类型（兑换、抽奖、积分、审核等）
+ */
 class NotificationService {
   /**
    * 发送通知给指定用户（通过客服聊天系统）
@@ -274,9 +280,10 @@ class NotificationService {
 
   /**
    * 兑换申请提交通知（通知用户）
-   *
+   * 业务场景：用户提交兑换申请后，系统发送确认通知
    * @param {number} user_id - 用户ID
    * @param {Object} exchangeData - 兑换数据
+   * @returns {Promise<Object>} 通知发送结果
    */
   static async notifyExchangePending (user_id, exchangeData) {
     return await this.send(user_id, {
@@ -294,8 +301,9 @@ class NotificationService {
 
   /**
    * 新订单待审核通知（通知管理员）
-   *
+   * 业务场景：有新的兑换订单提交，广播通知所有在线管理员
    * @param {Object} exchangeData - 兑换数据
+   * @returns {Promise<Object>} 通知发送结果
    */
   static async notifyNewExchangeAudit (exchangeData) {
     return await this.sendToAdmins({
@@ -314,9 +322,10 @@ class NotificationService {
 
   /**
    * 审核通过通知（通知用户）
-   *
+   * 业务场景：兑换申请审核通过，通知用户商品已添加到库存
    * @param {number} user_id - 用户ID
    * @param {Object} exchangeData - 兑换数据
+   * @returns {Promise<Object>} 通知发送结果
    */
   static async notifyExchangeApproved (user_id, exchangeData) {
     return await this.send(user_id, {
@@ -333,9 +342,10 @@ class NotificationService {
 
   /**
    * 审核拒绝通知（通知用户）
-   *
+   * 业务场景：兑换申请审核拒绝，通知用户并说明原因，积分已退回
    * @param {number} user_id - 用户ID
    * @param {Object} exchangeData - 兑换数据
+   * @returns {Promise<Object>} 通知发送结果
    */
   static async notifyExchangeRejected (user_id, exchangeData) {
     return await this.send(user_id, {
@@ -353,8 +363,9 @@ class NotificationService {
 
   /**
    * 超时订单告警通知（通知管理员）
-   *
+   * 业务场景：定时任务检测到有订单待审核超时，广播告警给所有管理员
    * @param {Object} alertData - 告警数据
+   * @returns {Promise<Object>} 通知发送结果
    */
   static async notifyTimeoutAlert (alertData) {
     return await this.sendToAdmins({
@@ -371,11 +382,12 @@ class NotificationService {
 
   /**
    * 通用审核通过通知（支持多种类型）
-   *
+   * 业务场景：统一处理各类审核通过通知（兑换、图片、反馈等）
    * @param {number} user_id - 用户ID
    * @param {Object} auditData - 审核数据
    * @param {string} auditData.type - 审核类型（exchange/image/feedback）
    * @param {Object} _options - 选项（预留参数）
+   * @returns {Promise<Object>} 通知发送结果
    */
   static async sendAuditApprovedNotification (user_id, auditData, _options = {}) {
     const { type } = auditData
@@ -413,12 +425,13 @@ class NotificationService {
 
   /**
    * 通用审核拒绝通知（支持多种类型）
-   *
+   * 业务场景：统一处理各类审核拒绝通知（兑换、图片、反馈等）
    * @param {number} user_id - 用户ID
    * @param {Object} auditData - 审核数据
    * @param {string} auditData.type - 审核类型（exchange/image/feedback）
    * @param {string} auditData.reason - 拒绝原因
    * @param {Object} _options - 选项（预留参数）
+   * @returns {Promise<Object>} 通知发送结果
    */
   static async sendAuditRejectedNotification (user_id, auditData, _options = {}) {
     const { type, reason } = auditData

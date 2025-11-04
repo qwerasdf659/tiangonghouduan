@@ -20,9 +20,9 @@ module.exports = sequelize => {
 
       // 业务分类字段
       business_type: {
-        type: DataTypes.ENUM('lottery', 'exchange', 'trade', 'uploads', 'user_upload_review'),
+        type: DataTypes.ENUM('lottery', 'exchange', 'trade', 'uploads'),
         allowNull: false,
-        comment: '业务类型：抽奖/兑换/交易/上传/用户上传审核'
+        comment: '业务类型：抽奖/兑换/交易/上传'
       },
 
       category: {
@@ -131,19 +131,12 @@ module.exports = sequelize => {
         comment: '奖励积分数量'
       },
 
-      // 业务标识字段（保留）
-      is_upload_review: {
-        type: DataTypes.BOOLEAN,
-        defaultValue: false,
-        allowNull: false,
-        comment: '是否为上传审核资源'
-      },
-
+      // 来源模块标识（🔄 已删除 'user_upload' - 旧拍照上传业务已废弃）
       source_module: {
-        type: DataTypes.ENUM('system', 'lottery', 'exchange', 'user_upload', 'admin'),
+        type: DataTypes.ENUM('system', 'lottery', 'exchange', 'admin'),
         defaultValue: 'system',
         allowNull: false,
-        comment: '来源模块'
+        comment: '来源模块：系统/抽奖/兑换/管理员'
       },
 
       // IP地址（安全审核需要）
@@ -301,10 +294,6 @@ module.exports = sequelize => {
     return this.review_status === 'pending'
   }
 
-  ImageResources.prototype.isUploadReview = function () {
-    return this.is_upload_review === true || this.business_type === 'user_upload_review'
-  }
-
   // 简化的类方法
   ImageResources.findByBusiness = function (businessType, category, options = {}) {
     const {
@@ -324,29 +313,6 @@ module.exports = sequelize => {
       limit: parseInt(_limit),
       offset: parseInt(_offset),
       order: [[orderBy, order]]
-    })
-  }
-
-  // 待审核资源查询（保留，核心功能）
-  ImageResources.findPendingReviews = function (limit = 50) {
-    return this.findAll({
-      where: {
-        [sequelize.Sequelize.Op.or]: [
-          { business_type: 'uploads', review_status: 'pending' },
-          { business_type: 'user_upload_review', review_status: 'pending' },
-          { is_upload_review: true, review_status: 'pending' }
-        ],
-        status: 'active'
-      },
-      include: [
-        {
-          model: sequelize.models.User,
-          as: 'uploader',
-          attributes: ['user_id', 'mobile', 'nickname']
-        }
-      ],
-      order: [['created_at', 'ASC']],
-      limit: parseInt(limit)
     })
   }
 

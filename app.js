@@ -443,13 +443,17 @@ try {
   app.use('/api/v4/inventory', require('./routes/v4/unified-engine/inventory'))
   appLogger.info('V4用户库存管理系统加载成功', { route: '/api/v4/inventory' })
 
-  // V4图片上传管理路由
-  app.use('/api/v4/photo', require('./routes/v4/unified-engine/photo'))
-  appLogger.info('V4图片上传管理系统加载成功', { route: '/api/v4/photo' })
-
   // V4积分管理路由
   app.use('/api/v4/unified-engine/points', require('./routes/v4/unified-engine/points'))
   appLogger.info('V4积分管理系统加载成功', { route: '/api/v4/unified-engine/points' })
+
+  // V4高级空间解锁路由（用户支付100积分解锁，有效期24小时）
+  app.use('/api/v4/premium', require('./routes/v4/unified-engine/premium'))
+  appLogger.info('V4高级空间解锁系统加载成功', { route: '/api/v4/premium' })
+
+  // V4消费记录管理路由（商家扫码录入、平台审核）
+  app.use('/api/v4/unified-engine/consumption', require('./routes/v4/unified-engine/consumption'))
+  appLogger.info('V4消费记录管理系统加载成功', { route: '/api/v4/unified-engine/consumption' })
 
   // V4系统功能路由（公告、反馈等）
   app.use('/api/v4/system', require('./routes/v4/system'))
@@ -458,6 +462,10 @@ try {
   // V4审核管理路由（批量审核、超时告警）
   app.use('/api/v4/audit-management', require('./routes/audit-management'))
   appLogger.info('V4审核管理系统加载成功', { route: '/api/v4/audit-management' })
+
+  // 🌙 V4生产环境调试控制接口（仅管理员，动态日志级别）
+  app.use('/api/v4/debug-control', require('./routes/v4/debug-control'))
+  appLogger.info('V4调试控制系统加载成功', { route: '/api/v4/debug-control', note: '仅管理员可用' })
 
   appLogger.info('统一决策引擎V4.0架构已完全启用', { message: '所有旧版API已弃用' })
 } catch (error) {

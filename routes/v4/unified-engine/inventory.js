@@ -53,7 +53,7 @@ router.get('/user/:user_id', authenticateToken, async (req, res) => {
     const { count, rows: inventory } = await models.UserInventory.findAndCountAll({
       where: whereConditions,
       attributes: [
-        'id',
+        'inventory_id', // 主键字段（修复：原为'id'，应使用正确的主键名称）
         'name',
         'description',
         'icon', // 🎯 包含新添加的icon字段
@@ -333,23 +333,22 @@ router.get('/products', authenticateToken, async (req, res) => {
     })
 
     // 🆕 转换为对应空间的展示信息（方案2核心逻辑）
-    const space_products = products.map(p => {
-      // 如果商品有getSpaceInfo方法，使用它获取空间特定信息
-      if (typeof p.getSpaceInfo === 'function') {
-        const space_info = p.getSpaceInfo(space)
-        if (space_info) {
-          return space_info
+    const space_products = products
+      .map(p => {
+        // 如果商品有getSpaceInfo方法，使用它获取空间特定信息
+        if (typeof p.getSpaceInfo === 'function') {
+          const space_info = p.getSpaceInfo(space)
+          if (space_info) {
+            return space_info
+          }
         }
-      }
-      // 否则返回原始数据
-      return p.toJSON()
-    }).filter(Boolean) // 过滤掉null值（商品不在该空间）
+        // 否则返回原始数据
+        return p.toJSON()
+      })
+      .filter(Boolean) // 过滤掉null值（商品不在该空间）
 
     // 数据脱敏处理
-    const sanitizedProducts = DataSanitizer.sanitizeExchangeProducts(
-      space_products,
-      dataLevel
-    )
+    const sanitizedProducts = DataSanitizer.sanitizeExchangeProducts(space_products, dataLevel)
 
     logger.info('获取商品列表成功', {
       user_id: req.user.user_id,
@@ -550,11 +549,16 @@ router.post('/exchange-records/:id/cancel', authenticateToken, async (req, res) 
       return ApiResponse.error(res, '取消原因不能超过200字符', 400)
     }
 
-    // 2. 查找兑换记录
+    // 2. 查找兑换记录（过滤已删除记录）
     const exchangeRecord = await models.ExchangeRecords.findByPk(exchange_id)
 
     if (!exchangeRecord) {
       return ApiResponse.error(res, '兑换记录不存在', 404)
+    }
+
+    // 检查记录是否已被删除
+    if (exchangeRecord.is_deleted === 1) {
+      return ApiResponse.error(res, '兑换记录不存在或已被删除', 404)
     }
 
     // 3. 验证权限：只允许用户取消自己的兑换记录
@@ -564,12 +568,13 @@ router.post('/exchange-records/:id/cancel', authenticateToken, async (req, res) 
 
     // 4. 验证兑换状态：只允许取消pending状态的记录（严格人工审核模式）
     if (exchangeRecord.status !== 'pending' || exchangeRecord.audit_status !== 'pending') {
-      const statusText = {
-        distributed: '已审核通过',
-        used: '已使用',
-        expired: '已过期',
-        cancelled: '已取消'
-      }[exchangeRecord.status] || '当前状态'
+      const statusText =
+        {
+          distributed: '已审核通过',
+          used: '已使用',
+          expired: '已过期',
+          cancelled: '已取消'
+        }[exchangeRecord.status] || '当前状态'
 
       return ApiResponse.error(res, `${statusText}的兑换记录无法取消`, 400)
     }
@@ -608,6 +613,8 @@ router.post('/exchange-records/:id/cancel', authenticateToken, async (req, res) 
 
 /**
  * 辅助函数：获取状态描述
+ * @param {string} status - 物品状态（available/pending/used/expired/transferred）
+ * @returns {string} 状态的中文描述
  */
 function getStatusDescription (status) {
   const statusMap = {
@@ -622,6 +629,8 @@ function getStatusDescription (status) {
 
 /**
  * 辅助函数：获取默认图标
+ * @param {string} type - 物品类型（voucher/product/service）
+ * @returns {string} 对应类型的emoji图标
  */
 function getDefaultIcon (type) {
   const iconMap = {
@@ -983,7 +992,10 @@ router.post('/verification/verify', authenticateToken, async (req, res) => {
     }
 
     // 检查是否过期
-    if (item.verification_expires_at && BeijingTimeHelper.createDatabaseTime() > item.verification_expires_at) {
+    if (
+      item.verification_expires_at &&
+      BeijingTimeHelper.createDatabaseTime() > item.verification_expires_at
+    ) {
       return ApiResponse.error(res, '核销码已过期', 400)
     }
 
@@ -1071,9 +1083,7 @@ router.get('/market/products/:id', authenticateToken, async (req, res) => {
           user_id: marketProduct.owner.user_id,
           nickname: marketProduct.owner.nickname || '匿名用户',
           // 对于非管理员，隐藏敏感信息
-          mobile: dataLevel === 'full'
-            ? marketProduct.owner.mobile
-            : '****',
+          mobile: dataLevel === 'full' ? marketProduct.owner.mobile : '****',
           registration_time: marketProduct.owner.created_at
         }
         : null,
@@ -1174,7 +1184,11 @@ router.post('/market/products/:id/purchase', authenticateToken, async (req, res)
 
     if (buyerAccount.balance < marketProduct.selling_points) {
       await transaction.rollback()
-      return ApiResponse.error(res, `积分不足，需要${marketProduct.selling_points}积分，当前${buyerAccount.balance}积分`, 400)
+      return ApiResponse.error(
+        res,
+        `积分不足，需要${marketProduct.selling_points}积分，当前${buyerAccount.balance}积分`,
+        400
+      )
     }
 
     // 5. 扣除买家积分
@@ -1200,14 +1214,17 @@ router.post('/market/products/:id/purchase', authenticateToken, async (req, res)
     })
 
     // 7. 转移商品所有权
-    await marketProduct.update({
-      user_id: buyer_id,
-      market_status: 'sold',
-      selling_points: null,
-      transfer_count: (marketProduct.transfer_count || 0) + 1,
-      acquisition_method: 'market_purchase',
-      acquisition_cost: marketProduct.selling_points
-    }, { transaction })
+    await marketProduct.update(
+      {
+        user_id: buyer_id,
+        market_status: 'sold',
+        selling_points: null,
+        transfer_count: (marketProduct.transfer_count || 0) + 1,
+        acquisition_method: 'market_purchase',
+        acquisition_cost: marketProduct.selling_points
+      },
+      { transaction }
+    )
 
     await transaction.commit()
 
@@ -1280,13 +1297,16 @@ router.post('/market/products/:id/withdraw', authenticateToken, async (req, res)
     }
 
     // 3. 撤回商品（恢复为普通库存状态）
-    await marketProduct.update({
-      market_status: 'withdrawn',
-      selling_points: null,
-      condition: null,
-      // 保留原有的基本信息
-      is_available: true
-    }, { transaction })
+    await marketProduct.update(
+      {
+        market_status: 'withdrawn',
+        selling_points: null,
+        condition: null,
+        // 保留原有的基本信息
+        is_available: true
+      },
+      { transaction }
+    )
 
     await transaction.commit()
 
@@ -1317,6 +1337,175 @@ router.post('/market/products/:id/withdraw', authenticateToken, async (req, res)
       seller_id: req.user.user_id
     })
     return ApiResponse.error(res, error.message || '撤回失败', 500)
+  }
+})
+
+/*
+ * ========================================
+ * API#7 统一软删除机制 - 兑换记录软删除
+ * ========================================
+ */
+
+/**
+ * @route DELETE /api/v4/inventory/exchange-records/:exchange_id
+ * @desc 软删除兑换记录（用户端隐藏记录，管理员可恢复）
+ * @access Private (用户自己的记录)
+ *
+ * @param {number} exchange_id - 兑换记录ID（路径参数）
+ *
+ * @returns {Object} 删除确认信息
+ * @returns {number} data.exchange_id - 被删除的兑换记录ID
+ * @returns {number} data.is_deleted - 删除标记（1=已删除）
+ * @returns {string} data.deleted_at - 删除时间（北京时间）
+ * @returns {string} data.record_type - 记录类型（exchange）
+ * @returns {string} data.note - 操作说明
+ *
+ * 业务规则：
+ * - 只能删除自己的兑换记录
+ * - 软删除：记录物理保留，只是标记为已删除（is_deleted=1）
+ * - 前端查询时自动过滤已删除记录
+ * - 用户删除后无法自己恢复，只有管理员可以恢复
+ * - 删除不影响积分（软删除只是隐藏记录，不涉及积分退回）
+ */
+router.delete('/exchange-records/:exchange_id', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.user_id
+    const { exchange_id } = req.params
+
+    // 1. 参数验证
+    if (!exchange_id || isNaN(parseInt(exchange_id))) {
+      return ApiResponse.error(res, '无效的兑换记录ID', 400)
+    }
+
+    const exchangeId = parseInt(exchange_id)
+
+    // 2. 查询兑换记录
+    const record = await models.ExchangeRecords.findOne({
+      where: {
+        exchange_id: exchangeId,
+        is_deleted: 0 // 只查询未删除的记录
+      }
+    })
+
+    if (!record) {
+      return ApiResponse.error(res, '兑换记录不存在或已被删除', 404)
+    }
+
+    // 3. 权限验证：只能删除自己的记录
+    if (record.user_id !== userId) {
+      return ApiResponse.error(res, '您无权删除此兑换记录', 403)
+    }
+
+    // 4. 检查是否已经被删除
+    if (record.is_deleted === 1) {
+      return ApiResponse.error(res, '该兑换记录已经被删除，无需重复操作', 400)
+    }
+
+    // 5. 执行软删除
+    const deletedAt = BeijingTimeHelper.createDatabaseTime()
+
+    await record.update({
+      is_deleted: 1,
+      deleted_at: deletedAt
+    })
+
+    logger.info('软删除兑换记录成功', {
+      exchange_id: exchangeId,
+      user_id: userId,
+      deleted_at: BeijingTimeHelper.formatForAPI(deletedAt)
+    })
+
+    // 6. 返回成功响应
+    return ApiResponse.success(res, {
+      exchange_id: exchangeId,
+      is_deleted: 1,
+      deleted_at: BeijingTimeHelper.formatForAPI(deletedAt),
+      record_type: 'exchange',
+      note: '兑换记录已删除，将不再显示在列表中'
+    }, '兑换记录已删除')
+  } catch (error) {
+    logger.error('软删除兑换记录失败', {
+      error: error.message,
+      exchange_id: req.params.exchange_id,
+      user_id: req.user?.user_id
+    })
+    return ApiResponse.error(res, error.message, 500)
+  }
+})
+
+/**
+ * @route POST /api/v4/inventory/exchange-records/:exchange_id/restore
+ * @desc 管理员恢复已删除的兑换记录（管理员专用）
+ * @access Private (仅管理员)
+ *
+ * @param {number} exchange_id - 兑换记录ID（路径参数）
+ *
+ * @returns {Object} 恢复确认信息
+ * @returns {number} data.exchange_id - 恢复的兑换记录ID
+ * @returns {number} data.is_deleted - 删除标记（0=未删除）
+ * @returns {number} data.user_id - 记录所属用户ID
+ * @returns {string} data.note - 操作说明
+ *
+ * 业务规则：
+ * - 仅管理员可以恢复已删除的记录
+ * - 恢复后用户端将重新显示该记录
+ * - 恢复操作会清空deleted_at时间戳
+ */
+router.post('/exchange-records/:exchange_id/restore', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const { exchange_id } = req.params
+    const adminId = req.user.user_id
+
+    // 1. 参数验证
+    if (!exchange_id || isNaN(parseInt(exchange_id))) {
+      return ApiResponse.error(res, '无效的兑换记录ID', 400)
+    }
+
+    const exchangeId = parseInt(exchange_id)
+
+    // 2. 查询已删除的记录（包含已删除的）
+    const record = await models.ExchangeRecords.findOne({
+      where: {
+        exchange_id: exchangeId
+        // 不过滤is_deleted，查询所有记录
+      }
+    })
+
+    if (!record) {
+      return ApiResponse.error(res, '兑换记录不存在', 404)
+    }
+
+    // 3. 检查是否已经被删除
+    if (record.is_deleted === 0) {
+      return ApiResponse.error(res, '该兑换记录未被删除，无需恢复', 400)
+    }
+
+    // 4. 恢复记录
+    await record.update({
+      is_deleted: 0,
+      deleted_at: null
+    })
+
+    logger.info('管理员恢复兑换记录成功', {
+      exchange_id: exchangeId,
+      admin_id: adminId,
+      original_user_id: record.user_id
+    })
+
+    // 5. 返回成功响应
+    return ApiResponse.success(res, {
+      exchange_id: exchangeId,
+      is_deleted: 0,
+      user_id: record.user_id,
+      note: '兑换记录已恢复，用户端将重新显示该记录'
+    }, '兑换记录已恢复')
+  } catch (error) {
+    logger.error('恢复兑换记录失败', {
+      error: error.message,
+      exchange_id: req.params.exchange_id,
+      admin_id: req.user?.user_id
+    })
+    return ApiResponse.error(res, error.message, 500)
   }
 })
 

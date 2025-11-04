@@ -118,6 +118,10 @@ module.exports = sequelize => {
         type: DataTypes.DATE,
         allowNull: false,
         comment: '提交审核时间',
+        /**
+         * 获取北京时间格式的提交审核时间
+         * @returns {string|null} 北京时间格式的日期字符串（YYYY年MM月DD日 HH:mm:ss）
+         */
         get () {
           const value = this.getDataValue('submitted_at')
           return value ? BeijingTimeHelper.formatChinese(value) : null
@@ -127,6 +131,10 @@ module.exports = sequelize => {
         type: DataTypes.DATE,
         allowNull: true,
         comment: '审核完成时间',
+        /**
+         * 获取北京时间格式的审核完成时间
+         * @returns {string|null} 北京时间格式的日期字符串（YYYY年MM月DD日 HH:mm:ss）
+         */
         get () {
           const value = this.getDataValue('audited_at')
           return value ? BeijingTimeHelper.formatChinese(value) : null
@@ -137,6 +145,10 @@ module.exports = sequelize => {
         allowNull: false,
         defaultValue: () => BeijingTimeHelper.createDatabaseTime(),
         comment: '创建时间',
+        /**
+         * 获取北京时间格式的创建时间
+         * @returns {string} 北京时间格式的日期字符串（YYYY年MM月DD日 HH:mm:ss）
+         */
         get () {
           return BeijingTimeHelper.formatChinese(this.getDataValue('created_at'))
         }
@@ -146,6 +158,10 @@ module.exports = sequelize => {
         allowNull: false,
         defaultValue: () => BeijingTimeHelper.createDatabaseTime(),
         comment: '更新时间',
+        /**
+         * 获取北京时间格式的更新时间
+         * @returns {string} 北京时间格式的日期字符串（YYYY年MM月DD日 HH:mm:ss）
+         */
         get () {
           return BeijingTimeHelper.formatChinese(this.getDataValue('updated_at'))
         }
@@ -210,6 +226,7 @@ module.exports = sequelize => {
 
   /**
    * 检查是否待审核
+   * @returns {boolean} true-待审核状态，false-其他状态
    */
   ContentReviewRecord.prototype.isPending = function () {
     return this.audit_status === 'pending'
@@ -217,6 +234,7 @@ module.exports = sequelize => {
 
   /**
    * 检查是否已审核
+   * @returns {boolean} true-已审核（approved/rejected/cancelled），false-待审核
    */
   ContentReviewRecord.prototype.isAudited = function () {
     return ['approved', 'rejected', 'cancelled'].includes(this.audit_status)
@@ -224,6 +242,7 @@ module.exports = sequelize => {
 
   /**
    * 获取状态描述
+   * @returns {string} 审核状态的中文描述（待审核/已通过/已拒绝/已取消/未知状态）
    */
   ContentReviewRecord.prototype.getStatusDescription = function () {
     const statusMap = {
@@ -237,6 +256,7 @@ module.exports = sequelize => {
 
   /**
    * 获取优先级描述
+   * @returns {string} 优先级的中文描述（高/中/低/未知）
    */
   ContentReviewRecord.prototype.getPriorityDescription = function () {
     const priorityMap = {
@@ -249,6 +269,8 @@ module.exports = sequelize => {
 
   /**
    * 关联关系定义
+   * @param {Object} models - Sequelize所有模型的集合对象
+   * @returns {void} 无返回值，仅定义关联关系
    */
   ContentReviewRecord.associate = function (models) {
     // 关联审核员（用户）

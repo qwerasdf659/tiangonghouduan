@@ -10,7 +10,15 @@ const { performance } = require('perf_hooks')
 const BeijingTimeHelper = require('../../../utils/timeHelper')
 const { TestConfig } = require('../../helpers/test-setup')
 
+/**
+ * 基础测试管理器类
+ * @class BaseTestManager
+ */
 class BaseTestManager {
+  /**
+   * 创建基础测试管理器实例
+   * @param {string} baseUrl - API基础URL
+   */
   constructor (baseUrl = 'http://localhost:3000') {
     this.baseUrl = baseUrl
     this.timeout = 30000
@@ -51,6 +59,7 @@ class BaseTestManager {
 
   /**
    * 设置请求和响应拦截器
+   * @returns {void}
    */
   setup_interceptors () {
     // 请求拦截器 - 性能监控
@@ -265,6 +274,7 @@ class BaseTestManager {
 
   /**
    * 重置测试数据
+   * @returns {void}
    */
   reset () {
     this.test_results = []
@@ -274,6 +284,7 @@ class BaseTestManager {
 
   /**
    * 清理测试资源
+   * @returns {Promise<void>} Promise对象
    */
   async cleanup () {
     try {
@@ -301,6 +312,11 @@ class BaseTestManager {
 
   /**
    * 兼容旧版makeRequest方法
+   * @param {string} method - HTTP方法
+   * @param {string} url - 请求URL
+   * @param {*} data - 请求数据
+   * @param {Object} options - 请求选项
+   * @returns {Promise<Object>} 响应数据
    */
   async makeRequest (method, url, data = null, options = {}) {
     return await this.make_request(method, url, data, options)
@@ -309,6 +325,8 @@ class BaseTestManager {
   /**
    * 兼容旧版authenticateUser方法
    * 保留原始userType作为token key，避免'regular'和'user'不匹配问题
+   * @param {string} userType - 用户类型
+   * @returns {Promise<Object>} 登录数据
    */
   async authenticateUser (userType = 'regular') {
     const mobile = userType === 'admin' ? '13612227930' : '13612227930'
@@ -331,6 +349,11 @@ class BaseTestManager {
 
   /**
    * 兼容旧版makeAuthenticatedRequest方法
+   * @param {string} method - HTTP方法
+   * @param {string} url - 请求URL
+   * @param {*} data - 请求数据
+   * @param {string} userType - 用户类型
+   * @returns {Promise<Object>} 响应数据
    */
   async makeAuthenticatedRequest (method, url, data = null, userType = 'user') {
     return await this.make_authenticated_request(method, url, data, userType)
@@ -338,6 +361,11 @@ class BaseTestManager {
 
   /**
    * 兼容旧版testAuthorizationLevels方法
+   * @param {string} url - 请求URL
+   * @param {string} method - HTTP方法
+   * @param {*} data - 请求数据
+   * @param {Object} expectedResults - 预期结果
+   * @returns {Promise<Array>} 测试结果数组
    */
   async testAuthorizationLevels (url, method, data, expectedResults) {
     const results = []
@@ -367,6 +395,11 @@ class BaseTestManager {
 
   /**
    * 兼容旧版testConcurrentRequests方法 (重命名避免重复)
+   * @param {string} url - 请求URL
+   * @param {string} method - HTTP方法
+   * @param {*} data - 请求数据
+   * @param {number} concurrency - 并发数
+   * @returns {Promise<Object>} 并发测试结果
    */
   async testConcurrentRequestsCompat (url, method, data, concurrency = 5) {
     const promises = []
@@ -397,6 +430,11 @@ class BaseTestManager {
 
   /**
    * 兼容旧版testConcurrentRequests方法别名
+   * @param {string} url - 请求URL
+   * @param {string} method - HTTP方法
+   * @param {*} data - 请求数据
+   * @param {number} concurrency - 并发数
+   * @returns {Promise<Object>} 并发测试结果
    */
   async testConcurrentRequests (url, method, data, concurrency = 5) {
     return await this.testConcurrentRequestsCompat(url, method, data, concurrency)
@@ -404,6 +442,8 @@ class BaseTestManager {
 
   /**
    * 兼容旧版authenticateV4User方法
+   * @param {string} userType - 用户类型
+   * @returns {Promise<Object>} 登录数据
    */
   async authenticateV4User (userType = 'regular') {
     return await this.authenticateUser(userType)
@@ -411,6 +451,11 @@ class BaseTestManager {
 
   /**
    * 兼容旧版testParameterValidation方法
+   * @param {string} url - 请求URL
+   * @param {string} method - HTTP方法
+   * @param {Object} validParams - 有效参数
+   * @param {Array} requiredFields - 必需字段
+   * @returns {Promise<Array>} 验证结果数组
    */
   async testParameterValidation (url, method, validParams, requiredFields) {
     const results = []
@@ -441,6 +486,8 @@ class BaseTestManager {
 
   /**
    * 🏥 带缓存的健康检查方法 - 解决重复调用问题
+   * @param {boolean} force_refresh - 是否强制刷新
+   * @returns {Promise<Object>} 健康检查结果
    */
   async health_check_with_cache (force_refresh = false) {
     const now = Date.now()
@@ -478,6 +525,7 @@ class BaseTestManager {
 
   /**
    * 🧹 清理健康检查缓存
+   * @returns {void}
    */
   clear_health_cache () {
     this.health_check_cache = {
@@ -490,6 +538,7 @@ class BaseTestManager {
 
   /**
    * 兼容旧版generateTestReport方法
+   * @returns {Object} 测试报告对象
    */
   generateTestReport () {
     return {

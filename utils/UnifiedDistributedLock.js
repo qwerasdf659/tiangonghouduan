@@ -15,7 +15,97 @@
 const { getRawClient } = require('./UnifiedRedisClient')
 const { v4: uuidv4 } = require('uuid')
 
+/**
+ * 统一分布式锁管理器
+ *
+ * 业务场景：
+ * - 抽奖系统防止库存超卖（锁定奖品库存）
+ * - 积分操作防止并发扣款（锁定用户积分账户）
+ * - 缓存更新防止缓存击穿（锁定缓存键）
+ * - 任务调度防止重复执行（锁定任务ID）
+ *
+ * 核心功能：
+ * - 获取分布式锁（acquireLock，支持重试和指数退避）
+ * - 释放分布式锁（releaseLock，使用Lua脚本保证原子性）
+ * - 锁续期功能（extendLock，延长锁的过期时间）
+ * - 安全临界区执行（withLock，自动获取和释放锁）
+ * - 批量锁管理（acquireBatchLock，一次性获取多个锁）
+ * - 锁状态检查（isLocked，检查资源是否被锁定）
+ * - 强制释放锁（forceReleaseLock，管理员功能）
+ * - 锁清理功能（cleanExpiredLocks，清理过期锁）
+ * - 统计信息（getStats，监控锁使用情况）
+ *
+ * 技术特性：
+ * - 统一使用UnifiedRedisClient客户端（消除重复连接）
+ * - 支持自动重试机制（最多3次，指数退避）
+ * - 支持锁续期功能（防止长时间任务锁过期）
+ * - 支持安全的临界区执行（自动获取和释放锁）
+ * - 原子性释放锁（使用Lua脚本，防止误释放）
+ * - 完整的错误处理和日志记录
+ *
+ * 锁设计：
+ * - 锁键格式：lock:{resource}（例如：lock:prize_123）
+ * - 锁值：UUID v4（唯一标识锁持有者）
+ * - 默认TTL：30秒（防止死锁）
+ * - 重试策略：指数退避（100ms、200ms、400ms等）
+ *
+ * Redis命令：
+ * - SET key value PX ttl NX（原子性获取锁）
+ * - EVAL lua_script（原子性释放锁）
+ * - PEXPIRE key ttl（续期锁）
+ * - KEYS pattern（查询锁列表）
+ * - PTTL key（查询锁剩余时间）
+ *
+ * 安全设计：
+ * - 只有持有锁的客户端才能释放锁（通过UUID验证）
+ * - 锁自动过期防止死锁（默认30秒）
+ * - 强制释放锁仅用于管理员清理（forceReleaseLock）
+ * - 批量锁操作失败时自动回滚（防止部分锁定）
+ *
+ * 使用示例：
+ * ```javascript
+ * const lock = new UnifiedDistributedLock()
+ *
+ * // 方式1：手动获取和释放锁
+ * const lockInfo = await lock.acquireLock('prize_123')
+ * try {
+ *   // 执行临界区代码
+ * } finally {
+ *   await lock.releaseLock(lockInfo)
+ * }
+ *
+ * // 方式2：自动管理锁（推荐）
+ * await lock.withLock('prize_123', async () => {
+ *   // 执行临界区代码
+ * })
+ * ```
+ *
+ * 性能优化：
+ * - 统一Redis客户端（消除重复连接开销）
+ * - Lua脚本执行（减少网络往返）
+ * - 指数退避重试（避免频繁重试）
+ * - 批量锁操作（减少Redis调用次数）
+ *
+ * 创建时间：2025年10月20日
+ * 最后更新：2025年10月30日
+ *
+ * @class UnifiedDistributedLock
+ */
 class UnifiedDistributedLock {
+  /**
+   * 构造函数 - 初始化分布式锁管理器
+   *
+   * 功能说明：
+   * - 使用UnifiedRedisClient统一Redis客户端（消除重复连接）
+   * - 设置锁键前缀：lock:
+   * - 设置默认TTL：30秒（防止死锁）
+   *
+   * 设计决策：
+   * - 使用统一Redis客户端而非单独创建连接（性能优化）
+   * - 默认30秒TTL平衡性能和安全性（防止死锁又不会太短）
+   *
+   * @constructor
+   */
   constructor () {
     // 使用统一Redis客户端，消除重复连接
     this.redis = getRawClient()
@@ -367,7 +457,7 @@ class UnifiedDistributedLock {
   /**
    * 睡眠函数
    * @param {number} ms 睡眠时间(毫秒)
-   * @returns {Promise<void>}
+   * @returns {Promise<void>} 返回Promise，延迟指定毫秒后resolve
    */
   sleep (ms) {
     return new Promise(resolve => {
@@ -423,6 +513,14 @@ class UnifiedDistributedLock {
 
   /**
    * 🧹 断开连接和清理资源
+   *
+   * 业务场景：
+   * - 应用关闭时清理Redis连接
+   * - 测试结束后断开连接
+   * - 避免连接泄漏
+   *
+   * @async
+   * @returns {Promise<void>} 返回Promise，断开连接完成后resolve
    */
   async disconnect () {
     try {

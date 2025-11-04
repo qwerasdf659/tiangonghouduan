@@ -8,7 +8,17 @@ const crypto = require('crypto')
 const path = require('path')
 const BeijingTimeHelper = require('../utils/timeHelper')
 
+/**
+ * Sealos对象存储服务类
+ * 职责：管理文件上传、下载、删除等对象存储操作
+ * 特点：基于AWS S3 SDK实现，适配Sealos对象存储API
+ * @class SealosStorageService
+ */
 class SealosStorageService {
+  /**
+   * 构造函数 - 初始化Sealos对象存储配置和S3客户端
+   * @constructor
+   */
   constructor () {
     // 🔴 使用用户提供的真实Sealos配置 - 强制使用正确桶名
     this.config = {
@@ -227,8 +237,8 @@ class SealosStorageService {
   /**
    * 压缩图片（可选实现）
    * @param {Buffer} imageBuffer - 图片缓冲区
-   * @param {Object} options - 压缩选项
-   * @returns {Promise<Buffer>} 压缩后的图片
+   * @param {Object} _options - 压缩选项（当前未使用）
+   * @returns {Promise<Buffer>} 压缩后的图片缓冲区
    */
   async compressImage (imageBuffer, _options = {}) {
     /*

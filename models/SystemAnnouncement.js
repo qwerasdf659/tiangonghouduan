@@ -1,6 +1,31 @@
 /**
- * 餐厅积分抽奖系统 V4.0统一引擎架构 - 系统公告模型
- * 支持首页公告显示和管理员公告管理功能
+ * 餐厅积分抽奖系统 V4.0统一引擎架构 - 系统公告模型（SystemAnnouncement）
+ *
+ * 业务场景：首页公告展示和管理员公告管理
+ *
+ * 核心功能：
+ * - 支持多类型公告（系统公告/活动公告/维护公告/通知公告）
+ * - 支持优先级控制（高/中/低），高优先级公告优先展示
+ * - 支持公告过期时间管理，过期公告自动不展示
+ * - 支持公告浏览次数统计
+ * - 支持内部备注和目标用户组（管理员可见，普通用户不可见）
+ *
+ * 业务流程：
+ * 1. 管理员创建公告 → 设置标题、内容、类型、优先级、过期时间
+ * 2. 公告发布 → is_active=true，开始展示
+ * 3. 用户访问首页 → 查询有效公告（is_active=true && 未过期）
+ * 4. 用户查看公告 → view_count自动增加
+ * 5. 公告过期或禁用 → expires_at已过或is_active=false，停止展示
+ *
+ * 数据库表名：system_announcements
+ * 主键：announcement_id（INTEGER，自增）
+ *
+ * 数据安全：
+ * - 普通用户仅能查看公开信息（标题、内容、类型、优先级、过期时间、查看次数）
+ * - 管理员可查看完整信息（包含内部备注、目标用户组、创建管理员等）
+ *
+ * 创建时间：2025年10月11日
+ * 最后更新：2025年10月30日（补充详细业务场景说明）
  */
 
 const { DataTypes } = require('sequelize')
@@ -94,6 +119,12 @@ module.exports = sequelize => {
           isDate: {
             msg: '过期时间必须是有效的日期格式'
           },
+          /**
+           * 验证过期时间必须晚于当前时间
+           * @param {Date} value - 过期时间值
+           * @returns {void} 无返回值，验证失败时抛出错误
+           * @throws {Error} 当过期时间早于或等于当前时间时抛出错误
+           */
           isAfterNow (value) {
             if (value && new Date(value) <= BeijingTimeHelper.createBeijingTime()) {
               throw new Error('过期时间必须晚于当前时间')
@@ -133,6 +164,10 @@ module.exports = sequelize => {
         type: DataTypes.DATE,
         allowNull: false,
         defaultValue: () => BeijingTimeHelper.createDatabaseTime(),
+        /**
+         * 获取北京时间格式的创建时间
+         * @returns {string} 北京时间格式的日期字符串（YYYY年MM月DD日 HH:mm:ss）
+         */
         get () {
           return BeijingTimeHelper.formatChinese(this.getDataValue('created_at'))
         },
@@ -142,6 +177,10 @@ module.exports = sequelize => {
         type: DataTypes.DATE,
         allowNull: false,
         defaultValue: () => BeijingTimeHelper.createDatabaseTime(),
+        /**
+         * 获取北京时间格式的更新时间
+         * @returns {string} 北京时间格式的日期字符串（YYYY年MM月DD日 HH:mm:ss）
+         */
         get () {
           return BeijingTimeHelper.formatChinese(this.getDataValue('updated_at'))
         },
@@ -159,6 +198,7 @@ module.exports = sequelize => {
       instanceMethods: {
         /**
          * 检查公告是否已过期
+         * @returns {boolean} true-已过期，false-未过期或无过期时间
          */
         isExpired () {
           if (!this.expires_at) return false
@@ -167,6 +207,8 @@ module.exports = sequelize => {
 
         /**
          * 增加查看次数
+         * @param {Object|null} transaction - Sequelize事务对象
+         * @returns {Promise<SystemAnnouncement>} 更新后的公告实例
          */
         async incrementViewCount (transaction = null) {
           return this.increment('view_count', { transaction })
@@ -174,6 +216,7 @@ module.exports = sequelize => {
 
         /**
          * 获取公告状态描述
+         * @returns {string} 状态描述（正常/已禁用/已过期）
          */
         getStatusDescription () {
           if (!this.is_active) return '已禁用'
@@ -186,6 +229,12 @@ module.exports = sequelize => {
       classMethods: {
         /**
          * 获取有效公告列表
+         * @param {Object} options - 查询选项
+         * @param {string|null} options.type - 公告类型筛选
+         * @param {string|null} options.priority - 优先级筛选
+         * @param {number} options.limit - 返回数量限制
+         * @param {number} options.offset - 偏移量
+         * @returns {Promise<Array<SystemAnnouncement>>} 有效公告列表
          */
         async getActiveAnnouncements (options = {}) {
           const { type = null, priority = null, limit = 10, offset = 0 } = options
@@ -221,6 +270,8 @@ module.exports = sequelize => {
 
         /**
          * 获取首页公告
+         * @param {number} limit - 返回数量限制
+         * @returns {Promise<Array<SystemAnnouncement>>} 首页公告列表
          */
         async getHomePageAnnouncements (limit = 5) {
           return this.getActiveAnnouncements({
@@ -231,6 +282,9 @@ module.exports = sequelize => {
 
         /**
          * 创建新公告
+         * @param {Object} data - 公告数据
+         * @param {number} adminId - 创建管理员ID
+         * @returns {Promise<SystemAnnouncement>} 新创建的公告实例
          */
         async createAnnouncement (data, adminId) {
           return this.create({

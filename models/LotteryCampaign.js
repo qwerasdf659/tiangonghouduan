@@ -18,7 +18,9 @@ const { Model, DataTypes } = require('sequelize')
 class LotteryCampaign extends Model {
   /**
    * 静态关联定义
+   * 业务关系：抽奖活动关联奖品、抽奖记录
    * @param {Object} models - 所有模型的引用
+   * @returns {void}
    */
   static associate (models) {
     // 一对多：一个活动有多个奖品
@@ -244,7 +246,13 @@ class LotteryCampaign extends Model {
 
   /**
    * 更新活动统计信息
+   * 业务场景：每次抽奖后更新活动的参与人数、抽奖次数、中奖次数、剩余奖池
    * @param {Object} stats - 统计更新数据
+   * @param {boolean} [stats.new_participant] - 是否为新参与者
+   * @param {boolean} [stats.new_draw] - 是否有新的抽奖
+   * @param {boolean} [stats.new_prize] - 是否有新的中奖
+   * @param {number} [stats.prize_value] - 中奖奖品价值
+   * @returns {Promise<void>} 无返回值
    */
   async updateStats (stats) {
     const updates = {}
@@ -458,6 +466,10 @@ module.exports = sequelize => {
         type: DataTypes.DECIMAL(10, 2),
         allowNull: false,
         comment: '每次抽奖消耗积分',
+        /**
+         * 获取每次抽奖消耗积分（自动转换为浮点数）
+         * @returns {number} 抽奖消耗积分
+         */
         get () {
           const value = this.getDataValue('cost_per_draw')
           return value ? parseFloat(value) : 0
@@ -479,6 +491,10 @@ module.exports = sequelize => {
         allowNull: false,
         defaultValue: 0.0,
         comment: '总奖池价值',
+        /**
+         * 获取总奖池价值（自动转换为浮点数）
+         * @returns {number} 总奖池价值
+         */
         get () {
           const value = this.getDataValue('total_prize_pool')
           return value ? parseFloat(value) : 0
@@ -489,6 +505,10 @@ module.exports = sequelize => {
         allowNull: false,
         defaultValue: 0.0,
         comment: '剩余奖池价值',
+        /**
+         * 获取剩余奖池价值（自动转换为浮点数）
+         * @returns {number} 剩余奖池价值
+         */
         get () {
           const value = this.getDataValue('remaining_prize_pool')
           return value ? parseFloat(value) : 0

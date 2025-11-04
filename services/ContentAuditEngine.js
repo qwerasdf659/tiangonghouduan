@@ -26,6 +26,12 @@
 const { ContentReviewRecord, sequelize } = require('../models')
 const BeijingTimeHelper = require('../utils/timeHelper')
 
+/**
+ * 内容审核引擎类
+ * 业务职责：提供统一的审核流程管理和回调机制
+ * 设计模式：通用基础设施层，解耦审核逻辑与业务逻辑
+ * 支持类型：exchange（兑换）、image（图片）、feedback（反馈）
+ */
 class ContentAuditEngine {
   /**
    * 提交审核
@@ -266,10 +272,12 @@ class ContentAuditEngine {
 
   /**
    * 触发审核回调
-   *
+   * 业务场景：审核通过/拒绝后，触发对应业务逻辑的回调处理
+   * 设计模式：回调机制，实现审核引擎与具体业务的解耦
    * @param {ContentReviewRecord} auditRecord - 审核记录
    * @param {string} result - 审核结果（approved/rejected）
    * @param {Object} transaction - 数据库事务
+   * @returns {Promise<void>} 无返回值，回调执行失败不影响审核结果
    * @private
    */
   static async triggerAuditCallback (auditRecord, result, transaction) {

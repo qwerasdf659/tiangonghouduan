@@ -17,7 +17,17 @@ const wsLogger = Logger.create('WebSocket')
 // 🕐 引入北京时间工具（2025年10月12日新增 - 时区统一）
 const BeijingTimeHelper = require('../utils/timeHelper')
 
+/**
+ * 聊天WebSocket服务类
+ * 职责：管理实时聊天WebSocket连接和消息推送
+ * 特点：简单易懂、维护成本低、支持5000+并发连接
+ * @class ChatWebSocketService
+ */
 class ChatWebSocketService {
+  /**
+   * 构造函数 - 初始化连接管理和限制配置
+   * @constructor
+   */
   constructor () {
     this.io = null
     this.connectedUsers = new Map() // 存储用户连接 {userId: socketId}
@@ -35,6 +45,7 @@ class ChatWebSocketService {
   /**
    * 初始化WebSocket服务
    * @param {Object} server - HTTP服务器实例
+   * @returns {void} 无返回值，初始化WebSocket服务并设置事件处理器
    */
   initialize (server) {
     if (!server) {
@@ -64,6 +75,7 @@ class ChatWebSocketService {
 
   /**
    * 设置事件处理器
+   * @returns {void} 无返回值，设置WebSocket连接和消息事件处理器
    */
   setupEventHandlers () {
     this.io.on('connection', (socket) => {
@@ -347,6 +359,7 @@ class ChatWebSocketService {
    * 强制断开指定用户的连接
    * @param {Number} user_id - 用户ID
    * @param {String} user_type - 用户类型 'user' 或 'admin'
+   * @returns {void} 无返回值，强制断开用户WebSocket连接
    */
   disconnectUser (user_id, user_type = 'user') {
     const map = user_type === 'user' ? this.connectedUsers : this.connectedAdmins

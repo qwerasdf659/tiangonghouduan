@@ -19,7 +19,47 @@ const { hasTestPrivilege } = require('../../../utils/TestAccountManager')
 // 🔥 V4.3新增：统一积分服务
 const PointsService = require('../../PointsService')
 
+/**
+ * 基础抽奖保底策略类
+ *
+ * 整合基础抽奖功能和保底机制的统一策略
+ *
+ * 业务场景：
+ * - 普通用户抽奖策略（根据奖品概率分配）
+ * - 保底机制：累计10次抽奖必中九八折券
+ * - 每日抽奖次数限制和积分消耗控制
+ *
+ * 核心功能：
+ * - 根据奖品概率分配中奖结果
+ * - 保底触发判断和自动发放保底奖品
+ * - 扣除抽奖积分和创建抽奖记录
+ * - 发放奖品到用户库存
+ *
+ * V4.1版本特性：
+ * - 移除基础中奖率限制，直接根据奖品概率分配
+ * - 每次抽奖必定从奖品池中选择一个奖品
+ * - 保底机制：每累计10次抽奖，第10次必中九八折券
+ */
 class BasicGuaranteeStrategy extends LotteryStrategy {
+  /**
+   * 构造函数
+   *
+   * 业务场景：初始化策略配置，包括保底规则、积分消耗等
+   *
+   * @param {Object} [config={}] - 策略配置对象
+   * @param {number} [config.maxDrawsPerDay=10] - 每日最大抽奖次数
+   * @param {number} [config.pointsCostPerDraw=100] - 每次抽奖消耗积分
+   * @param {Object} [config.guaranteeRule] - 保底规则配置
+   * @param {number} [config.guaranteeRule.triggerCount=10] - 累计抽奖次数触发保底
+   * @param {number} [config.guaranteeRule.guaranteePrizeId=9] - 保底奖品ID
+   *
+   * @example
+   * const strategy = new BasicGuaranteeStrategy({
+   *   maxDrawsPerDay: 10,
+   *   pointsCostPerDraw: 100,
+   *   guaranteeRule: { triggerCount: 10, guaranteePrizeId: 9 }
+   * })
+   */
   constructor (config = {}) {
     super('basic_guarantee', {
       enabled: true,
@@ -564,7 +604,17 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
 
   /**
    * 获取用户累计抽奖次数
+   *
+   * 业务场景：统计用户在指定活动中的累计抽奖次数，用于保底机制判断
    * 🔴 重要：统计所有抽奖记录，不论中奖与否
+   *
+   * @param {number} user_id - 用户ID
+   * @param {number} campaignId - 活动ID
+   * @returns {Promise<number>} 用户累计抽奖次数，失败时返回0
+   *
+   * @example
+   * const drawCount = await strategy.getUserDrawCount(10001, 1)
+   * console.log('累计抽奖次数:', drawCount)
    */
   async getUserDrawCount (user_id, campaignId) {
     try {
@@ -596,15 +646,43 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
 
   /**
    * 执行保底奖品发放
+   *
+   * 业务场景：当用户累计抽奖次数触发保底机制时，自动发放保底奖品（九八折券）
    * 🔴 核心功能：发放九八折券并扣除积分
    *
    * 🎯 2025-10-20修复：支持外部事务参数，确保连抽场景下的事务一致性
    * 🔥 2025-10-23修复：支持连抽统一扣除积分，避免重复扣除
+   *
    * @param {number} user_id - 用户ID
    * @param {number} campaignId - 活动ID
    * @param {number} drawNumber - 抽奖次数
-   * @param {Transaction} transaction - 外部事务对象（可选，连抽场景传入）
-   * @param {Object} context - 执行上下文（可选，用于识别连抽场景）
+   * @param {Transaction} [transaction=null] - 外部事务对象（可选，连抽场景传入）
+   * @param {Object} [context={}] - 执行上下文（可选，用于识别连抽场景）
+   * @param {boolean} [context.skip_points_deduction] - 是否跳过积分检查（连抽场景为true）
+   * @returns {Promise<Object>} 保底奖品发放结果
+   * @returns {Object} return.prize - 奖品信息
+   * @returns {number} return.prize.id - 奖品ID
+   * @returns {string} return.prize.name - 奖品名称
+   * @returns {string} return.prize.type - 奖品类型
+   * @returns {string} return.prize.value - 奖品价值
+   * @returns {number} return.prize.sort_order - 奖品排序（用于前端计算索引）
+   * @returns {number} return.pointsCost - 消耗积分
+   * @returns {number} return.remainingPoints - 剩余积分
+   * @returns {number} return.lotteryRecordId - 抽奖记录ID
+   * @returns {string} return.message - 中奖提示消息
+   *
+   * @throws {Error} 当用户积分不足时抛出错误
+   * @throws {Error} 当保底奖品不存在时抛出错误
+   *
+   * @example
+   * // 单抽场景
+   * const result = await strategy.executeGuaranteeAward(10001, 1, 10)
+   *
+   * @example
+   * // 连抽场景
+   * const result = await strategy.executeGuaranteeAward(10001, 1, 10, transaction, {
+   *   skip_points_deduction: true
+   * })
    */
   async executeGuaranteeAward (user_id, campaignId, drawNumber, transaction = null, context = {}) {
     /*
@@ -1060,10 +1138,18 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
   /**
    * 扣除用户积分 - 使用统一积分服务
    *
+   * 业务场景：抽奖前扣除用户积分，使用统一积分服务确保积分操作的一致性和幂等性
+   *
    * @param {number} user_id - 用户ID
    * @param {number} pointsCost - 扣除积分数
    * @param {string} draw_id - 抽奖ID（用于幂等性控制）
-   * @param {Object} transaction - 事务对象（可选）
+   * @param {Transaction} [transaction=null] - 事务对象（可选）
+   * @returns {Promise<void>} 无返回值，扣除成功则正常返回，失败则抛出异常
+   *
+   * @throws {Error} 当用户积分不足时抛出错误
+   *
+   * @example
+   * await strategy.deductPoints(10001, 100, 'draw_123', transaction)
    */
   async deductPoints (user_id, pointsCost, draw_id, transaction = null) {
     await PointsService.consumePoints(user_id, pointsCost, {
@@ -1081,8 +1167,22 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
   /**
    * 发放奖品 - 使用统一积分服务
    *
+   * 业务场景：根据奖品类型发放不同的奖励（积分、优惠券、实物等）
+   *
    * @param {number} user_id - 用户ID
    * @param {Object} prize - 奖品信息
+   * @param {number} prize.id - 奖品ID
+   * @param {string} prize.prize_name - 奖品名称
+   * @param {string} prize.prize_type - 奖品类型（points/coupon/physical等）
+   * @param {string} prize.prize_value - 奖品价值
+   * @param {Transaction} [transaction=null] - 事务对象（可选）
+   * @returns {Promise<void>} 无返回值，发放成功则正常返回，失败则抛出异常
+   *
+   * @throws {Error} 当发放奖品失败时抛出错误
+   *
+   * @example
+   * const prize = { id: 9, prize_name: '九八折券', prize_type: 'coupon', prize_value: '98%' }
+   * await strategy.distributePrize(10001, prize, transaction)
    */
   async distributePrize (user_id, prize, transaction = null) {
     // 根据奖品类型进行不同的发放逻辑
@@ -1128,10 +1228,29 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
   /**
    * 记录抽奖历史
    *
+   * 业务场景：在抽奖完成后创建抽奖历史记录，记录奖品信息、积分消耗等
+   *
    * @param {Object} context - 执行上下文
+   * @param {number} context.user_id - 用户ID
+   * @param {number} context.campaign_id - 活动ID
    * @param {Object} result - 抽奖结果
+   * @param {Object} result.prize - 奖品信息
+   * @param {boolean} result.is_winner - 是否中奖
    * @param {number} probability - 中奖概率
-   * @param {string} draw_id - 抽奖ID（可选，如果不提供则自动生成）
+   * @param {string} [draw_id=null] - 抽奖ID（可选，如果不提供则自动生成）
+   * @param {Transaction} [transaction=null] - 事务对象（可选）
+   * @returns {Promise<void>} 无返回值，记录成功则正常返回，失败则抛出异常
+   *
+   * @throws {Error} 当记录失败时抛出错误
+   *
+   * @example
+   * await strategy.recordLotteryHistory(
+   *   { user_id: 10001, campaign_id: 1 },
+   *   { prize: { id: 9, name: '九八折券' }, is_winner: true },
+   *   0.1,
+   *   'draw_123',
+   *   transaction
+   * )
    */
   async recordLotteryHistory (context, result, probability, draw_id = null, transaction = null) {
     // ✅ 统一业务标准：使用snake_case参数解构
@@ -1166,11 +1285,21 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
   /**
    * 检查用户是否有预设的抽奖结果队列
    *
+   * 业务场景：测试账号可以预设抽奖结果队列，用于测试特定场景
    * 🎯 2025-10-20修复：支持外部事务参数，确保查询在事务中执行，避免脏读
+   *
    * @param {number} user_id - 用户ID
-   * @param {number} campaignId - 活动ID（暂不使用，保留接口兼容性）
-   * @param {Transaction} transaction - 外部事务对象（可选，连抽场景传入）
-   * @returns {Object|null} 下一个预设结果或null
+   * @param {number} _campaignId - 活动ID（暂不使用，保留接口兼容性）
+   * @param {Transaction} [transaction=null] - 外部事务对象（可选，连抽场景传入）
+   * @returns {Promise<Object|null>} 下一个预设结果或null
+   * @returns {number} [return.prize_id] - 预设奖品ID
+   * @returns {string} [return.prize_name] - 预设奖品名称
+   *
+   * @example
+   * const preset = await strategy.checkUserPresetQueue(10001, 1, transaction)
+   * if (preset) {
+   *   console.log('使用预设结果:', preset.prize_name)
+   * }
    */
   async checkUserPresetQueue (user_id, _campaignId, transaction = null) {
     try {

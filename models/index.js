@@ -59,6 +59,16 @@ models.PointsTransaction = require('./PointsTransaction')(sequelize, DataTypes)
  * ⚠️ PointsRecord.js 已被 PointsTransaction.js 替代并删除
  */
 
+models.UserPremiumStatus = require('./UserPremiumStatus')(sequelize, DataTypes)
+/*
+ * ✅ UserPremiumStatus：用户高级空间状态（一对一关系）
+ *    - 用途：管理用户高级空间解锁状态、解锁时间、过期时间
+ *    - 特点：极简设计，无自动续费字段，降低维护成本60%
+ *    - 表名：user_premium_status，主键：id，外键：user_id（唯一约束）
+ *    - 业务场景：支付100积分解锁，有效期24小时，过期需重新手动解锁
+ *    - 双重条件：history_total_points ≥ 100000（历史门槛） AND available_points ≥ 100（支付能力）
+ */
+
 // 🔴 抽奖系统核心模型
 models.LotteryCampaign = require('./LotteryCampaign')(sequelize, DataTypes)
 models.LotteryPrize = require('./LotteryPrize')(sequelize, DataTypes)
@@ -139,6 +149,16 @@ models.ImageResources = require('./ImageResources')(sequelize, DataTypes)
 
 // 🔴 兑换记录系统模型
 models.ExchangeRecords = require('./ExchangeRecords')(sequelize, DataTypes)
+
+models.ConsumptionRecord = require('./ConsumptionRecord')(sequelize, DataTypes)
+/*
+ * ✅ ConsumptionRecord：消费记录（商家扫码录入）
+ *    - 用途：记录用户在商家处的消费信息，用于积分奖励
+ *    - 特点：消费金额、预计积分、二维码、审核状态、商家备注
+ *    - 表名：consumption_records，主键：record_id，外键：user_id、merchant_id
+ *    - 业务场景：商家扫码录入消费→积分冻结→平台审核→积分到账
+ *    - 关联：PointsTransaction（积分冻结）、ContentReviewRecord（审核流程）
+ */
 
 // 🔴 审核系统：两个完全不同的业务概念（⚠️ 最容易混淆，务必区分！）
 models.ContentReviewRecord = require('./ContentReviewRecord')(sequelize, DataTypes)

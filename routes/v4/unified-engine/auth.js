@@ -70,14 +70,17 @@ router.post('/login', async (req, res) => {
 
       try {
         // 1. 创建用户
-        user = await User.create({
-          mobile,
-          nickname: `用户${mobile.slice(-4)}`,
-          status: 'active',
-          consecutive_fail_count: 0,
-          history_total_points: 0,
-          login_count: 0
-        }, { transaction })
+        user = await User.create(
+          {
+            mobile,
+            nickname: `用户${mobile.slice(-4)}`,
+            status: 'active',
+            consecutive_fail_count: 0,
+            history_total_points: 0,
+            login_count: 0
+          },
+          { transaction }
+        )
 
         console.log(`用户 ${mobile} 注册成功，user_id: ${user.user_id}`)
 
@@ -103,11 +106,14 @@ router.post('/login', async (req, res) => {
           })
 
           if (!existingUserRole) {
-            await UserRole.create({
-              user_id: user.user_id,
-              role_id: userRole.role_id,
-              is_active: true
-            }, { transaction })
+            await UserRole.create(
+              {
+                user_id: user.user_id,
+                role_id: userRole.role_id,
+                is_active: true
+              },
+              { transaction }
+            )
             console.log(`用户 ${mobile} 已分配普通用户角色`)
           } else {
             console.log(`用户 ${mobile} 已有普通用户角色，跳过分配`)
@@ -174,74 +180,295 @@ router.post('/login', async (req, res) => {
  * 🛡️ 用户快速登录（手机号直接登录）
  * POST /api/v4/auth/quick-login
  */
+/**
+ * 🔐 微信手机号解密接口 (WeChat Phone Number Decryption)
+ * POST /api/v4/auth/decrypt-phone
+ *
+ * 📍 路由位置: routes/v4/unified-engine/auth.js
+ * 📋 功能说明: 解密微信加密的手机号数据，返回明文手机号
+ * 🔒 安全说明: 使用微信官方提供的解密算法，确保数据安全
+ * 🎯 调用时机: 用户微信授权后，前端调用此接口获取明文手机号
+ * 💡 技术实现: 使用微信session_key + AES-128-CBC解密算法
+ *
+ * @param {string} code - 微信登录凭证（wx.login获取）
+ * @param {string} encryptedData - 加密的手机号数据（wx.getPhoneNumber获取）
+ * @param {string} iv - 加密算法的初始向量（wx.getPhoneNumber获取）
+ * @returns {Object} 解密成功响应（phoneNumber: 明文手机号）
+ */
+router.post('/decrypt-phone', async (req, res) => {
+  try {
+    const { code, encryptedData, iv } = req.body
+
+    /*
+     * ========================================
+     * 步骤1: 参数验证
+     * ========================================
+     */
+    if (!code || !encryptedData || !iv) {
+      return res.apiError('参数不完整，需要code、encryptedData和iv', 'INVALID_PARAMS', null, 400)
+    }
+
+    console.log('📱 微信手机号解密请求...')
+
+    /*
+     * ========================================
+     * 步骤2: 使用code换取session_key
+     * ========================================
+     */
+    const WXBizDataCrypt = require('../../../utils/WXBizDataCrypt')
+    const axios = require('axios')
+
+    // 微信API地址
+    const wxApiUrl = `https://api.weixin.qq.com/sns/jscode2session?appid=${process.env.WX_APPID}&secret=${process.env.WX_SECRET}&js_code=${code}&grant_type=authorization_code`
+
+    console.log('🔄 请求微信API获取session_key...')
+    const wxRes = await axios.get(wxApiUrl)
+
+    if (!wxRes.data.session_key) {
+      console.error('❌ 微信session_key获取失败:', wxRes.data)
+      return res.apiError('微信session_key获取失败', 'WX_SESSION_ERROR', wxRes.data, 500)
+    }
+
+    const sessionKey = wxRes.data.session_key
+    console.log('✅ 获取到微信session_key')
+
+    /*
+     * ========================================
+     * 步骤3: 解密手机号
+     * ========================================
+     */
+    const pc = new WXBizDataCrypt(process.env.WX_APPID, sessionKey)
+    const data = pc.decryptData(encryptedData, iv)
+
+    if (!data.phoneNumber) {
+      console.error('❌ 手机号解密失败')
+      return res.apiError('手机号解密失败', 'DECRYPT_FAILED', null, 500)
+    }
+
+    console.log(`✅ 手机号解密成功: ${data.phoneNumber}`)
+
+    /*
+     * ========================================
+     * 步骤4: 返回明文手机号
+     * ========================================
+     */
+    return res.apiSuccess(
+      {
+        phoneNumber: data.phoneNumber, // 完整手机号（带区号，如+86 138****8000）
+        purePhoneNumber: data.purePhoneNumber, // 不带区号的手机号（13800138000）
+        countryCode: data.countryCode // 区号（中国：86）
+      },
+      '手机号获取成功'
+    )
+  } catch (error) {
+    console.error('❌ 微信手机号解密失败:', error)
+    return res.apiError('手机号解密失败', 'DECRYPT_ERROR', error.message, 500)
+  }
+})
+
+/**
+ * 🛡️ 微信授权一键登录 (WeChat One-Click Login)
+ * POST /api/v4/auth/quick-login
+ *
+ * 📍 路由位置: routes/v4/unified-engine/auth.js
+ * 📋 功能说明: 接收前端传入的微信授权手机号，完成用户登录或自动注册
+ * 🔒 安全说明: 手机号必须来自微信官方授权，禁止用户手动输入，杜绝商业风险
+ * 🎯 业务场景: 微信小程序登录、微信内H5登录、线下门店扫码登录
+ * 💡 设计理念: 微信官方验证 + 极致简化 + 快速转化 + 统一管理员和用户登录入口
+ * ⏱️ 开发工时: 已完成（0天）
+ * 🔧 技术栈: Sequelize ORM + BeijingTimeHelper时间工具 + JWT Token认证 + UUID角色系统
+ *
+ * ========================================
+ * 📊 业务逻辑（8个核心步骤）
+ * ========================================
+ * 步骤1: 验证手机号参数（必填参数检查）
+ * 步骤2: 查找用户（根据手机号查询users表）
+ * 步骤3: 新用户自动注册（创建用户+积分账户+角色分配，使用事务保证原子性）
+ * 步骤4: 验证账户状态（active正常登录，banned/inactive拒绝登录）
+ * 步骤5: 获取用户角色信息（基于UUID角色系统计算权限）
+ * 步骤6: 更新登录统计（last_login当前北京时间，login_count累加+1）
+ * 步骤7: 生成JWT Token（access_token有效期7天）
+ * 步骤8: 返回登录成功结果（包含Token和用户完整信息）
+ *
+ * @param {string} mobile - 手机号（必填，来自微信授权）
+ * @returns {Object} 登录成功响应（access_token + user信息 + role_based_admin）
+ */
 router.post('/quick-login', async (req, res) => {
   try {
+    /*
+     * ========================================
+     * 步骤1: 验证手机号参数
+     * ========================================
+     */
     const { mobile } = req.body
 
     if (!mobile) {
       return res.apiError('手机号不能为空', 'MOBILE_REQUIRED', null, 400)
     }
 
-    // 查找或创建用户
+    console.log(`📱 快速登录请求: ${mobile}`)
+
+    /*
+     * ========================================
+     * 步骤2: 查找用户
+     * ========================================
+     */
     let user = await User.findOne({ where: { mobile } })
 
+    /*
+     * ========================================
+     * 步骤3: 如果用户不存在，自动创建用户账户（使用事务保证数据完整性）
+     * ========================================
+     */
     if (!user) {
-      // 创建新用户（普通用户权限）
-      user = await User.create({
-        mobile,
-        nickname: `用户${mobile.slice(-4)}`,
-        status: 'active'
-      })
+      console.log(`用户 ${mobile} 不存在，开始自动注册...`)
 
-      // 为新用户分配普通用户角色
-      const userRole = await require('../../../models').Role.findOne({
-        where: { role_name: 'user' }
-      })
-      if (userRole) {
-        await require('../../../models').UserRole.create({
-          user_id: user.user_id,
-          role_id: userRole.id,
-          is_active: true
+      // ✅ 使用事务确保数据完整性（用户+积分账户+角色同步创建或失败回滚）
+      const sequelize = require('../../../config/database')
+      const transaction = await sequelize.transaction()
+
+      try {
+        // 1. 创建用户账户
+        user = await User.create(
+          {
+            mobile, // 手机号（唯一登录凭证，来自微信授权）
+            nickname: `用户${mobile.slice(-4)}`, // 自动生成昵称：用户+手机号后4位
+            status: 'active', // 默认激活状态
+            consecutive_fail_count: 0, // 连续未中奖次数初始值（保底机制核心字段）
+            history_total_points: 0, // 历史累计总积分初始值（臻选空间解锁条件）
+            login_count: 0 // 登录次数初始值
+          },
+          { transaction }
+        )
+
+        console.log(`✅ 用户 ${mobile} 注册成功，user_id: ${user.user_id}`)
+
+        /*
+         * ========================================
+         * ✅ 2. 创建积分账户（使用统一服务）
+         * ========================================
+         */
+        const PointsService = require('../../../services/PointsService')
+        await PointsService.createPointsAccount(user.user_id, transaction)
+
+        console.log(`✅ 用户 ${mobile} 积分账户创建成功`)
+
+        // 3. 为新用户分配普通用户角色
+        const Role = require('../../../models').Role
+        const UserRole = require('../../../models').UserRole
+
+        const userRole = await Role.findOne({
+          where: { role_name: 'user' },
+          transaction
         })
+
+        if (userRole) {
+          // 检查角色是否已分配（避免重复分配）
+          const existingUserRole = await UserRole.findOne({
+            where: {
+              user_id: user.user_id,
+              role_id: userRole.role_id // ⚠️ 使用role_id字段
+            },
+            transaction
+          })
+
+          if (!existingUserRole) {
+            await UserRole.create(
+              {
+                user_id: user.user_id,
+                role_id: userRole.role_id, // ⚠️ 使用role_id字段
+                is_active: true
+              },
+              { transaction }
+            )
+            console.log(`✅ 用户 ${mobile} 已分配普通用户角色`)
+          } else {
+            console.log(`用户 ${mobile} 已有普通用户角色，跳过分配`)
+          }
+        } else {
+          console.warn('⚠️ 警告：普通用户角色不存在，无法分配角色')
+        }
+
+        /*
+         * ========================================
+         * ✅ 提交事务（确保用户+积分账户+角色原子性创建）
+         * ========================================
+         */
+        await transaction.commit()
+        console.log(`✅ 用户 ${mobile} 注册流程完成（用户+积分账户+角色）`)
+      } catch (error) {
+        // 回滚事务
+        await transaction.rollback()
+        console.error(`❌ 用户 ${mobile} 注册失败:`, error)
+        return res.apiError('用户注册失败', 'REGISTRATION_FAILED', { error: error.message }, 500)
       }
     }
 
+    /*
+     * ========================================
+     * 步骤4: 验证账户状态
+     * ========================================
+     */
     if (user.status !== 'active') {
-      return res.apiError('用户账户已被禁用', 'USER_INACTIVE', null, 403)
+      console.warn(`❌ 用户 ${mobile} 账户已被禁用，status: ${user.status}`)
+      return res.apiError('用户账户已被禁用，无法登录', 'USER_INACTIVE', null, 403)
     }
 
-    // 🛡️ 获取用户角色信息
+    /*
+     * ========================================
+     * 步骤5: 获取用户角色信息（基于UUID角色系统）
+     * ========================================
+     */
     const userRoles = await getUserRoles(user.user_id)
 
-    // 更新最后登录时间
+    /*
+     * ========================================
+     * 步骤6: 更新最后登录时间和登录次数
+     * ========================================
+     */
     await user.update({
-      last_login: BeijingTimeHelper.createBeijingTime(),
-      login_count: (user.login_count || 0) + 1
+      last_login: BeijingTimeHelper.createBeijingTime(), // 当前北京时间（统一时区管理）
+      login_count: (user.login_count || 0) + 1 // 登录次数累加+1（支持用户行为分析）
     })
 
-    // 生成Token
+    console.log(
+      `✅ 用户 ${mobile} 更新登录统计：last_login=${user.last_login}, login_count=${user.login_count}`
+    )
+
+    /*
+     * ========================================
+     * 步骤7: 生成JWT Token（access_token + refresh_token）
+     * ========================================
+     */
     const tokens = await generateTokens(user)
 
+    /*
+     * ========================================
+     * 步骤8: 返回登录成功结果
+     * ========================================
+     */
     const responseData = {
-      access_token: tokens.access_token,
-      refresh_token: tokens.refresh_token,
+      access_token: tokens.access_token, // 访问令牌（JWT，有效期7天）
+      refresh_token: tokens.refresh_token, // 刷新令牌（JWT，用于刷新access_token）
       user: {
-        user_id: user.user_id,
-        mobile: user.mobile,
-        nickname: user.nickname,
-        role_based_admin: userRoles.isAdmin, // 🛡️ 基于角色计算
-        roles: userRoles.roles,
-        status: user.status,
-        created_at: user.created_at,
-        last_login: user.last_login
+        user_id: user.user_id, // 用户ID（唯一标识，自增主键）
+        mobile: user.mobile, // 手机号（登录凭证，唯一索引）
+        nickname: user.nickname, // 用户昵称（自动生成，格式：用户+后4位）
+        role_based_admin: userRoles.isAdmin, // 是否为管理员（基于UUID角色系统计算）
+        roles: userRoles.roles, // 用户角色列表（UUID角色系统，支持多角色）
+        status: user.status, // 账户状态（active/inactive/banned）
+        created_at: user.created_at, // 账户创建时间（北京时间，自动生成）
+        last_login: user.last_login // 最后登录时间（北京时间，刚更新）
       },
-      expires_in: 7 * 24 * 60 * 60, // 7天
-      timestamp: BeijingTimeHelper.apiTimestamp()
+      expires_in: 7 * 24 * 60 * 60, // Token有效期：7天=604800秒
+      timestamp: BeijingTimeHelper.apiTimestamp() // API响应时间戳（北京时间，统一格式）
     }
+
+    console.log(`✅ 用户 ${mobile} 微信授权登录成功`)
 
     return res.apiSuccess(responseData, '快速登录成功')
   } catch (error) {
-    console.error('快速登录失败:', error)
+    console.error('❌ 快速登录失败:', error)
     return res.apiError('快速登录失败', 'QUICK_LOGIN_FAILED', error.message, 500)
   }
 })

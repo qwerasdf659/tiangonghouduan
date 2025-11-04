@@ -1,10 +1,70 @@
 /**
  * 抽奖历史服务 - 处理历史记录查询相关业务逻辑
- * 从 routes/v4/unified-engine/lottery.js 中提取的历史记录相关业务逻辑
+ * 提供用户抽奖历史查询、批量抽奖记录查询、抽奖统计等功能
+ *
+ * 业务场景：
+ * - 用户查询自己的抽奖记录，了解历史中奖情况和奖品信息
+ * - 批量抽奖后查询本次批量抽奖的所有记录，统一展示抽奖结果
+ * - 运营人员查询用户抽奖统计数据，分析用户参与度和中奖率
+ * - 提供今日抽奖统计，支持用户查看当天抽奖情况
+ * - 辅助数据分析和运营决策，提供奖品分布、中奖率等指标
+ *
+ * 核心功能：
+ * 1. 历史记录查询：支持分页、日期范围过滤、奖品类型过滤、策略类型过滤
+ * 2. 批量抽奖记录：查询指定批量ID的所有抽奖记录，统计成功数量
+ * 3. 用户统计信息：总抽奖次数、中奖次数、中奖率、奖品类型分布、最近中奖记录
+ * 4. 今日统计：快捷查询今日抽奖统计数据
+ * 5. 记录格式化：统一格式化抽奖记录，添加奖品信息、活动信息、显示名称
+ * 6. 参数验证：验证查询参数的合法性，防止无效请求
+ *
+ * 集成模型：
+ * - LotteryDraw：抽奖记录模型，存储每次抽奖的详细数据
+ * - LotteryPrize：奖品模型，关联中奖奖品信息
+ * - LotteryCampaign：抽奖活动模型，关联抽奖活动信息
+ *
+ * 集成技术：
+ * - Sequelize ORM：数据库查询和关联查询
+ * - BeijingTimeHelper：北京时间处理工具，确保时间统一性
+ * - Logger：日志记录工具，记录查询日志和错误信息
+ *
+ * 使用方式：
+ * ```javascript
+ * const historyService = new LotteryHistoryService()
+ *
+ * // 查询用户抽奖历史
+ * const history = await historyService.get_user_lottery_history(10001, {
+ *   page: 1,
+ *   limit: 20,
+ *   start_date: '2025-10-01',
+ *   end_date: '2025-10-30',
+ *   prize_type: 'points'
+ * })
+ * console.log('总记录数:', history.total_count)
+ *
+ * // 查询批量抽奖记录
+ * const batchHistory = await historyService.get_batch_lottery_history('batch_12345')
+ * console.log('批量抽奖成功数:', batchHistory.success_count)
+ *
+ * // 查询用户统计信息
+ * const stats = await historyService.get_user_lottery_statistics(10001, {
+ *   start_date: '2025-10-01',
+ *   end_date: '2025-10-30'
+ * })
+ * console.log('中奖率:', stats.winning_rate)
+ * ```
+ *
+ * 注意事项：
+ * - 查询参数需要验证合法性，防止SQL注入和无效请求
+ * - 日期范围查询建议设置合理的时间跨度，避免查询数据量过大影响性能
+ * - 分页查询的limit参数建议限制在100以内，防止一次查询数据量过大
+ * - 格式化后的记录中包含关联奖品和活动信息，可能为null需要前端处理
+ * - 统计查询涉及聚合操作，数据量大时可能影响性能，建议添加缓存
  *
  * @description 基于snake_case命名格式的抽奖历史服务
  * @version 4.0.0
  * @date 2025-09-24
+ * @lastUpdate 2025年10月30日
+ * @author Claude Sonnet 4.5
  */
 
 const models = require('../../models')
@@ -12,7 +72,94 @@ const { Op } = require('sequelize')
 const BeijingTimeHelper = require('../../utils/timeHelper')
 const Logger = require('../UnifiedLotteryEngine/utils/Logger')
 
+/**
+ * 抽奖历史服务类
+ *
+ * 业务场景：
+ * - 提供统一的抽奖历史记录查询接口，支持用户和管理员查询历史抽奖数据
+ * - 支持多维度查询：按用户、按时间范围、按奖品类型、按策略类型过滤
+ * - 支持批量抽奖记录查询，统一展示一次批量抽奖的所有结果
+ * - 提供用户抽奖统计分析，包括总次数、中奖次数、中奖率、奖品类型分布等
+ * - 格式化抽奖记录，统一添加奖品信息、活动信息、显示名称，便于前端展示
+ *
+ * 核心功能：
+ * - get_user_lottery_history: 分页查询用户抽奖历史，支持日期范围、奖品类型、策略类型过滤
+ * - get_batch_lottery_history: 查询指定批量ID的所有抽奖记录，统计成功数量
+ * - get_user_lottery_statistics: 统计用户抽奖数据，包括总次数、中奖次数、中奖率、奖品分布
+ * - get_today_lottery_statistics: 快捷查询今日抽奖统计（基于北京时间）
+ * - format_lottery_record: 格式化单条抽奖记录，添加奖品信息和活动信息
+ * - validate_history_params: 验证查询参数合法性，防止无效请求和SQL注入
+ *
+ * 技术特点：
+ * - 使用Sequelize ORM进行数据库查询，支持关联查询（奖品、活动信息）
+ * - 集成BeijingTimeHelper统一处理时间，确保全系统使用北京时间
+ * - 集成Logger记录查询日志和错误信息，便于问题追踪
+ * - 支持分页查询，limit参数限制在100以内，防止一次查询数据量过大
+ * - 统一返回格式，包含时间戳、分页信息、记录列表
+ *
+ * 数据模型关联：
+ * - LotteryDraw（抽奖记录）- 主表
+ * - LotteryPrize（奖品）- 关联查询，提供奖品详细信息
+ * - LotteryCampaign（抽奖活动）- 关联查询，提供活动信息
+ *
+ * 使用示例：
+ * ```javascript
+ * const historyService = new LotteryHistoryService()
+ *
+ * // 查询用户抽奖历史（带过滤）
+ * const history = await historyService.get_user_lottery_history(10001, {
+ *   page: 1,
+ *   limit: 20,
+ *   start_date: '2025-10-01',
+ *   end_date: '2025-10-30',
+ *   prize_type: 'points'
+ * })
+ * console.log('抽奖历史:', history.records)
+ * console.log('总记录数:', history.total_count)
+ *
+ * // 查询批量抽奖记录
+ * const batchHistory = await historyService.get_batch_lottery_history('batch_12345')
+ * console.log('批量抽奖成功数:', batchHistory.success_count)
+ *
+ * // 查询用户统计信息
+ * const stats = await historyService.get_user_lottery_statistics(10001)
+ * console.log('总抽奖次数:', stats.total_draws)
+ * console.log('中奖次数:', stats.winning_draws)
+ * console.log('中奖率:', stats.winning_rate)
+ * ```
+ *
+ * 注意事项：
+ * - 查询参数需要验证合法性，使用validate_history_params方法验证
+ * - 日期范围查询建议设置合理时间跨度（如30天），避免查询数据量过大影响性能
+ * - 分页查询的limit参数建议限制在100以内，系统会自动强制限制
+ * - 格式化后的记录包含关联奖品和活动信息，可能为null需要前端处理
+ * - 统计查询涉及聚合操作，数据量大时可能影响性能，建议添加缓存
+ * - 所有时间字段使用北京时间（GMT+8），确保时间一致性
+ *
+ * @class LotteryHistoryService
+ * @description 抽奖历史服务，提供抽奖记录查询、统计、格式化等功能
+ * @version 4.0.0
+ * @date 2025-09-24
+ * @lastUpdate 2025年11月1日
+ * @author Claude Sonnet 4.5
+ */
 class LotteryHistoryService {
+  /**
+   * 构造函数 - 初始化抽奖历史服务
+   *
+   * 业务场景：创建抽奖历史服务实例，初始化日志记录器
+   *
+   * 业务规则：
+   * - 每个服务实例独立管理自己的日志记录器
+   * - 日志记录器模块名为'LotteryHistoryService'
+   *
+   * 初始化内容：
+   * - logger: 日志记录器，用于记录查询日志和错误信息
+   *
+   * @example
+   * const historyService = new LotteryHistoryService()
+   * console.log('抽奖历史服务已初始化')
+   */
   constructor () {
     this.logger = Logger.create('LotteryHistoryService')
   }

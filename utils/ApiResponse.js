@@ -6,6 +6,85 @@
 
 const BeijingTimeHelper = require('./timeHelper') // 🕐 北京时间工具
 
+/**
+ * API响应标准化工具类
+ *
+ * 业务场景：
+ * - 统一整个后端项目的API响应格式
+ * - 实现符合接口规范文档的标准化响应结构
+ * - 提供Express中间件模式的便捷响应方法
+ * - 集成北京时间时间戳（UTC+8）
+ *
+ * 核心功能：
+ * - 成功响应（success、created、paginated、noContent）
+ * - 错误响应（error、businessError、validationError）
+ * - HTTP状态码快捷方法（badRequest、unauthorized、forbidden等）
+ * - Express中间件注入（middleware()，提供res.apiSuccess等方法）
+ * - 统一错误处理中间件（errorHandler()）
+ * - 业务错误码标准化（BusinessErrorCodes）
+ * - 业务状态字段验证（validateBusinessStatus）
+ *
+ * 响应格式标准：
+ * {
+ *   success: boolean,    // 业务操作是否成功
+ *   code: string,        // 业务代码（如SUCCESS、ERROR等）
+ *   message: string,     // 响应消息
+ *   data: any,           // 响应数据
+ *   timestamp: string,   // 北京时间时间戳（YYYY-MM-DD HH:mm:ss）
+ *   version: string,     // API版本（固定为v4.0）
+ *   request_id: string   // 请求追踪ID（中间件模式时自动添加）
+ * }
+ *
+ * 使用方式：
+ * 1. 直接调用静态方法：
+ *    return res.json(ApiResponse.success(data))
+ *
+ * 2. Express中间件模式（推荐）：
+ *    app.use(ApiResponse.middleware())
+ *    router.get('/users', (req, res) => {
+ *      res.apiSuccess(users, '查询成功')
+ *    })
+ *
+ * 3. 错误处理中间件：
+ *    app.use(ApiResponse.errorHandler())
+ *
+ * HTTP状态码约定：
+ * - 所有业务响应固定使用HTTP 200状态码
+ * - 业务成功/失败通过response.success字段判断
+ * - 业务错误码通过response.code字段表示
+ * - 特殊场景（如JWT认证失败）使用对应的HTTP状态码
+ *
+ * 业务错误码分类：
+ * - 1xxx: 用户相关错误
+ * - 2xxx: 抽奖相关错误
+ * - 3xxx: 系统错误
+ * - 4xxx: 权限错误
+ * - 5xxx: 验证错误
+ * - 6xxx: 业务状态相关错误
+ * - 7xxx: 业务契约相关错误
+ *
+ * 安全设计：
+ * - 生产环境不返回详细错误堆栈
+ * - 开发/测试环境返回httpStatus便于调试
+ * - 自动处理Sequelize、JWT、Multer等常见错误
+ *
+ * 集成特性：
+ * - 自动生成请求追踪ID（request_id）
+ * - 支持Sequelize验证错误自动转换
+ * - 支持JWT认证错误自动处理
+ * - 支持Multer文件上传错误自动处理
+ *
+ * 设计决策：
+ * - 使用static方法而非实例方法，避免重复实例化
+ * - 中间件模式注入res对象，提供便捷的res.apiXxx()方法
+ * - 固定HTTP 200状态码，通过业务字段区分成功/失败（符合接口规范文档标准）
+ * - 集成业务错误码和状态字段验证（从ApiStandardManager合并）
+ *
+ * 创建时间：2025年10月20日
+ * 最后更新：2025年10月30日
+ *
+ * @class ApiResponse
+ */
 class ApiResponse {
   /**
    * 成功响应 - 符合接口规范文档标准

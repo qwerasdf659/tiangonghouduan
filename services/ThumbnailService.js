@@ -8,14 +8,27 @@ const path = require('path')
 const fs = require('fs').promises
 const { v4: uuidv4 } = require('uuid')
 
+/**
+ * 缩略图生成服务类
+ * 职责：生成多种尺寸的图片缩略图，优化图片加载性能
+ * 功能：支持small/medium/large三种尺寸，自动裁剪、质量控制
+ * @class ThumbnailService
+ */
 class ThumbnailService {
+  /**
+   * 构造函数 - 初始化缩略图服务和目录配置
+   * @constructor
+   */
   constructor () {
     this.uploadsDir = path.join(__dirname, '../uploads')
     this.thumbnailsDir = path.join(this.uploadsDir, 'thumbnails')
     this.ensureDirectories()
   }
 
-  // 确保目录存在
+  /**
+   * 确保缩略图目录存在
+   * @returns {Promise<void>} 无返回值，确保thumbnails目录存在并可访问
+   */
   async ensureDirectories () {
     try {
       await fs.access(this.thumbnailsDir)
@@ -90,6 +103,7 @@ class ThumbnailService {
   /**
    * 删除缩略图文件
    * @param {Object} thumbnailPaths - 缩略图路径对象
+   * @returns {Promise<void>} 无返回值，删除指定的缩略图文件
    */
   async deleteThumbnails (thumbnailPaths) {
     if (!thumbnailPaths) return
@@ -110,6 +124,7 @@ class ThumbnailService {
   /**
    * 清理失败的缩略图
    * @param {Object} thumbnails - 已生成的缩略图
+   * @returns {Promise<void>} 无返回值，清理失败生成的缩略图文件
    */
   async cleanupThumbnails (thumbnails) {
     for (const [, relativePath] of Object.entries(thumbnails)) {
@@ -128,7 +143,7 @@ class ThumbnailService {
   /**
    * 检查是否为支持的图片格式
    * @param {string} mimeType - MIME类型
-   * @returns {boolean}
+   * @returns {boolean} 是否为支持的图片格式（jpeg/jpg/png/webp/tiff/bmp）
    */
   isSupportedImageType (mimeType) {
     const supportedTypes = [
@@ -145,7 +160,7 @@ class ThumbnailService {
   /**
    * 批量生成缩略图（用于已存在的图片）
    * @param {Array} imagePaths - 图片路径数组
-   * @returns {Array} 生成结果
+   * @returns {Promise<Array>} 生成结果数组，每项包含originalPath、thumbnails、success字段
    */
   async batchGenerateThumbnails (imagePaths) {
     const results = []
@@ -172,7 +187,7 @@ class ThumbnailService {
 
   /**
    * 获取缩略图统计信息
-   * @returns {Object} 统计信息
+   * @returns {Promise<Object>} 统计信息对象，包含totalFiles、totalSize、totalSizeFormatted、files数组
    */
   async getThumbnailStats () {
     try {
@@ -211,7 +226,7 @@ class ThumbnailService {
   /**
    * 格式化文件大小
    * @param {number} bytes - 字节数
-   * @returns {string} 格式化后的大小
+   * @returns {string} 格式化后的文件大小（如 "2.5 MB"、"150 KB"）
    */
   formatFileSize (bytes) {
     if (bytes === 0) return '0 B'

@@ -8,7 +8,9 @@
 
 const BeijingTimeHelper = require('../../../../../utils/timeHelper')
 const models = require('../../../../../models')
-const { UnifiedLotteryEngine } = require('../../../../../services/UnifiedLotteryEngine/UnifiedLotteryEngine')
+const {
+  UnifiedLotteryEngine
+} = require('../../../../../services/UnifiedLotteryEngine/UnifiedLotteryEngine')
 const ManagementStrategy = require('../../../../../services/UnifiedLotteryEngine/strategies/ManagementStrategy')
 const PerformanceMonitor = require('../../../../../services/UnifiedLotteryEngine/utils/PerformanceMonitor')
 const Logger = require('../../../../../services/UnifiedLotteryEngine/utils/Logger')
@@ -101,13 +103,32 @@ function asyncHandler (fn) {
 }
 
 /**
- * 参数验证工具
+ * 参数验证工具集合
+ *
+ * 业务场景：管理员API参数验证，确保数据合法性
+ *
+ * 核心功能：
+ * - 用户ID验证（validateUserId）
+ * - 积分调整参数验证（validatePointsAdjustment）
+ * - 奖品池配置验证（validatePrizePool）
  */
 const validators = {
   /**
-   * 验证用户ID
+   * 验证用户ID的有效性
+   *
+   * 业务场景：管理员操作用户数据前，验证用户ID是否合法
+   *
+   * @param {string|number} user_id - 用户ID（可以是字符串或数字）
+   * @returns {number} 解析后的用户ID（整数）
+   *
+   * @throws {Error} 当user_id为空或无法转换为整数时抛出错误
+   *
+   * @example
+   * const validUserId = validators.validateUserId('10001') // 返回: 10001
+   * const validUserId2 = validators.validateUserId(10001)  // 返回: 10001
+   * // validators.validateUserId('abc')  // 抛出错误: 无效的用户ID
    */
-  validateUserId: (user_id) => {
+  validateUserId: user_id => {
     if (!user_id || isNaN(parseInt(user_id))) {
       throw new Error('无效的用户ID')
     }
@@ -115,7 +136,31 @@ const validators = {
   },
 
   /**
-   * 验证积分调整参数
+   * 验证积分调整参数的有效性
+   *
+   * 业务场景：管理员手动调整用户积分前，验证积分数量和调整原因是否合法
+   *
+   * 业务规则：
+   * - 积分数量必须是有效整数（可以是正数或负数）
+   * - 调整原因必须提供且不能为空字符串
+   * - 调整原因会记录到points_transactions表的transaction_title字段
+   *
+   * @param {string|number} points - 积分数量（正数增加，负数扣减）
+   * @param {string} reason - 调整原因（必填，会记录到交易记录）
+   * @returns {Object} 验证后的参数对象
+   * @returns {number} return.points - 解析后的积分数量（整数）
+   * @returns {string} return.reason - 清理后的调整原因（去除前后空格）
+   *
+   * @throws {Error} 当积分数量无效或调整原因为空时抛出错误
+   *
+   * @example
+   * const validated = validators.validatePointsAdjustment(100, '活动奖励')
+   * // 返回: { points: 100, reason: '活动奖励' }
+   *
+   * const validated2 = validators.validatePointsAdjustment('-50', '  违规扣分  ')
+   * // 返回: { points: -50, reason: '违规扣分' }
+   *
+   * // validators.validatePointsAdjustment(100, '')  // 抛出错误: 必须提供调整原因
    */
   validatePointsAdjustment: (points, reason) => {
     if (!points || isNaN(parseInt(points))) {
@@ -131,9 +176,35 @@ const validators = {
   },
 
   /**
-   * 验证奖品池参数
+   * 验证奖品池配置参数的有效性
+   *
+   * 业务场景：管理员配置抽奖活动奖品池前，验证奖品配置是否完整合法
+   *
+   * 业务规则：
+   * - 奖品列表不能为空（至少包含1个奖品）
+   * - 每个奖品必须包含：name（名称）、type（类型）、quantity（数量）
+   * - 奖品数量必须为正整数（>0）
+   * - 奖品类型包括：points（积分）、physical（实物）、coupon（优惠券）等
+   *
+   * @param {Array<Object>} prizes - 奖品配置数组
+   * @param {string} prizes[].name - 奖品名称（必填，如"100积分"）
+   * @param {string} prizes[].type - 奖品类型（必填，如"points"）
+   * @param {number} prizes[].quantity - 奖品库存数量（必填，正整数）
+   * @returns {boolean} 验证通过返回true
+   *
+   * @throws {Error} 当奖品列表为空、奖品信息不完整或数量无效时抛出错误
+   *
+   * @example
+   * const prizes = [
+   *   { name: '100积分', type: 'points', quantity: 100 },
+   *   { name: '优惠券', type: 'coupon', quantity: 50 }
+   * ]
+   * validators.validatePrizePool(prizes)  // 返回: true
+   *
+   * // validators.validatePrizePool([])  // 抛出错误: 奖品列表不能为空
+   * // validators.validatePrizePool([{ name: '奖品' }])  // 抛出错误: 奖品信息不完整
    */
-  validatePrizePool: (prizes) => {
+  validatePrizePool: prizes => {
     if (!Array.isArray(prizes) || prizes.length === 0) {
       throw new Error('奖品列表不能为空')
     }

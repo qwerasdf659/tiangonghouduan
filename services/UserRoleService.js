@@ -8,11 +8,17 @@
 
 const { User, Role, UserRole } = require('../models')
 
+/**
+ * 用户角色服务类
+ * 职责：管理用户角色和权限的分配、移除、检查等操作
+ * 特点：简化用户权限操作，保持User和Role模型分离
+ * @class UserRoleService
+ */
 class UserRoleService {
   /**
    * 🔍 获取用户完整信息（包含角色权限）
    * @param {number} user_id - 用户ID
-   * @returns {Object} 用户信息和权限数据
+   * @returns {Promise<Object>} 用户信息和权限数据，包含user_id、mobile、nickname、roles数组、is_admin、highest_role_level等字段
    */
   static async getUserWithRoles (user_id) {
     const user = await User.findByPk(user_id, {
@@ -57,6 +63,7 @@ class UserRoleService {
    * 🛡️ 分配用户角色
    * @param {number} user_id - 用户ID
    * @param {string} roleName - 角色名称
+   * @returns {Promise<Object>} 分配结果，包含message和role字段
    */
   static async assignUserRole (user_id, roleName) {
     const user = await User.findByPk(user_id)
@@ -99,6 +106,7 @@ class UserRoleService {
    * 🗑️ 移除用户角色
    * @param {number} user_id - 用户ID
    * @param {string} roleName - 角色名称
+   * @returns {Promise<Object>} 移除结果，包含message和role字段
    */
   static async removeUserRole (user_id, roleName) {
     const role = await Role.findOne({
@@ -127,6 +135,7 @@ class UserRoleService {
    * @param {number} user_id - 用户ID
    * @param {string} resource - 资源名称
    * @param {string} action - 操作类型
+   * @returns {Promise<boolean>} 是否拥有指定资源的操作权限
    */
   static async checkUserPermission (user_id, resource, action = 'read') {
     const user = await User.findByPk(user_id)
@@ -140,6 +149,7 @@ class UserRoleService {
   /**
    * 👥 批量获取用户角色信息
    * @param {Array} userIds - 用户ID数组
+   * @returns {Promise<Array>} 用户角色信息数组，每项包含user_id、mobile、nickname、roles、highest_role_level字段
    */
   static async getBatchUsersWithRoles (userIds) {
     const users = await User.findAll({
@@ -164,6 +174,7 @@ class UserRoleService {
 
   /**
    * 📊 获取角色统计信息
+   * @returns {Promise<Array>} 角色统计信息数组，每项包含role_name、role_level、user_count、description字段
    */
   static async getRoleStatistics () {
     const roles = await Role.findAll({

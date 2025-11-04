@@ -173,9 +173,10 @@ class LotteryDrawFormatter {
    * @returns {Object} 格式化后的分析数据
    */
   static formatBatchAnalysis (analysisData) {
-    const winRate = analysisData.total_draws > 0
-      ? ((analysisData.win_draws / analysisData.total_draws) * 100).toFixed(2)
-      : '0.00'
+    const winRate =
+      analysisData.total_draws > 0
+        ? ((analysisData.win_draws / analysisData.total_draws) * 100).toFixed(2)
+        : '0.00'
 
     return {
       total_draws: analysisData.total_draws,

@@ -18,7 +18,8 @@ const BeijingTimeHelper = require('../utils/timeHelper') // 🕐 北京时间工
 class UserPointsAccount extends Model {
   /**
    * 静态关联定义
-   * @param {Object} models - 所有模型的引用
+   * @param {Object} models - Sequelize所有模型的集合对象
+   * @returns {void} 无返回值，仅定义关联关系
    */
   static associate (models) {
     // 一对多：一个用户只有一个积分账户
@@ -42,7 +43,11 @@ class UserPointsAccount extends Model {
 
   /**
    * 检查账户是否健康
-   * @returns {Object} 健康状态详情
+   * @returns {Object} 健康状态详情对象
+   * @returns {boolean} return.is_healthy - 账户是否健康
+   * @returns {Array<Object>} return.issues - 账户问题列表
+   * @returns {Array<Object>} return.warnings - 账户警告列表
+   * @returns {number} return.health_score - 账户健康分数（0-100）
    */
   checkAccountHealth () {
     const issues = []
@@ -67,7 +72,10 @@ class UserPointsAccount extends Model {
 
   /**
    * 生成个性化推荐数据
-   * @returns {Object} 推荐数据
+   * @returns {Object} 推荐数据对象
+   * @returns {boolean} return.enabled - 推荐功能是否启用
+   * @returns {Array<Object>} return.recommendations - 推荐项列表
+   * @returns {string} return.generated_at - 推荐数据生成时间（北京时间）
    */
   generateRecommendations () {
     const recommendations = []
@@ -89,7 +97,18 @@ class UserPointsAccount extends Model {
 
   /**
    * 格式化账户摘要信息
-   * @returns {Object} 账户摘要
+   * @returns {Object} 账户摘要对象
+   * @returns {number} return.account_id - 账户ID
+   * @returns {number} return.user_id - 用户ID
+   * @returns {Object} return.balance - 积分余额信息
+   * @returns {number} return.balance.available - 可用积分
+   * @returns {number} return.balance.total_earned - 累计获得积分
+   * @returns {number} return.balance.total_consumed - 累计消耗积分
+   * @returns {Object} return.health - 账户健康状态
+   * @returns {Array<Object>} return.recommendations - 推荐项列表
+   * @returns {boolean} return.is_active - 账户是否激活
+   * @returns {Date} return.created_at - 创建时间
+   * @returns {Date} return.updated_at - 更新时间
    */
   toSummary () {
     const health = this.checkAccountHealth()
@@ -113,6 +132,11 @@ class UserPointsAccount extends Model {
 
   /**
    * 模型验证规则
+   * @param {Object} data - 需要验证的账户数据
+   * @param {number} data.available_points - 可用积分
+   * @param {number} data.total_earned - 累计获得积分
+   * @param {number} data.total_consumed - 累计消耗积分
+   * @returns {Object} 验证结果对象 {is_valid: boolean, errors: Array<string>}
    */
   static validateAccount (data) {
     const errors = []
@@ -164,7 +188,11 @@ module.exports = sequelize => {
         type: DataTypes.DECIMAL(10, 2),
         allowNull: false,
         defaultValue: 0.0,
-        comment: '可用积分余额',
+        comment: '可用积分余额（用户当前可用于兑换、抽奖的积分数量，业务规则：消费奖励审核通过后增加、兑换抽奖时扣除、审核拒绝退回时增加，计算公式：total_earned - total_consumed，范围：≥0，用途：兑换商品、参与抽奖、余额查询、权限判断）',
+        /**
+         * 获取可用积分的浮点数值
+         * @returns {number} 可用积分（浮点数格式）
+         */
         get () {
           const value = this.getDataValue('available_points')
           return value ? parseFloat(value) : 0
@@ -174,7 +202,11 @@ module.exports = sequelize => {
         type: DataTypes.DECIMAL(10, 2),
         allowNull: false,
         defaultValue: 0.0,
-        comment: '累计获得积分',
+        comment: '累计获得积分（用户历史累计获得的所有积分，只增不减，业务来源：消费奖励、活动奖励、管理员手动调整，积分规则：1元消费=1积分（四舍五入），用途：用户积分报表、等级判定、统计分析、财务对账）',
+        /**
+         * 获取累计获得积分的浮点数值
+         * @returns {number} 累计获得积分（浮点数格式）
+         */
         get () {
           const value = this.getDataValue('total_earned')
           return value ? parseFloat(value) : 0
@@ -184,17 +216,29 @@ module.exports = sequelize => {
         type: DataTypes.DECIMAL(10, 2),
         allowNull: false,
         defaultValue: 0.0,
-        comment: '累计消耗积分',
+        comment: '累计消耗积分（用户历史累计消耗的所有积分，只增不减，业务场景：兑换商品、参与抽奖，用途：用户消费行为分析、积分流水对账、退款凭证计算，业务规则：消费时增加，退款时不减少但available_points增加）',
+        /**
+         * 获取累计消耗积分的浮点数值
+         * @returns {number} 累计消耗积分（浮点数格式）
+         */
         get () {
           const value = this.getDataValue('total_consumed')
           return value ? parseFloat(value) : 0
         }
       },
+      /**
+       * 最后获得积分时间（用于追踪用户最近一次积分收入行为）
+       * @type {Date|null}
+       */
       last_earn_time: {
         type: DataTypes.DATE,
         allowNull: true,
         comment: '最后获得积分时间'
       },
+      /**
+       * 最后消耗积分时间（用于追踪用户最近一次积分支出行为）
+       * @type {Date|null}
+       */
       last_consume_time: {
         type: DataTypes.DATE,
         allowNull: true,
