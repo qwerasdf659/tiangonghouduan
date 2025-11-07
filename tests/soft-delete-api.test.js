@@ -77,7 +77,7 @@ describe('软删除功能集成测试', () => {
 
     test('用户软删除自己的消费记录', async () => {
       const response = await request(app)
-        .delete(`/api/v4/unified-engine/consumption/${recordId}`)
+        .delete(`/api/v4/consumption/${recordId}`)
         .set('Authorization', `Bearer ${userToken}`)
         .expect(200)
 
@@ -92,7 +92,7 @@ describe('软删除功能集成测试', () => {
 
     test('管理员恢复已删除的消费记录', async () => {
       const response = await request(app)
-        .post(`/api/v4/unified-engine/consumption/${recordId}/restore`)
+        .post(`/api/v4/consumption/${recordId}/restore`)
         .set('Authorization', `Bearer ${adminToken}`)
         .expect(200)
 
@@ -240,7 +240,7 @@ describe('软删除功能集成测试', () => {
 
       if (record) {
         const response = await request(app)
-          .post(`/api/v4/unified-engine/consumption/${record.record_id}/restore`)
+          .post(`/api/v4/consumption/${record.record_id}/restore`)
           .set('Authorization', `Bearer ${userToken}`)
 
         /*

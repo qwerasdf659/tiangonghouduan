@@ -29,10 +29,11 @@ module.exports = sequelize => {
           'exchange_refund',
           'prize_claim',
           'admin_adjustment',
-          'system_reward'
+          'system_reward',
+          'inventory_transfer'
         ),
         allowNull: false,
-        comment: '交易类型'
+        comment: '交易类型：point_transfer-积分转账，exchange_refund-兑换退款，prize_claim-奖品领取，admin_adjustment-管理员调整，system_reward-系统奖励，inventory_transfer-物品转让'
       },
 
       // 交易参与方
@@ -95,6 +96,23 @@ module.exports = sequelize => {
         type: DataTypes.ENUM('exchange', 'lottery', 'review', 'refund', 'system'),
         allowNull: true,
         comment: '关联记录类型'
+      },
+
+      // 物品转让相关字段（Item Transfer Fields - 物品转让相关字段，仅用于trade_type=inventory_transfer）
+      item_id: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+        comment: '物品ID（关联user_inventory.inventory_id，仅用于inventory_transfer类型，用于追踪物品转让历史）'
+      },
+      item_name: {
+        type: DataTypes.STRING(100),
+        allowNull: true,
+        comment: '物品名称（仅用于inventory_transfer类型，冗余字段用于快速查询显示）'
+      },
+      transfer_note: {
+        type: DataTypes.STRING(500),
+        allowNull: true,
+        comment: '转让备注（仅用于inventory_transfer类型，记录转让原因或说明）'
       },
 
       // 交易详情
@@ -185,6 +203,10 @@ module.exports = sequelize => {
         },
         {
           fields: ['trade_time']
+        },
+        {
+          fields: ['item_id', 'trade_type', 'created_at'],
+          name: 'idx_item_transfer_history'
         }
       ]
     }

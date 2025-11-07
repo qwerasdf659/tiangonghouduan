@@ -621,26 +621,6 @@ class NotificationService {
       data: securityData
     })
   }
-
-  /**
-   * 库存物品过期提醒
-   *
-   * @param {number} user_id - 用户ID
-   * @param {Object} inventoryData - 库存数据
-   * @param {string} inventoryData.item_name - 物品名称
-   * @param {number} inventoryData.days_to_expire - 距离过期天数
-   * @returns {Promise<Object>} 通知结果
-   */
-  static async notifyInventoryExpiring (user_id, inventoryData) {
-    const { item_name, days_to_expire } = inventoryData
-
-    return await this.send(user_id, {
-      type: 'inventory_expiring',
-      title: '⏰ 物品即将过期',
-      content: `您的【${item_name}】将在${days_to_expire}天后过期，请尽快使用！`,
-      data: inventoryData
-    })
-  }
 }
 
 module.exports = NotificationService

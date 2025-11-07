@@ -9,7 +9,12 @@ const BeijingTimeHelper = require('../../../../utils/timeHelper')
 const express = require('express')
 const router = express.Router()
 const { User, Role, UserRole } = require('../../../../models')
-const { authenticateToken, requireAdmin, getUserRoles } = require('../../../../middleware/auth')
+const {
+  authenticateToken,
+  requireAdmin,
+  getUserRoles,
+  invalidateUserPermissions
+} = require('../../../../middleware/auth')
 const { Op } = require('sequelize')
 
 // 所有路由都需要管理员权限
@@ -40,19 +45,29 @@ router.get('/users', async (req, res) => {
     // 基础查询
     const userQuery = {
       where: whereClause,
-      attributes: ['user_id', 'mobile', 'nickname', 'history_total_points', 'status', 'last_login', 'created_at'],
+      attributes: [
+        'user_id',
+        'mobile',
+        'nickname',
+        'history_total_points',
+        'status',
+        'last_login',
+        'created_at'
+      ],
       limit: finalLimit,
       offset: (parseInt(page) - 1) * finalLimit,
       order: [['created_at', 'DESC']],
-      include: [{
-        model: Role,
-        as: 'roles',
-        through: {
-          where: { is_active: true }
-        },
-        attributes: ['role_name', 'role_level'],
-        required: false
-      }]
+      include: [
+        {
+          model: Role,
+          as: 'roles',
+          through: {
+            where: { is_active: true }
+          },
+          attributes: ['role_name', 'role_level'],
+          required: false
+        }
+      ]
     }
 
     // 角色过滤
@@ -65,9 +80,8 @@ router.get('/users', async (req, res) => {
 
     // 处理用户数据，添加角色信息
     const processedUsers = users.map(user => {
-      const maxRoleLevel = user.roles.length > 0
-        ? Math.max(...user.roles.map(role => role.role_level))
-        : 0
+      const maxRoleLevel =
+        user.roles.length > 0 ? Math.max(...user.roles.map(role => role.role_level)) : 0
 
       return {
         user_id: user.user_id,
@@ -107,15 +121,17 @@ router.get('/users/:user_id', async (req, res) => {
 
     const user = await User.findOne({
       where: { user_id },
-      include: [{
-        model: Role,
-        as: 'roles',
-        through: {
-          where: { is_active: true },
-          attributes: ['assigned_at', 'assigned_by']
-        },
-        attributes: ['role_uuid', 'role_name', 'role_level', 'description']
-      }]
+      include: [
+        {
+          model: Role,
+          as: 'roles',
+          through: {
+            where: { is_active: true },
+            attributes: ['assigned_at', 'assigned_by']
+          },
+          attributes: ['role_uuid', 'role_name', 'role_level', 'description']
+        }
+      ]
     })
 
     if (!user) {
@@ -123,9 +139,8 @@ router.get('/users/:user_id', async (req, res) => {
     }
 
     // 计算用户权限级别
-    const maxRoleLevel = user.roles.length > 0
-      ? Math.max(...user.roles.map(role => role.role_level))
-      : 0
+    const maxRoleLevel =
+      user.roles.length > 0 ? Math.max(...user.roles.map(role => role.role_level)) : 0
 
     return res.apiSuccess('获取用户详情成功', {
       user: {
@@ -177,6 +192,31 @@ router.put('/users/:user_id/role', async (req, res) => {
       return res.apiError('用户不存在', 'USER_NOT_FOUND', null, 404)
     }
 
+    // 🛡️ 风险1修复: 验证操作者权限级别（防止低级别管理员修改高级别管理员）
+    const operatorRoles = await getUserRoles(req.user.user_id)
+    const operatorMaxLevel =
+      operatorRoles.roles.length > 0 ? Math.max(...operatorRoles.roles.map(r => r.role_level)) : 0
+
+    const targetUserRoles = await getUserRoles(user_id)
+    const targetMaxLevel =
+      targetUserRoles.roles.length > 0
+        ? Math.max(...targetUserRoles.roles.map(r => r.role_level))
+        : 0
+
+    // 操作者权限必须高于目标用户，才能修改其角色
+    if (operatorMaxLevel <= targetMaxLevel) {
+      await transaction.rollback()
+      return res.apiError(
+        '权限不足：无法修改同级或更高级别用户的角色',
+        'PERMISSION_DENIED',
+        {
+          operator_level: operatorMaxLevel,
+          target_level: targetMaxLevel
+        },
+        403
+      )
+    }
+
     // 验证目标角色
     const targetRole = await Role.findOne({
       where: { role_name },
@@ -195,17 +235,24 @@ router.put('/users/:user_id/role', async (req, res) => {
     })
 
     // 分配新角色
-    await UserRole.create({
-      user_id,
-      role_id: targetRole.id,
-      assigned_at: BeijingTimeHelper.createBeijingTime(),
-      assigned_by: req.user.user_id,
-      is_active: true
-    }, { transaction })
+    await UserRole.create(
+      {
+        user_id,
+        role_id: targetRole.role_id, // 修正：使用role_id而不是id
+        assigned_at: BeijingTimeHelper.createBeijingTime(),
+        assigned_by: req.user.user_id,
+        is_active: true
+      },
+      { transaction }
+    )
 
     await transaction.commit()
 
-    // 获取更新后的用户角色信息
+    // ✅ 风险点1解决：自动清除用户权限缓存（缓存一致性保证）
+    await invalidateUserPermissions(user_id, `role_change_${role_name}`)
+    console.log(`🔄 [Cache] 已清除用户${user_id}权限缓存（原因: 角色变更 ${role_name}）`)
+
+    // 获取更新后的用户角色信息（现在保证是最新数据）
     const updatedUserRoles = await getUserRoles(user_id)
 
     console.log(`✅ 用户角色更新成功: ${user_id} -> ${role_name} (操作者: ${req.user.user_id})`)
@@ -219,7 +266,15 @@ router.put('/users/:user_id/role', async (req, res) => {
       reason
     })
   } catch (error) {
-    await transaction.rollback()
+    // 🛡️ 风险3修复: 优化事务回滚处理（检查事务状态，避免重复回滚）
+    if (transaction && !transaction.finished) {
+      try {
+        await transaction.rollback()
+        console.log('✅ 事务已安全回滚')
+      } catch (rollbackError) {
+        console.error('❌ 事务回滚失败:', rollbackError.message)
+      }
+    }
     console.error('❌ 更新用户角色失败:', error.message)
     return res.apiError('更新用户角色失败', 'UPDATE_USER_ROLE_FAILED', null, 500)
   }
@@ -238,19 +293,37 @@ router.put('/users/:user_id/status', async (req, res) => {
       return res.apiError('无效的用户状态', 'INVALID_STATUS', null, 400)
     }
 
+    // 🛡️ 风险2修复: 禁止管理员修改自己的账号状态（防止误操作导致自我禁用）
+    if (parseInt(user_id) === req.user.user_id) {
+      return res.apiError(
+        '禁止修改自己的账号状态',
+        'CANNOT_MODIFY_SELF',
+        { user_id, operator_id: req.user.user_id },
+        403
+      )
+    }
+
     const user = await User.findByPk(user_id)
     if (!user) {
       return res.apiError('用户不存在', 'USER_NOT_FOUND', null, 404)
     }
 
+    const oldStatus = user.status
+
     // 更新用户状态
     await user.update({ status })
+
+    // ✅ 风险点1解决：自动清除用户权限缓存（缓存一致性保证）
+    await invalidateUserPermissions(user_id, `status_change_${oldStatus}_to_${status}`)
+    console.log(
+      `🔄 [Cache] 已清除用户${user_id}权限缓存（原因: 状态变更 ${oldStatus} → ${status}）`
+    )
 
     console.log(`✅ 用户状态更新成功: ${user_id} -> ${status} (操作者: ${req.user.user_id})`)
 
     return res.apiSuccess('用户状态更新成功', {
       user_id,
-      old_status: user.status,
+      old_status: oldStatus,
       new_status: status,
       operator_id: req.user.user_id,
       reason
@@ -275,7 +348,7 @@ router.get('/roles', async (req, res) => {
 
     return res.apiSuccess('获取角色列表成功', {
       roles: roles.map(role => ({
-        id: role.id,
+        id: role.role_id, // 修正：使用role_id保持命名一致性
         role_uuid: role.role_uuid,
         role_name: role.role_name,
         role_level: role.role_level,

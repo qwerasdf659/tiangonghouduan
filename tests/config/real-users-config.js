@@ -27,9 +27,9 @@ const REAL_USER_CONFIG = {
 
   // 🆔 方式2：通过用户ID指定用户（备选）
   byUserId: {
-    // 真实用户ID（从数据库获取）
-    regularUser1: process.env.TEST_USER1_ID ? parseInt(process.env.TEST_USER1_ID) : 4,
-    regularUser2: process.env.TEST_USER2_ID ? parseInt(process.env.TEST_USER2_ID) : 6,
+    // 真实用户ID（从数据库获取）- 2025-11-07更新
+    regularUser1: process.env.TEST_USER1_ID ? parseInt(process.env.TEST_USER1_ID) : 32,
+    regularUser2: process.env.TEST_USER2_ID ? parseInt(process.env.TEST_USER2_ID) : 33,
     adminUser: process.env.TEST_ADMIN_ID ? parseInt(process.env.TEST_ADMIN_ID) : 31
   },
 
@@ -58,7 +58,11 @@ const REAL_USER_CONFIG = {
   }
 }
 
-// 🛡️ 用户验证函数
+/**
+ * 🛡️ 用户验证函数
+ * 验证配置的测试用户是否在数据库中存在且符合要求
+ * @returns {Promise<Object>} 验证结果对象，包含用户信息和错误列表
+ */
 async function validateRealUsers () {
   const { User } = require('../../models')
 
@@ -152,7 +156,12 @@ async function validateRealUsers () {
   }
 }
 
-// 🎯 获取真实测试用户
+/**
+ * 🎯 获取真实测试用户
+ * 验证并返回配置的真实测试用户账户
+ * @returns {Promise<{regularUsers: Array, adminUser: Object, config: Object}>} 测试用户信息
+ * @throws {Error} 当用户验证失败时抛出错误
+ */
 async function getRealTestUsers () {
   const validationResults = await validateRealUsers()
 
@@ -180,7 +189,13 @@ async function getRealTestUsers () {
   }
 }
 
-// 🧹 测试数据清理功能
+/**
+ * 🧹 测试数据清理功能
+ * 清理测试过程中产生的临时数据
+ * @param {number} _userId - 用户ID（暂未使用）
+ * @param {number} _campaignId - 活动ID（暂未使用）
+ * @returns {Promise<void>} 无返回值的Promise
+ */
 async function cleanupTestData (_userId, _campaignId) {
   if (!REAL_USER_CONFIG.behavior.cleanupAfterTest) {
     console.log('⚠️ 已禁用测试后清理，跳过临时数据清理')

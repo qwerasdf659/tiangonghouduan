@@ -91,63 +91,79 @@ class DataSanitizer {
   }
 
   /**
-   * 库存管理数据脱敏 - 解决获取方式暴露等风险
+   * 库存管理数据脱敏 - 解决核销码泄露等安全风险（P0修复）
    *
-   * 业务场景：用户库存列表API响应时调用，防止用户通过抓包分析商品获取成本、市场价值等商业信息
+   * 业务场景：用户库存列表API响应时调用，防止用户通过抓包获取核销码、来源记录ID等敏感信息
    *
    * 脱敏规则：
-   * - 管理员（dataLevel='full'）：返回完整库存数据
-   * - 普通用户（dataLevel='public'）：移除acquisition_method（获取方式详情）、acquisition_cost（获取成本）、
-   *   market_value（市场价值）、transfer_history（转让历史详情）等敏感字段
-   * - 使用source_display（来源显示）替代acquisition_method（获取方式详情）
-   * - 使用display_value（显示价值）替代market_value（市场价值）
+   * - 管理员（dataLevel='full'）：返回完整库存数据（包含完整核销码）
+   * - 普通用户（dataLevel='public'）：移除verification_code（核销码）、verification_expires_at（核销码过期时间）、
+   *   source_id（来源记录ID）等敏感字段
+   * - verification_code脱敏：完整核销码（如A1B2C3D4）→脱敏后（******）
+   * - 使用source_display（来源显示）替代source_id（来源记录ID）
    *
-   * @param {Array<Object>} inventory - 库存数据数组，包含id、item_name、item_type、acquisition_method等字段
+   * @param {Array<Object>} inventory - 库存数据数组（UserInventory模型实例），包含inventory_id、name、type等字段
    * @param {string} dataLevel - 数据级别：'full'（管理员完整数据）或'public'（普通用户脱敏数据）
    * @returns {Array<Object>} 脱敏后的库存数组
-   * @returns {number} return[].id - 库存ID（通用id字段）
-   * @returns {string} return[].item_name - 物品名称
-   * @returns {string} return[].item_type - 物品类型
-   * @returns {string} return[].source_display - 来源显示（抽奖获得/兑换获得/转让获得等），替代acquisition_method
-   * @returns {string} return[].status - 库存状态
-   * @returns {boolean} return[].can_use - 是否可使用
-   * @returns {boolean} return[].can_transfer - 是否可转让
-   * @returns {boolean} return[].expires_soon - 是否即将过期（7天内）
-   * @returns {string} return[].display_value - 显示价值（高价值/中价值/基础价值），替代market_value
-   * @returns {string} return[].obtained_date - 获得日期（YYYY-MM-DD格式）
-   * @returns {number} return[].transfer_count - 转让次数
+   * @returns {number} return[].inventory_id - 库存ID（主键）
+   * @returns {string} return[].name - 物品名称
+   * @returns {string} return[].description - 物品描述
+   * @returns {string} return[].icon - 物品图标
+   * @returns {string} return[].type - 物品类型（voucher/product/service）
+   * @returns {number} return[].value - 物品价值
+   * @returns {string} return[].status - 物品状态（available/used/expired/transferred）
+   * @returns {string} return[].source_type - 来源类型（exchange/lottery/gift等）
+   * @returns {string} return[].acquired_at - 获得时间
+   * @returns {string} return[].expires_at - 过期时间
+   * @returns {string} return[].used_at - 使用时间
+   * @returns {string} return[].verification_code - 核销码（public级别：******；full级别：完整核销码）
+   * @returns {string} return[].created_at - 创建时间
+   * @returns {string} return[].updated_at - 更新时间
    *
    * @example
    * // 管理员查看完整数据
    * const adminInventory = DataSanitizer.sanitizeInventory(inventory, 'full')
-   * // 返回：包含acquisition_method、acquisition_cost、market_value等完整字段
+   * // 返回：包含完整verification_code、source_id等敏感字段
    *
    * // 普通用户查看脱敏数据
    * const publicInventory = DataSanitizer.sanitizeInventory(inventory, 'public')
-   * // 返回：移除敏感字段，使用source_display替代acquisition_method
+   * // 返回：verification_code脱敏为'******'，移除verification_expires_at、source_id
    */
   static sanitizeInventory (inventory, dataLevel) {
     if (dataLevel === 'full') {
       return inventory // 管理员看完整数据
     }
 
-    return inventory.map(item => ({
-      id: item.id,
-      item_name: item.item_name,
-      item_type: item.item_type,
-      source_display: this.getSourceDisplay(item.acquisition_method),
-      status: item.status,
-      can_use: item.can_use,
-      can_transfer: item.can_transfer,
-      expires_soon: this.checkExpiringSoon(item.expires_at),
-      display_value: this.getDisplayValue(item.market_value),
-      obtained_date: item.created_at ? item.created_at.split('T')[0] : null,
-      transfer_count: item.transfer_count || 0
+    // 普通用户数据脱敏（P0安全修复）
+    return inventory.map(item => {
+      const sanitized = {
+        inventory_id: item.inventory_id,
+        name: item.name,
+        description: item.description,
+        icon: item.icon,
+        type: item.type,
+        value: item.value,
+        status: item.status,
+        source_type: item.source_type,
+        acquired_at: item.acquired_at,
+        expires_at: item.expires_at,
+        used_at: item.used_at,
+        // 🔒 P0修复：核销码脱敏（完整码→******）
+        verification_code: item.verification_code ? '******' : null,
+        created_at: item.created_at,
+        updated_at: item.updated_at
+      }
+
       /*
-       * ❌ 移除敏感字段：acquisition_method, acquisition_cost, market_value,
-       * transfer_history, usage_restrictions详情
+       * ❌ 移除敏感字段（P0安全修复）：
+       * - verification_expires_at：核销码过期时间（避免暴露系统规则）
+       * - source_id：来源记录ID（系统内部标识，用户无需知道）
+       * - transfer_to_user_id：转让目标用户ID（隐私保护）
+       * - transfer_at：转让时间（隐私保护）
        */
-    }))
+
+      return sanitized
+    })
   }
 
   /**

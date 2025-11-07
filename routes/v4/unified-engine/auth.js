@@ -10,6 +10,17 @@ const router = express.Router()
 const { User } = require('../../../models')
 const { generateTokens, getUserRoles } = require('../../../middleware/auth')
 const BeijingTimeHelper = require('../../../utils/timeHelper')
+const { getRateLimiter } = require('../../../middleware/RateLimiterMiddleware')
+
+// ✅ 风险点3解决：创建Token验证接口专用限流器
+const rateLimiter = getRateLimiter()
+const verifyRateLimiter = rateLimiter.createLimiter({
+  windowMs: 60 * 1000, // 1分钟窗口
+  max: 100, // 最多100次请求（正常用户约12次/分钟，留足余量）
+  keyPrefix: 'rate_limit:auth:verify:',
+  message: 'Token验证过于频繁，请稍后再试',
+  keyGenerator: 'user' // 按用户限流（防止恶意用户滥用）
+})
 
 /**
  * 🛡️ 用户登录（支持自动注册）
@@ -517,8 +528,11 @@ router.get('/profile', require('../../../middleware/auth').authenticateToken, as
 /**
  * 🛡️ 验证Token有效性
  * POST /api/v4/auth/verify
+ * 
+ * ✅ 风险点3解决：应用限流中间件（防止DDoS攻击）
+ * ✅ 风险点5解决：使用全局错误处理中间件（next(error)模式）
  */
-router.post('/verify', require('../../../middleware/auth').authenticateToken, async (req, res) => {
+router.post('/verify', require('../../../middleware/auth').authenticateToken, verifyRateLimiter, async (req, res, next) => {
   try {
     const user_id = req.user.user_id
 
@@ -539,7 +553,8 @@ router.post('/verify', require('../../../middleware/auth').authenticateToken, as
     return res.apiSuccess(responseData, 'Token验证成功')
   } catch (error) {
     console.error('Token验证失败:', error)
-    return res.apiError('Token验证失败', 'TOKEN_VERIFY_FAILED', error.message, 500)
+    // ✅ 风险点5解决：利用全局errorHandler.js统一处理
+    next(error)
   }
 })
 

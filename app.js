@@ -451,9 +451,12 @@ try {
   app.use('/api/v4/premium', require('./routes/v4/unified-engine/premium'))
   appLogger.info('V4高级空间解锁系统加载成功', { route: '/api/v4/premium' })
 
-  // V4消费记录管理路由（商家扫码录入、平台审核）
-  app.use('/api/v4/unified-engine/consumption', require('./routes/v4/unified-engine/consumption'))
-  appLogger.info('V4消费记录管理系统加载成功', { route: '/api/v4/unified-engine/consumption' })
+  /*
+   * V4消费记录管理路由（商家扫码录入、平台审核）
+   * 路径前缀: /api/v4/consumption（与前端文档保持完全一致）
+   */
+  app.use('/api/v4/consumption', require('./routes/v4/unified-engine/consumption'))
+  appLogger.info('V4消费记录管理系统加载成功', { route: '/api/v4/consumption' })
 
   // V4系统功能路由（公告、反馈等）
   app.use('/api/v4/system', require('./routes/v4/system'))

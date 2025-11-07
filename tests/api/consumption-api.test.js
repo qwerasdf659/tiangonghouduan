@@ -5,14 +5,14 @@
  * 使用模型：Claude Sonnet 4.5
  *
  * 测试覆盖：
- * 1. 生成用户二维码 GET /api/v4/unified-engine/consumption/qrcode/:user_id
- * 2. 验证二维码 POST /api/v4/unified-engine/consumption/validate-qrcode
- * 3. 商家提交消费记录 POST /api/v4/unified-engine/consumption/submit
- * 4. 用户查询消费记录 GET /api/v4/unified-engine/consumption/user/:user_id
- * 5. 查询消费记录详情 GET /api/v4/unified-engine/consumption/detail/:record_id
- * 6. 管理员查询待审核记录 GET /api/v4/unified-engine/consumption/pending
- * 7. 管理员审核通过 POST /api/v4/unified-engine/consumption/approve/:record_id
- * 8. 管理员审核拒绝 POST /api/v4/unified-engine/consumption/reject/:record_id
+ * 1. 生成用户二维码 GET /api/v4/consumption/qrcode/:user_id
+ * 2. 验证二维码 POST /api/v4/consumption/validate-qrcode
+ * 3. 商家提交消费记录 POST /api/v4/consumption/submit
+ * 4. 用户查询消费记录 GET /api/v4/consumption/user/:user_id
+ * 5. 查询消费记录详情 GET /api/v4/consumption/detail/:record_id
+ * 6. 管理员查询待审核记录 GET /api/v4/consumption/pending
+ * 7. 管理员审核通过 POST /api/v4/consumption/approve/:record_id
+ * 8. 管理员审核拒绝 POST /api/v4/consumption/reject/:record_id
  *
  * 测试账号：13612227930 (既是普通用户也是管理员)
  * 数据库：restaurant_points_dev
@@ -61,7 +61,7 @@ describe('消费记录API测试套件', () => {
       // 生成测试二维码（用于后续测试）
       const qrResponse = await tester.makeAuthenticatedRequest(
         'GET',
-        `/api/v4/unified-engine/consumption/qrcode/${test_account.user_id}`,
+        `/api/v4/consumption/qrcode/${test_account.user_id}`,
         {},
         'regular'
       )
@@ -89,12 +89,12 @@ describe('消费记录API测试套件', () => {
    * ================================
    */
   describe('二维码生成和验证', () => {
-    test('GET /api/v4/unified-engine/consumption/qrcode/:user_id - 生成用户固定身份二维码', async () => {
+    test('GET /api/v4/consumption/qrcode/:user_id - 生成用户固定身份二维码', async () => {
       console.log('\n🔐 测试：生成用户固定身份二维码')
 
       const response = await tester.makeAuthenticatedRequest(
         'GET',
-        `/api/v4/unified-engine/consumption/qrcode/${test_account.user_id}`,
+        `/api/v4/consumption/qrcode/${test_account.user_id}`,
         {},
         'regular'
       )
@@ -113,12 +113,12 @@ describe('消费记录API测试套件', () => {
       console.log(`✅ 二维码生成成功: ${test_qr_code}`)
     })
 
-    test('POST /api/v4/unified-engine/consumption/validate-qrcode - 验证二维码有效性', async () => {
+    test('POST /api/v4/consumption/validate-qrcode - 验证二维码有效性', async () => {
       console.log('\n✅ 测试：验证二维码有效性')
 
       const response = await tester.makeAuthenticatedRequest(
         'POST',
-        '/api/v4/unified-engine/consumption/validate-qrcode',
+        '/api/v4/consumption/validate-qrcode',
         { qr_code: test_qr_code },
         'regular'
       )
@@ -134,12 +134,12 @@ describe('消费记录API测试套件', () => {
       console.log(`✅ 二维码验证通过，用户ID: ${response.data.data.user_id}`)
     })
 
-    test('POST /api/v4/unified-engine/consumption/validate-qrcode - 验证无效二维码', async () => {
+    test('POST /api/v4/consumption/validate-qrcode - 验证无效二维码', async () => {
       console.log('\n❌ 测试：验证无效二维码（应该失败）')
 
       const response = await tester.makeAuthenticatedRequest(
         'POST',
-        '/api/v4/unified-engine/consumption/validate-qrcode',
+        '/api/v4/consumption/validate-qrcode',
         { qr_code: 'QR_999_invalid_signature' },
         'regular'
       )
@@ -161,7 +161,7 @@ describe('消费记录API测试套件', () => {
    * ================================
    */
   describe('商家提交消费记录', () => {
-    test('POST /api/v4/unified-engine/consumption/submit - 商家成功提交消费记录', async () => {
+    test('POST /api/v4/consumption/submit - 商家成功提交消费记录', async () => {
       console.log('\n📝 测试：商家提交消费记录')
       console.log('test_qr_code值:', test_qr_code)
 
@@ -174,7 +174,7 @@ describe('消费记录API测试套件', () => {
 
       const response = await tester.makeAuthenticatedRequest(
         'POST',
-        '/api/v4/unified-engine/consumption/submit',
+        '/api/v4/consumption/submit',
         consumption_data,
         'regular'
       )
@@ -205,7 +205,7 @@ describe('消费记录API测试套件', () => {
       console.log(`🎁 预计奖励: ${response.data.data.points_to_award}积分`)
     })
 
-    test('POST /api/v4/unified-engine/consumption/submit - 防止3分钟内重复提交', async () => {
+    test('POST /api/v4/consumption/submit - 防止3分钟内重复提交', async () => {
       console.log('\n🚫 测试：3分钟内重复提交（应该被拒绝）')
 
       const consumption_data = {
@@ -216,7 +216,7 @@ describe('消费记录API测试套件', () => {
 
       const response = await tester.makeAuthenticatedRequest(
         'POST',
-        '/api/v4/unified-engine/consumption/submit',
+        '/api/v4/consumption/submit',
         consumption_data,
         'regular'
       )
@@ -232,12 +232,12 @@ describe('消费记录API测试套件', () => {
       console.log('✅ 3分钟防误操作机制生效')
     })
 
-    test('POST /api/v4/unified-engine/consumption/submit - 消费金额验证（必须大于0）', async () => {
+    test('POST /api/v4/consumption/submit - 消费金额验证（必须大于0）', async () => {
       console.log('\n❌ 测试：消费金额验证（金额为0应该失败）')
 
       const response = await tester.makeAuthenticatedRequest(
         'POST',
-        '/api/v4/unified-engine/consumption/submit',
+        '/api/v4/consumption/submit',
         {
           qr_code: test_qr_code,
           consumption_amount: 0,
@@ -263,12 +263,12 @@ describe('消费记录API测试套件', () => {
    * ================================
    */
   describe('用户查询消费记录', () => {
-    test('GET /api/v4/unified-engine/consumption/user/:user_id - 查询用户消费记录列表', async () => {
+    test('GET /api/v4/consumption/user/:user_id - 查询用户消费记录列表', async () => {
       console.log('\n📋 测试：查询用户消费记录列表')
 
       const response = await tester.makeAuthenticatedRequest(
         'GET',
-        `/api/v4/unified-engine/consumption/user/${test_account.user_id}`,
+        `/api/v4/consumption/user/${test_account.user_id}`,
         { page: 1, page_size: 10 },
         'regular'
       )
@@ -292,12 +292,12 @@ describe('消费记录API测试套件', () => {
       console.log('📊 统计信息:', response.data.data.stats)
     })
 
-    test('GET /api/v4/unified-engine/consumption/user/:user_id - 按状态筛选（pending）', async () => {
+    test('GET /api/v4/consumption/user/:user_id - 按状态筛选（pending）', async () => {
       console.log('\n🔍 测试：按状态筛选（待审核）')
 
       const response = await tester.makeAuthenticatedRequest(
         'GET',
-        `/api/v4/unified-engine/consumption/user/${test_account.user_id}`,
+        `/api/v4/consumption/user/${test_account.user_id}`,
         { status: 'pending', page: 1, page_size: 10 },
         'regular'
       )
@@ -318,7 +318,7 @@ describe('消费记录API测试套件', () => {
       }
     })
 
-    test('GET /api/v4/unified-engine/consumption/detail/:record_id - 查询消费记录详情', async () => {
+    test('GET /api/v4/consumption/detail/:record_id - 查询消费记录详情', async () => {
       if (!test_record_id) {
         console.log('⚠️ 跳过：test_record_id未设置（前置测试未成功）')
         return
@@ -328,7 +328,7 @@ describe('消费记录API测试套件', () => {
 
       const response = await tester.makeAuthenticatedRequest(
         'GET',
-        `/api/v4/unified-engine/consumption/detail/${test_record_id}`,
+        `/api/v4/consumption/detail/${test_record_id}`,
         {},
         'regular'
       )
@@ -351,12 +351,12 @@ describe('消费记录API测试套件', () => {
    * ================================
    */
   describe('管理员审核功能', () => {
-    test('GET /api/v4/unified-engine/consumption/pending - 查询待审核消费记录', async () => {
+    test('GET /api/v4/consumption/pending - 查询待审核消费记录', async () => {
       console.log('\n👔 测试：管理员查询待审核记录')
 
       const response = await tester.makeAuthenticatedRequest(
         'GET',
-        '/api/v4/unified-engine/consumption/pending',
+        '/api/v4/consumption/pending',
         { page: 1, page_size: 10 },
         'regular' // 测试账号既是用户也是管理员
       )
@@ -372,7 +372,7 @@ describe('消费记录API测试套件', () => {
       console.log(`✅ 查询成功，待审核记录: ${response.data.data.records.length} 条`)
     })
 
-    test('POST /api/v4/unified-engine/consumption/approve/:record_id - 管理员审核通过', async () => {
+    test('POST /api/v4/consumption/approve/:record_id - 管理员审核通过', async () => {
       if (!test_record_id) {
         console.log('⚠️ 跳过：test_record_id未设置（前置测试未成功）')
         return
@@ -382,7 +382,7 @@ describe('消费记录API测试套件', () => {
 
       const response = await tester.makeAuthenticatedRequest(
         'POST',
-        `/api/v4/unified-engine/consumption/approve/${test_record_id}`,
+        `/api/v4/consumption/approve/${test_record_id}`,
         { admin_notes: '测试审核通过，金额核实无误' },
         'regular' // 测试账号既是用户也是管理员
       )
@@ -400,7 +400,7 @@ describe('消费记录API测试套件', () => {
       console.log(`💰 新余额: ${response.data.data.new_balance}`)
     })
 
-    test('POST /api/v4/unified-engine/consumption/approve/:record_id - 重复审核应该失败', async () => {
+    test('POST /api/v4/consumption/approve/:record_id - 重复审核应该失败', async () => {
       if (!test_record_id) {
         console.log('⚠️ 跳过：test_record_id未设置（前置测试未成功）')
         return
@@ -410,7 +410,7 @@ describe('消费记录API测试套件', () => {
 
       const response = await tester.makeAuthenticatedRequest(
         'POST',
-        `/api/v4/unified-engine/consumption/approve/${test_record_id}`,
+        `/api/v4/consumption/approve/${test_record_id}`,
         { admin_notes: '重复审核测试' },
         'regular'
       )
@@ -444,7 +444,7 @@ describe('消费记录API测试套件', () => {
        */
       const response = await tester.makeAuthenticatedRequest(
         'POST',
-        '/api/v4/unified-engine/consumption/submit',
+        '/api/v4/consumption/submit',
         {
           qr_code: test_qr_code,
           consumption_amount: 50.0, // 不同金额
@@ -461,7 +461,7 @@ describe('消费记录API测试套件', () => {
       }
     })
 
-    test('POST /api/v4/unified-engine/consumption/reject/:record_id - 管理员审核拒绝', async () => {
+    test('POST /api/v4/consumption/reject/:record_id - 管理员审核拒绝', async () => {
       if (!reject_record_id) {
         console.log('⚠️ 跳过拒绝测试（无可用记录）')
         return
@@ -471,7 +471,7 @@ describe('消费记录API测试套件', () => {
 
       const response = await tester.makeAuthenticatedRequest(
         'POST',
-        `/api/v4/unified-engine/consumption/reject/${reject_record_id}`,
+        `/api/v4/consumption/reject/${reject_record_id}`,
         { admin_notes: '测试审核拒绝：消费金额与实际不符' },
         'regular'
       )
@@ -486,7 +486,7 @@ describe('消费记录API测试套件', () => {
       console.log(`✅ 审核拒绝成功，原因: ${response.data.data.reject_reason}`)
     })
 
-    test('POST /api/v4/unified-engine/consumption/reject/:record_id - 拒绝原因必填验证', async () => {
+    test('POST /api/v4/consumption/reject/:record_id - 拒绝原因必填验证', async () => {
       console.log('\n❌ 测试：拒绝原因必填验证')
 
       // 创建临时记录ID用于测试（使用不存在的ID）
@@ -494,7 +494,7 @@ describe('消费记录API测试套件', () => {
 
       const response = await tester.makeAuthenticatedRequest(
         'POST',
-        `/api/v4/unified-engine/consumption/reject/${temp_record_id}`,
+        `/api/v4/consumption/reject/${temp_record_id}`,
         { admin_notes: '' }, // 空原因
         'regular'
       )
