@@ -13,6 +13,7 @@ const dataAccessControl = (req, res, next) => {
     if (!req.user) {
       req.dataLevel = 'public'
       req.roleBasedAdmin = false
+      req.isAdmin = false // 未认证用户不是管理员
       console.log('[DataAccess] Anonymous user accessing with level: public')
       return next()
     }
@@ -23,6 +24,7 @@ const dataAccessControl = (req, res, next) => {
     // 设置数据访问级别标识
     req.dataLevel = isSuperAdmin ? 'full' : 'public'
     req.roleBasedAdmin = isSuperAdmin
+    // req.isAdmin 由 auth.js 中间件设置，此处仅用于未认证用户的情况
 
     // 记录访问日志（脱敏处理）
     console.log(`[DataAccess] User ${req.user.user_id} accessing with level: ${req.dataLevel}`)

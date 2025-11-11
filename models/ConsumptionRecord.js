@@ -506,9 +506,35 @@ module.exports = sequelize => {
         }
       ],
 
+      /*
+       * ========================================
+       * Sequelize Scopes（查询作用域）
+       * ========================================
+       * 用途：自动过滤已删除记录，防止开发人员遗漏WHERE is_deleted=0
+       * 参考文档：删除兑换记录API实施方案.md - 统一软删除机制
+       */
+      // 默认查询作用域：自动过滤已删除记录
+      defaultScope: {
+        where: {
+          is_deleted: 0 // 所有查询默认只返回未删除的记录
+        }
+      },
+
       // Sequelize Scope定义（快捷查询）
       scopes: {
-        // 未删除的记录（前端只负责数据展示，默认过滤已删除记录）
+        // 包含已删除记录的查询（管理员专用）
+        includeDeleted: {
+          where: {} // 查询所有记录，包括已删除的
+        },
+
+        // 只查询已删除的记录（管理员恢复功能专用）
+        onlyDeleted: {
+          where: {
+            is_deleted: 1 // 只返回已删除的记录
+          }
+        },
+
+        // 未删除的记录（前端只负责数据展示，现在这个scope已由defaultScope处理，保留用于兼容）
         notDeleted: {
           where: { is_deleted: 0 }
         },

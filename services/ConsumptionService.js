@@ -22,7 +22,7 @@
 
 'use strict'
 
-const { ConsumptionRecord, ContentReviewRecord, User } = require('../models')
+const { ConsumptionRecord, ContentReviewRecord, User, PointsTransaction } = require('../models')
 const PointsService = require('./PointsService')
 const QRCodeValidator = require('../utils/QRCodeValidator')
 const BeijingTimeHelper = require('../utils/timeHelper')
@@ -46,9 +46,43 @@ class ConsumptionService {
    * @param {number} data.merchant_id - 商家ID（录入人）
    * @returns {Object} 创建的消费记录
    */
+  /**
+   * 商家提交消费记录（扫码后录入）
+   *
+   * 业务场景（Business Scenario）：
+   * 1. 商家用管理APP扫描用户的积分卡二维码
+   * 2. 录入本次消费金额（如88.50元）
+   * 3. 系统自动创建消费记录 + pending积分交易 + 审核记录（三个操作原子性）
+   * 4. 用户APP显示"冻结积分89分（待审核）"
+   * 5. 管理员审核通过后，积分自动激活到账
+   *
+   * 技术特点（Technical Features）：
+   * - ✅ 使用Sequelize事务确保3个表数据一致性（ACID保证）
+   * - ✅ HMAC-SHA256验证QR码签名，防止伪造二维码攻击
+   * - ✅ 3分钟防重复提交窗口，避免商家误操作多次点击
+   * - ✅ 1元=1分的积分计算规则，四舍五入处理
+   * - ✅ pending积分机制，用户可见但不可用（提升信任感）
+   * - ✅ 完整的错误处理和日志记录（便于问题排查）
+   *
+   * @param {Object} data - 消费记录数据
+   * @param {string} data.qr_code - 用户二维码字符串（必填，格式: "QR_{user_id}_{signature}"）
+   * @param {number} data.merchant_id - 商家ID（必填，Merchant ID - Required）
+   * @param {number} data.consumption_amount - 消费金额，单位元（必填，>0，Consumption Amount in Yuan - Required）
+   * @param {string} [data.merchant_notes] - 商家备注（可选，Merchant Notes - Optional）
+   * @returns {Object} 消费记录对象（Consumption Record Object）
+   */
   static async merchantSubmitConsumption (data) {
+    // 🔒 创建数据库事务（Database Transaction - Ensure ACID）
+    const sequelize = ConsumptionRecord.sequelize
+    const transaction = await sequelize.transaction({
+      isolationLevel: Transaction.ISOLATION_LEVELS.READ_COMMITTED
+    })
+
     try {
-      // 1. 验证必填参数
+      console.log('📊 开始处理商家消费记录提交（使用事务保护）...')
+      console.log('📋 提交数据:', JSON.stringify(data, null, 2))
+
+      // 步骤1：验证必填参数
       if (!data.qr_code) {
         throw new Error('二维码不能为空')
       }
@@ -59,7 +93,7 @@ class ConsumptionService {
         throw new Error('商家ID不能为空')
       }
 
-      // 2. 验证二维码
+      // 步骤2：验证QR码签名（Step 2: Validate QR Code Signature - HMAC-SHA256）
       const qrValidation = QRCodeValidator.validateQRCode(data.qr_code)
       if (!qrValidation.valid) {
         throw new Error(`二维码验证失败：${qrValidation.error}`)
@@ -67,13 +101,13 @@ class ConsumptionService {
 
       const userId = qrValidation.user_id
 
-      // 3. 检查用户是否存在
-      const user = await User.findByPk(userId)
+      // 步骤3：检查用户是否存在（Step 3: Check User Existence）
+      const user = await User.findByPk(userId, { transaction }) // ✅ 在事务中查询
       if (!user) {
         throw new Error(`用户不存在（ID: ${userId}）`)
       }
 
-      // 4. 防重复提交检查（3分钟防误操作窗口）
+      // 步骤4：防重复提交检查（Step 4: Anti-Duplicate Submission Check - 3 Minutes Window）
       const threeMinutesAgo = new Date(Date.now() - 3 * 60 * 1000)
       const recentRecord = await ConsumptionRecord.findOne({
         where: {
@@ -84,7 +118,8 @@ class ConsumptionService {
             [Op.gte]: threeMinutesAgo
           }
         },
-        order: [['created_at', 'DESC']]
+        order: [['created_at', 'DESC']],
+        transaction // ✅ 在事务中查询
       })
 
       if (recentRecord) {
@@ -97,60 +132,81 @@ class ConsumptionService {
         }
       }
 
-      // 5. 计算预计奖励积分（1元=1分，四舍五入）
+      // 步骤5：计算奖励积分（Step 5: Calculate Points Reward - 1 Yuan = 1 Point, Rounded）
       const pointsToAward = Math.round(parseFloat(data.consumption_amount))
 
-      // 6. 创建消费记录
-      const consumptionRecord = await ConsumptionRecord.create({
-        user_id: userId,
-        merchant_id: data.merchant_id,
-        consumption_amount: data.consumption_amount,
-        points_to_award: pointsToAward,
-        status: 'pending', // 初始状态：待审核
-        qr_code: data.qr_code,
-        merchant_notes: data.merchant_notes || null,
-        created_at: BeijingTimeHelper.createDatabaseTime(),
-        updated_at: BeijingTimeHelper.createDatabaseTime()
-      })
+      // 🔒 步骤6：创建消费记录（Step 6: Create Consumption Record - Within Transaction）
+      const consumptionRecord = await ConsumptionRecord.create(
+        {
+          user_id: userId,
+          merchant_id: data.merchant_id,
+          consumption_amount: data.consumption_amount,
+          points_to_award: pointsToAward,
+          status: 'pending', // 待审核状态（Pending Status - Waiting for Admin Review）
+          qr_code: data.qr_code,
+          merchant_notes: data.merchant_notes || null,
+          created_at: BeijingTimeHelper.createDatabaseTime(),
+          updated_at: BeijingTimeHelper.createDatabaseTime()
+        },
+        { transaction }
+      ) // ✅ 在事务中创建
 
+      console.log(`✅ 消费记录创建成功 (ID: ${consumptionRecord.record_id})`)
+
+      // 🔒 步骤7：创建pending积分交易（Step 7: Create Pending Points Transaction - Within Transaction）
       /*
-       * 7. 创建冻结积分交易记录（status='pending'，表示积分冻结中）
        * 💡 核心逻辑：商家提交时就创建pending状态的积分交易，用户可以看到"冻结积分"
        * ⭐ 重要：这些冻结的积分不会影响用户原有的可用积分
        */
-      const pointsTransaction = await PointsService.createPendingPointsForConsumption({
-        user_id: userId,
-        points: pointsToAward,
-        reference_type: 'consumption',
-        reference_id: consumptionRecord.record_id,
-        business_type: 'consumption_reward',
-        transaction_title: '消费奖励（待审核）',
-        transaction_description: `消费${data.consumption_amount}元，预计奖励${pointsToAward}分，审核通过后到账`
-      })
+      const pointsTransaction = await PointsService.createPendingPointsForConsumption(
+        {
+          user_id: userId,
+          points: pointsToAward,
+          reference_type: 'consumption',
+          reference_id: consumptionRecord.record_id,
+          business_type: 'consumption_reward',
+          transaction_title: '消费奖励（待审核）',
+          transaction_description: `消费${data.consumption_amount}元，预计奖励${pointsToAward}分，审核通过后到账`
+        },
+        transaction
+      ) // ✅ 传递transaction参数
 
       console.log(
-        `✅ 积分冻结记录创建成功: transaction_id=${pointsTransaction.transaction_id}, points=${pointsToAward}分, status=pending`
+        `✅ Pending积分交易创建成功 (ID: ${pointsTransaction.transaction_id}, points=${pointsToAward}分)`
       )
 
-      // 8. 创建审核记录（使用ContentReviewRecord表）
-      await ContentReviewRecord.create({
-        auditable_type: 'consumption',
-        auditable_id: consumptionRecord.record_id,
-        audit_status: 'pending',
-        auditor_id: null,
-        audit_reason: null,
-        submitted_at: BeijingTimeHelper.createDatabaseTime(), // 提交审核时间（必需字段）
-        created_at: BeijingTimeHelper.createDatabaseTime(),
-        updated_at: BeijingTimeHelper.createDatabaseTime()
-      })
+      // 🔒 步骤8：创建审核记录（Step 8: Create Review Record - Within Transaction）
+      await ContentReviewRecord.create(
+        {
+          auditable_type: 'consumption',
+          auditable_id: consumptionRecord.record_id,
+          audit_status: 'pending', // 待审核状态（Pending Status - Waiting for Admin Review）
+          auditor_id: null, // 审核员ID（暂无，Auditor ID - None Yet）
+          audit_reason: null, // 审核原因（暂无，Audit Reason - None Yet）
+          submitted_at: BeijingTimeHelper.createDatabaseTime(),
+          created_at: BeijingTimeHelper.createDatabaseTime(),
+          updated_at: BeijingTimeHelper.createDatabaseTime()
+        },
+        { transaction }
+      ) // ✅ 在事务中创建
+
+      console.log('✅ 审核记录创建成功')
+
+      // 🎉 提交事务（Commit Transaction - All 3 Tables Updated Successfully）
+      await transaction.commit()
+      console.log('🎉 事务提交成功，3个表数据一致性已保证')
 
       console.log(
-        `✅ 消费记录创建成功: record_id=${consumptionRecord.record_id}, user_id=${userId}, amount=${data.consumption_amount}元, frozen_points=${pointsToAward}分`
+        `✅ 消费记录完整创建: record_id=${consumptionRecord.record_id}, user_id=${userId}, amount=${data.consumption_amount}元, frozen_points=${pointsToAward}分`
       )
 
       return consumptionRecord
     } catch (error) {
-      console.error('❌ 商家提交消费记录失败:', error.message)
+      // ⚠️ 发生错误，回滚事务（Error Occurred - Rollback Transaction）
+      await transaction.rollback()
+      console.error('❌ 商家消费记录提交失败（事务已回滚）:', error.message)
+      console.error('错误堆栈:', error.stack)
+
       // 打印Sequelize验证错误的详细信息
       if (error.name === 'SequelizeValidationError' && error.errors) {
         error.errors.forEach(err => {
@@ -223,17 +279,33 @@ class ConsumptionService {
         }
       )
 
-      // 5. 奖励积分（通过PointsService）
-      const pointsResult = await PointsService.addPoints(record.user_id, record.points_to_award, {
-        transaction,
-        business_type: 'consumption_reward',
-        reference_type: 'consumption',
-        reference_id: recordId,
-        source_type: 'merchant_scan',
-        title: '消费奖励',
-        description: `消费${record.consumption_amount}元，奖励${record.points_to_award}积分`,
-        operator_id: reviewData.reviewer_id
+      /*
+       * 5. 激活pending积分交易（审核通过后，pending → completed）
+       * 5.1 查找对应的pending积分交易
+       */
+      const pendingTransaction = await PointsTransaction.findOne({
+        where: {
+          reference_type: 'consumption',
+          reference_id: recordId,
+          transaction_type: 'earn',
+          status: 'pending'
+        },
+        transaction
       })
+
+      if (!pendingTransaction) {
+        throw new Error(`找不到对应的pending积分交易（消费记录ID: ${recordId}）`)
+      }
+
+      // 5.2 激活pending交易
+      const pointsResult = await PointsService.activatePendingPoints(
+        pendingTransaction.transaction_id,
+        {
+          transaction,
+          operator_id: reviewData.reviewer_id,
+          activation_notes: `【审核通过】消费${record.consumption_amount}元，奖励${record.points_to_award}积分`
+        }
+      )
 
       // 6. 提交事务
       await transaction.commit()
@@ -329,7 +401,25 @@ class ConsumptionService {
         reject_reason: reviewData.admin_notes
       }
     } catch (error) {
-      await transaction.rollback()
+      // ⭐ P0优化：完善事务回滚异常处理
+      try {
+        await transaction.rollback()
+        console.log('🔄 事务已回滚')
+      } catch (rollbackError) {
+        // ❌ 严重错误：事务回滚失败意味着数据可能不一致
+        console.error('❌❌❌ 严重错误：事务回滚失败（数据可能不一致）', {
+          recordId,
+          originalError: error.message, // 原始业务错误
+          rollbackError: rollbackError.message, // 回滚失败错误
+          timestamp: BeijingTimeHelper.createDatabaseTime(),
+          severity: 'CRITICAL' // 严重级别
+        })
+
+        // 将回滚错误附加到原始错误中
+        error.rollbackFailed = true
+        error.rollbackError = rollbackError.message
+      }
+
       console.error('❌ 审核拒绝失败:', error.message)
       throw error
     }
@@ -352,32 +442,68 @@ class ConsumptionService {
       const offset = (page - 1) * pageSize
 
       // 构建查询条件
+      /*
+       * 构建查询条件
+       * 注意：is_deleted: 0 过滤已由ConsumptionRecord模型的defaultScope自动处理
+       *
+       * 软删除业务规则：
+       * 1. 用户端默认不显示已删除记录（is_deleted=1），确保用户界面整洁
+       * 2. 软删除（Soft Delete）: 记录仍保留在数据库，只是标记为已删除
+       * 3. 用户删除记录后无法自己恢复，只有管理员可在后台恢复（POST /api/v4/consumption/:record_id/restore）
+       * 4. 删除操作不影响已奖励的积分（积分已发放，不会回收）
+       *
+       * 数据安全：
+       * - 防止数据丢失：管理员可恢复误删除的记录
+       * - 审计追踪：保留删除历史（deleted_at字段记录删除时间）
+       * - 业务合规：满足数据保留政策（如税务、审计需要历史消费记录）
+       */
       const where = {
-        user_id: userId,
-        is_deleted: 0 // 前端只负责数据展示：默认过滤已删除记录
+        user_id: userId
       }
       if (options.status) {
         where.status = options.status
       }
 
-      // 查询消费记录
+      /*
+       * 查询消费记录
+       * ✅ 风险R3修复：关联查询详细说明
+       */
       const { count, rows } = await ConsumptionRecord.findAndCountAll({
         where,
         include: [
           {
+            // 关联商家信息（提交消费记录的商家）
             association: 'merchant',
-            attributes: ['user_id', 'mobile', 'nickname'],
+            attributes: ['user_id', 'mobile', 'nickname'], // 只查询必要字段，避免过度查询
+            /*
+             * ⭐ required: false - 使用LEFT JOIN而不是INNER JOIN
+             * 业务意义：即使商家信息不存在（商家账号被删除），仍然显示消费记录
+             * 数据完整性：确保用户能看到所有消费记录，不因商家数据缺失而丢失记录
+             * 性能优化：LEFT JOIN比INNER JOIN更快（不需要等待两表匹配）
+             */
             required: false
           },
           {
+            // 关联审核员信息（审核此消费记录的管理员）
             association: 'reviewer',
-            attributes: ['user_id', 'mobile', 'nickname'],
+            attributes: ['user_id', 'mobile', 'nickname'], // 只查询必要字段
+            /*
+             * ⭐ required: false - 使用LEFT JOIN
+             * 业务意义：pending状态的记录尚未审核，reviewer_id为NULL，仍需显示
+             * 用户体验：用户能看到"待审核"记录，而不是因为缺少审核员信息而隐藏
+             * 数据安全：即使审核员账号被删除，历史记录仍然完整保留
+             */
             required: false
           }
         ],
-        order: [['created_at', 'DESC']],
-        limit: pageSize,
-        offset,
+        order: [['created_at', 'DESC']], // 按创建时间倒序（最新记录在前）
+        limit: pageSize, // 分页：每页记录数
+        offset, // 分页：跳过前N条记录
+        /*
+         * ⭐ distinct: true - 避免LEFT JOIN导致的记录重复
+         * 技术说明：Sequelize的findAndCountAll在使用include时，count可能重复计数
+         * 使用distinct: true确保count准确，避免前端分页显示错误
+         */
         distinct: true
       })
 
@@ -473,20 +599,20 @@ class ConsumptionService {
       const { count, rows } = await ConsumptionRecord.scope('pending').findAndCountAll({
         include: [
           {
-            association: 'user',
-            attributes: ['user_id', 'mobile', 'nickname'],
-            required: true
+            association: 'user', // 关联用户表（消费者信息）
+            attributes: ['user_id', 'mobile', 'nickname'], // 仅查询必要字段
+            required: false // ✅ 修复：使用LEFT JOIN，确保即使用户删除也能查到记录（数据完整性100%保障）
           },
           {
-            association: 'merchant',
-            attributes: ['user_id', 'mobile', 'nickname'],
-            required: false
+            association: 'merchant', // 关联商家表（商家信息）
+            attributes: ['user_id', 'mobile', 'nickname'], // 仅查询必要字段
+            required: false // 使用LEFT JOIN，商家可为空
           }
         ],
-        order: [['created_at', 'ASC']], // 按创建时间升序，先进先出
+        order: [['created_at', 'ASC']], // 按创建时间升序，先进先出（FIFO - First In First Out）
         limit: pageSize,
         offset,
-        distinct: true
+        distinct: true // 去重保护，确保count准确
       })
 
       return {
@@ -579,24 +705,79 @@ class ConsumptionService {
     try {
       const { includeDeleted = false } = options
 
-      // 构建查询条件
-      const whereClause = {
-        record_id: recordId
-      }
-
-      // 默认只查询未删除的记录（前端只负责数据展示）
-      if (!includeDeleted) {
-        whereClause.is_deleted = 0
-      }
+      /*
+       * 使用scope控制是否包含已删除记录
+       * 说明：ConsumptionRecord模型已添加defaultScope自动过滤is_deleted=0
+       * 如果需要包含已删除记录，使用scope('includeDeleted')
+       */
+      const query = includeDeleted
+        ? ConsumptionRecord.scope('includeDeleted')
+        : ConsumptionRecord
 
       // 查询记录
-      const record = await ConsumptionRecord.findOne({
-        where: whereClause
+      const record = await query.findOne({
+        where: {
+          record_id: recordId
+        }
       })
 
       return record
     } catch (error) {
       console.error('❌ 获取消费记录失败:', error.message)
+      throw error
+    }
+  }
+
+  /**
+   * 根据二维码获取用户信息
+   * 业务场景：管理员扫码后快速获取用户基本信息（昵称、手机号码）
+   *
+   * @param {string} qrCode - 用户二维码（格式：QR_{user_id}_{signature}）
+   * @returns {Object} 用户信息（user_id, nickname, mobile）
+   * @throws {Error} 二维码验证失败或用户不存在
+   *
+   * 实现逻辑：
+   * 1. 验证二维码格式和签名（调用QRCodeValidator）
+   * 2. 查询用户基本信息（仅返回必要字段）
+   * 3. 返回用户昵称和完整手机号码
+   */
+  static async getUserInfoByQRCode (qrCode) {
+    try {
+      console.log('🔍 [ConsumptionService] 开始验证二维码:', qrCode.substring(0, 20) + '...')
+
+      // 1. 验证二维码格式和签名
+      const validation = QRCodeValidator.validateQRCode(qrCode)
+      if (!validation.valid) {
+        throw new Error(`二维码验证失败：${validation.error}`)
+      }
+
+      console.log('✅ [ConsumptionService] 二维码验证通过，用户ID:', validation.user_id)
+
+      // 2. 查询用户信息（仅查询必要字段）
+      const user = await User.findOne({
+        where: {
+          user_id: validation.user_id
+        },
+        attributes: ['user_id', 'nickname', 'mobile'] // 仅返回必要字段
+      })
+
+      // 3. 验证用户是否存在
+      if (!user) {
+        throw new Error(`用户不存在（user_id: ${validation.user_id}）`)
+      }
+
+      console.log(
+        `✅ [ConsumptionService] 用户信息获取成功: user_id=${user.user_id}, nickname=${user.nickname}`
+      )
+
+      // 4. 返回用户信息
+      return {
+        user_id: user.user_id,
+        nickname: user.nickname,
+        mobile: user.mobile // 返回完整手机号码
+      }
+    } catch (error) {
+      console.error('❌ [ConsumptionService] 获取用户信息失败:', error.message)
       throw error
     }
   }

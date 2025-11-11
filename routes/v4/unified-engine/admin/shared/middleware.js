@@ -42,7 +42,7 @@ async function getSimpleSystemStats () {
       User.count(),
       User.count({
         where: {
-          last_login_at: {
+          last_login: { // ✅ 修复: last_login_at → last_login
             [Op.gte]: new Date(BeijingTimeHelper.timestamp() - 30 * 24 * 60 * 60 * 1000) // 30天内活跃
           }
         }
@@ -77,7 +77,7 @@ async function getSimpleSystemStats () {
         uptime: process.uptime(),
         memory: process.memoryUsage(),
         cpu_usage: os.loadavg()[0],
-        timestamp: BeijingTimeHelper.getCurrentTime()
+        timestamp: BeijingTimeHelper.apiTimestamp()
       }
     }
   } catch (error) {

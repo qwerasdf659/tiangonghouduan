@@ -284,15 +284,17 @@ describe('PointsService 积分服务测试', () => {
       // 验证available_points >= 0
       expect(overview.available_points).toBeGreaterThanOrEqual(0)
 
-      // 如果有冻结交易，验证其结构
+      // 如果有冻结交易，验证其结构（扁平化结构 - 实际业务代码）
       if (overview.frozen_transactions.length > 0) {
         const frozenTx = overview.frozen_transactions[0]
         expect(frozenTx).toHaveProperty('transaction_id')
         expect(frozenTx).toHaveProperty('points_amount')
-        expect(frozenTx).toHaveProperty('status')
-        expect(frozenTx.status).toBe('pending')
-        expect(frozenTx).toHaveProperty('consumption_record')
-        expect(frozenTx.business_type).toBe('consumption_reward')
+        expect(frozenTx).toHaveProperty('consumption_amount') // 消费金额（扁平化字段）
+        expect(frozenTx).toHaveProperty('merchant_notes') // 商家备注（扁平化字段）
+        expect(frozenTx).toHaveProperty('created_at') // 创建时间
+        expect(frozenTx).toHaveProperty('status_text') // 状态文本
+        expect(frozenTx.status_text).toBe('审核中')
+        expect(frozenTx).toHaveProperty('estimated_arrival') // 预计到账时间
       }
     })
 
@@ -316,22 +318,21 @@ describe('PointsService 积分服务测试', () => {
       // 验证total_frozen_points >= 0
       expect(frozenDetails.total_frozen_points).toBeGreaterThanOrEqual(0)
 
-      // 如果有冻结交易，验证其结构
+      // 如果有冻结交易，验证其结构（扁平化结构 - 实际业务代码）
       if (frozenDetails.frozen_transactions.length > 0) {
         const frozenTx = frozenDetails.frozen_transactions[0]
         expect(frozenTx).toHaveProperty('transaction_id')
         expect(frozenTx).toHaveProperty('points_amount')
-        expect(frozenTx).toHaveProperty('status')
+        expect(frozenTx).toHaveProperty('record_id') // 消费记录ID（扁平化字段）
+        expect(frozenTx).toHaveProperty('consumption_amount') // 消费金额（扁平化字段）
+        expect(frozenTx).toHaveProperty('merchant_notes') // 商家备注（扁平化字段）
+        expect(frozenTx).toHaveProperty('merchant_id') // 商家ID（扁平化字段）
+        expect(frozenTx).toHaveProperty('status') // 状态
         expect(frozenTx.status).toBe('pending')
-        expect(frozenTx).toHaveProperty('consumption_record')
-        expect(frozenTx.business_type).toBe('consumption_reward')
-
-        // 验证关联的消费记录
-        if (frozenTx.consumption_record) {
-          expect(frozenTx.consumption_record).toHaveProperty('record_id')
-          expect(frozenTx.consumption_record).toHaveProperty('consumption_amount')
-          expect(frozenTx.consumption_record).toHaveProperty('status')
-        }
+        expect(frozenTx).toHaveProperty('status_text') // 状态文本
+        expect(frozenTx.status_text).toBe('审核中')
+        expect(frozenTx).toHaveProperty('created_at') // 创建时间（北京时间格式）
+        expect(frozenTx).toHaveProperty('estimated_arrival') // 预计到账时间
       }
     })
 

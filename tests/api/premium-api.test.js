@@ -263,23 +263,24 @@ describe('高级空间解锁API测试', () => {
       if (status_response.status === 200 && status_response.data.data.unlocked && status_response.data.data.is_valid) {
         console.log('ℹ️ 已解锁且在有效期内，测试重复解锁拒绝')
 
-        // 测试重复解锁应该被拒绝
-        const response = await tester.makeAuthenticatedRequest(
-          'POST',
-          '/api/v4/premium/unlock',
-          null,
-          'regular'
-        )
-
-        // 重复解锁应该被拒绝（409）或者已经解锁成功（200）
-        expect([200, 409]).toContain(response.status)
-        if (response.status === 409) {
-          expect(response.data.success).toBe(false)
-          expect(response.data.code).toBe('ALREADY_UNLOCKED')
-          expect(response.data.data).toHaveProperty('remaining_hours')
-          console.log('✅ 重复解锁被正确拒绝')
-        } else {
+        // 测试重复解锁应该被拒绝（axios会对4xx抛出错误，需要try-catch处理）
+        try {
+          const response = await tester.makeAuthenticatedRequest(
+            'POST',
+            '/api/v4/premium/unlock',
+            null,
+            'regular'
+          )
+          // 如果成功（可能刚好过期了），验证返回数据
+          expect(response.status).toBe(200)
           console.log('ℹ️ 解锁成功（可能刚过期）')
+        } catch (error) {
+          // 期望返回409冲突（已解锁且在有效期内）
+          expect(error.response.status).toBe(409)
+          expect(error.response.data.success).toBe(false)
+          expect(error.response.data.code).toBe('ALREADY_UNLOCKED')
+          expect(error.response.data.data).toHaveProperty('remaining_hours')
+          console.log('✅ 重复解锁被正确拒绝（409 ALREADY_UNLOCKED）')
         }
         return
       }

@@ -51,9 +51,11 @@ describe('软删除功能集成测试', () => {
     let recordId = null
 
     test('创建测试消费记录', async () => {
-      // 先创建一个消费记录用于测试
+      /*
+       * 先创建一个消费记录用于测试
+       * 注意：defaultScope已自动过滤is_deleted=0，无需手动指定
+       */
       const [record] = await models.ConsumptionRecord.findAll({
-        where: { is_deleted: 0 },
         limit: 1
       })
 
@@ -84,8 +86,11 @@ describe('软删除功能集成测试', () => {
       expect(response.body.success).toBe(true)
       expect(response.body.message).toContain('已删除')
 
-      // 验证数据库记录被软删除
-      const record = await models.ConsumptionRecord.findByPk(recordId)
+      /*
+       * 验证数据库记录被软删除
+       * 注意：需要使用scope('includeDeleted')来查询已删除记录，因为defaultScope会过滤它们
+       */
+      const record = await models.ConsumptionRecord.scope('includeDeleted').findByPk(recordId)
       expect(record.is_deleted).toBe(1)
       expect(record.deleted_at).toBeTruthy()
     })
@@ -99,7 +104,7 @@ describe('软删除功能集成测试', () => {
       expect(response.body.success).toBe(true)
       expect(response.body.message).toContain('已恢复')
 
-      // 验证数据库记录被恢复
+      // 验证数据库记录被恢复（恢复后的记录可以直接用默认scope查询）
       const record = await models.ConsumptionRecord.findByPk(recordId)
       expect(record.is_deleted).toBe(0)
       expect(record.deleted_at).toBeNull()
@@ -113,8 +118,8 @@ describe('软删除功能集成测试', () => {
     let exchangeId = null
 
     test('创建测试兑换记录', async () => {
+      // 注意：defaultScope已自动过滤is_deleted=0，无需手动指定
       const [record] = await models.ExchangeRecords.findAll({
-        where: { is_deleted: 0 },
         limit: 1
       })
 
@@ -136,14 +141,17 @@ describe('软删除功能集成测试', () => {
       }
 
       const response = await request(app)
-        .delete(`/api/v4/unified-engine/inventory/exchange-records/${exchangeId}`)
+        .delete(`/api/v4/inventory/exchange-records/${exchangeId}`)
         .set('Authorization', `Bearer ${userToken}`)
         .expect(200)
 
       expect(response.body.success).toBe(true)
 
-      // 验证数据库记录被软删除
-      const record = await models.ExchangeRecords.findByPk(exchangeId)
+      /*
+       * 验证数据库记录被软删除
+       * 注意：需要使用scope('includeDeleted')来查询已删除记录，因为defaultScope会过滤它们
+       */
+      const record = await models.ExchangeRecords.scope('includeDeleted').findByPk(exchangeId)
       expect(record.is_deleted).toBe(1)
       expect(record.deleted_at).toBeTruthy()
     })
@@ -155,13 +163,13 @@ describe('软删除功能集成测试', () => {
       }
 
       const response = await request(app)
-        .post(`/api/v4/unified-engine/inventory/exchange-records/${exchangeId}/restore`)
+        .post(`/api/v4/inventory/exchange-records/${exchangeId}/restore`)
         .set('Authorization', `Bearer ${adminToken}`)
         .expect(200)
 
       expect(response.body.success).toBe(true)
 
-      // 验证数据库记录被恢复
+      // 验证数据库记录被恢复（恢复后的记录可以直接用默认scope查询）
       const record = await models.ExchangeRecords.findByPk(exchangeId)
       expect(record.is_deleted).toBe(0)
       expect(record.deleted_at).toBeNull()
@@ -207,8 +215,11 @@ describe('软删除功能集成测试', () => {
 
       expect(response.body.success).toBe(true)
 
-      // 验证数据库记录被软删除
-      const record = await models.PointsTransaction.findByPk(transactionId)
+      /*
+       * 验证数据库记录被软删除
+       * 注意：需要使用scope('includeDeleted')来查询已删除记录，因为defaultScope会过滤它们
+       */
+      const record = await models.PointsTransaction.scope('includeDeleted').findByPk(transactionId)
       expect(record.is_deleted).toBe(1)
       expect(record.deleted_at).toBeTruthy()
     })
@@ -221,7 +232,7 @@ describe('软删除功能集成测试', () => {
 
       expect(response.body.success).toBe(true)
 
-      // 验证数据库记录被恢复
+      // 验证数据库记录被恢复（恢复后的记录可以直接用默认scope查询）
       const record = await models.PointsTransaction.findByPk(transactionId)
       expect(record.is_deleted).toBe(0)
       expect(record.deleted_at).toBeNull()

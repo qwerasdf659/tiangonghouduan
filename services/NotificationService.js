@@ -381,6 +381,98 @@ class NotificationService {
   }
 
   /**
+   * 高级空间解锁成功通知（通知用户）
+   * 业务场景：用户成功解锁高级空间后，发送确认通知
+   * @param {number} user_id - 用户ID
+   * @param {Object} unlockData - 解锁数据
+   * @returns {Promise<Object>} 通知发送结果
+   * @example
+   * await NotificationService.notifyPremiumUnlockSuccess(31, {
+   *   unlock_cost: 100,
+   *   remaining_points: 390012,
+   *   expires_at: '2025-11-10 04:37:29',
+   *   validity_hours: 24,
+   *   is_first_unlock: false
+   * })
+   */
+  static async notifyPremiumUnlockSuccess (user_id, unlockData) {
+    const { unlock_cost, remaining_points, expires_at, validity_hours, is_first_unlock } = unlockData
+
+    return await this.send(user_id, {
+      type: 'premium_unlock_success',
+      title: `${is_first_unlock ? '🎉 高级空间首次解锁成功' : '🔄 高级空间重新解锁成功'}`,
+      content: `您已成功解锁高级空间功能（支付${unlock_cost}积分），剩余${remaining_points}积分，有效期${validity_hours}小时`,
+      data: {
+        unlock_cost,
+        remaining_points,
+        expires_at,
+        validity_hours,
+        is_first_unlock,
+        unlock_time: BeijingTimeHelper.now()
+      }
+    })
+  }
+
+  /**
+   * 高级空间即将过期提醒（通知用户）
+   * 业务场景：高级空间即将过期时（距离过期<2小时），发送提醒通知
+   * @param {number} user_id - 用户ID
+   * @param {Object} reminderData - 提醒数据
+   * @returns {Promise<Object>} 通知发送结果
+   * @example
+   * await NotificationService.notifyPremiumExpiringSoon(31, {
+   *   expires_at: '2025-11-10 04:37:29',
+   *   remaining_hours: 1,
+   *   remaining_minutes: 45
+   * })
+   */
+  static async notifyPremiumExpiringSoon (user_id, reminderData) {
+    const { expires_at, remaining_hours, remaining_minutes } = reminderData
+
+    return await this.send(user_id, {
+      type: 'premium_expiring_soon',
+      title: '⏰ 高级空间即将过期',
+      content: `您的高级空间访问权限将在${remaining_hours}小时${remaining_minutes % 60}分钟后过期，请及时重新解锁`,
+      data: {
+        expires_at,
+        remaining_hours,
+        remaining_minutes,
+        unlock_cost: 100,
+        reminder_time: BeijingTimeHelper.now()
+      }
+    })
+  }
+
+  /**
+   * 高级空间已过期通知（通知用户）
+   * 业务场景：高级空间过期后，发送通知提醒用户重新解锁
+   * @param {number} user_id - 用户ID
+   * @param {Object} expiryData - 过期数据
+   * @returns {Promise<Object>} 通知发送结果
+   * @example
+   * await NotificationService.notifyPremiumExpired(31, {
+   *   expired_at: '2025-11-10 04:37:29',
+   *   total_unlock_count: 2
+   * })
+   */
+  static async notifyPremiumExpired (user_id, expiryData) {
+    const { expired_at, total_unlock_count } = expiryData
+
+    return await this.send(user_id, {
+      type: 'premium_expired',
+      title: '📅 高级空间已过期',
+      content: '您的高级空间访问权限已过期，如需继续使用，请支付100积分重新解锁（有效期24小时）',
+      data: {
+        expired_at,
+        total_unlock_count,
+        unlock_cost: 100,
+        validity_hours: 24,
+        notification_time: BeijingTimeHelper.now()
+      }
+    })
+  }
+
+  /**
    * 通用审核通过通知（支持多种类型）
    * 业务场景：统一处理各类审核通过通知（兑换、图片、反馈等）
    * @param {number} user_id - 用户ID

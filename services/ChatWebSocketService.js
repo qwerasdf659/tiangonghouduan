@@ -38,6 +38,13 @@ class ChatWebSocketService {
     this.MAX_USER_CONNECTIONS = 4500 // 最大用户连接数
     this.MAX_ADMIN_CONNECTIONS = 500 // 最大客服连接数
 
+    /*
+     * ⚡ 服务启动日志ID（2025年11月08日新增 - 用于记录uptime运行时长）
+     * 说明：记录当前服务启动日志的ID，用于停止时更新记录
+     * 用途：提供uptime字段，用于服务稳定性监控和重启记录
+     */
+    this.currentStartupLogId = null // 当前启动日志ID（数据库记录）
+
     console.log('📦 ChatWebSocketService 实例已创建')
     console.log(`⚙️ 连接限制: 总${this.MAX_TOTAL_CONNECTIONS} | 用户${this.MAX_USER_CONNECTIONS} | 客服${this.MAX_ADMIN_CONNECTIONS}`)
   }
@@ -45,9 +52,9 @@ class ChatWebSocketService {
   /**
    * 初始化WebSocket服务
    * @param {Object} server - HTTP服务器实例
-   * @returns {void} 无返回值，初始化WebSocket服务并设置事件处理器
+   * @returns {Promise<void>} 无返回值，初始化WebSocket服务并设置事件处理器
    */
-  initialize (server) {
+  async initialize (server) {
     if (!server) {
       throw new Error('服务器实例不能为空')
     }
@@ -67,8 +74,36 @@ class ChatWebSocketService {
       pingInterval: 25000 // 25秒心跳间隔
     })
 
+    /*
+     * ⚡ 记录服务启动事件到数据库（2025年11月08日新增）
+     * 说明：记录服务启动时间、服务器信息，用于uptime计算和服务监控
+     * 用途：提供服务运行时长、重启历史、SLA统计
+     */
+    try {
+      const { WebSocketStartupLog } = require('../models')
+
+      const startupLog = await WebSocketStartupLog.recordStartup({
+        ip: this.getServerIP(),
+        hostname: require('os').hostname()
+      })
+
+      this.currentStartupLogId = startupLog.log_id
+
+      wsLogger.info('WebSocket服务启动记录已保存', {
+        logId: this.currentStartupLogId,
+        startTime: startupLog.start_time,
+        serverIP: startupLog.server_ip,
+        hostname: startupLog.server_hostname
+      })
+    } catch (error) {
+      wsLogger.error('保存启动记录失败', { error: error.message })
+    }
+
     this.setupEventHandlers()
+
+    const startTimeStr = BeijingTimeHelper.now()
     console.log('✅ 聊天WebSocket服务已启动')
+    console.log(`   启动时间: ${startTimeStr}`)
     console.log('   路径: /socket.io')
     console.log('   传输: WebSocket + Polling')
   }
@@ -308,16 +343,110 @@ class ChatWebSocketService {
   }
 
   /**
-   * 获取WebSocket服务状态
-   * @returns {Object} 状态信息
+   * 获取WebSocket服务状态（异步方法 - 从数据库查询uptime）
+   *
+   * @returns {Promise<Object>} 状态信息对象（符合API文档规范）
+   * @property {string} status - 服务运行状态（"running"运行中 / "stopped"已停止）
+   * @property {number} connections - 当前总连接数（用户+客服）
+   * @property {number} uptime - 服务运行时长（小时数，保留2位小数）
+   * @property {number} connected_users - 在线用户数
+   * @property {number} connected_admins - 在线客服数
+   * @property {string} timestamp - 查询时间戳（北京时间，格式：YYYY-MM-DD HH:mm:ss）
+   *
+   * @description
+   * 功能：获取WebSocket服务实时状态信息
+   * 用途：系统监控、管理后台展示、健康检查
+   * 性能：数据库查询，响应时间10-50ms
+   *
+   * @example
+   * // 示例返回值
+   * {
+   *   status: "running",       // 服务运行中
+   *   connections: 150,        // 总连接数150个
+   *   uptime: 12.5,           // 运行12.5小时
+   *   connected_users: 145,    // 在线用户145人
+   *   connected_admins: 5,     // 在线客服5人
+   *   timestamp: "2025-11-08 20:30:00"  // 查询时间（北京时间）
+   * }
    */
-  getStatus () {
-    return {
-      isRunning: this.io !== null,
-      connectedUsers: this.connectedUsers.size,
-      connectedAdmins: this.connectedAdmins.size,
-      totalConnections: this.connectedUsers.size + this.connectedAdmins.size,
-      timestamp: BeijingTimeHelper.now()
+  async getStatus () {
+    try {
+      const { WebSocketStartupLog } = require('../models')
+      const currentLog = await WebSocketStartupLog.getCurrentRunning()
+
+      /*
+       * 计算uptime运行时长（小时数）
+       * ⚡ 关键修复：使用getDataValue()获取原始数据库值，而不是格式化后的get钩子值
+       * 说明：get钩子会将start_time格式化为中文字符串，导致无法计算时间差
+       */
+      let uptimeHours = 0
+      if (currentLog) {
+        const rawStartTime = currentLog.getDataValue('start_time') // 获取原始DATETIME值
+        const startTime = new Date(rawStartTime).getTime()
+        const now = Date.now()
+        uptimeHours = parseFloat(((now - startTime) / 1000 / 3600).toFixed(2))
+      }
+
+      return {
+        /*
+         * 字段1: status（服务运行状态）- 符合API文档规范
+         * 说明：this.io不为null表示Socket.IO已初始化且正常运行
+         * 可能值："running"（运行中）/ "stopped"（已停止）
+         */
+        status: this.io !== null ? 'running' : 'stopped',
+
+        /*
+         * 字段2: connections（总连接数）- 符合API文档规范
+         * 说明：用户连接数 + 客服连接数 = 总连接数
+         * 用途：负载评估、扩容决策、连接数监控
+         */
+        connections: this.connectedUsers.size + this.connectedAdmins.size,
+
+        /*
+         * 字段3: uptime（服务运行时长-小时数）⭐ 核心字段 ⭐
+         * 说明：服务从启动到现在的运行时长，单位：小时
+         * 用途：服务稳定性评估（uptime越长=服务越稳定）、重启记录、SLA统计
+         * 示例：12.50表示运行12小时30分钟
+         */
+        uptime: uptimeHours,
+
+        /*
+         * 字段4: connected_users（在线用户数）
+         * 说明：当前连接的普通用户数量（不包括客服）
+         * 用途：用户活跃度统计、业务分析、负载评估
+         */
+        connected_users: this.connectedUsers.size,
+
+        /*
+         * 字段5: connected_admins（在线客服数）
+         * 说明：当前连接的客服数量
+         * 用途：客服排班、服务质量评估、工作负载分析
+         */
+        connected_admins: this.connectedAdmins.size,
+
+        /*
+         * 字段6: timestamp（查询时间戳）
+         * 说明：当前查询时间，北京时间（UTC+8），格式：YYYY-MM-DD HH:mm:ss
+         * 用途：时间记录、日志追踪、数据同步验证
+         */
+        timestamp: BeijingTimeHelper.now(),
+
+        // 字段7: startup_log_id（启动日志ID）- 用于追溯和调试
+        startup_log_id: this.currentStartupLogId
+      }
+    } catch (error) {
+      wsLogger.error('获取服务状态失败', { error: error.message })
+
+      // 降级处理：返回基本状态（不依赖数据库）
+      return {
+        status: this.io !== null ? 'running' : 'stopped',
+        connections: this.connectedUsers.size + this.connectedAdmins.size,
+        uptime: 0, // 数据库查询失败时返回0
+        connected_users: this.connectedUsers.size,
+        connected_admins: this.connectedAdmins.size,
+        timestamp: BeijingTimeHelper.now(),
+        startup_log_id: this.currentStartupLogId
+      }
     }
   }
 
@@ -374,7 +503,205 @@ class ChatWebSocketService {
       }
     }
   }
+
+  /**
+   * 获取服务器IP地址
+   * @returns {String} 服务器IP地址
+   *
+   * @description
+   * 功能：获取服务器的外网IP地址（用于记录服务启动日志）
+   * 逻辑：遍历网络接口，找到第一个非内网的IPv4地址
+   * 用途：服务启动日志、服务器信息记录、多实例区分
+   */
+  getServerIP () {
+    const os = require('os')
+    const interfaces = os.networkInterfaces()
+
+    for (const name of Object.keys(interfaces)) {
+      for (const iface of interfaces[name]) {
+        // 跳过内网地址和非IPv4地址
+        if (iface.family === 'IPv4' && !iface.internal) {
+          return iface.address
+        }
+      }
+    }
+
+    // 如果没有找到外网IP，返回本地地址
+    return '127.0.0.1'
+  }
+
+  /**
+   * 优雅停止WebSocket服务（记录停止事件）
+   * @param {String} reason - 停止原因（如："正常停止"、"部署更新"、"服务崩溃"等）
+   * @returns {Promise<void>} 无返回值
+   *
+   * @description
+   * 功能：优雅停止WebSocket服务并记录停止事件到数据库
+   * 流程：记录停止事件 → 断开所有连接 → 关闭Socket.IO → 清理资源
+   * 用途：服务维护、部署更新、异常处理、审计追踪
+   */
+  async shutdown (reason = '正常停止') {
+    wsLogger.info('WebSocket服务正在停止...', { reason })
+
+    try {
+      // 记录服务停止事件到数据库
+      if (this.currentStartupLogId) {
+        const { WebSocketStartupLog } = require('../models')
+        await WebSocketStartupLog.recordStop(this.currentStartupLogId, {
+          reason,
+          peak_connections: this.connectedUsers.size + this.connectedAdmins.size,
+          total_messages: 0 // 可以从统计中获取
+        })
+
+        wsLogger.info('WebSocket服务停止记录已保存', {
+          logId: this.currentStartupLogId,
+          reason
+        })
+      }
+
+      // 断开所有连接
+      if (this.io) {
+        this.io.disconnectSockets(true)
+        this.io.close()
+      }
+
+      // 清理资源
+      this.io = null
+      this.connectedUsers.clear()
+      this.connectedAdmins.clear()
+
+      wsLogger.info('WebSocket服务已停止')
+    } catch (error) {
+      wsLogger.error('停止服务失败', { error: error.message })
+    }
+  }
+
+  /**
+   * 通知会话关闭（推送给用户和管理员）
+   * @param {Number} session_id - 会话ID
+   * @param {Number} user_id - 用户ID
+   * @param {Number} admin_id - 管理员ID（可能为null）
+   * @param {Object} closeData - 关闭数据
+   * @param {String} closeData.close_reason - 关闭原因
+   * @param {Number} closeData.closed_by - 关闭操作人ID
+   * @param {Date} closeData.closed_at - 关闭时间
+   * @returns {Object} 通知结果 {notified_user, notified_admin, user_online, admin_online}
+   *
+   * 业务场景（Business Scenario）:
+   * 1. 管理员关闭会话后，实时通知在线用户（避免用户继续发消息）
+   * 2. 通知其他在线管理员会话状态变化（多客服协作场景）
+   * 3. 广播给所有管理员，用于管理后台列表实时刷新
+   *
+   * 技术说明（Technical Notes）:
+   * - WebSocket通知失败不影响关闭成功（非关键路径）
+   * - 用户刷新页面会看到最新状态（系统消息）
+   * - 离线用户上线后可查看系统消息
+   */
+  notifySessionClosed (session_id, user_id, admin_id, closeData) {
+    const result = {
+      notified_user: false,
+      notified_admin: false,
+      user_online: false,
+      admin_online: false
+    }
+
+    // 检查WebSocket服务是否已初始化
+    if (!this.io) {
+      wsLogger.warn('WebSocket服务未初始化，无法发送通知')
+      return result
+    }
+
+    // 1️⃣ 通知用户（如果在线）
+    const userSocketId = this.connectedUsers.get(user_id)
+    if (userSocketId) {
+      const userSocket = this.io.sockets.sockets.get(userSocketId)
+      if (userSocket) {
+        userSocket.emit('session_closed', {
+          session_id,
+          status: 'closed',
+          close_reason: closeData.close_reason,
+          closed_at: closeData.closed_at,
+          closed_by: closeData.closed_by,
+          message: `会话已被客服关闭：${closeData.close_reason}`,
+          timestamp: BeijingTimeHelper.now()
+        })
+        result.notified_user = true
+        result.user_online = true
+        wsLogger.info('通知用户会话关闭', { user_id, session_id, close_reason: closeData.close_reason })
+      }
+    }
+
+    // 2️⃣ 通知管理员（如果在线且不是关闭人）
+    if (admin_id && admin_id !== closeData.closed_by) {
+      const adminSocketId = this.connectedAdmins.get(admin_id)
+      if (adminSocketId) {
+        const adminSocket = this.io.sockets.sockets.get(adminSocketId)
+        if (adminSocket) {
+          adminSocket.emit('session_closed', {
+            session_id,
+            status: 'closed',
+            close_reason: closeData.close_reason,
+            closed_at: closeData.closed_at,
+            closed_by: closeData.closed_by,
+            message: '会话已被其他客服关闭',
+            timestamp: BeijingTimeHelper.now()
+          })
+          result.notified_admin = true
+          result.admin_online = true
+          wsLogger.info('通知管理员会话关闭', { admin_id, session_id })
+        }
+      }
+    }
+
+    // 3️⃣ 广播给所有在线管理员（用于管理后台列表刷新）
+    this.connectedAdmins.forEach((socketId, adminUserId) => {
+      if (adminUserId !== closeData.closed_by) { // 不通知关闭人自己
+        const socket = this.io.sockets.sockets.get(socketId)
+        if (socket) {
+          socket.emit('session_list_update', {
+            action: 'session_closed',
+            session_id,
+            timestamp: BeijingTimeHelper.now()
+          })
+        }
+      }
+    })
+
+    return result
+  }
+
+  /**
+   * 获取服务器IP地址（2025年11月08日新增）
+   * @returns {String} 服务器IP地址
+   */
+  getServerIP () {
+    try {
+      const os = require('os')
+      const interfaces = os.networkInterfaces()
+      for (const name of Object.keys(interfaces)) {
+        for (const iface of interfaces[name]) {
+          if (iface.family === 'IPv4' && !iface.internal) {
+            return iface.address
+          }
+        }
+      }
+      return '127.0.0.1'
+    } catch (error) {
+      return '127.0.0.1'
+    }
+  }
+
+  /**
+   * 获取单例实例（静态方法）
+   * @returns {ChatWebSocketService} WebSocket服务实例
+   */
+  static getInstance () {
+    return chatWebSocketServiceInstance
+  }
 }
 
-// 导出单例
-module.exports = new ChatWebSocketService()
+// 创建单例实例
+const chatWebSocketServiceInstance = new ChatWebSocketService()
+
+// 导出单例实例
+module.exports = chatWebSocketServiceInstance

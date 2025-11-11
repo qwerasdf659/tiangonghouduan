@@ -44,6 +44,23 @@
 const { DataTypes } = require('sequelize')
 
 module.exports = sequelize => {
+  /*
+   * 🔴 会话状态常量定义（Session Status Constants）
+   * 用于统一管理会话状态值，避免硬编码，提升代码可维护性
+   */
+  const SESSION_STATUS = {
+    WAITING: 'waiting', // 等待客服接入
+    ASSIGNED: 'assigned', // 已分配给客服
+    ACTIVE: 'active', // 活跃对话中
+    CLOSED: 'closed' // 已关闭
+  }
+
+  /*
+   * 🔴 活跃状态数组（Active Status Array）
+   * 用于查询所有活跃会话（waiting/assigned/active）
+   */
+  const ACTIVE_STATUS = [SESSION_STATUS.WAITING, SESSION_STATUS.ASSIGNED, SESSION_STATUS.ACTIVE]
+
   const CustomerServiceSession = sequelize.define(
     'CustomerServiceSession',
     {
@@ -67,8 +84,13 @@ module.exports = sequelize => {
       },
 
       status: {
-        type: DataTypes.ENUM('waiting', 'assigned', 'active', 'closed'),
-        defaultValue: 'waiting',
+        type: DataTypes.ENUM(
+          SESSION_STATUS.WAITING,
+          SESSION_STATUS.ASSIGNED,
+          SESSION_STATUS.ACTIVE,
+          SESSION_STATUS.CLOSED
+        ),
+        defaultValue: SESSION_STATUS.WAITING,
         comment: '会话状态'
       },
 
@@ -94,6 +116,18 @@ module.exports = sequelize => {
         type: DataTypes.DATE,
         allowNull: true,
         comment: '关闭时间'
+      },
+
+      close_reason: {
+        type: DataTypes.STRING(500),
+        allowNull: true,
+        comment: '关闭原因（最长500字符，如：问题已解决、用户未回复、恶意会话等）'
+      },
+
+      closed_by: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+        comment: '关闭操作人ID（外键关联users表的user_id，记录哪个管理员关闭的会话）'
       },
 
       satisfaction_score: {
@@ -144,6 +178,12 @@ module.exports = sequelize => {
       as: 'admin'
     })
 
+    // 会话可能被某个管理员关闭（关闭操作人）
+    CustomerServiceSession.belongsTo(models.User, {
+      foreignKey: 'closed_by',
+      as: 'closer'
+    })
+
     // 会话包含多条消息
     CustomerServiceSession.hasMany(models.ChatMessage, {
       foreignKey: 'session_id',
@@ -152,25 +192,25 @@ module.exports = sequelize => {
     })
   }
 
-  // 实例方法
+  // 实例方法（使用状态常量，消除硬编码）
   CustomerServiceSession.prototype.canBeAssignedTo = function (adminId) {
-    return this.status === 'waiting' || this.admin_id === adminId
+    return this.status === SESSION_STATUS.WAITING || this.admin_id === adminId
   }
 
   CustomerServiceSession.prototype.isClosed = function () {
-    return this.status === 'closed'
+    return this.status === SESSION_STATUS.CLOSED
   }
 
   CustomerServiceSession.prototype.isActive = function () {
-    return ['assigned', 'active'].includes(this.status)
+    return [SESSION_STATUS.ASSIGNED, SESSION_STATUS.ACTIVE].includes(this.status)
   }
 
-  // 类方法
+  // 类方法（使用状态常量数组，消除硬编码）
   CustomerServiceSession.findActiveByUserId = function (user_id) {
     return this.findAll({
       where: {
         user_id,
-        status: ['waiting', 'assigned', 'active']
+        status: ACTIVE_STATUS
       },
       order: [['created_at', 'DESC']]
     })
@@ -194,6 +234,13 @@ module.exports = sequelize => {
       order: [['updated_at', 'DESC']]
     })
   }
+
+  /*
+   * 🔴 导出状态常量（Export Status Constants）
+   * 供其他模块使用，实现全局状态统一管理
+   */
+  CustomerServiceSession.SESSION_STATUS = SESSION_STATUS
+  CustomerServiceSession.ACTIVE_STATUS = ACTIVE_STATUS
 
   return CustomerServiceSession
 }

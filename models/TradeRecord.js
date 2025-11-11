@@ -104,10 +104,10 @@ module.exports = sequelize => {
         allowNull: true,
         comment: '物品ID（关联user_inventory.inventory_id，仅用于inventory_transfer类型，用于追踪物品转让历史）'
       },
-      item_name: {
+      name: {
         type: DataTypes.STRING(100),
         allowNull: true,
-        comment: '物品名称（仅用于inventory_transfer类型，冗余字段用于快速查询显示）'
+        comment: '物品名称（Item Name - 仅用于inventory_transfer类型，冗余字段用于快速查询显示；统一使用name字段，与UserInventory保持一致）'
       },
       transfer_note: {
         type: DataTypes.STRING(500),

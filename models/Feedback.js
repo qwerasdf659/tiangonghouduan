@@ -428,14 +428,14 @@ module.exports = sequelize => {
          * 业务场景：用户在前端提交反馈表单
          *
          * 业务流程：
-         * 1. 自动生成唯一的feedback_id
+         * 1. ✅ P0修复：数据库自动生成feedback_id（自增主键），不再手动赋值
          * 2. 合并用户提交的数据（data参数）
          * 3. 自动填充用户信息（IP和设备信息）
          * 4. 根据优先级计算预计响应时间
          * 5. 设置北京时间为创建时间和更新时间
          *
          * 业务规则：
-         * - feedback_id自动生成（用户无需提供）
+         * - feedback_id由数据库自动生成（INTEGER，AUTO_INCREMENT，不应手动设置）
          * - user_ip和device_info从userInfo参数自动提取（前端透传）
          * - estimated_response_time根据priority自动计算（high-4小时/medium-24小时/low-72小时）
          * - created_at和updated_at使用北京时间
@@ -473,16 +473,19 @@ module.exports = sequelize => {
          * console.log('反馈已提交，ID：', feedback.feedback_id)
          */
         async createFeedback (data, userInfo = {}) {
-          const feedbackId = this.generateFeedbackId()
+          /*
+           * ✅ P0修复：删除手动生成的feedbackId，让数据库自动生成feedback_id
+           * 原因：feedback_id是自增主键（INTEGER AUTO_INCREMENT），数据库会自动分配
+           */
 
           return this.create({
-            id: feedbackId,
-            ...data,
-            user_ip: userInfo.ip,
-            device_info: userInfo.device,
-            estimated_response_time: this.calculateEstimatedResponseTime(data.priority),
-            created_at: BeijingTimeHelper.createBeijingTime(),
-            updated_at: BeijingTimeHelper.createBeijingTime()
+            // ✅ 删除id字段，让数据库自动生成feedback_id（自增主键）
+            ...data, // 展开data参数（包含user_id、category、content、priority、attachments等）
+            user_ip: userInfo.ip, // 用户IP（VARCHAR(45)，用于安全审计）
+            device_info: userInfo.device, // 设备信息（JSON对象，包含{userAgent, platform}）
+            estimated_response_time: this.calculateEstimatedResponseTime(data.priority), // 预计响应时间
+            created_at: BeijingTimeHelper.createBeijingTime(), // 创建时间（北京时间）
+            updated_at: BeijingTimeHelper.createBeijingTime() // 更新时间（北京时间）
           })
         },
 
@@ -659,14 +662,15 @@ module.exports = sequelize => {
 
       // 钩子函数
       hooks: {
+        /**
+         * ✅ P0修复：删除手动生成id的逻辑
+         * 原因：feedback_id是自增主键（INTEGER AUTO_INCREMENT），数据库会自动生成
+         * 说明：created_at和updated_at在字段定义中已经有defaultValue，这里的设置是额外保障
+         */
         beforeCreate: feedback => {
           feedback.created_at = BeijingTimeHelper.createBeijingTime()
           feedback.updated_at = BeijingTimeHelper.createBeijingTime()
-
-          // 如果没有ID，自动生成
-          if (!feedback.id) {
-            feedback.id = Feedback.generateFeedbackId()
-          }
+          // ✅ 删除id生成逻辑，让数据库自动生成feedback_id（自增主键）
         },
         beforeUpdate: feedback => {
           feedback.updated_at = BeijingTimeHelper.createBeijingTime()

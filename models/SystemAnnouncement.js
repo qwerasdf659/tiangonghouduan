@@ -190,111 +190,9 @@ module.exports = sequelize => {
     {
       tableName: 'system_announcements',
       timestamps: true,
-      created_at: 'created_at',
-      updated_at: 'updated_at',
+      createdAt: 'created_at',
+      updatedAt: 'updated_at',
       comment: '系统公告表 - 支持首页公告功能',
-
-      // 实例方法
-      instanceMethods: {
-        /**
-         * 检查公告是否已过期
-         * @returns {boolean} true-已过期，false-未过期或无过期时间
-         */
-        isExpired () {
-          if (!this.expires_at) return false
-          return new Date(this.expires_at) <= BeijingTimeHelper.createBeijingTime()
-        },
-
-        /**
-         * 增加查看次数
-         * @param {Object|null} transaction - Sequelize事务对象
-         * @returns {Promise<SystemAnnouncement>} 更新后的公告实例
-         */
-        async incrementViewCount (transaction = null) {
-          return this.increment('view_count', { transaction })
-        },
-
-        /**
-         * 获取公告状态描述
-         * @returns {string} 状态描述（正常/已禁用/已过期）
-         */
-        getStatusDescription () {
-          if (!this.is_active) return '已禁用'
-          if (this.isExpired()) return '已过期'
-          return '正常'
-        }
-      },
-
-      // 类方法
-      classMethods: {
-        /**
-         * 获取有效公告列表
-         * @param {Object} options - 查询选项
-         * @param {string|null} options.type - 公告类型筛选
-         * @param {string|null} options.priority - 优先级筛选
-         * @param {number} options.limit - 返回数量限制
-         * @param {number} options.offset - 偏移量
-         * @returns {Promise<Array<SystemAnnouncement>>} 有效公告列表
-         */
-        async getActiveAnnouncements (options = {}) {
-          const { type = null, priority = null, limit = 10, offset = 0 } = options
-
-          const whereClause = {
-            is_active: true,
-            [sequelize.Op.or]: [
-              { expires_at: null },
-              { expires_at: { [sequelize.Op.gt]: BeijingTimeHelper.createBeijingTime() } }
-            ]
-          }
-
-          if (type) whereClause.type = type
-          if (priority) whereClause.priority = priority
-
-          return this.findAll({
-            where: whereClause,
-            order: [
-              ['priority', 'DESC'], // 高优先级优先
-              ['created_at', 'DESC'] // 新发布的优先
-            ],
-            limit,
-            offset,
-            include: [
-              {
-                model: sequelize.models.User,
-                as: 'creator',
-                attributes: ['user_id', 'nickname']
-              }
-            ]
-          })
-        },
-
-        /**
-         * 获取首页公告
-         * @param {number} limit - 返回数量限制
-         * @returns {Promise<Array<SystemAnnouncement>>} 首页公告列表
-         */
-        async getHomePageAnnouncements (limit = 5) {
-          return this.getActiveAnnouncements({
-            type: ['system', 'activity', 'notice'],
-            limit
-          })
-        },
-
-        /**
-         * 创建新公告
-         * @param {Object} data - 公告数据
-         * @param {number} adminId - 创建管理员ID
-         * @returns {Promise<SystemAnnouncement>} 新创建的公告实例
-         */
-        async createAnnouncement (data, adminId) {
-          return this.create({
-            ...data,
-            admin_id: adminId,
-            created_at: BeijingTimeHelper.createBeijingTime(),
-            updated_at: BeijingTimeHelper.createBeijingTime()
-          })
-        }
-      },
 
       // 钩子函数
       hooks: {
@@ -324,6 +222,108 @@ module.exports = sequelize => {
       ]
     }
   )
+
+  // 🔴 实例方法（Sequelize v6+正确定义方式）
+  /**
+   * 检查公告是否已过期
+   * @returns {boolean} true-已过期，false-未过期或无过期时间
+   */
+  SystemAnnouncement.prototype.isExpired = function () {
+    if (!this.expires_at) return false
+    return new Date(this.expires_at) <= BeijingTimeHelper.createBeijingTime()
+  }
+
+  /**
+   * 增加查看次数
+   * @param {Object|null} transaction - Sequelize事务对象
+   * @returns {Promise<SystemAnnouncement>} 更新后的公告实例
+   */
+  SystemAnnouncement.prototype.incrementViewCount = async function (transaction = null) {
+    return this.increment('view_count', { transaction })
+  }
+
+  /**
+   * 获取公告状态描述
+   * @returns {string} 状态描述（正常/已禁用/已过期）
+   */
+  SystemAnnouncement.prototype.getStatusDescription = function () {
+    if (!this.is_active) return '已禁用'
+    if (this.isExpired()) return '已过期'
+    return '正常'
+  }
+
+  // 🔴 类方法（Sequelize v6+正确定义方式）
+  /**
+   * 获取有效公告列表
+   * @param {Object} options - 查询选项
+   * @param {string|null} options.type - 公告类型筛选
+   * @param {string|null} options.priority - 优先级筛选
+   * @param {number} options.limit - 返回数量限制
+   * @param {number} options.offset - 偏移量
+   * @returns {Promise<Array<SystemAnnouncement>>} 有效公告列表
+   */
+  SystemAnnouncement.getActiveAnnouncements = async function (options = {}) {
+    const { type = null, priority = null, limit = 10, offset = 0 } = options
+    const { Op } = require('sequelize')
+
+    const whereClause = {
+      is_active: true,
+      [Op.or]: [
+        { expires_at: null },
+        { expires_at: { [Op.gt]: BeijingTimeHelper.createBeijingTime() } }
+      ]
+    }
+
+    if (type) {
+      // 🔴 支持数组类型筛选（修复文档中提到的IN数组查询问题）
+      whereClause.type = Array.isArray(type) ? { [Op.in]: type } : type
+    }
+    if (priority) whereClause.priority = priority
+
+    return this.findAll({
+      where: whereClause,
+      order: [
+        ['priority', 'DESC'], // 高优先级优先
+        ['created_at', 'DESC'] // 新发布的优先
+      ],
+      limit,
+      offset,
+      include: [
+        {
+          model: sequelize.models.User,
+          as: 'creator',
+          attributes: ['user_id', 'nickname']
+        }
+      ]
+    })
+  }
+
+  /**
+   * 获取首页公告
+   * @param {number} limit - 返回数量限制
+   * @returns {Promise<Array<SystemAnnouncement>>} 首页公告列表
+   */
+  SystemAnnouncement.getHomePageAnnouncements = async function (limit = 5) {
+    return this.getActiveAnnouncements({
+      type: ['system', 'activity', 'notice'],
+      limit
+    })
+  }
+
+  /**
+   * 创建新公告
+   * @param {Object} data - 公告数据
+   * @param {number} adminId - 创建管理员ID
+   * @returns {Promise<SystemAnnouncement>} 新创建的公告实例
+   */
+  SystemAnnouncement.createAnnouncement = async function (data, adminId) {
+    return this.create({
+      ...data,
+      admin_id: adminId,
+      created_at: BeijingTimeHelper.createBeijingTime(),
+      updated_at: BeijingTimeHelper.createBeijingTime()
+    })
+  }
 
   // 关联关系
   SystemAnnouncement.associate = models => {

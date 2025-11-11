@@ -12,11 +12,9 @@
  * 使用模型：Claude Sonnet 4
  */
 
-const BeijingTimeHelper = require('../../../../utils/timeHelper')
 const express = require('express')
 const router = express.Router()
 const models = require('../../../../models')
-const ApiResponse = require('../../../../utils/ApiResponse')
 const { authenticateToken, requireAdmin } = require('../../../../middleware/auth')
 const Logger = require('../../../../services/UnifiedLotteryEngine/utils/Logger')
 const { Op } = require('sequelize')
@@ -49,36 +47,34 @@ router.get('/pending', authenticateToken, requireAdmin, async (req, res) => {
       returned: pendingAudits.length
     })
 
-    return ApiResponse.success(
-      res,
-      {
-        pending_count: pendingCount,
-        items: pendingAudits.map(record => {
-          const data = record.toJSON()
-          // 从product_snapshot中提取商品信息
-          const productInfo = data.product_snapshot || {}
-          return {
-            exchange_id: data.exchange_id,
-            user: data.user,
-            product_name: productInfo.name,
-            product_category: productInfo.category,
-            product_points: productInfo.exchange_points,
-            product_snapshot: data.product_snapshot,
-            quantity: data.quantity,
-            total_points: data.total_points,
-            exchange_code: data.exchange_code,
-            exchange_time: data.exchange_time,
-            space: data.space,
-            requires_audit: data.requires_audit,
-            audit_status: data.audit_status
-          }
-        })
-      },
-      '待审核列表获取成功'
+    return res.apiSuccess({
+      pending_count: pendingCount,
+      items: pendingAudits.map(record => {
+        const data = record.toJSON()
+        // 从product_snapshot中提取商品信息
+        const productInfo = data.product_snapshot || {}
+        return {
+          exchange_id: data.exchange_id,
+          user: data.user,
+          product_name: productInfo.name,
+          product_category: productInfo.category,
+          product_points: productInfo.exchange_points,
+          product_snapshot: data.product_snapshot,
+          quantity: data.quantity,
+          total_points: data.total_points,
+          exchange_code: data.exchange_code,
+          exchange_time: data.exchange_time,
+          space: data.space,
+          requires_audit: data.requires_audit,
+          audit_status: data.audit_status
+        }
+      })
+    },
+    '待审核列表获取成功'
     )
   } catch (error) {
     logger.error('获取待审核列表失败', { error: error.message, admin_id: req.user.user_id })
-    return ApiResponse.error(res, '获取待审核列表失败', 500)
+    return res.apiError('获取待审核列表失败', 'INTERNAL_ERROR', null, 500)
   }
 })
 
@@ -94,18 +90,21 @@ router.post('/:exchange_id/approve', authenticateToken, requireAdmin, async (req
     const { reason } = req.body
     const auditorId = req.user.user_id
 
-    // 1. 查找兑换记录
-    const exchangeRecord = await models.ExchangeRecords.findByPk(exchange_id, { transaction })
+    // 1. 查找兑换记录（✅ P1修复：添加悲观锁防止并发审核）
+    const exchangeRecord = await models.ExchangeRecords.findByPk(exchange_id, {
+      transaction,
+      lock: transaction.LOCK.UPDATE // 行级悲观锁（SELECT FOR UPDATE）
+    })
 
     if (!exchangeRecord) {
       await transaction.rollback()
-      return ApiResponse.error(res, '兑换记录不存在', 404)
+      return res.apiError('兑换记录不存在', 'NOT_FOUND', null, 404)
     }
 
     // 2. 验证审核状态
     if (!exchangeRecord.isPendingAudit()) {
       await transaction.rollback()
-      return ApiResponse.error(res, '该记录不是待审核状态', 400)
+      return res.apiError('该记录不是待审核状态', 'BAD_REQUEST', null, 400)
     }
 
     // 3. 记录审核前数据（用于审计日志）
@@ -117,8 +116,8 @@ router.post('/:exchange_id/approve', authenticateToken, requireAdmin, async (req
       user_id: exchangeRecord.user_id
     }
 
-    // 4. 审核通过
-    await exchangeRecord.approve(auditorId, reason)
+    // 4. 审核通过（传入外部事务，避免事务嵌套和库存重复创建）
+    await exchangeRecord.approve(auditorId, reason, { transaction })
 
     // 5. 记录审计日志
     await auditLogMiddleware.logExchangeAudit(
@@ -134,36 +133,22 @@ router.post('/:exchange_id/approve', authenticateToken, requireAdmin, async (req
       reason || '审核通过'
     )
 
-    // 6. 生成核销码并添加到用户库存
-    const product = exchangeRecord.product_snapshot
-    const inventoryItems = []
-
-    for (let i = 0; i < exchangeRecord.quantity; i++) {
-      const PointsService = require('../../../../services/PointsService')
-      const verificationCode = PointsService.generateVerificationCode()
-
-      const inventoryItem = await models.UserInventory.create(
-        {
-          user_id: exchangeRecord.user_id,
-          name: product.name,
-          description: product.description,
-          type: product.category === '优惠券' ? 'voucher' : 'product',
-          value: product.exchange_points,
-          status: 'available',
-          source_type: 'exchange',
-          source_id: exchangeRecord.exchange_id.toString(),
-          acquired_at: BeijingTimeHelper.createBeijingTime(),
-          expires_at: null,
-          verification_code: verificationCode,
-          verification_expires_at: BeijingTimeHelper.futureTime(30 * 24 * 60 * 60 * 1000) // 30天有效期
-        },
-        { transaction }
-      )
-
-      inventoryItems.push(inventoryItem)
-    }
+    /*
+     * 🔴 修复P0 bug：删除路由层重复的库存创建代码（第141-164行）
+     * approve()方法内部已经创建库存，这里不需要重复创建
+     */
 
     await transaction.commit()
+    // 6. 查询已创建的库存（用于返回给前端）
+    const inventoryItems = await models.UserInventory.findAll({
+      where: {
+        source_type: 'exchange',
+        source_id: exchangeRecord.exchange_id.toString()
+      },
+      attributes: ['inventory_id', 'name', 'verification_code'],
+      order: [['created_at', 'DESC']],
+      limit: exchangeRecord.quantity
+    })
 
     logger.info('审核通过成功', {
       exchange_id,
@@ -172,25 +157,23 @@ router.post('/:exchange_id/approve', authenticateToken, requireAdmin, async (req
       total_points: exchangeRecord.total_points
     })
 
-    return ApiResponse.success(
-      res,
-      {
-        exchange_id: exchangeRecord.exchange_id,
-        audit_status: exchangeRecord.audit_status,
-        status: exchangeRecord.status,
-        audited_at: exchangeRecord.audited_at,
-        inventory_items: inventoryItems.map(item => ({
-          inventory_id: item.inventory_id,
-          name: item.name,
-          verification_code: item.verification_code
-        }))
-      },
-      '审核通过，兑换已完成'
+    return res.apiSuccess({
+      exchange_id: exchangeRecord.exchange_id,
+      audit_status: exchangeRecord.audit_status,
+      status: exchangeRecord.status,
+      audited_at: exchangeRecord.audited_at,
+      inventory_items: inventoryItems.map(item => ({
+        inventory_id: item.inventory_id,
+        name: item.name,
+        verification_code: item.verification_code
+      }))
+    },
+    '审核通过，兑换已完成'
     )
   } catch (error) {
     await transaction.rollback()
     logger.error('审核通过失败', { error: error.message, exchange_id: req.params.exchange_id })
-    return ApiResponse.error(res, error.message || '审核通过失败', 500)
+    return res.apiError(error.message || '审核通过失败', 'ERROR', null, 500)
   }
 })
 
@@ -209,21 +192,24 @@ router.post('/:exchange_id/reject', authenticateToken, requireAdmin, async (req,
     // 1. 参数验证
     if (!reason || reason.trim().length === 0) {
       await transaction.rollback()
-      return ApiResponse.error(res, '审核拒绝必须提供原因', 400)
+      return res.apiError('审核拒绝必须提供原因', 'BAD_REQUEST', null, 400)
     }
 
-    // 2. 查找兑换记录
-    const exchangeRecord = await models.ExchangeRecords.findByPk(exchange_id, { transaction })
+    // 2. 查找兑换记录（✅ P1修复：添加悲观锁防止并发审核）
+    const exchangeRecord = await models.ExchangeRecords.findByPk(exchange_id, {
+      transaction,
+      lock: transaction.LOCK.UPDATE // 行级悲观锁（SELECT FOR UPDATE）
+    })
 
     if (!exchangeRecord) {
       await transaction.rollback()
-      return ApiResponse.error(res, '兑换记录不存在', 404)
+      return res.apiError('兑换记录不存在', 'NOT_FOUND', null, 404)
     }
 
     // 3. 验证审核状态
     if (!exchangeRecord.isPendingAudit()) {
       await transaction.rollback()
-      return ApiResponse.error(res, '该记录不是待审核状态', 400)
+      return res.apiError('该记录不是待审核状态', 'BAD_REQUEST', null, 400)
     }
 
     // 4. 记录审核前数据（用于审计日志）
@@ -235,8 +221,11 @@ router.post('/:exchange_id/reject', authenticateToken, requireAdmin, async (req,
       user_id: exchangeRecord.user_id
     }
 
-    // 5. 审核拒绝
-    await exchangeRecord.reject(auditorId, reason)
+    /*
+     * 5. 审核拒绝（传入外部事务，避免事务嵌套）
+     * ✅ reject()方法内部已经处理：退回积分 + 恢复库存
+     */
+    await exchangeRecord.reject(auditorId, reason, { transaction })
 
     // 6. 记录审计日志
     await auditLogMiddleware.logExchangeAudit(
@@ -252,15 +241,10 @@ router.post('/:exchange_id/reject', authenticateToken, requireAdmin, async (req,
       reason
     )
 
-    // 7. 退回积分给用户
-    const PointsService = require('../../../../services/PointsService')
-    await PointsService.addPoints(exchangeRecord.user_id, exchangeRecord.total_points, {
-      business_type: 'refund',
-      source_type: 'audit_rejected',
-      title: '兑换审核拒绝退款',
-      description: `兑换记录${exchange_id}审核拒绝，退回${exchangeRecord.total_points}积分`,
-      transaction
-    })
+    /*
+     * 🔴 修复P0 bug：删除路由层重复的积分退回代码（第247-254行）
+     * reject()方法内部已经退回积分，这里不需要重复退回
+     */
 
     await transaction.commit()
 
@@ -272,21 +256,19 @@ router.post('/:exchange_id/reject', authenticateToken, requireAdmin, async (req,
       reason
     })
 
-    return ApiResponse.success(
-      res,
-      {
-        exchange_id: exchangeRecord.exchange_id,
-        audit_status: exchangeRecord.audit_status,
-        status: exchangeRecord.status,
-        audited_at: exchangeRecord.audited_at,
-        refunded_points: exchangeRecord.total_points
-      },
-      '审核拒绝，积分已退回'
+    return res.apiSuccess({
+      exchange_id: exchangeRecord.exchange_id,
+      audit_status: exchangeRecord.audit_status,
+      status: exchangeRecord.status,
+      audited_at: exchangeRecord.audited_at,
+      refunded_points: exchangeRecord.total_points
+    },
+    '审核拒绝，积分已退回'
     )
   } catch (error) {
     await transaction.rollback()
     logger.error('审核拒绝失败', { error: error.message, exchange_id: req.params.exchange_id })
-    return ApiResponse.error(res, error.message || '审核拒绝失败', 500)
+    return res.apiError(error.message || '审核拒绝失败', 'ERROR', null, 500)
   }
 })
 
@@ -357,19 +339,17 @@ router.get('/history', authenticateToken, requireAdmin, async (req, res) => {
       returned: auditHistory.length
     })
 
-    return ApiResponse.success(
-      res,
-      {
-        total: count,
-        page: parseInt(page),
-        limit: finalLimit,
-        items: auditHistory.map(record => record.toJSON())
-      },
-      '审核历史获取成功'
+    return res.apiSuccess({
+      total: count,
+      page: parseInt(page),
+      limit: finalLimit,
+      items: auditHistory.map(record => record.toJSON())
+    },
+    '审核历史获取成功'
     )
   } catch (error) {
     logger.error('获取审核历史失败', { error: error.message, admin_id: req.user.user_id })
-    return ApiResponse.error(res, '获取审核历史失败', 500)
+    return res.apiError('获取审核历史失败', 'INTERNAL_ERROR', null, 500)
   }
 })
 

@@ -13,6 +13,20 @@ require('dotenv').config()
 
 // ⚡ 慢查询监控配置（2025年01月21日新增）
 const SLOW_QUERY_THRESHOLD = 1000 // 1秒阈值
+
+/*
+ * 🔴 集成数据库性能监控模块（2025-11-09新增）
+ * 用于统计慢查询频率，支持性能监控和告警
+ */
+let performanceMonitor = null
+try {
+  const { monitor } = require('../scripts/maintenance/database-performance-monitor')
+  performanceMonitor = monitor
+} catch (error) {
+  // 如果监控模块加载失败，不影响数据库正常运行
+  console.warn('⚠️ 数据库性能监控模块加载失败，慢查询统计功能不可用:', error.message)
+}
+
 const slowQueryLogger = (sql, timing) => {
   if (timing >= SLOW_QUERY_THRESHOLD) {
     console.warn('🐌 慢查询检测:', {
@@ -21,6 +35,19 @@ const slowQueryLogger = (sql, timing) => {
       threshold: `${SLOW_QUERY_THRESHOLD}ms`,
       timestamp: new Date().toISOString()
     })
+
+    /*
+     * 🔴 记录慢查询到性能监控系统（2025-11-09新增）
+     * 用于统计慢查询频率，判断是否需要优化
+     */
+    if (performanceMonitor) {
+      try {
+        performanceMonitor.recordSlowQuery(sql, timing)
+      } catch (error) {
+        // 监控记录失败不影响业务逻辑
+        console.warn('⚠️ 慢查询统计记录失败:', error.message)
+      }
+    }
   }
 }
 

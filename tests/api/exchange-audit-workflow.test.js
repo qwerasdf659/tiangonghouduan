@@ -15,7 +15,15 @@
 
 const request = require('supertest')
 const app = require('../../app')
-const { sequelize, User, Product, ExchangeRecords, UserPointsAccount, PointsTransaction, UserInventory } = require('../../models')
+const {
+  sequelize,
+  User,
+  Product,
+  ExchangeRecords,
+  UserPointsAccount,
+  PointsTransaction,
+  UserInventory
+} = require('../../models')
 const PointsService = require('../../services/PointsService')
 // 服务重命名（2025-10-12）：AuditManagementService → ExchangeOperationService
 const ExchangeOperationService = require('../../services/ExchangeOperationService')
@@ -60,14 +68,20 @@ describe('商品兑换审核流程完整测试', () => {
     })
 
     // 获取认证token（模拟登录）
-    const loginRes = await request(app)
-      .post('/api/v4/unified-engine/auth/verify-code')
-      .send({
-        mobile: '13612227930',
-        code: '123456'
-      })
+    const loginRes = await request(app).post('/api/v4/unified-engine/auth/login').send({
+      mobile: '13612227930',
+      verification_code: '123456'
+    })
 
-    authToken = loginRes.body.data.token
+    // 添加调试输出
+    if (!loginRes.body.success) {
+      console.error('登录失败:', JSON.stringify(loginRes.body, null, 2))
+      throw new Error(`登录失败: ${loginRes.body.message || '未知错误'}`)
+    }
+
+    console.log('登录成功, Token:', loginRes.body.data.access_token.substring(0, 50) + '...')
+
+    authToken = loginRes.body.data.access_token
     adminToken = authToken
   })
 
@@ -88,7 +102,7 @@ describe('商品兑换审核流程完整测试', () => {
 
       // 发起兑换
       const res = await request(app)
-        .post('/api/v4/unified-engine/inventory/exchange')
+        .post('/api/v4/inventory/exchange')
         .set('Authorization', `Bearer ${authToken}`)
         .send({
           product_id: testProduct.product_id,
@@ -133,7 +147,7 @@ describe('商品兑换审核流程完整测试', () => {
     beforeAll(async () => {
       // 创建一个待审核订单
       const res = await request(app)
-        .post('/api/v4/unified-engine/inventory/exchange')
+        .post('/api/v4/inventory/exchange')
         .set('Authorization', `Bearer ${authToken}`)
         .send({
           product_id: testProduct.product_id,
@@ -178,7 +192,7 @@ describe('商品兑换审核流程完整测试', () => {
 
       // 创建一个待审核订单
       const res = await request(app)
-        .post('/api/v4/unified-engine/inventory/exchange')
+        .post('/api/v4/inventory/exchange')
         .set('Authorization', `Bearer ${authToken}`)
         .send({
           product_id: testProduct.product_id,
@@ -233,19 +247,27 @@ describe('商品兑换审核流程完整测试', () => {
 
       // 创建一个待审核订单
       const res = await request(app)
-        .post('/api/v4/unified-engine/inventory/exchange')
+        .post('/api/v4/inventory/exchange')
         .set('Authorization', `Bearer ${authToken}`)
         .send({
           product_id: testProduct.product_id,
           quantity: 1
         })
 
+      // 添加调试输出
+      if (!res.body.success) {
+        console.error('场景4 - 兑换创建失败:', JSON.stringify(res.body, null, 2))
+        console.error('商品ID:', testProduct.product_id)
+        console.error('用户积分:', beforePoints)
+        throw new Error(`兑换创建失败: ${res.body.message || '未知错误'}`)
+      }
+
       exchangeId = res.body.data.exchange_id
     })
 
     test('用户可以取消pending状态的订单', async () => {
       const res = await request(app)
-        .post(`/api/v4/unified-engine/inventory/exchange-records/${exchangeId}/cancel`)
+        .post(`/api/v4/inventory/exchange-records/${exchangeId}/cancel`)
         .set('Authorization', `Bearer ${authToken}`)
         .send({
           reason: '用户测试取消'
@@ -263,7 +285,7 @@ describe('商品兑换审核流程完整测试', () => {
     test('已审核通过的订单不能取消', async () => {
       // 创建并审核通过一个订单
       const res1 = await request(app)
-        .post('/api/v4/unified-engine/inventory/exchange')
+        .post('/api/v4/inventory/exchange')
         .set('Authorization', `Bearer ${authToken}`)
         .send({
           product_id: testProduct.product_id,
@@ -276,7 +298,7 @@ describe('商品兑换审核流程完整测试', () => {
 
       // 尝试取消
       const res2 = await request(app)
-        .post(`/api/v4/unified-engine/inventory/exchange-records/${approvedExchangeId}/cancel`)
+        .post(`/api/v4/inventory/exchange-records/${approvedExchangeId}/cancel`)
         .set('Authorization', `Bearer ${authToken}`)
         .send({
           reason: '尝试取消已审核订单'
@@ -294,7 +316,7 @@ describe('商品兑换审核流程完整测试', () => {
       // 创建3个待审核订单
       for (let i = 0; i < 3; i++) {
         const res = await request(app)
-          .post('/api/v4/unified-engine/inventory/exchange')
+          .post('/api/v4/inventory/exchange')
           .set('Authorization', `Bearer ${authToken}`)
           .send({
             product_id: testProduct.product_id,

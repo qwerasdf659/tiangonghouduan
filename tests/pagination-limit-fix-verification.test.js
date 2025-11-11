@@ -11,6 +11,7 @@ const app = require('../app')
 
 describe('🔍 分页限制修复验证测试', () => {
   let testUserToken = ''
+  let testUserId = null // 🔧 修复：添加user_id变量
   const TEST_MOBILE = '13612227930'
   const TEST_CODE = '123456'
 
@@ -25,7 +26,8 @@ describe('🔍 分页限制修复验证测试', () => {
 
     expect(loginResponse.status).toBe(200)
     testUserToken = loginResponse.body.data.access_token
-    console.log('✅ 测试账号登录成功:', TEST_MOBILE)
+    testUserId = loginResponse.body.data.user.user_id // 🔧 修复：获取user_id
+    console.log('✅ 测试账号登录成功:', TEST_MOBILE, '(user_id:', testUserId, ')')
   })
 
   /**
@@ -52,7 +54,7 @@ describe('🔍 分页限制修复验证测试', () => {
    */
   test('2️⃣ 抽奖历史接口 - 应限制最大50条记录', async () => {
     const response = await request(app)
-      .get(`/api/v4/unified-engine/lottery/history/${TEST_MOBILE}`)
+      .get(`/api/v4/unified-engine/lottery/history/${testUserId}`) // 🔧 修复：使用user_id
       .set('Authorization', `Bearer ${testUserToken}`)
       .query({ limit: 999, page: 1 })
 
@@ -72,7 +74,7 @@ describe('🔍 分页限制修复验证测试', () => {
    */
   test('3️⃣ 用户库存接口 - 应限制最大50条记录', async () => {
     const response = await request(app)
-      .get(`/api/v4/inventory/user/${TEST_MOBILE}`)
+      .get(`/api/v4/inventory/user/${testUserId}`) // 🔧 修复：使用user_id
       .set('Authorization', `Bearer ${testUserToken}`)
       .query({ limit: 999, page: 1 })
 
@@ -138,7 +140,7 @@ describe('🔍 分页限制修复验证测试', () => {
    */
   test('7️⃣ 积分交易接口 - 应通过服务层限制最大100条记录', async () => {
     const response = await request(app)
-      .get(`/api/v4/unified-engine/points/transactions/${TEST_MOBILE}`)
+      .get(`/api/v4/unified-engine/points/transactions/${testUserId}`) // 🔧 修复：使用user_id
       .set('Authorization', `Bearer ${testUserToken}`)
       .query({ limit: 999, page: 1 })
 

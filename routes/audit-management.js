@@ -37,11 +37,11 @@ router.post('/batch-approve', authMiddleware.requireAdmin, async (req, res) => {
 
     // 验证参数
     if (!Array.isArray(exchange_ids) || exchange_ids.length === 0) {
-      return ApiResponse.error(res, 'exchange_ids必须是非空数组', 400)
+      return res.apiError('exchange_ids必须是非空数组', 'BAD_REQUEST', null, 400)
     }
 
     if (exchange_ids.length > 100) {
-      return ApiResponse.error(res, '批量审核最多支持100个订单', 400)
+      return res.apiError('批量审核最多支持100个订单', 'BAD_REQUEST', null, 400)
     }
 
     // 执行批量审核
@@ -58,7 +58,7 @@ router.post('/batch-approve', authMiddleware.requireAdmin, async (req, res) => {
     )
   } catch (error) {
     console.error('[批量审核通过] 错误:', error)
-    return ApiResponse.error(res, error.message, 500)
+    return res.apiError(error.message, 'INTERNAL_ERROR', null, 500)
   }
 })
 
@@ -76,11 +76,11 @@ router.post('/batch-reject', authMiddleware.requireAdmin, async (req, res) => {
 
     // 验证参数
     if (!Array.isArray(reject_items) || reject_items.length === 0) {
-      return ApiResponse.error(res, 'reject_items必须是非空数组', 400)
+      return res.apiError('reject_items必须是非空数组', 'BAD_REQUEST', null, 400)
     }
 
     if (reject_items.length > 100) {
-      return ApiResponse.error(res, '批量审核最多支持100个订单', 400)
+      return res.apiError('批量审核最多支持100个订单', 'BAD_REQUEST', null, 400)
     }
 
     // 验证每个项目的格式
@@ -89,7 +89,7 @@ router.post('/batch-reject', authMiddleware.requireAdmin, async (req, res) => {
     )
 
     if (invalidItems.length > 0) {
-      return ApiResponse.error(res, '每个订单必须包含exchange_id和reason（至少5个字符）', 400)
+      return res.apiError('每个订单必须包含exchange_id和reason（至少5个字符）', 'BAD_REQUEST', null, 400)
     }
 
     // 执行批量拒绝
@@ -102,7 +102,7 @@ router.post('/batch-reject', authMiddleware.requireAdmin, async (req, res) => {
     )
   } catch (error) {
     console.error('[批量审核拒绝] 错误:', error)
-    return ApiResponse.error(res, error.message, 500)
+    return res.apiError(error.message, 'INTERNAL_ERROR', null, 500)
   }
 })
 
@@ -118,23 +118,21 @@ router.get('/timeout-orders', authMiddleware.requireAdmin, async (req, res) => {
     const hours = parseInt(req.query.hours) || 24
 
     if (hours < 1 || hours > 720) {
-      return ApiResponse.error(res, '超时小时数必须在1-720之间', 400)
+      return res.apiError('超时小时数必须在1-720之间', 'BAD_REQUEST', null, 400)
     }
 
     const orders = await ExchangeOperationService.getTimeoutPendingOrders(hours)
 
-    return ApiResponse.success(
-      res,
-      {
-        timeout_hours: hours,
-        count: orders.length,
-        orders
-      },
-      '获取超时订单成功'
+    return res.apiSuccess({
+      timeout_hours: hours,
+      count: orders.length,
+      orders
+    },
+    '获取超时订单成功'
     )
   } catch (error) {
     console.error('[获取超时订单] 错误:', error)
-    return ApiResponse.error(res, error.message, 500)
+    return res.apiError(error.message, 'INTERNAL_ERROR', null, 500)
   }
 })
 
@@ -158,7 +156,7 @@ router.post('/check-timeout-alert', authMiddleware.requireAdmin, async (req, res
     )
   } catch (error) {
     console.error('[超时告警检查] 错误:', error)
-    return ApiResponse.error(res, error.message, 500)
+    return res.apiError(error.message, 'INTERNAL_ERROR', null, 500)
   }
 })
 
@@ -171,10 +169,10 @@ router.get('/statistics', authMiddleware.requireAdmin, async (req, res) => {
   try {
     const statistics = await ExchangeOperationService.getPendingOrdersStatistics()
 
-    return ApiResponse.success(res, statistics, '获取统计信息成功')
+    return res.apiSuccess(statistics, '获取统计信息成功')
   } catch (error) {
     console.error('[获取审核统计] 错误:', error)
-    return ApiResponse.error(res, error.message, 500)
+    return res.apiError(error.message, 'INTERNAL_ERROR', null, 500)
   }
 })
 
@@ -203,17 +201,15 @@ router.get('/unified/pending', authMiddleware.requireAdmin, async (req, res) => 
       offset: parseInt(offset)
     })
 
-    return ApiResponse.success(
-      res,
-      {
-        count: audits.length,
-        audits
-      },
-      '获取待审核记录成功'
+    return res.apiSuccess({
+      count: audits.length,
+      audits
+    },
+    '获取待审核记录成功'
     )
   } catch (error) {
     console.error('[获取待审核记录] 错误:', error)
-    return ApiResponse.error(res, error.message, 500)
+    return res.apiError(error.message, 'INTERNAL_ERROR', null, 500)
   }
 })
 
@@ -228,10 +224,10 @@ router.get('/unified/:audit_id', authMiddleware.requireAdmin, async (req, res) =
 
     const audit = await ContentAuditEngine.getAuditById(parseInt(audit_id))
 
-    return ApiResponse.success(res, audit, '获取审核详情成功')
+    return res.apiSuccess(audit, '获取审核详情成功')
   } catch (error) {
     console.error('[获取审核详情] 错误:', error)
-    return ApiResponse.error(res, error.message, 500)
+    return res.apiError(error.message, 'INTERNAL_ERROR', null, 500)
   }
 })
 
@@ -250,10 +246,10 @@ router.post('/unified/:audit_id/approve', authMiddleware.requireAdmin, async (re
 
     const result = await ContentAuditEngine.approve(parseInt(audit_id), auditorId, reason)
 
-    return ApiResponse.success(res, result, '审核通过成功')
+    return res.apiSuccess(result, '审核通过成功')
   } catch (error) {
     console.error('[统一审核通过] 错误:', error)
-    return ApiResponse.error(res, error.message, 500)
+    return res.apiError(error.message, 'INTERNAL_ERROR', null, 500)
   }
 })
 
@@ -271,15 +267,15 @@ router.post('/unified/:audit_id/reject', authMiddleware.requireAdmin, async (req
     const auditorId = req.user.user_id
 
     if (!reason || reason.trim().length < 5) {
-      return ApiResponse.error(res, '拒绝原因必须提供，且不少于5个字符', 400)
+      return res.apiError('拒绝原因必须提供，且不少于5个字符', 'BAD_REQUEST', null, 400)
     }
 
     const result = await ContentAuditEngine.reject(parseInt(audit_id), auditorId, reason)
 
-    return ApiResponse.success(res, result, '审核拒绝成功')
+    return res.apiSuccess(result, '审核拒绝成功')
   } catch (error) {
     console.error('[统一审核拒绝] 错误:', error)
-    return ApiResponse.error(res, error.message, 500)
+    return res.apiError(error.message, 'INTERNAL_ERROR', null, 500)
   }
 })
 
@@ -296,10 +292,10 @@ router.get('/unified/statistics', authMiddleware.requireAdmin, async (req, res) 
 
     const statistics = await ContentAuditEngine.getAuditStatistics(type)
 
-    return ApiResponse.success(res, statistics, '获取统计信息成功')
+    return res.apiSuccess(statistics, '获取统计信息成功')
   } catch (error) {
     console.error('[获取统一审核统计] 错误:', error)
-    return ApiResponse.error(res, error.message, 500)
+    return res.apiError(error.message, 'INTERNAL_ERROR', null, 500)
   }
 })
 
@@ -349,19 +345,17 @@ router.get('/audit-logs', authMiddleware.requireAdmin, async (req, res) => {
 
     const logs = await auditLogMiddleware.queryAuditLogs(queryOptions)
 
-    return ApiResponse.success(
-      res,
-      {
-        count: logs.length,
-        limit: limitNum,
-        offset: offsetNum,
-        logs
-      },
-      '查询审计日志成功'
+    return res.apiSuccess({
+      count: logs.length,
+      limit: limitNum,
+      offset: offsetNum,
+      logs
+    },
+    '查询审计日志成功'
     )
   } catch (error) {
     console.error('[查询审计日志] 错误:', error)
-    return ApiResponse.error(res, error.message, 500)
+    return res.apiError(error.message, 'INTERNAL_ERROR', null, 500)
   }
 })
 
@@ -384,10 +378,10 @@ router.get('/audit-logs/statistics', authMiddleware.requireAdmin, async (req, re
       endDate: end_date
     })
 
-    return ApiResponse.success(res, statistics, '获取审计日志统计成功')
+    return res.apiSuccess(statistics, '获取审计日志统计成功')
   } catch (error) {
     console.error('[审计日志统计] 错误:', error)
-    return ApiResponse.error(res, error.message, 500)
+    return res.apiError(error.message, 'INTERNAL_ERROR', null, 500)
   }
 })
 
@@ -412,13 +406,13 @@ router.get('/audit-logs/:log_id', authMiddleware.requireAdmin, async (req, res) 
     })
 
     if (!log) {
-      return ApiResponse.error(res, '审计日志不存在', 404)
+      return res.apiError('审计日志不存在', 'NOT_FOUND', null, 404)
     }
 
-    return ApiResponse.success(res, log, '获取审计日志详情成功')
+    return res.apiSuccess(log, '获取审计日志详情成功')
   } catch (error) {
     console.error('[获取审计日志详情] 错误:', error)
-    return ApiResponse.error(res, error.message, 500)
+    return res.apiError(error.message, 'INTERNAL_ERROR', null, 500)
   }
 })
 

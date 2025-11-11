@@ -238,6 +238,29 @@ module.exports = sequelize => {
         allowNull: true,
         comment: '批次ID'
       },
+      /**
+       * 批次抽奖ID（连抽功能专用）
+       *
+       * 业务含义：
+       * - 用于关联同一批次（10连抽）的多条抽奖记录
+       * - 格式：batch_<timestamp>_<user_id>
+       * - 示例：batch_l8k9j2_123
+       *
+       * 使用场景：
+       * - 查询"我的10连抽历史"
+       * - 统计"本批次中奖情况"
+       * - 支持批次级别的业务分析
+       *
+       * 技术特征：
+       * - 允许NULL（单次抽奖没有批次ID）
+       * - 有索引支持（快速查询）
+       * - 不是外键（避免额外约束）
+       */
+      batch_draw_id: {
+        type: DataTypes.STRING(50),
+        allowNull: true,
+        comment: '批次抽奖ID（连抽时使用，用于关联同一批次的多次抽奖）'
+      },
 
       // 核心业务字段
       /**

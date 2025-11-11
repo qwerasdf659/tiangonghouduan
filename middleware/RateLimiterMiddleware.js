@@ -44,6 +44,17 @@ class RateLimiterMiddleware {
         keyPrefix: 'rate_limit:login:',
         message: '登录尝试次数过多，请稍后再试',
         keyGenerator: 'ip' // 按IP限流
+      },
+      /*
+       * 聊天消息发送限流（Chat Message Sending Rate Limit）
+       * 防止用户恶意刷屏，保护系统稳定性
+       */
+      chat: {
+        windowMs: 60 * 1000, // 1分钟窗口
+        max: 10, // 最多10条消息/分钟
+        keyPrefix: 'rate_limit:chat:',
+        message: '发送消息过于频繁，请稍后重试',
+        keyGenerator: 'user' // 按用户ID限流
       }
     }
 

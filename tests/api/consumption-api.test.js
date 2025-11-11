@@ -2,11 +2,12 @@
  * 餐厅积分抽奖系统 V4.0 - 消费记录API测试套件
  * 业务场景：商家扫码录入方案A
  * 创建时间：2025年10月30日 北京时间
+ * 最后更新：2025年11月7日 北京时间
  * 使用模型：Claude Sonnet 4.5
  *
  * 测试覆盖：
  * 1. 生成用户二维码 GET /api/v4/consumption/qrcode/:user_id
- * 2. 验证二维码 POST /api/v4/consumption/validate-qrcode
+ * 2. 验证二维码并获取用户信息 GET /api/v4/consumption/user-info （替代原validate-qrcode接口）
  * 3. 商家提交消费记录 POST /api/v4/consumption/submit
  * 4. 用户查询消费记录 GET /api/v4/consumption/user/:user_id
  * 5. 查询消费记录详情 GET /api/v4/consumption/detail/:record_id
@@ -113,14 +114,14 @@ describe('消费记录API测试套件', () => {
       console.log(`✅ 二维码生成成功: ${test_qr_code}`)
     })
 
-    test('POST /api/v4/consumption/validate-qrcode - 验证二维码有效性', async () => {
-      console.log('\n✅ 测试：验证二维码有效性')
+    test('GET /api/v4/consumption/user-info - 验证二维码并获取用户信息', async () => {
+      console.log('\n✅ 测试：验证二维码并获取用户信息（管理员功能）')
 
       const response = await tester.makeAuthenticatedRequest(
-        'POST',
-        '/api/v4/consumption/validate-qrcode',
-        { qr_code: test_qr_code },
-        'regular'
+        'GET',
+        `/api/v4/consumption/user-info?qr_code=${test_qr_code}`,
+        null,
+        'admin' // 需要管理员权限
       )
 
       console.log('响应状态:', response.status)
@@ -128,20 +129,25 @@ describe('消费记录API测试套件', () => {
 
       expect(response.status).toBe(200)
       expect(response.data.success).toBe(true)
-      expect(response.data.data.valid).toBe(true)
       expect(response.data.data.user_id).toBe(test_account.user_id)
+      expect(response.data.data.nickname).toBeDefined()
+      expect(response.data.data.mobile).toBe(test_account.phone)
+      expect(response.data.data.qr_code).toBe(test_qr_code)
 
-      console.log(`✅ 二维码验证通过，用户ID: ${response.data.data.user_id}`)
+      console.log('✅ 二维码验证通过，获取用户信息成功:')
+      console.log(`   用户ID: ${response.data.data.user_id}`)
+      console.log(`   昵称: ${response.data.data.nickname}`)
+      console.log(`   手机号: ${response.data.data.mobile}`)
     })
 
-    test('POST /api/v4/consumption/validate-qrcode - 验证无效二维码', async () => {
+    test('GET /api/v4/consumption/user-info - 验证无效二维码', async () => {
       console.log('\n❌ 测试：验证无效二维码（应该失败）')
 
       const response = await tester.makeAuthenticatedRequest(
-        'POST',
-        '/api/v4/consumption/validate-qrcode',
-        { qr_code: 'QR_999_invalid_signature' },
-        'regular'
+        'GET',
+        '/api/v4/consumption/user-info?qr_code=QR_999_invalid_signature',
+        null,
+        'admin'
       )
 
       console.log('响应状态:', response.status)

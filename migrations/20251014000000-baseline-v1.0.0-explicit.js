@@ -185,7 +185,7 @@ module.exports = {
           allowNull: true,
           comment: '注册来源'
         },
-        last_login_at: {
+        last_login: {
           type: Sequelize.DATE,
           allowNull: true,
           comment: '最后登录时间'

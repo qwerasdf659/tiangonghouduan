@@ -1,0 +1,250 @@
+/**
+ * 创建聊天会话API并发测试
+ * 测试目的：验证数据库唯一索引(user_id, is_active_session)是否正确防止并发创建重复会话
+ *
+ * 测试场景：
+ * 1. 单用户并发创建10个会话，验证最终只有1个会话被创建
+ * 2. 验证所有并发请求都能成功返回（有些返回新创建的，有些返回现有的）
+ * 3. 验证频率限制功能是否正常工作
+ *
+ * 依赖的数据库索引：
+ * - UNIQUE INDEX idx_user_active_session ON customer_service_sessions(user_id, is_active_session)
+ */
+
+const request = require('supertest')
+const app = require('../../app')
+const { sequelize, CustomerServiceSession } = require('../../models')
+
+// 测试账号（需要是真实存在的用户）
+let TEST_USER_ID = null // 动态获取登录用户的user_id
+
+describe('创建聊天会话API并发测试（方案A：唯一索引+重试）', () => {
+  let authToken = null
+
+  // 测试前准备：登录获取token
+  beforeAll(async () => {
+    console.log('\n===== 测试前准备 =====')
+
+    // 登录获取token（使用V4统一认证引擎）
+    const loginResponse = await request(app).post('/api/v4/unified-engine/auth/login').send({
+      mobile: '13612227930',
+      verification_code: '123456' // 开发环境万能验证码
+    })
+
+    if (loginResponse.status !== 200) {
+      throw new Error(`登录失败: ${JSON.stringify(loginResponse.body)}`)
+    }
+
+    authToken = loginResponse.body.data.access_token
+    TEST_USER_ID = loginResponse.body.data.user.user_id // 动态获取user_id
+    console.log(`✅ 登录成功，user_id: ${TEST_USER_ID}`)
+  }, 60000) // 增加超时时间为60秒
+
+  // 测试前清理：删除测试用户的所有会话
+  beforeEach(async () => {
+    console.log('\n===== 清理测试数据 =====')
+
+    await CustomerServiceSession.destroy({
+      where: { user_id: TEST_USER_ID },
+      force: true // 物理删除，不使用软删除
+    })
+
+    const remainingSessions = await CustomerServiceSession.count({
+      where: { user_id: TEST_USER_ID }
+    })
+
+    console.log(`✅ 测试用户${TEST_USER_ID}的会话已清理，剩余: ${remainingSessions}个`)
+    expect(remainingSessions).toBe(0)
+  })
+
+  // 测试后清理
+  afterAll(async () => {
+    console.log('\n===== 测试后清理 =====')
+
+    // 清理测试数据
+    await CustomerServiceSession.destroy({
+      where: { user_id: TEST_USER_ID },
+      force: true
+    })
+
+    // 关闭数据库连接
+    await sequelize.close()
+    console.log('✅ 数据库连接已关闭')
+  })
+
+  /**
+   * 测试场景1：并发创建会话（验证唯一索引约束）
+   */
+  test('场景1：10个并发请求创建会话，最终只有1个会话被创建', async () => {
+    console.log('\n===== 测试场景1：并发创建会话 =====')
+
+    const concurrentRequests = 10 // 并发请求数量
+    const promises = []
+
+    console.log(`🚀 发起${concurrentRequests}个并发创建会话请求...`)
+
+    // 并发发起10个创建会话请求
+    for (let i = 0; i < concurrentRequests; i++) {
+      const promise = request(app)
+        .post('/api/v4/system/chat/create')
+        .set('Authorization', `Bearer ${authToken}`)
+        .send()
+
+      promises.push(promise)
+    }
+
+    // 等待所有请求完成
+    const responses = await Promise.all(promises)
+
+    console.log('\n📊 并发请求结果统计:')
+    console.log(`- 总请求数: ${responses.length}`)
+
+    // 统计响应状态
+    const successCount = responses.filter(r => r.status === 200).length
+    const errorCount = responses.filter(r => r.status !== 200).length
+
+    console.log(`- 成功响应(200): ${successCount}`)
+    console.log(`- 错误响应: ${errorCount}`)
+
+    // 验证：所有请求都应该成功（即使并发创建冲突，也应返回现有会话）
+    expect(successCount).toBe(concurrentRequests)
+    expect(errorCount).toBe(0)
+
+    // 提取所有响应的session_id
+    const sessionIds = responses.map(r => r.body.data?.session_id).filter(Boolean)
+    const uniqueSessionIds = [...new Set(sessionIds)]
+
+    console.log('\n🔍 会话创建结果:')
+    console.log(`- 返回的session_id数量: ${sessionIds.length}`)
+    console.log(`- 唯一的session_id数量: ${uniqueSessionIds.length}`)
+    console.log(`- session_id列表: ${JSON.stringify(uniqueSessionIds)}`)
+
+    // 核心验证：所有响应返回的session_id应该相同（因为唯一索引约束）
+    expect(uniqueSessionIds.length).toBe(1)
+    console.log(`✅ 所有并发请求返回相同的session_id: ${uniqueSessionIds[0]}`)
+
+    // 数据库验证：查询实际创建的会话数量
+    const actualSessions = await CustomerServiceSession.findAll({
+      where: {
+        user_id: TEST_USER_ID,
+        status: ['waiting', 'assigned', 'active']
+      }
+    })
+
+    console.log('\n🗄️ 数据库验证:')
+    console.log(`- 实际创建的活跃会话数量: ${actualSessions.length}`)
+
+    // 核心验证：数据库中应该只有1个活跃会话
+    expect(actualSessions.length).toBe(1)
+    console.log('✅ 数据库中只有1个活跃会话（唯一索引生效）')
+
+    // 验证会话字段
+    const session = actualSessions[0]
+    expect(session.user_id).toBe(TEST_USER_ID)
+    expect(session.status).toBe('waiting')
+    expect(session.source).toBe('mobile')
+    console.log('✅ 会话字段验证通过')
+  }, 30000) // 30秒超时
+
+  /**
+   * 测试场景2：验证频率限制功能
+   */
+  test('场景2：短时间内快速创建会话触发频率限制', async () => {
+    console.log('\n===== 测试场景2：频率限制功能 =====')
+
+    // 从业务配置读取频率限制参数
+    const businessConfig = require('../../config/business.config')
+    const rateLimit = businessConfig.chat.create_session_limit.max_creates_per_window
+
+    console.log(`📊 频率限制配置: ${rateLimit}次/${businessConfig.chat.create_session_limit.time_window_seconds}秒`)
+
+    const requests = []
+
+    console.log(`🚀 快速发起${rateLimit + 2}个创建会话请求（超过限制${rateLimit}次）...`)
+
+    // 快速发起请求（超过频率限制）
+    for (let i = 0; i < rateLimit + 2; i++) {
+      const promise = request(app)
+        .post('/api/v4/system/chat/create')
+        .set('Authorization', `Bearer ${authToken}`)
+        .send()
+
+      requests.push(promise)
+
+      // 快速请求，间隔10ms
+      await new Promise(resolve => setTimeout(resolve, 10))
+    }
+
+    const responses = await Promise.all(requests)
+
+    // 统计响应状态
+    const successResponses = responses.filter(r => r.status === 200)
+    const rateLimitResponses = responses.filter(r => r.status === 429)
+
+    console.log('\n📊 频率限制测试结果:')
+    console.log(`- 成功响应(200): ${successResponses.length}`)
+    console.log(`- 频率限制响应(429): ${rateLimitResponses.length}`)
+
+    // 验证：应该有部分请求被频率限制拦截（返回429）
+    expect(rateLimitResponses.length).toBeGreaterThan(0)
+    console.log('✅ 频率限制功能正常工作')
+
+    // 验证429响应的错误码和消息
+    if (rateLimitResponses.length > 0) {
+      const rateLimitError = rateLimitResponses[0].body
+      console.log('\n🔍 频率限制响应内容:')
+      console.log(JSON.stringify(rateLimitError, null, 2))
+
+      expect(rateLimitError.code).toBe('RATE_LIMIT_EXCEEDED')
+      expect(rateLimitError.message).toContain('频繁')
+      console.log('✅ 频率限制错误消息正确')
+    }
+  }, 30000)
+
+  /**
+   * 测试场景3：验证唯一索引异常处理逻辑
+   */
+  test('场景3：验证SequelizeUniqueConstraintError异常正确处理', async () => {
+    console.log('\n===== 测试场景3：唯一索引异常处理 =====')
+
+    // 第一次创建会话（成功）
+    console.log('🚀 第1次创建会话...')
+    const response1 = await request(app)
+      .post('/api/v4/system/chat/create')
+      .set('Authorization', `Bearer ${authToken}`)
+      .send()
+
+    expect(response1.status).toBe(200)
+    const sessionId1 = response1.body.data.session_id
+    console.log(`✅ 第1次创建成功，session_id: ${sessionId1}`)
+
+    // 等待1秒（避免频率限制）
+    await new Promise(resolve => setTimeout(resolve, 1000))
+
+    // 第二次创建会话（应该返回现有会话）
+    console.log('\n🚀 第2次创建会话（应返回现有会话）...')
+    const response2 = await request(app)
+      .post('/api/v4/system/chat/create')
+      .set('Authorization', `Bearer ${authToken}`)
+      .send()
+
+    expect(response2.status).toBe(200)
+    const sessionId2 = response2.body.data.session_id
+    console.log(`✅ 第2次请求成功，session_id: ${sessionId2}`)
+
+    // 验证：两次返回的session_id应该相同
+    expect(sessionId1).toBe(sessionId2)
+    console.log('✅ 两次返回相同的session_id，符合预期')
+
+    // 数据库验证：应该只有1个会话
+    const sessionCount = await CustomerServiceSession.count({
+      where: {
+        user_id: TEST_USER_ID,
+        status: ['waiting', 'assigned', 'active']
+      }
+    })
+
+    expect(sessionCount).toBe(1)
+    console.log('✅ 数据库中只有1个活跃会话')
+  }, 30000)
+})

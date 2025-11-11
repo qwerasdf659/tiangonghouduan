@@ -150,6 +150,10 @@ class DataSanitizer {
         used_at: item.used_at,
         // 🔒 P0修复：核销码脱敏（完整码→******）
         verification_code: item.verification_code ? '******' : null,
+        // ✅ 转让追踪字段（Transfer Tracking Fields - 公开信息，不敏感）
+        transfer_count: item.transfer_count, // 转让次数（Transfer Count - 物品被转让的次数）
+        last_transfer_at: item.last_transfer_at, // 最后转让时间（Last Transfer Time - 物品最后一次被转让的时间）
+        last_transfer_from: item.last_transfer_from, // 最后转让来源用户（Last Transfer From - 物品最后一次从哪个用户转来）
         created_at: item.created_at,
         updated_at: item.updated_at
       }
@@ -375,26 +379,53 @@ class DataSanitizer {
    * const publicSessions = DataSanitizer.sanitizeChatSessions(sessions, 'public')
    * // 返回：移除敏感字段，只返回基础会话信息
    */
+  /**
+   * 聊天会话数据脱敏
+   *
+   * 业务场景：聊天会话列表API响应时调用，防止用户通过抓包获取敏感信息
+   *
+   * 脱敏规则：
+   * - 管理员（dataLevel='full'）：返回完整会话数据（包含internal_notes、escalation_reasons等）
+   * - 普通用户（dataLevel='public'）：仅返回基础字段（session_id、type、status、messages、created_at）
+   *
+   * 数据安全：
+   * - 移除敏感字段：internal_notes（内部备注）、escalation_reasons（升级原因）、admin_notes（客服备注）
+   * - 保留业务字段：session_id、type、status、messages（消息关联数据）、created_at
+   *
+   * @param {Array} sessions - 会话列表数组（Sequelize查询结果）
+   * @param {string} dataLevel - 数据级别（'full'管理员完整数据 / 'public'普通用户脱敏数据）
+   * @returns {Array} 脱敏后的会话列表数组
+   *
+   * @example
+   * // 管理员查看完整数据
+   * const adminSessions = DataSanitizer.sanitizeChatSessions(sessions, 'full')
+   *
+   * @example
+   * // 普通用户查看脱敏数据
+   * const publicSessions = DataSanitizer.sanitizeChatSessions(sessions, 'public')
+   */
   static sanitizeChatSessions (sessions, dataLevel) {
+    // 管理员权限：返回完整数据（不脱敏）
     if (dataLevel === 'full') {
-      return sessions // 管理员看完整数据
+      return sessions
     }
 
-    return sessions.map(session => ({
-      session_id: session.session_id,
-      type: session.type,
-      status: session.status,
-      last_message: session.last_message
-        ? {
-          content: session.last_message.content,
-          sender_type: session.last_message.sender_type,
-          created_at: session.last_message.created_at
-        }
-        : null,
-      unread_count: session.unread_count || 0,
-      created_at: session.created_at
-      // ❌ 移除敏感字段：internal_notes, escalation_reasons, admin_notes
-    }))
+    // 普通用户权限：返回脱敏数据（仅保留基础业务字段）
+    return sessions.map(session => {
+      // 获取Sequelize实例的原始数据对象
+      const sessionData = session.toJSON ? session.toJSON() : session
+
+      return {
+        session_id: sessionData.session_id, // 会话ID（业务主键）
+        status: sessionData.status, // 会话状态（waiting/assigned/active/closed）
+        messages: sessionData.messages, // 消息关联数据（Sequelize include查询结果）
+        createdAt: sessionData.createdAt // 会话创建时间（北京时间）- 注意：Sequelize返回驼峰命名
+        /*
+         * ❌ 移除敏感字段：internal_notes、escalation_reasons、admin_notes、close_reason、closed_by
+         * ❌ 移除type字段：数据库表中不存在此字段
+         */
+      }
+    })
   }
 
   /**
@@ -430,15 +461,34 @@ class DataSanitizer {
     }
 
     return announcements.map(announcement => ({
-      id: announcement.id,
+      // 🔴 基础字段（7个 - Basic Fields）
+      id: announcement.id || announcement.announcement_id, // 兼容主键字段名（announcement_id是数据库主键）
       title: announcement.title,
       content: announcement.content,
       type: announcement.type,
       priority: announcement.priority,
       created_at: announcement.created_at,
       expires_at: announcement.expires_at,
-      is_active: announcement.is_active
-      // ❌ 移除敏感字段：admin_id, internal_notes, target_groups
+      is_active: announcement.is_active,
+
+      /*
+       * ✅ 新增公开字段（2个 - 修复P0级别字段丢失问题，解决前端显示异常和运营数据缺失问题）
+       * 业务场景1: view_count用于前端显示"已浏览XX次",提升用户对公告重要性的感知
+       * 业务场景2: view_count用于运营分析,判断公告的实际阅读量和用户关注度
+       * 业务场景3: creator用于前端显示"发布者:XX",增强公告的可信度和权威性
+       */
+      view_count: announcement.view_count || 0, // 浏览次数（默认0,防止undefined显示问题）
+      creator: announcement.creator
+        ? {
+          user_id: announcement.creator.user_id, // 发布者用户ID（用于前端显示和数据追踪）
+          nickname: announcement.creator.nickname // 发布者昵称（用于前端友好显示）
+        }
+        : null // creator为null时返回null,前端可统一处理为"系统管理员"
+
+      /*
+       * ❌ 仍然移除敏感字段（3个 - Sensitive Fields Removed）：admin_id, internal_notes, target_groups
+       * 原因: admin_id暴露管理员ID有安全风险,internal_notes是内部备注不应公开,target_groups是精准推送配置不应公开
+       */
     }))
   }
 
@@ -580,14 +630,18 @@ class DataSanitizer {
       return products // 管理员看完整数据
     }
 
+    // 脱敏处理：只保留公开可见的字段
     return products.map(product => ({
       id: product.id,
       seller_id: product.seller_id,
-      seller_name: this.maskUserName(product.seller_name),
+      // seller_name字段可能不存在，仅在存在时进行脱敏处理
+      ...(product.seller_name && { seller_name: this.maskUserName(product.seller_name) }),
       name: product.name,
       description: product.description,
-      image_url: product.image_url,
-      original_points: product.original_points,
+      // image_url字段可能不存在，仅在存在时包含
+      ...(product.image_url && { image_url: product.image_url }),
+      // original_points字段可能不存在，仅在存在时包含
+      ...(product.original_points !== undefined && { original_points: product.original_points }),
       selling_points: product.selling_points,
       condition: product.condition,
       category: product.category,
@@ -632,20 +686,43 @@ class DataSanitizer {
       return statistics // 管理员看完整数据
     }
 
+    // 用户查看自己的统计数据时，应该包含基本的积分、抽奖、库存等信息
     return {
       user_id: statistics.user_id,
+      account_created: statistics.account_created,
+      last_activity: statistics.last_activity,
+
+      // 抽奖统计（用户应该看到自己的抽奖记录）
       lottery_count: statistics.lottery_count,
+      lottery_wins: statistics.lottery_wins, // 🔥 方案A修复：添加中奖次数
+      lottery_win_rate: statistics.lottery_win_rate, // 🔥 方案A修复：添加中奖率
+
+      // 库存统计（用户应该看到自己的库存）
+      inventory_total: statistics.inventory_total, // 🔥 方案A修复：添加库存总数
+      inventory_available: statistics.inventory_available, // 🔥 方案A修复：添加可用库存
+
+      // 积分统计（用户应该看到自己的积分余额和交易记录）
+      points_balance: statistics.points_balance, // 🔥 方案A修复：添加积分余额（P0风险2核心修复）
+      total_points_earned: statistics.total_points_earned,
+      total_points_consumed: statistics.total_points_consumed, // 🔥 方案A修复：添加消耗积分
+      transaction_count: statistics.transaction_count, // 🔥 方案A修复：添加交易次数
+
+      // 兑换统计
       exchange_count: statistics.exchange_count,
+      exchange_points_spent: statistics.exchange_points_spent, // 🔥 方案A修复：添加兑换花费积分
+
       // 🔄 新业务：商家扫码录入消费记录统计（替代旧的upload_count）
       consumption_count: statistics.consumption_count,
       consumption_amount: statistics.consumption_amount,
       consumption_points: statistics.consumption_points,
-      month_points: statistics.month_points,
-      total_points_earned: statistics.total_points_earned,
-      account_created: statistics.account_created,
-      last_activity: statistics.last_activity,
+
+      // 活跃度评分
+      activity_score: statistics.activity_score, // 🔥 方案A修复：添加活跃度评分
+
+      // 成就徽章
       achievements: statistics.achievements?.filter(a => a.unlocked) || []
-      // ❌ 移除敏感字段：spending_pattern, prediction_model, risk_score
+
+      // ❌ 移除敏感字段：spending_pattern, prediction_model, risk_score（仅管理员可见）
     }
   }
 
@@ -655,19 +732,27 @@ class DataSanitizer {
    * 业务场景：反馈列表API响应时调用，防止用户通过抓包获取用户IP、设备信息、管理员ID、内部备注等敏感信息
    *
    * 脱敏规则：
-   * - 管理员（dataLevel='full'）：返回完整反馈数据
+   * - 管理员（dataLevel='full'）：返回完整反馈数据（包含所有字段）
    * - 普通用户（dataLevel='public'）：移除user_ip（用户IP）、device_info（设备信息）、
    *   admin_id（管理员ID）、internal_notes（内部备注）等敏感字段
-   * - 使用maskAdminName()对管理员名称进行脱敏处理
+   * - 使用maskAdminName()对管理员名称进行脱敏处理（如"张**"）
    *
-   * @param {Array<Object>} feedbacks - 反馈数据数组，包含id、category、user_ip、admin_id等字段
+   * ✅ P0修复（2025-11-08）：
+   * - 修复字段映射：id → feedback_id（使用正确的主键字段）
+   * - 添加缺失字段：priority、estimated_response_time、attachments
+   * - 完善回复信息：支持reply_content字段和admin关联对象
+   *
+   * @param {Array<Object>} feedbacks - 反馈数据数组，包含feedback_id、category、user_ip、admin_id等字段
    * @param {string} dataLevel - 数据级别：'full'（管理员完整数据）或'public'（普通用户脱敏数据）
    * @returns {Array<Object>} 脱敏后的反馈数组
-   * @returns {number} return[].id - 反馈ID
-   * @returns {string} return[].category - 反馈分类
-   * @returns {string} return[].content - 反馈内容
-   * @returns {string} return[].status - 反馈状态
-   * @returns {string} return[].created_at - 创建时间
+   * @returns {number} return[].feedback_id - 反馈ID（✅ P0修复：使用正确的主键字段）
+   * @returns {string} return[].category - 反馈分类（technical/feature/bug/complaint/suggestion/other）
+   * @returns {string} return[].content - 反馈内容（TEXT，1-5000字符）
+   * @returns {string} return[].status - 反馈状态（pending/processing/replied/closed）
+   * @returns {string} return[].priority - 优先级（high/medium/low）✅ 新增字段
+   * @returns {string} return[].created_at - 创建时间（北京时间）
+   * @returns {string} return[].estimated_response_time - 预计响应时间（如"4小时内"）✅ 新增字段
+   * @returns {Array} return[].attachments - 附件URLs（JSON数组）✅ 新增字段
    * @returns {Object|null} return[].reply - 回复对象（包含content、replied_at、admin_name（脱敏））
    *
    * @example
@@ -676,28 +761,40 @@ class DataSanitizer {
    */
   static sanitizeFeedbacks (feedbacks, dataLevel) {
     if (dataLevel === 'full') {
-      return feedbacks // 管理员看完整数据
+      return feedbacks // 管理员看完整数据（包含所有字段）
     }
 
+    // ✅ 普通用户看脱敏数据（移除敏感信息）
     return feedbacks.map(feedback => ({
-      id: feedback.id,
-      category: feedback.category,
-      content: feedback.content,
-      status: feedback.status,
-      created_at: feedback.created_at,
-      reply: feedback.reply
+      id: feedback.feedback_id, // ✅ 商业安全：使用通用id字段（防止抓包泄露表结构）
+      category: feedback.category, // 反馈分类（ENUM: technical/feature/bug/complaint/suggestion/other）
+      content: feedback.content, // 反馈内容（TEXT，1-5000字符）
+      status: feedback.status, // 处理状态（ENUM: pending/processing/replied/closed）
+      priority: feedback.priority, // ✅ 新增：优先级（ENUM: high/medium/low）
+      created_at: feedback.created_at, // 创建时间（DATETIME，北京时间，用户友好格式）
+      created_at_timestamp: feedback.createdAt ? new Date(feedback.createdAt).getTime() : null, // ✅ Unix时间戳（用于排序和时间计算）
+      estimated_response_time: feedback.estimated_response_time, // ✅ 新增：预计响应时间（VARCHAR(50)，如"4小时内"）
+      attachments: feedback.attachments, // ✅ 新增：附件URLs（JSON数组，用户自己上传的，可见）
+      reply: feedback.reply_content
         ? {
-          content: feedback.reply.content,
-          replied_at: feedback.reply.replied_at,
-          admin_name: this.maskAdminName(feedback.reply.admin_name)
+          // ✅ 回复信息（如果管理员已回复）
+          content: feedback.reply_content, // 回复内容（TEXT）
+          replied_at: feedback.replied_at, // 回复时间（DATETIME，北京时间）
+          admin_name: this.maskAdminName(feedback.admin?.nickname || '系统管理员') // 管理员名字脱敏（如"张**"）
         }
         : null
-      // ❌ 移除敏感字段：user_ip, device_info, admin_id, internal_notes
+      /*
+       * ❌ 移除敏感字段（用户不可见，仅管理员可见）：
+       * - user_ip: 用户IP地址（VARCHAR(45)，隐私保护，用于安全审计）
+       * - device_info: 设备信息（JSON对象，隐私保护，用于技术问题复现）
+       * - admin_id: 处理管理员ID（INTEGER，内部信息，用于绩效统计）
+       * - internal_notes: 内部备注（TEXT，管理员沟通用，用户不可见）
+       */
     }))
   }
 
   /**
-   * 兑换记录数据脱敏 - 新增前端需求
+   * 兑换记录数据脱敏 - 新增前端需求（✅ P0修复完成）
    *
    * 业务场景：兑换记录列表API响应时调用，防止用户通过抓包获取追踪详情、成本分析等敏感信息
    *
@@ -706,17 +803,27 @@ class DataSanitizer {
    * - 普通用户（dataLevel='public'）：移除tracking_details（追踪详情）、cost_analysis（成本分析）等敏感字段
    * - 只返回业务必需的兑换信息：ID、用户ID、商品ID、商品名称、积分成本、数量、状态、兑换时间、配送信息（简化版）
    *
-   * @param {Array<Object>} records - 兑换记录数组，包含id、user_id、product_id、tracking_details等字段
+   * ✅ P0修复（2025-11-09）：
+   * - 修复主键字段：id → exchange_id（使用正确的数据库主键字段名）
+   * - 修复商品名称：支持关联查询（record.product?.name）和快照（record.product_snapshot?.name）
+   * - 修复积分字段：统一使用total_points字段名
+   * - 新增必要字段：space、exchange_code、expires_at、used_at
+   *
+   * @param {Array<Object>} records - 兑换记录数组，包含exchange_id、user_id、product_id、tracking_details等字段
    * @param {string} dataLevel - 数据级别：'full'（管理员完整数据）或'public'（普通用户脱敏数据）
    * @returns {Array<Object>} 脱敏后的兑换记录数组
-   * @returns {number} return[].id - 记录ID
+   * @returns {number} return[].exchange_id - 兑换记录ID（✅ 修复：使用正确的主键字段）
    * @returns {number} return[].user_id - 用户ID
    * @returns {number} return[].product_id - 商品ID
-   * @returns {string} return[].product_name - 商品名称
-   * @returns {number} return[].points_cost - 积分成本（使用total_points字段）
-   * @returns {number} return[].quantity - 数量
-   * @returns {string} return[].status - 状态
-   * @returns {string} return[].exchange_time - 兑换时间
+   * @returns {string} return[].product_name - 商品名称（✅ 修复：支持关联查询和快照）
+   * @returns {number} return[].total_points - 消耗积分总数（✅ 修复：统一使用total_points字段名）
+   * @returns {number} return[].quantity - 兑换数量
+   * @returns {string} return[].status - 订单状态（pending/distributed/used/expired/cancelled）
+   * @returns {string} return[].space - 兑换空间（lucky/premium）✅ 新增字段
+   * @returns {string} return[].exchange_code - 兑换码（用户核销凭证）✅ 新增字段
+   * @returns {string} return[].exchange_time - 兑换时间（北京时间）
+   * @returns {string|null} return[].expires_at - 过期时间（北京时间）✅ 新增字段
+   * @returns {string|null} return[].used_at - 使用时间（北京时间）✅ 新增字段
    * @returns {Object} return[].delivery_info - 配送信息（简化版，包含method、code、expires_at）
    *
    * @example
@@ -729,19 +836,47 @@ class DataSanitizer {
     }
 
     return records.map(record => ({
-      id: record.id,
+      // ✅ P0修复：使用正确的主键字段名（exchange_id而不是id）
+      exchange_id: record.exchange_id,
+
+      // ✅ 基本字段（用户ID、商品ID、数量）
       user_id: record.user_id,
       product_id: record.product_id,
-      product_name: record.product_name,
-      points_cost: record.total_points, // ✅ 修复：使用正确的数据库字段total_points
-      quantity: record.quantity,
-      status: record.status,
+
+      /*
+       * ✅ P0修复：支持关联查询和快照两种方式获取商品名称
+       * 关联查询：record.product?.name（通过include查询Product表）
+       * 商品快照：record.product_snapshot?.name（兑换时保存的商品信息）
+       */
+      product_name: record.product?.name || record.product_snapshot?.name || '未知商品',
+
+      // ✅ P0修复：统一使用数据库字段名（total_points），前端也使用total_points
+      total_points: record.total_points, // 消耗积分总数
+
+      quantity: record.quantity, // 兑换数量
+      status: record.status, // 订单状态（pending/distributed/used/expired/cancelled）
+
+      // ✅ P0修复：新增兑换空间字段（lucky=幸运空间，premium=臻选空间）
+      space: record.space,
+
+      // ✅ P0修复：新增兑换码字段（用户核销凭证，前端必需显示）
+      exchange_code: record.exchange_code,
+
+      // ✅ P0修复：新增兑换时间字段（前端显示必需，北京时间）
       exchange_time: record.exchange_time,
+
+      // ✅ P0修复：新增过期时间字段（前端显示兑换码有效期）
+      expires_at: record.expires_at,
+
+      // ✅ P0修复：新增使用时间字段（前端显示核销时间，已使用订单显示）
+      used_at: record.used_at,
+
+      // ✅ 配送信息（保留必要字段，移除敏感字段）
       delivery_info: {
-        method: record.delivery_info?.method,
-        code: record.delivery_info?.code,
-        expires_at: record.delivery_info?.expires_at
-        // ❌ 移除敏感字段：tracking_details, cost_analysis
+        method: record.delivery_info?.method, // 配送方式（自提/快递）
+        code: record.delivery_info?.code, // 配送单号
+        expires_at: record.delivery_info?.expires_at // 配送截止时间
+        // ❌ 移除敏感字段：tracking_details（详细物流信息）, cost_analysis（成本分析）
       }
     }))
   }

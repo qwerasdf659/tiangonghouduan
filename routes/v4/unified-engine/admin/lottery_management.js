@@ -26,10 +26,11 @@ const {
  */
 router.post('/force-win', adminAuthMiddleware, asyncHandler(async (req, res) => {
   try {
-    const { user_id, reason = '管理员强制中奖' } = req.body
+    const { user_id, prize_id, reason = '管理员强制中奖', duration_minutes = null } = req.body
 
     // 参数验证
     const validatedUserId = validators.validateUserId(user_id)
+    const validatedPrizeId = validators.validatePrizeId(prize_id)
 
     // 查找用户
     const user = await models.User.findByPk(validatedUserId)
@@ -37,35 +38,55 @@ router.post('/force-win', adminAuthMiddleware, asyncHandler(async (req, res) => 
       return res.apiError('用户不存在', 'USER_NOT_FOUND')
     }
 
-    // 调用管理策略设置强制中奖
-    const result = await sharedComponents.managementStrategy.forceWin({
-      user_id: validatedUserId,
-      admin_id: req.user?.id,
+    // 查找奖品
+    const prize = await models.LotteryPrize.findByPk(validatedPrizeId)
+    if (!prize) {
+      return res.apiError('奖品不存在', 'PRIZE_NOT_FOUND')
+    }
+
+    // 计算过期时间（如果提供了持续时间）
+    let expiresAt = null
+    if (duration_minutes && !isNaN(parseInt(duration_minutes))) {
+      expiresAt = BeijingTimeHelper.futureTime(parseInt(duration_minutes) * 60 * 1000)
+    }
+
+    // 调用管理策略设置强制中奖（V4.1新签名：adminId, targetUserId, prizeId, reason, expiresAt）
+    const result = await sharedComponents.managementStrategy.forceWin(
+      req.user?.user_id || req.user?.id,
+      validatedUserId,
+      validatedPrizeId,
       reason,
-      timestamp: BeijingTimeHelper.getCurrentTime()
-    })
+      expiresAt
+    )
 
     if (result.success) {
       sharedComponents.logger.info('强制中奖设置成功', {
+        setting_id: result.setting_id,
         user_id: validatedUserId,
-        admin_id: req.user?.id,
+        prize_id: validatedPrizeId,
+        admin_id: req.user?.user_id || req.user?.id,
         reason,
-        timestamp: BeijingTimeHelper.getCurrentTime()
+        expires_at: expiresAt,
+        timestamp: result.timestamp
       })
 
       return res.apiSuccess({
+        setting_id: result.setting_id,
         user_id: validatedUserId,
         user_mobile: user.mobile,
+        prize_id: validatedPrizeId,
+        prize_name: prize.prize_name,
         status: 'force_win_set',
         reason,
-        admin_id: req.user?.id,
-        timestamp: BeijingTimeHelper.getCurrentTime()
+        expires_at: expiresAt,
+        admin_id: req.user?.user_id || req.user?.id,
+        timestamp: result.timestamp
       }, '强制中奖设置成功')
     } else {
       return res.apiError(result.error || '强制中奖设置失败', 'FORCE_WIN_FAILED')
     }
   } catch (error) {
-    if (error.message.includes('无效的')) {
+    if (error.message.includes('无效的') || error.message.includes('不存在') || error.message.includes('验证失败')) {
       return res.apiError(error.message, 'VALIDATION_ERROR')
     }
     sharedComponents.logger.error('强制中奖设置失败', { error: error.message })
@@ -82,7 +103,7 @@ router.post('/force-win', adminAuthMiddleware, asyncHandler(async (req, res) => 
  */
 router.post('/force-lose', adminAuthMiddleware, asyncHandler(async (req, res) => {
   try {
-    const { user_id, count = 1, reason = '管理员强制不中奖' } = req.body
+    const { user_id, count = 1, reason = '管理员强制不中奖', duration_minutes = null } = req.body
 
     // 参数验证
     const validatedUserId = validators.validateUserId(user_id)
@@ -97,38 +118,50 @@ router.post('/force-lose', adminAuthMiddleware, asyncHandler(async (req, res) =>
       return res.apiError('用户不存在', 'USER_NOT_FOUND')
     }
 
-    // 调用管理策略设置强制不中奖
-    const result = await sharedComponents.managementStrategy.forceLose({
-      user_id: validatedUserId,
-      count: parseInt(count),
-      admin_id: req.user?.id,
+    // 计算过期时间（如果提供了持续时间）
+    let expiresAt = null
+    if (duration_minutes && !isNaN(parseInt(duration_minutes))) {
+      expiresAt = BeijingTimeHelper.futureTime(parseInt(duration_minutes) * 60 * 1000)
+    }
+
+    // 调用管理策略设置强制不中奖（V4.1新签名：adminId, targetUserId, count, reason, expiresAt）
+    const result = await sharedComponents.managementStrategy.forceLose(
+      req.user?.user_id || req.user?.id,
+      validatedUserId,
+      parseInt(count),
       reason,
-      timestamp: BeijingTimeHelper.getCurrentTime()
-    })
+      expiresAt
+    )
 
     if (result.success) {
       sharedComponents.logger.info('强制不中奖设置成功', {
+        setting_id: result.setting_id,
         user_id: validatedUserId,
         count: parseInt(count),
-        admin_id: req.user?.id,
+        remaining: result.remaining,
+        admin_id: req.user?.user_id || req.user?.id,
         reason,
-        timestamp: BeijingTimeHelper.getCurrentTime()
+        expires_at: expiresAt,
+        timestamp: result.timestamp
       })
 
       return res.apiSuccess({
+        setting_id: result.setting_id,
         user_id: validatedUserId,
         user_mobile: user.mobile,
         status: 'force_lose_set',
         count: parseInt(count),
+        remaining: result.remaining,
         reason,
-        admin_id: req.user?.id,
-        timestamp: BeijingTimeHelper.getCurrentTime()
+        expires_at: expiresAt,
+        admin_id: req.user?.user_id || req.user?.id,
+        timestamp: result.timestamp
       }, `强制不中奖设置成功，将在接下来${count}次抽奖中不中奖`)
     } else {
       return res.apiError(result.error || '强制不中奖设置失败', 'FORCE_LOSE_FAILED')
     }
   } catch (error) {
-    if (error.message.includes('无效的')) {
+    if (error.message.includes('无效的') || error.message.includes('不存在') || error.message.includes('验证失败')) {
       return res.apiError(error.message, 'VALIDATION_ERROR')
     }
     sharedComponents.logger.error('强制不中奖设置失败', { error: error.message })
@@ -172,37 +205,38 @@ router.post('/probability-adjust', adminAuthMiddleware, asyncHandler(async (req,
     // 计算过期时间
     const expiresAt = BeijingTimeHelper.futureTime(parseInt(duration_minutes) * 60 * 1000)
 
-    // 调用管理策略设置概率调整
-    const result = await sharedComponents.managementStrategy.adjustProbability({
-      user_id: validatedUserId,
-      probability_multiplier: multiplier,
-      expires_at: expiresAt,
-      admin_id: req.user?.id,
+    // 调用管理策略设置概率调整（V4.1新签名：adminId, targetUserId, multiplier, reason, expiresAt）
+    const result = await sharedComponents.managementStrategy.adjustProbability(
+      req.user?.user_id || req.user?.id,
+      validatedUserId,
+      multiplier,
       reason,
-      timestamp: BeijingTimeHelper.getCurrentTime()
-    })
+      expiresAt
+    )
 
     if (result.success) {
       sharedComponents.logger.info('用户概率调整成功', {
+        setting_id: result.setting_id,
         user_id: validatedUserId,
-        probability_multiplier: multiplier,
+        probability_multiplier: result.multiplier,
         duration_minutes: parseInt(duration_minutes),
         expires_at: expiresAt,
-        admin_id: req.user?.id,
+        admin_id: req.user?.user_id || req.user?.id,
         reason,
-        timestamp: BeijingTimeHelper.getCurrentTime()
+        timestamp: result.timestamp
       })
 
       return res.apiSuccess({
+        setting_id: result.setting_id,
         user_id: validatedUserId,
         user_mobile: user.mobile,
         status: 'probability_adjusted',
-        probability_multiplier: multiplier,
+        probability_multiplier: result.multiplier,
         duration_minutes: parseInt(duration_minutes),
         expires_at: expiresAt,
         reason,
-        admin_id: req.user?.id,
-        timestamp: BeijingTimeHelper.getCurrentTime()
+        admin_id: req.user?.user_id || req.user?.id,
+        timestamp: result.timestamp
       }, `用户概率调整成功，倍数${multiplier}，持续${duration_minutes}分钟`)
     } else {
       return res.apiError(result.error || '概率调整失败', 'PROBABILITY_ADJUST_FAILED')
@@ -259,42 +293,46 @@ router.post('/user-specific-queue', adminAuthMiddleware, asyncHandler(async (req
     // 计算过期时间
     const expiresAt = BeijingTimeHelper.futureTime(parseInt(duration_minutes) * 60 * 1000)
 
-    // 调用管理策略设置用户特定队列
-    const result = await sharedComponents.managementStrategy.setUserQueue({
-      user_id: validatedUserId,
+    // 调用管理策略设置用户特定队列（V4.1新签名：adminId, targetUserId, queueConfig, reason, expiresAt）
+    const queueConfig = {
       queue_type,
       priority_level: parseInt(priority_level),
-      custom_strategy: custom_strategy || null,
-      expires_at: expiresAt,
-      admin_id: req.user?.id,
+      prize_queue: custom_strategy?.prize_queue || []
+    }
+
+    const result = await sharedComponents.managementStrategy.setUserQueue(
+      req.user?.user_id || req.user?.id,
+      validatedUserId,
+      queueConfig,
       reason,
-      timestamp: BeijingTimeHelper.getCurrentTime()
-    })
+      expiresAt
+    )
 
     if (result.success) {
       sharedComponents.logger.info('用户特定队列设置成功', {
+        setting_id: result.setting_id,
         user_id: validatedUserId,
-        queue_type,
-        priority_level: parseInt(priority_level),
+        queue_config: result.queue_config,
         duration_minutes: parseInt(duration_minutes),
         expires_at: expiresAt,
-        admin_id: req.user?.id,
+        admin_id: req.user?.user_id || req.user?.id,
         reason,
-        timestamp: BeijingTimeHelper.getCurrentTime()
+        timestamp: result.timestamp
       })
 
       return res.apiSuccess({
+        setting_id: result.setting_id,
         user_id: validatedUserId,
         user_mobile: user.mobile,
         status: 'user_queue_set',
-        queue_type,
-        priority_level: parseInt(priority_level),
+        queue_type: result.queue_config.queue_type,
+        priority_level: result.queue_config.priority_level,
         custom_strategy: custom_strategy || null,
         duration_minutes: parseInt(duration_minutes),
         expires_at: expiresAt,
         reason,
-        admin_id: req.user?.id,
-        timestamp: BeijingTimeHelper.getCurrentTime()
+        admin_id: req.user?.user_id || req.user?.id,
+        timestamp: result.timestamp
       }, `用户特定队列设置成功，类型：${queue_type}，优先级：${priority_level}，持续${duration_minutes}分钟`)
     } else {
       return res.apiError(result.error || '用户队列设置失败', 'USER_QUEUE_SET_FAILED')
@@ -328,20 +366,57 @@ router.get('/user-status/:user_id', adminAuthMiddleware, asyncHandler(async (req
       return res.apiError('用户不存在', 'USER_NOT_FOUND')
     }
 
-    // 获取用户管理状态
-    const result = await sharedComponents.managementStrategy.getUserManagementStatus(validatedUserId)
+    // 获取用户管理状态（V4.1：直接返回状态对象）
+    const managementStatus = await sharedComponents.managementStrategy.getUserManagementStatus(validatedUserId)
 
-    if (result.success) {
-      return res.apiSuccess({
-        user_id: validatedUserId,
-        user_mobile: user.mobile,
-        user_nickname: user.nickname,
-        management_status: result.data,
-        timestamp: BeijingTimeHelper.getCurrentTime()
-      }, '用户管理状态获取成功')
-    } else {
-      return res.apiError(result.error || '获取用户管理状态失败', 'GET_USER_STATUS_FAILED')
-    }
+    return res.apiSuccess({
+      user_id: validatedUserId,
+      user_mobile: user.mobile,
+      user_nickname: user.nickname,
+      management_status: {
+        force_win: managementStatus.force_win
+          ? {
+            setting_id: managementStatus.force_win.setting_id,
+            prize_id: managementStatus.force_win.setting_data.prize_id,
+            reason: managementStatus.force_win.setting_data.reason,
+            expires_at: managementStatus.force_win.expires_at,
+            status: managementStatus.force_win.status
+          }
+          : null,
+        force_lose: managementStatus.force_lose
+          ? {
+            setting_id: managementStatus.force_lose.setting_id,
+            count: managementStatus.force_lose.setting_data.count,
+            remaining: managementStatus.force_lose.setting_data.remaining,
+            reason: managementStatus.force_lose.setting_data.reason,
+            expires_at: managementStatus.force_lose.expires_at,
+            status: managementStatus.force_lose.status
+          }
+          : null,
+        probability_adjust: managementStatus.probability_adjust
+          ? {
+            setting_id: managementStatus.probability_adjust.setting_id,
+            multiplier: managementStatus.probability_adjust.setting_data.multiplier,
+            reason: managementStatus.probability_adjust.setting_data.reason,
+            expires_at: managementStatus.probability_adjust.expires_at,
+            status: managementStatus.probability_adjust.status
+          }
+          : null,
+        user_queue: managementStatus.user_queue
+          ? {
+            setting_id: managementStatus.user_queue.setting_id,
+            queue_type: managementStatus.user_queue.setting_data.queue_type,
+            priority_level: managementStatus.user_queue.setting_data.priority_level,
+            prize_queue: managementStatus.user_queue.setting_data.prize_queue,
+            current_index: managementStatus.user_queue.setting_data.current_index,
+            reason: managementStatus.user_queue.setting_data.reason,
+            expires_at: managementStatus.user_queue.expires_at,
+            status: managementStatus.user_queue.status
+          }
+          : null
+      },
+      timestamp: BeijingTimeHelper.apiTimestamp()
+    }, '用户管理状态获取成功')
   } catch (error) {
     if (error.message.includes('无效的')) {
       return res.apiError(error.message, 'VALIDATION_ERROR')
@@ -372,31 +447,31 @@ router.delete('/clear-user-settings/:user_id', adminAuthMiddleware, asyncHandler
       return res.apiError('用户不存在', 'USER_NOT_FOUND')
     }
 
-    // 清除用户管理设置
-    const result = await sharedComponents.managementStrategy.clearUserSettings({
-      user_id: validatedUserId,
-      admin_id: req.user?.id,
-      reason,
-      timestamp: BeijingTimeHelper.getCurrentTime()
-    })
+    // 清除用户管理设置（V4.1新签名：adminId, targetUserId, settingType）
+    const result = await sharedComponents.managementStrategy.clearUserSettings(
+      req.user?.user_id || req.user?.id,
+      validatedUserId,
+      null // 清除所有类型
+    )
 
     if (result.success) {
       sharedComponents.logger.info('用户管理设置清除成功', {
         user_id: validatedUserId,
-        admin_id: req.user?.id,
+        cleared_count: result.cleared_count,
+        admin_id: req.user?.user_id || req.user?.id,
         reason,
-        timestamp: BeijingTimeHelper.getCurrentTime()
+        timestamp: result.timestamp
       })
 
       return res.apiSuccess({
         user_id: validatedUserId,
         user_mobile: user.mobile,
         status: 'settings_cleared',
-        cleared_items: result.clearedItems || [],
+        cleared_count: result.cleared_count,
         reason,
-        admin_id: req.user?.id,
-        timestamp: BeijingTimeHelper.getCurrentTime()
-      }, '用户管理设置清除成功')
+        admin_id: req.user?.user_id || req.user?.id,
+        timestamp: result.timestamp
+      }, `用户管理设置清除成功，共清除${result.cleared_count}个设置`)
     } else {
       return res.apiError(result.error || '清除用户设置失败', 'CLEAR_USER_SETTINGS_FAILED')
     }

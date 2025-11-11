@@ -57,7 +57,7 @@ router.get('/status', adminAuthMiddleware, asyncHandler(async (req, res) => {
       lottery_engine: engineStatus,
       api: {
         version: '4.0.0',
-        last_check: BeijingTimeHelper.getCurrentTime()
+        last_check: BeijingTimeHelper.apiTimestamp()
       }
     }
 
@@ -139,7 +139,7 @@ router.get('/dashboard', adminAuthMiddleware, asyncHandler(async (req, res) => {
         timestamp: systemStats.system.timestamp
       },
       engine: engineStats,
-      last_updated: BeijingTimeHelper.getCurrentTime()
+      last_updated: BeijingTimeHelper.apiTimestamp()
     }
 
     return res.apiSuccess(dashboardData, '仪表板数据获取成功')

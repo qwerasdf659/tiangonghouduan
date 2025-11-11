@@ -40,8 +40,13 @@ class QRCodeValidator {
    * 构造函数
    */
   constructor () {
-    // 从环境变量获取签名密钥
-    this.secret = process.env.JWT_SECRET || 'default_secret_key_for_development'
+    // 从环境变量获取签名密钥（强制要求配置，移除默认密钥以提升安全性）
+    this.secret = process.env.JWT_SECRET
+
+    // 安全检查：必须配置JWT_SECRET环境变量
+    if (!this.secret) {
+      throw new Error('JWT_SECRET环境变量未设置，请在.env文件中配置。这是生成和验证二维码签名所必需的密钥。')
+    }
 
     // 签名算法
     this.algorithm = 'sha256'

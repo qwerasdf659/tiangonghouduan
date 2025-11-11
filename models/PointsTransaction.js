@@ -449,8 +449,8 @@ module.exports = sequelize => {
       status: {
         type: DataTypes.ENUM('pending', 'completed', 'failed', 'cancelled'),
         allowNull: false,
-        defaultValue: 'completed',
-        comment: '交易状态'
+        defaultValue: 'pending', // ✅ 与数据库默认值保持一致（Database Default: pending）
+        comment: '交易状态（Transaction Status: pending=待处理/冻结, completed=已完成, failed=失败, cancelled=已取消）'
       },
 
       failure_reason: {
@@ -478,6 +478,61 @@ module.exports = sequelize => {
         allowNull: true,
         defaultValue: null,
         comment: '删除时间（软删除时记录，管理员恢复时清空），时区：北京时间（GMT+8）'
+      },
+
+      // 删除原因（管理员必填，用户可选）
+      deletion_reason: {
+        type: DataTypes.TEXT,
+        allowNull: true,
+        defaultValue: null,
+        comment: '删除原因（管理员必填，用户可选，记录为什么删除该交易记录）'
+      },
+
+      // 删除操作者user_id（记录是谁删除的）
+      deleted_by: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+        defaultValue: null,
+        comment: '删除操作者user_id（记录是谁删除的，用于审计追溯）'
+      },
+
+      /*
+       * ========================================
+       * 恢复审计字段（API#4.10恢复交易记录审计增强）
+       * ========================================
+       * 说明：记录恢复操作的完整审计日志
+       * 参考文档：恢复交易记录API实施方案.md - 方案2审计增强方案
+       */
+      // 恢复操作员ID（记录是谁恢复的记录）
+      restored_by: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+        defaultValue: null,
+        comment: '恢复操作员ID（管理员user_id，NULL表示从未恢复）'
+      },
+
+      // 恢复时间（记录恢复操作的时间）
+      restored_at: {
+        type: DataTypes.DATE(3),
+        allowNull: true,
+        defaultValue: null,
+        comment: '恢复时间（北京时间GMT+8，NULL表示从未恢复）'
+      },
+
+      // 恢复原因（记录为什么恢复该记录）
+      restore_reason: {
+        type: DataTypes.TEXT,
+        allowNull: true,
+        defaultValue: null,
+        comment: '恢复原因（管理员填写，用于审计追溯）'
+      },
+
+      // 恢复次数（记录该记录被恢复的累计次数）
+      restore_count: {
+        type: DataTypes.INTEGER,
+        allowNull: false,
+        defaultValue: 0,
+        comment: '恢复次数（累计被恢复的次数，用于防止滥用）'
       }
     },
     {
@@ -489,6 +544,36 @@ module.exports = sequelize => {
       updated_at: 'updated_at',
       underscored: true,
       comment: '积分交易记录表',
+
+      /*
+       * ========================================
+       * Sequelize Scopes（查询作用域）
+       * ========================================
+       * 用途：自动过滤已删除记录，防止开发人员遗漏WHERE is_deleted=0
+       * 参考文档：删除兑换记录API实施方案.md - 统一软删除机制
+       */
+      // 默认查询作用域：自动过滤已删除记录
+      defaultScope: {
+        where: {
+          is_deleted: 0 // 所有查询默认只返回未删除的记录
+        }
+      },
+
+      // 自定义查询作用域
+      scopes: {
+        // 包含已删除记录的查询（管理员专用）
+        includeDeleted: {
+          where: {} // 查询所有记录，包括已删除的
+        },
+
+        // 只查询已删除的记录（管理员恢复功能专用）
+        onlyDeleted: {
+          where: {
+            is_deleted: 1 // 只返回已删除的记录
+          }
+        }
+      },
+
       indexes: [
         { fields: ['user_id', 'transaction_time'], name: 'idx_pt_user_time' },
         { fields: ['transaction_type'], name: 'idx_pt_transaction_type' },

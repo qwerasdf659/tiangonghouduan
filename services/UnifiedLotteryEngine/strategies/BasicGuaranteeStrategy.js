@@ -393,10 +393,13 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
             })
           }
 
-          // 🎯 步骤2: 再发放奖品（在事务中执行，确保顺序）
+          // 🎯 步骤2: 扣减奖品库存（在事务中执行，防止超卖）
+          await this.deductPrizeStock(prize, internalTransaction)
+
+          // 🎯 步骤3: 发放奖品（在事务中执行，确保顺序）
           await this.distributePrize(user_id, prize, internalTransaction)
 
-          // 🎯 步骤3: 记录抽奖历史（传入draw_id和transaction）
+          // 🎯 步骤4: 记录抽奖历史（传入draw_id和transaction）
           await this.recordLotteryHistory(
             context,
             { is_winner: true, prize },
@@ -733,12 +736,13 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
       // 2. 生成唯一的抽奖ID（用于幂等性控制）
       const draw_id = `draw_${BeijingTimeHelper.generateIdTimestamp()}_${user_id}_${Math.random().toString(36).substr(2, 6)}`
 
-      // 3. 获取九八折券奖品信息
+      // 3. 获取九八折券奖品信息（使用悲观锁防止超卖）
       const guaranteePrize = await models.LotteryPrize.findOne({
         where: {
           prize_id: this.config.guaranteePrize.prizeId,
           campaign_id: campaignId
         },
+        lock: internalTransaction.LOCK.UPDATE, // 🔥 修复：添加悲观锁防止库存超卖
         transaction: internalTransaction
       })
 
@@ -803,9 +807,31 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
         { transaction: internalTransaction }
       )
 
-      // 6. 扣减奖品库存
+      // 6. 扣减奖品库存（原子操作 + 库存验证）
       if (guaranteePrize.stock_quantity > 0) {
-        await guaranteePrize.decrement('stock_quantity', { by: 1, transaction: internalTransaction })
+        // 🔥 修复：使用UPDATE WHERE确保stock_quantity >= 0，防止超卖
+        const [affectedRows] = await models.sequelize.query(
+          'UPDATE lottery_prizes SET stock_quantity = stock_quantity - 1 WHERE prize_id = ? AND stock_quantity >= 1',
+          {
+            replacements: [guaranteePrize.prize_id],
+            transaction: internalTransaction,
+            type: models.sequelize.QueryTypes.UPDATE
+          }
+        )
+
+        if (affectedRows === 0) {
+          // 库存不足，回滚事务
+          if (!isExternalTransaction) {
+            await internalTransaction.rollback()
+          }
+          throw new Error('保底奖品库存不足')
+        }
+
+        this.logInfo('保底奖品库存扣减成功', {
+          prize_id: guaranteePrize.prize_id,
+          prize_name: guaranteePrize.prize_name,
+          remaining_stock: guaranteePrize.stock_quantity - 1
+        })
       }
 
       // 🎯 提交事务 - 仅在独立事务时提交
@@ -1162,6 +1188,64 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
     })
 
     this.logDebug('扣除用户积分（使用PointsService）', { user_id, pointsCost, draw_id })
+  }
+
+  /**
+   * 扣减奖品库存
+   *
+   * 🔥 修复：2025-10-30 - 为所有奖品添加库存扣减逻辑,防止超卖
+   *
+   * 业务场景：在发放奖品前扣减库存，使用原子操作防止超卖
+   *
+   * @param {Object} prize - 奖品信息
+   * @param {number} prize.prize_id - 奖品ID
+   * @param {string} prize.prize_name - 奖品名称
+   * @param {number|null} prize.stock_quantity - 当前库存数量（null表示无限库存）
+   * @param {Transaction} transaction - 事务对象（必需）
+   * @returns {Promise<void>} 无返回值，扣减成功则正常返回，失败则抛出异常
+   *
+   * @throws {Error} 当库存不足时抛出错误
+   *
+   * @example
+   * await strategy.deductPrizeStock(prize, transaction)
+   */
+  async deductPrizeStock (prize, transaction) {
+    // 如果库存为null，表示无限库存，无需扣减
+    if (prize.stock_quantity === null) {
+      this.logInfo('无限库存奖品，跳过库存扣减', {
+        prize_id: prize.prize_id,
+        prize_name: prize.prize_name
+      })
+      return
+    }
+
+    // 检查库存是否充足
+    if (prize.stock_quantity <= 0) {
+      throw new Error(`奖品库存不足：${prize.prize_name}`)
+    }
+
+    const models = require('../../../models')
+
+    // 🔥 使用UPDATE WHERE确保stock_quantity >= 0，防止超卖（原子操作）
+    const [affectedRows] = await models.sequelize.query(
+      'UPDATE lottery_prizes SET stock_quantity = stock_quantity - 1 WHERE prize_id = ? AND stock_quantity >= 1',
+      {
+        replacements: [prize.prize_id],
+        transaction,
+        type: models.sequelize.QueryTypes.UPDATE
+      }
+    )
+
+    if (affectedRows === 0) {
+      // 库存不足（可能被其他并发请求抢走）
+      throw new Error(`奖品库存不足或已售罄：${prize.prize_name}`)
+    }
+
+    this.logInfo('奖品库存扣减成功', {
+      prize_id: prize.prize_id,
+      prize_name: prize.prize_name,
+      remaining_stock: prize.stock_quantity - 1
+    })
   }
 
   /**

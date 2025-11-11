@@ -341,6 +341,30 @@ class BeijingTimeHelper {
   }
 
   /**
+   * 🔧 将任意时间转换为ISO8601格式（带+08:00时区）
+   * 用于API响应中的时间字段标准化
+   * @param {Date|string|null} date - 输入时间（支持Date对象、时间字符串、null）
+   * @returns {string|null} ISO8601格式的时间字符串，如果输入为null则返回null
+   * @example
+   * // 输入: '2025-07-07 00:11:11'
+   * // 输出: '2025-07-07T00:11:11.000+08:00'
+   */
+  static formatToISO (date) {
+    if (!date) return null
+
+    const inputDate = new Date(date)
+    if (isNaN(inputDate.getTime())) return null
+
+    // 转换为北京时间
+    const beijingOffset = 8 * 60 // 北京时间偏移量（分钟）
+    const utc = inputDate.getTime() + inputDate.getTimezoneOffset() * 60000
+    const beijingTime = new Date(utc + beijingOffset * 60000)
+
+    // 返回ISO8601格式带+08:00时区
+    return beijingTime.toISOString().replace('Z', '+08:00')
+  }
+
+  /**
    * 🆕 生成唯一ID用的时间戳字符串
    * @returns {string} 36进制时间戳字符串
    */

@@ -1,14 +1,15 @@
 /**
- * 管理策略（ManagementStrategy）- V4.0 统一架构版本
+ * 管理策略（ManagementStrategy）- V4.1 完整持久化版本
  *
- * 业务场景：管理员使用的抽奖控制功能，提供强制中奖、强制不中奖等管理员操作
+ * 业务场景：管理员使用的抽奖控制功能，提供强制中奖、强制不中奖、概率调整、用户专属队列等功能
  *
  * 核心功能：
- * - 管理员强制中奖：管理员可以为指定用户强制指定中奖奖品
- * - 管理员强制不中奖：管理员可以强制指定用户不中奖
- * - 管理员权限验证：基于UUID角色系统验证管理员权限
- * - 批量操作：支持管理员批量执行强制中奖/不中奖操作
- * - 操作日志：记录管理员操作日志，便于审计和追溯
+ * - 强制中奖：管理员为指定用户强制指定中奖奖品（支持持久化存储）
+ * - 强制不中奖：管理员强制用户N次不中奖（支持剩余次数递减）
+ * - 概率调整：管理员临时调整用户中奖概率倍数
+ * - 用户专属队列：管理员为用户预设抽奖结果队列
+ * - 缓存管理：内存缓存（5分钟TTL）+ 数据库持久化双层架构
+ * - 过期清理：自动清理过期设置（数据库+缓存同步）
  *
  * 🛡️ 权限系统：
  * - 基于UUID角色系统进行权限验证
@@ -17,50 +18,62 @@
  * - 支持特定权限检查（resource + action）
  *
  * 业务流程：
- * 1. 管理员发起操作请求（forceWin/forceNoWin）
+ * 1. 管理员发起操作请求（forceWin/forceLose/adjustProbability等）
  * 2. 验证管理员权限（validateAdminPermission）
  * 3. 验证目标用户状态（User.findByPk + status检查）
- * 4. 执行操作并记录日志
- * 5. 返回操作结果
+ * 4. 创建设置记录（LotteryManagementSetting.create + 数据库持久化）
+ * 5. 更新缓存（内存缓存 + 5分钟TTL）
+ * 6. 返回操作结果
  *
  * 创建时间：2025年10月31日
- * 最后更新：2025年10月31日
+ * 最后更新：2025年11月08日（V4.1完整持久化版本）
  */
 
 const BeijingTimeHelper = require('../../../utils/timeHelper')
-const { User } = require('../../../models')
+const { User, LotteryManagementSetting } = require('../../../models')
 const { getUserRoles } = require('../../../middleware/auth')
 const Logger = require('../utils/Logger')
+const { Op } = require('sequelize')
 
 /**
  * 管理策略类
- * 职责：提供管理员抽奖控制功能，包括强制中奖、强制不中奖等操作
+ * 职责：提供管理员抽奖控制功能，包括强制中奖、强制不中奖、概率调整、用户专属队列等操作
  * 设计模式：策略模式 - 管理员专用的抽奖策略
+ * 架构模式：双层架构（内存缓存 + 数据库持久化）
  */
 class ManagementStrategy {
   /**
    * 构造函数 - 初始化管理策略实例
    *
-   * 业务场景：创建管理策略实例，初始化日志器
+   * 业务场景：创建管理策略实例，初始化日志器和缓存系统
    *
    * @example
    * const strategy = new ManagementStrategy()
-   * // 创建实例后，可以使用forceWin、forceNoWin等方法
+   * // 创建实例后，可以使用forceWin、forceLose、adjustProbability等方法
    */
   constructor () {
     this.logger = Logger.create('ManagementStrategy')
+
+    // 🔄 内存缓存系统（5分钟TTL）
+    this.cache = new Map()
+    this.cacheTTL = 5 * 60 * 1000 // 5分钟
+
+    // 🔧 启动缓存清理定时器（每30秒执行一次）
+    this.startCacheCleanup()
   }
 
   /**
-   * 管理员强制中奖 - 使用UUID角色系统验证
+   * 管理员强制中奖 - V4.1完整持久化版本
    *
    * 业务场景：管理员为指定用户强制指定中奖奖品，用于测试、补偿或特殊活动
    *
    * 业务流程：
    * 1. 验证管理员权限（validateAdminPermission）
    * 2. 验证目标用户存在且状态为active
-   * 3. 记录操作日志（包含管理员ID、目标用户ID、奖品ID、操作原因）
-   * 4. 返回操作结果
+   * 3. 创建数据库记录（LotteryManagementSetting）
+   * 4. 更新内存缓存
+   * 5. 记录操作日志
+   * 6. 返回操作结果
    *
    * 🛡️ 权限要求：
    * - 管理员必须通过UUID角色系统验证
@@ -70,9 +83,11 @@ class ManagementStrategy {
    * @param {number} adminId - 管理员用户ID（执行操作的管理员）
    * @param {number} targetUserId - 目标用户ID（要强制中奖的用户）
    * @param {number} prizeId - 奖品ID（要强制中奖的奖品）
-   * @param {string} [reason='管理员操作'] - 操作原因（可选，默认为'管理员操作'），用于日志记录
+   * @param {string} [reason='管理员操作'] - 操作原因（可选，默认为'管理员操作'）
+   * @param {Date|null} [expiresAt=null] - 过期时间（可选，默认为null表示永不过期）
    * @returns {Promise<Object>} 操作结果对象
-   * @returns {boolean} return.success - 操作是否成功（始终为true，失败会抛出异常）
+   * @returns {boolean} return.success - 操作是否成功
+   * @returns {string} return.setting_id - 设置记录ID
    * @returns {string} return.result - 操作结果标识（'force_win'）
    * @returns {number} return.prize_id - 奖品ID
    * @returns {number} return.user_id - 目标用户ID
@@ -86,9 +101,9 @@ class ManagementStrategy {
    * @example
    * const strategy = new ManagementStrategy()
    * const result = await strategy.forceWin(10001, 20001, 30001, '测试补偿')
-   * // 返回：{ success: true, result: 'force_win', prize_id: 30001, user_id: 20001, admin_id: 10001, reason: '测试补偿', timestamp: '2025-10-31 00:14:55' }
+   * // 返回：{ success: true, setting_id: 'setting_...', result: 'force_win', prize_id: 30001, user_id: 20001, admin_id: 10001, reason: '测试补偿', timestamp: '2025-11-08 12:00:00' }
    */
-  async forceWin (adminId, targetUserId, prizeId, reason = '管理员操作') {
+  async forceWin (adminId, targetUserId, prizeId, reason = '管理员操作', expiresAt = null) {
     try {
       // 🛡️ 验证管理员权限
       const adminValidation = await this.validateAdminPermission(adminId)
@@ -106,16 +121,39 @@ class ManagementStrategy {
         throw new Error('目标用户不存在或已停用')
       }
 
-      this.logger.info('管理员强制中奖', {
+      // 💾 创建数据库记录
+      const setting = await LotteryManagementSetting.create({
+        user_id: targetUserId,
+        setting_type: 'force_win',
+        setting_data: {
+          prize_id: prizeId,
+          reason
+        },
+        expires_at: expiresAt,
+        status: 'active',
+        created_by: adminId
+      })
+
+      // 🔄 更新内存缓存
+      const cacheKey = `user_${targetUserId}_force_win`
+      this.cache.set(cacheKey, {
+        data: setting,
+        timestamp: Date.now()
+      })
+
+      this.logger.info('管理员强制中奖（持久化）', {
+        setting_id: setting.setting_id,
         adminId,
         targetUserId,
         prizeId,
         reason,
+        expires_at: expiresAt,
         timestamp: BeijingTimeHelper.now()
       })
 
       return {
         success: true,
+        setting_id: setting.setting_id,
         result: 'force_win',
         prize_id: prizeId,
         user_id: targetUserId,
@@ -130,29 +168,36 @@ class ManagementStrategy {
   }
 
   /**
-   * 管理员强制不中奖 - 使用UUID角色系统验证
+   * 管理员强制不中奖 - V4.1完整持久化版本
    *
-   * 业务场景：管理员强制指定用户不中奖，用于测试、防刷或特殊活动
+   * 业务场景：管理员强制用户N次不中奖，用于测试、防刷或特殊活动
    *
    * 业务流程：
    * 1. 验证管理员权限（validateAdminPermission）
-   * 2. 记录操作日志（包含管理员ID、目标用户ID、操作原因）
-   * 3. 返回操作结果
+   * 2. 创建数据库记录（LotteryManagementSetting），记录总次数和剩余次数
+   * 3. 更新内存缓存
+   * 4. 记录操作日志
+   * 5. 返回操作结果
    *
    * 🛡️ 权限要求：
    * - 管理员必须通过UUID角色系统验证
    * - 管理员状态必须为active
    *
-   * 注意：此方法不验证目标用户状态，因为可能用于阻止未注册用户中奖
+   * 注意：每次抽奖时会递减剩余次数，剩余次数为0时自动标记为used状态
    *
    * @param {number} adminId - 管理员用户ID（执行操作的管理员）
    * @param {number} targetUserId - 目标用户ID（要强制不中奖的用户）
-   * @param {string} [reason='管理员操作'] - 操作原因（可选，默认为'管理员操作'），用于日志记录
+   * @param {number} [count=1] - 不中奖次数（可选，默认为1次）
+   * @param {string} [reason='管理员操作'] - 操作原因（可选，默认为'管理员操作'）
+   * @param {Date|null} [expiresAt=null] - 过期时间（可选，默认为null表示永不过期）
    * @returns {Promise<Object>} 操作结果对象
-   * @returns {boolean} return.success - 操作是否成功（始终为true，失败会抛出异常）
-   * @returns {string} return.result - 操作结果标识（'force_no_win'）
+   * @returns {boolean} return.success - 操作是否成功
+   * @returns {string} return.setting_id - 设置记录ID
+   * @returns {string} return.result - 操作结果标识（'force_lose'）
    * @returns {number} return.user_id - 目标用户ID
    * @returns {number} return.admin_id - 管理员ID
+   * @returns {number} return.count - 总次数
+   * @returns {number} return.remaining - 剩余次数
    * @returns {string} return.reason - 操作原因
    * @returns {string} return.timestamp - 操作时间戳（北京时间GMT+8格式）
    *
@@ -160,10 +205,10 @@ class ManagementStrategy {
    *
    * @example
    * const strategy = new ManagementStrategy()
-   * const result = await strategy.forceNoWin(10001, 20001, '防刷保护')
-   * // 返回：{ success: true, result: 'force_no_win', user_id: 20001, admin_id: 10001, reason: '防刷保护', timestamp: '2025-10-31 00:14:55' }
+   * const result = await strategy.forceLose(10001, 20001, 5, '防刷保护')
+   * // 返回：{ success: true, setting_id: 'setting_...', result: 'force_lose', user_id: 20001, admin_id: 10001, count: 5, remaining: 5, reason: '防刷保护', timestamp: '2025-11-08 12:00:00' }
    */
-  async forceNoWin (adminId, targetUserId, reason = '管理员操作') {
+  async forceLose (adminId, targetUserId, count = 1, reason = '管理员操作', expiresAt = null) {
     try {
       // 🛡️ 验证管理员权限
       const adminValidation = await this.validateAdminPermission(adminId)
@@ -171,25 +216,517 @@ class ManagementStrategy {
         throw new Error(`管理员权限验证失败: ${adminValidation.reason}`)
       }
 
-      this.logger.info('管理员强制不中奖', {
+      // 💾 创建数据库记录
+      const setting = await LotteryManagementSetting.create({
+        user_id: targetUserId,
+        setting_type: 'force_lose',
+        setting_data: {
+          count,
+          remaining: count,
+          reason
+        },
+        expires_at: expiresAt,
+        status: 'active',
+        created_by: adminId
+      })
+
+      // 🔄 更新内存缓存
+      const cacheKey = `user_${targetUserId}_force_lose`
+      this.cache.set(cacheKey, {
+        data: setting,
+        timestamp: Date.now()
+      })
+
+      this.logger.info('管理员强制不中奖（持久化）', {
+        setting_id: setting.setting_id,
         adminId,
         targetUserId,
+        count,
+        remaining: count,
         reason,
+        expires_at: expiresAt,
         timestamp: BeijingTimeHelper.now()
       })
 
       return {
         success: true,
-        result: 'force_no_win',
+        setting_id: setting.setting_id,
+        result: 'force_lose',
         user_id: targetUserId,
         admin_id: adminId,
+        count,
+        remaining: count,
         reason,
         timestamp: BeijingTimeHelper.now()
       }
     } catch (error) {
-      this.logError('管理员强制不中奖失败', { adminId, targetUserId, error: error.message })
+      this.logError('管理员强制不中奖失败', { adminId, targetUserId, count, error: error.message })
       throw error
     }
+  }
+
+  /**
+   * 调整用户中奖概率 - V4.1新增方法
+   *
+   * 业务场景：管理员临时调整用户的中奖概率倍数，用于用户挽留、活跃度激励
+   *
+   * 业务流程：
+   * 1. 验证管理员权限（validateAdminPermission）
+   * 2. 验证概率倍数合法性（0.1-10倍）
+   * 3. 创建数据库记录（LotteryManagementSetting）
+   * 4. 更新内存缓存
+   * 5. 记录操作日志
+   * 6. 返回操作结果
+   *
+   * 🛡️ 权限要求：
+   * - 管理员必须通过UUID角色系统验证
+   * - 管理员状态必须为active
+   *
+   * 注意：概率倍数范围为0.1-10倍，超出范围会抛出错误
+   *
+   * @param {number} adminId - 管理员用户ID（执行操作的管理员）
+   * @param {number} targetUserId - 目标用户ID（要调整概率的用户）
+   * @param {number} multiplier - 概率倍数（0.1-10倍，1.0表示正常概率）
+   * @param {string} [reason='管理员操作'] - 操作原因（可选，默认为'管理员操作'）
+   * @param {Date|null} [expiresAt=null] - 过期时间（可选，默认为null表示永不过期）
+   * @returns {Promise<Object>} 操作结果对象
+   * @returns {boolean} return.success - 操作是否成功
+   * @returns {string} return.setting_id - 设置记录ID
+   * @returns {string} return.result - 操作结果标识（'probability_adjust'）
+   * @returns {number} return.user_id - 目标用户ID
+   * @returns {number} return.admin_id - 管理员ID
+   * @returns {number} return.multiplier - 概率倍数
+   * @returns {string} return.reason - 操作原因
+   * @returns {string} return.timestamp - 操作时间戳（北京时间GMT+8格式）
+   *
+   * @throws {Error} 当管理员权限验证失败时抛出错误
+   * @throws {Error} 当概率倍数超出范围时抛出错误
+   *
+   * @example
+   * const strategy = new ManagementStrategy()
+   * // 提升用户中奖概率2倍
+   * const result = await strategy.adjustProbability(10001, 20001, 2.0, '用户挽留')
+   * // 返回：{ success: true, setting_id: 'setting_...', result: 'probability_adjust', user_id: 20001, admin_id: 10001, multiplier: 2.0, reason: '用户挽留', timestamp: '2025-11-08 12:00:00' }
+   */
+  async adjustProbability (adminId, targetUserId, multiplier, reason = '管理员操作', expiresAt = null) {
+    try {
+      // 🛡️ 验证管理员权限
+      const adminValidation = await this.validateAdminPermission(adminId)
+      if (!adminValidation.valid) {
+        throw new Error(`管理员权限验证失败: ${adminValidation.reason}`)
+      }
+
+      // 验证概率倍数合法性（0.1-10倍）
+      if (multiplier < 0.1 || multiplier > 10) {
+        throw new Error('概率倍数必须在0.1-10倍之间')
+      }
+
+      // 💾 创建数据库记录
+      const setting = await LotteryManagementSetting.create({
+        user_id: targetUserId,
+        setting_type: 'probability_adjust',
+        setting_data: {
+          multiplier,
+          reason
+        },
+        expires_at: expiresAt,
+        status: 'active',
+        created_by: adminId
+      })
+
+      // 🔄 更新内存缓存
+      const cacheKey = `user_${targetUserId}_probability_adjust`
+      this.cache.set(cacheKey, {
+        data: setting,
+        timestamp: Date.now()
+      })
+
+      this.logger.info('调整用户中奖概率（持久化）', {
+        setting_id: setting.setting_id,
+        adminId,
+        targetUserId,
+        multiplier,
+        reason,
+        expires_at: expiresAt,
+        timestamp: BeijingTimeHelper.now()
+      })
+
+      return {
+        success: true,
+        setting_id: setting.setting_id,
+        result: 'probability_adjust',
+        user_id: targetUserId,
+        admin_id: adminId,
+        multiplier,
+        reason,
+        timestamp: BeijingTimeHelper.now()
+      }
+    } catch (error) {
+      this.logError('调整用户中奖概率失败', { adminId, targetUserId, multiplier, error: error.message })
+      throw error
+    }
+  }
+
+  /**
+   * 设置用户专属抽奖队列 - V4.1新增方法
+   *
+   * 业务场景：管理员为用户预设抽奖结果队列，用于精准运营、VIP体验优化
+   *
+   * 业务流程：
+   * 1. 验证管理员权限（validateAdminPermission）
+   * 2. 验证队列配置合法性
+   * 3. 创建数据库记录（LotteryManagementSetting）
+   * 4. 更新内存缓存
+   * 5. 记录操作日志
+   * 6. 返回操作结果
+   *
+   * 🛡️ 权限要求：
+   * - 管理员必须通过UUID角色系统验证
+   * - 管理员状态必须为active
+   *
+   * @param {number} adminId - 管理员用户ID（执行操作的管理员）
+   * @param {number} targetUserId - 目标用户ID（要设置队列的用户）
+   * @param {Object} queueConfig - 队列配置对象
+   * @param {string} queueConfig.queue_type - 队列类型（如：'vip_experience', 'precise_operation'）
+   * @param {number} queueConfig.priority_level - 优先级别（1-10，数字越大优先级越高）
+   * @param {Array<number>} queueConfig.prize_queue - 奖品ID队列（用户抽奖时按顺序返回）
+   * @param {string} [reason='管理员操作'] - 操作原因（可选，默认为'管理员操作'）
+   * @param {Date|null} [expiresAt=null] - 过期时间（可选，默认为null表示永不过期）
+   * @returns {Promise<Object>} 操作结果对象
+   * @returns {boolean} return.success - 操作是否成功
+   * @returns {string} return.setting_id - 设置记录ID
+   * @returns {string} return.result - 操作结果标识（'user_queue'）
+   * @returns {number} return.user_id - 目标用户ID
+   * @returns {number} return.admin_id - 管理员ID
+   * @returns {Object} return.queue_config - 队列配置
+   * @returns {string} return.reason - 操作原因
+   * @returns {string} return.timestamp - 操作时间戳（北京时间GMT+8格式）
+   *
+   * @throws {Error} 当管理员权限验证失败时抛出错误
+   * @throws {Error} 当队列配置不合法时抛出错误
+   *
+   * @example
+   * const strategy = new ManagementStrategy()
+   * const result = await strategy.setUserQueue(10001, 20001, {
+   *   queue_type: 'vip_experience',
+   *   priority_level: 8,
+   *   prize_queue: [101, 102, 103]
+   * }, 'VIP用户体验优化')
+   * // 返回：{ success: true, setting_id: 'setting_...', result: 'user_queue', user_id: 20001, admin_id: 10001, queue_config: {...}, reason: 'VIP用户体验优化', timestamp: '2025-11-08 12:00:00' }
+   */
+  async setUserQueue (adminId, targetUserId, queueConfig, reason = '管理员操作', expiresAt = null) {
+    try {
+      // 🛡️ 验证管理员权限
+      const adminValidation = await this.validateAdminPermission(adminId)
+      if (!adminValidation.valid) {
+        throw new Error(`管理员权限验证失败: ${adminValidation.reason}`)
+      }
+
+      // 验证队列配置合法性
+      if (!queueConfig.queue_type || !queueConfig.priority_level || !Array.isArray(queueConfig.prize_queue)) {
+        throw new Error('队列配置不完整：必须包含queue_type、priority_level、prize_queue')
+      }
+
+      if (queueConfig.priority_level < 1 || queueConfig.priority_level > 10) {
+        throw new Error('优先级别必须在1-10之间')
+      }
+
+      if (queueConfig.prize_queue.length === 0) {
+        throw new Error('奖品队列不能为空')
+      }
+
+      // 💾 创建数据库记录
+      const setting = await LotteryManagementSetting.create({
+        user_id: targetUserId,
+        setting_type: 'user_queue',
+        setting_data: {
+          queue_type: queueConfig.queue_type,
+          priority_level: queueConfig.priority_level,
+          prize_queue: queueConfig.prize_queue,
+          current_index: 0,
+          reason
+        },
+        expires_at: expiresAt,
+        status: 'active',
+        created_by: adminId
+      })
+
+      // 🔄 更新内存缓存
+      const cacheKey = `user_${targetUserId}_user_queue`
+      this.cache.set(cacheKey, {
+        data: setting,
+        timestamp: Date.now()
+      })
+
+      this.logger.info('设置用户专属抽奖队列（持久化）', {
+        setting_id: setting.setting_id,
+        adminId,
+        targetUserId,
+        queue_config: queueConfig,
+        reason,
+        expires_at: expiresAt,
+        timestamp: BeijingTimeHelper.now()
+      })
+
+      return {
+        success: true,
+        setting_id: setting.setting_id,
+        result: 'user_queue',
+        user_id: targetUserId,
+        admin_id: adminId,
+        queue_config: queueConfig,
+        reason,
+        timestamp: BeijingTimeHelper.now()
+      }
+    } catch (error) {
+      this.logError('设置用户专属抽奖队列失败', { adminId, targetUserId, queueConfig, error: error.message })
+      throw error
+    }
+  }
+
+  /**
+   * 获取用户管理设置状态 - V4.1新增方法
+   *
+   * 业务场景：查询用户当前生效的所有管理设置，用于状态查询和调试
+   *
+   * 业务流程：
+   * 1. 查询内存缓存（优先）
+   * 2. 如果缓存未命中，查询数据库（active状态 + 未过期）
+   * 3. 更新内存缓存
+   * 4. 返回设置列表
+   *
+   * @param {number} userId - 用户ID
+   * @returns {Promise<Object>} 用户管理设置状态对象
+   * @returns {Object|null} return.force_win - 强制中奖设置（如果存在）
+   * @returns {Object|null} return.force_lose - 强制不中奖设置（如果存在）
+   * @returns {Object|null} return.probability_adjust - 概率调整设置（如果存在）
+   * @returns {Object|null} return.user_queue - 用户专属队列设置（如果存在）
+   *
+   * @example
+   * const strategy = new ManagementStrategy()
+   * const status = await strategy.getUserManagementStatus(20001)
+   * // 返回：{ force_win: {...}, force_lose: null, probability_adjust: {...}, user_queue: null }
+   */
+  async getUserManagementStatus (userId) {
+    try {
+      const status = {
+        force_win: null,
+        force_lose: null,
+        probability_adjust: null,
+        user_queue: null
+      }
+
+      const settingTypes = ['force_win', 'force_lose', 'probability_adjust', 'user_queue']
+
+      for (const settingType of settingTypes) {
+        const cacheKey = `user_${userId}_${settingType}`
+        const cached = this.cache.get(cacheKey)
+
+        // 🔄 检查缓存有效性
+        if (cached && (Date.now() - cached.timestamp) < this.cacheTTL) {
+          status[settingType] = cached.data
+          continue
+        }
+
+        // 💾 查询数据库
+        const setting = await LotteryManagementSetting.findOne({
+          where: {
+            user_id: userId,
+            setting_type: settingType,
+            status: 'active'
+          },
+          order: [['created_at', 'DESC']]
+        })
+
+        if (setting && setting.isActive()) {
+          status[settingType] = setting
+          // 更新缓存
+          this.cache.set(cacheKey, {
+            data: setting,
+            timestamp: Date.now()
+          })
+        }
+      }
+
+      return status
+    } catch (error) {
+      this.logError('获取用户管理设置状态失败', { userId, error: error.message })
+      throw error
+    }
+  }
+
+  /**
+   * 清除用户管理设置 - V4.1新增方法
+   *
+   * 业务场景：管理员手动清除用户的管理设置，用于取消操作或纠正错误
+   *
+   * 业务流程：
+   * 1. 验证管理员权限（validateAdminPermission）
+   * 2. 查询用户生效的设置记录
+   * 3. 批量更新状态为cancelled
+   * 4. 清除内存缓存
+   * 5. 记录操作日志
+   * 6. 返回操作结果
+   *
+   * 🛡️ 权限要求：
+   * - 管理员必须通过UUID角色系统验证
+   * - 管理员状态必须为active
+   *
+   * @param {number} adminId - 管理员用户ID（执行操作的管理员）
+   * @param {number} targetUserId - 目标用户ID（要清除设置的用户）
+   * @param {string|null} [settingType=null] - 设置类型（可选，默认为null表示清除所有类型）
+   * @returns {Promise<Object>} 操作结果对象
+   * @returns {boolean} return.success - 操作是否成功
+   * @returns {number} return.cleared_count - 清除的设置数量
+   * @returns {string} return.timestamp - 操作时间戳（北京时间GMT+8格式）
+   *
+   * @throws {Error} 当管理员权限验证失败时抛出错误
+   *
+   * @example
+   * const strategy = new ManagementStrategy()
+   * // 清除用户所有管理设置
+   * const result1 = await strategy.clearUserSettings(10001, 20001)
+   * // 返回：{ success: true, cleared_count: 3, timestamp: '2025-11-08 12:00:00' }
+   *
+   * // 仅清除用户的强制中奖设置
+   * const result2 = await strategy.clearUserSettings(10001, 20001, 'force_win')
+   * // 返回：{ success: true, cleared_count: 1, timestamp: '2025-11-08 12:00:00' }
+   */
+  async clearUserSettings (adminId, targetUserId, settingType = null) {
+    try {
+      // 🛡️ 验证管理员权限
+      const adminValidation = await this.validateAdminPermission(adminId)
+      if (!adminValidation.valid) {
+        throw new Error(`管理员权限验证失败: ${adminValidation.reason}`)
+      }
+
+      // 💾 构建查询条件
+      const whereCondition = {
+        user_id: targetUserId,
+        status: 'active'
+      }
+
+      if (settingType) {
+        whereCondition.setting_type = settingType
+      }
+
+      // 批量更新状态为cancelled
+      const [updatedCount] = await LotteryManagementSetting.update(
+        { status: 'cancelled' },
+        { where: whereCondition }
+      )
+
+      // 🔄 清除内存缓存
+      const settingTypes = settingType ? [settingType] : ['force_win', 'force_lose', 'probability_adjust', 'user_queue']
+      settingTypes.forEach(type => {
+        const cacheKey = `user_${targetUserId}_${type}`
+        this.cache.delete(cacheKey)
+      })
+
+      this.logger.info('清除用户管理设置', {
+        adminId,
+        targetUserId,
+        settingType: settingType || '所有类型',
+        cleared_count: updatedCount,
+        timestamp: BeijingTimeHelper.now()
+      })
+
+      return {
+        success: true,
+        cleared_count: updatedCount,
+        timestamp: BeijingTimeHelper.now()
+      }
+    } catch (error) {
+      this.logError('清除用户管理设置失败', { adminId, targetUserId, settingType, error: error.message })
+      throw error
+    }
+  }
+
+  /**
+   * 清理过期设置 - V4.1新增方法（定时任务调用）
+   *
+   * 业务场景：定时清理数据库中的过期设置，释放存储空间和提升查询性能
+   *
+   * 业务流程：
+   * 1. 查询所有过期的active状态设置（expires_at < 当前时间）
+   * 2. 批量更新状态为expired
+   * 3. 清除相关的内存缓存
+   * 4. 记录清理日志
+   * 5. 返回清理结果
+   *
+   * 注意：此方法通常由定时任务（scheduledTasks）自动调用，每小时执行一次
+   *
+   * @returns {Promise<Object>} 清理结果对象
+   * @returns {number} return.cleaned_count - 清理的设置数量
+   * @returns {string} return.timestamp - 清理时间戳（北京时间GMT+8格式）
+   *
+   * @example
+   * const strategy = new ManagementStrategy()
+   * const result = await strategy.cleanupExpiredSettings()
+   * // 返回：{ cleaned_count: 15, timestamp: '2025-11-08 12:00:00' }
+   */
+  async cleanupExpiredSettings () {
+    try {
+      // 💾 查询并更新过期设置
+      const [updatedCount] = await LotteryManagementSetting.update(
+        { status: 'expired' },
+        {
+          where: {
+            status: 'active',
+            expires_at: {
+              [Op.lt]: new Date()
+            }
+          }
+        }
+      )
+
+      // 🔄 清除所有缓存（简单粗暴，确保一致性）
+      this.cache.clear()
+
+      this.logger.info('清理过期设置', {
+        cleaned_count: updatedCount,
+        timestamp: BeijingTimeHelper.now()
+      })
+
+      return {
+        cleaned_count: updatedCount,
+        timestamp: BeijingTimeHelper.now()
+      }
+    } catch (error) {
+      this.logError('清理过期设置失败', { error: error.message })
+      throw error
+    }
+  }
+
+  /**
+   * 启动缓存清理定时器 - V4.1新增方法
+   *
+   * 业务场景：启动内存缓存的自动清理定时器，每30秒清理一次过期缓存
+   *
+   * 注意：此方法在构造函数中自动调用，无需手动调用
+   *
+   * @private
+   */
+  startCacheCleanup () {
+    setInterval(() => {
+      const now = Date.now()
+      let cleanedCount = 0
+
+      for (const [key, value] of this.cache.entries()) {
+        if (now - value.timestamp > this.cacheTTL) {
+          this.cache.delete(key)
+          cleanedCount++
+        }
+      }
+
+      if (cleanedCount > 0) {
+        this.logger.debug('缓存自动清理', {
+          cleaned_count: cleanedCount,
+          remaining_count: this.cache.size,
+          timestamp: BeijingTimeHelper.now()
+        })
+      }
+    }, 30000) // 每30秒执行一次
   }
 
   /**
@@ -399,24 +936,20 @@ class ManagementStrategy {
    * @returns {number} return.page - 当前页码
    * @returns {number} return.limit - 每页数量
    *
-   * @throws {Error} 当管理员权限验证失败时抛出错误
-   *
    * @example
    * const strategy = new ManagementStrategy()
-   * const logs = await strategy.getAdminOperationLog(10001, { page: 1, limit: 20 })
+   * const result = await strategy.getOperationLogs(10001, { page: 1, limit: 20 })
    * // 返回：{ logs: [], total: 0, page: 1, limit: 20 }
    */
-  async getAdminOperationLog (adminId, filters = {}) {
+  async getOperationLogs (adminId, filters = {}) {
     try {
-      // 🛡️ 验证管理员权限
-      const hasPermission = await this.checkAdminPermission(adminId)
-      if (!hasPermission) {
-        throw new Error('需要管理员权限')
+      // 验证管理员权限
+      const isAdmin = await this.checkAdminPermission(adminId)
+      if (!isAdmin) {
+        throw new Error('管理员权限验证失败')
       }
 
-      // 这里可以实现具体的日志查询逻辑
-      this.logger.info('获取管理员操作日志', { adminId, filters })
-
+      // 占位实现：实际日志查询逻辑需要根据业务需求实现
       return {
         logs: [],
         total: 0,
@@ -430,138 +963,188 @@ class ManagementStrategy {
   }
 
   /**
-   * 管理员批量操作
+   * 批量操作：批量强制中奖
    *
-   * 业务场景：管理员批量执行强制中奖或强制不中奖操作，提高操作效率
+   * 业务场景：管理员为多个用户批量设置强制中奖，用于批量补偿或批量测试
    *
    * 业务流程：
-   * 1. 验证管理员权限（validateAdminPermission，需要lottery:manage权限）
-   * 2. 遍历目标用户列表，逐个执行操作
-   * 3. 记录每个操作的成功或失败结果
-   * 4. 记录批量操作日志（包含总数、成功数、失败数）
-   * 5. 返回批量操作结果和统计信息
+   * 1. 验证管理员权限（validateAdminPermission）一次
+   * 2. 遍历用户列表，为每个用户调用forceWin方法
+   * 3. 记录成功和失败的操作
+   * 4. 返回批量操作结果
    *
-   * 支持的操作类型：
-   * - 'force_win': 强制中奖（需要target.user_id和target.prizeId）
-   * - 'force_no_win': 强制不中奖（需要target.user_id）
+   * 🛡️ 权限要求：
+   * - 管理员必须通过UUID角色系统验证
+   * - 管理员状态必须为active
    *
-   * @param {number} adminId - 管理员用户ID（执行批量操作的管理员）
-   * @param {string} operation - 操作类型（'force_win'或'force_no_win'）
-   * @param {Array<Object>} targets - 目标用户数组
-   * @param {number} targets[].user_id - 目标用户ID（必需）
-   * @param {number} [targets[].prizeId] - 奖品ID（当operation为'force_win'时必需）
-   * @param {string} [reason='管理员批量操作'] - 操作原因（可选，默认为'管理员批量操作'），用于日志记录
+   * @param {number} adminId - 管理员用户ID（执行操作的管理员）
+   * @param {Array<Object>} operations - 操作列表
+   * @param {number} operations[].user_id - 目标用户ID
+   * @param {number} operations[].prize_id - 奖品ID
+   * @param {string} [operations[].reason='批量操作'] - 操作原因（可选）
    * @returns {Promise<Object>} 批量操作结果对象
-   * @returns {boolean} return.success - 批量操作是否成功（始终为true，失败会抛出异常）
-   * @returns {string} return.operation - 操作类型
-   * @returns {Array<Object>} return.results - 操作结果数组
-   * @returns {Object} return.results[].target - 目标用户对象
-   * @returns {Object|string} return.results[].result - 操作结果对象（成功时）或错误消息（失败时）
-   * @returns {boolean} return.results[].success - 单个操作是否成功
-   * @returns {Object} return.summary - 统计信息对象
-   * @returns {number} return.summary.total - 总操作数
-   * @returns {number} return.summary.success - 成功操作数
-   * @returns {number} return.summary.failure - 失败操作数
+   * @returns {Array} return.success - 成功的操作列表
+   * @returns {Array} return.failed - 失败的操作列表
+   * @returns {number} return.total - 总操作数量
+   * @returns {number} return.success_count - 成功数量
+   * @returns {number} return.failed_count - 失败数量
    *
    * @throws {Error} 当管理员权限验证失败时抛出错误
-   * @throws {Error} 当操作类型不支持时抛出错误
    *
    * @example
    * const strategy = new ManagementStrategy()
-   * const result = await strategy.batchOperation(10001, 'force_win', [
-   *   { user_id: 20001, prizeId: 30001 },
-   *   { user_id: 20002, prizeId: 30002 }
-   * ], '活动补偿')
-   * // 返回：{ success: true, operation: 'force_win', results: [...], summary: { total: 2, success: 2, failure: 0 } }
+   * const result = await strategy.batchForceWin(10001, [
+   *   { user_id: 20001, prize_id: 30001, reason: '补偿1' },
+   *   { user_id: 20002, prize_id: 30002, reason: '补偿2' }
+   * ])
+   * // 返回：{ success: [{...}, {...}], failed: [], total: 2, success_count: 2, failed_count: 0 }
    */
-  async batchOperation (adminId, operation, targets, reason = '管理员批量操作') {
+  async batchForceWin (adminId, operations) {
     try {
-      // 🛡️ 验证管理员权限
-      const adminValidation = await this.validateAdminPermission(adminId, {
-        resource: 'lottery',
-        action: 'manage'
-      })
-
+      // 🛡️ 验证管理员权限（只验证一次）
+      const adminValidation = await this.validateAdminPermission(adminId)
       if (!adminValidation.valid) {
         throw new Error(`管理员权限验证失败: ${adminValidation.reason}`)
       }
 
-      const results = []
-      for (const target of targets) {
+      const results = {
+        success: [],
+        failed: [],
+        total: operations.length,
+        success_count: 0,
+        failed_count: 0
+      }
+
+      // 批量执行强制中奖操作
+      for (const operation of operations) {
         try {
-          let result
-          switch (operation) {
-          case 'force_win':
-            result = await this.forceWin(adminId, target.user_id, target.prizeId, reason)
-            break
-          case 'force_no_win':
-            result = await this.forceNoWin(adminId, target.user_id, reason)
-            break
-          default:
-            throw new Error(`不支持的操作类型: ${operation}`)
-          }
-          results.push({ target, result, success: true })
+          const result = await this.forceWin(
+            adminId,
+            operation.user_id,
+            operation.prize_id,
+            operation.reason || '批量操作'
+          )
+          results.success.push(result)
+          results.success_count++
         } catch (error) {
-          results.push({ target, error: error.message, success: false })
+          results.failed.push({
+            user_id: operation.user_id,
+            prize_id: operation.prize_id,
+            error: error.message
+          })
+          results.failed_count++
         }
       }
 
-      this.logger.info('管理员批量操作完成', {
+      this.logger.info('批量强制中奖完成', {
         adminId,
-        operation,
-        totalTargets: targets.length,
-        successCount: results.filter(r => r.success).length,
-        failureCount: results.filter(r => !r.success).length
+        total: results.total,
+        success_count: results.success_count,
+        failed_count: results.failed_count,
+        timestamp: BeijingTimeHelper.now()
       })
 
-      return {
-        success: true,
-        operation,
-        results,
-        summary: {
-          total: targets.length,
-          success: results.filter(r => r.success).length,
-          failure: results.filter(r => !r.success).length
-        }
-      }
+      return results
     } catch (error) {
-      this.logError('管理员批量操作失败', { adminId, operation, error: error.message })
+      this.logError('批量强制中奖失败', { adminId, error: error.message })
       throw error
     }
   }
 
   /**
-   * 记录错误日志（内部方法）
+   * 批量操作：批量强制不中奖
    *
-   * 业务场景：统一记录错误日志，封装日志记录逻辑
+   * 业务场景：管理员为多个用户批量设置强制不中奖，用于批量防刷或批量测试
    *
-   * @param {string} message - 错误消息内容
-   * @param {Object} data - 错误相关数据对象（如操作参数、错误详情等）
-   * @returns {void} 无返回值
+   * 业务流程：
+   * 1. 验证管理员权限（validateAdminPermission）一次
+   * 2. 遍历用户列表，为每个用户调用forceLose方法
+   * 3. 记录成功和失败的操作
+   * 4. 返回批量操作结果
+   *
+   * 🛡️ 权限要求：
+   * - 管理员必须通过UUID角色系统验证
+   * - 管理员状态必须为active
+   *
+   * @param {number} adminId - 管理员用户ID（执行操作的管理员）
+   * @param {Array<Object>} operations - 操作列表
+   * @param {number} operations[].user_id - 目标用户ID
+   * @param {number} [operations[].count=1] - 不中奖次数（可选）
+   * @param {string} [operations[].reason='批量操作'] - 操作原因（可选）
+   * @returns {Promise<Object>} 批量操作结果对象
+   * @returns {Array} return.success - 成功的操作列表
+   * @returns {Array} return.failed - 失败的操作列表
+   * @returns {number} return.total - 总操作数量
+   * @returns {number} return.success_count - 成功数量
+   * @returns {number} return.failed_count - 失败数量
+   *
+   * @throws {Error} 当管理员权限验证失败时抛出错误
    *
    * @example
-   * // 内部调用，无需直接使用
-   * this.logError('操作失败', { adminId: 10001, error: err.message })
+   * const strategy = new ManagementStrategy()
+   * const result = await strategy.batchForceLose(10001, [
+   *   { user_id: 20001, count: 5, reason: '防刷1' },
+   *   { user_id: 20002, count: 3, reason: '防刷2' }
+   * ])
+   * // 返回：{ success: [{...}, {...}], failed: [], total: 2, success_count: 2, failed_count: 0 }
    */
-  logError (message, data) {
-    this.logger.error(message, data)
+  async batchForceLose (adminId, operations) {
+    try {
+      // 🛡️ 验证管理员权限（只验证一次）
+      const adminValidation = await this.validateAdminPermission(adminId)
+      if (!adminValidation.valid) {
+        throw new Error(`管理员权限验证失败: ${adminValidation.reason}`)
+      }
+
+      const results = {
+        success: [],
+        failed: [],
+        total: operations.length,
+        success_count: 0,
+        failed_count: 0
+      }
+
+      // 批量执行强制不中奖操作
+      for (const operation of operations) {
+        try {
+          const result = await this.forceLose(
+            adminId,
+            operation.user_id,
+            operation.count || 1,
+            operation.reason || '批量操作'
+          )
+          results.success.push(result)
+          results.success_count++
+        } catch (error) {
+          results.failed.push({
+            user_id: operation.user_id,
+            error: error.message
+          })
+          results.failed_count++
+        }
+      }
+
+      this.logger.info('批量强制不中奖完成', {
+        adminId,
+        total: results.total,
+        success_count: results.success_count,
+        failed_count: results.failed_count,
+        timestamp: BeijingTimeHelper.now()
+      })
+
+      return results
+    } catch (error) {
+      this.logError('批量强制不中奖失败', { adminId, error: error.message })
+      throw error
+    }
   }
 
   /**
-   * 记录信息日志（内部方法）
-   *
-   * 业务场景：统一记录信息日志，封装日志记录逻辑
-   *
-   * @param {string} message - 信息消息内容
-   * @param {Object} data - 信息相关数据对象（如操作参数、结果等）
-   * @returns {void} 无返回值
-   *
-   * @example
-   * // 内部调用，无需直接使用
-   * this.logInfo('操作成功', { adminId: 10001, targetUserId: 20001 })
+   * 日志错误记录
+   * @private
    */
-  logInfo (message, data) {
-    this.logger.info(message, data)
+  logError (message, data) {
+    this.logger.error(message, { ...data, timestamp: BeijingTimeHelper.now() })
   }
 }
 

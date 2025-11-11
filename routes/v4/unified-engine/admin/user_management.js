@@ -80,7 +80,7 @@ router.get('/users', async (req, res) => {
 
     // 处理用户数据，添加角色信息
     const processedUsers = users.map(user => {
-      const maxRoleLevel =
+      const max_role_level =
         user.roles.length > 0 ? Math.max(...user.roles.map(role => role.role_level)) : 0
 
       return {
@@ -89,14 +89,15 @@ router.get('/users', async (req, res) => {
         nickname: user.nickname,
         history_total_points: user.history_total_points,
         status: user.status,
-        role_level: maxRoleLevel,
+        role_level: max_role_level,
         roles: user.roles.map(role => role.role_name),
         last_login: user.last_login,
         created_at: user.created_at
       }
     })
 
-    return res.apiSuccess('获取用户列表成功', {
+    // 返回用户列表 - 参数顺序：data第1个, message第2个
+    return res.apiSuccess({
       users: processedUsers,
       pagination: {
         current_page: parseInt(page),
@@ -104,7 +105,7 @@ router.get('/users', async (req, res) => {
         total: count,
         total_pages: Math.ceil(count / parseInt(limit))
       }
-    })
+    }, '获取用户列表成功')
   } catch (error) {
     console.error('❌ 获取用户列表失败:', error.message)
     return res.apiError('获取用户列表失败', 'GET_USERS_FAILED', null, 500)
@@ -139,10 +140,10 @@ router.get('/users/:user_id', async (req, res) => {
     }
 
     // 计算用户权限级别
-    const maxRoleLevel =
+    const max_role_level =
       user.roles.length > 0 ? Math.max(...user.roles.map(role => role.role_level)) : 0
 
-    return res.apiSuccess('获取用户详情成功', {
+    return res.apiSuccess({
       user: {
         user_id: user.user_id,
         mobile: user.mobile,
@@ -150,7 +151,7 @@ router.get('/users/:user_id', async (req, res) => {
         status: user.status,
         history_total_points: user.history_total_points,
         consecutive_fail_count: user.consecutive_fail_count,
-        role_level: maxRoleLevel,
+        role_level: max_role_level,
         roles: user.roles.map(role => ({
           role_uuid: role.role_uuid,
           role_name: role.role_name,
@@ -163,7 +164,7 @@ router.get('/users/:user_id', async (req, res) => {
         created_at: user.created_at,
         updated_at: user.updated_at
       }
-    })
+    }, '获取用户详情成功')
   } catch (error) {
     console.error('❌ 获取用户详情失败:', error.message)
     return res.apiError('获取用户详情失败', 'GET_USER_FAILED', null, 500)
@@ -257,14 +258,14 @@ router.put('/users/:user_id/role', async (req, res) => {
 
     console.log(`✅ 用户角色更新成功: ${user_id} -> ${role_name} (操作者: ${req.user.user_id})`)
 
-    return res.apiSuccess('用户角色更新成功', {
+    return res.apiSuccess({
       user_id,
       new_role: role_name,
       new_role_level: targetRole.role_level,
       roles: updatedUserRoles.roles,
       operator_id: req.user.user_id,
       reason
-    })
+    }, '用户角色更新成功')
   } catch (error) {
     // 🛡️ 风险3修复: 优化事务回滚处理（检查事务状态，避免重复回滚）
     if (transaction && !transaction.finished) {
@@ -321,13 +322,13 @@ router.put('/users/:user_id/status', async (req, res) => {
 
     console.log(`✅ 用户状态更新成功: ${user_id} -> ${status} (操作者: ${req.user.user_id})`)
 
-    return res.apiSuccess('用户状态更新成功', {
+    return res.apiSuccess({
       user_id,
       old_status: oldStatus,
       new_status: status,
       operator_id: req.user.user_id,
       reason
-    })
+    }, '用户状态更新成功')
   } catch (error) {
     console.error('❌ 更新用户状态失败:', error.message)
     return res.apiError('更新用户状态失败', 'UPDATE_USER_STATUS_FAILED', null, 500)
@@ -346,7 +347,7 @@ router.get('/roles', async (req, res) => {
       order: [['role_level', 'DESC']]
     })
 
-    return res.apiSuccess('获取角色列表成功', {
+    return res.apiSuccess({
       roles: roles.map(role => ({
         id: role.role_id, // 修正：使用role_id保持命名一致性
         role_uuid: role.role_uuid,
@@ -354,7 +355,7 @@ router.get('/roles', async (req, res) => {
         role_level: role.role_level,
         description: role.description
       }))
-    })
+    }, '获取角色列表成功')
   } catch (error) {
     console.error('❌ 获取角色列表失败:', error.message)
     return res.apiError('获取角色列表失败', 'GET_ROLES_FAILED', null, 500)

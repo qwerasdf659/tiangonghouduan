@@ -204,9 +204,41 @@ function checkSecurityConfig () {
   }
 }
 
-// 6️⃣ 检查日志配置
+// 6️⃣ 检查微信小程序配置（微信授权登录必需）
+function checkWeChatConfig () {
+  console.log('\n' + colorize('6️⃣ 检查微信小程序配置（微信授权登录）', 'cyan'))
+  console.log('='.repeat(50))
+
+  const wxAppId = process.env.WX_APPID
+  const wxSecret = process.env.WX_SECRET
+
+  if (!wxAppId || !wxSecret) {
+    const missing = []
+    if (!wxAppId) missing.push('WX_APPID')
+    if (!wxSecret) missing.push('WX_SECRET')
+
+    addResult('warnings', `微信配置缺失：${missing.join(', ')}（微信授权登录功能不可用）`)
+    console.log(colorize(`⚠️ 微信配置缺失：${missing.join(', ')}`, 'yellow'))
+    console.log(colorize('   ❌ 微信授权登录功能不可用', 'yellow'))
+    console.log(colorize('💡 获取方式：', 'yellow'))
+    console.log(colorize('   1. 登录微信公众平台：https://mp.weixin.qq.com/', 'yellow'))
+    console.log(colorize('   2. 进入"开发" → "开发管理" → "开发设置"', 'yellow'))
+    console.log(colorize('   3. 复制 AppID 和 AppSecret 到 .env 文件', 'yellow'))
+    console.log(colorize('   4. 在 .env 中添加：', 'yellow'))
+    console.log(colorize('      WX_APPID=你的微信小程序AppID', 'yellow'))
+    console.log(colorize('      WX_SECRET=你的微信小程序AppSecret', 'yellow'))
+  } else {
+    addResult('passed', '微信小程序配置完整')
+    console.log(colorize('✅ 微信小程序配置完整', 'green'))
+    console.log(colorize(`   📱 AppID: ${wxAppId.substring(0, 8)}...（已配置）`, 'blue'))
+    console.log(colorize('   🔐 AppSecret: ********（已配置，已隐藏）', 'blue'))
+    console.log(colorize('   ✅ 微信授权登录功能可用', 'green'))
+  }
+}
+
+// 7️⃣ 检查日志配置
 function checkLoggingConfig () {
-  console.log('\n' + colorize('6️⃣ 检查日志配置', 'cyan'))
+  console.log('\n' + colorize('7️⃣ 检查日志配置', 'cyan'))
   console.log('='.repeat(50))
 
   const nodeEnv = process.env.NODE_ENV || 'development'
@@ -227,7 +259,7 @@ function checkLoggingConfig () {
   }
 }
 
-// 7️⃣ 生成检查报告
+// 8️⃣ 生成检查报告
 function generateReport () {
   console.log('\n' + colorize('📊 环境检查报告', 'cyan'))
   console.log('='.repeat(50))
@@ -298,6 +330,7 @@ async function main () {
   checkSmsConfig()
   checkPortConfig()
   checkSecurityConfig()
+  checkWeChatConfig()
   checkLoggingConfig()
 
   // 生成报告

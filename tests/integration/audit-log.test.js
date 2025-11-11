@@ -24,7 +24,7 @@ describe('审计日志功能测试', () => {
     // 1. 获取管理员token
     const loginRes = await request(app).post('/api/v4/unified-engine/auth/login').send({
       mobile: '13612227930',
-      code: '123456'
+      verification_code: '123456'
     })
 
     if (!loginRes.body.success || !loginRes.body.data.access_token) {
@@ -209,7 +209,7 @@ describe('审计日志功能测试', () => {
       // 获取普通用户token
       const userLoginRes = await request(app).post('/api/v4/unified-engine/auth/login').send({
         mobile: '13800000000', // 假设这是普通用户
-        code: '123456'
+        verification_code: '123456'
       })
 
       if (userLoginRes.status === 200 && userLoginRes.body.success) {

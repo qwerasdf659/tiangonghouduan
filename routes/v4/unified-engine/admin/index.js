@@ -19,7 +19,6 @@ const userManagementRoutes = require('./user_management')
 const lotteryManagementRoutes = require('./lottery_management')
 const analyticsRoutes = require('./analytics')
 const auditRoutes = require('./audit') // 🆕 兑换审核管理
-const campaignPermissionsRoutes = require('./campaign-permissions') // 🆕 活动权限管理
 
 // 挂载子模块路由
 router.use('/auth', authRoutes)
@@ -30,7 +29,6 @@ router.use('/user-management', userManagementRoutes)
 router.use('/lottery-management', lotteryManagementRoutes)
 router.use('/analytics', analyticsRoutes)
 router.use('/audit', auditRoutes) // 🆕 兑换审核路由
-router.use('/campaign-permissions', campaignPermissionsRoutes) // 🆕 活动权限路由
 
 /**
  * GET / - Admin API根路径信息
@@ -38,6 +36,15 @@ router.use('/campaign-permissions', campaignPermissionsRoutes) // 🆕 活动权
  * @description 返回Admin API的基本信息和可用模块
  * @route GET /api/v4/unified-engine/admin/
  * @access Public
+ */
+/**
+ * ⚠️ 重要提醒：添加新模块时必须同步更新modules对象
+ *
+ * 更新步骤:
+ * 1. 在admin/目录创建新路由文件（如new_module.js）
+ * 2. 在本文件引入并挂载路由（router.use('/new-module', newModuleRoutes)）
+ * 3. 在下方modules对象添加模块信息
+ * 4. 运行测试验证: npm test（确保单元测试通过）
  */
 router.get('/', (req, res) => {
   const adminInfo = {
@@ -87,14 +94,11 @@ router.get('/', (req, res) => {
       audit: {
         description: '兑换审核管理',
         endpoints: ['/pending', '/:exchange_id/approve', '/:exchange_id/reject', '/history']
-      },
-      campaign_permissions: {
-        description: '活动权限管理',
-        endpoints: ['/assign', '/revoke', '/list', '/check']
       }
+      // ⚠️ campaign_permissions模块暂未实现，待实现后再添加到此列表
     },
     documentation: '请参考各模块的API文档',
-    timestamp: BeijingTimeHelper.now()
+    timestamp: BeijingTimeHelper.apiTimestamp() // 统一使用apiTimestamp格式：2025-11-08 17:32:07
   }
 
   res.apiSuccess(adminInfo, 'Admin API模块信息')

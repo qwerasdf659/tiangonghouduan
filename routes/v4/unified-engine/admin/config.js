@@ -47,12 +47,12 @@ router.put('/config', adminAuthMiddleware, asyncHandler(async (req, res) => {
       sharedComponents.logger.info('引擎配置更新成功', {
         config,
         updated_by: req.user?.user_id,
-        updated_at: BeijingTimeHelper.getCurrentTime()
+        updated_at: BeijingTimeHelper.apiTimestamp()
       })
 
       return res.apiSuccess({
         updated_config: result.config,
-        timestamp: BeijingTimeHelper.getCurrentTime()
+        timestamp: BeijingTimeHelper.apiTimestamp()
       }, '配置更新成功')
     } else {
       return res.apiError(result.error || '配置更新失败', 'CONFIG_UPDATE_FAILED')
@@ -103,15 +103,15 @@ router.post('/test/simulate', adminAuthMiddleware, asyncHandler(async (req, res)
           round: i + 1,
           result: simulationResult.success ? 'win' : 'lose',
           probability: simulationResult.probability,
-          strategy_used: simulationResult.strategy,
-          timestamp: BeijingTimeHelper.getCurrentTime()
+          strategy_name: simulationResult.strategy, // ✅ 修复: strategy_used → strategy_name
+          timestamp: BeijingTimeHelper.now() // ✅ 修复: getCurrentTime() → now()
         })
       } catch (simError) {
         simulationResults.push({
           round: i + 1,
           result: 'error',
           error: simError.message,
-          timestamp: BeijingTimeHelper.getCurrentTime()
+          timestamp: BeijingTimeHelper.now() // ✅ 修复: getCurrentTime() → now()
         })
       }
     }
@@ -129,7 +129,7 @@ router.post('/test/simulate', adminAuthMiddleware, asyncHandler(async (req, res)
       win_rate: times > 0 ? ((wins / times) * 100).toFixed(2) : 0,
       strategy_type,
       user_id: parseInt(user_id),
-      timestamp: BeijingTimeHelper.getCurrentTime()
+      timestamp: BeijingTimeHelper.apiTimestamp()
     }
 
     sharedComponents.logger.info('抽奖模拟测试完成', summary)

@@ -90,7 +90,8 @@ module.exports = sequelize => {
           'prize_delete', // 奖品删除
           'campaign_config', // 活动配置（修改活动配置）
           'role_assign', // 角色分配（给用户分配角色）
-          'system_config' // 系统配置修改
+          'system_config', // 系统配置修改
+          'session_assign' // 客服会话分配（分配/取消/转移）
         ),
         allowNull: false,
         comment: '操作类型'

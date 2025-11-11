@@ -59,6 +59,15 @@ SMS_SECRET_KEY=your_aliyun_sms_secret_key
 SMS_SIGN_NAME=餐厅积分系统
 SMS_TEMPLATE_CODE=SMS_123456789
 
+# 🔴 微信小程序配置（微信授权一键登录功能必需）
+# 获取方式：
+# 1. 登录微信公众平台: https://mp.weixin.qq.com/
+# 2. 进入"开发" → "开发管理" → "开发设置"
+# 3. 复制AppID和AppSecret
+# ⚠️ 注意：WX_SECRET为敏感信息，请勿泄露
+WX_APPID=your_wechat_mini_program_appid
+WX_SECRET=your_wechat_mini_program_secret
+
 # 🔴 服务器地址配置 - 根据文档配置
 # 内网地址
 INTERNAL_BASE_URL=http://devbox2.ns-br0za7uc.svc.cluster.local:3000

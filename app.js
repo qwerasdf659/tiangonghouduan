@@ -470,6 +470,10 @@ try {
   app.use('/api/v4/debug-control', require('./routes/v4/debug-control'))
   appLogger.info('V4调试控制系统加载成功', { route: '/api/v4/debug-control', note: '仅管理员可用' })
 
+  // 🔐 V4层级权限管理路由（区域负责人→业务经理→业务员三级管理）
+  app.use('/api/v4/hierarchy', require('./routes/v4/hierarchy'))
+  appLogger.info('V4层级权限管理系统加载成功', { route: '/api/v4/hierarchy', note: '层级化角色权限管理，2025-11-07新增' })
+
   appLogger.info('统一决策引擎V4.0架构已完全启用', { message: '所有旧版API已弃用' })
 } catch (error) {
   appLogger.error('V4统一决策引擎加载失败', { error: error.message, stack: error.stack })
@@ -601,7 +605,7 @@ if (require.main === module) {
 
     // 初始化定时任务
     try {
-      const ScheduledTasks = require('./scripts/scheduled-tasks')
+      const ScheduledTasks = require('./scripts/maintenance/scheduled-tasks')
       ScheduledTasks.initialize()
       appLogger.info('定时任务初始化完成')
     } catch (error) {
@@ -627,6 +631,40 @@ if (require.main === module) {
       architecture: '现代化微服务架构',
       websocket: '实时通信已启用'
     })
+
+    /*
+     * 🔌 优雅关闭处理（2025年11月08日新增）
+     * 功能：服务关闭时记录WebSocket停止事件到数据库
+     * 用途：服务维护、部署更新、异常追踪、SLA统计
+     */
+    const gracefulShutdown = async (signal) => {
+      appLogger.info(`收到${signal}信号，开始优雅关闭...`)
+
+      try {
+        // 记录WebSocket服务停止事件
+        const ChatWebSocketService = require('./services/ChatWebSocketService')
+        await ChatWebSocketService.shutdown(`收到${signal}信号`)
+        appLogger.info('WebSocket服务已优雅关闭')
+      } catch (error) {
+        appLogger.error('WebSocket关闭失败', { error: error.message })
+      }
+
+      // 关闭数据库连接
+      try {
+        const { sequelize } = require('./models')
+        await sequelize.close()
+        appLogger.info('数据库连接已关闭')
+      } catch (error) {
+        appLogger.error('数据库关闭失败', { error: error.message })
+      }
+
+      appLogger.info('服务已优雅关闭')
+      process.exit(0)
+    }
+
+    // 注册信号处理
+    process.on('SIGTERM', () => gracefulShutdown('SIGTERM'))
+    process.on('SIGINT', () => gracefulShutdown('SIGINT'))
   })
 }
 

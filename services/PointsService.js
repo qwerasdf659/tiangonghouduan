@@ -112,7 +112,7 @@
 
 const BeijingTimeHelper = require('../utils/timeHelper')
 const { UserPointsAccount, PointsTransaction, User } = require('../models')
-const { Sequelize, Transaction } = require('sequelize')
+const { Sequelize, Transaction, Op } = require('sequelize')
 
 /**
  * 积分服务类
@@ -315,7 +315,31 @@ class PointsService {
    * @param {string} data.transaction_description - 交易描述
    * @returns {Object} 创建的积分交易记录
    */
-  static async createPendingPointsForConsumption (data) {
+  /**
+   * 创建pending积分交易（消费奖励审核前冻结）
+   *
+   * 业务场景（Business Scenario）：
+   * - 商家扫码录入消费记录时，创建pending状态的积分交易记录
+   * - 用户可以看到"冻结积分"，但不计入可用余额
+   * - 审核通过后，由ConsumptionService.approveConsumption()方法激活积分
+   *
+   * 技术特点（Technical Features）：
+   * - 不更新用户积分账户余额（points_balance_before = points_balance_after）
+   * - status='pending'（冻结状态，等待审核）
+   * - 支持事务传递（transaction参数，确保数据一致性）
+   *
+   * @param {Object} data - 交易数据
+   * @param {number} data.user_id - 用户ID（必填，User ID - Required）
+   * @param {number} data.points - 积分数量（必填，大于0，Points Amount - Required, Must > 0）
+   * @param {number} data.reference_id - 关联记录ID，如consumption_record_id（必填，Reference ID - Required）
+   * @param {string} data.reference_type - 关联类型，如'consumption'（可选，默认'consumption'，Reference Type - Optional）
+   * @param {string} data.business_type - 业务类型，如'consumption_reward'（可选，Business Type - Optional）
+   * @param {string} data.transaction_title - 交易标题（可选，Transaction Title - Optional）
+   * @param {string} data.transaction_description - 交易描述（可选，Transaction Description - Optional）
+   * @param {Object} transaction - Sequelize事务对象（必填，用于事务保护，Sequelize Transaction Object - Required for Transaction Protection）
+   * @returns {Object} pending积分交易记录（Pending Points Transaction Record）
+   */
+  static async createPendingPointsForConsumption (data, transaction) {
     try {
       // 1. 验证必填参数
       if (!data.user_id || !data.points || !data.reference_id) {
@@ -326,37 +350,152 @@ class PointsService {
         throw new Error('积分数量必须大于0')
       }
 
-      // 2. 获取用户积分账户（读取当前余额）
-      const account = await this.getUserPointsAccount(data.user_id)
+      // 2. 获取用户积分账户（读取当前余额）- 在事务中查询
+      const account = await this.getUserPointsAccount(data.user_id, transaction)
       const currentBalance = parseFloat(account.available_points)
 
       /*
-       * 3. 创建pending状态的积分交易记录
+       * 3. 创建pending状态的积分交易记录（在事务中创建）
        * ⭐ 关键：余额before和after相同（不更新余额），status='pending'（冻结状态）
        */
-      const pointsTransaction = await PointsTransaction.create({
-        user_id: data.user_id,
-        account_id: account.account_id,
-        transaction_type: 'earn', // 收入类型（但pending状态，暂不到账）
-        points_amount: data.points,
-        points_balance_before: currentBalance, // 当前余额
-        points_balance_after: currentBalance, // 余额不变（积分冻结中）
-        business_type: data.business_type || 'consumption_reward',
-        source_type: 'merchant_submit',
-        reference_type: data.reference_type || 'consumption',
-        reference_id: data.reference_id,
-        transaction_title: data.transaction_title || '消费奖励（待审核）',
-        transaction_description: data.transaction_description || '',
-        operator_id: null, // 无操作员（系统自动创建）
-        transaction_time: BeijingTimeHelper.createBeijingTime(),
-        status: 'pending' // ⭐ 核心状态：pending=积分冻结中
-      })
+      const pointsTransaction = await PointsTransaction.create(
+        {
+          user_id: data.user_id,
+          account_id: account.account_id,
+          transaction_type: 'earn', // 收入类型（但pending状态，暂不到账）
+          points_amount: data.points,
+          points_balance_before: currentBalance, // 当前余额
+          points_balance_after: currentBalance, // 余额不变（积分冻结中）
+          business_type: data.business_type || 'consumption_reward',
+          source_type: 'merchant_submit',
+          reference_type: data.reference_type || 'consumption',
+          reference_id: data.reference_id,
+          transaction_title: data.transaction_title || '消费奖励（待审核）',
+          transaction_description: data.transaction_description || '',
+          operator_id: null, // 无操作员（系统自动创建）
+          transaction_time: BeijingTimeHelper.createBeijingTime(),
+          status: 'pending' // ⭐ 核心状态：pending=积分冻结中
+        },
+        { transaction }
+      ) // ✅ 在事务中创建
 
-      console.log(`✅ 创建pending积分交易: transaction_id=${pointsTransaction.transaction_id}, user_id=${data.user_id}, points=${data.points}分, status=pending`)
+      console.log(
+        `✅ 创建pending积分交易: transaction_id=${pointsTransaction.transaction_id}, user_id=${data.user_id}, points=${data.points}分, status=pending`
+      )
 
       return pointsTransaction
     } catch (error) {
       console.error('❌ 创建pending积分交易失败:', error.message)
+      throw error
+    }
+  }
+
+  /**
+   * 激活pending状态的积分交易（审核通过时调用）
+   * 业务场景：消费记录审核通过时，将pending状态的冻结积分激活为completed
+   *
+   * @param {number} transaction_id - pending积分交易ID
+   * @param {Object} options - 选项参数
+   * @param {Transaction} options.transaction - Sequelize事务对象（必需）
+   * @param {number} options.operator_id - 操作员ID（审核员）
+   * @param {string} options.activation_notes - 激活备注（可选）
+   * @returns {Object} 激活结果
+   */
+  static async activatePendingPoints (transaction_id, options = {}) {
+    const { transaction, operator_id, activation_notes } = options
+
+    if (!transaction) {
+      throw new Error('必须在事务中调用activatePendingPoints')
+    }
+
+    try {
+      // Step 1: 查询pending交易（加锁防止并发）
+      const pendingTx = await PointsTransaction.findByPk(transaction_id, {
+        transaction,
+        lock: transaction.LOCK.UPDATE
+      })
+
+      if (!pendingTx) {
+        throw new Error(`积分交易不存在（ID: ${transaction_id}）`)
+      }
+
+      // Step 2: 验证状态
+      if (pendingTx.status !== 'pending') {
+        throw new Error(`积分交易状态不是pending（当前: ${pendingTx.status}）`)
+      }
+
+      if (pendingTx.transaction_type !== 'earn') {
+        throw new Error(`只能激活earn类型的pending交易（当前: ${pendingTx.transaction_type}）`)
+      }
+
+      // Step 3: 更新交易状态为completed
+      await pendingTx.update(
+        {
+          status: 'completed',
+          transaction_time: BeijingTimeHelper.createDatabaseTime(), // 更新为实际到账时间
+          operator_id,
+          transaction_description: activation_notes || pendingTx.transaction_description,
+          updated_at: BeijingTimeHelper.createDatabaseTime()
+        },
+        { transaction }
+      )
+
+      // Step 4: 更新用户积分账户余额
+      const pointsAmount = parseFloat(pendingTx.points_amount)
+
+      // 4.1 查询并锁定积分账户
+      const account = await UserPointsAccount.findOne({
+        where: { user_id: pendingTx.user_id },
+        transaction,
+        lock: transaction.LOCK.UPDATE
+      })
+
+      if (!account) {
+        throw new Error(`用户积分账户不存在（user_id: ${pendingTx.user_id}）`)
+      }
+
+      // 4.2 更新积分账户余额
+      const newAvailablePoints = parseFloat(account.available_points) + pointsAmount
+      const newTotalEarned = parseFloat(account.total_earned) + pointsAmount
+
+      await account.update(
+        {
+          available_points: newAvailablePoints,
+          total_earned: newTotalEarned,
+          updated_at: BeijingTimeHelper.createDatabaseTime()
+        },
+        { transaction }
+      )
+
+      // 4.3 更新积分交易记录的余额after字段（补充实际到账后的余额）
+      await pendingTx.update(
+        {
+          points_balance_after: newAvailablePoints
+        },
+        { transaction }
+      )
+
+      // Step 5: 同步更新User.history_total_points字段（用于臻选空间解锁判断）
+      const User = require('../models').User
+      await User.increment(
+        { history_total_points: pointsAmount },
+        {
+          where: { user_id: pendingTx.user_id },
+          transaction
+        }
+      )
+
+      console.log(
+        `✅ Pending积分已激活: transaction_id=${transaction_id}, user_id=${pendingTx.user_id}, points=${pointsAmount}`
+      )
+
+      return {
+        transaction: pendingTx,
+        new_balance: newAvailablePoints,
+        points_activated: pointsAmount
+      }
+    } catch (error) {
+      console.error(`❌ 激活pending积分失败: ${error.message}`)
       throw error
     }
   }
@@ -444,12 +583,14 @@ class PointsService {
         user_id,
         account_id: account.account_id,
         transaction_type: 'consume',
-        points_amount: -points, // ✅ 修复Bug：consume类型存储负数表示扣除
+        points_amount: points, // ✅ 统一存储正数，由transaction_type区分类型
         points_balance_before: oldBalance,
         points_balance_after: newBalance,
         business_type: options.business_type || 'manual',
         source_type: options.source_type || 'system',
         business_id: options.business_id || null, // ✅ 保存业务ID
+        reference_type: options.reference_type || null, // ✅ 关联类型（如market_product）
+        reference_id: options.reference_id || null, // ✅ 关联ID（如product_id）
         transaction_title: options.title || '积分消费',
         transaction_description: options.description || '',
         operator_id: options.operator_id || null,
@@ -486,7 +627,7 @@ class PointsService {
       account_status: account.is_active ? 'active' : 'inactive',
       last_earn_time: account.last_earn_time,
       last_consume_time: account.last_consume_time,
-      created_at: account.createdAt || account.created_at // 兼容Sequelize的underscored配置（createdAt是驼峰命名）
+      created_at: account.created_at // 统一使用snake_case命名
     }
   }
 
@@ -623,21 +764,20 @@ class PointsService {
 
       // eslint-disable-next-line no-await-in-loop
       for (const operation of operations) {
-        // 兼容驼峰命名(userId)和蛇形命名(user_id)
-        const { type, user_id, userId, points, options } = operation
-        const actualUserId = user_id || userId
+        // 统一使用snake_case命名规范
+        const { type, user_id, points, options } = operation
 
-        if (!actualUserId) {
-          throw new Error('操作缺少用户ID参数(user_id或userId)')
+        if (!user_id) {
+          throw new Error('操作缺少用户ID参数(user_id)')
         }
 
         let result
         if (type === 'add') {
           // eslint-disable-next-line no-await-in-loop
-          result = await this.addPoints(actualUserId, points, { ...options, transaction })
+          result = await this.addPoints(user_id, points, { ...options, transaction })
         } else if (type === 'consume') {
           // eslint-disable-next-line no-await-in-loop
-          result = await this.consumePoints(actualUserId, points, { ...options, transaction })
+          result = await this.consumePoints(user_id, points, { ...options, transaction })
         } else {
           throw new Error(`未知的操作类型: ${type}`)
         }
@@ -849,9 +989,12 @@ class PointsService {
     const { ExchangeRecords, Product } = require('../models')
     const { page = 1, limit = 20, status = null, space = null } = options
 
+    /*
+     * 构建查询条件
+     * 注意：is_deleted: 0 过滤已由ExchangeRecords模型的defaultScope自动处理
+     */
     const whereClause = {
-      user_id,
-      is_deleted: 0 // 前端只负责数据展示：默认过滤已删除记录
+      user_id
     }
     if (status) whereClause.status = status
     if (space) whereClause.space = space
@@ -909,9 +1052,12 @@ class PointsService {
     const finalLimit = Math.min(parseInt(limit), 100)
     const offset = (page - 1) * finalLimit
 
+    /*
+     * 构建查询条件
+     * 注意：is_deleted: 0 过滤已由PointsTransaction模型的defaultScope自动处理
+     */
     const whereClause = {
-      user_id,
-      is_deleted: 0 // 前端只负责数据展示：默认过滤已删除记录
+      user_id
     }
     // 🛡️ 修复Bug：type为'all'时不应该作为筛选条件
     if (type && type !== 'all') {
@@ -972,13 +1118,22 @@ class PointsService {
 
       /*
        * 2. 查询冻结中的积分交易记录（status='pending'）
-       * 2. 查询冻结中的积分交易
+       * 2. 查询冻结中的积分交易（只查询7天内的记录）
+       * Query frozen points transactions (only records within 7 days)
        */
+
+      // 🔧 计算7天前的时间（冻结积分过期时间：7天）
+      const sevenDaysAgo = new Date()
+      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
+
       const frozenTransactions = await PointsTransaction.findAll({
         where: {
           user_id,
           status: 'pending', // 只查询冻结状态
-          business_type: 'consumption_reward' // 只查询消费奖励类型
+          business_type: 'consumption_reward', // 只查询消费奖励类型
+          created_at: {
+            [Op.gte]: sevenDaysAgo // ✅ 只查询7天内的记录（Only query records within 7 days）
+          }
         },
         attributes: [
           'transaction_id',
@@ -1035,6 +1190,22 @@ class PointsService {
         // === 冻结积分明细 ===
         frozen_transactions: frozenTransactions.map(t => {
           const consumptionRecord = consumptionRecordsMap[t.reference_id] || null
+
+          // 🔧 动态计算预计到账时间（基于创建时间）- Dynamic ETA Calculation
+          const hoursSinceCreation = Math.floor(
+            (Date.now() - new Date(t.created_at).getTime()) / (1000 * 60 * 60)
+          )
+          let estimated_arrival
+          if (hoursSinceCreation < 1) {
+            estimated_arrival = '预计23小时内到账' // 刚提交不久（Just submitted）
+          } else if (hoursSinceCreation < 24) {
+            estimated_arrival = `预计${24 - hoursSinceCreation}小时内到账` // 24小时内（Within 24 hours）
+          } else if (hoursSinceCreation < 48) {
+            estimated_arrival = '审核中，请耐心等待' // 超过24小时但未超过48小时（Over 24h but under 48h）
+          } else {
+            estimated_arrival = '审核超时，建议联系管理员' // 超过48小时（Over 48 hours）
+          }
+
           return {
             transaction_id: t.transaction_id,
             points_amount: parseFloat(t.points_amount), // 冻结积分数
@@ -1042,7 +1213,7 @@ class PointsService {
             merchant_notes: consumptionRecord?.merchant_notes || '', // 商家备注
             created_at: BeijingTimeHelper.formatForAPI(t.created_at), // 创建时间
             status_text: '审核中', // 状态文本（前端显示）
-            estimated_arrival: '预计24小时内到账' // 预计到账时间提示
+            estimated_arrival // 🔧 动态预计到账时间（Dynamic ETA）
           }
         }),
 
@@ -1073,25 +1244,38 @@ class PointsService {
       const pageSize = Math.min(parseInt(options.page_size) || 20, 50)
       const offset = (page - 1) * pageSize
 
-      // 1. 查询冻结中的积分交易记录
+      /**
+       * ✅ 计算7天前的时间（冻结积分过期时间：7天）
+       * Calculate 7 days ago (frozen points expiry time: 7 days)
+       */
+      const sevenDaysAgo = new Date()
+      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
+
+      /**
+       * 1. 查询冻结中的积分交易记录（只查询7天内的记录）
+       * Query frozen points transactions (only records within 7 days)
+       */
       const { count, rows: frozenTransactions } = await PointsTransaction.findAndCountAll({
         where: {
           user_id,
           status: 'pending',
-          business_type: 'consumption_reward'
+          business_type: 'consumption_reward',
+          created_at: {
+            [Op.gte]: sevenDaysAgo // ✅ 只查询7天内的记录（Only query records within 7 days）
+          }
         },
         attributes: [
           'transaction_id',
           'points_amount',
           'reference_type',
           'reference_id',
-          'created_at',
+          'created_at', // 原始Date对象（用于时间计算）
           'status'
         ],
         order: [['created_at', 'DESC']],
         limit: pageSize,
         offset,
-        raw: true
+        raw: true // 返回普通对象（performance optimization）
       })
 
       // 2. 获取关联的消费记录ID列表
@@ -1144,6 +1328,26 @@ class PointsService {
         // === 冻结积分明细列表 ===
         frozen_transactions: frozenTransactions.map(t => {
           const consumptionRecord = consumptionRecordsMap[t.reference_id] || null
+
+          /*
+           * 🔧 动态计算预计到账时间（基于创建时间）- Dynamic ETA Calculation
+           * 注意：t.created_at是从数据库查询出来的原始Date对象或字符串（需在formatForAPI之前使用）
+           */
+          const createdTime =
+            t.created_at instanceof Date ? t.created_at.getTime() : new Date(t.created_at).getTime()
+          const hoursSinceCreation = Math.floor((Date.now() - createdTime) / (1000 * 60 * 60))
+
+          let estimatedArrival
+          if (hoursSinceCreation < 1) {
+            estimatedArrival = '预计23小时内到账' // 刚提交不久（Just submitted）
+          } else if (hoursSinceCreation < 24) {
+            estimatedArrival = `预计${24 - hoursSinceCreation}小时内到账` // 24小时内（Within 24 hours）
+          } else if (hoursSinceCreation < 48) {
+            estimatedArrival = '审核中，请耐心等待' // 超过24小时但未超过48小时（Over 24h but under 48h）
+          } else {
+            estimatedArrival = '审核超时，建议联系管理员' // 超过48小时（Over 48 hours）
+          }
+
           return {
             transaction_id: t.transaction_id,
             record_id: consumptionRecord?.record_id || null,
@@ -1153,13 +1357,21 @@ class PointsService {
             merchant_id: consumptionRecord?.merchant_id || null,
             status: t.status,
             status_text: '审核中',
-            created_at: BeijingTimeHelper.formatForAPI(t.created_at),
-            estimated_arrival: '预计24小时内到账'
+            created_at: BeijingTimeHelper.formatForAPI(t.created_at), // 创建时间（格式化为API对象）
+            estimated_arrival: estimatedArrival // 🔧 动态预计到账时间（Dynamic ETA）
           }
         })
       }
     } catch (error) {
-      console.error('❌ 获取用户冻结积分明细失败:', error.message)
+      // 🔧 增强错误日志：记录完整错误堆栈和请求参数（Enhanced Error Logging）
+      console.error('❌ 获取用户冻结积分明细失败:', {
+        error_message: error.message,
+        error_stack: error.stack, // 错误堆栈（Error Stack Trace）
+        user_id,
+        page: options.page,
+        page_size: options.page_size,
+        timestamp: new Date().toISOString()
+      })
       throw new Error(`获取用户冻结积分明细失败: ${error.message}`)
     }
   }

@@ -28,6 +28,8 @@ const {
 } = require('../../../models')
 const { authenticateToken } = require('../../../middleware/auth')
 const BeijingTimeHelper = require('../../../utils/timeHelper')
+const logger = require('../../../utils/logger')
+const NotificationService = require('../../../services/NotificationService')
 
 /*
  * ========================================
@@ -234,9 +236,11 @@ router.post('/unlock', authenticateToken, async (req, res) => {
       { transaction }
     ) // 在事务中更新，确保原子性
 
-    console.log(
-      `💰 用户 ${userId} 扣除积分: ${UNLOCK_COST}积分，剩余: ${newAvailablePoints}积分（事务中）`
-    )
+    logger.info('高级空间解锁-积分扣除', {
+      user_id: userId,
+      unlock_cost: UNLOCK_COST,
+      remaining_points: newAvailablePoints
+    })
 
     /*
      * ========================================
@@ -266,9 +270,12 @@ router.post('/unlock', authenticateToken, async (req, res) => {
       { transaction }
     ) // 在事务中创建，确保原子性
 
-    console.log(
-      `📝 记录积分交易: 用户 ${userId} 消费 ${UNLOCK_COST}积分（高级空间解锁），剩余 ${newAvailablePoints}积分（事务中）`
-    )
+    logger.info('高级空间解锁-积分交易记录', {
+      user_id: userId,
+      transaction_type: 'consume',
+      points_amount: UNLOCK_COST,
+      balance_after: newAvailablePoints
+    })
 
     /*
      * ========================================
@@ -294,9 +301,11 @@ router.post('/unlock', authenticateToken, async (req, res) => {
         { transaction }
       ) // 在事务中创建，确保原子性
 
-      console.log(
-        `🎉 用户 ${userId} 首次解锁高级空间（积分解锁），有效期至 ${BeijingTimeHelper.toBeijingTime(expiresAt)}（事务中）`
-      )
+      logger.info('高级空间首次解锁', {
+        user_id: userId,
+        unlock_method: 'points',
+        expires_at: BeijingTimeHelper.toBeijingTime(expiresAt)
+      })
     } else {
       // 重新解锁：更新现有记录
       await premiumStatus.update(
@@ -309,9 +318,11 @@ router.post('/unlock', authenticateToken, async (req, res) => {
         { transaction }
       ) // 在事务中更新，确保原子性
 
-      console.log(
-        `🔄 用户 ${userId} 重新解锁高级空间（第${premiumStatus.total_unlock_count}次），有效期至 ${BeijingTimeHelper.toBeijingTime(expiresAt)}（事务中）`
-      )
+      logger.info('高级空间重新解锁', {
+        user_id: userId,
+        unlock_count: premiumStatus.total_unlock_count,
+        expires_at: BeijingTimeHelper.toBeijingTime(expiresAt)
+      })
     }
 
     /*
@@ -322,9 +333,37 @@ router.post('/unlock', authenticateToken, async (req, res) => {
      */
     await transaction.commit()
 
-    console.log(
-      `✅ 用户 ${userId} 成功解锁高级空间（${isFirstUnlock ? '首次' : '重新'}解锁）：付费${UNLOCK_COST}积分，剩余${newAvailablePoints}积分，有效期${VALIDITY_HOURS}小时`
-    )
+    logger.info('高级空间解锁成功', {
+      user_id: userId,
+      is_first_unlock: isFirstUnlock,
+      unlock_cost: UNLOCK_COST,
+      remaining_points: newAvailablePoints,
+      validity_hours: VALIDITY_HOURS,
+      total_unlock_count: premiumStatus.total_unlock_count
+    })
+
+    /*
+     * ========================================
+     * 步骤9: 发送解锁成功通知（异步，不影响返回）
+     * ========================================
+     * 通过客服聊天系统发送通知给用户
+     */
+    setImmediate(async () => {
+      try {
+        await NotificationService.notifyPremiumUnlockSuccess(userId, {
+          unlock_cost: UNLOCK_COST,
+          remaining_points: newAvailablePoints,
+          expires_at: BeijingTimeHelper.toBeijingTime(expiresAt),
+          validity_hours: VALIDITY_HOURS,
+          is_first_unlock: isFirstUnlock
+        })
+      } catch (notifyError) {
+        logger.error('高级空间解锁通知发送失败', {
+          user_id: userId,
+          error: notifyError.message
+        })
+      }
+    })
 
     /*
      * ========================================
@@ -352,7 +391,11 @@ router.post('/unlock', authenticateToken, async (req, res) => {
      * ========================================
      */
     await transaction.rollback() // 回滚事务，撤销所有操作
-    console.error('❌ 高级空间解锁失败:', error)
+    logger.error('高级空间解锁失败', {
+      user_id: req.user.user_id,
+      error: error.message,
+      stack: error.stack
+    })
 
     return res.apiError('解锁失败，请稍后重试', 'UNLOCK_FAILED', { error: error.message }, 500)
   }
@@ -482,7 +525,10 @@ router.get('/status', authenticateToken, async (req, res) => {
       '高级空间访问中'
     )
   } catch (error) {
-    console.error('❌ 查询高级空间状态失败:', error)
+    logger.error('查询高级空间状态失败', {
+      user_id: req.user.user_id,
+      error: error.message
+    })
     return res.apiError('查询失败', 'QUERY_FAILED', { error: error.message }, 500)
   }
 })

@@ -20,27 +20,74 @@ router.post('/create', authenticateToken, requireAdmin, async (req, res) => {
     const adminId = req.user.user_id
     const { user_id, presets } = req.body
 
-    // 参数验证
+    // ===== 第1步：基础参数验证 =====
     if (!user_id || !presets || !Array.isArray(presets) || presets.length === 0) {
-      return res.apiError('参数错误：需要user_id和presets数组', 'INVALID_PARAMETERS')
+      return res.apiError('参数错误：需要user_id和presets数组', 'INVALID_PARAMETERS', null, null)
     }
 
-    // 验证目标用户存在
+    /*
+     * ===== 第2步：最大数量限制验证（风险2修复）=====
+     * 业务规则：单次最多创建20条预设（基于实际业务：VIP用户最多10条）
+     * ROI评分：⭐⭐⭐⭐⭐（成本极低，防护价值高）
+     */
+    const MAX_PRESETS_PER_BATCH = 20
+    if (presets.length > MAX_PRESETS_PER_BATCH) {
+      return res.apiError(
+        `单次最多创建${MAX_PRESETS_PER_BATCH}条预设，当前：${presets.length}条`,
+        'TOO_MANY_PRESETS',
+        null,
+        null
+      )
+    }
+
+    /*
+     * ===== 第3步：queue_order唯一性验证（风险1修复）=====
+     * 业务规则：同一批次中，queue_order不能重复
+     * ROI评分：⭐⭐⭐⭐⭐（成本极低，收益极高）
+     */
+    const queueOrders = presets.map(p => p.queue_order)
+    const uniqueOrders = new Set(queueOrders)
+    if (queueOrders.length !== uniqueOrders.size) {
+      return res.apiError(
+        '预设数据错误：同一批次中queue_order不能重复',
+        'DUPLICATE_QUEUE_ORDER',
+        null,
+        null
+      )
+    }
+
+    // ===== 第4步：验证目标用户存在 =====
     const targetUser = await models.User.findByPk(user_id)
     if (!targetUser) {
-      return res.apiError('目标用户不存在', 'USER_NOT_FOUND')
+      return res.apiError('目标用户不存在', 'USER_NOT_FOUND', null, null)
     }
 
-    // 验证预设数据格式
+    // ===== 第5步：验证预设数据格式和奖品存在性 =====
     for (const preset of presets) {
-      if (!preset.prize_id || !preset.queue_order) {
-        return res.apiError('预设数据格式错误：需要prize_id和queue_order', 'INVALID_PRESET_DATA')
+      // 验证必需字段存在性（使用更精确的判断，避免0被误判为缺失）
+      if (!preset.prize_id || preset.queue_order === undefined || preset.queue_order === null) {
+        return res.apiError(
+          '预设数据格式错误：需要prize_id和queue_order',
+          'INVALID_PRESET_DATA',
+          null,
+          null
+        )
+      }
+
+      // 验证queue_order为正整数（在验证存在性之后，避免0被误判）
+      if (!Number.isInteger(preset.queue_order) || preset.queue_order < 1) {
+        return res.apiError(
+          `队列顺序必须为正整数，当前：${preset.queue_order}`,
+          'INVALID_QUEUE_ORDER',
+          null,
+          null
+        )
       }
 
       // 验证奖品存在
       const prize = await models.LotteryPrize.findByPk(preset.prize_id)
       if (!prize) {
-        return res.apiError(`奖品ID ${preset.prize_id} 不存在`, 'PRIZE_NOT_FOUND')
+        return res.apiError(`奖品ID ${preset.prize_id} 不存在`, 'PRIZE_NOT_FOUND', null, null)
       }
     }
 
@@ -58,7 +105,8 @@ router.post('/create', authenticateToken, requireAdmin, async (req, res) => {
       timestamp: BeijingTimeHelper.apiTimestamp()
     })
 
-    return res.apiSuccess('抽奖预设创建成功', {
+    // 返回创建结果 - 参数顺序：data第1个, message第2个
+    return res.apiSuccess({
       user_id,
       presets_count: createdPresets.length,
       created_presets: createdPresets.map(preset => ({
@@ -67,9 +115,27 @@ router.post('/create', authenticateToken, requireAdmin, async (req, res) => {
         queue_order: preset.queue_order,
         status: preset.status
       }))
-    })
+    }, '抽奖预设创建成功')
   } catch (error) {
-    console.error('❌ 创建抽奖预设失败:', error.message)
+    // 🎯 细化错误处理：区分Sequelize错误类型
+    console.error('❌ 创建抽奖预设失败:', error.message, error.stack)
+
+    // Sequelize数据库错误
+    if (error.name === 'SequelizeDatabaseError') {
+      return res.apiError('数据库操作失败，请稍后重试', 'DATABASE_ERROR', null, null)
+    }
+
+    // Sequelize外键约束错误
+    if (error.name === 'SequelizeForeignKeyConstraintError') {
+      return res.apiError('数据关联错误，请检查用户ID或奖品ID是否有效', 'FOREIGN_KEY_ERROR', null, null)
+    }
+
+    // Sequelize唯一约束错误
+    if (error.name === 'SequelizeUniqueConstraintError') {
+      return res.apiError('预设队列顺序重复，同一用户的queue_order不能重复', 'DUPLICATE_QUEUE_ORDER', null, null)
+    }
+
+    // 其他未知错误
     return res.apiInternalError('创建抽奖预设失败')
   }
 })
@@ -77,17 +143,47 @@ router.post('/create', authenticateToken, requireAdmin, async (req, res) => {
 /**
  * 查看用户的抽奖预设列表
  * GET /api/v4/lottery-preset/user/:user_id
+ *
+ * @description 查看指定用户的抽奖预设队列，包含完整的预设信息和统计数据
+ * @route GET /api/v4/lottery-preset/user/:user_id
+ * @access Private（需要JWT认证 + 管理员权限）
+ *
+ * 业务场景：
+ * - 运营审计：查看为用户创建的预设配置，核对预设奖品是否正确
+ * - 用户支持：用户投诉时，客服查询用户预设状态，确认是否有运营干预
+ * - 预设监控：管理员监控预设使用情况，判断用户是否已使用完所有预设
+ * - 策略调整：运营人员查看用户预设队列，决定是否需要补充或清理预设
+ *
+ * 参数说明：
+ * @param {number} user_id - 路径参数，目标用户ID（必填）
+ * @query {string} status - 查询参数，状态筛选（可选：pending/used/all，默认all）
+ *
+ * 返回数据：
+ * @returns {Object} data.user - 目标用户信息（user_id、mobile、nickname）
+ * @returns {Object} data.stats - 预设统计信息（total、pending、used）
+ * @returns {Array} data.presets - 预设列表数组（按queue_order升序排序）
  */
 router.get('/user/:user_id', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const adminId = req.user.user_id
-    const { user_id } = req.params
+
+    // 🎯 参数验证：user_id类型验证（防止SQL注入和无效值）
+    const user_id = parseInt(req.params.user_id)
+    if (isNaN(user_id) || user_id <= 0) {
+      return res.apiError('无效的用户ID，必须是正整数', 'INVALID_USER_ID', null, null)
+    }
+
+    // 🎯 参数验证：status白名单验证（防止无效状态值）
     const { status = 'all' } = req.query
+    const allowedStatus = ['pending', 'used', 'all']
+    if (!allowedStatus.includes(status)) {
+      return res.apiError(`无效的状态参数，允许值：${allowedStatus.join('/')}`, 'INVALID_STATUS', null, null)
+    }
 
     // 验证目标用户存在
     const targetUser = await models.User.findByPk(user_id)
     if (!targetUser) {
-      return res.apiError('目标用户不存在', 'USER_NOT_FOUND')
+      return res.apiError('目标用户不存在', 'USER_NOT_FOUND', null, null)
     }
 
     // 构建查询条件
@@ -103,12 +199,12 @@ router.get('/user/:user_id', authenticateToken, requireAdmin, async (req, res) =
         {
           model: models.LotteryPrize,
           as: 'prize',
-          attributes: ['prize_id', 'name', 'prize_type', 'prize_value', 'description']
+          attributes: ['prize_id', 'prize_name', 'prize_type', 'prize_value', 'prize_description']
         },
         {
           model: models.User,
           as: 'admin',
-          attributes: ['user_id', 'username', 'nickname']
+          attributes: ['user_id', 'mobile', 'nickname']
         }
       ],
       order: [['queue_order', 'ASC']]
@@ -120,14 +216,16 @@ router.get('/user/:user_id', authenticateToken, requireAdmin, async (req, res) =
     console.log('🔍 管理员查看用户预设', {
       adminId,
       targetUserId: user_id,
+      status,
       presetsCount: presets.length,
       timestamp: BeijingTimeHelper.apiTimestamp()
     })
 
-    return res.apiSuccess('获取用户预设成功', {
+    // 返回用户预设数据 - 参数顺序：data第1个, message第2个
+    return res.apiSuccess({
       user: {
         user_id: targetUser.user_id,
-        username: targetUser.username,
+        mobile: targetUser.mobile,
         nickname: targetUser.nickname
       },
       stats,
@@ -140,9 +238,27 @@ router.get('/user/:user_id', authenticateToken, requireAdmin, async (req, res) =
         prize: preset.prize,
         admin: preset.admin
       }))
-    })
+    }, '获取用户预设成功')
   } catch (error) {
-    console.error('❌ 查看用户预设失败:', error.message)
+    // 🎯 细化错误处理：区分Sequelize错误类型
+    console.error('❌ 查看用户预设失败:', error.message, error.stack)
+
+    // Sequelize数据库错误
+    if (error.name === 'SequelizeDatabaseError') {
+      return res.apiError('数据库查询失败，请稍后重试', 'DATABASE_ERROR', null, null)
+    }
+
+    // Sequelize连接错误
+    if (error.name === 'SequelizeConnectionError') {
+      return res.apiError('数据库连接失败，请联系技术支持', 'CONNECTION_ERROR', null, null)
+    }
+
+    // Sequelize超时错误
+    if (error.name === 'SequelizeTimeoutError') {
+      return res.apiError('数据库查询超时，请重试', 'QUERY_TIMEOUT', null, null)
+    }
+
+    // 其他未知错误
     return res.apiInternalError('查看用户预设失败')
   }
 })
@@ -150,16 +266,33 @@ router.get('/user/:user_id', authenticateToken, requireAdmin, async (req, res) =
 /**
  * 清理用户的所有预设
  * DELETE /api/v4/lottery-preset/user/:user_id
+ *
+ * @description 删除指定用户的所有预设记录（包括pending和used状态）
+ * @route DELETE /api/v4/lottery-preset/user/:user_id
+ * @access Private（需要JWT认证 + 管理员权限）
+ *
+ * 业务场景：
+ * - 运营调整：重新规划用户的预设策略前，先清除旧预设
+ * - 用户投诉：删除错误的预设配置
+ * - 活动结束：清理活动期间的预设记录
+ *
+ * 参数说明：
+ * @param {number} user_id - 路径参数，目标用户ID（必填）
  */
 router.delete('/user/:user_id', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const adminId = req.user.user_id
-    const { user_id } = req.params
+
+    // 🎯 参数验证：user_id类型验证
+    const user_id = parseInt(req.params.user_id)
+    if (isNaN(user_id) || user_id <= 0) {
+      return res.apiError('无效的用户ID，必须是正整数', 'INVALID_USER_ID', null, null)
+    }
 
     // 验证目标用户存在
     const targetUser = await models.User.findByPk(user_id)
     if (!targetUser) {
-      return res.apiError('目标用户不存在', 'USER_NOT_FOUND')
+      return res.apiError('目标用户不存在', 'USER_NOT_FOUND', null, null)
     }
 
     // 清理用户的所有预设
@@ -172,12 +305,26 @@ router.delete('/user/:user_id', authenticateToken, requireAdmin, async (req, res
       timestamp: BeijingTimeHelper.apiTimestamp()
     })
 
-    return res.apiSuccess('清理用户预设成功', {
+    // 返回清理结果 - 参数顺序：data第1个, message第2个
+    return res.apiSuccess({
       user_id,
       deleted_count: deletedCount
-    })
+    }, `成功清理${deletedCount}条预设记录`)
   } catch (error) {
-    console.error('❌ 清理用户预设失败:', error.message)
+    // 🎯 细化错误处理：区分Sequelize错误类型
+    console.error('❌ 清理用户预设失败:', error.message, error.stack)
+
+    // Sequelize数据库错误
+    if (error.name === 'SequelizeDatabaseError') {
+      return res.apiError('数据库删除失败，请稍后重试', 'DATABASE_ERROR', null, null)
+    }
+
+    // Sequelize连接错误
+    if (error.name === 'SequelizeConnectionError') {
+      return res.apiError('数据库连接失败，请联系技术支持', 'CONNECTION_ERROR', null, null)
+    }
+
+    // 其他未知错误
     return res.apiInternalError('清理用户预设失败')
   }
 })
@@ -185,12 +332,29 @@ router.delete('/user/:user_id', authenticateToken, requireAdmin, async (req, res
 /**
  * 获取预设统计信息
  * GET /api/v4/lottery-preset/stats
+ *
+ * @description 获取系统级预设统计数据（管理员监控运营效果）
+ * @route GET /api/v4/lottery-preset/stats
+ * @access Private（需要JWT认证 + 管理员权限）
+ *
+ * 业务场景：
+ * - 运营监控：查看预设总体使用情况
+ * - 数据分析：评估预设运营效果（使用率、奖品分布）
+ * - 决策支持：根据统计数据调整运营策略
+ *
+ * 返回数据：
+ * @returns {number} total_presets - 总预设数量（pending + used）
+ * @returns {number} pending_presets - 待使用预设数量
+ * @returns {number} used_presets - 已使用预设数量
+ * @returns {number} total_users_with_presets - 拥有预设的用户数量
+ * @returns {string} usage_rate - 预设使用率（百分比）
+ * @returns {Array} prize_type_distribution - 奖品类型分布统计
  */
 router.get('/stats', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const adminId = req.user.user_id
 
-    // 获取总体统计
+    // 🎯 性能优化：并行执行所有统计查询
     const [totalPresets, pendingPresets, usedPresets, totalUsers] = await Promise.all([
       models.LotteryPreset.count(),
       models.LotteryPreset.count({ where: { status: 'pending' } }),
@@ -219,22 +383,39 @@ router.get('/stats', authenticateToken, requireAdmin, async (req, res) => {
 
     console.log('📊 管理员查看预设统计', {
       adminId,
+      totalPresets,
+      pendingPresets,
+      usedPresets,
       timestamp: BeijingTimeHelper.apiTimestamp()
     })
 
-    return res.apiSuccess('获取预设统计成功', {
+    // 返回统计数据 - 参数顺序：data第1个, message第2个
+    return res.apiSuccess({
       total_presets: totalPresets,
       pending_presets: pendingPresets,
       used_presets: usedPresets,
       total_users_with_presets: totalUsers,
-      usage_rate: totalPresets > 0 ? ((usedPresets / totalPresets) * 100).toFixed(2) : 0,
+      usage_rate: totalPresets > 0 ? ((usedPresets / totalPresets) * 100).toFixed(2) : '0.00',
       prize_type_distribution: prizeTypeStats.map(stat => ({
         prize_type: stat.getDataValue('prize_type'),
-        count: stat.getDataValue('count')
+        count: parseInt(stat.getDataValue('count'))
       }))
-    })
+    }, '获取预设统计成功')
   } catch (error) {
-    console.error('❌ 获取预设统计失败:', error.message)
+    // 🎯 细化错误处理：区分Sequelize错误类型
+    console.error('❌ 获取预设统计失败:', error.message, error.stack)
+
+    // Sequelize数据库错误
+    if (error.name === 'SequelizeDatabaseError') {
+      return res.apiError('数据库查询失败，请稍后重试', 'DATABASE_ERROR', null, null)
+    }
+
+    // Sequelize连接错误
+    if (error.name === 'SequelizeConnectionError') {
+      return res.apiError('数据库连接失败，请联系技术支持', 'CONNECTION_ERROR', null, null)
+    }
+
+    // 其他未知错误
     return res.apiInternalError('获取预设统计失败')
   }
 })

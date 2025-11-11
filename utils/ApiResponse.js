@@ -386,8 +386,12 @@ class ApiResponse {
    * @returns {Object} Express响应
    */
   static send (res, apiResponse) {
-    // ✅ 修正：固定使用HTTP 200状态码，业务状态通过response.code字段表示
-    return res.status(200).json(apiResponse)
+    /*
+     * ✅ 使用apiResponse中的httpStatus字段（如果有），否则使用200
+     * 业务成功：200；业务错误：根据httpStatus字段（如400、401、403、404、500等）
+     */
+    const statusCode = apiResponse.httpStatus || 200
+    return res.status(statusCode).json(apiResponse)
   }
 
   /**

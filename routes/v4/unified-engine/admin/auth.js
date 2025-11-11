@@ -68,17 +68,18 @@ router.post('/login', async (req, res) => {
     // 生成Token
     const tokens = await generateTokens(user)
 
-    return res.apiSuccess('管理员登录成功', {
+    // 返回登录结果 - 参数顺序：data第1个, message第2个
+    return res.apiSuccess({
       ...tokens,
       user: {
         user_id: user.user_id,
         mobile: user.mobile,
         nickname: user.nickname,
         status: user.status,
-        role_level: userRoles.roleLevel,
+        role_level: userRoles.role_level,
         roles: userRoles.roles
       }
-    })
+    }, '管理员登录成功')
   } catch (error) {
     console.error('❌ 管理员登录失败:', error.message)
     return res.apiError('登录失败', 'LOGIN_FAILED', null, 500)
@@ -118,19 +119,20 @@ router.get('/profile', async (req, res) => {
       return res.apiError('用户不具备管理员权限', 'INSUFFICIENT_PERMISSION', null, 403)
     }
 
-    return res.apiSuccess('获取管理员信息成功', {
+    // 返回管理员信息 - 参数顺序：data第1个, message第2个
+    return res.apiSuccess({
       user: {
         user_id: user.user_id,
         mobile: user.mobile,
         nickname: user.nickname,
         status: user.status,
-        role_level: userRoles.roleLevel,
+        role_level: userRoles.role_level,
         roles: userRoles.roles,
         last_login: user.last_login,
         login_count: user.login_count,
         created_at: user.created_at
       }
-    })
+    }, '获取管理员信息成功')
   } catch (error) {
     if (error.name === 'JsonWebTokenError') {
       return res.apiError('无效的Token', 'INVALID_TOKEN', null, 401)

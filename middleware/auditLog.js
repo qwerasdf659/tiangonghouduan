@@ -71,7 +71,8 @@ exports.logOperation = async (
       'prize_delete',
       'campaign_config',
       'role_assign',
-      'system_config'
+      'system_config',
+      'session_assign' // 客服会话分配（P1优化）
     ]
 
     if (!validOperationTypes.includes(operationType)) {

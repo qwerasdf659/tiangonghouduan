@@ -145,6 +145,45 @@ describe('管理员和系统管理API测试', () => {
         expect(response.data.data).toHaveProperty('trend_analysis')
       }
     })
+
+    test('✅ WebSocket服务状态 - GET /api/v4/system/chat/ws-status', async () => {
+      const response = await tester.makeAuthenticatedRequest(
+        'GET',
+        '/api/v4/system/chat/ws-status',
+        null,
+        'admin'
+      )
+
+      expect([200, 401, 403]).toContain(response.status)
+      if (response.status === 200) {
+        // 验证API返回格式符合规范
+        expect(response.data.data).toHaveProperty('status')
+        expect(response.data.data).toHaveProperty('connections')
+        expect(response.data.data).toHaveProperty('uptime')
+        expect(response.data.data).toHaveProperty('connected_users')
+        expect(response.data.data).toHaveProperty('connected_admins')
+        expect(response.data.data).toHaveProperty('timestamp')
+        expect(response.data.data).toHaveProperty('startup_log_id')
+
+        // 验证字段类型
+        expect(typeof response.data.data.status).toBe('string')
+        expect(typeof response.data.data.connections).toBe('number')
+        expect(typeof response.data.data.uptime).toBe('number')
+        expect(typeof response.data.data.connected_users).toBe('number')
+        expect(typeof response.data.data.connected_admins).toBe('number')
+
+        // 验证业务逻辑
+        expect(['running', 'stopped']).toContain(response.data.data.status)
+        expect(response.data.data.uptime).toBeGreaterThanOrEqual(0)
+        expect(response.data.data.connections).toBeGreaterThanOrEqual(0)
+
+        console.log('📊 WebSocket服务状态:', {
+          status: response.data.data.status,
+          uptime: `${response.data.data.uptime}小时`,
+          connections: response.data.data.connections
+        })
+      }
+    })
   })
 
   // ========== 调度系统API ==========

@@ -343,23 +343,80 @@ module.exports = sequelize => {
       indexes: [
         {
           fields: ['campaign_id', 'status'],
-          name: 'idx_lp_campaign_status'
+          name: 'idx_lp_campaign_status',
+          comment: '活动状态复合索引'
         },
         {
           fields: ['prize_type', 'status'],
-          name: 'idx_lp_type_status'
+          name: 'idx_lp_type_status',
+          comment: '奖品类型状态复合索引'
         },
         {
           fields: ['win_probability'],
-          name: 'idx_lp_probability'
+          name: 'idx_lp_probability',
+          comment: '中奖概率索引'
         },
         {
           fields: ['sort_order'],
-          name: 'idx_lp_sort'
+          name: 'idx_lp_sort',
+          comment: '排序索引'
+        },
+        {
+          fields: ['campaign_id', 'sort_order'],
+          name: 'idx_unique_campaign_sort_order',
+          unique: true,
+          comment: '活动内排序唯一约束 - 防止转盘位置冲突'
         }
       ]
     }
   )
+
+  /**
+   * 🔒 数据验证钩子：防止sort_order重复
+   * 业务场景：确保同一活动内的奖品排序不重复，避免前端转盘位置冲突
+   * 触发时机：创建新奖品前自动执行
+   */
+  LotteryPrize.addHook('beforeCreate', async (prize, options) => {
+    // 检查同一活动内是否已存在相同的sort_order
+    const existing = await LotteryPrize.findOne({
+      where: {
+        campaign_id: prize.campaign_id,
+        sort_order: prize.sort_order
+      },
+      transaction: options.transaction
+    })
+
+    if (existing) {
+      throw new Error(
+        `奖品排序${prize.sort_order}已存在于活动${prize.campaign_id}中，请使用不同的排序值`
+      )
+    }
+  })
+
+  /**
+   * 🔒 数据验证钩子：防止更新时sort_order重复
+   * 业务场景：确保更新奖品时不会产生排序冲突
+   * 触发时机：更新奖品前自动执行
+   */
+  LotteryPrize.addHook('beforeUpdate', async (prize, options) => {
+    // 只有在sort_order或campaign_id发生变化时才检查
+    if (prize.changed('sort_order') || prize.changed('campaign_id')) {
+      const existing = await LotteryPrize.findOne({
+        where: {
+          campaign_id: prize.campaign_id,
+          sort_order: prize.sort_order,
+          prize_id: { [require('sequelize').Op.ne]: prize.prize_id }
+        },
+        transaction: options.transaction
+      })
+
+      if (existing) {
+        throw new Error(
+          `奖品排序${prize.sort_order}已存在于活动${prize.campaign_id}中，请使用不同的排序值`
+        )
+      }
+    }
+  })
 
   return LotteryPrize
 }

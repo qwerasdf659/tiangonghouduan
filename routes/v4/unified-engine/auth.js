@@ -8,7 +8,12 @@
 const express = require('express')
 const router = express.Router()
 const { User } = require('../../../models')
-const { generateTokens, getUserRoles } = require('../../../middleware/auth')
+const {
+  generateTokens,
+  getUserRoles,
+  authenticateToken,
+  invalidateUserPermissions
+} = require('../../../middleware/auth')
 const BeijingTimeHelper = require('../../../utils/timeHelper')
 const { getRateLimiter } = require('../../../middleware/RateLimiterMiddleware')
 
@@ -35,6 +40,12 @@ const verifyRateLimiter = rateLimiter.createLimiter({
  * @param {string} verification_code - 验证码
  */
 router.post('/login', async (req, res) => {
+  /*
+   * 🔴 登录性能监控：记录开始时间（2025-11-09新增）
+   * 用于监控登录响应时间，判断是否需要优化（文档方案0建议）
+   */
+  const loginStartTime = Date.now()
+
   try {
     const { mobile, verification_code } = req.body
 
@@ -95,9 +106,9 @@ router.post('/login', async (req, res) => {
 
         console.log(`用户 ${mobile} 注册成功，user_id: ${user.user_id}`)
 
-        // ✅ 2. 创建积分账户（使用统一服务）
+        // ✅ 2. 创建积分账户（使用统一服务，传递transaction保证事务完整性）
         const PointsService = require('../../../services/PointsService')
-        await PointsService.createPointsAccount(user.user_id)
+        await PointsService.createPointsAccount(user.user_id, transaction)
 
         console.log(`用户 ${mobile} 积分账户创建成功`)
 
@@ -180,6 +191,31 @@ router.post('/login', async (req, res) => {
     }
 
     const message = isNewUser ? '注册并登录成功' : '登录成功'
+
+    /*
+     * 🔴 登录性能监控：记录登录耗时（2025-11-09新增）
+     * 告警阈值：>3秒需要关注，>5秒需要优化（文档方案0建议）
+     */
+    const loginDuration = Date.now() - loginStartTime
+    if (loginDuration > 3000) {
+      console.warn('⚠️ 登录耗时告警:', {
+        mobile: mobile.substring(0, 3) + '****' + mobile.substring(7), // 脱敏处理
+        duration: `${loginDuration}ms`,
+        threshold: '3000ms',
+        is_new_user: isNewUser,
+        timestamp: new Date().toISOString(),
+        suggestion:
+          loginDuration > 5000
+            ? '登录耗时>5秒，建议执行优化方案2（参考文档）'
+            : '登录耗时>3秒，持续观察，如持续1周则需优化'
+      })
+    } else if (loginDuration > 1000) {
+      // 1-3秒：记录信息级日志，用于性能分析
+      console.log(
+        `📊 登录耗时: ${loginDuration}ms (用户: ${mobile.substring(0, 3)}****${mobile.substring(7)})`
+      )
+    }
+
     return res.apiSuccess(responseData, message)
   } catch (error) {
     console.error('登录失败:', error)
@@ -305,6 +341,12 @@ router.post('/decrypt-phone', async (req, res) => {
  * @returns {Object} 登录成功响应（access_token + user信息 + role_based_admin）
  */
 router.post('/quick-login', async (req, res) => {
+  /*
+   * 🔴 登录性能监控：记录开始时间（2025-11-09新增）
+   * 用于监控登录响应时间，判断是否需要优化（文档方案0建议）
+   */
+  const loginStartTime = Date.now()
+
   try {
     /*
      * ========================================
@@ -477,6 +519,30 @@ router.post('/quick-login', async (req, res) => {
 
     console.log(`✅ 用户 ${mobile} 微信授权登录成功`)
 
+    /*
+     * 🔴 登录性能监控：记录登录耗时（2025-11-09新增）
+     * 告警阈值：>3秒需要关注，>5秒需要优化（文档方案0建议）
+     */
+    const loginDuration = Date.now() - loginStartTime
+    if (loginDuration > 3000) {
+      console.warn('⚠️ 登录耗时告警:', {
+        mobile: mobile.substring(0, 3) + '****' + mobile.substring(7), // 脱敏处理
+        duration: `${loginDuration}ms`,
+        threshold: '3000ms',
+        login_type: 'quick_login',
+        timestamp: new Date().toISOString(),
+        suggestion:
+          loginDuration > 5000
+            ? '登录耗时>5秒，建议执行优化方案2（参考文档）'
+            : '登录耗时>3秒，持续观察，如持续1周则需优化'
+      })
+    } else if (loginDuration > 1000) {
+      // 1-3秒：记录信息级日志，用于性能分析
+      console.log(
+        `📊 登录耗时: ${loginDuration}ms (用户: ${mobile.substring(0, 3)}****${mobile.substring(7)}, 类型: quick_login)`
+      )
+    }
+
     return res.apiSuccess(responseData, '快速登录成功')
   } catch (error) {
     console.error('❌ 快速登录失败:', error)
@@ -494,8 +560,19 @@ router.get('/profile', require('../../../middleware/auth').authenticateToken, as
 
     // 重新查询用户信息确保数据最新
     const user = await User.findByPk(user_id)
+
+    // ✅ P0级修复：添加status二次检查（防御性编程）
+    // 即使authenticateToken中间件已检查，这里再次验证作为安全加固
     if (!user) {
       return res.apiError('用户不存在', 'USER_NOT_FOUND', null, 404)
+    }
+
+    // 🔴 关键：status二次检查，防止被禁用用户继续访问
+    if (user.status !== 'active') {
+      console.warn(
+        `❌ [Security Alert] Banned user tried to access profile: user_id=${user.user_id}, status=${user.status}`
+      )
+      return res.apiError('账户已被禁用或删除', 'ACCOUNT_BANNED', null, 403)
     }
 
     // 🛡️ 获取用户角色信息
@@ -511,8 +588,8 @@ router.get('/profile', require('../../../middleware/auth').authenticateToken, as
         status: user.status,
         consecutive_fail_count: user.consecutive_fail_count,
         history_total_points: user.history_total_points,
-        created_at: user.created_at,
-        last_login: user.last_login,
+        created_at: BeijingTimeHelper.formatToISO(user.createdAt), // 🔧 转换为ISO8601格式（带+08:00）
+        last_login: BeijingTimeHelper.formatToISO(user.last_login), // 🔧 转换为ISO8601格式（带+08:00）
         login_count: user.login_count
       },
       timestamp: BeijingTimeHelper.apiTimestamp()
@@ -528,35 +605,40 @@ router.get('/profile', require('../../../middleware/auth').authenticateToken, as
 /**
  * 🛡️ 验证Token有效性
  * POST /api/v4/auth/verify
- * 
+ *
  * ✅ 风险点3解决：应用限流中间件（防止DDoS攻击）
  * ✅ 风险点5解决：使用全局错误处理中间件（next(error)模式）
  */
-router.post('/verify', require('../../../middleware/auth').authenticateToken, verifyRateLimiter, async (req, res, next) => {
-  try {
-    const user_id = req.user.user_id
+router.post(
+  '/verify',
+  require('../../../middleware/auth').authenticateToken,
+  verifyRateLimiter,
+  async (req, res, next) => {
+    try {
+      const user_id = req.user.user_id
 
-    // 🛡️ 获取用户角色信息
-    const userRoles = await getUserRoles(user_id)
+      // 🛡️ 获取用户角色信息
+      const userRoles = await getUserRoles(user_id)
 
-    const responseData = {
-      valid: true,
-      user: {
-        user_id,
-        mobile: req.user.mobile,
-        role_based_admin: userRoles.isAdmin, // 🛡️ 基于角色计算
-        roles: userRoles.roles
-      },
-      timestamp: BeijingTimeHelper.apiTimestamp()
+      const responseData = {
+        valid: true,
+        user: {
+          user_id,
+          mobile: req.user.mobile,
+          role_based_admin: userRoles.isAdmin, // 🛡️ 基于角色计算
+          roles: userRoles.roles
+        },
+        timestamp: BeijingTimeHelper.apiTimestamp()
+      }
+
+      return res.apiSuccess(responseData, 'Token验证成功')
+    } catch (error) {
+      console.error('Token验证失败:', error)
+      // ✅ 风险点5解决：利用全局errorHandler.js统一处理
+      return next(error)
     }
-
-    return res.apiSuccess(responseData, 'Token验证成功')
-  } catch (error) {
-    console.error('Token验证失败:', error)
-    // ✅ 风险点5解决：利用全局errorHandler.js统一处理
-    next(error)
   }
-})
+)
 
 /**
  * 🛡️ 刷新访问Token
@@ -623,6 +705,47 @@ router.post('/refresh', async (req, res) => {
       return res.apiError('刷新Token已过期', 'REFRESH_TOKEN_EXPIRED', error.message, 401)
     }
     return res.apiError('Token刷新失败', 'REFRESH_TOKEN_FAILED', error.message, 500)
+  }
+})
+
+/**
+ * 🛡️ 用户退出登录（User Logout）
+ * POST /api/v4/unified-engine/auth/logout
+ *
+ * 业务场景：
+ * - 用户主动退出登录，清除服务端权限缓存
+ * - 确保下次刷新Token时重新验证账户状态
+ *
+ * 技术实现：
+ * - 调用invalidateUserPermissions清除双层缓存（内存+Redis）
+ * - 前端需要同步清除localStorage中的Token
+ *
+ * 安全说明：
+ * - 仅清除权限缓存，不实现Token黑名单（基于10人小型系统实用主义原则）
+ * - 缓存清除后，下次刷新Token时强制从数据库验证账户状态
+ * - 如管理员禁用账户（status='banned'），刷新Token会返回403错误
+ *
+ * @param {string} req.user.user_id - 用户ID（从Access Token中获取）
+ * @returns {Object} 退出登录结果
+ */
+router.post('/logout', authenticateToken, async (req, res) => {
+  try {
+    const user_id = req.user.user_id
+
+    /**
+     * 🔑 清除用户权限缓存（利用已有的invalidateUserPermissions函数）
+     * 作用：清除内存缓存（memoryCache.delete）+ Redis缓存（redisClient.del）
+     * 效果：下次刷新Token时，getUserRoles函数缓存未命中，触发数据库查询
+     */
+    await invalidateUserPermissions(user_id, 'user_logout')
+
+    // 📝 记录退出日志（便于审计和问题追踪）
+    console.log(`✅ [Auth] 用户退出登录: user_id=${user_id}, mobile=${req.user.mobile}`)
+
+    return res.apiSuccess(null, '退出登录成功', 'LOGOUT_SUCCESS')
+  } catch (error) {
+    console.error('❌ [Auth] 退出登录失败:', error)
+    return res.apiError('退出登录失败', 'LOGOUT_FAILED', error.message, 500)
   }
 })
 

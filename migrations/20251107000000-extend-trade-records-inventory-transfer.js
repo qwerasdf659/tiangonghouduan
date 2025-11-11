@@ -9,7 +9,7 @@
  * 变更说明：
  * 1. 扩展trade_type枚举值，添加'inventory_transfer'（物品转让）
  * 2. 添加item_id字段（INT），用于关联inventory_id
- * 3. 添加item_name字段（VARCHAR(100)），记录转让物品名称
+ * 3. 添加name字段（VARCHAR(100)），记录转让物品名称（统一使用name字段）
  * 4. 添加transfer_note字段（VARCHAR(500)），记录转让备注
  *
  * 业务场景：
@@ -23,7 +23,7 @@
  *
  * 影响范围：
  * - 修改trade_records表的trade_type字段（扩展枚举）
- * - 添加3个新字段：item_id、item_name、transfer_note
+ * - 添加3个新字段：item_id、name、transfer_note
  */
 
 'use strict'
@@ -81,18 +81,19 @@ module.exports = {
 
       /*
        * ========================================
-       * 第3步：添加item_name字段
+       * 第3步：添加name字段
        * ========================================
        * 记录转让物品的名称（冗余字段，提高查询效率）
+       * 统一使用name字段，与UserInventory保持一致
        */
-      console.log('3. 添加item_name字段...')
+      console.log('3. 添加name字段...')
       await queryInterface.addColumn(
         'trade_records',
-        'item_name',
+        'name',
         {
           type: Sequelize.STRING(100),
           allowNull: true,
-          comment: '物品名称（仅用于inventory_transfer类型，冗余字段用于快速查询显示）'
+          comment: '物品名称（Item Name - 仅用于inventory_transfer类型，冗余字段用于快速查询显示；统一使用name字段，与UserInventory保持一致）'
         },
         { transaction }
       )
@@ -182,8 +183,8 @@ module.exports = {
       console.log('2. 删除transfer_note字段...')
       await queryInterface.removeColumn('trade_records', 'transfer_note', { transaction })
 
-      console.log('3. 删除item_name字段...')
-      await queryInterface.removeColumn('trade_records', 'item_name', { transaction })
+      console.log('3. 删除name字段...')
+      await queryInterface.removeColumn('trade_records', 'name', { transaction })
 
       console.log('4. 删除item_id字段...')
       await queryInterface.removeColumn('trade_records', 'item_id', { transaction })

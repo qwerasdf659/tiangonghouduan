@@ -29,7 +29,7 @@ router.get(
   adminAuthMiddleware,
   asyncHandler(async (req, res) => {
     try {
-      const { days = 7, strategy_filter, user_filter } = req.query
+      const { days = 7, user_filter } = req.query
 
       // 参数验证
       const dayCount = Math.min(Math.max(parseInt(days) || 7, 1), 90) // 限制1-90天
@@ -46,9 +46,11 @@ router.get(
         }
       }
 
-      if (strategy_filter) {
-        whereClause.strategy_used = strategy_filter
-      }
+      /*
+       * ✅ P0-1修复: 移除strategy_used字段使用（字段不存在）
+       * strategy_filter功能已移除，因为数据库中无strategy_used字段
+       * 如需策略分析，可使用draw_type字段作为简化维度
+       */
 
       if (user_filter) {
         whereClause.user_id = parseInt(user_filter)
@@ -58,10 +60,10 @@ router.get(
       const [
         totalDraws,
         winningDraws,
-        strategiesStats,
+        _strategiesStats, // 已移除，保留变量名避免解构错误
         dailyStats,
         userDistribution,
-        winRateByStrategy
+        _winRateByStrategy // 已移除，保留变量名避免解构错误
       ] = await Promise.all([
         // 总抽奖次数
         models.LotteryDraw.count({ where: whereClause }),
@@ -71,23 +73,11 @@ router.get(
           where: { ...whereClause, is_winner: true }
         }),
 
-        // 按策略统计
-        models.LotteryDraw.findAll({
-          where: whereClause,
-          attributes: [
-            'strategy_used',
-            [models.sequelize.fn('COUNT', '*'), 'count'],
-            [
-              models.sequelize.fn(
-                'SUM',
-                models.sequelize.literal('CASE WHEN is_winner THEN 1 ELSE 0 END')
-              ),
-              'wins'
-            ]
-          ],
-          group: ['strategy_used'],
-          raw: true
-        }),
+        /*
+         * ✅ P0-1修复: 移除strategy_used查询（字段不存在）
+         * 返回空数组，保持Promise.all结构不变
+         */
+        Promise.resolve([]),
 
         // 按日期统计
         models.LotteryDraw.findAll({
@@ -128,39 +118,18 @@ router.get(
           raw: true
         }),
 
-        // 按策略的中奖率分析
-        models.LotteryDraw.findAll({
-          where: whereClause,
-          attributes: [
-            'strategy_used',
-            [
-              models.sequelize.fn('AVG', models.sequelize.col('win_probability')),
-              'avg_probability'
-            ],
-            [models.sequelize.fn('COUNT', '*'), 'total_draws'],
-            [
-              models.sequelize.fn(
-                'SUM',
-                models.sequelize.literal('CASE WHEN is_winner THEN 1 ELSE 0 END')
-              ),
-              'actual_wins'
-            ]
-          ],
-          group: ['strategy_used'],
-          raw: true
-        })
+        /*
+         * ✅ P0-1 & P0-2修复: 移除strategy_used和win_probability查询（字段不存在）
+         * 返回空数组，保持Promise.all结构不变
+         */
+        Promise.resolve([])
       ])
 
       // 计算整体统计
       const overallWinRate = totalDraws > 0 ? ((winningDraws / totalDraws) * 100).toFixed(2) : 0
 
-      // 处理策略统计数据
-      const processedStrategiesStats = strategiesStats.map(stat => ({
-        strategy: stat.strategy_used || 'unknown',
-        total_draws: parseInt(stat.count),
-        wins: parseInt(stat.wins),
-        win_rate: stat.count > 0 ? ((stat.wins / stat.count) * 100).toFixed(2) : 0
-      }))
+      // ✅ P0-1修复: strategiesStats已改为空数组，无需处理
+      const processedStrategiesStats = []
 
       // 处理每日统计数据
       const processedDailyStats = dailyStats.map(stat => ({
@@ -178,19 +147,8 @@ router.get(
         personal_win_rate: stat.draws > 0 ? ((stat.wins / stat.draws) * 100).toFixed(2) : 0
       }))
 
-      // 处理策略效率分析
-      const processedWinRateAnalysis = winRateByStrategy.map(stat => ({
-        strategy: stat.strategy_used || 'unknown',
-        expected_probability: parseFloat(stat.avg_probability || 0).toFixed(4),
-        actual_win_rate:
-          stat.total_draws > 0 ? ((stat.actual_wins / stat.total_draws) * 100).toFixed(2) : 0,
-        efficiency:
-          stat.avg_probability > 0
-            ? ((stat.actual_wins / stat.total_draws / stat.avg_probability) * 100).toFixed(2)
-            : 0,
-        total_draws: parseInt(stat.total_draws),
-        actual_wins: parseInt(stat.actual_wins)
-      }))
+      // ✅ P0-1 & P0-2修复: winRateByStrategy已改为空数组，无需处理
+      const processedWinRateAnalysis = []
 
       // 获取引擎性能统计
       let enginePerformanceStats = {}
@@ -226,7 +184,7 @@ router.get(
           total_active_users: userDistribution.length
         },
         engine_performance: enginePerformanceStats,
-        generated_at: BeijingTimeHelper.getCurrentTime()
+        generated_at: BeijingTimeHelper.now()
       }
 
       sharedComponents.logger.info('决策分析数据生成成功', {
@@ -329,43 +287,40 @@ router.get(
           raw: true
         }),
 
-        // 用户活跃度趋势
+        /*
+         * ✅ P0-4修复: last_login_at → last_login (User模型实际字段)
+         * ✅ P0-5修复: 移除admin_users统计（需要复杂的roles表JOIN，且非核心功能）
+         */
         models.User.findAll({
           where: {
-            last_login_at: {
+            last_login: {
               [Op.gte]: startDate,
               [Op.lte]: endDate
             }
           },
           attributes: [
             [
-              models.sequelize.fn('DATE_FORMAT', models.sequelize.col('last_login_at'), dateFormat),
+              models.sequelize.fn('DATE_FORMAT', models.sequelize.col('last_login'), dateFormat),
               'period'
             ],
-            [models.sequelize.fn('COUNT', '*'), 'active_users'],
-            [
-              models.sequelize.fn(
-                'COUNT',
-                models.sequelize.literal('CASE WHEN roles.role_level >= 100 THEN 1 END')
-              ),
-              'admin_users'
-            ]
+            [models.sequelize.fn('COUNT', '*'), 'active_users']
+            // admin_users统计已移除（需要复杂的belongsToMany关联）
           ],
           group: [
-            models.sequelize.fn('DATE_FORMAT', models.sequelize.col('last_login_at'), dateFormat)
+            models.sequelize.fn('DATE_FORMAT', models.sequelize.col('last_login'), dateFormat)
           ],
           order: [
             [
-              models.sequelize.fn('DATE_FORMAT', models.sequelize.col('last_login_at'), dateFormat),
+              models.sequelize.fn('DATE_FORMAT', models.sequelize.col('last_login'), dateFormat),
               'ASC'
             ]
           ],
           raw: true
         }),
 
-        // 奖品发放趋势（如果有Prize模型）
-        models.Prize
-          ? models.Prize.findAll({
+        // 奖品发放趋势（使用LotteryPrize模型）
+        models.LotteryPrize
+          ? models.LotteryPrize.findAll({
             where: {
               created_at: {
                 [Op.gte]: startDate,
@@ -382,7 +337,7 @@ router.get(
                 'period'
               ],
               [models.sequelize.fn('COUNT', '*'), 'prizes_added'],
-              [models.sequelize.fn('SUM', models.sequelize.col('quantity')), 'total_quantity']
+              [models.sequelize.fn('SUM', models.sequelize.col('stock_quantity')), 'total_quantity']
             ],
             group: [
               models.sequelize.fn('DATE_FORMAT', models.sequelize.col('created_at'), dateFormat)
@@ -411,10 +366,10 @@ router.get(
         win_rate: trend.total_draws > 0 ? ((trend.wins / trend.total_draws) * 100).toFixed(2) : 0
       }))
 
+      // ✅ P0-5修复: 移除admin_users字段（查询中已删除）
       const processedUserTrends = userTrends.map(trend => ({
         period: trend.period,
-        active_users: parseInt(trend.active_users),
-        admin_users: parseInt(trend.admin_users || 0)
+        active_users: parseInt(trend.active_users)
       }))
 
       const processedPrizeTrends = prizeTrends.map(trend => ({
@@ -445,7 +400,7 @@ router.get(
               ).toFixed(2)
               : 0
         },
-        generated_at: BeijingTimeHelper.getCurrentTime()
+        generated_at: BeijingTimeHelper.now()
       }
 
       return res.apiSuccess(trendsData, '趋势分析数据获取成功')
@@ -505,7 +460,7 @@ router.get(
       ])
 
       const performanceReport = {
-        timestamp: BeijingTimeHelper.getCurrentTime(),
+        timestamp: BeijingTimeHelper.now(),
         system: {
           uptime_seconds: systemStats.uptime,
           uptime_formatted: formatUptime(systemStats.uptime),
@@ -557,9 +512,9 @@ router.get(
   asyncHandler(async (req, res) => {
     try {
       // 获取今日时间范围（北京时间）
-      const todayStart = BeijingTimeHelper.getStartOfDay()
-      const todayEnd = BeijingTimeHelper.getEndOfDay()
-      const nowBeijing = BeijingTimeHelper.getCurrentTime()
+      const todayStart = BeijingTimeHelper.todayStart()
+      const todayEnd = BeijingTimeHelper.todayEnd()
+      const nowBeijing = BeijingTimeHelper.now()
 
       sharedComponents.logger.info('管理员请求今日统计数据', {
         admin_id: req.user.user_id,
@@ -632,7 +587,8 @@ router.get(
             is_winner: true
           }
         }),
-        models.LotteryDraw.sum('points_consumed', {
+        // ✅ P0-3修复: points_consumed → cost_points (LotteryDraw模型实际字段)
+        models.LotteryDraw.sum('cost_points', {
           where: {
             created_at: {
               [Op.gte]: todayStart,
@@ -706,10 +662,13 @@ router.get(
           }
         }),
 
-        // 活动统计
+        /*
+         * 活动统计（登录会话数）
+         * ✅ 修复: login_time → created_at (AuthenticationSession模型实际字段)
+         */
         models.AuthenticationSession.count({
           where: {
-            login_time: {
+            created_at: {
               [Op.gte]: todayStart,
               [Op.lte]: todayEnd
             }
@@ -737,7 +696,7 @@ router.get(
 
       // 构建响应数据
       const todayStats = {
-        date: BeijingTimeHelper.formatDate(nowBeijing),
+        date: BeijingTimeHelper.formatForAPI(nowBeijing).formatted,
         timestamp: nowBeijing,
 
         // 用户相关统计

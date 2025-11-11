@@ -31,20 +31,65 @@ const cacheStats = {
   memoryHits: 0,
   redisHits: 0,
   databaseQueries: 0,
-  totalQueries: 0
+  totalQueries: 0,
+  lastReportTime: Date.now() // 上次报告时间
+}
+
+/**
+ * 📊 定期输出缓存统计信息（每100次查询或每5分钟）
+ * 功能：监控缓存命中率、数据库查询频率，便于性能优化决策
+ * @returns {void}
+ */
+function reportCacheStats () {
+  const now = Date.now()
+  const timeSinceLastReport = now - cacheStats.lastReportTime
+
+  // 每100次查询或每5分钟输出一次
+  if (cacheStats.totalQueries % 100 === 0 || timeSinceLastReport > 300000) {
+    if (cacheStats.totalQueries > 0) {
+      const memoryHitRate = ((cacheStats.memoryHits / cacheStats.totalQueries) * 100).toFixed(1)
+      const redisHitRate = ((cacheStats.redisHits / cacheStats.totalQueries) * 100).toFixed(1)
+      const totalHitRate = (
+        ((cacheStats.memoryHits + cacheStats.redisHits) / cacheStats.totalQueries) *
+        100
+      ).toFixed(1)
+      const dbQueryRate = ((cacheStats.databaseQueries / cacheStats.totalQueries) * 100).toFixed(1)
+
+      console.log('\n📊 [Auth缓存统计] 性能报告:')
+      console.log(`   总查询次数: ${cacheStats.totalQueries}`)
+      console.log(`   内存缓存命中: ${cacheStats.memoryHits}次 (${memoryHitRate}%)`)
+      console.log(`   Redis缓存命中: ${cacheStats.redisHits}次 (${redisHitRate}%)`)
+      console.log(`   数据库查询: ${cacheStats.databaseQueries}次 (${dbQueryRate}%)`)
+      console.log(`   综合缓存命中率: ${totalHitRate}%`)
+      console.log(`   内存缓存大小: ${memoryCache.size}项`)
+
+      // 性能告警
+      if (parseFloat(totalHitRate) < 80) {
+        console.warn('   ⚠️ 缓存命中率偏低（<80%），建议检查缓存配置')
+      }
+      if (parseFloat(dbQueryRate) > 20) {
+        console.warn('   ⚠️ 数据库查询率偏高（>20%），建议增加缓存时间')
+      }
+
+      cacheStats.lastReportTime = now
+    }
+  }
 }
 
 /**
  * 🚀 从缓存获取用户权限
+ * @param {number} user_id - 用户ID
+ * @returns {Promise<Object|null>} 用户权限对象或null
  */
 async function getUserPermissionsFromCache (user_id) {
   cacheStats.totalQueries++
+  reportCacheStats() // 📊 定期输出统计信息
 
   // 1. 检查内存缓存
   const memoryKey = `permissions_${user_id}`
   const memoryItem = memoryCache.get(memoryKey)
 
-  if (memoryItem && (BeijingTimeHelper.timestamp() - memoryItem.timestamp) < MEMORY_TTL) {
+  if (memoryItem && BeijingTimeHelper.timestamp() - memoryItem.timestamp < MEMORY_TTL) {
     cacheStats.memoryHits++
     return memoryItem.data
   }
@@ -77,6 +122,9 @@ async function getUserPermissionsFromCache (user_id) {
 
 /**
  * 🚀 设置用户权限缓存
+ * @param {number} user_id - 用户ID
+ * @param {Object} data - 权限数据对象
+ * @returns {Promise<void>} 无返回值
  */
 async function setUserPermissionsCache (user_id, data) {
   // 设置内存缓存
@@ -99,6 +147,9 @@ async function setUserPermissionsCache (user_id, data) {
 
 /**
  * 🗑️ 清除用户权限缓存
+ * @param {number} user_id - 用户ID
+ * @param {string} reason - 清除原因
+ * @returns {Promise<void>} 无返回值
  */
 async function invalidateUserPermissions (user_id, reason = 'unknown') {
   // 清除内存缓存
@@ -136,22 +187,34 @@ async function getUserRoles (user_id, forceRefresh = false) {
 
     cacheStats.databaseQueries++
 
+    // ⏱️ 记录查询开始时间（用于慢查询监控）
+    const queryStartTime = Date.now()
+
     const user = await User.findOne({
       where: { user_id, status: 'active' },
-      include: [{
-        model: Role,
-        as: 'roles',
-        through: {
-          where: { is_active: true }
-        },
-        attributes: ['role_id', 'role_uuid', 'role_name', 'role_level', 'permissions']
-      }]
+      include: [
+        {
+          model: Role,
+          as: 'roles',
+          through: {
+            where: { is_active: true }
+          },
+          attributes: ['role_id', 'role_uuid', 'role_name', 'role_level', 'permissions']
+        }
+      ]
     })
+
+    // ⚠️ 慢查询告警（超过1秒记录警告）
+    const queryDuration = Date.now() - queryStartTime
+    if (queryDuration > 1000) {
+      console.warn(`⚠️ [Auth] 慢查询告警: getUserRoles(user_id=${user_id}) 耗时${queryDuration}ms`)
+      console.warn('   建议：检查数据库索引或优化查询语句')
+    }
 
     if (!user || !user.roles) {
       const emptyResult = {
         isAdmin: false,
-        roleLevel: 0,
+        role_level: 0, // 🔄 统一命名：使用role_level（snake_case标准）
         roles: [],
         permissions: []
       }
@@ -161,9 +224,8 @@ async function getUserRoles (user_id, forceRefresh = false) {
     }
 
     // 计算最高权限级别
-    const maxRoleLevel = user.roles.length > 0
-      ? Math.max(...user.roles.map(role => role.role_level))
-      : 0
+    const maxRoleLevel =
+      user.roles.length > 0 ? Math.max(...user.roles.map(role => role.role_level)) : 0
 
     // 合并所有角色权限
     const allPermissions = new Set()
@@ -181,7 +243,7 @@ async function getUserRoles (user_id, forceRefresh = false) {
 
     const result = {
       isAdmin: maxRoleLevel >= 100, // 🛡️ 基于角色级别计算管理员权限
-      roleLevel: maxRoleLevel,
+      role_level: maxRoleLevel, // 🔄 统一命名：使用role_level替代roleLevel（snake_case标准）
       roles: user.roles.map(role => ({
         role_uuid: role.role_uuid,
         role_name: role.role_name,
@@ -198,7 +260,7 @@ async function getUserRoles (user_id, forceRefresh = false) {
     console.error('❌ 获取用户角色失败:', error.message)
     return {
       isAdmin: false,
-      roleLevel: 0,
+      role_level: 0, // 🔄 统一命名：使用role_level（snake_case标准）
       roles: [],
       permissions: []
     }
@@ -216,7 +278,7 @@ async function generateTokens (user) {
     const userRoles = await getUserRoles(user.user_id)
 
     // 🔐 确定主要角色名称（用于前端显示）
-    const primaryRole = userRoles.roles.find(r => r.role_level === userRoles.roleLevel)
+    const primaryRole = userRoles.roles.find(r => r.role_level === userRoles.role_level)
     const userRole = primaryRole ? primaryRole.role_name : 'user'
 
     const payload = {
@@ -224,7 +286,7 @@ async function generateTokens (user) {
       mobile: user.mobile,
       nickname: user.nickname,
       status: user.status,
-      role_level: userRoles.roleLevel, // 🛡️ 基于角色计算
+      role_level: userRoles.role_level, // 🛡️ 基于角色计算
       is_admin: userRoles.isAdmin, // 🔐 管理员标识
       user_role: userRole, // 🔐 角色名称
       iat: Math.floor(BeijingTimeHelper.timestamp() / 1000)
@@ -250,7 +312,7 @@ async function generateTokens (user) {
         mobile: user.mobile,
         nickname: user.nickname,
         status: user.status,
-        role_level: userRoles.roleLevel,
+        role_level: userRoles.role_level, // 🔄 统一命名：使用role_level
         is_admin: userRoles.isAdmin,
         user_role: userRole,
         roles: userRoles.roles
@@ -297,7 +359,7 @@ async function verifyRefreshToken (refresh_token) {
         mobile: user.mobile,
         nickname: user.nickname,
         status: user.status,
-        role_level: userRoles.roleLevel,
+        role_level: userRoles.role_level, // 🔄 统一命名：使用role_level
         roles: userRoles.roles
       }
     }
@@ -314,6 +376,7 @@ async function verifyRefreshToken (refresh_token) {
  * @param {Object} req - 请求对象
  * @param {Object} res - 响应对象
  * @param {Function} next - 下一个中间件
+ * @returns {Promise<void>} 无返回值
  */
 async function authenticateToken (req, res, next) {
   try {
@@ -353,7 +416,7 @@ async function authenticateToken (req, res, next) {
       mobile: user.mobile,
       nickname: user.nickname,
       status: user.status,
-      role_level: userRoles.roleLevel,
+      role_level: userRoles.role_level, // 🔄 统一命名：使用role_level
       roles: userRoles.roles,
       permissions: userRoles.permissions
     }
@@ -361,6 +424,13 @@ async function authenticateToken (req, res, next) {
     // 一次性设置用户信息，避免竞态条件
     // eslint-disable-next-line require-atomic-updates
     req.user = userInfo
+
+    /*
+     * 🛡️ 设置管理员标识（基于角色级别 >= 100）
+     * 用于路由层快速判断管理员权限
+     */
+    // eslint-disable-next-line require-atomic-updates
+    req.isAdmin = userRoles.isAdmin
 
     next()
   } catch (error) {
@@ -392,6 +462,7 @@ async function authenticateToken (req, res, next) {
  * @param {Object} req - 请求对象
  * @param {Object} res - 响应对象
  * @param {Function} next - 下一个中间件
+ * @returns {Promise<void>} 无返回值（验证通过调用next()，失败返回错误响应）
  */
 async function requireAdmin (req, res, next) {
   try {
@@ -423,6 +494,73 @@ async function requireAdmin (req, res, next) {
 }
 
 /**
+ * 🛡️ 可选Token认证中间件（用于公开接口）
+ * @description 尝试认证用户，如果有token则设置用户信息，没有token则允许匿名访问
+ * @param {Object} req - 请求对象
+ * @param {Object} res - 响应对象
+ * @param {Function} next - 下一个中间件
+ * @returns {Promise<void>} 无返回值（总是调用next()，允许继续处理请求）
+ */
+async function optionalAuth (req, res, next) {
+  try {
+    const authHeader = req.headers.authorization
+    const token = authHeader && authHeader.split(' ')[1]
+
+    // 如果没有token，直接通过（匿名访问）
+    if (!token) {
+      return next()
+    }
+
+    // 有token时，尝试验证
+    try {
+      const decoded = jwt.verify(token, process.env.JWT_SECRET)
+
+      // 从数据库获取最新用户信息
+      const user = await User.findOne({
+        where: { user_id: decoded.user_id, status: 'active' }
+      })
+
+      if (!user) {
+        // token无效但允许匿名访问
+        return next()
+      }
+
+      // 🛡️ 获取用户角色信息
+      const userRoles = await getUserRoles(user.user_id)
+
+      // 构建用户信息对象
+      const userInfo = {
+        user_id: user.user_id,
+        mobile: user.mobile,
+        nickname: user.nickname,
+        status: user.status,
+        role_level: userRoles.role_level, // 🔄 统一命名：使用role_level
+        roles: userRoles.roles,
+        permissions: userRoles.permissions
+      }
+
+      // 一次性设置用户信息，避免竞态条件
+      // eslint-disable-next-line require-atomic-updates
+      req.user = userInfo
+
+      // 🛡️ 设置管理员标识（基于角色级别 >= 100）
+      // eslint-disable-next-line require-atomic-updates
+      req.isAdmin = userRoles.isAdmin
+
+      next()
+    } catch (tokenError) {
+      // Token错误也允许匿名访问（不返回错误）
+      console.warn('⚠️ Token验证失败但允许匿名访问:', tokenError.message)
+      next()
+    }
+  } catch (error) {
+    console.error('❌ 可选认证失败:', error.message)
+    // 发生错误也允许匿名访问
+    next()
+  }
+}
+
+/**
  * 🛡️ 权限检查中间件（基于UUID角色系统）
  * @param {string} requiredPermission - 需要的权限
  * @returns {Function} 中间件函数
@@ -447,9 +585,11 @@ function requirePermission (requiredPermission) {
       const [resource] = requiredPermission.split(':')
 
       // 检查通配符权限
-      if (req.user.permissions.includes('*:*') ||
-          req.user.permissions.includes(`${resource}:*`) ||
-          req.user.permissions.includes(requiredPermission)) {
+      if (
+        req.user.permissions.includes('*:*') ||
+        req.user.permissions.includes(`${resource}:*`) ||
+        req.user.permissions.includes(requiredPermission)
+      ) {
         return next()
       }
 
@@ -484,14 +624,18 @@ const PermissionManager = {
   getStats: () => ({
     ...cacheStats,
     memoryCacheSize: memoryCache.size,
-    hitRate: cacheStats.totalQueries > 0
-      ? (((cacheStats.memoryHits + cacheStats.redisHits) / cacheStats.totalQueries) * 100).toFixed(1) + '%'
-      : '0%',
+    hitRate:
+      cacheStats.totalQueries > 0
+        ? (
+          ((cacheStats.memoryHits + cacheStats.redisHits) / cacheStats.totalQueries) *
+          100
+        ).toFixed(1) + '%'
+        : '0%',
     redisAvailable: !!redisClient
   }),
 
   // 强制刷新用户权限
-  forceRefreshUser: (user_id) => getUserRoles(user_id, true),
+  forceRefreshUser: user_id => getUserRoles(user_id, true),
 
   // 批量清除缓存
   invalidateMultipleUsers: async (userIds, reason = 'batch_operation') => {
@@ -504,6 +648,7 @@ module.exports = {
   generateTokens,
   verifyRefreshToken,
   authenticateToken,
+  optionalAuth, // 可选认证中间件（用于公开接口）
   requireAdmin,
   requirePermission,
   PermissionManager,
