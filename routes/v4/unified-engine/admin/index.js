@@ -34,7 +34,7 @@ router.use('/audit', auditRoutes) // 🆕 兑换审核路由
  * GET / - Admin API根路径信息
  *
  * @description 返回Admin API的基本信息和可用模块
- * @route GET /api/v4/unified-engine/admin/
+ * @route GET /api/v4/admin/
  * @access Public
  */
 /**

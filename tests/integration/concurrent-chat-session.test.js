@@ -26,7 +26,7 @@ describe('创建聊天会话API并发测试（方案A：唯一索引+重试）',
     console.log('\n===== 测试前准备 =====')
 
     // 登录获取token（使用V4统一认证引擎）
-    const loginResponse = await request(app).post('/api/v4/unified-engine/auth/login').send({
+    const loginResponse = await request(app).post('/api/v4/auth/login').send({
       mobile: '13612227930',
       verification_code: '123456' // 开发环境万能验证码
     })

@@ -22,7 +22,7 @@ describe('审计日志功能测试', () => {
   // 测试前准备
   beforeAll(async () => {
     // 1. 获取管理员token
-    const loginRes = await request(app).post('/api/v4/unified-engine/auth/login').send({
+    const loginRes = await request(app).post('/api/v4/auth/login').send({
       mobile: '13612227930',
       verification_code: '123456'
     })
@@ -207,7 +207,7 @@ describe('审计日志功能测试', () => {
   describe('审计日志权限控制', () => {
     test('非管理员不能查询审计日志', async () => {
       // 获取普通用户token
-      const userLoginRes = await request(app).post('/api/v4/unified-engine/auth/login').send({
+      const userLoginRes = await request(app).post('/api/v4/auth/login').send({
         mobile: '13800000000', // 假设这是普通用户
         verification_code: '123456'
       })

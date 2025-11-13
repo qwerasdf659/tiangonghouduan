@@ -20,7 +20,7 @@ const {
  * POST /batch-add - 批量添加奖品到奖品池
  *
  * @description 批量添加奖品到指定活动的奖品池
- * @route POST /api/v4/unified-engine/admin/prize-pool/batch-add
+ * @route POST /api/v4/admin/prize-pool/batch-add
  * @access Private (需要管理员权限)
  *
  * 🔒 P0修复：
@@ -162,7 +162,7 @@ router.post(
  * GET /:campaign_code - 获取指定活动的奖品池
  *
  * @description 获取指定活动的所有奖品信息
- * @route GET /api/v4/unified-engine/admin/prize-pool/:campaign_code
+ * @route GET /api/v4/admin/prize-pool/:campaign_code
  * @access Private (需要管理员权限)
  *
  * 🎯 V4.2: 使用campaign_code标识符（方案2实施）
@@ -279,7 +279,7 @@ router.get(
  * PUT /prize/:prize_id - 更新奖品信息
  *
  * @description 更新指定奖品的信息
- * @route PUT /api/v4/unified-engine/admin/prize-pool/prize/:prize_id
+ * @route PUT /api/v4/admin/prize-pool/prize/:prize_id
  * @access Private (需要管理员权限)
  *
  * 🔒 P0修复：修正模型名称和字段映射

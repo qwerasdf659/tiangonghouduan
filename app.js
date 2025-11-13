@@ -47,10 +47,10 @@ app.use(
   helmet({
     contentSecurityPolicy: {
       directives: {
-        defaultSrc: ['\'self\''],
-        styleSrc: ['\'self\'', '\'unsafe-inline\''],
-        scriptSrc: ['\'self\'', 'https://unpkg.com', 'https://cdn.jsdelivr.net'],
-        imgSrc: ['\'self\'', 'data:', 'https:']
+        defaultSrc: ["'self'"],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        scriptSrc: ["'self'", 'https://unpkg.com', 'https://cdn.jsdelivr.net'],
+        imgSrc: ["'self'", 'data:', 'https:']
       }
     }
   })
@@ -63,11 +63,7 @@ app.use(
       // 允许的源列表
       const allowedOrigins = process.env.ALLOWED_ORIGINS
         ? process.env.ALLOWED_ORIGINS.split(',')
-        : [
-          'http://localhost:3000',
-          'http://localhost:8080',
-          'https://omqktqrtntnn.sealosbja.site'
-        ]
+        : ['http://localhost:3000', 'http://localhost:8080', 'https://omqktqrtntnn.sealosbja.site']
 
       // 微信小程序请求没有origin，允许通过
       if (!origin) return callback(null, true)
@@ -139,7 +135,7 @@ const fallbackLimiter = rateLimit({
     // 当Redis可用时跳过后备限流器
     return rateLimiter.redisClient.isConnected
   },
-  keyGenerator: (req) => {
+  keyGenerator: req => {
     return req.ip || req.connection.remoteAddress || 'unknown'
   }
 })
@@ -293,8 +289,8 @@ app.get('/api/v4', (req, res) => {
         }
       },
       endpoints: {
-        lottery: '/api/v4/unified-engine/lottery',
-        admin: '/api/v4/unified-engine/admin',
+        lottery: '/api/v4/lottery',
+        admin: '/api/v4/admin',
         health: '/health'
       },
       features: ['统一抽奖引擎', '智能策略选择', '实时决策处理', '完整审计日志', '高性能优化']
@@ -317,10 +313,10 @@ app.get('/api/v4/docs', (req, res) => {
       unified_engine: {
         description: 'V4统一抽奖引擎提供完整的抽奖执行和管理功能',
         endpoints: {
-          'POST /api/v4/unified-engine/lottery/execute': '执行抽奖',
-          'GET /api/v4/unified-engine/lottery/strategies': '获取策略列表',
-          'GET /api/v4/unified-engine/lottery/metrics': '获取引擎指标',
-          'POST /api/v4/unified-engine/lottery/validate': '验证抽奖条件'
+          'POST /api/v4/lottery/execute': '执行抽奖',
+          'GET /api/v4/lottery/strategies': '获取策略列表',
+          'GET /api/v4/lottery/metrics': '获取引擎指标',
+          'POST /api/v4/lottery/validate': '验证抽奖条件'
         },
         strategies: [
           'BasicGuaranteeStrategy - 基础抽奖保底策略, ManagementStrategy - 管理策略',
@@ -330,10 +326,10 @@ app.get('/api/v4/docs', (req, res) => {
       admin_system: {
         description: 'V4管理系统提供引擎配置、监控和维护功能',
         endpoints: {
-          'GET /api/v4/unified-engine/admin/dashboard': '管理仪表板',
-          'POST /api/v4/unified-engine/admin/config': '更新引擎配置',
-          'GET /api/v4/unified-engine/admin/logs': '获取执行日志',
-          'POST /api/v4/unified-engine/admin/maintenance': '维护模式控制'
+          'GET /api/v4/admin/system/dashboard': '管理仪表板',
+          'POST /api/v4/admin/config': '更新引擎配置',
+          'GET /api/v4/admin/logs': '获取执行日志',
+          'POST /api/v4/admin/maintenance': '维护模式控制'
         },
         features: ['引擎监控', '配置管理', '日志分析', '性能优化']
       },
@@ -361,8 +357,8 @@ app.get('/api/v4/docs', (req, res) => {
         base_url: process.env.API_BASE_URL || `http://localhost:${process.env.PORT || 3000}`,
         contact: {
           api: '/api/v4',
-          lottery: '/api/v4/unified-engine/lottery',
-          admin: '/api/v4/unified-engine/admin'
+          lottery: '/api/v4/lottery',
+          admin: '/api/v4/admin'
         }
       }
     },
@@ -387,8 +383,8 @@ app.get('/', (req, res) => {
       endpoints: {
         health: '/health',
         api: '/api/v4',
-        lottery_engine: '/api/v4/unified-engine/lottery',
-        admin_panel: '/api/v4/unified-engine/admin',
+        lottery_engine: '/api/v4/lottery',
+        admin_panel: '/api/v4/admin',
         docs: '/api/v4/docs'
       }
     },
@@ -407,10 +403,10 @@ app.get('/api', (req, res) => {
       available_versions: ['v4'],
       architecture: 'unified_decision_engine',
       v4_features: {
-        unified_engine: '/api/v4/unified-engine/lottery',
-        admin_panel: '/api/v4/unified-engine/admin',
-        performance_metrics: '/api/v4/unified-engine/admin/status',
-        decision_analytics: '/api/v4/unified-engine/admin/decisions/analytics'
+        unified_engine: '/api/v4/lottery',
+        admin_panel: '/api/v4/admin',
+        performance_metrics: '/api/v4/admin/system/status',
+        decision_analytics: '/api/v4/admin/analytics/decisions/analytics'
       }
     },
     timestamp: BeijingTimeHelper.apiTimestamp()
@@ -419,17 +415,29 @@ app.get('/api', (req, res) => {
 
 // 🔗 V4统一引擎路由注册（清理后只保留V4版本）
 try {
-  // V4统一认证引擎路由
-  app.use('/api/v4/unified-engine/auth', require('./routes/v4/unified-engine/auth'))
-  appLogger.info('V4统一认证引擎加载成功', { route: '/api/v4/unified-engine/auth' })
+  // V4认证系统路由（RESTful标准 - 符合腾讯、阿里、网易、米哈游行业规范）
+  app.use('/api/v4/auth', require('./routes/v4/unified-engine/auth'))
+  appLogger.info('V4认证系统加载成功（RESTful标准）', {
+    route: '/api/v4/auth', // 扁平化业务资源路径
+    standard: 'RESTful', // API设计标准
+    reference: '腾讯云、阿里云、网易云、米哈游行业标准' // 参考依据
+  })
 
-  // V4统一抽奖引擎路由
-  app.use('/api/v4/unified-engine/lottery', require('./routes/v4/unified-engine/lottery'))
-  appLogger.info('V4统一抽奖引擎加载成功', { route: '/api/v4/unified-engine/lottery' })
+  // V4抽奖系统路由（RESTful标准 - 游戏行业标准设计）
+  app.use('/api/v4/lottery', require('./routes/v4/unified-engine/lottery'))
+  appLogger.info('V4抽奖系统加载成功（RESTful标准）', {
+    route: '/api/v4/lottery', // 扁平化业务资源路径
+    standard: 'RESTful', // API设计标准
+    reference: '米哈游原神、网易游戏行业标准' // 参考依据
+  })
 
-  // V4统一管理引擎路由
-  app.use('/api/v4/unified-engine/admin', require('./routes/v4/unified-engine/admin'))
-  appLogger.info('V4统一管理引擎加载成功', { route: '/api/v4/unified-engine/admin' })
+  // V4管理系统路由（RESTful标准 - 后台管理标准设计）
+  app.use('/api/v4/admin', require('./routes/v4/unified-engine/admin'))
+  appLogger.info('V4管理系统加载成功（RESTful标准）', {
+    route: '/api/v4/admin', // 扁平化业务资源路径
+    standard: 'RESTful', // API设计标准
+    reference: '腾讯云、阿里云后台管理行业标准' // 参考依据
+  })
 
   // V4权限管理路由
   app.use('/api/v4/permissions', require('./routes/v4/permissions'))
@@ -443,9 +451,13 @@ try {
   app.use('/api/v4/inventory', require('./routes/v4/unified-engine/inventory'))
   appLogger.info('V4用户库存管理系统加载成功', { route: '/api/v4/inventory' })
 
-  // V4积分管理路由
-  app.use('/api/v4/unified-engine/points', require('./routes/v4/unified-engine/points'))
-  appLogger.info('V4积分管理系统加载成功', { route: '/api/v4/unified-engine/points' })
+  // V4积分管理系统路由（RESTful标准 - 积分系统标准设计）
+  app.use('/api/v4/points', require('./routes/v4/unified-engine/points'))
+  appLogger.info('V4积分管理系统加载成功（RESTful标准）', {
+    route: '/api/v4/points', // 扁平化业务资源路径
+    standard: 'RESTful', // API设计标准
+    reference: '腾讯、阿里积分系统行业标准' // 参考依据
+  })
 
   // V4高级空间解锁路由（用户支付100积分解锁，有效期24小时）
   app.use('/api/v4/premium', require('./routes/v4/unified-engine/premium'))
@@ -472,9 +484,23 @@ try {
 
   // 🔐 V4层级权限管理路由（区域负责人→业务经理→业务员三级管理）
   app.use('/api/v4/hierarchy', require('./routes/v4/hierarchy'))
-  appLogger.info('V4层级权限管理系统加载成功', { route: '/api/v4/hierarchy', note: '层级化角色权限管理，2025-11-07新增' })
+  appLogger.info('V4层级权限管理系统加载成功', {
+    route: '/api/v4/hierarchy',
+    note: '层级化角色权限管理，2025-11-07新增'
+  })
 
-  appLogger.info('统一决策引擎V4.0架构已完全启用', { message: '所有旧版API已弃用' })
+  appLogger.info('V4 RESTful API架构已完全启用', {
+    message: '完全扁平化设计，符合腾讯云、阿里云、网易云、米哈游行业标准',
+    core_apis: {
+      auth: '/api/v4/auth',
+      lottery: '/api/v4/lottery',
+      admin: '/api/v4/admin',
+      points: '/api/v4/points'
+    },
+    refactored_from: 'V4统一引擎架构（/api/v4/unified-engine/*）',
+    refactored_at: '2025-11-11',
+    standard: 'RESTful资源导向设计'
+  })
 } catch (error) {
   appLogger.error('V4统一决策引擎加载失败', { error: error.message, stack: error.stack })
   process.exit(1) // 如果核心引擎加载失败，应用无法继续运行
@@ -491,13 +517,13 @@ app.use('*', (req, res) => {
         'GET /health',
         'GET /api/v4',
         'GET /api/v4/docs',
-        'POST /api/v4/unified-engine/auth/login',
-        'POST /api/v4/unified-engine/auth/register',
-        'POST /api/v4/unified-engine/auth/logout',
-        'GET /api/v4/unified-engine/auth/verify',
-        'POST /api/v4/unified-engine/lottery/execute',
-        'GET /api/v4/unified-engine/lottery/strategies',
-        'GET /api/v4/unified-engine/admin/dashboard',
+        'POST /api/v4/auth/login',
+        'POST /api/v4/auth/register',
+        'POST /api/v4/auth/logout',
+        'GET /api/v4/auth/verify',
+        'POST /api/v4/lottery/execute',
+        'GET /api/v4/lottery/strategies',
+        'GET /api/v4/admin/system/dashboard',
         'GET /api/v4/permissions/user/:userId',
         'POST /api/v4/permissions/check',
         'POST /api/v4/permissions/promote',
@@ -620,8 +646,8 @@ if (require.main === module) {
       start_time: BeijingTimeHelper.apiTimestamp(),
       endpoints: {
         health: `http://${HOST}:${PORT}/health`,
-        lottery: `http://${HOST}:${PORT}/api/v4/unified-engine/lottery`,
-        admin: `http://${HOST}:${PORT}/api/v4/unified-engine/admin`,
+        lottery: `http://${HOST}:${PORT}/api/v4/lottery`,
+        admin: `http://${HOST}:${PORT}/api/v4/admin`,
         websocket: `ws://${HOST}:${PORT}/socket.io` // 新增WebSocket端点
       }
     })
@@ -637,7 +663,7 @@ if (require.main === module) {
      * 功能：服务关闭时记录WebSocket停止事件到数据库
      * 用途：服务维护、部署更新、异常追踪、SLA统计
      */
-    const gracefulShutdown = async (signal) => {
+    const gracefulShutdown = async signal => {
       appLogger.info(`收到${signal}信号，开始优雅关闭...`)
 
       try {

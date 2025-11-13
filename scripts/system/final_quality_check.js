@@ -102,7 +102,7 @@ class FinalQualityChecker {
     const endpoints = [
       { name: '健康检查', url: 'http://localhost:3000/health', method: 'GET' },
       { name: 'V4基础', url: 'http://localhost:3000/api/v4', method: 'GET' },
-      { name: '认证登录', url: 'http://localhost:3000/api/v4/unified-engine/auth/login', method: 'POST', data: { mobile: '13612227930', verification_code: '123456' } }
+      { name: '认证登录', url: 'http://localhost:3000/api/v4/auth/login', method: 'POST', data: { mobile: '13612227930', verification_code: '123456' } }
     ]
 
     const results = []

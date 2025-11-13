@@ -28,7 +28,7 @@ const dbConfig = {
  */
 async function getToken () {
   try {
-    const response = await axios.post(`${BASE_URL}/api/v4/unified-engine/auth/login`, {
+    const response = await axios.post(`${BASE_URL}/api/v4/auth/login`, {
       mobile: TEST_MOBILE,
       verification_code: TEST_CODE
     })
@@ -48,7 +48,7 @@ async function testCampaignAPI (token) {
   try {
     const startTime = Date.now()
 
-    const response = await axios.get(`${BASE_URL}/api/v4/unified-engine/lottery/campaigns?status=active`, {
+    const response = await axios.get(`${BASE_URL}/api/v4/lottery/campaigns?status=active`, {
       headers: { Authorization: `Bearer ${token}` }
     })
 

@@ -21,7 +21,7 @@ const {
  * POST /force-win - 强制用户中奖
  *
  * @description 管理员强制指定用户在下次抽奖中获胜
- * @route POST /api/v4/unified-engine/admin/lottery-management/force-win
+ * @route POST /api/v4/admin/lottery-management/force-win
  * @access Private (需要管理员权限)
  */
 router.post('/force-win', adminAuthMiddleware, asyncHandler(async (req, res) => {
@@ -98,7 +98,7 @@ router.post('/force-win', adminAuthMiddleware, asyncHandler(async (req, res) => 
  * POST /force-lose - 强制用户不中奖
  *
  * @description 管理员强制指定用户在指定次数内不中奖
- * @route POST /api/v4/unified-engine/admin/lottery-management/force-lose
+ * @route POST /api/v4/admin/lottery-management/force-lose
  * @access Private (需要管理员权限)
  */
 router.post('/force-lose', adminAuthMiddleware, asyncHandler(async (req, res) => {
@@ -173,7 +173,7 @@ router.post('/force-lose', adminAuthMiddleware, asyncHandler(async (req, res) =>
  * POST /probability-adjust - 调整用户中奖概率
  *
  * @description 管理员调整指定用户的中奖概率
- * @route POST /api/v4/unified-engine/admin/lottery-management/probability-adjust
+ * @route POST /api/v4/admin/lottery-management/probability-adjust
  * @access Private (需要管理员权限)
  */
 router.post('/probability-adjust', adminAuthMiddleware, asyncHandler(async (req, res) => {
@@ -254,7 +254,7 @@ router.post('/probability-adjust', adminAuthMiddleware, asyncHandler(async (req,
  * POST /user-specific-queue - 设置用户特定抽奖队列
  *
  * @description 为特定用户设置专门的抽奖队列和策略
- * @route POST /api/v4/unified-engine/admin/lottery-management/user-specific-queue
+ * @route POST /api/v4/admin/lottery-management/user-specific-queue
  * @access Private (需要管理员权限)
  */
 router.post('/user-specific-queue', adminAuthMiddleware, asyncHandler(async (req, res) => {
@@ -350,7 +350,7 @@ router.post('/user-specific-queue', adminAuthMiddleware, asyncHandler(async (req
  * GET /user-status/:user_id - 获取用户抽奖管理状态
  *
  * @description 获取指定用户的所有抽奖管理状态，包括强制设置、概率调整、队列状态等
- * @route GET /api/v4/unified-engine/admin/lottery-management/user-status/:user_id
+ * @route GET /api/v4/admin/lottery-management/user-status/:user_id
  * @access Private (需要管理员权限)
  */
 router.get('/user-status/:user_id', adminAuthMiddleware, asyncHandler(async (req, res) => {
@@ -430,7 +430,7 @@ router.get('/user-status/:user_id', adminAuthMiddleware, asyncHandler(async (req
  * DELETE /clear-user-settings/:user_id - 清除用户的所有管理设置
  *
  * @description 清除指定用户的所有抽奖管理设置，恢复默认状态
- * @route DELETE /api/v4/unified-engine/admin/lottery-management/clear-user-settings/:user_id
+ * @route DELETE /api/v4/admin/lottery-management/clear-user-settings/:user_id
  * @access Private (需要管理员权限)
  */
 router.delete('/clear-user-settings/:user_id', adminAuthMiddleware, asyncHandler(async (req, res) => {

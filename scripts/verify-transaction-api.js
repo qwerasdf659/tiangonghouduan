@@ -127,7 +127,7 @@ async function verifyAPIRoutes () {
   try {
     // 1. 登录获取token
     printColor('   正在登录获取测试token...', 'blue')
-    const loginRes = await axios.post(`${API_BASE_URL}/api/v4/unified-engine/auth/login`, {
+    const loginRes = await axios.post(`${API_BASE_URL}/api/v4/auth/login`, {
       mobile: TEST_MOBILE,
       verification_code: VERIFICATION_CODE
     })
@@ -145,7 +145,7 @@ async function verifyAPIRoutes () {
     // 2. 测试基本API调用
     printColor('   正在测试基本API调用...', 'blue')
     const apiRes = await axios.get(
-      `${API_BASE_URL}/api/v4/unified-engine/points/transactions/${user_id}?page=1&limit=20`,
+      `${API_BASE_URL}/api/v4/points/transactions/${user_id}?page=1&limit=20`,
       { headers: { Authorization: `Bearer ${token}` } }
     )
 
@@ -195,7 +195,7 @@ async function verifyFunctionality () {
 
   try {
     // 登录
-    const loginRes = await axios.post(`${API_BASE_URL}/api/v4/unified-engine/auth/login`, {
+    const loginRes = await axios.post(`${API_BASE_URL}/api/v4/auth/login`, {
       mobile: TEST_MOBILE,
       verification_code: VERIFICATION_CODE
     })
@@ -206,7 +206,7 @@ async function verifyFunctionality () {
     // 1. 测试类型筛选（earn）
     printColor('   测试类型筛选（earn）...', 'blue')
     const earnRes = await axios.get(
-      `${API_BASE_URL}/api/v4/unified-engine/points/transactions/${user_id}?type=earn&limit=10`,
+      `${API_BASE_URL}/api/v4/points/transactions/${user_id}?type=earn&limit=10`,
       { headers: { Authorization: `Bearer ${token}` } }
     )
 
@@ -220,7 +220,7 @@ async function verifyFunctionality () {
     // 2. 测试类型筛选（consume）
     printColor('   测试类型筛选（consume）...', 'blue')
     const consumeRes = await axios.get(
-      `${API_BASE_URL}/api/v4/unified-engine/points/transactions/${user_id}?type=consume&limit=10`,
+      `${API_BASE_URL}/api/v4/points/transactions/${user_id}?type=consume&limit=10`,
       { headers: { Authorization: `Bearer ${token}` } }
     )
 
@@ -234,7 +234,7 @@ async function verifyFunctionality () {
     // 3. 测试分页功能
     printColor('   测试分页功能...', 'blue')
     const page2Res = await axios.get(
-      `${API_BASE_URL}/api/v4/unified-engine/points/transactions/${user_id}?page=2&limit=5`,
+      `${API_BASE_URL}/api/v4/points/transactions/${user_id}?page=2&limit=5`,
       { headers: { Authorization: `Bearer ${token}` } }
     )
 
@@ -247,7 +247,7 @@ async function verifyFunctionality () {
     // 4. 测试limit上限保护
     printColor('   测试limit上限保护...', 'blue')
     const limitRes = await axios.get(
-      `${API_BASE_URL}/api/v4/unified-engine/points/transactions/${user_id}?limit=200`,
+      `${API_BASE_URL}/api/v4/points/transactions/${user_id}?limit=200`,
       { headers: { Authorization: `Bearer ${token}` } }
     )
 
@@ -261,7 +261,7 @@ async function verifyFunctionality () {
     printColor('   测试参数验证...', 'blue')
     try {
       await axios.get(
-        `${API_BASE_URL}/api/v4/unified-engine/points/transactions/undefined`,
+        `${API_BASE_URL}/api/v4/points/transactions/undefined`,
         { headers: { Authorization: `Bearer ${token}` } }
       )
       issues.push('❌ 参数验证失败：应该拒绝无效user_id但未拒绝')
@@ -276,7 +276,7 @@ async function verifyFunctionality () {
     // 6. 测试时间排序
     printColor('   测试时间排序...', 'blue')
     const sortRes = await axios.get(
-      `${API_BASE_URL}/api/v4/unified-engine/points/transactions/${user_id}?limit=5`,
+      `${API_BASE_URL}/api/v4/points/transactions/${user_id}?limit=5`,
       { headers: { Authorization: `Bearer ${token}` } }
     )
 

@@ -21,7 +21,7 @@ const {
  * GET /status - 获取系统状态
  *
  * @description 获取系统运行状态、数据库连接状态、Redis状态等
- * @route GET /api/v4/unified-engine/admin/status
+ * @route GET /api/v4/admin/status
  * @access Private (需要管理员权限)
  */
 router.get('/status', adminAuthMiddleware, asyncHandler(async (req, res) => {
@@ -72,7 +72,7 @@ router.get('/status', adminAuthMiddleware, asyncHandler(async (req, res) => {
  * GET /dashboard - 获取管理员仪表板数据
  *
  * @description 获取管理员仪表板展示数据，包括用户统计、抽奖统计、系统概览
- * @route GET /api/v4/unified-engine/admin/dashboard
+ * @route GET /api/v4/admin/dashboard
  * @access Private (需要管理员权限)
  */
 router.get('/dashboard', adminAuthMiddleware, asyncHandler(async (req, res) => {
@@ -153,7 +153,7 @@ router.get('/dashboard', adminAuthMiddleware, asyncHandler(async (req, res) => {
  * GET /management-status - 获取管理策略状态
  *
  * @description 获取抽奖管理策略的当前状态和配置
- * @route GET /api/v4/unified-engine/admin/management-status
+ * @route GET /api/v4/admin/management-status
  * @access Private (需要管理员权限)
  */
 router.get('/management-status', adminAuthMiddleware, asyncHandler(async (req, res) => {
@@ -175,7 +175,7 @@ router.get('/management-status', adminAuthMiddleware, asyncHandler(async (req, r
 
 /**
  * POST /announcements - 创建系统公告
- * @route POST /api/v4/unified-engine/admin/announcements
+ * @route POST /api/v4/admin/announcements
  * @access Private (需要管理员权限)
  */
 router.post('/announcements', adminAuthMiddleware, asyncHandler(async (req, res) => {
@@ -227,7 +227,7 @@ router.post('/announcements', adminAuthMiddleware, asyncHandler(async (req, res)
 
 /**
  * GET /announcements - 获取所有公告
- * @route GET /api/v4/unified-engine/admin/announcements
+ * @route GET /api/v4/admin/announcements
  * @access Private (需要管理员权限)
  */
 router.get('/announcements', adminAuthMiddleware, asyncHandler(async (req, res) => {
@@ -269,7 +269,7 @@ router.get('/announcements', adminAuthMiddleware, asyncHandler(async (req, res) 
 
 /**
  * PUT /announcements/:id - 更新公告
- * @route PUT /api/v4/unified-engine/admin/announcements/:id
+ * @route PUT /api/v4/admin/announcements/:id
  * @access Private (需要管理员权限)
  */
 router.put('/announcements/:id', adminAuthMiddleware, asyncHandler(async (req, res) => {
@@ -305,7 +305,7 @@ router.put('/announcements/:id', adminAuthMiddleware, asyncHandler(async (req, r
 
 /**
  * DELETE /announcements/:id - 删除公告
- * @route DELETE /api/v4/unified-engine/admin/announcements/:id
+ * @route DELETE /api/v4/admin/announcements/:id
  * @access Private (需要管理员权限)
  */
 router.delete('/announcements/:id', adminAuthMiddleware, asyncHandler(async (req, res) => {
@@ -336,7 +336,7 @@ router.delete('/announcements/:id', adminAuthMiddleware, asyncHandler(async (req
 
 /**
  * GET /feedbacks - 获取所有用户反馈
- * @route GET /api/v4/unified-engine/admin/feedbacks
+ * @route GET /api/v4/admin/feedbacks
  * @access Private (需要管理员权限)
  */
 router.get('/feedbacks', adminAuthMiddleware, asyncHandler(async (req, res) => {
@@ -389,7 +389,7 @@ router.get('/feedbacks', adminAuthMiddleware, asyncHandler(async (req, res) => {
 
 /**
  * POST /feedbacks/:id/reply - 回复用户反馈
- * @route POST /api/v4/unified-engine/admin/feedbacks/:id/reply
+ * @route POST /api/v4/admin/feedbacks/:id/reply
  * @access Private (需要管理员权限)
  */
 router.post('/feedbacks/:id/reply', adminAuthMiddleware, asyncHandler(async (req, res) => {
@@ -433,7 +433,7 @@ router.post('/feedbacks/:id/reply', adminAuthMiddleware, asyncHandler(async (req
 
 /**
  * PUT /feedbacks/:id/status - 更新反馈状态
- * @route PUT /api/v4/unified-engine/admin/feedbacks/:id/status
+ * @route PUT /api/v4/admin/feedbacks/:id/status
  * @access Private (需要管理员权限)
  */
 router.put('/feedbacks/:id/status', adminAuthMiddleware, asyncHandler(async (req, res) => {

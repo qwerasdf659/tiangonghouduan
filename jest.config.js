@@ -12,7 +12,15 @@ module.exports = {
   testMatch: ['**/tests/**/*.test.js', '**/tests/**/*.spec.js'],
 
   // 忽略的测试文件
-  testPathIgnorePatterns: ['/node_modules/', '/coverage/', '/dist/', '/tests/helpers/'],
+  testPathIgnorePatterns: [
+    '/node_modules/',
+    '/coverage/',
+    '/dist/',
+    '/tests/helpers/',
+    '/tests/backup-20251112/',  // 忽略备份目录,避免测试重复执行
+    '/tests/temp/',             // 忽略临时目录
+    '/tests/manual/'            // 忽略手动测试目录
+  ],
 
   // 设置文件
   setupFilesAfterEnv: ['<rootDir>/tests/helpers/test-setup.js'],

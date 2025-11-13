@@ -1,12 +1,12 @@
 #!/usr/bin/env node
 /**
  * 🔍 sort_order唯一约束验证脚本
- * 
+ *
  * 验证目标：
  * 1. 数据库层面的唯一索引是否生效
  * 2. 模型层面的beforeCreate/beforeUpdate钩子是否生效
  * 3. 防止同一活动内出现重复的sort_order
- * 
+ *
  * 业务场景：确保前端转盘不会出现两个奖品位置冲突
  */
 
@@ -15,7 +15,7 @@ const { LotteryPrize, LotteryCampaign, sequelize } = require('../models')
 /**
  * 测试1：验证数据库唯一索引
  */
-async function testDatabaseConstraint() {
+async function testDatabaseConstraint () {
   console.log('📋 测试1：验证数据库唯一索引')
   console.log('----------------------------------------')
 
@@ -96,7 +96,7 @@ async function testDatabaseConstraint() {
 /**
  * 测试2：验证模型钩子（beforeCreate）
  */
-async function testModelHook() {
+async function testModelHook () {
   console.log('\n📋 测试2：验证模型钩子（beforeCreate）')
   console.log('----------------------------------------')
 
@@ -124,7 +124,7 @@ async function testModelHook() {
     console.log(`✅ 找到测试活动和奖品: sort_order=${existingPrize.sort_order}`)
 
     // 尝试创建重复的sort_order（通过模型钩子应该被阻止）
-    console.log(`\n🔒 触发beforeCreate钩子验证...`)
+    console.log('\n🔒 触发beforeCreate钩子验证...')
 
     try {
       await LotteryPrize.create({
@@ -163,13 +163,13 @@ async function testModelHook() {
 /**
  * 测试3：验证数据库索引存在性
  */
-async function testIndexExistence() {
+async function testIndexExistence () {
   console.log('\n📋 测试3：验证数据库索引存在性')
   console.log('----------------------------------------')
 
   try {
     const [indexes] = await sequelize.query(
-      "SHOW INDEX FROM lottery_prizes WHERE Key_name = 'idx_unique_campaign_sort_order'"
+      'SHOW INDEX FROM lottery_prizes WHERE Key_name = \'idx_unique_campaign_sort_order\''
     )
 
     if (indexes.length === 0) {
@@ -192,7 +192,7 @@ async function testIndexExistence() {
 /**
  * 主测试函数
  */
-async function main() {
+async function main () {
   console.log('🔍 开始验证sort_order唯一约束...\n')
 
   const results = {
@@ -238,4 +238,3 @@ async function main() {
 
 // 执行测试
 main()
-

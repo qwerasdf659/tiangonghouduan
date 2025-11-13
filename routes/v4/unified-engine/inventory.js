@@ -1015,7 +1015,7 @@ router.get('/exchange-records', authenticateToken, async (req, res) => {
  */
 /**
  * 生成核销码API（Generate Verification Code）
- * POST /api/v4/unified-engine/inventory/generate-code/:item_id
+ * POST /api/v4/inventory/generate-code/:item_id
  *
  * 业务场景（Business Scenario）：
  * 用户兑换商品后，为库存物品生成24小时有效的核销码，用于商家线下核销验证

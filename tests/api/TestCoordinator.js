@@ -45,7 +45,7 @@ class TestCoordinator extends BaseTestManager {
 
     while (Date.now() - start_time < timeout) {
       try {
-        const response = await this.make_request('GET', '/api/v4/unified-engine/lottery/health')
+        const response = await this.make_request('GET', '/api/v4/lottery/health')
         if (response.status === 200 && response.data.success) {
           const elapsed = Math.round((Date.now() - start_time) / 1000)
           console.log(`✅ V4引擎已就绪 (等待${elapsed}秒)`)

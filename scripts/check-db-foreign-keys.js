@@ -52,4 +52,3 @@ const sequelize = new Sequelize(
     process.exit(1)
   }
 })()
-

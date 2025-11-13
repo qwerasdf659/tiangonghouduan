@@ -1,12 +1,12 @@
 #!/usr/bin/env node
 /**
  * 🧪 批量添加奖品sort_order唯一性验证脚本
- * 
+ *
  * 验证目标：
  * 1. 未提供sort_order时，系统自动分配唯一值
  * 2. 提供重复sort_order时，系统正确报错
  * 3. 批量创建多个奖品时，sort_order不冲突
- * 
+ *
  * 业务场景：管理员批量添加奖品到奖品池
  */
 
@@ -15,7 +15,7 @@ const { LotteryPrize, LotteryCampaign, sequelize } = require('../models')
 /**
  * 测试1：未提供sort_order时自动分配唯一值
  */
-async function testAutoAssignSortOrder() {
+async function testAutoAssignSortOrder () {
   console.log('📋 测试1：未提供sort_order时自动分配唯一值')
   console.log('----------------------------------------')
 
@@ -138,7 +138,7 @@ async function testAutoAssignSortOrder() {
 /**
  * 测试2：提供重复sort_order时正确报错
  */
-async function testDuplicateSortOrderError() {
+async function testDuplicateSortOrderError () {
   console.log('\n📋 测试2：提供重复sort_order时正确报错')
   console.log('----------------------------------------')
 
@@ -216,7 +216,7 @@ async function testDuplicateSortOrderError() {
 /**
  * 主测试函数
  */
-async function main() {
+async function main () {
   console.log('🧪 开始批量添加奖品sort_order唯一性验证...\n')
 
   const results = {
@@ -257,4 +257,3 @@ async function main() {
 
 // 执行测试
 main()
-

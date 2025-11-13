@@ -105,12 +105,12 @@ function parseRouteFile (filePath, routePrefix = '') {
 function scanRoutes (baseDir) {
   // V4统一引擎路由
   const v4Routes = [
-    { file: 'routes/v4/unified-engine/auth.js', prefix: '/api/v4/unified-engine/auth' },
-    { file: 'routes/v4/unified-engine/lottery.js', prefix: '/api/v4/unified-engine/lottery' },
-    { file: 'routes/v4/unified-engine/points.js', prefix: '/api/v4/unified-engine/points' },
+    { file: 'routes/v4/unified-engine/auth.js', prefix: '/api/v4/auth' },
+    { file: 'routes/v4/unified-engine/lottery.js', prefix: '/api/v4/lottery' },
+    { file: 'routes/v4/unified-engine/points.js', prefix: '/api/v4/points' },
     { file: 'routes/v4/unified-engine/inventory.js', prefix: '/api/v4/inventory' },
     { file: 'routes/v4/unified-engine/consumption.js', prefix: '/api/v4/consumption' },
-    { file: 'routes/v4/unified-engine/admin.js', prefix: '/api/v4/unified-engine/admin' },
+    { file: 'routes/v4/unified-engine/admin.js', prefix: '/api/v4/admin' },
     { file: 'routes/v4/system.js', prefix: '/api/v4/system' },
     { file: 'routes/v4/permissions.js', prefix: '/api/v4/permissions' }
   ]

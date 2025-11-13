@@ -1,5 +1,9 @@
 /**
- * 餐厅积分抽奖系统 V4.0统一引擎架构 - 抽奖API路由（/api/v4/unified-engine/lottery）
+ * 餐厅积分抽奖系统 V4.0 RESTful架构 - 抽奖系统路由
+ *
+ * @route /api/v4/lottery
+ * @standard RESTful资源导向设计
+ * @reference 米哈游原神、网易游戏行业标准
  *
  * 业务场景：提供抽奖相关的REST API接口，包括奖品查询、抽奖执行、抽奖历史等功能
  *
@@ -62,7 +66,7 @@
  * 使用示例：
  * ```javascript
  * // 示例1：获取奖品列表（已脱敏）
- * GET /api/v4/unified-engine/lottery/prizes/daily_lottery
+ * GET /api/v4/lottery/prizes/daily_lottery
  * Authorization: Bearer <token>
  *
  * // 响应（已隐藏概率和库存）
@@ -77,7 +81,7 @@
  * }
  *
  * // 示例2：执行单次抽奖
- * POST /api/v4/unified-engine/lottery/draw/daily_lottery
+ * POST /api/v4/lottery/draw/daily_lottery
  * Authorization: Bearer <token>
  * Content-Type: application/json
  * {}
@@ -95,7 +99,7 @@
  * }
  *
  * // 示例3：连续抽奖3次
- * POST /api/v4/unified-engine/lottery/multi-draw/daily_lottery
+ * POST /api/v4/lottery/multi-draw/daily_lottery
  * Authorization: Bearer <token>
  * Content-Type: application/json
  * {
@@ -152,7 +156,7 @@ const requestCache = new Map()
  * @param {Function} next - 下一个中间件
  * @returns {void}
  */
-function requestDeduplication (req, res, next) {
+function requestDeduplication(req, res, next) {
   const { campaign_code, draw_count = 1 } = req.body
   const user_id = req.user?.user_id
 
@@ -590,7 +594,7 @@ router.post(
  * GET /history/:user_id - 获取用户抽奖历史
  *
  * @description 获取指定用户的抽奖历史记录
- * @route GET /api/v4/unified-engine/lottery/history/:user_id
+ * @route GET /api/v4/lottery/history/:user_id
  * @access Private (需要认证)
  *
  * 🔧 V4.4优化（2025-11-10）：增强错误日志记录
@@ -649,7 +653,7 @@ router.get('/history/:user_id', authenticateToken, async (req, res) => {
  * GET /campaigns - 获取活动列表
  *
  * @description 获取当前可用的抽奖活动列表
- * @route GET /api/v4/unified-engine/lottery/campaigns
+ * @route GET /api/v4/lottery/campaigns
  * @access Private (需要认证)
  */
 router.get('/campaigns', authenticateToken, async (req, res) => {
@@ -673,7 +677,7 @@ router.get('/campaigns', authenticateToken, async (req, res) => {
  * GET /points/:user_id - 获取用户积分信息
  *
  * @description 获取用户的积分余额和相关信息
- * @route GET /api/v4/unified-engine/lottery/points/:user_id
+ * @route GET /api/v4/lottery/points/:user_id
  * @access Private (需要认证 + 限流保护60次/分钟)
  *
  * 🔴 P0优化（2025-11-10）：防止自动创建垃圾账户
@@ -764,7 +768,7 @@ router.get('/points/:user_id', authenticateToken, pointsRateLimiter, async (req,
  * GET /statistics/:user_id - 获取用户抽奖统计（Get User Lottery Statistics - 查询用户的抽奖数据统计）
  *
  * @description 获取用户的抽奖统计信息（用户总抽奖次数、中奖次数、中奖率等核心指标）
- * @route GET /api/v4/unified-engine/lottery/statistics/:user_id
+ * @route GET /api/v4/lottery/statistics/:user_id
  * @access Private (需要认证 - JWT认证token必须提供)
  *
  * 业务场景（Business Scenarios）：
@@ -853,7 +857,7 @@ router.get('/statistics/:user_id', authenticateToken, async (req, res) => {
  * GET /health - 抽奖系统健康检查
  *
  * @description 检查抽奖系统的运行状态
- * @route GET /api/v4/unified-engine/lottery/health
+ * @route GET /api/v4/lottery/health
  * @access Public
  */
 router.get('/health', (req, res) => {

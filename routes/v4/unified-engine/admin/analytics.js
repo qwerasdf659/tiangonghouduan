@@ -21,7 +21,7 @@ const {
  * GET /decisions/analytics - 获取决策分析数据
  *
  * @description 获取抽奖引擎的决策分析数据和统计信息
- * @route GET /api/v4/unified-engine/admin/analytics/decisions/analytics
+ * @route GET /api/v4/admin/analytics/decisions/analytics
  * @access Private (需要管理员权限)
  */
 router.get(
@@ -205,7 +205,7 @@ router.get(
  * GET /lottery/trends - 获取抽奖趋势分析
  *
  * @description 获取抽奖活动的趋势分析数据
- * @route GET /api/v4/unified-engine/admin/analytics/lottery/trends
+ * @route GET /api/v4/admin/analytics/lottery/trends
  * @access Private (需要管理员权限)
  */
 router.get(
@@ -415,7 +415,7 @@ router.get(
  * GET /performance/report - 获取系统性能报告
  *
  * @description 获取系统性能和引擎运行报告
- * @route GET /api/v4/unified-engine/admin/analytics/performance/report
+ * @route GET /api/v4/admin/analytics/performance/report
  * @access Private (需要管理员权限)
  */
 router.get(
@@ -503,7 +503,7 @@ router.get(
  * GET /stats/today - 获取管理员今日统计数据
  *
  * @description 获取今日系统运营数据统计，包括用户活动、抽奖数据、积分数据等
- * @route GET /api/v4/unified-engine/admin/analytics/stats/today
+ * @route GET /api/v4/admin/analytics/stats/today
  * @access Private (需要管理员权限)
  */
 router.get(

@@ -21,7 +21,7 @@ if (!fs.existsSync(logDir)) {
 }
 
 // 🔴 错误日志记录器
-function logError (error, req, additionalInfo = {}) {
+function logError(error, req, additionalInfo = {}) {
   const timestamp = BeijingTimeHelper.apiTimestamp() // 🕐 北京时间API时间戳
   const logEntry = {
     timestamp,
@@ -46,9 +46,9 @@ function logError (error, req, additionalInfo = {}) {
     },
     user: req.user
       ? {
-        user_id: req.user.user_id,
-        username: req.user.username
-      }
+          user_id: req.user.user_id,
+          username: req.user.username
+        }
       : null,
     additionalInfo,
     environment: process.env.NODE_ENV
@@ -72,7 +72,7 @@ function logError (error, req, additionalInfo = {}) {
 }
 
 // 🔴 敏感数据过滤
-function sanitizeRequestBody (body) {
+function sanitizeRequestBody(body) {
   if (!body || typeof body !== 'object') return body
 
   const sanitized = { ...body }
@@ -230,11 +230,11 @@ const notFoundHandler = (req, res) => {
     data: {
       availableEndpoints: [
         'GET /health - 健康检查',
-        'POST /api/auth/login - 用户登录',
-        'GET /api/lottery/config - 抽奖配置',
-        'GET /api/exchange/products - 商品列表',
+        'POST /api/v4/auth/login - 用户登录',
+        'GET /api/v4/lottery/campaigns - 抽奖活动列表',
+        'GET /api/v4/points/balance - 积分余额查询',
         'POST /api/v4/consumption/submit - 商家扫码录入消费',
-        '管理员功能已简化，无需商家审核'
+        '更多API请访问 GET /api/v4/docs'
       ]
     }
   }
@@ -247,7 +247,7 @@ const notFoundHandler = (req, res) => {
 
 // 🔴 自定义错误类
 class BusinessLogicError extends Error {
-  constructor (message, code = 3000, data = null) {
+  constructor(message, code = 3000, data = null) {
     super(message)
     this.name = 'BusinessLogicError'
     this.code = code
@@ -256,7 +256,7 @@ class BusinessLogicError extends Error {
 }
 
 class ValidationError extends Error {
-  constructor (message, details = null) {
+  constructor(message, details = null) {
     super(message)
     this.name = 'ValidationError'
     this.details = details
@@ -264,28 +264,28 @@ class ValidationError extends Error {
 }
 
 class UnauthorizedError extends Error {
-  constructor (message = '认证失败') {
+  constructor(message = '认证失败') {
     super(message)
     this.name = 'UnauthorizedError'
   }
 }
 
 class ForbiddenError extends Error {
-  constructor (message = '权限不足') {
+  constructor(message = '权限不足') {
     super(message)
     this.name = 'ForbiddenError'
   }
 }
 
 class NotFoundError extends Error {
-  constructor (message = '资源不存在') {
+  constructor(message = '资源不存在') {
     super(message)
     this.name = 'NotFoundError'
   }
 }
 
 class ConflictError extends Error {
-  constructor (message = '资源冲突') {
+  constructor(message = '资源冲突') {
     super(message)
     this.name = 'ConflictError'
   }

@@ -20,7 +20,7 @@ const TestCoordinator = require('../api/TestCoordinator')
 async function getUserPoints (tester, user_id) {
   const response = await tester.makeAuthenticatedRequest(
     'GET',
-    `/api/v4/unified-engine/points/balance/${user_id}`,
+    `/api/v4/points/balance/${user_id}`,
     null,
     'regular'
   )
@@ -30,7 +30,7 @@ async function getUserPoints (tester, user_id) {
 async function getUserInventory (tester, user_id) {
   const response = await tester.makeAuthenticatedRequest(
     'GET',
-    `/api/v4/unified-engine/user/inventory/${user_id}`,
+    `/api/v4/user/inventory/${user_id}`,
     null,
     'regular'
   )
@@ -41,7 +41,7 @@ async function getAvailableCampaign (tester) {
   // campaigns接口需要认证
   const response = await tester.makeAuthenticatedRequest(
     'GET',
-    '/api/v4/unified-engine/lottery/campaigns',
+    '/api/v4/lottery/campaigns',
     null,
     'regular'
   )
@@ -88,7 +88,7 @@ describe('🧮 核心业务逻辑测试', () => {
       // 获取可用的抽奖活动（需要认证）
       const campaignsResponse = await tester.makeAuthenticatedRequest(
         'GET',
-        '/api/v4/unified-engine/lottery/campaigns',
+        '/api/v4/lottery/campaigns',
         null,
         'regular'
       )
@@ -104,7 +104,7 @@ describe('🧮 核心业务逻辑测试', () => {
       // 获取今日抽奖记录
       const historyResponse = await tester.makeAuthenticatedRequest(
         'GET',
-        `/api/v4/unified-engine/lottery/history/${test_user_id}`,
+        `/api/v4/lottery/history/${test_user_id}`,
         null,
         'regular'
       )
@@ -130,7 +130,7 @@ describe('🧮 核心业务逻辑测试', () => {
         // 应该拒绝抽奖
         const drawResponse = await tester.makeAuthenticatedRequest(
           'POST',
-          '/api/v4/unified-engine/lottery/draw',
+          '/api/v4/lottery/draw',
           { campaign_id, draw_type: 'single' },
           'regular'
         )
@@ -163,14 +163,14 @@ describe('🧮 核心业务逻辑测试', () => {
 
       if (currentPoints < requiredPoints) {
         // 积分不足，应该拒绝抽奖
-        console.log('🔍 发送请求: POST /api/v4/unified-engine/lottery/draw')
+        console.log('🔍 发送请求: POST /api/v4/lottery/draw')
         console.log(
           `📋 请求数据: user_id=${low_points_user_id}, campaign_id=${campaign.campaign_id}, draw_count=1`
         )
 
         const drawResponse = await tester.makeAuthenticatedRequest(
           'POST',
-          '/api/v4/unified-engine/lottery/draw',
+          '/api/v4/lottery/draw',
           { user_id: low_points_user_id, campaign_id: campaign.campaign_id, draw_count: 1 },
           'regular'
         )
@@ -212,7 +212,7 @@ describe('🧮 核心业务逻辑测试', () => {
       // 执行抽奖
       const drawResponse = await tester.makeAuthenticatedRequest(
         'POST',
-        '/api/v4/unified-engine/lottery/draw',
+        '/api/v4/lottery/draw',
         { campaign_id: campaign.campaign_id, draw_type: 'single' },
         'regular'
       )
@@ -237,7 +237,7 @@ describe('🧮 核心业务逻辑测试', () => {
         // 验证抽奖记录存在
         const historyResponse = await tester.makeAuthenticatedRequest(
           'GET',
-          `/api/v4/unified-engine/lottery/history/${test_user_id}`,
+          `/api/v4/lottery/history/${test_user_id}`,
           null,
           'regular'
         )
@@ -279,7 +279,7 @@ describe('🧮 核心业务逻辑测试', () => {
         // 执行抽奖
         const drawResponse = await tester.makeAuthenticatedRequest(
           'POST',
-          '/api/v4/unified-engine/lottery/execute',
+          '/api/v4/lottery/execute',
           {
             user_id: test_user_id,
             campaign_id: campaign.campaign_id,
@@ -305,7 +305,7 @@ describe('🧮 核心业务逻辑测试', () => {
           // ✅ 验证数据库记录使用is_winner字段
           const historyResponse = await tester.makeAuthenticatedRequest(
             'GET',
-            `/api/v4/unified-engine/lottery/history/${test_user_id}`,
+            `/api/v4/lottery/history/${test_user_id}`,
             null,
             'regular'
           )
@@ -331,7 +331,7 @@ describe('🧮 核心业务逻辑测试', () => {
         // 获取多条抽奖历史记录验证业务语义
         const historyResponse = await tester.makeAuthenticatedRequest(
           'GET',
-          `/api/v4/unified-engine/lottery/history/${test_user_id}`,
+          `/api/v4/lottery/history/${test_user_id}`,
           null,
           'regular'
         )
@@ -372,7 +372,7 @@ describe('🧮 核心业务逻辑测试', () => {
         // ✅ 验证积分交易状态
         const pointsResponse = await tester.makeAuthenticatedRequest(
           'GET',
-          `/api/v4/unified-engine/points/transactions/${test_user_id}`,
+          `/api/v4/points/transactions/${test_user_id}`,
           null,
           'regular'
         )
@@ -441,7 +441,7 @@ describe('🧮 核心业务逻辑测试', () => {
 
       const earnResponse = await tester.makeAuthenticatedRequest(
         'POST',
-        '/api/v4/unified-engine/admin/points/adjust',
+        '/api/v4/admin/points/adjust',
         earnData,
         'admin'
       )
@@ -484,7 +484,7 @@ describe('🧮 核心业务逻辑测试', () => {
 
       const spendResponse = await tester.makeAuthenticatedRequest(
         'POST',
-        '/api/v4/unified-engine/points/spend',
+        '/api/v4/points/spend',
         spendData,
         'regular'
       )
@@ -522,13 +522,13 @@ describe('🧮 核心业务逻辑测试', () => {
       const [response1, response2] = await Promise.all([
         tester.makeAuthenticatedRequest(
           'POST',
-          '/api/v4/unified-engine/lottery/draw',
+          '/api/v4/lottery/draw',
           drawData,
           'regular'
         ),
         tester.makeAuthenticatedRequest(
           'POST',
-          '/api/v4/unified-engine/lottery/draw',
+          '/api/v4/lottery/draw',
           drawData,
           'regular'
         )
@@ -557,7 +557,7 @@ describe('🧮 核心业务逻辑测试', () => {
 
       const invalidResponse = await tester.makeAuthenticatedRequest(
         'POST',
-        '/api/v4/unified-engine/admin/points/adjust',
+        '/api/v4/admin/points/adjust',
         invalidData,
         'admin'
       )
@@ -587,7 +587,7 @@ describe('🧮 核心业务逻辑测试', () => {
       const spendPromises = Array.from({ length: 3 }, () =>
         tester.makeAuthenticatedRequest(
           'POST',
-          '/api/v4/unified-engine/points/spend',
+          '/api/v4/points/spend',
           { amount: 10, reason: '并发测试', context: 'concurrent_test' },
           'regular'
         )

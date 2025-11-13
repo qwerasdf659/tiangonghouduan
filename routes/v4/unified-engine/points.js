@@ -1,5 +1,9 @@
 /**
- * 餐厅积分抽奖系统 V4.0统一引擎架构 - 积分API路由（/api/v4/unified-engine/points）
+ * 餐厅积分抽奖系统 V4.0 RESTful架构 - 积分管理系统路由
+ *
+ * @route /api/v4/points
+ * @standard RESTful资源导向设计
+ * @reference 腾讯、阿里积分系统行业标准
  *
  * 业务场景：提供积分相关的REST API接口，包括余额查询、交易历史、统计分析等功能
  *
@@ -72,7 +76,7 @@
  * 使用示例：
  * ```javascript
  * // 示例1：查询当前用户积分余额
- * GET /api/v4/unified-engine/points/balance
+ * GET /api/v4/points/balance
  * Authorization: Bearer <token>
  *
  * // 响应
@@ -88,7 +92,7 @@
  * }
  *
  * // 示例2：查询交易历史（带筛选和分页）
- * GET /api/v4/unified-engine/points/transactions?transaction_type=earn&page=1&limit=10
+ * GET /api/v4/points/transactions?transaction_type=earn&page=1&limit=10
  * Authorization: Bearer <token>
  *
  * // 响应
@@ -118,7 +122,7 @@
  * }
  *
  * // 示例3：管理员调整用户积分
- * POST /api/v4/unified-engine/points/admin/adjust
+ * POST /api/v4/points/admin/adjust
  * Authorization: Bearer <admin_token>
  * Content-Type: application/json
  * {
@@ -226,7 +230,7 @@ const pointsBalanceByIdRateLimiter = rateLimiter.createLimiter({
  * GET /balance - 获取当前用户积分余额（已优化）
  *
  * @description 从JWT token中自动获取当前用户的积分余额信息
- * @route GET /api/v4/unified-engine/points/balance
+ * @route GET /api/v4/points/balance
  * @access Private (需要认证)
  *
  * 优化内容（2025-11-03）：
@@ -347,7 +351,7 @@ router.get('/balance', authenticateToken, balanceRateLimiter, async (req, res) =
  * GET /balance/:user_id - 获取指定用户积分余额
  *
  * @description 获取指定用户的积分余额信息（管理员可查询任意用户）
- * @route GET /api/v4/unified-engine/points/balance/:user_id
+ * @route GET /api/v4/points/balance/:user_id
  * @access Private (需要认证 + 限流保护60次/分钟)
  *
  * 🔴 P0优化说明（基于实施方案文档 - 完整版）：
@@ -372,111 +376,116 @@ router.get('/balance', authenticateToken, balanceRateLimiter, async (req, res) =
  * - 解决：路由层先检查账户是否存在，直接读取account数据而不调用服务层方法
  * - 效果：真正实现"用户存在但无账户"时不自动创建，防止数据污染
  */
-router.get('/balance/:user_id', authenticateToken, pointsBalanceByIdRateLimiter, async (req, res) => {
-  try {
-    const { user_id } = req.params
-    const current_user_id = req.user.user_id
+router.get(
+  '/balance/:user_id',
+  authenticateToken,
+  pointsBalanceByIdRateLimiter,
+  async (req, res) => {
+    try {
+      const { user_id } = req.params
+      const current_user_id = req.user.user_id
 
-    // 🔴 P0优化1：参数严格验证 - 确保user_id为有效正整数
-    const target_user_id = parseInt(user_id)
-    if (isNaN(target_user_id) || target_user_id <= 0) {
-      return res.apiError(
-        'user_id参数无效，必须为正整数',
-        'INVALID_USER_ID',
-        { received_user_id: user_id },
-        400
-      )
-    }
+      // 🔴 P0优化1：参数严格验证 - 确保user_id为有效正整数
+      const target_user_id = parseInt(user_id)
+      if (isNaN(target_user_id) || target_user_id <= 0) {
+        return res.apiError(
+          'user_id参数无效，必须为正整数',
+          'INVALID_USER_ID',
+          { received_user_id: user_id },
+          400
+        )
+      }
 
-    // 🛡️ 权限检查：只能查询自己的积分，除非是超级管理员
-    const currentUserRoles = await getUserRoles(current_user_id)
-    if (target_user_id !== current_user_id && !currentUserRoles.isAdmin) {
-      return res.apiError('无权限查询其他用户积分', 'PERMISSION_DENIED', {}, 403)
-    }
+      // 🛡️ 权限检查：只能查询自己的积分，除非是超级管理员
+      const currentUserRoles = await getUserRoles(current_user_id)
+      if (target_user_id !== current_user_id && !currentUserRoles.isAdmin) {
+        return res.apiError('无权限查询其他用户积分', 'PERMISSION_DENIED', {}, 403)
+      }
 
-    // ✅ 审计日志：记录管理员查询他人积分的操作（安全审计和合规性要求）
-    if (currentUserRoles.isAdmin && target_user_id !== current_user_id) {
-      console.warn('[Audit] 管理员查询他人积分', {
-        operator_id: current_user_id, // 操作者（管理员）
-        operator_mobile: req.user.mobile, // 操作者手机号
-        target_user_id, // 被查询的用户ID
-        action: 'query_user_points_balance', // 操作类型
-        ip: req.ip, // 请求来源IP
-        user_agent: req.headers['user-agent'], // 请求客户端
-        timestamp: BeijingTimeHelper.now() // 北京时间
+      // ✅ 审计日志：记录管理员查询他人积分的操作（安全审计和合规性要求）
+      if (currentUserRoles.isAdmin && target_user_id !== current_user_id) {
+        console.warn('[Audit] 管理员查询他人积分', {
+          operator_id: current_user_id, // 操作者（管理员）
+          operator_mobile: req.user.mobile, // 操作者手机号
+          target_user_id, // 被查询的用户ID
+          action: 'query_user_points_balance', // 操作类型
+          ip: req.ip, // 请求来源IP
+          user_agent: req.headers['user-agent'], // 请求客户端
+          timestamp: BeijingTimeHelper.now() // 北京时间
+        })
+      }
+
+      // 🔴 P0优化2：用户存在性验证 - 防止自动创建垃圾账户导致数据污染
+      const user = await User.findByPk(target_user_id)
+      if (!user) {
+        return res.apiError(
+          '用户不存在，请检查user_id是否正确',
+          'USER_NOT_FOUND',
+          { user_id: target_user_id },
+          404
+        )
+      }
+
+      // 🔴 P0优化3：账户存在性和状态检查 - 防止自动创建垃圾账户
+      const account = await UserPointsAccount.findOne({
+        where: { user_id: target_user_id }
       })
-    }
 
-    // 🔴 P0优化2：用户存在性验证 - 防止自动创建垃圾账户导致数据污染
-    const user = await User.findByPk(target_user_id)
-    if (!user) {
-      return res.apiError(
-        '用户不存在，请检查user_id是否正确',
-        'USER_NOT_FOUND',
-        { user_id: target_user_id },
-        404
-      )
-    }
+      // 🔴 关键修复：如果用户存在但没有积分账户，返回明确错误，不自动创建
+      if (!account) {
+        return res.apiError(
+          '该用户尚未开通积分账户',
+          'POINTS_ACCOUNT_NOT_FOUND',
+          {
+            user_id: target_user_id,
+            suggestion: '用户需要先进行消费或参与活动才会开通积分账户'
+          },
+          404
+        )
+      }
 
-    // 🔴 P0优化3：账户存在性和状态检查 - 防止自动创建垃圾账户
-    const account = await UserPointsAccount.findOne({
-      where: { user_id: target_user_id }
-    })
+      // 如果账户存在但已被冻结，返回明确的错误提示
+      if (!account.is_active) {
+        return res.apiError(
+          '积分账户已被冻结，无法查询余额',
+          'ACCOUNT_FROZEN',
+          {
+            user_id: target_user_id,
+            freeze_reason: account.freeze_reason || '未提供冻结原因'
+          },
+          403
+        )
+      }
 
-    // 🔴 关键修复：如果用户存在但没有积分账户，返回明确错误，不自动创建
-    if (!account) {
-      return res.apiError(
-        '该用户尚未开通积分账户',
-        'POINTS_ACCOUNT_NOT_FOUND',
+      // 🔴 优化：直接返回账户数据，不调用getUserPoints（避免触发自动创建逻辑）
+      const points_info = {
+        available_points: parseFloat(account.available_points),
+        total_earned: parseFloat(account.total_earned),
+        total_consumed: parseFloat(account.total_consumed)
+      }
+
+      return res.apiSuccess(
         {
           user_id: target_user_id,
-          suggestion: '用户需要先进行消费或参与活动才会开通积分账户'
+          available_points: points_info.available_points,
+          total_earned: points_info.total_earned,
+          total_consumed: points_info.total_consumed,
+          timestamp: BeijingTimeHelper.apiTimestamp()
         },
-        404
+        '积分余额查询成功'
       )
+    } catch (error) {
+      console.error('❌ 积分余额查询失败:', error)
+      return res.apiInternalError('积分余额查询失败', error.message, 'POINTS_BALANCE_ERROR')
     }
-
-    // 如果账户存在但已被冻结，返回明确的错误提示
-    if (!account.is_active) {
-      return res.apiError(
-        '积分账户已被冻结，无法查询余额',
-        'ACCOUNT_FROZEN',
-        {
-          user_id: target_user_id,
-          freeze_reason: account.freeze_reason || '未提供冻结原因'
-        },
-        403
-      )
-    }
-
-    // 🔴 优化：直接返回账户数据，不调用getUserPoints（避免触发自动创建逻辑）
-    const points_info = {
-      available_points: parseFloat(account.available_points),
-      total_earned: parseFloat(account.total_earned),
-      total_consumed: parseFloat(account.total_consumed)
-    }
-
-    return res.apiSuccess(
-      {
-        user_id: target_user_id,
-        available_points: points_info.available_points,
-        total_earned: points_info.total_earned,
-        total_consumed: points_info.total_consumed,
-        timestamp: BeijingTimeHelper.apiTimestamp()
-      },
-      '积分余额查询成功'
-    )
-  } catch (error) {
-    console.error('❌ 积分余额查询失败:', error)
-    return res.apiInternalError('积分余额查询失败', error.message, 'POINTS_BALANCE_ERROR')
   }
-})
+)
 
 /**
  * GET /transactions/:user_id - 获取用户积分交易历史
  *
  * @description 获取用户的积分交易记录，支持分页
- * @route GET /api/v4/unified-engine/points/transactions/:user_id
+ * @route GET /api/v4/points/transactions/:user_id
  * @access Private (需要认证)
  */
 router.get('/transactions/:user_id', authenticateToken, async (req, res) => {
@@ -548,7 +557,7 @@ router.get('/transactions/:user_id', authenticateToken, async (req, res) => {
  * POST /admin/adjust - 管理员调整用户积分
  *
  * @description 管理员专用接口，用于调整用户积分（增加或扣除）
- * @route POST /api/v4/unified-engine/points/admin/adjust
+ * @route POST /api/v4/points/admin/adjust
  * @access Private (需要超级管理员权限)
  *
  * 🔴 P0优化说明（2025-11-10）：
@@ -690,7 +699,7 @@ router.post('/admin/adjust', authenticateToken, async (req, res) => {
  * GET /admin/statistics - 获取积分统计信息（优化版 - 2025年11月10日）
  *
  * @description 管理员专用接口，获取积分系统全局统计数据
- * @route GET /api/v4/unified-engine/points/admin/statistics
+ * @route GET /api/v4/points/admin/statistics
  * @access Private (需要超级管理员权限)
  *
  * 优化内容（基于文档《获取管理员积分统计API实施方案.md》）：
@@ -842,7 +851,7 @@ router.get('/admin/statistics', authenticateToken, async (req, res) => {
             sequelize.fn(
               'SUM',
               sequelize.literal(
-                'CASE WHEN transaction_type = \'earn\' AND status = \'completed\' THEN points_amount ELSE 0 END'
+                "CASE WHEN transaction_type = 'earn' AND status = 'completed' THEN points_amount ELSE 0 END"
               )
             ),
             'total_earned_points'
@@ -856,7 +865,7 @@ router.get('/admin/statistics', authenticateToken, async (req, res) => {
             sequelize.fn(
               'SUM',
               sequelize.literal(
-                'CASE WHEN transaction_type = \'consume\' AND status = \'completed\' THEN points_amount ELSE 0 END'
+                "CASE WHEN transaction_type = 'consume' AND status = 'completed' THEN points_amount ELSE 0 END"
               )
             ),
             'total_consumed_points'
@@ -871,7 +880,7 @@ router.get('/admin/statistics', authenticateToken, async (req, res) => {
             sequelize.fn(
               'SUM',
               sequelize.literal(
-                'CASE WHEN status = \'pending\' AND transaction_type = \'earn\' THEN points_amount ELSE 0 END'
+                "CASE WHEN status = 'pending' AND transaction_type = 'earn' THEN points_amount ELSE 0 END"
               )
             ),
             'pending_earn_points'
@@ -885,7 +894,7 @@ router.get('/admin/statistics', authenticateToken, async (req, res) => {
             sequelize.fn(
               'SUM',
               sequelize.literal(
-                'CASE WHEN DATE(transaction_time) = CURDATE() AND transaction_type = \'earn\' AND status = \'completed\' THEN points_amount ELSE 0 END'
+                "CASE WHEN DATE(transaction_time) = CURDATE() AND transaction_type = 'earn' AND status = 'completed' THEN points_amount ELSE 0 END"
               )
             ),
             'today_earn_points'
@@ -899,7 +908,7 @@ router.get('/admin/statistics', authenticateToken, async (req, res) => {
             sequelize.fn(
               'SUM',
               sequelize.literal(
-                'CASE WHEN DATE(transaction_time) = CURDATE() AND transaction_type = \'consume\' AND status = \'completed\' THEN points_amount ELSE 0 END'
+                "CASE WHEN DATE(transaction_time) = CURDATE() AND transaction_type = 'consume' AND status = 'completed' THEN points_amount ELSE 0 END"
               )
             ),
             'today_consume_points'
@@ -910,7 +919,7 @@ router.get('/admin/statistics', authenticateToken, async (req, res) => {
            * 业务含义：status='failed'的交易记录数，用于监控系统异常
            */
           [
-            sequelize.fn('COUNT', sequelize.literal('CASE WHEN status = \'failed\' THEN 1 END')),
+            sequelize.fn('COUNT', sequelize.literal("CASE WHEN status = 'failed' THEN 1 END")),
             'failed_transactions'
           ]
         ],
@@ -1029,7 +1038,7 @@ router.get('/admin/statistics', authenticateToken, async (req, res) => {
  * GET /user/statistics/:user_id - 获取用户统计数据
  *
  * @description 获取用户的完整统计信息，包括抽奖、兑换、上传等数据
- * @route GET /api/v4/unified-engine/points/user/statistics/:user_id
+ * @route GET /api/v4/points/user/statistics/:user_id
  * @access Private (需要认证)
  */
 router.get('/user/statistics/:user_id', authenticateToken, async (req, res) => {
@@ -1075,15 +1084,15 @@ router.get('/user/statistics/:user_id', authenticateToken, async (req, res) => {
 
     const pointsInfo = pointsAccount
       ? {
-        available_points: parseFloat(pointsAccount.available_points),
-        total_earned: parseFloat(pointsAccount.total_earned),
-        total_consumed: parseFloat(pointsAccount.total_consumed)
-      }
+          available_points: parseFloat(pointsAccount.available_points),
+          total_earned: parseFloat(pointsAccount.total_earned),
+          total_consumed: parseFloat(pointsAccount.total_consumed)
+        }
       : {
-        available_points: 0,
-        total_earned: 0,
-        total_consumed: 0
-      }
+          available_points: 0,
+          total_earned: 0,
+          total_consumed: 0
+        }
 
     // 并行获取其他统计数据
     const [lotteryStats, exchangeStats, consumptionStats, inventoryStats] = await Promise.all([
@@ -1165,7 +1174,7 @@ router.get('/user/statistics/:user_id', authenticateToken, async (req, res) => {
  * @returns {Promise<Object>} 抽奖统计数据
  * @description 统计用户的抽奖次数（总次数、本月次数、最后抽奖时间）
  */
-async function getLotteryStatistics (user_id) {
+async function getLotteryStatistics(user_id) {
   const { LotteryDraw } = require('../../../models')
 
   // 🔥 并行查询：总次数、本月次数、最后抽奖时间
@@ -1207,7 +1216,7 @@ async function getLotteryStatistics (user_id) {
  * @param {number} user_id - 用户ID
  * @returns {Promise<Object>} 兑换统计数据
  */
-async function getExchangeStatistics (user_id) {
+async function getExchangeStatistics(user_id) {
   const { ExchangeRecords } = require('../../../models')
 
   const [totalCount, totalPoints, thisMonth] = await Promise.all([
@@ -1241,7 +1250,7 @@ async function getExchangeStatistics (user_id) {
  * @returns {Promise<Object>} 消费记录统计数据
  * @description 统计用户通过商家扫码录入的消费记录情况
  */
-async function getConsumptionStatistics (user_id) {
+async function getConsumptionStatistics(user_id) {
   const { ConsumptionRecord } = require('../../../models')
   const { Op } = require('sequelize')
 
@@ -1324,7 +1333,7 @@ async function getConsumptionStatistics (user_id) {
  * @param {number} user_id - 用户ID
  * @returns {Promise<Object>} 库存统计数据
  */
-async function getInventoryStatistics (user_id) {
+async function getInventoryStatistics(user_id) {
   const { UserInventory } = require('../../../models')
 
   const [totalCount, availableCount, usedCount] = await Promise.all([
@@ -1346,7 +1355,7 @@ async function getInventoryStatistics (user_id) {
  * @param {Object} stats - 统计数据
  * @returns {Array} 成就列表
  */
-function calculateAchievements (stats) {
+function calculateAchievements(stats) {
   const achievements = []
 
   // 抽奖相关成就
@@ -1396,7 +1405,7 @@ function calculateAchievements (stats) {
 }
 
 /**
- * GET /api/v4/unified-engine/points/overview
+ * GET /api/v4/points/overview
  * 获取用户积分概览（包含可用积分和冻结积分）
  * @description 为用户提供完整的积分账户概览,包括:
  *              - 可用积分(available_points，可直接使用于兑换、抽奖)
@@ -1540,7 +1549,7 @@ router.get('/frozen', authenticateToken, async (req, res) => {
  * GET /trend - 获取用户积分趋势数据（图表展示专用）
  *
  * @description 获取用户指定天数内的积分获得/消费趋势数据，返回前端Chart.js可直接使用的格式
- * @route GET /api/v4/unified-engine/points/trend
+ * @route GET /api/v4/points/trend
  * @access Private（需要JWT认证 + 限流保护，用户只能查询自己的数据）
  *
  * 业务逻辑（基于项目实际代码风格）:
@@ -2237,7 +2246,7 @@ router.post(
 )
 
 /**
- * @route GET /api/v4/unified-engine/points/restore-audit
+ * @route GET /api/v4/points/restore-audit
  * @desc 查询积分交易恢复审计记录（管理员专用）
  * @access Private (仅管理员)
  *

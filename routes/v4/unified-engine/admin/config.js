@@ -19,7 +19,7 @@ const {
  * PUT /config - 更新引擎配置
  *
  * @description 更新抽奖引擎的配置参数
- * @route PUT /api/v4/unified-engine/admin/config
+ * @route PUT /api/v4/admin/config
  * @access Private (需要管理员权限)
  */
 router.put('/config', adminAuthMiddleware, asyncHandler(async (req, res) => {
@@ -67,7 +67,7 @@ router.put('/config', adminAuthMiddleware, asyncHandler(async (req, res) => {
  * POST /test/simulate - 抽奖模拟测试
  *
  * @description 模拟抽奖过程，用于测试配置和策略
- * @route POST /api/v4/unified-engine/admin/test/simulate
+ * @route POST /api/v4/admin/test/simulate
  * @access Private (需要管理员权限)
  */
 router.post('/test/simulate', adminAuthMiddleware, asyncHandler(async (req, res) => {
