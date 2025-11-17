@@ -418,4 +418,3 @@ class ServiceTestSuite {
 module.exports = {
   ServiceTestSuite
 }
-

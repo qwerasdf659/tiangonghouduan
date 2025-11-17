@@ -54,7 +54,7 @@ async function getTestUserToken (app, mobile = TEST_DATA.users.testUser.mobile, 
   const token = response.body.data?.token
   if (!token) {
     throw new Error(
-      `❌ 登录成功但未返回token\n` +
+      '❌ 登录成功但未返回token\n' +
       `响应数据: ${JSON.stringify(response.body.data, null, 2)}`
     )
   }
@@ -190,4 +190,3 @@ module.exports = {
   batchLogin, // 批量登录
   logout // 登出
 }
-

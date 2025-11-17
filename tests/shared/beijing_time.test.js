@@ -215,7 +215,7 @@ class BeijingTimeTestSuite {
     }
 
     // 执行数据库时区查询
-    const [results] = await sequelize.query("SELECT @@session.time_zone as timezone, NOW() as current_time")
+    const [results] = await sequelize.query('SELECT @@session.time_zone as timezone, NOW() as current_time')
     const dbTimezone = results[0].timezone
     const dbCurrentTime = results[0].current_time
 
@@ -286,4 +286,3 @@ class BeijingTimeTestSuite {
 module.exports = {
   BeijingTimeTestSuite
 }
-

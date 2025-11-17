@@ -244,7 +244,7 @@ class IdempotencyTestSuite {
     const balanceAfterFirst = accountAfterFirst.available_points
 
     if (balanceAfterFirst !== balanceBefore + amount) {
-      throw new Error(`❌ 第一次执行异常: 余额变更不正确`)
+      throw new Error('❌ 第一次执行异常: 余额变更不正确')
     }
 
     // 第二次添加积分（相同business_id）
@@ -259,7 +259,7 @@ class IdempotencyTestSuite {
     const balanceAfterSecond = accountAfterSecond.available_points
 
     if (balanceAfterSecond !== balanceAfterFirst) {
-      throw new Error(`❌ 幂等性失败: 重复执行导致余额再次变更`)
+      throw new Error('❌ 幂等性失败: 重复执行导致余额再次变更')
     }
 
     console.log('✅ 积分服务幂等性保护有效')
@@ -315,7 +315,7 @@ class IdempotencyTestSuite {
     })
 
     if (countAfterFirst !== countBefore + 1) {
-      throw new Error(`❌ 第一次抽奖异常: 预期增加1条记录`)
+      throw new Error('❌ 第一次抽奖异常: 预期增加1条记录')
     }
 
     // 第二次抽奖（相同idempotency_key）
@@ -332,7 +332,7 @@ class IdempotencyTestSuite {
     })
 
     if (countAfterSecond !== countAfterFirst) {
-      throw new Error(`❌ 抽奖幂等性失败: 重复执行创建了新记录`)
+      throw new Error('❌ 抽奖幂等性失败: 重复执行创建了新记录')
     }
 
     console.log('✅ 抽奖服务幂等性保护有效')
@@ -354,4 +354,3 @@ class IdempotencyTestSuite {
 module.exports = {
   IdempotencyTestSuite
 }
-
