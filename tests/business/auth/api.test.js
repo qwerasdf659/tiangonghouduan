@@ -1,7 +1,7 @@
 /**
  * 认证和权限系统API测试 (V4架构)
  * 迁移自 tests/api/auth-api.test.js
- * 
+ *
  * 测试覆盖：
  * 1. V4统一引擎核心功能（健康检查、版本、状态）
  * 2. 认证系统API（登录、token管理、权限验证）
@@ -13,7 +13,7 @@
  * - 验证API响应格式符合RESTful和ApiResponse标准
  * - 验证JWT认证流程完整性
  * - 验证权限管理准确性
- * 
+ *
  * 创建时间：2025年11月13日 北京时间
  */
 
@@ -28,9 +28,11 @@ describe('认证和权限系统API测试（V4架构）', () => {
   const testUser = TestConfig.real_data.testUser
   const adminUser = TestConfig.real_data.adminUser
 
-  // ==========================================
-  // 🔧 测试前准备
-  // ==========================================
+  /*
+   * ==========================================
+   * 🔧 测试前准备
+   * ==========================================
+   */
 
   beforeAll(async () => {
     console.log('🚀 认证和权限系统API测试启动')
@@ -67,9 +69,11 @@ describe('认证和权限系统API测试（V4架构）', () => {
     console.log('🏁 认证和权限系统API测试完成')
   })
 
-  // ==========================================
-  // 🏥 V4引擎核心功能
-  // ==========================================
+  /*
+   * ==========================================
+   * 🏥 V4引擎核心功能
+   * ==========================================
+   */
 
   describe('V4统一引擎核心功能', () => {
     test('V4引擎健康检查 - GET /api/v4/lottery/health', async () => {
@@ -80,7 +84,7 @@ describe('认证和权限系统API测试（V4架构）', () => {
         expect(response.data).toHaveProperty('success', true)
         expect(response.data.data).toHaveProperty('status')
         expect(response.data.data).toHaveProperty('timestamp')
-        
+
         console.log('✅ V4引擎健康状态:', response.data.data.status)
       }
     })
@@ -92,7 +96,7 @@ describe('认证和权限系统API测试（V4架构）', () => {
       if (response.status === 200) {
         expect(response.data.data).toHaveProperty('version')
         expect(response.data.data).toHaveProperty('build_time')
-        
+
         console.log('✅ V4版本:', response.data.data.version)
       }
     })
@@ -104,15 +108,17 @@ describe('认证和权限系统API测试（V4架构）', () => {
       if (response.status === 200) {
         expect(response.data.data).toHaveProperty('engine_status')
         expect(response.data.data).toHaveProperty('strategies_status')
-        
+
         console.log('✅ V4引擎状态:', response.data.data.engine_status)
       }
     })
   })
 
-  // ==========================================
-  // 🔐 认证系统API
-  // ==========================================
+  /*
+   * ==========================================
+   * 🔐 认证系统API
+   * ==========================================
+   */
 
   describe('认证系统API', () => {
     test('用户登录 - POST /api/v4/auth/login', async () => {
@@ -135,7 +141,7 @@ describe('认证和权限系统API测试（V4架构）', () => {
         expect(response.data.data).toHaveProperty('user')
         expect(response.data.data.user).toHaveProperty('user_id')
         expect(response.data.data.user).toHaveProperty('mobile')
-        
+
         console.log('✅ 用户登录成功, user_id:', response.data.data.user.user_id)
       }
     })
@@ -153,7 +159,7 @@ describe('认证和权限系统API测试（V4架构）', () => {
         expect(response.data).toHaveProperty('success', true)
         expect(response.data.data).toHaveProperty('valid', true)
         expect(response.data.data).toHaveProperty('user_id')
-        
+
         console.log('✅ Token验证通过, user_id:', response.data.data.user_id)
       }
     })
@@ -174,7 +180,7 @@ describe('认证和权限系统API测试（V4架构）', () => {
         expect(response.data.data).toHaveProperty('timestamp')
 
         const { user } = response.data.data
-        
+
         // 验证核心字段
         expect(user).toHaveProperty('user_id')
         expect(user).toHaveProperty('mobile')
@@ -197,7 +203,7 @@ describe('认证和权限系统API测试（V4架构）', () => {
         // 验证角色信息
         expect(Array.isArray(user.roles)).toBe(true)
         expect(typeof user.role_based_admin).toBe('boolean')
-        
+
         console.log('✅ 获取用户信息成功:', {
           user_id: user.user_id,
           mobile: user.mobile,
@@ -216,7 +222,7 @@ describe('认证和权限系统API测试（V4架构）', () => {
 
       expect(response.status).toBe(401)
       expect(response.data).toHaveProperty('success', false)
-      
+
       console.log('✅ 无效Token被正确拒绝')
     })
 
@@ -225,7 +231,7 @@ describe('认证和权限系统API测试（V4架构）', () => {
 
       expect(response.status).toBe(401)
       expect(response.data).toHaveProperty('success', false)
-      
+
       console.log('✅ 缺少Token被正确拒绝')
     })
 
@@ -241,7 +247,7 @@ describe('认证和权限系统API测试（V4架构）', () => {
       if (response.status === 200) {
         expect(response.data).toHaveProperty('success', true)
         expect(response.data).toHaveProperty('code', 'LOGOUT_SUCCESS')
-        
+
         console.log('✅ 用户登出成功')
       }
     })
@@ -282,7 +288,7 @@ describe('认证和权限系统API测试（V4架构）', () => {
         expect(refresh_response.data.data.user).toHaveProperty('roles')
         expect(refresh_response.data.data).toHaveProperty('expires_in')
         expect(refresh_response.data.data).toHaveProperty('timestamp')
-        
+
         console.log('✅ Token刷新成功')
       }
     })
@@ -294,7 +300,7 @@ describe('认证和权限系统API测试（V4架构）', () => {
       if (response.status === 400) {
         expect(response.data).toHaveProperty('success', false)
         expect(response.data).toHaveProperty('message', '刷新Token不能为空')
-        
+
         console.log('✅ 缺少refresh_token参数被正确拒绝')
       }
     })
@@ -308,15 +314,17 @@ describe('认证和权限系统API测试（V4架构）', () => {
       if (response.status === 401) {
         expect(response.data).toHaveProperty('success', false)
         expect(response.data).toHaveProperty('message', '刷新Token无效')
-        
+
         console.log('✅ 无效refresh_token被正确拒绝')
       }
     })
   })
 
-  // ==========================================
-  // 🔑 权限管理API
-  // ==========================================
+  /*
+   * ==========================================
+   * 🔑 权限管理API
+   * ==========================================
+   */
 
   describe('V4权限管理API', () => {
     test('检查用户权限 - POST /api/v4/permissions/check', async () => {
@@ -337,7 +345,7 @@ describe('认证和权限系统API测试（V4架构）', () => {
         expect(response.data.data).toHaveProperty('action')
         expect(response.data.data).toHaveProperty('role_based_admin')
         expect(response.data.data).toHaveProperty('role_level')
-        
+
         console.log('✅ 权限检查成功:', {
           resource: response.data.data.resource,
           action: response.data.data.action,
@@ -364,7 +372,7 @@ describe('认证和权限系统API测试（V4架构）', () => {
         expect(response.data.data).toHaveProperty('role_level')
         expect(response.data.data).toHaveProperty('roles')
         expect(Array.isArray(response.data.data.roles)).toBe(true)
-        
+
         console.log('✅ 获取用户权限列表成功, 权限数:', response.data.data.permissions.permissions.length)
       }
     })
@@ -382,10 +390,9 @@ describe('认证和权限系统API测试（V4架构）', () => {
         expect(response.data.data).toHaveProperty('total_count')
         expect(response.data.data).toHaveProperty('admins')
         expect(Array.isArray(response.data.data.admins)).toBe(true)
-        
+
         console.log('✅ 获取管理员列表成功, 总数:', response.data.data.total_count)
       }
     })
   })
 })
-

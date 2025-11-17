@@ -851,7 +851,7 @@ router.get('/admin/statistics', authenticateToken, async (req, res) => {
             sequelize.fn(
               'SUM',
               sequelize.literal(
-                "CASE WHEN transaction_type = 'earn' AND status = 'completed' THEN points_amount ELSE 0 END"
+                'CASE WHEN transaction_type = \'earn\' AND status = \'completed\' THEN points_amount ELSE 0 END'
               )
             ),
             'total_earned_points'
@@ -865,7 +865,7 @@ router.get('/admin/statistics', authenticateToken, async (req, res) => {
             sequelize.fn(
               'SUM',
               sequelize.literal(
-                "CASE WHEN transaction_type = 'consume' AND status = 'completed' THEN points_amount ELSE 0 END"
+                'CASE WHEN transaction_type = \'consume\' AND status = \'completed\' THEN points_amount ELSE 0 END'
               )
             ),
             'total_consumed_points'
@@ -880,7 +880,7 @@ router.get('/admin/statistics', authenticateToken, async (req, res) => {
             sequelize.fn(
               'SUM',
               sequelize.literal(
-                "CASE WHEN status = 'pending' AND transaction_type = 'earn' THEN points_amount ELSE 0 END"
+                'CASE WHEN status = \'pending\' AND transaction_type = \'earn\' THEN points_amount ELSE 0 END'
               )
             ),
             'pending_earn_points'
@@ -894,7 +894,7 @@ router.get('/admin/statistics', authenticateToken, async (req, res) => {
             sequelize.fn(
               'SUM',
               sequelize.literal(
-                "CASE WHEN DATE(transaction_time) = CURDATE() AND transaction_type = 'earn' AND status = 'completed' THEN points_amount ELSE 0 END"
+                'CASE WHEN DATE(transaction_time) = CURDATE() AND transaction_type = \'earn\' AND status = \'completed\' THEN points_amount ELSE 0 END'
               )
             ),
             'today_earn_points'
@@ -908,7 +908,7 @@ router.get('/admin/statistics', authenticateToken, async (req, res) => {
             sequelize.fn(
               'SUM',
               sequelize.literal(
-                "CASE WHEN DATE(transaction_time) = CURDATE() AND transaction_type = 'consume' AND status = 'completed' THEN points_amount ELSE 0 END"
+                'CASE WHEN DATE(transaction_time) = CURDATE() AND transaction_type = \'consume\' AND status = \'completed\' THEN points_amount ELSE 0 END'
               )
             ),
             'today_consume_points'
@@ -919,7 +919,7 @@ router.get('/admin/statistics', authenticateToken, async (req, res) => {
            * 业务含义：status='failed'的交易记录数，用于监控系统异常
            */
           [
-            sequelize.fn('COUNT', sequelize.literal("CASE WHEN status = 'failed' THEN 1 END")),
+            sequelize.fn('COUNT', sequelize.literal('CASE WHEN status = \'failed\' THEN 1 END')),
             'failed_transactions'
           ]
         ],
@@ -1084,15 +1084,15 @@ router.get('/user/statistics/:user_id', authenticateToken, async (req, res) => {
 
     const pointsInfo = pointsAccount
       ? {
-          available_points: parseFloat(pointsAccount.available_points),
-          total_earned: parseFloat(pointsAccount.total_earned),
-          total_consumed: parseFloat(pointsAccount.total_consumed)
-        }
+        available_points: parseFloat(pointsAccount.available_points),
+        total_earned: parseFloat(pointsAccount.total_earned),
+        total_consumed: parseFloat(pointsAccount.total_consumed)
+      }
       : {
-          available_points: 0,
-          total_earned: 0,
-          total_consumed: 0
-        }
+        available_points: 0,
+        total_earned: 0,
+        total_consumed: 0
+      }
 
     // 并行获取其他统计数据
     const [lotteryStats, exchangeStats, consumptionStats, inventoryStats] = await Promise.all([
@@ -1174,7 +1174,7 @@ router.get('/user/statistics/:user_id', authenticateToken, async (req, res) => {
  * @returns {Promise<Object>} 抽奖统计数据
  * @description 统计用户的抽奖次数（总次数、本月次数、最后抽奖时间）
  */
-async function getLotteryStatistics(user_id) {
+async function getLotteryStatistics (user_id) {
   const { LotteryDraw } = require('../../../models')
 
   // 🔥 并行查询：总次数、本月次数、最后抽奖时间
@@ -1216,7 +1216,7 @@ async function getLotteryStatistics(user_id) {
  * @param {number} user_id - 用户ID
  * @returns {Promise<Object>} 兑换统计数据
  */
-async function getExchangeStatistics(user_id) {
+async function getExchangeStatistics (user_id) {
   const { ExchangeRecords } = require('../../../models')
 
   const [totalCount, totalPoints, thisMonth] = await Promise.all([
@@ -1250,7 +1250,7 @@ async function getExchangeStatistics(user_id) {
  * @returns {Promise<Object>} 消费记录统计数据
  * @description 统计用户通过商家扫码录入的消费记录情况
  */
-async function getConsumptionStatistics(user_id) {
+async function getConsumptionStatistics (user_id) {
   const { ConsumptionRecord } = require('../../../models')
   const { Op } = require('sequelize')
 
@@ -1333,7 +1333,7 @@ async function getConsumptionStatistics(user_id) {
  * @param {number} user_id - 用户ID
  * @returns {Promise<Object>} 库存统计数据
  */
-async function getInventoryStatistics(user_id) {
+async function getInventoryStatistics (user_id) {
   const { UserInventory } = require('../../../models')
 
   const [totalCount, availableCount, usedCount] = await Promise.all([
@@ -1355,7 +1355,7 @@ async function getInventoryStatistics(user_id) {
  * @param {Object} stats - 统计数据
  * @returns {Array} 成就列表
  */
-function calculateAchievements(stats) {
+function calculateAchievements (stats) {
   const achievements = []
 
   // 抽奖相关成就

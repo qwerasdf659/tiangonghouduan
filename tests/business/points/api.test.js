@@ -7,13 +7,13 @@
  * 3. 积分验证API（余额验证）
  * 4. 用户信息API（个人信息、统计）
  * 5. 用户画像API（深度分析、行为追踪）
- * 
+ *
  * 测试原则：
  * - 使用真实数据库（restaurant_points_dev）
  * - 使用统一测试数据（test-data.js）
  * - 验证API响应格式符合业务标准
  * - 测试认证和授权机制
- * 
+ *
  * 创建时间：2025年11月12日 北京时间
  */
 
@@ -23,9 +23,11 @@ const { TEST_DATA, createTestData } = require('../../helpers/test-data')
 const { TestConfig } = require('../../helpers/test-setup')
 const BeijingTimeHelper = require('../../../utils/timeHelper')
 
-// ==========================================
-// 🔧 测试环境设置
-// ==========================================
+/*
+ * ==========================================
+ * 🔧 测试环境设置
+ * ==========================================
+ */
 
 describe('积分系统API测试（V4架构）', () => {
   let authToken = null
@@ -82,9 +84,11 @@ describe('积分系统API测试（V4架构）', () => {
     console.log('🏁 积分系统API测试完成')
   })
 
-  // ==========================================
-  // 📊 积分查询API测试
-  // ==========================================
+  /*
+   * ==========================================
+   * 📊 积分查询API测试
+   * ==========================================
+   */
 
   describe('积分查询API', () => {
     test('应该能获取当前用户积分余额 - GET /api/v4/user/points', async () => {
@@ -101,7 +105,7 @@ describe('积分系统API测试（V4架构）', () => {
       // 验证响应格式
       expect(response.body).toHaveProperty('success', true)
       expect(response.body).toHaveProperty('data')
-      
+
       // 验证积分数据
       const data = response.body.data
       expect(data).toHaveProperty('total_points')
@@ -126,7 +130,7 @@ describe('积分系统API测试（V4架构）', () => {
 
       expect(response.body).toHaveProperty('success', true)
       const data = response.body.data
-      
+
       // 验证交易历史数据结构
       expect(data).toHaveProperty('transactions')
       expect(Array.isArray(data.transactions)).toBe(true)
@@ -149,7 +153,7 @@ describe('积分系统API测试（V4架构）', () => {
 
       expect(response.body).toHaveProperty('success', true)
       const data = response.body.data
-      
+
       // 验证统计数据
       expect(data).toHaveProperty('total_earned')
       expect(data).toHaveProperty('total_spent')
@@ -161,9 +165,11 @@ describe('积分系统API测试（V4架构）', () => {
     })
   })
 
-  // ==========================================
-  // 📈 积分趋势API测试
-  // ==========================================
+  /*
+   * ==========================================
+   * 📈 积分趋势API测试
+   * ==========================================
+   */
 
   describe('积分趋势API', () => {
     test('应该能查询积分趋势（默认30天）- GET /api/v4/points/trend', async () => {
@@ -260,9 +266,11 @@ describe('积分系统API测试（V4架构）', () => {
     })
   })
 
-  // ==========================================
-  // ✅ 积分验证API测试
-  // ==========================================
+  /*
+   * ==========================================
+   * ✅ 积分验证API测试
+   * ==========================================
+   */
 
   describe('积分验证API', () => {
     test('应该能验证积分余额是否足够 - POST /api/v4/points/validate', async () => {
@@ -284,7 +292,7 @@ describe('积分系统API测试（V4架构）', () => {
 
       expect(response.body).toHaveProperty('success', true)
       const data = response.body.data
-      
+
       expect(data).toHaveProperty('is_valid')
       expect(data).toHaveProperty('current_balance')
       expect(typeof data.is_valid).toBe('boolean')
@@ -294,9 +302,11 @@ describe('积分系统API测试（V4架构）', () => {
     })
   })
 
-  // ==========================================
-  // 👤 用户信息API测试
-  // ==========================================
+  /*
+   * ==========================================
+   * 👤 用户信息API测试
+   * ==========================================
+   */
 
   describe('用户信息API', () => {
     test('应该能获取用户个人信息 - GET /api/v4/user/profile', async () => {
@@ -312,12 +322,12 @@ describe('积分系统API测试（V4架构）', () => {
 
       expect(response.body).toHaveProperty('success', true)
       const data = response.body.data
-      
+
       expect(data).toHaveProperty('user_id')
       expect(data).toHaveProperty('mobile')
       expect(data).toHaveProperty('points')
       expect(data).toHaveProperty('status')
-      
+
       console.log(`👤 用户信息 - ID: ${data.user_id}, 手机: ${data.mobile}`)
     })
 
@@ -334,18 +344,20 @@ describe('积分系统API测试（V4架构）', () => {
 
       expect(response.body).toHaveProperty('success', true)
       const data = response.body.data
-      
+
       expect(data).toHaveProperty('lottery_count')
       expect(data).toHaveProperty('win_count')
       expect(data).toHaveProperty('total_points_earned')
-      
+
       console.log(`📊 用户统计 - 抽奖: ${data.lottery_count}次, 中奖: ${data.win_count}次`)
     })
   })
 
-  // ==========================================
-  // 🔍 用户画像API测试（需要管理员权限）
-  // ==========================================
+  /*
+   * ==========================================
+   * 🔍 用户画像API测试（需要管理员权限）
+   * ==========================================
+   */
 
   describe('用户画像API（管理员）', () => {
     test('应该能获取用户深度画像 - GET /api/v4/user/profiling/deep', async () => {
@@ -412,9 +424,11 @@ describe('积分系统API测试（V4架构）', () => {
     })
   })
 
-  // ==========================================
-  // 🔒 认证测试
-  // ==========================================
+  /*
+   * ==========================================
+   * 🔒 认证测试
+   * ==========================================
+   */
 
   describe('API认证测试', () => {
     test('应该拒绝未认证的请求 - GET /api/v4/user/points', async () => {
@@ -436,4 +450,3 @@ describe('积分系统API测试（V4架构）', () => {
     })
   })
 })
-

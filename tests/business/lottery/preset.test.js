@@ -1,11 +1,11 @@
 /**
  * 抽奖预设系统API测试（V4架构迁移版本）
- * 
+ *
  * **原文件**: tests/api/lottery-preset-api.test.js
  * **迁移日期**: 2025年11月12日 北京时间
  * **业务域**: 抽奖系统 - 预设管理
  * **优先级**: P1 (核心业务功能)
- * 
+ *
  * **测试覆盖**:
  * 1. GET /api/v4/lottery-preset/stats - 获取预设统计
  * 2. POST /api/v4/lottery-preset/create - 创建抽奖预设
@@ -772,4 +772,3 @@ describe('抽奖预设系统API测试（V4架构）', () => {
     })
   })
 })
-

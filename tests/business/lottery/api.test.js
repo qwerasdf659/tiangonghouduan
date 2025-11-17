@@ -1,7 +1,7 @@
 /**
  * 抽奖系统API测试 (V4架构)
  * 迁移自 tests/api/lottery-api.test.js
- * 
+ *
  * 测试覆盖：
  * 1. 抽奖系统API（策略、执行、历史、指标、统计）
  * 2. 奖品分发系统API（历史、重试、统计）
@@ -14,7 +14,7 @@
  * - 验证API响应格式符合RESTful和ApiResponse标准
  * - 验证抽奖业务逻辑正确性（100%中奖、双策略）
  * - 验证性能和并发处理能力
- * 
+ *
  * 创建时间：2025年11月13日 北京时间
  */
 
@@ -29,9 +29,11 @@ describe('抽奖系统API测试（V4架构）', () => {
   const testUser = TestConfig.real_data.testUser
   const adminUser = TestConfig.real_data.adminUser
 
-  // ==========================================
-  // 🔧 测试前准备
-  // ==========================================
+  /*
+   * ==========================================
+   * 🔧 测试前准备
+   * ==========================================
+   */
 
   beforeAll(async () => {
     console.log('🚀 抽奖系统API测试启动')
@@ -68,9 +70,11 @@ describe('抽奖系统API测试（V4架构）', () => {
     console.log('🏁 抽奖系统API测试完成')
   })
 
-  // ==========================================
-  // 🎰 抽奖系统API
-  // ==========================================
+  /*
+   * ==========================================
+   * 🎰 抽奖系统API
+   * ==========================================
+   */
 
   describe('抽奖系统API', () => {
     test('获取抽奖策略列表 - GET /api/v4/lottery/strategies', async () => {
@@ -86,7 +90,7 @@ describe('抽奖系统API测试（V4架构）', () => {
         expect(strategy_names).toContain('BasicGuaranteeStrategy')
         expect(strategy_names).toContain('ManagementStrategy')
         expect(strategy_names.length).toBe(2)
-        
+
         console.log('✅ 抽奖策略列表:', strategy_names)
       }
     })
@@ -111,7 +115,7 @@ describe('抽奖系统API测试（V4架构）', () => {
         expect(response.data.data).toHaveProperty('strategy_used')
         expect(response.data.data).toHaveProperty('result')
         expect(response.data.data).toHaveProperty('draw_id')
-        
+
         console.log('✅ 抽奖执行成功:', {
           strategy_used: response.data.data.strategy_used,
           draw_id: response.data.data.draw_id
@@ -132,7 +136,7 @@ describe('抽奖系统API测试（V4架构）', () => {
         expect(response.data.data).toHaveProperty('total_draws')
         expect(response.data.data).toHaveProperty('success_rate')
         expect(response.data.data).toHaveProperty('strategy_metrics')
-        
+
         console.log('✅ 抽奖引擎指标:', {
           total_draws: response.data.data.total_draws,
           success_rate: response.data.data.success_rate
@@ -153,7 +157,7 @@ describe('抽奖系统API测试（V4架构）', () => {
         expect(response.data.data).toHaveProperty('records')
         expect(Array.isArray(response.data.data.records)).toBe(true)
         expect(response.data.data).toHaveProperty('pagination')
-        
+
         console.log('✅ 抽奖历史记录数:', response.data.data.records.length)
       }
     })
@@ -294,9 +298,11 @@ describe('抽奖系统API测试（V4架构）', () => {
     })
   })
 
-  // ==========================================
-  // 🎁 奖品分发系统API
-  // ==========================================
+  /*
+   * ==========================================
+   * 🎁 奖品分发系统API
+   * ==========================================
+   */
 
   describe('奖品分发系统API', () => {
     test('获取用户奖品分发历史 - GET /api/v4/prizeDistribution/user/:user_id/history', async () => {
@@ -312,7 +318,7 @@ describe('抽奖系统API测试（V4架构）', () => {
         expect(response.data.data).toHaveProperty('distribution_history')
         expect(Array.isArray(response.data.data.distribution_history)).toBe(true)
         expect(response.data.data).toHaveProperty('total_count')
-        
+
         console.log('✅ 奖品分发历史记录数:', response.data.data.total_count)
       }
     })
@@ -330,7 +336,7 @@ describe('抽奖系统API测试（V4架构）', () => {
         expect(response.data.data).toHaveProperty('total_distributions')
         expect(response.data.data).toHaveProperty('success_rate')
         expect(response.data.data).toHaveProperty('prize_type_breakdown')
-        
+
         console.log('✅ 奖品分发统计:', {
           total_distributions: response.data.data.total_distributions,
           success_rate: response.data.data.success_rate
@@ -351,15 +357,17 @@ describe('抽奖系统API测试（V4架构）', () => {
         expect(response.data.data).toHaveProperty('admin_history')
         expect(Array.isArray(response.data.data.admin_history)).toBe(true)
         expect(response.data.data).toHaveProperty('pagination')
-        
+
         console.log('✅ 管理员分发历史记录数:', response.data.data.admin_history.length)
       }
     })
   })
 
-  // ==========================================
-  // 📊 概率系统API
-  // ==========================================
+  /*
+   * ==========================================
+   * 📊 概率系统API
+   * ==========================================
+   */
 
   describe('概率系统API', () => {
     test('获取概率配置 - GET /api/v4/probability/config', async () => {
@@ -375,7 +383,7 @@ describe('抽奖系统API测试（V4架构）', () => {
         expect(response.data.data).toHaveProperty('base_probability')
         expect(response.data.data).toHaveProperty('adjustment_factors')
         expect(response.data.data).toHaveProperty('strategy_probabilities')
-        
+
         console.log('✅ 概率配置:', {
           base_probability: response.data.data.base_probability
         })
@@ -401,7 +409,7 @@ describe('抽奖系统API测试（V4架构）', () => {
         expect(response.data.data).toHaveProperty('calculated_probability')
         expect(response.data.data).toHaveProperty('adjustment_factors')
         expect(response.data.data).toHaveProperty('base_probability')
-        
+
         console.log('✅ 中奖概率计算:', {
           calculated_probability: response.data.data.calculated_probability,
           base_probability: response.data.data.base_probability
@@ -422,15 +430,17 @@ describe('抽奖系统API测试（V4架构）', () => {
         expect(response.data.data).toHaveProperty('overall_statistics')
         expect(response.data.data).toHaveProperty('strategy_statistics')
         expect(response.data.data).toHaveProperty('trend_analysis')
-        
+
         console.log('✅ 概率统计分析获取成功')
       }
     })
   })
 
-  // ==========================================
-  // 🚀 性能和集成测试
-  // ==========================================
+  /*
+   * ==========================================
+   * 🚀 性能和集成测试
+   * ==========================================
+   */
 
   describe('性能和集成测试', () => {
     test('API响应时间性能测试', async () => {
@@ -487,4 +497,3 @@ describe('抽奖系统API测试（V4架构）', () => {
     })
   })
 })
-

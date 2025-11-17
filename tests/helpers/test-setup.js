@@ -305,6 +305,62 @@ const TestConfig = {
   }
 }
 
+/**
+ * 🔧 修复测试超时问题 - 清理定时器
+ *
+ * 问题根因:
+ * - ManagementStrategy.js的startCacheCleanup()启动了setInterval
+ * - routes/v4/system.js中有多个setInterval定时任务
+ * - 这些定时器在测试环境中不会自动清理，导致Jest超时
+ *
+ * 解决方案:
+ * - 在测试环境中mock所有定时器函数
+ * - 测试完成后清理所有定时器
+ *
+ * 创建时间: 2025-11-14
+ */
+if (typeof jest !== 'undefined') {
+  // 保存原始的定时器函数
+  const originalSetInterval = global.setInterval
+  const originalSetTimeout = global.setTimeout
+  const timers = []
+
+  // Mock setInterval - 记录所有定时器
+  global.setInterval = function (...args) {
+    const timer = originalSetInterval.apply(this, args)
+    timers.push({ type: 'interval', timer })
+    return timer
+  }
+
+  // Mock setTimeout - 记录所有定时器
+  global.setTimeout = function (...args) {
+    const timer = originalSetTimeout.apply(this, args)
+    timers.push({ type: 'timeout', timer })
+    return timer
+  }
+
+  // 在每个测试套件结束后清理定时器
+  afterAll(() => {
+    console.log(`🧹 清理${timers.length}个定时器...`)
+    timers.forEach(({ type, timer }) => {
+      try {
+        if (type === 'interval') {
+          clearInterval(timer)
+        } else {
+          clearTimeout(timer)
+        }
+      } catch (error) {
+        // 忽略清理错误
+      }
+    })
+    timers.length = 0
+
+    // 恢复原始函数
+    global.setInterval = originalSetInterval
+    global.setTimeout = originalSetTimeout
+  })
+}
+
 // 导出工具类 - 只保留真实数据工具
 module.exports = {
   TestAssertions,

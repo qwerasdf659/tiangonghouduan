@@ -47,10 +47,10 @@ app.use(
   helmet({
     contentSecurityPolicy: {
       directives: {
-        defaultSrc: ["'self'"],
-        styleSrc: ["'self'", "'unsafe-inline'"],
-        scriptSrc: ["'self'", 'https://unpkg.com', 'https://cdn.jsdelivr.net'],
-        imgSrc: ["'self'", 'data:', 'https:']
+        defaultSrc: ['\'self\''],
+        styleSrc: ['\'self\'', '\'unsafe-inline\''],
+        scriptSrc: ['\'self\'', 'https://unpkg.com', 'https://cdn.jsdelivr.net'],
+        imgSrc: ['\'self\'', 'data:', 'https:']
       }
     }
   })
