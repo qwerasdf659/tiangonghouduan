@@ -33,8 +33,9 @@ const BeijingTimeHelper = require('../../../utils/timeHelper')
 describe('积分余额查询API - P0优化验证（V4架构）', () => {
   let adminToken = null
   let normalUserToken = null
-  const testUser = TestConfig.real_data.testUser
-  const adminUser = TestConfig.real_data.adminUser
+  // ✅ 修复：统一使用TEST_DATA而非TestConfig.real_data
+  const testUser = TEST_DATA.users.testUser
+  const adminUser = TEST_DATA.users.adminUser
 
   let normalTestUser = null // 普通测试用户
   let testAccount = null

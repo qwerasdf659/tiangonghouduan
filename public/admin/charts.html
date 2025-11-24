@@ -1,0 +1,648 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>图表可视化 - 管理后台</title>
+  
+  <!-- ✅ Bootstrap 5 - UI框架 -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  
+  <!-- ✅ Bootstrap Icons - 图标库 -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+  
+  <!-- ✅ 公共样式表 - 统一主题和响应式设计 -->
+  <link href="/admin/css/common.css" rel="stylesheet">
+  
+  <!-- ✅ 页面特有样式 -->
+  <style>
+    .chart-container {
+      position: relative;
+      height: 350px;
+      margin-bottom: 20px;
+    }
+  </style>
+</head>
+<body class="bg-light">
+  <!-- 顶部导航 -->
+  <nav class="navbar navbar-dark bg-primary">
+    <div class="container-fluid">
+      <a href="/admin/dashboard.html" class="navbar-brand">
+        <i class="bi bi-arrow-left me-2"></i>📈 管理后台 - 图表可视化
+      </a>
+      <div>
+        <span class="text-light me-3" id="welcomeText">欢迎，管理员</span>
+        <button class="btn btn-outline-light btn-sm" id="logoutBtn">退出登录</button>
+      </div>
+    </div>
+  </nav>
+  
+  <div class="container-fluid mt-4">
+    <!-- 时间范围选择 -->
+    <div class="card mb-3">
+      <div class="card-body">
+        <div class="row g-3 align-items-end">
+          <div class="col-md-3">
+            <label class="form-label">数据周期</label>
+            <select class="form-select" id="periodSelect">
+              <option value="7">最近7天</option>
+              <option value="14">最近14天</option>
+              <option value="30" selected>最近30天</option>
+              <option value="90">最近90天</option>
+            </select>
+          </div>
+          <div class="col-md-3">
+            <button class="btn btn-primary w-100" id="loadAllChartsBtn">
+              <i class="bi bi-arrow-repeat"></i> 刷新数据
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- 用户增长趋势 -->
+    <div class="row g-3 mb-3">
+      <div class="col-lg-8">
+        <div class="card">
+          <div class="card-header bg-white">
+            <h6 class="mb-0">
+              <i class="bi bi-graph-up-arrow"></i> 用户增长趋势
+            </h6>
+          </div>
+          <div class="card-body">
+            <div class="chart-container">
+              <canvas id="userGrowthChart"></canvas>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="col-lg-4">
+        <div class="card">
+          <div class="card-header bg-white">
+            <h6 class="mb-0">
+              <i class="bi bi-pie-chart"></i> 用户类型分布
+            </h6>
+          </div>
+          <div class="card-body">
+            <div class="chart-container">
+              <canvas id="userTypePieChart"></canvas>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- 抽奖数据分析 -->
+    <div class="row g-3 mb-3">
+      <div class="col-lg-12">
+        <div class="card">
+          <div class="card-header bg-white">
+            <h6 class="mb-0">
+              <i class="bi bi-bar-chart-line"></i> 抽奖次数与中奖率趋势
+            </h6>
+          </div>
+          <div class="card-body">
+            <div class="chart-container">
+              <canvas id="lotteryTrendChart"></canvas>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- 消费与积分分析 -->
+    <div class="row g-3 mb-3">
+      <div class="col-lg-6">
+        <div class="card">
+          <div class="card-header bg-white">
+            <h6 class="mb-0">
+              <i class="bi bi-cash-stack"></i> 消费金额趋势
+            </h6>
+          </div>
+          <div class="card-body">
+            <div class="chart-container">
+              <canvas id="consumptionChart"></canvas>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="col-lg-6">
+        <div class="card">
+          <div class="card-header bg-white">
+            <h6 class="mb-0">
+              <i class="bi bi-star-fill"></i> 积分流动趋势
+            </h6>
+          </div>
+          <div class="card-body">
+            <div class="chart-container">
+              <canvas id="pointsFlowChart"></canvas>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- 奖品发放分析 -->
+    <div class="row g-3 mb-3">
+      <div class="col-lg-6">
+        <div class="card">
+          <div class="card-header bg-white">
+            <h6 class="mb-0">
+              <i class="bi bi-gift-fill"></i> TOP10 热门奖品
+            </h6>
+          </div>
+          <div class="card-body">
+            <div class="chart-container">
+              <canvas id="topPrizesChart"></canvas>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="col-lg-6">
+        <div class="card">
+          <div class="card-header bg-white">
+            <h6 class="mb-0">
+              <i class="bi bi-clock-history"></i> 活跃时段分布
+            </h6>
+          </div>
+          <div class="card-body">
+            <div class="chart-container">
+              <canvas id="activeHoursChart"></canvas>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <!-- 加载遮罩层 -->
+  <div class="loading-overlay" id="loadingOverlay">
+    <div class="spinner-border text-light" style="width: 3rem; height: 3rem;" role="status">
+      <span class="visually-hidden">处理中...</span>
+    </div>
+  </div>
+
+  <!-- ✅ Bootstrap JS -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  
+  <!-- ✅ Chart.js - 图表库 -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  
+  <!-- ✅ 引入通用工具库 -->
+  <script src="/admin/js/admin-common.js"></script>
+  
+  <script>
+    /**
+     * 全局变量 - 存储图表实例
+     */
+    let charts = {
+      userGrowth: null,
+      userTypePie: null,
+      lotteryTrend: null,
+      consumption: null,
+      pointsFlow: null,
+      topPrizes: null,
+      activeHours: null
+    };
+    
+    /**
+     * 页面初始化
+     */
+    document.addEventListener('DOMContentLoaded', function() {
+      // 显示用户信息
+      const userInfo = getCurrentUser();
+      if (userInfo && userInfo.nickname) {
+        document.getElementById('welcomeText').textContent = `欢迎，${userInfo.nickname}`;
+      }
+      
+      // ===== 静态按钮事件监听器 =====
+      // 退出登录按钮
+      document.getElementById('logoutBtn').addEventListener('click', logout);
+      
+      // 刷新图表按钮
+      document.getElementById('loadAllChartsBtn').addEventListener('click', () => loadAllCharts());
+      
+      // ✅ Token和权限验证
+      if (!getToken() || !checkAdminPermission()) {
+        return;
+      }
+      
+      // 加载所有图表
+      loadAllCharts();
+      
+      // 周期选择变化时重新加载
+      document.getElementById('periodSelect').addEventListener('change', loadAllCharts);
+    });
+    
+    /**
+     * 加载所有图表数据
+     */
+    async function loadAllCharts() {
+      showLoading();
+      
+      try {
+        const days = document.getElementById('periodSelect').value;
+        const response = await apiRequest(`/api/v4/statistics/charts?days=${days}`);
+        
+        if (response && response.success) {
+          const data = response.data;
+          
+          // 渲染所有图表
+          renderUserGrowthChart(data.user_growth);
+          renderUserTypePieChart(data.user_types);
+          renderLotteryTrendChart(data.lottery_trend);
+          renderConsumptionChart(data.consumption_trend);
+          renderPointsFlowChart(data.points_flow);
+          renderTopPrizesChart(data.top_prizes);
+          renderActiveHoursChart(data.active_hours);
+        } else {
+          showError('加载失败', response?.message || '获取图表数据失败');
+        }
+      } catch (error) {
+        console.error('加载图表失败:', error);
+        showError('加载失败', error.message);
+      } finally {
+        hideLoading();
+      }
+    }
+    
+    /**
+     * 渲染用户增长趋势图
+     * @param {Object} data - 数据
+     */
+    function renderUserGrowthChart(data) {
+      const ctx = document.getElementById('userGrowthChart').getContext('2d');
+      
+      // 销毁旧图表
+      if (charts.userGrowth) {
+        charts.userGrowth.destroy();
+      }
+      
+      charts.userGrowth = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: data?.labels || [],
+          datasets: [{
+            label: '新增用户',
+            data: data?.new_users || [],
+            borderColor: 'rgb(75, 192, 192)',
+            backgroundColor: 'rgba(75, 192, 192, 0.1)',
+            tension: 0.4,
+            fill: true
+          }, {
+            label: '活跃用户',
+            data: data?.active_users || [],
+            borderColor: 'rgb(255, 159, 64)',
+            backgroundColor: 'rgba(255, 159, 64, 0.1)',
+            tension: 0.4,
+            fill: true
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              position: 'top',
+            },
+            tooltip: {
+              mode: 'index',
+              intersect: false,
+            }
+          },
+          scales: {
+            y: {
+              beginAtZero: true
+            }
+          }
+        }
+      });
+    }
+    
+    /**
+     * 渲染用户类型分布饼图
+     * @param {Object} data - 数据
+     */
+    function renderUserTypePieChart(data) {
+      const ctx = document.getElementById('userTypePieChart').getContext('2d');
+      
+      if (charts.userTypePie) {
+        charts.userTypePie.destroy();
+      }
+      
+      charts.userTypePie = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+          labels: ['普通用户', 'VIP用户', '管理员'],
+          datasets: [{
+            data: [
+              data?.normal || 0,
+              data?.vip || 0,
+              data?.admin || 0
+            ],
+            backgroundColor: [
+              'rgba(54, 162, 235, 0.8)',
+              'rgba(255, 206, 86, 0.8)',
+              'rgba(255, 99, 132, 0.8)'
+            ],
+            borderWidth: 2
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              position: 'bottom',
+            }
+          }
+        }
+      });
+    }
+    
+    /**
+     * 渲染抽奖趋势图（双Y轴）
+     * @param {Object} data - 数据
+     */
+    function renderLotteryTrendChart(data) {
+      const ctx = document.getElementById('lotteryTrendChart').getContext('2d');
+      
+      if (charts.lotteryTrend) {
+        charts.lotteryTrend.destroy();
+      }
+      
+      charts.lotteryTrend = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: data?.labels || [],
+          datasets: [{
+            label: '抽奖次数',
+            data: data?.draws || [],
+            backgroundColor: 'rgba(54, 162, 235, 0.6)',
+            yAxisID: 'y'
+          }, {
+            label: '中奖次数',
+            data: data?.wins || [],
+            backgroundColor: 'rgba(75, 192, 192, 0.6)',
+            yAxisID: 'y'
+          }, {
+            label: '中奖率(%)',
+            data: data?.win_rate || [],
+            type: 'line',
+            borderColor: 'rgb(255, 99, 132)',
+            backgroundColor: 'rgba(255, 99, 132, 0.1)',
+            yAxisID: 'y1',
+            tension: 0.4
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          interaction: {
+            mode: 'index',
+            intersect: false,
+          },
+          plugins: {
+            legend: {
+              position: 'top',
+            }
+          },
+          scales: {
+            y: {
+              type: 'linear',
+              display: true,
+              position: 'left',
+              title: {
+                display: true,
+                text: '次数'
+              }
+            },
+            y1: {
+              type: 'linear',
+              display: true,
+              position: 'right',
+              title: {
+                display: true,
+                text: '中奖率(%)'
+              },
+              grid: {
+                drawOnChartArea: false,
+              }
+            }
+          }
+        }
+      });
+    }
+    
+    /**
+     * 渲染消费金额趋势图
+     * @param {Object} data - 数据
+     */
+    function renderConsumptionChart(data) {
+      const ctx = document.getElementById('consumptionChart').getContext('2d');
+      
+      if (charts.consumption) {
+        charts.consumption.destroy();
+      }
+      
+      charts.consumption = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: data?.labels || [],
+          datasets: [{
+            label: '消费金额(元)',
+            data: data?.amounts || [],
+            borderColor: 'rgb(255, 99, 132)',
+            backgroundColor: 'rgba(255, 99, 132, 0.1)',
+            tension: 0.4,
+            fill: true
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              position: 'top',
+            }
+          },
+          scales: {
+            y: {
+              beginAtZero: true,
+              ticks: {
+                callback: function(value) {
+                  return '¥' + value;
+                }
+              }
+            }
+          }
+        }
+      });
+    }
+    
+    /**
+     * 渲染积分流动趋势图
+     * @param {Object} data - 数据
+     */
+    function renderPointsFlowChart(data) {
+      const ctx = document.getElementById('pointsFlowChart').getContext('2d');
+      
+      if (charts.pointsFlow) {
+        charts.pointsFlow.destroy();
+      }
+      
+      charts.pointsFlow = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: data?.labels || [],
+          datasets: [{
+            label: '发放积分',
+            data: data?.issued || [],
+            backgroundColor: 'rgba(75, 192, 192, 0.6)',
+          }, {
+            label: '消耗积分',
+            data: data?.consumed || [],
+            backgroundColor: 'rgba(255, 159, 64, 0.6)',
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              position: 'top',
+            }
+          },
+          scales: {
+            y: {
+              beginAtZero: true
+            }
+          }
+        }
+      });
+    }
+    
+    /**
+     * 渲染TOP10热门奖品图
+     * @param {Object} data - 数据
+     */
+    function renderTopPrizesChart(data) {
+      const ctx = document.getElementById('topPrizesChart').getContext('2d');
+      
+      if (charts.topPrizes) {
+        charts.topPrizes.destroy();
+      }
+      
+      charts.topPrizes = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: data?.labels || [],
+          datasets: [{
+            label: '发放次数',
+            data: data?.counts || [],
+            backgroundColor: [
+              'rgba(255, 99, 132, 0.6)',
+              'rgba(54, 162, 235, 0.6)',
+              'rgba(255, 206, 86, 0.6)',
+              'rgba(75, 192, 192, 0.6)',
+              'rgba(153, 102, 255, 0.6)',
+              'rgba(255, 159, 64, 0.6)',
+              'rgba(199, 199, 199, 0.6)',
+              'rgba(83, 102, 255, 0.6)',
+              'rgba(255, 99, 255, 0.6)',
+              'rgba(99, 255, 132, 0.6)'
+            ],
+            borderWidth: 1
+          }]
+        },
+        options: {
+          indexAxis: 'y',
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              display: false
+            }
+          },
+          scales: {
+            x: {
+              beginAtZero: true
+            }
+          }
+        }
+      });
+    }
+    
+    /**
+     * 渲染活跃时段分布图
+     * @param {Object} data - 数据
+     */
+    function renderActiveHoursChart(data) {
+      const ctx = document.getElementById('activeHoursChart').getContext('2d');
+      
+      if (charts.activeHours) {
+        charts.activeHours.destroy();
+      }
+      
+      charts.activeHours = new Chart(ctx, {
+        type: 'radar',
+        data: {
+          labels: data?.labels || ['0时', '3时', '6时', '9时', '12时', '15时', '18时', '21时'],
+          datasets: [{
+            label: '活跃用户数',
+            data: data?.values || [],
+            fill: true,
+            backgroundColor: 'rgba(54, 162, 235, 0.2)',
+            borderColor: 'rgb(54, 162, 235)',
+            pointBackgroundColor: 'rgb(54, 162, 235)',
+            pointBorderColor: '#fff',
+            pointHoverBackgroundColor: '#fff',
+            pointHoverBorderColor: 'rgb(54, 162, 235)'
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              position: 'top',
+            }
+          },
+          scales: {
+            r: {
+              beginAtZero: true
+            }
+          }
+        }
+      });
+    }
+    
+    /**
+     * 显示加载状态
+     */
+    function showLoading() {
+      document.getElementById('loadingOverlay').classList.add('show');
+    }
+    
+    /**
+     * 隐藏加载状态
+     */
+    function hideLoading() {
+      document.getElementById('loadingOverlay').classList.remove('show');
+    }
+    
+    /**
+     * 显示错误提示
+     * @param {string} title - 标题
+     * @param {string} message - 消息
+     */
+    function showError(title, message) {
+      alert(`❌ ${title}\n${message}`);
+    }
+  </script>
+</body>
+</html>
+

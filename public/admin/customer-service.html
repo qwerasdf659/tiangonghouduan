@@ -1,0 +1,1045 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <!-- ✅ CSP策略 - 允许加载本地脚本和WebSocket连接 -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; 
+                 script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; 
+                 style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; 
+                 font-src 'self' https://cdn.jsdelivr.net; 
+                 connect-src 'self' ws: wss: http://localhost:* https://localhost:*; 
+                 img-src 'self' data: https:;"
+    />
+
+    <title>客服工作台 - 管理后台</title>
+
+    <!-- ✅ Bootstrap 5 - UI框架 -->
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+    />
+
+    <!-- ✅ Bootstrap Icons - 图标库 -->
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css"
+      rel="stylesheet"
+    />
+
+    <!-- ✅ 公共样式表 - 统一主题和响应式设计 -->
+    <link href="/admin/css/common.css" rel="stylesheet" />
+
+    <!-- ✅ 页面特有样式 -->
+    <style>
+      body {
+        height: 100vh;
+        overflow: hidden;
+      }
+      .cs-container {
+        height: calc(100vh - 56px);
+        display: flex;
+      }
+      .sessions-sidebar {
+        width: 320px;
+        border-right: 1px solid #dee2e6;
+        display: flex;
+        flex-direction: column;
+        background: #f8f9fa;
+      }
+      .session-item {
+        padding: 12px 16px;
+        border-bottom: 1px solid #dee2e6;
+        cursor: pointer;
+        transition: background 0.2s;
+      }
+      .session-item:hover {
+        background: #e9ecef;
+      }
+      .session-item.active {
+        background: #fff;
+        border-left: 3px solid #0d6efd;
+      }
+      .session-item .unread-badge {
+        background: #dc3545;
+        color: white;
+        border-radius: 10px;
+        padding: 2px 8px;
+        font-size: 0.75rem;
+        font-weight: bold;
+      }
+      .chat-main {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        background: #fff;
+      }
+      .chat-header {
+        padding: 16px 20px;
+        border-bottom: 1px solid #dee2e6;
+        background: #fff;
+      }
+      .chat-messages {
+        flex: 1;
+        overflow-y: auto;
+        padding: 20px;
+        background: #f5f5f5;
+      }
+      .message-item {
+        margin-bottom: 16px;
+        display: flex;
+        align-items: flex-start;
+      }
+      .message-item.user-message {
+        justify-content: flex-start;
+      }
+      .message-item.admin-message {
+        justify-content: flex-end;
+      }
+      .message-bubble {
+        max-width: 60%;
+        padding: 10px 14px;
+        border-radius: 12px;
+        word-wrap: break-word;
+      }
+      .user-message .message-bubble {
+        background: #fff;
+        border: 1px solid #dee2e6;
+      }
+      .admin-message .message-bubble {
+        background: #0d6efd;
+        color: white;
+      }
+      .message-time {
+        font-size: 0.75rem;
+        color: #6c757d;
+        margin-top: 4px;
+      }
+      .chat-input-area {
+        padding: 16px 20px;
+        border-top: 1px solid #dee2e6;
+        background: #fff;
+      }
+      .quick-replies {
+        display: flex;
+        gap: 8px;
+        margin-bottom: 12px;
+        flex-wrap: wrap;
+      }
+    </style>
+  </head>
+  <body class="bg-light">
+    <!-- 顶部导航 -->
+    <nav class="navbar navbar-dark bg-primary">
+      <div class="container-fluid">
+        <a href="/admin/dashboard.html" class="navbar-brand">
+          <i class="bi bi-arrow-left me-2"></i>💬 管理后台 - 客服工作台
+        </a>
+        <div>
+          <span class="text-light me-3" id="welcomeText">欢迎，管理员</span>
+          <button class="btn btn-outline-light btn-sm" id="logoutBtn">退出登录</button>
+        </div>
+      </div>
+    </nav>
+
+    <!-- 客服工作台主体 -->
+    <div class="cs-container">
+      <!-- 会话列表侧边栏 -->
+      <div class="sessions-sidebar">
+        <!-- 筛选器 -->
+        <div class="p-3 border-bottom bg-white">
+          <div class="input-group input-group-sm mb-2">
+            <input type="text" class="form-control" id="sessionSearch" placeholder="搜索用户..." />
+            <button class="btn btn-outline-secondary" id="sessionSearchBtn">
+              <i class="bi bi-search"></i>
+            </button>
+          </div>
+          <select class="form-select form-select-sm" id="sessionStatusFilter">
+            <option value="all">全部会话</option>
+            <option value="waiting">待处理</option>
+            <option value="active">进行中</option>
+            <option value="closed">已关闭</option>
+          </select>
+        </div>
+
+        <!-- 会话列表 -->
+        <div class="flex-fill overflow-auto" id="sessionsList">
+          <div class="text-center py-5">
+            <div class="spinner-border text-primary" role="status">
+              <span class="visually-hidden">加载中...</span>
+            </div>
+            <p class="mt-2 text-muted small">正在加载会话...</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- 聊天主区域 -->
+      <div class="chat-main">
+        <!-- 默认空状态 -->
+        <div id="emptyState" class="h-100 d-flex align-items-center justify-content-center">
+          <div class="text-center text-muted">
+            <i class="bi bi-chat-dots" style="font-size: 4rem"></i>
+            <p class="mt-3">请从左侧选择一个会话开始聊天</p>
+          </div>
+        </div>
+
+        <!-- 聊天界面（隐藏） -->
+        <div
+          id="chatInterface"
+          style="display: none; height: 100%; display: flex; flex-direction: column"
+        >
+          <!-- 聊天头部 -->
+          <div class="chat-header">
+            <div class="d-flex justify-content-between align-items-center">
+              <div class="d-flex align-items-center">
+                <img
+                  id="chatUserAvatar"
+                  src=""
+                  class="rounded-circle me-3"
+                  style="width: 40px; height: 40px"
+                  alt="头像"
+                />
+                <div>
+                  <h6 class="mb-0" id="chatUserName">用户昵称</h6>
+                  <small class="text-muted" id="chatUserMobile">手机号</small>
+                </div>
+              </div>
+              <div>
+                <button class="btn btn-sm btn-outline-primary me-2" id="transferSessionBtn">
+                  <i class="bi bi-arrow-left-right"></i> 转接
+                </button>
+                <button class="btn btn-sm btn-outline-success me-2" id="closeSessionBtn">
+                  <i class="bi bi-check-circle"></i> 结束会话
+                </button>
+                <button class="btn btn-sm btn-outline-info" id="viewUserInfoBtn">
+                  <i class="bi bi-person-circle"></i> 用户信息
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- 消息区域 -->
+          <div class="chat-messages" id="chatMessages">
+            <!-- 消息将动态加载到这里 -->
+          </div>
+
+          <!-- 输入区域 -->
+          <div class="chat-input-area">
+            <!-- 快捷回复 -->
+            <div class="quick-replies">
+              <button
+                class="btn btn-sm btn-outline-secondary quick-reply-btn"
+                data-reply="您好，有什么可以帮助您的吗？"
+              >
+                👋 欢迎语
+              </button>
+              <button
+                class="btn btn-sm btn-outline-secondary quick-reply-btn"
+                data-reply="请稍等，我为您查询一下"
+              >
+                ⏳ 查询中
+              </button>
+              <button
+                class="btn btn-sm btn-outline-secondary quick-reply-btn"
+                data-reply="感谢您的反馈，我们会尽快处理"
+              >
+                🙏 感谢反馈
+              </button>
+              <button
+                class="btn btn-sm btn-outline-secondary quick-reply-btn"
+                data-reply="祝您使用愉快！"
+              >
+                😊 祝福语
+              </button>
+            </div>
+
+            <!-- 输入框 -->
+            <div class="input-group">
+              <textarea
+                class="form-control"
+                id="messageInput"
+                rows="3"
+                placeholder="输入消息...按Enter发送，Shift+Enter换行"
+              ></textarea>
+              <button class="btn btn-primary" id="sendMessageBtn">
+                <i class="bi bi-send"></i> 发送
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 用户信息模态框 -->
+    <div class="modal fade" id="userInfoModal" tabindex="-1">
+      <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title"><i class="bi bi-person-circle"></i> 用户详细信息</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+          </div>
+          <div class="modal-body" id="userInfoBody">
+            <!-- 用户信息将动态加载 -->
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 转接会话模态框 -->
+    <div class="modal fade" id="transferModal" tabindex="-1">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title"><i class="bi bi-arrow-left-right"></i> 转接会话</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+          </div>
+          <div class="modal-body">
+            <label class="form-label">选择接收客服</label>
+            <select class="form-select" id="transferTargetSelect">
+              <option value="">请选择...</option>
+              <!-- 客服列表将动态加载 -->
+            </select>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+            <button type="button" class="btn btn-primary" id="submitTransferBtn">确认转接</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 加载遮罩层 -->
+    <div class="loading-overlay" id="loadingOverlay">
+      <div class="spinner-border text-light" style="width: 3rem; height: 3rem" role="status">
+        <span class="visually-hidden">处理中...</span>
+      </div>
+    </div>
+
+    <!-- ✅ Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+    <!-- ✅ Socket.IO客户端库 -->
+    <!-- ✅ Socket.IO客户端库 - 本地版本（安全，不依赖外部CDN） -->
+    <script src="/admin/js/vendor/socket.io.min.js"></script>
+
+    <!-- ✅ 引入通用工具库 -->
+    <script src="/admin/js/admin-common.js"></script>
+
+    <script>
+      /**
+       * 全局变量
+       */
+      let currentSessionId = null
+      let allSessions = []
+      let wsConnection = null
+      let messagePollingInterval = null
+
+      /**
+       * 页面初始化
+       */
+      document.addEventListener('DOMContentLoaded', function () {
+        // 显示用户信息
+        const userInfo = getCurrentUser()
+        if (userInfo && userInfo.nickname) {
+          document.getElementById('welcomeText').textContent = `欢迎，${userInfo.nickname}`
+        }
+
+        // 加载会话列表
+        loadSessions()
+
+        // 加载客服列表（用于转接）
+        loadAdminList()
+
+        // 初始化WebSocket连接
+        initWebSocket()
+
+        // ===== 静态按钮事件监听器 =====
+        // 退出登录按钮
+        document.getElementById('logoutBtn').addEventListener('click', logout)
+
+        // 搜索按钮
+        document.getElementById('sessionSearchBtn').addEventListener('click', () => loadSessions())
+
+        // 状态筛选器
+        document
+          .getElementById('sessionStatusFilter')
+          .addEventListener('change', () => loadSessions())
+
+        // 搜索框回车搜索
+        document.getElementById('sessionSearch').addEventListener('keypress', e => {
+          if (e.key === 'Enter') {
+            loadSessions()
+          }
+        })
+
+        // 聊天头部按钮
+        document.getElementById('transferSessionBtn').addEventListener('click', transferSession)
+        document.getElementById('closeSessionBtn').addEventListener('click', closeSession)
+        document.getElementById('viewUserInfoBtn').addEventListener('click', viewUserInfo)
+
+        // 发送消息按钮
+        document.getElementById('sendMessageBtn').addEventListener('click', sendMessage)
+
+        // 确认转接按钮
+        document.getElementById('submitTransferBtn').addEventListener('click', submitTransfer)
+
+        // 输入框回车发送
+        document.getElementById('messageInput').addEventListener('keydown', function (e) {
+          if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault()
+            sendMessage()
+          }
+        })
+
+        // ===== 事件委托：会话列表项 =====
+        document.getElementById('sessionsList').addEventListener('click', e => {
+          const sessionItem = e.target.closest('.session-item')
+          if (sessionItem) {
+            const sessionId = parseInt(sessionItem.dataset.sessionId)
+            if (!isNaN(sessionId)) {
+              openSession(sessionId)
+            }
+          }
+        })
+
+        // ===== 事件委托：快捷回复按钮 =====
+        document.querySelector('.quick-replies').addEventListener('click', e => {
+          const quickReplyBtn = e.target.closest('.quick-reply-btn')
+          if (quickReplyBtn) {
+            const replyText = quickReplyBtn.dataset.reply
+            insertQuickReply(replyText)
+          }
+        })
+
+        // ===== 图片加载错误处理 =====
+        // 图片加载错误处理 - 使用Bootstrap Icons作为默认头像占位符
+        document.getElementById('sessionsList').addEventListener(
+          'error',
+          e => {
+            if (e.target.classList.contains('session-avatar-img')) {
+              // 替换为占位符图标（使用data URI避免额外请求和404错误）
+              e.target.src =
+                'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2NCIgaGVpZ2h0PSI2NCIgZmlsbD0iI2NjYyIgY2xhc3M9ImJpIGJpLXBlcnNvbi1jaXJjbGUiIHZpZXdCb3g9IjAgMCAxNiAxNiI+PHBhdGggZD0iTTExIDZhMyAzIDAgMSAxLTYgMCAzIDMgMCAwIDEgNiAweiIvPjxwYXRoIGZpbGwtcnVsZT0iZXZlbm9kZCIgZD0iTTAgOGE4IDggMCAxIDEgMTYgMEE4IDggMCAwIDEgMCA4em04IDdhNyA3IDAgMCAwIDUuMzg3LTIuNTAzQTEzLjkzMyAxMy45MzMgMCAwIDAgOCAxMS41YTEzLjkzMyAxMy45MzMgMCAwIDAtNS4zODcgMS4wMDdBNyA3IDAgMCAwIDggMTV6Ii8+PC9zdmc+'
+              e.target.alt = '默认头像'
+            }
+          },
+          true
+        )
+
+        // 定期轮询刷新会话列表（30秒）
+        setInterval(() => loadSessions(true), 30000)
+      })
+
+      /**
+       * 初始化WebSocket连接（使用Socket.IO）
+       */
+      function initWebSocket() {
+        try {
+          // 使用Socket.IO连接
+          wsConnection = io({
+            auth: {
+              token: getToken()
+            },
+            transports: ['websocket', 'polling']
+          })
+
+          wsConnection.on('connect', () => {
+            console.log('✅ WebSocket连接成功')
+            // Socket.IO会自动发送auth信息
+          })
+
+          wsConnection.on('message', data => {
+            handleWebSocketMessage(data)
+          })
+
+          wsConnection.on('new_message', data => {
+            handleWebSocketMessage({ type: 'new_message', ...data })
+          })
+
+          wsConnection.on('session_update', data => {
+            handleWebSocketMessage({ type: 'session_update', ...data })
+          })
+
+          wsConnection.on('error', error => {
+            console.error('WebSocket错误:', error)
+          })
+
+          wsConnection.on('disconnect', reason => {
+            console.log('WebSocket连接已断开:', reason)
+          })
+
+          wsConnection.on('connect_error', error => {
+            console.error('WebSocket连接失败:', error)
+          })
+        } catch (error) {
+          console.error('WebSocket初始化失败:', error)
+        }
+      }
+
+      /**
+       * 处理WebSocket消息
+       * @param {Object} data - 消息数据
+       */
+      function handleWebSocketMessage(data) {
+        switch (data.type) {
+          case 'new_message':
+            // 新消息到达
+            if (data.session_id === currentSessionId) {
+              appendMessage(data.message)
+              scrollToBottom()
+            }
+            // 更新会话列表（显示未读标记）
+            loadSessions(true)
+            break
+
+          case 'new_session':
+            // 新会话创建
+            loadSessions(true)
+            break
+
+          case 'session_closed':
+            // 会话已关闭
+            if (data.session_id === currentSessionId) {
+              alert('当前会话已被关闭')
+              closeCurrentChat()
+            }
+            loadSessions(true)
+            break
+        }
+      }
+
+      /**
+       * 加载会话列表
+       * @param {boolean} silent - 是否静默刷新
+       */
+      async function loadSessions(silent = false) {
+        if (!silent) {
+          showLoading()
+        }
+
+        try {
+          const status = document.getElementById('sessionStatusFilter').value
+          const search = document.getElementById('sessionSearch').value.trim()
+
+          const params = new URLSearchParams()
+          if (status !== 'all') {
+            params.append('status', status)
+          }
+          if (search) {
+            params.append('search', search)
+          }
+
+          const response = await apiRequest(
+            `/api/v4/admin/customer-service/sessions?${params.toString()}`
+          )
+
+          if (response && response.success) {
+            allSessions = response.data.sessions || response.data.list || []
+            renderSessions(allSessions)
+          } else {
+            if (!silent) {
+              showError('加载失败', response?.message || '获取会话列表失败')
+            }
+          }
+        } catch (error) {
+          console.error('加载会话失败:', error)
+          if (!silent) {
+            showError('加载失败', error.message)
+          }
+        } finally {
+          if (!silent) {
+            hideLoading()
+          }
+        }
+      }
+
+      /**
+       * 渲染会话列表
+       * @param {Array} sessions - 会话数组
+       */
+      function renderSessions(sessions) {
+        const container = document.getElementById('sessionsList')
+
+        if (sessions.length === 0) {
+          container.innerHTML = `
+          <div class="text-center py-5">
+            <i class="bi bi-inbox text-muted" style="font-size: 3rem;"></i>
+            <p class="mt-2 text-muted small">暂无会话</p>
+          </div>
+        `
+          return
+        }
+
+        // 使用Bootstrap Icons的SVG作为默认头像（Base64编码）
+        const defaultAvatar =
+          'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2NCIgaGVpZ2h0PSI2NCIgZmlsbD0iI2NjYyIgY2xhc3M9ImJpIGJpLXBlcnNvbi1jaXJjbGUiIHZpZXdCb3g9IjAgMCAxNiAxNiI+PHBhdGggZD0iTTExIDZhMyAzIDAgMSAxLTYgMCAzIDMgMCAwIDEgNiAweiIvPjxwYXRoIGZpbGwtcnVsZT0iZXZlbm9kZCIgZD0iTTAgOGE4IDggMCAxIDEgMTYgMEE4IDggMCAwIDEgMCA4em04IDdhNyA3IDAgMCAwIDUuMzg3LTIuNTAzQTEzLjkzMyAxMy45MzMgMCAwIDAgOCAxMS41YTEzLjkzMyAxMy45MzMgMCAwIDAtNS4zODcgMS4wMDdBNyA3IDAgMCAwIDggMTV6Ii8+PC9zdmc+'
+
+        container.innerHTML = sessions
+          .map(
+            session => `
+        <div class="session-item ${session.session_id === currentSessionId ? 'active' : ''}" 
+             data-session-id="${session.session_id}">
+          <div class="d-flex justify-content-between align-items-start mb-1">
+            <div class="d-flex align-items-center flex-fill">
+              <img src="${session.user_avatar || defaultAvatar}" 
+                   class="rounded-circle me-2 session-avatar-img" 
+                   style="width: 36px; height: 36px;"
+                   alt="头像"
+                   onerror="this.src='${defaultAvatar}'">
+              <div class="flex-fill">
+                <div class="fw-bold small">${session.user_nickname || '未命名用户'}</div>
+                <div class="text-muted" style="font-size: 0.75rem;">${maskPhone(session.user_mobile || '')}</div>
+              </div>
+            </div>
+            ${
+              session.unread_count > 0
+                ? `<span class="unread-badge">${session.unread_count}</span>`
+                : ''
+            }
+          </div>
+          <div class="text-muted small text-truncate">${session.last_message || '暂无消息'}</div>
+          <div class="d-flex justify-content-between align-items-center mt-1">
+            <span class="badge ${getSessionStatusBadge(session.status)}">${getSessionStatusText(session.status)}</span>
+            <small class="text-muted" style="font-size: 0.7rem;">${formatRelativeTime(session.updated_at)}</small>
+          </div>
+        </div>
+      `
+          )
+          .join('')
+      }
+
+      /**
+       * 获取会话状态徽章样式
+       * @param {string} status - 会话状态
+       * @returns {string} CSS类名
+       */
+      function getSessionStatusBadge(status) {
+        const badges = {
+          waiting: 'bg-warning text-dark',
+          active: 'bg-success',
+          closed: 'bg-secondary'
+        }
+        return badges[status] || 'bg-secondary'
+      }
+
+      /**
+       * 获取会话状态文本
+       * @param {string} status - 会话状态
+       * @returns {string} 状态文本
+       */
+      function getSessionStatusText(status) {
+        const texts = {
+          waiting: '待处理',
+          active: '进行中',
+          closed: '已关闭'
+        }
+        return texts[status] || '未知'
+      }
+
+      /**
+       * 打开会话
+       * @param {number} sessionId - 会话ID
+       */
+      async function openSession(sessionId) {
+        if (sessionId === currentSessionId) return
+
+        currentSessionId = sessionId
+        showLoading()
+
+        try {
+          // 获取会话详情和消息历史
+          const response = await apiRequest(
+            `/api/v4/admin/customer-service/sessions/${sessionId}/messages`
+          )
+
+          if (response && response.success) {
+            const session = response.data.session
+            const messages = response.data.messages || []
+
+            // 更新聊天头部信息
+            // 使用Bootstrap Icons的SVG作为默认头像（Base64编码）
+            const defaultAvatar =
+              'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2NCIgaGVpZ2h0PSI2NCIgZmlsbD0iI2NjYyIgY2xhc3M9ImJpIGJpLXBlcnNvbi1jaXJjbGUiIHZpZXdCb3g9IjAgMCAxNiAxNiI+PHBhdGggZD0iTTExIDZhMyAzIDAgMSAxLTYgMCAzIDMgMCAwIDEgNiAweiIvPjxwYXRoIGZpbGwtcnVsZT0iZXZlbm9kZCIgZD0iTTAgOGE4IDggMCAxIDEgMTYgMEE4IDggMCAwIDEgMCA4em04IDdhNyA3IDAgMCAwIDUuMzg3LTIuNTAzQTEzLjkzMyAxMy45MzMgMCAwIDAgOCAxMS41YTEzLjkzMyAxMy45MzMgMCAwIDAtNS4zODcgMS4wMDdBNyA3IDAgMCAwIDggMTV6Ii8+PC9zdmc+'
+
+            const avatarElement = document.getElementById('chatUserAvatar')
+            avatarElement.src = session.user_avatar || defaultAvatar
+            avatarElement.onerror = function () {
+              this.src = defaultAvatar
+            }
+
+            document.getElementById('chatUserName').textContent =
+              session.user_nickname || '未命名用户'
+            document.getElementById('chatUserMobile').textContent = maskPhone(
+              session.user_mobile || ''
+            )
+
+            // 渲染消息
+            renderMessages(messages)
+
+            // 显示聊天界面
+            document.getElementById('emptyState').style.display = 'none'
+            document.getElementById('chatInterface').style.display = 'flex'
+
+            // 标记消息为已读
+            markAsRead(sessionId)
+
+            // 刷新会话列表（更新active状态）
+            loadSessions(true)
+          } else {
+            showError('打开失败', response?.message || '获取会话信息失败')
+          }
+        } catch (error) {
+          console.error('打开会话失败:', error)
+          showError('打开失败', error.message)
+        } finally {
+          hideLoading()
+        }
+      }
+
+      /**
+       * 渲染消息列表
+       * @param {Array} messages - 消息数组
+       */
+      function renderMessages(messages) {
+        const container = document.getElementById('chatMessages')
+        container.innerHTML = ''
+
+        messages.forEach(msg => appendMessage(msg))
+        scrollToBottom()
+      }
+
+      /**
+       * 追加单条消息
+       * @param {Object} message - 消息对象
+       */
+      function appendMessage(message) {
+        const container = document.getElementById('chatMessages')
+        const isAdmin = message.sender_type === 'admin'
+
+        const messageHtml = `
+        <div class="message-item ${isAdmin ? 'admin-message' : 'user-message'}">
+          <div>
+            <div class="message-bubble">
+              ${escapeHtml(message.message_content || message.content)}
+            </div>
+            <div class="message-time ${isAdmin ? 'text-end' : ''}">${formatDate(message.created_at)}</div>
+          </div>
+        </div>
+      `
+
+        container.insertAdjacentHTML('beforeend', messageHtml)
+      }
+
+      /**
+       * 滚动到底部
+       */
+      function scrollToBottom() {
+        const container = document.getElementById('chatMessages')
+        container.scrollTop = container.scrollHeight
+      }
+
+      /**
+       * 发送消息
+       */
+      async function sendMessage() {
+        const input = document.getElementById('messageInput')
+        const content = input.value.trim()
+
+        if (!content) {
+          alert('请输入消息内容')
+          return
+        }
+
+        if (!currentSessionId) {
+          alert('请先选择一个会话')
+          return
+        }
+
+        try {
+          const response = await apiRequest(
+            `/api/v4/admin/customer-service/sessions/${currentSessionId}/send`,
+            {
+              method: 'POST',
+              body: JSON.stringify({ content: content })
+            }
+          )
+
+          if (response && response.success) {
+            // 清空输入框
+            input.value = ''
+
+            // 追加消息
+            appendMessage({
+              sender_type: 'admin',
+              message_content: content,
+              created_at: new Date().toISOString()
+            })
+
+            scrollToBottom()
+
+            // 通过WebSocket发送（如果连接正常）
+            if (wsConnection && wsConnection.connected) {
+              wsConnection.emit('send_message', {
+                session_id: currentSessionId,
+                content: content
+              })
+            }
+          } else {
+            showError('发送失败', response?.message || '消息发送失败')
+          }
+        } catch (error) {
+          console.error('发送消息失败:', error)
+          showError('发送失败', error.message)
+        }
+      }
+
+      /**
+       * 插入快捷回复
+       * @param {string} text - 回复文本
+       */
+      function insertQuickReply(text) {
+        document.getElementById('messageInput').value = text
+        document.getElementById('messageInput').focus()
+      }
+
+      /**
+       * 标记消息为已读
+       * @param {number} sessionId - 会话ID
+       */
+      async function markAsRead(sessionId) {
+        try {
+          await apiRequest(`/api/v4/admin/customer-service/sessions/${sessionId}/mark-read`, {
+            method: 'POST'
+          })
+        } catch (error) {
+          console.error('标记已读失败:', error)
+        }
+      }
+
+      /**
+       * 查看用户信息
+       */
+      async function viewUserInfo() {
+        if (!currentSessionId) return
+
+        showLoading()
+
+        try {
+          const session = allSessions.find(s => s.session_id === currentSessionId)
+          if (!session) return
+
+          // 使用后端实际API路径：/api/v4/admin/user-management/users/:user_id
+          const response = await apiRequest(
+            `/api/v4/admin/user-management/users/${session.user_id}`
+          )
+
+          if (response && response.success) {
+            const user = response.data.user || response.data
+            renderUserInfo(user)
+            new bootstrap.Modal(document.getElementById('userInfoModal')).show()
+          }
+        } catch (error) {
+          console.error('获取用户信息失败:', error)
+        } finally {
+          hideLoading()
+        }
+      }
+
+      /**
+       * 渲染用户信息
+       * @param {Object} user - 用户对象
+       */
+      function renderUserInfo(user) {
+        // 使用Bootstrap Icons的SVG作为默认头像（Base64编码）
+        const defaultAvatar =
+          'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2NCIgaGVpZ2h0PSI2NCIgZmlsbD0iI2NjYyIgY2xhc3M9ImJpIGJpLXBlcnNvbi1jaXJjbGUiIHZpZXdCb3g9IjAgMCAxNiAxNiI+PHBhdGggZD0iTTExIDZhMyAzIDAgMSAxLTYgMCAzIDMgMCAwIDEgNiAweiIvPjxwYXRoIGZpbGwtcnVsZT0iZXZlbm9kZCIgZD0iTTAgOGE4IDggMCAxIDEgMTYgMEE4IDggMCAwIDEgMCA4em04IDdhNyA3IDAgMCAwIDUuMzg3LTIuNTAzQTEzLjkzMyAxMy45MzMgMCAwIDAgOCAxMS41YTEzLjkzMyAxMy45MzMgMCAwIDAtNS4zODcgMS4wMDdBNyA3IDAgMCAwIDggMTV6Ii8+PC9zdmc+'
+
+        const infoHtml = `
+        <div class="text-center mb-3">
+          <img src="${user.avatar_url || defaultAvatar}" 
+               class="rounded-circle" 
+               style="width: 80px; height: 80px;"
+               onerror="this.src='${defaultAvatar}'"
+               alt="头像">
+        </div>
+        <div class="row g-2">
+          <div class="col-6"><strong>用户ID：</strong>${user.user_id || user.id}</div>
+          <div class="col-6"><strong>昵称：</strong>${user.nickname || '未设置'}</div>
+          <div class="col-6"><strong>手机号：</strong>${user.mobile || '-'}</div>
+          <div class="col-6"><strong>积分：</strong><span class="text-primary">${formatNumber(user.points_balance || 0)}</span></div>
+          <div class="col-6"><strong>注册时间：</strong>${formatDate(user.created_at)}</div>
+          <div class="col-6"><strong>最后活跃：</strong>${user.last_active_at ? formatDate(user.last_active_at) : '从未'}</div>
+        </div>
+      `
+
+        document.getElementById('userInfoBody').innerHTML = infoHtml
+      }
+
+      /**
+       * 加载客服列表（管理员列表）
+       */
+      async function loadAdminList() {
+        try {
+          // 使用后端实际API路径：/api/v4/admin/user-management/users + role_filter参数
+          const response = await apiRequest('/api/v4/admin/user-management/users?role_filter=admin')
+          if (response && response.success) {
+            // 注意：返回数据结构为 { users: [...], pagination: {...} }
+            const admins = response.data.users || []
+            const select = document.getElementById('transferTargetSelect')
+            select.innerHTML =
+              '<option value="">请选择...</option>' +
+              admins
+                .map(
+                  admin =>
+                    `<option value="${admin.user_id}">${admin.nickname || admin.mobile}</option>`
+                )
+                .join('')
+          }
+        } catch (error) {
+          console.error('加载客服列表失败:', error)
+        }
+      }
+
+      /**
+       * 转接会话
+       */
+      function transferSession() {
+        if (!currentSessionId) return
+        new bootstrap.Modal(document.getElementById('transferModal')).show()
+      }
+
+      /**
+       * 提交转接
+       */
+      async function submitTransfer() {
+        const targetId = document.getElementById('transferTargetSelect').value
+        if (!targetId) {
+          alert('请选择接收客服')
+          return
+        }
+
+        showLoading()
+
+        try {
+          const response = await apiRequest(
+            `/api/v4/admin/customer-service/sessions/${currentSessionId}/transfer`,
+            {
+              method: 'POST',
+              body: JSON.stringify({ target_admin_id: parseInt(targetId) })
+            }
+          )
+
+          if (response && response.success) {
+            showSuccess('转接成功', '会话已转接')
+            bootstrap.Modal.getInstance(document.getElementById('transferModal')).hide()
+            closeCurrentChat()
+            loadSessions()
+          } else {
+            showError('转接失败', response?.message || '操作失败')
+          }
+        } catch (error) {
+          console.error('转接失败:', error)
+          showError('转接失败', error.message)
+        } finally {
+          hideLoading()
+        }
+      }
+
+      /**
+       * 结束会话
+       */
+      async function closeSession() {
+        if (!confirm('确认结束当前会话？')) return
+
+        showLoading()
+
+        try {
+          const response = await apiRequest(
+            `/api/v4/admin/customer-service/sessions/${currentSessionId}/close`,
+            {
+              method: 'POST'
+            }
+          )
+
+          if (response && response.success) {
+            showSuccess('操作成功', '会话已关闭')
+            closeCurrentChat()
+            loadSessions()
+          } else {
+            showError('操作失败', response?.message || '关闭会话失败')
+          }
+        } catch (error) {
+          console.error('关闭会话失败:', error)
+          showError('操作失败', error.message)
+        } finally {
+          hideLoading()
+        }
+      }
+
+      /**
+       * 关闭当前聊天界面
+       */
+      function closeCurrentChat() {
+        currentSessionId = null
+        document.getElementById('chatInterface').style.display = 'none'
+        document.getElementById('emptyState').style.display = 'flex'
+        document.getElementById('messageInput').value = ''
+      }
+
+      /**
+       * HTML转义
+       * @param {string} text - 文本
+       * @returns {string} 转义后的文本
+       */
+      function escapeHtml(text) {
+        const div = document.createElement('div')
+        div.textContent = text
+        return div.innerHTML
+      }
+
+      /**
+       * 显示加载状态
+       */
+      function showLoading() {
+        document.getElementById('loadingOverlay').classList.add('show')
+      }
+
+      /**
+       * 隐藏加载状态
+       */
+      function hideLoading() {
+        document.getElementById('loadingOverlay').classList.remove('show')
+      }
+
+      /**
+       * 显示成功提示
+       * @param {string} title - 标题
+       * @param {string} message - 消息
+       */
+      function showSuccess(title, message) {
+        alert(`✅ ${title}\n${message}`)
+      }
+
+      /**
+       * 显示错误提示
+       * @param {string} title - 标题
+       * @param {string} message - 消息
+       */
+      function showError(title, message) {
+        alert(`❌ ${title}\n${message}`)
+      }
+
+      // 页面卸载时关闭WebSocket
+      window.addEventListener('beforeunload', () => {
+        if (wsConnection) {
+          wsConnection.disconnect()
+        }
+      })
+    </script>
+  </body>
+</html>

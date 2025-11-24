@@ -85,6 +85,16 @@ class DatabasePerformanceMonitor {
    */
   async checkConnectionCount () {
     try {
+      // 检查sequelize对象是否已初始化
+      if (!sequelize || !sequelize.query) {
+        logger.warn('[性能监控] Sequelize对象未初始化，跳过连接数检查')
+        return {
+          status: 'skipped',
+          message: 'Sequelize未初始化',
+          timestamp: new Date().toISOString()
+        }
+      }
+
       // 查询MySQL连接数
       const [results] = await sequelize.query('SHOW STATUS LIKE "Threads_connected"')
       const currentConnections = parseInt(results[0].Value)

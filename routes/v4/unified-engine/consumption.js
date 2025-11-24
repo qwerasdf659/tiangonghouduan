@@ -339,6 +339,49 @@ router.get('/pending', authenticateToken, requireAdmin, async (req, res) => {
 })
 
 /**
+ * @route GET /api/v4/consumption/admin/records
+ * @desc 管理员查询所有消费记录（支持筛选、搜索、统计）
+ * @access Private (管理员)
+ *
+ * @query {number} page - 页码（默认1）
+ * @query {number} page_size - 每页数量（默认20，最大100）
+ * @query {string} status - 状态筛选（pending/approved/rejected/all，默认all）
+ * @query {string} search - 搜索关键词（手机号、用户昵称）
+ *
+ * @returns {Object} {
+ *   records: Array - 消费记录列表
+ *   pagination: Object - 分页信息
+ *   statistics: Object - 统计数据（待审核、今日审核、通过、拒绝）
+ * }
+ */
+router.get('/admin/records', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const { page = 1, page_size = 20, status = 'all', search = '' } = req.query
+
+    logger.info('管理员查询消费记录', {
+      admin_id: req.user.user_id,
+      page,
+      page_size,
+      status,
+      search
+    })
+
+    // 调用服务层查询
+    const result = await ConsumptionService.getAdminRecords({
+      page: parseInt(page),
+      page_size: parseInt(page_size),
+      status,
+      search
+    })
+
+    return res.apiSuccess(result, '查询成功')
+  } catch (error) {
+    logger.error('管理员查询消费记录失败', { error: error.message })
+    return res.apiError(error.message, 500)
+  }
+})
+
+/**
  * @route POST /api/v4/consumption/approve/:record_id
  * @desc 管理员审核通过消费记录
  * @access Private (管理员)

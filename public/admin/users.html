@@ -1,0 +1,1264 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>用户管理 - 管理后台</title>
+  
+  <!-- ✅ Bootstrap 5 - UI框架 -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  
+  <!-- ✅ Bootstrap Icons - 图标库 -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+  
+  <!-- ✅ 公共样式表 - 统一主题和响应式设计 -->
+  <link href="/admin/css/common.css" rel="stylesheet">
+</head>
+<body class="bg-light">
+  <!-- 顶部导航 -->
+  <nav class="navbar navbar-dark bg-primary">
+    <div class="container-fluid">
+      <a href="/admin/dashboard.html" class="navbar-brand">
+        <i class="bi bi-arrow-left me-2"></i>👥 管理后台 - 用户管理
+      </a>
+      <div>
+        <span class="text-light me-3" id="welcomeText">欢迎，管理员</span>
+        <button class="btn btn-outline-light btn-sm" id="logoutBtn">退出登录</button>
+      </div>
+    </div>
+  </nav>
+  
+  <div class="container-fluid mt-4">
+    <!-- 筛选器区域 -->
+    <div class="card mb-3">
+      <div class="card-body">
+        <div class="row g-3">
+          <div class="col-md-3">
+            <label class="form-label">用户类型</label>
+            <select class="form-select" id="userTypeFilter">
+              <option value="all">全部用户</option>
+              <option value="normal">普通用户</option>
+              <option value="vip">VIP用户</option>
+              <option value="admin">管理员</option>
+            </select>
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">账户状态</label>
+            <select class="form-select" id="statusFilter">
+              <option value="all">全部状态</option>
+              <option value="active">正常</option>
+              <option value="banned">已封禁</option>
+            </select>
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">搜索</label>
+            <input type="text" class="form-control" id="searchInput" placeholder="手机号、昵称、ID">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">&nbsp;</label>
+            <div>
+              <button class="btn btn-primary" id="searchBtn">
+                <i class="bi bi-search"></i> 搜索
+              </button>
+              <button class="btn btn-outline-secondary" id="resetBtn">
+                <i class="bi bi-arrow-clockwise"></i> 重置
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- 统计信息 -->
+    <div class="row g-3 mb-3">
+      <div class="col-md-3">
+        <div class="card">
+          <div class="card-body text-center">
+            <h6 class="text-muted">总用户数</h6>
+            <h3 class="text-primary" id="totalUsers">-</h3>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="card">
+          <div class="card-body text-center">
+            <h6 class="text-muted">今日新增</h6>
+            <h3 class="text-success" id="todayUsers">-</h3>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="card">
+          <div class="card-body text-center">
+            <h6 class="text-muted">活跃用户</h6>
+            <h3 class="text-info" id="activeUsers">-</h3>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="card">
+          <div class="card-body text-center">
+            <h6 class="text-muted">VIP用户</h6>
+            <h3 class="text-warning" id="vipUsers">-</h3>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- 数据表格 -->
+    <div class="card">
+      <div class="card-body">
+        <div class="table-responsive">
+          <table class="table table-hover align-middle">
+            <thead class="table-light">
+              <tr>
+                <th style="width: 80px;">ID</th>
+                <th>用户信息</th>
+                <th>角色</th>
+                <th>积分</th>
+                <th>注册时间</th>
+                <th>最后活跃</th>
+                <th>状态</th>
+                <th style="width: 200px;">操作</th>
+              </tr>
+            </thead>
+            <tbody id="usersTableBody">
+              <tr>
+                <td colspan="8" class="text-center py-5">
+                  <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">加载中...</span>
+                  </div>
+                  <p class="mt-2 text-muted">正在加载数据...</p>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        
+        <!-- 分页 -->
+        <nav aria-label="分页导航">
+          <ul class="pagination justify-content-center mb-0" id="pagination">
+            <li class="page-item disabled">
+              <span class="page-link">加载中...</span>
+            </li>
+          </ul>
+        </nav>
+      </div>
+    </div>
+  </div>
+  
+  <!-- 用户详情模态框 -->
+  <div class="modal fade" id="userDetailModal" tabindex="-1">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">
+            <i class="bi bi-person-circle"></i> 用户详情
+          </h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body" id="userDetailBody">
+          <!-- 用户详情将动态加载 -->
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <!-- 角色管理模态框 -->
+  <div class="modal fade" id="roleModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">
+            <i class="bi bi-shield-check"></i> 角色管理
+          </h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label">选择角色</label>
+            <div id="rolesCheckboxes">
+              <!-- 角色复选框将动态加载 -->
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+          <button type="button" class="btn btn-primary" id="saveRolesBtn">保存</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <!-- 🆕 概率调整模态框 -->
+  <div class="modal fade" id="probabilityModal" tabindex="-1">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header bg-info bg-gradient text-white">
+          <h5 class="modal-title">
+            <i class="bi bi-percent"></i> 用户个性化中奖率设置
+          </h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <!-- 用户信息 -->
+          <div class="alert alert-light border">
+            <div class="row">
+              <div class="col-6">
+                <strong>用户手机：</strong><span id="probModalUserMobile">-</span>
+              </div>
+              <div class="col-6">
+                <strong>用户ID：</strong><span id="probModalUserId">-</span>
+              </div>
+            </div>
+          </div>
+          
+          <!-- 调整模式选择 -->
+          <div class="mb-4">
+            <label class="form-label fw-bold">调整模式</label>
+            <div class="btn-group w-100" role="group">
+              <input type="radio" class="btn-check" name="adjustmentMode" id="modeGlobal" value="global" checked>
+              <label class="btn btn-outline-secondary" for="modeGlobal">
+                <i class="bi bi-globe"></i> 全局倍数调整
+              </label>
+              <input type="radio" class="btn-check" name="adjustmentMode" id="modeSpecific" value="specific">
+              <label class="btn btn-outline-info" for="modeSpecific">
+                <i class="bi bi-bullseye"></i> 特定奖品调整
+              </label>
+            </div>
+            <div class="form-text">
+              全局：所有奖品概率按倍数调整 | 特定：只调整某个奖品，其他自动缩放
+            </div>
+          </div>
+          
+          <!-- 全局倍数调整区域 -->
+          <div id="globalAdjustArea">
+            <div class="mb-3">
+              <label class="form-label">概率倍数（0.1-10倍）</label>
+              <input type="number" class="form-control" id="probabilityMultiplier" 
+                     min="0.1" max="10" step="0.1" value="2.0" placeholder="1.0表示不变，2.0表示翻倍">
+              <div class="form-text">
+                例如：设置2.0，则所有奖品中奖率翻倍（一等奖20%→40%）
+              </div>
+            </div>
+          </div>
+          
+          <!-- 特定奖品调整区域 -->
+          <div id="specificAdjustArea" style="display:none;">
+            <div class="mb-3">
+              <label class="form-label">选择要调整的奖品</label>
+              <select class="form-select" id="targetPrizeSelect">
+                <option value="">请先选择奖品...</option>
+              </select>
+              <div class="form-text">
+                选择一个奖品进行概率调整
+              </div>
+            </div>
+            
+            <div class="mb-3">
+              <label class="form-label">设置新概率（1%-100%）</label>
+              <div class="input-group">
+                <input type="number" class="form-control" id="customProbability" 
+                       min="1" max="100" step="1" value="50" placeholder="50">
+                <span class="input-group-text">%</span>
+              </div>
+              <div class="form-text text-danger">
+                ⚠️ 其他奖品概率将自动按比例缩减，确保总概率100%
+              </div>
+            </div>
+            
+            <!-- 概率预览 -->
+            <div class="card bg-light">
+              <div class="card-body">
+                <h6 class="card-title">概率调整预览</h6>
+                <div id="probabilityPreview">
+                  <p class="text-muted mb-0">请选择奖品并设置概率</p>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <!-- 公共设置 -->
+          <div class="mb-3 mt-4">
+            <label class="form-label">持续时间（分钟）</label>
+            <select class="form-select" id="durationMinutes">
+              <option value="30">30分钟</option>
+              <option value="60" selected>1小时</option>
+              <option value="180">3小时</option>
+              <option value="360">6小时</option>
+              <option value="1440">24小时</option>
+            </select>
+          </div>
+          
+          <div class="mb-3">
+            <label class="form-label">调整原因</label>
+            <input type="text" class="form-control" id="probabilityReason" 
+                   placeholder="例如：VIP用户挽留、活动促销等" maxlength="100">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+          <button type="button" class="btn btn-info" id="saveProbabilityBtn">
+            <i class="bi bi-check-lg"></i> 保存设置
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <!-- 加载遮罩层 -->
+  <div class="loading-overlay" id="loadingOverlay">
+    <div class="spinner-border text-light" style="width: 3rem; height: 3rem;" role="status">
+      <span class="visually-hidden">处理中...</span>
+    </div>
+  </div>
+
+  <!-- ✅ Bootstrap JS -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  
+  <!-- ✅ 引入通用工具库 -->
+  <script src="/admin/js/admin-common.js"></script>
+  
+  <script>
+    /**
+     * 全局变量
+     */
+    let currentPage = 1;
+    let currentUserId = null;
+    let availableRoles = [];
+    const pageSize = 20;
+    
+    /**
+     * 页面初始化
+     */
+    document.addEventListener('DOMContentLoaded', function() {
+      // 显示用户信息
+      const userInfo = getCurrentUser();
+      if (userInfo && userInfo.nickname) {
+        document.getElementById('welcomeText').textContent = `欢迎，${userInfo.nickname}`;
+      }
+      
+      // ✅ Token和权限验证
+      if (!getToken() || !checkAdminPermission()) {
+        return;
+      }
+      
+      // 加载可用角色列表
+      loadAvailableRoles();
+      
+      // 加载用户列表
+      loadUsers();
+      
+      // ===== 静态按钮事件监听器 =====
+      // 退出登录按钮
+      document.getElementById('logoutBtn').addEventListener('click', logout);
+      
+      // 搜索按钮
+      document.getElementById('searchBtn').addEventListener('click', () => {
+        currentPage = 1;
+        loadUsers();
+      });
+      
+      // 重置按钮
+      document.getElementById('resetBtn').addEventListener('click', resetFilters);
+      
+      // 筛选器变化时重新加载
+      document.getElementById('userTypeFilter').addEventListener('change', () => {
+        currentPage = 1;
+        loadUsers();
+      });
+      
+      document.getElementById('statusFilter').addEventListener('change', () => {
+        currentPage = 1;
+        loadUsers();
+      });
+      
+      // 搜索框回车触发搜索
+      document.getElementById('searchInput').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+          currentPage = 1;
+          loadUsers();
+        }
+      });
+      
+      // 保存角色按钮
+      document.getElementById('saveRolesBtn').addEventListener('click', saveUserRoles);
+      
+      // 🆕 保存概率设置按钮
+      document.getElementById('saveProbabilityBtn').addEventListener('click', saveProbabilityAdjustment);
+      
+      // 🆕 调整模式切换事件
+      document.querySelectorAll('input[name="adjustmentMode"]').forEach(radio => {
+        radio.addEventListener('change', toggleAdjustmentMode);
+      });
+      
+      // 🆕 奖品选择和概率输入变化时更新预览
+      document.getElementById('targetPrizeSelect')?.addEventListener('change', updateProbabilityPreview);
+      document.getElementById('customProbability')?.addEventListener('input', updateProbabilityPreview);
+      
+      // ===== 事件委托：用户表格操作按钮 =====
+      document.getElementById('usersTableBody').addEventListener('click', (e) => {
+        // 查看详情按钮
+        const detailBtn = e.target.closest('.user-detail-btn');
+        if (detailBtn) {
+          const userId = parseInt(detailBtn.dataset.userId);
+          viewUserDetail(userId);
+          return;
+        }
+        
+        // 🆕 概率调整按钮
+        const probabilityBtn = e.target.closest('.user-probability-btn');
+        if (probabilityBtn) {
+          const userId = parseInt(probabilityBtn.dataset.userId);
+          const userMobile = probabilityBtn.dataset.userMobile;
+          openProbabilityModal(userId, userMobile);
+          return;
+        }
+        
+        // 管理角色按钮
+        const rolesBtn = e.target.closest('.user-roles-btn');
+        if (rolesBtn) {
+          const userId = parseInt(rolesBtn.dataset.userId);
+          manageRoles(userId);
+          return;
+        }
+        
+        // 封禁按钮
+        const banBtn = e.target.closest('.user-ban-btn');
+        if (banBtn) {
+          const userId = parseInt(banBtn.dataset.userId);
+          banUser(userId);
+          return;
+        }
+        
+        // 解封按钮
+        const unbanBtn = e.target.closest('.user-unban-btn');
+        if (unbanBtn) {
+          const userId = parseInt(unbanBtn.dataset.userId);
+          unbanUser(userId);
+          return;
+        }
+      });
+      
+      // ===== 事件委托：分页按钮 =====
+      document.getElementById('pagination').addEventListener('click', (e) => {
+        e.preventDefault();
+        const pageBtn = e.target.closest('.page-nav-btn');
+        if (pageBtn && !pageBtn.closest('.disabled') && !pageBtn.closest('.active')) {
+          const page = parseInt(pageBtn.dataset.page);
+          if (!isNaN(page) && page > 0) {
+            changePage(page);
+          }
+        }
+      });
+      
+      // ===== 图片加载错误处理 =====
+      // 使用Bootstrap Icons作为默认头像占位符，避免404错误
+      document.getElementById('usersTableBody').addEventListener('error', (e) => {
+        if (e.target.classList.contains('user-avatar-img')) {
+          // 替换为占位符图标（使用data URI避免额外请求）
+          e.target.src = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2NCIgaGVpZ2h0PSI2NCIgZmlsbD0iI2NjYyIgY2xhc3M9ImJpIGJpLXBlcnNvbi1jaXJjbGUiIHZpZXdCb3g9IjAgMCAxNiAxNiI+PHBhdGggZD0iTTExIDZhMyAzIDAgMSAxLTYgMCAzIDMgMCAwIDEgNiAweiIvPjxwYXRoIGZpbGwtcnVsZT0iZXZlbm9kZCIgZD0iTTAgOGE4IDggMCAxIDEgMTYgMEE4IDggMCAwIDEgMCA4em04IDdhNyA3IDAgMCAwIDUuMzg3LTIuNTAzQTEzLjkzMyAxMy45MzMgMCAwIDAgOCAxMS41YTEzLjkzMyAxMy45MzMgMCAwIDAtNS4zODcgMS4wMDdBNyA3IDAgMCAwIDggMTV6Ii8+PC9zdmc+';
+          e.target.alt = '默认头像';
+        }
+      }, true);
+    });
+    
+    /**
+     * 加载可用角色列表
+     */
+    async function loadAvailableRoles() {
+      try {
+        // 使用后端实际API路径：/api/v4/admin/user-management/roles
+        const response = await apiRequest('/api/v4/admin/user-management/roles');
+        if (response && response.success) {
+          availableRoles = response.data.roles || response.data.list || [];
+        }
+      } catch (error) {
+        console.error('加载角色列表失败:', error);
+      }
+    }
+    
+    /**
+     * 加载用户列表
+     * @param {boolean} silent - 是否静默刷新
+     */
+    async function loadUsers(silent = false) {
+      if (!silent) {
+        showLoading();
+      }
+      
+      try {
+        const userType = document.getElementById('userTypeFilter').value;
+        const status = document.getElementById('statusFilter').value;
+        const search = document.getElementById('searchInput').value.trim();
+        
+        // 构建查询参数
+        const params = new URLSearchParams({
+          page: currentPage,
+          limit: pageSize
+        });
+        
+        if (userType !== 'all') {
+          params.append('type', userType);
+        }
+        
+        if (status !== 'all') {
+          params.append('status', status);
+        }
+        
+        if (search) {
+          params.append('search', search);
+        }
+        
+        // 调用API - 使用后端实际API路径：/api/v4/admin/user-management/users
+        const response = await apiRequest(`/api/v4/admin/user-management/users?${params.toString()}`);
+        
+        if (response && response.success) {
+          renderUsers(response.data);
+          updateStatistics(response.data);
+        } else {
+          showError('加载失败', response?.message || '获取数据失败');
+        }
+      } catch (error) {
+        console.error('加载用户失败:', error);
+        showError('加载失败', error.message);
+      } finally {
+        hideLoading();
+      }
+    }
+    
+    /**
+     * 渲染用户列表
+     * @param {Object} data - API返回的数据
+     */
+    function renderUsers(data) {
+      const tbody = document.getElementById('usersTableBody');
+      const users = data.users || data.list || [];
+      
+      if (users.length === 0) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="8" class="text-center py-5">
+              <i class="bi bi-inbox text-muted" style="font-size: 3rem;"></i>
+              <p class="mt-2 text-muted">暂无数据</p>
+            </td>
+          </tr>
+        `;
+        renderPagination(0, 0);
+        return;
+      }
+      
+      tbody.innerHTML = users.map(user => {
+        // 使用Bootstrap Icons的SVG作为默认头像（Base64编码，避免额外网络请求）
+        const defaultAvatar = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2NCIgaGVpZ2h0PSI2NCIgZmlsbD0iI2NjYyIgY2xhc3M9ImJpIGJpLXBlcnNvbi1jaXJjbGUiIHZpZXdCb3g9IjAgMCAxNiAxNiI+PHBhdGggZD0iTTExIDZhMyAzIDAgMSAxLTYgMCAzIDMgMCAwIDEgNiAweiIvPjxwYXRoIGZpbGwtcnVsZT0iZXZlbm9kZCIgZD0iTTAgOGE4IDggMCAxIDEgMTYgMEE4IDggMCAwIDEgMCA4em04IDdhNyA3IDAgMCAwIDUuMzg3LTIuNTAzQTEzLjkzMyAxMy45MzMgMCAwIDAgOCAxMS41YTEzLjkzMyAxMy45MzMgMCAwIDAtNS4zODcgMS4wMDdBNyA3IDAgMCAwIDggMTV6Ii8+PC9zdmc+';
+        
+        return `
+        <tr>
+          <td>${user.user_id || user.id}</td>
+          <td>
+            <div class="d-flex align-items-center">
+              <img src="${user.avatar_url || defaultAvatar}" 
+                   class="user-avatar me-3 user-avatar-img" 
+                   alt="头像"
+                   onerror="this.src='${defaultAvatar}'">
+              <div>
+                <div class="fw-bold">${user.nickname || '未设置昵称'}</div>
+                <small class="text-muted">${maskPhone(user.mobile || '-')}</small>
+              </div>
+            </div>
+          </td>
+          <td>${renderRoleBadges(user.roles)}</td>
+          <td class="text-primary fw-bold">${formatNumber(user.points_balance || 0)}</td>
+          <td>
+            <div>${formatDate(user.created_at)}</div>
+            <small class="text-muted">${formatRelativeTime(user.created_at)}</small>
+          </td>
+          <td>
+            ${user.last_active_at ? 
+              `<div>${formatDate(user.last_active_at)}</div>
+               <small class="text-muted">${formatRelativeTime(user.last_active_at)}</small>` :
+              '<span class="text-muted">从未活跃</span>'
+            }
+          </td>
+          <td>${renderStatusBadge(user.status)}</td>
+          <td>
+            <div class="btn-group btn-group-sm">
+              <button class="btn btn-outline-primary user-detail-btn" data-user-id="${user.user_id || user.id}">
+                <i class="bi bi-eye"></i> 详情
+              </button>
+              <button class="btn btn-outline-info user-probability-btn" data-user-id="${user.user_id || user.id}" data-user-mobile="${user.mobile}">
+                <i class="bi bi-percent"></i> 概率
+              </button>
+              <button class="btn btn-outline-warning user-roles-btn" data-user-id="${user.user_id || user.id}">
+                <i class="bi bi-shield"></i> 角色
+              </button>
+              ${user.status === 'active' ?
+                `<button class="btn btn-outline-danger user-ban-btn" data-user-id="${user.user_id || user.id}">
+                  <i class="bi bi-x-circle"></i> 封禁
+                </button>` :
+                `<button class="btn btn-outline-success user-unban-btn" data-user-id="${user.user_id || user.id}">
+                  <i class="bi bi-check-circle"></i> 解封
+                </button>`
+              }
+            </div>
+          </td>
+        </tr>
+      `;
+      }).join('');
+      
+      // 渲染分页
+      const total = data.total || users.length;
+      renderPagination(total, currentPage);
+    }
+    
+    /**
+     * 渲染角色徽章
+     * @param {Array} roles - 角色数组
+     * @returns {string} HTML字符串
+     */
+    function renderRoleBadges(roles) {
+      if (!roles || roles.length === 0) {
+        return '<span class="text-muted small">无角色</span>';
+      }
+      
+      return roles.map(role => {
+        const bgColor = role.role_level >= 100 ? 'bg-danger' : 
+                       role.role_level >= 50 ? 'bg-warning' : 'bg-secondary';
+        return `<span class="badge ${bgColor} role-badge">${role.role_name}</span>`;
+      }).join('');
+    }
+    
+    /**
+     * 渲染状态徽章
+     * @param {string} status - 状态
+     * @returns {string} HTML字符串
+     */
+    function renderStatusBadge(status) {
+      const badges = {
+        active: '<span class="badge bg-success"><i class="bi bi-check-circle"></i> 正常</span>',
+        banned: '<span class="badge bg-danger"><i class="bi bi-x-circle"></i> 已封禁</span>'
+      };
+      return badges[status] || '<span class="badge bg-secondary">未知</span>';
+    }
+    
+    /**
+     * 渲染分页
+     * @param {number} total - 总记录数
+     * @param {number} current - 当前页码
+     */
+    function renderPagination(total, current) {
+      const pagination = document.getElementById('pagination');
+      const totalPages = Math.ceil(total / pageSize);
+      
+      if (totalPages <= 1) {
+        pagination.innerHTML = `
+          <li class="page-item disabled">
+            <span class="page-link">共 ${total} 条记录</span>
+          </li>
+        `;
+        return;
+      }
+      
+      let html = `
+        <li class="page-item ${current === 1 ? 'disabled' : ''}">
+          <a class="page-link page-nav-btn" href="#" data-page="${current - 1}">上一页</a>
+        </li>
+      `;
+      
+      // 显示页码
+      const maxPages = 7;
+      let startPage = Math.max(1, current - Math.floor(maxPages / 2));
+      let endPage = Math.min(totalPages, startPage + maxPages - 1);
+      
+      if (endPage - startPage < maxPages - 1) {
+        startPage = Math.max(1, endPage - maxPages + 1);
+      }
+      
+      if (startPage > 1) {
+        html += `<li class="page-item"><a class="page-link page-nav-btn" href="#" data-page="1">1</a></li>`;
+        if (startPage > 2) {
+          html += `<li class="page-item disabled"><span class="page-link">...</span></li>`;
+        }
+      }
+      
+      for (let i = startPage; i <= endPage; i++) {
+        html += `
+          <li class="page-item ${i === current ? 'active' : ''}">
+            <a class="page-link page-nav-btn" href="#" data-page="${i}">${i}</a>
+          </li>
+        `;
+      }
+      
+      if (endPage < totalPages) {
+        if (endPage < totalPages - 1) {
+          html += `<li class="page-item disabled"><span class="page-link">...</span></li>`;
+        }
+        html += `<li class="page-item"><a class="page-link page-nav-btn" href="#" data-page="${totalPages}">${totalPages}</a></li>`;
+      }
+      
+      html += `
+        <li class="page-item ${current === totalPages ? 'disabled' : ''}">
+          <a class="page-link page-nav-btn" href="#" data-page="${current + 1}">下一页</a>
+        </li>
+      `;
+      
+      pagination.innerHTML = html;
+    }
+    
+    /**
+     * 更新统计信息
+     * @param {Object} data - API返回的数据
+     */
+    function updateStatistics(data) {
+      if (data.statistics) {
+        document.getElementById('totalUsers').textContent = formatNumber(data.statistics.total || 0);
+        document.getElementById('todayUsers').textContent = formatNumber(data.statistics.today || 0);
+        document.getElementById('activeUsers').textContent = formatNumber(data.statistics.active || 0);
+        document.getElementById('vipUsers').textContent = formatNumber(data.statistics.vip || 0);
+      }
+    }
+    
+    /**
+     * 切换页码
+     * @param {number} page - 目标页码
+     */
+    function changePage(page) {
+      currentPage = page;
+      loadUsers();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+    
+    /**
+     * 重置筛选器
+     */
+    function resetFilters() {
+      document.getElementById('userTypeFilter').value = 'all';
+      document.getElementById('statusFilter').value = 'all';
+      document.getElementById('searchInput').value = '';
+      currentPage = 1;
+      loadUsers();
+    }
+    
+    /**
+     * 查看用户详情
+     * @param {number} userId - 用户ID
+     */
+    async function viewUserDetail(userId) {
+      showLoading();
+      
+      try {
+        // 使用后端实际API路径：/api/v4/admin/user-management/users/:user_id
+        const response = await apiRequest(`/api/v4/admin/user-management/users/${userId}`);
+        
+        if (response && response.success) {
+          const user = response.data.user || response.data;
+          renderUserDetail(user);
+          new bootstrap.Modal(document.getElementById('userDetailModal')).show();
+        } else {
+          showError('获取失败', response?.message || '获取用户详情失败');
+        }
+      } catch (error) {
+        console.error('获取用户详情失败:', error);
+        showError('获取失败', error.message);
+      } finally {
+        hideLoading();
+      }
+    }
+    
+    /**
+     * 渲染用户详情
+     * @param {Object} user - 用户对象
+     */
+    function renderUserDetail(user) {
+      // 使用Bootstrap Icons的SVG作为默认头像（Base64编码）
+      const defaultAvatar = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2NCIgaGVpZ2h0PSI2NCIgZmlsbD0iI2NjYyIgY2xhc3M9ImJpIGJpLXBlcnNvbi1jaXJjbGUiIHZpZXdCb3g9IjAgMCAxNiAxNiI+PHBhdGggZD0iTTExIDZhMyAzIDAgMSAxLTYgMCAzIDMgMCAwIDEgNiAweiIvPjxwYXRoIGZpbGwtcnVsZT0iZXZlbm9kZCIgZD0iTTAgOGE4IDggMCAxIDEgMTYgMEE4IDggMCAwIDEgMCA4em04IDdhNyA3IDAgMCAwIDUuMzg3LTIuNTAzQTEzLjkzMyAxMy45MzMgMCAwIDAgOCAxMS41YTEzLjkzMyAxMy45MzMgMCAwIDAtNS4zODcgMS4wMDdBNyA3IDAgMCAwIDggMTV6Ii8+PC9zdmc+';
+      
+      const detailHtml = `
+        <div class="row g-3">
+          <div class="col-md-12 text-center mb-3">
+            <img src="${user.avatar_url || defaultAvatar}" 
+                 class="rounded-circle" 
+                 style="width: 100px; height: 100px;"
+                 alt="头像"
+                 onerror="this.src='${defaultAvatar}'">
+          </div>
+          <div class="col-md-6">
+            <strong>用户ID：</strong>${user.user_id || user.id}
+          </div>
+          <div class="col-md-6">
+            <strong>昵称：</strong>${user.nickname || '未设置'}
+          </div>
+          <div class="col-md-6">
+            <strong>手机号：</strong>${user.mobile || '-'}
+          </div>
+          <div class="col-md-6">
+            <strong>邮箱：</strong>${user.email || '未绑定'}
+          </div>
+          <div class="col-md-6">
+            <strong>角色：</strong>${renderRoleBadges(user.roles)}
+          </div>
+          <div class="col-md-6">
+            <strong>状态：</strong>${renderStatusBadge(user.status)}
+          </div>
+          <div class="col-md-6">
+            <strong>积分余额：</strong>
+            <span class="text-primary fw-bold">${formatNumber(user.points_balance || 0)}</span>
+          </div>
+          <div class="col-md-6">
+            <strong>累计消费：</strong>¥${(user.total_consumption || 0).toFixed(2)}
+          </div>
+          <div class="col-md-6">
+            <strong>注册时间：</strong>${formatDate(user.created_at)}
+          </div>
+          <div class="col-md-6">
+            <strong>最后活跃：</strong>
+            ${user.last_active_at ? formatDate(user.last_active_at) : '从未活跃'}
+          </div>
+          <div class="col-12">
+            <strong>个人简介：</strong>
+            <p class="text-muted">${user.bio || '暂无简介'}</p>
+          </div>
+        </div>
+      `;
+      
+      document.getElementById('userDetailBody').innerHTML = detailHtml;
+    }
+    
+    /**
+     * 管理用户角色
+     * @param {number} userId - 用户ID
+     */
+    async function manageRoles(userId) {
+      currentUserId = userId;
+      showLoading();
+      
+      try {
+        // 获取用户详情（包含角色信息） - 使用后端实际API路径
+        const response = await apiRequest(`/api/v4/admin/user-management/users/${userId}`);
+        
+        if (response && response.success) {
+          // 从用户详情中提取角色信息
+          const user = response.data.user || response.data;
+          const userRoles = user.roles || [];
+          renderRolesCheckboxes(userRoles);
+          new bootstrap.Modal(document.getElementById('roleModal')).show();
+        } else {
+          showError('获取失败', response?.message || '获取用户角色失败');
+        }
+      } catch (error) {
+        console.error('获取用户角色失败:', error);
+        showError('获取失败', error.message);
+      } finally {
+        hideLoading();
+      }
+    }
+    
+    /**
+     * 渲染角色复选框
+     * @param {Array} userRoles - 用户当前角色
+     */
+    function renderRolesCheckboxes(userRoles) {
+      const container = document.getElementById('rolesCheckboxes');
+      const userRoleIds = userRoles.map(r => r.role_id || r.id);
+      
+      container.innerHTML = availableRoles.map(role => `
+        <div class="form-check">
+          <input class="form-check-input" 
+                 type="checkbox" 
+                 id="role_${role.role_id || role.id}" 
+                 value="${role.role_id || role.id}"
+                 ${userRoleIds.includes(role.role_id || role.id) ? 'checked' : ''}>
+          <label class="form-check-label" for="role_${role.role_id || role.id}">
+            <span class="badge ${role.role_level >= 100 ? 'bg-danger' : 'bg-secondary'} me-2">
+              ${role.role_name}
+            </span>
+            <small class="text-muted">${role.description || ''}</small>
+          </label>
+        </div>
+      `).join('');
+    }
+    
+    /**
+     * 保存用户角色
+     * ⚠️ 注意：后端API一次只能设置一个角色（单一角色模式）
+     */
+    async function saveUserRoles() {
+      const checkboxes = document.querySelectorAll('#rolesCheckboxes input[type="checkbox"]:checked');
+      
+      // 检查是否选择了角色
+      if (checkboxes.length === 0) {
+        showError('保存失败', '请至少选择一个角色');
+        return;
+      }
+      
+      // ⚠️ 后端只支持单一角色，如果选择多个，只使用第一个
+      if (checkboxes.length > 1) {
+        showError('提示', '系统当前只支持单一角色，将使用第一个选中的角色');
+      }
+      
+      // 获取角色名称（后端需要role_name，不是role_id）
+      const selectedRole = checkboxes[0];
+      const roleName = selectedRole.getAttribute('data-role-name') || selectedRole.nextElementSibling?.textContent?.trim();
+      
+      if (!roleName) {
+        showError('保存失败', '无法获取角色名称');
+        return;
+      }
+      
+      showLoading();
+      
+      try {
+        // 使用后端实际API路径：PUT /api/v4/admin/user-management/users/:user_id/role
+        const response = await apiRequest(`/api/v4/admin/user-management/users/${currentUserId}/role`, {
+          method: 'PUT',
+          body: JSON.stringify({ 
+            role_name: roleName,  // 后端需要role_name参数
+            reason: '管理员手动更新角色'
+          })
+        });
+        
+        if (response && response.success) {
+          showSuccess('保存成功', '用户角色已更新');
+          bootstrap.Modal.getInstance(document.getElementById('roleModal')).hide();
+          loadUsers(true);
+        } else {
+          showError('保存失败', response?.message || '操作失败');
+        }
+      } catch (error) {
+        console.error('保存角色失败:', error);
+        showError('保存失败', error.message);
+      } finally {
+        hideLoading();
+      }
+    }
+    
+    /**
+     * 封禁用户
+     * @param {number} userId - 用户ID
+     */
+    async function banUser(userId) {
+      if (!confirm('确认封禁该用户？封禁后用户将无法登录和使用系统功能。')) {
+        return;
+      }
+      
+      showLoading();
+      
+      try {
+        // 使用后端实际API路径：PUT /api/v4/admin/user-management/users/:user_id/status
+        const response = await apiRequest(`/api/v4/admin/user-management/users/${userId}/status`, {
+          method: 'PUT',
+          body: JSON.stringify({
+            status: 'banned',  // 设置为封禁状态
+            reason: '管理员手动封禁'
+          })
+        });
+        
+        if (response && response.success) {
+          showSuccess('操作成功', '用户已被封禁');
+          loadUsers(true);
+        } else {
+          showError('操作失败', response?.message || '封禁失败');
+        }
+      } catch (error) {
+        console.error('封禁用户失败:', error);
+        showError('操作失败', error.message);
+      } finally {
+        hideLoading();
+      }
+    }
+    
+    /**
+     * 解封用户
+     * @param {number} userId - 用户ID
+     */
+    async function unbanUser(userId) {
+      if (!confirm('确认解封该用户？解封后用户可以正常登录和使用系统功能。')) {
+        return;
+      }
+      
+      showLoading();
+      
+      try {
+        // 使用后端实际API路径：PUT /api/v4/admin/user-management/users/:user_id/status
+        const response = await apiRequest(`/api/v4/admin/user-management/users/${userId}/status`, {
+          method: 'PUT',
+          body: JSON.stringify({
+            status: 'active',  // 设置为正常状态
+            reason: '管理员手动解封'
+          })
+        });
+        
+        if (response && response.success) {
+          showSuccess('操作成功', '用户已解封');
+          loadUsers(true);
+        } else {
+          showError('操作失败', response?.message || '解封失败');
+        }
+      } catch (error) {
+        console.error('解封用户失败:', error);
+        showError('操作失败', error.message);
+      } finally {
+        hideLoading();
+      }
+    }
+    
+    /**
+     * 显示加载状态
+     */
+    function showLoading() {
+      document.getElementById('loadingOverlay').classList.add('show');
+    }
+    
+    /**
+     * 隐藏加载状态
+     */
+    function hideLoading() {
+      document.getElementById('loadingOverlay').classList.remove('show');
+    }
+    
+    /**
+     * 显示成功提示
+     * @param {string} title - 标题
+     * @param {string} message - 消息
+     */
+    function showSuccess(title, message) {
+      alert(`✅ ${title}\n${message}`);
+    }
+    
+    /**
+     * 显示错误提示
+     * @param {string} title - 标题
+     * @param {string} message - 消息
+     */
+    function showError(title, message) {
+      alert(`❌ ${title}\n${message}`);
+    }
+    
+    // ========== 🆕 用户个性化概率调整功能 ==========
+    
+    let currentProbabilityUserId = null;
+    let allPrizes = []; // 存储所有奖品数据
+    
+    /**
+     * 打开概率调整模态框
+     * @param {number} userId - 用户ID
+     * @param {string} userMobile - 用户手机号
+     */
+    async function openProbabilityModal(userId, userMobile) {
+      currentProbabilityUserId = userId;
+      
+      // 设置用户信息
+      document.getElementById('probModalUserId').textContent = userId;
+      document.getElementById('probModalUserMobile').textContent = userMobile;
+      
+      // 加载奖品列表
+      await loadPrizesForProbability();
+      
+      // 显示模态框
+      new bootstrap.Modal(document.getElementById('probabilityModal')).show();
+    }
+    
+    /**
+     * 加载奖品列表（用于特定奖品调整）
+     */
+    async function loadPrizesForProbability() {
+      try {
+        // 调用后端API获取奖品列表（使用campaign_code而非ID）
+        const response = await apiRequest('/api/v4/admin/prize-pool/BASIC_LOTTERY'); // 默认活动：基础抽奖
+        
+        if (response && response.success) {
+          const prizes = response.data.prizes || [];
+          allPrizes = prizes; // 保存到全局变量
+          
+          // 填充奖品下拉列表
+          const select = document.getElementById('targetPrizeSelect');
+          select.innerHTML = '<option value="">请选择奖品...</option>' +
+            prizes.map(prize => {
+              const probability = (parseFloat(prize.win_probability || 0) * 100).toFixed(1);
+              return `<option value="${prize.prize_id}" data-probability="${prize.win_probability}">
+                ${prize.prize_name} (当前概率${probability}%)
+              </option>`;
+            }).join('');
+        }
+      } catch (error) {
+        console.error('加载奖品列表失败:', error);
+      }
+    }
+    
+    /**
+     * 切换调整模式（全局/特定）
+     */
+    function toggleAdjustmentMode() {
+      const mode = document.querySelector('input[name="adjustmentMode"]:checked').value;
+      
+      const globalArea = document.getElementById('globalAdjustArea');
+      const specificArea = document.getElementById('specificAdjustArea');
+      
+      if (mode === 'global') {
+        globalArea.style.display = 'block';
+        specificArea.style.display = 'none';
+      } else {
+        globalArea.style.display = 'none';
+        specificArea.style.display = 'block';
+      }
+    }
+    
+    /**
+     * 更新概率预览
+     */
+    function updateProbabilityPreview() {
+      const targetPrizeSelect = document.getElementById('targetPrizeSelect');
+      const customProbabilityInput = document.getElementById('customProbability');
+      
+      const selectedPrizeId = parseInt(targetPrizeSelect.value);
+      const newProbability = parseFloat(customProbabilityInput.value) / 100; // 转换为0-1
+      
+      if (!selectedPrizeId || !newProbability) {
+        document.getElementById('probabilityPreview').innerHTML = 
+          '<p class="text-muted mb-0">请选择奖品并设置概率</p>';
+        return;
+      }
+      
+      // 计算调整后的概率分布
+      const targetPrize = allPrizes.find(p => p.prize_id === selectedPrizeId);
+      if (!targetPrize) return;
+      
+      const originalProbability = parseFloat(targetPrize.win_probability);
+      const otherPrizesTotalProb = allPrizes
+        .filter(p => p.prize_id !== selectedPrizeId)
+        .reduce((sum, p) => sum + parseFloat(p.win_probability || 0), 0);
+      
+      const remainingProb = 1.0 - newProbability;
+      const scaleFactor = otherPrizesTotalProb > 0 ? remainingProb / otherPrizesTotalProb : 0;
+      
+      // 生成预览HTML
+      let previewHtml = '<table class="table table-sm mb-0">';
+      previewHtml += '<thead><tr><th>奖品</th><th>原概率</th><th>→</th><th>新概率</th></tr></thead>';
+      previewHtml += '<tbody>';
+      
+      allPrizes.forEach(prize => {
+        const originalProb = parseFloat(prize.win_probability || 0);
+        let adjustedProb;
+        let isTarget = false;
+        
+        if (prize.prize_id === selectedPrizeId) {
+          adjustedProb = newProbability;
+          isTarget = true;
+        } else {
+          adjustedProb = originalProb * scaleFactor;
+        }
+        
+        const className = isTarget ? 'table-info' : '';
+        previewHtml += `
+          <tr class="${className}">
+            <td>${prize.prize_name}${isTarget ? ' 🎯' : ''}</td>
+            <td>${(originalProb * 100).toFixed(1)}%</td>
+            <td><i class="bi bi-arrow-right"></i></td>
+            <td class="fw-bold ${isTarget ? 'text-info' : ''}">${(adjustedProb * 100).toFixed(1)}%</td>
+          </tr>
+        `;
+      });
+      
+      const totalAdjusted = allPrizes.reduce((sum, prize) => {
+        if (prize.prize_id === selectedPrizeId) return sum + newProbability;
+        const originalProb = parseFloat(prize.win_probability || 0);
+        return sum + (originalProb * scaleFactor);
+      }, 0);
+      
+      previewHtml += `
+        <tr class="table-light fw-bold">
+          <td>总计</td>
+          <td>100%</td>
+          <td></td>
+          <td>${(totalAdjusted * 100).toFixed(1)}%</td>
+        </tr>
+      `;
+      previewHtml += '</tbody></table>';
+      
+      document.getElementById('probabilityPreview').innerHTML = previewHtml;
+    }
+    
+    /**
+     * 保存概率调整设置
+     */
+    async function saveProbabilityAdjustment() {
+      if (!currentProbabilityUserId) {
+        showError('错误', '未选择用户');
+        return;
+      }
+      
+      const mode = document.querySelector('input[name="adjustmentMode"]:checked').value;
+      const durationMinutes = parseInt(document.getElementById('durationMinutes').value);
+      const reason = document.getElementById('probabilityReason').value || '管理员概率调整';
+      
+      let requestData = {
+        user_id: currentProbabilityUserId,
+        duration_minutes: durationMinutes,
+        reason: reason
+      };
+      
+      if (mode === 'global') {
+        // 全局倍数调整
+        const multiplier = parseFloat(document.getElementById('probabilityMultiplier').value);
+        if (!multiplier || multiplier < 0.1 || multiplier > 10) {
+          showError('参数错误', '概率倍数必须在0.1-10之间');
+          return;
+        }
+        requestData.probability_multiplier = multiplier;
+      } else {
+        // 特定奖品调整
+        const prizeId = parseInt(document.getElementById('targetPrizeSelect').value);
+        const customProb = parseFloat(document.getElementById('customProbability').value) / 100;
+        
+        if (!prizeId) {
+          showError('参数错误', '请选择要调整的奖品');
+          return;
+        }
+        
+        if (!customProb || customProb < 0.01 || customProb > 1.0) {
+          showError('参数错误', '自定义概率必须在1%-100%之间');
+          return;
+        }
+        
+        requestData.prize_id = prizeId;
+        requestData.custom_probability = customProb;
+      }
+      
+      showLoading();
+      
+      try {
+        // 调用后端API：POST /api/v4/admin/lottery-management/probability-adjust
+        const response = await apiRequest('/api/v4/admin/lottery-management/probability-adjust', {
+          method: 'POST',
+          body: JSON.stringify(requestData)
+        });
+        
+        if (response && response.success) {
+          showSuccess('设置成功', response.message || '用户概率调整成功');
+          bootstrap.Modal.getInstance(document.getElementById('probabilityModal')).hide();
+          
+          // 重置表单
+          document.getElementById('probabilityMultiplier').value = '2.0';
+          document.getElementById('customProbability').value = '50';
+          document.getElementById('targetPrizeSelect').value = '';
+          document.getElementById('probabilityReason').value = '';
+          document.getElementById('modeGlobal').checked = true;
+          toggleAdjustmentMode();
+        } else {
+          showError('设置失败', response?.message || '概率调整失败');
+        }
+      } catch (error) {
+        console.error('概率调整失败:', error);
+        showError('设置失败', error.message);
+      } finally {
+        hideLoading();
+      }
+    }
+    
+  </script>
+</body>
+</html>
+

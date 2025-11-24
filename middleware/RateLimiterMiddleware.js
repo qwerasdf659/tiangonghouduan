@@ -269,7 +269,7 @@ class RateLimiterMiddleware {
       const stats = {
         total_keys: keys.length,
         keys: [],
-        timestamp: BeijingTimeHelper.now()
+        timestamp: BeijingTimeHelper.formatForAPI(new Date()).iso
       }
 
       for (const key of keys.slice(0, 100)) {
@@ -289,7 +289,7 @@ class RateLimiterMiddleware {
       console.error('[RateLimiter] 获取统计信息失败:', error)
       return {
         error: error.message,
-        timestamp: BeijingTimeHelper.now()
+        timestamp: BeijingTimeHelper.formatForAPI(new Date()).iso
       }
     }
   }

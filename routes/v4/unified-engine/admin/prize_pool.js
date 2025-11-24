@@ -15,6 +15,7 @@ const {
   validators,
   models
 } = require('./shared/middleware')
+const DecimalConverter = require('../../../../utils/formatters/DecimalConverter') // 🔧 DECIMAL字段类型转换工具
 
 /**
  * POST /batch-add - 批量添加奖品到奖品池
@@ -123,11 +124,16 @@ router.post(
         created_by: req.user?.id
       })
 
+      // 🔧 转换DECIMAL字段为数字类型（修复前端TypeError）
+      const convertedPrizes = DecimalConverter.convertPrizeData(
+        createdPrizes.map(p => p.toJSON())
+      )
+
       return res.apiSuccess(
         {
           campaign_id: parseInt(campaign_id),
           added_prizes: createdPrizes.length,
-          prizes: createdPrizes
+          prizes: convertedPrizes
         },
         '奖品批量添加成功'
       )
@@ -154,6 +160,120 @@ router.post(
       // 其他错误
       sharedComponents.logger.error('奖品批量添加失败', { error: error.message })
       return res.apiInternalError('奖品批量添加失败', error.message, 'PRIZE_BATCH_ADD_ERROR')
+    }
+  })
+)
+
+/**
+ * GET /list - 获取所有奖品列表（不限活动）
+ *
+ * @description 获取所有奖品的列表，支持按活动和状态筛选
+ * @route GET /api/v4/prizes/list
+ * @access Private (需要管理员权限)
+ * @query campaign_id - 可选，筛选指定活动
+ * @query status - 可选，筛选状态
+ *
+ * 🔴 注意：必须在 /:campaign_code 之前定义，否则会被参数化路由捕获
+ */
+router.get(
+  '/list',
+  adminAuthMiddleware,
+  asyncHandler(async (req, res) => {
+    try {
+      const { campaign_id, status } = req.query
+
+      const where = {}
+      if (campaign_id) where.campaign_id = parseInt(campaign_id)
+      if (status) where.status = status
+
+      const prizes = await models.LotteryPrize.findAll({
+        where,
+        include: [
+          {
+            model: models.LotteryCampaign,
+            as: 'campaign',
+            attributes: ['campaign_id', 'campaign_code', 'campaign_name', 'status']
+          }
+        ],
+        order: [['created_at', 'DESC']],
+        attributes: [
+          'prize_id',
+          'campaign_id',
+          'prize_name',
+          'prize_type',
+          'prize_value',
+          'stock_quantity',
+          'total_win_count',
+          'daily_win_count',
+          'max_daily_wins',
+          'win_probability',
+          'probability',
+          'prize_description',
+          'image_id',
+          'angle',
+          'color',
+          'cost_points',
+          'status',
+          'sort_order',
+          'created_at',
+          'updated_at'
+        ]
+      })
+
+      const statistics = {
+        total: prizes.length,
+        active: prizes.filter(p => p.status === 'active').length,
+        inactive: prizes.filter(p => p.status === 'inactive').length,
+        out_of_stock: prizes.filter(p => {
+          const remaining = (p.stock_quantity || 0) - (p.total_win_count || 0)
+          return remaining <= 0
+        }).length,
+        total_stock: prizes.reduce((sum, p) => sum + (p.stock_quantity || 0), 0),
+        remaining_stock: prizes.reduce((sum, p) => {
+          const remaining = (p.stock_quantity || 0) - (p.total_win_count || 0)
+          return sum + Math.max(0, remaining)
+        }, 0)
+      }
+
+      const formattedPrizes = prizes.map(prize => ({
+        prize_id: prize.prize_id,
+        campaign_id: prize.campaign_id,
+        campaign_name: prize.campaign?.campaign_name || '未关联活动',
+        campaign_code: prize.campaign?.campaign_code,
+        prize_name: prize.prize_name,
+        prize_type: prize.prize_type,
+        prize_value: prize.prize_value,
+        stock_quantity: prize.stock_quantity,
+        remaining_quantity: Math.max(0, (prize.stock_quantity || 0) - (prize.total_win_count || 0)),
+        total_win_count: prize.total_win_count || 0,
+        daily_win_count: prize.daily_win_count || 0,
+        max_daily_wins: prize.max_daily_wins,
+        win_probability: prize.win_probability,
+        probability: prize.probability,
+        prize_description: prize.prize_description,
+        image_id: prize.image_id,
+        angle: prize.angle,
+        color: prize.color,
+        cost_points: prize.cost_points,
+        status: prize.status,
+        sort_order: prize.sort_order,
+        created_at: prize.created_at,
+        updated_at: prize.updated_at
+      }))
+
+      // 🔧 转换DECIMAL字段为数字类型（修复前端TypeError: prize_value.toFixed is not a function）
+      const convertedPrizes = DecimalConverter.convertPrizeData(formattedPrizes)
+
+      return res.apiSuccess(
+        {
+          prizes: convertedPrizes,
+          statistics
+        },
+        '奖品列表获取成功'
+      )
+    } catch (error) {
+      sharedComponents.logger.error('获取奖品列表失败', { error: error.message })
+      return res.apiInternalError('获取奖品列表失败', error.message, 'PRIZE_LIST_ERROR')
     }
   })
 )
@@ -226,6 +346,37 @@ router.get(
       }, 0)
       const usedQuantity = prizes.reduce((sum, prize) => sum + (prize.total_win_count || 0), 0)
 
+      // 格式化奖品数据
+      const formattedPrizesForCampaign = prizes.map(prize => ({
+        prize_id: prize.prize_id, // 使用正确的主键字段
+        campaign_id: prize.campaign_id,
+        prize_name: prize.prize_name, // 修复字段名
+        prize_type: prize.prize_type, // 修复字段名
+        prize_value: prize.prize_value, // 修复字段名
+        stock_quantity: prize.stock_quantity, // 修复字段名
+        remaining_quantity: Math.max(
+          0,
+          (prize.stock_quantity || 0) - (prize.total_win_count || 0)
+        ),
+        win_probability: prize.win_probability,
+        probability: prize.probability,
+        prize_description: prize.prize_description, // 修复字段名
+        image_id: prize.image_id, // 使用image_id
+        angle: prize.angle,
+        color: prize.color,
+        cost_points: prize.cost_points,
+        status: prize.status,
+        sort_order: prize.sort_order,
+        total_win_count: prize.total_win_count,
+        daily_win_count: prize.daily_win_count,
+        max_daily_wins: prize.max_daily_wins,
+        created_at: prize.created_at,
+        updated_at: prize.updated_at
+      }))
+
+      // 🔧 转换DECIMAL字段为数字类型（修复前端TypeError）
+      const convertedPrizesForCampaign = DecimalConverter.convertPrizeData(formattedPrizesForCampaign)
+
       const prizePoolInfo = {
         campaign: {
           campaign_code: campaign.campaign_code,
@@ -239,32 +390,7 @@ router.get(
           used_quantity: usedQuantity,
           usage_rate: totalQuantity > 0 ? ((usedQuantity / totalQuantity) * 100).toFixed(2) : 0
         },
-        prizes: prizes.map(prize => ({
-          prize_id: prize.prize_id, // 使用正确的主键字段
-          campaign_id: prize.campaign_id,
-          prize_name: prize.prize_name, // 修复字段名
-          prize_type: prize.prize_type, // 修复字段名
-          prize_value: prize.prize_value, // 修复字段名
-          stock_quantity: prize.stock_quantity, // 修复字段名
-          remaining_quantity: Math.max(
-            0,
-            (prize.stock_quantity || 0) - (prize.total_win_count || 0)
-          ),
-          win_probability: prize.win_probability,
-          probability: prize.probability,
-          prize_description: prize.prize_description, // 修复字段名
-          image_id: prize.image_id, // 使用image_id
-          angle: prize.angle,
-          color: prize.color,
-          cost_points: prize.cost_points,
-          status: prize.status,
-          sort_order: prize.sort_order,
-          total_win_count: prize.total_win_count,
-          daily_win_count: prize.daily_win_count,
-          max_daily_wins: prize.max_daily_wins,
-          created_at: prize.created_at,
-          updated_at: prize.updated_at
-        }))
+        prizes: convertedPrizesForCampaign
       }
 
       return res.apiSuccess(prizePoolInfo, '奖品池信息获取成功')
@@ -358,36 +484,42 @@ router.put(
       // 🔒 重新查询更新后的奖品（P0修复：使用正确的模型名）
       const updatedPrize = await models.LotteryPrize.findByPk(prize_id)
 
+      // 格式化奖品数据
+      const updatedPrizeData = {
+        prize_id: updatedPrize.prize_id,
+        campaign_id: updatedPrize.campaign_id,
+        prize_name: updatedPrize.prize_name,
+        prize_type: updatedPrize.prize_type,
+        prize_value: updatedPrize.prize_value,
+        stock_quantity: updatedPrize.stock_quantity,
+        remaining_quantity: Math.max(
+          0,
+          (updatedPrize.stock_quantity || 0) - (updatedPrize.total_win_count || 0)
+        ),
+        win_probability: updatedPrize.win_probability,
+        probability: updatedPrize.probability,
+        prize_description: updatedPrize.prize_description,
+        image_id: updatedPrize.image_id,
+        angle: updatedPrize.angle,
+        color: updatedPrize.color,
+        cost_points: updatedPrize.cost_points,
+        status: updatedPrize.status,
+        sort_order: updatedPrize.sort_order,
+        total_win_count: updatedPrize.total_win_count,
+        daily_win_count: updatedPrize.daily_win_count,
+        max_daily_wins: updatedPrize.max_daily_wins,
+        created_at: updatedPrize.created_at,
+        updated_at: updatedPrize.updated_at
+      }
+
+      // 🔧 转换DECIMAL字段为数字类型（修复前端TypeError）
+      const convertedPrizeData = DecimalConverter.convertPrizeData(updatedPrizeData)
+
       return res.apiSuccess(
         {
           prize_id: updatedPrize.prize_id,
           updated_fields: Object.keys(filteredUpdateData),
-          prize: {
-            prize_id: updatedPrize.prize_id,
-            campaign_id: updatedPrize.campaign_id,
-            prize_name: updatedPrize.prize_name,
-            prize_type: updatedPrize.prize_type,
-            prize_value: updatedPrize.prize_value,
-            stock_quantity: updatedPrize.stock_quantity,
-            remaining_quantity: Math.max(
-              0,
-              (updatedPrize.stock_quantity || 0) - (updatedPrize.total_win_count || 0)
-            ),
-            win_probability: updatedPrize.win_probability,
-            probability: updatedPrize.probability,
-            prize_description: updatedPrize.prize_description,
-            image_id: updatedPrize.image_id,
-            angle: updatedPrize.angle,
-            color: updatedPrize.color,
-            cost_points: updatedPrize.cost_points,
-            status: updatedPrize.status,
-            sort_order: updatedPrize.sort_order,
-            total_win_count: updatedPrize.total_win_count,
-            daily_win_count: updatedPrize.daily_win_count,
-            max_daily_wins: updatedPrize.max_daily_wins,
-            created_at: updatedPrize.created_at,
-            updated_at: updatedPrize.updated_at
-          }
+          prize: convertedPrizeData
         },
         '奖品信息更新成功'
       )
@@ -410,6 +542,131 @@ router.put(
 
       sharedComponents.logger.error('奖品信息更新失败', { error: error.message })
       return res.apiInternalError('奖品信息更新失败', error.message, 'PRIZE_UPDATE_ERROR')
+    }
+  })
+)
+
+/**
+ * POST /prize/:prize_id/add-stock - 补充库存（原路径保持兼容）
+ *
+ * @description 为指定奖品补充库存数量
+ * @route POST /api/v4/admin/prize-pool/prize/:prize_id/add-stock
+ * @access Private (需要管理员权限)
+ */
+router.post(
+  '/prize/:prize_id/add-stock',
+  adminAuthMiddleware,
+  asyncHandler(async (req, res) => {
+    const transaction = await models.sequelize.transaction()
+
+    try {
+      const prizeId = parseInt(req.params.prize_id)
+      const { quantity } = req.body
+
+      if (!quantity || quantity <= 0) {
+        await transaction.rollback()
+        return res.apiError('补充数量必须大于0', 'INVALID_QUANTITY')
+      }
+
+      // 查找奖品
+      const prize = await models.LotteryPrize.findByPk(prizeId, { transaction })
+      if (!prize) {
+        await transaction.rollback()
+        return res.apiError('奖品不存在', 'PRIZE_NOT_FOUND')
+      }
+
+      const oldQuantity = prize.stock_quantity || 0
+      const newQuantity = oldQuantity + parseInt(quantity)
+
+      // 更新库存
+      await prize.update({ stock_quantity: newQuantity }, { transaction })
+
+      // 如果之前是out_of_stock状态，自动恢复为active
+      if (prize.status === 'out_of_stock') {
+        await prize.update({ status: 'active' }, { transaction })
+      }
+
+      await transaction.commit()
+
+      sharedComponents.logger.info('库存补充成功', {
+        prize_id: prizeId,
+        old_quantity: oldQuantity,
+        add_quantity: quantity,
+        new_quantity: newQuantity,
+        operated_by: req.user?.id
+      })
+
+      return res.apiSuccess(
+        {
+          prize_id: prizeId,
+          old_quantity: oldQuantity,
+          add_quantity: parseInt(quantity),
+          new_quantity: newQuantity,
+          remaining_quantity: newQuantity - (prize.total_win_count || 0)
+        },
+        '库存补充成功'
+      )
+    } catch (error) {
+      await transaction.rollback()
+      sharedComponents.logger.error('补充库存失败', { error: error.message })
+      return res.apiInternalError('补充库存失败', error.message, 'ADD_STOCK_ERROR')
+    }
+  })
+)
+
+/**
+ * DELETE /prize/:prize_id - 删除奖品（原路径保持兼容）
+ *
+ * @description 删除指定的奖品（仅当无中奖记录时）
+ * @route DELETE /api/v4/admin/prize-pool/prize/:prize_id
+ * @access Private (需要管理员权限)
+ */
+router.delete(
+  '/prize/:prize_id',
+  adminAuthMiddleware,
+  asyncHandler(async (req, res) => {
+    const transaction = await models.sequelize.transaction()
+
+    try {
+      const prizeId = parseInt(req.params.prize_id)
+
+      // 查找奖品
+      const prize = await models.LotteryPrize.findByPk(prizeId, { transaction })
+      if (!prize) {
+        await transaction.rollback()
+        return res.apiError('奖品不存在', 'PRIZE_NOT_FOUND')
+      }
+
+      // 检查是否已有用户中奖
+      const totalWins = prize.total_win_count || 0
+      if (totalWins > 0) {
+        await transaction.rollback()
+        return res.apiError(
+          `该奖品已被中奖${totalWins}次，不能删除。建议改为停用状态。`,
+          'PRIZE_IN_USE'
+        )
+      }
+
+      // 删除奖品
+      await prize.destroy({ transaction })
+      await transaction.commit()
+
+      sharedComponents.logger.info('奖品删除成功', {
+        prize_id: prizeId,
+        prize_name: prize.prize_name,
+        deleted_by: req.user?.id
+      })
+
+      return res.apiSuccess(
+        {
+          prize_id: prizeId
+        },
+        '奖品删除成功'
+      )
+    } catch (error) {
+      await transaction.rollback()
+      sharedComponents.logger.error('删除奖品失败', { error: error.message })
+      return res.apiInternalError('删除奖品失败', error.message, 'PRIZE_DELETE_ERROR')
     }
   })
 )

@@ -302,7 +302,7 @@ class ScheduledTasks {
               const remainingMinutes = Math.ceil(remainingMs / (1000 * 60))
 
               await NotificationService.notifyPremiumExpiringSoon(status.user_id, {
-                expires_at: BeijingTimeHelper.toBeijingTime(status.expires_at),
+                expires_at: BeijingTimeHelper.formatForAPI(status.expires_at).iso,
                 remaining_hours: remainingHours,
                 remaining_minutes: remainingMinutes
               })
@@ -382,7 +382,7 @@ class ScheduledTasks {
           for (const expired of expiredUsers) {
             try {
               await NotificationService.notifyPremiumExpired(expired.user_id, {
-                expired_at: BeijingTimeHelper.toBeijingTime(expired.expires_at),
+                expired_at: BeijingTimeHelper.formatForAPI(expired.expires_at).iso,
                 total_unlock_count: expired.total_unlock_count
               })
               notifiedCount++

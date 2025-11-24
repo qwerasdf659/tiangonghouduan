@@ -14,7 +14,11 @@
  * - 业务语义明确：每个测试数据都有清晰的业务含义
  * - 易于维护：修改测试数据只需要改这一个文件
  * - 真实数据：不使用Mock数据,使用真实数据库数据
+ * - 北京时间标准：所有时间数据使用BeijingTimeHelper生成，确保时区一致性
  */
+
+// 引入北京时间辅助工具
+const BeijingTimeHelper = require('../../utils/timeHelper')
 
 const TEST_DATA = {
   /*
@@ -246,7 +250,7 @@ const createTestData = {
   lotteryRequest: (overrides = {}) => ({
     user_id: TEST_DATA.users.testUser.user_id,
     campaign_id: TEST_DATA.lottery.testCampaign.campaign_id,
-    timestamp: new Date().toISOString(),
+    timestamp: BeijingTimeHelper.createBeijingISO(), // 使用北京时间
     ...overrides
   })
 }
@@ -304,7 +308,7 @@ const testDataGenerator = {
     return Array.from({ length: count }, (_, index) => ({
       mobile: `${prefix}${String(Math.floor(Math.random() * 100000000)).padStart(8, '0')}`,
       nickname: `测试用户${index + 1}`,
-      created_at: new Date().toISOString()
+      created_at: BeijingTimeHelper.createBeijingISO() // 使用北京时间
     }))
   },
 
@@ -329,7 +333,7 @@ const testDataGenerator = {
         type,
         source: type === 'earn' ? 'lottery' : 'exchange',
         description: `测试${type}积分_${index + 1}`,
-        created_at: new Date(Date.now() - index * 24 * 60 * 60 * 1000).toISOString() // 每条记录间隔1天
+        created_at: BeijingTimeHelper.getDaysAgo(index) // 使用北京时间，每条记录间隔1天
       }
     })
   },
@@ -354,7 +358,7 @@ const testDataGenerator = {
         prize_id: isWinner ? (index % 3) + 1 : 3, // 奖品ID轮换
         is_winner: isWinner,
         prize_value: isWinner ? [100, 50, 20][index % 3] : 0,
-        lottery_time: new Date(Date.now() - index * 60 * 60 * 1000).toISOString(), // 每条记录间隔1小时
+        lottery_time: BeijingTimeHelper.getHoursAgo(index), // 使用北京时间，每条记录间隔1小时
         status: 'completed'
       }
     })
@@ -386,7 +390,8 @@ const testDataGenerator = {
     }[interval] || 24 * 60 * 60 * 1000
 
     for (let time = start; time <= end; time += intervalMs) {
-      result.push(new Date(time).toISOString())
+      // 转换为北京时间ISO格式
+      result.push(BeijingTimeHelper.formatToBeijingISO(new Date(time)))
     }
 
     return result

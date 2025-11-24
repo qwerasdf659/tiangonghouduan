@@ -26,7 +26,8 @@ const { TestConfig } = require('../../helpers/test-setup')
 const BeijingTimeHelper = require('../../../utils/timeHelper')
 
 describe('积分服务层测试（V4架构）', () => {
-  const testUser = TestConfig.real_data.testUser
+  // ✅ 修复：统一使用TEST_DATA而非TestConfig.real_data
+  const testUser = TEST_DATA.users.testUser
 
   beforeAll(async () => {
     console.log('🚀 积分服务层测试启动')

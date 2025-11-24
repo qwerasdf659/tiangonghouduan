@@ -140,6 +140,14 @@ models.ChatMessage = require('./ChatMessage')(sequelize, DataTypes)
 // V4.0新增：系统公告和反馈系统
 models.SystemAnnouncement = require('./SystemAnnouncement')(sequelize, DataTypes)
 models.Feedback = require('./Feedback')(sequelize, DataTypes)
+models.SystemSettings = require('./SystemSettings')(sequelize, DataTypes)
+/*
+ * ✅ SystemSettings：系统设置（系统配置管理）
+ *    - 用途：存储系统各模块的配置设置（基础设置、抽奖设置、积分设置、通知设置、安全设置）
+ *    - 特点：支持多种数据类型（string/number/boolean/json）、分类管理、可见性控制、只读保护
+ *    - 表名：system_settings，主键：setting_id，外键：updated_by（最后更新管理员）
+ *    - 业务场景：系统配置管理、参数调整、策略控制
+ */
 
 // 🔴 图片和存储系统
 models.ImageResources = require('./ImageResources')(sequelize, DataTypes)

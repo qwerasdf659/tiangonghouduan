@@ -240,8 +240,8 @@ class NotificationService {
         created_at: BeijingTimeHelper.createBeijingTime()
       }
 
-      // ✅ 广播给所有在线管理员
-      const count = ChatWebSocketService.broadcastToAllAdmins(adminNotification)
+      // ✅ 广播通知给所有在线管理员（使用notification事件）
+      const count = ChatWebSocketService.broadcastNotificationToAllAdmins(adminNotification)
 
       // 记录管理员通知日志
       console.log('[通知] 管理员通知已广播', {
@@ -396,7 +396,8 @@ class NotificationService {
    * })
    */
   static async notifyPremiumUnlockSuccess (user_id, unlockData) {
-    const { unlock_cost, remaining_points, expires_at, validity_hours, is_first_unlock } = unlockData
+    const { unlock_cost, remaining_points, expires_at, validity_hours, is_first_unlock } =
+      unlockData
 
     return await this.send(user_id, {
       type: 'premium_unlock_success',
@@ -408,7 +409,7 @@ class NotificationService {
         expires_at,
         validity_hours,
         is_first_unlock,
-        unlock_time: BeijingTimeHelper.now()
+        unlock_time: BeijingTimeHelper.formatForAPI(new Date()).iso
       }
     })
   }
@@ -438,7 +439,7 @@ class NotificationService {
         remaining_hours,
         remaining_minutes,
         unlock_cost: 100,
-        reminder_time: BeijingTimeHelper.now()
+        reminder_time: BeijingTimeHelper.formatForAPI(new Date()).iso
       }
     })
   }
@@ -467,7 +468,7 @@ class NotificationService {
         total_unlock_count,
         unlock_cost: 100,
         validity_hours: 24,
-        notification_time: BeijingTimeHelper.now()
+        notification_time: BeijingTimeHelper.formatForAPI(new Date()).iso
       }
     })
   }

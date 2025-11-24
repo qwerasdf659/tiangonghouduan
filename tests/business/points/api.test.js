@@ -20,7 +20,6 @@
 const request = require('supertest')
 const app = require('../../../app')
 const { TEST_DATA, createTestData } = require('../../helpers/test-data')
-const { TestConfig } = require('../../helpers/test-setup')
 const BeijingTimeHelper = require('../../../utils/timeHelper')
 
 /*
@@ -32,8 +31,9 @@ const BeijingTimeHelper = require('../../../utils/timeHelper')
 describe('积分系统API测试（V4架构）', () => {
   let authToken = null
   let adminToken = null
-  const testUser = TestConfig.real_data.testUser
-  const adminUser = TestConfig.real_data.adminUser
+  // ✅ 修复：统一使用TEST_DATA而非TestConfig.real_data
+  const testUser = TEST_DATA.users.testUser
+  const adminUser = TEST_DATA.users.adminUser
 
   // 测试前准备：获取认证token
   beforeAll(async () => {

@@ -12,6 +12,7 @@
 process.env.TZ = 'Asia/Shanghai'
 
 const express = require('express')
+const path = require('path') // 用于静态文件路径处理
 const cors = require('cors')
 const helmet = require('helmet')
 const compression = require('compression')
@@ -48,9 +49,16 @@ app.use(
     contentSecurityPolicy: {
       directives: {
         defaultSrc: ['\'self\''],
-        styleSrc: ['\'self\'', '\'unsafe-inline\''],
-        scriptSrc: ['\'self\'', 'https://unpkg.com', 'https://cdn.jsdelivr.net'],
-        imgSrc: ['\'self\'', 'data:', 'https:']
+        styleSrc: ['\'self\'', '\'unsafe-inline\'', 'https://cdn.jsdelivr.net', 'https://unpkg.com'],
+        scriptSrc: ['\'self\'', '\'unsafe-inline\'', 'https://unpkg.com', 'https://cdn.jsdelivr.net'],
+        imgSrc: ['\'self\'', 'data:', 'https:'],
+        baseUri: ['\'self\''],
+        fontSrc: ['\'self\'', 'https:', 'data:'],
+        formAction: ['\'self\''],
+        frameAncestors: ['\'self\''],
+        objectSrc: ['\'none\''],
+        scriptSrcAttr: ['\'none\''],
+        upgradeInsecureRequests: []
       }
     }
   })
@@ -413,6 +421,52 @@ app.get('/api', (req, res) => {
   })
 })
 
+/*
+ * ========================================
+ * 🌐 Web管理后台静态文件托管
+ * ========================================
+ */
+/**
+ * 托管管理后台静态文件
+ *
+ * 路径映射：
+ * - /admin/login.html → public/admin/login.html
+ * - /admin/js/admin-common.js → public/admin/js/admin-common.js
+ * - /admin/css/admin-main.css → public/admin/css/admin-main.css
+ *
+ * ⚠️ 必须在API路由注册之前配置，避免路由冲突
+ */
+app.use('/admin', express.static(path.join(__dirname, 'public/admin'), {
+  index: false, // 禁用默认首页，避免冲突
+  maxAge: process.env.NODE_ENV === 'production' ? '1h' : 0, // 开发环境禁用缓存，生产环境缓存1小时
+  etag: process.env.NODE_ENV === 'production', // 生产环境启用ETag缓存
+  lastModified: true, // 启用Last-Modified
+  dotfiles: 'ignore', // 忽略隐藏文件
+  redirect: false, // 禁用目录重定向
+  setHeaders: (res, _filePath) => {
+    // 开发环境强制不缓存
+    if (process.env.NODE_ENV !== 'production') {
+      res.set('Cache-Control', 'no-cache, no-store, must-revalidate')
+      res.set('Pragma', 'no-cache')
+      res.set('Expires', '0')
+    }
+  }
+}))
+
+/**
+ * 根路径重定向到登录页
+ */
+app.get('/admin', (req, res) => {
+  res.redirect(301, '/admin/login.html')
+})
+
+appLogger.info('✅ Web管理后台静态文件托管已配置', {
+  mount: '/admin',
+  directory: 'public/admin',
+  cache: '1h'
+})
+// ========================================
+
 // 🔗 V4统一引擎路由注册（清理后只保留V4版本）
 try {
   // V4认证系统路由（RESTful标准 - 符合腾讯、阿里、网易、米哈游行业规范）
@@ -473,6 +527,14 @@ try {
   // V4系统功能路由（公告、反馈等）
   app.use('/api/v4/system', require('./routes/v4/system'))
   appLogger.info('V4系统功能模块加载成功', { route: '/api/v4/system' })
+
+  // V4数据统计报表路由
+  app.use('/api/v4/statistics', require('./routes/v4/statistics'))
+  appLogger.info('V4数据统计报表系统加载成功', { route: '/api/v4/statistics' })
+
+  // V4通知管理路由（基于SystemAnnouncement实现）
+  app.use('/api/v4/notifications', require('./routes/v4/notifications'))
+  appLogger.info('V4通知管理系统加载成功', { route: '/api/v4/notifications', note: '复用SystemAnnouncement表' })
 
   // V4审核管理路由（批量审核、超时告警）
   app.use('/api/v4/audit-management', require('./routes/audit-management'))

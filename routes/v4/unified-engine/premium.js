@@ -97,8 +97,8 @@ router.post('/unlock', authenticateToken, async (req, res) => {
           {
             unlocked: true,
             is_valid: true,
-            unlock_time: BeijingTimeHelper.toBeijingTime(premiumStatus.unlock_time),
-            expires_at: BeijingTimeHelper.toBeijingTime(premiumStatus.expires_at),
+            unlock_time: BeijingTimeHelper.formatForAPI(premiumStatus.unlock_time).iso,
+            expires_at: BeijingTimeHelper.formatForAPI(premiumStatus.expires_at).iso,
             remaining_hours: remainingHours,
             remaining_minutes: Math.ceil((expiresAt - now) / (1000 * 60)), // 剩余分钟数
             total_unlock_count: premiumStatus.total_unlock_count || 0,
@@ -304,7 +304,7 @@ router.post('/unlock', authenticateToken, async (req, res) => {
       logger.info('高级空间首次解锁', {
         user_id: userId,
         unlock_method: 'points',
-        expires_at: BeijingTimeHelper.toBeijingTime(expiresAt)
+        expires_at: BeijingTimeHelper.formatForAPI(expiresAt).iso
       })
     } else {
       // 重新解锁：更新现有记录
@@ -321,7 +321,7 @@ router.post('/unlock', authenticateToken, async (req, res) => {
       logger.info('高级空间重新解锁', {
         user_id: userId,
         unlock_count: premiumStatus.total_unlock_count,
-        expires_at: BeijingTimeHelper.toBeijingTime(expiresAt)
+        expires_at: BeijingTimeHelper.formatForAPI(expiresAt).iso
       })
     }
 
@@ -353,7 +353,7 @@ router.post('/unlock', authenticateToken, async (req, res) => {
         await NotificationService.notifyPremiumUnlockSuccess(userId, {
           unlock_cost: UNLOCK_COST,
           remaining_points: newAvailablePoints,
-          expires_at: BeijingTimeHelper.toBeijingTime(expiresAt),
+          expires_at: BeijingTimeHelper.formatForAPI(expiresAt).iso,
           validity_hours: VALIDITY_HOURS,
           is_first_unlock: isFirstUnlock
         })
@@ -376,8 +376,8 @@ router.post('/unlock', authenticateToken, async (req, res) => {
         is_first_unlock: isFirstUnlock, // 是否首次解锁：true=首次解锁，false=重新解锁
         unlock_cost: UNLOCK_COST, // 本次解锁费用：固定100积分
         remaining_points: newAvailablePoints, // 剩余积分：扣费后的user_points_accounts.available_points
-        unlock_time: BeijingTimeHelper.toBeijingTime(unlockTime), // 本次解锁时间（北京时间格式：YYYY-MM-DD HH:mm:ss）
-        expires_at: BeijingTimeHelper.toBeijingTime(expiresAt), // 过期时间（24小时后，北京时间格式：YYYY-MM-DD HH:mm:ss）
+        unlock_time: BeijingTimeHelper.formatForAPI(unlockTime).iso, // 本次解锁时间（ISO 8601格式）
+        expires_at: BeijingTimeHelper.formatForAPI(expiresAt).iso, // 过期时间（24小时后，ISO 8601格式）
         validity_hours: VALIDITY_HOURS, // 有效期时长：固定24小时
         total_unlock_count: premiumStatus.total_unlock_count, // 累计解锁次数（包括本次解锁）
         note: `恭喜！您已成功解锁高级空间功能（${isFirstUnlock ? '首次' : '重新'}解锁，支付${UNLOCK_COST}积分，剩余${newAvailablePoints}积分，有效期${VALIDITY_HOURS}小时）`
@@ -461,11 +461,11 @@ router.get('/status', authenticateToken, async (req, res) => {
           unlocked: false,
           is_expired: isExpired, // 是否已过期
           last_unlock_time: isUnlocked
-            ? BeijingTimeHelper.toBeijingTime(premiumStatus.unlock_time)
+            ? BeijingTimeHelper.formatForAPI(premiumStatus.unlock_time).iso
             : null,
           last_expires_at:
             isUnlocked && premiumStatus.expires_at
-              ? BeijingTimeHelper.toBeijingTime(premiumStatus.expires_at)
+              ? BeijingTimeHelper.formatForAPI(premiumStatus.expires_at).iso
               : null,
           conditions: {
             condition_1: {
@@ -512,10 +512,10 @@ router.get('/status', authenticateToken, async (req, res) => {
       {
         unlocked: true,
         is_valid: true,
-        unlock_time: BeijingTimeHelper.toBeijingTime(premiumStatus.unlock_time),
+        unlock_time: BeijingTimeHelper.formatForAPI(premiumStatus.unlock_time).iso,
         unlock_method: premiumStatus.unlock_method,
         unlock_cost: UNLOCK_COST,
-        expires_at: BeijingTimeHelper.toBeijingTime(premiumStatus.expires_at),
+        expires_at: BeijingTimeHelper.formatForAPI(premiumStatus.expires_at).iso,
         remaining_hours: remainingHours,
         remaining_minutes: remainingMinutes,
         validity_hours: VALIDITY_HOURS,

@@ -330,6 +330,180 @@ router.delete('/user/:user_id', authenticateToken, requireAdmin, async (req, res
 })
 
 /**
+ * 获取所有预设列表（管理员视角）
+ * GET /api/v4/lottery-preset/list
+ *
+ * @description 获取所有用户的预设列表，支持筛选和分页（管理员查看所有预设记录）
+ * @route GET /api/v4/lottery-preset/list
+ * @access Private（需要JWT认证 + 管理员权限）
+ *
+ * 业务场景：
+ * - 预设列表管理：管理员查看所有预设记录，进行统一管理
+ * - 运营审计：审查所有预设配置，确保运营策略执行正确
+ * - 用户支持：快速定位用户的预设配置，处理用户问题
+ * - 数据分析：导出预设数据，分析运营效果
+ *
+ * 查询参数：
+ * @query {string} status - 状态筛选（可选：pending/used/all，默认all）
+ * @query {number} user_id - 用户ID筛选（可选，筛选特定用户的预设）
+ * @query {number} page - 页码（默认1）
+ * @query {number} page_size - 每页数量（默认20，最大100）
+ * @query {string} order_by - 排序字段（默认created_at，可选：queue_order）
+ * @query {string} order_dir - 排序方向（默认DESC，可选：ASC/DESC）
+ *
+ * 返回数据：
+ * @returns {Array} list - 预设列表数组
+ * @returns {Object} pagination - 分页信息（total、page、page_size、total_pages）
+ * @returns {Object} filters - 当前筛选条件
+ */
+router.get('/list', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const adminId = req.user.user_id
+
+    // 🎯 参数验证和默认值设置
+    const {
+      status = 'all',
+      user_id,
+      page = 1,
+      page_size = 20,
+      order_by = 'created_at',
+      order_dir = 'DESC'
+    } = req.query
+
+    // 验证status参数
+    const allowedStatus = ['pending', 'used', 'all']
+    if (!allowedStatus.includes(status)) {
+      return res.apiError(`无效的状态参数，允许值：${allowedStatus.join('/')}`, 'INVALID_STATUS', null, null)
+    }
+
+    // 验证排序字段
+    const allowedOrderBy = ['created_at', 'queue_order']
+    if (!allowedOrderBy.includes(order_by)) {
+      return res.apiError(`无效的排序字段，允许值：${allowedOrderBy.join('/')}`, 'INVALID_ORDER_BY', null, null)
+    }
+
+    // 验证排序方向
+    const allowedOrderDir = ['ASC', 'DESC']
+    if (!allowedOrderDir.includes(order_dir.toUpperCase())) {
+      return res.apiError(`无效的排序方向，允许值：${allowedOrderDir.join('/')}`, 'INVALID_ORDER_DIR', null, null)
+    }
+
+    // 验证分页参数
+    const pageNum = parseInt(page)
+    const pageSizeNum = parseInt(page_size)
+    if (isNaN(pageNum) || pageNum < 1) {
+      return res.apiError('页码必须是大于0的整数', 'INVALID_PAGE', null, null)
+    }
+    if (isNaN(pageSizeNum) || pageSizeNum < 1 || pageSizeNum > 100) {
+      return res.apiError('每页数量必须在1-100之间', 'INVALID_PAGE_SIZE', null, null)
+    }
+
+    // 构建查询条件
+    const whereCondition = {}
+    if (status !== 'all') {
+      whereCondition.status = status
+    }
+    if (user_id) {
+      const userId = parseInt(user_id)
+      if (isNaN(userId) || userId <= 0) {
+        return res.apiError('无效的用户ID，必须是正整数', 'INVALID_USER_ID', null, null)
+      }
+      whereCondition.user_id = userId
+    }
+
+    // 计算分页偏移量
+    const offset = (pageNum - 1) * pageSizeNum
+
+    // 🎯 并行查询：获取数据和总数（性能优化）
+    const [presets, totalCount] = await Promise.all([
+      models.LotteryPreset.findAll({
+        where: whereCondition,
+        include: [
+          {
+            model: models.User,
+            as: 'targetUser',
+            attributes: ['user_id', 'mobile', 'nickname']
+          },
+          {
+            model: models.LotteryPrize,
+            as: 'prize',
+            attributes: ['prize_id', 'prize_name', 'prize_type', 'prize_value', 'prize_description']
+          },
+          {
+            model: models.User,
+            as: 'admin',
+            attributes: ['user_id', 'mobile', 'nickname']
+          }
+        ],
+        order: [[order_by, order_dir.toUpperCase()]],
+        limit: pageSizeNum,
+        offset
+      }),
+      models.LotteryPreset.count({ where: whereCondition })
+    ])
+
+    // 计算总页数
+    const totalPages = Math.ceil(totalCount / pageSizeNum)
+
+    console.log('📋 管理员查看预设列表', {
+      adminId,
+      status,
+      user_id: user_id || 'all',
+      page: pageNum,
+      page_size: pageSizeNum,
+      totalCount,
+      timestamp: BeijingTimeHelper.apiTimestamp()
+    })
+
+    // 返回预设列表 - 参数顺序：data第1个, message第2个
+    return res.apiSuccess({
+      list: presets.map(preset => ({
+        preset_id: preset.preset_id,
+        user_id: preset.user_id,
+        prize_id: preset.prize_id,
+        queue_order: preset.queue_order,
+        status: preset.status,
+        created_at: preset.created_at,
+        target_user: preset.targetUser,
+        prize: preset.prize,
+        admin: preset.admin
+      })),
+      pagination: {
+        total: totalCount,
+        page: pageNum,
+        page_size: pageSizeNum,
+        total_pages: totalPages
+      },
+      filters: {
+        status,
+        user_id: user_id || null
+      }
+    }, '获取预设列表成功')
+  } catch (error) {
+    // 🎯 细化错误处理：区分Sequelize错误类型
+    console.error('❌ 获取预设列表失败:', error.message, error.stack)
+
+    // Sequelize数据库错误
+    if (error.name === 'SequelizeDatabaseError') {
+      return res.apiError('数据库查询失败，请稍后重试', 'DATABASE_ERROR', null, null)
+    }
+
+    // Sequelize连接错误
+    if (error.name === 'SequelizeConnectionError') {
+      return res.apiError('数据库连接失败，请联系技术支持', 'CONNECTION_ERROR', null, null)
+    }
+
+    // Sequelize超时错误
+    if (error.name === 'SequelizeTimeoutError') {
+      return res.apiError('数据库查询超时，请重试', 'QUERY_TIMEOUT', null, null)
+    }
+
+    // 其他未知错误
+    return res.apiInternalError('获取预设列表失败')
+  }
+})
+
+/**
  * 获取预设统计信息
  * GET /api/v4/lottery-preset/stats
  *

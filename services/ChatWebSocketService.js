@@ -46,7 +46,9 @@ class ChatWebSocketService {
     this.currentStartupLogId = null // 当前启动日志ID（数据库记录）
 
     console.log('📦 ChatWebSocketService 实例已创建')
-    console.log(`⚙️ 连接限制: 总${this.MAX_TOTAL_CONNECTIONS} | 用户${this.MAX_USER_CONNECTIONS} | 客服${this.MAX_ADMIN_CONNECTIONS}`)
+    console.log(
+      `⚙️ 连接限制: 总${this.MAX_TOTAL_CONNECTIONS} | 用户${this.MAX_USER_CONNECTIONS} | 客服${this.MAX_ADMIN_CONNECTIONS}`
+    )
   }
 
   /**
@@ -113,7 +115,7 @@ class ChatWebSocketService {
    * @returns {void} 无返回值，设置WebSocket连接和消息事件处理器
    */
   setupEventHandlers () {
-    this.io.on('connection', (socket) => {
+    this.io.on('connection', socket => {
       // ⚡ 连接数检查（2025年01月21日新增）
       const totalConnections = this.connectedUsers.size + this.connectedAdmins.size
 
@@ -135,15 +137,20 @@ class ChatWebSocketService {
         return
       }
 
-      console.log(`🔌 客户端连接成功: ${socket.id} (${totalConnections + 1}/${this.MAX_TOTAL_CONNECTIONS})`)
+      console.log(
+        `🔌 客户端连接成功: ${socket.id} (${totalConnections + 1}/${this.MAX_TOTAL_CONNECTIONS})`
+      )
 
       // 1. 用户注册连接
-      socket.on('register_user', (data) => {
+      socket.on('register_user', data => {
         try {
           const { user_id, user_type } = data // user_type: 'user' 或 'admin'
 
           if (!user_id || !user_type) {
-            wsLogger.error('用户注册失败', { reason: '缺少user_id或user_type', socketId: socket.id })
+            wsLogger.error('用户注册失败', {
+              reason: '缺少user_id或user_type',
+              socketId: socket.id
+            })
             return
           }
 
@@ -234,7 +241,7 @@ class ChatWebSocketService {
       })
 
       // 3. 断开连接
-      socket.on('disconnect', (reason) => {
+      socket.on('disconnect', reason => {
         console.log(`🔌 客户端断开: ${socket.id}, 原因: ${reason}`)
 
         // 清理用户连接记录
@@ -257,7 +264,7 @@ class ChatWebSocketService {
       })
 
       // 4. 错误处理
-      socket.on('error', (error) => {
+      socket.on('error', error => {
         console.error(`❌ WebSocket错误: ${socket.id}`, error.message)
       })
     })
@@ -339,6 +346,58 @@ class ChatWebSocketService {
     }
 
     console.log(`📢 消息已广播给 ${successCount}/${this.connectedAdmins.size} 个在线客服`)
+    return successCount
+  }
+
+  /**
+   * 推送通知给指定管理员（专用于系统通知）
+   * @param {Number} admin_id - 接收管理员ID
+   * @param {Object} notification - 通知对象
+   * @returns {Boolean} 是否推送成功
+   */
+  pushNotificationToAdmin (admin_id, notification) {
+    const socketId = this.connectedAdmins.get(admin_id)
+    if (socketId) {
+      try {
+        this.io.to(socketId).emit('notification', notification)
+        console.log(`🔔 通知已推送给管理员 ${admin_id}`)
+        return true
+      } catch (error) {
+        wsLogger.error('推送通知给管理员失败', {
+          admin_id,
+          notification_id: notification.notification_id || 'unknown',
+          error: error.message,
+          timestamp: BeijingTimeHelper.now()
+        })
+        return false
+      }
+    }
+    console.log(`⚠️ 管理员 ${admin_id} 不在线，无法推送通知`)
+    return false
+  }
+
+  /**
+   * 广播通知给所有在线管理员（专用于系统通知）
+   * @param {Object} notification - 通知对象
+   * @returns {Number} 成功推送的管理员数量
+   */
+  broadcastNotificationToAllAdmins (notification) {
+    let successCount = 0
+
+    for (const [admin_id, socketId] of this.connectedAdmins.entries()) {
+      try {
+        this.io.to(socketId).emit('notification', notification)
+        successCount++
+      } catch (error) {
+        wsLogger.error('广播通知给管理员失败', {
+          admin_id,
+          notification_id: notification.notification_id || 'unknown',
+          error: error.message
+        })
+      }
+    }
+
+    console.log(`📢 通知已广播给 ${successCount}/${this.connectedAdmins.size} 个在线管理员`)
     return successCount
   }
 
@@ -505,32 +564,6 @@ class ChatWebSocketService {
   }
 
   /**
-   * 获取服务器IP地址
-   * @returns {String} 服务器IP地址
-   *
-   * @description
-   * 功能：获取服务器的外网IP地址（用于记录服务启动日志）
-   * 逻辑：遍历网络接口，找到第一个非内网的IPv4地址
-   * 用途：服务启动日志、服务器信息记录、多实例区分
-   */
-  getServerIP () {
-    const os = require('os')
-    const interfaces = os.networkInterfaces()
-
-    for (const name of Object.keys(interfaces)) {
-      for (const iface of interfaces[name]) {
-        // 跳过内网地址和非IPv4地址
-        if (iface.family === 'IPv4' && !iface.internal) {
-          return iface.address
-        }
-      }
-    }
-
-    // 如果没有找到外网IP，返回本地地址
-    return '127.0.0.1'
-  }
-
-  /**
    * 优雅停止WebSocket服务（记录停止事件）
    * @param {String} reason - 停止原因（如："正常停止"、"部署更新"、"服务崩溃"等）
    * @returns {Promise<void>} 无返回值
@@ -627,7 +660,11 @@ class ChatWebSocketService {
         })
         result.notified_user = true
         result.user_online = true
-        wsLogger.info('通知用户会话关闭', { user_id, session_id, close_reason: closeData.close_reason })
+        wsLogger.info('通知用户会话关闭', {
+          user_id,
+          session_id,
+          close_reason: closeData.close_reason
+        })
       }
     }
 
@@ -655,7 +692,8 @@ class ChatWebSocketService {
 
     // 3️⃣ 广播给所有在线管理员（用于管理后台列表刷新）
     this.connectedAdmins.forEach((socketId, adminUserId) => {
-      if (adminUserId !== closeData.closed_by) { // 不通知关闭人自己
+      if (adminUserId !== closeData.closed_by) {
+        // 不通知关闭人自己
         const socket = this.io.sockets.sockets.get(socketId)
         if (socket) {
           socket.emit('session_list_update', {

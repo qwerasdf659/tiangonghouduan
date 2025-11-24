@@ -278,7 +278,7 @@ class ConsumptionRecord extends Model {
       points_to_award: this.points_to_award,
       status: this.status,
       status_name: this.getStatusName(),
-      created_at: BeijingTimeHelper.toBeijingTime(this.created_at),
+      created_at: BeijingTimeHelper.formatForAPI(this.created_at).iso,
       age: this.getAge()
     }
   }

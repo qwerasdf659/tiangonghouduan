@@ -746,6 +746,72 @@ router.post('/refresh', async (req, res) => {
  * @param {string} req.user.user_id - 用户ID（从Access Token中获取）
  * @returns {Object} 退出登录结果
  */
+/**
+ * GET /api/v4/auth/verify - 验证Token有效性
+ *
+ * @route GET /api/v4/auth/verify
+ * @group Auth - 认证相关
+ * @security JWT
+ *
+ * @description 验证当前Token是否有效，返回用户基本信息
+ * @returns {Object} 200 - Token有效，返回用户信息
+ * @returns {Object} 401 - Token无效或已过期
+ * @returns {Object} 403 - 用户账号已禁用
+ * @returns {Object} 404 - 用户不存在
+ *
+ * 业务场景：
+ * - 前端页面加载时验证登录状态
+ * - Token续期前的有效性检查
+ * - 跨页面的用户信息同步
+ */
+router.get('/verify', authenticateToken, async (req, res) => {
+  try {
+    const user_id = req.user.user_id
+    const { Role } = require('../../../models')
+
+    // 获取用户完整信息
+    const user = await User.findByPk(user_id, {
+      attributes: ['user_id', 'mobile', 'nickname', 'status'],
+      include: [{
+        model: Role,
+        as: 'roles',
+        through: { where: { is_active: true }, attributes: [] },
+        attributes: ['role_name', 'role_level'],
+        required: false
+      }]
+    })
+
+    if (!user) {
+      return res.apiError('用户不存在', 'USER_NOT_FOUND', null, 404)
+    }
+
+    if (user.status !== 'active') {
+      return res.apiError('用户账号已被禁用', 'USER_INACTIVE', { status: user.status }, 403)
+    }
+
+    // 计算最高权限等级
+    const max_role_level = user.roles.length > 0
+      ? Math.max(...user.roles.map(r => r.role_level))
+      : 0
+
+    console.log(`✅ [Auth] Token验证成功: user_id=${user_id}, roles=${user.roles.map(r => r.role_name).join(',')}`)
+
+    return res.apiSuccess({
+      user_id: user.user_id,
+      mobile: user.mobile,
+      nickname: user.nickname,
+      status: user.status,
+      roles: user.roles.map(r => r.role_name),
+      role_level: max_role_level,
+      is_admin: max_role_level >= 100,
+      token_valid: true
+    }, 'Token验证成功', 'TOKEN_VALID')
+  } catch (error) {
+    console.error('❌ [Auth] Token验证失败:', error)
+    return res.apiInternalError('Token验证失败', error.message, 'TOKEN_VERIFY_ERROR')
+  }
+})
+
 router.post('/logout', authenticateToken, async (req, res) => {
   try {
     const user_id = req.user.user_id

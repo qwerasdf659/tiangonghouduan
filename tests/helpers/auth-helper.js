@@ -38,7 +38,7 @@ async function getTestUserToken (app, mobile = TEST_DATA.users.testUser.mobile, 
   // 1. 发送登录请求
   const response = await request(app)
     .post('/api/v4/auth/login')
-    .send({ mobile, code })
+    .send({ mobile, verification_code: code }) // 修复：使用verification_code参数名
 
   // 2. 验证登录结果
   if (!response.body.success) {
@@ -50,8 +50,8 @@ async function getTestUserToken (app, mobile = TEST_DATA.users.testUser.mobile, 
     )
   }
 
-  // 3. 提取并验证token
-  const token = response.body.data?.token
+  // 3. 提取并验证token（后端返回access_token）
+  const token = response.body.data?.token || response.body.data?.access_token
   if (!token) {
     throw new Error(
       '❌ 登录成功但未返回token\n' +

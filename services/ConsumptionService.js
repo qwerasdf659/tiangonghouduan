@@ -631,6 +631,131 @@ class ConsumptionService {
   }
 
   /**
+   * 管理员查询所有消费记录（支持筛选、搜索、统计）
+   *
+   * @param {Object} options - 查询选项
+   * @param {number} options.page - 页码（默认1）
+   * @param {number} options.page_size - 每页数量（默认20，最大100）
+   * @param {string} options.status - 状态筛选（pending/approved/rejected，默认all）
+   * @param {string} options.search - 搜索关键词（手机号、用户昵称）
+   * @returns {Object} { records, pagination, statistics }
+   */
+  static async getAdminRecords (options = {}) {
+    try {
+      const page = options.page || 1
+      const pageSize = Math.min(options.page_size || 20, 100)
+      const offset = (page - 1) * pageSize
+      const status = options.status || 'all'
+      const search = options.search?.trim() || ''
+
+      // 构建查询条件
+      const whereConditions = {
+        is_deleted: 0 // 只查询未删除的记录
+      }
+
+      // 状态筛选
+      if (status !== 'all') {
+        whereConditions.status = status
+      }
+
+      // 搜索条件（支持手机号、用户昵称）
+      const includeConditions = [
+        {
+          association: 'user',
+          attributes: ['user_id', 'mobile', 'nickname'],
+          required: false,
+          where: search
+            ? {
+              [Op.or]: [
+                { mobile: { [Op.like]: `%${search}%` } },
+                { nickname: { [Op.like]: `%${search}%` } }
+              ]
+            }
+            : undefined
+        },
+        {
+          association: 'merchant',
+          attributes: ['user_id', 'mobile', 'nickname'],
+          required: false
+        },
+        {
+          association: 'reviewer',
+          attributes: ['user_id', 'mobile', 'nickname'],
+          required: false
+        }
+      ]
+
+      // 并行查询：记录列表 + 统计数据
+      const [{ count, rows }, statistics] = await Promise.all([
+        // 查询记录列表
+        ConsumptionRecord.findAndCountAll({
+          where: whereConditions,
+          include: includeConditions,
+          order: [
+            ['status', 'ASC'], // 待审核优先
+            ['created_at', 'DESC'] // 最新的在前
+          ],
+          limit: pageSize,
+          offset,
+          distinct: true
+        }),
+
+        // 查询统计数据（今日）
+        ConsumptionRecord.findAll({
+          attributes: ['status', [Sequelize.fn('COUNT', Sequelize.col('record_id')), 'count']],
+          where: {
+            is_deleted: 0,
+            created_at: {
+              // 今日开始时间（北京时间00:00:00）
+              [Op.gte]: new Date(new Date().setHours(0, 0, 0, 0))
+            }
+          },
+          group: ['status'],
+          raw: true
+        })
+      ])
+
+      // 处理统计数据
+      const stats = {
+        pending: 0,
+        approved: 0,
+        rejected: 0,
+        today: 0
+      }
+
+      statistics.forEach(stat => {
+        if (stat.status === 'pending') stats.pending = parseInt(stat.count)
+        if (stat.status === 'approved') stats.approved = parseInt(stat.count)
+        if (stat.status === 'rejected') stats.rejected = parseInt(stat.count)
+        stats.today += parseInt(stat.count)
+      })
+
+      // 补充待审核总数（不限今日）
+      const pendingTotal = await ConsumptionRecord.count({
+        where: {
+          status: 'pending',
+          is_deleted: 0
+        }
+      })
+      stats.pending = pendingTotal
+
+      return {
+        records: rows.map(r => r.toAPIResponse()),
+        pagination: {
+          total: count,
+          page,
+          page_size: pageSize,
+          total_pages: Math.ceil(count / pageSize)
+        },
+        statistics: stats
+      }
+    } catch (error) {
+      console.error('❌ 管理员查询消费记录失败:', error.message)
+      throw new Error('查询消费记录失败：' + error.message)
+    }
+  }
+
+  /**
    * 获取消费记录详情
    *
    * @param {number} recordId - 消费记录ID
@@ -710,9 +835,7 @@ class ConsumptionService {
        * 说明：ConsumptionRecord模型已添加defaultScope自动过滤is_deleted=0
        * 如果需要包含已删除记录，使用scope('includeDeleted')
        */
-      const query = includeDeleted
-        ? ConsumptionRecord.scope('includeDeleted')
-        : ConsumptionRecord
+      const query = includeDeleted ? ConsumptionRecord.scope('includeDeleted') : ConsumptionRecord
 
       // 查询记录
       const record = await query.findOne({

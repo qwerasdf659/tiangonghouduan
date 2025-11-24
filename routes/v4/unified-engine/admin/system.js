@@ -84,7 +84,8 @@ router.get('/dashboard', adminAuthMiddleware, asyncHandler(async (req, res) => {
     const today = BeijingTimeHelper.createBeijingTime()
     const todayStart = new Date(today.setHours(0, 0, 0, 0))
 
-    const [todayLotteries, todayWins, todayNewUsers] = await Promise.all([
+    const [todayLotteries, todayWins, todayNewUsers, todayCustomerSessions, todayMessages, todayPointsConsumed] = await Promise.all([
+      // 今日抽奖次数
       models.LotteryDraw.count({
         where: {
           created_at: {
@@ -92,6 +93,7 @@ router.get('/dashboard', adminAuthMiddleware, asyncHandler(async (req, res) => {
           }
         }
       }),
+      // 今日中奖次数
       models.LotteryDraw.count({
         where: {
           created_at: {
@@ -100,7 +102,32 @@ router.get('/dashboard', adminAuthMiddleware, asyncHandler(async (req, res) => {
           is_winner: true
         }
       }),
+      // 今日新增用户
       models.User.count({
+        where: {
+          created_at: {
+            [require('sequelize').Op.gte]: todayStart
+          }
+        }
+      }),
+      // 今日客服会话数量
+      models.CustomerServiceSession.count({
+        where: {
+          created_at: {
+            [require('sequelize').Op.gte]: todayStart
+          }
+        }
+      }),
+      // 今日聊天消息数量
+      models.ChatMessage.count({
+        where: {
+          created_at: {
+            [require('sequelize').Op.gte]: todayStart
+          }
+        }
+      }),
+      // 今日积分消耗（所有抽奖消耗的积分总和）
+      models.LotteryDraw.sum('cost_points', {
         where: {
           created_at: {
             [require('sequelize').Op.gte]: todayStart
@@ -130,7 +157,12 @@ router.get('/dashboard', adminAuthMiddleware, asyncHandler(async (req, res) => {
         new_users: todayNewUsers,
         lottery_draws: todayLotteries,
         wins: todayWins,
-        win_rate: todayLotteries > 0 ? ((todayWins / todayLotteries) * 100).toFixed(2) : 0
+        win_rate: todayLotteries > 0 ? ((todayWins / todayLotteries) * 100).toFixed(2) : '0.00',
+        points_consumed: todayPointsConsumed || 0 // 今日积分消耗
+      },
+      customer_service: {
+        today_sessions: todayCustomerSessions || 0, // 今日客服会话数
+        today_messages: todayMessages || 0 // 今日消息数量
       },
       system: {
         uptime: systemStats.system.uptime,

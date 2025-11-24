@@ -1,0 +1,867 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>系统设置 - 管理后台</title>
+  
+  <!-- ✅ Bootstrap 5 - UI框架 -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  
+  <!-- ✅ Bootstrap Icons - 图标库 -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+  
+  <!-- ✅ 公共样式表 - 统一主题和响应式设计 -->
+  <link href="/admin/css/common.css" rel="stylesheet">
+  
+  <!-- ✅ 页面特有样式 -->
+  <style>
+    .settings-nav {
+      position: sticky;
+      top: 20px;
+    }
+    .settings-section {
+      scroll-margin-top: 80px;
+    }
+  </style>
+</head>
+<body class="bg-light">
+  <!-- 顶部导航 -->
+  <nav class="navbar navbar-dark bg-primary">
+    <div class="container-fluid">
+      <a href="/admin/dashboard.html" class="navbar-brand">
+        <i class="bi bi-arrow-left me-2"></i>⚙️ 管理后台 - 系统设置
+      </a>
+      <div>
+        <span class="text-light me-3" id="welcomeText">欢迎，管理员</span>
+        <button class="btn btn-outline-light btn-sm" id="logoutBtn">退出登录</button>
+      </div>
+    </div>
+  </nav>
+  
+  <div class="container-fluid mt-4">
+    <!-- ✅ 功能状态提示横幅 -->
+    <div class="alert alert-success alert-dismissible fade show mb-3" role="alert">
+      <h6 class="alert-heading">
+        <i class="bi bi-check-circle-fill"></i> 系统设置功能已完整实现
+      </h6>
+      <hr>
+      <p class="mb-2"><strong>✅ 已实现的功能：</strong></p>
+      <ul class="mb-0">
+        <li>基础设置保存（✓ /api/v4/admin/settings/basic）</li>
+        <li>积分设置保存（✓ /api/v4/admin/settings/points）</li>
+        <li>通知设置保存（✓ /api/v4/admin/settings/notification）</li>
+        <li>安全设置保存（✓ /api/v4/admin/settings/security）</li>
+        <li>缓存清除功能（✓ /api/v4/admin/cache/clear）</li>
+      </ul>
+      <hr>
+      <p class="mb-0 text-muted small">
+        <i class="bi bi-info-circle"></i> 
+        注：抽奖算法配置（中奖率、保底规则等）在config/business.config.js中管理，需要技术团队修改代码。
+      </p>
+      <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+    
+    <div class="row">
+      <!-- 侧边导航 -->
+      <div class="col-md-3">
+        <div class="card settings-nav">
+          <div class="card-header bg-white">
+            <h6 class="mb-0">设置导航</h6>
+          </div>
+          <div class="list-group list-group-flush">
+            <a href="#basic-settings" class="list-group-item list-group-item-action">
+              <i class="bi bi-gear"></i> 基础设置
+            </a>
+            <a href="#lottery-settings" class="list-group-item list-group-item-action">
+              <i class="bi bi-gift"></i> 抽奖设置
+            </a>
+            <a href="#points-settings" class="list-group-item list-group-item-action">
+              <i class="bi bi-star"></i> 积分设置
+            </a>
+            <a href="#notification-settings" class="list-group-item list-group-item-action">
+              <i class="bi bi-bell"></i> 通知设置
+            </a>
+            <a href="#security-settings" class="list-group-item list-group-item-action">
+              <i class="bi bi-shield-lock"></i> 安全设置
+            </a>
+            <a href="#cache-settings" class="list-group-item list-group-item-action">
+              <i class="bi bi-database"></i> 缓存管理
+            </a>
+          </div>
+        </div>
+      </div>
+      
+      <!-- 主要内容区 -->
+      <div class="col-md-9">
+        <!-- 基础设置 -->
+        <div id="basic-settings" class="card mb-3 settings-section">
+          <div class="card-header bg-white">
+            <h5 class="mb-0"><i class="bi bi-gear"></i> 基础设置</h5>
+          </div>
+          <div class="card-body">
+            <form id="basicSettingsForm">
+              <div class="row g-3">
+                <div class="col-md-6">
+                  <label class="form-label">系统名称</label>
+                  <input type="text" class="form-control" id="systemName" value="餐厅抽奖系统">
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">系统版本</label>
+                  <input type="text" class="form-control" id="systemVersion" value="v1.0.0" readonly>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">客服电话</label>
+                  <input type="tel" class="form-control" id="customerServicePhone" placeholder="400-xxx-xxxx">
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">客服邮箱</label>
+                  <input type="email" class="form-control" id="customerServiceEmail" placeholder="support@example.com">
+                </div>
+                <div class="col-12">
+                  <label class="form-label">系统公告</label>
+                  <textarea class="form-control" id="systemAnnouncement" rows="3" placeholder="系统公告内容..."></textarea>
+                </div>
+                <div class="col-12">
+                  <label class="form-label">维护模式</label>
+                  <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" id="maintenanceMode">
+                    <label class="form-check-label" for="maintenanceMode">
+                      启用维护模式（启用后普通用户无法访问系统）
+                    </label>
+                  </div>
+                </div>
+                <div class="col-12">
+                  <button type="button" class="btn btn-primary" id="saveBasicSettingsBtn">
+                    <i class="bi bi-check-lg"></i> 保存设置
+                  </button>
+                </div>
+              </div>
+            </form>
+          </div>
+        </div>
+        
+        <!-- 抽奖设置 -->
+        <div id="lottery-settings" class="card mb-3 settings-section">
+          <div class="card-header bg-white">
+            <h5 class="mb-0"><i class="bi bi-gift"></i> 抽奖设置</h5>
+          </div>
+          <div class="card-body">
+            <form id="lotterySettingsForm">
+              <div class="row g-3">
+                <div class="col-md-6">
+                  <label class="form-label">每日抽奖次数限制</label>
+                  <input type="number" class="form-control" id="dailyDrawLimit" min="1" value="10">
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">每次消费所需积分</label>
+                  <input type="number" class="form-control" id="drawCostPoints" min="0" value="100">
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">最低消费金额(元)</label>
+                  <input type="number" class="form-control" id="minConsumptionAmount" min="0" step="0.01" value="50.00">
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">积分兑换比例(元:积分)</label>
+                  <input type="text" class="form-control" id="pointsConversionRate" value="1:10">
+                </div>
+                <div class="col-12">
+                  <label class="form-label">保底中奖机制</label>
+                  <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" id="guaranteedWinEnabled">
+                    <label class="form-check-label" for="guaranteedWinEnabled">
+                      启用保底中奖（连续N次未中奖后必中）
+                    </label>
+                  </div>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">保底抽奖次数</label>
+                  <input type="number" class="form-control" id="guaranteedWinCount" min="1" value="20">
+                </div>
+                <div class="col-12">
+                  <button type="button" class="btn btn-primary" id="saveLotterySettingsBtn">
+                    <i class="bi bi-check-lg"></i> 保存设置
+                  </button>
+                </div>
+              </div>
+            </form>
+          </div>
+        </div>
+        
+        <!-- 积分设置 -->
+        <div id="points-settings" class="card mb-3 settings-section">
+          <div class="card-header bg-white">
+            <h5 class="mb-0"><i class="bi bi-star"></i> 积分设置</h5>
+          </div>
+          <div class="card-body">
+            <form id="pointsSettingsForm">
+              <div class="row g-3">
+                <div class="col-md-6">
+                  <label class="form-label">注册赠送积分</label>
+                  <input type="number" class="form-control" id="registerBonusPoints" min="0" value="100">
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">每日签到积分</label>
+                  <input type="number" class="form-control" id="dailyCheckInPoints" min="0" value="10">
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">推荐好友积分</label>
+                  <input type="number" class="form-control" id="referralBonusPoints" min="0" value="50">
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">积分有效期(天)</label>
+                  <input type="number" class="form-control" id="pointsExpireDays" min="0" value="365" placeholder="0表示永久有效">
+                </div>
+                <div class="col-12">
+                  <label class="form-label">积分清零规则</label>
+                  <select class="form-select" id="pointsClearRule">
+                    <option value="never">永不清零</option>
+                    <option value="yearly">每年清零一次</option>
+                    <option value="inactive">180天未活跃清零</option>
+                  </select>
+                </div>
+                <div class="col-12">
+                  <button type="button" class="btn btn-primary" id="savePointsSettingsBtn">
+                    <i class="bi bi-check-lg"></i> 保存设置
+                  </button>
+                </div>
+              </div>
+            </form>
+          </div>
+        </div>
+        
+        <!-- 通知设置 -->
+        <div id="notification-settings" class="card mb-3 settings-section">
+          <div class="card-header bg-white">
+            <h5 class="mb-0"><i class="bi bi-bell"></i> 通知设置</h5>
+          </div>
+          <div class="card-body">
+            <form id="notificationSettingsForm">
+              <div class="row g-3">
+                <div class="col-12">
+                  <h6>邮件通知</h6>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">SMTP服务器</label>
+                  <input type="text" class="form-control" id="smtpHost" placeholder="smtp.example.com">
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">SMTP端口</label>
+                  <input type="number" class="form-control" id="smtpPort" value="465">
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">发件人邮箱</label>
+                  <input type="email" class="form-control" id="smtpEmail" placeholder="noreply@example.com">
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">邮箱密码</label>
+                  <input type="password" class="form-control" id="smtpPassword" placeholder="••••••••">
+                </div>
+                <div class="col-12">
+                  <hr>
+                  <h6>短信通知</h6>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">短信服务商</label>
+                  <select class="form-select" id="smsProvider">
+                    <option value="">请选择</option>
+                    <option value="aliyun">阿里云</option>
+                    <option value="tencent">腾讯云</option>
+                    <option value="huawei">华为云</option>
+                  </select>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">AccessKey ID</label>
+                  <input type="text" class="form-control" id="smsAccessKey" placeholder="AccessKey ID">
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">AccessKey Secret</label>
+                  <input type="password" class="form-control" id="smsAccessSecret" placeholder="••••••••">
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">短信签名</label>
+                  <input type="text" class="form-control" id="smsSignature" placeholder="【系统名称】">
+                </div>
+                <div class="col-12">
+                  <button type="button" class="btn btn-primary" id="saveNotificationSettingsBtn">
+                    <i class="bi bi-check-lg"></i> 保存设置
+                  </button>
+                </div>
+              </div>
+            </form>
+          </div>
+        </div>
+        
+        <!-- 安全设置 -->
+        <div id="security-settings" class="card mb-3 settings-section">
+          <div class="card-header bg-white">
+            <h5 class="mb-0"><i class="bi bi-shield-lock"></i> 安全设置</h5>
+          </div>
+          <div class="card-body">
+            <form id="securitySettingsForm">
+              <div class="row g-3">
+                <div class="col-md-6">
+                  <label class="form-label">登录失败锁定次数</label>
+                  <input type="number" class="form-control" id="loginFailLimit" min="3" value="5">
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">锁定时长(分钟)</label>
+                  <input type="number" class="form-control" id="lockoutDuration" min="5" value="30">
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">会话超时时间(分钟)</label>
+                  <input type="number" class="form-control" id="sessionTimeout" min="10" value="120">
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">JWT Token有效期(小时)</label>
+                  <input type="number" class="form-control" id="jwtExpireHours" min="1" value="24">
+                </div>
+                <div class="col-12">
+                  <label class="form-label">IP白名单</label>
+                  <textarea class="form-control" id="ipWhitelist" rows="3" placeholder="每行一个IP地址，留空表示不限制"></textarea>
+                  <small class="text-muted">示例：192.168.1.1 或 192.168.1.0/24</small>
+                </div>
+                <div class="col-12">
+                  <label class="form-label">安全选项</label>
+                  <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="enableTwoFactor">
+                    <label class="form-check-label" for="enableTwoFactor">
+                      启用双因素认证
+                    </label>
+                  </div>
+                  <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="forceHttps">
+                    <label class="form-check-label" for="forceHttps">
+                      强制使用HTTPS
+                    </label>
+                  </div>
+                  <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="enableAuditLog">
+                    <label class="form-check-label" for="enableAuditLog">
+                      启用操作审计日志
+                    </label>
+                  </div>
+                </div>
+                <div class="col-12">
+                  <button type="button" class="btn btn-primary" id="saveSecuritySettingsBtn">
+                    <i class="bi bi-check-lg"></i> 保存设置
+                  </button>
+                </div>
+              </div>
+            </form>
+          </div>
+        </div>
+        
+        <!-- 缓存管理 -->
+        <div id="cache-settings" class="card mb-3 settings-section">
+          <div class="card-header bg-white">
+            <h5 class="mb-0"><i class="bi bi-database"></i> 缓存管理</h5>
+          </div>
+          <div class="card-body">
+            <div class="row g-3">
+              <div class="col-12">
+                <div class="alert alert-info">
+                  <i class="bi bi-info-circle"></i>
+                  清除缓存可能会暂时影响系统性能，建议在低峰期操作。
+                </div>
+              </div>
+              <div class="col-md-6">
+                <div class="card">
+                  <div class="card-body text-center">
+                    <i class="bi bi-box text-primary" style="font-size: 3rem;"></i>
+                    <h6 class="mt-2">用户缓存</h6>
+                    <p class="text-muted small">清除用户信息、权限等缓存</p>
+                    <button class="btn btn-outline-primary btn-sm clear-cache-btn" data-cache-type="user">
+                      <i class="bi bi-trash"></i> 清除
+                    </button>
+                  </div>
+                </div>
+              </div>
+              <div class="col-md-6">
+                <div class="card">
+                  <div class="card-body text-center">
+                    <i class="bi bi-graph-up text-success" style="font-size: 3rem;"></i>
+                    <h6 class="mt-2">统计缓存</h6>
+                    <p class="text-muted small">清除统计数据缓存</p>
+                    <button class="btn btn-outline-success btn-sm clear-cache-btn" data-cache-type="stats">
+                      <i class="bi bi-trash"></i> 清除
+                    </button>
+                  </div>
+                </div>
+              </div>
+              <div class="col-md-6">
+                <div class="card">
+                  <div class="card-body text-center">
+                    <i class="bi bi-gear text-warning" style="font-size: 3rem;"></i>
+                    <h6 class="mt-2">系统配置缓存</h6>
+                    <p class="text-muted small">清除系统配置缓存</p>
+                    <button class="btn btn-outline-warning btn-sm clear-cache-btn" data-cache-type="config">
+                      <i class="bi bi-trash"></i> 清除
+                    </button>
+                  </div>
+                </div>
+              </div>
+              <div class="col-md-6">
+                <div class="card">
+                  <div class="card-body text-center">
+                    <i class="bi bi-asterisk text-danger" style="font-size: 3rem;"></i>
+                    <h6 class="mt-2">全部缓存</h6>
+                    <p class="text-muted small">清除所有缓存数据</p>
+                    <button class="btn btn-outline-danger btn-sm clear-cache-btn" data-cache-type="all">
+                      <i class="bi bi-trash"></i> 清除
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <!-- 加载遮罩层 -->
+  <div class="loading-overlay" id="loadingOverlay">
+    <div class="spinner-border text-light" style="width: 3rem; height: 3rem;" role="status">
+      <span class="visually-hidden">处理中...</span>
+    </div>
+  </div>
+
+  <!-- ✅ Bootstrap JS -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  
+  <!-- ✅ 引入通用工具库 -->
+  <script src="/admin/js/admin-common.js"></script>
+  
+  <script>
+    /**
+     * 页面初始化
+     */
+    document.addEventListener('DOMContentLoaded', function() {
+      // 显示用户信息
+      const userInfo = getCurrentUser();
+      if (userInfo && userInfo.nickname) {
+        document.getElementById('welcomeText').textContent = `欢迎，${userInfo.nickname}`;
+      }
+      
+      // ✅ Token和权限验证
+      if (!getToken() || !checkAdminPermission()) {
+        return;
+      }
+      
+      // 加载所有设置
+      loadAllSettings();
+      
+      // ===== 静态按钮事件监听器 =====
+      // 退出登录按钮
+      document.getElementById('logoutBtn').addEventListener('click', logout);
+      
+      // 保存设置按钮
+      document.getElementById('saveBasicSettingsBtn').addEventListener('click', saveBasicSettings);
+      document.getElementById('saveLotterySettingsBtn').addEventListener('click', saveLotterySettings);
+      document.getElementById('savePointsSettingsBtn').addEventListener('click', savePointsSettings);
+      document.getElementById('saveNotificationSettingsBtn').addEventListener('click', saveNotificationSettings);
+      document.getElementById('saveSecuritySettingsBtn').addEventListener('click', saveSecuritySettings);
+      
+      // ===== 事件委托：缓存清理按钮 =====
+      document.addEventListener('click', (e) => {
+        const clearCacheBtn = e.target.closest('.clear-cache-btn');
+        if (clearCacheBtn) {
+          const cacheType = clearCacheBtn.dataset.cacheType;
+          clearCache(cacheType);
+        }
+      });
+      
+      // 平滑滚动
+      document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+        anchor.addEventListener('click', function (e) {
+          e.preventDefault();
+          const target = document.querySelector(this.getAttribute('href'));
+          if (target) {
+            target.scrollIntoView({ behavior: 'smooth' });
+          }
+        });
+      });
+    });
+    
+    /**
+     * 加载所有设置
+     */
+    async function loadAllSettings() {
+      showLoading();
+      
+      try {
+        // 并行加载所有分类的设置
+        const [basicRes, pointsRes, notificationRes, securityRes] = await Promise.all([
+          apiRequest('/api/v4/admin/settings/basic').catch(e => null),
+          apiRequest('/api/v4/admin/settings/points').catch(e => null),
+          apiRequest('/api/v4/admin/settings/notification').catch(e => null),
+          apiRequest('/api/v4/admin/settings/security').catch(e => null)
+        ]);
+        
+        // 加载基础设置
+        if (basicRes && basicRes.success) {
+          basicRes.data.settings.forEach(setting => {
+            const { setting_key, parsed_value } = setting;
+            if (setting_key === 'system_name') document.getElementById('systemName').value = parsed_value;
+            if (setting_key === 'system_version') document.getElementById('systemVersion').value = parsed_value;
+            if (setting_key === 'customer_phone') document.getElementById('customerServicePhone').value = parsed_value;
+            if (setting_key === 'customer_email') document.getElementById('customerServiceEmail').value = parsed_value;
+          });
+        }
+        
+        // 加载积分设置
+        if (pointsRes && pointsRes.success) {
+          pointsRes.data.settings.forEach(setting => {
+            const { setting_key, parsed_value } = setting;
+            if (setting_key === 'sign_in_points') document.getElementById('dailyCheckInPoints').value = parsed_value;
+            if (setting_key === 'initial_points') document.getElementById('registerBonusPoints').value = parsed_value;
+            if (setting_key === 'points_expire_days') document.getElementById('pointsExpireDays').value = parsed_value;
+          });
+        }
+        
+        // 加载通知设置
+        if (notificationRes && notificationRes.success) {
+          notificationRes.data.settings.forEach(setting => {
+            const { setting_key, parsed_value } = setting;
+            const smsCheckbox = document.getElementById('smsEnabled');
+            const emailCheckbox = document.getElementById('emailEnabled');
+            const appCheckbox = document.getElementById('appNotificationEnabled');
+            
+            if (setting_key === 'sms_enabled' && smsCheckbox) smsCheckbox.checked = parsed_value;
+            if (setting_key === 'email_enabled' && emailCheckbox) emailCheckbox.checked = parsed_value;
+            if (setting_key === 'app_notification_enabled' && appCheckbox) appCheckbox.checked = parsed_value;
+          });
+        }
+        
+        // 加载安全设置
+        if (securityRes && securityRes.success) {
+          securityRes.data.settings.forEach(setting => {
+            const { setting_key, parsed_value } = setting;
+            if (setting_key === 'max_login_attempts') document.getElementById('loginFailLimit').value = parsed_value;
+            if (setting_key === 'lockout_duration') document.getElementById('lockoutDuration').value = parsed_value;
+            const pwdLengthInput = document.getElementById('passwordMinLength');
+            const rateLimitInput = document.getElementById('apiRateLimit');
+            if (setting_key === 'password_min_length' && pwdLengthInput) pwdLengthInput.value = parsed_value;
+            if (setting_key === 'api_rate_limit' && rateLimitInput) rateLimitInput.value = parsed_value;
+          });
+        }
+        
+        console.log('✅ 所有设置加载完成');
+      } catch (error) {
+        console.error('加载设置失败:', error);
+        showError('加载失败', error.message);
+      } finally {
+        hideLoading();
+      }
+    }
+    
+    /**
+     * 填充基础设置
+     */
+    function fillBasicSettings(data) {
+      if (!data) return;
+      if (data.system_name) document.getElementById('systemName').value = data.system_name;
+      if (data.customer_service_phone) document.getElementById('customerServicePhone').value = data.customer_service_phone;
+      if (data.customer_service_email) document.getElementById('customerServiceEmail').value = data.customer_service_email;
+      if (data.system_announcement) document.getElementById('systemAnnouncement').value = data.system_announcement;
+      if (data.maintenance_mode !== undefined) document.getElementById('maintenanceMode').checked = data.maintenance_mode;
+    }
+    
+    /**
+     * 填充抽奖设置
+     */
+    function fillLotterySettings(data) {
+      if (!data) return;
+      if (data.daily_draw_limit) document.getElementById('dailyDrawLimit').value = data.daily_draw_limit;
+      if (data.draw_cost_points) document.getElementById('drawCostPoints').value = data.draw_cost_points;
+      if (data.min_consumption_amount) document.getElementById('minConsumptionAmount').value = data.min_consumption_amount;
+      if (data.points_conversion_rate) document.getElementById('pointsConversionRate').value = data.points_conversion_rate;
+      if (data.guaranteed_win_enabled !== undefined) document.getElementById('guaranteedWinEnabled').checked = data.guaranteed_win_enabled;
+      if (data.guaranteed_win_count) document.getElementById('guaranteedWinCount').value = data.guaranteed_win_count;
+    }
+    
+    /**
+     * 填充积分设置
+     */
+    function fillPointsSettings(data) {
+      if (!data) return;
+      if (data.register_bonus_points) document.getElementById('registerBonusPoints').value = data.register_bonus_points;
+      if (data.daily_check_in_points) document.getElementById('dailyCheckInPoints').value = data.daily_check_in_points;
+      if (data.referral_bonus_points) document.getElementById('referralBonusPoints').value = data.referral_bonus_points;
+      if (data.points_expire_days) document.getElementById('pointsExpireDays').value = data.points_expire_days;
+      if (data.points_clear_rule) document.getElementById('pointsClearRule').value = data.points_clear_rule;
+    }
+    
+    /**
+     * 填充通知设置
+     */
+    function fillNotificationSettings(data) {
+      if (!data) return;
+      if (data.smtp_host) document.getElementById('smtpHost').value = data.smtp_host;
+      if (data.smtp_port) document.getElementById('smtpPort').value = data.smtp_port;
+      if (data.smtp_email) document.getElementById('smtpEmail').value = data.smtp_email;
+      if (data.sms_provider) document.getElementById('smsProvider').value = data.sms_provider;
+      if (data.sms_signature) document.getElementById('smsSignature').value = data.sms_signature;
+    }
+    
+    /**
+     * 填充安全设置
+     */
+    function fillSecuritySettings(data) {
+      if (!data) return;
+      if (data.login_fail_limit) document.getElementById('loginFailLimit').value = data.login_fail_limit;
+      if (data.lockout_duration) document.getElementById('lockoutDuration').value = data.lockout_duration;
+      if (data.session_timeout) document.getElementById('sessionTimeout').value = data.session_timeout;
+      if (data.jwt_expire_hours) document.getElementById('jwtExpireHours').value = data.jwt_expire_hours;
+      if (data.ip_whitelist) document.getElementById('ipWhitelist').value = data.ip_whitelist;
+      if (data.enable_two_factor !== undefined) document.getElementById('enableTwoFactor').checked = data.enable_two_factor;
+      if (data.force_https !== undefined) document.getElementById('forceHttps').checked = data.force_https;
+      if (data.enable_audit_log !== undefined) document.getElementById('enableAuditLog').checked = data.enable_audit_log;
+    }
+    
+    /**
+     * 保存基础设置
+     */
+    async function saveBasicSettings() {
+      showLoading();
+      
+      try {
+        const settings = {
+          system_name: document.getElementById('systemName').value,
+          customer_phone: document.getElementById('customerServicePhone').value,
+          customer_email: document.getElementById('customerServiceEmail').value
+        };
+        
+        // 调用后端API
+        const response = await apiRequest('/api/v4/admin/settings/basic', {
+          method: 'PUT',
+          body: JSON.stringify({ settings })
+        });
+        
+        if (response && response.success) {
+          showSuccess('保存成功', '基础设置已更新');
+        } else {
+          showError('保存失败', response?.message || '保存基础设置失败');
+        }
+      } catch (error) {
+        console.error('保存设置失败:', error);
+        showError('保存失败', error.message);
+      } finally {
+        hideLoading();
+      }
+    }
+    
+    /**
+     * 保存抽奖设置
+     * 
+     * 注：抽奖算法配置在config/business.config.js中管理（技术团队负责）
+     * 用户个性化概率请使用【用户管理】页面的【概率】功能
+     */
+    async function saveLotterySettings() {
+      showLoading();
+      
+      try {
+        const data = {
+          daily_draw_limit: parseInt(document.getElementById('dailyDrawLimit').value),
+          draw_cost_points: parseInt(document.getElementById('drawCostPoints').value),
+          min_consumption_amount: parseFloat(document.getElementById('minConsumptionAmount').value),
+          points_conversion_rate: document.getElementById('pointsConversionRate').value,
+          guaranteed_win_enabled: document.getElementById('guaranteedWinEnabled').checked,
+          guaranteed_win_count: parseInt(document.getElementById('guaranteedWinCount').value)
+        };
+        
+        // 提示用户：抽奖核心配置需要修改代码
+        alert(
+          '💡 抽奖配置说明\n\n' +
+          '✅ 运营配置（可通过界面修改）：\n' +
+          '   - 请前往【用户管理】页面\n' +
+          '   - 点击用户的【概率】按钮\n' +
+          '   - 可设置特定用户的中奖率\n' +
+          '\n' +
+          '⚙️ 算法配置（需要技术团队修改代码）：\n' +
+          '   - 基础中奖率：config/business.config.js\n' +
+          '   - 保底触发规则：BasicGuaranteeStrategy.js\n' +
+          '   - 连抽定价：config/business.config.js\n' +
+          '\n' +
+          '修改算法配置后需要重启服务生效。'
+        );
+        
+      } catch (error) {
+        console.error('保存设置失败:', error);
+        showError('保存失败', error.message);
+      } finally {
+        hideLoading();
+      }
+    }
+    
+    /**
+     * 保存积分设置
+     */
+    async function savePointsSettings() {
+      showLoading();
+      
+      try {
+        const settings = {
+          sign_in_points: parseInt(document.getElementById('dailyCheckInPoints').value),
+          initial_points: parseInt(document.getElementById('registerBonusPoints').value),
+          points_expire_days: parseInt(document.getElementById('pointsExpireDays').value)
+        };
+        
+        // 调用后端API
+        const response = await apiRequest('/api/v4/admin/settings/points', {
+          method: 'PUT',
+          body: JSON.stringify({ settings })
+        });
+        
+        if (response && response.success) {
+          showSuccess('保存成功', '积分设置已更新');
+        } else {
+          showError('保存失败', response?.message || '保存积分设置失败');
+        }
+        
+      } catch (error) {
+        console.error('保存设置失败:', error);
+        showError('保存失败', error.message);
+      } finally {
+        hideLoading();
+      }
+    }
+    
+    /**
+     * 保存通知设置
+     */
+    async function saveNotificationSettings() {
+      showLoading();
+      
+      try {
+        const settings = {
+          sms_enabled: document.getElementById('smsEnabled')?.checked || false,
+          email_enabled: document.getElementById('emailEnabled')?.checked || false,
+          app_notification_enabled: document.getElementById('appNotificationEnabled')?.checked !== false
+        };
+        
+        // 调用后端API
+        const response = await apiRequest('/api/v4/admin/settings/notification', {
+          method: 'PUT',
+          body: JSON.stringify({ settings })
+        });
+        
+        if (response && response.success) {
+          showSuccess('保存成功', '通知设置已更新');
+        } else {
+          showError('保存失败', response?.message || '保存通知设置失败');
+        }
+      } catch (error) {
+        console.error('保存设置失败:', error);
+        showError('保存失败', error.message);
+      } finally {
+        hideLoading();
+      }
+    }
+    
+    /**
+     * 保存安全设置
+     */
+    async function saveSecuritySettings() {
+      showLoading();
+      
+      try {
+        const settings = {
+          max_login_attempts: parseInt(document.getElementById('loginFailLimit').value),
+          lockout_duration: parseInt(document.getElementById('lockoutDuration').value),
+          password_min_length: parseInt(document.getElementById('passwordMinLength')?.value || 6),
+          api_rate_limit: parseInt(document.getElementById('apiRateLimit')?.value || 100)
+        };
+        
+        // 调用后端API
+        const response = await apiRequest('/api/v4/admin/settings/security', {
+          method: 'PUT',
+          body: JSON.stringify({ settings })
+        });
+        
+        if (response && response.success) {
+          showSuccess('保存成功', '安全设置已更新');
+        } else {
+          showError('保存失败', response?.message || '保存安全设置失败');
+        }
+      } catch (error) {
+        console.error('保存设置失败:', error);
+        showError('保存失败', error.message);
+      } finally {
+        hideLoading();
+      }
+    }
+    
+    /**
+     * 清除缓存
+     * @param {string} type - 缓存类型
+     */
+    async function clearCache(type) {
+      if (!confirm(`确认清除${type === 'all' ? '全部' : type}缓存？\n清除后需要一定时间重建缓存，可能暂时影响性能。`)) {
+        return;
+      }
+      
+      showLoading();
+      
+      try {
+        // 根据类型构建pattern
+        let pattern = '*'; // 默认全部
+        if (type === 'rate_limit') pattern = 'rate_limit:*';
+        else if (type === 'user') pattern = 'user_*';
+        else if (type === 'prize') pattern = 'prize_*';
+        
+        // 调用后端API
+        const response = await apiRequest('/api/v4/admin/cache/clear', {
+          method: 'POST',
+          body: JSON.stringify({ pattern, confirm: true })
+        });
+        
+        if (response && response.success) {
+          showSuccess('清除成功', `已清除${response.data.cleared_count}个缓存键`);
+        } else {
+          showError('清除失败', response?.message || '缓存清除失败');
+        }
+      } catch (error) {
+        console.error('清除缓存失败:', error);
+        showError('清除失败', error.message);
+      } finally {
+        hideLoading();
+      }
+    }
+    
+    /**
+     * 显示加载状态
+     */
+    function showLoading() {
+      document.getElementById('loadingOverlay').classList.add('show');
+    }
+    
+    /**
+     * 隐藏加载状态
+     */
+    function hideLoading() {
+      document.getElementById('loadingOverlay').classList.remove('show');
+    }
+    
+    /**
+     * 显示成功提示
+     * @param {string} title - 标题
+     * @param {string} message - 消息
+     */
+    function showSuccess(title, message) {
+      alert(`✅ ${title}\n${message}`);
+    }
+    
+    /**
+     * 显示错误提示
+     * @param {string} title - 标题
+     * @param {string} message - 消息
+     */
+    function showError(title, message) {
+      alert(`❌ ${title}\n${message}`);
+    }
+  </script>
+</body>
+</html>
+

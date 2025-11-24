@@ -2228,7 +2228,7 @@ router.post(
           is_deleted: 0, // 当前删除标记（0=未删除）
           user_id: record.user_id, // 记录所属用户ID
           restored_by: adminId, // 恢复操作员ID
-          restored_at: BeijingTimeHelper.toBeijingTime(restoreTime), // 恢复时间（北京时间字符串）
+          restored_at: BeijingTimeHelper.formatForAPI(restoreTime).iso, // 恢复时间（ISO 8601格式）
           restore_count: restoreCount + 1, // 累计恢复次数
           note: '交易记录已恢复，用户端将重新显示该记录' // 操作说明
         },
@@ -2337,8 +2337,8 @@ router.get('/restore-audit', authenticateToken, requireAdmin, async (req, res) =
     // ===== Step 4: 格式化时间字段 =====
     const formattedRecords = rows.map(record => ({
       ...record,
-      deleted_at: record.deleted_at ? BeijingTimeHelper.toBeijingTime(record.deleted_at) : null,
-      restored_at: record.restored_at ? BeijingTimeHelper.toBeijingTime(record.restored_at) : null
+      deleted_at: record.deleted_at ? BeijingTimeHelper.formatForAPI(record.deleted_at).iso : null,
+      restored_at: record.restored_at ? BeijingTimeHelper.formatForAPI(record.restored_at).iso : null
     }))
 
     // ===== Step 5: 返回审计记录 =====

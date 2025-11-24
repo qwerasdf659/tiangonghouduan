@@ -288,6 +288,7 @@ class ExchangeOperationService {
       include: [
         {
           model: User,
+          as: 'user', // 明确指定关联别名（ExchangeRecords与User有多个关联：user和auditor）
           attributes: ['user_id', 'username', 'phone']
         }
       ],

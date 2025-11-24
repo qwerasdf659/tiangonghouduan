@@ -1762,7 +1762,7 @@ class UnifiedLotteryEngine {
             win_time: lastWin.created_at // 中奖时间（北京时间 - Beijing Time）
           }
           : null, // 最近一次中奖记录（如果没有中奖记录则为null）
-        timestamp: BeijingTimeHelper.now() // 响应时间戳（北京时间 - Beijing Time），格式：YYYY-MM-DDTHH:mm:ss.sss+08:00
+        timestamp: BeijingTimeHelper.formatForAPI(new Date()).iso // 响应时间戳（ISO 8601格式）
       }
     } catch (error) {
       // ❌ 错误处理：记录错误日志并抛出异常

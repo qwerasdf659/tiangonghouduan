@@ -246,7 +246,7 @@ class ConcurrencyControlMiddleware {
       totalActiveRequests: this.activeRequests.size,
       userConcurrency,
       ipConcurrency,
-      timestamp: BeijingTimeHelper.now()
+      timestamp: BeijingTimeHelper.formatForAPI(new Date()).iso
     }
   }
 

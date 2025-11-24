@@ -13,7 +13,7 @@
 const request = require('supertest')
 const app = require('../../app')
 const models = require('../../models')
-const { generateTestToken } = require('../helpers/authHelper')
+const { getTestUserToken } = require('../helpers/auth-helper')
 
 describe('撤回市场商品API优化功能测试', () => {
   let testUser

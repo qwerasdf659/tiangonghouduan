@@ -359,8 +359,8 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
         // ✅ 生成唯一的抽奖ID（用于幂等性控制）
         const draw_id = `draw_${BeijingTimeHelper.generateIdTimestamp()}_${user_id}_${Math.random().toString(36).substr(2, 6)}`
 
-        // 直接从奖品池中选择奖品
-        const prize = await this.selectPrize(await this.getAvailablePrizes(campaignId))
+        // 直接从奖品池中选择奖品（传入user_id以支持个性化概率）
+        const prize = await this.selectPrize(await this.getAvailablePrizes(campaignId), user_id)
 
         if (prize) {
           /**
@@ -1028,13 +1028,14 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
   }
 
   /**
-   * 从奖品池中选择奖品（优化版）
+   * 从奖品池中选择奖品（优化版 + 用户个性化概率支持）
    * 支持50个奖品的加权随机选择算法
    *
    * @param {Array} prizes - 可用奖品列表
-   * @returns {Object} 选中的奖品
+   * @param {number} user_id - 用户ID（用于查询个性化概率设置）
+   * @returns {Promise<Object>} 选中的奖品
    */
-  selectPrize (prizes) {
+  async selectPrize (prizes, user_id = null) {
     if (!prizes || prizes.length === 0) {
       this.logError('奖品列表为空，无法选择奖品')
       return null
@@ -1043,7 +1044,7 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
     // 🎯 固定概率抽奖算法 - 严格按照业务设定的中奖概率执行
     try {
       // 过滤可用奖品（有库存且激活，且概率大于0）
-      const availablePrizes = prizes.filter(prize => {
+      let availablePrizes = prizes.filter(prize => {
         return (
           prize.status === 'active' &&
           (prize.stock_quantity === null || prize.stock_quantity > 0) &&
@@ -1057,14 +1058,20 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
         return null
       }
 
+      // 🆕 检查用户是否有特定奖品概率调整设置
+      if (user_id) {
+        availablePrizes = await this.applyUserProbabilityAdjustment(availablePrizes, user_id)
+      }
+
       // 计算总概率（理论上应该等于1.0，即100%）
       const totalProbability = availablePrizes.reduce((sum, prize) => {
-        return sum + parseFloat(prize.win_probability)
+        return sum + parseFloat(prize.adjusted_probability || prize.win_probability)
       }, 0)
 
       this.logInfo('抽奖概率信息', {
         totalProbability,
-        availablePrizes: availablePrizes.length
+        availablePrizes: availablePrizes.length,
+        hasUserAdjustment: user_id && availablePrizes.some(p => p.adjusted_probability)
       })
 
       // 生成0-1之间的随机数
@@ -1073,14 +1080,18 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
 
       // 根据固定概率选择奖品
       for (const prize of availablePrizes) {
-        currentProbability += parseFloat(prize.win_probability)
+        const prizeProbability = parseFloat(prize.adjusted_probability || prize.win_probability)
+        currentProbability += prizeProbability
         if (randomValue <= currentProbability) {
           this.logInfo('奖品选择成功', {
             prizeId: prize.prize_id,
             prizeName: prize.prize_name,
-            setProbability: (prize.win_probability * 100).toFixed(2) + '%',
+            originalProbability: (prize.win_probability * 100).toFixed(2) + '%',
+            adjustedProbability: prize.adjusted_probability
+              ? (prize.adjusted_probability * 100).toFixed(2) + '%'
+              : null,
             randomValue: randomValue.toFixed(4),
-            hitRange: `${((currentProbability - prize.win_probability) * 100).toFixed(2)}%-${(currentProbability * 100).toFixed(2)}%`
+            hitRange: `${((currentProbability - prizeProbability) * 100).toFixed(2)}%-${(currentProbability * 100).toFixed(2)}%`
           })
           return prize
         }
@@ -1099,6 +1110,155 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
       // 异常情况下随机选择
       return prizes[Math.floor(Math.random() * prizes.length)]
     }
+  }
+
+  /**
+   * 🆕 应用用户个性化概率调整
+   *
+   * @description 根据用户的probability_adjust设置，调整奖品概率
+   * @param {Array} prizes - 原始奖品列表
+   * @param {number} user_id - 用户ID
+   * @returns {Promise<Array>} 调整后的奖品列表
+   *
+   * @example
+   * // 用户A：一等奖设置为50%，其他奖品自动缩减
+   * const adjustedPrizes = await this.applyUserProbabilityAdjustment(prizes, userA_id)
+   */
+  async applyUserProbabilityAdjustment (prizes, user_id) {
+    try {
+      const { LotteryManagementSetting } = require('../../../models')
+
+      // 查询用户的概率调整设置
+      const adjustment = await LotteryManagementSetting.findOne({
+        where: {
+          user_id,
+          setting_type: 'probability_adjust',
+          status: 'active'
+        }
+      })
+
+      if (!adjustment || !adjustment.setting_data) {
+        return prizes // 无调整设置，返回原始概率
+      }
+
+      const settingData = adjustment.setting_data
+
+      // ===== 类型1：特定奖品概率调整 =====
+      if (settingData.adjustment_type === 'specific_prize' && settingData.prize_id) {
+        return this.adjustSpecificPrizeProbability(prizes, settingData)
+      }
+
+      // ===== 类型2：全局倍数调整（原有功能） =====
+      if (settingData.adjustment_type === 'global_multiplier' && settingData.multiplier) {
+        return prizes.map(prize => ({
+          ...prize,
+          adjusted_probability: Math.min(1.0, prize.win_probability * settingData.multiplier)
+        }))
+      }
+
+      return prizes
+    } catch (error) {
+      this.logError('应用用户概率调整失败', { user_id, error: error.message })
+      return prizes // 出错时返回原始概率
+    }
+  }
+
+  /**
+   * 🆕 调整特定奖品概率并自动缩放其他奖品
+   *
+   * @description
+   * 1. 将指定奖品的概率设置为自定义值
+   * 2. 其他奖品按比例缩放，确保总概率=100%
+   *
+   * @param {Array} prizes - 原始奖品列表
+   * @param {Object} settingData - 调整设置
+   * @param {number} settingData.prize_id - 要调整的奖品ID
+   * @param {number} settingData.custom_probability - 自定义概率（0-1）
+   * @returns {Array} 调整后的奖品列表
+   *
+   * @example
+   * 原始配置：一等奖20%、二等奖30%、三等奖50%
+   * 调整设置：一等奖设置为50%
+   * 调整结果：一等奖50%、二等奖18.75%、三等奖31.25%
+   */
+  adjustSpecificPrizeProbability (prizes, settingData) {
+    const { prize_id, custom_probability } = settingData
+
+    // 找到要调整的奖品
+    const targetPrize = prizes.find(p => p.prize_id === prize_id)
+    if (!targetPrize) {
+      this.logWarn('指定的奖品不存在于奖品池', { prize_id })
+      return prizes
+    }
+
+    const originalProbability = parseFloat(targetPrize.win_probability)
+    const newProbability = parseFloat(custom_probability)
+
+    // 计算其他奖品的原始概率总和
+    const otherPrizesTotalProbability = prizes
+      .filter(p => p.prize_id !== prize_id)
+      .reduce((sum, p) => sum + parseFloat(p.win_probability), 0)
+
+    // 计算缩放比例（确保总概率=100%）
+    const remainingProbability = 1.0 - newProbability
+    const scaleFactor =
+      otherPrizesTotalProbability > 0 ? remainingProbability / otherPrizesTotalProbability : 0
+
+    // 应用概率调整
+    const adjustedPrizes = prizes.map(prize => {
+      // 🔴 处理Sequelize模型实例：使用dataValues获取原始数据
+      let prizeData
+      if (prize.dataValues) {
+        // Sequelize模型实例
+        prizeData = { ...prize.dataValues }
+      } else if (prize.toJSON && typeof prize.toJSON === 'function') {
+        // 有toJSON方法的对象
+        prizeData = prize.toJSON()
+      } else {
+        // 普通对象
+        prizeData = { ...prize }
+      }
+
+      if (prizeData.prize_id === prize_id) {
+        // 目标奖品：使用自定义概率
+        return {
+          ...prizeData,
+          adjusted_probability: newProbability,
+          adjustment_info: {
+            original: originalProbability,
+            adjusted: newProbability,
+            reason: '管理员特定奖品概率调整'
+          }
+        }
+      } else {
+        // 其他奖品：按比例缩放
+        const originalProb = parseFloat(prizeData.win_probability) || 0
+        const adjustedProb = originalProb * scaleFactor
+        return {
+          ...prizeData,
+          adjusted_probability: adjustedProb,
+          adjustment_info: {
+            original: originalProb,
+            adjusted: adjustedProb,
+            scale_factor: scaleFactor,
+            reason: '自动缩放以保持总概率100%'
+          }
+        }
+      }
+    })
+
+    this.logInfo('特定奖品概率调整完成', {
+      target_prize_id: prize_id,
+      target_prize_name: targetPrize.prize_name,
+      original_probability: (originalProbability * 100).toFixed(2) + '%',
+      new_probability: (newProbability * 100).toFixed(2) + '%',
+      scale_factor: scaleFactor.toFixed(4),
+      total_probability_after: adjustedPrizes
+        .reduce((sum, p) => sum + p.adjusted_probability, 0)
+        .toFixed(4)
+    })
+
+    return adjustedPrizes
   }
 
   /**

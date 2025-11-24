@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>数据仪表盘 - 管理后台</title>
+  
+  <!-- ✅ Bootstrap 5 - UI框架 -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  
+  <!-- ✅ Bootstrap Icons - 图标库 -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+  
+  <!-- ✅ 公共样式表 - 统一主题和响应式设计 -->
+  <link href="/admin/css/common.css" rel="stylesheet">
+</head>
+<body class="bg-light">
+  <!-- 顶部导航 -->
+  <nav class="navbar navbar-dark bg-primary">
+    <div class="container-fluid">
+      <span class="navbar-brand">📊 管理后台 - 数据仪表盘</span>
+      <div>
+        <span class="text-light me-3" id="welcomeText">欢迎，管理员</span>
+        <button class="btn btn-outline-light btn-sm" id="logoutBtn">退出登录</button>
+      </div>
+    </div>
+  </nav>
+  
+  <div class="container mt-4">
+    <h4 class="mb-3">今日数据概览</h4>
+    
+    <!-- 统计卡片 -->
+    <div class="row g-3 mb-4">
+      <div class="col-md-3">
+        <div class="card">
+          <div class="card-body text-center">
+            <h6 class="text-muted">总用户数</h6>
+            <h2 id="totalUsers" class="text-primary">-</h2>
+            <small class="text-success">今日新增: <span id="todayNewUsers">-</span></small>
+          </div>
+        </div>
+      </div>
+      
+      <div class="col-md-3">
+        <div class="card">
+          <div class="card-body text-center">
+            <h6 class="text-muted">今日抽奖</h6>
+            <h2 id="todayDraws" class="text-success">-</h2>
+            <small class="text-info">中奖: <span id="todayWins">-</span></small>
+          </div>
+        </div>
+      </div>
+      
+      <div class="col-md-3">
+        <div class="card">
+          <div class="card-body text-center">
+            <h6 class="text-muted">中奖率</h6>
+            <h2 id="winRate" class="text-warning">-</h2>
+            <small class="text-secondary">消耗积分: <span id="points">-</span></small>
+          </div>
+        </div>
+      </div>
+      
+      <div class="col-md-3">
+        <div class="card">
+          <div class="card-body text-center">
+            <h6 class="text-muted">客服会话</h6>
+            <h2 id="sessions" class="text-danger">-</h2>
+            <small class="text-muted">消息数: <span id="messages">-</span></small>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- 快速导航 -->
+    <div class="row">
+      <div class="col-12">
+        <div class="card">
+          <div class="card-body">
+            <h5 class="card-title">
+              <i class="bi bi-lightning-fill"></i> 快速操作
+            </h5>
+            
+            <!-- P0 - 核心业务功能 -->
+            <div class="mb-3">
+              <h6 class="text-muted mb-2">
+                <span class="badge bg-danger me-2">P0</span>核心业务功能
+              </h6>
+              <div class="row g-2">
+                <div class="col-md-3 col-sm-6">
+                  <a href="/admin/consumption.html" class="btn btn-outline-primary w-100">
+                    <i class="bi bi-clipboard-check"></i> 消费记录审核
+                  </a>
+                </div>
+                <div class="col-md-3 col-sm-6">
+                  <a href="/admin/presets.html" class="btn btn-outline-warning w-100">
+                    <i class="bi bi-stars"></i> 抽奖预设管理
+                  </a>
+                </div>
+              </div>
+            </div>
+            
+            <!-- P1 - 实用功能 -->
+            <div class="mb-3">
+              <h6 class="text-muted mb-2">
+                <span class="badge bg-primary me-2">P1</span>实用功能
+              </h6>
+              <div class="row g-2">
+                <div class="col-md-3 col-sm-6">
+                  <a href="/admin/users.html" class="btn btn-outline-info w-100">
+                    <i class="bi bi-people"></i> 用户管理
+                  </a>
+                </div>
+                <div class="col-md-3 col-sm-6">
+                  <a href="/admin/prizes.html" class="btn btn-outline-success w-100">
+                    <i class="bi bi-gift"></i> 奖品池配置
+                  </a>
+                </div>
+                <div class="col-md-3 col-sm-6">
+                  <a href="/admin/customer-service.html" class="btn btn-outline-danger w-100">
+                    <i class="bi bi-chat-dots"></i> 客服工作台
+                  </a>
+                </div>
+              </div>
+            </div>
+            
+            <!-- P2 - 高级功能 -->
+            <div>
+              <h6 class="text-muted mb-2">
+                <span class="badge bg-success me-2">P2</span>高级功能
+              </h6>
+              <div class="row g-2">
+                <div class="col-md-3 col-sm-6">
+                  <a href="/admin/statistics.html" class="btn btn-outline-primary w-100">
+                    <i class="bi bi-bar-chart-fill"></i> 数据统计报表
+                  </a>
+                </div>
+                <div class="col-md-3 col-sm-6">
+                  <a href="/admin/charts.html" class="btn btn-outline-success w-100">
+                    <i class="bi bi-graph-up"></i> 图表可视化
+                  </a>
+                </div>
+                <div class="col-md-3 col-sm-6">
+                  <a href="/admin/notifications.html" class="btn btn-outline-warning w-100">
+                    <i class="bi bi-bell-fill"></i> 系统通知中心
+                  </a>
+                </div>
+                <div class="col-md-3 col-sm-6">
+                  <a href="/admin/settings.html" class="btn btn-outline-danger w-100">
+                    <i class="bi bi-gear-fill"></i> 系统设置
+                  </a>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ✅ 引入通用工具库 -->
+  <script src="/admin/js/admin-common.js"></script>
+  
+  <script>
+    /**
+     * 显示用户信息
+     */
+    document.addEventListener('DOMContentLoaded', function() {
+      const userInfo = getCurrentUser();
+      if (userInfo && userInfo.nickname) {
+        document.getElementById('welcomeText').textContent = `欢迎，${userInfo.nickname}`;
+      }
+      
+      // 退出登录按钮
+      document.getElementById('logoutBtn').addEventListener('click', logout);
+    });
+    
+    /**
+     * 加载仪表盘数据
+     * 使用现有管理API：/api/v4/admin/system/dashboard
+     * 
+     * 后端数据结构（V4统一抽奖引擎）：
+     * {
+     *   overview: { total_users, active_users, total_lotteries, win_rate },
+     *   today: { new_users, lottery_draws, wins, win_rate, points_consumed },
+     *   customer_service: { today_sessions, today_messages },
+     *   system: { uptime, memory_usage, cpu_usage, timestamp }
+     * }
+     */
+    async function loadDashboardData() {
+      try {
+        const response = await apiRequest('/api/v4/admin/system/dashboard');
+        
+        if (response && response.success && response.data) {
+          const data = response.data;
+          
+          // 适配后端V4数据结构 - 总用户数据
+          if (data.overview) {
+            document.getElementById('totalUsers').textContent = formatNumber(data.overview.total_users || 0);
+          }
+          
+          // 适配后端V4数据结构 - 今日数据
+          if (data.today) {
+            document.getElementById('todayNewUsers').textContent = data.today.new_users || 0;
+            document.getElementById('todayDraws').textContent = formatNumber(data.today.lottery_draws || 0);
+            document.getElementById('todayWins').textContent = formatNumber(data.today.wins || 0);
+            document.getElementById('winRate').textContent = (data.today.win_rate || 0) + '%';
+            document.getElementById('points').textContent = formatNumber(data.today.points_consumed || 0);
+          }
+          
+          // 适配后端V4数据结构 - 客服会话数据
+          if (data.customer_service) {
+            document.getElementById('sessions').textContent = formatNumber(data.customer_service.today_sessions || 0);
+            document.getElementById('messages').textContent = formatNumber(data.customer_service.today_messages || 0);
+          }
+          
+          console.log('✅ 仪表盘数据加载成功', {
+            total_users: data.overview?.total_users,
+            today_new_users: data.today?.new_users,
+            today_draws: data.today?.lottery_draws,
+            today_wins: data.today?.wins,
+            win_rate: data.today?.win_rate
+          });
+        } else {
+          console.warn('⚠️ 仪表盘API返回数据格式异常:', response);
+        }
+      } catch (error) {
+        console.error('❌ 加载仪表盘数据失败:', error);
+        handleApiError(error, '加载仪表盘数据');
+      }
+    }
+    
+    // 页面初始化
+    if (getToken() && checkAdminPermission()) {
+      loadDashboardData();
+      setInterval(loadDashboardData, 60000); // 每分钟刷新
+    }
+  </script>
+</body>
+</html>
+

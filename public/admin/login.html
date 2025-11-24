@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>管理后台登录 - 餐厅积分抽奖系统</title>
+  
+  <!-- ✅ Bootstrap 5 - UI框架 -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  
+  <!-- ✅ 公共样式表 - 统一主题和响应式设计 -->
+  <link href="/admin/css/common.css" rel="stylesheet">
+</head>
+<body class="bg-light d-flex align-items-center" style="height: 100vh;">
+  <div class="container">
+    <div class="row justify-content-center">
+      <div class="col-md-4">
+        <div class="card shadow">
+          <div class="card-body p-4">
+            <div class="text-center mb-4">
+              <h3>🔐 管理后台登录</h3>
+              <p class="text-muted">餐厅积分抽奖系统 V4.0</p>
+            </div>
+            
+            <form id="loginForm">
+              <div class="mb-3">
+                <label class="form-label">手机号</label>
+                <input 
+                  type="tel" 
+                  class="form-control" 
+                  id="phone" 
+                  placeholder="请输入手机号" 
+                  value="13800138000" 
+                  required
+                >
+              </div>
+              
+              <div class="mb-3">
+                <label class="form-label">验证码</label>
+                <input 
+                  type="text" 
+                  class="form-control" 
+                  id="code" 
+                  placeholder="请输入验证码" 
+                  value="123456" 
+                  required
+                >
+                <small class="text-muted">开发环境万能验证码：123456</small>
+              </div>
+              
+              <button type="submit" class="btn btn-primary w-100">登录</button>
+            </form>
+            
+            <div id="loginStatus" class="mt-3"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    /**
+     * 显示登录状态消息
+     * @param {string} message - 消息内容
+     * @param {boolean} isError - 是否为错误消息
+     */
+    function showStatus(message, isError = false) {
+      const statusDiv = document.getElementById('loginStatus');
+      statusDiv.innerHTML = `
+        <div class="alert alert-${isError ? 'danger' : 'info'}" role="alert">
+          ${message}
+        </div>
+      `;
+    }
+
+    /**
+     * 登录处理函数
+     * ✅ 使用正确的API参数：mobile（不是phone_number）
+     */
+    document.getElementById('loginForm').addEventListener('submit', async function(e) {
+      e.preventDefault();
+      
+      const phone = document.getElementById('phone').value;
+      const code = document.getElementById('code').value;
+      
+      showStatus('正在登录...');
+      
+      try {
+        const response = await fetch('/api/v4/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            mobile: phone,           // ✅ 使用mobile参数
+            verification_code: code 
+          })
+        });
+        
+        const result = await response.json();
+        console.log('登录响应:', result);
+        
+        // ✅ 修复：后端返回的是access_token，不是token
+        if (result.success && result.data && result.data.access_token) {
+          const user = result.data.user;
+          
+          // ✅ 权限检查（基于user.roles数组）
+          const hasAdminAccess = user.roles && user.roles.some(role => 
+            role.role_name === 'admin' || role.role_level >= 100
+          );
+          
+          if (hasAdminAccess) {
+            showStatus('✅ 登录成功，正在跳转...');
+            
+            // 保存Token和用户信息（使用access_token）
+            localStorage.setItem('admin_token', result.data.access_token);
+            localStorage.setItem('admin_user', JSON.stringify(user));
+            
+            // 延迟跳转，让用户看到成功消息
+            setTimeout(() => {
+              window.location.href = '/admin/dashboard.html';
+            }, 1000);
+          } else {
+            showStatus('❌ 此账号没有管理员权限，请联系系统管理员', true);
+          }
+        } else {
+          showStatus(`❌ 登录失败: ${result.message || '未知错误'}`, true);
+        }
+      } catch (error) {
+        console.error('登录错误:', error);
+        showStatus(`❌ 网络错误: ${error.message}`, true);
+      }
+    });
+  </script>
+</body>
+</html>
+

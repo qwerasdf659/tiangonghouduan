@@ -49,10 +49,10 @@ describe('用户管理安全修复测试 (风险1、2、3 - V4架构)', () => {
     console.log(`📅 测试时间: ${BeijingTimeHelper.now()} (北京时间)`)
     console.log('🗄️ 数据库: restaurant_points_dev')
 
-    // 使用统一测试账号
+    // ✅ 修复：统一使用TEST_DATA而非TestConfig.real_data
     adminUser = {
-      ...TestConfig.real_data.adminUser,
-      user_id: TestConfig.real_data.adminUser.user_id
+      ...TEST_DATA.users.adminUser,
+      user_id: TEST_DATA.users.adminUser.user_id
     }
 
     // 创建测试用户1

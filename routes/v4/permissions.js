@@ -137,6 +137,38 @@ router.get('/current', authenticateToken, async (req, res) => {
 })
 
 /**
+ * GET /api/v4/permissions/me - 获取我的权限信息（别名路由）
+ *
+ * @route GET /api/v4/permissions/me
+ * @description 获取当前登录用户的权限信息（/current的别名，符合RESTful标准）
+ */
+router.get('/me', authenticateToken, async (req, res) => {
+  try {
+    const user_id = req.user.user_id
+
+    // 获取用户完整权限信息
+    const permissions = await permission_module.getUserPermissions(parseInt(user_id))
+
+    // 构建响应数据
+    const response_data = {
+      user_id: parseInt(user_id),
+      roles: permissions.roles,
+      role_based_admin: permissions.role_based_admin,
+      role_level: permissions.role_level,
+      permissions,
+      can_manage_lottery: permissions.role_based_admin,
+      can_view_admin_panel: permissions.role_based_admin,
+      can_modify_user_permissions: permissions.role_based_admin
+    }
+
+    return res.apiSuccess(response_data, '当前用户权限信息获取成功')
+  } catch (error) {
+    console.error('❌ 获取当前用户权限失败:', error)
+    return res.apiInternalError('获取当前用户权限信息失败', error.message)
+  }
+})
+
+/**
  * 🛡️ 检查权限
  * POST /api/v4/permissions/check
  * 🔒 P2修复：添加参数标准化验证中间件

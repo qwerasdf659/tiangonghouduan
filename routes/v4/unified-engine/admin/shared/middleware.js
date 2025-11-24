@@ -42,7 +42,8 @@ async function getSimpleSystemStats () {
       User.count(),
       User.count({
         where: {
-          last_login: { // ✅ 修复: last_login_at → last_login
+          last_login: {
+            // ✅ 修复: last_login_at → last_login
             [Op.gte]: new Date(BeijingTimeHelper.timestamp() - 30 * 24 * 60 * 60 * 1000) // 30天内活跃
           }
         }
@@ -133,6 +134,21 @@ const validators = {
       throw new Error('无效的用户ID')
     }
     return parseInt(user_id)
+  },
+
+  /**
+   * 验证奖品ID的有效性
+   *
+   * @description 验证奖品ID是否合法（用于概率调整、强制中奖等功能）
+   * @param {string|number} prize_id - 奖品ID
+   * @returns {number} 解析后的奖品ID（整数）
+   * @throws {Error} 当prize_id为空或无法转换为整数时抛出错误
+   */
+  validatePrizeId: prize_id => {
+    if (!prize_id || isNaN(parseInt(prize_id))) {
+      throw new Error('无效的奖品ID')
+    }
+    return parseInt(prize_id)
   },
 
   /**

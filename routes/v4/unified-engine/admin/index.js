@@ -14,21 +14,31 @@ const router = express.Router()
 const authRoutes = require('./auth')
 const systemRoutes = require('./system')
 const configRoutes = require('./config')
+const settingsRoutes = require('./settings') // 🆕 系统设置管理
 const prizePoolRoutes = require('./prize_pool')
 const userManagementRoutes = require('./user_management')
 const lotteryManagementRoutes = require('./lottery_management')
 const analyticsRoutes = require('./analytics')
 const auditRoutes = require('./audit') // 🆕 兑换审核管理
+const customerServiceRoutes = require('./customer_service') // 🆕 客服管理
 
 // 挂载子模块路由
 router.use('/auth', authRoutes)
 router.use('/system', systemRoutes)
+/*
+ * 🔧 核心系统监控接口兼容性挂载 - 同时支持 /admin/status 和 /admin/system/status
+ * 解决前端路径不匹配问题（前端预期：/api/v4/admin/status，后端实际：/api/v4/admin/system/status）
+ * 将system路由也挂载到根路径，使核心接口可直接访问
+ */
+router.use(systemRoutes)
 router.use('/config', configRoutes)
+router.use(settingsRoutes) // 🆕 系统设置路由（挂载到根路径，使/admin/settings/:category可直接访问）
 router.use('/prize-pool', prizePoolRoutes)
 router.use('/user-management', userManagementRoutes)
 router.use('/lottery-management', lotteryManagementRoutes)
 router.use('/analytics', analyticsRoutes)
 router.use('/audit', auditRoutes) // 🆕 兑换审核路由
+router.use('/customer-service', customerServiceRoutes) // 🆕 客服管理路由
 
 /**
  * GET / - Admin API根路径信息
@@ -64,6 +74,18 @@ router.get('/', (req, res) => {
         description: '配置管理',
         endpoints: ['/config', '/test/simulate']
       },
+      settings: {
+        description: '系统设置管理（运营配置）',
+        endpoints: [
+          '/settings',
+          '/settings/basic',
+          '/settings/points',
+          '/settings/notification',
+          '/settings/security',
+          '/cache/clear'
+        ],
+        note: '抽奖算法配置在 /config/business.config.js 中管理'
+      },
       prize_pool: {
         description: '奖品池管理',
         endpoints: [
@@ -94,6 +116,18 @@ router.get('/', (req, res) => {
       audit: {
         description: '兑换审核管理',
         endpoints: ['/pending', '/:exchange_id/approve', '/:exchange_id/reject', '/history']
+      },
+      customer_service: {
+        description: '客服管理',
+        endpoints: [
+          '/sessions',
+          '/sessions/stats',
+          '/sessions/:id/messages',
+          '/sessions/:id/send',
+          '/sessions/:id/mark-read',
+          '/sessions/:id/transfer',
+          '/sessions/:id/close'
+        ]
       }
       // ⚠️ campaign_permissions模块暂未实现，待实现后再添加到此列表
     },

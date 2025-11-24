@@ -19,14 +19,14 @@
 
 const TestCoordinator = require('../../api/TestCoordinator')
 const { TEST_DATA, createTestData } = require('../../helpers/test-data')
-const { TestConfig } = require('../../helpers/test-setup')
 const BeijingTimeHelper = require('../../../utils/timeHelper')
 
 describe('认证和权限系统API测试（V4架构）', () => {
   let tester = null
   let test_user_id = null
-  const testUser = TestConfig.real_data.testUser
-  const adminUser = TestConfig.real_data.adminUser
+  // ✅ 修复：统一使用TEST_DATA而非TestConfig.real_data
+  const testUser = TEST_DATA.users.testUser
+  const adminUser = TEST_DATA.users.adminUser
 
   /*
    * ==========================================

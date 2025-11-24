@@ -1,0 +1,802 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>抽奖预设管理 - 管理后台</title>
+  
+  <!-- ✅ Bootstrap 5 - UI框架 -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  
+  <!-- ✅ Bootstrap Icons - 图标库 -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+  
+  <!-- ✅ 公共样式表 - 统一主题和响应式设计 -->
+  <link href="/admin/css/common.css" rel="stylesheet">
+  
+  <!-- ✅ 页面特有样式 -->
+  <style>
+    .prize-card {
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .prize-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    }
+    .probability-bar {
+      height: 8px;
+      border-radius: 4px;
+      overflow: hidden;
+      background: #e9ecef;
+    }
+    .probability-fill {
+      height: 100%;
+      transition: width 0.3s ease;
+    }
+  </style>
+</head>
+<body class="bg-light">
+  <!-- 顶部导航 -->
+  <nav class="navbar navbar-dark bg-primary">
+    <div class="container-fluid">
+      <a href="/admin/dashboard.html" class="navbar-brand">
+        <i class="bi bi-arrow-left me-2"></i>🎯 管理后台 - 抽奖预设管理
+      </a>
+      <div>
+        <span class="text-light me-3" id="welcomeText">欢迎，管理员</span>
+        <button class="btn btn-outline-light btn-sm" id="logoutBtn">退出登录</button>
+      </div>
+    </div>
+  </nav>
+  
+  <div class="container-fluid mt-4">
+    <!-- 操作区域 -->
+    <div class="card mb-3">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center">
+          <div>
+            <h5 class="mb-0">
+              <i class="bi bi-gift"></i> 抽奖预设配置
+            </h5>
+            <small class="text-muted">创建和管理抽奖预设方案</small>
+          </div>
+          <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createPresetModal">
+            <i class="bi bi-plus-lg"></i> 创建新预设
+          </button>
+        </div>
+      </div>
+    </div>
+    
+    <!-- 预设列表 -->
+    <div class="row g-3" id="presetsList">
+      <div class="col-12 text-center py-5">
+        <div class="spinner-border text-primary" role="status">
+          <span class="visually-hidden">加载中...</span>
+        </div>
+        <p class="mt-2 text-muted">正在加载预设列表...</p>
+      </div>
+    </div>
+  </div>
+  
+  <!-- 创建预设模态框 -->
+  <div class="modal fade" id="createPresetModal" tabindex="-1">
+    <div class="modal-dialog modal-xl">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">
+            <i class="bi bi-plus-circle"></i> 创建抽奖预设
+          </h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <!-- 基本信息 -->
+          <div class="card mb-3">
+            <div class="card-header">
+              <h6 class="mb-0"><i class="bi bi-info-circle"></i> 基本信息</h6>
+            </div>
+            <div class="card-body">
+              <div class="row g-3">
+                <div class="col-md-6">
+                  <label class="form-label">预设名称 <span class="text-danger">*</span></label>
+                  <input type="text" class="form-control" id="presetName" placeholder="例如：周末特惠预设">
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">预设类型</label>
+                  <select class="form-select" id="presetType">
+                    <option value="normal">普通抽奖</option>
+                    <option value="special">特殊活动</option>
+                    <option value="vip">VIP专属</option>
+                  </select>
+                </div>
+                <div class="col-12">
+                  <label class="form-label">预设描述</label>
+                  <textarea class="form-control" id="presetDescription" rows="2" placeholder="请输入预设说明..."></textarea>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <!-- 奖品配置 -->
+          <div class="card">
+            <div class="card-header">
+              <div class="d-flex justify-content-between align-items-center">
+                <h6 class="mb-0"><i class="bi bi-box-seam"></i> 奖品配置</h6>
+                <button type="button" class="btn btn-sm btn-success" id="addPrizeItemBtn">
+                  <i class="bi bi-plus"></i> 添加奖品
+                </button>
+              </div>
+            </div>
+            <div class="card-body">
+              <div id="prizesContainer">
+                <!-- 奖品项目将动态添加到这里 -->
+              </div>
+              <div class="alert alert-info mt-3 mb-0" role="alert">
+                <i class="bi bi-lightbulb"></i> 
+                <strong>提示：</strong>所有奖品的概率总和应等于100%
+                <span class="ms-3">当前总概率：<strong id="totalProbability">0.00</strong>%</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+          <button type="button" class="btn btn-primary" id="submitPresetBtn">
+            <i class="bi bi-check-lg"></i> 创建预设
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <!-- 查看预设详情模态框 -->
+  <div class="modal fade" id="viewPresetModal" tabindex="-1">
+    <div class="modal-dialog modal-xl">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="viewPresetTitle">预设详情</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body" id="viewPresetBody">
+          <!-- 预设详情将动态加载到这里 -->
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <!-- 加载遮罩层 -->
+  <div class="loading-overlay" id="loadingOverlay">
+    <div class="spinner-border text-light" style="width: 3rem; height: 3rem;" role="status">
+      <span class="visually-hidden">处理中...</span>
+    </div>
+  </div>
+
+  <!-- ✅ Bootstrap JS -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  
+  <!-- ✅ 引入通用工具库 -->
+  <script src="/admin/js/admin-common.js"></script>
+  
+  <script>
+    /**
+     * 全局变量
+     */
+    let prizeItemCount = 0;
+    let currentPresets = [];
+    
+    /**
+     * 页面初始化
+     */
+    document.addEventListener('DOMContentLoaded', function() {
+      // 显示用户信息
+      const userInfo = getCurrentUser();
+      if (userInfo && userInfo.nickname) {
+        document.getElementById('welcomeText').textContent = `欢迎，${userInfo.nickname}`;
+      }
+      
+      // ✅ Token和权限验证
+      if (!getToken() || !checkAdminPermission()) {
+        return;
+      }
+      
+      // 加载预设列表
+      loadPresets();
+      
+      // ===== 静态按钮事件监听器 =====
+      // 退出登录按钮
+      const logoutBtn = document.getElementById('logoutBtn');
+      if (logoutBtn) {
+        logoutBtn.addEventListener('click', logout);
+      } else {
+        console.error('❌ 退出登录按钮不存在: #logoutBtn');
+      }
+      
+      // 添加奖品项按钮
+      const addPrizeItemBtn = document.getElementById('addPrizeItemBtn');
+      if (addPrizeItemBtn) {
+        addPrizeItemBtn.addEventListener('click', addPrizeItem);
+      } else {
+        console.error('❌ 添加奖品按钮不存在: #addPrizeItemBtn');
+      }
+      
+      // 提交预设按钮
+      const submitPresetBtn = document.getElementById('submitPresetBtn');
+      if (submitPresetBtn) {
+        submitPresetBtn.addEventListener('click', submitPreset);
+      } else {
+        console.error('❌ 提交预设按钮不存在: #submitPresetBtn');
+      }
+      
+      // ===== 事件委托：预设操作按钮 =====
+      const presetsContainer = document.getElementById('presetsList');
+      if (presetsContainer) {
+        presetsContainer.addEventListener('click', (e) => {
+          // 查看详情按钮
+          const viewBtn = e.target.closest('.preset-view-btn');
+          if (viewBtn) {
+            const presetId = parseInt(viewBtn.dataset.presetId);
+            viewPreset(presetId);
+            return;
+          }
+          
+          // 激活预设按钮
+          const activateBtn = e.target.closest('.preset-activate-btn');
+          if (activateBtn) {
+            const presetId = parseInt(activateBtn.dataset.presetId);
+            activatePreset(presetId);
+            return;
+          }
+        });
+      } else {
+        console.error('❌ 预设列表容器不存在: #presetsList');
+      }
+      
+      // ===== 事件委托：移除奖品项按钮 =====
+      const prizesContainer = document.getElementById('prizesContainer');
+      if (prizesContainer) {
+        prizesContainer.addEventListener('click', (e) => {
+          const removeBtn = e.target.closest('.remove-prize-item-btn');
+          if (removeBtn) {
+            const itemId = parseInt(removeBtn.dataset.itemId);
+            removePrizeItem(itemId);
+          }
+        });
+        
+        // ===== 事件委托：概率输入变化 =====
+        prizesContainer.addEventListener('change', (e) => {
+          if (e.target.classList.contains('prize-probability')) {
+            updateTotalProbability();
+          }
+        });
+      } else {
+        console.error('❌ 奖品容器不存在: #prizesContainer');
+      }
+      
+      // 初始化默认奖品项目
+      addPrizeItem();
+    });
+    
+    /**
+     * 加载预设列表
+     */
+    async function loadPresets() {
+      showLoading();
+      
+      try {
+        const response = await apiRequest('/api/v4/lottery-preset/list');
+        
+        if (response && response.success) {
+          currentPresets = response.data.presets || response.data.list || [];
+          renderPresetsList(currentPresets);
+        } else {
+          showError('加载失败', response?.message || '获取预设列表失败');
+        }
+      } catch (error) {
+        console.error('加载预设失败:', error);
+        showError('加载失败', error.message);
+      } finally {
+        hideLoading();
+      }
+    }
+    
+    /**
+     * 渲染预设列表
+     * @param {Array} presets - 预设数组
+     */
+    function renderPresetsList(presets) {
+      const container = document.getElementById('presetsList');
+      
+      // ===== 容器存在性检查 =====
+      if (!container) {
+        console.error('❌ 预设列表容器不存在: #presetsList');
+        showError('页面错误', '预设列表容器未找到，请刷新页面重试');
+        return;
+      }
+      
+      if (presets.length === 0) {
+        container.innerHTML = `
+          <div class="col-12 text-center py-5">
+            <i class="bi bi-inbox text-muted" style="font-size: 3rem;"></i>
+            <p class="mt-2 text-muted">暂无预设，点击右上角创建新预设</p>
+          </div>
+        `;
+        return;
+      }
+      
+      container.innerHTML = presets.map(preset => `
+        <div class="col-md-6 col-lg-4">
+          <div class="card prize-card h-100">
+            <div class="card-header bg-primary text-white">
+              <div class="d-flex justify-content-between align-items-center">
+                <h6 class="mb-0">${preset.preset_name || preset.name}</h6>
+                <span class="badge bg-light text-dark">${getTypeLabel(preset.preset_type || preset.type)}</span>
+              </div>
+            </div>
+            <div class="card-body">
+              <p class="text-muted small mb-3">${preset.description || '暂无描述'}</p>
+              
+              <div class="mb-2">
+                <small class="text-muted">包含奖品：</small>
+                <strong>${getPrizesCount(preset)}</strong> 种
+              </div>
+              
+              <div class="mb-2">
+                <small class="text-muted">创建时间：</small>
+                <div><small>${formatDate(preset.created_at)}</small></div>
+              </div>
+              
+              <div class="mb-3">
+                <small class="text-muted">创建者：</small>
+                <strong>${preset.creator_name || '管理员'}</strong>
+              </div>
+              
+              <div class="d-grid gap-2">
+                <button class="btn btn-outline-primary btn-sm preset-view-btn" data-preset-id="${preset.preset_id || preset.id}">
+                  <i class="bi bi-eye"></i> 查看详情
+                </button>
+                <button class="btn btn-outline-success btn-sm preset-activate-btn" data-preset-id="${preset.preset_id || preset.id}">
+                  <i class="bi bi-lightning"></i> 激活预设
+                </button>
+              </div>
+            </div>
+            <div class="card-footer text-muted">
+              <small>
+                <i class="bi bi-calendar"></i> 
+                ${formatRelativeTime(preset.created_at)}
+              </small>
+            </div>
+          </div>
+        </div>
+      `).join('');
+    }
+    
+    /**
+     * 获取类型标签
+     * @param {string} type - 类型
+     * @returns {string} 标签文本
+     */
+    function getTypeLabel(type) {
+      const labels = {
+        normal: '普通',
+        special: '特殊',
+        vip: 'VIP'
+      };
+      return labels[type] || '普通';
+    }
+    
+    /**
+     * 获取奖品数量
+     * @param {Object} preset - 预设对象
+     * @returns {number} 奖品数量
+     */
+    function getPrizesCount(preset) {
+      if (preset.prizes && Array.isArray(preset.prizes)) {
+        return preset.prizes.length;
+      }
+      if (preset.preset_config) {
+        try {
+          const config = typeof preset.preset_config === 'string' ? 
+            JSON.parse(preset.preset_config) : preset.preset_config;
+          return config.prizes?.length || 0;
+        } catch {
+          return 0;
+        }
+      }
+      return 0;
+    }
+    
+    /**
+     * 添加奖品项目
+     */
+    function addPrizeItem() {
+      prizeItemCount++;
+      const container = document.getElementById('prizesContainer');
+      
+      // ===== 容器存在性检查 =====
+      if (!container) {
+        console.error('❌ 奖品容器不存在: #prizesContainer');
+        showError('页面错误', '奖品容器未找到，请刷新页面重试');
+        return;
+      }
+      
+      const itemHtml = `
+        <div class="card mb-2 prize-item" id="prizeItem${prizeItemCount}">
+          <div class="card-body">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <h6 class="mb-0">奖品 #${prizeItemCount}</h6>
+              <button type="button" class="btn btn-sm btn-outline-danger remove-prize-item-btn" data-item-id="${prizeItemCount}">
+                <i class="bi bi-trash"></i>
+              </button>
+            </div>
+            <div class="row g-2">
+              <div class="col-md-4">
+                <label class="form-label small">奖品名称 <span class="text-danger">*</span></label>
+                <input type="text" class="form-control form-control-sm prize-name" placeholder="例如：现金红包">
+              </div>
+              <div class="col-md-3">
+                <label class="form-label small">类型 <span class="text-danger">*</span></label>
+                <select class="form-select form-select-sm prize-type">
+                  <option value="physical">实物奖品</option>
+                  <option value="virtual">虚拟奖品</option>
+                  <option value="points">积分</option>
+                  <option value="coupon">优惠券</option>
+                </select>
+              </div>
+              <div class="col-md-2">
+                <label class="form-label small">价值 <span class="text-danger">*</span></label>
+                <input type="number" class="form-control form-control-sm prize-value" step="0.01" min="0" placeholder="0.00">
+              </div>
+              <div class="col-md-3">
+                <label class="form-label small">中奖概率(%) <span class="text-danger">*</span></label>
+                <input type="number" class="form-control form-control-sm prize-probability" 
+                  step="0.01" min="0" max="100" placeholder="0.00">
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+      
+      container.insertAdjacentHTML('beforeend', itemHtml);
+    }
+    
+    /**
+     * 删除奖品项目
+     * @param {number} itemId - 项目ID
+     */
+    function removePrizeItem(itemId) {
+      const item = document.getElementById(`prizeItem${itemId}`);
+      if (item) {
+        item.remove();
+        updateTotalProbability();
+      }
+    }
+    
+    /**
+     * 更新总概率
+     */
+    function updateTotalProbability() {
+      const items = document.querySelectorAll('.prize-probability');
+      let total = 0;
+      
+      items.forEach(item => {
+        const value = parseFloat(item.value) || 0;
+        total += value;
+      });
+      
+      const totalElement = document.getElementById('totalProbability');
+      
+      // ===== 元素存在性检查 =====
+      if (!totalElement) {
+        console.error('❌ 总概率显示元素不存在: #totalProbability');
+        return;
+      }
+      
+      totalElement.textContent = total.toFixed(2);
+      
+      // 根据总概率显示不同颜色
+      if (Math.abs(total - 100) < 0.01) {
+        totalElement.className = 'text-success fw-bold';
+      } else if (total > 100) {
+        totalElement.className = 'text-danger fw-bold';
+      } else {
+        totalElement.className = 'text-warning fw-bold';
+      }
+    }
+    
+    /**
+     * 提交预设
+     */
+    async function submitPreset() {
+      // 收集基本信息
+      const nameElement = document.getElementById('presetName');
+      const typeElement = document.getElementById('presetType');
+      const descriptionElement = document.getElementById('presetDescription');
+      
+      // ===== 表单元素存在性检查 =====
+      if (!nameElement || !typeElement || !descriptionElement) {
+        console.error('❌ 表单元素缺失');
+        showError('表单错误', '预设表单元素未找到，请刷新页面重试');
+        return;
+      }
+      
+      const name = nameElement.value.trim();
+      const type = typeElement.value;
+      const description = descriptionElement.value.trim();
+      
+      if (!name) {
+        alert('请输入预设名称');
+        return;
+      }
+      
+      // 收集奖品信息
+      const prizes = [];
+      const prizeItems = document.querySelectorAll('.prize-item');
+      
+      if (prizeItems.length === 0) {
+        alert('请至少添加一个奖品');
+        return;
+      }
+      
+      let totalProbability = 0;
+      for (const item of prizeItems) {
+        const prizeName = item.querySelector('.prize-name').value.trim();
+        const prizeType = item.querySelector('.prize-type').value;
+        const prizeValue = parseFloat(item.querySelector('.prize-value').value) || 0;
+        const prizeProbability = parseFloat(item.querySelector('.prize-probability').value) || 0;
+        
+        if (!prizeName) {
+          alert('请填写所有奖品的名称');
+          return;
+        }
+        
+        if (prizeValue <= 0) {
+          alert('奖品价值必须大于0');
+          return;
+        }
+        
+        if (prizeProbability <= 0) {
+          alert('中奖概率必须大于0');
+          return;
+        }
+        
+        totalProbability += prizeProbability;
+        
+        prizes.push({
+          prize_name: prizeName,
+          prize_type: prizeType,
+          prize_value: prizeValue,
+          probability: prizeProbability
+        });
+      }
+      
+      // 验证总概率
+      if (Math.abs(totalProbability - 100) > 0.01) {
+        if (!confirm(`当前总概率为 ${totalProbability.toFixed(2)}%，不等于100%，是否继续？`)) {
+          return;
+        }
+      }
+      
+      showLoading();
+      
+      try {
+        const response = await apiRequest('/api/v4/lottery-preset/create', {
+          method: 'POST',
+          body: JSON.stringify({
+            preset_name: name,
+            preset_type: type,
+            description: description,
+            preset_config: {
+              prizes: prizes,
+              total_probability: totalProbability
+            }
+          })
+        });
+        
+        if (response && response.success) {
+          showSuccess('创建成功', '抽奖预设已创建');
+          
+          // 关闭模态框
+          bootstrap.Modal.getInstance(document.getElementById('createPresetModal')).hide();
+          
+          // 重置表单
+          resetPresetForm();
+          
+          // 重新加载列表
+          loadPresets();
+        } else {
+          showError('创建失败', response?.message || '操作失败');
+        }
+      } catch (error) {
+        console.error('创建预设失败:', error);
+        showError('创建失败', error.message);
+      } finally {
+        hideLoading();
+      }
+    }
+    
+    /**
+     * 重置预设表单
+     */
+    function resetPresetForm() {
+      document.getElementById('presetName').value = '';
+      document.getElementById('presetType').value = 'normal';
+      document.getElementById('presetDescription').value = '';
+      document.getElementById('prizesContainer').innerHTML = '';
+      prizeItemCount = 0;
+      addPrizeItem();
+    }
+    
+    /**
+     * 查看预设详情
+     * @param {number} presetId - 预设ID
+     */
+    function viewPreset(presetId) {
+      const preset = currentPresets.find(p => (p.preset_id || p.id) === presetId);
+      if (!preset) {
+        alert('预设不存在');
+        return;
+      }
+      
+      document.getElementById('viewPresetTitle').textContent = preset.preset_name || preset.name;
+      
+      let prizes = [];
+      if (preset.prizes && Array.isArray(preset.prizes)) {
+        prizes = preset.prizes;
+      } else if (preset.preset_config) {
+        try {
+          const config = typeof preset.preset_config === 'string' ? 
+            JSON.parse(preset.preset_config) : preset.preset_config;
+          prizes = config.prizes || [];
+        } catch (error) {
+          console.error('解析预设配置失败:', error);
+        }
+      }
+      
+      const detailsHtml = `
+        <div class="row g-3">
+          <div class="col-md-6">
+            <strong>预设类型：</strong>
+            <span class="badge bg-primary">${getTypeLabel(preset.preset_type || preset.type)}</span>
+          </div>
+          <div class="col-md-6">
+            <strong>创建时间：</strong> ${formatDate(preset.created_at)}
+          </div>
+          <div class="col-12">
+            <strong>描述：</strong>
+            <p class="text-muted">${preset.description || '暂无描述'}</p>
+          </div>
+          <div class="col-12">
+            <h6 class="border-bottom pb-2">奖品配置（${prizes.length}种）</h6>
+            <div class="table-responsive">
+              <table class="table table-sm table-hover">
+                <thead class="table-light">
+                  <tr>
+                    <th>奖品名称</th>
+                    <th>类型</th>
+                    <th>价值</th>
+                    <th>中奖概率</th>
+                    <th>概率图示</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${prizes.map(prize => `
+                    <tr>
+                      <td>${prize.prize_name}</td>
+                      <td>${getPrizeTypeLabel(prize.prize_type)}</td>
+                      <td class="fw-bold">¥${(prize.prize_value || 0).toFixed(2)}</td>
+                      <td><strong>${(prize.probability || 0).toFixed(2)}%</strong></td>
+                      <td>
+                        <div class="probability-bar">
+                          <div class="probability-fill bg-primary" style="width: ${prize.probability}%"></div>
+                        </div>
+                      </td>
+                    </tr>
+                  `).join('')}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      `;
+      
+      document.getElementById('viewPresetBody').innerHTML = detailsHtml;
+      new bootstrap.Modal(document.getElementById('viewPresetModal')).show();
+    }
+    
+    /**
+     * 获取奖品类型标签
+     * @param {string} type - 奖品类型
+     * @returns {string} 标签文本
+     */
+    function getPrizeTypeLabel(type) {
+      const labels = {
+        physical: '实物',
+        virtual: '虚拟',
+        points: '积分',
+        coupon: '优惠券'
+      };
+      return labels[type] || '未知';
+    }
+    
+    /**
+     * 激活预设
+     * @param {number} presetId - 预设ID
+     */
+    async function activatePreset(presetId) {
+      const preset = currentPresets.find(p => (p.preset_id || p.id) === presetId);
+      if (!preset) {
+        alert('预设不存在');
+        return;
+      }
+      
+      if (!confirm(`确认激活预设"${preset.preset_name || preset.name}"？\n激活后将替换当前的抽奖配置。`)) {
+        return;
+      }
+      
+      showLoading();
+      
+      try {
+        const response = await apiRequest(`/api/v4/lottery-preset/activate/${presetId}`, {
+          method: 'POST'
+        });
+        
+        if (response && response.success) {
+          showSuccess('激活成功', '抽奖预设已激活');
+        } else {
+          showError('激活失败', response?.message || '操作失败');
+        }
+      } catch (error) {
+        console.error('激活预设失败:', error);
+        showError('激活失败', error.message);
+      } finally {
+        hideLoading();
+      }
+    }
+    
+    /**
+     * 显示加载状态
+     */
+    function showLoading() {
+      const loadingOverlay = document.getElementById('loadingOverlay');
+      if (loadingOverlay) {
+        loadingOverlay.classList.add('show');
+      } else {
+        console.error('❌ 加载遮罩层不存在: #loadingOverlay');
+      }
+    }
+    
+    /**
+     * 隐藏加载状态
+     */
+    function hideLoading() {
+      const loadingOverlay = document.getElementById('loadingOverlay');
+      if (loadingOverlay) {
+        loadingOverlay.classList.remove('show');
+      } else {
+        console.error('❌ 加载遮罩层不存在: #loadingOverlay');
+      }
+    }
+    
+    /**
+     * 显示成功提示
+     * @param {string} title - 标题
+     * @param {string} message - 消息
+     */
+    function showSuccess(title, message) {
+      alert(`✅ ${title}\n${message}`);
+    }
+    
+    /**
+     * 显示错误提示
+     * @param {string} title - 标题
+     * @param {string} message - 消息
+     */
+    function showError(title, message) {
+      alert(`❌ ${title}\n${message}`);
+    }
+  </script>
+</body>
+</html>
+

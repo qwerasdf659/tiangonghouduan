@@ -1,4 +1,5 @@
 const BeijingTimeHelper = require('../utils/timeHelper')
+const DecimalConverter = require('../utils/formatters/DecimalConverter') // 🔧 DECIMAL字段类型转换工具
 
 /**
  * 统一数据脱敏服务（DataSanitizer）
@@ -70,10 +71,14 @@ class DataSanitizer {
    */
   static sanitizePrizes (prizes, dataLevel) {
     if (dataLevel === 'full') {
-      return prizes // 管理员看完整数据
+      // 管理员看完整数据，但需要转换DECIMAL字段为数字类型（修复前端TypeError）
+      return DecimalConverter.convertPrizeData(
+        Array.isArray(prizes) ? prizes : [prizes]
+      )
     }
 
-    return prizes.map(prize => ({
+    // 普通用户数据脱敏
+    const sanitized = prizes.map(prize => ({
       id: prize.prize_id,
       name: prize.prize_name,
       type: prize.prize_type,
@@ -88,6 +93,9 @@ class DataSanitizer {
        * cost_points, max_daily_wins, daily_win_count, angle, color
        */
     }))
+
+    // 即使是脱敏数据，也需要确保数字字段是数字类型（如果包含）
+    return sanitized
   }
 
   /**
