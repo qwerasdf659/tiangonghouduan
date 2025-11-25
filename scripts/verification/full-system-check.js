@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * 全系统深度排查工具
- * 
+ *
  * 用途：排查整个devbox中的潜在问题
  * 范围：后端数据库 + web端后台管理前端
  */
@@ -83,15 +83,15 @@ class FullSystemChecker {
         if (file.endsWith('.js') && file !== 'index.js') {
           const modelName = file.replace('.js', '')
           const content = fs.readFileSync(path.join(modelsDir, file), 'utf8')
-          
+
           const fields = []
           const fieldRegex = /(\w+):\s*\{[^}]*type:\s*DataTypes\./g
           let match
-          
+
           while ((match = fieldRegex.exec(content)) !== null) {
             fields.push(match[1])
           }
-          
+
           modelFields.set(modelName, fields)
         }
       })
@@ -106,11 +106,11 @@ class FullSystemChecker {
       fs.readdirSync(servicesDir).forEach(file => {
         if (file.endsWith('.js')) {
           const content = fs.readFileSync(path.join(servicesDir, file), 'utf8')
-          
+
           // 提取attributes中使用的字段
           const attributesRegex = /attributes:\s*\[([^\]]+)\]/g
           let match
-          
+
           while ((match = attributesRegex.exec(content)) !== null) {
             totalChecked++
             const fieldsStr = match[1]
@@ -127,7 +127,7 @@ class FullSystemChecker {
                   break
                 }
               }
-              
+
               if (!found && field.length > 0 && field.length < 50) {
                 const issue = `${file}: 字段 '${field}' 可能未在模型中定义`
                 this.issues.warning.push(issue)
@@ -169,15 +169,15 @@ class FullSystemChecker {
           if (file.endsWith('.js')) {
             const className = file.replace('.js', '')
             const content = fs.readFileSync(path.join(utilsDir, file), 'utf8')
-            
+
             const methods = []
             const methodRegex = /static\s+(\w+)\s*\(/g
             let match
-            
+
             while ((match = methodRegex.exec(content)) !== null) {
               methods.push(match[1])
             }
-            
+
             utilsMethods.set(className, methods)
           }
         })
@@ -203,7 +203,7 @@ class FullSystemChecker {
       })
 
       if (issuesFound === 0) {
-        console.log(`   ✅ 所有工具类方法调用正确`)
+        console.log('   ✅ 所有工具类方法调用正确')
       } else {
         console.log(`   ⚠️ 发现 ${issuesFound} 处潜在问题`)
       }
@@ -218,21 +218,21 @@ class FullSystemChecker {
    */
   scanDirectoryForUtilsCalls (dir, utilsMethods, dirName, onIssue) {
     const files = fs.readdirSync(dir)
-    
+
     files.forEach(file => {
       const filePath = path.join(dir, file)
       const stat = fs.statSync(filePath)
-      
+
       if (stat.isDirectory() && file !== 'node_modules') {
         this.scanDirectoryForUtilsCalls(filePath, utilsMethods, dirName, onIssue)
       } else if (file.endsWith('.js')) {
         const content = fs.readFileSync(filePath, 'utf8')
-        
+
         // 检查工具类方法调用
         utilsMethods.forEach((methods, className) => {
           const callRegex = new RegExp(`${className}\\.([\\w]+)\\(`, 'g')
           let match
-          
+
           while ((match = callRegex.exec(content)) !== null) {
             const methodName = match[1]
             if (!methods.includes(methodName)) {
@@ -254,34 +254,34 @@ class FullSystemChecker {
 
     try {
       const modelsIndexPath = path.join(__dirname, '../../models/index.js')
-      
+
       if (!fs.existsSync(modelsIndexPath)) {
         console.log('   ⚠️ models/index.js 不存在')
         return
       }
 
       const content = fs.readFileSync(modelsIndexPath, 'utf8')
-      
+
       // 检查是否有模型关联定义
-      const hasAssociations = content.includes('hasMany') || 
-                            content.includes('belongsTo') || 
+      const hasAssociations = content.includes('hasMany') ||
+                            content.includes('belongsTo') ||
                             content.includes('hasOne')
-      
+
       if (hasAssociations) {
         console.log('   ✅ 发现模型关联定义')
-        
+
         // 检查常见的关联问题
         const modelsDir = path.join(__dirname, '../../models')
         const modelFiles = fs.readdirSync(modelsDir)
           .filter(f => f.endsWith('.js') && f !== 'index.js')
-        
+
         console.log(`   检查 ${modelFiles.length} 个模型的关联...`)
-        
+
         // 简单检查：确保每个模型都有基本的关联定义
         modelFiles.forEach(file => {
           const modelName = file.replace('.js', '')
           const pattern = new RegExp(`${modelName}\\.(hasMany|belongsTo|hasOne)`, 'g')
-          
+
           if (!pattern.test(content)) {
             this.issues.info.push(`模型 ${modelName} 可能缺少关联定义`)
           }
@@ -304,7 +304,7 @@ class FullSystemChecker {
 
     try {
       const routesV4AdminPath = path.join(__dirname, '../../routes/v4/unified-engine/admin')
-      
+
       if (!fs.existsSync(routesV4AdminPath)) {
         console.log('   ⚠️ admin路由目录不存在')
         return
@@ -318,23 +318,23 @@ class FullSystemChecker {
       }
 
       const indexContent = fs.readFileSync(indexPath, 'utf8')
-      
+
       // 获取所有路由文件
       const routeFiles = fs.readdirSync(routesV4AdminPath)
         .filter(f => f.endsWith('.js') && f !== 'index.js')
-      
+
       console.log(`   发现 ${routeFiles.length} 个路由模块`)
-      
+
       let registeredCount = 0
       let unregisteredCount = 0
-      
+
       routeFiles.forEach(file => {
         const moduleName = file.replace('.js', '')
-        const hasImport = indexContent.includes(`require('./${file}'`) || 
+        const hasImport = indexContent.includes(`require('./${file}'`) ||
                          indexContent.includes(`require('./${moduleName}')`)
-        const hasMount = indexContent.includes(`router.use(`) && 
+        const hasMount = indexContent.includes('router.use(') &&
                         indexContent.includes(moduleName.replace(/_/g, '-'))
-        
+
         if (hasImport && hasMount) {
           registeredCount++
         } else {
@@ -344,7 +344,7 @@ class FullSystemChecker {
           this.issues.warning.push(issue)
         }
       })
-      
+
       console.log(`   ✅ 已注册: ${registeredCount}, ⚠️ 未注册: ${unregisteredCount}`)
     } catch (error) {
       console.log(`   ❌ 检查失败: ${error.message}`)
@@ -367,17 +367,17 @@ class FullSystemChecker {
         if (depth > 5) return // 防止过深递归
 
         const files = fs.readdirSync(dir)
-        
+
         files.forEach(file => {
           const filePath = path.join(dir, file)
           const stat = fs.statSync(filePath)
-          
+
           if (stat.isDirectory() && file !== 'node_modules') {
             checkDir(filePath, depth + 1)
           } else if (file.endsWith('.js')) {
             checkedFiles++
             const content = fs.readFileSync(filePath, 'utf8')
-            
+
             // 检查错误的middleware引入
             if (content.includes('authMiddleware') && !content.includes('middleware/auth')) {
               const relativePath = path.relative(process.cwd(), filePath)
@@ -386,7 +386,7 @@ class FullSystemChecker {
               this.issues.warning.push(issue)
               issuesFound++
             }
-            
+
             // 检查middleware引入路径是否正确
             const middlewareImports = content.match(/require\(['"]([^'"]*middleware[^'"]*)['"]\)/g)
             if (middlewareImports) {
@@ -408,10 +408,10 @@ class FullSystemChecker {
       }
 
       checkDir(routesDir)
-      
+
       console.log(`   检查了 ${checkedFiles} 个路由文件`)
       if (issuesFound === 0) {
-        console.log(`   ✅ 所有middleware引入路径正确`)
+        console.log('   ✅ 所有middleware引入路径正确')
       } else {
         console.log(`   ⚠️ 发现 ${issuesFound} 处问题`)
       }
@@ -436,17 +436,17 @@ class FullSystemChecker {
         if (file.endsWith('.js') && file !== 'index.js') {
           checkedModels++
           const content = fs.readFileSync(path.join(modelsDir, file), 'utf8')
-          
+
           // 检查DECIMAL字段定义
           if (content.includes('DataTypes.DECIMAL')) {
             const decimalRegex = /(\w+):\s*\{[^}]*type:\s*DataTypes\.DECIMAL\((\d+),\s*(\d+)\)/g
             let match
-            
+
             while ((match = decimalRegex.exec(content)) !== null) {
               const fieldName = match[1]
               const precision = parseInt(match[2])
               const scale = parseInt(match[3])
-              
+
               // 检查精度配置是否合理
               if (precision < scale) {
                 const issue = `${file}: ${fieldName} DECIMAL(${precision},${scale}) 精度小于标度`
@@ -454,7 +454,7 @@ class FullSystemChecker {
                 this.issues.warning.push(issue)
                 issuesFound++
               }
-              
+
               if (precision > 65) {
                 const issue = `${file}: ${fieldName} DECIMAL(${precision},${scale}) 精度超过MySQL最大值65`
                 console.log(`   ⚠️ ${issue}`)
@@ -468,7 +468,7 @@ class FullSystemChecker {
 
       console.log(`   检查了 ${checkedModels} 个模型`)
       if (issuesFound === 0) {
-        console.log(`   ✅ 所有字段类型定义正确`)
+        console.log('   ✅ 所有字段类型定义正确')
       } else {
         console.log(`   ⚠️ 发现 ${issuesFound} 处潜在问题`)
       }
@@ -506,7 +506,7 @@ class FullSystemChecker {
 
     try {
       const publicAdminDir = path.join(__dirname, '../../public/admin')
-      
+
       if (!fs.existsSync(publicAdminDir)) {
         console.log('   ⚠️ public/admin 目录不存在')
         return
@@ -518,7 +518,7 @@ class FullSystemChecker {
       const scanFile = (filePath) => {
         const content = fs.readFileSync(filePath, 'utf8')
         const relativePath = path.relative(publicAdminDir, filePath)
-        
+
         // 匹配API调用
         const patterns = [
           /(?:fetch|apiRequest)\s*\(\s*['"`]([^'"`]+)['"`]/g,
@@ -533,7 +533,7 @@ class FullSystemChecker {
               const lineNumber = content.substring(0, match.index).split('\n').length
               apiCalls.push({
                 file: relativePath,
-                url: url,
+                url,
                 line: lineNumber
               })
             }
@@ -543,11 +543,11 @@ class FullSystemChecker {
 
       const scanDirectory = (dir) => {
         const files = fs.readdirSync(dir)
-        
+
         files.forEach(file => {
           const filePath = path.join(dir, file)
           const stat = fs.statSync(filePath)
-          
+
           if (stat.isDirectory()) {
             scanDirectory(filePath)
           } else if (file.endsWith('.html') || file.endsWith('.js')) {
@@ -588,7 +588,7 @@ class FullSystemChecker {
       })
 
       if (issuesFound === 0) {
-        console.log(`   ✅ 所有API调用路径规范`)
+        console.log('   ✅ 所有API调用路径规范')
       } else {
         console.log(`   ⚠️ 发现 ${issuesFound} 处潜在问题`)
       }
@@ -600,11 +600,11 @@ class FullSystemChecker {
         apiSummary.set(basePath, (apiSummary.get(basePath) || 0) + 1)
       })
 
-      console.log(`\n   📊 API调用统计（前10个最常用）:`)
+      console.log('\n   📊 API调用统计（前10个最常用）:')
       const sorted = Array.from(apiSummary.entries())
         .sort((a, b) => b[1] - a[1])
         .slice(0, 10)
-      
+
       sorted.forEach(([path, count]) => {
         console.log(`      ${count}次: ${path}`)
       })
@@ -624,7 +624,7 @@ class FullSystemChecker {
       const publicAdminDir = path.join(__dirname, '../../public/admin')
       let foundWebSocket = false
       let foundSocketIO = false
-      let issues = []
+      const issues = []
 
       const scanFile = (filePath) => {
         const content = fs.readFileSync(filePath, 'utf8')
@@ -651,11 +651,11 @@ class FullSystemChecker {
         if (!fs.existsSync(dir)) return
 
         const files = fs.readdirSync(dir)
-        
+
         files.forEach(file => {
           const filePath = path.join(dir, file)
           const stat = fs.statSync(filePath)
-          
+
           if (stat.isDirectory()) {
             scanDirectory(filePath)
           } else if (file.endsWith('.html') || file.endsWith('.js')) {
@@ -667,13 +667,13 @@ class FullSystemChecker {
       scanDirectory(publicAdminDir)
 
       if (!foundWebSocket && !foundSocketIO) {
-        console.log(`   ℹ️ 未发现WebSocket使用`)
+        console.log('   ℹ️ 未发现WebSocket使用')
       } else if (foundWebSocket && foundSocketIO) {
-        console.log(`   ⚠️ 同时使用了原生WebSocket和Socket.IO，需要统一`)
+        console.log('   ⚠️ 同时使用了原生WebSocket和Socket.IO，需要统一')
         this.issues.warning.push('前端WebSocket技术栈不统一')
         issues.forEach(issue => console.log(`      - ${issue}`))
       } else {
-        console.log(`   ✅ WebSocket技术栈统一`)
+        console.log('   ✅ WebSocket技术栈统一')
       }
     } catch (error) {
       console.log(`   ❌ 检查失败: ${error.message}`)
@@ -689,7 +689,7 @@ class FullSystemChecker {
 
     try {
       const publicAdminDir = path.join(__dirname, '../../public/admin')
-      
+
       if (!fs.existsSync(publicAdminDir)) {
         console.log('   ⚠️ public/admin 目录不存在')
         return
@@ -708,7 +708,7 @@ class FullSystemChecker {
         const beijingTimeCalls = content.match(/BeijingTimeHelper\.(\w+)\(/g)
         if (beijingTimeCalls) {
           const validMethods = ['toBeijingTime', 'formatForAPI', 'format', 'parse']
-          
+
           beijingTimeCalls.forEach(call => {
             const methodName = call.match(/BeijingTimeHelper\.(\w+)\(/)[1]
             if (!validMethods.includes(methodName)) {
@@ -723,11 +723,11 @@ class FullSystemChecker {
 
       const scanDirectory = (dir) => {
         const files = fs.readdirSync(dir)
-        
+
         files.forEach(file => {
           const filePath = path.join(dir, file)
           const stat = fs.statSync(filePath)
-          
+
           if (stat.isDirectory()) {
             scanDirectory(filePath)
           } else if (file.endsWith('.html') || file.endsWith('.js')) {
@@ -740,7 +740,7 @@ class FullSystemChecker {
 
       console.log(`   检查了 ${checkedFiles} 个前端文件`)
       if (issuesFound === 0) {
-        console.log(`   ✅ 所有工具类方法调用正确`)
+        console.log('   ✅ 所有工具类方法调用正确')
       } else {
         console.log(`   ⚠️ 发现 ${issuesFound} 处潜在问题`)
       }
@@ -758,7 +758,7 @@ class FullSystemChecker {
 
     try {
       const publicAdminDir = path.join(__dirname, '../../public/admin')
-      
+
       if (!fs.existsSync(publicAdminDir)) {
         console.log('   ⚠️ public/admin 目录不存在')
         return
@@ -766,7 +766,7 @@ class FullSystemChecker {
 
       let filesWithAPI = 0
       let filesWithToken = 0
-      let filesWithoutToken = []
+      const filesWithoutToken = []
 
       const scanFile = (filePath) => {
         const content = fs.readFileSync(filePath, 'utf8')
@@ -777,8 +777,8 @@ class FullSystemChecker {
           filesWithAPI++
 
           // 检查是否处理Token
-          if (content.includes('getToken') || 
-              content.includes('admin_token') || 
+          if (content.includes('getToken') ||
+              content.includes('admin_token') ||
               content.includes('Authorization')) {
             filesWithToken++
           } else {
@@ -789,11 +789,11 @@ class FullSystemChecker {
 
       const scanDirectory = (dir) => {
         const files = fs.readdirSync(dir)
-        
+
         files.forEach(file => {
           const filePath = path.join(dir, file)
           const stat = fs.statSync(filePath)
-          
+
           if (stat.isDirectory()) {
             scanDirectory(filePath)
           } else if (file.endsWith('.html') || file.endsWith('.js')) {
@@ -806,7 +806,7 @@ class FullSystemChecker {
 
       console.log(`   有API调用的文件: ${filesWithAPI}`)
       console.log(`   处理Token的文件: ${filesWithToken}`)
-      
+
       if (filesWithoutToken.length > 0) {
         console.log(`   ⚠️ ${filesWithoutToken.length} 个文件可能缺少Token处理:`)
         filesWithoutToken.slice(0, 5).forEach(file => {
@@ -816,7 +816,7 @@ class FullSystemChecker {
           console.log(`      ... 还有 ${filesWithoutToken.length - 5} 个`)
         }
       } else {
-        console.log(`   ✅ 所有API调用都处理Token`)
+        console.log('   ✅ 所有API调用都处理Token')
       }
     } catch (error) {
       console.log(`   ❌ 检查失败: ${error.message}`)
@@ -832,14 +832,14 @@ class FullSystemChecker {
 
     try {
       const publicAdminDir = path.join(__dirname, '../../public/admin')
-      
+
       if (!fs.existsSync(publicAdminDir)) {
         console.log('   ⚠️ public/admin 目录不存在')
         return
       }
 
       let filesWithTryCatch = 0
-      let filesWithoutTryCatch = []
+      const filesWithoutTryCatch = []
       let totalAsyncFunctions = 0
 
       const scanFile = (filePath) => {
@@ -862,11 +862,11 @@ class FullSystemChecker {
 
       const scanDirectory = (dir) => {
         const files = fs.readdirSync(dir)
-        
+
         files.forEach(file => {
           const filePath = path.join(dir, file)
           const stat = fs.statSync(filePath)
-          
+
           if (stat.isDirectory()) {
             scanDirectory(filePath)
           } else if (file.endsWith('.html') || file.endsWith('.js')) {
@@ -879,12 +879,12 @@ class FullSystemChecker {
 
       console.log(`   发现 ${totalAsyncFunctions} 个async函数`)
       console.log(`   有错误处理: ${filesWithTryCatch} 个文件`)
-      
+
       if (filesWithoutTryCatch.length > 0) {
         console.log(`   ⚠️ ${filesWithoutTryCatch.length} 个文件可能缺少错误处理`)
         this.issues.info.push(`${filesWithoutTryCatch.length} 个文件可能缺少错误处理`)
       } else {
-        console.log(`   ✅ 所有async函数都有错误处理`)
+        console.log('   ✅ 所有async函数都有错误处理')
       }
     } catch (error) {
       console.log(`   ❌ 检查失败: ${error.message}`)
@@ -901,8 +901,8 @@ class FullSystemChecker {
     console.log('='.repeat(80))
     console.log('')
 
-    const totalIssues = this.issues.critical.length + 
-                       this.issues.warning.length + 
+    const totalIssues = this.issues.critical.length +
+                       this.issues.warning.length +
                        this.issues.info.length
 
     console.log(`🔴 严重问题: ${this.issues.critical.length}`)
@@ -955,35 +955,35 @@ class FullSystemChecker {
    * 保存报告到文件
    */
   saveReportToFile (reportPath) {
-    let markdown = `# 全系统排查报告\n\n`
+    let markdown = '# 全系统排查报告\n\n'
     markdown += `> 生成时间：${new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })}\n\n`
-    markdown += `## 概览\n\n`
+    markdown += '## 概览\n\n'
     markdown += `- 🔴 严重问题: ${this.issues.critical.length}\n`
     markdown += `- ⚠️ 警告: ${this.issues.warning.length}\n`
     markdown += `- ℹ️ 信息: ${this.issues.info.length}\n\n`
 
     if (this.issues.critical.length > 0) {
-      markdown += `## 🔴 严重问题\n\n`
+      markdown += '## 🔴 严重问题\n\n'
       this.issues.critical.forEach((issue, index) => {
         markdown += `${index + 1}. ${issue}\n`
       })
-      markdown += `\n`
+      markdown += '\n'
     }
 
     if (this.issues.warning.length > 0) {
-      markdown += `## ⚠️ 警告\n\n`
+      markdown += '## ⚠️ 警告\n\n'
       this.issues.warning.forEach((issue, index) => {
         markdown += `${index + 1}. ${issue}\n`
       })
-      markdown += `\n`
+      markdown += '\n'
     }
 
     if (this.issues.info.length > 0) {
-      markdown += `## ℹ️ 信息\n\n`
+      markdown += '## ℹ️ 信息\n\n'
       this.issues.info.forEach((issue, index) => {
         markdown += `${index + 1}. ${issue}\n`
       })
-      markdown += `\n`
+      markdown += '\n'
     }
 
     fs.writeFileSync(reportPath, markdown, 'utf8')
@@ -998,4 +998,3 @@ checker.run().catch(error => {
   console.error('❌ 检查过程发生错误:', error)
   process.exit(1)
 })
-

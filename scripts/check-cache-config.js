@@ -192,4 +192,3 @@ function runChecks () {
 // 执行检查
 const exitCode = runChecks()
 process.exit(exitCode)
-

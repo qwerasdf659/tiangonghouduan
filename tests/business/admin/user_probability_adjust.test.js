@@ -1,15 +1,15 @@
 /**
  * 用户个性化中奖率设置功能测试
- * 
+ *
  * 业务场景：管理员通过Web平台为特定用户设置个性化中奖率
- * 
+ *
  * 测试范围：
  * 1. 特定奖品概率调整（用户A一等奖20%，用户B一等奖50%）
  * 2. 其他奖品自动缩放（确保总概率100%）
  * 3. 用户状态查询
  * 4. 配置清除
  * 5. 抽奖算法应用个性化概率
- * 
+ *
  * @version 4.0.0
  * @date 2025-11-23
  */
@@ -37,7 +37,7 @@ describe('用户个性化中奖率设置功能测试', () => {
     const campaign = await LotteryCampaign.findOne({
       where: { campaign_code: 'BASIC_LOTTERY' }
     })
-    
+
     if (campaign) {
       const prize = await LotteryPrize.findOne({
         where: { campaign_id: campaign.campaign_id, status: 'active' },
@@ -449,4 +449,3 @@ describe('用户个性化中奖率设置功能测试', () => {
     })
   })
 })
-

@@ -17,6 +17,12 @@
     "lint": "eslint . --ext .js",
     "lint:fix": "eslint . --ext .js --fix",
     "monitor:db": "node scripts/check-db-connections.js",
+    "_comment_monitoring": "=== 系统监控工具命令（2025-11-24新增）===",
+    "monitor:pool": "node scripts/monitoring/pool-monitor.js",
+    "monitor:pool:once": "node scripts/monitoring/pool-monitor.js --once",
+    "monitor:system": "node scripts/monitoring/lightweight-monitor.js",
+    "monitor:system:once": "node scripts/monitoring/lightweight-monitor.js --once",
+    "monitor:redis": "bash scripts/monitoring/redis-persistence-setup.sh",
     "db:migrate": "npx sequelize-cli db:migrate",
     "db:migrate:undo": "npx sequelize-cli db:migrate:undo",
     "db:seed": "npx sequelize-cli db:seed:all",
@@ -154,6 +160,7 @@
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
+    "ajv-formats": "^3.0.1",
     "eslint": "^8.55.0",
     "eslint-config-standard": "^17.1.0",
     "eslint-plugin-import": "^2.29.0",

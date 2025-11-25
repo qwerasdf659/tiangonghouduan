@@ -102,7 +102,7 @@ class ComprehensiveChecker {
   guessFullPath (filePath, routePath) {
     // 从app.js的注册信息推断
     const appContent = fs.readFileSync(path.resolve(__dirname, '../../app.js'), 'utf8')
-    
+
     // 提取文件对应的基础路径
     const relativePath = filePath.replace(process.cwd(), '.').replace(/\\/g, '/')
     const requirePath = relativePath.replace('./', '')
@@ -121,7 +121,7 @@ class ComprehensiveChecker {
       const subPath = filePath.match(/admin\/(\w+)\.js/)
       if (subPath) {
         const moduleName = subPath[1].replace(/_/g, '-')
-        return routePath === '/' 
+        return routePath === '/'
           ? `/api/v4/admin/${moduleName}`
           : `/api/v4/admin/${moduleName}${routePath}`
       }
@@ -179,7 +179,7 @@ class ComprehensiveChecker {
       let match
       while ((match = pattern.exec(content)) !== null) {
         const apiPath = match[match.length - 1]
-        
+
         if (apiPath.startsWith('/api/')) {
           this.frontendAPIs.push({
             path: apiPath,
@@ -216,7 +216,7 @@ class ComprehensiveChecker {
 
     // 去重
     const uniqueAPIs = this.deduplicateAPIs(this.backendAPIs)
-    
+
     console.log(`需要测试的API: ${uniqueAPIs.length} 个\n`)
 
     for (const api of uniqueAPIs) {
@@ -231,7 +231,7 @@ class ComprehensiveChecker {
    */
   deduplicateAPIs (apis) {
     const seen = new Map()
-    
+
     apis.forEach(api => {
       const key = `${api.method}:${api.fullPath}`
       if (!seen.has(key)) {
@@ -278,7 +278,6 @@ class ComprehensiveChecker {
       })
 
       console.log(`✅ ${api.method.padEnd(6)} ${api.fullPath}`)
-
     } catch (error) {
       const httpStatus = error.response?.status
       const errorCode = error.response?.data?.code || error.code
@@ -384,7 +383,7 @@ class ComprehensiveChecker {
 // 命令行执行
 if (require.main === module) {
   const checker = new ComprehensiveChecker()
-  
+
   checker.run().then(summary => {
     if (summary && summary.notFound > 0) {
       console.error('\n❌ 发现API缺失问题')
@@ -399,4 +398,3 @@ if (require.main === module) {
 }
 
 module.exports = ComprehensiveChecker
-

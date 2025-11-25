@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * 快速完整性检查工具
- * 
+ *
  * 用途：在开发过程中快速检查常见的前后端集成问题
  * 使用：node scripts/verification/quick-check.js
  */
@@ -59,16 +59,16 @@ class QuickIntegrityChecker {
         if (file.endsWith('.js') && file !== 'index.js') {
           const modelName = file.replace('.js', '')
           const content = fs.readFileSync(path.join(modelsDir, file), 'utf8')
-          
+
           // 提取字段名（简化版）
           const fields = []
           const fieldRegex = /(\w+):\s*\{[^}]*type:\s*DataTypes\./g
           let match
-          
+
           while ((match = fieldRegex.exec(content)) !== null) {
             fields.push(match[1])
           }
-          
+
           models[modelName] = fields
         }
       })
@@ -81,11 +81,11 @@ class QuickIntegrityChecker {
         fs.readdirSync(servicesDir).forEach(file => {
           if (file.endsWith('.js')) {
             const content = fs.readFileSync(path.join(servicesDir, file), 'utf8')
-            
+
             // 提取attributes中使用的字段
             const attributesRegex = /attributes:\s*\[([^\]]+)\]/g
             let match
-            
+
             while ((match = attributesRegex.exec(content)) !== null) {
               const fieldsStr = match[1]
               const usedFields = fieldsStr
@@ -102,7 +102,7 @@ class QuickIntegrityChecker {
                     break
                   }
                 }
-                
+
                 if (!found) {
                   issues.push(`${file}: 使用了未定义的字段 '${field}'`)
                 }
@@ -138,7 +138,7 @@ class QuickIntegrityChecker {
     try {
       // 检查admin路由文件
       const adminIndexPath = path.join(__dirname, '../../routes/v4/unified-engine/admin/index.js')
-      
+
       if (!fs.existsSync(adminIndexPath)) {
         console.log('❌ admin/index.js 文件不存在')
         this.errors.push('admin路由主文件缺失')
@@ -147,11 +147,11 @@ class QuickIntegrityChecker {
       }
 
       const content = fs.readFileSync(adminIndexPath, 'utf8')
-      
+
       // 检查customer-service路由
-      const hasCustomerServiceImport = content.includes("require('./customer_service')")
-      const hasCustomerServiceMount = content.includes("router.use('/customer-service'")
-      
+      const hasCustomerServiceImport = content.includes('require(\'./customer_service\')')
+      const hasCustomerServiceMount = content.includes('router.use(\'/customer-service\'')
+
       if (hasCustomerServiceImport && hasCustomerServiceMount) {
         console.log('✅ customer-service 路由已正确注册')
         this.passed.push('路由注册检查')
@@ -188,14 +188,14 @@ class QuickIntegrityChecker {
         fs.readdirSync(routesDir).forEach(file => {
           if (file.endsWith('.js') && file !== 'index.js') {
             const content = fs.readFileSync(path.join(routesDir, file), 'utf8')
-            
+
             // 检查middleware引入
             if (content.includes('authMiddleware')) {
               issues.push(`${file}: 使用了不存在的 'authMiddleware'，应该使用 'middleware/auth'`)
             }
 
             // 检查正确的middleware引入
-            const hasCorrectImport = content.includes("require('../../../../middleware/auth')")
+            const hasCorrectImport = content.includes('require(\'../../../../middleware/auth\')')
             if (content.includes('authenticateToken') && !hasCorrectImport) {
               const currentImport = content.match(/require\(['"]([^'"]*auth[^'"]*)['"]\)/)
               if (currentImport) {
@@ -238,7 +238,7 @@ class QuickIntegrityChecker {
 
       if (result.includes('online')) {
         console.log('✅ 服务正在运行')
-        
+
         // 测试API端点
         try {
           execSync('curl -s http://localhost:3000/api/v4/admin/customer-service/sessions > /dev/null 2>&1', {
