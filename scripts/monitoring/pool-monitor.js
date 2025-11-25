@@ -32,7 +32,7 @@ class DatabasePoolMonitor {
    * @param {boolean} options.enableHistory - 是否启用历史记录，默认false
    * @param {number} options.historyMaxSize - 历史记录最大条数，默认100
    */
-  constructor(options = {}) {
+  constructor (options = {}) {
     this.sequelize = sequelize
     this.config = {
       checkInterval: options.checkInterval || 60000, // 默认60秒
@@ -61,7 +61,7 @@ class DatabasePoolMonitor {
    * 获取连接池当前状态
    * @returns {Object} 连接池状态对象
    */
-  getPoolStatus() {
+  getPoolStatus () {
     const pool = this.sequelize.connectionManager.pool
 
     if (!pool) {
@@ -88,7 +88,7 @@ class DatabasePoolMonitor {
    * @param {Object} status - 连接池状态
    * @returns {Object} 使用指标
    */
-  calculateMetrics(status) {
+  calculateMetrics (status) {
     if (!status.available) {
       return {
         activeRatio: 0,
@@ -114,7 +114,7 @@ class DatabasePoolMonitor {
    * @param {Object} metrics - 使用指标
    * @returns {Array} 告警信息数组
    */
-  checkAlerts(status, metrics) {
+  checkAlerts (status, metrics) {
     const alerts = []
 
     // 1. 检查活跃连接比例
@@ -160,7 +160,7 @@ class DatabasePoolMonitor {
    * 执行单次检查
    * @returns {Object} 检查结果
    */
-  async performCheck() {
+  async performCheck () {
     this.stats.totalChecks++
     this.stats.lastCheckTime = new Date().toISOString()
 
@@ -210,7 +210,7 @@ class DatabasePoolMonitor {
    * @param {Object} metrics - 使用指标
    * @param {Array} alerts - 告警信息
    */
-  logStatus(status, metrics, alerts) {
+  logStatus (status, metrics, alerts) {
     const timestamp = new Date().toLocaleString('zh-CN', {
       timeZone: 'Asia/Shanghai',
       year: 'numeric',
@@ -224,7 +224,7 @@ class DatabasePoolMonitor {
 
     console.log(`\n📊 [${timestamp}] 连接池状态监控`)
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
-    console.log(`🔹 连接池状态:`)
+    console.log('🔹 连接池状态:')
     console.log(`   总连接: ${status.size}/${status.max} (配置: ${status.min}-${status.max})`)
     console.log(`   使用中: ${status.using} (${(metrics.activeRatio * 100).toFixed(1)}%)`)
     console.log(`   空闲:   ${status.available} (${(metrics.idleRatio * 100).toFixed(1)}%)`)
@@ -249,27 +249,31 @@ class DatabasePoolMonitor {
    * 处理告警
    * @param {Array} alerts - 告警信息数组
    */
-  handleAlerts(alerts) {
-    // 这里可以集成告警通知（钉钉、企业微信、邮件等）
-    // 当前仅记录日志
+  handleAlerts (alerts) {
+    /*
+     * 这里可以集成告警通知（钉钉、企业微信、邮件等）
+     * 当前仅记录日志
+     */
 
     alerts.forEach(alert => {
       const logLevel = alert.level === 'CRITICAL' ? 'error' : 'warn'
       console[logLevel](`[ALERT] ${alert.type}: ${alert.message}`)
     })
 
-    // TODO: 集成告警通知
-    // 示例：发送钉钉/企业微信通知
-    // if (process.env.ALERT_WEBHOOK_URL) {
-    //   this.sendWebhookAlert(alerts)
-    // }
+    /*
+     * TODO: 集成告警通知
+     * 示例：发送钉钉/企业微信通知
+     * if (process.env.ALERT_WEBHOOK_URL) {
+     *   this.sendWebhookAlert(alerts)
+     * }
+     */
   }
 
   /**
    * 记录历史数据
    * @param {Object} data - 监控数据
    */
-  recordHistory(data) {
+  recordHistory (data) {
     this.history.push({
       ...data,
       timestamp: new Date().toISOString()
@@ -286,7 +290,7 @@ class DatabasePoolMonitor {
    * @param {number} limit - 获取最近N条记录
    * @returns {Array} 历史记录数组
    */
-  getHistory(limit = 10) {
+  getHistory (limit = 10) {
     return this.history.slice(-limit)
   }
 
@@ -294,7 +298,7 @@ class DatabasePoolMonitor {
    * 获取统计信息
    * @returns {Object} 统计信息
    */
-  getStats() {
+  getStats () {
     return {
       ...this.stats,
       alertRate: this.stats.totalChecks > 0
@@ -307,7 +311,7 @@ class DatabasePoolMonitor {
    * 启动监控
    * @param {number} interval - 检查间隔（毫秒），可选
    */
-  start(interval) {
+  start (interval) {
     if (this.timer) {
       console.warn('⚠️ 监控已在运行中')
       return
@@ -315,7 +319,7 @@ class DatabasePoolMonitor {
 
     const checkInterval = interval || this.config.checkInterval
 
-    console.log(`🚀 数据库连接池监控已启动`)
+    console.log('🚀 数据库连接池监控已启动')
     console.log(`   检查间隔: ${checkInterval / 1000}秒`)
     console.log(`   活跃连接告警阈值: ${this.config.activeRatioThreshold * 100}%`)
     console.log(`   等待连接告警阈值: ${this.config.waitingCountThreshold}个`)
@@ -333,7 +337,7 @@ class DatabasePoolMonitor {
   /**
    * 停止监控
    */
-  stop() {
+  stop () {
     if (!this.timer) {
       console.warn('⚠️ 监控未运行')
       return
@@ -343,7 +347,7 @@ class DatabasePoolMonitor {
     this.timer = null
 
     console.log('🛑 数据库连接池监控已停止')
-    console.log(`📊 监控统计:`)
+    console.log('📊 监控统计:')
     console.log(`   总检查次数: ${this.stats.totalChecks}`)
     console.log(`   告警次数: ${this.stats.alerts}`)
     console.log(`   告警率: ${this.getStats().alertRate}`)
@@ -382,7 +386,6 @@ if (require.main === module) {
         console.error('检查失败:', error)
         process.exit(1)
       })
-      return
     } else if (arg === '--help' || arg === '-h') {
       console.log(`
 数据库连接池监控工具
@@ -424,4 +427,3 @@ if (require.main === module) {
 }
 
 module.exports = DatabasePoolMonitor
-
