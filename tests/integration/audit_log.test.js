@@ -64,9 +64,9 @@ describe('审计日志功能测试', () => {
         return
       }
 
-      // 执行审核通过操作
+      // 执行审核通过操作（使用新的统一审核管理API）
       const res = await request(app)
-        .post(`/api/v4/admin/audit/${testExchangeId}/approve`)
+        .post(`/api/v4/audit-management/unified/${testExchangeId}/approve`)
         .set('Authorization', `Bearer ${adminToken}`)
         .send({
           reason: '测试审核通过'

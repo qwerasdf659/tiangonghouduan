@@ -519,6 +519,47 @@ module.exports = sequelize => {
         allowNull: false,
         comment: '奖品分布配置'
       },
+      /**
+       * 参与条件配置（JSON格式）
+       * @type {Object}
+       * @业务含义 存储活动的参与门槛条件，支持多种条件类型组合
+       * @数据结构 {"条件类型": {"operator": "运算符", "value": "条件值"}}
+       * @业务场景 管理员在Web后台配置，用户端API自动验证
+       * @默认值 null（表示无条件限制，所有用户可参与）
+       * @example
+       * {
+       *   "user_points": {"operator": ">=", "value": 100},
+       *   "user_type": {"operator": "in", "value": ["vip", "svip"]},
+       *   "registration_days": {"operator": ">=", "value": 30},
+       *   "consecutive_fail_count": {"operator": ">=", "value": 10}
+       * }
+       */
+      participation_conditions: {
+        type: DataTypes.JSON,
+        allowNull: true,
+        defaultValue: null,
+        comment: '参与条件配置（JSON格式，NULL表示无条件限制）'
+      },
+      /**
+       * 条件不满足时的错误提示语（JSON格式）
+       * @type {Object}
+       * @业务含义 为每个条件配置用户友好的错误提示
+       * @数据结构 {"条件类型": "提示语"}
+       * @业务场景 用户不满足条件时，小程序端显示具体原因和解决建议
+       * @用户体验 避免用户疑惑"为什么我不能参与"
+       * @example
+       * {
+       *   "user_points": "您的积分不足100分，快去消费获取积分吧！",
+       *   "user_type": "此活动仅限VIP会员参与，升级VIP即可参加",
+       *   "registration_days": "注册满30天后才能参与，新用户请先体验其他活动"
+       * }
+       */
+      condition_error_messages: {
+        type: DataTypes.JSON,
+        allowNull: true,
+        defaultValue: null,
+        comment: '条件错误提示语（JSON格式，提供用户友好的说明）'
+      },
       start_time: {
         type: DataTypes.DATE,
         allowNull: false,

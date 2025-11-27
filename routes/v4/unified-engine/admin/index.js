@@ -19,7 +19,6 @@ const prizePoolRoutes = require('./prize_pool')
 const userManagementRoutes = require('./user_management')
 const lotteryManagementRoutes = require('./lottery_management')
 const analyticsRoutes = require('./analytics')
-const auditRoutes = require('./audit') // 🆕 兑换审核管理
 const customerServiceRoutes = require('./customer_service') // 🆕 客服管理
 
 // 挂载子模块路由
@@ -37,7 +36,6 @@ router.use('/prize-pool', prizePoolRoutes)
 router.use('/user-management', userManagementRoutes)
 router.use('/lottery-management', lotteryManagementRoutes)
 router.use('/analytics', analyticsRoutes)
-router.use('/audit', auditRoutes) // 🆕 兑换审核路由
 router.use('/customer-service', customerServiceRoutes) // 🆕 客服管理路由
 
 /**
@@ -112,10 +110,6 @@ router.get('/', (req, res) => {
       analytics: {
         description: '数据分析',
         endpoints: ['/decisions/analytics', '/lottery/trends', '/performance/report']
-      },
-      audit: {
-        description: '兑换审核管理',
-        endpoints: ['/pending', '/:exchange_id/approve', '/:exchange_id/reject', '/history']
       },
       customer_service: {
         description: '客服管理',

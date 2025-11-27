@@ -485,6 +485,14 @@ try {
     reference: '米哈游原神、网易游戏行业标准' // 参考依据
   })
 
+  // V4活动条件管理路由（RESTful标准 - 活动参与条件配置）
+  app.use('/api/v4/activities', require('./routes/v4/unified-engine/activity-conditions'))
+  appLogger.info('V4活动条件管理系统加载成功（RESTful标准）', {
+    route: '/api/v4/activities', // 扁平化业务资源路径
+    standard: 'RESTful', // API设计标准
+    reference: '活动参与条件验证系统' // 参考依据
+  })
+
   // V4管理系统路由（RESTful标准 - 后台管理标准设计）
   app.use('/api/v4/admin', require('./routes/v4/unified-engine/admin'))
   appLogger.info('V4管理系统加载成功（RESTful标准）', {

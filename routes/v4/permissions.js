@@ -100,47 +100,10 @@ router.get('/user/:user_id', authenticateToken, async (req, res) => {
 })
 
 /**
- * 🛡️ 获取当前用户权限信息
- * GET /api/v4/permissions/current
- *
- * @description 获取当前登录用户的完整权限信息
- * @optimization 方案2代码清理优化：
- *   1. 移除冗余的权限检查逻辑（用户只能查自己，无需验证）
- *   2. 只调用getUserPermissions（包含所有需要的信息）
- *   3. 减少1次数据库查询，响应时间提升10-20ms
- */
-router.get('/current', authenticateToken, async (req, res) => {
-  try {
-    const user_id = req.user.user_id
-
-    // 🛡️ 获取用户完整权限信息（包含角色、级别、权限列表）
-    const permissions = await permission_module.getUserPermissions(parseInt(user_id))
-
-    // 🎯 构建响应数据
-    const response_data = {
-      user_id: parseInt(user_id),
-      roles: permissions.roles, // 角色列表
-      role_based_admin: permissions.role_based_admin, // 是否管理员
-      role_level: permissions.role_level, // 角色级别
-      permissions, // 完整权限信息
-      // 🛡️ 简化的权限检查结果（基于role_based_admin）
-      can_manage_lottery: permissions.role_based_admin,
-      can_view_admin_panel: permissions.role_based_admin,
-      can_modify_user_permissions: permissions.role_based_admin
-    }
-
-    return res.apiSuccess(response_data, '当前用户权限信息获取成功')
-  } catch (error) {
-    console.error('❌ 获取当前用户权限失败:', error)
-    return res.apiInternalError('获取当前用户权限信息失败', error.message)
-  }
-})
-
-/**
- * GET /api/v4/permissions/me - 获取我的权限信息（别名路由）
+ * GET /api/v4/permissions/me - 获取我的权限信息
  *
  * @route GET /api/v4/permissions/me
- * @description 获取当前登录用户的权限信息（/current的别名，符合RESTful标准）
+ * @description 获取当前登录用户的权限信息（符合RESTful标准）
  */
 router.get('/me', authenticateToken, async (req, res) => {
   try {
