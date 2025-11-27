@@ -51,7 +51,7 @@ class ActivityConditionValidator {
    *   console.log('不满足条件:', result.messages);
    * }
    */
-  static async validateUser(user, activity) {
+  static async validateUser (user, activity) {
     // 1. 获取条件配置
     const conditions = activity.participation_conditions || {}
     const errorMessages = activity.condition_error_messages || {}
@@ -109,7 +109,7 @@ class ActivityConditionValidator {
    * @param {Object} conditionRule - 条件规则（如{operator: '>=', value: 100}）
    * @returns {boolean} 是否满足条件
    */
-  static evaluateCondition(userData, conditionKey, conditionRule) {
+  static evaluateCondition (userData, conditionKey, conditionRule) {
     const userValue = userData[conditionKey]
     const { operator, value } = conditionRule
 
@@ -120,22 +120,22 @@ class ActivityConditionValidator {
 
     // 根据运算符执行比较
     switch (operator) {
-      case '>=':
-        return userValue >= value
-      case '<=':
-        return userValue <= value
-      case '>':
-        return userValue > value
-      case '<':
-        return userValue < value
-      case '=':
-        return userValue === value
-      case 'in':
-        // value应该是数组，检查userValue是否在数组中
-        return Array.isArray(value) && value.includes(userValue)
-      default:
-        console.warn(`⚠️ 未知的运算符: ${operator}`)
-        return false
+    case '>=':
+      return userValue >= value
+    case '<=':
+      return userValue <= value
+    case '>':
+      return userValue > value
+    case '<':
+      return userValue < value
+    case '=':
+      return userValue === value
+    case 'in':
+      // value应该是数组，检查userValue是否在数组中
+      return Array.isArray(value) && value.includes(userValue)
+    default:
+      console.warn(`⚠️ 未知的运算符: ${operator}`)
+      return false
     }
   }
 
@@ -152,7 +152,7 @@ class ActivityConditionValidator {
    * @param {number} userId - 用户ID
    * @returns {Promise<Object>} 用户数据对象
    */
-  static async getUserData(userId) {
+  static async getUserData (userId) {
     // 查询用户基础信息
     const user = await User.findByPk(userId, {
       include: [
