@@ -160,10 +160,27 @@ router.post('/sessions/:session_id/send', async (req, res) => {
       return res.apiError('消息内容不能为空', 400)
     }
 
+    // 内容长度验证
+    const businessConfig = require('../../../../config/business.config')
+    const { message: messageConfig } = businessConfig.chat
+    if (content.length > messageConfig.max_length) {
+      return res.apiError(
+        `消息内容不能超过${messageConfig.max_length}字符（当前${content.length}字符）`,
+        400
+      )
+    }
+
+    // 消息类型枚举验证
+    const allowedTypes = ['text', 'image', 'system']
+    if (message_type && !allowedTypes.includes(message_type)) {
+      return res.apiError('消息类型无效（允许值：text/image/system）', 400)
+    }
+
     const data = {
       admin_id: req.user.user_id,
       content: content.trim(),
-      message_type: message_type || 'text'
+      message_type: message_type || 'text',
+      role_level: req.user.role_level  // ✅ 新增：传递权限等级
     }
 
     const result = await CustomerServiceSessionService.sendMessage(session_id, data)
@@ -171,9 +188,13 @@ router.post('/sessions/:session_id/send', async (req, res) => {
     return res.apiSuccess(result, '发送消息成功')
   } catch (error) {
     console.error('发送消息失败:', error)
+    
+    // ✅ 增强错误处理
     let statusCode = 500
     if (error.message === '会话不存在') statusCode = 404
-    if (error.message === '无权限操作此会话') statusCode = 403
+    if (error.message.includes('权限')) statusCode = 403
+    if (error.message.includes('敏感词')) statusCode = 400
+    if (error.message.includes('频繁')) statusCode = 429
 
     return res.apiError(error.message, statusCode)
   }

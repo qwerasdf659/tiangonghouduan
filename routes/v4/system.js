@@ -1625,6 +1625,11 @@ router.post('/chat/send', authenticateToken, async (req, res) => {
  * @returns {Object} data.pushed - 是否实时推送成功
  */
 router.post('/chat/admin-reply', authenticateToken, async (req, res) => {
+  // ⚠️ 废弃警告：建议迁移到新版API
+  console.warn(`⚠️ [DEPRECATED] 旧版API调用: POST /api/v4/system/chat/admin-reply`)
+  console.warn(`⚠️ 建议迁移到: POST /api/v4/admin/customer-service/sessions/:id/send`)
+  console.warn(`⚠️ 调用者: 管理员ID ${req.user?.user_id}, IP ${req.ip}`)
+
   // 🔐 Step 1: 开启Sequelize事务（核心优化点）
   const transaction = await sequelize.transaction()
 

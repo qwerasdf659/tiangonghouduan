@@ -621,44 +621,6 @@ router.get('/profile', require('../../../middleware/auth').authenticateToken, as
 })
 
 /**
- * 🛡️ 验证Token有效性
- * POST /api/v4/auth/verify
- *
- * ✅ 风险点3解决：应用限流中间件（防止DDoS攻击）
- * ✅ 风险点5解决：使用全局错误处理中间件（next(error)模式）
- */
-router.post(
-  '/verify',
-  require('../../../middleware/auth').authenticateToken,
-  verifyRateLimiter,
-  async (req, res, next) => {
-    try {
-      const user_id = req.user.user_id
-
-      // 🛡️ 获取用户角色信息
-      const userRoles = await getUserRoles(user_id)
-
-      const responseData = {
-        valid: true,
-        user: {
-          user_id,
-          mobile: req.user.mobile,
-          role_based_admin: userRoles.isAdmin, // 🛡️ 基于角色计算
-          roles: userRoles.roles
-        },
-        timestamp: BeijingTimeHelper.apiTimestamp()
-      }
-
-      return res.apiSuccess(responseData, 'Token验证成功')
-    } catch (error) {
-      console.error('Token验证失败:', error)
-      // ✅ 风险点5解决：利用全局errorHandler.js统一处理
-      return next(error)
-    }
-  }
-)
-
-/**
  * 🛡️ 刷新访问Token
  * POST /api/v4/auth/refresh
  *
@@ -747,38 +709,40 @@ router.post('/refresh', async (req, res) => {
  * @returns {Object} 退出登录结果
  */
 /**
- * GET /api/v4/auth/verify - 验证Token有效性
+ * 🛡️ 验证Token有效性（统一接口）
+ * GET /api/v4/auth/verify
  *
  * @route GET /api/v4/auth/verify
  * @group Auth - 认证相关
  * @security JWT
  *
- * @description 验证当前Token是否有效，返回用户基本信息
+ * @description 验证当前Token是否有效，返回用户完整信息
  * @returns {Object} 200 - Token有效，返回用户信息
  * @returns {Object} 401 - Token无效或已过期
  * @returns {Object} 403 - 用户账号已禁用
  * @returns {Object} 404 - 用户不存在
+ *
+ * ✅ 优化特性：
+ * - 限流保护：100次/分钟（防DDoS攻击）
+ * - 缓存机制：getUserRoles函数自动缓存角色信息
+ * - 完整数据：返回用户所有必要信息
+ * - 全局错误处理：使用next(error)统一处理异常
  *
  * 业务场景：
  * - 前端页面加载时验证登录状态
  * - Token续期前的有效性检查
  * - 跨页面的用户信息同步
  */
-router.get('/verify', authenticateToken, async (req, res) => {
+router.get('/verify', authenticateToken, verifyRateLimiter, async (req, res, next) => {
   try {
     const user_id = req.user.user_id
-    const { Role } = require('../../../models')
+
+    // 🛡️ 使用缓存机制获取用户角色信息（getUserRoles内置缓存）
+    const userRoles = await getUserRoles(user_id)
 
     // 获取用户完整信息
     const user = await User.findByPk(user_id, {
-      attributes: ['user_id', 'mobile', 'nickname', 'status'],
-      include: [{
-        model: Role,
-        as: 'roles',
-        through: { where: { is_active: true }, attributes: [] },
-        attributes: ['role_name', 'role_level'],
-        required: false
-      }]
+      attributes: ['user_id', 'mobile', 'nickname', 'status', 'created_at', 'last_login', 'login_count']
     })
 
     if (!user) {
@@ -789,26 +753,26 @@ router.get('/verify', authenticateToken, async (req, res) => {
       return res.apiError('用户账号已被禁用', 'USER_INACTIVE', { status: user.status }, 403)
     }
 
-    // 计算最高权限等级
-    const max_role_level = user.roles.length > 0
-      ? Math.max(...user.roles.map(r => r.role_level))
-      : 0
-
-    console.log(`✅ [Auth] Token验证成功: user_id=${user_id}, roles=${user.roles.map(r => r.role_name).join(',')}`)
+    console.log(`✅ [Auth] Token验证成功: user_id=${user_id}, roles=${userRoles.roles.join(',')}`)
 
     return res.apiSuccess({
       user_id: user.user_id,
       mobile: user.mobile,
       nickname: user.nickname,
       status: user.status,
-      roles: user.roles.map(r => r.role_name),
-      role_level: max_role_level,
-      is_admin: max_role_level >= 100,
-      token_valid: true
+      roles: userRoles.roles,
+      role_level: userRoles.maxLevel,
+      is_admin: userRoles.isAdmin,
+      role_based_admin: userRoles.isAdmin,
+      created_at: BeijingTimeHelper.formatToISO(user.created_at),
+      last_login: BeijingTimeHelper.formatToISO(user.last_login),
+      login_count: user.login_count,
+      token_valid: true,
+      timestamp: BeijingTimeHelper.apiTimestamp()
     }, 'Token验证成功', 'TOKEN_VALID')
   } catch (error) {
     console.error('❌ [Auth] Token验证失败:', error)
-    return res.apiInternalError('Token验证失败', error.message, 'TOKEN_VERIFY_ERROR')
+    return next(error)
   }
 })
 

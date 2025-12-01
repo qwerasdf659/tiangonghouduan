@@ -26,6 +26,88 @@ const { CustomerServiceSession, ChatMessage, User } = require('../models')
 const BeijingTimeHelper = require('../utils/timeHelper')
 const { Sequelize, Transaction } = require('sequelize')
 const { Op } = Sequelize
+const businessConfig = require('../config/business.config')
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// 🔒 安全工具函数（从 routes/v4/system.js 复制，避免重复代码）
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+/**
+ * XSS内容安全过滤
+ * 复用自 routes/v4/system.js 行1730-1736
+ */
+function sanitizeContent(content) {
+  return content.trim()
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#x27;')
+    .replace(/\//g, '&#x2F;')
+}
+
+/**
+ * 敏感词检测
+ * 复用自 routes/v4/system.js 行1742-1751
+ */
+function checkSensitiveWords(content) {
+  const { content_filter: contentFilter } = businessConfig.chat
+
+  if (!contentFilter.enabled) {
+    return { passed: true }
+  }
+
+  const matchedWord = contentFilter.sensitive_words.find(word =>
+    content.includes(word)
+  )
+
+  if (matchedWord && contentFilter.reject_on_match) {
+    return { passed: false, matchedWord }
+  }
+
+  return { passed: true }
+}
+
+/**
+ * 管理员消息频率限制
+ * 复用自 routes/v4/system.js 行52-142
+ */
+const adminMessageTimestamps = new Map()
+
+function checkAdminRateLimit(admin_id) {
+  const { rate_limit: rateLimit } = businessConfig.chat
+  const limit = rateLimit.admin.max_messages_per_minute
+  const timeWindow = rateLimit.admin.time_window_seconds * 1000
+
+  const now = Date.now()
+  const timestamps = adminMessageTimestamps.get(admin_id) || []
+  
+  const recentTimestamps = timestamps.filter(ts => now - ts < timeWindow)
+  
+  if (recentTimestamps.length >= limit) {
+    return { allowed: false, limit, current: recentTimestamps.length }
+  }
+  
+  recentTimestamps.push(now)
+  adminMessageTimestamps.set(admin_id, recentTimestamps)
+  
+  return { allowed: true, limit, current: recentTimestamps.length }
+}
+
+// 定期清理过期记录（防止内存泄漏）
+setInterval(() => {
+  const now = Date.now()
+  const TEN_MINUTES = 10 * 60 * 1000
+  
+  adminMessageTimestamps.forEach((timestamps, adminId) => {
+    const recentTimestamps = timestamps.filter(ts => now - ts < TEN_MINUTES)
+    if (recentTimestamps.length === 0) {
+      adminMessageTimestamps.delete(adminId)
+    } else {
+      adminMessageTimestamps.set(adminId, recentTimestamps)
+    }
+  })
+}, 10 * 60 * 1000)
 
 /**
  * 客服会话服务类
@@ -285,11 +367,26 @@ class CustomerServiceSessionService {
     })
 
     try {
-      const { admin_id, content, message_type = 'text' } = data
+      const { admin_id, content, message_type = 'text', role_level = 100 } = data
 
       console.log(`📤 管理员 ${admin_id} 向会话 ${session_id} 发送消息`)
 
-      // 验证会话是否存在
+      // ✅ 1. XSS内容安全过滤
+      const sanitized_content = sanitizeContent(content)
+
+      // ✅ 2. 敏感词检测
+      const sensitiveCheck = checkSensitiveWords(sanitized_content)
+      if (!sensitiveCheck.passed) {
+        throw new Error(`消息包含敏感词：${sensitiveCheck.matchedWord}`)
+      }
+
+      // ✅ 3. 频率限制检查
+      const rateLimitCheck = checkAdminRateLimit(admin_id)
+      if (!rateLimitCheck.allowed) {
+        throw new Error(`发送消息过于频繁，每分钟最多${rateLimitCheck.limit}条`)
+      }
+
+      // ✅ 4. 验证会话是否存在
       const session = await CustomerServiceSession.findOne({
         where: { session_id },
         transaction
@@ -299,23 +396,40 @@ class CustomerServiceSessionService {
         throw new Error('会话不存在')
       }
 
-      // 验证管理员是否有权限发送消息
-      if (session.admin_id && session.admin_id !== admin_id) {
-        throw new Error('无权限操作此会话')
+      // ✅ 4.5. 验证会话状态（只有waiting/assigned/active可回复）
+      const ACTIVE_STATUS = ['waiting', 'assigned', 'active']
+      if (!ACTIVE_STATUS.includes(session.status)) {
+        throw new Error(`会话已关闭，无法发送消息（当前状态：${session.status}）`)
       }
 
-      // 创建消息记录
+      // ✅ 5. 权限细分控制（支持超级管理员接管）
+      if (session.admin_id && session.admin_id !== admin_id) {
+        if (role_level < 200) {
+          throw new Error('无权限操作此会话，需要超级管理员权限')
+        }
+        console.log(`⚠️ 超级管理员 ${admin_id} 接管会话 ${session_id}`)
+      }
+
+      // ✅ 6. 自动分配未分配的会话
+      if (!session.admin_id) {
+        await session.update({
+          admin_id,
+          status: 'assigned'
+        }, { transaction })
+      }
+
+      // ✅ 7. 创建消息记录（使用过滤后的内容）
       const message = await ChatMessage.create({
         session_id,
         sender_id: admin_id,
         sender_type: 'admin',
         message_source: 'admin_client',
-        content,
+        content: sanitized_content,
         message_type,
         status: 'sent'
       }, { transaction })
 
-      // 更新会话的最后消息时间
+      // ✅ 8. 更新会话的最后消息时间
       await session.update({
         last_message_at: new Date(),
         status: session.status === 'waiting' || session.status === 'assigned' ? 'active' : session.status
@@ -325,18 +439,39 @@ class CustomerServiceSessionService {
 
       console.log(`✅ 消息发送成功，消息ID: ${message.message_id}`)
 
-      /*
-       * TODO: 通过WebSocket推送消息给用户端
-       * const webSocketService = require('./ChatWebSocketService')
-       * await webSocketService.sendMessageToUser(session.user_id, message)
-       */
+      // ✅ 9. WebSocket实时推送（事务外执行）
+      let pushed = false
+      try {
+        const ChatWebSocketService = require('./ChatWebSocketService')
+        const messageData = {
+          message_id: message.message_id,
+          session_id,
+          sender_id: admin_id,
+          sender_type: 'admin',
+          content: sanitized_content,
+          message_type: message.message_type,
+          created_at: message.created_at
+        }
+        pushed = ChatWebSocketService.pushMessageToUser(session.user_id, messageData)
 
+        if (pushed) {
+          console.log(`📤 消息已实时推送给用户 ${session.user_id}`)
+        } else {
+          console.log(`⚠️ 用户 ${session.user_id} 不在线，消息已保存`)
+        }
+      } catch (wsError) {
+        console.error('❌ WebSocket推送失败:', wsError)
+        // 不影响消息发送成功
+      }
+
+      // ✅ 10. 返回详细结果
       return {
         message_id: message.message_id,
-        content: message.content,
+        content: sanitized_content,
         sender_type: message.sender_type,
         message_type: message.message_type,
-        created_at: BeijingTimeHelper.formatForAPI(message.created_at).iso
+        created_at: BeijingTimeHelper.formatForAPI(message.created_at).iso,
+        pushed  // 标识是否实时推送成功
       }
     } catch (error) {
       await transaction.rollback()
