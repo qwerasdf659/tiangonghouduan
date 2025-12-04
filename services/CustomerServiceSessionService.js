@@ -28,15 +28,17 @@ const { Sequelize, Transaction } = require('sequelize')
 const { Op } = Sequelize
 const businessConfig = require('../config/business.config')
 
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// 🔒 安全工具函数（从 routes/v4/system.js 复制，避免重复代码）
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+/*
+ * ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ * 🔒 安全工具函数（从 routes/v4/system.js 复制，避免重复代码）
+ * ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ */
 
 /**
  * XSS内容安全过滤
  * 复用自 routes/v4/system.js 行1730-1736
  */
-function sanitizeContent(content) {
+function sanitizeContent (content) {
   return content.trim()
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
@@ -50,7 +52,7 @@ function sanitizeContent(content) {
  * 敏感词检测
  * 复用自 routes/v4/system.js 行1742-1751
  */
-function checkSensitiveWords(content) {
+function checkSensitiveWords (content) {
   const { content_filter: contentFilter } = businessConfig.chat
 
   if (!contentFilter.enabled) {
@@ -74,23 +76,23 @@ function checkSensitiveWords(content) {
  */
 const adminMessageTimestamps = new Map()
 
-function checkAdminRateLimit(admin_id) {
+function checkAdminRateLimit (admin_id) {
   const { rate_limit: rateLimit } = businessConfig.chat
   const limit = rateLimit.admin.max_messages_per_minute
   const timeWindow = rateLimit.admin.time_window_seconds * 1000
 
   const now = Date.now()
   const timestamps = adminMessageTimestamps.get(admin_id) || []
-  
+
   const recentTimestamps = timestamps.filter(ts => now - ts < timeWindow)
-  
+
   if (recentTimestamps.length >= limit) {
     return { allowed: false, limit, current: recentTimestamps.length }
   }
-  
+
   recentTimestamps.push(now)
   adminMessageTimestamps.set(admin_id, recentTimestamps)
-  
+
   return { allowed: true, limit, current: recentTimestamps.length }
 }
 
@@ -98,7 +100,7 @@ function checkAdminRateLimit(admin_id) {
 setInterval(() => {
   const now = Date.now()
   const TEN_MINUTES = 10 * 60 * 1000
-  
+
   adminMessageTimestamps.forEach((timestamps, adminId) => {
     const recentTimestamps = timestamps.filter(ts => now - ts < TEN_MINUTES)
     if (recentTimestamps.length === 0) {
@@ -471,7 +473,7 @@ class CustomerServiceSessionService {
         sender_type: message.sender_type,
         message_type: message.message_type,
         created_at: BeijingTimeHelper.formatForAPI(message.created_at).iso,
-        pushed  // 标识是否实时推送成功
+        pushed // 标识是否实时推送成功
       }
     } catch (error) {
       await transaction.rollback()

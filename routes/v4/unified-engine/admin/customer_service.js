@@ -180,7 +180,7 @@ router.post('/sessions/:session_id/send', async (req, res) => {
       admin_id: req.user.user_id,
       content: content.trim(),
       message_type: message_type || 'text',
-      role_level: req.user.role_level  // ✅ 新增：传递权限等级
+      role_level: req.user.role_level // ✅ 新增：传递权限等级
     }
 
     const result = await CustomerServiceSessionService.sendMessage(session_id, data)
@@ -188,7 +188,7 @@ router.post('/sessions/:session_id/send', async (req, res) => {
     return res.apiSuccess(result, '发送消息成功')
   } catch (error) {
     console.error('发送消息失败:', error)
-    
+
     // ✅ 增强错误处理
     let statusCode = 500
     if (error.message === '会话不存在') statusCode = 404

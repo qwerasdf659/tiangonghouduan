@@ -3,11 +3,11 @@
  * 测试文件：tests/integration/market-withdraw-optimization.test.js
  *
  * 测试范围：
- * 1. 撤回冷却时间功能（4小时限制）
+ * 1. 撤回冷却时间功能（1小时商品级别限制）
  * 2. 撤回统计字段更新（withdraw_count、last_withdraw_at、last_withdraw_reason）
  * 3. condition字段保留功能
  *
- * 基于文档：撤回市场商品API实施方案V5.0 - 轻量级优化方案
+ * 基于文档：奖品二级市场撤回控制方案-终极分析报告
  */
 
 const request = require('supertest')
@@ -33,7 +33,7 @@ describe('撤回市场商品API优化功能测试', () => {
     }
 
     // 2. 生成测试token
-    testToken = generateTestToken(testUser.user_id)
+    testToken = await getTestUserToken(app, testUser.mobile)
 
     // 3. 清理测试数据（删除之前的测试商品和历史撤回记录）
     await models.UserInventory.destroy({
@@ -46,14 +46,7 @@ describe('撤回市场商品API优化功能测试', () => {
       force: true // ✅ 硬删除，确保完全清理
     })
 
-    // 3.1 清理该用户所有历史撤回记录（避免触发冷却时间限制）
-    await models.UserInventory.destroy({
-      where: {
-        user_id: testUser.user_id,
-        market_status: 'withdrawn'
-      },
-      force: true // ✅ 硬删除所有撤回状态的商品
-    })
+    // 3.1 注意：新方案采用商品级别冷却，无需清理其他商品的撤回记录
 
     // 4. 创建两个测试商品用于撤回测试
     testProduct1 = await models.UserInventory.create({
@@ -140,32 +133,58 @@ describe('撤回市场商品API优化功能测试', () => {
   })
 
   /**
-   * 测试2：撤回冷却时间限制
-   * 验证4小时内不能重复撤回
+   * 测试2：撤回冷却时间限制（商品级别）
+   * 验证同一商品1小时内不能重复撤回，但不同商品互不影响
    */
-  describe('测试2：撤回冷却时间限制', () => {
-    test('应该拒绝4小时内的第二次撤回', async () => {
+  describe('测试2：撤回冷却时间限制（商品级别）', () => {
+    test('应该允许撤回不同商品（商品级别冷却）', async () => {
       // 第一次撤回已经在测试1完成，testProduct1已被撤回
 
-      // 立即尝试撤回第二个商品，应该被冷却限制拒绝
+      // 立即尝试撤回第二个商品，应该成功（因为是不同商品）
       const response = await request(app)
         .post(`/api/v4/inventory/market/products/${testProduct2.inventory_id}/withdraw`)
         .set('Authorization', `Bearer ${testToken}`)
         .send({
-          withdraw_reason: '测试冷却时间'
+          withdraw_reason: '测试商品级别冷却'
+        })
+
+      // 验证成功响应（新方案：不同商品互不影响）
+      expect(response.status).toBe(200)
+      expect(response.body.success).toBe(true)
+      expect(response.body.data).toHaveProperty('new_status', 'withdrawn')
+      expect(response.body.data).toHaveProperty('cooldown_until') // 应返回冷却结束时间
+
+      // 验证商品状态已改变
+      await testProduct2.reload()
+      expect(testProduct2.market_status).toBe('withdrawn') // 状态应为已撤回
+      expect(testProduct2.withdraw_count).toBe(1) // 撤回次数应为1
+    })
+
+    test('应该拒绝同一商品1小时内的重复撤回', async () => {
+      // 将testProduct1重新上架（保留last_withdraw_at）
+      await testProduct1.update({
+        market_status: 'on_sale',
+        selling_points: 600
+      })
+
+      // 立即尝试再次撤回同一商品，应该被拒绝
+      const response = await request(app)
+        .post(`/api/v4/inventory/market/products/${testProduct1.inventory_id}/withdraw`)
+        .set('Authorization', `Bearer ${testToken}`)
+        .send({
+          withdraw_reason: '测试同一商品冷却'
         })
 
       // 验证返回429错误（Too Many Requests）
       expect(response.status).toBe(429)
       expect(response.body.success).toBe(false)
-      expect(response.body.message).toMatch(/撤回操作过于频繁/)
-      expect(response.body.data).toHaveProperty('cooldown_remaining_hours') // 应返回剩余冷却时间
+      expect(response.body.message).toMatch(/该商品在1小时内已撤回过/)
+      expect(response.body.data).toHaveProperty('cooldown_remaining_minutes') // 应返回剩余冷却分钟数
       expect(response.body.data).toHaveProperty('next_available_time') // 应返回下次可用时间
 
       // 验证商品状态未改变
-      await testProduct2.reload()
-      expect(testProduct2.market_status).toBe('on_sale') // 状态应保持在售
-      expect(testProduct2.withdraw_count).toBe(0) // 撤回次数应保持0
+      await testProduct1.reload()
+      expect(testProduct1.market_status).toBe('on_sale') // 状态应保持在售
     })
   })
 
@@ -175,13 +194,13 @@ describe('撤回市场商品API优化功能测试', () => {
    */
   describe('测试3：condition字段保留功能', () => {
     test('撤回后应保留商品成色信息', async () => {
-      // 从数据库验证testProduct1的成色是否保留
-      await testProduct1.reload()
+      // 从数据库验证testProduct2的成色是否保留（testProduct2在测试2中被撤回）
+      await testProduct2.reload()
 
-      expect(testProduct1.condition).toBe('excellent') // 成色应保留为"优秀"
-      expect(testProduct1.market_status).toBe('withdrawn') // 状态应为已撤回
-      expect(testProduct1.selling_points).toBeNull() // 售价已清空
-      expect(testProduct1.is_available).toBe(true) // 商品应可用
+      expect(testProduct2.condition).toBe('good') // 成色应保留为"良好"
+      expect(testProduct2.market_status).toBe('withdrawn') // 状态应为已撤回
+      expect(testProduct2.selling_points).toBeNull() // 售价已清空
+      expect(testProduct2.is_available).toBe(true) // 商品应可用
     })
   })
 
@@ -191,12 +210,19 @@ describe('撤回市场商品API优化功能测试', () => {
    */
   describe('测试4：撤回统计字段累加', () => {
     test('多次撤回时withdraw_count应正确累加', async () => {
-      // 手动模拟4小时后的场景（修改last_withdraw_at为4小时前）
-      await testProduct1.update({
-        market_status: 'on_sale', // 重新上架
-        selling_points: 600, // 重新定价
-        last_withdraw_at: new Date(Date.now() - 5 * 60 * 60 * 1000) // 5小时前（超过4小时冷却）
-      })
+      // 先reload获取最新状态
+      await testProduct1.reload()
+
+      // 手动模拟1小时后的场景（修改last_withdraw_at为2小时前）
+      const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000)
+      await models.sequelize.query(
+        'UPDATE user_inventory SET market_status = ?, selling_points = ?, last_withdraw_at = ? WHERE inventory_id = ?',
+        {
+          replacements: ['on_sale', 600, twoHoursAgo, testProduct1.inventory_id],
+          type: models.Sequelize.QueryTypes.UPDATE
+        }
+      )
+      await testProduct1.reload() // 重新加载以获取更新后的数据
 
       // 第二次撤回
       const response = await request(app)
@@ -276,11 +302,11 @@ describe('撤回市场商品API优化功能测试', () => {
    */
   describe('测试6：状态验证', () => {
     test('应该拒绝撤回已撤回的商品', async () => {
-      // testProduct1当前状态为withdrawn（在测试4中撤回）
+      // testProduct2当前状态为withdrawn（在测试2中撤回）
 
       // 尝试再次撤回
       const response = await request(app)
-        .post(`/api/v4/inventory/market/products/${testProduct1.inventory_id}/withdraw`)
+        .post(`/api/v4/inventory/market/products/${testProduct2.inventory_id}/withdraw`)
         .set('Authorization', `Bearer ${testToken}`)
         .send({
           withdraw_reason: '尝试重复撤回'

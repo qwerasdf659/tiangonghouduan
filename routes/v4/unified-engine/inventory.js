@@ -2136,10 +2136,14 @@ router.post('/market/products/:id/purchase', authenticateToken, async (req, res)
       transaction
     })
 
-    // 6. 给卖家增加积分（扣除5%手续费 - Seller Receives 95% After Platform Fee）
-    const feeRate = 0.05 // 5%平台手续费（Platform fee rate）
-    const fee = Math.floor(marketProduct.selling_points * feeRate)
-    const sellerReceived = marketProduct.selling_points - fee
+    // 6. 给卖家增加积分（按商品价值分档计算手续费 - Fee Calculation Based on Item Value Tiers）
+    const FeeCalculator = require('../../../services/FeeCalculator')
+    const feeInfo = FeeCalculator.calculateItemFee(
+      marketProduct.value, // 商品价值（用于分档）- Item value for fee tier determination
+      marketProduct.selling_points // 售价（用于计算手续费）- Selling price for fee calculation
+    )
+    const fee = feeInfo.fee // 手续费 - Platform fee
+    const sellerReceived = feeInfo.net_amount // 卖家实收 - Seller net amount
 
     // 🔥 生成卖家的业务ID（幂等性保护 - Seller's Business ID for Idempotency）
     const sale_business_id = `market_sale_${product_id}_${marketProduct.user_id}_${timestamp}`
@@ -2176,7 +2180,9 @@ router.post('/market/products/:id/purchase', authenticateToken, async (req, res)
       buyer_id,
       selling_points: marketProduct.selling_points,
       seller_received: sellerReceived,
-      transaction_fee: fee
+      transaction_fee: fee,
+      fee_rate: feeInfo.rate, // 费率（如0.03）- Fee rate
+      fee_tier: feeInfo.tier // 档位名称（如'低价值档'）- Fee tier name
     })
 
     return ApiResponse.success(
@@ -2189,6 +2195,8 @@ router.post('/market/products/:id/purchase', authenticateToken, async (req, res)
         transaction_amount: marketProduct.selling_points,
         seller_received: sellerReceived,
         transaction_fee: fee,
+        fee_rate: feeInfo.rate, // 费率（如0.03表示3%）- Fee rate
+        fee_tier: feeInfo.tier, // 档位名称（如'低价值档'）- Fee tier name
         purchased_at: BeijingTimeHelper.createDatabaseTime(),
         purchase_note: purchase_note || null
       },
@@ -2209,14 +2217,15 @@ router.post('/market/products/:id/purchase', authenticateToken, async (req, res)
  * 撤回市场商品
  * POST /api/v4/inventory/market/products/:id/withdraw
  *
- * 优化内容（基于撤回市场商品API实施方案V5.0 - 轻量级优化方案）：
- * 1. 增加4小时撤回冷却时间检查（防滥用）
+ * 优化内容（基于奖品二级市场撤回控制方案-终极分析报告）：
+ * 1. 商品级别1小时撤回冷却时间检查（防滥用）
  * 2. 保留condition字段（优化用户体验）
  * 3. 使用撤回统计字段（withdraw_count、last_withdraw_at、last_withdraw_reason）
  *
  * 业务规则：
  * - 只能撤回自己的在售商品（user_id + market_status验证）
- * - 4小时内只能撤回一次（防止恶意刷排名）
+ * - 同一商品1小时内只能撤回一次（防止恶意刷排名）
+ * - 不同商品互不影响（商品级别冷却）
  * - 撤回后保留成色信息（用户重新上架无需重填）
  * - 记录撤回次数和原因（数据分析和审计追溯）
  */
@@ -2257,44 +2266,52 @@ router.post('/market/products/:id/withdraw', authenticateToken, async (req, res)
 
       /*
        * ========================================
-       * 🔒 步骤2：防滥用检查 - 4小时撤回冷却时间
-       * 注意：冷却时间检查在权限验证之后，避免误导用户
+       * 🔒 步骤2：防滥用检查 - 1小时撤回冷却时间（商品级别）
+       *
+       * 【业务规则】
+       * - 同一商品撤回后1小时内不能再次撤回（防止恶意刷排名）
+       * - 不同商品互不影响，撤回商品A不会阻止撤回商品B
+       *
+       * 【技术实现】
+       * - 直接使用当前商品的last_withdraw_at字段（步骤1查询时已获取）
+       * - 无需额外数据库查询，复用已有数据
+       * - 主键查询O(1)复杂度，性能稳定
+       *
+       * 【对比旧方案】
+       * - 旧：查询用户所有withdrawn商品 → 新：直接使用当前商品
+       * - 旧：4小时用户级冷却 → 新：1小时商品级冷却
+       * - 旧：2次数据库查询 → 新：1次数据库查询
        * ========================================
        */
-      const WITHDRAW_COOLDOWN = 4 * 60 * 60 * 1000 // 4小时冷却（14400000毫秒）
+      const WITHDRAW_COOLDOWN = 1 * 60 * 60 * 1000 // 1小时冷却（3600000毫秒）
 
-      // 查询用户最近一次撤回时间
-      const lastWithdraw = await models.UserInventory.findOne({
-        where: {
-          user_id: seller_id,
-          market_status: 'withdrawn',
-          last_withdraw_at: {
-            [models.Sequelize.Op.gte]: new Date(Date.now() - WITHDRAW_COOLDOWN)
-          }
-        },
-        order: [['last_withdraw_at', 'DESC']],
-        attributes: ['last_withdraw_at'], // 仅查询需要的字段，优化性能
-        transaction // ✅ 在同一事务中查询，确保数据一致性
-      })
+      /*
+       * ✅ 直接检查当前商品的冷却状态（复用步骤1的查询结果，无需额外查询）
+       * marketProduct 是步骤1中已查询的商品对象，包含 last_withdraw_at 字段
+       */
+      if (marketProduct.last_withdraw_at) {
+        // 计算距离上次撤回已过去的时间（毫秒）
+        const lastWithdrawTime = new Date(marketProduct.last_withdraw_at).getTime()
+        const elapsedTime = Date.now() - lastWithdrawTime // 已过去的时间
+        const remainingTime = WITHDRAW_COOLDOWN - elapsedTime // 剩余冷却时间
 
-      // 如果4小时内已撤回过商品，拒绝本次撤回
-      if (lastWithdraw) {
-        await transaction.rollback() // ✅ 记得回滚事务
-        // ✅ 确保日期字段转换为Date对象（Sequelize可能返回字符串或Date对象）
-        const lastWithdrawTime = new Date(lastWithdraw.last_withdraw_at).getTime()
-        const remainingTime = WITHDRAW_COOLDOWN - (Date.now() - lastWithdrawTime)
-        const remainingHours = Math.ceil(remainingTime / (60 * 60 * 1000))
+        // 如果还在冷却期内（剩余时间>0），拒绝本次撤回
+        if (remainingTime > 0) {
+          await transaction.rollback() // 回滚事务，释放行锁
+          const remainingMinutes = Math.ceil(remainingTime / 60000) // 转换为分钟（向上取整）
 
-        return res.apiError(
-          `撤回操作过于频繁，请${remainingHours}小时后再试。这是为了防止滥用市场功能。`,
-          'TOO_MANY_REQUESTS',
-          {
-            cooldown_remaining_ms: remainingTime,
-            cooldown_remaining_hours: remainingHours,
-            next_available_time: new Date(Date.now() + remainingTime).toISOString()
-          },
-          429 // 429 Too Many Requests
-        )
+          return res.apiError(
+            `该商品在1小时内已撤回过，请${remainingMinutes}分钟后再试`,
+            'TOO_MANY_REQUESTS', // 业务错误码：操作过于频繁
+            {
+              cooldown_remaining_minutes: remainingMinutes, // 前端可用于倒计时显示
+              cooldown_remaining_ms: remainingTime, // 精确毫秒数（可选）
+              item_id: marketProduct.inventory_id, // 当前商品ID（便于调试）
+              next_available_time: new Date(Date.now() + remainingTime).toISOString() // 下次可撤回时间
+            },
+            429 // HTTP 429 Too Many Requests
+          )
+        }
       }
 
       /*
