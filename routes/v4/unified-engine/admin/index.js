@@ -20,6 +20,7 @@ const userManagementRoutes = require('./user_management')
 const lotteryManagementRoutes = require('./lottery_management')
 const analyticsRoutes = require('./analytics')
 const customerServiceRoutes = require('./customer_service') // 🆕 客服管理
+const marketplaceRoutes = require('./marketplace') // 🆕 市场统计管理
 
 // 挂载子模块路由
 router.use('/auth', authRoutes)
@@ -37,6 +38,7 @@ router.use('/user-management', userManagementRoutes)
 router.use('/lottery-management', lotteryManagementRoutes)
 router.use('/analytics', analyticsRoutes)
 router.use('/customer-service', customerServiceRoutes) // 🆕 客服管理路由
+router.use('/marketplace', marketplaceRoutes) // 🆕 市场统计路由
 
 /**
  * GET / - Admin API根路径信息
@@ -122,6 +124,10 @@ router.get('/', (req, res) => {
           '/sessions/:id/transfer',
           '/sessions/:id/close'
         ]
+      },
+      marketplace: {
+        description: '市场统计管理',
+        endpoints: ['/marketplace/listing-stats']
       }
       // ⚠️ campaign_permissions模块暂未实现，待实现后再添加到此列表
     },

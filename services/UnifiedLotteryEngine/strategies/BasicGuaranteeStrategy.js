@@ -359,8 +359,8 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
         // ✅ 生成唯一的抽奖ID（用于幂等性控制）
         const draw_id = `draw_${BeijingTimeHelper.generateIdTimestamp()}_${user_id}_${Math.random().toString(36).substr(2, 6)}`
 
-        // 直接从奖品池中选择奖品（传入user_id以支持个性化概率）
-        const prize = await this.selectPrize(await this.getAvailablePrizes(campaignId), user_id)
+        // 直接从奖品池中选择奖品（传入user_id以支持个性化概率和预算过滤）
+        const prize = await this.selectPrize(await this.getAvailablePrizes(campaignId, user_id), user_id)
 
         if (prize) {
           /**
@@ -399,10 +399,46 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
           // 🎯 步骤3: 发放奖品（在事务中执行，确保顺序）
           await this.distributePrize(user_id, prize, internalTransaction)
 
-          // 🎯 步骤4: 记录抽奖历史（传入draw_id和transaction）
+          /*
+           * 🔥 步骤3.5: 双账户模型 - 扣除预算积分和记录审计字段
+           * 业务规则：
+           * - 扣除用户的预算积分（remaining_budget_points - prize_value_points）
+           * - 更新统计字段（total_draw_count、won_count、last_draw_at）
+           * - 记录预算审计字段（budget_points_before、budget_points_after）
+           */
+          const prizeValuePoints = prize.prize_value_points || 0
+          const budgetBefore = userAccount.remaining_budget_points || 0
+          const budgetAfter = Math.max(0, budgetBefore - prizeValuePoints)
+
+          await userAccount.update(
+            {
+              remaining_budget_points: budgetAfter,
+              used_budget_points: (userAccount.used_budget_points || 0) + prizeValuePoints,
+              total_draw_count: (userAccount.total_draw_count || 0) + 1,
+              won_count: (userAccount.won_count || 0) + 1,
+              last_draw_at: BeijingTimeHelper.createDatabaseTime()
+            },
+            { transaction: internalTransaction }
+          )
+
+          this.logInfo('双账户模型：预算扣除成功', {
+            user_id,
+            prize_id: prize.prize_id,
+            prize_value_points: prizeValuePoints,
+            budget_before: budgetBefore,
+            budget_after: budgetAfter
+          })
+
+          // 🎯 步骤4: 记录抽奖历史（传入draw_id、transaction和预算审计字段）
           await this.recordLotteryHistory(
             context,
-            { is_winner: true, prize },
+            {
+              is_winner: true,
+              prize,
+              prize_value_points: prizeValuePoints,
+              budget_points_before: budgetBefore,
+              budget_points_after: budgetAfter
+            },
             1.0,
             draw_id,
             internalTransaction
@@ -1268,8 +1304,14 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
    * @param {number} campaignId - 活动ID
    * @returns {Promise<Array>} 奖品列表
    */
-  async getAvailablePrizes (campaignId) {
-    const { LotteryPrize } = require('../../../models')
+  /**
+   * 获取可用奖品池（双账户模型：根据预算过滤）
+   * @param {number} campaignId - 活动ID
+   * @param {number} userId - 用户ID（用于预算过滤）
+   * @returns {Promise<Array>} 可用奖品列表
+   */
+  async getAvailablePrizes (campaignId, userId = null) {
+    const { LotteryPrize, UserPointsAccount } = require('../../../models')
 
     try {
       // 🎯 优化查询 - 支持50+奖品的高效查询
@@ -1283,6 +1325,9 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
           'prize_name', // ✅ 修复：使用正确的数据库字段名
           'prize_type',
           'prize_value',
+          'prize_value_points', // 🔥 双账户模型：奖品价值积分
+          'virtual_amount', // 🔥 双账户模型：虚拟奖品数量
+          'category', // 🔥 双账户模型：奖品分类
           'win_probability',
           'stock_quantity',
           'max_daily_wins',
@@ -1301,22 +1346,68 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
         return []
       }
 
+      /*
+       * ========== 双账户模型：预算过滤逻辑 ==========
+       * 业务规则：
+       * - 根据用户剩余预算积分筛选奖品池
+       * - 只能抽中 prize_value_points <= remaining_budget_points 的奖品
+       * - 预算用完后只能中0成本空奖（prize_value_points = 0）
+       */
+      let filteredPrizes = prizes
+
+      if (userId) {
+        // 查询用户的剩余预算积分
+        const userAccount = await UserPointsAccount.findOne({
+          where: { user_id: userId },
+          attributes: ['remaining_budget_points']
+        })
+
+        if (userAccount) {
+          const remainingBudget = userAccount.remaining_budget_points || 0
+
+          // 根据预算筛选奖品池
+          filteredPrizes = prizes.filter(prize => {
+            const prizeValuePoints = prize.prize_value_points || 0
+            return prizeValuePoints <= remainingBudget
+          })
+
+          this.logInfo('双账户模型：预算过滤完成', {
+            userId,
+            campaignId,
+            remainingBudget,
+            totalPrizes: prizes.length,
+            filteredPrizes: filteredPrizes.length,
+            budgetExhausted: remainingBudget === 0
+          })
+
+          // 如果预算用完了，至少保证有空奖可抽
+          if (filteredPrizes.length === 0) {
+            filteredPrizes = prizes.filter(p => (p.prize_value_points || 0) === 0)
+            this.logWarn('预算耗尽，仅保留0成本空奖', {
+              userId,
+              emptyPrizesCount: filteredPrizes.length
+            })
+          }
+        }
+      }
+
       // 记录奖品池统计
-      const totalPrizes = prizes.length
-      const activePrizes = prizes.filter(p => p.stock_quantity > 0).length
-      const totalStock = prizes.reduce((sum, p) => sum + (p.stock_quantity || 0), 0)
+      const totalPrizes = filteredPrizes.length
+      const activePrizes = filteredPrizes.filter(p => p.stock_quantity > 0).length
+      const totalStock = filteredPrizes.reduce((sum, p) => sum + (p.stock_quantity || 0), 0)
 
       this.logInfo('奖品池查询完成', {
         campaignId,
+        userId,
         totalPrizes,
         activePrizes,
         totalStock,
         timestamp: BeijingTimeHelper.now()
       })
 
-      return prizes
+      return filteredPrizes
     } catch (error) {
-      this.logError('获取奖品池失败', { campaignId, error: error.message })
+      this.logError('获取奖品池失败', { campaignId, userId, error: error.message })
       throw new Error(`获取奖品池失败: ${error.message}`)
     }
   }
@@ -1429,6 +1520,8 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
    * await strategy.distributePrize(10001, prize, transaction)
    */
   async distributePrize (user_id, prize, transaction = null) {
+    const { UserInventory } = require('../../../models')
+
     // 根据奖品类型进行不同的发放逻辑
     switch (prize.prize_type) {
     case 'points':
@@ -1443,7 +1536,7 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
 
       this.logInfo('发放积分奖励（使用PointsService + 事务）', {
         user_id,
-        prizeId: prize.id,
+        prizeId: prize.prize_id,
         prizeName: prize.prize_name,
         points: prize.prize_value,
         inTransaction: !!transaction
@@ -1451,18 +1544,61 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
       break
 
     case 'coupon':
-      // 优惠券：记录到用户库存（这里简化处理）
-      this.logInfo('发放优惠券奖品', {
+    case 'physical':
+    case 'virtual': {
+      /**
+       * 🔥 双账户模型：虚拟奖品/优惠券/实物奖品发放到用户背包
+       *
+       * 业务场景：
+       * - 抽奖中奖后，将虚拟奖品（水晶、贵金属）写入用户背包
+       * - 用户可在背包中查看虚拟奖品
+       * - 用户可使用虚拟奖品价值积分在兑换市场兑换商品
+       *
+       * 关键字段：
+       * - virtual_amount: 虚拟奖品数量（如100个水晶）
+       * - virtual_value_points: 虚拟奖品价值积分（用于兑换商品）
+       * - lottery_record_id: 关联的抽奖记录ID
+       */
+      const virtualAmount = prize.virtual_amount || 0
+      const virtualValuePoints = prize.prize_value_points || 0
+      const category = prize.category || 'virtual'
+
+      await UserInventory.create(
+        {
+          user_id,
+          name: prize.prize_name,
+          description: prize.prize_description || `抽奖获得：${prize.prize_name}`,
+          type: prize.prize_type === 'coupon' ? 'voucher' : prize.prize_type === 'physical' ? 'product' : 'service',
+          value: Math.round(parseFloat(prize.prize_value) || 0),
+          status: 'available',
+          source_type: 'lottery',
+          source_id: null, // 后续在recordLotteryHistory中更新
+          virtual_amount: virtualAmount,
+          virtual_value_points: virtualValuePoints,
+          lottery_record_id: null, // 后续在recordLotteryHistory中更新
+          acquisition_method: 'lottery',
+          acquisition_cost: this.config.pointsCostPerDraw,
+          can_transfer: true,
+          can_use: true,
+          acquired_at: BeijingTimeHelper.createDatabaseTime(),
+          created_at: BeijingTimeHelper.createDatabaseTime(),
+          updated_at: BeijingTimeHelper.createDatabaseTime()
+        },
+        { transaction }
+      )
+
+      this.logInfo('发放虚拟奖品到用户背包', {
         user_id,
-        prizeId: prize.id,
-        couponValue: prize.prize_value
+        prizeId: prize.prize_id,
+        prizeName: prize.prize_name,
+        prizeType: prize.prize_type,
+        virtualAmount,
+        virtualValuePoints,
+        category,
+        inTransaction: !!transaction
       })
       break
-
-    case 'physical':
-      // 实物奖品：记录待发货状态（这里简化处理）
-      this.logInfo('发放实物奖品', { user_id, prizeId: prize.id, prizeName: prize.prize_name })
-      break
+    }
 
     default:
       this.logError('未知奖品类型', { prizeType: prize.prize_type })
@@ -1519,6 +1655,10 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
         cost_points: this.config.pointsCostPerDraw, // ✅ 修复：使用正确的字段名cost_points
         is_winner: result.is_winner,
         win_probability: probability,
+        // 🔥 双账户模型：预算审计字段
+        prize_value_points: result.prize_value_points || 0,
+        budget_points_before: result.budget_points_before || null,
+        budget_points_after: result.budget_points_after || null,
         created_at: BeijingTimeHelper.createBeijingTime(),
         result_details: JSON.stringify(result)
       },

@@ -1308,6 +1308,111 @@ class DataSanitizer {
     if (!adminName) return '客服'
     return '客服' + adminName.slice(-1)
   }
+
+  /**
+   * 兑换市场商品列表数据脱敏
+   *
+   * 业务场景：兑换市场商品列表API响应时调用，防止泄露商业敏感信息
+   *
+   * 脱敏规则：
+   * - 管理员（dataLevel='full'）：返回完整商品数据
+   * - 普通用户（dataLevel='public'）：移除cost_price（成本价）、total_exchange_count（销量统计）等敏感字段
+   *
+   * @param {Array<Object>} items - 商品数据数组
+   * @param {string} dataLevel - 数据级别：'full'（管理员）或'public'（普通用户）
+   * @returns {Array<Object>} 脱敏后的商品数组
+   */
+  static sanitizeExchangeMarketItems (items, dataLevel) {
+    if (dataLevel === 'full') {
+      // 管理员看完整数据
+      return DecimalConverter.convertExchangeItemData(
+        Array.isArray(items) ? items : [items]
+      )
+    }
+
+    // 普通用户数据脱敏
+    const sanitized = items.map(item => ({
+      id: item.item_id || item.id,
+      name: item.item_name || item.name,
+      description: item.item_description || item.description,
+      price_type: item.price_type,
+      virtual_value_price: item.virtual_value_price || 0,
+      points_price: item.points_price || 0,
+      stock: item.stock,
+      status: item.status,
+      sort_order: item.sort_order,
+      created_at: item.created_at
+      // ❌ 移除敏感字段：cost_price, total_exchange_count
+    }))
+
+    return sanitized
+  }
+
+  /**
+   * 兑换市场单个商品数据脱敏
+   *
+   * @param {Object} item - 商品数据
+   * @param {string} dataLevel - 数据级别：'full'（管理员）或'public'（普通用户）
+   * @returns {Object} 脱敏后的商品数据
+   */
+  static sanitizeExchangeMarketItem (item, dataLevel) {
+    const items = this.sanitizeExchangeMarketItems([item], dataLevel)
+    return items[0]
+  }
+
+  /**
+   * 兑换市场订单列表数据脱敏
+   *
+   * 业务场景：用户查询兑换订单列表时调用，保护订单敏感信息
+   *
+   * 脱敏规则：
+   * - 管理员（dataLevel='full'）：返回完整订单数据
+   * - 普通用户（dataLevel='public'）：移除total_cost（成本金额）等敏感字段
+   *
+   * @param {Array<Object>} orders - 订单数据数组
+   * @param {string} dataLevel - 数据级别：'full'（管理员）或'public'（普通用户）
+   * @returns {Array<Object>} 脱敏后的订单数组
+   */
+  static sanitizeExchangeMarketOrders (orders, dataLevel) {
+    if (dataLevel === 'full') {
+      // 管理员看完整数据
+      return DecimalConverter.convertExchangeMarketRecordData(
+        Array.isArray(orders) ? orders : [orders]
+      )
+    }
+
+    // 普通用户数据脱敏
+    const sanitized = orders.map(order => ({
+      id: order.record_id || order.id,
+      order_no: order.order_no,
+      item_snapshot: {
+        name: order.item_snapshot?.item_name || order.item_snapshot?.name,
+        description: order.item_snapshot?.item_description || order.item_snapshot?.description
+      },
+      quantity: order.quantity,
+      payment_type: order.payment_type,
+      virtual_value_paid: order.virtual_value_paid || 0,
+      points_paid: order.points_paid || 0,
+      status: order.status,
+      exchange_time: order.exchange_time,
+      shipped_at: order.shipped_at
+      // ❌ 移除敏感字段：total_cost, admin_remark
+    }))
+
+    return sanitized
+  }
+
+  /**
+   * 兑换市场单个订单数据脱敏
+   *
+   * @param {Object} order - 订单数据
+   * @param {string} dataLevel - 数据级别：'full'（管理员）或'public'（普通用户）
+   * @returns {Object} 脱敏后的订单数据
+   */
+  static sanitizeExchangeMarketOrder (order, dataLevel) {
+    const orders = this.sanitizeExchangeMarketOrders([order], dataLevel)
+    return orders[0]
+  }
 }
 
 module.exports = DataSanitizer

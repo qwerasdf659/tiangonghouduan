@@ -21,6 +21,7 @@ const router = express.Router()
 const { SystemAnnouncement } = require('../../models')
 const { authenticateToken, requireAdmin } = require('../../middleware/auth')
 const { Op } = require('sequelize')
+const AnnouncementService = require('../../services/AnnouncementService') // 🔴 引入公告服务层
 
 /**
  * GET /api/v4/notifications - 获取通知列表
@@ -40,44 +41,21 @@ router.get('/', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const { type, limit = 50 } = req.query
 
-    const whereClause = { is_active: true }
-
-    // 类型筛选（映射前端类型到后端类型）
-    if (type && type !== 'all') {
-      const typeMapping = {
-        system: 'system',
-        user: 'notice',
-        order: 'notice',
-        alert: 'maintenance'
-      }
-      whereClause.type = typeMapping[type] || 'notice'
-    }
-
-    // 查询系统公告作为通知
-    const announcements = await SystemAnnouncement.findAll({
-      where: whereClause,
-      order: [
-        ['priority', 'DESC'],
-        ['created_at', 'DESC']
-      ],
-      limit: Math.min(parseInt(limit), 100)
+    // ✅ 使用 AnnouncementService 统一查询逻辑
+    const announcements = await AnnouncementService.getAnnouncements({
+      type,
+      limit,
+      activeOnly: true,
+      filterExpired: false,
+      dataLevel: 'full',
+      includeCreator: false
     })
 
-    // 转换为通知格式
-    const notifications = announcements.map(ann => ({
-      notification_id: ann.announcement_id,
-      id: ann.announcement_id,
-      type: ann.type,
-      title: ann.title,
-      content: ann.content,
-      is_read: ann.view_count > 0, // 浏览过视为已读
-      created_at: ann.created_at,
-      priority: ann.priority,
-      expires_at: ann.expires_at
-    }))
+    // ✅ 使用 AnnouncementService 方法转换为通知格式
+    const notifications = AnnouncementService.convertToNotificationFormat(announcements)
 
-    // 统计未读数
-    const unread_count = notifications.filter(n => !n.is_read).length
+    // ✅ 使用 AnnouncementService 获取未读数量
+    const unread_count = await AnnouncementService.getUnreadCount({ type })
 
     return res.apiSuccess({
       notifications,

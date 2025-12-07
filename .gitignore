@@ -61,5 +61,8 @@ server.log
 .cursor/
 !.cursor/rules/
 
+# Claude AI配置（保留所有内容）
+# .claude目录不忽略
+
 # Environment variables
 .env

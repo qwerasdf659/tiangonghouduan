@@ -320,6 +320,34 @@ module.exports = sequelize => {
         defaultValue: 'active',
         comment: '奖品状态'
       },
+      /**
+       * 奖品价值积分（双账户模型核心字段）
+       * 用于预算控制，决定抽中该奖品需要消耗多少预算积分
+       */
+      prize_value_points: {
+        type: DataTypes.INTEGER,
+        allowNull: false,
+        defaultValue: 0,
+        comment: '奖品价值积分（统一价值单位）'
+      },
+      /**
+       * 虚拟奖品数量（水晶、贵金属等）
+       * 仅当type='virtual'且category为crystal/metal时有效
+       */
+      virtual_amount: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+        comment: '虚拟奖品数量（水晶等）'
+      },
+      /**
+       * 奖品分类（扩展字段）
+       * 用于区分虚拟奖品类型：crystal（水晶）/metal（贵金属）/physical（实物）/empty（空奖）
+       */
+      category: {
+        type: DataTypes.STRING(50),
+        allowNull: true,
+        comment: '分类:crystal/metal/physical/empty/virtual'
+      },
       created_at: {
         type: DataTypes.DATE,
         allowNull: false,

@@ -166,6 +166,30 @@ models.ImageResources = require('./ImageResources')(sequelize, DataTypes)
 
 // 🔴 兑换记录系统模型
 models.ExchangeRecords = require('./ExchangeRecords')(sequelize, DataTypes)
+/*
+ * ✅ ExchangeRecords：积分兑换实物商品记录
+ *    - 用途：记录用户使用积分兑换商品的订单
+ *    - 特点：积分扣除、商品兑换、审核流程、库存创建
+ */
+
+// 🔥 双账户模型：兑换市场系统（2025年12月06日新增）
+models.ExchangeItem = require('./ExchangeItem')(sequelize, DataTypes)
+/*
+ * ✅ ExchangeItem：兑换市场商品配置表
+ *    - 用途：配置用户可以使用虚拟奖品价值或积分兑换的商品
+ *    - 特点：支持虚拟奖品/积分/混合支付方式
+ *    - 表名：exchange_items，主键：item_id
+ *    - 业务场景：用户抽奖获得虚拟奖品（水晶等）→ 使用虚拟奖品价值兑换商品
+ */
+
+models.ExchangeMarketRecord = require('./ExchangeMarketRecord')(sequelize, DataTypes)
+/*
+ * ✅ ExchangeMarketRecord：兑换市场订单记录表
+ *    - 用途：记录用户在兑换市场中的兑换订单
+ *    - 特点：虚拟奖品价值/积分支付、订单管理、发货追踪
+ *    - 表名：exchange_market_records，主键：record_id
+ *    - 业务场景：用户选择商品 → 扣除虚拟奖品价值 → 创建订单 → 发货
+ */
 
 models.ConsumptionRecord = require('./ConsumptionRecord')(sequelize, DataTypes)
 /*

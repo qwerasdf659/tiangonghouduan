@@ -16,6 +16,7 @@ const {
   models,
   BeijingTimeHelper
 } = require('./shared/middleware')
+const AnnouncementService = require('../../../../services/AnnouncementService') // 🔴 引入公告服务层
 
 /**
  * GET /status - 获取系统状态
@@ -227,29 +228,29 @@ router.post('/announcements', adminAuthMiddleware, asyncHandler(async (req, res)
       return res.apiError('标题和内容不能为空', 'INVALID_PARAMETERS')
     }
 
-    // 创建公告
-    const announcement = await models.SystemAnnouncement.create({
-      title: title.trim(),
-      content: content.trim(),
-      type,
-      priority,
-      target_groups,
-      expires_at: expires_at ? new Date(expires_at) : null,
-      admin_id: req.user.user_id,
-      internal_notes,
-      created_at: BeijingTimeHelper.createBeijingTime(),
-      updated_at: BeijingTimeHelper.createBeijingTime()
-    })
+    // ✅ 使用 AnnouncementService 创建公告
+    const announcement = await AnnouncementService.createAnnouncement(
+      {
+        title: title.trim(),
+        content: content.trim(),
+        type,
+        priority,
+        target_groups,
+        expires_at: expires_at ? new Date(expires_at) : null,
+        internal_notes
+      },
+      req.user.user_id
+    )
 
     sharedComponents.logger.info('管理员创建系统公告', {
       admin_id: req.user.user_id,
-      announcement_id: announcement.id,
+      announcement_id: announcement.announcement_id,
       title: announcement.title,
       type: announcement.type
     })
 
     return res.apiSuccess({
-      announcement: announcement.toJSON()
+      announcement
     }, '公告创建成功')
   } catch (error) {
     sharedComponents.logger.error('创建公告失败', { error: error.message })
@@ -272,26 +273,30 @@ router.get('/announcements', adminAuthMiddleware, asyncHandler(async (req, res) 
       offset = 0
     } = req.query
 
-    const whereClause = {}
-    if (type && type !== 'all') whereClause.type = type
-    if (priority && priority !== 'all') whereClause.priority = priority
-    if (is_active !== null) whereClause.is_active = is_active === 'true'
+    // ✅ 使用 AnnouncementService 统一查询逻辑
+    const announcements = await AnnouncementService.getAnnouncements({
+      type,
+      priority,
+      activeOnly: is_active === 'true',
+      filterExpired: false,
+      limit,
+      offset,
+      dataLevel: 'full',
+      includeCreator: true
+    })
 
-    const announcements = await models.SystemAnnouncement.findAll({
-      where: whereClause,
-      order: [['created_at', 'DESC']],
-      limit: Math.min(parseInt(limit), 100),
-      offset: parseInt(offset),
-      include: [{
-        model: models.User,
-        as: 'creator',
-        attributes: ['user_id', 'nickname']
-      }]
+    const total = await AnnouncementService.getAnnouncementsCount({
+      type,
+      priority,
+      activeOnly: is_active === 'true',
+      filterExpired: false
     })
 
     return res.apiSuccess({
-      announcements: announcements.map(a => a.toJSON()),
-      total: announcements.length
+      announcements,
+      total,
+      limit: parseInt(limit),
+      offset: parseInt(offset)
     }, '获取公告列表成功')
   } catch (error) {
     sharedComponents.logger.error('获取公告列表失败', { error: error.message })
@@ -309,16 +314,12 @@ router.put('/announcements/:id', adminAuthMiddleware, asyncHandler(async (req, r
     const { id } = req.params
     const updateData = req.body
 
-    const announcement = await models.SystemAnnouncement.findByPk(id)
+    // ✅ 使用 AnnouncementService 更新公告
+    const announcement = await AnnouncementService.updateAnnouncement(id, updateData)
+
     if (!announcement) {
       return res.apiError('公告不存在', 'ANNOUNCEMENT_NOT_FOUND')
     }
-
-    // 更新公告
-    await announcement.update({
-      ...updateData,
-      updated_at: BeijingTimeHelper.createBeijingTime()
-    })
 
     sharedComponents.logger.info('管理员更新系统公告', {
       admin_id: req.user.user_id,
@@ -327,7 +328,7 @@ router.put('/announcements/:id', adminAuthMiddleware, asyncHandler(async (req, r
     })
 
     return res.apiSuccess({
-      announcement: announcement.toJSON()
+      announcement
     }, '公告更新成功')
   } catch (error) {
     sharedComponents.logger.error('更新公告失败', { error: error.message })
@@ -344,12 +345,18 @@ router.delete('/announcements/:id', adminAuthMiddleware, asyncHandler(async (req
   try {
     const { id } = req.params
 
+    // 先获取公告信息用于日志
     const announcement = await models.SystemAnnouncement.findByPk(id)
     if (!announcement) {
       return res.apiError('公告不存在', 'ANNOUNCEMENT_NOT_FOUND')
     }
 
-    await announcement.destroy()
+    // ✅ 使用 AnnouncementService 删除公告
+    const deleted = await AnnouncementService.deleteAnnouncement(id)
+
+    if (!deleted) {
+      return res.apiError('删除公告失败', 'ANNOUNCEMENT_DELETE_FAILED')
+    }
 
     sharedComponents.logger.info('管理员删除系统公告', {
       admin_id: req.user.user_id,

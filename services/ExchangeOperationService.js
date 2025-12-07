@@ -289,7 +289,7 @@ class ExchangeOperationService {
         {
           model: User,
           as: 'user', // 明确指定关联别名（ExchangeRecords与User有多个关联：user和auditor）
-          attributes: ['user_id', 'username', 'phone']
+          attributes: ['user_id', 'mobile', 'nickname'] // 修复: users表实际字段为mobile和nickname
         }
       ],
       order: [['exchange_time', 'ASC']]
@@ -298,8 +298,9 @@ class ExchangeOperationService {
     return orders.map(order => ({
       exchange_id: order.exchange_id,
       user_id: order.user_id,
-      username: order.User?.username,
-      phone: order.User?.phone,
+      mobile: order.User?.mobile, // 修复: 使用mobile字段
+      nickname: order.User?.nickname, // 修复: 使用nickname字段
+      user_display: order.User?.nickname || order.User?.mobile, // 显示名称：优先昵称，其次手机号
       product_name: order.product_snapshot.name,
       quantity: order.quantity,
       total_points: order.total_points,
@@ -383,7 +384,7 @@ class ExchangeOperationService {
       '',
       '⏰ 最早订单:',
       `   订单号: ${statistics.oldestOrder.exchange_id}`,
-      `   用户: ${statistics.oldestOrder.username} (${statistics.oldestOrder.phone})`,
+      `   用户: ${statistics.oldestOrder.user_display} (${statistics.oldestOrder.mobile})`, // 修复: 使用user_display和mobile
       `   商品: ${statistics.oldestOrder.product_name} × ${statistics.oldestOrder.quantity}`,
       `   超时: ${statistics.oldestOrder.timeout_hours}小时`,
       '',
@@ -392,7 +393,7 @@ class ExchangeOperationService {
 
     orders.slice(0, 10).forEach((order, index) => {
       lines.push(
-        `   ${index + 1}. ID:${order.exchange_id} | ${order.product_name} | ${order.username} | 超时${order.timeout_hours}h`
+        `   ${index + 1}. ID:${order.exchange_id} | ${order.product_name} | ${order.user_display} | 超时${order.timeout_hours}h` // 修复: 使用user_display
       )
     })
 

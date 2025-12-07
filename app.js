@@ -513,6 +513,13 @@ try {
   app.use('/api/v4/inventory', require('./routes/v4/unified-engine/inventory'))
   appLogger.info('V4用户库存管理系统加载成功', { route: '/api/v4/inventory' })
 
+  // V4兑换市场路由（双账户+商城双玩法方案）
+  app.use('/api/v4/exchange_market', require('./routes/v4/unified-engine/exchange_market'))
+  appLogger.info('V4兑换市场系统加载成功（双账户模型）', {
+    route: '/api/v4/exchange_market',
+    note: '虚拟奖品价值/积分/混合支付兑换系统'
+  })
+
   // V4积分管理系统路由（RESTful标准 - 积分系统标准设计）
   app.use('/api/v4/points', require('./routes/v4/unified-engine/points'))
   appLogger.info('V4积分管理系统加载成功（RESTful标准）', {

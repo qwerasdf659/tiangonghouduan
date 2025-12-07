@@ -307,15 +307,46 @@ class ConsumptionService {
         }
       )
 
+      /*
+       * ========== 双账户模型：预算分配逻辑 ==========
+       * 业务规则：
+       * - 平台抽成10%用于奖品预算
+       * - 抽成的80%作为预算积分
+       * - 价值系数为3（1元预算 = 3预算积分）
+       * 计算公式：budget_points = consumption_amount × 0.1 × 0.8 × 3 = consumption_amount × 0.24
+       */
+      const budgetPointsToAllocate = Math.round(record.consumption_amount * 0.24)
+      if (budgetPointsToAllocate > 0) {
+        const userAccount = await UserPointsAccount.findOne({
+          where: { user_id: record.user_id },
+          transaction,
+          lock: transaction.LOCK.UPDATE
+        })
+
+        if (userAccount) {
+          // 更新预算积分字段
+          await userAccount.update(
+            {
+              budget_points: userAccount.budget_points + budgetPointsToAllocate,
+              remaining_budget_points: userAccount.remaining_budget_points + budgetPointsToAllocate
+            },
+            { transaction }
+          )
+
+          console.log(`💰 预算分配成功: user_id=${record.user_id}, 预算积分=${budgetPointsToAllocate}, 剩余预算=${userAccount.remaining_budget_points + budgetPointsToAllocate}`)
+        }
+      }
+
       // 6. 提交事务
       await transaction.commit()
 
-      console.log(`✅ 消费记录审核通过: record_id=${recordId}, 奖励积分=${record.points_to_award}`)
+      console.log(`✅ 消费记录审核通过: record_id=${recordId}, 奖励积分=${record.points_to_award}, 预算积分=${budgetPointsToAllocate}`)
 
       return {
         consumption_record: record,
         points_transaction: pointsResult.transaction,
         points_awarded: record.points_to_award,
+        budget_points_allocated: budgetPointsToAllocate,
         new_balance: pointsResult.new_balance
       }
     } catch (error) {

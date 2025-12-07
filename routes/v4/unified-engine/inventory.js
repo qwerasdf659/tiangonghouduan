@@ -274,17 +274,17 @@ router.get('/item/:item_id', authenticateToken, async (req, res) => {
     // 确保icon字段存在
     if (!itemData.icon) {
       switch (itemData.type) {
-      case 'voucher':
-        itemData.icon = '🎫'
-        break
-      case 'product':
-        itemData.icon = '🎁'
-        break
-      case 'service':
-        itemData.icon = '🔧'
-        break
-      default:
-        itemData.icon = '📦'
+        case 'voucher':
+          itemData.icon = '🎫'
+          break
+        case 'product':
+          itemData.icon = '🎁'
+          break
+        case 'service':
+          itemData.icon = '🔧'
+          break
+        default:
+          itemData.icon = '📦'
       }
     }
 
@@ -545,18 +545,18 @@ router.get('/admin/statistics', authenticateToken, requireAdmin, async (req, res
       // 类型分布数据（map转换为前端友好格式，添加边界保护）
       type_distribution: Array.isArray(typeStats)
         ? typeStats.map(stat => ({
-          type: stat.type || 'unknown', // 防止type为null
-          icon: stat.icon || getDefaultIcon(stat.type || 'voucher'), // 图标补全
-          count: parseInt(stat.dataValues?.count || 0) // 防止count为undefined，确保返回整数
-        }))
+            type: stat.type || 'unknown', // 防止type为null
+            icon: stat.icon || getDefaultIcon(stat.type || 'voucher'), // 图标补全
+            count: parseInt(stat.dataValues?.count || 0) // 防止count为undefined，确保返回整数
+          }))
         : [], // typeStats不是数组时返回空数组
 
       // 最近物品动态（map转换为前端友好格式，添加边界保护）
       recent_items: Array.isArray(recentItems)
         ? recentItems.map(item => ({
-          ...item.toJSON(), // Sequelize实例转为普通对象
-          icon: item.icon || getDefaultIcon(item.type || 'voucher') // 图标补全
-        }))
+            ...item.toJSON(), // Sequelize实例转为普通对象
+            icon: item.icon || getDefaultIcon(item.type || 'voucher') // 图标补全
+          }))
         : [] // recentItems不是数组时返回空数组
     }
 
@@ -1187,7 +1187,7 @@ router.post('/exchange-records/:id/cancel', authenticateToken, async (req, res) 
  * @param {string} status - 物品状态（available/pending/used/expired/transferred）
  * @returns {string} 状态的中文描述
  */
-function getStatusDescription (status) {
+function getStatusDescription(status) {
   const statusMap = {
     available: '可用',
     pending: '待处理',
@@ -1203,7 +1203,7 @@ function getStatusDescription (status) {
  * @param {string} type - 物品类型（voucher/product/service）
  * @returns {string} 对应类型的emoji图标
  */
-function getDefaultIcon (type) {
+function getDefaultIcon(type) {
   const iconMap = {
     voucher: '🎫',
     product: '🎁',
@@ -1285,15 +1285,15 @@ router.get('/market/products', authenticateToken, async (req, res) => {
     // 排序规则
     let order = [['created_at', 'DESC']]
     switch (sort) {
-    case 'price_low':
-      order = [['selling_points', 'ASC']]
-      break
-    case 'price_high':
-      order = [['selling_points', 'DESC']]
-      break
-    case 'newest':
-      order = [['created_at', 'DESC']]
-      break
+      case 'price_low':
+        order = [['selling_points', 'ASC']]
+        break
+      case 'price_high':
+        order = [['selling_points', 'DESC']]
+        break
+      case 'newest':
+        order = [['created_at', 'DESC']]
+        break
     }
 
     const { count, rows: marketProducts } = await models.UserInventory.findAndCountAll({
@@ -1918,10 +1918,10 @@ router.post('/verification/verify', authenticateToken, async (req, res) => {
         // 物品所有者信息
         user: item.user
           ? {
-            user_id: item.user.user_id,
-            mobile: item.user.mobile,
-            nickname: item.user.nickname
-          }
+              user_id: item.user.user_id,
+              mobile: item.user.mobile,
+              nickname: item.user.nickname
+            }
           : null,
         // 🔥 新增：核销操作人信息（便于前端展示"由XX商户核销"）
         operator: {
@@ -1982,12 +1982,12 @@ router.get('/market/products/:id', authenticateToken, async (req, res) => {
       seller_id: marketProduct.user_id,
       seller_info: marketProduct.user // 🔧 修复：使用正确的关联对象访问
         ? {
-          user_id: marketProduct.user.user_id,
-          nickname: marketProduct.user.nickname || '匿名用户',
-          // 对于非管理员，隐藏敏感信息
-          mobile: dataLevel === 'full' ? marketProduct.user.mobile : '****',
-          registration_time: marketProduct.user.created_at
-        }
+            user_id: marketProduct.user.user_id,
+            nickname: marketProduct.user.nickname || '匿名用户',
+            // 对于非管理员，隐藏敏感信息
+            mobile: dataLevel === 'full' ? marketProduct.user.mobile : '****',
+            registration_time: marketProduct.user.created_at
+          }
         : null,
 
       // 商品基础信息
@@ -2385,6 +2385,267 @@ router.post('/market/products/:id/withdraw', authenticateToken, async (req, res)
       seller_id: req.user?.user_id
     })
     return res.apiError(error.message || '撤回失败', 'INTERNAL_ERROR', null, 500)
+  }
+})
+
+/*
+ * ========================================
+ * 市场交易 - 上架限制功能（Marketplace Listing Limit）
+ * ========================================
+ * 实施方案：上架限制完整实施方案-最终版.md
+ * 创建时间：2025-12-05
+ * 核心功能：限制用户同时上架的商品数量（最多10件），防止刷屏和垄断
+ * ========================================
+ */
+
+const marketplaceConfig = require('../../../config/marketplace.config')
+
+/**
+ * 上架商品到交易市场
+ * POST /api/v4/inventory/market/list
+ *
+ * @description 用户将库存物品上架到市场出售，带上架数量限制
+ *
+ * 🎯 核心功能：
+ * 1. 检查用户当前在售商品数量，限制最多10件
+ * 2. 验证售价合理性（50%-200%原值）
+ * 3. 验证物品所有权和状态
+ * 4. 更新物品状态为on_sale
+ *
+ * 🔒 业务规则：
+ * - 最多10件同时在售（可配置）
+ * - 售价范围：物品价值的50%-200%
+ * - 只能上架自己的available状态物品
+ * - 不可转让的物品不能上架
+ *
+ * @param {number} req.body.inventory_id - 库存物品ID（必填）
+ * @param {number} req.body.selling_points - 出售价格/积分（必填，INTEGER类型）
+ *
+ * @returns {Object} 上架成功信息和上架状态统计
+ */
+router.post('/market/list', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.user_id
+    const { inventory_id, selling_points } = req.body
+
+    logger.info('开始处理上架请求', {
+      user_id: userId,
+      inventory_id,
+      selling_points
+    })
+
+    /*
+     * ========================================
+     * 🔥 核心逻辑：上架数量限制检查（10行）
+     * ========================================
+     */
+
+    // 1️⃣ 查询当前在售数量（1次COUNT查询，使用idx_user_inventory_user_market索引）
+    const activeListings = await models.UserInventory.count({
+      where: {
+        user_id: userId,
+        market_status: 'on_sale'
+      }
+    })
+
+    logger.info('查询用户在售商品数量', {
+      user_id: userId,
+      active_listings: activeListings
+    })
+
+    // 2️⃣ 检查是否超限
+    const maxListings = marketplaceConfig.max_active_listings
+
+    if (activeListings >= maxListings) {
+      logger.warn('用户上架数量已达上限', {
+        user_id: userId,
+        current: activeListings,
+        limit: maxListings
+      })
+
+      return res.apiError(
+        `您已有${activeListings}件商品在售，最多${maxListings}件`,
+        'LISTING_LIMIT_EXCEEDED',
+        {
+          current: activeListings,
+          limit: maxListings,
+          remaining: 0,
+          tip: '请先撤回部分商品后再上架'
+        },
+        403
+      )
+    }
+
+    /*
+     * ========================================
+     * 以下是标准上架逻辑
+     * ========================================
+     */
+
+    // 3️⃣ 验证参数
+    if (!inventory_id || selling_points === undefined) {
+      return res.apiError(
+        '缺少必要参数：inventory_id 和 selling_points',
+        'INVALID_PARAMS',
+        null,
+        400
+      )
+    }
+
+    // 4️⃣ 验证售价（selling_points是INTEGER类型，表示出售价格/积分）
+    const sellingPrice = parseInt(selling_points)
+    if (isNaN(sellingPrice) || sellingPrice <= 0) {
+      return res.apiError('售价必须是大于0的整数', 'INVALID_PRICE', null, 400)
+    }
+
+    // 5️⃣ 查询库存物品（确保是用户自己的物品且未上架）
+    const inventory = await models.UserInventory.findOne({
+      where: {
+        inventory_id,
+        user_id: userId,
+        status: 'available', // 物品状态必须是可用
+        market_status: null // 未上架
+      }
+    })
+
+    if (!inventory) {
+      logger.warn('库存物品不存在或不符合上架条件', {
+        user_id: userId,
+        inventory_id
+      })
+
+      return res.apiError('库存物品不存在、不属于您或已上架', 'INVENTORY_NOT_FOUND', null, 404)
+    }
+
+    // 6️⃣ 检查物品是否可转让
+    if (inventory.can_transfer === false) {
+      return res.apiError('该物品不支持转让', 'CANNOT_TRANSFER', null, 400)
+    }
+
+    // 7️⃣ 验证售价合理性（防止恶意定价或洗积分）
+    if (marketplaceConfig.price_validation.enabled) {
+      const minPrice = Math.floor(inventory.value * marketplaceConfig.price_validation.min_ratio) // 最低50%原值
+      const maxPrice = Math.ceil(inventory.value * marketplaceConfig.price_validation.max_ratio) // 最高200%原值
+
+      if (sellingPrice < minPrice || sellingPrice > maxPrice) {
+        logger.warn('售价不合理', {
+          user_id: userId,
+          inventory_id,
+          selling_price: sellingPrice,
+          item_value: inventory.value,
+          min_price: minPrice,
+          max_price: maxPrice
+        })
+
+        return res.apiError(
+          `售价不合理，建议范围：${minPrice}-${maxPrice}积分（物品价值：${inventory.value}积分）`,
+          'PRICE_OUT_OF_RANGE',
+          {
+            item_value: inventory.value,
+            min_price: minPrice,
+            max_price: maxPrice,
+            your_price: sellingPrice
+          },
+          400
+        )
+      }
+    }
+
+    // 8️⃣ 更新库存状态为上架
+    await inventory.update({
+      market_status: 'on_sale',
+      selling_points: sellingPrice // INTEGER类型，出售价格（积分）
+      // 注意：基于真实表结构，没有listed_at字段，使用updated_at即可
+    })
+
+    // 9️⃣ 记录操作日志
+    logger.info('商品上架成功', {
+      user_id: userId,
+      inventory_id,
+      item_name: inventory.name,
+      selling_price: sellingPrice,
+      item_value: inventory.value,
+      active_listings: activeListings + 1,
+      timestamp: new Date().toISOString()
+    })
+
+    // 🔟 返回成功响应
+    return res.apiSuccess(
+      {
+        inventory: {
+          id: inventory.inventory_id,
+          name: inventory.name,
+          description: inventory.description,
+          selling_price: sellingPrice, // 出售价格（积分）
+          item_value: inventory.value, // 物品原价值
+          type: inventory.type,
+          condition: inventory.condition || 'good'
+        },
+        listing_status: {
+          current: activeListings + 1,
+          limit: maxListings,
+          remaining: maxListings - activeListings - 1,
+          percentage: Math.round(((activeListings + 1) / maxListings) * 100)
+        }
+      },
+      '上架成功'
+    )
+  } catch (error) {
+    logger.error('上架失败', {
+      error: error.message,
+      stack: error.stack,
+      user_id: req.user?.user_id
+    })
+
+    return res.apiError(error.message || '上架失败，请稍后重试', 'INTERNAL_ERROR', null, 500)
+  }
+})
+
+/**
+ * 获取用户上架状态
+ * GET /api/v4/inventory/market/listing-status
+ *
+ * @description 查询当前用户的上架状态统计信息
+ *
+ * @returns {Object} 上架状态信息
+ * @returns {number} data.current - 当前在售商品数量
+ * @returns {number} data.limit - 最大上架限制
+ * @returns {number} data.remaining - 剩余可上架数量
+ * @returns {number} data.percentage - 使用百分比
+ */
+router.get('/market/listing-status', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.user_id
+
+    // 查询当前在售数量
+    const activeListings = await models.UserInventory.count({
+      where: {
+        user_id: userId,
+        market_status: 'on_sale'
+      }
+    })
+
+    const maxListings = marketplaceConfig.max_active_listings
+
+    logger.info('查询上架状态', {
+      user_id: userId,
+      current: activeListings,
+      limit: maxListings
+    })
+
+    return res.apiSuccess({
+      current: activeListings,
+      limit: maxListings,
+      remaining: maxListings - activeListings,
+      percentage: Math.round((activeListings / maxListings) * 100)
+    })
+  } catch (error) {
+    logger.error('获取上架状态失败', {
+      error: error.message,
+      user_id: req.user?.user_id
+    })
+
+    return res.apiError(error.message || '获取上架状态失败', 'INTERNAL_ERROR', null, 500)
   }
 })
 

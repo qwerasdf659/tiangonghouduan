@@ -18,7 +18,6 @@ const dataAccessControl = require('../../middleware/dataAccessControl')
 const BeijingTimeHelper = require('../../utils/timeHelper')
 const { Op } = require('sequelize')
 const { logOperation } = require('../../middleware/auditLog') // 🔴 引入审计日志中间件
-const AnnouncementService = require('../../services/AnnouncementService') // 🔴 引入公告服务层
 
 /*
  * 🔴 获取会话状态常量（Get Session Status Constants）
@@ -422,33 +421,50 @@ function validateStatistics (stats) {
 router.get('/announcements', optionalAuth, dataAccessControl, async (req, res) => {
   try {
     const { type = null, priority = null, limit = 10, offset = 0 } = req.query
+
     const dataLevel = req.isAdmin ? 'full' : 'public'
 
-    // ✅ 使用 AnnouncementService 统一查询逻辑
-    const announcements = await AnnouncementService.getAnnouncements({
-      type,
-      priority,
-      limit,
-      offset,
-      activeOnly: true,
-      filterExpired: true,
-      dataLevel,
-      includeCreator: true
+    // 获取有效公告
+    const whereClause = {
+      is_active: true
+    }
+
+    // 添加过期时间过滤
+    whereClause[require('sequelize').Op.or] = [
+      { expires_at: null },
+      { expires_at: { [require('sequelize').Op.gt]: BeijingTimeHelper.createBeijingTime() } }
+    ]
+
+    if (type && type !== 'all') whereClause.type = type
+    if (priority && priority !== 'all') whereClause.priority = priority
+
+    const announcements = await SystemAnnouncement.findAll({
+      where: whereClause,
+      order: [
+        ['priority', 'DESC'], // 高优先级优先
+        ['created_at', 'DESC'] // 新发布的优先
+      ],
+      limit: Math.min(parseInt(limit), 50), // 限制最大50条
+      offset: parseInt(offset),
+      include: [
+        {
+          model: User,
+          as: 'creator',
+          attributes: ['user_id', 'nickname']
+        }
+      ]
     })
 
-    const total = await AnnouncementService.getAnnouncementsCount({
-      type,
-      priority,
-      activeOnly: true,
-      filterExpired: true
-    })
+    // 数据脱敏处理
+    const sanitizedData = DataSanitizer.sanitizeAnnouncements(
+      announcements.map(a => a.toJSON()),
+      dataLevel
+    )
 
     return res.apiSuccess(
       {
-        announcements,
-        total,
-        limit: parseInt(limit),
-        offset: parseInt(offset),
+        announcements: sanitizedData,
+        total: announcements.length,
         has_more: announcements.length === parseInt(limit)
       },
       '获取系统公告成功'
@@ -492,23 +508,26 @@ router.get('/announcements/home', optionalAuth, dataAccessControl, async (req, r
     })
 
     /*
-     * 📈 更新公告查看次数
+     * 📈 Step 3: 更新公告查看次数（文档第516-522行要求）
      * 业务场景：统计公告浏览量，用于运营数据分析（评估公告触达效果）
      * 优化方案：并行更新（Promise.allSettled）提升性能，单个失败不影响整体
      */
     await Promise.allSettled(
       announcements.map(announcement =>
-        AnnouncementService.incrementViewCount(announcement.announcement_id)
+        announcement.increment('view_count').catch(err => {
+          console.error(`⚠️ 更新view_count失败（ID:${announcement.announcement_id}):`, err.message)
+          // 更新失败不影响公告查询返回，静默处理
+        })
       )
     )
 
-    // 🔒 数据脱敏处理（根据用户权限返回public或full级别数据）
+    // 🔒 Step 4: 数据脱敏处理（根据用户权限返回public或full级别数据）
     const sanitizedData = DataSanitizer.sanitizeAnnouncements(
       announcements.map(a => a.toJSON()),
       dataLevel
     )
 
-    // 🎉 返回首页公告数据
+    // 🎉 Step 5: 返回首页公告数据
     return res.apiSuccess(
       {
         announcements: sanitizedData
@@ -1582,6 +1601,286 @@ router.post('/chat/send', authenticateToken, async (req, res) => {
 })
 
 /**
+ * @route POST /api/v4/system/chat/admin-reply
+ * @desc 管理员回复用户消息（方案2: 标准优化方案）
+ * @access Private (仅管理员)
+ *
+ * 功能优化点（2025年11月08日）：
+ * 1. ✅ Sequelize事务保护：确保数据一致性（核心优化）
+ * 2. ✅ 权限细分控制：超级管理员可接管其他客服会话
+ * 3. ✅ XSS内容安全过滤：HTML标签转义
+ * 4. ✅ 敏感词检测：从配置文件读取敏感词库
+ * 5. ✅ 消息频率限制：防止消息轰炸（从配置文件读取）
+ * 6. ✅ 详细错误处理：分类错误和详细日志
+ *
+ * @param {Object} req.body.session_id - 会话ID（必填）
+ * @param {Object} req.body.content - 消息内容（必填，1-5000字符）
+ * @param {Object} req.body.message_type - 消息类型（可选，默认text）
+ *
+ * @returns {Object} data.message_id - 消息ID
+ * @returns {Object} data.session_id - 会话ID
+ * @returns {Object} data.content - 消息内容
+ * @returns {Object} data.message_type - 消息类型
+ * @returns {Object} data.sent_at - 发送时间（北京时间）
+ * @returns {Object} data.pushed - 是否实时推送成功
+ */
+router.post('/chat/admin-reply', authenticateToken, async (req, res) => {
+  // ⚠️ 废弃警告：建议迁移到新版API
+  console.warn('⚠️ [DEPRECATED] 旧版API调用: POST /api/v4/system/chat/admin-reply')
+  console.warn('⚠️ 建议迁移到: POST /api/v4/admin/customer-service/sessions/:id/send')
+  console.warn(`⚠️ 调用者: 管理员ID ${req.user?.user_id}, IP ${req.ip}`)
+
+  // 🔐 Step 1: 开启Sequelize事务（核心优化点）
+  const transaction = await sequelize.transaction()
+
+  try {
+    // Step 2: 导入依赖
+    const { ChatMessage, CustomerServiceSession } = require('../../models')
+    const BeijingTimeHelper = require('../../utils/timeHelper')
+    const businessConfig = require('../../config/business.config')
+
+    // Step 3: 权限验证（基于role_level字段）
+    if (!req.user || req.user.role_level < 100) {
+      await transaction.rollback()
+      return res.apiForbidden('需要管理员权限（role_level >= 100）')
+    }
+
+    const current_admin_id = req.user.user_id
+    const current_role_level = req.user.role_level
+
+    console.log(`📝 管理员 ${current_admin_id}（权限等级${current_role_level}）尝试回复消息`)
+
+    // Step 4: 参数提取和基础验证
+    const { session_id, content, message_type = 'text' } = req.body
+
+    // 参数必填性验证
+    if (!session_id || !content) {
+      await transaction.rollback()
+      return res.apiBadRequest('会话ID和消息内容不能为空')
+    }
+
+    // 内容长度验证（从配置文件读取）
+    const { message: messageConfig } = businessConfig.chat
+    if (content.trim().length === 0) {
+      await transaction.rollback()
+      return res.apiBadRequest('消息内容不能为空白字符')
+    }
+
+    if (content.length > messageConfig.max_length) {
+      await transaction.rollback()
+      return res.apiBadRequest(
+        `消息内容不能超过${messageConfig.max_length}字符（当前${content.length}字符）`
+      )
+    }
+
+    // message_type枚举验证
+    if (!['text', 'image', 'system'].includes(message_type)) {
+      await transaction.rollback()
+      return res.apiBadRequest('消息类型无效（允许值：text/image/system）')
+    }
+
+    // Step 5: 会话存在性和状态验证（在事务中查询）
+    const session = await CustomerServiceSession.findOne({
+      where: { session_id },
+      transaction // 🔐 在事务中查询，避免脏读
+    })
+
+    if (!session) {
+      await transaction.rollback()
+      return res.apiNotFound(`会话不存在（session_id=${session_id}）`)
+    }
+
+    // 验证会话状态（只有waiting/assigned/active可回复）
+    if (!ACTIVE_STATUS.includes(session.status)) {
+      await transaction.rollback()
+      return res.apiBadRequest(`会话已关闭，无法发送消息（当前状态：${session.status}）`)
+    }
+
+    console.log(
+      `📋 会话${session_id}状态：${session.status}，当前客服：${session.admin_id || '未分配'}`
+    )
+
+    /*
+     * Step 6: 权限细分检查（✅ 修复死代码问题）
+     * 场景1：会话已分配给其他客服
+     */
+    if (session.admin_id && session.admin_id !== current_admin_id) {
+      // 超级管理员（role_level >= 200）可以接管其他客服的会话
+      if (current_role_level < 200) {
+        await transaction.rollback()
+        return res.apiForbidden(
+          `此会话已分配给其他客服（ID:${session.admin_id}），需要超级管理员权限（role_level >= 200）才能接管`
+        )
+      }
+      console.log(`⚠️ 超级管理员${current_admin_id}接管客服${session.admin_id}的会话${session_id}`)
+    }
+
+    // Step 7: 自动分配未分配的会话（在事务中）
+    if (!session.admin_id) {
+      console.log(`🔄 自动分配会话${session_id}给管理员${current_admin_id}`)
+      await session.update(
+        {
+          admin_id: current_admin_id,
+          status: SESSION_STATUS.ASSIGNED, // waiting → assigned
+          updated_at: BeijingTimeHelper.createBeijingTime()
+        },
+        { transaction }
+      ) // 🔐 在事务中更新
+    }
+
+    // Step 8: 内容安全过滤（XSS防护 + 敏感词检测）
+    let sanitized_content = content.trim()
+
+    // 基础XSS防护：转义HTML特殊字符
+    sanitized_content = sanitized_content
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#x27;')
+      .replace(/\//g, '&#x2F;')
+
+    /**
+     * 敏感词过滤（从配置文件读取）
+     * 使用some方法避免循环中的await
+     */
+    const { content_filter: contentFilter } = businessConfig.chat
+    if (contentFilter.enabled) {
+      const hasSensitiveWord = contentFilter.sensitive_words.some(word =>
+        sanitized_content.includes(word)
+      )
+      if (hasSensitiveWord && contentFilter.reject_on_match) {
+        await transaction.rollback()
+        return res.apiBadRequest('消息包含敏感词，请修改后重新发送')
+      }
+    }
+
+    /*
+     * Step 9: 消息频率限制检查（防止消息轰炸）
+     * 查询最近N秒内该管理员对该会话的消息数量（从配置文件读取）
+     */
+    const { rate_limit: rateLimit } = businessConfig.chat
+    const time_window_ms = rateLimit.admin.time_window_seconds * 1000
+    const time_window_ago = new Date(Date.now() - time_window_ms)
+    const recent_messages_count = await ChatMessage.count({
+      where: {
+        session_id,
+        sender_id: current_admin_id,
+        sender_type: 'admin',
+        created_at: { [Op.gte]: time_window_ago }
+      },
+      transaction
+    })
+
+    // 限制：从配置文件读取管理员消息频率限制
+    const max_messages = rateLimit.admin.max_messages_per_minute
+    if (recent_messages_count >= max_messages) {
+      await transaction.rollback()
+      return res.apiBadRequest(
+        `发送消息过于频繁，请稍后再试（限制：每分钟最多${max_messages}条，已发送${recent_messages_count}条）`
+      )
+    }
+
+    // Step 10: 创建消息记录（在事务中）
+    const message = await ChatMessage.create(
+      {
+        session_id,
+        sender_id: current_admin_id,
+        sender_type: 'admin',
+        message_source: 'admin_client',
+        content: sanitized_content, // 使用过滤后的内容
+        message_type,
+        created_at: BeijingTimeHelper.createBeijingTime()
+      },
+      { transaction }
+    ) // 🔐 在事务中创建
+
+    console.log(`✅ 消息${message.message_id}已创建，会话${session_id}`)
+
+    // Step 11: 更新会话最后消息时间（在事务中）
+    await session.update(
+      {
+        last_message_at: BeijingTimeHelper.createBeijingTime(),
+        updated_at: BeijingTimeHelper.createBeijingTime()
+      },
+      { transaction }
+    ) // 🔐 在事务中更新
+
+    // Step 12: 提交事务（关键点：只有所有操作成功才提交）
+    await transaction.commit()
+    console.log(`🔐 事务已提交：消息${message.message_id}，会话${session_id}`)
+
+    // Step 13: WebSocket实时推送消息给用户（事务外执行）
+    let pushed = false
+    try {
+      const ChatWebSocketService = require('../../services/ChatWebSocketService')
+
+      // 构造推送消息数据
+      const messageData = {
+        message_id: message.message_id,
+        session_id,
+        sender_id: current_admin_id,
+        sender_type: 'admin',
+        sender_name: req.user.nickname || '客服',
+        content: sanitized_content,
+        message_type: message.message_type,
+        created_at: message.created_at
+      }
+
+      // 推送消息给用户
+      pushed = ChatWebSocketService.pushMessageToUser(session.user_id, messageData)
+
+      if (pushed) {
+        console.log(`📤 消息${message.message_id}已实时推送给用户${session.user_id}`)
+      } else {
+        console.log(`⚠️ 用户${session.user_id}不在线，消息${message.message_id}已保存到数据库`)
+      }
+    } catch (wsError) {
+      // WebSocket推送失败不影响消息发送（消息已保存到数据库）
+      console.error('❌ WebSocket推送失败:', {
+        message_id: message.message_id,
+        user_id: session.user_id,
+        error: wsError.message,
+        stack: wsError.stack
+      })
+      console.log('✅ 消息已保存到数据库，等待用户上线后同步')
+      // 不影响API返回成功（用户离线时会在登录后获取离线消息）
+    }
+
+    // Step 14: 返回消息发送结果
+    const responseData = {
+      message_id: message.message_id,
+      session_id,
+      content: sanitized_content,
+      message_type: message.message_type,
+      sent_at: message.created_at,
+      pushed // 标识是否实时推送成功
+    }
+
+    return res.apiSuccess(responseData, '消息发送成功')
+  } catch (error) {
+    // ===== 错误处理：回滚事务并返回详细错误信息 =====
+    await transaction.rollback()
+    console.error('❌ 管理员回复失败:', {
+      admin_id: req.user?.user_id,
+      session_id: req.body?.session_id,
+      error: error.message,
+      stack: error.stack,
+      timestamp: BeijingTimeHelper.now()
+    })
+
+    // 根据错误类型返回不同的错误消息
+    if (error.name === 'SequelizeValidationError') {
+      return res.apiBadRequest('数据验证失败：' + error.message)
+    } else if (error.name === 'SequelizeDatabaseError') {
+      return res.apiInternalError('数据库错误：' + error.message)
+    } else {
+      return res.apiInternalError('发送消息失败：' + error.message)
+    }
+  }
+})
+
+/**
  * 🔧 构建安全的查询条件（兼容软删除字段）- 方案A步骤3
  * @param {Object} model - Sequelize模型
  * @param {number} user_id - 用户ID
@@ -2038,6 +2337,736 @@ router.get('/admin/overview', authenticateToken, dataAccessControl, async (req, 
   } catch (error) {
     console.error('获取系统概览失败:', error)
     return res.apiError('获取系统概览失败', 'INTERNAL_ERROR', null, 500)
+  }
+})
+
+/**
+ * @route GET /api/v4/system/admin/chat/sessions
+ * @desc 管理员获取所有聊天会话列表
+ * @access Private (管理员权限)
+ */
+router.get('/admin/chat/sessions', authenticateToken, async (req, res) => {
+  try {
+    const { getUserRoles } = require('../../middleware/auth')
+
+    // 🛡️ 权限检查：只有管理员可以查看所有会话
+    const userRoles = await getUserRoles(req.user.user_id)
+    if (!userRoles.isAdmin) {
+      return res.apiError('权限不足，仅管理员可访问', 'FORBIDDEN', null, 403)
+    }
+
+    const { page = 1, limit = 20, status = 'all' } = req.query
+    // 🎯 分页安全保护：最大100条记录（管理员权限）
+    const finalLimit = Math.min(parseInt(limit), 100)
+    const { CustomerServiceSession, ChatMessage, User } = require('../../models')
+
+    // 构建查询条件
+    const whereClause = {}
+    if (status !== 'all') {
+      whereClause.status = status
+    }
+    // ❌ 移除type筛选：数据库表中不存在type字段
+
+    // 获取聊天会话列表
+    const { count, rows: sessions } = await CustomerServiceSession.findAndCountAll({
+      where: whereClause,
+      include: [
+        {
+          model: User,
+          as: 'user',
+          attributes: ['user_id', 'mobile', 'nickname'], // 🔧 修正字段名：user_id是主键，nickname是昵称字段
+          required: true
+        },
+        {
+          model: User,
+          as: 'admin',
+          attributes: ['user_id', 'mobile', 'nickname'], // 🔧 修正字段名：user_id是主键，nickname是昵称字段
+          required: false
+        },
+        {
+          model: ChatMessage,
+          as: 'messages',
+          limit: 1,
+          order: [['created_at', 'DESC']],
+          required: false,
+          attributes: ['message_id', 'content', 'sender_type', 'created_at'] // 🔧 修正字段名：message_id是主键
+        }
+      ],
+      order: [['created_at', 'DESC']],
+      limit: finalLimit,
+      offset: (parseInt(page) - 1) * finalLimit
+    })
+
+    // 使用DataSanitizer进行数据脱敏
+    const DataSanitizer = require('../../services/DataSanitizer')
+    const sanitizedSessions = DataSanitizer.sanitizeChatSessions
+      ? DataSanitizer.sanitizeChatSessions(sessions, 'full')
+      : sessions
+
+    // 🔧 批量查询未读消息数（修复R2 - 避免N+1查询问题）
+    const sessionIds = sessions.map(s => s.session_id)
+    const unreadCounts = await ChatMessage.findAll({
+      attributes: [
+        'session_id',
+        [sequelize.fn('COUNT', sequelize.col('message_id')), 'unread_count']
+      ],
+      where: {
+        session_id: sessionIds,
+        sender_type: 'user', // 只统计用户发送的消息
+        status: ['sent', 'delivered'] // 未读状态（排除read已读状态）
+      },
+      group: ['session_id'],
+      raw: true
+    })
+
+    // 转换为Map便于O(1)时间复杂度查询
+    const unreadCountMap = new Map(
+      unreadCounts.map(item => [item.session_id, parseInt(item.unread_count)])
+    )
+
+    // 格式化响应数据
+    const formattedSessions = sanitizedSessions.map(session => {
+      const lastMessage = session.messages && session.messages[0]
+      return {
+        session_id: session.session_id,
+        user_id: session.user_id,
+        user_info: session.user
+          ? {
+            mobile: session.user.mobile,
+            nickname: session.user.nickname // 🔧 数据库字段是nickname（不是display_name）
+          }
+          : null,
+        admin_id: session.admin_id,
+        admin_info: session.admin
+          ? {
+            mobile: session.admin.mobile,
+            nickname: session.admin.nickname // 🔧 数据库字段是nickname（不是display_name）
+          }
+          : null,
+        status: session.status, // 会话状态（waiting/assigned/active/closed）
+        created_at: session.createdAt, // 🔧 Sequelize返回驼峰命名createdAt
+        updated_at: session.updatedAt, // 🔧 Sequelize返回驼峰命名updatedAt
+        last_message: lastMessage
+          ? {
+            content:
+                lastMessage.content.length > 50
+                  ? [...lastMessage.content].slice(0, 50).join('') + '...' // 🔧 修复R4 - 使用字符数组slice避免截断中文乱码
+                  : lastMessage.content,
+            sender_type: lastMessage.sender_type,
+            created_at: lastMessage.created_at
+          }
+          : null,
+        unread_count: unreadCountMap.get(session.session_id) || 0 // ✅ 修复R2 - 使用批量查询的未读消息数
+      }
+    })
+
+    console.log(`管理员 ${req.user.user_id} 查看聊天会话列表`, {
+      total: count,
+      page: parseInt(page),
+      status
+      // ❌ 移除type：数据库表中不存在type字段
+    })
+
+    return res.apiSuccess(
+      {
+        sessions: formattedSessions,
+        pagination: {
+          current_page: parseInt(page),
+          total_pages: Math.ceil(count / finalLimit), // 使用finalLimit计算总页数
+          total_count: count,
+          per_page: finalLimit, // 添加实际每页数量
+          has_next: count > parseInt(page) * finalLimit // 使用finalLimit计算是否有下一页
+        },
+        filters: {
+          status
+          // ❌ 移除type：数据库表中不存在type字段
+        }
+      },
+      '管理员聊天会话列表获取成功'
+    )
+  } catch (error) {
+    console.error('管理员获取聊天会话列表失败:', error)
+
+    // 🔧 修复R5 - 根据错误类型返回不同错误码和消息
+    if (error.name === 'SequelizeDatabaseError') {
+      return res.apiError('数据库查询失败，请稍后重试', 'DATABASE_ERROR', null, 500)
+    }
+
+    if (error.message && error.message.includes('DataSanitizer')) {
+      return res.apiError('数据脱敏失败，系统配置异常', 'SANITIZATION_ERROR', null, 500)
+    }
+
+    if (error.name === 'ValidationError') {
+      return res.apiError('参数验证失败，请检查输入参数', 'VALIDATION_ERROR', null, 400)
+    }
+
+    // 默认错误处理
+    return res.apiError('获取聊天会话列表失败', 'INTERNAL_ERROR', null, 500)
+  }
+})
+
+/**
+ * @route PUT /api/v4/system/admin/chat/sessions/:sessionId/assign
+ * @desc 管理员分配聊天会话给特定管理员
+ * @access Private (管理员权限)
+ */
+router.put('/admin/chat/sessions/:sessionId/assign', authenticateToken, async (req, res) => {
+  try {
+    const { getUserRoles } = require('../../middleware/auth')
+
+    // 🛡️ 权限检查：只有管理员可以分配会话
+    const userRoles = await getUserRoles(req.user.user_id)
+    if (!userRoles.isAdmin) {
+      return res.apiError('权限不足，仅管理员可访问', 'FORBIDDEN', null, 403)
+    }
+
+    const { sessionId } = req.params
+    const { admin_id } = req.body
+    const { CustomerServiceSession } = require('../../models')
+
+    // 查找会话
+    const session = await CustomerServiceSession.findOne({
+      where: { session_id: sessionId }
+    })
+
+    if (!session) {
+      return res.apiError('聊天会话不存在', 'NOT_FOUND', null, 404)
+    }
+
+    /*
+     * ===== 🆕 P1优化：参数有效性验证 =====
+     * 验证会话状态（已关闭的会话不能重新分配）
+     */
+    if (session.status === SESSION_STATUS.CLOSED) {
+      return res.apiError('已关闭的会话不能重新分配', 'BAD_REQUEST', null, 400)
+    }
+
+    // 如果是分配操作（admin_id不为null），验证目标客服有效性
+    if (admin_id) {
+      const { User } = require('../../models')
+
+      // 1. 验证目标管理员是否存在且状态为active
+      const targetAdmin = await User.findOne({
+        where: { user_id: admin_id, status: 'active' }
+      })
+
+      if (!targetAdmin) {
+        return res.apiError('目标客服不存在或已禁用', 'BAD_REQUEST', null, 400)
+      }
+
+      // 2. 验证目标用户是否有客服权限
+      const targetRoles = await getUserRoles(admin_id)
+      if (!targetRoles.isAdmin) {
+        return res.apiError('目标用户不是客服，无法分配会话', 'BAD_REQUEST', null, 400)
+      }
+
+      // 3. 检查客服是否在线（仅警告，不阻止分配）
+      const ChatWebSocketService = require('../../services/ChatWebSocketService')
+      const isOnline = ChatWebSocketService.connectedAdmins.has(admin_id)
+      if (!isOnline) {
+        console.log(`⚠️ 警告：客服 ${admin_id} 当前不在线，但仍允许分配`)
+      }
+    }
+    // ===== 🆕 参数验证结束 =====
+
+    // 保存原始admin_id用于取消分配通知和审计日志（重要：update前保存）
+    const originalAdminId = session.admin_id
+    const originalStatus = session.status
+
+    // 更新会话分配
+    await session.update({
+      admin_id: admin_id || null,
+      status: admin_id ? SESSION_STATUS.ASSIGNED : SESSION_STATUS.WAITING, // 🔴 使用状态常量，替代硬编码
+      updated_at: BeijingTimeHelper.createBeijingTime()
+    })
+
+    // ===== 🆕 WebSocket实时通知（方案1实施）=====
+    const ChatWebSocketService = require('../../services/ChatWebSocketService')
+
+    if (admin_id) {
+      // 推送通知给新分配的客服（复用已有服务）
+      const notificationData = {
+        type: 'session_assigned', // 通知类型：会话已分配
+        session_id: sessionId, // 会话ID
+        user_id: session.user_id, // 咨询用户ID
+        priority: session.priority, // 优先级（1-5，1=普通，5=紧急VIP）
+        assigned_at: BeijingTimeHelper.now(), // 分配时间（北京时间）
+        assigned_by: req.user.nickname || '管理员', // 分配人名称
+        message: '您有新的客服会话待处理' // 通知文案
+      }
+
+      const pushed = ChatWebSocketService.pushMessageToAdmin(admin_id, notificationData)
+      if (!pushed) {
+        console.log(`⚠️ 客服 ${admin_id} 不在线，通知将在下次登录时通过轮询获取`)
+      } else {
+        console.log(`✅ 已推送会话分配通知给客服 ${admin_id}`)
+      }
+    }
+
+    // 如果是取消分配（admin_id传null），通知原客服会话已被移除
+    if (!admin_id && originalAdminId) {
+      const unassignNotification = {
+        type: 'session_unassigned', // 通知类型：会话已取消分配
+        session_id: sessionId, // 会话ID
+        reason: '会话已被管理员重新分配', // 原因说明
+        timestamp: BeijingTimeHelper.now() // 时间戳（北京时间）
+      }
+      ChatWebSocketService.pushMessageToAdmin(originalAdminId, unassignNotification)
+      console.log(`✅ 已通知客服 ${originalAdminId} 会话已取消分配`)
+    }
+    // ===== 🆕 WebSocket通知结束 =====
+
+    // ===== 🆕 P1优化：操作审计日志 =====
+    const { logOperation } = require('../../middleware/auditLog')
+
+    // 确定操作动作
+    let action = 'assign'
+    if (!admin_id && originalAdminId) {
+      action = 'unassign' // 取消分配
+    } else if (admin_id && originalAdminId && admin_id !== originalAdminId) {
+      action = 'transfer' // 转移会话
+    } else if (admin_id && !originalAdminId) {
+      action = 'assign' // 首次分配
+    }
+
+    // 记录审计日志（异步记录，不影响业务响应）
+    logOperation(
+      req,
+      'session_assign', // 操作类型
+      'CustomerServiceSession', // 目标对象类型
+      sessionId, // 目标对象ID
+      action, // 操作动作（assign/unassign/transfer）
+      {
+        admin_id: originalAdminId, // 操作前数据
+        status: originalStatus
+      },
+      {
+        admin_id: admin_id || null, // 操作后数据
+        status: session.status
+      },
+      req.body.reason || null // 操作原因（可选）
+    ).catch(err => {
+      // 审计日志记录失败不影响业务操作
+      console.error('❌ 审计日志记录失败:', err.message)
+    })
+    // ===== 🆕 审计日志结束 =====
+
+    console.log(`管理员 ${req.user.user_id} 分配会话 ${sessionId} 给管理员 ${admin_id}`)
+    console.log(
+      `📝 审计日志已记录: ${action} 操作 (从客服${originalAdminId || 'null'} → ${admin_id || 'null'})`
+    )
+
+    return res.apiSuccess(
+      {
+        session_id: sessionId,
+        admin_id,
+        status: session.status
+      },
+      '会话分配成功'
+    )
+  } catch (error) {
+    console.error('管理员分配聊天会话失败:', error)
+    return res.apiError('分配聊天会话失败', 'INTERNAL_ERROR', null, 500)
+  }
+})
+
+/**
+ * @route PUT /api/v4/system/admin/chat/sessions/:sessionId/close
+ * @desc 管理员关闭聊天会话（优化版 - 添加事务保护和WebSocket通知）
+ * @access Private (管理员权限)
+ *
+ * 修复内容（Fix Content）:
+ * 1. ✅ 添加Sequelize事务保护 - 确保会话更新和消息创建原子化
+ * 2. ✅ 修复sender_type错误 - 从'system'改为'admin'（ENUM只有'user'和'admin'）
+ * 3. ✅ 添加message_source='system' - 标识为系统自动生成的消息
+ * 4. ✅ 添加参数校验 - 防止超长输入和XSS攻击
+ * 5. ✅ 添加WebSocket实时通知 - 通知在线用户和管理员
+ *
+ * 修复前问题（Previous Issues）:
+ * - 🔴 close_reason和closed_by字段不存在，数据100%丢失（已修复：添加数据库字段）
+ * - 🔴 sender_type='system'不在ENUM中（已修复：改为'admin' + message_source='system'）
+ * - 🔴 缺少事务保护，5%数据不一致风险（已修复：添加事务）
+ * - 🟡 缺少参数校验，存在安全风险（已修复：添加校验）
+ */
+router.put('/admin/chat/sessions/:sessionId/close', authenticateToken, async (req, res) => {
+  let transaction
+
+  try {
+    const { getUserRoles } = require('../../middleware/auth')
+
+    // 🛡️ 权限检查：只有管理员可以关闭会话
+    const userRoles = await getUserRoles(req.user.user_id)
+    if (!userRoles.isAdmin) {
+      return res.apiError('权限不足，仅管理员可访问', 'FORBIDDEN', null, 403)
+    }
+
+    const { sessionId } = req.params
+    let { close_reason = '管理员关闭' } = req.body
+
+    // ✅ 新增：参数校验和清理
+    if (close_reason) {
+      close_reason = close_reason.trim()
+
+      // 长度校验（防止超长输入）
+      if (close_reason.length > 500) {
+        return res.apiError('关闭原因不能超过500字符', 'INVALID_PARAM', null, 400)
+      }
+
+      // 空字符串处理
+      if (close_reason.length === 0) {
+        close_reason = '管理员关闭'
+      }
+
+      // HTML标签过滤（防止XSS攻击）
+      close_reason = close_reason.replace(/<[^>]*>/g, '')
+    }
+
+    const { CustomerServiceSession, ChatMessage } = require('../../models')
+
+    // 查找会话（预加载用户和管理员信息，用于WebSocket通知）
+    const session = await CustomerServiceSession.findOne({
+      where: { session_id: sessionId },
+      include: [
+        {
+          model: require('../../models').User,
+          as: 'user',
+          attributes: ['user_id', 'nickname']
+        },
+        {
+          model: require('../../models').User,
+          as: 'admin',
+          attributes: ['user_id', 'nickname']
+        }
+      ]
+    })
+
+    if (!session) {
+      return res.apiError('聊天会话不存在', 'NOT_FOUND', null, 404)
+    }
+
+    if (session.status === 'closed') {
+      return res.apiError('会话已关闭', 'BAD_REQUEST', null, 400)
+    }
+
+    // ✅ 新增：开启事务
+    transaction = await sequelize.transaction()
+
+    // ✅ 改进：在事务中关闭会话
+    await session.update(
+      {
+        status: SESSION_STATUS.CLOSED, // 🔴 使用状态常量，替代硬编码
+        close_reason,
+        closed_by: req.user.user_id,
+        closed_at: BeijingTimeHelper.createBeijingTime(),
+        updated_at: BeijingTimeHelper.createBeijingTime()
+      },
+      { transaction }
+    )
+
+    // ✅ 改进：在事务中创建系统消息（修复sender_type错误）
+    await ChatMessage.create(
+      {
+        session_id: sessionId,
+        sender_id: req.user.user_id, // 管理员ID（触发关闭的人）
+        sender_type: 'admin', // ✅ 修正：发送者类型是管理员（ENUM只有'user'和'admin'）
+        message_source: 'system', // ✅ 新增：消息来源是系统（标识为系统自动生成）
+        content: `会话已被管理员关闭：${close_reason}`,
+        message_type: 'system', // ✅ 消息类型是系统消息
+        status: 'sent', // ✅ 消息状态
+        created_at: BeijingTimeHelper.createBeijingTime(),
+        updated_at: BeijingTimeHelper.createBeijingTime()
+      },
+      { transaction }
+    )
+
+    // ✅ 提交事务
+    await transaction.commit()
+
+    console.log(`✅ 管理员 ${req.user.user_id} 关闭会话 ${sessionId}，原因：${close_reason}`)
+
+    // ✅ 新增：WebSocket实时通知
+    try {
+      const ChatWebSocketService = require('../../services/ChatWebSocketService')
+      const wsService = ChatWebSocketService.getInstance()
+
+      if (wsService) {
+        const notifyResult = wsService.notifySessionClosed(
+          sessionId,
+          session.user_id,
+          session.admin_id,
+          {
+            close_reason,
+            closed_by: req.user.user_id,
+            closed_at: session.closed_at
+          }
+        )
+        console.log('📢 WebSocket通知结果:', notifyResult)
+      }
+    } catch (wsError) {
+      // WebSocket通知失败不影响主流程
+      console.warn('⚠️ WebSocket通知失败（不影响关闭成功）:', wsError.message)
+    }
+
+    return res.apiSuccess(
+      {
+        session_id: sessionId,
+        status: SESSION_STATUS.CLOSED, // 🔴 使用状态常量，替代硬编码
+        closed_at: session.closed_at,
+        close_reason,
+        closed_by: req.user.user_id
+      },
+      '会话关闭成功'
+    )
+  } catch (error) {
+    // ✅ 改进：事务回滚
+    if (transaction) {
+      try {
+        await transaction.rollback()
+        console.log('🔄 事务已回滚')
+      } catch (rollbackError) {
+        console.error('❌ 事务回滚失败:', rollbackError.message)
+      }
+    }
+
+    console.error('❌ 管理员关闭聊天会话失败:', error)
+    return res.apiError('关闭聊天会话失败', 'INTERNAL_ERROR', null, 500)
+  }
+})
+
+/**
+ * @route GET /api/v4/system/admin/chat/stats
+ * @desc 管理员获取聊天系统统计数据（Chat System Statistics for Admins）
+ * @access Private (管理员权限 - Admin Only)
+ *
+ * 功能说明（Function Description）:
+ * - 实时统计聊天系统各项指标（Real-time Statistics）
+ * - 支持今日统计、总体统计、按状态分组统计
+ * - 真实计算平均响应时间（Average Response Time）
+ * - 优雅降级处理（Graceful Degradation）
+ * - 性能监控和日志记录（Performance Monitoring）
+ *
+ * 数据来源（Data Sources）:
+ * - CustomerServiceSession: 客服聊天会话表（customer_service_sessions）
+ * - ChatMessage: 聊天消息表（chat_messages）
+ *
+ * 返回数据结构（Response Structure）:
+ * {
+ *   timestamp: "2025-11-08 18:00:00",  // 查询时间戳（北京时间）
+ *   query_duration_ms: 250,             // 查询耗时（毫秒）
+ *   overall: {
+ *     total_sessions: 1500,             // 总会话数
+ *     active_sessions: 25,              // 活跃会话数（waiting/assigned/active）
+ *     waiting_sessions: 5,              // 等待会话数（关键监控指标）
+ *     avg_response_time_seconds: 65     // 平均响应时间（秒，真实计算）
+ *   },
+ *   today: {
+ *     new_sessions: 50,                 // 今日新增会话数
+ *     total_messages: 500,              // 今日消息总数
+ *     closed_sessions: 40,              // 今日关闭会话数（新增字段）
+ *     avg_messages_per_session: 10      // 今日平均消息数/会话
+ *   },
+ *   by_status: {
+ *     waiting: 5,                       // 等待中会话
+ *     assigned: 10,                     // 已分配会话
+ *     active: 10,                       // 活跃会话
+ *     closed: 1475                      // 已关闭会话
+ *   }
+ * }
+ *
+ * 最后更新：2025-11-08（实现文档中的所有优化建议）
+ */
+router.get('/admin/chat/stats', authenticateToken, async (req, res) => {
+  const queryStartTime = Date.now() // 🕐 记录查询开始时间（Performance Monitoring Start）
+
+  try {
+    const { getUserRoles } = require('../../middleware/auth')
+
+    // 🛡️ 权限检查：只有管理员可以查看统计（Security: Admin Only）
+    const userRoles = await getUserRoles(req.user.user_id)
+    if (!userRoles.isAdmin) {
+      return res.apiError('权限不足，仅管理员可访问', 'FORBIDDEN', null, 403)
+    }
+
+    const { CustomerServiceSession, ChatMessage } = require('../../models')
+    const BeijingTimeHelper = require('../../utils/timeHelper')
+
+    // 📅 获取今日时间范围（北京时间 - Get Today Time Range in Beijing Time）
+    const todayStart = BeijingTimeHelper.todayStart() // 今日00:00:00.000
+    const todayEnd = BeijingTimeHelper.todayEnd() // 今日23:59:59.999
+
+    // 🚀 并行获取统计数据（使用Promise.allSettled优雅降级 - Parallel Query with Graceful Degradation）
+    const results = await Promise.allSettled([
+      // 1️⃣ 总会话数查询（Query Total Sessions）
+      CustomerServiceSession.count(),
+
+      // 2️⃣ 活跃会话数查询（Query Active Sessions - waiting/assigned/active）
+      CustomerServiceSession.count({
+        where: { status: ACTIVE_STATUS } // 🔴 使用状态常量数组，替代硬编码
+      }),
+
+      // 3️⃣ 今日新会话查询（Query Today New Sessions）
+      CustomerServiceSession.count({
+        where: {
+          created_at: {
+            [Op.gte]: todayStart, // 大于等于今日开始时间
+            [Op.lte]: todayEnd // 小于等于今日结束时间
+          }
+        }
+      }),
+
+      // 4️⃣ 今日消息总数查询（Query Today Total Messages）
+      ChatMessage.count({
+        where: {
+          created_at: {
+            [Op.gte]: todayStart,
+            [Op.lte]: todayEnd
+          }
+        }
+      }),
+
+      // 5️⃣ 今日关闭会话数查询（Query Today Closed Sessions - 新增字段）
+      CustomerServiceSession.count({
+        where: {
+          closed_at: {
+            // ✅ 使用closed_at字段（关闭时间）
+            [Op.gte]: todayStart,
+            [Op.lte]: todayEnd
+          },
+          status: SESSION_STATUS.CLOSED // ✅ 确保状态为closed（使用常量）
+        }
+      }),
+
+      // 6️⃣ 真实平均响应时间计算（Real Average Response Time Calculation - 核心优化）
+      calculateAverageResponseTime(todayStart, todayEnd, CustomerServiceSession, ChatMessage),
+
+      // 7️⃣ 按状态分组统计（Group by Status）
+      CustomerServiceSession.findAll({
+        attributes: ['status', [CustomerServiceSession.sequelize.fn('COUNT', '*'), 'count']],
+        group: ['status'],
+        raw: true // 返回普通对象，性能优化
+      })
+    ])
+
+    // 📊 处理查询结果，失败时使用默认值（Handle Query Results with Default Values）
+    const totalSessions = results[0].status === 'fulfilled' ? results[0].value : 0
+    const activeSessions = results[1].status === 'fulfilled' ? results[1].value : 0
+    const todaySessions = results[2].status === 'fulfilled' ? results[2].value : 0
+    const todayMessages = results[3].status === 'fulfilled' ? results[3].value : 0
+    const todayClosedSessions = results[4].status === 'fulfilled' ? results[4].value : 0 // ✅ 新增字段
+    const avgResponseTime = results[5].status === 'fulfilled' ? results[5].value : 60 // ✅ 真实计算值
+    const sessionsByStatus = results[6].status === 'fulfilled' ? results[6].value : []
+
+    // ⚠️ 记录失败的查询（用于监控和调试 - Log Failed Queries for Monitoring）
+    results.forEach((result, index) => {
+      if (result.status === 'rejected') {
+        const queryNames = [
+          '总会话数',
+          '活跃会话数',
+          '今日新会话',
+          '今日消息数',
+          '今日关闭会话',
+          '平均响应时间',
+          '状态分组统计'
+        ]
+        console.error(`❌ 聊天统计查询${index + 1}（${queryNames[index]}）失败:`, result.reason)
+      }
+    })
+
+    // 📊 处理状态统计数据（Process Status Statistics）
+    const statusStats = {}
+    sessionsByStatus.forEach(item => {
+      statusStats[item.status] = parseInt(item.count)
+    })
+
+    // 🕐 计算查询耗时（Calculate Query Duration）
+    const queryEndTime = Date.now()
+    const queryDuration = queryEndTime - queryStartTime
+
+    // 📊 记录查询耗时（Log Query Duration for Performance Monitoring）
+    console.log(`📊 [聊天统计] 查询完成，耗时: ${queryDuration}ms`)
+
+    // ⚠️ 慢查询告警（Slow Query Warning - 超过500ms时告警）
+    if (queryDuration > 500) {
+      console.warn(`⚠️ [聊天统计] 查询耗时过长: ${queryDuration}ms（建议<500ms）`)
+    }
+
+    // 🎯 构建响应数据（Build Response Data）
+    const chatStats = {
+      timestamp: BeijingTimeHelper.apiTimestamp(), // 查询时间戳（北京时间ISO格式）
+      query_duration_ms: queryDuration, // ✅ 查询耗时（毫秒）- 新增性能监控字段
+
+      // 📊 总体统计（Overall Statistics）
+      overall: {
+        total_sessions: totalSessions, // 总会话数
+        active_sessions: activeSessions, // 活跃会话数
+        waiting_sessions: statusStats.waiting || 0, // ✅ 等待会话数（顶层字段）- 新增关键监控指标
+        avg_response_time_seconds: avgResponseTime // ✅ 平均响应时间（秒）- 真实计算值
+      },
+
+      // 📅 今日统计（Today Statistics）
+      today: {
+        new_sessions: todaySessions, // 今日新会话
+        total_messages: todayMessages, // 今日消息总数
+        closed_sessions: todayClosedSessions, // ✅ 今日关闭会话数 - 新增字段
+        avg_messages_per_session:
+          todaySessions > 0 // 今日平均消息数/会话
+            ? Math.round(todayMessages / todaySessions)
+            : 0
+      },
+
+      // 📈 按状态统计（Statistics by Status）
+      by_status: {
+        waiting: statusStats.waiting || 0, // 等待中会话
+        assigned: statusStats.assigned || 0, // 已分配会话
+        active: statusStats.active || 0, // 活跃会话
+        closed: statusStats.closed || 0 // 已关闭会话
+      }
+    }
+
+    // 🔴 P2-8：数据验证和边界检查（Data Validation and Boundary Check）
+    const validation = validateStatistics(chatStats)
+    if (!validation.valid) {
+      console.warn('⚠️ [聊天统计] 数据验证警告:', validation.warnings)
+      // 记录到监控系统（可扩展为告警）
+      validation.warnings.forEach(warning => {
+        console.warn(`   ⚠️ 数据异常: ${warning}`)
+      })
+    }
+
+    /*
+     * 🔴 P2-9：记录管理员操作审计日志（Audit Log for Admin Operation）
+     * 记录管理员查询聊天统计的操作，用于安全审计和责任追溯
+     */
+    try {
+      await logOperation(
+        req,
+        'system_config', // 操作类型：系统配置相关
+        'ChatStatistics', // 目标对象类型
+        0, // 目标ID（统计数据无特定ID，使用0）
+        'query', // 操作动作：查询
+        null, // 操作前数据（查询操作无before数据）
+        {
+          query_duration_ms: queryDuration,
+          total_sessions: totalSessions,
+          active_sessions: activeSessions,
+          waiting_sessions: statusStats.waiting || 0
+        }, // 操作后数据（记录关键统计指标）
+        null, // 操作原因（可选）
+        { businessId: `chat_stats_${Date.now()}` } // 业务关联ID
+      )
+    } catch (auditError) {
+      // 审计日志失败不影响业务，仅记录错误
+      console.error('[审计日志] 记录失败:', auditError.message)
+    }
+
+    // ✅ 返回成功响应（Return Success Response）
+    console.log(`✅ [聊天统计] 准备返回响应数据，数据大小: ${JSON.stringify(chatStats).length}字节`)
+    return res.apiSuccess(chatStats, '聊天系统统计数据获取成功')
+  } catch (error) {
+    // ❌ 错误处理（Error Handling）
+    const queryDuration = Date.now() - queryStartTime
+    console.error(`❌ [聊天统计] 获取失败（耗时${queryDuration}ms）:`, error)
+    return res.apiError('获取聊天系统统计失败', 'CHAT_STATS_ERROR', null, 500)
   }
 })
 

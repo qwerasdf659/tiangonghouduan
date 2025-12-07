@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>用户上架状态统计 - 管理后台</title>
+  
+  <!-- Bootstrap 5 -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <!-- Bootstrap Icons -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+  <!-- 公共样式 -->
+  <link href="/admin/css/common.css" rel="stylesheet">
+</head>
+<body class="bg-light">
+  <!-- 顶部导航 -->
+  <nav class="navbar navbar-dark bg-primary">
+    <div class="container-fluid">
+      <span class="navbar-brand">📊 用户上架状态统计</span>
+      <div>
+        <span class="text-light me-3" id="welcomeText">欢迎，管理员</span>
+        <button class="btn btn-outline-light btn-sm" id="logoutBtn">退出登录</button>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container-fluid mt-4">
+    <!-- 统计概览卡片 -->
+    <div class="row g-3 mb-4">
+      <div class="col-md-4">
+        <div class="card border-primary">
+          <div class="card-body text-center">
+            <h6 class="text-muted">有上架商品的用户</h6>
+            <h2 id="totalUsersWithListings" class="text-primary">-</h2>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="card border-warning">
+          <div class="card-body text-center">
+            <h6 class="text-muted">接近上限用户（≥8件）</h6>
+            <h2 id="usersNearLimit" class="text-warning">-</h2>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="card border-danger">
+          <div class="card-body text-center">
+            <h6 class="text-muted">达到上限用户（≥10件）</h6>
+            <h2 id="usersAtLimit" class="text-danger">-</h2>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 筛选和搜索 -->
+    <div class="card mb-4">
+      <div class="card-body">
+        <div class="row g-3">
+          <div class="col-md-3">
+            <label class="form-label">筛选条件</label>
+            <select class="form-select" id="filterSelect">
+              <option value="all">全部用户</option>
+              <option value="near_limit">接近上限（≥8件）</option>
+              <option value="at_limit">达到上限（≥10件）</option>
+            </select>
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">&nbsp;</label>
+            <div>
+              <button class="btn btn-primary" id="searchBtn">
+                <i class="bi bi-search"></i> 查询
+              </button>
+              <button class="btn btn-secondary ms-2" id="resetBtn">
+                <i class="bi bi-arrow-clockwise"></i> 重置
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 数据表格 -->
+    <div class="card">
+      <div class="card-body">
+        <div class="table-responsive">
+          <table class="table table-hover">
+            <thead>
+              <tr>
+                <th>用户ID</th>
+                <th>用户名</th>
+                <th>手机号</th>
+                <th>上架状态</th>
+                <th>剩余可上架</th>
+                <th>状态</th>
+                <th>注册时间</th>
+                <th>操作</th>
+              </tr>
+            </thead>
+            <tbody id="statsTableBody">
+              <tr>
+                <td colspan="8" class="text-center">
+                  <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">加载中...</span>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- 分页 -->
+        <nav aria-label="分页导航">
+          <ul class="pagination justify-content-end mb-0" id="pagination">
+            <!-- 动态生成分页 -->
+          </ul>
+        </nav>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bootstrap JS -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  
+  <script>
+    // 全局变量
+    let currentPage = 1;
+    let pageSize = 20;
+    let currentFilter = 'all';
+
+    // 页面加载完成后初始化
+    document.addEventListener('DOMContentLoaded', function() {
+      // 检查登录状态
+      checkAuth();
+      
+      // 加载数据
+      fetchStats();
+      
+      // 绑定事件
+      document.getElementById('searchBtn').addEventListener('click', handleSearch);
+      document.getElementById('resetBtn').addEventListener('click', handleReset);
+      document.getElementById('filterSelect').addEventListener('change', handleFilterChange);
+      document.getElementById('logoutBtn').addEventListener('click', handleLogout);
+    });
+
+    // 检查认证
+    function checkAuth() {
+      const token = localStorage.getItem('admin_token');
+      if (!token) {
+        window.location.href = '/admin/login.html';
+        return;
+      }
+    }
+
+    // 获取统计数据
+    async function fetchStats() {
+      try {
+        const token = localStorage.getItem('admin_token');
+        const params = new URLSearchParams({
+          page: currentPage,
+          limit: pageSize,
+          filter: currentFilter
+        });
+
+        const response = await fetch(`/api/v4/admin/marketplace/listing-stats?${params}`, {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+          updateSummary(data.data.summary);
+          updateTable(data.data.stats);
+          updatePagination(data.data.pagination);
+        } else {
+          showError('获取数据失败');
+        }
+      } catch (error) {
+        console.error('获取统计数据失败', error);
+        showError('获取数据失败，请稍后重试');
+      }
+    }
+
+    // 更新统计概览
+    function updateSummary(summary) {
+      document.getElementById('totalUsersWithListings').textContent = summary.total_users_with_listings;
+      document.getElementById('usersNearLimit').textContent = summary.users_near_limit;
+      document.getElementById('usersAtLimit').textContent = summary.users_at_limit;
+    }
+
+    // 更新表格
+    function updateTable(stats) {
+      const tbody = document.getElementById('statsTableBody');
+      
+      if (stats.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted">暂无数据</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = stats.map(item => `
+        <tr>
+          <td>${item.user_id}</td>
+          <td>${item.username || '-'}</td>
+          <td>${item.phone || '-'}</td>
+          <td>
+            <div>
+              <span class="badge ${getStatusBadgeClass(item.status)}">
+                ${item.active_listings} / ${item.limit}
+              </span>
+              <div class="progress mt-2" style="height: 8px;">
+                <div class="progress-bar ${getProgressClass(item.percentage)}" 
+                     role="progressbar" 
+                     style="width: ${item.percentage}%"
+                     aria-valuenow="${item.percentage}" 
+                     aria-valuemin="0" 
+                     aria-valuemax="100">
+                </div>
+              </div>
+            </div>
+          </td>
+          <td>
+            <span class="${item.remaining === 0 ? 'text-danger fw-bold' : ''}">
+              ${item.remaining} 件
+            </span>
+          </td>
+          <td>
+            <span class="badge ${getStatusTagClass(item.status)}">
+              ${getStatusText(item.status)}
+            </span>
+          </td>
+          <td>${formatDate(item.registered_at)}</td>
+          <td>
+            <button class="btn btn-sm btn-outline-primary" onclick="viewUserListings(${item.user_id})">
+              查看商品
+            </button>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    // 更新分页
+    function updatePagination(pagination) {
+      const paginationEl = document.getElementById('pagination');
+      const totalPages = pagination.total_pages;
+      
+      if (totalPages <= 1) {
+        paginationEl.innerHTML = '';
+        return;
+      }
+
+      let html = '';
+      
+      // 上一页
+      html += `
+        <li class="page-item ${currentPage === 1 ? 'disabled' : ''}">
+          <a class="page-link" href="#" onclick="changePage(${currentPage - 1}); return false;">上一页</a>
+        </li>
+      `;
+
+      // 页码
+      for (let i = 1; i <= totalPages; i++) {
+        if (i === 1 || i === totalPages || (i >= currentPage - 2 && i <= currentPage + 2)) {
+          html += `
+            <li class="page-item ${i === currentPage ? 'active' : ''}">
+              <a class="page-link" href="#" onclick="changePage(${i}); return false;">${i}</a>
+            </li>
+          `;
+        } else if (i === currentPage - 3 || i === currentPage + 3) {
+          html += '<li class="page-item disabled"><span class="page-link">...</span></li>';
+        }
+      }
+
+      // 下一页
+      html += `
+        <li class="page-item ${currentPage === totalPages ? 'disabled' : ''}">
+          <a class="page-link" href="#" onclick="changePage(${currentPage + 1}); return false;">下一页</a>
+        </li>
+      `;
+
+      paginationEl.innerHTML = html;
+    }
+
+    // 切换页码
+    function changePage(page) {
+      currentPage = page;
+      fetchStats();
+    }
+
+    // 处理搜索
+    function handleSearch() {
+      currentPage = 1;
+      fetchStats();
+    }
+
+    // 处理重置
+    function handleReset() {
+      currentFilter = 'all';
+      currentPage = 1;
+      document.getElementById('filterSelect').value = 'all';
+      fetchStats();
+    }
+
+    // 处理筛选变化
+    function handleFilterChange(e) {
+      currentFilter = e.target.value;
+      currentPage = 1;
+      fetchStats();
+    }
+
+    // 查看用户商品
+    function viewUserListings(userId) {
+      window.location.href = `/admin/users.html?user_id=${userId}&tab=inventory`;
+    }
+
+    // 退出登录
+    function handleLogout() {
+      localStorage.removeItem('admin_token');
+      window.location.href = '/admin/login.html';
+    }
+
+    // 辅助函数
+    function getStatusBadgeClass(status) {
+      const classMap = {
+        'at_limit': 'bg-danger',
+        'near_limit': 'bg-warning',
+        'normal': 'bg-success'
+      };
+      return classMap[status] || 'bg-secondary';
+    }
+
+    function getProgressClass(percentage) {
+      if (percentage >= 100) return 'bg-danger';
+      if (percentage >= 80) return 'bg-warning';
+      return 'bg-success';
+    }
+
+    function getStatusTagClass(status) {
+      const classMap = {
+        'at_limit': 'bg-danger',
+        'near_limit': 'bg-warning',
+        'normal': 'bg-success'
+      };
+      return classMap[status] || 'bg-secondary';
+    }
+
+    function getStatusText(status) {
+      const textMap = {
+        'at_limit': '已满',
+        'near_limit': '接近',
+        'normal': '正常'
+      };
+      return textMap[status] || '未知';
+    }
+
+    function formatDate(dateStr) {
+      if (!dateStr) return '-';
+      const date = new Date(dateStr);
+      return date.toLocaleString('zh-CN', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    }
+
+    function showError(message) {
+      alert(message);
+    }
+  </script>
+</body>
+</html>
+

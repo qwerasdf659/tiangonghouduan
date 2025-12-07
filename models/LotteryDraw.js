@@ -323,6 +323,36 @@ module.exports = sequelize => {
         comment: '抽奖结果元数据'
       },
 
+      // ========== 双账户模型预算审计字段 ==========
+      /**
+       * 奖品价值积分消耗（双账户模型审计字段）
+       * 记录本次抽奖消耗的预算积分
+       */
+      prize_value_points: {
+        type: DataTypes.INTEGER,
+        allowNull: false,
+        defaultValue: 0,
+        comment: '奖品价值积分消耗'
+      },
+      /**
+       * 抽奖前预算积分（审计字段）
+       * 记录抽奖前用户的剩余预算积分
+       */
+      budget_points_before: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+        comment: '抽奖前预算积分'
+      },
+      /**
+       * 抽奖后预算积分（审计字段）
+       * 记录抽奖后用户的剩余预算积分
+       */
+      budget_points_after: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+        comment: '抽奖后预算积分'
+      },
+
       // 审计信息
       ip_address: {
         type: DataTypes.STRING(45),

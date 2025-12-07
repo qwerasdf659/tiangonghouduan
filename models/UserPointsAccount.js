@@ -254,6 +254,93 @@ module.exports = sequelize => {
         type: DataTypes.STRING(255),
         allowNull: true,
         comment: '冻结原因'
+      },
+      /**
+       * 冻结积分（审核中）
+       * 双账户模型扩展字段 - 记录审核中的积分
+       */
+      frozen_points: {
+        type: DataTypes.DECIMAL(10, 2),
+        allowNull: false,
+        defaultValue: 0.0,
+        comment: '冻结积分（审核中）',
+        get () {
+          const value = this.getDataValue('frozen_points')
+          return value ? parseFloat(value) : 0
+        }
+      },
+      /**
+       * 预算积分总额（系统内部，用户不可见）
+       * 双账户模型核心字段 - 控制用户能中什么奖品
+       */
+      budget_points: {
+        type: DataTypes.INTEGER,
+        allowNull: false,
+        defaultValue: 0,
+        comment: '预算积分总额（系统内部）'
+      },
+      /**
+       * 剩余预算积分（系统内部，用户不可见）
+       * 双账户模型核心字段 - 用于抽奖时筛选奖品池
+       */
+      remaining_budget_points: {
+        type: DataTypes.INTEGER,
+        allowNull: false,
+        defaultValue: 0,
+        comment: '剩余预算积分（系统内部）'
+      },
+      /**
+       * 已用预算积分（系统内部，用户不可见）
+       * 双账户模型核心字段 - 记录已消耗的预算积分
+       */
+      used_budget_points: {
+        type: DataTypes.INTEGER,
+        allowNull: false,
+        defaultValue: 0,
+        comment: '已用预算积分（系统内部）'
+      },
+      /**
+       * 总抽奖次数（统计字段）
+       */
+      total_draw_count: {
+        type: DataTypes.INTEGER,
+        allowNull: false,
+        defaultValue: 0,
+        comment: '总抽奖次数'
+      },
+      /**
+       * 总兑换次数（统计字段）
+       */
+      total_redeem_count: {
+        type: DataTypes.INTEGER,
+        allowNull: false,
+        defaultValue: 0,
+        comment: '总兑换次数'
+      },
+      /**
+       * 中奖次数（统计字段）
+       */
+      won_count: {
+        type: DataTypes.INTEGER,
+        allowNull: false,
+        defaultValue: 0,
+        comment: '中奖次数'
+      },
+      /**
+       * 最后抽奖时间
+       */
+      last_draw_at: {
+        type: DataTypes.DATE,
+        allowNull: true,
+        comment: '最后抽奖时间'
+      },
+      /**
+       * 最后兑换时间
+       */
+      last_redeem_at: {
+        type: DataTypes.DATE,
+        allowNull: true,
+        comment: '最后兑换时间'
       }
     },
     {
