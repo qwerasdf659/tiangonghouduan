@@ -18,7 +18,7 @@ const sequelize = new Sequelize(
   }
 )
 
-async function executeMigration() {
+async function executeMigration () {
   try {
     console.log('🚀 开始执行数据库迁移...\n')
     await sequelize.authenticate()

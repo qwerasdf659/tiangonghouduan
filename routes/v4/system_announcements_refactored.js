@@ -1,7 +1,7 @@
 /**
  * 用户端公告接口（重构版）
  * 路径前缀: /api/v4/system/announcements
- * 
+ *
  * 优化点:
  * - 统一使用 AnnouncementService
  * - 消除查询逻辑重复
@@ -25,11 +25,11 @@ router.get('/', async (req, res) => {
     const announcements = await AnnouncementService.getAnnouncements({
       type,
       priority,
-      activeOnly: true,        // 用户端仅显示活跃公告
-      filterExpired: true,     // 用户端过滤过期公告
+      activeOnly: true, // 用户端仅显示活跃公告
+      filterExpired: true, // 用户端过滤过期公告
       limit,
       offset,
-      dataLevel: 'public',     // 用户端数据脱敏
+      dataLevel: 'public', // 用户端数据脱敏
       includeCreator: true
     })
 
@@ -95,7 +95,7 @@ router.get('/:id', async (req, res) => {
 
     const announcement = await AnnouncementService.getAnnouncementById(
       id,
-      'public'  // 用户端数据脱敏
+      'public' // 用户端数据脱敏
     )
 
     if (!announcement) {
@@ -123,4 +123,3 @@ router.get('/:id', async (req, res) => {
 })
 
 module.exports = router
-

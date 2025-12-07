@@ -145,10 +145,12 @@ module.exports = sequelize => {
    */
   ExchangeItem.prototype.getPaymentRequired = function () {
     return {
-      virtualValue: this.price_type === 'virtual' ? this.virtual_value_price :
-                   this.price_type === 'mixed' ? this.mixed_virtual_value : 0,
-      points: this.price_type === 'points' ? this.points_price :
-              this.price_type === 'mixed' ? this.mixed_points : 0
+      virtualValue: this.price_type === 'virtual'
+        ? this.virtual_value_price
+        : this.price_type === 'mixed' ? this.mixed_virtual_value : 0,
+      points: this.price_type === 'points'
+        ? this.points_price
+        : this.price_type === 'mixed' ? this.mixed_points : 0
     }
   }
 

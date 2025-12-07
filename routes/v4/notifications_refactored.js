@@ -1,7 +1,7 @@
 /**
  * 管理员通知中心接口（重构版）
  * 路径前缀: /api/v4/notifications
- * 
+ *
  * 优化点:
  * - 统一使用 AnnouncementService
  * - 使用 convertToNotificationFormat 转换格式
@@ -29,10 +29,10 @@ router.get('/', async (req, res) => {
     const announcements = await AnnouncementService.getAnnouncements({
       type,
       activeOnly: true,
-      filterExpired: false,    // 管理员可查看过期通知
+      filterExpired: false, // 管理员可查看过期通知
       limit,
       offset: 0,
-      dataLevel: 'full',       // 管理员完整数据
+      dataLevel: 'full', // 管理员完整数据
       includeCreator: true
     })
 
@@ -70,7 +70,7 @@ router.get('/:notification_id', async (req, res) => {
 
     const announcement = await AnnouncementService.getAnnouncementById(
       notification_id,
-      'full'  // 管理员完整数据
+      'full' // 管理员完整数据
     )
 
     if (!announcement) {
@@ -161,8 +161,10 @@ router.post('/read-all', async (req, res) => {
  */
 router.post('/clear', async (req, res) => {
   try {
-    // 注意: 这个功能可能需要软删除或标记，而不是物理删除
-    // 暂时保留原有逻辑，建议后续优化
+    /*
+     * 注意: 这个功能可能需要软删除或标记，而不是物理删除
+     * 暂时保留原有逻辑，建议后续优化
+     */
     res.json({
       success: true,
       message: '已清空已读通知'
@@ -210,4 +212,3 @@ router.post('/send', async (req, res) => {
 })
 
 module.exports = router
-

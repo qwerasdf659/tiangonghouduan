@@ -18,7 +18,7 @@ const sequelize = new Sequelize(
   }
 )
 
-async function checkDatabaseSchema() {
+async function checkDatabaseSchema () {
   try {
     console.log('🔍 正在连接数据库...')
     await sequelize.authenticate()

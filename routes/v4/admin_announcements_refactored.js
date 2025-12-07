@@ -1,7 +1,7 @@
 /**
  * 管理员公告管理接口（重构版）
  * 路径前缀: /api/v4/admin/announcements
- * 
+ *
  * 优化点:
  * - 统一使用 AnnouncementService
  * - CRUD操作统一封装
@@ -72,11 +72,11 @@ router.get('/', async (req, res) => {
     const announcements = await AnnouncementService.getAnnouncements({
       type,
       priority,
-      activeOnly: is_active === 'true',  // 管理员可查看所有状态
-      filterExpired: false,              // 管理员可查看过期公告
+      activeOnly: is_active === 'true', // 管理员可查看所有状态
+      filterExpired: false, // 管理员可查看过期公告
       limit,
       offset,
-      dataLevel: 'full',                 // 管理员完整数据
+      dataLevel: 'full', // 管理员完整数据
       includeCreator: true
     })
 
@@ -123,7 +123,7 @@ router.get('/:id', async (req, res) => {
 
     const announcement = await AnnouncementService.getAnnouncementById(
       id,
-      'full'  // 管理员完整数据
+      'full' // 管理员完整数据
     )
 
     if (!announcement) {
@@ -237,4 +237,3 @@ router.get('/statistics', async (req, res) => {
 })
 
 module.exports = router
-

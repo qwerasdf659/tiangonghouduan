@@ -274,17 +274,17 @@ router.get('/item/:item_id', authenticateToken, async (req, res) => {
     // 确保icon字段存在
     if (!itemData.icon) {
       switch (itemData.type) {
-        case 'voucher':
-          itemData.icon = '🎫'
-          break
-        case 'product':
-          itemData.icon = '🎁'
-          break
-        case 'service':
-          itemData.icon = '🔧'
-          break
-        default:
-          itemData.icon = '📦'
+      case 'voucher':
+        itemData.icon = '🎫'
+        break
+      case 'product':
+        itemData.icon = '🎁'
+        break
+      case 'service':
+        itemData.icon = '🔧'
+        break
+      default:
+        itemData.icon = '📦'
       }
     }
 
@@ -545,18 +545,18 @@ router.get('/admin/statistics', authenticateToken, requireAdmin, async (req, res
       // 类型分布数据（map转换为前端友好格式，添加边界保护）
       type_distribution: Array.isArray(typeStats)
         ? typeStats.map(stat => ({
-            type: stat.type || 'unknown', // 防止type为null
-            icon: stat.icon || getDefaultIcon(stat.type || 'voucher'), // 图标补全
-            count: parseInt(stat.dataValues?.count || 0) // 防止count为undefined，确保返回整数
-          }))
+          type: stat.type || 'unknown', // 防止type为null
+          icon: stat.icon || getDefaultIcon(stat.type || 'voucher'), // 图标补全
+          count: parseInt(stat.dataValues?.count || 0) // 防止count为undefined，确保返回整数
+        }))
         : [], // typeStats不是数组时返回空数组
 
       // 最近物品动态（map转换为前端友好格式，添加边界保护）
       recent_items: Array.isArray(recentItems)
         ? recentItems.map(item => ({
-            ...item.toJSON(), // Sequelize实例转为普通对象
-            icon: item.icon || getDefaultIcon(item.type || 'voucher') // 图标补全
-          }))
+          ...item.toJSON(), // Sequelize实例转为普通对象
+          icon: item.icon || getDefaultIcon(item.type || 'voucher') // 图标补全
+        }))
         : [] // recentItems不是数组时返回空数组
     }
 
@@ -1187,7 +1187,7 @@ router.post('/exchange-records/:id/cancel', authenticateToken, async (req, res) 
  * @param {string} status - 物品状态（available/pending/used/expired/transferred）
  * @returns {string} 状态的中文描述
  */
-function getStatusDescription(status) {
+function getStatusDescription (status) {
   const statusMap = {
     available: '可用',
     pending: '待处理',
@@ -1203,7 +1203,7 @@ function getStatusDescription(status) {
  * @param {string} type - 物品类型（voucher/product/service）
  * @returns {string} 对应类型的emoji图标
  */
-function getDefaultIcon(type) {
+function getDefaultIcon (type) {
   const iconMap = {
     voucher: '🎫',
     product: '🎁',
@@ -1285,15 +1285,15 @@ router.get('/market/products', authenticateToken, async (req, res) => {
     // 排序规则
     let order = [['created_at', 'DESC']]
     switch (sort) {
-      case 'price_low':
-        order = [['selling_points', 'ASC']]
-        break
-      case 'price_high':
-        order = [['selling_points', 'DESC']]
-        break
-      case 'newest':
-        order = [['created_at', 'DESC']]
-        break
+    case 'price_low':
+      order = [['selling_points', 'ASC']]
+      break
+    case 'price_high':
+      order = [['selling_points', 'DESC']]
+      break
+    case 'newest':
+      order = [['created_at', 'DESC']]
+      break
     }
 
     const { count, rows: marketProducts } = await models.UserInventory.findAndCountAll({
@@ -1918,10 +1918,10 @@ router.post('/verification/verify', authenticateToken, async (req, res) => {
         // 物品所有者信息
         user: item.user
           ? {
-              user_id: item.user.user_id,
-              mobile: item.user.mobile,
-              nickname: item.user.nickname
-            }
+            user_id: item.user.user_id,
+            mobile: item.user.mobile,
+            nickname: item.user.nickname
+          }
           : null,
         // 🔥 新增：核销操作人信息（便于前端展示"由XX商户核销"）
         operator: {
@@ -1982,12 +1982,12 @@ router.get('/market/products/:id', authenticateToken, async (req, res) => {
       seller_id: marketProduct.user_id,
       seller_info: marketProduct.user // 🔧 修复：使用正确的关联对象访问
         ? {
-            user_id: marketProduct.user.user_id,
-            nickname: marketProduct.user.nickname || '匿名用户',
-            // 对于非管理员，隐藏敏感信息
-            mobile: dataLevel === 'full' ? marketProduct.user.mobile : '****',
-            registration_time: marketProduct.user.created_at
-          }
+          user_id: marketProduct.user.user_id,
+          nickname: marketProduct.user.nickname || '匿名用户',
+          // 对于非管理员，隐藏敏感信息
+          mobile: dataLevel === 'full' ? marketProduct.user.mobile : '****',
+          registration_time: marketProduct.user.created_at
+        }
         : null,
 
       // 商品基础信息

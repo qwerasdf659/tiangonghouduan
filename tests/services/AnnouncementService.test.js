@@ -28,7 +28,7 @@ describe('AnnouncementService', () => {
           expires_at: null,
           view_count: 10,
           created_at: '2025-12-01T10:00:00+08:00',
-          toJSON: function() { return this }
+          toJSON: function () { return this }
         },
         {
           announcement_id: 2,
@@ -40,7 +40,7 @@ describe('AnnouncementService', () => {
           expires_at: '2025-12-31T23:59:59+08:00',
           view_count: 5,
           created_at: '2025-12-02T10:00:00+08:00',
-          toJSON: function() { return this }
+          toJSON: function () { return this }
         }
       ]
 
@@ -58,7 +58,7 @@ describe('AnnouncementService', () => {
       expect(result).toHaveLength(2)
       expect(result[0].announcement_id).toBe(1)
       expect(result[0].title).toBe('测试公告1')
-      
+
       // 验证查询条件
       expect(SystemAnnouncement.findAll).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -136,7 +136,7 @@ describe('AnnouncementService', () => {
 
       expect(SystemAnnouncement.findAll).toHaveBeenCalledWith(
         expect.objectContaining({
-          limit: 50  // 用户端最大限制
+          limit: 50 // 用户端最大限制
         })
       )
     })
@@ -151,7 +151,7 @@ describe('AnnouncementService', () => {
 
       expect(SystemAnnouncement.findAll).toHaveBeenCalledWith(
         expect.objectContaining({
-          limit: 100  // 管理员最大限制
+          limit: 100 // 管理员最大限制
         })
       )
     })
@@ -187,7 +187,7 @@ describe('AnnouncementService', () => {
         content: '内容',
         type: 'system',
         priority: 'high',
-        toJSON: function() { return this }
+        toJSON: function () { return this }
       }
 
       SystemAnnouncement.findByPk.mockResolvedValue(mockAnnouncement)
@@ -257,7 +257,7 @@ describe('AnnouncementService', () => {
         type: 'system',
         title: '测试公告',
         content: '内容',
-        is_read: false,  // view_count=0 表示未读
+        is_read: false, // view_count=0 表示未读
         priority: 'high'
       })
     })
@@ -360,7 +360,7 @@ describe('AnnouncementService', () => {
         created_by: 100,
         is_active: true,
         view_count: 0,
-        toJSON: function() { return this }
+        toJSON: function () { return this }
       }
 
       SystemAnnouncement.create.mockResolvedValue(mockCreatedAnnouncement)
@@ -394,7 +394,7 @@ describe('AnnouncementService', () => {
         announcement_id: 1,
         title: '旧标题',
         update: jest.fn().mockResolvedValue(true),
-        toJSON: function() { return { ...this, title: '新标题' } }
+        toJSON: function () { return { ...this, title: '新标题' } }
       }
 
       SystemAnnouncement.findByPk.mockResolvedValue(mockAnnouncement)
@@ -457,10 +457,10 @@ describe('AnnouncementService', () => {
   describe('getStatistics', () => {
     test('应该返回公告统计信息', async () => {
       SystemAnnouncement.count
-        .mockResolvedValueOnce(100)  // total
-        .mockResolvedValueOnce(80)   // active
-        .mockResolvedValueOnce(10)   // expired
-        .mockResolvedValueOnce(5)    // unread
+        .mockResolvedValueOnce(100) // total
+        .mockResolvedValueOnce(80) // active
+        .mockResolvedValueOnce(10) // expired
+        .mockResolvedValueOnce(5) // unread
 
       BeijingTimeHelper.createBeijingTime.mockReturnValue(new Date('2025-12-07T10:00:00+08:00'))
 
@@ -475,4 +475,3 @@ describe('AnnouncementService', () => {
     })
   })
 })
-
