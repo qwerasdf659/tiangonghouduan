@@ -103,10 +103,9 @@
             <label class="form-label">支付方式</label>
             <select class="form-select" id="priceTypeFilter">
               <option value="">全部方式</option>
-              <option value="virtual">虚拟奖品价值</option>
-              <option value="points">积分</option>
-              <option value="mixed">混合支付</option>
+              <option value="virtual">虚拟奖品价值（唯一方式）</option>
             </select>
+            <small class="text-muted">已简化为唯一支付方式</small>
           </div>
           <div class="col-md-3">
             <label class="form-label">排序方式</label>
@@ -184,26 +183,29 @@
               </div>
               <div class="col-md-6">
                 <label class="form-label">支付方式 <span class="text-danger">*</span></label>
-                <select class="form-select" name="price_type" required id="priceTypeSelect">
-                  <option value="">请选择</option>
-                  <option value="virtual">虚拟奖品价值</option>
-                  <option value="points">积分</option>
-                  <option value="mixed">混合支付</option>
+                <select class="form-select" name="price_type" required id="priceTypeSelect" disabled>
+                  <option value="virtual" selected>虚拟奖品价值（唯一方式）</option>
                 </select>
+                <small class="text-muted">
+                  已简化为唯一支付方式，保持业务逻辑清晰
+                </small>
               </div>
               <div class="col-12">
                 <label class="form-label">商品描述</label>
                 <textarea class="form-control" name="item_description" rows="3" maxlength="500"></textarea>
               </div>
-              <div class="col-md-6" id="virtualPriceGroup" style="display:none;">
-                <label class="form-label">虚拟价值价格 <span class="text-danger">*</span></label>
-                <input type="number" class="form-control" name="virtual_value_price" min="0" step="0.01">
-                <small class="text-muted">用户需要消耗的虚拟奖品价值</small>
+              <div class="col-md-6">
+                <label class="form-label">虚拟价值价格 <span class="text-danger">*</span> <span class="badge bg-success">实际扣除</span></label>
+                <input type="number" class="form-control" name="virtual_value_price" min="1" required>
+                <small class="text-success">✅ 用户兑换时从背包扣除的虚拟奖品价值（实际支付金额）</small>
               </div>
-              <div class="col-md-6" id="pointsPriceGroup" style="display:none;">
-                <label class="form-label">积分价格 <span class="text-danger">*</span></label>
+              <div class="col-md-6">
+                <label class="form-label">积分价格 <span class="badge bg-secondary">仅展示</span></label>
                 <input type="number" class="form-control" name="points_price" min="0">
-                <small class="text-muted">用户需要消耗的积分数量</small>
+                <small class="text-muted">
+                  📱 仅在前端显示"值多少积分"，不会扣除用户的显示积分<br>
+                  💡 建议设置为与虚拟价值相同，便于用户理解
+                </small>
               </div>
               <div class="col-md-4">
                 <label class="form-label">成本价 <span class="text-danger">*</span></label>
@@ -259,23 +261,24 @@
               </div>
               <div class="col-md-6">
                 <label class="form-label">支付方式 <span class="text-danger">*</span></label>
-                <select class="form-select" name="price_type" id="editPriceType" required>
-                  <option value="virtual">虚拟奖品价值</option>
-                  <option value="points">积分</option>
-                  <option value="mixed">混合支付</option>
+                <select class="form-select" name="price_type" id="editPriceType" required disabled>
+                  <option value="virtual" selected>虚拟奖品价值（唯一方式）</option>
                 </select>
+                <small class="text-muted">统一支付方式，不可修改</small>
               </div>
               <div class="col-12">
                 <label class="form-label">商品描述</label>
                 <textarea class="form-control" name="item_description" id="editItemDescription" rows="3"></textarea>
               </div>
-              <div class="col-md-6" id="editVirtualPriceGroup">
-                <label class="form-label">虚拟价值价格</label>
-                <input type="number" class="form-control" name="virtual_value_price" id="editVirtualPrice" min="0" step="0.01">
+              <div class="col-md-6">
+                <label class="form-label">虚拟价值价格 <span class="badge bg-success">实际扣除</span></label>
+                <input type="number" class="form-control" name="virtual_value_price" id="editVirtualPrice" min="1" required>
+                <small class="text-success">✅ 实际支付价格（从user_inventory扣除）</small>
               </div>
-              <div class="col-md-6" id="editPointsPriceGroup">
-                <label class="form-label">积分价格</label>
+              <div class="col-md-6">
+                <label class="form-label">积分价格 <span class="badge bg-secondary">仅展示</span></label>
                 <input type="number" class="form-control" name="points_price" id="editPointsPrice" min="0">
+                <small class="text-muted">📱 前端展示用，不扣除显示积分</small>
               </div>
               <div class="col-md-4">
                 <label class="form-label">成本价</label>
@@ -340,42 +343,9 @@
     function bindEvents() {
       document.getElementById('logoutBtn').addEventListener('click', logout);
       document.getElementById('searchBtn').addEventListener('click', handleSearch);
-      document.getElementById('priceTypeSelect').addEventListener('change', handlePriceTypeChange);
-      document.getElementById('editPriceType').addEventListener('change', handleEditPriceTypeChange);
+      // price_type 已固定为 virtual，无需切换逻辑
       document.getElementById('submitAddItemBtn').addEventListener('click', handleAddItem);
       document.getElementById('submitEditItemBtn').addEventListener('click', handleEditItem);
-    }
-
-    // 处理支付方式选择
-    function handlePriceTypeChange(e) {
-      const priceType = e.target.value;
-      const virtualGroup = document.getElementById('virtualPriceGroup');
-      const pointsGroup = document.getElementById('pointsPriceGroup');
-      const virtualInput = document.querySelector('#addItemForm [name="virtual_value_price"]');
-      const pointsInput = document.querySelector('#addItemForm [name="points_price"]');
-
-      virtualGroup.style.display = 'none';
-      pointsGroup.style.display = 'none';
-      virtualInput.required = false;
-      pointsInput.required = false;
-
-      if (priceType === 'virtual' || priceType === 'mixed') {
-        virtualGroup.style.display = 'block';
-        virtualInput.required = true;
-      }
-      if (priceType === 'points' || priceType === 'mixed') {
-        pointsGroup.style.display = 'block';
-        pointsInput.required = true;
-      }
-    }
-
-    function handleEditPriceTypeChange(e) {
-      const priceType = e.target.value;
-      const virtualGroup = document.getElementById('editVirtualPriceGroup');
-      const pointsGroup = document.getElementById('editPointsPriceGroup');
-
-      virtualGroup.style.display = (priceType === 'virtual' || priceType === 'mixed') ? 'block' : 'none';
-      pointsGroup.style.display = (priceType === 'points' || priceType === 'mixed') ? 'block' : 'none';
     }
 
     // 处理搜索
@@ -441,17 +411,8 @@
           ? '<span class="badge bg-success">上架</span>'
           : '<span class="badge bg-secondary">下架</span>';
 
-        let priceDisplay = '';
-        if (item.price_type === 'virtual') {
-          priceDisplay = `<span class="badge bg-info">${item.virtual_value_price} 虚拟价值</span>`;
-        } else if (item.price_type === 'points') {
-          priceDisplay = `<span class="badge bg-primary">${item.points_price} 积分</span>`;
-        } else if (item.price_type === 'mixed') {
-          priceDisplay = `
-            <span class="badge bg-info">${item.virtual_value_price} 虚拟</span>
-            <span class="badge bg-primary">${item.points_price} 积分</span>
-          `;
-        }
+        // 只显示虚拟价值（唯一支付方式）
+        const priceDisplay = `<span class="badge bg-info">${item.virtual_value_price} 虚拟价值</span>`;
 
         return `
           <tr>
@@ -687,14 +648,10 @@
       }
     }
 
-    // 工具函数
+    // 工具函数：获取支付方式文本（仅支持virtual）
     function getPriceTypeText(type) {
-      const map = {
-        'virtual': '虚拟价值',
-        'points': '积分',
-        'mixed': '混合支付'
-      };
-      return map[type] || type;
+      // 统一返回"虚拟价值"，因为只支持virtual支付方式
+      return '虚拟价值';
     }
 
     function escapeHtml(text) {

@@ -5,12 +5,19 @@
  * 功能说明：
  * - 获取兑换市场商品列表
  * - 获取商品详情
- * - 兑换商品（虚拟奖品价值/积分/混合支付）
+ * - 兑换商品（仅支持虚拟奖品价值支付）
  * - 查询用户订单
  * - 管理员订单管理
  * - 统计数据查询
  *
+ * 业务规则（强制）：
+ * - ✅ 兑换只能使用虚拟奖品价值
+ * - ❌ 禁止扣除 available_points（显示积分）
+ * - ❌ 禁止扣除 remaining_budget_points（预算积分）
+ * - ✅ payment_type 必须为 'virtual'
+ *
  * 创建时间：2025年12月06日
+ * 最后修改：2025年12月09日 - 统一为只支持virtual支付方式
  * 使用 Claude Sonnet 4.5 模型
  */
 
@@ -28,7 +35,7 @@ const logger = new Logger('ExchangeMarketAPI')
  * GET /api/v4/exchange_market/items
  *
  * @query {string} status - 商品状态（active/inactive，默认active）
- * @query {string} price_type - 支付方式（virtual/points/mixed）
+ * @query {string} price_type - 支付方式（只支持 virtual）
  * @query {number} page - 页码（默认1）
  * @query {number} page_size - 每页数量（默认20，最大50）
  * @query {string} sort_by - 排序字段（默认sort_order）
@@ -68,12 +75,12 @@ router.get('/items', authenticateToken, async (req, res) => {
       )
     }
 
-    // 支付方式白名单验证
+    // 支付方式白名单验证（只支持 virtual）
     if (price_type) {
-      const validPriceTypes = ['virtual', 'points', 'mixed']
+      const validPriceTypes = ['virtual']
       if (!validPriceTypes.includes(price_type)) {
         return res.apiError(
-          `无效的price_type参数，允许值：${validPriceTypes.join(', ')}`,
+          '无效的price_type参数，当前只支持 virtual（虚拟奖品价值支付）',
           'BAD_REQUEST',
           null,
           400

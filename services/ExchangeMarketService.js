@@ -1,33 +1,38 @@
 /**
  * 餐厅积分抽奖系统 V4.0 - 兑换市场服务（ExchangeMarketService）
  *
- * 业务场景：双账户+商城双玩法方案中的兑换市场功能
- * 用户使用虚拟奖品价值或积分兑换实物商品
+ * 业务场景：用户使用虚拟奖品价值兑换实物商品（唯一支付方式）
  *
  * 核心功能：
  * 1. 商品列表查询（支持分类、排序、分页）
- * 2. 商品兑换（虚拟奖品价值/积分/混合支付）
+ * 2. 商品兑换（仅支持虚拟奖品价值支付）
  * 3. 订单管理（查询订单、订单详情）
- * 4. 价格计算（根据支付方式计算实际支付金额）
+ *
+ * 支付方式（简化后）：
+ * - ✅ 虚拟奖品支付：从 user_inventory 扣除虚拟奖品价值（唯一方式）
+ * - ❌ 积分支付：已废弃，不再支持
+ * - ❌ 混合支付：已废弃，不再支持
+ *
+ * 业务规则（强制）：
+ * - ✅ 兑换只能使用虚拟奖品价值
+ * - ❌ 禁止扣除 available_points（显示积分）
+ * - ❌ 禁止检查/扣除 remaining_budget_points（预算积分）
+ * - ✅ points_paid 必须强制为 0
+ * - ✅ payment_type 必须为 'virtual'
  *
  * 业务流程：
  *
  * 1. **用户查看商品列表**
  *    - 调用getMarketItems() → 返回可兑换商品列表
- *    - 前端展示商品信息（名称、价格、库存、支付方式）
+ *    - 前端展示商品信息（名称、价格、库存）
  *
  * 2. **用户兑换商品流程**
  *    - 用户选择商品和数量
- *    - 调用exchangeItem() → 检查库存 → 检查支付能力
- *    - 扣除虚拟奖品价值/积分 → 创建订单 → 扣减库存
+ *    - 调用exchangeItem() → 检查库存 → 检查虚拟奖品价值
+ *    - 扣除虚拟奖品价值 → 创建订单 → 扣减库存
  *    - 返回订单信息
  *
- * 3. **支付方式处理**
- *    - 虚拟奖品支付：从user_inventory扣除虚拟奖品价值
- *    - 积分支付：从available_points扣除积分
- *    - 混合支付：同时扣除虚拟奖品价值和积分
- *
- * 4. **订单查询流程**
+ * 3. **订单查询流程**
  *    - 调用getUserOrders() → 返回用户订单列表
  *    - 支持状态筛选（pending/completed/shipped/cancelled）
  *
@@ -38,19 +43,19 @@
  *   - ExchangeMarketService：处理新兑换市场（ExchangeItem）的用户兑换业务
  *
  * 数据模型关联：
- * - ExchangeItem：兑换市场商品表（price_type, virtual_value_price, points_price）
- * - ExchangeMarketRecord：兑换订单表（payment_type, virtual_value_paid, points_paid）
+ * - ExchangeItem：兑换市场商品表（price_type='virtual', virtual_value_price, points_price仅展示）
+ * - ExchangeMarketRecord：兑换订单表（payment_type='virtual', virtual_value_paid, points_paid=0）
  * - UserInventory：用户库存表（虚拟奖品存储，virtual_value_points）
- * - UserPointsAccount：积分账户表（available_points）
+ * - UserPointsAccount：积分账户表（available_points - 兑换时不扣除）
  *
  * 业务规则：
- * - 虚拟奖品价值从背包扣除，不扣除预算积分（抽奖时已扣除）
- * - 积分支付扣除available_points，不扣除预算积分
+ * - 虚拟奖品价值从背包扣除（抽奖时已扣除预算积分）
  * - 兑换时使用事务确保原子性（扣除+创建订单+扣减库存）
  * - 商品库存不足时拒绝兑换
  * - 订单号格式：EM{timestamp}{random}（EM = Exchange Market）
  *
  * 创建时间：2025年12月06日
+ * 最后修改：2025年12月08日 - 删除points/mixed支付方式，统一为virtual
  * 使用模型：Claude Sonnet 4.5
  */
 
@@ -224,100 +229,40 @@ class ExchangeMarketService {
         totalPoints
       })
 
-      // 4. 检查支付能力并执行扣除
-      let virtualValuePaid = 0
-      let pointsPaid = 0
-
-      switch (item.price_type) {
-      case 'virtual': {
-        // 虚拟奖品价值支付
-        const userVirtualValue = await this._getUserTotalVirtualValue(user_id, transaction)
-
-        if (userVirtualValue < totalVirtualValue) {
-          await transaction.rollback()
-          throw new Error(
-            `虚拟奖品价值不足，需要${totalVirtualValue}，当前${userVirtualValue}`
-          )
-        }
-
-        // 扣除虚拟奖品价值
-        await this._deductVirtualValue(user_id, totalVirtualValue, transaction)
-        virtualValuePaid = totalVirtualValue
-        break
-      }
-
-      case 'points': {
-        // 积分支付
-        if (userAccount.available_points < totalPoints) {
-          await transaction.rollback()
-          throw new Error(
-            `积分不足，需要${totalPoints}，当前${userAccount.available_points}`
-          )
-        }
-
-        // 生成唯一的业务ID
-        const business_id = `exchange_market_${BeijingTimeHelper.generateIdTimestamp()}_${user_id}`
-
-        // 扣除积分（使用PointsService确保一致性）
-        await PointsService.consumePoints(user_id, totalPoints, {
-          transaction,
-          business_id,
-          business_type: 'exchange_market',
-          source_type: 'system',
-          title: `兑换商品：${item.item_name}`,
-          description: `兑换${quantity}个${item.item_name}，消耗${totalPoints}积分`
-        })
-        pointsPaid = totalPoints
-        break
-      }
-
-      case 'mixed': {
-        // 混合支付
-        const userVirtualValue = await this._getUserTotalVirtualValue(user_id, transaction)
-
-        if (userVirtualValue < totalVirtualValue) {
-          await transaction.rollback()
-          throw new Error(
-            `虚拟奖品价值不足，需要${totalVirtualValue}，当前${userVirtualValue}`
-          )
-        }
-
-        if (userAccount.available_points < totalPoints) {
-          await transaction.rollback()
-          throw new Error(
-            `积分不足，需要${totalPoints}，当前${userAccount.available_points}`
-          )
-        }
-
-        // 扣除虚拟奖品价值
-        await this._deductVirtualValue(user_id, totalVirtualValue, transaction)
-        virtualValuePaid = totalVirtualValue
-
-        // 生成唯一的业务ID
-        const business_id = `exchange_market_${BeijingTimeHelper.generateIdTimestamp()}_${user_id}`
-
-        // 扣除积分
-        await PointsService.consumePoints(user_id, totalPoints, {
-          transaction,
-          business_id,
-          business_type: 'exchange_market',
-          source_type: 'system',
-          title: `兑换商品：${item.item_name}（混合支付）`,
-          description: `兑换${quantity}个${item.item_name}，消耗${totalVirtualValue}虚拟奖品价值+${totalPoints}积分`
-        })
-        pointsPaid = totalPoints
-        break
-      }
-
-      default:
+      // 4. 强制校验：只允许 virtual 类型（业务规则强制）
+      if (item.price_type !== 'virtual') {
         await transaction.rollback()
-        throw new Error(`不支持的支付方式：${item.price_type}`)
+        throw new Error(
+          `不支持的支付方式：${item.price_type}。` +
+          '当前仅支持虚拟奖品支付（price_type=\'virtual\'），请联系管理员更新商品配置。'
+        )
       }
 
-      // 5. 生成订单号
+      // 5. 使用虚拟奖品价值支付（唯一支付方式）
+      console.log('[兑换市场] 使用虚拟奖品价值支付')
+
+      // 检查虚拟价值是否足够
+      const userVirtualValue = await this._getUserTotalVirtualValue(user_id, transaction)
+
+      if (userVirtualValue < totalVirtualValue) {
+        await transaction.rollback()
+        throw new Error(
+          `虚拟奖品不足，需要${totalVirtualValue}虚拟价值，当前${userVirtualValue}。` +
+          '请先参与抽奖获取虚拟奖品。'
+        )
+      }
+
+      // 扣除虚拟奖品价值
+      await this._deductVirtualValue(user_id, totalVirtualValue, transaction)
+      const virtualValuePaid = totalVirtualValue
+      const pointsPaid = 0 // 强制为 0，不扣除显示积分
+
+      console.log(`[兑换市场] 扣除虚拟价值成功：${totalVirtualValue}`)
+
+      // 6. 生成订单号
       const order_no = this._generateOrderNo()
 
-      // 6. 创建兑换订单
+      // 7. 创建兑换订单
       const record = await ExchangeMarketRecord.create(
         {
           order_no,
@@ -332,9 +277,9 @@ class ExchangeMarketService {
             points_price: item.points_price
           },
           quantity,
-          payment_type: item.price_type,
+          payment_type: 'virtual', // 强制为 virtual
           virtual_value_paid: virtualValuePaid,
-          points_paid: pointsPaid,
+          points_paid: pointsPaid, // 强制为 0
           total_cost: (item.cost_price || 0) * quantity,
           status: 'pending',
           exchange_time: BeijingTimeHelper.createDatabaseTime()
@@ -342,7 +287,7 @@ class ExchangeMarketService {
         { transaction }
       )
 
-      // 7. 扣减商品库存
+      // 8. 扣减商品库存
       await item.update(
         {
           stock: item.stock - quantity,
@@ -351,7 +296,7 @@ class ExchangeMarketService {
         { transaction }
       )
 
-      // 8. 更新用户统计字段
+      // 9. 更新用户统计字段
       await userAccount.update(
         {
           total_redeem_count: (userAccount.total_redeem_count || 0) + 1,
@@ -360,7 +305,7 @@ class ExchangeMarketService {
         { transaction }
       )
 
-      // 9. 提交事务
+      // 10. 提交事务
       await transaction.commit()
 
       console.log(`[兑换市场] 兑换成功，订单号：${order_no}`)

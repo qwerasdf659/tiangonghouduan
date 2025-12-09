@@ -56,7 +56,7 @@ describe('AnnouncementService', () => {
       })
 
       expect(result).toHaveLength(2)
-      expect(result[0].announcement_id).toBe(1)
+      expect(result[0].id).toBe(1) // DataSanitizer 在 public 级别将 announcement_id 转换为 id
       expect(result[0].title).toBe('测试公告1')
 
       // 验证查询条件
@@ -195,7 +195,7 @@ describe('AnnouncementService', () => {
       const result = await AnnouncementService.getAnnouncementById(1, 'public')
 
       expect(result).toBeDefined()
-      expect(result.announcement_id).toBe(1)
+      expect(result.id).toBe(1) // DataSanitizer 在 public 级别将 announcement_id 转换为 id
       expect(SystemAnnouncement.findByPk).toHaveBeenCalledWith(1, expect.any(Object))
     })
 
@@ -443,14 +443,6 @@ describe('AnnouncementService', () => {
       const result = await AnnouncementService.deleteAnnouncement(999)
 
       expect(result).toBe(false)
-    })
-  })
-
-  describe('getHomeAnnouncements', () => {
-    test('应该抛出错误（功能暂不实现）', async () => {
-      await expect(
-        AnnouncementService.getHomeAnnouncements(5)
-      ).rejects.toThrow('小程序前端功能暂不开发')
     })
   })
 

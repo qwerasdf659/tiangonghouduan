@@ -22,7 +22,13 @@
 
 'use strict'
 
-const { ConsumptionRecord, ContentReviewRecord, User, PointsTransaction } = require('../models')
+const {
+  ConsumptionRecord,
+  ContentReviewRecord,
+  User,
+  PointsTransaction,
+  UserPointsAccount
+} = require('../models')
 const PointsService = require('./PointsService')
 const QRCodeValidator = require('../utils/QRCodeValidator')
 const BeijingTimeHelper = require('../utils/timeHelper')
@@ -313,9 +319,16 @@ class ConsumptionService {
        * - 平台抽成10%用于奖品预算
        * - 抽成的80%作为预算积分
        * - 价值系数为3（1元预算 = 3预算积分）
-       * 计算公式：budget_points = consumption_amount × 0.1 × 0.8 × 3 = consumption_amount × 0.24
+       * 计算公式：budget_points = consumption_amount × 系数（动态配置，默认0.24）
        */
-      const budgetPointsToAllocate = Math.round(record.consumption_amount * 0.24)
+      // 动态读取预算系数
+      const budgetRatio = await ConsumptionService.getBudgetRatio()
+      const budgetPointsToAllocate = Math.round(record.consumption_amount * budgetRatio)
+
+      console.log(
+        `💰 预算分配: 消费${record.consumption_amount}元 × ${budgetRatio} = ${budgetPointsToAllocate}积分`
+      )
+
       if (budgetPointsToAllocate > 0) {
         const userAccount = await UserPointsAccount.findOne({
           where: { user_id: record.user_id },
@@ -333,14 +346,18 @@ class ConsumptionService {
             { transaction }
           )
 
-          console.log(`💰 预算分配成功: user_id=${record.user_id}, 预算积分=${budgetPointsToAllocate}, 剩余预算=${userAccount.remaining_budget_points + budgetPointsToAllocate}`)
+          console.log(
+            `💰 预算分配成功: user_id=${record.user_id}, 预算积分=${budgetPointsToAllocate}, 剩余预算=${userAccount.remaining_budget_points + budgetPointsToAllocate}`
+          )
         }
       }
 
       // 6. 提交事务
       await transaction.commit()
 
-      console.log(`✅ 消费记录审核通过: record_id=${recordId}, 奖励积分=${record.points_to_award}, 预算积分=${budgetPointsToAllocate}`)
+      console.log(
+        `✅ 消费记录审核通过: record_id=${recordId}, 奖励积分=${record.points_to_award}, 预算积分=${budgetPointsToAllocate}`
+      )
 
       return {
         consumption_record: record,
@@ -933,6 +950,41 @@ class ConsumptionService {
     } catch (error) {
       console.error('❌ [ConsumptionService] 获取用户信息失败:', error.message)
       throw error
+    }
+  }
+
+  /**
+   * 获取预算分配系数（动态读取配置）
+   *
+   * @description 从system_settings表动态读取预算分配系数
+   * @returns {Promise<number>} 预算系数（默认0.24）
+   *
+   * 业务规则：
+   * - 从数据库读取 budget_allocation_ratio 配置项
+   * - 配置不存在或读取失败时返回默认值 0.24
+   * - 异常时降级到默认值，确保业务不中断
+   */
+  static async getBudgetRatio () {
+    try {
+      const { SystemSettings } = require('../models')
+
+      // 查询预算系数配置
+      const setting = await SystemSettings.findOne({
+        where: { setting_key: 'budget_allocation_ratio' }
+      })
+
+      if (setting) {
+        const ratio = setting.getParsedValue() // 使用已有解析方法
+        console.log(`[配置] 预算系数: ${ratio}`)
+        return ratio
+      }
+
+      // 配置不存在时返回默认值
+      console.warn('[配置] 未找到预算系数配置，使用默认值: 0.24')
+      return 0.24
+    } catch (error) {
+      console.error('[配置] 获取预算系数失败:', error.message)
+      return 0.24 // 异常时返回安全默认值
     }
   }
 }

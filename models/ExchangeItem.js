@@ -1,13 +1,27 @@
 /**
  * 兑换市场商品模型 - ExchangeItem
  * 双账户模型兑换市场核心表
- * 用户可以使用虚拟奖品价值或积分兑换商品
+ * 用户只能使用虚拟奖品价值兑换商品（唯一支付方式）
  *
  * 业务场景：
  * - 用户抽奖获得虚拟奖品（水晶、贵金属等）
  * - 虚拟奖品存入背包（UserInventory）
  * - 用户使用背包中的虚拟奖品价值兑换商品
- * - 兑换时不再扣预算积分（已在抽奖时扣除）
+ * - 兑换时不扣除显示积分和预算积分（已在抽奖时扣除）
+ *
+ * 支付方式说明：
+ * - price_type：只支持 'virtual'（虚拟奖品价值支付，唯一方式）
+ * - virtual_value_price：实际扣除的虚拟奖品价值（必须字段）
+ * - points_price：仅用于前端展示，不实际扣除显示积分（可选字段）
+ *
+ * 业务规则（强制）：
+ * - ✅ 兑换只能使用虚拟奖品价值
+ * - ❌ 禁止扣除 available_points（显示积分）
+ * - ❌ 禁止扣除 remaining_budget_points（预算积分）
+ * - ✅ price_type 必须为 'virtual'
+ * - ✅ points_price 仅用于展示
+ *
+ * 最后修改：2025年12月08日 - 统一为只支持virtual支付方式
  */
 
 const { DataTypes } = require('sequelize')
@@ -42,31 +56,22 @@ module.exports = sequelize => {
         comment: '商品图片URL'
       },
 
-      // 价格类型（双账户模型核心字段）
+      // 价格类型（双账户模型核心字段 - 已简化为只支持virtual）
       price_type: {
-        type: DataTypes.ENUM('virtual', 'points', 'mixed'),
+        type: DataTypes.ENUM('virtual'),
         allowNull: false,
-        comment: '支付方式：虚拟奖品/积分/混合'
+        defaultValue: 'virtual',
+        comment: '支付方式（仅支持虚拟奖品价值支付）'
       },
       virtual_value_price: {
         type: DataTypes.INTEGER,
-        allowNull: true,
-        comment: '虚拟奖品价格（价值积分）'
+        allowNull: false,
+        comment: '虚拟奖品价格（实际扣除的虚拟价值，必须字段）'
       },
       points_price: {
         type: DataTypes.INTEGER,
         allowNull: true,
-        comment: '积分价格'
-      },
-      mixed_virtual_value: {
-        type: DataTypes.INTEGER,
-        allowNull: true,
-        comment: '混合支付-虚拟奖品价值'
-      },
-      mixed_points: {
-        type: DataTypes.INTEGER,
-        allowNull: true,
-        comment: '混合支付-积分数量'
+        comment: '积分价格（仅用于前端展示，不扣除用户显示积分）'
       },
 
       // 成本和库存
@@ -142,15 +147,16 @@ module.exports = sequelize => {
 
   /**
    * 获取支付要求
+   * 注意：当前只支持 virtual 支付方式
+   *
+   * @returns {Object} 支付要求
+   * @returns {number} returns.virtualValue - 需要的虚拟奖品价值
+   * @returns {number} returns.points - 展示用积分价格（不实际扣除）
    */
   ExchangeItem.prototype.getPaymentRequired = function () {
     return {
-      virtualValue: this.price_type === 'virtual'
-        ? this.virtual_value_price
-        : this.price_type === 'mixed' ? this.mixed_virtual_value : 0,
-      points: this.price_type === 'points'
-        ? this.points_price
-        : this.price_type === 'mixed' ? this.mixed_points : 0
+      virtualValue: this.virtual_value_price || 0,
+      points: this.points_price || 0 // 仅用于展示，不扣除显示积分
     }
   }
 

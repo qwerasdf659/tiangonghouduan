@@ -1,12 +1,21 @@
 /**
  * 兑换市场记录模型 - ExchangeMarketRecord
- * 记录用户使用虚拟奖品价值或积分兑换商品的订单
+ * 记录用户使用虚拟奖品价值兑换商品的订单（唯一支付方式）
  *
  * 业务场景：
- * - 用户选择商品并支付（虚拟奖品价值/积分/混合）
- * - 扣除用户背包中的虚拟奖品或积分
+ * - 用户选择商品并支付虚拟奖品价值
+ * - 扣除用户背包中的虚拟奖品价值
  * - 创建兑换订单
  * - 发货和订单状态管理
+ *
+ * 业务规则（强制）：
+ * - ✅ 只支持虚拟奖品价值支付
+ * - ❌ 禁止扣除 available_points（显示积分）
+ * - ❌ 禁止扣除 remaining_budget_points（预算积分）
+ * - ✅ points_paid 必须强制为 0
+ * - ✅ payment_type 必须为 'virtual'
+ *
+ * 最后修改：2025年12月09日 - 统一为只支持virtual支付方式
  */
 
 const { DataTypes } = require('sequelize')
@@ -46,21 +55,22 @@ module.exports = sequelize => {
 
       // 支付信息
       payment_type: {
-        type: DataTypes.ENUM('virtual', 'points', 'mixed'),
+        type: DataTypes.ENUM('virtual'),
         allowNull: false,
-        comment: '支付方式'
+        defaultValue: 'virtual',
+        comment: '支付方式（仅支持虚拟奖品价值支付）'
       },
       virtual_value_paid: {
         type: DataTypes.INTEGER,
         allowNull: false,
         defaultValue: 0,
-        comment: '消耗虚拟奖品价值'
+        comment: '消耗虚拟奖品价值（实际支付金额）'
       },
       points_paid: {
         type: DataTypes.INTEGER,
         allowNull: false,
         defaultValue: 0,
-        comment: '消耗积分'
+        comment: '消耗积分（应始终为0，仅用于展示）'
       },
 
       // 成本信息（后端记录，不对外暴露）

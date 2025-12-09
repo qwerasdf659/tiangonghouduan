@@ -160,9 +160,9 @@ router.get('/listing-stats', authenticateToken, requireAdmin, async (req, res) =
  *
  * @body {string} item_name - 商品名称（必填，最长100字符）
  * @body {string} item_description - 商品描述（可选，最长500字符）
- * @body {string} price_type - 支付方式（必填：virtual/points/mixed）
- * @body {number} virtual_value_price - 虚拟价值价格（price_type为virtual或mixed时必填）
- * @body {number} points_price - 积分价格（price_type为points或mixed时必填）
+ * @body {string} price_type - 支付方式（必填：只支持 virtual）
+ * @body {number} virtual_value_price - 虚拟价值价格（必填，实际扣除的虚拟奖品价值）
+ * @body {number} points_price - 积分价格（可选，仅用于前端展示，不扣除用户显示积分）
  * @body {number} cost_price - 成本价（必填）
  * @body {number} stock - 初始库存（必填，>=0）
  * @body {number} sort_order - 排序号（必填，默认100）
@@ -204,27 +204,19 @@ router.post('/exchange_market/items', authenticateToken, requireAdmin, async (re
       return res.apiError('商品描述最长500字符', 'BAD_REQUEST', null, 400)
     }
 
-    const validPriceTypes = ['virtual', 'points', 'mixed']
+    const validPriceTypes = ['virtual']
     if (!validPriceTypes.includes(price_type)) {
       return res.apiError(
-        `无效的price_type参数，允许值：${validPriceTypes.join(', ')}`,
+        '无效的price_type参数，当前只支持 virtual（虚拟奖品价值支付）',
         'BAD_REQUEST',
         null,
         400
       )
     }
 
-    // 根据支付方式验证价格
-    if (price_type === 'virtual' || price_type === 'mixed') {
-      if (!virtual_value_price || virtual_value_price <= 0) {
-        return res.apiError('虚拟价值价格必须大于0', 'BAD_REQUEST', null, 400)
-      }
-    }
-
-    if (price_type === 'points' || price_type === 'mixed') {
-      if (!points_price || points_price <= 0) {
-        return res.apiError('积分价格必须大于0', 'BAD_REQUEST', null, 400)
-      }
+    // 虚拟价值价格验证（必填）
+    if (!virtual_value_price || virtual_value_price <= 0) {
+      return res.apiError('虚拟价值价格必须大于0', 'BAD_REQUEST', null, 400)
     }
 
     if (cost_price === undefined || cost_price < 0) {
@@ -351,10 +343,10 @@ router.put('/exchange_market/items/:item_id', authenticateToken, requireAdmin, a
     }
 
     if (price_type !== undefined) {
-      const validPriceTypes = ['virtual', 'points', 'mixed']
+      const validPriceTypes = ['virtual']
       if (!validPriceTypes.includes(price_type)) {
         return res.apiError(
-          `无效的price_type参数，允许值：${validPriceTypes.join(', ')}`,
+          '无效的price_type参数，当前只支持 virtual（虚拟奖品价值支付）',
           'BAD_REQUEST',
           null,
           400

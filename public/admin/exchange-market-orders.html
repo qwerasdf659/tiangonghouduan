@@ -76,12 +76,11 @@
           </div>
           <div class="col-md-3">
             <label class="form-label">支付方式</label>
-            <select class="form-select" id="paymentTypeFilter">
-              <option value="">全部方式</option>
+            <select class="form-select" id="paymentTypeFilter" disabled>
+              <option value="">全部方式（仅支持虚拟价值）</option>
               <option value="virtual">虚拟价值</option>
-              <option value="points">积分</option>
-              <option value="mixed">混合支付</option>
             </select>
+            <small class="text-muted">已统一为虚拟价值支付</small>
           </div>
           <div class="col-md-3">
             <label class="form-label">搜索订单号</label>
@@ -368,17 +367,8 @@
         const statusBadge = getStatusBadge(order.status);
         const paymentTypeText = getPaymentTypeText(order.payment_type);
 
-        let paymentAmount = '';
-        if (order.payment_type === 'virtual') {
-          paymentAmount = `<span class="badge bg-info">${order.virtual_value_paid} 虚拟</span>`;
-        } else if (order.payment_type === 'points') {
-          paymentAmount = `<span class="badge bg-primary">${order.points_paid} 积分</span>`;
-        } else if (order.payment_type === 'mixed') {
-          paymentAmount = `
-            <span class="badge bg-info">${order.virtual_value_paid} 虚拟</span><br>
-            <span class="badge bg-primary">${order.points_paid} 积分</span>
-          `;
-        }
+        // 只显示虚拟价值（唯一支付方式）
+        const paymentAmount = `<span class="badge bg-info">${order.virtual_value_paid} 虚拟</span>`;
 
         return `
           <tr>
@@ -452,11 +442,9 @@
           document.getElementById('detailCost').textContent = order.total_cost || '-';
           document.getElementById('detailRemark').textContent = order.admin_remark || '-';
 
-          // 根据支付方式显示/隐藏行
-          document.getElementById('detailVirtualRow').style.display =
-            (order.payment_type === 'virtual' || order.payment_type === 'mixed') ? 'table-row' : 'none';
-          document.getElementById('detailPointsRow').style.display =
-            (order.payment_type === 'points' || order.payment_type === 'mixed') ? 'table-row' : 'none';
+          // 始终显示虚拟价值行，隐藏积分支付行（只支持virtual）
+          document.getElementById('detailVirtualRow').style.display = 'table-row';
+          document.getElementById('detailPointsRow').style.display = 'none';
 
           new bootstrap.Modal(document.getElementById('orderDetailModal')).show();
         } else {
@@ -556,12 +544,8 @@
     }
 
     function getPaymentTypeText(type) {
-      const map = {
-        'virtual': '虚拟价值',
-        'points': '积分',
-        'mixed': '混合支付'
-      };
-      return map[type] || type;
+      // 统一返回"虚拟价值"，因为只支持virtual支付方式
+      return '虚拟价值';
     }
 
     function formatDate(dateStr) {

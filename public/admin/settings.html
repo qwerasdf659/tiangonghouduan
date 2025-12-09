@@ -220,6 +220,21 @@
                     <option value="inactive">180天未活跃清零</option>
                   </select>
                 </div>
+                <div class="col-md-6">
+                  <label class="form-label">预算分配系数</label>
+                  <input 
+                    type="number" 
+                    class="form-control" 
+                    id="budget_allocation_ratio"
+                    step="0.01" 
+                    min="0" 
+                    max="1"
+                    placeholder="0.24"
+                  >
+                  <small class="text-muted">
+                    公式：预算积分 = 消费金额 × 该系数（如1000元×0.24=240预算积分）
+                  </small>
+                </div>
                 <div class="col-12">
                   <button type="button" class="btn btn-primary" id="savePointsSettingsBtn">
                     <i class="bi bi-check-lg"></i> 保存设置
@@ -517,6 +532,7 @@
             if (setting_key === 'sign_in_points') document.getElementById('dailyCheckInPoints').value = parsed_value;
             if (setting_key === 'initial_points') document.getElementById('registerBonusPoints').value = parsed_value;
             if (setting_key === 'points_expire_days') document.getElementById('pointsExpireDays').value = parsed_value;
+            if (setting_key === 'budget_allocation_ratio') document.getElementById('budget_allocation_ratio').value = parsed_value;
           });
         }
         
@@ -705,7 +721,8 @@
         const settings = {
           sign_in_points: parseInt(document.getElementById('dailyCheckInPoints').value),
           initial_points: parseInt(document.getElementById('registerBonusPoints').value),
-          points_expire_days: parseInt(document.getElementById('pointsExpireDays').value)
+          points_expire_days: parseInt(document.getElementById('pointsExpireDays').value),
+          budget_allocation_ratio: parseFloat(document.getElementById('budget_allocation_ratio').value)
         };
         
         // 调用后端API
@@ -715,7 +732,7 @@
         });
         
         if (response && response.success) {
-          showSuccess('保存成功', '积分设置已更新');
+          showSuccess('保存成功', '积分设置已更新（包括预算分配系数）');
         } else {
           showError('保存失败', response?.message || '保存积分设置失败');
         }

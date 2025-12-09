@@ -13,6 +13,11 @@ const { Op } = require('sequelize')
 const BeijingTimeHelper = require('../utils/timeHelper')
 const DataSanitizer = require('./DataSanitizer')
 
+/**
+ * 公告服务类
+ * @class AnnouncementService
+ * @description 提供统一的公告查询、创建、更新、删除等操作，解决三套接口查询逻辑重复问题
+ */
 class AnnouncementService {
   /**
    * 统一的公告查询方法
@@ -305,16 +310,6 @@ class AnnouncementService {
 
     await announcement.destroy()
     return true
-  }
-
-  /**
-   * 获取首页公告（小程序端专用 - 本项目不涉及）
-   * 注：本方法仅供参考，当前项目仅开发Web管理后台
-   * @deprecated 当前项目不开发小程序前端，此方法暂不使用
-   */
-  static async getHomeAnnouncements (limit = 5) {
-    // 预留接口，暂不实现
-    throw new Error('小程序前端功能暂不开发')
   }
 
   /**
