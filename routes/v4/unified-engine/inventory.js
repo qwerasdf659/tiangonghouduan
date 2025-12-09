@@ -19,10 +19,10 @@ const router = express.Router()
 const models = require('../../../models')
 const ApiResponse = require('../../../utils/ApiResponse')
 const { authenticateToken, requireAdmin, getUserRoles } = require('../../../middleware/auth')
-const DataSanitizer = require('../../../services/DataSanitizer')
+const DataSanitizer = require('../../../services/DataSanitizer') // eslint-disable-line no-unused-vars -- 在其他未重构的路由中使用
 const Logger = require('../../../services/UnifiedLotteryEngine/utils/Logger')
 const NotificationService = require('../../../services/NotificationService')
-const { Op, Transaction } = require('sequelize') // 添加Transaction用于行级锁（Add Transaction for row-level locking）
+const { Transaction } = require('sequelize') // 添加Transaction用于行级锁（Add Transaction for row-level locking）
 
 const logger = new Logger('InventoryAPI')
 
@@ -41,7 +41,6 @@ router.get('/user/:user_id', authenticateToken, async (req, res) => {
 
     /*
      * ✅ 优化1：严格验证user_id参数（防止NaN绕过权限检查）
-     * 第1步：检测NaN和非法值
      */
     const requestedUserId = parseInt(user_id, 10)
     if (isNaN(requestedUserId) || requestedUserId <= 0) {
@@ -53,162 +52,45 @@ router.get('/user/:user_id', authenticateToken, async (req, res) => {
       return res.apiError('无效的用户ID，必须是正整数', 'BAD_REQUEST', null, 400)
     }
 
-    /*
-     * 第2步：用户身份验证（P0修复 - 防止用户A查询用户B的库存）
-     * 业务规则：普通用户只能查询自己的库存，管理员（role_level >= 100）可查询任意用户
-     */
-    logger.info('调用getUserRoles', { user_id: req.user.user_id })
-    const userRoles = await getUserRoles(req.user.user_id)
-    logger.info('getUserRoles返回', { userRoles })
-
-    if (requestedUserId !== req.user.user_id && !userRoles.isAdmin) {
-      logger.warn('越权访问库存', {
-        requestedUserId, // 请求查询的用户ID（已验证为有效数字）
-        actualUserId: req.user.user_id, // 实际登录的用户ID
-        role_level: userRoles.role_level // 用户角色级别
-      })
-      return res.apiError('无权限查看其他用户库存', 'FORBIDDEN', null, 403)
-    }
-
-    /*
-     * 第3步：审计日志 - 记录管理员查询他人库存的操作
-     */
-    if (requestedUserId !== req.user.user_id && userRoles.isAdmin) {
-      logger.info('管理员查询用户库存', {
-        admin_id: req.user.user_id,
-        target_user_id: requestedUserId,
-        query_time: BeijingTimeHelper.formatForAPI(new Date())
-      })
-    }
-
-    /*
-     * 🎯 分页参数严格验证：确保范围1-50，默认20
-     * 防止NaN、0、负数导致查询失败
-     */
-    const finalLimit = Math.min(Math.max(parseInt(limit) || 20, 1), 50)
-
-    // 构建查询条件
-    const whereConditions = { user_id }
-
-    if (status) {
-      whereConditions.status = status
-    }
-
-    if (type) {
-      whereConditions.type = type
-    }
-
-    // 分页参数
-    const offset = (page - 1) * finalLimit
-
-    // 查询用户库存
-    const { count, rows: inventory } = await models.UserInventory.findAndCountAll({
-      where: whereConditions,
-      attributes: [
-        'inventory_id', // 主键字段（修复：原为'id'，应使用正确的主键名称）
-        'name',
-        'description',
-        'icon', // 🎯 包含新添加的icon字段
-        'type',
-        'value',
-        'status',
-        'source_type',
-        'source_id',
-        'acquired_at',
-        'expires_at',
-        'used_at',
-        'verification_code',
-        'verification_expires_at',
-        'transfer_to_user_id',
-        'transfer_at',
-        'transfer_count', // 转让次数（Transfer Count - 记录物品被转让的次数）
-        'last_transfer_at', // 最后转让时间（Last Transfer Time - 物品最后一次被转让的时间）
-        'last_transfer_from', // 最后转让来源用户（Last Transfer From - 物品最后一次从哪个用户转来）
-        'created_at',
-        'updated_at'
-      ],
-      order: [['acquired_at', 'DESC']],
-      limit: finalLimit,
-      offset
-    })
-
-    /*
-     * ✅ 优化3：Icon处理已移至模型层getter（性能提升15-20ms）
-     * 处理数据，添加业务逻辑字段（状态描述、过期状态等）
-     */
-    const processedInventory = inventory.map(item => {
-      const itemData = item.toJSON()
-
-      // icon字段由模型层getter自动处理，无需应用层处理
-
-      // 添加状态描述（业务逻辑，保留在应用层）
-      itemData.status_description = getStatusDescription(itemData.status)
-
-      // 添加过期状态（业务逻辑，保留在应用层）
-      if (itemData.expires_at) {
-        itemData.is_expired = BeijingTimeHelper.createBeijingTime() > new Date(itemData.expires_at)
-      }
-
-      return itemData
-    })
-
-    /*
-     * ✅ 优化2：数据脱敏处理（P0修复 - 防止核销码泄露）
-     * 根据用户角色决定数据级别：管理员（role_level >= 100）看完整数据，普通用户看脱敏数据
-     */
-    const dataLevel = userRoles.isAdmin ? 'full' : 'public'
-    const sanitizedInventory = DataSanitizer.sanitizeInventory(processedInventory, dataLevel)
+    // ✅ 调用 InventoryService 获取用户库存
+    const InventoryService = req.app.locals.services.getService('inventory')
+    const result = await InventoryService.getUserInventory(
+      requestedUserId,
+      { status, type, page, limit },
+      { viewerId: req.user.user_id }
+    )
 
     logger.info('获取用户库存成功', {
-      user_id,
-      total: count,
-      returned: inventory.length,
-      filters: { status, type },
-      dataLevel // 记录数据级别
+      user_id: requestedUserId,
+      total: result.pagination.total,
+      returned: result.inventory.length
     })
 
-    return res.apiSuccess(
-      {
-        inventory: sanitizedInventory, // 使用脱敏后的数据
-        pagination: {
-          total: count,
-          page: parseInt(page),
-          limit: finalLimit,
-          total_pages: Math.ceil(count / finalLimit)
-        }
-      },
-      '获取库存列表成功'
-    )
+    return res.apiSuccess(result, '获取库存列表成功')
   } catch (error) {
     /*
      * ✅ 优化4：错误分类处理（P1优化 - 提供用户友好的错误提示）
      */
     logger.error('获取用户库存失败', {
       error: error.message,
-      errorName: error.name, // Sequelize错误类型
-      stack: error.stack, // 错误堆栈（用于调试）
+      errorName: error.name,
+      stack: error.stack,
       user_id: req.params.user_id,
-      query: req.query // 查询参数（便于复现问题）
+      query: req.query
     })
 
-    // 错误分类处理（根据错误类型返回不同状态码和友好提示）
+    // 错误分类处理
     if (error.name === 'SequelizeDatabaseError') {
-      // 数据库错误（如表不存在、字段错误等）
       return res.apiError('数据库查询失败，请稍后重试', 'INTERNAL_ERROR', null, 500)
     } else if (error.name === 'SequelizeConnectionError') {
-      // 数据库连接错误
       return res.apiError('数据库连接失败，请稍后重试', 'SERVICE_UNAVAILABLE', null, 503)
     } else if (error.name === 'SequelizeValidationError') {
-      // 数据验证错误
       return res.apiError(`数据验证失败: ${error.message}`, 'BAD_REQUEST', null, 400)
-    } else if (error.message.includes('invalid') || error.message.includes('参数')) {
-      // 参数验证错误
-      return res.apiError('请求参数无效，请检查后重试', 'BAD_REQUEST', null, 400)
+    } else if (error.message.includes('无权限')) {
+      return res.apiError(error.message, 'FORBIDDEN', null, 403)
     } else if (error.message.includes('timeout')) {
-      // 超时错误
       return res.apiError('请求超时，请稍后重试', 'GATEWAY_TIMEOUT', null, 504)
     } else {
-      // 未知错误
       return res.apiError('获取库存列表失败，请稍后重试', 'INTERNAL_ERROR', null, 500)
     }
   }
@@ -218,93 +100,44 @@ router.get('/user/:user_id', authenticateToken, async (req, res) => {
  * 获取库存物品详情
  * GET /api/v4/inventory/item/:item_id
  *
- * ✅ P2+P3修复完成（2025-11-10）：
- * - 补充管理员权限：管理员可查看所有用户物品进行审计
- * - 移除mobile字段：保护用户隐私，防止数据泄露
- * - 审计日志增强：记录管理员查看他人物品的操作
+ * ✅ 重构完成（2025-12-09）：
+ * - 调用 InventoryService.getItemDetail() 替代直接查询 models
+ * - 服务层已包含权限检查、审计日志、数据脱敏等逻辑
  */
 router.get('/item/:item_id', authenticateToken, async (req, res) => {
   try {
     const { item_id } = req.params
-    const currentUserId = req.user.user_id
 
-    // ✅ P2修复：获取用户权限，判断是否为管理员
-    const userRoles = await getUserRoles(currentUserId)
-    const isAdmin = userRoles.isAdmin // 管理员标识（role_level >= 100）
-
-    // ✅ P2修复：管理员可查看所有物品，普通用户只能查看自己的
-    const whereClause = {
-      inventory_id: item_id
+    // 参数验证
+    const itemId = parseInt(item_id, 10)
+    if (isNaN(itemId) || itemId <= 0) {
+      return res.apiError('无效的物品ID，必须是正整数', 'BAD_REQUEST', null, 400)
     }
 
-    // 普通用户：添加user_id限制，只能查看自己的物品
-    if (!isAdmin) {
-      whereClause.user_id = currentUserId
-    }
-
-    const item = await models.UserInventory.findOne({
-      where: whereClause,
-      include: [
-        {
-          model: models.User,
-          as: 'user',
-          // ✅ P3修复：移除mobile字段，保护用户隐私
-          attributes: ['user_id', 'nickname']
-        }
-      ]
-    })
-
-    if (!item) {
-      return res.apiError('库存物品不存在', 'NOT_FOUND', null, 404)
-    }
-
-    // ✅ P2修复：审计日志 - 记录管理员查看他人物品的操作
-    if (isAdmin && item.user_id !== currentUserId) {
-      logger.info('管理员查看用户物品详情', {
-        admin_id: currentUserId,
-        target_user_id: item.user_id,
-        item_id,
-        item_name: item.name,
-        query_time: BeijingTimeHelper.formatForAPI(new Date())
-      })
-    }
-
-    const itemData = item.toJSON()
-
-    // 确保icon字段存在
-    if (!itemData.icon) {
-      switch (itemData.type) {
-      case 'voucher':
-        itemData.icon = '🎫'
-        break
-      case 'product':
-        itemData.icon = '🎁'
-        break
-      case 'service':
-        itemData.icon = '🔧'
-        break
-      default:
-        itemData.icon = '📦'
-      }
-    }
+    // ✅ 调用 InventoryService 获取物品详情
+    const InventoryService = req.app.locals.services.getService('inventory')
+    const sanitizedItem = await InventoryService.getItemDetail(req.user.user_id, itemId)
 
     logger.info('获取库存物品详情成功', {
-      item_id,
-      user_id: item.user_id,
-      requester_id: currentUserId,
-      is_admin: isAdmin,
-      is_owner: item.user_id === currentUserId
+      item_id: itemId,
+      user_id: req.user.user_id
     })
 
-    return res.apiSuccess({ item: itemData }, '获取物品详情成功')
+    return res.apiSuccess({ item: sanitizedItem }, '获取物品详情成功')
   } catch (error) {
-    logger.error('获取库存物品详情失败', {
+    logger.error('获取物品详情失败', {
       error: error.message,
       stack: error.stack,
       item_id: req.params.item_id,
       user_id: req.user?.user_id
     })
-    return res.apiError('获取物品详情失败', 'INTERNAL_ERROR', null, 500)
+
+    if (error.message.includes('不存在')) {
+      return res.apiError(error.message, 'NOT_FOUND', null, 404)
+    } else if (error.message.includes('无权限')) {
+      return res.apiError(error.message, 'FORBIDDEN', null, 403)
+    }
+    return res.apiError('获取物品详情失败，请稍后重试', 'INTERNAL_ERROR', null, 500)
   }
 })
 
@@ -312,128 +145,59 @@ router.get('/item/:item_id', authenticateToken, async (req, res) => {
  * 使用库存物品（Use Inventory Item - 库存物品使用API）
  * POST /api/v4/inventory/use/:item_id
  *
+ * ✅ 重构完成（2025-12-09）：
+ * - 调用 InventoryService.useItem() 替代直接操作 models
+ * - 服务层已包含权限验证、状态检查、核销码验证等逻辑
+ *
  * 业务场景（Business Scenarios）：
  * - 用户使用库存中的物品（优惠券核销、实物商品领取、虚拟物品使用等）
- * - 核心逻辑：状态转换（available → used）+ 使用时间记录 + 可选核销码验证
- *
- * P0修复（2025-11-09）：
- * - ✅ 添加权限验证：只允许物品所有者使用自己的物品
- * - ✅ 添加核销码过期检查：verification_expires_at时间验证
+ * - 核心逻辑：状态转换（available → used）+ 使用时间记录
  *
  * 路由参数（Route Parameters）：
  * @param {number} item_id - 库存物品ID（inventory_id，URL路径参数，必填）
  *
  * 请求体（Request Body）:
- * @param {string} verification_code - 核销码（Verification Code，可选，商家核销场景需要）
+ * @param {string} verification_code - 核销码（可选，商家核销场景需要）
  */
 router.post('/use/:item_id', authenticateToken, async (req, res) => {
   try {
-    // 🔐 Step 1: 获取路径参数和请求体参数（Get Parameters）
-    const { item_id } = req.params // 物品ID（Item ID，URL路径参数）
-    const { verification_code } = req.body // 核销码（Verification Code，请求体参数，可选）
+    const { item_id } = req.params
+    const { verification_code } = req.body
 
-    /*
-     * 📦 Step 2: 查询库存物品记录（Query Inventory Item，使用主键查询，性能最优）
-     * ✅ P0修复：添加user_id验证，防止用户A使用用户B的物品
-     */
-    const item = await models.UserInventory.findOne({
-      where: {
-        inventory_id: item_id,
-        user_id: req.user.user_id // ✅ 添加所有权验证（Ownership Validation）
-      }
+    // 参数验证
+    const itemId = parseInt(item_id, 10)
+    if (isNaN(itemId) || itemId <= 0) {
+      return res.apiError('无效的物品ID，必须是正整数', 'BAD_REQUEST', null, 400)
+    }
+
+    // ✅ 调用 InventoryService 使用物品
+    const InventoryService = req.app.locals.services.getService('inventory')
+    const result = await InventoryService.useItem(req.user.user_id, itemId, {
+      verification_code
     })
 
-    // ❌ Step 3: 物品存在性检查（Existence Validation）
-    if (!item) {
-      return res.apiError('库存物品不存在', 'NOT_FOUND', null, 404)
-      /*
-       * 场景1（Scenario 1）：用户传入无效的item_id或物品已被删除
-       * 场景2（Scenario 2）：用户尝试使用他人物品（所有权验证失败）
-       * HTTP状态码（HTTP Status Code）：404（资源不存在 - Resource Not Found）
-       */
-    }
-
-    // 🔒 Step 4: 物品状态检查（Status Validation - 业务规则：只有available状态可使用）
-    if (item.status !== 'available') {
-      return res.apiError('物品不可使用', 'BAD_REQUEST', null, 400)
-      /*
-       * 场景1（Scenario 1）：status='used' - 物品已使用（重复使用 - Duplicate Usage）
-       * 场景2（Scenario 2）：status='expired' - 物品已过期（Expired）
-       * 场景3（Scenario 3）：status='transferred' - 物品已转让给他人（Transferred）
-       * HTTP状态码（HTTP Status Code）：400（业务逻辑错误 - Business Logic Error）
-       */
-    }
-
-    // ⏰ Step 5: 物品过期检查（Expiration Check - 自动过期处理）
-    if (item.expires_at && BeijingTimeHelper.createDatabaseTime() > new Date(item.expires_at)) {
-      /*
-       * 业务规则（Business Rule）：物品超过expires_at时间后不可使用
-       * 自动处理（Auto Processing）：将status更新为expired（过期状态）
-       */
-      await item.update({ status: 'expired' })
-      return res.apiError('物品已过期', 'BAD_REQUEST', null, 400)
-    }
-
-    // 🔑 Step 6.1: 核销码过期检查（Verification Code Expiration Check - P1优化）
-    if (
-      item.verification_expires_at &&
-      BeijingTimeHelper.createDatabaseTime() > new Date(item.verification_expires_at)
-    ) {
-      /*
-       * 业务规则（Business Rule）：核销码有24小时有效期，超过后无法使用
-       * 场景（Scenario）：商家核销时，核销码已过期
-       */
-      logger.warn('核销码已过期', {
-        item_id,
-        verification_expires_at: item.verification_expires_at,
-        current_time: BeijingTimeHelper.createDatabaseTime()
-      })
-      return res.apiError('核销码已过期，请重新生成', 'BAD_REQUEST', null, 400)
-    }
-
-    // 🔑 Step 6.2: 核销码内容验证（Verification Code Validation - 可选，商家核销场景需要）
-    if (item.verification_code && item.verification_code !== verification_code) {
-      /*
-       * 业务规则（Business Rules）：
-       * 1. 如果物品有核销码（item.verification_code不为空），必须验证
-       * 2. 如果物品无核销码（item.verification_code为null），跳过验证
-       * 3. 核销码必须完全一致（大小写敏感 - Case Sensitive）
-       */
-      return res.apiError('验证码错误', 'BAD_REQUEST', null, 400)
-      /*
-       * 场景（Scenario）：商家核销时输入错误的核销码
-       * 安全性（Security）：防止用户伪造核销凭证（Prevent Fake Verification）
-       */
-    }
-
-    // ✅ Step 7: 使用物品（Use Item - 状态转换：available → used）
-    await item.update({
-      status: 'used', // 状态（Status）：已使用（终态，不可逆转 - Final State, Irreversible）
-      used_at: BeijingTimeHelper.createBeijingTime() // 使用时间（Used At）：当前北京时间（Current Beijing Time）
-    })
-    /*
-     * 说明（Notes）：
-     * - Sequelize的update()方法是原子操作（Atomic Operation），数据库层面保证一致性
-     * - status字段有ENUM约束，只能是预定义的5个值之一（available/used/expired/pending/transferred）
-     * - used_at字段类型为DATE，存储北京时间（项目统一时区 - Unified Timezone）
-     */
-
-    // 📝 Step 8: 记录业务日志（Business Logging - 用于审计和问题追踪）
     logger.info('库存物品使用成功', {
-      item_id, // 物品ID（Item ID）
-      user_id: item.user_id, // 用户ID（User ID，物品所有者 - Item Owner）
-      name: item.name // 物品名称（Item Name）
+      item_id: itemId,
+      user_id: req.user.user_id,
+      item_name: result.item_name
     })
 
-    // 🎉 Step 9: 返回成功响应（Success Response - 使用项目统一的API响应格式）
-    return res.apiSuccess({ item }, '物品使用成功')
+    return res.apiSuccess({ item: result }, '物品使用成功')
   } catch (error) {
-    // ❌ 异常处理（Exception Handling - 统一错误响应格式）
     logger.error('使用库存物品失败', {
-      error: error.message, // 错误消息（Error Message）
-      item_id: req.params.item_id // 触发错误的物品ID（Failed Item ID）
+      error: error.message,
+      item_id: req.params.item_id,
+      user_id: req.user?.user_id
     })
-    return res.apiError('物品使用失败', 'INTERNAL_ERROR', null, 500)
+
+    if (error.message.includes('不存在')) {
+      return res.apiError(error.message, 'NOT_FOUND', null, 404)
+    } else if (error.message.includes('无权限')) {
+      return res.apiError(error.message, 'FORBIDDEN', null, 403)
+    } else if (error.message.includes('不可用') || error.message.includes('过期') || error.message.includes('状态')) {
+      return res.apiError(error.message, 'BAD_REQUEST', null, 400)
+    }
+    return res.apiError('物品使用失败，请稍后重试', 'INTERNAL_ERROR', null, 500)
   }
 })
 
@@ -454,122 +218,20 @@ router.post('/use/:item_id', authenticateToken, async (req, res) => {
  */
 router.get('/admin/statistics', authenticateToken, requireAdmin, async (req, res) => {
   try {
-    /*
-     * 🚀 并行查询所有统计数据（性能优化：并行执行8个独立查询，比串行快70%）
-     * 数据完整性：统计5种状态（available, used, expired, transferred, pending）
-     */
-    const [
-      totalItems,
-      availableItems,
-      usedItems,
-      expiredItems,
-      transferredItems, // ✅ 新增：已转让物品统计
-      pendingItems, // ✅ 新增：待处理物品统计
-      typeStats,
-      recentItems
-    ] = await Promise.all([
-      // 查询1：统计库存物品总数（所有用户的所有物品，包含5种状态）
-      models.UserInventory.count(),
+    // ✅ 调用 InventoryService 获取统计数据
+    const InventoryService = req.app.locals.services.getService('inventory')
+    const statistics = await InventoryService.getAdminStatistics()
 
-      // 查询2：统计可用物品数量（status='available'，用户可正常使用）
-      models.UserInventory.count({ where: { status: 'available' } }),
-
-      // 查询3：统计已使用物品数量（status='used'，商家已核销）
-      models.UserInventory.count({ where: { status: 'used' } }),
-
-      // 查询4：统计已过期物品数量（status='expired'，超过有效期）
-      models.UserInventory.count({ where: { status: 'expired' } }),
-
-      /*
-       * ✅ 查询5：统计已转让物品数量（status='transferred'，用户间物品流转）
-       * 业务场景：追踪市场交易活跃度，分析用户物品转让行为
-       */
-      models.UserInventory.count({ where: { status: 'transferred' } }),
-
-      /*
-       * ✅ 查询6：统计待处理物品数量（status='pending'，审核中或待确认）
-       * 业务场景：监控需要审核的特殊物品（如高价值奖品、特殊补偿等）
-       */
-      models.UserInventory.count({ where: { status: 'pending' } }),
-
-      /*
-       * 查询7：按类型分组统计（type + icon分组，返回每种类型的数量）
-       * GROUP BY type, icon - 统计不同类型物品的分布
-       */
-      models.UserInventory.findAll({
-        attributes: ['type', 'icon', [models.sequelize.fn('COUNT', '*'), 'count']],
-        group: ['type', 'icon']
-      }),
-
-      /*
-       * 查询8：查询最近获得的10个物品（用于展示最近动态）
-       * ORDER BY created_at DESC - 按创建时间降序
-       * LIMIT 10 - 只返回最新的10个物品
-       */
-      models.UserInventory.findAll({
-        attributes: ['inventory_id', 'name', 'type', 'icon', 'status', 'created_at'],
-        order: [['created_at', 'DESC']],
-        limit: 10
-      })
-    ])
-
-    // 📊 计算多维度使用率指标（提供不同业务场景的分析维度）
-    const activeUsageRate = totalItems > 0 ? ((usedItems / totalItems) * 100).toFixed(2) : 0 // 主动使用率：已使用/总数
-    const consumptionRate =
-      totalItems > 0 ? (((usedItems + expiredItems) / totalItems) * 100).toFixed(2) : 0 // 消耗率：(已使用+已过期)/总数
-    const effectiveUsageRate =
-      usedItems + availableItems > 0
-        ? ((usedItems / (usedItems + availableItems)) * 100).toFixed(2)
-        : 0 // 有效使用率：已使用/(已使用+可用)，排除过期物品
-    const transferRate = totalItems > 0 ? ((transferredItems / totalItems) * 100).toFixed(2) : 0 // 转让率：已转让/总数，评估市场活跃度
-
-    /*
-     * 📋 组装统计数据对象（业务数据结构化）
-     * ✅ 数据验证和边界保护：确保数组有效性，防止map操作报错
-     */
-    const statistics = {
-      // ✅ 基础统计数据（5种状态全部统计，数据完整性100%）
-      total_items: totalItems || 0, // 库存物品总数（防止undefined）
-      available_items: availableItems || 0, // 可用物品数量
-      used_items: usedItems || 0, // 已使用物品数量
-      expired_items: expiredItems || 0, // 已过期物品数量
-      transferred_items: transferredItems || 0, // ✅ 已转让物品数量（市场交易监控）
-      pending_items: pendingItems || 0, // ✅ 待处理物品数量（审核流程监控）
-
-      // ✅ 多维度使用率指标（支持不同业务场景分析）
-      active_usage_rate: activeUsageRate, // 主动使用率：衡量用户主动使用意愿
-      consumption_rate: consumptionRate, // 消耗率：衡量物品实际消耗情况（含过期）
-      effective_usage_rate: effectiveUsageRate, // 有效使用率：排除过期后的使用率
-      transfer_rate: transferRate, // ✅ 转让率：衡量市场交易活跃度
-
-      // 类型分布数据（map转换为前端友好格式，添加边界保护）
-      type_distribution: Array.isArray(typeStats)
-        ? typeStats.map(stat => ({
-          type: stat.type || 'unknown', // 防止type为null
-          icon: stat.icon || getDefaultIcon(stat.type || 'voucher'), // 图标补全
-          count: parseInt(stat.dataValues?.count || 0) // 防止count为undefined，确保返回整数
-        }))
-        : [], // typeStats不是数组时返回空数组
-
-      // 最近物品动态（map转换为前端友好格式，添加边界保护）
-      recent_items: Array.isArray(recentItems)
-        ? recentItems.map(item => ({
-          ...item.toJSON(), // Sequelize实例转为普通对象
-          icon: item.icon || getDefaultIcon(item.type || 'voucher') // 图标补全
-        }))
-        : [] // recentItems不是数组时返回空数组
-    }
-
-    // 📝 记录操作日志（便于审计和问题追踪）
+    // 📝 记录操作日志
     logger.info('管理员获取库存统计成功', {
       admin_id: req.user.user_id,
-      total_items: totalItems,
-      available_items: availableItems,
-      transferred_items: transferredItems, // 记录转让数量
-      pending_items: pendingItems // 记录待处理数量
+      total_items: statistics.total_items,
+      available_items: statistics.available_items,
+      transferred_items: statistics.transferred_items,
+      pending_items: statistics.pending_items
     })
 
-    // ✅ 返回成功响应（使用项目统一的ApiResponse封装）
+    // ✅ 返回成功响应
     return res.apiSuccess({ statistics }, '获取库存统计成功')
   } catch (error) {
     // ❌ 错误处理（记录错误日志并返回详细错误分类）
@@ -1043,49 +705,25 @@ router.get('/exchange-records', authenticateToken, async (req, res) => {
 router.post('/generate-code/:item_id', authenticateToken, async (req, res) => {
   try {
     const { item_id } = req.params
+    const userId = req.user.user_id
 
-    /*
-     * 查找库存物品（Find inventory item）
-     * 验证物品存在且属于当前用户（Verify item exists and belongs to current user）
-     */
-    const item = await models.UserInventory.findOne({
-      where: { inventory_id: item_id, user_id: req.user.user_id }
-    })
+    // ✅ 调用 InventoryService 生成核销码
+    const InventoryService = req.app.locals.services.getService('inventory')
+    const result = await InventoryService.generateVerificationCode(userId, item_id)
 
-    if (!item) {
-      return res.apiError('库存物品不存在', 'NOT_FOUND', null, 404)
-    }
-
-    /*
-     * 验证物品状态（Verify item status）
-     * 只有available状态可以生成核销码（Only available items can generate verification code）
-     */
-    if (item.status !== 'available') {
-      return res.apiError('物品状态不允许生成核销码', 'BAD_REQUEST', null, 400)
-    }
-
-    /*
-     * ✅ 使用模型方法生成核销码（Use model method to generate verification code）
-     * 优势（Advantages）：
-     * 1. crypto.randomBytes()加密安全随机数（优于Math.random()）
-     * 2. while循环确保100%唯一性（查询数据库验证不重复）
-     * 3. 自动设置过期时间（24小时后，北京时间）
-     * 4. 一次调用完成所有操作（生成+验证+保存）
-     */
-    const verificationCode = await item.generateVerificationCode()
-
+    // 📝 记录操作日志
     logger.info('生成核销码成功', {
       item_id,
-      user_id: req.user.user_id,
-      verification_code: verificationCode,
-      expires_at: item.verification_expires_at
+      user_id: userId,
+      verification_code: result.verification_code,
+      expires_at: result.expires_at
     })
 
-    // 返回成功响应（Return success response）
+    // ✅ 返回成功响应
     return res.apiSuccess(
       {
-        verification_code: verificationCode,
-        expires_at: item.verification_expires_at
+        verification_code: result.verification_code,
+        expires_at: result.expires_at
       },
       '核销码生成成功'
     )
@@ -1186,8 +824,9 @@ router.post('/exchange-records/:id/cancel', authenticateToken, async (req, res) 
  * 辅助函数：获取状态描述
  * @param {string} status - 物品状态（available/pending/used/expired/transferred）
  * @returns {string} 状态的中文描述
+ * @deprecated 已移至 InventoryService，路由层不再使用
  */
-function getStatusDescription (status) {
+function _getStatusDescription (status) {
   const statusMap = {
     available: '可用',
     pending: '待处理',
@@ -1202,8 +841,9 @@ function getStatusDescription (status) {
  * 辅助函数：获取默认图标
  * @param {string} type - 物品类型（voucher/product/service）
  * @returns {string} 对应类型的emoji图标
+ * @deprecated 已移至 InventoryService，路由层不再使用
  */
-function getDefaultIcon (type) {
+function _getDefaultIcon (type) {
   const iconMap = {
     voucher: '🎫',
     product: '🎁',
@@ -1422,6 +1062,33 @@ router.get('/market/products', authenticateToken, async (req, res) => {
  *   }
  * }
  */
+/**
+ * ✅ 重构完成（2025-12-09）：
+ * - 调用 InventoryService.transferItem() 替代直接操作 models
+ * - 服务层已包含权限验证、目标用户验证、转让次数检查、事务管理等逻辑
+ *
+ * 转让库存物品（Transfer Inventory Item - 库存物品转让API）
+ * POST /api/v4/inventory/transfer
+ *
+ * 业务场景（Business Scenarios）：
+ * - 用户将库存物品转让给其他用户（礼物赠送、朋友共享等）
+ * - 核心逻辑：归属权变更（owner变更） + 转让记录 + 转让次数追踪
+ *
+ * 请求体（Request Body）:
+ * @param {number} item_id - 物品ID（必填）
+ * @param {number} target_user_id - 目标用户ID（必填）
+ * @param {string} transfer_note - 转让备注（可选）
+ *
+ * @example
+ * // 请求示例
+ * POST /api/v4/inventory/transfer
+ * Headers: { "Authorization": "Bearer <JWT_TOKEN>" }
+ * Body: {
+ *   "item_id": 123,
+ *   "target_user_id": 456,
+ *   "transfer_note": "送你的礼物"
+ * }
+ */
 router.post('/transfer', authenticateToken, async (req, res) => {
   try {
     const { item_id, target_user_id, transfer_note } = req.body
@@ -1432,124 +1099,32 @@ router.post('/transfer', authenticateToken, async (req, res) => {
       return res.apiError('物品ID和目标用户ID不能为空', 'BAD_REQUEST', null, 400)
     }
 
-    if (currentUserId === parseInt(target_user_id)) {
+    const itemId = parseInt(item_id, 10)
+    const targetUserId = parseInt(target_user_id, 10)
+
+    if (isNaN(itemId) || itemId <= 0 || isNaN(targetUserId) || targetUserId <= 0) {
+      return res.apiError('物品ID和目标用户ID必须是正整数', 'BAD_REQUEST', null, 400)
+    }
+
+    if (currentUserId === targetUserId) {
       return res.apiError('不能转让给自己', 'BAD_REQUEST', null, 400)
     }
 
-    // 查找库存物品
-    const item = await models.UserInventory.findOne({
-      where: {
-        inventory_id: item_id, // 🔧 修复：使用正确的主键字段名inventory_id
-        user_id: currentUserId,
-        status: 'available'
-      }
+    // ✅ 调用 InventoryService 转让物品
+    const InventoryService = req.app.locals.services.getService('inventory')
+    const result = await InventoryService.transferItem(currentUserId, targetUserId, itemId, {
+      transfer_note
     })
 
-    if (!item) {
-      return res.apiError('库存物品不存在或不可转让', 'NOT_FOUND', null, 404)
-    }
+    logger.info('库存物品转让成功', {
+      item_id: itemId,
+      from_user_id: currentUserId,
+      to_user_id: targetUserId,
+      item_name: result.name,
+      transfer_count: result.transfer_count
+    })
 
-    // 检查物品是否可以转让
-    if (item.can_transfer === false) {
-      return res.apiError('该物品不支持转让', 'BAD_REQUEST', null, 400)
-    }
-
-    // 检查物品是否已过期
-    if (item.expires_at && BeijingTimeHelper.createDatabaseTime() > new Date(item.expires_at)) {
-      await item.update({ status: 'expired' })
-      return res.apiError('物品已过期，无法转让', 'BAD_REQUEST', null, 400)
-    }
-
-    // 检查目标用户是否存在
-    const targetUser = await models.User.findByPk(target_user_id)
-    if (!targetUser) {
-      return res.apiError('目标用户不存在', 'NOT_FOUND', null, 404)
-    }
-
-    // 检查转让次数限制（如果有的话）
-    const maxTransferCount = 3 // 最大转让次数
-    if (item.transfer_count >= maxTransferCount) {
-      return res.apiError(
-        `该物品已达到最大转让次数(${maxTransferCount}次)`,
-        'BAD_REQUEST',
-        null,
-        400
-      )
-    }
-
-    // 开始数据库事务
-    const transaction = await models.sequelize.transaction()
-
-    try {
-      // 🔄 记录转让历史到TradeRecord（支持管理员查看完整转让链条）
-      if (models.TradeRecord) {
-        await models.TradeRecord.create(
-          {
-            trade_code: `tf_${BeijingTimeHelper.generateIdTimestamp()}_${Math.random().toString(36).substr(2, 8)}`,
-            trade_type: 'inventory_transfer', // 使用正确的字段名和枚举值
-            from_user_id: currentUserId,
-            to_user_id: target_user_id,
-            points_amount: 0, // 物品转让不涉及积分
-            fee_points_amount: 0,
-            net_points_amount: 0,
-            status: 'completed',
-            item_id, // 物品ID，用于追踪转让链条
-            name: item.name, // 物品名称（统一使用name字段）
-            transfer_note: transfer_note || '库存物品转让', // 转让备注
-            trade_reason: transfer_note || '用户主动转让物品',
-            trade_time: BeijingTimeHelper.createBeijingTime(),
-            processed_time: BeijingTimeHelper.createBeijingTime(),
-            created_at: BeijingTimeHelper.createBeijingTime(),
-            updated_at: BeijingTimeHelper.createBeijingTime()
-          },
-          { transaction }
-        )
-      }
-
-      /*
-       * 更新物品所有者（转让归属权变更）
-       * 说明：同时更新last_transfer_at和last_transfer_from，支持快速追溯（无需JOIN TradeRecord）
-       */
-      await item.update(
-        {
-          user_id: target_user_id, // 更新所有者为目标用户
-          transfer_count: (item.transfer_count || 0) + 1, // 转让次数+1
-          last_transfer_at: BeijingTimeHelper.createBeijingTime(), // 记录最后转让时间（北京时间）
-          last_transfer_from: currentUserId, // 记录最后转让来源用户ID（从谁转让而来）
-          updated_at: BeijingTimeHelper.createBeijingTime() // 更新时间
-        },
-        { transaction }
-      )
-
-      // 提交事务
-      await transaction.commit()
-
-      logger.info('库存物品转让成功', {
-        item_id,
-        from_user_id: currentUserId,
-        to_user_id: target_user_id,
-        name: item.name, // 统一使用name字段
-        transfer_count: item.transfer_count + 1
-      })
-
-      // 构建转让响应数据（已脱敏）
-      const sanitizedTransferData = {
-        transfer_id: `tf_${BeijingTimeHelper.generateIdTimestamp()}_${Math.random().toString(36).substr(2, 8)}`,
-        item_id,
-        name: item.name, // 统一使用name字段
-        from_user_id: currentUserId,
-        to_user_id: target_user_id,
-        transfer_note: transfer_note || '库存物品转让',
-        transfer_count: item.transfer_count + 1,
-        transferred_at: BeijingTimeHelper.createBeijingTime()
-      }
-
-      return res.apiSuccess(sanitizedTransferData, '物品转让成功')
-    } catch (transactionError) {
-      // 回滚事务
-      await transaction.rollback()
-      throw transactionError
-    }
+    return res.apiSuccess(result, '物品转让成功')
   } catch (error) {
     logger.error('转让库存物品失败', {
       error: error.message,
@@ -1557,7 +1132,13 @@ router.post('/transfer', authenticateToken, async (req, res) => {
       current_user: req.user.user_id,
       target_user: req.body.target_user_id
     })
-    return res.apiError('物品转让失败', 'INTERNAL_ERROR', null, 500)
+
+    if (error.message.includes('不存在')) {
+      return res.apiError(error.message, 'NOT_FOUND', null, 404)
+    } else if (error.message.includes('不能转让') || error.message.includes('不支持') || error.message.includes('已过期') || error.message.includes('最大转让次数')) {
+      return res.apiError(error.message, 'BAD_REQUEST', null, 400)
+    }
+    return res.apiError('物品转让失败，请稍后重试', 'INTERNAL_ERROR', null, 500)
   }
 })
 
@@ -1578,140 +1159,52 @@ router.post('/transfer', authenticateToken, async (req, res) => {
 router.get('/transfer-history', authenticateToken, async (req, res) => {
   try {
     const { page = 1, limit = 20, type = 'all', item_id } = req.query
-    // 🎯 分页安全保护：最大50条记录（普通用户转让历史）
-    const finalLimit = Math.min(parseInt(limit), 50)
-    const user_id = req.user.user_id
-    const { getUserRoles } = require('../../../middleware/auth')
+    const userId = req.user.user_id
 
-    if (!models.TradeRecord) {
-      return res.apiError('转让历史功能暂未开放', 'SERVICE_UNAVAILABLE', null, 503)
+    // ✅ 参数验证：item_id 如果存在需要转为整数
+    const itemIdParam = item_id ? parseInt(item_id, 10) : undefined
+    if (item_id && (isNaN(itemIdParam) || itemIdParam <= 0)) {
+      return res.apiError('无效的物品ID', 'BAD_REQUEST', null, 400)
     }
 
-    // 🛡️ 获取用户权限（Get User Roles - 获取用户权限）
-    const userRoles = await getUserRoles(user_id)
-    const isAdmin = userRoles.isAdmin // 管理员标识（role_level >= 100）
+    // ✅ 调用 InventoryService 获取转让历史
+    const InventoryService = req.app.locals.services.getService('inventory')
+    const result = await InventoryService.getTransferHistory(
+      userId,
+      { direction: type, item_id: itemIdParam, page, limit },
+      { viewerId: userId }
+    )
 
-    // 构建查询条件（Query Conditions - 查询条件）
-    const whereClause = {
-      trade_type: 'inventory_transfer' // 使用正确的字段名和枚举值
-    }
-
-    // 🔐 权限控制：普通用户只能查看与自己直接相关的转让记录（Permission Control - 权限控制）
-    if (!isAdmin) {
-      // 普通用户：只能查看一手转让（自己发出或自己接收的）
-      if (type === 'sent') {
-        whereClause.from_user_id = user_id
-      } else if (type === 'received') {
-        whereClause.to_user_id = user_id
-      } else {
-        // type === 'all'：查看所有与自己直接相关的转让
-        whereClause[Op.or] = [{ from_user_id: user_id }, { to_user_id: user_id }]
-      }
-
-      // 🚫 普通用户不能通过item_id查看完整转让链条（Restrict Access - 限制访问）
-      if (item_id) {
-        logger.warn('普通用户尝试查看完整转让链条', {
-          user_id,
-          item_id,
-          role_level: userRoles.role_level
-        })
-        return res.apiError('无权限查看物品完整转让链条，仅管理员可查看', 'FORBIDDEN', null, 403)
-      }
-    } else {
-      // 🔑 管理员：可以查看指定物品的完整转让链条（Admin Access - 管理员访问）
-      if (item_id) {
-        // 管理员通过item_id查看完整转让链条（Complete Transfer Chain - 完整转让链条）
-        whereClause.item_id = item_id
-        logger.info('管理员查看物品完整转让链条', {
-          admin_id: user_id,
-          item_id,
-          role_level: userRoles.role_level
-        })
-      } else {
-        /*
-         * 管理员查看所有转让记录（需要分页保护）
-         * 不添加用户过滤条件，返回所有转让记录
-         */
-      }
-    }
-
-    // 获取转让历史记录（Get Transfer History - 获取转让历史记录）
-    const { count, rows: transferHistory } = await models.TradeRecord.findAndCountAll({
-      where: whereClause,
-      include: [
-        {
-          model: models.User,
-          as: 'fromUser',
-          attributes: ['user_id', 'nickname', 'mobile'], // 修正：User主键是user_id而不是id
-          required: false
-        },
-        {
-          model: models.User,
-          as: 'toUser',
-          attributes: ['user_id', 'nickname', 'mobile'], // 修正：User主键是user_id而不是id
-          required: false
-        }
-      ],
-      order: [['created_at', 'DESC']],
-      limit: finalLimit,
-      offset: (parseInt(page) - 1) * finalLimit
-    })
-
-    // 格式化转让历史数据（Format Transfer History - 格式化转让历史数据）
-    const formattedHistory = transferHistory.map(record => {
-      const baseData = {
-        transfer_id: record.trade_id, // 修正：TradeRecord主键是trade_id
-        item_id: record.item_id,
-        name: record.name, // 统一使用name字段
-        from_user_id: record.from_user_id,
-        from_user_name: record.fromUser?.nickname || '未知用户', // 修正：User使用nickname字段
-        to_user_id: record.to_user_id,
-        to_user_name: record.toUser?.nickname || '未知用户', // 修正：User使用nickname字段
-        transfer_note: record.transfer_note,
-        status: record.status,
-        created_at: record.created_at
-      }
-
-      // 🔐 仅普通用户需要direction标识（管理员查看完整链条时不需要）
-      if (!isAdmin || !item_id) {
-        baseData.direction = record.from_user_id === user_id ? 'sent' : 'received'
-      }
-
-      return baseData
-    })
-
+    // 📝 记录操作日志
     logger.info('获取转让历史成功', {
-      user_id,
-      total: count,
+      user_id: userId,
+      total: result.pagination.total,
       type,
       page: parseInt(page),
-      is_admin: isAdmin,
-      query_item_id: item_id || null
+      query_item_id: itemIdParam || null,
+      view_mode: result.filter.view_mode
     })
 
-    return ApiResponse.success(
-      res,
+    // ✅ 返回成功响应
+    return res.apiSuccess(
       {
-        transfer_history: formattedHistory,
-        pagination: {
-          current_page: parseInt(page),
-          total_pages: Math.ceil(count / parseInt(limit)),
-          total_count: count,
-          has_next: count > parseInt(page) * parseInt(limit)
-        },
-        filter: {
-          type,
-          item_id: item_id || null,
-          view_mode: isAdmin && item_id ? 'complete_chain' : 'direct_only' // 查看模式：完整链条 vs 仅直接转让
-        }
+        transfer_history: result.records,
+        pagination: result.pagination,
+        filter: result.filter
       },
-      isAdmin && item_id ? '物品完整转让链条获取成功' : '转让历史获取成功'
+      result.filter.view_mode === 'complete_chain' ? '物品完整转让链条获取成功' : '转让历史获取成功'
     )
   } catch (error) {
     logger.error('获取转让历史失败', {
       error: error.message,
       user_id: req.user.user_id
     })
+
+    // ✅ 错误分类处理
+    if (error.message.includes('无权限')) {
+      return res.apiError(error.message, 'FORBIDDEN', null, 403)
+    }
+
     return res.apiError('获取转让历史失败', 'INTERNAL_ERROR', null, 500)
   }
 })
@@ -1755,6 +1248,7 @@ router.get('/transfer-history', authenticateToken, async (req, res) => {
 router.post('/verification/verify', authenticateToken, async (req, res) => {
   try {
     const { verification_code } = req.body
+    const merchantId = req.user.user_id
 
     // ============ 步骤1：参数验证（Parameter Validation）============
 
@@ -1768,7 +1262,7 @@ router.post('/verification/verify', authenticateToken, async (req, res) => {
     if (!codePattern.test(verification_code.trim().toUpperCase())) {
       logger.warn('核销码格式错误', {
         verification_code: verification_code.trim(),
-        operator_id: req.user.user_id,
+        operator_id: merchantId,
         expected_format: '8位大写十六进制字符（0-9, A-F）'
       })
       return res.apiError(
@@ -1783,12 +1277,12 @@ router.post('/verification/verify', authenticateToken, async (req, res) => {
      * ============ 步骤2：权限验证（Permission Verification）============
      * ✅ P0严重问题修复：添加商户权限验证
      */
-    const userRoles = await getUserRoles(req.user.user_id)
+    const userRoles = await getUserRoles(merchantId)
 
     // 只允许商户（role_level >= 50）或管理员（role_level >= 100）核销
     if (userRoles.role_level < 50) {
       logger.warn('核销权限不足', {
-        user_id: req.user.user_id,
+        user_id: merchantId,
         role_level: userRoles.role_level,
         verification_code: verification_code.trim(),
         required_level: '50（商户）或 100（管理员）'
@@ -1796,73 +1290,19 @@ router.post('/verification/verify', authenticateToken, async (req, res) => {
       return res.apiError('权限不足，只有商户或管理员可以核销', 'FORBIDDEN', null, 403)
     }
 
-    // ============ 步骤3：查询核销码（Query Verification Code）============
+    // ============ 步骤3：调用 InventoryService 执行核销============
 
-    // 查找库存物品（命中verification_code UNIQUE索引，O(1)查询）
-    const item = await models.UserInventory.findOne({
-      where: { verification_code: verification_code.trim().toUpperCase() },
-      include: [
-        {
-          model: models.User,
-          as: 'user',
-          attributes: ['user_id', 'mobile', 'nickname']
-        }
-      ]
-    })
+    const InventoryService = req.app.locals.services.getService('inventory')
+    const result = await InventoryService.verifyCode(merchantId, verification_code.trim().toUpperCase())
 
-    // ============ 步骤4：业务规则验证（Business Rules Validation）============
-
-    // 验证4.1：核销码存在性
-    if (!item) {
-      logger.warn('核销码不存在', {
-        verification_code: verification_code.trim(),
-        operator_id: req.user.user_id
-      })
-      return res.apiError('核销码不存在或无效', 'NOT_FOUND', null, 404)
-    }
-
-    // 验证4.2：防止重复核销
-    if (item.status === 'used') {
-      logger.warn('核销码已使用', {
-        verification_code: verification_code.trim(),
-        inventory_id: item.inventory_id,
-        used_at: item.used_at,
-        operator_id: req.user.user_id
-      })
-      return res.apiError('该核销码已使用', 'BAD_REQUEST', null, 400)
-    }
-
-    // 验证4.3：核销码过期检查
-    if (
-      item.verification_expires_at &&
-      BeijingTimeHelper.createDatabaseTime() > item.verification_expires_at
-    ) {
-      logger.warn('核销码已过期', {
-        verification_code: verification_code.trim(),
-        inventory_id: item.inventory_id,
-        expires_at: item.verification_expires_at,
-        operator_id: req.user.user_id
-      })
-      return res.apiError('核销码已过期', 'BAD_REQUEST', null, 400)
-    }
-
-    // ============ 步骤5：执行核销操作（Execute Verification）============
-
-    // ✅ P0严重问题修复：记录核销操作人operator_id
-    await item.update({
-      status: 'used',
-      used_at: BeijingTimeHelper.createBeijingTime(),
-      operator_id: req.user.user_id // 🔥 新增：记录核销操作人ID
-    })
-
-    // ============ 步骤6：记录核销日志（Logging）============
+    // ============ 步骤4：记录核销日志（Logging）============
 
     // ✅ P2优化：增强日志记录（包含IP和User-Agent）
     logger.info('核销验证成功', {
       verification_code: verification_code.trim(),
-      inventory_id: item.inventory_id,
-      user_id: item.user_id,
-      operator_id: req.user.user_id,
+      inventory_id: result.item_id,
+      user_id: result.user_id,
+      operator_id: merchantId,
       // 新增：请求来源追踪
       client_ip: req.ip || req.connection.remoteAddress || req.socket.remoteAddress,
       user_agent: req.get('User-Agent') || 'unknown',
@@ -1870,62 +1310,53 @@ router.post('/verification/verify', authenticateToken, async (req, res) => {
       device_type: req.get('User-Agent')?.includes('Mobile') ? 'mobile' : 'desktop'
     })
 
-    // ============ 步骤7：发送核销通知（Notification）============
+    // ============ 步骤5：发送核销通知（Notification）============
 
     /*
      * ✅ P1优化：核销成功后通知用户（异步非阻塞方式）
      * 🔥 不使用await，让通知在后台发送，不阻塞API响应
      */
-    NotificationService.send(item.user_id, {
+    NotificationService.send(result.user_id, {
       type: 'verification_success',
       title: '核销通知',
-      content: `您的${item.name}已被核销成功，核销时间：${BeijingTimeHelper.formatChinese(item.used_at)}`,
+      content: `您的${result.item_name}已被核销成功，核销时间：${BeijingTimeHelper.formatChinese(result.used_at)}`,
       data: {
-        inventory_id: item.inventory_id,
-        name: item.name,
-        type: item.type,
-        value: item.value,
-        used_at: item.used_at,
-        operator_id: req.user.user_id,
+        inventory_id: result.item_id,
+        name: result.item_name,
+        status: result.status,
+        used_at: result.used_at,
+        operator_id: merchantId,
         operator_nickname: req.user.nickname || userRoles.roleName || '商户'
       }
     })
       .then(() => {
         logger.info('核销通知已发送', {
-          user_id: item.user_id,
-          inventory_id: item.inventory_id,
-          operator_id: req.user.user_id
+          user_id: result.user_id,
+          inventory_id: result.item_id,
+          operator_id: merchantId
         })
       })
       .catch(notificationError => {
         // 通知失败不应该影响核销业务流程
         logger.warn('核销通知发送失败（不影响核销结果）', {
           error: notificationError.message,
-          user_id: item.user_id,
-          inventory_id: item.inventory_id
+          user_id: result.user_id,
+          inventory_id: result.item_id
         })
       })
 
-    // ============ 步骤8：返回核销结果（Response）============
+    // ============ 步骤6：返回核销结果（Response）============
 
     return res.apiSuccess(
       {
-        inventory_id: item.inventory_id,
-        name: item.name,
-        type: item.type,
-        value: item.value,
-        used_at: item.used_at,
-        // 物品所有者信息
-        user: item.user
-          ? {
-            user_id: item.user.user_id,
-            mobile: item.user.mobile,
-            nickname: item.user.nickname
-          }
-          : null,
-        // 🔥 新增：核销操作人信息（便于前端展示"由XX商户核销"）
+        inventory_id: result.item_id,
+        name: result.item_name,
+        user_id: result.user_id,
+        status: result.status,
+        used_at: result.used_at,
+        // 🔥 核销操作人信息（便于前端展示"由XX商户核销"）
         operator: {
-          user_id: req.user.user_id,
+          user_id: merchantId,
           nickname: req.user.nickname || userRoles.roleName || '商户'
         }
       },

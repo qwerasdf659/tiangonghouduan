@@ -10,9 +10,19 @@
 // V4 核心服务
 const { UnifiedLotteryEngine } = require('./UnifiedLotteryEngine/UnifiedLotteryEngine')
 const { ThumbnailService } = require('./ThumbnailService') // 🎯 导入类
-/*
- * const UserInventoryService = require('./UserInventoryService') // TODO: 待实现
- */
+
+// V4 领域服务
+const InventoryService = require('./InventoryService')
+const PointsService = require('./PointsService')
+const ExchangeMarketService = require('./ExchangeMarketService')
+const ExchangeOperationService = require('./ExchangeOperationService')
+const ContentAuditEngine = require('./ContentAuditEngine')
+const AnnouncementService = require('./AnnouncementService')
+const NotificationService = require('./NotificationService')
+const ConsumptionService = require('./ConsumptionService')
+const CustomerServiceSessionService = require('./CustomerServiceSessionService')
+const HierarchyManagementService = require('./HierarchyManagementService')
+const UserRoleService = require('./UserRoleService')
 
 // V4 模块化服务
 const { lottery_service_container } = require('./lottery')
@@ -142,11 +152,21 @@ class ServiceManager {
       // ✅ 注册V4统一抽奖引擎（移除旧版LotteryDrawService）
       this._services.set('unifiedLotteryEngine', new UnifiedLotteryEngine(this.models))
 
-      /*
-       * 注册其他核心服务
-       * this._services.set('userInventory', new UserInventoryService(this.models)) // TODO: 待实现
-       */
+      // ✅ 注册缩略图服务
       this._services.set('thumbnail', new ThumbnailService(this.models))
+
+      // ✅ 注册领域服务（Domain Services）
+      this._services.set('inventory', InventoryService)
+      this._services.set('points', PointsService)
+      this._services.set('exchangeMarket', ExchangeMarketService)
+      this._services.set('exchangeOperation', ExchangeOperationService)
+      this._services.set('contentAudit', ContentAuditEngine)
+      this._services.set('announcement', AnnouncementService)
+      this._services.set('notification', NotificationService)
+      this._services.set('consumption', ConsumptionService)
+      this._services.set('customerServiceSession', CustomerServiceSessionService)
+      this._services.set('hierarchyManagement', HierarchyManagementService)
+      this._services.set('userRole', UserRoleService)
 
       // 注册模块化抽奖服务容器
       this._services.set('lotteryContainer', lottery_service_container)
