@@ -8,11 +8,11 @@
 
 const express = require('express')
 const router = express.Router()
+const BeijingTimeHelper = require('../../../../utils/timeHelper')
 const {
   sharedComponents,
   adminAuthMiddleware,
-  asyncHandler,
-  BeijingTimeHelper
+  asyncHandler
 } = require('./shared/middleware')
 
 /**

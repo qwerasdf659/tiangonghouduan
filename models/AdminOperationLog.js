@@ -88,10 +88,15 @@ module.exports = sequelize => {
           'prize_config', // 奖品配置（修改奖品配置）
           'prize_create', // 奖品创建
           'prize_delete', // 奖品删除
+          'prize_stock_adjust', // 奖品库存调整（补充库存）
           'campaign_config', // 活动配置（修改活动配置）
           'role_assign', // 角色分配（给用户分配角色）
+          'role_change', // 角色变更（修改用户角色）
           'system_config', // 系统配置修改
-          'session_assign' // 客服会话分配（分配/取消/转移）
+          'session_assign', // 客服会话分配（分配/取消/转移）
+          'inventory_operation', // 库存操作（使用/核销/上架/下架）
+          'inventory_transfer', // 物品转让（用户间物品转让）
+          'consumption_audit' // 消费审核（审核通过/拒绝）
         ),
         allowNull: false,
         comment: '操作类型'
@@ -245,9 +250,15 @@ module.exports = sequelize => {
       prize_config: '奖品配置',
       prize_create: '奖品创建',
       prize_delete: '奖品删除',
+      prize_stock_adjust: '奖品库存调整',
       campaign_config: '活动配置',
       role_assign: '角色分配',
-      system_config: '系统配置'
+      role_change: '角色变更',
+      system_config: '系统配置',
+      session_assign: '客服会话分配',
+      inventory_operation: '库存操作',
+      inventory_transfer: '物品转让',
+      consumption_audit: '消费审核'
     }
     return typeMap[this.operation_type] || '未知操作'
   }

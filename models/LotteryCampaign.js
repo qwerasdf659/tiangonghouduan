@@ -370,66 +370,6 @@ class LotteryCampaign extends Model {
       updated_at: this.updated_at
     }
   }
-
-  /**
-   * 静态方法：获取活跃的活动列表
-   * @param {Object} options - 查询选项
-   * @returns {Promise<Array>} 活跃活动列表
-   */
-  static async getActiveCampaigns (options = {}) {
-    const { limit = 10 } = options
-    const now = BeijingTimeHelper.createBeijingTime()
-
-    const whereClause = {
-      status: 'active',
-      start_time: { [this.sequelize.Sequelize.Op.lte]: now },
-      end_time: { [this.sequelize.Sequelize.Op.gte]: now }
-    }
-
-    return await this.findAll({
-      where: whereClause,
-      order: [['start_time', 'ASC']],
-      limit,
-      include: ['prizes']
-    })
-  }
-
-  /**
-   * 静态方法：批量更新活动状态
-   * @returns {Promise<Object>} 更新结果
-   */
-  static async batchUpdateStatus () {
-    const now = BeijingTimeHelper.createBeijingTime()
-
-    // 自动开始符合条件的活动
-    const startResult = await this.update(
-      { status: 'active' },
-      {
-        where: {
-          status: 'draft',
-          start_time: { [this.sequelize.Sequelize.Op.lte]: now },
-          end_time: { [this.sequelize.Sequelize.Op.gte]: now }
-        }
-      }
-    )
-
-    // 自动结束过期的活动
-    const endResult = await this.update(
-      { status: 'ended' },
-      {
-        where: {
-          status: 'active',
-          end_time: { [this.sequelize.Sequelize.Op.lt]: now }
-        }
-      }
-    )
-
-    return {
-      started: startResult[0],
-      ended: endResult[0],
-      timestamp: now
-    }
-  }
 }
 
 /**

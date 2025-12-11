@@ -113,6 +113,100 @@
 const BeijingTimeHelper = require('../utils/timeHelper')
 const { UserPointsAccount, PointsTransaction, User } = require('../models')
 const { Sequelize, Transaction, Op } = require('sequelize')
+const AuditLogService = require('./AuditLogService')
+
+/**
+ * 🎯 统一数据输出视图常量（Data Output View Constants）
+ *
+ * 业务场景（Business Scenario）：
+ * - 统一管理积分领域的数据输出字段，避免字段选择分散在各方法
+ * - 符合架构规范：与库存领域的 INVENTORY_ATTRIBUTES 模式保持一致
+ * - 根据权限级别（用户/管理员）返回不同的数据字段，保护敏感信息
+ *
+ * 设计原则（Design Principles）：
+ * - userView：用户视图 - 用户查询自己的积分账户时返回的字段（不包含敏感字段）
+ * - adminView：管理员视图 - 管理员查询用户积分账户时返回的字段（包含所有字段）
+ * - transactionView：交易视图 - 查询积分交易记录时返回的字段（标准交易信息）
+ *
+ * 使用示例（Usage Example）：
+ * ```javascript
+ * // 用户查询自己的积分账户
+ * const account = await UserPointsAccount.findOne({
+ *   where: { user_id: userId },
+ *   attributes: POINTS_ATTRIBUTES.userView
+ * });
+ *
+ * // 管理员查询用户积分账户
+ * const account = await UserPointsAccount.findOne({
+ *   where: { user_id: userId },
+ *   attributes: POINTS_ATTRIBUTES.adminView
+ * });
+ *
+ * // 查询交易记录
+ * const transactions = await PointsTransaction.findAll({
+ *   where: { user_id: userId },
+ *   attributes: POINTS_ATTRIBUTES.transactionView
+ * });
+ * ```
+ */
+const POINTS_ATTRIBUTES = {
+  /**
+   * 用户视图（User View）
+   * 用户查询自己的积分账户时返回的字段
+   * 不包含敏感字段：frozen_points, budget_points, remaining_budget_points
+   */
+  userView: [
+    'account_id', // 账户ID（Account ID）
+    'user_id', // 用户ID（User ID）
+    'available_points', // 可用积分（Available Points）
+    'total_earned', // 累计获得积分（Total Earned Points）
+    'total_consumed', // 累计消耗积分（Total Consumed Points）
+    'freeze_reason', // 冻结原因（Freeze Reason - 用户有权知道账户被冻结的原因）
+    'last_earn_time', // 最后获得时间（Last Earn Time）
+    'last_consume_time', // 最后消费时间（Last Consume Time）
+    'is_active', // 账户状态（Account Status）
+    'created_at' // 创建时间（Created At）
+  ],
+
+  /**
+   * 管理员视图（Admin View）
+   * 管理员查询用户积分账户时返回的字段
+   * 包含所有字段，用于后台管理和数据分析
+   */
+  adminView: [
+    'account_id', // 账户ID（Account ID）
+    'user_id', // 用户ID（User ID）
+    'available_points', // 可用积分（Available Points）
+    'total_earned', // 累计获得积分（Total Earned Points）
+    'total_consumed', // 累计消耗积分（Total Consumed Points）
+    'frozen_points', // 冻结积分（Frozen Points）
+    'budget_points', // 预算积分（Budget Points）
+    'remaining_budget_points', // 剩余预算积分（Remaining Budget Points）
+    'freeze_reason', // 冻结原因（Freeze Reason）
+    'last_earn_time', // 最后获得时间（Last Earn Time）
+    'last_consume_time', // 最后消费时间（Last Consume Time）
+    'is_active', // 账户状态（Account Status）
+    'created_at', // 创建时间（Created At）
+    'updated_at' // 更新时间（Updated At）
+  ],
+
+  /**
+   * 交易视图（Transaction View）
+   * 查询积分交易记录时返回的字段
+   * 包含交易核心信息，用于历史记录展示和数据分析
+   */
+  transactionView: [
+    'transaction_id', // 交易ID（Transaction ID）
+    'transaction_type', // 交易类型：earn/consume（Transaction Type）
+    'points_amount', // 积分数量（Points Amount）
+    'points_balance_before', // 交易前余额（Balance Before Transaction）
+    'points_balance_after', // 交易后余额（Balance After Transaction）
+    'business_type', // 业务类型（Business Type）
+    'transaction_title', // 交易标题（Transaction Title）
+    'transaction_time', // 交易时间（Transaction Time）
+    'status' // 状态：completed/pending/cancelled（Status）
+  ]
+}
 
 /**
  * 积分服务类
@@ -282,6 +376,22 @@ class PointsService {
       },
       { transaction }
     )
+
+    // 📝 记录审计日志（异步，失败不影响业务）
+    try {
+      await AuditLogService.logPointsAdd({
+        operator_id: options.operator_id || user_id,
+        user_id,
+        before_points: oldBalance,
+        after_points: newBalance,
+        points_amount: points,
+        reason: options.title || options.description || '增加积分',
+        business_id: options.business_id,
+        transaction
+      })
+    } catch (auditError) {
+      console.error('[PointsService] 审计日志记录失败:', auditError.message)
+    }
 
     return {
       success: true,
@@ -485,6 +595,21 @@ class PointsService {
         }
       )
 
+      // 📝 记录审计日志（异步，失败不影响业务）
+      try {
+        await AuditLogService.logPointsActivate({
+          operator_id: operator_id || pendingTx.user_id,
+          user_id: pendingTx.user_id,
+          transaction_id,
+          points_amount: pointsAmount,
+          reason: activation_notes || '激活pending积分',
+          business_id: `activate_pending_${transaction_id}`,
+          transaction
+        })
+      } catch (auditError) {
+        console.error('[PointsService] 审计日志记录失败:', auditError.message)
+      }
+
       console.log(
         `✅ Pending积分已激活: transaction_id=${transaction_id}, user_id=${pendingTx.user_id}, points=${pointsAmount}`
       )
@@ -600,6 +725,22 @@ class PointsService {
       { transaction }
     )
 
+    // 📝 记录审计日志（异步，失败不影响业务）
+    try {
+      await AuditLogService.logPointsConsume({
+        operator_id: options.operator_id || user_id,
+        user_id,
+        before_points: oldBalance,
+        after_points: newBalance,
+        points_amount: points,
+        reason: options.title || options.description || '消费积分',
+        business_id: options.business_id,
+        transaction
+      })
+    } catch (auditError) {
+      console.error('[PointsService] 审计日志记录失败:', auditError.message)
+    }
+
     return {
       success: true,
       transaction_id: pointsTransaction.transaction_id,
@@ -660,8 +801,13 @@ class PointsService {
 
     const offset = (page - 1) * limit
 
+    /*
+     * ✅ 使用统一视图常量：transactionView（交易视图）
+     * 统一管理查询字段，避免字段选择分散
+     */
     const { count, rows: transactions } = await PointsTransaction.findAndCountAll({
       where: whereClause,
+      attributes: POINTS_ATTRIBUTES.transactionView,
       order: [['transaction_time', 'DESC']],
       limit: parseInt(limit),
       offset: parseInt(offset)
@@ -675,9 +821,7 @@ class PointsService {
         points_balance_before: parseFloat(t.points_balance_before),
         points_balance_after: parseFloat(t.points_balance_after),
         business_type: t.business_type,
-        source_type: t.source_type,
         transaction_title: t.transaction_title,
-        transaction_description: t.transaction_description,
         transaction_time: t.transaction_time,
         status: t.status
       })),
@@ -804,229 +948,6 @@ class PointsService {
   }
 
   /**
-   * 兑换商品 - 新增前端需求功能
-   * @param {number} user_id - 用户ID
-   * @param {number} productId - 商品ID
-   * @param {number} quantity - 兑换数量
-   * @param {string} space - 空间类型（如：lucky）
-   * @returns {Object} 兑换结果
-   */
-  static async exchangeProduct (user_id, productId, quantity = 1, space = 'lucky') {
-    const { Product, ExchangeRecords } = require('../models') // ✅ UserInventory在审核通过后才需要
-    const { sequelize, Sequelize } = require('../models')
-    const transaction = await sequelize.transaction()
-
-    try {
-      // 1. ✅ 获取商品信息并加悲观锁（解决问题5：防止并发超卖）
-      const product = await Product.findByPk(productId, {
-        lock: transaction.LOCK.UPDATE, // ✅ 悲观锁：锁定该行直到事务结束
-        transaction
-      })
-
-      if (!product) {
-        throw new Error('商品不存在')
-      }
-
-      // 🆕 2. 获取对应空间的商品信息（方案2）
-      const space_info = product.getSpaceInfo ? product.getSpaceInfo(space) : null
-      if (!space_info) {
-        throw new Error(`该商品在${space}空间不可用`)
-      }
-
-      if (!product.isAvailable()) {
-        throw new Error('商品暂不可兑换')
-      }
-
-      // 🆕 3. 检查对应空间的库存（方案2）
-      let current_stock
-      if (space === 'premium' && product.space === 'both') {
-        // 臻选空间：使用premium_stock（如果有独立库存）
-        current_stock = product.premium_stock !== null ? product.premium_stock : product.stock
-      } else {
-        // 幸运空间或单一空间商品：使用stock
-        current_stock = product.stock
-      }
-
-      if (current_stock < quantity) {
-        throw new Error(`商品库存不足（当前库存：${current_stock}）`)
-      }
-
-      // 🆕 4. 计算所需积分（使用对应空间的积分）
-      const totalPoints = space_info.exchange_points * quantity
-
-      // 5. 消费积分
-      await this.consumePoints(user_id, totalPoints, {
-        business_type: 'exchange',
-        source_type: 'product_exchange',
-        title: `兑换商品：${product.name}（${space}空间）`,
-        description: `兑换${quantity}个${product.name}（${space}空间）`,
-        transaction
-      })
-
-      // 🆕 6. 原子性减少对应空间的库存（方案2）
-      let update_fields
-      let where_condition
-
-      if (space === 'premium' && product.space === 'both' && product.premium_stock !== null) {
-        // 臻选空间有独立库存：扣减premium_stock
-        update_fields = {
-          premium_stock: sequelize.literal(`premium_stock - ${quantity}`)
-        }
-        where_condition = {
-          product_id: productId,
-          premium_stock: { [Sequelize.Op.gte]: quantity }
-        }
-      } else {
-        // 幸运空间或共享库存：扣减stock
-        update_fields = {
-          stock: sequelize.literal(`stock - ${quantity}`)
-        }
-        where_condition = {
-          product_id: productId,
-          stock: { [Sequelize.Op.gte]: quantity }
-        }
-      }
-
-      const [affectedRows] = await Product.update(update_fields, {
-        where: where_condition,
-        transaction
-      })
-
-      // 7. ✅ 检查更新结果（如果受影响行数为0，说明库存不足或并发冲突）
-      if (affectedRows === 0) {
-        throw new Error('商品库存不足（并发冲突或库存已售罄）')
-      }
-
-      // 8. 生成兑换码
-      const exchangeCode = this.generateExchangeCode()
-
-      /*
-       * 9. 创建兑换记录（✅ 严格人工审核模式：所有兑换都需要审核）
-       * exchange_id 现在是INT AUTO_INCREMENT主键，不再手动赋值
-       */
-      const exchangeRecord = await ExchangeRecords.create(
-        {
-          user_id,
-          product_id: productId,
-          product_snapshot: {
-            name: product.name,
-            description: product.description,
-            category: product.category,
-            exchange_points: space_info.exchange_points, // 🆕 使用对应空间的积分
-            space, // 🆕 记录兑换空间
-            requires_audit: true // ✅ 所有商品都需要审核
-          },
-          quantity,
-          total_points: totalPoints,
-          exchange_code: exchangeCode,
-          status: 'pending', // 等待审核
-          space, // 🆕 记录兑换空间
-          delivery_method: product.category === '优惠券' ? 'virtual' : 'physical',
-          exchange_time: BeijingTimeHelper.createBeijingTime(),
-          // ✅ 审核相关字段：所有兑换都需要人工审核
-          requires_audit: true,
-          audit_status: 'pending'
-        },
-        { transaction }
-      )
-
-      // 9.1 提交审核（不调用needsAudit，强制审核）
-      console.log(`[兑换] 订单${exchangeRecord.exchange_id}已提交审核，等待管理员处理`)
-      await transaction.commit()
-
-      // 9.2 发送通知
-      try {
-        const NotificationService = require('../services/NotificationService')
-
-        // 通知用户：申请已提交
-        await NotificationService.notifyExchangePending(user_id, {
-          exchange_id: exchangeRecord.exchange_id,
-          product_name: product.name,
-          quantity,
-          total_points: totalPoints
-        })
-
-        // 通知管理员：有新订单待审核
-        await NotificationService.notifyNewExchangeAudit({
-          exchange_id: exchangeRecord.exchange_id,
-          user_id,
-          product_name: product.name,
-          quantity,
-          total_points: totalPoints,
-          product_category: product.category
-        })
-      } catch (notifyError) {
-        // 通知失败不影响兑换流程
-        console.error('[兑换] 发送通知失败:', notifyError.message)
-      }
-
-      // 9.3 返回：需要审核，不立即发放库存
-      return {
-        success: true,
-        needs_audit: true, // ✅ 标记需要审核
-        exchange_id: exchangeRecord.exchange_id,
-        exchange_code: exchangeCode,
-        product_name: product.name,
-        quantity,
-        total_points: totalPoints,
-        audit_status: 'pending',
-        message: '兑换申请已提交，积分已扣除，请等待管理员审核',
-        exchange_time: exchangeRecord.exchange_time
-      }
-    } catch (error) {
-      await transaction.rollback()
-      throw new Error(`商品兑换失败: ${error.message}`)
-    }
-  }
-
-  /**
-   * 获取用户兑换记录
-   * @param {number} user_id - 用户ID
-   * @param {Object} options - 查询选项
-   * @returns {Object} 兑换记录列表
-   */
-  static async getExchangeRecords (user_id, options = {}) {
-    const { ExchangeRecords, Product } = require('../models')
-    const { page = 1, limit = 20, status = null, space = null } = options
-
-    /*
-     * 构建查询条件
-     * 注意：is_deleted: 0 过滤已由ExchangeRecords模型的defaultScope自动处理
-     */
-    const whereClause = {
-      user_id
-    }
-    if (status) whereClause.status = status
-    if (space) whereClause.space = space
-
-    const offset = (page - 1) * limit
-
-    const { count, rows } = await ExchangeRecords.findAndCountAll({
-      where: whereClause,
-      include: [
-        {
-          model: Product,
-          as: 'product',
-          attributes: ['product_id', 'name', 'category', 'image']
-        }
-      ],
-      order: [['exchange_time', 'DESC']],
-      limit: parseInt(limit),
-      offset
-    })
-
-    return {
-      records: rows,
-      pagination: {
-        total: count,
-        page: parseInt(page),
-        limit: parseInt(limit),
-        total_pages: Math.ceil(count / limit)
-      }
-    }
-  }
-
-  /**
    * 获取用户积分信息（API响应格式）
    * @param {number} user_id - 用户ID
    * @returns {Object} 积分信息
@@ -1064,8 +985,13 @@ class PointsService {
       whereClause.transaction_type = type
     }
 
+    /*
+     * ✅ 使用统一视图常量：transactionView（交易视图）
+     * 统一管理查询字段，避免字段选择分散
+     */
     const { count, rows } = await PointsTransaction.findAndCountAll({
       where: whereClause,
+      attributes: POINTS_ATTRIBUTES.transactionView,
       order: [['transaction_time', 'DESC']],
       limit: finalLimit,
       offset
@@ -1373,6 +1299,1122 @@ class PointsService {
         timestamp: new Date().toISOString()
       })
       throw new Error(`获取用户冻结积分明细失败: ${error.message}`)
+    }
+  }
+
+  /**
+   * 软删除交易记录
+   *
+   * 业务场景：
+   * - 用户删除待处理、失败或已取消的记录
+   * - 管理员删除任意状态的记录（需要填写原因）
+   *
+   * @param {number} userId - 用户ID
+   * @param {number} transactionId - 交易记录ID
+   * @param {Object} context - 上下文信息
+   * @param {boolean} context.isAdmin - 是否管理员
+   * @param {string} context.deletion_reason - 删除原因（管理员必填）
+   * @param {Object} context.transaction - 事务对象（可选）
+   * @returns {Promise<Object>} 删除结果
+   */
+  static async deleteTransaction (userId, transactionId, context = {}) {
+    const { isAdmin = false, deletion_reason, transaction: externalTransaction } = context
+
+    // 支持外部事务传入
+    const transaction = externalTransaction || (await PointsTransaction.sequelize.transaction())
+    const shouldCommit = !externalTransaction
+
+    try {
+      // 查询记录（加行级锁）
+      const record = await PointsTransaction.findOne({
+        where: {
+          transaction_id: transactionId,
+          user_id: userId,
+          is_deleted: 0
+        },
+        lock: transaction.LOCK.UPDATE,
+        transaction
+      })
+
+      if (!record) {
+        throw new Error('交易记录不存在或已被删除')
+      }
+
+      // 业务规则验证
+      if (!isAdmin) {
+        const allowedStatuses = ['pending', 'failed', 'cancelled']
+        if (!allowedStatuses.includes(record.status)) {
+          throw new Error('只能删除待处理、失败或已取消的记录。已完成的交易记录请联系管理员处理。')
+        }
+
+        if (record.transaction_type === 'refund') {
+          throw new Error('退款记录不允许删除，请联系管理员')
+        }
+      } else {
+        if (!deletion_reason || deletion_reason.trim().length < 5) {
+          throw new Error('管理员删除记录必须填写删除原因（至少5个字符）')
+        }
+      }
+
+      // 执行软删除
+      await record.update(
+        {
+          is_deleted: 1,
+          deleted_at: BeijingTimeHelper.createDatabaseTime(),
+          deletion_reason: isAdmin ? deletion_reason : `用户自主删除${record.status}状态记录`,
+          deleted_by: userId
+        },
+        { transaction }
+      )
+
+      if (shouldCommit) {
+        await transaction.commit()
+      }
+
+      return {
+        transaction_id: transactionId,
+        deleted_at: record.deleted_at,
+        deletion_reason: record.deletion_reason
+      }
+    } catch (error) {
+      if (shouldCommit) {
+        await transaction.rollback()
+      }
+      throw error
+    }
+  }
+
+  /**
+   * 恢复交易记录
+   *
+   * 业务场景：
+   * - 管理员恢复误删的交易记录
+   *
+   * @param {number} adminId - 管理员ID
+   * @param {number} transactionId - 交易记录ID
+   * @param {Object} context - 上下文信息
+   * @param {string} context.restore_reason - 恢复原因（必填）
+   * @param {Object} context.transaction - 事务对象（可选）
+   * @returns {Promise<Object>} 恢复结果
+   */
+  static async restoreTransaction (adminId, transactionId, context = {}) {
+    const { restore_reason, transaction: externalTransaction } = context
+
+    // 支持外部事务传入
+    const transaction = externalTransaction || (await PointsTransaction.sequelize.transaction())
+    const shouldCommit = !externalTransaction
+
+    try {
+      // 参数验证
+      if (!restore_reason || restore_reason.trim().length < 5) {
+        throw new Error('恢复原因必须至少5个字符')
+      }
+
+      // 查询已删除的记录
+      const record = await PointsTransaction.scope('includeDeleted').findOne({
+        where: {
+          transaction_id: transactionId,
+          is_deleted: 1
+        },
+        lock: transaction.LOCK.UPDATE,
+        transaction
+      })
+
+      if (!record) {
+        throw new Error('交易记录不存在或未被删除')
+      }
+
+      // 业务规则验证
+      if (record.restored_by !== null) {
+        throw new Error('该记录已恢复过，无需重复操作')
+      }
+
+      // 执行恢复
+      await record.update(
+        {
+          is_deleted: 0,
+          deleted_at: null,
+          restored_at: BeijingTimeHelper.createDatabaseTime(),
+          restored_by: adminId,
+          restore_reason
+        },
+        { transaction }
+      )
+
+      if (shouldCommit) {
+        await transaction.commit()
+      }
+
+      return {
+        transaction_id: transactionId,
+        restored_at: record.restored_at,
+        restore_reason
+      }
+    } catch (error) {
+      if (shouldCommit) {
+        await transaction.rollback()
+      }
+      throw error
+    }
+  }
+
+  /**
+   * 获取恢复审计记录
+   *
+   * 业务场景：
+   * - 管理员查看交易记录恢复历史
+   *
+   * @param {Object} filters - 过滤条件
+   * @param {number} filters.admin_id - 管理员ID（可选）
+   * @param {string} filters.start_date - 开始日期（可选）
+   * @param {string} filters.end_date - 结束日期（可选）
+   * @param {number} filters.page - 页码（默认1）
+   * @param {number} filters.limit - 每页数量（默认20）
+   * @param {Object} options - 选项
+   * @param {Object} options.transaction - 事务对象（可选）
+   * @returns {Promise<Object>} {records, pagination}
+   */
+  static async getRestoreAudit (filters = {}, options = {}) {
+    const { transaction = null } = options
+    const { admin_id, start_date, end_date, page = 1, limit = 20 } = filters
+
+    try {
+      // 构建查询条件
+      const where = {
+        restored_by: { [Op.not]: null } // 仅查询已恢复的记录
+      }
+
+      if (admin_id) {
+        where.restored_by = admin_id
+      }
+
+      if (start_date) {
+        const startDateTime = BeijingTimeHelper.parseDate(start_date, '00:00:00')
+        where.restored_at = { [Op.gte]: startDateTime }
+      }
+
+      if (end_date) {
+        const endDateTime = BeijingTimeHelper.parseDate(end_date, '23:59:59')
+        where.restored_at = where.restored_at || {}
+        where.restored_at[Op.lte] = endDateTime
+      }
+
+      // 分页参数
+      const finalLimit = Math.min(Math.max(parseInt(limit) || 20, 1), 100)
+      const offset = (page - 1) * finalLimit
+
+      // 查询数据
+      const { count, rows } = await PointsTransaction.scope('includeDeleted').findAndCountAll({
+        where,
+        include: [
+          {
+            model: User,
+            as: 'user',
+            attributes: ['user_id', 'nickname', 'mobile']
+          },
+          {
+            model: User,
+            as: 'restoredByUser',
+            attributes: ['user_id', 'nickname'],
+            required: false
+          }
+        ],
+        order: [['restored_at', 'DESC']],
+        limit: finalLimit,
+        offset,
+        transaction
+      })
+
+      // 格式化数据
+      const records = rows.map(r => ({
+        transaction_id: r.transaction_id,
+        user_id: r.user_id,
+        user_nickname: r.user?.nickname || '未知用户',
+        points_amount: parseFloat(r.points_amount),
+        transaction_type: r.transaction_type,
+        status: r.status,
+        deleted_at: r.deleted_at,
+        deletion_reason: r.deletion_reason,
+        restored_at: r.restored_at,
+        restored_by: r.restored_by,
+        restored_by_nickname: r.restoredByUser?.nickname || '未知管理员',
+        restore_reason: r.restore_reason
+      }))
+
+      return {
+        records,
+        pagination: {
+          total: count,
+          page: parseInt(page),
+          limit: finalLimit,
+          total_pages: Math.ceil(count / finalLimit)
+        }
+      }
+    } catch (error) {
+      throw new Error(`获取恢复审计记录失败: ${error.message}`)
+    }
+  }
+
+  /**
+   * 🆕 架构重构 - 获取用户账户（封装用户存在性和账户查询）
+   *
+   * 业务场景（Business Scenario）：
+   * - 路由层调用此方法验证用户存在性和账户有效性
+   * - 替代路由层直接调用 User.findByPk 和 UserPointsAccount.findOne
+   * - 符合架构规范：路由层不直连 models，统一通过 Service 层操作
+   *
+   * 与 getUserPointsAccount 的区别（Difference from getUserPointsAccount）：
+   * - getUserPointsAccount: 自动创建不存在的账户（Auto-create if not exists）
+   * - getUserAccount: 不自动创建，返回明确错误（No auto-create, throw explicit error）
+   *
+   * @param {number} userId - 用户ID（User ID - Required）
+   * @returns {Promise<Object>} 用户和账户信息（User and Account Info）
+   * @returns {Object} result.user - 用户对象（User Object）
+   * @returns {Object} result.account - 积分账户对象（Points Account Object）
+   * @throws {Error} 用户不存在（User not found）
+   * @throws {Error} 积分账户不存在（Points account not found）
+   * @throws {Error} 积分账户已冻结（Account frozen）
+   */
+  /**
+   * 🆕 架构重构 - 获取用户账户（增强版 - 支持返回用户基本信息）
+   *
+   * @param {number} userId - 用户ID
+   * @returns {Promise<Object>} { user, account }
+   * @throws {Error} 用户不存在
+   */
+  static async getUserAccount (userId) {
+    // Step 1: 验证用户存在性（Validate user existence）
+    const user = await User.findByPk(userId, {
+      attributes: ['user_id', 'created_at', 'last_login', 'login_count']
+    })
+    if (!user) {
+      throw new Error('用户不存在')
+    }
+
+    /*
+     * Step 2: 查询积分账户（Query points account）
+     * ✅ 使用统一视图常量：userView（用户视图，不包含敏感字段）
+     */
+    const account = await UserPointsAccount.findOne({
+      where: { user_id: userId },
+      attributes: POINTS_ATTRIBUTES.userView
+    })
+    if (!account) {
+      throw new Error('积分账户不存在')
+    }
+
+    // Step 3: 检查账户状态（Check account status）
+    if (!account.is_active) {
+      throw new Error(`积分账户已被冻结，原因：${account.freeze_reason || '未说明原因'}`)
+    }
+
+    // Step 4: 返回用户和账户信息（Return user and account info）
+    return { user, account }
+  }
+
+  /**
+   * 🆕 架构重构 - 获取用户基本信息（用于账户不存在场景）
+   *
+   * @param {number} userId - 用户ID
+   * @returns {Promise<Object>} { user, hasAccount }
+   * @throws {Error} 用户不存在
+   */
+  static async getUserBasicInfo (userId) {
+    const user = await User.findByPk(userId, {
+      attributes: ['user_id', 'created_at', 'last_login', 'login_count']
+    })
+    if (!user) {
+      throw new Error('用户不存在')
+    }
+
+    // 检查是否有积分账户
+    const account = await UserPointsAccount.findOne({
+      where: { user_id: userId }
+    })
+
+    return {
+      user,
+      hasAccount: !!account,
+      defaultPoints: {
+        available_points: 0,
+        total_earned: 0,
+        total_consumed: 0
+      }
+    }
+  }
+
+  /**
+   * 🆕 架构重构 - 计算用户成就（业务逻辑收口到Service层）
+   *
+   * @param {Object} stats - 统计数据
+   * @param {Object} stats.lottery - 抽奖统计
+   * @param {Object} stats.exchange - 兑换统计
+   * @param {Object} stats.consumption - 消费统计
+   * @param {number} stats.totalEarned - 总获得积分
+   * @returns {Array} 成就列表
+   */
+  static calculateAchievements (stats) {
+    const achievements = []
+
+    // 抽奖相关成就
+    if (stats.lottery.total_count >= 1) {
+      achievements.push({
+        id: 'first_lottery',
+        name: '初试身手',
+        description: '完成第一次抽奖',
+        unlocked: true,
+        category: 'lottery'
+      })
+    }
+
+    if (stats.lottery.total_count >= 10) {
+      achievements.push({
+        id: 'lottery_enthusiast',
+        name: '抽奖达人',
+        description: '完成10次抽奖',
+        unlocked: true,
+        category: 'lottery'
+      })
+    }
+
+    // 兑换相关成就
+    if (stats.exchange.total_count >= 1) {
+      achievements.push({
+        id: 'first_exchange',
+        name: '首次兑换',
+        description: '完成第一次商品兑换',
+        unlocked: true,
+        category: 'exchange'
+      })
+    }
+
+    // 积分相关成就
+    if (stats.totalEarned >= 1000) {
+      achievements.push({
+        id: 'points_collector',
+        name: '积分收集者',
+        description: '累计获得1000积分',
+        unlocked: true,
+        category: 'points'
+      })
+    }
+
+    return achievements
+  }
+
+  /**
+   * 🆕 架构重构 - 获取管理员积分统计（封装复杂聚合查询）
+   *
+   * 业务场景（Business Scenario）：
+   * - 管理员查看积分系统全局统计数据
+   * - 封装原路由层 L760-920 的复杂聚合查询逻辑
+   * - 符合架构规范：复杂查询逻辑收口到 Service 层
+   *
+   * 统计指标（Statistics Metrics）：
+   * - 账户统计：总账户数、活跃账户数、总积分余额
+   * - 交易统计：总交易数、30天内交易数、今日交易数
+   * - 积分流向：累计发放、累计消耗、冻结积分、净流入
+   * - 今日数据：今日发放、今日消耗
+   * - 异常监控：失败交易数、7天内大额交易数
+   *
+   * @returns {Promise<Object>} 管理员统计数据（Admin Statistics）
+   * @returns {Object} result.accountStats - 账户统计（Account Statistics）
+   * @returns {Object} result.transactionStats - 交易统计（Transaction Statistics）
+   * @returns {Object} result.abnormalStats - 异常统计（Abnormal Statistics）
+   */
+  static async getAdminStatistics () {
+    const sequelize = UserPointsAccount.sequelize
+
+    // 🚀 并行执行3次聚合查询（优化性能）
+    const [accountStats, transactionStats, abnormalStats] = await Promise.all([
+      /**
+       * 【查询1】账户统计 - 1次查询完成5个统计指标
+       * Account Statistics - 5 metrics in 1 query
+       */
+      UserPointsAccount.findOne({
+        attributes: [
+          // total_accounts: 总账户数（Total Accounts Count）
+          [sequelize.fn('COUNT', sequelize.col('account_id')), 'total_accounts'],
+
+          // active_accounts: 活跃账户数（Active Accounts Count）
+          [
+            sequelize.fn('COUNT', sequelize.literal('CASE WHEN is_active = true THEN 1 END')),
+            'active_accounts'
+          ],
+
+          // total_balance: 所有用户可用积分总额（Total Available Points Balance）
+          [sequelize.fn('SUM', sequelize.col('available_points')), 'total_balance'],
+
+          // total_system_earned: 系统累计发放积分（Total System Earned Points）
+          [sequelize.fn('SUM', sequelize.col('total_earned')), 'total_system_earned'],
+
+          // total_system_consumed: 系统累计消耗积分（Total System Consumed Points）
+          [sequelize.fn('SUM', sequelize.col('total_consumed')), 'total_system_consumed']
+        ],
+        raw: true // 返回纯JSON对象，性能更好（Return plain JSON for better performance）
+      }),
+
+      /**
+       * 【查询2】交易统计 - 1次查询完成9个统计指标
+       * Transaction Statistics - 9 metrics in 1 query
+       */
+      PointsTransaction.findOne({
+        attributes: [
+          // total_transactions: 总交易数（Total Transactions Count）
+          [sequelize.fn('COUNT', sequelize.col('transaction_id')), 'total_transactions'],
+
+          // recent_transactions: 30天内交易数（Recent 30-day Transactions Count）
+          [
+            sequelize.fn(
+              'COUNT',
+              sequelize.literal('CASE WHEN transaction_time >= NOW() - INTERVAL 30 DAY THEN 1 END')
+            ),
+            'recent_transactions'
+          ],
+
+          // today_transactions: 今日交易数（Today Transactions Count）
+          [
+            sequelize.fn(
+              'COUNT',
+              sequelize.literal('CASE WHEN DATE(transaction_time) = CURDATE() THEN 1 END')
+            ),
+            'today_transactions'
+          ],
+
+          // total_earned_points: 累计发放积分（Total Earned Points）
+          [
+            sequelize.fn(
+              'SUM',
+              sequelize.literal(
+                'CASE WHEN transaction_type = \'earn\' AND status = \'completed\' THEN points_amount ELSE 0 END'
+              )
+            ),
+            'total_earned_points'
+          ],
+
+          // total_consumed_points: 累计消耗积分（Total Consumed Points）
+          [
+            sequelize.fn(
+              'SUM',
+              sequelize.literal(
+                'CASE WHEN transaction_type = \'consume\' AND status = \'completed\' THEN points_amount ELSE 0 END'
+              )
+            ),
+            'total_consumed_points'
+          ],
+
+          // pending_earn_points: 冻结积分总额（Frozen/Pending Earn Points）
+          [
+            sequelize.fn(
+              'SUM',
+              sequelize.literal(
+                'CASE WHEN status = \'pending\' AND transaction_type = \'earn\' THEN points_amount ELSE 0 END'
+              )
+            ),
+            'pending_earn_points'
+          ],
+
+          // today_earn_points: 今日发放积分（Today Earned Points）
+          [
+            sequelize.fn(
+              'SUM',
+              sequelize.literal(
+                'CASE WHEN DATE(transaction_time) = CURDATE() AND transaction_type = \'earn\' AND status = \'completed\' THEN points_amount ELSE 0 END'
+              )
+            ),
+            'today_earn_points'
+          ],
+
+          // today_consume_points: 今日消耗积分（Today Consumed Points）
+          [
+            sequelize.fn(
+              'SUM',
+              sequelize.literal(
+                'CASE WHEN DATE(transaction_time) = CURDATE() AND transaction_type = \'consume\' AND status = \'completed\' THEN points_amount ELSE 0 END'
+              )
+            ),
+            'today_consume_points'
+          ],
+
+          // failed_transactions: 失败交易数（Failed Transactions Count）
+          [
+            sequelize.fn('COUNT', sequelize.literal('CASE WHEN status = \'failed\' THEN 1 END')),
+            'failed_transactions'
+          ]
+        ],
+        raw: true
+      }),
+
+      /**
+       * 【查询3】异常统计 - 最近7天的安全监控数据
+       * Abnormal Statistics - Recent 7 days security monitoring
+       */
+      PointsTransaction.findOne({
+        attributes: [
+          // large_transactions: 大额交易数（>10000积分）
+          [
+            sequelize.fn(
+              'COUNT',
+              sequelize.literal('CASE WHEN ABS(points_amount) > 10000 THEN 1 END')
+            ),
+            'large_transactions'
+          ]
+        ],
+        where: {
+          transaction_time: {
+            [Op.gte]: sequelize.literal('NOW() - INTERVAL 7 DAY')
+          }
+        },
+        raw: true
+      })
+    ])
+
+    // 返回统计数据（Return statistics）
+    return { accountStats, transactionStats, abnormalStats }
+  }
+
+  /**
+   * 🆕 架构重构 - 获取用户统计数据（封装用户维度统计）
+   *
+   * 业务场景（Business Scenario）：
+   * - 管理员或用户本人查看个人积分统计
+   * - 封装原路由层的用户统计查询逻辑
+   * - 符合架构规范：统计查询收口到 Service 层
+   *
+   * 统计内容（Statistics Content）：
+   * - 本月获得积分（Month Earned Points）
+   * - 历史总积分统计（Historical Total Points）
+   *
+   * @param {number} userId - 用户ID（User ID - Required）
+   * @returns {Promise<Object>} 用户统计数据（User Statistics）
+   * @returns {number} result.month_earned - 本月获得积分（Month Earned Points）
+   */
+  static async getUserStatistics (userId) {
+    // 计算本月开始时间（Calculate month start time）
+    const monthStart = BeijingTimeHelper.createBeijingTime()
+    monthStart.setDate(1)
+    monthStart.setHours(0, 0, 0, 0)
+
+    // 使用Sequelize聚合查询直接计算本月获得积分（Use Sequelize aggregation）
+    const monthEarned =
+      (await PointsTransaction.sum('points_amount', {
+        where: {
+          user_id: userId,
+          transaction_type: 'earn', // 只统计"获得积分"类型的交易（Only count earn transactions）
+          transaction_time: { [Op.gte]: monthStart }, // 交易时间 >= 本月1号（Transaction time >= 1st of current month）
+          status: 'completed' // 只统计已完成的交易（Only count completed transactions）
+        }
+      })) || 0 // 如果返回null（无记录），默认为0（Default to 0 if null）
+
+    return {
+      month_earned: monthEarned
+    }
+  }
+
+  /**
+   * 🆕 架构重构 - 获取用户完整统计数据（封装多维度统计查询）
+   *
+   * 业务场景（Business Scenario）：
+   * - 用户查看个人数据统计
+   * - 封装原 points.js 路由层的 GET /user/statistics/:user_id 接口逻辑
+   * - 符合架构规范：多表查询逻辑收口到 Service 层
+   *
+   * 统计维度（Statistics Dimensions）：
+   * - 抽奖统计：总次数、本月次数、最后抽奖时间（Lottery Statistics）
+   * - 兑换统计：总次数、总积分消耗、本月次数（Exchange Statistics）
+   * - 消费统计：总消费次数、审核通过率、消费金额、奖励积分（Consumption Statistics）
+   * - 库存统计：总物品数、可用数、已使用数、使用率（Inventory Statistics）
+   *
+   * @param {number} userId - 用户ID（User ID - Required）
+   * @returns {Promise<Object>} 完整统计数据（Full Statistics）
+   * @returns {Object} result.lottery - 抽奖统计（Lottery Statistics）
+   * @returns {Object} result.exchange - 兑换统计（Exchange Statistics）
+   * @returns {Object} result.consumption - 消费统计（Consumption Statistics）
+   * @returns {Object} result.inventory - 库存统计（Inventory Statistics）
+   */
+  static async getUserFullStatistics (userId) {
+    const { LotteryDraw, ExchangeRecords, ConsumptionRecord, UserInventory } = require('../models')
+    const sequelize = UserPointsAccount.sequelize
+
+    // 本月第一天0点(北京时间)
+    const monthStart = new Date(
+      BeijingTimeHelper.createDatabaseTime().getFullYear(),
+      BeijingTimeHelper.createDatabaseTime().getMonth(),
+      1
+    )
+
+    // 🚀 并行执行所有统计查询（Parallel execution for optimal performance）
+    const [lotteryStats, exchangeStats, consumptionStats, inventoryStats] = await Promise.all([
+      // 1. 抽奖统计（Lottery Statistics）
+      this._getLotteryStats(userId, LotteryDraw, monthStart),
+
+      // 2. 兑换统计（Exchange Statistics）
+      this._getExchangeStats(userId, ExchangeRecords, monthStart),
+
+      // 3. 消费统计（Consumption Statistics）
+      this._getConsumptionStats(userId, ConsumptionRecord, monthStart, sequelize),
+
+      // 4. 库存统计（Inventory Statistics）
+      this._getInventoryStats(userId, UserInventory)
+    ])
+
+    return {
+      lottery: lotteryStats,
+      exchange: exchangeStats,
+      consumption: consumptionStats,
+      inventory: inventoryStats
+    }
+  }
+
+  /**
+   * 🔒 私有方法 - 获取抽奖统计
+   * @private
+   * @param {number} userId - 用户ID
+   * @param {Object} LotteryDraw - 抽奖记录模型
+   * @param {Date} monthStart - 本月开始时间
+   * @returns {Promise<Object>} 抽奖统计数据
+   */
+  static async _getLotteryStats (userId, LotteryDraw, monthStart) {
+    const [totalCount, thisMonth, lastDraw] = await Promise.all([
+      // 总抽奖次数（Total lottery count）
+      LotteryDraw.count({ where: { user_id: userId } }),
+
+      // 本月抽奖次数（This month count）
+      LotteryDraw.count({
+        where: {
+          user_id: userId,
+          created_at: { [Op.gte]: monthStart }
+        }
+      }),
+
+      // 最后一次抽奖时间（Last draw time）
+      LotteryDraw.findOne({
+        where: { user_id: userId },
+        order: [['created_at', 'DESC']],
+        attributes: ['created_at']
+      })
+    ])
+
+    return {
+      total_count: totalCount,
+      month_count: thisMonth,
+      last_draw: lastDraw ? lastDraw.created_at : null
+    }
+  }
+
+  /**
+   * 🔒 私有方法 - 获取兑换统计
+   * @private
+   * @param {number} userId - 用户ID
+   * @param {Object} ExchangeRecords - 兑换记录模型
+   * @param {Date} monthStart - 本月开始时间
+   * @returns {Promise<Object>} 兑换统计数据
+   */
+  static async _getExchangeStats (userId, ExchangeRecords, monthStart) {
+    const [totalCount, totalPoints, thisMonth] = await Promise.all([
+      // 总兑换次数（Total exchange count）
+      ExchangeRecords.count({ where: { user_id: userId } }),
+
+      // 总消耗积分（Total points consumed）
+      ExchangeRecords.sum('total_points', { where: { user_id: userId } }) || 0,
+
+      // 本月兑换次数（This month count）
+      ExchangeRecords.count({
+        where: {
+          user_id: userId,
+          exchange_time: { [Op.gte]: monthStart }
+        }
+      })
+    ])
+
+    return {
+      total_count: totalCount,
+      total_points: totalPoints,
+      month_count: thisMonth
+    }
+  }
+
+  /**
+   * 🔒 私有方法 - 获取消费统计（商家扫码录入）
+   * @private
+   * @param {number} userId - 用户ID
+   * @param {Object} ConsumptionRecord - 消费记录模型
+   * @param {Date} monthStart - 本月开始时间
+   * @param {Object} sequelize - Sequelize实例
+   * @returns {Promise<Object>} 消费统计数据
+   */
+  static async _getConsumptionStats (userId, ConsumptionRecord, monthStart, sequelize) {
+    // 如果ConsumptionRecord模型不存在,返回空数据(向后兼容)
+    if (!ConsumptionRecord) {
+      return {
+        total_count: 0,
+        approved_count: 0,
+        pending_count: 0,
+        approval_rate: 0,
+        month_count: 0,
+        total_consumption_amount: 0,
+        total_points_awarded: 0
+      }
+    }
+
+    const [totalCount, approvedCount, pendingCount, thisMonth, totalStats] = await Promise.all([
+      // 总消费记录数（Total consumption count）
+      ConsumptionRecord.count({ where: { user_id: userId } }),
+
+      // 已通过审核的记录数（Approved count）
+      ConsumptionRecord.count({
+        where: { user_id: userId, status: 'approved' }
+      }),
+
+      // 待审核的记录数（Pending count）
+      ConsumptionRecord.count({
+        where: { user_id: userId, status: 'pending' }
+      }),
+
+      // 本月消费记录数（This month count）
+      ConsumptionRecord.count({
+        where: {
+          user_id: userId,
+          created_at: { [Op.gte]: monthStart }
+        }
+      }),
+
+      // 总消费金额和总奖励积分（Total amount and points）
+      ConsumptionRecord.findAll({
+        where: {
+          user_id: userId,
+          status: 'approved',
+          is_deleted: 0
+        },
+        attributes: [
+          [sequelize.fn('SUM', sequelize.col('consumption_amount')), 'total_amount'],
+          [sequelize.fn('SUM', sequelize.col('points_to_award')), 'total_points']
+        ],
+        raw: true
+      })
+    ])
+
+    return {
+      total_count: totalCount,
+      approved_count: approvedCount,
+      pending_count: pendingCount,
+      approval_rate: totalCount > 0 ? ((approvedCount / totalCount) * 100).toFixed(1) : 0,
+      month_count: thisMonth,
+      total_consumption_amount: parseFloat(totalStats[0]?.total_amount || 0),
+      total_points_awarded: parseInt(totalStats[0]?.total_points || 0)
+    }
+  }
+
+  /**
+   * 🔒 私有方法 - 获取库存统计
+   * @private
+   * @param {number} userId - 用户ID
+   * @param {Object} UserInventory - 用户库存模型
+   * @returns {Promise<Object>} 库存统计数据
+   */
+  static async _getInventoryStats (userId, UserInventory) {
+    const [totalCount, availableCount, usedCount] = await Promise.all([
+      // 总物品数（Total items count）
+      UserInventory.count({ where: { user_id: userId } }),
+
+      // 可用物品数（Available items count）
+      UserInventory.count({ where: { user_id: userId, status: 'available' } }),
+
+      // 已使用物品数（Used items count）
+      UserInventory.count({ where: { user_id: userId, status: 'used' } })
+    ])
+
+    return {
+      total_count: totalCount,
+      available_count: availableCount,
+      used_count: usedCount,
+      usage_rate: totalCount > 0 ? ((usedCount / totalCount) * 100).toFixed(1) : 0
+    }
+  }
+
+  /**
+   * 🆕 架构重构 - 检查账户健康状态（从 UserPointsAccount 模型迁移）
+   *
+   * 业务场景（Business Scenario）：
+   * - 检查积分账户是否存在异常（冻结、余额异常等）
+   * - 为管理员和用户提供账户健康度诊断
+   * - 符合架构规范：业务逻辑收口到 Service 层，Model 层只负责数据结构
+   *
+   * @param {Object} account - 积分账户实例（UserPointsAccount Instance）
+   * @returns {Object} 健康状态详情（Health Status Details）
+   * @returns {boolean} result.is_healthy - 账户是否健康（Is Account Healthy）
+   * @returns {Array<Object>} result.issues - 账户问题列表（Account Issues List）
+   * @returns {Array<Object>} result.warnings - 账户警告列表（Account Warnings List）
+   * @returns {number} result.health_score - 账户健康分数，范围0-100（Health Score, Range 0-100）
+   *
+   * @example
+   * const account = await PointsService.getUserPointsAccount(userId)
+   * const health = PointsService.getAccountHealth(account)
+   * console.log(health.is_healthy) // true/false
+   * console.log(health.health_score) // 100
+   */
+  static getAccountHealth (account) {
+    const issues = []
+    const warnings = []
+
+    // 检查账户是否被冻结（Check if account is frozen）
+    if (!account.is_active) {
+      issues.push({
+        type: 'account_frozen',
+        message: '账户已被冻结',
+        reason: account.freeze_reason
+      })
+    }
+
+    // 返回健康状态详情（Return health status details）
+    return {
+      is_healthy: issues.length === 0,
+      issues,
+      warnings,
+      health_score: Math.max(0, 100 - issues.length * 30 - warnings.length * 10)
+    }
+  }
+
+  /**
+   * 🆕 架构重构 - 生成个性化推荐数据（从 UserPointsAccount 模型迁移）
+   *
+   * 业务场景（Business Scenario）：
+   * - 为用户提供积分使用建议和任务推荐
+   * - 提升用户积分系统参与度
+   * - 符合架构规范：业务逻辑收口到 Service 层
+   *
+   * @param {Object} _account - 积分账户实例（UserPointsAccount Instance）- 预留参数，用于未来基于账户状态的个性化推荐
+   * @returns {Object} 推荐数据（Recommendation Data）
+   * @returns {boolean} result.enabled - 推荐功能是否启用（Is Recommendation Enabled）
+   * @returns {Array<Object>} result.recommendations - 推荐项列表（Recommendations List）
+   * @returns {string} result.generated_at - 推荐数据生成时间（Generated Timestamp）
+   *
+   * @example
+   * const account = await PointsService.getUserPointsAccount(userId)
+   * const recommendations = PointsService.getAccountRecommendations(account)
+   * console.log(recommendations.recommendations) // [{ type: 'daily_tasks', ... }]
+   */
+  static getAccountRecommendations (_account) {
+    const recommendations = []
+
+    /*
+     * 基础推荐：建议用户完成任务获得积分（Basic recommendation: complete daily tasks）
+     * 未来可以基于 _account 参数实现个性化推荐（Future: personalized recommendations based on _account）
+     */
+    recommendations.push({
+      type: 'daily_tasks',
+      priority: 'medium',
+      message: '完成每日任务获得积分奖励',
+      action: 'complete_tasks'
+    })
+
+    return {
+      enabled: true,
+      recommendations,
+      generated_at: BeijingTimeHelper.apiTimestamp() // 北京时间API时间戳（Beijing Time API Timestamp）
+    }
+  }
+
+  /**
+   * 🆕 架构重构 - 格式化账户摘要信息（从 UserPointsAccount 模型迁移）
+   *
+   * 业务场景（Business Scenario）：
+   * - 为前端提供格式化的账户摘要数据（健康状态+推荐+余额）
+   * - 统一账户数据输出格式，避免在路由层拼装数据
+   * - 符合架构规范：数据组装逻辑收口到 Service 层
+   *
+   * @param {Object} account - 积分账户实例（UserPointsAccount Instance）
+   * @returns {Object} 账户摘要（Account Summary）
+   * @returns {number} result.account_id - 账户ID（Account ID）
+   * @returns {number} result.user_id - 用户ID（User ID）
+   * @returns {Object} result.balance - 积分余额信息（Balance Info）
+   * @returns {number} result.balance.available - 可用积分（Available Points）
+   * @returns {number} result.balance.total_earned - 累计获得积分（Total Earned Points）
+   * @returns {number} result.balance.total_consumed - 累计消耗积分（Total Consumed Points）
+   * @returns {Object} result.health - 账户健康状态（Account Health Status）
+   * @returns {Array<Object>} result.recommendations - 推荐项列表（Recommendations List）
+   * @returns {boolean} result.is_active - 账户是否激活（Is Account Active）
+   * @returns {Date} result.created_at - 创建时间（Created At）
+   * @returns {Date} result.updated_at - 更新时间（Updated At）
+   *
+   * @example
+   * const account = await PointsService.getUserPointsAccount(userId)
+   * const summary = PointsService.getAccountSummary(account)
+   * return res.apiSuccess(summary, '账户摘要获取成功')
+   */
+  static getAccountSummary (account) {
+    const health = this.getAccountHealth(account)
+    const recommendations = this.getAccountRecommendations(account)
+
+    return {
+      account_id: account.account_id,
+      user_id: account.user_id,
+      balance: {
+        available: parseFloat(account.available_points),
+        total_earned: parseFloat(account.total_earned),
+        total_consumed: parseFloat(account.total_consumed)
+      },
+      health,
+      recommendations: recommendations.enabled ? recommendations.recommendations : [],
+      is_active: account.is_active,
+      created_at: account.created_at,
+      updated_at: account.updated_at
+    }
+  }
+
+  /**
+   * 🆕 架构重构 - 获取用户积分趋势数据（封装趋势查询逻辑）
+   *
+   * 业务场景（Business Scenario）：
+   * - 用户查看积分获得/消费趋势图表
+   * - 封装原 points.js 路由层的 GET /trend 接口逻辑（L1447-1690）
+   * - 符合架构规范：复杂查询和数据处理逻辑收口到 Service 层
+   *
+   * 功能说明（Feature Description）：
+   * 1. 查询指定天数内的积分交易记录（Sequelize查询）
+   * 2. 按日期分组统计（JavaScript Map数据结构）
+   * 3. 生成完整日期序列并补全缺失日期（循环生成）
+   * 4. 返回前端Chart.js可直接使用的数组格式（labels, earn_data, consume_data）
+   *
+   * @param {number} userId - 用户ID（User ID - Required）
+   * @param {Object} options - 查询选项（Query Options）
+   * @param {number} options.days - 查询天数，默认30天，范围7-90天（Days to query，default 30, range 7-90）
+   * @param {string} options.end_date - 结束日期，默认今天，格式YYYY-MM-DD（End date，default today，format YYYY-MM-DD）
+   * @returns {Promise<Object>} 趋势数据（Trend Data）
+   * @returns {Array<string>} result.labels - 日期标签数组，格式['11-01', '11-02', ...]（Date labels for Chart.js X-axis）
+   * @returns {Array<number>} result.earn_data - 每日获得积分数组（Daily earned points data）
+   * @returns {Array<number>} result.consume_data - 每日消费积分数组（Daily consumed points data）
+   * @returns {number} result.total_earn - 周期总获得积分（Total earned points in period）
+   * @returns {number} result.total_consume - 周期总消费积分（Total consumed points in period）
+   * @returns {number} result.net_change - 净变化（Net change = total_earn - total_consume）
+   * @returns {string} result.period - 统计周期描述（Period description）
+   * @returns {number} result.days - 实际统计天数（Actual days counted）
+   * @returns {number} result.data_points - 数据点数量（Data points count）
+   * @returns {string} result.timestamp - 查询时间戳（Query timestamp）
+   */
+  static async getUserPointsTrend (userId, options = {}) {
+    let { days = 30, end_date } = options
+
+    // 🔒 参数验证和安全清洗（Parameter validation and sanitization）
+    days = Math.min(Math.max(parseInt(days) || 30, 7), 90)
+
+    // 📅 处理结束日期（Handle end date）
+    let end_date_obj
+    if (end_date) {
+      end_date_obj = new Date(end_date)
+      if (isNaN(end_date_obj.getTime())) {
+        throw new Error('无效的结束日期格式，请使用YYYY-MM-DD格式')
+      }
+
+      const today = BeijingTimeHelper.createBeijingTime()
+      today.setHours(23, 59, 59, 999)
+
+      if (end_date_obj > today) {
+        throw new Error('结束日期不能超过今天')
+      }
+    } else {
+      end_date_obj = BeijingTimeHelper.createBeijingTime()
+    }
+
+    // 📅 计算日期范围（Calculate date range）
+    const start_date_obj = new Date(end_date_obj)
+    start_date_obj.setDate(start_date_obj.getDate() - (days - 1))
+    start_date_obj.setHours(0, 0, 0, 0)
+
+    const end_date_copy = new Date(end_date_obj)
+    end_date_copy.setHours(23, 59, 59, 999)
+
+    // 📊 查询交易记录（Query transactions）
+    const transactions = await PointsTransaction.findAll({
+      where: {
+        user_id: userId,
+        transaction_time: {
+          [Op.gte]: start_date_obj,
+          [Op.lte]: end_date_copy
+        },
+        status: 'completed'
+      },
+      attributes: ['transaction_id', 'transaction_type', 'points_amount', 'transaction_time'],
+      order: [['transaction_time', 'ASC']],
+      raw: true
+    })
+
+    // 📊 按日期分组统计（Group by date）
+    const daily_stats = new Map()
+
+    transactions.forEach(tx => {
+      const time_date =
+        tx.transaction_time instanceof Date ? tx.transaction_time : new Date(tx.transaction_time)
+
+      // 使用北京时区提取日期（Extract date in Beijing timezone）
+      const date_key = time_date
+        .toLocaleDateString('zh-CN', {
+          timeZone: 'Asia/Shanghai',
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit'
+        })
+        .replace(/\//g, '-')
+
+      if (!daily_stats.has(date_key)) {
+        daily_stats.set(date_key, { earn_amount: 0, consume_amount: 0 })
+      }
+
+      const stats = daily_stats.get(date_key)
+      const amount = Math.abs(parseFloat(tx.points_amount))
+
+      if (tx.transaction_type === 'earn') {
+        stats.earn_amount += amount
+      } else if (tx.transaction_type === 'consume') {
+        stats.consume_amount += amount
+      }
+    })
+
+    // 🗓️ 生成完整日期序列并补全缺失日期（Generate complete date sequence）
+    const labels = []
+    const earn_data = []
+    const consume_data = []
+    let total_earn = 0
+    let total_consume = 0
+
+    const current_date = new Date(start_date_obj)
+    const final_end_date = new Date(end_date_obj)
+    // eslint-disable-next-line no-unmodified-loop-condition
+    while (current_date <= final_end_date) {
+      const date_key = current_date
+        .toLocaleDateString('zh-CN', {
+          timeZone: 'Asia/Shanghai',
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit'
+        })
+        .replace(/\//g, '-')
+      const label = date_key.substring(5)
+      labels.push(label)
+
+      const stats = daily_stats.get(date_key) || { earn_amount: 0, consume_amount: 0 }
+
+      earn_data.push(Math.round(stats.earn_amount))
+      consume_data.push(Math.round(stats.consume_amount))
+
+      total_earn += stats.earn_amount
+      total_consume += stats.consume_amount
+
+      current_date.setDate(current_date.getDate() + 1)
+    }
+
+    // 🎉 返回趋势数据（Return trend data）
+    return {
+      labels,
+      earn_data,
+      consume_data,
+      total_earn: Math.round(total_earn),
+      total_consume: Math.round(total_consume),
+      net_change: Math.round(total_earn - total_consume),
+      period: `${start_date_obj.toISOString().split('T')[0]} 至 ${end_date_obj.toISOString().split('T')[0]}`,
+      days,
+      data_points: labels.length,
+      timestamp: BeijingTimeHelper.apiTimestamp()
     }
   }
 }

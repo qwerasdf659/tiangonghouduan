@@ -7,6 +7,9 @@
  */
 
 const { User, Role, UserRole } = require('../models')
+const BeijingTimeHelper = require('../utils/timeHelper')
+const logger = require('../utils/logger')
+const AuditLogService = require('./AuditLogService')
 
 /**
  * 用户角色服务类
@@ -193,6 +196,327 @@ class UserRoleService {
       user_count: role.users?.length || 0,
       description: role.description
     }))
+  }
+
+  /**
+   * 🔄 更新用户角色（管理后台专用）
+   *
+   * @param {number} user_id - 用户ID
+   * @param {string} role_name - 新角色名称
+   * @param {number} operator_id - 操作者ID
+   * @param {Object} options - 选项参数
+   * @param {Object} options.transaction - 外部事务对象（可选）
+   * @param {string} options.reason - 操作原因（可选）
+   * @param {string} options.ip_address - IP地址（可选）
+   * @param {string} options.user_agent - 用户代理（可选）
+   * @returns {Promise<Object>} 更新结果
+   */
+  static async updateUserRole (user_id, role_name, operator_id, options = {}) {
+    const { transaction, reason, ip_address, user_agent } = options
+    const { getUserRoles, invalidateUserPermissions } = require('../middleware/auth')
+    const { sequelize } = require('../models')
+
+    // 创建内部事务（如果外部没有传入）
+    const internalTransaction = transaction || (await sequelize.transaction())
+
+    try {
+      // 验证目标用户
+      const targetUser = await User.findByPk(user_id, { transaction: internalTransaction })
+      if (!targetUser) {
+        throw new Error('用户不存在')
+      }
+
+      // 验证操作者权限级别（防止低级别管理员修改高级别管理员）
+      const operatorRoles = await getUserRoles(operator_id)
+      const operatorMaxLevel = operatorRoles.roles.length > 0 ? Math.max(...operatorRoles.roles.map(r => r.role_level)) : 0
+
+      const targetUserRoles = await getUserRoles(user_id)
+      const targetMaxLevel = targetUserRoles.roles.length > 0 ? Math.max(...targetUserRoles.roles.map(r => r.role_level)) : 0
+
+      // 操作者权限必须高于目标用户
+      if (operatorMaxLevel <= targetMaxLevel) {
+        throw new Error(`权限不足：无法修改同级或更高级别用户的角色（操作者级别: ${operatorMaxLevel}, 目标用户级别: ${targetMaxLevel}）`)
+      }
+
+      // 验证目标角色
+      const targetRole = await Role.findOne({ where: { role_name }, transaction: internalTransaction })
+      if (!targetRole) {
+        throw new Error('角色不存在')
+      }
+
+      // 保存旧角色信息（用于审计日志）
+      const oldRoles = targetUserRoles.roles.map(r => r.role_name).join(', ') || '无角色'
+      const oldRoleLevel = targetMaxLevel
+
+      // 移除用户现有角色
+      await UserRole.destroy({ where: { user_id }, transaction: internalTransaction })
+
+      // 分配新角色
+      await UserRole.create({
+        user_id,
+        role_id: targetRole.role_id,
+        assigned_at: BeijingTimeHelper.createBeijingTime(),
+        assigned_by: operator_id,
+        is_active: true
+      }, { transaction: internalTransaction })
+
+      // 记录审计日志（权限变更属于高敏感操作）
+      await AuditLogService.logOperation({
+        operator_id,
+        operation_type: 'role_change',
+        target_type: 'User',
+        target_id: user_id,
+        action: 'update',
+        before_data: {
+          roles: oldRoles,
+          role_level: oldRoleLevel
+        },
+        after_data: {
+          roles: role_name,
+          role_level: targetRole.role_level
+        },
+        reason: reason || `角色变更: ${oldRoles} → ${role_name}`,
+        business_id: `role_change_${user_id}_${Date.now()}`,
+        ip_address,
+        user_agent,
+        transaction: internalTransaction
+      })
+
+      // 如果没有外部事务，提交内部事务
+      if (!transaction) {
+        await internalTransaction.commit()
+      }
+
+      // 自动清除用户权限缓存
+      await invalidateUserPermissions(user_id, `role_change_${role_name}`)
+      logger.info('权限缓存已清除', { user_id, reason: `角色变更 ${role_name}` })
+
+      // 获取更新后的用户角色信息
+      const updatedUserRoles = await getUserRoles(user_id)
+
+      logger.info('用户角色更新成功', { user_id, new_role: role_name, operator_id })
+
+      return {
+        user_id,
+        new_role: role_name,
+        new_role_level: targetRole.role_level,
+        roles: updatedUserRoles.roles,
+        operator_id,
+        reason
+      }
+    } catch (error) {
+      // 如果没有外部事务，回滚内部事务
+      if (!transaction && internalTransaction && !internalTransaction.finished) {
+        await internalTransaction.rollback()
+      }
+      logger.error('更新用户角色失败', { user_id, role_name, error: error.message })
+      throw error
+    }
+  }
+
+  /**
+   * 📝 更新用户状态（管理后台专用）
+   *
+   * @param {number} user_id - 用户ID
+   * @param {string} status - 状态（active/inactive/banned）
+   * @param {number} operator_id - 操作者ID
+   * @param {Object} options - 选项参数
+   * @returns {Promise<Object>} 更新结果
+   */
+  static async updateUserStatus (user_id, status, operator_id, options = {}) {
+    const { reason = '' } = options
+    const { invalidateUserPermissions } = require('../middleware/auth')
+
+    // 验证状态值
+    if (!['active', 'inactive', 'banned'].includes(status)) {
+      throw new Error('无效的用户状态')
+    }
+
+    // 禁止管理员修改自己的账号状态
+    if (parseInt(user_id) === operator_id) {
+      throw new Error(`禁止修改自己的账号状态（用户ID: ${user_id}, 操作者ID: ${operator_id}）`)
+    }
+
+    // 查找用户
+    const user = await User.findByPk(user_id)
+    if (!user) {
+      throw new Error('用户不存在')
+    }
+
+    const oldStatus = user.status
+
+    // 更新用户状态
+    await user.update({ status })
+
+    // 自动清除用户权限缓存
+    await invalidateUserPermissions(user_id, `status_change_${oldStatus}_to_${status}`)
+    logger.info('权限缓存已清除', { user_id, reason: `状态变更 ${oldStatus} → ${status}` })
+
+    logger.info('用户状态更新成功', { user_id, old_status: oldStatus, new_status: status, operator_id })
+
+    return {
+      user_id,
+      old_status: oldStatus,
+      new_status: status,
+      operator_id,
+      reason
+    }
+  }
+
+  /**
+   * 📋 获取用户列表（管理后台）
+   *
+   * @param {Object} filters - 过滤条件
+   * @returns {Promise<Object>} 用户列表和分页信息
+   */
+  static async getUserList (filters = {}) {
+    const { Op } = require('sequelize')
+    const { page = 1, limit = 20, search, role_filter } = filters
+
+    // 分页安全保护
+    const finalLimit = Math.min(parseInt(limit), 100)
+
+    // 构建查询条件
+    const whereClause = {}
+    if (search) {
+      whereClause[Op.or] = [
+        { mobile: { [Op.like]: `%${search}%` } },
+        { nickname: { [Op.like]: `%${search}%` } }
+      ]
+    }
+
+    // 基础查询
+    const userQuery = {
+      where: whereClause,
+      attributes: ['user_id', 'mobile', 'nickname', 'history_total_points', 'status', 'last_login', 'created_at'],
+      limit: finalLimit,
+      offset: (parseInt(page) - 1) * finalLimit,
+      order: [['created_at', 'DESC']],
+      include: [{
+        model: Role,
+        as: 'roles',
+        through: { where: { is_active: true } },
+        attributes: ['role_name', 'role_level'],
+        required: false
+      }]
+    }
+
+    // 角色过滤
+    if (role_filter) {
+      userQuery.include[0].where = { role_name: role_filter }
+      userQuery.include[0].required = true
+    }
+
+    // 查询用户数据
+    const { count, rows: users } = await User.findAndCountAll(userQuery)
+
+    // 处理用户数据
+    const processedUsers = users.map(user => {
+      const max_role_level = user.roles.length > 0 ? Math.max(...user.roles.map(role => role.role_level)) : 0
+      return {
+        user_id: user.user_id,
+        mobile: user.mobile,
+        nickname: user.nickname,
+        history_total_points: user.history_total_points,
+        status: user.status,
+        role_level: max_role_level,
+        roles: user.roles.map(role => role.role_name),
+        last_login: user.last_login,
+        created_at: user.created_at
+      }
+    })
+
+    logger.info('获取用户列表成功', { count })
+
+    return {
+      users: processedUsers,
+      pagination: {
+        current_page: parseInt(page),
+        per_page: parseInt(limit),
+        total: count,
+        total_pages: Math.ceil(count / parseInt(limit))
+      }
+    }
+  }
+
+  /**
+   * 📄 获取单个用户详情（管理后台）
+   *
+   * @param {number} user_id - 用户ID
+   * @returns {Promise<Object>} 用户详情
+   */
+  static async getUserDetail (user_id) {
+    // 查询用户信息（包含角色信息）
+    const user = await User.findOne({
+      where: { user_id },
+      include: [{
+        model: Role,
+        as: 'roles',
+        through: {
+          where: { is_active: true },
+          attributes: ['assigned_at', 'assigned_by']
+        },
+        attributes: ['role_uuid', 'role_name', 'role_level', 'description']
+      }]
+    })
+
+    if (!user) {
+      throw new Error('用户不存在')
+    }
+
+    // 计算用户权限级别
+    const max_role_level = user.roles.length > 0 ? Math.max(...user.roles.map(role => role.role_level)) : 0
+
+    logger.info('获取用户详情成功', { user_id })
+
+    return {
+      user: {
+        user_id: user.user_id,
+        mobile: user.mobile,
+        nickname: user.nickname,
+        status: user.status,
+        history_total_points: user.history_total_points,
+        consecutive_fail_count: user.consecutive_fail_count,
+        role_level: max_role_level,
+        roles: user.roles.map(role => ({
+          role_uuid: role.role_uuid,
+          role_name: role.role_name,
+          role_level: role.role_level,
+          description: role.description,
+          assigned_at: role.UserRole?.assigned_at
+        })),
+        last_login: user.last_login,
+        login_count: user.login_count,
+        created_at: user.created_at,
+        updated_at: user.updated_at
+      }
+    }
+  }
+
+  /**
+   * 📃 获取所有可用角色列表（管理后台）
+   *
+   * @returns {Promise<Object>} 角色列表
+   */
+  static async getRoleList () {
+    // 查询所有激活的角色
+    const roles = await Role.findAll({
+      where: { is_active: true },
+      attributes: ['role_id', 'role_uuid', 'role_name', 'role_level', 'description'],
+      order: [['role_level', 'DESC']]
+    })
+
+    logger.info('获取角色列表成功', { count: roles.length })
+
+    return {
+      roles: roles.map(role => ({
+        id: role.role_id,
+        role_uuid: role.role_uuid,
+        role_name: role.role_name,
+        role_level: role.role_level,
+        description: role.description
+      }))
+    }
   }
 }
 

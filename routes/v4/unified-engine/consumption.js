@@ -26,7 +26,6 @@ const BeijingTimeHelper = require('../../../utils/timeHelper')
 const express = require('express')
 const router = express.Router()
 const { authenticateToken, requireAdmin } = require('../../../middleware/auth')
-const ConsumptionService = require('../../../services/ConsumptionService')
 const QRCodeValidator = require('../../../utils/QRCodeValidator')
 const Logger = require('../../../services/UnifiedLotteryEngine/utils/Logger')
 
@@ -57,6 +56,9 @@ const logger = new Logger('ConsumptionAPI')
  */
 router.post('/submit', authenticateToken, async (req, res) => {
   try {
+    // 🔄 通过 ServiceManager 获取 ConsumptionService（符合TR-005规范）
+    const ConsumptionService = req.app.locals.services.getService('consumption')
+
     const { qr_code, consumption_amount, merchant_notes } = req.body
     const merchantId = req.user.user_id
 
@@ -128,6 +130,9 @@ router.post('/submit', authenticateToken, async (req, res) => {
  */
 router.get('/user/:user_id', authenticateToken, async (req, res) => {
   try {
+    // 🔄 通过 ServiceManager 获取 ConsumptionService（符合TR-005规范）
+    const ConsumptionService = req.app.locals.services.getService('consumption')
+
     const { user_id } = req.params
     const { status, page = 1, page_size = 20 } = req.query
 
@@ -219,56 +224,30 @@ router.get('/user/:user_id', authenticateToken, async (req, res) => {
  */
 router.get('/detail/:record_id', authenticateToken, async (req, res) => {
   try {
+    // 🔄 通过 ServiceManager 获取 ConsumptionService（符合TR-005规范）
+    const ConsumptionService = req.app.locals.services.getService('consumption')
+
     const { record_id } = req.params
+    const recordId = parseInt(record_id)
 
-    logger.info('查询消费记录详情', { record_id })
-
-    /*
-     * ✅ P0优化：步骤1 - 轻量查询验证权限（仅查询3个字段，响应<50ms）
-     * 注意：defaultScope自动过滤已删除记录，无需手动指定is_deleted字段
-     */
-    const { ConsumptionRecord } = require('../../../models')
-    const basicRecord = await ConsumptionRecord.findByPk(parseInt(record_id), {
-      attributes: ['record_id', 'user_id', 'merchant_id']
-    })
+    logger.info('查询消费记录详情', { record_id: recordId })
 
     /*
-     * ✅ P0优化：步骤2 - 记录不存在或已删除，直接返回404（不触发完整查询）
-     * 注意：由于defaultScope，已删除的记录会被自动过滤，findByPk返回null
+     * ✅ 调用 Service 层方法（含权限检查）
+     * Service 内部完成：1) 轻量查询验证权限  2) 权限通过后查询完整数据
      */
-    if (!basicRecord) {
-      logger.warn('消费记录不存在或已删除', { record_id })
-      return res.apiError('消费记录不存在或已被删除', 'NOT_FOUND', null, 404)
-    }
-
-    // ✅ P0优化：步骤3 - 验证权限（避免查询关联数据，节省5个表的JOIN查询）
-    /*
-     * ✅ 权限检查：用户本人、商家、管理员(role_level >= 100)可查询
-     * 修复：使用role_level数值比较，避免字符串匹配不一致风险
-     */
-    if (
-      req.user.user_id !== basicRecord.user_id &&
-      req.user.user_id !== basicRecord.merchant_id &&
-      req.user.role_level < 100
-    ) {
-      // 无权限：记录日志但不触发完整查询（节省约150ms数据库时间）
-      logger.warn('无权限查询消费记录', {
-        record_id,
-        user_id: req.user.user_id,
-        record_user_id: basicRecord.user_id,
-        record_merchant_id: basicRecord.merchant_id
-      })
-      return res.apiError('无权查看此消费记录', 'FORBIDDEN', null, 403)
-    }
-
-    // ✅ P0优化：步骤4 - 权限验证通过，查询完整数据（包含关联查询，响应~200ms）
-    const record = await ConsumptionService.getConsumptionRecordDetail(parseInt(record_id), {
-      include_review_records: true,
-      include_points_transaction: true
-    })
+    const record = await ConsumptionService.getConsumptionDetailWithAuth(
+      recordId,
+      req.user.user_id,
+      req.user.role_level >= 100,
+      {
+        include_review_records: true,
+        include_points_transaction: true
+      }
+    )
 
     logger.info('查询消费记录详情成功', {
-      record_id,
+      record_id: recordId,
       user_id: req.user.user_id,
       access_reason:
         req.user.role_level >= 100
@@ -287,9 +266,14 @@ router.get('/detail/:record_id', authenticateToken, async (req, res) => {
     })
 
     // ✅ P1优化：错误消息脱敏处理（不暴露数据库、表名、技术栈信息）
-    if (error.message && (error.message.includes('不存在') || error.message.includes('已被删除'))) {
+    if (error.statusCode === 404 || error.message.includes('不存在') || error.message.includes('已被删除')) {
       // 业务错误：记录不存在或已删除
       return res.apiError('消费记录不存在或已被删除', 'NOT_FOUND', null, 404)
+    }
+
+    if (error.statusCode === 403 || error.message.includes('无权')) {
+      // 业务错误：权限不足
+      return res.apiError('无权查看此消费记录', 'FORBIDDEN', null, 403)
     }
 
     // 其他错误统一返回通用消息（不暴露技术细节）
@@ -313,6 +297,9 @@ router.get('/detail/:record_id', authenticateToken, async (req, res) => {
  */
 router.get('/pending', authenticateToken, requireAdmin, async (req, res) => {
   try {
+    // 🔄 通过 ServiceManager 获取 ConsumptionService（符合TR-005规范）
+    const ConsumptionService = req.app.locals.services.getService('consumption')
+
     const { page = 1, page_size = 20 } = req.query
 
     // 分页参数验证
@@ -356,6 +343,9 @@ router.get('/pending', authenticateToken, requireAdmin, async (req, res) => {
  */
 router.get('/admin/records', authenticateToken, requireAdmin, async (req, res) => {
   try {
+    // 🔄 通过 ServiceManager 获取 ConsumptionService（符合TR-005规范）
+    const ConsumptionService = req.app.locals.services.getService('consumption')
+
     const { page = 1, page_size = 20, status = 'all', search = '' } = req.query
 
     logger.info('管理员查询消费记录', {
@@ -397,6 +387,9 @@ router.get('/admin/records', authenticateToken, requireAdmin, async (req, res) =
  */
 router.post('/approve/:record_id', authenticateToken, requireAdmin, async (req, res) => {
   try {
+    // 🔄 通过 ServiceManager 获取 ConsumptionService（符合TR-005规范）
+    const ConsumptionService = req.app.locals.services.getService('consumption')
+
     const { record_id } = req.params
     const { admin_notes } = req.body
     const reviewerId = req.user.user_id
@@ -457,6 +450,9 @@ router.post('/approve/:record_id', authenticateToken, requireAdmin, async (req, 
  */
 router.post('/reject/:record_id', authenticateToken, requireAdmin, async (req, res) => {
   try {
+    // 🔄 通过 ServiceManager 获取 ConsumptionService（符合TR-005规范）
+    const ConsumptionService = req.app.locals.services.getService('consumption')
+
     const { record_id } = req.params
     const { admin_notes } = req.body
     const reviewerId = req.user.user_id
@@ -627,6 +623,9 @@ router.get('/qrcode/:user_id', authenticateToken, async (req, res) => {
  */
 router.get('/user-info', authenticateToken, requireAdmin, async (req, res) => {
   try {
+    // 🔄 通过 ServiceManager 获取 ConsumptionService（符合TR-005规范）
+    const ConsumptionService = req.app.locals.services.getService('consumption')
+
     const { qr_code } = req.query
 
     // 参数验证
@@ -716,6 +715,9 @@ router.get('/user-info', authenticateToken, requireAdmin, async (req, res) => {
  */
 router.delete('/:record_id', authenticateToken, async (req, res) => {
   try {
+    // 🔄 通过 ServiceManager 获取 ConsumptionService（符合TR-005规范）
+    const ConsumptionService = req.app.locals.services.getService('consumption')
+
     const userId = req.user.user_id // 从JWT token获取用户ID
     const { record_id } = req.params
 
@@ -820,6 +822,9 @@ router.delete('/:record_id', authenticateToken, async (req, res) => {
  */
 router.post('/:record_id/restore', authenticateToken, requireAdmin, async (req, res) => {
   try {
+    // 🔄 通过 ServiceManager 获取 ConsumptionService（符合TR-005规范）
+    const ConsumptionService = req.app.locals.services.getService('consumption')
+
     const { record_id } = req.params
     const adminId = req.user.user_id
 

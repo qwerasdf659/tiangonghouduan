@@ -23,6 +23,26 @@ const ConsumptionService = require('./ConsumptionService')
 const CustomerServiceSessionService = require('./CustomerServiceSessionService')
 const HierarchyManagementService = require('./HierarchyManagementService')
 const UserRoleService = require('./UserRoleService')
+const ChatWebSocketService = require('./ChatWebSocketService')
+const PrizePoolService = require('./PrizePoolService') // 奖品池服务
+const PremiumService = require('./PremiumService') // 高级空间服务
+const SystemSettingsService = require('./SystemSettingsService') // 系统设置服务
+const UserService = require('./UserService') // 用户服务
+const UserDashboardService = require('./UserDashboardService') // 用户画像服务
+
+// V4 管理后台服务（新增）
+const AdminAnalyticsService = require('./AdminAnalyticsService') // 管理后台数据分析服务
+const FeedbackService = require('./FeedbackService') // 反馈管理服务
+const AdminSystemService = require('./AdminSystemService') // 管理后台系统监控服务
+const AdminMarketplaceService = require('./AdminMarketplaceService') // 管理后台市场管理服务
+const AdminLotteryService = require('./AdminLotteryService') // 管理后台抽奖管理服务
+const AdminCustomerServiceService = require('./AdminCustomerServiceService') // 管理后台客服管理服务
+
+// V4 架构重构新增服务（2025-12-10）
+const LotteryPresetService = require('./LotteryPresetService') // 抽奖预设管理服务
+const ActivityService = require('./ActivityService') // 活动管理服务
+const StatisticsService = require('./StatisticsService') // 统计数据服务
+const AuditLogService = require('./AuditLogService') // 审计日志服务
 
 // V4 模块化服务
 const { lottery_service_container } = require('./lottery')
@@ -167,9 +187,49 @@ class ServiceManager {
       this._services.set('customerServiceSession', CustomerServiceSessionService)
       this._services.set('hierarchyManagement', HierarchyManagementService)
       this._services.set('userRole', UserRoleService)
+      this._services.set('chatWebSocket', ChatWebSocketService) // ChatWebSocketService is already an instance
+      this._services.set('user', UserService) // 用户服务
+
+      // ✅ 注册管理服务（Admin Services）
+      this._services.set('prizePool', PrizePoolService) // 奖品池服务
+      this._services.set('premium', PremiumService) // 高级空间服务
+      this._services.set('systemSettings', SystemSettingsService) // 系统设置服务
+      this._services.set('adminAnalytics', AdminAnalyticsService) // 管理后台数据分析服务
+      this._services.set('feedback', FeedbackService) // 反馈管理服务
+      this._services.set('adminSystem', AdminSystemService) // 管理后台系统监控服务
+      this._services.set('adminMarketplace', AdminMarketplaceService) // 管理后台市场管理服务
+      this._services.set('adminLottery', AdminLotteryService) // 管理后台抽奖管理服务
+      this._services.set('adminCustomerService', AdminCustomerServiceService) // 管理后台客服管理服务
+      this._services.set('userDashboard', UserDashboardService) // 用户画像服务
+
+      // ✅ 注册架构重构新增服务（P0优先级 - 2025-12-10）
+      this._services.set('lotteryPreset', LotteryPresetService) // 抽奖预设管理服务
+      this._services.set('activity', ActivityService) // 活动管理服务
+      this._services.set('statistics', StatisticsService) // 统计数据服务
+      this._services.set('auditLog', AuditLogService) // 审计日志服务（P1优先级 - 2025-12-10）
+      this._services.set('lotteryManagement', AdminLotteryService) // 抽奖管理服务（文档要求的别名）
 
       // 注册模块化抽奖服务容器
       this._services.set('lotteryContainer', lottery_service_container)
+
+      /*
+       * 🎯 初始化阶段依赖注入（P2优先级 - 2025-12-10）
+       * 为所有需要依赖其他Service的Service注入依赖
+       */
+      console.log('🔧 开始注入Service依赖...')
+
+      // 注入管理后台服务的依赖
+      if (typeof AdminCustomerServiceService.initialize === 'function') {
+        AdminCustomerServiceService.initialize(this)
+      }
+      if (typeof AdminLotteryService.initialize === 'function') {
+        AdminLotteryService.initialize(this)
+      }
+      if (typeof AdminMarketplaceService.initialize === 'function') {
+        AdminMarketplaceService.initialize(this)
+      }
+
+      console.log('✅ Service依赖注入完成')
 
       this._initialized = true
       console.log('✅ V4服务管理器初始化完成')

@@ -666,6 +666,22 @@ app.use((error, req, res, _next) => {
   })
 })
 
+// 🔧 初始化Service层（移到这里，确保测试环境也能使用）
+try {
+  const models = require('./models')
+  const { initializeServices } = require('./services')
+  const services = initializeServices(models)
+
+  // 将Service容器添加到app实例中，供路由使用
+  app.locals.services = services
+
+  appLogger.info('Service层初始化完成', {
+    services: Array.from(services.getAllServices().keys())
+  })
+} catch (error) {
+  appLogger.error('Service层初始化失败', { error: error.message })
+}
+
 // 🚀 启动服务器
 const PORT = process.env.PORT || 3000
 const HOST = process.env.HOST || '0.0.0.0'
@@ -677,22 +693,6 @@ if (require.main === module) {
 
   server.listen(PORT, HOST, async () => {
     console.log('🔄 [DEBUG] 服务器启动监听完成')
-
-    // 初始化Service层
-    try {
-      const models = require('./models')
-      const { initializeServices } = require('./services')
-      const services = initializeServices(models)
-
-      // 将Service容器添加到app实例中，供路由使用
-      app.locals.services = services
-
-      appLogger.info('Service层初始化完成', {
-        services: Array.from(services.getAllServices().keys())
-      })
-    } catch (error) {
-      appLogger.error('Service层初始化失败', { error: error.message })
-    }
 
     // 🔌 初始化聊天WebSocket服务（新增）
     try {

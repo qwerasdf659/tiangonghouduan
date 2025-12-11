@@ -44,31 +44,23 @@ router.get('/config', async (req, res) => {
       action: 'VIEW_DEBUG_CONFIG'
     })
 
-    res.json({
-      success: true,
-      message: '获取调试配置成功',
-      data: {
-        environment: process.env.NODE_ENV,
-        currentLogLevel: config.currentLevel,
-        availableLogLevels: config.availableLevels,
-        debugUsers: config.debugUsers,
-        debugSessions: config.debugSessions,
-        debugUsersCount: config.debugUsers.length,
-        debugSessionsCount: config.debugSessions.length,
-        timestamp: new Date().toISOString()
-      }
-    })
+    return res.apiSuccess({
+      environment: process.env.NODE_ENV,
+      currentLogLevel: config.currentLevel,
+      availableLogLevels: config.availableLevels,
+      debugUsers: config.debugUsers,
+      debugSessions: config.debugSessions,
+      debugUsersCount: config.debugUsers.length,
+      debugSessionsCount: config.debugSessions.length,
+      timestamp: new Date().toISOString()
+    }, '获取调试配置成功')
   } catch (error) {
     logger.error('获取调试配置失败', {
       adminId: req.user?.id,
       error: error.message
     })
 
-    res.status(500).json({
-      success: false,
-      message: '获取调试配置失败',
-      error: error.message
-    })
+    return res.apiError('获取调试配置失败', 'GET_DEBUG_CONFIG_FAILED', { error: error.message }, 500)
   }
 })
 
@@ -87,23 +79,16 @@ router.post('/log-level', async (req, res) => {
     const { level, duration } = req.body
 
     if (!level) {
-      return res.status(400).json({
-        success: false,
-        message: '日志级别不能为空',
-        error_code: 'LOG_LEVEL_REQUIRED'
-      })
+      return res.apiError('日志级别不能为空', 'LOG_LEVEL_REQUIRED', null, 400)
     }
 
     // 设置日志级别
     const success = logger.setLogLevel(level)
 
     if (!success) {
-      return res.status(400).json({
-        success: false,
-        message: '无效的日志级别',
-        error_code: 'INVALID_LOG_LEVEL',
+      return res.apiError('无效的日志级别', 'INVALID_LOG_LEVEL', {
         availableLevels: ['error', 'warn', 'info', 'debug', 'trace']
-      })
+      }, 400)
     }
 
     // 审计日志
@@ -127,26 +112,18 @@ router.post('/log-level', async (req, res) => {
       }, duration * 60 * 1000)
     }
 
-    res.json({
-      success: true,
-      message: `日志级别已调整为 ${level}`,
-      data: {
-        level,
-        duration: duration ? `${duration}分钟后自动恢复` : '永久生效',
-        timestamp: new Date().toISOString()
-      }
-    })
+    return res.apiSuccess({
+      level,
+      duration: duration ? `${duration}分钟后自动恢复` : '永久生效',
+      timestamp: new Date().toISOString()
+    }, `日志级别已调整为 ${level}`)
   } catch (error) {
     logger.error('调整日志级别失败', {
       adminId: req.user?.id,
       error: error.message
     })
 
-    res.status(500).json({
-      success: false,
-      message: '调整日志级别失败',
-      error: error.message
-    })
+    return res.apiError('调整日志级别失败', 'CHANGE_LOG_LEVEL_FAILED', { error: error.message }, 500)
   }
 })
 
@@ -165,11 +142,7 @@ router.post('/user-debug', async (req, res) => {
     const { userId, duration = 30 } = req.body
 
     if (!userId) {
-      return res.status(400).json({
-        success: false,
-        message: '用户ID不能为空',
-        error_code: 'USER_ID_REQUIRED'
-      })
+      return res.apiError('用户ID不能为空', 'USER_ID_REQUIRED', null, 400)
     }
 
     // 启用用户调试模式
@@ -184,28 +157,20 @@ router.post('/user-debug', async (req, res) => {
       action: 'ENABLE_USER_DEBUG'
     })
 
-    res.json({
-      success: true,
-      message: `已为用户 ${userId} 开启调试模式`,
-      data: {
-        userId,
-        duration: `${duration}分钟`,
-        autoDisableAt: new Date(Date.now() + duration * 60 * 1000).toISOString(),
-        note: '该用户的所有请求将记录详细日志',
-        timestamp: new Date().toISOString()
-      }
-    })
+    return res.apiSuccess({
+      userId,
+      duration: `${duration}分钟`,
+      autoDisableAt: new Date(Date.now() + duration * 60 * 1000).toISOString(),
+      note: '该用户的所有请求将记录详细日志',
+      timestamp: new Date().toISOString()
+    }, `已为用户 ${userId} 开启调试模式`)
   } catch (error) {
     logger.error('开启用户调试模式失败', {
       adminId: req.user?.id,
       error: error.message
     })
 
-    res.status(500).json({
-      success: false,
-      message: '开启用户调试模式失败',
-      error: error.message
-    })
+    return res.apiError('开启用户调试模式失败', 'ENABLE_USER_DEBUG_FAILED', { error: error.message }, 500)
   }
 })
 
@@ -224,11 +189,7 @@ router.post('/session-debug', async (req, res) => {
     const { sessionId, duration = 30 } = req.body
 
     if (!sessionId) {
-      return res.status(400).json({
-        success: false,
-        message: '会话ID不能为空',
-        error_code: 'SESSION_ID_REQUIRED'
-      })
+      return res.apiError('会话ID不能为空', 'SESSION_ID_REQUIRED', null, 400)
     }
 
     // 启用会话调试模式
@@ -243,28 +204,20 @@ router.post('/session-debug', async (req, res) => {
       action: 'ENABLE_SESSION_DEBUG'
     })
 
-    res.json({
-      success: true,
-      message: `已为会话 ${sessionId} 开启调试模式`,
-      data: {
-        sessionId,
-        duration: `${duration}分钟`,
-        autoDisableAt: new Date(Date.now() + duration * 60 * 1000).toISOString(),
-        note: '该会话的所有请求将记录详细日志',
-        timestamp: new Date().toISOString()
-      }
-    })
+    return res.apiSuccess({
+      sessionId,
+      duration: `${duration}分钟`,
+      autoDisableAt: new Date(Date.now() + duration * 60 * 1000).toISOString(),
+      note: '该会话的所有请求将记录详细日志',
+      timestamp: new Date().toISOString()
+    }, `已为会话 ${sessionId} 开启调试模式`)
   } catch (error) {
     logger.error('开启会话调试模式失败', {
       adminId: req.user?.id,
       error: error.message
     })
 
-    res.status(500).json({
-      success: false,
-      message: '开启会话调试模式失败',
-      error: error.message
-    })
+    return res.apiError('开启会话调试模式失败', 'ENABLE_SESSION_DEBUG_FAILED', { error: error.message }, 500)
   }
 })
 
@@ -287,26 +240,18 @@ router.post('/clear-debug', async (req, res) => {
       action: 'CLEAR_ALL_DEBUG'
     })
 
-    res.json({
-      success: true,
-      message: '已清除所有调试会话',
-      data: {
-        clearedUsersCount: beforeConfig.debugUsers.length,
-        clearedSessionsCount: beforeConfig.debugSessions.length,
-        timestamp: new Date().toISOString()
-      }
-    })
+    return res.apiSuccess({
+      clearedUsersCount: beforeConfig.debugUsers.length,
+      clearedSessionsCount: beforeConfig.debugSessions.length,
+      timestamp: new Date().toISOString()
+    }, '已清除所有调试会话')
   } catch (error) {
     logger.error('清除调试会话失败', {
       adminId: req.user?.id,
       error: error.message
     })
 
-    res.status(500).json({
-      success: false,
-      message: '清除调试会话失败',
-      error: error.message
-    })
+    return res.apiError('清除调试会话失败', 'CLEAR_DEBUG_FAILED', { error: error.message }, 500)
   }
 })
 
@@ -321,11 +266,9 @@ router.get('/log-files', async (req, res) => {
     const logDir = path.join(__dirname, '../../logs')
 
     if (!fs.existsSync(logDir)) {
-      return res.json({
-        success: true,
-        message: '日志目录不存在',
-        data: { files: [] }
-      })
+      return res.apiSuccess({
+        files: []
+      }, '日志目录不存在')
     }
 
     const files = fs.readdirSync(logDir)
@@ -351,26 +294,18 @@ router.get('/log-files', async (req, res) => {
       action: 'VIEW_LOG_FILES'
     })
 
-    res.json({
-      success: true,
-      message: '获取日志文件列表成功',
-      data: {
-        files,
-        totalFiles: files.length,
-        logDirectory: logDir
-      }
-    })
+    return res.apiSuccess({
+      files,
+      totalFiles: files.length,
+      logDirectory: logDir
+    }, '获取日志文件列表成功')
   } catch (error) {
     logger.error('获取日志文件列表失败', {
       adminId: req.user?.id,
       error: error.message
     })
 
-    res.status(500).json({
-      success: false,
-      message: '获取日志文件列表失败',
-      error: error.message
-    })
+    return res.apiError('获取日志文件列表失败', 'GET_LOG_FILES_FAILED', { error: error.message }, 500)
   }
 })
 

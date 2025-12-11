@@ -24,7 +24,6 @@
 const express = require('express')
 const router = express.Router()
 const { authenticateToken, requireAdmin, getUserRoles } = require('../../../middleware/auth')
-const ExchangeMarketService = require('../../../services/ExchangeMarketService')
 const DataSanitizer = require('../../../services/DataSanitizer')
 const Logger = require('../../../services/UnifiedLotteryEngine/utils/Logger')
 
@@ -43,6 +42,9 @@ const logger = new Logger('ExchangeMarketAPI')
  */
 router.get('/items', authenticateToken, async (req, res) => {
   try {
+    // 🔄 通过 ServiceManager 获取 ExchangeMarketService（符合TR-005规范）
+    const ExchangeMarketService = req.app.locals.services.getService('exchangeMarket')
+
     const {
       status = 'active',
       price_type,
@@ -148,6 +150,9 @@ router.get('/items', authenticateToken, async (req, res) => {
  */
 router.get('/items/:item_id', authenticateToken, async (req, res) => {
   try {
+    // 🔄 通过 ServiceManager 获取 ExchangeMarketService（符合TR-005规范）
+    const ExchangeMarketService = req.app.locals.services.getService('exchangeMarket')
+
     const { item_id } = req.params
     const user_id = req.user.user_id
 
@@ -201,6 +206,9 @@ router.get('/items/:item_id', authenticateToken, async (req, res) => {
  */
 router.post('/exchange', authenticateToken, async (req, res) => {
   try {
+    // 🔄 通过 ServiceManager 获取 ExchangeMarketService（符合TR-005规范）
+    const ExchangeMarketService = req.app.locals.services.getService('exchangeMarket')
+
     const { item_id, quantity = 1 } = req.body
     const user_id = req.user.user_id
 
@@ -222,8 +230,13 @@ router.post('/exchange', authenticateToken, async (req, res) => {
       return res.apiError('兑换数量必须在1-10之间', 'BAD_REQUEST', null, 400)
     }
 
+    // ✅ 生成 business_id 用于幂等性控制（任务4.1：补全幂等性覆盖）
+    const business_id = `exchange_${user_id}_${itemId}_${Date.now()}`
+
     // 调用服务层
-    const result = await ExchangeMarketService.exchangeItem(user_id, itemId, exchangeQuantity)
+    const result = await ExchangeMarketService.exchangeItem(user_id, itemId, exchangeQuantity, {
+      business_id
+    })
 
     logger.info('兑换成功', {
       user_id,
@@ -272,6 +285,9 @@ router.post('/exchange', authenticateToken, async (req, res) => {
  */
 router.get('/orders', authenticateToken, async (req, res) => {
   try {
+    // 🔄 通过 ServiceManager 获取 ExchangeMarketService（符合TR-005规范）
+    const ExchangeMarketService = req.app.locals.services.getService('exchangeMarket')
+
     const { status, page = 1, page_size = 20 } = req.query
     const user_id = req.user.user_id
 
@@ -340,6 +356,9 @@ router.get('/orders', authenticateToken, async (req, res) => {
  */
 router.get('/orders/:order_no', authenticateToken, async (req, res) => {
   try {
+    // 🔄 通过 ServiceManager 获取 ExchangeMarketService（符合TR-005规范）
+    const ExchangeMarketService = req.app.locals.services.getService('exchangeMarket')
+
     const { order_no } = req.params
     const user_id = req.user.user_id
 
@@ -393,6 +412,9 @@ router.get('/orders/:order_no', authenticateToken, async (req, res) => {
  */
 router.post('/orders/:order_no/status', authenticateToken, requireAdmin, async (req, res) => {
   try {
+    // 🔄 通过 ServiceManager 获取 ExchangeMarketService（符合TR-005规范）
+    const ExchangeMarketService = req.app.locals.services.getService('exchangeMarket')
+
     const { order_no } = req.params
     const { status, remark = '' } = req.body
     const operator_id = req.user.user_id
@@ -461,6 +483,9 @@ router.post('/orders/:order_no/status', authenticateToken, requireAdmin, async (
  */
 router.get('/statistics', authenticateToken, requireAdmin, async (req, res) => {
   try {
+    // 🔄 通过 ServiceManager 获取 ExchangeMarketService（符合TR-005规范）
+    const ExchangeMarketService = req.app.locals.services.getService('exchangeMarket')
+
     const admin_id = req.user.user_id
 
     logger.info('管理员查询统计数据', { admin_id })

@@ -18,10 +18,9 @@
 
 const express = require('express')
 const router = express.Router()
-const { SystemAnnouncement } = require('../../models')
+// 🔄 TR-005规范：删除遗留的 models 直接引用，改为通过 ServiceManager 获取 Service
 const { authenticateToken, requireAdmin } = require('../../middleware/auth')
 const { Op } = require('sequelize')
-const AnnouncementService = require('../../services/AnnouncementService') // 🔴 引入公告服务层
 
 /**
  * GET /api/v4/notifications - 获取通知列表
@@ -39,6 +38,9 @@ const AnnouncementService = require('../../services/AnnouncementService') // �
  */
 router.get('/', authenticateToken, requireAdmin, async (req, res) => {
   try {
+    // 🔄 通过 ServiceManager 获取 AnnouncementService（符合TR-005规范）
+    const AnnouncementService = req.app.locals.services.getService('announcement')
+
     const { type, limit = 50 } = req.query
 
     // ✅ 使用 AnnouncementService 统一查询逻辑
@@ -84,14 +86,16 @@ router.get('/:notification_id', authenticateToken, requireAdmin, async (req, res
   try {
     const { notification_id } = req.params
 
-    const announcement = await SystemAnnouncement.findByPk(notification_id)
+    // 🔄 通过 ServiceManager 获取 AnnouncementService（符合TR-005规范）
+    const AnnouncementService = req.app.locals.services.getService('announcement')
+    const announcement = await AnnouncementService.getAnnouncementById(notification_id, 'full')
 
     if (!announcement) {
       return res.apiError('通知不存在', 'NOTIFICATION_NOT_FOUND', null, 404)
     }
 
     // 增加浏览次数（异步，不影响返回）
-    announcement.increment('view_count').catch(err => {
+    AnnouncementService.incrementViewCount(notification_id).catch(err => {
       console.error(`⚠️ 更新view_count失败（ID:${notification_id}):`, err.message)
     })
 
@@ -130,14 +134,16 @@ router.post('/:notification_id/read', authenticateToken, requireAdmin, async (re
   try {
     const { notification_id } = req.params
 
-    const announcement = await SystemAnnouncement.findByPk(notification_id)
+    // 🔄 通过 ServiceManager 获取 AnnouncementService（符合TR-005规范）
+    const AnnouncementService = req.app.locals.services.getService('announcement')
+    const announcement = await AnnouncementService.getAnnouncementById(notification_id, 'full')
 
     if (!announcement) {
       return res.apiError('通知不存在', 'NOTIFICATION_NOT_FOUND', null, 404)
     }
 
     // 增加浏览次数
-    await announcement.increment('view_count')
+    await AnnouncementService.incrementViewCount(notification_id)
 
     return res.apiSuccess({
       notification_id,
@@ -161,16 +167,11 @@ router.post('/:notification_id/read', authenticateToken, requireAdmin, async (re
  */
 router.post('/read-all', authenticateToken, requireAdmin, async (req, res) => {
   try {
-    // 更新所有view_count=0的公告
-    const [updated_count] = await SystemAnnouncement.update(
-      { view_count: 1 },
-      {
-        where: {
-          is_active: true,
-          view_count: 0
-        }
-      }
-    )
+    // 🔄 通过 ServiceManager 获取 AnnouncementService（符合TR-005规范）
+    const AnnouncementService = req.app.locals.services.getService('announcement')
+
+    // 使用 AnnouncementService 批量标记已读
+    const updated_count = await AnnouncementService.markAsReadBatch([])
 
     console.log(`[Notifications] ✅ 全部标记已读: ${updated_count}条公告`)
 
@@ -195,24 +196,31 @@ router.post('/read-all', authenticateToken, requireAdmin, async (req, res) => {
  */
 router.post('/clear', authenticateToken, requireAdmin, async (req, res) => {
   try {
-    // 将已读（view_count>0）的公告设为不活跃
-    const [cleared_count] = await SystemAnnouncement.update(
-      { is_active: false },
-      {
-        where: {
-          is_active: true,
-          view_count: {
-            [Op.gt]: 0
-          }
-        }
-      }
-    )
+    // 🔄 通过 ServiceManager 获取 AnnouncementService（符合TR-005规范）
+    const AnnouncementService = req.app.locals.services.getService('announcement')
+
+    // 获取所有已读的活跃公告ID
+    const announcements = await AnnouncementService.getAnnouncements({
+      activeOnly: true,
+      filterExpired: false,
+      limit: 1000,
+      dataLevel: 'full',
+      includeCreator: false
+    })
+
+    // 筛选出已读的公告（view_count > 0）
+    const readAnnouncementIds = announcements
+      .filter(ann => ann.view_count > 0)
+      .map(ann => ann.announcement_id)
+
+    // ✅ 使用 AnnouncementService 批量停用公告
+    const cleared_count = await AnnouncementService.deactivateBatch(readAnnouncementIds)
 
     console.log(`[Notifications] ✅ 清空通知: ${cleared_count}条公告设为不活跃`)
 
     return res.apiSuccess({
       cleared_count
-    }, `成功清空${cleared_count}条已读通知`)
+    }, cleared_count > 0 ? `成功清空${cleared_count}条已读通知` : '没有需要清空的已读通知')
   } catch (error) {
     console.error('[Notifications] ❌ 清空通知失败:', error)
     return res.apiInternalError('清空通知失败', error.message, 'CLEAR_NOTIFICATIONS_ERROR')
@@ -242,6 +250,9 @@ router.post('/send', authenticateToken, requireAdmin, async (req, res) => {
       return res.apiError('标题和内容不能为空', 'MISSING_REQUIRED_FIELDS', null, 400)
     }
 
+    // 🔄 通过 ServiceManager 获取 AnnouncementService（符合TR-005规范）
+    const AnnouncementService = req.app.locals.services.getService('announcement')
+
     // 映射前端类型到后端类型
     const typeMapping = {
       system: 'system',
@@ -251,18 +262,15 @@ router.post('/send', authenticateToken, requireAdmin, async (req, res) => {
     }
     const announcement_type = typeMapping[type] || 'notice'
 
-    // 创建系统公告
-    const announcement = await SystemAnnouncement.create({
+    // 使用 AnnouncementService 创建公告
+    const announcement = await AnnouncementService.createAnnouncement({
       title,
       content,
       type: announcement_type,
-      priority: type === 'alert' ? 'high' : 'medium', // 警告类型优先级高，其他为中等
-      is_active: true,
-      view_count: 0,
-      target_user_group: target,
-      admin_id: req.user.user_id,
+      priority: type === 'alert' ? 'high' : 'medium',
+      target_groups: target,
       internal_notes: `通过通知中心发送，管理员ID: ${req.user.user_id}`
-    })
+    }, req.user.user_id)
 
     console.log(`[Notifications] ✅ 发送通知成功: ${announcement.announcement_id} - ${title}`)
 

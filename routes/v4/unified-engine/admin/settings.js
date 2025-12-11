@@ -4,6 +4,11 @@
  * @description 系统配置管理相关路由（基础设置、抽奖设置、积分设置、通知设置、安全设置）
  * @version 4.0.0
  * @date 2025-11-23 北京时间
+ *
+ * 架构原则：
+ * - 路由层不直连 models（所有数据库操作通过 Service 层）
+ * - 路由层不开启事务（事务管理在 Service 层）
+ * - 通过 ServiceManager 统一获取服务实例
  */
 
 const express = require('express')
@@ -11,9 +16,7 @@ const router = express.Router()
 const {
   sharedComponents,
   adminAuthMiddleware,
-  asyncHandler,
-  models,
-  BeijingTimeHelper
+  asyncHandler
 } = require('./shared/middleware')
 
 /**
@@ -34,65 +37,35 @@ router.get(
     try {
       const { category } = req.params
 
-      // 验证分类是否合法
-      const validCategories = ['basic', 'lottery', 'points', 'notification', 'security']
-      if (!validCategories.includes(category)) {
-        return res.apiError(
-          '无效的设置分类',
-          'INVALID_CATEGORY',
-          { valid_categories: validCategories },
-          400
-        )
-      }
+      // 获取系统设置服务
+      const SystemSettingsService = req.app.locals.services.getService('systemSettings')
 
-      // 查询该分类下的所有配置项
-      const settings = await models.SystemSettings.findAll({
-        where: {
-          category,
-          is_visible: true // 只返回可见的配置项
-        },
-        attributes: [
-          'setting_id',
-          'category',
-          'setting_key',
-          'setting_value',
-          'value_type',
-          'description',
-          'is_readonly',
-          'updated_by',
-          'updated_at'
-        ],
-        order: [['setting_id', 'ASC']]
-      })
-
-      // 转换配置项数据（自动解析value_type）
-      const parsedSettings = settings.map(setting => {
-        const data = setting.toJSON()
-        // 使用模型的getParsedValue方法自动解析值
-        data.parsed_value = setting.getParsedValue()
-        return data
-      })
+      // 调用服务层方法（服务层负责验证和数据查询）
+      const result = await SystemSettingsService.getSettingsByCategory(category)
 
       sharedComponents.logger.info('管理员查询系统设置', {
         admin_id: req.user.user_id,
         category,
-        count: settings.length
+        count: result.count
       })
 
-      return res.apiSuccess(
-        {
-          category,
-          count: settings.length,
-          settings: parsedSettings
-        },
-        `${category}设置获取成功`
-      )
+      return res.apiSuccess(result, `${category}设置获取成功`)
     } catch (error) {
       sharedComponents.logger.error('获取系统设置失败', {
         error: error.message,
         category: req.params.category
       })
-      return res.apiInternalError('获取系统设置失败', error.message, 'SETTINGS_GET_ERROR')
+
+      // 处理业务错误
+      if (error.message.includes('无效的设置分类')) {
+        return res.apiError(error.message, 'INVALID_CATEGORY', null, 400)
+      }
+
+      return res.apiInternalError(
+        '获取系统设置失败',
+        error.message,
+        'SETTINGS_GET_ERROR'
+      )
     }
   })
 )
@@ -119,115 +92,47 @@ router.put(
       const { category } = req.params
       const { settings: settingsToUpdate } = req.body
 
-      // 验证分类是否合法（删除lottery，抽奖算法配置在代码中管理）
-      const validCategories = ['basic', 'points', 'notification', 'security']
-      if (!validCategories.includes(category)) {
+      // 获取系统设置服务
+      const SystemSettingsService = req.app.locals.services.getService('systemSettings')
+
+      // 调用服务层方法（服务层负责事务管理、验证和更新逻辑）
+      const result = await SystemSettingsService.updateSettings(
+        category,
+        settingsToUpdate,
+        req.user.user_id
+        // 注意：不传入事务对象，由服务层内部管理事务
+      )
+
+      // 根据更新结果返回响应
+      if (result.error_count === result.total_requested) {
         return res.apiError(
-          '无效的设置分类',
-          'INVALID_CATEGORY',
-          { valid_categories: validCategories },
+          '所有设置项更新失败',
+          'ALL_SETTINGS_UPDATE_FAILED',
+          result,
           400
         )
       }
 
-      // 验证更新数据
-      if (
-        !settingsToUpdate ||
-        typeof settingsToUpdate !== 'object' ||
-        Object.keys(settingsToUpdate).length === 0
-      ) {
-        return res.apiError('请提供要更新的设置项', 'INVALID_SETTINGS_DATA', null, 400)
-      }
-
-      const settingKeys = Object.keys(settingsToUpdate)
-      const updateResults = []
-      const errors = []
-
-      // 使用事务保证数据一致性
-      await models.sequelize.transaction(async transaction => {
-        for (const settingKey of settingKeys) {
-          try {
-            // 查找配置项
-            const setting = await models.SystemSettings.findOne({
-              where: {
-                category,
-                setting_key: settingKey
-              },
-              transaction
-            })
-
-            if (!setting) {
-              errors.push({
-                setting_key: settingKey,
-                error: '配置项不存在'
-              })
-              continue
-            }
-
-            // 检查是否为只读配置
-            if (setting.is_readonly) {
-              errors.push({
-                setting_key: settingKey,
-                error: '此配置项为只读，不可修改'
-              })
-              continue
-            }
-
-            // 更新配置值（使用模型的setValue方法自动类型转换）
-            const newValue = settingsToUpdate[settingKey]
-            setting.setValue(newValue)
-            setting.updated_by = req.user.user_id
-            setting.updated_at = BeijingTimeHelper.createBeijingTime()
-
-            await setting.save({ transaction })
-
-            updateResults.push({
-              setting_key: settingKey,
-              old_value: setting.setting_value,
-              new_value: newValue,
-              success: true
-            })
-
-            sharedComponents.logger.info('管理员更新系统设置', {
-              admin_id: req.user.user_id,
-              category,
-              setting_key: settingKey,
-              new_value: newValue
-            })
-          } catch (error) {
-            errors.push({
-              setting_key: settingKey,
-              error: error.message
-            })
-          }
-        }
-      })
-
-      // 返回更新结果
-      const responseData = {
-        category,
-        total_requested: settingKeys.length,
-        success_count: updateResults.length,
-        error_count: errors.length,
-        updates: updateResults,
-        timestamp: BeijingTimeHelper.apiTimestamp()
-      }
-
-      if (errors.length > 0) {
-        responseData.errors = errors
-      }
-
-      if (errors.length === settingKeys.length) {
-        return res.apiError('所有设置项更新失败', 'ALL_SETTINGS_UPDATE_FAILED', responseData, 400)
-      }
-
-      return res.apiSuccess(responseData, `${category}设置更新完成`)
+      return res.apiSuccess(result, `${category}设置更新完成`)
     } catch (error) {
       sharedComponents.logger.error('更新系统设置失败', {
         error: error.message,
         category: req.params.category
       })
-      return res.apiInternalError('更新系统设置失败', error.message, 'SETTINGS_UPDATE_ERROR')
+
+      // 处理业务错误
+      if (error.message.includes('无效的设置分类')) {
+        return res.apiError(error.message, 'INVALID_CATEGORY', null, 400)
+      }
+      if (error.message.includes('请提供要更新的设置项')) {
+        return res.apiError(error.message, 'INVALID_SETTINGS_DATA', null, 400)
+      }
+
+      return res.apiInternalError(
+        '更新系统设置失败',
+        error.message,
+        'SETTINGS_UPDATE_ERROR'
+      )
     }
   })
 )
@@ -244,33 +149,22 @@ router.get(
   adminAuthMiddleware,
   asyncHandler(async (req, res) => {
     try {
-      // 查询所有分类的配置数量
-      const categoryCounts = await models.SystemSettings.findAll({
-        attributes: [
-          'category',
-          [models.sequelize.fn('COUNT', models.sequelize.col('setting_id')), 'count']
-        ],
-        where: {
-          is_visible: true
-        },
-        group: ['category']
-      })
+      // 获取系统设置服务
+      const SystemSettingsService = req.app.locals.services.getService('systemSettings')
 
-      const summary = {
-        total_settings: 0,
-        categories: {}
-      }
-
-      categoryCounts.forEach(item => {
-        const data = item.toJSON()
-        summary.categories[data.category] = parseInt(data.count)
-        summary.total_settings += parseInt(data.count)
-      })
+      // 调用服务层方法
+      const summary = await SystemSettingsService.getSettingsSummary()
 
       return res.apiSuccess(summary, '系统设置概览获取成功')
     } catch (error) {
-      sharedComponents.logger.error('获取系统设置概览失败', { error: error.message })
-      return res.apiInternalError('获取系统设置概览失败', error.message, 'SETTINGS_SUMMARY_ERROR')
+      sharedComponents.logger.error('获取系统设置概览失败', {
+        error: error.message
+      })
+      return res.apiInternalError(
+        '获取系统设置概览失败',
+        error.message,
+        'SETTINGS_SUMMARY_ERROR'
+      )
     }
   })
 )
@@ -302,43 +196,27 @@ router.post(
         )
       }
 
-      const { getRawClient } = require('../../../../utils/UnifiedRedisClient')
-      const rawClient = getRawClient()
+      // 获取系统设置服务
+      const SystemSettingsService = req.app.locals.services.getService('systemSettings')
 
-      let clearedCount = 0
-      const cachePattern = pattern || '*' // 默认清除所有
+      // 调用服务层方法（服务层负责Redis操作）
+      const result = await SystemSettingsService.clearCache(pattern)
 
-      // 使用SCAN命令安全地获取匹配的keys（避免KEYS命令阻塞）
-      const keys = await rawClient.keys(cachePattern)
+      sharedComponents.logger.warn('管理员清除系统缓存', {
+        admin_id: req.user.user_id,
+        pattern: result.pattern,
+        cleared_count: result.cleared_count,
+        total_keys: result.matched_keys
+      })
 
-      if (keys && keys.length > 0) {
-        // 批量删除keys
-        if (keys.length === 1) {
-          clearedCount = await rawClient.del(keys[0])
-        } else {
-          clearedCount = await rawClient.del(...keys)
-        }
-
-        sharedComponents.logger.warn('管理员清除系统缓存', {
-          admin_id: req.user.user_id,
-          pattern: cachePattern,
-          cleared_count: clearedCount,
-          total_keys: keys.length
-        })
-      }
-
-      return res.apiSuccess(
-        {
-          pattern: cachePattern,
-          cleared_count: clearedCount,
-          matched_keys: keys ? keys.length : 0,
-          timestamp: BeijingTimeHelper.apiTimestamp()
-        },
-        '缓存清除成功'
-      )
+      return res.apiSuccess(result, '缓存清除成功')
     } catch (error) {
       sharedComponents.logger.error('清除缓存失败', { error: error.message })
-      return res.apiInternalError('清除缓存失败', error.message, 'CACHE_CLEAR_ERROR')
+      return res.apiInternalError(
+        '清除缓存失败',
+        error.message,
+        'CACHE_CLEAR_ERROR'
+      )
     }
   })
 )

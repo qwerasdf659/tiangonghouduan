@@ -72,7 +72,9 @@ exports.logOperation = async (
       'campaign_config',
       'role_assign',
       'system_config',
-      'session_assign' // 客服会话分配（P1优化）
+      'session_assign', // 客服会话分配（P1优化）
+      'inventory_operation', // 库存操作审计（使用/转让/核销）
+      'consumption_audit' // 消费审核审计（审核通过/拒绝）
     ]
 
     if (!validOperationTypes.includes(operationType)) {

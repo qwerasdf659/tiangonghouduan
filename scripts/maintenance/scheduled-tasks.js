@@ -9,15 +9,18 @@
  * 3. 抽奖管理设置过期清理（每小时检查）
  * 4. 抽奖管理缓存自动清理（每30秒）
  * 5. 数据库性能监控（每5分钟）- 2025-11-09新增
+ * 6. 抽奖奖品每日中奖次数重置（每天凌晨0点）- 2025-12-11新增
+ * 7. 抽奖活动状态同步（每小时检查）- 2025-12-11新增
  *
  * 创建时间：2025-10-10
- * 更新时间：2025-11-09（新增数据库性能监控任务）
+ * 更新时间：2025-12-11（新增抽奖相关定时任务，符合架构重构任务2.1）
  */
 
 const cron = require('node-cron')
 // 服务重命名（2025-10-12）：AuditManagementService → ExchangeOperationService
 const ExchangeOperationService = require('../../services/ExchangeOperationService')
 const ManagementStrategy = require('../../services/UnifiedLotteryEngine/strategies/ManagementStrategy')
+const AdminLotteryService = require('../../services/AdminLotteryService')
 const logger = require('../../utils/logger')
 const { UserPremiumStatus, sequelize } = require('../../models')
 const { Op } = sequelize.Sequelize
@@ -26,9 +29,16 @@ const BeijingTimeHelper = require('../../utils/timeHelper')
 // 2025-11-09新增：数据库性能监控
 const { monitor: databaseMonitor } = require('./database-performance-monitor')
 
+/**
+ * 定时任务管理类
+ *
+ * @class ScheduledTasks
+ * @description 负责管理所有定时任务的调度和执行
+ */
 class ScheduledTasks {
   /**
    * 初始化所有定时任务
+   * @returns {void}
    */
   static initialize () {
     logger.info('开始初始化定时任务...')
@@ -54,12 +64,19 @@ class ScheduledTasks {
     // 任务7: 每5分钟执行数据库性能监控（2025-11-09新增）
     this.scheduleDatabasePerformanceMonitor()
 
+    // 任务8: 每天凌晨0点重置抽奖奖品每日中奖次数（2025-12-11新增）
+    this.scheduleLotteryPrizesDailyReset()
+
+    // 任务9: 每小时同步抽奖活动状态（2025-12-11新增）
+    this.scheduleLotteryCampaignStatusSync()
+
     logger.info('所有定时任务已初始化完成')
   }
 
   /**
    * 定时任务1: 每小时检查超过24小时的待审核订单
    * Cron表达式: 0 * * * * (每小时的0分)
+   * @returns {void}
    */
   static scheduleTimeoutCheck () {
     cron.schedule('0 * * * *', async () => {
@@ -83,6 +100,7 @@ class ScheduledTasks {
   /**
    * 定时任务2: 每天9点和18点检查超过72小时的待审核订单（紧急告警）
    * Cron表达式: 0 9,18 * * * (每天9点和18点)
+   * @returns {void}
    */
   static scheduleUrgentTimeoutCheck () {
     cron.schedule('0 9,18 * * *', async () => {
@@ -107,6 +125,7 @@ class ScheduledTasks {
   /**
    * 定时任务3: 每天凌晨3点执行数据一致性检查
    * Cron表达式: 0 3 * * * (每天凌晨3点)
+   * @returns {void}
    */
   static scheduleDataConsistencyCheck () {
     cron.schedule('0 3 * * *', async () => {
@@ -159,6 +178,7 @@ class ScheduledTasks {
 
   /**
    * 手动触发24小时超时检查（用于测试）
+   * @returns {Promise<Object>} 检查结果对象
    */
   static async manualTimeoutCheck () {
     logger.info('[手动触发] 执行24小时超时订单检查...')
@@ -174,6 +194,7 @@ class ScheduledTasks {
 
   /**
    * 手动触发72小时紧急超时检查（用于测试）
+   * @returns {Promise<Object>} 检查结果对象
    */
   static async manualUrgentTimeoutCheck () {
     logger.info('[手动触发] 执行72小时紧急超时订单检查...')
@@ -200,6 +221,7 @@ class ScheduledTasks {
    * 4. 记录清理日志
    *
    * 创建时间：2025-11-08
+   * @returns {void}
    */
   static scheduleLotteryManagementCleanup () {
     cron.schedule('0 * * * *', async () => {
@@ -268,6 +290,7 @@ class ScheduledTasks {
    * - is_unlocked: true=已解锁且有效，false=未解锁或已过期
    *
    * 创建时间：2025-11-09
+   * @returns {void}
    */
   static schedulePremiumExpiryReminder () {
     cron.schedule('0 * * * *', async () => {
@@ -341,6 +364,7 @@ class ScheduledTasks {
    * - is_unlocked: true=已解锁且有效，false=未解锁或已过期
    *
    * 创建时间：2025-11-09
+   * @returns {void}
    */
   static schedulePremiumStatusCleanup () {
     cron.schedule('0 3 * * *', async () => {
@@ -429,6 +453,7 @@ class ScheduledTasks {
    * 参考文档：docs/数据库性能问题排查和优化方案.md
    *
    * 创建时间：2025-11-09
+   * @returns {void}
    */
   static scheduleDatabasePerformanceMonitor () {
     cron.schedule('0,10,20,30,40,50 * * * *', async () => {
@@ -485,6 +510,156 @@ class ScheduledTasks {
       return report
     } catch (error) {
       logger.error('[手动触发] 数据库性能监控失败', { error: error.message })
+      throw error
+    }
+  }
+
+  /**
+   * 定时任务8: 每天凌晨0点重置抽奖奖品每日中奖次数
+   * Cron表达式: 0 0 * * * (每天凌晨0点)
+   *
+   * 业务场景：
+   * - 每日凌晨自动重置所有奖品的今日中奖次数
+   * - 确保每日中奖限制（max_daily_wins）正常工作
+   * - 为新的一天的抽奖活动做准备
+   *
+   * 功能：
+   * 1. 批量更新所有奖品的daily_win_count为0
+   * 2. 记录重置日志和统计信息
+   *
+   * 架构设计：
+   * - 从LotteryPrize模型迁移到AdminLotteryService（符合任务2.1）
+   * - 批处理逻辑应在Service层，Model层只保留字段定义
+   *
+   * 参考文档：docs/架构重构待办清单.md - 任务2.1
+   *
+   * 创建时间：2025-12-11
+   * @returns {void}
+   */
+  static scheduleLotteryPrizesDailyReset () {
+    cron.schedule('0 0 * * *', async () => {
+      try {
+        logger.info('[定时任务] 开始重置抽奖奖品每日中奖次数...')
+
+        // 调用AdminLotteryService的方法
+        const result = await AdminLotteryService.resetDailyWinCounts()
+
+        logger.info('[定时任务] 抽奖奖品每日中奖次数重置完成', {
+          updated_count: result.updated_count,
+          timestamp: result.timestamp
+        })
+      } catch (error) {
+        logger.error('[定时任务] 抽奖奖品每日中奖次数重置失败', { error: error.message })
+      }
+    })
+
+    logger.info('✅ 定时任务已设置: 抽奖奖品每日中奖次数重置（每天凌晨0点执行）')
+  }
+
+  /**
+   * 定时任务9: 每小时同步抽奖活动状态
+   * Cron表达式: 0 * * * * (每小时的0分)
+   *
+   * 业务场景：
+   * - 每小时自动检查并同步抽奖活动状态
+   * - 自动开启到达开始时间的draft活动
+   * - 自动结束已过结束时间的active活动
+   * - 确保活动状态与时间保持一致
+   *
+   * 功能：
+   * 1. 将符合条件的draft活动更新为active（start_time <= 现在 < end_time）
+   * 2. 将过期的active活动更新为ended（end_time < 现在）
+   * 3. 记录状态变更日志和统计信息
+   *
+   * 架构设计：
+   * - 从LotteryCampaign模型迁移到AdminLotteryService（符合任务2.1）
+   * - 批处理逻辑应在Service层，Model层只保留字段定义
+   *
+   * 参考文档：docs/架构重构待办清单.md - 任务2.1
+   *
+   * 创建时间：2025-12-11
+   * @returns {void}
+   */
+  static scheduleLotteryCampaignStatusSync () {
+    cron.schedule('0 * * * *', async () => {
+      try {
+        logger.info('[定时任务] 开始同步抽奖活动状态...')
+
+        // 调用AdminLotteryService的方法
+        const result = await AdminLotteryService.syncCampaignStatus()
+
+        if (result.started > 0 || result.ended > 0) {
+          logger.info('[定时任务] 抽奖活动状态同步完成', {
+            started_count: result.started,
+            ended_count: result.ended,
+            timestamp: result.timestamp
+          })
+        } else {
+          logger.info('[定时任务] 抽奖活动状态同步完成：无需更新')
+        }
+      } catch (error) {
+        logger.error('[定时任务] 抽奖活动状态同步失败', { error: error.message })
+      }
+    })
+
+    logger.info('✅ 定时任务已设置: 抽奖活动状态同步（每小时执行）')
+  }
+
+  /**
+   * 手动触发抽奖奖品每日中奖次数重置（用于测试）
+   *
+   * 业务场景：手动重置奖品每日中奖次数，用于开发调试和即时重置
+   *
+   * @returns {Promise<Object>} 重置结果对象
+   * @returns {boolean} return.success - 是否成功
+   * @returns {number} return.updated_count - 更新的奖品数量
+   * @returns {Date} return.timestamp - 重置时间戳
+   *
+   * @example
+   * const ScheduledTasks = require('./scripts/maintenance/scheduled-tasks')
+   * const result = await ScheduledTasks.manualLotteryPrizesDailyReset()
+   * console.log(`重置了${result.updated_count}个奖品的每日中奖次数`)
+   *
+   * 创建时间：2025-12-11
+   */
+  static async manualLotteryPrizesDailyReset () {
+    logger.info('[手动触发] 执行抽奖奖品每日中奖次数重置...')
+    try {
+      const result = await AdminLotteryService.resetDailyWinCounts()
+      logger.info('[手动触发] 重置完成', { result })
+      return result
+    } catch (error) {
+      logger.error('[手动触发] 重置失败', { error: error.message })
+      throw error
+    }
+  }
+
+  /**
+   * 手动触发抽奖活动状态同步（用于测试）
+   *
+   * 业务场景：手动同步活动状态，用于开发调试和即时同步
+   *
+   * @returns {Promise<Object>} 同步结果对象
+   * @returns {boolean} return.success - 是否成功
+   * @returns {number} return.started - 开始的活动数量
+   * @returns {number} return.ended - 结束的活动数量
+   * @returns {Date} return.timestamp - 同步时间戳
+   *
+   * @example
+   * const ScheduledTasks = require('./scripts/maintenance/scheduled-tasks')
+   * const result = await ScheduledTasks.manualLotteryCampaignStatusSync()
+   * console.log(`启动了${result.started}个活动，结束了${result.ended}个活动`)
+   *
+   * 创建时间：2025-12-11
+   */
+  static async manualLotteryCampaignStatusSync () {
+    logger.info('[手动触发] 执行抽奖活动状态同步...')
+    try {
+      const result = await AdminLotteryService.syncCampaignStatus()
+      logger.info('[手动触发] 同步完成', { result })
+      return result
+    } catch (error) {
+      logger.error('[手动触发] 同步失败', { error: error.message })
       throw error
     }
   }

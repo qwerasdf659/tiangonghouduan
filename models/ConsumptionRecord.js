@@ -390,6 +390,21 @@ module.exports = sequelize => {
 
       /*
        * ========================================
+       * 业务幂等控制
+       * ========================================
+       */
+      business_id: {
+        type: DataTypes.STRING(100),
+        allowNull: true, // 允许为空，兼容历史数据
+        // eslint-disable-next-line no-template-curly-in-string
+        comment: '业务关联ID，用于幂等控制（格式：consumption_${userId}_${merchantId}_${timestamp}）',
+        validate: {
+          len: [0, 100]
+        }
+      },
+
+      /*
+       * ========================================
        * 备注信息
        * ========================================
        */

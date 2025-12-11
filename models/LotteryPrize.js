@@ -142,15 +142,6 @@ class LotteryPrize extends Model {
   }
 
   /**
-   * 重置每日中奖次数（静态方法）
-   * 业务场景：每日凌晨定时任务执行，重置所有奖品的今日中奖次数
-   * @returns {Promise<void>} 无返回值
-   */
-  static async resetDailyWinCount () {
-    await LotteryPrize.update({ daily_win_count: 0 }, { where: {} })
-  }
-
-  /**
    * 获取奖品摘要信息
    * 业务场景：API响应、管理后台展示
    * @returns {Object} 奖品摘要对象

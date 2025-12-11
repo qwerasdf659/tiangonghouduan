@@ -313,6 +313,30 @@ class AnnouncementService {
   }
 
   /**
+   * 批量停用公告（设置为不活跃）
+   * 用于清空已读通知等场景
+   *
+   * @param {Array<number>} announcementIds - 公告ID数组
+   * @returns {Promise<number>} 更新的记录数
+   */
+  static async deactivateBatch (announcementIds = []) {
+    if (announcementIds.length === 0) {
+      return 0
+    }
+
+    const [updatedCount] = await SystemAnnouncement.update(
+      { is_active: false },
+      {
+        where: {
+          announcement_id: { [Op.in]: announcementIds }
+        }
+      }
+    )
+
+    return updatedCount
+  }
+
+  /**
    * 获取公告统计信息（管理员后台专用）
    * @returns {Promise<Object>} 统计数据
    */

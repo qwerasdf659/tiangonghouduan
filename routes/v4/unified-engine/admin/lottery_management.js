@@ -2,19 +2,24 @@
  * 抽奖管理模块
  *
  * @description 抽奖管理相关路由，包括强制中奖、强制不中奖、概率调整、用户特定队列等
- * @version 4.0.0
+ * @version 5.0.0（重构版：使用AdminLotteryService）
  * @date 2025-09-24
+ * @updated 2025-12-09（重构：路由层委托给AdminLotteryService处理）
+ *
+ * 架构原则：
+ * - 路由层不直连 models（所有数据库操作通过 Service 层）
+ * - 路由层不开启事务（事务管理在 Service 层）
+ * - 通过 ServiceManager 统一获取服务实例
+ * - 使用 AdminLotteryService 封装所有抽奖管理逻辑
  */
 
 const express = require('express')
 const router = express.Router()
+const BeijingTimeHelper = require('../../../../utils/timeHelper')
 const {
-  sharedComponents,
   adminAuthMiddleware,
   asyncHandler,
-  validators,
-  models,
-  BeijingTimeHelper
+  validators
 } = require('./shared/middleware')
 
 /**
@@ -35,26 +40,17 @@ router.post(
       const validatedUserId = validators.validateUserId(user_id)
       const validatedPrizeId = validators.validatePrizeId(prize_id)
 
-      // 查找用户
-      const user = await models.User.findByPk(validatedUserId)
-      if (!user) {
-        return res.apiError('用户不存在', 'USER_NOT_FOUND')
-      }
-
-      // 查找奖品
-      const prize = await models.LotteryPrize.findByPk(validatedPrizeId)
-      if (!prize) {
-        return res.apiError('奖品不存在', 'PRIZE_NOT_FOUND')
-      }
-
       // 计算过期时间（如果提供了持续时间）
       let expiresAt = null
       if (duration_minutes && !isNaN(parseInt(duration_minutes))) {
         expiresAt = BeijingTimeHelper.futureTime(parseInt(duration_minutes) * 60 * 1000)
       }
 
-      // 调用管理策略设置强制中奖（V4.1新签名：adminId, targetUserId, prizeId, reason, expiresAt）
-      const result = await sharedComponents.managementStrategy.forceWin(
+      // 🎯 通过 ServiceManager 获取 AdminLotteryService
+      const AdminLotteryService = req.app.locals.services.getService('adminLottery')
+
+      // 🎯 调用服务层方法（内部会验证用户/奖品、调用ManagementStrategy、记录审计日志）
+      const result = await AdminLotteryService.forceWinForUser(
         req.user?.user_id || req.user?.id,
         validatedUserId,
         validatedPrizeId,
@@ -62,44 +58,17 @@ router.post(
         expiresAt
       )
 
-      if (result.success) {
-        sharedComponents.logger.info('强制中奖设置成功', {
-          setting_id: result.setting_id,
-          user_id: validatedUserId,
-          prize_id: validatedPrizeId,
-          admin_id: req.user?.user_id || req.user?.id,
-          reason,
-          expires_at: expiresAt,
-          timestamp: result.timestamp
-        })
-
-        return res.apiSuccess(
-          {
-            setting_id: result.setting_id,
-            user_id: validatedUserId,
-            user_mobile: user.mobile,
-            prize_id: validatedPrizeId,
-            prize_name: prize.prize_name,
-            status: 'force_win_set',
-            reason,
-            expires_at: expiresAt,
-            admin_id: req.user?.user_id || req.user?.id,
-            timestamp: result.timestamp
-          },
-          '强制中奖设置成功'
-        )
-      } else {
-        return res.apiError(result.error || '强制中奖设置失败', 'FORCE_WIN_FAILED')
-      }
+      return res.apiSuccess(result, '强制中奖设置成功')
     } catch (error) {
       if (
         error.message.includes('无效的') ||
         error.message.includes('不存在') ||
-        error.message.includes('验证失败')
+        error.message.includes('验证失败') ||
+        error.code === 'USER_NOT_FOUND' ||
+        error.message.includes('奖品不存在')
       ) {
-        return res.apiError(error.message, 'VALIDATION_ERROR')
+        return res.apiError(error.message, error.code || 'VALIDATION_ERROR')
       }
-      sharedComponents.logger.error('强制中奖设置失败', { error: error.message })
       return res.apiInternalError('强制中奖设置失败', error.message, 'FORCE_WIN_ERROR')
     }
   })
@@ -126,20 +95,17 @@ router.post(
         return res.apiError('不中奖次数必须在1-100之间', 'INVALID_COUNT')
       }
 
-      // 查找用户
-      const user = await models.User.findByPk(validatedUserId)
-      if (!user) {
-        return res.apiError('用户不存在', 'USER_NOT_FOUND')
-      }
-
       // 计算过期时间（如果提供了持续时间）
       let expiresAt = null
       if (duration_minutes && !isNaN(parseInt(duration_minutes))) {
         expiresAt = BeijingTimeHelper.futureTime(parseInt(duration_minutes) * 60 * 1000)
       }
 
-      // 调用管理策略设置强制不中奖（V4.1新签名：adminId, targetUserId, count, reason, expiresAt）
-      const result = await sharedComponents.managementStrategy.forceLose(
+      // 🎯 通过 ServiceManager 获取 AdminLotteryService
+      const AdminLotteryService = req.app.locals.services.getService('adminLottery')
+
+      // 🎯 调用服务层方法
+      const result = await AdminLotteryService.forceLoseForUser(
         req.user?.user_id || req.user?.id,
         validatedUserId,
         parseInt(count),
@@ -147,45 +113,16 @@ router.post(
         expiresAt
       )
 
-      if (result.success) {
-        sharedComponents.logger.info('强制不中奖设置成功', {
-          setting_id: result.setting_id,
-          user_id: validatedUserId,
-          count: parseInt(count),
-          remaining: result.remaining,
-          admin_id: req.user?.user_id || req.user?.id,
-          reason,
-          expires_at: expiresAt,
-          timestamp: result.timestamp
-        })
-
-        return res.apiSuccess(
-          {
-            setting_id: result.setting_id,
-            user_id: validatedUserId,
-            user_mobile: user.mobile,
-            status: 'force_lose_set',
-            count: parseInt(count),
-            remaining: result.remaining,
-            reason,
-            expires_at: expiresAt,
-            admin_id: req.user?.user_id || req.user?.id,
-            timestamp: result.timestamp
-          },
-          `强制不中奖设置成功，将在接下来${count}次抽奖中不中奖`
-        )
-      } else {
-        return res.apiError(result.error || '强制不中奖设置失败', 'FORCE_LOSE_FAILED')
-      }
+      return res.apiSuccess(result, `强制不中奖设置成功，将在接下来${count}次抽奖中不中奖`)
     } catch (error) {
       if (
         error.message.includes('无效的') ||
         error.message.includes('不存在') ||
-        error.message.includes('验证失败')
+        error.message.includes('验证失败') ||
+        error.code === 'USER_NOT_FOUND'
       ) {
-        return res.apiError(error.message, 'VALIDATION_ERROR')
+        return res.apiError(error.message, error.code || 'VALIDATION_ERROR')
       }
-      sharedComponents.logger.error('强制不中奖设置失败', { error: error.message })
       return res.apiInternalError('强制不中奖设置失败', error.message, 'FORCE_LOSE_ERROR')
     }
   })
@@ -205,9 +142,9 @@ router.post(
     try {
       const {
         user_id,
-        probability_multiplier, // 🔴 兼容旧版：全局倍数（如果没有prize_id）
-        prize_id, // 🆕 新增：特定奖品ID
-        custom_probability, // 🆕 新增：自定义概率（0-1之间）
+        probability_multiplier, // 🔴 全局倍数（如果没有prize_id）
+        prize_id, // 🆕 特定奖品ID
+        custom_probability, // 🆕 自定义概率（0-1之间）
         duration_minutes = 60,
         reason = '管理员概率调整'
       } = req.body
@@ -217,7 +154,7 @@ router.post(
 
       // 🆕 判断是全局调整还是特定奖品调整
       const isSpecificPrize = !!prize_id
-      let settingData = {}
+      let adjustmentData = {}
 
       if (isSpecificPrize) {
         // ===== 特定奖品概率调整（新功能） =====
@@ -233,18 +170,11 @@ router.post(
           return res.apiError('自定义概率必须在0.01-1.0之间（1%-100%）', 'PROBABILITY_OUT_OF_RANGE')
         }
 
-        // 查找奖品
-        const prize = await models.LotteryPrize.findByPk(validatedPrizeId)
-        if (!prize) {
-          return res.apiError('奖品不存在', 'PRIZE_NOT_FOUND')
-        }
-
-        settingData = {
+        adjustmentData = {
           prize_id: validatedPrizeId,
-          prize_name: prize.prize_name,
           custom_probability: probability,
-          auto_adjust_others: true, // 自动调整其他奖品概率
-          adjustment_type: 'specific_prize' // 标记为特定奖品调整
+          adjustment_type: 'specific_prize',
+          reason
         }
       } else {
         // ===== 全局概率倍数调整（原有功能） =====
@@ -257,9 +187,10 @@ router.post(
           return res.apiError('概率倍数必须在0.1-10之间', 'PROBABILITY_MULTIPLIER_OUT_OF_RANGE')
         }
 
-        settingData = {
+        adjustmentData = {
           multiplier,
-          adjustment_type: 'global_multiplier' // 标记为全局倍数调整
+          adjustment_type: 'global_multiplier',
+          reason
         }
       }
 
@@ -273,67 +204,29 @@ router.post(
         return res.apiError('持续时间必须在1-1440分钟之间', 'INVALID_DURATION')
       }
 
-      // 查找用户
-      const user = await models.User.findByPk(validatedUserId)
-      if (!user) {
-        return res.apiError('用户不存在', 'USER_NOT_FOUND')
-      }
-
       // 计算过期时间
       const expiresAt = BeijingTimeHelper.futureTime(parseInt(duration_minutes) * 60 * 1000)
 
-      // 🔴 直接创建数据库记录（不调用ManagementStrategy，避免数据格式不匹配）
-      const setting = await models.LotteryManagementSetting.create({
-        user_id: validatedUserId,
-        setting_type: 'probability_adjust',
-        setting_data: settingData,
-        expires_at: expiresAt,
-        status: 'active',
-        created_by: req.user?.user_id || req.user?.id
-      })
+      // 🎯 通过 ServiceManager 获取 AdminLotteryService
+      const AdminLotteryService = req.app.locals.services.getService('adminLottery')
 
-      sharedComponents.logger.info('用户概率调整成功', {
-        setting_id: setting.setting_id,
-        user_id: validatedUserId,
-        is_specific_prize: isSpecificPrize,
-        setting_data: settingData,
-        duration_minutes: parseInt(duration_minutes),
-        expires_at: expiresAt,
-        admin_id: req.user?.user_id || req.user?.id,
-        reason,
-        timestamp: BeijingTimeHelper.now()
-      })
+      // 🎯 调用服务层方法
+      const result = await AdminLotteryService.adjustUserProbability(
+        req.user?.user_id || req.user?.id,
+        validatedUserId,
+        adjustmentData,
+        expiresAt
+      )
 
-      const responseData = {
-        setting_id: setting.setting_id,
-        user_id: validatedUserId,
-        user_mobile: user.mobile,
-        status: 'probability_adjusted',
-        adjustment_type: settingData.adjustment_type,
-        duration_minutes: parseInt(duration_minutes),
-        expires_at: expiresAt,
-        reason,
-        admin_id: req.user?.user_id || req.user?.id,
-        timestamp: BeijingTimeHelper.now()
-      }
-
-      // 添加具体调整信息
-      if (isSpecificPrize) {
-        responseData.prize_id = settingData.prize_id
-        responseData.prize_name = settingData.prize_name
-        responseData.custom_probability = settingData.custom_probability
-        responseData.message = `${settingData.prize_name}概率调整为${(settingData.custom_probability * 100).toFixed(1)}%`
-      } else {
-        responseData.probability_multiplier = settingData.multiplier
-        responseData.message = `全局概率倍数${settingData.multiplier}`
-      }
-
-      return res.apiSuccess(responseData, `用户概率调整成功，持续${duration_minutes}分钟`)
+      return res.apiSuccess(result, `用户概率调整成功，持续${duration_minutes}分钟`)
     } catch (error) {
-      if (error.message.includes('无效的')) {
-        return res.apiError(error.message, 'VALIDATION_ERROR')
+      if (
+        error.message.includes('无效的') ||
+        error.code === 'USER_NOT_FOUND' ||
+        error.message.includes('奖品不存在')
+      ) {
+        return res.apiError(error.message, error.code || 'VALIDATION_ERROR')
       }
-      sharedComponents.logger.error('概率调整失败', { error: error.message })
       return res.apiInternalError('概率调整失败', error.message, 'PROBABILITY_ADJUST_ERROR')
     }
   })
@@ -381,23 +274,21 @@ router.post(
         return res.apiError('持续时间必须在1-1440分钟之间', 'INVALID_DURATION')
       }
 
-      // 查找用户
-      const user = await models.User.findByPk(validatedUserId)
-      if (!user) {
-        return res.apiError('用户不存在', 'USER_NOT_FOUND')
-      }
-
       // 计算过期时间
       const expiresAt = BeijingTimeHelper.futureTime(parseInt(duration_minutes) * 60 * 1000)
 
-      // 调用管理策略设置用户特定队列（V4.1新签名：adminId, targetUserId, queueConfig, reason, expiresAt）
+      // 准备队列配置
       const queueConfig = {
         queue_type,
         priority_level: parseInt(priority_level),
         prize_queue: custom_strategy?.prize_queue || []
       }
 
-      const result = await sharedComponents.managementStrategy.setUserQueue(
+      // 🎯 通过 ServiceManager 获取 AdminLotteryService
+      const AdminLotteryService = req.app.locals.services.getService('adminLottery')
+
+      // 🎯 调用服务层方法
+      const result = await AdminLotteryService.setUserQueue(
         req.user?.user_id || req.user?.id,
         validatedUserId,
         queueConfig,
@@ -405,43 +296,18 @@ router.post(
         expiresAt
       )
 
-      if (result.success) {
-        sharedComponents.logger.info('用户特定队列设置成功', {
-          setting_id: result.setting_id,
-          user_id: validatedUserId,
-          queue_config: result.queue_config,
-          duration_minutes: parseInt(duration_minutes),
-          expires_at: expiresAt,
-          admin_id: req.user?.user_id || req.user?.id,
-          reason,
-          timestamp: result.timestamp
-        })
-
-        return res.apiSuccess(
-          {
-            setting_id: result.setting_id,
-            user_id: validatedUserId,
-            user_mobile: user.mobile,
-            status: 'user_queue_set',
-            queue_type: result.queue_config.queue_type,
-            priority_level: result.queue_config.priority_level,
-            custom_strategy: custom_strategy || null,
-            duration_minutes: parseInt(duration_minutes),
-            expires_at: expiresAt,
-            reason,
-            admin_id: req.user?.user_id || req.user?.id,
-            timestamp: result.timestamp
-          },
-          `用户特定队列设置成功，类型：${queue_type}，优先级：${priority_level}，持续${duration_minutes}分钟`
-        )
-      } else {
-        return res.apiError(result.error || '用户队列设置失败', 'USER_QUEUE_SET_FAILED')
-      }
+      return res.apiSuccess(
+        {
+          ...result,
+          custom_strategy: custom_strategy || null,
+          duration_minutes: parseInt(duration_minutes)
+        },
+        `用户特定队列设置成功，类型：${queue_type}，优先级：${priority_level}，持续${duration_minutes}分钟`
+      )
     } catch (error) {
-      if (error.message.includes('无效的')) {
-        return res.apiError(error.message, 'VALIDATION_ERROR')
+      if (error.message.includes('无效的') || error.code === 'USER_NOT_FOUND') {
+        return res.apiError(error.message, error.code || 'VALIDATION_ERROR')
       }
-      sharedComponents.logger.error('用户队列设置失败', { error: error.message })
       return res.apiInternalError('用户队列设置失败', error.message, 'USER_QUEUE_SET_ERROR')
     }
   })
@@ -464,77 +330,79 @@ router.get(
       // 参数验证
       const validatedUserId = validators.validateUserId(user_id)
 
-      // 查找用户
-      const user = await models.User.findByPk(validatedUserId)
-      if (!user) {
-        return res.apiError('用户不存在', 'USER_NOT_FOUND')
-      }
+      // 🎯 通过 ServiceManager 获取 AdminLotteryService
+      const AdminLotteryService = req.app.locals.services.getService('adminLottery')
 
-      // 获取用户管理状态（V4.1：直接返回状态对象）
-      const managementStatus =
-        await sharedComponents.managementStrategy.getUserManagementStatus(validatedUserId)
+      // 🎯 调用服务层方法获取用户管理状态
+      const statusData = await AdminLotteryService.getUserManagementStatus(validatedUserId)
 
+      // 🎯 格式化返回数据（与原路由格式保持一致）
       return res.apiSuccess(
         {
-          user_id: validatedUserId,
-          user_mobile: user.mobile,
-          user_nickname: user.nickname,
+          user_id: statusData.user_id,
+          user_mobile: statusData.user_mobile,
+          user_nickname: statusData.user_nickname,
           management_status: {
-            force_win: managementStatus.force_win
+            force_win: statusData.management_status.force_win
               ? {
-                setting_id: managementStatus.force_win.setting_id,
-                prize_id: managementStatus.force_win.setting_data.prize_id,
-                reason: managementStatus.force_win.setting_data.reason,
-                expires_at: managementStatus.force_win.expires_at,
-                status: managementStatus.force_win.status
+                setting_id: statusData.management_status.force_win.setting_id,
+                prize_id: statusData.management_status.force_win.setting_data.prize_id,
+                reason: statusData.management_status.force_win.setting_data.reason,
+                expires_at: statusData.management_status.force_win.expires_at,
+                status: statusData.management_status.force_win.status
               }
               : null,
-            force_lose: managementStatus.force_lose
+            force_lose: statusData.management_status.force_lose
               ? {
-                setting_id: managementStatus.force_lose.setting_id,
-                count: managementStatus.force_lose.setting_data.count,
-                remaining: managementStatus.force_lose.setting_data.remaining,
-                reason: managementStatus.force_lose.setting_data.reason,
-                expires_at: managementStatus.force_lose.expires_at,
-                status: managementStatus.force_lose.status
+                setting_id: statusData.management_status.force_lose.setting_id,
+                count: statusData.management_status.force_lose.setting_data.count,
+                remaining: statusData.management_status.force_lose.setting_data.remaining,
+                reason: statusData.management_status.force_lose.setting_data.reason,
+                expires_at: statusData.management_status.force_lose.expires_at,
+                status: statusData.management_status.force_lose.status
               }
               : null,
-            probability_adjust: managementStatus.probability_adjust
+            probability_adjust: statusData.management_status.probability_adjust
               ? {
-                setting_id: managementStatus.probability_adjust.setting_id,
-                adjustment_type: managementStatus.probability_adjust.setting_data.adjustment_type,
-                multiplier: managementStatus.probability_adjust.setting_data.multiplier,
-                prize_id: managementStatus.probability_adjust.setting_data.prize_id,
-                prize_name: managementStatus.probability_adjust.setting_data.prize_name,
-                custom_probability: managementStatus.probability_adjust.setting_data.custom_probability,
-                auto_adjust_others: managementStatus.probability_adjust.setting_data.auto_adjust_others,
-                reason: managementStatus.probability_adjust.setting_data.reason,
-                expires_at: managementStatus.probability_adjust.expires_at,
-                status: managementStatus.probability_adjust.status
+                setting_id: statusData.management_status.probability_adjust.setting_id,
+                adjustment_type:
+                    statusData.management_status.probability_adjust.setting_data.adjustment_type,
+                multiplier:
+                    statusData.management_status.probability_adjust.setting_data.multiplier,
+                prize_id: statusData.management_status.probability_adjust.setting_data.prize_id,
+                prize_name:
+                    statusData.management_status.probability_adjust.setting_data.prize_name,
+                custom_probability:
+                    statusData.management_status.probability_adjust.setting_data.custom_probability,
+                auto_adjust_others:
+                    statusData.management_status.probability_adjust.setting_data.auto_adjust_others,
+                reason: statusData.management_status.probability_adjust.setting_data.reason,
+                expires_at: statusData.management_status.probability_adjust.expires_at,
+                status: statusData.management_status.probability_adjust.status
               }
               : null,
-            user_queue: managementStatus.user_queue
+            user_queue: statusData.management_status.user_queue
               ? {
-                setting_id: managementStatus.user_queue.setting_id,
-                queue_type: managementStatus.user_queue.setting_data.queue_type,
-                priority_level: managementStatus.user_queue.setting_data.priority_level,
-                prize_queue: managementStatus.user_queue.setting_data.prize_queue,
-                current_index: managementStatus.user_queue.setting_data.current_index,
-                reason: managementStatus.user_queue.setting_data.reason,
-                expires_at: managementStatus.user_queue.expires_at,
-                status: managementStatus.user_queue.status
+                setting_id: statusData.management_status.user_queue.setting_id,
+                queue_type: statusData.management_status.user_queue.setting_data.queue_type,
+                priority_level:
+                    statusData.management_status.user_queue.setting_data.priority_level,
+                prize_queue: statusData.management_status.user_queue.setting_data.prize_queue,
+                current_index: statusData.management_status.user_queue.setting_data.current_index,
+                reason: statusData.management_status.user_queue.setting_data.reason,
+                expires_at: statusData.management_status.user_queue.expires_at,
+                status: statusData.management_status.user_queue.status
               }
               : null
           },
-          timestamp: BeijingTimeHelper.apiTimestamp()
+          timestamp: statusData.timestamp
         },
         '用户管理状态获取成功'
       )
     } catch (error) {
-      if (error.message.includes('无效的')) {
-        return res.apiError(error.message, 'VALIDATION_ERROR')
+      if (error.message.includes('无效的') || error.code === 'USER_NOT_FOUND') {
+        return res.apiError(error.message, error.code || 'VALIDATION_ERROR')
       }
-      sharedComponents.logger.error('获取用户管理状态失败', { error: error.message })
       return res.apiInternalError('获取用户管理状态失败', error.message, 'GET_USER_STATUS_ERROR')
     }
   })
@@ -558,48 +426,22 @@ router.delete(
       // 参数验证
       const validatedUserId = validators.validateUserId(user_id)
 
-      // 查找用户
-      const user = await models.User.findByPk(validatedUserId)
-      if (!user) {
-        return res.apiError('用户不存在', 'USER_NOT_FOUND')
-      }
+      // 🎯 通过 ServiceManager 获取 AdminLotteryService
+      const AdminLotteryService = req.app.locals.services.getService('adminLottery')
 
-      // 清除用户管理设置（V4.1新签名：adminId, targetUserId, settingType）
-      const result = await sharedComponents.managementStrategy.clearUserSettings(
+      // 🎯 调用服务层方法清除用户设置
+      const result = await AdminLotteryService.clearUserSettings(
         req.user?.user_id || req.user?.id,
         validatedUserId,
-        null // 清除所有类型
+        null, // 清除所有类型
+        reason
       )
 
-      if (result.success) {
-        sharedComponents.logger.info('用户管理设置清除成功', {
-          user_id: validatedUserId,
-          cleared_count: result.cleared_count,
-          admin_id: req.user?.user_id || req.user?.id,
-          reason,
-          timestamp: result.timestamp
-        })
-
-        return res.apiSuccess(
-          {
-            user_id: validatedUserId,
-            user_mobile: user.mobile,
-            status: 'settings_cleared',
-            cleared_count: result.cleared_count,
-            reason,
-            admin_id: req.user?.user_id || req.user?.id,
-            timestamp: result.timestamp
-          },
-          `用户管理设置清除成功，共清除${result.cleared_count}个设置`
-        )
-      } else {
-        return res.apiError(result.error || '清除用户设置失败', 'CLEAR_USER_SETTINGS_FAILED')
-      }
+      return res.apiSuccess(result, `用户管理设置清除成功，共清除${result.cleared_count}个设置`)
     } catch (error) {
-      if (error.message.includes('无效的')) {
-        return res.apiError(error.message, 'VALIDATION_ERROR')
+      if (error.message.includes('无效的') || error.code === 'USER_NOT_FOUND') {
+        return res.apiError(error.message, error.code || 'VALIDATION_ERROR')
       }
-      sharedComponents.logger.error('清除用户设置失败', { error: error.message })
       return res.apiInternalError('清除用户设置失败', error.message, 'CLEAR_USER_SETTINGS_ERROR')
     }
   })

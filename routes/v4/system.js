@@ -5,26 +5,19 @@
 
 const express = require('express')
 const router = express.Router()
-const {
-  SystemAnnouncement,
-  Feedback,
-  User,
-  CustomerServiceSession,
-  sequelize
-} = require('../../models')
+/*
+ * 🔄 TR-005规范：已完成Service层迁移
+ * - 公告接口：通过 AnnouncementService
+ * - 反馈接口：通过 FeedbackService
+ * - 系统状态：通过 UserDashboardService
+ * - 会话创建：通过 CustomerServiceSessionService
+ * 注：所有业务逻辑已通过Service层统一处理，路由层不直接操作models
+ */
 const DataSanitizer = require('../../services/DataSanitizer')
-const { authenticateToken, optionalAuth } = require('../../middleware/auth') // 🔴 引入可选认证中间件
+const { authenticateToken, optionalAuth } = require('../../middleware/auth')
 const dataAccessControl = require('../../middleware/dataAccessControl')
 const BeijingTimeHelper = require('../../utils/timeHelper')
 const { Op } = require('sequelize')
-const { logOperation } = require('../../middleware/auditLog') // 🔴 引入审计日志中间件
-const AnnouncementService = require('../../services/AnnouncementService') // 🔴 引入公告服务层
-
-/*
- * 🔴 获取会话状态常量（Get Session Status Constants）
- * 从CustomerServiceSession模型获取状态常量，避免硬编码
- */
-const { SESSION_STATUS, ACTIVE_STATUS } = CustomerServiceSession
 
 /*
  * ⚡ 消息发送频率限制器（Message Rate Limiter）
@@ -256,7 +249,8 @@ function checkCreateSessionRateLimit (userId) {
  * - 使用指数退避算法：第1次重试延迟1秒，第2次2秒，第3次3秒
  * - 提升消息实时到达率，减少客服端需要刷新页面的情况
  *
- * @param {Object} session - 会话对象（CustomerServiceSession实例）
+ * @param {Object} ChatWebSocketService - WebSocket服务实例
+ * @param {number|null} sessionAdminId - 会话分配的客服ID（null表示未分配）
  * @param {Object} messageData - 消息数据对象
  * @param {number} maxRetries - 最大重试次数（默认3次）
  * @returns {Promise<boolean>} - 推送是否最终成功
@@ -271,16 +265,14 @@ function checkCreateSessionRateLimit (userId) {
  * - 即使推送最终失败，消息已保存到数据库，不影响业务连续性
  * - 客服可通过轮询API或刷新页面获取新消息（降级策略）
  */
-async function pushMessageWithRetry (session, messageData, maxRetries = 3) {
-  const ChatWebSocketService = require('../../services/ChatWebSocketService')
-
+async function pushMessageWithRetry (ChatWebSocketService, sessionAdminId, messageData, maxRetries = 3) {
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
       // 根据会话状态选择推送策略
       let pushed
-      if (session.admin_id) {
+      if (sessionAdminId) {
         // 会话已分配客服，精准推送给该客服
-        pushed = ChatWebSocketService.pushMessageToAdmin(session.admin_id, messageData)
+        pushed = ChatWebSocketService.pushMessageToAdmin(sessionAdminId, messageData)
       } else {
         // 会话未分配，广播给所有在线客服
         const count = ChatWebSocketService.broadcastToAllAdmins(messageData)
@@ -327,93 +319,6 @@ async function pushMessageWithRetry (session, messageData, maxRetries = 3) {
  * @param {Object} stats - 统计数据对象
  * @returns {Object} 验证结果 { valid: boolean, warnings: Array<string> }
  */
-function validateStatistics (stats) {
-  const warnings = []
-
-  // 1️⃣ 基础数值合理性检查（数值必须>=0）
-  const numericFields = [
-    'total_sessions',
-    'active_sessions',
-    'waiting_sessions',
-    'avg_response_time_seconds',
-    'new_sessions',
-    'total_messages',
-    'closed_sessions',
-    'avg_messages_per_session'
-  ]
-
-  for (const field of numericFields) {
-    // 🔥 修复ESLint警告：使用安全的对象访问替代eval
-    let value
-    if (field.includes('.')) {
-      const parts = field.split('.')
-      value = stats[parts[0]]?.[parts[1]] // 安全的嵌套属性访问
-    } else {
-      value = stats[field]
-    }
-
-    if (value !== undefined && (value < 0 || !isFinite(value))) {
-      warnings.push(`${field}数值异常: ${value}（应>=0且为有限数）`)
-    }
-  }
-
-  // 2️⃣ 逻辑一致性检查（Logic Consistency Check）
-  const { overall, today, by_status } = stats
-
-  // 检查：活跃会话数不应超过总会话数
-  if (overall.active_sessions > overall.total_sessions) {
-    warnings.push(
-      `活跃会话数(${overall.active_sessions})超过总会话数(${overall.total_sessions})，数据不一致`
-    )
-  }
-
-  // 检查：等待会话数不应超过活跃会话数
-  if (overall.waiting_sessions > overall.active_sessions) {
-    warnings.push(
-      `等待会话数(${overall.waiting_sessions})超过活跃会话数(${overall.active_sessions})，数据不一致`
-    )
-  }
-
-  // 检查：今日新会话数不应超过总会话数（除非是新系统）
-  if (today.new_sessions > overall.total_sessions && overall.total_sessions > 0) {
-    warnings.push(
-      `今日新会话(${today.new_sessions})超过总会话数(${overall.total_sessions})，可能有误`
-    )
-  }
-
-  // 检查：按状态统计的总和应等于总会话数（允许10%误差）
-  if (by_status) {
-    const statusSum =
-      (by_status.waiting || 0) +
-      (by_status.assigned || 0) +
-      (by_status.active || 0) +
-      (by_status.closed || 0)
-    const deviation = Math.abs(statusSum - overall.total_sessions) / overall.total_sessions
-
-    if (deviation > 0.1) {
-      // 超过10%误差
-      warnings.push(
-        `按状态统计总和(${statusSum})与总会话数(${overall.total_sessions})偏差>10%，数据不一致`
-      )
-    }
-  }
-
-  /*
-   * 3️⃣ 业务合理性检查（Business Logic Check）
-   * 平均响应时间异常检测（>1小时可能异常）
-   */
-  if (overall.avg_response_time_seconds > 3600) {
-    warnings.push(`平均响应时间(${overall.avg_response_time_seconds}秒)超过1小时，可能异常`)
-  }
-
-  // 平均消息数异常检测（>100可能异常）
-  if (today.avg_messages_per_session > 100) {
-    warnings.push(`平均消息数(${today.avg_messages_per_session})超过100，可能异常`)
-  }
-
-  return { valid: warnings.length === 0, warnings }
-}
-
 /**
  * @route GET /api/v4/system/announcements
  * @desc 获取系统公告列表
@@ -421,6 +326,9 @@ function validateStatistics (stats) {
  */
 router.get('/announcements', optionalAuth, dataAccessControl, async (req, res) => {
   try {
+    // 🔄 通过 ServiceManager 获取 AnnouncementService（符合TR-005规范）
+    const AnnouncementService = req.app.locals.services.getService('announcement')
+
     const { type = null, priority = null, limit = 10, offset = 0 } = req.query
     const dataLevel = req.isAdmin ? 'full' : 'public'
 
@@ -466,29 +374,21 @@ router.get('/announcements', optionalAuth, dataAccessControl, async (req, res) =
  */
 router.get('/announcements/home', optionalAuth, dataAccessControl, async (req, res) => {
   try {
+    // 🔄 通过 ServiceManager 获取 AnnouncementService（符合TR-005规范）
+    const AnnouncementService = req.app.locals.services.getService('announcement')
+
     const dataLevel = req.isAdmin ? 'full' : 'public'
 
-    const announcements = await SystemAnnouncement.findAll({
-      where: {
-        is_active: true,
-        type: ['system', 'activity', 'notice'],
-        [require('sequelize').Op.or]: [
-          { expires_at: null },
-          { expires_at: { [require('sequelize').Op.gt]: BeijingTimeHelper.createBeijingTime() } }
-        ]
-      },
-      order: [
-        ['priority', 'DESC'],
-        ['created_at', 'DESC']
-      ],
-      limit: 5,
-      include: [
-        {
-          model: User,
-          as: 'creator',
-          attributes: ['user_id', 'nickname']
-        }
-      ]
+    // ✅ 使用 AnnouncementService 统一查询逻辑（不直接操作models）
+    const announcements = await AnnouncementService.getAnnouncements({
+      type: null, // 不限制类型（获取所有类型：system/activity/notice等）
+      priority: null, // 不限制优先级（按优先级DESC排序）
+      limit: 5, // 只显示前5条
+      offset: 0,
+      activeOnly: true, // 仅查询活跃公告
+      filterExpired: true, // 过滤过期公告
+      dataLevel, // 根据用户权限返回不同级别的数据
+      includeCreator: true // 关联创建者信息
     })
 
     /*
@@ -502,16 +402,10 @@ router.get('/announcements/home', optionalAuth, dataAccessControl, async (req, r
       )
     )
 
-    // 🔒 数据脱敏处理（根据用户权限返回public或full级别数据）
-    const sanitizedData = DataSanitizer.sanitizeAnnouncements(
-      announcements.map(a => a.toJSON()),
-      dataLevel
-    )
-
-    // 🎉 返回首页公告数据
+    // 🎉 返回首页公告数据（数据脱敏已在Service层完成）
     return res.apiSuccess(
       {
-        announcements: sanitizedData
+        announcements
       },
       '获取首页公告成功'
     )
@@ -530,14 +424,8 @@ router.post('/feedback', authenticateToken, async (req, res) => {
   try {
     const { category = 'other', content, priority = 'medium', attachments = null } = req.body
 
-    // 验证必需参数
-    if (!content || content.trim().length === 0) {
-      return res.apiError('反馈内容不能为空', 'BAD_REQUEST', null, 400)
-    }
-
-    if (content.length > 5000) {
-      return res.apiError('反馈内容不能超过5000字符', 'BAD_REQUEST', null, 400)
-    }
+    // 🔄 通过 ServiceManager 获取 FeedbackService（符合TR-005规范）
+    const FeedbackService = req.app.locals.services.getService('feedback')
 
     // 获取用户信息
     const userInfo = {
@@ -548,29 +436,19 @@ router.post('/feedback', authenticateToken, async (req, res) => {
       }
     }
 
-    /**
-     * ✅ P0修复：删除手动生成的feedbackId，让数据库自动生成feedback_id（自增主键）
-     * 原因：Feedback模型主键是feedback_id（INTEGER，AUTO_INCREMENT），不是id字段
-     * 数据库会自动生成：feedback_id = 1, 2, 3, 4, ...
-     */
-
-    // 创建反馈记录（让数据库自动生成feedback_id）
-    const feedback = await Feedback.create({
-      // ✅ 不指定id，让数据库自动生成feedback_id（自增主键）
-      user_id: req.user.user_id, // 用户ID（INTEGER，外键关联users.user_id）
-      category, // 反馈分类（ENUM，6种类型，默认'other'）
-      content: content.trim(), // 反馈内容（TEXT，1-5000字符，去除首尾空格）
-      priority, // 优先级（ENUM: high/medium/low，默认'medium'）
-      attachments, // 附件URLs（JSON数组，可为null）
-      user_ip: userInfo.ip, // 用户IP（VARCHAR(45)，用于安全审计）
-      device_info: userInfo.device, // 设备信息（JSON对象，用于技术问题复现）
-      estimated_response_time: calculateResponseTime(priority), // 预计响应时间（根据优先级计算）
-      created_at: BeijingTimeHelper.createBeijingTime(), // 创建时间（北京时间）
-      updated_at: BeijingTimeHelper.createBeijingTime() // 更新时间（北京时间）
+    // ✅ 使用 FeedbackService 创建反馈
+    const feedback = await FeedbackService.createFeedback({
+      user_id: req.user.user_id,
+      category,
+      content,
+      priority,
+      attachments,
+      user_ip: userInfo.ip,
+      device_info: userInfo.device
     })
 
     // 返回脱敏后的数据
-    const sanitizedFeedback = DataSanitizer.sanitizeFeedbacks([feedback.toJSON()], 'public')[0]
+    const sanitizedFeedback = DataSanitizer.sanitizeFeedbacks([feedback], 'public')[0]
 
     return res.apiSuccess(
       {
@@ -580,8 +458,8 @@ router.post('/feedback', authenticateToken, async (req, res) => {
     )
   } catch (error) {
     console.error('提交反馈失败:', error)
-    if (error.name === 'SequelizeValidationError') {
-      return res.apiError(error.errors[0].message, 'VALIDATION_ERROR', null, 400)
+    if (error.message === '反馈内容不能为空' || error.message === '反馈内容不能超过5000字符') {
+      return res.apiError(error.message, 'VALIDATION_ERROR', null, 400)
     }
     return res.apiError('提交反馈失败', 'INTERNAL_ERROR', null, 500)
   }
@@ -624,20 +502,16 @@ router.post('/feedback', authenticateToken, async (req, res) => {
  * 6. 错误处理 - 区分数据库错误、参数错误、认证错误，返回详细错误信息
  */
 router.get('/feedback/my', authenticateToken, async (req, res) => {
-  // ===== 第1步：获取并验证查询参数（Parameter Validation） =====
-  const { status = null, limit = 10, offset = 0 } = req.query
-  const user_id = req.user.user_id // 从JWT token获取当前用户ID（由authenticateToken中间件解析）
-
   try {
-    // ===== 第2步：参数验证（防止非法参数导致查询错误或安全问题）=====
+    // 🔄 通过 ServiceManager 获取 FeedbackService（符合TR-005规范）
+    const FeedbackService = req.app.locals.services.getService('feedback')
 
-    /*
-     * 2.1 验证status参数合法性（Status Parameter Validation）
-     * 合法值：pending（待处理）、processing（处理中）、replied（已回复）、closed（已关闭）、all（全部）
-     */
+    const { status = null, limit = 10, offset = 0 } = req.query
+    const user_id = req.user.user_id
+
+    // 参数验证
     const valid_statuses = ['pending', 'processing', 'replied', 'closed', 'all']
     if (status && !valid_statuses.includes(status)) {
-      // 返回400错误，告知用户status参数无效及合法值列表
       return res.apiError(
         `status参数无效，必须是以下值之一：${valid_statuses.join(', ')}`,
         'INVALID_PARAMETER',
@@ -646,176 +520,91 @@ router.get('/feedback/my', authenticateToken, async (req, res) => {
       )
     }
 
-    /*
-     * 2.2 验证limit参数（Limit Parameter Validation）
-     * 转换为整数并限制范围1-50（parseInt失败返回NaN，使用默认值10）
-     */
     const parsed_limit = parseInt(limit)
     const valid_limit =
       isNaN(parsed_limit) || parsed_limit < 1
-        ? 10 // 默认值10条
-        : Math.min(parsed_limit, 50) // 最大限制50条（防止一次性查询过多数据）
+        ? 10
+        : Math.min(parsed_limit, 50)
 
-    /*
-     * 2.3 验证offset参数（Offset Parameter Validation）
-     * 转换为整数并确保非负数（负数或NaN使用默认值0）
-     */
     const parsed_offset = parseInt(offset)
     const valid_offset =
       isNaN(parsed_offset) || parsed_offset < 0
-        ? 0 // 默认值0（从第一条开始）
+        ? 0
         : parsed_offset
 
-    // ===== 第3步：记录查询日志（Query Logging，便于问题追踪和性能分析）=====
     console.log('📊 [反馈列表查询]', {
-      user_id, // 用户ID（用于追踪是哪个用户的查询）
-      status: status || 'all', // 查询状态（null或未传表示查询全部）
-      limit: valid_limit, // 每页数量（实际生效值）
-      offset: valid_offset, // 偏移量（实际生效值）
-      timestamp: new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' }) // 查询时间戳（北京时间）
+      user_id,
+      status: status || 'all',
+      limit: valid_limit,
+      offset: valid_offset,
+      timestamp: new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })
     })
 
-    // ===== 第4步：构建查询条件（Build Query Conditions）=====
-    const where_clause = { user_id } // 必需条件：只查询当前用户的反馈
-
-    // 如果指定了status且不是'all'，添加状态筛选条件
-    if (status && status !== 'all') {
-      where_clause.status = status // 添加status字段到where条件（配合索引idx_feedbacks_user_status）
-    }
-
-    /*
-     * ===== 第5步：执行数据库查询（Database Query）=====
-     * 记录查询开始时间（用于性能监控）
-     */
-    const query_start_time = Date.now()
-
-    /*
-     * 使用findAndCountAll同时获取数据和总数（Sequelize ORM方法）
-     * count: 总记录数（满足where条件的所有记录数，不受limit和offset影响）
-     * rows: 当前页数据（受limit和offset影响的实际返回记录）
-     */
-    const { count, rows: feedbacks } = await Feedback.findAndCountAll({
-      where: where_clause, // 查询条件：user_id（必需）+ status（可选）
-      order: [['created_at', 'DESC']], // 排序：按创建时间降序（最新反馈在前，符合用户习惯）
-      limit: valid_limit, // 分页限制：每页数量（1-50条）
-      offset: valid_offset, // 分页偏移：跳过前N条记录
-      include: [
-        // 关联查询：管理员信息（显示回复人昵称）
-        {
-          model: User, // 关联User模型
-          as: 'admin', // 别名：admin（在Feedback模型中定义的关联别名）
-          attributes: ['user_id', 'nickname'], // 只查询必要字段（减少数据传输量）
-          required: false // 左连接（LEFT JOIN）：无管理员时不影响查询结果
-        }
-      ]
-      /*
-       * 性能说明（Performance Notes）:
-       * - 查询命中索引：idx_feedbacks_user_status（user_id + status联合索引）
-       * - 预期查询耗时：<100ms（单用户反馈<100条）
-       * - 无JOIN性能问题：仅关联admin表，且使用LEFT JOIN
-       */
+    // ✅ 使用 FeedbackService 获取反馈列表
+    const result = await FeedbackService.getFeedbackList({
+      user_id,
+      status: status && status !== 'all' ? status : null,
+      limit: valid_limit,
+      offset: valid_offset
     })
 
-    // 记录查询耗时（Query Performance Monitoring）
-    const query_time = Date.now() - query_start_time
+    // 数据脱敏处理
+    const sanitized_data = DataSanitizer.sanitizeFeedbacks(result.feedbacks, 'public')
 
-    // 慢查询警告（Slow Query Warning）：查询耗时>500ms时输出警告日志
-    if (query_time > 500) {
-      console.warn('⚠️ [慢查询警告]', {
-        user_id,
-        query_time: `${query_time}ms`, // 查询耗时（毫秒）
-        status: status || 'all',
-        limit: valid_limit,
-        offset: valid_offset,
-        result_count: feedbacks.length, // 返回记录数
-        total_count: count // 总记录数
-      })
-    } else {
-      // 正常查询日志（Normal Query Log）
-      console.log('✅ [查询完成]', {
-        query_time: `${query_time}ms`,
-        result_count: feedbacks.length,
-        total_count: count
-      })
-    }
-
-    /*
-     * ===== 第6步：数据脱敏处理（Data Sanitization）=====
-     * 使用DataSanitizer统一处理敏感数据（DataSanitizer Service）
-     * data_level: 'public' - 公开级别（用户端查看）
-     * 自动隐藏：user_ip（用户IP地址）、device_info（设备信息）、internal_notes（内部备注）
-     * 保留字段：feedback_id、category、content、status、priority、created_at、updated_at、admin.nickname
-     */
-    const sanitized_data = DataSanitizer.sanitizeFeedbacks(
-      feedbacks.map(f => f.toJSON()), // 转换为普通JavaScript对象（去除Sequelize实例方法）
-      'public' // 数据级别：public（用户端）vs full（管理员端）
-    )
-
-    // ===== 第7步：返回成功响应（Success Response）=====
     return res.apiSuccess(
       {
-        feedbacks: sanitized_data, // 反馈记录数组（已脱敏）
-        total: count, // ✅ 正确的总数量（修复前：feedbacks.length仅为当前页数量）
-        // 元数据（Metadata，辅助前端处理）
+        feedbacks: sanitized_data,
+        total: result.total,
         page: {
-          limit: valid_limit, // 每页数量（实际生效值）
-          offset: valid_offset, // 偏移量（实际生效值）
-          current_page: Math.floor(valid_offset / valid_limit) + 1, // 当前页码（计算得出）
-          total_pages: Math.ceil(count / valid_limit) // 总页数（前端分页组件使用）
+          limit: valid_limit,
+          offset: valid_offset,
+          current_page: Math.floor(valid_offset / valid_limit) + 1,
+          total_pages: Math.ceil(result.total / valid_limit)
         }
       },
-      '获取反馈列表成功' // 成功消息（前端toast提示）
+      '获取反馈列表成功'
     )
   } catch (error) {
-    // ===== 错误处理（Error Handling）=====
-
-    // 记录完整错误堆栈（Full Error Stack Logging）
     console.error('❌ [获取反馈列表失败]', {
-      user_id,
-      error_message: error.message, // 错误消息
-      error_name: error.name, // 错误类型名称
-      error_stack: error.stack, // 完整错误堆栈（便于调试）
-      query_params: { status, limit, offset } // 查询参数（便于复现问题）
+      user_id: req.user?.user_id,
+      error_message: error.message,
+      error_name: error.name,
+      error_stack: error.stack,
+      query_params: { status: req.query.status, limit: req.query.limit, offset: req.query.offset }
     })
 
-    // 区分错误类型并返回详细错误信息（Error Type Classification）
-
-    // 1. 数据库连接错误（Database Connection Error）
     if (error.name === 'SequelizeConnectionError') {
       return res.apiError(
-        '数据库连接失败，请稍后重试', // 用户友好的错误提示
+        '数据库连接失败，请稍后重试',
         'DATABASE_CONNECTION_ERROR',
         null,
-        503 // HTTP 503 Service Unavailable（服务不可用）
+        503
       )
     }
 
-    // 2. 数据库查询超时（Database Timeout Error）
     if (error.name === 'SequelizeTimeoutError') {
       return res.apiError(
-        '数据库查询超时，请稍后重试', // 用户友好的错误提示
+        '数据库查询超时，请稍后重试',
         'DATABASE_TIMEOUT',
         null,
-        504 // HTTP 504 Gateway Timeout（网关超时）
+        504
       )
     }
 
-    // 3. 参数验证错误（Validation Error）
     if (error.name === 'SequelizeValidationError') {
       return res.apiError(
-        error.errors[0].message, // Sequelize验证错误消息
+        error.errors[0].message,
         'VALIDATION_ERROR',
         null,
-        400 // HTTP 400 Bad Request（请求参数错误）
+        400
       )
     }
 
-    // 4. 其他未知错误（Unknown Error）
     return res.apiError(
-      '获取反馈列表失败，请联系客服', // 通用错误提示
+      '获取反馈列表失败，请联系客服',
       'INTERNAL_ERROR',
       null,
-      500 // HTTP 500 Internal Server Error（服务器内部错误）
+      500
     )
   }
 })
@@ -830,22 +619,11 @@ router.get('/feedback/:id', authenticateToken, async (req, res) => {
     const { id: feedback_id } = req.params
     const user_id = req.user.user_id
 
-    // 查找反馈记录
-    const feedback = await Feedback.findByPk(feedback_id, {
-      include: [
-        {
-          model: User,
-          as: 'user',
-          attributes: ['user_id', 'mobile', 'nickname']
-        },
-        {
-          model: User,
-          as: 'admin',
-          attributes: ['user_id', 'nickname'],
-          required: false
-        }
-      ]
-    })
+    // 🔄 通过 ServiceManager 获取 FeedbackService（符合TR-005规范）
+    const FeedbackService = req.app.locals.services.getService('feedback')
+
+    // ✅ 使用 FeedbackService 查询反馈详情（不直接操作models）
+    const feedback = await FeedbackService.getFeedbackById(feedback_id)
 
     if (!feedback) {
       return res.apiError('反馈不存在', 'NOT_FOUND', null, 404)
@@ -877,7 +655,7 @@ router.get('/feedback/:id', authenticateToken, async (req, res) => {
         }
         : null,
 
-      // 处理信息（✅ 修复问题1：使用正确的字段名reply_content）
+      // 处理信息（✅ 使用正确的字段名reply_content）
       reply_content: feedback.reply_content,
       admin_info: feedback.admin
         ? {
@@ -886,11 +664,11 @@ router.get('/feedback/:id', authenticateToken, async (req, res) => {
         }
         : null,
 
-      // 时间信息（✅ 修复问题2：删除不存在的resolved_at字段）
+      // 时间信息（✅ 仅使用存在的字段）
       created_at: feedback.created_at,
       replied_at: feedback.replied_at,
 
-      // 处理进度（✅ 修复问题3：直接读取数据库字段，修复问题4：使用正确的字段名internal_notes）
+      // 处理进度（✅ 直接读取数据库字段）
       estimated_response_time: feedback.estimated_response_time,
       internal_notes: userRoles.isAdmin ? feedback.internal_notes : undefined
     }
@@ -926,47 +704,20 @@ router.get('/status', optionalAuth, dataAccessControl, async (req, res) => {
 
     /*
      * 管理员可见的详细统计信息（Admin-only Statistics）
-     * 使用Promise.allSettled实现错误隔离，单个查询失败不影响整体API可用性
+     * ✅ 使用 UserDashboardService.getSystemStatus() 统一查询（符合TR-005规范）
      */
     if (dataLevel === 'full') {
-      /*
-       * 并发执行3个统计查询，使用Promise.allSettled避免单点故障（Error Isolation）
-       * 技术原因：Promise.all在任一查询失败时会导致整体失败，Promise.allSettled可降级展示部分数据
-       */
-      const results = await Promise.allSettled([
-        User.count(), // 查询1：用户总数（Total Users Count）
-        SystemAnnouncement.count({ where: { is_active: true } }), // 查询2：活跃公告数（Active Announcements）
-        Feedback.count({ where: { status: 'pending' } }) // 查询3：待处理反馈数（Pending Feedbacks）
-      ])
+      // 🔄 通过 ServiceManager 获取 UserDashboardService（符合TR-005规范）
+      const UserDashboardService = req.app.locals.services.getService('userDashboard')
 
-      /*
-       * 安全提取查询结果，失败时使用默认值0（Safe Result Extraction with Fallback）
-       * 业务价值：即使部分查询失败，管理员仍能查看其他可用的统计数据
-       */
-      const totalUsers = results[0].status === 'fulfilled' ? results[0].value : 0
-      const totalAnnouncements = results[1].status === 'fulfilled' ? results[1].value : 0
-      const pendingFeedbacks = results[2].status === 'fulfilled' ? results[2].value : 0
-
-      /*
-       * 记录失败的查询，便于排查数据库问题（Log Failed Queries for Troubleshooting）
-       * 开发人员可通过日志快速定位是哪个表的查询失败，缩短问题排查时间
-       */
-      results.forEach((result, index) => {
-        if (result.status === 'rejected') {
-          const queryNames = ['User.count', 'SystemAnnouncement.count', 'Feedback.count']
-          const queryDescriptions = ['用户总数统计', '活跃公告统计', '待处理反馈统计']
-          console.error(
-            `❌ 系统状态统计查询失败 - ${queryDescriptions[index]}（${queryNames[index]}）:`,
-            result.reason.message
-          )
-        }
-      })
+      // ✅ 使用 Service 查询系统状态统计（不直接操作models）
+      const statistics = await UserDashboardService.getSystemStatus()
 
       // 添加统计数据到响应中（Add Statistics to Response）
       systemStatus.statistics = {
-        total_users: totalUsers, // 用户总数（包含所有状态：active/inactive/banned）
-        active_announcements: totalAnnouncements, // 活跃公告数（is_active=true）
-        pending_feedbacks: pendingFeedbacks // 待处理反馈数（status='pending'）
+        total_users: statistics.total_users, // 用户总数（包含所有状态：active/inactive/banned）
+        active_announcements: statistics.active_announcements, // 活跃公告数（is_active=true）
+        pending_feedbacks: statistics.pending_feedbacks // 待处理反馈数（status='pending'）
       }
     }
 
@@ -1102,59 +853,16 @@ router.post('/chat/create', authenticateToken, async (req, res) => {
     )
   }
 
-  // 🔴 步骤2：使用数据库唯一索引 + 应用层重试机制（方案A - 最佳实践）
-  /*
-   * 实现原理：
-   * 1. 数据库层面通过 UNIQUE(user_id, is_active_session) 索引保证并发安全
-   * 2. 应用层先检查活跃会话，不存在则直接创建
-   * 3. 如果并发创建触发唯一索引冲突，捕获异常后重新查询返回现有会话
-   *
-   * 优势：
-   * - 性能最优：无锁等待，并发度高
-   * - 逻辑简单：代码清晰易维护
-   * - 数据一致性：数据库层面强制约束
-   * - 零技术债务：标准SQL特性，无额外依赖
-   */
+  // ✅ 通过 ServiceManager 获取 CustomerServiceSessionService（符合TR-005规范）
+  const CustomerServiceSessionService = req.app.locals.services.getService('customerServiceSession')
+
   try {
-    // 🔴 步骤2.1：快速检查是否已有活跃会话（避免不必要的INSERT）
-    const existingSession = await CustomerServiceSession.findOne({
-      where: {
-        user_id: userId,
-        status: ACTIVE_STATUS // ['waiting', 'assigned', 'active']
-      },
-      order: [['created_at', 'DESC']]
+    // ✅ 使用 Service 层方法创建或获取会话（不直接操作models）
+    const session = await CustomerServiceSessionService.getOrCreateSession(userId, {
+      source: 'mobile',
+      priority: 1
     })
 
-    if (existingSession) {
-      console.log(`✅ 用户${userId}使用现有会话: ${existingSession.session_id}`)
-      return res.apiSuccess(
-        {
-          session_id: existingSession.session_id,
-          status: existingSession.status,
-          source: existingSession.source,
-          created_at: existingSession.created_at
-        },
-        '使用现有会话'
-      )
-    }
-
-    // 🔴 步骤2.2：直接创建新会话（依赖数据库唯一索引保证并发安全）
-    /*
-     * 并发场景处理：
-     * - 如果两个请求同时到达此处，都尝试创建会话
-     * - 数据库的UNIQUE(user_id, is_active_session)索引会拦截第二个INSERT
-     * - 失败的请求会收到SequelizeUniqueConstraintError异常
-     * - 异常处理中会重新查询并返回先创建成功的会话
-     */
-    const session = await CustomerServiceSession.create({
-      user_id: userId,
-      status: SESSION_STATUS.WAITING, // 初始状态：waiting（等待客服接单）
-      source: 'mobile', // 默认来源为mobile
-      priority: 1,
-      created_at: BeijingTimeHelper.createBeijingTime()
-    })
-
-    console.log(`✅ 用户${userId}创建新会话成功: ${session.session_id}`)
     return res.apiSuccess(
       {
         session_id: session.session_id,
@@ -1162,43 +870,9 @@ router.post('/chat/create', authenticateToken, async (req, res) => {
         source: session.source,
         created_at: session.created_at
       },
-      '聊天会话创建成功'
+      session.is_new ? '聊天会话创建成功' : '使用现有会话'
     )
   } catch (error) {
-    const errorName = error.name || ''
-
-    // 🔴 步骤3：处理并发创建冲突（唯一索引约束触发）
-    if (errorName === 'SequelizeUniqueConstraintError') {
-      console.log(`⚠️ 用户${userId}并发创建会话被数据库唯一索引拦截，查询已创建的会话`)
-
-      // 重新查询现有会话（此时另一个并发请求已成功创建）
-      const existingSession = await CustomerServiceSession.findOne({
-        where: {
-          user_id: userId,
-          status: ACTIVE_STATUS
-        },
-        order: [['created_at', 'DESC']]
-      })
-
-      if (existingSession) {
-        console.log(`✅ 用户${userId}获取并发创建的会话: ${existingSession.session_id}`)
-        return res.apiSuccess(
-          {
-            session_id: existingSession.session_id,
-            status: existingSession.status,
-            source: existingSession.source,
-            created_at: existingSession.created_at
-          },
-          '使用现有会话'
-        )
-      }
-
-      // 理论上不应该到达这里（唯一索引冲突说明会话必然存在）
-      console.error(`❌ 异常：唯一索引冲突但查询不到活跃会话（用户${userId}）`)
-      return res.apiError('会话状态异常，请刷新后重试', 'SESSION_STATE_INCONSISTENT', null, 500)
-    }
-
-    // 🔴 步骤4：处理其他数据库错误
     console.error(`❌ 用户${userId}创建会话失败:`, error)
     return res.apiError('创建聊天会话失败，请稍后重试', 'INTERNAL_ERROR', null, 500)
   }
@@ -1226,85 +900,34 @@ router.get('/chat/sessions', authenticateToken, async (req, res) => {
   try {
     // 获取分页参数（默认第1页，每页10条）
     const { page = 1, limit = 10 } = req.query
-    // 分页安全保护：最大50条记录（普通用户权限）
-    const finalLimit = Math.min(parseInt(limit), 50)
-    const offset = (parseInt(page) - 1) * finalLimit
 
-    const { CustomerServiceSession, ChatMessage } = require('../../models')
-    const { Op } = require('sequelize')
-
-    // 查询用户的会话列表（支持分页）
-    const { count, rows: sessions } = await CustomerServiceSession.findAndCountAll({
-      where: { user_id: req.user.user_id }, // 用户数据隔离（只能查询自己的会话）
-      include: [
-        {
-          model: ChatMessage,
-          as: 'messages',
-          limit: 1, // 只取最后1条消息（减少数据传输量）
-          order: [['created_at', 'DESC']], // 按消息时间倒序（最新的消息排在最前）
-          required: false, // LEFT JOIN（即使会话没有消息也会返回）
-          attributes: ['message_id', 'content', 'sender_type', 'created_at'] // 只返回必要字段
-        }
-      ],
-      order: [['created_at', 'DESC']], // 会话按创建时间倒序排列（最新的会话在前）
-      limit: finalLimit, // 分页限制
-      offset, // 分页偏移量
-      separate: false // 强制使用JOIN查询（避免N+1问题）
-    })
-
-    // ✅ P0修复：使用DataSanitizer进行数据脱敏（符合项目统一规范）
-    const DataSanitizer = require('../../services/DataSanitizer')
-    const sanitizedSessions = DataSanitizer.sanitizeChatSessions
-      ? DataSanitizer.sanitizeChatSessions(sessions, 'public') // 普通用户使用'public'级别脱敏
-      : sessions // 降级方案：如果DataSanitizer方法不存在，直接使用原始数据
+    // 🔄 通过 ServiceManager 获取 CustomerServiceSessionService（符合TR-005规范）
+    const CustomerServiceSessionService = req.app.locals.services.getService('customerServiceSession')
 
     /*
-     * ✅ P1实现：未读消息实时计算（方案A：实时COUNT查询）
-     * 为每个会话计算未读消息数（客服发送的未读消息）
+     * ✅ 使用 CustomerServiceSessionService 获取会话列表
+     * 参数说明：user_id（用户ID）、page（页码）、page_size（每页数量）、
+     * include_last_message（包含最后一条消息）、calculate_unread（计算未读消息数）
      */
-    const sessionDataWithUnread = await Promise.all(
-      sanitizedSessions.map(async session => {
-        // 查询该会话的未读消息数（sender_type='admin' AND status IN ('sent','delivered')）
-        const unreadCount = await ChatMessage.count({
-          where: {
-            session_id: session.session_id,
-            sender_type: 'admin', // 客服发送的消息
-            status: {
-              [Op.in]: ['sent', 'delivered'] // 未读状态（已发送但未读/已送达但未读）
-            }
-          }
-        })
-
-        // 格式化会话数据（构建前端友好的数据结构）
-        const lastMessage = session.messages && session.messages[0]
-        return {
-          session_id: session.session_id, // 会话唯一标识ID（数据库主键）
-          status: session.status, // 会话状态（waiting/assigned/active/closed）
-          created_at: session.createdAt, // 会话创建时间（北京时间格式）- 注意：Sequelize返回驼峰命名createdAt
-          last_message: lastMessage
-            ? {
-              content:
-                  lastMessage.content.length > 50
-                    ? lastMessage.content.substring(0, 50) + '...'
-                    : lastMessage.content, // 消息内容（截取前50字符）
-              sender_type: lastMessage.sender_type, // 发送者类型（user用户/admin客服）
-              created_at: lastMessage.created_at // 消息发送时间（北京时间格式）
-            }
-            : null, // null值便于前端判断（如显示"暂无消息"占位符）
-          unread_count: unreadCount // ✅ 未读消息数量（实时计算）
-        }
-      })
-    )
+    const result = await CustomerServiceSessionService.getSessionList({
+      user_id: req.user.user_id, // 用户数据隔离（只能查询自己的会话）
+      page: parseInt(page),
+      page_size: Math.min(parseInt(limit), 50), // 分页安全保护：最大50条记录
+      include_last_message: true, // 包含最后一条消息
+      calculate_unread: true, // 计算未读消息数
+      sort_by: 'created_at', // 按创建时间排序
+      sort_order: 'DESC' // 倒序排列（最新的会话在前）
+    })
 
     // ✅ P1实现：返回分页信息（支持前端分页组件）
     return res.apiSuccess(
       {
-        sessions: sessionDataWithUnread,
+        sessions: result.sessions,
         pagination: {
-          current_page: parseInt(page), // 当前页码
-          per_page: finalLimit, // 每页数量
-          total_count: count, // 总会话数
-          total_pages: Math.ceil(count / finalLimit) // 总页数
+          current_page: result.pagination.page, // 当前页码
+          per_page: result.pagination.page_size, // 每页数量
+          total_count: result.pagination.total, // 总会话数
+          total_pages: result.pagination.total_pages // 总页数
         }
       },
       '获取会话列表成功'
@@ -1326,99 +949,34 @@ router.get('/chat/history/:sessionId', authenticateToken, async (req, res) => {
     const { page = 1, limit = 50 } = req.query
     // 🎯 分页安全保护：最大100条记录（普通用户聊天历史）
     const finalLimit = Math.min(parseInt(limit), 100)
-    const { ChatMessage, CustomerServiceSession } = require('../../models')
 
-    // 验证会话权限
-    const session = await CustomerServiceSession.findOne({
-      where: {
-        session_id: sessionId,
-        user_id: req.user.user_id
-      }
-    })
+    // 🔄 通过 ServiceManager 获取 CustomerServiceSessionService（符合TR-005规范）
+    const CustomerServiceSessionService = req.app.locals.services.getService('customerServiceSession')
 
-    if (!session) {
-      return res.apiError('会话不存在或无权限访问', 'NOT_FOUND', null, 404)
-    }
-
-    const offset = (page - 1) * finalLimit
-
-    // ✅ 显式指定返回所有必要字段（包括metadata）- 增强代码健壮性
-    const { count, rows: messages } = await ChatMessage.findAndCountAll({
-      where: { session_id: sessionId }, // 查询条件：指定会话ID
-      order: [['created_at', 'DESC']], // 排序：按创建时间倒序
-      limit: finalLimit, // 分页限制：最多100条
-      offset, // 分页偏移量
-      // 🎯 显式列出所有字段 - 确保metadata字段正确返回
-      attributes: [
-        'message_id', // 消息ID（主键）
-        'session_id', // 会话ID（外键）
-        'sender_id', // 发送者ID
-        'sender_type', // 发送者类型（user/admin）
-        'message_source', // 消息来源（user_client/admin_client/system）
-        'content', // 消息内容（文本/图片占位符）
-        'message_type', // 消息类型（text/image/system）
-        'status', // 消息状态（sending/sent/delivered/read）
-        'reply_to_id', // 回复的消息ID（如果是回复消息）
-        'temp_message_id', // 前端临时消息ID
-        'metadata', // ✅ 扩展数据（图片URL、尺寸等）- CRITICAL for image messages
-        'created_at', // 创建时间（北京时间）
-        'updated_at' // 更新时间（北京时间）
-      ],
-      include: [
-        {
-          model: User,
-          as: 'sender',
-          attributes: ['user_id', 'nickname'],
-          required: false // ⚠️ 允许sender为null（系统消息、已删除用户）
-        }
-      ]
-    })
-
-    /**
-     * 🔧 修复风险点4（P2中等风险）：自动标记消息为已读
-     * 业务逻辑：用户查看聊天历史时，将管理员发送的未读消息标记为已读
-     * 这样可以确保未读消息计数的准确性，改善用户体验
+    /*
+     * ✅ 使用 CustomerServiceSessionService 获取会话消息
+     * 参数说明：
+     * - user_id：用户ID验证（只能查看自己的会话）
+     * - page/limit：分页参数
+     * - mark_as_read：自动标记管理员消息为已读
+     * - include_all_fields：包含所有字段（metadata等）
      */
-    const { Op } = require('sequelize')
-    try {
-      const updateResult = await ChatMessage.update(
-        { status: 'read' }, // 更新状态为已读
-        {
-          where: {
-            session_id: sessionId, // 限定当前会话
-            sender_type: 'admin', // 只标记管理员发送的消息（用户查看时标记对方消息）
-            status: { [Op.in]: ['sent', 'delivered'] } // 只更新未读消息（避免重复更新）
-          }
-        }
-      )
+    const result = await CustomerServiceSessionService.getSessionMessages(sessionId, {
+      user_id: req.user.user_id, // 权限验证：用户只能查看自己的会话
+      page: parseInt(page),
+      limit: finalLimit,
+      mark_as_read: true, // 自动标记管理员发送的未读消息为已读
+      include_all_fields: true // 返回所有字段（包括metadata、temp_message_id等）
+    })
 
-      if (updateResult[0] > 0) {
-        console.log(`✅ 会话${sessionId}：已标记${updateResult[0]}条管理员消息为已读`)
-      }
-    } catch (updateError) {
-      // 已读状态更新失败不影响查询结果返回，仅记录错误日志
-      console.error(`⚠️ 更新消息已读状态失败 (会话${sessionId}):`, updateError.message)
-    }
-
-    // 🔧 修复sender为null导致前端错误的问题（风险点1 - P2中等风险）
     return res.apiSuccess(
       {
-        messages: messages.reverse().map(msg => {
-          const data = msg.toJSON()
-          // ✅ 防御性编程：处理sender为null的情况（已删除用户、系统消息）
-          if (!data.sender) {
-            data.sender = {
-              user_id: data.sender_id,
-              nickname: '已删除用户' // 提供友好的默认昵称
-            }
-          }
-          return data
-        }),
+        messages: result.messages,
         pagination: {
-          total: count,
+          total: result.total,
           page: parseInt(page),
           limit: finalLimit,
-          total_pages: Math.ceil(count / finalLimit)
+          total_pages: Math.ceil(result.total / finalLimit)
         }
       },
       '获取聊天历史成功'
@@ -1437,7 +995,6 @@ router.get('/chat/history/:sessionId', authenticateToken, async (req, res) => {
 router.post('/chat/send', authenticateToken, async (req, res) => {
   try {
     const { session_id, content, message_type = 'text' } = req.body
-    const { ChatMessage, CustomerServiceSession } = require('../../models')
     const businessConfig = require('../../config/business.config')
 
     /*
@@ -1500,43 +1057,18 @@ router.post('/chat/send', authenticateToken, async (req, res) => {
       }
     }
 
-    // Step 3: 验证会话权限
-    const session = await CustomerServiceSession.findOne({
-      where: {
-        session_id,
-        user_id: req.user.user_id
-      }
-    })
-
-    if (!session) {
-      return res.apiError('会话不存在或无权限访问', 'NOT_FOUND', null, 404)
-    }
-
-    // Step 4: 检查会话状态（允许waiting、assigned、active状态发送消息）
-    if (!ACTIVE_STATUS.includes(session.status)) {
-      // 🔴 使用状态常量数组，替代硬编码
-      return res.apiError('会话已关闭，无法发送消息', 'BAD_REQUEST', null, 400)
-    }
+    // 🔄 通过 ServiceManager 获取服务（符合TR-005规范）
+    const CustomerServiceSessionService = req.app.locals.services.getService('customerServiceSession')
+    const ChatWebSocketService = req.app.locals.services.getService('chatWebSocket')
 
     /*
-     * 创建消息记录
-     * message_id 现在是BIGINT AUTO_INCREMENT主键，不再手动赋值
-     * 使用sanitized_content确保内容已通过安全过滤
+     * ✅ 使用 CustomerServiceSessionService 发送用户消息
+     * 服务负责：验证会话权限、检查会话状态、创建消息、更新会话
      */
-    const message = await ChatMessage.create({
-      session_id,
-      sender_id: req.user.user_id,
-      sender_type: 'user',
-      message_source: 'user_client', // 明确标记消息来源
+    const message = await CustomerServiceSessionService.sendUserMessage(session_id, {
+      user_id: userId,
       content: sanitized_content,
-      message_type,
-      created_at: BeijingTimeHelper.createBeijingTime()
-    })
-
-    // 更新会话的最后活动时间
-    await session.update({
-      last_message_at: BeijingTimeHelper.createBeijingTime(),
-      updated_at: BeijingTimeHelper.createBeijingTime()
+      message_type
     })
 
     /*
@@ -1544,21 +1076,18 @@ router.post('/chat/send', authenticateToken, async (req, res) => {
      * 基于文档第1697-1762行建议，添加自动重试提升实时性
      */
     try {
-      // 构建消息数据
+      // 构建消息数据（用于WebSocket推送）
       const messageData = {
-        message_id: message.message_id,
-        session_id,
-        sender_id: req.user.user_id,
-        sender_type: 'user',
+        ...message,
         sender_name: req.user.nickname || '用户',
-        content: message.content,
-        message_type: message.message_type,
-        created_at: message.created_at,
         timestamp: BeijingTimeHelper.timestamp()
       }
 
-      // 使用带重试机制的推送函数（最多重试3次）
-      await pushMessageWithRetry(session, messageData, 3)
+      /*
+       * 使用带重试机制的推送函数（最多重试3次）
+       * 传入session_admin_id而非整个session对象，避免直接访问模型
+       */
+      await pushMessageWithRetry(ChatWebSocketService, message.session_admin_id, messageData, 3)
     } catch (wsError) {
       // WebSocket推送失败不影响消息发送（降级策略）
       console.error('WebSocket推送失败:', wsError.message)
@@ -1567,8 +1096,8 @@ router.post('/chat/send', authenticateToken, async (req, res) => {
 
     return res.apiSuccess(
       {
-        message_id: message.message_id, // 使用正确的字段名message_id
-        session_id,
+        message_id: message.message_id,
+        session_id: message.session_id,
         content: message.content,
         message_type: message.message_type,
         sent_at: message.created_at
@@ -1577,6 +1106,14 @@ router.post('/chat/send', authenticateToken, async (req, res) => {
     )
   } catch (error) {
     console.error('发送消息失败:', error)
+
+    // 细化错误处理
+    if (error.message === '会话不存在或无权限访问') {
+      return res.apiError(error.message, 'NOT_FOUND', null, 404)
+    } else if (error.message.includes('会话已关闭')) {
+      return res.apiError(error.message, 'BAD_REQUEST', null, 400)
+    }
+
     return res.apiError('发送消息失败', 'INTERNAL_ERROR', null, 500)
   }
 })
@@ -1629,212 +1166,15 @@ router.get('/user/statistics/:user_id', authenticateToken, dataAccessControl, as
       return res.apiError('无权限查看其他用户统计', 'FORBIDDEN', null, 403)
     }
 
-    const dataLevel = isAdmin ? 'full' : 'public'
+    // 🔄 通过 ServiceManager 获取 UserDashboardService（符合TR-005规范）
+    const UserDashboardService = req.app.locals.services.getService('userDashboard')
 
-    // 🔥 方案A步骤2+3：并行查询各种统计数据（添加UserPointsAccount + 兼容性检查）
-    const [
-      userInfo,
-      lotteryStats,
-      inventoryStats,
-      pointsStats,
-      pointsAccount,
-      exchangeStats,
-      consumptionStats
-    ] = await Promise.all([
-      // 基本用户信息
-      User.findByPk(user_id, {
-        attributes: ['user_id', 'nickname', 'created_at', 'updated_at']
-      }),
-
-      // 抽奖统计
-      require('../../models').LotteryDraw.findAll({
-        where: { user_id },
-        attributes: [
-          [require('sequelize').fn('COUNT', require('sequelize').col('*')), 'total_draws'],
-          [
-            require('sequelize').fn(
-              'COUNT',
-              require('sequelize').literal('CASE WHEN is_winner = 1 THEN 1 END')
-            ),
-            'winning_draws'
-          ]
-        ],
-        raw: true
-      }),
-
-      // 库存统计
-      require('../../models').UserInventory.findAll({
-        where: { user_id },
-        attributes: [
-          [require('sequelize').fn('COUNT', require('sequelize').col('*')), 'total_items'],
-          [
-            require('sequelize').fn(
-              'COUNT',
-              require('sequelize').literal('CASE WHEN status = "available" THEN 1 END')
-            ),
-            'available_items'
-          ]
-        ],
-        raw: true
-      }),
-
-      // 积分统计（🔥 方案A步骤3：兼容性过滤已删除记录）
-      require('../../models').PointsTransaction.findAll({
-        where: buildSafeWhereCondition(require('../../models').PointsTransaction, user_id),
-        attributes: [
-          [
-            require('sequelize').fn(
-              'SUM',
-              require('sequelize').literal(
-                'CASE WHEN transaction_type = "earn" THEN points_amount ELSE 0 END'
-              )
-            ),
-            'total_earned'
-          ],
-          [
-            require('sequelize').fn(
-              'SUM',
-              require('sequelize').literal(
-                'CASE WHEN transaction_type = "consume" THEN points_amount ELSE 0 END'
-              )
-            ),
-            'total_consumed'
-          ],
-          [require('sequelize').fn('COUNT', require('sequelize').col('*')), 'total_transactions']
-        ],
-        raw: true
-      }),
-
-      // 🔥 方案A步骤2：查询用户积分账户（获取准确的积分余额 - P0修复）
-      require('../../models').UserPointsAccount.findOne({
-        where: { user_id },
-        attributes: ['available_points', 'total_earned', 'total_consumed']
-      }),
-
-      // 兑换统计（🔥 方案A步骤3：兼容性过滤已删除记录）
-      require('../../models').ExchangeRecords.findAll({
-        where: buildSafeWhereCondition(require('../../models').ExchangeRecords, user_id),
-        attributes: [
-          [require('sequelize').fn('COUNT', require('sequelize').col('*')), 'total_exchanges'],
-          [
-            require('sequelize').fn('SUM', require('sequelize').col('total_points')),
-            'total_points_spent'
-          ]
-        ],
-        raw: true
-      }),
-
-      // 🔄 消费记录统计（新业务：商家扫码录入）（🔥 方案A步骤3：兼容性处理 + try-catch容错）
-      (async () => {
-        try {
-          if (require('../../models').ConsumptionRecord) {
-            return await require('../../models').ConsumptionRecord.findAll({
-              where: buildSafeWhereCondition(require('../../models').ConsumptionRecord, user_id),
-              attributes: [
-                [
-                  require('sequelize').fn('COUNT', require('sequelize').col('*')),
-                  'total_consumptions'
-                ],
-                [
-                  require('sequelize').fn('SUM', require('sequelize').col('consumption_amount')),
-                  'total_amount'
-                ],
-                [
-                  require('sequelize').fn('SUM', require('sequelize').col('points_to_award')),
-                  'total_points'
-                ]
-              ],
-              raw: true
-            })
-          } else {
-            return [{ total_consumptions: 0, total_amount: 0, total_points: 0 }]
-          }
-        } catch (error) {
-          // 查询失败（表不存在或字段错误），使用默认值
-          console.warn('⚠️ ConsumptionRecord查询失败（可能表不存在）:', error.message)
-          return [{ total_consumptions: 0, total_amount: 0, total_points: 0 }]
-        }
-      })()
-    ])
-
-    if (!userInfo) {
-      return res.apiError('用户不存在', 'NOT_FOUND', null, 404)
-    }
-
-    // 构建统计数据
-    const statistics = {
-      user_id: parseInt(user_id),
-      account_created: userInfo.dataValues.created_at || userInfo.created_at, // 🔥 修复：使用dataValues访问时间字段
-      last_activity: userInfo.dataValues.updated_at || userInfo.updated_at, // 🔥 修复：使用dataValues访问时间字段
-
-      // 抽奖统计
-      lottery_count: parseInt(lotteryStats[0]?.total_draws || 0),
-      lottery_wins: parseInt(lotteryStats[0]?.winning_draws || 0),
-      lottery_win_rate:
-        lotteryStats[0]?.total_draws > 0
-          ? (((lotteryStats[0]?.winning_draws || 0) / lotteryStats[0]?.total_draws) * 100).toFixed(
-            1
-          ) + '%'
-          : '0%',
-
-      // 库存统计
-      inventory_total: parseInt(inventoryStats[0]?.total_items || 0),
-      inventory_available: parseInt(inventoryStats[0]?.available_items || 0),
-
-      // 积分统计
-      total_points_earned: parseInt(pointsStats[0]?.total_earned || 0),
-      total_points_consumed: parseInt(pointsStats[0]?.total_consumed || 0),
-      // 🔥 方案A步骤2：使用账户表的准确余额（替代原有计算逻辑 - P0修复）
-      points_balance: pointsAccount?.available_points || 0, // 从账户表获取实际余额
-      transaction_count: parseInt(pointsStats[0]?.total_transactions || 0),
-
-      // 兑换统计
-      exchange_count: parseInt(exchangeStats[0]?.total_exchanges || 0),
-      exchange_points_spent: parseInt(exchangeStats[0]?.total_points_spent || 0),
-
-      // 🔄 消费记录统计（新业务：商家扫码录入）
-      consumption_count: parseInt(consumptionStats[0]?.total_consumptions || 0), // 消费记录数
-      consumption_amount: parseFloat(consumptionStats[0]?.total_amount || 0), // 总消费金额(元)
-      consumption_points: parseInt(consumptionStats[0]?.total_points || 0), // 总奖励积分
-
-      // 活跃度评分（简单算法）
-      activity_score: Math.min(
-        100,
-        Math.floor(
-          parseInt(lotteryStats[0]?.total_draws || 0) * 2 +
-            parseInt(exchangeStats[0]?.total_exchanges || 0) * 3 +
-            parseInt(consumptionStats[0]?.total_consumptions || 0) * 5 // 🔄 使用消费记录数
-        )
-      ),
-
-      // 成就徽章（示例）
-      achievements: []
-    }
-
-    // 添加成就徽章
-    if (statistics.lottery_count >= 10) {
-      statistics.achievements.push({ name: '抽奖达人', icon: '🎰', unlocked: true })
-    }
-    if (statistics.lottery_win_rate && parseFloat(statistics.lottery_win_rate) >= 30) {
-      statistics.achievements.push({ name: '幸运之星', icon: '⭐', unlocked: true })
-    }
-    if (statistics.exchange_count >= 5) {
-      statistics.achievements.push({ name: '兑换专家', icon: '🛒', unlocked: true })
-    }
-    // 🔄 消费记录相关成就（新业务：商家扫码录入）
-    if (statistics.consumption_count >= 10) {
-      statistics.achievements.push({ name: '消费达人', icon: '💳', unlocked: true })
-    }
-    if (statistics.consumption_amount >= 1000) {
-      statistics.achievements.push({ name: '千元大客', icon: '💰', unlocked: true })
-    }
-
-    // 数据脱敏处理
-    const sanitizedStatistics = DataSanitizer.sanitizeUserStatistics(statistics, dataLevel)
+    // ✅ 使用 UserDashboardService 获取用户统计数据
+    const statistics = await UserDashboardService.getUserStatistics(user_id, isAdmin)
 
     return res.apiSuccess(
       {
-        statistics: sanitizedStatistics
+        statistics
       },
       '获取用户统计成功'
     )
@@ -1851,7 +1191,9 @@ router.get('/user/statistics/:user_id', authenticateToken, dataAccessControl, as
     })
 
     // 🔥 P1优化：根据错误类型返回不同的响应（细化错误处理）
-    if (error.name === 'SequelizeDatabaseError') {
+    if (error.message === '用户不存在') {
+      return res.apiError('用户不存在', 'NOT_FOUND', null, 404)
+    } else if (error.name === 'SequelizeDatabaseError') {
       // 数据库查询错误（SQL语法错误、字段不存在等）
       return res.apiError('数据库查询失败，请联系技术支持', 'DATABASE_ERROR', null, 500)
     } else if (
@@ -1887,151 +1229,15 @@ router.get('/admin/overview', authenticateToken, dataAccessControl, async (req, 
       return res.apiError('需要管理员权限', 'FORBIDDEN', null, 403)
     }
 
-    // 并行查询系统统计数据
-    const [userStats, lotteryStats, pointsStats, systemHealth] = await Promise.all([
-      // 用户统计
-      User.findAll({
-        attributes: [
-          [require('sequelize').fn('COUNT', require('sequelize').col('*')), 'total_users'],
-          [
-            require('sequelize').fn(
-              'COUNT',
-              require('sequelize').literal('CASE WHEN DATE(created_at) = CURDATE() THEN 1 END')
-            ),
-            'new_users_today'
-          ],
-          [
-            require('sequelize').fn(
-              'COUNT',
-              require('sequelize').literal(
-                'CASE WHEN updated_at >= DATE_SUB(NOW(), INTERVAL 24 HOUR) THEN 1 END'
-              )
-            ),
-            'active_users_24h'
-          ]
-        ],
-        raw: true
-      }),
+    // 🔄 通过 ServiceManager 获取 UserDashboardService（符合TR-005规范）
+    const UserDashboardService = req.app.locals.services.getService('userDashboard')
 
-      // 抽奖统计
-      require('../models').LotteryDraw.findAll({
-        attributes: [
-          [require('sequelize').fn('COUNT', require('sequelize').col('*')), 'total_draws'],
-          [
-            require('sequelize').fn(
-              'COUNT',
-              require('sequelize').literal('CASE WHEN DATE(created_at) = CURDATE() THEN 1 END')
-            ),
-            'draws_today'
-          ],
-          [
-            require('sequelize').fn(
-              'COUNT',
-              require('sequelize').literal('CASE WHEN is_winner = 1 THEN 1 END')
-            ),
-            'total_wins'
-          ]
-        ],
-        raw: true
-      }),
-
-      // 积分统计（过滤已删除记录）
-      require('../models').PointsTransaction.findAll({
-        where: {
-          is_deleted: 0 // 系统统计时排除已删除的记录
-        },
-        attributes: [
-          [
-            require('sequelize').fn(
-              'SUM',
-              require('sequelize').literal(
-                'CASE WHEN transaction_type = "earn" THEN points_amount ELSE 0 END'
-              )
-            ),
-            'total_points_issued'
-          ],
-          [
-            require('sequelize').fn(
-              'SUM',
-              require('sequelize').literal(
-                'CASE WHEN transaction_type = "consume" THEN points_amount ELSE 0 END'
-              )
-            ),
-            'total_points_consumed'
-          ],
-          [
-            require('sequelize').fn(
-              'COUNT',
-              require('sequelize').literal('CASE WHEN DATE(created_at) = CURDATE() THEN 1 END')
-            ),
-            'transactions_today'
-          ]
-        ],
-        raw: true
-      }),
-
-      // 系统健康状态
-      Promise.resolve({
-        server_uptime: process.uptime(),
-        memory_usage: process.memoryUsage(),
-        node_version: process.version
-      })
-    ])
-
-    const overview = {
-      timestamp: BeijingTimeHelper.nowLocale(),
-
-      // 用户数据
-      users: {
-        total: parseInt(userStats[0]?.total_users || 0),
-        new_today: parseInt(userStats[0]?.new_users_today || 0),
-        active_24h: parseInt(userStats[0]?.active_users_24h || 0)
-      },
-
-      // 抽奖数据
-      lottery: {
-        total_draws: parseInt(lotteryStats[0]?.total_draws || 0),
-        draws_today: parseInt(lotteryStats[0]?.draws_today || 0),
-        total_wins: parseInt(lotteryStats[0]?.total_wins || 0),
-        win_rate:
-          lotteryStats[0]?.total_draws > 0
-            ? (((lotteryStats[0]?.total_wins || 0) / lotteryStats[0]?.total_draws) * 100).toFixed(
-              1
-            ) + '%'
-            : '0%'
-      },
-
-      // 积分数据
-      points: {
-        total_issued: parseInt(pointsStats[0]?.total_points_issued || 0),
-        total_consumed: parseInt(pointsStats[0]?.total_points_consumed || 0),
-        transactions_today: parseInt(pointsStats[0]?.transactions_today || 0),
-        circulation_rate:
-          pointsStats[0]?.total_points_issued > 0
-            ? (
-              ((pointsStats[0]?.total_points_consumed || 0) /
-                  pointsStats[0]?.total_points_issued) *
-                100
-            ).toFixed(1) + '%'
-            : '0%'
-      },
-
-      // 系统状态
-      system: {
-        uptime_hours: Math.floor(systemHealth.server_uptime / 3600),
-        memory_used_mb: Math.floor(systemHealth.memory_usage.used / 1024 / 1024),
-        memory_total_mb: Math.floor(systemHealth.memory_usage.rss / 1024 / 1024),
-        node_version: systemHealth.node_version,
-        status: 'healthy'
-      }
-    }
-
-    // 管理员看完整数据，无需脱敏
-    const sanitizedOverview = DataSanitizer.sanitizeSystemOverview(overview, 'full')
+    // ✅ 使用 UserDashboardService 获取系统概览
+    const overview = await UserDashboardService.getSystemOverview()
 
     return res.apiSuccess(
       {
-        overview: sanitizedOverview
+        overview
       },
       '获取系统概览成功'
     )
@@ -2068,176 +1274,4 @@ router.get('/admin/overview', authenticateToken, dataAccessControl, async (req, 
  *
  * 最后更新：2025-11-08
  */
-async function calculateAverageResponseTime (
-  startTime,
-  endTime,
-  CustomerServiceSession,
-  ChatMessage
-) {
-  try {
-    // 1️⃣ 查询今日已响应的会话（排除未响应的waiting状态）
-    const sessions = await CustomerServiceSession.findAll({
-      where: {
-        created_at: {
-          [Op.gte]: startTime,
-          [Op.lte]: endTime
-        },
-        status: {
-          [Op.not]: SESSION_STATUS.WAITING // ✅ 排除waiting状态（未响应的会话），使用常量
-        }
-      },
-      attributes: ['session_id', 'created_at'] // 仅查询需要的字段（性能优化）
-    })
-
-    // 2️⃣ 无数据时返回默认值60秒（No Data Default Value）
-    if (sessions.length === 0) {
-      console.log('📊 [平均响应时间] 今日无已响应会话，返回默认值60秒')
-      return 60
-    }
-
-    let totalResponseTime = 0 // 总响应时间（秒）
-    let validSessions = 0 // 有效会话数（排除异常数据）
-
-    // 3️⃣ 循环计算每个会话的响应时间（Calculate Response Time for Each Session）
-    for (const session of sessions) {
-      // 并行查询该会话的第一条用户消息和第一条客服消息
-      const [firstUserMsg, firstAdminMsg] = await Promise.all([
-        // 查询用户首条消息（First User Message）
-        ChatMessage.findOne({
-          where: {
-            session_id: session.session_id,
-            sender_type: 'user' // 用户发送的消息
-          },
-          order: [['created_at', 'ASC']], // 按时间升序，取最早的消息
-          attributes: ['created_at']
-        }),
-        // 查询客服首条消息（First Admin Message）
-        ChatMessage.findOne({
-          where: {
-            session_id: session.session_id,
-            sender_type: 'admin' // 客服发送的消息
-          },
-          order: [['created_at', 'ASC']],
-          attributes: ['created_at']
-        })
-      ])
-
-      // 4️⃣ 计算响应时间差（Calculate Response Time Difference）
-      if (firstUserMsg && firstAdminMsg) {
-        const responseTime = (firstAdminMsg.created_at - firstUserMsg.created_at) / 1000 // 转换为秒
-
-        // 5️⃣ 排除异常数据（Filter Abnormal Data）
-        if (responseTime > 0 && responseTime < 3600) {
-          // 响应时间必须>0秒且<1小时
-          totalResponseTime += responseTime
-          validSessions++
-        } else if (responseTime >= 3600) {
-          console.warn(
-            `⚠️ [平均响应时间] 异常数据：session_id=${session.session_id}，响应时间=${Math.round(responseTime)}秒（>1小时）`
-          )
-        }
-      }
-    }
-
-    // 6️⃣ 计算平均值并返回（Calculate Average and Return）
-    const avgResponseTime = validSessions > 0 ? Math.round(totalResponseTime / validSessions) : 60
-
-    console.log(
-      `📊 [平均响应时间] 统计完成：有效会话${validSessions}个，平均响应时间${avgResponseTime}秒`
-    )
-
-    return avgResponseTime
-  } catch (error) {
-    // ❌ 计算失败时返回默认值60秒（Fallback to Default Value on Error）
-    console.error('❌ [平均响应时间] 计算失败，返回默认值60秒:', error)
-    return 60
-  }
-}
-
-/**
- * @route GET /api/v4/system/chat/ws-status
- * @desc 获取WebSocket服务状态（含运行时长uptime）
- * @access Private
- *
- * @description
- * 功能：获取WebSocket服务的实时状态信息
- * 字段：status（运行状态）、connections（总连接数）、uptime（运行时长-小时）、
- *      connected_users（在线用户数）、connected_admins（在线客服数）、
- *      timestamp（查询时间）、startup_log_id（启动日志ID）
- * 用途：服务监控、负载评估、稳定性分析、重启记录追踪
- */
-router.get('/chat/ws-status', authenticateToken, async (req, res) => {
-  try {
-    const ChatWebSocketService = require('../../services/ChatWebSocketService')
-
-    /*
-     * ⚡ 获取WebSocket服务状态（异步查询数据库获取uptime）
-     * 说明：getStatus()现在是异步方法，从websocket_startup_logs表查询运行时长
-     */
-    const status = await ChatWebSocketService.getStatus()
-    const onlineUsers = ChatWebSocketService.getOnlineUsers()
-    const onlineAdmins = ChatWebSocketService.getOnlineAdmins()
-
-    // ✅ 使用中间件方法，代码更简洁
-    const responseData = {
-      ...status,
-      onlineUsers,
-      onlineAdmins
-    }
-
-    return res.apiSuccess(responseData, 'WebSocket服务状态')
-  } catch (error) {
-    console.error('获取WebSocket状态失败:', error)
-    return res.apiInternalError('获取WebSocket状态失败')
-  }
-})
-
-/**
- * 计算反馈预计响应时间（工具函数）
- *
- * 业务场景：
- * - 用户提交反馈后，根据反馈优先级自动计算预计响应时间
- * - 前端显示预计响应时间，提升用户体验和满意度
- * - 运营团队根据优先级合理安排处理顺序，确保高优先级反馈及时响应
- *
- * 业务规则：
- * - high（高优先级）：4小时内响应，适用于紧急问题（如：系统故障、账户异常）
- * - medium（中优先级）：24小时内响应，适用于一般问题（如：功能咨询、体验反馈）
- * - low（低优先级）：72小时内响应，适用于建议类反馈（如：功能建议、优化建议）
- * - 未知优先级：默认72小时内响应，兜底处理
- *
- * 响应时间标准：
- * - 响应时间指管理员第一次回复的时间，不是问题解决时间
- * - 实际响应时间可能因人力资源、问题复杂度等因素有所调整
- * - 系统会记录实际响应时间，用于服务质量分析和改进
- *
- * @param {string} priority - 反馈优先级（high/medium/low）
- * @returns {string} 预计响应时间描述（如："4小时内"、"24小时内"、"72小时内"）
- *
- * @example
- * // 高优先级反馈
- * const responseTime = calculateResponseTime('high')
- * console.log(responseTime) // 输出: "4小时内"
- *
- * @example
- * // 中优先级反馈
- * const responseTime = calculateResponseTime('medium')
- * console.log(responseTime) // 输出: "24小时内"
- *
- * @example
- * // 未知优先级（兜底处理）
- * const responseTime = calculateResponseTime('unknown')
- * console.log(responseTime) // 输出: "72小时内"
- *
- * @description 根据反馈优先级返回预计响应时间描述，提升用户体验
- */
-function calculateResponseTime (priority) {
-  const responseTimeMap = {
-    high: '4小时内',
-    medium: '24小时内',
-    low: '72小时内'
-  }
-  return responseTimeMap[priority] || '72小时内'
-}
-
 module.exports = router

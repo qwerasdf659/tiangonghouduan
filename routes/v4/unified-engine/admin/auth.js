@@ -1,15 +1,14 @@
 /**
  * 管理员认证路由 - V4.0 UUID角色系统版本
  * 🛡️ 权限管理：完全使用UUID角色系统，移除is_admin字段依赖
+ * 🏗️ 架构优化：路由层瘦身，业务逻辑收口到Service层
  * 创建时间：2025年01月21日
- * 更新时间：2025年01月28日
+ * 更新时间：2025年12月11日
  */
 
-const BeijingTimeHelper = require('../../../../utils/timeHelper')
 const express = require('express')
 const router = express.Router()
-const { User } = require('../../../../models')
-const { generateTokens, getUserRoles } = require('../../../../middleware/auth')
+const { generateTokens, getUserRoles, authenticateToken } = require('../../../../middleware/auth')
 
 /**
  * 🛡️ 管理员登录（基于UUID角色系统）
@@ -24,64 +23,47 @@ router.post('/login', async (req, res) => {
       return res.apiError('手机号不能为空', 'MOBILE_REQUIRED', null, 400)
     }
 
-    // ✅ 验证码必填验证（修复缺陷）
-    if (!verification_code || verification_code.trim() === '') {
-      return res.apiError('验证码不能为空', 'VERIFICATION_CODE_REQUIRED', null, 400)
-    }
+    // ✅ 通过 ServiceManager 获取 UserService
+    const UserService = req.app.locals.services.getService('user')
 
-    // ✅ 开发环境万能验证码（修复验证逻辑）
-    if (process.env.NODE_ENV === 'development') {
-      if (verification_code !== '123456') {
-        return res.apiError('验证码错误（开发环境使用123456）', 'INVALID_VERIFICATION_CODE', null, 400)
-      }
-    } else {
-      /*
-       * 生产环境验证码验证逻辑（待实现）
-       * TODO: 实现短信验证码验证
-       */
-      return res.apiError('生产环境验证码验证未实现', 'VERIFICATION_NOT_IMPLEMENTED', null, 501)
-    }
-
-    // 查找用户
-    const user = await User.findOne({ where: { mobile } })
-
-    if (!user) {
-      return res.apiError('用户不存在', 'USER_NOT_FOUND', null, 404)
-    }
-
-    if (user.status !== 'active') {
-      return res.apiError('用户账户已被禁用', 'USER_INACTIVE', null, 403)
-    }
-
-    // 🛡️ 检查用户是否具有管理员权限（基于UUID角色系统）
-    const userRoles = await getUserRoles(user.user_id)
-    if (!userRoles.isAdmin) {
-      return res.apiError('用户不具备管理员权限', 'INSUFFICIENT_PERMISSION', null, 403)
-    }
-
-    // 更新最后登录时间
-    await user.update({
-      last_login: BeijingTimeHelper.createBeijingTime(),
-      login_count: user.login_count + 1
-    })
+    // ✅ 调用 Service 层方法（Service 内部完成所有验证和业务逻辑）
+    const { user, roles } = await UserService.adminLogin(mobile, verification_code)
 
     // 生成Token
     const tokens = await generateTokens(user)
 
     // 返回登录结果 - 参数顺序：data第1个, message第2个
-    return res.apiSuccess({
-      ...tokens,
-      user: {
-        user_id: user.user_id,
-        mobile: user.mobile,
-        nickname: user.nickname,
-        status: user.status,
-        role_level: userRoles.role_level,
-        roles: userRoles.roles
-      }
-    }, '管理员登录成功')
+    return res.apiSuccess(
+      {
+        ...tokens,
+        user: {
+          user_id: user.user_id,
+          mobile: user.mobile,
+          nickname: user.nickname,
+          status: user.status,
+          role_level: roles.role_level,
+          roles: roles.roles
+        }
+      },
+      '管理员登录成功'
+    )
   } catch (error) {
     console.error('❌ 管理员登录失败:', error.message)
+
+    // 业务错误处理（根据错误码返回对应状态码）
+    if (error.code === 'VERIFICATION_CODE_REQUIRED' || error.code === 'INVALID_VERIFICATION_CODE') {
+      return res.apiError(error.message, error.code, null, 400)
+    }
+    if (error.code === 'USER_NOT_FOUND') {
+      return res.apiError(error.message, error.code, null, 404)
+    }
+    if (error.code === 'USER_INACTIVE' || error.code === 'INSUFFICIENT_PERMISSION') {
+      return res.apiError(error.message, error.code, null, 403)
+    }
+    if (error.code === 'VERIFICATION_NOT_IMPLEMENTED') {
+      return res.apiError(error.message, error.code, null, 501)
+    }
+
     return res.apiError('登录失败', 'LOGIN_FAILED', null, 500)
   }
 })
@@ -90,28 +72,25 @@ router.post('/login', async (req, res) => {
  * 🛡️ 管理员信息获取（基于UUID角色系统）
  * GET /api/v4/admin/auth/profile
  */
-router.get('/profile', async (req, res) => {
+router.get('/profile', authenticateToken, async (req, res) => {
   try {
-    const authHeader = req.headers.authorization
-    const token = authHeader && authHeader.split(' ')[1]
+    // ✅ 通过 ServiceManager 获取 UserService
+    const UserService = req.app.locals.services.getService('user')
 
-    if (!token) {
-      return res.apiError('缺少认证Token', 'MISSING_TOKEN', null, 401)
-    }
-
-    const jwt = require('jsonwebtoken')
-    const decoded = jwt.verify(token, process.env.JWT_SECRET)
-
-    // 获取用户信息
-    const user = await User.findOne({
-      where: { user_id: decoded.user_id, status: 'active' }
+    // ✅ 调用 Service 层方法获取用户信息（含状态验证）
+    const user = await UserService.getUserWithValidation(req.user.user_id, {
+      attributes: [
+        'user_id',
+        'mobile',
+        'nickname',
+        'status',
+        'last_login',
+        'login_count',
+        'created_at'
+      ]
     })
 
-    if (!user) {
-      return res.apiError('用户不存在或已被禁用', 'USER_NOT_FOUND', null, 401)
-    }
-
-    // 🛡️ 获取用户角色信息
+    // 获取用户角色信息
     const userRoles = await getUserRoles(user.user_id)
 
     // 验证管理员权限
@@ -120,28 +99,34 @@ router.get('/profile', async (req, res) => {
     }
 
     // 返回管理员信息 - 参数顺序：data第1个, message第2个
-    return res.apiSuccess({
-      user: {
-        user_id: user.user_id,
-        mobile: user.mobile,
-        nickname: user.nickname,
-        status: user.status,
-        role_level: userRoles.role_level,
-        roles: userRoles.roles,
-        last_login: user.last_login,
-        login_count: user.login_count,
-        created_at: user.created_at
-      }
-    }, '获取管理员信息成功')
+    return res.apiSuccess(
+      {
+        user: {
+          user_id: user.user_id,
+          mobile: user.mobile,
+          nickname: user.nickname,
+          status: user.status,
+          role_level: userRoles.role_level,
+          roles: userRoles.roles,
+          last_login: user.last_login,
+          login_count: user.login_count,
+          created_at: user.created_at
+        }
+      },
+      '获取管理员信息成功'
+    )
   } catch (error) {
-    if (error.name === 'JsonWebTokenError') {
-      return res.apiError('无效的Token', 'INVALID_TOKEN', null, 401)
-    } else if (error.name === 'TokenExpiredError') {
-      return res.apiError('Token已过期', 'TOKEN_EXPIRED', null, 401)
-    } else {
-      console.error('❌ 获取管理员信息失败:', error.message)
-      return res.apiError('获取用户信息失败', 'GET_PROFILE_FAILED', null, 500)
+    console.error('❌ 获取管理员信息失败:', error.message)
+
+    // 业务错误处理（根据错误码返回对应状态码）
+    if (error.code === 'USER_NOT_FOUND') {
+      return res.apiError(error.message, error.code, null, 404)
     }
+    if (error.code === 'USER_INACTIVE') {
+      return res.apiError(error.message, error.code, null, 403)
+    }
+
+    return res.apiError('获取用户信息失败', 'GET_PROFILE_FAILED', null, 500)
   }
 })
 

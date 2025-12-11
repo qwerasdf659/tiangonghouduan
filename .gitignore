@@ -45,6 +45,9 @@ images/uploads/
 *.backup
 *.bak
 
+# 路由归档目录（TR-010规范）
+routes/v4/_archived/
+
 # 操作系统生成的文件
 *.pid
 *.lock

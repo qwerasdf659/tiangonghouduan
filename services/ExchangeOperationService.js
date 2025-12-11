@@ -104,6 +104,7 @@
 const { ExchangeRecords, User } = require('../models')
 const { Op } = require('sequelize')
 const BeijingTimeHelper = require('../utils/timeHelper')
+const AuditLogService = require('./AuditLogService')
 
 /**
  * 兑换订单运营服务类
@@ -122,7 +123,7 @@ class ExchangeOperationService {
    * @param {string} batchReason - 批量审核原因
    * @returns {Object} 批量审核结果
    */
-  static async batchApproveOrders (auditorId, exchangeIds, batchReason = '批量审核通过') {
+  static async batchApproveOrders(auditorId, exchangeIds, batchReason = '批量审核通过') {
     console.log(`[批量审核] 审核员${auditorId}批量审核${exchangeIds.length}个订单`)
 
     const results = {
@@ -160,6 +161,21 @@ class ExchangeOperationService {
         // 3. 执行审核通过
         await exchange.approve(auditorId, batchReason)
 
+        // 📝 记录审计日志（异步，失败不影响业务）
+        try {
+          await AuditLogService.logExchangeAudit({
+            operator_id: auditorId,
+            exchange_id: exchangeId,
+            action: 'approve',
+            before_status: 'pending',
+            after_status: 'approved',
+            reason: batchReason,
+            business_id: `batch_approve_${exchangeId}`
+          })
+        } catch (auditError) {
+          console.error(`[批量审核] 订单${exchangeId}审计日志记录失败:`, auditError.message)
+        }
+
         results.success.push({
           exchange_id: exchangeId,
           user_id: exchange.user_id,
@@ -194,7 +210,7 @@ class ExchangeOperationService {
    * @param {Array<Object>} rejectItems - 拒绝订单数组 [{exchange_id, reason}]
    * @returns {Object} 批量审核结果
    */
-  static async batchRejectOrders (auditorId, rejectItems) {
+  static async batchRejectOrders(auditorId, rejectItems) {
     console.log(`[批量拒绝] 审核员${auditorId}批量拒绝${rejectItems.length}个订单`)
 
     const results = {
@@ -242,6 +258,21 @@ class ExchangeOperationService {
         // 3. 执行审核拒绝
         await exchange.reject(auditorId, reason)
 
+        // 📝 记录审计日志（异步，失败不影响业务）
+        try {
+          await AuditLogService.logExchangeAudit({
+            operator_id: auditorId,
+            exchange_id: exchangeId,
+            action: 'reject',
+            before_status: 'pending',
+            after_status: 'rejected',
+            reason,
+            business_id: `batch_reject_${exchangeId}`
+          })
+        } catch (auditError) {
+          console.error(`[批量拒绝] 订单${exchangeId}审计日志记录失败:`, auditError.message)
+        }
+
         results.success.push({
           exchange_id: exchangeId,
           user_id: exchange.user_id,
@@ -275,7 +306,7 @@ class ExchangeOperationService {
    * @param {number} timeoutHours - 超时小时数，默认24小时
    * @returns {Array} 超时订单列表
    */
-  static async getTimeoutPendingOrders (timeoutHours = 24) {
+  static async getTimeoutPendingOrders(timeoutHours = 24) {
     const timeoutThreshold = new Date(BeijingTimeHelper.timestamp() - timeoutHours * 60 * 60 * 1000)
 
     const orders = await ExchangeRecords.findAll({
@@ -305,7 +336,9 @@ class ExchangeOperationService {
       quantity: order.quantity,
       total_points: order.total_points,
       exchange_time: order.exchange_time,
-      timeout_hours: Math.floor((BeijingTimeHelper.timestamp() - new Date(order.exchange_time)) / (60 * 60 * 1000))
+      timeout_hours: Math.floor(
+        (BeijingTimeHelper.timestamp() - new Date(order.exchange_time)) / (60 * 60 * 1000)
+      )
     }))
   }
 
@@ -315,7 +348,7 @@ class ExchangeOperationService {
    * @param {number} timeoutHours - 超时小时数，默认24小时
    * @returns {Object} 告警结果
    */
-  static async checkTimeoutAndAlert (timeoutHours = 24) {
+  static async checkTimeoutAndAlert(timeoutHours = 24) {
     console.log(`[超时告警] 开始检查超过${timeoutHours}小时的待审核订单...`)
 
     const timeoutOrders = await this.getTimeoutPendingOrders(timeoutHours)
@@ -373,7 +406,7 @@ class ExchangeOperationService {
    * @param {Object} statistics - 统计信息
    * @returns {string} 告警消息
    */
-  static generateAlertMessage (orders, statistics) {
+  static generateAlertMessage(orders, statistics) {
     const lines = [
       '🚨 待审核订单超时告警',
       '',
@@ -412,7 +445,7 @@ class ExchangeOperationService {
    *
    * @returns {Object} 统计信息
    */
-  static async getPendingOrdersStatistics () {
+  static async getPendingOrdersStatistics() {
     const now = BeijingTimeHelper.createDatabaseTime()
     const oneHourAgo = new Date(now - 1 * 60 * 60 * 1000)
     const sixHoursAgo = new Date(now - 6 * 60 * 60 * 1000)
@@ -482,7 +515,7 @@ class ExchangeOperationService {
    * @returns {Object} returns.statistics - 订单统计信息
    * @returns {Object} returns.alerts - 告警信息
    */
-  static async scheduledTimeoutCheck () {
+  static async scheduledTimeoutCheck() {
     console.log('[定时任务] 开始执行超时订单检查...')
 
     try {
@@ -514,6 +547,221 @@ class ExchangeOperationService {
         success: false,
         error: error.message
       }
+    }
+  }
+
+  /**
+   * 创建商品兑换订单（协调多领域服务）
+   *
+   * 业务场景：
+   * - 用户兑换商品的完整流程协调
+   * - 协调多个领域服务：InventoryService（商品验证、库存扣减）、PointsService（积分扣除）
+   * - 使用事务保证原子性，任何步骤失败都会回滚
+   *
+   * 业务流程：
+   * 1. 开启事务
+   * 2. 调用 InventoryService 验证商品和库存
+   * 3. 调用 PointsService 扣除积分
+   * 4. 创建兑换记录（ExchangeRecords）
+   * 5. 调用 InventoryService 扣减库存
+   * 6. 提交事务
+   * 7. 发送通知（异步，失败不影响业务）
+   *
+   * @param {number} userId - 用户ID
+   * @param {number} productId - 商品ID
+   * @param {number} quantity - 兑换数量
+   * @param {string} space - 空间类型（lucky/premium）
+   * @returns {Promise<Object>} 兑换结果
+   * @throws {Error} 任何步骤失败都会抛出错误并回滚事务
+   */
+  static async createExchange(userId, productId, quantity = 1, space = 'lucky') {
+    const { sequelize } = require('../models')
+    const InventoryService = require('./InventoryService')
+    const PointsService = require('./PointsService')
+    const NotificationService = require('./NotificationService')
+    const BeijingTimeHelper = require('../utils/timeHelper')
+
+    const transaction = await sequelize.transaction()
+
+    try {
+      console.log(`[兑换] 用户${userId}开始兑换商品${productId}，数量${quantity}，空间${space}`)
+
+      // 1. 验证商品和库存（调用 InventoryService）
+      const { product, space_info, total_points } =
+        await InventoryService.validateProductForExchange(productId, space, quantity, {
+          transaction
+        })
+
+      console.log(`[兑换] 商品验证通过，所需积分：${total_points}`)
+
+      // 2. 扣除积分（调用 PointsService）
+      await PointsService.consumePoints(userId, total_points, {
+        business_type: 'exchange',
+        source_type: 'product_exchange',
+        title: `兑换商品：${product.name}（${space}空间）`,
+        description: `兑换${quantity}个${product.name}（${space}空间）`,
+        transaction
+      })
+
+      console.log(`[兑换] 积分扣除成功，已扣除${total_points}积分`)
+
+      // 3. 生成兑换码
+      const exchangeCode = this._generateExchangeCode()
+
+      // 4. 创建兑换记录
+      const exchangeRecord = await ExchangeRecords.create(
+        {
+          user_id: userId,
+          product_id: productId,
+          product_snapshot: {
+            name: product.name,
+            description: product.description,
+            category: product.category,
+            exchange_points: space_info.exchange_points,
+            space,
+            requires_audit: true
+          },
+          quantity,
+          total_points,
+          exchange_code: exchangeCode,
+          status: 'pending',
+          space,
+          delivery_method: product.category === '优惠券' ? 'virtual' : 'physical',
+          exchange_time: BeijingTimeHelper.createBeijingTime(),
+          requires_audit: true,
+          audit_status: 'pending'
+        },
+        { transaction }
+      )
+
+      console.log(`[兑换] 兑换记录创建成功，订单ID：${exchangeRecord.exchange_id}`)
+
+      // 5. 扣减库存（调用 InventoryService）
+      await InventoryService.deductProductStock(productId, space, quantity, { transaction })
+
+      console.log('[兑换] 库存扣减成功')
+
+      // 6. 提交事务
+      await transaction.commit()
+
+      console.log(`[兑换] 事务提交成功，订单${exchangeRecord.exchange_id}已提交审核`)
+
+      // 7. 发送通知（异步，失败不影响业务）
+      try {
+        // 通知用户：申请已提交
+        await NotificationService.notifyExchangePending(userId, {
+          exchange_id: exchangeRecord.exchange_id,
+          product_name: product.name,
+          quantity,
+          total_points
+        })
+
+        // 通知管理员：有新订单待审核
+        await NotificationService.notifyNewExchangeAudit({
+          exchange_id: exchangeRecord.exchange_id,
+          user_id: userId,
+          product_name: product.name,
+          quantity,
+          total_points,
+          product_category: product.category
+        })
+      } catch (notifyError) {
+        // 通知失败不影响兑换流程
+        console.error('[兑换] 发送通知失败:', notifyError.message)
+      }
+
+      // 8. 返回兑换结果
+      return {
+        success: true,
+        needs_audit: true,
+        exchange_id: exchangeRecord.exchange_id,
+        exchange_code: exchangeCode,
+        product_name: product.name,
+        quantity,
+        total_points,
+        audit_status: 'pending',
+        message: '兑换申请已提交，积分已扣除，请等待管理员审核',
+        exchange_time: exchangeRecord.exchange_time
+      }
+    } catch (error) {
+      await transaction.rollback()
+      console.error(`[兑换] 商品兑换失败: ${error.message}`)
+      throw new Error(`商品兑换失败: ${error.message}`)
+    }
+  }
+
+  /**
+   * 生成兑换码（私有方法）
+   * @private
+   * @returns {string} 兑换码
+   */
+  static _generateExchangeCode() {
+    const BeijingTimeHelper = require('../utils/timeHelper')
+    const timestamp = BeijingTimeHelper.timestamp().toString(36)
+    const random = Math.random().toString(36).substr(2, 8)
+    return `EXC${timestamp}${random}`.toUpperCase()
+  }
+
+  /**
+   * 获取用户兑换记录
+   *
+   * 业务场景：
+   * - 用户个人中心查看兑换记录
+   * - 订单追踪和状态查询
+   * - 兑换码查询和核销记录
+   *
+   * @param {number} userId - 用户ID
+   * @param {Object} options - 查询选项
+   * @param {number} options.page - 页码（默认1）
+   * @param {number} options.limit - 每页数量（默认20）
+   * @param {string} options.status - 状态过滤（pending/distributed/used/expired/cancelled）
+   * @param {string} options.space - 空间过滤（lucky/premium）
+   * @returns {Promise<Object>} {records, pagination}
+   */
+  static async getExchangeRecords(userId, options = {}) {
+    const { Product } = require('../models')
+    const { page = 1, limit = 20, status = null, space = null } = options
+
+    console.log(`[兑换记录] 查询用户${userId}的兑换记录`, { page, limit, status, space })
+
+    try {
+      // 构建查询条件
+      const whereClause = {
+        user_id: userId
+      }
+      if (status) whereClause.status = status
+      if (space) whereClause.space = space
+
+      const offset = (page - 1) * limit
+
+      const { count, rows } = await ExchangeRecords.findAndCountAll({
+        where: whereClause,
+        include: [
+          {
+            model: Product,
+            as: 'product',
+            attributes: ['product_id', 'name', 'category', 'image']
+          }
+        ],
+        order: [['exchange_time', 'DESC']],
+        limit: parseInt(limit),
+        offset
+      })
+
+      console.log(`[兑换记录] 查询成功，共${count}条记录，返回${rows.length}条`)
+
+      return {
+        records: rows,
+        pagination: {
+          total: count,
+          page: parseInt(page),
+          limit: parseInt(limit),
+          total_pages: Math.ceil(count / limit)
+        }
+      }
+    } catch (error) {
+      console.error(`[兑换记录] 查询失败: ${error.message}`)
+      throw error
     }
   }
 }

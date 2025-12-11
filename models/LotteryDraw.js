@@ -160,6 +160,32 @@ module.exports = sequelize => {
         primaryKey: true,
         comment: '抽奖记录唯一ID'
       },
+      /**
+       * 业务关联ID（幂等控制字段）
+       *
+       * 业务含义：
+       * - 用于防止重复提交创建多条抽奖记录
+       * - 实现永久幂等保护
+       * - 支持业务操作追溯
+       *
+       * 技术规范：
+       * - 格式：lottery_draw_用户ID_活动ID_时间戳
+       * - 同一business_id只能创建一条记录
+       * - 重复提交返回已有记录（幂等）
+       *
+       * 使用场景：
+       * - 用户抽奖时生成business_id，防止重复提交
+       * - 通过business_id查询是否已存在记录
+       * - 实现幂等性保护，避免数据重复
+       *
+       * P0-3规范：所有资产变动必须有business_id幂等控制
+       * P0-6任务：抽奖结果未使用business_id幂等控制（已修复）
+       */
+      business_id: {
+        type: DataTypes.STRING(100),
+        allowNull: true, // 允许为空，兼容历史数据
+        comment: '业务关联ID，用于幂等控制'
+      },
       user_id: {
         type: DataTypes.INTEGER,
         allowNull: false,
@@ -387,6 +413,11 @@ module.exports = sequelize => {
         {
           name: 'idx_user_id',
           fields: ['user_id']
+        },
+        {
+          name: 'idx_business_id',
+          fields: ['business_id'],
+          comment: '业务ID索引，用于幂等查询'
         },
         {
           name: 'idx_prize_id',

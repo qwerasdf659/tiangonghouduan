@@ -23,7 +23,6 @@
 
 const express = require('express')
 const router = express.Router()
-const { User } = require('../../../models')
 const {
   generateTokens,
   getUserRoles,
@@ -94,81 +93,35 @@ router.post('/login', async (req, res) => {
       return res.apiError('生产环境验证码验证未实现', 'VERIFICATION_NOT_IMPLEMENTED', null, 501)
     }
 
-    // 查找或创建用户
-    let user = await User.findOne({ where: { mobile } })
+    // 🎯 通过ServiceManager获取UserService
+    const UserService = req.app.locals.services.getService('user')
+
+    // 查找用户或自动注册
+    let user = await UserService.findByMobile(mobile)
     let isNewUser = false
 
     if (!user) {
-      // 用户不存在，自动注册
+      // 用户不存在，自动注册（Service 内部管理事务）
       console.log(`用户 ${mobile} 不存在，开始自动注册...`)
 
-      // ✅ 使用事务确保数据完整性（解决问题1：积分账户创建策略）
-      const sequelize = require('../../../config/database')
-      const transaction = await sequelize.transaction()
-
       try {
-        // 1. 创建用户
-        user = await User.create(
-          {
-            mobile,
-            nickname: `用户${mobile.slice(-4)}`,
-            status: 'active',
-            consecutive_fail_count: 0,
-            history_total_points: 0,
-            login_count: 0
-          },
-          { transaction }
-        )
-
-        console.log(`用户 ${mobile} 注册成功，user_id: ${user.user_id}`)
-
-        // ✅ 2. 创建积分账户（使用统一服务，传递transaction保证事务完整性）
-        const PointsService = require('../../../services/PointsService')
-        await PointsService.createPointsAccount(user.user_id, transaction)
-
-        console.log(`用户 ${mobile} 积分账户创建成功`)
-
-        // 3. 为新用户分配普通用户角色
-        const Role = require('../../../models').Role
-        const UserRole = require('../../../models').UserRole
-
-        const userRole = await Role.findOne({ where: { role_name: 'user' } })
-
-        if (userRole) {
-          // 检查角色是否已分配（避免重复分配）
-          const existingUserRole = await UserRole.findOne({
-            where: {
-              user_id: user.user_id,
-              role_id: userRole.role_id
-            }
-          })
-
-          if (!existingUserRole) {
-            await UserRole.create(
-              {
-                user_id: user.user_id,
-                role_id: userRole.role_id,
-                is_active: true
-              },
-              { transaction }
-            )
-            console.log(`用户 ${mobile} 已分配普通用户角色`)
-          } else {
-            console.log(`用户 ${mobile} 已有普通用户角色，跳过分配`)
-          }
-        } else {
-          console.warn('警告：普通用户角色不存在，无法分配角色')
-        }
-
-        await transaction.commit()
+        user = await UserService.registerUser(mobile)
+        isNewUser = true
         console.log(`用户 ${mobile} 注册流程完成（用户+积分账户+角色）`)
       } catch (error) {
-        await transaction.rollback()
         console.error(`用户 ${mobile} 注册失败:`, error)
-        return res.apiError('用户注册失败', 'REGISTRATION_FAILED', { error: error.message }, 500)
-      }
 
-      isNewUser = true
+        // 处理业务错误
+        if (error.code === 'MOBILE_EXISTS') {
+          // 并发情况下可能出现：检查时不存在，注册时已存在
+          user = await UserService.findByMobile(mobile)
+          if (!user) {
+            return res.apiError('用户注册失败', 'REGISTRATION_FAILED', { error: error.message }, 500)
+          }
+        } else {
+          return res.apiError('用户注册失败', 'REGISTRATION_FAILED', { error: error.message }, 500)
+        }
+      }
     }
 
     // 检查用户状态
@@ -180,10 +133,7 @@ router.post('/login', async (req, res) => {
     const userRoles = await getUserRoles(user.user_id)
 
     // 更新最后登录时间和登录次数
-    await user.update({
-      last_login: BeijingTimeHelper.createBeijingTime(),
-      login_count: (user.login_count || 0) + 1
-    })
+    await UserService.updateLoginStats(user.user_id)
 
     // 生成Token
     const tokens = await generateTokens(user)
@@ -377,99 +327,40 @@ router.post('/quick-login', async (req, res) => {
 
     console.log(`📱 快速登录请求: ${mobile}`)
 
+    // 🎯 通过ServiceManager获取UserService
+    const UserService = req.app.locals.services.getService('user')
+
     /*
      * ========================================
      * 步骤2: 查找用户
      * ========================================
      */
-    let user = await User.findOne({ where: { mobile } })
+    let user = await UserService.findByMobile(mobile)
 
     /*
      * ========================================
-     * 步骤3: 如果用户不存在，自动创建用户账户（使用事务保证数据完整性）
+     * 步骤3: 如果用户不存在，自动创建用户账户（Service 内部管理事务）
      * ========================================
      */
     if (!user) {
       console.log(`用户 ${mobile} 不存在，开始自动注册...`)
 
-      // ✅ 使用事务确保数据完整性（用户+积分账户+角色同步创建或失败回滚）
-      const sequelize = require('../../../config/database')
-      const transaction = await sequelize.transaction()
-
       try {
-        // 1. 创建用户账户
-        user = await User.create(
-          {
-            mobile, // 手机号（唯一登录凭证，来自微信授权）
-            nickname: `用户${mobile.slice(-4)}`, // 自动生成昵称：用户+手机号后4位
-            status: 'active', // 默认激活状态
-            consecutive_fail_count: 0, // 连续未中奖次数初始值（保底机制核心字段）
-            history_total_points: 0, // 历史累计总积分初始值（臻选空间解锁条件）
-            login_count: 0 // 登录次数初始值
-          },
-          { transaction }
-        )
-
-        console.log(`✅ 用户 ${mobile} 注册成功，user_id: ${user.user_id}`)
-
-        /*
-         * ========================================
-         * ✅ 2. 创建积分账户（使用统一服务）
-         * ========================================
-         */
-        const PointsService = require('../../../services/PointsService')
-        await PointsService.createPointsAccount(user.user_id, transaction)
-
-        console.log(`✅ 用户 ${mobile} 积分账户创建成功`)
-
-        // 3. 为新用户分配普通用户角色
-        const Role = require('../../../models').Role
-        const UserRole = require('../../../models').UserRole
-
-        const userRole = await Role.findOne({
-          where: { role_name: 'user' },
-          transaction
-        })
-
-        if (userRole) {
-          // 检查角色是否已分配（避免重复分配）
-          const existingUserRole = await UserRole.findOne({
-            where: {
-              user_id: user.user_id,
-              role_id: userRole.role_id // ⚠️ 使用role_id字段
-            },
-            transaction
-          })
-
-          if (!existingUserRole) {
-            await UserRole.create(
-              {
-                user_id: user.user_id,
-                role_id: userRole.role_id, // ⚠️ 使用role_id字段
-                is_active: true
-              },
-              { transaction }
-            )
-            console.log(`✅ 用户 ${mobile} 已分配普通用户角色`)
-          } else {
-            console.log(`用户 ${mobile} 已有普通用户角色，跳过分配`)
-          }
-        } else {
-          console.warn('⚠️ 警告：普通用户角色不存在，无法分配角色')
-        }
-
-        /*
-         * ========================================
-         * ✅ 提交事务（确保用户+积分账户+角色原子性创建）
-         * ========================================
-         */
-        await transaction.commit()
+        user = await UserService.registerUser(mobile)
         console.log(`✅ 用户 ${mobile} 注册流程完成（用户+积分账户+角色）`)
       } catch (error) {
-        // 回滚事务
-        await transaction.rollback()
         console.error(`❌ 用户 ${mobile} 注册失败:`, error)
-        return res.apiError('用户注册失败', 'REGISTRATION_FAILED', { error: error.message }, 500)
+
+        // 处理业务错误
+        if (error.code === 'MOBILE_EXISTS') {
+          // 并发情况下可能出现：检查时不存在，注册时已存在
+          user = await UserService.findByMobile(mobile)
+          if (!user) {
+            return res.apiError('用户注册失败', 'REGISTRATION_FAILED', { error: error.message }, 500)
+          }
+        } else {
+          return res.apiError('用户注册失败', 'REGISTRATION_FAILED', { error: error.message }, 500)
+        }
       }
     }
 
@@ -495,10 +386,7 @@ router.post('/quick-login', async (req, res) => {
      * 步骤6: 更新最后登录时间和登录次数
      * ========================================
      */
-    await user.update({
-      last_login: BeijingTimeHelper.createBeijingTime(), // 当前北京时间（统一时区管理）
-      login_count: (user.login_count || 0) + 1 // 登录次数累加+1（支持用户行为分析）
-    })
+    await UserService.updateLoginStats(user.user_id)
 
     console.log(
       `✅ 用户 ${mobile} 更新登录统计：last_login=${user.last_login}, login_count=${user.login_count}`
@@ -574,24 +462,11 @@ router.get('/profile', require('../../../middleware/auth').authenticateToken, as
   try {
     const user_id = req.user.user_id
 
-    // 重新查询用户信息确保数据最新
-    const user = await User.findByPk(user_id)
+    // 🎯 通过ServiceManager获取UserService
+    const UserService = req.app.locals.services.getService('user')
 
-    /*
-     * ✅ P0级修复：添加status二次检查（防御性编程）
-     * 即使authenticateToken中间件已检查，这里再次验证作为安全加固
-     */
-    if (!user) {
-      return res.apiError('用户不存在', 'USER_NOT_FOUND', null, 404)
-    }
-
-    // 🔴 关键：status二次检查，防止被禁用用户继续访问
-    if (user.status !== 'active') {
-      console.warn(
-        `❌ [Security Alert] Banned user tried to access profile: user_id=${user.user_id}, status=${user.status}`
-      )
-      return res.apiError('账户已被禁用或删除', 'ACCOUNT_BANNED', null, 403)
-    }
+    // ✅ 使用 UserService 获取用户信息（含状态验证）
+    const user = await UserService.getUserWithValidation(user_id)
 
     // 🛡️ 获取用户角色信息
     const userRoles = await getUserRoles(user_id)
@@ -606,7 +481,7 @@ router.get('/profile', require('../../../middleware/auth').authenticateToken, as
         status: user.status,
         consecutive_fail_count: user.consecutive_fail_count,
         history_total_points: user.history_total_points,
-        created_at: BeijingTimeHelper.formatToISO(user.createdAt), // 🔧 转换为ISO8601格式（带+08:00）
+        created_at: BeijingTimeHelper.formatToISO(user.created_at), // 🔧 转换为ISO8601格式（带+08:00）
         last_login: BeijingTimeHelper.formatToISO(user.last_login), // 🔧 转换为ISO8601格式（带+08:00）
         login_count: user.login_count
       },
@@ -616,6 +491,18 @@ router.get('/profile', require('../../../middleware/auth').authenticateToken, as
     return res.apiSuccess(responseData, '用户信息获取成功')
   } catch (error) {
     console.error('获取用户信息失败:', error)
+
+    // 根据错误类型返回不同的响应
+    if (error.code === 'USER_NOT_FOUND') {
+      return res.apiError(error.message, error.code, null, 404)
+    }
+    if (error.code === 'USER_INACTIVE') {
+      console.warn(
+        `❌ [Security Alert] Banned user tried to access profile: user_id=${req.user.user_id}`
+      )
+      return res.apiError('账户已被禁用或删除', 'ACCOUNT_BANNED', null, 403)
+    }
+
     return res.apiError('获取用户信息失败', 'GET_PROFILE_FAILED', error.message, 500)
   }
 })
@@ -644,15 +531,11 @@ router.post('/refresh', async (req, res) => {
       return res.apiError('刷新Token无效', 'INVALID_REFRESH_TOKEN', null, 401)
     }
 
-    // 获取用户信息并重新生成Token
-    const user = await User.findByPk(verifyResult.user.user_id)
-    if (!user) {
-      return res.apiError('用户不存在', 'USER_NOT_FOUND', null, 404)
-    }
+    // 🎯 通过ServiceManager获取UserService
+    const UserService = req.app.locals.services.getService('user')
 
-    if (user.status !== 'active') {
-      return res.apiError('用户账户已被禁用', 'USER_INACTIVE', null, 403)
-    }
+    // ✅ 使用 UserService 获取用户信息并验证状态
+    const user = await UserService.getUserWithValidation(verifyResult.user.user_id)
 
     // 生成新的Token对
     const tokens = await generateTokens(user)
@@ -677,13 +560,23 @@ router.post('/refresh', async (req, res) => {
     return res.apiSuccess(responseData, 'Token刷新成功')
   } catch (error) {
     console.error('Token刷新失败:', error)
-    // 区分不同的错误类型
+
+    // 根据错误类型返回不同的响应
+    if (error.code === 'USER_NOT_FOUND') {
+      return res.apiError(error.message, error.code, null, 404)
+    }
+    if (error.code === 'USER_INACTIVE') {
+      return res.apiError('用户账户已被禁用', 'USER_INACTIVE', null, 403)
+    }
+
+    // 区分不同的JWT错误类型
     if (error.name === 'JsonWebTokenError') {
       return res.apiError('刷新Token格式错误', 'INVALID_REFRESH_TOKEN_FORMAT', error.message, 401)
     }
     if (error.name === 'TokenExpiredError') {
       return res.apiError('刷新Token已过期', 'REFRESH_TOKEN_EXPIRED', error.message, 401)
     }
+
     return res.apiError('Token刷新失败', 'REFRESH_TOKEN_FAILED', error.message, 500)
   }
 })
@@ -737,21 +630,16 @@ router.get('/verify', authenticateToken, verifyRateLimiter, async (req, res, nex
   try {
     const user_id = req.user.user_id
 
-    // 🛡️ 使用缓存机制获取用户角色信息（getUserRoles内置缓存）
-    const userRoles = await getUserRoles(user_id)
+    // 🎯 通过ServiceManager获取UserService
+    const UserService = req.app.locals.services.getService('user')
 
-    // 获取用户完整信息
-    const user = await User.findByPk(user_id, {
+    // ✅ 使用 UserService 获取用户信息（含状态验证）
+    const user = await UserService.getUserWithValidation(user_id, {
       attributes: ['user_id', 'mobile', 'nickname', 'status', 'created_at', 'last_login', 'login_count']
     })
 
-    if (!user) {
-      return res.apiError('用户不存在', 'USER_NOT_FOUND', null, 404)
-    }
-
-    if (user.status !== 'active') {
-      return res.apiError('用户账号已被禁用', 'USER_INACTIVE', { status: user.status }, 403)
-    }
+    // 🛡️ 使用缓存机制获取用户角色信息（getUserRoles内置缓存）
+    const userRoles = await getUserRoles(user_id)
 
     console.log(`✅ [Auth] Token验证成功: user_id=${user_id}, roles=${userRoles.roles.join(',')}`)
 
@@ -767,11 +655,21 @@ router.get('/verify', authenticateToken, verifyRateLimiter, async (req, res, nex
       created_at: BeijingTimeHelper.formatToISO(user.created_at),
       last_login: BeijingTimeHelper.formatToISO(user.last_login),
       login_count: user.login_count,
-      token_valid: true,
+      valid: true, // 向后兼容旧测试
+      token_valid: true, // 新字段
       timestamp: BeijingTimeHelper.apiTimestamp()
     }, 'Token验证成功', 'TOKEN_VALID')
   } catch (error) {
     console.error('❌ [Auth] Token验证失败:', error)
+
+    // 根据错误类型返回不同的响应
+    if (error.code === 'USER_NOT_FOUND') {
+      return res.apiError(error.message, error.code, null, 404)
+    }
+    if (error.code === 'USER_INACTIVE') {
+      return res.apiError('用户账号已被禁用', 'USER_INACTIVE', { status: 'inactive' }, 403)
+    }
+
     return next(error)
   }
 })

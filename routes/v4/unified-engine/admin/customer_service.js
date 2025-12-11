@@ -3,8 +3,9 @@
  *
  * @description 管理员端客服系统API路由
  * @module routes/v4/unified-engine/admin/customer_service
- * @version 4.0.0
+ * @version 5.0.0（重构版：使用AdminCustomerServiceService）
  * @date 2025-11-23
+ * @updated 2025-12-09（重构：路由层委托给AdminCustomerServiceService处理）
  *
  * 业务场景：
  * - 管理员查看和管理客服会话
@@ -19,12 +20,18 @@
  * - POST   /sessions/:id/transfer - 转接会话
  * - POST   /sessions/:id/close    - 关闭会话
  * - GET    /sessions/stats        - 获取统计信息
+ *
+ * 架构原则：
+ * - 路由层不直连 models（所有数据库操作通过 Service 层）
+ * - 路由层不开启事务（事务管理在 Service 层）
+ * - 通过 ServiceManager 统一获取服务实例
+ * - 使用 AdminCustomerServiceService 作为 Facade 层
  */
 
 const express = require('express')
 const router = express.Router()
-const CustomerServiceSessionService = require('../../../../services/CustomerServiceSessionService')
 const { authenticateToken, requireAdmin } = require('../../../../middleware/auth')
+const businessConfig = require('../../../../config/business.config')
 
 // 🔐 所有路由都需要管理员权限
 router.use(authenticateToken, requireAdmin)
@@ -51,6 +58,9 @@ router.use(authenticateToken, requireAdmin)
  */
 router.get('/sessions', async (req, res) => {
   try {
+    // 🎯 通过 ServiceManager 获取 AdminCustomerServiceService
+    const AdminCustomerServiceService = req.app.locals.services.getService('adminCustomerService')
+
     const options = {
       page: req.query.page,
       page_size: req.query.page_size,
@@ -61,12 +71,13 @@ router.get('/sessions', async (req, res) => {
       sort_order: req.query.sort_order
     }
 
-    const result = await CustomerServiceSessionService.getSessionList(options)
+    // 🎯 调用服务层方法
+    const result = await AdminCustomerServiceService.getSessionList(options)
 
     res.apiSuccess(result, '获取会话列表成功')
   } catch (error) {
     console.error('获取会话列表失败:', error)
-    res.apiError(error.message, 500)
+    res.apiError(error.message, 'INTERNAL_ERROR', null, 500)
   }
 })
 
@@ -86,14 +97,18 @@ router.get('/sessions', async (req, res) => {
  */
 router.get('/sessions/stats', async (req, res) => {
   try {
+    // 🎯 通过 ServiceManager 获取 AdminCustomerServiceService
+    const AdminCustomerServiceService = req.app.locals.services.getService('adminCustomerService')
+
     const admin_id = req.query.admin_id ? parseInt(req.query.admin_id) : undefined
 
-    const stats = await CustomerServiceSessionService.getSessionStats(admin_id)
+    // 🎯 调用服务层方法
+    const stats = await AdminCustomerServiceService.getSessionStats(admin_id)
 
     res.apiSuccess(stats, '获取统计信息成功')
   } catch (error) {
     console.error('获取统计信息失败:', error)
-    res.apiError(error.message, 500)
+    res.apiError(error.message, 'INTERNAL_ERROR', null, 500)
   }
 })
 
@@ -116,19 +131,28 @@ router.get('/sessions/stats', async (req, res) => {
  */
 router.get('/sessions/:session_id/messages', async (req, res) => {
   try {
+    // 🎯 通过 ServiceManager 获取 AdminCustomerServiceService
+    const AdminCustomerServiceService = req.app.locals.services.getService('adminCustomerService')
+
     const session_id = parseInt(req.params.session_id)
     const options = {
       limit: req.query.limit,
       before_message_id: req.query.before_message_id
     }
 
-    const result = await CustomerServiceSessionService.getSessionMessages(session_id, options)
+    // 🎯 调用服务层方法
+    const result = await AdminCustomerServiceService.getSessionMessages(session_id, options)
 
     res.apiSuccess(result, '获取会话消息成功')
   } catch (error) {
     console.error('获取会话消息失败:', error)
     const statusCode = error.message === '会话不存在' ? 404 : 500
-    res.apiError(error.message, statusCode)
+    res.apiError(
+      error.message,
+      error.message === '会话不存在' ? 'NOT_FOUND' : 'INTERNAL_ERROR',
+      null,
+      statusCode
+    )
   }
 })
 
@@ -157,15 +181,16 @@ router.post('/sessions/:session_id/send', async (req, res) => {
 
     // 参数验证
     if (!content || content.trim() === '') {
-      return res.apiError('消息内容不能为空', 400)
+      return res.apiError('消息内容不能为空', 'BAD_REQUEST', null, 400)
     }
 
     // 内容长度验证
-    const businessConfig = require('../../../../config/business.config')
     const { message: messageConfig } = businessConfig.chat
     if (content.length > messageConfig.max_length) {
       return res.apiError(
         `消息内容不能超过${messageConfig.max_length}字符（当前${content.length}字符）`,
+        'BAD_REQUEST',
+        null,
         400
       )
     }
@@ -173,17 +198,21 @@ router.post('/sessions/:session_id/send', async (req, res) => {
     // 消息类型枚举验证
     const allowedTypes = ['text', 'image', 'system']
     if (message_type && !allowedTypes.includes(message_type)) {
-      return res.apiError('消息类型无效（允许值：text/image/system）', 400)
+      return res.apiError('消息类型无效（允许值：text/image/system）', 'BAD_REQUEST', null, 400)
     }
 
     const data = {
       admin_id: req.user.user_id,
       content: content.trim(),
       message_type: message_type || 'text',
-      role_level: req.user.role_level // ✅ 新增：传递权限等级
+      role_level: req.user.role_level // ✅ 传递权限等级
     }
 
-    const result = await CustomerServiceSessionService.sendMessage(session_id, data)
+    // 🎯 通过 ServiceManager 获取 AdminCustomerServiceService
+    const AdminCustomerServiceService = req.app.locals.services.getService('adminCustomerService')
+
+    // 🎯 调用服务层方法
+    const result = await AdminCustomerServiceService.sendMessage(session_id, data)
 
     return res.apiSuccess(result, '发送消息成功')
   } catch (error) {
@@ -191,12 +220,23 @@ router.post('/sessions/:session_id/send', async (req, res) => {
 
     // ✅ 增强错误处理
     let statusCode = 500
-    if (error.message === '会话不存在') statusCode = 404
-    if (error.message.includes('权限')) statusCode = 403
-    if (error.message.includes('敏感词')) statusCode = 400
-    if (error.message.includes('频繁')) statusCode = 429
+    let errorCode = 'INTERNAL_ERROR'
 
-    return res.apiError(error.message, statusCode)
+    if (error.message === '会话不存在') {
+      statusCode = 404
+      errorCode = 'NOT_FOUND'
+    } else if (error.message.includes('权限')) {
+      statusCode = 403
+      errorCode = 'FORBIDDEN'
+    } else if (error.message.includes('敏感词')) {
+      statusCode = 400
+      errorCode = 'BAD_REQUEST'
+    } else if (error.message.includes('频繁')) {
+      statusCode = 429
+      errorCode = 'TOO_MANY_REQUESTS'
+    }
+
+    return res.apiError(error.message, errorCode, null, statusCode)
   }
 })
 
@@ -220,16 +260,27 @@ router.post('/sessions/:session_id/mark-read', async (req, res) => {
     const session_id = parseInt(req.params.session_id)
     const admin_id = req.user.user_id
 
-    const result = await CustomerServiceSessionService.markSessionAsRead(session_id, admin_id)
+    // 🎯 通过 ServiceManager 获取 AdminCustomerServiceService
+    const AdminCustomerServiceService = req.app.locals.services.getService('adminCustomerService')
+
+    // 🎯 调用服务层方法
+    const result = await AdminCustomerServiceService.markSessionAsRead(session_id, admin_id)
 
     res.apiSuccess(result, '标记已读成功')
   } catch (error) {
     console.error('标记已读失败:', error)
     let statusCode = 500
-    if (error.message === '会话不存在') statusCode = 404
-    if (error.message === '无权限操作此会话') statusCode = 403
+    let errorCode = 'INTERNAL_ERROR'
 
-    res.apiError(error.message, statusCode)
+    if (error.message === '会话不存在') {
+      statusCode = 404
+      errorCode = 'NOT_FOUND'
+    } else if (error.message === '无权限操作此会话') {
+      statusCode = 403
+      errorCode = 'FORBIDDEN'
+    }
+
+    res.apiError(error.message, errorCode, null, statusCode)
   }
 })
 
@@ -257,26 +308,41 @@ router.post('/sessions/:session_id/transfer', async (req, res) => {
 
     // 参数验证
     if (!target_admin_id) {
-      return res.apiError('目标客服ID不能为空', 400)
+      return res.apiError('目标客服ID不能为空', 'BAD_REQUEST', null, 400)
     }
 
     const current_admin_id = req.user.user_id
     const target_id = parseInt(target_admin_id)
 
     if (current_admin_id === target_id) {
-      return res.apiError('不能转接给自己', 400)
+      return res.apiError('不能转接给自己', 'BAD_REQUEST', null, 400)
     }
 
-    const result = await CustomerServiceSessionService.transferSession(session_id, current_admin_id, target_id)
+    // 🎯 通过 ServiceManager 获取 AdminCustomerServiceService
+    const AdminCustomerServiceService = req.app.locals.services.getService('adminCustomerService')
+
+    // 🎯 调用服务层方法
+    const result = await AdminCustomerServiceService.transferSession(
+      session_id,
+      current_admin_id,
+      target_id
+    )
 
     return res.apiSuccess(result, '转接会话成功')
   } catch (error) {
     console.error('转接会话失败:', error)
     let statusCode = 500
-    if (error.message === '会话不存在' || error.message === '目标客服不存在') statusCode = 404
-    if (error.message === '无权限转接此会话') statusCode = 403
+    let errorCode = 'INTERNAL_ERROR'
 
-    return res.apiError(error.message, statusCode)
+    if (error.message === '会话不存在' || error.message === '目标客服不存在') {
+      statusCode = 404
+      errorCode = 'NOT_FOUND'
+    } else if (error.message === '无权限转接此会话') {
+      statusCode = 403
+      errorCode = 'FORBIDDEN'
+    }
+
+    return res.apiError(error.message, errorCode, null, statusCode)
   }
 })
 
@@ -306,16 +372,27 @@ router.post('/sessions/:session_id/close', async (req, res) => {
       close_reason: close_reason || '问题已解决'
     }
 
-    const result = await CustomerServiceSessionService.closeSession(session_id, data)
+    // 🎯 通过 ServiceManager 获取 AdminCustomerServiceService
+    const AdminCustomerServiceService = req.app.locals.services.getService('adminCustomerService')
+
+    // 🎯 调用服务层方法
+    const result = await AdminCustomerServiceService.closeSession(session_id, data)
 
     res.apiSuccess(result, '关闭会话成功')
   } catch (error) {
     console.error('关闭会话失败:', error)
     let statusCode = 500
-    if (error.message === '会话不存在') statusCode = 404
-    if (error.message === '无权限关闭此会话') statusCode = 403
+    let errorCode = 'INTERNAL_ERROR'
 
-    res.apiError(error.message, statusCode)
+    if (error.message === '会话不存在') {
+      statusCode = 404
+      errorCode = 'NOT_FOUND'
+    } else if (error.message === '无权限关闭此会话') {
+      statusCode = 403
+      errorCode = 'FORBIDDEN'
+    }
+
+    res.apiError(error.message, errorCode, null, statusCode)
   }
 })
 

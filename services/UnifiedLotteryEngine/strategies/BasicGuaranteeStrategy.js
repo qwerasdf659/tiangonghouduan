@@ -772,6 +772,9 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
       // 2. 生成唯一的抽奖ID（用于幂等性控制）
       const draw_id = `draw_${BeijingTimeHelper.generateIdTimestamp()}_${user_id}_${Math.random().toString(36).substr(2, 6)}`
 
+      // 🎯 生成business_id（格式：lottery_draw_${userId}_${campaignId}_${timestamp}）
+      const businessId = context.business_id || `lottery_draw_${user_id}_${campaignId}_${Date.now()}`
+
       // 3. 获取九八折券奖品信息（使用悲观锁防止超卖）
       const guaranteePrize = await models.LotteryPrize.findOne({
         where: {
@@ -819,6 +822,7 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
       const lotteryRecord = await models.LotteryDraw.create(
         {
           draw_id,
+          business_id: businessId, // 🎯 P0-6修复：添加business_id用于幂等控制
           user_id,
           lottery_id: campaignId,
           campaign_id: campaignId,
@@ -1632,6 +1636,35 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
    *   transaction
    * )
    */
+  /**
+   * 记录抽奖历史（带幂等控制）
+   *
+   * 业务场景：创建抽奖记录，防止重复提交
+   *
+   * 幂等控制：
+   * - 通过business_id防止重复提交
+   * - 同一business_id只能创建一条记录
+   * - 重复提交返回已有记录
+   *
+   * P0-3规范：所有资产变动必须有business_id幂等控制
+   * P0-6任务：抽奖结果未使用business_id幂等控制（已修复）
+   *
+   * @param {Object} context - 抽奖上下文
+   * @param {Object} result - 抽奖结果
+   * @param {number} probability - 中奖概率
+   * @param {string|null} draw_id - 抽奖记录ID（可选）
+   * @param {Transaction|null} transaction - 数据库事务对象（可选）
+   * @returns {Promise<Object>} 抽奖记录对象
+   *
+   * @example
+   * await strategy.recordLotteryHistory(
+   *   context,
+   *   { is_winner: true, prize: {...} },
+   *   1.0,
+   *   'draw_123',
+   *   transaction
+   * )
+   */
   async recordLotteryHistory (context, result, probability, draw_id = null, transaction = null) {
     // ✅ 统一业务标准：使用snake_case参数解构
     const { user_id, campaign_id } = context
@@ -1641,9 +1674,33 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
       draw_id ||
       `draw_${BeijingTimeHelper.generateIdTimestamp()}_${user_id}_${Math.random().toString(36).substr(2, 6)}`
 
-    await LotteryDraw.create(
+    // 🎯 生成business_id（格式：lottery_draw_${userId}_${campaignId}_${timestamp}）
+    const businessId = context.business_id || `lottery_draw_${user_id}_${campaign_id}_${Date.now()}`
+
+    // 🔥 P0-6修复：添加幂等检查，防止重复提交创建多条抽奖记录
+    if (businessId) {
+      const existingDraw = await LotteryDraw.findOne({
+        where: { business_id: businessId },
+        transaction: transaction || undefined
+      })
+
+      if (existingDraw) {
+        this.logInfo('抽奖记录已存在（幂等）', {
+          business_id: businessId,
+          draw_id: existingDraw.draw_id,
+          user_id,
+          campaign_id
+        })
+        // 返回已有记录（幂等）
+        return existingDraw
+      }
+    }
+
+    // 创建新的抽奖记录
+    const lotteryDraw = await LotteryDraw.create(
       {
         draw_id: finalDrawId,
+        business_id: businessId, // 🎯 添加business_id字段
         user_id,
         lottery_id: campaign_id,
         campaign_id,
@@ -1664,6 +1721,16 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
       },
       transaction ? { transaction } : {}
     ) // 🎯 传入事务对象
+
+    this.logInfo('抽奖记录创建成功', {
+      business_id: businessId,
+      draw_id: finalDrawId,
+      user_id,
+      campaign_id,
+      is_winner: result.is_winner
+    })
+
+    return lotteryDraw
   }
 
   /**

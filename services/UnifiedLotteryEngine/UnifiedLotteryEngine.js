@@ -1144,6 +1144,19 @@ class UnifiedLotteryEngine {
 
       // 步骤2：执行多次抽奖（不再重复扣除积分）
       for (let i = 0; i < draw_count; i++) {
+        /**
+         * 🎯 P0-6修复：生成唯一的business_id用于幂等控制
+         *
+         * 业务场景：防止用户重复提交创建多条抽奖记录
+         * 幂等规则：
+         * - 格式：lottery_draw_${userId}_${campaignId}_${batchDrawId}_${drawNumber}
+         * - 同一business_id只能创建一条记录
+         * - 重复提交返回已有记录（幂等）
+         *
+         * P0-3规范：所有资产变动必须有business_id幂等控制
+         */
+        const drawBusinessId = `lottery_draw_${user_id}_${campaign_id}_${batchDrawId}_${i + 1}`
+
         const context = {
           user_id,
           campaign_id,
@@ -1151,6 +1164,7 @@ class UnifiedLotteryEngine {
           total_draws: draw_count,
           skip_points_deduction: true, // 🎯 关键标识：告诉策略不要再扣除积分
           batch_draw_id: batchDrawId, // 传递批次ID
+          business_id: drawBusinessId, // 🎯 P0-6修复：添加business_id用于幂等控制
           user_status: {
             available_points: userAccount.available_points - requiredPoints // 显示扣除后的余额
           }
@@ -1771,6 +1785,141 @@ class UnifiedLotteryEngine {
         error: error.message
       })
       throw new Error(`获取用户统计失败: ${error.message}`)
+    }
+  }
+
+  /**
+   * 通过campaign_code获取活动并验证状态
+   *
+   * 业务场景：路由层通过campaign_code查询活动，验证活动是否存在且状态是否可用
+   *
+   * @param {string} campaign_code - 活动代码（如'BASIC_LOTTERY'）
+   * @param {Object} options - 选项参数
+   * @param {boolean} options.checkStatus - 是否检查活动状态（默认true，只返回active状态的活动）
+   * @returns {Promise<Object>} 活动对象
+   * @throws {Error} 活动不存在或状态不可用
+   */
+  async getCampaignByCode (campaign_code, options = {}) {
+    const { checkStatus = true } = options
+
+    try {
+      const models = require('../../models')
+
+      const campaign = await models.LotteryCampaign.findOne({
+        where: { campaign_code }
+      })
+
+      if (!campaign) {
+        const error = new Error('活动不存在，请检查活动代码是否正确')
+        error.code = 'CAMPAIGN_NOT_FOUND'
+        error.statusCode = 404
+        error.data = { campaign_code, hint: '常见活动代码: BASIC_LOTTERY' }
+        throw error
+      }
+
+      if (checkStatus && campaign.status !== 'active') {
+        const statusMessages = {
+          ended: `活动已于 ${campaign.end_time} 结束`,
+          paused: '活动暂时关闭，请稍后再试',
+          draft: '活动尚未开始，敬请期待'
+        }
+        const error = new Error(statusMessages[campaign.status] || '活动暂不可用')
+        error.code = 'CAMPAIGN_NOT_ACTIVE'
+        error.statusCode = 403
+        error.data = {
+          campaign_code,
+          status: campaign.status,
+          start_time: campaign.start_time,
+          end_time: campaign.end_time
+        }
+        throw error
+      }
+
+      this.logInfo('通过campaign_code获取活动', {
+        campaign_code,
+        campaign_id: campaign.campaign_id,
+        status: campaign.status
+      })
+
+      return campaign
+    } catch (error) {
+      if (error.code === 'CAMPAIGN_NOT_FOUND' || error.code === 'CAMPAIGN_NOT_ACTIVE') {
+        throw error
+      }
+
+      this.logError('通过campaign_code获取活动失败', {
+        campaign_code,
+        error: error.message
+      })
+      throw new Error(`获取活动失败: ${error.message}`)
+    }
+  }
+
+  /**
+   * 通过campaign_code获取活动奖品列表（含活动验证）
+   *
+   * 业务场景：路由层获取奖品列表时，需要先验证活动是否存在且可用
+   *
+   * @param {string} campaign_code - 活动代码
+   * @returns {Promise<Object>} 包含活动信息和奖品列表的对象
+   */
+  async getCampaignWithPrizes (campaign_code) {
+    try {
+      // 步骤1：获取并验证活动
+      const campaign = await this.getCampaignByCode(campaign_code)
+
+      // 步骤2：获取奖品列表（使用campaign_id）
+      const prizes = await this.get_campaign_prizes(campaign.campaign_id)
+
+      this.logInfo('获取活动奖品列表成功', {
+        campaign_code,
+        campaign_id: campaign.campaign_id,
+        prizesCount: prizes.length
+      })
+
+      return {
+        campaign,
+        prizes
+      }
+    } catch (error) {
+      this.logError('获取活动奖品列表失败', {
+        campaign_code,
+        error: error.message
+      })
+      throw error
+    }
+  }
+
+  /**
+   * 通过campaign_code获取活动配置（含活动验证）
+   *
+   * 业务场景：路由层获取活动配置时，需要先验证活动是否存在且可用
+   *
+   * @param {string} campaign_code - 活动代码
+   * @param {Object} options - 选项参数
+   * @param {boolean} options.checkStatus - 是否检查活动状态（默认true）
+   * @returns {Promise<Object>} 活动配置对象
+   */
+  async getCampaignConfigByCode (campaign_code, options = {}) {
+    try {
+      // 步骤1：获取并验证活动
+      const campaign = await this.getCampaignByCode(campaign_code, options)
+
+      // 步骤2：获取完整配置（使用campaign_id）
+      const config = await this.get_campaign_config(campaign.campaign_id)
+
+      this.logInfo('获取活动配置成功', {
+        campaign_code,
+        campaign_id: campaign.campaign_id
+      })
+
+      return config
+    } catch (error) {
+      this.logError('获取活动配置失败', {
+        campaign_code,
+        error: error.message
+      })
+      throw error
     }
   }
 }

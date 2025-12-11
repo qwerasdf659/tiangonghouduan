@@ -4,10 +4,14 @@
  * @description 提供admin子模块共用的中间件、初始化组件和工具函数
  * @version 4.0.0
  * @date 2025-09-24
+ *
+ * ⚠️ 架构收口规范：
+ * - 本文件仅导出中间件、工具函数和共享组件
+ * - 禁止导出 models / Op / BeijingTimeHelper 等基础依赖
+ * - 新代码必须通过 ServiceManager 调用业务 Service
+ * - 数据库操作必须收口到 Service 层，路由层禁止直连 models
  */
 
-const BeijingTimeHelper = require('../../../../../utils/timeHelper')
-const models = require('../../../../../models')
 const {
   UnifiedLotteryEngine
 } = require('../../../../../services/UnifiedLotteryEngine/UnifiedLotteryEngine')
@@ -15,7 +19,6 @@ const ManagementStrategy = require('../../../../../services/UnifiedLotteryEngine
 const PerformanceMonitor = require('../../../../../services/UnifiedLotteryEngine/utils/PerformanceMonitor')
 const Logger = require('../../../../../services/UnifiedLotteryEngine/utils/Logger')
 const { requireAdmin, authenticateToken } = require('../../../../../middleware/auth')
-const { Op } = require('sequelize')
 
 // 初始化共享组件
 const sharedComponents = {
@@ -26,61 +29,19 @@ const sharedComponents = {
 }
 
 /**
- * ✅ 简化的系统统计函数 - 替代过度设计的DataCollector
+ * ✅ 简化的系统统计函数 - 通过AdminAnalyticsService获取统计数据
+ *
+ * @description 使用Service层统一管理数据访问，符合V4架构规范
+ * @param {Object} serviceManager - 服务管理器实例
  * @returns {Promise<Object>} 简化的系统统计信息
  */
-async function getSimpleSystemStats () {
-  const { User, LotteryDraw } = require('../../../../../models')
-  const os = require('os')
-
+async function getSimpleSystemStats (serviceManager) {
   try {
-    const today = BeijingTimeHelper.createBeijingTime()
-    const todayStart = new Date(today.setHours(0, 0, 0, 0))
+    // ✅ 通过ServiceManager获取AdminAnalyticsService
+    const AdminAnalyticsService = serviceManager.getService('adminAnalytics')
 
-    // 并行获取基础统计
-    const [totalUsers, activeUsers, newUsers, totalLotteries, winLotteries] = await Promise.all([
-      User.count(),
-      User.count({
-        where: {
-          last_login: {
-            // ✅ 修复: last_login_at → last_login
-            [Op.gte]: new Date(BeijingTimeHelper.timestamp() - 30 * 24 * 60 * 60 * 1000) // 30天内活跃
-          }
-        }
-      }),
-      User.count({
-        where: {
-          created_at: {
-            [Op.gte]: todayStart
-          }
-        }
-      }),
-      LotteryDraw.count(),
-      LotteryDraw.count({
-        where: {
-          is_winner: true
-        }
-      })
-    ])
-
-    return {
-      users: {
-        total: totalUsers,
-        active: activeUsers,
-        new_today: newUsers
-      },
-      lottery: {
-        total: totalLotteries,
-        wins: winLotteries,
-        win_rate: totalLotteries > 0 ? ((winLotteries / totalLotteries) * 100).toFixed(2) : 0
-      },
-      system: {
-        uptime: process.uptime(),
-        memory: process.memoryUsage(),
-        cpu_usage: os.loadavg()[0],
-        timestamp: BeijingTimeHelper.apiTimestamp()
-      }
-    }
+    // ✅ 调用Service方法，不再直连models
+    return await AdminAnalyticsService.getSimpleSystemStats()
   } catch (error) {
     console.error('获取系统统计失败:', error)
     throw error
@@ -242,9 +203,9 @@ module.exports = {
   getSimpleSystemStats,
   adminAuthMiddleware,
   asyncHandler,
-  validators,
-  // 导出常用的依赖，避免重复引入
-  models,
-  BeijingTimeHelper,
-  Op
+  validators
+  /**
+   * ✅ models / Op / BeijingTimeHelper 已移除
+   * 新代码必须通过 ServiceManager 调用业务 Service
+   */
 }

@@ -130,7 +130,6 @@ const router = express.Router()
 const { authenticateToken, getUserRoles } = require('../../../middleware/auth')
 const dataAccessControl = require('../../../middleware/dataAccessControl')
 const DataSanitizer = require('../../../services/DataSanitizer')
-const lottery_engine = require('../../../services/UnifiedLotteryEngine/UnifiedLotteryEngine')
 const BeijingTimeHelper = require('../../../utils/timeHelper')
 
 /*
@@ -271,46 +270,9 @@ router.get('/prizes/:campaignCode', authenticateToken, dataAccessControl, async 
       )
     }
 
-    // 通过campaign_code查询活动（不限制status，用于区分错误类型）
-    const { LotteryCampaign } = require('../../../models')
-    const campaign = await LotteryCampaign.findOne({
-      where: { campaign_code }
-    })
-
-    // 🔥 友好错误提示（与/config路由保持一致）
-    if (!campaign) {
-      return res.apiError(
-        '活动不存在，请检查活动代码是否正确',
-        'CAMPAIGN_NOT_FOUND',
-        {
-          campaign_code,
-          hint: '常见活动代码: BASIC_LOTTERY'
-        },
-        404
-      )
-    }
-
-    if (campaign.status !== 'active') {
-      const statusMessages = {
-        ended: `活动已于 ${campaign.end_time} 结束`,
-        paused: '活动暂时关闭，请稍后再试',
-        draft: '活动尚未开始，敬请期待'
-      }
-      return res.apiError(
-        statusMessages[campaign.status] || '活动暂不可用',
-        'CAMPAIGN_NOT_ACTIVE',
-        {
-          campaign_code,
-          status: campaign.status,
-          start_time: campaign.start_time,
-          end_time: campaign.end_time
-        },
-        403
-      )
-    }
-
-    // 使用campaign.campaign_id获取奖品列表（内部仍用ID）
-    const fullPrizes = await lottery_engine.get_campaign_prizes(campaign.campaign_id)
+    // ✅ 通过Service获取活动和奖品列表（不再直连models）
+    const lottery_engine = req.app.locals.services.getService('unifiedLotteryEngine')
+    const { campaign: _campaign, prizes: fullPrizes } = await lottery_engine.getCampaignWithPrizes(campaign_code)
 
     // 根据用户权限进行数据脱敏
     const sanitizedPrizes = DataSanitizer.sanitizePrizes(fullPrizes, req.dataLevel)
@@ -354,43 +316,9 @@ router.get('/config/:campaignCode', authenticateToken, dataAccessControl, async 
       )
     }
 
-    // 通过campaign_code查询活动（不限制status，用于区分错误类型）
-    const { LotteryCampaign } = require('../../../models')
-    const campaign = await LotteryCampaign.findOne({
-      where: { campaign_code }
-    })
-
-    // 🔥 P1级修复：友好错误提示
-    if (!campaign) {
-      return res.apiError(
-        '活动不存在，请检查活动代码是否正确',
-        'CAMPAIGN_NOT_FOUND',
-        {
-          campaign_code,
-          hint: '常见活动代码: BASIC_LOTTERY'
-        },
-        404
-      )
-    }
-
-    if (campaign.status !== 'active') {
-      const statusMessages = {
-        ended: `活动已于 ${campaign.end_time} 结束`,
-        paused: '活动暂时关闭，请稍后再试',
-        draft: '活动尚未开始，敬请期待'
-      }
-      return res.apiError(
-        statusMessages[campaign.status] || '活动暂不可用',
-        'CAMPAIGN_NOT_ACTIVE',
-        {
-          campaign_code,
-          status: campaign.status,
-          start_time: campaign.start_time,
-          end_time: campaign.end_time
-        },
-        403
-      )
-    }
+    // ✅ 通过Service获取活动配置（不再直连models）
+    const lottery_engine = req.app.locals.services.getService('unifiedLotteryEngine')
+    const campaign = await lottery_engine.getCampaignByCode(campaign_code)
 
     // 使用campaign.campaign_id获取完整配置（内部仍用ID）
     const fullConfig = await lottery_engine.get_campaign_config(campaign.campaign_id)
@@ -498,22 +426,11 @@ router.post(
         return res.apiError('缺少必需参数: campaign_code', 'MISSING_PARAMETER', {}, 400)
       }
 
-      // 通过campaign_code查询活动
-      const { LotteryCampaign } = require('../../../models')
-      const campaign = await LotteryCampaign.findOne({
-        where: { campaign_code, status: 'active' }
+      // ✅ 通过Service获取并验证活动（不再直连models）
+      const lottery_engine = req.app.locals.services.getService('unifiedLotteryEngine')
+      const campaign = await lottery_engine.getCampaignByCode(campaign_code, {
+        checkStatus: true // 只获取active状态的活动
       })
-
-      if (!campaign) {
-        return res.apiError(
-          `活动不存在或已关闭: ${campaign_code}`,
-          'CAMPAIGN_NOT_FOUND',
-          { campaign_code },
-          404
-        )
-      }
-
-      // 执行抽奖（内部使用campaign.campaign_id，包含预设奖品逻辑，但对用户完全透明）
       const drawResult = await lottery_engine.execute_draw(
         user_id,
         campaign.campaign_id,
@@ -622,6 +539,7 @@ router.get('/history/:user_id', authenticateToken, async (req, res) => {
     }
 
     // 获取抽奖历史
+    const lottery_engine = req.app.locals.services.getService('unifiedLotteryEngine')
     const history = await lottery_engine.get_user_history(user_id, {
       page: finalPage,
       limit: finalLimit
@@ -661,6 +579,7 @@ router.get('/campaigns', authenticateToken, async (req, res) => {
     const { status = 'active' } = req.query
 
     // 获取活动列表
+    const lottery_engine = req.app.locals.services.getService('unifiedLotteryEngine')
     const campaigns = await lottery_engine.get_campaigns({
       status,
       user_id: req.user.user_id
@@ -717,38 +636,12 @@ router.get('/points/:user_id', authenticateToken, pointsRateLimiter, async (req,
       })
     }
 
-    // 🔴 P0优化：验证用户存在性
-    const { User, UserPointsAccount } = require('../../../models')
-    const user = await User.findByPk(user_id)
-    if (!user) {
-      return res.apiError('用户不存在', 'USER_NOT_FOUND', { user_id }, 404)
-    }
-
-    // 🔴 P0优化：检查积分账户是否存在（不自动创建）
-    const points_info = await UserPointsAccount.findOne({
-      where: { user_id },
-      attributes: [
-        'account_id',
-        'user_id',
-        'available_points',
-        'total_earned',
-        'total_consumed',
-        'is_active'
-      ]
+    // ✅ 通过UserService验证用户和积分账户（不再直连models）
+    const UserService = req.app.locals.services.getService('user')
+    const { user: _user, points_account: points_info } = await UserService.getUserWithPoints(user_id, {
+      checkPointsAccount: true,
+      checkStatus: true
     })
-
-    if (!points_info) {
-      return res.apiError(
-        '该用户尚未开通积分账户',
-        'POINTS_ACCOUNT_NOT_FOUND',
-        { user_id, suggestion: '用户需要先进行消费或参与活动才会开通积分账户' },
-        404
-      )
-    }
-
-    if (!points_info.is_active) {
-      return res.apiError('积分账户已被冻结', 'ACCOUNT_FROZEN', { user_id }, 403)
-    }
 
     return res.apiSuccess(points_info, '用户积分获取成功', 'POINTS_SUCCESS')
   } catch (error) {
@@ -839,6 +732,7 @@ router.get('/statistics/:user_id', authenticateToken, async (req, res) => {
      *                  today_win_rate、total_points_cost、guarantee_wins、normal_wins、
      *                  prize_type_distribution、last_win、timestamp
      */
+    const lottery_engine = req.app.locals.services.getService('unifiedLotteryEngine')
     const statistics = await lottery_engine.get_user_statistics(user_id)
 
     /*

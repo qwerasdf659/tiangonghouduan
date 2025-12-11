@@ -3,12 +3,16 @@
  * 创建时间：2025年08月19日 UTC
  * 特点：领域驱动设计 + 高性能索引优化
  * 描述：用户积分账户的完整管理，专注于积分余额和账户状态管理
+ *
+ * ✅ 架构重构说明（2025-12-10）：
+ * - 业务逻辑方法已迁移到 PointsService 服务层
+ * - Model 层只保留：字段定义、关联、基础校验
+ * - 符合架构规范：Model 层纯净化，业务逻辑收口到 Service 层
  */
 
 'use strict'
 
 const { Model, DataTypes } = require('sequelize')
-const BeijingTimeHelper = require('../utils/timeHelper') // 🕐 北京时间工具
 
 /**
  * 用户积分账户模型
@@ -39,95 +43,6 @@ class UserPointsAccount extends Model {
     })
 
     // 🗑️ 通过业务事件关联已删除 - BusinessEvent模型已删除 - 2025年01月21日
-  }
-
-  /**
-   * 检查账户是否健康
-   * @returns {Object} 健康状态详情对象
-   * @returns {boolean} return.is_healthy - 账户是否健康
-   * @returns {Array<Object>} return.issues - 账户问题列表
-   * @returns {Array<Object>} return.warnings - 账户警告列表
-   * @returns {number} return.health_score - 账户健康分数（0-100）
-   */
-  checkAccountHealth () {
-    const issues = []
-    const warnings = []
-
-    // 检查账户是否被冻结
-    if (!this.is_active) {
-      issues.push({
-        type: 'account_frozen',
-        message: '账户已被冻结',
-        reason: this.freeze_reason
-      })
-    }
-
-    return {
-      is_healthy: issues.length === 0,
-      issues,
-      warnings,
-      health_score: Math.max(0, 100 - issues.length * 30 - warnings.length * 10)
-    }
-  }
-
-  /**
-   * 生成个性化推荐数据
-   * @returns {Object} 推荐数据对象
-   * @returns {boolean} return.enabled - 推荐功能是否启用
-   * @returns {Array<Object>} return.recommendations - 推荐项列表
-   * @returns {string} return.generated_at - 推荐数据生成时间（北京时间）
-   */
-  generateRecommendations () {
-    const recommendations = []
-
-    // 基础推荐：建议用户完成任务获得积分
-    recommendations.push({
-      type: 'daily_tasks',
-      priority: 'medium',
-      message: '完成每日任务获得积分奖励',
-      action: 'complete_tasks'
-    })
-
-    return {
-      enabled: true,
-      recommendations,
-      generated_at: BeijingTimeHelper.apiTimestamp() // 🕐 北京时间API时间戳
-    }
-  }
-
-  /**
-   * 格式化账户摘要信息
-   * @returns {Object} 账户摘要对象
-   * @returns {number} return.account_id - 账户ID
-   * @returns {number} return.user_id - 用户ID
-   * @returns {Object} return.balance - 积分余额信息
-   * @returns {number} return.balance.available - 可用积分
-   * @returns {number} return.balance.total_earned - 累计获得积分
-   * @returns {number} return.balance.total_consumed - 累计消耗积分
-   * @returns {Object} return.health - 账户健康状态
-   * @returns {Array<Object>} return.recommendations - 推荐项列表
-   * @returns {boolean} return.is_active - 账户是否激活
-   * @returns {Date} return.created_at - 创建时间
-   * @returns {Date} return.updated_at - 更新时间
-   */
-  toSummary () {
-    const health = this.checkAccountHealth()
-    const recommendations = this.generateRecommendations()
-
-    return {
-      account_id: this.account_id,
-      user_id: this.user_id,
-      balance: {
-        available: parseFloat(this.available_points),
-        total_earned: parseFloat(this.total_earned),
-        total_consumed: parseFloat(this.total_consumed)
-      },
-      health,
-      recommendations: recommendations.enabled ? recommendations.recommendations : [],
-      is_active: this.is_active,
-      created_at: this.created_at,
-      updated_at: this.updated_at
-    }
   }
 
   /**
@@ -264,6 +179,10 @@ module.exports = sequelize => {
         allowNull: false,
         defaultValue: 0.0,
         comment: '冻结积分（审核中）',
+        /**
+         * 获取冻结积分的浮点数值
+         * @returns {number} 冻结积分（浮点数格式）
+         */
         get () {
           const value = this.getDataValue('frozen_points')
           return value ? parseFloat(value) : 0

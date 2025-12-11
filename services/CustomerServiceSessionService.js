@@ -123,6 +123,7 @@ class CustomerServiceSessionService {
    *
    * 业务场景：
    * - 管理员查看待处理的客服会话
+   * - 用户查看自己的会话列表
    * - 支持按状态、时间范围、搜索关键词筛选
    * - 分页加载会话列表
    *
@@ -131,9 +132,12 @@ class CustomerServiceSessionService {
    * @param {number} [options.page_size=20] - 每页数量
    * @param {string} [options.status] - 会话状态筛选（waiting/assigned/active/closed）
    * @param {number} [options.admin_id] - 筛选指定客服的会话
+   * @param {number} [options.user_id] - 筛选指定用户的会话（用户端专用）
    * @param {string} [options.search] - 搜索关键词（用户昵称/手机号）
    * @param {string} [options.sort_by='updated_at'] - 排序字段
    * @param {string} [options.sort_order='DESC'] - 排序方向
+   * @param {boolean} [options.include_last_message=false] - 是否包含最后一条消息
+   * @param {boolean} [options.calculate_unread=false] - 是否计算未读消息数
    * @returns {Object} 会话列表和分页信息
    */
   static async getSessionList (options = {}) {
@@ -143,9 +147,12 @@ class CustomerServiceSessionService {
         page_size = 20,
         status,
         admin_id,
+        user_id,
         search,
         sort_by = 'updated_at',
-        sort_order = 'DESC'
+        sort_order = 'DESC',
+        include_last_message = false,
+        calculate_unread = false
       } = options
 
       console.log('📋 获取客服会话列表，参数:', JSON.stringify(options, null, 2))
@@ -163,32 +170,51 @@ class CustomerServiceSessionService {
         where.admin_id = admin_id
       }
 
+      // 用户筛选（用户端专用）
+      if (user_id) {
+        where.user_id = user_id
+      }
+
       // 构建查询（包含用户信息）
+      const includeOptions = [
+        {
+          model: User,
+          as: 'user',
+          attributes: ['user_id', 'nickname', 'mobile'],
+          // 搜索条件
+          where: search
+            ? {
+              [Op.or]: [
+                { nickname: { [Op.like]: `%${search}%` } },
+                { mobile: { [Op.like]: `%${search}%` } }
+              ]
+            }
+            : undefined,
+          required: !!search
+        },
+        {
+          model: User,
+          as: 'admin',
+          attributes: ['user_id', 'nickname', 'mobile'],
+          required: false
+        }
+      ]
+
+      // 如果需要包含最后一条消息
+      if (include_last_message) {
+        includeOptions.push({
+          model: ChatMessage,
+          as: 'messages',
+          limit: 1,
+          order: [['created_at', 'DESC']],
+          required: false,
+          attributes: ['message_id', 'content', 'sender_type', 'created_at']
+        })
+      }
+
       const queryOptions = {
         where,
-        include: [
-          {
-            model: User,
-            as: 'user',
-            attributes: ['user_id', 'nickname', 'mobile'],
-            // 搜索条件
-            where: search
-              ? {
-                [Op.or]: [
-                  { nickname: { [Op.like]: `%${search}%` } },
-                  { mobile: { [Op.like]: `%${search}%` } }
-                ]
-              }
-              : undefined,
-            required: !!search
-          },
-          {
-            model: User,
-            as: 'admin',
-            attributes: ['user_id', 'nickname', 'mobile'],
-            required: false
-          }
-        ],
+        include: includeOptions,
         order: [[sort_by, sort_order]],
         limit: parseInt(page_size),
         offset: (parseInt(page) - 1) * parseInt(page_size)
@@ -198,7 +224,7 @@ class CustomerServiceSessionService {
       const { rows: sessions, count: total } = await CustomerServiceSession.findAndCountAll(queryOptions)
 
       // 格式化返回数据
-      const formattedSessions = sessions.map(session => ({
+      let formattedSessions = sessions.map(session => ({
         session_id: session.session_id,
         user: session.user
           ? {
@@ -218,9 +244,27 @@ class CustomerServiceSessionService {
         last_message_at: session.last_message_at ? BeijingTimeHelper.formatForAPI(session.last_message_at).iso : null,
         created_at: BeijingTimeHelper.formatForAPI(session.created_at).iso,
         updated_at: BeijingTimeHelper.formatForAPI(session.updated_at).iso,
-        // 获取未读消息数（需要额外查询）
-        unread_count: 0 // TODO: 后续优化添加未读数统计
+        last_message: include_last_message && session.messages && session.messages.length > 0
+          ? session.messages[0]
+          : null,
+        unread_count: 0
       }))
+
+      // 如果需要计算未读消息数
+      if (calculate_unread) {
+        formattedSessions = await Promise.all(
+          formattedSessions.map(async session => {
+            const unreadCount = await ChatMessage.count({
+              where: {
+                session_id: session.session_id,
+                sender_type: 'admin',
+                status: { [Op.in]: ['sent', 'delivered'] }
+              }
+            })
+            return { ...session, unread_count: unreadCount }
+          })
+        )
+      }
 
       console.log(`✅ 成功获取${formattedSessions.length}条会话记录`)
 
@@ -244,23 +288,44 @@ class CustomerServiceSessionService {
    *
    * 业务场景：
    * - 管理员点击会话，查看完整的聊天记录
+   * - 用户查看自己的聊天历史（user_id验证）
    * - 加载会话基本信息和历史消息
    *
    * @param {number} session_id - 会话ID
    * @param {Object} options - 查询选项
    * @param {number} [options.limit=50] - 消息数量限制
    * @param {number} [options.before_message_id] - 加载指定消息之前的历史（用于分页）
+   * @param {number} [options.page] - 页码（用于分页，与offset配合使用）
+   * @param {number} [options.offset] - 偏移量（用于分页）
+   * @param {number} [options.user_id] - 用户ID（用于权限验证，用户端专用）
+   * @param {boolean} [options.mark_as_read=false] - 是否标记消息为已读（用户端查看时）
+   * @param {boolean} [options.include_all_fields=false] - 是否包含所有消息字段（包括metadata等）
    * @returns {Object} 会话详情和消息列表
    */
   static async getSessionMessages (session_id, options = {}) {
     try {
-      const { limit = 50, before_message_id } = options
+      const {
+        limit = 50,
+        before_message_id,
+        page,
+        offset,
+        user_id,
+        mark_as_read = false,
+        include_all_fields = false
+      } = options
 
       console.log(`📋 获取会话 ${session_id} 的消息，参数:`, JSON.stringify(options, null, 2))
 
+      // 构建会话查询条件
+      const sessionWhere = { session_id }
+      if (user_id) {
+        // 用户端查询：验证权限（用户只能查看自己的会话）
+        sessionWhere.user_id = user_id
+      }
+
       // 获取会话详情
       const session = await CustomerServiceSession.findOne({
-        where: { session_id },
+        where: sessionWhere,
         include: [
           {
             model: User,
@@ -276,7 +341,7 @@ class CustomerServiceSessionService {
       })
 
       if (!session) {
-        throw new Error('会话不存在')
+        throw new Error(user_id ? '会话不存在或无权限访问' : '会话不存在')
       }
 
       // 构建消息查询条件
@@ -285,37 +350,97 @@ class CustomerServiceSessionService {
         messageWhere.message_id = { [Op.lt]: before_message_id }
       }
 
-      // 获取消息列表
-      const messages = await ChatMessage.findAll({
+      // 构建查询选项
+      const queryOptions = {
         where: messageWhere,
         include: [
           {
             model: User,
             as: 'sender',
-            attributes: ['user_id', 'nickname']
+            attributes: ['user_id', 'nickname'],
+            required: false // ⚠️ 允许sender为null（系统消息、已删除用户）
           }
         ],
         order: [['created_at', 'DESC']],
         limit: parseInt(limit)
-      })
+      }
+
+      // 添加偏移量（如果提供了offset或page）
+      if (offset !== undefined) {
+        queryOptions.offset = parseInt(offset)
+      } else if (page !== undefined) {
+        queryOptions.offset = (parseInt(page) - 1) * parseInt(limit)
+      }
+
+      // 如果需要所有字段，显式指定属性列表
+      if (include_all_fields) {
+        queryOptions.attributes = [
+          'message_id', 'session_id', 'sender_id', 'sender_type',
+          'message_source', 'content', 'message_type', 'status',
+          'reply_to_id', 'temp_message_id', 'metadata',
+          'created_at', 'updated_at'
+        ]
+      }
+
+      // 获取消息列表（支持count用于分页）
+      const { count, rows: messages } = await ChatMessage.findAndCountAll(queryOptions)
+
+      // 如果需要标记为已读（用户查看聊天历史时）
+      if (mark_as_read && user_id) {
+        try {
+          const [updateCount] = await ChatMessage.update(
+            { status: 'read' },
+            {
+              where: {
+                session_id,
+                sender_type: 'admin', // 只标记管理员发送的消息
+                status: { [Op.in]: ['sent', 'delivered'] } // 只更新未读消息
+              }
+            }
+          )
+          if (updateCount > 0) {
+            console.log(`✅ 会话${session_id}：已标记${updateCount}条管理员消息为已读`)
+          }
+        } catch (updateError) {
+          console.error(`⚠️ 更新消息已读状态失败 (会话${session_id}):`, updateError.message)
+          // 不影响主流程
+        }
+      }
 
       // 格式化返回数据
-      const formattedMessages = messages.reverse().map(msg => ({
-        message_id: msg.message_id,
-        session_id: msg.session_id,
-        sender: msg.sender
-          ? {
-            user_id: msg.sender.user_id,
-            nickname: msg.sender.nickname
+      const formattedMessages = messages.reverse().map(msg => {
+        const data = msg.toJSON()
+
+        // ✅ 防御性编程：处理sender为null的情况（已删除用户、系统消息）
+        if (!data.sender) {
+          data.sender = {
+            user_id: data.sender_id,
+            nickname: '已删除用户'
           }
-          : null,
-        sender_type: msg.sender_type,
-        message_source: msg.message_source,
-        content: msg.content,
-        message_type: msg.message_type,
-        status: msg.status,
-        created_at: BeijingTimeHelper.formatForAPI(msg.created_at).iso
-      }))
+        }
+
+        // 如果不需要所有字段，只返回基础字段
+        if (!include_all_fields) {
+          return {
+            message_id: data.message_id,
+            session_id: data.session_id,
+            sender: data.sender,
+            sender_type: data.sender_type,
+            message_source: data.message_source,
+            content: data.content,
+            message_type: data.message_type,
+            status: data.status,
+            created_at: BeijingTimeHelper.formatForAPI(msg.created_at).iso
+          }
+        }
+
+        // 返回所有字段（包括metadata等）
+        return {
+          ...data,
+          created_at: BeijingTimeHelper.formatForAPI(msg.created_at).iso,
+          updated_at: BeijingTimeHelper.formatForAPI(msg.updated_at).iso
+        }
+      })
 
       console.log(`✅ 成功获取${formattedMessages.length}条消息`)
 
@@ -340,6 +465,7 @@ class CustomerServiceSessionService {
           created_at: BeijingTimeHelper.formatForAPI(session.created_at).iso
         },
         messages: formattedMessages,
+        total: count, // 总消息数（用于分页）
         has_more: messages.length === parseInt(limit)
       }
     } catch (error) {
@@ -478,6 +604,91 @@ class CustomerServiceSessionService {
     } catch (error) {
       await transaction.rollback()
       console.error('❌ 发送消息失败:', error)
+      throw error
+    }
+  }
+
+  /**
+   * 发送用户消息（用户端专用）
+   *
+   * 业务场景：
+   * - 用户在移动端或Web端发送聊天消息
+   * - 自动验证会话权限（用户只能向自己的会话发送消息）
+   * - 检查会话状态（已关闭的会话无法发送）
+   *
+   * @param {number} session_id - 会话ID
+   * @param {Object} data - 消息数据
+   * @param {number} data.user_id - 发送用户的ID
+   * @param {string} data.content - 消息内容（应该已经过滤和验证）
+   * @param {string} [data.message_type='text'] - 消息类型（text/image）
+   * @returns {Object} 创建的消息对象
+   * @throws {Error} 会话不存在、无权限、会话已关闭等错误
+   */
+  static async sendUserMessage (session_id, data) {
+    const sequelize = CustomerServiceSession.sequelize
+    const transaction = await sequelize.transaction({
+      isolationLevel: Transaction.ISOLATION_LEVELS.READ_COMMITTED
+    })
+
+    try {
+      const { user_id, content, message_type = 'text' } = data
+
+      console.log(`📤 用户 ${user_id} 向会话 ${session_id} 发送消息`)
+
+      // ✅ 1. 验证会话是否存在且属于该用户
+      const session = await CustomerServiceSession.findOne({
+        where: {
+          session_id,
+          user_id // 用户只能向自己的会话发送消息
+        },
+        transaction
+      })
+
+      if (!session) {
+        throw new Error('会话不存在或无权限访问')
+      }
+
+      // ✅ 2. 检查会话状态（只有waiting/assigned/active可发送消息）
+      const ACTIVE_STATUS = ['waiting', 'assigned', 'active']
+      if (!ACTIVE_STATUS.includes(session.status)) {
+        throw new Error(`会话已关闭，无法发送消息（当前状态：${session.status}）`)
+      }
+
+      // ✅ 3. 创建消息记录
+      const message = await ChatMessage.create({
+        session_id,
+        sender_id: user_id,
+        sender_type: 'user',
+        message_source: 'user_client',
+        content,
+        message_type,
+        status: 'sent'
+      }, { transaction })
+
+      // ✅ 4. 更新会话的最后消息时间
+      await session.update({
+        last_message_at: new Date(),
+        updated_at: new Date()
+      }, { transaction })
+
+      await transaction.commit()
+
+      console.log(`✅ 用户消息发送成功，消息ID: ${message.message_id}`)
+
+      // ✅ 5. 返回消息数据（供WebSocket推送使用）
+      return {
+        message_id: message.message_id,
+        session_id,
+        sender_id: user_id,
+        sender_type: 'user',
+        content: message.content,
+        message_type: message.message_type,
+        created_at: BeijingTimeHelper.formatForAPI(message.created_at).iso,
+        session_admin_id: session.admin_id // 🔴 返回会话的admin_id（用于WebSocket推送）
+      }
+    } catch (error) {
+      await transaction.rollback()
+      console.error('❌ 用户发送消息失败:', error)
       throw error
     }
   }
@@ -724,6 +935,327 @@ class CustomerServiceSessionService {
     } catch (error) {
       console.error('❌ 获取统计信息失败:', error)
       throw error
+    }
+  }
+
+  /**
+   * 获取或创建会话（支持并发安全）
+   *
+   * 业务场景：
+   * - 用户发起聊天时自动创建或获取现有会话
+   * - 支持高并发场景（多个请求同时创建会话）
+   *
+   * 并发安全机制：
+   * 1. 数据库层面：UNIQUE(user_id, is_active_session) 索引保证唯一性
+   * 2. 应用层：快速检查 → 创建 → 冲突重试
+   * 3. 零锁等待：无需分布式锁，性能最优
+   *
+   * @param {number} user_id - 用户ID
+   * @param {Object} options - 创建选项
+   * @param {string} [options.source='mobile'] - 会话来源
+   * @param {number} [options.priority=1] - 会话优先级
+   * @returns {Promise<Object>} 会话对象
+   * @returns {number} return.session_id - 会话ID
+   * @returns {string} return.status - 会话状态
+   * @returns {string} return.source - 会话来源
+   * @returns {Date} return.created_at - 创建时间
+   * @returns {boolean} return.is_new - 是否为新创建的会话
+   */
+  static async getOrCreateSession (user_id, options = {}) {
+    try {
+      const { source = 'mobile', priority = 1 } = options
+
+      // 定义活跃状态（未关闭的会话）
+      const ACTIVE_STATUS = ['waiting', 'assigned', 'active']
+
+      // 🔴 步骤1：快速检查是否已有活跃会话（避免不必要的INSERT）
+      const existingSession = await CustomerServiceSession.findOne({
+        where: {
+          user_id,
+          status: ACTIVE_STATUS
+        },
+        order: [['created_at', 'DESC']]
+      })
+
+      if (existingSession) {
+        console.log(`✅ 用户${user_id}使用现有会话: ${existingSession.session_id}`)
+        return {
+          session_id: existingSession.session_id,
+          status: existingSession.status,
+          source: existingSession.source,
+          created_at: existingSession.created_at,
+          is_new: false
+        }
+      }
+
+      // 🔴 步骤2：创建新会话（依赖数据库唯一索引保证并发安全）
+      try {
+        const session = await CustomerServiceSession.create({
+          user_id,
+          status: 'waiting', // 初始状态：waiting（等待客服接单）
+          source,
+          priority,
+          created_at: BeijingTimeHelper.createBeijingTime()
+        })
+
+        console.log(`✅ 用户${user_id}创建新会话成功: ${session.session_id}`)
+        return {
+          session_id: session.session_id,
+          status: session.status,
+          source: session.source,
+          created_at: session.created_at,
+          is_new: true
+        }
+      } catch (createError) {
+        // 🔴 步骤3：处理并发创建冲突（唯一索引约束触发）
+        if (createError.name === 'SequelizeUniqueConstraintError') {
+          console.log(`⚠️ 用户${user_id}并发创建会话被数据库唯一索引拦截，查询已创建的会话`)
+
+          // 重新查询现有会话（此时另一个并发请求已成功创建）
+          const concurrentSession = await CustomerServiceSession.findOne({
+            where: {
+              user_id,
+              status: ACTIVE_STATUS
+            },
+            order: [['created_at', 'DESC']]
+          })
+
+          if (concurrentSession) {
+            console.log(`✅ 用户${user_id}获取并发创建的会话: ${concurrentSession.session_id}`)
+            return {
+              session_id: concurrentSession.session_id,
+              status: concurrentSession.status,
+              source: concurrentSession.source,
+              created_at: concurrentSession.created_at,
+              is_new: false
+            }
+          }
+
+          // 理论上不应该到达这里（唯一索引冲突说明会话必然存在）
+          console.error(`❌ 异常：唯一索引冲突但查询不到活跃会话（用户${user_id}）`)
+          throw new Error('会话状态异常，请刷新后重试')
+        }
+
+        // 其他创建错误，直接抛出
+        throw createError
+      }
+    } catch (error) {
+      console.error('❌ 获取或创建会话失败:', error)
+      throw error
+    }
+  }
+
+  /**
+   * 验证聊天统计数据的逻辑一致性
+   *
+   * 业务场景：
+   * - 防止脏数据影响业务决策
+   * - 确保管理后台展示的统计数据准确可信
+   * - 数据质量保障和异常检测
+   *
+   * 验证内容：
+   * 1. 基础数值合理性检查（数值>=0且为有限数）
+   * 2. 逻辑一致性检查（活跃会话<=总会话等）
+   * 3. 业务合理性检查（响应时间<1小时等）
+   *
+   * @param {Object} stats - 统计数据对象
+   * @param {Object} stats.overall - 总体统计
+   * @param {number} stats.overall.total_sessions - 总会话数
+   * @param {number} stats.overall.active_sessions - 活跃会话数
+   * @param {number} stats.overall.waiting_sessions - 等待会话数
+   * @param {number} stats.overall.avg_response_time_seconds - 平均响应时间（秒）
+   * @param {Object} stats.today - 今日统计
+   * @param {number} stats.today.new_sessions - 今日新会话数
+   * @param {number} stats.today.avg_messages_per_session - 平均消息数
+   * @param {Object} stats.by_status - 按状态统计
+   * @returns {Object} 验证结果
+   * @returns {boolean} return.valid - 是否通过验证
+   * @returns {Array<string>} return.warnings - 警告信息列表
+   */
+  static validateStatistics (stats) {
+    const warnings = []
+
+    // 1️⃣ 基础数值合理性检查（数值必须>=0）
+    const numericFields = [
+      'total_sessions',
+      'active_sessions',
+      'waiting_sessions',
+      'avg_response_time_seconds',
+      'new_sessions',
+      'total_messages',
+      'closed_sessions',
+      'avg_messages_per_session'
+    ]
+
+    for (const field of numericFields) {
+      // 安全的对象访问
+      let value
+      if (field.includes('.')) {
+        const parts = field.split('.')
+        value = stats[parts[0]]?.[parts[1]]
+      } else {
+        value = stats[field]
+      }
+
+      if (value !== undefined && (value < 0 || !isFinite(value))) {
+        warnings.push(`${field}数值异常: ${value}（应>=0且为有限数）`)
+      }
+    }
+
+    // 2️⃣ 逻辑一致性检查
+    const { overall, today, by_status } = stats
+
+    if (overall) {
+      // 检查：活跃会话数不应超过总会话数
+      if (overall.active_sessions > overall.total_sessions) {
+        warnings.push(
+          `活跃会话数(${overall.active_sessions})超过总会话数(${overall.total_sessions})，数据不一致`
+        )
+      }
+
+      // 检查：等待会话数不应超过活跃会话数
+      if (overall.waiting_sessions > overall.active_sessions) {
+        warnings.push(
+          `等待会话数(${overall.waiting_sessions})超过活跃会话数(${overall.active_sessions})，数据不一致`
+        )
+      }
+
+      // 平均响应时间异常检测（>1小时可能异常）
+      if (overall.avg_response_time_seconds > 3600) {
+        warnings.push(`平均响应时间(${overall.avg_response_time_seconds}秒)超过1小时，可能异常`)
+      }
+    }
+
+    if (today && overall) {
+      // 检查：今日新会话数不应超过总会话数（除非是新系统）
+      if (today.new_sessions > overall.total_sessions && overall.total_sessions > 0) {
+        warnings.push(
+          `今日新会话(${today.new_sessions})超过总会话数(${overall.total_sessions})，可能有误`
+        )
+      }
+
+      // 平均消息数异常检测（>100可能异常）
+      if (today.avg_messages_per_session > 100) {
+        warnings.push(`平均消息数(${today.avg_messages_per_session})超过100，可能异常`)
+      }
+    }
+
+    // 检查：按状态统计的总和应等于总会话数（允许10%误差）
+    if (by_status && overall) {
+      const statusSum =
+        (by_status.waiting || 0) +
+        (by_status.assigned || 0) +
+        (by_status.active || 0) +
+        (by_status.closed || 0)
+      const deviation = Math.abs(statusSum - overall.total_sessions) / overall.total_sessions
+
+      if (deviation > 0.1) {
+        warnings.push(
+          `按状态统计总和(${statusSum})与总会话数(${overall.total_sessions})偏差>10%，数据不一致`
+        )
+      }
+    }
+
+    return { valid: warnings.length === 0, warnings }
+  }
+
+  /**
+   * 计算客服平均响应时间
+   *
+   * 业务场景：
+   * - 监控客服响应速度（KPI指标）
+   * - 支持客服绩效考核
+   * - 优化人力资源配置
+   * - 服务质量监控
+   *
+   * 计算逻辑：
+   * 1. 查询指定时间范围内已响应的会话（排除waiting状态）
+   * 2. 对每个会话计算：客服首次回复时间 - 用户首条消息时间
+   * 3. 过滤异常数据（响应时间>1小时）
+   * 4. 返回平均值
+   *
+   * @param {Date} startTime - 开始时间
+   * @param {Date} endTime - 结束时间
+   * @returns {Promise<number>} 平均响应时间（秒），无数据时返回60
+   */
+  static async calculateAverageResponseTime (startTime, endTime) {
+    try {
+      // 1️⃣ 查询已响应的会话（排除未响应的waiting状态）
+      const sessions = await CustomerServiceSession.findAll({
+        where: {
+          created_at: {
+            [Op.gte]: startTime,
+            [Op.lte]: endTime
+          },
+          status: {
+            [Op.not]: 'waiting'
+          }
+        },
+        attributes: ['session_id', 'created_at']
+      })
+
+      // 2️⃣ 无数据时返回默认值60秒
+      if (sessions.length === 0) {
+        console.log('📊 [平均响应时间] 今日无已响应会话，返回默认值60秒')
+        return 60
+      }
+
+      let totalResponseTime = 0
+      let validSessions = 0
+
+      // 3️⃣ 计算每个会话的响应时间
+      for (const session of sessions) {
+        // 并行查询该会话的第一条用户消息和第一条客服消息
+        const [firstUserMsg, firstAdminMsg] = await Promise.all([
+          ChatMessage.findOne({
+            where: {
+              session_id: session.session_id,
+              sender_type: 'user'
+            },
+            order: [['created_at', 'ASC']],
+            attributes: ['created_at']
+          }),
+          ChatMessage.findOne({
+            where: {
+              session_id: session.session_id,
+              sender_type: 'admin'
+            },
+            order: [['created_at', 'ASC']],
+            attributes: ['created_at']
+          })
+        ])
+
+        // 4️⃣ 计算响应时间差
+        if (firstUserMsg && firstAdminMsg) {
+          const responseTime = (firstAdminMsg.created_at - firstUserMsg.created_at) / 1000
+
+          // 5️⃣ 排除异常数据（响应时间必须>0秒且<1小时）
+          if (responseTime > 0 && responseTime < 3600) {
+            totalResponseTime += responseTime
+            validSessions++
+          } else if (responseTime >= 3600) {
+            console.warn(
+              `⚠️ [平均响应时间] 异常数据：session_id=${session.session_id}，响应时间=${Math.round(responseTime)}秒（>1小时）`
+            )
+          }
+        }
+      }
+
+      // 6️⃣ 计算平均值
+      if (validSessions === 0) {
+        console.log('📊 [平均响应时间] 无有效数据，返回默认值60秒')
+        return 60
+      }
+
+      const avgResponseTime = Math.round(totalResponseTime / validSessions)
+      console.log(
+        `📊 [平均响应时间] ${avgResponseTime}秒（基于${validSessions}个有效会话）`
+      )
+
+      return avgResponseTime
+    } catch (error) {
+      console.error('❌ 计算平均响应时间失败:', error)
+      return 60 // 出错时返回默认值
     }
   }
 }

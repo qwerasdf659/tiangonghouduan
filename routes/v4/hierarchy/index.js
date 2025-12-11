@@ -16,7 +16,6 @@
 const express = require('express')
 const router = express.Router()
 const { authenticateToken } = require('../../../middleware/auth')
-const HierarchyManagementService = require('../../../services/HierarchyManagementService')
 
 /**
  * 🏗️ 创建用户层级关系
@@ -57,14 +56,14 @@ const HierarchyManagementService = require('../../../services/HierarchyManagemen
  */
 router.post('/create', authenticateToken, async (req, res) => {
   try {
+    // 🔄 通过 ServiceManager 获取 HierarchyManagementService（符合TR-005规范）
+    const HierarchyManagementService = req.app.locals.services.getService('hierarchyManagement')
+
     const { user_id, superior_user_id, role_id, store_id } = req.body
 
     // 参数验证
     if (!user_id || !role_id) {
-      return res.status(400).json({
-        success: false,
-        message: '缺少必需参数：user_id 和 role_id'
-      })
+      return res.apiError('缺少必需参数：user_id 和 role_id', 'MISSING_REQUIRED_PARAMS', null, 400)
     }
 
     const result = await HierarchyManagementService.createHierarchy(
@@ -74,13 +73,10 @@ router.post('/create', authenticateToken, async (req, res) => {
       store_id
     )
 
-    res.json(result)
+    return res.apiSuccess(result, '层级关系创建成功')
   } catch (error) {
     console.error('❌ 创建层级关系失败:', error.message)
-    res.status(500).json({
-      success: false,
-      message: error.message
-    })
+    return res.apiError(error.message, 'CREATE_HIERARCHY_FAILED', null, 500)
   }
 })
 
@@ -118,6 +114,9 @@ router.post('/create', authenticateToken, async (req, res) => {
  */
 router.get('/subordinates/:userId', authenticateToken, async (req, res) => {
   try {
+    // 🔄 通过 ServiceManager 获取 HierarchyManagementService（符合TR-005规范）
+    const HierarchyManagementService = req.app.locals.services.getService('hierarchyManagement')
+
     const { userId } = req.params
     const { include_inactive } = req.query
 
@@ -128,10 +127,7 @@ router.get('/subordinates/:userId', authenticateToken, async (req, res) => {
     )
 
     if (!canView && req.user.user_id !== parseInt(userId)) {
-      return res.status(403).json({
-        success: false,
-        message: '无权限查看该用户的下级信息'
-      })
+      return res.apiError('无权限查看该用户的下级信息', 'PERMISSION_DENIED', null, 403)
     }
 
     const subordinates = await HierarchyManagementService.getAllSubordinates(
@@ -139,17 +135,16 @@ router.get('/subordinates/:userId', authenticateToken, async (req, res) => {
       include_inactive === 'true'
     )
 
-    res.json({
-      success: true,
-      count: subordinates.length,
-      subordinates
-    })
+    return res.apiSuccess(
+      {
+        count: subordinates.length,
+        subordinates
+      },
+      '查询下级成功'
+    )
   } catch (error) {
     console.error('❌ 查询下级失败:', error.message)
-    res.status(500).json({
-      success: false,
-      message: error.message
-    })
+    return res.apiError(error.message, 'GET_SUBORDINATES_FAILED', null, 500)
   }
 })
 
@@ -187,21 +182,18 @@ router.get('/subordinates/:userId', authenticateToken, async (req, res) => {
  */
 router.post('/deactivate', authenticateToken, async (req, res) => {
   try {
+    // 🔄 通过 ServiceManager 获取 HierarchyManagementService（符合TR-005规范）
+    const HierarchyManagementService = req.app.locals.services.getService('hierarchyManagement')
+
     const { target_user_id, reason, include_subordinates = false } = req.body
 
     // 参数验证
     if (!target_user_id) {
-      return res.status(400).json({
-        success: false,
-        message: '缺少必需参数：target_user_id'
-      })
+      return res.apiError('缺少必需参数：target_user_id', 'MISSING_REQUIRED_PARAMS', null, 400)
     }
 
     if (!reason) {
-      return res.status(400).json({
-        success: false,
-        message: '请提供停用原因'
-      })
+      return res.apiError('请提供停用原因', 'MISSING_REASON', null, 400)
     }
 
     const result = await HierarchyManagementService.batchDeactivatePermissions(
@@ -211,13 +203,10 @@ router.post('/deactivate', authenticateToken, async (req, res) => {
       include_subordinates
     )
 
-    res.json(result)
+    return res.apiSuccess(result, '批量停用权限成功')
   } catch (error) {
     console.error('❌ 批量停用权限失败:', error.message)
-    res.status(500).json({
-      success: false,
-      message: error.message
-    })
+    return res.apiError(error.message, 'DEACTIVATE_PERMISSIONS_FAILED', null, 500)
   }
 })
 
@@ -252,14 +241,14 @@ router.post('/deactivate', authenticateToken, async (req, res) => {
  */
 router.post('/activate', authenticateToken, async (req, res) => {
   try {
+    // 🔄 通过 ServiceManager 获取 HierarchyManagementService（符合TR-005规范）
+    const HierarchyManagementService = req.app.locals.services.getService('hierarchyManagement')
+
     const { target_user_id, include_subordinates = false } = req.body
 
     // 参数验证
     if (!target_user_id) {
-      return res.status(400).json({
-        success: false,
-        message: '缺少必需参数：target_user_id'
-      })
+      return res.apiError('缺少必需参数：target_user_id', 'MISSING_REQUIRED_PARAMS', null, 400)
     }
 
     const result = await HierarchyManagementService.batchActivatePermissions(
@@ -268,13 +257,10 @@ router.post('/activate', authenticateToken, async (req, res) => {
       include_subordinates
     )
 
-    res.json(result)
+    return res.apiSuccess(result, '批量激活权限成功')
   } catch (error) {
     console.error('❌ 批量激活权限失败:', error.message)
-    res.status(500).json({
-      success: false,
-      message: error.message
-    })
+    return res.apiError(error.message, 'ACTIVATE_PERMISSIONS_FAILED', null, 500)
   }
 })
 
@@ -309,6 +295,9 @@ router.post('/activate', authenticateToken, async (req, res) => {
  */
 router.get('/stats/:userId', authenticateToken, async (req, res) => {
   try {
+    // 🔄 通过 ServiceManager 获取 HierarchyManagementService（符合TR-005规范）
+    const HierarchyManagementService = req.app.locals.services.getService('hierarchyManagement')
+
     const { userId } = req.params
 
     // 权限验证
@@ -318,24 +307,15 @@ router.get('/stats/:userId', authenticateToken, async (req, res) => {
     )
 
     if (!canView && req.user.user_id !== parseInt(userId)) {
-      return res.status(403).json({
-        success: false,
-        message: '无权限查看该用户的统计信息'
-      })
+      return res.apiError('无权限查看该用户的统计信息', 'PERMISSION_DENIED', null, 403)
     }
 
     const stats = await HierarchyManagementService.getHierarchyStats(parseInt(userId))
 
-    res.json({
-      success: true,
-      stats
-    })
+    return res.apiSuccess({ stats }, '获取层级统计成功')
   } catch (error) {
     console.error('❌ 获取层级统计失败:', error.message)
-    res.status(500).json({
-      success: false,
-      message: error.message
-    })
+    return res.apiError(error.message, 'GET_HIERARCHY_STATS_FAILED', null, 500)
   }
 })
 

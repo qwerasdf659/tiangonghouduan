@@ -68,7 +68,6 @@ const {
 } = require('../models')
 const { Op } = require('sequelize')
 const BeijingTimeHelper = require('../utils/timeHelper')
-const PointsService = require('./PointsService')
 
 /**
  * 兑换市场服务类
@@ -174,9 +173,62 @@ class ExchangeMarketService {
    * @param {number} user_id - 用户ID
    * @param {number} item_id - 商品ID
    * @param {number} quantity - 兑换数量
+   * @param {Object} options - 选项
+   * @param {string} options.business_id - 业务唯一ID（可选，用于幂等性）
    * @returns {Promise<Object>} 兑换结果和订单信息
    */
-  static async exchangeItem (user_id, item_id, quantity = 1) {
+  static async exchangeItem (user_id, item_id, quantity = 1, options = {}) {
+    const { business_id } = options
+
+    // ✅ 幂等性检查（解决任务4.1：为高风险操作添加强制幂等检查）
+    if (business_id) {
+      const existingOrder = await ExchangeMarketRecord.findOne({
+        where: {
+          user_id,
+          item_id,
+          status: { [Op.in]: ['pending', 'completed', 'shipped'] } // 排除已取消的订单
+        },
+        order: [['exchange_time', 'DESC']],
+        limit: 1
+      })
+
+      if (existingOrder) {
+        console.log('[兑换市场] ⚠️ 幂等性检查：兑换订单已存在，返回原结果', {
+          business_id,
+          order_no: existingOrder.order_no,
+          user_id,
+          item_id,
+          status: existingOrder.status
+        })
+
+        // 获取当前虚拟价值余额
+        const userAccount = await UserPointsAccount.findOne({
+          where: { user_id }
+        })
+
+        return {
+          success: true,
+          message: '兑换订单已存在',
+          order: {
+            order_no: existingOrder.order_no,
+            record_id: existingOrder.record_id,
+            item_name: existingOrder.item_snapshot?.item_name || '未知商品',
+            quantity: existingOrder.quantity,
+            payment_type: existingOrder.payment_type,
+            virtual_value_paid: existingOrder.virtual_value_paid,
+            points_paid: existingOrder.points_paid,
+            status: existingOrder.status
+          },
+          remaining: {
+            virtual_value: await this._getUserTotalVirtualValue(user_id),
+            available_points: userAccount?.available_points || 0
+          },
+          is_duplicate: true, // ✅ 标记为重复请求
+          timestamp: BeijingTimeHelper.now()
+        }
+      }
+    }
+
     const transaction = await sequelize.transaction()
 
     try {
@@ -234,7 +286,7 @@ class ExchangeMarketService {
         await transaction.rollback()
         throw new Error(
           `不支持的支付方式：${item.price_type}。` +
-          '当前仅支持虚拟奖品支付（price_type=\'virtual\'），请联系管理员更新商品配置。'
+            '当前仅支持虚拟奖品支付（price_type=\'virtual\'），请联系管理员更新商品配置。'
         )
       }
 
@@ -248,7 +300,7 @@ class ExchangeMarketService {
         await transaction.rollback()
         throw new Error(
           `虚拟奖品不足，需要${totalVirtualValue}虚拟价值，当前${userVirtualValue}。` +
-          '请先参与抽奖获取虚拟奖品。'
+            '请先参与抽奖获取虚拟奖品。'
         )
       }
 
@@ -639,6 +691,261 @@ class ExchangeMarketService {
     } catch (error) {
       console.error('[兑换市场] 查询统计数据失败:', error.message)
       throw new Error(`查询统计数据失败: ${error.message}`)
+    }
+  }
+
+  /**
+   * 创建兑换商品（管理员操作）
+   *
+   * @param {Object} itemData - 商品数据
+   * @param {string} itemData.item_name - 商品名称
+   * @param {string} [itemData.item_description] - 商品描述
+   * @param {string} itemData.price_type - 支付方式（virtual）
+   * @param {number} itemData.virtual_value_price - 虚拟价值价格
+   * @param {number} [itemData.points_price] - 积分价格（仅展示）
+   * @param {number} itemData.cost_price - 成本价
+   * @param {number} itemData.stock - 初始库存
+   * @param {number} [itemData.sort_order=100] - 排序号
+   * @param {string} [itemData.status='active'] - 商品状态
+   * @param {number} created_by - 创建者ID
+   * @returns {Promise<Object>} 创建结果
+   */
+  static async createExchangeItem (itemData, created_by) {
+    try {
+      console.log('[兑换市场] 管理员创建商品', {
+        item_name: itemData.item_name,
+        created_by
+      })
+
+      // 参数验证
+      if (!itemData.item_name || itemData.item_name.trim().length === 0) {
+        throw new Error('商品名称不能为空')
+      }
+
+      if (itemData.item_name.length > 100) {
+        throw new Error('商品名称最长100字符')
+      }
+
+      if (itemData.item_description && itemData.item_description.length > 500) {
+        throw new Error('商品描述最长500字符')
+      }
+
+      if (itemData.price_type !== 'virtual') {
+        throw new Error('无效的price_type参数，当前只支持 virtual（虚拟奖品价值支付）')
+      }
+
+      if (!itemData.virtual_value_price || itemData.virtual_value_price <= 0) {
+        throw new Error('虚拟价值价格必须大于0')
+      }
+
+      if (itemData.cost_price === undefined || itemData.cost_price < 0) {
+        throw new Error('成本价必须大于等于0')
+      }
+
+      if (itemData.stock === undefined || itemData.stock < 0) {
+        throw new Error('库存必须大于等于0')
+      }
+
+      const validStatuses = ['active', 'inactive']
+      if (itemData.status && !validStatuses.includes(itemData.status)) {
+        throw new Error(`无效的status参数，允许值：${validStatuses.join(', ')}`)
+      }
+
+      // 创建商品
+      const item = await ExchangeItem.create({
+        item_name: itemData.item_name.trim(),
+        item_description: itemData.item_description ? itemData.item_description.trim() : '',
+        price_type: itemData.price_type,
+        virtual_value_price: parseFloat(itemData.virtual_value_price) || 0,
+        points_price: parseInt(itemData.points_price) || 0,
+        cost_price: parseFloat(itemData.cost_price),
+        stock: parseInt(itemData.stock),
+        sort_order: parseInt(itemData.sort_order) || 100,
+        status: itemData.status || 'active',
+        created_at: BeijingTimeHelper.createDatabaseTime(),
+        updated_at: BeijingTimeHelper.createDatabaseTime()
+      })
+
+      console.log(`[兑换市场] 商品创建成功，item_id: ${item.item_id}`)
+
+      return {
+        success: true,
+        item: item.toJSON(),
+        timestamp: BeijingTimeHelper.now()
+      }
+    } catch (error) {
+      console.error('[兑换市场] 创建商品失败:', error.message)
+      throw error
+    }
+  }
+
+  /**
+   * 更新兑换商品（管理员操作）
+   *
+   * @param {number} item_id - 商品ID
+   * @param {Object} updateData - 更新数据
+   * @returns {Promise<Object>} 更新结果
+   */
+  static async updateExchangeItem (item_id, updateData) {
+    try {
+      console.log('[兑换市场] 管理员更新商品', { item_id })
+
+      // 查询商品
+      const item = await ExchangeItem.findByPk(item_id)
+      if (!item) {
+        throw new Error('商品不存在')
+      }
+
+      // 构建更新数据
+      const finalUpdateData = { updated_at: BeijingTimeHelper.createDatabaseTime() }
+
+      if (updateData.item_name !== undefined) {
+        if (updateData.item_name.trim().length === 0) {
+          throw new Error('商品名称不能为空')
+        }
+        if (updateData.item_name.length > 100) {
+          throw new Error('商品名称最长100字符')
+        }
+        finalUpdateData.item_name = updateData.item_name.trim()
+      }
+
+      if (updateData.item_description !== undefined) {
+        if (updateData.item_description.length > 500) {
+          throw new Error('商品描述最长500字符')
+        }
+        finalUpdateData.item_description = updateData.item_description.trim()
+      }
+
+      if (updateData.price_type !== undefined) {
+        if (updateData.price_type !== 'virtual') {
+          throw new Error('无效的price_type参数，当前只支持 virtual（虚拟奖品价值支付）')
+        }
+        finalUpdateData.price_type = updateData.price_type
+      }
+
+      if (updateData.virtual_value_price !== undefined) {
+        if (updateData.virtual_value_price < 0) {
+          throw new Error('虚拟价值价格必须大于等于0')
+        }
+        finalUpdateData.virtual_value_price = parseFloat(updateData.virtual_value_price)
+      }
+
+      if (updateData.points_price !== undefined) {
+        if (updateData.points_price < 0) {
+          throw new Error('积分价格必须大于等于0')
+        }
+        finalUpdateData.points_price = parseInt(updateData.points_price)
+      }
+
+      if (updateData.cost_price !== undefined) {
+        if (updateData.cost_price < 0) {
+          throw new Error('成本价必须大于等于0')
+        }
+        finalUpdateData.cost_price = parseFloat(updateData.cost_price)
+      }
+
+      if (updateData.stock !== undefined) {
+        if (updateData.stock < 0) {
+          throw new Error('库存必须大于等于0')
+        }
+        finalUpdateData.stock = parseInt(updateData.stock)
+      }
+
+      if (updateData.sort_order !== undefined) {
+        finalUpdateData.sort_order = parseInt(updateData.sort_order)
+      }
+
+      if (updateData.status !== undefined) {
+        const validStatuses = ['active', 'inactive']
+        if (!validStatuses.includes(updateData.status)) {
+          throw new Error(`无效的status参数，允许值：${validStatuses.join(', ')}`)
+        }
+        finalUpdateData.status = updateData.status
+      }
+
+      // 更新商品
+      await item.update(finalUpdateData)
+
+      console.log(`[兑换市场] 商品更新成功，item_id: ${item_id}`)
+
+      return {
+        success: true,
+        item: item.toJSON(),
+        timestamp: BeijingTimeHelper.now()
+      }
+    } catch (error) {
+      console.error(`[兑换市场] 更新商品失败(item_id:${item_id}):`, error.message)
+      throw error
+    }
+  }
+
+  /**
+   * 删除兑换商品（管理员操作）
+   *
+   * @param {number} item_id - 商品ID
+   * @returns {Promise<Object>} 删除结果
+   */
+  static async deleteExchangeItem (item_id) {
+    const transaction = await sequelize.transaction()
+
+    try {
+      console.log('[兑换市场] 管理员删除商品', { item_id })
+
+      // 查询商品
+      const item = await ExchangeItem.findByPk(item_id, { transaction })
+      if (!item) {
+        await transaction.rollback()
+        throw new Error('商品不存在')
+      }
+
+      // 检查是否有相关订单
+      const orderCount = await ExchangeMarketRecord.count({
+        where: { item_id },
+        transaction
+      })
+
+      if (orderCount > 0) {
+        // 如果有订单，只能下架不能删除
+        await item.update(
+          {
+            status: 'inactive',
+            updated_at: BeijingTimeHelper.createDatabaseTime()
+          },
+          { transaction }
+        )
+
+        await transaction.commit()
+
+        console.log(`[兑换市场] 商品有${orderCount}个关联订单，已下架而非删除`)
+
+        return {
+          success: true,
+          action: 'deactivated',
+          message: `该商品有${orderCount}个关联订单，已自动下架而非删除`,
+          item: item.toJSON(),
+          timestamp: BeijingTimeHelper.now()
+        }
+      }
+
+      // 删除商品
+      await item.destroy({ transaction })
+      await transaction.commit()
+
+      console.log(`[兑换市场] 商品删除成功，item_id: ${item_id}`)
+
+      return {
+        success: true,
+        action: 'deleted',
+        message: '商品删除成功',
+        timestamp: BeijingTimeHelper.now()
+      }
+    } catch (error) {
+      if (transaction && !transaction.finished) {
+        await transaction.rollback()
+      }
+
+      console.error(`[兑换市场] 删除商品失败(item_id:${item_id}):`, error.message)
+      throw error
     }
   }
 }

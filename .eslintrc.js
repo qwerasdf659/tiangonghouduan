@@ -22,7 +22,7 @@ module.exports = {
 
   // 解析器选项
   parserOptions: {
-    ecmaVersion: 12,
+    ecmaVersion: 2022, // 更新为ES2022以支持类静态字段语法
     sourceType: 'module'
   },
 

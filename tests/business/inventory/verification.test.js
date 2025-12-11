@@ -23,7 +23,7 @@
  * - 13612227930: 测试用户（既是普通用户也是管理员，role_level>=100）
  */
 
-const TestCoordinator = require('../../helpers/TestCoordinator')
+const TestCoordinator = require('../../api/TestCoordinator')
 const moment = require('moment-timezone')
 const { UserInventory, User } = require('../../../models')
 const BeijingTimeHelper = require('../../../utils/timeHelper')
