@@ -21,7 +21,7 @@ async function finalVerification () {
 
   try {
     console.log('🔍 P0-2 任务最终验证\n')
-    console.log('=' .repeat(60))
+    console.log('='.repeat(60))
 
     // ==================== 1. 代码实现验证 ====================
     console.log('\n📝 1. 代码实现验证')
@@ -30,9 +30,9 @@ async function finalVerification () {
     // 1.1 UserRoleService
     const serviceCode = fs.readFileSync('./services/UserRoleService.js', 'utf8')
     const checks = {
-      'UserRoleService 导入 AuditLogService': serviceCode.includes("require('./AuditLogService')"),
+      'UserRoleService 导入 AuditLogService': serviceCode.includes('require(\'./AuditLogService\')'),
       'UserRoleService 调用 logOperation': serviceCode.includes('AuditLogService.logOperation'),
-      'UserRoleService 使用 role_change': serviceCode.includes("operation_type: 'role_change'"),
+      'UserRoleService 使用 role_change': serviceCode.includes('operation_type: \'role_change\''),
       'UserRoleService 记录 before_data': serviceCode.includes('before_data:'),
       'UserRoleService 记录 after_data': serviceCode.includes('after_data:'),
       'UserRoleService 生成 business_id': serviceCode.includes('business_id:'),
@@ -52,7 +52,7 @@ async function finalVerification () {
 
     // 1.2 AuditLogService
     const auditServiceCode = fs.readFileSync('./services/AuditLogService.js', 'utf8')
-    const auditCheck = auditServiceCode.includes("'role_change'")
+    const auditCheck = auditServiceCode.includes('\'role_change\'')
     if (auditCheck) {
       console.log('   ✅ AuditLogService 支持 role_change')
       results.passed.push('AuditLogService 支持 role_change')
@@ -63,7 +63,7 @@ async function finalVerification () {
 
     // 1.3 AdminOperationLog 模型
     const modelCode = fs.readFileSync('./models/AdminOperationLog.js', 'utf8')
-    const modelCheck = modelCode.includes("'role_change'")
+    const modelCheck = modelCode.includes('\'role_change\'')
     if (modelCheck) {
       console.log('   ✅ AdminOperationLog 模型定义 role_change')
       results.passed.push('AdminOperationLog 模型定义 role_change')
@@ -80,7 +80,7 @@ async function finalVerification () {
     const routeChecks = {
       '路由传递 reason': routeCode.includes('reason'),
       '路由传递 ip_address': routeCode.includes('ip_address: req.ip'),
-      '路由传递 user_agent': routeCode.includes("user_agent: req.headers['user-agent']")
+      '路由传递 user_agent': routeCode.includes('user_agent: req.headers[\'user-agent\']')
     }
 
     for (const [check, result] of Object.entries(routeChecks)) {
@@ -202,10 +202,10 @@ async function finalVerification () {
 
     const migrationCode = fs.readFileSync('./migrations/20251211000000-add-role-change-operation-type.js', 'utf8')
     const migrationChecks = {
-      '迁移文件包含 role_change': migrationCode.includes("'role_change'"),
-      '迁移文件包含 prize_stock_adjust': migrationCode.includes("'prize_stock_adjust'"),
-      '迁移文件有验证逻辑': migrationCode.includes('hasRoleChange'),
-      '迁移文件有回滚逻辑': migrationCode.includes('down:')
+      '迁移文件包含 role_change': migrationCode.includes('\'role_change\''),
+      '迁移文件包含 prize_stock_adjust': migrationCode.includes('\'prize_stock_adjust\''),
+      迁移文件有验证逻辑: migrationCode.includes('hasRoleChange'),
+      迁移文件有回滚逻辑: migrationCode.includes('down:')
     }
 
     for (const [check, result] of Object.entries(migrationChecks)) {

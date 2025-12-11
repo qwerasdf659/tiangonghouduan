@@ -13,7 +13,7 @@ async function testRoleChangeAudit () {
     console.log('✅ 测试1：检查 UserRoleService.updateUserRole 代码')
     const serviceCode = fs.readFileSync('./services/UserRoleService.js', 'utf8')
 
-    const hasAuditLogImport = serviceCode.includes("require('./AuditLogService')")
+    const hasAuditLogImport = serviceCode.includes('require(\'./AuditLogService\')')
     const hasAuditLogCall = serviceCode.includes('AuditLogService.logOperation')
     const hasRoleChangeType = serviceCode.includes('role_change')
 
@@ -24,7 +24,7 @@ async function testRoleChangeAudit () {
     // 测试2：检查 AuditLogService 是否支持 role_change
     console.log('\n✅ 测试2：检查 AuditLogService 支持的操作类型')
     const auditServiceCode = fs.readFileSync('./services/AuditLogService.js', 'utf8')
-    const supportsRoleChange = auditServiceCode.includes("'role_change'")
+    const supportsRoleChange = auditServiceCode.includes('\'role_change\'')
     console.log(`   - 支持 'role_change' 操作类型: ${supportsRoleChange ? '✅' : '❌'}`)
 
     // 测试3：检查数据库枚举值
@@ -43,7 +43,7 @@ async function testRoleChangeAudit () {
     // 测试4：检查 AdminOperationLog 模型
     console.log('\n✅ 测试4：检查 AdminOperationLog 模型定义')
     const modelCode = fs.readFileSync('./models/AdminOperationLog.js', 'utf8')
-    const modelHasRoleChange = modelCode.includes("'role_change'")
+    const modelHasRoleChange = modelCode.includes('\'role_change\'')
     console.log(`   - 模型定义包含 'role_change': ${modelHasRoleChange ? '✅' : '❌'}`)
 
     // 汇总测试结果

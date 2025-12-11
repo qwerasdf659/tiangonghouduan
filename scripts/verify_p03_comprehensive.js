@@ -82,9 +82,9 @@ async function comprehensiveVerification () {
 
     // 2.1 检查 addStock 方法
     console.log('2.1 检查 addStock 方法...')
-    const hasAddStockAudit = prizePoolServiceCode.includes('AuditLogService.logOperation')
-      && prizePoolServiceCode.includes("operation_type: 'prize_stock_adjust'")
-      && prizePoolServiceCode.includes('奖品库存调整')
+    const hasAddStockAudit = prizePoolServiceCode.includes('AuditLogService.logOperation') &&
+      prizePoolServiceCode.includes('operation_type: \'prize_stock_adjust\'') &&
+      prizePoolServiceCode.includes('奖品库存调整')
 
     if (hasAddStockAudit) {
       console.log('  ✅ addStock 方法正确调用审计日志')
@@ -96,9 +96,9 @@ async function comprehensiveVerification () {
 
     // 2.2 检查 updatePrize 方法
     console.log('2.2 检查 updatePrize 方法...')
-    const hasUpdatePrizeAudit = prizePoolServiceCode.includes('AuditLogService.logOperation')
-      && prizePoolServiceCode.includes("operation_type: 'prize_config'")
-      && prizePoolServiceCode.includes('奖品配置修改')
+    const hasUpdatePrizeAudit = prizePoolServiceCode.includes('AuditLogService.logOperation') &&
+      prizePoolServiceCode.includes('operation_type: \'prize_config\'') &&
+      prizePoolServiceCode.includes('奖品配置修改')
 
     if (hasUpdatePrizeAudit) {
       console.log('  ✅ updatePrize 方法正确调用审计日志')
@@ -110,9 +110,9 @@ async function comprehensiveVerification () {
 
     // 2.3 检查 deletePrize 方法
     console.log('2.3 检查 deletePrize 方法...')
-    const hasDeletePrizeAudit = prizePoolServiceCode.includes('AuditLogService.logOperation')
-      && prizePoolServiceCode.includes("operation_type: 'prize_delete'")
-      && prizePoolServiceCode.includes('删除奖品')
+    const hasDeletePrizeAudit = prizePoolServiceCode.includes('AuditLogService.logOperation') &&
+      prizePoolServiceCode.includes('operation_type: \'prize_delete\'') &&
+      prizePoolServiceCode.includes('删除奖品')
 
     if (hasDeletePrizeAudit) {
       console.log('  ✅ deletePrize 方法正确调用审计日志')
@@ -124,9 +124,9 @@ async function comprehensiveVerification () {
 
     // 2.4 检查 batchAddPrizes 方法
     console.log('2.4 检查 batchAddPrizes 方法...')
-    const hasBatchAddPrizesAudit = prizePoolServiceCode.includes('AuditLogService.logOperation')
-      && prizePoolServiceCode.includes("operation_type: 'prize_create'")
-      && prizePoolServiceCode.includes('批量添加')
+    const hasBatchAddPrizesAudit = prizePoolServiceCode.includes('AuditLogService.logOperation') &&
+      prizePoolServiceCode.includes('operation_type: \'prize_create\'') &&
+      prizePoolServiceCode.includes('批量添加')
 
     if (hasBatchAddPrizesAudit) {
       console.log('  ✅ batchAddPrizes 方法正确调用审计日志')
@@ -177,8 +177,8 @@ async function comprehensiveVerification () {
     ]
 
     transactionChecks.forEach(check => {
-      const hasInternalTx = prizePoolServiceCode.includes(`${check.method}`)
-        && prizePoolServiceCode.includes('internalTransaction')
+      const hasInternalTx = prizePoolServiceCode.includes(`${check.method}`) &&
+        prizePoolServiceCode.includes('internalTransaction')
       const hasRollback = prizePoolServiceCode.includes('rollback')
 
       if (hasInternalTx && hasRollback) {

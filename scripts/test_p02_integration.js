@@ -96,9 +96,9 @@ async function testP02Integration () {
     const serviceCode = fs.readFileSync('./services/UserRoleService.js', 'utf8')
 
     const checks = {
-      '导入 AuditLogService': serviceCode.includes("require('./AuditLogService')"),
+      '导入 AuditLogService': serviceCode.includes('require(\'./AuditLogService\')'),
       '调用 AuditLogService.logOperation': serviceCode.includes('AuditLogService.logOperation'),
-      '使用 role_change 类型': serviceCode.includes("operation_type: 'role_change'"),
+      '使用 role_change 类型': serviceCode.includes('operation_type: \'role_change\''),
       '包含 before_data': serviceCode.includes('before_data:'),
       '包含 after_data': serviceCode.includes('after_data:'),
       '包含 business_id': serviceCode.includes('business_id:'),

@@ -123,7 +123,7 @@ class ExchangeOperationService {
    * @param {string} batchReason - 批量审核原因
    * @returns {Object} 批量审核结果
    */
-  static async batchApproveOrders(auditorId, exchangeIds, batchReason = '批量审核通过') {
+  static async batchApproveOrders (auditorId, exchangeIds, batchReason = '批量审核通过') {
     console.log(`[批量审核] 审核员${auditorId}批量审核${exchangeIds.length}个订单`)
 
     const results = {
@@ -210,7 +210,7 @@ class ExchangeOperationService {
    * @param {Array<Object>} rejectItems - 拒绝订单数组 [{exchange_id, reason}]
    * @returns {Object} 批量审核结果
    */
-  static async batchRejectOrders(auditorId, rejectItems) {
+  static async batchRejectOrders (auditorId, rejectItems) {
     console.log(`[批量拒绝] 审核员${auditorId}批量拒绝${rejectItems.length}个订单`)
 
     const results = {
@@ -306,7 +306,7 @@ class ExchangeOperationService {
    * @param {number} timeoutHours - 超时小时数，默认24小时
    * @returns {Array} 超时订单列表
    */
-  static async getTimeoutPendingOrders(timeoutHours = 24) {
+  static async getTimeoutPendingOrders (timeoutHours = 24) {
     const timeoutThreshold = new Date(BeijingTimeHelper.timestamp() - timeoutHours * 60 * 60 * 1000)
 
     const orders = await ExchangeRecords.findAll({
@@ -348,7 +348,7 @@ class ExchangeOperationService {
    * @param {number} timeoutHours - 超时小时数，默认24小时
    * @returns {Object} 告警结果
    */
-  static async checkTimeoutAndAlert(timeoutHours = 24) {
+  static async checkTimeoutAndAlert (timeoutHours = 24) {
     console.log(`[超时告警] 开始检查超过${timeoutHours}小时的待审核订单...`)
 
     const timeoutOrders = await this.getTimeoutPendingOrders(timeoutHours)
@@ -406,7 +406,7 @@ class ExchangeOperationService {
    * @param {Object} statistics - 统计信息
    * @returns {string} 告警消息
    */
-  static generateAlertMessage(orders, statistics) {
+  static generateAlertMessage (orders, statistics) {
     const lines = [
       '🚨 待审核订单超时告警',
       '',
@@ -445,7 +445,7 @@ class ExchangeOperationService {
    *
    * @returns {Object} 统计信息
    */
-  static async getPendingOrdersStatistics() {
+  static async getPendingOrdersStatistics () {
     const now = BeijingTimeHelper.createDatabaseTime()
     const oneHourAgo = new Date(now - 1 * 60 * 60 * 1000)
     const sixHoursAgo = new Date(now - 6 * 60 * 60 * 1000)
@@ -515,7 +515,7 @@ class ExchangeOperationService {
    * @returns {Object} returns.statistics - 订单统计信息
    * @returns {Object} returns.alerts - 告警信息
    */
-  static async scheduledTimeoutCheck() {
+  static async scheduledTimeoutCheck () {
     console.log('[定时任务] 开始执行超时订单检查...')
 
     try {
@@ -574,7 +574,7 @@ class ExchangeOperationService {
    * @returns {Promise<Object>} 兑换结果
    * @throws {Error} 任何步骤失败都会抛出错误并回滚事务
    */
-  static async createExchange(userId, productId, quantity = 1, space = 'lucky') {
+  static async createExchange (userId, productId, quantity = 1, space = 'lucky') {
     const { sequelize } = require('../models')
     const InventoryService = require('./InventoryService')
     const PointsService = require('./PointsService')
@@ -695,7 +695,7 @@ class ExchangeOperationService {
    * @private
    * @returns {string} 兑换码
    */
-  static _generateExchangeCode() {
+  static _generateExchangeCode () {
     const BeijingTimeHelper = require('../utils/timeHelper')
     const timestamp = BeijingTimeHelper.timestamp().toString(36)
     const random = Math.random().toString(36).substr(2, 8)
@@ -718,7 +718,7 @@ class ExchangeOperationService {
    * @param {string} options.space - 空间过滤（lucky/premium）
    * @returns {Promise<Object>} {records, pagination}
    */
-  static async getExchangeRecords(userId, options = {}) {
+  static async getExchangeRecords (userId, options = {}) {
     const { Product } = require('../models')
     const { page = 1, limit = 20, status = null, space = null } = options
 
