@@ -1342,7 +1342,6 @@ class ReportingService {
           100,
           Math.floor(
             parseInt(lotteryStats[0]?.total_draws || 0) * 2 +
-              parseInt(exchangeStats[0]?.total_exchanges || 0) * 3 +
               parseInt(consumptionStats[0]?.total_consumptions || 0) * 5
           )
         ),

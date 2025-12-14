@@ -227,7 +227,6 @@ describe('审计日志功能测试', () => {
             expect(change).toHaveProperty('new_value')
           })
         }
-      }
     })
   })
 })
