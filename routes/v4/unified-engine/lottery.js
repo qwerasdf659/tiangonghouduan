@@ -129,6 +129,7 @@ const express = require('express')
 const router = express.Router()
 const { authenticateToken, getUserRoles } = require('../../../middleware/auth')
 const dataAccessControl = require('../../../middleware/dataAccessControl')
+const { handleServiceError } = require('../../../middleware/validation')
 const DataSanitizer = require('../../../services/DataSanitizer')
 const BeijingTimeHelper = require('../../../utils/timeHelper')
 
@@ -284,7 +285,7 @@ router.get('/prizes/:campaignCode', authenticateToken, dataAccessControl, async 
     return res.apiSuccess(sanitizedPrizes, '奖品列表获取成功', 'PRIZES_SUCCESS')
   } catch (error) {
     console.error('获取奖品列表失败:', error)
-    return res.apiError(error.message, 'PRIZES_ERROR', {}, 500)
+    return handleServiceError(error, res, '获取奖品列表失败')
   }
 })
 
@@ -401,7 +402,7 @@ router.get('/config/:campaignCode', authenticateToken, dataAccessControl, async 
     }
   } catch (error) {
     console.error('获取抽奖配置失败:', error)
-    return res.apiError(error.message, 'CONFIG_ERROR', {}, 500)
+    return handleServiceError(error, res, '获取抽奖配置失败')
   }
 })
 
@@ -465,7 +466,8 @@ router.post(
               type: 'empty',
               sort_order: null,
               icon: '💨',
-              rarity: 'common'
+              rarity: 'common',
+              display_points: 0
             }
           }
 
@@ -478,7 +480,10 @@ router.post(
             sort_order: prize.prize.sort_order, // 🎯 前端用于计算索引（index = sort_order - 1）
             icon: DataSanitizer.getPrizeIcon(prize.prize.type),
             rarity: DataSanitizer.calculateRarity(prize.prize.type),
-            display_value: DataSanitizer.getDisplayValue(prize.prize.value)
+            display_points: typeof prize.prize.value === 'number' ? prize.prize.value : parseFloat(prize.prize.value) || 0,
+            display_value: DataSanitizer.getDisplayValue(
+              typeof prize.prize.value === 'number' ? prize.prize.value : parseFloat(prize.prize.value) || 0
+            )
           }
         }),
         total_points_cost: drawResult.total_points_cost, // 实际消耗积分（折后价）
@@ -502,7 +507,7 @@ router.post(
       return res.apiSuccess(sanitizedResult, '抽奖成功', 'DRAW_SUCCESS')
     } catch (error) {
       console.error('抽奖失败:', error)
-      return res.apiError(error.message, 'DRAW_ERROR', {}, 500)
+      return handleServiceError(error, res, '抽奖失败')
     }
   }
 )
@@ -557,13 +562,7 @@ router.get('/history/:user_id', authenticateToken, async (req, res) => {
       timestamp: BeijingTimeHelper.now() // 北京时间
     })
 
-    // ✅ 生产环境返回通用错误消息（不暴露细节）
-    const isProduction = process.env.NODE_ENV === 'production'
-    const errorMessage = isProduction
-      ? '获取抽奖历史失败，请稍后重试' // 通用消息
-      : error.message // 开发环境：显示详细错误
-
-    return res.apiError(errorMessage, 'HISTORY_ERROR', {}, 500)
+    return handleServiceError(error, res, '获取抽奖历史失败')
   }
 })
 
@@ -588,7 +587,7 @@ router.get('/campaigns', authenticateToken, async (req, res) => {
     return res.apiSuccess(campaigns, '活动列表获取成功', 'CAMPAIGNS_SUCCESS')
   } catch (error) {
     console.error('获取活动列表失败:', error)
-    return res.apiError(error.message, 'CAMPAIGNS_ERROR', {}, 500)
+    return handleServiceError(error, res, '获取活动列表失败')
   }
 })
 
@@ -653,7 +652,7 @@ router.get('/points/:user_id', authenticateToken, pointsRateLimiter, async (req,
       stack: error.stack,
       timestamp: BeijingTimeHelper.now()
     })
-    return res.apiError(error.message, 'POINTS_ERROR', {}, 500)
+    return handleServiceError(error, res, '获取用户积分失败')
   }
 })
 
@@ -743,7 +742,7 @@ router.get('/statistics/:user_id', authenticateToken, async (req, res) => {
   } catch (error) {
     // ❌ 错误处理（记录错误日志并返回友好的错误信息）
     console.error('获取统计信息失败:', error)
-    return res.apiError(error.message, 'STATISTICS_ERROR', {}, 500)
+    return handleServiceError(error, res, '获取统计信息失败')
   }
 })
 
@@ -768,12 +767,7 @@ router.get('/health', (req, res) => {
     )
   } catch (error) {
     console.error('抽奖系统健康检查失败:', error)
-    return res.apiError(
-      '抽奖系统健康检查失败',
-      'HEALTH_CHECK_FAILED',
-      { error: error.message },
-      500
-    )
+    return handleServiceError(error, res, '抽奖系统健康检查失败')
   }
 })
 

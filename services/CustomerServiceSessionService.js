@@ -71,45 +71,11 @@ function checkSensitiveWords (content) {
 }
 
 /**
- * 管理员消息频率限制
- * 复用自 routes/v4/system.js 行52-142
+ * 聊天频率限制服务
+ * ✅ P2-F架构重构：统一使用 ChatRateLimitService 管理所有频率限制逻辑
+ * 移除重复代码，避免多处维护同一逻辑
  */
-const adminMessageTimestamps = new Map()
-
-function checkAdminRateLimit (admin_id) {
-  const { rate_limit: rateLimit } = businessConfig.chat
-  const limit = rateLimit.admin.max_messages_per_minute
-  const timeWindow = rateLimit.admin.time_window_seconds * 1000
-
-  const now = Date.now()
-  const timestamps = adminMessageTimestamps.get(admin_id) || []
-
-  const recentTimestamps = timestamps.filter(ts => now - ts < timeWindow)
-
-  if (recentTimestamps.length >= limit) {
-    return { allowed: false, limit, current: recentTimestamps.length }
-  }
-
-  recentTimestamps.push(now)
-  adminMessageTimestamps.set(admin_id, recentTimestamps)
-
-  return { allowed: true, limit, current: recentTimestamps.length }
-}
-
-// 定期清理过期记录（防止内存泄漏）
-setInterval(() => {
-  const now = Date.now()
-  const TEN_MINUTES = 10 * 60 * 1000
-
-  adminMessageTimestamps.forEach((timestamps, adminId) => {
-    const recentTimestamps = timestamps.filter(ts => now - ts < TEN_MINUTES)
-    if (recentTimestamps.length === 0) {
-      adminMessageTimestamps.delete(adminId)
-    } else {
-      adminMessageTimestamps.set(adminId, recentTimestamps)
-    }
-  })
-}, 10 * 60 * 1000)
+const ChatRateLimitService = require('./ChatRateLimitService')
 
 /**
  * 客服会话服务类
@@ -508,8 +474,12 @@ class CustomerServiceSessionService {
         throw new Error(`消息包含敏感词：${sensitiveCheck.matchedWord}`)
       }
 
-      // ✅ 3. 频率限制检查
-      const rateLimitCheck = checkAdminRateLimit(admin_id)
+      /*
+       * ✅ 3. 频率限制检查
+       * ✅ P2-F架构重构：使用 ChatRateLimitService 统一管理频率限制
+       * 管理员使用 role_level >= 100 标识
+       */
+      const rateLimitCheck = ChatRateLimitService.checkMessageRateLimit(admin_id, 100)
       if (!rateLimitCheck.allowed) {
         throw new Error(`发送消息过于频繁，每分钟最多${rateLimitCheck.limit}条`)
       }

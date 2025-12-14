@@ -37,7 +37,7 @@
  * 外键：user_id（users.user_id，CASCADE删除），transfer_to_user_id（users.user_id，转让目标用户）
  *
  * 集成服务：
- * - ExchangeRecords：兑换审核通过后创建库存
+ * - （已删除）ExchangeRecords：兑换审核通过后创建库存
  * - DrawRecords：抽奖中奖后创建库存
  * - MerchantService：核销码验证和使用
  * - NotificationService：过期提醒和使用通知

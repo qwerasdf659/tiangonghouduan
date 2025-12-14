@@ -237,6 +237,12 @@ function validatePaginationParams (options = {}) {
 function handleServiceError (error, res, defaultMessage = '操作失败') {
   const errorMessage = error.message || defaultMessage
 
+  // 🔴 P1-1: 优先检查自定义的 statusCode 和 errorCode（用于幂等键冲突等场景）
+  if (error.statusCode) {
+    const errorCode = error.errorCode || 'SERVICE_ERROR'
+    return res.apiError(errorMessage, errorCode, null, error.statusCode)
+  }
+
   // 根据错误消息内容判断错误类型
   if (errorMessage.includes('不存在') || errorMessage.includes('未找到')) {
     return res.apiError(errorMessage, 'NOT_FOUND', null, 404)
@@ -252,7 +258,6 @@ function handleServiceError (error, res, defaultMessage = '操作失败') {
     errorMessage.includes('无效') ||
     errorMessage.includes('不可用') ||
     errorMessage.includes('过期') ||
-    errorMessage.includes('已') ||
     errorMessage.includes('超出') ||
     errorMessage.includes('不足')
   ) {

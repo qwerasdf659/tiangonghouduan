@@ -106,7 +106,7 @@ module.exports = sequelize => {
       target_type: {
         type: DataTypes.STRING(50),
         allowNull: false,
-        comment: '目标对象类型（User/Product/Prize/ExchangeRecords等）'
+        comment: '目标对象类型（User/Product/Prize/ExchangeMarketRecord等）'
       },
       target_id: {
         type: DataTypes.BIGINT,

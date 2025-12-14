@@ -33,11 +33,11 @@ router.get(
     try {
       const { days = 7, user_filter } = req.query
 
-      // 获取数据分析服务
-      const AdminAnalyticsService = req.app.locals.services.getService('adminAnalytics')
+      // 获取统一报表服务（P2-C架构重构：合并AdminAnalyticsService、StatisticsService、UserDashboardService）
+      const ReportingService = req.app.locals.services.getService('reporting')
 
       // 调用服务层方法获取决策分析数据
-      const analyticsData = await AdminAnalyticsService.getDecisionAnalytics(
+      const analyticsData = await ReportingService.getDecisionAnalytics(
         parseInt(days),
         user_filter ? parseInt(user_filter) : null,
         sharedComponents.performanceMonitor
@@ -71,11 +71,11 @@ router.get(
     try {
       const { period = 'week', granularity = 'daily' } = req.query
 
-      // 获取数据分析服务
-      const AdminAnalyticsService = req.app.locals.services.getService('adminAnalytics')
+      // 获取统一报表服务
+      const ReportingService = req.app.locals.services.getService('reporting')
 
       // 调用服务层方法获取趋势分析数据
-      const trendsData = await AdminAnalyticsService.getLotteryTrends(period, granularity)
+      const trendsData = await ReportingService.getLotteryTrends(period, granularity)
 
       return res.apiSuccess(trendsData, '趋势分析数据获取成功')
     } catch (error) {
@@ -97,11 +97,11 @@ router.get(
   adminAuthMiddleware,
   asyncHandler(async (req, res) => {
     try {
-      // 获取数据分析服务
-      const AdminAnalyticsService = req.app.locals.services.getService('adminAnalytics')
+      // 获取统一报表服务
+      const ReportingService = req.app.locals.services.getService('reporting')
 
       // 调用服务层方法获取性能报告
-      const performanceReport = await AdminAnalyticsService.getPerformanceReport(
+      const performanceReport = await ReportingService.getPerformanceReport(
         sharedComponents.performanceMonitor,
         sharedComponents.lotteryEngine
       )
@@ -130,11 +130,11 @@ router.get(
         admin_id: req.user.user_id
       })
 
-      // 获取数据分析服务
-      const AdminAnalyticsService = req.app.locals.services.getService('adminAnalytics')
+      // 获取统一报表服务
+      const ReportingService = req.app.locals.services.getService('reporting')
 
       // 调用服务层方法获取今日统计数据
-      const todayStats = await AdminAnalyticsService.getTodayStats()
+      const todayStats = await ReportingService.getTodayStats()
 
       sharedComponents.logger.info('管理员今日统计数据获取成功', {
         admin_id: req.user.user_id,

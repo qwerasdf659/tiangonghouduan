@@ -2,9 +2,9 @@
  * 餐厅积分抽奖系统 V4.0 - 市场管理API
  *
  * @description 管理员查看市场统计信息和管理兑换商品
- * @version 2.0.0（重构版）
+ * @version 3.0.0（P2-C架构重构版）
  * @created 2025-12-05
- * @updated 2025-12-09（重构：使用AdminMarketplaceService统一管理）
+ * @updated 2025-12-11（P2-C重构：AdminMarketplaceService合并到ExchangeMarketService）
  *
  * 核心功能：
  * - 查询所有用户的上架统计
@@ -16,12 +16,13 @@
  * - 路由层不直连 models（所有数据库操作通过 Service 层）
  * - 路由层不开启事务（事务管理在 Service 层）
  * - 通过 ServiceManager 统一获取服务实例
- * - 使用 AdminMarketplaceService 作为 Facade 层
+ * - 使用 ExchangeMarketService 统一管理兑换市场业务
  */
 
 const express = require('express')
 const router = express.Router()
 const { authenticateToken, requireAdmin } = require('../../../../middleware/auth')
+// const { handleServiceError } = require('../../../../middleware/validation') // 未使用，已注释
 const Logger = require('../../../../services/UnifiedLotteryEngine/utils/Logger')
 const marketplaceConfig = require('../../../../config/marketplace.config')
 
@@ -60,11 +61,11 @@ router.get('/listing-stats', authenticateToken, requireAdmin, async (req, res) =
       filter
     })
 
-    // 🎯 通过 ServiceManager 获取 AdminMarketplaceService
-    const AdminMarketplaceService = req.app.locals.services.getService('adminMarketplace')
+    // 🎯 P2-C架构重构：通过 ServiceManager 获取 ExchangeMarketService
+    const ExchangeMarketService = req.app.locals.services.getService('exchangeMarket')
 
     // 🎯 调用服务层方法获取用户上架统计
-    const result = await AdminMarketplaceService.getUserListingStats({
+    const result = await ExchangeMarketService.getUserListingStats({
       page,
       limit,
       filter,
@@ -127,11 +128,11 @@ router.post('/exchange_market/items', authenticateToken, requireAdmin, async (re
       stock
     })
 
-    // 🎯 通过 ServiceManager 获取 AdminMarketplaceService
-    const AdminMarketplaceService = req.app.locals.services.getService('adminMarketplace')
+    // 🎯 P2-C架构重构：通过 ServiceManager 获取 ExchangeMarketService
+    const ExchangeMarketService = req.app.locals.services.getService('exchangeMarket')
 
     // 🎯 调用服务层方法创建商品
-    const result = await AdminMarketplaceService.createExchangeItem(
+    const result = await ExchangeMarketService.createExchangeItem(
       {
         item_name,
         item_description,
@@ -208,11 +209,11 @@ router.put('/exchange_market/items/:item_id', authenticateToken, requireAdmin, a
       return res.apiError('无效的商品ID', 'BAD_REQUEST', null, 400)
     }
 
-    // 🎯 通过 ServiceManager 获取 AdminMarketplaceService
-    const AdminMarketplaceService = req.app.locals.services.getService('adminMarketplace')
+    // 🎯 P2-C架构重构：通过 ServiceManager 获取 ExchangeMarketService
+    const ExchangeMarketService = req.app.locals.services.getService('exchangeMarket')
 
     // 🎯 调用服务层方法更新商品
-    const result = await AdminMarketplaceService.updateExchangeItem(itemId, {
+    const result = await ExchangeMarketService.updateExchangeItem(itemId, {
       item_name,
       item_description,
       price_type,
@@ -283,11 +284,11 @@ router.delete(
         return res.apiError('无效的商品ID', 'BAD_REQUEST', null, 400)
       }
 
-      // 🎯 通过 ServiceManager 获取 AdminMarketplaceService
-      const AdminMarketplaceService = req.app.locals.services.getService('adminMarketplace')
+      // 🎯 P2-C架构重构：通过 ServiceManager 获取 ExchangeMarketService
+      const ExchangeMarketService = req.app.locals.services.getService('exchangeMarket')
 
       // 🎯 调用服务层方法删除商品
-      const result = await AdminMarketplaceService.deleteExchangeItem(itemId)
+      const result = await ExchangeMarketService.deleteExchangeItem(itemId)
 
       logger.info('兑换商品删除操作完成', {
         admin_id,

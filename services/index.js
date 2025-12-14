@@ -15,7 +15,6 @@ const { ThumbnailService } = require('./ThumbnailService') // 🎯 导入类
 const InventoryService = require('./InventoryService')
 const PointsService = require('./PointsService')
 const ExchangeMarketService = require('./ExchangeMarketService')
-const ExchangeOperationService = require('./ExchangeOperationService')
 const ContentAuditEngine = require('./ContentAuditEngine')
 const AnnouncementService = require('./AnnouncementService')
 const NotificationService = require('./NotificationService')
@@ -26,23 +25,23 @@ const UserRoleService = require('./UserRoleService')
 const ChatWebSocketService = require('./ChatWebSocketService')
 const PrizePoolService = require('./PrizePoolService') // 奖品池服务
 const PremiumService = require('./PremiumService') // 高级空间服务
-const SystemSettingsService = require('./SystemSettingsService') // 系统设置服务
 const UserService = require('./UserService') // 用户服务
-const UserDashboardService = require('./UserDashboardService') // 用户画像服务
+const ChatRateLimitService = require('./ChatRateLimitService') // 聊天频率限制服务
 
 // V4 管理后台服务（新增）
-const AdminAnalyticsService = require('./AdminAnalyticsService') // 管理后台数据分析服务
 const FeedbackService = require('./FeedbackService') // 反馈管理服务
-const AdminSystemService = require('./AdminSystemService') // 管理后台系统监控服务
-const AdminMarketplaceService = require('./AdminMarketplaceService') // 管理后台市场管理服务
+const AdminSystemService = require('./AdminSystemService') // 管理后台系统服务（已合并SystemSettingsService）
+// const AdminMarketplaceService = require('./AdminMarketplaceService') // 管理后台市场管理服务 - 已合并到ExchangeMarketService
 const AdminLotteryService = require('./AdminLotteryService') // 管理后台抽奖管理服务
 const AdminCustomerServiceService = require('./AdminCustomerServiceService') // 管理后台客服管理服务
 
 // V4 架构重构新增服务（2025-12-10）
 const LotteryPresetService = require('./LotteryPresetService') // 抽奖预设管理服务
 const ActivityService = require('./ActivityService') // 活动管理服务
-const StatisticsService = require('./StatisticsService') // 统计数据服务
 const AuditLogService = require('./AuditLogService') // 审计日志服务
+
+// V4 P2-C架构重构：服务合并优化（2025-12-11）
+const ReportingService = require('./ReportingService') // 统一报表服务（合并AdminAnalyticsService、StatisticsService、UserDashboardService）
 
 // V4 模块化服务
 const { lottery_service_container } = require('./lottery')
@@ -179,7 +178,6 @@ class ServiceManager {
       this._services.set('inventory', InventoryService)
       this._services.set('points', PointsService)
       this._services.set('exchangeMarket', ExchangeMarketService)
-      this._services.set('exchangeOperation', ExchangeOperationService)
       this._services.set('contentAudit', ContentAuditEngine)
       this._services.set('announcement', AnnouncementService)
       this._services.set('notification', NotificationService)
@@ -189,25 +187,25 @@ class ServiceManager {
       this._services.set('userRole', UserRoleService)
       this._services.set('chatWebSocket', ChatWebSocketService) // ChatWebSocketService is already an instance
       this._services.set('user', UserService) // 用户服务
+      this._services.set('chatRateLimit', ChatRateLimitService) // 聊天频率限制服务（P2-F架构重构 2025-12-11）
 
       // ✅ 注册管理服务（Admin Services）
       this._services.set('prizePool', PrizePoolService) // 奖品池服务
       this._services.set('premium', PremiumService) // 高级空间服务
-      this._services.set('systemSettings', SystemSettingsService) // 系统设置服务
-      this._services.set('adminAnalytics', AdminAnalyticsService) // 管理后台数据分析服务
       this._services.set('feedback', FeedbackService) // 反馈管理服务
-      this._services.set('adminSystem', AdminSystemService) // 管理后台系统监控服务
-      this._services.set('adminMarketplace', AdminMarketplaceService) // 管理后台市场管理服务
+      this._services.set('adminSystem', AdminSystemService) // 管理后台系统服务（已合并SystemSettingsService）
+      // this._services.set('adminMarketplace', AdminMarketplaceService) // 管理后台市场管理服务 - 已合并到ExchangeMarketService
       this._services.set('adminLottery', AdminLotteryService) // 管理后台抽奖管理服务
       this._services.set('adminCustomerService', AdminCustomerServiceService) // 管理后台客服管理服务
-      this._services.set('userDashboard', UserDashboardService) // 用户画像服务
 
       // ✅ 注册架构重构新增服务（P0优先级 - 2025-12-10）
       this._services.set('lotteryPreset', LotteryPresetService) // 抽奖预设管理服务
       this._services.set('activity', ActivityService) // 活动管理服务
-      this._services.set('statistics', StatisticsService) // 统计数据服务
       this._services.set('auditLog', AuditLogService) // 审计日志服务（P1优先级 - 2025-12-10）
       this._services.set('lotteryManagement', AdminLotteryService) // 抽奖管理服务（文档要求的别名）
+
+      // ✅ 注册P2-C架构重构服务（2025-12-11）
+      this._services.set('reporting', ReportingService) // 统一报表服务（合并AdminAnalyticsService、StatisticsService、UserDashboardService）
 
       // 注册模块化抽奖服务容器
       this._services.set('lotteryContainer', lottery_service_container)
@@ -225,9 +223,7 @@ class ServiceManager {
       if (typeof AdminLotteryService.initialize === 'function') {
         AdminLotteryService.initialize(this)
       }
-      if (typeof AdminMarketplaceService.initialize === 'function') {
-        AdminMarketplaceService.initialize(this)
-      }
+      // AdminMarketplaceService已合并到ExchangeMarketService，不再需要初始化
 
       console.log('✅ Service依赖注入完成')
 

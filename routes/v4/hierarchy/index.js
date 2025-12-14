@@ -16,6 +16,7 @@
 const express = require('express')
 const router = express.Router()
 const { authenticateToken } = require('../../../middleware/auth')
+const { asyncHandler } = require('../../../middleware/errorHandler')
 
 /**
  * 🏗️ 创建用户层级关系
@@ -54,8 +55,10 @@ const { authenticateToken } = require('../../../middleware/auth')
  * }
  * ```
  */
-router.post('/create', authenticateToken, async (req, res) => {
-  try {
+router.post(
+  '/create',
+  authenticateToken,
+  asyncHandler(async (req, res) => {
     // 🔄 通过 ServiceManager 获取 HierarchyManagementService（符合TR-005规范）
     const HierarchyManagementService = req.app.locals.services.getService('hierarchyManagement')
 
@@ -74,11 +77,8 @@ router.post('/create', authenticateToken, async (req, res) => {
     )
 
     return res.apiSuccess(result, '层级关系创建成功')
-  } catch (error) {
-    console.error('❌ 创建层级关系失败:', error.message)
-    return res.apiError(error.message, 'CREATE_HIERARCHY_FAILED', null, 500)
-  }
-})
+  })
+)
 
 /**
  * 🔍 查询用户的所有下级
@@ -112,8 +112,10 @@ router.post('/create', authenticateToken, async (req, res) => {
  * }
  * ```
  */
-router.get('/subordinates/:userId', authenticateToken, async (req, res) => {
-  try {
+router.get(
+  '/subordinates/:userId',
+  authenticateToken,
+  asyncHandler(async (req, res) => {
     // 🔄 通过 ServiceManager 获取 HierarchyManagementService（符合TR-005规范）
     const HierarchyManagementService = req.app.locals.services.getService('hierarchyManagement')
 
@@ -142,11 +144,8 @@ router.get('/subordinates/:userId', authenticateToken, async (req, res) => {
       },
       '查询下级成功'
     )
-  } catch (error) {
-    console.error('❌ 查询下级失败:', error.message)
-    return res.apiError(error.message, 'GET_SUBORDINATES_FAILED', null, 500)
-  }
-})
+  })
+)
 
 /**
  * 🚫 批量停用用户权限
@@ -180,8 +179,10 @@ router.get('/subordinates/:userId', authenticateToken, async (req, res) => {
  * }
  * ```
  */
-router.post('/deactivate', authenticateToken, async (req, res) => {
-  try {
+router.post(
+  '/deactivate',
+  authenticateToken,
+  asyncHandler(async (req, res) => {
     // 🔄 通过 ServiceManager 获取 HierarchyManagementService（符合TR-005规范）
     const HierarchyManagementService = req.app.locals.services.getService('hierarchyManagement')
 
@@ -204,11 +205,8 @@ router.post('/deactivate', authenticateToken, async (req, res) => {
     )
 
     return res.apiSuccess(result, '批量停用权限成功')
-  } catch (error) {
-    console.error('❌ 批量停用权限失败:', error.message)
-    return res.apiError(error.message, 'DEACTIVATE_PERMISSIONS_FAILED', null, 500)
-  }
-})
+  })
+)
 
 /**
  * ✅ 批量激活用户权限
@@ -239,8 +237,10 @@ router.post('/deactivate', authenticateToken, async (req, res) => {
  * }
  * ```
  */
-router.post('/activate', authenticateToken, async (req, res) => {
-  try {
+router.post(
+  '/activate',
+  authenticateToken,
+  asyncHandler(async (req, res) => {
     // 🔄 通过 ServiceManager 获取 HierarchyManagementService（符合TR-005规范）
     const HierarchyManagementService = req.app.locals.services.getService('hierarchyManagement')
 
@@ -258,11 +258,8 @@ router.post('/activate', authenticateToken, async (req, res) => {
     )
 
     return res.apiSuccess(result, '批量激活权限成功')
-  } catch (error) {
-    console.error('❌ 批量激活权限失败:', error.message)
-    return res.apiError(error.message, 'ACTIVATE_PERMISSIONS_FAILED', null, 500)
-  }
-})
+  })
+)
 
 /**
  * 📊 获取用户层级统计信息
@@ -293,8 +290,10 @@ router.post('/activate', authenticateToken, async (req, res) => {
  * }
  * ```
  */
-router.get('/stats/:userId', authenticateToken, async (req, res) => {
-  try {
+router.get(
+  '/stats/:userId',
+  authenticateToken,
+  asyncHandler(async (req, res) => {
     // 🔄 通过 ServiceManager 获取 HierarchyManagementService（符合TR-005规范）
     const HierarchyManagementService = req.app.locals.services.getService('hierarchyManagement')
 
@@ -313,10 +312,7 @@ router.get('/stats/:userId', authenticateToken, async (req, res) => {
     const stats = await HierarchyManagementService.getHierarchyStats(parseInt(userId))
 
     return res.apiSuccess({ stats }, '获取层级统计成功')
-  } catch (error) {
-    console.error('❌ 获取层级统计失败:', error.message)
-    return res.apiError(error.message, 'GET_HIERARCHY_STATS_FAILED', null, 500)
-  }
-})
+  })
+)
 
 module.exports = router

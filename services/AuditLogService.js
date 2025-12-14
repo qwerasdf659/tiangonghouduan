@@ -464,7 +464,7 @@ class AuditLogService {
     return this.logOperation({
       operator_id,
       operation_type: 'exchange_audit',
-      target_type: 'ExchangeRecords',
+      target_type: 'ExchangeMarketRecord',
       target_id: exchange_id,
       action,
       before_data: {

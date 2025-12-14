@@ -24,6 +24,7 @@
 const express = require('express')
 const router = express.Router()
 const { authenticateToken, requireAdmin, getUserRoles } = require('../../../middleware/auth')
+const { handleServiceError } = require('../../../middleware/validation')
 const DataSanitizer = require('../../../services/DataSanitizer')
 const Logger = require('../../../services/UnifiedLotteryEngine/utils/Logger')
 
@@ -138,7 +139,7 @@ router.get('/items', authenticateToken, async (req, res) => {
       stack: error.stack,
       user_id: req.user?.user_id
     })
-    return res.apiError(error.message || '获取商品列表失败', 'INTERNAL_ERROR', null, 500)
+    return handleServiceError(error, res, '获取商品列表失败')
   }
 })
 
@@ -188,12 +189,7 @@ router.get('/items/:item_id', authenticateToken, async (req, res) => {
       user_id: req.user?.user_id,
       item_id: req.params.item_id
     })
-
-    if (error.message.includes('不存在')) {
-      return res.apiError(error.message, 'NOT_FOUND', null, 404)
-    }
-
-    return res.apiError(error.message || '获取商品详情失败', 'INTERNAL_ERROR', null, 500)
+    return handleServiceError(error, res, '获取商品详情失败')
   }
 })
 
@@ -203,16 +199,55 @@ router.get('/items/:item_id', authenticateToken, async (req, res) => {
  *
  * @body {number} item_id - 商品ID（必填）
  * @body {number} quantity - 兑换数量（默认1）
+ * @body {string} business_id - 业务唯一ID（必填，用于幂等性控制）
+ * @header {string} Idempotency-Key - 幂等键（可选，Header方式，与business_id二选一）
+ *
+ * 🔴 业务幂等性设计（P1-1强制规范）：
+ * 1. 强制幂等键：客户端必须提供幂等键，支持两种方式：
+ *    - 方式A：Body中的 business_id（推荐，业务交易号语义）
+ *    - 方式B：Header中的 Idempotency-Key（兼容标准HTTP幂等设计）
+ * 2. 缺失即拒绝：两者都未提供时，直接返回 400 错误
+ * 3. 禁止后端兜底生成：不再自动生成 business_id（防止重复下单）
+ * 4. 冲突保护：同一幂等键但请求参数不同时，返回 409 错误
+ * 5. 幂等返回：同一幂等键重复请求时，返回原结果（标记 is_duplicate: true）
+ *
+ * ⚠️ 注意：此接口不支持后端自动生成幂等键，客户端必须主动传入。
+ * 建议前端使用 UUID 或 timestamp+random 生成唯一ID，并在重试时复用同一ID。
  */
 router.post('/exchange', authenticateToken, async (req, res) => {
   try {
     // 🔄 通过 ServiceManager 获取 ExchangeMarketService（符合TR-005规范）
     const ExchangeMarketService = req.app.locals.services.getService('exchangeMarket')
 
-    const { item_id, quantity = 1 } = req.body
+    const { item_id, quantity = 1, business_id: bodyBusinessId } = req.body
+    const headerIdempotencyKey = req.headers['idempotency-key']
     const user_id = req.user.user_id
 
-    logger.info('用户兑换商品', { user_id, item_id, quantity })
+    logger.info('用户兑换商品请求', {
+      user_id,
+      item_id,
+      quantity,
+      body_business_id: bodyBusinessId,
+      header_idempotency_key: headerIdempotencyKey
+    })
+
+    // 🔴 P1-1强制校验：必须提供幂等键（business_id 或 Idempotency-Key）
+    if (!bodyBusinessId && !headerIdempotencyKey) {
+      logger.warn('缺少幂等键', { user_id, item_id })
+      return res.apiError(
+        '缺少幂等键：请在请求Body中提供 business_id 或在Header中提供 Idempotency-Key。' +
+          '重试时必须复用同一幂等键以防止重复下单。',
+        'BAD_REQUEST',
+        {
+          required_fields: ['business_id (Body)', 'Idempotency-Key (Header)'],
+          requirement: 'at_least_one'
+        },
+        400
+      )
+    }
+
+    // 🔴 优先使用 Body 中的 business_id，如果没有则使用 Header 中的 Idempotency-Key
+    const business_id = bodyBusinessId || headerIdempotencyKey
 
     // 参数验证
     if (!item_id || item_id === undefined) {
@@ -230,10 +265,7 @@ router.post('/exchange', authenticateToken, async (req, res) => {
       return res.apiError('兑换数量必须在1-10之间', 'BAD_REQUEST', null, 400)
     }
 
-    // ✅ 生成 business_id 用于幂等性控制（任务4.1：补全幂等性覆盖）
-    const business_id = `exchange_${user_id}_${itemId}_${Date.now()}`
-
-    // 调用服务层
+    // 🔴 P1-1冲突保护：调用服务层（Service内部会验证幂等性和参数冲突）
     const result = await ExchangeMarketService.exchangeItem(user_id, itemId, exchangeQuantity, {
       business_id
     })
@@ -242,15 +274,20 @@ router.post('/exchange', authenticateToken, async (req, res) => {
       user_id,
       item_id: itemId,
       quantity: exchangeQuantity,
+      business_id, // 记录实际使用的 business_id
       order_no: result.order.order_no,
       virtual_value_paid: result.order.virtual_value_paid,
-      points_paid: result.order.points_paid
+      points_paid: result.order.points_paid,
+      is_duplicate: result.is_duplicate || false
     })
 
+    // ✅ 在响应中返回 business_id，供前端确认幂等键
     return res.apiSuccess(
       {
         order: result.order,
-        remaining: result.remaining
+        remaining: result.remaining,
+        business_id, // ✅ 回传 business_id 供前端确认
+        ...(result.is_duplicate && { is_duplicate: true }) // ✅ 只有重复请求时才返回此字段
       },
       result.message
     )
@@ -259,19 +296,10 @@ router.post('/exchange', authenticateToken, async (req, res) => {
       error: error.message,
       stack: error.stack,
       user_id: req.user?.user_id,
-      item_id: req.body?.item_id
+      item_id: req.body?.item_id,
+      business_id: req.body?.business_id || req.headers['idempotency-key']
     })
-
-    // 根据错误类型返回不同的响应
-    if (error.message.includes('不存在')) {
-      return res.apiError(error.message, 'NOT_FOUND', null, 404)
-    }
-
-    if (error.message.includes('不足') || error.message.includes('库存')) {
-      return res.apiError(error.message, 'BAD_REQUEST', null, 400)
-    }
-
-    return res.apiError(error.message || '兑换失败', 'INTERNAL_ERROR', null, 500)
+    return handleServiceError(error, res, '兑换失败')
   }
 })
 
@@ -344,7 +372,7 @@ router.get('/orders', authenticateToken, async (req, res) => {
       stack: error.stack,
       user_id: req.user?.user_id
     })
-    return res.apiError(error.message || '查询订单列表失败', 'INTERNAL_ERROR', null, 500)
+    return handleServiceError(error, res, '查询订单列表失败')
   }
 })
 
@@ -393,12 +421,7 @@ router.get('/orders/:order_no', authenticateToken, async (req, res) => {
       user_id: req.user?.user_id,
       order_no: req.params.order_no
     })
-
-    if (error.message.includes('不存在') || error.message.includes('无权访问')) {
-      return res.apiError(error.message, 'NOT_FOUND', null, 404)
-    }
-
-    return res.apiError(error.message || '查询订单详情失败', 'INTERNAL_ERROR', null, 500)
+    return handleServiceError(error, res, '查询订单详情失败')
   }
 })
 
@@ -468,12 +491,7 @@ router.post('/orders/:order_no/status', authenticateToken, requireAdmin, async (
       operator_id: req.user?.user_id,
       order_no: req.params.order_no
     })
-
-    if (error.message.includes('不存在')) {
-      return res.apiError(error.message, 'NOT_FOUND', null, 404)
-    }
-
-    return res.apiError(error.message || '更新订单状态失败', 'INTERNAL_ERROR', null, 500)
+    return handleServiceError(error, res, '更新订单状态失败')
   }
 })
 
@@ -506,7 +524,7 @@ router.get('/statistics', authenticateToken, requireAdmin, async (req, res) => {
       stack: error.stack,
       admin_id: req.user?.user_id
     })
-    return res.apiError(error.message || '查询统计数据失败', 'INTERNAL_ERROR', null, 500)
+    return handleServiceError(error, res, '查询统计数据失败')
   }
 })
 

@@ -37,6 +37,127 @@ const { Op } = Sequelize
 const AuditLogService = require('./AuditLogService')
 
 /**
+ * 🎯 统一数据输出视图常量（Data Output View Constants）
+ *
+ * 业务场景（Business Scenario）：
+ * - 统一管理消费记录领域的数据输出字段，避免字段选择分散在各方法
+ * - 符合架构规范：与积分领域的 POINTS_ATTRIBUTES、库存领域的 INVENTORY_ATTRIBUTES 模式保持一致
+ * - 根据权限级别（用户/商家/管理员）和业务场景返回不同的数据字段，保护敏感信息
+ *
+ * 设计原则（Design Principles）：
+ * - consumptionRecordUserView：用户消费记录视图 - 用户查看自己的消费记录时返回的字段
+ * - consumptionRecordMerchantView：商家消费记录视图 - 商家查看自己录入的消费记录时返回的字段
+ * - consumptionRecordAdminView：管理员消费记录视图 - 管理员查看所有消费记录时返回的字段（包含所有字段）
+ * - pendingConsumptionView：待审核消费记录视图 - 管理员查看待审核列表时返回的字段
+ *
+ * 使用示例（Usage Example）：
+ * ```javascript
+ * // 用户查看自己的消费记录
+ * const userRecords = await ConsumptionRecord.findAll({
+ *   where: { user_id: userId },
+ *   attributes: CONSUMPTION_ATTRIBUTES.consumptionRecordUserView
+ * });
+ *
+ * // 商家查看自己录入的消费记录
+ * const merchantRecords = await ConsumptionRecord.findAll({
+ *   where: { merchant_id: merchantId },
+ *   attributes: CONSUMPTION_ATTRIBUTES.consumptionRecordMerchantView
+ * });
+ *
+ * // 管理员查看所有消费记录（包含审核信息）
+ * const adminRecords = await ConsumptionRecord.findAll({
+ *   attributes: CONSUMPTION_ATTRIBUTES.consumptionRecordAdminView
+ * });
+ * ```
+ */
+// eslint-disable-next-line no-unused-vars -- 视图常量定义，供未来优化使用
+const CONSUMPTION_ATTRIBUTES = {
+  /**
+   * 用户消费记录视图（Consumption Record User View）
+   * 用户查看自己的消费记录时返回的字段
+   * 不包含审核员信息、管理员备注等敏感字段
+   */
+  consumptionRecordUserView: [
+    'record_id', // 记录ID（Record ID）
+    'user_id', // 用户ID（User ID）
+    'merchant_id', // 商家ID（Merchant ID）
+    'consumption_amount', // 消费金额（Consumption Amount）
+    'points_to_award', // 奖励积分（Points to Award）
+    'status', // 状态：pending/approved/rejected/expired（Status）
+    'qr_code', // 二维码（QR Code）
+    'merchant_notes', // 商家备注（Merchant Notes）
+    'business_id', // 业务ID（Business ID - 用于幂等性）
+    'created_at', // 创建时间（Created At）
+    'updated_at', // 更新时间（Updated At）
+    'is_deleted' // 是否删除（Is Deleted）
+  ],
+
+  /**
+   * 商家消费记录视图（Consumption Record Merchant View）
+   * 商家查看自己录入的消费记录时返回的字段
+   * 包含用户信息和审核状态，不包含管理员备注
+   */
+  consumptionRecordMerchantView: [
+    'record_id', // 记录ID（Record ID）
+    'user_id', // 用户ID（User ID）
+    'merchant_id', // 商家ID（Merchant ID）
+    'consumption_amount', // 消费金额（Consumption Amount）
+    'points_to_award', // 奖励积分（Points to Award）
+    'status', // 状态（Status）
+    'qr_code', // 二维码（QR Code）
+    'merchant_notes', // 商家备注（Merchant Notes）
+    'business_id', // 业务ID（Business ID）
+    'reviewed_at', // 审核时间（Reviewed At）
+    'created_at', // 创建时间（Created At）
+    'updated_at', // 更新时间（Updated At）
+    'is_deleted' // 是否删除（Is Deleted）
+  ],
+
+  /**
+   * 管理员消费记录视图（Consumption Record Admin View）
+   * 管理员查看所有消费记录时返回的字段
+   * 包含所有字段，用于后台管理和数据分析
+   */
+  consumptionRecordAdminView: [
+    'record_id', // 记录ID（Record ID）
+    'user_id', // 用户ID（User ID）
+    'merchant_id', // 商家ID（Merchant ID）
+    'consumption_amount', // 消费金额（Consumption Amount）
+    'points_to_award', // 奖励积分（Points to Award）
+    'status', // 状态（Status）
+    'qr_code', // 二维码（QR Code）
+    'merchant_notes', // 商家备注（Merchant Notes）
+    'business_id', // 业务ID（Business ID）
+    'reviewed_by', // 审核员ID（Reviewed By - 敏感信息，仅管理员可见）
+    'reviewed_at', // 审核时间（Reviewed At）
+    'admin_notes', // 管理员备注（Admin Notes - 敏感信息，仅管理员可见）
+    'created_at', // 创建时间（Created At）
+    'updated_at', // 更新时间（Updated At）
+    'is_deleted', // 是否删除（Is Deleted）
+    'deleted_at' // 删除时间（Deleted At）
+  ],
+
+  /**
+   * 待审核消费记录视图（Pending Consumption View）
+   * 管理员查看待审核列表时返回的字段
+   * 包含审核必需的关键信息
+   */
+  pendingConsumptionView: [
+    'record_id', // 记录ID（Record ID）
+    'user_id', // 用户ID（User ID）
+    'merchant_id', // 商家ID（Merchant ID）
+    'consumption_amount', // 消费金额（Consumption Amount）
+    'points_to_award', // 奖励积分（Points to Award）
+    'status', // 状态（Status）
+    'qr_code', // 二维码（QR Code）
+    'merchant_notes', // 商家备注（Merchant Notes）
+    'business_id', // 业务ID（Business ID）
+    'created_at', // 创建时间（Created At）
+    'updated_at' // 更新时间（Updated At）
+  ]
+}
+
+/**
  * 消费记录服务类
  * 负责商家扫码录入消费记录的业务逻辑处理
  *
@@ -165,7 +286,9 @@ class ConsumptionService {
         { transaction }
       ) // ✅ 在事务中创建
 
-      console.log(`✅ 消费记录创建成功 (ID: ${consumptionRecord.record_id}, business_id: ${business_id})`)
+      console.log(
+        `✅ 消费记录创建成功 (ID: ${consumptionRecord.record_id}, business_id: ${business_id})`
+      )
 
       // 🔒 步骤8：创建pending积分交易（Step 8: Create Pending Points Transaction - Within Transaction）
       /*
@@ -889,11 +1012,8 @@ class ConsumptionService {
        * ✅ 步骤3：验证权限（避免查询关联数据，节省5个表的JOIN查询）
        * 权限检查：用户本人、商家、管理员(role_level >= 100)可查询
        */
-      const hasAccess = (
-        viewerId === basicRecord.user_id ||
-        viewerId === basicRecord.merchant_id ||
-        isAdmin
-      )
+      const hasAccess =
+        viewerId === basicRecord.user_id || viewerId === basicRecord.merchant_id || isAdmin
 
       if (!hasAccess) {
         const error = new Error('无权访问此消费记录')

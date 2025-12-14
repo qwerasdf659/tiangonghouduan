@@ -9,315 +9,32 @@ const router = express.Router()
  * 🔄 TR-005规范：已完成Service层迁移
  * - 公告接口：通过 AnnouncementService
  * - 反馈接口：通过 FeedbackService
- * - 系统状态：通过 UserDashboardService
+ * - 系统状态：通过 ReportingService（P2-C架构重构：合并UserDashboardService）
  * - 会话创建：通过 CustomerServiceSessionService
  * 注：所有业务逻辑已通过Service层统一处理，路由层不直接操作models
  */
 const DataSanitizer = require('../../services/DataSanitizer')
 const { authenticateToken, optionalAuth } = require('../../middleware/auth')
+const { handleServiceError } = require('../../middleware/validation')
 const dataAccessControl = require('../../middleware/dataAccessControl')
 const BeijingTimeHelper = require('../../utils/timeHelper')
-const { Op } = require('sequelize')
+const ChatRateLimitService = require('../../services/ChatRateLimitService')
+// const { Op } = require('sequelize') // 未使用，已注释
 
 /*
- * ⚡ 消息发送频率限制器（Message Rate Limiter）
- * 基于《发送聊天消息API实施方案.md》文档第1617-1689行的高优先级建议
- *
- * 功能说明：
- * - 防止恶意用户短时间内发送大量消息（刷屏攻击）
- * - 使用内存Map存储用户发送时间戳，避免引入Redis依赖
- * - 限制规则：每分钟最多发送10条消息（1分钟=60秒窗口）
- * - 自动清理：每10分钟清理过期记录，防止内存泄漏
- *
- * 数据结构：
- * userMessageTimestamps: Map<user_id, Array<timestamp>>
- *   - key: 用户ID（number类型）
- *   - value: 该用户最近发送消息的时间戳数组（毫秒级时间戳）
- *
- * 设计原则：
- * - 简单实用：无需Redis等外部依赖，维护成本极低
- * - 性能优秀：内存操作，检查耗时<1ms
- * - 适合小型项目：服务重启后限制清零，但对小数据量项目完全够用
- *
- * 业务场景：
- * - 正常用户：平均每分钟发送2-3条消息，不会触发限制
- * - 恶意用户：快速连续发送超过10条消息，返回429错误
+ * 🔄 TR-005规范+P2-F架构重构：已完成频率限制逻辑下沉到Service层
+ * - 消息频率限制：通过 ChatRateLimitService.checkMessageRateLimit()
+ * - 创建会话频率限制：通过 ChatRateLimitService.checkCreateSessionRateLimit()
+ * - WebSocket推送重试：通过 ChatRateLimitService.pushMessageWithRetry()
+ * 注：所有频率限制逻辑已迁移到 ChatRateLimitService，路由层不再包含业务逻辑
  */
-const userMessageTimestamps = new Map()
 
 /**
- * 定期清理过期的时间戳记录（防止内存泄漏）
- * 清理策略：删除10分钟前的所有记录
- * 执行频率：每10分钟执行一次
- */
-setInterval(
-  () => {
-    const now = Date.now()
-    const TEN_MINUTES = 10 * 60 * 1000 // 10分钟（毫秒）
-
-    userMessageTimestamps.forEach((timestamps, userId) => {
-      // 过滤出最近10分钟内的时间戳
-      const recentTimestamps = timestamps.filter(ts => now - ts < TEN_MINUTES)
-
-      if (recentTimestamps.length === 0) {
-        // 如果该用户10分钟内无消息记录，删除该用户的记录
-        userMessageTimestamps.delete(userId)
-      } else {
-        // 否则更新为过滤后的时间戳数组
-        userMessageTimestamps.set(userId, recentTimestamps)
-      }
-    })
-
-    // 记录清理日志
-    console.log(`✅ 消息频率限制器：已清理过期记录，当前监控用户数: ${userMessageTimestamps.size}`)
-  },
-  10 * 60 * 1000
-) // 每10分钟执行一次
-
-/**
- * 检查用户消息发送频率
+ * 🔴 注意：数据合理性验证函数已迁移到 CustomerServiceSessionService.validateStatistics()
+ * 本注释保留用于代码历史追踪
  *
- * @param {number} userId - 用户ID
- * @param {number} role_level - 用户角色等级（默认0=普通用户，>=100=管理员）
- * @returns {Object} - { allowed: boolean, limit: number, current: number }
- *
- * 限制规则（从配置文件business.config.js读取）：
- * - 普通用户：1分钟内最多20条消息
- * - 管理员：1分钟内最多30条消息
- * - 超过限制返回{allowed: false}，调用方应返回429错误
- *
- * 算法逻辑：
- * 1. 根据用户角色等级读取对应的频率限制配置
- * 2. 获取该用户的历史时间戳数组
- * 3. 过滤出最近1分钟内的时间戳（滑动窗口算法）
- * 4. 检查是否超过配置的限制
- * 5. 如果未超限，记录本次发送时间并返回{allowed: true}
- * 6. 如果超限，返回{allowed: false, limit, current}提供详细信息
- */
-function checkMessageRateLimit (userId, role_level = 0) {
-  const businessConfig = require('../../config/business.config')
-  const now = Date.now()
-  const ONE_MINUTE = 60 * 1000 // 1分钟（毫秒）
-
-  // 根据角色等级读取频率限制配置
-  const rateLimitConfig =
-    role_level >= 100 ? businessConfig.chat.rate_limit.admin : businessConfig.chat.rate_limit.user
-
-  const MAX_MESSAGES_PER_MINUTE = rateLimitConfig.max_messages_per_minute
-
-  // 获取该用户的历史时间戳数组（如果没有记录，初始化为空数组）
-  const timestamps = userMessageTimestamps.get(userId) || []
-
-  // 过滤出最近1分钟内的时间戳（滑动窗口）
-  const recentTimestamps = timestamps.filter(ts => now - ts < ONE_MINUTE)
-
-  // 检查是否超过频率限制
-  if (recentTimestamps.length >= MAX_MESSAGES_PER_MINUTE) {
-    // 超过限制，返回详细信息
-    return {
-      allowed: false,
-      limit: MAX_MESSAGES_PER_MINUTE,
-      current: recentTimestamps.length,
-      userType: role_level >= 100 ? 'admin' : 'user'
-    }
-  }
-
-  // 未超限，记录本次发送时间
-  recentTimestamps.push(now)
-  userMessageTimestamps.set(userId, recentTimestamps)
-
-  // 返回允许发送
-  return {
-    allowed: true,
-    limit: MAX_MESSAGES_PER_MINUTE,
-    current: recentTimestamps.length,
-    userType: role_level >= 100 ? 'admin' : 'user'
-  }
-}
-
-/*
- * ⚡ 创建会话频率限制器（Create Session Rate Limiter）
- * 基于《创建聊天会话API实施方案.md》文档的并发控制方案
- *
- * 功能说明：
- * - 防止用户短时间内重复创建会话（并发创建导致重复会话）
- * - 使用内存Map存储用户创建会话的时间戳，避免引入Redis依赖
- * - 限制规则：每10秒最多创建3次会话（防止并发重复创建）
- * - 自动清理：每10分钟清理过期记录，防止内存泄漏
- *
- * 数据结构：
- * createSessionTimestamps: Map<user_id, Array<timestamp>>
- *   - key: 用户ID（number类型）
- *   - value: 该用户最近创建会话的时间戳数组（毫秒级时间戳）
- *
- * 设计原则：
- * - 简单实用：无需Redis等外部依赖，维护成本极低
- * - 性能优秀：内存操作，检查耗时<1ms
- * - 适合小型项目：服务重启后限制清零，但对小数据量项目完全够用
- *
- * 业务场景：
- * - 正常用户：平均每次创建会话间隔>10秒，不会触发限制
- * - 并发请求：用户快速连续创建会话（网络抖动、重复点击），返回429错误
- */
-const createSessionTimestamps = new Map()
-
-/**
- * 定期清理创建会话的时间戳记录（防止内存泄漏）
- * 清理策略：删除10分钟前的所有记录
- * 执行频率：每10分钟执行一次
- */
-setInterval(
-  () => {
-    const now = Date.now()
-    const TEN_MINUTES = 10 * 60 * 1000
-
-    createSessionTimestamps.forEach((timestamps, userId) => {
-      const recentTimestamps = timestamps.filter(ts => now - ts < TEN_MINUTES)
-
-      if (recentTimestamps.length === 0) {
-        createSessionTimestamps.delete(userId)
-      } else {
-        createSessionTimestamps.set(userId, recentTimestamps)
-      }
-    })
-
-    console.log(
-      `✅ 创建会话频率限制器：已清理过期记录，当前监控用户数: ${createSessionTimestamps.size}`
-    )
-  },
-  10 * 60 * 1000
-)
-
-/**
- * 检查用户创建会话的频率
- *
- * @param {number} userId - 用户ID
- * @returns {Object} - { allowed: boolean, limit: number, current: number, remainingTime: number }
- *
- * 限制规则（从配置文件business.config.js读取）：
- * - 所有用户：每10秒内最多创建3次会话
- * - 超过限制返回{allowed: false}，调用方应返回429错误
- *
- * 算法逻辑：
- * 1. 从业务配置文件读取限制参数
- * 2. 获取该用户的历史时间戳数组
- * 3. 过滤出时间窗口内的时间戳（滑动窗口算法）
- * 4. 检查是否超过限制
- * 5. 如果未超限，记录本次创建时间并返回{allowed: true}
- * 6. 如果超限，返回{allowed: false, remainingTime}提供剩余等待时间
- */
-function checkCreateSessionRateLimit (userId) {
-  const businessConfig = require('../../config/business.config')
-  const now = Date.now()
-
-  // 从配置文件读取限制参数
-  const TIME_WINDOW = businessConfig.chat.create_session_limit.time_window_seconds * 1000 // 转换为毫秒
-  const MAX_CREATES = businessConfig.chat.create_session_limit.max_creates_per_window
-
-  const timestamps = createSessionTimestamps.get(userId) || []
-  const recentTimestamps = timestamps.filter(ts => now - ts < TIME_WINDOW)
-
-  if (recentTimestamps.length >= MAX_CREATES) {
-    const oldestTimestamp = Math.min(...recentTimestamps)
-    const remainingTime = Math.ceil((oldestTimestamp + TIME_WINDOW - now) / 1000)
-
-    return {
-      allowed: false,
-      limit: MAX_CREATES,
-      current: recentTimestamps.length,
-      remainingTime: Math.max(remainingTime, 1)
-    }
-  }
-
-  recentTimestamps.push(now)
-  createSessionTimestamps.set(userId, recentTimestamps)
-
-  return {
-    allowed: true,
-    limit: MAX_CREATES,
-    current: recentTimestamps.length,
-    remainingTime: 0
-  }
-}
-
-/**
- * WebSocket推送重试函数（带自动重试机制）
- * 基于《发送聊天消息API实施方案.md》文档第1697-1762行的中优先级建议
- *
- * 功能说明：
- * - WebSocket推送失败时自动重试，最多重试3次
- * - 使用指数退避算法：第1次重试延迟1秒，第2次2秒，第3次3秒
- * - 提升消息实时到达率，减少客服端需要刷新页面的情况
- *
- * @param {Object} ChatWebSocketService - WebSocket服务实例
- * @param {number|null} sessionAdminId - 会话分配的客服ID（null表示未分配）
- * @param {Object} messageData - 消息数据对象
- * @param {number} maxRetries - 最大重试次数（默认3次）
- * @returns {Promise<boolean>} - 推送是否最终成功
- *
- * 重试策略：
- * - 第1次推送失败：等待1秒后重试
- * - 第2次推送失败：等待2秒后重试
- * - 第3次推送失败：等待3秒后重试
- * - 第4次推送失败：记录错误日志，放弃推送
- *
- * 业务说明：
- * - 即使推送最终失败，消息已保存到数据库，不影响业务连续性
- * - 客服可通过轮询API或刷新页面获取新消息（降级策略）
- */
-async function pushMessageWithRetry (ChatWebSocketService, sessionAdminId, messageData, maxRetries = 3) {
-  for (let attempt = 1; attempt <= maxRetries; attempt++) {
-    try {
-      // 根据会话状态选择推送策略
-      let pushed
-      if (sessionAdminId) {
-        // 会话已分配客服，精准推送给该客服
-        pushed = ChatWebSocketService.pushMessageToAdmin(sessionAdminId, messageData)
-      } else {
-        // 会话未分配，广播给所有在线客服
-        const count = ChatWebSocketService.broadcastToAllAdmins(messageData)
-        pushed = count > 0 // 如果有客服在线，认为推送成功
-      }
-
-      if (pushed) {
-        // 推送成功
-        if (attempt > 1) {
-          console.log(`✅ WebSocket推送成功 (第${attempt}次尝试)`)
-        }
-        return true
-      } else {
-        // 推送失败（客服不在线）
-        throw new Error(`客服不在线或推送失败 (尝试${attempt}/${maxRetries})`)
-      }
-    } catch (wsError) {
-      console.error(`⚠️ WebSocket推送失败 (第${attempt}/${maxRetries}次):`, wsError.message)
-
-      if (attempt < maxRetries) {
-        // 还有重试机会，等待后重试（指数退避：1秒、2秒、3秒）
-        const delaySeconds = attempt
-        console.log(`⏰ ${delaySeconds}秒后进行第${attempt + 1}次重试...`)
-        await new Promise(resolve => {
-          setTimeout(() => {
-            resolve()
-          }, delaySeconds * 1000)
-        })
-      } else {
-        // 最终失败，记录错误日志
-        console.error('❌ WebSocket推送最终失败，消息已保存到数据库，客服可通过轮询获取')
-        return false
-      }
-    }
-  }
-
-  return false
-}
-
-/**
- * 🔴 数据合理性验证函数（P2-8优化：添加数据验证和边界检查）
- * 验证聊天统计数据的逻辑一致性，防止脏数据影响业务决策
- *
- * @param {Object} stats - 统计数据对象
- * @returns {Object} 验证结果 { valid: boolean, warnings: Array<string> }
+ * 迁移原因：P2-F架构重构 - 将复杂业务逻辑从路由层下沉到Service层
+ * 迁移时间：2025年12月11日
  */
 /**
  * @route GET /api/v4/system/announcements
@@ -363,7 +80,7 @@ router.get('/announcements', optionalAuth, dataAccessControl, async (req, res) =
     )
   } catch (error) {
     console.error('获取系统公告失败:', error)
-    return res.apiError('获取系统公告失败', 'INTERNAL_ERROR', null, 500)
+    return handleServiceError(error, res, '获取系统公告失败')
   }
 })
 
@@ -411,7 +128,7 @@ router.get('/announcements/home', optionalAuth, dataAccessControl, async (req, r
     )
   } catch (error) {
     console.error('获取首页公告失败:', error)
-    return res.apiError('获取首页公告失败', 'INTERNAL_ERROR', null, 500)
+    return handleServiceError(error, res, '获取首页公告失败')
   }
 })
 
@@ -458,10 +175,7 @@ router.post('/feedback', authenticateToken, async (req, res) => {
     )
   } catch (error) {
     console.error('提交反馈失败:', error)
-    if (error.message === '反馈内容不能为空' || error.message === '反馈内容不能超过5000字符') {
-      return res.apiError(error.message, 'VALIDATION_ERROR', null, 400)
-    }
-    return res.apiError('提交反馈失败', 'INTERNAL_ERROR', null, 500)
+    return handleServiceError(error, res, '提交反馈失败')
   }
 })
 
@@ -521,16 +235,10 @@ router.get('/feedback/my', authenticateToken, async (req, res) => {
     }
 
     const parsed_limit = parseInt(limit)
-    const valid_limit =
-      isNaN(parsed_limit) || parsed_limit < 1
-        ? 10
-        : Math.min(parsed_limit, 50)
+    const valid_limit = isNaN(parsed_limit) || parsed_limit < 1 ? 10 : Math.min(parsed_limit, 50)
 
     const parsed_offset = parseInt(offset)
-    const valid_offset =
-      isNaN(parsed_offset) || parsed_offset < 0
-        ? 0
-        : parsed_offset
+    const valid_offset = isNaN(parsed_offset) || parsed_offset < 0 ? 0 : parsed_offset
 
     console.log('📊 [反馈列表查询]', {
       user_id,
@@ -573,39 +281,7 @@ router.get('/feedback/my', authenticateToken, async (req, res) => {
       query_params: { status: req.query.status, limit: req.query.limit, offset: req.query.offset }
     })
 
-    if (error.name === 'SequelizeConnectionError') {
-      return res.apiError(
-        '数据库连接失败，请稍后重试',
-        'DATABASE_CONNECTION_ERROR',
-        null,
-        503
-      )
-    }
-
-    if (error.name === 'SequelizeTimeoutError') {
-      return res.apiError(
-        '数据库查询超时，请稍后重试',
-        'DATABASE_TIMEOUT',
-        null,
-        504
-      )
-    }
-
-    if (error.name === 'SequelizeValidationError') {
-      return res.apiError(
-        error.errors[0].message,
-        'VALIDATION_ERROR',
-        null,
-        400
-      )
-    }
-
-    return res.apiError(
-      '获取反馈列表失败，请联系客服',
-      'INTERNAL_ERROR',
-      null,
-      500
-    )
+    return handleServiceError(error, res, '获取反馈列表失败')
   }
 })
 
@@ -682,7 +358,7 @@ router.get('/feedback/:id', authenticateToken, async (req, res) => {
     return res.apiSuccess(sanitizedDetail, '获取反馈详情成功')
   } catch (error) {
     console.error('获取反馈详情失败:', error)
-    return res.apiError('获取反馈详情失败', 'INTERNAL_ERROR', null, 500)
+    return handleServiceError(error, res, '获取反馈详情失败')
   }
 })
 
@@ -704,14 +380,14 @@ router.get('/status', optionalAuth, dataAccessControl, async (req, res) => {
 
     /*
      * 管理员可见的详细统计信息（Admin-only Statistics）
-     * ✅ 使用 UserDashboardService.getSystemStatus() 统一查询（符合TR-005规范）
+     * ✅ P2-C架构重构：使用 ReportingService.getSystemStatus() 统一查询（符合TR-005规范）
      */
     if (dataLevel === 'full') {
-      // 🔄 通过 ServiceManager 获取 UserDashboardService（符合TR-005规范）
-      const UserDashboardService = req.app.locals.services.getService('userDashboard')
+      // 🔄 通过 ServiceManager 获取 ReportingService
+      const ReportingService = req.app.locals.services.getService('reporting')
 
       // ✅ 使用 Service 查询系统状态统计（不直接操作models）
-      const statistics = await UserDashboardService.getSystemStatus()
+      const statistics = await ReportingService.getSystemOverview()
 
       // 添加统计数据到响应中（Add Statistics to Response）
       systemStatus.statistics = {
@@ -729,7 +405,7 @@ router.get('/status', optionalAuth, dataAccessControl, async (req, res) => {
     )
   } catch (error) {
     console.error('获取系统状态失败:', error)
-    return res.apiError('获取系统状态失败', 'INTERNAL_ERROR', null, 500)
+    return handleServiceError(error, res, '获取系统状态失败')
   }
 })
 
@@ -805,7 +481,7 @@ router.get('/business-config', optionalAuth, dataAccessControl, async (req, res)
     )
   } catch (error) {
     console.error('获取业务配置失败:', error)
-    return res.apiError('获取业务配置失败', 'INTERNAL_ERROR', null, 500)
+    return handleServiceError(error, res, '获取业务配置失败')
   }
 })
 
@@ -835,8 +511,11 @@ router.get('/business-config', optionalAuth, dataAccessControl, async (req, res)
 router.post('/chat/create', authenticateToken, async (req, res) => {
   const userId = req.user.user_id
 
-  // 🔴 步骤1：频率限制检查（防止恶意重复创建）
-  const rateLimitCheck = checkCreateSessionRateLimit(userId)
+  /*
+   * 🔴 步骤1：频率限制检查（防止恶意重复创建）
+   * ✅ 使用 ChatRateLimitService 统一管理频率限制（P2-F架构重构）
+   */
+  const rateLimitCheck = ChatRateLimitService.checkCreateSessionRateLimit(userId)
   if (!rateLimitCheck.allowed) {
     console.log(
       `⚠️ 用户${userId}触发创建会话频率限制（10秒内${rateLimitCheck.current}/${rateLimitCheck.limit}次）`
@@ -874,7 +553,7 @@ router.post('/chat/create', authenticateToken, async (req, res) => {
     )
   } catch (error) {
     console.error(`❌ 用户${userId}创建会话失败:`, error)
-    return res.apiError('创建聊天会话失败，请稍后重试', 'INTERNAL_ERROR', null, 500)
+    return handleServiceError(error, res, '创建聊天会话失败')
   }
 })
 
@@ -902,7 +581,8 @@ router.get('/chat/sessions', authenticateToken, async (req, res) => {
     const { page = 1, limit = 10 } = req.query
 
     // 🔄 通过 ServiceManager 获取 CustomerServiceSessionService（符合TR-005规范）
-    const CustomerServiceSessionService = req.app.locals.services.getService('customerServiceSession')
+    const CustomerServiceSessionService =
+      req.app.locals.services.getService('customerServiceSession')
 
     /*
      * ✅ 使用 CustomerServiceSessionService 获取会话列表
@@ -934,7 +614,7 @@ router.get('/chat/sessions', authenticateToken, async (req, res) => {
     )
   } catch (error) {
     console.error('获取会话列表失败:', error)
-    return res.apiError('获取会话列表失败', 'INTERNAL_ERROR', null, 500)
+    return handleServiceError(error, res, '获取会话列表失败')
   }
 })
 
@@ -951,7 +631,8 @@ router.get('/chat/history/:sessionId', authenticateToken, async (req, res) => {
     const finalLimit = Math.min(parseInt(limit), 100)
 
     // 🔄 通过 ServiceManager 获取 CustomerServiceSessionService（符合TR-005规范）
-    const CustomerServiceSessionService = req.app.locals.services.getService('customerServiceSession')
+    const CustomerServiceSessionService =
+      req.app.locals.services.getService('customerServiceSession')
 
     /*
      * ✅ 使用 CustomerServiceSessionService 获取会话消息
@@ -983,7 +664,7 @@ router.get('/chat/history/:sessionId', authenticateToken, async (req, res) => {
     )
   } catch (error) {
     console.error('获取聊天历史失败:', error)
-    return res.apiError('获取聊天历史失败', 'INTERNAL_ERROR', null, 500)
+    return handleServiceError(error, res, '获取聊天历史失败')
   }
 })
 
@@ -999,12 +680,13 @@ router.post('/chat/send', authenticateToken, async (req, res) => {
 
     /*
      * ⚡ Step 1: 频率限制检查（Rate Limit Check）
+     * ✅ 使用 ChatRateLimitService 统一管理频率限制（P2-F架构重构）
      * 基于文档第1617-1689行建议和config/business.config.js配置
      * 防止恶意刷屏攻击，保护系统稳定性
      */
     const userId = req.user.user_id
     const role_level = req.user.role_level || 0 // 获取用户角色等级
-    const rateLimitCheck = checkMessageRateLimit(userId, role_level)
+    const rateLimitCheck = ChatRateLimitService.checkMessageRateLimit(userId, role_level)
 
     if (!rateLimitCheck.allowed) {
       // 超过频率限制，返回429错误
@@ -1058,7 +740,8 @@ router.post('/chat/send', authenticateToken, async (req, res) => {
     }
 
     // 🔄 通过 ServiceManager 获取服务（符合TR-005规范）
-    const CustomerServiceSessionService = req.app.locals.services.getService('customerServiceSession')
+    const CustomerServiceSessionService =
+      req.app.locals.services.getService('customerServiceSession')
     const ChatWebSocketService = req.app.locals.services.getService('chatWebSocket')
 
     /*
@@ -1073,6 +756,7 @@ router.post('/chat/send', authenticateToken, async (req, res) => {
 
     /*
      * ✅ 通过WebSocket实时推送消息给客服（带自动重试机制）
+     * ✅ 使用 ChatRateLimitService 统一管理WebSocket推送重试（P2-F架构重构）
      * 基于文档第1697-1762行建议，添加自动重试提升实时性
      */
     try {
@@ -1087,7 +771,12 @@ router.post('/chat/send', authenticateToken, async (req, res) => {
        * 使用带重试机制的推送函数（最多重试3次）
        * 传入session_admin_id而非整个session对象，避免直接访问模型
        */
-      await pushMessageWithRetry(ChatWebSocketService, message.session_admin_id, messageData, 3)
+      await ChatRateLimitService.pushMessageWithRetry(
+        ChatWebSocketService,
+        message.session_admin_id,
+        messageData,
+        3
+      )
     } catch (wsError) {
       // WebSocket推送失败不影响消息发送（降级策略）
       console.error('WebSocket推送失败:', wsError.message)
@@ -1106,15 +795,7 @@ router.post('/chat/send', authenticateToken, async (req, res) => {
     )
   } catch (error) {
     console.error('发送消息失败:', error)
-
-    // 细化错误处理
-    if (error.message === '会话不存在或无权限访问') {
-      return res.apiError(error.message, 'NOT_FOUND', null, 404)
-    } else if (error.message.includes('会话已关闭')) {
-      return res.apiError(error.message, 'BAD_REQUEST', null, 400)
-    }
-
-    return res.apiError('发送消息失败', 'INTERNAL_ERROR', null, 500)
+    return handleServiceError(error, res, '发送消息失败')
   }
 })
 
@@ -1124,10 +805,10 @@ router.post('/chat/send', authenticateToken, async (req, res) => {
  * @param {number} user_id - 用户ID
  * @returns {Object} where条件对象
  *
- * 注意：ExchangeRecords、PointsTransaction、ConsumptionRecord模型已添加defaultScope自动过滤is_deleted=0
+ * 注意：PointsTransaction、ConsumptionRecord模型已添加defaultScope自动过滤is_deleted=0
  * 此函数保留user_id过滤，is_deleted过滤由defaultScope自动处理
  */
-const buildSafeWhereCondition = (model, user_id) => {
+const _buildSafeWhereCondition = (model, user_id) => {
   /*
    * 仅返回user_id过滤条件
    * is_deleted过滤由模型的defaultScope自动处理
@@ -1162,15 +843,15 @@ router.get('/user/statistics/:user_id', authenticateToken, dataAccessControl, as
     const isAdmin = req.isAdmin
 
     // 权限检查：只能查看自己的统计或管理员查看任何用户
-    if (parseInt(user_id) !== currentUserId && !isAdmin) {
+    if (user_id !== currentUserId && !isAdmin) {
       return res.apiError('无权限查看其他用户统计', 'FORBIDDEN', null, 403)
     }
 
-    // 🔄 通过 ServiceManager 获取 UserDashboardService（符合TR-005规范）
-    const UserDashboardService = req.app.locals.services.getService('userDashboard')
+    // 🔄 通过 ServiceManager 获取 ReportingService（P2-C架构重构）
+    const ReportingService = req.app.locals.services.getService('reporting')
 
-    // ✅ 使用 UserDashboardService 获取用户统计数据
-    const statistics = await UserDashboardService.getUserStatistics(user_id, isAdmin)
+    // ✅ 使用 ReportingService 获取用户统计数据
+    const statistics = await ReportingService.getUserStatistics(user_id, isAdmin)
 
     return res.apiSuccess(
       {
@@ -1181,40 +862,16 @@ router.get('/user/statistics/:user_id', authenticateToken, dataAccessControl, as
   } catch (error) {
     // 🔥 P1优化：详细错误日志记录（包含堆栈信息和请求上下文）
     console.error('获取用户统计失败:', {
-      error_name: error.name, // 错误类型名称（如SequelizeDatabaseError）
-      error_message: error.message, // 错误消息
-      error_stack: error.stack, // 堆栈跟踪（用于调试）
-      user_id: req.params.user_id, // 请求的用户ID
-      current_user_id: req.user?.user_id, // 当前登录用户ID
-      is_admin: req.isAdmin, // 是否管理员
-      timestamp: BeijingTimeHelper.now() // 错误时间戳（北京时间）
+      error_name: error.name,
+      error_message: error.message,
+      error_stack: error.stack,
+      user_id: req.params.user_id,
+      current_user_id: req.user?.user_id,
+      is_admin: req.isAdmin,
+      timestamp: BeijingTimeHelper.now()
     })
 
-    // 🔥 P1优化：根据错误类型返回不同的响应（细化错误处理）
-    if (error.message === '用户不存在') {
-      return res.apiError('用户不存在', 'NOT_FOUND', null, 404)
-    } else if (error.name === 'SequelizeDatabaseError') {
-      // 数据库查询错误（SQL语法错误、字段不存在等）
-      return res.apiError('数据库查询失败，请联系技术支持', 'DATABASE_ERROR', null, 500)
-    } else if (
-      error.name === 'SequelizeConnectionError' ||
-      error.name === 'SequelizeConnectionTimedOutError'
-    ) {
-      // 数据库连接错误或超时
-      return res.apiError('数据库连接失败，请稍后重试', 'CONNECTION_ERROR', null, 503)
-    } else if (error.name === 'SequelizeUniqueConstraintError') {
-      // 唯一约束冲突（理论上不应该发生在查询操作）
-      return res.apiError('数据冲突，请刷新后重试', 'CONFLICT_ERROR', null, 409)
-    } else if (error.name === 'SequelizeForeignKeyConstraintError') {
-      // 外键约束错误（用户不存在或已被删除）
-      return res.apiError('用户数据异常，请联系客服', 'DATA_ERROR', null, 400)
-    } else if (error.name === 'SequelizeValidationError') {
-      // 数据验证错误
-      return res.apiError(`数据验证失败: ${error.message}`, 'VALIDATION_ERROR', null, 400)
-    } else {
-      // 其他未知错误（Unknown Errors）
-      return res.apiError(`获取用户统计失败: ${error.message}`, 'INTERNAL_ERROR', null, 500)
-    }
+    return handleServiceError(error, res, '获取用户统计失败')
   }
 })
 
@@ -1229,11 +886,11 @@ router.get('/admin/overview', authenticateToken, dataAccessControl, async (req, 
       return res.apiError('需要管理员权限', 'FORBIDDEN', null, 403)
     }
 
-    // 🔄 通过 ServiceManager 获取 UserDashboardService（符合TR-005规范）
-    const UserDashboardService = req.app.locals.services.getService('userDashboard')
+    // 🔄 通过 ServiceManager 获取 ReportingService（P2-C架构重构）
+    const ReportingService = req.app.locals.services.getService('reporting')
 
-    // ✅ 使用 UserDashboardService 获取系统概览
-    const overview = await UserDashboardService.getSystemOverview()
+    // ✅ 使用 ReportingService 获取系统概览
+    const overview = await ReportingService.getSystemOverview()
 
     return res.apiSuccess(
       {
@@ -1243,7 +900,7 @@ router.get('/admin/overview', authenticateToken, dataAccessControl, async (req, 
     )
   } catch (error) {
     console.error('获取系统概览失败:', error)
-    return res.apiError('获取系统概览失败', 'INTERNAL_ERROR', null, 500)
+    return handleServiceError(error, res, '获取系统概览失败')
   }
 })
 

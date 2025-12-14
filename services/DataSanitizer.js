@@ -85,7 +85,13 @@ class DataSanitizer {
       icon: this.getPrizeIcon(prize.prize_type),
       rarity: this.calculateRarity(prize.prize_type), // 用稀有度替代概率
       available: prize.stock_quantity > 0, // 简化库存状态
-      display_value: this.getDisplayValue(prize.prize_type),
+      /**
+       * ✅ 展示积分（用户可见）
+       * 产品决策：允许用户看到每个奖品的展示积分，用于提升感知与解释成本降低
+       * 安全边界：仍不返回内部预算成本（prize_value_points），避免暴露控成本口径
+       */
+      display_points: DecimalConverter.toNumber(prize.prize_value, 0),
+      display_value: this.getDisplayValue(DecimalConverter.toNumber(prize.prize_value, 0)),
       status: prize.status,
       sort_order: prize.sort_order // ✅ 前端需要此字段确定奖品在转盘上的位置索引
       /*
@@ -804,92 +810,7 @@ class DataSanitizer {
   /**
    * 兑换记录数据脱敏 - 新增前端需求（✅ P0修复完成）
    *
-   * 业务场景：兑换记录列表API响应时调用，防止用户通过抓包获取追踪详情、成本分析等敏感信息
-   *
-   * 脱敏规则：
-   * - 管理员（dataLevel='full'）：返回完整兑换记录数据
-   * - 普通用户（dataLevel='public'）：移除tracking_details（追踪详情）、cost_analysis（成本分析）等敏感字段
-   * - 只返回业务必需的兑换信息：ID、用户ID、商品ID、商品名称、积分成本、数量、状态、兑换时间、配送信息（简化版）
-   *
-   * ✅ P0修复（2025-11-09）：
-   * - 修复主键字段：id → exchange_id（使用正确的数据库主键字段名）
-   * - 修复商品名称：支持关联查询（record.product?.name）和快照（record.product_snapshot?.name）
-   * - 修复积分字段：统一使用total_points字段名
-   * - 新增必要字段：space、exchange_code、expires_at、used_at
-   *
-   * @param {Array<Object>} records - 兑换记录数组，包含exchange_id、user_id、product_id、tracking_details等字段
-   * @param {string} dataLevel - 数据级别：'full'（管理员完整数据）或'public'（普通用户脱敏数据）
-   * @returns {Array<Object>} 脱敏后的兑换记录数组
-   * @returns {number} return[].exchange_id - 兑换记录ID（✅ 修复：使用正确的主键字段）
-   * @returns {number} return[].user_id - 用户ID
-   * @returns {number} return[].product_id - 商品ID
-   * @returns {string} return[].product_name - 商品名称（✅ 修复：支持关联查询和快照）
-   * @returns {number} return[].total_points - 消耗积分总数（✅ 修复：统一使用total_points字段名）
-   * @returns {number} return[].quantity - 兑换数量
-   * @returns {string} return[].status - 订单状态（pending/distributed/used/expired/cancelled）
-   * @returns {string} return[].space - 兑换空间（lucky/premium）✅ 新增字段
-   * @returns {string} return[].exchange_code - 兑换码（用户核销凭证）✅ 新增字段
-   * @returns {string} return[].exchange_time - 兑换时间（北京时间）
-   * @returns {string|null} return[].expires_at - 过期时间（北京时间）✅ 新增字段
-   * @returns {string|null} return[].used_at - 使用时间（北京时间）✅ 新增字段
-   * @returns {Object} return[].delivery_info - 配送信息（简化版，包含method、code、expires_at）
-   *
-   * @example
-   * const adminRecords = DataSanitizer.sanitizeExchangeRecords(records, 'full')
-   * const publicRecords = DataSanitizer.sanitizeExchangeRecords(records, 'public')
-   */
-  static sanitizeExchangeRecords (records, dataLevel) {
-    if (dataLevel === 'full') {
-      return records // 管理员看完整数据
-    }
-
-    return records.map(record => ({
-      // ✅ P0修复：使用正确的主键字段名（exchange_id而不是id）
-      exchange_id: record.exchange_id,
-
-      // ✅ 基本字段（用户ID、商品ID、数量）
-      user_id: record.user_id,
-      product_id: record.product_id,
-
-      /*
-       * ✅ P0修复：支持关联查询和快照两种方式获取商品名称
-       * 关联查询：record.product?.name（通过include查询Product表）
-       * 商品快照：record.product_snapshot?.name（兑换时保存的商品信息）
-       */
-      product_name: record.product?.name || record.product_snapshot?.name || '未知商品',
-
-      // ✅ P0修复：统一使用数据库字段名（total_points），前端也使用total_points
-      total_points: record.total_points, // 消耗积分总数
-
-      quantity: record.quantity, // 兑换数量
-      status: record.status, // 订单状态（pending/distributed/used/expired/cancelled）
-
-      // ✅ P0修复：新增兑换空间字段（lucky=幸运空间，premium=臻选空间）
-      space: record.space,
-
-      // ✅ P0修复：新增兑换码字段（用户核销凭证，前端必需显示）
-      exchange_code: record.exchange_code,
-
-      // ✅ P0修复：新增兑换时间字段（前端显示必需，北京时间）
-      exchange_time: record.exchange_time,
-
-      // ✅ P0修复：新增过期时间字段（前端显示兑换码有效期）
-      expires_at: record.expires_at,
-
-      // ✅ P0修复：新增使用时间字段（前端显示核销时间，已使用订单显示）
-      used_at: record.used_at,
-
-      // ✅ 配送信息（保留必要字段，移除敏感字段）
-      delivery_info: {
-        method: record.delivery_info?.method, // 配送方式（自提/快递）
-        code: record.delivery_info?.code, // 配送单号
-        expires_at: record.delivery_info?.expires_at // 配送截止时间
-        // ❌ 移除敏感字段：tracking_details（详细物流信息）, cost_analysis（成本分析）
-      }
-    }))
-  }
-
-  /**
+   * /**
    * 交易记录数据脱敏 - 新增前端需求
    *
    * 业务场景：交易记录列表API响应时调用，防止用户通过抓包获取内部成本、管理员调整、系统标识等敏感信息

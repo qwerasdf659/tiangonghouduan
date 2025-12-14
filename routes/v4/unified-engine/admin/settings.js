@@ -37,11 +37,11 @@ router.get(
     try {
       const { category } = req.params
 
-      // 获取系统设置服务
-      const SystemSettingsService = req.app.locals.services.getService('systemSettings')
+      // 获取管理后台系统服务（P2-C架构重构：已合并SystemSettingsService）
+      const AdminSystemService = req.app.locals.services.getService('adminSystem')
 
       // 调用服务层方法（服务层负责验证和数据查询）
-      const result = await SystemSettingsService.getSettingsByCategory(category)
+      const result = await AdminSystemService.getSettingsByCategory(category)
 
       sharedComponents.logger.info('管理员查询系统设置', {
         admin_id: req.user.user_id,
@@ -92,11 +92,11 @@ router.put(
       const { category } = req.params
       const { settings: settingsToUpdate } = req.body
 
-      // 获取系统设置服务
-      const SystemSettingsService = req.app.locals.services.getService('systemSettings')
+      // 获取管理后台系统服务（P2-C架构重构）
+      const AdminSystemService = req.app.locals.services.getService('adminSystem')
 
       // 调用服务层方法（服务层负责事务管理、验证和更新逻辑）
-      const result = await SystemSettingsService.updateSettings(
+      const result = await AdminSystemService.updateSettings(
         category,
         settingsToUpdate,
         req.user.user_id
@@ -149,11 +149,11 @@ router.get(
   adminAuthMiddleware,
   asyncHandler(async (req, res) => {
     try {
-      // 获取系统设置服务
-      const SystemSettingsService = req.app.locals.services.getService('systemSettings')
+      // 获取管理后台系统服务（P2-C架构重构）
+      const AdminSystemService = req.app.locals.services.getService('adminSystem')
 
       // 调用服务层方法
-      const summary = await SystemSettingsService.getSettingsSummary()
+      const summary = await AdminSystemService.getSettingsSummary()
 
       return res.apiSuccess(summary, '系统设置概览获取成功')
     } catch (error) {
@@ -196,11 +196,11 @@ router.post(
         )
       }
 
-      // 获取系统设置服务
-      const SystemSettingsService = req.app.locals.services.getService('systemSettings')
+      // 获取管理后台系统服务（P2-C架构重构）
+      const AdminSystemService = req.app.locals.services.getService('adminSystem')
 
       // 调用服务层方法（服务层负责Redis操作）
-      const result = await SystemSettingsService.clearCache(pattern)
+      const result = await AdminSystemService.clearCache(pattern)
 
       sharedComponents.logger.warn('管理员清除系统缓存', {
         admin_id: req.user.user_id,

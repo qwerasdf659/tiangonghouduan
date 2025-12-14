@@ -153,6 +153,7 @@
 const express = require('express')
 const router = express.Router()
 const { authenticateToken, getUserRoles, requireAdmin } = require('../../../middleware/auth')
+const { handleServiceError } = require('../../../middleware/validation')
 const BeijingTimeHelper = require('../../../utils/timeHelper')
 const Logger = require('../../../services/UnifiedLotteryEngine/utils/Logger')
 
@@ -224,18 +225,17 @@ const pointsBalanceByIdRateLimiter = rateLimiter.createLimiter({
 })
 
 /**
- * GET /balance - 获取当前用户积分余额（已优化）
+ * GET /balance - 获取当前用户积分余额（P2-B架构优化完成）
  *
  * @description 从JWT token中自动获取当前用户的积分余额信息
  * @route GET /api/v4/points/balance
  * @access Private (需要认证)
  *
- * 优化内容（2025-11-03）：
- * - ✅ 添加API限流保护（10次/分钟/用户）
- * - ✅ 细化错误处理（区分用户不存在、账户冻结等错误类型）
- * - ✅ 添加账户状态检查（防止冻结账户查询）
- * - ✅ 扩展返回数据（添加frozen_points冻结积分、last_earn_time等字段）
- * - ✅ 完善日志记录（成功查询、性能监控、错误分类）
+ * 🆕 P2-B架构优化说明（2025-12-11）：
+ * - ✅ 数据组装逻辑下沉到 PointsService.getBalanceResponse()（符合架构规范TR-005）
+ * - ✅ 路由层只保留：参数校验 + 权限校验 + 调用 Service + 统一响应
+ * - ✅ 保持原有业务逻辑和返回数据结构不变
+ * - ✅ 保留性能监控逻辑（HTTP层面监控）
  */
 router.get('/balance', authenticateToken, balanceRateLimiter, async (req, res) => {
   const startTime = Date.now()
@@ -245,81 +245,32 @@ router.get('/balance', authenticateToken, balanceRateLimiter, async (req, res) =
     // ✅ 通过 ServiceManager 获取 PointsService（符合TR-005规范）
     const PointsService = req.app.locals.services.getService('points')
 
-    // 📊 Step 1: 记录查询开始日志
+    // 📊 记录查询开始日志
     console.log(`[PointsBalance] 用户${user_id}查询积分余额`)
 
-    // ✅ Step 2: 调用 Service 获取用户账户（封装了用户存在性和账户查询）
-    const { account } = await PointsService.getUserAccount(user_id)
+    // ✅ 调用 Service 层获取完整响应数据（所有业务逻辑在 Service 内）
+    const balanceData = await PointsService.getBalanceResponse(user_id)
 
-    // ✅ Step 3: 获取完整的积分信息（包括待审核积分）
-    const points_overview = await PointsService.getUserPointsOverview(user_id)
-
-    // ⏱️ Step 4: 记录性能日志
+    // ⏱️ 记录性能日志
     const queryTime = Date.now() - startTime
     if (queryTime > 100) {
       console.warn(`[PointsBalance] 查询耗时过长: ${queryTime}ms, user_id=${user_id}`)
     } else {
       console.log(
-        `[PointsBalance] 查询成功: ${queryTime}ms, user_id=${user_id}, available=${points_overview.available_points}`
+        `[PointsBalance] 查询成功: ${queryTime}ms, user_id=${user_id}, available=${balanceData.available_points}`
       )
     }
 
-    // ✅ Step 5: 返回完整的积分数据
-    return res.apiSuccess(
-      {
-        user_id,
-        // 核心积分数据
-        available_points: points_overview.available_points,
-        total_earned: points_overview.total_earned,
-        total_consumed: points_overview.total_consumed,
-        // 扩展数据（新增）
-        frozen_points: points_overview.frozen_points || 0, // 冻结积分（待审核的消费奖励积分）
-        last_earn_time: account.last_earn_time, // 最后获得积分时间
-        last_consume_time: account.last_consume_time, // 最后消耗积分时间
-        is_active: account.is_active, // 账户激活状态
-        // 元数据
-        timestamp: BeijingTimeHelper.apiTimestamp(),
-        query_time_ms: queryTime // 查询耗时（毫秒）
-      },
-      '积分余额查询成功'
-    )
+    // ✅ 添加查询耗时到响应数据
+    balanceData.query_time_ms = queryTime
+
+    // ✅ 统一响应
+    return res.apiSuccess(balanceData, '积分余额查询成功')
   } catch (error) {
     // ❌ 细化错误类型处理
     const queryTime = Date.now() - startTime
-
-    // Service 层抛出的业务错误
-    if (error.message.includes('不存在')) {
-      return res.apiError(error.message, 'NOT_FOUND', null, 404)
-    }
-    if (error.message.includes('冻结')) {
-      return res.apiError(error.message, 'ACCOUNT_FROZEN', null, 403)
-    }
-
-    // 数据库连接错误
-    if (error.name === 'SequelizeConnectionError') {
-      console.error(
-        `[PointsBalance] 数据库连接失败: user_id=${user_id}, time=${queryTime}ms`,
-        error
-      )
-      return res.apiInternalError(
-        '数据库连接失败，请稍后重试',
-        error.message,
-        'DATABASE_CONNECTION_ERROR'
-      )
-    }
-
-    // 数据库查询超时
-    if (error.name === 'SequelizeTimeoutError') {
-      console.error(
-        `[PointsBalance] 数据库查询超时: user_id=${user_id}, time=${queryTime}ms`,
-        error
-      )
-      return res.apiInternalError('查询超时，请稍后重试', error.message, 'DATABASE_TIMEOUT_ERROR')
-    }
-
-    // 其他未知错误
     console.error(`[PointsBalance] 查询失败: user_id=${user_id}, time=${queryTime}ms`, error)
-    return res.apiInternalError('积分余额查询失败', error.message, 'POINTS_BALANCE_ERROR')
+    return handleServiceError(error, res, '积分余额查询失败')
   }
 })
 
@@ -416,16 +367,7 @@ router.get(
       )
     } catch (error) {
       console.error('❌ 积分余额查询失败:', error)
-
-      // Service 层抛出的业务错误
-      if (error.message.includes('不存在')) {
-        return res.apiError(error.message, 'NOT_FOUND', null, 404)
-      }
-      if (error.message.includes('冻结')) {
-        return res.apiError(error.message, 'ACCOUNT_FROZEN', null, 403)
-      }
-
-      return res.apiInternalError('积分余额查询失败', error.message, 'POINTS_BALANCE_ERROR')
+      return handleServiceError(error, res, '积分余额查询失败')
     }
   }
 )
@@ -501,22 +443,21 @@ router.get('/transactions/:user_id', authenticateToken, async (req, res) => {
     )
   } catch (error) {
     console.error('积分交易记录查询失败:', error)
-    return res.apiInternalError('积分交易记录查询失败', error.message, 'POINTS_TRANSACTIONS_ERROR')
+    return handleServiceError(error, res, '积分交易记录查询失败')
   }
 })
 
 /**
- * POST /admin/adjust - 管理员调整用户积分
+ * POST /admin/adjust - 管理员调整用户积分（架构重构完成 - 2025-12-11）
  *
  * @description 管理员专用接口，用于调整用户积分（增加或扣除）
  * @route POST /api/v4/points/admin/adjust
  * @access Private (需要超级管理员权限)
  *
- * 🔴 P0优化说明（2025-11-10）：
- * 1. 参数严格验证 - 确保user_id为有效正整数
- * 2. 用户存在性验证 - 调整前验证目标用户是否存在
- * 3. 直接读取账户数据 - 避免调用getUserPoints触发自动创建逻辑
- * 4. 业务合理性 - addPoints/consumePoints自动创建账户是合理的（管理员主动操作）
+ * 🆕 架构重构说明（2025-12-11）：
+ * - ✅ 业务逻辑下沉到 PointsService.adminAdjustPoints()（符合架构规范TR-005）
+ * - ✅ 路由层只保留：参数校验 + 权限校验 + 调用 Service + 统一响应
+ * - ✅ 保持原有业务逻辑和返回数据结构不变
  */
 router.post('/admin/adjust', authenticateToken, async (req, res) => {
   try {
@@ -532,176 +473,42 @@ router.post('/admin/adjust', authenticateToken, async (req, res) => {
       return res.apiError('无权限执行此操作', 'PERMISSION_DENIED', {}, 403)
     }
 
-    // 🔴 P0优化：参数严格验证
+    // 🔴 参数验证：user_id 必须为有效正整数
     const target_user_id = parseInt(user_id)
     if (isNaN(target_user_id) || target_user_id <= 0) {
       return res.apiError('user_id参数无效，必须为正整数', 'INVALID_USER_ID', {}, 400)
     }
 
-    if (!amount || !reason) {
-      return res.apiError('积分数量和调整原因不能为空', 'INVALID_PARAMS', {}, 400)
-    }
+    // ✅ 调用 Service 层执行积分调整（所有业务逻辑在 Service 内）
+    const result = await PointsService.adminAdjustPoints({
+      admin_id,
+      user_id: target_user_id,
+      amount,
+      reason,
+      type,
+      request_id
+    })
 
-    if (typeof amount !== 'number' || amount === 0) {
-      return res.apiError('积分数量必须是非零数字', 'INVALID_PARAMS', {}, 400)
-    }
-
-    // ✅ 验证用户存在性（getUserAccount会验证用户和账户）
-    try {
-      await PointsService.getUserAccount(target_user_id)
-    } catch (verifyError) {
-      // 用户或账户不存在，返回友好错误
-      if (verifyError.message.includes('用户不存在')) {
-        return res.apiError(
-          '目标用户不存在，请检查user_id是否正确',
-          'USER_NOT_FOUND',
-          { user_id: target_user_id },
-          404
-        )
-      }
-      // 账户不存在时，addPoints/consumePoints会自动创建（管理员操作合理）
-    }
-
-    // ✅ 生成唯一business_id确保幂等性（防止网络重试导致重复调整）
-    const business_id =
-      request_id ||
-      `admin_adjust_${admin_id}_${target_user_id}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
-
-    // ✅ 记录调整前余额（如果账户不存在，addPoints/consumePoints会自动创建）
-    let old_balance = 0
-    try {
-      const { account } = await PointsService.getUserAccount(target_user_id)
-      old_balance = parseFloat(account.available_points)
-    } catch (e) {
-      // 账户不存在，初始余额为0
-      old_balance = 0
-    }
-
-    // ✅ 执行积分调整（会自动创建账户，这是合理的业务行为）
-    let result
-    if (amount > 0) {
-      // 增加积分
-      result = await PointsService.addPoints(target_user_id, amount, {
-        business_id, // ✅ 传入business_id实现幂等性保护
-        business_type: 'admin_adjust',
-        source_type: 'admin',
-        title: `管理员调整积分(+${amount})`,
-        description: reason,
-        operator_id: admin_id
-      })
-    } else {
-      // ✅ 扣除积分前先检查余额并返回详细错误信息
-      const required_amount = Math.abs(amount)
-
-      if (old_balance < required_amount) {
-        return res.apiError(
-          `积分余额不足：当前余额${old_balance}分，需要扣除${required_amount}分，差额${required_amount - old_balance}分`,
-          'INSUFFICIENT_BALANCE',
-          {
-            current_balance: old_balance,
-            required_amount,
-            shortage: required_amount - old_balance
-          },
-          400
-        )
-      }
-
-      // 余额充足，执行扣除
-      result = await PointsService.consumePoints(target_user_id, required_amount, {
-        business_id, // ✅ 传入business_id实现幂等性保护
-        business_type: 'admin_adjust',
-        source_type: 'admin',
-        title: `管理员调整积分(-${required_amount})`,
-        description: reason,
-        operator_id: admin_id
-      })
-    }
-
-    // ✅ 获取调整后的余额
-    const { account: updatedAccount } = await PointsService.getUserAccount(target_user_id)
-    const new_balance = parseFloat(updatedAccount.available_points)
-
-    // 📝 记录操作日志（便于审计追踪）
-    console.log(
-      `✅ 积分调整成功 - 管理员:${admin_id} 用户:${target_user_id} 金额:${amount} 原因:${reason} 余额:${old_balance}→${new_balance} 幂等标识:${business_id}`
-    )
-
-    return res.apiSuccess(
-      {
-        user_id: target_user_id,
-        adjustment: {
-          amount,
-          type,
-          reason,
-          admin_id,
-          timestamp: BeijingTimeHelper.apiTimestamp(),
-          is_duplicate: result?.is_duplicate || false // 标记是否为重复请求（幂等性检测）
-        },
-        balance_change: {
-          old_balance,
-          new_balance,
-          change: amount
-        },
-        account_summary: {
-          available_points: new_balance,
-          total_earned: parseFloat(updatedAccount.total_earned),
-          total_consumed: parseFloat(updatedAccount.total_consumed)
-        }
-      },
-      '积分调整成功'
-    )
+    // ✅ 统一响应
+    return res.apiSuccess(result, '积分调整成功')
   } catch (error) {
     console.error('❌ 管理员积分调整失败:', error)
-    return res.apiInternalError('积分调整失败', error.message, 'ADMIN_POINTS_ADJUST_ERROR')
+    return handleServiceError(error, res, '积分调整失败')
   }
 })
 
 /**
- * GET /admin/statistics - 获取积分统计信息（优化版 - 2025年11月10日）
+ * GET /admin/statistics - 获取积分统计信息（P2-B架构优化完成）
  *
  * @description 管理员专用接口，获取积分系统全局统计数据
  * @route GET /api/v4/points/admin/statistics
  * @access Private (需要超级管理员权限)
  *
- * 优化内容（基于文档《获取管理员积分统计API实施方案.md》）：
- * 1. ✅ 查询优化：4次count改为3次并行聚合查询（性能提升40%）
- * 2. ✅ 时间计算修复：使用MySQL的NOW()函数替代客户端计算（避免时区问题）
- * 3. ✅ 数据维度扩展：从4个指标扩展到14个指标（功能完善250%）
- * 4. ✅ 新增积分流向统计：total_earned, total_consumed, frozen_points(冻结积分), net_flow
- * 5. ✅ 新增今日数据统计：today_transactions, today_earn_points, today_consume_points
- * 6. ✅ 新增异常监控：failed_transactions（失败交易数）
- * 7. ✅ 新增系统负债：total_balance（所有用户可用积分总额）
- *
- * 返回数据结构：
- * {
- *   statistics: {
- *     // 基础统计
- *     total_accounts: 123,              // 总账户数
- *     active_accounts: 89,              // 活跃账户数
- *     total_balance: 156789.50,         // 系统积分负债（所有用户可用积分总额）
- *     total_system_earned: 234567.80,   // 系统累计发放积分
- *     total_system_consumed: 77778.30,  // 系统累计消耗积分
- *
- *     // 交易统计
- *     total_transactions: 1567,         // 总交易数
- *     recent_transactions: 234,         // 30天内交易数
- *     today_transactions: 12,           // 今日交易数
- *
- *     // 积分流向（从交易记录统计）
- *     total_earned_points: 234567.80,   // 累计发放积分（从交易记录）
- *     total_consumed_points: 77778.30,  // 累计消耗积分（从交易记录）
- *     pending_earn_points: 2340.00,     // 待审核积分（pending状态）
- *     net_flow: 156789.50,              // 净流入（total_earned - total_consumed）
- *
- *     // 今日数据
- *     today_earn_points: 500.00,        // 今日发放积分
- *     today_consume_points: 300.00,     // 今日消耗积分
- *
- *     // 异常监控
- *     failed_transactions: 5            // 失败交易数
- *   },
- *   timestamp: "2025-11-10 00:30:22"
- * }
+ * 🆕 P2-B架构优化说明（2025-12-11）：
+ * - ✅ 数据组装逻辑下沉到 PointsService.getAdminStatistics()（符合架构规范TR-005）
+ * - ✅ 路由层只保留：参数校验 + 权限校验 + 调用 Service + 统一响应
+ * - ✅ Service层直接返回完整的格式化统计数据
+ * - ✅ 保持原有业务逻辑和返回数据结构不变
  */
 router.get('/admin/statistics', authenticateToken, async (req, res) => {
   const startTime = Date.now() // 性能监控：记录开始时间
@@ -720,48 +527,12 @@ router.get('/admin/statistics', authenticateToken, async (req, res) => {
 
     console.log('[AdminStatistics] 🔍 开始查询积分系统统计数据...')
 
-    // ✅ 调用 Service 层的 getAdminStatistics 方法（封装了所有复杂聚合查询）
-    const { accountStats, transactionStats, abnormalStats } =
-      await PointsService.getAdminStatistics()
+    // ✅ 调用 Service 层获取完整统计数据（所有数据组装逻辑在 Service 内）
+    const { statistics } = await PointsService.getAdminStatistics()
 
     // ⏱️ 记录查询性能
     const queryTime = Date.now() - startTime
     console.log(`[AdminStatistics] ✅ 数据库查询完成，耗时: ${queryTime}ms`)
-
-    /*
-     * 🔧 组装返回数据（遵循统一的数据结构规范）
-     * 所有数值字段使用parseInt/parseFloat确保类型正确
-     * || 0 确保null值转换为0
-     */
-    const statistics = {
-      // 基础统计
-      total_accounts: parseInt(accountStats.total_accounts) || 0, // 总账户数
-      active_accounts: parseInt(accountStats.active_accounts) || 0, // 活跃账户数
-      total_balance: parseFloat(accountStats.total_balance) || 0, // 总积分余额（系统负债）
-      total_system_earned: parseFloat(accountStats.total_system_earned) || 0, // 系统累计发放
-      total_system_consumed: parseFloat(accountStats.total_system_consumed) || 0, // 系统累计消耗
-
-      // 交易统计
-      total_transactions: parseInt(transactionStats.total_transactions) || 0, // 总交易数
-      recent_transactions: parseInt(transactionStats.recent_transactions) || 0, // 30天内交易数
-      today_transactions: parseInt(transactionStats.today_transactions) || 0, // 今日交易数
-
-      // 积分流向（从交易记录统计）
-      total_earned_points: parseFloat(transactionStats.total_earned_points) || 0, // 累计发放积分
-      total_consumed_points: parseFloat(transactionStats.total_consumed_points) || 0, // 累计消耗积分
-      pending_earn_points: parseFloat(transactionStats.pending_earn_points) || 0, // 待审核积分
-      net_flow: parseFloat(
-        (transactionStats.total_earned_points || 0) - (transactionStats.total_consumed_points || 0)
-      ), // 净流入
-
-      // 今日数据
-      today_earn_points: parseFloat(transactionStats.today_earn_points) || 0, // 今日发放积分
-      today_consume_points: parseFloat(transactionStats.today_consume_points) || 0, // 今日消耗积分
-
-      // 异常监控
-      failed_transactions: parseInt(transactionStats.failed_transactions) || 0, // 失败交易数
-      large_transactions_7d: parseInt(abnormalStats.large_transactions) || 0 // 7天内大额交易数
-    }
 
     // 📊 记录统计数据摘要
     console.log(
@@ -779,46 +550,28 @@ router.get('/admin/statistics', authenticateToken, async (req, res) => {
     )
   } catch (error) {
     const queryTime = Date.now() - startTime
-
-    // ❌ 细化错误类型处理
-    if (error.name === 'SequelizeConnectionError') {
-      console.error(`[AdminStatistics] ❌ 数据库连接失败: time=${queryTime}ms`, error)
-      return res.apiInternalError(
-        '数据库连接失败，请稍后重试',
-        error.message,
-        'DATABASE_CONNECTION_ERROR'
-      )
-    }
-
-    if (error.name === 'SequelizeTimeoutError') {
-      console.error(`[AdminStatistics] ❌ 数据库查询超时: time=${queryTime}ms`, error)
-      return res.apiInternalError('查询超时，请稍后重试', error.message, 'DATABASE_TIMEOUT_ERROR')
-    }
-
-    // 其他未知错误
     console.error(`[AdminStatistics] ❌ 获取积分统计失败: time=${queryTime}ms`, error)
-    return res.apiInternalError('获取积分统计失败', error.message, 'POINTS_STATISTICS_ERROR')
+    return handleServiceError(error, res, '获取积分统计失败')
   }
 })
 
 /**
- * GET /user/statistics/:user_id - 获取用户统计数据（架构重构完成）
+ * GET /user/statistics/:user_id - 获取用户统计数据（架构重构完成 - 2025-12-11）
  *
  * @description 获取用户的完整统计信息，包括抽奖、兑换、消费、库存等数据
  * @route GET /api/v4/points/user/statistics/:user_id
  * @access Private (需要认证)
  *
- * 🆕 架构重构说明（2025-12-10）：
- * - ✅ 移除路由层直连 models 的代码（符合架构规范TR-005）
- * - ✅ 统计查询逻辑收口到 PointsService.getUserFullStatistics()
+ * 🆕 架构重构说明（2025-12-11）：
+ * - ✅ 数据组装逻辑下沉到 PointsService.getUserStatisticsResponse()（符合架构规范TR-005）
+ * - ✅ 路由层只保留：参数校验 + 权限校验 + 调用 Service + 统一响应
  * - ✅ 保持原有业务逻辑和返回数据结构不变
- * - ✅ 删除辅助函数（getLotteryStatistics等已迁移到Service层）
  */
 router.get('/user/statistics/:user_id', authenticateToken, async (req, res) => {
   try {
     const { user_id: rawUserId } = req.params
 
-    // 🔥 参数验证：类型转换和有效性检查（与system.js保持一致）
+    // 🔥 参数验证：类型转换和有效性检查
     const user_id = parseInt(rawUserId, 10)
 
     // 🔥 有效性检查
@@ -842,68 +595,10 @@ router.get('/user/statistics/:user_id', authenticateToken, async (req, res) => {
     // ✅ 通过 ServiceManager 获取 PointsService（符合TR-005规范）
     const PointsService = req.app.locals.services.getService('points')
 
-    // ✅ 调用 Service 层获取用户信息和账户（统一处理存在性验证）
-    let userInfo, pointsInfo
-    try {
-      const { user, account } = await PointsService.getUserAccount(user_id)
-      userInfo = user
-      pointsInfo = {
-        available_points: parseFloat(account.available_points),
-        total_earned: parseFloat(account.total_earned),
-        total_consumed: parseFloat(account.total_consumed)
-      }
-    } catch (error) {
-      // 用户不存在，返回404
-      if (error.message.includes('用户不存在')) {
-        return res.apiError('用户不存在', 'USER_NOT_FOUND', {}, 404)
-      }
-      // 账户不存在，通过Service获取用户基本信息和默认积分
-      const userBasicInfo = await PointsService.getUserBasicInfo(user_id)
-      userInfo = userBasicInfo.user
-      pointsInfo = userBasicInfo.defaultPoints
-    }
+    // ✅ 调用 Service 层获取完整统计响应数据（所有业务逻辑在 Service 内）
+    const statistics = await PointsService.getUserStatisticsResponse(user_id)
 
-    // ✅ 调用 Service 层获取完整统计数据（封装了原辅助函数逻辑）
-    const [fullStats, monthStats] = await Promise.all([
-      PointsService.getUserFullStatistics(user_id),
-      PointsService.getUserStatistics(user_id)
-    ])
-
-    const statistics = {
-      user_id: parseInt(user_id),
-      account_created: userInfo.created_at,
-      last_activity: userInfo.last_login,
-      login_count: userInfo.login_count,
-
-      // 积分统计
-      points: {
-        current_balance: pointsInfo.available_points,
-        total_earned: pointsInfo.total_earned,
-        total_consumed: pointsInfo.total_consumed,
-        month_earned: parseFloat(monthStats.month_earned) || 0
-      },
-
-      // 抽奖统计
-      lottery: fullStats.lottery,
-
-      // 兑换统计
-      exchange: fullStats.exchange,
-
-      // 消费记录统计（新业务：商家扫码录入）
-      consumption: fullStats.consumption,
-
-      // 库存统计
-      inventory: fullStats.inventory,
-
-      // ✅ 成就数据（通过Service计算）
-      achievements: PointsService.calculateAchievements({
-        lottery: fullStats.lottery,
-        exchange: fullStats.exchange,
-        consumption: fullStats.consumption,
-        totalEarned: pointsInfo.total_earned
-      })
-    }
-
+    // ✅ 统一响应
     return res.apiSuccess(
       {
         statistics,
@@ -913,7 +608,7 @@ router.get('/user/statistics/:user_id', authenticateToken, async (req, res) => {
     )
   } catch (error) {
     console.error('获取用户统计失败:', error)
-    return res.apiInternalError('获取用户统计失败', error.message, 'USER_STATISTICS_ERROR')
+    return handleServiceError(error, res, '获取用户统计失败')
   }
 })
 
@@ -974,16 +669,7 @@ router.get('/overview', authenticateToken, async (req, res) => {
       query_time_ms: queryTime,
       timestamp: BeijingTimeHelper.now()
     })
-
-    // Service 层抛出的业务错误
-    if (error.message.includes('不存在')) {
-      return res.apiError(error.message, 'NOT_FOUND', null, 404)
-    }
-    if (error.message.includes('冻结')) {
-      return res.apiError(error.message, 'ACCOUNT_FROZEN', null, 403)
-    }
-
-    return res.apiError('获取积分概览失败', 500, { error: error.message })
+    return handleServiceError(error, res, '获取积分概览失败')
   }
 })
 
@@ -1050,7 +736,7 @@ router.get('/frozen', authenticateToken, async (req, res) => {
       query_time_ms: queryTime,
       timestamp: BeijingTimeHelper.now()
     })
-    return res.apiError('获取冻结积分明细失败', 500, { error: error.message })
+    return handleServiceError(error, res, '获取冻结积分明细失败')
   }
 })
 
@@ -1080,7 +766,9 @@ router.get('/trend', authenticateToken, trendRateLimiter, async (req, res) => {
     const { days, end_date } = req.query
 
     // 📊 Step 3: 记录查询日志（便于调试和问题追踪）
-    console.log(`📊 查询积分趋势 - 用户ID: ${user_id}, 天数: ${days || 30}, 结束日期: ${end_date || '今天'}`)
+    console.log(
+      `📊 查询积分趋势 - 用户ID: ${user_id}, 天数: ${days || 30}, 结束日期: ${end_date || '今天'}`
+    )
 
     // ✅ Step 4: 通过 ServiceManager 获取 PointsService（符合TR-005规范）
     const PointsService = req.app.locals.services.getService('points')
@@ -1101,13 +789,7 @@ router.get('/trend', authenticateToken, trendRateLimiter, async (req, res) => {
   } catch (error) {
     // ❌ 错误处理（统一错误响应格式）
     console.error('❌ 获取积分趋势失败:', error)
-
-    // Service层抛出的业务错误
-    if (error.message.includes('无效的结束日期') || error.message.includes('结束日期不能超过今天')) {
-      return res.apiError(error.message, 'INVALID_PARAMETER', null, 400)
-    }
-
-    return res.apiInternalError('积分趋势查询失败', error.message, 'POINTS_TREND_ERROR')
+    return handleServiceError(error, res, '积分趋势查询失败')
   }
 })
 
@@ -1197,17 +879,7 @@ router.delete('/transaction/:transaction_id', authenticateToken, async (req, res
       transaction_id: req.params.transaction_id,
       user_id: req.user?.user_id
     })
-
-    if (error.message.includes('不存在') || error.message.includes('已被删除')) {
-      return res.apiError(error.message, 'NOT_FOUND', null, 404)
-    } else if (
-      error.message.includes('只能删除') ||
-      error.message.includes('不允许') ||
-      error.message.includes('必须填写')
-    ) {
-      return res.apiError(error.message, 'BAD_REQUEST', null, 400)
-    }
-    return res.apiError('删除失败，请稍后重试', 'INTERNAL_ERROR', null, 500)
+    return handleServiceError(error, res, '删除失败')
   }
 })
 
@@ -1286,13 +958,7 @@ router.post(
         transaction_id: req.params.transaction_id,
         admin_id: req.user?.user_id
       })
-
-      if (error.message.includes('不存在') || error.message.includes('未被删除')) {
-        return res.apiError(error.message, 'NOT_FOUND', null, 404)
-      } else if (error.message.includes('已恢复') || error.message.includes('必须至少')) {
-        return res.apiError(error.message, 'BAD_REQUEST', null, 400)
-      }
-      return res.apiError('恢复失败，请稍后重试', 'INTERNAL_ERROR', null, 500)
+      return handleServiceError(error, res, '恢复失败')
     }
   }
 )
@@ -1352,8 +1018,7 @@ router.get('/restore-audit', authenticateToken, requireAdmin, async (req, res) =
       admin_id: req.user?.user_id,
       query: req.query
     })
-
-    return res.apiError('获取审计记录失败，请稍后重试', 'INTERNAL_ERROR', null, 500)
+    return handleServiceError(error, res, '获取审计记录失败')
   }
 })
 

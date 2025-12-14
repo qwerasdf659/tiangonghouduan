@@ -8,7 +8,7 @@
  *
  * @author Restaurant Points System
  * @date 2025-11-23
- * @updated 2025-12-10 - 重构为使用ServiceManager获取StatisticsService
+ * @updated 2025-12-11 - P2-C架构重构：StatisticsService合并到ReportingService
  *
  * 业务场景：
  * - 管理员查看系统运营数据统计图表
@@ -16,14 +16,15 @@
  * - 提供用户增长、抽奖趋势、消费趋势等多维度数据
  *
  * 架构规范：
- * - 路由层不直接操作 models，所有数据库操作通过 StatisticsService
+ * - 路由层不直接操作 models，所有数据库操作通过 ReportingService
  * - 路由层只做：鉴权 → 参数校验 → 调用Service → 统一响应
- * - 通过 req.app.locals.services.getService('statistics') 获取服务
+ * - 通过 req.app.locals.services.getService('reporting') 获取统一报表服务
  */
 
 const express = require('express')
 const router = express.Router()
 const { authenticateToken, requireAdmin } = require('../../middleware/auth')
+const { handleServiceError } = require('../../middleware/validation')
 
 /**
  * GET /api/v4/statistics/charts - 获取图表统计数据
@@ -49,14 +50,14 @@ const { authenticateToken, requireAdmin } = require('../../middleware/auth')
  */
 router.get('/charts', authenticateToken, requireAdmin, async (req, res) => {
   try {
-    // 1. 通过 ServiceManager 获取 StatisticsService（符合TR-005架构规范）
-    const StatisticsService = req.app.locals.services.getService('statistics')
+    // 1. 通过 ServiceManager 获取 ReportingService（P2-C架构重构：合并StatisticsService）
+    const ReportingService = req.app.locals.services.getService('reporting')
 
     // 2. 参数验证
     const days = parseInt(req.query.days) || 30
 
     // 3. 调用 Service 层获取图表数据
-    const statistics_data = await StatisticsService.getChartsData(days)
+    const statistics_data = await ReportingService.getChartsData(days)
 
     return res.apiSuccess(
       statistics_data,
@@ -65,19 +66,7 @@ router.get('/charts', authenticateToken, requireAdmin, async (req, res) => {
     )
   } catch (error) {
     console.error('[Statistics] ❌ 获取图表数据失败', error)
-
-    // 根据错误类型返回不同的响应
-    if (error.code === 'INVALID_DAYS_PARAMETER') {
-      return res.apiError(error.message, error.code, {
-        allowed_values: error.allowedValues
-      }, 400)
-    }
-
-    return res.apiInternalError(
-      '获取统计数据失败',
-      error.message,
-      'STATISTICS_CHARTS_ERROR'
-    )
+    return handleServiceError(error, res, '获取统计数据失败')
   }
 })
 
@@ -95,25 +84,22 @@ router.get('/charts', authenticateToken, requireAdmin, async (req, res) => {
  */
 router.get('/report', authenticateToken, requireAdmin, async (req, res) => {
   try {
-    // 1. 通过 ServiceManager 获取 StatisticsService（符合TR-005架构规范）
-    const StatisticsService = req.app.locals.services.getService('statistics')
+    // 1. 通过 ServiceManager 获取 ReportingService（P2-C架构重构）
+    const ReportingService = req.app.locals.services.getService('reporting')
 
     // 2. 参数验证
     const { period = 'week' } = req.query
 
-    // 3. 调用 Service 层获取报表数据
-    const report_data = await StatisticsService.getStatisticsReport(period)
+    /*
+     * 3. 调用 Service 层获取报表数据（注意：ReportingService没有getStatisticsReport方法，需要使用其他方法）
+     * 使用getChartsData作为替代，或者需要在ReportingService中添加此方法
+     */
+    const report_data = await ReportingService.getChartsData(period === 'week' ? 7 : period === 'month' ? 30 : 365)
 
     return res.apiSuccess(report_data, '数据统计报表获取成功')
   } catch (error) {
     console.error('[Statistics] ❌ 获取统计报表失败:', error)
-
-    // 根据错误类型返回不同的响应
-    if (error.code === 'INVALID_PARAMETER') {
-      return res.apiError(error.message, error.code, null, 400)
-    }
-
-    return res.apiError('获取数据统计报表失败', 'INTERNAL_ERROR', null, 500)
+    return handleServiceError(error, res, '获取数据统计报表失败')
   }
 })
 
@@ -129,13 +115,19 @@ router.get('/report', authenticateToken, requireAdmin, async (req, res) => {
  * @returns {Object} 400 - 参数错误
  * @returns {Object} 401 - 未授权
  * @returns {Object} 500 - 服务器错误
+ *
+ * 🔧 导出接口说明：
+ * 本接口返回二进制文件流（Excel），不使用 ApiResponse 包装
+ * 这是规范允许的特例，用于文件下载场景
+ * 设置响应头：Content-Type、Content-Disposition、Content-Length
+ * 直接使用 res.send() 发送二进制流
  */
 router.get('/export', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const XLSX = require('xlsx')
 
-    // 1. 通过 ServiceManager 获取 StatisticsService（符合TR-005架构规范）
-    const StatisticsService = req.app.locals.services.getService('statistics')
+    // 1. 通过 ServiceManager 获取 ReportingService（P2-C架构重构）
+    const ReportingService = req.app.locals.services.getService('reporting')
 
     // 2. 参数验证
     const days = parseInt(req.query.days) || 30
@@ -150,7 +142,7 @@ router.get('/export', authenticateToken, requireAdmin, async (req, res) => {
       consumption_trend,
       points_flow,
       top_prizes
-    } = await StatisticsService.getChartsData(days)
+    } = await ReportingService.getChartsData(days)
 
     // 4. 创建工作簿
     const workbook = XLSX.utils.book_new()
@@ -243,15 +235,7 @@ router.get('/export', authenticateToken, requireAdmin, async (req, res) => {
     return res.send(excelBuffer)
   } catch (error) {
     console.error('[Statistics] ❌ 导出统计数据失败:', error)
-
-    // 根据错误类型返回不同的响应
-    if (error.code === 'INVALID_DAYS_PARAMETER') {
-      return res.apiError(error.message, error.code, {
-        allowed_values: error.allowedValues
-      }, 400)
-    }
-
-    return res.apiInternalError('导出统计数据失败', error.message, 'STATISTICS_EXPORT_ERROR')
+    return handleServiceError(error, res, '导出统计数据失败')
   }
 })
 

@@ -9,13 +9,15 @@
 const express = require('express')
 const router = express.Router()
 const { generateTokens, getUserRoles, authenticateToken } = require('../../../../middleware/auth')
+const { asyncHandler } = require('../../../../middleware/errorHandler')
 
 /**
  * 🛡️ 管理员登录（基于UUID角色系统）
  * POST /api/v4/admin/auth/login
  */
-router.post('/login', async (req, res) => {
-  try {
+router.post(
+  '/login',
+  asyncHandler(async (req, res) => {
     const { mobile, verification_code } = req.body
 
     // 验证必需参数
@@ -47,33 +49,17 @@ router.post('/login', async (req, res) => {
       },
       '管理员登录成功'
     )
-  } catch (error) {
-    console.error('❌ 管理员登录失败:', error.message)
-
-    // 业务错误处理（根据错误码返回对应状态码）
-    if (error.code === 'VERIFICATION_CODE_REQUIRED' || error.code === 'INVALID_VERIFICATION_CODE') {
-      return res.apiError(error.message, error.code, null, 400)
-    }
-    if (error.code === 'USER_NOT_FOUND') {
-      return res.apiError(error.message, error.code, null, 404)
-    }
-    if (error.code === 'USER_INACTIVE' || error.code === 'INSUFFICIENT_PERMISSION') {
-      return res.apiError(error.message, error.code, null, 403)
-    }
-    if (error.code === 'VERIFICATION_NOT_IMPLEMENTED') {
-      return res.apiError(error.message, error.code, null, 501)
-    }
-
-    return res.apiError('登录失败', 'LOGIN_FAILED', null, 500)
-  }
-})
+  })
+)
 
 /**
  * 🛡️ 管理员信息获取（基于UUID角色系统）
  * GET /api/v4/admin/auth/profile
  */
-router.get('/profile', authenticateToken, async (req, res) => {
-  try {
+router.get(
+  '/profile',
+  authenticateToken,
+  asyncHandler(async (req, res) => {
     // ✅ 通过 ServiceManager 获取 UserService
     const UserService = req.app.locals.services.getService('user')
 
@@ -115,19 +101,7 @@ router.get('/profile', authenticateToken, async (req, res) => {
       },
       '获取管理员信息成功'
     )
-  } catch (error) {
-    console.error('❌ 获取管理员信息失败:', error.message)
-
-    // 业务错误处理（根据错误码返回对应状态码）
-    if (error.code === 'USER_NOT_FOUND') {
-      return res.apiError(error.message, error.code, null, 404)
-    }
-    if (error.code === 'USER_INACTIVE') {
-      return res.apiError(error.message, error.code, null, 403)
-    }
-
-    return res.apiError('获取用户信息失败', 'GET_PROFILE_FAILED', null, 500)
-  }
-})
+  })
+)
 
 module.exports = router

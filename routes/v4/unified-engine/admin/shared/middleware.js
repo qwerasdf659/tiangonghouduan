@@ -29,19 +29,19 @@ const sharedComponents = {
 }
 
 /**
- * ✅ 简化的系统统计函数 - 通过AdminAnalyticsService获取统计数据
+ * ✅ 简化的系统统计函数 - 通过ReportingService获取统计数据
  *
- * @description 使用Service层统一管理数据访问，符合V4架构规范
+ * @description 使用Service层统一管理数据访问，符合V4架构规范（P2-C架构重构版）
  * @param {Object} serviceManager - 服务管理器实例
  * @returns {Promise<Object>} 简化的系统统计信息
  */
 async function getSimpleSystemStats (serviceManager) {
   try {
-    // ✅ 通过ServiceManager获取AdminAnalyticsService
-    const AdminAnalyticsService = serviceManager.getService('adminAnalytics')
+    // ✅ 通过ServiceManager获取ReportingService（P2-C架构重构：已合并AdminAnalyticsService、StatisticsService、UserDashboardService）
+    const ReportingService = serviceManager.getService('reporting')
 
     // ✅ 调用Service方法，不再直连models
-    return await AdminAnalyticsService.getSimpleSystemStats()
+    return await ReportingService.getSimpleSystemStats()
   } catch (error) {
     console.error('获取系统统计失败:', error)
     throw error

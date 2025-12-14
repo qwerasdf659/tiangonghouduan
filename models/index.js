@@ -164,14 +164,6 @@ models.ImageResources = require('./ImageResources')(sequelize, DataTypes)
  * UserPoolAccess模型已删除 - 功能合并到User表的pool_access_level字段 (2025年09月22日)
  */
 
-// 🔴 兑换记录系统模型
-models.ExchangeRecords = require('./ExchangeRecords')(sequelize, DataTypes)
-/*
- * ✅ ExchangeRecords：积分兑换实物商品记录
- *    - 用途：记录用户使用积分兑换商品的订单
- *    - 特点：积分扣除、商品兑换、审核流程、库存创建
- */
-
 // 🔥 双账户模型：兑换市场系统（2025年12月06日新增）
 models.ExchangeItem = require('./ExchangeItem')(sequelize, DataTypes)
 /*

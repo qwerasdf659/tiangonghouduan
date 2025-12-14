@@ -26,6 +26,7 @@ const BeijingTimeHelper = require('../../../utils/timeHelper')
 const express = require('express')
 const router = express.Router()
 const { authenticateToken, requireAdmin } = require('../../../middleware/auth')
+const { handleServiceError } = require('../../../middleware/validation')
 const QRCodeValidator = require('../../../utils/QRCodeValidator')
 const Logger = require('../../../services/UnifiedLotteryEngine/utils/Logger')
 
@@ -108,7 +109,7 @@ router.post('/submit', authenticateToken, async (req, res) => {
     )
   } catch (error) {
     logger.error('提交消费记录失败', { error: error.message })
-    return res.apiError(error.message, 400)
+    return handleServiceError(error, res, '提交消费记录失败')
   }
 })
 
@@ -202,7 +203,7 @@ router.get('/user/:user_id', authenticateToken, async (req, res) => {
     return res.apiSuccess(result, '查询成功')
   } catch (error) {
     logger.error('查询用户消费记录失败', { error: error.message })
-    return res.apiError(error.message, 500)
+    return handleServiceError(error, res, '查询用户消费记录失败')
   }
 })
 
@@ -264,20 +265,7 @@ router.get('/detail/:record_id', authenticateToken, async (req, res) => {
       stack: error.stack,
       record_id: req.params.record_id
     })
-
-    // ✅ P1优化：错误消息脱敏处理（不暴露数据库、表名、技术栈信息）
-    if (error.statusCode === 404 || error.message.includes('不存在') || error.message.includes('已被删除')) {
-      // 业务错误：记录不存在或已删除
-      return res.apiError('消费记录不存在或已被删除', 'NOT_FOUND', null, 404)
-    }
-
-    if (error.statusCode === 403 || error.message.includes('无权')) {
-      // 业务错误：权限不足
-      return res.apiError('无权查看此消费记录', 'FORBIDDEN', null, 403)
-    }
-
-    // 其他错误统一返回通用消息（不暴露技术细节）
-    return res.apiError('查询消费记录失败，请稍后重试', 'INTERNAL_ERROR', null, 500)
+    return handleServiceError(error, res, '查询消费记录失败')
   }
 })
 
@@ -321,7 +309,7 @@ router.get('/pending', authenticateToken, requireAdmin, async (req, res) => {
     return res.apiSuccess(result, '查询成功')
   } catch (error) {
     logger.error('查询待审核记录失败', { error: error.message })
-    return res.apiError(error.message, 500)
+    return handleServiceError(error, res, '查询待审核记录失败')
   }
 })
 
@@ -367,7 +355,7 @@ router.get('/admin/records', authenticateToken, requireAdmin, async (req, res) =
     return res.apiSuccess(result, '查询成功')
   } catch (error) {
     logger.error('管理员查询消费记录失败', { error: error.message })
-    return res.apiError(error.message, 500)
+    return handleServiceError(error, res, '查询消费记录失败')
   }
 })
 
@@ -428,9 +416,7 @@ router.post('/approve/:record_id', authenticateToken, requireAdmin, async (req, 
       record_id: req.params.record_id,
       reviewer_id: req.user.user_id
     })
-
-    // ✅ 遵循项目统一API响应标准：所有响应返回HTTP 200，业务状态通过success字段判断
-    return res.apiError(error.message)
+    return handleServiceError(error, res, '审核通过失败')
   }
 })
 
@@ -494,7 +480,7 @@ router.post('/reject/:record_id', authenticateToken, requireAdmin, async (req, r
     )
   } catch (error) {
     logger.error('审核拒绝失败', { error: error.message })
-    return res.apiError(error.message, 400)
+    return handleServiceError(error, res, '审核拒绝失败')
   }
 })
 
@@ -564,7 +550,7 @@ router.get('/qrcode/:user_id', authenticateToken, async (req, res) => {
     )
   } catch (error) {
     logger.error('生成二维码失败', { error: error.message })
-    return res.apiError(error.message, 500)
+    return handleServiceError(error, res, '生成二维码失败')
   }
 })
 
@@ -654,7 +640,7 @@ router.get('/user-info', authenticateToken, requireAdmin, async (req, res) => {
     )
   } catch (error) {
     logger.error('获取用户信息失败', { error: error.message })
-    return res.apiError(error.message, 400)
+    return handleServiceError(error, res, '获取用户信息失败')
   }
 })
 
@@ -784,7 +770,7 @@ router.delete('/:record_id', authenticateToken, async (req, res) => {
       record_id: req.params.record_id,
       user_id: req.user?.user_id
     })
-    return res.apiError(error.message, 500)
+    return handleServiceError(error, res, '删除消费记录失败')
   }
 })
 
@@ -875,7 +861,7 @@ router.post('/:record_id/restore', authenticateToken, requireAdmin, async (req, 
       record_id: req.params.record_id,
       admin_id: req.user?.user_id
     })
-    return res.apiError(error.message, 500)
+    return handleServiceError(error, res, '恢复消费记录失败')
   }
 })
 

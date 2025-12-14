@@ -89,7 +89,7 @@
  */
 
 const BeijingTimeHelper = require('../utils/timeHelper')
-const { UserInventory, TradeRecord, User, Product, ExchangeRecords } = require('../models')
+const { UserInventory, TradeRecord, User, Product } = require('../models')
 const { Op } = require('sequelize')
 const DataSanitizer = require('./DataSanitizer')
 const Logger = require('./UnifiedLotteryEngine/utils/Logger')
@@ -743,7 +743,7 @@ class InventoryService {
           action: 'transfer',
           before_data: {
             user_id: fromUserId,
-            transfer_count: (item.transfer_count || 0)
+            transfer_count: item.transfer_count || 0
           },
           after_data: {
             user_id: toUserId,
@@ -888,7 +888,7 @@ class InventoryService {
       })
 
       if (!item) {
-        throw new Error('核销码无效')
+        throw new Error('核销码不存在')
       }
 
       /*
@@ -983,6 +983,30 @@ class InventoryService {
       })
       throw error
     }
+  }
+
+  /**
+   * 验证核销码格式（用于提前校验，避免无效查询）
+   *
+   * @param {string} verificationCode - 核销码
+   * @returns {Object} {valid: boolean, error?: string}
+   */
+  static validateVerificationCodeFormat (verificationCode) {
+    // 验证非空
+    if (!verificationCode || verificationCode.trim().length === 0) {
+      return { valid: false, error: '核销码不能为空' }
+    }
+
+    // 验证格式：8位大写十六进制字符
+    const codePattern = /^[A-F0-9]{8}$/
+    if (!codePattern.test(verificationCode.trim().toUpperCase())) {
+      return {
+        valid: false,
+        error: '核销码格式错误，应为8位大写字母（A-F）和数字（0-9）组合，例如：A1B2C3D4'
+      }
+    }
+
+    return { valid: true }
   }
 
   /**
@@ -1395,223 +1419,6 @@ class InventoryService {
       logger.error('获取商品列表失败', {
         error: error.message,
         filters
-      })
-      throw error
-    }
-  }
-
-  /**
-   * 取消兑换记录
-   *
-   * 业务场景：
-   * - 用户取消未分配的兑换订单
-   * - 退还已扣除的积分
-   *
-   * @param {number} userId - 用户ID
-   * @param {number} exchangeId - 兑换记录ID
-   * @param {Object} options - 选项
-   * @param {Object} options.transaction - 事务对象（可选）
-   * @returns {Promise<Object>} 取消结果
-   */
-  static async cancelExchange (userId, exchangeId, options = {}) {
-    const { transaction: externalTransaction } = options
-
-    // 支持外部事务传入
-    const transaction = externalTransaction || (await ExchangeRecords.sequelize.transaction())
-    const shouldCommit = !externalTransaction
-
-    try {
-      logger.info('开始取消兑换记录', {
-        user_id: userId,
-        exchange_id: exchangeId
-      })
-
-      // 查询兑换记录（加行级锁）
-      const exchangeRecord = await ExchangeRecords.findByPk(exchangeId, {
-        lock: transaction.LOCK.UPDATE,
-        transaction
-      })
-
-      if (!exchangeRecord) {
-        throw new Error('兑换记录不存在')
-      }
-
-      // 权限检查
-      if (exchangeRecord.user_id !== userId) {
-        throw new Error('无权限操作此兑换记录')
-      }
-
-      /*
-       * ✅ 幂等性检查（解决任务4.1：为高风险操作添加强制幂等检查）
-       * 如果订单已经取消，返回原结果（防止重复取消和重复退款）
-       */
-      if (exchangeRecord.status === 'cancelled') {
-        logger.info('⚠️ 幂等性检查：兑换订单已取消，返回原结果', {
-          exchange_id: exchangeId,
-          user_id: userId,
-          status: exchangeRecord.status,
-          audit_status: exchangeRecord.audit_status,
-          audited_at: exchangeRecord.audited_at
-        })
-
-        if (shouldCommit) {
-          await transaction.commit()
-        }
-
-        return {
-          exchange_id: exchangeId,
-          status: 'cancelled',
-          audit_status: exchangeRecord.audit_status,
-          audited_at: exchangeRecord.audited_at,
-          total_points: exchangeRecord.total_points,
-          is_duplicate: true // ✅ 标记为重复请求
-        }
-      }
-
-      // 调用模型的取消方法（包含业务逻辑）
-      const result = await exchangeRecord.cancel({ transaction })
-
-      // 提交事务
-      if (shouldCommit) {
-        await transaction.commit()
-      }
-
-      logger.info('取消兑换记录成功', {
-        user_id: userId,
-        exchange_id: exchangeId
-      })
-
-      return result
-    } catch (error) {
-      if (shouldCommit) {
-        await transaction.rollback()
-      }
-      logger.error('取消兑换记录失败', {
-        error: error.message,
-        user_id: userId,
-        exchange_id: exchangeId
-      })
-      throw error
-    }
-  }
-
-  /**
-   * 软删除兑换记录
-   *
-   * 业务场景：
-   * - 用户删除已完成或已取消的兑换记录
-   * - 软删除，数据仍保留可恢复
-   *
-   * @param {number} userId - 用户ID
-   * @param {number} exchangeId - 兑换记录ID
-   * @param {Object} options - 选项
-   * @param {Object} options.transaction - 事务对象（可选）
-   * @returns {Promise<Object>} 删除结果
-   */
-  static async deleteExchange (userId, exchangeId, options = {}) {
-    const { transaction = null } = options
-
-    try {
-      logger.info('开始软删除兑换记录', {
-        user_id: userId,
-        exchange_id: exchangeId
-      })
-
-      // 查询兑换记录
-      const record = await ExchangeRecords.findOne({
-        where: {
-          exchange_id: exchangeId,
-          user_id: userId
-        },
-        transaction
-      })
-
-      if (!record) {
-        throw new Error('兑换记录不存在')
-      }
-
-      // 状态检查
-      if (!['distributed', 'cancelled', 'expired'].includes(record.status)) {
-        throw new Error('只能删除已完成、已取消或已过期的兑换记录')
-      }
-
-      // 执行软删除
-      await record.destroy({ transaction })
-
-      logger.info('软删除兑换记录成功', {
-        user_id: userId,
-        exchange_id: exchangeId
-      })
-
-      return {
-        exchange_id: exchangeId,
-        deleted_at: new Date()
-      }
-    } catch (error) {
-      logger.error('软删除兑换记录失败', {
-        error: error.message,
-        user_id: userId,
-        exchange_id: exchangeId
-      })
-      throw error
-    }
-  }
-
-  /**
-   * 恢复已删除的兑换记录
-   *
-   * 业务场景：
-   * - 用户恢复误删的兑换记录
-   *
-   * @param {number} userId - 用户ID
-   * @param {number} exchangeId - 兑换记录ID
-   * @param {Object} options - 选项
-   * @param {Object} options.transaction - 事务对象（可选）
-   * @returns {Promise<Object>} 恢复结果
-   */
-  static async restoreExchange (userId, exchangeId, options = {}) {
-    const { transaction = null } = options
-
-    try {
-      logger.info('开始恢复兑换记录', {
-        user_id: userId,
-        exchange_id: exchangeId
-      })
-
-      // 查询已删除的记录
-      const record = await ExchangeRecords.scope('includeDeleted').findOne({
-        where: {
-          exchange_id: exchangeId,
-          user_id: userId
-        },
-        transaction
-      })
-
-      if (!record) {
-        throw new Error('兑换记录不存在')
-      }
-
-      if (!record.deleted_at) {
-        throw new Error('该记录未被删除')
-      }
-
-      // 恢复记录
-      await record.restore({ transaction })
-
-      logger.info('恢复兑换记录成功', {
-        user_id: userId,
-        exchange_id: exchangeId
-      })
-
-      return {
-        exchange_id: exchangeId,
-        restored_at: new Date()
-      }
-    } catch (error) {
-      logger.error('恢复兑换记录失败', {
-        error: error.message,
-        user_id: userId,
-        exchange_id: exchangeId
       })
       throw error
     }

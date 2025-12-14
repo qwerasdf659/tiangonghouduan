@@ -154,6 +154,24 @@ class PrizePoolService {
             prize_name: prizeData.name, // 前端字段映射：name → prize_name
             prize_type: prizeData.type, // 前端字段映射：type → prize_type
             prize_value: prizeData.value || 0, // 前端字段映射：value → prize_value
+            /**
+             * 双账户模型：内部预算成本（系统内部）
+             * - 兼容字段：prize_value_points / value_points / budget_cost_points
+             * - 语义：用于 remaining_budget_points 的筛奖与扣减
+             */
+            prize_value_points:
+              parseInt(
+                prizeData.prize_value_points ??
+                  prizeData.value_points ??
+                  prizeData.budget_cost_points ??
+                  0
+              ) || 0,
+            // 双账户模型：虚拟奖品扩展字段（可选）
+            virtual_amount:
+              prizeData.virtual_amount !== undefined && prizeData.virtual_amount !== null
+                ? parseInt(prizeData.virtual_amount) || 0
+                : null,
+            category: prizeData.category || null,
             stock_quantity: parseInt(prizeData.quantity), // 前端字段映射：quantity → stock_quantity
             win_probability: prizeData.probability || 0, // 中奖概率
             probability: prizeData.wheelProbability || prizeData.probability || 0, // 转盘显示概率
@@ -256,6 +274,9 @@ class PrizePoolService {
           'prize_name',
           'prize_type',
           'prize_value',
+          'prize_value_points',
+          'virtual_amount',
+          'category',
           'stock_quantity',
           'win_probability',
           'probability',
@@ -290,6 +311,9 @@ class PrizePoolService {
         prize_name: prize.prize_name,
         prize_type: prize.prize_type,
         prize_value: prize.prize_value,
+        prize_value_points: prize.prize_value_points,
+        virtual_amount: prize.virtual_amount,
+        category: prize.category,
         stock_quantity: prize.stock_quantity,
         remaining_quantity: Math.max(0, (prize.stock_quantity || 0) - (prize.total_win_count || 0)),
         win_probability: prize.win_probability,
@@ -376,6 +400,9 @@ class PrizePoolService {
           'prize_name',
           'prize_type',
           'prize_value',
+          'prize_value_points',
+          'virtual_amount',
+          'category',
           'stock_quantity',
           'total_win_count',
           'daily_win_count',
@@ -419,6 +446,9 @@ class PrizePoolService {
         prize_name: prize.prize_name,
         prize_type: prize.prize_type,
         prize_value: prize.prize_value,
+        prize_value_points: prize.prize_value_points,
+        virtual_amount: prize.virtual_amount,
+        category: prize.category,
         stock_quantity: prize.stock_quantity,
         remaining_quantity: Math.max(0, (prize.stock_quantity || 0) - (prize.total_win_count || 0)),
         total_win_count: prize.total_win_count || 0,
@@ -482,6 +512,9 @@ class PrizePoolService {
         prize_name: prize.prize_name,
         prize_type: prize.prize_type,
         prize_value: prize.prize_value,
+        prize_value_points: prize.prize_value_points,
+        virtual_amount: prize.virtual_amount,
+        category: prize.category,
         stock_quantity: prize.stock_quantity,
         win_probability: prize.win_probability,
         probability: prize.probability,
@@ -493,6 +526,13 @@ class PrizePoolService {
         name: 'prize_name',
         type: 'prize_type',
         value: 'prize_value',
+        // 双账户模型：内部预算成本（系统内部）
+        prize_value_points: 'prize_value_points',
+        value_points: 'prize_value_points',
+        budget_cost_points: 'prize_value_points',
+        // 双账户模型：虚拟奖品扩展字段
+        virtual_amount: 'virtual_amount',
+        category: 'category',
         quantity: 'stock_quantity',
         probability: 'win_probability',
         wheelProbability: 'probability',
@@ -536,6 +576,9 @@ class PrizePoolService {
         prize_name: prize.prize_name,
         prize_type: prize.prize_type,
         prize_value: prize.prize_value,
+        prize_value_points: prize.prize_value_points,
+        virtual_amount: prize.virtual_amount,
+        category: prize.category,
         stock_quantity: prize.stock_quantity,
         win_probability: prize.win_probability,
         probability: prize.probability,
@@ -587,6 +630,9 @@ class PrizePoolService {
         prize_name: updatedPrize.prize_name,
         prize_type: updatedPrize.prize_type,
         prize_value: updatedPrize.prize_value,
+        prize_value_points: updatedPrize.prize_value_points,
+        virtual_amount: updatedPrize.virtual_amount,
+        category: updatedPrize.category,
         stock_quantity: updatedPrize.stock_quantity,
         remaining_quantity: Math.max(
           0,

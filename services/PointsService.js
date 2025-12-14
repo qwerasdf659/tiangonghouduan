@@ -1644,6 +1644,54 @@ class PointsService {
   }
 
   /**
+   * 🆕 P2-B优化 - 获取用户积分余额响应数据（架构重构完成）
+   *
+   * 业务场景（Business Scenario）：
+   * - 将路由层的数据组装逻辑下沉到Service层
+   * - 符合架构规范TR-005：路由层只保留"参数校验 + 权限校验 + 调用Service + 统一响应"
+   *
+   * 功能说明（Function Description）：
+   * - 封装GET /api/v4/points/balance接口的完整响应数据
+   * - 包含用户积分账户信息、积分概览、时间戳等完整数据
+   *
+   * @param {number} user_id - 用户ID（User ID - Required）
+   * @returns {Promise<Object>} 积分余额响应数据（Balance Response Data）
+   * @returns {number} result.user_id - 用户ID（User ID）
+   * @returns {number} result.available_points - 可用积分（Available Points）
+   * @returns {number} result.total_earned - 累计获得积分（Total Earned Points）
+   * @returns {number} result.total_consumed - 累计消耗积分（Total Consumed Points）
+   * @returns {number} result.frozen_points - 冻结积分（Frozen Points）
+   * @returns {string} result.last_earn_time - 最后获得积分时间（Last Earn Time）
+   * @returns {string} result.last_consume_time - 最后消耗积分时间（Last Consume Time）
+   * @returns {boolean} result.is_active - 账户激活状态（Account Active Status）
+   * @returns {string} result.timestamp - API时间戳（API Timestamp）
+   * @throws {Error} 用户不存在、账户不存在、账户已冻结
+   */
+  static async getBalanceResponse (user_id) {
+    // Step 1: 获取用户账户信息（验证用户存在性和账户状态）
+    const { account } = await this.getUserAccount(user_id)
+
+    // Step 2: 获取完整的积分概览（包括冻结积分）
+    const points_overview = await this.getUserPointsOverview(user_id)
+
+    // Step 3: 组装响应数据（封装路由层的数据组装逻辑）
+    return {
+      user_id,
+      // 核心积分数据
+      available_points: points_overview.available_points,
+      total_earned: points_overview.total_earned,
+      total_consumed: points_overview.total_consumed,
+      // 扩展数据
+      frozen_points: points_overview.frozen_points || 0, // 冻结积分（待审核的消费奖励积分）
+      last_earn_time: account.last_earn_time, // 最后获得积分时间
+      last_consume_time: account.last_consume_time, // 最后消耗积分时间
+      is_active: account.is_active, // 账户激活状态
+      // 元数据
+      timestamp: BeijingTimeHelper.apiTimestamp() // 北京时间API时间戳
+    }
+  }
+
+  /**
    * 🆕 架构重构 - 计算用户成就（业务逻辑收口到Service层）
    *
    * @param {Object} stats - 统计数据
@@ -1869,8 +1917,42 @@ class PointsService {
       })
     ])
 
-    // 返回统计数据（Return statistics）
-    return { accountStats, transactionStats, abnormalStats }
+    /*
+     * 🔧 P2-B优化：将路由层的数据组装逻辑下沉到Service层
+     * 组装完整的响应数据结构（所有数值字段使用parseInt/parseFloat确保类型正确，|| 0 确保null值转换为0）
+     */
+    const statistics = {
+      // 基础统计
+      total_accounts: parseInt(accountStats.total_accounts) || 0, // 总账户数
+      active_accounts: parseInt(accountStats.active_accounts) || 0, // 活跃账户数
+      total_balance: parseFloat(accountStats.total_balance) || 0, // 总积分余额（系统负债）
+      total_system_earned: parseFloat(accountStats.total_system_earned) || 0, // 系统累计发放
+      total_system_consumed: parseFloat(accountStats.total_system_consumed) || 0, // 系统累计消耗
+
+      // 交易统计
+      total_transactions: parseInt(transactionStats.total_transactions) || 0, // 总交易数
+      recent_transactions: parseInt(transactionStats.recent_transactions) || 0, // 30天内交易数
+      today_transactions: parseInt(transactionStats.today_transactions) || 0, // 今日交易数
+
+      // 积分流向（从交易记录统计）
+      total_earned_points: parseFloat(transactionStats.total_earned_points) || 0, // 累计发放积分
+      total_consumed_points: parseFloat(transactionStats.total_consumed_points) || 0, // 累计消耗积分
+      pending_earn_points: parseFloat(transactionStats.pending_earn_points) || 0, // 待审核积分
+      net_flow: parseFloat(
+        (transactionStats.total_earned_points || 0) - (transactionStats.total_consumed_points || 0)
+      ), // 净流入
+
+      // 今日数据
+      today_earn_points: parseFloat(transactionStats.today_earn_points) || 0, // 今日发放积分
+      today_consume_points: parseFloat(transactionStats.today_consume_points) || 0, // 今日消耗积分
+
+      // 异常监控
+      failed_transactions: parseInt(transactionStats.failed_transactions) || 0, // 失败交易数
+      large_transactions_7d: parseInt(abnormalStats.large_transactions) || 0 // 7天内大额交易数
+    }
+
+    // 返回完整的格式化统计数据（Return formatted statistics）
+    return { statistics }
   }
 
   /**
@@ -1933,7 +2015,7 @@ class PointsService {
    * @returns {Object} result.inventory - 库存统计（Inventory Statistics）
    */
   static async getUserFullStatistics (userId) {
-    const { LotteryDraw, ExchangeRecords, ConsumptionRecord, UserInventory } = require('../models')
+    const { LotteryDraw, ConsumptionRecord, UserInventory } = require('../models')
     const sequelize = UserPointsAccount.sequelize
 
     // 本月第一天0点(北京时间)
@@ -1944,23 +2026,19 @@ class PointsService {
     )
 
     // 🚀 并行执行所有统计查询（Parallel execution for optimal performance）
-    const [lotteryStats, exchangeStats, consumptionStats, inventoryStats] = await Promise.all([
+    const [lotteryStats, consumptionStats, inventoryStats] = await Promise.all([
       // 1. 抽奖统计（Lottery Statistics）
       this._getLotteryStats(userId, LotteryDraw, monthStart),
 
-      // 2. 兑换统计（Exchange Statistics）
-      this._getExchangeStats(userId, ExchangeRecords, monthStart),
-
-      // 3. 消费统计（Consumption Statistics）
+      // 2. 消费统计（Consumption Statistics）
       this._getConsumptionStats(userId, ConsumptionRecord, monthStart, sequelize),
 
-      // 4. 库存统计（Inventory Statistics）
+      // 3. 库存统计（Inventory Statistics）
       this._getInventoryStats(userId, UserInventory)
     ])
 
     return {
       lottery: lotteryStats,
-      exchange: exchangeStats,
       consumption: consumptionStats,
       inventory: inventoryStats
     }
@@ -1999,38 +2077,6 @@ class PointsService {
       total_count: totalCount,
       month_count: thisMonth,
       last_draw: lastDraw ? lastDraw.created_at : null
-    }
-  }
-
-  /**
-   * 🔒 私有方法 - 获取兑换统计
-   * @private
-   * @param {number} userId - 用户ID
-   * @param {Object} ExchangeRecords - 兑换记录模型
-   * @param {Date} monthStart - 本月开始时间
-   * @returns {Promise<Object>} 兑换统计数据
-   */
-  static async _getExchangeStats (userId, ExchangeRecords, monthStart) {
-    const [totalCount, totalPoints, thisMonth] = await Promise.all([
-      // 总兑换次数（Total exchange count）
-      ExchangeRecords.count({ where: { user_id: userId } }),
-
-      // 总消耗积分（Total points consumed）
-      ExchangeRecords.sum('total_points', { where: { user_id: userId } }) || 0,
-
-      // 本月兑换次数（This month count）
-      ExchangeRecords.count({
-        where: {
-          user_id: userId,
-          exchange_time: { [Op.gte]: monthStart }
-        }
-      })
-    ])
-
-    return {
-      total_count: totalCount,
-      total_points: totalPoints,
-      month_count: thisMonth
     }
   }
 
@@ -2416,6 +2462,261 @@ class PointsService {
       data_points: labels.length,
       timestamp: BeijingTimeHelper.apiTimestamp()
     }
+  }
+
+  /**
+   * 管理员调整用户积分（Admin Adjust User Points）
+   *
+   * @description 管理员专用方法，用于调整用户积分（增加或扣除），封装完整的业务逻辑
+   *
+   * 业务场景（Business Scenario）：
+   * - 活动补偿：管理员为用户补偿积分
+   * - 错误修正：修正系统错误导致的积分异常
+   * - 违规处罚：扣除违规用户的积分
+   * - 人工调整：其他需要人工干预的积分调整
+   *
+   * 核心功能（Core Features）：
+   * - ✅ 用户存在性验证（User Validation）
+   * - ✅ 账户存在性验证（Account Validation）
+   * - ✅ 余额充足性检查（Balance Validation）
+   * - ✅ 幂等性控制（Idempotency Control）
+   * - ✅ 审计日志记录（Audit Logging）
+   *
+   * @param {Object} params - 调整参数
+   * @param {number} params.admin_id - 管理员ID（必填，Admin ID - Required）
+   * @param {number} params.user_id - 目标用户ID（必填，User ID - Required）
+   * @param {number} params.amount - 调整金额（必填，正数表示增加，负数表示扣除，Amount - Required）
+   * @param {string} params.reason - 调整原因（必填，Reason - Required）
+   * @param {string} params.type - 业务类型（可选，默认 'admin_adjust'，Business Type - Optional）
+   * @param {string} params.request_id - 请求ID（可选，用于幂等性控制，Request ID - Optional for Idempotency）
+   *
+   * @returns {Object} 调整结果
+   * @returns {number} result.user_id - 用户ID
+   * @returns {Object} result.adjustment - 调整信息
+   * @returns {Object} result.balance_change - 余额变化
+   * @returns {Object} result.account_summary - 账户摘要
+   *
+   * @throws {Error} 用户不存在
+   * @throws {Error} 账户不存在
+   * @throws {Error} 余额不足
+   *
+   * 使用示例（Usage Example）：
+   * ```javascript
+   * const result = await PointsService.adminAdjustPoints({
+   *   admin_id: 1,
+   *   user_id: 123,
+   *   amount: 500,
+   *   reason: '活动补偿'
+   * });
+   * ```
+   */
+  static async adminAdjustPoints (params) {
+    const { admin_id, user_id, amount, reason, type = 'admin_adjust', request_id } = params
+
+    // 📝 Step 1: 参数验证
+    if (!user_id || !amount || !reason) {
+      throw new Error('用户ID、调整金额和原因不能为空')
+    }
+
+    if (typeof amount !== 'number' || amount === 0) {
+      throw new Error('调整金额必须是非零数字')
+    }
+
+    // 📝 Step 2: 验证用户和账户存在性（getUserAccount 会验证用户和账户）
+    try {
+      await this.getUserAccount(user_id)
+    } catch (verifyError) {
+      // 用户不存在，返回友好错误
+      if (verifyError.message.includes('用户不存在')) {
+        throw new Error(`目标用户不存在，请检查user_id是否正确（user_id: ${user_id}）`)
+      }
+      // 账户不存在时，addPoints/consumePoints会自动创建（管理员操作合理）
+    }
+
+    // 📝 Step 3: 生成唯一business_id确保幂等性（防止网络重试导致重复调整）
+    const business_id =
+      request_id ||
+      `admin_adjust_${admin_id}_${user_id}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+
+    // 📝 Step 4: 记录调整前余额
+    let old_balance = 0
+    try {
+      const { account } = await this.getUserAccount(user_id)
+      old_balance = parseFloat(account.available_points)
+    } catch (e) {
+      // 账户不存在，初始余额为0
+      old_balance = 0
+    }
+
+    // 📝 Step 5: 执行积分调整
+    let result
+    if (amount > 0) {
+      // 增加积分
+      result = await this.addPoints(user_id, amount, {
+        business_id,
+        business_type: type,
+        source_type: 'admin',
+        title: `管理员调整积分(+${amount})`,
+        description: reason,
+        operator_id: admin_id
+      })
+    } else {
+      // 扣除积分前先检查余额
+      const required_amount = Math.abs(amount)
+
+      if (old_balance < required_amount) {
+        throw new Error(
+          `积分余额不足：当前余额${old_balance}分，需要扣除${required_amount}分，差额${required_amount - old_balance}分`
+        )
+      }
+
+      // 余额充足，执行扣除
+      result = await this.consumePoints(user_id, required_amount, {
+        business_id,
+        business_type: type,
+        source_type: 'admin',
+        title: `管理员调整积分(-${required_amount})`,
+        description: reason,
+        operator_id: admin_id
+      })
+    }
+
+    // 📝 Step 6: 获取调整后的余额
+    const { account: updatedAccount } = await this.getUserAccount(user_id)
+    const new_balance = parseFloat(updatedAccount.available_points)
+
+    // 📝 Step 7: 记录操作日志（便于审计追踪）
+    console.log(
+      `✅ 积分调整成功 - 管理员:${admin_id} 用户:${user_id} 金额:${amount} 原因:${reason} 余额:${old_balance}→${new_balance} 幂等标识:${business_id}`
+    )
+
+    // 📝 Step 8: 返回完整的调整结果
+    return {
+      user_id,
+      adjustment: {
+        amount,
+        type,
+        reason,
+        admin_id,
+        timestamp: BeijingTimeHelper.apiTimestamp(),
+        is_duplicate: result?.is_duplicate || false // 标记是否为重复请求（幂等性检测）
+      },
+      balance_change: {
+        old_balance,
+        new_balance,
+        change: amount
+      },
+      account_summary: {
+        available_points: new_balance,
+        total_earned: parseFloat(updatedAccount.total_earned),
+        total_consumed: parseFloat(updatedAccount.total_consumed)
+      }
+    }
+  }
+
+  /**
+   * 获取用户统计响应数据（User Statistics Response）
+   *
+   * @description 封装获取用户完整统计数据的逻辑，包括用户信息、积分、抽奖、兑换、消费、库存等
+   *
+   * 业务场景（Business Scenario）：
+   * - 用户查看个人统计页面
+   * - 管理员查看用户详细数据
+   * - 数据分析和报表生成
+   *
+   * 核心功能（Core Features）：
+   * - ✅ 用户信息获取（User Info）
+   * - ✅ 积分账户数据（Points Account）
+   * - ✅ 完整统计数据（Full Statistics）
+   * - ✅ 成就计算（Achievements）
+   * - ✅ 数据组装（Data Assembly）
+   *
+   * @param {number} userId - 用户ID（必填，User ID - Required）
+   *
+   * @returns {Object} 统计响应数据
+   * @returns {number} result.user_id - 用户ID
+   * @returns {string} result.account_created - 账户创建时间
+   * @returns {string} result.last_activity - 最后活动时间
+   * @returns {number} result.login_count - 登录次数
+   * @returns {Object} result.points - 积分统计
+   * @returns {Object} result.lottery - 抽奖统计
+   * @returns {Object} result.exchange - 兑换统计
+   * @returns {Object} result.consumption - 消费统计
+   * @returns {Object} result.inventory - 库存统计
+   * @returns {Object} result.achievements - 成就数据
+   *
+   * @throws {Error} 用户不存在
+   *
+   * 使用示例（Usage Example）：
+   * ```javascript
+   * const statistics = await PointsService.getUserStatisticsResponse(123);
+   * ```
+   */
+  static async getUserStatisticsResponse (userId) {
+    // 📝 Step 1: 获取用户信息和账户
+    let userInfo, pointsInfo
+    try {
+      const { user, account } = await this.getUserAccount(userId)
+      userInfo = user
+      pointsInfo = {
+        available_points: parseFloat(account.available_points),
+        total_earned: parseFloat(account.total_earned),
+        total_consumed: parseFloat(account.total_consumed)
+      }
+    } catch (error) {
+      // 用户不存在，抛出错误
+      if (error.message.includes('用户不存在')) {
+        throw new Error('用户不存在')
+      }
+      // 账户不存在，获取用户基本信息和默认积分
+      const userBasicInfo = await this.getUserBasicInfo(userId)
+      userInfo = userBasicInfo.user
+      pointsInfo = userBasicInfo.defaultPoints
+    }
+
+    // 📝 Step 2: 并行获取完整统计数据
+    const [fullStats, monthStats] = await Promise.all([
+      this.getUserFullStatistics(userId),
+      this.getUserStatistics(userId)
+    ])
+
+    // 📝 Step 3: 组装统计数据
+    const statistics = {
+      user_id: parseInt(userId),
+      account_created: userInfo.created_at,
+      last_activity: userInfo.last_login,
+      login_count: userInfo.login_count,
+
+      // 积分统计
+      points: {
+        current_balance: pointsInfo.available_points,
+        total_earned: pointsInfo.total_earned,
+        total_consumed: pointsInfo.total_consumed,
+        month_earned: parseFloat(monthStats.month_earned) || 0
+      },
+
+      // 抽奖统计
+      lottery: fullStats.lottery,
+
+      // 兑换统计
+      exchange: fullStats.exchange,
+
+      // 消费记录统计（新业务：商家扫码录入）
+      consumption: fullStats.consumption,
+
+      // 库存统计
+      inventory: fullStats.inventory,
+
+      // 成就数据（通过Service计算）
+      achievements: this.calculateAchievements({
+        lottery: fullStats.lottery,
+        exchange: fullStats.exchange,
+        consumption: fullStats.consumption,
+        totalEarned: pointsInfo.total_earned
+      })
+    }
+
+    return statistics
   }
 }
 

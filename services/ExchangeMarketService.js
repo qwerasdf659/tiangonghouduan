@@ -39,7 +39,7 @@
  * 职责定位（与其他服务的区别）：
  * - **应用层服务**：专注新兑换市场业务（ExchangeItem + ExchangeMarketRecord）
  * - **与ExchangeOperationService的区别**：
- *   - ExchangeOperationService：处理旧兑换系统（ExchangeRecords）的运营管理
+ *   - （已删除）ExchangeOperationService：处理旧兑换系统（ExchangeRecords）的运营管理
  *   - ExchangeMarketService：处理新兑换市场（ExchangeItem）的用户兑换业务
  *
  * 数据模型关联：
@@ -68,6 +68,148 @@ const {
 } = require('../models')
 const { Op } = require('sequelize')
 const BeijingTimeHelper = require('../utils/timeHelper')
+
+/**
+ * 🎯 统一数据输出视图常量（Data Output View Constants）
+ *
+ * 业务场景（Business Scenario）：
+ * - 统一管理兑换市场领域的数据输出字段，避免字段选择分散在各方法
+ * - 符合架构规范：与积分领域的 POINTS_ATTRIBUTES、库存领域的 INVENTORY_ATTRIBUTES 模式保持一致
+ * - 根据权限级别（用户/管理员）和业务场景返回不同的数据字段，保护敏感信息
+ *
+ * 设计原则（Design Principles）：
+ * - marketItemView：市场商品列表视图 - 用户浏览商品列表时返回的字段
+ * - marketItemDetailView：商品详情视图 - 用户查看商品详情时返回的字段
+ * - adminMarketItemView：管理员商品视图 - 管理员查看商品时返回的字段（包含敏感信息）
+ * - marketOrderView：用户订单视图 - 用户查看自己的订单时返回的字段
+ * - adminMarketOrderView：管理员订单视图 - 管理员查看订单时返回的字段（包含所有字段）
+ *
+ * 使用示例（Usage Example）：
+ * ```javascript
+ * // 用户浏览商品列表
+ * const items = await ExchangeItem.findAll({
+ *   where: { status: 'active' },
+ *   attributes: EXCHANGE_MARKET_ATTRIBUTES.marketItemView
+ * });
+ *
+ * // 管理员查看商品（包含成本价等敏感信息）
+ * const items = await ExchangeItem.findAll({
+ *   attributes: EXCHANGE_MARKET_ATTRIBUTES.adminMarketItemView
+ * });
+ *
+ * // 用户查看自己的订单
+ * const orders = await ExchangeMarketRecord.findAll({
+ *   where: { user_id: userId },
+ *   attributes: EXCHANGE_MARKET_ATTRIBUTES.marketOrderView
+ * });
+ * ```
+ */
+const EXCHANGE_MARKET_ATTRIBUTES = {
+  /**
+   * 市场商品列表视图（Market Item List View）
+   * 用户浏览商品列表时返回的字段
+   * 不包含敏感字段：cost_price（成本价）、total_exchange_count（总兑换次数）
+   */
+  marketItemView: [
+    'item_id', // 商品ID（Item ID）
+    'item_name', // 商品名称（Item Name）
+    'item_description', // 商品描述（Item Description）
+    'price_type', // 支付方式：virtual/points/mixed（Price Type）
+    'virtual_value_price', // 虚拟价值价格（Virtual Value Price）
+    'points_price', // 积分价格（Points Price）
+    'stock', // 库存（Stock）
+    'sort_order', // 排序（Sort Order）
+    'status', // 状态：active/inactive（Status）
+    'created_at' // 创建时间（Created At）
+  ],
+
+  /**
+   * 商品详情视图（Market Item Detail View）
+   * 用户查看商品详情时返回的字段
+   * 包含商品的完整信息（除敏感字段外）
+   */
+  marketItemDetailView: [
+    'item_id', // 商品ID（Item ID）
+    'item_name', // 商品名称（Item Name）
+    'item_description', // 商品描述（Item Description）
+    'price_type', // 支付方式（Price Type）
+    'virtual_value_price', // 虚拟价值价格（Virtual Value Price）
+    'points_price', // 积分价格（Points Price）
+    'stock', // 库存（Stock）
+    'total_exchange_count', // 总兑换次数（Total Exchange Count - 展示商品热度）
+    'sort_order', // 排序（Sort Order）
+    'status', // 状态（Status）
+    'created_at', // 创建时间（Created At）
+    'updated_at' // 更新时间（Updated At）
+  ],
+
+  /**
+   * 管理员商品视图（Admin Market Item View）
+   * 管理员查看商品时返回的字段
+   * 包含所有字段，用于后台管理和数据分析
+   */
+  adminMarketItemView: [
+    'item_id', // 商品ID（Item ID）
+    'item_name', // 商品名称（Item Name）
+    'item_description', // 商品描述（Item Description）
+    'price_type', // 支付方式（Price Type）
+    'virtual_value_price', // 虚拟价值价格（Virtual Value Price）
+    'points_price', // 积分价格（Points Price）
+    'cost_price', // 成本价（Cost Price - 敏感信息，仅管理员可见）
+    'stock', // 库存（Stock）
+    'total_exchange_count', // 总兑换次数（Total Exchange Count）
+    'sort_order', // 排序（Sort Order）
+    'status', // 状态（Status）
+    'created_at', // 创建时间（Created At）
+    'updated_at' // 更新时间（Updated At）
+  ],
+
+  /**
+   * 用户订单视图（Market Order View）
+   * 用户查看自己的订单时返回的字段
+   * 不包含管理员备注等管理信息
+   */
+  marketOrderView: [
+    'record_id', // 订单记录ID（Record ID）
+    'order_no', // 订单号（Order Number）
+    'user_id', // 用户ID（User ID）
+    'item_id', // 商品ID（Item ID）
+    'item_snapshot', // 商品快照（Item Snapshot）
+    'quantity', // 数量（Quantity）
+    'payment_type', // 支付方式：virtual/points/mixed（Payment Type）
+    'virtual_value_paid', // 虚拟价值支付（Virtual Value Paid）
+    'points_paid', // 积分支付（Points Paid）
+    'status', // 状态：pending/completed/shipped/cancelled（Status）
+    'exchange_time', // 兑换时间（Exchange Time）
+    'shipped_at', // 发货时间（Shipped At）
+    'created_at', // 创建时间（Created At）
+    'updated_at' // 更新时间（Updated At）
+  ],
+
+  /**
+   * 管理员订单视图（Admin Market Order View）
+   * 管理员查看订单时返回的字段
+   * 包含所有字段，用于后台管理和数据分析
+   */
+  adminMarketOrderView: [
+    'record_id', // 订单记录ID（Record ID）
+    'order_no', // 订单号（Order Number）
+    'user_id', // 用户ID（User ID）
+    'item_id', // 商品ID（Item ID）
+    'item_snapshot', // 商品快照（Item Snapshot）
+    'quantity', // 数量（Quantity）
+    'payment_type', // 支付方式（Payment Type）
+    'virtual_value_paid', // 虚拟价值支付（Virtual Value Paid）
+    'points_paid', // 积分支付（Points Paid）
+    'total_cost', // 总成本（Total Cost - 敏感信息，仅管理员可见）
+    'status', // 状态（Status）
+    'admin_remark', // 管理员备注（Admin Remark - 敏感信息，仅管理员可见）
+    'exchange_time', // 兑换时间（Exchange Time）
+    'shipped_at', // 发货时间（Shipped At）
+    'created_at', // 创建时间（Created At）
+    'updated_at' // 更新时间（Updated At）
+  ]
+}
 
 /**
  * 兑换市场服务类
@@ -116,6 +258,7 @@ class ExchangeMarketService {
       // 查询商品列表
       const { count, rows } = await ExchangeItem.findAndCountAll({
         where,
+        attributes: EXCHANGE_MARKET_ATTRIBUTES.marketItemView, // ✅ 使用统一视图常量
         limit,
         offset,
         order: [[sort_by, sort_order]]
@@ -149,7 +292,8 @@ class ExchangeMarketService {
   static async getItemDetail (item_id) {
     try {
       const item = await ExchangeItem.findOne({
-        where: { item_id }
+        where: { item_id },
+        attributes: EXCHANGE_MARKET_ATTRIBUTES.marketItemDetailView // ✅ 使用统一视图常量
       })
 
       if (!item) {
@@ -174,36 +318,67 @@ class ExchangeMarketService {
    * @param {number} item_id - 商品ID
    * @param {number} quantity - 兑换数量
    * @param {Object} options - 选项
-   * @param {string} options.business_id - 业务唯一ID（可选，用于幂等性）
+   * @param {string} options.business_id - 业务唯一ID（必填，用于幂等性）
+   * @param {Transaction} options.transaction - 外部事务对象（可选）
    * @returns {Promise<Object>} 兑换结果和订单信息
    */
   static async exchangeItem (user_id, item_id, quantity = 1, options = {}) {
-    const { business_id } = options
+    const { business_id, transaction: externalTransaction } = options
 
-    // ✅ 幂等性检查（解决任务4.1：为高风险操作添加强制幂等检查）
-    if (business_id) {
+    // 🔥 必填参数校验
+    if (!business_id) {
+      throw new Error('business_id 参数不能为空，用于幂等性控制')
+    }
+
+    // 🔥 支持外部传入的事务（与PointsService对齐）
+    const transaction = externalTransaction || await sequelize.transaction()
+    const shouldCommit = !externalTransaction // 只有自己创建的事务才提交/回滚
+
+    try {
+      // ✅ 幂等性检查：以 business_id 为唯一键（与PointsService对齐）
+      // 🔴 P1-1-5: 不使用悲观锁，依赖数据库唯一约束防止并发创建重复订单
+      // 原因：多个事务同时使用 FOR UPDATE 竞争同一行会导致死锁
+      // 解决方案：利用唯一索引约束，并发插入时自动捕获冲突
       const existingOrder = await ExchangeMarketRecord.findOne({
         where: {
-          user_id,
-          item_id,
-          status: { [Op.in]: ['pending', 'completed', 'shipped'] } // 排除已取消的订单
+          business_id
         },
-        order: [['exchange_time', 'DESC']],
-        limit: 1
+        // 移除悲观锁，避免死锁
+        transaction
       })
 
       if (existingOrder) {
-        console.log('[兑换市场] ⚠️ 幂等性检查：兑换订单已存在，返回原结果', {
+        console.log('[兑换市场] ⚠️ 幂等性检查：business_id已存在，验证参数一致性', {
           business_id,
           order_no: existingOrder.order_no,
-          user_id,
-          item_id,
-          status: existingOrder.status
+          existing_item_id: existingOrder.item_id,
+          existing_quantity: existingOrder.quantity,
+          request_item_id: item_id,
+          request_quantity: quantity
+        })
+
+        // 🔴 P1-1冲突保护：验证请求参数是否一致（确保类型一致）
+        if (Number(existingOrder.item_id) !== Number(item_id) || Number(existingOrder.quantity) !== Number(quantity)) {
+          const conflictError = new Error(
+            `幂等键冲突：business_id="${business_id}" 已被使用于不同参数的订单。` +
+              `原订单：商品ID=${existingOrder.item_id}, 数量=${existingOrder.quantity}；` +
+              `当前请求：商品ID=${item_id}, 数量=${quantity}。` +
+              '请使用不同的幂等键或确认请求参数正确。'
+          )
+          conflictError.statusCode = 409 // HTTP 409 Conflict
+          conflictError.errorCode = 'IDEMPOTENCY_KEY_CONFLICT'
+          throw conflictError
+        }
+
+        console.log('[兑换市场] ✅ 参数一致性验证通过，返回原结果（幂等）', {
+          business_id,
+          order_no: existingOrder.order_no
         })
 
         // 获取当前虚拟价值余额
         const userAccount = await UserPointsAccount.findOne({
-          where: { user_id }
+          where: { user_id },
+          transaction
         })
 
         return {
@@ -220,19 +395,15 @@ class ExchangeMarketService {
             status: existingOrder.status
           },
           remaining: {
-            virtual_value: await this._getUserTotalVirtualValue(user_id),
+            virtual_value: await this._getUserTotalVirtualValue(user_id, transaction),
             available_points: userAccount?.available_points || 0
           },
           is_duplicate: true, // ✅ 标记为重复请求
           timestamp: BeijingTimeHelper.now()
         }
       }
-    }
 
-    const transaction = await sequelize.transaction()
-
-    try {
-      console.log(`[兑换市场] 用户${user_id}兑换商品${item_id}，数量${quantity}`)
+      console.log(`[兑换市场] 用户${user_id}兑换商品${item_id}，数量${quantity}，business_id=${business_id}`)
 
       // 1. 获取商品信息（加锁防止超卖）
       const item = await ExchangeItem.findOne({
@@ -242,17 +413,14 @@ class ExchangeMarketService {
       })
 
       if (!item) {
-        await transaction.rollback()
         throw new Error('商品不存在')
       }
 
       if (item.status !== 'active') {
-        await transaction.rollback()
         throw new Error('商品已下架')
       }
 
       if (item.stock < quantity) {
-        await transaction.rollback()
         throw new Error(`库存不足，当前库存：${item.stock}`)
       }
 
@@ -264,7 +432,6 @@ class ExchangeMarketService {
       })
 
       if (!userAccount) {
-        await transaction.rollback()
         throw new Error('用户积分账户不存在')
       }
 
@@ -283,7 +450,6 @@ class ExchangeMarketService {
 
       // 4. 强制校验：只允许 virtual 类型（业务规则强制）
       if (item.price_type !== 'virtual') {
-        await transaction.rollback()
         throw new Error(
           `不支持的支付方式：${item.price_type}。` +
             '当前仅支持虚拟奖品支付（price_type=\'virtual\'），请联系管理员更新商品配置。'
@@ -297,7 +463,6 @@ class ExchangeMarketService {
       const userVirtualValue = await this._getUserTotalVirtualValue(user_id, transaction)
 
       if (userVirtualValue < totalVirtualValue) {
-        await transaction.rollback()
         throw new Error(
           `虚拟奖品不足，需要${totalVirtualValue}虚拟价值，当前${userVirtualValue}。` +
             '请先参与抽奖获取虚拟奖品。'
@@ -314,30 +479,81 @@ class ExchangeMarketService {
       // 6. 生成订单号
       const order_no = this._generateOrderNo()
 
-      // 7. 创建兑换订单
-      const record = await ExchangeMarketRecord.create(
-        {
-          order_no,
-          user_id,
-          item_id,
-          item_snapshot: {
-            item_id: item.item_id,
-            item_name: item.item_name,
-            item_description: item.item_description,
-            price_type: item.price_type,
-            virtual_value_price: item.virtual_value_price,
-            points_price: item.points_price
+      // 7. 创建兑换订单（✅ 包含 business_id）
+      // 🔴 P1-1-5: 捕获唯一约束冲突（并发场景）
+      let record
+      try {
+        record = await ExchangeMarketRecord.create(
+          {
+            order_no,
+            business_id, // ✅ 记录 business_id 用于幂等性
+            user_id,
+            item_id,
+            item_snapshot: {
+              item_id: item.item_id,
+              item_name: item.name,
+              item_description: item.description,
+              price_type: item.price_type,
+              virtual_value_price: item.virtual_value_price,
+              points_price: item.points_price
+            },
+            quantity,
+            payment_type: 'virtual', // 强制为 virtual
+            virtual_value_paid: virtualValuePaid,
+            points_paid: pointsPaid, // 强制为 0
+            total_cost: (item.cost_price || 0) * quantity,
+            status: 'pending',
+            exchange_time: BeijingTimeHelper.createDatabaseTime()
           },
-          quantity,
-          payment_type: 'virtual', // 强制为 virtual
-          virtual_value_paid: virtualValuePaid,
-          points_paid: pointsPaid, // 强制为 0
-          total_cost: (item.cost_price || 0) * quantity,
-          status: 'pending',
-          exchange_time: BeijingTimeHelper.createDatabaseTime()
-        },
-        { transaction }
-      )
+          { transaction }
+        )
+      } catch (createError) {
+        // 🔴 捕获唯一约束冲突（并发场景下，多个事务同时插入相同 business_id）
+        if (createError.name === 'SequelizeUniqueConstraintError' || 
+            createError.message?.includes('Duplicate entry') ||
+            createError.message?.includes('idx_business_id_unique')) {
+          console.log('[兑换市场] ⚠️ 并发冲突：business_id已存在，重试查询', { business_id })
+          
+          // 回滚当前事务的本地更改，重新查询已存在的订单
+          if (shouldCommit) {
+            await transaction.rollback()
+          }
+          
+          // 重新查询已经创建的订单
+          const concurrentOrder = await ExchangeMarketRecord.findOne({
+            where: { business_id }
+          })
+          
+          if (concurrentOrder) {
+            // 验证参数一致性
+            if (Number(concurrentOrder.item_id) !== Number(item_id) || Number(concurrentOrder.quantity) !== Number(quantity)) {
+              const conflictError = new Error(
+                `幂等键冲突：business_id="${business_id}" 已被使用于不同参数的订单。` +
+                  `原订单：商品ID=${concurrentOrder.item_id}, 数量=${concurrentOrder.quantity}；` +
+                  `当前请求：商品ID=${item_id}, 数量=${quantity}。` +
+                  '请使用不同的幂等键或确认请求参数正确。'
+              )
+              conflictError.statusCode = 409
+              conflictError.errorCode = 'IDEMPOTENCY_KEY_CONFLICT'
+              throw conflictError
+            }
+            
+            // 返回已存在的订单（幂等）
+            const userAccount = await UserPointsAccount.findOne({ where: { user_id } })
+            return {
+              order: concurrentOrder.toJSON(),
+              remaining: {
+                virtual_value: userAccount?.virtual_value_balance || 0,
+                points: userAccount?.points_balance || 0
+              },
+              is_duplicate: true,
+              message: '兑换成功（并发幂等返回）'
+            }
+          }
+        }
+        // 非唯一约束错误，直接抛出
+        throw createError
+      }
 
       // 8. 扣减商品库存
       await item.update(
@@ -357,8 +573,10 @@ class ExchangeMarketService {
         { transaction }
       )
 
-      // 10. 提交事务
-      await transaction.commit()
+      // 10. 提交事务（只有自己创建的事务才提交）
+      if (shouldCommit) {
+        await transaction.commit()
+      }
 
       console.log(`[兑换市场] 兑换成功，订单号：${order_no}`)
 
@@ -368,7 +586,7 @@ class ExchangeMarketService {
         order: {
           order_no,
           record_id: record.record_id,
-          item_name: item.item_name,
+          item_name: item.name,
           quantity,
           payment_type: item.price_type,
           virtual_value_paid: virtualValuePaid,
@@ -382,8 +600,8 @@ class ExchangeMarketService {
         timestamp: BeijingTimeHelper.now()
       }
     } catch (error) {
-      // 回滚事务
-      if (transaction && !transaction.finished) {
+      // 回滚事务（只有自己创建的事务才回滚）
+      if (shouldCommit && transaction && !transaction.finished) {
         await transaction.rollback()
       }
 
@@ -421,6 +639,7 @@ class ExchangeMarketService {
       // 查询订单列表
       const { count, rows } = await ExchangeMarketRecord.findAndCountAll({
         where,
+        attributes: EXCHANGE_MARKET_ATTRIBUTES.marketOrderView, // ✅ 使用统一视图常量
         limit,
         offset,
         order: [['exchange_time', 'DESC']]
@@ -455,7 +674,8 @@ class ExchangeMarketService {
   static async getOrderDetail (user_id, order_no) {
     try {
       const order = await ExchangeMarketRecord.findOne({
-        where: { user_id, order_no }
+        where: { user_id, order_no },
+        attributes: EXCHANGE_MARKET_ATTRIBUTES.marketOrderView // ✅ 使用统一视图常量
       })
 
       if (!order) {
@@ -480,10 +700,16 @@ class ExchangeMarketService {
    * @param {string} new_status - 新状态（completed/shipped/cancelled）
    * @param {number} operator_id - 操作员ID
    * @param {string} remark - 备注
+   * @param {Object} options - 选项
+   * @param {Transaction} options.transaction - 外部事务对象（可选）
    * @returns {Promise<Object>} 更新结果
    */
-  static async updateOrderStatus (order_no, new_status, operator_id, remark = '') {
-    const transaction = await sequelize.transaction()
+  static async updateOrderStatus (order_no, new_status, operator_id, remark = '', options = {}) {
+    const { transaction: externalTransaction } = options
+
+    // 🔥 支持外部传入的事务（与PointsService对齐）
+    const transaction = externalTransaction || await sequelize.transaction()
+    const shouldCommit = !externalTransaction // 只有自己创建的事务才提交/回滚
 
     try {
       console.log(`[兑换市场] 更新订单状态：${order_no} -> ${new_status}`)
@@ -495,7 +721,6 @@ class ExchangeMarketService {
       })
 
       if (!order) {
-        await transaction.rollback()
         throw new Error('订单不存在')
       }
 
@@ -519,7 +744,10 @@ class ExchangeMarketService {
         )
       }
 
-      await transaction.commit()
+      // 提交事务（只有自己创建的事务才提交）
+      if (shouldCommit) {
+        await transaction.commit()
+      }
 
       console.log(`[兑换市场] 订单状态更新成功：${order_no} -> ${new_status}`)
 
@@ -533,7 +761,8 @@ class ExchangeMarketService {
         timestamp: BeijingTimeHelper.now()
       }
     } catch (error) {
-      if (transaction && !transaction.finished) {
+      // 回滚事务（只有自己创建的事务才回滚）
+      if (shouldCommit && transaction && !transaction.finished) {
         await transaction.rollback()
       }
 
@@ -551,12 +780,12 @@ class ExchangeMarketService {
    * @private
    */
   static async _getUserTotalVirtualValue (user_id, transaction = null) {
-    const result = await UserInventory.sum('virtual_value_points', {
+    const result = await UserInventory.sum('value', {
       where: {
         user_id,
-        item_type: 'prize',
+        source_type: 'lottery', // 抽奖获得的虚拟奖品
         status: 'available',
-        virtual_value_points: { [Op.gt]: 0 } // 只统计有价值的虚拟奖品
+        value: { [Op.gt]: 0 } // 只统计有价值的虚拟奖品
       },
       transaction
     })
@@ -578,21 +807,23 @@ class ExchangeMarketService {
     const virtualPrizes = await UserInventory.findAll({
       where: {
         user_id,
-        item_type: 'prize',
+        source_type: 'lottery', // 抽奖获得的虚拟奖品
         status: 'available',
-        virtual_value_points: { [Op.gt]: 0 }
+        value: { [Op.gt]: 0 }
       },
-      order: [['virtual_value_points', 'ASC']],
+      order: [['value', 'ASC']],
       lock: transaction.LOCK.UPDATE,
       transaction
     })
+
+    console.log(`[兑换市场] 查询到 ${virtualPrizes.length} 个可用虚拟奖品，总价值: ${virtualPrizes.reduce((sum, p) => sum + (p.value || 0), 0)}`)
 
     let remaining = value_to_deduct
 
     for (const prize of virtualPrizes) {
       if (remaining <= 0) break
 
-      const prizeValue = prize.virtual_value_points || 0
+      const prizeValue = prize.value || 0
 
       if (prizeValue <= remaining) {
         // 完全消耗这个奖品
@@ -605,6 +836,7 @@ class ExchangeMarketService {
           { transaction }
         )
         remaining -= prizeValue
+        console.log(`[兑换市场] 消耗虚拟奖品 inventory_id=${prize.inventory_id}, value=${prizeValue}, 剩余需求=${remaining}`)
       } else {
         /*
          * 部分消耗（如果虚拟奖品支持部分使用）
@@ -883,10 +1115,16 @@ class ExchangeMarketService {
    * 删除兑换商品（管理员操作）
    *
    * @param {number} item_id - 商品ID
+   * @param {Object} options - 选项
+   * @param {Transaction} options.transaction - 外部事务对象（可选）
    * @returns {Promise<Object>} 删除结果
    */
-  static async deleteExchangeItem (item_id) {
-    const transaction = await sequelize.transaction()
+  static async deleteExchangeItem (item_id, options = {}) {
+    const { transaction: externalTransaction } = options
+
+    // 🔥 支持外部传入的事务（与PointsService对齐）
+    const transaction = externalTransaction || await sequelize.transaction()
+    const shouldCommit = !externalTransaction // 只有自己创建的事务才提交/回滚
 
     try {
       console.log('[兑换市场] 管理员删除商品', { item_id })
@@ -894,7 +1132,6 @@ class ExchangeMarketService {
       // 查询商品
       const item = await ExchangeItem.findByPk(item_id, { transaction })
       if (!item) {
-        await transaction.rollback()
         throw new Error('商品不存在')
       }
 
@@ -914,7 +1151,10 @@ class ExchangeMarketService {
           { transaction }
         )
 
-        await transaction.commit()
+        // 提交事务（只有自己创建的事务才提交）
+        if (shouldCommit) {
+          await transaction.commit()
+        }
 
         console.log(`[兑换市场] 商品有${orderCount}个关联订单，已下架而非删除`)
 
@@ -929,7 +1169,11 @@ class ExchangeMarketService {
 
       // 删除商品
       await item.destroy({ transaction })
-      await transaction.commit()
+
+      // 提交事务（只有自己创建的事务才提交）
+      if (shouldCommit) {
+        await transaction.commit()
+      }
 
       console.log(`[兑换市场] 商品删除成功，item_id: ${item_id}`)
 
@@ -940,11 +1184,74 @@ class ExchangeMarketService {
         timestamp: BeijingTimeHelper.now()
       }
     } catch (error) {
-      if (transaction && !transaction.finished) {
+      // 回滚事务（只有自己创建的事务才回滚）
+      if (shouldCommit && transaction && !transaction.finished) {
         await transaction.rollback()
       }
 
       console.error(`[兑换市场] 删除商品失败(item_id:${item_id}):`, error.message)
+      throw error
+    }
+  }
+
+  /**
+   * 获取用户上架统计（管理员专用）
+   *
+   * @description
+   * 整合InventoryService的getUserListingStats方法，为管理员提供用户上架状态统计。
+   * 支持分页、筛选（全部/接近上限/达到上限），返回用户详情和统计信息。
+   *
+   * 🎯 P2-C架构重构：从AdminMarketplaceService合并到ExchangeMarketService
+   *
+   * 业务场景：
+   * - 管理员查看所有用户的上架情况
+   * - 识别接近上限的用户，提前干预
+   * - 统计市场整体上架状态
+   *
+   * @param {Object} options - 查询选项
+   * @param {number} [options.page=1] - 页码
+   * @param {number} [options.limit=20] - 每页数量
+   * @param {string} [options.filter='all'] - 筛选条件：all/near_limit/at_limit
+   * @param {number} options.max_listings - 最大上架数量限制
+   * @returns {Promise<Object>} 用户上架统计结果
+   * @returns {Array} result.stats - 用户上架统计列表
+   * @returns {Object} result.pagination - 分页信息
+   * @returns {Object} result.summary - 总体统计摘要
+   *
+   * @throws {Error} 当查询失败时抛出错误
+   *
+   * @example
+   * const stats = await ExchangeMarketService.getUserListingStats({
+   *   page: 1,
+   *   limit: 20,
+   *   filter: 'at_limit',
+   *   max_listings: 3
+   * });
+   */
+  static async getUserListingStats (options) {
+    try {
+      console.log('[兑换市场] 管理员获取用户上架统计', {
+        page: options.page,
+        limit: options.limit,
+        filter: options.filter
+      })
+
+      // 🎯 调用InventoryService的方法（避免重复实现）
+      const InventoryService = require('./InventoryService')
+      const result = await InventoryService.getUserListingStats(options)
+
+      console.log('[兑换市场] 用户上架统计查询成功', {
+        total_users: result.summary.total_users_with_listings,
+        filtered_count: result.pagination.total
+      })
+
+      return result
+    } catch (error) {
+      console.error('[兑换市场] 获取用户上架统计失败:', {
+        error: error.message,
+        stack: error.stack,
+        options
+      })
       throw error
     }
   }

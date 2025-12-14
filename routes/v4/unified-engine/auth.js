@@ -31,6 +31,7 @@ const {
 } = require('../../../middleware/auth')
 const BeijingTimeHelper = require('../../../utils/timeHelper')
 const { getRateLimiter } = require('../../../middleware/RateLimiterMiddleware')
+const { asyncHandler } = require('../../../middleware/errorHandler')
 
 // ✅ 风险点3解决：创建Token验证接口专用限流器
 const rateLimiter = getRateLimiter()
@@ -54,14 +55,15 @@ const verifyRateLimiter = rateLimiter.createLimiter({
  * @param {string} mobile - 手机号
  * @param {string} verification_code - 验证码
  */
-router.post('/login', async (req, res) => {
-  /*
-   * 🔴 登录性能监控：记录开始时间（2025-11-09新增）
-   * 用于监控登录响应时间，判断是否需要优化（文档方案0建议）
-   */
-  const loginStartTime = Date.now()
+router.post(
+  '/login',
+  asyncHandler(async (req, res) => {
+    /*
+     * 🔴 登录性能监控：记录开始时间（2025-11-09新增）
+     * 用于监控登录响应时间，判断是否需要优化（文档方案0建议）
+     */
+    const loginStartTime = Date.now()
 
-  try {
     const { mobile, verification_code } = req.body
 
     // 验证必需参数
@@ -116,7 +118,12 @@ router.post('/login', async (req, res) => {
           // 并发情况下可能出现：检查时不存在，注册时已存在
           user = await UserService.findByMobile(mobile)
           if (!user) {
-            return res.apiError('用户注册失败', 'REGISTRATION_FAILED', { error: error.message }, 500)
+            return res.apiError(
+              '用户注册失败',
+              'REGISTRATION_FAILED',
+              { error: error.message },
+              500
+            )
           }
         } else {
           return res.apiError('用户注册失败', 'REGISTRATION_FAILED', { error: error.message }, 500)
@@ -183,11 +190,8 @@ router.post('/login', async (req, res) => {
     }
 
     return res.apiSuccess(responseData, message)
-  } catch (error) {
-    console.error('登录失败:', error)
-    return res.apiError('登录失败', 'LOGIN_FAILED', error.message, 500)
-  }
-})
+  })
+)
 
 /**
  * 🛡️ 用户快速登录（手机号直接登录）
@@ -208,8 +212,9 @@ router.post('/login', async (req, res) => {
  * @param {string} iv - 加密算法的初始向量（wx.getPhoneNumber获取）
  * @returns {Object} 解密成功响应（phoneNumber: 明文手机号）
  */
-router.post('/decrypt-phone', async (req, res) => {
-  try {
+router.post(
+  '/decrypt-phone',
+  asyncHandler(async (req, res) => {
     const { code, encryptedData, iv } = req.body
 
     /*
@@ -273,11 +278,8 @@ router.post('/decrypt-phone', async (req, res) => {
       },
       '手机号获取成功'
     )
-  } catch (error) {
-    console.error('❌ 微信手机号解密失败:', error)
-    return res.apiError('手机号解密失败', 'DECRYPT_ERROR', error.message, 500)
-  }
-})
+  })
+)
 
 /**
  * 🛡️ 微信授权一键登录 (WeChat One-Click Login)
@@ -306,14 +308,15 @@ router.post('/decrypt-phone', async (req, res) => {
  * @param {string} mobile - 手机号（必填，来自微信授权）
  * @returns {Object} 登录成功响应（access_token + user信息 + role_based_admin）
  */
-router.post('/quick-login', async (req, res) => {
-  /*
-   * 🔴 登录性能监控：记录开始时间（2025-11-09新增）
-   * 用于监控登录响应时间，判断是否需要优化（文档方案0建议）
-   */
-  const loginStartTime = Date.now()
+router.post(
+  '/quick-login',
+  asyncHandler(async (req, res) => {
+    /*
+     * 🔴 登录性能监控：记录开始时间（2025-11-09新增）
+     * 用于监控登录响应时间，判断是否需要优化（文档方案0建议）
+     */
+    const loginStartTime = Date.now()
 
-  try {
     /*
      * ========================================
      * 步骤1: 验证手机号参数
@@ -356,7 +359,12 @@ router.post('/quick-login', async (req, res) => {
           // 并发情况下可能出现：检查时不存在，注册时已存在
           user = await UserService.findByMobile(mobile)
           if (!user) {
-            return res.apiError('用户注册失败', 'REGISTRATION_FAILED', { error: error.message }, 500)
+            return res.apiError(
+              '用户注册失败',
+              'REGISTRATION_FAILED',
+              { error: error.message },
+              500
+            )
           }
         } else {
           return res.apiError('用户注册失败', 'REGISTRATION_FAILED', { error: error.message }, 500)
@@ -448,18 +456,17 @@ router.post('/quick-login', async (req, res) => {
     }
 
     return res.apiSuccess(responseData, '快速登录成功')
-  } catch (error) {
-    console.error('❌ 快速登录失败:', error)
-    return res.apiError('快速登录失败', 'QUICK_LOGIN_FAILED', error.message, 500)
-  }
-})
+  })
+)
 
 /**
  * 🛡️ 获取当前用户信息
  * GET /api/v4/auth/profile
  */
-router.get('/profile', require('../../../middleware/auth').authenticateToken, async (req, res) => {
-  try {
+router.get(
+  '/profile',
+  require('../../../middleware/auth').authenticateToken,
+  asyncHandler(async (req, res) => {
     const user_id = req.user.user_id
 
     // 🎯 通过ServiceManager获取UserService
@@ -489,23 +496,8 @@ router.get('/profile', require('../../../middleware/auth').authenticateToken, as
     }
 
     return res.apiSuccess(responseData, '用户信息获取成功')
-  } catch (error) {
-    console.error('获取用户信息失败:', error)
-
-    // 根据错误类型返回不同的响应
-    if (error.code === 'USER_NOT_FOUND') {
-      return res.apiError(error.message, error.code, null, 404)
-    }
-    if (error.code === 'USER_INACTIVE') {
-      console.warn(
-        `❌ [Security Alert] Banned user tried to access profile: user_id=${req.user.user_id}`
-      )
-      return res.apiError('账户已被禁用或删除', 'ACCOUNT_BANNED', null, 403)
-    }
-
-    return res.apiError('获取用户信息失败', 'GET_PROFILE_FAILED', error.message, 500)
-  }
-})
+  })
+)
 
 /**
  * 🛡️ 刷新访问Token
@@ -514,8 +506,9 @@ router.get('/profile', require('../../../middleware/auth').authenticateToken, as
  * @body {string} refresh_token - 刷新Token
  * @returns {Object} 新的访问Token和刷新Token
  */
-router.post('/refresh', async (req, res) => {
-  try {
+router.post(
+  '/refresh',
+  asyncHandler(async (req, res) => {
     const { refresh_token } = req.body
 
     // 验证必需参数
@@ -558,28 +551,8 @@ router.post('/refresh', async (req, res) => {
     }
 
     return res.apiSuccess(responseData, 'Token刷新成功')
-  } catch (error) {
-    console.error('Token刷新失败:', error)
-
-    // 根据错误类型返回不同的响应
-    if (error.code === 'USER_NOT_FOUND') {
-      return res.apiError(error.message, error.code, null, 404)
-    }
-    if (error.code === 'USER_INACTIVE') {
-      return res.apiError('用户账户已被禁用', 'USER_INACTIVE', null, 403)
-    }
-
-    // 区分不同的JWT错误类型
-    if (error.name === 'JsonWebTokenError') {
-      return res.apiError('刷新Token格式错误', 'INVALID_REFRESH_TOKEN_FORMAT', error.message, 401)
-    }
-    if (error.name === 'TokenExpiredError') {
-      return res.apiError('刷新Token已过期', 'REFRESH_TOKEN_EXPIRED', error.message, 401)
-    }
-
-    return res.apiError('Token刷新失败', 'REFRESH_TOKEN_FAILED', error.message, 500)
-  }
-})
+  })
+)
 
 /**
  * 🛡️ 用户退出登录（User Logout）
@@ -626,8 +599,11 @@ router.post('/refresh', async (req, res) => {
  * - Token续期前的有效性检查
  * - 跨页面的用户信息同步
  */
-router.get('/verify', authenticateToken, verifyRateLimiter, async (req, res, next) => {
-  try {
+router.get(
+  '/verify',
+  authenticateToken,
+  verifyRateLimiter,
+  asyncHandler(async (req, res) => {
     const user_id = req.user.user_id
 
     // 🎯 通过ServiceManager获取UserService
@@ -635,7 +611,15 @@ router.get('/verify', authenticateToken, verifyRateLimiter, async (req, res, nex
 
     // ✅ 使用 UserService 获取用户信息（含状态验证）
     const user = await UserService.getUserWithValidation(user_id, {
-      attributes: ['user_id', 'mobile', 'nickname', 'status', 'created_at', 'last_login', 'login_count']
+      attributes: [
+        'user_id',
+        'mobile',
+        'nickname',
+        'status',
+        'created_at',
+        'last_login',
+        'login_count'
+      ]
     })
 
     // 🛡️ 使用缓存机制获取用户角色信息（getUserRoles内置缓存）
@@ -643,39 +627,33 @@ router.get('/verify', authenticateToken, verifyRateLimiter, async (req, res, nex
 
     console.log(`✅ [Auth] Token验证成功: user_id=${user_id}, roles=${userRoles.roles.join(',')}`)
 
-    return res.apiSuccess({
-      user_id: user.user_id,
-      mobile: user.mobile,
-      nickname: user.nickname,
-      status: user.status,
-      roles: userRoles.roles,
-      role_level: userRoles.maxLevel,
-      is_admin: userRoles.isAdmin,
-      role_based_admin: userRoles.isAdmin,
-      created_at: BeijingTimeHelper.formatToISO(user.created_at),
-      last_login: BeijingTimeHelper.formatToISO(user.last_login),
-      login_count: user.login_count,
-      valid: true, // 向后兼容旧测试
-      token_valid: true, // 新字段
-      timestamp: BeijingTimeHelper.apiTimestamp()
-    }, 'Token验证成功', 'TOKEN_VALID')
-  } catch (error) {
-    console.error('❌ [Auth] Token验证失败:', error)
+    return res.apiSuccess(
+      {
+        user_id: user.user_id,
+        mobile: user.mobile,
+        nickname: user.nickname,
+        status: user.status,
+        roles: userRoles.roles,
+        role_level: userRoles.maxLevel,
+        is_admin: userRoles.isAdmin,
+        role_based_admin: userRoles.isAdmin,
+        created_at: BeijingTimeHelper.formatToISO(user.created_at),
+        last_login: BeijingTimeHelper.formatToISO(user.last_login),
+        login_count: user.login_count,
+        valid: true, // 向后兼容旧测试
+        token_valid: true, // 新字段
+        timestamp: BeijingTimeHelper.apiTimestamp()
+      },
+      'Token验证成功',
+      'TOKEN_VALID'
+    )
+  })
+)
 
-    // 根据错误类型返回不同的响应
-    if (error.code === 'USER_NOT_FOUND') {
-      return res.apiError(error.message, error.code, null, 404)
-    }
-    if (error.code === 'USER_INACTIVE') {
-      return res.apiError('用户账号已被禁用', 'USER_INACTIVE', { status: 'inactive' }, 403)
-    }
-
-    return next(error)
-  }
-})
-
-router.post('/logout', authenticateToken, async (req, res) => {
-  try {
+router.post(
+  '/logout',
+  authenticateToken,
+  asyncHandler(async (req, res) => {
     const user_id = req.user.user_id
 
     /**
@@ -689,10 +667,7 @@ router.post('/logout', authenticateToken, async (req, res) => {
     console.log(`✅ [Auth] 用户退出登录: user_id=${user_id}, mobile=${req.user.mobile}`)
 
     return res.apiSuccess(null, '退出登录成功', 'LOGOUT_SUCCESS')
-  } catch (error) {
-    console.error('❌ [Auth] 退出登录失败:', error)
-    return res.apiError('退出登录失败', 'LOGOUT_FAILED', error.message, 500)
-  }
-})
+  })
+)
 
 module.exports = router

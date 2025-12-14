@@ -4,6 +4,25 @@
  *
  * 🎯 目的：简化用户权限操作，而不合并User和Role模型
  * 🛡️ 优势：保持模型分离的同时提供便捷的业务接口
+ *
+ * ⚠️ 【安全使用指南】
+ * ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ * 1. 【生产环境推荐】
+ *    - 路由层修改用户角色，必须使用 updateUserRole() 作为唯一入口
+ *    - 该方法包含完整的：事务保护 + 权限校验 + 审计日志 + 缓存失效
+ *
+ * 2. 【assignUserRole / removeUserRole 使用限制】
+ *    - ❌ 禁止在路由层直接调用这两个方法
+ *    - ❌ 禁止在对外暴露的API接口中使用
+ *    - ⚠️ 这两个方法缺少：事务保护、审计日志、缓存失效机制
+ *    - ✅ 仅供内部工具、测试脚本、或特殊场景下的编排使用
+ *
+ * 3. 【为什么要限制使用】
+ *    - 权限变更是高敏感操作，必须有完整的审计追踪
+ *    - 必须自动失效用户权限缓存，否则权限不生效
+ *    - 必须防止权限越级修改（低级别管理员修改高级别管理员）
+ *    - 简单的分配/移除方法无法满足这些安全要求
+ * ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
  */
 
 const { User, Role, UserRole } = require('../models')
@@ -25,13 +44,15 @@ class UserRoleService {
    */
   static async getUserWithRoles (user_id) {
     const user = await User.findByPk(user_id, {
-      include: [{
-        model: Role,
-        as: 'roles',
-        where: { is_active: true },
-        through: { where: { is_active: true } },
-        required: false
-      }]
+      include: [
+        {
+          model: Role,
+          as: 'roles',
+          where: { is_active: true },
+          through: { where: { is_active: true } },
+          required: false
+        }
+      ]
     })
 
     if (!user) {
@@ -49,12 +70,13 @@ class UserRoleService {
       history_total_points: user.history_total_points,
 
       // 角色权限信息
-      roles: user.roles?.map(role => ({
-        role_uuid: role.role_uuid,
-        role_name: role.role_name,
-        role_level: role.role_level,
-        permissions: role.permissions
-      })) || [],
+      roles:
+        user.roles?.map(role => ({
+          role_uuid: role.role_uuid,
+          role_name: role.role_name,
+          role_level: role.role_level,
+          permissions: role.permissions
+        })) || [],
 
       // 便捷权限检查
       is_admin: await user.isAdmin(),
@@ -63,7 +85,29 @@ class UserRoleService {
   }
 
   /**
-   * 🛡️ 分配用户角色
+   * 🛡️ 分配用户角色（内部工具方法）
+   *
+   * ⚠️ 【重要安全警告】
+   * ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   * ❌ 禁止在路由层直接调用此方法
+   * ❌ 禁止在对外暴露的API接口中使用此方法
+   * ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   *
+   * 【此方法缺少的安全机制】
+   * - ❌ 无事务保护（数据不一致风险）
+   * - ❌ 无审计日志记录（操作无法追溯）
+   * - ❌ 无权限缓存失效（权限变更不生效）
+   * - ❌ 无权限等级校验（可能越级修改）
+   *
+   * 【生产环境推荐】
+   * ✅ 请使用 updateUserRole() 方法，该方法包含完整的安全保护机制
+   *
+   * 【适用场景】
+   * - ✅ 内部工具脚本（如初始化脚本、数据迁移）
+   * - ✅ 自动化测试代码
+   * - ✅ 需要在其他服务方法内部编排使用的场景
+   *
+   * @deprecated 生产环境不推荐直接使用，请改用 updateUserRole()
    * @param {number} user_id - 用户ID
    * @param {string} roleName - 角色名称
    * @returns {Promise<Object>} 分配结果，包含message和role字段
@@ -106,7 +150,29 @@ class UserRoleService {
   }
 
   /**
-   * 🗑️ 移除用户角色
+   * 🗑️ 移除用户角色（内部工具方法）
+   *
+   * ⚠️ 【重要安全警告】
+   * ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   * ❌ 禁止在路由层直接调用此方法
+   * ❌ 禁止在对外暴露的API接口中使用此方法
+   * ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   *
+   * 【此方法缺少的安全机制】
+   * - ❌ 无事务保护（数据不一致风险）
+   * - ❌ 无审计日志记录（操作无法追溯）
+   * - ❌ 无权限缓存失效（权限变更不生效）
+   * - ❌ 无权限等级校验（可能越级修改）
+   *
+   * 【生产环境推荐】
+   * ✅ 请使用 updateUserRole() 方法，该方法包含完整的安全保护机制
+   *
+   * 【适用场景】
+   * - ✅ 内部工具脚本（如初始化脚本、数据迁移）
+   * - ✅ 自动化测试代码
+   * - ✅ 需要在其他服务方法内部编排使用的场景
+   *
+   * @deprecated 生产环境不推荐直接使用，请改用 updateUserRole()
    * @param {number} user_id - 用户ID
    * @param {string} roleName - 角色名称
    * @returns {Promise<Object>} 移除结果，包含message和role字段
@@ -157,13 +223,15 @@ class UserRoleService {
   static async getBatchUsersWithRoles (userIds) {
     const users = await User.findAll({
       where: { user_id: userIds },
-      include: [{
-        model: Role,
-        as: 'roles',
-        where: { is_active: true },
-        through: { where: { is_active: true } },
-        required: false
-      }]
+      include: [
+        {
+          model: Role,
+          as: 'roles',
+          where: { is_active: true },
+          through: { where: { is_active: true } },
+          required: false
+        }
+      ]
     })
 
     return users.map(user => ({
@@ -182,12 +250,14 @@ class UserRoleService {
   static async getRoleStatistics () {
     const roles = await Role.findAll({
       where: { is_active: true },
-      include: [{
-        model: User,
-        as: 'users',
-        through: { where: { is_active: true } },
-        required: false
-      }]
+      include: [
+        {
+          model: User,
+          as: 'users',
+          through: { where: { is_active: true } },
+          required: false
+        }
+      ]
     })
 
     return roles.map(role => ({
@@ -228,18 +298,27 @@ class UserRoleService {
 
       // 验证操作者权限级别（防止低级别管理员修改高级别管理员）
       const operatorRoles = await getUserRoles(operator_id)
-      const operatorMaxLevel = operatorRoles.roles.length > 0 ? Math.max(...operatorRoles.roles.map(r => r.role_level)) : 0
+      const operatorMaxLevel =
+        operatorRoles.roles.length > 0 ? Math.max(...operatorRoles.roles.map(r => r.role_level)) : 0
 
       const targetUserRoles = await getUserRoles(user_id)
-      const targetMaxLevel = targetUserRoles.roles.length > 0 ? Math.max(...targetUserRoles.roles.map(r => r.role_level)) : 0
+      const targetMaxLevel =
+        targetUserRoles.roles.length > 0
+          ? Math.max(...targetUserRoles.roles.map(r => r.role_level))
+          : 0
 
       // 操作者权限必须高于目标用户
       if (operatorMaxLevel <= targetMaxLevel) {
-        throw new Error(`权限不足：无法修改同级或更高级别用户的角色（操作者级别: ${operatorMaxLevel}, 目标用户级别: ${targetMaxLevel}）`)
+        throw new Error(
+          `权限不足：无法修改同级或更高级别用户的角色（操作者级别: ${operatorMaxLevel}, 目标用户级别: ${targetMaxLevel}）`
+        )
       }
 
       // 验证目标角色
-      const targetRole = await Role.findOne({ where: { role_name }, transaction: internalTransaction })
+      const targetRole = await Role.findOne({
+        where: { role_name },
+        transaction: internalTransaction
+      })
       if (!targetRole) {
         throw new Error('角色不存在')
       }
@@ -252,13 +331,16 @@ class UserRoleService {
       await UserRole.destroy({ where: { user_id }, transaction: internalTransaction })
 
       // 分配新角色
-      await UserRole.create({
-        user_id,
-        role_id: targetRole.role_id,
-        assigned_at: BeijingTimeHelper.createBeijingTime(),
-        assigned_by: operator_id,
-        is_active: true
-      }, { transaction: internalTransaction })
+      await UserRole.create(
+        {
+          user_id,
+          role_id: targetRole.role_id,
+          assigned_at: BeijingTimeHelper.createBeijingTime(),
+          assigned_by: operator_id,
+          is_active: true
+        },
+        { transaction: internalTransaction }
+      )
 
       // 记录审计日志（权限变更属于高敏感操作）
       await AuditLogService.logOperation({
@@ -352,7 +434,12 @@ class UserRoleService {
     await invalidateUserPermissions(user_id, `status_change_${oldStatus}_to_${status}`)
     logger.info('权限缓存已清除', { user_id, reason: `状态变更 ${oldStatus} → ${status}` })
 
-    logger.info('用户状态更新成功', { user_id, old_status: oldStatus, new_status: status, operator_id })
+    logger.info('用户状态更新成功', {
+      user_id,
+      old_status: oldStatus,
+      new_status: status,
+      operator_id
+    })
 
     return {
       user_id,
@@ -388,17 +475,27 @@ class UserRoleService {
     // 基础查询
     const userQuery = {
       where: whereClause,
-      attributes: ['user_id', 'mobile', 'nickname', 'history_total_points', 'status', 'last_login', 'created_at'],
+      attributes: [
+        'user_id',
+        'mobile',
+        'nickname',
+        'history_total_points',
+        'status',
+        'last_login',
+        'created_at'
+      ],
       limit: finalLimit,
       offset: (parseInt(page) - 1) * finalLimit,
       order: [['created_at', 'DESC']],
-      include: [{
-        model: Role,
-        as: 'roles',
-        through: { where: { is_active: true } },
-        attributes: ['role_name', 'role_level'],
-        required: false
-      }]
+      include: [
+        {
+          model: Role,
+          as: 'roles',
+          through: { where: { is_active: true } },
+          attributes: ['role_name', 'role_level'],
+          required: false
+        }
+      ]
     }
 
     // 角色过滤
@@ -412,7 +509,8 @@ class UserRoleService {
 
     // 处理用户数据
     const processedUsers = users.map(user => {
-      const max_role_level = user.roles.length > 0 ? Math.max(...user.roles.map(role => role.role_level)) : 0
+      const max_role_level =
+        user.roles.length > 0 ? Math.max(...user.roles.map(role => role.role_level)) : 0
       return {
         user_id: user.user_id,
         mobile: user.mobile,
@@ -449,15 +547,17 @@ class UserRoleService {
     // 查询用户信息（包含角色信息）
     const user = await User.findOne({
       where: { user_id },
-      include: [{
-        model: Role,
-        as: 'roles',
-        through: {
-          where: { is_active: true },
-          attributes: ['assigned_at', 'assigned_by']
-        },
-        attributes: ['role_uuid', 'role_name', 'role_level', 'description']
-      }]
+      include: [
+        {
+          model: Role,
+          as: 'roles',
+          through: {
+            where: { is_active: true },
+            attributes: ['assigned_at', 'assigned_by']
+          },
+          attributes: ['role_uuid', 'role_name', 'role_level', 'description']
+        }
+      ]
     })
 
     if (!user) {
@@ -465,7 +565,8 @@ class UserRoleService {
     }
 
     // 计算用户权限级别
-    const max_role_level = user.roles.length > 0 ? Math.max(...user.roles.map(role => role.role_level)) : 0
+    const max_role_level =
+      user.roles.length > 0 ? Math.max(...user.roles.map(role => role.role_level)) : 0
 
     logger.info('获取用户详情成功', { user_id })
 

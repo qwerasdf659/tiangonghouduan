@@ -15,11 +15,10 @@
  * - ✅ points_paid 必须强制为 0
  * - ✅ payment_type 必须为 'virtual'
  *
- * 最后修改：2025年12月09日 - 统一为只支持virtual支付方式
+ * 最后修改：2025年12月12日 - 添加business_id等字段支持幂等性
  */
 
 const { DataTypes } = require('sequelize')
-const BeijingTimeHelper = require('../utils/timeHelper')
 
 module.exports = sequelize => {
   const ExchangeMarketRecord = sequelize.define(
@@ -87,11 +86,43 @@ module.exports = sequelize => {
         unique: true,
         comment: '订单号'
       },
+      business_id: {
+        type: DataTypes.STRING(100),
+        allowNull: true,
+        unique: true,
+        comment: '业务唯一标识（用于幂等性控制，防止重复提交）'
+      },
+      item_snapshot: {
+        type: DataTypes.JSON,
+        allowNull: true,
+        comment: '商品快照（记录兑换时的商品信息：名称、价格、描述等）'
+      },
+      quantity: {
+        type: DataTypes.INTEGER,
+        allowNull: false,
+        defaultValue: 1,
+        comment: '兑换数量'
+      },
+      total_cost: {
+        type: DataTypes.DECIMAL(10, 2),
+        allowNull: true,
+        comment: '总成本（管理员可见，= cost_price * quantity）'
+      },
       status: {
         type: DataTypes.ENUM('pending', 'completed', 'shipped', 'cancelled'),
         allowNull: false,
         defaultValue: 'pending',
         comment: '订单状态'
+      },
+      admin_remark: {
+        type: DataTypes.TEXT,
+        allowNull: true,
+        comment: '管理员备注（管理员操作订单时的备注信息）'
+      },
+      exchange_time: {
+        type: DataTypes.DATE,
+        allowNull: true,
+        comment: '兑换时间（记录实际兑换时刻，北京时间）'
       },
       shipped_at: {
         type: DataTypes.DATE,
@@ -107,6 +138,7 @@ module.exports = sequelize => {
       underscored: true,
       indexes: [
         { fields: ['order_no'], unique: true },
+        { fields: ['business_id'], unique: true, name: 'idx_business_id_unique' },
         { fields: ['user_id'] },
         { fields: ['status'] },
         { fields: ['created_at'] }
@@ -117,6 +149,8 @@ module.exports = sequelize => {
 
   /**
    * 关联定义
+   * @param {Object} models - Sequelize模型集合
+   * @returns {void} 无返回值
    */
   ExchangeMarketRecord.associate = function (models) {
     // 属于用户
@@ -134,6 +168,7 @@ module.exports = sequelize => {
 
   /**
    * 生成订单号
+   * @returns {string} 订单号
    */
   ExchangeMarketRecord.generateOrderNo = function () {
     const timestamp = Date.now()
