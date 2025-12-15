@@ -1607,6 +1607,62 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
     default:
       this.logError('未知奖品类型', { prizeType: prize.prize_type })
     }
+
+    /**
+     * 🆕 V4.5.0 材料系统：发放材料（如果奖品配置了材料）
+     *
+     * 业务场景：
+     * - 抽奖时可以发放材料（碎红水晶、完整红水晶等）
+     * - 与积分、虚拟奖品发放并行，不影响现有功能
+     * - 支持幂等性控制，防止重复发放
+     *
+     * 数据来源：
+     * - material_asset_code: 材料资产代码（如red_shard、red_crystal）
+     * - material_amount: 材料数量
+     *
+     * 业务规则：
+     * - 只有当material_asset_code和material_amount都存在时才发放材料
+     * - 使用MaterialService.add()统一发放材料
+     * - 传入transaction确保事务一致性
+     * - 使用business_id确保幂等性
+     */
+    if (prize.material_asset_code && prize.material_amount) {
+      // 动态获取MaterialService（避免循环依赖）
+      const MaterialService = require('../../MaterialService')
+
+      // 生成唯一的business_id（用于幂等性控制）
+      const business_id = `lottery_draw_${BeijingTimeHelper.generateIdTimestamp()}_${user_id}_${prize.prize_id}_material`
+
+      // 调用MaterialService发放材料
+      await MaterialService.add(
+        user_id,
+        prize.material_asset_code,
+        prize.material_amount,
+        {
+          transaction, // 传入事务对象，确保与抽奖在同一事务中
+          business_id, // 幂等键
+          business_type: 'lottery_reward',
+          title: `抽奖获得${prize.prize_name}材料`,
+          meta: {
+            prize_id: prize.prize_id,
+            prize_name: prize.prize_name,
+            prize_type: prize.prize_type,
+            material_asset_code: prize.material_asset_code,
+            material_amount: prize.material_amount
+          }
+        }
+      )
+
+      this.logInfo('发放材料奖励（V4.5.0材料系统）', {
+        user_id,
+        prize_id: prize.prize_id,
+        prize_name: prize.prize_name,
+        material_asset_code: prize.material_asset_code,
+        material_amount: prize.material_amount,
+        business_id,
+        inTransaction: !!transaction
+      })
+    }
   }
 
   /**

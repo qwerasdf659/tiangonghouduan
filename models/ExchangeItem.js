@@ -61,17 +61,29 @@ module.exports = sequelize => {
         type: DataTypes.ENUM('virtual'),
         allowNull: false,
         defaultValue: 'virtual',
-        comment: '支付方式（仅支持虚拟奖品价值支付）'
+        comment: '支付方式（仅支持虚拟奖品价值支付）- 已废弃，保留用于历史数据兼容'
       },
       virtual_value_price: {
         type: DataTypes.INTEGER,
         allowNull: false,
-        comment: '虚拟奖品价格（实际扣除的虚拟价值，必须字段）'
+        comment: '虚拟奖品价格（实际扣除的虚拟价值）- 已废弃，保留用于回滚观测'
       },
       points_price: {
         type: DataTypes.INTEGER,
         allowNull: true,
-        comment: '积分价格（仅用于前端展示，不扣除用户显示积分）'
+        comment: '积分价格（仅用于前端展示，不扣除用户显示积分）- 已废弃'
+      },
+
+      // V4.5.0 材料资产支付字段（2025-12-15新增）
+      cost_asset_code: {
+        type: DataTypes.STRING(50),
+        allowNull: true,
+        comment: '成本资产代码（Cost Asset Code - 兑换商品消耗的材料资产类型）：red_shard-碎红水晶、red_crystal-完整红水晶等；业务规则：新商品必填，历史商品可为null；支持多种材料资产扩展；用途：兑换支付资产类型、库存扣减依据、成本核算基础'
+      },
+      cost_amount: {
+        type: DataTypes.BIGINT,
+        allowNull: true,
+        comment: '成本数量（Cost Amount - 兑换单件商品需要的材料数量）：单位根据cost_asset_code确定（如10个碎红水晶）；业务规则：新商品必填，历史商品可为null；使用BIGINT避免浮点精度问题；数据范围：1-1000000；用途：兑换扣减材料数量、成本核算、商品定价参考'
       },
 
       // 成本和库存

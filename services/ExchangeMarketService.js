@@ -63,7 +63,6 @@ const {
   ExchangeItem,
   ExchangeMarketRecord,
   UserInventory,
-  UserPointsAccount,
   sequelize
 } = require('../models')
 const { Op } = require('sequelize')
@@ -313,6 +312,11 @@ class ExchangeMarketService {
 
   /**
    * 兑换商品（核心业务逻辑）
+   * V4.5.0 材料资产支付版本（2025-12-15）
+   *
+   * 支付方式改造：
+   * - 旧版：从UserInventory扣除虚拟奖品价值（virtual_value_price）
+   * - 新版：使用AssetService扣减材料资产（cost_asset_code + cost_amount）
    *
    * @param {number} user_id - 用户ID
    * @param {number} item_id - 商品ID
@@ -335,10 +339,12 @@ class ExchangeMarketService {
     const shouldCommit = !externalTransaction // 只有自己创建的事务才提交/回滚
 
     try {
-      // ✅ 幂等性检查：以 business_id 为唯一键（与PointsService对齐）
-      // 🔴 P1-1-5: 不使用悲观锁，依赖数据库唯一约束防止并发创建重复订单
-      // 原因：多个事务同时使用 FOR UPDATE 竞争同一行会导致死锁
-      // 解决方案：利用唯一索引约束，并发插入时自动捕获冲突
+      /*
+       * ✅ 幂等性检查：以 business_id 为唯一键（与PointsService对齐）
+       * 🔴 P1-1-5: 不使用悲观锁，依赖数据库唯一约束防止并发创建重复订单
+       * 原因：多个事务同时使用 FOR UPDATE 竞争同一行会导致死锁
+       * 解决方案：利用唯一索引约束，并发插入时自动捕获冲突
+       */
       const existingOrder = await ExchangeMarketRecord.findOne({
         where: {
           business_id
@@ -375,11 +381,17 @@ class ExchangeMarketService {
           order_no: existingOrder.order_no
         })
 
-        // 获取当前虚拟价值余额
-        const userAccount = await UserPointsAccount.findOne({
-          where: { user_id },
-          transaction
-        })
+        // V4.5.0: 获取材料余额（如果有pay_asset_code）
+        const MaterialService = require('./MaterialService')
+        let materialBalance = 0
+        if (existingOrder.pay_asset_code) {
+          const balanceRecord = await MaterialService.getOrCreateBalance(
+            user_id,
+            existingOrder.pay_asset_code,
+            { transaction }
+          )
+          materialBalance = balanceRecord.balance || 0
+        }
 
         return {
           success: true,
@@ -389,14 +401,16 @@ class ExchangeMarketService {
             record_id: existingOrder.record_id,
             item_name: existingOrder.item_snapshot?.item_name || '未知商品',
             quantity: existingOrder.quantity,
+            pay_asset_code: existingOrder.pay_asset_code,
+            pay_amount: existingOrder.pay_amount,
+            // 保留旧字段用于兼容
             payment_type: existingOrder.payment_type,
             virtual_value_paid: existingOrder.virtual_value_paid,
             points_paid: existingOrder.points_paid,
             status: existingOrder.status
           },
           remaining: {
-            virtual_value: await this._getUserTotalVirtualValue(user_id, transaction),
-            available_points: userAccount?.available_points || 0
+            material_balance: materialBalance
           },
           is_duplicate: true, // ✅ 标记为重复请求
           timestamp: BeijingTimeHelper.now()
@@ -424,63 +438,91 @@ class ExchangeMarketService {
         throw new Error(`库存不足，当前库存：${item.stock}`)
       }
 
-      // 2. 获取用户积分账户
-      const userAccount = await UserPointsAccount.findOne({
-        where: { user_id },
-        lock: transaction.LOCK.UPDATE,
-        transaction
-      })
-
-      if (!userAccount) {
-        throw new Error('用户积分账户不存在')
+      // V4.5.0: 验证商品是否配置了材料资产支付
+      if (!item.cost_asset_code || !item.cost_amount) {
+        throw new Error(
+          '商品未配置材料资产支付方式（cost_asset_code/cost_amount缺失）。' +
+            '请联系管理员更新商品配置。'
+        )
       }
 
-      // 3. 计算总价
-      const totalVirtualValue = (item.virtual_value_price || 0) * quantity
-      const totalPoints = (item.points_price || 0) * quantity
+      // 2. 计算总支付金额
+      const totalPayAmount = item.cost_amount * quantity
 
-      console.log('[兑换市场] 价格计算', {
-        price_type: item.price_type,
-        virtual_value_price: item.virtual_value_price,
-        points_price: item.points_price,
+      console.log('[兑换市场] 材料资产支付计算', {
+        cost_asset_code: item.cost_asset_code,
+        cost_amount: item.cost_amount,
         quantity,
-        totalVirtualValue,
-        totalPoints
+        totalPayAmount
       })
 
-      // 4. 强制校验：只允许 virtual 类型（业务规则强制）
-      if (item.price_type !== 'virtual') {
-        throw new Error(
-          `不支持的支付方式：${item.price_type}。` +
-            '当前仅支持虚拟奖品支付（price_type=\'virtual\'），请联系管理员更新商品配置。'
-        )
+      // 3. 使用MaterialService扣减材料资产
+      const MaterialService = require('./MaterialService')
+
+      console.log('[兑换市场] 开始扣减材料资产', {
+        user_id,
+        asset_code: item.cost_asset_code,
+        amount: totalPayAmount,
+        business_id: `${business_id}_material_deduct`
+      })
+
+      // 扣减材料资产
+      const materialResult = await MaterialService.consume(
+        user_id,
+        item.cost_asset_code,
+        totalPayAmount,
+        {
+          transaction,
+          business_id: `${business_id}_material_deduct`, // 材料扣减的幂等键
+          business_type: 'exchange_market_deduct', // 业务类型：兑换市场扣减
+          title: `兑换商品：${item.name}`,
+          meta: {
+            item_id,
+            item_name: item.name,
+            quantity,
+            order_business_id: business_id
+          }
+        }
+      )
+
+      // 如果是重复扣减，说明之前已经创建过订单但事务未提交，需要查询订单
+      if (materialResult.is_duplicate) {
+        console.log('[兑换市场] ⚠️ 材料扣减幂等返回，查询已存在订单', {
+          business_id
+        })
+
+        const existingRecord = await ExchangeMarketRecord.findOne({
+          where: { business_id },
+          transaction
+        })
+
+        if (existingRecord) {
+          if (shouldCommit) {
+            await transaction.commit()
+          }
+
+          return {
+            success: true,
+            message: '兑换订单已存在（材料扣减幂等）',
+            order: existingRecord.toJSON(),
+            remaining: {
+              material_balance: materialResult.new_balance
+            },
+            is_duplicate: true,
+            timestamp: BeijingTimeHelper.now()
+          }
+        }
       }
 
-      // 5. 使用虚拟奖品价值支付（唯一支付方式）
-      console.log('[兑换市场] 使用虚拟奖品价值支付')
+      console.log(`[兑换市场] 材料扣减成功：${totalPayAmount}个${item.cost_asset_code}，剩余${materialResult.new_balance}`)
 
-      // 检查虚拟价值是否足够
-      const userVirtualValue = await this._getUserTotalVirtualValue(user_id, transaction)
-
-      if (userVirtualValue < totalVirtualValue) {
-        throw new Error(
-          `虚拟奖品不足，需要${totalVirtualValue}虚拟价值，当前${userVirtualValue}。` +
-            '请先参与抽奖获取虚拟奖品。'
-        )
-      }
-
-      // 扣除虚拟奖品价值
-      await this._deductVirtualValue(user_id, totalVirtualValue, transaction)
-      const virtualValuePaid = totalVirtualValue
-      const pointsPaid = 0 // 强制为 0，不扣除显示积分
-
-      console.log(`[兑换市场] 扣除虚拟价值成功：${totalVirtualValue}`)
-
-      // 6. 生成订单号
+      // 4. 生成订单号
       const order_no = this._generateOrderNo()
 
-      // 7. 创建兑换订单（✅ 包含 business_id）
-      // 🔴 P1-1-5: 捕获唯一约束冲突（并发场景）
+      /*
+       * 5. 创建兑换订单（✅ 包含 business_id 和材料支付字段）
+       * 🔴 P1-1-5: 捕获唯一约束冲突（并发场景）
+       */
       let record
       try {
         record = await ExchangeMarketRecord.create(
@@ -493,14 +535,21 @@ class ExchangeMarketService {
               item_id: item.item_id,
               item_name: item.name,
               item_description: item.description,
+              cost_asset_code: item.cost_asset_code,
+              cost_amount: item.cost_amount,
+              // 保留旧字段用于兼容
               price_type: item.price_type,
               virtual_value_price: item.virtual_value_price,
               points_price: item.points_price
             },
             quantity,
-            payment_type: 'virtual', // 强制为 virtual
-            virtual_value_paid: virtualValuePaid,
-            points_paid: pointsPaid, // 强制为 0
+            // V4.5.0 新字段：材料资产支付
+            pay_asset_code: item.cost_asset_code,
+            pay_amount: totalPayAmount,
+            // 旧字段保留但设为默认值（用于回滚兼容）
+            payment_type: 'virtual',
+            virtual_value_paid: 0,
+            points_paid: 0,
             total_cost: (item.cost_price || 0) * quantity,
             status: 'pending',
             exchange_time: BeijingTimeHelper.createDatabaseTime()
@@ -509,24 +558,29 @@ class ExchangeMarketService {
         )
       } catch (createError) {
         // 🔴 捕获唯一约束冲突（并发场景下，多个事务同时插入相同 business_id）
-        if (createError.name === 'SequelizeUniqueConstraintError' || 
-            createError.message?.includes('Duplicate entry') ||
-            createError.message?.includes('idx_business_id_unique')) {
+        if (
+          createError.name === 'SequelizeUniqueConstraintError' ||
+          createError.message?.includes('Duplicate entry') ||
+          createError.message?.includes('idx_business_id_unique')
+        ) {
           console.log('[兑换市场] ⚠️ 并发冲突：business_id已存在，重试查询', { business_id })
-          
+
           // 回滚当前事务的本地更改，重新查询已存在的订单
           if (shouldCommit) {
             await transaction.rollback()
           }
-          
+
           // 重新查询已经创建的订单
           const concurrentOrder = await ExchangeMarketRecord.findOne({
             where: { business_id }
           })
-          
+
           if (concurrentOrder) {
             // 验证参数一致性
-            if (Number(concurrentOrder.item_id) !== Number(item_id) || Number(concurrentOrder.quantity) !== Number(quantity)) {
+            if (
+              Number(concurrentOrder.item_id) !== Number(item_id) ||
+              Number(concurrentOrder.quantity) !== Number(quantity)
+            ) {
               const conflictError = new Error(
                 `幂等键冲突：business_id="${business_id}" 已被使用于不同参数的订单。` +
                   `原订单：商品ID=${concurrentOrder.item_id}, 数量=${concurrentOrder.quantity}；` +
@@ -537,14 +591,23 @@ class ExchangeMarketService {
               conflictError.errorCode = 'IDEMPOTENCY_KEY_CONFLICT'
               throw conflictError
             }
-            
+
             // 返回已存在的订单（幂等）
-            const userAccount = await UserPointsAccount.findOne({ where: { user_id } })
+            const MaterialService = require('./MaterialService')
+            let materialBalance = 0
+            if (concurrentOrder.pay_asset_code) {
+              const balanceRecord = await MaterialService.getOrCreateBalance(
+                user_id,
+                concurrentOrder.pay_asset_code
+              )
+              materialBalance = balanceRecord.balance || 0
+            }
+
             return {
+              success: true,
               order: concurrentOrder.toJSON(),
               remaining: {
-                virtual_value: userAccount?.virtual_value_balance || 0,
-                points: userAccount?.points_balance || 0
+                material_balance: materialBalance
               },
               is_duplicate: true,
               message: '兑换成功（并发幂等返回）'
@@ -555,25 +618,16 @@ class ExchangeMarketService {
         throw createError
       }
 
-      // 8. 扣减商品库存
+      // 6. 扣减商品库存
       await item.update(
         {
           stock: item.stock - quantity,
-          total_exchange_count: (item.total_exchange_count || 0) + quantity
+          sold_count: (item.sold_count || 0) + quantity
         },
         { transaction }
       )
 
-      // 9. 更新用户统计字段
-      await userAccount.update(
-        {
-          total_redeem_count: (userAccount.total_redeem_count || 0) + 1,
-          last_redeem_at: BeijingTimeHelper.createDatabaseTime()
-        },
-        { transaction }
-      )
-
-      // 10. 提交事务（只有自己创建的事务才提交）
+      // 7. 提交事务（只有自己创建的事务才提交）
       if (shouldCommit) {
         await transaction.commit()
       }
@@ -588,14 +642,12 @@ class ExchangeMarketService {
           record_id: record.record_id,
           item_name: item.name,
           quantity,
-          payment_type: item.price_type,
-          virtual_value_paid: virtualValuePaid,
-          points_paid: pointsPaid,
+          pay_asset_code: item.cost_asset_code,
+          pay_amount: totalPayAmount,
           status: 'pending'
         },
         remaining: {
-          virtual_value: await this._getUserTotalVirtualValue(user_id),
-          available_points: userAccount.available_points - pointsPaid
+          material_balance: materialResult.new_balance
         },
         timestamp: BeijingTimeHelper.now()
       }
@@ -773,6 +825,8 @@ class ExchangeMarketService {
 
   /**
    * 获取用户虚拟奖品总价值（私有方法）
+   * @deprecated V4.5.0: 已废弃，兑换市场改为使用材料资产系统（AssetService）
+   * 保留此方法仅用于数据回滚和向后兼容，不建议在新代码中使用
    *
    * @param {number} user_id - 用户ID
    * @param {Transaction} [transaction] - 事务对象
@@ -780,6 +834,10 @@ class ExchangeMarketService {
    * @private
    */
   static async _getUserTotalVirtualValue (user_id, transaction = null) {
+    console.warn(
+      '[兑换市场] ⚠️ 警告：_getUserTotalVirtualValue已废弃（V4.5.0），请使用AssetService.getBalance代替'
+    )
+
     const result = await UserInventory.sum('value', {
       where: {
         user_id,
@@ -795,6 +853,8 @@ class ExchangeMarketService {
 
   /**
    * 扣除用户虚拟奖品价值（私有方法）
+   * @deprecated V4.5.0: 已废弃，兑换市场改为使用材料资产系统（AssetService）
+   * 保留此方法仅用于数据回滚和向后兼容，不建议在新代码中使用
    *
    * @param {number} user_id - 用户ID
    * @param {number} value_to_deduct - 要扣除的价值
@@ -803,6 +863,10 @@ class ExchangeMarketService {
    * @private
    */
   static async _deductVirtualValue (user_id, value_to_deduct, transaction) {
+    console.warn(
+      '[兑换市场] ⚠️ 警告：_deductVirtualValue已废弃（V4.5.0），请使用AssetService.changeBalance代替'
+    )
+
     // 获取用户所有可用的虚拟奖品（按价值升序，优先消耗小额）
     const virtualPrizes = await UserInventory.findAll({
       where: {

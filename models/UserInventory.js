@@ -255,12 +255,28 @@ module.exports = sequelize => {
           '市场状态（Market Status - 商品在市场的交易状态）：on_sale-在售中（可被购买或撤回）| sold-已售出（终态，已被其他用户购买）| withdrawn-已撤回（终态，卖家主动下架）| null-普通库存（未上架到市场）；业务规则：只有on_sale状态可以撤回，sold和withdrawn为终态不可逆转；用途：市场商品筛选、状态流转控制、交易记录'
       },
 
-      // 售价（Selling Price in Points - 用户设定的商品售价）
+      // 售价（Selling Price in Points - 用户设定的商品售价）- ⚠️ 已废弃，保留用于回滚观测
       selling_points: {
         type: DataTypes.INTEGER,
         allowNull: true,
         comment:
-          '出售价格（Selling Price - 用户设定的商品售价，单位：积分）：卖家自定义价格，通常低于原value值以吸引买家；业务规则：上架时必填，撤回后清空为null；数据范围：1-10000积分；用途：市场价格排序、交易金额计算、成本收益分析'
+          '出售价格（Selling Price - 用户设定的商品售价，单位：积分）：⚠️ 已废弃字段，保留用于回滚观测，业务逻辑不再读取；卖家自定义价格，通常低于原value值以吸引买家；业务规则：上架时必填，撤回后清空为null；数据范围：1-10000积分；用途：历史数据对比、回滚观测、数据迁移验证'
+      },
+
+      // 售价资产代码（Selling Asset Code - 市场售价的资产类型）- V4.2新增，DIAMOND结算
+      selling_asset_code: {
+        type: DataTypes.STRING(50),
+        allowNull: true,
+        comment:
+          '出售资产代码（Selling Asset Code - 市场售价的资产类型）：DIAMOND-钻石资产（交易市场唯一结算币种）；业务规则：上架时必填且只允许DIAMOND，撤回后清空为null；用途：市场价格资产类型、交易结算依据、多资产扩展预留'
+      },
+
+      // 售价金额（Selling Amount - 市场售价金额，单位DIAMOND）- V4.2新增，DIAMOND结算
+      selling_amount: {
+        type: DataTypes.BIGINT,
+        allowNull: true,
+        comment:
+          '出售金额（Selling Amount - 市场售价金额，单位：DIAMOND）：卖家自定义价格，使用BIGINT避免浮点精度问题；业务规则：上架时必填，撤回后清空为null；数据范围：1-1000000 DIAMOND；用途：市场价格排序、交易金额计算、成本收益分析'
       },
 
       // 成色（Item Condition - 商品物理状态和使用程度）

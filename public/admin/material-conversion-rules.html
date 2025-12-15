@@ -1,0 +1,700 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>材料转换规则管理 - 管理后台</title>
+
+  <!-- Bootstrap 5 - UI框架 -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+
+  <!-- Bootstrap Icons - 图标库 -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+
+  <!-- 公共样式表 - 统一主题和响应式设计 -->
+  <link href="/admin/css/common.css" rel="stylesheet">
+
+  <style>
+    .rule-card {
+      border-left: 4px solid #0d6efd;
+    }
+    .asset-flow {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .validation-warning {
+      border-left: 4px solid #ffc107;
+      padding: 1rem;
+      background-color: #fff3cd;
+      border-radius: 4px;
+    }
+  </style>
+</head>
+<body class="bg-light">
+  <!-- 顶部导航 -->
+  <nav class="navbar navbar-dark bg-primary">
+    <div class="container-fluid">
+      <a href="/admin/dashboard.html" class="navbar-brand">
+        <i class="bi bi-arrow-left me-2"></i>管理后台 - 材料转换规则管理
+      </a>
+      <div>
+        <span class="text-light me-3" id="welcomeText">欢迎，管理员</span>
+        <button class="btn btn-outline-light btn-sm" id="logoutBtn">退出登录</button>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container-fluid mt-4">
+    <!-- 操作区域 -->
+    <div class="card mb-3">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center">
+          <div>
+            <h5 class="mb-0">
+              <i class="bi bi-arrow-left-right"></i> 材料转换规则管理
+            </h5>
+            <small class="text-muted">配置碎片与水晶之间的转换规则</small>
+          </div>
+          <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addRuleModal">
+            <i class="bi bi-plus-lg"></i> 添加转换规则
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 统计信息 -->
+    <div class="row g-3 mb-3">
+      <div class="col-md-3">
+        <div class="card">
+          <div class="card-body text-center">
+            <h6 class="text-muted">转换规则总数</h6>
+            <h3 class="text-primary" id="totalRules">-</h3>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="card">
+          <div class="card-body text-center">
+            <h6 class="text-muted">已启用</h6>
+            <h3 class="text-success" id="enabledRules">-</h3>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="card">
+          <div class="card-body text-center">
+            <h6 class="text-muted">已禁用</h6>
+            <h3 class="text-warning" id="disabledRules">-</h3>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="card">
+          <div class="card-body text-center">
+            <h6 class="text-muted">转换路径数</h6>
+            <h3 class="text-info" id="totalPaths">-</h3>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 数据表格 -->
+    <div class="card">
+      <div class="card-body">
+        <div class="table-responsive">
+          <table class="table table-hover align-middle">
+            <thead class="table-light">
+              <tr>
+                <th>规则ID</th>
+                <th>转换方向</th>
+                <th>转换比例</th>
+                <th>生效时间</th>
+                <th>状态</th>
+                <th>风控校验</th>
+                <th style="width: 220px;">操作</th>
+              </tr>
+            </thead>
+            <tbody id="rulesTableBody">
+              <tr>
+                <td colspan="7" class="text-center py-5">
+                  <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">加载中...</span>
+                  </div>
+                  <p class="mt-2 text-muted">正在加载数据...</p>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 添加转换规则模态框 -->
+  <div class="modal fade" id="addRuleModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">
+            <i class="bi bi-plus-circle"></i> 添加转换规则
+          </h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <form id="addRuleForm">
+            <div class="row g-3">
+              <div class="col-md-6">
+                <label class="form-label">源资产 <span class="text-danger">*</span></label>
+                <select class="form-select" id="fromAssetCode" required>
+                  <option value="">请选择</option>
+                </select>
+                <small class="text-muted">用户付出的资产</small>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label">目标资产 <span class="text-danger">*</span></label>
+                <select class="form-select" id="toAssetCode" required>
+                  <option value="">请选择</option>
+                </select>
+                <small class="text-muted">用户获得的资产</small>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label">输入数量 <span class="text-danger">*</span></label>
+                <input type="number" class="form-control" id="inputQuantity" required min="1" placeholder="如: 10">
+                <small class="text-muted">每次转换所需的源资产数量</small>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label">输出数量 <span class="text-danger">*</span></label>
+                <input type="number" class="form-control" id="outputQuantity" required min="1" placeholder="如: 1">
+                <small class="text-muted">每次转换获得的目标资产数量</small>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label">生效时间 <span class="text-danger">*</span></label>
+                <input type="datetime-local" class="form-control" id="effectiveAt" required>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label">启用状态</label>
+                <select class="form-select" id="isEnabled">
+                  <option value="1">启用</option>
+                  <option value="0">禁用</option>
+                </select>
+              </div>
+            </div>
+            <!-- 风控提示区域 -->
+            <div id="validationWarnings" class="mt-3"></div>
+          </form>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+          <button type="button" class="btn btn-primary" id="submitAddBtn">
+            <i class="bi bi-check-lg"></i> 确认添加
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 编辑转换规则模态框 -->
+  <div class="modal fade" id="editRuleModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">
+            <i class="bi bi-pencil"></i> 编辑转换规则
+          </h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <form id="editRuleForm">
+            <input type="hidden" id="editRuleId">
+            <div class="row g-3">
+              <div class="col-md-12">
+                <label class="form-label">转换方向</label>
+                <input type="text" class="form-control" id="editDirection" disabled>
+                <small class="text-muted">转换方向不可修改</small>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label">输入数量 <span class="text-danger">*</span></label>
+                <input type="number" class="form-control" id="editInputQuantity" required min="1">
+              </div>
+              <div class="col-md-6">
+                <label class="form-label">输出数量 <span class="text-danger">*</span></label>
+                <input type="number" class="form-control" id="editOutputQuantity" required min="1">
+              </div>
+              <div class="col-md-6">
+                <label class="form-label">生效时间 <span class="text-danger">*</span></label>
+                <input type="datetime-local" class="form-control" id="editEffectiveAt" required>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label">启用状态</label>
+                <select class="form-select" id="editIsEnabled">
+                  <option value="1">启用</option>
+                  <option value="0">禁用</option>
+                </select>
+              </div>
+            </div>
+            <!-- 风控提示区域 -->
+            <div id="editValidationWarnings" class="mt-3"></div>
+          </form>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+          <button type="button" class="btn btn-primary" id="submitEditBtn">
+            <i class="bi bi-check-lg"></i> 保存更新
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast 提示组件 -->
+  <div class="position-fixed bottom-0 end-0 p-3" style="z-index: 11">
+    <div id="successToast" class="toast align-items-center text-white bg-success border-0" role="alert">
+      <div class="d-flex">
+        <div class="toast-body" id="successToastBody"></div>
+        <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+      </div>
+    </div>
+    <div id="errorToast" class="toast align-items-center text-white bg-danger border-0" role="alert">
+      <div class="d-flex">
+        <div class="toast-body" id="errorToastBody"></div>
+        <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bootstrap JS -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+  <!-- 公共工具函数 -->
+  <script src="/admin/js/admin-common.js"></script>
+
+  <!-- 页面脚本 -->
+  <script>
+    // 全局变量
+    let currentRules = [];
+    let assetTypes = [];
+    let addRuleModalInstance, editRuleModalInstance;
+    let successToastInstance, errorToastInstance;
+
+    // 初始化
+    document.addEventListener('DOMContentLoaded', function() {
+      // 权限检查
+      if (!checkAdminPermission()) {
+        return;
+      }
+
+      // 显示用户信息
+      const user = getCurrentUser();
+      if (user) {
+        document.getElementById('welcomeText').textContent = `欢迎，${user.nickname || user.mobile}`;
+      }
+
+      // 初始化模态框
+      addRuleModalInstance = new bootstrap.Modal(document.getElementById('addRuleModal'));
+      editRuleModalInstance = new bootstrap.Modal(document.getElementById('editRuleModal'));
+
+      // 初始化Toast
+      successToastInstance = new bootstrap.Toast(document.getElementById('successToast'));
+      errorToastInstance = new bootstrap.Toast(document.getElementById('errorToast'));
+
+      // 加载资产类型和规则
+      Promise.all([loadAssetTypes(), loadRules()]);
+
+      // 退出登录
+      document.getElementById('logoutBtn').addEventListener('click', logout);
+
+      // 提交添加
+      document.getElementById('submitAddBtn').addEventListener('click', submitAddRule);
+
+      // 提交编辑
+      document.getElementById('submitEditBtn').addEventListener('click', submitEditRule);
+
+      // 表格操作按钮事件委托
+      document.getElementById('rulesTableBody').addEventListener('click', function(e) {
+        // 编辑按钮
+        const editBtn = e.target.closest('.edit-btn');
+        if (editBtn) {
+          const ruleId = editBtn.dataset.ruleId;
+          editRule(ruleId);
+          return;
+        }
+
+        // 切换状态按钮
+        const toggleBtn = e.target.closest('.toggle-btn');
+        if (toggleBtn) {
+          const ruleId = toggleBtn.dataset.ruleId;
+          const currentStatus = toggleBtn.dataset.status === '1';
+          toggleRuleStatus(ruleId, currentStatus);
+          return;
+        }
+      });
+    });
+
+    /**
+     * 加载资产类型
+     */
+    async function loadAssetTypes() {
+      try {
+        const response = await apiRequest('/api/v4/admin/material/asset-types');
+        if (response && response.success) {
+          assetTypes = response.data || [];
+          populateAssetSelects();
+        }
+      } catch (error) {
+        console.error('加载资产类型失败:', error);
+      }
+    }
+
+    /**
+     * 填充资产选择框
+     */
+    function populateAssetSelects() {
+      const fromSelect = document.getElementById('fromAssetCode');
+      const toSelect = document.getElementById('toAssetCode');
+
+      const options = assetTypes
+        .filter(a => a.is_enabled)
+        .map(a => `<option value="${a.asset_code}">${a.display_name} (${a.asset_code})</option>`)
+        .join('');
+
+      fromSelect.innerHTML = '<option value="">请选择</option>' + options;
+      toSelect.innerHTML = '<option value="">请选择</option>' + options;
+    }
+
+    /**
+     * 加载转换规则列表
+     */
+    async function loadRules() {
+      const tbody = document.getElementById('rulesTableBody');
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="7" class="text-center py-5">
+            <div class="spinner-border text-primary" role="status">
+              <span class="visually-hidden">加载中...</span>
+            </div>
+            <p class="mt-2 text-muted">正在加载数据...</p>
+          </td>
+        </tr>
+      `;
+
+      try {
+        const response = await apiRequest('/api/v4/admin/material/conversion-rules');
+
+        if (response && response.success) {
+          currentRules = response.data || [];
+          renderRules(currentRules);
+          updateStatistics(currentRules);
+        } else {
+          showErrorToast(response?.message || '加载失败');
+          tbody.innerHTML = `
+            <tr>
+              <td colspan="7" class="text-center py-5 text-danger">
+                <i class="bi bi-exclamation-triangle" style="font-size: 2rem;"></i>
+                <p class="mt-2">加载失败：${response?.message || '未知错误'}</p>
+              </td>
+            </tr>
+          `;
+        }
+      } catch (error) {
+        console.error('加载转换规则失败:', error);
+        showErrorToast(error.message);
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="7" class="text-center py-5 text-danger">
+              <i class="bi bi-exclamation-triangle" style="font-size: 2rem;"></i>
+              <p class="mt-2">加载失败：${error.message}</p>
+            </td>
+          </tr>
+        `;
+      }
+    }
+
+    /**
+     * 渲染转换规则列表
+     */
+    function renderRules(rules) {
+      const tbody = document.getElementById('rulesTableBody');
+
+      if (rules.length === 0) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="7" class="text-center py-5">
+              <i class="bi bi-inbox text-muted" style="font-size: 3rem;"></i>
+              <p class="mt-2 text-muted">暂无转换规则，点击右上角添加</p>
+            </td>
+          </tr>
+        `;
+        return;
+      }
+
+      tbody.innerHTML = rules.map(rule => `
+        <tr>
+          <td><code>#${rule.rule_id}</code></td>
+          <td>
+            <div class="asset-flow">
+              <span class="badge bg-warning">${rule.from_asset_code}</span>
+              <i class="bi bi-arrow-right text-primary"></i>
+              <span class="badge bg-success">${rule.to_asset_code}</span>
+            </div>
+          </td>
+          <td>
+            <strong>${rule.input_quantity}</strong> : <strong>${rule.output_quantity}</strong>
+            <br><small class="text-muted">(${(rule.output_quantity / rule.input_quantity).toFixed(4)})</small>
+          </td>
+          <td>
+            <small>${formatDate(rule.effective_at)}</small>
+          </td>
+          <td>
+            <span class="badge ${rule.is_enabled ? 'bg-success' : 'bg-secondary'}">
+              ${rule.is_enabled ? '已启用' : '已禁用'}
+            </span>
+          </td>
+          <td>
+            ${renderValidationBadges(rule)}
+          </td>
+          <td>
+            <button class="btn btn-sm btn-primary edit-btn" data-rule-id="${rule.rule_id}">
+              <i class="bi bi-pencil"></i> 编辑
+            </button>
+            <button class="btn btn-sm btn-${rule.is_enabled ? 'warning' : 'success'} toggle-btn"
+                    data-rule-id="${rule.rule_id}"
+                    data-status="${rule.is_enabled ? 1 : 0}">
+              <i class="bi bi-${rule.is_enabled ? 'pause' : 'play'}-circle"></i>
+              ${rule.is_enabled ? '禁用' : '启用'}
+            </button>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    /**
+     * 渲染风控校验徽章
+     */
+    function renderValidationBadges(rule) {
+      const badges = [];
+
+      if (rule.cycle_detected) {
+        badges.push('<span class="badge bg-danger" title="检测到循环转换"><i class="bi bi-exclamation-triangle"></i> 循环</span>');
+      }
+
+      if (rule.arbitrage_detected) {
+        badges.push('<span class="badge bg-warning" title="检测到套利风险"><i class="bi bi-shield-exclamation"></i> 套利</span>');
+      }
+
+      if (badges.length === 0) {
+        badges.push('<span class="badge bg-success"><i class="bi bi-check-circle"></i> 正常</span>');
+      }
+
+      return badges.join(' ');
+    }
+
+    /**
+     * 更新统计信息
+     */
+    function updateStatistics(rules) {
+      const total = rules.length;
+      const enabled = rules.filter(r => r.is_enabled).length;
+      const disabled = total - enabled;
+      const paths = new Set(rules.map(r => `${r.from_asset_code}-${r.to_asset_code}`)).size;
+
+      document.getElementById('totalRules').textContent = total;
+      document.getElementById('enabledRules').textContent = enabled;
+      document.getElementById('disabledRules').textContent = disabled;
+      document.getElementById('totalPaths').textContent = paths;
+    }
+
+    /**
+     * 提交添加转换规则
+     */
+    async function submitAddRule() {
+      const form = document.getElementById('addRuleForm');
+      if (!form.checkValidity()) {
+        form.reportValidity();
+        return;
+      }
+
+      const data = {
+        from_asset_code: document.getElementById('fromAssetCode').value,
+        to_asset_code: document.getElementById('toAssetCode').value,
+        input_quantity: parseInt(document.getElementById('inputQuantity').value),
+        output_quantity: parseInt(document.getElementById('outputQuantity').value),
+        effective_at: document.getElementById('effectiveAt').value,
+        is_enabled: parseInt(document.getElementById('isEnabled').value)
+      };
+
+      try {
+        const submitBtn = document.getElementById('submitAddBtn');
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>提交中...';
+
+        const response = await apiRequest('/api/v4/admin/material/conversion-rules', {
+          method: 'POST',
+          body: JSON.stringify(data)
+        });
+
+        if (response && response.success) {
+          showSuccessToast('添加成功');
+          addRuleModalInstance.hide();
+          form.reset();
+          loadRules();
+        } else {
+          showErrorToast(response?.message || '添加失败');
+          // 显示风控警告
+          if (response?.validation) {
+            displayValidationWarnings('validationWarnings', response.validation);
+          }
+        }
+      } catch (error) {
+        console.error('添加转换规则失败:', error);
+        showErrorToast(error.message);
+      } finally {
+        const submitBtn = document.getElementById('submitAddBtn');
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = '<i class="bi bi-check-lg"></i> 确认添加';
+      }
+    }
+
+    /**
+     * 编辑转换规则
+     */
+    function editRule(ruleId) {
+      const rule = currentRules.find(r => r.rule_id === parseInt(ruleId));
+      if (!rule) return;
+
+      document.getElementById('editRuleId').value = rule.rule_id;
+      document.getElementById('editDirection').value = `${rule.from_asset_code} → ${rule.to_asset_code}`;
+      document.getElementById('editInputQuantity').value = rule.input_quantity;
+      document.getElementById('editOutputQuantity').value = rule.output_quantity;
+      document.getElementById('editEffectiveAt').value = formatDateTimeLocal(rule.effective_at);
+      document.getElementById('editIsEnabled').value = rule.is_enabled ? '1' : '0';
+
+      editRuleModalInstance.show();
+    }
+
+    /**
+     * 提交编辑转换规则
+     */
+    async function submitEditRule() {
+      const form = document.getElementById('editRuleForm');
+      if (!form.checkValidity()) {
+        form.reportValidity();
+        return;
+      }
+
+      const ruleId = document.getElementById('editRuleId').value;
+      const data = {
+        input_quantity: parseInt(document.getElementById('editInputQuantity').value),
+        output_quantity: parseInt(document.getElementById('editOutputQuantity').value),
+        effective_at: document.getElementById('editEffectiveAt').value,
+        is_enabled: parseInt(document.getElementById('editIsEnabled').value)
+      };
+
+      try {
+        const submitBtn = document.getElementById('submitEditBtn');
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>保存中...';
+
+        const response = await apiRequest(`/api/v4/admin/material/conversion-rules/${ruleId}`, {
+          method: 'PUT',
+          body: JSON.stringify(data)
+        });
+
+        if (response && response.success) {
+          showSuccessToast('更新成功');
+          editRuleModalInstance.hide();
+          loadRules();
+        } else {
+          showErrorToast(response?.message || '更新失败');
+          if (response?.validation) {
+            displayValidationWarnings('editValidationWarnings', response.validation);
+          }
+        }
+      } catch (error) {
+        console.error('更新转换规则失败:', error);
+        showErrorToast(error.message);
+      } finally {
+        const submitBtn = document.getElementById('submitEditBtn');
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = '<i class="bi bi-check-lg"></i> 保存更新';
+      }
+    }
+
+    /**
+     * 切换规则状态
+     */
+    async function toggleRuleStatus(ruleId, currentStatus) {
+      const newStatus = currentStatus ? 0 : 1;
+      const action = newStatus ? '启用' : '禁用';
+
+      if (!confirm(`确定要${action}该转换规则吗？`)) {
+        return;
+      }
+
+      try {
+        const response = await apiRequest(`/api/v4/admin/material/conversion-rules/${ruleId}`, {
+          method: 'PUT',
+          body: JSON.stringify({ is_enabled: newStatus })
+        });
+
+        if (response && response.success) {
+          showSuccessToast(`${action}成功`);
+          loadRules();
+        } else {
+          showErrorToast(response?.message || `${action}失败`);
+        }
+      } catch (error) {
+        console.error(`${action}转换规则失败:`, error);
+        showErrorToast(error.message);
+      }
+    }
+
+    /**
+     * 显示风控校验警告
+     */
+    function displayValidationWarnings(containerId, validation) {
+      const container = document.getElementById(containerId);
+      const warnings = [];
+
+      if (validation.cycle_detected) {
+        warnings.push('<div class="validation-warning mb-2"><i class="bi bi-exclamation-triangle text-warning"></i> <strong>循环检测：</strong>检测到循环转换路径，可能导致无限套利</div>');
+      }
+
+      if (validation.arbitrage_detected) {
+        warnings.push('<div class="validation-warning"><i class="bi bi-shield-exclamation text-warning"></i> <strong>套利检测：</strong>检测到套利风险，建议调整转换比例</div>');
+      }
+
+      container.innerHTML = warnings.join('');
+    }
+
+    /**
+     * 格式化日期时间为本地输入格式
+     */
+    function formatDateTimeLocal(dateString) {
+      const date = new Date(dateString);
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      const hours = String(date.getHours()).padStart(2, '0');
+      const minutes = String(date.getMinutes()).padStart(2, '0');
+      return `${year}-${month}-${day}T${hours}:${minutes}`;
+    }
+
+    /**
+     * 显示成功提示
+     */
+    function showSuccessToast(message) {
+      document.getElementById('successToastBody').textContent = message;
+      successToastInstance.show();
+    }
+
+    /**
+     * 显示错误提示
+     */
+    function showErrorToast(message) {
+      document.getElementById('errorToastBody').textContent = message;
+      errorToastInstance.show();
+    }
+  </script>
+</body>
+</html>

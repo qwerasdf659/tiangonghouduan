@@ -110,8 +110,10 @@ describe('兑换市场幂等性测试 (Exchange Market Idempotency)', () => {
       updated_at: BeijingTimeHelper.createDatabaseTime()
     })
 
-    // 创建测试用户的虚拟奖品（用于支付）
-    // 创建多个小额虚拟奖品（value=100），正好等于商品价格，方便完全消耗
+    /*
+     * 创建测试用户的虚拟奖品（用于支付）
+     * 创建多个小额虚拟奖品（value=100），正好等于商品价格，方便完全消耗
+     */
     for (let i = 0; i < 5; i++) {
       // eslint-disable-next-line no-await-in-loop
       await UserInventory.create({
@@ -141,7 +143,7 @@ describe('兑换市场幂等性测试 (Exchange Market Idempotency)', () => {
     console.log('✅ 测试环境初始化完成')
     console.log(`   - 测试用户ID: ${testUser.user_id}`)
     console.log(`   - 测试商品ID: ${testItem.item_id}`)
-    console.log(`   - 创建了5个虚拟奖品，每个价值: 100`)
+    console.log('   - 创建了5个虚拟奖品，每个价值: 100')
   }, 30000)
 
   /**
@@ -576,8 +578,10 @@ describe('兑换市场幂等性测试 (Exchange Market Idempotency)', () => {
           }
         )
 
-        // 🔴 验证外部事务仍未完成（通过尝试commit来验证）
-        // 如果Service已经commit，这里会抛出错误
+        /*
+         * 🔴 验证外部事务仍未完成（通过尝试commit来验证）
+         * 如果Service已经commit，这里会抛出错误
+         */
         let canCommit = false
         try {
           await externalTransaction.commit()

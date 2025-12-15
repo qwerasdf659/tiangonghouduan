@@ -1604,19 +1604,27 @@ class InventoryService {
   }
 
   /**
-   * 上架商品到市场
+   * 上架商品到市场（V4.2 - DIAMOND定价）
    *
    * 业务场景：
-   * - 用户将库存物品上架到交易市场
+   * - 用户将闲置物品上架到市场出售
+   * - 使用DIAMOND资产定价（不再使用积分）
+   * - 只有available状态的物品可以上架
+   *
+   * 业务规则（不做兼容）：
+   * - 只接收selling_amount参数（DIAMOND定价）
+   * - 直接拒绝selling_points参数（收到即抛出错误）
+   * - 强制写入selling_asset_code='DIAMOND'
    *
    * @param {number} userId - 用户ID
    * @param {number} itemId - 物品ID
    * @param {Object} marketInfo - 市场信息
-   * @param {number} marketInfo.selling_points - 售价（积分）
-   * @param {string} marketInfo.condition - 成色（new/good/fair）
+   * @param {number} marketInfo.selling_amount - 售价（DIAMOND，整数，必填）
+   * @param {string} marketInfo.condition - 成色（new/excellent/good/fair/poor，可选，默认good）
    * @param {Object} options - 选项
    * @param {Object} options.transaction - 事务对象（可选）
    * @returns {Promise<Object>} 上架结果
+   * @throws {Error} 如果传入selling_points参数或缺少selling_amount
    */
   static async listProductToMarket (userId, itemId, marketInfo, options = {}) {
     const { transaction: externalTransaction } = options
@@ -1626,10 +1634,35 @@ class InventoryService {
     const shouldCommit = !externalTransaction
 
     try {
-      logger.info('开始上架商品到市场', {
+      // 【不做兼容】拒绝selling_points参数
+      if (marketInfo.selling_points !== undefined) {
+        throw new Error('不支持selling_points参数，请使用selling_amount（DIAMOND定价）')
+      }
+
+      // 【必填验证】selling_amount必须存在
+      if (marketInfo.selling_amount === undefined || marketInfo.selling_amount === null) {
+        throw new Error('缺少必填参数：selling_amount（DIAMOND定价）')
+      }
+
+      // 参数验证：selling_amount必须为正整数
+      const sellingAmount = parseInt(marketInfo.selling_amount)
+      if (isNaN(sellingAmount) || sellingAmount <= 0) {
+        throw new Error('售价必须大于0（DIAMOND）')
+      }
+
+      // 参数验证：成色
+      const validConditions = ['new', 'excellent', 'good', 'fair', 'poor']
+      const condition = marketInfo.condition || 'good'
+      if (!validConditions.includes(condition)) {
+        throw new Error(`无效的成色参数：${condition}，允许值：${validConditions.join(', ')}`)
+      }
+
+      logger.info('开始上架商品到市场（DIAMOND定价）', {
         user_id: userId,
         item_id: itemId,
-        selling_points: marketInfo.selling_points
+        selling_amount: sellingAmount,
+        selling_asset_code: 'DIAMOND',
+        condition
       })
 
       // 查询物品（加行级锁）
@@ -1652,23 +1685,12 @@ class InventoryService {
         throw new Error('该物品已在市场上架')
       }
 
-      // 参数验证
-      const sellingPoints = parseInt(marketInfo.selling_points)
-      if (isNaN(sellingPoints) || sellingPoints <= 0) {
-        throw new Error('售价必须大于0')
-      }
-
-      const validConditions = ['new', 'good', 'fair']
-      const condition = marketInfo.condition || 'good'
-      if (!validConditions.includes(condition)) {
-        throw new Error(`无效的成色参数：${condition}`)
-      }
-
-      // 更新物品状态为上架
+      // 更新物品状态为上架（使用DIAMOND定价）
       await inventory.update(
         {
           market_status: 'on_sale',
-          selling_points: sellingPoints,
+          selling_asset_code: 'DIAMOND', // 【强制】固定为DIAMOND
+          selling_amount: sellingAmount, // 【新字段】DIAMOND金额
           condition,
           is_available: true,
           listed_at: BeijingTimeHelper.createBeijingTime()
@@ -1681,16 +1703,20 @@ class InventoryService {
         await transaction.commit()
       }
 
-      logger.info('上架商品到市场成功', {
+      logger.info('上架商品到市场成功（DIAMOND定价）', {
         user_id: userId,
         item_id: itemId,
-        selling_points: sellingPoints
+        selling_asset_code: 'DIAMOND',
+        selling_amount: sellingAmount,
+        condition
       })
 
+      // 返回结果（只返回DIAMOND口径，不返回selling_points）
       return {
         item_id: itemId,
         market_status: 'on_sale',
-        selling_points: sellingPoints,
+        selling_asset_code: 'DIAMOND',
+        selling_amount: sellingAmount,
         condition,
         listed_at: inventory.listed_at
       }
@@ -1698,63 +1724,79 @@ class InventoryService {
       if (shouldCommit) {
         await transaction.rollback()
       }
-      logger.error('上架商品到市场失败', {
+      logger.error('上架商品到市场失败（DIAMOND定价）', {
         error: error.message,
         user_id: userId,
-        item_id: itemId
+        item_id: itemId,
+        selling_amount: marketInfo.selling_amount
       })
       throw error
     }
   }
 
   /**
-   * 购买市场商品
+   * 购买市场商品（V4.2 - DIAMOND结算 + 强幂等 + 手续费）
    *
    * 业务场景：
-   * - 用户使用积分购买市场上的商品
-   * - 涉及积分扣除、物品归属变更
+   * - 用户使用DIAMOND资产购买市场上的商品（不再使用积分）
+   * - 支持手续费计算和平台收入
+   * - 强幂等性控制，防止重复扣款
+   * - 创建三笔资产流水（买家扣减、卖家入账、平台手续费）
+   *
+   * 业务规则：
+   * - business_id必填（强制幂等）
+   * - 使用AssetService进行DIAMOND扣减和入账
+   * - 集成FeeCalculator计算手续费
+   * - 手续费入平台账户（PLATFORM_USER_ID）
+   * - 创建TradeRecord记录对账字段
    *
    * @param {number} buyerId - 购买者ID
    * @param {number} productId - 商品ID
    * @param {Object} options - 选项
    * @param {Object} options.transaction - 事务对象（可选）
-   * @param {string} options.business_id - 业务唯一ID（可选，用于幂等性）
+   * @param {string} options.business_id - 业务唯一ID（必填，用于幂等性）
    * @returns {Promise<Object>} 购买结果
+   * @throws {Error} 如果缺少business_id或余额不足
    */
   static async purchaseMarketProduct (buyerId, productId, options = {}) {
     const { transaction: externalTransaction, business_id } = options
 
-    // ✅ 幂等性检查（解决任务4.1：为高风险操作添加强制幂等检查）
-    if (business_id) {
-      const existingTrade = await TradeRecord.findOne({
-        where: {
-          trade_type: 'market_purchase',
-          item_id: productId,
-          to_user_id: buyerId,
-          status: 'completed'
-        }
+    // 【强制验证】business_id必填
+    if (!business_id) {
+      throw new Error('缺少必填参数：business_id（强幂等控制）')
+    }
+
+    // 🔥 幂等性检查：通过business_id查询（对齐AssetService幂等策略）
+    const existingTrade = await TradeRecord.findOne({
+      where: {
+        business_id,
+        trade_type: 'market_purchase'
+      }
+    })
+
+    if (existingTrade) {
+      logger.info('⚠️ 幂等性检查：市场购买操作已存在，返回原结果', {
+        business_id,
+        trade_code: existingTrade.trade_code,
+        buyer_id: buyerId,
+        seller_id: existingTrade.from_user_id,
+        product_id: productId,
+        asset_code: existingTrade.asset_code,
+        gross_amount: existingTrade.gross_amount
       })
 
-      if (existingTrade) {
-        logger.info('⚠️ 幂等性检查：市场购买操作已存在，返回原结果', {
-          business_id,
-          trade_code: existingTrade.trade_code,
-          buyer_id: buyerId,
-          seller_id: existingTrade.from_user_id,
-          product_id: productId,
-          points: existingTrade.points_amount
-        })
-
-        return {
-          trade_code: existingTrade.trade_code,
-          item_id: productId,
-          name: existingTrade.name,
-          seller_id: existingTrade.from_user_id,
-          buyer_id: buyerId,
-          points: existingTrade.points_amount,
-          purchased_at: existingTrade.trade_time,
-          is_duplicate: true // ✅ 标记为重复请求
-        }
+      return {
+        trade_code: existingTrade.trade_code,
+        item_id: productId,
+        name: existingTrade.name,
+        seller_id: existingTrade.from_user_id,
+        buyer_id: buyerId,
+        asset_code: existingTrade.asset_code,
+        gross_amount: existingTrade.gross_amount,
+        fee_amount: existingTrade.fee_amount,
+        net_amount: existingTrade.net_amount,
+        purchased_at: existingTrade.trade_time,
+        is_duplicate: true // ✅ 标记为重复请求
       }
     }
 
@@ -1763,7 +1805,12 @@ class InventoryService {
     const shouldCommit = !externalTransaction
 
     try {
-      logger.info('开始购买市场商品', {
+      // 引入所需服务
+      const AssetService = require('./AssetService')
+      const FeeCalculator = require('./FeeCalculator')
+      const FEE_RULES = require('../config/fee_rules')
+
+      logger.info('开始购买市场商品（DIAMOND结算）', {
         buyer_id: buyerId,
         product_id: productId,
         business_id
@@ -1785,25 +1832,118 @@ class InventoryService {
       }
 
       const sellerId = marketProduct.user_id
-      const sellingPoints = marketProduct.selling_points
+      const sellingAmount = marketProduct.selling_amount // 【新字段】DIAMOND金额
+      const sellingAssetCode = marketProduct.selling_asset_code // 【新字段】资产代码
+
+      // 验证商品定价完整性
+      if (!sellingAmount || !sellingAssetCode) {
+        throw new Error('商品定价不完整：缺少selling_amount或selling_asset_code')
+      }
+
+      if (sellingAssetCode !== 'DIAMOND') {
+        throw new Error(`不支持的结算资产：${sellingAssetCode}，只支持DIAMOND`)
+      }
 
       // 检查是否购买自己的商品
       if (buyerId === sellerId) {
         throw new Error('不能购买自己的商品')
       }
 
-      // 扣除买家积分（通过 PointsService）
-      const PointsService = require('./PointsService')
-      await PointsService.deductPoints(buyerId, sellingPoints, {
-        reason: `购买市场商品：${marketProduct.name}`,
+      // 🔥 计算手续费（按商品价值分档，基于selling_amount计算）
+      let feeAmount = 0
+      let feeRate = 0
+      const PLATFORM_USER_ID = parseInt(process.env.PLATFORM_USER_ID || 0)
+
+      // 检查手续费开关
+      const feeEnabled =
+        FEE_RULES.enabled &&
+        FEE_RULES.trade_type_fees &&
+        FEE_RULES.trade_type_fees.market_purchase &&
+        FEE_RULES.trade_type_fees.market_purchase.enabled
+
+      if (feeEnabled) {
+        // 验证平台账户配置
+        if (!PLATFORM_USER_ID || PLATFORM_USER_ID <= 0) {
+          throw new Error('手续费已启用，但PLATFORM_USER_ID未配置或无效')
+        }
+
+        // 计算手续费（使用FeeCalculator，按商品价值分档）
+        const feeInfo = FeeCalculator.calculateItemFee(marketProduct.value, sellingAmount)
+        feeAmount = feeInfo.fee
+        feeRate = feeInfo.rate
+
+        logger.info('手续费计算完成', {
+          item_value: marketProduct.value,
+          selling_amount: sellingAmount,
+          fee_amount: feeAmount,
+          fee_rate: feeRate,
+          tier: feeInfo.tier
+        })
+      } else {
+        logger.info('手续费已禁用，跳过手续费计算')
+      }
+
+      // 计算对账金额
+      const grossAmount = sellingAmount // 买家支付总金额
+      const netAmount = sellingAmount - feeAmount // 卖家实收金额
+
+      // 验证对账公式
+      if (grossAmount !== feeAmount + netAmount) {
+        throw new Error(
+          `对账金额错误：gross_amount(${grossAmount}) ≠ fee_amount(${feeAmount}) + net_amount(${netAmount})`
+        )
+      }
+
+      /*
+       * 🔥 三笔资产流水（买家扣减、卖家入账、平台手续费）
+       * 1. 买家扣减DIAMOND
+       */
+      await AssetService.changeBalance(buyerId, 'DIAMOND', -grossAmount, {
+        business_id: `${business_id}_buyer_debit`,
+        business_type: 'market_purchase_buyer_debit',
+        meta: {
+          product_id: productId,
+          product_name: marketProduct.name,
+          seller_id: sellerId,
+          gross_amount: grossAmount,
+          fee_amount: feeAmount,
+          net_amount: netAmount
+        },
         transaction
       })
 
-      // 增加卖家积分
-      await PointsService.addPoints(sellerId, sellingPoints, {
-        reason: `出售市场商品：${marketProduct.name}`,
+      // 2. 卖家入账DIAMOND（实收金额）
+      await AssetService.changeBalance(sellerId, 'DIAMOND', netAmount, {
+        business_id: `${business_id}_seller_credit`,
+        business_type: 'market_purchase_seller_credit',
+        meta: {
+          product_id: productId,
+          product_name: marketProduct.name,
+          buyer_id: buyerId,
+          gross_amount: grossAmount,
+          fee_amount: feeAmount,
+          net_amount: netAmount
+        },
         transaction
       })
+
+      // 3. 平台手续费入账（如果手续费>0）
+      if (feeAmount > 0 && PLATFORM_USER_ID > 0) {
+        await AssetService.changeBalance(PLATFORM_USER_ID, 'DIAMOND', feeAmount, {
+          business_id: `${business_id}_platform_fee`,
+          business_type: 'market_purchase_platform_fee_credit',
+          meta: {
+            product_id: productId,
+            product_name: marketProduct.name,
+            buyer_id: buyerId,
+            seller_id: sellerId,
+            gross_amount: grossAmount,
+            fee_amount: feeAmount,
+            fee_rate: feeRate
+          },
+          transaction
+        })
+      }
 
       // 更新物品归属和状态
       await marketProduct.update(
@@ -1819,7 +1959,7 @@ class InventoryService {
         { transaction }
       )
 
-      // 创建交易记录
+      // 创建交易记录（包含对账字段）
       const tradeCode = `mp_${BeijingTimeHelper.generateIdTimestamp()}_${Math.random().toString(36).substr(2, 8)}`
       await TradeRecord.create(
         {
@@ -1827,13 +1967,21 @@ class InventoryService {
           trade_type: 'market_purchase',
           from_user_id: sellerId,
           to_user_id: buyerId,
-          points_amount: sellingPoints,
-          fee_points_amount: 0,
-          net_points_amount: sellingPoints,
+          // 【旧字段】保留用于兼容性（使用selling_amount填充）
+          points_amount: sellingAmount,
+          fee_points_amount: feeAmount,
+          net_points_amount: netAmount,
+          // 【新字段】对账字段
+          asset_code: 'DIAMOND',
+          gross_amount: grossAmount,
+          fee_amount: feeAmount,
+          net_amount: netAmount,
+          business_id, // 【幂等键】
+          // 其他字段
           status: 'completed',
           item_id: productId,
           name: marketProduct.name,
-          trade_reason: '市场商品交易',
+          trade_reason: '市场商品交易（DIAMOND结算）',
           trade_time: BeijingTimeHelper.createBeijingTime(),
           processed_time: BeijingTimeHelper.createBeijingTime()
         },
@@ -1845,11 +1993,15 @@ class InventoryService {
         await transaction.commit()
       }
 
-      logger.info('购买市场商品成功', {
+      logger.info('购买市场商品成功（DIAMOND结算）', {
         buyer_id: buyerId,
         seller_id: sellerId,
         product_id: productId,
-        points: sellingPoints
+        asset_code: 'DIAMOND',
+        gross_amount: grossAmount,
+        fee_amount: feeAmount,
+        net_amount: netAmount,
+        trade_code: tradeCode
       })
 
       return {
@@ -1858,17 +2010,22 @@ class InventoryService {
         name: marketProduct.name,
         seller_id: sellerId,
         buyer_id: buyerId,
-        points: sellingPoints,
-        purchased_at: BeijingTimeHelper.createBeijingTime()
+        asset_code: 'DIAMOND',
+        gross_amount: grossAmount,
+        fee_amount: feeAmount,
+        net_amount: netAmount,
+        purchased_at: BeijingTimeHelper.createBeijingTime(),
+        is_duplicate: false
       }
     } catch (error) {
       if (shouldCommit) {
         await transaction.rollback()
       }
-      logger.error('购买市场商品失败', {
+      logger.error('购买市场商品失败（DIAMOND结算）', {
         error: error.message,
         buyer_id: buyerId,
-        product_id: productId
+        product_id: productId,
+        business_id
       })
       throw error
     }

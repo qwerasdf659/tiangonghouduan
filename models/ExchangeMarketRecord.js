@@ -57,19 +57,31 @@ module.exports = sequelize => {
         type: DataTypes.ENUM('virtual'),
         allowNull: false,
         defaultValue: 'virtual',
-        comment: '支付方式（仅支持虚拟奖品价值支付）'
+        comment: '支付方式（仅支持虚拟奖品价值支付）- 已废弃，保留用于历史数据兼容'
       },
       virtual_value_paid: {
         type: DataTypes.INTEGER,
         allowNull: false,
         defaultValue: 0,
-        comment: '消耗虚拟奖品价值（实际支付金额）'
+        comment: '消耗虚拟奖品价值（实际支付金额）- 已废弃，保留用于回滚观测'
       },
       points_paid: {
         type: DataTypes.INTEGER,
         allowNull: false,
         defaultValue: 0,
-        comment: '消耗积分（应始终为0，仅用于展示）'
+        comment: '消耗积分（应始终为0，仅用于展示）- 已废弃'
+      },
+
+      // V4.5.0 材料资产支付字段（2025-12-15新增）
+      pay_asset_code: {
+        type: DataTypes.STRING(50),
+        allowNull: true,
+        comment: '支付资产代码（Pay Asset Code - 兑换订单实际扣减的材料资产类型）：red_shard-碎红水晶、red_crystal-完整红水晶等；业务规则：新订单必填，历史订单可为null；与exchange_items.cost_asset_code对应；用途：订单支付对账、材料消耗统计、成本核算依据'
+      },
+      pay_amount: {
+        type: DataTypes.BIGINT,
+        allowNull: true,
+        comment: '支付数量（Pay Amount - 兑换订单实际扣减的材料总数量）：计算公式：cost_amount * quantity；单位根据pay_asset_code确定；业务规则：新订单必填，历史订单可为null；使用BIGINT避免浮点精度问题；用途：订单支付对账、材料消耗统计、成本核算'
       },
 
       // 成本信息（后端记录，不对外暴露）

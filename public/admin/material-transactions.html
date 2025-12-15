@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>材料流水查询 - 管理后台</title>
+
+  <!-- Bootstrap 5 - UI框架 -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+
+  <!-- Bootstrap Icons - 图标库 -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+
+  <!-- 公共样式表 - 统一主题和响应式设计 -->
+  <link href="/admin/css/common.css" rel="stylesheet">
+
+  <style>
+    .tx-increase {
+      color: #28a745;
+      font-weight: bold;
+    }
+    .tx-decrease {
+      color: #dc3545;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body class="bg-light">
+  <!-- 顶部导航 -->
+  <nav class="navbar navbar-dark bg-primary">
+    <div class="container-fluid">
+      <a href="/admin/dashboard.html" class="navbar-brand">
+        <i class="bi bi-arrow-left me-2"></i>管理后台 - 材料流水查询
+      </a>
+      <div>
+        <span class="text-light me-3" id="welcomeText">欢迎，管理员</span>
+        <button class="btn btn-outline-light btn-sm" id="logoutBtn">退出登录</button>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container-fluid mt-4">
+    <!-- 筛选区域 -->
+    <div class="card mb-3">
+      <div class="card-body">
+        <h5 class="mb-3">
+          <i class="bi bi-filter"></i> 筛选条件
+        </h5>
+        <form id="filterForm" class="row g-3">
+          <div class="col-md-3">
+            <label class="form-label">用户ID</label>
+            <input type="number" class="form-control" id="filterUserId" placeholder="输入用户ID">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">业务ID</label>
+            <input type="text" class="form-control" id="filterBusinessId" placeholder="输入业务ID">
+          </div>
+          <div class="col-md-2">
+            <label class="form-label">资产类型</label>
+            <select class="form-select" id="filterAssetCode">
+              <option value="">全部</option>
+            </select>
+          </div>
+          <div class="col-md-2">
+            <label class="form-label">交易类型</label>
+            <select class="form-select" id="filterTxType">
+              <option value="">全部</option>
+              <option value="increase">增加</option>
+              <option value="decrease">减少</option>
+            </select>
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">开始时间</label>
+            <input type="datetime-local" class="form-control" id="filterStartTime">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">结束时间</label>
+            <input type="datetime-local" class="form-control" id="filterEndTime">
+          </div>
+          <div class="col-md-6 d-flex align-items-end gap-2">
+            <button type="submit" class="btn btn-primary flex-fill">
+              <i class="bi bi-search"></i> 查询
+            </button>
+            <button type="button" class="btn btn-secondary" id="resetBtn">
+              <i class="bi bi-arrow-counterclockwise"></i> 重置
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- 统计信息 -->
+    <div class="row g-3 mb-3">
+      <div class="col-md-3">
+        <div class="card">
+          <div class="card-body text-center">
+            <h6 class="text-muted">查询结果数</h6>
+            <h3 class="text-primary" id="totalTransactions">-</h3>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="card">
+          <div class="card-body text-center">
+            <h6 class="text-muted">增加记录</h6>
+            <h3 class="text-success" id="increaseCount">-</h3>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="card">
+          <div class="card-body text-center">
+            <h6 class="text-muted">减少记录</h6>
+            <h3 class="text-danger" id="decreaseCount">-</h3>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="card">
+          <div class="card-body text-center">
+            <h6 class="text-muted">当前页</h6>
+            <h3 class="text-info"><span id="currentPage">1</span> / <span id="totalPages">1</span></h3>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 数据表格 -->
+    <div class="card">
+      <div class="card-body">
+        <div class="table-responsive">
+          <table class="table table-hover align-middle">
+            <thead class="table-light">
+              <tr>
+                <th>流水ID</th>
+                <th>用户ID</th>
+                <th>资产</th>
+                <th>交易类型</th>
+                <th>变动数量</th>
+                <th>变动前</th>
+                <th>变动后</th>
+                <th>业务类型</th>
+                <th>业务ID</th>
+                <th>创建时间</th>
+              </tr>
+            </thead>
+            <tbody id="transactionsTableBody">
+              <tr>
+                <td colspan="10" class="text-center py-5">
+                  <i class="bi bi-inbox text-muted" style="font-size: 3rem;"></i>
+                  <p class="mt-2 text-muted">请设置筛选条件并点击查询</p>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- 分页控件 -->
+        <nav id="paginationNav" style="display: none;">
+          <ul class="pagination justify-content-center mb-0" id="pagination">
+          </ul>
+        </nav>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast 提示组件 -->
+  <div class="position-fixed bottom-0 end-0 p-3" style="z-index: 11">
+    <div id="successToast" class="toast align-items-center text-white bg-success border-0" role="alert">
+      <div class="d-flex">
+        <div class="toast-body" id="successToastBody"></div>
+        <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+      </div>
+    </div>
+    <div id="errorToast" class="toast align-items-center text-white bg-danger border-0" role="alert">
+      <div class="d-flex">
+        <div class="toast-body" id="errorToastBody"></div>
+        <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bootstrap JS -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+  <!-- 公共工具函数 -->
+  <script src="/admin/js/admin-common.js"></script>
+
+  <!-- 页面脚本 -->
+  <script>
+    // 全局变量
+    let assetTypes = [];
+    let currentPage = 1;
+    let pageSize = 20;
+    let totalRecords = 0;
+    let successToastInstance, errorToastInstance;
+
+    // 初始化
+    document.addEventListener('DOMContentLoaded', function() {
+      // 权限检查
+      if (!checkAdminPermission()) {
+        return;
+      }
+
+      // 显示用户信息
+      const user = getCurrentUser();
+      if (user) {
+        document.getElementById('welcomeText').textContent = `欢迎，${user.nickname || user.mobile}`;
+      }
+
+      // 初始化Toast
+      successToastInstance = new bootstrap.Toast(document.getElementById('successToast'));
+      errorToastInstance = new bootstrap.Toast(document.getElementById('errorToast'));
+
+      // 加载资产类型
+      loadAssetTypes();
+
+      // 退出登录
+      document.getElementById('logoutBtn').addEventListener('click', logout);
+
+      // 筛选表单提交
+      document.getElementById('filterForm').addEventListener('submit', handleFilter);
+
+      // 重置按钮
+      document.getElementById('resetBtn').addEventListener('click', resetFilter);
+    });
+
+    /**
+     * 加载资产类型
+     */
+    async function loadAssetTypes() {
+      try {
+        const response = await apiRequest('/api/v4/admin/material/asset-types');
+        if (response && response.success) {
+          assetTypes = response.data || [];
+          populateAssetSelect();
+        }
+      } catch (error) {
+        console.error('加载资产类型失败:', error);
+      }
+    }
+
+    /**
+     * 填充资产选择框
+     */
+    function populateAssetSelect() {
+      const select = document.getElementById('filterAssetCode');
+      const options = assetTypes
+        .map(a => `<option value="${a.asset_code}">${a.display_name} (${a.asset_code})</option>`)
+        .join('');
+
+      select.innerHTML = '<option value="">全部</option>' + options;
+    }
+
+    /**
+     * 处理筛选
+     */
+    function handleFilter(e) {
+      e.preventDefault();
+      currentPage = 1;
+      loadTransactions();
+    }
+
+    /**
+     * 重置筛选
+     */
+    function resetFilter() {
+      document.getElementById('filterForm').reset();
+      currentPage = 1;
+      const tbody = document.getElementById('transactionsTableBody');
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="10" class="text-center py-5">
+            <i class="bi bi-inbox text-muted" style="font-size: 3rem;"></i>
+            <p class="mt-2 text-muted">请设置筛选条件并点击查询</p>
+          </td>
+        </tr>
+      `;
+      document.getElementById('paginationNav').style.display = 'none';
+      resetStatistics();
+    }
+
+    /**
+     * 加载交易流水
+     */
+    async function loadTransactions() {
+      const tbody = document.getElementById('transactionsTableBody');
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="10" class="text-center py-5">
+            <div class="spinner-border text-primary" role="status">
+              <span class="visually-hidden">加载中...</span>
+            </div>
+            <p class="mt-2 text-muted">正在加载数据...</p>
+          </td>
+        </tr>
+      `;
+
+      // 构建查询参数
+      const params = new URLSearchParams();
+
+      const userId = document.getElementById('filterUserId').value.trim();
+      const businessId = document.getElementById('filterBusinessId').value.trim();
+      const assetCode = document.getElementById('filterAssetCode').value;
+      const txType = document.getElementById('filterTxType').value;
+      const startTime = document.getElementById('filterStartTime').value;
+      const endTime = document.getElementById('filterEndTime').value;
+
+      if (userId) params.append('user_id', userId);
+      if (businessId) params.append('business_id', businessId);
+      if (assetCode) params.append('asset_code', assetCode);
+      if (txType) params.append('tx_type', txType);
+      if (startTime) params.append('start_time', startTime);
+      if (endTime) params.append('end_time', endTime);
+
+      params.append('page', currentPage);
+      params.append('page_size', pageSize);
+
+      try {
+        const response = await apiRequest(`/api/v4/admin/material/transactions?${params.toString()}`);
+
+        if (response && response.success) {
+          const { transactions, pagination } = response.data;
+
+          totalRecords = pagination.total;
+          renderTransactions(transactions);
+          updateStatistics(transactions);
+          renderPagination(pagination);
+        } else {
+          showErrorToast(response?.message || '查询失败');
+          tbody.innerHTML = `
+            <tr>
+              <td colspan="10" class="text-center py-5 text-danger">
+                <i class="bi bi-exclamation-triangle" style="font-size: 2rem;"></i>
+                <p class="mt-2">查询失败：${response?.message || '未知错误'}</p>
+              </td>
+            </tr>
+          `;
+        }
+      } catch (error) {
+        console.error('加载交易流水失败:', error);
+        showErrorToast(error.message);
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="10" class="text-center py-5 text-danger">
+              <i class="bi bi-exclamation-triangle" style="font-size: 2rem;"></i>
+              <p class="mt-2">加载失败：${error.message}</p>
+            </td>
+          </tr>
+        `;
+      }
+    }
+
+    /**
+     * 渲染交易流水列表
+     */
+    function renderTransactions(transactions) {
+      const tbody = document.getElementById('transactionsTableBody');
+
+      if (transactions.length === 0) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="10" class="text-center py-5">
+              <i class="bi bi-inbox text-muted" style="font-size: 3rem;"></i>
+              <p class="mt-2 text-muted">未找到符合条件的记录</p>
+            </td>
+          </tr>
+        `;
+        return;
+      }
+
+      tbody.innerHTML = transactions.map(tx => `
+        <tr>
+          <td><code>#${tx.tx_id}</code></td>
+          <td><code>${tx.user_id}</code></td>
+          <td>
+            <span class="badge bg-info">${tx.asset_code}</span>
+          </td>
+          <td>
+            <span class="badge ${tx.tx_type === 'increase' ? 'bg-success' : 'bg-danger'}">
+              ${getTxTypeLabel(tx.tx_type)}
+            </span>
+          </td>
+          <td>
+            <span class="${tx.tx_type === 'increase' ? 'tx-increase' : 'tx-decrease'}">
+              ${tx.tx_type === 'increase' ? '+' : '-'}${tx.amount}
+            </span>
+          </td>
+          <td>${tx.balance_before}</td>
+          <td>${tx.balance_after}</td>
+          <td>
+            <span class="badge bg-secondary">${tx.business_type || '-'}</span>
+          </td>
+          <td><small><code>${tx.business_id || '-'}</code></small></td>
+          <td>
+            <small>${formatDate(tx.created_at)}</small>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    /**
+     * 更新统计信息
+     */
+    function updateStatistics(transactions) {
+      const increaseCount = transactions.filter(tx => tx.tx_type === 'increase').length;
+      const decreaseCount = transactions.filter(tx => tx.tx_type === 'decrease').length;
+
+      document.getElementById('totalTransactions').textContent = totalRecords;
+      document.getElementById('increaseCount').textContent = increaseCount;
+      document.getElementById('decreaseCount').textContent = decreaseCount;
+    }
+
+    /**
+     * 重置统计信息
+     */
+    function resetStatistics() {
+      document.getElementById('totalTransactions').textContent = '-';
+      document.getElementById('increaseCount').textContent = '-';
+      document.getElementById('decreaseCount').textContent = '-';
+      document.getElementById('currentPage').textContent = '1';
+      document.getElementById('totalPages').textContent = '1';
+    }
+
+    /**
+     * 渲染分页控件
+     */
+    function renderPagination(pagination) {
+      const { current_page, total_pages, has_prev, has_next } = pagination;
+
+      document.getElementById('currentPage').textContent = current_page;
+      document.getElementById('totalPages').textContent = total_pages;
+
+      if (total_pages <= 1) {
+        document.getElementById('paginationNav').style.display = 'none';
+        return;
+      }
+
+      document.getElementById('paginationNav').style.display = 'block';
+
+      const paginationEl = document.getElementById('pagination');
+      let html = '';
+
+      // 上一页
+      html += `
+        <li class="page-item ${!has_prev ? 'disabled' : ''}">
+          <a class="page-link" href="#" onclick="changePage(${current_page - 1}); return false;">上一页</a>
+        </li>
+      `;
+
+      // 页码
+      const maxVisible = 5;
+      let startPage = Math.max(1, current_page - Math.floor(maxVisible / 2));
+      let endPage = Math.min(total_pages, startPage + maxVisible - 1);
+
+      if (endPage - startPage < maxVisible - 1) {
+        startPage = Math.max(1, endPage - maxVisible + 1);
+      }
+
+      if (startPage > 1) {
+        html += `<li class="page-item"><a class="page-link" href="#" onclick="changePage(1); return false;">1</a></li>`;
+        if (startPage > 2) {
+          html += `<li class="page-item disabled"><span class="page-link">...</span></li>`;
+        }
+      }
+
+      for (let i = startPage; i <= endPage; i++) {
+        html += `
+          <li class="page-item ${i === current_page ? 'active' : ''}">
+            <a class="page-link" href="#" onclick="changePage(${i}); return false;">${i}</a>
+          </li>
+        `;
+      }
+
+      if (endPage < total_pages) {
+        if (endPage < total_pages - 1) {
+          html += `<li class="page-item disabled"><span class="page-link">...</span></li>`;
+        }
+        html += `<li class="page-item"><a class="page-link" href="#" onclick="changePage(${total_pages}); return false;">${total_pages}</a></li>`;
+      }
+
+      // 下一页
+      html += `
+        <li class="page-item ${!has_next ? 'disabled' : ''}">
+          <a class="page-link" href="#" onclick="changePage(${current_page + 1}); return false;">下一页</a>
+        </li>
+      `;
+
+      paginationEl.innerHTML = html;
+    }
+
+    /**
+     * 切换页码
+     */
+    function changePage(page) {
+      currentPage = page;
+      loadTransactions();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    /**
+     * 获取交易类型标签
+     */
+    function getTxTypeLabel(txType) {
+      const labels = {
+        'increase': '增加',
+        'decrease': '减少'
+      };
+      return labels[txType] || txType;
+    }
+
+    /**
+     * 显示成功提示
+     */
+    function showSuccessToast(message) {
+      document.getElementById('successToastBody').textContent = message;
+      successToastInstance.show();
+    }
+
+    /**
+     * 显示错误提示
+     */
+    function showErrorToast(message) {
+      document.getElementById('errorToastBody').textContent = message;
+      errorToastInstance.show();
+    }
+  </script>
+</body>
+</html>

@@ -118,20 +118,33 @@ router.post(
       const buyer_id = req.user.user_id
       const { purchase_note } = req.body
 
-      // 生成 business_id 用于幂等性控制
-      const business_id = `purchase_${buyer_id}_${productId}_${Date.now()}`
+      // 【强制幂等】客户端必须传入business_id或Idempotency-Key（二选一）
+      const businessId = req.body.business_id || req.headers['idempotency-key']
 
-      // 调用 InventoryService 购买市场商品
+      if (!businessId) {
+        return res.apiError(
+          '缺少必填参数：business_id（Body）或 Idempotency-Key（Header），强幂等控制',
+          'BAD_REQUEST',
+          null,
+          400
+        )
+      }
+
+      // 调用 InventoryService 购买市场商品（使用DIAMOND结算）
       const InventoryService = req.app.locals.services.getService('inventory')
       const result = await InventoryService.purchaseMarketProduct(buyer_id, productId, {
-        business_id
+        business_id: businessId
       })
 
-      logger.info('市场商品购买成功', {
+      logger.info('市场商品购买成功（DIAMOND结算）', {
         product_id: productId,
         buyer_id,
         seller_id: result.seller_id,
-        points: result.points
+        asset_code: result.asset_code,
+        gross_amount: result.gross_amount,
+        fee_amount: result.fee_amount,
+        net_amount: result.net_amount,
+        is_duplicate: result.is_duplicate
       })
 
       return res.apiSuccess(
@@ -139,10 +152,10 @@ router.post(
           ...result,
           purchase_note: purchase_note || null
         },
-        '购买成功'
+        result.is_duplicate ? '购买成功（幂等请求）' : '购买成功'
       )
     } catch (error) {
-      logger.error('购买市场商品失败', {
+      logger.error('购买市场商品失败（DIAMOND结算）', {
         error: error.message,
         product_id: req.validated.id,
         buyer_id: req.user?.user_id
@@ -204,28 +217,33 @@ router.post(
 router.post('/market/list', authenticateToken, async (req, res) => {
   try {
     const userId = req.user.user_id
-    const { inventory_id, selling_points, condition = 'good' } = req.body
+    const { inventory_id, selling_points, selling_amount, condition = 'good' } = req.body
 
-    // 参数验证
-    if (!inventory_id || selling_points === undefined) {
-      return res.apiError('缺少必要参数：inventory_id 和 selling_points', 'BAD_REQUEST', null, 400)
+    // 【不做兼容】拒绝selling_points参数
+    if (selling_points !== undefined) {
+      return res.apiError('不支持selling_points参数，请使用selling_amount（DIAMOND定价）', 'BAD_REQUEST', null, 400)
+    }
+
+    // 【必填验证】selling_amount必须存在
+    if (!inventory_id || selling_amount === undefined) {
+      return res.apiError('缺少必要参数：inventory_id 和 selling_amount', 'BAD_REQUEST', null, 400)
     }
 
     const itemId = parseInt(inventory_id, 10)
-    const sellingPrice = parseInt(selling_points, 10)
+    const sellingAmountValue = parseInt(selling_amount, 10)
 
     if (isNaN(itemId) || itemId <= 0) {
       return res.apiError('无效的物品ID', 'BAD_REQUEST', null, 400)
     }
 
-    if (isNaN(sellingPrice) || sellingPrice <= 0) {
-      return res.apiError('售价必须是大于0的整数', 'BAD_REQUEST', null, 400)
+    if (isNaN(sellingAmountValue) || sellingAmountValue <= 0) {
+      return res.apiError('售价必须是大于0的整数（DIAMOND）', 'BAD_REQUEST', null, 400)
     }
 
-    // 调用 InventoryService 上架商品
+    // 调用 InventoryService 上架商品（使用DIAMOND定价）
     const InventoryService = req.app.locals.services.getService('inventory')
     const result = await InventoryService.listProductToMarket(userId, itemId, {
-      selling_points: sellingPrice,
+      selling_amount: sellingAmountValue,
       condition
     })
 

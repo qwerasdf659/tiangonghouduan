@@ -21,6 +21,8 @@ const lotteryManagementRoutes = require('./lottery_management')
 const analyticsRoutes = require('./analytics')
 const customerServiceRoutes = require('./customer_service') // 🆕 客服管理
 const marketplaceRoutes = require('./marketplace') // 🆕 市场统计管理
+const materialRoutes = require('./material') // 🆕 材料系统管理（V4.5.0）
+const diamondRoutes = require('./diamond') // 🆕 钻石系统管理（V4.5.0）
 
 // 挂载子模块路由
 router.use('/auth', authRoutes)
@@ -39,6 +41,8 @@ router.use('/lottery-management', lotteryManagementRoutes)
 router.use('/analytics', analyticsRoutes)
 router.use('/customer-service', customerServiceRoutes) // 🆕 客服管理路由
 router.use('/marketplace', marketplaceRoutes) // 🆕 市场统计路由
+router.use('/material', materialRoutes) // 🆕 材料系统管理路由（V4.5.0）
+router.use('/diamond', diamondRoutes) // 🆕 钻石系统管理路由（V4.5.0）
 
 /**
  * GET / - Admin API根路径信息
@@ -128,6 +132,26 @@ router.get('/', (req, res) => {
       marketplace: {
         description: '市场统计管理',
         endpoints: ['/marketplace/listing-stats']
+      },
+      material: {
+        description: '材料系统管理（V4.5.0）',
+        endpoints: [
+          '/material/asset-types',
+          '/material/conversion-rules',
+          '/material/users/:user_id/balance',
+          '/material/users/:user_id/adjust',
+          '/material/transactions'
+        ],
+        note: '材料资产类型管理、转换规则管理、用户余额查询/调整、材料流水查询'
+      },
+      diamond: {
+        description: '钻石系统管理（V4.5.0）',
+        endpoints: [
+          '/diamond/users/:user_id/balance',
+          '/diamond/users/:user_id/adjust',
+          '/diamond/transactions'
+        ],
+        note: '用户钻石余额查询/调整、钻石流水查询'
       }
       // ⚠️ campaign_permissions模块暂未实现，待实现后再添加到此列表
     },

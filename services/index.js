@@ -43,6 +43,11 @@ const AuditLogService = require('./AuditLogService') // 审计日志服务
 // V4 P2-C架构重构：服务合并优化（2025-12-11）
 const ReportingService = require('./ReportingService') // 统一报表服务（合并AdminAnalyticsService、StatisticsService、UserDashboardService）
 
+// V4.5.0 材料系统服务（2025-12-15）
+const MaterialService = require('./MaterialService') // 材料系统核心服务
+const DiamondService = require('./DiamondService') // 钻石系统核心服务
+const AssetConversionService = require('./AssetConversionService') // 资产转换服务（材料转钻石）
+
 // V4 模块化服务
 const { lottery_service_container } = require('./lottery')
 
@@ -206,6 +211,11 @@ class ServiceManager {
 
       // ✅ 注册P2-C架构重构服务（2025-12-11）
       this._services.set('reporting', ReportingService) // 统一报表服务（合并AdminAnalyticsService、StatisticsService、UserDashboardService）
+
+      // ✅ 注册V4.5.0材料系统服务（2025-12-15）
+      this._services.set('material', MaterialService) // 材料系统核心服务
+      this._services.set('diamond', DiamondService) // 钻石系统核心服务
+      this._services.set('assetConversion', AssetConversionService) // 资产转换服务（材料转钻石）
 
       // 注册模块化抽奖服务容器
       this._services.set('lotteryContainer', lottery_service_container)

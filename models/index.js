@@ -183,6 +183,25 @@ models.ExchangeMarketRecord = require('./ExchangeMarketRecord')(sequelize, DataT
  *    - 业务场景：用户选择商品 → 扣除虚拟奖品价值 → 创建订单 → 发货
  */
 
+// 🔥 统一资产底座系统（2025年12月15日新增）
+models.UserAssetAccount = require('./UserAssetAccount')(sequelize, DataTypes)
+/*
+ * ✅ UserAssetAccount：用户资产账户表（统一管理DIAMOND和材料资产余额）
+ *    - 用途：管理用户的DIAMOND资产和材料资产余额
+ *    - 特点：DIAMOND和所有材料使用同一套账本（通过asset_code区分），user_id + asset_code组合唯一
+ *    - 表名：user_asset_accounts，主键：asset_account_id，外键：user_id
+ *    - 业务场景：交易市场DIAMOND结算、兑换市场材料资产扣减、材料转换（碎红水晶→DIAMOND）
+ */
+
+models.AssetTransaction = require('./AssetTransaction')(sequelize, DataTypes)
+/*
+ * ✅ AssetTransaction：资产流水表（记录所有资产变动流水）
+ *    - 用途：记录DIAMOND和材料资产的所有变动流水
+ *    - 特点：支持幂等性控制（business_id + business_type唯一约束），delta_amount可正可负，记录变动后余额
+ *    - 表名：asset_transactions，主键：transaction_id，外键：user_id
+ *    - 业务场景：市场购买（买家扣减、卖家入账、平台手续费）、兑换扣减、材料转换、对账审计
+ */
+
 models.ConsumptionRecord = require('./ConsumptionRecord')(sequelize, DataTypes)
 /*
  * ✅ ConsumptionRecord：消费记录（商家扫码录入）
@@ -252,6 +271,61 @@ models.WebSocketStartupLog = require('./WebSocketStartupLog')(sequelize, DataTyp
  *    - 特点：记录启动时间、停止时间、运行时长、峰值连接数、服务器信息
  *    - 表名：websocket_startup_logs，主键：log_id
  *    - 业务场景：服务监控→uptime计算→重启历史查询→SLA统计
+ */
+
+// 🔴 材料系统（V4.5.0新增，2025-12-15）
+models.MaterialAssetType = require('./MaterialAssetType')(sequelize, DataTypes)
+/*
+ * ✅ MaterialAssetType：材料资产类型
+ *    - 用途：定义系统中存在的材料种类（碎红水晶、完整红水晶、橙碎片等）
+ *    - 特点：支持动态新增材料类型、材料价值配置、分组管理、层级管理
+ *    - 表名：material_asset_types，主键：asset_code
+ *    - 业务场景：运营新增材料类型→配置价值→启用/禁用→前端展示排序
+ */
+
+models.UserMaterialBalance = require('./UserMaterialBalance')(sequelize, DataTypes)
+/*
+ * ✅ UserMaterialBalance：用户材料余额
+ *    - 用途：记录每个用户在每种材料上的余额（支持部分扣减）
+ *    - 特点：行级锁防并发、事务性操作、余额为0不删除记录
+ *    - 表名：user_material_balances，主键：balance_id，唯一约束：(user_id, asset_code)
+ *    - 业务场景：抽奖获得材料→合成/分解材料→兑换消耗材料→余额查询
+ */
+
+models.MaterialConversionRule = require('./MaterialConversionRule')(sequelize, DataTypes)
+/*
+ * ✅ MaterialConversionRule：材料转换规则
+ *    - 用途：定义材料间的转换关系和比例（合成、分解、逐级转换）
+ *    - 特点：支持动态调整比例、版本化管理（effective_at）、历史追溯
+ *    - 表名：material_conversion_rules，主键：rule_id
+ *    - 业务场景：配置合成规则→配置分解规则→比例调整→启用/禁用规则
+ */
+
+models.MaterialTransaction = require('./MaterialTransaction')(sequelize, DataTypes)
+/*
+ * ✅ MaterialTransaction：材料流水
+ *    - 用途：记录所有材料的变动（获得、消耗、转换等），用于审计和对账
+ *    - 特点：幂等性控制（business_id唯一）、before/after余额、业务类型追溯
+ *    - 表名：material_transactions，主键：tx_id，唯一约束：business_id
+ *    - 业务场景：抽奖发放→转换流水→兑换扣减→管理员调整→对账审计
+ */
+
+models.UserDiamondAccount = require('./UserDiamondAccount')(sequelize, DataTypes)
+/*
+ * ✅ UserDiamondAccount：用户钻石账户
+ *    - 用途：记录每个用户的钻石（DIAMOND）余额，钻石作为虚拟价值货币
+ *    - 特点：一对一关系（一个用户一个账户）、行级锁防并发、事务性操作
+ *    - 表名：user_diamond_accounts，主键：account_id，唯一约束：user_id
+ *    - 业务场景：材料分解钻石→交易市场结算→任务奖励→充值获得→管理员发放
+ */
+
+models.DiamondTransaction = require('./DiamondTransaction')(sequelize, DataTypes)
+/*
+ * ✅ DiamondTransaction：钻石流水
+ *    - 用途：记录所有钻石的变动（获得、消耗、管理员调整等），用于审计和对账
+ *    - 特点：幂等性控制（business_id唯一）、before/after余额、业务类型追溯
+ *    - 表名：diamond_transactions，主键：tx_id，唯一约束：business_id
+ *    - 业务场景：材料分解→交易结算→任务奖励→充值→管理员调整→对账审计
  */
 
 /*

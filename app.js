@@ -534,6 +534,20 @@ try {
   app.use('/api/v4/consumption', require('./routes/v4/unified-engine/consumption'))
   appLogger.info('V4消费记录管理系统加载成功', { route: '/api/v4/consumption' })
 
+  // V4.5.0 资产转换路由（材料转钻石）
+  app.use('/api/v4/assets', require('./routes/v4/unified-engine/assets'))
+  appLogger.info('V4.5.0 资产转换系统加载成功', {
+    route: '/api/v4/assets',
+    note: '材料转钻石、余额查询、转换规则查询'
+  })
+
+  // V4.5.0 材料系统路由（用户侧）- 材料余额查询、材料转换、钻石分解
+  app.use('/api/v4/material', require('./routes/v4/unified-engine/material'))
+  appLogger.info('V4.5.0 材料系统加载成功（用户侧）', {
+    route: '/api/v4/material',
+    note: '材料余额、材料转换（合成/分解）、碎红水晶分解钻石、转换规则查询、材料流水'
+  })
+
   // V4系统功能路由（公告、反馈等）
   app.use('/api/v4/system', require('./routes/v4/system'))
   appLogger.info('V4系统功能模块加载成功', { route: '/api/v4/system' })

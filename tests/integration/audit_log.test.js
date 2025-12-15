@@ -51,21 +51,6 @@ describe('审计日志功能测试', () => {
       // ✅ 已删除旧兑换订单（ExchangeRecords）相关测试
       // TODO: 如果需要测试审计日志，可以改用兑换市场订单（ExchangeMarketRecord）
       expect(true).toBe(true)
-        order: [['created_at', 'DESC']]
-      })
-
-      // 验证审计日志已创建
-      expect(auditLog).toBeTruthy()
-      expect(auditLog.operator_id).toBe(adminUserId)
-      expect(auditLog.target_id).toBe(testExchangeId)
-      expect(auditLog.operation_type).toBe('exchange_audit')
-      expect(auditLog.action).toBe('approve')
-      expect(auditLog.reason).toContain('测试审核通过')
-      expect(auditLog.before_data).toBeTruthy()
-      expect(auditLog.after_data).toBeTruthy()
-      expect(auditLog.changed_fields).toBeTruthy()
-
-      testAdminOperationLogId = auditLog.log_id
     })
   })
 
@@ -227,6 +212,7 @@ describe('审计日志功能测试', () => {
             expect(change).toHaveProperty('new_value')
           })
         }
+      }
     })
   })
 })

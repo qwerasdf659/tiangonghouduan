@@ -34,7 +34,7 @@ require('dotenv').config()
  * 2. exchange_records表的idx_user_exchange_time索引
  * 操作使用事务确保原子性，如果任何一步失败则全部回滚
  */
-async function rollbackDeletedMigrations() {
+async function rollbackDeletedMigrations () {
   const sequelize = new Sequelize(
     process.env.DB_NAME || 'restaurant_points_dev',
     process.env.DB_USER || 'root',

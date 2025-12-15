@@ -58,6 +58,12 @@ const FEE_RULES = {
       enabled: true, // 积分转账手续费
       use_tiers: false,
       fixed_rate: 0.02 // 固定2%手续费
+    },
+    market_purchase: {
+      enabled: true, // 是否启用市场购买手续费（交易市场DIAMOND结算）
+      use_tiers: true, // 使用分档计费（按UserInventory.value分档，手续费基于selling_amount计算）
+      fixed_rate: null, // 固定费率（当use_tiers=false时使用）
+      description: '交易市场DIAMOND结算手续费，按商品价值分档，手续费从selling_amount中扣除，平台收入'
     }
   }
 }

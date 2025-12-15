@@ -489,24 +489,23 @@ if (require.main === module) {
       console.error('检查失败:', error)
       process.exit(1)
     })
-    return
+  } else {
+    // 持续监控模式
+    const monitor = new LightweightMonitor(config)
+    monitor.start()
+
+    // 优雅退出处理
+    process.on('SIGINT', () => {
+      console.log('\n\n收到退出信号，停止监控...')
+      monitor.stop()
+      process.exit(0)
+    })
+
+    process.on('SIGTERM', () => {
+      monitor.stop()
+      process.exit(0)
+    })
   }
-
-  // 持续监控模式
-  const monitor = new LightweightMonitor(config)
-  monitor.start()
-
-  // 优雅退出处理
-  process.on('SIGINT', () => {
-    console.log('\n\n收到退出信号，停止监控...')
-    monitor.stop()
-    process.exit(0)
-  })
-
-  process.on('SIGTERM', () => {
-    monitor.stop()
-    process.exit(0)
-  })
 }
 
 module.exports = LightweightMonitor
