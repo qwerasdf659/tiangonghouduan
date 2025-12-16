@@ -90,7 +90,7 @@
 
 const BeijingTimeHelper = require('../utils/timeHelper')
 const { UserInventory, TradeRecord, User, Product } = require('../models')
-const { Op } = require('sequelize')
+const { sequelize, Op } = require('../config/database')
 const DataSanitizer = require('./DataSanitizer')
 const Logger = require('./UnifiedLotteryEngine/utils/Logger')
 const { getUserRoles } = require('../middleware/auth')
@@ -299,7 +299,7 @@ class InventoryService {
    * @param {Object} options.transaction - 事务对象（可选）
    * @returns {Promise<Object>} {inventory, pagination}
    */
-  static async getUserInventory (userId, filters = {}, options = {}) {
+  static async getUserInventory(userId, filters = {}, options = {}) {
     try {
       const { status, type, page = 1, limit = 20 } = filters
       const { viewerId, transaction = null } = options
@@ -378,7 +378,7 @@ class InventoryService {
    * @param {number} itemId - 物品ID
    * @returns {Promise<Object>} 物品详情
    */
-  static async getItemDetail (viewerId, itemId) {
+  static async getItemDetail(viewerId, itemId) {
     try {
       logger.info('开始获取物品详情', {
         viewer_id: viewerId,
@@ -468,7 +468,7 @@ class InventoryService {
    * @param {string} context.business_id - 业务唯一ID（可选，用于幂等性）
    * @returns {Promise<Object>} 使用结果
    */
-  static async useItem (actorId, itemId, context = {}) {
+  static async useItem(actorId, itemId, context = {}) {
     const { transaction: externalTransaction, business_id } = context
 
     // 支持外部事务传入
@@ -596,7 +596,7 @@ class InventoryService {
    * @param {string} context.business_id - 业务唯一ID（可选，用于幂等性）
    * @returns {Promise<Object>} 转让结果
    */
-  static async transferItem (fromUserId, toUserId, itemId, context = {}) {
+  static async transferItem(fromUserId, toUserId, itemId, context = {}) {
     const { transaction: externalTransaction, transfer_note, business_id } = context
 
     // 参数验证
@@ -798,7 +798,7 @@ class InventoryService {
    * @param {Object} options.transaction - 事务对象（可选）
    * @returns {Promise<Object>} {verification_code, expires_at}
    */
-  static async generateVerificationCode (userId, itemId, options = {}) {
+  static async generateVerificationCode(userId, itemId, options = {}) {
     const { transaction = null } = options
 
     try {
@@ -865,7 +865,7 @@ class InventoryService {
    * @param {Object} options.transaction - 事务对象（可选）
    * @returns {Promise<Object>} 核销结果
    */
-  static async verifyCode (merchantId, verificationCode, options = {}) {
+  static async verifyCode(merchantId, verificationCode, options = {}) {
     const { transaction: externalTransaction } = options
 
     // 支持外部事务传入
@@ -991,7 +991,7 @@ class InventoryService {
    * @param {string} verificationCode - 核销码
    * @returns {Object} {valid: boolean, error?: string}
    */
-  static validateVerificationCodeFormat (verificationCode) {
+  static validateVerificationCodeFormat(verificationCode) {
     // 验证非空
     if (!verificationCode || verificationCode.trim().length === 0) {
       return { valid: false, error: '核销码不能为空' }
@@ -1026,7 +1026,7 @@ class InventoryService {
    * @param {Object} options.transaction - 事务对象（可选）
    * @returns {Promise<Object>} 统计数据
    */
-  static async getAdminStatistics (options = {}) {
+  static async getAdminStatistics(options = {}) {
     const { transaction = null } = options
 
     try {
@@ -1106,18 +1106,18 @@ class InventoryService {
         // 类型分布数据
         type_distribution: Array.isArray(typeStats)
           ? typeStats.map(stat => ({
-            type: stat.type || 'unknown',
-            icon: stat.icon || this._getDefaultIcon(stat.type || 'voucher'),
-            count: parseInt(stat.dataValues?.count || 0)
-          }))
+              type: stat.type || 'unknown',
+              icon: stat.icon || this._getDefaultIcon(stat.type || 'voucher'),
+              count: parseInt(stat.dataValues?.count || 0)
+            }))
           : [],
 
         // 最近物品动态
         recent_items: Array.isArray(recentItems)
           ? recentItems.map(item => ({
-            ...item.toJSON(),
-            icon: item.icon || this._getDefaultIcon(item.type || 'voucher')
-          }))
+              ...item.toJSON(),
+              icon: item.icon || this._getDefaultIcon(item.type || 'voucher')
+            }))
           : []
       }
 
@@ -1154,7 +1154,7 @@ class InventoryService {
    * @param {Object} options.transaction - 事务对象（可选）
    * @returns {Promise<Object>} {records, pagination, filter}
    */
-  static async getTransferHistory (userId, filters = {}, options = {}) {
+  static async getTransferHistory(userId, filters = {}, options = {}) {
     try {
       const { direction = 'all', item_id, page = 1, limit = 20 } = filters
       const { viewerId, transaction = null } = options
@@ -1330,7 +1330,7 @@ class InventoryService {
    * @param {Object} options.transaction - 事务对象（可选）
    * @returns {Promise<Object>} {products, pagination}
    */
-  static async getProducts (filters = {}, options = {}) {
+  static async getProducts(filters = {}, options = {}) {
     try {
       const { space = 'lucky', category, page = 1, limit = 20 } = filters
       const { viewerId, transaction = null } = options
@@ -1440,12 +1440,15 @@ class InventoryService {
    * @param {Object} options.transaction - 事务对象（可选）
    * @returns {Promise<Object>} {products, pagination}
    */
-  static async getMarketProducts (filters = {}, options = {}) {
+  static async getMarketProducts(filters = {}, options = {}) {
     try {
       const { category, sort = 'newest', page = 1, limit = 20 } = filters
       const { transaction = null } = options
 
-      logger.info('开始获取市场商品列表', {
+      // 引入所需模型
+      const { MarketListing, ItemInstance } = require('../models')
+
+      logger.info('开始获取市场商品列表（从 market_listings 查询）', {
         category,
         sort,
         page,
@@ -1473,54 +1476,113 @@ class InventoryService {
       const finalPage = Math.max(parseInt(page) || 1, 1)
       const offset = (finalPage - 1) * finalLimit
 
-      // 构建查询条件
+      /*
+       * 🔴 P0-1 修复：从 market_listings 表查询，不再使用 UserInventory
+       * 🔴 P1-1c 增强：支持可叠加资产和不可叠加物品两种类型
+       * 构建查询条件
+       */
       const whereClause = {
-        market_status: 'on_sale',
-        is_available: true
+        status: 'on_sale'
+        // 🔴 P1-1c：不限制 listing_kind，同时支持 item_instance 和 fungible_asset
       }
 
-      if (category && category !== 'all') {
-        whereClause.type = category
-      }
-
-      // 排序规则
+      // 排序规则（按 price_amount 排序）
       let order = [['created_at', 'DESC']]
       switch (sort) {
-      case 'price_low':
-        order = [['selling_points', 'ASC']]
-        break
-      case 'price_high':
-        order = [['selling_points', 'DESC']]
-        break
-      case 'newest':
-        order = [['created_at', 'DESC']]
-        break
+        case 'price_low':
+          order = [['price_amount', 'ASC']]
+          break
+        case 'price_high':
+          order = [['price_amount', 'DESC']]
+          break
+        case 'newest':
+          order = [['created_at', 'DESC']]
+          break
       }
 
-      // 查询市场商品（✅ 使用统一视图常量）
-      const { count, rows: marketProducts } = await UserInventory.findAndCountAll({
+      /*
+       * 🔴 P0-1 + P1-1c：查询 market_listings 表，支持两种类型
+       * - item_instance：关联 item_instances 表（物品所有权真相）
+       * - fungible_asset：不关联，直接从 market_listings 读取
+       */
+      const { count, rows: marketListings } = await MarketListing.findAndCountAll({
         where: whereClause,
-        attributes: INVENTORY_ATTRIBUTES.marketView, // ✅ 使用统一视图常量
+        include: [
+          {
+            model: ItemInstance,
+            as: 'offerItem',
+            required: false, // LEFT JOIN，允许 fungible_asset 类型不关联
+            attributes: ['item_instance_id', 'owner_user_id', 'item_type', 'status', 'meta']
+          }
+        ],
         order,
         limit: finalLimit,
         offset,
         transaction
       })
 
-      // 格式化商品数据
-      const formattedProducts = marketProducts.map(item => ({
-        id: item.inventory_id,
-        seller_id: item.user_id,
-        name: item.name,
-        description: item.description || '暂无描述',
-        selling_points: item.selling_points || 0,
-        condition: item.condition || 'good',
-        category: item.type,
-        is_available: item.is_available,
-        created_at: item.created_at
-      }))
+      /*
+       * 🔴 P1-1c 增强：格式化商品数据，支持两种类型
+       * - item_instance：从 item_instances.meta 获取信息
+       * - fungible_asset：从 market_listings 字段直接获取
+       */
+      const formattedProducts = marketListings
+        .map(listing => {
+          // 判断挂牌类型
+          if (listing.listing_kind === 'item_instance') {
+            // 不可叠加物品
+            const itemMeta = listing.offerItem?.meta || {}
+            const itemType = listing.offerItem?.item_type || 'unknown'
 
-      logger.info('获取市场商品列表成功', {
+            // 如果前端需要按 category 过滤，需要从 item_type 映射
+            if (category && category !== 'all') {
+              const typeMapping = {
+                voucher: 'voucher',
+                product: 'product',
+                service: 'service'
+              }
+              if (typeMapping[itemType] !== category) {
+                return null // 过滤掉不匹配的类别
+              }
+            }
+
+            return {
+              listing_id: listing.listing_id,
+              listing_kind: 'item_instance',
+              id: listing.offer_item_instance_id,
+              seller_id: listing.seller_user_id,
+              name: itemMeta.name || '未命名物品',
+              description: itemMeta.description || '暂无描述',
+              price_amount: listing.price_amount,
+              selling_points: listing.price_amount,
+              condition: 'good',
+              category: itemType,
+              is_available: listing.status === 'on_sale',
+              created_at: listing.created_at
+            }
+          } else if (listing.listing_kind === 'fungible_asset') {
+            // 可叠加资产
+            return {
+              listing_id: listing.listing_id,
+              listing_kind: 'fungible_asset',
+              seller_id: listing.seller_user_id,
+              offer_asset_code: listing.offer_asset_code,
+              offer_amount: listing.offer_amount,
+              name: `${listing.offer_asset_code} x${listing.offer_amount}`,
+              description: `出售 ${listing.offer_amount} 个 ${listing.offer_asset_code}`,
+              price_amount: listing.price_amount,
+              selling_points: listing.price_amount,
+              category: 'material',
+              is_available: listing.status === 'on_sale',
+              created_at: listing.created_at
+            }
+          }
+
+          return null
+        })
+        .filter(item => item !== null) // 过滤掉空值
+
+      logger.info('获取市场商品列表成功（从 market_listings）', {
         total: count,
         returned: formattedProducts.length
       })
@@ -1528,10 +1590,10 @@ class InventoryService {
       return {
         products: formattedProducts,
         pagination: {
-          total: count,
+          total: formattedProducts.length, // 注意：如果有 category 过滤，total 可能不准确
           page: finalPage,
           limit: finalLimit,
-          total_pages: Math.ceil(count / finalLimit)
+          total_pages: Math.ceil(formattedProducts.length / finalLimit)
         }
       }
     } catch (error) {
@@ -1549,55 +1611,93 @@ class InventoryService {
    * 业务场景：
    * - 用户查看市场商品的详细信息
    *
-   * @param {number} productId - 商品ID
+   * 🔴 P0-2 修复：从 market_listings 查询，关联 item_instances（物品所有权真相）
+   *
+   * @param {number} listingIdOrItemId - 挂牌ID 或 物品实例ID（兼容旧参数）
    * @param {Object} options - 选项
-   * @param {Object} options.transaction - 事务对象（可选）
+   * @param {Object} [options.transaction] - 事务对象（可选）
    * @returns {Promise<Object>} 商品详情
    */
-  static async getMarketProductDetail (productId, options = {}) {
+  static async getMarketProductDetail(listingIdOrItemId, options = {}) {
     const { transaction = null } = options
 
+    // 引入所需模型
+    const { MarketListing, ItemInstance } = require('../models')
+
     try {
-      logger.info('开始获取市场商品详情', {
-        product_id: productId
+      logger.info('开始获取市场商品详情（从 market_listings 查询）', {
+        listing_id_or_item_id: listingIdOrItemId
       })
 
-      const marketProduct = await UserInventory.findOne({
+      // 🔴 P0-2：优先按 listing_id 查询，兼容按 offer_item_instance_id 查询
+      let marketListing = await MarketListing.findOne({
         where: {
-          inventory_id: productId,
-          market_status: 'on_sale',
-          is_available: true
+          listing_id: listingIdOrItemId,
+          status: 'on_sale'
         },
-        attributes: INVENTORY_ATTRIBUTES.marketView, // ✅ 使用统一视图常量
+        include: [
+          {
+            model: ItemInstance,
+            as: 'offerItem',
+            required: true,
+            attributes: ['item_instance_id', 'owner_user_id', 'item_type', 'status', 'meta']
+          }
+        ],
         transaction
       })
 
-      if (!marketProduct) {
+      // 兼容：如果按 listing_id 没找到，尝试按 offer_item_instance_id 查询
+      if (!marketListing) {
+        marketListing = await MarketListing.findOne({
+          where: {
+            offer_item_instance_id: listingIdOrItemId,
+            status: 'on_sale'
+          },
+          include: [
+            {
+              model: ItemInstance,
+              as: 'offerItem',
+              required: true,
+              attributes: ['item_instance_id', 'owner_user_id', 'item_type', 'status', 'meta']
+            }
+          ],
+          transaction
+        })
+      }
+
+      if (!marketListing) {
         throw new Error('市场商品不存在或已下架')
       }
 
+      const itemMeta = marketListing.offerItem?.meta || {}
+      const itemType = marketListing.offerItem?.item_type || 'unknown'
+
       const productDetail = {
-        id: marketProduct.inventory_id,
-        seller_id: marketProduct.user_id,
-        name: marketProduct.name,
-        description: marketProduct.description || '暂无描述',
-        selling_points: marketProduct.selling_points || 0,
-        condition: marketProduct.condition || 'good',
-        category: marketProduct.type,
-        is_available: marketProduct.is_available,
-        created_at: marketProduct.created_at,
-        expires_at: marketProduct.expires_at
+        listing_id: marketListing.listing_id,
+        id: marketListing.offer_item_instance_id,
+        seller_id: marketListing.seller_user_id,
+        name: itemMeta.name || '未命名物品',
+        description: itemMeta.description || '暂无描述',
+        price_amount: marketListing.price_amount,
+        selling_points: marketListing.price_amount,
+        condition: 'good',
+        category: itemType,
+        is_available: marketListing.status === 'on_sale',
+        created_at: marketListing.created_at,
+        expires_at: null
       }
 
-      logger.info('获取市场商品详情成功', {
-        product_id: productId
+      logger.info('获取市场商品详情成功（从 market_listings）', {
+        listing_id: marketListing.listing_id,
+        item_instance_id: marketListing.offer_item_instance_id,
+        seller_id: productDetail.seller_id
       })
 
       return productDetail
     } catch (error) {
       logger.error('获取市场商品详情失败', {
         error: error.message,
-        product_id: productId
+        listing_id_or_item_id: listingIdOrItemId
       })
       throw error
     }
@@ -1612,21 +1712,23 @@ class InventoryService {
    * - 只有available状态的物品可以上架
    *
    * 业务规则（不做兼容）：
-   * - 只接收selling_amount参数（DIAMOND定价）
-   * - 直接拒绝selling_points参数（收到即抛出错误）
-   * - 强制写入selling_asset_code='DIAMOND'
+   * - **强幂等**：必须由客户端提供 business_id（缺失直接报错）
+   * - 只接收 price_amount 参数（DIAMOND定价）
+   * - 直接拒绝 selling_amount / selling_points（不做兼容）
+   * - 定价资产固定为 DIAMOND（price_asset_code='DIAMOND'）
    *
    * @param {number} userId - 用户ID
    * @param {number} itemId - 物品ID
    * @param {Object} marketInfo - 市场信息
-   * @param {number} marketInfo.selling_amount - 售价（DIAMOND，整数，必填）
+   * @param {string} marketInfo.business_id - 幂等键（必填，客户端提供）
+   * @param {number} marketInfo.price_amount - 售价（DIAMOND，整数，必填）
    * @param {string} marketInfo.condition - 成色（new/excellent/good/fair/poor，可选，默认good）
    * @param {Object} options - 选项
    * @param {Object} options.transaction - 事务对象（可选）
    * @returns {Promise<Object>} 上架结果
    * @throws {Error} 如果传入selling_points参数或缺少selling_amount
    */
-  static async listProductToMarket (userId, itemId, marketInfo, options = {}) {
+  static async listProductToMarket(userId, itemId, marketInfo, options = {}) {
     const { transaction: externalTransaction } = options
 
     // 支持外部事务传入
@@ -1634,21 +1736,31 @@ class InventoryService {
     const shouldCommit = !externalTransaction
 
     try {
-      // 【不做兼容】拒绝selling_points参数
+      // 🔴 强幂等：business_id 必填（客户端提供）
+      if (!marketInfo.business_id) {
+        throw new Error('缺少必填参数：business_id（幂等键，客户端必须提供）')
+      }
+
+      // 【不做兼容】拒绝旧字段
       if (marketInfo.selling_points !== undefined) {
-        throw new Error('不支持selling_points参数，请使用selling_amount（DIAMOND定价）')
+        throw new Error('不支持 selling_points，请使用 price_amount（DIAMOND定价）')
+      }
+      if (marketInfo.selling_amount !== undefined) {
+        throw new Error('不支持 selling_amount，请使用 price_amount（DIAMOND定价）')
       }
 
-      // 【必填验证】selling_amount必须存在
-      if (marketInfo.selling_amount === undefined || marketInfo.selling_amount === null) {
-        throw new Error('缺少必填参数：selling_amount（DIAMOND定价）')
+      // 【必填验证】price_amount 必须存在
+      if (marketInfo.price_amount === undefined || marketInfo.price_amount === null) {
+        throw new Error('缺少必填参数：price_amount（DIAMOND定价）')
       }
 
-      // 参数验证：selling_amount必须为正整数
-      const sellingAmount = parseInt(marketInfo.selling_amount)
-      if (isNaN(sellingAmount) || sellingAmount <= 0) {
+      // 参数验证：price_amount 必须为正整数
+      const priceAmount = parseInt(marketInfo.price_amount)
+      if (isNaN(priceAmount) || priceAmount <= 0) {
         throw new Error('售价必须大于0（DIAMOND）')
       }
+
+      const businessId = marketInfo.business_id
 
       // 参数验证：成色
       const validConditions = ['new', 'excellent', 'good', 'fair', 'poor']
@@ -1660,43 +1772,112 @@ class InventoryService {
       logger.info('开始上架商品到市场（DIAMOND定价）', {
         user_id: userId,
         item_id: itemId,
-        selling_amount: sellingAmount,
-        selling_asset_code: 'DIAMOND',
+        business_id: businessId,
+        price_amount: priceAmount,
+        price_asset_code: 'DIAMOND',
         condition
       })
 
-      // 查询物品（加行级锁）
-      const inventory = await UserInventory.findOne({
-        where: {
-          inventory_id: itemId,
+      // 🔴 强幂等：检查是否已存在同 business_id 的挂牌
+      const { MarketListing } = require('../models')
+      const existingListing = await MarketListing.findOne({
+        where: { business_id: businessId },
+        transaction
+      })
+
+      if (existingListing) {
+        const isParamsMatch =
+          existingListing.listing_kind === 'item_instance' &&
+          Number(existingListing.seller_user_id) === Number(userId) &&
+          Number(existingListing.offer_item_instance_id) === Number(itemId) &&
+          Number(existingListing.price_amount) === Number(priceAmount) &&
+          existingListing.price_asset_code === 'DIAMOND'
+
+        if (!isParamsMatch) {
+          const conflictError = new Error(
+            `幂等键冲突：business_id="${businessId}" 已用于不同参数的挂牌操作。` +
+              `（已存在：seller_user_id=${existingListing.seller_user_id}, offer_item_instance_id=${existingListing.offer_item_instance_id}, price_amount=${existingListing.price_amount}；` +
+              `当前：seller_user_id=${userId}, offer_item_instance_id=${itemId}, price_amount=${priceAmount}）`
+          )
+          conflictError.statusCode = 409
+          conflictError.errorCode = 'IDEMPOTENCY_KEY_CONFLICT'
+          throw conflictError
+        }
+
+        // 参数一致：幂等返回同结果
+        logger.info('命中幂等：挂牌已存在，直接返回', {
           user_id: userId,
+          business_id: businessId,
+          listing_id: existingListing.listing_id
+        })
+
+        if (shouldCommit) {
+          await transaction.commit()
+        }
+
+        return {
+          is_duplicate: true,
+          business_id: businessId,
+          listing_id: existingListing.listing_id,
+          listing_kind: existingListing.listing_kind,
+          item_instance_id: itemId,
+          price_asset_code: existingListing.price_asset_code,
+          price_amount: Number(existingListing.price_amount),
+          status: existingListing.status,
+          condition,
+          listed_at: existingListing.created_at || BeijingTimeHelper.createBeijingTime()
+        }
+      }
+
+      // 🔴 P0-2 修复：使用 ItemInstance 作为物品所有权真相
+      const { ItemInstance } = require('../models')
+      const itemInstance = await ItemInstance.findOne({
+        where: {
+          item_instance_id: itemId,
+          owner_user_id: userId,
           status: 'available'
         },
         lock: transaction.LOCK.UPDATE,
         transaction
       })
 
-      if (!inventory) {
+      if (!itemInstance) {
         throw new Error('物品不存在或不可上架')
       }
 
-      // 检查是否已上架
-      if (inventory.market_status === 'on_sale') {
-        throw new Error('该物品已在市场上架')
-      }
-
-      // 更新物品状态为上架（使用DIAMOND定价）
-      await inventory.update(
+      // 更新物品状态为上架（锁定状态）
+      await itemInstance.update(
         {
-          market_status: 'on_sale',
-          selling_asset_code: 'DIAMOND', // 【强制】固定为DIAMOND
-          selling_amount: sellingAmount, // 【新字段】DIAMOND金额
-          condition,
-          is_available: true,
-          listed_at: BeijingTimeHelper.createBeijingTime()
+          status: 'locked', // 上架时锁定物品
+          locked_at: BeijingTimeHelper.createBeijingTime()
         },
         { transaction }
       )
+
+      /**
+       * 创建 market_listings 记录（物品所有权真相）
+       */
+      const listing = await MarketListing.create(
+        {
+          listing_kind: 'item_instance',
+          seller_user_id: userId,
+          business_id: businessId,
+          offer_item_instance_id: itemInstance.item_instance_id, // 引用 item_instances.item_instance_id
+          price_asset_code: 'DIAMOND',
+          price_amount: priceAmount,
+          seller_offer_frozen: false, // 物品实例不需要冻结（所有权直接转移）
+          status: 'on_sale'
+        },
+        { transaction }
+      )
+
+      logger.info('[InventoryService] 物品已上架到 market_listings', {
+        item_instance_id: itemInstance.item_instance_id,
+        seller_user_id: userId,
+        business_id: businessId,
+        listing_id: listing.listing_id,
+        price_amount: priceAmount
+      })
 
       // 提交事务
       if (shouldCommit) {
@@ -1706,19 +1887,23 @@ class InventoryService {
       logger.info('上架商品到市场成功（DIAMOND定价）', {
         user_id: userId,
         item_id: itemId,
-        selling_asset_code: 'DIAMOND',
-        selling_amount: sellingAmount,
+        business_id: businessId,
+        price_asset_code: 'DIAMOND',
+        price_amount: priceAmount,
         condition
       })
 
-      // 返回结果（只返回DIAMOND口径，不返回selling_points）
+      // 返回结果（只返回 DIAMOND 口径）
       return {
-        item_id: itemId,
-        market_status: 'on_sale',
-        selling_asset_code: 'DIAMOND',
-        selling_amount: sellingAmount,
+        is_duplicate: false,
+        business_id: businessId,
+        listing_id: listing.listing_id,
+        listing_kind: 'item_instance',
+        item_instance_id: itemId,
+        price_asset_code: 'DIAMOND',
+        price_amount: priceAmount,
         condition,
-        listed_at: inventory.listed_at
+        listed_at: itemInstance.locked_at // 使用 itemInstance 的锁定时间
       }
     } catch (error) {
       if (shouldCommit) {
@@ -1728,37 +1913,43 @@ class InventoryService {
         error: error.message,
         user_id: userId,
         item_id: itemId,
-        selling_amount: marketInfo.selling_amount
+        price_amount: marketInfo.price_amount,
+        business_id: marketInfo.business_id
       })
       throw error
     }
   }
 
   /**
-   * 购买市场商品（V4.2 - DIAMOND结算 + 强幂等 + 手续费）
+   * 购买市场商品（Phase 2 - 冻结链路升级版）
    *
    * 业务场景：
-   * - 用户使用DIAMOND资产购买市场上的商品（不再使用积分）
-   * - 支持手续费计算和平台收入
+   * - 用户使用DIAMOND资产购买市场上的商品
+   * - 使用冻结链路：锁定挂牌 → 冻结资产 → 结算 → 转移所有权
    * - 强幂等性控制，防止重复扣款
-   * - 创建三笔资产流水（买家扣减、卖家入账、平台手续费）
+   * - 通过 TradeOrderService 统一管理订单流程
+   *
+   * 业务流程（Phase 2 架构）：
+   * 1. 查询 market_listings 表获取挂牌信息（不再使用 UserInventory.market_status）
+   * 2. 调用 TradeOrderService.createOrder() 创建订单并冻结资产
+   * 3. 调用 TradeOrderService.completeOrder() 完成订单并结算资产
+   * 4. 更新 UserInventory 的所有权（user_id: seller → buyer）
    *
    * 业务规则：
    * - business_id必填（强制幂等）
-   * - 使用AssetService进行DIAMOND扣减和入账
-   * - 集成FeeCalculator计算手续费
-   * - 手续费入平台账户（PLATFORM_USER_ID）
-   * - 创建TradeRecord记录对账字段
+   * - 使用 market_listings 表作为挂牌真相
+   * - 使用 TradeOrderService 统一管理订单和资产冻结/结算
+   * - 手续费入系统账户（SYSTEM_PLATFORM_FEE）
    *
    * @param {number} buyerId - 购买者ID
-   * @param {number} productId - 商品ID
+   * @param {number} productId - 商品ID（UserInventory.inventory_id）
    * @param {Object} options - 选项
    * @param {Object} options.transaction - 事务对象（可选）
    * @param {string} options.business_id - 业务唯一ID（必填，用于幂等性）
    * @returns {Promise<Object>} 购买结果
-   * @throws {Error} 如果缺少business_id或余额不足
+   * @throws {Error} 如果缺少business_id、挂牌不存在、余额不足等
    */
-  static async purchaseMarketProduct (buyerId, productId, options = {}) {
+  static async purchaseMarketProduct(buyerId, productId, options = {}) {
     const { transaction: externalTransaction, business_id } = options
 
     // 【强制验证】business_id必填
@@ -1766,222 +1957,147 @@ class InventoryService {
       throw new Error('缺少必填参数：business_id（强幂等控制）')
     }
 
-    // 🔥 幂等性检查：通过business_id查询（对齐AssetService幂等策略）
-    const existingTrade = await TradeRecord.findOne({
-      where: {
-        business_id,
-        trade_type: 'market_purchase'
-      }
+    // 引入所需服务
+    const TradeOrderService = require('./TradeOrderService')
+    const { MarketListing } = require('../models')
+
+    logger.info('[Phase 2] 开始购买市场商品（冻结链路）', {
+      buyer_id: buyerId,
+      product_id: productId,
+      business_id
     })
-
-    if (existingTrade) {
-      logger.info('⚠️ 幂等性检查：市场购买操作已存在，返回原结果', {
-        business_id,
-        trade_code: existingTrade.trade_code,
-        buyer_id: buyerId,
-        seller_id: existingTrade.from_user_id,
-        product_id: productId,
-        asset_code: existingTrade.asset_code,
-        gross_amount: existingTrade.gross_amount
-      })
-
-      return {
-        trade_code: existingTrade.trade_code,
-        item_id: productId,
-        name: existingTrade.name,
-        seller_id: existingTrade.from_user_id,
-        buyer_id: buyerId,
-        asset_code: existingTrade.asset_code,
-        gross_amount: existingTrade.gross_amount,
-        fee_amount: existingTrade.fee_amount,
-        net_amount: existingTrade.net_amount,
-        purchased_at: existingTrade.trade_time,
-        is_duplicate: true // ✅ 标记为重复请求
-      }
-    }
 
     // 支持外部事务传入
     const transaction = externalTransaction || (await UserInventory.sequelize.transaction())
     const shouldCommit = !externalTransaction
 
     try {
-      // 引入所需服务
-      const AssetService = require('./AssetService')
-      const FeeCalculator = require('./FeeCalculator')
-      const FEE_RULES = require('../config/fee_rules')
-
-      logger.info('开始购买市场商品（DIAMOND结算）', {
-        buyer_id: buyerId,
-        product_id: productId,
-        business_id
-      })
-
-      // 查询市场商品（加行级锁）
-      const marketProduct = await UserInventory.findOne({
+      // 1. 查询挂牌信息（从 market_listings 表，不再使用 UserInventory.market_status）
+      const listing = await MarketListing.findOne({
         where: {
-          inventory_id: productId,
-          market_status: 'on_sale',
-          is_available: true
+          offer_item_instance_id: productId,
+          status: 'on_sale'
         },
-        lock: transaction.LOCK.UPDATE,
+        include: [
+          {
+            model: UserInventory,
+            as: 'offerItem',
+            required: true
+          }
+        ],
         transaction
       })
 
-      if (!marketProduct) {
-        throw new Error('商品不存在或已下架')
+      if (!listing) {
+        throw new Error(`挂牌不存在或已下架: inventory_id=${productId}`)
       }
 
-      const sellerId = marketProduct.user_id
-      const sellingAmount = marketProduct.selling_amount // 【新字段】DIAMOND金额
-      const sellingAssetCode = marketProduct.selling_asset_code // 【新字段】资产代码
-
-      // 验证商品定价完整性
-      if (!sellingAmount || !sellingAssetCode) {
-        throw new Error('商品定价不完整：缺少selling_amount或selling_asset_code')
-      }
-
-      if (sellingAssetCode !== 'DIAMOND') {
-        throw new Error(`不支持的结算资产：${sellingAssetCode}，只支持DIAMOND`)
+      // 验证物品实例存在且可用
+      const itemInstance = listing.offerItem
+      if (!itemInstance || !itemInstance.is_available) {
+        throw new Error('物品实例不存在或不可用')
       }
 
       // 检查是否购买自己的商品
-      if (buyerId === sellerId) {
+      if (buyerId === listing.seller_user_id) {
         throw new Error('不能购买自己的商品')
       }
 
-      // 🔥 计算手续费（按商品价值分档，基于selling_amount计算）
-      let feeAmount = 0
-      let feeRate = 0
-      const PLATFORM_USER_ID = parseInt(process.env.PLATFORM_USER_ID || 0)
-
-      // 检查手续费开关
-      const feeEnabled =
-        FEE_RULES.enabled &&
-        FEE_RULES.trade_type_fees &&
-        FEE_RULES.trade_type_fees.market_purchase &&
-        FEE_RULES.trade_type_fees.market_purchase.enabled
-
-      if (feeEnabled) {
-        // 验证平台账户配置
-        if (!PLATFORM_USER_ID || PLATFORM_USER_ID <= 0) {
-          throw new Error('手续费已启用，但PLATFORM_USER_ID未配置或无效')
-        }
-
-        // 计算手续费（使用FeeCalculator，按商品价值分档）
-        const feeInfo = FeeCalculator.calculateItemFee(marketProduct.value, sellingAmount)
-        feeAmount = feeInfo.fee
-        feeRate = feeInfo.rate
-
-        logger.info('手续费计算完成', {
-          item_value: marketProduct.value,
-          selling_amount: sellingAmount,
-          fee_amount: feeAmount,
-          fee_rate: feeRate,
-          tier: feeInfo.tier
-        })
-      } else {
-        logger.info('手续费已禁用，跳过手续费计算')
-      }
-
-      // 计算对账金额
-      const grossAmount = sellingAmount // 买家支付总金额
-      const netAmount = sellingAmount - feeAmount // 卖家实收金额
-
-      // 验证对账公式
-      if (grossAmount !== feeAmount + netAmount) {
-        throw new Error(
-          `对账金额错误：gross_amount(${grossAmount}) ≠ fee_amount(${feeAmount}) + net_amount(${netAmount})`
-        )
-      }
-
-      /*
-       * 🔥 三笔资产流水（买家扣减、卖家入账、平台手续费）
-       * 1. 买家扣减DIAMOND
-       */
-      await AssetService.changeBalance(buyerId, 'DIAMOND', -grossAmount, {
-        business_id: `${business_id}_buyer_debit`,
-        business_type: 'market_purchase_buyer_debit',
-        meta: {
-          product_id: productId,
-          product_name: marketProduct.name,
-          seller_id: sellerId,
-          gross_amount: grossAmount,
-          fee_amount: feeAmount,
-          net_amount: netAmount
-        },
-        transaction
+      // 2. 创建订单并冻结买家资产（调用 TradeOrderService）
+      logger.info('[Phase 2] 创建订单并冻结资产', {
+        listing_id: listing.listing_id,
+        buyer_id: buyerId,
+        price_amount: listing.price_amount
       })
 
-      // 2. 卖家入账DIAMOND（实收金额）
-      await AssetService.changeBalance(sellerId, 'DIAMOND', netAmount, {
-        business_id: `${business_id}_seller_credit`,
-        business_type: 'market_purchase_seller_credit',
-        meta: {
-          product_id: productId,
-          product_name: marketProduct.name,
-          buyer_id: buyerId,
-          gross_amount: grossAmount,
-          fee_amount: feeAmount,
-          net_amount: netAmount
-        },
-        transaction
-      })
-
-      // 3. 平台手续费入账（如果手续费>0）
-      if (feeAmount > 0 && PLATFORM_USER_ID > 0) {
-        await AssetService.changeBalance(PLATFORM_USER_ID, 'DIAMOND', feeAmount, {
-          business_id: `${business_id}_platform_fee`,
-          business_type: 'market_purchase_platform_fee_credit',
-          meta: {
-            product_id: productId,
-            product_name: marketProduct.name,
-            buyer_id: buyerId,
-            seller_id: sellerId,
-            gross_amount: grossAmount,
-            fee_amount: feeAmount,
-            fee_rate: feeRate
-          },
-          transaction
-        })
-      }
-
-      // 更新物品归属和状态
-      await marketProduct.update(
+      const createOrderResult = await TradeOrderService.createOrder(
         {
-          user_id: buyerId,
-          market_status: 'sold',
-          is_available: true,
-          sold_at: BeijingTimeHelper.createBeijingTime(),
-          transfer_count: (marketProduct.transfer_count || 0) + 1,
-          last_transfer_at: BeijingTimeHelper.createBeijingTime(),
-          last_transfer_from: sellerId
+          business_id,
+          listing_id: listing.listing_id,
+          buyer_user_id: buyerId
         },
         { transaction }
       )
 
-      // 创建交易记录（包含对账字段）
-      const tradeCode = `mp_${BeijingTimeHelper.generateIdTimestamp()}_${Math.random().toString(36).substr(2, 8)}`
+      const order = createOrderResult.order
+      const is_duplicate = createOrderResult.is_duplicate
+
+      // 如果是幂等请求，直接返回已有订单信息
+      if (is_duplicate) {
+        logger.info('[Phase 2] 幂等请求，返回已有订单', {
+          order_id: order.order_id,
+          business_id
+        })
+
+        // 提交事务
+        if (shouldCommit) {
+          await transaction.commit()
+        }
+
+        return {
+          order_id: order.order_id,
+          trade_code: `order_${order.order_id}`,
+          item_id: productId,
+          name: itemInstance.name,
+          seller_id: listing.seller_user_id,
+          buyer_id: buyerId,
+          asset_code: order.asset_code,
+          gross_amount: order.gross_amount,
+          fee_amount: order.fee_amount,
+          net_amount: order.net_amount,
+          purchased_at: order.created_at,
+          is_duplicate: true
+        }
+      }
+
+      // 3. 完成订单并结算资产（调用 TradeOrderService）
+      logger.info('[Phase 2] 完成订单并结算资产', {
+        order_id: order.order_id
+      })
+
+      // 🔴 P0-1 修复：使用同一 business_id（不加后缀），通过 business_type 区分各分录
+      await TradeOrderService.completeOrder(
+        {
+          order_id: order.order_id,
+          business_id // 使用同一个 business_id
+        },
+        { transaction }
+      )
+
+      // 4. 更新物品实例的转让追踪信息
+      await itemInstance.update(
+        {
+          sold_at: BeijingTimeHelper.createBeijingTime(),
+          transfer_count: (itemInstance.transfer_count || 0) + 1,
+          last_transfer_at: BeijingTimeHelper.createBeijingTime(),
+          last_transfer_from: listing.seller_user_id
+        },
+        { transaction }
+      )
+
+      // 5. 创建交易记录（用于兼容性和历史追溯）
+      const tradeCode = `order_${order.order_id}`
       await TradeRecord.create(
         {
           trade_code: tradeCode,
           trade_type: 'market_purchase',
-          from_user_id: sellerId,
+          from_user_id: listing.seller_user_id,
           to_user_id: buyerId,
-          // 【旧字段】保留用于兼容性（使用selling_amount填充）
-          points_amount: sellingAmount,
-          fee_points_amount: feeAmount,
-          net_points_amount: netAmount,
+          // 【旧字段】保留用于兼容性
+          points_amount: order.gross_amount,
+          fee_points_amount: order.fee_amount,
+          net_points_amount: order.net_amount,
           // 【新字段】对账字段
-          asset_code: 'DIAMOND',
-          gross_amount: grossAmount,
-          fee_amount: feeAmount,
-          net_amount: netAmount,
+          asset_code: order.asset_code,
+          gross_amount: order.gross_amount,
+          fee_amount: order.fee_amount,
+          net_amount: order.net_amount,
           business_id, // 【幂等键】
           // 其他字段
           status: 'completed',
           item_id: productId,
-          name: marketProduct.name,
-          trade_reason: '市场商品交易（DIAMOND结算）',
+          name: itemInstance.name,
+          trade_reason: '市场商品交易（Phase 2 冻结链路）',
           trade_time: BeijingTimeHelper.createBeijingTime(),
           processed_time: BeijingTimeHelper.createBeijingTime()
         },
@@ -1993,38 +2109,319 @@ class InventoryService {
         await transaction.commit()
       }
 
-      logger.info('购买市场商品成功（DIAMOND结算）', {
+      logger.info('[Phase 2] 购买市场商品成功（冻结链路）', {
         buyer_id: buyerId,
-        seller_id: sellerId,
+        seller_id: listing.seller_user_id,
         product_id: productId,
-        asset_code: 'DIAMOND',
-        gross_amount: grossAmount,
-        fee_amount: feeAmount,
-        net_amount: netAmount,
+        order_id: order.order_id,
+        asset_code: order.asset_code,
+        gross_amount: order.gross_amount,
+        fee_amount: order.fee_amount,
+        net_amount: order.net_amount,
         trade_code: tradeCode
       })
 
       return {
+        order_id: order.order_id,
         trade_code: tradeCode,
         item_id: productId,
-        name: marketProduct.name,
-        seller_id: sellerId,
+        name: itemInstance.name,
+        seller_id: listing.seller_user_id,
         buyer_id: buyerId,
-        asset_code: 'DIAMOND',
-        gross_amount: grossAmount,
-        fee_amount: feeAmount,
-        net_amount: netAmount,
-        purchased_at: BeijingTimeHelper.createBeijingTime(),
+        asset_code: order.asset_code,
+        gross_amount: order.gross_amount,
+        fee_amount: order.fee_amount,
+        net_amount: order.net_amount,
+        purchased_at: order.completed_at || order.created_at,
         is_duplicate: false
       }
     } catch (error) {
       if (shouldCommit) {
         await transaction.rollback()
       }
-      logger.error('购买市场商品失败（DIAMOND结算）', {
+      logger.error('[Phase 2] 购买市场商品失败（冻结链路）', {
         error: error.message,
         buyer_id: buyerId,
         product_id: productId,
+        business_id
+      })
+      throw error
+    }
+  }
+
+  /**
+   * 购买市场挂牌商品（基于listing_id）
+   *
+   * 🔴 P0-3 修复：新方法，基于 listing_id（挂牌ID）而非 item_instance_id
+   *
+   * 业务场景：
+   * - 用户购买交易市场中的挂牌商品
+   * - 支持强幂等性控制（business_id）
+   * - 使用 DIAMOND 结算
+   *
+   * 业务流程：
+   * 1. 根据 listing_id 查询挂牌信息
+   * 2. 创建订单并冻结买家资产
+   * 3. 完成订单并结算（买家扣减、卖家入账、平台手续费）
+   * 4. 转移物品所有权
+   * 5. 创建交易记录
+   *
+   * @param {number} buyerId - 买家用户ID
+   * @param {number} listingId - 挂牌ID（listing_id）
+   * @param {Object} options - 选项
+   * @param {string} options.business_id - 业务ID（幂等键，必填）
+   * @param {Object} options.transaction - 事务对象（可选）
+   * @returns {Promise<Object>} 购买结果
+   */
+  static async purchaseMarketListing(buyerId, listingId, options = {}) {
+    const { transaction: externalTransaction, business_id } = options
+
+    // 【强制验证】business_id必填
+    if (!business_id) {
+      throw new Error('缺少必填参数：business_id（强幂等控制）')
+    }
+
+    // 引入所需服务
+    const TradeOrderService = require('./TradeOrderService')
+    const { MarketListing, ItemInstance } = require('../models')
+
+    logger.info('[Phase 2] 开始购买市场挂牌商品（listing_id）', {
+      buyer_id: buyerId,
+      listing_id: listingId,
+      business_id
+    })
+
+    // 支持外部事务传入
+    const transaction = externalTransaction || (await sequelize.transaction())
+    const shouldCommit = !externalTransaction
+
+    try {
+      /*
+       * 🔴 P1-1c 增强：支持可叠加资产和不可叠加物品两种类型的购买
+       * 1. 根据 listing_id 查询挂牌信息（从 market_listings 表）
+       */
+      const listing = await MarketListing.findOne({
+        where: {
+          listing_id: listingId,
+          status: 'on_sale'
+        },
+        include: [
+          {
+            model: ItemInstance,
+            as: 'offerItem',
+            required: false // 🔴 P1-1c：允许 fungible_asset 类型不关联 ItemInstance
+          }
+        ],
+        transaction
+      })
+
+      if (!listing) {
+        throw new Error(`挂牌不存在或已下架: listing_id=${listingId}`)
+      }
+
+      // 🔴 P1-1c：根据挂牌类型进行不同的验证
+      if (listing.listing_kind === 'item_instance') {
+        // 不可叠加物品：验证物品实例存在且可用
+        const itemInstance = listing.offerItem
+        if (!itemInstance) {
+          throw new Error('物品实例不存在或不可用')
+        }
+
+        // 所有权一致性校验（物品所有权真相）
+        if (Number(itemInstance.owner_user_id) !== Number(listing.seller_user_id)) {
+          throw new Error('物品所有权异常：物品不属于当前卖家，禁止购买')
+        }
+
+        /**
+         * 物品挂牌时会被锁定（status=locked），以防止卖家同时使用/转让。
+         * 购买时应允许 locked（以及兼容历史数据的 available）。
+         */
+        const allowedItemStatuses = ['locked', 'available']
+        if (!allowedItemStatuses.includes(itemInstance.status)) {
+          throw new Error(`物品实例状态不可购买：${itemInstance.status}`)
+        }
+      } else if (listing.listing_kind === 'fungible_asset') {
+        // 可叠加资产：验证卖家标的已冻结
+        if (!listing.seller_offer_frozen) {
+          throw new Error('卖家标的资产未冻结，挂牌状态异常')
+        }
+      }
+
+      // 检查是否购买自己的商品
+      if (buyerId === listing.seller_user_id) {
+        throw new Error('不能购买自己的商品')
+      }
+
+      // 2. 创建订单并冻结买家资产（调用 TradeOrderService）
+      logger.info('[Phase 2] 创建订单并冻结资产', {
+        listing_id: listing.listing_id,
+        buyer_id: buyerId,
+        price_amount: listing.price_amount
+      })
+
+      const createOrderResult = await TradeOrderService.createOrder(
+        {
+          business_id,
+          listing_id: listing.listing_id,
+          buyer_user_id: buyerId
+        },
+        { transaction }
+      )
+
+      const order = createOrderResult.order
+      const is_duplicate = createOrderResult.is_duplicate
+
+      // 如果是幂等请求，直接返回已有订单信息
+      if (is_duplicate) {
+        logger.info('[Phase 2] 幂等请求，返回已有订单', {
+          order_id: order.order_id,
+          business_id
+        })
+
+        // 提交事务
+        if (shouldCommit) {
+          await transaction.commit()
+        }
+
+        // 🔴 P1-1c：根据挂牌类型返回不同的信息
+        const result = {
+          order_id: order.order_id,
+          trade_code: `order_${order.order_id}`,
+          listing_id: listingId,
+          listing_kind: listing.listing_kind,
+          seller_id: listing.seller_user_id,
+          buyer_id: buyerId,
+          asset_code: order.asset_code,
+          gross_amount: order.gross_amount,
+          fee_amount: order.fee_amount,
+          net_amount: order.net_amount,
+          purchased_at: order.created_at,
+          is_duplicate: true
+        }
+
+        if (listing.listing_kind === 'item_instance') {
+          const itemMeta = listing.offerItem?.meta || {}
+          result.item_id = listing.offer_item_instance_id
+          result.name = itemMeta.name || '未命名物品'
+        } else if (listing.listing_kind === 'fungible_asset') {
+          result.offer_asset_code = listing.offer_asset_code
+          result.offer_amount = listing.offer_amount
+          result.name = `${listing.offer_asset_code} x${listing.offer_amount}`
+        }
+
+        return result
+      }
+
+      // 3. 完成订单并结算资产（调用 TradeOrderService）
+      logger.info('[Phase 2] 完成订单并结算资产', {
+        order_id: order.order_id
+      })
+
+      await TradeOrderService.completeOrder(
+        {
+          order_id: order.order_id,
+          business_id
+        },
+        { transaction }
+      )
+
+      /*
+       * 🔴 P1-1c：创建交易记录（支持两种类型）
+       * 4. 创建交易记录（用于兼容性和历史追溯）
+       */
+      const tradeCode = `order_${order.order_id}`
+      let tradeName = '未命名物品'
+
+      if (listing.listing_kind === 'item_instance') {
+        const itemMeta = listing.offerItem?.meta || {}
+        tradeName = itemMeta.name || '未命名物品'
+      } else if (listing.listing_kind === 'fungible_asset') {
+        tradeName = `${listing.offer_asset_code} x${listing.offer_amount}`
+      }
+
+      await TradeRecord.create(
+        {
+          trade_code: tradeCode,
+          trade_type: 'market_purchase',
+          from_user_id: listing.seller_user_id,
+          to_user_id: buyerId,
+          // 【旧字段】保留用于兼容性
+          points_amount: order.gross_amount,
+          fee_points_amount: order.fee_amount,
+          net_points_amount: order.net_amount,
+          // 【新字段】对账字段
+          asset_code: order.asset_code,
+          gross_amount: order.gross_amount,
+          fee_amount: order.fee_amount,
+          net_amount: order.net_amount,
+          business_id,
+          // 其他字段
+          status: 'completed',
+          item_id: listing.offer_item_instance_id,
+          name: tradeName,
+          trade_reason: '市场商品交易（Phase 2 冻结链路）',
+          trade_time: BeijingTimeHelper.createBeijingTime(),
+          processed_time: BeijingTimeHelper.createBeijingTime()
+        },
+        { transaction }
+      )
+
+      // 提交事务
+      if (shouldCommit) {
+        await transaction.commit()
+      }
+
+      logger.info('[Phase 2] 购买市场挂牌商品成功', {
+        buyer_id: buyerId,
+        seller_id: listing.seller_user_id,
+        listing_id: listingId,
+        listing_kind: listing.listing_kind,
+        item_instance_id: listing.offer_item_instance_id,
+        offer_asset_code: listing.offer_asset_code,
+        offer_amount: listing.offer_amount,
+        order_id: order.order_id,
+        asset_code: order.asset_code,
+        gross_amount: order.gross_amount,
+        fee_amount: order.fee_amount,
+        net_amount: order.net_amount,
+        trade_code: tradeCode
+      })
+
+      // 🔴 P1-1c：根据挂牌类型返回不同的信息
+      const result = {
+        order_id: order.order_id,
+        trade_code: tradeCode,
+        listing_id: listingId,
+        listing_kind: listing.listing_kind,
+        seller_id: listing.seller_user_id,
+        buyer_id: buyerId,
+        asset_code: order.asset_code,
+        gross_amount: order.gross_amount,
+        fee_amount: order.fee_amount,
+        net_amount: order.net_amount,
+        purchased_at: order.completed_at || order.created_at,
+        is_duplicate: false
+      }
+
+      if (listing.listing_kind === 'item_instance') {
+        const itemMeta = listing.offerItem?.meta || {}
+        result.item_id = listing.offer_item_instance_id
+        result.name = itemMeta.name || '未命名物品'
+      } else if (listing.listing_kind === 'fungible_asset') {
+        result.offer_asset_code = listing.offer_asset_code
+        result.offer_amount = listing.offer_amount
+        result.name = `${listing.offer_asset_code} x${listing.offer_amount}`
+      }
+
+      return result
+    } catch (error) {
+      if (shouldCommit) {
+        await transaction.rollback()
+      }
+      logger.error('[Phase 2] 购买市场挂牌商品失败', {
+        error: error.message,
+        buyer_id: buyerId,
+        listing_id: listingId,
         business_id
       })
       throw error
@@ -2043,7 +2440,7 @@ class InventoryService {
    * @param {Object} options.transaction - 事务对象（可选）
    * @returns {Promise<Object>} 撤回结果
    */
-  static async withdrawMarketProduct (userId, productId, options = {}) {
+  static async withdrawMarketProduct(userId, productId, options = {}) {
     const { transaction: externalTransaction } = options
 
     // 支持外部事务传入
@@ -2056,7 +2453,79 @@ class InventoryService {
         product_id: productId
       })
 
-      // 查询商品（加行级锁）
+      /**
+       * 🔴 Phase 2/3：优先撤回新交易市场挂牌（market_listings）
+       * - 兼容旧逻辑：如果未命中 market_listings，则回落到 UserInventory.market_status
+       */
+      const { MarketListing, ItemInstance } = require('../models')
+
+      const listing = await MarketListing.findOne({
+        where: {
+          listing_id: productId,
+          seller_user_id: userId
+        },
+        lock: transaction.LOCK.UPDATE,
+        transaction
+      })
+
+      if (listing) {
+        if (listing.status !== 'on_sale') {
+          throw new Error(`挂牌状态不允许撤回：${listing.status}（只允许 on_sale）`)
+        }
+
+        // 物品挂牌：撤回时需要解锁物品实例
+        if (listing.listing_kind === 'item_instance' && listing.offer_item_instance_id) {
+          const itemInstance = await ItemInstance.findOne({
+            where: {
+              item_instance_id: listing.offer_item_instance_id,
+              owner_user_id: userId
+            },
+            lock: transaction.LOCK.UPDATE,
+            transaction
+          })
+
+          if (!itemInstance) {
+            throw new Error('物品实例不存在或不属于您，无法撤回')
+          }
+
+          // 解锁物品实例（回到可用）
+          await itemInstance.update(
+            {
+              status: 'available',
+              locked_by_order_id: null,
+              locked_at: null
+            },
+            { transaction }
+          )
+        }
+
+        await listing.update(
+          {
+            status: 'withdrawn',
+            locked_by_order_id: null,
+            locked_at: null
+          },
+          { transaction }
+        )
+
+        if (shouldCommit) {
+          await transaction.commit()
+        }
+
+        logger.info('撤回市场挂牌成功（market_listings）', {
+          user_id: userId,
+          listing_id: listing.listing_id,
+          listing_kind: listing.listing_kind
+        })
+
+        return {
+          listing_id: listing.listing_id,
+          status: listing.status,
+          withdrawn: true
+        }
+      }
+
+      // ====== 兼容旧逻辑：UserInventory.market_status ======
       const marketProduct = await UserInventory.findOne({
         where: {
           inventory_id: productId,
@@ -2071,7 +2540,6 @@ class InventoryService {
         throw new Error('商品不存在或不属于您')
       }
 
-      // 更新状态为撤回
       await marketProduct.update(
         {
           market_status: 'withdrawn',
@@ -2120,7 +2588,7 @@ class InventoryService {
    * @param {Object} options.transaction - 事务对象（可选）
    * @returns {Promise<Object>} 上架状态统计
    */
-  static async checkListingStatus (userId, options = {}) {
+  static async checkListingStatus(userId, options = {}) {
     const { transaction = null } = options
 
     try {
@@ -2128,13 +2596,27 @@ class InventoryService {
         user_id: userId
       })
 
-      const onSaleCount = await UserInventory.count({
-        where: {
-          user_id: userId,
-          market_status: 'on_sale'
-        },
-        transaction
-      })
+      const { MarketListing } = require('../models')
+
+      // Phase 2/3：以 market_listings 为准，同时兼容旧数据（UserInventory.market_status）
+      const [marketListingsCount, legacyCount] = await Promise.all([
+        MarketListing.count({
+          where: {
+            seller_user_id: userId,
+            status: 'on_sale'
+          },
+          transaction
+        }),
+        UserInventory.count({
+          where: {
+            user_id: userId,
+            market_status: 'on_sale'
+          },
+          transaction
+        }).catch(() => 0)
+      ])
+
+      const onSaleCount = Number(marketListingsCount || 0) + Number(legacyCount || 0)
 
       logger.info('检查上架状态成功', {
         user_id: userId,
@@ -2143,7 +2625,11 @@ class InventoryService {
 
       return {
         user_id: userId,
-        on_sale_count: onSaleCount
+        on_sale_count: onSaleCount,
+        breakdown: {
+          market_listings: Number(marketListingsCount || 0),
+          user_inventory_legacy: Number(legacyCount || 0)
+        }
       }
     } catch (error) {
       logger.error('检查上架状态失败', {
@@ -2163,7 +2649,7 @@ class InventoryService {
    * @param {number} targetUserId - 目标用户ID
    * @returns {Promise<boolean>} 权限检查结果
    */
-  static async _checkViewPermission (viewerId, targetUserId) {
+  static async _checkViewPermission(viewerId, targetUserId) {
     if (viewerId === targetUserId) {
       return true
     }
@@ -2182,7 +2668,7 @@ class InventoryService {
    * @param {Array} inventory - 库存数据
    * @returns {Array} 处理后的库存数据
    */
-  static _processInventoryData (inventory) {
+  static _processInventoryData(inventory) {
     return inventory.map(item => {
       const itemData = item.toJSON()
 
@@ -2204,7 +2690,7 @@ class InventoryService {
    * @param {string} status - 状态
    * @returns {string} 状态描述
    */
-  static _getStatusDescription (status) {
+  static _getStatusDescription(status) {
     const statusMap = {
       available: '可用',
       used: '已使用',
@@ -2221,7 +2707,7 @@ class InventoryService {
    * @param {string} type - 物品类型
    * @returns {string} 默认图标
    */
-  static _getDefaultIcon (type) {
+  static _getDefaultIcon(type) {
     const iconMap = {
       voucher: '🎫',
       product: '🎁',
@@ -2240,7 +2726,7 @@ class InventoryService {
    * @param {number} [options.max_listings=10] - 上架上限
    * @returns {Promise<Object>} 统计结果
    */
-  static async getUserListingStats (options = {}) {
+  static async getUserListingStats(options = {}) {
     const { page = 1, limit = 20, filter = 'all', max_listings = 10 } = options
 
     try {
@@ -2248,30 +2734,87 @@ class InventoryService {
 
       const offset = (page - 1) * limit
 
-      // 查询所有用户的上架统计（按user_id分组统计在售商品数量）
-      const stats = await UserInventory.findAll({
-        attributes: [
-          'user_id',
-          [
-            UserInventory.sequelize.fn('COUNT', UserInventory.sequelize.col('inventory_id')),
-            'active_listings'
-          ]
-        ],
-        where: {
-          market_status: 'on_sale'
-        },
-        include: [
-          {
-            model: User,
-            as: 'user',
+      /**
+       * Phase 2/3：按 market_listings 统计（新交易市场）
+       * - 同时兼容旧数据（UserInventory.market_status）作为补充
+       */
+      const { MarketListing } = require('../models')
+
+      const [marketStats, legacyStats] = await Promise.all([
+        MarketListing.findAll({
+          attributes: [
+            'seller_user_id',
+            [sequelize.fn('COUNT', sequelize.col('listing_id')), 'active_listings']
+          ],
+          where: { status: 'on_sale' },
+          group: ['seller_user_id'],
+          raw: true
+        }),
+        UserInventory.findAll({
+          attributes: [
+            'user_id',
+            [
+              UserInventory.sequelize.fn('COUNT', UserInventory.sequelize.col('inventory_id')),
+              'active_listings'
+            ]
+          ],
+          where: { market_status: 'on_sale' },
+          group: ['user_id'],
+          raw: true
+        }).catch(() => [])
+      ])
+
+      // 拉取用户信息（避免 GROUP BY + include 在部分SQL模式下出错）
+      const userIds = new Set()
+      for (const row of marketStats) userIds.add(Number(row.seller_user_id))
+      for (const row of legacyStats) userIds.add(Number(row.user_id))
+
+      const users = userIds.size
+        ? await User.findAll({
+            where: { user_id: Array.from(userIds) },
             attributes: ['user_id', 'nickname', 'mobile', 'created_at'],
-            required: true
-          }
-        ],
-        group: ['user_id'],
-        order: [[UserInventory.sequelize.literal('active_listings'), 'DESC']],
-        raw: true
-      })
+            raw: true
+          })
+        : []
+
+      const userMap = new Map(users.map(u => [Number(u.user_id), u]))
+
+      // 合并两份统计（按 user_id/seller_user_id 聚合）
+      const merged = new Map()
+
+      for (const row of marketStats) {
+        const userId = Number(row.seller_user_id)
+        const u = userMap.get(userId) || {}
+        merged.set(userId, {
+          user_id: userId,
+          nickname: u.nickname,
+          mobile: u.mobile,
+          registered_at: u.created_at,
+          active_listings: Number(row.active_listings || 0)
+        })
+      }
+
+      for (const row of legacyStats) {
+        const userId = Number(row.user_id)
+        const u = userMap.get(userId) || {}
+        const existing = merged.get(userId)
+        const legacyCount = Number(row.active_listings || 0)
+        if (existing) {
+          existing.active_listings += legacyCount
+        } else {
+          merged.set(userId, {
+            user_id: userId,
+            nickname: u.nickname,
+            mobile: u.mobile,
+            registered_at: u.created_at,
+            active_listings: legacyCount
+          })
+        }
+      }
+
+      const stats = Array.from(merged.values()).sort(
+        (a, b) => b.active_listings - a.active_listings
+      )
 
       // 应用筛选条件
       let filteredStats = stats
@@ -2301,14 +2844,14 @@ class InventoryService {
 
         return {
           user_id: item.user_id,
-          nickname: item['user.nickname'],
-          mobile: item['user.mobile'],
+          nickname: item.nickname,
+          mobile: item.mobile,
           active_listings: activeListings,
           limit: max_listings,
           remaining: max_listings - activeListings,
           percentage: Math.round((activeListings / max_listings) * 100),
           status,
-          registered_at: item['user.created_at']
+          registered_at: item.registered_at
         }
       })
 
@@ -2361,7 +2904,7 @@ class InventoryService {
    * @returns {Promise<Object>} {product, space_info, current_stock, total_points}
    * @throws {Error} 商品不存在、不可兑换、库存不足等错误
    */
-  static async validateProductForExchange (productId, space, quantity, options = {}) {
+  static async validateProductForExchange(productId, space, quantity, options = {}) {
     const { transaction } = options
 
     if (!transaction) {
@@ -2455,7 +2998,7 @@ class InventoryService {
    * @returns {Promise<number>} 受影响的行数（应为1）
    * @throws {Error} 库存不足或并发冲突
    */
-  static async deductProductStock (productId, space, quantity, options = {}) {
+  static async deductProductStock(productId, space, quantity, options = {}) {
     const { transaction } = options
     const { sequelize, Sequelize } = require('../models')
 
@@ -2524,6 +3067,329 @@ class InventoryService {
         quantity,
         error: error.message
       })
+      throw error
+    }
+  }
+
+  /**
+   * 挂牌可叠加资产到交易市场（Fungible Asset Listing）
+   *
+   * Phase 3 - P3-4：实现可叠加资产挂牌功能（冻结卖家标的）
+   *
+   * 业务场景：
+   * - 用户将余额型资产（如 red_shard、DIAMOND）挂牌出售
+   * - 挂牌时冻结卖家标的资产（防止重复出售）
+   * - 创建 market_listings 记录
+   *
+   * 硬约束（来自文档）：
+   * - **冻结强制**：listing_kind=fungible_asset 时必须冻结卖家标的
+   * - **DIAMOND定价**：price_asset_code 只允许 DIAMOND
+   * - **幂等键**：business_id 由调用方提供（如 listing_freeze_seller_offer_${user_id}_${timestamp}）
+   *
+   * @param {number} userId - 卖家用户ID
+   * @param {Object} listingInfo - 挂牌信息
+   * @param {string} listingInfo.business_id - 幂等键（挂牌冻结业务ID）
+   * @param {string} listingInfo.offer_asset_code - 标的资产代码（如 red_shard）
+   * @param {number} listingInfo.offer_amount - 标的资产数量
+   * @param {number} listingInfo.price_amount - 售价（DIAMOND）
+   * @param {Object} options - 选项参数
+   * @param {Sequelize.Transaction} options.transaction - 外部事务
+   * @returns {Promise<Object>} 挂牌记录
+   */
+  static async listFungibleAssetToMarket(userId, listingInfo, options = {}) {
+    const { transaction: externalTransaction } = options
+    const transaction = externalTransaction || (await sequelize.transaction())
+    const shouldCommit = !externalTransaction
+
+    try {
+      const { business_id, offer_asset_code, offer_amount, price_amount } = listingInfo
+
+      // 1. 参数验证
+      if (!business_id) {
+        throw new Error('缺少必填参数：business_id（幂等键）')
+      }
+      if (!offer_asset_code) {
+        throw new Error('缺少必填参数：offer_asset_code（标的资产代码）')
+      }
+      if (!offer_amount || offer_amount <= 0) {
+        throw new Error('标的资产数量必须大于0')
+      }
+      if (!price_amount || price_amount <= 0) {
+        throw new Error('售价必须大于0（DIAMOND）')
+      }
+
+      logger.info('开始挂牌可叠加资产到市场', {
+        user_id: userId,
+        business_id,
+        offer_asset_code,
+        offer_amount,
+        price_amount
+      })
+
+      // 1.1 幂等性检查（优先返回已有挂牌，避免重复冻结+重复插入）
+      const { MarketListing } = require('../models')
+      const existingListing = await MarketListing.findOne({
+        where: { business_id },
+        transaction
+      })
+
+      if (existingListing) {
+        const isParamsMatch =
+          existingListing.listing_kind === 'fungible_asset' &&
+          Number(existingListing.seller_user_id) === Number(userId) &&
+          existingListing.offer_asset_code === offer_asset_code &&
+          Number(existingListing.offer_amount) === Number(offer_amount) &&
+          Number(existingListing.price_amount) === Number(price_amount) &&
+          existingListing.price_asset_code === 'DIAMOND'
+
+        if (!isParamsMatch) {
+          const conflictError = new Error(
+            `幂等键冲突：business_id="${business_id}" 已用于不同参数的挂牌操作。`
+          )
+          conflictError.statusCode = 409
+          conflictError.errorCode = 'IDEMPOTENCY_KEY_CONFLICT'
+          throw conflictError
+        }
+
+        if (shouldCommit) {
+          await transaction.commit()
+        }
+
+        return {
+          is_duplicate: true,
+          listing_id: existingListing.listing_id,
+          listing_kind: existingListing.listing_kind,
+          offer_asset_code: existingListing.offer_asset_code,
+          offer_amount: Number(existingListing.offer_amount),
+          price_amount: Number(existingListing.price_amount),
+          status: existingListing.status,
+          seller_offer_frozen: existingListing.seller_offer_frozen
+        }
+      }
+
+      // 2. 冻结卖家标的资产
+      const AssetService = require('./AssetService')
+      const freezeResult = await AssetService.freeze(
+        {
+          business_id,
+          business_type: 'listing_freeze_seller_offer',
+          user_id: userId,
+          asset_code: offer_asset_code,
+          amount: offer_amount,
+          meta: {
+            listing_action: 'create',
+            offer_asset_code,
+            offer_amount,
+            price_amount,
+            price_asset_code: 'DIAMOND'
+          }
+        },
+        { transaction }
+      )
+
+      logger.info('卖家标的资产已冻结', {
+        user_id: userId,
+        asset_code: offer_asset_code,
+        frozen_amount: offer_amount,
+        freeze_result: freezeResult
+      })
+
+      // 3. 创建 market_listings 记录（🔴 P1-1 修复：添加 business_id 幂等保证）
+      const listing = await MarketListing.create(
+        {
+          listing_id: null, // 自增
+          listing_kind: 'fungible_asset',
+          seller_user_id: userId,
+          business_id, // 🔴 P1-1 修复：填充 business_id（幂等键）
+          offer_item_instance_id: null, // 可叠加资产不需要
+          offer_asset_code,
+          offer_amount,
+          price_asset_code: 'DIAMOND',
+          price_amount,
+          seller_offer_frozen: true, // 强制为 true
+          status: 'on_sale',
+          locked_by_order_id: null,
+          locked_at: null,
+          created_at: BeijingTimeHelper.createBeijingTime(),
+          updated_at: BeijingTimeHelper.createBeijingTime()
+        },
+        { transaction }
+      )
+
+      logger.info('market_listings 记录已创建', {
+        listing_id: listing.listing_id,
+        listing_kind: 'fungible_asset',
+        seller_user_id: userId,
+        offer_asset_code,
+        offer_amount
+      })
+
+      // 4. 提交事务
+      if (shouldCommit) {
+        await transaction.commit()
+      }
+
+      return {
+        listing_id: listing.listing_id,
+        listing_kind: listing.listing_kind,
+        offer_asset_code: listing.offer_asset_code,
+        offer_amount: listing.offer_amount,
+        price_amount: listing.price_amount,
+        status: listing.status,
+        seller_offer_frozen: listing.seller_offer_frozen
+      }
+    } catch (error) {
+      if (shouldCommit) {
+        await transaction.rollback()
+      }
+
+      logger.error('挂牌可叠加资产失败', {
+        user_id: userId,
+        listing_info: listingInfo,
+        error: error.message
+      })
+
+      throw error
+    }
+  }
+
+  /**
+   * 撤回可叠加资产挂牌（Withdraw Fungible Asset Listing）
+   *
+   * Phase 3 - P3-5：实现可叠加资产撤单功能（解冻卖家标的）
+   *
+   * 业务场景：
+   * - 卖家撤回挂牌，解冻标的资产
+   * - 只允许 status=on_sale 的挂牌撤回
+   *
+   * 硬约束（来自文档）：
+   * - **状态校验**：只允许 on_sale → withdrawn
+   * - **解冻强制**：必须解冻卖家标的资产
+   * - **幂等键**：business_id 由调用方提供
+   *
+   * @param {number} userId - 卖家用户ID
+   * @param {number} listingId - 挂牌ID
+   * @param {Object} withdrawInfo - 撤回信息
+   * @param {string} withdrawInfo.business_id - 幂等键（挂牌解冻业务ID）
+   * @param {Object} options - 选项参数
+   * @param {Sequelize.Transaction} options.transaction - 外部事务
+   * @returns {Promise<Object>} 撤回结果
+   */
+  static async withdrawFungibleAssetListing(userId, listingId, withdrawInfo, options = {}) {
+    const { transaction: externalTransaction } = options
+    const transaction = externalTransaction || (await sequelize.transaction())
+    const shouldCommit = !externalTransaction
+
+    try {
+      const { business_id } = withdrawInfo
+
+      // 1. 参数验证
+      if (!business_id) {
+        throw new Error('缺少必填参数：business_id（幂等键）')
+      }
+
+      logger.info('开始撤回可叠加资产挂牌', {
+        user_id: userId,
+        listing_id: listingId,
+        business_id
+      })
+
+      // 2. 查询挂牌记录（加锁）
+      const { MarketListing } = require('../models')
+      const listing = await MarketListing.findOne({
+        where: {
+          listing_id: listingId,
+          seller_user_id: userId,
+          listing_kind: 'fungible_asset'
+        },
+        lock: transaction.LOCK.UPDATE,
+        transaction
+      })
+
+      if (!listing) {
+        throw new Error('挂牌不存在或无权撤回')
+      }
+
+      // 3. 状态校验
+      if (listing.status !== 'on_sale') {
+        // 幂等：如果已撤回，直接返回成功
+        if (listing.status === 'withdrawn') {
+          if (shouldCommit) {
+            await transaction.commit()
+          }
+          return {
+            listing_id: listing.listing_id,
+            status: listing.status,
+            withdrawn: true,
+            is_duplicate: true
+          }
+        }
+
+        throw new Error(`挂牌状态不允许撤回：${listing.status}（只允许 on_sale）`)
+      }
+
+      // 4. 解冻卖家标的资产
+      const AssetService = require('./AssetService')
+      const unfreezeResult = await AssetService.unfreeze(
+        {
+          business_id,
+          business_type: 'listing_unfreeze_seller_offer',
+          user_id: userId,
+          asset_code: listing.offer_asset_code,
+          amount: listing.offer_amount,
+          meta: {
+            listing_action: 'withdraw',
+            listing_id: listingId,
+            offer_asset_code: listing.offer_asset_code,
+            offer_amount: listing.offer_amount
+          }
+        },
+        { transaction }
+      )
+
+      logger.info('卖家标的资产已解冻', {
+        user_id: userId,
+        asset_code: listing.offer_asset_code,
+        unfrozen_amount: listing.offer_amount,
+        unfreeze_result: unfreezeResult
+      })
+
+      // 5. 更新挂牌状态
+      await listing.update(
+        {
+          status: 'withdrawn',
+          updated_at: BeijingTimeHelper.createBeijingTime()
+        },
+        { transaction }
+      )
+
+      logger.info('挂牌已撤回', {
+        listing_id: listingId,
+        status: 'withdrawn'
+      })
+
+      // 6. 提交事务
+      if (shouldCommit) {
+        await transaction.commit()
+      }
+
+      return {
+        listing_id: listing.listing_id,
+        status: listing.status,
+        withdrawn: true
+      }
+    } catch (error) {
+      if (shouldCommit) {
+        await transaction.rollback()
+      }
+
+      logger.error('撤回可叠加资产挂牌失败', {
+        user_id: userId,
+        listing_id: listingId,
+        withdraw_info: withdrawInfo,
+        error: error.message
+      })
+
       throw error
     }
   }

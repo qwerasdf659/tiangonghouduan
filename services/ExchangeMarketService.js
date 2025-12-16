@@ -1,24 +1,33 @@
 /**
- * 餐厅积分抽奖系统 V4.0 - 兑换市场服务（ExchangeMarketService）
+ * 餐厅积分抽奖系统 V4.5.0 - 兑换市场服务（ExchangeMarketService）
+ * 🔥 Phase 3已迁移：使用统一账本（AssetService）扣减材料资产
  *
- * 业务场景：用户使用虚拟奖品价值兑换实物商品（唯一支付方式）
+ * 业务场景：用户使用材料资产兑换实物商品
  *
  * 核心功能：
  * 1. 商品列表查询（支持分类、排序、分页）
- * 2. 商品兑换（仅支持虚拟奖品价值支付）
+ * 2. 商品兑换（使用材料资产支付：cost_asset_code + cost_amount）
  * 3. 订单管理（查询订单、订单详情）
  *
- * 支付方式（简化后）：
- * - ✅ 虚拟奖品支付：从 user_inventory 扣除虚拟奖品价值（唯一方式）
+ * Phase 3改造要点：
+ * - ✅ 使用AssetService.changeBalance()替代MaterialService.consume()
+ * - ✅ 业务类型：exchange_debit（兑换市场材料扣减）
+ * - ✅ 统一business_id：订单级幂等键，不再使用_material_deduct后缀
+ * - ✅ 余额来源：统一从account_asset_balances读取，不再依赖旧余额表
+ * - ✅ 409冲突检查：已在ExchangeMarketService层实现，参数不同返回409
+ *
+ * 支付方式（V4.5.0）：
+ * - ✅ 材料资产支付：从统一账本扣除材料资产（cost_asset_code + cost_amount）
  * - ❌ 积分支付：已废弃，不再支持
  * - ❌ 混合支付：已废弃，不再支持
+ * - ❌ 虚拟奖品支付：已废弃，统一为材料资产支付
  *
  * 业务规则（强制）：
- * - ✅ 兑换只能使用虚拟奖品价值
+ * - ✅ 兑换只能使用材料资产（必须配置cost_asset_code和cost_amount）
  * - ❌ 禁止扣除 available_points（显示积分）
  * - ❌ 禁止检查/扣除 remaining_budget_points（预算积分）
  * - ✅ points_paid 必须强制为 0
- * - ✅ payment_type 必须为 'virtual'
+ * - ✅ payment_type 必须为 'material'（材料资产支付）
  *
  * 业务流程：
  *
@@ -59,12 +68,7 @@
  * 使用模型：Claude Sonnet 4.5
  */
 
-const {
-  ExchangeItem,
-  ExchangeMarketRecord,
-  UserInventory,
-  sequelize
-} = require('../models')
+const { ExchangeItem, ExchangeMarketRecord, UserInventory, sequelize } = require('../models')
 const { Op } = require('sequelize')
 const BeijingTimeHelper = require('../utils/timeHelper')
 
@@ -231,7 +235,7 @@ class ExchangeMarketService {
    * @param {string} [options.sort_order='ASC'] - 排序方向
    * @returns {Promise<Object>} 商品列表和分页信息
    */
-  static async getMarketItems (options = {}) {
+  static async getMarketItems(options = {}) {
     const {
       status = 'active',
       price_type = null,
@@ -288,7 +292,7 @@ class ExchangeMarketService {
    * @param {number} item_id - 商品ID
    * @returns {Promise<Object>} 商品详情
    */
-  static async getItemDetail (item_id) {
+  static async getItemDetail(item_id) {
     try {
       const item = await ExchangeItem.findOne({
         where: { item_id },
@@ -326,7 +330,7 @@ class ExchangeMarketService {
    * @param {Transaction} options.transaction - 外部事务对象（可选）
    * @returns {Promise<Object>} 兑换结果和订单信息
    */
-  static async exchangeItem (user_id, item_id, quantity = 1, options = {}) {
+  static async exchangeItem(user_id, item_id, quantity = 1, options = {}) {
     const { business_id, transaction: externalTransaction } = options
 
     // 🔥 必填参数校验
@@ -335,7 +339,7 @@ class ExchangeMarketService {
     }
 
     // 🔥 支持外部传入的事务（与PointsService对齐）
-    const transaction = externalTransaction || await sequelize.transaction()
+    const transaction = externalTransaction || (await sequelize.transaction())
     const shouldCommit = !externalTransaction // 只有自己创建的事务才提交/回滚
 
     try {
@@ -364,7 +368,10 @@ class ExchangeMarketService {
         })
 
         // 🔴 P1-1冲突保护：验证请求参数是否一致（确保类型一致）
-        if (Number(existingOrder.item_id) !== Number(item_id) || Number(existingOrder.quantity) !== Number(quantity)) {
+        if (
+          Number(existingOrder.item_id) !== Number(item_id) ||
+          Number(existingOrder.quantity) !== Number(quantity)
+        ) {
           const conflictError = new Error(
             `幂等键冲突：business_id="${business_id}" 已被使用于不同参数的订单。` +
               `原订单：商品ID=${existingOrder.item_id}, 数量=${existingOrder.quantity}；` +
@@ -381,16 +388,45 @@ class ExchangeMarketService {
           order_no: existingOrder.order_no
         })
 
-        // V4.5.0: 获取材料余额（如果有pay_asset_code）
-        const MaterialService = require('./MaterialService')
+        /*
+         * 🔴 幂等回放：补齐指纹字段（pay_asset_code/pay_amount）并修复 AssetService.getBalance 参数签名
+         * 文档要求：兑换市场幂等指纹 = item_id + quantity + pay_asset_code + pay_amount
+         */
+        const AssetService = require('./AssetService')
+        const currentItem = await ExchangeItem.findOne({
+          where: { item_id },
+          transaction
+        })
+        if (!currentItem) {
+          throw new Error('商品不存在')
+        }
+        if (!currentItem.cost_asset_code || !currentItem.cost_amount) {
+          throw new Error('商品未配置材料资产支付方式（cost_asset_code/cost_amount缺失）')
+        }
+        const expectedPayAssetCode = currentItem.cost_asset_code
+        const expectedPayAmount = currentItem.cost_amount * quantity
+
+        if (
+          existingOrder.pay_asset_code !== expectedPayAssetCode ||
+          Number(existingOrder.pay_amount) !== Number(expectedPayAmount)
+        ) {
+          const conflictError = new Error(
+            `幂等键冲突：business_id="${business_id}" 已被使用于不同支付参数的订单。` +
+              `原订单：pay_asset_code=${existingOrder.pay_asset_code}, pay_amount=${existingOrder.pay_amount}；` +
+              `当前请求：pay_asset_code=${expectedPayAssetCode}, pay_amount=${expectedPayAmount}。`
+          )
+          conflictError.statusCode = 409
+          conflictError.errorCode = 'IDEMPOTENCY_KEY_CONFLICT'
+          throw conflictError
+        }
+
         let materialBalance = 0
         if (existingOrder.pay_asset_code) {
-          const balanceRecord = await MaterialService.getOrCreateBalance(
-            user_id,
-            existingOrder.pay_asset_code,
+          const balanceResult = await AssetService.getBalance(
+            { user_id, asset_code: existingOrder.pay_asset_code },
             { transaction }
           )
-          materialBalance = balanceRecord.balance || 0
+          materialBalance = balanceResult.available_amount || 0
         }
 
         return {
@@ -417,7 +453,9 @@ class ExchangeMarketService {
         }
       }
 
-      console.log(`[兑换市场] 用户${user_id}兑换商品${item_id}，数量${quantity}，business_id=${business_id}`)
+      console.log(
+        `[兑换市场] 用户${user_id}兑换商品${item_id}，数量${quantity}，business_id=${business_id}`
+      )
 
       // 1. 获取商品信息（加锁防止超卖）
       const item = await ExchangeItem.findOne({
@@ -456,32 +494,37 @@ class ExchangeMarketService {
         totalPayAmount
       })
 
-      // 3. 使用MaterialService扣减材料资产
-      const MaterialService = require('./MaterialService')
+      // 3. 使用AssetService统一账本扣减材料资产（Phase 3迁移）
+      const AssetService = require('./AssetService')
 
-      console.log('[兑换市场] 开始扣减材料资产', {
+      console.log('[兑换市场] 开始扣减材料资产（统一账本）', {
         user_id,
         asset_code: item.cost_asset_code,
         amount: totalPayAmount,
-        business_id: `${business_id}_material_deduct`
+        business_id: `${business_id}`
       })
 
-      // 扣减材料资产
-      const materialResult = await MaterialService.consume(
-        user_id,
-        item.cost_asset_code,
-        totalPayAmount,
+      /*
+       * 扣减材料资产（使用统一账本AssetService）
+       * business_type: exchange_debit（兑换市场材料扣减）
+       */
+      const materialResult = await AssetService.changeBalance(
         {
-          transaction,
-          business_id: `${business_id}_material_deduct`, // 材料扣减的幂等键
-          business_type: 'exchange_market_deduct', // 业务类型：兑换市场扣减
-          title: `兑换商品：${item.name}`,
+          user_id,
+          asset_code: item.cost_asset_code,
+          delta_amount: -totalPayAmount, // 负数表示扣减
+          business_id: `${business_id}`, // 幂等键：使用订单级business_id
+          business_type: 'exchange_debit', // 业务类型：兑换市场扣减
           meta: {
             item_id,
             item_name: item.name,
             quantity,
-            order_business_id: business_id
+            cost_amount: item.cost_amount,
+            total_pay_amount: totalPayAmount
           }
+        },
+        {
+          transaction
         }
       )
 
@@ -501,12 +544,18 @@ class ExchangeMarketService {
             await transaction.commit()
           }
 
+          // 获取当前材料余额
+          const currentBalance = await AssetService.getBalance(
+            { user_id, asset_code: item.cost_asset_code },
+            { transaction }
+          )
+
           return {
             success: true,
             message: '兑换订单已存在（材料扣减幂等）',
             order: existingRecord.toJSON(),
             remaining: {
-              material_balance: materialResult.new_balance
+              material_balance: currentBalance.available_amount
             },
             is_duplicate: true,
             timestamp: BeijingTimeHelper.now()
@@ -514,7 +563,9 @@ class ExchangeMarketService {
         }
       }
 
-      console.log(`[兑换市场] 材料扣减成功：${totalPayAmount}个${item.cost_asset_code}，剩余${materialResult.new_balance}`)
+      console.log(
+        `[兑换市场] 材料扣减成功：${totalPayAmount}个${item.cost_asset_code}，剩余余额通过统一账本管理`
+      )
 
       // 4. 生成订单号
       const order_no = this._generateOrderNo()
@@ -592,15 +643,15 @@ class ExchangeMarketService {
               throw conflictError
             }
 
-            // 返回已存在的订单（幂等）
-            const MaterialService = require('./MaterialService')
+            // 🔴 P0-5 修复：使用 AssetService.getBalance() 替代已删除的 MaterialService
+            const AssetService = require('./AssetService')
             let materialBalance = 0
             if (concurrentOrder.pay_asset_code) {
-              const balanceRecord = await MaterialService.getOrCreateBalance(
+              const balanceResult = await AssetService.getBalance(
                 user_id,
                 concurrentOrder.pay_asset_code
               )
-              materialBalance = balanceRecord.balance || 0
+              materialBalance = balanceResult.available_amount || 0
             }
 
             return {
@@ -672,7 +723,7 @@ class ExchangeMarketService {
    * @param {number} [options.page_size=20] - 每页数量
    * @returns {Promise<Object>} 订单列表和分页信息
    */
-  static async getUserOrders (user_id, options = {}) {
+  static async getUserOrders(user_id, options = {}) {
     const { status = null, page = 1, page_size = 20 } = options
 
     try {
@@ -723,7 +774,7 @@ class ExchangeMarketService {
    * @param {string} order_no - 订单号
    * @returns {Promise<Object>} 订单详情
    */
-  static async getOrderDetail (user_id, order_no) {
+  static async getOrderDetail(user_id, order_no) {
     try {
       const order = await ExchangeMarketRecord.findOne({
         where: { user_id, order_no },
@@ -756,11 +807,11 @@ class ExchangeMarketService {
    * @param {Transaction} options.transaction - 外部事务对象（可选）
    * @returns {Promise<Object>} 更新结果
    */
-  static async updateOrderStatus (order_no, new_status, operator_id, remark = '', options = {}) {
+  static async updateOrderStatus(order_no, new_status, operator_id, remark = '', options = {}) {
     const { transaction: externalTransaction } = options
 
     // 🔥 支持外部传入的事务（与PointsService对齐）
-    const transaction = externalTransaction || await sequelize.transaction()
+    const transaction = externalTransaction || (await sequelize.transaction())
     const shouldCommit = !externalTransaction // 只有自己创建的事务才提交/回滚
 
     try {
@@ -833,7 +884,7 @@ class ExchangeMarketService {
    * @returns {Promise<number>} 虚拟奖品总价值
    * @private
    */
-  static async _getUserTotalVirtualValue (user_id, transaction = null) {
+  static async _getUserTotalVirtualValue(user_id, transaction = null) {
     console.warn(
       '[兑换市场] ⚠️ 警告：_getUserTotalVirtualValue已废弃（V4.5.0），请使用AssetService.getBalance代替'
     )
@@ -862,7 +913,7 @@ class ExchangeMarketService {
    * @returns {Promise<void>} 无返回值，在事务中扣除库存中的虚拟价值
    * @private
    */
-  static async _deductVirtualValue (user_id, value_to_deduct, transaction) {
+  static async _deductVirtualValue(user_id, value_to_deduct, transaction) {
     console.warn(
       '[兑换市场] ⚠️ 警告：_deductVirtualValue已废弃（V4.5.0），请使用AssetService.changeBalance代替'
     )
@@ -880,7 +931,9 @@ class ExchangeMarketService {
       transaction
     })
 
-    console.log(`[兑换市场] 查询到 ${virtualPrizes.length} 个可用虚拟奖品，总价值: ${virtualPrizes.reduce((sum, p) => sum + (p.value || 0), 0)}`)
+    console.log(
+      `[兑换市场] 查询到 ${virtualPrizes.length} 个可用虚拟奖品，总价值: ${virtualPrizes.reduce((sum, p) => sum + (p.value || 0), 0)}`
+    )
 
     let remaining = value_to_deduct
 
@@ -900,7 +953,9 @@ class ExchangeMarketService {
           { transaction }
         )
         remaining -= prizeValue
-        console.log(`[兑换市场] 消耗虚拟奖品 inventory_id=${prize.inventory_id}, value=${prizeValue}, 剩余需求=${remaining}`)
+        console.log(
+          `[兑换市场] 消耗虚拟奖品 inventory_id=${prize.inventory_id}, value=${prizeValue}, 剩余需求=${remaining}`
+        )
       } else {
         /*
          * 部分消耗（如果虚拟奖品支持部分使用）
@@ -925,7 +980,7 @@ class ExchangeMarketService {
    * @returns {string} 订单号
    * @private
    */
-  static _generateOrderNo () {
+  static _generateOrderNo() {
     const timestamp = Date.now()
     const random = Math.random().toString(36).substr(2, 6).toUpperCase()
     return `EM${timestamp}${random}`
@@ -936,7 +991,7 @@ class ExchangeMarketService {
    *
    * @returns {Promise<Object>} 统计数据
    */
-  static async getMarketStatistics () {
+  static async getMarketStatistics() {
     try {
       console.log('[兑换市场] 查询统计数据')
 
@@ -1006,7 +1061,7 @@ class ExchangeMarketService {
    * @param {number} created_by - 创建者ID
    * @returns {Promise<Object>} 创建结果
    */
-  static async createExchangeItem (itemData, created_by) {
+  static async createExchangeItem(itemData, created_by) {
     try {
       console.log('[兑换市场] 管理员创建商品', {
         item_name: itemData.item_name,
@@ -1082,7 +1137,7 @@ class ExchangeMarketService {
    * @param {Object} updateData - 更新数据
    * @returns {Promise<Object>} 更新结果
    */
-  static async updateExchangeItem (item_id, updateData) {
+  static async updateExchangeItem(item_id, updateData) {
     try {
       console.log('[兑换市场] 管理员更新商品', { item_id })
 
@@ -1183,11 +1238,11 @@ class ExchangeMarketService {
    * @param {Transaction} options.transaction - 外部事务对象（可选）
    * @returns {Promise<Object>} 删除结果
    */
-  static async deleteExchangeItem (item_id, options = {}) {
+  static async deleteExchangeItem(item_id, options = {}) {
     const { transaction: externalTransaction } = options
 
     // 🔥 支持外部传入的事务（与PointsService对齐）
-    const transaction = externalTransaction || await sequelize.transaction()
+    const transaction = externalTransaction || (await sequelize.transaction())
     const shouldCommit = !externalTransaction // 只有自己创建的事务才提交/回滚
 
     try {
@@ -1292,7 +1347,7 @@ class ExchangeMarketService {
    *   max_listings: 3
    * });
    */
-  static async getUserListingStats (options) {
+  static async getUserListingStats(options) {
     try {
       console.log('[兑换市场] 管理员获取用户上架统计', {
         page: options.page,

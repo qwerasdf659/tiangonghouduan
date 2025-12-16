@@ -42,14 +42,23 @@ class AssetTransaction extends Model {
    * @param {Object} models - Sequelize所有模型的集合对象
    * @returns {void} 无返回值，仅定义关联关系
    */
-  static associate (models) {
-    // 多对一：流水归属于用户
+  static associate(models) {
+    // 多对一：流水归属于用户（历史兼容字段）
     AssetTransaction.belongsTo(models.User, {
       foreignKey: 'user_id',
       as: 'user',
       onDelete: 'RESTRICT', // 用户删除时保护流水数据
       onUpdate: 'CASCADE',
-      comment: '关联用户信息（流水所属用户）'
+      comment: '关联用户信息（流水所属用户，历史兼容字段）'
+    })
+
+    // 多对一：流水归属于账户（新账户体系）
+    AssetTransaction.belongsTo(models.Account, {
+      foreignKey: 'account_id',
+      as: 'account',
+      onDelete: 'RESTRICT', // 账户删除时保护流水数据
+      onUpdate: 'CASCADE',
+      comment: '关联账户信息（流水所属账户，支持用户账户和系统账户）'
     })
   }
 
@@ -61,13 +70,15 @@ class AssetTransaction extends Model {
    * @param {number} data.balance_after - 变动后余额
    * @returns {Object} 验证结果对象 {is_valid: boolean, errors: Array<string>}
    */
-  static validateTransaction (data) {
+  static validateTransaction(data) {
     const errors = []
 
-    // 验证变动金额不能为0
-    if (data.delta_amount === 0) {
-      errors.push('变动金额不能为0')
-    }
+    /**
+     * 🔴 P0-6 修复：删除 delta_amount === 0 的检查
+     * 原因：settleFromFrozen 场景下，从 frozen_amount 扣减并不改变 available_amount
+     * 因此 delta_amount 可能为 0（仅记录冻结结算动作，不改变可用余额）
+     * 允许冻结结算场景的 delta_amount = 0
+     */
 
     // 验证变动后余额不能为负数
     if (data.balance_after < 0) {
@@ -119,20 +130,27 @@ module.exports = sequelize => {
         comment: '流水ID（主键）'
       },
 
-      // 用户ID（User ID - 流水所属用户）
+      // 用户ID（User ID - 流水所属用户，历史兼容字段）
       user_id: {
         type: DataTypes.INTEGER,
-        allowNull: false,
+        allowNull: true, // 系统账户时为NULL
         comment:
-          '用户ID（User ID - 流水所属用户）：关联users.user_id，标识这笔流水属于哪个用户'
+          '用户ID（User ID - 流水所属用户，历史兼容字段）：关联users.user_id，标识这笔流水属于哪个用户，系统账户时为NULL，新业务应使用account_id'
+      },
+
+      // 账户ID（Account ID - 流水所属账户，新账户体系）
+      account_id: {
+        type: DataTypes.BIGINT,
+        allowNull: true, // 允许NULL（兼容历史数据）
+        comment:
+          '账户ID（Account ID - 流水所属账户）：关联accounts.account_id，支持用户账户和系统账户（平台手续费、铸币、销毁、托管），新业务必填'
       },
 
       // 资产代码（Asset Code - 资产类型标识）
       asset_code: {
         type: DataTypes.STRING(50),
         allowNull: false,
-        comment:
-          '资产代码（Asset Code - 资产类型标识）：DIAMOND-钻石资产, red_shard-碎红水晶, 等'
+        comment: '资产代码（Asset Code - 资产类型标识）：DIAMOND-钻石资产, red_shard-碎红水晶, 等'
       },
 
       // 变动金额（Delta Amount - 资产变动数量）
@@ -141,6 +159,14 @@ module.exports = sequelize => {
         allowNull: false,
         comment:
           '变动金额（Delta Amount - 资产变动数量）：正数表示增加，负数表示扣减，单位为1个资产单位（如1 DIAMOND），不能为0'
+      },
+
+      // 变动前余额（Balance Before - 变动前的资产余额）
+      balance_before: {
+        type: DataTypes.BIGINT,
+        allowNull: true, // 允许NULL（兼容历史数据）
+        comment:
+          '变动前余额（Balance Before - 本次变动前的资产余额）：与balance_after配合用于完整对账（before + delta = after），新业务必填'
       },
 
       // 变动后余额（Balance After - 变动后的资产余额）
@@ -194,7 +220,12 @@ module.exports = sequelize => {
         {
           fields: ['user_id', 'asset_code', 'created_at'],
           name: 'idx_user_asset_time',
-          comment: '索引：用户ID + 资产代码 + 创建时间（用于查询用户的资产流水历史）'
+          comment: '索引：用户ID + 资产代码 + 创建时间（用于查询用户的资产流水历史，历史兼容）'
+        },
+        {
+          fields: ['account_id', 'asset_code', 'created_at'],
+          name: 'idx_account_asset_time',
+          comment: '索引：账户ID + 资产代码 + 创建时间（用于查询账户的资产流水历史，新账户体系）'
         },
         {
           fields: ['business_type', 'created_at'],

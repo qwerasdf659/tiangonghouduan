@@ -3,6 +3,10 @@
  * 根据数据级别控制返回字段
  */
 
+/**
+ * @class DataSanitizer
+ * @description 数据脱敏工具类，根据数据级别控制返回字段
+ */
 class DataSanitizer {
   /**
    * 公告数据脱敏
@@ -10,7 +14,7 @@ class DataSanitizer {
    * @param {string} level - 数据级别 (public/full)
    * @returns {Array} 脱敏后的数据
    */
-  static sanitizeAnnouncements (announcements, level = 'public') {
+  static sanitizeAnnouncements(announcements, level = 'public') {
     if (level === 'full') {
       // 管理员完整数据
       return announcements
@@ -29,9 +33,9 @@ class DataSanitizer {
       // 创建者信息脱敏
       creator: ann.creator
         ? {
-          nickname: ann.creator.nickname,
-          avatar: ann.creator.avatar
-        }
+            nickname: ann.creator.nickname,
+            avatar: ann.creator.avatar
+          }
         : null
     }))
   }
@@ -42,7 +46,7 @@ class DataSanitizer {
    * @param {string} level - 数据级别
    * @returns {Object} 脱敏后的用户数据
    */
-  static sanitizeUser (user, level = 'public') {
+  static sanitizeUser(user, level = 'public') {
     if (level === 'full') {
       return user
     }

@@ -21,7 +21,19 @@ if (!fs.existsSync(logDir)) {
 }
 
 // 🔴 错误日志记录器
-function logError (error, req, additionalInfo = {}) {
+/**
+ * 记录错误日志（写入 logs/error-YYYY-MM-DD.log）
+ *
+ * 业务场景：
+ * - 开发环境：输出详细错误上下文（包含脱敏后的请求体）
+ * - 生产环境：输出精简错误信息，并落盘用于排障
+ *
+ * @param {Error} error - 错误对象
+ * @param {Object} req - Express 请求对象
+ * @param {Object} additionalInfo - 额外上下文（可选）
+ * @returns {void} 无返回值
+ */
+function logError(error, req, additionalInfo = {}) {
   const timestamp = BeijingTimeHelper.apiTimestamp() // 🕐 北京时间API时间戳
   const logEntry = {
     timestamp,
@@ -46,9 +58,9 @@ function logError (error, req, additionalInfo = {}) {
     },
     user: req.user
       ? {
-        user_id: req.user.user_id,
-        username: req.user.username
-      }
+          user_id: req.user.user_id,
+          username: req.user.username
+        }
       : null,
     additionalInfo,
     environment: process.env.NODE_ENV
@@ -72,7 +84,13 @@ function logError (error, req, additionalInfo = {}) {
 }
 
 // 🔴 敏感数据过滤
-function sanitizeRequestBody (body) {
+/**
+ * 对请求体进行脱敏，避免敏感字段被写入日志
+ *
+ * @param {Object} body - 原始请求体
+ * @returns {Object} 脱敏后的请求体
+ */
+function sanitizeRequestBody(body) {
   if (!body || typeof body !== 'object') return body
 
   const sanitized = { ...body }
@@ -88,6 +106,19 @@ function sanitizeRequestBody (body) {
 }
 
 // 🔴 主错误处理中间件
+/**
+ * Express 统一错误处理中间件
+ *
+ * 业务场景：
+ * - 捕获路由/服务层抛出的异常，统一输出 ApiResponse 标准格式
+ * - 记录错误日志，便于定位与审计
+ *
+ * @param {Error} err - 错误对象
+ * @param {Object} req - Express 请求对象
+ * @param {Object} res - Express 响应对象
+ * @param {Function} _next - Express next（未使用）
+ * @returns {void} 无返回值
+ */
 const errorHandler = (err, req, res, _next) => {
   // 设置默认错误信息
   let errorCode = 5000
@@ -223,6 +254,13 @@ const errorHandler = (err, req, res, _next) => {
 }
 
 // 🔴 404 处理中间件
+/**
+ * 404 处理器：未匹配到任何路由时返回统一错误格式
+ *
+ * @param {Object} req - Express 请求对象
+ * @param {Object} res - Express 响应对象
+ * @returns {Object} ApiResponse 错误响应
+ */
 const notFoundHandler = (req, res) => {
   const errorResponse = {
     code: 4000,
@@ -246,8 +284,21 @@ const notFoundHandler = (req, res) => {
 }
 
 // 🔴 自定义错误类
+/**
+ * 业务逻辑错误（Business Logic Error）
+ *
+ * 业务场景：服务层主动抛出的业务错误（例如余额不足、状态机不允许等）
+ */
 class BusinessLogicError extends Error {
-  constructor (message, code = 3000, data = null) {
+  /**
+   * 构造业务错误对象
+   *
+   * @param {string} message - 错误描述（面向业务）
+   * @param {number} code - 错误码（默认3000）
+   * @param {Object|null} data - 额外数据（可选）
+   * @returns {void} 无返回值
+   */
+  constructor(message, code = 3000, data = null) {
     super(message)
     this.name = 'BusinessLogicError'
     this.code = code
@@ -255,43 +306,105 @@ class BusinessLogicError extends Error {
   }
 }
 
+/**
+ * 参数/数据校验错误（Validation Error）
+ *
+ * 业务场景：参数缺失、格式非法、字段不符合业务约束等
+ */
 class ValidationError extends Error {
-  constructor (message, details = null) {
+  /**
+   * 构造校验错误对象
+   *
+   * @param {string} message - 错误描述
+   * @param {Object|null} details - 错误详情（可选）
+   * @returns {void} 无返回值
+   */
+  constructor(message, details = null) {
     super(message)
     this.name = 'ValidationError'
     this.details = details
   }
 }
 
+/**
+ * 未认证错误（Unauthorized Error）
+ *
+ * 业务场景：Token无效/缺失导致的认证失败
+ */
 class UnauthorizedError extends Error {
-  constructor (message = '认证失败') {
+  /**
+   * 构造未认证错误对象
+   *
+   * @param {string} message - 错误描述（可选）
+   * @returns {void} 无返回值
+   */
+  constructor(message = '认证失败') {
     super(message)
     this.name = 'UnauthorizedError'
   }
 }
 
+/**
+ * 无权限错误（Forbidden Error）
+ *
+ * 业务场景：已登录但无权限访问资源
+ */
 class ForbiddenError extends Error {
-  constructor (message = '权限不足') {
+  /**
+   * 构造无权限错误对象
+   *
+   * @param {string} message - 错误描述（可选）
+   * @returns {void} 无返回值
+   */
+  constructor(message = '权限不足') {
     super(message)
     this.name = 'ForbiddenError'
   }
 }
 
+/**
+ * 资源不存在错误（Not Found Error）
+ *
+ * 业务场景：请求的资源不存在（订单/挂牌/物品等）
+ */
 class NotFoundError extends Error {
-  constructor (message = '资源不存在') {
+  /**
+   * 构造资源不存在错误对象
+   *
+   * @param {string} message - 错误描述（可选）
+   * @returns {void} 无返回值
+   */
+  constructor(message = '资源不存在') {
     super(message)
     this.name = 'NotFoundError'
   }
 }
 
+/**
+ * 资源冲突错误（Conflict Error）
+ *
+ * 业务场景：幂等键冲突、状态冲突等需要返回409的场景
+ */
 class ConflictError extends Error {
-  constructor (message = '资源冲突') {
+  /**
+   * 构造资源冲突错误对象
+   *
+   * @param {string} message - 错误描述（可选）
+   * @returns {void} 无返回值
+   */
+  constructor(message = '资源冲突') {
     super(message)
     this.name = 'ConflictError'
   }
 }
 
 // 🔴 异步错误捕获包装器
+/**
+ * 异步路由包装器：自动捕获 Promise rejection 并交给 errorHandler
+ *
+ * @param {Function} fn - 异步处理函数 (req, res, next) => Promise
+ * @returns {Function} Express 中间件函数
+ */
 const asyncHandler = fn => {
   return (req, res, next) => {
     Promise.resolve(fn(req, res, next)).catch(next)
@@ -299,6 +412,13 @@ const asyncHandler = fn => {
 }
 
 // 🔴 参数验证辅助函数
+/**
+ * 校验必填字段
+ *
+ * @param {Array<string>} fields - 必填字段列表
+ * @param {Object} data - 待校验对象
+ * @returns {{valid: boolean, missing: Array<string>}} 校验结果（valid=true 表示通过）
+ */
 const validateRequired = (fields, data) => {
   const missing = []
 
@@ -313,6 +433,12 @@ const validateRequired = (fields, data) => {
   }
 }
 
+/**
+ * 校验邮箱格式
+ *
+ * @param {string} email - 邮箱地址
+ * @returns {void} 无返回值；不合法将抛出 ValidationError
+ */
 const validateEmail = email => {
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
   if (!emailRegex.test(email)) {
@@ -320,6 +446,12 @@ const validateEmail = email => {
   }
 }
 
+/**
+ * 校验手机号格式（中国大陆手机号）
+ *
+ * @param {string} phone - 手机号
+ * @returns {void} 无返回值；不合法将抛出 ValidationError
+ */
 const validatePhone = phone => {
   const phoneRegex = /^1[3-9]\d{9}$/
   if (!phoneRegex.test(phone)) {

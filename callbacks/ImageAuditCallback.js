@@ -24,8 +24,9 @@ module.exports = {
    * @param {number} imageId - 图片资源ID
    * @param {Object} auditRecord - 审核记录
    * @param {Object} transaction - 数据库事务
+   * @returns {Promise<{success: boolean, points_awarded: number}>} 回调处理结果（含发放积分数量）
    */
-  async approved (imageId, auditRecord, transaction) {
+  async approved(imageId, auditRecord, transaction) {
     console.log(`[图片审核回调] 审核通过: image_id=${imageId}`)
 
     try {
@@ -37,12 +38,15 @@ module.exports = {
       }
 
       // 2. 更新图片资源审核状态
-      await image.update({
-        review_status: 'approved',
-        reviewer_id: auditRecord.auditor_id,
-        review_reason: auditRecord.audit_reason,
-        reviewed_at: BeijingTimeHelper.createDatabaseTime()
-      }, { transaction })
+      await image.update(
+        {
+          review_status: 'approved',
+          reviewer_id: auditRecord.auditor_id,
+          review_reason: auditRecord.audit_reason,
+          reviewed_at: BeijingTimeHelper.createDatabaseTime()
+        },
+        { transaction }
+      )
 
       console.log(`[图片审核回调] 图片状态已更新: image_id=${imageId}, status=approved`)
 
@@ -51,14 +55,17 @@ module.exports = {
         await PointsService.addPoints(image.uploaded_by, image.points_awarded, {
           transaction,
           business_type: 'reward',
-          business_id: `image_reward_${imageId}_${Date.now()}`,
+          // 🔴 幂等性：使用确定性 business_id，避免回调重复触发导致重复发放
+          business_id: `image_reward_${imageId}`,
           source_type: 'image_review',
           title: '图片审核通过奖励',
           description: `图片${imageId}审核通过，奖励${image.points_awarded}积分`,
           operator_id: auditRecord.auditor_id
         })
 
-        console.log(`[图片审核回调] 积分奖励已发放: user_id=${image.uploaded_by}, points=${image.points_awarded}`)
+        console.log(
+          `[图片审核回调] 积分奖励已发放: user_id=${image.uploaded_by}, points=${image.points_awarded}`
+        )
       }
 
       // 4. 发送审核通过通知
@@ -94,8 +101,9 @@ module.exports = {
    * @param {number} imageId - 图片资源ID
    * @param {Object} auditRecord - 审核记录
    * @param {Object} transaction - 数据库事务
+   * @returns {Promise<{success: boolean}>} 回调处理结果（success=true 表示处理完成）
    */
-  async rejected (imageId, auditRecord, transaction) {
+  async rejected(imageId, auditRecord, transaction) {
     console.log(`[图片审核回调] 审核拒绝: image_id=${imageId}`)
 
     try {
@@ -107,12 +115,15 @@ module.exports = {
       }
 
       // 2. 更新图片资源审核状态
-      await image.update({
-        review_status: 'rejected',
-        reviewer_id: auditRecord.auditor_id,
-        review_reason: auditRecord.audit_reason,
-        reviewed_at: BeijingTimeHelper.createDatabaseTime()
-      }, { transaction })
+      await image.update(
+        {
+          review_status: 'rejected',
+          reviewer_id: auditRecord.auditor_id,
+          review_reason: auditRecord.audit_reason,
+          reviewed_at: BeijingTimeHelper.createDatabaseTime()
+        },
+        { transaction }
+      )
 
       console.log(`[图片审核回调] 图片状态已更新: image_id=${imageId}, status=rejected`)
 

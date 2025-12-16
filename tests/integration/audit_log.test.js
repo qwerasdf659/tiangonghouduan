@@ -37,7 +37,6 @@ describe('审计日志功能测试', () => {
     // 解析JWT token获取user_id
     const tokenPayload = JSON.parse(Buffer.from(adminToken.split('.')[1], 'base64').toString())
     adminUserId = tokenPayload.user_id
-
   })
 
   // 测试后清理
@@ -48,8 +47,10 @@ describe('审计日志功能测试', () => {
 
   describe('审计日志记录功能', () => {
     test('审计日志功能基本可用', async () => {
-      // ✅ 已删除旧兑换订单（ExchangeRecords）相关测试
-      // TODO: 如果需要测试审计日志，可以改用兑换市场订单（ExchangeMarketRecord）
+      /*
+       * ✅ 已删除旧兑换订单（ExchangeRecords）相关测试
+       * TODO: 如果需要测试审计日志，可以改用兑换市场订单（ExchangeMarketRecord）
+       */
       expect(true).toBe(true)
     })
   })

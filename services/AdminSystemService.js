@@ -138,7 +138,7 @@ class AdminSystemService {
    * @returns {Object} return.lottery_engine - 抽奖引擎状态
    * @returns {Object} return.api - API版本信息
    */
-  static async getSystemStatus (lotteryEngine = null, performanceMonitor = null) {
+  static async getSystemStatus(lotteryEngine = null, performanceMonitor = null) {
     try {
       logger.info('获取系统状态')
 
@@ -160,9 +160,8 @@ class AdminSystemService {
         strategies: {
           management: !!lotteryEngine
         },
-        performance: performanceMonitor && performanceMonitor.getStats
-          ? performanceMonitor.getStats()
-          : {}
+        performance:
+          performanceMonitor && performanceMonitor.getStats ? performanceMonitor.getStats() : {}
       }
 
       const statusInfo = {
@@ -201,7 +200,7 @@ class AdminSystemService {
    * @returns {Object} return.engine - 引擎性能
    * @returns {string} return.last_updated - 最后更新时间
    */
-  static async getDashboardData (_lotteryEngine = null, performanceMonitor = null) {
+  static async getDashboardData(_lotteryEngine = null, performanceMonitor = null) {
     try {
       logger.info('获取仪表板数据')
 
@@ -218,7 +217,7 @@ class AdminSystemService {
         todayNewUsers,
         todayCustomerSessions,
         todayMessages,
-        todayPointsConsumed
+        todayPointsConsumedRaw
       ] = await Promise.all([
         // 今日抽奖次数
         models.LotteryDraw.count({
@@ -268,8 +267,10 @@ class AdminSystemService {
               [Op.gte]: todayStart
             }
           }
-        }) || 0
+        })
       ])
+      // 🔧 sum() 在无记录时会返回 null，按业务标准应返回 0（number）
+      const todayPointsConsumed = Number(todayPointsConsumedRaw) || 0
 
       // 获取抽奖引擎性能统计
       let engineStats = {}
@@ -324,7 +325,7 @@ class AdminSystemService {
    * @param {Object} managementStrategy - 管理策略实例
    * @returns {Promise<Object>} 管理策略状态
    */
-  static async getManagementStatus (managementStrategy) {
+  static async getManagementStatus(managementStrategy) {
     try {
       logger.info('获取管理策略状态')
 
@@ -348,7 +349,7 @@ class AdminSystemService {
    * @private
    * @returns {Promise<Object>} 系统统计信息
    */
-  static async _getSimpleSystemStats () {
+  static async _getSimpleSystemStats() {
     try {
       // 并行查询统计数据
       const [totalUsers, activeUsers, totalLotteries, totalWins] = await Promise.all([
@@ -404,7 +405,7 @@ class AdminSystemService {
    * @returns {number} return.count - 配置项数量
    * @returns {Array<Object>} return.settings - 配置项列表
    */
-  static async getSettingsByCategory (category) {
+  static async getSettingsByCategory(category) {
     try {
       // 验证分类是否合法
       const validCategories = ['basic', 'points', 'notification', 'security']
@@ -466,7 +467,7 @@ class AdminSystemService {
    * @returns {number} return.total_settings - 总配置项数量
    * @returns {Object} return.categories - 各分类的配置项数量
    */
-  static async getSettingsSummary () {
+  static async getSettingsSummary() {
     try {
       // 查询所有分类的配置数量
       const categoryCounts = await SystemSettings.findAll({
@@ -517,7 +518,7 @@ class AdminSystemService {
    * @returns {Array<Object>} return.errors - 更新失败的配置项列表（如果有）
    * @returns {string} return.timestamp - 更新时间戳
    */
-  static async updateSettings (category, settingsToUpdate, userId, options = {}) {
+  static async updateSettings(category, settingsToUpdate, userId, options = {}) {
     const { transaction } = options
 
     // 创建内部事务（如果外部没有传入）
@@ -651,7 +652,7 @@ class AdminSystemService {
    * @returns {number} return.matched_keys - 匹配的key数量
    * @returns {string} return.timestamp - 清除时间戳
    */
-  static async clearCache (pattern = '*') {
+  static async clearCache(pattern = '*') {
     try {
       const { getRawClient } = require('../utils/UnifiedRedisClient')
       const rawClient = getRawClient()

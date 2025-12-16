@@ -25,7 +25,6 @@
  */
 
 const { DataTypes } = require('sequelize')
-const BeijingTimeHelper = require('../utils/timeHelper')
 
 module.exports = sequelize => {
   const ExchangeItem = sequelize.define(
@@ -78,12 +77,14 @@ module.exports = sequelize => {
       cost_asset_code: {
         type: DataTypes.STRING(50),
         allowNull: true,
-        comment: '成本资产代码（Cost Asset Code - 兑换商品消耗的材料资产类型）：red_shard-碎红水晶、red_crystal-完整红水晶等；业务规则：新商品必填，历史商品可为null；支持多种材料资产扩展；用途：兑换支付资产类型、库存扣减依据、成本核算基础'
+        comment:
+          '成本资产代码（Cost Asset Code - 兑换商品消耗的材料资产类型）：red_shard-碎红水晶、red_crystal-完整红水晶等；业务规则：新商品必填，历史商品可为null；支持多种材料资产扩展；用途：兑换支付资产类型、库存扣减依据、成本核算基础'
       },
       cost_amount: {
         type: DataTypes.BIGINT,
         allowNull: true,
-        comment: '成本数量（Cost Amount - 兑换单件商品需要的材料数量）：单位根据cost_asset_code确定（如10个碎红水晶）；业务规则：新商品必填，历史商品可为null；使用BIGINT避免浮点精度问题；数据范围：1-1000000；用途：兑换扣减材料数量、成本核算、商品定价参考'
+        comment:
+          '成本数量（Cost Amount - 兑换单件商品需要的材料数量）：单位根据cost_asset_code确定（如10个碎红水晶）；业务规则：新商品必填，历史商品可为null；使用BIGINT避免浮点精度问题；数据范围：1-1000000；用途：兑换扣减材料数量、成本核算、商品定价参考'
       },
 
       // 成本和库存
@@ -130,17 +131,16 @@ module.exports = sequelize => {
       created_at: 'created_at',
       updated_at: 'updated_at',
       underscored: true,
-      indexes: [
-        { fields: ['price_type'] },
-        { fields: ['status'] },
-        { fields: ['category'] }
-      ],
+      indexes: [{ fields: ['price_type'] }, { fields: ['status'] }, { fields: ['category'] }],
       comment: '兑换市场商品表'
     }
   )
 
   /**
    * 关联定义
+   *
+   * @param {Object} models - Sequelize所有模型集合
+   * @returns {void} 无返回值，仅定义模型关联关系
    */
   ExchangeItem.associate = function (models) {
     // 一对多：商品有多个兑换记录
@@ -152,6 +152,8 @@ module.exports = sequelize => {
 
   /**
    * 检查库存是否充足
+   *
+   * @returns {boolean} 是否有库存（true-有库存，false-无库存）
    */
   ExchangeItem.prototype.hasStock = function () {
     return this.stock > 0

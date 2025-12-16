@@ -45,7 +45,12 @@ module.exports = sequelize => {
         type: DataTypes.DATE,
         allowNull: false,
         comment: '服务启动时间（北京时间）',
-        get () {
+        /**
+         * 获取格式化后的服务启动时间（北京时间）
+         *
+         * @returns {string|null} 格式化后的时间字符串；无值返回 null
+         */
+        get() {
           const rawValue = this.getDataValue('start_time')
           return rawValue ? BeijingTimeHelper.formatChinese(rawValue) : null
         }
@@ -76,7 +81,12 @@ module.exports = sequelize => {
         type: DataTypes.DATE,
         allowNull: true,
         comment: '服务停止时间（北京时间）',
-        get () {
+        /**
+         * 获取格式化后的服务停止时间（北京时间）
+         *
+         * @returns {string|null} 格式化后的时间字符串；无值返回 null
+         */
+        get() {
           const rawValue = this.getDataValue('stop_time')
           return rawValue ? BeijingTimeHelper.formatChinese(rawValue) : null
         }
@@ -112,7 +122,12 @@ module.exports = sequelize => {
         allowNull: false,
         defaultValue: () => BeijingTimeHelper.createDatabaseTime(),
         comment: '记录创建时间（北京时间）',
-        get () {
+        /**
+         * 获取格式化后的记录创建时间（北京时间）
+         *
+         * @returns {string|null} 格式化后的时间字符串；无值返回 null
+         */
+        get() {
           const rawValue = this.getDataValue('created_at')
           return rawValue ? BeijingTimeHelper.formatChinese(rawValue) : null
         }
@@ -121,7 +136,12 @@ module.exports = sequelize => {
         type: DataTypes.DATE,
         allowNull: true,
         comment: '记录更新时间（服务停止时更新）',
-        get () {
+        /**
+         * 获取格式化后的记录更新时间（北京时间）
+         *
+         * @returns {string|null} 格式化后的时间字符串；无值返回 null
+         */
+        get() {
           const rawValue = this.getDataValue('updated_at')
           return rawValue ? BeijingTimeHelper.formatChinese(rawValue) : null
         }

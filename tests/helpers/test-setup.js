@@ -12,12 +12,15 @@ require('dotenv').config()
 // 🔧 修复：设置必需的环境变量
 process.env.NODE_ENV = 'test'
 process.env.JWT_SECRET = process.env.JWT_SECRET || 'test-jwt-secret-key-for-development-only'
+// ✅ 测试环境关闭限流（避免 429 干扰业务断言）
+process.env.DISABLE_RATE_LIMITER = 'true'
 
 // 🔴 统一数据库配置 - 使用唯一真实数据库 restaurant_points_dev
 if (!process.env.DB_HOST) {
   console.log('🔧 设置测试环境数据库配置...')
   process.env.DB_HOST = process.env.DB_HOST || 'dbconn.sealosbja.site'
-  process.env.DB_PORT = process.env.DB_PORT || '38380'
+  // 🔴 统一数据库：测试/开发/生产全部连接唯一真实库 restaurant_points_dev
+  process.env.DB_PORT = process.env.DB_PORT || '42569'
   process.env.DB_USER = process.env.DB_USER || 'root'
   process.env.DB_PASSWORD = process.env.DB_PASSWORD || 'mc6r9cgb'
   process.env.DB_NAME = process.env.DB_NAME || 'restaurant_points_dev'
@@ -40,7 +43,7 @@ class TestAssertions {
    * @param {Object} response - API响应对象
    * @param {boolean} expectSuccess - 是否期望成功响应
    */
-  static validateApiResponse (response, expectSuccess = true) {
+  static validateApiResponse(response, expectSuccess = true) {
     // 验证业务标准必需字段
     expect(response).toHaveProperty('success')
     expect(response).toHaveProperty('code')
@@ -73,7 +76,7 @@ class TestAssertions {
   /**
    * 验证数据库记录
    */
-  static validateDatabaseRecord (record, requiredFields = []) {
+  static validateDatabaseRecord(record, requiredFields = []) {
     expect(record).toBeTruthy()
 
     requiredFields.forEach(field => {
@@ -85,7 +88,7 @@ class TestAssertions {
   /**
    * 验证时间戳格式
    */
-  static validateTimestamp (timestamp) {
+  static validateTimestamp(timestamp) {
     expect(timestamp).toBeTruthy()
     expect(new Date(timestamp).toString()).not.toBe('Invalid Date')
   }
@@ -93,7 +96,7 @@ class TestAssertions {
   /**
    * 🚨 验证业务语义一致性 - 防止测试适配错误实现
    */
-  static validateBusinessSemantics (actualValue, businessContext) {
+  static validateBusinessSemantics(actualValue, businessContext) {
     // 业务语义映射表
     const businessTerminology = {
       // 奖品发放状态
@@ -126,7 +129,7 @@ class TestAssertions {
   /**
    * 🚨 验证测试标准不被降低
    */
-  static validateTestStandards (testExpectation, context) {
+  static validateTestStandards(testExpectation, context) {
     const dangerousPatterns = [
       {
         pattern: /basic|guarantee|management/, // 简化的策略名
@@ -160,7 +163,7 @@ class TestAssertions {
   /**
    * 🚨 验证API响应格式一致性 - 业务标准验证
    */
-  static validateApiResponseConsistency (response) {
+  static validateApiResponseConsistency(response) {
     // 验证业务标准的API响应格式：{success, code, message, data, timestamp, version, request_id}
     const requiredFields = [
       'success',
@@ -219,15 +222,15 @@ class TestAssertions {
  * 测试时间工具
  */
 class TestTimeHelper {
-  static getCurrentBeijingTime () {
+  static getCurrentBeijingTime() {
     return BeijingTimeHelper.now()
   }
 
-  static isValidTimestamp (timestamp) {
+  static isValidTimestamp(timestamp) {
     return !isNaN(Date.parse(timestamp))
   }
 
-  static getTimeDifference (time1, time2) {
+  static getTimeDifference(time1, time2) {
     return Math.abs(new Date(time1) - new Date(time2))
   }
 }
@@ -236,7 +239,7 @@ class TestTimeHelper {
  * 性能测试工具
  */
 class PerformanceHelper {
-  static async measureExecutionTime (fn) {
+  static async measureExecutionTime(fn) {
     const start = process.hrtime.bigint()
     const result = await fn()
     const end = process.hrtime.bigint()
@@ -245,7 +248,7 @@ class PerformanceHelper {
     return { result, duration }
   }
 
-  static validateResponseTime (duration, maxTime = 1000) {
+  static validateResponseTime(duration, maxTime = 1000) {
     expect(duration).toBeLessThan(maxTime)
   }
 }
@@ -358,6 +361,19 @@ if (typeof jest !== 'undefined') {
     // 恢复原始函数
     global.setInterval = originalSetInterval
     global.setTimeout = originalSetTimeout
+  })
+
+  // 🔧 清理 Redis 连接（避免 open handles 导致 Jest 报告 TCPWRAP）
+  afterAll(async () => {
+    try {
+      const { getRedisClient } = require('../../utils/UnifiedRedisClient')
+      const redisClient = getRedisClient()
+      if (redisClient && typeof redisClient.disconnect === 'function') {
+        await redisClient.disconnect()
+      }
+    } catch (error) {
+      // 忽略清理错误，避免影响测试结果
+    }
   })
 }
 

@@ -37,9 +37,13 @@ const businessConfig = require('../config/business.config')
 /**
  * XSS内容安全过滤
  * 复用自 routes/v4/system.js 行1730-1736
+ *
+ * @param {string} content - 原始内容
+ * @returns {string} 脱敏/转义后的安全内容
  */
-function sanitizeContent (content) {
-  return content.trim()
+function sanitizeContent(content) {
+  return content
+    .trim()
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
@@ -51,17 +55,20 @@ function sanitizeContent (content) {
 /**
  * 敏感词检测
  * 复用自 routes/v4/system.js 行1742-1751
+ *
+ * @param {string} content - 待检测内容
+ * @returns {Object} result - 检测结果
+ * @returns {boolean} result.passed - 是否通过检测（true-通过，false-不通过）
+ * @returns {string} [result.matchedWord] - 命中的敏感词（仅当 passed=false 时返回）
  */
-function checkSensitiveWords (content) {
+function checkSensitiveWords(content) {
   const { content_filter: contentFilter } = businessConfig.chat
 
   if (!contentFilter.enabled) {
     return { passed: true }
   }
 
-  const matchedWord = contentFilter.sensitive_words.find(word =>
-    content.includes(word)
-  )
+  const matchedWord = contentFilter.sensitive_words.find(word => content.includes(word))
 
   if (matchedWord && contentFilter.reject_on_match) {
     return { passed: false, matchedWord }
@@ -106,7 +113,7 @@ class CustomerServiceSessionService {
    * @param {boolean} [options.calculate_unread=false] - 是否计算未读消息数
    * @returns {Object} 会话列表和分页信息
    */
-  static async getSessionList (options = {}) {
+  static async getSessionList(options = {}) {
     try {
       const {
         page = 1,
@@ -150,11 +157,11 @@ class CustomerServiceSessionService {
           // 搜索条件
           where: search
             ? {
-              [Op.or]: [
-                { nickname: { [Op.like]: `%${search}%` } },
-                { mobile: { [Op.like]: `%${search}%` } }
-              ]
-            }
+                [Op.or]: [
+                  { nickname: { [Op.like]: `%${search}%` } },
+                  { mobile: { [Op.like]: `%${search}%` } }
+                ]
+              }
             : undefined,
           required: !!search
         },
@@ -187,32 +194,36 @@ class CustomerServiceSessionService {
       }
 
       // 执行查询
-      const { rows: sessions, count: total } = await CustomerServiceSession.findAndCountAll(queryOptions)
+      const { rows: sessions, count: total } =
+        await CustomerServiceSession.findAndCountAll(queryOptions)
 
       // 格式化返回数据
       let formattedSessions = sessions.map(session => ({
         session_id: session.session_id,
         user: session.user
           ? {
-            user_id: session.user.user_id,
-            nickname: session.user.nickname,
-            mobile: session.user.mobile
-          }
+              user_id: session.user.user_id,
+              nickname: session.user.nickname,
+              mobile: session.user.mobile
+            }
           : null,
         admin: session.admin
           ? {
-            user_id: session.admin.user_id,
-            nickname: session.admin.nickname
-          }
+              user_id: session.admin.user_id,
+              nickname: session.admin.nickname
+            }
           : null,
         status: session.status,
         priority: session.priority,
-        last_message_at: session.last_message_at ? BeijingTimeHelper.formatForAPI(session.last_message_at).iso : null,
+        last_message_at: session.last_message_at
+          ? BeijingTimeHelper.formatForAPI(session.last_message_at).iso
+          : null,
         created_at: BeijingTimeHelper.formatForAPI(session.created_at).iso,
         updated_at: BeijingTimeHelper.formatForAPI(session.updated_at).iso,
-        last_message: include_last_message && session.messages && session.messages.length > 0
-          ? session.messages[0]
-          : null,
+        last_message:
+          include_last_message && session.messages && session.messages.length > 0
+            ? session.messages[0]
+            : null,
         unread_count: 0
       }))
 
@@ -268,7 +279,7 @@ class CustomerServiceSessionService {
    * @param {boolean} [options.include_all_fields=false] - 是否包含所有消息字段（包括metadata等）
    * @returns {Object} 会话详情和消息列表
    */
-  static async getSessionMessages (session_id, options = {}) {
+  static async getSessionMessages(session_id, options = {}) {
     try {
       const {
         limit = 50,
@@ -341,10 +352,19 @@ class CustomerServiceSessionService {
       // 如果需要所有字段，显式指定属性列表
       if (include_all_fields) {
         queryOptions.attributes = [
-          'message_id', 'session_id', 'sender_id', 'sender_type',
-          'message_source', 'content', 'message_type', 'status',
-          'reply_to_id', 'temp_message_id', 'metadata',
-          'created_at', 'updated_at'
+          'message_id',
+          'session_id',
+          'sender_id',
+          'sender_type',
+          'message_source',
+          'content',
+          'message_type',
+          'status',
+          'reply_to_id',
+          'temp_message_id',
+          'metadata',
+          'created_at',
+          'updated_at'
         ]
       }
 
@@ -415,16 +435,16 @@ class CustomerServiceSessionService {
           session_id: session.session_id,
           user: session.user
             ? {
-              user_id: session.user.user_id,
-              nickname: session.user.nickname,
-              mobile: session.user.mobile
-            }
+                user_id: session.user.user_id,
+                nickname: session.user.nickname,
+                mobile: session.user.mobile
+              }
             : null,
           admin: session.admin
             ? {
-              user_id: session.admin.user_id,
-              nickname: session.admin.nickname
-            }
+                user_id: session.admin.user_id,
+                nickname: session.admin.nickname
+              }
             : null,
           status: session.status,
           priority: session.priority,
@@ -454,7 +474,7 @@ class CustomerServiceSessionService {
    * @param {string} [data.message_type='text'] - 消息类型（text/image/system）
    * @returns {Object} 创建的消息对象
    */
-  static async sendMessage (session_id, data) {
+  static async sendMessage(session_id, data) {
     const sequelize = CustomerServiceSession.sequelize
     const transaction = await sequelize.transaction({
       isolationLevel: Transaction.ISOLATION_LEVELS.READ_COMMITTED
@@ -510,28 +530,40 @@ class CustomerServiceSessionService {
 
       // ✅ 6. 自动分配未分配的会话
       if (!session.admin_id) {
-        await session.update({
-          admin_id,
-          status: 'assigned'
-        }, { transaction })
+        await session.update(
+          {
+            admin_id,
+            status: 'assigned'
+          },
+          { transaction }
+        )
       }
 
       // ✅ 7. 创建消息记录（使用过滤后的内容）
-      const message = await ChatMessage.create({
-        session_id,
-        sender_id: admin_id,
-        sender_type: 'admin',
-        message_source: 'admin_client',
-        content: sanitized_content,
-        message_type,
-        status: 'sent'
-      }, { transaction })
+      const message = await ChatMessage.create(
+        {
+          session_id,
+          sender_id: admin_id,
+          sender_type: 'admin',
+          message_source: 'admin_client',
+          content: sanitized_content,
+          message_type,
+          status: 'sent'
+        },
+        { transaction }
+      )
 
       // ✅ 8. 更新会话的最后消息时间
-      await session.update({
-        last_message_at: new Date(),
-        status: session.status === 'waiting' || session.status === 'assigned' ? 'active' : session.status
-      }, { transaction })
+      await session.update(
+        {
+          last_message_at: new Date(),
+          status:
+            session.status === 'waiting' || session.status === 'assigned'
+              ? 'active'
+              : session.status
+        },
+        { transaction }
+      )
 
       await transaction.commit()
 
@@ -594,7 +626,7 @@ class CustomerServiceSessionService {
    * @returns {Object} 创建的消息对象
    * @throws {Error} 会话不存在、无权限、会话已关闭等错误
    */
-  static async sendUserMessage (session_id, data) {
+  static async sendUserMessage(session_id, data) {
     const sequelize = CustomerServiceSession.sequelize
     const transaction = await sequelize.transaction({
       isolationLevel: Transaction.ISOLATION_LEVELS.READ_COMMITTED
@@ -625,21 +657,27 @@ class CustomerServiceSessionService {
       }
 
       // ✅ 3. 创建消息记录
-      const message = await ChatMessage.create({
-        session_id,
-        sender_id: user_id,
-        sender_type: 'user',
-        message_source: 'user_client',
-        content,
-        message_type,
-        status: 'sent'
-      }, { transaction })
+      const message = await ChatMessage.create(
+        {
+          session_id,
+          sender_id: user_id,
+          sender_type: 'user',
+          message_source: 'user_client',
+          content,
+          message_type,
+          status: 'sent'
+        },
+        { transaction }
+      )
 
       // ✅ 4. 更新会话的最后消息时间
-      await session.update({
-        last_message_at: new Date(),
-        updated_at: new Date()
-      }, { transaction })
+      await session.update(
+        {
+          last_message_at: new Date(),
+          updated_at: new Date()
+        },
+        { transaction }
+      )
 
       await transaction.commit()
 
@@ -673,7 +711,7 @@ class CustomerServiceSessionService {
    * @param {number} admin_id - 管理员ID
    * @returns {Object} 更新结果
    */
-  static async markSessionAsRead (session_id, admin_id) {
+  static async markSessionAsRead(session_id, admin_id) {
     try {
       console.log(`👁️ 管理员 ${admin_id} 标记会话 ${session_id} 为已读`)
 
@@ -725,7 +763,7 @@ class CustomerServiceSessionService {
    * @param {number} target_admin_id - 目标客服ID
    * @returns {Object} 转接结果
    */
-  static async transferSession (session_id, current_admin_id, target_admin_id) {
+  static async transferSession(session_id, current_admin_id, target_admin_id) {
     const sequelize = CustomerServiceSession.sequelize
     const transaction = await sequelize.transaction({
       isolationLevel: Transaction.ISOLATION_LEVELS.READ_COMMITTED
@@ -760,21 +798,27 @@ class CustomerServiceSessionService {
       }
 
       // 更新会话的客服
-      await session.update({
-        admin_id: target_admin_id,
-        status: 'assigned'
-      }, { transaction })
+      await session.update(
+        {
+          admin_id: target_admin_id,
+          status: 'assigned'
+        },
+        { transaction }
+      )
 
       // 创建系统消息记录转接操作
-      const systemMessage = await ChatMessage.create({
-        session_id,
-        sender_id: null,
-        sender_type: 'admin',
-        message_source: 'system',
-        content: `会话已从 ${currentAdmin?.nickname || '客服'} 转接给 ${targetAdmin.nickname}`,
-        message_type: 'system',
-        status: 'sent'
-      }, { transaction })
+      const systemMessage = await ChatMessage.create(
+        {
+          session_id,
+          sender_id: null,
+          sender_type: 'admin',
+          message_source: 'system',
+          content: `会话已从 ${currentAdmin?.nickname || '客服'} 转接给 ${targetAdmin.nickname}`,
+          message_type: 'system',
+          status: 'sent'
+        },
+        { transaction }
+      )
 
       await transaction.commit()
 
@@ -812,7 +856,7 @@ class CustomerServiceSessionService {
    * @param {string} [data.close_reason] - 关闭原因
    * @returns {Object} 关闭结果
    */
-  static async closeSession (session_id, data) {
+  static async closeSession(session_id, data) {
     const sequelize = CustomerServiceSession.sequelize
     const transaction = await sequelize.transaction({
       isolationLevel: Transaction.ISOLATION_LEVELS.READ_COMMITTED
@@ -839,23 +883,29 @@ class CustomerServiceSessionService {
       }
 
       // 更新会话状态
-      await session.update({
-        status: 'closed',
-        closed_at: new Date(),
-        closed_by: admin_id,
-        close_reason
-      }, { transaction })
+      await session.update(
+        {
+          status: 'closed',
+          closed_at: new Date(),
+          closed_by: admin_id,
+          close_reason
+        },
+        { transaction }
+      )
 
       // 创建系统消息
-      await ChatMessage.create({
-        session_id,
-        sender_id: null,
-        sender_type: 'admin',
-        message_source: 'system',
-        content: `会话已关闭：${close_reason}`,
-        message_type: 'system',
-        status: 'sent'
-      }, { transaction })
+      await ChatMessage.create(
+        {
+          session_id,
+          sender_id: null,
+          sender_type: 'admin',
+          message_source: 'system',
+          content: `会话已关闭：${close_reason}`,
+          message_type: 'system',
+          status: 'sent'
+        },
+        { transaction }
+      )
 
       await transaction.commit()
 
@@ -883,7 +933,7 @@ class CustomerServiceSessionService {
    * @param {number} [admin_id] - 指定客服ID（可选）
    * @returns {Object} 统计信息
    */
-  static async getSessionStats (admin_id) {
+  static async getSessionStats(admin_id) {
     try {
       const baseWhere = admin_id ? { admin_id } : {}
 
@@ -931,7 +981,7 @@ class CustomerServiceSessionService {
    * @returns {Date} return.created_at - 创建时间
    * @returns {boolean} return.is_new - 是否为新创建的会话
    */
-  static async getOrCreateSession (user_id, options = {}) {
+  static async getOrCreateSession(user_id, options = {}) {
     try {
       const { source = 'mobile', priority = 1 } = options
 
@@ -1042,7 +1092,7 @@ class CustomerServiceSessionService {
    * @returns {boolean} return.valid - 是否通过验证
    * @returns {Array<string>} return.warnings - 警告信息列表
    */
-  static validateStatistics (stats) {
+  static validateStatistics(stats) {
     const warnings = []
 
     // 1️⃣ 基础数值合理性检查（数值必须>=0）
@@ -1148,7 +1198,7 @@ class CustomerServiceSessionService {
    * @param {Date} endTime - 结束时间
    * @returns {Promise<number>} 平均响应时间（秒），无数据时返回60
    */
-  static async calculateAverageResponseTime (startTime, endTime) {
+  static async calculateAverageResponseTime(startTime, endTime) {
     try {
       // 1️⃣ 查询已响应的会话（排除未响应的waiting状态）
       const sessions = await CustomerServiceSession.findAll({
@@ -1218,9 +1268,7 @@ class CustomerServiceSessionService {
       }
 
       const avgResponseTime = Math.round(totalResponseTime / validSessions)
-      console.log(
-        `📊 [平均响应时间] ${avgResponseTime}秒（基于${validSessions}个有效会话）`
-      )
+      console.log(`📊 [平均响应时间] ${avgResponseTime}秒（基于${validSessions}个有效会话）`)
 
       return avgResponseTime
     } catch (error) {

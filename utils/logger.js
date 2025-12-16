@@ -97,28 +97,46 @@ const logger = winston.createLogger({
 
 // 📺 控制台输出（开发环境）
 if (process.env.NODE_ENV !== 'production') {
-  logger.add(new winston.transports.Console({
-    format: winston.format.combine(
-      winston.format.colorize({ colors: LOG_COLORS }),
-      winston.format.printf(({ level, message, timestamp, ...metadata }) => {
-        let msg = `${timestamp} [${level}]: ${message}`
-        if (Object.keys(metadata).length > 0) {
-          msg += ` ${JSON.stringify(metadata)}`
-        }
-        return msg
-      })
-    )
-  }))
+  logger.add(
+    new winston.transports.Console({
+      format: winston.format.combine(
+        winston.format.colorize({ colors: LOG_COLORS }),
+        winston.format.printf(({ level, message, timestamp, ...metadata }) => {
+          let msg = `${timestamp} [${level}]: ${message}`
+          if (Object.keys(metadata).length > 0) {
+            msg += ` ${JSON.stringify(metadata)}`
+          }
+          return msg
+        })
+      )
+    })
+  )
 }
 
 // 🔐 敏感信息脱敏
-function sanitize (data) {
+/**
+ * 敏感信息脱敏（Sanitize）
+ *
+ * 业务场景：
+ * - 日志中可能包含 password/token 等敏感字段，必须脱敏后再输出
+ * - 该函数会对对象进行深拷贝并递归脱敏
+ *
+ * @param {Object|null} data - 待脱敏的对象（可为空）
+ * @returns {Object|null} 脱敏后的对象（若入参为空则原样返回）
+ */
+function sanitize(data) {
   if (!data) return data
 
   const sensitive = ['password', 'token', 'secret', 'key', 'authorization']
   const sanitized = JSON.parse(JSON.stringify(data))
 
-  function maskValue (obj) {
+  /**
+   * 递归脱敏对象中的敏感字段
+   *
+   * @param {Object|null} obj - 待处理对象
+   * @returns {void} 无返回值，直接修改 obj
+   */
+  function maskValue(obj) {
     if (typeof obj !== 'object' || obj === null) return
 
     for (const key in obj) {
@@ -135,18 +153,28 @@ function sanitize (data) {
 }
 
 // 🎯 智能日志记录器（支持按用户/会话调试）
+/**
+ * 智能日志记录器（SmartLogger）
+ *
+ * 业务场景：
+ * - 支持按 userId/sessionId/requestId 临时开启更详细的日志
+ * - 统一封装 error/warn/info/debug/trace 五级日志方法
+ */
 class SmartLogger {
   /**
    * 记录日志（自动判断是否需要详细日志）
+   *
+   * @param {string} level - 日志级别（error/warn/info/debug/trace）
+   * @param {string} message - 日志消息（中文描述）
+   * @param {Object} meta - 附加信息（会被脱敏后输出）
+   * @returns {void} 无返回值
    */
-  log (level, message, meta = {}) {
+  log(level, message, meta = {}) {
     const { userId, sessionId, requestId } = meta
 
     // 🔍 检查是否需要为此用户/会话记录详细日志
     const needDetailedLog =
-      debugUsers.has(userId) ||
-      debugSessions.has(sessionId) ||
-      debugSessions.has(requestId)
+      debugUsers.has(userId) || debugSessions.has(sessionId) || debugSessions.has(requestId)
 
     // 如果需要详细日志，临时提升到 trace 级别
     if (needDetailedLog && LOG_LEVELS[level] > LOG_LEVELS.trace) {
@@ -160,58 +188,113 @@ class SmartLogger {
     logger.log(level, message, sanitizedMeta)
   }
 
-  // 🔴 错误日志
-  error (message, meta = {}) {
+  /**
+   * 错误日志
+   *
+   * @param {string} message - 日志消息
+   * @param {Object} meta - 附加信息
+   * @returns {void} 无返回值
+   */
+  error(message, meta = {}) {
     this.log('error', message, { ...meta, stack: new Error().stack })
   }
 
-  // 🟡 警告日志
-  warn (message, meta = {}) {
+  /**
+   * 警告日志
+   *
+   * @param {string} message - 日志消息
+   * @param {Object} meta - 附加信息
+   * @returns {void} 无返回值
+   */
+  warn(message, meta = {}) {
     this.log('warn', message, meta)
   }
 
-  // 🔵 信息日志
-  info (message, meta = {}) {
+  /**
+   * 信息日志
+   *
+   * @param {string} message - 日志消息
+   * @param {Object} meta - 附加信息
+   * @returns {void} 无返回值
+   */
+  info(message, meta = {}) {
     this.log('info', message, meta)
   }
 
-  // 🟢 调试日志
-  debug (message, meta = {}) {
+  /**
+   * 调试日志
+   *
+   * @param {string} message - 日志消息
+   * @param {Object} meta - 附加信息
+   * @returns {void} 无返回值
+   */
+  debug(message, meta = {}) {
     this.log('debug', message, meta)
   }
 
-  // 🔍 追踪日志（最详细）
-  trace (message, meta = {}) {
+  /**
+   * 追踪日志（最详细）
+   *
+   * @param {string} message - 日志消息
+   * @param {Object} meta - 附加信息
+   * @returns {void} 无返回值
+   */
+  trace(message, meta = {}) {
     this.log('trace', message, meta)
   }
 
-  // 🎯 为特定用户开启调试模式
-  enableDebugForUser (userId, durationMinutes = 30) {
+  /**
+   * 为特定用户开启调试模式（临时）
+   *
+   * @param {number|string} userId - 用户ID
+   * @param {number} durationMinutes - 开启时长（分钟，默认30）
+   * @returns {void} 无返回值
+   */
+  enableDebugForUser(userId, durationMinutes = 30) {
     debugUsers.add(userId)
     this.info('为用户开启调试模式', { userId, duration: `${durationMinutes}分钟` })
 
     // 自动关闭
-    setTimeout(() => {
-      debugUsers.delete(userId)
-      this.info('用户调试模式已关闭', { userId })
-    }, durationMinutes * 60 * 1000)
+    setTimeout(
+      () => {
+        debugUsers.delete(userId)
+        this.info('用户调试模式已关闭', { userId })
+      },
+      durationMinutes * 60 * 1000
+    )
   }
 
-  // 🎯 为特定会话开启调试模式
-  enableDebugForSession (sessionId, durationMinutes = 30) {
+  /**
+   * 为特定会话开启调试模式（临时）
+   *
+   * @param {string} sessionId - 会话ID
+   * @param {number} durationMinutes - 开启时长（分钟，默认30）
+   * @returns {void} 无返回值
+   */
+  enableDebugForSession(sessionId, durationMinutes = 30) {
     debugSessions.add(sessionId)
     this.info('为会话开启调试模式', { sessionId, duration: `${durationMinutes}分钟` })
 
     // 自动关闭
-    setTimeout(() => {
-      debugSessions.delete(sessionId)
-      this.info('会话调试模式已关闭', { sessionId })
-    }, durationMinutes * 60 * 1000)
+    setTimeout(
+      () => {
+        debugSessions.delete(sessionId)
+        this.info('会话调试模式已关闭', { sessionId })
+      },
+      durationMinutes * 60 * 1000
+    )
   }
 
-  // 🎚️ 动态调整全局日志级别
-  setLogLevel (level) {
-    if (!LOG_LEVELS.hasOwnProperty(level)) {
+  /**
+   * 动态调整全局日志级别
+   *
+   * 业务场景：生产环境临时提升/降低日志级别（无需重启）
+   *
+   * @param {string} level - 日志级别（error/warn/info/debug/trace）
+   * @returns {boolean} 是否设置成功
+   */
+  setLogLevel(level) {
+    if (!Object.prototype.hasOwnProperty.call(LOG_LEVELS, level)) {
       this.error('无效的日志级别', { level, validLevels: Object.keys(LOG_LEVELS) })
       return false
     }
@@ -222,8 +305,12 @@ class SmartLogger {
     return true
   }
 
-  // 📊 获取当前日志配置
-  getConfig () {
+  /**
+   * 获取当前日志配置
+   *
+   * @returns {Object} 当前配置（currentLevel/debugUsers/debugSessions/availableLevels）
+   */
+  getConfig() {
     return {
       currentLevel: CURRENT_LOG_LEVEL,
       debugUsers: Array.from(debugUsers),
@@ -232,8 +319,12 @@ class SmartLogger {
     }
   }
 
-  // 🧹 清除所有调试会话
-  clearAllDebugSessions () {
+  /**
+   * 清除所有调试会话
+   *
+   * @returns {void} 无返回值
+   */
+  clearAllDebugSessions() {
     const count = debugUsers.size + debugSessions.size
     debugUsers.clear()
     debugSessions.clear()

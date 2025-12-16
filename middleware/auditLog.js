@@ -127,7 +127,7 @@ exports.logOperation = async (
  * @param {Object} beforeAccount - 调整前账户数据
  * @param {Object} afterAccount - 调整后账户数据
  * @param {string} reason - 调整原因
- * @returns {Promise<AdminOperationLog>}
+ * @returns {Promise<AdminOperationLog>} 审计日志记录
  */
 exports.logPointsAdjust = async (req, userId, beforeAccount, afterAccount, reason) => {
   return exports.logOperation(
@@ -151,7 +151,7 @@ exports.logPointsAdjust = async (req, userId, beforeAccount, afterAccount, reaso
  * @param {Object} beforeExchange - 审核前数据
  * @param {Object} afterExchange - 审核后数据
  * @param {string} reason - 审核意见
- * @returns {Promise<AdminOperationLog>}
+ * @returns {Promise<AdminOperationLog>} 审计日志记录
  */
 exports.logExchangeAudit = async (
   req,
@@ -183,7 +183,7 @@ exports.logExchangeAudit = async (
  * @param {Object} beforeProduct - 操作前数据
  * @param {Object} afterProduct - 操作后数据
  * @param {string} reason - 操作原因
- * @returns {Promise<AdminOperationLog>}
+ * @returns {Promise<AdminOperationLog>} 审计日志记录
  */
 exports.logProductConfig = async (req, productId, action, beforeProduct, afterProduct, reason) => {
   const operationTypeMap = {
@@ -213,7 +213,7 @@ exports.logProductConfig = async (req, productId, action, beforeProduct, afterPr
  * @param {Object} beforeUser - 操作前数据
  * @param {Object} afterUser - 操作后数据
  * @param {string} reason - 操作原因
- * @returns {Promise<AdminOperationLog>}
+ * @returns {Promise<AdminOperationLog>} 审计日志记录
  */
 exports.logUserStatusChange = async (req, userId, action, beforeUser, afterUser, reason) => {
   return exports.logOperation(
@@ -237,7 +237,7 @@ exports.logUserStatusChange = async (req, userId, action, beforeUser, afterUser,
  * @param {Object} beforePrize - 操作前数据
  * @param {Object} afterPrize - 操作后数据
  * @param {string} reason - 操作原因
- * @returns {Promise<AdminOperationLog>}
+ * @returns {Promise<AdminOperationLog>} 审计日志记录
  */
 exports.logPrizeConfig = async (req, prizeId, action, beforePrize, afterPrize, reason) => {
   const operationTypeMap = {
@@ -267,7 +267,7 @@ exports.logPrizeConfig = async (req, prizeId, action, beforePrize, afterPrize, r
  * @param {Object} beforeCampaign - 操作前数据
  * @param {Object} afterCampaign - 操作后数据
  * @param {string} reason - 操作原因
- * @returns {Promise<AdminOperationLog>}
+ * @returns {Promise<AdminOperationLog>} 审计日志记录
  */
 exports.logCampaignConfig = async (
   req,
@@ -298,7 +298,7 @@ exports.logCampaignConfig = async (
  * @param {Object} beforeRoles - 操作前角色
  * @param {Object} afterRoles - 操作后角色
  * @param {string} reason - 操作原因
- * @returns {Promise<AdminOperationLog>}
+ * @returns {Promise<AdminOperationLog>} 审计日志记录
  */
 exports.logRoleAssign = async (req, userId, action, beforeRoles, afterRoles, reason) => {
   return exports.logOperation(
@@ -319,7 +319,7 @@ exports.logRoleAssign = async (req, userId, action, beforeRoles, afterRoles, rea
  * @param {Object} req - Express请求对象
  * @returns {string} IP地址
  */
-function getClientIP (req) {
+function getClientIP(req) {
   // 优先从代理头获取真实IP
   const forwarded = req.headers['x-forwarded-for']
   if (forwarded) {
@@ -338,6 +338,19 @@ function getClientIP (req) {
 
 /**
  * 审计日志查询工具
+ *
+ * 业务场景：后台管理查询审计日志列表（支持多条件筛选与分页）
+ *
+ * @param {Object} options - 查询选项
+ * @param {number|null} options.operatorId - 操作员ID（可选）
+ * @param {string|null} options.operationType - 操作类型（可选）
+ * @param {string|null} options.targetType - 目标类型（可选）
+ * @param {number|string|null} options.targetId - 目标ID（可选）
+ * @param {string|Date|null} options.startDate - 开始时间（可选）
+ * @param {string|Date|null} options.endDate - 结束时间（可选）
+ * @param {number} options.limit - 分页大小（默认50）
+ * @param {number} options.offset - 分页偏移（默认0）
+ * @returns {Promise<Array<AdminOperationLog>>} 审计日志列表
  */
 exports.queryAdminOperationLogs = async (options = {}) => {
   const {
@@ -403,6 +416,14 @@ exports.queryAdminOperationLogs = async (options = {}) => {
 
 /**
  * 获取审计日志统计信息
+ *
+ * 业务场景：后台管理查看审计日志统计汇总（总数、按类型/动作分组）
+ *
+ * @param {Object} options - 查询选项
+ * @param {number|null} options.operatorId - 操作员ID（可选）
+ * @param {string|Date|null} options.startDate - 开始时间（可选）
+ * @param {string|Date|null} options.endDate - 结束时间（可选）
+ * @returns {Promise<Object>} 统计结果对象（total/byType/byAction）
  */
 exports.getAuditStatistics = async (options = {}) => {
   const { operatorId = null, startDate = null, endDate = null } = options

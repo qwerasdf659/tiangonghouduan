@@ -28,8 +28,9 @@ class LotteryManagementSetting extends Model {
   /**
    * 静态关联定义
    * @param {Object} models - 所有模型的引用
+   * @returns {void} 无返回值，仅定义模型关联关系
    */
-  static associate (models) {
+  static associate(models) {
     // 关联到目标用户（设置对哪个用户生效）
     LotteryManagementSetting.belongsTo(models.User, {
       foreignKey: 'user_id',
@@ -55,7 +56,7 @@ class LotteryManagementSetting extends Model {
    *   console.log('设置已过期')
    * }
    */
-  isExpired () {
+  isExpired() {
     if (!this.expires_at) return false
     return new Date(this.expires_at) < new Date()
   }
@@ -70,13 +71,13 @@ class LotteryManagementSetting extends Model {
    *   console.log('设置生效中')
    * }
    */
-  isActive () {
+  isActive() {
     return this.status === 'active' && !this.isExpired()
   }
 
   /**
    * 标记设置为已使用（用于force_win等一次性设置）
-   * @returns {Promise<void>}
+   * @returns {Promise<void>} 无返回值，保存状态变更到数据库
    *
    * @example
    * // 用户抽奖时，如果有force_win设置，使用后标记为used
@@ -85,21 +86,21 @@ class LotteryManagementSetting extends Model {
    *   await setting.markAsUsed()
    * }
    */
-  async markAsUsed () {
+  async markAsUsed() {
     this.status = 'used'
     await this.save()
   }
 
   /**
    * 取消设置（管理员手动取消）
-   * @returns {Promise<void>}
+   * @returns {Promise<void>} 无返回值，保存状态变更到数据库
    *
    * @example
    * // 管理员取消用户的强制中奖设置
    * const setting = await LotteryManagementSetting.findByPk(setting_id)
    * await setting.cancel()
    */
-  async cancel () {
+  async cancel() {
     this.status = 'cancelled'
     await this.save()
   }
@@ -108,7 +109,7 @@ class LotteryManagementSetting extends Model {
 /**
  * 初始化模型
  * @param {Object} sequelize - Sequelize实例
- * @returns {typeof LotteryManagementSetting} 初始化后的模型类
+ * @returns {Model} 初始化后的模型类（LotteryManagementSetting）
  */
 module.exports = sequelize => {
   LotteryManagementSetting.init(
@@ -117,7 +118,8 @@ module.exports = sequelize => {
       setting_id: {
         type: DataTypes.STRING(50),
         primaryKey: true,
-        defaultValue: () => `setting_${BeijingTimeHelper.generateIdTimestamp()}_${Math.random().toString(36).substr(2, 6)}`,
+        defaultValue: () =>
+          `setting_${BeijingTimeHelper.generateIdTimestamp()}_${Math.random().toString(36).substr(2, 6)}`,
         comment: '设置记录唯一标识（格式：setting_时间戳_随机码）'
       },
 
@@ -136,14 +138,16 @@ module.exports = sequelize => {
       setting_type: {
         type: DataTypes.ENUM('force_win', 'force_lose', 'probability_adjust', 'user_queue'),
         allowNull: false,
-        comment: '设置类型：force_win-强制中奖，force_lose-强制不中奖，probability_adjust-概率调整，user_queue-用户专属队列'
+        comment:
+          '设置类型：force_win-强制中奖，force_lose-强制不中奖，probability_adjust-概率调整，user_queue-用户专属队列'
       },
 
       // 设置详情：JSON格式存储设置参数
       setting_data: {
         type: DataTypes.JSON,
         allowNull: false,
-        comment: '设置详情（JSON格式）：force_win={prize_id,reason}，force_lose={count,remaining,reason}，probability_adjust={multiplier,reason}，user_queue={queue_type,priority_level,custom_strategy}'
+        comment:
+          '设置详情（JSON格式）：force_win={prize_id,reason}，force_lose={count,remaining,reason}，probability_adjust={multiplier,reason}，user_queue={queue_type,priority_level,custom_strategy}'
       },
 
       // 过期时间：设置自动失效时间（北京时间GMT+8）
@@ -196,7 +200,8 @@ module.exports = sequelize => {
       createdAt: 'created_at',
       updatedAt: 'updated_at',
       underscored: true,
-      comment: '抽奖管理设置表：存储管理员的抽奖干预设置（强制中奖、强制不中奖、概率调整、用户专属队列）',
+      comment:
+        '抽奖管理设置表：存储管理员的抽奖干预设置（强制中奖、强制不中奖、概率调整、用户专属队列）',
       indexes: [
         {
           name: 'idx_user_status',

@@ -21,7 +21,7 @@
  * - 仅管理员可创建预设，普通用户只能查看自己的预设
  */
 
-const TestCoordinator = require('../../helpers/TestCoordinator')
+const TestCoordinator = require('../../api/TestCoordinator')
 const moment = require('moment-timezone')
 const models = require('../../../models')
 const { TEST_DATA } = require('../../helpers/test-data')
@@ -768,7 +768,9 @@ describe('抽奖预设系统API测试（V4架构）', () => {
       // 平均响应时间应在合理范围内
       expect(avg_time).toBeLessThan(500)
 
-      console.log(`⚡ 并发性能测试: ${concurrent_requests}个请求, 总耗时${duration}ms, 平均${Math.round(avg_time)}ms`)
+      console.log(
+        `⚡ 并发性能测试: ${concurrent_requests}个请求, 总耗时${duration}ms, 平均${Math.round(avg_time)}ms`
+      )
     })
   })
 })

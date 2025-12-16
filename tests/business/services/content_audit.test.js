@@ -14,7 +14,7 @@
 
 const ContentAuditEngine = require('../../../services/ContentAuditEngine')
 const { ContentReviewRecord, User, sequelize } = require('../../../models')
-const BeijingTimeHelper = require('../../utils/timeHelper')
+const BeijingTimeHelper = require('../../../utils/timeHelper')
 const { TEST_DATA } = require('../../helpers/test-data')
 
 describe('ContentAuditEngine - 内容审核引擎测试', () => {

@@ -21,238 +21,52 @@
 const express = require('express')
 const router = express.Router()
 const { authenticateToken, requireAdmin } = require('../../../../middleware/auth')
-const { handleServiceError } = require('../../../../middleware/validation')
-const Logger = require('../../../../services/UnifiedLotteryEngine/utils/Logger')
-
-const logger = new Logger('DiamondAdminAPI')
 
 /**
- * 查询用户钻石余额
+ * 查询用户钻石余额（已禁用）
  * GET /api/v4/admin/diamond/users/:user_id/balance
- *
- * @description 管理员查询指定用户的钻石余额
- * @param {number} user_id - 用户ID
- * @returns {object} account - 钻石账户信息
- * @returns {number} account.account_id - 账户ID
- * @returns {number} account.user_id - 用户ID
- * @returns {number} account.balance - 钻石余额
- * @returns {string} account.created_at - 创建时间
- * @returns {string} account.updated_at - 更新时间
+ * @deprecated Phase 4 - 旧钻石账户表已删除，请使用统一资产查询接口
  */
 router.get('/users/:user_id/balance', authenticateToken, requireAdmin, async (req, res) => {
-  try {
-    const DiamondService = req.app.locals.services.getService('diamond')
-    const admin_id = req.user.user_id
-    const { user_id } = req.params
-
-    logger.info('管理员查询用户钻石余额', {
-      admin_id,
-      target_user_id: parseInt(user_id)
-    })
-
-    // 调用Service获取账户信息
-    const account = await DiamondService.getUserAccount(parseInt(user_id))
-
-    logger.info('查询用户钻石余额成功', {
-      admin_id,
-      target_user_id: parseInt(user_id),
-      balance: account?.balance || 0
-    })
-
-    return res.apiSuccess(
-      { account },
-      '查询用户钻石余额成功'
-    )
-  } catch (error) {
-    logger.error('查询用户钻石余额失败', {
-      error: error.message,
-      stack: error.stack,
-      admin_id: req.user?.user_id,
-      target_user_id: req.params?.user_id
-    })
-    return handleServiceError(error, res, '查询用户钻石余额失败')
-  }
+  return res.apiError(
+    '❌ 钻石余额查询功能已迁移至统一资产管理模块（Phase 4）。' +
+      '\n旧的钻石账户表（user_diamond_accounts）已删除。' +
+      '\n请使用 GET /api/v4/admin/assets/balance/:user_id?asset_code=DIAMOND 查询资产余额。',
+    'DEPRECATED_API',
+    null,
+    410 // 410 Gone
+  )
 })
 
 /**
- * 管理员调整用户钻石余额
+ * 管理员调整用户钻石余额（已禁用）
  * POST /api/v4/admin/diamond/users/:user_id/adjust
- *
- * @description 管理员人工调整用户的钻石余额（用于运营补偿、活动发放、纠错等）
- * @param {number} user_id - 用户ID
- * @body {number} delta - 必填，变动金额（可正可负，正数=增加，负数=减少）
- * @body {string} business_id - 必填，幂等键（唯一标识，格式建议：admin_adjust_diamond_{admin_id}_{timestamp}）
- * @body {string} title - 必填，调整原因（用于前端展示和审计）
- * @body {object} meta - 可选，元数据（如：工单号、活动ID、备注等）
- *
- * @returns {object} result - 调整结果
- * @returns {number} result.tx_id - 流水ID
- * @returns {number} result.balance_before - 调整前余额
- * @returns {number} result.balance_after - 调整后余额
- * @returns {number} result.amount - 变动金额（绝对值）
- * @returns {string} result.tx_type - 交易类型（earn/consume/admin_adjust）
+ * @deprecated 已迁移至统一资产管理模块
  */
 router.post('/users/:user_id/adjust', authenticateToken, requireAdmin, async (req, res) => {
-  try {
-    const DiamondService = req.app.locals.services.getService('diamond')
-    const admin_id = req.user.user_id
-    const { user_id } = req.params
-    const { delta, business_id, title, meta } = req.body
-
-    // 参数验证
-    if (delta === undefined || !business_id || !title) {
-      return res.apiError(
-        '缺少必填参数：delta、business_id、title',
-        'BAD_REQUEST',
-        null,
-        400
-      )
-    }
-
-    // delta参数验证
-    const deltaAmount = parseInt(delta)
-    if (isNaN(deltaAmount) || deltaAmount === 0) {
-      return res.apiError(
-        'delta必须是非零整数',
-        'BAD_REQUEST',
-        null,
-        400
-      )
-    }
-
-    logger.info('管理员调整用户钻石余额', {
-      admin_id,
-      target_user_id: parseInt(user_id),
-      delta: deltaAmount,
-      business_id,
-      title
-    })
-
-    // 调用Service执行调整
-    const result = await DiamondService.adminAdjust(
-      parseInt(user_id),
-      deltaAmount,
-      {
-        business_id,
-        title,
-        meta: meta || { admin_id, timestamp: new Date() }
-      }
-    )
-
-    logger.info('管理员调整用户钻石余额成功', {
-      admin_id,
-      target_user_id: parseInt(user_id),
-      delta: deltaAmount,
-      balance_before: result.balance_before,
-      balance_after: result.balance_after
-    })
-
-    return res.apiSuccess(
-      result,
-      '调整用户钻石余额成功'
-    )
-  } catch (error) {
-    logger.error('管理员调整用户钻石余额失败', {
-      error: error.message,
-      stack: error.stack,
-      admin_id: req.user?.user_id,
-      target_user_id: req.params?.user_id
-    })
-    return handleServiceError(error, res, '调整用户钻石余额失败')
-  }
+  return res.apiError(
+    '❌ 管理员调整钻石余额功能已迁移至统一资产管理模块，此API已禁用（Phase 4）。' +
+      '\n请使用 POST /api/v4/admin/assets/balance/adjust 接口进行资产调整。',
+    'DEPRECATED_API',
+    null,
+    410 // 410 Gone
+  )
 })
 
 /**
- * 查询钻石流水（管理员）
+ * 查询钻石流水（管理员）- 已禁用
  * GET /api/v4/admin/diamond/transactions
- *
- * @description 管理员查询钻石流水（支持按用户、业务类型等多维度筛选）
- * @query {number} user_id - 可选，用户ID过滤
- * @query {string} tx_type - 可选，交易类型过滤（earn/consume/admin_adjust）
- * @query {string} business_type - 可选，业务类型过滤（material_convert/admin_adjust等）
- * @query {string} business_id - 可选，业务ID过滤（精确匹配）
- * @query {string} start_date - 可选，开始日期（格式：YYYY-MM-DD）
- * @query {string} end_date - 可选，结束日期（格式：YYYY-MM-DD）
- * @query {number} page - 页码（默认1）
- * @query {number} page_size - 每页数量（默认20，最大100）
- * @returns {Array} transactions - 钻石流水列表
- * @returns {object} pagination - 分页信息
+ * @deprecated Phase 4 - 旧钻石流水表已删除，请使用统一资产流水查询接口
  */
 router.get('/transactions', authenticateToken, requireAdmin, async (req, res) => {
-  try {
-    const DiamondService = req.app.locals.services.getService('diamond')
-    const admin_id = req.user.user_id
-
-    const {
-      user_id,
-      tx_type,
-      business_type,
-      business_id,
-      start_date,
-      end_date,
-      page = 1,
-      page_size = 20
-    } = req.query
-
-    // 参数验证
-    const finalPage = Math.max(parseInt(page) || 1, 1)
-    const finalPageSize = Math.min(Math.max(parseInt(page_size) || 20, 1), 100)
-
-    // tx_type白名单验证
-    if (tx_type) {
-      const validTxTypes = ['earn', 'consume', 'admin_adjust']
-      if (!validTxTypes.includes(tx_type)) {
-        return res.apiError(
-          `无效的tx_type参数，允许值：${validTxTypes.join(', ')}`,
-          'BAD_REQUEST',
-          null,
-          400
-        )
-      }
-    }
-
-    logger.info('管理员查询钻石流水', {
-      admin_id,
-      filters: {
-        user_id,
-        tx_type,
-        business_type,
-        business_id
-      },
-      page: finalPage,
-      page_size: finalPageSize
-    })
-
-    // 调用Service查询流水
-    const result = await DiamondService.getTransactions({
-      user_id: user_id ? parseInt(user_id) : undefined,
-      tx_type,
-      business_type,
-      business_id,
-      start_date,
-      end_date,
-      page: finalPage,
-      page_size: finalPageSize
-    })
-
-    logger.info('管理员查询钻石流水成功', {
-      admin_id,
-      total: result.pagination.total,
-      returned: result.transactions.length
-    })
-
-    return res.apiSuccess(
-      result,
-      '查询钻石流水成功'
-    )
-  } catch (error) {
-    logger.error('管理员查询钻石流水失败', {
-      error: error.message,
-      stack: error.stack,
-      admin_id: req.user?.user_id
-    })
-    return handleServiceError(error, res, '查询钻石流水失败')
-  }
+  return res.apiError(
+    '❌ 钻石流水查询功能已迁移至统一资产管理模块（Phase 4）。' +
+      '\n旧的钻石流水表（diamond_transactions）已删除。' +
+      '\n请使用 GET /api/v4/admin/assets/transactions?asset_code=DIAMOND 查询资产流水。',
+    'DEPRECATED_API',
+    null,
+    410 // 410 Gone
+  )
 })
 
 module.exports = router

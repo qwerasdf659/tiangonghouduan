@@ -74,7 +74,7 @@ class UnifiedRedisClient {
    *
    * @constructor
    */
-  constructor () {
+  constructor() {
     if (UnifiedRedisClient.instance) {
       return UnifiedRedisClient.instance
     }
@@ -114,39 +114,49 @@ class UnifiedRedisClient {
    * 设置事件处理器
    * @returns {void} 无返回值
    */
-  setupEventHandlers () {
-    // 主客户端事件
+  setupEventHandlers() {
+    /*
+     * 🔧 注意：NODE_ENV 可能在模块初始化后才被测试框架设置
+     * 因此不能在这里“缓存”shouldLog，必须在事件触发时读取最新环境变量
+     * 主客户端事件
+     */
     this.client.on('connect', () => {
-      console.log('[UnifiedRedisClient] 主客户端连接成功')
+      if (!process.env.JEST_WORKER_ID) console.log('[UnifiedRedisClient] 主客户端连接成功')
       this.isConnected = true
     })
 
     this.client.on('error', err => {
-      console.error('[UnifiedRedisClient] 主客户端连接错误:', err)
+      if (!process.env.JEST_WORKER_ID) {
+        console.error('[UnifiedRedisClient] 主客户端连接错误:', err)
+      }
       this.isConnected = false
     })
 
     this.client.on('close', () => {
-      console.log('[UnifiedRedisClient] 主客户端连接关闭')
+      if (!process.env.JEST_WORKER_ID) console.log('[UnifiedRedisClient] 主客户端连接关闭')
       this.isConnected = false
     })
 
     // 发布客户端事件
     this.pubClient.on('connect', () => {
-      console.log('[UnifiedRedisClient] 发布客户端连接成功')
+      if (!process.env.JEST_WORKER_ID) console.log('[UnifiedRedisClient] 发布客户端连接成功')
     })
 
     this.pubClient.on('error', err => {
-      console.error('[UnifiedRedisClient] 发布客户端错误:', err)
+      if (!process.env.JEST_WORKER_ID) {
+        console.error('[UnifiedRedisClient] 发布客户端错误:', err)
+      }
     })
 
     // 订阅客户端事件
     this.subClient.on('connect', () => {
-      console.log('[UnifiedRedisClient] 订阅客户端连接成功')
+      if (!process.env.JEST_WORKER_ID) console.log('[UnifiedRedisClient] 订阅客户端连接成功')
     })
 
     this.subClient.on('error', err => {
-      console.error('[UnifiedRedisClient] 订阅客户端错误:', err)
+      if (!process.env.JEST_WORKER_ID) {
+        console.error('[UnifiedRedisClient] 订阅客户端错误:', err)
+      }
     })
   }
 
@@ -154,7 +164,7 @@ class UnifiedRedisClient {
    * 获取主客户端实例
    * @returns {Redis} Redis客户端实例
    */
-  getClient () {
+  getClient() {
     return this.client
   }
 
@@ -162,7 +172,7 @@ class UnifiedRedisClient {
    * 获取发布客户端实例
    * @returns {Redis} 发布客户端实例
    */
-  getPubClient () {
+  getPubClient() {
     return this.pubClient
   }
 
@@ -170,7 +180,7 @@ class UnifiedRedisClient {
    * 获取订阅客户端实例
    * @returns {Redis} 订阅客户端实例
    */
-  getSubClient () {
+  getSubClient() {
     return this.subClient
   }
 
@@ -178,7 +188,7 @@ class UnifiedRedisClient {
    * 确保连接成功
    * @returns {Promise<Redis>} 连接的客户端
    */
-  async ensureConnection () {
+  async ensureConnection() {
     if (this.isConnected) {
       return this.client
     }
@@ -195,7 +205,7 @@ class UnifiedRedisClient {
    * 健康检查
    * @returns {Promise<boolean>} 连接是否健康
    */
-  async healthCheck () {
+  async healthCheck() {
     try {
       const result = await this.client.ping()
       return result === 'PONG'
@@ -216,7 +226,7 @@ class UnifiedRedisClient {
    * @param {number|null} ttl - 过期时间（秒），null表示不过期
    * @returns {Promise<any>} Redis操作结果
    */
-  async set (key, value, ttl = null) {
+  async set(key, value, ttl = null) {
     const client = await this.ensureConnection()
     if (ttl) {
       return await client.setex(key, ttl, value)
@@ -229,7 +239,7 @@ class UnifiedRedisClient {
    * @param {string} key - 键名
    * @returns {Promise<any>} 键的值
    */
-  async get (key) {
+  async get(key) {
     const client = await this.ensureConnection()
     return await client.get(key)
   }
@@ -239,7 +249,7 @@ class UnifiedRedisClient {
    * @param {string} key - 键名
    * @returns {Promise<number>} 删除的键数量
    */
-  async del (key) {
+  async del(key) {
     const client = await this.ensureConnection()
     return await client.del(key)
   }
@@ -249,7 +259,7 @@ class UnifiedRedisClient {
    * @param {string} key - 键名
    * @returns {Promise<number>} 1表示存在，0表示不存在
    */
-  async exists (key) {
+  async exists(key) {
     const client = await this.ensureConnection()
     return await client.exists(key)
   }
@@ -260,7 +270,7 @@ class UnifiedRedisClient {
    * @param {number} ttl - 过期时间（秒）
    * @returns {Promise<number>} 1表示成功，0表示键不存在
    */
-  async expire (key, ttl) {
+  async expire(key, ttl) {
     const client = await this.ensureConnection()
     return await client.expire(key, ttl)
   }
@@ -272,7 +282,7 @@ class UnifiedRedisClient {
    * @param {any} value - 值
    * @returns {Promise<number>} 1表示新字段，0表示更新已有字段
    */
-  async hset (key, field, value) {
+  async hset(key, field, value) {
     const client = await this.ensureConnection()
     return await client.hset(key, field, value)
   }
@@ -283,7 +293,7 @@ class UnifiedRedisClient {
    * @param {string} field - 字段名
    * @returns {Promise<any>} 字段的值
    */
-  async hget (key, field) {
+  async hget(key, field) {
     const client = await this.ensureConnection()
     return await client.hget(key, field)
   }
@@ -293,7 +303,7 @@ class UnifiedRedisClient {
    * @param {string} key - 键名
    * @returns {Promise<Object>} 哈希对象
    */
-  async hgetall (key) {
+  async hgetall(key) {
     const client = await this.ensureConnection()
     return await client.hgetall(key)
   }
@@ -304,7 +314,7 @@ class UnifiedRedisClient {
    * @param {string} field - 字段名
    * @returns {Promise<number>} 删除的字段数量
    */
-  async hdel (key, field) {
+  async hdel(key, field) {
     const client = await this.ensureConnection()
     return await client.hdel(key, field)
   }
@@ -316,7 +326,7 @@ class UnifiedRedisClient {
    * @param {any} member - 成员值
    * @returns {Promise<number>} 新添加的成员数量
    */
-  async zadd (key, score, member) {
+  async zadd(key, score, member) {
     const client = await this.ensureConnection()
     return await client.zadd(key, score, member)
   }
@@ -328,7 +338,7 @@ class UnifiedRedisClient {
    * @param {number} max - 最大分数
    * @returns {Promise<number>} 删除的成员数量
    */
-  async zremrangebyscore (key, min, max) {
+  async zremrangebyscore(key, min, max) {
     const client = await this.ensureConnection()
     return await client.zremrangebyscore(key, min, max)
   }
@@ -338,7 +348,7 @@ class UnifiedRedisClient {
    * @param {string} key - 键名
    * @returns {Promise<number>} 成员数量
    */
-  async zcard (key) {
+  async zcard(key) {
     const client = await this.ensureConnection()
     return await client.zcard(key)
   }
@@ -350,7 +360,7 @@ class UnifiedRedisClient {
    * @param {number} max - 最大分数
    * @returns {Promise<number>} 成员数量
    */
-  async zcount (key, min, max) {
+  async zcount(key, min, max) {
     const client = await this.ensureConnection()
     return await client.zcount(key, min, max)
   }
@@ -359,7 +369,7 @@ class UnifiedRedisClient {
    * 创建Redis事务（批量操作）
    * @returns {Promise<Object>} Multi对象
    */
-  async multi () {
+  async multi() {
     const client = await this.ensureConnection()
     return client.multi()
   }
@@ -368,7 +378,7 @@ class UnifiedRedisClient {
    * 创建Redis管道（批量操作）
    * @returns {Promise<Object>} Pipeline对象
    */
-  async pipeline () {
+  async pipeline() {
     const client = await this.ensureConnection()
     return client.pipeline()
   }
@@ -380,7 +390,7 @@ class UnifiedRedisClient {
    * @param {...any} args - 其他参数
    * @returns {Promise<any>} 脚本执行结果
    */
-  async eval (script, numKeys, ...args) {
+  async eval(script, numKeys, ...args) {
     const client = await this.ensureConnection()
     return await client.eval(script, numKeys, ...args)
   }
@@ -389,7 +399,7 @@ class UnifiedRedisClient {
    * 关闭所有连接
    * @returns {Promise<void>} 所有连接关闭完成
    */
-  async disconnect () {
+  async disconnect() {
     const promises = []
 
     if (this.client) {
@@ -406,14 +416,16 @@ class UnifiedRedisClient {
 
     await Promise.all(promises)
     this.isConnected = false
-    console.log('[UnifiedRedisClient] 所有连接已关闭')
+    // 🔧 允许后续在同一进程内重新建立连接（避免测试/重启场景复用旧 promise）
+    this.connectionPromise = null
+    if (!process.env.JEST_WORKER_ID) console.log('[UnifiedRedisClient] 所有连接已关闭')
   }
 
   /**
    * 获取连接状态
    * @returns {Object} 连接状态对象（连接状态、配置信息）
    */
-  getStatus () {
+  getStatus() {
     return {
       isConnected: this.isConnected,
       config: {
@@ -437,7 +449,7 @@ let redisClient = null
  * 获取统一Redis客户端实例
  * @returns {UnifiedRedisClient} Redis客户端实例
  */
-function getRedisClient () {
+function getRedisClient() {
   if (!redisClient) {
     redisClient = new UnifiedRedisClient()
   }
@@ -448,7 +460,7 @@ function getRedisClient () {
  * 获取原生ioredis客户端（向后兼容）
  * @returns {Redis} 原生ioredis客户端
  */
-function getRawClient () {
+function getRawClient() {
   return getRedisClient().getClient()
 }
 
@@ -456,7 +468,7 @@ function getRawClient () {
  * 快速健康检查
  * @returns {Promise<boolean>} 连接是否健康
  */
-async function isRedisHealthy () {
+async function isRedisHealthy() {
   try {
     const client = getRedisClient()
     return await client.healthCheck()

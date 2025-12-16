@@ -1,23 +1,23 @@
 /**
- * 材料资产类型模型 - 材料系统核心配置表
- * 创建时间：2025-12-15 16:56:20 (北京时间)
- * 版本号：v4.5.0-material-system
+ * 材料资产类型模型
  *
- * 功能描述：
- * - 定义系统中存在的材料种类（碎红水晶、完整红水晶、橙碎片、完整橙水晶等）
- * - 支持动态新增材料类型，无需修改表结构
- * - 支持材料价值配置（可见价值、预算价值）
- * - 支持材料分组、形态、层级管理
+ * Phase 2 - P1-1：材料配置表模型
  *
- * 架构设计：
- * - Model层只负责：字段定义、关联、基础校验
- * - 业务逻辑在Service层处理（MaterialService）
- * - 符合领域驱动设计（DDD）原则
+ * 业务场景：
+ * - 材料类型配置（展示名称/分组/形态/层级）
+ * - 价值口径配置（visible_value_points/budget_value_points）
+ * - 材料展示与转换规则配置真相源
  *
- * 关联关系：
- * - UserMaterialBalance：一对多（一个资产类型可被多个用户持有）
- * - MaterialConversionRule：一对多（一个资产类型可参与多个转换规则）
- * - MaterialTransaction：一对多（一个资产类型有多条流水记录）
+ * 硬约束（来自文档）：
+ * - **禁止硬编码**：所有材料类型必须来自配置表，便于运营动态调整
+ * - 配置表真相：material_asset_types 为材料配置真相源
+ * - 余额真相：account_asset_balances 为余额真相源（不在本表）
+ *
+ * 命名规范（snake_case）：
+ * - 表名：material_asset_types
+ * - 主键：material_asset_type_id
+ *
+ * 创建时间：2025-12-15
  */
 
 'use strict'
@@ -26,159 +26,123 @@ const { Model, DataTypes } = require('sequelize')
 
 /**
  * 材料资产类型模型类
- * @class MaterialAssetType
- * @extends {Model}
+ * 职责：材料类型配置管理
+ * 设计模式：配置表模式
  */
 class MaterialAssetType extends Model {
   /**
-   * 定义模型关联关系
-   * @param {Object} models - 所有Sequelize模型的集合
-   * @returns {void}
+   * 静态关联定义
+   *
+   * @param {Object} _models - Sequelize所有模型的集合对象（当前未使用）
+   * @returns {void} 无返回值，仅定义关联关系
    */
-  static associate (models) {
-    // 一对多：一个资产类型可被多个用户持有
-    MaterialAssetType.hasMany(models.UserMaterialBalance, {
-      foreignKey: 'asset_code',
-      as: 'balances',
-      comment: '用户材料余额'
-    })
-
-    // 一对多：一个资产类型可作为转换规则的源资产
-    MaterialAssetType.hasMany(models.MaterialConversionRule, {
-      foreignKey: 'from_asset_code',
-      as: 'conversion_rules_from',
-      comment: '作为源资产的转换规则'
-    })
-
-    // 一对多：一个资产类型可作为转换规则的目标资产
-    MaterialAssetType.hasMany(models.MaterialConversionRule, {
-      foreignKey: 'to_asset_code',
-      as: 'conversion_rules_to',
-      comment: '作为目标资产的转换规则'
-    })
-
-    // 一对多：一个资产类型有多条流水记录
-    MaterialAssetType.hasMany(models.MaterialTransaction, {
-      foreignKey: 'asset_code',
-      as: 'transactions',
-      comment: '材料流水记录'
-    })
+  static associate(_models) {
+    /*
+     * 材料资产类型与材料转换规则的关联说明：
+     * - 本表只存“材料展示与分组配置”
+     * - 转换规则表以 from_asset_code/to_asset_code（字符串）引用 asset_code，因此不做 ORM 外键关联
+     */
   }
 }
 
 /**
- * 初始化材料资产类型模型
+ * 模型初始化
+ *
  * @param {Sequelize} sequelize - Sequelize实例
- * @returns {typeof MaterialAssetType} 初始化后的模型类
+ * @returns {MaterialAssetType} 初始化后的模型
  */
 module.exports = sequelize => {
   MaterialAssetType.init(
     {
-      // 主键：资产代码
-      asset_code: {
-        type: DataTypes.STRING(32),
+      // 主键ID（Material Asset Type ID）
+      material_asset_type_id: {
+        type: DataTypes.BIGINT,
         primaryKey: true,
-        allowNull: false,
-        comment: '资产代码（主键），如：red_shard（碎红水晶）、red_crystal（完整红水晶）'
+        autoIncrement: true,
+        comment: '材料资产类型ID（主键）'
       },
 
-      // 展示名称
+      // 资产代码（Asset Code - 唯一标识）
+      asset_code: {
+        type: DataTypes.STRING(50),
+        allowNull: false,
+        unique: true,
+        comment:
+          '资产代码（Asset Code - 唯一标识）：如 red_shard/red_crystal/orange_shard，必须唯一，与 account_asset_balances.asset_code 关联'
+      },
+
+      // 展示名称（Display Name - 用户可见名称）
       display_name: {
-        type: DataTypes.STRING(64),
+        type: DataTypes.STRING(100),
         allowNull: false,
-        comment: '展示名称（用于前端显示），如：碎红水晶、完整红水晶'
+        comment: '展示名称（Display Name - 用户可见名称）：如"红色碎片""红色水晶"'
       },
 
-      // 材料组代码
+      // 分组代码（Group Code - 材料分组）
       group_code: {
-        type: DataTypes.STRING(16),
+        type: DataTypes.STRING(50),
         allowNull: false,
-        comment: '材料组代码（用于分组管理），如：red（红系）、orange（橙系）'
+        comment:
+          '分组代码（Group Code - 材料分组）：如 red/orange/yellow/green/blue/purple，用于材料逐级转换的层级归类'
       },
 
-      // 形态（碎片或完整体）
+      // 形态（Form - 碎片/水晶）
       form: {
         type: DataTypes.ENUM('shard', 'crystal'),
         allowNull: false,
-        comment: '形态：shard（碎片）、crystal（完整体/水晶）'
+        comment: '形态（Form - 碎片/水晶）：shard-碎片（低级形态），crystal-水晶（高级形态）'
       },
 
-      // 层级
+      // 层级（Tier - 材料层级）
       tier: {
         type: DataTypes.INTEGER,
         allowNull: false,
-        comment: '层级（红=1、橙=2、紫=3...），用于限制升级方向，避免循环转换'
+        comment:
+          '层级（Tier - 材料层级）：数字越大层级越高，如 1-碎片层级，2-水晶层级，用于转换规则校验'
       },
 
-      // 可见价值（积分口径）
-      visible_value_points: {
-        type: DataTypes.BIGINT,
-        allowNull: false,
-        defaultValue: 0,
-        comment: '可见价值（积分口径），用于展示、对齐门票单位、解释成本'
-      },
-
-      // 预算价值（积分口径）
-      budget_value_points: {
-        type: DataTypes.BIGINT,
-        allowNull: false,
-        defaultValue: 0,
-        comment: '预算价值（积分口径），用于预算控奖、系统成本口径'
-      },
-
-      // 排序顺序
+      // 排序权重（Sort Order - 展示排序）
       sort_order: {
         type: DataTypes.INTEGER,
         allowNull: false,
         defaultValue: 0,
-        comment: '排序顺序（数字越小越靠前），用于前端展示排序'
+        comment: '排序权重（Sort Order - 展示排序）：数字越小越靠前，用于材料列表展示排序'
       },
 
-      // 是否启用
+      // 可见价值锚点（Visible Value Points - 展示口径）
+      visible_value_points: {
+        type: DataTypes.BIGINT,
+        allowNull: true,
+        comment:
+          '可见价值锚点（Visible Value Points - 展示口径）：用户可见的材料价值锚点，如 1 red_shard = 10 visible_value_points，用于展示与比较，可选'
+      },
+
+      // 预算价值锚点（Budget Value Points - 系统口径）
+      budget_value_points: {
+        type: DataTypes.BIGINT,
+        allowNull: true,
+        comment:
+          '预算价值锚点（Budget Value Points - 系统口径）：系统内部预算计算口径，用于成本核算与风控，可选'
+      },
+
+      // 是否启用（Is Enabled - 启用状态）
       is_enabled: {
-        type: DataTypes.TINYINT(1),
+        type: DataTypes.BOOLEAN,
         allowNull: false,
-        defaultValue: 1,
-        comment: '是否启用（1=启用，0=禁用）'
-      },
-
-      // 创建时间
-      created_at: {
-        type: DataTypes.DATE,
-        allowNull: false,
-        defaultValue: DataTypes.NOW,
-        comment: '创建时间（北京时间）'
-      },
-
-      // 更新时间
-      updated_at: {
-        type: DataTypes.DATE,
-        allowNull: false,
-        defaultValue: DataTypes.NOW,
-        comment: '更新时间（北京时间）'
+        defaultValue: true,
+        comment:
+          '是否启用（Is Enabled - 启用状态）：true-启用（可展示可转换），false-禁用（不可展示不可转换）'
       }
     },
     {
       sequelize,
       modelName: 'MaterialAssetType',
       tableName: 'material_asset_types',
-      timestamps: true,
       underscored: true,
-      comment: '材料资产类型表（定义系统中存在的材料种类）',
-      indexes: [
-        {
-          name: 'idx_group_form_tier',
-          fields: ['group_code', 'form', 'tier']
-        },
-        {
-          name: 'idx_is_enabled',
-          fields: ['is_enabled']
-        },
-        {
-          name: 'idx_sort_order',
-          fields: ['sort_order']
-        }
-      ]
+      timestamps: true,
+      createdAt: 'created_at',
+      updatedAt: 'updated_at',
+      comment: '材料资产类型表（Material Asset Types - 材料配置真相源）'
     }
   )
 

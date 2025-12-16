@@ -8,8 +8,24 @@ const BeijingTimeHelper = require('../utils/timeHelper')
 const UnifiedDistributedLock = require('../utils/UnifiedDistributedLock')
 const ApiResponse = require('../utils/ApiResponse')
 
+/**
+ * 并发控制中间件（Concurrency Control Middleware）
+ *
+ * 业务场景：
+ * - 限制单个用户的并发请求数，防止刷接口/并发写入导致的数据竞争
+ * - 为关键写操作提供分布式锁，确保“单业务单据/单资源”原子性
+ *
+ * 注意：
+ * - 该中间件只负责并发与锁控制，不负责业务逻辑
+ * - 错误返回遵循统一 ApiResponse 格式
+ */
 class ConcurrencyControlMiddleware {
-  constructor () {
+  /**
+   * 构造函数：初始化分布式锁管理器与并发计数器
+   *
+   * @returns {void} 无返回值
+   */
+  constructor() {
     this.lockManager = new UnifiedDistributedLock()
     this.activeRequests = new Map()
 
@@ -28,7 +44,7 @@ class ConcurrencyControlMiddleware {
    * @param {number} maxConcurrent 最大并发数，默认5
    * @returns {Function} Express中间件函数
    */
-  limitUserConcurrency (maxConcurrent = 5) {
+  limitUserConcurrency(maxConcurrent = 5) {
     return async (req, res, next) => {
       const user_id = req.user?.user_id
 
@@ -82,7 +98,7 @@ class ConcurrencyControlMiddleware {
    * @param {Object} options 锁配置选项
    * @returns {Function} Express中间件函数
    */
-  distributedLock (keyGenerator, options = {}) {
+  distributedLock(keyGenerator, options = {}) {
     const {
       ttl = 30000, // 锁过期时间，默认30秒
       maxRetries = 3, // 最大重试次数
@@ -180,7 +196,7 @@ class ConcurrencyControlMiddleware {
    * @param {number} maxConcurrent 最大并发数
    * @returns {Function} Express中间件函数
    */
-  limitIPConcurrency (maxConcurrent = 10) {
+  limitIPConcurrency(maxConcurrent = 10) {
     return async (req, res, next) => {
       const clientIP = req.ip || req.connection.remoteAddress
       const ipKey = `ip_concurrency:${clientIP}`
@@ -224,7 +240,7 @@ class ConcurrencyControlMiddleware {
    * 获取并发统计信息
    * @returns {Object} 并发统计数据
    */
-  getStats () {
+  getStats() {
     const userConcurrency = []
     const ipConcurrency = []
 
@@ -252,8 +268,10 @@ class ConcurrencyControlMiddleware {
 
   /**
    * 清理资源
+   *
+   * @returns {Promise<void>} 无返回值，用于应用退出时释放锁管理器资源
    */
-  async cleanup () {
+  async cleanup() {
     try {
       console.log('[ConcurrencyControl] 正在清理资源...')
 

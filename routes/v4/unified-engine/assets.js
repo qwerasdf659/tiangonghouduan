@@ -77,11 +77,7 @@ router.post('/convert', authenticateToken, async (req, res) => {
     // 🔄 通过 ServiceManager 获取 AssetConversionService（符合TR-005规范）
     const AssetConversionService = req.app.locals.services.getService('assetConversion')
 
-    const {
-      from_asset_code,
-      to_asset_code,
-      from_amount
-    } = req.body
+    const { from_asset_code, to_asset_code, from_amount } = req.body
 
     // 获取幂等键（Body business_id 或 Header Idempotency-Key 二选一）
     let business_id = req.body.business_id
@@ -114,21 +110,11 @@ router.post('/convert', authenticateToken, async (req, res) => {
     }
 
     if (!to_asset_code) {
-      return res.apiError(
-        '缺少必填参数：to_asset_code（目标资产代码）',
-        'BAD_REQUEST',
-        null,
-        400
-      )
+      return res.apiError('缺少必填参数：to_asset_code（目标资产代码）', 'BAD_REQUEST', null, 400)
     }
 
     if (!from_amount) {
-      return res.apiError(
-        '缺少必填参数：from_amount（转换数量）',
-        'BAD_REQUEST',
-        null,
-        400
-      )
+      return res.apiError('缺少必填参数：from_amount（转换数量）', 'BAD_REQUEST', null, 400)
     }
 
     // 2. 幂等键验证（强制要求）
@@ -274,7 +260,10 @@ router.post('/convert', authenticateToken, async (req, res) => {
     }
 
     // 转换规则错误（特殊处理）
-    if (error.message && (error.message.includes('不支持的材料转换') || error.message.includes('转换规则'))) {
+    if (
+      error.message &&
+      (error.message.includes('不支持的材料转换') || error.message.includes('转换规则'))
+    ) {
       return res.apiError(
         error.message,
         'UNSUPPORTED_CONVERSION',
@@ -316,74 +305,93 @@ router.post('/convert', authenticateToken, async (req, res) => {
  * }
  */
 router.get('/balances', authenticateToken, async (req, res) => {
-  try {
-    // 🔄 通过 ServiceManager 获取 MaterialService
-    const MaterialService = req.app.locals.services.getService('material')
-    const DiamondService = req.app.locals.services.getService('diamond')
+  return res.apiError(
+    '❌ 材料余额查询功能已迁移（Phase 4）。' +
+      '\nMaterialService和DiamondService已删除。' +
+      '\n请使用AssetService查询统一资产余额。' +
+      '\n示例: GET /api/v4/assets/balance?asset_code=red_shard',
+    'DEPRECATED_API',
+    {
+      migration_guide: {
+        old_service: 'MaterialService + DiamondService',
+        new_service: 'AssetService',
+        example: 'await AssetService.getBalance({ user_id, asset_code })'
+      }
+    },
+    410
+  )
 
-    const user_id = req.user.user_id
-
-    logger.info('获取用户材料余额', { user_id })
-
-    // 获取用户所有材料余额
-    const materialBalances = await MaterialService.getUserBalances(user_id, {
-      includeAssetType: true,
-      includeZeroBalance: false
-    })
-
-    // 获取用户钻石余额
-    const diamondAccount = await DiamondService.getUserAccount(user_id)
-    const diamondBalance = diamondAccount ? diamondAccount.balance : 0
-
-    // 组合结果
-    const balances = []
-
-    // 添加材料余额
-    materialBalances.forEach(balance => {
-      balances.push({
-        asset_code: balance.asset_code,
-        balance: balance.balance,
-        display_name: balance.asset_type ? balance.asset_type.display_name : balance.asset_code,
-        group_code: balance.asset_type ? balance.asset_type.group_code : 'material',
-        tier: balance.asset_type ? balance.asset_type.tier : null,
-        form: balance.asset_type ? balance.asset_type.form : null
-      })
-    })
-
-    // 添加钻石余额
-    balances.push({
-      asset_code: 'DIAMOND',
-      balance: diamondBalance,
-      display_name: '钻石',
-      group_code: 'currency',
-      tier: null,
-      form: null
-    })
-
-    logger.info('获取材料余额成功', {
-      user_id,
-      material_count: materialBalances.length,
-      diamond_balance: diamondBalance
-    })
-
-    return res.apiSuccess(
-      {
-        balances,
-        summary: {
-          total_materials: materialBalances.length,
-          total_diamonds: diamondBalance
-        }
-      },
-      '获取材料余额成功'
-    )
-  } catch (error) {
-    logger.error('获取材料余额失败', {
-      error: error.message,
-      stack: error.stack,
-      user_id: req.user?.user_id
-    })
-    return handleServiceError(error, res, '获取材料余额失败')
-  }
+  // 以下是旧代码（已禁用）
+  /*
+   *try {
+   *  // 🔄 通过 ServiceManager 获取 MaterialService
+   *  const MaterialService = req.app.locals.services.getService('material')
+   *  const DiamondService = req.app.locals.services.getService('diamond')
+   *
+   *  const user_id = req.user.user_id
+   *
+   *  logger.info('获取用户材料余额', { user_id })
+   *
+   *  // 获取用户所有材料余额
+   *  const materialBalances = await MaterialService.getUserBalances(user_id, {
+   *    includeAssetType: true,
+   *    includeZeroBalance: false
+   *  })
+   *
+   *  // 获取用户钻石余额
+   *  const diamondAccount = await DiamondService.getUserAccount(user_id)
+   *  const diamondBalance = diamondAccount ? diamondAccount.balance : 0
+   *
+   *  // 组合结果
+   *  const balances = []
+   *
+   *  // 添加材料余额
+   *  materialBalances.forEach(balance => {
+   *    balances.push({
+   *      asset_code: balance.asset_code,
+   *      balance: balance.balance,
+   *      display_name: balance.asset_type ? balance.asset_type.display_name : balance.asset_code,
+   *      group_code: balance.asset_type ? balance.asset_type.group_code : 'material',
+   *      tier: balance.asset_type ? balance.asset_type.tier : null,
+   *      form: balance.asset_type ? balance.asset_type.form : null
+   *    })
+   *  })
+   *
+   *  // 添加钻石余额
+   *  balances.push({
+   *    asset_code: 'DIAMOND',
+   *    balance: diamondBalance,
+   *    display_name: '钻石',
+   *    group_code: 'currency',
+   *    tier: null,
+   *    form: null
+   *  })
+   *
+   *  logger.info('获取材料余额成功', {
+   *    user_id,
+   *    material_count: materialBalances.length,
+   *    diamond_balance: diamondBalance
+   *  })
+   *
+   *  return res.apiSuccess(
+   *    {
+   *      balances,
+   *      summary: {
+   *        total_materials: materialBalances.length,
+   *        total_diamonds: diamondBalance
+   *      }
+   *    },
+   *    '获取材料余额成功'
+   *  )
+   *} catch (error) {
+   *  logger.error('获取材料余额失败', {
+   *    error: error.message,
+   *    stack: error.stack,
+   *    user_id: req.user?.user_id
+   *  })
+   *  return handleServiceError(error, res, '获取材料余额失败')
+   *}
+   */
 })
 
 /**
@@ -415,37 +423,42 @@ router.get('/balances', authenticateToken, async (req, res) => {
  */
 router.get('/conversion-rules', authenticateToken, async (req, res) => {
   try {
-    const { MATERIAL_CONVERSION_RULES } = require('../../../config/material_conversion_rules')
-
     const user_id = req.user.user_id
 
-    logger.info('获取材料转换规则', { user_id })
+    logger.info('获取材料转换规则（从数据库）', { user_id })
 
-    // 将规则转换为数组格式
-    const rules = Object.values(MATERIAL_CONVERSION_RULES)
+    // 🔴 项目规范：路由不直连 models，统一通过 ServiceManager 获取服务
+    const AssetConversionService = req.app.locals.services.getService('assetConversion')
+    const dbRules = await AssetConversionService.getConversionRules()
 
-    logger.info('获取转换规则成功', {
+    logger.info('获取转换规则成功（从数据库）', {
       user_id,
-      rule_count: rules.length
+      rule_count: dbRules.length
     })
+
+    // 转换为前端需要的格式
+    const rules = dbRules.map(rule => ({
+      rule_id: rule.rule_id,
+      from_asset_code: rule.from_asset_code,
+      to_asset_code: rule.to_asset_code,
+      from_amount: rule.from_amount,
+      to_amount: rule.to_amount,
+      conversion_rate: `${rule.from_amount}:${rule.to_amount}`, // 例如 "100:1"
+      description: `${rule.from_amount} ${rule.from_asset_code} → ${rule.to_amount} ${rule.to_asset_code}`,
+      effective_at: rule.effective_at,
+      enabled: rule.is_enabled
+    }))
 
     return res.apiSuccess(
       {
-        rules: rules.map(rule => ({
-          from_asset_code: rule.from_asset_code,
-          to_asset_code: rule.to_asset_code,
-          conversion_rate: rule.conversion_rate,
-          description: rule.description,
-          min_amount: rule.min_amount,
-          max_amount: rule.max_amount,
-          enabled: rule.enabled,
-          display_config: rule.display_config
-        }))
+        rules,
+        source: 'database', // 标记数据来源
+        total_rules: rules.length
       },
-      '获取转换规则成功'
+      '获取转换规则成功（从数据库）'
     )
   } catch (error) {
-    logger.error('获取转换规则失败', {
+    logger.error('获取转换规则失败（数据库查询）', {
       error: error.message,
       stack: error.stack,
       user_id: req.user?.user_id

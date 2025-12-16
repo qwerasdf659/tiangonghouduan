@@ -52,7 +52,7 @@ class IdempotencyTestSuite {
    * @returns {Promise<Object>} 测试结果
    * @throws {Error} 如果幂等性保护失效
    */
-  static async testBusinessIdIdempotency (operation, businessId, verifyResult = null) {
+  static async testBusinessIdIdempotency(operation, businessId, verifyResult = null) {
     console.log(`🔒 测试幂等性: business_id=${businessId}`)
 
     // 第一次执行
@@ -95,7 +95,7 @@ class IdempotencyTestSuite {
    * @returns {Promise<Object>} 测试结果
    * @throws {Error} 如果检测到幂等性失败
    */
-  static async testIdempotencyFailureDetection (operation, getRecordCount, businessId) {
+  static async testIdempotencyFailureDetection(operation, getRecordCount, businessId) {
     console.log(`🔍 检测幂等性失败: business_id=${businessId}`)
 
     // 执行前的记录数
@@ -106,7 +106,9 @@ class IdempotencyTestSuite {
     const countAfterFirst = await getRecordCount()
 
     if (countAfterFirst !== countBefore + 1) {
-      throw new Error(`❌ 第一次执行异常: 预期增加1条记录，实际增加${countAfterFirst - countBefore}条`)
+      throw new Error(
+        `❌ 第一次执行异常: 预期增加1条记录，实际增加${countAfterFirst - countBefore}条`
+      )
     }
 
     // 第二次执行（相同business_id）
@@ -114,7 +116,9 @@ class IdempotencyTestSuite {
     const countAfterSecond = await getRecordCount()
 
     if (countAfterSecond !== countAfterFirst) {
-      throw new Error(`❌ 幂等性失败: 重复执行创建了新记录 (${countAfterSecond - countAfterFirst}条)`)
+      throw new Error(
+        `❌ 幂等性失败: 重复执行创建了新记录 (${countAfterSecond - countAfterFirst}条)`
+      )
     }
 
     console.log('✅ 幂等性保护有效: 重复执行未创建新记录')
@@ -142,7 +146,7 @@ class IdempotencyTestSuite {
    * @returns {Promise<Object>} 测试结果
    * @throws {Error} 如果并发幂等性保护失效
    */
-  static async testConcurrentIdempotency (operation, concurrentCount = 5) {
+  static async testConcurrentIdempotency(operation, concurrentCount = 5) {
     console.log(`🔒 测试并发幂等性: ${concurrentCount}个并发请求`)
 
     // 并发执行多个相同请求
@@ -184,7 +188,7 @@ class IdempotencyTestSuite {
    * @returns {Promise<Object>} 测试结果
    * @throws {Error} 如果独立性测试失败
    */
-  static async testBusinessIdIndependence (createOperation, businessIds) {
+  static async testBusinessIdIndependence(createOperation, businessIds) {
     console.log(`🔍 测试business_id独立性: ${businessIds.length}个ID`)
 
     const results = []
@@ -225,7 +229,7 @@ class IdempotencyTestSuite {
    * @returns {Promise<Object>} 测试结果
    * @throws {Error} 如果幂等性保护失效
    */
-  static async testPointsServiceIdempotency (userId, amount, businessId, PointsService) {
+  static async testPointsServiceIdempotency(userId, amount, businessId, PointsService) {
     console.log(`💰 测试积分服务幂等性: user_id=${userId}, business_id=${businessId}`)
 
     // 获取初始余额
@@ -233,7 +237,7 @@ class IdempotencyTestSuite {
     const balanceBefore = accountBefore.available_points
 
     // 第一次添加积分
-    const result1 = await PointsService.addPoints(userId, amount, {
+    await PointsService.addPoints(userId, amount, {
       business_id: businessId,
       business_type: 'idempotency_test',
       title: '幂等性测试积分'
@@ -248,7 +252,7 @@ class IdempotencyTestSuite {
     }
 
     // 第二次添加积分（相同business_id）
-    const result2 = await PointsService.addPoints(userId, amount, {
+    await PointsService.addPoints(userId, amount, {
       business_id: businessId, // 相同business_id
       business_type: 'idempotency_test',
       title: '幂等性测试积分（重复）'
@@ -291,7 +295,7 @@ class IdempotencyTestSuite {
    * @returns {Promise<Object>} 测试结果
    * @throws {Error} 如果幂等性保护失效
    */
-  static async testLotteryIdempotency (userId, campaignId, idempotencyKey, LotteryEngine) {
+  static async testLotteryIdempotency(userId, campaignId, idempotencyKey, LotteryEngine) {
     console.log(`🎲 测试抽奖幂等性: user_id=${userId}, key=${idempotencyKey}`)
 
     const { LotteryDraw } = require('../../models')
@@ -302,7 +306,7 @@ class IdempotencyTestSuite {
     })
 
     // 第一次抽奖
-    const result1 = await LotteryEngine.executeLottery({
+    await LotteryEngine.executeLottery({
       user_id: userId,
       campaign_id: campaignId,
       draws_count: 1,
@@ -319,7 +323,7 @@ class IdempotencyTestSuite {
     }
 
     // 第二次抽奖（相同idempotency_key）
-    const result2 = await LotteryEngine.executeLottery({
+    await LotteryEngine.executeLottery({
       user_id: userId,
       campaign_id: campaignId,
       draws_count: 1,

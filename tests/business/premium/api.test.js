@@ -22,7 +22,7 @@
  * - 无自动续费
  */
 
-const TestCoordinator = require('../../helpers/TestCoordinator')
+const TestCoordinator = require('../../api/TestCoordinator')
 const moment = require('moment-timezone')
 const { User, UserPointsAccount, UserPremiumStatus } = require('../../../models')
 const { TEST_DATA } = require('../../helpers/test-data')
@@ -100,8 +100,12 @@ describe('高级空间解锁API测试', () => {
           expect(response.data.data).toHaveProperty('can_unlock')
           expect(response.data.data).toHaveProperty('unlock_cost')
           console.log('ℹ️ 未解锁或已过期')
-          console.log(`   条件1(历史积分): ${response.data.data.conditions.condition_1.current}/${response.data.data.conditions.condition_1.required}`)
-          console.log(`   条件2(当前余额): ${response.data.data.conditions.condition_2.current}/${response.data.data.conditions.condition_2.required}`)
+          console.log(
+            `   条件1(历史积分): ${response.data.data.conditions.condition_1.current}/${response.data.data.conditions.condition_1.required}`
+          )
+          console.log(
+            `   条件2(当前余额): ${response.data.data.conditions.condition_2.current}/${response.data.data.conditions.condition_2.required}`
+          )
           console.log(`   是否可解锁: ${response.data.data.can_unlock ? '是' : '否'}`)
         }
       }
@@ -257,7 +261,11 @@ describe('高级空间解锁API测试', () => {
         'regular'
       )
 
-      if (status_response.status === 200 && status_response.data.data.unlocked && status_response.data.data.is_valid) {
+      if (
+        status_response.status === 200 &&
+        status_response.data.data.unlocked &&
+        status_response.data.data.is_valid
+      ) {
         console.log('ℹ️ 已解锁且在有效期内，测试重复解锁拒绝')
 
         // 测试重复解锁应该被拒绝（axios会对4xx抛出错误，需要try-catch处理）

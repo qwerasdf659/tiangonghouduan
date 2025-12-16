@@ -104,11 +104,22 @@ models.Product = require('./Product')(sequelize, DataTypes)
 
 models.UserInventory = require('./UserInventory')(sequelize, DataTypes)
 /*
- * ✅ UserInventory：用户库存管理
+ * ✅ UserInventory：用户库存管理（已迁移至 ItemInstance）
  *    - 用途：管理用户获得的奖品、商品和优惠券
  *    - 特点：物品状态（可用/使用/过期）、来源追溯、核销码、转让记录
  *    - 表名：user_inventory，主键：inventory_id，外键：user_id
  *    - 业务场景：抽奖中奖后分发、兑换获得、使用核销、转让给他人
+ *    - ⚠️ 数据已迁移至 item_instances 表，user_inventory 作为历史兼容保留
+ */
+
+models.ItemInstance = require('./ItemInstance')(sequelize, DataTypes)
+/*
+ * ✅ ItemInstance：物品实例所有权管理（物品所有权真相 - P0-2）
+ *    - 用途：管理不可叠加物品的所有权状态（装备、卡牌、优惠券等）
+ *    - 特点：单源真相、状态机管理、订单锁定、所有权转移
+ *    - 表名：item_instances，主键：item_instance_id，外键：owner_user_id
+ *    - 业务场景：物品上架、购买转移、使用核销、过期管理
+ *    - 状态流转：available → locked → transferred/used/expired
  */
 
 models.TradeRecord = require('./TradeRecord')(sequelize, DataTypes)
@@ -202,6 +213,27 @@ models.AssetTransaction = require('./AssetTransaction')(sequelize, DataTypes)
  *    - 业务场景：市场购买（买家扣减、卖家入账、平台手续费）、兑换扣减、材料转换、对账审计
  */
 
+// 🔥 统一账户体系（2025年12月15日新增 - Phase 1）
+models.Account = require('./Account')(sequelize, DataTypes)
+/*
+ * ✅ Account：账户主体表（用户账户 + 系统账户统一管理）
+ *    - 用途：统一账户体系，区分用户账户（account_type=user）和系统账户（account_type=system）
+ *    - 特点：用户账户关联user_id（唯一），系统账户使用system_code（唯一），如SYSTEM_PLATFORM_FEE（平台手续费）
+ *    - 表名：accounts，主键：account_id，外键：user_id
+ *    - 业务场景：替换PLATFORM_USER_ID方案，手续费入系统账户，支持系统发放/销毁/托管账户
+ *    - 系统账户：SYSTEM_PLATFORM_FEE（手续费）、SYSTEM_MINT（发放）、SYSTEM_BURN（销毁）、SYSTEM_ESCROW（托管）
+ */
+
+models.AccountAssetBalance = require('./AccountAssetBalance')(sequelize, DataTypes)
+/*
+ * ✅ AccountAssetBalance：账户资产余额表（可用余额 + 冻结余额）
+ *    - 用途：管理每个账户的每种资产余额（支持冻结模型）
+ *    - 特点：available_amount（可用余额）+ frozen_amount（冻结余额），交易市场必须走冻结链路
+ *    - 表名：account_asset_balances，主键：balance_id，外键：account_id，唯一约束：(account_id, asset_code)
+ *    - 业务场景：下单冻结买家DIAMOND → 成交从冻结扣减 → 取消解冻；挂牌冻结卖家标的 → 成交扣减 → 撤单解冻
+ *    - 冻结操作：freeze（可用→冻结）、unfreeze（冻结→可用）、deductFromFrozen（从冻结扣减）
+ */
+
 models.ConsumptionRecord = require('./ConsumptionRecord')(sequelize, DataTypes)
 /*
  * ✅ ConsumptionRecord：消费记录（商家扫码录入）
@@ -273,59 +305,33 @@ models.WebSocketStartupLog = require('./WebSocketStartupLog')(sequelize, DataTyp
  *    - 业务场景：服务监控→uptime计算→重启历史查询→SLA统计
  */
 
-// 🔴 材料系统（V4.5.0新增，2025-12-15）
+/*
+ * 🔴 材料系统（V4.5.0）
+ *
+ * 最终态对齐（生产方案硬约束）：
+ * - 材料配置真相：material_asset_types / material_conversion_rules（禁止硬编码）
+ * - 材料余额真相：account_asset_balances / asset_transactions（统一账本）
+ */
 models.MaterialAssetType = require('./MaterialAssetType')(sequelize, DataTypes)
-/*
- * ✅ MaterialAssetType：材料资产类型
- *    - 用途：定义系统中存在的材料种类（碎红水晶、完整红水晶、橙碎片等）
- *    - 特点：支持动态新增材料类型、材料价值配置、分组管理、层级管理
- *    - 表名：material_asset_types，主键：asset_code
- *    - 业务场景：运营新增材料类型→配置价值→启用/禁用→前端展示排序
- */
-
-models.UserMaterialBalance = require('./UserMaterialBalance')(sequelize, DataTypes)
-/*
- * ✅ UserMaterialBalance：用户材料余额
- *    - 用途：记录每个用户在每种材料上的余额（支持部分扣减）
- *    - 特点：行级锁防并发、事务性操作、余额为0不删除记录
- *    - 表名：user_material_balances，主键：balance_id，唯一约束：(user_id, asset_code)
- *    - 业务场景：抽奖获得材料→合成/分解材料→兑换消耗材料→余额查询
- */
-
 models.MaterialConversionRule = require('./MaterialConversionRule')(sequelize, DataTypes)
+
+// 🔴 V4.2 交易市场升级模型（Phase 2）
+models.MarketListing = require('./MarketListing')(sequelize, DataTypes)
 /*
- * ✅ MaterialConversionRule：材料转换规则
- *    - 用途：定义材料间的转换关系和比例（合成、分解、逐级转换）
- *    - 特点：支持动态调整比例、版本化管理（effective_at）、历史追溯
- *    - 表名：material_conversion_rules，主键：rule_id
- *    - 业务场景：配置合成规则→配置分解规则→比例调整→启用/禁用规则
+ * ✅ MarketListing：市场挂牌
+ *    - 用途：管理交易市场的挂牌信息（不可叠加物品 + 可叠加资产）
+ *    - 特点：支持锁定机制、冻结标记、状态流转（on_sale → locked → sold/withdrawn）
+ *    - 表名：market_listings，主键：listing_id
+ *    - 业务场景：创建挂牌→购买挂牌→撤回挂牌→超时解锁
  */
 
-models.MaterialTransaction = require('./MaterialTransaction')(sequelize, DataTypes)
+models.TradeOrder = require('./TradeOrder')(sequelize, DataTypes)
 /*
- * ✅ MaterialTransaction：材料流水
- *    - 用途：记录所有材料的变动（获得、消耗、转换等），用于审计和对账
- *    - 特点：幂等性控制（business_id唯一）、before/after余额、业务类型追溯
- *    - 表名：material_transactions，主键：tx_id，唯一约束：business_id
- *    - 业务场景：抽奖发放→转换流水→兑换扣减→管理员调整→对账审计
- */
-
-models.UserDiamondAccount = require('./UserDiamondAccount')(sequelize, DataTypes)
-/*
- * ✅ UserDiamondAccount：用户钻石账户
- *    - 用途：记录每个用户的钻石（DIAMOND）余额，钻石作为虚拟价值货币
- *    - 特点：一对一关系（一个用户一个账户）、行级锁防并发、事务性操作
- *    - 表名：user_diamond_accounts，主键：account_id，唯一约束：user_id
- *    - 业务场景：材料分解钻石→交易市场结算→任务奖励→充值获得→管理员发放
- */
-
-models.DiamondTransaction = require('./DiamondTransaction')(sequelize, DataTypes)
-/*
- * ✅ DiamondTransaction：钻石流水
- *    - 用途：记录所有钻石的变动（获得、消耗、管理员调整等），用于审计和对账
- *    - 特点：幂等性控制（business_id唯一）、before/after余额、业务类型追溯
- *    - 表名：diamond_transactions，主键：tx_id，唯一约束：business_id
- *    - 业务场景：材料分解→交易结算→任务奖励→充值→管理员调整→对账审计
+ * ✅ TradeOrder：交易订单
+ *    - 用途：管理所有交易订单，提供强幂等性控制和对账支持
+ *    - 特点：business_id全局唯一、对账字段（gross_amount = fee_amount + net_amount）
+ *    - 表名：trade_orders，主键：order_id，唯一约束：business_id
+ *    - 业务场景：创建订单→冻结资产→成交结算→取消订单
  */
 
 /*

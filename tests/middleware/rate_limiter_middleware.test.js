@@ -4,6 +4,9 @@
  * 创建时间：2025年10月12日 北京时间
  */
 
+// 🔧 本套件需要真实验证 429 行为，必须显式开启限流（全局测试环境会默认关闭以避免干扰其他业务测试）
+process.env.DISABLE_RATE_LIMITER = 'false'
+
 const { getRateLimiter } = require('../../middleware/RateLimiterMiddleware')
 const { getRedisClient } = require('../../utils/UnifiedRedisClient')
 
@@ -33,7 +36,7 @@ describe('RateLimiterMiddleware 中间件测试 - 请求频率限制', () => {
   })
 
   // 创建Mock请求和响应对象的辅助函数
-  function createMockReqRes (options = {}) {
+  function createMockReqRes(options = {}) {
     const req = {
       user: options.user || null,
       ip: options.ip || '127.0.0.1',
@@ -354,7 +357,7 @@ describe('RateLimiterMiddleware 中间件测试 - 请求频率限制', () => {
         windowMs: 60 * 1000,
         max: 2,
         keyPrefix: 'rate_limit:test:custom:',
-        keyGenerator: (req) => {
+        keyGenerator: req => {
           // 按路径限流
           return `path:${req.path}`
         }
@@ -373,7 +376,11 @@ describe('RateLimiterMiddleware 中间件测试 - 请求频率限制', () => {
       expect(res3.statusCode).toBe(429)
 
       // 不同路径应该可以请求
-      const { req: reqOther, res: resOther, next: nextOther } = createMockReqRes({ path: '/other/api' })
+      const {
+        req: reqOther,
+        res: resOther,
+        next: nextOther
+      } = createMockReqRes({ path: '/other/api' })
       await limiter(reqOther, resOther, nextOther)
       expect(resOther.statusCode).toBeNull()
     })

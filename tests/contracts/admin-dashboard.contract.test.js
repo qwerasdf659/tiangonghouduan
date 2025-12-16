@@ -9,13 +9,21 @@
 
 const request = require('supertest')
 const Ajv = require('ajv')
-const addFormats = require('ajv-formats').default
+const ajvFormats = require('ajv-formats')
 const contractSchema = require('../../docs/api-contracts/admin-dashboard.contract.json')
 
 // 初始化JSON Schema验证器
 const ajv = new Ajv({ allErrors: true, strict: false })
-if (addFormats) {
-  addFormats(ajv)
+const addFormats = typeof ajvFormats === 'function' ? ajvFormats : ajvFormats?.default
+/*
+ * 🔧 兼容：当前项目依赖树里 Ajv 版本可能不是 ajv-formats 期望的版本
+ * 本契约 schema 未使用 format 关键字，因此不阻塞测试执行
+ */
+try {
+  if (typeof addFormats === 'function') addFormats(ajv)
+} catch (error) {
+  // eslint-disable-next-line no-console
+  console.warn('[contract-test] ajv-formats 初始化失败，跳过 formats 插件：', error?.message)
 }
 
 describe('API契约测试: Admin Dashboard', () => {
@@ -27,12 +35,10 @@ describe('API契约测试: Admin Dashboard', () => {
     // 延迟加载app，避免初始化定时器问题
     app = require('../../app')
 
-    const response = await request(app)
-      .post('/api/v4/auth/login')
-      .send({
-        mobile: '13612227930',
-        verification_code: '123456'
-      })
+    const response = await request(app).post('/api/v4/auth/login').send({
+      mobile: '13612227930',
+      verification_code: '123456'
+    })
 
     expect(response.body.success).toBe(true)
     authToken = response.body.data.access_token

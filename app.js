@@ -48,16 +48,16 @@ app.use(
   helmet({
     contentSecurityPolicy: {
       directives: {
-        defaultSrc: ['\'self\''],
-        styleSrc: ['\'self\'', '\'unsafe-inline\'', 'https://cdn.jsdelivr.net', 'https://unpkg.com'],
-        scriptSrc: ['\'self\'', '\'unsafe-inline\'', 'https://unpkg.com', 'https://cdn.jsdelivr.net'],
-        imgSrc: ['\'self\'', 'data:', 'https:'],
-        baseUri: ['\'self\''],
-        fontSrc: ['\'self\'', 'https:', 'data:'],
-        formAction: ['\'self\''],
-        frameAncestors: ['\'self\''],
-        objectSrc: ['\'none\''],
-        scriptSrcAttr: ['\'none\''],
+        defaultSrc: ["'self'"],
+        styleSrc: ["'self'", "'unsafe-inline'", 'https://cdn.jsdelivr.net', 'https://unpkg.com'],
+        scriptSrc: ["'self'", "'unsafe-inline'", 'https://unpkg.com', 'https://cdn.jsdelivr.net'],
+        imgSrc: ["'self'", 'data:', 'https:'],
+        baseUri: ["'self'"],
+        fontSrc: ["'self'", 'https:', 'data:'],
+        formAction: ["'self'"],
+        frameAncestors: ["'self'"],
+        objectSrc: ["'none'"],
+        scriptSrcAttr: ["'none'"],
         upgradeInsecureRequests: []
       }
     }
@@ -539,13 +539,6 @@ try {
   appLogger.info('V4.5.0 资产转换系统加载成功', {
     route: '/api/v4/assets',
     note: '材料转钻石、余额查询、转换规则查询'
-  })
-
-  // V4.5.0 材料系统路由（用户侧）- 材料余额查询、材料转换、钻石分解
-  app.use('/api/v4/material', require('./routes/v4/unified-engine/material'))
-  appLogger.info('V4.5.0 材料系统加载成功（用户侧）', {
-    route: '/api/v4/material',
-    note: '材料余额、材料转换（合成/分解）、碎红水晶分解钻石、转换规则查询、材料流水'
   })
 
   // V4系统功能路由（公告、反馈等）

@@ -20,7 +20,6 @@ const express = require('express')
 const router = express.Router()
 // 🔄 TR-005规范：删除遗留的 models 直接引用，改为通过 ServiceManager 获取 Service
 const { authenticateToken, requireAdmin } = require('../../middleware/auth')
-const { Op } = require('sequelize')
 
 /**
  * GET /api/v4/notifications - 获取通知列表
@@ -59,11 +58,14 @@ router.get('/', authenticateToken, requireAdmin, async (req, res) => {
     // ✅ 使用 AnnouncementService 获取未读数量
     const unread_count = await AnnouncementService.getUnreadCount({ type })
 
-    return res.apiSuccess({
-      notifications,
-      total: notifications.length,
-      unread: unread_count
-    }, '获取通知列表成功')
+    return res.apiSuccess(
+      {
+        notifications,
+        total: notifications.length,
+        unread: unread_count
+      },
+      '获取通知列表成功'
+    )
   } catch (error) {
     console.error('[Notifications] ❌ 获取通知列表失败:', error)
     return res.apiInternalError('获取通知列表失败', error.message, 'NOTIFICATIONS_LIST_ERROR')
@@ -145,10 +147,13 @@ router.post('/:notification_id/read', authenticateToken, requireAdmin, async (re
     // 增加浏览次数
     await AnnouncementService.incrementViewCount(notification_id)
 
-    return res.apiSuccess({
-      notification_id,
-      is_read: true
-    }, '标记已读成功')
+    return res.apiSuccess(
+      {
+        notification_id,
+        is_read: true
+      },
+      '标记已读成功'
+    )
   } catch (error) {
     console.error('[Notifications] ❌ 标记已读失败:', error)
     return res.apiInternalError('标记已读失败', error.message, 'MARK_READ_ERROR')
@@ -175,9 +180,12 @@ router.post('/read-all', authenticateToken, requireAdmin, async (req, res) => {
 
     console.log(`[Notifications] ✅ 全部标记已读: ${updated_count}条公告`)
 
-    return res.apiSuccess({
-      updated_count
-    }, `成功标记${updated_count}条通知为已读`)
+    return res.apiSuccess(
+      {
+        updated_count
+      },
+      `成功标记${updated_count}条通知为已读`
+    )
   } catch (error) {
     console.error('[Notifications] ❌ 全部标记已读失败:', error)
     return res.apiInternalError('全部标记已读失败', error.message, 'MARK_ALL_READ_ERROR')
@@ -218,9 +226,12 @@ router.post('/clear', authenticateToken, requireAdmin, async (req, res) => {
 
     console.log(`[Notifications] ✅ 清空通知: ${cleared_count}条公告设为不活跃`)
 
-    return res.apiSuccess({
-      cleared_count
-    }, cleared_count > 0 ? `成功清空${cleared_count}条已读通知` : '没有需要清空的已读通知')
+    return res.apiSuccess(
+      {
+        cleared_count
+      },
+      cleared_count > 0 ? `成功清空${cleared_count}条已读通知` : '没有需要清空的已读通知'
+    )
   } catch (error) {
     console.error('[Notifications] ❌ 清空通知失败:', error)
     return res.apiInternalError('清空通知失败', error.message, 'CLEAR_NOTIFICATIONS_ERROR')
@@ -263,24 +274,30 @@ router.post('/send', authenticateToken, requireAdmin, async (req, res) => {
     const announcement_type = typeMapping[type] || 'notice'
 
     // 使用 AnnouncementService 创建公告
-    const announcement = await AnnouncementService.createAnnouncement({
-      title,
-      content,
-      type: announcement_type,
-      priority: type === 'alert' ? 'high' : 'medium',
-      target_groups: target,
-      internal_notes: `通过通知中心发送，管理员ID: ${req.user.user_id}`
-    }, req.user.user_id)
+    const announcement = await AnnouncementService.createAnnouncement(
+      {
+        title,
+        content,
+        type: announcement_type,
+        priority: type === 'alert' ? 'high' : 'medium',
+        target_groups: target,
+        internal_notes: `通过通知中心发送，管理员ID: ${req.user.user_id}`
+      },
+      req.user.user_id
+    )
 
     console.log(`[Notifications] ✅ 发送通知成功: ${announcement.announcement_id} - ${title}`)
 
-    return res.apiSuccess({
-      notification_id: announcement.announcement_id,
-      title,
-      content,
-      type: announcement_type,
-      created_at: announcement.created_at
-    }, '通知发送成功')
+    return res.apiSuccess(
+      {
+        notification_id: announcement.announcement_id,
+        title,
+        content,
+        type: announcement_type,
+        created_at: announcement.created_at
+      },
+      '通知发送成功'
+    )
   } catch (error) {
     console.error('[Notifications] ❌ 发送通知失败:', error)
     return res.apiInternalError('发送通知失败', error.message, 'SEND_NOTIFICATION_ERROR')

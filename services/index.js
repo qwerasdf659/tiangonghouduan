@@ -34,6 +34,7 @@ const AdminSystemService = require('./AdminSystemService') // 管理后台系统
 // const AdminMarketplaceService = require('./AdminMarketplaceService') // 管理后台市场管理服务 - 已合并到ExchangeMarketService
 const AdminLotteryService = require('./AdminLotteryService') // 管理后台抽奖管理服务
 const AdminCustomerServiceService = require('./AdminCustomerServiceService') // 管理后台客服管理服务
+const MaterialManagementService = require('./MaterialManagementService') // 材料系统运营管理服务（V4.5.0）
 
 // V4 架构重构新增服务（2025-12-10）
 const LotteryPresetService = require('./LotteryPresetService') // 抽奖预设管理服务
@@ -43,9 +44,10 @@ const AuditLogService = require('./AuditLogService') // 审计日志服务
 // V4 P2-C架构重构：服务合并优化（2025-12-11）
 const ReportingService = require('./ReportingService') // 统一报表服务（合并AdminAnalyticsService、StatisticsService、UserDashboardService）
 
-// V4.5.0 材料系统服务（2025-12-15）
-const MaterialService = require('./MaterialService') // 材料系统核心服务
-const DiamondService = require('./DiamondService') // 钻石系统核心服务
+/*
+ * V4.5.0 材料系统服务（2025-12-15）
+ * ⚠️ Phase 4: MaterialService和DiamondService已删除，使用AssetService和AssetConversionService
+ */
 const AssetConversionService = require('./AssetConversionService') // 资产转换服务（材料转钻石）
 
 // V4 模块化服务
@@ -142,7 +144,7 @@ class ServiceManager {
    *
    * @constructor
    */
-  constructor () {
+  constructor() {
     this.models = models
     this._services = new Map()
     this._initialized = false
@@ -165,7 +167,7 @@ class ServiceManager {
    * @returns {Promise<void>} 初始化完成后resolve，失败则抛出错误
    * @throws {Error} 当服务初始化失败时抛出错误
    */
-  async initialize () {
+  async initialize() {
     if (this._initialized) {
       return
     }
@@ -202,6 +204,7 @@ class ServiceManager {
       // this._services.set('adminMarketplace', AdminMarketplaceService) // 管理后台市场管理服务 - 已合并到ExchangeMarketService
       this._services.set('adminLottery', AdminLotteryService) // 管理后台抽奖管理服务
       this._services.set('adminCustomerService', AdminCustomerServiceService) // 管理后台客服管理服务
+      this._services.set('materialManagement', MaterialManagementService) // 材料系统运营管理服务（管理员）
 
       // ✅ 注册架构重构新增服务（P0优先级 - 2025-12-10）
       this._services.set('lotteryPreset', LotteryPresetService) // 抽奖预设管理服务
@@ -212,9 +215,10 @@ class ServiceManager {
       // ✅ 注册P2-C架构重构服务（2025-12-11）
       this._services.set('reporting', ReportingService) // 统一报表服务（合并AdminAnalyticsService、StatisticsService、UserDashboardService）
 
-      // ✅ 注册V4.5.0材料系统服务（2025-12-15）
-      this._services.set('material', MaterialService) // 材料系统核心服务
-      this._services.set('diamond', DiamondService) // 钻石系统核心服务
+      /*
+       * ✅ 注册V4.5.0材料系统服务（2025-12-15）
+       * ⚠️ Phase 4: MaterialService和DiamondService已删除，仅保留AssetConversionService
+       */
       this._services.set('assetConversion', AssetConversionService) // 资产转换服务（材料转钻石）
 
       // 注册模块化抽奖服务容器
@@ -251,7 +255,7 @@ class ServiceManager {
    * @param {string} serviceName - 服务名称
    * @returns {Object} 服务实例
    */
-  getService (serviceName) {
+  getService(serviceName) {
     if (!this._initialized) {
       throw new Error('服务管理器尚未初始化，请先调用 initialize()')
     }
@@ -270,7 +274,7 @@ class ServiceManager {
    * @param {string} serviceName - 服务名称
    * @returns {boolean} 服务存在返回true，否则返回false
    */
-  hasService (serviceName) {
+  hasService(serviceName) {
     return this._services.has(serviceName)
   }
 
@@ -278,7 +282,7 @@ class ServiceManager {
    * 获取所有服务列表
    * @returns {Array<string>} 所有已注册服务的名称数组
    */
-  getServiceList () {
+  getServiceList() {
     return Array.from(this._services.keys())
   }
 
@@ -305,7 +309,7 @@ class ServiceManager {
    * @async
    * @returns {Promise<Object>} 包含所有服务健康状态的对象
    */
-  async getHealthStatus () {
+  async getHealthStatus() {
     const status = {
       initialized: this._initialized,
       totalServices: this._services.size,
@@ -352,7 +356,7 @@ class ServiceManager {
    * @async
    * @returns {Promise<void>} 所有服务关闭完成后resolve
    */
-  async shutdown () {
+  async shutdown() {
     console.log('🛑 开始关闭服务管理器...')
 
     for (const [serviceName, service] of this._services.entries()) {
@@ -380,7 +384,7 @@ const serviceManager = new ServiceManager()
  * @param {Object} _models - 数据库模型
  * @returns {Object} 服务容器
  */
-function initializeServices (_models) {
+function initializeServices(_models) {
   const container = {
     // 提供getService方法来获取服务
     getService: serviceName => serviceManager.getService(serviceName),

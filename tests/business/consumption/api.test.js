@@ -19,7 +19,7 @@
  * 数据库：restaurant_points_dev
  */
 
-const TestCoordinator = require('../../helpers/TestCoordinator')
+const TestCoordinator = require('../../api/TestCoordinator')
 const moment = require('moment-timezone')
 const { TEST_DATA } = require('../../helpers/test-data')
 

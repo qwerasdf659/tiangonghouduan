@@ -10,7 +10,7 @@
  * - 防止用户滥用撤回功能刷新商品排序
  * - 提供撤回冷却时间检查（建议4小时）
  *
- * 相关API: POST /api/v4/inventory/market/products/:id/withdraw
+ * 相关API: POST /api/v4/inventory/market/listings/:listing_id/withdraw
  */
 
 'use strict'
@@ -28,7 +28,8 @@ module.exports = {
           type: Sequelize.INTEGER,
           allowNull: false,
           defaultValue: 0,
-          comment: '撤回次数统计：每次撤回操作后+1；用途：防滥用监控（超过5次可能异常）、用户行为分析'
+          comment:
+            '撤回次数统计：每次撤回操作后+1；用途：防滥用监控（超过5次可能异常）、用户行为分析'
         },
         { transaction }
       )

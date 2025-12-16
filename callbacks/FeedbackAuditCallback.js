@@ -23,8 +23,9 @@ module.exports = {
    * @param {number} feedbackId - 反馈ID
    * @param {Object} auditRecord - 审核记录
    * @param {Object} transaction - 数据库事务
+   * @returns {Promise<{success: boolean}>} 回调处理结果（success=true 表示处理完成）
    */
-  async approved (feedbackId, auditRecord, transaction) {
+  async approved(feedbackId, auditRecord, transaction) {
     console.log(`[反馈审核回调] 审核通过: feedback_id=${feedbackId}`)
 
     try {
@@ -36,11 +37,15 @@ module.exports = {
       }
 
       // 2. 更新反馈状态（审核通过后进入处理流程）
-      await feedback.update({
-        status: 'processing', // 审核通过后进入处理中状态
-        admin_id: auditRecord.auditor_id,
-        internal_notes: `${feedback.internal_notes || ''}\n\n[审核通过] ${auditRecord.audit_reason || ''}`.trim()
-      }, { transaction })
+      await feedback.update(
+        {
+          status: 'processing', // 审核通过后进入处理中状态
+          admin_id: auditRecord.auditor_id,
+          internal_notes:
+            `${feedback.internal_notes || ''}\n\n[审核通过] ${auditRecord.audit_reason || ''}`.trim()
+        },
+        { transaction }
+      )
 
       console.log(`[反馈审核回调] 反馈状态已更新: feedback_id=${feedbackId}, status=processing`)
 
@@ -76,8 +81,9 @@ module.exports = {
    * @param {number} feedbackId - 反馈ID
    * @param {Object} auditRecord - 审核记录
    * @param {Object} transaction - 数据库事务
+   * @returns {Promise<{success: boolean}>} 回调处理结果（success=true 表示处理完成）
    */
-  async rejected (feedbackId, auditRecord, transaction) {
+  async rejected(feedbackId, auditRecord, transaction) {
     console.log(`[反馈审核回调] 审核拒绝: feedback_id=${feedbackId}`)
 
     try {
@@ -89,13 +95,17 @@ module.exports = {
       }
 
       // 2. 更新反馈状态（审核拒绝后直接关闭）
-      await feedback.update({
-        status: 'closed', // 审核拒绝后直接关闭
-        admin_id: auditRecord.auditor_id,
-        reply_content: `您的反馈未通过审核。原因：${auditRecord.audit_reason}`,
-        replied_at: BeijingTimeHelper.createDatabaseTime(),
-        internal_notes: `${feedback.internal_notes || ''}\n\n[审核拒绝] ${auditRecord.audit_reason}`.trim()
-      }, { transaction })
+      await feedback.update(
+        {
+          status: 'closed', // 审核拒绝后直接关闭
+          admin_id: auditRecord.auditor_id,
+          reply_content: `您的反馈未通过审核。原因：${auditRecord.audit_reason}`,
+          replied_at: BeijingTimeHelper.createDatabaseTime(),
+          internal_notes:
+            `${feedback.internal_notes || ''}\n\n[审核拒绝] ${auditRecord.audit_reason}`.trim()
+        },
+        { transaction }
+      )
 
       console.log(`[反馈审核回调] 反馈状态已更新: feedback_id=${feedbackId}, status=closed`)
 

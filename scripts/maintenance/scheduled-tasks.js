@@ -11,9 +11,10 @@
  * 5. 数据库性能监控（每5分钟）- 2025-11-09新增
  * 6. 抽奖奖品每日中奖次数重置（每天凌晨0点）- 2025-12-11新增
  * 7. 抽奖活动状态同步（每小时检查）- 2025-12-11新增
+ * 8. 交易市场锁超时解锁（每5分钟检查）- 2025-12-15新增（Phase 2）
  *
  * 创建时间：2025-10-10
- * 更新时间：2025-12-11（新增抽奖相关定时任务，符合架构重构任务2.1）
+ * 更新时间：2025-12-15（新增交易市场锁超时解锁任务，符合Phase 2架构升级）
  */
 
 const cron = require('node-cron')
@@ -28,6 +29,8 @@ const NotificationService = require('../../services/NotificationService')
 const BeijingTimeHelper = require('../../utils/timeHelper')
 // 2025-11-09新增：数据库性能监控
 const { monitor: databaseMonitor } = require('./database-performance-monitor')
+// 2025-12-15新增：交易订单服务（Phase 2）
+const TradeOrderService = require('../../services/TradeOrderService')
 
 /**
  * 定时任务管理类
@@ -40,7 +43,7 @@ class ScheduledTasks {
    * 初始化所有定时任务
    * @returns {void}
    */
-  static initialize () {
+  static initialize() {
     logger.info('开始初始化定时任务...')
 
     // 任务1: 每小时检查超时订单（24小时）
@@ -70,6 +73,9 @@ class ScheduledTasks {
     // 任务9: 每小时同步抽奖活动状态（2025-12-11新增）
     this.scheduleLotteryCampaignStatusSync()
 
+    // 任务10: 每5分钟检查交易市场锁超时并解锁（2025-12-15新增）
+    this.scheduleMarketListingLockTimeout()
+
     logger.info('所有定时任务已初始化完成')
   }
 
@@ -78,7 +84,7 @@ class ScheduledTasks {
    * Cron表达式: 0 * * * * (每小时的0分)
    * @returns {void}
    */
-  static scheduleTimeoutCheck () {
+  static scheduleTimeoutCheck() {
     cron.schedule('0 * * * *', async () => {
       try {
         logger.info('[定时任务] 开始执行24小时超时订单检查...')
@@ -102,7 +108,7 @@ class ScheduledTasks {
    * Cron表达式: 0 9,18 * * * (每天9点和18点)
    * @returns {void}
    */
-  static scheduleUrgentTimeoutCheck () {
+  static scheduleUrgentTimeoutCheck() {
     cron.schedule('0 9,18 * * *', async () => {
       try {
         logger.info('[定时任务] 开始执行72小时紧急超时订单检查...')
@@ -127,7 +133,7 @@ class ScheduledTasks {
    * Cron表达式: 0 3 * * * (每天凌晨3点)
    * @returns {void}
    */
-  static scheduleDataConsistencyCheck () {
+  static scheduleDataConsistencyCheck() {
     cron.schedule('0 3 * * *', async () => {
       try {
         logger.info('[定时任务] 开始执行每日数据一致性检查...')
@@ -180,7 +186,7 @@ class ScheduledTasks {
    * 手动触发24小时超时检查（用于测试）
    * @returns {Promise<Object>} 检查结果对象
    */
-  static async manualTimeoutCheck () {
+  static async manualTimeoutCheck() {
     logger.info('[手动触发] 执行24小时超时订单检查...')
     try {
       const result = await ExchangeOperationService.checkTimeoutAndAlert(24)
@@ -196,7 +202,7 @@ class ScheduledTasks {
    * 手动触发72小时紧急超时检查（用于测试）
    * @returns {Promise<Object>} 检查结果对象
    */
-  static async manualUrgentTimeoutCheck () {
+  static async manualUrgentTimeoutCheck() {
     logger.info('[手动触发] 执行72小时紧急超时订单检查...')
     try {
       const result = await ExchangeOperationService.checkTimeoutAndAlert(72)
@@ -223,7 +229,7 @@ class ScheduledTasks {
    * 创建时间：2025-11-08
    * @returns {void}
    */
-  static scheduleLotteryManagementCleanup () {
+  static scheduleLotteryManagementCleanup() {
     cron.schedule('0 * * * *', async () => {
       try {
         logger.info('[定时任务] 开始清理过期的抽奖管理设置...')
@@ -261,7 +267,7 @@ class ScheduledTasks {
    *
    * 创建时间：2025-11-08
    */
-  static async manualLotteryManagementCleanup () {
+  static async manualLotteryManagementCleanup() {
     logger.info('[手动触发] 执行抽奖管理设置清理...')
     try {
       const managementStrategy = new ManagementStrategy()
@@ -292,7 +298,7 @@ class ScheduledTasks {
    * 创建时间：2025-11-09
    * @returns {void}
    */
-  static schedulePremiumExpiryReminder () {
+  static schedulePremiumExpiryReminder() {
     cron.schedule('0 * * * *', async () => {
       try {
         logger.info('[定时任务] 开始检查即将过期的高级空间...')
@@ -332,11 +338,15 @@ class ScheduledTasks {
 
               successCount++
             } catch (error) {
-              logger.error(`[定时任务] 发送过期提醒失败 (user_id: ${status.user_id})`, { error: error.message })
+              logger.error(`[定时任务] 发送过期提醒失败 (user_id: ${status.user_id})`, {
+                error: error.message
+              })
             }
           }
 
-          logger.info(`[定时任务] 高级空间过期提醒发送完成：${successCount}/${expiringStatuses.length}`)
+          logger.info(
+            `[定时任务] 高级空间过期提醒发送完成：${successCount}/${expiringStatuses.length}`
+          )
         } else {
           logger.info('[定时任务] 无即将过期的高级空间')
         }
@@ -366,7 +376,7 @@ class ScheduledTasks {
    * 创建时间：2025-11-09
    * @returns {void}
    */
-  static schedulePremiumStatusCleanup () {
+  static schedulePremiumStatusCleanup() {
     cron.schedule('0 3 * * *', async () => {
       try {
         logger.info('[定时任务] 开始清理过期的高级空间状态...')
@@ -411,7 +421,9 @@ class ScheduledTasks {
               })
               notifiedCount++
             } catch (error) {
-              logger.error(`[定时任务] 发送过期通知失败 (user_id: ${expired.user_id})`, { error: error.message })
+              logger.error(`[定时任务] 发送过期通知失败 (user_id: ${expired.user_id})`, {
+                error: error.message
+              })
             }
           }
 
@@ -455,7 +467,7 @@ class ScheduledTasks {
    * 创建时间：2025-11-09
    * @returns {void}
    */
-  static scheduleDatabasePerformanceMonitor () {
+  static scheduleDatabasePerformanceMonitor() {
     cron.schedule('0,10,20,30,40,50 * * * *', async () => {
       try {
         logger.info('[定时任务] 开始执行数据库性能监控...')
@@ -500,7 +512,7 @@ class ScheduledTasks {
    *
    * 创建时间：2025-11-09
    */
-  static async manualDatabasePerformanceCheck () {
+  static async manualDatabasePerformanceCheck() {
     logger.info('[手动触发] 执行数据库性能监控...')
     try {
       const results = await databaseMonitor.performFullCheck()
@@ -536,7 +548,7 @@ class ScheduledTasks {
    * 创建时间：2025-12-11
    * @returns {void}
    */
-  static scheduleLotteryPrizesDailyReset () {
+  static scheduleLotteryPrizesDailyReset() {
     cron.schedule('0 0 * * *', async () => {
       try {
         logger.info('[定时任务] 开始重置抽奖奖品每日中奖次数...')
@@ -580,7 +592,7 @@ class ScheduledTasks {
    * 创建时间：2025-12-11
    * @returns {void}
    */
-  static scheduleLotteryCampaignStatusSync () {
+  static scheduleLotteryCampaignStatusSync() {
     cron.schedule('0 * * * *', async () => {
       try {
         logger.info('[定时任务] 开始同步抽奖活动状态...')
@@ -622,7 +634,7 @@ class ScheduledTasks {
    *
    * 创建时间：2025-12-11
    */
-  static async manualLotteryPrizesDailyReset () {
+  static async manualLotteryPrizesDailyReset() {
     logger.info('[手动触发] 执行抽奖奖品每日中奖次数重置...')
     try {
       const result = await AdminLotteryService.resetDailyWinCounts()
@@ -652,7 +664,7 @@ class ScheduledTasks {
    *
    * 创建时间：2025-12-11
    */
-  static async manualLotteryCampaignStatusSync () {
+  static async manualLotteryCampaignStatusSync() {
     logger.info('[手动触发] 执行抽奖活动状态同步...')
     try {
       const result = await AdminLotteryService.syncCampaignStatus()
@@ -660,6 +672,186 @@ class ScheduledTasks {
       return result
     } catch (error) {
       logger.error('[手动触发] 同步失败', { error: error.message })
+      throw error
+    }
+  }
+
+  /**
+   * 定时任务10: 每5分钟检查交易市场锁超时并解锁
+   * Cron表达式: 每5分钟执行一次 (星/5 * * * *)
+   *
+   * 业务场景：
+   * - 扫描 market_listings 表中 status=locked 且 locked_at 超时（默认15分钟）的挂牌
+   * - 自动取消订单并解冻买家资产
+   * - 回滚挂牌状态为 on_sale
+   *
+   * 创建时间：2025-12-15（Phase 2）
+   * @returns {void}
+   */
+  static scheduleMarketListingLockTimeout() {
+    cron.schedule('*/5 * * * *', async () => {
+      try {
+        logger.info('[定时任务] 开始检查交易市场锁超时...')
+        const result = await this.checkAndUnlockTimeoutListings()
+
+        if (result.unlocked_count > 0) {
+          logger.warn(`[定时任务] 解锁了${result.unlocked_count}个超时挂牌`)
+        } else {
+          logger.info('[定时任务] 交易市场锁超时检查完成，无超时挂牌')
+        }
+      } catch (error) {
+        logger.error('[定时任务] 交易市场锁超时检查失败', { error: error.message })
+      }
+    })
+
+    logger.info('✅ 定时任务已设置: 交易市场锁超时解锁（每5分钟执行）')
+  }
+
+  /**
+   * 检查并解锁超时的挂牌
+   *
+   * 业务规则：
+   * - 扫描 status=locked 且 locked_at 超过15分钟的挂牌
+   * - 查询关联订单（通过 locked_by_order_id）
+   * - 取消订单并解冻买家资产
+   * - 回滚挂牌状态为 on_sale
+   *
+   * @returns {Promise<Object>} 结果对象 {unlocked_count, failed_count, details}
+   */
+  static async checkAndUnlockTimeoutListings() {
+    const { MarketListing, TradeOrder } = require('../../models')
+
+    try {
+      // 1. 查询超时的挂牌（status=locked 且 locked_at 超过15分钟）
+      const timeoutThreshold = new Date(Date.now() - 15 * 60 * 1000) // 15分钟前
+
+      const timeoutListings = await MarketListing.findAll({
+        where: {
+          status: 'locked',
+          locked_at: {
+            [Op.lt]: timeoutThreshold
+          }
+        },
+        include: [
+          {
+            model: TradeOrder,
+            as: 'lockingOrder',
+            where: {
+              status: {
+                [Op.in]: ['created', 'frozen']
+              }
+            },
+            required: false
+          }
+        ]
+      })
+
+      logger.info(`[锁超时检查] 发现${timeoutListings.length}个超时挂牌`)
+
+      if (timeoutListings.length === 0) {
+        return {
+          unlocked_count: 0,
+          failed_count: 0,
+          details: []
+        }
+      }
+
+      // 2. 逐个处理超时挂牌
+      let unlocked_count = 0
+      let failed_count = 0
+      const details = []
+
+      for (const listing of timeoutListings) {
+        try {
+          const order = listing.lockingOrder
+
+          if (!order) {
+            // 没有关联订单，直接回滚挂牌状态
+            await listing.update({
+              status: 'on_sale',
+              locked_by_order_id: null,
+              locked_at: null
+            })
+
+            unlocked_count++
+            details.push({
+              listing_id: listing.listing_id,
+              order_id: null,
+              action: 'unlocked_without_order',
+              success: true
+            })
+
+            logger.info(`[锁超时解锁] 挂牌${listing.listing_id}已解锁（无关联订单）`)
+            continue
+          }
+
+          // 有关联订单，取消订单并解冻资产
+          const business_id = `timeout_unlock_${order.order_id}_${Date.now()}`
+
+          await TradeOrderService.cancelOrder({
+            order_id: order.order_id,
+            business_id,
+            cancel_reason: '订单超时自动取消（锁定超过15分钟）'
+          })
+
+          unlocked_count++
+          details.push({
+            listing_id: listing.listing_id,
+            order_id: order.order_id,
+            action: 'cancelled_and_unlocked',
+            success: true
+          })
+
+          logger.info(`[锁超时解锁] 订单${order.order_id}已取消，挂牌${listing.listing_id}已解锁`)
+        } catch (error) {
+          failed_count++
+          details.push({
+            listing_id: listing.listing_id,
+            order_id: listing.locked_by_order_id,
+            action: 'failed',
+            success: false,
+            error: error.message
+          })
+
+          logger.error(`[锁超时解锁] 处理挂牌${listing.listing_id}失败`, {
+            error: error.message
+          })
+        }
+      }
+
+      logger.info(`[锁超时检查] 完成：解锁${unlocked_count}个，失败${failed_count}个`)
+
+      return {
+        unlocked_count,
+        failed_count,
+        details
+      }
+    } catch (error) {
+      logger.error('[锁超时检查] 执行失败', { error: error.message })
+      throw error
+    }
+  }
+
+  /**
+   * 手动触发交易市场锁超时检查
+   *
+   * 业务场景：管理员手动触发锁超时检查（不等定时任务）
+   *
+   * 使用示例：
+   * const result = await ScheduledTasks.manualMarketListingLockTimeout()
+   * console.log(`解锁了${result.unlocked_count}个超时挂牌`)
+   *
+   * 创建时间：2025-12-15
+   * @returns {Promise<Object>} 结果对象 {unlocked_count, failed_count, details}
+   */
+  static async manualMarketListingLockTimeout() {
+    logger.info('[手动触发] 执行交易市场锁超时检查...')
+    try {
+      const result = await this.checkAndUnlockTimeoutListings()
+      logger.info('[手动触发] 检查完成', { result })
+      return result
+    } catch (error) {
+      logger.error('[手动触发] 检查失败', { error: error.message })
       throw error
     }
   }

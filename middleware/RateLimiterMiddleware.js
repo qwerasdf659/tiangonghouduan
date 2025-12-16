@@ -15,8 +15,23 @@ const BeijingTimeHelper = require('../utils/timeHelper')
 const { getRedisClient } = require('../utils/UnifiedRedisClient')
 const ApiResponse = require('../utils/ApiResponse')
 
+/**
+ * API 请求频率限制中间件（Rate Limiter Middleware）
+ *
+ * 业务场景：
+ * - 防止恶意刷接口（登录、抽奖、聊天等关键接口）
+ * - 基于 Redis Sorted Set 实现滑动窗口限流
+ *
+ * 输出约束：
+ * - 达到限流时返回统一 ApiResponse.error 格式
+ */
 class RateLimiterMiddleware {
-  constructor () {
+  /**
+   * 构造函数：初始化 Redis 客户端与限流预设配置
+   *
+   * @returns {void} 无返回值
+   */
+  constructor() {
     // 使用统一的Redis客户端
     this.redisClient = getRedisClient()
 
@@ -73,7 +88,7 @@ class RateLimiterMiddleware {
    * @param {Object|string} options 限流配置或预设名称
    * @returns {Function} Express中间件函数
    */
-  createLimiter (options = {}) {
+  createLimiter(options = {}) {
     // 如果传入字符串，使用预设配置
     if (typeof options === 'string') {
       const presetName = options
@@ -97,6 +112,20 @@ class RateLimiterMiddleware {
 
     return async (req, res, next) => {
       try {
+        /*
+         * ✅ 测试环境限流开关（Systemic Fix）
+         *
+         * 业务场景：
+         * - Jest/SuperTest 会在短时间内发起大量请求，用于验证业务契约与返回结构
+         * - 若不关闭限流，会导致大量 429 干扰测试断言（例如本应返回 200/401 的接口被 429 覆盖）
+         *
+         * 约束：
+         * - 仅在测试环境通过显式开关关闭，不影响生产/开发环境真实限流行为
+         */
+        if (process.env.DISABLE_RATE_LIMITER === 'true') {
+          return next()
+        }
+
         // 生成限流key
         const limitKey = this._generateKey(req, config)
 
@@ -209,7 +238,7 @@ class RateLimiterMiddleware {
    * @param {Object} config 限流配置
    * @returns {string|null} 限流key
    */
-  _generateKey (req, config) {
+  _generateKey(req, config) {
     const { keyPrefix, keyGenerator } = config
 
     // 自定义key生成函数
@@ -245,7 +274,7 @@ class RateLimiterMiddleware {
    * @param {string} key Redis key
    * @returns {Promise<number|null>} 最早请求的时间戳
    */
-  async _getOldestRequestTime (key) {
+  async _getOldestRequestTime(key) {
     try {
       const client = await this.redisClient.ensureConnection()
       const result = await client.zrange(key, 0, 0, 'WITHSCORES')
@@ -261,7 +290,7 @@ class RateLimiterMiddleware {
    * @param {string} keyPattern key模式（如 'rate_limit:lottery:*'）
    * @returns {Promise<Object>} 统计信息
    */
-  async getStats (keyPattern = 'rate_limit:*') {
+  async getStats(keyPattern = 'rate_limit:*') {
     try {
       const client = await this.redisClient.ensureConnection()
       const keys = await client.keys(keyPattern)
@@ -299,7 +328,7 @@ class RateLimiterMiddleware {
    * @param {string} key 限流key
    * @returns {Promise<boolean>} 是否成功
    */
-  async resetLimit (key) {
+  async resetLimit(key) {
     try {
       await this.redisClient.del(key)
       console.log(`[RateLimiter] 已重置限流: ${key}`)
@@ -315,7 +344,7 @@ class RateLimiterMiddleware {
    * @param {string} keyPattern key模式
    * @returns {Promise<number>} 清理的key数量
    */
-  async clearAll (keyPattern = 'rate_limit:*') {
+  async clearAll(keyPattern = 'rate_limit:*') {
     try {
       const client = await this.redisClient.ensureConnection()
       const keys = await client.keys(keyPattern)
@@ -340,8 +369,10 @@ class RateLimiterMiddleware {
 
   /**
    * 清理资源
+   *
+   * @returns {Promise<void>} 无返回值，用于应用退出时释放资源
    */
-  async cleanup () {
+  async cleanup() {
     try {
       console.log('[RateLimiter] 正在清理资源...')
       // Redis客户端由UnifiedRedisClient统一管理，这里不需要关闭
@@ -359,7 +390,7 @@ let rateLimiterInstance = null
  * 获取限流器单例实例
  * @returns {RateLimiterMiddleware} 限流器实例
  */
-function getRateLimiter () {
+function getRateLimiter() {
   if (!rateLimiterInstance) {
     rateLimiterInstance = new RateLimiterMiddleware()
   }

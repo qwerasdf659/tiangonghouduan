@@ -51,7 +51,7 @@ class ManagementStrategy {
    * const strategy = new ManagementStrategy()
    * // 创建实例后，可以使用forceWin、forceLose、adjustProbability等方法
    */
-  constructor () {
+  constructor() {
     this.logger = Logger.create('ManagementStrategy')
 
     // 🔄 内存缓存系统（5分钟TTL）
@@ -103,7 +103,7 @@ class ManagementStrategy {
    * const result = await strategy.forceWin(10001, 20001, 30001, '测试补偿')
    * // 返回：{ success: true, setting_id: 'setting_...', result: 'force_win', prize_id: 30001, user_id: 20001, admin_id: 10001, reason: '测试补偿', timestamp: '2025-11-08 12:00:00' }
    */
-  async forceWin (adminId, targetUserId, prizeId, reason = '管理员操作', expiresAt = null) {
+  async forceWin(adminId, targetUserId, prizeId, reason = '管理员操作', expiresAt = null) {
     try {
       // 🛡️ 验证管理员权限
       const adminValidation = await this.validateAdminPermission(adminId)
@@ -208,7 +208,7 @@ class ManagementStrategy {
    * const result = await strategy.forceLose(10001, 20001, 5, '防刷保护')
    * // 返回：{ success: true, setting_id: 'setting_...', result: 'force_lose', user_id: 20001, admin_id: 10001, count: 5, remaining: 5, reason: '防刷保护', timestamp: '2025-11-08 12:00:00' }
    */
-  async forceLose (adminId, targetUserId, count = 1, reason = '管理员操作', expiresAt = null) {
+  async forceLose(adminId, targetUserId, count = 1, reason = '管理员操作', expiresAt = null) {
     try {
       // 🛡️ 验证管理员权限
       const adminValidation = await this.validateAdminPermission(adminId)
@@ -308,7 +308,13 @@ class ManagementStrategy {
    * const result = await strategy.adjustProbability(10001, 20001, 2.0, '用户挽留')
    * // 返回：{ success: true, setting_id: 'setting_...', result: 'probability_adjust', user_id: 20001, admin_id: 10001, multiplier: 2.0, reason: '用户挽留', timestamp: '2025-11-08 12:00:00' }
    */
-  async adjustProbability (adminId, targetUserId, multiplier, reason = '管理员操作', expiresAt = null) {
+  async adjustProbability(
+    adminId,
+    targetUserId,
+    multiplier,
+    reason = '管理员操作',
+    expiresAt = null
+  ) {
     try {
       // 🛡️ 验证管理员权限
       const adminValidation = await this.validateAdminPermission(adminId)
@@ -362,7 +368,12 @@ class ManagementStrategy {
         timestamp: BeijingTimeHelper.now()
       }
     } catch (error) {
-      this.logError('调整用户中奖概率失败', { adminId, targetUserId, multiplier, error: error.message })
+      this.logError('调整用户中奖概率失败', {
+        adminId,
+        targetUserId,
+        multiplier,
+        error: error.message
+      })
       throw error
     }
   }
@@ -414,7 +425,7 @@ class ManagementStrategy {
    * }, 'VIP用户体验优化')
    * // 返回：{ success: true, setting_id: 'setting_...', result: 'user_queue', user_id: 20001, admin_id: 10001, queue_config: {...}, reason: 'VIP用户体验优化', timestamp: '2025-11-08 12:00:00' }
    */
-  async setUserQueue (adminId, targetUserId, queueConfig, reason = '管理员操作', expiresAt = null) {
+  async setUserQueue(adminId, targetUserId, queueConfig, reason = '管理员操作', expiresAt = null) {
     try {
       // 🛡️ 验证管理员权限
       const adminValidation = await this.validateAdminPermission(adminId)
@@ -423,7 +434,11 @@ class ManagementStrategy {
       }
 
       // 验证队列配置合法性
-      if (!queueConfig.queue_type || !queueConfig.priority_level || !Array.isArray(queueConfig.prize_queue)) {
+      if (
+        !queueConfig.queue_type ||
+        !queueConfig.priority_level ||
+        !Array.isArray(queueConfig.prize_queue)
+      ) {
         throw new Error('队列配置不完整：必须包含queue_type、priority_level、prize_queue')
       }
 
@@ -479,7 +494,12 @@ class ManagementStrategy {
         timestamp: BeijingTimeHelper.now()
       }
     } catch (error) {
-      this.logError('设置用户专属抽奖队列失败', { adminId, targetUserId, queueConfig, error: error.message })
+      this.logError('设置用户专属抽奖队列失败', {
+        adminId,
+        targetUserId,
+        queueConfig,
+        error: error.message
+      })
       throw error
     }
   }
@@ -507,7 +527,7 @@ class ManagementStrategy {
    * const status = await strategy.getUserManagementStatus(20001)
    * // 返回：{ force_win: {...}, force_lose: null, probability_adjust: {...}, user_queue: null }
    */
-  async getUserManagementStatus (userId) {
+  async getUserManagementStatus(userId) {
     try {
       const status = {
         force_win: null,
@@ -523,7 +543,7 @@ class ManagementStrategy {
         const cached = this.cache.get(cacheKey)
 
         // 🔄 检查缓存有效性
-        if (cached && (Date.now() - cached.timestamp) < this.cacheTTL) {
+        if (cached && Date.now() - cached.timestamp < this.cacheTTL) {
           status[settingType] = cached.data
           continue
         }
@@ -592,7 +612,7 @@ class ManagementStrategy {
    * const result2 = await strategy.clearUserSettings(10001, 20001, 'force_win')
    * // 返回：{ success: true, cleared_count: 1, timestamp: '2025-11-08 12:00:00' }
    */
-  async clearUserSettings (adminId, targetUserId, settingType = null) {
+  async clearUserSettings(adminId, targetUserId, settingType = null) {
     try {
       // 🛡️ 验证管理员权限
       const adminValidation = await this.validateAdminPermission(adminId)
@@ -617,7 +637,9 @@ class ManagementStrategy {
       )
 
       // 🔄 清除内存缓存
-      const settingTypes = settingType ? [settingType] : ['force_win', 'force_lose', 'probability_adjust', 'user_queue']
+      const settingTypes = settingType
+        ? [settingType]
+        : ['force_win', 'force_lose', 'probability_adjust', 'user_queue']
       settingTypes.forEach(type => {
         const cacheKey = `user_${targetUserId}_${type}`
         this.cache.delete(cacheKey)
@@ -637,7 +659,12 @@ class ManagementStrategy {
         timestamp: BeijingTimeHelper.now()
       }
     } catch (error) {
-      this.logError('清除用户管理设置失败', { adminId, targetUserId, settingType, error: error.message })
+      this.logError('清除用户管理设置失败', {
+        adminId,
+        targetUserId,
+        settingType,
+        error: error.message
+      })
       throw error
     }
   }
@@ -665,7 +692,7 @@ class ManagementStrategy {
    * const result = await strategy.cleanupExpiredSettings()
    * // 返回：{ cleaned_count: 15, timestamp: '2025-11-08 12:00:00' }
    */
-  async cleanupExpiredSettings () {
+  async cleanupExpiredSettings() {
     try {
       // 💾 查询并更新过期设置
       const [updatedCount] = await LotteryManagementSetting.update(
@@ -706,8 +733,9 @@ class ManagementStrategy {
    * 注意：此方法在构造函数中自动调用，无需手动调用
    *
    * @private
+   * @returns {void} 无返回值，启动定时器定期清理内存缓存
    */
-  startCacheCleanup () {
+  startCacheCleanup() {
     setInterval(() => {
       const now = Date.now()
       let cleanedCount = 0
@@ -762,7 +790,7 @@ class ManagementStrategy {
    *   console.log('管理员验证失败', result.reason)
    * }
    */
-  async validateAdminInfo (adminInfo) {
+  async validateAdminInfo(adminInfo) {
     try {
       if (!adminInfo || !adminInfo.user_id) {
         return { valid: false, reason: 'ADMIN_INFO_MISSING' }
@@ -828,7 +856,7 @@ class ManagementStrategy {
    * const result2 = await strategy.validateAdminPermission(10001, { resource: 'lottery', action: 'manage' })
    * // 返回：{ valid: true, admin: {...}, roles: [...], adminLevel: 1 } 或 { valid: false, reason: 'PERMISSION_DENIED' }
    */
-  async validateAdminPermission (adminId, requiredPermission = null) {
+  async validateAdminPermission(adminId, requiredPermission = null) {
     try {
       // 🛡️ 获取用户角色信息
       const userRoles = await getUserRoles(adminId)
@@ -892,7 +920,7 @@ class ManagementStrategy {
    *   console.log('用户不是管理员')
    * }
    */
-  async checkAdminPermission (adminId) {
+  async checkAdminPermission(adminId) {
     try {
       // 🛡️ 使用UUID角色系统进行权限验证
       const userRoles = await getUserRoles(adminId)
@@ -941,7 +969,7 @@ class ManagementStrategy {
    * const result = await strategy.getOperationLogs(10001, { page: 1, limit: 20 })
    * // 返回：{ logs: [], total: 0, page: 1, limit: 20 }
    */
-  async getOperationLogs (adminId, filters = {}) {
+  async getOperationLogs(adminId, filters = {}) {
     try {
       // 验证管理员权限
       const isAdmin = await this.checkAdminPermission(adminId)
@@ -999,7 +1027,7 @@ class ManagementStrategy {
    * ])
    * // 返回：{ success: [{...}, {...}], failed: [], total: 2, success_count: 2, failed_count: 0 }
    */
-  async batchForceWin (adminId, operations) {
+  async batchForceWin(adminId, operations) {
     try {
       // 🛡️ 验证管理员权限（只验证一次）
       const adminValidation = await this.validateAdminPermission(adminId)
@@ -1088,7 +1116,7 @@ class ManagementStrategy {
    * ])
    * // 返回：{ success: [{...}, {...}], failed: [], total: 2, success_count: 2, failed_count: 0 }
    */
-  async batchForceLose (adminId, operations) {
+  async batchForceLose(adminId, operations) {
     try {
       // 🛡️ 验证管理员权限（只验证一次）
       const adminValidation = await this.validateAdminPermission(adminId)
@@ -1142,8 +1170,12 @@ class ManagementStrategy {
   /**
    * 日志错误记录
    * @private
+   *
+   * @param {string} message - 日志消息（中文描述）
+   * @param {Object} data - 附加数据（用于排障定位）
+   * @returns {void} 无返回值
    */
-  logError (message, data) {
+  logError(message, data) {
     this.logger.error(message, { ...data, timestamp: BeijingTimeHelper.now() })
   }
 }

@@ -67,10 +67,10 @@ const inventoryMarketRoutes = require('./inventory-market')
  * - GET    /admin/statistics                       - 获取管理员统计
  *
  * 市场交易功能（inventory-market.js）：
- * - GET    /market/products                        - 获取市场商品列表
- * - GET    /market/products/:id                    - 获取市场商品详情
- * - POST   /market/products/:id/purchase           - 购买市场商品
- * - POST   /market/products/:id/withdraw           - 撤回市场商品
+ * - GET    /market/listings                        - 获取市场挂牌列表
+ * - GET    /market/listings/:listing_id            - 获取市场挂牌详情
+ * - POST   /market/listings/:listing_id/purchase   - 购买市场挂牌
+ * - POST   /market/listings/:listing_id/withdraw   - 撤回市场挂牌
  * - POST   /market/list                            - 上架商品到市场
  * - GET    /market/listing-status                  - 获取用户上架状态
  *
@@ -105,7 +105,7 @@ router.use('/', inventoryMarketRoutes)
  * 完整API访问路径示例（API Path Examples）：
  * - GET  /api/v4/inventory/user/:user_id
  * - POST /api/v4/inventory/use/:item_id
- * - GET  /api/v4/inventory/market/products
- * - POST /api/v4/inventory/exchange
+ * - GET  /api/v4/inventory/market/listings
+ * - POST /api/v4/inventory/market/listings/:listing_id/purchase
  */
 module.exports = router

@@ -91,7 +91,7 @@ class AuditLogService {
    * @param {Object} params.transaction - 事务对象（可选）
    * @returns {Promise<AdminOperationLog|null>} 审计日志记录
    */
-  static async logOperation (params) {
+  static async logOperation(params) {
     try {
       const {
         operator_id,
@@ -189,9 +189,9 @@ class AuditLogService {
    * @param {string} params.reason - 操作原因
    * @param {string} params.business_id - 业务ID
    * @param {Object} params.transaction - 事务对象
-   * @returns {Promise<AdminOperationLog|null>}
+   * @returns {Promise<AdminOperationLog|null>} 审计日志记录（失败返回null，不阻塞业务流程）
    */
-  static async logPointsAdd (params) {
+  static async logPointsAdd(params) {
     const {
       operator_id,
       user_id,
@@ -233,9 +233,9 @@ class AuditLogService {
    * @param {string} params.reason - 操作原因
    * @param {string} params.business_id - 业务ID
    * @param {Object} params.transaction - 事务对象
-   * @returns {Promise<AdminOperationLog|null>}
+   * @returns {Promise<AdminOperationLog|null>} 审计日志记录（失败返回null，不阻塞业务流程）
    */
-  static async logPointsConsume (params) {
+  static async logPointsConsume(params) {
     const {
       operator_id,
       user_id,
@@ -276,9 +276,9 @@ class AuditLogService {
    * @param {string} params.reason - 操作原因
    * @param {string} params.business_id - 业务ID
    * @param {Object} params.transaction - 事务对象
-   * @returns {Promise<AdminOperationLog|null>}
+   * @returns {Promise<AdminOperationLog|null>} 审计日志记录（失败返回null，不阻塞业务流程）
    */
-  static async logPointsActivate (params) {
+  static async logPointsActivate(params) {
     const {
       operator_id,
       user_id,
@@ -319,9 +319,9 @@ class AuditLogService {
    * @param {string} params.reason - 操作原因
    * @param {string} params.business_id - 业务ID
    * @param {Object} params.transaction - 事务对象
-   * @returns {Promise<AdminOperationLog|null>}
+   * @returns {Promise<AdminOperationLog|null>} 审计日志记录（失败返回null，不阻塞业务流程）
    */
-  static async logInventoryUse (params) {
+  static async logInventoryUse(params) {
     const { operator_id, item_id, item_name, reason, business_id, transaction } = params
 
     return this.logOperation({
@@ -357,9 +357,9 @@ class AuditLogService {
    * @param {string} params.reason - 操作原因
    * @param {string} params.business_id - 业务ID
    * @param {Object} params.transaction - 事务对象
-   * @returns {Promise<AdminOperationLog|null>}
+   * @returns {Promise<AdminOperationLog|null>} 审计日志记录（失败返回null，不阻塞业务流程）
    */
-  static async logInventoryTransfer (params) {
+  static async logInventoryTransfer(params) {
     const {
       operator_id,
       item_id,
@@ -401,9 +401,9 @@ class AuditLogService {
    * @param {string} params.reason - 操作原因
    * @param {string} params.business_id - 业务ID
    * @param {Object} params.transaction - 事务对象
-   * @returns {Promise<AdminOperationLog|null>}
+   * @returns {Promise<AdminOperationLog|null>} 审计日志记录（失败返回null，不阻塞业务流程）
    */
-  static async logInventoryVerify (params) {
+  static async logInventoryVerify(params) {
     const {
       operator_id,
       item_id,
@@ -447,9 +447,9 @@ class AuditLogService {
    * @param {string} params.reason - 操作原因
    * @param {string} params.business_id - 业务ID
    * @param {Object} params.transaction - 事务对象
-   * @returns {Promise<AdminOperationLog|null>}
+   * @returns {Promise<AdminOperationLog|null>} 审计日志记录（失败返回null，不阻塞业务流程）
    */
-  static async logExchangeAudit (params) {
+  static async logExchangeAudit(params) {
     const {
       operator_id,
       exchange_id,
@@ -492,9 +492,9 @@ class AuditLogService {
    * @param {string} params.reason - 操作原因
    * @param {string} params.business_id - 业务ID
    * @param {Object} params.transaction - 事务对象
-   * @returns {Promise<AdminOperationLog|null>}
+   * @returns {Promise<AdminOperationLog|null>} 审计日志记录（失败返回null，不阻塞业务流程）
    */
-  static async logConsumptionAudit (params) {
+  static async logConsumptionAudit(params) {
     const {
       operator_id,
       consumption_id,
@@ -537,9 +537,9 @@ class AuditLogService {
    * @param {Object} params.after_data - 操作后数据
    * @param {string} params.reason - 操作原因
    * @param {Object} params.transaction - 事务对象
-   * @returns {Promise<AdminOperationLog|null>}
+   * @returns {Promise<AdminOperationLog|null>} 审计日志记录（失败返回null，不阻塞业务流程）
    */
-  static async logProductConfig (params) {
+  static async logProductConfig(params) {
     const { operator_id, product_id, action, before_data, after_data, reason, transaction } = params
 
     const operationTypeMap = {
@@ -567,7 +567,7 @@ class AuditLogService {
    * @param {Array<Object>} logItems - 日志项数组
    * @returns {Promise<Object>} 批量记录结果
    */
-  static async batchLogOperation (logItems) {
+  static async batchLogOperation(logItems) {
     const results = {
       total: logItems.length,
       success: 0,
@@ -609,7 +609,7 @@ class AuditLogService {
    * @param {number} filters.offset - 偏移量（默认0）
    * @returns {Promise<Array>} 审计日志列表
    */
-  static async queryAuditLogs (filters = {}) {
+  static async queryAuditLogs(filters = {}) {
     const {
       operator_id = null,
       operation_type = null,
@@ -678,7 +678,7 @@ class AuditLogService {
    * @returns {Promise<AdminOperationLog>} 审计日志详情
    * @throws {Error} 当日志不存在时抛出错误
    */
-  static async getById (logId) {
+  static async getById(logId) {
     try {
       // 验证参数
       if (!logId || isNaN(logId) || logId <= 0) {
@@ -715,7 +715,7 @@ class AuditLogService {
    * @param {string} filters.end_date - 结束日期
    * @returns {Promise<Object>} 统计信息
    */
-  static async getAuditStatistics (filters = {}) {
+  static async getAuditStatistics(filters = {}) {
     const { operator_id = null, start_date = null, end_date = null } = filters
 
     try {

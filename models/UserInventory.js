@@ -217,7 +217,7 @@ module.exports = sequelize => {
          * ✅ 优化3：添加虚拟字段getter，自动补全默认值（P1优化 - 性能提升15-20ms）
          * @returns {string} 图标字符串
          */
-        get () {
+        get() {
           const rawValue = this.getDataValue('icon')
           if (rawValue) return rawValue // 如果已设置icon，直接返回
 
@@ -240,10 +240,10 @@ module.exports = sequelize => {
        * 功能模块：市场商品列表、商品上架、商品撤回、商品购买
        * 迁移文件：20250929165731-add-market-fields-to-user-inventory.js
        * 相关API：
-       * - GET /api/v4/inventory/market/products - 获取市场商品列表
-       * - GET /api/v4/inventory/market/products/:id - 获取商品详情
-       * - POST /api/v4/inventory/market/products/:id/withdraw - 撤回商品
-       * - POST /api/v4/inventory/market/products/:id/purchase - 购买商品
+       * - GET  /api/v4/inventory/market/listings - 获取市场挂牌列表
+       * - GET  /api/v4/inventory/market/listings/:listing_id - 获取挂牌详情
+       * - POST /api/v4/inventory/market/listings/:listing_id/purchase - 购买挂牌
+       * - POST /api/v4/inventory/market/listings/:listing_id/withdraw - 撤回挂牌
        * ========================================
        */
 
@@ -399,7 +399,7 @@ module.exports = sequelize => {
        * ========================================
        * 业务场景：防止恶意用户滥用撤回功能刷新商品排序，记录撤回历史便于数据分析
        * 功能模块：撤回冷却时间检查、撤回次数统计、撤回原因分析
-       * 相关API：POST /api/v4/inventory/market/products/:id/withdraw
+       * 相关API：POST /api/v4/inventory/market/listings/:listing_id/withdraw
        * 推荐方案：轻量级优化（方案2）- 在UserInventory表增加字段，无需新建表
        * ========================================
        */
