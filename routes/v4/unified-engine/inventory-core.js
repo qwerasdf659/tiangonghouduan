@@ -22,7 +22,7 @@
 
 const express = require('express')
 const router = express.Router()
-const { authenticateToken, requireAdmin, getUserRoles } = require('../../../middleware/auth')
+const { authenticateToken, requireAdmin } = require('../../../middleware/auth')
 const Logger = require('../../../services/UnifiedLotteryEngine/utils/Logger')
 const { validatePositiveInteger, handleServiceError } = require('../../../middleware/validation')
 
@@ -235,37 +235,22 @@ router.post(
   authenticateToken,
   validatePositiveInteger('item_id', 'params'),
   async (req, res) => {
-    try {
-      const itemId = req.validated.item_id
-      const userId = req.user.user_id
+    // 该接口已废弃，统一迁移到新版核销系统
+    logger.warn('旧版核销码生成接口已废弃', {
+      item_id: req.validated.item_id,
+      user_id: req.user?.user_id
+    })
 
-      // 调用 InventoryService 生成核销码
-      const InventoryService = req.app.locals.services.getService('inventory')
-      const result = await InventoryService.generateVerificationCode(userId, itemId)
-
-      logger.info('生成核销码成功', {
-        item_id: itemId,
-        user_id: userId,
-        verification_code: result.verification_code,
-        expires_at: result.expires_at
-      })
-
-      return res.apiSuccess(
-        {
-          verification_code: result.verification_code,
-          expires_at: result.expires_at
-        },
-        '核销码生成成功'
-      )
-    } catch (error) {
-      logger.error('生成核销码失败', {
-        error: error.message,
-        item_id: req.validated.item_id,
-        user_id: req.user?.user_id
-      })
-
-      return handleServiceError(error, res, '生成核销码失败')
-    }
+    return res.apiError(
+      '该接口已废弃，请使用新版核销系统',
+      'ENDPOINT_DEPRECATED',
+      {
+        new_endpoint: '/api/v4/redemption/orders',
+        migration_guide: 'https://docs.example.com/redemption-migration',
+        deprecation_date: '2025-12-17'
+      },
+      410
+    )
   }
 )
 
@@ -277,74 +262,21 @@ router.post(
  * 权限要求：只允许商户（role_level >= 50）或管理员核销
  */
 router.post('/verification/verify', authenticateToken, async (req, res) => {
-  try {
-    const { verification_code } = req.body
-    const merchantId = req.user.user_id
+  // 该接口已废弃，统一迁移到新版核销系统
+  logger.warn('旧版核销验证接口已废弃', {
+    operator_id: req.user?.user_id
+  })
 
-    // 格式验证
-    const InventoryService = req.app.locals.services.getService('inventory')
-    const formatValidation = InventoryService.validateVerificationCodeFormat(verification_code)
-    if (!formatValidation.valid) {
-      return res.apiError(formatValidation.error, 'BAD_REQUEST', null, 400)
-    }
-
-    // 权限验证（只允许商户或管理员核销）
-    const userRoles = await getUserRoles(merchantId)
-    if (userRoles.role_level < 50) {
-      return res.apiError('权限不足，只有商户或管理员可以核销', 'FORBIDDEN', null, 403)
-    }
-
-    // 调用 InventoryService 执行核销
-    const result = await InventoryService.verifyCode(
-      merchantId,
-      verification_code.trim().toUpperCase()
-    )
-
-    // 异步发送通知（不阻塞响应）
-    const NotificationService = req.app.locals.services.getService('notification')
-    NotificationService.send(result.user_id, {
-      type: 'verification_success',
-      title: '核销通知',
-      content: `您的${result.item_name}已被核销成功`,
-      data: {
-        inventory_id: result.item_id,
-        name: result.item_name,
-        used_at: result.used_at
-      }
-    }).catch(error => {
-      logger.warn('核销通知发送失败（不影响核销结果）', {
-        error: error.message,
-        user_id: result.user_id
-      })
-    })
-
-    logger.info('核销验证成功', {
-      inventory_id: result.item_id,
-      operator_id: merchantId
-    })
-
-    return res.apiSuccess(
-      {
-        inventory_id: result.item_id,
-        name: result.item_name,
-        user_id: result.user_id,
-        status: result.status,
-        used_at: result.used_at,
-        operator: {
-          user_id: merchantId,
-          nickname: req.user.nickname || userRoles.roleName || '商户'
-        }
-      },
-      '核销成功'
-    )
-  } catch (error) {
-    logger.error('核销验证失败', {
-      error: error.message,
-      operator_id: req.user.user_id
-    })
-
-    return handleServiceError(error, res, '核销验证失败')
-  }
+  return res.apiError(
+    '该核销接口已废弃，请使用新版核销系统',
+    'ENDPOINT_DEPRECATED',
+    {
+      new_endpoint: '/api/v4/redemption/fulfill',
+      migration_guide: 'https://docs.example.com/redemption-migration',
+      deprecation_date: '2025-12-17'
+    },
+    410
+  )
 })
 
 /**

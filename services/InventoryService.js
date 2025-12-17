@@ -1,6 +1,11 @@
 /**
  * 餐厅积分抽奖系统 V4.0统一引擎架构 - 库存服务（InventoryService）
  *
+ * @deprecated 此服务已废弃，请使用新的双轨架构：
+ *   - 背包查询 → 使用 BackpackService.getUserBackpack()
+ *   - 核销码生成 → 使用 RedemptionOrderService.createOrder()
+ *   - 核销验证 → 使用 RedemptionOrderService.fulfillOrder()
+ *
  * 业务场景：管理用户库存的完整生命周期，包括库存查询、物品使用、转让、核销等所有库存相关业务
  *
  * 核心功能：
@@ -802,6 +807,14 @@ class InventoryService {
     const { transaction = null } = options
 
     try {
+      // ⚠️ 废弃警告：此方法已废弃，请使用 RedemptionOrderService
+      logger.warn('⚠️ 此方法已废弃，请使用 RedemptionOrderService.createOrder()', {
+        method: 'generateVerificationCode',
+        deprecated_since: '2025-12-17',
+        replacement: 'RedemptionOrderService.createOrder(item_instance_id)',
+        caller: new Error().stack.split('\n')[2]?.trim()
+      })
+
       logger.info('开始生成核销码', {
         user_id: userId,
         item_id: itemId
@@ -873,6 +886,14 @@ class InventoryService {
     const shouldCommit = !externalTransaction
 
     try {
+      // ⚠️ 废弃警告：此方法已废弃，请使用 RedemptionOrderService
+      logger.warn('⚠️ 此方法已废弃，请使用 RedemptionOrderService.fulfillOrder()', {
+        method: 'verifyCode',
+        deprecated_since: '2025-12-17',
+        replacement: 'RedemptionOrderService.fulfillOrder(code, redeemer_user_id)',
+        caller: new Error().stack.split('\n')[2]?.trim()
+      })
+
       logger.info('开始核销验证', {
         merchant_id: merchantId,
         verification_code: verificationCode

@@ -64,36 +64,38 @@ app.use(
   })
 )
 
+/**
+ * CORS origin 验证函数
+ * @param {string} origin - 请求来源
+ * @param {Function} callback - 回调函数
+ * @returns {void}
+ */
+const corsOriginValidator = function (origin, callback) {
+  // 允许的源列表
+  const allowedOrigins = process.env.ALLOWED_ORIGINS
+    ? process.env.ALLOWED_ORIGINS.split(',')
+    : ['http://localhost:3000', 'http://localhost:8080', 'https://omqktqrtntnn.sealosbja.site']
+
+  // 微信小程序请求没有origin，允许通过
+  if (!origin) return callback(null, true)
+
+  // 检查是否在允许列表中
+  if (allowedOrigins.indexOf(origin) !== -1) {
+    callback(null, true)
+  } else {
+    // 允许微信小程序域名
+    if (origin.includes('servicewechat.com') || origin.includes('weixin.qq.com')) {
+      callback(null, true)
+    } else {
+      callback(new Error('Not allowed by CORS'))
+    }
+  }
+}
+
 // 🔧 CORS配置 - 支持微信小程序跨域访问
 app.use(
   cors({
-    /**
-     * CORS origin 验证函数
-     * @param {string|undefined} origin - 请求来源
-     * @param {Function} callback - 回调函数
-     * @returns {void}
-     */
-    origin: function (origin, callback) {
-      // 允许的源列表
-      const allowedOrigins = process.env.ALLOWED_ORIGINS
-        ? process.env.ALLOWED_ORIGINS.split(',')
-        : ['http://localhost:3000', 'http://localhost:8080', 'https://omqktqrtntnn.sealosbja.site']
-
-      // 微信小程序请求没有origin，允许通过
-      if (!origin) return callback(null, true)
-
-      // 检查是否在允许列表中
-      if (allowedOrigins.indexOf(origin) !== -1) {
-        callback(null, true)
-      } else {
-        // 允许微信小程序域名
-        if (origin.includes('servicewechat.com') || origin.includes('weixin.qq.com')) {
-          callback(null, true)
-        } else {
-          callback(new Error('Not allowed by CORS'))
-        }
-      }
-    },
+    origin: corsOriginValidator,
     credentials: true,
     optionsSuccessStatus: 200,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
@@ -157,8 +159,8 @@ app.use('/api/', fallbackLimiter)
 
 // 字段转换器功能已删除 - 使用统一的snake_case命名格式
 
-// 🔧 API响应格式统一中间件 - 统一所有API响应格式（全局应用）
-app.use(ApiResponse.middleware())
+// 🔧 API响应格式统一中间件 - 统一所有API响应格式
+app.use('/api/', ApiResponse.middleware())
 
 // 🔧 请求日志中间件
 app.use((req, res, next) => {
@@ -190,16 +192,16 @@ app.use('/api/', (req, res, next) => {
         ip: req.ip
       })
 
-      // 使用res.apiError()方法，由ApiResponse中间件注入
-      return res.apiError(
-        '请求处理超时，请稍后重试',
-        'REQUEST_TIMEOUT',
-        {
+      res.status(504).json({
+        success: false,
+        code: 'REQUEST_TIMEOUT',
+        message: '请求处理超时，请稍后重试',
+        data: {
           timeout: `${API_TIMEOUT / 1000}秒`,
           suggestion: '如果问题持续，请联系技术支持'
         },
-        504
-      )
+        timestamp: BeijingTimeHelper.apiTimestamp()
+      })
     }
   })
 
@@ -234,12 +236,15 @@ app.get('/health', async (req, res) => {
       redisStatus = 'disconnected'
     }
 
-    // 使用res.apiSuccess()方法，由ApiResponse中间件注入
-    return res.apiSuccess(
-      {
+    const healthData = {
+      success: true, // ✅ 业务标准格式
+      code: 'SYSTEM_HEALTHY', // ✅ 业务代码
+      message: 'V4 Unified Lottery Engine 系统运行正常', // ✅ 用户友好消息
+      data: {
         status: 'healthy',
         version: '4.0.0',
         architecture: 'V4 Unified Lottery Engine',
+        timestamp: BeijingTimeHelper.apiTimestamp(), // �� 北京时间API时间戳
         systems: {
           database: databaseStatus,
           redis: redisStatus,
@@ -251,30 +256,38 @@ app.get('/health', async (req, res) => {
         },
         uptime: Math.floor(process.uptime()) + 's'
       },
-      'V4 Unified Lottery Engine 系统运行正常',
-      'SYSTEM_HEALTHY'
-    )
+      version: 'v4.0', // ✅ API版本信息
+      request_id:
+        req.headers['x-request-id'] ||
+        `health_${Date.now()}_${Math.random().toString(36).substr(2, 6)}` // ✅ 请求追踪ID
+    }
+
+    res.json(healthData)
   } catch (error) {
     console.error('健康检查失败:', error)
-
-    // 使用res.apiError()方法，由ApiResponse中间件注入
-    return res.apiError(
-      '系统健康检查失败',
-      'SYSTEM_UNHEALTHY',
-      {
+    res.status(500).json({
+      success: false, // ✅ 业务标准格式
+      code: 'SYSTEM_UNHEALTHY', // ✅ 业务错误代码
+      message: '系统健康检查失败', // ✅ 用户友好错误消息
+      data: {
         status: 'unhealthy',
-        error: error.message
+        error: error.message,
+        timestamp: BeijingTimeHelper.apiTimestamp() // 🕐 北京时间API时间戳
       },
-      500
-    )
+      version: 'v4.0', // ✅ API版本信息
+      request_id:
+        req.headers['x-request-id'] ||
+        `health_error_${Date.now()}_${Math.random().toString(36).substr(2, 6)}` // ✅ 请求追踪ID
+    })
   }
 })
 
 // 📊 V4统一引擎信息端点
 app.get('/api/v4', (req, res) => {
-  // 使用res.apiSuccess()方法，由ApiResponse中间件注入
-  return res.apiSuccess(
-    {
+  res.json({
+    code: 0,
+    msg: 'V4统一抽奖引擎信息获取成功',
+    data: {
       version: '4.0.0',
       name: '餐厅积分抽奖系统 V4统一引擎',
       architecture: 'unified-lottery-engine',
@@ -298,15 +311,16 @@ app.get('/api/v4', (req, res) => {
       },
       features: ['统一抽奖引擎', '智能策略选择', '实时决策处理', '完整审计日志', '高性能优化']
     },
-    'V4统一抽奖引擎信息获取成功'
-  )
+    timestamp: BeijingTimeHelper.apiTimestamp()
+  })
 })
 
 // 📚 V4统一引擎API文档端点
 app.get('/api/v4/docs', (req, res) => {
-  // 使用res.apiSuccess()方法，由ApiResponse中间件注入
-  return res.apiSuccess(
-    {
+  res.json({
+    code: 0,
+    msg: 'V4统一抽奖引擎API文档获取成功',
+    data: {
       title: '餐厅积分抽奖系统 V4.0 统一引擎API文档',
       version: '4.0.0',
       architecture: 'unified-lottery-engine',
@@ -364,8 +378,8 @@ app.get('/api/v4/docs', (req, res) => {
         }
       }
     },
-    'V4统一抽奖引擎API文档获取成功'
-  )
+    timestamp: BeijingTimeHelper.apiTimestamp()
+  })
 })
 
 /*
@@ -373,9 +387,10 @@ app.get('/api/v4/docs', (req, res) => {
  * 根路径
  */
 app.get('/', (req, res) => {
-  // 使用res.apiSuccess()方法，由ApiResponse中间件注入
-  return res.apiSuccess(
-    {
+  res.json({
+    success: true,
+    message: '餐厅积分抽奖系统 V4.0 - 统一抽奖引擎',
+    data: {
       name: '餐厅积分抽奖系统 V4统一引擎',
       version: '4.0.0',
       api_version: 'v4',
@@ -389,15 +404,16 @@ app.get('/', (req, res) => {
         docs: '/api/v4/docs'
       }
     },
-    '餐厅积分抽奖系统 V4.0 - 统一抽奖引擎'
-  )
+    timestamp: BeijingTimeHelper.apiTimestamp()
+  })
 })
 
 // API基础路径
 app.get('/api', (req, res) => {
-  // 使用res.apiSuccess()方法，由ApiResponse中间件注入
-  return res.apiSuccess(
-    {
+  res.json({
+    success: true,
+    message: 'API服务正常',
+    data: {
       version: 'v4.0',
       latest_version: 'v4.0',
       available_versions: ['v4'],
@@ -409,8 +425,8 @@ app.get('/api', (req, res) => {
         decision_analytics: '/api/v4/admin/analytics/decisions/analytics'
       }
     },
-    'API服务正常'
-  )
+    timestamp: BeijingTimeHelper.apiTimestamp()
+  })
 })
 
 /*
@@ -508,6 +524,13 @@ try {
   app.use('/api/v4/inventory', require('./routes/v4/unified-engine/inventory'))
   appLogger.info('V4用户库存管理系统加载成功', { route: '/api/v4/inventory' })
 
+  // V4核销系统路由（12位Base32核销码，30天有效期）
+  app.use('/api/v4/redemption', require('./routes/v4/unified-engine/redemption'))
+  appLogger.info('V4核销系统加载成功', {
+    route: '/api/v4/redemption',
+    note: '新版核销系统（12位Base32码，SHA-256哈希存储，30天TTL）'
+  })
+
   // V4兑换市场路由（双账户+商城双玩法方案）
   app.use('/api/v4/exchange_market', require('./routes/v4/unified-engine/exchange_market'))
   appLogger.info('V4兑换市场系统加载成功（双账户模型）', {
@@ -534,13 +557,6 @@ try {
   app.use('/api/v4/consumption', require('./routes/v4/unified-engine/consumption'))
   appLogger.info('V4消费记录管理系统加载成功', { route: '/api/v4/consumption' })
 
-  // V4.5.0 资产转换路由（材料转钻石）
-  app.use('/api/v4/assets', require('./routes/v4/unified-engine/assets'))
-  appLogger.info('V4.5.0 资产转换系统加载成功', {
-    route: '/api/v4/assets',
-    note: '材料转钻石、余额查询、转换规则查询'
-  })
-
   // V4系统功能路由（公告、反馈等）
   app.use('/api/v4/system', require('./routes/v4/system'))
   appLogger.info('V4系统功能模块加载成功', { route: '/api/v4/system' })
@@ -557,7 +573,7 @@ try {
   })
 
   /*
-   * V4审核管理路由（批量审核、超时告警）- 已废弃（P0-2）
+   * V4审核管理路由（批量审核、超时告警）
    * app.use('/api/v4/audit-management', require('./routes/audit-management'))
    * appLogger.info('V4审核管理系统加载成功', { route: '/api/v4/audit-management' })
    */
@@ -592,47 +608,31 @@ try {
 
 // 🔧 404处理
 app.use('*', (req, res) => {
-  // 检查请求路径是否在 /api/ 下（有ApiResponse中间件注入的方法）
-  if (req.originalUrl.startsWith('/api/')) {
-    // 使用res.apiError()方法，由ApiResponse中间件注入
-    return res.apiError(
-      `接口不存在: ${req.method} ${req.originalUrl}`,
-      'NOT_FOUND',
-      {
-        error: 'NOT_FOUND',
-        availableEndpoints: [
-          'GET /health',
-          'GET /api/v4',
-          'GET /api/v4/docs',
-          'POST /api/v4/auth/login',
-          'POST /api/v4/auth/register',
-          'POST /api/v4/auth/logout',
-          'GET /api/v4/auth/verify',
-          'POST /api/v4/lottery/execute',
-          'GET /api/v4/lottery/strategies',
-          'GET /api/v4/admin/system/dashboard',
-          'GET /api/v4/permissions/user/:userId',
-          'POST /api/v4/permissions/check',
-          'POST /api/v4/permissions/promote',
-          'POST /api/v4/permissions/create-admin',
-          'GET /api/v4/permissions/me'
-        ]
-      },
-      404
-    )
-  } else {
-    // 非 /api/ 路径下，也使用res.apiError()方法，由ApiResponse中间件注入
-    return res.apiError(
-      `接口不存在: ${req.method} ${req.originalUrl}`,
-      'NOT_FOUND',
-      {
-        error: 'NOT_FOUND',
-        suggestion: '请检查URL是否正确',
-        availableEndpoints: ['GET /health', 'GET /api/v4', 'GET /api/v4/docs', 'GET /']
-      },
-      404
-    )
-  }
+  res.status(404).json({
+    code: 404,
+    msg: `接口不存在: ${req.method} ${req.originalUrl}`,
+    data: {
+      error: 'NOT_FOUND',
+      availableEndpoints: [
+        'GET /health',
+        'GET /api/v4',
+        'GET /api/v4/docs',
+        'POST /api/v4/auth/login',
+        'POST /api/v4/auth/register',
+        'POST /api/v4/auth/logout',
+        'GET /api/v4/auth/verify',
+        'POST /api/v4/lottery/execute',
+        'GET /api/v4/lottery/strategies',
+        'GET /api/v4/admin/system/dashboard',
+        'GET /api/v4/permissions/user/:userId',
+        'POST /api/v4/permissions/check',
+        'POST /api/v4/permissions/promote',
+        'POST /api/v4/permissions/create-admin',
+        'GET /api/v4/permissions/me'
+      ]
+    },
+    timestamp: BeijingTimeHelper.apiTimestamp() // 🕐 北京时间API时间戳
+  })
 })
 
 /*
@@ -652,22 +652,41 @@ app.use((error, req, res, _next) => {
 
   // Sequelize错误处理
   if (error.name === 'SequelizeError') {
-    return res.apiError('数据库操作失败', 'DATABASE_ERROR', { error_type: error.name }, 500)
+    return res.status(500).json({
+      success: false,
+      error: 'DATABASE_ERROR',
+      message: '数据库操作失败',
+      timestamp: BeijingTimeHelper.apiTimestamp() // 🕐 北京时间API时间戳
+    })
   }
 
   // JWT错误处理
   if (error.name === 'JsonWebTokenError') {
-    return res.apiError('Token无效', 'INVALID_TOKEN', null, 401)
+    return res.status(401).json({
+      success: false,
+      error: 'INVALID_TOKEN',
+      message: 'Token无效',
+      timestamp: BeijingTimeHelper.apiTimestamp() // 🕐 北京时间API时间戳
+    })
   }
 
   // 验证错误处理
   if (error.name === 'ValidationError') {
-    return res.apiError(error.message, 'VALIDATION_ERROR', null, 400)
+    return res.status(400).json({
+      success: false,
+      error: 'VALIDATION_ERROR',
+      message: error.message,
+      timestamp: BeijingTimeHelper.apiTimestamp() // 🕐 北京时间API时间戳
+    })
   }
 
   // 默认错误处理
-  const errorMessage = process.env.NODE_ENV === 'development' ? error.message : '服务器内部错误'
-  return res.apiError(errorMessage, 'INTERNAL_SERVER_ERROR', null, 500)
+  res.status(500).json({
+    success: false,
+    error: 'INTERNAL_SERVER_ERROR',
+    message: process.env.NODE_ENV === 'development' ? error.message : '服务器内部错误',
+    timestamp: BeijingTimeHelper.apiTimestamp() // 🕐 北京时间API时间戳
+  })
 })
 
 // 🔧 初始化Service层（移到这里，确保测试环境也能使用）

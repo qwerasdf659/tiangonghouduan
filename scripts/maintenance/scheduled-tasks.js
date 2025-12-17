@@ -12,14 +12,15 @@
  * 6. 抽奖奖品每日中奖次数重置（每天凌晨0点）- 2025-12-11新增
  * 7. 抽奖活动状态同步（每小时检查）- 2025-12-11新增
  * 8. 交易市场锁超时解锁（每5分钟检查）- 2025-12-15新增（Phase 2）
+ * 9. 核销码过期清理（每天凌晨2点）- 2025-12-17新增（Phase 1）
  *
  * 创建时间：2025-10-10
- * 更新时间：2025-12-15（新增交易市场锁超时解锁任务，符合Phase 2架构升级）
+ * 更新时间：2025-12-17（新增核销码过期清理任务，符合背包双轨架构）
  */
 
 const cron = require('node-cron')
-// 服务重命名（2025-10-12）：AuditManagementService → ExchangeOperationService
-const ExchangeOperationService = require('../../services/ExchangeOperationService')
+// 服务重命名（2025-10-12）：AuditManagementService → ExchangeMarketService
+const ExchangeMarketService = require('../../services/ExchangeMarketService')
 const ManagementStrategy = require('../../services/UnifiedLotteryEngine/strategies/ManagementStrategy')
 const AdminLotteryService = require('../../services/AdminLotteryService')
 const logger = require('../../utils/logger')
@@ -31,6 +32,8 @@ const BeijingTimeHelper = require('../../utils/timeHelper')
 const { monitor: databaseMonitor } = require('./database-performance-monitor')
 // 2025-12-15新增：交易订单服务（Phase 2）
 const TradeOrderService = require('../../services/TradeOrderService')
+// 2025-12-17新增：核销订单服务（Phase 1）
+const RedemptionOrderService = require('../../services/RedemptionOrderService')
 
 /**
  * 定时任务管理类
@@ -76,6 +79,9 @@ class ScheduledTasks {
     // 任务10: 每5分钟检查交易市场锁超时并解锁（2025-12-15新增）
     this.scheduleMarketListingLockTimeout()
 
+    // 任务11: 每天凌晨2点清理过期核销码（2025-12-17新增）
+    this.scheduleRedemptionOrderExpiration()
+
     logger.info('所有定时任务已初始化完成')
   }
 
@@ -88,7 +94,7 @@ class ScheduledTasks {
     cron.schedule('0 * * * *', async () => {
       try {
         logger.info('[定时任务] 开始执行24小时超时订单检查...')
-        const result = await ExchangeOperationService.checkTimeoutAndAlert(24)
+        const result = await ExchangeMarketService.checkTimeoutAndAlert(24)
 
         if (result.hasTimeout) {
           logger.warn(`[定时任务] 发现${result.count}个超时订单（24小时）`)
@@ -112,7 +118,7 @@ class ScheduledTasks {
     cron.schedule('0 9,18 * * *', async () => {
       try {
         logger.info('[定时任务] 开始执行72小时紧急超时订单检查...')
-        const result = await ExchangeOperationService.checkTimeoutAndAlert(72)
+        const result = await ExchangeMarketService.checkTimeoutAndAlert(72)
 
         if (result.hasTimeout) {
           logger.error(`[定时任务] 🚨 发现${result.count}个紧急超时订单（72小时）`)
@@ -149,7 +155,7 @@ class ScheduledTasks {
         })
 
         // 获取待审核订单统计
-        const statistics = await ExchangeOperationService.getPendingOrdersStatistics()
+        const statistics = await ExchangeMarketService.getPendingOrdersStatistics()
 
         logger.info('[定时任务] 待审核订单统计', {
           total: statistics.total,
@@ -189,7 +195,7 @@ class ScheduledTasks {
   static async manualTimeoutCheck() {
     logger.info('[手动触发] 执行24小时超时订单检查...')
     try {
-      const result = await ExchangeOperationService.checkTimeoutAndAlert(24)
+      const result = await ExchangeMarketService.checkTimeoutAndAlert(24)
       logger.info('[手动触发] 检查完成', { result })
       return result
     } catch (error) {
@@ -205,7 +211,7 @@ class ScheduledTasks {
   static async manualUrgentTimeoutCheck() {
     logger.info('[手动触发] 执行72小时紧急超时订单检查...')
     try {
-      const result = await ExchangeOperationService.checkTimeoutAndAlert(72)
+      const result = await ExchangeMarketService.checkTimeoutAndAlert(72)
       logger.info('[手动触发] 检查完成', { result })
       return result
     } catch (error) {
@@ -852,6 +858,69 @@ class ScheduledTasks {
       return result
     } catch (error) {
       logger.error('[手动触发] 检查失败', { error: error.message })
+      throw error
+    }
+  }
+
+  /**
+   * 定时任务11: 每天凌晨2点清理过期核销码
+   * Cron表达式: 0 2 * * * (每天凌晨2点)
+   *
+   * 业务场景：
+   * - 每天凌晨自动扫描并标记过期的兑换订单（30天TTL）
+   * - 将 status=pending 且 expires_at < 当前时间的订单更新为 expired
+   * - 确保核销码系统的数据一致性
+   *
+   * 功能：
+   * 1. 批量更新过期订单状态为 'expired'
+   * 2. 记录过期数量和时间戳
+   *
+   * 创建时间：2025-12-17（Phase 1）
+   * @returns {void}
+   */
+  static scheduleRedemptionOrderExpiration() {
+    cron.schedule('0 2 * * *', async () => {
+      try {
+        logger.info('[定时任务] 开始清理过期核销订单...')
+
+        // 调用 RedemptionOrderService 的过期清理方法
+        const expiredCount = await RedemptionOrderService.expireOrders()
+
+        if (expiredCount > 0) {
+          logger.warn(`[定时任务] 清理完成：${expiredCount}个核销订单已过期`)
+        } else {
+          logger.info('[定时任务] 清理完成：无过期核销订单')
+        }
+      } catch (error) {
+        logger.error('[定时任务] 核销订单过期清理失败', { error: error.message })
+      }
+    })
+
+    logger.info('✅ 定时任务已设置: 核销订单过期清理（每天凌晨2点执行）')
+  }
+
+  /**
+   * 手动触发核销订单过期清理（用于测试）
+   *
+   * 业务场景：手动清理过期核销订单，用于开发调试和即时清理
+   *
+   * @returns {Promise<number>} 过期的订单数量
+   *
+   * @example
+   * const ScheduledTasks = require('./scripts/maintenance/scheduled-tasks')
+   * const count = await ScheduledTasks.manualRedemptionOrderExpiration()
+   * console.log(`清理了${count}个过期核销订单`)
+   *
+   * 创建时间：2025-12-17
+   */
+  static async manualRedemptionOrderExpiration() {
+    logger.info('[手动触发] 执行核销订单过期清理...')
+    try {
+      const count = await RedemptionOrderService.expireOrders()
+      logger.info('[手动触发] 清理完成', { expired_count: count })
+      return count
+    } catch (error) {
+      logger.error('[手动触发] 清理失败', { error: error.message })
       throw error
     }
   }

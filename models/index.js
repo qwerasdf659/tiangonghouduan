@@ -334,6 +334,16 @@ models.TradeOrder = require('./TradeOrder')(sequelize, DataTypes)
  *    - 业务场景：创建订单→冻结资产→成交结算→取消订单
  */
 
+// 🔴 V4.2 背包双轨架构模型（Phase 1 - 核销码系统）
+models.RedemptionOrder = require('./RedemptionOrder')(sequelize, DataTypes)
+/*
+ * ✅ RedemptionOrder：兑换订单
+ *    - 用途：管理核销码生成和核销流程（替代 UserInventory.verification_code）
+ *    - 特点：12位Base32核销码 + SHA-256哈希存储 + 30天TTL
+ *    - 表名：redemption_orders，主键：order_id（UUID），唯一约束：code_hash
+ *    - 业务场景：生成核销码→核销验证→过期清理
+ */
+
 /*
  * 🔴 统一决策引擎V4.0模型
  * 🗑️ models.DecisionRecord模型已删除 - 过度设计，餐厅抽奖系统不需要决策过程分析 - 2025年01月21日

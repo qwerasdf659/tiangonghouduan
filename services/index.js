@@ -51,6 +51,10 @@ const ReportingService = require('./ReportingService') // 统一报表服务（�
 const AssetService = require('./AssetService') // 统一资产服务（账户体系 + 冻结模型）
 const AssetConversionService = require('./AssetConversionService') // 资产转换服务（材料转钻石）
 
+// V4.2 背包双轨架构服务（Phase 1 - 核销码系统）
+const RedemptionOrderService = require('./RedemptionOrderService') // 兑换订单服务（12位Base32核销码 + SHA-256哈希）
+const BackpackService = require('./BackpackService') // 背包双轨查询服务（assets[] + items[]）
+
 // V4 模块化服务
 const { lottery_service_container } = require('./lottery')
 
@@ -223,6 +227,10 @@ class ServiceManager {
       this._services.set('asset', AssetService) // 统一资产服务（余额/冻结/流水/幂等）
       this._services.set('assetConversion', AssetConversionService) // 资产转换服务（材料转钻石）
 
+      // 注册V4.2背包双轨架构服务（Phase 1 - 核销码系统）
+      this._services.set('redemptionOrder', RedemptionOrderService) // 兑换订单服务（12位Base32核销码 + SHA-256哈希）
+      this._services.set('backpack', BackpackService) // 背包双轨查询服务（assets[] + items[]）
+
       // 注册模块化抽奖服务容器
       this._services.set('lotteryContainer', lottery_service_container)
 
@@ -322,8 +330,10 @@ class ServiceManager {
       try {
         // 检查服务是否有健康检查方法
         if (typeof service.getHealthStatus === 'function') {
+          // eslint-disable-next-line no-await-in-loop
           status.services[serviceName] = await service.getHealthStatus()
         } else if (typeof service.health === 'function') {
+          // eslint-disable-next-line no-await-in-loop
           status.services[serviceName] = await service.health()
         } else {
           status.services[serviceName] = {
@@ -364,6 +374,7 @@ class ServiceManager {
     for (const [serviceName, service] of this._services.entries()) {
       try {
         if (typeof service.shutdown === 'function') {
+          // eslint-disable-next-line no-await-in-loop
           await service.shutdown()
           console.log(`✅ 服务 ${serviceName} 已关闭`)
         }
