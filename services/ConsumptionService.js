@@ -199,7 +199,7 @@ class ConsumptionService {
    * @param {string} [data.merchant_notes] - 商家备注（可选，Merchant Notes - Optional）
    * @returns {Object} 消费记录对象（Consumption Record Object）
    */
-  static async merchantSubmitConsumption (data) {
+  static async merchantSubmitConsumption(data) {
     // 🔒 创建数据库事务（Database Transaction - Ensure ACID）
     const sequelize = ConsumptionRecord.sequelize
     const transaction = await sequelize.transaction({
@@ -221,19 +221,25 @@ class ConsumptionService {
         throw new Error('商家ID不能为空')
       }
 
-      // 步骤2：验证QR码签名（Step 2: Validate QR Code Signature - HMAC-SHA256）
+      // 步骤2：验证QR码签名（Step 2: Validate QR Code Signature - HMAC-SHA256，UUID版本）
       const qrValidation = QRCodeValidator.validateQRCode(data.qr_code)
       if (!qrValidation.valid) {
         throw new Error(`二维码验证失败：${qrValidation.error}`)
       }
 
-      const userId = qrValidation.user_id
+      const userUuid = qrValidation.user_uuid
 
-      // 步骤3：检查用户是否存在（Step 3: Check User Existence）
-      const user = await User.findByPk(userId, { transaction }) // ✅ 在事务中查询
+      // 步骤3：根据UUID查找用户（Step 3: Find User by UUID）
+      const user = await User.findOne({
+        where: { user_uuid: userUuid },
+        transaction
+      }) // ✅ 在事务中查询
+
       if (!user) {
-        throw new Error(`用户不存在（ID: ${userId}）`)
+        throw new Error(`用户不存在（UUID: ${userUuid}）`)
       }
+
+      const userId = user.user_id // 获取内部user_id用于后续业务逻辑
 
       /*
        * 步骤4：生成业务ID（Business ID Generation - For Idempotency Control）
@@ -363,7 +369,7 @@ class ConsumptionService {
    * @param {string} reviewData.admin_notes - 审核备注（可选）
    * @returns {Object} 审核结果
    */
-  static async approveConsumption (recordId, reviewData) {
+  static async approveConsumption(recordId, reviewData) {
     // 使用数据库事务确保数据一致性
     const sequelize = ConsumptionRecord.sequelize
     const transaction = await sequelize.transaction({
@@ -531,7 +537,7 @@ class ConsumptionService {
    * @param {string} reviewData.admin_notes - 拒绝原因（必填）
    * @returns {Object} 审核结果
    */
-  static async rejectConsumption (recordId, reviewData) {
+  static async rejectConsumption(recordId, reviewData) {
     // 使用数据库事务
     const sequelize = ConsumptionRecord.sequelize
     const transaction = await sequelize.transaction()
@@ -648,7 +654,7 @@ class ConsumptionService {
    * @param {number} options.page_size - 每页数量（默认20）
    * @returns {Object} 查询结果
    */
-  static async getUserConsumptionRecords (userId, options = {}) {
+  static async getUserConsumptionRecords(userId, options = {}) {
     try {
       const page = options.page || 1
       const pageSize = options.page_size || 20
@@ -745,7 +751,7 @@ class ConsumptionService {
    * @param {number} userId - 用户ID
    * @returns {Object} 统计信息
    */
-  static async getUserConsumptionStats (userId) {
+  static async getUserConsumptionStats(userId) {
     try {
       // 统计各状态的记录数和金额
       const stats = await ConsumptionRecord.findAll({
@@ -802,7 +808,7 @@ class ConsumptionService {
    * @param {number} options.page_size - 每页数量（默认20）
    * @returns {Object} 查询结果
    */
-  static async getPendingConsumptionRecords (options = {}) {
+  static async getPendingConsumptionRecords(options = {}) {
     try {
       const page = options.page || 1
       const pageSize = options.page_size || 20
@@ -853,7 +859,7 @@ class ConsumptionService {
    * @param {string} options.search - 搜索关键词（手机号、用户昵称）
    * @returns {Object} { records, pagination, statistics }
    */
-  static async getAdminRecords (options = {}) {
+  static async getAdminRecords(options = {}) {
     try {
       const page = options.page || 1
       const pageSize = Math.min(options.page_size || 20, 100)
@@ -879,11 +885,11 @@ class ConsumptionService {
           required: false,
           where: search
             ? {
-              [Op.or]: [
-                { mobile: { [Op.like]: `%${search}%` } },
-                { nickname: { [Op.like]: `%${search}%` } }
-              ]
-            }
+                [Op.or]: [
+                  { mobile: { [Op.like]: `%${search}%` } },
+                  { nickname: { [Op.like]: `%${search}%` } }
+                ]
+              }
             : undefined
         },
         {
@@ -991,7 +997,7 @@ class ConsumptionService {
    * - 权限通过后再查询完整数据（包含关联查询，响应~200ms）
    * - 无权限查询节省约75%时间和80%数据库资源
    */
-  static async getConsumptionDetailWithAuth (recordId, viewerId, isAdmin = false, options = {}) {
+  static async getConsumptionDetailWithAuth(recordId, viewerId, isAdmin = false, options = {}) {
     try {
       /*
        * ✅ 步骤1：轻量查询验证权限（仅查询3个字段，响应<50ms）
@@ -1038,7 +1044,7 @@ class ConsumptionService {
    * @param {boolean} options.include_points_transaction - 是否包含积分交易记录
    * @returns {Object} 消费记录详情
    */
-  static async getConsumptionRecordDetail (recordId, options = {}) {
+  static async getConsumptionRecordDetail(recordId, options = {}) {
     try {
       // 构建include数组
       const include = [
@@ -1100,7 +1106,7 @@ class ConsumptionService {
    * @param {boolean} options.includeDeleted - 是否包含已删除记录（默认false，管理员恢复时需要true）
    * @returns {Object|null} 消费记录实例或null
    */
-  static async getRecordById (recordId, options = {}) {
+  static async getRecordById(recordId, options = {}) {
     try {
       const { includeDeleted = false } = options
 
@@ -1126,50 +1132,54 @@ class ConsumptionService {
   }
 
   /**
-   * 根据二维码获取用户信息
+   * 根据二维码获取用户信息（UUID版本）
    * 业务场景：管理员扫码后快速获取用户基本信息（昵称、手机号码）
    *
-   * @param {string} qrCode - 用户二维码（格式：QR_{user_id}_{signature}）
-   * @returns {Object} 用户信息（user_id, nickname, mobile）
+   * @param {string} qrCode - 用户二维码（格式：QR_{user_uuid}_{signature}）
+   * @returns {Object} 用户信息（user_id, user_uuid, nickname, mobile）
    * @throws {Error} 二维码验证失败或用户不存在
    *
    * 实现逻辑：
-   * 1. 验证二维码格式和签名（调用QRCodeValidator）
-   * 2. 查询用户基本信息（仅返回必要字段）
-   * 3. 返回用户昵称和完整手机号码
+   * 1. 验证二维码格式和签名（调用QRCodeValidator，UUID版本）
+   * 2. 根据user_uuid查询用户基本信息（仅返回必要字段）
+   * 3. 返回用户昵称、UUID和完整手机号码
    */
-  static async getUserInfoByQRCode (qrCode) {
+  static async getUserInfoByQRCode(qrCode) {
     try {
-      console.log('🔍 [ConsumptionService] 开始验证二维码:', qrCode.substring(0, 20) + '...')
+      console.log(
+        '🔍 [ConsumptionService] 开始验证二维码（UUID版本）:',
+        qrCode.substring(0, 30) + '...'
+      )
 
-      // 1. 验证二维码格式和签名
+      // 1. 验证二维码格式和签名（UUID版本）
       const validation = QRCodeValidator.validateQRCode(qrCode)
       if (!validation.valid) {
         throw new Error(`二维码验证失败：${validation.error}`)
       }
 
-      console.log('✅ [ConsumptionService] 二维码验证通过，用户ID:', validation.user_id)
+      console.log('✅ [ConsumptionService] 二维码验证通过，用户UUID:', validation.user_uuid)
 
-      // 2. 查询用户信息（仅查询必要字段）
+      // 2. 根据UUID查询用户信息（仅查询必要字段）
       const user = await User.findOne({
         where: {
-          user_id: validation.user_id
+          user_uuid: validation.user_uuid
         },
-        attributes: ['user_id', 'nickname', 'mobile'] // 仅返回必要字段
+        attributes: ['user_id', 'user_uuid', 'nickname', 'mobile'] // 返回必要字段
       })
 
       // 3. 验证用户是否存在
       if (!user) {
-        throw new Error(`用户不存在（user_id: ${validation.user_id}）`)
+        throw new Error(`用户不存在（user_uuid: ${validation.user_uuid}）`)
       }
 
       console.log(
-        `✅ [ConsumptionService] 用户信息获取成功: user_id=${user.user_id}, nickname=${user.nickname}`
+        `✅ [ConsumptionService] 用户信息获取成功: user_id=${user.user_id}, user_uuid=${user.user_uuid.substring(0, 8)}..., nickname=${user.nickname}`
       )
 
-      // 4. 返回用户信息
+      // 4. 返回用户信息（包含user_uuid）
       return {
         user_id: user.user_id,
+        user_uuid: user.user_uuid, // UUID标识
         nickname: user.nickname,
         mobile: user.mobile // 返回完整手机号码
       }
@@ -1190,7 +1200,7 @@ class ConsumptionService {
    * - 配置不存在或读取失败时返回默认值 0.24
    * - 异常时降级到默认值，确保业务不中断
    */
-  static async getBudgetRatio () {
+  static async getBudgetRatio() {
     try {
       const { SystemSettings } = require('../models')
 

@@ -29,6 +29,15 @@ module.exports = sequelize => {
         comment: '用户唯一标识'
       },
 
+      // ⭐⭐⭐⭐⭐ 外部UUID标识 - 必需，极高优先级（用于QR码，隐私保护）
+      user_uuid: {
+        type: DataTypes.UUID,
+        allowNull: false,
+        unique: true,
+        defaultValue: DataTypes.UUIDV4,
+        comment: '用户UUID（用于外部标识和QR码，UUIDv4格式，防止用户ID枚举攻击）'
+      },
+
       // ⭐⭐⭐⭐⭐ 唯一标识+登录 - 必需，极高优先级
       mobile: {
         type: DataTypes.STRING(20),
@@ -89,6 +98,11 @@ module.exports = sequelize => {
         {
           unique: true,
           fields: ['mobile']
+        },
+        {
+          unique: true,
+          fields: ['user_uuid'],
+          name: 'idx_users_user_uuid_unique'
         },
         {
           fields: ['status']
@@ -295,6 +309,13 @@ module.exports = sequelize => {
   User.findByMobile = function (mobile) {
     return this.findOne({
       where: { mobile, status: 'active' }
+    })
+  }
+
+  // 🔥 根据UUID查找用户（用于QR码验证）
+  User.findByUuid = function (userUuid) {
+    return this.findOne({
+      where: { user_uuid: userUuid, status: 'active' }
     })
   }
 

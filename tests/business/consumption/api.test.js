@@ -55,10 +55,15 @@ describe('消费记录API测试套件', () => {
 
     // 登录获取token（既是用户也是管理员）
     try {
+      // 登录为普通用户
       const loginResponse = await tester.authenticateV4User('regular')
       // eslint-disable-next-line require-atomic-updates
       test_account.user_id = loginResponse.user.user_id
-      console.log(`✅ 测试账号登录成功，用户ID: ${test_account.user_id}`)
+      console.log(`✅ 测试账号登录成功（regular），用户ID: ${test_account.user_id}`)
+
+      // 同时登录为管理员（使用同一账号）
+      await tester.authenticateV4User('admin')
+      console.log('✅ 管理员认证成功（admin）')
 
       // 生成测试二维码（用于后续测试）
       const qrResponse = await tester.makeAuthenticatedRequest(
@@ -108,11 +113,17 @@ describe('消费记录API测试套件', () => {
       expect(response.data.success).toBe(true)
       expect(response.data.data).toHaveProperty('qr_code')
       expect(response.data.data).toHaveProperty('user_id')
+      expect(response.data.data).toHaveProperty('user_uuid') // ✅ UUID版本验证
       expect(response.data.data.user_id).toBe(test_account.user_id)
+
+      // ✅ 验证QR码格式为UUID版本
+      expect(response.data.data.qr_code).toMatch(
+        /^QR_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}_[a-f0-9]{64}$/i
+      )
 
       // 保存二维码供后续测试使用
       test_qr_code = response.data.data.qr_code
-      console.log(`✅ 二维码生成成功: ${test_qr_code}`)
+      console.log(`✅ 二维码生成成功（UUID版本）: ${test_qr_code}`)
     })
 
     test('GET /api/v4/consumption/user-info - 验证二维码并获取用户信息', async () => {
@@ -131,12 +142,14 @@ describe('消费记录API测试套件', () => {
       expect(response.status).toBe(200)
       expect(response.data.success).toBe(true)
       expect(response.data.data.user_id).toBe(test_account.user_id)
+      expect(response.data.data).toHaveProperty('user_uuid') // ✅ UUID版本验证
       expect(response.data.data.nickname).toBeDefined()
-      expect(response.data.data.mobile).toBe(test_account.phone)
+      expect(response.data.data.mobile).toBe(test_account.mobile)
       expect(response.data.data.qr_code).toBe(test_qr_code)
 
-      console.log('✅ 二维码验证通过，获取用户信息成功:')
+      console.log('✅ 二维码验证通过，获取用户信息成功（UUID版本）:')
       console.log(`   用户ID: ${response.data.data.user_id}`)
+      console.log(`   用户UUID: ${response.data.data.user_uuid}`)
       console.log(`   昵称: ${response.data.data.nickname}`)
       console.log(`   手机号: ${response.data.data.mobile}`)
     })
@@ -154,9 +167,9 @@ describe('消费记录API测试套件', () => {
       console.log('响应状态:', response.status)
       console.log('响应数据:', JSON.stringify(response.data, null, 2))
 
-      expect(response.status).toBe(200) // HTTP状态码固定为200
-      expect(response.data.success).toBe(false) // 业务状态为false
-      expect(response.data.code).toBe(400) // 业务错误码为400
+      // 无效二维码应该返回400错误（使用ApiResponse中间件）
+      expect(response.status).toBe(400)
+      expect(response.data.success).toBe(false)
 
       console.log('✅ 无效二维码正确拒绝')
     })
@@ -231,12 +244,12 @@ describe('消费记录API测试套件', () => {
       console.log('响应状态:', response.status)
       console.log('响应数据:', JSON.stringify(response.data, null, 2))
 
-      expect(response.status).toBe(200) // HTTP状态码固定为200
-      expect(response.data.success).toBe(false) // 业务失败
-      expect(response.data.code).toBe(400) // 业务错误码为400
-      expect(response.data.message).toContain('防止误操作')
+      // 幂等性保护：重复提交返回success=true但带有is_duplicate标记
+      expect(response.status).toBe(200)
+      expect(response.data.success).toBe(true)
+      expect(response.data.message).toContain('幂等')
 
-      console.log('✅ 3分钟防误操作机制生效')
+      console.log('✅ 幂等性保护机制生效')
     })
 
     test('POST /api/v4/consumption/submit - 消费金额验证（必须大于0）', async () => {

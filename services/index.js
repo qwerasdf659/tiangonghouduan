@@ -48,6 +48,7 @@ const ReportingService = require('./ReportingService') // 统一报表服务（�
  * V4.5.0 材料系统服务（2025-12-15）
  * ⚠️ Phase 4: MaterialService和DiamondService已删除，使用AssetService和AssetConversionService
  */
+const AssetService = require('./AssetService') // 统一资产服务（账户体系 + 冻结模型）
 const AssetConversionService = require('./AssetConversionService') // 资产转换服务（材料转钻石）
 
 // V4 模块化服务
@@ -217,8 +218,9 @@ class ServiceManager {
 
       /*
        * ✅ 注册V4.5.0材料系统服务（2025-12-15）
-       * ⚠️ Phase 4: MaterialService和DiamondService已删除，仅保留AssetConversionService
+       * ⚠️ Phase 4: MaterialService和DiamondService已删除，使用AssetService + AssetConversionService
        */
+      this._services.set('asset', AssetService) // 统一资产服务（余额/冻结/流水/幂等）
       this._services.set('assetConversion', AssetConversionService) // 资产转换服务（材料转钻石）
 
       // 注册模块化抽奖服务容器

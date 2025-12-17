@@ -492,7 +492,7 @@ router.post('/reject/:record_id', authenticateToken, requireAdmin, async (req, r
 
 /**
  * @route GET /api/v4/consumption/qrcode/:user_id
- * @desc 生成用户固定身份二维码
+ * @desc 生成用户固定身份二维码（UUID版本）
  * @access Private (用户本人或管理员)
  *
  * @param {number} user_id - 用户ID
@@ -501,9 +501,12 @@ router.post('/reject/:record_id', authenticateToken, requireAdmin, async (req, r
  * @example
  * GET /api/v4/consumption/qrcode/123
  * {
- *   "qr_code": "QR_123_a1b2c3d4...",
+ *   "qr_code": "QR_550e8400-e29b-41d4-a716-446655440000_a1b2c3d4...",
  *   "user_id": 123,
- *   "valid_until": "2025-10-30 23:59:59",
+ *   "user_uuid": "550e8400-e29b-41d4-a716-446655440000",
+ *   "generated_at": "2025-12-17 14:30:00",
+ *   "validity": "permanent",
+ *   "note": "此二维码长期有效，可打印使用（UUID版本，隐私保护）",
  *   "usage": "请商家扫描此二维码录入消费"
  * }
  */
@@ -532,18 +535,29 @@ router.get('/qrcode/:user_id', authenticateToken, async (req, res) => {
       return res.apiError('无权生成其他用户的二维码', 403)
     }
 
-    logger.info('生成用户二维码', { user_id: userId })
+    logger.info('生成用户二维码（UUID版本）', { user_id: userId })
 
-    // 生成二维码
-    const qrCodeInfo = QRCodeValidator.generateQRCodeInfo(userId)
+    // 查询用户获取UUID
+    const { User } = require('../../../models')
+    const user = await User.findByPk(userId, {
+      attributes: ['user_id', 'user_uuid']
+    })
+
+    if (!user) {
+      return res.apiError('用户不存在', 404)
+    }
+
+    // 使用UUID生成二维码
+    const qrCodeInfo = QRCodeValidator.generateQRCodeInfo(user.user_uuid)
 
     return res.apiSuccess(
       {
         qr_code: qrCodeInfo.qr_code,
-        user_id: qrCodeInfo.user_id,
+        user_id: user.user_id, // 内部标识
+        user_uuid: qrCodeInfo.user_uuid, // 外部标识
         generated_at: qrCodeInfo.generated_at,
         validity: qrCodeInfo.validity, // 固定身份码，永久有效
-        note: qrCodeInfo.note, // 说明：此二维码长期有效，可打印使用
+        note: qrCodeInfo.note, // 说明：此二维码长期有效，可打印使用（UUID版本，隐私保护）
         usage: '请商家扫描此二维码录入消费金额'
       },
       '二维码生成成功'
@@ -632,6 +646,7 @@ router.get('/user-info', authenticateToken, requireAdmin, async (req, res) => {
     return res.apiSuccess(
       {
         user_id: userInfo.user_id,
+        user_uuid: userInfo.user_uuid, // UUID标识
         nickname: userInfo.nickname,
         mobile: userInfo.mobile,
         qr_code

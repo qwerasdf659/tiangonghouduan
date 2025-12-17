@@ -280,6 +280,42 @@ router.post('/convert', authenticateToken, async (req, res) => {
 })
 
 /**
+ * 获取当前用户指定资产余额（统一账本）
+ * GET /api/v4/assets/balance?asset_code=DIAMOND
+ *
+ * 说明：
+ * - Phase 4: 余额真相来自 account_asset_balances（available_amount + frozen_amount）
+ * - asset_code 可省略，默认 DIAMOND
+ */
+router.get('/balance', authenticateToken, async (req, res) => {
+  try {
+    const user_id = req.user.user_id
+    const asset_code = (req.query.asset_code || 'DIAMOND').toString()
+
+    // ✅ 通过 ServiceManager 获取 AssetService（符合TR-005规范）
+    const AssetService = req.app.locals.services.getService('asset')
+
+    const balance = await AssetService.getBalance({ user_id, asset_code })
+
+    return res.apiSuccess(
+      {
+        asset_code,
+        ...balance
+      },
+      '获取资产余额成功'
+    )
+  } catch (error) {
+    logger.error('获取资产余额失败', {
+      error: error.message,
+      stack: error.stack,
+      user_id: req.user?.user_id,
+      asset_code: req.query?.asset_code
+    })
+    return handleServiceError(error, res, '获取资产余额失败')
+  }
+})
+
+/**
  * 获取用户材料余额接口
  * GET /api/v4/assets/balances
  *
@@ -305,93 +341,86 @@ router.post('/convert', authenticateToken, async (req, res) => {
  * }
  */
 router.get('/balances', authenticateToken, async (req, res) => {
-  return res.apiError(
-    '❌ 材料余额查询功能已迁移（Phase 4）。' +
-      '\nMaterialService和DiamondService已删除。' +
-      '\n请使用AssetService查询统一资产余额。' +
-      '\n示例: GET /api/v4/assets/balance?asset_code=red_shard',
-    'DEPRECATED_API',
-    {
-      migration_guide: {
-        old_service: 'MaterialService + DiamondService',
-        new_service: 'AssetService',
-        example: 'await AssetService.getBalance({ user_id, asset_code })'
-      }
-    },
-    410
-  )
+  try {
+    const user_id = req.user.user_id
 
-  // 以下是旧代码（已禁用）
-  /*
-   *try {
-   *  // 🔄 通过 ServiceManager 获取 MaterialService
-   *  const MaterialService = req.app.locals.services.getService('material')
-   *  const DiamondService = req.app.locals.services.getService('diamond')
-   *
-   *  const user_id = req.user.user_id
-   *
-   *  logger.info('获取用户材料余额', { user_id })
-   *
-   *  // 获取用户所有材料余额
-   *  const materialBalances = await MaterialService.getUserBalances(user_id, {
-   *    includeAssetType: true,
-   *    includeZeroBalance: false
-   *  })
-   *
-   *  // 获取用户钻石余额
-   *  const diamondAccount = await DiamondService.getUserAccount(user_id)
-   *  const diamondBalance = diamondAccount ? diamondAccount.balance : 0
-   *
-   *  // 组合结果
-   *  const balances = []
-   *
-   *  // 添加材料余额
-   *  materialBalances.forEach(balance => {
-   *    balances.push({
-   *      asset_code: balance.asset_code,
-   *      balance: balance.balance,
-   *      display_name: balance.asset_type ? balance.asset_type.display_name : balance.asset_code,
-   *      group_code: balance.asset_type ? balance.asset_type.group_code : 'material',
-   *      tier: balance.asset_type ? balance.asset_type.tier : null,
-   *      form: balance.asset_type ? balance.asset_type.form : null
-   *    })
-   *  })
-   *
-   *  // 添加钻石余额
-   *  balances.push({
-   *    asset_code: 'DIAMOND',
-   *    balance: diamondBalance,
-   *    display_name: '钻石',
-   *    group_code: 'currency',
-   *    tier: null,
-   *    form: null
-   *  })
-   *
-   *  logger.info('获取材料余额成功', {
-   *    user_id,
-   *    material_count: materialBalances.length,
-   *    diamond_balance: diamondBalance
-   *  })
-   *
-   *  return res.apiSuccess(
-   *    {
-   *      balances,
-   *      summary: {
-   *        total_materials: materialBalances.length,
-   *        total_diamonds: diamondBalance
-   *      }
-   *    },
-   *    '获取材料余额成功'
-   *  )
-   *} catch (error) {
-   *  logger.error('获取材料余额失败', {
-   *    error: error.message,
-   *    stack: error.stack,
-   *    user_id: req.user?.user_id
-   *  })
-   *  return handleServiceError(error, res, '获取材料余额失败')
-   *}
-   */
+    // ✅ 通过 ServiceManager 获取 AssetService（符合TR-005规范）
+    const AssetService = req.app.locals.services.getService('asset')
+
+    const rows = await AssetService.getAllBalances({ user_id })
+
+    const balances = rows.map(r => ({
+      asset_code: r.asset_code,
+      available_amount: Number(r.available_amount),
+      frozen_amount: Number(r.frozen_amount),
+      total_amount: Number(r.available_amount) + Number(r.frozen_amount)
+    }))
+
+    return res.apiSuccess(
+      {
+        balances,
+        summary: {
+          total_assets: balances.length
+        }
+      },
+      '获取资产余额列表成功'
+    )
+  } catch (error) {
+    logger.error('获取资产余额列表失败', {
+      error: error.message,
+      stack: error.stack,
+      user_id: req.user?.user_id
+    })
+    return handleServiceError(error, res, '获取资产余额列表失败')
+  }
+})
+
+/**
+ * 获取当前用户资产流水（统一账本）
+ * GET /api/v4/assets/transactions?asset_code=DIAMOND&page=1&page_size=20
+ */
+router.get('/transactions', authenticateToken, async (req, res) => {
+  try {
+    const user_id = req.user.user_id
+    const asset_code = req.query.asset_code ? req.query.asset_code.toString() : undefined
+    const business_type = req.query.business_type ? req.query.business_type.toString() : undefined
+    const page = req.query.page ? parseInt(req.query.page) : 1
+    const page_size = req.query.page_size ? parseInt(req.query.page_size) : 20
+
+    if (isNaN(page) || page <= 0) {
+      return res.apiError(
+        'page参数无效，必须为正整数',
+        'BAD_REQUEST',
+        { page: req.query.page },
+        400
+      )
+    }
+    if (isNaN(page_size) || page_size <= 0 || page_size > 200) {
+      return res.apiError(
+        'page_size参数无效，必须为1-200的正整数',
+        'BAD_REQUEST',
+        { page_size: req.query.page_size },
+        400
+      )
+    }
+
+    const AssetService = req.app.locals.services.getService('asset')
+    const result = await AssetService.getTransactions(
+      { user_id },
+      { asset_code, business_type, page, page_size }
+    )
+
+    return res.apiSuccess(result, '获取资产流水成功')
+  } catch (error) {
+    logger.error('获取资产流水失败', {
+      error: error.message,
+      stack: error.stack,
+      user_id: req.user?.user_id,
+      asset_code: req.query?.asset_code,
+      business_type: req.query?.business_type
+    })
+    return handleServiceError(error, res, '获取资产流水失败')
+  }
 })
 
 /**
