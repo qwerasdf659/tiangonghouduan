@@ -32,8 +32,11 @@ const BeijingTimeHelper = require('../../utils/timeHelper')
 const { monitor: databaseMonitor } = require('./database-performance-monitor')
 // 2025-12-15新增：交易订单服务（Phase 2）
 const TradeOrderService = require('../../services/TradeOrderService')
-// 2025-12-17新增：核销订单服务（Phase 1）
-const RedemptionOrderService = require('../../services/RedemptionOrderService')
+// 2025-12-17新增：每日资产对账任务（Phase 1）
+const DailyAssetReconciliation = require('../../jobs/daily-asset-reconciliation')
+// 🔴 移除 RedemptionOrderService 直接引用（2025-12-17 P1-2）
+// 原因：统一通过 jobs/daily-redemption-order-expiration.js 作为唯一入口
+// 避免多处直接调用服务层方法，确保业务逻辑和报告格式统一
 
 /**
  * 定时任务管理类
@@ -81,6 +84,9 @@ class ScheduledTasks {
 
     // 任务11: 每天凌晨2点清理过期核销码（2025-12-17新增）
     this.scheduleRedemptionOrderExpiration()
+
+    // 任务12: 每天凌晨2点执行资产对账（2025-12-17新增）
+    this.scheduleDailyAssetReconciliation()
 
     logger.info('所有定时任务已初始化完成')
   }
@@ -876,27 +882,156 @@ class ScheduledTasks {
    * 2. 记录过期数量和时间戳
    *
    * 创建时间：2025-12-17（Phase 1）
+   * 统一入口（2025-12-17 P1-2）：
+   * - 调用 jobs/daily-redemption-order-expiration.js 作为唯一权威入口
+   * - 避免直接调用 RedemptionOrderService，确保业务逻辑和报告统一
+   * - 所有过期清理逻辑集中在 DailyRedemptionOrderExpiration 类中
+   *
    * @returns {void}
    */
   static scheduleRedemptionOrderExpiration() {
     cron.schedule('0 2 * * *', async () => {
+      const lockKey = 'lock:redemption_order_expiration'
+      const lockValue = `${process.pid}_${Date.now()}` // 进程ID + 时间戳作为锁值
+      let redisClient = null
+
       try {
-        logger.info('[定时任务] 开始清理过期核销订单...')
+        // 获取Redis客户端
+        const { getRawClient } = require('../../utils/UnifiedRedisClient')
+        redisClient = getRawClient()
 
-        // 调用 RedemptionOrderService 的过期清理方法
-        const expiredCount = await RedemptionOrderService.expireOrders()
+        // 尝试获取分布式锁（10分钟过期）
+        const acquired = await redisClient.set(lockKey, lockValue, 'EX', 600, 'NX')
 
-        if (expiredCount > 0) {
-          logger.warn(`[定时任务] 清理完成：${expiredCount}个核销订单已过期`)
-        } else {
-          logger.info('[定时任务] 清理完成：无过期核销订单')
+        if (!acquired) {
+          logger.info('[定时任务] 其他实例正在执行核销订单过期清理，跳过')
+          return
         }
+
+        logger.info('[定时任务] 获取分布式锁成功，开始执行每日核销订单过期清理...', {
+          lock_key: lockKey,
+          lock_value: lockValue
+        })
+
+        // 调用统一的 Job 类执行清理（唯一权威入口）
+        const DailyRedemptionOrderExpiration = require('../../jobs/daily-redemption-order-expiration')
+        const report = await DailyRedemptionOrderExpiration.execute()
+
+        if (report.expired_count > 0) {
+          logger.warn(`[定时任务] 每日核销订单过期清理完成：${report.expired_count}个订单已过期`)
+        } else {
+          logger.info('[定时任务] 每日核销订单过期清理完成：无过期订单')
+        }
+
+        // 释放锁
+        await redisClient.del(lockKey)
+        logger.info('[定时任务] 分布式锁已释放', { lock_key: lockKey })
       } catch (error) {
         logger.error('[定时任务] 核销订单过期清理失败', { error: error.message })
+
+        // 确保释放锁
+        if (redisClient) {
+          try {
+            await redisClient.del(lockKey)
+          } catch (unlockError) {
+            logger.error('[定时任务] 释放分布式锁失败', { error: unlockError.message })
+          }
+        }
       }
     })
 
-    logger.info('✅ 定时任务已设置: 核销订单过期清理（每天凌晨2点执行）')
+    logger.info('✅ 定时任务已设置: 核销订单过期清理（每天凌晨2点执行，支持分布式锁）')
+  }
+
+  /**
+   * 任务12: 每天凌晨2点执行每日资产对账（2025-12-17新增）
+   * Cron表达式: 0 2 * * * (每天凌晨2点)
+   * @returns {void}
+   */
+  static scheduleDailyAssetReconciliation() {
+    cron.schedule('0 2 * * *', async () => {
+      const lockKey = 'lock:daily_asset_reconciliation'
+      const lockValue = `${process.pid}_${Date.now()}` // 进程ID + 时间戳作为锁值
+      let redisClient = null
+
+      try {
+        // 获取Redis客户端
+        const { getRawClient } = require('../../utils/UnifiedRedisClient')
+        redisClient = getRawClient()
+
+        // 尝试获取分布式锁（20分钟过期，资产对账可能耗时较长）
+        const acquired = await redisClient.set(lockKey, lockValue, 'EX', 1200, 'NX')
+
+        if (!acquired) {
+          logger.info('[定时任务] 其他实例正在执行每日资产对账，跳过')
+          return
+        }
+
+        logger.info('[定时任务] 获取分布式锁成功，开始执行每日资产对账...', {
+          lock_key: lockKey,
+          lock_value: lockValue
+        })
+
+        // 调用 DailyAssetReconciliation 的对账方法
+        const report = await DailyAssetReconciliation.execute()
+
+        if (report.status === 'OK') {
+          logger.info('[定时任务] 每日资产对账完成：无差异')
+        } else {
+          logger.warn(
+            `[定时任务] 每日资产对账完成：发现${report.discrepancy_count}笔差异（状态: ${report.status}）`
+          )
+        }
+
+        // 释放锁
+        await redisClient.del(lockKey)
+        logger.info('[定时任务] 分布式锁已释放', { lock_key: lockKey })
+      } catch (error) {
+        logger.error('[定时任务] 每日资产对账失败', { error: error.message })
+
+        // 确保释放锁
+        if (redisClient) {
+          try {
+            await redisClient.del(lockKey)
+          } catch (unlockError) {
+            logger.error('[定时任务] 释放分布式锁失败', { error: unlockError.message })
+          }
+        }
+      }
+    })
+
+    logger.info('✅ 定时任务已设置: 每日资产对账（每天凌晨2点执行，支持分布式锁）')
+  }
+
+  /**
+   * 手动触发每日资产对账（用于测试）
+   *
+   * 业务场景：手动执行资产对账，用于开发调试和即时检查
+   *
+   * @returns {Promise<Object>} 对账报告对象
+   *
+   * @example
+   * const ScheduledTasks = require('./scripts/maintenance/scheduled-tasks')
+   * const report = await ScheduledTasks.manualDailyAssetReconciliation()
+   * console.log('对账状态:', report.status)
+   * console.log('发现差异:', report.discrepancy_count)
+   */
+  static async manualDailyAssetReconciliation() {
+    try {
+      logger.info('[手动触发] 开始执行每日资产对账...')
+      const report = await DailyAssetReconciliation.execute()
+
+      logger.info('[手动触发] 每日资产对账完成', {
+        status: report.status,
+        total_checked: report.total_checked,
+        discrepancy_count: report.discrepancy_count
+      })
+
+      return report
+    } catch (error) {
+      logger.error('[手动触发] 每日资产对账失败', { error: error.message })
+      throw error
+    }
   }
 
   /**
@@ -904,21 +1039,29 @@ class ScheduledTasks {
    *
    * 业务场景：手动清理过期核销订单，用于开发调试和即时清理
    *
-   * @returns {Promise<number>} 过期的订单数量
+   * @returns {Promise<Object>} 清理报告对象
+   * @returns {number} return.expired_count - 过期的订单数量
+   * @returns {string} return.timestamp - 执行时间
+   * @returns {number} return.duration_ms - 执行耗时
+   * @returns {string} return.status - 执行状态 (SUCCESS/ERROR)
    *
    * @example
    * const ScheduledTasks = require('./scripts/maintenance/scheduled-tasks')
-   * const count = await ScheduledTasks.manualRedemptionOrderExpiration()
-   * console.log(`清理了${count}个过期核销订单`)
+   * const report = await ScheduledTasks.manualRedemptionOrderExpiration()
+   * console.log(`清理了${report.expired_count}个过期核销订单`)
    *
    * 创建时间：2025-12-17
+   * 统一入口（2025-12-17 P1-2）：调用 jobs/daily-redemption-order-expiration.js
    */
   static async manualRedemptionOrderExpiration() {
     logger.info('[手动触发] 执行核销订单过期清理...')
     try {
-      const count = await RedemptionOrderService.expireOrders()
-      logger.info('[手动触发] 清理完成', { expired_count: count })
-      return count
+      // 使用统一的 Job 类（唯一权威入口）
+      const DailyRedemptionOrderExpiration = require('../../jobs/daily-redemption-order-expiration')
+      const report = await DailyRedemptionOrderExpiration.execute()
+
+      logger.info('[手动触发] 清理完成', { expired_count: report.expired_count })
+      return report
     } catch (error) {
       logger.error('[手动触发] 清理失败', { error: error.message })
       throw error

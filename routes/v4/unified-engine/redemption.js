@@ -65,9 +65,42 @@ router.post('/orders', authenticateToken, async (req, res) => {
       user_id: userId
     })
 
-    // 调用RedemptionOrderService生成订单
+    // 🔐 关键安全校验：所有权或管理员权限检查（防越权）
+    const { ItemInstance } = req.app.locals.models
+    const item = await ItemInstance.findByPk(item_instance_id)
+
+    if (!item) {
+      logger.error('物品实例不存在', { item_instance_id })
+      return res.apiError('物品实例不存在', 'NOT_FOUND', null, 404)
+    }
+
+    // 检查物品所有权
+    if (item.owner_user_id !== userId) {
+      // 如果不是所有者，检查是否为管理员
+      const { getUserRoles } = require('../../../middleware/auth')
+      const userRoles = await getUserRoles(userId)
+
+      if (!userRoles.isAdmin) {
+        logger.warn('非所有者且非管理员尝试生成核销码（防越权）', {
+          user_id: userId,
+          item_instance_id,
+          actual_owner: item.owner_user_id
+        })
+        return res.apiError('无权操作该物品，仅所有者或管理员可生成核销码', 'FORBIDDEN', null, 403)
+      }
+
+      logger.info('管理员生成核销码', {
+        admin_user_id: userId,
+        item_instance_id,
+        actual_owner: item.owner_user_id
+      })
+    }
+
+    // 调用RedemptionOrderService生成订单（传入创建者ID用于服务层兜底）
     const RedemptionOrderService = req.app.locals.services.getService('redemptionOrder')
-    const result = await RedemptionOrderService.createOrder(item_instance_id)
+    const result = await RedemptionOrderService.createOrder(item_instance_id, {
+      creator_user_id: userId // 传入创建者ID，供服务层兜底校验
+    })
 
     logger.info('核销订单生成成功', {
       order_id: result.order.order_id,
@@ -150,7 +183,7 @@ router.post('/fulfill', authenticateToken, async (req, res) => {
     }
 
     // 权限验证（只允许商户或管理员核销）
-    const { getUserRoles } = require('../../../utils/roleHelpers')
+    const { getUserRoles } = require('../../../middleware/auth')
     const userRoles = await getUserRoles(redeemerUserId)
 
     if (userRoles.role_level < 50) {

@@ -47,33 +47,36 @@ class RedemptionOrderService {
    *
    * 业务流程：
    * 1. 验证物品实例存在且可用
-   * 2. 生成唯一的12位Base32核销码
-   * 3. 计算SHA-256哈希
-   * 4. 创建订单记录（30天有效期）
-   * 5. 返回明文码（仅此一次，不再存储）
+   * 2. 🔐 验证所有权或管理员权限（服务层兜底）
+   * 3. 生成唯一的12位Base32核销码
+   * 4. 计算SHA-256哈希
+   * 5. 创建订单记录（30天有效期）
+   * 6. 返回明文码（仅此一次，不再存储）
    *
    * @param {number} item_instance_id - 物品实例ID
    * @param {Object} [options] - 事务选项
    * @param {Object} [options.transaction] - Sequelize事务对象
+   * @param {number} [options.creator_user_id] - 创建者用户ID（用于权限兜底校验）
    * @returns {Promise<Object>} {order, code} - 订单对象和明文码
-   * @throws {Error} 物品实例不存在、物品不可用、核销码生成失败等
+   * @throws {Error} 物品实例不存在、物品不可用、权限不足、核销码生成失败等
    *
    * @example
-   * const result = await RedemptionOrderService.createOrder(123)
+   * const result = await RedemptionOrderService.createOrder(123, { creator_user_id: 456 })
    * console.log('核销码:', result.code) // '3K7J-2MQP-WXYZ'
    * console.log('订单ID:', result.order.order_id)
    * console.log('过期时间:', result.order.expires_at)
    */
   static async createOrder(item_instance_id, options = {}) {
-    const { transaction: externalTx } = options
+    const { transaction: externalTx, creator_user_id } = options
     const tx = externalTx || (await sequelize.transaction())
     const shouldCommit = !externalTx
 
     try {
-      logger.info('开始创建兑换订单', { item_instance_id })
+      logger.info('开始创建兑换订单', { item_instance_id, creator_user_id })
 
-      // 1. 验证物品实例存在且可用
+      // 1. 验证物品实例存在且可用（使用行锁防止并发冲突）
       const item = await ItemInstance.findByPk(item_instance_id, {
+        lock: tx.LOCK.UPDATE, // 添加行锁（SELECT ... FOR UPDATE）
         transaction: tx
       })
 
@@ -83,6 +86,57 @@ class RedemptionOrderService {
 
       if (item.status !== 'available') {
         throw new Error(`物品实例不可用: status=${item.status}`)
+      }
+
+      // 1.5 幂等性检查：防止同一物品并发创建多个pending订单
+      const existingOrder = await RedemptionOrder.findOne({
+        where: {
+          item_instance_id,
+          status: 'pending'
+        },
+        transaction: tx
+      })
+
+      if (existingOrder) {
+        logger.warn('物品已有pending核销订单，拒绝重复创建', {
+          item_instance_id,
+          existing_order_id: existingOrder.order_id,
+          creator_user_id
+        })
+        throw new Error('该物品已有待核销订单，请勿重复生成核销码')
+      }
+
+      // 🔐 2. 服务层兜底：所有权或管理员权限校验（防越权）
+      if (creator_user_id) {
+        // 检查创建者是否为物品所有者
+        if (item.owner_user_id !== creator_user_id) {
+          // 检查创建者是否为管理员（统一使用getUserRoles，基于role_level判定）
+          const { getUserRoles } = require('../middleware/auth')
+          const userRoles = await getUserRoles(creator_user_id)
+
+          // 管理员判定：role_level >= 100
+          if (!userRoles.isAdmin) {
+            logger.error('服务层兜底：非所有者且非管理员尝试生成核销码', {
+              creator_user_id,
+              item_instance_id,
+              actual_owner: item.owner_user_id,
+              role_level: userRoles.role_level
+            })
+            throw new Error('权限不足：仅物品所有者或管理员可生成核销码')
+          }
+
+          logger.info('服务层验证：管理员生成核销码', {
+            admin_user_id: creator_user_id,
+            item_instance_id,
+            actual_owner: item.owner_user_id,
+            role_level: userRoles.role_level
+          })
+        }
+      } else {
+        // 如果未传入creator_user_id，记录警告（建议路由层传入）
+        logger.warn('创建核销订单时未传入creator_user_id，无法执行权限兜底校验', {
+          item_instance_id
+        })
       }
 
       // 2. 生成唯一核销码（最多重试3次）
@@ -115,12 +169,22 @@ class RedemptionOrderService {
         { transaction: tx }
       )
 
+      // 5. 立即锁定物品实例（防止码已发出但物品被转让/重复生成码）
+      await item.lock(order.order_id, { transaction: tx })
+
+      logger.info('物品已锁定', {
+        item_instance_id,
+        order_id: order.order_id,
+        locked_at: item.locked_at
+      })
+
       if (shouldCommit) await tx.commit()
 
       logger.info('兑换订单创建成功', {
         order_id: order.order_id,
         item_instance_id,
-        expires_at: expiresAt
+        expires_at: expiresAt,
+        item_locked: true
       })
 
       // ⚠️ 明文码只返回一次，不再存储
@@ -263,7 +327,13 @@ class RedemptionOrderService {
 
       const order = await RedemptionOrder.findByPk(order_id, {
         lock: tx.LOCK.UPDATE,
-        transaction: tx
+        transaction: tx,
+        include: [
+          {
+            model: ItemInstance,
+            as: 'item_instance'
+          }
+        ]
       })
 
       if (!order) {
@@ -281,11 +351,21 @@ class RedemptionOrderService {
         return order
       }
 
+      // 更新订单状态为cancelled
       await order.update({ status: 'cancelled' }, { transaction: tx })
+
+      // 释放物品锁定（如果物品被该订单锁定）
+      if (order.item_instance && order.item_instance.locked_by_order_id === order_id) {
+        await order.item_instance.unlock({ transaction: tx })
+        logger.info('物品锁定已释放', {
+          item_instance_id: order.item_instance_id,
+          order_id
+        })
+      }
 
       if (shouldCommit) await tx.commit()
 
-      logger.info('订单取消成功', { order_id })
+      logger.info('订单取消成功', { order_id, item_unlocked: true })
 
       return order
     } catch (error) {
@@ -313,24 +393,59 @@ class RedemptionOrderService {
     try {
       logger.info('开始清理过期兑换订单')
 
-      const [affectedCount] = await RedemptionOrder.update(
+      // 1. 查找所有过期的pending订单（需要关联物品实例以便解锁）
+      const expiredOrders = await RedemptionOrder.findAll({
+        where: {
+          status: 'pending',
+          expires_at: {
+            [sequelize.Sequelize.Op.lt]: new Date()
+          }
+        },
+        include: [
+          {
+            model: ItemInstance,
+            as: 'item_instance',
+            required: false // LEFT JOIN，避免物品不存在时订单无法过期
+          }
+        ],
+        transaction: tx
+      })
+
+      if (expiredOrders.length === 0) {
+        await tx.commit()
+        logger.info('无过期订单需要清理')
+        return 0
+      }
+
+      // 2. 批量更新订单状态为expired
+      const orderIds = expiredOrders.map(order => order.order_id)
+      await RedemptionOrder.update(
         { status: 'expired' },
         {
           where: {
-            status: 'pending',
-            expires_at: {
-              [sequelize.Sequelize.Op.lt]: new Date()
-            }
+            order_id: orderIds
           },
           transaction: tx
         }
       )
 
+      // 3. 释放被这些订单锁定的物品
+      let unlockedCount = 0
+      for (const order of expiredOrders) {
+        if (order.item_instance && order.item_instance.locked_by_order_id === order.order_id) {
+          await order.item_instance.unlock({ transaction: tx })
+          unlockedCount++
+        }
+      }
+
       await tx.commit()
 
-      logger.info('过期订单清理完成', { expired_count: affectedCount })
+      logger.info('过期订单清理完成', {
+        expired_count: expiredOrders.length,
+        unlocked_items: unlockedCount
+      })
 
-      return affectedCount
+      return expiredOrders.length
     } catch (error) {
       await tx.rollback()
       logger.error('过期订单清理失败', { error: error.message })

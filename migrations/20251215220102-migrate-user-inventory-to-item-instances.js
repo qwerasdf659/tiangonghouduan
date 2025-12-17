@@ -88,10 +88,11 @@ module.exports = {
           expires_at: record.expires_at,
           used_at: record.used_at,
 
-          // 核销信息
-          operator_id: record.operator_id,
-          verification_code: record.verification_code,
-          verification_expires_at: record.verification_expires_at,
+          // 🔒 核销信息 - 不再迁移明文核销码
+          // 旧核销码已废弃，核销信息统一通过 redemption_orders 表管理
+          // verification_code: [已删除] - 禁止明文存储
+          // verification_expires_at: [已删除] - TTL由redemption_orders管理
+          operator_id: record.operator_id, // 仅保留操作者ID用于历史追溯
 
           // 转让信息
           transfer_to_user_id: record.transfer_to_user_id,

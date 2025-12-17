@@ -531,6 +531,13 @@ try {
     note: '新版核销系统（12位Base32码，SHA-256哈希存储，30天TTL）'
   })
 
+  // V4背包双轨系统路由（可叠加资产 + 不可叠加物品）
+  app.use('/api/v4/backpack', require('./routes/v4/unified-engine/backpack'))
+  appLogger.info('背包双轨系统加载成功', {
+    route: '/api/v4/backpack',
+    note: '统一背包查询接口（assets[] + items[]）'
+  })
+
   // V4兑换市场路由（双账户+商城双玩法方案）
   app.use('/api/v4/exchange_market', require('./routes/v4/unified-engine/exchange_market'))
   appLogger.info('V4兑换市场系统加载成功（双账户模型）', {
@@ -695,8 +702,9 @@ try {
   const { initializeServices } = require('./services')
   const services = initializeServices(models)
 
-  // 将Service容器添加到app实例中，供路由使用
+  // 将Service容器和Models添加到app实例中，供路由使用
   app.locals.services = services
+  app.locals.models = models // 注入models供路由层使用
 
   appLogger.info('Service层初始化完成', {
     services: Array.from(services.getAllServices().keys())

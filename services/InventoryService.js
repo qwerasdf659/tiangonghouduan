@@ -795,215 +795,93 @@ class InventoryService {
   }
 
   /**
-   * 生成核销码
+   * ❌ 已废弃：生成核销码（方案A - 2025-12-17立即停止）
    *
+   * @deprecated 此方法已完全废弃，请使用 RedemptionOrderService.createOrder(item_instance_id)
    * @param {number} userId - 用户ID
    * @param {number} itemId - 物品ID
-   * @param {Object} options - 选项
-   * @param {Object} options.transaction - 事务对象（可选）
-   * @returns {Promise<Object>} {verification_code, expires_at}
+   * @param {Object} _options - 选项（未使用）
+   * @returns {Promise<never>} 总是抛出异常
+   * @throws {Error} 强制抛出异常，不再支持旧6位数字码生成
+   *
+   * 废弃原因：
+   * - 旧码（6位数字，5分钟TTL）已废弃，系统统一使用新码（12位Base32，30天TTL）
+   * - 新码使用SHA-256哈希存储，更安全
+   * - 新码通过 redemption_orders 表管理，支持更完善的状态机
+   *
+   * 迁移指南：
+   * 1. 使用 RedemptionOrderService.createOrder(item_instance_id, options) 生成新码
+   * 2. 新码返回格式：{ order: RedemptionOrder, code: '1234-5678-90AB' }
+   * 3. 新码有效期：30天（vs 旧码5分钟）
+   * 4. 核销接口：RedemptionOrderService.fulfillOrder(code, redeemer_user_id)
+   *
+   * 决策记录：2025-12-17 用户选择方案A（一刀切，立即停止旧码生成）
    */
-  static async generateVerificationCode(userId, itemId, options = {}) {
-    const { transaction = null } = options
+  static async generateVerificationCode(userId, itemId, _options = {}) {
+    logger.error('尝试调用已废弃的旧码生成方法', {
+      method: 'generateVerificationCode',
+      deprecated_since: '2025-12-17',
+      user_id: userId,
+      item_id: itemId,
+      caller: new Error().stack.split('\n')[2]?.trim()
+    })
 
-    try {
-      // ⚠️ 废弃警告：此方法已废弃，请使用 RedemptionOrderService
-      logger.warn('⚠️ 此方法已废弃，请使用 RedemptionOrderService.createOrder()', {
-        method: 'generateVerificationCode',
-        deprecated_since: '2025-12-17',
-        replacement: 'RedemptionOrderService.createOrder(item_instance_id)',
-        caller: new Error().stack.split('\n')[2]?.trim()
-      })
-
-      logger.info('开始生成核销码', {
-        user_id: userId,
-        item_id: itemId
-      })
-
-      // 1. 查询物品（验证所有权）
-      const item = await UserInventory.findOne({
-        where: {
-          inventory_id: itemId,
-          user_id: userId,
-          status: 'available'
-        },
-        transaction
-      })
-
-      if (!item) {
-        throw new Error('物品不存在或不可用')
-      }
-
-      // 2. 生成6位数字码
-      const verificationCode = Math.floor(100000 + Math.random() * 900000).toString()
-
-      // 3. 设置过期时间（5分钟）
-      const expiresAt = new Date(Date.now() + 5 * 60 * 1000)
-
-      // 4. 更新物品记录
-      await item.update(
-        {
-          verification_code: verificationCode,
-          verification_expires_at: expiresAt
-        },
-        { transaction }
-      )
-
-      logger.info('生成核销码成功', {
-        user_id: userId,
-        item_id: itemId,
-        verification_code: verificationCode
-      })
-
-      return {
-        verification_code: verificationCode,
-        expires_at: expiresAt
-      }
-    } catch (error) {
-      logger.error('生成核销码失败', {
-        error: error.message,
-        user_id: userId,
-        item_id: itemId
-      })
-      throw error
-    }
+    throw new Error(
+      '此方法已完全废弃（方案A - 一刀切）。' +
+        '旧6位数字码不再支持。' +
+        '请使用 RedemptionOrderService.createOrder(item_instance_id) 生成新12位Base32码。' +
+        '新码有效期30天，更安全且功能更完善。' +
+        '迁移文档：docs/背包双轨架构迁移执行方案-真实版.md'
+    )
   }
 
   /**
-   * 核销验证
+   * ❌ 已废弃：核销验证（方案A - 2025-12-17立即停止）
    *
+   * @deprecated 此方法已完全废弃，请使用 RedemptionOrderService.fulfillOrder(code, redeemer_user_id)
    * @param {number} merchantId - 商家ID
    * @param {string} verificationCode - 核销码
-   * @param {Object} options - 选项
-   * @param {Object} options.transaction - 事务对象（可选）
-   * @returns {Promise<Object>} 核销结果
+   * @param {Object} _options - 选项（未使用）
+   * @returns {Promise<never>} 总是抛出异常
+   * @throws {Error} 强制抛出异常，不再支持旧8位HEX码核销
+   *
+   * 废弃原因：
+   * - 旧码（8位HEX，24小时TTL）已废弃，系统统一使用新码（12位Base32，30天TTL）
+   * - 新码使用SHA-256哈希存储，安全性大幅提升
+   * - 新码通过 redemption_orders 表管理，支持完整的状态机（pending/fulfilled/cancelled/expired）
+   * - 新码支持更完善的幂等性和并发控制
+   *
+   * 迁移指南：
+   * 1. 使用 RedemptionOrderService.fulfillOrder(code, redeemer_user_id, options) 核销新码
+   * 2. 新码格式：12位Base32，如 '1234-5678-90AB'（带连字符为显示格式）
+   * 3. 核销返回格式：{ order: RedemptionOrder, item: ItemInstance }
+   * 4. 新码有效期：30天（vs 旧码24小时）
+   * 5. 新码状态：pending → fulfilled（核销成功）或 expired（超时）或 cancelled（取消）
+   *
+   * 商家端迁移：
+   * - 旧接口：POST /api/v4/inventory/verification/verify
+   * - 新接口：POST /api/v4/redemption/fulfill
+   * - 新接口请求体：{ code: "1234567890AB", redeemer_user_id: 123 }
+   *
+   * 决策记录：2025-12-17 用户选择方案A（一刀切，立即停止旧码核销）
    */
-  static async verifyCode(merchantId, verificationCode, options = {}) {
-    const { transaction: externalTransaction } = options
+  static async verifyCode(merchantId, verificationCode, _options = {}) {
+    logger.error('尝试调用已废弃的旧码核销方法', {
+      method: 'verifyCode',
+      deprecated_since: '2025-12-17',
+      merchant_id: merchantId,
+      verification_code: verificationCode,
+      caller: new Error().stack.split('\n')[2]?.trim()
+    })
 
-    // 支持外部事务传入
-    const transaction = externalTransaction || (await UserInventory.sequelize.transaction())
-    const shouldCommit = !externalTransaction
-
-    try {
-      // ⚠️ 废弃警告：此方法已废弃，请使用 RedemptionOrderService
-      logger.warn('⚠️ 此方法已废弃，请使用 RedemptionOrderService.fulfillOrder()', {
-        method: 'verifyCode',
-        deprecated_since: '2025-12-17',
-        replacement: 'RedemptionOrderService.fulfillOrder(code, redeemer_user_id)',
-        caller: new Error().stack.split('\n')[2]?.trim()
-      })
-
-      logger.info('开始核销验证', {
-        merchant_id: merchantId,
-        verification_code: verificationCode
-      })
-
-      // 1. 根据核销码查询物品（加行级锁，不限制状态）
-      const item = await UserInventory.findOne({
-        where: {
-          verification_code: verificationCode
-        },
-        lock: transaction.LOCK.UPDATE,
-        transaction
-      })
-
-      if (!item) {
-        throw new Error('核销码不存在')
-      }
-
-      /*
-       * ✅ 幂等性检查（解决任务4.1：为高风险操作添加强制幂等检查）
-       * 如果物品已经被核销，返回原结果（防止重复核销）
-       */
-      if (item.status === 'used') {
-        logger.info('⚠️ 幂等性检查：物品已被核销，返回原结果', {
-          verification_code: verificationCode,
-          item_id: item.inventory_id,
-          merchant_id: merchantId,
-          used_at: item.used_at,
-          operator_id: item.operator_id
-        })
-
-        if (shouldCommit) {
-          await transaction.commit()
-        }
-
-        return {
-          item_id: item.inventory_id,
-          item_name: item.name,
-          user_id: item.user_id,
-          status: 'used',
-          used_at: item.used_at,
-          is_duplicate: true // ✅ 标记为重复请求
-        }
-      }
-
-      // 2. 状态检查（只有available状态可核销）
-      if (item.status !== 'available') {
-        throw new Error(`物品状态为${item.status}，无法核销`)
-      }
-
-      // 3. 验证码有效性检查（未过期）
-      if (item.verification_expires_at && new Date() > new Date(item.verification_expires_at)) {
-        throw new Error('核销码已过期')
-      }
-
-      // 4. 更新物品状态
-      await item.update(
-        {
-          status: 'used',
-          used_at: BeijingTimeHelper.createBeijingTime(),
-          operator_id: merchantId
-        },
-        { transaction }
-      )
-
-      // 5. 提交事务
-      if (shouldCommit) {
-        await transaction.commit()
-      }
-
-      // 📝 记录审计日志（异步，失败不影响业务）
-      try {
-        await AuditLogService.logInventoryVerify({
-          operator_id: merchantId,
-          item_id: item.inventory_id,
-          user_id: item.user_id,
-          item_name: item.name,
-          verification_code: verificationCode,
-          reason: '核销物品',
-          business_id: `verify_${item.inventory_id}_${Date.now()}`,
-          transaction: shouldCommit ? null : transaction // 已提交则不传事务
-        })
-      } catch (auditError) {
-        logger.error('审计日志记录失败', { error: auditError.message })
-      }
-
-      logger.info('核销验证成功', {
-        merchant_id: merchantId,
-        item_id: item.inventory_id,
-        user_id: item.user_id
-      })
-
-      return {
-        item_id: item.inventory_id,
-        item_name: item.name,
-        user_id: item.user_id,
-        status: 'used',
-        used_at: item.used_at
-      }
-    } catch (error) {
-      if (shouldCommit) {
-        await transaction.rollback()
-      }
-      logger.error('核销验证失败', {
-        error: error.message,
-        merchant_id: merchantId,
-        verification_code: verificationCode
-      })
-      throw error
-    }
+    throw new Error(
+      '此方法已完全废弃（方案A - 一刀切）。' +
+        '旧8位HEX码不再支持核销。' +
+        '请使用 RedemptionOrderService.fulfillOrder(code, redeemer_user_id) 核销新12位Base32码。' +
+        '商家端请更新扫码接口为 POST /api/v4/redemption/fulfill。' +
+        '新码有效期30天，更安全且功能更完善。' +
+        '迁移文档：docs/背包双轨架构迁移执行方案-真实版.md'
+    )
   }
 
   /**

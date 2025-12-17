@@ -76,28 +76,24 @@ router.get(
 
       // 权限检查：用户只能查看自己的背包（管理员除外）
       if (targetUserId !== viewerUserId) {
-        // 检查查看者是否为管理员
-        const { User } = req.app.locals.models
-        const viewerUser = await User.findByPk(viewerUserId)
+        // 检查查看者是否为管理员（统一使用getUserRoles，基于role_level判定）
+        const { getUserRoles } = require('../../../middleware/auth')
+        const userRoles = await getUserRoles(viewerUserId)
 
-        if (!viewerUser) {
-          logger.error('查看者用户不存在', { viewer_user_id: viewerUserId })
-          return res.apiError('用户不存在', 404)
-        }
-
-        const isAdmin = await viewerUser.isAdmin()
-
-        if (!isAdmin) {
+        // 管理员判定：role_level >= 100
+        if (!userRoles.isAdmin) {
           logger.warn('非管理员尝试查看他人背包', {
             viewer_user_id: viewerUserId,
-            target_user_id: targetUserId
+            target_user_id: targetUserId,
+            role_level: userRoles.role_level
           })
           return res.apiError('无权查看其他用户的背包', 403)
         }
 
         logger.info('管理员查看用户背包', {
           admin_user_id: viewerUserId,
-          target_user_id: targetUserId
+          target_user_id: targetUserId,
+          role_level: userRoles.role_level
         })
       }
 
@@ -161,28 +157,24 @@ router.get(
 
       // 权限检查：用户只能查看自己的统计（管理员除外）
       if (targetUserId !== viewerUserId) {
-        // 检查查看者是否为管理员
-        const { User } = req.app.locals.models
-        const viewerUser = await User.findByPk(viewerUserId)
+        // 检查查看者是否为管理员（统一使用getUserRoles，基于role_level判定）
+        const { getUserRoles } = require('../../../middleware/auth')
+        const userRoles = await getUserRoles(viewerUserId)
 
-        if (!viewerUser) {
-          logger.error('查看者用户不存在', { viewer_user_id: viewerUserId })
-          return res.apiError('用户不存在', 404)
-        }
-
-        const isAdmin = await viewerUser.isAdmin()
-
-        if (!isAdmin) {
+        // 管理员判定：role_level >= 100
+        if (!userRoles.isAdmin) {
           logger.warn('非管理员尝试查看他人背包统计', {
             viewer_user_id: viewerUserId,
-            target_user_id: targetUserId
+            target_user_id: targetUserId,
+            role_level: userRoles.role_level
           })
           return res.apiError('无权查看其他用户的背包统计', 403)
         }
 
         logger.info('管理员查看用户背包统计', {
           admin_user_id: viewerUserId,
-          target_user_id: targetUserId
+          target_user_id: targetUserId,
+          role_level: userRoles.role_level
         })
       }
 

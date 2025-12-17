@@ -648,27 +648,12 @@ module.exports = sequelize => {
    * console.log('核销码:', code); // 输出: A1B2C3D4
    */
   UserInventory.prototype.generateVerificationCode = async function () {
-    const crypto = require('crypto')
-    let code
-    let isUnique = false
-
-    /*
-     * 确保生成唯一的核销码
-     * TODO: 性能优化 - 考虑重构避免循环中await
-     */
-    while (!isUnique) {
-      code = crypto.randomBytes(4).toString('hex').toUpperCase()
-      const existing = await UserInventory.findOne({
-        where: { verification_code: code }
-      })
-      isUnique = !existing
-    }
-
-    this.verification_code = code
-    this.verification_expires_at = BeijingTimeHelper.futureTime(24 * 60 * 60 * 1000) // 24小时后过期
-    await this.save()
-
-    return code
+    throw new Error(
+      'UserInventory.generateVerificationCode() 已完全废弃（方案A - 一刀切, 2025-12-17）。' +
+        '请使用 RedemptionOrderService.createOrder(item_instance_id) 生成新12位Base32码。' +
+        'UserInventory 表已废弃，请使用 ItemInstance + RedemptionOrder 新系统。' +
+        '迁移文档：docs/背包双轨架构迁移执行方案-真实版.md'
+    )
   }
 
   return UserInventory

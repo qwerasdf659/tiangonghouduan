@@ -29,52 +29,38 @@ const { validatePositiveInteger, handleServiceError } = require('../../../middle
 const logger = new Logger('InventoryCoreAPI')
 
 /**
- * 获取用户库存列表
+ * ❌ 已废弃：获取用户库存列表（方案A - 2025-12-17立即禁用）
  * GET /api/v4/inventory/user/:user_id
  *
- * 业务场景：用户查看自己或管理员查看指定用户的库存物品列表
- * 权限控制：用户只能查看自己的库存，管理员可以查看任意用户的库存
+ * 废弃原因：背包系统已迁移至双轨架构（stackable assets + non-stackable items）
+ * 新接口：GET /api/v4/backpack/user/:user_id
+ * 迁移文档：docs/背包双轨架构迁移执行方案-真实版.md
+ * 决策记录：2025-12-17 用户选择方案A（一刀切，立即禁用）
+ *
+ * 注意：410响应在认证检查之前返回，无需token即可看到废弃提示
  */
-router.get(
-  '/user/:user_id',
-  authenticateToken,
-  validatePositiveInteger('user_id', 'params'),
-  async (req, res) => {
-    try {
-      logger.info('开始处理库存列表请求', {
-        user_id: req.validated.user_id,
-        req_user_id: req.user?.user_id
-      })
+router.get('/user/:user_id', async (req, res) => {
+  logger.warn('访问已废弃的旧背包接口', {
+    deprecated_endpoint: '/api/v4/inventory/user/:user_id',
+    new_endpoint: '/api/v4/backpack/user/:user_id',
+    user_id: req.params.user_id,
+    ip: req.ip,
+    user_agent: req.headers['user-agent']
+  })
 
-      const { status, type, page = 1, limit = 20 } = req.query
-      const requestedUserId = req.validated.user_id
-
-      // 调用 InventoryService 获取用户库存
-      const InventoryService = req.app.locals.services.getService('inventory')
-      const result = await InventoryService.getUserInventory(
-        requestedUserId,
-        { status, type, page, limit },
-        { viewerId: req.user.user_id }
-      )
-
-      logger.info('获取用户库存成功', {
-        user_id: requestedUserId,
-        total: result.pagination.total,
-        returned: result.inventory.length
-      })
-
-      return res.apiSuccess(result, '获取库存列表成功')
-    } catch (error) {
-      logger.error('获取用户库存失败', {
-        error: error.message,
-        user_id: req.validated.user_id,
-        query: req.query
-      })
-
-      return handleServiceError(error, res, '获取库存列表失败')
-    }
-  }
-)
+  return res.apiError(
+    '此接口已废弃，请使用新的背包接口',
+    'ENDPOINT_DEPRECATED',
+    {
+      deprecated_endpoint: '/api/v4/inventory/user/:user_id',
+      new_endpoint: '/api/v4/backpack/user/:user_id',
+      deprecation_date: '2025-12-17',
+      reason:
+        '背包系统已迁移至双轨架构（stackable assets + non-stackable items），旧单轨接口不再支持'
+    },
+    410
+  )
+})
 
 /**
  * 获取库存物品详情
@@ -114,108 +100,65 @@ router.get(
 )
 
 /**
- * 使用库存物品（Use Inventory Item - 库存物品使用API）
+ * 使用库存物品（Use Inventory Item - 已废弃）
  * POST /api/v4/inventory/use/:item_id
  *
- * 业务场景：用户使用库存中的可用物品（如优惠券、实物商品等）
- * 幂等性控制：通过 business_id 防止重复使用
+ * ⚠️ 该接口已废弃（410 Gone）
+ * 原因：旧版UserInventory表已迁移到新双轨系统（ItemInstance + AssetBalance）
+ * 迁移路径：
+ * - 物品类（item）：使用核销系统 POST /api/v4/redemption/orders
+ * - 资产类（asset）：通过AssetBalance统一管理（无需单独使用接口）
  */
 router.post(
   '/use/:item_id',
   authenticateToken,
   validatePositiveInteger('item_id', 'params'),
   async (req, res) => {
-    try {
-      const itemId = req.validated.item_id
-      const { verification_code } = req.body
-      const userId = req.user.user_id
+    logger.warn('旧库存使用接口被调用（已废弃）', {
+      item_id: req.validated.item_id,
+      user_id: req.user?.user_id,
+      path: req.path
+    })
 
-      // 生成 business_id 用于幂等性控制
-      const business_id = `use_${userId}_${itemId}_${Date.now()}`
-
-      // 调用 InventoryService 使用物品
-      const InventoryService = req.app.locals.services.getService('inventory')
-      const result = await InventoryService.useItem(userId, itemId, {
-        verification_code,
-        business_id
-      })
-
-      logger.info('库存物品使用成功', {
-        item_id: itemId,
-        user_id: req.user.user_id,
-        item_name: result.item_name
-      })
-
-      return res.apiSuccess({ item: result }, '物品使用成功')
-    } catch (error) {
-      logger.error('使用库存物品失败', {
-        error: error.message,
-        item_id: req.validated.item_id,
-        user_id: req.user?.user_id
-      })
-
-      return handleServiceError(error, res, '物品使用失败')
-    }
+    return res.apiError(
+      '该接口已废弃，请使用新核销系统',
+      'ENDPOINT_GONE',
+      {
+        new_endpoint: 'POST /api/v4/redemption/orders',
+        migration_note: '旧版库存系统已迁移到新双轨系统，物品类请使用核销系统生成核销码'
+      },
+      410
+    )
   }
 )
 
 /**
- * 转让库存物品（Transfer Inventory Item）
+ * 转让库存物品（Transfer Inventory Item - 已废弃）
  * POST /api/v4/inventory/transfer
  *
- * 业务场景：用户将库存物品转让给其他用户（礼物赠送、朋友共享等）
- * 幂等性控制：通过 business_id 防止重复转让
+ * ⚠️ 该接口已废弃（410 Gone）
+ * 原因：旧版UserInventory表已迁移到新双轨系统（ItemInstance + AssetBalance）
+ * 迁移路径：
+ * - 物品类（item）：使用交易系统 POST /api/v4/trade/listings（挂单）+ POST /api/v4/trade/orders（购买）
+ * - 资产类（asset）：暂不支持转让（业务限制）
  */
 router.post('/transfer', authenticateToken, async (req, res) => {
-  try {
-    const { item_id, target_user_id, transfer_note } = req.body
-    const currentUserId = req.user.user_id
+  logger.warn('旧库存转让接口被调用（已废弃）', {
+    item_id: req.body.item_id,
+    user_id: req.user?.user_id,
+    target_user_id: req.body.target_user_id,
+    path: req.path
+  })
 
-    // 参数验证
-    if (!item_id || !target_user_id) {
-      return res.apiError('物品ID和目标用户ID不能为空', 'BAD_REQUEST', null, 400)
-    }
-
-    const itemId = parseInt(item_id, 10)
-    const targetUserId = parseInt(target_user_id, 10)
-
-    if (isNaN(itemId) || itemId <= 0 || isNaN(targetUserId) || targetUserId <= 0) {
-      return res.apiError('物品ID和目标用户ID必须是正整数', 'BAD_REQUEST', null, 400)
-    }
-
-    if (currentUserId === targetUserId) {
-      return res.apiError('不能转让给自己', 'BAD_REQUEST', null, 400)
-    }
-
-    // 生成 business_id 用于幂等性控制
-    const business_id = `transfer_${currentUserId}_${itemId}_${Date.now()}`
-
-    // 调用 InventoryService 转让物品
-    const InventoryService = req.app.locals.services.getService('inventory')
-    const result = await InventoryService.transferItem(currentUserId, targetUserId, itemId, {
-      transfer_note,
-      business_id
-    })
-
-    logger.info('库存物品转让成功', {
-      item_id: itemId,
-      from_user_id: currentUserId,
-      to_user_id: targetUserId,
-      item_name: result.name,
-      transfer_count: result.transfer_count
-    })
-
-    return res.apiSuccess(result, '物品转让成功')
-  } catch (error) {
-    logger.error('转让库存物品失败', {
-      error: error.message,
-      item_id: req.body.item_id,
-      current_user: req.user.user_id,
-      target_user: req.body.target_user_id
-    })
-
-    return handleServiceError(error, res, '物品转让失败')
-  }
+  return res.apiError(
+    '该接口已废弃，请使用新交易系统',
+    'ENDPOINT_GONE',
+    {
+      new_endpoint: 'POST /api/v4/trade/listings',
+      migration_note: '旧版库存系统已迁移到新双轨系统，物品转让请使用交易系统挂单交易'
+    },
+    410
+  )
 })
 
 /**
