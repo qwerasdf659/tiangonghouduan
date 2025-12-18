@@ -1,3 +1,6 @@
+const Logger = require('../services/UnifiedLotteryEngine/utils/Logger')
+const logger = new Logger('ConsumptionService')
+
 /**
  * 餐厅积分抽奖系统 V4.0 - 消费记录服务
  *
@@ -19,8 +22,6 @@
  * 创建时间：2025年10月30日
  * 最后更新：2025年10月30日
  */
-
-'use strict'
 
 const {
   ConsumptionRecord,
@@ -207,8 +208,8 @@ class ConsumptionService {
     })
 
     try {
-      console.log('📊 开始处理商家消费记录提交（使用事务保护）...')
-      console.log('📋 提交数据:', JSON.stringify(data, null, 2))
+      logger.info('📊 开始处理商家消费记录提交（使用事务保护）...')
+      logger.info('📋 提交数据:', JSON.stringify(data, null, 2))
 
       // 步骤1：验证必填参数
       if (!data.qr_code) {
@@ -248,7 +249,7 @@ class ConsumptionService {
        */
       const business_id = `consumption_${userId}_${data.merchant_id}_${BeijingTimeHelper.generateIdTimestamp()}`
 
-      console.log(`生成业务ID: ${business_id}`)
+      logger.info(`生成业务ID: ${business_id}`)
 
       /*
        * 步骤5：幂等性检查（Idempotency Check - Prevent Duplicate Submission）
@@ -262,7 +263,7 @@ class ConsumptionService {
       })
 
       if (existingRecord) {
-        console.log(`⚠️ 幂等性检查: business_id=${business_id}已存在，返回已有记录（幂等）`)
+        logger.info(`⚠️ 幂等性检查: business_id=${business_id}已存在，返回已有记录（幂等）`)
         await transaction.commit()
         return {
           success: true,
@@ -292,7 +293,7 @@ class ConsumptionService {
         { transaction }
       ) // ✅ 在事务中创建
 
-      console.log(
+      logger.info(
         `✅ 消费记录创建成功 (ID: ${consumptionRecord.record_id}, business_id: ${business_id})`
       )
 
@@ -314,7 +315,7 @@ class ConsumptionService {
         transaction
       ) // ✅ 传递transaction参数
 
-      console.log(
+      logger.info(
         `✅ Pending积分交易创建成功 (ID: ${pointsTransaction.transaction_id}, points=${pointsToAward}分)`
       )
 
@@ -333,13 +334,13 @@ class ConsumptionService {
         { transaction }
       ) // ✅ 在事务中创建
 
-      console.log('✅ 审核记录创建成功')
+      logger.info('✅ 审核记录创建成功')
 
       // 🎉 提交事务（Commit Transaction - All 3 Tables Updated Successfully）
       await transaction.commit()
-      console.log('🎉 事务提交成功，3个表数据一致性已保证')
+      logger.info('🎉 事务提交成功，3个表数据一致性已保证')
 
-      console.log(
+      logger.info(
         `✅ 消费记录完整创建: record_id=${consumptionRecord.record_id}, user_id=${userId}, amount=${data.consumption_amount}元, frozen_points=${pointsToAward}分`
       )
 
@@ -347,13 +348,13 @@ class ConsumptionService {
     } catch (error) {
       // ⚠️ 发生错误，回滚事务（Error Occurred - Rollback Transaction）
       await transaction.rollback()
-      console.error('❌ 商家消费记录提交失败（事务已回滚）:', error.message)
-      console.error('错误堆栈:', error.stack)
+      logger.error('❌ 商家消费记录提交失败（事务已回滚）:', error.message)
+      logger.error('错误堆栈:', error.stack)
 
       // 打印Sequelize验证错误的详细信息
       if (error.name === 'SequelizeValidationError' && error.errors) {
         error.errors.forEach(err => {
-          console.error(`   验证错误 - 字段: ${err.path}, 值: ${err.value}, 原因: ${err.message}`)
+          logger.error(`   验证错误 - 字段: ${err.path}, 值: ${err.value}, 原因: ${err.message}`)
         })
       }
       throw error
@@ -462,7 +463,7 @@ class ConsumptionService {
       const budgetRatio = await ConsumptionService.getBudgetRatio()
       const budgetPointsToAllocate = Math.round(record.consumption_amount * budgetRatio)
 
-      console.log(
+      logger.info(
         `💰 预算分配: 消费${record.consumption_amount}元 × ${budgetRatio} = ${budgetPointsToAllocate}积分`
       )
 
@@ -483,7 +484,7 @@ class ConsumptionService {
             { transaction }
           )
 
-          console.log(
+          logger.info(
             `💰 预算分配成功: user_id=${record.user_id}, 预算积分=${budgetPointsToAllocate}, 剩余预算=${userAccount.remaining_budget_points + budgetPointsToAllocate}`
           )
         }
@@ -506,10 +507,10 @@ class ConsumptionService {
           transaction: null // 事务已提交，不传transaction
         })
       } catch (auditError) {
-        console.error('[ConsumptionService] 审计日志记录失败:', auditError.message)
+        logger.error('[ConsumptionService] 审计日志记录失败:', auditError.message)
       }
 
-      console.log(
+      logger.info(
         `✅ 消费记录审核通过: record_id=${recordId}, 奖励积分=${record.points_to_award}, 预算积分=${budgetPointsToAllocate}`
       )
 
@@ -523,7 +524,7 @@ class ConsumptionService {
     } catch (error) {
       // 回滚事务
       await transaction.rollback()
-      console.error('❌ 审核通过失败:', error.message)
+      logger.error('❌ 审核通过失败:', error.message)
       throw error
     }
   }
@@ -610,10 +611,10 @@ class ConsumptionService {
           transaction: null // 事务已提交，不传transaction
         })
       } catch (auditError) {
-        console.error('[ConsumptionService] 审计日志记录失败:', auditError.message)
+        logger.error('[ConsumptionService] 审计日志记录失败:', auditError.message)
       }
 
-      console.log(`✅ 消费记录审核拒绝: record_id=${recordId}, 原因=${reviewData.admin_notes}`)
+      logger.info(`✅ 消费记录审核拒绝: record_id=${recordId}, 原因=${reviewData.admin_notes}`)
 
       return {
         consumption_record: record,
@@ -623,10 +624,10 @@ class ConsumptionService {
       // ⭐ P0优化：完善事务回滚异常处理
       try {
         await transaction.rollback()
-        console.log('🔄 事务已回滚')
+        logger.info('🔄 事务已回滚')
       } catch (rollbackError) {
         // ❌ 严重错误：事务回滚失败意味着数据可能不一致
-        console.error('❌❌❌ 严重错误：事务回滚失败（数据可能不一致）', {
+        logger.error('❌❌❌ 严重错误：事务回滚失败（数据可能不一致）', {
           recordId,
           originalError: error.message, // 原始业务错误
           rollbackError: rollbackError.message, // 回滚失败错误
@@ -639,7 +640,7 @@ class ConsumptionService {
         error.rollbackError = rollbackError.message
       }
 
-      console.error('❌ 审核拒绝失败:', error.message)
+      logger.error('❌ 审核拒绝失败:', error.message)
       throw error
     }
   }
@@ -740,7 +741,7 @@ class ConsumptionService {
         stats
       }
     } catch (error) {
-      console.error('❌ 查询消费记录失败:', error.message)
+      logger.error('❌ 查询消费记录失败:', error.message)
       throw error
     }
   }
@@ -795,7 +796,7 @@ class ConsumptionService {
 
       return result
     } catch (error) {
-      console.error('❌ 获取消费统计失败:', error.message)
+      logger.error('❌ 获取消费统计失败:', error.message)
       throw error
     }
   }
@@ -844,7 +845,7 @@ class ConsumptionService {
         }
       }
     } catch (error) {
-      console.error('❌ 查询待审核记录失败:', error.message)
+      logger.error('❌ 查询待审核记录失败:', error.message)
       throw error
     }
   }
@@ -969,7 +970,7 @@ class ConsumptionService {
         statistics: stats
       }
     } catch (error) {
-      console.error('❌ 管理员查询消费记录失败:', error.message)
+      logger.error('❌ 管理员查询消费记录失败:', error.message)
       throw new Error('查询消费记录失败：' + error.message)
     }
   }
@@ -1030,7 +1031,7 @@ class ConsumptionService {
       // ✅ 步骤4：权限验证通过，查询完整数据（包含关联查询，响应~200ms）
       return await this.getConsumptionRecordDetail(recordId, options)
     } catch (error) {
-      console.error('❌ 获取消费记录详情（含权限检查）失败:', error.message)
+      logger.error('❌ 获取消费记录详情（含权限检查）失败:', error.message)
       throw error
     }
   }
@@ -1092,7 +1093,7 @@ class ConsumptionService {
 
       return record.toAPIResponse()
     } catch (error) {
-      console.error('❌ 获取消费记录详情失败:', error.message)
+      logger.error('❌ 获取消费记录详情失败:', error.message)
       throw error
     }
   }
@@ -1126,7 +1127,7 @@ class ConsumptionService {
 
       return record
     } catch (error) {
-      console.error('❌ 获取消费记录失败:', error.message)
+      logger.error('❌ 获取消费记录失败:', error.message)
       throw error
     }
   }
@@ -1146,7 +1147,7 @@ class ConsumptionService {
    */
   static async getUserInfoByQRCode(qrCode) {
     try {
-      console.log(
+      logger.info(
         '🔍 [ConsumptionService] 开始验证二维码（UUID版本）:',
         qrCode.substring(0, 30) + '...'
       )
@@ -1157,7 +1158,7 @@ class ConsumptionService {
         throw new Error(`二维码验证失败：${validation.error}`)
       }
 
-      console.log('✅ [ConsumptionService] 二维码验证通过，用户UUID:', validation.user_uuid)
+      logger.info('✅ [ConsumptionService] 二维码验证通过，用户UUID:', validation.user_uuid)
 
       // 2. 根据UUID查询用户信息（仅查询必要字段）
       const user = await User.findOne({
@@ -1172,7 +1173,7 @@ class ConsumptionService {
         throw new Error(`用户不存在（user_uuid: ${validation.user_uuid}）`)
       }
 
-      console.log(
+      logger.info(
         `✅ [ConsumptionService] 用户信息获取成功: user_id=${user.user_id}, user_uuid=${user.user_uuid.substring(0, 8)}..., nickname=${user.nickname}`
       )
 
@@ -1184,7 +1185,7 @@ class ConsumptionService {
         mobile: user.mobile // 返回完整手机号码
       }
     } catch (error) {
-      console.error('❌ [ConsumptionService] 获取用户信息失败:', error.message)
+      logger.error('❌ [ConsumptionService] 获取用户信息失败:', error.message)
       throw error
     }
   }
@@ -1211,15 +1212,15 @@ class ConsumptionService {
 
       if (setting) {
         const ratio = setting.getParsedValue() // 使用已有解析方法
-        console.log(`[配置] 预算系数: ${ratio}`)
+        logger.info(`[配置] 预算系数: ${ratio}`)
         return ratio
       }
 
       // 配置不存在时返回默认值
-      console.warn('[配置] 未找到预算系数配置，使用默认值: 0.24')
+      logger.warn('[配置] 未找到预算系数配置，使用默认值: 0.24')
       return 0.24
     } catch (error) {
-      console.error('[配置] 获取预算系数失败:', error.message)
+      logger.error('[配置] 获取预算系数失败:', error.message)
       return 0.24 // 异常时返回安全默认值
     }
   }

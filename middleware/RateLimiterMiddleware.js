@@ -1,3 +1,6 @@
+const Logger = require('../services/UnifiedLotteryEngine/utils/Logger')
+const logger = new Logger('RateLimiterMiddleware')
+
 /**
  * API请求频率限制中间件 V4
  * 基于Redis的滑动窗口限流算法，防止恶意刷接口
@@ -161,7 +164,7 @@ class RateLimiterMiddleware {
           }
 
           // 记录限流日志
-          console.warn('[RateLimiter] 限流触发', {
+          logger.warn('[RateLimiter] 限流触发', {
             key: limitKey,
             current: requestCount,
             limit: config.max,
@@ -215,7 +218,7 @@ class RateLimiterMiddleware {
                 // 移除本次请求记录
                 await this.redisClient.getClient().zrem(limitKey, requestId)
               } catch (error) {
-                console.error('[RateLimiter] 移除请求记录失败:', error)
+                logger.error('[RateLimiter] 移除请求记录失败:', error)
               }
             }
 
@@ -225,7 +228,7 @@ class RateLimiterMiddleware {
 
         next()
       } catch (error) {
-        console.error('[RateLimiter] 限流中间件错误:', error)
+        logger.error('[RateLimiter] 限流中间件错误:', error)
         // 发生错误时不阻塞请求，继续处理
         next()
       }
@@ -252,7 +255,7 @@ class RateLimiterMiddleware {
       const user_id = req.user?.user_id
       if (!user_id) {
         // 未登录用户，跳过限流或降级为IP限流
-        console.debug('[RateLimiter] 未登录用户，跳过用户级限流')
+        logger.debug('[RateLimiter] 未登录用户，跳过用户级限流')
         return null
       }
       return `${keyPrefix}user:${user_id}`
@@ -265,7 +268,7 @@ class RateLimiterMiddleware {
     }
 
     // 未知的keyGenerator类型
-    console.warn(`[RateLimiter] 未知的keyGenerator类型: ${keyGenerator}`)
+    logger.warn(`[RateLimiter] 未知的keyGenerator类型: ${keyGenerator}`)
     return null
   }
 
@@ -280,7 +283,7 @@ class RateLimiterMiddleware {
       const result = await client.zrange(key, 0, 0, 'WITHSCORES')
       return result && result.length >= 2 ? parseFloat(result[1]) : null
     } catch (error) {
-      console.error('[RateLimiter] 获取最早请求时间失败:', error)
+      logger.error('[RateLimiter] 获取最早请求时间失败:', error)
       return null
     }
   }
@@ -325,7 +328,7 @@ class RateLimiterMiddleware {
 
       return Array.from(keys)
     } catch (error) {
-      console.error('[RateLimiter] SCAN命令执行失败:', error)
+      logger.error('[RateLimiter] SCAN命令执行失败:', error)
       throw error
     }
   }
@@ -362,7 +365,7 @@ class RateLimiterMiddleware {
 
       return stats
     } catch (error) {
-      console.error('[RateLimiter] 获取统计信息失败:', error)
+      logger.error('[RateLimiter] 获取统计信息失败:', error)
       return {
         error: error.message,
         timestamp: BeijingTimeHelper.formatForAPI(new Date()).iso
@@ -378,10 +381,10 @@ class RateLimiterMiddleware {
   async resetLimit(key) {
     try {
       await this.redisClient.del(key)
-      console.log(`[RateLimiter] 已重置限流: ${key}`)
+      logger.info(`[RateLimiter] 已重置限流: ${key}`)
       return true
     } catch (error) {
-      console.error('[RateLimiter] 重置限流失败:', error)
+      logger.error('[RateLimiter] 重置限流失败:', error)
       return false
     }
   }
@@ -408,10 +411,10 @@ class RateLimiterMiddleware {
       })
       await pipeline.exec()
 
-      console.log(`[RateLimiter] 已清理 ${keys.length} 个限流key`)
+      logger.info(`[RateLimiter] 已清理 ${keys.length} 个限流key`)
       return keys.length
     } catch (error) {
-      console.error('[RateLimiter] 清理限流数据失败:', error)
+      logger.error('[RateLimiter] 清理限流数据失败:', error)
       return 0
     }
   }
@@ -423,11 +426,11 @@ class RateLimiterMiddleware {
    */
   async cleanup() {
     try {
-      console.log('[RateLimiter] 正在清理资源...')
+      logger.info('[RateLimiter] 正在清理资源...')
       // Redis客户端由UnifiedRedisClient统一管理，这里不需要关闭
-      console.log('[RateLimiter] 资源清理完成')
+      logger.info('[RateLimiter] 资源清理完成')
     } catch (error) {
-      console.error('[RateLimiter] 资源清理失败:', error)
+      logger.error('[RateLimiter] 资源清理失败:', error)
     }
   }
 }

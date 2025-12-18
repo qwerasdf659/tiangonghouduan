@@ -11,6 +11,8 @@ const router = express.Router()
 const { authenticateToken, getUserRoles } = require('../../middleware/auth')
 const permission_module = require('../../modules/UserPermissionModule')
 const permissionAuditLogger = require('../../utils/PermissionAuditLogger') // 🔒 P1修复：审计日志系统
+const Logger = require('../../services/UnifiedLotteryEngine/utils/Logger')
+const logger = Logger.create('PermissionsRoute')
 
 /**
  * 🛡️ P2修复：参数标准化验证中间件
@@ -56,7 +58,7 @@ const validatePermissionParams = (req, res, next) => {
 
     return next()
   } catch (error) {
-    console.error('❌ 参数验证失败:', error)
+    logger.error('❌ 参数验证失败:', error)
     return res.apiInternalError('参数验证失败', error.message)
   }
 }
@@ -94,7 +96,7 @@ router.get('/user/:user_id', authenticateToken, async (req, res) => {
 
     return res.apiSuccess(response_data, '用户权限信息获取成功')
   } catch (error) {
-    console.error('❌ 获取用户权限失败:', error)
+    logger.error('❌ 获取用户权限失败:', error)
     return res.apiInternalError('获取用户权限信息失败', error.message)
   }
 })
@@ -126,7 +128,7 @@ router.get('/me', authenticateToken, async (req, res) => {
 
     return res.apiSuccess(response_data, '当前用户权限信息获取成功')
   } catch (error) {
-    console.error('❌ 获取当前用户权限失败:', error)
+    logger.error('❌ 获取当前用户权限失败:', error)
     return res.apiInternalError('获取当前用户权限信息失败', error.message)
   }
 })
@@ -172,7 +174,7 @@ router.post('/check', authenticateToken, validatePermissionParams, async (req, r
 
     return res.apiSuccess(response_data, '权限检查完成')
   } catch (error) {
-    console.error('❌ 权限检查失败:', error)
+    logger.error('❌ 权限检查失败:', error)
     return res.apiInternalError('权限检查失败', error.message)
   }
 })
@@ -205,7 +207,7 @@ router.get('/admins', authenticateToken, async (req, res) => {
 
     return res.apiSuccess(response_data, '管理员列表获取成功')
   } catch (error) {
-    console.error('❌ 获取管理员列表失败:', error)
+    logger.error('❌ 获取管理员列表失败:', error)
     return res.apiInternalError('获取管理员列表失败', error.message)
   }
 })
@@ -257,7 +259,7 @@ router.post('/refresh', authenticateToken, async (req, res) => {
 
     return res.apiSuccess(response_data, '权限缓存已刷新')
   } catch (error) {
-    console.error('❌ 刷新权限缓存失败:', error)
+    logger.error('❌ 刷新权限缓存失败:', error)
     return res.apiInternalError('刷新权限缓存失败', error.message)
   }
 })
@@ -301,7 +303,7 @@ router.post('/batch-check', authenticateToken, async (req, res) => {
 
     return res.apiSuccess(result, `批量权限检查完成（共${permissions.length}项）`)
   } catch (error) {
-    console.error('❌ 批量权限检查失败:', error)
+    logger.error('❌ 批量权限检查失败:', error)
     return res.apiInternalError('批量权限检查失败', error.message)
   }
 })
@@ -331,7 +333,7 @@ router.get('/statistics', authenticateToken, async (req, res) => {
 
     return res.apiSuccess(response_data, '权限统计信息获取成功')
   } catch (error) {
-    console.error('❌ 获取权限统计失败:', error)
+    logger.error('❌ 获取权限统计失败:', error)
     return res.apiInternalError('获取权限统计信息失败', error.message)
   }
 })

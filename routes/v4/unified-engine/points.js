@@ -171,7 +171,7 @@ const balanceRateLimiter = rateLimiter.createLimiter({
   keyGenerator: 'user', // 按用户限流
   message: '查询过于频繁，请稍后再试',
   onLimitReached: (req, key, count) => {
-    console.warn('[PointsBalance] 查询限流触发', {
+    logger.warn('[PointsBalance] 查询限流触发', {
       user_id: req.user?.user_id,
       count,
       limit: 10,
@@ -192,7 +192,7 @@ const trendRateLimiter = rateLimiter.createLimiter({
   message: '趋势查询过于频繁，请稍后再试', // 用户友好的错误提示
   onLimitReached: (req, key, count) => {
     // 限流触发时的日志记录，便于监控和分析恶意请求
-    console.warn('[PointsTrend] 查询限流触发', {
+    logger.warn('[PointsTrend] 查询限流触发', {
       user_id: req.user?.user_id,
       count,
       limit: 30,
@@ -214,7 +214,7 @@ const pointsBalanceByIdRateLimiter = rateLimiter.createLimiter({
   keyGenerator: 'user', // 按用户ID限流
   message: '查询过于频繁，请稍后再试',
   onLimitReached: (req, key, count) => {
-    console.warn('[PointsBalanceById] 查询限流触发', {
+    logger.warn('[PointsBalanceById] 查询限流触发', {
       user_id: req.user?.user_id,
       target_user_id: req.params.user_id,
       count,
@@ -246,7 +246,7 @@ router.get('/balance', authenticateToken, balanceRateLimiter, async (req, res) =
     const PointsService = req.app.locals.services.getService('points')
 
     // 📊 记录查询开始日志
-    console.log(`[PointsBalance] 用户${user_id}查询积分余额`)
+    logger.info(`[PointsBalance] 用户${user_id}查询积分余额`)
 
     // ✅ 调用 Service 层获取完整响应数据（所有业务逻辑在 Service 内）
     const balanceData = await PointsService.getBalanceResponse(user_id)
@@ -254,9 +254,9 @@ router.get('/balance', authenticateToken, balanceRateLimiter, async (req, res) =
     // ⏱️ 记录性能日志
     const queryTime = Date.now() - startTime
     if (queryTime > 100) {
-      console.warn(`[PointsBalance] 查询耗时过长: ${queryTime}ms, user_id=${user_id}`)
+      logger.warn(`[PointsBalance] 查询耗时过长: ${queryTime}ms, user_id=${user_id}`)
     } else {
-      console.log(
+      logger.info(
         `[PointsBalance] 查询成功: ${queryTime}ms, user_id=${user_id}, available=${balanceData.available_points}`
       )
     }
@@ -269,7 +269,7 @@ router.get('/balance', authenticateToken, balanceRateLimiter, async (req, res) =
   } catch (error) {
     // ❌ 细化错误类型处理
     const queryTime = Date.now() - startTime
-    console.error(`[PointsBalance] 查询失败: user_id=${user_id}, time=${queryTime}ms`, error)
+    logger.error(`[PointsBalance] 查询失败: user_id=${user_id}, time=${queryTime}ms`, error)
     return handleServiceError(error, res, '积分余额查询失败')
   }
 })
@@ -334,7 +334,7 @@ router.get(
 
       // ✅ 审计日志：记录管理员查询他人积分的操作（安全审计和合规性要求）
       if (currentUserRoles.isAdmin && target_user_id !== current_user_id) {
-        console.warn('[Audit] 管理员查询他人积分', {
+        logger.warn('[Audit] 管理员查询他人积分', {
           operator_id: current_user_id, // 操作者（管理员）
           operator_mobile: req.user.mobile, // 操作者手机号
           target_user_id, // 被查询的用户ID
@@ -366,7 +366,7 @@ router.get(
         '积分余额查询成功'
       )
     } catch (error) {
-      console.error('❌ 积分余额查询失败:', error)
+      logger.error('❌ 积分余额查询失败:', error)
       return handleServiceError(error, res, '积分余额查询失败')
     }
   }
@@ -442,7 +442,7 @@ router.get('/transactions/:user_id', authenticateToken, async (req, res) => {
       '积分交易记录查询成功'
     )
   } catch (error) {
-    console.error('积分交易记录查询失败:', error)
+    logger.error('积分交易记录查询失败:', error)
     return handleServiceError(error, res, '积分交易记录查询失败')
   }
 })
@@ -492,7 +492,7 @@ router.post('/admin/adjust', authenticateToken, async (req, res) => {
     // ✅ 统一响应
     return res.apiSuccess(result, '积分调整成功')
   } catch (error) {
-    console.error('❌ 管理员积分调整失败:', error)
+    logger.error('❌ 管理员积分调整失败:', error)
     return handleServiceError(error, res, '积分调整失败')
   }
 })
@@ -525,17 +525,17 @@ router.get('/admin/statistics', authenticateToken, async (req, res) => {
     // ✅ 通过 ServiceManager 获取 PointsService（符合TR-005规范）
     const PointsService = req.app.locals.services.getService('points')
 
-    console.log('[AdminStatistics] 🔍 开始查询积分系统统计数据...')
+    logger.info('[AdminStatistics] 🔍 开始查询积分系统统计数据...')
 
     // ✅ 调用 Service 层获取完整统计数据（所有数据组装逻辑在 Service 内）
     const { statistics } = await PointsService.getAdminStatistics()
 
     // ⏱️ 记录查询性能
     const queryTime = Date.now() - startTime
-    console.log(`[AdminStatistics] ✅ 数据库查询完成，耗时: ${queryTime}ms`)
+    logger.info(`[AdminStatistics] ✅ 数据库查询完成，耗时: ${queryTime}ms`)
 
     // 📊 记录统计数据摘要
-    console.log(
+    logger.info(
       `[AdminStatistics] 📊 统计数据摘要: 总账户${statistics.total_accounts}, 活跃${statistics.active_accounts}, 总交易${statistics.total_transactions}, 系统负债${statistics.total_balance}`
     )
 
@@ -550,7 +550,7 @@ router.get('/admin/statistics', authenticateToken, async (req, res) => {
     )
   } catch (error) {
     const queryTime = Date.now() - startTime
-    console.error(`[AdminStatistics] ❌ 获取积分统计失败: time=${queryTime}ms`, error)
+    logger.error(`[AdminStatistics] ❌ 获取积分统计失败: time=${queryTime}ms`, error)
     return handleServiceError(error, res, '获取积分统计失败')
   }
 })
@@ -607,7 +607,7 @@ router.get('/user/statistics/:user_id', authenticateToken, async (req, res) => {
       '用户统计数据获取成功'
     )
   } catch (error) {
-    console.error('获取用户统计失败:', error)
+    logger.error('获取用户统计失败:', error)
     return handleServiceError(error, res, '获取用户统计失败')
   }
 })
@@ -634,7 +634,7 @@ router.get('/overview', authenticateToken, async (req, res) => {
 
     const user_id = req.user.user_id
 
-    console.log(`📊 获取用户积分概览 - 用户ID: ${user_id}`)
+    logger.info(`📊 获取用户积分概览 - 用户ID: ${user_id}`)
 
     // ✅ 验证用户账户存在性（getUserAccount会验证用户和账户）
     await PointsService.getUserAccount(user_id)
@@ -645,7 +645,7 @@ router.get('/overview', authenticateToken, async (req, res) => {
     // 🔧 性能监控：计算查询耗时并触发慢查询告警（Performance Monitoring & Slow Query Alert）
     const queryTime = Date.now() - startTime
     if (queryTime > 500) {
-      console.warn('⚠️ [PointsOverview] 慢查询告警', {
+      logger.warn('⚠️ [PointsOverview] 慢查询告警', {
         query_time_ms: queryTime,
         user_id,
         record_count: overview.frozen_transactions?.length || 0,
@@ -653,7 +653,7 @@ router.get('/overview', authenticateToken, async (req, res) => {
         suggestion: '检查数据库索引是否失效，或数据量是否异常增长'
       })
     } else {
-      console.log(
+      logger.info(
         `✅ 积分概览获取成功 - 用户ID: ${user_id}, 可用: ${overview.available_points}, 冻结: ${overview.frozen_points}, 耗时: ${queryTime}ms`
       )
     }
@@ -662,7 +662,7 @@ router.get('/overview', authenticateToken, async (req, res) => {
   } catch (error) {
     // 🔧 增强错误日志：记录完整错误堆栈和请求参数（Enhanced Error Logging）
     const queryTime = Date.now() - startTime
-    console.error('❌ 获取积分概览失败:', {
+    logger.error('❌ 获取积分概览失败:', {
       error_message: error.message,
       error_stack: error.stack, // 错误堆栈（Error Stack Trace）
       user_id: req.user?.user_id,
@@ -695,7 +695,7 @@ router.get('/frozen', authenticateToken, async (req, res) => {
     const user_id = req.user.user_id
     const { page = 1, page_size = 20 } = req.query
 
-    console.log(`📋 获取冻结积分明细 - 用户ID: ${user_id}, 页码: ${page}, 每页: ${page_size}`)
+    logger.info(`📋 获取冻结积分明细 - 用户ID: ${user_id}, 页码: ${page}, 每页: ${page_size}`)
 
     // 调用PointsService获取冻结积分明细
     const frozenDetails = await PointsService.getUserFrozenPoints(user_id, {
@@ -708,7 +708,7 @@ router.get('/frozen', authenticateToken, async (req, res) => {
 
     // 🔧 慢查询告警（超过500ms）- Slow Query Alert
     if (queryTime > 500) {
-      console.warn('⚠️ [FrozenPoints] 慢查询告警', {
+      logger.warn('⚠️ [FrozenPoints] 慢查询告警', {
         query_time_ms: queryTime,
         user_id,
         page: parseInt(page),
@@ -718,7 +718,7 @@ router.get('/frozen', authenticateToken, async (req, res) => {
         suggestion: '检查数据库索引是否失效，或数据量是否异常增长'
       })
     } else {
-      console.log(
+      logger.info(
         `✅ 冻结积分明细获取成功 - 用户ID: ${user_id}, 记录数: ${frozenDetails.total_count}, 耗时: ${queryTime}ms`
       )
     }
@@ -727,7 +727,7 @@ router.get('/frozen', authenticateToken, async (req, res) => {
   } catch (error) {
     // 🔧 增强错误日志：记录完整错误堆栈和请求参数（Enhanced Error Logging）
     const queryTime = Date.now() - startTime
-    console.error('❌ 获取冻结积分明细失败:', {
+    logger.error('❌ 获取冻结积分明细失败:', {
       error_message: error.message,
       error_stack: error.stack, // 错误堆栈（用于快速定位问题）
       user_id: req.user?.user_id,
@@ -766,7 +766,7 @@ router.get('/trend', authenticateToken, trendRateLimiter, async (req, res) => {
     const { days, end_date } = req.query
 
     // 📊 Step 3: 记录查询日志（便于调试和问题追踪）
-    console.log(
+    logger.info(
       `📊 查询积分趋势 - 用户ID: ${user_id}, 天数: ${days || 30}, 结束日期: ${end_date || '今天'}`
     )
 
@@ -780,7 +780,7 @@ router.get('/trend', authenticateToken, trendRateLimiter, async (req, res) => {
     })
 
     // 📈 Step 6: 记录数据处理完成日志
-    console.log(
+    logger.info(
       `📈 数据处理完成 - 数据点: ${trendData.data_points}, 总获得: ${trendData.total_earn}, 总消费: ${trendData.total_consume}`
     )
 
@@ -788,7 +788,7 @@ router.get('/trend', authenticateToken, trendRateLimiter, async (req, res) => {
     return res.apiSuccess(trendData, '积分趋势查询成功')
   } catch (error) {
     // ❌ 错误处理（统一错误响应格式）
-    console.error('❌ 获取积分趋势失败:', error)
+    logger.error('❌ 获取积分趋势失败:', error)
     return handleServiceError(error, res, '积分趋势查询失败')
   }
 })

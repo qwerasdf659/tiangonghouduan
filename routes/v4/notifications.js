@@ -1,3 +1,6 @@
+const Logger = require('../../services/UnifiedLotteryEngine/utils/Logger')
+const logger = new Logger('notifications')
+
 /**
  * 通知API路由模块 (Notifications API Routes)
  *
@@ -67,7 +70,7 @@ router.get('/', authenticateToken, requireAdmin, async (req, res) => {
       '获取通知列表成功'
     )
   } catch (error) {
-    console.error('[Notifications] ❌ 获取通知列表失败:', error)
+    logger.error('[Notifications] ❌ 获取通知列表失败:', error)
     return res.apiInternalError('获取通知列表失败', error.message, 'NOTIFICATIONS_LIST_ERROR')
   }
 })
@@ -98,7 +101,7 @@ router.get('/:notification_id', authenticateToken, requireAdmin, async (req, res
 
     // 增加浏览次数（异步，不影响返回）
     AnnouncementService.incrementViewCount(notification_id).catch(err => {
-      console.error(`⚠️ 更新view_count失败（ID:${notification_id}):`, err.message)
+      logger.error(`⚠️ 更新view_count失败（ID:${notification_id}):`, err.message)
     })
 
     // 转换为通知格式
@@ -117,7 +120,7 @@ router.get('/:notification_id', authenticateToken, requireAdmin, async (req, res
 
     return res.apiSuccess({ notification }, '获取通知详情成功')
   } catch (error) {
-    console.error('[Notifications] ❌ 获取通知详情失败:', error)
+    logger.error('[Notifications] ❌ 获取通知详情失败:', error)
     return res.apiInternalError('获取通知详情失败', error.message, 'NOTIFICATION_DETAIL_ERROR')
   }
 })
@@ -155,7 +158,7 @@ router.post('/:notification_id/read', authenticateToken, requireAdmin, async (re
       '标记已读成功'
     )
   } catch (error) {
-    console.error('[Notifications] ❌ 标记已读失败:', error)
+    logger.error('[Notifications] ❌ 标记已读失败:', error)
     return res.apiInternalError('标记已读失败', error.message, 'MARK_READ_ERROR')
   }
 })
@@ -178,7 +181,7 @@ router.post('/read-all', authenticateToken, requireAdmin, async (req, res) => {
     // 使用 AnnouncementService 批量标记已读
     const updated_count = await AnnouncementService.markAsReadBatch([])
 
-    console.log(`[Notifications] ✅ 全部标记已读: ${updated_count}条公告`)
+    logger.info(`[Notifications] ✅ 全部标记已读: ${updated_count}条公告`)
 
     return res.apiSuccess(
       {
@@ -187,7 +190,7 @@ router.post('/read-all', authenticateToken, requireAdmin, async (req, res) => {
       `成功标记${updated_count}条通知为已读`
     )
   } catch (error) {
-    console.error('[Notifications] ❌ 全部标记已读失败:', error)
+    logger.error('[Notifications] ❌ 全部标记已读失败:', error)
     return res.apiInternalError('全部标记已读失败', error.message, 'MARK_ALL_READ_ERROR')
   }
 })
@@ -224,7 +227,7 @@ router.post('/clear', authenticateToken, requireAdmin, async (req, res) => {
     // ✅ 使用 AnnouncementService 批量停用公告
     const cleared_count = await AnnouncementService.deactivateBatch(readAnnouncementIds)
 
-    console.log(`[Notifications] ✅ 清空通知: ${cleared_count}条公告设为不活跃`)
+    logger.info(`[Notifications] ✅ 清空通知: ${cleared_count}条公告设为不活跃`)
 
     return res.apiSuccess(
       {
@@ -233,7 +236,7 @@ router.post('/clear', authenticateToken, requireAdmin, async (req, res) => {
       cleared_count > 0 ? `成功清空${cleared_count}条已读通知` : '没有需要清空的已读通知'
     )
   } catch (error) {
-    console.error('[Notifications] ❌ 清空通知失败:', error)
+    logger.error('[Notifications] ❌ 清空通知失败:', error)
     return res.apiInternalError('清空通知失败', error.message, 'CLEAR_NOTIFICATIONS_ERROR')
   }
 })
@@ -286,7 +289,7 @@ router.post('/send', authenticateToken, requireAdmin, async (req, res) => {
       req.user.user_id
     )
 
-    console.log(`[Notifications] ✅ 发送通知成功: ${announcement.announcement_id} - ${title}`)
+    logger.info(`[Notifications] ✅ 发送通知成功: ${announcement.announcement_id} - ${title}`)
 
     return res.apiSuccess(
       {
@@ -299,7 +302,7 @@ router.post('/send', authenticateToken, requireAdmin, async (req, res) => {
       '通知发送成功'
     )
   } catch (error) {
-    console.error('[Notifications] ❌ 发送通知失败:', error)
+    logger.error('[Notifications] ❌ 发送通知失败:', error)
     return res.apiInternalError('发送通知失败', error.message, 'SEND_NOTIFICATION_ERROR')
   }
 })

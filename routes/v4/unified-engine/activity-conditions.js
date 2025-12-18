@@ -1,3 +1,6 @@
+const Logger = require('../../../services/UnifiedLotteryEngine/utils/Logger')
+const logger = new Logger('activity-conditions')
+
 /**
  * 活动条件管理API路由
  *
@@ -12,8 +15,6 @@
  * - 通过 ServiceManager 统一获取服务实例
  * - 使用 ActivityService 封装所有活动管理逻辑
  */
-
-'use strict'
 
 const express = require('express')
 const router = express.Router()
@@ -39,7 +40,7 @@ router.get('/available', authenticateToken, async (req, res) => {
 
     return res.apiSuccess(result, `找到${result.total}个可参与的活动`)
   } catch (error) {
-    console.error('❌ 获取可参与活动失败:', error)
+    logger.error('❌ 获取可参与活动失败:', error)
     return res.apiError('获取活动列表失败', 'FETCH_ACTIVITIES_FAILED', null, error)
   }
 })
@@ -65,7 +66,7 @@ router.get('/:id/check-eligibility', authenticateToken, async (req, res) => {
 
     return res.apiSuccess(result, result.eligible ? '满足参与条件' : '不满足参与条件')
   } catch (error) {
-    console.error('❌ 检查参与条件失败:', error)
+    logger.error('❌ 检查参与条件失败:', error)
 
     if (error.code === 'ACTIVITY_NOT_FOUND') {
       return res.apiError(error.message, error.code, null, 404)
@@ -113,7 +114,7 @@ router.post('/:id/participate', authenticateToken, async (req, res) => {
       '条件验证通过，可以参与活动'
     )
   } catch (error) {
-    console.error('❌ 参与活动失败:', error)
+    logger.error('❌ 参与活动失败:', error)
 
     if (error.code === 'ACTIVITY_NOT_FOUND') {
       return res.apiError(error.message, error.code, null, 404)
@@ -154,7 +155,7 @@ router.post(
 
       return res.apiSuccess(result, '活动条件配置成功')
     } catch (error) {
-      console.error('❌ 配置活动条件失败:', error)
+      logger.error('❌ 配置活动条件失败:', error)
 
       if (error.code === 'ACTIVITY_NOT_FOUND') {
         return res.apiError(error.message, error.code, null, 404)

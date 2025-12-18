@@ -1,3 +1,6 @@
+const Logger = require('../services/UnifiedLotteryEngine/utils/Logger')
+const logger = new Logger('ExchangeMarketService')
+
 /**
  * 餐厅积分抽奖系统 V4.5.0 - 兑换市场服务（ExchangeMarketService）
  * 🔥 Phase 3已迁移：使用统一账本（AssetService）扣减材料资产
@@ -246,7 +249,7 @@ class ExchangeMarketService {
     } = options
 
     try {
-      console.log('[兑换市场] 查询商品列表', { status, price_type, page, page_size })
+      logger.info('[兑换市场] 查询商品列表', { status, price_type, page, page_size })
 
       // 构建查询条件
       const where = { status }
@@ -267,7 +270,7 @@ class ExchangeMarketService {
         order: [[sort_by, sort_order]]
       })
 
-      console.log(`[兑换市场] 找到${count}个商品，返回第${page}页（${rows.length}个）`)
+      logger.info(`[兑换市场] 找到${count}个商品，返回第${page}页（${rows.length}个）`)
 
       return {
         success: true,
@@ -281,7 +284,7 @@ class ExchangeMarketService {
         timestamp: BeijingTimeHelper.now()
       }
     } catch (error) {
-      console.error('[兑换市场] 查询商品列表失败:', error.message)
+      logger.error('[兑换市场] 查询商品列表失败:', error.message)
       throw new Error(`查询商品列表失败: ${error.message}`)
     }
   }
@@ -309,7 +312,7 @@ class ExchangeMarketService {
         timestamp: BeijingTimeHelper.now()
       }
     } catch (error) {
-      console.error(`[兑换市场] 查询商品详情失败(item_id:${item_id}):`, error.message)
+      logger.error(`[兑换市场] 查询商品详情失败(item_id:${item_id}):`, error.message)
       throw error
     }
   }
@@ -358,7 +361,7 @@ class ExchangeMarketService {
       })
 
       if (existingOrder) {
-        console.log('[兑换市场] ⚠️ 幂等性检查：business_id已存在，验证参数一致性', {
+        logger.info('[兑换市场] ⚠️ 幂等性检查：business_id已存在，验证参数一致性', {
           business_id,
           order_no: existingOrder.order_no,
           existing_item_id: existingOrder.item_id,
@@ -383,7 +386,7 @@ class ExchangeMarketService {
           throw conflictError
         }
 
-        console.log('[兑换市场] ✅ 参数一致性验证通过，返回原结果（幂等）', {
+        logger.info('[兑换市场] ✅ 参数一致性验证通过，返回原结果（幂等）', {
           business_id,
           order_no: existingOrder.order_no
         })
@@ -453,7 +456,7 @@ class ExchangeMarketService {
         }
       }
 
-      console.log(
+      logger.info(
         `[兑换市场] 用户${user_id}兑换商品${item_id}，数量${quantity}，business_id=${business_id}`
       )
 
@@ -487,7 +490,7 @@ class ExchangeMarketService {
       // 2. 计算总支付金额
       const totalPayAmount = item.cost_amount * quantity
 
-      console.log('[兑换市场] 材料资产支付计算', {
+      logger.info('[兑换市场] 材料资产支付计算', {
         cost_asset_code: item.cost_asset_code,
         cost_amount: item.cost_amount,
         quantity,
@@ -497,7 +500,7 @@ class ExchangeMarketService {
       // 3. 使用AssetService统一账本扣减材料资产（Phase 3迁移）
       const AssetService = require('./AssetService')
 
-      console.log('[兑换市场] 开始扣减材料资产（统一账本）', {
+      logger.info('[兑换市场] 开始扣减材料资产（统一账本）', {
         user_id,
         asset_code: item.cost_asset_code,
         amount: totalPayAmount,
@@ -530,7 +533,7 @@ class ExchangeMarketService {
 
       // 如果是重复扣减，说明之前已经创建过订单但事务未提交，需要查询订单
       if (materialResult.is_duplicate) {
-        console.log('[兑换市场] ⚠️ 材料扣减幂等返回，查询已存在订单', {
+        logger.info('[兑换市场] ⚠️ 材料扣减幂等返回，查询已存在订单', {
           business_id
         })
 
@@ -563,7 +566,7 @@ class ExchangeMarketService {
         }
       }
 
-      console.log(
+      logger.info(
         `[兑换市场] 材料扣减成功：${totalPayAmount}个${item.cost_asset_code}，剩余余额通过统一账本管理`
       )
 
@@ -614,7 +617,7 @@ class ExchangeMarketService {
           createError.message?.includes('Duplicate entry') ||
           createError.message?.includes('idx_business_id_unique')
         ) {
-          console.log('[兑换市场] ⚠️ 并发冲突：business_id已存在，重试查询', { business_id })
+          logger.info('[兑换市场] ⚠️ 并发冲突：business_id已存在，重试查询', { business_id })
 
           // 回滚当前事务的本地更改，重新查询已存在的订单
           if (shouldCommit) {
@@ -683,7 +686,7 @@ class ExchangeMarketService {
         await transaction.commit()
       }
 
-      console.log(`[兑换市场] 兑换成功，订单号：${order_no}`)
+      logger.info(`[兑换市场] 兑换成功，订单号：${order_no}`)
 
       return {
         success: true,
@@ -708,7 +711,7 @@ class ExchangeMarketService {
         await transaction.rollback()
       }
 
-      console.error(`[兑换市场] 兑换失败(user_id:${user_id}, item_id:${item_id}):`, error.message)
+      logger.error(`[兑换市场] 兑换失败(user_id:${user_id}, item_id:${item_id}):`, error.message)
       throw error
     }
   }
@@ -727,7 +730,7 @@ class ExchangeMarketService {
     const { status = null, page = 1, page_size = 20 } = options
 
     try {
-      console.log(`[兑换市场] 查询用户${user_id}订单列表`, { status, page, page_size })
+      logger.info(`[兑换市场] 查询用户${user_id}订单列表`, { status, page, page_size })
 
       // 构建查询条件
       const where = { user_id }
@@ -748,7 +751,7 @@ class ExchangeMarketService {
         order: [['exchange_time', 'DESC']]
       })
 
-      console.log(`[兑换市场] 找到${count}个订单，返回第${page}页（${rows.length}个）`)
+      logger.info(`[兑换市场] 找到${count}个订单，返回第${page}页（${rows.length}个）`)
 
       return {
         success: true,
@@ -762,7 +765,7 @@ class ExchangeMarketService {
         timestamp: BeijingTimeHelper.now()
       }
     } catch (error) {
-      console.error(`[兑换市场] 查询用户订单列表失败(user_id:${user_id}):`, error.message)
+      logger.error(`[兑换市场] 查询用户订单列表失败(user_id:${user_id}):`, error.message)
       throw new Error(`查询订单列表失败: ${error.message}`)
     }
   }
@@ -791,7 +794,7 @@ class ExchangeMarketService {
         timestamp: BeijingTimeHelper.now()
       }
     } catch (error) {
-      console.error(`[兑换市场] 查询订单详情失败(order_no:${order_no}):`, error.message)
+      logger.error(`[兑换市场] 查询订单详情失败(order_no:${order_no}):`, error.message)
       throw error
     }
   }
@@ -815,7 +818,7 @@ class ExchangeMarketService {
     const shouldCommit = !externalTransaction // 只有自己创建的事务才提交/回滚
 
     try {
-      console.log(`[兑换市场] 更新订单状态：${order_no} -> ${new_status}`)
+      logger.info(`[兑换市场] 更新订单状态：${order_no} -> ${new_status}`)
 
       const order = await ExchangeMarketRecord.findOne({
         where: { order_no },
@@ -852,7 +855,7 @@ class ExchangeMarketService {
         await transaction.commit()
       }
 
-      console.log(`[兑换市场] 订单状态更新成功：${order_no} -> ${new_status}`)
+      logger.info(`[兑换市场] 订单状态更新成功：${order_no} -> ${new_status}`)
 
       return {
         success: true,
@@ -869,7 +872,7 @@ class ExchangeMarketService {
         await transaction.rollback()
       }
 
-      console.error(`[兑换市场] 更新订单状态失败(order_no:${order_no}):`, error.message)
+      logger.error(`[兑换市场] 更新订单状态失败(order_no:${order_no}):`, error.message)
       throw error
     }
   }
@@ -885,7 +888,7 @@ class ExchangeMarketService {
    * @private
    */
   static async _getUserTotalVirtualValue(user_id, transaction = null) {
-    console.warn(
+    logger.warn(
       '[兑换市场] ⚠️ 警告：_getUserTotalVirtualValue已废弃（V4.5.0），请使用AssetService.getBalance代替'
     )
 
@@ -914,7 +917,7 @@ class ExchangeMarketService {
    * @private
    */
   static async _deductVirtualValue(user_id, value_to_deduct, transaction) {
-    console.warn(
+    logger.warn(
       '[兑换市场] ⚠️ 警告：_deductVirtualValue已废弃（V4.5.0），请使用AssetService.changeBalance代替'
     )
 
@@ -931,7 +934,7 @@ class ExchangeMarketService {
       transaction
     })
 
-    console.log(
+    logger.info(
       `[兑换市场] 查询到 ${virtualPrizes.length} 个可用虚拟奖品，总价值: ${virtualPrizes.reduce((sum, p) => sum + (p.value || 0), 0)}`
     )
 
@@ -953,7 +956,7 @@ class ExchangeMarketService {
           { transaction }
         )
         remaining -= prizeValue
-        console.log(
+        logger.info(
           `[兑换市场] 消耗虚拟奖品 inventory_id=${prize.inventory_id}, value=${prizeValue}, 剩余需求=${remaining}`
         )
       } else {
@@ -961,7 +964,7 @@ class ExchangeMarketService {
          * 部分消耗（如果虚拟奖品支持部分使用）
          * 注意：当前设计中虚拟奖品不支持部分使用，如果需要支持需要调整逻辑
          */
-        console.warn(
+        logger.warn(
           `[兑换市场] 虚拟奖品${prize.inventory_id}价值${prizeValue}大于剩余需求${remaining}，但当前不支持部分使用`
         )
       }
@@ -971,7 +974,7 @@ class ExchangeMarketService {
       throw new Error(`虚拟奖品价值不足，还需要${remaining}`)
     }
 
-    console.log(`[兑换市场] 扣除虚拟奖品价值成功：${value_to_deduct}`)
+    logger.info(`[兑换市场] 扣除虚拟奖品价值成功：${value_to_deduct}`)
   }
 
   /**
@@ -993,7 +996,7 @@ class ExchangeMarketService {
    */
   static async getMarketStatistics() {
     try {
-      console.log('[兑换市场] 查询统计数据')
+      logger.info('[兑换市场] 查询统计数据')
 
       // 查询各状态订单数量
       const [totalOrders, pendingOrders, completedOrders, shippedOrders, cancelledOrders] =
@@ -1040,7 +1043,7 @@ class ExchangeMarketService {
         timestamp: BeijingTimeHelper.now()
       }
     } catch (error) {
-      console.error('[兑换市场] 查询统计数据失败:', error.message)
+      logger.error('[兑换市场] 查询统计数据失败:', error.message)
       throw new Error(`查询统计数据失败: ${error.message}`)
     }
   }
@@ -1063,7 +1066,7 @@ class ExchangeMarketService {
    */
   static async createExchangeItem(itemData, created_by) {
     try {
-      console.log('[兑换市场] 管理员创建商品', {
+      logger.info('[兑换市场] 管理员创建商品', {
         item_name: itemData.item_name,
         created_by
       })
@@ -1117,7 +1120,7 @@ class ExchangeMarketService {
         updated_at: BeijingTimeHelper.createDatabaseTime()
       })
 
-      console.log(`[兑换市场] 商品创建成功，item_id: ${item.item_id}`)
+      logger.info(`[兑换市场] 商品创建成功，item_id: ${item.item_id}`)
 
       return {
         success: true,
@@ -1125,7 +1128,7 @@ class ExchangeMarketService {
         timestamp: BeijingTimeHelper.now()
       }
     } catch (error) {
-      console.error('[兑换市场] 创建商品失败:', error.message)
+      logger.error('[兑换市场] 创建商品失败:', error.message)
       throw error
     }
   }
@@ -1139,7 +1142,7 @@ class ExchangeMarketService {
    */
   static async updateExchangeItem(item_id, updateData) {
     try {
-      console.log('[兑换市场] 管理员更新商品', { item_id })
+      logger.info('[兑换市场] 管理员更新商品', { item_id })
 
       // 查询商品
       const item = await ExchangeItem.findByPk(item_id)
@@ -1217,7 +1220,7 @@ class ExchangeMarketService {
       // 更新商品
       await item.update(finalUpdateData)
 
-      console.log(`[兑换市场] 商品更新成功，item_id: ${item_id}`)
+      logger.info(`[兑换市场] 商品更新成功，item_id: ${item_id}`)
 
       return {
         success: true,
@@ -1225,7 +1228,7 @@ class ExchangeMarketService {
         timestamp: BeijingTimeHelper.now()
       }
     } catch (error) {
-      console.error(`[兑换市场] 更新商品失败(item_id:${item_id}):`, error.message)
+      logger.error(`[兑换市场] 更新商品失败(item_id:${item_id}):`, error.message)
       throw error
     }
   }
@@ -1246,7 +1249,7 @@ class ExchangeMarketService {
     const shouldCommit = !externalTransaction // 只有自己创建的事务才提交/回滚
 
     try {
-      console.log('[兑换市场] 管理员删除商品', { item_id })
+      logger.info('[兑换市场] 管理员删除商品', { item_id })
 
       // 查询商品
       const item = await ExchangeItem.findByPk(item_id, { transaction })
@@ -1275,7 +1278,7 @@ class ExchangeMarketService {
           await transaction.commit()
         }
 
-        console.log(`[兑换市场] 商品有${orderCount}个关联订单，已下架而非删除`)
+        logger.info(`[兑换市场] 商品有${orderCount}个关联订单，已下架而非删除`)
 
         return {
           success: true,
@@ -1294,7 +1297,7 @@ class ExchangeMarketService {
         await transaction.commit()
       }
 
-      console.log(`[兑换市场] 商品删除成功，item_id: ${item_id}`)
+      logger.info(`[兑换市场] 商品删除成功，item_id: ${item_id}`)
 
       return {
         success: true,
@@ -1308,7 +1311,7 @@ class ExchangeMarketService {
         await transaction.rollback()
       }
 
-      console.error(`[兑换市场] 删除商品失败(item_id:${item_id}):`, error.message)
+      logger.error(`[兑换市场] 删除商品失败(item_id:${item_id}):`, error.message)
       throw error
     }
   }
@@ -1349,7 +1352,7 @@ class ExchangeMarketService {
    */
   static async getUserListingStats(options) {
     try {
-      console.log('[兑换市场] 管理员获取用户上架统计', {
+      logger.info('[兑换市场] 管理员获取用户上架统计', {
         page: options.page,
         limit: options.limit,
         filter: options.filter
@@ -1359,14 +1362,14 @@ class ExchangeMarketService {
       const InventoryService = require('./InventoryService')
       const result = await InventoryService.getUserListingStats(options)
 
-      console.log('[兑换市场] 用户上架统计查询成功', {
+      logger.info('[兑换市场] 用户上架统计查询成功', {
         total_users: result.summary.total_users_with_listings,
         filtered_count: result.pagination.total
       })
 
       return result
     } catch (error) {
-      console.error('[兑换市场] 获取用户上架统计失败:', {
+      logger.error('[兑换市场] 获取用户上架统计失败:', {
         error: error.message,
         stack: error.stack,
         options

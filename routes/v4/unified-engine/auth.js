@@ -1,3 +1,6 @@
+const Logger = require('../../../services/UnifiedLotteryEngine/utils/Logger')
+const logger = new Logger('auth')
+
 /**
  * V4认证系统路由 - RESTful标准设计（基于UUID角色系统）
  *
@@ -100,14 +103,14 @@ router.post('/login', async (req, res) => {
 
   if (!user) {
     // 用户不存在，自动注册（Service 内部管理事务）
-    console.log(`用户 ${mobile} 不存在，开始自动注册...`)
+    logger.info(`用户 ${mobile} 不存在，开始自动注册...`)
 
     try {
       user = await UserService.registerUser(mobile)
       isNewUser = true
-      console.log(`用户 ${mobile} 注册流程完成（用户+积分账户+角色）`)
+      logger.info(`用户 ${mobile} 注册流程完成（用户+积分账户+角色）`)
     } catch (error) {
-      console.error(`用户 ${mobile} 注册失败:`, error)
+      logger.error(`用户 ${mobile} 注册失败:`, error)
 
       // 处理业务错误
       if (error.code === 'MOBILE_EXISTS') {
@@ -162,7 +165,7 @@ router.post('/login', async (req, res) => {
    */
   const loginDuration = Date.now() - loginStartTime
   if (loginDuration > 3000) {
-    console.warn('⚠️ 登录耗时告警:', {
+    logger.warn('⚠️ 登录耗时告警:', {
       mobile: mobile.substring(0, 3) + '****' + mobile.substring(7), // 脱敏处理
       duration: `${loginDuration}ms`,
       threshold: '3000ms',
@@ -175,7 +178,7 @@ router.post('/login', async (req, res) => {
     })
   } else if (loginDuration > 1000) {
     // 1-3秒：记录信息级日志，用于性能分析
-    console.log(
+    logger.info(
       `📊 登录耗时: ${loginDuration}ms (用户: ${mobile.substring(0, 3)}****${mobile.substring(7)})`
     )
   }
@@ -214,7 +217,7 @@ router.post('/decrypt-phone', async (req, res) => {
     return res.apiError('参数不完整，需要code、encryptedData和iv', 'INVALID_PARAMS', null, 400)
   }
 
-  console.log('📱 微信手机号解密请求...')
+  logger.info('📱 微信手机号解密请求...')
 
   /*
    * ========================================
@@ -227,16 +230,16 @@ router.post('/decrypt-phone', async (req, res) => {
   // 微信API地址
   const wxApiUrl = `https://api.weixin.qq.com/sns/jscode2session?appid=${process.env.WX_APPID}&secret=${process.env.WX_SECRET}&js_code=${code}&grant_type=authorization_code`
 
-  console.log('🔄 请求微信API获取session_key...')
+  logger.info('🔄 请求微信API获取session_key...')
   const wxRes = await axios.get(wxApiUrl)
 
   if (!wxRes.data.session_key) {
-    console.error('❌ 微信session_key获取失败:', wxRes.data)
+    logger.error('❌ 微信session_key获取失败:', wxRes.data)
     return res.apiError('微信session_key获取失败', 'WX_SESSION_ERROR', wxRes.data, 500)
   }
 
   const sessionKey = wxRes.data.session_key
-  console.log('✅ 获取到微信session_key')
+  logger.info('✅ 获取到微信session_key')
 
   /*
    * ========================================
@@ -247,11 +250,11 @@ router.post('/decrypt-phone', async (req, res) => {
   const data = pc.decryptData(encryptedData, iv)
 
   if (!data.phoneNumber) {
-    console.error('❌ 手机号解密失败')
+    logger.error('❌ 手机号解密失败')
     return res.apiError('手机号解密失败', 'DECRYPT_FAILED', null, 500)
   }
 
-  console.log(`✅ 手机号解密成功: ${data.phoneNumber}`)
+  logger.info(`✅ 手机号解密成功: ${data.phoneNumber}`)
 
   /*
    * ========================================
@@ -313,7 +316,7 @@ router.post('/quick-login', async (req, res) => {
     return res.apiError('手机号不能为空', 'MOBILE_REQUIRED', null, 400)
   }
 
-  console.log(`📱 快速登录请求: ${mobile}`)
+  logger.info(`📱 快速登录请求: ${mobile}`)
 
   // 🎯 通过ServiceManager获取UserService
   const UserService = req.app.locals.services.getService('user')
@@ -331,13 +334,13 @@ router.post('/quick-login', async (req, res) => {
    * ========================================
    */
   if (!user) {
-    console.log(`用户 ${mobile} 不存在，开始自动注册...`)
+    logger.info(`用户 ${mobile} 不存在，开始自动注册...`)
 
     try {
       user = await UserService.registerUser(mobile)
-      console.log(`✅ 用户 ${mobile} 注册流程完成（用户+积分账户+角色）`)
+      logger.info(`✅ 用户 ${mobile} 注册流程完成（用户+积分账户+角色）`)
     } catch (error) {
-      console.error(`❌ 用户 ${mobile} 注册失败:`, error)
+      logger.error(`❌ 用户 ${mobile} 注册失败:`, error)
 
       // 处理业务错误
       if (error.code === 'MOBILE_EXISTS') {
@@ -358,7 +361,7 @@ router.post('/quick-login', async (req, res) => {
    * ========================================
    */
   if (user.status !== 'active') {
-    console.warn(`❌ 用户 ${mobile} 账户已被禁用，status: ${user.status}`)
+    logger.warn(`❌ 用户 ${mobile} 账户已被禁用，status: ${user.status}`)
     return res.apiError('用户账户已被禁用，无法登录', 'USER_INACTIVE', null, 403)
   }
 
@@ -376,7 +379,7 @@ router.post('/quick-login', async (req, res) => {
    */
   await UserService.updateLoginStats(user.user_id)
 
-  console.log(
+  logger.info(
     `✅ 用户 ${mobile} 更新登录统计：last_login=${user.last_login}, login_count=${user.login_count}`
   )
 
@@ -409,7 +412,7 @@ router.post('/quick-login', async (req, res) => {
     timestamp: BeijingTimeHelper.apiTimestamp() // API响应时间戳（北京时间，统一格式）
   }
 
-  console.log(`✅ 用户 ${mobile} 微信授权登录成功`)
+  logger.info(`✅ 用户 ${mobile} 微信授权登录成功`)
 
   /*
    * 🔴 登录性能监控：记录登录耗时（2025-11-09新增）
@@ -417,7 +420,7 @@ router.post('/quick-login', async (req, res) => {
    */
   const loginDuration = Date.now() - loginStartTime
   if (loginDuration > 3000) {
-    console.warn('⚠️ 登录耗时告警:', {
+    logger.warn('⚠️ 登录耗时告警:', {
       mobile: mobile.substring(0, 3) + '****' + mobile.substring(7), // 脱敏处理
       duration: `${loginDuration}ms`,
       threshold: '3000ms',
@@ -430,7 +433,7 @@ router.post('/quick-login', async (req, res) => {
     })
   } else if (loginDuration > 1000) {
     // 1-3秒：记录信息级日志，用于性能分析
-    console.log(
+    logger.info(
       `📊 登录耗时: ${loginDuration}ms (用户: ${mobile.substring(0, 3)}****${mobile.substring(7)}, 类型: quick_login)`
     )
   }
@@ -593,7 +596,7 @@ router.get('/verify', authenticateToken, verifyRateLimiter, async (req, res) => 
   // 🛡️ 使用缓存机制获取用户角色信息（getUserRoles内置缓存）
   const userRoles = await getUserRoles(user_id)
 
-  console.log(`✅ [Auth] Token验证成功: user_id=${user_id}, roles=${userRoles.roles.join(',')}`)
+  logger.info(`✅ [Auth] Token验证成功: user_id=${user_id}, roles=${userRoles.roles.join(',')}`)
 
   return res.apiSuccess(
     {
@@ -628,7 +631,7 @@ router.post('/logout', authenticateToken, async (req, res) => {
   await invalidateUserPermissions(user_id, 'user_logout')
 
   // 📝 记录退出日志（便于审计和问题追踪）
-  console.log(`✅ [Auth] 用户退出登录: user_id=${user_id}, mobile=${req.user.mobile}`)
+  logger.info(`✅ [Auth] 用户退出登录: user_id=${user_id}, mobile=${req.user.mobile}`)
 
   return res.apiSuccess(null, '退出登录成功', 'LOGOUT_SUCCESS')
 })

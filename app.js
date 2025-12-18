@@ -17,13 +17,27 @@ const cors = require('cors')
 const helmet = require('helmet')
 const compression = require('compression')
 const rateLimit = require('express-rate-limit')
-// 🔴 dotenv配置：仅development允许override（P0修复）
-if ((process.env.NODE_ENV || 'development') === 'development') {
+// 🔴 dotenv配置：仅development允许override（P0修复 - 严格模式）
+if (process.env.NODE_ENV === 'development') {
   require('dotenv').config({ override: true })
   console.log('⚠️ [Development] 使用 dotenv override 模式')
 } else {
   require('dotenv').config()
   console.log('✅ [Production/Staging] 使用平台注入配置，禁止 override')
+}
+
+// 🔧 配置校验（仅staging/production强制退出）
+const { validateConfig, isDevelopment } = require('./config/environment')
+if (!isDevelopment()) {
+  // staging/production环境：缺配置直接退出（fail-fast）
+  validateConfig()
+} else {
+  // development环境：仅警告，不退出（提升开发体验）
+  try {
+    validateConfig()
+  } catch (error) {
+    console.warn('⚠️ [Development] 配置校验失败（已忽略）:', error.message)
+  }
 }
 
 // 🕐 北京时间工具导入
@@ -302,8 +316,9 @@ app.get('/health', async (req, res) => {
 // 📊 V4统一引擎信息端点
 app.get('/api/v4', (req, res) => {
   res.json({
-    code: 0,
-    msg: 'V4统一抽奖引擎信息获取成功',
+    success: true,
+    code: 'ENGINE_INFO_SUCCESS',
+    message: 'V4统一抽奖引擎信息获取成功',
     data: {
       version: '4.0.0',
       name: '餐厅积分抽奖系统 V4统一引擎',
@@ -335,13 +350,14 @@ app.get('/api/v4', (req, res) => {
 // 📚 V4统一引擎API文档端点
 app.get('/api/v4/docs', (req, res) => {
   res.json({
-    code: 0,
-    msg: 'V4统一抽奖引擎API文档获取成功',
+    success: true,
+    code: 'API_DOCS_SUCCESS',
+    message: 'V4统一抽奖引擎API文档获取成功',
     data: {
       title: '餐厅积分抽奖系统 V4.0 统一引擎API文档',
       version: '4.0.0',
       architecture: 'unified-lottery-engine',
-      description: 'V4统一抽奖引擎架构，通过统一引擎管理3种抽奖策略',
+      description: 'V4统一抽奖引擎架构，通过统一引擎管理2种抽奖策略',
       last_updated: BeijingTimeHelper.apiTimestamp(),
       unified_engine: {
         description: 'V4统一抽奖引擎提供完整的抽奖执行和管理功能',
@@ -352,7 +368,7 @@ app.get('/api/v4/docs', (req, res) => {
           'POST /api/v4/lottery/validate': '验证抽奖条件'
         },
         strategies: [
-          'BasicGuaranteeStrategy - 基础抽奖保底策略, ManagementStrategy - 管理策略',
+          'BasicGuaranteeStrategy - 基础抽奖保底策略',
           'ManagementStrategy - 管理抽奖策略'
         ]
       },
@@ -633,10 +649,10 @@ try {
 // 🔧 404处理
 app.use('*', (req, res) => {
   res.status(404).json({
-    code: 404,
-    msg: `接口不存在: ${req.method} ${req.originalUrl}`,
+    success: false,
+    code: 'NOT_FOUND',
+    message: `接口不存在: ${req.method} ${req.originalUrl}`,
     data: {
-      error: 'NOT_FOUND',
       availableEndpoints: [
         'GET /health',
         'GET /api/v4',
@@ -678,8 +694,9 @@ app.use((error, req, res, _next) => {
   if (error.name === 'SequelizeError') {
     return res.status(500).json({
       success: false,
-      error: 'DATABASE_ERROR',
+      code: 'DATABASE_ERROR',
       message: '数据库操作失败',
+      data: null,
       timestamp: BeijingTimeHelper.apiTimestamp() // 🕐 北京时间API时间戳
     })
   }
@@ -688,8 +705,9 @@ app.use((error, req, res, _next) => {
   if (error.name === 'JsonWebTokenError') {
     return res.status(401).json({
       success: false,
-      error: 'INVALID_TOKEN',
+      code: 'INVALID_TOKEN',
       message: 'Token无效',
+      data: null,
       timestamp: BeijingTimeHelper.apiTimestamp() // 🕐 北京时间API时间戳
     })
   }
@@ -698,8 +716,9 @@ app.use((error, req, res, _next) => {
   if (error.name === 'ValidationError') {
     return res.status(400).json({
       success: false,
-      error: 'VALIDATION_ERROR',
+      code: 'VALIDATION_ERROR',
       message: error.message,
+      data: null,
       timestamp: BeijingTimeHelper.apiTimestamp() // 🕐 北京时间API时间戳
     })
   }
@@ -707,8 +726,9 @@ app.use((error, req, res, _next) => {
   // 默认错误处理
   res.status(500).json({
     success: false,
-    error: 'INTERNAL_SERVER_ERROR',
+    code: 'INTERNAL_SERVER_ERROR',
     message: process.env.NODE_ENV === 'development' ? error.message : '服务器内部错误',
+    data: null,
     timestamp: BeijingTimeHelper.apiTimestamp() // 🕐 北京时间API时间戳
   })
 })

@@ -1,3 +1,6 @@
+const Logger = require('../services/UnifiedLotteryEngine/utils/Logger')
+const logger = new Logger('ChatRateLimitService')
+
 /**
  * 聊天频率限制服务（Chat Rate Limit Service）
  *
@@ -24,8 +27,6 @@
  * 创建时间：2025年12月11日
  * 最后更新：2025年12月11日
  */
-
-'use strict'
 
 const businessConfig = require('../config/business.config')
 
@@ -95,7 +96,7 @@ class ChatRateLimitService {
         }
       })
 
-      console.log(
+      logger.info(
         `✅ 消息频率限制器：已清理过期记录，当前监控用户数: ${ChatRateLimitService.userMessageTimestamps.size}`
       )
     }, ChatRateLimitService.CLEANUP_INTERVAL)
@@ -116,7 +117,7 @@ class ChatRateLimitService {
         }
       })
 
-      console.log(
+      logger.info(
         `✅ 管理员消息频率限制器：已清理过期记录，当前监控管理员数: ${ChatRateLimitService.adminMessageTimestamps.size}`
       )
     }, ChatRateLimitService.CLEANUP_INTERVAL)
@@ -137,12 +138,12 @@ class ChatRateLimitService {
         }
       })
 
-      console.log(
+      logger.info(
         `✅ 创建会话频率限制器：已清理过期记录，当前监控用户数: ${ChatRateLimitService.createSessionTimestamps.size}`
       )
     }, ChatRateLimitService.CLEANUP_INTERVAL)
 
-    console.log('✅ ChatRateLimitService：定期清理机制已启动')
+    logger.info('✅ ChatRateLimitService：定期清理机制已启动')
   }
 
   /**
@@ -343,7 +344,7 @@ class ChatRateLimitService {
         if (pushed) {
           // 推送成功
           if (attempt > 1) {
-            console.log(`✅ WebSocket推送成功 (第${attempt}次尝试)`)
+            logger.info(`✅ WebSocket推送成功 (第${attempt}次尝试)`)
           }
           return true
         } else {
@@ -351,12 +352,12 @@ class ChatRateLimitService {
           throw new Error(`客服不在线或推送失败 (尝试${attempt}/${maxRetries})`)
         }
       } catch (wsError) {
-        console.error(`⚠️ WebSocket推送失败 (第${attempt}/${maxRetries}次):`, wsError.message)
+        logger.error(`⚠️ WebSocket推送失败 (第${attempt}/${maxRetries}次):`, wsError.message)
 
         if (attempt < maxRetries) {
           // 还有重试机会，等待后重试（指数退避：1秒、2秒、3秒）
           const delaySeconds = attempt
-          console.log(`⏰ ${delaySeconds}秒后进行第${attempt + 1}次重试...`)
+          logger.info(`⏰ ${delaySeconds}秒后进行第${attempt + 1}次重试...`)
           await new Promise(resolve => {
             setTimeout(() => {
               resolve()
@@ -364,7 +365,7 @@ class ChatRateLimitService {
           })
         } else {
           // 最终失败，记录错误日志
-          console.error('❌ WebSocket推送最终失败，消息已保存到数据库，客服可通过轮询获取')
+          logger.error('❌ WebSocket推送最终失败，消息已保存到数据库，客服可通过轮询获取')
           return false
         }
       }
@@ -417,12 +418,12 @@ class ChatRateLimitService {
     if (type === 'message' || type === 'all') {
       ChatRateLimitService.userMessageTimestamps.delete(userId)
       ChatRateLimitService.adminMessageTimestamps.delete(userId)
-      console.log(`✅ 已重置用户${userId}的消息频率限制`)
+      logger.info(`✅ 已重置用户${userId}的消息频率限制`)
     }
 
     if (type === 'session' || type === 'all') {
       ChatRateLimitService.createSessionTimestamps.delete(userId)
-      console.log(`✅ 已重置用户${userId}的创建会话频率限制`)
+      logger.info(`✅ 已重置用户${userId}的创建会话频率限制`)
     }
   }
 }

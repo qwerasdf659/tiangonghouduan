@@ -1,3 +1,6 @@
+const Logger = require('../services/UnifiedLotteryEngine/utils/Logger')
+const logger = new Logger('ActivityService')
+
 /**
  * 餐厅积分抽奖系统 V4.0 - 活动管理服务（ActivityService）
  *
@@ -58,7 +61,7 @@ class ActivityService {
    * @returns {Promise<Object>} 包含可参与活动列表和总数的对象
    * @throws {Error} 数据库查询失败等
    */
-  static async getAvailableActivitiesForUser (userId) {
+  static async getAvailableActivitiesForUser(userId) {
     try {
       // 1. 获取所有进行中的活动
       const now = BeijingTimeHelper.createBeijingTime()
@@ -131,7 +134,7 @@ class ActivityService {
         total: availableActivities.length
       }
     } catch (error) {
-      console.error('❌ 获取可参与活动失败:', error)
+      logger.error('❌ 获取可参与活动失败:', error)
       throw error
     }
   }
@@ -146,15 +149,12 @@ class ActivityService {
    * @returns {Promise<Object>} 包含资格检查结果的对象
    * @throws {Error} 活动不存在等
    */
-  static async checkEligibility (userId, activityIdOrCode) {
+  static async checkEligibility(userId, activityIdOrCode) {
     try {
       // 查找活动（支持ID或代码）
       const activity = await models.LotteryCampaign.findOne({
         where: {
-          [Op.or]: [
-            { campaign_id: activityIdOrCode },
-            { campaign_code: activityIdOrCode }
-          ]
+          [Op.or]: [{ campaign_id: activityIdOrCode }, { campaign_code: activityIdOrCode }]
         }
       })
 
@@ -178,7 +178,7 @@ class ActivityService {
         messages: validation.messages
       }
     } catch (error) {
-      console.error('❌ 检查参与条件失败:', error)
+      logger.error('❌ 检查参与条件失败:', error)
       throw error
     }
   }
@@ -194,7 +194,7 @@ class ActivityService {
    * @returns {Promise<Object>} 包含更新后活动信息的对象
    * @throws {Error} 活动不存在等
    */
-  static async configureConditions (campaignCode, participationConditions, conditionErrorMessages) {
+  static async configureConditions(campaignCode, participationConditions, conditionErrorMessages) {
     try {
       // 查找活动
       const activity = await models.LotteryCampaign.findOne({
@@ -220,7 +220,7 @@ class ActivityService {
         condition_error_messages: activity.condition_error_messages
       }
     } catch (error) {
-      console.error('❌ 配置活动条件失败:', error)
+      logger.error('❌ 配置活动条件失败:', error)
       throw error
     }
   }

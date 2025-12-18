@@ -78,7 +78,7 @@ const ENV_CONFIG = {
  *
  * @returns {Object} 当前环境配置对象
  */
-function getCurrentConfig () {
+function getCurrentConfig() {
   const config = ENV_CONFIG[NODE_ENV]
 
   if (!config) {
@@ -96,14 +96,8 @@ function getCurrentConfig () {
  * @throws {Error} 缺少必需环境变量时抛出错误
  * @returns {void} 无返回值，验证失败时直接退出进程
  */
-function validateConfig () {
-  const required = [
-    'NODE_ENV',
-    'PORT',
-    'DB_HOST',
-    'DB_PORT',
-    'DB_NAME'
-  ]
+function validateConfig() {
+  const required = ['NODE_ENV', 'PORT', 'DB_HOST', 'DB_PORT', 'DB_NAME']
 
   // Redis配置可以是REDIS_URL或REDIS_HOST
   const hasRedisConfig = process.env.REDIS_URL || process.env.REDIS_HOST
@@ -117,8 +111,8 @@ function validateConfig () {
   }
 
   if (!hasRedisConfig) {
-    console.error('❌ 缺少Redis配置: 需要REDIS_URL或REDIS_HOST')
-    process.exit(1)
+    console.warn('⚠️ 缺少Redis配置: Redis功能将降级运行')
+    console.warn('   建议配置: REDIS_URL 或 REDIS_HOST')
   }
 
   console.log(`✅ 环境配置验证通过: ${getCurrentConfig().displayName}`)
@@ -130,7 +124,7 @@ function validateConfig () {
  * @description 根据当前环境返回适当的express.static配置
  * @returns {Object} express.static配置对象
  */
-function getStaticCacheConfig () {
+function getStaticCacheConfig() {
   const config = getCurrentConfig()
   const staticConfig = config.cache.static
 
@@ -174,7 +168,7 @@ function getStaticCacheConfig () {
  * @description 在控制台输出当前环境的配置详情
  * @returns {void} 无返回值，仅输出信息到控制台
  */
-function printConfig () {
+function printConfig() {
   const config = getCurrentConfig()
 
   console.log('\n' + '='.repeat(50))

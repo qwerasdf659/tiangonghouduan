@@ -62,9 +62,9 @@ class RedemptionOrderService {
    *
    * @example
    * const result = await RedemptionOrderService.createOrder(123, { creator_user_id: 456 })
-   * console.log('核销码:', result.code) // '3K7J-2MQP-WXYZ'
-   * console.log('订单ID:', result.order.order_id)
-   * console.log('过期时间:', result.order.expires_at)
+   * logger.info('核销码:', result.code) // '3K7J-2MQP-WXYZ'
+   * logger.info('订单ID:', result.order.order_id)
+   * logger.info('过期时间:', result.order.expires_at)
    */
   static async createOrder(item_instance_id, options = {}) {
     const { transaction: externalTx, creator_user_id } = options
@@ -218,7 +218,7 @@ class RedemptionOrderService {
    *
    * @example
    * const order = await RedemptionOrderService.fulfillOrder('3K7J-2MQP-WXYZ', 123)
-   * console.log('核销成功:', order.order_id)
+   * logger.info('核销成功:', order.order_id)
    */
   static async fulfillOrder(code, redeemer_user_id, options = {}) {
     const { transaction: externalTx } = options

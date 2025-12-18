@@ -1,3 +1,6 @@
+const Logger = require('../services/UnifiedLotteryEngine/utils/Logger')
+const logger = new Logger('sealosStorage')
+
 /**
  * Sealos对象存储服务
  * 基于AWS S3 SDK实现，适配Sealos对象存储API
@@ -19,7 +22,7 @@ class SealosStorageService {
    * 构造函数 - 初始化Sealos对象存储配置和S3客户端
    * @constructor
    */
-  constructor () {
+  constructor() {
     // 🔴 使用用户提供的真实Sealos配置 - 强制使用正确桶名
     this.config = {
       endpoint: process.env.SEALOS_ENDPOINT || 'https://objectstorageapi.bja.sealos.run',
@@ -38,7 +41,7 @@ class SealosStorageService {
       signatureVersion: 'v4'
     })
 
-    console.log('🔗 Sealos存储初始化完成:', {
+    logger.info('🔗 Sealos存储初始化完成:', {
       endpoint: this.config.endpoint,
       bucket: this.config.bucket,
       accessKey: this.config.accessKeyId
@@ -52,7 +55,7 @@ class SealosStorageService {
    * @param {string} folder - 存储文件夹 (默认: photos)
    * @returns {Promise<string>} 文件访问URL
    */
-  async uploadImage (fileBuffer, originalName, folder = 'photos') {
+  async uploadImage(fileBuffer, originalName, folder = 'photos') {
     try {
       // 生成唯一文件名
       const timestamp = BeijingTimeHelper.timestamp()
@@ -73,16 +76,16 @@ class SealosStorageService {
         CacheControl: 'max-age=31536000' // 缓存1年
       }
 
-      console.log(`📤 开始上传文件: ${fileName}`)
+      logger.info(`📤 开始上传文件: ${fileName}`)
 
       // 执行上传
       const result = await this.s3.upload(uploadParams).promise()
 
-      console.log(`✅ 文件上传成功: ${result.Location}`)
+      logger.info(`✅ 文件上传成功: ${result.Location}`)
 
       return result.Location
     } catch (error) {
-      console.error('❌ Sealos文件上传失败:', error)
+      logger.error('❌ Sealos文件上传失败:', error)
       throw new Error(`文件上传失败: ${error.message}`)
     }
   }
@@ -93,16 +96,16 @@ class SealosStorageService {
    * @param {string} folder - 存储文件夹
    * @returns {Promise<Array>} 上传结果数组
    */
-  async uploadMultipleImages (files, folder = 'photos') {
+  async uploadMultipleImages(files, folder = 'photos') {
     try {
       const uploadPromises = files.map(file => this.uploadImage(file.buffer, file.name, folder))
 
       const results = await Promise.all(uploadPromises)
-      console.log(`✅ 批量上传完成，共${results.length}个文件`)
+      logger.info(`✅ 批量上传完成，共${results.length}个文件`)
 
       return results
     } catch (error) {
-      console.error('❌ 批量上传失败:', error)
+      logger.error('❌ 批量上传失败:', error)
       throw error
     }
   }
@@ -112,7 +115,7 @@ class SealosStorageService {
    * @param {string} fileKey - 文件Key或完整URL
    * @returns {Promise<boolean>} 删除结果
    */
-  async deleteFile (fileKey) {
+  async deleteFile(fileKey) {
     try {
       // 如果是完整URL，提取Key
       if (fileKey.startsWith('http')) {
@@ -126,11 +129,11 @@ class SealosStorageService {
       }
 
       await this.s3.deleteObject(deleteParams).promise()
-      console.log(`🗑️ 文件删除成功: ${fileKey}`)
+      logger.info(`🗑️ 文件删除成功: ${fileKey}`)
 
       return true
     } catch (error) {
-      console.error('❌ 文件删除失败:', error)
+      logger.error('❌ 文件删除失败:', error)
       return false
     }
   }
@@ -141,7 +144,7 @@ class SealosStorageService {
    * @param {number} expiresIn - 过期时间（秒，默认1小时）
    * @returns {Promise<string>} 临时访问URL
    */
-  async getSignedUrl (fileKey, expiresIn = 3600) {
+  async getSignedUrl(fileKey, expiresIn = 3600) {
     try {
       const params = {
         Bucket: this.config.bucket,
@@ -152,7 +155,7 @@ class SealosStorageService {
       const url = await this.s3.getSignedUrlPromise('getObject', params)
       return url
     } catch (error) {
-      console.error('❌ 获取临时URL失败:', error)
+      logger.error('❌ 获取临时URL失败:', error)
       throw error
     }
   }
@@ -162,7 +165,7 @@ class SealosStorageService {
    * @param {string} fileKey - 文件Key
    * @returns {Promise<boolean>} 文件是否存在
    */
-  async fileExists (fileKey) {
+  async fileExists(fileKey) {
     try {
       await this.s3
         .headObject({
@@ -185,7 +188,7 @@ class SealosStorageService {
    * @param {string} fileKey - 文件Key
    * @returns {Promise<Object>} 文件元数据
    */
-  async getFileMetadata (fileKey) {
+  async getFileMetadata(fileKey) {
     try {
       const result = await this.s3
         .headObject({
@@ -201,7 +204,7 @@ class SealosStorageService {
         etag: result.ETag
       }
     } catch (error) {
-      console.error('❌ 获取文件元数据失败:', error)
+      logger.error('❌ 获取文件元数据失败:', error)
       throw error
     }
   }
@@ -212,7 +215,7 @@ class SealosStorageService {
    * @param {number} maxKeys - 最大返回数量
    * @returns {Promise<Array>} 文件列表
    */
-  async listFiles (prefix = '', maxKeys = 1000) {
+  async listFiles(prefix = '', maxKeys = 1000) {
     try {
       const params = {
         Bucket: this.config.bucket,
@@ -229,7 +232,7 @@ class SealosStorageService {
         etag: item.ETag
       }))
     } catch (error) {
-      console.error('❌ 列出文件失败:', error)
+      logger.error('❌ 列出文件失败:', error)
       throw error
     }
   }
@@ -240,7 +243,7 @@ class SealosStorageService {
    * @param {Object} _options - 压缩选项（当前未使用）
    * @returns {Promise<Buffer>} 压缩后的图片缓冲区
    */
-  async compressImage (imageBuffer, _options = {}) {
+  async compressImage(imageBuffer, _options = {}) {
     /*
      * 这里可以集成图片压缩库如sharp
      * 暂时返回原图
@@ -253,7 +256,7 @@ class SealosStorageService {
    * @param {string} ext - 文件扩展名
    * @returns {string} Content-Type
    */
-  getContentType (ext) {
+  getContentType(ext) {
     const contentTypes = {
       '.jpg': 'image/jpeg',
       '.jpeg': 'image/jpeg',
@@ -274,7 +277,7 @@ class SealosStorageService {
    * 🔴 测试连接
    * @returns {Promise<boolean>} 连接测试结果
    */
-  async testConnection () {
+  async testConnection() {
     try {
       // 尝试列出存储桶内容
       await this.s3
@@ -284,10 +287,10 @@ class SealosStorageService {
         })
         .promise()
 
-      console.log('✅ Sealos存储连接测试成功')
+      logger.info('✅ Sealos存储连接测试成功')
       return true
     } catch (error) {
-      console.error('❌ Sealos存储连接测试失败:', error)
+      logger.error('❌ Sealos存储连接测试失败:', error)
       return false
     }
   }
@@ -296,7 +299,7 @@ class SealosStorageService {
    * 🔴 获取存储统计信息
    * @returns {Promise<Object>} 存储统计
    */
-  async getStorageStats () {
+  async getStorageStats() {
     try {
       const files = await this.listFiles()
       const totalSize = files.reduce((sum, file) => sum + file.size, 0)
@@ -307,7 +310,7 @@ class SealosStorageService {
         totalSizeMB: (totalSize / (1024 * 1024)).toFixed(2)
       }
     } catch (error) {
-      console.error('❌ 获取存储统计失败:', error)
+      logger.error('❌ 获取存储统计失败:', error)
       throw error
     }
   }

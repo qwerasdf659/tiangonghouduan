@@ -1,3 +1,6 @@
+const Logger = require('../services/UnifiedLotteryEngine/utils/Logger')
+const logger = new Logger('index')
+
 /**
  * 服务管理器 - V4统一版本
  * 管理系统中所有服务的生命周期
@@ -178,7 +181,7 @@ class ServiceManager {
     }
 
     try {
-      console.log('🚀 初始化V4服务管理器...')
+      logger.info('🚀 初始化V4服务管理器...')
 
       // ✅ 注册V4统一抽奖引擎（移除旧版LotteryDrawService）
       this._services.set('unifiedLotteryEngine', new UnifiedLotteryEngine(this.models))
@@ -238,7 +241,7 @@ class ServiceManager {
        * 🎯 初始化阶段依赖注入（P2优先级 - 2025-12-10）
        * 为所有需要依赖其他Service的Service注入依赖
        */
-      console.log('🔧 开始注入Service依赖...')
+      logger.info('🔧 开始注入Service依赖...')
 
       // 注入管理后台服务的依赖
       if (typeof AdminCustomerServiceService.initialize === 'function') {
@@ -249,13 +252,13 @@ class ServiceManager {
       }
       // AdminMarketplaceService已合并到ExchangeMarketService，不再需要初始化
 
-      console.log('✅ Service依赖注入完成')
+      logger.info('✅ Service依赖注入完成')
 
       this._initialized = true
-      console.log('✅ V4服务管理器初始化完成')
-      console.log(`📊 已注册服务: ${Array.from(this._services.keys()).join(', ')}`)
+      logger.info('✅ V4服务管理器初始化完成')
+      logger.info(`📊 已注册服务: ${Array.from(this._services.keys()).join(', ')}`)
     } catch (error) {
-      console.error('❌ 服务管理器初始化失败:', error)
+      logger.error('❌ 服务管理器初始化失败:', error)
       throw error
     }
   }
@@ -369,23 +372,23 @@ class ServiceManager {
    * @returns {Promise<void>} 所有服务关闭完成后resolve
    */
   async shutdown() {
-    console.log('🛑 开始关闭服务管理器...')
+    logger.info('🛑 开始关闭服务管理器...')
 
     for (const [serviceName, service] of this._services.entries()) {
       try {
         if (typeof service.shutdown === 'function') {
           // eslint-disable-next-line no-await-in-loop
           await service.shutdown()
-          console.log(`✅ 服务 ${serviceName} 已关闭`)
+          logger.info(`✅ 服务 ${serviceName} 已关闭`)
         }
       } catch (error) {
-        console.error(`❌ 服务 ${serviceName} 关闭失败:`, error)
+        logger.error(`❌ 服务 ${serviceName} 关闭失败:`, error)
       }
     }
 
     this._services.clear()
     this._initialized = false
-    console.log('✅ 服务管理器已关闭')
+    logger.info('✅ 服务管理器已关闭')
   }
 }
 
@@ -411,7 +414,7 @@ function initializeServices(_models) {
 
   // 异步初始化
   serviceManager.initialize().catch(error => {
-    console.error('服务管理器初始化失败:', error)
+    logger.error('服务管理器初始化失败:', error)
   })
 
   return container

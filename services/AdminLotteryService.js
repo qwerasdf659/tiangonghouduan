@@ -121,7 +121,7 @@ class AdminLotteryService {
    * // 在ServiceManager.initialize()中调用
    * AdminLotteryService.initialize(serviceManager)
    */
-  static initialize (serviceManager) {
+  static initialize(serviceManager) {
     // 🎯 直接从_services Map获取，避免触发初始化检查
     this._dependencies.user = serviceManager._services.get('user')
     this._dependencies.prizePool = serviceManager._services.get('prizePool')
@@ -171,7 +171,7 @@ class AdminLotteryService {
    *   new Date(Date.now() + 3600000) // 1小时后过期
    * );
    */
-  static async forceWinForUser (
+  static async forceWinForUser(
     adminId,
     userId,
     prizeId,
@@ -315,7 +315,7 @@ class AdminLotteryService {
    *   '防刷保护'
    * );
    */
-  static async forceLoseForUser (
+  static async forceLoseForUser(
     adminId,
     userId,
     count = 1,
@@ -475,7 +475,7 @@ class AdminLotteryService {
    *   expiresAt
    * );
    */
-  static async adjustUserProbability (adminId, userId, adjustmentData, expiresAt = null) {
+  static async adjustUserProbability(adminId, userId, adjustmentData, expiresAt = null) {
     const transaction = await models.sequelize.transaction()
 
     try {
@@ -646,7 +646,7 @@ class AdminLotteryService {
    *   'VIP用户专属队列'
    * );
    */
-  static async setUserQueue (
+  static async setUserQueue(
     adminId,
     userId,
     queueConfig,
@@ -774,7 +774,7 @@ class AdminLotteryService {
    * const status = await AdminLotteryService.getUserManagementStatus(20001);
    * // status.management_status.force_win: { setting_id, prize_id, reason, expires_at, status }
    */
-  static async getUserManagementStatus (userId) {
+  static async getUserManagementStatus(userId) {
     try {
       logger.info('查询用户管理状态', {
         user_id: userId
@@ -857,7 +857,7 @@ class AdminLotteryService {
    * // 清除特定类型设置
    * const result = await AdminLotteryService.clearUserSettings(10001, 20001, 'force_win');
    */
-  static async clearUserSettings (adminId, userId, settingType = null, reason = '管理员清除设置') {
+  static async clearUserSettings(adminId, userId, settingType = null, reason = '管理员清除设置') {
     const transaction = await models.sequelize.transaction()
 
     try {
@@ -964,17 +964,14 @@ class AdminLotteryService {
    * 创建时间：2025年12月11日（从LotteryPrize.resetDailyWinCount迁移）
    * 迁移原因：符合"Model层纯净度"架构原则（任务2.1）
    */
-  static async resetDailyWinCounts () {
+  static async resetDailyWinCounts() {
     try {
       logger.info('[批处理任务] 开始重置每日中奖次数...')
 
       const { LotteryPrize } = models
 
       // 批量更新所有奖品的daily_win_count为0
-      const [updatedCount] = await LotteryPrize.update(
-        { daily_win_count: 0 },
-        { where: {} }
-      )
+      const [updatedCount] = await LotteryPrize.update({ daily_win_count: 0 }, { where: {} })
 
       logger.info('[批处理任务] 每日中奖次数重置完成', {
         updated_count: updatedCount,
@@ -1024,12 +1021,12 @@ class AdminLotteryService {
    * @example
    * // 定时任务调用
    * const result = await AdminLotteryService.syncCampaignStatus()
-   * console.log(`启动了${result.started}个活动，结束了${result.ended}个活动`)
+   * logger.info(`启动了${result.started}个活动，结束了${result.ended}个活动`)
    *
    * 创建时间：2025年12月11日（从LotteryCampaign.batchUpdateStatus迁移）
    * 迁移原因：符合"Model层纯净度"架构原则（任务2.1）
    */
-  static async syncCampaignStatus () {
+  static async syncCampaignStatus() {
     try {
       logger.info('[批处理任务] 开始同步活动状态...')
 
@@ -1113,7 +1110,7 @@ class AdminLotteryService {
    * 创建时间：2025年12月11日（从LotteryCampaign.getActiveCampaigns迁移）
    * 迁移原因：符合"Model层纯净度"架构原则（任务2.1）
    */
-  static async getActiveCampaigns (options = {}) {
+  static async getActiveCampaigns(options = {}) {
     try {
       const { limit = 10, includePrizes = true } = options
 

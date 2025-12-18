@@ -39,18 +39,18 @@
  *   end_date: '2025-10-30',
  *   prize_type: 'points'
  * })
- * console.log('总记录数:', history.total_count)
+ * logger.info('总记录数:', history.total_count)
  *
  * // 查询批量抽奖记录
  * const batchHistory = await historyService.get_batch_lottery_history('batch_12345')
- * console.log('批量抽奖成功数:', batchHistory.success_count)
+ * logger.info('批量抽奖成功数:', batchHistory.success_count)
  *
  * // 查询用户统计信息
  * const stats = await historyService.get_user_lottery_statistics(10001, {
  *   start_date: '2025-10-01',
  *   end_date: '2025-10-30'
  * })
- * console.log('中奖率:', stats.winning_rate)
+ * logger.info('中奖率:', stats.winning_rate)
  * ```
  *
  * 注意事项：
@@ -113,18 +113,18 @@ const Logger = require('../UnifiedLotteryEngine/utils/Logger')
  *   end_date: '2025-10-30',
  *   prize_type: 'points'
  * })
- * console.log('抽奖历史:', history.records)
- * console.log('总记录数:', history.total_count)
+ * logger.info('抽奖历史:', history.records)
+ * logger.info('总记录数:', history.total_count)
  *
  * // 查询批量抽奖记录
  * const batchHistory = await historyService.get_batch_lottery_history('batch_12345')
- * console.log('批量抽奖成功数:', batchHistory.success_count)
+ * logger.info('批量抽奖成功数:', batchHistory.success_count)
  *
  * // 查询用户统计信息
  * const stats = await historyService.get_user_lottery_statistics(10001)
- * console.log('总抽奖次数:', stats.total_draws)
- * console.log('中奖次数:', stats.winning_draws)
- * console.log('中奖率:', stats.winning_rate)
+ * logger.info('总抽奖次数:', stats.total_draws)
+ * logger.info('中奖次数:', stats.winning_draws)
+ * logger.info('中奖率:', stats.winning_rate)
  * ```
  *
  * 注意事项：
@@ -156,9 +156,9 @@ class LotteryHistoryService {
    *
    * @example
    * const historyService = new LotteryHistoryService()
-   * console.log('抽奖历史服务已初始化')
+   * logger.info('抽奖历史服务已初始化')
    */
-  constructor () {
+  constructor() {
     this.logger = Logger.create('LotteryHistoryService')
   }
 
@@ -168,7 +168,7 @@ class LotteryHistoryService {
    * @param {Object} options - 查询选项
    * @returns {Object} 历史记录数据
    */
-  async get_user_lottery_history (user_id, options = {}) {
+  async get_user_lottery_history(user_id, options = {}) {
     try {
       const {
         page = 1,
@@ -250,7 +250,7 @@ class LotteryHistoryService {
    * @param {string} batch_id - 批量ID
    * @returns {Object} 批量抽奖历史
    */
-  async get_batch_lottery_history (batch_id) {
+  async get_batch_lottery_history(batch_id) {
     try {
       const records = await models.LotteryDraw.findAll({
         where: { batch_id },
@@ -289,7 +289,7 @@ class LotteryHistoryService {
    * @param {Object} date_range - 日期范围
    * @returns {Object} 统计信息
    */
-  async get_user_lottery_statistics (user_id, date_range = {}) {
+  async get_user_lottery_statistics(user_id, date_range = {}) {
     try {
       const { start_date, end_date } = date_range
 
@@ -348,7 +348,8 @@ class LotteryHistoryService {
         user_id,
         total_draws,
         winning_draws,
-        winning_rate: total_draws > 0 ? (winning_draws / total_draws * 100).toFixed(2) + '%' : '0%',
+        winning_rate:
+          total_draws > 0 ? ((winning_draws / total_draws) * 100).toFixed(2) + '%' : '0%',
         prize_type_distribution: prize_type_stats.map(stat => ({
           prize_type: stat.prize_type,
           count: parseInt(stat.getDataValue('count'))
@@ -368,7 +369,7 @@ class LotteryHistoryService {
    * @param {number} user_id - 用户ID
    * @returns {Object} 今日统计
    */
-  async get_today_lottery_statistics (user_id) {
+  async get_today_lottery_statistics(user_id) {
     try {
       const today_start = BeijingTimeHelper.getTodayStart()
       const today_end = BeijingTimeHelper.getTodayEnd()
@@ -388,7 +389,7 @@ class LotteryHistoryService {
    * @param {Object} record - 原始记录
    * @returns {Object} 格式化后的记录
    */
-  format_lottery_record (record) {
+  format_lottery_record(record) {
     const formatted_record = {
       id: record.id,
       user_id: record.user_id,
@@ -431,7 +432,7 @@ class LotteryHistoryService {
    * @param {string} type - 奖品类型
    * @returns {string} 显示名称
    */
-  get_prize_type_name (type) {
+  get_prize_type_name(type) {
     const type_map = {
       points: '积分奖励',
       product: '实物奖品',
@@ -447,7 +448,7 @@ class LotteryHistoryService {
    * @param {Object} params - 查询参数
    * @returns {Object} 验证结果
    */
-  validate_history_params (params) {
+  validate_history_params(params) {
     try {
       const { user_id, page, limit } = params
 

@@ -1,3 +1,6 @@
+const Logger = require('../../../services/UnifiedLotteryEngine/utils/Logger')
+const logger = new Logger('lottery-preset')
+
 /**
  * 抽奖预设管理路由
  * 为管理员提供用户抽奖结果预设功能
@@ -46,7 +49,7 @@ router.post('/create', authenticateToken, requireAdmin, async (req, res) => {
     )
   } catch (error) {
     // 🎯 细化错误处理：根据Service层抛出的错误类型返回合适的HTTP状态码
-    console.error('❌ 创建抽奖预设失败:', error.message)
+    logger.error('❌ 创建抽奖预设失败:', error.message)
 
     // Service层的业务错误
     if (
@@ -132,7 +135,7 @@ router.get('/user/:user_id', authenticateToken, requireAdmin, async (req, res) =
     return res.apiSuccess(result, '获取用户预设成功')
   } catch (error) {
     // 🎯 细化错误处理：根据Service层抛出的错误类型返回合适的HTTP状态码
-    console.error('❌ 查看用户预设失败:', error.message)
+    logger.error('❌ 查看用户预设失败:', error.message)
 
     // Service层的业务错误
     if (error.code === 'INVALID_USER_ID' || error.code === 'INVALID_STATUS') {
@@ -194,7 +197,7 @@ router.delete('/user/:user_id', authenticateToken, requireAdmin, async (req, res
     return res.apiSuccess(result, `成功清理${result.deleted_count}条预设记录`)
   } catch (error) {
     // 🎯 细化错误处理：根据Service层抛出的错误类型返回合适的HTTP状态码
-    console.error('❌ 清理用户预设失败:', error.message)
+    logger.error('❌ 清理用户预设失败:', error.message)
 
     // Service层的业务错误
     if (error.code === 'INVALID_USER_ID') {
@@ -257,7 +260,7 @@ router.get('/list', authenticateToken, requireAdmin, async (req, res) => {
     // 🎯 调用服务层方法（将查询参数传递给Service层）
     const result = await LotteryPresetService.listPresetsWithPagination(req.query)
 
-    console.log('📋 管理员查看预设列表', {
+    logger.info('📋 管理员查看预设列表', {
       adminId,
       filters: result.filters,
       totalCount: result.pagination.total
@@ -267,7 +270,7 @@ router.get('/list', authenticateToken, requireAdmin, async (req, res) => {
     return res.apiSuccess(result, '获取预设列表成功')
   } catch (error) {
     // 🎯 细化错误处理：根据Service层抛出的错误类型返回合适的HTTP状态码
-    console.error('❌ 获取预设列表失败:', error.message)
+    logger.error('❌ 获取预设列表失败:', error.message)
 
     // Service层的业务错误
     if (
@@ -332,7 +335,7 @@ router.get('/stats', authenticateToken, requireAdmin, async (req, res) => {
     // 🎯 调用服务层方法
     const stats = await LotteryPresetService.getPresetStats()
 
-    console.log('📊 管理员查看预设统计', {
+    logger.info('📊 管理员查看预设统计', {
       adminId,
       totalPresets: stats.total_presets,
       pendingPresets: stats.pending_presets,
@@ -343,7 +346,7 @@ router.get('/stats', authenticateToken, requireAdmin, async (req, res) => {
     return res.apiSuccess(stats, '获取预设统计成功')
   } catch (error) {
     // 🎯 细化错误处理：根据Service层抛出的错误类型返回合适的HTTP状态码
-    console.error('❌ 获取预设统计失败:', error.message)
+    logger.error('❌ 获取预设统计失败:', error.message)
 
     // Sequelize数据库错误
     if (error.name === 'SequelizeDatabaseError') {

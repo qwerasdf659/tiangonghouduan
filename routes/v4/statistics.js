@@ -1,3 +1,6 @@
+const Logger = require('../../services/UnifiedLotteryEngine/utils/Logger')
+const logger = new Logger('statistics')
+
 /**
  * 统计数据API路由模块 (Statistics Data API Routes)
  *
@@ -65,7 +68,7 @@ router.get('/charts', authenticateToken, requireAdmin, async (req, res) => {
       'STATISTICS_CHARTS_SUCCESS'
     )
   } catch (error) {
-    console.error('[Statistics] ❌ 获取图表数据失败', error)
+    logger.error('[Statistics] ❌ 获取图表数据失败', error)
     return handleServiceError(error, res, '获取统计数据失败')
   }
 })
@@ -94,11 +97,13 @@ router.get('/report', authenticateToken, requireAdmin, async (req, res) => {
      * 3. 调用 Service 层获取报表数据（注意：ReportingService没有getStatisticsReport方法，需要使用其他方法）
      * 使用getChartsData作为替代，或者需要在ReportingService中添加此方法
      */
-    const report_data = await ReportingService.getChartsData(period === 'week' ? 7 : period === 'month' ? 30 : 365)
+    const report_data = await ReportingService.getChartsData(
+      period === 'week' ? 7 : period === 'month' ? 30 : 365
+    )
 
     return res.apiSuccess(report_data, '数据统计报表获取成功')
   } catch (error) {
-    console.error('[Statistics] ❌ 获取统计报表失败:', error)
+    logger.error('[Statistics] ❌ 获取统计报表失败:', error)
     return handleServiceError(error, res, '获取数据统计报表失败')
   }
 })
@@ -132,17 +137,11 @@ router.get('/export', authenticateToken, requireAdmin, async (req, res) => {
     // 2. 参数验证
     const days = parseInt(req.query.days) || 30
 
-    console.log(`[Statistics] 📥 开始导出统计数据，时间范围: 最近${days}天`)
+    logger.info(`[Statistics] 📥 开始导出统计数据，时间范围: 最近${days}天`)
 
     // 3. 调用 Service 层获取图表数据
-    const {
-      user_growth,
-      user_types,
-      lottery_trend,
-      consumption_trend,
-      points_flow,
-      top_prizes
-    } = await ReportingService.getChartsData(days)
+    const { user_growth, user_types, lottery_trend, consumption_trend, points_flow, top_prizes } =
+      await ReportingService.getChartsData(days)
 
     // 4. 创建工作簿
     const workbook = XLSX.utils.book_new()
@@ -159,9 +158,17 @@ router.get('/export', authenticateToken, requireAdmin, async (req, res) => {
 
     // 6. 用户类型分布表
     const user_types_sheet = XLSX.utils.json_to_sheet([
-      { 用户类型: '普通用户', 数量: user_types.regular.count, 占比: user_types.regular.percentage + '%' },
+      {
+        用户类型: '普通用户',
+        数量: user_types.regular.count,
+        占比: user_types.regular.percentage + '%'
+      },
       { 用户类型: '管理员', 数量: user_types.admin.count, 占比: user_types.admin.percentage + '%' },
-      { 用户类型: '商家', 数量: user_types.merchant.count, 占比: user_types.merchant.percentage + '%' },
+      {
+        用户类型: '商家',
+        数量: user_types.merchant.count,
+        占比: user_types.merchant.percentage + '%'
+      },
       { 用户类型: '总计', 数量: user_types.total, 占比: '100.00%' }
     ])
     XLSX.utils.book_append_sheet(workbook, user_types_sheet, '用户类型分布')
@@ -225,16 +232,19 @@ router.get('/export', authenticateToken, requireAdmin, async (req, res) => {
     const now = new Date()
     const beijing_now = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Shanghai' }))
     const filename = `统计报表_${days}天_${beijing_now.toISOString().split('T')[0]}.xlsx`
-    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    res.setHeader(
+      'Content-Type',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    )
     res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(filename)}"`)
     res.setHeader('Content-Length', excelBuffer.length)
 
-    console.log(`[Statistics] ✅ Excel导出成功: ${filename} (${excelBuffer.length} bytes)`)
+    logger.info(`[Statistics] ✅ Excel导出成功: ${filename} (${excelBuffer.length} bytes)`)
 
     // 13. 发送文件
     return res.send(excelBuffer)
   } catch (error) {
-    console.error('[Statistics] ❌ 导出统计数据失败:', error)
+    logger.error('[Statistics] ❌ 导出统计数据失败:', error)
     return handleServiceError(error, res, '导出统计数据失败')
   }
 })

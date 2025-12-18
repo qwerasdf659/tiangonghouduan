@@ -1,3 +1,6 @@
+const Logger = require('../../services/UnifiedLotteryEngine/utils/Logger')
+const logger = new Logger('system')
+
 /**
  * 餐厅积分抽奖系统 V4.0 - 系统功能API路由
  * 包括系统公告、反馈系统、系统状态等功能
@@ -79,7 +82,7 @@ router.get('/announcements', optionalAuth, dataAccessControl, async (req, res) =
       '获取系统公告成功'
     )
   } catch (error) {
-    console.error('获取系统公告失败:', error)
+    logger.error('获取系统公告失败:', error)
     return handleServiceError(error, res, '获取系统公告失败')
   }
 })
@@ -127,7 +130,7 @@ router.get('/announcements/home', optionalAuth, dataAccessControl, async (req, r
       '获取首页公告成功'
     )
   } catch (error) {
-    console.error('获取首页公告失败:', error)
+    logger.error('获取首页公告失败:', error)
     return handleServiceError(error, res, '获取首页公告失败')
   }
 })
@@ -174,7 +177,7 @@ router.post('/feedback', authenticateToken, async (req, res) => {
       '反馈提交成功'
     )
   } catch (error) {
-    console.error('提交反馈失败:', error)
+    logger.error('提交反馈失败:', error)
     return handleServiceError(error, res, '提交反馈失败')
   }
 })
@@ -240,7 +243,7 @@ router.get('/feedback/my', authenticateToken, async (req, res) => {
     const parsed_offset = parseInt(offset)
     const valid_offset = isNaN(parsed_offset) || parsed_offset < 0 ? 0 : parsed_offset
 
-    console.log('📊 [反馈列表查询]', {
+    logger.info('📊 [反馈列表查询]', {
       user_id,
       status: status || 'all',
       limit: valid_limit,
@@ -273,7 +276,7 @@ router.get('/feedback/my', authenticateToken, async (req, res) => {
       '获取反馈列表成功'
     )
   } catch (error) {
-    console.error('❌ [获取反馈列表失败]', {
+    logger.error('❌ [获取反馈列表失败]', {
       user_id: req.user?.user_id,
       error_message: error.message,
       error_name: error.name,
@@ -325,19 +328,19 @@ router.get('/feedback/:id', authenticateToken, async (req, res) => {
       // 用户信息
       user_info: feedback.user
         ? {
-          user_id: feedback.user.user_id,
-          mobile: userRoles.isAdmin ? feedback.user.mobile : '****',
-          nickname: feedback.user.nickname || '匿名用户'
-        }
+            user_id: feedback.user.user_id,
+            mobile: userRoles.isAdmin ? feedback.user.mobile : '****',
+            nickname: feedback.user.nickname || '匿名用户'
+          }
         : null,
 
       // 处理信息（✅ 使用正确的字段名reply_content）
       reply_content: feedback.reply_content,
       admin_info: feedback.admin
         ? {
-          admin_id: feedback.admin.user_id,
-          admin_name: feedback.admin.nickname || '管理员'
-        }
+            admin_id: feedback.admin.user_id,
+            admin_name: feedback.admin.nickname || '管理员'
+          }
         : null,
 
       // 时间信息（✅ 仅使用存在的字段）
@@ -357,7 +360,7 @@ router.get('/feedback/:id', authenticateToken, async (req, res) => {
 
     return res.apiSuccess(sanitizedDetail, '获取反馈详情成功')
   } catch (error) {
-    console.error('获取反馈详情失败:', error)
+    logger.error('获取反馈详情失败:', error)
     return handleServiceError(error, res, '获取反馈详情失败')
   }
 })
@@ -404,7 +407,7 @@ router.get('/status', optionalAuth, dataAccessControl, async (req, res) => {
       '获取系统状态成功'
     )
   } catch (error) {
-    console.error('获取系统状态失败:', error)
+    logger.error('获取系统状态失败:', error)
     return handleServiceError(error, res, '获取系统状态失败')
   }
 })
@@ -480,7 +483,7 @@ router.get('/business-config', optionalAuth, dataAccessControl, async (req, res)
       '获取业务配置成功'
     )
   } catch (error) {
-    console.error('获取业务配置失败:', error)
+    logger.error('获取业务配置失败:', error)
     return handleServiceError(error, res, '获取业务配置失败')
   }
 })
@@ -517,7 +520,7 @@ router.post('/chat/create', authenticateToken, async (req, res) => {
    */
   const rateLimitCheck = ChatRateLimitService.checkCreateSessionRateLimit(userId)
   if (!rateLimitCheck.allowed) {
-    console.log(
+    logger.info(
       `⚠️ 用户${userId}触发创建会话频率限制（10秒内${rateLimitCheck.current}/${rateLimitCheck.limit}次）`
     )
     return res.apiError(
@@ -552,7 +555,7 @@ router.post('/chat/create', authenticateToken, async (req, res) => {
       session.is_new ? '聊天会话创建成功' : '使用现有会话'
     )
   } catch (error) {
-    console.error(`❌ 用户${userId}创建会话失败:`, error)
+    logger.error(`❌ 用户${userId}创建会话失败:`, error)
     return handleServiceError(error, res, '创建聊天会话失败')
   }
 })
@@ -613,7 +616,7 @@ router.get('/chat/sessions', authenticateToken, async (req, res) => {
       '获取会话列表成功'
     )
   } catch (error) {
-    console.error('获取会话列表失败:', error)
+    logger.error('获取会话列表失败:', error)
     return handleServiceError(error, res, '获取会话列表失败')
   }
 })
@@ -663,7 +666,7 @@ router.get('/chat/history/:sessionId', authenticateToken, async (req, res) => {
       '获取聊天历史成功'
     )
   } catch (error) {
-    console.error('获取聊天历史失败:', error)
+    logger.error('获取聊天历史失败:', error)
     return handleServiceError(error, res, '获取聊天历史失败')
   }
 })
@@ -690,7 +693,7 @@ router.post('/chat/send', authenticateToken, async (req, res) => {
 
     if (!rateLimitCheck.allowed) {
       // 超过频率限制，返回429错误
-      console.warn(
+      logger.warn(
         `⚠️ ${rateLimitCheck.userType === 'admin' ? '管理员' : '用户'}${userId}触发消息发送频率限制（1分钟内${rateLimitCheck.current}/${rateLimitCheck.limit}条）`
       )
       return res.apiError(
@@ -734,7 +737,7 @@ router.post('/chat/send', authenticateToken, async (req, res) => {
         sanitized_content.includes(word)
       )
       if (hasSensitiveWord && contentFilter.reject_on_match) {
-        console.warn(`⚠️ 用户${userId}发送的消息包含敏感词，已拦截`)
+        logger.warn(`⚠️ 用户${userId}发送的消息包含敏感词，已拦截`)
         return res.apiError('消息包含敏感词，请修改后重新发送', 'CONTENT_VIOLATION', null, 400)
       }
     }
@@ -779,8 +782,8 @@ router.post('/chat/send', authenticateToken, async (req, res) => {
       )
     } catch (wsError) {
       // WebSocket推送失败不影响消息发送（降级策略）
-      console.error('WebSocket推送失败:', wsError.message)
-      console.log('✅ 消息已保存到数据库，稍后可通过轮询获取')
+      logger.error('WebSocket推送失败:', wsError.message)
+      logger.info('✅ 消息已保存到数据库，稍后可通过轮询获取')
     }
 
     return res.apiSuccess(
@@ -794,7 +797,7 @@ router.post('/chat/send', authenticateToken, async (req, res) => {
       '消息发送成功'
     )
   } catch (error) {
-    console.error('发送消息失败:', error)
+    logger.error('发送消息失败:', error)
     return handleServiceError(error, res, '发送消息失败')
   }
 })
@@ -861,7 +864,7 @@ router.get('/user/statistics/:user_id', authenticateToken, dataAccessControl, as
     )
   } catch (error) {
     // 🔥 P1优化：详细错误日志记录（包含堆栈信息和请求上下文）
-    console.error('获取用户统计失败:', {
+    logger.error('获取用户统计失败:', {
       error_name: error.name,
       error_message: error.message,
       error_stack: error.stack,
@@ -899,7 +902,7 @@ router.get('/admin/overview', authenticateToken, dataAccessControl, async (req, 
       '获取系统概览成功'
     )
   } catch (error) {
-    console.error('获取系统概览失败:', error)
+    logger.error('获取系统概览失败:', error)
     return handleServiceError(error, res, '获取系统概览失败')
   }
 })

@@ -1,3 +1,6 @@
+const Logger = require('../services/UnifiedLotteryEngine/utils/Logger')
+const logger = new Logger('HierarchyManagementService')
+
 /**
  * 层级权限管理服务（简化版） - 餐厅积分抽奖系统 V4.0 统一引擎架构
  * 业务场景：管理区域负责人→业务经理→业务员三级层级关系和权限操作
@@ -49,7 +52,7 @@ class HierarchyManagementService {
    * 示例：业务经理（user_id=10）添加业务员（user_id=20）到门店（store_id=5）
    * await createHierarchy(20, 10, role_id, 5)
    */
-  static async createHierarchy (user_id, superior_user_id, role_id, store_id = null) {
+  static async createHierarchy(user_id, superior_user_id, role_id, store_id = null) {
     try {
       // 1. 验证用户和角色存在
       const user = await User.findByPk(user_id)
@@ -80,13 +83,13 @@ class HierarchyManagementService {
         activated_at: BeijingTimeHelper.createDatabaseTime()
       })
 
-      console.log(
+      logger.info(
         `✅ 创建层级关系成功: 用户${user_id} → 上级${superior_user_id}, 角色级别${role.role_level}`
       )
 
       // 4. 🔄 清除新用户的权限缓存（确保权限立即生效）
       await PermissionManager.invalidateUser(user_id, 'hierarchy_create')
-      console.log(`✅ 已清除用户${user_id}的权限缓存`)
+      logger.info(`✅ 已清除用户${user_id}的权限缓存`)
 
       return {
         success: true,
@@ -94,7 +97,7 @@ class HierarchyManagementService {
         message: '层级关系创建成功'
       }
     } catch (error) {
-      console.error('❌ 创建层级关系失败:', error.message)
+      logger.error('❌ 创建层级关系失败:', error.message)
       throw error
     }
   }
@@ -117,7 +120,7 @@ class HierarchyManagementService {
    *
    * 安全增强：添加循环检测和深度限制，防止数据异常导致无限递归
    */
-  static async getAllSubordinates (
+  static async getAllSubordinates(
     user_id,
     include_inactive = false,
     maxDepth = 10,
@@ -130,13 +133,13 @@ class HierarchyManagementService {
       const findSubordinates = async (currentUserId, currentVisited) => {
         // 🛡️ 循环检测：防止无限递归
         if (currentVisited.has(currentUserId)) {
-          console.warn(`⚠️ 检测到循环引用: user_id=${currentUserId}`)
+          logger.warn(`⚠️ 检测到循环引用: user_id=${currentUserId}`)
           return
         }
 
         // 🛡️ 深度限制：防止过深的递归
         if (currentVisited.size >= maxDepth) {
-          console.warn(`⚠️ 达到最大递归深度: ${maxDepth}层`)
+          logger.warn(`⚠️ 达到最大递归深度: ${maxDepth}层`)
           return
         }
 
@@ -183,13 +186,13 @@ class HierarchyManagementService {
       const initialVisited = new Set(visited)
       await findSubordinates(user_id, initialVisited)
 
-      console.log(
+      logger.info(
         `✅ 查询到用户${user_id}的${allSubordinates.length}个下级（包含已停用: ${include_inactive}）`
       )
 
       return allSubordinates
     } catch (error) {
-      console.error('❌ 查询下级失败:', error.message)
+      logger.error('❌ 查询下级失败:', error.message)
       throw error
     }
   }
@@ -215,7 +218,7 @@ class HierarchyManagementService {
    * 示例2：业务经理离职，停用其本人及所有下级业务员（需要明确传入true）
    * await batchDeactivatePermissions(10, 1, '业务经理离职', true)
    */
-  static async batchDeactivatePermissions (
+  static async batchDeactivatePermissions(
     target_user_id,
     operator_user_id,
     reason,
@@ -238,7 +241,7 @@ class HierarchyManagementService {
         usersToDeactivate = [target_user_id, ...subordinates.map(sub => sub.user_id)]
       }
 
-      console.log(
+      logger.info(
         `🚫 准备停用${usersToDeactivate.length}个用户的权限（目标用户: ${target_user_id}，包含下级: ${include_subordinates}）`
       )
 
@@ -291,7 +294,7 @@ class HierarchyManagementService {
       // 7. 提交事务（缓存失效成功后才提交，保证数据一致性）
       await transaction.commit()
 
-      console.log(`✅ 成功停用${usersToDeactivate.length}个用户的权限，并清除缓存`)
+      logger.info(`✅ 成功停用${usersToDeactivate.length}个用户的权限，并清除缓存`)
 
       return {
         success: true,
@@ -301,7 +304,7 @@ class HierarchyManagementService {
       }
     } catch (error) {
       await transaction.rollback()
-      console.error('❌ 批量停用权限失败:', error.message)
+      logger.error('❌ 批量停用权限失败:', error.message)
       throw error
     }
   }
@@ -317,7 +320,7 @@ class HierarchyManagementService {
    * @param {boolean} include_subordinates - 是否同时激活所有下级（默认false）
    * @returns {Promise<Object>} { success, activated_count, activated_users, message }
    */
-  static async batchActivatePermissions (
+  static async batchActivatePermissions(
     target_user_id,
     operator_user_id,
     include_subordinates = false
@@ -339,7 +342,7 @@ class HierarchyManagementService {
         usersToActivate = [target_user_id, ...subordinates.map(sub => sub.user_id)]
       }
 
-      console.log(`✅ 准备激活${usersToActivate.length}个用户的权限`)
+      logger.info(`✅ 准备激活${usersToActivate.length}个用户的权限`)
 
       // 3. 批量激活层级关系（恢复is_active=true，清除停用记录）
       await UserHierarchy.update(
@@ -389,7 +392,7 @@ class HierarchyManagementService {
       // 7. 提交事务（缓存失效成功后才提交，保证数据一致性）
       await transaction.commit()
 
-      console.log(`✅ 成功激活${usersToActivate.length}个用户的权限，并清除缓存`)
+      logger.info(`✅ 成功激活${usersToActivate.length}个用户的权限，并清除缓存`)
 
       return {
         success: true,
@@ -399,7 +402,7 @@ class HierarchyManagementService {
       }
     } catch (error) {
       await transaction.rollback()
-      console.error('❌ 批量激活权限失败:', error.message)
+      logger.error('❌ 批量激活权限失败:', error.message)
       throw error
     }
   }
@@ -416,7 +419,7 @@ class HierarchyManagementService {
    *
    * 简化说明：使用简单的递归查询判断上下级关系，不依赖 hierarchy_path
    */
-  static async canManageUser (operator_user_id, target_user_id) {
+  static async canManageUser(operator_user_id, target_user_id) {
     try {
       // 1. 获取操作人的角色级别
       const operatorHierarchy = await UserHierarchy.findOne({
@@ -462,7 +465,7 @@ class HierarchyManagementService {
 
       return isSubordinate
     } catch (error) {
-      console.error('❌ 权限检查失败:', error.message)
+      logger.error('❌ 权限检查失败:', error.message)
       return false
     }
   }
@@ -478,7 +481,7 @@ class HierarchyManagementService {
    *
    * 简化说明：按角色类型统计，而不是按层级深度统计（更直观）
    */
-  static async getHierarchyStats (user_id) {
+  static async getHierarchyStats(user_id) {
     try {
       // 1. 获取所有下级
       const allSubordinates = await this.getAllSubordinates(user_id, false)
@@ -528,7 +531,7 @@ class HierarchyManagementService {
         stats_by_role: statsByRole
       }
     } catch (error) {
-      console.error('❌ 获取层级统计失败:', error.message)
+      logger.error('❌ 获取层级统计失败:', error.message)
       throw error
     }
   }

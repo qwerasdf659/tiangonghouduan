@@ -1,3 +1,6 @@
+const Logger = require('../services/UnifiedLotteryEngine/utils/Logger')
+const logger = new Logger('ThumbnailService')
+
 /**
  * 缩略图生成服务
  * 支持多种尺寸的缩略图生成，优化图片加载性能
@@ -19,7 +22,7 @@ class ThumbnailService {
    * 构造函数 - 初始化缩略图服务和目录配置
    * @constructor
    */
-  constructor () {
+  constructor() {
     this.uploadsDir = path.join(__dirname, '../uploads')
     this.thumbnailsDir = path.join(this.uploadsDir, 'thumbnails')
     this.ensureDirectories()
@@ -29,12 +32,12 @@ class ThumbnailService {
    * 确保缩略图目录存在
    * @returns {Promise<void>} 无返回值，确保thumbnails目录存在并可访问
    */
-  async ensureDirectories () {
+  async ensureDirectories() {
     try {
       await fs.access(this.thumbnailsDir)
     } catch {
       await fs.mkdir(this.thumbnailsDir, { recursive: true })
-      console.log('✅ 创建缩略图目录:', this.thumbnailsDir)
+      logger.info('✅ 创建缩略图目录:', this.thumbnailsDir)
     }
   }
 
@@ -44,7 +47,7 @@ class ThumbnailService {
    * @param {Object} options - 生成选项
    * @returns {Object} 缩略图路径对象
    */
-  async generateThumbnails (originalPath, options = {}) {
+  async generateThumbnails(originalPath, options = {}) {
     const {
       sizes = {
         small: { width: 150, height: 150 },
@@ -88,12 +91,12 @@ class ThumbnailService {
           .toFile(thumbnailPath)
 
         thumbnails[sizeName] = relativePath
-        console.log(`✅ 生成${sizeName}缩略图: ${relativePath}`)
+        logger.info(`✅ 生成${sizeName}缩略图: ${relativePath}`)
       }
 
       return thumbnails
     } catch (error) {
-      console.error('缩略图生成失败:', error)
+      logger.error('缩略图生成失败:', error)
       // 清理已生成的缩略图
       await this.cleanupThumbnails(thumbnails)
       throw error
@@ -105,7 +108,7 @@ class ThumbnailService {
    * @param {Object} thumbnailPaths - 缩略图路径对象
    * @returns {Promise<void>} 无返回值，删除指定的缩略图文件
    */
-  async deleteThumbnails (thumbnailPaths) {
+  async deleteThumbnails(thumbnailPaths) {
     if (!thumbnailPaths) return
 
     for (const [sizeName, relativePath] of Object.entries(thumbnailPaths)) {
@@ -114,9 +117,9 @@ class ThumbnailService {
       const fullPath = path.join(this.uploadsDir, relativePath)
       try {
         await fs.unlink(fullPath)
-        console.log(`🗑️ 删除${sizeName}缩略图: ${relativePath}`)
+        logger.info(`🗑️ 删除${sizeName}缩略图: ${relativePath}`)
       } catch (error) {
-        console.warn(`⚠️ 删除缩略图失败: ${relativePath}`, error.message)
+        logger.warn(`⚠️ 删除缩略图失败: ${relativePath}`, error.message)
       }
     }
   }
@@ -126,14 +129,14 @@ class ThumbnailService {
    * @param {Object} thumbnails - 已生成的缩略图
    * @returns {Promise<void>} 无返回值，清理失败生成的缩略图文件
    */
-  async cleanupThumbnails (thumbnails) {
+  async cleanupThumbnails(thumbnails) {
     for (const [, relativePath] of Object.entries(thumbnails)) {
       if (!relativePath) continue
 
       const fullPath = path.join(this.uploadsDir, relativePath)
       try {
         await fs.unlink(fullPath)
-        console.log(`🧹 清理失败缩略图: ${relativePath}`)
+        logger.info(`🧹 清理失败缩略图: ${relativePath}`)
       } catch (error) {
         // 忽略清理错误
       }
@@ -145,7 +148,7 @@ class ThumbnailService {
    * @param {string} mimeType - MIME类型
    * @returns {boolean} 是否为支持的图片格式（jpeg/jpg/png/webp/tiff/bmp）
    */
-  isSupportedImageType (mimeType) {
+  isSupportedImageType(mimeType) {
     const supportedTypes = [
       'image/jpeg',
       'image/jpg',
@@ -162,7 +165,7 @@ class ThumbnailService {
    * @param {Array} imagePaths - 图片路径数组
    * @returns {Promise<Array>} 生成结果数组，每项包含originalPath、thumbnails、success字段
    */
-  async batchGenerateThumbnails (imagePaths) {
+  async batchGenerateThumbnails(imagePaths) {
     const results = []
 
     for (const imagePath of imagePaths) {
@@ -189,11 +192,11 @@ class ThumbnailService {
    * 获取缩略图统计信息
    * @returns {Promise<Object>} 统计信息对象，包含totalFiles、totalSize、totalSizeFormatted、files数组
    */
-  async getThumbnailStats () {
+  async getThumbnailStats() {
     try {
       const files = await fs.readdir(this.thumbnailsDir)
       const stats = await Promise.all(
-        files.map(async (file) => {
+        files.map(async file => {
           const filePath = path.join(this.thumbnailsDir, file)
           const stat = await fs.stat(filePath)
           return {
@@ -213,7 +216,7 @@ class ThumbnailService {
         files: stats
       }
     } catch (error) {
-      console.error('获取缩略图统计失败:', error)
+      logger.error('获取缩略图统计失败:', error)
       return {
         totalFiles: 0,
         totalSize: 0,
@@ -228,7 +231,7 @@ class ThumbnailService {
    * @param {number} bytes - 字节数
    * @returns {string} 格式化后的文件大小（如 "2.5 MB"、"150 KB"）
    */
-  formatFileSize (bytes) {
+  formatFileSize(bytes) {
     if (bytes === 0) return '0 B'
     const k = 1024
     const sizes = ['B', 'KB', 'MB', 'GB']

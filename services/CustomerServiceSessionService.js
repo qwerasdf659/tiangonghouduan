@@ -1,3 +1,6 @@
+const Logger = require('../services/UnifiedLotteryEngine/utils/Logger')
+const logger = new Logger('CustomerServiceSessionService')
+
 /**
  * 客服会话服务（Customer Service Session Service）
  *
@@ -19,8 +22,6 @@
  * 创建时间：2025年11月23日
  * 最后更新：2025年11月23日
  */
-
-'use strict'
 
 const { CustomerServiceSession, ChatMessage, User } = require('../models')
 const BeijingTimeHelper = require('../utils/timeHelper')
@@ -128,7 +129,7 @@ class CustomerServiceSessionService {
         calculate_unread = false
       } = options
 
-      console.log('📋 获取客服会话列表，参数:', JSON.stringify(options, null, 2))
+      logger.info('📋 获取客服会话列表，参数:', JSON.stringify(options, null, 2))
 
       // 构建查询条件
       const where = {}
@@ -243,7 +244,7 @@ class CustomerServiceSessionService {
         )
       }
 
-      console.log(`✅ 成功获取${formattedSessions.length}条会话记录`)
+      logger.info(`✅ 成功获取${formattedSessions.length}条会话记录`)
 
       return {
         sessions: formattedSessions,
@@ -255,7 +256,7 @@ class CustomerServiceSessionService {
         }
       }
     } catch (error) {
-      console.error('❌ 获取会话列表失败:', error)
+      logger.error('❌ 获取会话列表失败:', error)
       throw error
     }
   }
@@ -291,7 +292,7 @@ class CustomerServiceSessionService {
         include_all_fields = false
       } = options
 
-      console.log(`📋 获取会话 ${session_id} 的消息，参数:`, JSON.stringify(options, null, 2))
+      logger.info(`📋 获取会话 ${session_id} 的消息，参数:`, JSON.stringify(options, null, 2))
 
       // 构建会话查询条件
       const sessionWhere = { session_id }
@@ -385,10 +386,10 @@ class CustomerServiceSessionService {
             }
           )
           if (updateCount > 0) {
-            console.log(`✅ 会话${session_id}：已标记${updateCount}条管理员消息为已读`)
+            logger.info(`✅ 会话${session_id}：已标记${updateCount}条管理员消息为已读`)
           }
         } catch (updateError) {
-          console.error(`⚠️ 更新消息已读状态失败 (会话${session_id}):`, updateError.message)
+          logger.error(`⚠️ 更新消息已读状态失败 (会话${session_id}):`, updateError.message)
           // 不影响主流程
         }
       }
@@ -428,7 +429,7 @@ class CustomerServiceSessionService {
         }
       })
 
-      console.log(`✅ 成功获取${formattedMessages.length}条消息`)
+      logger.info(`✅ 成功获取${formattedMessages.length}条消息`)
 
       return {
         session: {
@@ -455,7 +456,7 @@ class CustomerServiceSessionService {
         has_more: messages.length === parseInt(limit)
       }
     } catch (error) {
-      console.error('❌ 获取会话消息失败:', error)
+      logger.error('❌ 获取会话消息失败:', error)
       throw error
     }
   }
@@ -483,7 +484,7 @@ class CustomerServiceSessionService {
     try {
       const { admin_id, content, message_type = 'text', role_level = 100 } = data
 
-      console.log(`📤 管理员 ${admin_id} 向会话 ${session_id} 发送消息`)
+      logger.info(`📤 管理员 ${admin_id} 向会话 ${session_id} 发送消息`)
 
       // ✅ 1. XSS内容安全过滤
       const sanitized_content = sanitizeContent(content)
@@ -525,7 +526,7 @@ class CustomerServiceSessionService {
         if (role_level < 200) {
           throw new Error('无权限操作此会话，需要超级管理员权限')
         }
-        console.log(`⚠️ 超级管理员 ${admin_id} 接管会话 ${session_id}`)
+        logger.info(`⚠️ 超级管理员 ${admin_id} 接管会话 ${session_id}`)
       }
 
       // ✅ 6. 自动分配未分配的会话
@@ -567,7 +568,7 @@ class CustomerServiceSessionService {
 
       await transaction.commit()
 
-      console.log(`✅ 消息发送成功，消息ID: ${message.message_id}`)
+      logger.info(`✅ 消息发送成功，消息ID: ${message.message_id}`)
 
       // ✅ 9. WebSocket实时推送（事务外执行）
       let pushed = false
@@ -585,12 +586,12 @@ class CustomerServiceSessionService {
         pushed = ChatWebSocketService.pushMessageToUser(session.user_id, messageData)
 
         if (pushed) {
-          console.log(`📤 消息已实时推送给用户 ${session.user_id}`)
+          logger.info(`📤 消息已实时推送给用户 ${session.user_id}`)
         } else {
-          console.log(`⚠️ 用户 ${session.user_id} 不在线，消息已保存`)
+          logger.info(`⚠️ 用户 ${session.user_id} 不在线，消息已保存`)
         }
       } catch (wsError) {
-        console.error('❌ WebSocket推送失败:', wsError)
+        logger.error('❌ WebSocket推送失败:', wsError)
         // 不影响消息发送成功
       }
 
@@ -605,7 +606,7 @@ class CustomerServiceSessionService {
       }
     } catch (error) {
       await transaction.rollback()
-      console.error('❌ 发送消息失败:', error)
+      logger.error('❌ 发送消息失败:', error)
       throw error
     }
   }
@@ -635,7 +636,7 @@ class CustomerServiceSessionService {
     try {
       const { user_id, content, message_type = 'text' } = data
 
-      console.log(`📤 用户 ${user_id} 向会话 ${session_id} 发送消息`)
+      logger.info(`📤 用户 ${user_id} 向会话 ${session_id} 发送消息`)
 
       // ✅ 1. 验证会话是否存在且属于该用户
       const session = await CustomerServiceSession.findOne({
@@ -681,7 +682,7 @@ class CustomerServiceSessionService {
 
       await transaction.commit()
 
-      console.log(`✅ 用户消息发送成功，消息ID: ${message.message_id}`)
+      logger.info(`✅ 用户消息发送成功，消息ID: ${message.message_id}`)
 
       // ✅ 5. 返回消息数据（供WebSocket推送使用）
       return {
@@ -696,7 +697,7 @@ class CustomerServiceSessionService {
       }
     } catch (error) {
       await transaction.rollback()
-      console.error('❌ 用户发送消息失败:', error)
+      logger.error('❌ 用户发送消息失败:', error)
       throw error
     }
   }
@@ -713,7 +714,7 @@ class CustomerServiceSessionService {
    */
   static async markSessionAsRead(session_id, admin_id) {
     try {
-      console.log(`👁️ 管理员 ${admin_id} 标记会话 ${session_id} 为已读`)
+      logger.info(`👁️ 管理员 ${admin_id} 标记会话 ${session_id} 为已读`)
 
       // 验证会话权限
       const session = await CustomerServiceSession.findOne({
@@ -740,13 +741,13 @@ class CustomerServiceSessionService {
         }
       )
 
-      console.log(`✅ 标记 ${updatedCount} 条消息为已读`)
+      logger.info(`✅ 标记 ${updatedCount} 条消息为已读`)
 
       return {
         updated_count: updatedCount
       }
     } catch (error) {
-      console.error('❌ 标记已读失败:', error)
+      logger.error('❌ 标记已读失败:', error)
       throw error
     }
   }
@@ -770,7 +771,7 @@ class CustomerServiceSessionService {
     })
 
     try {
-      console.log(`🔄 转接会话 ${session_id}: ${current_admin_id} → ${target_admin_id}`)
+      logger.info(`🔄 转接会话 ${session_id}: ${current_admin_id} → ${target_admin_id}`)
 
       // 验证会话
       const session = await CustomerServiceSession.findOne({
@@ -822,7 +823,7 @@ class CustomerServiceSessionService {
 
       await transaction.commit()
 
-      console.log('✅ 会话转接成功')
+      logger.info('✅ 会话转接成功')
 
       /*
        * TODO: 通知目标客服有新会话
@@ -838,7 +839,7 @@ class CustomerServiceSessionService {
       }
     } catch (error) {
       await transaction.rollback()
-      console.error('❌ 转接会话失败:', error)
+      logger.error('❌ 转接会话失败:', error)
       throw error
     }
   }
@@ -865,7 +866,7 @@ class CustomerServiceSessionService {
     try {
       const { admin_id, close_reason = '问题已解决' } = data
 
-      console.log(`🔒 管理员 ${admin_id} 关闭会话 ${session_id}`)
+      logger.info(`🔒 管理员 ${admin_id} 关闭会话 ${session_id}`)
 
       // 验证会话
       const session = await CustomerServiceSession.findOne({
@@ -909,7 +910,7 @@ class CustomerServiceSessionService {
 
       await transaction.commit()
 
-      console.log('✅ 会话关闭成功')
+      logger.info('✅ 会话关闭成功')
 
       return {
         session_id,
@@ -918,7 +919,7 @@ class CustomerServiceSessionService {
       }
     } catch (error) {
       await transaction.rollback()
-      console.error('❌ 关闭会话失败:', error)
+      logger.error('❌ 关闭会话失败:', error)
       throw error
     }
   }
@@ -953,7 +954,7 @@ class CustomerServiceSessionService {
         active_total: waiting + assigned + active
       }
     } catch (error) {
-      console.error('❌ 获取统计信息失败:', error)
+      logger.error('❌ 获取统计信息失败:', error)
       throw error
     }
   }
@@ -998,7 +999,7 @@ class CustomerServiceSessionService {
       })
 
       if (existingSession) {
-        console.log(`✅ 用户${user_id}使用现有会话: ${existingSession.session_id}`)
+        logger.info(`✅ 用户${user_id}使用现有会话: ${existingSession.session_id}`)
         return {
           session_id: existingSession.session_id,
           status: existingSession.status,
@@ -1018,7 +1019,7 @@ class CustomerServiceSessionService {
           created_at: BeijingTimeHelper.createBeijingTime()
         })
 
-        console.log(`✅ 用户${user_id}创建新会话成功: ${session.session_id}`)
+        logger.info(`✅ 用户${user_id}创建新会话成功: ${session.session_id}`)
         return {
           session_id: session.session_id,
           status: session.status,
@@ -1029,7 +1030,7 @@ class CustomerServiceSessionService {
       } catch (createError) {
         // 🔴 步骤3：处理并发创建冲突（唯一索引约束触发）
         if (createError.name === 'SequelizeUniqueConstraintError') {
-          console.log(`⚠️ 用户${user_id}并发创建会话被数据库唯一索引拦截，查询已创建的会话`)
+          logger.info(`⚠️ 用户${user_id}并发创建会话被数据库唯一索引拦截，查询已创建的会话`)
 
           // 重新查询现有会话（此时另一个并发请求已成功创建）
           const concurrentSession = await CustomerServiceSession.findOne({
@@ -1041,7 +1042,7 @@ class CustomerServiceSessionService {
           })
 
           if (concurrentSession) {
-            console.log(`✅ 用户${user_id}获取并发创建的会话: ${concurrentSession.session_id}`)
+            logger.info(`✅ 用户${user_id}获取并发创建的会话: ${concurrentSession.session_id}`)
             return {
               session_id: concurrentSession.session_id,
               status: concurrentSession.status,
@@ -1052,7 +1053,7 @@ class CustomerServiceSessionService {
           }
 
           // 理论上不应该到达这里（唯一索引冲突说明会话必然存在）
-          console.error(`❌ 异常：唯一索引冲突但查询不到活跃会话（用户${user_id}）`)
+          logger.error(`❌ 异常：唯一索引冲突但查询不到活跃会话（用户${user_id}）`)
           throw new Error('会话状态异常，请刷新后重试')
         }
 
@@ -1060,7 +1061,7 @@ class CustomerServiceSessionService {
         throw createError
       }
     } catch (error) {
-      console.error('❌ 获取或创建会话失败:', error)
+      logger.error('❌ 获取或创建会话失败:', error)
       throw error
     }
   }
@@ -1216,7 +1217,7 @@ class CustomerServiceSessionService {
 
       // 2️⃣ 无数据时返回默认值60秒
       if (sessions.length === 0) {
-        console.log('📊 [平均响应时间] 今日无已响应会话，返回默认值60秒')
+        logger.info('📊 [平均响应时间] 今日无已响应会话，返回默认值60秒')
         return 60
       }
 
@@ -1254,7 +1255,7 @@ class CustomerServiceSessionService {
             totalResponseTime += responseTime
             validSessions++
           } else if (responseTime >= 3600) {
-            console.warn(
+            logger.warn(
               `⚠️ [平均响应时间] 异常数据：session_id=${session.session_id}，响应时间=${Math.round(responseTime)}秒（>1小时）`
             )
           }
@@ -1263,16 +1264,16 @@ class CustomerServiceSessionService {
 
       // 6️⃣ 计算平均值
       if (validSessions === 0) {
-        console.log('📊 [平均响应时间] 无有效数据，返回默认值60秒')
+        logger.info('📊 [平均响应时间] 无有效数据，返回默认值60秒')
         return 60
       }
 
       const avgResponseTime = Math.round(totalResponseTime / validSessions)
-      console.log(`📊 [平均响应时间] ${avgResponseTime}秒（基于${validSessions}个有效会话）`)
+      logger.info(`📊 [平均响应时间] ${avgResponseTime}秒（基于${validSessions}个有效会话）`)
 
       return avgResponseTime
     } catch (error) {
-      console.error('❌ 计算平均响应时间失败:', error)
+      logger.error('❌ 计算平均响应时间失败:', error)
       return 60 // 出错时返回默认值
     }
   }

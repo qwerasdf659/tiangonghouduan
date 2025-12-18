@@ -122,11 +122,9 @@ class ApiResponse {
       version: 'v4.0'
     }
 
-    // 在开发环境添加更多调试信息
-    if (process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test') {
-      if (httpStatus) {
-        response.httpStatus = httpStatus
-      }
+    // 始终写入httpStatus（所有环境统一行为）
+    if (httpStatus) {
+      response.httpStatus = httpStatus
     }
 
     return response
@@ -240,7 +238,7 @@ class ApiResponse {
    * @returns {Object} 格式化的方法不允许响应
    */
   static methodNotAllowed(message = 'Method Not Allowed', allowedMethods = []) {
-    const response = this.error(message, 'METHOD_NOT_ALLOWED', null, 4005)
+    const response = this.error(message, 'METHOD_NOT_ALLOWED', null, 405)
     response.allowedMethods = allowedMethods
     return response
   }
@@ -253,7 +251,7 @@ class ApiResponse {
    * @returns {Object} 格式化的冲突响应
    */
   static conflict(message = 'Conflict', errorCode = 'CONFLICT', details = null) {
-    return this.error(message, errorCode, details, 4009)
+    return this.error(message, errorCode, details, 409)
   }
 
   /**
@@ -263,7 +261,7 @@ class ApiResponse {
    * @returns {Object} 格式化的实体过大响应
    */
   static payloadTooLarge(message = 'Payload Too Large', maxSize = null) {
-    const response = this.error(message, 'PAYLOAD_TOO_LARGE', null, 4013)
+    const response = this.error(message, 'PAYLOAD_TOO_LARGE', null, 413)
     if (maxSize) {
       response.maxSize = maxSize
     }
@@ -277,7 +275,7 @@ class ApiResponse {
    * @returns {Object} 格式化的不支持媒体类型响应
    */
   static unsupportedMediaType(message = 'Unsupported Media Type', supportedTypes = []) {
-    const response = this.error(message, 'UNSUPPORTED_MEDIA_TYPE', null, 4015)
+    const response = this.error(message, 'UNSUPPORTED_MEDIA_TYPE', null, 415)
     response.supportedTypes = supportedTypes
     return response
   }
@@ -289,7 +287,7 @@ class ApiResponse {
    * @returns {Object} 格式化的请求频率过高响应
    */
   static tooManyRequests(message = 'Too Many Requests', retryAfter = 60) {
-    const response = this.error(message, 'TOO_MANY_REQUESTS', null, 4029)
+    const response = this.error(message, 'TOO_MANY_REQUESTS', null, 429)
     response.retryAfter = retryAfter
     return response
   }
@@ -306,7 +304,7 @@ class ApiResponse {
     errorCode = 'INTERNAL_ERROR',
     details = null
   ) {
-    return this.error(message, errorCode, details, 5001)
+    return this.error(message, errorCode, details, 500)
   }
 
   /**
@@ -316,7 +314,7 @@ class ApiResponse {
    * @returns {Object} 格式化的服务不可用响应
    */
   static serviceUnavailable(message = 'Service Unavailable', retryAfter = 300) {
-    const response = this.error(message, 'SERVICE_UNAVAILABLE', null, 5003)
+    const response = this.error(message, 'SERVICE_UNAVAILABLE', null, 503)
     response.retryAfter = retryAfter
     return response
   }
@@ -327,7 +325,7 @@ class ApiResponse {
    * @returns {Object} 格式化的网关超时响应
    */
   static gatewayTimeout(message = 'Gateway Timeout') {
-    return this.error(message, 'GATEWAY_TIMEOUT', null, 5004)
+    return this.error(message, 'GATEWAY_TIMEOUT', null, 504)
   }
 
   /**
@@ -365,8 +363,9 @@ class ApiResponse {
     const failureCount = totalCount - successCount
 
     return {
-      code: failureCount === 0 ? 0 : 1, // ✅ 修正：全部成功使用0，有失败使用1
-      msg: message, // ✅ 修正：使用msg字段名，符合前端标准
+      success: failureCount === 0, // 业务操作是否全部成功
+      code: failureCount === 0 ? 'BATCH_SUCCESS' : 'BATCH_PARTIAL_FAILURE', // 业务码（字符串枚举）
+      message, // 人类可读消息（统一使用message）
       data: results,
       summary: {
         total: totalCount,

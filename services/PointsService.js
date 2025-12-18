@@ -1,3 +1,6 @@
+const Logger = require('../services/UnifiedLotteryEngine/utils/Logger')
+const logger = new Logger('PointsService')
+
 /**
  * 餐厅积分抽奖系统 V4.0统一引擎架构 - 积分服务（PointsService）
  *
@@ -220,7 +223,7 @@ class PointsService {
    * @param {Object} transaction - 事务对象（可选，用于在事务中查询最新数据）
    * @returns {Object} 积分账户信息
    */
-  static async getUserPointsAccount (user_id, transaction = null) {
+  static async getUserPointsAccount(user_id, transaction = null) {
     let account = await UserPointsAccount.findOne({
       where: { user_id, is_active: true },
       transaction, // ✅ 修复Bug：支持事务查询，确保读取事务中的最新数据
@@ -241,7 +244,7 @@ class PointsService {
    * @param {Object} _transaction - 事务对象（可选）
    * @returns {Object} 新创建的积分账户
    */
-  static async createPointsAccount (user_id, _transaction = null) {
+  static async createPointsAccount(user_id, _transaction = null) {
     // 获取用户的历史积分作为初始值
     const user = await User.findByPk(user_id, { transaction: _transaction })
     if (!user) {
@@ -301,7 +304,7 @@ class PointsService {
    * @param {number} options.operator_id - 操作员ID
    * @returns {Object} 交易结果
    */
-  static async addPoints (user_id, points, options = {}) {
+  static async addPoints(user_id, points, options = {}) {
     if (points <= 0) {
       throw new Error('积分数量必须大于0')
     }
@@ -321,7 +324,7 @@ class PointsService {
       })
 
       if (existingTransaction) {
-        console.log(`⚠️ 幂等性检查: business_id=${options.business_id}已处理，返回原结果`)
+        logger.info(`⚠️ 幂等性检查: business_id=${options.business_id}已处理，返回原结果`)
         return {
           success: true,
           transaction_id: existingTransaction.transaction_id,
@@ -390,7 +393,7 @@ class PointsService {
         transaction
       })
     } catch (auditError) {
-      console.error('[PointsService] 审计日志记录失败:', auditError.message)
+      logger.error('[PointsService] 审计日志记录失败:', auditError.message)
     }
 
     return {
@@ -449,7 +452,7 @@ class PointsService {
    * @param {Object} transaction - Sequelize事务对象（必填，用于事务保护，Sequelize Transaction Object - Required for Transaction Protection）
    * @returns {Object} pending积分交易记录（Pending Points Transaction Record）
    */
-  static async createPendingPointsForConsumption (data, transaction) {
+  static async createPendingPointsForConsumption(data, transaction) {
     try {
       // 1. 验证必填参数
       if (!data.user_id || !data.points || !data.reference_id) {
@@ -489,13 +492,13 @@ class PointsService {
         { transaction }
       ) // ✅ 在事务中创建
 
-      console.log(
+      logger.info(
         `✅ 创建pending积分交易: transaction_id=${pointsTransaction.transaction_id}, user_id=${data.user_id}, points=${data.points}分, status=pending`
       )
 
       return pointsTransaction
     } catch (error) {
-      console.error('❌ 创建pending积分交易失败:', error.message)
+      logger.error('❌ 创建pending积分交易失败:', error.message)
       throw error
     }
   }
@@ -511,7 +514,7 @@ class PointsService {
    * @param {string} options.activation_notes - 激活备注（可选）
    * @returns {Object} 激活结果
    */
-  static async activatePendingPoints (transaction_id, options = {}) {
+  static async activatePendingPoints(transaction_id, options = {}) {
     const { transaction, operator_id, activation_notes } = options
 
     if (!transaction) {
@@ -607,10 +610,10 @@ class PointsService {
           transaction
         })
       } catch (auditError) {
-        console.error('[PointsService] 审计日志记录失败:', auditError.message)
+        logger.error('[PointsService] 审计日志记录失败:', auditError.message)
       }
 
-      console.log(
+      logger.info(
         `✅ Pending积分已激活: transaction_id=${transaction_id}, user_id=${pendingTx.user_id}, points=${pointsAmount}`
       )
 
@@ -620,7 +623,7 @@ class PointsService {
         points_activated: pointsAmount
       }
     } catch (error) {
-      console.error(`❌ 激活pending积分失败: ${error.message}`)
+      logger.error(`❌ 激活pending积分失败: ${error.message}`)
       throw error
     }
   }
@@ -639,7 +642,7 @@ class PointsService {
    * @param {number} options.operator_id - 操作员ID
    * @returns {Object} 交易结果
    */
-  static async consumePoints (user_id, points, options = {}) {
+  static async consumePoints(user_id, points, options = {}) {
     if (points <= 0) {
       throw new Error('积分数量必须大于0')
     }
@@ -659,7 +662,7 @@ class PointsService {
       })
 
       if (existingTransaction) {
-        console.log(`⚠️ 幂等性检查: business_id=${options.business_id}已处理，跳过重复消费`)
+        logger.info(`⚠️ 幂等性检查: business_id=${options.business_id}已处理，跳过重复消费`)
         return {
           success: true,
           transaction_id: existingTransaction.transaction_id,
@@ -738,7 +741,7 @@ class PointsService {
         transaction
       })
     } catch (auditError) {
-      console.error('[PointsService] 审计日志记录失败:', auditError.message)
+      logger.error('[PointsService] 审计日志记录失败:', auditError.message)
     }
 
     return {
@@ -757,7 +760,7 @@ class PointsService {
    * @param {number} user_id - 用户ID
    * @returns {Object} 积分余额信息
    */
-  static async getPointsBalance (user_id) {
+  static async getPointsBalance(user_id) {
     const account = await this.getUserPointsAccount(user_id)
 
     return {
@@ -778,7 +781,7 @@ class PointsService {
    * @param {Object} options - 查询选项
    * @returns {Object} 交易历史
    */
-  static async getPointsHistory (user_id, options = {}) {
+  static async getPointsHistory(user_id, options = {}) {
     const {
       page = 1,
       limit = 20,
@@ -839,7 +842,7 @@ class PointsService {
    * @param {number} user_id - 用户ID
    * @returns {Object} 积分统计信息
    */
-  static async getPointsStatistics (user_id) {
+  static async getPointsStatistics(user_id) {
     const account = await this.getUserPointsAccount(user_id)
 
     // 获取最近30天的交易统计
@@ -889,7 +892,7 @@ class PointsService {
    * @param {number} requiredPoints - 需要的积分数量
    * @returns {boolean} 是否有足够积分
    */
-  static async hasEnoughPoints (user_id, requiredPoints) {
+  static async hasEnoughPoints(user_id, requiredPoints) {
     const account = await this.getUserPointsAccount(user_id)
     return parseFloat(account.available_points) >= requiredPoints
   }
@@ -899,7 +902,7 @@ class PointsService {
    * @param {Array} operations - 操作列表
    * @returns {Object} 批量操作结果
    */
-  static async batchPointsOperation (operations) {
+  static async batchPointsOperation(operations) {
     const { sequelize } = require('../models')
     const transaction = await sequelize.transaction()
 
@@ -952,7 +955,7 @@ class PointsService {
    * @param {number} user_id - 用户ID
    * @returns {Object} 积分信息
    */
-  static async getUserPoints (user_id) {
+  static async getUserPoints(user_id) {
     const account = await this.getUserPointsAccount(user_id)
     return {
       available_points: parseFloat(account.available_points),
@@ -967,7 +970,7 @@ class PointsService {
    * @param {Object} options - 查询选项
    * @returns {Object} 交易记录列表
    */
-  static async getUserTransactions (user_id, options = {}) {
+  static async getUserTransactions(user_id, options = {}) {
     const { page = 1, limit = 20, type = null } = options
     // 🎯 服务层二次保护：最大100条记录（防止内部调用风险）
     const finalLimit = Math.min(parseInt(limit), 100)
@@ -1007,7 +1010,7 @@ class PointsService {
    * 生成兑换码
    * @returns {string} 兑换码
    */
-  static generateExchangeCode () {
+  static generateExchangeCode() {
     const timestamp = BeijingTimeHelper.timestamp().toString(36)
     const random = Math.random().toString(36).substr(2, 8)
     return `EXC${timestamp}${random}`.toUpperCase()
@@ -1017,7 +1020,7 @@ class PointsService {
    * 生成核销码
    * @returns {string} 核销码
    */
-  static generateVerificationCode () {
+  static generateVerificationCode() {
     return Math.random().toString(36).substr(2, 8).toUpperCase()
   }
 
@@ -1037,7 +1040,7 @@ class PointsService {
    * 新获得但尚未审核通过的积分处于"冻结"状态，暂时不可用
    * 审核通过后，冻结积分自动加入可用积分
    */
-  static async getUserPointsOverview (user_id) {
+  static async getUserPointsOverview(user_id) {
     try {
       // 1. 获取用户积分账户（可用积分）
       const account = await this.getUserPointsAccount(user_id)
@@ -1150,7 +1153,7 @@ class PointsService {
             : '当前无冻结积分'
       }
     } catch (error) {
-      console.error('❌ 获取用户积分概览失败:', error.message)
+      logger.error('❌ 获取用户积分概览失败:', error.message)
       throw new Error(`获取用户积分概览失败: ${error.message}`)
     }
   }
@@ -1164,7 +1167,7 @@ class PointsService {
    * @param {number} options.page_size - 每页数量（默认20）
    * @returns {Object} 冻结积分明细列表
    */
-  static async getUserFrozenPoints (user_id, options = {}) {
+  static async getUserFrozenPoints(user_id, options = {}) {
     try {
       const page = Math.max(parseInt(options.page) || 1, 1)
       const pageSize = Math.min(parseInt(options.page_size) || 20, 50)
@@ -1290,7 +1293,7 @@ class PointsService {
       }
     } catch (error) {
       // 🔧 增强错误日志：记录完整错误堆栈和请求参数（Enhanced Error Logging）
-      console.error('❌ 获取用户冻结积分明细失败:', {
+      logger.error('❌ 获取用户冻结积分明细失败:', {
         error_message: error.message,
         error_stack: error.stack, // 错误堆栈（Error Stack Trace）
         user_id,
@@ -1317,7 +1320,7 @@ class PointsService {
    * @param {Object} context.transaction - 事务对象（可选）
    * @returns {Promise<Object>} 删除结果
    */
-  static async deleteTransaction (userId, transactionId, context = {}) {
+  static async deleteTransaction(userId, transactionId, context = {}) {
     const { isAdmin = false, deletion_reason, transaction: externalTransaction } = context
 
     // 支持外部事务传入
@@ -1397,7 +1400,7 @@ class PointsService {
    * @param {Object} context.transaction - 事务对象（可选）
    * @returns {Promise<Object>} 恢复结果
    */
-  static async restoreTransaction (adminId, transactionId, context = {}) {
+  static async restoreTransaction(adminId, transactionId, context = {}) {
     const { restore_reason, transaction: externalTransaction } = context
 
     // 支持外部事务传入
@@ -1474,7 +1477,7 @@ class PointsService {
    * @param {Object} options.transaction - 事务对象（可选）
    * @returns {Promise<Object>} {records, pagination}
    */
-  static async getRestoreAudit (filters = {}, options = {}) {
+  static async getRestoreAudit(filters = {}, options = {}) {
     const { transaction = null } = options
     const { admin_id, start_date, end_date, page = 1, limit = 20 } = filters
 
@@ -1582,7 +1585,7 @@ class PointsService {
    * @returns {Promise<Object>} { user, account }
    * @throws {Error} 用户不存在
    */
-  static async getUserAccount (userId) {
+  static async getUserAccount(userId) {
     // Step 1: 验证用户存在性（Validate user existence）
     const user = await User.findByPk(userId, {
       attributes: ['user_id', 'created_at', 'last_login', 'login_count']
@@ -1619,7 +1622,7 @@ class PointsService {
    * @returns {Promise<Object>} { user, hasAccount }
    * @throws {Error} 用户不存在
    */
-  static async getUserBasicInfo (userId) {
+  static async getUserBasicInfo(userId) {
     const user = await User.findByPk(userId, {
       attributes: ['user_id', 'created_at', 'last_login', 'login_count']
     })
@@ -1667,7 +1670,7 @@ class PointsService {
    * @returns {string} result.timestamp - API时间戳（API Timestamp）
    * @throws {Error} 用户不存在、账户不存在、账户已冻结
    */
-  static async getBalanceResponse (user_id) {
+  static async getBalanceResponse(user_id) {
     // Step 1: 获取用户账户信息（验证用户存在性和账户状态）
     const { account } = await this.getUserAccount(user_id)
 
@@ -1701,7 +1704,7 @@ class PointsService {
    * @param {number} stats.totalEarned - 总获得积分
    * @returns {Array} 成就列表
    */
-  static calculateAchievements (stats) {
+  static calculateAchievements(stats) {
     const achievements = []
 
     // 抽奖相关成就
@@ -1770,7 +1773,7 @@ class PointsService {
    * @returns {Object} result.transactionStats - 交易统计（Transaction Statistics）
    * @returns {Object} result.abnormalStats - 异常统计（Abnormal Statistics）
    */
-  static async getAdminStatistics () {
+  static async getAdminStatistics() {
     const sequelize = UserPointsAccount.sequelize
 
     // 🚀 并行执行3次聚合查询（优化性能）
@@ -1834,7 +1837,7 @@ class PointsService {
             sequelize.fn(
               'SUM',
               sequelize.literal(
-                'CASE WHEN transaction_type = \'earn\' AND status = \'completed\' THEN points_amount ELSE 0 END'
+                "CASE WHEN transaction_type = 'earn' AND status = 'completed' THEN points_amount ELSE 0 END"
               )
             ),
             'total_earned_points'
@@ -1845,7 +1848,7 @@ class PointsService {
             sequelize.fn(
               'SUM',
               sequelize.literal(
-                'CASE WHEN transaction_type = \'consume\' AND status = \'completed\' THEN points_amount ELSE 0 END'
+                "CASE WHEN transaction_type = 'consume' AND status = 'completed' THEN points_amount ELSE 0 END"
               )
             ),
             'total_consumed_points'
@@ -1856,7 +1859,7 @@ class PointsService {
             sequelize.fn(
               'SUM',
               sequelize.literal(
-                'CASE WHEN status = \'pending\' AND transaction_type = \'earn\' THEN points_amount ELSE 0 END'
+                "CASE WHEN status = 'pending' AND transaction_type = 'earn' THEN points_amount ELSE 0 END"
               )
             ),
             'pending_earn_points'
@@ -1867,7 +1870,7 @@ class PointsService {
             sequelize.fn(
               'SUM',
               sequelize.literal(
-                'CASE WHEN DATE(transaction_time) = CURDATE() AND transaction_type = \'earn\' AND status = \'completed\' THEN points_amount ELSE 0 END'
+                "CASE WHEN DATE(transaction_time) = CURDATE() AND transaction_type = 'earn' AND status = 'completed' THEN points_amount ELSE 0 END"
               )
             ),
             'today_earn_points'
@@ -1878,7 +1881,7 @@ class PointsService {
             sequelize.fn(
               'SUM',
               sequelize.literal(
-                'CASE WHEN DATE(transaction_time) = CURDATE() AND transaction_type = \'consume\' AND status = \'completed\' THEN points_amount ELSE 0 END'
+                "CASE WHEN DATE(transaction_time) = CURDATE() AND transaction_type = 'consume' AND status = 'completed' THEN points_amount ELSE 0 END"
               )
             ),
             'today_consume_points'
@@ -1886,7 +1889,7 @@ class PointsService {
 
           // failed_transactions: 失败交易数（Failed Transactions Count）
           [
-            sequelize.fn('COUNT', sequelize.literal('CASE WHEN status = \'failed\' THEN 1 END')),
+            sequelize.fn('COUNT', sequelize.literal("CASE WHEN status = 'failed' THEN 1 END")),
             'failed_transactions'
           ]
         ],
@@ -1971,7 +1974,7 @@ class PointsService {
    * @returns {Promise<Object>} 用户统计数据（User Statistics）
    * @returns {number} result.month_earned - 本月获得积分（Month Earned Points）
    */
-  static async getUserStatistics (userId) {
+  static async getUserStatistics(userId) {
     // 计算本月开始时间（Calculate month start time）
     const monthStart = BeijingTimeHelper.createBeijingTime()
     monthStart.setDate(1)
@@ -2014,7 +2017,7 @@ class PointsService {
    * @returns {Object} result.consumption - 消费统计（Consumption Statistics）
    * @returns {Object} result.inventory - 库存统计（Inventory Statistics）
    */
-  static async getUserFullStatistics (userId) {
+  static async getUserFullStatistics(userId) {
     const { LotteryDraw, ConsumptionRecord, UserInventory } = require('../models')
     const sequelize = UserPointsAccount.sequelize
 
@@ -2052,7 +2055,7 @@ class PointsService {
    * @param {Date} monthStart - 本月开始时间
    * @returns {Promise<Object>} 抽奖统计数据
    */
-  static async _getLotteryStats (userId, LotteryDraw, monthStart) {
+  static async _getLotteryStats(userId, LotteryDraw, monthStart) {
     const [totalCount, thisMonth, lastDraw] = await Promise.all([
       // 总抽奖次数（Total lottery count）
       LotteryDraw.count({ where: { user_id: userId } }),
@@ -2089,7 +2092,7 @@ class PointsService {
    * @param {Object} sequelize - Sequelize实例
    * @returns {Promise<Object>} 消费统计数据
    */
-  static async _getConsumptionStats (userId, ConsumptionRecord, monthStart, sequelize) {
+  static async _getConsumptionStats(userId, ConsumptionRecord, monthStart, sequelize) {
     // 如果ConsumptionRecord模型不存在,返回空数据(向后兼容)
     if (!ConsumptionRecord) {
       return {
@@ -2158,7 +2161,7 @@ class PointsService {
    * @param {Object} UserInventory - 用户库存模型
    * @returns {Promise<Object>} 库存统计数据
    */
-  static async _getInventoryStats (userId, UserInventory) {
+  static async _getInventoryStats(userId, UserInventory) {
     const [totalCount, availableCount, usedCount] = await Promise.all([
       // 总物品数（Total items count）
       UserInventory.count({ where: { user_id: userId } }),
@@ -2196,10 +2199,10 @@ class PointsService {
    * @example
    * const account = await PointsService.getUserPointsAccount(userId)
    * const health = PointsService.getAccountHealth(account)
-   * console.log(health.is_healthy) // true/false
-   * console.log(health.health_score) // 100
+   * logger.info(health.is_healthy) // true/false
+   * logger.info(health.health_score) // 100
    */
-  static getAccountHealth (account) {
+  static getAccountHealth(account) {
     const issues = []
     const warnings = []
 
@@ -2238,9 +2241,9 @@ class PointsService {
    * @example
    * const account = await PointsService.getUserPointsAccount(userId)
    * const recommendations = PointsService.getAccountRecommendations(account)
-   * console.log(recommendations.recommendations) // [{ type: 'daily_tasks', ... }]
+   * logger.info(recommendations.recommendations) // [{ type: 'daily_tasks', ... }]
    */
-  static getAccountRecommendations (_account) {
+  static getAccountRecommendations(_account) {
     const recommendations = []
 
     /*
@@ -2288,7 +2291,7 @@ class PointsService {
    * const summary = PointsService.getAccountSummary(account)
    * return res.apiSuccess(summary, '账户摘要获取成功')
    */
-  static getAccountSummary (account) {
+  static getAccountSummary(account) {
     const health = this.getAccountHealth(account)
     const recommendations = this.getAccountRecommendations(account)
 
@@ -2338,7 +2341,7 @@ class PointsService {
    * @returns {number} result.data_points - 数据点数量（Data points count）
    * @returns {string} result.timestamp - 查询时间戳（Query timestamp）
    */
-  static async getUserPointsTrend (userId, options = {}) {
+  static async getUserPointsTrend(userId, options = {}) {
     let { days = 30, end_date } = options
 
     // 🔒 参数验证和安全清洗（Parameter validation and sanitization）
@@ -2510,7 +2513,7 @@ class PointsService {
    * });
    * ```
    */
-  static async adminAdjustPoints (params) {
+  static async adminAdjustPoints(params) {
     const { admin_id, user_id, amount, reason, type = 'admin_adjust', request_id } = params
 
     // 📝 Step 1: 参数验证
@@ -2586,7 +2589,7 @@ class PointsService {
     const new_balance = parseFloat(updatedAccount.available_points)
 
     // 📝 Step 7: 记录操作日志（便于审计追踪）
-    console.log(
+    logger.info(
       `✅ 积分调整成功 - 管理员:${admin_id} 用户:${user_id} 金额:${amount} 原因:${reason} 余额:${old_balance}→${new_balance} 幂等标识:${business_id}`
     )
 
@@ -2652,7 +2655,7 @@ class PointsService {
    * const statistics = await PointsService.getUserStatisticsResponse(123);
    * ```
    */
-  static async getUserStatisticsResponse (userId) {
+  static async getUserStatisticsResponse(userId) {
     // 📝 Step 1: 获取用户信息和账户
     let userInfo, pointsInfo
     try {

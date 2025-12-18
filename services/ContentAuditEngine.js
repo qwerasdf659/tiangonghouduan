@@ -1,3 +1,6 @@
+const Logger = require('../services/UnifiedLotteryEngine/utils/Logger')
+const logger = new Logger('ContentAuditEngine')
+
 /**
  * 内容审核引擎（通用审核基础设施层）
  *
@@ -44,10 +47,10 @@ class ContentAuditEngine {
    * @param {Object} options.transaction - 数据库事务
    * @returns {Promise<ContentReviewRecord>} 审核记录
    */
-  static async submitForAudit (auditableType, auditableId, options = {}) {
+  static async submitForAudit(auditableType, auditableId, options = {}) {
     const { priority = 'medium', auditData = {}, transaction = null } = options
 
-    console.log(`[审核服务] 提交审核: ${auditableType} ID=${auditableId}, 优先级=${priority}`)
+    logger.info(`[审核服务] 提交审核: ${auditableType} ID=${auditableId}, 优先级=${priority}`)
 
     // 验证审核对象类型
     const validTypes = ['exchange', 'image', 'feedback']
@@ -72,7 +75,7 @@ class ContentAuditEngine {
     })
 
     if (existingAudit) {
-      console.log(`[审核服务] 已存在待审核记录: audit_id=${existingAudit.audit_id}`)
+      logger.info(`[审核服务] 已存在待审核记录: audit_id=${existingAudit.audit_id}`)
       return existingAudit
     }
 
@@ -89,7 +92,7 @@ class ContentAuditEngine {
       { transaction }
     )
 
-    console.log(`[审核服务] 审核记录已创建: audit_id=${auditRecord.audit_id}`)
+    logger.info(`[审核服务] 审核记录已创建: audit_id=${auditRecord.audit_id}`)
 
     return auditRecord
   }
@@ -103,12 +106,12 @@ class ContentAuditEngine {
    * @param {Object} options - 选项
    * @returns {Promise<Object>} 审核结果
    */
-  static async approve (auditId, auditorId, reason = null, options = {}) {
+  static async approve(auditId, auditorId, reason = null, options = {}) {
     const shouldCommit = !options.transaction
     const transaction = options.transaction || (await sequelize.transaction())
 
     try {
-      console.log(`[审核服务] 审核通过: audit_id=${auditId}, auditor_id=${auditorId}`)
+      logger.info(`[审核服务] 审核通过: audit_id=${auditId}, auditor_id=${auditorId}`)
 
       // 1. 获取审核记录
       const auditRecord = await ContentReviewRecord.findByPk(auditId, { transaction })
@@ -142,7 +145,7 @@ class ContentAuditEngine {
         await transaction.commit()
       }
 
-      console.log(`[审核服务] 审核通过成功: audit_id=${auditId}`)
+      logger.info(`[审核服务] 审核通过成功: audit_id=${auditId}`)
 
       return {
         success: true,
@@ -153,7 +156,7 @@ class ContentAuditEngine {
       if (shouldCommit) {
         await transaction.rollback()
       }
-      console.error(`[审核服务] 审核通过失败: ${error.message}`)
+      logger.error(`[审核服务] 审核通过失败: ${error.message}`)
       throw error
     }
   }
@@ -167,7 +170,7 @@ class ContentAuditEngine {
    * @param {Object} options - 选项
    * @returns {Promise<Object>} 审核结果
    */
-  static async reject (auditId, auditorId, reason, options = {}) {
+  static async reject(auditId, auditorId, reason, options = {}) {
     if (!reason || reason.trim().length < 5) {
       throw new Error('拒绝原因必须提供，且不少于5个字符')
     }
@@ -176,7 +179,7 @@ class ContentAuditEngine {
     const transaction = options.transaction || (await sequelize.transaction())
 
     try {
-      console.log(`[审核服务] 审核拒绝: audit_id=${auditId}, auditor_id=${auditorId}`)
+      logger.info(`[审核服务] 审核拒绝: audit_id=${auditId}, auditor_id=${auditorId}`)
 
       // 1. 获取审核记录
       const auditRecord = await ContentReviewRecord.findByPk(auditId, { transaction })
@@ -210,7 +213,7 @@ class ContentAuditEngine {
         await transaction.commit()
       }
 
-      console.log(`[审核服务] 审核拒绝成功: audit_id=${auditId}`)
+      logger.info(`[审核服务] 审核拒绝成功: audit_id=${auditId}`)
 
       return {
         success: true,
@@ -221,7 +224,7 @@ class ContentAuditEngine {
       if (shouldCommit) {
         await transaction.rollback()
       }
-      console.error(`[审核服务] 审核拒绝失败: ${error.message}`)
+      logger.error(`[审核服务] 审核拒绝失败: ${error.message}`)
       throw error
     }
   }
@@ -234,10 +237,10 @@ class ContentAuditEngine {
    * @param {Object} options - 选项
    * @returns {Promise<Object>} 取消结果
    */
-  static async cancel (auditId, reason = null, options = {}) {
+  static async cancel(auditId, reason = null, options = {}) {
     const transaction = options.transaction || null
 
-    console.log(`[审核服务] 取消审核: audit_id=${auditId}`)
+    logger.info(`[审核服务] 取消审核: audit_id=${auditId}`)
 
     // 1. 获取审核记录
     const auditRecord = await ContentReviewRecord.findByPk(auditId, { transaction })
@@ -261,7 +264,7 @@ class ContentAuditEngine {
       { transaction }
     )
 
-    console.log(`[审核服务] 审核取消成功: audit_id=${auditId}`)
+    logger.info(`[审核服务] 审核取消成功: audit_id=${auditId}`)
 
     return {
       success: true,
@@ -280,9 +283,9 @@ class ContentAuditEngine {
    * @returns {Promise<void>} 无返回值，回调执行失败不影响审核结果
    * @private
    */
-  static async triggerAuditCallback (auditRecord, result, transaction) {
+  static async triggerAuditCallback(auditRecord, result, transaction) {
     try {
-      console.log(`[审核回调] 触发回调: type=${auditRecord.auditable_type}, result=${result}`)
+      logger.info(`[审核回调] 触发回调: type=${auditRecord.auditable_type}, result=${result}`)
 
       // 动态加载对应的回调处理器
       const callbackMap = {
@@ -293,7 +296,7 @@ class ContentAuditEngine {
 
       const callbackPath = callbackMap[auditRecord.auditable_type]
       if (!callbackPath) {
-        console.warn(`[审核回调] 未找到回调处理器: ${auditRecord.auditable_type}`)
+        logger.warn(`[审核回调] 未找到回调处理器: ${auditRecord.auditable_type}`)
         return
       }
 
@@ -303,7 +306,7 @@ class ContentAuditEngine {
         callback = require(callbackPath)
       } catch (err) {
         if (err.code === 'MODULE_NOT_FOUND') {
-          console.warn(`[审核回调] 回调处理器未实现: ${callbackPath}`)
+          logger.warn(`[审核回调] 回调处理器未实现: ${callbackPath}`)
           return
         }
         throw err
@@ -312,12 +315,12 @@ class ContentAuditEngine {
       // 执行回调
       if (callback && typeof callback[result] === 'function') {
         await callback[result](auditRecord.auditable_id, auditRecord, transaction)
-        console.log(`[审核回调] 回调执行成功: ${auditRecord.auditable_type}.${result}`)
+        logger.info(`[审核回调] 回调执行成功: ${auditRecord.auditable_type}.${result}`)
       } else {
-        console.warn(`[审核回调] 回调方法未实现: ${auditRecord.auditable_type}.${result}`)
+        logger.warn(`[审核回调] 回调方法未实现: ${auditRecord.auditable_type}.${result}`)
       }
     } catch (error) {
-      console.error(`[审核回调] 回调执行失败: ${error.message}`)
+      logger.error(`[审核回调] 回调执行失败: ${error.message}`)
       // 回调失败不影响审核结果，记录错误但不抛出
     }
   }
@@ -328,7 +331,7 @@ class ContentAuditEngine {
    * @param {Object} options - 查询选项
    * @returns {Promise<Array>} 审核记录列表
    */
-  static async getPendingAudits (options = {}) {
+  static async getPendingAudits(options = {}) {
     const { auditableType = null, priority = null, limit = 20, offset = 0 } = options
 
     const whereClause = {
@@ -362,7 +365,7 @@ class ContentAuditEngine {
    * @param {number} auditId - 审核记录ID
    * @returns {Promise<ContentReviewRecord>} 审核记录
    */
-  static async getAuditById (auditId) {
+  static async getAuditById(auditId) {
     const audit = await ContentReviewRecord.findByPk(auditId)
 
     if (!audit) {
@@ -379,7 +382,7 @@ class ContentAuditEngine {
    * @param {number} auditableId - 审核对象ID
    * @returns {Promise<Array>} 审核记录列表
    */
-  static async getAuditsByAuditable (auditableType, auditableId) {
+  static async getAuditsByAuditable(auditableType, auditableId) {
     const audits = await ContentReviewRecord.findAll({
       where: {
         auditable_type: auditableType,
@@ -397,7 +400,7 @@ class ContentAuditEngine {
    * @param {string} auditableType - 审核对象类型（可选）
    * @returns {Promise<Object>} 统计信息
    */
-  static async getAuditStatistics (auditableType = null) {
+  static async getAuditStatistics(auditableType = null) {
     const whereClause = auditableType ? { auditable_type: auditableType } : {}
 
     const [total, pending, approved, rejected, cancelled] = await Promise.all([

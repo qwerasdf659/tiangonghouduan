@@ -1,3 +1,6 @@
+const Logger = require('../services/UnifiedLotteryEngine/utils/Logger')
+const logger = new Logger('dataAccessControl')
+
 /**
  * 统一数据访问控制中间件 - V4.0 统一架构版本
  * 用于所有需要数据脱敏的API路由
@@ -14,7 +17,7 @@ const dataAccessControl = (req, res, next) => {
       req.dataLevel = 'public'
       req.roleBasedAdmin = false
       req.isAdmin = false // 未认证用户不是管理员
-      console.log('[DataAccess] Anonymous user accessing with level: public')
+      logger.info('[DataAccess] Anonymous user accessing with level: public')
       return next()
     }
 
@@ -27,11 +30,11 @@ const dataAccessControl = (req, res, next) => {
     // req.isAdmin 由 auth.js 中间件设置，此处仅用于未认证用户的情况
 
     // 记录访问日志（脱敏处理）
-    console.log(`[DataAccess] User ${req.user.user_id} accessing with level: ${req.dataLevel}`)
+    logger.info(`[DataAccess] User ${req.user.user_id} accessing with level: ${req.dataLevel}`)
 
     next()
   } catch (error) {
-    console.error('[DataAccess] Middleware error:', error)
+    logger.error('[DataAccess] Middleware error:', error)
     return res.status(500).json({
       success: false,
       message: '权限检查失败',

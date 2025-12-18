@@ -1,3 +1,6 @@
+const Logger = require('../services/UnifiedLotteryEngine/utils/Logger')
+const logger = new Logger('AnnouncementService')
+
 /**
  * 公告/通知统一服务层
  * 解决三套接口查询逻辑重复问题
@@ -32,7 +35,7 @@ class AnnouncementService {
    * @param {boolean} options.includeCreator - 是否关联创建者信息
    * @returns {Promise<Array>} 公告列表
    */
-  static async getAnnouncements (options = {}) {
+  static async getAnnouncements(options = {}) {
     const {
       type = null,
       priority = null,
@@ -87,11 +90,13 @@ class AnnouncementService {
 
     // 关联创建者信息
     if (includeCreator) {
-      queryOptions.include = [{
-        model: User,
-        as: 'creator',
-        attributes: ['user_id', 'nickname']
-      }]
+      queryOptions.include = [
+        {
+          model: User,
+          as: 'creator',
+          attributes: ['user_id', 'nickname']
+        }
+      ]
     }
 
     const announcements = await SystemAnnouncement.findAll(queryOptions)
@@ -106,13 +111,8 @@ class AnnouncementService {
    * @param {Object} options - 查询选项（同getAnnouncements）
    * @returns {Promise<number>} 公告总数
    */
-  static async getAnnouncementsCount (options = {}) {
-    const {
-      type = null,
-      priority = null,
-      activeOnly = true,
-      filterExpired = true
-    } = options
+  static async getAnnouncementsCount(options = {}) {
+    const { type = null, priority = null, activeOnly = true, filterExpired = true } = options
 
     const whereClause = {}
 
@@ -136,13 +136,15 @@ class AnnouncementService {
    * @param {string} dataLevel - 数据级别 (public/full)
    * @returns {Promise<Object|null>} 公告详情
    */
-  static async getAnnouncementById (announcementId, dataLevel = 'public') {
+  static async getAnnouncementById(announcementId, dataLevel = 'public') {
     const announcement = await SystemAnnouncement.findByPk(announcementId, {
-      include: [{
-        model: User,
-        as: 'creator',
-        attributes: ['user_id', 'nickname']
-      }]
+      include: [
+        {
+          model: User,
+          as: 'creator',
+          attributes: ['user_id', 'nickname']
+        }
+      ]
     })
 
     if (!announcement) return null
@@ -157,7 +159,7 @@ class AnnouncementService {
    * @param {number} announcementId - 公告ID
    * @returns {Promise<boolean>} 是否成功
    */
-  static async incrementViewCount (announcementId) {
+  static async incrementViewCount(announcementId) {
     try {
       const announcement = await SystemAnnouncement.findByPk(announcementId)
       if (announcement) {
@@ -166,7 +168,7 @@ class AnnouncementService {
       }
       return false
     } catch (error) {
-      console.error('增加浏览次数失败:', error)
+      logger.error('增加浏览次数失败:', error)
       return false
     }
   }
@@ -176,7 +178,7 @@ class AnnouncementService {
    * @param {Array} announcements - 公告列表
    * @returns {Array} 通知格式列表
    */
-  static convertToNotificationFormat (announcements) {
+  static convertToNotificationFormat(announcements) {
     return announcements.map(ann => ({
       notification_id: ann.announcement_id,
       id: ann.announcement_id,
@@ -196,7 +198,7 @@ class AnnouncementService {
    * @param {Object} options - 查询选项
    * @returns {Promise<number>} 未读数量
    */
-  static async getUnreadCount (options = {}) {
+  static async getUnreadCount(options = {}) {
     const { type = null } = options
 
     const whereClause = {
@@ -216,7 +218,7 @@ class AnnouncementService {
    * @param {Array<number>} announcementIds - 公告ID数组
    * @returns {Promise<number>} 更新数量
    */
-  static async markAsReadBatch (announcementIds = []) {
+  static async markAsReadBatch(announcementIds = []) {
     if (announcementIds.length === 0) {
       // 全部标记已读
       const [affectedCount] = await SystemAnnouncement.update(
@@ -249,7 +251,7 @@ class AnnouncementService {
    * @param {number} creatorId - 创建者ID
    * @returns {Promise<Object>} 创建的公告
    */
-  static async createAnnouncement (data, creatorId) {
+  static async createAnnouncement(data, creatorId) {
     const {
       title,
       content,
@@ -282,7 +284,7 @@ class AnnouncementService {
    * @param {Object} data - 更新数据
    * @returns {Promise<Object|null>} 更新后的公告
    */
-  static async updateAnnouncement (announcementId, data) {
+  static async updateAnnouncement(announcementId, data) {
     const announcement = await SystemAnnouncement.findByPk(announcementId)
     if (!announcement) return null
 
@@ -304,7 +306,7 @@ class AnnouncementService {
    * @param {number} announcementId - 公告ID
    * @returns {Promise<boolean>} 是否成功
    */
-  static async deleteAnnouncement (announcementId) {
+  static async deleteAnnouncement(announcementId) {
     const announcement = await SystemAnnouncement.findByPk(announcementId)
     if (!announcement) return false
 
@@ -319,7 +321,7 @@ class AnnouncementService {
    * @param {Array<number>} announcementIds - 公告ID数组
    * @returns {Promise<number>} 更新的记录数
    */
-  static async deactivateBatch (announcementIds = []) {
+  static async deactivateBatch(announcementIds = []) {
     if (announcementIds.length === 0) {
       return 0
     }
@@ -340,7 +342,7 @@ class AnnouncementService {
    * 获取公告统计信息（管理员后台专用）
    * @returns {Promise<Object>} 统计数据
    */
-  static async getStatistics () {
+  static async getStatistics() {
     const [totalCount, activeCount, expiredCount, unreadCount] = await Promise.all([
       SystemAnnouncement.count(),
       SystemAnnouncement.count({ where: { is_active: true } }),

@@ -2497,25 +2497,14 @@ class InventoryService {
 
       const { MarketListing } = require('../models')
 
-      // Phase 2/3：以 market_listings 为准，同时兼容旧数据（UserInventory.market_status）
-      const [marketListingsCount, legacyCount] = await Promise.all([
-        MarketListing.count({
-          where: {
-            seller_user_id: userId,
-            status: 'on_sale'
-          },
-          transaction
-        }),
-        UserInventory.count({
-          where: {
-            user_id: userId,
-            market_status: 'on_sale'
-          },
-          transaction
-        }).catch(() => 0)
-      ])
-
-      const onSaleCount = Number(marketListingsCount || 0) + Number(legacyCount || 0)
+      // ✅ 迁移已完成（2025-12-17截止），仅统计 market_listings
+      const onSaleCount = await MarketListing.count({
+        where: {
+          seller_user_id: userId,
+          status: 'on_sale'
+        },
+        transaction
+      })
 
       logger.info('检查上架状态成功', {
         user_id: userId,
@@ -2524,11 +2513,7 @@ class InventoryService {
 
       return {
         user_id: userId,
-        on_sale_count: onSaleCount,
-        breakdown: {
-          market_listings: Number(marketListingsCount || 0),
-          user_inventory_legacy: Number(legacyCount || 0)
-        }
+        on_sale_count: onSaleCount
       }
     } catch (error) {
       logger.error('检查上架状态失败', {

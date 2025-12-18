@@ -1,3 +1,6 @@
+const Logger = require('../services/UnifiedLotteryEngine/utils/Logger')
+const logger = new Logger('auth')
+
 /**
  * 统一认证中间件 - V4.0 统一架构版本
  * 🛡️ 权限认证：完全使用UUID角色系统，移除is_admin字段依赖
@@ -15,9 +18,9 @@ let redisClient = null
 try {
   const { getRawClient } = require('../utils/UnifiedRedisClient')
   redisClient = getRawClient()
-  console.log('🚀 [Auth] Redis缓存已启用')
+  logger.info('🚀 [Auth] Redis缓存已启用')
 } catch (error) {
-  console.warn('⚠️ [Auth] Redis不可用，使用纯内存缓存:', error.message)
+  logger.warn('⚠️ [Auth] Redis不可用，使用纯内存缓存:', error.message)
 }
 
 // 内存缓存管理
@@ -55,20 +58,20 @@ function reportCacheStats() {
       ).toFixed(1)
       const dbQueryRate = ((cacheStats.databaseQueries / cacheStats.totalQueries) * 100).toFixed(1)
 
-      console.log('\n📊 [Auth缓存统计] 性能报告:')
-      console.log(`   总查询次数: ${cacheStats.totalQueries}`)
-      console.log(`   内存缓存命中: ${cacheStats.memoryHits}次 (${memoryHitRate}%)`)
-      console.log(`   Redis缓存命中: ${cacheStats.redisHits}次 (${redisHitRate}%)`)
-      console.log(`   数据库查询: ${cacheStats.databaseQueries}次 (${dbQueryRate}%)`)
-      console.log(`   综合缓存命中率: ${totalHitRate}%`)
-      console.log(`   内存缓存大小: ${memoryCache.size}项`)
+      logger.info('\n📊 [Auth缓存统计] 性能报告:')
+      logger.info(`   总查询次数: ${cacheStats.totalQueries}`)
+      logger.info(`   内存缓存命中: ${cacheStats.memoryHits}次 (${memoryHitRate}%)`)
+      logger.info(`   Redis缓存命中: ${cacheStats.redisHits}次 (${redisHitRate}%)`)
+      logger.info(`   数据库查询: ${cacheStats.databaseQueries}次 (${dbQueryRate}%)`)
+      logger.info(`   综合缓存命中率: ${totalHitRate}%`)
+      logger.info(`   内存缓存大小: ${memoryCache.size}项`)
 
       // 性能告警
       if (parseFloat(totalHitRate) < 80) {
-        console.warn('   ⚠️ 缓存命中率偏低（<80%），建议检查缓存配置')
+        logger.warn('   ⚠️ 缓存命中率偏低（<80%），建议检查缓存配置')
       }
       if (parseFloat(dbQueryRate) > 20) {
-        console.warn('   ⚠️ 数据库查询率偏高（>20%），建议增加缓存时间')
+        logger.warn('   ⚠️ 数据库查询率偏高（>20%），建议增加缓存时间')
       }
 
       cacheStats.lastReportTime = now
@@ -113,7 +116,7 @@ async function getUserPermissionsFromCache(user_id) {
         return data
       }
     } catch (error) {
-      console.warn('⚠️ [Auth] Redis读取失败:', error.message)
+      logger.warn('⚠️ [Auth] Redis读取失败:', error.message)
     }
   }
 
@@ -140,7 +143,7 @@ async function setUserPermissionsCache(user_id, data) {
       const redisKey = `${REDIS_PREFIX}${user_id}`
       await redisClient.setex(redisKey, REDIS_TTL, JSON.stringify(data))
     } catch (error) {
-      console.warn('⚠️ [Auth] Redis写入失败:', error.message)
+      logger.warn('⚠️ [Auth] Redis写入失败:', error.message)
     }
   }
 }
@@ -162,11 +165,11 @@ async function invalidateUserPermissions(user_id, reason = 'unknown') {
       const redisKey = `${REDIS_PREFIX}${user_id}`
       await redisClient.del(redisKey)
     } catch (error) {
-      console.warn('⚠️ [Auth] Redis删除失败:', error.message)
+      logger.warn('⚠️ [Auth] Redis删除失败:', error.message)
     }
   }
 
-  console.log(`🔄 [Auth] 清除用户权限缓存: ${user_id} (原因: ${reason})`)
+  logger.info(`🔄 [Auth] 清除用户权限缓存: ${user_id} (原因: ${reason})`)
 }
 
 /**
@@ -207,8 +210,8 @@ async function getUserRoles(user_id, forceRefresh = false) {
     // ⚠️ 慢查询告警（超过1秒记录警告）
     const queryDuration = Date.now() - queryStartTime
     if (queryDuration > 1000) {
-      console.warn(`⚠️ [Auth] 慢查询告警: getUserRoles(user_id=${user_id}) 耗时${queryDuration}ms`)
-      console.warn('   建议：检查数据库索引或优化查询语句')
+      logger.warn(`⚠️ [Auth] 慢查询告警: getUserRoles(user_id=${user_id}) 耗时${queryDuration}ms`)
+      logger.warn('   建议：检查数据库索引或优化查询语句')
     }
 
     if (!user || !user.roles) {
@@ -257,7 +260,7 @@ async function getUserRoles(user_id, forceRefresh = false) {
 
     return result
   } catch (error) {
-    console.error('❌ 获取用户角色失败:', error.message)
+    logger.error('❌ 获取用户角色失败:', error.message)
     return {
       isAdmin: false,
       role_level: 0, // 🔄 统一命名：使用role_level（snake_case标准）
@@ -319,7 +322,7 @@ async function generateTokens(user) {
       }
     }
   } catch (error) {
-    console.error('❌ 生成Token失败:', error.message)
+    logger.error('❌ 生成Token失败:', error.message)
     throw error
   }
 }
@@ -449,7 +452,7 @@ async function authenticateToken(req, res, next) {
         message: 'Token已过期'
       })
     } else {
-      console.error('❌ Token认证失败:', error.message)
+      logger.error('❌ Token认证失败:', error.message)
       return res.status(401).json({
         success: false,
         error: 'AUTH_FAILED',
@@ -486,7 +489,7 @@ async function requireAdmin(req, res, next) {
 
     next()
   } catch (error) {
-    console.error('❌ 管理员权限验证失败:', error.message)
+    logger.error('❌ 管理员权限验证失败:', error.message)
     return res.status(500).json({
       success: false,
       error: 'PERMISSION_CHECK_FAILED',
@@ -552,11 +555,11 @@ async function optionalAuth(req, res, next) {
       next()
     } catch (tokenError) {
       // Token错误也允许匿名访问（不返回错误）
-      console.warn('⚠️ Token验证失败但允许匿名访问:', tokenError.message)
+      logger.warn('⚠️ Token验证失败但允许匿名访问:', tokenError.message)
       next()
     }
   } catch (error) {
-    console.error('❌ 可选认证失败:', error.message)
+    logger.error('❌ 可选认证失败:', error.message)
     // 发生错误也允许匿名访问
     next()
   }
@@ -605,7 +608,7 @@ function requirePermission(requiredPermission) {
         }
       })
     } catch (error) {
-      console.error('❌ 权限检查失败:', error.message)
+      logger.error('❌ 权限检查失败:', error.message)
       return res.status(500).json({
         success: false,
         error: 'PERMISSION_CHECK_FAILED',

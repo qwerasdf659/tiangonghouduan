@@ -1,3 +1,6 @@
+const Logger = require('../services/UnifiedLotteryEngine/utils/Logger')
+const logger = new Logger('AuditLogService')
+
 /**
  * 餐厅积分抽奖系统 V4.0 - 统一审计日志服务（AuditLogService）
  *
@@ -110,7 +113,7 @@ class AuditLogService {
 
       // 1. 验证必填参数
       if (!operator_id || !operation_type || !target_type || !target_id || !action) {
-        console.warn('[审计日志] 缺少必填参数，跳过记录')
+        logger.warn('[审计日志] 缺少必填参数，跳过记录')
         return null
       }
 
@@ -137,7 +140,7 @@ class AuditLogService {
       ]
 
       if (!validOperationTypes.includes(operation_type)) {
-        console.warn(`[审计日志] 无效的操作类型: ${operation_type}`)
+        logger.warn(`[审计日志] 无效的操作类型: ${operation_type}`)
         return null
       }
 
@@ -164,15 +167,15 @@ class AuditLogService {
         { transaction }
       )
 
-      console.log(
+      logger.info(
         `[审计日志] 记录成功: log_id=${auditLog.log_id}, 操作员=${operator_id}, 类型=${operation_type}, 动作=${action}`
       )
 
       return auditLog
     } catch (error) {
       // 审计日志记录失败不影响业务操作，只记录错误
-      console.error(`[审计日志] 记录失败: ${error.message}`)
-      console.error(error.stack)
+      logger.error(`[审计日志] 记录失败: ${error.message}`)
+      logger.error(error.stack)
       return null
     }
   }
@@ -588,7 +591,7 @@ class AuditLogService {
       }
     }
 
-    console.log(
+    logger.info(
       `[审计日志] 批量记录完成: 总数=${results.total}, 成功=${results.success}, 失败=${results.failed}`
     )
 
@@ -666,7 +669,7 @@ class AuditLogService {
 
       return logs
     } catch (error) {
-      console.error('[审计日志查询] 失败:', error.message)
+      logger.error('[审计日志查询] 失败:', error.message)
       throw error
     }
   }
@@ -701,7 +704,7 @@ class AuditLogService {
 
       return log
     } catch (error) {
-      console.error(`[审计日志详情] 查询失败: log_id=${logId}, 错误=${error.message}`)
+      logger.error(`[审计日志详情] 查询失败: log_id=${logId}, 错误=${error.message}`)
       throw error
     }
   }
@@ -772,7 +775,7 @@ class AuditLogService {
         }))
       }
     } catch (error) {
-      console.error('[审计日志统计] 失败:', error.message)
+      logger.error('[审计日志统计] 失败:', error.message)
       throw error
     }
   }

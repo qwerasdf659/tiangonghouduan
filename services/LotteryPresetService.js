@@ -1,3 +1,6 @@
+const Logger = require('../services/UnifiedLotteryEngine/utils/Logger')
+const logger = new Logger('LotteryPresetService')
+
 /**
  * 餐厅积分抽奖系统 V4.0 - 抽奖预设管理服务（LotteryPresetService）
  *
@@ -57,7 +60,7 @@ class LotteryPresetService {
    * @returns {Promise<Array>} 创建的预设列表
    * @throws {Error} 参数错误、用户不存在、奖品不存在等
    */
-  static async createPresets (adminId, userId, presets) {
+  static async createPresets(adminId, userId, presets) {
     // ===== 第1步：基础参数验证 =====
     if (!adminId || !userId || !presets || !Array.isArray(presets) || presets.length === 0) {
       const error = new Error('参数错误：需要adminId、userId和presets数组')
@@ -68,7 +71,9 @@ class LotteryPresetService {
     // ===== 第2步：最大数量限制验证 =====
     const MAX_PRESETS_PER_BATCH = 20
     if (presets.length > MAX_PRESETS_PER_BATCH) {
-      const error = new Error(`单次最多创建${MAX_PRESETS_PER_BATCH}条预设，当前：${presets.length}条`)
+      const error = new Error(
+        `单次最多创建${MAX_PRESETS_PER_BATCH}条预设，当前：${presets.length}条`
+      )
       error.code = 'TOO_MANY_PRESETS'
       throw error
     }
@@ -118,13 +123,9 @@ class LotteryPresetService {
     }
 
     // ===== 第6步：创建预设队列 =====
-    const createdPresets = await models.LotteryPreset.createPresetQueue(
-      userId,
-      presets,
-      adminId
-    )
+    const createdPresets = await models.LotteryPreset.createPresetQueue(userId, presets, adminId)
 
-    console.log('🎯 管理员创建抽奖预设成功', {
+    logger.info('🎯 管理员创建抽奖预设成功', {
       adminId,
       targetUserId: userId,
       presetsCount: createdPresets.length,
@@ -145,7 +146,7 @@ class LotteryPresetService {
    * @returns {Promise<Object>} 包含用户信息、预设列表、统计数据的对象
    * @throws {Error} 用户不存在、无效状态参数等
    */
-  static async getUserPresets (adminId, userId, status = 'all') {
+  static async getUserPresets(adminId, userId, status = 'all') {
     // 🎯 参数验证：userId类型验证
     if (isNaN(userId) || userId <= 0) {
       const error = new Error('无效的用户ID，必须是正整数')
@@ -196,7 +197,7 @@ class LotteryPresetService {
     // 获取统计信息
     const stats = await models.LotteryPreset.getUserPresetStats(userId)
 
-    console.log('🔍 管理员查看用户预设', {
+    logger.info('🔍 管理员查看用户预设', {
       adminId,
       targetUserId: userId,
       status,
@@ -233,7 +234,7 @@ class LotteryPresetService {
    * @returns {Promise<Object>} 包含user_id和deleted_count的对象
    * @throws {Error} 用户不存在等
    */
-  static async clearUserPresets (adminId, userId) {
+  static async clearUserPresets(adminId, userId) {
     // 🎯 参数验证：userId类型验证
     if (isNaN(userId) || userId <= 0) {
       const error = new Error('无效的用户ID，必须是正整数')
@@ -252,7 +253,7 @@ class LotteryPresetService {
     // 清理用户的所有预设
     const deletedCount = await models.LotteryPreset.clearUserPresets(userId)
 
-    console.log('🗑️ 管理员清理用户预设', {
+    logger.info('🗑️ 管理员清理用户预设', {
       adminId,
       targetUserId: userId,
       deletedCount,
@@ -280,7 +281,7 @@ class LotteryPresetService {
    * @returns {Promise<Object>} 包含list、pagination、filters的对象
    * @throws {Error} 参数验证失败等
    */
-  static async listPresetsWithPagination (filters = {}) {
+  static async listPresetsWithPagination(filters = {}) {
     const {
       status = 'all',
       user_id,
@@ -409,7 +410,7 @@ class LotteryPresetService {
    *
    * @returns {Promise<Object>} 包含各种统计数据的对象
    */
-  static async getPresetStats () {
+  static async getPresetStats() {
     // 🎯 性能优化：并行执行所有统计查询
     const [totalPresets, pendingPresets, usedPresets, totalUsers] = await Promise.all([
       models.LotteryPreset.count(),

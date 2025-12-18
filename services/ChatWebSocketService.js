@@ -45,8 +45,8 @@ class ChatWebSocketService {
      */
     this.currentStartupLogId = null // 当前启动日志ID（数据库记录）
 
-    console.log('📦 ChatWebSocketService 实例已创建')
-    console.log(
+    wsLogger.info('📦 ChatWebSocketService 实例已创建')
+    wsLogger.info(
       `⚙️ 连接限制: 总${this.MAX_TOTAL_CONNECTIONS} | 用户${this.MAX_USER_CONNECTIONS} | 客服${this.MAX_ADMIN_CONNECTIONS}`
     )
   }
@@ -155,10 +155,10 @@ class ChatWebSocketService {
     this.setupEventHandlers()
 
     const startTimeStr = BeijingTimeHelper.now()
-    console.log('✅ 聊天WebSocket服务已启动')
-    console.log(`   启动时间: ${startTimeStr}`)
-    console.log('   路径: /socket.io')
-    console.log('   传输: WebSocket + Polling')
+    wsLogger.info('✅ 聊天WebSocket服务已启动')
+    wsLogger.info(`   启动时间: ${startTimeStr}`)
+    wsLogger.info('   路径: /socket.io')
+    wsLogger.info('   传输: WebSocket + Polling')
   }
 
   /**
@@ -200,7 +200,7 @@ class ChatWebSocketService {
         return
       }
 
-      console.log(
+      wsLogger.info(
         `🔌 客户端连接成功: ${socket.id} (${totalConnections + 1}/${this.MAX_TOTAL_CONNECTIONS})`
       )
 
@@ -236,13 +236,13 @@ class ChatWebSocketService {
 
       // 3. 断开连接
       socket.on('disconnect', reason => {
-        console.log(`🔌 客户端断开: ${socket.id}, 原因: ${reason}`)
+        wsLogger.info(`🔌 客户端断开: ${socket.id}, 原因: ${reason}`)
 
         // 清理用户连接记录
         for (const [userId, socketId] of this.connectedUsers.entries()) {
           if (socketId === socket.id) {
             this.connectedUsers.delete(userId)
-            console.log(`👤 用户 ${userId} 已断开 (剩余: ${this.connectedUsers.size}个用户在线)`)
+            wsLogger.info(`👤 用户 ${userId} 已断开 (剩余: ${this.connectedUsers.size}个用户在线)`)
             break
           }
         }
@@ -251,7 +251,9 @@ class ChatWebSocketService {
         for (const [adminId, socketId] of this.connectedAdmins.entries()) {
           if (socketId === socket.id) {
             this.connectedAdmins.delete(adminId)
-            console.log(`👨‍💼 客服 ${adminId} 已断开 (剩余: ${this.connectedAdmins.size}个客服在线)`)
+            wsLogger.info(
+              `👨‍💼 客服 ${adminId} 已断开 (剩余: ${this.connectedAdmins.size}个客服在线)`
+            )
             break
           }
         }
@@ -259,7 +261,7 @@ class ChatWebSocketService {
 
       // 4. 错误处理
       socket.on('error', error => {
-        console.error(`❌ WebSocket错误: ${socket.id}`, error.message)
+        wsLogger.error(`❌ WebSocket错误: ${socket.id}`, error.message)
       })
     })
   }
@@ -275,7 +277,7 @@ class ChatWebSocketService {
     if (socketId) {
       try {
         this.io.to(socketId).emit('new_message', message)
-        console.log(`📤 消息已推送给用户 ${user_id}`)
+        wsLogger.info(`📤 消息已推送给用户 ${user_id}`)
         return true
       } catch (error) {
         wsLogger.error('推送消息给用户失败', {
@@ -287,7 +289,7 @@ class ChatWebSocketService {
         return false
       }
     }
-    console.log(`⚠️ 用户 ${user_id} 不在线，无法推送`)
+    wsLogger.info(`⚠️ 用户 ${user_id} 不在线，无法推送`)
     return false
   }
 
@@ -302,7 +304,7 @@ class ChatWebSocketService {
     if (socketId) {
       try {
         this.io.to(socketId).emit('new_message', message)
-        console.log(`📤 消息已推送给客服 ${admin_id}`)
+        wsLogger.info(`📤 消息已推送给客服 ${admin_id}`)
         return true
       } catch (error) {
         wsLogger.error('推送消息给客服失败', {
@@ -314,7 +316,7 @@ class ChatWebSocketService {
         return false
       }
     }
-    console.log(`⚠️ 客服 ${admin_id} 不在线，无法推送`)
+    wsLogger.info(`⚠️ 客服 ${admin_id} 不在线，无法推送`)
     return false
   }
 
@@ -339,7 +341,7 @@ class ChatWebSocketService {
       }
     }
 
-    console.log(`📢 消息已广播给 ${successCount}/${this.connectedAdmins.size} 个在线客服`)
+    wsLogger.info(`📢 消息已广播给 ${successCount}/${this.connectedAdmins.size} 个在线客服`)
     return successCount
   }
 
@@ -354,7 +356,7 @@ class ChatWebSocketService {
     if (socketId) {
       try {
         this.io.to(socketId).emit('notification', notification)
-        console.log(`🔔 通知已推送给管理员 ${admin_id}`)
+        wsLogger.info(`🔔 通知已推送给管理员 ${admin_id}`)
         return true
       } catch (error) {
         wsLogger.error('推送通知给管理员失败', {
@@ -366,7 +368,7 @@ class ChatWebSocketService {
         return false
       }
     }
-    console.log(`⚠️ 管理员 ${admin_id} 不在线，无法推送通知`)
+    wsLogger.info(`⚠️ 管理员 ${admin_id} 不在线，无法推送通知`)
     return false
   }
 
@@ -391,7 +393,7 @@ class ChatWebSocketService {
       }
     }
 
-    console.log(`📢 通知已广播给 ${successCount}/${this.connectedAdmins.size} 个在线管理员`)
+    wsLogger.info(`📢 通知已广播给 ${successCount}/${this.connectedAdmins.size} 个在线管理员`)
     return successCount
   }
 
@@ -552,7 +554,7 @@ class ChatWebSocketService {
       if (socket) {
         socket.disconnect(true)
         map.delete(user_id)
-        console.log(`🔌 已强制断开 ${user_type} ${user_id} 的连接`)
+        wsLogger.info(`🔌 已强制断开 ${user_type} ${user_id} 的连接`)
       }
     }
   }

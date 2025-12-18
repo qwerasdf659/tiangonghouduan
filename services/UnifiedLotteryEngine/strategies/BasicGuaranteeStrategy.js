@@ -1,3 +1,6 @@
+const Logger = require('../utils/Logger')
+const _logger = new Logger('BasicGuaranteeStrategy')
+
 /**
  * 基础抽奖保底策略
  * 整合基础抽奖功能和保底机制的统一策略
@@ -667,7 +670,7 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
    *
    * @example
    * const drawCount = await strategy.getUserDrawCount(10001, 1)
-   * console.log('累计抽奖次数:', drawCount)
+   * logger.info('累计抽奖次数:', drawCount)
    */
   async getUserDrawCount(user_id, campaignId) {
     try {
@@ -1830,7 +1833,7 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
    * @example
    * const preset = await strategy.checkUserPresetQueue(10001, 1, transaction)
    * if (preset) {
-   *   console.log('使用预设结果:', preset.prize_name)
+   *   logger.info('使用预设结果:', preset.prize_name)
    * }
    */
   async checkUserPresetQueue(user_id, _campaignId, transaction = null) {

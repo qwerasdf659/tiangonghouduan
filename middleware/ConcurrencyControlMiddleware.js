@@ -1,3 +1,6 @@
+const Logger = require('../services/UnifiedLotteryEngine/utils/Logger')
+const logger = new Logger('ConcurrencyControlMiddleware')
+
 /**
  * 并发控制中间件 V4
  * 使用统一分布式锁管理器，提供用户并发控制和分布式锁功能
@@ -111,7 +114,7 @@ class ConcurrencyControlMiddleware {
       const lockKey = typeof keyGenerator === 'function' ? keyGenerator(req) : keyGenerator
 
       if (!lockKey) {
-        console.error('[ConcurrencyControl] 锁key不能为空')
+        logger.error('[ConcurrencyControl] 锁key不能为空')
         return res
           .status(500)
           .json(ApiResponse.error('内部服务器错误', 'INVALID_LOCK_KEY', null, -500))
@@ -158,7 +161,7 @@ class ConcurrencyControlMiddleware {
           }
         )
       } catch (error) {
-        console.error(`[ConcurrencyControl] 分布式锁错误: ${lockKey}`, error)
+        logger.error(`[ConcurrencyControl] 分布式锁错误: ${lockKey}`, error)
 
         // 根据错误类型返回不同的响应
         if (error.message.includes('无法获取资源锁')) {
@@ -273,7 +276,7 @@ class ConcurrencyControlMiddleware {
    */
   async cleanup() {
     try {
-      console.log('[ConcurrencyControl] 正在清理资源...')
+      logger.info('[ConcurrencyControl] 正在清理资源...')
 
       // 清理活跃请求记录
       this.activeRequests.clear()
@@ -283,9 +286,9 @@ class ConcurrencyControlMiddleware {
         await this.lockManager.disconnect()
       }
 
-      console.log('[ConcurrencyControl] 资源清理完成')
+      logger.info('[ConcurrencyControl] 资源清理完成')
     } catch (error) {
-      console.error('[ConcurrencyControl] 资源清理失败:', error)
+      logger.error('[ConcurrencyControl] 资源清理失败:', error)
     }
   }
 }

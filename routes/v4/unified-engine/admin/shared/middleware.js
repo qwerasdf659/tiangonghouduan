@@ -35,7 +35,7 @@ const sharedComponents = {
  * @param {Object} serviceManager - 服务管理器实例
  * @returns {Promise<Object>} 简化的系统统计信息
  */
-async function getSimpleSystemStats (serviceManager) {
+async function getSimpleSystemStats(serviceManager) {
   try {
     // ✅ 通过ServiceManager获取ReportingService（P2-C架构重构：已合并AdminAnalyticsService、StatisticsService、UserDashboardService）
     const ReportingService = serviceManager.getService('reporting')
@@ -43,7 +43,7 @@ async function getSimpleSystemStats (serviceManager) {
     // ✅ 调用Service方法，不再直连models
     return await ReportingService.getSimpleSystemStats()
   } catch (error) {
-    console.error('获取系统统计失败:', error)
+    sharedComponents.logger.error('获取系统统计失败:', error)
     throw error
   }
 }
@@ -58,7 +58,7 @@ const adminAuthMiddleware = [authenticateToken, requireAdmin]
  * @param {Function} fn 异步处理函数
  * @returns {Function} 包装后的中间件函数
  */
-function asyncHandler (fn) {
+function asyncHandler(fn) {
   return (req, res, next) => {
     Promise.resolve(fn(req, res, next)).catch(next)
   }

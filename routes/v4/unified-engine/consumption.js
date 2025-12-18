@@ -65,15 +65,15 @@ router.post('/submit', authenticateToken, async (req, res) => {
 
     // 参数验证
     if (!qr_code) {
-      return res.apiError('二维码不能为空', 400)
+      return res.apiError('二维码不能为空', 'BAD_REQUEST', null, 400)
     }
 
     if (!consumption_amount || consumption_amount <= 0) {
-      return res.apiError('消费金额必须大于0', 400)
+      return res.apiError('消费金额必须大于0', 'BAD_REQUEST', null, 400)
     }
 
     if (consumption_amount > 99999.99) {
-      return res.apiError('消费金额不能超过99999.99元', 400)
+      return res.apiError('消费金额不能超过99999.99元', 'BAD_REQUEST', null, 400)
     }
 
     logger.info('商家提交消费记录', {
@@ -149,7 +149,7 @@ router.get('/user/:user_id', authenticateToken, async (req, res) => {
         parsed: userId,
         requester: req.user.user_id
       })
-      return res.apiError('无效的用户ID，必须是正整数', 400)
+      return res.apiError('无效的用户ID，必须是正整数', 'BAD_REQUEST', null, 400)
     }
 
     /*
@@ -163,7 +163,7 @@ router.get('/user/:user_id', authenticateToken, async (req, res) => {
         target: userId,
         requester_role_level: req.user.role_level
       })
-      return res.apiError('无权查询其他用户的消费记录', 403)
+      return res.apiError('无权查询其他用户的消费记录', 'FORBIDDEN', null, 403)
     }
 
     /*
@@ -445,12 +445,12 @@ router.post('/reject/:record_id', authenticateToken, requireAdmin, async (req, r
 
     // 验证拒绝原因（5-500字符，符合P0优化要求）
     if (!admin_notes || admin_notes.trim().length < 5) {
-      return res.apiError('拒绝原因不能为空，且至少5个字符', 400)
+      return res.apiError('拒绝原因不能为空，且至少5个字符', 'BAD_REQUEST', null, 400)
     }
 
     // ⭐ P0优化：增加最大长度限制（防止超长文本影响性能和前端显示）
     if (admin_notes.length > 500) {
-      return res.apiError('拒绝原因最多500个字符，请精简描述', 400)
+      return res.apiError('拒绝原因最多500个字符，请精简描述', 'BAD_REQUEST', null, 400)
     }
 
     logger.info('管理员审核拒绝消费记录', {
@@ -520,7 +520,7 @@ router.get('/qrcode/:user_id', authenticateToken, async (req, res) => {
     const userId = parseInt(user_id, 10)
     if (isNaN(userId) || userId <= 0) {
       logger.warn('无效的用户ID参数', { user_id, requester: req.user.user_id })
-      return res.apiError('无效的用户ID，必须是正整数', 400)
+      return res.apiError('无效的用户ID，必须是正整数', 'BAD_REQUEST', null, 400)
     }
 
     /*
@@ -532,7 +532,7 @@ router.get('/qrcode/:user_id', authenticateToken, async (req, res) => {
         requester: req.user.user_id,
         target: userId
       })
-      return res.apiError('无权生成其他用户的二维码', 403)
+      return res.apiError('无权生成其他用户的二维码', 'FORBIDDEN', null, 403)
     }
 
     logger.info('生成用户二维码（UUID版本）', { user_id: userId })
@@ -544,7 +544,7 @@ router.get('/qrcode/:user_id', authenticateToken, async (req, res) => {
     })
 
     if (!user) {
-      return res.apiError('用户不存在', 404)
+      return res.apiError('用户不存在', 'NOT_FOUND', null, 404)
     }
 
     // 使用UUID生成二维码
@@ -630,7 +630,7 @@ router.get('/user-info', authenticateToken, requireAdmin, async (req, res) => {
 
     // 参数验证
     if (!qr_code) {
-      return res.apiError('二维码不能为空', 400)
+      return res.apiError('二维码不能为空', 'BAD_REQUEST', null, 400)
     }
 
     logger.info('获取用户信息', { qr_code: qr_code.substring(0, 20) + '...' })
@@ -724,7 +724,7 @@ router.delete('/:record_id', authenticateToken, async (req, res) => {
 
     // 1. 参数验证：检查record_id是否为有效的正整数
     if (!record_id || isNaN(parseInt(record_id))) {
-      return res.apiError('无效的记录ID，必须是正整数', 400)
+      return res.apiError('无效的记录ID，必须是正整数', 'BAD_REQUEST', null, 400)
     }
 
     const recordId = parseInt(record_id)
@@ -733,12 +733,12 @@ router.delete('/:record_id', authenticateToken, async (req, res) => {
     const record = await ConsumptionService.getRecordById(recordId)
 
     if (!record) {
-      return res.apiError('消费记录不存在或已被删除', 404)
+      return res.apiError('消费记录不存在或已被删除', 'NOT_FOUND', null, 404)
     }
 
     // 3. 权限验证：只能删除自己的记录
     if (record.user_id !== userId) {
-      return res.apiError('您无权删除此消费记录', 403)
+      return res.apiError('您无权删除此消费记录', 'FORBIDDEN', null, 403)
     }
 
     // 🔒 安全修复：普通用户只能删除pending状态的记录，管理员可删除任何状态
@@ -751,7 +751,7 @@ router.delete('/:record_id', authenticateToken, async (req, res) => {
 
     // 4. 检查是否已经被删除
     if (record.is_deleted === 1) {
-      return res.apiError('该消费记录已经被删除，无需重复操作', 400)
+      return res.apiError('该消费记录已经被删除，无需重复操作', 'BAD_REQUEST', null, 400)
     }
 
     // 5. 执行软删除：标记为已删除
@@ -831,7 +831,7 @@ router.post('/:record_id/restore', authenticateToken, requireAdmin, async (req, 
 
     // 1. 参数验证
     if (!record_id || isNaN(parseInt(record_id))) {
-      return res.apiError('无效的记录ID', 400)
+      return res.apiError('无效的记录ID', 'BAD_REQUEST', null, 400)
     }
 
     const recordId = parseInt(record_id)
@@ -840,12 +840,12 @@ router.post('/:record_id/restore', authenticateToken, requireAdmin, async (req, 
     const record = await ConsumptionService.getRecordById(recordId, { includeDeleted: true })
 
     if (!record) {
-      return res.apiError('消费记录不存在', 404)
+      return res.apiError('消费记录不存在', 'NOT_FOUND', null, 404)
     }
 
     // 3. 检查是否已经被删除
     if (record.is_deleted === 0) {
-      return res.apiError('该消费记录未被删除，无需恢复', 400)
+      return res.apiError('该消费记录未被删除，无需恢复', 'BAD_REQUEST', null, 400)
     }
 
     // 4. 恢复记录：清除软删除标记

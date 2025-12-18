@@ -1,3 +1,6 @@
+const Logger = require('../../../services/UnifiedLotteryEngine/utils/Logger')
+const logger = new Logger('lottery')
+
 /**
  * 餐厅积分抽奖系统 V4.0 RESTful架构 - 抽奖系统路由
  *
@@ -156,7 +159,7 @@ const requestCache = new Map()
  * @param {Function} next - 下一个中间件
  * @returns {void}
  */
-function requestDeduplication (req, res, next) {
+function requestDeduplication(req, res, next) {
   const { campaign_code, draw_count = 1 } = req.body
   const user_id = req.user?.user_id
 
@@ -173,7 +176,7 @@ function requestDeduplication (req, res, next) {
 
   if (existingRequest && now - existingRequest.timestamp < 5000) {
     // 5秒内重复请求，返回"请求处理中"
-    console.warn(
+    logger.warn(
       `⚠️ 请求去重: ${requestKey} 距离上次请求仅${Math.round((now - existingRequest.timestamp) / 1000)}秒`
     )
     return res.apiError(
@@ -212,7 +215,7 @@ const lotteryRateLimiter = rateLimiter.createLimiter({
   keyGenerator: 'user', // 按用户限流
   message: '抽奖过于频繁，请稍后再试',
   onLimitReached: (req, key, count) => {
-    console.warn('[Lottery] 抽奖限流触发', {
+    logger.warn('[Lottery] 抽奖限流触发', {
       user_id: req.user?.user_id,
       count,
       limit: 20,
@@ -233,7 +236,7 @@ const pointsRateLimiter = rateLimiter.createLimiter({
   keyGenerator: 'user', // 按用户ID限流
   message: '查询过于频繁，请稍后再试',
   onLimitReached: (req, key, count) => {
-    console.warn('[Points] 积分查询限流触发', {
+    logger.warn('[Points] 积分查询限流触发', {
       user_id: req.user?.user_id,
       target_user_id: req.params.user_id,
       count,
@@ -273,18 +276,19 @@ router.get('/prizes/:campaignCode', authenticateToken, dataAccessControl, async 
 
     // ✅ 通过Service获取活动和奖品列表（不再直连models）
     const lottery_engine = req.app.locals.services.getService('unifiedLotteryEngine')
-    const { campaign: _campaign, prizes: fullPrizes } = await lottery_engine.getCampaignWithPrizes(campaign_code)
+    const { campaign: _campaign, prizes: fullPrizes } =
+      await lottery_engine.getCampaignWithPrizes(campaign_code)
 
     // 根据用户权限进行数据脱敏
     const sanitizedPrizes = DataSanitizer.sanitizePrizes(fullPrizes, req.dataLevel)
 
-    console.log(
+    logger.info(
       `[LotteryAPI] User ${req.user.user_id} accessed prizes for ${campaign_code} with level: ${req.dataLevel}`
     )
 
     return res.apiSuccess(sanitizedPrizes, '奖品列表获取成功', 'PRIZES_SUCCESS')
   } catch (error) {
-    console.error('获取奖品列表失败:', error)
+    logger.error('获取奖品列表失败:', error)
     return handleServiceError(error, res, '获取奖品列表失败')
   }
 })
@@ -334,9 +338,7 @@ router.get('/config/:campaignCode', authenticateToken, dataAccessControl, async 
 
     // 如果配置缺失，记录告警日志
     if (isConfigMissing) {
-      console.error(
-        `🚨 [CONFIG_ERROR] 活动 ${campaign_code} 缺少 draw_pricing 配置，已使用默认配置`
-      )
+      logger.error(`🚨 [CONFIG_ERROR] 活动 ${campaign_code} 缺少 draw_pricing 配置，已使用默认配置`)
     }
 
     if (req.dataLevel === 'full') {
@@ -401,7 +403,7 @@ router.get('/config/:campaignCode', authenticateToken, dataAccessControl, async 
       return res.apiSuccess(sanitizedConfig, '抽奖配置获取成功')
     }
   } catch (error) {
-    console.error('获取抽奖配置失败:', error)
+    logger.error('获取抽奖配置失败:', error)
     return handleServiceError(error, res, '获取抽奖配置失败')
   }
 })
@@ -439,7 +441,7 @@ router.post(
       )
 
       // 🔍 调试日志：查看策略返回的原始数据
-      console.log(
+      logger.info(
         '[DEBUG] drawResult.prizes:',
         JSON.stringify(
           drawResult.prizes.map(p => ({
@@ -480,9 +482,14 @@ router.post(
             sort_order: prize.prize.sort_order, // 🎯 前端用于计算索引（index = sort_order - 1）
             icon: DataSanitizer.getPrizeIcon(prize.prize.type),
             rarity: DataSanitizer.calculateRarity(prize.prize.type),
-            display_points: typeof prize.prize.value === 'number' ? prize.prize.value : parseFloat(prize.prize.value) || 0,
+            display_points:
+              typeof prize.prize.value === 'number'
+                ? prize.prize.value
+                : parseFloat(prize.prize.value) || 0,
             display_value: DataSanitizer.getDisplayValue(
-              typeof prize.prize.value === 'number' ? prize.prize.value : parseFloat(prize.prize.value) || 0
+              typeof prize.prize.value === 'number'
+                ? prize.prize.value
+                : parseFloat(prize.prize.value) || 0
             )
           }
         }),
@@ -502,11 +509,11 @@ router.post(
         draw_count,
         result: 'success'
       })
-      console.log('[LotteryDraw]', logData)
+      logger.info('[LotteryDraw]', logData)
 
       return res.apiSuccess(sanitizedResult, '抽奖成功', 'DRAW_SUCCESS')
     } catch (error) {
-      console.error('抽奖失败:', error)
+      logger.error('抽奖失败:', error)
       return handleServiceError(error, res, '抽奖失败')
     }
   }
@@ -553,7 +560,7 @@ router.get('/history/:user_id', authenticateToken, async (req, res) => {
     return res.apiSuccess(history, '抽奖历史获取成功', 'HISTORY_SUCCESS')
   } catch (error) {
     // ✅ 完整错误上下文记录（服务端日志）
-    console.error('🔴 获取抽奖历史失败', {
+    logger.error('🔴 获取抽奖历史失败', {
       error_message: error.message,
       error_stack: error.stack, // 堆栈信息
       user_id: parseInt(req.params.user_id),
@@ -586,7 +593,7 @@ router.get('/campaigns', authenticateToken, async (req, res) => {
 
     return res.apiSuccess(campaigns, '活动列表获取成功', 'CAMPAIGNS_SUCCESS')
   } catch (error) {
-    console.error('获取活动列表失败:', error)
+    logger.error('获取活动列表失败:', error)
     return handleServiceError(error, res, '获取活动列表失败')
   }
 })
@@ -624,7 +631,7 @@ router.get('/points/:user_id', authenticateToken, pointsRateLimiter, async (req,
 
     // ✅ 审计日志：记录管理员查询他人积分的操作（安全审计和合规性要求）
     if (currentUserRoles.isAdmin && req.user.user_id !== user_id) {
-      console.warn('[Audit] 管理员查询他人积分', {
+      logger.warn('[Audit] 管理员查询他人积分', {
         operator_id: req.user.user_id, // 操作者（管理员）
         operator_mobile: req.user.mobile, // 操作者手机号
         target_user_id: user_id, // 被查询的用户ID
@@ -637,15 +644,18 @@ router.get('/points/:user_id', authenticateToken, pointsRateLimiter, async (req,
 
     // ✅ 通过UserService验证用户和积分账户（不再直连models）
     const UserService = req.app.locals.services.getService('user')
-    const { user: _user, points_account: points_info } = await UserService.getUserWithPoints(user_id, {
-      checkPointsAccount: true,
-      checkStatus: true
-    })
+    const { user: _user, points_account: points_info } = await UserService.getUserWithPoints(
+      user_id,
+      {
+        checkPointsAccount: true,
+        checkStatus: true
+      }
+    )
 
     return res.apiSuccess(points_info, '用户积分获取成功', 'POINTS_SUCCESS')
   } catch (error) {
     // 详细错误日志（包含上下文信息，便于调试）
-    console.error('[Points API] 获取用户积分失败', {
+    logger.error('[Points API] 获取用户积分失败', {
       user_id: req.params.user_id,
       requester: req.user?.user_id,
       error: error.message,
@@ -741,7 +751,7 @@ router.get('/statistics/:user_id', authenticateToken, async (req, res) => {
     return res.apiSuccess(statistics, '统计信息获取成功', 'STATISTICS_SUCCESS')
   } catch (error) {
     // ❌ 错误处理（记录错误日志并返回友好的错误信息）
-    console.error('获取统计信息失败:', error)
+    logger.error('获取统计信息失败:', error)
     return handleServiceError(error, res, '获取统计信息失败')
   }
 })
@@ -766,7 +776,7 @@ router.get('/health', (req, res) => {
       'V4.0抽奖系统运行正常'
     )
   } catch (error) {
-    console.error('抽奖系统健康检查失败:', error)
+    logger.error('抽奖系统健康检查失败:', error)
     return handleServiceError(error, res, '抽奖系统健康检查失败')
   }
 })

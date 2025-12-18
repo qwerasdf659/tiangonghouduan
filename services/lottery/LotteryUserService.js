@@ -1,3 +1,6 @@
+const Logger = require('../UnifiedLotteryEngine/utils/Logger')
+const logger = new Logger('LotteryUserService')
+
 /**
  * 抽奖用户服务 - V4.0 UUID角色系统版本
  * 提供用户信息查询、权限验证、统计信息、抽奖权限验证等功能
@@ -39,26 +42,26 @@
  *
  * // 获取用户信息
  * const userInfo = await userService.getUserInfo(10001)
- * console.log('用户昵称:', userInfo.nickname)
- * console.log('是否管理员:', userInfo.role_based_admin)
+ * logger.info('用户昵称:', userInfo.nickname)
+ * logger.info('是否管理员:', userInfo.role_based_admin)
  *
  * // 验证用户是否为管理员
  * const isAdmin = await userService.isAdmin(10001)
  * if (isAdmin) {
- *   console.log('用户是管理员，允许访问管理功能')
+ *   logger.info('用户是管理员，允许访问管理功能')
  * }
  *
  * // 验证抽奖权限
  * const permission = await userService.validateLotteryPermission(10001)
  * if (permission.valid) {
- *   console.log('用户可以参与抽奖')
+ *   logger.info('用户可以参与抽奖')
  * } else {
- *   console.log('用户无法参与抽奖，原因:', permission.reason)
+ *   logger.info('用户无法参与抽奖，原因:', permission.reason)
  * }
  *
  * // 更新连续失败次数
  * const newCount = await userService.updateConsecutiveFailCount(10001, true)
- * console.log('新的连续失败次数:', newCount)
+ * logger.info('新的连续失败次数:', newCount)
  * ```
  *
  * 注意事项：
@@ -111,10 +114,10 @@ class LotteryUserService {
    *
    * @example
    * const userInfo = await userService.getUserInfo(10001)
-   * console.log('用户昵称:', userInfo.nickname)
-   * console.log('是否管理员:', userInfo.role_based_admin)
+   * logger.info('用户昵称:', userInfo.nickname)
+   * logger.info('是否管理员:', userInfo.role_based_admin)
    */
-  async getUserInfo (user_id) {
+  async getUserInfo(user_id) {
     try {
       const user = await User.findByPk(user_id)
       if (!user) {
@@ -137,7 +140,7 @@ class LotteryUserService {
         updated_at: user.updated_at
       }
     } catch (error) {
-      console.error('获取用户信息失败:', error)
+      logger.error('获取用户信息失败:', error)
       throw error
     }
   }
@@ -153,15 +156,15 @@ class LotteryUserService {
    * @example
    * const isAdmin = await userService.isAdmin(10001)
    * if (isAdmin) {
-   *   console.log('用户是管理员，允许访问管理功能')
+   *   logger.info('用户是管理员，允许访问管理功能')
    * }
    */
-  async isAdmin (user_id) {
+  async isAdmin(user_id) {
     try {
       const userRoles = await getUserRoles(user_id)
       return userRoles.isAdmin
     } catch (error) {
-      console.error('检查管理员权限失败:', error)
+      logger.error('检查管理员权限失败:', error)
       return false
     }
   }
@@ -179,17 +182,17 @@ class LotteryUserService {
    * @example
    * const canManage = await userService.hasPermission(10001, 'lottery', 'update')
    * if (canManage) {
-   *   console.log('用户可以管理抽奖活动')
+   *   logger.info('用户可以管理抽奖活动')
    * }
    */
-  async hasPermission (user_id, resource, action = 'read') {
+  async hasPermission(user_id, resource, action = 'read') {
     try {
       const user = await User.findByPk(user_id)
       if (!user) return false
 
       return await user.hasPermission(resource, action)
     } catch (error) {
-      console.error('检查用户权限失败:', error)
+      logger.error('检查用户权限失败:', error)
       return false
     }
   }
@@ -219,9 +222,9 @@ class LotteryUserService {
    *
    * @example
    * const stats = await userService.getUserStats(10001)
-   * console.log('用户中奖率:', stats.stats.win_rate)
+   * logger.info('用户中奖率:', stats.stats.win_rate)
    */
-  async getUserStats (user_id) {
+  async getUserStats(user_id) {
     try {
       const user = await User.findByPk(user_id)
       if (!user) {
@@ -249,7 +252,7 @@ class LotteryUserService {
         }
       }
     } catch (error) {
-      console.error('获取用户统计失败:', error)
+      logger.error('获取用户统计失败:', error)
       throw error
     }
   }
@@ -270,12 +273,12 @@ class LotteryUserService {
    * @example
    * const permission = await userService.validateLotteryPermission(10001)
    * if (permission.valid) {
-   *   console.log('用户可以参与抽奖')
+   *   logger.info('用户可以参与抽奖')
    * } else {
-   *   console.log('用户无法参与抽奖，原因:', permission.reason)
+   *   logger.info('用户无法参与抽奖，原因:', permission.reason)
    * }
    */
-  async validateLotteryPermission (user_id) {
+  async validateLotteryPermission(user_id) {
     try {
       const user = await User.findByPk(user_id)
       if (!user) {
@@ -296,7 +299,7 @@ class LotteryUserService {
         can_participate: true
       }
     } catch (error) {
-      console.error('验证抽奖权限失败:', error)
+      logger.error('验证抽奖权限失败:', error)
       return { valid: false, reason: 'VALIDATION_ERROR' }
     }
   }
@@ -315,21 +318,19 @@ class LotteryUserService {
    * @example
    * // 抽奖失败，增加失败次数
    * const newCount = await userService.updateConsecutiveFailCount(10001, true)
-   * console.log('新的连续失败次数:', newCount)
+   * logger.info('新的连续失败次数:', newCount)
    *
    * // 抽奖成功，重置失败次数
    * await userService.updateConsecutiveFailCount(10001, false)
    */
-  async updateConsecutiveFailCount (user_id, increment = true) {
+  async updateConsecutiveFailCount(user_id, increment = true) {
     try {
       const user = await User.findByPk(user_id)
       if (!user) {
         throw new Error('用户不存在')
       }
 
-      const newCount = increment
-        ? (user.consecutive_fail_count || 0) + 1
-        : 0
+      const newCount = increment ? (user.consecutive_fail_count || 0) + 1 : 0
 
       await user.update({
         consecutive_fail_count: newCount
@@ -337,7 +338,7 @@ class LotteryUserService {
 
       return newCount
     } catch (error) {
-      console.error('更新连续失败次数失败:', error)
+      logger.error('更新连续失败次数失败:', error)
       throw error
     }
   }
@@ -356,9 +357,9 @@ class LotteryUserService {
    * @example
    * // 用户获得100积分
    * const newTotal = await userService.updateHistoryTotalPoints(10001, 100)
-   * console.log('新的历史总积分:', newTotal)
+   * logger.info('新的历史总积分:', newTotal)
    */
-  async updateHistoryTotalPoints (user_id, points) {
+  async updateHistoryTotalPoints(user_id, points) {
     try {
       const user = await User.findByPk(user_id)
       if (!user) {
@@ -373,7 +374,7 @@ class LotteryUserService {
 
       return newTotal
     } catch (error) {
-      console.error('更新历史总积分失败:', error)
+      logger.error('更新历史总积分失败:', error)
       throw error
     }
   }

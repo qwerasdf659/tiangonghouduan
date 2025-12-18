@@ -1,3 +1,6 @@
+const Logger = require('../../../../services/UnifiedLotteryEngine/utils/Logger')
+const logger = new Logger('customer_service')
+
 /**
  * 客服管理路由 - Admin Customer Service Routes
  *
@@ -76,7 +79,7 @@ router.get('/sessions', async (req, res) => {
 
     res.apiSuccess(result, '获取会话列表成功')
   } catch (error) {
-    console.error('获取会话列表失败:', error)
+    logger.error('获取会话列表失败:', error)
     res.apiError(error.message, 'INTERNAL_ERROR', null, 500)
   }
 })
@@ -107,7 +110,7 @@ router.get('/sessions/stats', async (req, res) => {
 
     res.apiSuccess(stats, '获取统计信息成功')
   } catch (error) {
-    console.error('获取统计信息失败:', error)
+    logger.error('获取统计信息失败:', error)
     res.apiError(error.message, 'INTERNAL_ERROR', null, 500)
   }
 })
@@ -145,7 +148,7 @@ router.get('/sessions/:session_id/messages', async (req, res) => {
 
     res.apiSuccess(result, '获取会话消息成功')
   } catch (error) {
-    console.error('获取会话消息失败:', error)
+    logger.error('获取会话消息失败:', error)
     const statusCode = error.message === '会话不存在' ? 404 : 500
     res.apiError(
       error.message,
@@ -216,7 +219,7 @@ router.post('/sessions/:session_id/send', async (req, res) => {
 
     return res.apiSuccess(result, '发送消息成功')
   } catch (error) {
-    console.error('发送消息失败:', error)
+    logger.error('发送消息失败:', error)
 
     // ✅ 增强错误处理
     let statusCode = 500
@@ -268,7 +271,7 @@ router.post('/sessions/:session_id/mark-read', async (req, res) => {
 
     res.apiSuccess(result, '标记已读成功')
   } catch (error) {
-    console.error('标记已读失败:', error)
+    logger.error('标记已读失败:', error)
     let statusCode = 500
     let errorCode = 'INTERNAL_ERROR'
 
@@ -330,7 +333,7 @@ router.post('/sessions/:session_id/transfer', async (req, res) => {
 
     return res.apiSuccess(result, '转接会话成功')
   } catch (error) {
-    console.error('转接会话失败:', error)
+    logger.error('转接会话失败:', error)
     let statusCode = 500
     let errorCode = 'INTERNAL_ERROR'
 
@@ -380,7 +383,7 @@ router.post('/sessions/:session_id/close', async (req, res) => {
 
     res.apiSuccess(result, '关闭会话成功')
   } catch (error) {
-    console.error('关闭会话失败:', error)
+    logger.error('关闭会话失败:', error)
     let statusCode = 500
     let errorCode = 'INTERNAL_ERROR'
 

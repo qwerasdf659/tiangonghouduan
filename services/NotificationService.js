@@ -1,3 +1,6 @@
+const Logger = require('../services/UnifiedLotteryEngine/utils/Logger')
+const logger = new Logger('NotificationService')
+
 /**
  * 通知服务 - 统一客服聊天系统通知
  *
@@ -36,7 +39,7 @@ class NotificationService {
    * @param {Object} options.data - 附加数据
    * @returns {Promise<Object>} 通知结果
    */
-  static async send (user_id, options) {
+  static async send(user_id, options) {
     const { type, title, content, data = {} } = options
 
     try {
@@ -49,7 +52,7 @@ class NotificationService {
       })
 
       // 记录通知日志
-      console.log('[通知] 系统通知已发送', {
+      logger.info('[通知] 系统通知已发送', {
         user_id,
         type,
         title,
@@ -71,7 +74,7 @@ class NotificationService {
         timestamp: result.created_at
       }
     } catch (error) {
-      console.error('[通知] 发送失败', {
+      logger.error('[通知] 发送失败', {
         user_id,
         type,
         error: error.message
@@ -100,7 +103,7 @@ class NotificationService {
    * @param {Object} options.metadata - 附加元数据
    * @returns {Promise<Object>} 消息发送结果
    */
-  static async sendToChat (user_id, options) {
+  static async sendToChat(user_id, options) {
     const { title, content, notification_type, metadata = {} } = options
 
     // 导入必要的模型和服务
@@ -159,12 +162,12 @@ class NotificationService {
       pushed = ChatWebSocketService.pushMessageToUser(user_id, messageData)
 
       if (pushed) {
-        console.log(`✅ 系统通知已实时推送给用户 ${user_id}`)
+        logger.info(`✅ 系统通知已实时推送给用户 ${user_id}`)
       } else {
-        console.log(`📝 用户 ${user_id} 不在线，系统通知已保存到数据库`)
+        logger.info(`📝 用户 ${user_id} 不在线，系统通知已保存到数据库`)
       }
     } catch (wsError) {
-      console.error('[通知] WebSocket推送失败:', wsError.message)
+      logger.error('[通知] WebSocket推送失败:', wsError.message)
       // WebSocket推送失败不影响消息保存
     }
 
@@ -183,7 +186,7 @@ class NotificationService {
    * @param {number} user_id - 用户ID
    * @returns {Promise<Object>} 客服聊天会话对象
    */
-  static async getOrCreateCustomerServiceSession (user_id) {
+  static async getOrCreateCustomerServiceSession(user_id) {
     const { CustomerServiceSession } = require('../models')
 
     // 1. 查找用户的活跃会话（waiting/assigned/active状态）
@@ -206,7 +209,7 @@ class NotificationService {
         updated_at: BeijingTimeHelper.createBeijingTime()
       })
 
-      console.log(`📱 为用户 ${user_id} 创建新的聊天会话（系统通知）`)
+      logger.info(`📱 为用户 ${user_id} 创建新的聊天会话（系统通知）`)
     }
 
     return session
@@ -222,7 +225,7 @@ class NotificationService {
    * @param {Object} options.data - 附加数据
    * @returns {Promise<Object>} 通知结果
    */
-  static async sendToAdmins (options) {
+  static async sendToAdmins(options) {
     const { type, title, content, data = {} } = options
 
     try {
@@ -244,7 +247,7 @@ class NotificationService {
       const count = ChatWebSocketService.broadcastNotificationToAllAdmins(adminNotification)
 
       // 记录管理员通知日志
-      console.log('[通知] 管理员通知已广播', {
+      logger.info('[通知] 管理员通知已广播', {
         type,
         title,
         online_admins: count,
@@ -263,7 +266,7 @@ class NotificationService {
         timestamp: adminNotification.created_at
       }
     } catch (error) {
-      console.error('[通知] 管理员通知发送失败', {
+      logger.error('[通知] 管理员通知发送失败', {
         type,
         error: error.message
       })
@@ -285,7 +288,7 @@ class NotificationService {
    * @param {Object} exchangeData - 兑换数据
    * @returns {Promise<Object>} 通知发送结果
    */
-  static async notifyExchangePending (user_id, exchangeData) {
+  static async notifyExchangePending(user_id, exchangeData) {
     return await this.send(user_id, {
       type: 'exchange_pending',
       title: '兑换申请已提交',
@@ -305,7 +308,7 @@ class NotificationService {
    * @param {Object} exchangeData - 兑换数据
    * @returns {Promise<Object>} 通知发送结果
    */
-  static async notifyNewExchangeAudit (exchangeData) {
+  static async notifyNewExchangeAudit(exchangeData) {
     return await this.sendToAdmins({
       type: 'new_exchange_audit',
       title: '新的兑换订单待审核',
@@ -327,7 +330,7 @@ class NotificationService {
    * @param {Object} exchangeData - 兑换数据
    * @returns {Promise<Object>} 通知发送结果
    */
-  static async notifyExchangeApproved (user_id, exchangeData) {
+  static async notifyExchangeApproved(user_id, exchangeData) {
     return await this.send(user_id, {
       type: 'exchange_approved',
       title: '兑换审核通过',
@@ -347,7 +350,7 @@ class NotificationService {
    * @param {Object} exchangeData - 兑换数据
    * @returns {Promise<Object>} 通知发送结果
    */
-  static async notifyExchangeRejected (user_id, exchangeData) {
+  static async notifyExchangeRejected(user_id, exchangeData) {
     return await this.send(user_id, {
       type: 'exchange_rejected',
       title: '兑换审核未通过',
@@ -367,7 +370,7 @@ class NotificationService {
    * @param {Object} alertData - 告警数据
    * @returns {Promise<Object>} 通知发送结果
    */
-  static async notifyTimeoutAlert (alertData) {
+  static async notifyTimeoutAlert(alertData) {
     return await this.sendToAdmins({
       type: 'pending_orders_alert',
       title: '待审核订单超时告警',
@@ -395,7 +398,7 @@ class NotificationService {
    *   is_first_unlock: false
    * })
    */
-  static async notifyPremiumUnlockSuccess (user_id, unlockData) {
+  static async notifyPremiumUnlockSuccess(user_id, unlockData) {
     const { unlock_cost, remaining_points, expires_at, validity_hours, is_first_unlock } =
       unlockData
 
@@ -427,7 +430,7 @@ class NotificationService {
    *   remaining_minutes: 45
    * })
    */
-  static async notifyPremiumExpiringSoon (user_id, reminderData) {
+  static async notifyPremiumExpiringSoon(user_id, reminderData) {
     const { expires_at, remaining_hours, remaining_minutes } = reminderData
 
     return await this.send(user_id, {
@@ -456,7 +459,7 @@ class NotificationService {
    *   total_unlock_count: 2
    * })
    */
-  static async notifyPremiumExpired (user_id, expiryData) {
+  static async notifyPremiumExpired(user_id, expiryData) {
     const { expired_at, total_unlock_count } = expiryData
 
     return await this.send(user_id, {
@@ -482,7 +485,7 @@ class NotificationService {
    * @param {Object} _options - 选项（预留参数）
    * @returns {Promise<Object>} 通知发送结果
    */
-  static async sendAuditApprovedNotification (user_id, auditData, _options = {}) {
+  static async sendAuditApprovedNotification(user_id, auditData, _options = {}) {
     const { type } = auditData
 
     const notificationMap = {
@@ -526,7 +529,7 @@ class NotificationService {
    * @param {Object} _options - 选项（预留参数）
    * @returns {Promise<Object>} 通知发送结果
    */
-  static async sendAuditRejectedNotification (user_id, auditData, _options = {}) {
+  static async sendAuditRejectedNotification(user_id, auditData, _options = {}) {
     const { type, reason } = auditData
 
     const notificationMap = {
@@ -568,7 +571,7 @@ class NotificationService {
    * @param {string} lotteryData.draw_id - 抽奖记录ID
    * @returns {Promise<Object>} 通知结果
    */
-  static async notifyLotteryWin (user_id, lotteryData) {
+  static async notifyLotteryWin(user_id, lotteryData) {
     const { prize_name, prize_type, prize_value, draw_id } = lotteryData
 
     // 根据奖品类型定制消息
@@ -607,7 +610,7 @@ class NotificationService {
    * @param {number} pointsData.balance_after - 变动后余额
    * @returns {Promise<Object>} 通知结果
    */
-  static async notifyPointsChange (user_id, pointsData) {
+  static async notifyPointsChange(user_id, pointsData) {
     const { change_type, points_amount, reason, balance_after } = pointsData
 
     const isEarn = change_type === 'earn'
@@ -634,7 +637,7 @@ class NotificationService {
    * @param {string} productData.product_category - 商品类别
    * @returns {Promise<Object>} 通知结果
    */
-  static async notifyNewProduct (user_id, productData) {
+  static async notifyNewProduct(user_id, productData) {
     const { product_name, exchange_points, product_category } = productData
 
     if (user_id) {
@@ -666,7 +669,7 @@ class NotificationService {
    * @param {string} announcementData.announcement_type - 公告类型
    * @returns {Promise<Object>} 通知结果
    */
-  static async notifyAnnouncement (user_id, announcementData) {
+  static async notifyAnnouncement(user_id, announcementData) {
     const { title, content, announcement_type } = announcementData
 
     if (user_id) {
@@ -704,7 +707,7 @@ class NotificationService {
    * @param {string} securityData.ip_address - IP地址
    * @returns {Promise<Object>} 通知结果
    */
-  static async notifySecurityEvent (user_id, securityData) {
+  static async notifySecurityEvent(user_id, securityData) {
     const { description, ip_address } = securityData
 
     return await this.send(user_id, {

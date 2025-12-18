@@ -87,7 +87,7 @@ router.get(
             target_user_id: targetUserId,
             role_level: userRoles.role_level
           })
-          return res.apiError('无权查看其他用户的背包', 403)
+          return res.apiError('无权查看其他用户的背包', 'FORBIDDEN', null, 403)
         }
 
         logger.info('管理员查看用户背包', {
@@ -168,7 +168,7 @@ router.get(
             target_user_id: targetUserId,
             role_level: userRoles.role_level
           })
-          return res.apiError('无权查看其他用户的背包统计', 403)
+          return res.apiError('无权查看其他用户的背包统计', 'FORBIDDEN', null, 403)
         }
 
         logger.info('管理员查看用户背包统计', {

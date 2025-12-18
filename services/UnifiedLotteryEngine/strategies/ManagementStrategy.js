@@ -785,9 +785,9 @@ class ManagementStrategy {
    * const strategy = new ManagementStrategy()
    * const result = await strategy.validateAdminInfo({ user_id: 10001 })
    * if (result.valid) {
-   *   console.log('管理员验证通过', result.admin)
+   *   logger.info('管理员验证通过', result.admin)
    * } else {
-   *   console.log('管理员验证失败', result.reason)
+   *   logger.info('管理员验证失败', result.reason)
    * }
    */
   async validateAdminInfo(adminInfo) {
@@ -915,9 +915,9 @@ class ManagementStrategy {
    * const strategy = new ManagementStrategy()
    * const isAdmin = await strategy.checkAdminPermission(10001)
    * if (isAdmin) {
-   *   console.log('用户是管理员')
+   *   logger.info('用户是管理员')
    * } else {
-   *   console.log('用户不是管理员')
+   *   logger.info('用户不是管理员')
    * }
    */
   async checkAdminPermission(adminId) {

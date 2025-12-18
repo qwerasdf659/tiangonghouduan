@@ -204,15 +204,17 @@ class BackpackService {
 
     try {
       /*
-       * 1. 查询用户的所有物品实例（只返回 available 和 locked 状态）
-       * 背包双轨架构要求：只返回可见的物品，排除已使用、已过期、已转移等终态
+       * 1. 查询用户的所有物品实例（只返回 available 状态）
+       * 背包双轨架构要求：只返回可用的物品，排除locked（交易中）、used、expired等状态
+       *
+       * 业务理由：
+       * - locked状态：物品正在交易/核销流程中，用户暂时不可使用，不应显示在背包
+       * - available状态：物品可正常使用、转让、核销，应显示在背包
        */
       const instances = await ItemInstance.findAll({
         where: {
           owner_user_id: user_id,
-          status: {
-            [sequelize.Sequelize.Op.in]: ['available', 'locked'] // 只查询 available 和 locked 状态
-          }
+          status: 'available' // 只查询 available 状态（可用物品）
         },
         order: [['created_at', 'DESC']], // 使用 created_at 替代 acquired_at
         transaction

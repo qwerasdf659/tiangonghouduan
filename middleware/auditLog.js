@@ -1,3 +1,6 @@
+const Logger = require('../services/UnifiedLotteryEngine/utils/Logger')
+const logger = new Logger('auditLog')
+
 /**
  * 餐厅积分抽奖系统 V4.0 - 操作审计日志中间件
  *
@@ -54,7 +57,7 @@ exports.logOperation = async (
   try {
     // 1. 验证操作员
     if (!req.user || !req.user.user_id) {
-      console.warn('[审计日志] 无法记录：未找到操作员信息')
+      logger.warn('[审计日志] 无法记录：未找到操作员信息')
       return null
     }
 
@@ -78,7 +81,7 @@ exports.logOperation = async (
     ]
 
     if (!validOperationTypes.includes(operationType)) {
-      console.warn(`[审计日志] 无效的操作类型: ${operationType}`)
+      logger.warn(`[审计日志] 无效的操作类型: ${operationType}`)
       return null
     }
 
@@ -106,15 +109,15 @@ exports.logOperation = async (
       created_at: BeijingTimeHelper.createDatabaseTime()
     })
 
-    console.log(
+    logger.info(
       `[审计日志] 记录成功: log_id=${auditLog.log_id}, 操作员=${req.user.user_id}, 类型=${operationType}, 动作=${action}`
     )
 
     return auditLog
   } catch (error) {
     // 审计日志记录失败不影响业务操作，只记录错误
-    console.error(`[审计日志] 记录失败: ${error.message}`)
-    console.error(error.stack)
+    logger.error(`[审计日志] 记录失败: ${error.message}`)
+    logger.error(error.stack)
     return null
   }
 }
@@ -409,7 +412,7 @@ exports.queryAdminOperationLogs = async (options = {}) => {
 
     return logs
   } catch (error) {
-    console.error('[审计日志查询] 失败:', error.message)
+    logger.error('[审计日志查询] 失败:', error.message)
     throw error
   }
 }
@@ -482,7 +485,7 @@ exports.getAuditStatistics = async (options = {}) => {
       }))
     }
   } catch (error) {
-    console.error('[审计日志统计] 失败:', error.message)
+    logger.error('[审计日志统计] 失败:', error.message)
     throw error
   }
 }
