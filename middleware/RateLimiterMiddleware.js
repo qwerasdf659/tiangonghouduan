@@ -286,6 +286,51 @@ class RateLimiterMiddleware {
   }
 
   /**
+   * 使用SCAN命令迭代查询匹配的keys（替代KEYS命令）
+   *
+   * 业务场景：
+   * - 生产环境中KEYS命令会阻塞Redis，影响所有请求
+   * - SCAN命令是游标迭代，不阻塞Redis主线程
+   *
+   * 技术细节：
+   * - COUNT参数只是建议值，实际返回数量可能不同
+   * - 需要循环调用直到cursor为0
+   * - 自动去重（Set结构）
+   *
+   * @private
+   * @param {Object} client Redis客户端
+   * @param {string} pattern 匹配模式（如 'rate_limit:*'）
+   * @returns {Promise<Array<string>>} 匹配的keys数组
+   */
+  async _scanKeys(client, pattern) {
+    const keys = new Set() // 使用Set自动去重
+    let cursor = '0'
+
+    try {
+      do {
+        /*
+         * SCAN命令参数：cursor MATCH pattern COUNT count
+         * 返回格式：[newCursor, [keys]]
+         */
+        const result = await client.scan(cursor, 'MATCH', pattern, 'COUNT', 100)
+
+        cursor = result[0] // 下一次游标位置
+        const matchedKeys = result[1] // 本批次匹配的keys
+
+        // 将匹配的keys添加到Set中
+        matchedKeys.forEach(key => keys.add(key))
+
+        // cursor为'0'表示遍历完成
+      } while (cursor !== '0')
+
+      return Array.from(keys)
+    } catch (error) {
+      console.error('[RateLimiter] SCAN命令执行失败:', error)
+      throw error
+    }
+  }
+
+  /**
    * 获取限流统计信息
    * @param {string} keyPattern key模式（如 'rate_limit:lottery:*'）
    * @returns {Promise<Object>} 统计信息
@@ -293,7 +338,9 @@ class RateLimiterMiddleware {
   async getStats(keyPattern = 'rate_limit:*') {
     try {
       const client = await this.redisClient.ensureConnection()
-      const keys = await client.keys(keyPattern)
+
+      // ✅ 使用SCAN替代KEYS命令（避免生产环境阻塞）
+      const keys = await this._scanKeys(client, keyPattern)
 
       const stats = {
         total_keys: keys.length,
@@ -347,7 +394,9 @@ class RateLimiterMiddleware {
   async clearAll(keyPattern = 'rate_limit:*') {
     try {
       const client = await this.redisClient.ensureConnection()
-      const keys = await client.keys(keyPattern)
+
+      // ✅ 使用SCAN替代KEYS命令（避免生产环境阻塞）
+      const keys = await this._scanKeys(client, keyPattern)
 
       if (keys.length === 0) {
         return 0

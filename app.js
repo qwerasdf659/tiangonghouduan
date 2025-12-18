@@ -17,7 +17,14 @@ const cors = require('cors')
 const helmet = require('helmet')
 const compression = require('compression')
 const rateLimit = require('express-rate-limit')
-require('dotenv').config({ override: true }) // 🔴 强制覆盖系统环境变量
+// 🔴 dotenv配置：仅development允许override（P0修复）
+if ((process.env.NODE_ENV || 'development') === 'development') {
+  require('dotenv').config({ override: true })
+  console.log('⚠️ [Development] 使用 dotenv override 模式')
+} else {
+  require('dotenv').config()
+  console.log('✅ [Production/Staging] 使用平台注入配置，禁止 override')
+}
 
 // 🕐 北京时间工具导入
 const BeijingTimeHelper = require('./utils/timeHelper')
@@ -226,22 +233,32 @@ app.get('/health', async (req, res) => {
       databaseStatus = 'disconnected'
     }
 
-    // 检查Redis连接
+    // 检查Redis连接（真实检查 - P0修复）
     let redisStatus = 'disconnected'
     try {
-      // 这里可以添加Redis连接检查
-      redisStatus = 'connected'
+      const { isRedisHealthy } = require('./utils/UnifiedRedisClient')
+      const redisHealthy = await isRedisHealthy()
+      redisStatus = redisHealthy ? 'connected' : 'disconnected'
     } catch (error) {
       appLogger.error('Redis连接检查失败', { error: error.message })
       redisStatus = 'disconnected'
     }
 
+    // 计算整体状态（degraded模式 - P0修复）
+    const overallStatus =
+      databaseStatus === 'connected' && redisStatus === 'connected' ? 'healthy' : 'degraded'
+
+    const healthCode = overallStatus === 'healthy' ? 'SYSTEM_HEALTHY' : 'SYSTEM_DEGRADED'
+
     const healthData = {
       success: true, // ✅ 业务标准格式
-      code: 'SYSTEM_HEALTHY', // ✅ 业务代码
-      message: 'V4 Unified Lottery Engine 系统运行正常', // ✅ 用户友好消息
+      code: healthCode, // ✅ 业务代码（根据整体状态）
+      message:
+        overallStatus === 'healthy'
+          ? 'V4 Unified Lottery Engine 系统运行正常'
+          : 'V4 Unified Lottery Engine 系统降级运行', // ✅ 用户友好消息
       data: {
-        status: 'healthy',
+        status: overallStatus,
         version: '4.0.0',
         architecture: 'V4 Unified Lottery Engine',
         timestamp: BeijingTimeHelper.apiTimestamp(), // �� 北京时间API时间戳

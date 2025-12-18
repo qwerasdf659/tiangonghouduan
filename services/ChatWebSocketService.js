@@ -28,7 +28,7 @@ class ChatWebSocketService {
    * 构造函数 - 初始化连接管理和限制配置
    * @constructor
    */
-  constructor () {
+  constructor() {
     this.io = null
     this.connectedUsers = new Map() // 存储用户连接 {userId: socketId}
     this.connectedAdmins = new Map() // 存储客服连接 {adminId: socketId}
@@ -56,7 +56,7 @@ class ChatWebSocketService {
    * @param {Object} server - HTTP服务器实例
    * @returns {Promise<void>} 无返回值，初始化WebSocket服务并设置事件处理器
    */
-  async initialize (server) {
+  async initialize(server) {
     if (!server) {
       throw new Error('服务器实例不能为空')
     }
@@ -66,7 +66,25 @@ class ChatWebSocketService {
     // 初始化Socket.IO
     this.io = socketIO(server, {
       cors: {
-        origin: '*', // 生产环境建议配置具体域名
+        origin: (origin, callback) => {
+          // CORS白名单配置（P0安全修复）
+          const allowedOrigins = process.env.ALLOWED_ORIGINS
+            ? process.env.ALLOWED_ORIGINS.split(',')
+            : ['http://localhost:3000', 'http://localhost:8080']
+
+          // 微信小程序场景：无origin或servicewechat.com
+          if (!origin || origin.includes('servicewechat.com') || origin.includes('weixin.qq.com')) {
+            return callback(null, true)
+          }
+
+          // 白名单检查
+          if (allowedOrigins.includes(origin)) {
+            return callback(null, true)
+          }
+
+          wsLogger.warn('WebSocket连接被CORS拒绝', { origin })
+          callback(new Error('Not allowed by CORS'))
+        },
         methods: ['GET', 'POST'],
         credentials: true
       },
@@ -101,6 +119,39 @@ class ChatWebSocketService {
       wsLogger.error('保存启动记录失败', { error: error.message })
     }
 
+    // 🔐 强制握手JWT鉴权（P0安全修复 - 2025年12月18日）
+    const jwt = require('jsonwebtoken')
+    this.io.use((socket, next) => {
+      const token = socket.handshake.auth?.token
+
+      if (!token) {
+        wsLogger.warn('WebSocket握手失败：缺少token', {
+          socket_id: socket.id,
+          ip: socket.handshake.address
+        })
+        return next(new Error('Authentication required: missing token'))
+      }
+
+      try {
+        const decoded = jwt.verify(token, process.env.JWT_SECRET)
+        socket.user = decoded // 将用户信息挂载到socket
+
+        wsLogger.info('WebSocket握手鉴权成功', {
+          user_id: decoded.user_id,
+          role: decoded.role || decoded.is_admin,
+          socket_id: socket.id
+        })
+
+        next()
+      } catch (error) {
+        wsLogger.warn('WebSocket握手失败：token无效', {
+          error: error.message,
+          socket_id: socket.id
+        })
+        next(new Error('Authentication failed: invalid token'))
+      }
+    })
+
     this.setupEventHandlers()
 
     const startTimeStr = BeijingTimeHelper.now()
@@ -114,8 +165,20 @@ class ChatWebSocketService {
    * 设置事件处理器
    * @returns {void} 无返回值，设置WebSocket连接和消息事件处理器
    */
-  setupEventHandlers () {
+  setupEventHandlers() {
     this.io.on('connection', socket => {
+      // 🔐 从JWT自动注册用户身份（P0安全修复 - 2025年12月18日）
+      const userId = socket.user.user_id
+      const isAdmin = socket.user.role === 'admin' || socket.user.is_admin === true
+
+      if (isAdmin) {
+        this.connectedAdmins.set(userId, socket.id)
+        wsLogger.info('管理员已连接', { user_id: userId, socket_id: socket.id })
+      } else {
+        this.connectedUsers.set(userId, socket.id)
+        wsLogger.info('用户已连接', { user_id: userId, socket_id: socket.id })
+      }
+
       // ⚡ 连接数检查（2025年01月21日新增）
       const totalConnections = this.connectedUsers.size + this.connectedAdmins.size
 
@@ -142,97 +205,28 @@ class ChatWebSocketService {
       )
 
       // 1. 用户注册连接
+
+      // ⚠️ register_user已降级为能力声明（不可决定身份）
       socket.on('register_user', data => {
-        try {
-          const { user_id, user_type } = data // user_type: 'user' 或 'admin'
+        /*
+         * ❌ 禁止：决定身份、写入 connectedAdmins/connectedUsers
+         * ✅ 允许：声明订阅偏好、加入房间等
+         */
+        const { preferences, rooms } = data
 
-          if (!user_id || !user_type) {
-            wsLogger.error('用户注册失败', {
-              reason: '缺少user_id或user_type',
-              socketId: socket.id
-            })
-            return
-          }
-
-          // ⚡ 用户类型连接数检查（2025年01月21日新增）
-          if (user_type === 'user' && this.connectedUsers.size >= this.MAX_USER_CONNECTIONS) {
-            wsLogger.error('用户连接已满', {
-              current: this.connectedUsers.size,
-              max: this.MAX_USER_CONNECTIONS,
-              user_id
-            })
-
-            socket.emit('register_failed', {
-              reason: 'MAX_USER_CONNECTIONS_REACHED',
-              message: '用户连接数已满，请稍后重试',
-              timestamp: BeijingTimeHelper.now()
-            })
-            socket.disconnect(true)
-            return
-          }
-
-          if (user_type === 'admin' && this.connectedAdmins.size >= this.MAX_ADMIN_CONNECTIONS) {
-            wsLogger.error('客服连接已满', {
-              current: this.connectedAdmins.size,
-              max: this.MAX_ADMIN_CONNECTIONS,
-              admin_id: user_id
-            })
-
-            socket.emit('register_failed', {
-              reason: 'MAX_ADMIN_CONNECTIONS_REACHED',
-              message: '客服连接数已满，请稍后重试',
-              timestamp: BeijingTimeHelper.now()
-            })
-            socket.disconnect(true)
-            return
-          }
-
-          if (user_type === 'user') {
-            // 如果用户已有连接，先断开旧连接
-            const oldSocketId = this.connectedUsers.get(user_id)
-            if (oldSocketId && oldSocketId !== socket.id) {
-              const oldSocket = this.io.sockets.sockets.get(oldSocketId)
-              if (oldSocket) {
-                oldSocket.disconnect(true)
-                console.log(`🔄 断开用户 ${user_id} 的旧连接`)
-              }
-            }
-
-            this.connectedUsers.set(user_id, socket.id)
-            console.log(`👤 用户 ${user_id} 已连接 (总计: ${this.connectedUsers.size}个用户在线)`)
-
-            // 通知用户连接成功
-            socket.emit('register_success', {
-              user_id,
-              user_type: 'user',
-              timestamp: BeijingTimeHelper.now()
-            })
-          } else if (user_type === 'admin') {
-            // 如果客服已有连接，先断开旧连接
-            const oldSocketId = this.connectedAdmins.get(user_id)
-            if (oldSocketId && oldSocketId !== socket.id) {
-              const oldSocket = this.io.sockets.sockets.get(oldSocketId)
-              if (oldSocket) {
-                oldSocket.disconnect(true)
-                console.log(`🔄 断开客服 ${user_id} 的旧连接`)
-              }
-            }
-
-            this.connectedAdmins.set(user_id, socket.id)
-            console.log(`👨‍💼 客服 ${user_id} 已连接 (总计: ${this.connectedAdmins.size}个客服在线)`)
-
-            // 通知客服连接成功
-            socket.emit('register_success', {
-              user_id,
-              user_type: 'admin',
-              timestamp: BeijingTimeHelper.now()
-            })
-          } else {
-            console.error(`❌ 未知的用户类型: ${user_type}`)
-          }
-        } catch (error) {
-          console.error('❌ 注册用户时出错:', error.message)
+        if (preferences) {
+          socket.preferences = preferences
         }
+
+        if (rooms) {
+          rooms.forEach(room => socket.join(room))
+        }
+
+        wsLogger.info('用户订阅偏好已更新', {
+          user_id: socket.user.user_id,
+          preferences,
+          rooms
+        })
       })
 
       // 2. 心跳检测（保持连接活跃）
@@ -276,7 +270,7 @@ class ChatWebSocketService {
    * @param {Object} message - 消息对象
    * @returns {Boolean} 是否推送成功
    */
-  pushMessageToUser (user_id, message) {
+  pushMessageToUser(user_id, message) {
     const socketId = this.connectedUsers.get(user_id)
     if (socketId) {
       try {
@@ -303,7 +297,7 @@ class ChatWebSocketService {
    * @param {Object} message - 消息对象
    * @returns {Boolean} 是否推送成功
    */
-  pushMessageToAdmin (admin_id, message) {
+  pushMessageToAdmin(admin_id, message) {
     const socketId = this.connectedAdmins.get(admin_id)
     if (socketId) {
       try {
@@ -329,7 +323,7 @@ class ChatWebSocketService {
    * @param {Object} message - 消息对象
    * @returns {Number} 成功推送的客服数量
    */
-  broadcastToAllAdmins (message) {
+  broadcastToAllAdmins(message) {
     let successCount = 0
 
     for (const [admin_id, socketId] of this.connectedAdmins.entries()) {
@@ -355,7 +349,7 @@ class ChatWebSocketService {
    * @param {Object} notification - 通知对象
    * @returns {Boolean} 是否推送成功
    */
-  pushNotificationToAdmin (admin_id, notification) {
+  pushNotificationToAdmin(admin_id, notification) {
     const socketId = this.connectedAdmins.get(admin_id)
     if (socketId) {
       try {
@@ -381,7 +375,7 @@ class ChatWebSocketService {
    * @param {Object} notification - 通知对象
    * @returns {Number} 成功推送的管理员数量
    */
-  broadcastNotificationToAllAdmins (notification) {
+  broadcastNotificationToAllAdmins(notification) {
     let successCount = 0
 
     for (const [admin_id, socketId] of this.connectedAdmins.entries()) {
@@ -428,7 +422,7 @@ class ChatWebSocketService {
    *   timestamp: "2025-11-08 20:30:00"  // 查询时间（北京时间）
    * }
    */
-  async getStatus () {
+  async getStatus() {
     try {
       const { WebSocketStartupLog } = require('../models')
       const currentLog = await WebSocketStartupLog.getCurrentRunning()
@@ -513,7 +507,7 @@ class ChatWebSocketService {
    * 获取在线用户列表
    * @returns {Array} 在线用户ID列表
    */
-  getOnlineUsers () {
+  getOnlineUsers() {
     return Array.from(this.connectedUsers.keys())
   }
 
@@ -521,7 +515,7 @@ class ChatWebSocketService {
    * 获取在线客服列表
    * @returns {Array} 在线客服ID列表
    */
-  getOnlineAdmins () {
+  getOnlineAdmins() {
     return Array.from(this.connectedAdmins.keys())
   }
 
@@ -530,7 +524,7 @@ class ChatWebSocketService {
    * @param {Number} user_id - 用户ID
    * @returns {Boolean} 是否在线
    */
-  isUserOnline (user_id) {
+  isUserOnline(user_id) {
     return this.connectedUsers.has(user_id)
   }
 
@@ -539,7 +533,7 @@ class ChatWebSocketService {
    * @param {Number} admin_id - 客服ID
    * @returns {Boolean} 是否在线
    */
-  isAdminOnline (admin_id) {
+  isAdminOnline(admin_id) {
     return this.connectedAdmins.has(admin_id)
   }
 
@@ -549,7 +543,7 @@ class ChatWebSocketService {
    * @param {String} user_type - 用户类型 'user' 或 'admin'
    * @returns {void} 无返回值，强制断开用户WebSocket连接
    */
-  disconnectUser (user_id, user_type = 'user') {
+  disconnectUser(user_id, user_type = 'user') {
     const map = user_type === 'user' ? this.connectedUsers : this.connectedAdmins
     const socketId = map.get(user_id)
 
@@ -573,7 +567,7 @@ class ChatWebSocketService {
    * 流程：记录停止事件 → 断开所有连接 → 关闭Socket.IO → 清理资源
    * 用途：服务维护、部署更新、异常处理、审计追踪
    */
-  async shutdown (reason = '正常停止') {
+  async shutdown(reason = '正常停止') {
     wsLogger.info('WebSocket服务正在停止...', { reason })
 
     try {
@@ -630,7 +624,7 @@ class ChatWebSocketService {
    * - 用户刷新页面会看到最新状态（系统消息）
    * - 离线用户上线后可查看系统消息
    */
-  notifySessionClosed (session_id, user_id, admin_id, closeData) {
+  notifySessionClosed(session_id, user_id, admin_id, closeData) {
     const result = {
       notified_user: false,
       notified_admin: false,
@@ -712,7 +706,7 @@ class ChatWebSocketService {
    * 获取服务器IP地址（2025年11月08日新增）
    * @returns {String} 服务器IP地址
    */
-  getServerIP () {
+  getServerIP() {
     try {
       const os = require('os')
       const interfaces = os.networkInterfaces()
@@ -733,7 +727,7 @@ class ChatWebSocketService {
    * 获取单例实例（静态方法）
    * @returns {ChatWebSocketService} WebSocket服务实例
    */
-  static getInstance () {
+  static getInstance() {
     return chatWebSocketServiceInstance
   }
 }

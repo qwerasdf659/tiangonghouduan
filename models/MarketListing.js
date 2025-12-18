@@ -179,6 +179,12 @@ module.exports = sequelize => {
       underscored: true,
       indexes: [
         {
+          unique: true,
+          fields: ['seller_user_id', 'business_id'],
+          name: 'uk_market_listings_seller_business_id',
+          comment: '卖家+业务ID唯一索引（幂等保证 - P0修复）'
+        },
+        {
           fields: ['seller_user_id']
         },
         {

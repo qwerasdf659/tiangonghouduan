@@ -25,8 +25,6 @@ const express = require('express')
 const router = express.Router()
 const { logger } = require('../../utils/logger')
 const { authenticateToken, requireAdmin } = require('../../middleware/auth')
-const { asyncHandler } = require('../../middleware/errorHandler')
-
 // 🔐 所有接口都需要管理员权限
 router.use(authenticateToken)
 router.use(requireAdmin) // ✅ 修复：使用requireAdmin替代不存在的requireRole
@@ -35,32 +33,29 @@ router.use(requireAdmin) // ✅ 修复：使用requireAdmin替代不存在的req
  * 📊 获取当前调试配置
  * GET /api/v4/debug-control/config
  */
-router.get(
-  '/config',
-  asyncHandler(async (req, res) => {
-    const config = logger.getConfig()
+router.get('/config', async (req, res) => {
+  const config = logger.getConfig()
 
-    logger.info('查询调试配置', {
-      adminId: req.user.id,
-      adminName: req.user.username,
-      action: 'VIEW_DEBUG_CONFIG'
-    })
-
-    return res.apiSuccess(
-      {
-        environment: process.env.NODE_ENV,
-        currentLogLevel: config.currentLevel,
-        availableLogLevels: config.availableLevels,
-        debugUsers: config.debugUsers,
-        debugSessions: config.debugSessions,
-        debugUsersCount: config.debugUsers.length,
-        debugSessionsCount: config.debugSessions.length,
-        timestamp: new Date().toISOString()
-      },
-      '获取调试配置成功'
-    )
+  logger.info('查询调试配置', {
+    adminId: req.user.id,
+    adminName: req.user.username,
+    action: 'VIEW_DEBUG_CONFIG'
   })
-)
+
+  return res.apiSuccess(
+    {
+      environment: process.env.NODE_ENV,
+      currentLogLevel: config.currentLevel,
+      availableLogLevels: config.availableLevels,
+      debugUsers: config.debugUsers,
+      debugSessions: config.debugSessions,
+      debugUsersCount: config.debugUsers.length,
+      debugSessionsCount: config.debugSessions.length,
+      timestamp: new Date().toISOString()
+    },
+    '获取调试配置成功'
+  )
+})
 
 /**
  * 🎚️ 动态调整全局日志级别
@@ -72,63 +67,60 @@ router.get(
  *   "duration": 30     // 持续时间（分钟），可选
  * }
  */
-router.post(
-  '/log-level',
-  asyncHandler(async (req, res) => {
-    const { level, duration } = req.body
+router.post('/log-level', async (req, res) => {
+  const { level, duration } = req.body
 
-    if (!level) {
-      return res.apiError('日志级别不能为空', 'LOG_LEVEL_REQUIRED', null, 400)
-    }
+  if (!level) {
+    return res.apiError('日志级别不能为空', 'LOG_LEVEL_REQUIRED', null, 400)
+  }
 
-    // 设置日志级别
-    const success = logger.setLogLevel(level)
+  // 设置日志级别
+  const success = logger.setLogLevel(level)
 
-    if (!success) {
-      return res.apiError(
-        '无效的日志级别',
-        'INVALID_LOG_LEVEL',
-        {
-          availableLevels: ['error', 'warn', 'info', 'debug', 'trace']
-        },
-        400
-      )
-    }
-
-    // 审计日志
-    logger.warn('管理员调整日志级别', {
-      adminId: req.user.id,
-      adminName: req.user.username,
-      oldLevel: logger.getConfig().currentLevel,
-      newLevel: level,
-      duration: duration ? `${duration}分钟` : '永久',
-      action: 'CHANGE_LOG_LEVEL'
-    })
-
-    // 如果指定了持续时间，自动恢复
-    if (duration && duration > 0) {
-      setTimeout(
-        () => {
-          logger.setLogLevel('info') // 恢复默认级别
-          logger.warn('日志级别已自动恢复', {
-            reason: '临时调试时间到期',
-            restoredLevel: 'info'
-          })
-        },
-        duration * 60 * 1000
-      )
-    }
-
-    return res.apiSuccess(
+  if (!success) {
+    return res.apiError(
+      '无效的日志级别',
+      'INVALID_LOG_LEVEL',
       {
-        level,
-        duration: duration ? `${duration}分钟后自动恢复` : '永久生效',
-        timestamp: new Date().toISOString()
+        availableLevels: ['error', 'warn', 'info', 'debug', 'trace']
       },
-      `日志级别已调整为 ${level}`
+      400
     )
+  }
+
+  // 审计日志
+  logger.warn('管理员调整日志级别', {
+    adminId: req.user.id,
+    adminName: req.user.username,
+    oldLevel: logger.getConfig().currentLevel,
+    newLevel: level,
+    duration: duration ? `${duration}分钟` : '永久',
+    action: 'CHANGE_LOG_LEVEL'
   })
-)
+
+  // 如果指定了持续时间，自动恢复
+  if (duration && duration > 0) {
+    setTimeout(
+      () => {
+        logger.setLogLevel('info') // 恢复默认级别
+        logger.warn('日志级别已自动恢复', {
+          reason: '临时调试时间到期',
+          restoredLevel: 'info'
+        })
+      },
+      duration * 60 * 1000
+    )
+  }
+
+  return res.apiSuccess(
+    {
+      level,
+      duration: duration ? `${duration}分钟后自动恢复` : '永久生效',
+      timestamp: new Date().toISOString()
+    },
+    `日志级别已调整为 ${level}`
+  )
+})
 
 /**
  * 🎯 为特定用户开启调试模式
@@ -140,39 +132,36 @@ router.post(
  *   "duration": 30  // 持续时间（分钟），默认30分钟
  * }
  */
-router.post(
-  '/user-debug',
-  asyncHandler(async (req, res) => {
-    const { userId, duration = 30 } = req.body
+router.post('/user-debug', async (req, res) => {
+  const { userId, duration = 30 } = req.body
 
-    if (!userId) {
-      return res.apiError('用户ID不能为空', 'USER_ID_REQUIRED', null, 400)
-    }
+  if (!userId) {
+    return res.apiError('用户ID不能为空', 'USER_ID_REQUIRED', null, 400)
+  }
 
-    // 启用用户调试模式
-    logger.enableDebugForUser(userId, duration)
+  // 启用用户调试模式
+  logger.enableDebugForUser(userId, duration)
 
-    // 审计日志
-    logger.warn('管理员为用户开启调试模式', {
-      adminId: req.user.id,
-      adminName: req.user.username,
-      targetUserId: userId,
-      duration: `${duration}分钟`,
-      action: 'ENABLE_USER_DEBUG'
-    })
-
-    return res.apiSuccess(
-      {
-        userId,
-        duration: `${duration}分钟`,
-        autoDisableAt: new Date(Date.now() + duration * 60 * 1000).toISOString(),
-        note: '该用户的所有请求将记录详细日志',
-        timestamp: new Date().toISOString()
-      },
-      `已为用户 ${userId} 开启调试模式`
-    )
+  // 审计日志
+  logger.warn('管理员为用户开启调试模式', {
+    adminId: req.user.id,
+    adminName: req.user.username,
+    targetUserId: userId,
+    duration: `${duration}分钟`,
+    action: 'ENABLE_USER_DEBUG'
   })
-)
+
+  return res.apiSuccess(
+    {
+      userId,
+      duration: `${duration}分钟`,
+      autoDisableAt: new Date(Date.now() + duration * 60 * 1000).toISOString(),
+      note: '该用户的所有请求将记录详细日志',
+      timestamp: new Date().toISOString()
+    },
+    `已为用户 ${userId} 开启调试模式`
+  )
+})
 
 /**
  * 🎯 为特定会话开启调试模式
@@ -184,124 +173,115 @@ router.post(
  *   "duration": 30  // 持续时间（分钟），默认30分钟
  * }
  */
-router.post(
-  '/session-debug',
-  asyncHandler(async (req, res) => {
-    const { sessionId, duration = 30 } = req.body
+router.post('/session-debug', async (req, res) => {
+  const { sessionId, duration = 30 } = req.body
 
-    if (!sessionId) {
-      return res.apiError('会话ID不能为空', 'SESSION_ID_REQUIRED', null, 400)
-    }
+  if (!sessionId) {
+    return res.apiError('会话ID不能为空', 'SESSION_ID_REQUIRED', null, 400)
+  }
 
-    // 启用会话调试模式
-    logger.enableDebugForSession(sessionId, duration)
+  // 启用会话调试模式
+  logger.enableDebugForSession(sessionId, duration)
 
-    // 审计日志
-    logger.warn('管理员为会话开启调试模式', {
-      adminId: req.user.id,
-      adminName: req.user.username,
-      targetSessionId: sessionId,
-      duration: `${duration}分钟`,
-      action: 'ENABLE_SESSION_DEBUG'
-    })
-
-    return res.apiSuccess(
-      {
-        sessionId,
-        duration: `${duration}分钟`,
-        autoDisableAt: new Date(Date.now() + duration * 60 * 1000).toISOString(),
-        note: '该会话的所有请求将记录详细日志',
-        timestamp: new Date().toISOString()
-      },
-      `已为会话 ${sessionId} 开启调试模式`
-    )
+  // 审计日志
+  logger.warn('管理员为会话开启调试模式', {
+    adminId: req.user.id,
+    adminName: req.user.username,
+    targetSessionId: sessionId,
+    duration: `${duration}分钟`,
+    action: 'ENABLE_SESSION_DEBUG'
   })
-)
+
+  return res.apiSuccess(
+    {
+      sessionId,
+      duration: `${duration}分钟`,
+      autoDisableAt: new Date(Date.now() + duration * 60 * 1000).toISOString(),
+      note: '该会话的所有请求将记录详细日志',
+      timestamp: new Date().toISOString()
+    },
+    `已为会话 ${sessionId} 开启调试模式`
+  )
+})
 
 /**
  * 🧹 清除所有调试会话
  * POST /api/v4/debug-control/clear-debug
  */
-router.post(
-  '/clear-debug',
-  asyncHandler(async (req, res) => {
-    const beforeConfig = logger.getConfig()
+router.post('/clear-debug', async (req, res) => {
+  const beforeConfig = logger.getConfig()
 
-    logger.clearAllDebugSessions()
+  logger.clearAllDebugSessions()
 
-    // 审计日志
-    logger.warn('管理员清除所有调试会话', {
-      adminId: req.user.id,
-      adminName: req.user.username,
-      clearedUsers: beforeConfig.debugUsers.length,
-      clearedSessions: beforeConfig.debugSessions.length,
-      action: 'CLEAR_ALL_DEBUG'
-    })
-
-    return res.apiSuccess(
-      {
-        clearedUsersCount: beforeConfig.debugUsers.length,
-        clearedSessionsCount: beforeConfig.debugSessions.length,
-        timestamp: new Date().toISOString()
-      },
-      '已清除所有调试会话'
-    )
+  // 审计日志
+  logger.warn('管理员清除所有调试会话', {
+    adminId: req.user.id,
+    adminName: req.user.username,
+    clearedUsers: beforeConfig.debugUsers.length,
+    clearedSessions: beforeConfig.debugSessions.length,
+    action: 'CLEAR_ALL_DEBUG'
   })
-)
+
+  return res.apiSuccess(
+    {
+      clearedUsersCount: beforeConfig.debugUsers.length,
+      clearedSessionsCount: beforeConfig.debugSessions.length,
+      timestamp: new Date().toISOString()
+    },
+    '已清除所有调试会话'
+  )
+})
 
 /**
  * 📋 查看最近的日志文件列表
  * GET /api/v4/debug-control/log-files
  */
-router.get(
-  '/log-files',
-  asyncHandler(async (req, res) => {
-    const fs = require('fs')
-    const path = require('path')
-    const logDir = path.join(__dirname, '../../logs')
+router.get('/log-files', async (req, res) => {
+  const fs = require('fs')
+  const path = require('path')
+  const logDir = path.join(__dirname, '../../logs')
 
-    if (!fs.existsSync(logDir)) {
-      return res.apiSuccess(
-        {
-          files: []
-        },
-        '日志目录不存在'
-      )
-    }
-
-    const files = fs
-      .readdirSync(logDir)
-      .filter(file => file.endsWith('.log'))
-      .map(file => {
-        const filePath = path.join(logDir, file)
-        const stats = fs.statSync(filePath)
-
-        return {
-          name: file,
-          size: `${(stats.size / 1024 / 1024).toFixed(2)} MB`,
-          sizeBytes: stats.size,
-          modified: stats.mtime.toISOString(),
-          created: stats.birthtime.toISOString()
-        }
-      })
-      .sort((a, b) => new Date(b.modified) - new Date(a.modified))
-
-    logger.info('查询日志文件列表', {
-      adminId: req.user.id,
-      adminName: req.user.username,
-      filesCount: files.length,
-      action: 'VIEW_LOG_FILES'
-    })
-
+  if (!fs.existsSync(logDir)) {
     return res.apiSuccess(
       {
-        files,
-        totalFiles: files.length,
-        logDirectory: logDir
+        files: []
       },
-      '获取日志文件列表成功'
+      '日志目录不存在'
     )
+  }
+
+  const files = fs
+    .readdirSync(logDir)
+    .filter(file => file.endsWith('.log'))
+    .map(file => {
+      const filePath = path.join(logDir, file)
+      const stats = fs.statSync(filePath)
+
+      return {
+        name: file,
+        size: `${(stats.size / 1024 / 1024).toFixed(2)} MB`,
+        sizeBytes: stats.size,
+        modified: stats.mtime.toISOString(),
+        created: stats.birthtime.toISOString()
+      }
+    })
+    .sort((a, b) => new Date(b.modified) - new Date(a.modified))
+
+  logger.info('查询日志文件列表', {
+    adminId: req.user.id,
+    adminName: req.user.username,
+    filesCount: files.length,
+    action: 'VIEW_LOG_FILES'
   })
-)
+
+  return res.apiSuccess(
+    {
+      files,
+      totalFiles: files.length,
+      logDirectory: logDir
+    },
+    '获取日志文件列表成功'
+  )
+})
 
 module.exports = router

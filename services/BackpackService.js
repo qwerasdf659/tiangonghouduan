@@ -137,26 +137,43 @@ class BackpackService {
       // 2. 过滤余额 > 0 的资产
       const validAssets = assetAccounts.filter(account => account.balance > 0)
 
-      // 3. 格式化资产数据
-      const formattedAssets = await Promise.all(
-        validAssets.map(async account => {
-          // 查询资产类型信息（用于获取显示名称）
-          const assetType = await MaterialAssetType.findOne({
-            where: { asset_code: account.asset_code },
-            transaction
-          })
+      // ✅ 修复N+1查询问题：批量查询所有资产类型信息
+      if (validAssets.length === 0) {
+        return []
+      }
 
-          return {
-            asset_code: account.asset_code,
-            display_name: assetType?.display_name || account.asset_code,
-            balance: account.balance,
-            frozen_balance: account.frozen_balance,
-            available_balance: account.available_balance,
-            category: assetType?.category || 'unknown',
-            rarity: assetType?.rarity || 'common'
+      const asset_codes = [...new Set(validAssets.map(account => account.asset_code))]
+
+      // 一次性查询所有需要的资产类型信息
+      const assetTypes = await MaterialAssetType.findAll({
+        where: {
+          asset_code: {
+            [sequelize.Sequelize.Op.in]: asset_codes
           }
-        })
-      )
+        },
+        transaction
+      })
+
+      // 建立 asset_code -> assetType 的映射
+      const assetTypeMap = new Map()
+      assetTypes.forEach(assetType => {
+        assetTypeMap.set(assetType.asset_code, assetType)
+      })
+
+      // 3. 格式化资产数据（从 Map 中读取，避免重复查询）
+      const formattedAssets = validAssets.map(account => {
+        const assetType = assetTypeMap.get(account.asset_code)
+
+        return {
+          asset_code: account.asset_code,
+          display_name: assetType?.display_name || account.asset_code,
+          balance: account.balance,
+          frozen_balance: account.frozen_balance,
+          available_balance: account.available_balance,
+          category: assetType?.category || 'unknown',
+          rarity: assetType?.rarity || 'common'
+        }
+      })
 
       return formattedAssets
     } catch (error) {

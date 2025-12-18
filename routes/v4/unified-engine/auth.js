@@ -31,8 +31,6 @@ const {
 } = require('../../../middleware/auth')
 const BeijingTimeHelper = require('../../../utils/timeHelper')
 const { getRateLimiter } = require('../../../middleware/RateLimiterMiddleware')
-const { asyncHandler } = require('../../../middleware/errorHandler')
-
 // ✅ 风险点3解决：创建Token验证接口专用限流器
 const rateLimiter = getRateLimiter()
 const verifyRateLimiter = rateLimiter.createLimiter({
@@ -55,143 +53,135 @@ const verifyRateLimiter = rateLimiter.createLimiter({
  * @param {string} mobile - 手机号
  * @param {string} verification_code - 验证码
  */
-router.post(
-  '/login',
-  asyncHandler(async (req, res) => {
-    /*
-     * 🔴 登录性能监控：记录开始时间（2025-11-09新增）
-     * 用于监控登录响应时间，判断是否需要优化（文档方案0建议）
-     */
-    const loginStartTime = Date.now()
+router.post('/login', async (req, res) => {
+  /*
+   * 🔴 登录性能监控：记录开始时间（2025-11-09新增）
+   * 用于监控登录响应时间，判断是否需要优化（文档方案0建议）
+   */
+  const loginStartTime = Date.now()
 
-    const { mobile, verification_code } = req.body
+  const { mobile, verification_code } = req.body
 
-    // 验证必需参数
-    if (!mobile) {
-      return res.apiError('手机号不能为空', 'MOBILE_REQUIRED', null, 400)
-    }
+  // 验证必需参数
+  if (!mobile) {
+    return res.apiError('手机号不能为空', 'MOBILE_REQUIRED', null, 400)
+  }
 
-    // ✅ 验证码必填验证
-    if (!verification_code || verification_code.trim() === '') {
-      return res.apiError('验证码不能为空', 'VERIFICATION_CODE_REQUIRED', null, 400)
-    }
+  // ✅ 验证码必填验证
+  if (!verification_code || verification_code.trim() === '') {
+    return res.apiError('验证码不能为空', 'VERIFICATION_CODE_REQUIRED', null, 400)
+  }
 
-    // ✅ 验证码验证逻辑
-    if (process.env.NODE_ENV === 'development') {
-      // 开发环境：使用万能验证码 123456
-      if (verification_code !== '123456') {
-        return res.apiError(
-          '验证码错误（开发环境使用123456）',
-          'INVALID_VERIFICATION_CODE',
-          null,
-          400
-        )
-      }
-    } else {
-      /*
-       * 生产环境：真实验证码验证逻辑
-       * TODO: 实现短信验证码验证
-       */
-      return res.apiError('生产环境验证码验证未实现', 'VERIFICATION_NOT_IMPLEMENTED', null, 501)
-    }
-
-    // 🎯 通过ServiceManager获取UserService
-    const UserService = req.app.locals.services.getService('user')
-
-    // 查找用户或自动注册
-    let user = await UserService.findByMobile(mobile)
-    let isNewUser = false
-
-    if (!user) {
-      // 用户不存在，自动注册（Service 内部管理事务）
-      console.log(`用户 ${mobile} 不存在，开始自动注册...`)
-
-      try {
-        user = await UserService.registerUser(mobile)
-        isNewUser = true
-        console.log(`用户 ${mobile} 注册流程完成（用户+积分账户+角色）`)
-      } catch (error) {
-        console.error(`用户 ${mobile} 注册失败:`, error)
-
-        // 处理业务错误
-        if (error.code === 'MOBILE_EXISTS') {
-          // 并发情况下可能出现：检查时不存在，注册时已存在
-          user = await UserService.findByMobile(mobile)
-          if (!user) {
-            return res.apiError(
-              '用户注册失败',
-              'REGISTRATION_FAILED',
-              { error: error.message },
-              500
-            )
-          }
-        } else {
-          return res.apiError('用户注册失败', 'REGISTRATION_FAILED', { error: error.message }, 500)
-        }
-      }
-    }
-
-    // 检查用户状态
-    if (user.status !== 'active') {
-      return res.apiError('用户账户已被禁用', 'USER_INACTIVE', null, 403)
-    }
-
-    // 🛡️ 获取用户角色信息
-    const userRoles = await getUserRoles(user.user_id)
-
-    // 更新最后登录时间和登录次数
-    await UserService.updateLoginStats(user.user_id)
-
-    // 生成Token
-    const tokens = await generateTokens(user)
-
-    const responseData = {
-      access_token: tokens.access_token,
-      refresh_token: tokens.refresh_token,
-      user: {
-        user_id: user.user_id,
-        mobile: user.mobile,
-        nickname: user.nickname,
-        role_based_admin: userRoles.isAdmin, // 🛡️ 基于角色计算
-        roles: userRoles.roles,
-        status: user.status,
-        last_login: user.last_login,
-        login_count: user.login_count
-      },
-      is_new_user: isNewUser, // 标识是否为新注册用户
-      expires_in: 7 * 24 * 60 * 60, // 7天
-      timestamp: BeijingTimeHelper.apiTimestamp()
-    }
-
-    const message = isNewUser ? '注册并登录成功' : '登录成功'
-
-    /*
-     * 🔴 登录性能监控：记录登录耗时（2025-11-09新增）
-     * 告警阈值：>3秒需要关注，>5秒需要优化（文档方案0建议）
-     */
-    const loginDuration = Date.now() - loginStartTime
-    if (loginDuration > 3000) {
-      console.warn('⚠️ 登录耗时告警:', {
-        mobile: mobile.substring(0, 3) + '****' + mobile.substring(7), // 脱敏处理
-        duration: `${loginDuration}ms`,
-        threshold: '3000ms',
-        is_new_user: isNewUser,
-        timestamp: new Date().toISOString(),
-        suggestion:
-          loginDuration > 5000
-            ? '登录耗时>5秒，建议执行优化方案2（参考文档）'
-            : '登录耗时>3秒，持续观察，如持续1周则需优化'
-      })
-    } else if (loginDuration > 1000) {
-      // 1-3秒：记录信息级日志，用于性能分析
-      console.log(
-        `📊 登录耗时: ${loginDuration}ms (用户: ${mobile.substring(0, 3)}****${mobile.substring(7)})`
+  // ✅ 验证码验证逻辑
+  if (process.env.NODE_ENV === 'development') {
+    // 开发环境：使用万能验证码 123456
+    if (verification_code !== '123456') {
+      return res.apiError(
+        '验证码错误（开发环境使用123456）',
+        'INVALID_VERIFICATION_CODE',
+        null,
+        400
       )
     }
+  } else {
+    /*
+     * 生产环境：真实验证码验证逻辑
+     * TODO: 实现短信验证码验证
+     */
+    return res.apiError('生产环境验证码验证未实现', 'VERIFICATION_NOT_IMPLEMENTED', null, 501)
+  }
 
-    return res.apiSuccess(responseData, message)
-  })
-)
+  // 🎯 通过ServiceManager获取UserService
+  const UserService = req.app.locals.services.getService('user')
+
+  // 查找用户或自动注册
+  let user = await UserService.findByMobile(mobile)
+  let isNewUser = false
+
+  if (!user) {
+    // 用户不存在，自动注册（Service 内部管理事务）
+    console.log(`用户 ${mobile} 不存在，开始自动注册...`)
+
+    try {
+      user = await UserService.registerUser(mobile)
+      isNewUser = true
+      console.log(`用户 ${mobile} 注册流程完成（用户+积分账户+角色）`)
+    } catch (error) {
+      console.error(`用户 ${mobile} 注册失败:`, error)
+
+      // 处理业务错误
+      if (error.code === 'MOBILE_EXISTS') {
+        // 并发情况下可能出现：检查时不存在，注册时已存在
+        user = await UserService.findByMobile(mobile)
+        if (!user) {
+          return res.apiError('用户注册失败', 'REGISTRATION_FAILED', { error: error.message }, 500)
+        }
+      } else {
+        return res.apiError('用户注册失败', 'REGISTRATION_FAILED', { error: error.message }, 500)
+      }
+    }
+  }
+
+  // 检查用户状态
+  if (user.status !== 'active') {
+    return res.apiError('用户账户已被禁用', 'USER_INACTIVE', null, 403)
+  }
+
+  // 🛡️ 获取用户角色信息
+  const userRoles = await getUserRoles(user.user_id)
+
+  // 更新最后登录时间和登录次数
+  await UserService.updateLoginStats(user.user_id)
+
+  // 生成Token
+  const tokens = await generateTokens(user)
+
+  const responseData = {
+    access_token: tokens.access_token,
+    refresh_token: tokens.refresh_token,
+    user: {
+      user_id: user.user_id,
+      mobile: user.mobile,
+      nickname: user.nickname,
+      role_based_admin: userRoles.isAdmin, // 🛡️ 基于角色计算
+      roles: userRoles.roles,
+      status: user.status,
+      last_login: user.last_login,
+      login_count: user.login_count
+    },
+    is_new_user: isNewUser, // 标识是否为新注册用户
+    expires_in: 7 * 24 * 60 * 60, // 7天
+    timestamp: BeijingTimeHelper.apiTimestamp()
+  }
+
+  const message = isNewUser ? '注册并登录成功' : '登录成功'
+
+  /*
+   * 🔴 登录性能监控：记录登录耗时（2025-11-09新增）
+   * 告警阈值：>3秒需要关注，>5秒需要优化（文档方案0建议）
+   */
+  const loginDuration = Date.now() - loginStartTime
+  if (loginDuration > 3000) {
+    console.warn('⚠️ 登录耗时告警:', {
+      mobile: mobile.substring(0, 3) + '****' + mobile.substring(7), // 脱敏处理
+      duration: `${loginDuration}ms`,
+      threshold: '3000ms',
+      is_new_user: isNewUser,
+      timestamp: new Date().toISOString(),
+      suggestion:
+        loginDuration > 5000
+          ? '登录耗时>5秒，建议执行优化方案2（参考文档）'
+          : '登录耗时>3秒，持续观察，如持续1周则需优化'
+    })
+  } else if (loginDuration > 1000) {
+    // 1-3秒：记录信息级日志，用于性能分析
+    console.log(
+      `📊 登录耗时: ${loginDuration}ms (用户: ${mobile.substring(0, 3)}****${mobile.substring(7)})`
+    )
+  }
+
+  return res.apiSuccess(responseData, message)
+})
 
 /**
  * 🛡️ 用户快速登录（手机号直接登录）
@@ -212,74 +202,71 @@ router.post(
  * @param {string} iv - 加密算法的初始向量（wx.getPhoneNumber获取）
  * @returns {Object} 解密成功响应（phoneNumber: 明文手机号）
  */
-router.post(
-  '/decrypt-phone',
-  asyncHandler(async (req, res) => {
-    const { code, encryptedData, iv } = req.body
+router.post('/decrypt-phone', async (req, res) => {
+  const { code, encryptedData, iv } = req.body
 
-    /*
-     * ========================================
-     * 步骤1: 参数验证
-     * ========================================
-     */
-    if (!code || !encryptedData || !iv) {
-      return res.apiError('参数不完整，需要code、encryptedData和iv', 'INVALID_PARAMS', null, 400)
-    }
+  /*
+   * ========================================
+   * 步骤1: 参数验证
+   * ========================================
+   */
+  if (!code || !encryptedData || !iv) {
+    return res.apiError('参数不完整，需要code、encryptedData和iv', 'INVALID_PARAMS', null, 400)
+  }
 
-    console.log('📱 微信手机号解密请求...')
+  console.log('📱 微信手机号解密请求...')
 
-    /*
-     * ========================================
-     * 步骤2: 使用code换取session_key
-     * ========================================
-     */
-    const WXBizDataCrypt = require('../../../utils/WXBizDataCrypt')
-    const axios = require('axios')
+  /*
+   * ========================================
+   * 步骤2: 使用code换取session_key
+   * ========================================
+   */
+  const WXBizDataCrypt = require('../../../utils/WXBizDataCrypt')
+  const axios = require('axios')
 
-    // 微信API地址
-    const wxApiUrl = `https://api.weixin.qq.com/sns/jscode2session?appid=${process.env.WX_APPID}&secret=${process.env.WX_SECRET}&js_code=${code}&grant_type=authorization_code`
+  // 微信API地址
+  const wxApiUrl = `https://api.weixin.qq.com/sns/jscode2session?appid=${process.env.WX_APPID}&secret=${process.env.WX_SECRET}&js_code=${code}&grant_type=authorization_code`
 
-    console.log('🔄 请求微信API获取session_key...')
-    const wxRes = await axios.get(wxApiUrl)
+  console.log('🔄 请求微信API获取session_key...')
+  const wxRes = await axios.get(wxApiUrl)
 
-    if (!wxRes.data.session_key) {
-      console.error('❌ 微信session_key获取失败:', wxRes.data)
-      return res.apiError('微信session_key获取失败', 'WX_SESSION_ERROR', wxRes.data, 500)
-    }
+  if (!wxRes.data.session_key) {
+    console.error('❌ 微信session_key获取失败:', wxRes.data)
+    return res.apiError('微信session_key获取失败', 'WX_SESSION_ERROR', wxRes.data, 500)
+  }
 
-    const sessionKey = wxRes.data.session_key
-    console.log('✅ 获取到微信session_key')
+  const sessionKey = wxRes.data.session_key
+  console.log('✅ 获取到微信session_key')
 
-    /*
-     * ========================================
-     * 步骤3: 解密手机号
-     * ========================================
-     */
-    const pc = new WXBizDataCrypt(process.env.WX_APPID, sessionKey)
-    const data = pc.decryptData(encryptedData, iv)
+  /*
+   * ========================================
+   * 步骤3: 解密手机号
+   * ========================================
+   */
+  const pc = new WXBizDataCrypt(process.env.WX_APPID, sessionKey)
+  const data = pc.decryptData(encryptedData, iv)
 
-    if (!data.phoneNumber) {
-      console.error('❌ 手机号解密失败')
-      return res.apiError('手机号解密失败', 'DECRYPT_FAILED', null, 500)
-    }
+  if (!data.phoneNumber) {
+    console.error('❌ 手机号解密失败')
+    return res.apiError('手机号解密失败', 'DECRYPT_FAILED', null, 500)
+  }
 
-    console.log(`✅ 手机号解密成功: ${data.phoneNumber}`)
+  console.log(`✅ 手机号解密成功: ${data.phoneNumber}`)
 
-    /*
-     * ========================================
-     * 步骤4: 返回明文手机号
-     * ========================================
-     */
-    return res.apiSuccess(
-      {
-        phoneNumber: data.phoneNumber, // 完整手机号（带区号，如+86 138****8000）
-        purePhoneNumber: data.purePhoneNumber, // 不带区号的手机号（13800138000）
-        countryCode: data.countryCode // 区号（中国：86）
-      },
-      '手机号获取成功'
-    )
-  })
-)
+  /*
+   * ========================================
+   * 步骤4: 返回明文手机号
+   * ========================================
+   */
+  return res.apiSuccess(
+    {
+      phoneNumber: data.phoneNumber, // 完整手机号（带区号，如+86 138****8000）
+      purePhoneNumber: data.purePhoneNumber, // 不带区号的手机号（13800138000）
+      countryCode: data.countryCode // 区号（中国：86）
+    },
+    '手机号获取成功'
+  )
+})
 
 /**
  * 🛡️ 微信授权一键登录 (WeChat One-Click Login)
@@ -308,196 +295,184 @@ router.post(
  * @param {string} mobile - 手机号（必填，来自微信授权）
  * @returns {Object} 登录成功响应（access_token + user信息 + role_based_admin）
  */
-router.post(
-  '/quick-login',
-  asyncHandler(async (req, res) => {
-    /*
-     * 🔴 登录性能监控：记录开始时间（2025-11-09新增）
-     * 用于监控登录响应时间，判断是否需要优化（文档方案0建议）
-     */
-    const loginStartTime = Date.now()
+router.post('/quick-login', async (req, res) => {
+  /*
+   * 🔴 登录性能监控：记录开始时间（2025-11-09新增）
+   * 用于监控登录响应时间，判断是否需要优化（文档方案0建议）
+   */
+  const loginStartTime = Date.now()
 
-    /*
-     * ========================================
-     * 步骤1: 验证手机号参数
-     * ========================================
-     */
-    const { mobile } = req.body
+  /*
+   * ========================================
+   * 步骤1: 验证手机号参数
+   * ========================================
+   */
+  const { mobile } = req.body
 
-    if (!mobile) {
-      return res.apiError('手机号不能为空', 'MOBILE_REQUIRED', null, 400)
-    }
+  if (!mobile) {
+    return res.apiError('手机号不能为空', 'MOBILE_REQUIRED', null, 400)
+  }
 
-    console.log(`📱 快速登录请求: ${mobile}`)
+  console.log(`📱 快速登录请求: ${mobile}`)
 
-    // 🎯 通过ServiceManager获取UserService
-    const UserService = req.app.locals.services.getService('user')
+  // 🎯 通过ServiceManager获取UserService
+  const UserService = req.app.locals.services.getService('user')
 
-    /*
-     * ========================================
-     * 步骤2: 查找用户
-     * ========================================
-     */
-    let user = await UserService.findByMobile(mobile)
+  /*
+   * ========================================
+   * 步骤2: 查找用户
+   * ========================================
+   */
+  let user = await UserService.findByMobile(mobile)
 
-    /*
-     * ========================================
-     * 步骤3: 如果用户不存在，自动创建用户账户（Service 内部管理事务）
-     * ========================================
-     */
-    if (!user) {
-      console.log(`用户 ${mobile} 不存在，开始自动注册...`)
+  /*
+   * ========================================
+   * 步骤3: 如果用户不存在，自动创建用户账户（Service 内部管理事务）
+   * ========================================
+   */
+  if (!user) {
+    console.log(`用户 ${mobile} 不存在，开始自动注册...`)
 
-      try {
-        user = await UserService.registerUser(mobile)
-        console.log(`✅ 用户 ${mobile} 注册流程完成（用户+积分账户+角色）`)
-      } catch (error) {
-        console.error(`❌ 用户 ${mobile} 注册失败:`, error)
+    try {
+      user = await UserService.registerUser(mobile)
+      console.log(`✅ 用户 ${mobile} 注册流程完成（用户+积分账户+角色）`)
+    } catch (error) {
+      console.error(`❌ 用户 ${mobile} 注册失败:`, error)
 
-        // 处理业务错误
-        if (error.code === 'MOBILE_EXISTS') {
-          // 并发情况下可能出现：检查时不存在，注册时已存在
-          user = await UserService.findByMobile(mobile)
-          if (!user) {
-            return res.apiError(
-              '用户注册失败',
-              'REGISTRATION_FAILED',
-              { error: error.message },
-              500
-            )
-          }
-        } else {
+      // 处理业务错误
+      if (error.code === 'MOBILE_EXISTS') {
+        // 并发情况下可能出现：检查时不存在，注册时已存在
+        user = await UserService.findByMobile(mobile)
+        if (!user) {
           return res.apiError('用户注册失败', 'REGISTRATION_FAILED', { error: error.message }, 500)
         }
+      } else {
+        return res.apiError('用户注册失败', 'REGISTRATION_FAILED', { error: error.message }, 500)
       }
     }
+  }
 
-    /*
-     * ========================================
-     * 步骤4: 验证账户状态
-     * ========================================
-     */
-    if (user.status !== 'active') {
-      console.warn(`❌ 用户 ${mobile} 账户已被禁用，status: ${user.status}`)
-      return res.apiError('用户账户已被禁用，无法登录', 'USER_INACTIVE', null, 403)
-    }
+  /*
+   * ========================================
+   * 步骤4: 验证账户状态
+   * ========================================
+   */
+  if (user.status !== 'active') {
+    console.warn(`❌ 用户 ${mobile} 账户已被禁用，status: ${user.status}`)
+    return res.apiError('用户账户已被禁用，无法登录', 'USER_INACTIVE', null, 403)
+  }
 
-    /*
-     * ========================================
-     * 步骤5: 获取用户角色信息（基于UUID角色系统）
-     * ========================================
-     */
-    const userRoles = await getUserRoles(user.user_id)
+  /*
+   * ========================================
+   * 步骤5: 获取用户角色信息（基于UUID角色系统）
+   * ========================================
+   */
+  const userRoles = await getUserRoles(user.user_id)
 
-    /*
-     * ========================================
-     * 步骤6: 更新最后登录时间和登录次数
-     * ========================================
-     */
-    await UserService.updateLoginStats(user.user_id)
+  /*
+   * ========================================
+   * 步骤6: 更新最后登录时间和登录次数
+   * ========================================
+   */
+  await UserService.updateLoginStats(user.user_id)
 
+  console.log(
+    `✅ 用户 ${mobile} 更新登录统计：last_login=${user.last_login}, login_count=${user.login_count}`
+  )
+
+  /*
+   * ========================================
+   * 步骤7: 生成JWT Token（access_token + refresh_token）
+   * ========================================
+   */
+  const tokens = await generateTokens(user)
+
+  /*
+   * ========================================
+   * 步骤8: 返回登录成功结果
+   * ========================================
+   */
+  const responseData = {
+    access_token: tokens.access_token, // 访问令牌（JWT，有效期7天）
+    refresh_token: tokens.refresh_token, // 刷新令牌（JWT，用于刷新access_token）
+    user: {
+      user_id: user.user_id, // 用户ID（唯一标识，自增主键）
+      mobile: user.mobile, // 手机号（登录凭证，唯一索引）
+      nickname: user.nickname, // 用户昵称（自动生成，格式：用户+后4位）
+      role_based_admin: userRoles.isAdmin, // 是否为管理员（基于UUID角色系统计算）
+      roles: userRoles.roles, // 用户角色列表（UUID角色系统，支持多角色）
+      status: user.status, // 账户状态（active/inactive/banned）
+      created_at: user.created_at, // 账户创建时间（北京时间，自动生成）
+      last_login: user.last_login // 最后登录时间（北京时间，刚更新）
+    },
+    expires_in: 7 * 24 * 60 * 60, // Token有效期：7天=604800秒
+    timestamp: BeijingTimeHelper.apiTimestamp() // API响应时间戳（北京时间，统一格式）
+  }
+
+  console.log(`✅ 用户 ${mobile} 微信授权登录成功`)
+
+  /*
+   * 🔴 登录性能监控：记录登录耗时（2025-11-09新增）
+   * 告警阈值：>3秒需要关注，>5秒需要优化（文档方案0建议）
+   */
+  const loginDuration = Date.now() - loginStartTime
+  if (loginDuration > 3000) {
+    console.warn('⚠️ 登录耗时告警:', {
+      mobile: mobile.substring(0, 3) + '****' + mobile.substring(7), // 脱敏处理
+      duration: `${loginDuration}ms`,
+      threshold: '3000ms',
+      login_type: 'quick_login',
+      timestamp: new Date().toISOString(),
+      suggestion:
+        loginDuration > 5000
+          ? '登录耗时>5秒，建议执行优化方案2（参考文档）'
+          : '登录耗时>3秒，持续观察，如持续1周则需优化'
+    })
+  } else if (loginDuration > 1000) {
+    // 1-3秒：记录信息级日志，用于性能分析
     console.log(
-      `✅ 用户 ${mobile} 更新登录统计：last_login=${user.last_login}, login_count=${user.login_count}`
+      `📊 登录耗时: ${loginDuration}ms (用户: ${mobile.substring(0, 3)}****${mobile.substring(7)}, 类型: quick_login)`
     )
+  }
 
-    /*
-     * ========================================
-     * 步骤7: 生成JWT Token（access_token + refresh_token）
-     * ========================================
-     */
-    const tokens = await generateTokens(user)
-
-    /*
-     * ========================================
-     * 步骤8: 返回登录成功结果
-     * ========================================
-     */
-    const responseData = {
-      access_token: tokens.access_token, // 访问令牌（JWT，有效期7天）
-      refresh_token: tokens.refresh_token, // 刷新令牌（JWT，用于刷新access_token）
-      user: {
-        user_id: user.user_id, // 用户ID（唯一标识，自增主键）
-        mobile: user.mobile, // 手机号（登录凭证，唯一索引）
-        nickname: user.nickname, // 用户昵称（自动生成，格式：用户+后4位）
-        role_based_admin: userRoles.isAdmin, // 是否为管理员（基于UUID角色系统计算）
-        roles: userRoles.roles, // 用户角色列表（UUID角色系统，支持多角色）
-        status: user.status, // 账户状态（active/inactive/banned）
-        created_at: user.created_at, // 账户创建时间（北京时间，自动生成）
-        last_login: user.last_login // 最后登录时间（北京时间，刚更新）
-      },
-      expires_in: 7 * 24 * 60 * 60, // Token有效期：7天=604800秒
-      timestamp: BeijingTimeHelper.apiTimestamp() // API响应时间戳（北京时间，统一格式）
-    }
-
-    console.log(`✅ 用户 ${mobile} 微信授权登录成功`)
-
-    /*
-     * 🔴 登录性能监控：记录登录耗时（2025-11-09新增）
-     * 告警阈值：>3秒需要关注，>5秒需要优化（文档方案0建议）
-     */
-    const loginDuration = Date.now() - loginStartTime
-    if (loginDuration > 3000) {
-      console.warn('⚠️ 登录耗时告警:', {
-        mobile: mobile.substring(0, 3) + '****' + mobile.substring(7), // 脱敏处理
-        duration: `${loginDuration}ms`,
-        threshold: '3000ms',
-        login_type: 'quick_login',
-        timestamp: new Date().toISOString(),
-        suggestion:
-          loginDuration > 5000
-            ? '登录耗时>5秒，建议执行优化方案2（参考文档）'
-            : '登录耗时>3秒，持续观察，如持续1周则需优化'
-      })
-    } else if (loginDuration > 1000) {
-      // 1-3秒：记录信息级日志，用于性能分析
-      console.log(
-        `📊 登录耗时: ${loginDuration}ms (用户: ${mobile.substring(0, 3)}****${mobile.substring(7)}, 类型: quick_login)`
-      )
-    }
-
-    return res.apiSuccess(responseData, '快速登录成功')
-  })
-)
+  return res.apiSuccess(responseData, '快速登录成功')
+})
 
 /**
  * 🛡️ 获取当前用户信息
  * GET /api/v4/auth/profile
  */
-router.get(
-  '/profile',
-  require('../../../middleware/auth').authenticateToken,
-  asyncHandler(async (req, res) => {
-    const user_id = req.user.user_id
+router.get('/profile', require('../../../middleware/auth').authenticateToken, async (req, res) => {
+  const user_id = req.user.user_id
 
-    // 🎯 通过ServiceManager获取UserService
-    const UserService = req.app.locals.services.getService('user')
+  // 🎯 通过ServiceManager获取UserService
+  const UserService = req.app.locals.services.getService('user')
 
-    // ✅ 使用 UserService 获取用户信息（含状态验证）
-    const user = await UserService.getUserWithValidation(user_id)
+  // ✅ 使用 UserService 获取用户信息（含状态验证）
+  const user = await UserService.getUserWithValidation(user_id)
 
-    // 🛡️ 获取用户角色信息
-    const userRoles = await getUserRoles(user_id)
+  // 🛡️ 获取用户角色信息
+  const userRoles = await getUserRoles(user_id)
 
-    const responseData = {
-      user: {
-        user_id: user.user_id,
-        mobile: user.mobile,
-        nickname: user.nickname,
-        role_based_admin: userRoles.isAdmin, // 🛡️ 基于角色计算
-        roles: userRoles.roles,
-        status: user.status,
-        consecutive_fail_count: user.consecutive_fail_count,
-        history_total_points: user.history_total_points,
-        created_at: BeijingTimeHelper.formatToISO(user.created_at), // 🔧 转换为ISO8601格式（带+08:00）
-        last_login: BeijingTimeHelper.formatToISO(user.last_login), // 🔧 转换为ISO8601格式（带+08:00）
-        login_count: user.login_count
-      },
-      timestamp: BeijingTimeHelper.apiTimestamp()
-    }
+  const responseData = {
+    user: {
+      user_id: user.user_id,
+      mobile: user.mobile,
+      nickname: user.nickname,
+      role_based_admin: userRoles.isAdmin, // 🛡️ 基于角色计算
+      roles: userRoles.roles,
+      status: user.status,
+      consecutive_fail_count: user.consecutive_fail_count,
+      history_total_points: user.history_total_points,
+      created_at: BeijingTimeHelper.formatToISO(user.created_at), // 🔧 转换为ISO8601格式（带+08:00）
+      last_login: BeijingTimeHelper.formatToISO(user.last_login), // 🔧 转换为ISO8601格式（带+08:00）
+      login_count: user.login_count
+    },
+    timestamp: BeijingTimeHelper.apiTimestamp()
+  }
 
-    return res.apiSuccess(responseData, '用户信息获取成功')
-  })
-)
+  return res.apiSuccess(responseData, '用户信息获取成功')
+})
 
 /**
  * 🛡️ 刷新访问Token
@@ -506,53 +481,50 @@ router.get(
  * @body {string} refresh_token - 刷新Token
  * @returns {Object} 新的访问Token和刷新Token
  */
-router.post(
-  '/refresh',
-  asyncHandler(async (req, res) => {
-    const { refresh_token } = req.body
+router.post('/refresh', async (req, res) => {
+  const { refresh_token } = req.body
 
-    // 验证必需参数
-    if (!refresh_token) {
-      return res.apiError('刷新Token不能为空', 'REFRESH_TOKEN_REQUIRED', null, 400)
-    }
+  // 验证必需参数
+  if (!refresh_token) {
+    return res.apiError('刷新Token不能为空', 'REFRESH_TOKEN_REQUIRED', null, 400)
+  }
 
-    // 验证刷新Token
-    const { verifyRefreshToken } = require('../../../middleware/auth')
-    const verifyResult = await verifyRefreshToken(refresh_token)
+  // 验证刷新Token
+  const { verifyRefreshToken } = require('../../../middleware/auth')
+  const verifyResult = await verifyRefreshToken(refresh_token)
 
-    if (!verifyResult.valid) {
-      return res.apiError('刷新Token无效', 'INVALID_REFRESH_TOKEN', null, 401)
-    }
+  if (!verifyResult.valid) {
+    return res.apiError('刷新Token无效', 'INVALID_REFRESH_TOKEN', null, 401)
+  }
 
-    // 🎯 通过ServiceManager获取UserService
-    const UserService = req.app.locals.services.getService('user')
+  // 🎯 通过ServiceManager获取UserService
+  const UserService = req.app.locals.services.getService('user')
 
-    // ✅ 使用 UserService 获取用户信息并验证状态
-    const user = await UserService.getUserWithValidation(verifyResult.user.user_id)
+  // ✅ 使用 UserService 获取用户信息并验证状态
+  const user = await UserService.getUserWithValidation(verifyResult.user.user_id)
 
-    // 生成新的Token对
-    const tokens = await generateTokens(user)
+  // 生成新的Token对
+  const tokens = await generateTokens(user)
 
-    // 🛡️ 获取用户角色信息
-    const userRoles = await getUserRoles(user.user_id)
+  // 🛡️ 获取用户角色信息
+  const userRoles = await getUserRoles(user.user_id)
 
-    const responseData = {
-      access_token: tokens.access_token,
-      refresh_token: tokens.refresh_token,
-      user: {
-        user_id: user.user_id,
-        mobile: user.mobile,
-        role_based_admin: userRoles.isAdmin, // 🛡️ 基于角色计算
-        roles: userRoles.roles,
-        status: user.status
-      },
-      expires_in: 7 * 24 * 60 * 60, // 7天
-      timestamp: BeijingTimeHelper.apiTimestamp()
-    }
+  const responseData = {
+    access_token: tokens.access_token,
+    refresh_token: tokens.refresh_token,
+    user: {
+      user_id: user.user_id,
+      mobile: user.mobile,
+      role_based_admin: userRoles.isAdmin, // 🛡️ 基于角色计算
+      roles: userRoles.roles,
+      status: user.status
+    },
+    expires_in: 7 * 24 * 60 * 60, // 7天
+    timestamp: BeijingTimeHelper.apiTimestamp()
+  }
 
-    return res.apiSuccess(responseData, 'Token刷新成功')
-  })
-)
+  return res.apiSuccess(responseData, 'Token刷新成功')
+})
 
 /**
  * 🛡️ 用户退出登录（User Logout）
@@ -599,75 +571,66 @@ router.post(
  * - Token续期前的有效性检查
  * - 跨页面的用户信息同步
  */
-router.get(
-  '/verify',
-  authenticateToken,
-  verifyRateLimiter,
-  asyncHandler(async (req, res) => {
-    const user_id = req.user.user_id
+router.get('/verify', authenticateToken, verifyRateLimiter, async (req, res) => {
+  const user_id = req.user.user_id
 
-    // 🎯 通过ServiceManager获取UserService
-    const UserService = req.app.locals.services.getService('user')
+  // 🎯 通过ServiceManager获取UserService
+  const UserService = req.app.locals.services.getService('user')
 
-    // ✅ 使用 UserService 获取用户信息（含状态验证）
-    const user = await UserService.getUserWithValidation(user_id, {
-      attributes: [
-        'user_id',
-        'mobile',
-        'nickname',
-        'status',
-        'created_at',
-        'last_login',
-        'login_count'
-      ]
-    })
-
-    // 🛡️ 使用缓存机制获取用户角色信息（getUserRoles内置缓存）
-    const userRoles = await getUserRoles(user_id)
-
-    console.log(`✅ [Auth] Token验证成功: user_id=${user_id}, roles=${userRoles.roles.join(',')}`)
-
-    return res.apiSuccess(
-      {
-        user_id: user.user_id,
-        mobile: user.mobile,
-        nickname: user.nickname,
-        status: user.status,
-        roles: userRoles.roles,
-        role_level: userRoles.maxLevel,
-        is_admin: userRoles.isAdmin,
-        role_based_admin: userRoles.isAdmin,
-        created_at: BeijingTimeHelper.formatToISO(user.created_at),
-        last_login: BeijingTimeHelper.formatToISO(user.last_login),
-        login_count: user.login_count,
-        valid: true, // 向后兼容旧测试
-        token_valid: true, // 新字段
-        timestamp: BeijingTimeHelper.apiTimestamp()
-      },
-      'Token验证成功',
-      'TOKEN_VALID'
-    )
+  // ✅ 使用 UserService 获取用户信息（含状态验证）
+  const user = await UserService.getUserWithValidation(user_id, {
+    attributes: [
+      'user_id',
+      'mobile',
+      'nickname',
+      'status',
+      'created_at',
+      'last_login',
+      'login_count'
+    ]
   })
-)
 
-router.post(
-  '/logout',
-  authenticateToken,
-  asyncHandler(async (req, res) => {
-    const user_id = req.user.user_id
+  // 🛡️ 使用缓存机制获取用户角色信息（getUserRoles内置缓存）
+  const userRoles = await getUserRoles(user_id)
 
-    /**
-     * 🔑 清除用户权限缓存（利用已有的invalidateUserPermissions函数）
-     * 作用：清除内存缓存（memoryCache.delete）+ Redis缓存（redisClient.del）
-     * 效果：下次刷新Token时，getUserRoles函数缓存未命中，触发数据库查询
-     */
-    await invalidateUserPermissions(user_id, 'user_logout')
+  console.log(`✅ [Auth] Token验证成功: user_id=${user_id}, roles=${userRoles.roles.join(',')}`)
 
-    // 📝 记录退出日志（便于审计和问题追踪）
-    console.log(`✅ [Auth] 用户退出登录: user_id=${user_id}, mobile=${req.user.mobile}`)
+  return res.apiSuccess(
+    {
+      user_id: user.user_id,
+      mobile: user.mobile,
+      nickname: user.nickname,
+      status: user.status,
+      roles: userRoles.roles,
+      role_level: userRoles.maxLevel,
+      is_admin: userRoles.isAdmin,
+      role_based_admin: userRoles.isAdmin,
+      created_at: BeijingTimeHelper.formatToISO(user.created_at),
+      last_login: BeijingTimeHelper.formatToISO(user.last_login),
+      login_count: user.login_count,
+      valid: true, // 向后兼容旧测试
+      token_valid: true, // 新字段
+      timestamp: BeijingTimeHelper.apiTimestamp()
+    },
+    'Token验证成功',
+    'TOKEN_VALID'
+  )
+})
 
-    return res.apiSuccess(null, '退出登录成功', 'LOGOUT_SUCCESS')
-  })
-)
+router.post('/logout', authenticateToken, async (req, res) => {
+  const user_id = req.user.user_id
+
+  /**
+   * 🔑 清除用户权限缓存（利用已有的invalidateUserPermissions函数）
+   * 作用：清除内存缓存（memoryCache.delete）+ Redis缓存（redisClient.del）
+   * 效果：下次刷新Token时，getUserRoles函数缓存未命中，触发数据库查询
+   */
+  await invalidateUserPermissions(user_id, 'user_logout')
+
+  // 📝 记录退出日志（便于审计和问题追踪）
+  console.log(`✅ [Auth] 用户退出登录: user_id=${user_id}, mobile=${req.user.mobile}`)
+
+  return res.apiSuccess(null, '退出登录成功', 'LOGOUT_SUCCESS')
+})
 
 module.exports = router
