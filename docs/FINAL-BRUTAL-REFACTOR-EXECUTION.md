@@ -1000,11 +1000,13 @@ jobs:
 set -e  # 任意步骤失败立即退出
 
 echo "🚨 开始暴力重构（Zero-Compatibility）..."
+echo "⚠️⚠️⚠️ 警告：本操作不可回滚 ⚠️⚠️⚠️"
+echo ""
 
 # 前置检查
-read -p "⚠️ 已创建 Git 代码标签？(yes/no): " GIT_TAG_CONFIRM
-if [ "$GIT_TAG_CONFIRM" != "yes" ]; then
-  echo "❌ 请先创建 Git 代码标签！"
+read -p "⚠️ 测试环境已完整预演并通过？(yes/no): " TEST_CONFIRM
+if [ "$TEST_CONFIRM" != "yes" ]; then
+  echo "❌ 请先在测试环境完整预演！"
   exit 1
 fi
 
@@ -1033,9 +1035,10 @@ echo "1. DROP TABLE user_inventory（数据永久丢失）"
 echo "2. DROP TABLE user_points_accounts（数据永久丢失）"
 echo "3. DROP TABLE points_transactions（数据永久丢失）"
 echo "4. 删除所有旧代码（硬删除，不归档）"
+echo "5. 执行后无法回滚，只能继续推进"
 echo ""
-read -p "确认执行？输入 'I UNDERSTAND' 继续: " FINAL_CONFIRM
-if [ "$FINAL_CONFIRM" != "I UNDERSTAND" ]; then
+read -p "确认执行？输入 'DELETE FOREVER' 继续: " FINAL_CONFIRM
+if [ "$FINAL_CONFIRM" != "DELETE FOREVER" ]; then
   echo "❌ 操作已取消"
   exit 1
 fi
