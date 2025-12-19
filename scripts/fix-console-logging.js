@@ -174,7 +174,7 @@ class LoggingSystemFixer {
     // 提取模块名（用于Logger实例化）
     const moduleName = path.basename(relativePath, '.js')
 
-    return `const Logger = require('${loggerPath}')\nconst logger = new Logger('${moduleName}')\n\n`
+    return `const Logger = require('${loggerPath}')\nconst logger = require('../utils/logger').logger\n\n`
   }
 
   /**

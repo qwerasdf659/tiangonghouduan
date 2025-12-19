@@ -22,9 +22,8 @@ const express = require('express')
 const router = express.Router()
 const { authenticateToken } = require('../../../middleware/auth')
 const { validatePositiveInteger, handleServiceError } = require('../../../middleware/validation')
-const Logger = require('../../../services/UnifiedLotteryEngine/utils/Logger')
 
-const logger = new Logger('RedemptionAPI')
+const logger = require('../../../utils/logger').logger
 
 /**
  * 生成核销订单（Generate Redemption Order）

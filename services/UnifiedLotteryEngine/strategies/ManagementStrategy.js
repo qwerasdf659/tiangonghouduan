@@ -32,7 +32,6 @@
 const BeijingTimeHelper = require('../../../utils/timeHelper')
 const { User, LotteryManagementSetting } = require('../../../models')
 const { getUserRoles } = require('../../../middleware/auth')
-const Logger = require('../utils/Logger')
 const { Op } = require('sequelize')
 
 /**
@@ -52,7 +51,7 @@ class ManagementStrategy {
    * // 创建实例后，可以使用forceWin、forceLose、adjustProbability等方法
    */
   constructor() {
-    this.logger = Logger.create('ManagementStrategy')
+    this.logger = require('../../../utils/logger').logger
 
     // 🔄 内存缓存系统（5分钟TTL）
     this.cache = new Map()

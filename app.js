@@ -11,6 +11,7 @@
 // 🔴 设置应用程序时区为北京时间 (中国区域)
 process.env.TZ = 'Asia/Shanghai'
 
+const crypto = require('crypto')
 const express = require('express')
 const path = require('path') // 用于静态文件路径处理
 const cors = require('cors')
@@ -44,12 +45,28 @@ if (!isDevelopment()) {
 const BeijingTimeHelper = require('./utils/timeHelper')
 
 // 📝 统一日志系统导入
-const Logger = require('./services/UnifiedLotteryEngine/utils/Logger')
-const appLogger = Logger.create('Application')
+const logger = require('./utils/logger')
+const appLogger = logger
 
 // 🔧 导入API响应统一中间件 - 解决API格式不一致问题
 const ApiResponse = require('./utils/ApiResponse')
 // const ApiStandardManager = require('./utils/ApiStandardManager') // 已合并到ApiResponse中，删除冗余引用
+
+/**
+ * 统一 request_id 获取逻辑（与 ApiResponse.middleware 兼容）
+ * - /api/*：优先使用 ApiResponse.middleware 注入的 req.id
+ * - 非 /api/*：使用请求头或本地生成
+ * @param {Object} req - Express请求对象
+ * @returns {string} 请求ID
+ */
+function getRequestId(req) {
+  return (
+    req.id ||
+    req.headers['x-request-id'] ||
+    req.headers['request-id'] ||
+    `req_${crypto.randomUUID()}`
+  )
+}
 
 // 确保Node.js使用北京时间
 appLogger.info('应用启动', {
@@ -139,6 +156,9 @@ app.use(compression())
 const { getRateLimiter } = require('./middleware/RateLimiterMiddleware')
 const rateLimiter = getRateLimiter()
 
+// 🔧 API响应格式统一中间件 - 统一所有API响应格式（必须在 /api 限流器之前，确保限流响应也包含 request_id）
+app.use('/api/', ApiResponse.middleware())
+
 // 🔧 全局API限流 - 100次/分钟/IP（基于Redis）
 const globalRateLimiter = rateLimiter.createLimiter({
   windowMs: 60 * 1000, // 1分钟窗口
@@ -161,16 +181,40 @@ app.use('/api/', globalRateLimiter)
 const fallbackLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15分钟
   max: 1000, // 限制每个IP 15分钟内最多1000个请求
-  message: {
-    success: false,
-    error: 'RATE_LIMIT_EXCEEDED',
-    message: '请求太频繁，请稍后再试'
+  // 使用 handler 输出统一 ApiResponse 格式（禁止直接返回非标准 message 对象）
+  handler: (req, res, _next, options) => {
+    // 🔴 可观测性：记录后备限流触发（Redis退化）
+    appLogger.warn('[RateLimiter] 后备限流触发（Redis不可用）', {
+      limiter_type: 'fallback',
+      redis_status: 'disconnected',
+      ip: req.ip,
+      path: req.path,
+      method: req.method,
+      timestamp: BeijingTimeHelper.now()
+    })
+    return res.apiError(
+      options.message || '请求太频繁，请稍后再试',
+      'RATE_LIMIT_EXCEEDED',
+      { window_ms: options.windowMs, max: options.limit },
+      429
+    )
   },
   standardHeaders: true,
   legacyHeaders: false,
-  skip: () => {
+  skip: req => {
+    const redisConnected = rateLimiter.redisClient.isConnected
+    // 🔴 可观测性：记录限流链路切换
+    if (!redisConnected) {
+      appLogger.warn('[RateLimiter] Redis不可用，启用后备限流', {
+        limiter_type: 'fallback',
+        redis_status: 'disconnected',
+        ip: req.ip,
+        path: req.path,
+        timestamp: BeijingTimeHelper.now()
+      })
+    }
     // 当Redis可用时跳过后备限流器
-    return rateLimiter.redisClient.isConnected
+    return redisConnected
   },
   keyGenerator: req => {
     return req.ip || req.connection.remoteAddress || 'unknown'
@@ -179,9 +223,6 @@ const fallbackLimiter = rateLimit({
 app.use('/api/', fallbackLimiter)
 
 // 字段转换器功能已删除 - 使用统一的snake_case命名格式
-
-// 🔧 API响应格式统一中间件 - 统一所有API响应格式
-app.use('/api/', ApiResponse.middleware())
 
 // 🔧 请求日志中间件
 app.use((req, res, next) => {
@@ -213,16 +254,15 @@ app.use('/api/', (req, res, next) => {
         ip: req.ip
       })
 
-      res.status(504).json({
-        success: false,
-        code: 'REQUEST_TIMEOUT',
-        message: '请求处理超时，请稍后重试',
-        data: {
+      return res.apiError(
+        '请求处理超时，请稍后重试',
+        'REQUEST_TIMEOUT',
+        {
           timeout: `${API_TIMEOUT / 1000}秒`,
           suggestion: '如果问题持续，请联系技术支持'
         },
-        timestamp: BeijingTimeHelper.apiTimestamp()
-      })
+        504
+      )
     }
   })
 
@@ -275,7 +315,6 @@ app.get('/health', async (req, res) => {
         status: overallStatus,
         version: '4.0.0',
         architecture: 'V4 Unified Lottery Engine',
-        timestamp: BeijingTimeHelper.apiTimestamp(), // �� 北京时间API时间戳
         systems: {
           database: databaseStatus,
           redis: redisStatus,
@@ -287,39 +326,33 @@ app.get('/health', async (req, res) => {
         },
         uptime: Math.floor(process.uptime()) + 's'
       },
+      timestamp: BeijingTimeHelper.apiTimestamp(), // ✅ 顶层 timestamp（监控标准）
       version: 'v4.0', // ✅ API版本信息
-      request_id:
-        req.headers['x-request-id'] ||
-        `health_${Date.now()}_${Math.random().toString(36).substr(2, 6)}` // ✅ 请求追踪ID
+      request_id: getRequestId(req) // ✅ 请求追踪ID
     }
 
     res.json(healthData)
   } catch (error) {
-    console.error('健康检查失败:', error)
+    appLogger.error('健康检查失败', { error: error.message, stack: error.stack })
     res.status(500).json({
       success: false, // ✅ 业务标准格式
       code: 'SYSTEM_UNHEALTHY', // ✅ 业务错误代码
       message: '系统健康检查失败', // ✅ 用户友好错误消息
       data: {
         status: 'unhealthy',
-        error: error.message,
-        timestamp: BeijingTimeHelper.apiTimestamp() // 🕐 北京时间API时间戳
+        error: error.message
       },
+      timestamp: BeijingTimeHelper.apiTimestamp(), // ✅ 顶层 timestamp
       version: 'v4.0', // ✅ API版本信息
-      request_id:
-        req.headers['x-request-id'] ||
-        `health_error_${Date.now()}_${Math.random().toString(36).substr(2, 6)}` // ✅ 请求追踪ID
+      request_id: getRequestId(req) // ✅ 请求追踪ID
     })
   }
 })
 
 // 📊 V4统一引擎信息端点
 app.get('/api/v4', (req, res) => {
-  res.json({
-    success: true,
-    code: 'ENGINE_INFO_SUCCESS',
-    message: 'V4统一抽奖引擎信息获取成功',
-    data: {
+  return res.apiSuccess(
+    {
       version: '4.0.0',
       name: '餐厅积分抽奖系统 V4统一引擎',
       architecture: 'unified-lottery-engine',
@@ -343,17 +376,15 @@ app.get('/api/v4', (req, res) => {
       },
       features: ['统一抽奖引擎', '智能策略选择', '实时决策处理', '完整审计日志', '高性能优化']
     },
-    timestamp: BeijingTimeHelper.apiTimestamp()
-  })
+    'V4统一抽奖引擎信息获取成功',
+    'ENGINE_INFO_SUCCESS'
+  )
 })
 
 // 📚 V4统一引擎API文档端点
 app.get('/api/v4/docs', (req, res) => {
-  res.json({
-    success: true,
-    code: 'API_DOCS_SUCCESS',
-    message: 'V4统一抽奖引擎API文档获取成功',
-    data: {
+  return res.apiSuccess(
+    {
       title: '餐厅积分抽奖系统 V4.0 统一引擎API文档',
       version: '4.0.0',
       architecture: 'unified-lottery-engine',
@@ -411,8 +442,9 @@ app.get('/api/v4/docs', (req, res) => {
         }
       }
     },
-    timestamp: BeijingTimeHelper.apiTimestamp()
-  })
+    'V4统一抽奖引擎API文档获取成功',
+    'API_DOCS_SUCCESS'
+  )
 })
 
 /*
@@ -443,10 +475,8 @@ app.get('/', (req, res) => {
 
 // API基础路径
 app.get('/api', (req, res) => {
-  res.json({
-    success: true,
-    message: 'API服务正常',
-    data: {
+  return res.apiSuccess(
+    {
       version: 'v4.0',
       latest_version: 'v4.0',
       available_versions: ['v4'],
@@ -458,8 +488,9 @@ app.get('/api', (req, res) => {
         decision_analytics: '/api/v4/admin/analytics/decisions/analytics'
       }
     },
-    timestamp: BeijingTimeHelper.apiTimestamp()
-  })
+    'API服务正常',
+    'API_OK'
+  )
 })
 
 /*
@@ -671,7 +702,9 @@ app.use('*', (req, res) => {
         'GET /api/v4/permissions/me'
       ]
     },
-    timestamp: BeijingTimeHelper.apiTimestamp() // 🕐 北京时间API时间戳
+    timestamp: BeijingTimeHelper.apiTimestamp(), // 🕐 北京时间API时间戳
+    version: 'v4.0',
+    request_id: getRequestId(req)
   })
 })
 
@@ -687,50 +720,40 @@ app.use((error, req, res, _next) => {
     error: error.message,
     stack: error.stack,
     url: req.url,
-    method: req.method
+    method: req.method,
+    request_id: getRequestId(req)
   })
 
   // Sequelize错误处理
   if (error.name === 'SequelizeError') {
-    return res.status(500).json({
-      success: false,
-      code: 'DATABASE_ERROR',
-      message: '数据库操作失败',
-      data: null,
-      timestamp: BeijingTimeHelper.apiTimestamp() // 🕐 北京时间API时间戳
-    })
+    const resp = ApiResponse.error('数据库操作失败', 'DATABASE_ERROR', null, 500)
+    resp.request_id = getRequestId(req)
+    return ApiResponse.send(res, resp)
   }
 
   // JWT错误处理
   if (error.name === 'JsonWebTokenError') {
-    return res.status(401).json({
-      success: false,
-      code: 'INVALID_TOKEN',
-      message: 'Token无效',
-      data: null,
-      timestamp: BeijingTimeHelper.apiTimestamp() // 🕐 北京时间API时间戳
-    })
+    const resp = ApiResponse.error('Token无效', 'INVALID_TOKEN', null, 401)
+    resp.request_id = getRequestId(req)
+    return ApiResponse.send(res, resp)
   }
 
   // 验证错误处理
   if (error.name === 'ValidationError') {
-    return res.status(400).json({
-      success: false,
-      code: 'VALIDATION_ERROR',
-      message: error.message,
-      data: null,
-      timestamp: BeijingTimeHelper.apiTimestamp() // 🕐 北京时间API时间戳
-    })
+    const resp = ApiResponse.error(error.message, 'VALIDATION_ERROR', null, 400)
+    resp.request_id = getRequestId(req)
+    return ApiResponse.send(res, resp)
   }
 
   // 默认错误处理
-  res.status(500).json({
-    success: false,
-    code: 'INTERNAL_SERVER_ERROR',
-    message: process.env.NODE_ENV === 'development' ? error.message : '服务器内部错误',
-    data: null,
-    timestamp: BeijingTimeHelper.apiTimestamp() // 🕐 北京时间API时间戳
-  })
+  const resp = ApiResponse.error(
+    process.env.NODE_ENV === 'development' ? error.message : '服务器内部错误',
+    'INTERNAL_SERVER_ERROR',
+    null,
+    500
+  )
+  resp.request_id = getRequestId(req)
+  return ApiResponse.send(res, resp)
 })
 
 // 🔧 初始化Service层（移到这里，确保测试环境也能使用）

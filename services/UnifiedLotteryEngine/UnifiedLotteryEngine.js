@@ -128,7 +128,6 @@ const BasicGuaranteeStrategy = require('./strategies/BasicGuaranteeStrategy')
 const ManagementStrategy = require('./strategies/ManagementStrategy')
 const PerformanceMonitor = require('./utils/PerformanceMonitor')
 const CacheManager = require('./utils/CacheManager')
-const Logger = require('./utils/Logger')
 
 /**
  * V4统一抽奖引擎核心类
@@ -163,7 +162,7 @@ class UnifiedLotteryEngine {
     // 核心组件初始化
     this.performanceMonitor = new PerformanceMonitor()
     this.cacheManager = new CacheManager()
-    this.logger = new Logger()
+    this.logger = require('../../utils/logger').logger
 
     // 策略管理
     this.strategies = new Map()
@@ -1446,7 +1445,7 @@ class UnifiedLotteryEngine {
       const userDrawCounts = {}
       if (user_id) {
         // Step 1: 获取今日开始时间（北京时间00:00:00）
-        const today = require('moment-timezone')().tz('Asia/Shanghai').startOf('day').toDate()
+        const today = BeijingTimeHelper.getTodayStart()
 
         // Step 2: 提取所有活动ID数组，示例：[1, 2, 3, 4, 5]
         const campaignIds = campaigns.map(c => c.campaign_id)
@@ -1637,7 +1636,7 @@ class UnifiedLotteryEngine {
        * 📊 业务场景（Business Scenario）：显示"今日已抽奖3次"，激励用户继续参与
        * 📊 性能评估（Performance）：单次查询耗时约25-30ms
        */
-      const today = require('moment-timezone')().tz('Asia/Shanghai').startOf('day').toDate()
+      const today = BeijingTimeHelper.getTodayStart()
       const todayDraws = await models.LotteryDraw.count({
         where: {
           user_id,

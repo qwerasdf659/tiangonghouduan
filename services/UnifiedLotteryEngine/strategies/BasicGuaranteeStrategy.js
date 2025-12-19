@@ -1,5 +1,4 @@
-const Logger = require('../utils/Logger')
-const _logger = new Logger('BasicGuaranteeStrategy')
+const _logger = require('../../../utils/logger').logger
 
 /**
  * 基础抽奖保底策略
@@ -16,7 +15,6 @@ const _logger = new Logger('BasicGuaranteeStrategy')
 const BeijingTimeHelper = require('../../../utils/timeHelper')
 const LotteryStrategy = require('../core/LotteryStrategy')
 const { LotteryDraw, UserPointsAccount } = require('../../../models')
-const moment = require('moment-timezone')
 // 🎯 V4新增：集成测试账号权限管理
 const { hasTestPrivilege } = require('../../../utils/TestAccountManager')
 // 🔥 V4.3新增：统一积分服务
@@ -127,7 +125,7 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
       }
 
       // 验证今日抽奖次数是否超限
-      const today = moment().tz('Asia/Shanghai').startOf('day').toDate()
+      const today = BeijingTimeHelper.getTodayStart()
       const todayDrawCount = await LotteryDraw.count({
         where: {
           user_id,
@@ -986,7 +984,7 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
       }
 
       // 调用其他验证逻辑（排除积分检查，避免重复）
-      const today = moment().tz('Asia/Shanghai').startOf('day').toDate()
+      const today = BeijingTimeHelper.getTodayStart()
       const todayDrawCount = await LotteryDraw.count({
         where: {
           user_id,
@@ -1548,8 +1546,6 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
    * await strategy.distributePrize(10001, prize, transaction)
    */
   async distributePrize(user_id, prize, transaction = null, options = {}) {
-    const { UserInventory } = require('../../../models')
-
     // 根据奖品类型进行不同的发放逻辑
     switch (prize.prize_type) {
       case 'points':
@@ -1572,43 +1568,27 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
         break
 
       case 'coupon':
-      case 'physical':
-      case 'virtual': {
+      case 'physical': {
         /**
-         * 🔥 双账户模型：虚拟奖品/优惠券/实物奖品发放到用户背包
+         * 🔥 背包双轨架构：优惠券/实物奖品发放到 ItemInstance（不可叠加物品轨）
          *
          * 业务场景：
-         * - 抽奖中奖后，将虚拟奖品（水晶、贵金属）写入用户背包
-         * - 用户可在背包中查看虚拟奖品
-         * - 用户可使用虚拟奖品价值积分在兑换市场兑换商品
-         *
-         * 关键字段：
-         * - virtual_amount: 虚拟奖品数量（如100个水晶）
-         * - virtual_value_points: 虚拟奖品价值积分（用于兑换商品）
-         * - lottery_record_id: 关联的抽奖记录ID
+         * - 抽奖中奖后，将优惠券/实物奖品写入 item_instances 表
+         * - 用户可在背包中查看物品实例
+         * - 每个物品都有独立的 item_instance_id
          */
-        const virtualAmount = prize.virtual_amount || 0
-        const virtualValuePoints = prize.prize_value_points || 0
-        const category = prize.category || 'virtual'
+        const { ItemInstance } = require('../../../models')
 
-        await UserInventory.create(
+        await ItemInstance.create(
           {
-            user_id,
-            name: prize.prize_name,
-            description: prize.prize_description || `抽奖获得：${prize.prize_name}`,
-            type:
-              prize.prize_type === 'coupon'
-                ? 'voucher'
-                : prize.prize_type === 'physical'
-                  ? 'product'
-                  : 'service',
-            value: Math.round(parseFloat(prize.prize_value) || 0),
+            owner_user_id: user_id,
+            item_name: prize.prize_name,
+            item_description: prize.prize_description || `抽奖获得：${prize.prize_name}`,
+            item_type: prize.prize_type === 'coupon' ? 'voucher' : 'product',
+            item_value: Math.round(parseFloat(prize.prize_value) || 0),
             status: 'available',
             source_type: 'lottery',
-            source_id: null, // 后续在recordLotteryHistory中更新
-            virtual_amount: virtualAmount,
-            virtual_value_points: virtualValuePoints,
-            lottery_record_id: null, // 后续在recordLotteryHistory中更新
+            source_id: options.draw_id || null,
             acquisition_method: 'lottery',
             acquisition_cost: this.config.pointsCostPerDraw,
             can_transfer: true,
@@ -1620,16 +1600,35 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
           { transaction }
         )
 
-        this.logInfo('发放虚拟奖品到用户背包', {
+        this.logInfo('发放物品到背包（ItemInstance）', {
           user_id,
           prizeId: prize.prize_id,
           prizeName: prize.prize_name,
           prizeType: prize.prize_type,
-          virtualAmount,
-          virtualValuePoints,
-          category,
           inTransaction: !!transaction
         })
+        break
+      }
+
+      case 'virtual': {
+        /**
+         * 🔥 背包双轨架构：虚拟资产发放到 AssetService（可叠加资产轨）
+         *
+         * 业务场景：
+         * - 抽奖中奖后，虚拟资产（材料/碎片）通过 AssetService 发放
+         * - 自动累加到用户资产余额
+         * - 支持幂等性控制
+         */
+        /*
+         * 虚拟奖品通过材料系统发放（见下方 material_asset_code 逻辑）
+         * 如果没有配置 material_asset_code，则记录警告
+         */
+        if (!prize.material_asset_code) {
+          this.logWarn('虚拟奖品未配置 material_asset_code，跳过发放', {
+            prize_id: prize.prize_id,
+            prize_name: prize.prize_name
+          })
+        }
         break
       }
 

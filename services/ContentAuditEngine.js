@@ -1,5 +1,4 @@
-const Logger = require('../services/UnifiedLotteryEngine/utils/Logger')
-const logger = new Logger('ContentAuditEngine')
+const logger = require('../utils/logger').logger
 
 /**
  * 内容审核引擎（通用审核基础设施层）

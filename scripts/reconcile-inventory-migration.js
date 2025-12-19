@@ -27,9 +27,7 @@ const {
   AssetTransaction,
   RedemptionOrder
 } = require('../models')
-const Logger = require('../services/UnifiedLotteryEngine/utils/Logger')
-
-const logger = new Logger('ReconciliationScript')
+const logger = require('../utils/logger').logger
 
 /**
  * 对账主类

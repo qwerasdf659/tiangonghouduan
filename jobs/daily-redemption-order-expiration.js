@@ -16,9 +16,8 @@
  */
 
 const RedemptionOrderService = require('../services/RedemptionOrderService')
-const Logger = require('../services/UnifiedLotteryEngine/utils/Logger')
 
-const logger = new Logger('DailyRedemptionOrderExpiration')
+const logger = require('../utils/logger').logger
 
 /**
  * 每日兑换订单过期清理任务类

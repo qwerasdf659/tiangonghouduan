@@ -141,7 +141,7 @@ if [ $HEALTH_PERCENTAGE -eq 100 ]; then
     echo "🌐 访问地址:"
     echo "   Web管理后台: http://localhost:3000/"
     echo "   健康检查: http://localhost:3000/health"
-    echo "   API基础路径: http://localhost:3000/api/v2/"
+    echo "   API基础路径: http://localhost:3000/api/v4/"
     echo ""
     echo "🛡️ 稳定性保证:"
     echo "   ✅ PM2托管，独立于终端运行"

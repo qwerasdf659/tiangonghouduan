@@ -1,5 +1,4 @@
-const Logger = require('../services/UnifiedLotteryEngine/utils/Logger')
-const logger = new Logger('dataAccessControl')
+const logger = require('../utils/logger').logger
 
 /**
  * 统一数据访问控制中间件 - V4.0 统一架构版本

@@ -17,9 +17,8 @@
  */
 
 const { AccountAssetBalance, AssetTransaction, Account, Op } = require('../models')
-const Logger = require('../services/UnifiedLotteryEngine/utils/Logger')
 
-const logger = new Logger('DailyAssetReconciliation')
+const logger = require('../utils/logger').logger
 
 /**
  * 每日资产对账任务类

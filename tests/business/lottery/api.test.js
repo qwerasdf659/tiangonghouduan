@@ -19,7 +19,7 @@
  */
 
 const TestCoordinator = require('../../api/TestCoordinator')
-const { TEST_DATA, createTestData } = require('../../helpers/test-data')
+const { TEST_DATA } = require('../../helpers/test-data')
 const BeijingTimeHelper = require('../../../utils/timeHelper')
 
 describe('抽奖系统API测试（V4架构）', () => {
@@ -27,7 +27,6 @@ describe('抽奖系统API测试（V4架构）', () => {
   let test_user_id = null
   // ✅ 修复：统一使用TEST_DATA而非TestConfig.real_data
   const testUser = TEST_DATA.users.testUser
-  const adminUser = TEST_DATA.users.adminUser
 
   /*
    * ==========================================
@@ -99,7 +98,10 @@ describe('抽奖系统API测试（V4架构）', () => {
           expect(campaign).toHaveProperty('campaign_code')
           expect(campaign).toHaveProperty('name')
           expect(campaign).toHaveProperty('status')
-          console.log('✅ 抽奖活动列表:', response.data.data.map(c => c.campaign_code))
+          console.log(
+            '✅ 抽奖活动列表:',
+            response.data.data.map(c => c.campaign_code)
+          )
         }
       }
     })

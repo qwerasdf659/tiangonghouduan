@@ -97,11 +97,10 @@ const BeijingTimeHelper = require('../utils/timeHelper')
 const { UserInventory, TradeRecord, User, Product } = require('../models')
 const { sequelize, Op } = require('../config/database')
 const DataSanitizer = require('./DataSanitizer')
-const Logger = require('./UnifiedLotteryEngine/utils/Logger')
 const { getUserRoles } = require('../middleware/auth')
 const AuditLogService = require('./AuditLogService')
 
-const logger = new Logger('InventoryService')
+const logger = require('../utils/logger').logger
 
 /**
  * 🎯 统一数据输出视图常量（Data Output View Constants）

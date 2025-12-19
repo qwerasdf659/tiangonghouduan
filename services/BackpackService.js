@@ -22,9 +22,8 @@
 
 const { ItemInstance, MaterialAssetType, sequelize } = require('../models')
 const AssetService = require('./AssetService')
-const Logger = require('./UnifiedLotteryEngine/utils/Logger')
 
-const logger = new Logger('BackpackService')
+const logger = require('../utils/logger').logger
 
 /**
  * 背包服务类

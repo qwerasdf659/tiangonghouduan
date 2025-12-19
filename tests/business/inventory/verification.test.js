@@ -24,9 +24,8 @@
  */
 
 const TestCoordinator = require('../../api/TestCoordinator')
-const moment = require('moment-timezone')
-const { UserInventory, User } = require('../../../models')
 const BeijingTimeHelper = require('../../../utils/timeHelper')
+const { UserInventory, User } = require('../../../models')
 const { TEST_DATA } = require('../../helpers/test-data')
 
 describe('核销验证API测试套件（Inventory Verification API Test Suite）', () => {
@@ -45,7 +44,7 @@ describe('核销验证API测试套件（Inventory Verification API Test Suite）
     console.log('🚀 核销验证API测试套件启动（Inventory Verification API Test Suite Started）')
     console.log('='.repeat(70))
     console.log(
-      `📅 测试时间（Test Time）: ${moment().tz('Asia/Shanghai').format('YYYY-MM-DD HH:mm:ss')} (北京时间)`
+      `📅 测试时间（Test Time）: ${BeijingTimeHelper.toBeijingTime(new Date())} (北京时间)`
     )
     console.log(`📱 测试账号（Test Account）: ${test_account.mobile}`)
     console.log('='.repeat(70))
@@ -313,7 +312,10 @@ describe('核销验证API测试套件（Inventory Verification API Test Suite）
       console.log('✅ 核销码过期验证测试通过')
 
       // 清理测试数据
-      await UserInventory.destroy({ where: { inventory_id: expiredItem.inventory_id }, force: true })
+      await UserInventory.destroy({
+        where: { inventory_id: expiredItem.inventory_id },
+        force: true
+      })
     })
   })
 
@@ -324,7 +326,9 @@ describe('核销验证API测试套件（Inventory Verification API Test Suite）
    */
   describe('数据完整性验证（Data Integrity Verification）', () => {
     test('核销后数据库字段完整性检查', async () => {
-      console.log('\n🔍 测试：核销后数据库字段完整性（Database Field Integrity After Verification）')
+      console.log(
+        '\n🔍 测试：核销后数据库字段完整性（Database Field Integrity After Verification）'
+      )
 
       // 创建新的测试核销码
       const newItem = await UserInventory.create({

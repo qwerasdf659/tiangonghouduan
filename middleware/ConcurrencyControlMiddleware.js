@@ -1,5 +1,4 @@
-const Logger = require('../services/UnifiedLotteryEngine/utils/Logger')
-const logger = new Logger('ConcurrencyControlMiddleware')
+const logger = require('../utils/logger').logger
 
 /**
  * 并发控制中间件 V4

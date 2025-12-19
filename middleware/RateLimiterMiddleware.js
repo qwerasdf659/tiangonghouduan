@@ -1,5 +1,4 @@
-const Logger = require('../services/UnifiedLotteryEngine/utils/Logger')
-const logger = new Logger('RateLimiterMiddleware')
+const logger = require('../utils/logger').logger
 
 /**
  * API请求频率限制中间件 V4
@@ -17,6 +16,7 @@ const logger = new Logger('RateLimiterMiddleware')
 const BeijingTimeHelper = require('../utils/timeHelper')
 const { getRedisClient } = require('../utils/UnifiedRedisClient')
 const ApiResponse = require('../utils/ApiResponse')
+const crypto = require('crypto')
 
 /**
  * API 请求频率限制中间件（Rate Limiter Middleware）
@@ -164,7 +164,9 @@ class RateLimiterMiddleware {
           }
 
           // 记录限流日志
-          logger.warn('[RateLimiter] 限流触发', {
+          logger.warn('[RateLimiter] Redis主限流触发', {
+            limiter_type: 'redis_primary',
+            redis_status: 'connected',
             key: limitKey,
             current: requestCount,
             limit: config.max,
@@ -177,23 +179,23 @@ class RateLimiterMiddleware {
           })
 
           // 返回429错误
-          return res.status(429).json(
-            ApiResponse.error(
-              config.message,
-              'RATE_LIMIT_EXCEEDED',
-              {
-                limit: config.max,
-                window_seconds: config.windowMs / 1000,
-                retry_after: retryAfter,
-                current: requestCount
-              },
-              -429
-            )
+          const resp = ApiResponse.error(
+            config.message,
+            'RATE_LIMIT_EXCEEDED',
+            {
+              limit: config.max,
+              window_seconds: config.windowMs / 1000,
+              retry_after: retryAfter,
+              current: requestCount
+            },
+            429
           )
+          resp.request_id = req.id || req.headers['x-request-id'] || `req_${crypto.randomUUID()}`
+          return res.status(429).json(resp)
         }
 
         // 4. 记录本次请求
-        const requestId = `${now}_${Math.random().toString(36).substr(2, 9)}`
+        const requestId = `${now}_${crypto.randomUUID()}`
         await this.redisClient.zadd(limitKey, now, requestId)
 
         // 5. 设置key过期时间（窗口大小的2倍，防止内存泄漏）

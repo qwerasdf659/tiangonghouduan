@@ -1,5 +1,4 @@
-const Logger = require('./Logger')
-const _logger = new Logger('CacheManager')
+const _logger = require('../../../utils/logger').logger
 
 /**
  * 缓存管理器

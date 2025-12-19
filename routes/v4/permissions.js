@@ -11,8 +11,7 @@ const router = express.Router()
 const { authenticateToken, getUserRoles } = require('../../middleware/auth')
 const permission_module = require('../../modules/UserPermissionModule')
 const permissionAuditLogger = require('../../utils/PermissionAuditLogger') // 🔒 P1修复：审计日志系统
-const Logger = require('../../services/UnifiedLotteryEngine/utils/Logger')
-const logger = Logger.create('PermissionsRoute')
+const logger = require('../../utils/logger').logger
 
 /**
  * 🛡️ P2修复：参数标准化验证中间件
@@ -238,7 +237,7 @@ router.post('/refresh', authenticateToken, async (req, res) => {
 
     // 🔄 清除权限缓存
     const { invalidateUserPermissions } = require('../../middleware/auth')
-    await invalidateUserPermissions(user_id, 'manual_refresh')
+    await invalidateUserPermissions(user_id, 'manual_refresh', request_user_id)
 
     // 🔒 记录审计日志
     await permissionAuditLogger.logPermissionChange({

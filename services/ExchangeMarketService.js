@@ -1,9 +1,8 @@
-const Logger = require('../services/UnifiedLotteryEngine/utils/Logger')
-const logger = new Logger('ExchangeMarketService')
+const logger = require('../utils/logger').logger
 
 /**
  * 餐厅积分抽奖系统 V4.5.0 - 兑换市场服务（ExchangeMarketService）
- * 🔥 Phase 3已迁移：使用统一账本（AssetService）扣减材料资产
+ * 材料资产支付兑换市场核心服务（V4.5.0统一版）
  *
  * 业务场景：用户使用材料资产兑换实物商品
  *
@@ -12,66 +11,51 @@ const logger = new Logger('ExchangeMarketService')
  * 2. 商品兑换（使用材料资产支付：cost_asset_code + cost_amount）
  * 3. 订单管理（查询订单、订单详情）
  *
- * Phase 3改造要点：
- * - ✅ 使用AssetService.changeBalance()替代MaterialService.consume()
- * - ✅ 业务类型：exchange_debit（兑换市场材料扣减）
- * - ✅ 统一business_id：订单级幂等键，不再使用_material_deduct后缀
- * - ✅ 余额来源：统一从account_asset_balances读取，不再依赖旧余额表
- * - ✅ 409冲突检查：已在ExchangeMarketService层实现，参数不同返回409
- *
- * 支付方式（V4.5.0）：
+ * 支付方式（V4.5.0唯一方式）：
  * - ✅ 材料资产支付：从统一账本扣除材料资产（cost_asset_code + cost_amount）
- * - ❌ 积分支付：已废弃，不再支持
- * - ❌ 混合支付：已废弃，不再支持
- * - ❌ 虚拟奖品支付：已废弃，统一为材料资产支付
+ * - ✅ 材料扣减通过 AssetService.changeBalance() 执行
+ * - ✅ 业务类型：exchange_debit（兑换市场材料扣减）
+ * - ✅ 支持幂等性控制（business_id 唯一约束）
  *
  * 业务规则（强制）：
  * - ✅ 兑换只能使用材料资产（必须配置cost_asset_code和cost_amount）
- * - ❌ 禁止扣除 available_points（显示积分）
- * - ❌ 禁止检查/扣除 remaining_budget_points（预算积分）
- * - ✅ points_paid 必须强制为 0
- * - ✅ payment_type 必须为 'material'（材料资产支付）
+ * - ✅ 所有材料变动必须有流水记录（asset_transactions表）
+ * - ✅ 订单必须记录pay_asset_code和pay_amount用于对账
  *
  * 业务流程：
  *
  * 1. **用户查看商品列表**
  *    - 调用getMarketItems() → 返回可兑换商品列表
- *    - 前端展示商品信息（名称、价格、库存）
+ *    - 前端展示商品信息（名称、材料成本、库存）
  *
  * 2. **用户兑换商品流程**
  *    - 用户选择商品和数量
- *    - 调用exchangeItem() → 检查库存 → 检查虚拟奖品价值
- *    - 扣除虚拟奖品价值 → 创建订单 → 扣减库存
+ *    - 调用exchangeItem() → 检查库存 → 检查材料资产余额
+ *    - 扣除材料资产 → 创建订单 → 扣减库存
  *    - 返回订单信息
  *
  * 3. **订单查询流程**
  *    - 调用getUserOrders() → 返回用户订单列表
  *    - 支持状态筛选（pending/completed/shipped/cancelled）
  *
- * 职责定位（与其他服务的区别）：
- * - **应用层服务**：专注新兑换市场业务（ExchangeItem + ExchangeMarketRecord）
- * - **与ExchangeOperationService的区别**：
- *   - （已删除）ExchangeOperationService：处理旧兑换系统（ExchangeRecords）的运营管理
- *   - ExchangeMarketService：处理新兑换市场（ExchangeItem）的用户兑换业务
- *
  * 数据模型关联：
- * - ExchangeItem：兑换市场商品表（price_type='virtual', virtual_value_price, points_price仅展示）
- * - ExchangeMarketRecord：兑换订单表（payment_type='virtual', virtual_value_paid, points_paid=0）
- * - UserInventory：用户库存表（虚拟奖品存储，virtual_value_points）
- * - UserPointsAccount：积分账户表（available_points - 兑换时不扣除）
+ * - ExchangeItem：兑换市场商品表（cost_asset_code + cost_amount）
+ * - ExchangeMarketRecord：兑换订单表（pay_asset_code + pay_amount）
+ * - Account + AccountAssetBalance：统一资产账本（通过 AssetService 操作）
+ * - AssetTransaction：资产流水表（所有材料变动记录）
  *
  * 业务规则：
- * - 虚拟奖品价值从背包扣除（抽奖时已扣除预算积分）
+ * - 材料资产从统一账本扣除（AssetService.changeBalance）
  * - 兑换时使用事务确保原子性（扣除+创建订单+扣减库存）
  * - 商品库存不足时拒绝兑换
- * - 订单号格式：EM{timestamp}{random}（EM = Exchange Market）
+ * - 订单号格式：EXC{timestamp}{random}
  *
  * 创建时间：2025年12月06日
- * 最后修改：2025年12月08日 - 删除points/mixed支付方式，统一为virtual
+ * 最后修改：2025年12月18日 - 暴力移除旧方案，统一为材料资产支付
  * 使用模型：Claude Sonnet 4.5
  */
 
-const { ExchangeItem, ExchangeMarketRecord, UserInventory, sequelize } = require('../models')
+const { ExchangeItem, ExchangeMarketRecord, sequelize } = require('../models')
 const { Op } = require('sequelize')
 const BeijingTimeHelper = require('../utils/timeHelper')
 
@@ -118,11 +102,10 @@ const EXCHANGE_MARKET_ATTRIBUTES = {
    */
   marketItemView: [
     'item_id', // 商品ID（Item ID）
-    'item_name', // 商品名称（Item Name）
-    'item_description', // 商品描述（Item Description）
-    'price_type', // 支付方式：virtual/points/mixed（Price Type）
-    'virtual_value_price', // 虚拟价值价格（Virtual Value Price）
-    'points_price', // 积分价格（Points Price）
+    'name', // 商品名称（Name）
+    'description', // 商品描述（Description）
+    'cost_asset_code', // 材料资产代码（Cost Asset Code）
+    'cost_amount', // 材料成本数量（Cost Amount）
     'stock', // 库存（Stock）
     'sort_order', // 排序（Sort Order）
     'status', // 状态：active/inactive（Status）
@@ -136,11 +119,10 @@ const EXCHANGE_MARKET_ATTRIBUTES = {
    */
   marketItemDetailView: [
     'item_id', // 商品ID（Item ID）
-    'item_name', // 商品名称（Item Name）
-    'item_description', // 商品描述（Item Description）
-    'price_type', // 支付方式（Price Type）
-    'virtual_value_price', // 虚拟价值价格（Virtual Value Price）
-    'points_price', // 积分价格（Points Price）
+    'name', // 商品名称（Name）
+    'description', // 商品描述（Description）
+    'cost_asset_code', // 材料资产代码（Cost Asset Code）
+    'cost_amount', // 材料成本数量（Cost Amount）
     'stock', // 库存（Stock）
     'total_exchange_count', // 总兑换次数（Total Exchange Count - 展示商品热度）
     'sort_order', // 排序（Sort Order）
@@ -158,9 +140,8 @@ const EXCHANGE_MARKET_ATTRIBUTES = {
     'item_id', // 商品ID（Item ID）
     'item_name', // 商品名称（Item Name）
     'item_description', // 商品描述（Item Description）
-    'price_type', // 支付方式（Price Type）
-    'virtual_value_price', // 虚拟价值价格（Virtual Value Price）
-    'points_price', // 积分价格（Points Price）
+    'cost_asset_code', // 材料资产代码（Cost Asset Code）
+    'cost_amount', // 材料成本数量（Cost Amount）
     'cost_price', // 成本价（Cost Price - 敏感信息，仅管理员可见）
     'stock', // 库存（Stock）
     'total_exchange_count', // 总兑换次数（Total Exchange Count）
@@ -182,9 +163,8 @@ const EXCHANGE_MARKET_ATTRIBUTES = {
     'item_id', // 商品ID（Item ID）
     'item_snapshot', // 商品快照（Item Snapshot）
     'quantity', // 数量（Quantity）
-    'payment_type', // 支付方式：virtual/points/mixed（Payment Type）
-    'virtual_value_paid', // 虚拟价值支付（Virtual Value Paid）
-    'points_paid', // 积分支付（Points Paid）
+    'pay_asset_code', // 支付资产代码（Pay Asset Code）
+    'pay_amount', // 支付数量（Pay Amount）
     'status', // 状态：pending/completed/shipped/cancelled（Status）
     'exchange_time', // 兑换时间（Exchange Time）
     'shipped_at', // 发货时间（Shipped At）
@@ -204,9 +184,8 @@ const EXCHANGE_MARKET_ATTRIBUTES = {
     'item_id', // 商品ID（Item ID）
     'item_snapshot', // 商品快照（Item Snapshot）
     'quantity', // 数量（Quantity）
-    'payment_type', // 支付方式（Payment Type）
-    'virtual_value_paid', // 虚拟价值支付（Virtual Value Paid）
-    'points_paid', // 积分支付（Points Paid）
+    'pay_asset_code', // 支付资产代码（Pay Asset Code）
+    'pay_amount', // 支付数量（Pay Amount）
     'total_cost', // 总成本（Total Cost - 敏感信息，仅管理员可见）
     'status', // 状态（Status）
     'admin_remark', // 管理员备注（Admin Remark - 敏感信息，仅管理员可见）
@@ -241,7 +220,7 @@ class ExchangeMarketService {
   static async getMarketItems(options = {}) {
     const {
       status = 'active',
-      price_type = null,
+      asset_code = null,
       page = 1,
       page_size = 20,
       sort_by = 'sort_order',
@@ -249,12 +228,12 @@ class ExchangeMarketService {
     } = options
 
     try {
-      logger.info('[兑换市场] 查询商品列表', { status, price_type, page, page_size })
+      logger.info('[兑换市场] 查询商品列表', { status, asset_code, page, page_size })
 
       // 构建查询条件
       const where = { status }
-      if (price_type) {
-        where.price_type = price_type
+      if (asset_code) {
+        where.cost_asset_code = asset_code
       }
 
       // 分页参数
@@ -321,9 +300,7 @@ class ExchangeMarketService {
    * 兑换商品（核心业务逻辑）
    * V4.5.0 材料资产支付版本（2025-12-15）
    *
-   * 支付方式改造：
-   * - 旧版：从UserInventory扣除虚拟奖品价值（virtual_value_price）
-   * - 新版：使用AssetService扣减材料资产（cost_asset_code + cost_amount）
+   * 支付方式：使用AssetService扣减材料资产（cost_asset_code + cost_amount）
    *
    * @param {number} user_id - 用户ID
    * @param {number} item_id - 商品ID
@@ -442,10 +419,6 @@ class ExchangeMarketService {
             quantity: existingOrder.quantity,
             pay_asset_code: existingOrder.pay_asset_code,
             pay_amount: existingOrder.pay_amount,
-            // 保留旧字段用于兼容
-            payment_type: existingOrder.payment_type,
-            virtual_value_paid: existingOrder.virtual_value_paid,
-            points_paid: existingOrder.points_paid,
             status: existingOrder.status
           },
           remaining: {
@@ -590,20 +563,12 @@ class ExchangeMarketService {
               item_name: item.name,
               item_description: item.description,
               cost_asset_code: item.cost_asset_code,
-              cost_amount: item.cost_amount,
-              // 保留旧字段用于兼容
-              price_type: item.price_type,
-              virtual_value_price: item.virtual_value_price,
-              points_price: item.points_price
+              cost_amount: item.cost_amount
             },
             quantity,
-            // V4.5.0 新字段：材料资产支付
+            // V4.5.0 材料资产支付（唯一支付方式）
             pay_asset_code: item.cost_asset_code,
             pay_amount: totalPayAmount,
-            // 旧字段保留但设为默认值（用于回滚兼容）
-            payment_type: 'virtual',
-            virtual_value_paid: 0,
-            points_paid: 0,
             total_cost: (item.cost_price || 0) * quantity,
             status: 'pending',
             exchange_time: BeijingTimeHelper.createDatabaseTime()
@@ -878,106 +843,6 @@ class ExchangeMarketService {
   }
 
   /**
-   * 获取用户虚拟奖品总价值（私有方法）
-   * @deprecated V4.5.0: 已废弃，兑换市场改为使用材料资产系统（AssetService）
-   * 保留此方法仅用于数据回滚和向后兼容，不建议在新代码中使用
-   *
-   * @param {number} user_id - 用户ID
-   * @param {Transaction} [transaction] - 事务对象
-   * @returns {Promise<number>} 虚拟奖品总价值
-   * @private
-   */
-  static async _getUserTotalVirtualValue(user_id, transaction = null) {
-    logger.warn(
-      '[兑换市场] ⚠️ 警告：_getUserTotalVirtualValue已废弃（V4.5.0），请使用AssetService.getBalance代替'
-    )
-
-    const result = await UserInventory.sum('value', {
-      where: {
-        user_id,
-        source_type: 'lottery', // 抽奖获得的虚拟奖品
-        status: 'available',
-        value: { [Op.gt]: 0 } // 只统计有价值的虚拟奖品
-      },
-      transaction
-    })
-
-    return result || 0
-  }
-
-  /**
-   * 扣除用户虚拟奖品价值（私有方法）
-   * @deprecated V4.5.0: 已废弃，兑换市场改为使用材料资产系统（AssetService）
-   * 保留此方法仅用于数据回滚和向后兼容，不建议在新代码中使用
-   *
-   * @param {number} user_id - 用户ID
-   * @param {number} value_to_deduct - 要扣除的价值
-   * @param {Transaction} transaction - 事务对象
-   * @returns {Promise<void>} 无返回值，在事务中扣除库存中的虚拟价值
-   * @private
-   */
-  static async _deductVirtualValue(user_id, value_to_deduct, transaction) {
-    logger.warn(
-      '[兑换市场] ⚠️ 警告：_deductVirtualValue已废弃（V4.5.0），请使用AssetService.changeBalance代替'
-    )
-
-    // 获取用户所有可用的虚拟奖品（按价值升序，优先消耗小额）
-    const virtualPrizes = await UserInventory.findAll({
-      where: {
-        user_id,
-        source_type: 'lottery', // 抽奖获得的虚拟奖品
-        status: 'available',
-        value: { [Op.gt]: 0 }
-      },
-      order: [['value', 'ASC']],
-      lock: transaction.LOCK.UPDATE,
-      transaction
-    })
-
-    logger.info(
-      `[兑换市场] 查询到 ${virtualPrizes.length} 个可用虚拟奖品，总价值: ${virtualPrizes.reduce((sum, p) => sum + (p.value || 0), 0)}`
-    )
-
-    let remaining = value_to_deduct
-
-    for (const prize of virtualPrizes) {
-      if (remaining <= 0) break
-
-      const prizeValue = prize.value || 0
-
-      if (prizeValue <= remaining) {
-        // 完全消耗这个奖品
-        // eslint-disable-next-line no-await-in-loop -- Sequential processing required for transaction consistency
-        await prize.update(
-          {
-            status: 'used',
-            used_at: BeijingTimeHelper.createDatabaseTime()
-          },
-          { transaction }
-        )
-        remaining -= prizeValue
-        logger.info(
-          `[兑换市场] 消耗虚拟奖品 inventory_id=${prize.inventory_id}, value=${prizeValue}, 剩余需求=${remaining}`
-        )
-      } else {
-        /*
-         * 部分消耗（如果虚拟奖品支持部分使用）
-         * 注意：当前设计中虚拟奖品不支持部分使用，如果需要支持需要调整逻辑
-         */
-        logger.warn(
-          `[兑换市场] 虚拟奖品${prize.inventory_id}价值${prizeValue}大于剩余需求${remaining}，但当前不支持部分使用`
-        )
-      }
-    }
-
-    if (remaining > 0) {
-      throw new Error(`虚拟奖品价值不足，还需要${remaining}`)
-    }
-
-    logger.info(`[兑换市场] 扣除虚拟奖品价值成功：${value_to_deduct}`)
-  }
-
-  /**
    * 生成订单号（私有方法）
    *
    * @returns {string} 订单号
@@ -1008,11 +873,10 @@ class ExchangeMarketService {
           ExchangeMarketRecord.count({ where: { status: 'cancelled' } })
         ])
 
-      // 查询总兑换额
-      const [totalVirtualValue, totalPoints] = await Promise.all([
-        ExchangeMarketRecord.sum('virtual_value_paid'),
-        ExchangeMarketRecord.sum('points_paid')
-      ])
+      // 查询材料资产消耗统计
+      const totalMaterialCost = await ExchangeMarketRecord.sum('pay_amount', {
+        where: { pay_asset_code: { [Op.ne]: null } }
+      })
 
       // 查询商品库存统计
       const itemStats = await ExchangeItem.findAll({
@@ -1034,9 +898,8 @@ class ExchangeMarketService {
             shipped: shippedOrders,
             cancelled: cancelledOrders
           },
-          revenue: {
-            total_virtual_value: totalVirtualValue || 0,
-            total_points: totalPoints || 0
+          material_consumption: {
+            total_amount: totalMaterialCost || 0
           },
           items: itemStats
         },
@@ -1051,12 +914,14 @@ class ExchangeMarketService {
   /**
    * 创建兑换商品（管理员操作）
    *
+   * 创建兑换商品（管理员操作）
+   * V4.5.0 材料资产支付版本
+   *
    * @param {Object} itemData - 商品数据
    * @param {string} itemData.item_name - 商品名称
    * @param {string} [itemData.item_description] - 商品描述
-   * @param {string} itemData.price_type - 支付方式（virtual）
-   * @param {number} itemData.virtual_value_price - 虚拟价值价格
-   * @param {number} [itemData.points_price] - 积分价格（仅展示）
+   * @param {string} itemData.cost_asset_code - 材料资产代码（如 'red_shard'）
+   * @param {number} itemData.cost_amount - 材料资产数量（必填，>0）
    * @param {number} itemData.cost_price - 成本价
    * @param {number} itemData.stock - 初始库存
    * @param {number} [itemData.sort_order=100] - 排序号
@@ -1084,12 +949,13 @@ class ExchangeMarketService {
         throw new Error('商品描述最长500字符')
       }
 
-      if (itemData.price_type !== 'virtual') {
-        throw new Error('无效的price_type参数，当前只支持 virtual（虚拟奖品价值支付）')
+      // V4.5.0：材料资产支付必填校验
+      if (!itemData.cost_asset_code) {
+        throw new Error('材料资产代码（cost_asset_code）不能为空')
       }
 
-      if (!itemData.virtual_value_price || itemData.virtual_value_price <= 0) {
-        throw new Error('虚拟价值价格必须大于0')
+      if (!itemData.cost_amount || itemData.cost_amount <= 0) {
+        throw new Error('材料成本数量（cost_amount）必须大于0')
       }
 
       if (itemData.cost_price === undefined || itemData.cost_price < 0) {
@@ -1105,13 +971,12 @@ class ExchangeMarketService {
         throw new Error(`无效的status参数，允许值：${validStatuses.join(', ')}`)
       }
 
-      // 创建商品
+      // 创建商品（V4.5.0材料资产支付）
       const item = await ExchangeItem.create({
         item_name: itemData.item_name.trim(),
         item_description: itemData.item_description ? itemData.item_description.trim() : '',
-        price_type: itemData.price_type,
-        virtual_value_price: parseFloat(itemData.virtual_value_price) || 0,
-        points_price: parseInt(itemData.points_price) || 0,
+        cost_asset_code: itemData.cost_asset_code,
+        cost_amount: parseInt(itemData.cost_amount) || 0,
         cost_price: parseFloat(itemData.cost_price),
         stock: parseInt(itemData.stock),
         sort_order: parseInt(itemData.sort_order) || 100,
@@ -1170,25 +1035,19 @@ class ExchangeMarketService {
         finalUpdateData.item_description = updateData.item_description.trim()
       }
 
-      if (updateData.price_type !== undefined) {
-        if (updateData.price_type !== 'virtual') {
-          throw new Error('无效的price_type参数，当前只支持 virtual（虚拟奖品价值支付）')
+      // V4.5.0：材料资产支付字段更新
+      if (updateData.cost_asset_code !== undefined) {
+        if (!updateData.cost_asset_code) {
+          throw new Error('材料资产代码不能为空')
         }
-        finalUpdateData.price_type = updateData.price_type
+        finalUpdateData.cost_asset_code = updateData.cost_asset_code
       }
 
-      if (updateData.virtual_value_price !== undefined) {
-        if (updateData.virtual_value_price < 0) {
-          throw new Error('虚拟价值价格必须大于等于0')
+      if (updateData.cost_amount !== undefined) {
+        if (updateData.cost_amount <= 0) {
+          throw new Error('材料成本数量必须大于0')
         }
-        finalUpdateData.virtual_value_price = parseFloat(updateData.virtual_value_price)
-      }
-
-      if (updateData.points_price !== undefined) {
-        if (updateData.points_price < 0) {
-          throw new Error('积分价格必须大于等于0')
-        }
-        finalUpdateData.points_price = parseInt(updateData.points_price)
+        finalUpdateData.cost_amount = parseInt(updateData.cost_amount)
       }
 
       if (updateData.cost_price !== undefined) {

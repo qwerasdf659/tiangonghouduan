@@ -1,5 +1,4 @@
-const Logger = require('../services/UnifiedLotteryEngine/utils/Logger')
-const logger = new Logger('index')
+const logger = require('../utils/logger').logger
 
 /**
  * 服务管理器 - V4统一版本
@@ -15,7 +14,6 @@ const { UnifiedLotteryEngine } = require('./UnifiedLotteryEngine/UnifiedLotteryE
 const { ThumbnailService } = require('./ThumbnailService') // 🎯 导入类
 
 // V4 领域服务
-const InventoryService = require('./InventoryService')
 const PointsService = require('./PointsService')
 const ExchangeMarketService = require('./ExchangeMarketService')
 const ContentAuditEngine = require('./ContentAuditEngine')
@@ -190,7 +188,6 @@ class ServiceManager {
       this._services.set('thumbnail', new ThumbnailService(this.models))
 
       // ✅ 注册领域服务（Domain Services）
-      this._services.set('inventory', InventoryService)
       this._services.set('points', PointsService)
       this._services.set('exchangeMarket', ExchangeMarketService)
       this._services.set('contentAudit', ContentAuditEngine)

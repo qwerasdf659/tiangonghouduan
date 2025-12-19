@@ -69,7 +69,6 @@
 const models = require('../../models')
 const { Op } = require('sequelize')
 const BeijingTimeHelper = require('../../utils/timeHelper')
-const Logger = require('../UnifiedLotteryEngine/utils/Logger')
 
 /**
  * 抽奖历史服务类
@@ -159,7 +158,7 @@ class LotteryHistoryService {
    * logger.info('抽奖历史服务已初始化')
    */
   constructor() {
-    this.logger = Logger.create('LotteryHistoryService')
+    this.logger = require('../../utils/logger').logger
   }
 
   /**

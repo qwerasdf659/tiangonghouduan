@@ -11,10 +11,11 @@
  * 4. 向后兼容 - 不影响现有REST API
  */
 
-// ⚡ 引入统一日志系统（2025年01月21日新增）
-const Logger = require('./UnifiedLotteryEngine/utils/Logger')
-const wsLogger = Logger.create('WebSocket')
-// 🕐 引入北京时间工具（2025年10月12日新增 - 时区统一）
+/**
+ * ⚡ 引入统一日志系统（2025年01月21日新增）
+ * 🕐 引入北京时间工具（2025年10月12日新增 - 时区统一）
+ */
+const wsLogger = require('../utils/logger').logger
 const BeijingTimeHelper = require('../utils/timeHelper')
 
 /**

@@ -20,7 +20,7 @@
  */
 
 const TestCoordinator = require('../../api/TestCoordinator')
-const moment = require('moment-timezone')
+const BeijingTimeHelper = require('../../../utils/timeHelper')
 const { TEST_DATA } = require('../../helpers/test-data')
 
 describe('消费记录API测试套件', () => {
@@ -37,9 +37,7 @@ describe('消费记录API测试套件', () => {
   beforeAll(async () => {
     console.log('🚀 消费记录API测试套件启动')
     console.log('='.repeat(70))
-    console.log(
-      `📅 测试时间: ${moment().tz('Asia/Shanghai').format('YYYY-MM-DD HH:mm:ss')} (北京时间)`
-    )
+    console.log(`📅 测试时间: ${BeijingTimeHelper.toBeijingTime(new Date())} (北京时间)`)
     console.log(`📱 测试账号: ${test_account.mobile}`)
     console.log('='.repeat(70))
 

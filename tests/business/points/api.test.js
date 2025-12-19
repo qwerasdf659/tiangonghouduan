@@ -19,7 +19,7 @@
 
 const request = require('supertest')
 const app = require('../../../app')
-const { TEST_DATA, createTestData } = require('../../helpers/test-data')
+const { TEST_DATA } = require('../../helpers/test-data')
 const BeijingTimeHelper = require('../../../utils/timeHelper')
 
 /*
@@ -432,9 +432,7 @@ describe('积分系统API测试（V4架构）', () => {
 
   describe('API认证测试', () => {
     test('应该拒绝未认证的请求 - GET /api/v4/user/points', async () => {
-      const response = await request(app)
-        .get('/api/v4/user/points')
-        .expect(401)
+      const response = await request(app).get('/api/v4/user/points').expect(401)
 
       expect(response.body).toHaveProperty('success', false)
       expect(response.body.code).toMatch(/AUTH|UNAUTHORIZED/i)

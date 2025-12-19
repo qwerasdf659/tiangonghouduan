@@ -116,12 +116,11 @@
  */
 
 const BeijingTimeHelper = require('../utils/timeHelper')
-const Logger = require('./UnifiedLotteryEngine/utils/Logger')
 const models = require('../models')
 const { SystemSettings, sequelize } = models
 const { Op } = require('sequelize')
 
-const logger = new Logger('AdminSystemService')
+const logger = require('../utils/logger').logger
 
 /**
  * 管理后台系统监控服务类

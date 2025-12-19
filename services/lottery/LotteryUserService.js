@@ -1,5 +1,4 @@
-const Logger = require('../UnifiedLotteryEngine/utils/Logger')
-const logger = new Logger('LotteryUserService')
+const logger = require('../../utils/logger').logger
 
 /**
  * 抽奖用户服务 - V4.0 UUID角色系统版本

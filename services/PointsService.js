@@ -1,5 +1,4 @@
-const Logger = require('../services/UnifiedLotteryEngine/utils/Logger')
-const logger = new Logger('PointsService')
+const logger = require('../utils/logger').logger
 
 /**
  * 餐厅积分抽奖系统 V4.0统一引擎架构 - 积分服务（PointsService）
@@ -2018,7 +2017,7 @@ class PointsService {
    * @returns {Object} result.inventory - 库存统计（Inventory Statistics）
    */
   static async getUserFullStatistics(userId) {
-    const { LotteryDraw, ConsumptionRecord, UserInventory } = require('../models')
+    const { LotteryDraw, ConsumptionRecord, ItemInstance } = require('../models')
     const sequelize = UserPointsAccount.sequelize
 
     // 本月第一天0点(北京时间)
@@ -2036,8 +2035,8 @@ class PointsService {
       // 2. 消费统计（Consumption Statistics）
       this._getConsumptionStats(userId, ConsumptionRecord, monthStart, sequelize),
 
-      // 3. 库存统计（Inventory Statistics）
-      this._getInventoryStats(userId, UserInventory)
+      // 3. 库存统计（Inventory Statistics - 使用新表 ItemInstance）
+      this._getInventoryStats(userId, ItemInstance)
     ])
 
     return {
@@ -2155,22 +2154,22 @@ class PointsService {
   }
 
   /**
-   * 🔒 私有方法 - 获取库存统计
+   * 🔒 私有方法 - 获取库存统计（使用新表 ItemInstance）
    * @private
    * @param {number} userId - 用户ID
-   * @param {Object} UserInventory - 用户库存模型
+   * @param {Object} ItemInstance - 物品实例模型（新背包双轨架构）
    * @returns {Promise<Object>} 库存统计数据
    */
-  static async _getInventoryStats(userId, UserInventory) {
+  static async _getInventoryStats(userId, ItemInstance) {
     const [totalCount, availableCount, usedCount] = await Promise.all([
       // 总物品数（Total items count）
-      UserInventory.count({ where: { user_id: userId } }),
+      ItemInstance.count({ where: { owner_user_id: userId } }),
 
       // 可用物品数（Available items count）
-      UserInventory.count({ where: { user_id: userId, status: 'available' } }),
+      ItemInstance.count({ where: { owner_user_id: userId, status: 'available' } }),
 
       // 已使用物品数（Used items count）
-      UserInventory.count({ where: { user_id: userId, status: 'used' } })
+      ItemInstance.count({ where: { owner_user_id: userId, status: 'used' } })
     ])
 
     return {

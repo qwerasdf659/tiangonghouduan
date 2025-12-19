@@ -21,7 +21,13 @@
 
 'use strict'
 
-const { UserPointsAccount, PointsTransaction, LotteryDraw, LotteryPrize, User } = require('../../models')
+const {
+  UserPointsAccount,
+  PointsTransaction,
+  LotteryDraw,
+  LotteryPrize,
+  User
+} = require('../../models')
 const { Op: _Op } = require('sequelize') // 保留供未来使用
 const BeijingTimeHelper = require('../../utils/timeHelper')
 const inquirer = require('inquirer')
@@ -38,7 +44,7 @@ const colors = {
   magenta: '\x1b[35m'
 }
 
-function log (message, color = 'reset') {
+function log(message, color = 'reset') {
   console.log(`${colors[color]}${message}${colors.reset}`)
 }
 
@@ -47,7 +53,7 @@ function log (message, color = 'reset') {
 /**
  * 诊断用户积分问题
  */
-async function diagnoseUserPointsIssue (mobile = null) {
+async function diagnoseUserPointsIssue(mobile = null) {
   log('\n🔍 诊断用户积分问题', 'cyan')
   log('='.repeat(60), 'cyan')
 
@@ -59,7 +65,7 @@ async function diagnoseUserPointsIssue (mobile = null) {
           type: 'input',
           name: 'inputMobile',
           message: '请输入要诊断的用户手机号:',
-          validate: (input) => {
+          validate: input => {
             if (input.length !== 11) {
               return '请输入11位手机号'
             }
@@ -177,7 +183,7 @@ async function diagnoseUserPointsIssue (mobile = null) {
 /**
  * 分析重复交易记录
  */
-async function analyzeDuplicateTransactions () {
+async function analyzeDuplicateTransactions() {
   log('\n🔍 分析重复交易记录', 'cyan')
   log('='.repeat(60), 'cyan')
 
@@ -225,7 +231,7 @@ async function analyzeDuplicateTransactions () {
 /**
  * 修复积分余额不一致
  */
-async function fixPointsBalanceInconsistency () {
+async function fixPointsBalanceInconsistency() {
   log('\n🔧 修复积分余额不一致', 'cyan')
   log('='.repeat(60), 'cyan')
 
@@ -293,7 +299,10 @@ async function fixPointsBalanceInconsistency () {
         { where: { user_id: acc.user_id } }
       )
       fixedCount++
-      log(`✅ 修复用户 ${acc.user_id}: ${acc.available_points} → ${acc.calculated_balance}`, 'green')
+      log(
+        `✅ 修复用户 ${acc.user_id}: ${acc.available_points} → ${acc.calculated_balance}`,
+        'green'
+      )
     }
 
     log(`\n✅ 修复完成！共修复 ${fixedCount} 个账户`, 'green')
@@ -308,7 +317,7 @@ async function fixPointsBalanceInconsistency () {
 /**
  * 测试登录API
  */
-async function testLoginAPI () {
+async function testLoginAPI() {
   log('\n🧪 测试登录API', 'cyan')
   log('='.repeat(60), 'cyan')
 
@@ -327,7 +336,7 @@ async function testLoginAPI () {
     // 1. 测试发送验证码
     log('\n1️⃣  测试发送验证码...', 'blue')
     try {
-      const sendCodeResponse = await axios.post('http://localhost:3000/api/v2/auth/send-code', {
+      const sendCodeResponse = await axios.post('http://localhost:3000/api/v4/auth/send-code', {
         mobile,
         scene: 'login'
       })
@@ -345,7 +354,7 @@ async function testLoginAPI () {
     // 2. 测试登录（使用123456万能验证码）
     log('\n2️⃣  测试登录（使用万能验证码123456）...', 'blue')
     try {
-      const loginResponse = await axios.post('http://localhost:3000/api/v2/auth/login', {
+      const loginResponse = await axios.post('http://localhost:3000/api/v4/auth/login', {
         mobile,
         code: '123456'
       })
@@ -375,7 +384,7 @@ async function testLoginAPI () {
 /**
  * 综合健康检查
  */
-async function comprehensiveHealthCheck () {
+async function comprehensiveHealthCheck() {
   log('\n🏥 综合健康检查', 'cyan')
   log('='.repeat(60), 'cyan')
 
@@ -428,7 +437,7 @@ async function comprehensiveHealthCheck () {
 
 // ==================== 主菜单 ====================
 
-async function showMenu () {
+async function showMenu() {
   log('\n' + '='.repeat(60), 'cyan')
   log('  🔍 诊断工具统一工具包 (Diagnostic Toolkit V2.0)', 'cyan')
   log('='.repeat(60), 'cyan')
@@ -474,26 +483,26 @@ async function showMenu () {
   }
 }
 
-async function executeAction (action) {
+async function executeAction(action) {
   try {
     switch (action) {
-    case 'diagnose':
-      await diagnoseUserPointsIssue()
-      break
-    case 'analyze-duplicates':
-      await analyzeDuplicateTransactions()
-      break
-    case 'fix':
-      await fixPointsBalanceInconsistency()
-      break
-    case 'test-login':
-      await testLoginAPI()
-      break
-    case 'health':
-      await comprehensiveHealthCheck()
-      break
-    default:
-      log(`\n❌ 未知操作: ${action}`, 'red')
+      case 'diagnose':
+        await diagnoseUserPointsIssue()
+        break
+      case 'analyze-duplicates':
+        await analyzeDuplicateTransactions()
+        break
+      case 'fix':
+        await fixPointsBalanceInconsistency()
+        break
+      case 'test-login':
+        await testLoginAPI()
+        break
+      case 'health':
+        await comprehensiveHealthCheck()
+        break
+      default:
+        log(`\n❌ 未知操作: ${action}`, 'red')
     }
   } catch (error) {
     log(`\n❌ 执行失败: ${error.message}`, 'red')
@@ -502,7 +511,7 @@ async function executeAction (action) {
 
 // ==================== 主程序入口 ====================
 
-async function main () {
+async function main() {
   try {
     // 检查是否通过命令行参数直接执行
     const args = process.argv.slice(2)

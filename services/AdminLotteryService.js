@@ -84,12 +84,11 @@
  * 使用模型：Claude Sonnet 4.5
  */
 
-const Logger = require('./UnifiedLotteryEngine/utils/Logger')
 const BeijingTimeHelper = require('../utils/timeHelper')
 const models = require('../models')
 const AuditLogService = require('./AuditLogService')
 
-const logger = new Logger('AdminLotteryService')
+const logger = require('../utils/logger').logger
 
 /**
  * 管理后台抽奖管理服务类

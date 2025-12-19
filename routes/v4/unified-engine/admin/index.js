@@ -22,7 +22,7 @@ const analyticsRoutes = require('./analytics')
 const customerServiceRoutes = require('./customer_service') // 🆕 客服管理
 const marketplaceRoutes = require('./marketplace') // 🆕 市场统计管理
 const materialRoutes = require('./material') // 🆕 材料系统管理（V4.5.0）
-const diamondRoutes = require('./diamond') // 🆕 钻石系统管理（V4.5.0）
+// 钻石系统管理已废弃（Phase 4），统一迁移到资产管理模块
 
 // 挂载子模块路由
 router.use('/auth', authRoutes)
@@ -42,7 +42,6 @@ router.use('/analytics', analyticsRoutes)
 router.use('/customer-service', customerServiceRoutes) // 🆕 客服管理路由
 router.use('/marketplace', marketplaceRoutes) // 🆕 市场统计路由
 router.use('/material', materialRoutes) // 🆕 材料系统管理路由（V4.5.0）
-router.use('/diamond', diamondRoutes) // 🆕 钻石系统管理路由（V4.5.0）
 
 /**
  * GET / - Admin API根路径信息

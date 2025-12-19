@@ -22,11 +22,9 @@
 const express = require('express')
 const router = express.Router()
 const { authenticateToken, requireAdmin } = require('../../../../middleware/auth')
-// const { handleServiceError } = require('../../../../middleware/validation') // 未使用，已注释
-const Logger = require('../../../../services/UnifiedLotteryEngine/utils/Logger')
 const marketplaceConfig = require('../../../../config/marketplace.config')
 
-const logger = new Logger('MarketplaceAdminAPI')
+const logger = require('../../../../utils/logger').logger
 
 /**
  * 管理员查询所有用户上架状态
@@ -95,11 +93,12 @@ router.get('/listing-stats', authenticateToken, requireAdmin, async (req, res) =
  * 创建兑换商品（管理员操作）
  * POST /api/v4/admin/marketplace/exchange_market/items
  *
+ * V4.5.0 材料资产支付版本
+ *
  * @body {string} item_name - 商品名称（必填，最长100字符）
  * @body {string} item_description - 商品描述（可选，最长500字符）
- * @body {string} price_type - 支付方式（必填：只支持 virtual）
- * @body {number} virtual_value_price - 虚拟价值价格（必填，实际扣除的虚拟奖品价值）
- * @body {number} points_price - 积分价格（可选，仅用于前端展示，不扣除用户显示积分）
+ * @body {string} cost_asset_code - 材料资产代码（必填，如 'red_shard'）
+ * @body {number} cost_amount - 材料资产数量（必填，>0）
  * @body {number} cost_price - 成本价（必填）
  * @body {number} stock - 初始库存（必填，>=0）
  * @body {number} sort_order - 排序号（必填，默认100）
@@ -110,9 +109,8 @@ router.post('/exchange_market/items', authenticateToken, requireAdmin, async (re
     const {
       item_name,
       item_description = '',
-      price_type,
-      virtual_value_price = 0,
-      points_price = 0,
+      cost_asset_code,
+      cost_amount,
       cost_price,
       stock,
       sort_order = 100,
@@ -121,24 +119,24 @@ router.post('/exchange_market/items', authenticateToken, requireAdmin, async (re
 
     const admin_id = req.user.user_id
 
-    logger.info('管理员创建兑换商品', {
+    logger.info('管理员创建兑换商品（材料资产支付）', {
       admin_id,
       item_name,
-      price_type,
+      cost_asset_code,
+      cost_amount,
       stock
     })
 
     // 🎯 P2-C架构重构：通过 ServiceManager 获取 ExchangeMarketService
     const ExchangeMarketService = req.app.locals.services.getService('exchangeMarket')
 
-    // 🎯 调用服务层方法创建商品
+    // 🎯 调用服务层方法创建商品（V4.5.0 材料资产支付）
     const result = await ExchangeMarketService.createExchangeItem(
       {
         item_name,
         item_description,
-        price_type,
-        virtual_value_price,
-        points_price,
+        cost_asset_code,
+        cost_amount,
         cost_price,
         stock,
         sort_order,
@@ -147,10 +145,12 @@ router.post('/exchange_market/items', authenticateToken, requireAdmin, async (re
       admin_id
     )
 
-    logger.info('兑换商品创建成功', {
+    logger.info('兑换商品创建成功（材料资产支付）', {
       admin_id,
       item_id: result.item.id,
-      item_name: result.item.item_name
+      item_name: result.item.item_name,
+      cost_asset_code: result.item.cost_asset_code,
+      cost_amount: result.item.cost_amount
     })
 
     return res.apiSuccess(result, '商品创建成功')
@@ -179,6 +179,8 @@ router.post('/exchange_market/items', authenticateToken, requireAdmin, async (re
  * 更新兑换商品（管理员操作）
  * PUT /api/v4/admin/marketplace/exchange_market/items/:item_id
  *
+ * V4.5.0 材料资产支付版本
+ *
  * @param {number} item_id - 商品ID
  */
 router.put('/exchange_market/items/:item_id', authenticateToken, requireAdmin, async (req, res) => {
@@ -187,9 +189,8 @@ router.put('/exchange_market/items/:item_id', authenticateToken, requireAdmin, a
     const {
       item_name,
       item_description,
-      price_type,
-      virtual_value_price,
-      points_price,
+      cost_asset_code,
+      cost_amount,
       cost_price,
       stock,
       sort_order,
@@ -198,9 +199,11 @@ router.put('/exchange_market/items/:item_id', authenticateToken, requireAdmin, a
 
     const admin_id = req.user.user_id
 
-    logger.info('管理员更新兑换商品', {
+    logger.info('管理员更新兑换商品（材料资产支付）', {
       admin_id,
-      item_id
+      item_id,
+      cost_asset_code,
+      cost_amount
     })
 
     // 参数验证
@@ -212,23 +215,24 @@ router.put('/exchange_market/items/:item_id', authenticateToken, requireAdmin, a
     // 🎯 P2-C架构重构：通过 ServiceManager 获取 ExchangeMarketService
     const ExchangeMarketService = req.app.locals.services.getService('exchangeMarket')
 
-    // 🎯 调用服务层方法更新商品
+    // 🎯 调用服务层方法更新商品（V4.5.0 材料资产支付）
     const result = await ExchangeMarketService.updateExchangeItem(itemId, {
       item_name,
       item_description,
-      price_type,
-      virtual_value_price,
-      points_price,
+      cost_asset_code,
+      cost_amount,
       cost_price,
       stock,
       sort_order,
       status
     })
 
-    logger.info('兑换商品更新成功', {
+    logger.info('兑换商品更新成功（材料资产支付）', {
       admin_id,
       item_id: itemId,
-      item_name: result.item.item_name
+      item_name: result.item.item_name,
+      cost_asset_code: result.item.cost_asset_code,
+      cost_amount: result.item.cost_amount
     })
 
     return res.apiSuccess(result, '商品更新成功')

@@ -1,5 +1,4 @@
-const Logger = require('../services/UnifiedLotteryEngine/utils/Logger')
-const logger = new Logger('ActivityConditionValidator')
+const logger = require('../utils/logger').logger
 
 /**
  * 活动条件验证服务（基于JSON配置方案）

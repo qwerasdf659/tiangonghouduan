@@ -1,5 +1,4 @@
-const Logger = require('../../../../services/UnifiedLotteryEngine/utils/Logger')
-const logger = new Logger('user_management')
+const logger = require('../../../../utils/logger').logger
 
 /**
  * 管理员用户管理路由 - V4.0 UUID角色系统版本

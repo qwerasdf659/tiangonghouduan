@@ -1,5 +1,4 @@
-const Logger = require('../services/UnifiedLotteryEngine/utils/Logger')
-const logger = new Logger('ThumbnailService')
+const logger = require('../utils/logger').logger
 
 /**
  * 缩略图生成服务

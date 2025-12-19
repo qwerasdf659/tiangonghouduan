@@ -1,5 +1,4 @@
-const Logger = require('../../../services/UnifiedLotteryEngine/utils/Logger')
-const logger = new Logger('auth')
+const logger = require('../../../utils/logger').logger
 
 /**
  * V4认证系统路由 - RESTful标准设计（基于UUID角色系统）
@@ -628,7 +627,7 @@ router.post('/logout', authenticateToken, async (req, res) => {
    * 作用：清除内存缓存（memoryCache.delete）+ Redis缓存（redisClient.del）
    * 效果：下次刷新Token时，getUserRoles函数缓存未命中，触发数据库查询
    */
-  await invalidateUserPermissions(user_id, 'user_logout')
+  await invalidateUserPermissions(user_id, 'user_logout', user_id)
 
   // 📝 记录退出日志（便于审计和问题追踪）
   logger.info(`✅ [Auth] 用户退出登录: user_id=${user_id}, mobile=${req.user.mobile}`)

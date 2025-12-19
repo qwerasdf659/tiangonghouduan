@@ -23,9 +23,7 @@
 
 const { sequelize, RedemptionOrder, ItemInstance } = require('../../models')
 const RedemptionOrderService = require('../../services/RedemptionOrderService')
-const Logger = require('../../services/UnifiedLotteryEngine/utils/Logger')
-
-const logger = new Logger('RegenerateRedemptionCode')
+const logger = require('../../utils/logger').logger
 
 /**
  * 重新生成核销码工具类

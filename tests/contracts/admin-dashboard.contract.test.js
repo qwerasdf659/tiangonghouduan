@@ -144,7 +144,7 @@ describe('API契约测试: Admin Dashboard', () => {
   describe('API版本兼容性测试', () => {
     test('应该拒绝V2路径的请求', async () => {
       const response = await request(app)
-        .get('/api/v2/admin/dashboard/stats')
+        .get('/api/v4/admin/dashboard/stats')
         .set('Authorization', `Bearer ${authToken}`)
 
       expect(response.status).toBe(404)

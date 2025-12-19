@@ -1,5 +1,4 @@
-const Logger = require('../../services/UnifiedLotteryEngine/utils/Logger')
-const logger = new Logger('statistics')
+const logger = require('../../utils/logger').logger
 
 /**
  * 统计数据API路由模块 (Statistics Data API Routes)

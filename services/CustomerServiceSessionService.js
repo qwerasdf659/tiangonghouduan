@@ -1,5 +1,4 @@
-const Logger = require('../services/UnifiedLotteryEngine/utils/Logger')
-const logger = new Logger('CustomerServiceSessionService')
+const logger = require('../utils/logger').logger
 
 /**
  * 客服会话服务（Customer Service Session Service）

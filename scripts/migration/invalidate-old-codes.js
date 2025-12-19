@@ -33,9 +33,7 @@ const path = require('path')
 require('dotenv').config({ path: path.resolve(__dirname, '../../.env') })
 
 const { sequelize, UserInventory } = require('../../models')
-const Logger = require('../../services/UnifiedLotteryEngine/utils/Logger')
-
-const logger = new Logger('InvalidateOldCodes')
+const logger = require('../../utils/logger').logger
 
 /**
  * 作废旧版核销码

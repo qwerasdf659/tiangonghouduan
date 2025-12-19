@@ -69,9 +69,7 @@
  * 使用模型：Claude Sonnet 4.5
  */
 
-const Logger = require('./UnifiedLotteryEngine/utils/Logger')
-
-const logger = new Logger('AdminCustomerServiceService')
+const logger = require('../utils/logger').logger
 
 /**
  * 管理后台客服管理服务类（Facade模式）

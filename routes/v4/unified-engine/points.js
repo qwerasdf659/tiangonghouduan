@@ -155,9 +155,8 @@ const router = express.Router()
 const { authenticateToken, getUserRoles, requireAdmin } = require('../../../middleware/auth')
 const { handleServiceError } = require('../../../middleware/validation')
 const BeijingTimeHelper = require('../../../utils/timeHelper')
-const Logger = require('../../../services/UnifiedLotteryEngine/utils/Logger')
 
-const logger = new Logger('PointsAPI')
+const logger = require('../../../utils/logger').logger
 
 // 🔧 限流中间件 - 防止恶意频繁查询
 const { getRateLimiter } = require('../../../middleware/RateLimiterMiddleware')

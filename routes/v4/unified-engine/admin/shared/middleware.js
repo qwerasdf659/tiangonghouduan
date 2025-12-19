@@ -17,7 +17,6 @@ const {
 } = require('../../../../../services/UnifiedLotteryEngine/UnifiedLotteryEngine')
 const ManagementStrategy = require('../../../../../services/UnifiedLotteryEngine/strategies/ManagementStrategy')
 const PerformanceMonitor = require('../../../../../services/UnifiedLotteryEngine/utils/PerformanceMonitor')
-const Logger = require('../../../../../services/UnifiedLotteryEngine/utils/Logger')
 const { requireAdmin, authenticateToken } = require('../../../../../middleware/auth')
 
 // 初始化共享组件
@@ -25,7 +24,7 @@ const sharedComponents = {
   lotteryEngine: new UnifiedLotteryEngine(),
   managementStrategy: new ManagementStrategy(),
   performanceMonitor: new PerformanceMonitor(),
-  logger: new Logger('AdminAPIv4')
+  logger: require('../../../../../utils/logger').logger
 }
 
 /**

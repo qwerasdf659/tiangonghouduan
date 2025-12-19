@@ -1,5 +1,4 @@
-const Logger = require('../services/UnifiedLotteryEngine/utils/Logger')
-const logger = new Logger('ConsumptionService')
+const logger = require('../utils/logger').logger
 
 /**
  * 餐厅积分抽奖系统 V4.0 - 消费记录服务

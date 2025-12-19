@@ -1,5 +1,4 @@
-const Logger = require('../services/UnifiedLotteryEngine/utils/Logger')
-const logger = new Logger('sealosStorage')
+const logger = require('../utils/logger').logger
 
 /**
  * Sealos对象存储服务

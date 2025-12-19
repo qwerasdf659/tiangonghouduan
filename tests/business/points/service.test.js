@@ -21,8 +21,7 @@
 
 const PointsService = require('../../../services/PointsService')
 const { User } = require('../../../models')
-const { TEST_DATA, createTestData } = require('../../helpers/test-data')
-const { TestConfig } = require('../../helpers/test-setup')
+const { TEST_DATA } = require('../../helpers/test-data')
 const BeijingTimeHelper = require('../../../utils/timeHelper')
 
 describe('积分服务层测试（V4架构）', () => {
@@ -67,7 +66,9 @@ describe('积分服务层测试（V4架构）', () => {
       expect(account.available_points).toBeGreaterThanOrEqual(0)
       expect(account.total_earned).toBeGreaterThanOrEqual(account.total_consumed)
 
-      console.log(`📊 积分账户 - 可用: ${account.available_points}, 总获得: ${account.total_earned}`)
+      console.log(
+        `📊 积分账户 - 可用: ${account.available_points}, 总获得: ${account.total_earned}`
+      )
     })
 
     test('应该能获取积分余额信息', async () => {
@@ -118,8 +119,12 @@ describe('积分服务层测试（V4架构）', () => {
     })
 
     test('应该拒绝增加负数或零积分', async () => {
-      await expect(PointsService.addPoints(testUser.user_id, 0)).rejects.toThrow('积分数量必须大于0')
-      await expect(PointsService.addPoints(testUser.user_id, -10)).rejects.toThrow('积分数量必须大于0')
+      await expect(PointsService.addPoints(testUser.user_id, 0)).rejects.toThrow(
+        '积分数量必须大于0'
+      )
+      await expect(PointsService.addPoints(testUser.user_id, -10)).rejects.toThrow(
+        '积分数量必须大于0'
+      )
     })
   })
 
@@ -196,7 +201,9 @@ describe('积分服务层测试（V4架构）', () => {
       expect(hasEnoughSmall).toBe(true)
       expect(hasEnoughLarge).toBe(false)
 
-      console.log(`✅ 余额检查 - 10积分: ${hasEnoughSmall}, ${balance.available_points + 1000}积分: ${hasEnoughLarge}`)
+      console.log(
+        `✅ 余额检查 - 10积分: ${hasEnoughSmall}, ${balance.available_points + 1000}积分: ${hasEnoughLarge}`
+      )
     })
   })
 
@@ -230,7 +237,9 @@ describe('积分服务层测试（V4架构）', () => {
         expect(transaction).toHaveProperty('transaction_time')
         expect(['earn', 'consume']).toContain(transaction.transaction_type)
 
-        console.log(`📜 交易历史 - 总数: ${history.pagination.total_count}, 本页: ${history.transactions.length}`)
+        console.log(
+          `📜 交易历史 - 总数: ${history.pagination.total_count}, 本页: ${history.transactions.length}`
+        )
       }
     })
 
@@ -284,8 +293,12 @@ describe('积分服务层测试（V4架构）', () => {
       expect(stats.total_consumed).toBeGreaterThanOrEqual(0)
       expect(stats.account_age_days).toBeGreaterThanOrEqual(0)
 
-      console.log(`📊 积分统计 - 余额: ${stats.current_balance}, 总获得: ${stats.total_earned}, 总消费: ${stats.total_consumed}`)
-      console.log(`   30天净变化: ${stats.recent_30_days.net_change}, 账户年龄: ${stats.account_age_days}天`)
+      console.log(
+        `📊 积分统计 - 余额: ${stats.current_balance}, 总获得: ${stats.total_earned}, 总消费: ${stats.total_consumed}`
+      )
+      console.log(
+        `   30天净变化: ${stats.recent_30_days.net_change}, 账户年龄: ${stats.account_age_days}天`
+      )
     })
   })
 
@@ -331,7 +344,9 @@ describe('积分服务层测试（V4架构）', () => {
       const finalBalance = await PointsService.getPointsBalance(testUser.user_id)
       expect(finalBalance.available_points).toBe(initialBalance.available_points + 10) // +20 -10
 
-      console.log(`🔄 批量操作 - 初始: ${initialBalance.available_points}, 最终: ${finalBalance.available_points}`)
+      console.log(
+        `🔄 批量操作 - 初始: ${initialBalance.available_points}, 最终: ${finalBalance.available_points}`
+      )
     })
 
     test('批量操作失败时应该回滚', async () => {
@@ -385,7 +400,9 @@ describe('积分服务层测试（V4架构）', () => {
       expect(overview.available_points).toBeGreaterThanOrEqual(0)
       expect(overview.total_earned).toBeGreaterThanOrEqual(overview.total_consumed)
 
-      console.log(`❄️ 积分概览 - 可用: ${overview.available_points}, 冻结: ${overview.frozen_points}`)
+      console.log(
+        `❄️ 积分概览 - 可用: ${overview.available_points}, 冻结: ${overview.frozen_points}`
+      )
 
       // 如果有冻结交易，验证其结构
       if (overview.frozen_transactions.length > 0) {
@@ -421,7 +438,9 @@ describe('积分服务层测试（V4架构）', () => {
       expect(frozenDetails.frozen_transactions.length).toBeLessThanOrEqual(10)
       expect(frozenDetails.total_frozen_points).toBeGreaterThanOrEqual(0)
 
-      console.log(`❄️ 冻结明细 - 总数: ${frozenDetails.total_count}, 总冻结: ${frozenDetails.total_frozen_points}`)
+      console.log(
+        `❄️ 冻结明细 - 总数: ${frozenDetails.total_count}, 总冻结: ${frozenDetails.total_frozen_points}`
+      )
 
       // 如果有冻结交易，验证其结构
       if (frozenDetails.frozen_transactions.length > 0) {
@@ -460,7 +479,9 @@ describe('积分服务层测试（V4架构）', () => {
 
       expect(largePage.page_size).toBeLessThanOrEqual(50)
 
-      console.log(`📄 分页测试 - 第2页: ${page2.frozen_transactions.length}条, 大页面限制: ${largePage.page_size}`)
+      console.log(
+        `📄 分页测试 - 第2页: ${page2.frozen_transactions.length}条, 大页面限制: ${largePage.page_size}`
+      )
     })
   })
 
@@ -474,15 +495,21 @@ describe('积分服务层测试（V4架构）', () => {
     test('应该处理不存在的用户', async () => {
       const nonExistentUserId = 99999
 
-      await expect(PointsService.createPointsAccount(nonExistentUserId)).rejects.toThrow('用户不存在')
+      await expect(PointsService.createPointsAccount(nonExistentUserId)).rejects.toThrow(
+        '用户不存在'
+      )
       await expect(PointsService.getUserPointsAccount(nonExistentUserId)).rejects.toThrow()
 
       console.log('❌ 不存在用户错误处理正确')
     })
 
     test('应该处理无效的积分数量', async () => {
-      await expect(PointsService.addPoints(testUser.user_id, -100)).rejects.toThrow('积分数量必须大于0')
-      await expect(PointsService.consumePoints(testUser.user_id, 0)).rejects.toThrow('积分数量必须大于0')
+      await expect(PointsService.addPoints(testUser.user_id, -100)).rejects.toThrow(
+        '积分数量必须大于0'
+      )
+      await expect(PointsService.consumePoints(testUser.user_id, 0)).rejects.toThrow(
+        '积分数量必须大于0'
+      )
 
       console.log('❌ 无效积分数量错误处理正确')
     })

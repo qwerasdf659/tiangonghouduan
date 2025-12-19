@@ -22,22 +22,19 @@
  */
 
 const TestCoordinator = require('../../api/TestCoordinator')
-const moment = require('moment-timezone')
+const BeijingTimeHelper = require('../../../utils/timeHelper')
 const models = require('../../../models')
 const { TEST_DATA } = require('../../helpers/test-data')
 
 describe('抽奖预设系统API测试（V4架构）', () => {
   let tester
-  let admin_token
   let test_user_id
   const test_account = TEST_DATA.users.adminUser // 使用统一测试数据
 
   beforeAll(async () => {
     console.log('🚀 抽奖预设系统API测试启动')
     console.log('='.repeat(70))
-    console.log(
-      `📅 测试时间: ${moment().tz('Asia/Shanghai').format('YYYY-MM-DD HH:mm:ss')} (北京时间)`
-    )
+    console.log(`📅 测试时间: ${BeijingTimeHelper.toBeijingTime(new Date())} (北京时间)`)
     console.log(`👤 测试账号: ${test_account.mobile} (用户ID: ${test_account.user_id})`)
     console.log('🗄️ 数据库: restaurant_points_dev')
 
@@ -47,7 +44,6 @@ describe('抽奖预设系统API测试（V4架构）', () => {
     try {
       const admin_data = await tester.authenticateV4User('admin')
       test_user_id = admin_data.user.user_id
-      admin_token = tester.tokens.admin
       console.log('✅ 管理员认证完成')
     } catch (error) {
       console.error('❌ 管理员认证失败:', error.message)

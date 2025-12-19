@@ -16,7 +16,6 @@ const { sequelize, AdminOperationLog } = require('../../models')
 describe('审计日志功能测试', () => {
   let adminToken
   let adminUserId
-  let testExchangeId
   let testAdminOperationLogId
 
   // 测试前准备

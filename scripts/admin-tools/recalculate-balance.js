@@ -38,9 +38,7 @@
 
 const { sequelize } = require('../../config/database')
 const { AccountAssetBalance, AssetTransaction } = require('../../models')
-const Logger = require('../../services/UnifiedLotteryEngine/utils/Logger')
-
-const logger = new Logger('RecalculateBalance')
+const logger = require('../../utils/logger').logger
 
 /**
  * 重算单个账户单个资产的余额

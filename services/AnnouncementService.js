@@ -1,5 +1,4 @@
-const Logger = require('../services/UnifiedLotteryEngine/utils/Logger')
-const logger = new Logger('AnnouncementService')
+const logger = require('../utils/logger').logger
 
 /**
  * 公告/通知统一服务层

@@ -1,5 +1,4 @@
-const Logger = require('../utils/Logger')
-const logger = new Logger('LotteryStrategy')
+const logger = require('../../../utils/logger').logger
 
 /**
  * 抽奖策略基类 - 统一接口定义
@@ -10,7 +9,7 @@ const logger = new Logger('LotteryStrategy')
  * @date 2025-09-11
  */
 
-const moment = require('moment-timezone')
+const BeijingTimeHelper = require('../../../utils/timeHelper')
 
 /**
  * 抽奖策略基础接口类
@@ -180,7 +179,7 @@ class LotteryStrategy {
    * @returns {string} 北京时间字符串
    */
   getBeijingTime() {
-    return moment().tz('Asia/Shanghai').format('YYYY-MM-DD HH:mm:ss')
+    return BeijingTimeHelper.toDatabaseFormat(new Date())
   }
 
   /**
@@ -189,7 +188,7 @@ class LotteryStrategy {
    * @returns {string} ISO格式的北京时间戳
    */
   getBeijingTimestamp() {
-    return moment().tz('Asia/Shanghai').toISOString()
+    return BeijingTimeHelper.apiTimestamp()
   }
 
   /**

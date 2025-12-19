@@ -1,23 +1,24 @@
 /**
  * 餐厅积分抽奖系统 V4.5 - 兑换市场API
- * 处理兑换市场材料资产支付功能
+ * 材料资产支付兑换市场路由（V4.5.0统一版）
  *
  * 功能说明：
- * - 获取兑换市场商品列表
- * - 获取商品详情
- * - 兑换商品（使用材料资产支付，如red_shard）
- * - 查询用户订单
+ * - 获取兑换市场商品列表（展示材料成本）
+ * - 获取商品详情（展示cost_asset_code + cost_amount）
+ * - 兑换商品（使用材料资产支付，通过AssetService扣减）
+ * - 查询用户订单（显示pay_asset_code + pay_amount）
  * - 管理员订单管理
- * - 统计数据查询
+ * - 统计数据查询（材料消耗统计）
  *
- * 业务规则（V4.5.0）：
- * - ✅ 兑换使用材料资产支付（cost_asset_code + cost_amount）
- * - ✅ 支付资产扣减通过AssetService执行
- * - ✅ 订单记录pay_asset_code和pay_amount字段
+ * 业务规则（V4.5.0强制）：
+ * - ✅ 兑换只能使用材料资产支付（cost_asset_code + cost_amount）
+ * - ✅ 支付资产扣减通过AssetService.changeBalance()执行
+ * - ✅ 订单记录pay_asset_code和pay_amount字段（必填）
  * - ✅ 支持幂等性控制（business_id必填）
+ * - ❌ 禁止积分支付和虚拟价值支付（已彻底移除）
  *
  * 创建时间：2025年12月06日
- * 最后修改：2025年12月15日 - 改造为材料资产支付系统
+ * 最后修改：2025年12月18日 - 暴力移除旧方案，统一为材料资产支付
  * 使用 Claude Sonnet 4.5 模型
  */
 
@@ -26,16 +27,15 @@ const router = express.Router()
 const { authenticateToken, requireAdmin, getUserRoles } = require('../../../middleware/auth')
 const { handleServiceError } = require('../../../middleware/validation')
 const DataSanitizer = require('../../../services/DataSanitizer')
-const Logger = require('../../../services/UnifiedLotteryEngine/utils/Logger')
 
-const logger = new Logger('ExchangeMarketAPI')
+const logger = require('../../../utils/logger').logger
 
 /**
  * 获取兑换市场商品列表
  * GET /api/v4/exchange_market/items
  *
  * @query {string} status - 商品状态（active/inactive，默认active）
- * @query {string} price_type - 支付方式（只支持 virtual）
+ * @query {string} asset_code - 材料资产代码筛选（可选）
  * @query {number} page - 页码（默认1）
  * @query {number} page_size - 每页数量（默认20，最大50）
  * @query {string} sort_by - 排序字段（默认sort_order）
@@ -48,7 +48,7 @@ router.get('/items', authenticateToken, async (req, res) => {
 
     const {
       status = 'active',
-      price_type,
+      asset_code,
       page = 1,
       page_size = 20,
       sort_by = 'sort_order',
@@ -58,7 +58,7 @@ router.get('/items', authenticateToken, async (req, res) => {
     logger.info('获取兑换市场商品列表', {
       user_id: req.user.user_id,
       status,
-      price_type,
+      asset_code,
       page,
       page_size
     })
@@ -78,17 +78,9 @@ router.get('/items', authenticateToken, async (req, res) => {
       )
     }
 
-    // 支付方式白名单验证（只支持 virtual）
-    if (price_type) {
-      const validPriceTypes = ['virtual']
-      if (!validPriceTypes.includes(price_type)) {
-        return res.apiError(
-          '无效的price_type参数，当前只支持 virtual（虚拟奖品价值支付）',
-          'BAD_REQUEST',
-          null,
-          400
-        )
-      }
+    // V4.5.0：材料资产代码筛选（可选）
+    if (asset_code) {
+      // 可选的筛选参数，传递给Service层
     }
 
     // 排序方向白名单验证
@@ -105,7 +97,7 @@ router.get('/items', authenticateToken, async (req, res) => {
     // 调用服务层
     const result = await ExchangeMarketService.getMarketItems({
       status,
-      price_type,
+      asset_code,
       page: finalPage,
       page_size: finalPageSize,
       sort_by,
@@ -282,12 +274,9 @@ router.post('/exchange', authenticateToken, async (req, res) => {
       quantity: exchangeQuantity,
       business_id, // 记录实际使用的 business_id
       order_no: result.order.order_no,
-      // V4.5.0: 材料资产支付字段
+      // V4.5.0: 材料资产支付字段（唯一真相）
       pay_asset_code: result.order.pay_asset_code,
       pay_amount: result.order.pay_amount,
-      // 保留旧字段用于兼容
-      virtual_value_paid: result.order.virtual_value_paid,
-      points_paid: result.order.points_paid,
       is_duplicate: result.is_duplicate || false
     })
 

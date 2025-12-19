@@ -16,7 +16,7 @@
 
 const request = require('supertest')
 const app = require('../../../app')
-const { User, LotteryManagementSetting, LotteryPrize, LotteryCampaign } = require('../../../models')
+const { LotteryManagementSetting, LotteryPrize, LotteryCampaign } = require('../../../models')
 const { loginAsAdmin, getTestUserToken } = require('../../helpers/auth-helper')
 const { TEST_DATA } = require('../../helpers/test-data')
 
@@ -220,8 +220,9 @@ describe('用户个性化中奖率设置功能测试', () => {
     })
 
     test('应该拒绝非管理员访问', async () => {
-      const response = await request(app)
-        .get(`/api/v4/admin/lottery-management/user-status/${testUserId}`)
+      const response = await request(app).get(
+        `/api/v4/admin/lottery-management/user-status/${testUserId}`
+      )
       // 不设置token
 
       expect(response.status).toBe(401)

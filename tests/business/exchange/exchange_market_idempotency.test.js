@@ -1,6 +1,8 @@
 /**
  * 兑换市场幂等性测试套件 (Exchange Market Idempotency Test Suite)
  *
+ * V4.5.0 材料资产支付版本
+ *
  * 业务场景：测试兑换市场的幂等性保护机制，确保不会产生重复订单
  *
  * P1-1待办任务：兑换市场 `/api/v4/exchange_market/exchange` 的 business_id 策略
@@ -8,7 +10,7 @@
  * 核心功能测试：
  * 1. 强制幂等键验证 - 缺少business_id和Idempotency-Key时返回400
  * 2. 幂等性保护 - 相同business_id重复请求只创建一笔订单
- * 3. 虚拟价值防重复扣除 - 幂等请求不会重复扣除虚拟奖品
+ * 3. 材料资产防重复扣除 - 幂等请求不会重复扣除材料资产
  * 4. 冲突保护 - 同一幂等键但不同参数返回409
  * 5. 外部事务支持 - Service支持外部事务传入
  *
@@ -19,30 +21,35 @@
  * - 冲突保护：同一幂等键但参数不同时返回409
  * - 幂等返回：同一幂等键返回原结果（标记is_duplicate）
  *
- * 创建时间：2025年12月12日
+ * 创建时间：2025年12月18日
+ * 更新时间：2025年12月18日 - 重构为材料资产支付
  * 符合规范：docs/架构重构待办清单.md - P1-1
  * 使用模型：Claude Sonnet 4.5
  */
 
 const request = require('supertest')
-const { sequelize, ExchangeItem, ExchangeMarketRecord, UserInventory, UserPointsAccount } = require('../../../models')
+const {
+  sequelize,
+  ExchangeItem,
+  ExchangeMarketRecord,
+  UserAssetAccount
+} = require('../../../models')
 const ExchangeMarketService = require('../../../services/ExchangeMarketService')
+const AssetService = require('../../../services/AssetService')
 const BeijingTimeHelper = require('../../../utils/timeHelper')
 
-describe('兑换市场幂等性测试 (Exchange Market Idempotency)', () => {
+describe('兑换市场幂等性测试 (Exchange Market Idempotency - V4.5.0 材料资产支付)', () => {
   let app
   let testUser
   let testToken
   let testItem
-  let testInventoryItem
 
   /**
    * 测试前置准备
    * 1. 初始化app和数据库连接
-   * 2. 创建测试用户和积分账户
-   * 3. 创建测试商品
-   * 4. 清理旧的测试虚拟奖品
-   * 5. 创建测试用户的虚拟奖品（用于支付）
+   * 2. 创建测试用户
+   * 3. 创建测试商品（材料资产支付）
+   * 4. 初始化测试用户的材料资产账户
    */
   beforeAll(async () => {
     // 初始化Express应用
@@ -70,38 +77,12 @@ describe('兑换市场幂等性测试 (Exchange Market Idempotency)', () => {
       { expiresIn: '24h' }
     )
 
-    // 确保测试用户有积分账户
-    let pointsAccount = await UserPointsAccount.findOne({
-      where: { user_id: testUser.user_id }
-    })
-
-    if (!pointsAccount) {
-      pointsAccount = await UserPointsAccount.create({
-        user_id: testUser.user_id,
-        available_points: 0,
-        total_earned_points: 0,
-        total_consumed_points: 0
-      })
-    }
-
-    // 清理测试用户的所有旧虚拟奖品（aggressive cleanup）
-    console.log('🧹 清理所有旧虚拟奖品...')
-    const deleted = await UserInventory.destroy({
-      where: {
-        user_id: testUser.user_id,
-        source_type: 'lottery'
-        // 不再限制名称，清理所有lottery类型的虚拟奖品
-      }
-    })
-    console.log(`   - 已删除 ${deleted} 个旧虚拟奖品`)
-
-    // 创建测试商品
+    // 创建测试商品（V4.5.0 材料资产支付）
     testItem = await ExchangeItem.create({
       name: '【测试】幂等性测试商品',
-      description: '用于测试兑换市场幂等性的测试商品',
-      price_type: 'virtual',
-      virtual_value_price: 100,
-      points_price: 0,
+      description: '用于测试兑换市场幂等性的测试商品（材料资产支付）',
+      cost_asset_code: 'red_shard', // 材料资产代码：碎红水晶
+      cost_amount: 100, // 成本数量：100个碎红水晶
       cost_price: 50,
       stock: 1000,
       sort_order: 1,
@@ -110,88 +91,64 @@ describe('兑换市场幂等性测试 (Exchange Market Idempotency)', () => {
       updated_at: BeijingTimeHelper.createDatabaseTime()
     })
 
-    /*
-     * 创建测试用户的虚拟奖品（用于支付）
-     * 创建多个小额虚拟奖品（value=100），正好等于商品价格，方便完全消耗
-     */
-    for (let i = 0; i < 5; i++) {
-      // eslint-disable-next-line no-await-in-loop
-      await UserInventory.create({
+    // 初始化测试用户的材料资产账户（red_shard）
+    let assetAccount = await UserAssetAccount.findOne({
+      where: {
         user_id: testUser.user_id,
-        name: `【测试】虚拟奖品-${i + 1}`,
-        description: '用于测试兑换市场幂等性的虚拟奖品',
-        type: 'product', // 必填：产品类型
-        value: 100, // 价值100，正好等于商品价格
-        status: 'available',
-        source_type: 'lottery', // 必填：来源于抽奖（识别为虚拟奖品）
-        source_id: `test_lottery_${Date.now()}_${i}`,
-        acquired_at: BeijingTimeHelper.createDatabaseTime(),
-        can_transfer: true,
-        can_use: true,
-        is_available: true,
-        transfer_count: 0,
-        withdraw_count: 0
+        asset_code: 'red_shard'
+      }
+    })
+
+    if (!assetAccount) {
+      assetAccount = await UserAssetAccount.create({
+        user_id: testUser.user_id,
+        asset_code: 'red_shard',
+        balance: 0,
+        total_earned: 0,
+        total_consumed: 0,
+        created_at: BeijingTimeHelper.createDatabaseTime(),
+        updated_at: BeijingTimeHelper.createDatabaseTime()
       })
     }
-
-    // 记录最后一个创建的虚拟奖品
-    testInventoryItem = await UserInventory.findOne({
-      where: { user_id: testUser.user_id, source_type: 'lottery', status: 'available' },
-      order: [['inventory_id', 'DESC']]
-    })
 
     console.log('✅ 测试环境初始化完成')
     console.log(`   - 测试用户ID: ${testUser.user_id}`)
     console.log(`   - 测试商品ID: ${testItem.item_id}`)
-    console.log('   - 创建了5个虚拟奖品，每个价值: 100')
+    console.log(`   - 商品成本: ${testItem.cost_amount} ${testItem.cost_asset_code}`)
   }, 30000)
 
   /**
    * 每个测试前的准备
-   * 确保每个测试开始时都有足够的虚拟奖品
+   * 确保每个测试开始时都有足够的材料资产
    */
   beforeEach(async () => {
-    // 查询用户当前虚拟价值总和（只统计 status='available' 的虚拟奖品）
-    const currentVirtualValue = await ExchangeMarketService._getUserTotalVirtualValue(
-      testUser.user_id
-    )
-
-    console.log(`🔍 测试前检查虚拟价值: ${currentVirtualValue}`)
-
-    // 如果虚拟价值不足500，创建新的虚拟奖品
-    if (currentVirtualValue < 500) {
-      console.log(`⚠️ 虚拟价值不足(${currentVirtualValue} < 500)，创建新虚拟奖品`)
-
-      // 创建5个小额虚拟奖品（value=100）
-      for (let i = 0; i < 5; i++) {
-        // eslint-disable-next-line no-await-in-loop
-        await UserInventory.create({
-          user_id: testUser.user_id,
-          name: `【测试】虚拟奖品-补充-${i + 1}`,
-          description: '用于测试兑换市场幂等性的虚拟奖品',
-          type: 'product', // 必填：产品类型
-          value: 100, // 价值100，正好等于商品价格
-          status: 'available',
-          source_type: 'lottery', // 必填：来源于抽奖（识别为虚拟奖品）
-          source_id: `test_lottery_refill_${Date.now()}_${i}`,
-          acquired_at: BeijingTimeHelper.createDatabaseTime(),
-          can_transfer: true,
-          can_use: true,
-          is_available: true,
-          transfer_count: 0,
-          withdraw_count: 0
-        })
+    // 查询用户当前材料资产余额
+    const assetAccount = await UserAssetAccount.findOne({
+      where: {
+        user_id: testUser.user_id,
+        asset_code: 'red_shard'
       }
+    })
 
-      console.log('✅ 已创建5个新虚拟奖品（每个价值100）')
+    const currentBalance = assetAccount ? assetAccount.balance : 0
+    console.log(`🔍 测试前检查材料资产余额: ${currentBalance} red_shard`)
 
-      // 重新查询虚拟价值总和，验证是否能查到
-      const verifyVirtualValue = await ExchangeMarketService._getUserTotalVirtualValue(
-        testUser.user_id
+    // 如果余额不足1000，充值到1000
+    if (currentBalance < 1000) {
+      console.log(`⚠️ 材料资产不足(${currentBalance} < 1000)，充值到1000`)
+
+      await AssetService.changeBalance(
+        testUser.user_id,
+        'red_shard',
+        1000 - currentBalance,
+        'test_recharge',
+        `test_recharge_${Date.now()}`,
+        '测试充值'
       )
-      console.log(`🔍 创建后重新查询虚拟价值: ${verifyVirtualValue}`)
+
+      console.log(`✅ 已充值 ${1000 - currentBalance} red_shard`)
     } else {
-      console.log(`✅ 虚拟价值充足(${currentVirtualValue})，无需创建`)
+      console.log(`✅ 材料资产充足(${currentBalance})，无需充值`)
     }
   })
 
@@ -206,10 +163,6 @@ describe('兑换市场幂等性测试 (Exchange Market Idempotency)', () => {
         where: { item_id: testItem.item_id }
       })
       await testItem.destroy()
-    }
-
-    if (testInventoryItem) {
-      await testInventoryItem.destroy()
     }
 
     console.log('✅ 测试数据清理完成')
@@ -262,7 +215,6 @@ describe('兑换市场幂等性测试 (Exchange Market Idempotency)', () => {
           business_id, // 应该回传business_id
           order: expect.objectContaining({
             order_no: expect.any(String),
-            item_name: expect.any(String),
             status: 'pending'
           })
         }
@@ -360,15 +312,21 @@ describe('兑换市场幂等性测试 (Exchange Market Idempotency)', () => {
       console.log('✅ 幂等性验证通过：数据库中只有1条记录')
     })
 
-    test('虚拟奖品价值应该只扣除一次', async () => {
-      const business_id = `test_virtual_value_deduct_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`
+    test('材料资产应该只扣除一次', async () => {
+      const business_id = `test_asset_deduct_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`
 
-      // 获取初始虚拟价值
-      const virtualValueBefore = await ExchangeMarketService._getUserTotalVirtualValue(testUser.user_id)
-      console.log(`🔍 初始虚拟价值: ${virtualValueBefore}`)
+      // 获取初始材料资产余额
+      const assetAccountBefore = await UserAssetAccount.findOne({
+        where: {
+          user_id: testUser.user_id,
+          asset_code: 'red_shard'
+        }
+      })
+      const balanceBefore = assetAccountBefore.balance
+      console.log(`🔍 初始材料资产余额: ${balanceBefore} red_shard`)
 
       // 第一次兑换
-      const _response1 = await request(app)
+      const response1 = await request(app)
         .post('/api/v4/exchange_market/exchange')
         .set('Authorization', `Bearer ${testToken}`)
         .send({
@@ -378,12 +336,19 @@ describe('兑换市场幂等性测试 (Exchange Market Idempotency)', () => {
         })
         .expect(200)
 
-      const virtualValueAfterFirst = await ExchangeMarketService._getUserTotalVirtualValue(testUser.user_id)
-      const deducted = virtualValueBefore - virtualValueAfterFirst
+      // 查询第一次兑换后的余额
+      const assetAccountAfterFirst = await UserAssetAccount.findOne({
+        where: {
+          user_id: testUser.user_id,
+          asset_code: 'red_shard'
+        }
+      })
+      const balanceAfterFirst = assetAccountAfterFirst.balance
+      const deducted = balanceBefore - balanceAfterFirst
 
-      console.log(`✅ 第一次兑换完成，扣除虚拟价值: ${deducted}`)
-      console.log(`   - order_no: ${_response1.body.data.order.order_no}`)
-      expect(deducted).toBe(testItem.virtual_value_price) // 应该扣除商品价格
+      console.log(`✅ 第一次兑换完成，扣除材料资产: ${deducted} red_shard`)
+      console.log(`   - order_no: ${response1.body.data.order.order_no}`)
+      expect(deducted).toBe(testItem.cost_amount) // 应该扣除商品成本
 
       // 第二次兑换（相同business_id）
       const response2 = await request(app)
@@ -396,17 +361,24 @@ describe('兑换市场幂等性测试 (Exchange Market Idempotency)', () => {
         })
         .expect(200)
 
-      const virtualValueAfterSecond = await ExchangeMarketService._getUserTotalVirtualValue(testUser.user_id)
+      // 查询第二次兑换后的余额
+      const assetAccountAfterSecond = await UserAssetAccount.findOne({
+        where: {
+          user_id: testUser.user_id,
+          asset_code: 'red_shard'
+        }
+      })
+      const balanceAfterSecond = assetAccountAfterSecond.balance
 
       console.log('✅ 第二次兑换完成（幂等）')
-      expect(virtualValueAfterSecond).toBe(virtualValueAfterFirst) // ✅ 虚拟价值不应该再次扣除
+      expect(balanceAfterSecond).toBe(balanceAfterFirst) // ✅ 材料资产不应该再次扣除
       expect(response2.body.data.is_duplicate).toBe(true)
 
-      console.log('✅ 虚拟价值防重复扣除验证通过')
-      console.log(`   - 扣除前: ${virtualValueBefore}`)
-      console.log(`   - 第一次后: ${virtualValueAfterFirst}`)
-      console.log(`   - 第二次后: ${virtualValueAfterSecond}`)
-      console.log(`   - 只扣除一次: ${virtualValueAfterSecond === virtualValueAfterFirst}`)
+      console.log('✅ 材料资产防重复扣除验证通过')
+      console.log(`   - 扣除前: ${balanceBefore}`)
+      console.log(`   - 第一次后: ${balanceAfterFirst}`)
+      console.log(`   - 第二次后: ${balanceAfterSecond}`)
+      console.log(`   - 只扣除一次: ${balanceAfterSecond === balanceAfterFirst}`)
     })
   })
 
@@ -419,7 +391,7 @@ describe('兑换市场幂等性测试 (Exchange Market Idempotency)', () => {
       const business_id = `test_conflict_item_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`
 
       // 第一次请求
-      const _response1 = await request(app)
+      const response1 = await request(app)
         .post('/api/v4/exchange_market/exchange')
         .set('Authorization', `Bearer ${testToken}`)
         .send({
@@ -431,15 +403,14 @@ describe('兑换市场幂等性测试 (Exchange Market Idempotency)', () => {
 
       console.log('✅ 第一次请求成功')
       console.log(`   - item_id: ${testItem.item_id}`)
-      console.log(`   - order_no: ${_response1.body.data.order.order_no}`)
+      console.log(`   - order_no: ${response1.body.data.order.order_no}`)
 
       // 创建另一个测试商品
       const anotherItem = await ExchangeItem.create({
         name: '【测试】另一个商品',
         description: '用于测试冲突保护',
-        price_type: 'virtual',
-        virtual_value_price: 100,
-        points_price: 0,
+        cost_asset_code: 'red_shard',
+        cost_amount: 100,
         cost_price: 50,
         stock: 1000,
         sort_order: 1,
@@ -475,7 +446,7 @@ describe('兑换市场幂等性测试 (Exchange Market Idempotency)', () => {
       const business_id = `test_conflict_quantity_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`
 
       // 第一次请求
-      const _response1 = await request(app)
+      const response1 = await request(app)
         .post('/api/v4/exchange_market/exchange')
         .set('Authorization', `Bearer ${testToken}`)
         .send({
@@ -487,7 +458,7 @@ describe('兑换市场幂等性测试 (Exchange Market Idempotency)', () => {
 
       console.log('✅ 第一次请求成功')
       console.log('   - quantity: 1')
-      console.log(`   - order_no: ${_response1.body.data.order.order_no}`)
+      console.log(`   - order_no: ${response1.body.data.order.order_no}`)
 
       // 第二次请求（相同business_id，但不同quantity）
       const response2 = await request(app)
@@ -568,15 +539,10 @@ describe('兑换市场幂等性测试 (Exchange Market Idempotency)', () => {
 
       try {
         // 调用Service
-        await ExchangeMarketService.exchangeItem(
-          testUser.user_id,
-          testItem.item_id,
-          1,
-          {
-            business_id,
-            transaction: externalTransaction
-          }
-        )
+        await ExchangeMarketService.exchangeItem(testUser.user_id, testItem.item_id, 1, {
+          business_id,
+          transaction: externalTransaction
+        })
 
         /*
          * 🔴 验证外部事务仍未完成（通过尝试commit来验证）
@@ -633,7 +599,9 @@ describe('兑换市场幂等性测试 (Exchange Market Idempotency)', () => {
       // 验证所有请求都成功
       responses.forEach((response, index) => {
         expect(response.status).toBe(200)
-        console.log(`   - 请求${index + 1}: ${response.body.data.is_duplicate ? '幂等返回' : '首次创建'}`)
+        console.log(
+          `   - 请求${index + 1}: ${response.body.data.is_duplicate ? '幂等返回' : '首次创建'}`
+        )
       })
 
       // 验证数据库中只有一条订单记录

@@ -43,12 +43,10 @@ describe('GET /api/v4/lottery/points/:user_id - 增强功能测试（V4架构）
     redisClient = getRedisClient()
 
     // 1. 获取管理员token（使用统一测试账号）
-    const adminLoginRes = await request(app)
-      .post('/api/v2/auth/login')
-      .send({
-        phone: TEST_DATA.users.adminUser.mobile,
-        verification_code: TEST_DATA.auth.verificationCode
-      })
+    const adminLoginRes = await request(app).post('/api/v4/auth/login').send({
+      phone: TEST_DATA.users.adminUser.mobile,
+      verification_code: TEST_DATA.auth.verificationCode
+    })
 
     console.log('管理员登录响应:', {
       status: adminLoginRes.status,
@@ -63,12 +61,10 @@ describe('GET /api/v4/lottery/points/:user_id - 增强功能测试（V4架构）
       console.log('✅ 管理员登录成功:', adminUserId)
     } else {
       // 尝试使用V4认证接口
-      const v4LoginRes = await request(app)
-        .post('/api/v4/auth/login')
-        .send({
-          mobile: '13612227930',
-          verification_code: '123456'
-        })
+      const v4LoginRes = await request(app).post('/api/v4/auth/login').send({
+        mobile: '13612227930',
+        verification_code: '123456'
+      })
 
       console.log('V4管理员登录响应:', {
         status: v4LoginRes.status,
@@ -105,21 +101,19 @@ describe('GET /api/v4/lottery/points/:user_id - 增强功能测试（V4架构）
     if (!testAccount) {
       testAccount = await UserPointsAccount.create({
         user_id: testUser.user_id,
-        available_points: 2000.00,
-        total_earned: 3000.00,
-        total_consumed: 1000.00,
+        available_points: 2000.0,
+        total_earned: 3000.0,
+        total_consumed: 1000.0,
         is_active: true
       })
       console.log('✅ 创建测试积分账户:', testAccount.account_id)
     }
 
     // 4. 获取普通用户token
-    const normalLoginRes = await request(app)
-      .post('/api/v2/auth/login')
-      .send({
-        phone: testPhone,
-        verification_code: '123456'
-      })
+    const normalLoginRes = await request(app).post('/api/v4/auth/login').send({
+      phone: testPhone,
+      verification_code: '123456'
+    })
 
     console.log('普通用户登录响应:', {
       status: normalLoginRes.status,
@@ -134,12 +128,10 @@ describe('GET /api/v4/lottery/points/:user_id - 增强功能测试（V4架构）
       console.log('✅ 普通用户登录成功:', normalUserId)
     } else {
       // 尝试使用V4认证接口
-      const v4NormalLoginRes = await request(app)
-        .post('/api/v4/auth/login')
-        .send({
-          mobile: testPhone,
-          verification_code: '123456'
-        })
+      const v4NormalLoginRes = await request(app).post('/api/v4/auth/login').send({
+        mobile: testPhone,
+        verification_code: '123456'
+      })
 
       console.log('V4普通用户登录响应:', {
         status: v4NormalLoginRes.status,
@@ -243,8 +235,8 @@ describe('GET /api/v4/lottery/points/:user_id - 增强功能测试（V4架构）
 
       const frozenAccount = await UserPointsAccount.create({
         user_id: frozenUser.user_id,
-        available_points: 500.00,
-        total_earned: 500.00,
+        available_points: 500.0,
+        total_earned: 500.0,
         total_consumed: 0,
         is_active: false, // 冻结账户
         freeze_reason: '测试冻结原因：违规操作'

@@ -27,7 +27,7 @@
 
 const request = require('supertest')
 const app = require('../../../app')
-const { TEST_DATA, createTestData } = require('../../helpers/test-data')
+const { TEST_DATA } = require('../../helpers/test-data')
 const { TestAssertions, TestConfig } = require('../../helpers/test-setup')
 const { getTestUserToken } = require('../../helpers/auth-helper')
 
@@ -37,7 +37,6 @@ const { getTestUserToken } = require('../../helpers/auth-helper')
  * ==========================================
  */
 describe('积分业务测试套件（V4架构）', () => {
-  let testUserId
   let authToken
 
   // 所有测试前：初始化测试环境
@@ -48,8 +47,6 @@ describe('积分业务测试套件（V4架构）', () => {
     console.log(`🆔 用户ID: ${TEST_DATA.users.testUser.user_id}`)
     console.log(`🗄️ 数据库: ${TestConfig.database.database}`)
     console.log('='.repeat(70))
-
-    testUserId = TEST_DATA.users.testUser.user_id
 
     // 🔐 获取测试用户的真实认证token
     authToken = await getTestUserToken(app)
@@ -126,7 +123,9 @@ describe('积分业务测试套件（V4架构）', () => {
       expect(response.body.data).toHaveProperty('total_earned')
       expect(response.body.data).toHaveProperty('total_spent')
 
-      console.log(`✅ 统计信息查询成功: 累计获得 ${response.body.data.total_earned}, 累计消费 ${response.body.data.total_spent}`)
+      console.log(
+        `✅ 统计信息查询成功: 累计获得 ${response.body.data.total_earned}, 累计消费 ${response.body.data.total_spent}`
+      )
     })
 
     /**
@@ -256,7 +255,9 @@ describe('积分业务测试套件（V4架构）', () => {
       expect(typeof response.body.data.is_valid).toBe('boolean')
       expect(typeof response.body.data.current_balance).toBe('number')
 
-      console.log(`✅ 余额验证成功: 当前余额 ${response.body.data.current_balance}, 验证结果 ${response.body.data.is_valid}`)
+      console.log(
+        `✅ 余额验证成功: 当前余额 ${response.body.data.current_balance}, 验证结果 ${response.body.data.is_valid}`
+      )
     })
 
     /**

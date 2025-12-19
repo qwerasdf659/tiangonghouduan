@@ -28,9 +28,8 @@ const router = express.Router()
 const { authenticateToken, requireAdmin } = require('../../../middleware/auth')
 const { handleServiceError } = require('../../../middleware/validation')
 const QRCodeValidator = require('../../../utils/QRCodeValidator')
-const Logger = require('../../../services/UnifiedLotteryEngine/utils/Logger')
 
-const logger = new Logger('ConsumptionAPI')
+const logger = require('../../../utils/logger').logger
 
 /*
  * ========================================

@@ -8,7 +8,7 @@
  */
 
 const MaterialConversionValidator = require('../utils/materialConversionValidator')
-const { MaterialAssetType, MaterialConversionRule } = require('../models')
+const { MaterialAssetType } = require('../models')
 const { sequelize } = require('../models')
 
 describe('P1 修复验证测试', () => {

@@ -58,7 +58,6 @@
  */
 
 const BeijingTimeHelper = require('../../../utils/timeHelper')
-const Logger = require('./Logger')
 
 /**
  * 统一决策引擎性能监控器类
@@ -121,7 +120,7 @@ class PerformanceMonitor {
    * monitor.thresholds.decisionTime = 300 // 调整为300ms
    */
   constructor() {
-    this.logger = new Logger('PerformanceMonitor')
+    this.logger = require('../../../utils/logger').logger
     this.metrics = new Map()
     this.thresholds = {
       decisionTime: 500, // 决策时间阈值：500ms

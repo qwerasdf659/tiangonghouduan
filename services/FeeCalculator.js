@@ -1,5 +1,4 @@
-const Logger = require('../services/UnifiedLotteryEngine/utils/Logger')
-const _logger = new Logger('FeeCalculator')
+const _logger = require('../utils/logger').logger
 
 /**
  * 手续费计算服务

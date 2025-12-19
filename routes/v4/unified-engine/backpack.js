@@ -19,9 +19,8 @@ const express = require('express')
 const router = express.Router()
 const { authenticateToken } = require('../../../middleware/auth')
 const { validatePositiveInteger, handleServiceError } = require('../../../middleware/validation')
-const Logger = require('../../../services/UnifiedLotteryEngine/utils/Logger')
 
-const logger = new Logger('BackpackAPI')
+const logger = require('../../../utils/logger').logger
 
 /**
  * 获取用户背包（双轨统一查询）

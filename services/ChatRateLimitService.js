@@ -1,5 +1,4 @@
-const Logger = require('../services/UnifiedLotteryEngine/utils/Logger')
-const logger = new Logger('ChatRateLimitService')
+const logger = require('../utils/logger').logger
 
 /**
  * 聊天频率限制服务（Chat Rate Limit Service）

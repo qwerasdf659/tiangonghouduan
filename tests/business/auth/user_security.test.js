@@ -25,8 +25,7 @@
 const request = require('supertest')
 const app = require('../../../app')
 const { User, Role, sequelize } = require('../../../models')
-const { TEST_DATA, createTestData } = require('../../helpers/test-data')
-const { TestConfig } = require('../../helpers/test-setup')
+const { TEST_DATA } = require('../../helpers/test-data')
 const { getUserRoles } = require('../../../middleware/auth')
 const BeijingTimeHelper = require('../../../utils/timeHelper')
 
@@ -77,12 +76,10 @@ describe('用户管理安全修复测试 (风险1、2、3 - V4架构)', () => {
 
     // 管理员登录获取token
     try {
-      const loginRes = await request(app)
-        .post('/api/v4/auth/login')
-        .send({
-          mobile: adminUser.mobile,
-          verification_code: '123456'
-        })
+      const loginRes = await request(app).post('/api/v4/auth/login').send({
+        mobile: adminUser.mobile,
+        verification_code: '123456'
+      })
 
       if (loginRes.body.success && loginRes.body.data.access_token) {
         adminToken = loginRes.body.data.access_token
@@ -123,11 +120,12 @@ describe('用户管理安全修复测试 (风险1、2、3 - V4架构)', () => {
 
       // 确保测试用户1是普通用户（role_level=0）
       const userRoles = await getUserRoles(regularUser1.user_id)
-      const userMaxLevel = userRoles.roles.length > 0
-        ? Math.max(...userRoles.roles.map(r => r.role_level))
-        : 0
+      const userMaxLevel =
+        userRoles.roles.length > 0 ? Math.max(...userRoles.roles.map(r => r.role_level)) : 0
 
-      console.log(`\n测试：管理员(level=${testContext.adminMaxLevel}) 修改 用户1(level=${userMaxLevel}) 的角色`)
+      console.log(
+        `\n测试：管理员(level=${testContext.adminMaxLevel}) 修改 用户1(level=${userMaxLevel}) 的角色`
+      )
 
       // 管理员修改低级别用户的角色
       const response = await request(app)
@@ -143,9 +141,10 @@ describe('用户管理安全修复测试 (风险1、2、3 - V4架构)', () => {
       expect(response.body.success).toBe(true)
 
       // API的data字段包含成功消息
-      const dataMessage = typeof response.body.data === 'string'
-        ? response.body.data
-        : JSON.stringify(response.body.data)
+      const dataMessage =
+        typeof response.body.data === 'string'
+          ? response.body.data
+          : JSON.stringify(response.body.data)
 
       console.log(`✅ 正常修改成功: ${dataMessage}`)
     })
@@ -247,7 +246,9 @@ describe('用户管理安全修复测试 (风险1、2、3 - V4架构)', () => {
       expect(response.body.data.operator_id).toBe(adminUser.user_id)
 
       console.log(`✅ 安全保护生效: ${response.body.message}`)
-      console.log(`   用户ID: ${response.body.data.user_id}, 操作者ID: ${response.body.data.operator_id}`)
+      console.log(
+        `   用户ID: ${response.body.data.user_id}, 操作者ID: ${response.body.data.operator_id}`
+      )
     })
   })
 
@@ -285,11 +286,13 @@ describe('用户管理安全修复测试 (风险1、2、3 - V4架构)', () => {
 
       // 验证用户角色未被改变
       const userAfter = await User.findByPk(regularUser1.user_id, {
-        include: [{
-          model: Role,
-          as: 'roles',
-          through: { where: { is_active: true } }
-        }]
+        include: [
+          {
+            model: Role,
+            as: 'roles',
+            through: { where: { is_active: true } }
+          }
+        ]
       })
 
       expect(userAfter.roles.length).toBeGreaterThan(0)

@@ -1,5 +1,4 @@
-const Logger = require('../../services/UnifiedLotteryEngine/utils/Logger')
-const logger = new Logger('notifications')
+const logger = require('../../utils/logger').logger
 
 /**
  * 通知API路由模块 (Notifications API Routes)

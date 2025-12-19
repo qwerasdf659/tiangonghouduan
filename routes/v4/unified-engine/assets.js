@@ -23,9 +23,8 @@ const express = require('express')
 const router = express.Router()
 const { authenticateToken } = require('../../../middleware/auth')
 const { handleServiceError } = require('../../../middleware/validation')
-const Logger = require('../../../services/UnifiedLotteryEngine/utils/Logger')
 
-const logger = new Logger('AssetConversionAPI')
+const logger = require('../../../utils/logger').logger
 
 /**
  * 材料转换接口（显式转换）

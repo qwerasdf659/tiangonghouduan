@@ -1,5 +1,4 @@
-const Logger = require('../services/UnifiedLotteryEngine/utils/Logger')
-const logger = new Logger('auth')
+const logger = require('../utils/logger').logger
 
 /**
  * 统一认证中间件 - V4.0 统一架构版本
@@ -152,9 +151,10 @@ async function setUserPermissionsCache(user_id, data) {
  * 🗑️ 清除用户权限缓存
  * @param {number} user_id - 用户ID
  * @param {string} reason - 清除原因
+ * @param {number|null} operator_id - 操作人ID（用于审计，可选）
  * @returns {Promise<void>} 无返回值
  */
-async function invalidateUserPermissions(user_id, reason = 'unknown') {
+async function invalidateUserPermissions(user_id, reason = 'unknown', operator_id = null) {
   // 清除内存缓存
   const memoryKey = `permissions_${user_id}`
   memoryCache.delete(memoryKey)
@@ -170,6 +170,29 @@ async function invalidateUserPermissions(user_id, reason = 'unknown') {
   }
 
   logger.info(`🔄 [Auth] 清除用户权限缓存: ${user_id} (原因: ${reason})`)
+
+  /*
+   * 🔒 审计日志（不阻塞主流程）
+   * 说明：AdminOperationLog.operation_type 是 ENUM，这里复用 system_config 类型，避免引入新枚举值导致迁移成本上升
+   */
+  if (operator_id) {
+    try {
+      const AuditLogService = require('../services/AuditLogService')
+      await AuditLogService.logOperation({
+        operator_id,
+        operation_type: 'system_config',
+        target_type: 'User',
+        target_id: user_id,
+        action: 'invalidate_permissions_cache',
+        before_data: null,
+        after_data: null,
+        reason,
+        business_id: `permissions_cache_invalidate_${user_id}_${BeijingTimeHelper.timestamp()}`
+      })
+    } catch (auditError) {
+      logger.warn('⚠️ [Auth] 权限缓存失效审计日志记录失败（非致命）:', auditError.message)
+    }
+  }
 }
 
 /**

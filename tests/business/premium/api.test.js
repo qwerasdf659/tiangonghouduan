@@ -23,7 +23,7 @@
  */
 
 const TestCoordinator = require('../../api/TestCoordinator')
-const moment = require('moment-timezone')
+const BeijingTimeHelper = require('../../../utils/timeHelper')
 const { User, UserPointsAccount, UserPremiumStatus } = require('../../../models')
 const { TEST_DATA } = require('../../helpers/test-data')
 
@@ -34,9 +34,7 @@ describe('高级空间解锁API测试', () => {
   beforeAll(async () => {
     console.log('🚀 高级空间解锁API测试启动')
     console.log('='.repeat(70))
-    console.log(
-      `📅 测试时间: ${moment().tz('Asia/Shanghai').format('YYYY-MM-DD HH:mm:ss')} (北京时间)`
-    )
+    console.log(`📅 测试时间: ${BeijingTimeHelper.toBeijingTime(new Date())} (北京时间)`)
     console.log(`👤 测试账号: ${test_account.mobile} (用户ID: ${test_account.user_id})`)
     console.log('🗄️ 数据库: restaurant_points_dev')
 

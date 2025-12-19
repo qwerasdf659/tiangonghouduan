@@ -1,5 +1,4 @@
-const Logger = require('../../services/UnifiedLotteryEngine/utils/Logger')
-const logger = new Logger('system')
+const logger = require('../../utils/logger').logger
 
 /**
  * 餐厅积分抽奖系统 V4.0 - 系统功能API路由
@@ -22,7 +21,6 @@ const { handleServiceError } = require('../../middleware/validation')
 const dataAccessControl = require('../../middleware/dataAccessControl')
 const BeijingTimeHelper = require('../../utils/timeHelper')
 const ChatRateLimitService = require('../../services/ChatRateLimitService')
-// const { Op } = require('sequelize') // 未使用，已注释
 
 /*
  * 🔄 TR-005规范+P2-F架构重构：已完成频率限制逻辑下沉到Service层

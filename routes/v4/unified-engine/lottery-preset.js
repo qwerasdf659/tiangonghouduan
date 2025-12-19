@@ -1,5 +1,4 @@
-const Logger = require('../../../services/UnifiedLotteryEngine/utils/Logger')
-const logger = new Logger('lottery-preset')
+const logger = require('../../../utils/logger').logger
 
 /**
  * 抽奖预设管理路由

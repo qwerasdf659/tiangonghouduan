@@ -1,27 +1,23 @@
 /**
  * 兑换市场商品模型 - ExchangeItem
- * 双账户模型兑换市场核心表
- * 用户只能使用虚拟奖品价值兑换商品（唯一支付方式）
+ * 材料资产支付兑换市场核心表（V4.5.0统一版）
  *
  * 业务场景：
- * - 用户抽奖获得虚拟奖品（水晶、贵金属等）
- * - 虚拟奖品存入背包（UserInventory）
- * - 用户使用背包中的虚拟奖品价值兑换商品
- * - 兑换时不扣除显示积分和预算积分（已在抽奖时扣除）
+ * - 用户通过抽奖、转换等途径获得材料资产（碎红水晶、完整红水晶等）
+ * - 材料资产存入统一账本（Account + AccountAssetBalance）
+ * - 用户使用材料资产兑换商品（通过 AssetService.changeBalance() 扣减）
  *
- * 支付方式说明：
- * - price_type：只支持 'virtual'（虚拟奖品价值支付，唯一方式）
- * - virtual_value_price：实际扣除的虚拟奖品价值（必须字段）
- * - points_price：仅用于前端展示，不实际扣除显示积分（可选字段）
+ * 支付方式说明（V4.5.0唯一方式）：
+ * - cost_asset_code：兑换商品需要的材料资产类型（如 red_shard）
+ * - cost_amount：兑换单件商品需要的材料数量
+ * - 所有兑换操作通过 AssetService.changeBalance() 扣减材料资产
  *
  * 业务规则（强制）：
- * - ✅ 兑换只能使用虚拟奖品价值
- * - ❌ 禁止扣除 available_points（显示积分）
- * - ❌ 禁止扣除 remaining_budget_points（预算积分）
- * - ✅ price_type 必须为 'virtual'
- * - ✅ points_price 仅用于展示
+ * - ✅ 兑换只能使用材料资产支付
+ * - ✅ cost_asset_code + cost_amount 为新商品必填字段
+ * - ❌ 禁止积分支付和虚拟奖品价值支付（已彻底移除）
  *
- * 最后修改：2025年12月08日 - 统一为只支持virtual支付方式
+ * 最后修改：2025年12月18日 - 暴力移除旧方案，统一为材料资产支付
  */
 
 const { DataTypes } = require('sequelize')
@@ -55,36 +51,18 @@ module.exports = sequelize => {
         comment: '商品图片URL'
       },
 
-      // 价格类型（双账户模型核心字段 - 已简化为只支持virtual）
-      price_type: {
-        type: DataTypes.ENUM('virtual'),
-        allowNull: false,
-        defaultValue: 'virtual',
-        comment: '支付方式（仅支持虚拟奖品价值支付）- 已废弃，保留用于历史数据兼容'
-      },
-      virtual_value_price: {
-        type: DataTypes.INTEGER,
-        allowNull: false,
-        comment: '虚拟奖品价格（实际扣除的虚拟价值）- 已废弃，保留用于回滚观测'
-      },
-      points_price: {
-        type: DataTypes.INTEGER,
-        allowNull: true,
-        comment: '积分价格（仅用于前端展示，不扣除用户显示积分）- 已废弃'
-      },
-
-      // V4.5.0 材料资产支付字段（2025-12-15新增）
+      // V4.5.0 材料资产支付字段（唯一支付方式）
       cost_asset_code: {
         type: DataTypes.STRING(50),
-        allowNull: true,
+        allowNull: false,
         comment:
-          '成本资产代码（Cost Asset Code - 兑换商品消耗的材料资产类型）：red_shard-碎红水晶、red_crystal-完整红水晶等；业务规则：新商品必填，历史商品可为null；支持多种材料资产扩展；用途：兑换支付资产类型、库存扣减依据、成本核算基础'
+          '成本资产代码（Cost Asset Code - 兑换商品消耗的材料资产类型）：red_shard-碎红水晶、red_crystal-完整红水晶等；业务规则：必填字段；支持多种材料资产扩展；用途：兑换支付资产类型、库存扣减依据、成本核算基础'
       },
       cost_amount: {
         type: DataTypes.BIGINT,
-        allowNull: true,
+        allowNull: false,
         comment:
-          '成本数量（Cost Amount - 兑换单件商品需要的材料数量）：单位根据cost_asset_code确定（如10个碎红水晶）；业务规则：新商品必填，历史商品可为null；使用BIGINT避免浮点精度问题；数据范围：1-1000000；用途：兑换扣减材料数量、成本核算、商品定价参考'
+          '成本数量（Cost Amount - 兑换单件商品需要的材料数量）：单位根据cost_asset_code确定（如10个碎红水晶）；业务规则：必填字段；使用BIGINT避免浮点精度问题；数据范围：1-1000000；用途：兑换扣减材料数量、成本核算、商品定价参考'
       },
 
       // 成本和库存
@@ -131,8 +109,8 @@ module.exports = sequelize => {
       created_at: 'created_at',
       updated_at: 'updated_at',
       underscored: true,
-      indexes: [{ fields: ['price_type'] }, { fields: ['status'] }, { fields: ['category'] }],
-      comment: '兑换市场商品表'
+      indexes: [{ fields: ['status'] }, { fields: ['category'] }, { fields: ['cost_asset_code'] }],
+      comment: '兑换市场商品表（V4.5.0材料资产支付）'
     }
   )
 
@@ -160,17 +138,16 @@ module.exports = sequelize => {
   }
 
   /**
-   * 获取支付要求
-   * 注意：当前只支持 virtual 支付方式
+   * 获取材料资产支付要求（V4.5.0统一版）
    *
    * @returns {Object} 支付要求
-   * @returns {number} returns.virtualValue - 需要的虚拟奖品价值
-   * @returns {number} returns.points - 展示用积分价格（不实际扣除）
+   * @returns {string} returns.asset_code - 需要的材料资产代码
+   * @returns {number} returns.amount - 需要的材料数量
    */
   ExchangeItem.prototype.getPaymentRequired = function () {
     return {
-      virtualValue: this.virtual_value_price || 0,
-      points: this.points_price || 0 // 仅用于展示，不扣除显示积分
+      asset_code: this.cost_asset_code,
+      amount: this.cost_amount || 0
     }
   }
 

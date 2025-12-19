@@ -18,7 +18,7 @@
  */
 
 const TestCoordinator = require('../../api/TestCoordinator')
-const { TEST_DATA, createTestData } = require('../../helpers/test-data')
+const { TEST_DATA } = require('../../helpers/test-data')
 const BeijingTimeHelper = require('../../../utils/timeHelper')
 
 describe('认证和权限系统API测试（V4架构）', () => {
@@ -26,7 +26,6 @@ describe('认证和权限系统API测试（V4架构）', () => {
   let test_user_id = null
   // ✅ 修复：统一使用TEST_DATA而非TestConfig.real_data
   const testUser = TEST_DATA.users.testUser
-  const adminUser = TEST_DATA.users.adminUser
 
   /*
    * ==========================================
@@ -127,11 +126,7 @@ describe('认证和权限系统API测试（V4架构）', () => {
         verification_code: '123456'
       }
 
-      const response = await tester.makeRequest(
-        'POST',
-        '/api/v4/auth/login',
-        login_data
-      )
+      const response = await tester.makeRequest('POST', '/api/v4/auth/login', login_data)
 
       expect([200, 400]).toContain(response.status)
       if (response.status === 200) {
@@ -213,12 +208,9 @@ describe('认证和权限系统API测试（V4架构）', () => {
     })
 
     test('获取用户信息 - 无效Token应返回401', async () => {
-      const response = await tester.makeRequest(
-        'GET',
-        '/api/v4/auth/profile',
-        null,
-        { Authorization: 'Bearer invalid_token_here' }
-      )
+      const response = await tester.makeRequest('GET', '/api/v4/auth/profile', null, {
+        Authorization: 'Bearer invalid_token_here'
+      })
 
       expect(response.status).toBe(401)
       expect(response.data).toHaveProperty('success', false)
@@ -254,14 +246,10 @@ describe('认证和权限系统API测试（V4架构）', () => {
 
     test('Token刷新 - POST /api/v4/auth/refresh', async () => {
       // 先登录获取refresh_token
-      const login_response = await tester.makeRequest(
-        'POST',
-        '/api/v4/auth/quick-login',
-        {
-          mobile: testUser.mobile,
-          verification_code: '123456'
-        }
-      )
+      const login_response = await tester.makeRequest('POST', '/api/v4/auth/quick-login', {
+        mobile: testUser.mobile,
+        verification_code: '123456'
+      })
 
       expect(login_response.status).toBe(200)
       expect(login_response.data.data).toHaveProperty('refresh_token')
@@ -269,11 +257,9 @@ describe('认证和权限系统API测试（V4架构）', () => {
       const refresh_token = login_response.data.data.refresh_token
 
       // 使用refresh_token刷新Token
-      const refresh_response = await tester.makeRequest(
-        'POST',
-        '/api/v4/auth/refresh',
-        { refresh_token }
-      )
+      const refresh_response = await tester.makeRequest('POST', '/api/v4/auth/refresh', {
+        refresh_token
+      })
 
       expect([200, 401]).toContain(refresh_response.status)
       if (refresh_response.status === 200) {
@@ -373,7 +359,10 @@ describe('认证和权限系统API测试（V4架构）', () => {
         expect(response.data.data).toHaveProperty('roles')
         expect(Array.isArray(response.data.data.roles)).toBe(true)
 
-        console.log('✅ 获取用户权限列表成功, 权限数:', response.data.data.permissions.permissions.length)
+        console.log(
+          '✅ 获取用户权限列表成功, 权限数:',
+          response.data.data.permissions.permissions.length
+        )
       }
     })
 

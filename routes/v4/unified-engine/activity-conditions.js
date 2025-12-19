@@ -1,5 +1,4 @@
-const Logger = require('../../../services/UnifiedLotteryEngine/utils/Logger')
-const logger = new Logger('activity-conditions')
+const logger = require('../../../utils/logger').logger
 
 /**
  * 活动条件管理API路由

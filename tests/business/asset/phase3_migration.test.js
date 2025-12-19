@@ -10,27 +10,15 @@
  * Phase 3实施
  */
 
-const request = require('supertest')
-const {
-  sequelize,
-  User,
-  AssetTransaction,
-  AccountAssetBalance,
-  Account
-} = require('../../../models')
+const { User, AssetTransaction } = require('../../../models')
 const { Op } = require('sequelize')
 const AssetService = require('../../../services/AssetService')
-const ExchangeMarketService = require('../../../services/ExchangeMarketService')
 const AssetConversionService = require('../../../services/AssetConversionService')
 
 describe('Phase 3迁移测试：统一账本域', () => {
-  let app
   let testUser
 
   beforeAll(async () => {
-    // 初始化Express应用
-    app = require('../../../app')
-
     // 查找或创建测试用户
     const [user, created] = await User.findOrCreate({
       where: { mobile: '13600000003' },

@@ -22,10 +22,10 @@
 const express = require('express')
 const router = express.Router()
 const { authenticateToken } = require('../../../middleware/auth')
-const Logger = require('../../../services/UnifiedLotteryEngine/utils/Logger')
+
 const { validatePositiveInteger, handleServiceError } = require('../../../middleware/validation')
 
-const logger = new Logger('InventoryMarketAPI')
+const logger = require('../../../utils/logger').logger
 
 /**
  * 获取交易市场挂牌列表

@@ -370,7 +370,7 @@ class UserRoleService {
       }
 
       // 自动清除用户权限缓存
-      await invalidateUserPermissions(user_id, `role_change_${role_name}`)
+      await invalidateUserPermissions(user_id, `role_change_${role_name}`, operator_id)
       logger.info('权限缓存已清除', { user_id, reason: `角色变更 ${role_name}` })
 
       // P1安全修复：如果权限降级，强制断开WebSocket连接（用户需重新连接鉴权）
@@ -452,7 +452,7 @@ class UserRoleService {
     await user.update({ status })
 
     // 自动清除用户权限缓存
-    await invalidateUserPermissions(user_id, `status_change_${oldStatus}_to_${status}`)
+    await invalidateUserPermissions(user_id, `status_change_${oldStatus}_to_${status}`, operator_id)
     logger.info('权限缓存已清除', { user_id, reason: `状态变更 ${oldStatus} → ${status}` })
 
     // P1安全修复：如果用户被禁用/停用，强制断开所有WebSocket连接

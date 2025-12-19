@@ -415,7 +415,23 @@ class ApiResponse {
       const requestId =
         req.headers['x-request-id'] ||
         req.headers['request-id'] ||
-        `req_${Date.now()}_${Math.random().toString(36).substr(2, 8)}`
+        (() => {
+          // Node.js 16+ 支持 crypto.randomUUID（本项目Node.js 20+）
+          try {
+            const crypto = require('crypto')
+            return `req_${crypto.randomUUID()}`
+          } catch (_e) {
+            return `req_${Date.now()}_${Math.random().toString(36).substr(2, 8)}`
+          }
+        })()
+
+      /*
+       * ✅ 注入 request_id 到 req，并回传响应头（全链路追踪）
+       * 说明：很多中间件/错误处理器需要从 req 读取 request_id
+       */
+      // eslint-disable-next-line require-atomic-updates
+      req.id = requestId
+      res.setHeader('X-Request-ID', requestId)
 
       // 注入统一的成功响应方法 - 符合接口规范文档标准
       res.apiSuccess = (data = null, message = '操作成功', code = 'SUCCESS') => {

@@ -26,8 +26,7 @@
 const request = require('supertest')
 const app = require('../../../app')
 const { User, UserPointsAccount } = require('../../../models')
-const { TEST_DATA, createTestData } = require('../../helpers/test-data')
-const { TestConfig } = require('../../helpers/test-setup')
+const { TEST_DATA } = require('../../helpers/test-data')
 const BeijingTimeHelper = require('../../../utils/timeHelper')
 
 describe('积分余额查询API - P0优化验证（V4架构）', () => {
@@ -55,12 +54,10 @@ describe('积分余额查询API - P0优化验证（V4架构）', () => {
 
     // 1. 获取管理员token
     try {
-      const adminLoginRes = await request(app)
-        .post('/api/v4/auth/login')
-        .send({
-          mobile: adminUser.mobile,
-          verification_code: '123456'
-        })
+      const adminLoginRes = await request(app).post('/api/v4/auth/login').send({
+        mobile: adminUser.mobile,
+        verification_code: '123456'
+      })
 
       if (adminLoginRes.body.success && adminLoginRes.body.data.token) {
         adminToken = adminLoginRes.body.data.token
@@ -88,9 +85,9 @@ describe('积分余额查询API - P0优化验证（V4架构）', () => {
     if (!testAccount) {
       testAccount = await UserPointsAccount.create({
         user_id: normalTestUser.user_id,
-        available_points: 1000.00,
-        total_earned: 1500.00,
-        total_consumed: 500.00,
+        available_points: 1000.0,
+        total_earned: 1500.0,
+        total_consumed: 500.0,
         is_active: true
       })
       console.log('✅ 创建测试积分账户:', testAccount.account_id)
@@ -98,12 +95,10 @@ describe('积分余额查询API - P0优化验证（V4架构）', () => {
 
     // 4. 获取普通用户token
     try {
-      const normalLoginRes = await request(app)
-        .post('/api/v4/auth/login')
-        .send({
-          mobile: testPhone,
-          verification_code: '123456'
-        })
+      const normalLoginRes = await request(app).post('/api/v4/auth/login').send({
+        mobile: testPhone,
+        verification_code: '123456'
+      })
 
       if (normalLoginRes.body.success && normalLoginRes.body.data.token) {
         normalUserToken = normalLoginRes.body.data.token
@@ -283,8 +278,8 @@ describe('积分余额查询API - P0优化验证（V4架构）', () => {
 
       frozenAccount = await UserPointsAccount.create({
         user_id: frozenUser.user_id,
-        available_points: 500.00,
-        total_earned: 500.00,
+        available_points: 500.0,
+        total_earned: 500.0,
         total_consumed: 0,
         is_active: false, // 冻结账户
         freeze_reason: '测试冻结原因：违规操作'
@@ -458,8 +453,7 @@ describe('积分余额查询API - P0优化验证（V4架构）', () => {
         return
       }
 
-      const res = await request(app)
-        .get(`/api/v4/points/balance/${normalTestUser.user_id}`)
+      const res = await request(app).get(`/api/v4/points/balance/${normalTestUser.user_id}`)
 
       expect(res.status).toBe(401)
 

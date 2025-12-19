@@ -1,5 +1,4 @@
-const Logger = require('../../../../services/UnifiedLotteryEngine/utils/Logger')
-const logger = new Logger('customer_service')
+const logger = require('../../../../utils/logger').logger
 
 /**
  * 客服管理路由 - Admin Customer Service Routes

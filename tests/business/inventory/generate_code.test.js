@@ -26,9 +26,8 @@
  */
 
 const TestCoordinator = require('../../api/TestCoordinator')
-const moment = require('moment-timezone')
-const { UserInventory, User } = require('../../../models')
 const BeijingTimeHelper = require('../../../utils/timeHelper')
+const { UserInventory } = require('../../../models')
 const { TEST_DATA } = require('../../helpers/test-data')
 
 // 设置Jest全局超时时间为60秒（应对登录API慢的问题）
@@ -49,7 +48,7 @@ describe('生成核销码API测试套件（Generate Verification Code API Test S
     console.log('🚀 生成核销码API测试套件启动（Generate Verification Code API Test Suite Started）')
     console.log('='.repeat(70))
     console.log(
-      `📅 测试时间（Test Time）: ${moment().tz('Asia/Shanghai').format('YYYY-MM-DD HH:mm:ss')} (北京时间)`
+      `📅 测试时间（Test Time）: ${BeijingTimeHelper.toBeijingTime(new Date())} (北京时间)`
     )
     console.log(`📱 测试账号（Test Account）: ${test_account.mobile}`)
     console.log('='.repeat(70))

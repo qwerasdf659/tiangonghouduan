@@ -1,21 +1,20 @@
 /**
  * 兑换市场记录模型 - ExchangeMarketRecord
- * 记录用户使用虚拟奖品价值兑换商品的订单（唯一支付方式）
+ * 材料资产支付兑换订单表（V4.5.0统一版）
  *
  * 业务场景：
- * - 用户选择商品并支付虚拟奖品价值
- * - 扣除用户背包中的虚拟奖品价值
- * - 创建兑换订单
+ * - 用户选择商品并使用材料资产支付
+ * - 通过 AssetService.changeBalance() 扣除材料资产
+ * - 创建兑换订单（记录 pay_asset_code + pay_amount）
  * - 发货和订单状态管理
  *
  * 业务规则（强制）：
- * - ✅ 只支持虚拟奖品价值支付
- * - ❌ 禁止扣除 available_points（显示积分）
- * - ❌ 禁止扣除 remaining_budget_points（预算积分）
- * - ✅ points_paid 必须强制为 0
- * - ✅ payment_type 必须为 'virtual'
+ * - ✅ 只支持材料资产支付（pay_asset_code + pay_amount）
+ * - ✅ 材料扣减通过 AssetService 统一账本执行
+ * - ✅ 支持幂等性控制（business_id 唯一约束）
+ * - ❌ 禁止积分支付和虚拟奖品价值支付（已彻底移除）
  *
- * 最后修改：2025年12月12日 - 添加business_id等字段支持幂等性
+ * 最后修改：2025年12月18日 - 暴力移除旧方案，统一为材料资产支付
  */
 
 const { DataTypes } = require('sequelize')
@@ -52,36 +51,18 @@ module.exports = sequelize => {
         }
       },
 
-      // 支付信息
-      payment_type: {
-        type: DataTypes.ENUM('virtual'),
-        allowNull: false,
-        defaultValue: 'virtual',
-        comment: '支付方式（仅支持虚拟奖品价值支付）- 已废弃，保留用于历史数据兼容'
-      },
-      virtual_value_paid: {
-        type: DataTypes.INTEGER,
-        allowNull: false,
-        defaultValue: 0,
-        comment: '消耗虚拟奖品价值（实际支付金额）- 已废弃，保留用于回滚观测'
-      },
-      points_paid: {
-        type: DataTypes.INTEGER,
-        allowNull: false,
-        defaultValue: 0,
-        comment: '消耗积分（应始终为0，仅用于展示）- 已废弃'
-      },
-
-      // V4.5.0 材料资产支付字段（2025-12-15新增）
+      // V4.5.0 材料资产支付字段（唯一支付方式）
       pay_asset_code: {
         type: DataTypes.STRING(50),
-        allowNull: true,
-        comment: '支付资产代码（Pay Asset Code - 兑换订单实际扣减的材料资产类型）：red_shard-碎红水晶、red_crystal-完整红水晶等；业务规则：新订单必填，历史订单可为null；与exchange_items.cost_asset_code对应；用途：订单支付对账、材料消耗统计、成本核算依据'
+        allowNull: false,
+        comment:
+          '支付资产代码（Pay Asset Code - 兑换订单实际扣减的材料资产类型）：red_shard-碎红水晶、red_crystal-完整红水晶等；业务规则：必填字段；与exchange_items.cost_asset_code对应；用途：订单支付对账、材料消耗统计、成本核算依据'
       },
       pay_amount: {
         type: DataTypes.BIGINT,
-        allowNull: true,
-        comment: '支付数量（Pay Amount - 兑换订单实际扣减的材料总数量）：计算公式：cost_amount * quantity；单位根据pay_asset_code确定；业务规则：新订单必填，历史订单可为null；使用BIGINT避免浮点精度问题；用途：订单支付对账、材料消耗统计、成本核算'
+        allowNull: false,
+        comment:
+          '支付数量（Pay Amount - 兑换订单实际扣减的材料总数量）：计算公式：cost_amount * quantity；单位根据pay_asset_code确定；业务规则：必填字段；使用BIGINT避免浮点精度问题；用途：订单支付对账、材料消耗统计、成本核算'
       },
 
       // 成本信息（后端记录，不对外暴露）
@@ -184,7 +165,9 @@ module.exports = sequelize => {
    */
   ExchangeMarketRecord.generateOrderNo = function () {
     const timestamp = Date.now()
-    const random = Math.floor(Math.random() * 10000).toString().padStart(4, '0')
+    const random = Math.floor(Math.random() * 10000)
+      .toString()
+      .padStart(4, '0')
     return `EXC${timestamp}${random}`
   }
 

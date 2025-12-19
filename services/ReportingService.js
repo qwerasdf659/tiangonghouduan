@@ -30,7 +30,7 @@
  * - LotteryDraw：抽奖记录表
  * - ConsumptionRecord：消费记录表
  * - PointsTransaction：积分交易表
- * - UserInventory：用户库存表
+ * - ItemInstance：物品实例表（背包双轨架构 - 不可叠加物品轨）
  * - CustomerServiceSession：客服会话表
  * - ChatMessage：聊天消息表
  * - Role：角色表
@@ -41,11 +41,10 @@
 
 const BeijingTimeHelper = require('../utils/timeHelper')
 const DataSanitizer = require('./DataSanitizer')
-const Logger = require('./UnifiedLotteryEngine/utils/Logger')
 const models = require('../models')
 const { Op, fn, col, literal } = require('sequelize')
 
-const logger = new Logger('ReportingService')
+const logger = require('../utils/logger').logger
 
 /**
  * 统一报表服务类
@@ -62,7 +61,7 @@ class ReportingService {
    * @param {number|null} userFilter - 用户ID过滤（可选）
    * @returns {Promise<Object>} 决策分析数据
    */
-  static async getDecisionAnalytics (days = 7, userFilter = null) {
+  static async getDecisionAnalytics(days = 7, userFilter = null) {
     try {
       // 参数验证
       const dayCount = Math.min(Math.max(parseInt(days) || 7, 1), 90)
@@ -181,25 +180,25 @@ class ReportingService {
    * @param {string} granularity - 时间粒度（hourly、daily）
    * @returns {Promise<Object>} 趋势分析数据
    */
-  static async getLotteryTrends (period = 'week', granularity = 'daily') {
+  static async getLotteryTrends(period = 'week', granularity = 'daily') {
     try {
       // 计算时间范围
       let days = 7
       switch (period) {
-      case 'day':
-        days = 1
-        break
-      case 'week':
-        days = 7
-        break
-      case 'month':
-        days = 30
-        break
-      case 'quarter':
-        days = 90
-        break
-      default:
-        days = 7
+        case 'day':
+          days = 1
+          break
+        case 'week':
+          days = 7
+          break
+        case 'month':
+          days = 30
+          break
+        case 'quarter':
+          days = 90
+          break
+        default:
+          days = 7
       }
 
       const endDate = BeijingTimeHelper.createBeijingTime()
@@ -252,21 +251,21 @@ class ReportingService {
         // 奖品发放趋势
         models.LotteryPrize
           ? models.LotteryPrize.findAll({
-            where: {
-              created_at: {
-                [Op.gte]: startDate,
-                [Op.lte]: endDate
-              }
-            },
-            attributes: [
-              [fn('DATE_FORMAT', col('created_at'), dateFormat), 'period'],
-              [fn('COUNT', col('draw_id')), 'prizes_added'],
-              [fn('SUM', col('stock_quantity')), 'total_quantity']
-            ],
-            group: [fn('DATE_FORMAT', col('created_at'), dateFormat)],
-            order: [[fn('DATE_FORMAT', col('created_at'), dateFormat), 'ASC']],
-            raw: true
-          })
+              where: {
+                created_at: {
+                  [Op.gte]: startDate,
+                  [Op.lte]: endDate
+                }
+              },
+              attributes: [
+                [fn('DATE_FORMAT', col('created_at'), dateFormat), 'period'],
+                [fn('COUNT', col('draw_id')), 'prizes_added'],
+                [fn('SUM', col('stock_quantity')), 'total_quantity']
+              ],
+              group: [fn('DATE_FORMAT', col('created_at'), dateFormat)],
+              order: [[fn('DATE_FORMAT', col('created_at'), dateFormat), 'ASC']],
+              raw: true
+            })
           : Promise.resolve([])
       ])
 
@@ -307,9 +306,9 @@ class ReportingService {
           average_win_rate:
             processedLotteryTrends.length > 0
               ? (
-                processedLotteryTrends.reduce((sum, t) => sum + parseFloat(t.win_rate), 0) /
+                  processedLotteryTrends.reduce((sum, t) => sum + parseFloat(t.win_rate), 0) /
                   processedLotteryTrends.length
-              ).toFixed(2)
+                ).toFixed(2)
               : 0
         },
         generated_at: BeijingTimeHelper.now()
@@ -334,7 +333,7 @@ class ReportingService {
    * @param {Object} performanceMonitor - 性能监控器实例
    * @returns {Promise<Object>} 性能报告数据
    */
-  static async getPerformanceReport (performanceMonitor = null) {
+  static async getPerformanceReport(performanceMonitor = null) {
     try {
       // 获取引擎性能监控数据
       let performanceData = {}
@@ -418,7 +417,7 @@ class ReportingService {
    *
    * @returns {Promise<Object>} 今日统计数据
    */
-  static async getTodayStats () {
+  static async getTodayStats() {
     try {
       // 获取今日时间范围（北京时间）
       const todayStart = BeijingTimeHelper.todayStart()
@@ -528,8 +527,8 @@ class ReportingService {
           }
         }) || 0,
 
-        // 库存统计
-        models.UserInventory.count({
+        // 库存统计（使用新表 ItemInstance）
+        models.ItemInstance.count({
           where: {
             created_at: {
               [Op.gte]: todayStart,
@@ -537,7 +536,7 @@ class ReportingService {
             }
           }
         }),
-        models.UserInventory.count({
+        models.ItemInstance.count({
           where: {
             used_at: {
               [Op.gte]: todayStart,
@@ -577,13 +576,13 @@ class ReportingService {
         // 消费记录统计
         models.ConsumptionRecord
           ? models.ConsumptionRecord.count({
-            where: {
-              created_at: {
-                [Op.gte]: todayStart,
-                [Op.lte]: todayEnd
+              where: {
+                created_at: {
+                  [Op.gte]: todayStart,
+                  [Op.lte]: todayEnd
+                }
               }
-            }
-          })
+            })
           : 0
       ])
 
@@ -669,7 +668,7 @@ class ReportingService {
    * @description 提供快速的系统概览统计，用于管理后台中间件
    * @returns {Promise<Object>} 简化的系统统计数据
    */
-  static async getSimpleSystemStats () {
+  static async getSimpleSystemStats() {
     const os = require('os')
 
     try {
@@ -736,7 +735,7 @@ class ReportingService {
    * @returns {Promise<Object>} 包含所有图表数据的对象
    * @throws {Error} 参数错误、数据库查询失败等
    */
-  static async getChartsData (days = 30) {
+  static async getChartsData(days = 30) {
     // 1. 验证查询参数
     if (![7, 30, 90].includes(days)) {
       const error = new Error('参数错误：days必须是7、30或90')
@@ -760,7 +759,9 @@ class ReportingService {
     start_date.setDate(start_date.getDate() - days)
     start_date.setHours(0, 0, 0, 0)
 
-    logger.info(`查询时间范围: ${start_date.toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })} ~ ${end_date.toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })}`)
+    logger.info(
+      `查询时间范围: ${start_date.toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })} ~ ${end_date.toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })}`
+    )
 
     // 3. 并行查询所有统计数据
     const start_time = Date.now()
@@ -815,7 +816,7 @@ class ReportingService {
    * @param {number} days - 天数
    * @returns {Promise<Array>} 用户增长数据数组
    */
-  static async getUserGrowthData (start_date, end_date, days) {
+  static async getUserGrowthData(start_date, end_date, days) {
     try {
       // 查询每天新增用户数
       const daily_users = await models.User.findAll({
@@ -864,7 +865,9 @@ class ReportingService {
         })
       }
 
-      logger.info(`用户增长数据: ${days}天内新增${cumulative - total_users_before}人，总用户${cumulative}人`)
+      logger.info(
+        `用户增长数据: ${days}天内新增${cumulative - total_users_before}人，总用户${cumulative}人`
+      )
       return growth_data
     } catch (error) {
       logger.error('获取用户增长数据失败:', error)
@@ -877,51 +880,59 @@ class ReportingService {
    *
    * @returns {Promise<Object>} 用户类型统计对象
    */
-  static async getUserTypesData () {
+  static async getUserTypesData() {
     try {
       const Role = models.Role
 
       // 查询各类型用户数量（通过角色关联）
-      const [user_role_users, admin_role_users, merchant_role_users, all_users] = await Promise.all([
-        // 普通用户：拥有user角色
-        models.User.count({
-          distinct: true,
-          include: [{
-            model: Role,
-            as: 'roles',
-            where: { role_name: 'user', is_active: true },
-            through: { where: { is_active: true } },
-            required: true
-          }]
-        }),
+      const [user_role_users, admin_role_users, merchant_role_users, all_users] = await Promise.all(
+        [
+          // 普通用户：拥有user角色
+          models.User.count({
+            distinct: true,
+            include: [
+              {
+                model: Role,
+                as: 'roles',
+                where: { role_name: 'user', is_active: true },
+                through: { where: { is_active: true } },
+                required: true
+              }
+            ]
+          }),
 
-        // 管理员用户：拥有admin角色
-        models.User.count({
-          distinct: true,
-          include: [{
-            model: Role,
-            as: 'roles',
-            where: { role_name: 'admin', is_active: true },
-            through: { where: { is_active: true } },
-            required: true
-          }]
-        }),
+          // 管理员用户：拥有admin角色
+          models.User.count({
+            distinct: true,
+            include: [
+              {
+                model: Role,
+                as: 'roles',
+                where: { role_name: 'admin', is_active: true },
+                through: { where: { is_active: true } },
+                required: true
+              }
+            ]
+          }),
 
-        // 商家用户：拥有merchant角色
-        models.User.count({
-          distinct: true,
-          include: [{
-            model: Role,
-            as: 'roles',
-            where: { role_name: 'merchant', is_active: true },
-            through: { where: { is_active: true } },
-            required: true
-          }]
-        }),
+          // 商家用户：拥有merchant角色
+          models.User.count({
+            distinct: true,
+            include: [
+              {
+                model: Role,
+                as: 'roles',
+                where: { role_name: 'merchant', is_active: true },
+                through: { where: { is_active: true } },
+                required: true
+              }
+            ]
+          }),
 
-        // 总用户数
-        models.User.count()
-      ])
+          // 总用户数
+          models.User.count()
+        ]
+      )
 
       const types_data = {
         regular: {
@@ -939,7 +950,9 @@ class ReportingService {
         total: all_users
       }
 
-      logger.info(`用户类型分布: 普通${user_role_users}, 管理员${admin_role_users}, 商家${merchant_role_users}, 总用户${all_users}`)
+      logger.info(
+        `用户类型分布: 普通${user_role_users}, 管理员${admin_role_users}, 商家${merchant_role_users}, 总用户${all_users}`
+      )
       return types_data
     } catch (error) {
       logger.error('获取用户类型数据失败:', error)
@@ -960,7 +973,7 @@ class ReportingService {
    * @param {number} days - 天数
    * @returns {Promise<Array>} 抽奖趋势数据数组
    */
-  static async getLotteryTrendData (start_date, end_date, days) {
+  static async getLotteryTrendData(start_date, end_date, days) {
     try {
       // 查询每天抽奖数据
       const daily_lottery = await models.LotteryDraw.findAll({
@@ -1017,7 +1030,7 @@ class ReportingService {
    * @param {number} days - 天数
    * @returns {Promise<Array>} 消费趋势数据数组
    */
-  static async getConsumptionTrendData (start_date, end_date, days) {
+  static async getConsumptionTrendData(start_date, end_date, days) {
     try {
       // 查询每天消费数据（只统计已审核通过的记录）
       const daily_consumption = await models.ConsumptionRecord.findAll({
@@ -1073,14 +1086,30 @@ class ReportingService {
    * @param {number} days - 天数
    * @returns {Promise<Array>} 积分流水数据数组
    */
-  static async getPointsFlowData (start_date, end_date, days) {
+  static async getPointsFlowData(start_date, end_date, days) {
     try {
       // 查询每天积分流水（区分收入和支出）
       const daily_points = await models.PointsTransaction.findAll({
         attributes: [
           [fn('DATE', col('transaction_time')), 'date'],
-          [fn('SUM', literal('CASE WHEN transaction_type IN (\'earn\', \'admin_add\', \'refund\') THEN amount ELSE 0 END')), 'earned'],
-          [fn('SUM', literal('CASE WHEN transaction_type IN (\'spend\', \'admin_deduct\') THEN amount ELSE 0 END')), 'spent']
+          [
+            fn(
+              'SUM',
+              literal(
+                "CASE WHEN transaction_type IN ('earn', 'admin_add', 'refund') THEN amount ELSE 0 END"
+              )
+            ),
+            'earned'
+          ],
+          [
+            fn(
+              'SUM',
+              literal(
+                "CASE WHEN transaction_type IN ('spend', 'admin_deduct') THEN amount ELSE 0 END"
+              )
+            ),
+            'spent'
+          ]
         ],
         where: {
           transaction_time: {
@@ -1129,14 +1158,11 @@ class ReportingService {
    * @param {Date} end_date - 结束日期
    * @returns {Promise<Array>} 热门奖品数据数组
    */
-  static async getTopPrizesData (start_date, end_date) {
+  static async getTopPrizesData(start_date, end_date) {
     try {
       // 查询中奖记录，统计各奖品的中奖次数
       const prize_stats = await models.LotteryDraw.findAll({
-        attributes: [
-          'prize_name',
-          [fn('COUNT', col('draw_id')), 'count']
-        ],
+        attributes: ['prize_name', [fn('COUNT', col('draw_id')), 'count']],
         where: {
           created_at: {
             [Op.between]: [start_date, end_date]
@@ -1177,7 +1203,7 @@ class ReportingService {
    * @param {Date} end_date - 结束日期
    * @returns {Promise<Array>} 活跃时段数据数组
    */
-  static async getActiveHoursData (start_date, end_date) {
+  static async getActiveHoursData(start_date, end_date) {
     try {
       // 统计各个时段的用户活动（以抽奖记录为活跃度指标）
       const hourly_activity = await models.LotteryDraw.findAll({
@@ -1208,8 +1234,13 @@ class ReportingService {
         })
       }
 
-      const peak_hour = hours_data.reduce((max, item) => item.activity_count > max.activity_count ? item : max, hours_data[0])
-      logger.info(`活跃时段数据: 高峰时段${peak_hour.hour_label}，活跃度${peak_hour.activity_count}`)
+      const peak_hour = hours_data.reduce(
+        (max, item) => (item.activity_count > max.activity_count ? item : max),
+        hours_data[0]
+      )
+      logger.info(
+        `活跃时段数据: 高峰时段${peak_hour.hour_label}，活跃度${peak_hour.activity_count}`
+      )
       return hours_data
     } catch (error) {
       logger.error('获取活跃时段数据失败:', error)
@@ -1226,83 +1257,89 @@ class ReportingService {
    * @param {boolean} isAdmin - 是否管理员（决定数据脱敏级别）
    * @returns {Promise<Object>} 用户统计数据
    */
-  static async getUserStatistics (user_id, isAdmin = false) {
+  static async getUserStatistics(user_id, isAdmin = false) {
     try {
       const dataLevel = isAdmin ? 'full' : 'public'
 
       // 并行查询各种统计数据
-      const [
-        userInfo,
-        lotteryStats,
-        inventoryStats,
-        pointsStats,
-        pointsAccount,
-        consumptionStats
-      ] = await Promise.all([
-        // 基本用户信息
-        models.User.findByPk(user_id, {
-          attributes: ['user_id', 'nickname', 'created_at', 'updated_at']
-        }),
+      const [userInfo, lotteryStats, inventoryStats, pointsStats, pointsAccount, consumptionStats] =
+        await Promise.all([
+          // 基本用户信息
+          models.User.findByPk(user_id, {
+            attributes: ['user_id', 'nickname', 'created_at', 'updated_at']
+          }),
 
-        // 抽奖统计
-        models.LotteryDraw.findAll({
-          where: { user_id },
-          attributes: [
-            [fn('COUNT', col('*')), 'total_draws'],
-            [fn('COUNT', literal('CASE WHEN is_winner = 1 THEN 1 END')), 'winning_draws']
-          ],
-          raw: true
-        }),
+          // 抽奖统计
+          models.LotteryDraw.findAll({
+            where: { user_id },
+            attributes: [
+              [fn('COUNT', col('*')), 'total_draws'],
+              [fn('COUNT', literal('CASE WHEN is_winner = 1 THEN 1 END')), 'winning_draws']
+            ],
+            raw: true
+          }),
 
-        // 库存统计
-        models.UserInventory.findAll({
-          where: { user_id },
-          attributes: [
-            [fn('COUNT', col('*')), 'total_items'],
-            [fn('COUNT', literal('CASE WHEN status = "available" THEN 1 END')), 'available_items']
-          ],
-          raw: true
-        }),
+          // 库存统计（使用新表 ItemInstance）
+          models.ItemInstance.findAll({
+            where: { owner_user_id: user_id },
+            attributes: [
+              [fn('COUNT', col('*')), 'total_items'],
+              [fn('COUNT', literal('CASE WHEN status = "available" THEN 1 END')), 'available_items']
+            ],
+            raw: true
+          }),
 
-        // 积分统计
-        models.PointsTransaction.findAll({
-          where: { user_id },
-          attributes: [
-            [fn('SUM', literal('CASE WHEN transaction_type = "earn" THEN points_amount ELSE 0 END')), 'total_earned'],
-            [fn('SUM', literal('CASE WHEN transaction_type = "consume" THEN points_amount ELSE 0 END')), 'total_consumed'],
-            [fn('COUNT', col('*')), 'total_transactions']
-          ],
-          raw: true
-        }),
+          // 积分统计
+          models.PointsTransaction.findAll({
+            where: { user_id },
+            attributes: [
+              [
+                fn(
+                  'SUM',
+                  literal('CASE WHEN transaction_type = "earn" THEN points_amount ELSE 0 END')
+                ),
+                'total_earned'
+              ],
+              [
+                fn(
+                  'SUM',
+                  literal('CASE WHEN transaction_type = "consume" THEN points_amount ELSE 0 END')
+                ),
+                'total_consumed'
+              ],
+              [fn('COUNT', col('*')), 'total_transactions']
+            ],
+            raw: true
+          }),
 
-        // 用户积分账户
-        models.UserPointsAccount.findOne({
-          where: { user_id },
-          attributes: ['available_points', 'total_earned', 'total_consumed']
-        }),
+          // 用户积分账户
+          models.UserPointsAccount.findOne({
+            where: { user_id },
+            attributes: ['available_points', 'total_earned', 'total_consumed']
+          }),
 
-        // 消费记录统计
-        (async () => {
-          try {
-            if (models.ConsumptionRecord) {
-              return await models.ConsumptionRecord.findAll({
-                where: { user_id },
-                attributes: [
-                  [fn('COUNT', col('*')), 'total_consumptions'],
-                  [fn('SUM', col('consumption_amount')), 'total_amount'],
-                  [fn('SUM', col('points_to_award')), 'total_points']
-                ],
-                raw: true
-              })
-            } else {
+          // 消费记录统计
+          (async () => {
+            try {
+              if (models.ConsumptionRecord) {
+                return await models.ConsumptionRecord.findAll({
+                  where: { user_id },
+                  attributes: [
+                    [fn('COUNT', col('*')), 'total_consumptions'],
+                    [fn('SUM', col('consumption_amount')), 'total_amount'],
+                    [fn('SUM', col('points_to_award')), 'total_points']
+                  ],
+                  raw: true
+                })
+              } else {
+                return [{ total_consumptions: 0, total_amount: 0, total_points: 0 }]
+              }
+            } catch (error) {
+              logger.warn('ConsumptionRecord查询失败（可能表不存在）:', error.message)
               return [{ total_consumptions: 0, total_amount: 0, total_points: 0 }]
             }
-          } catch (error) {
-            logger.warn('ConsumptionRecord查询失败（可能表不存在）:', error.message)
-            return [{ total_consumptions: 0, total_amount: 0, total_points: 0 }]
-          }
-        })()
-      ])
+          })()
+        ])
 
       if (!userInfo) {
         throw new Error('用户不存在')
@@ -1319,7 +1356,10 @@ class ReportingService {
         lottery_wins: parseInt(lotteryStats[0]?.winning_draws || 0),
         lottery_win_rate:
           lotteryStats[0]?.total_draws > 0
-            ? (((lotteryStats[0]?.winning_draws || 0) / lotteryStats[0]?.total_draws) * 100).toFixed(1) + '%'
+            ? (
+                ((lotteryStats[0]?.winning_draws || 0) / lotteryStats[0]?.total_draws) *
+                100
+              ).toFixed(1) + '%'
             : '0%',
 
         // 库存统计
@@ -1388,7 +1428,7 @@ class ReportingService {
    *
    * @returns {Promise<Object>} 系统概览数据
    */
-  static async getSystemOverview () {
+  static async getSystemOverview() {
     try {
       // 并行查询系统统计数据
       const [userStats, lotteryStats, pointsStats, systemHealth] = await Promise.all([
@@ -1396,8 +1436,17 @@ class ReportingService {
         models.User.findAll({
           attributes: [
             [fn('COUNT', col('*')), 'total_users'],
-            [fn('COUNT', literal('CASE WHEN DATE(created_at) = CURDATE() THEN 1 END')), 'new_users_today'],
-            [fn('COUNT', literal('CASE WHEN updated_at >= DATE_SUB(NOW(), INTERVAL 24 HOUR) THEN 1 END')), 'active_users_24h']
+            [
+              fn('COUNT', literal('CASE WHEN DATE(created_at) = CURDATE() THEN 1 END')),
+              'new_users_today'
+            ],
+            [
+              fn(
+                'COUNT',
+                literal('CASE WHEN updated_at >= DATE_SUB(NOW(), INTERVAL 24 HOUR) THEN 1 END')
+              ),
+              'active_users_24h'
+            ]
           ],
           raw: true
         }),
@@ -1406,7 +1455,10 @@ class ReportingService {
         models.LotteryDraw.findAll({
           attributes: [
             [fn('COUNT', col('*')), 'total_draws'],
-            [fn('COUNT', literal('CASE WHEN DATE(created_at) = CURDATE() THEN 1 END')), 'draws_today'],
+            [
+              fn('COUNT', literal('CASE WHEN DATE(created_at) = CURDATE() THEN 1 END')),
+              'draws_today'
+            ],
             [fn('COUNT', literal('CASE WHEN is_winner = 1 THEN 1 END')), 'total_wins']
           ],
           raw: true
@@ -1418,9 +1470,24 @@ class ReportingService {
             is_deleted: 0
           },
           attributes: [
-            [fn('SUM', literal('CASE WHEN transaction_type = "earn" THEN points_amount ELSE 0 END')), 'total_points_issued'],
-            [fn('SUM', literal('CASE WHEN transaction_type = "consume" THEN points_amount ELSE 0 END')), 'total_points_consumed'],
-            [fn('COUNT', literal('CASE WHEN DATE(created_at) = CURDATE() THEN 1 END')), 'transactions_today']
+            [
+              fn(
+                'SUM',
+                literal('CASE WHEN transaction_type = "earn" THEN points_amount ELSE 0 END')
+              ),
+              'total_points_issued'
+            ],
+            [
+              fn(
+                'SUM',
+                literal('CASE WHEN transaction_type = "consume" THEN points_amount ELSE 0 END')
+              ),
+              'total_points_consumed'
+            ],
+            [
+              fn('COUNT', literal('CASE WHEN DATE(created_at) = CURDATE() THEN 1 END')),
+              'transactions_today'
+            ]
           ],
           raw: true
         }),
@@ -1450,7 +1517,9 @@ class ReportingService {
           total_wins: parseInt(lotteryStats[0]?.total_wins || 0),
           win_rate:
             lotteryStats[0]?.total_draws > 0
-              ? (((lotteryStats[0]?.total_wins || 0) / lotteryStats[0]?.total_draws) * 100).toFixed(1) + '%'
+              ? (((lotteryStats[0]?.total_wins || 0) / lotteryStats[0]?.total_draws) * 100).toFixed(
+                  1
+                ) + '%'
               : '0%'
         },
 
@@ -1462,10 +1531,10 @@ class ReportingService {
           circulation_rate:
             pointsStats[0]?.total_points_issued > 0
               ? (
-                ((pointsStats[0]?.total_points_consumed || 0) /
+                  ((pointsStats[0]?.total_points_consumed || 0) /
                     pointsStats[0]?.total_points_issued) *
                   100
-              ).toFixed(1) + '%'
+                ).toFixed(1) + '%'
               : '0%'
         },
 
@@ -1497,7 +1566,7 @@ class ReportingService {
    * @param {number} uptimeSeconds - 运行时间（秒）
    * @returns {string} 格式化的时间字符串
    */
-  static _formatUptime (uptimeSeconds) {
+  static _formatUptime(uptimeSeconds) {
     const days = Math.floor(uptimeSeconds / (24 * 60 * 60))
     const hours = Math.floor((uptimeSeconds % (24 * 60 * 60)) / (60 * 60))
     const minutes = Math.floor((uptimeSeconds % (60 * 60)) / 60)
