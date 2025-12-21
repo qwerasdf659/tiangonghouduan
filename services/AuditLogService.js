@@ -329,7 +329,7 @@ class AuditLogService {
     return this.logOperation({
       operator_id,
       operation_type: 'inventory_operation',
-      target_type: 'UserInventory',
+      target_type: 'ItemInstance', // 物品实例表（已从 UserInventory 迁移）
       target_id: item_id,
       action: 'use',
       before_data: {
@@ -376,7 +376,7 @@ class AuditLogService {
     return this.logOperation({
       operator_id,
       operation_type: 'inventory_transfer', // ✅ 使用独立的物品转让审计类型（P0-4整改）
-      target_type: 'UserInventory',
+      target_type: 'ItemInstance', // 物品实例表（已从 UserInventory 迁移）
       target_id: item_id,
       action: 'transfer',
       before_data: {
@@ -420,7 +420,7 @@ class AuditLogService {
     return this.logOperation({
       operator_id,
       operation_type: 'inventory_operation',
-      target_type: 'UserInventory',
+      target_type: 'ItemInstance', // 物品实例表（已从 UserInventory 迁移）
       target_id: item_id,
       action: 'verify',
       before_data: {

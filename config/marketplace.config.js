@@ -44,7 +44,7 @@ module.exports = {
    * @业务规则
    * - 最低价：物品价值的50%（防止恶意低价转移积分）
    * - 最高价：物品价值的200%（防止欺诈高价）
-   * - 基于UserInventory.value字段验证
+   * - 基于ItemInstance.meta.value或MarketListing.price_amount字段验证
    *
    * @示例
    * - 物品价值500积分

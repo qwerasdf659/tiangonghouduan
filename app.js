@@ -542,139 +542,120 @@ appLogger.info('✅ Web管理后台静态文件托管已配置', {
 })
 // ========================================
 
-// 🔗 V4统一引擎路由注册（清理后只保留V4版本）
+/*
+ * ========================================
+ * 🔗 V4 API路由注册（标准化域结构）
+ * ========================================
+ *
+ * 📌 API顶层域规范（共8个标准域）：
+ * - /market    交易市场
+ * - /shop      积分商城（积分、兑换、消费、会员）
+ * - /lottery   抽奖系统
+ * - /inventory 库存管理
+ * - /user      用户中心
+ * - /admin     管理后台
+ * - /auth      认证授权
+ * - /system    系统功能
+ *
+ * 📌 目录结构规范：
+ * - routes/v4/{domain}/ 目录名与顶层域一致
+ * - 每个域有独立的index.js聚合子路由
+ */
 try {
-  // V4认证系统路由（RESTful标准 - 符合腾讯、阿里、网易、米哈游行业规范）
-  app.use('/api/v4/auth', require('./routes/v4/unified-engine/auth'))
-  appLogger.info('V4认证系统加载成功（RESTful标准）', {
-    route: '/api/v4/auth', // 扁平化业务资源路径
-    standard: 'RESTful', // API设计标准
-    reference: '腾讯云、阿里云、网易云、米哈游行业标准' // 参考依据
-  })
-
-  // V4抽奖系统路由（RESTful标准 - 游戏行业标准设计）
-  app.use('/api/v4/lottery', require('./routes/v4/unified-engine/lottery'))
-  appLogger.info('V4抽奖系统加载成功（RESTful标准）', {
-    route: '/api/v4/lottery', // 扁平化业务资源路径
-    standard: 'RESTful', // API设计标准
-    reference: '米哈游原神、网易游戏行业标准' // 参考依据
-  })
-
-  // V4活动条件管理路由（RESTful标准 - 活动参与条件配置）
-  app.use('/api/v4/activities', require('./routes/v4/unified-engine/activity-conditions'))
-  appLogger.info('V4活动条件管理系统加载成功（RESTful标准）', {
-    route: '/api/v4/activities', // 扁平化业务资源路径
-    standard: 'RESTful', // API设计标准
-    reference: '活动参与条件验证系统' // 参考依据
-  })
-
-  // V4管理系统路由（RESTful标准 - 后台管理标准设计）
-  app.use('/api/v4/admin', require('./routes/v4/unified-engine/admin'))
-  appLogger.info('V4管理系统加载成功（RESTful标准）', {
-    route: '/api/v4/admin', // 扁平化业务资源路径
-    standard: 'RESTful', // API设计标准
-    reference: '腾讯云、阿里云后台管理行业标准' // 参考依据
-  })
-
-  // V4权限管理路由
-  app.use('/api/v4/permissions', require('./routes/v4/permissions'))
-  appLogger.info('V4权限管理系统加载成功', { route: '/api/v4/permissions' })
-
-  // V4抽奖预设管理路由
-  app.use('/api/v4/lottery-preset', require('./routes/v4/unified-engine/lottery-preset'))
-  appLogger.info('V4抽奖预设管理系统加载成功', { route: '/api/v4/lottery-preset' })
-
-  // V4用户库存管理路由
-  app.use('/api/v4/inventory', require('./routes/v4/unified-engine/inventory'))
-  appLogger.info('V4用户库存管理系统加载成功', { route: '/api/v4/inventory' })
-
-  // V4核销系统路由（12位Base32核销码，30天有效期）
-  app.use('/api/v4/redemption', require('./routes/v4/unified-engine/redemption'))
-  appLogger.info('V4核销系统加载成功', {
-    route: '/api/v4/redemption',
-    note: '新版核销系统（12位Base32码，SHA-256哈希存储，30天TTL）'
-  })
-
-  // V4背包双轨系统路由（可叠加资产 + 不可叠加物品）
-  app.use('/api/v4/backpack', require('./routes/v4/unified-engine/backpack'))
-  appLogger.info('背包双轨系统加载成功', {
-    route: '/api/v4/backpack',
-    note: '统一背包查询接口（assets[] + items[]）'
-  })
-
-  // V4兑换市场路由（双账户+商城双玩法方案）
-  app.use('/api/v4/exchange_market', require('./routes/v4/unified-engine/exchange_market'))
-  appLogger.info('V4兑换市场系统加载成功（双账户模型）', {
-    route: '/api/v4/exchange_market',
-    note: '虚拟奖品价值/积分/混合支付兑换系统'
-  })
-
-  // V4积分管理系统路由（RESTful标准 - 积分系统标准设计）
-  app.use('/api/v4/points', require('./routes/v4/unified-engine/points'))
-  appLogger.info('V4积分管理系统加载成功（RESTful标准）', {
-    route: '/api/v4/points', // 扁平化业务资源路径
-    standard: 'RESTful', // API设计标准
-    reference: '腾讯、阿里积分系统行业标准' // 参考依据
-  })
-
-  // V4高级空间解锁路由（用户支付100积分解锁，有效期24小时）
-  app.use('/api/v4/premium', require('./routes/v4/unified-engine/premium'))
-  appLogger.info('V4高级空间解锁系统加载成功', { route: '/api/v4/premium' })
+  /*
+   * ========================================
+   * 1. /auth - 认证授权域
+   * ========================================
+   */
+  app.use('/api/v4/auth', require('./routes/v4/auth'))
+  appLogger.info('✅ auth域加载成功', { route: '/api/v4/auth' })
 
   /*
-   * V4消费记录管理路由（商家扫码录入、平台审核）
-   * 路径前缀: /api/v4/consumption（与前端文档保持完全一致）
+   * ========================================
+   * 2. /admin - 管理后台域
+   * ========================================
    */
-  app.use('/api/v4/consumption', require('./routes/v4/unified-engine/consumption'))
-  appLogger.info('V4消费记录管理系统加载成功', { route: '/api/v4/consumption' })
+  app.use('/api/v4/admin', require('./routes/v4/admin'))
+  appLogger.info('✅ admin域加载成功', { route: '/api/v4/admin' })
 
-  // V4系统功能路由（公告、反馈等）
+  /*
+   * ========================================
+   * 3. /lottery - 抽奖系统域
+   * ========================================
+   */
+  app.use('/api/v4/lottery', require('./routes/v4/lottery'))
+  appLogger.info('✅ lottery域加载成功', { route: '/api/v4/lottery' })
+
+  /*
+   * ========================================
+   * 4. /inventory - 库存管理域
+   * ========================================
+   */
+  app.use('/api/v4/inventory', require('./routes/v4/inventory'))
+  appLogger.info('✅ inventory域加载成功', { route: '/api/v4/inventory' })
+
+  /*
+   * ========================================
+   * 5. /market - 交易市场域
+   * ========================================
+   */
+  app.use('/api/v4/market', require('./routes/v4/market'))
+  appLogger.info('✅ market域加载成功', { route: '/api/v4/market' })
+
+  /*
+   * ========================================
+   * 6. /shop - 积分商城域
+   * ========================================
+   */
+  app.use('/api/v4/shop', require('./routes/v4/shop'))
+  appLogger.info('✅ shop域加载成功', { route: '/api/v4/shop' })
+
+  /*
+   * ========================================
+   * 7. /system - 系统功能域
+   * ========================================
+   */
   app.use('/api/v4/system', require('./routes/v4/system'))
-  appLogger.info('V4系统功能模块加载成功', { route: '/api/v4/system' })
-
-  // V4数据统计报表路由
-  app.use('/api/v4/statistics', require('./routes/v4/statistics'))
-  appLogger.info('V4数据统计报表系统加载成功', { route: '/api/v4/statistics' })
-
-  // V4通知管理路由（基于SystemAnnouncement实现）
-  app.use('/api/v4/notifications', require('./routes/v4/notifications'))
-  appLogger.info('V4通知管理系统加载成功', {
-    route: '/api/v4/notifications',
-    note: '复用SystemAnnouncement表'
-  })
+  appLogger.info('✅ system域加载成功', { route: '/api/v4/system' })
 
   /*
-   * V4审核管理路由（批量审核、超时告警）
-   * app.use('/api/v4/audit-management', require('./routes/audit-management'))
-   * appLogger.info('V4审核管理系统加载成功', { route: '/api/v4/audit-management' })
+   * ========================================
+   * 8. /user - 用户中心域
+   * ========================================
    */
+  app.use('/api/v4/user', require('./routes/v4/user'))
+  appLogger.info('✅ user域加载成功', { route: '/api/v4/user' })
 
-  // 🌙 V4生产环境调试控制接口（仅管理员，动态日志级别）
+  /*
+   * ========================================
+   * 🔧 调试控制接口（仅管理员）
+   * ========================================
+   */
   app.use('/api/v4/debug-control', require('./routes/v4/debug-control'))
-  appLogger.info('V4调试控制系统加载成功', { route: '/api/v4/debug-control', note: '仅管理员可用' })
+  appLogger.info('✅ debug-control加载成功', { route: '/api/v4/debug-control' })
 
-  // 🔐 V4层级权限管理路由（区域负责人→业务经理→业务员三级管理）
-  app.use('/api/v4/hierarchy', require('./routes/v4/hierarchy'))
-  appLogger.info('V4层级权限管理系统加载成功', {
-    route: '/api/v4/hierarchy',
-    note: '层级化角色权限管理，2025-11-07新增'
-  })
-
-  appLogger.info('V4 RESTful API架构已完全启用', {
-    message: '完全扁平化设计，符合腾讯云、阿里云、网易云、米哈游行业标准',
-    core_apis: {
-      auth: '/api/v4/auth',
-      lottery: '/api/v4/lottery',
-      admin: '/api/v4/admin',
-      points: '/api/v4/points'
-    },
-    refactored_from: 'V4统一引擎架构（/api/v4/unified-engine/*）',
-    refactored_at: '2025-11-11',
-    standard: 'RESTful资源导向设计'
+  /*
+   * ========================================
+   * 📊 API架构信息汇总
+   * ========================================
+   */
+  appLogger.info('🎉 V4 API标准化域结构加载完成', {
+    standard_domains: [
+      '/auth',
+      '/admin',
+      '/lottery',
+      '/inventory',
+      '/market',
+      '/shop',
+      '/system',
+      '/user'
+    ],
+    compliance: '符合01-技术架构标准-权威版.md P0规范',
+    refactored_at: '2025-12-21'
   })
 } catch (error) {
-  appLogger.error('V4统一决策引擎加载失败', { error: error.message, stack: error.stack })
-  process.exit(1) // 如果核心引擎加载失败，应用无法继续运行
+  appLogger.error('❌ V4 API路由加载失败', { error: error.message, stack: error.stack })
+  process.exit(1)
 }
 
 // 🔧 404处理

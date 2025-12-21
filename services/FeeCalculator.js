@@ -5,19 +5,21 @@ const _logger = require('../utils/logger').logger
  * 文件路径：services/FeeCalculator.js
  *
  * 业务场景：
- * - 计算物品转让的手续费（基于UserInventory.value字段）
+ * - 计算物品转让的手续费（基于 ItemInstance.meta.value 字段）
  * - 支持按商品价值分档计费
  * - 集成到TradeRecord交易记录系统
  *
  * 数据库关联：
- * - UserInventory.value（商品价值积分）- 用于计费分档
- * - UserInventory.selling_points（用户定价）- 买家支付金额
+ * - ItemInstance.meta.value（商品价值）- 用于计费分档
+ * - MarketListing.price_amount（用户定价）- 买家支付金额
  * - TradeRecord.fee_points_amount（手续费）- 平台收取
- * - TradeRecord.net_points_amount（卖家实收）- selling_points - fee
+ * - TradeRecord.net_points_amount（卖家实收）- price_amount - fee
  *
  * 使用示例：
- * const feeInfo = FeeCalculator.calculateItemFee(item.value, item.selling_points);
+ * const feeInfo = FeeCalculator.calculateItemFee(item.meta.value, listing.price_amount);
  * // 返回：{ fee: 30, rate: 0.05, netAmount: 570, tier: '中价值档' }
+ *
+ * 更新时间：2025-12-21 - 暴力重构移除 UserInventory 引用
  */
 
 const FEE_RULES = require('../config/fee_rules')
@@ -32,12 +34,12 @@ class FeeCalculator {
    * 根据商品价值计算单个商品的手续费（核心方法）
    *
    * 业务规则：
-   * - 按UserInventory.value字段分档计费（不是selling_points）
-   * - 手续费从selling_points中扣除，卖家实收 = selling_points - fee
+   * - 按 ItemInstance.meta.value 字段分档计费（不是 price_amount）
+   * - 手续费从 price_amount 中扣除，卖家实收 = price_amount - fee
    * - 向上取整，最小收1积分
    *
-   * @param {number} itemValue - 商品价值积分（UserInventory.value字段）
-   * @param {number} sellingPrice - 用户定价（UserInventory.selling_points字段）
+   * @param {number} itemValue - 商品价值（ItemInstance.meta.value 字段）
+   * @param {number} sellingPrice - 用户定价（MarketListing.price_amount 字段）
    * @returns {Object} 手续费计算结果
    *   - fee: 手续费积分（向上取整）
    *   - rate: 费率（如0.03表示3%）
@@ -101,11 +103,11 @@ class FeeCalculator {
    * 计算整个订单的手续费（支持混合商品 - 当前系统为单商品交易）
    *
    * 业务场景：
-   * - 当前系统：每次交易只涉及一个物品（UserInventory单条记录）
+   * - 当前系统：每次交易只涉及一个物品（ItemInstance 单条记录）
    * - 未来扩展：支持批量购买多个物品
    *
    * @param {Array} orderItems - 订单商品列表
-   *   [{ inventory_id, item_value, selling_price }, ...]
+   *   [{ item_instance_id, item_value, selling_price }, ...]
    * @returns {Object} 订单手续费汇总
    *   - total_fee: 总手续费
    *   - total_selling_price: 总售价
@@ -163,7 +165,7 @@ class FeeCalculator {
    * - 商品详情页展示预估手续费
    * - 上架前提示用户手续费档位
    *
-   * @param {number} itemValue - 商品价值（UserInventory.value）
+   * @param {number} itemValue - 商品价值（ItemInstance.meta.value）
    * @returns {number} 费率（如0.03表示3%）
    *
    * @example
@@ -183,7 +185,7 @@ class FeeCalculator {
    * - 客服解释手续费规则
    * - 用户帮助文档
    *
-   * @param {number} itemValue - 商品价值（UserInventory.value）
+   * @param {number} itemValue - 商品价值（ItemInstance.meta.value）
    * @returns {string} 费率说明（如"3%（低价值档）- 普通优惠券、小额商品"）
    *
    * @example
@@ -204,7 +206,7 @@ class FeeCalculator {
    * - 物品转让时创建交易记录
    * - 自动计算手续费并记录到数据库
    *
-   * @param {Object} item - UserInventory物品对象
+   * @param {Object} item - ItemInstance物品对象
    * @param {number} buyerId - 买家用户ID
    * @param {number} sellerId - 卖家用户ID
    * @param {Object} transaction - Sequelize事务对象

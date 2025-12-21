@@ -67,7 +67,7 @@
  * - LotteryCampaign：抽奖活动表（活动配置、有效期、奖品池）
  * - LotteryPrize：奖品表（奖品信息、概率、库存）
  * - LotteryDraw：抽奖记录表（用户抽奖历史、中奖记录）
- * - UserInventory：用户库存表（中奖奖品存储）
+ * - ItemInstance：物品实例表（中奖奖品存储，已从 UserInventory 迁移）
  * - PointsTransaction：积分交易表（抽奖扣分记录）
  *
  * 性能指标：

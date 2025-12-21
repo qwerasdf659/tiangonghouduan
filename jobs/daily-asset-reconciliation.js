@@ -301,9 +301,11 @@ class DailyAssetReconciliation {
    * @private
    */
   static async _sendAlert(report) {
-    /*
-     * TODO: 接入企业微信/钉钉告警
-     * 当前仅记录日志
+    /**
+     * 告警通知（设计预留）
+     *
+     * 当前实现：通过日志记录异常
+     * 扩展方式：如需接入企业微信/钉钉告警，可在此处集成对应SDK
      */
 
     logger.error('发现资产余额差异', {

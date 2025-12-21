@@ -1558,6 +1558,92 @@ class ReportingService {
     }
   }
 
+  // ==================== 库存统计相关方法 ====================
+
+  /**
+   * 获取管理员库存统计数据
+   *
+   * @description 提供系统库存的全面统计分析，包括物品总数、状态分布、类型分布
+   *
+   * 业务场景：
+   * - 管理员查看系统库存运营数据
+   * - 监控物品状态分布和健康度
+   * - 分析物品类型结构
+   *
+   * @returns {Promise<Object>} 库存统计数据
+   * @returns {number} returns.total_items - 物品总数
+   * @returns {number} returns.available_items - 可用物品数
+   * @returns {number} returns.locked_items - 锁定物品数（市场上架中）
+   * @returns {number} returns.used_items - 已使用物品数
+   * @returns {number} returns.expired_items - 已过期物品数
+   * @returns {Object} returns.by_status - 按状态统计的明细
+   * @returns {Object} returns.by_type - 按类型统计的明细
+   * @returns {string} returns.generated_at - 生成时间（北京时间ISO格式）
+   */
+  static async getInventoryAdminStatistics() {
+    try {
+      const { ItemInstance, sequelize } = models
+
+      // 并行执行统计查询提升性能
+      const [totalItems, statusStats, typeStats] = await Promise.all([
+        // 总物品数
+        ItemInstance.count(),
+
+        // 按状态统计
+        ItemInstance.findAll({
+          attributes: [
+            'status',
+            [sequelize.fn('COUNT', sequelize.col('item_instance_id')), 'count']
+          ],
+          group: ['status'],
+          raw: true
+        }),
+
+        // 按类型统计
+        ItemInstance.findAll({
+          attributes: [
+            'item_type',
+            [sequelize.fn('COUNT', sequelize.col('item_instance_id')), 'count']
+          ],
+          group: ['item_type'],
+          raw: true
+        })
+      ])
+
+      // 转换为对象格式
+      const statusMap = {}
+      statusStats.forEach(stat => {
+        statusMap[stat.status] = parseInt(stat.count, 10)
+      })
+
+      const typeMap = {}
+      typeStats.forEach(stat => {
+        typeMap[stat.item_type || 'unknown'] = parseInt(stat.count, 10)
+      })
+
+      const statistics = {
+        total_items: totalItems,
+        available_items: statusMap.available || 0,
+        locked_items: statusMap.locked || 0,
+        used_items: statusMap.used || 0,
+        expired_items: statusMap.expired || 0,
+        by_status: statusMap,
+        by_type: typeMap,
+        generated_at: BeijingTimeHelper.formatBeijingTime(new Date())
+      }
+
+      logger.info('ReportingService.getInventoryAdminStatistics 统计完成', {
+        total_items: statistics.total_items,
+        available_items: statistics.available_items
+      })
+
+      return statistics
+    } catch (error) {
+      logger.error('获取库存统计失败:', error)
+      throw error
+    }
+  }
+
   // ==================== 辅助方法 ====================
 
   /**

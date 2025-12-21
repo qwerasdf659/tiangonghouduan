@@ -307,13 +307,18 @@ async function generateTokens(user) {
     const primaryRole = userRoles.roles.find(r => r.role_level === userRoles.role_level)
     const userRole = primaryRole ? primaryRole.role_name : 'user'
 
+    /**
+     * 🔐 JWT Payload（P1-2修复：移除is_admin字段）
+     * 原因：管理员权限应实时从数据库查询，而非存储在Token中
+     * 安全性：避免权限变更后Token未过期导致的权限漂移问题
+     */
     const payload = {
       user_id: user.user_id,
       mobile: user.mobile,
       nickname: user.nickname,
       status: user.status,
       role_level: userRoles.role_level, // 🛡️ 基于角色计算
-      is_admin: userRoles.isAdmin, // 🔐 管理员标识
+      // P1-2修复：移除is_admin字段，权限实时查询而非存储在JWT中
       user_role: userRole, // 🔐 角色名称
       iat: Math.floor(BeijingTimeHelper.timestamp() / 1000)
     }

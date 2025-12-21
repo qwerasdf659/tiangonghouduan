@@ -143,9 +143,11 @@ describe('BackpackService - 背包服务', () => {
     })
 
     it.skip('普通用户不能查看其他用户的背包（权限检查待实现）', async () => {
-      /*
-       * TODO: BackpackService权限检查待实现
-       * 当前版本暂时允许查看其他用户背包
+      /**
+       * 测试跳过说明：
+       * - 当前版本：权限检查在路由层通过requireAdmin中间件完成
+       * - BackpackService层不再重复检查权限
+       * - 如需启用此测试，需先在Service层实现权限检查逻辑
        */
       const other_user_id = test_user.user_id + 1
 

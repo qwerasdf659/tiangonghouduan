@@ -221,13 +221,11 @@ module.exports = sequelize => {
       })
     }
 
-    // 用户库存
-    if (models.UserInventory) {
-      User.hasMany(models.UserInventory, {
-        foreignKey: 'user_id',
-        as: 'inventory'
-      })
-    }
+    /*
+     * ❌ UserInventory 关联已删除（2025-12-21 暴力重构）
+     * 替代方案：使用 ItemInstance 模型
+     * User.hasMany(models.ItemInstance, { foreignKey: 'owner_user_id', as: 'items' })
+     */
 
     // VIP等级关联
     if (models.VipLevel) {

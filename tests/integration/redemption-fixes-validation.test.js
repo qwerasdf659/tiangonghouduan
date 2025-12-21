@@ -158,27 +158,29 @@ describe('核销系统修复验证测试', () => {
     })
   })
 
-  describe('P0-4: 旧库存接口废弃', () => {
-    test('POST /api/v4/inventory/use/:item_id 应返回410 Gone', async () => {
+  describe('P0-4: 旧库存接口已删除（返回404）', () => {
+    /*
+     * 📌 规范说明：旧接口直接返回404，不使用410 Gone
+     * 参考：01-技术架构标准-权威版.md - "零残留原则"
+     */
+    test('POST /api/v4/inventory/use/:item_id 应返回404 Not Found', async () => {
       const response = await request(app)
         .post('/api/v4/inventory/use/1')
         .set('Authorization', `Bearer ${authToken}`)
         .send({ verification_code: '123456' })
 
-      expect(response.status).toBe(410)
-      expect(response.body.error_code).toBe('ENDPOINT_GONE')
-      expect(response.body.new_endpoint).toContain('/api/v4/redemption/orders')
+      expect(response.status).toBe(404)
+      expect(response.body.code).toBe('NOT_FOUND')
     })
 
-    test('POST /api/v4/inventory/transfer 应返回410 Gone', async () => {
+    test('POST /api/v4/inventory/transfer 应返回404 Not Found', async () => {
       const response = await request(app)
         .post('/api/v4/inventory/transfer')
         .set('Authorization', `Bearer ${authToken}`)
         .send({ item_id: 1, target_user_id: 2 })
 
-      expect(response.status).toBe(410)
-      expect(response.body.error_code).toBe('ENDPOINT_GONE')
-      expect(response.body.new_endpoint).toContain('/api/v4/trade/listings')
+      expect(response.status).toBe(404)
+      expect(response.body.code).toBe('NOT_FOUND')
     })
   })
 

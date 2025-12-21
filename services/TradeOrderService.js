@@ -5,7 +5,7 @@
  * - 订单域（Order Domain）核心服务
  * - 统一管理交易订单的创建、取消、完成
  * - 协调资产冻结/解冻/结算（调用 AssetService）
- * - 协调物品所有权变更（调用 UserInventory）
+ * - 协调物品所有权变更（调用 ItemInstance）
  * - 提供强幂等性保证（business_id）
  *
  * 业务流程：
@@ -15,7 +15,7 @@
  *    - 创建订单记录（TradeOrder.status = frozen）
  * 2. 完成订单（completeOrder）：
  *    - 从冻结资产结算（AssetService.settleFromFrozen）
- *    - 转移物品所有权（UserInventory.owner_user_id）
+ *    - 转移物品所有权（ItemInstance.owner_user_id）
  *    - 更新订单状态（TradeOrder.status = completed）
  * 3. 取消订单（cancelOrder）：
  *    - 解冻买家资产（AssetService.unfreeze）
@@ -23,7 +23,7 @@
  *    - 更新订单状态（TradeOrder.status = cancelled）
  *
  * 创建时间：2025-12-15（Phase 2）
- * 更新时间：2025-12-15
+ * 更新时间：2025-12-21 - 暴力重构移除 UserInventory 引用
  */
 
 const { sequelize, TradeOrder, MarketListing, ItemInstance } = require('../models')
@@ -412,7 +412,7 @@ class TradeOrderService {
    * 业务流程：
    * 1. 验证订单状态（frozen）
    * 2. 从冻结资产结算（AssetService.settleFromFrozen）
-   * 3. 转移物品所有权（UserInventory.owner_user_id）
+   * 3. 转移物品所有权（ItemInstance.owner_user_id）
    * 4. 更新订单状态（completed）
    * 5. 更新挂牌状态（sold）
    *

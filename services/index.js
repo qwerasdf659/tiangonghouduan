@@ -29,10 +29,9 @@ const PremiumService = require('./PremiumService') // 高级空间服务
 const UserService = require('./UserService') // 用户服务
 const ChatRateLimitService = require('./ChatRateLimitService') // 聊天频率限制服务
 
-// V4 管理后台服务（新增）
+// V4 管理后台服务
 const FeedbackService = require('./FeedbackService') // 反馈管理服务
 const AdminSystemService = require('./AdminSystemService') // 管理后台系统服务（已合并SystemSettingsService）
-// const AdminMarketplaceService = require('./AdminMarketplaceService') // 管理后台市场管理服务 - 已合并到ExchangeMarketService
 const AdminLotteryService = require('./AdminLotteryService') // 管理后台抽奖管理服务
 const AdminCustomerServiceService = require('./AdminCustomerServiceService') // 管理后台客服管理服务
 const MaterialManagementService = require('./MaterialManagementService') // 材料系统运营管理服务（V4.5.0）
@@ -55,6 +54,9 @@ const AssetConversionService = require('./AssetConversionService') // 资产转�
 // V4.2 背包双轨架构服务（Phase 1 - 核销码系统）
 const RedemptionOrderService = require('./RedemptionOrderService') // 兑换订单服务（12位Base32核销码 + SHA-256哈希）
 const BackpackService = require('./BackpackService') // 背包双轨查询服务（assets[] + items[]）
+
+// V4.2 交易市场服务（2025-12-21 暴力重构）
+const TradeOrderService = require('./TradeOrderService') // 交易订单服务（市场交易核心）
 
 // V4 模块化服务
 const { lottery_service_container } = require('./lottery')
@@ -230,6 +232,9 @@ class ServiceManager {
       // 注册V4.2背包双轨架构服务（Phase 1 - 核销码系统）
       this._services.set('redemptionOrder', RedemptionOrderService) // 兑换订单服务（12位Base32核销码 + SHA-256哈希）
       this._services.set('backpack', BackpackService) // 背包双轨查询服务（assets[] + items[]）
+
+      // 注册V4.2交易市场服务（2025-12-21 暴力重构）
+      this._services.set('tradeOrder', TradeOrderService) // 交易订单服务（市场交易核心）
 
       // 注册模块化抽奖服务容器
       this._services.set('lotteryContainer', lottery_service_container)

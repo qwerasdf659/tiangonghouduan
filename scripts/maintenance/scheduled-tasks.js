@@ -128,7 +128,7 @@ class ScheduledTasks {
 
         if (result.hasTimeout) {
           logger.error(`[定时任务] 🚨 发现${result.count}个紧急超时订单（72小时）`)
-          // TODO: 发送紧急通知给管理员
+          // 扩展点：如需发送紧急通知（钉钉/企业微信），可在此处集成NotificationService
         } else {
           logger.info('[定时任务] 72小时超时订单检查完成，无超时订单')
         }

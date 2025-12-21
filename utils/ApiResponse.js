@@ -622,7 +622,7 @@ ApiResponse.BusinessStatusStandards = {
     type: 'enum',
     values: ['available', 'used', 'expired'],
     description: '库存物品状态枚举',
-    usage: ['UserInventory'],
+    usage: ['ItemInstance'], // 已从 UserInventory 迁移
     scenarios: ['物品可用性判断', '使用状态追踪']
   },
   prize_queue_status: {

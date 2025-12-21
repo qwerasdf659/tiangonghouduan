@@ -45,7 +45,8 @@ const _tableNameMap = {
   'LotteryPreset.js': 'lottery_presets',
   'Product.js': 'products',
   'TradeRecord.js': 'trade_records',
-  'UserInventory.js': 'user_inventory',
+  // 🗑️ UserInventory.js 已删除 - 迁移至 ItemInstance - 2025年12月21日
+  'ItemInstance.js': 'item_instances', // 替代 UserInventory
   'CustomerServiceSession.js': 'customer_service_sessions',
   'ChatMessage.js': 'chat_messages',
   'Feedback.js': 'feedbacks',

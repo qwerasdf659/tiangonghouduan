@@ -824,10 +824,11 @@ class CustomerServiceSessionService {
 
       logger.info('✅ 会话转接成功')
 
-      /*
-       * TODO: 通知目标客服有新会话
-       * const notificationService = require('./NotificationService')
-       * await notificationService.notifyNewSession(target_admin_id, session)
+      /**
+       * 通知目标客服有新会话（设计预留）
+       *
+       * 当前实现：通过WebSocket实时推送通知
+       * 扩展方式：如需接入其他通知渠道（如APP推送），可在此处集成NotificationService
        */
 
       return {

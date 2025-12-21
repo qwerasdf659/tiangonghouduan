@@ -114,7 +114,7 @@ class DataSanitizer {
    * - verification_code脱敏：完整核销码（如A1B2C3D4）→脱敏后（******）
    * - 使用source_display（来源显示）替代source_id（来源记录ID）
    *
-   * @param {Array<Object>} inventory - 库存数据数组（UserInventory模型实例），包含inventory_id、name、type等字段
+   * @param {Array<Object>} inventory - 库存数据数组（ItemInstance模型实例），包含item_instance_id、name、type等字段
    * @param {string} dataLevel - 数据级别：'full'（管理员完整数据）或'public'（普通用户脱敏数据）
    * @returns {Array<Object>} 脱敏后的库存数组
    * @returns {number} return[].inventory_id - 库存ID（主键）

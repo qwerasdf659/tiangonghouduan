@@ -23,7 +23,7 @@ class LotteryDraw extends Model {
    * @param {Object} models - 所有模型的引用
    * @returns {void}
    */
-  static associate (models) {
+  static associate(models) {
     // 关联到用户
     LotteryDraw.belongsTo(models.User, {
       foreignKey: 'user_id',
@@ -65,7 +65,7 @@ class LotteryDraw extends Model {
    * 获取抽奖结果显示文本
    * @returns {string} 抽奖结果文本（如"中奖"、"未中奖"）
    */
-  getDrawResultName () {
+  getDrawResultName() {
     return LotteryDrawFormatter.getDrawResultText(this.is_winner)
   }
 
@@ -73,7 +73,7 @@ class LotteryDraw extends Model {
    * 获取奖品发放状态名称
    * @returns {string} 奖品发放状态文本（如"待发放"、"已发放"）
    */
-  getPrizeStatusName () {
+  getPrizeStatusName() {
     return LotteryDrawFormatter.getPrizeStatusText(this.prize_status)
   }
 
@@ -82,7 +82,7 @@ class LotteryDraw extends Model {
    * 业务含义：是否获得有价值的奖品（非空奖）
    * @returns {boolean} 是否中奖
    */
-  isWinner () {
+  isWinner() {
     return this.is_winner
   }
 
@@ -90,7 +90,7 @@ class LotteryDraw extends Model {
    * 检查奖品是否已发放
    * @returns {boolean} 奖品是否已发放
    */
-  isPrizeDelivered () {
+  isPrizeDelivered() {
     return LotteryDrawFormatter.isPrizeDelivered(this.prize_status)
   }
 
@@ -98,7 +98,7 @@ class LotteryDraw extends Model {
    * 检查奖品是否可领取
    * @returns {boolean} 奖品是否可领取
    */
-  isPrizeClaimable () {
+  isPrizeClaimable() {
     return LotteryDrawFormatter.isPrizeClaimable(this.is_winner, this.prize_status)
   }
 
@@ -106,7 +106,7 @@ class LotteryDraw extends Model {
    * 输出摘要格式（使用Formatter）
    * @returns {Object} 抽奖记录摘要对象
    */
-  toSummary () {
+  toSummary() {
     return LotteryDrawFormatter.formatToSummary(this)
   }
 
@@ -115,7 +115,7 @@ class LotteryDraw extends Model {
    * 业务场景：API响应数据格式化
    * @returns {Object} JSON格式的抽奖记录
    */
-  toJSON () {
+  toJSON() {
     return LotteryDrawFormatter.formatToJSON(this)
   }
 
@@ -132,7 +132,7 @@ class LotteryDraw extends Model {
    * @param {boolean} data.is_winner - 是否中奖
    * @returns {Array<string>} 错误信息数组（为空表示验证通过）
    */
-  static validateBasicData (data) {
+  static validateBasicData(data) {
     const errors = []
 
     if (!data.user_id || data.user_id <= 0) {
@@ -183,8 +183,9 @@ module.exports = sequelize => {
        */
       business_id: {
         type: DataTypes.STRING(100),
-        allowNull: true, // 允许为空，兼容历史数据
-        comment: '业务关联ID，用于幂等控制'
+        allowNull: false, // P1-1修复：同步数据库约束，业务ID为必需字段
+        unique: true, // P1-1修复：唯一约束，确保幂等性
+        comment: '业务关联ID，用于幂等控制（唯一，不可为空）'
       },
       user_id: {
         type: DataTypes.INTEGER,
@@ -415,9 +416,10 @@ module.exports = sequelize => {
           fields: ['user_id']
         },
         {
-          name: 'idx_business_id',
+          name: 'uk_lottery_draws_business_id',
           fields: ['business_id'],
-          comment: '业务ID索引，用于幂等查询'
+          unique: true, // P1-1修复：唯一索引，同步数据库约束
+          comment: '业务ID唯一索引，用于幂等控制'
         },
         {
           name: 'idx_prize_id',

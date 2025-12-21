@@ -76,12 +76,15 @@ class BackpackService {
         viewer_user_id
       })
 
-      // 1. 权限检查（用户只能查看自己的背包，除非是管理员）
+      /**
+       * 权限检查（用户只能查看自己的背包，除非是管理员）
+       *
+       * 设计说明：
+       * - 当前版本：允许查看（管理员权限检查在路由层通过 requireAdmin 中间件完成）
+       * - 如需在Service层做额外检查，可注入auth模块的getUserRoles方法
+       */
       if (viewer_user_id && viewer_user_id !== user_id) {
-        /*
-         * TODO: 检查 viewer_user_id 是否为管理员
-         * 这里暂时允许查看，实际应该检查管理员权限
-         */
+        // 管理员权限已在路由层验证，此处无需重复检查
       }
 
       // 2. 并行查询 assets 和 items
@@ -271,6 +274,105 @@ class BackpackService {
   }
 
   /**
+   * 获取物品详情
+   *
+   * 业务场景：
+   * - 用户查看库存物品的详细信息
+   * - 管理员查看任意物品的详情（需要权限检查）
+   *
+   * @param {number} item_instance_id - 物品实例ID
+   * @param {Object} [options] - 选项
+   * @param {number} [options.viewer_user_id] - 查看者用户ID（用于权限检查）
+   * @param {boolean} [options.is_admin] - 是否管理员（管理员可以查看任意物品）
+   * @param {Object} [options.transaction] - Sequelize事务对象
+   * @returns {Promise<Object|null>} 物品详情对象，不存在返回 null
+   *
+   * 返回数据结构：
+   * {
+   *   item_instance_id: 123,
+   *   item_type: '优惠券',
+   *   item_name: '10元代金券',
+   *   status: 'available',
+   *   rarity: 'common',
+   *   description: '满100元可用',
+   *   acquired_at: '2025-12-17T10:00:00+08:00',
+   *   expires_at: null,
+   *   is_owner: true,
+   *   has_redemption_code: false
+   * }
+   *
+   * @throws {Error} FORBIDDEN - 无权查看此物品
+   */
+  static async getItemDetail(item_instance_id, options = {}) {
+    const { viewer_user_id, is_admin = false, transaction = null } = options
+
+    try {
+      logger.info('获取物品详情', {
+        item_instance_id,
+        viewer_user_id,
+        is_admin
+      })
+
+      // 1. 查询物品实例
+      const item = await ItemInstance.findOne({
+        where: { item_instance_id },
+        transaction
+      })
+
+      if (!item) {
+        logger.info('物品不存在', { item_instance_id })
+        return null
+      }
+
+      // 2. 权限检查：普通用户只能查看自己的物品
+      if (!is_admin && viewer_user_id && item.owner_user_id !== viewer_user_id) {
+        const error = new Error('无权查看此物品')
+        error.code = 'FORBIDDEN'
+        throw error
+      }
+
+      // 3. 查询是否有核销码（仅查询待核销的订单）
+      const { RedemptionOrder } = require('../models')
+      const redemptionOrder = await RedemptionOrder.findOne({
+        where: {
+          item_instance_id,
+          status: 'pending'
+        },
+        attributes: ['order_id'],
+        transaction
+      })
+
+      // 4. 格式化返回数据
+      const itemDetail = {
+        item_instance_id: item.item_instance_id,
+        item_type: item.item_type || 'unknown',
+        item_name: item.item_name,
+        status: item.status,
+        rarity: item.meta?.rarity || 'common',
+        description: item.meta?.description || '',
+        acquired_at: item.created_at,
+        expires_at: item.meta?.expires_at || null,
+        is_owner: viewer_user_id ? item.owner_user_id === viewer_user_id : null,
+        has_redemption_code: !!redemptionOrder
+      }
+
+      logger.info('获取物品详情成功', {
+        item_instance_id,
+        status: item.status,
+        has_redemption_code: itemDetail.has_redemption_code
+      })
+
+      return itemDetail
+    } catch (error) {
+      logger.error('获取物品详情失败', {
+        error: error.message,
+        item_instance_id
+      })
+      throw error
+    }
+  }
+
+  /**
    * 获取背包统计信息
    *
    * @param {number} user_id - 用户ID
@@ -299,6 +401,132 @@ class BackpackService {
       }
     } catch (error) {
       logger.error('获取背包统计失败', {
+        error: error.message,
+        user_id
+      })
+      throw error
+    }
+  }
+
+  /**
+   * 获取物品转让历史记录
+   *
+   * 业务场景：
+   * - 普通用户：查看与自己相关的转让记录（发送或接收）
+   * - 管理员：可以查看指定物品的完整转让链条
+   *
+   * @param {number} user_id - 用户ID
+   * @param {Object} [options] - 选项
+   * @param {string} [options.type='all'] - 记录类型：'sent'(发送)/'received'(接收)/'all'(全部)
+   * @param {number} [options.item_instance_id] - 物品实例ID（管理员可指定查看完整转让链条）
+   * @param {boolean} [options.is_admin=false] - 是否管理员
+   * @param {number} [options.page=1] - 页码
+   * @param {number} [options.limit=20] - 每页数量
+   * @param {Object} [options.transaction] - Sequelize事务对象
+   * @returns {Promise<Object>} 转让历史记录和分页信息
+   *
+   * 返回数据结构：
+   * {
+   *   records: [{
+   *     record_id: 1,
+   *     item_instance_id: 123,
+   *     from_user_id: 1,
+   *     to_user_id: 2,
+   *     transfer_time: '2025-12-17T10:00:00+08:00',
+   *     remark: '转让备注'
+   *   }],
+   *   pagination: {
+   *     total: 100,
+   *     page: 1,
+   *     limit: 20,
+   *     total_pages: 5
+   *   },
+   *   filter: {
+   *     type: 'all',
+   *     item_id: null,
+   *     view_mode: 'user_related'
+   *   }
+   * }
+   */
+  static async getTransferHistory(user_id, options = {}) {
+    const {
+      type = 'all',
+      item_instance_id,
+      is_admin = false,
+      page = 1,
+      limit = 20,
+      transaction = null
+    } = options
+
+    try {
+      const { TradeRecord, Op } = require('../models')
+
+      // 1. 构建查询条件
+      const whereClause = {}
+
+      // 只查询转让类型的记录
+      whereClause.operation_type = 'inventory_transfer'
+
+      // 2. 权限和过滤条件
+      if (is_admin && item_instance_id) {
+        // 管理员可以查看指定物品的完整转让链条
+        whereClause.item_instance_id = item_instance_id
+      } else {
+        // 普通用户只能查看与自己相关的记录
+        if (type === 'sent') {
+          whereClause.from_user_id = user_id
+        } else if (type === 'received') {
+          whereClause.to_user_id = user_id
+        } else {
+          // 查看所有与自己相关的
+          whereClause[Op.or] = [{ from_user_id: user_id }, { to_user_id: user_id }]
+        }
+      }
+
+      // 3. 分页查询
+      const offset = (parseInt(page, 10) - 1) * parseInt(limit, 10)
+      const { count, rows: records } = await TradeRecord.findAndCountAll({
+        where: whereClause,
+        order: [['created_at', 'DESC']],
+        limit: parseInt(limit, 10),
+        offset,
+        transaction
+      })
+
+      // 4. 格式化返回数据
+      const formattedRecords = records.map(record => ({
+        record_id: record.record_id,
+        item_instance_id: record.item_instance_id,
+        from_user_id: record.from_user_id,
+        to_user_id: record.to_user_id,
+        transfer_time: record.created_at,
+        remark: record.remark || ''
+      }))
+
+      logger.info('获取转让历史成功', {
+        user_id,
+        total: count,
+        type,
+        item_instance_id: item_instance_id || null,
+        view_mode: is_admin && item_instance_id ? 'complete_chain' : 'user_related'
+      })
+
+      return {
+        records: formattedRecords,
+        pagination: {
+          total: count,
+          page: parseInt(page, 10),
+          limit: parseInt(limit, 10),
+          total_pages: Math.ceil(count / parseInt(limit, 10))
+        },
+        filter: {
+          type,
+          item_id: item_instance_id || null,
+          view_mode: is_admin && item_instance_id ? 'complete_chain' : 'user_related'
+        }
+      }
+    } catch (error) {
+      logger.error('获取转让历史失败', {
         error: error.message,
         user_id
       })

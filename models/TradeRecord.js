@@ -34,7 +34,8 @@ module.exports = sequelize => {
           'market_purchase'
         ),
         allowNull: false,
-        comment: '交易类型：point_transfer-积分转账，exchange_refund-兑换退款，prize_claim-奖品领取，admin_adjustment-管理员调整，system_reward-系统奖励，inventory_transfer-物品转让，market_purchase-市场购买（交易市场DIAMOND结算）'
+        comment:
+          '交易类型：point_transfer-积分转账，exchange_refund-兑换退款，prize_claim-奖品领取，admin_adjustment-管理员调整，system_reward-系统奖励，inventory_transfer-物品转让，market_purchase-市场购买（交易市场DIAMOND结算）'
       },
 
       // 交易参与方
@@ -76,30 +77,35 @@ module.exports = sequelize => {
       asset_code: {
         type: DataTypes.STRING(50),
         allowNull: true,
-        comment: '结算资产代码（Asset Code - 交易结算使用的资产类型）：DIAMOND-钻石资产（交易市场唯一结算币种）；业务规则：仅trade_type=market_purchase时使用，固定为DIAMOND；用途：资产结算类型、多资产扩展预留、对账验证'
+        comment:
+          '结算资产代码（Asset Code - 交易结算使用的资产类型）：DIAMOND-钻石资产（交易市场唯一结算币种）；业务规则：仅trade_type=market_purchase时使用，固定为DIAMOND；用途：资产结算类型、多资产扩展预留、对账验证'
       },
       gross_amount: {
         type: DataTypes.BIGINT,
         allowNull: true,
-        comment: '买家支付总金额（Gross Amount - 买家支付的总金额，包含手续费）：使用BIGINT避免浮点精度问题；业务规则：gross_amount = fee_amount + net_amount（对账公式）；用途：买家扣款金额、对账验证、交易金额统计'
+        comment:
+          '买家支付总金额（Gross Amount - 买家支付的总金额，包含手续费）：使用BIGINT避免浮点精度问题；业务规则：gross_amount = fee_amount + net_amount（对账公式）；用途：买家扣款金额、对账验证、交易金额统计'
       },
       fee_amount: {
         type: DataTypes.BIGINT,
         allowNull: true,
         defaultValue: 0,
-        comment: '平台手续费金额（Fee Amount - 平台收取的手续费金额）：使用BIGINT避免浮点精度问题；业务规则：按fee_rules配置计算，向上取整；用途：平台收入对账、手续费统计、商家成本分析'
+        comment:
+          '平台手续费金额（Fee Amount - 平台收取的手续费金额）：使用BIGINT避免浮点精度问题；业务规则：按fee_rules配置计算，向上取整；用途：平台收入对账、手续费统计、商家成本分析'
       },
       net_amount: {
         type: DataTypes.BIGINT,
         allowNull: true,
-        comment: '卖家实收金额（Net Amount - 卖家实际收到的金额，扣除手续费后）：使用BIGINT避免浮点精度问题；业务规则：net_amount = gross_amount - fee_amount；用途：卖家入账金额、收益统计、对账验证'
+        comment:
+          '卖家实收金额（Net Amount - 卖家实际收到的金额，扣除手续费后）：使用BIGINT避免浮点精度问题；业务规则：net_amount = gross_amount - fee_amount；用途：卖家入账金额、收益统计、对账验证'
       },
 
       // 幂等性控制字段（Idempotency Control Field - 用于防止重复交易）- V4.2新增
       business_id: {
         type: DataTypes.STRING(100),
         allowNull: true,
-        comment: '业务唯一标识（Business ID - 幂等键，用于防止重复扣款）：客户端必传，格式如mp_20251215_xxx；业务规则：同一business_id只能创建一条记录，重复请求返回原结果；用途：幂等性控制、重复交易防护、对账追溯'
+        comment:
+          '业务唯一标识（Business ID - 幂等键，用于防止重复扣款）：客户端必传，格式如mp_20251215_xxx；业务规则：同一business_id只能创建一条记录，重复请求返回原结果；用途：幂等性控制、重复交易防护、对账追溯'
       },
 
       // 交易状态
@@ -133,12 +139,14 @@ module.exports = sequelize => {
       item_id: {
         type: DataTypes.INTEGER,
         allowNull: true,
-        comment: '物品ID（关联user_inventory.inventory_id，仅用于inventory_transfer类型，用于追踪物品转让历史）'
+        comment:
+          '物品ID（关联item_instances.item_instance_id，仅用于inventory_transfer类型，用于追踪物品转让历史）'
       },
       name: {
         type: DataTypes.STRING(100),
         allowNull: true,
-        comment: '物品名称（Item Name - 仅用于inventory_transfer类型，冗余字段用于快速查询显示；统一使用name字段，与UserInventory保持一致）'
+        comment:
+          '物品名称（Item Name - 仅用于inventory_transfer类型，冗余字段用于快速查询显示；统一使用name字段，与ItemInstance保持一致）'
       },
       transfer_note: {
         type: DataTypes.STRING(500),

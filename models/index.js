@@ -102,14 +102,11 @@ models.Product = require('./Product')(sequelize, DataTypes)
  *    - 表名：products，主键：product_id
  */
 
-models.UserInventory = require('./UserInventory')(sequelize, DataTypes)
 /*
- * ✅ UserInventory：用户库存管理（已迁移至 ItemInstance）
- *    - 用途：管理用户获得的奖品、商品和优惠券
- *    - 特点：物品状态（可用/使用/过期）、来源追溯、核销码、转让记录
- *    - 表名：user_inventory，主键：inventory_id，外键：user_id
- *    - 业务场景：抽奖中奖后分发、兑换获得、使用核销、转让给他人
- *    - ⚠️ 数据已迁移至 item_instances 表，user_inventory 作为历史兼容保留
+ * ❌ UserInventory 模型已删除（2025-12-21 暴力重构）
+ *    - 数据已迁移至 item_instances 表
+ *    - 核销码功能已迁移至 redemption_orders 表
+ *    - 替代服务：BackpackService + RedemptionOrderService
  */
 
 models.ItemInstance = require('./ItemInstance')(sequelize, DataTypes)
