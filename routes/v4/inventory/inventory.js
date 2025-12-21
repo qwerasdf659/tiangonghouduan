@@ -7,10 +7,11 @@
  *    - 转让历史记录查询
  *    - 管理员库存统计
  *
- * 2. inventory-market.js（市场交易功能）：
- *    - 市场商品列表查询
- *    - 商品上架/购买/撤回
- *    - 查询用户上架状态
+ * 2. market/（市场交易功能，已拆分为子模块）：
+ *    - listings.js - 市场商品列表查询
+ *    - sell.js     - 商品上架
+ *    - buy.js      - 商品购买
+ *    - manage.js   - 撤回/管理
  *
  * 注意：兑换功能已迁移到 /api/v4/exchange_market
  *
@@ -23,7 +24,7 @@ const router = express.Router()
 
 // 引入子路由模块
 const inventoryCoreRoutes = require('./inventory-core')
-const inventoryMarketRoutes = require('./inventory-market')
+const inventoryMarketRoutes = require('./market/index')
 
 /**
  * 路由映射表（Route Mapping Table）

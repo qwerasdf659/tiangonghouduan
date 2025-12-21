@@ -23,20 +23,20 @@
 const express = require('express')
 const router = express.Router()
 
-// 积分管理路由
-const pointsRoutes = require('./points')
+// 积分管理路由（已拆分为子模块：balance.js, transactions.js, statistics.js, admin.js）
+const pointsRoutes = require('./points/index')
 
-// 兑换系统路由（兑换码核销）
-const redemptionRoutes = require('./redemption')
+// 兑换系统路由（已拆分为子模块：orders.js, fulfill.js, query.js）
+const redemptionRoutes = require('./redemption/index')
 
-// 消费记录路由
-const consumptionRoutes = require('./consumption')
+// 消费记录路由（已拆分为子模块：submit.js, query.js, review.js, qrcode.js）
+const consumptionRoutes = require('./consumption/index')
 
 // 会员权益路由
 const premiumRoutes = require('./premium')
 
-// 资产管理路由
-const assetsRoutes = require('./assets')
+// 资产管理路由（已拆分为子模块：convert.js, balance.js, transactions.js, rules.js）
+const assetsRoutes = require('./assets/index')
 
 // 挂载路由
 router.use('/points', pointsRoutes)

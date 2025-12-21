@@ -165,11 +165,11 @@ router.post('/orders', authenticateToken, async (req, res) => {
  * @returns {Object} item_instance - 物品实例信息
  *
  * 错误场景：
- * - 核销码格式错误 → 400
- * - 核销码不存在 → 404
- * - 核销码已使用 → 409
- * - 核销码已过期 → 410
- * - 权限不足 → 403
+ * - 核销码格式错误 → 400 BAD_REQUEST
+ * - 核销码不存在 → 404 NOT_FOUND
+ * - 核销码已使用 → 409 CONFLICT
+ * - 核销码已过期 → 400 EXPIRED
+ * - 权限不足 → 403 FORBIDDEN
  */
 router.post('/fulfill', authenticateToken, async (req, res) => {
   try {
@@ -241,11 +241,11 @@ router.post('/fulfill', authenticateToken, async (req, res) => {
         },
         item_instance: order.item_instance
           ? {
-              item_instance_id: order.item_instance.item_instance_id,
-              item_type: order.item_instance.item_type,
-              item_name: order.item_instance.item_name,
-              status: order.item_instance.status
-            }
+            item_instance_id: order.item_instance.item_instance_id,
+            item_type: order.item_instance.item_type,
+            item_name: order.item_instance.item_name,
+            status: order.item_instance.status
+          }
           : null,
         redeemer: {
           user_id: redeemerUserId,
@@ -275,7 +275,7 @@ router.post('/fulfill', authenticateToken, async (req, res) => {
     }
 
     if (error.message.includes('已过期') || error.message.includes('超过有效期')) {
-      return res.apiError(error.message, 'GONE', null, 410)
+      return res.apiError(error.message, 'EXPIRED', null, 400)
     }
 
     return handleServiceError(error, res, '核销失败')

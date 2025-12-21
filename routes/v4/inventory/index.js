@@ -26,8 +26,8 @@ const inventoryRoutes = require('./inventory')
 // 库存核心操作路由
 const inventoryCoreRoutes = require('./inventory-core')
 
-// 库存市场相关路由
-const inventoryMarketRoutes = require('./inventory-market')
+// 库存市场相关路由（已拆分为子模块：listings.js, sell.js, buy.js, manage.js）
+const inventoryMarketRoutes = require('./market/index')
 
 // 用户背包路由
 const backpackRoutes = require('./backpack')

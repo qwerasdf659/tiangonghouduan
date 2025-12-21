@@ -12,14 +12,14 @@ const router = express.Router()
 
 // 导入所有子模块
 const authRoutes = require('./auth')
-const systemRoutes = require('./system')
+const systemRoutes = require('./system') // 模块化重构：拆分为子模块目录
 const configRoutes = require('./config')
 const settingsRoutes = require('./settings') // 🆕 系统设置管理
 const prizePoolRoutes = require('./prize_pool')
 const userManagementRoutes = require('./user_management')
-const lotteryManagementRoutes = require('./lottery_management')
+const lotteryManagementRoutes = require('./lottery-management') // 模块化重构：拆分为子模块
 const analyticsRoutes = require('./analytics')
-const customerServiceRoutes = require('./customer_service') // 🆕 客服管理
+const customerServiceRoutes = require('./customer-service') // 模块化重构：拆分为子模块
 const marketplaceRoutes = require('./marketplace') // 🆕 市场统计管理
 const materialRoutes = require('./material') // 🆕 材料系统管理（V4.5.0）
 // 钻石系统管理已废弃（Phase 4），统一迁移到资产管理模块

@@ -1,0 +1,153 @@
+/**
+ * 餐厅积分抽奖系统 V4.0 - 系统状态和配置API路由
+ *
+ * 功能：
+ * - 获取系统状态信息
+ * - 获取业务配置（前后端共享配置）
+ *
+ * 路由前缀：/api/v4/system
+ *
+ * 创建时间：2025年12月22日
+ * 拆分自：system.js（符合Controller拆分规范 150-250行）
+ */
+
+const express = require('express')
+const router = express.Router()
+const logger = require('../../../utils/logger').logger
+const { optionalAuth } = require('../../../middleware/auth')
+const { handleServiceError } = require('../../../middleware/validation')
+const dataAccessControl = require('../../../middleware/dataAccessControl')
+const BeijingTimeHelper = require('../../../utils/timeHelper')
+
+/**
+ * @route GET /api/v4/system/status
+ * @desc 获取系统状态信息
+ * @access Public
+ *
+ * @returns {Object} 系统状态信息
+ * @returns {string} system.server_time - 服务器时间（北京时间）
+ * @returns {string} system.status - 系统状态（running）
+ * @returns {string} system.version - 系统版本号
+ * @returns {Object} system.statistics - 统计信息（仅管理员可见）
+ */
+router.get('/status', optionalAuth, dataAccessControl, async (req, res) => {
+  try {
+    const dataLevel = req.isAdmin ? 'full' : 'public'
+
+    // 系统基本状态
+    const systemStatus = {
+      server_time: BeijingTimeHelper.nowLocale(),
+      status: 'running',
+      version: '4.0.0'
+    }
+
+    /*
+     * 管理员可见的详细统计信息（Admin-only Statistics）
+     * ✅ P2-C架构重构：使用 ReportingService.getSystemStatus() 统一查询（符合TR-005规范）
+     */
+    if (dataLevel === 'full') {
+      // 🔄 通过 ServiceManager 获取 ReportingService
+      const ReportingService = req.app.locals.services.getService('reporting')
+
+      // ✅ 使用 Service 查询系统状态统计（不直接操作models）
+      const statistics = await ReportingService.getSystemOverview()
+
+      // 添加统计数据到响应中（Add Statistics to Response）
+      systemStatus.statistics = {
+        total_users: statistics.total_users, // 用户总数（包含所有状态：active/inactive/banned）
+        active_announcements: statistics.active_announcements, // 活跃公告数（is_active=true）
+        pending_feedbacks: statistics.pending_feedbacks // 待处理反馈数（status='pending'）
+      }
+    }
+
+    return res.apiSuccess(
+      {
+        system: systemStatus
+      },
+      '获取系统状态成功'
+    )
+  } catch (error) {
+    logger.error('获取系统状态失败:', error)
+    return handleServiceError(error, res, '获取系统状态失败')
+  }
+})
+
+/**
+ * @route GET /api/v4/system/business-config
+ * @desc 获取业务配置（前后端共享配置）
+ * @access Public
+ *
+ * @description
+ * 返回统一的业务配置，包括：
+ * - 连抽定价配置（单抽/3连抽/5连抽/10连抽）
+ * - 积分系统规则（上限/下限/验证规则）
+ * - 用户系统配置（昵称规则/验证码有效期）
+ * - 图片上传限制（文件大小/类型/数量）
+ * - 分页配置（用户/管理员）
+ *
+ * @returns {Object} 业务配置信息
+ */
+router.get('/business-config', optionalAuth, dataAccessControl, async (req, res) => {
+  try {
+    // 读取业务配置文件
+    const businessConfig = require('../../../config/business.config')
+
+    // 根据用户角色返回不同级别的配置
+    const dataLevel = req.isAdmin ? 'full' : 'public'
+
+    // 公开配置（所有用户可见）
+    const publicConfig = {
+      lottery: {
+        draw_pricing: businessConfig.lottery.draw_pricing, // 连抽定价配置
+        daily_limit: businessConfig.lottery.daily_limit.all, // 每日抽奖上限
+        free_draw_allowed: businessConfig.lottery.free_draw_allowed // 是否允许免费抽奖
+      },
+      points: {
+        display_name: businessConfig.points.display_name, // 积分显示名称
+        max_balance: businessConfig.points.max_balance, // 积分上限
+        min_balance: businessConfig.points.min_balance // 积分下限
+      },
+      user: {
+        nickname: {
+          min_length: businessConfig.user.nickname.min_length, // 昵称最小长度
+          max_length: businessConfig.user.nickname.max_length // 昵称最大长度
+        },
+        verification_code: {
+          expiry_seconds: businessConfig.user.verification_code.expiry_seconds, // 验证码有效期（秒）
+          resend_interval: businessConfig.user.verification_code.resend_interval // 重发间隔（秒）
+        }
+      },
+      upload: {
+        image: {
+          max_size_mb: businessConfig.upload.image.max_size_mb, // 图片最大大小（MB）
+          max_count: businessConfig.upload.image.max_count, // 单次最大上传数量
+          allowed_types: businessConfig.upload.image.allowed_types // 允许的文件类型
+        }
+      },
+      pagination: {
+        user: businessConfig.pagination.user, // 普通用户分页配置
+        admin: dataLevel === 'full' ? businessConfig.pagination.admin : undefined // 管理员分页配置（仅管理员可见）
+      }
+    }
+
+    // 管理员可见的完整配置
+    if (dataLevel === 'full') {
+      publicConfig.points.validation = businessConfig.points.validation // 积分验证规则（仅管理员可见）
+      publicConfig.lottery.daily_limit_reset_time = businessConfig.lottery.daily_limit.reset_time // 每日限制重置时间（仅管理员可见）
+    }
+
+    return res.apiSuccess(
+      {
+        config: publicConfig,
+        version: '4.0.0',
+        last_updated: '2025-10-21'
+      },
+      '获取业务配置成功'
+    )
+  } catch (error) {
+    logger.error('获取业务配置失败:', error)
+    return handleServiceError(error, res, '获取业务配置失败')
+  }
+})
+
+module.exports = router

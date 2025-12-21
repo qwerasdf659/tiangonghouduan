@@ -21,8 +21,8 @@
 const express = require('express')
 const router = express.Router()
 
-// 交易市场核心路由
-const exchangeMarketRoutes = require('./exchange_market')
+// 交易市场核心路由（已拆分为子模块：items.js, exchange.js, orders.js, statistics.js）
+const exchangeMarketRoutes = require('./exchange/index')
 
 // 挂载路由
 router.use('/', exchangeMarketRoutes)
