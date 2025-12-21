@@ -61,8 +61,9 @@ server.log
 *.bundle
 
 # Cursor IDE配置（但保留规则文档）
-.cursor/
+.cursor/*
 !.cursor/rules/
+!.cursor/rules/*
 
 # Claude AI配置（保留所有内容）
 # .claude目录不忽略

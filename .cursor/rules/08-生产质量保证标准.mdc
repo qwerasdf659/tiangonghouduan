@@ -1,0 +1,943 @@
+---
+alwaysApply: true
+lastUpdated: 2025年12月18日
+---
+
+# 🛡️ 生产质量保证标准（基于实际技术债务分析的强制规范）
+
+## 🔴 **基于生产问题的质量控制体系**
+
+本规范基于实际技术债务检查清单提炼，涵盖接口契约、健康检查、配置管理、WebSocket安全、数据库迁移、事务并发、性能优化、权限缓存等8大关键领域的强制标准。
+
+---
+
+## 1️⃣ **API响应契约强制标准**
+
+### **统一响应格式规范**
+
+**强制要求**: 所有API响应必须使用统一的标准格式
+
+```javascript
+// ✅ 标准响应格式（强制）
+{
+  success: boolean,           // 成功标识
+  code: string,              // 业务码（字符串，如 'SUCCESS', 'NOT_FOUND'）
+  message: string,           // 人类可读消息
+  data: object | array | null, // 业务数据
+  timestamp: string,         // ISO8601 时间戳（北京时间）
+  version: string,           // API版本号
+  request_id: string         // 请求追踪ID
+}
+```
+
+**禁止模式**:
+```javascript
+// ❌ 禁止：多套格式混用
+{ code: 404, msg: '...' }           // 错误：数字code + msg
+{ status: 'ok', result: {...} }     // 错误：非标准字段
+{ error: '...' }                     // 错误：仅错误信息
+```
+
+### **HTTP状态码与业务码分离原则**
+
+**强制规范**:
+- HTTP状态码：仅用于传输层（200/400/401/403/404/500）
+- 业务码（code字段）：用于业务逻辑分类（字符串格式）
+
+```javascript
+// ✅ 正确使用
+ApiResponse.badRequest('参数错误', 'INVALID_PARAMS', details, 400)
+// HTTP状态码: 400, 业务码: 'INVALID_PARAMS'
+
+ApiResponse.unauthorized('未登录', 'UNAUTHORIZED', null, 401)
+// HTTP状态码: 401, 业务码: 'UNAUTHORIZED'
+
+// ❌ 禁止：业务码使用数字
+ApiResponse.error('错误', 40001, null, 400)  // 错误：40001不是字符串
+```
+
+### **404处理器字段完整性**
+
+**强制要求**: 404处理器必须包含所有标准字段
+
+```javascript
+// ✅ 正确的404处理器
+app.use('*', (req, res) => {
+  return res.status(404).json({
+    success: false,
+    code: 'NOT_FOUND',
+    message: `接口不存在: ${req.method} ${req.originalUrl}`,
+    data: { availableEndpoints: [...] },
+    timestamp: BeijingTimeHelper.apiTimestamp(),
+    version: process.env.API_VERSION || 'v4',    // ✅ 必需
+    request_id: req.id || generateRequestId()    // ✅ 必需
+  })
+})
+```
+
+### **全局错误处理器规范**
+
+**强制要求**: 全局错误处理必须使用ApiResponse标准格式
+
+```javascript
+// ✅ 标准错误处理器
+app.use((err, req, res, next) => {
+  const statusCode = err.statusCode || err.status || 500
+  const errorCode = err.code || 'INTERNAL_ERROR'
+  const message = err.message || '服务器内部错误'
+  
+  // 必须使用ApiResponse.error()
+  return res.status(statusCode).json(
+    ApiResponse.error(message, errorCode, { stack: err.stack }, statusCode)
+  )
+})
+
+// ❌ 禁止：直接返回非标准格式
+app.use((err, req, res, next) => {
+  res.status(500).json({ error: err.message })  // ❌ 非标准格式
+})
+```
+
+---
+
+## 2️⃣ **健康检查与可观测性标准**
+
+### **健康检查端点强制实现**
+
+**强制要求**: `/health` 端点必须真实检查所有依赖服务
+
+```javascript
+// ✅ 真实健康检查实现
+app.get('/health', async (req, res) => {
+  const checks = {}
+  
+  // 1. 数据库检查（必需）
+  try {
+    await sequelize.authenticate()
+    checks.database = { status: 'connected', latency: latency }
+  } catch (error) {
+    checks.database = { status: 'disconnected', error: error.message }
+  }
+  
+  // 2. Redis检查（必需）
+  try {
+    const { isRedisHealthy } = require('./utils/UnifiedRedisClient')
+    const healthy = await isRedisHealthy()
+    checks.redis = { status: healthy ? 'connected' : 'disconnected' }
+  } catch (error) {
+    checks.redis = { status: 'disconnected', error: error.message }
+  }
+  
+  // 3. 计算整体状态
+  const allHealthy = Object.values(checks).every(c => c.status === 'connected')
+  const overallStatus = allHealthy ? 'healthy' : 'degraded'
+  
+  // 4. degraded 状态返回 200（而非 503）
+  return res.status(200).json({
+    status: overallStatus,
+    code: allHealthy ? 'SYSTEM_HEALTHY' : 'SYSTEM_DEGRADED',
+    checks: checks,
+    timestamp: BeijingTimeHelper.apiTimestamp()
+  })
+})
+
+// ❌ 禁止：占位实现
+app.get('/health', (req, res) => {
+  res.json({ status: 'ok' })  // ❌ 未真实检查依赖
+})
+```
+
+### **结构化日志强制标准**
+
+**强制要求**: 禁止在服务代码中使用 `console.log/console.warn/console.error`
+
+```javascript
+// ✅ 正确：使用结构化日志
+const logger = require('./utils/logger')
+
+logger.info('用户登录成功', { 
+  user_id: userId, 
+  ip: req.ip,
+  request_id: req.id 
+})
+
+logger.error('数据库查询失败', {
+  error: error.message,
+  stack: error.stack,
+  query: query,
+  request_id: req.id
+})
+
+// ❌ 禁止：纯文本日志（无结构、无request_id、无法搜索）
+console.log('用户登录成功:', userId)
+console.error('错误:', error)
+```
+
+**例外场景**: 仅允许在以下场景使用 `console.*`:
+- 应用启动阶段（logger 初始化前）
+- 紧急降级场景（logger 不可用）
+- 开发调试（必须带明确的 `[DEBUG]` 前缀）
+
+### **request_id 全链路追踪**
+
+**强制要求**: 所有日志和错误响应必须包含 `request_id`
+
+```javascript
+// ✅ 在中间件中生成 request_id
+app.use((req, res, next) => {
+  req.id = req.headers['x-request-id'] || generateRequestId()
+  res.setHeader('X-Request-ID', req.id)
+  next()
+})
+
+// ✅ 日志中传递 request_id
+logger.info('处理请求', { request_id: req.id, path: req.path })
+
+// ✅ 服务层方法接收 request_id
+class UserService {
+  static async createUser(userData, { request_id }) {
+    logger.info('创建用户', { request_id, user_data: userData })
+    // ...
+  }
+}
+
+// ❌ 禁止：日志缺少 request_id
+logger.info('处理请求', { path: req.path })  // ❌ 无法关联请求
+```
+
+---
+
+## 3️⃣ **配置与环境变量强制标准**
+
+### **环境变量加载严格模式**
+
+**强制要求**: 生产环境禁止使用 `dotenv` 的 `override` 模式
+
+```javascript
+// ✅ 正确：严格区分开发/生产环境
+if (process.env.NODE_ENV === 'development') {
+  require('dotenv').config({ override: true })
+  console.log('⚠️ [Development] 使用 dotenv override 模式')
+} else {
+  require('dotenv').config()
+  console.log('✅ [Production] 使用平台注入配置，禁止 override')
+}
+
+// ❌ 禁止：给 NODE_ENV 缺省值
+const env = process.env.NODE_ENV || 'development'  // ❌ 生产漏配会当开发环境
+if (env === 'development') { ... }
+
+// ❌ 禁止：全局 override
+require('dotenv').config({ override: true })  // ❌ 会覆盖生产配置
+```
+
+### **配置校验强制执行**
+
+**强制要求**: 应用启动时必须校验必需的环境变量
+
+```javascript
+// ✅ 启动时强制校验
+const { validateConfig, isDevelopment } = require('./config/environment')
+
+if (!isDevelopment()) {
+  // 生产/测试环境：校验失败立即退出
+  validateConfig()
+} else {
+  // 开发环境：仅警告
+  try {
+    validateConfig()
+  } catch (error) {
+    console.warn('⚠️ [Development] 配置校验失败（已忽略）:', error.message)
+  }
+}
+
+// ✅ 配置校验函数实现
+function validateConfig() {
+  const required = ['NODE_ENV', 'PORT', 'DB_HOST', 'DB_PORT', 'DB_NAME', 
+                   'DB_USER', 'DB_PASSWORD', 'JWT_SECRET', 'REDIS_HOST']
+  const missing = required.filter(key => !process.env[key])
+  
+  if (missing.length > 0) {
+    console.error('❌ 缺少必需的环境变量:', missing)
+    process.exit(1)  // 立即退出
+  }
+  
+  // 类型校验
+  if (isNaN(parseInt(process.env.PORT))) {
+    console.error('❌ PORT 必须是有效的数字')
+    process.exit(1)
+  }
+}
+
+// ❌ 禁止：校验函数定义但不执行
+function validateConfig() { ... }
+// 缺少调用，启动时不会触发校验
+```
+
+### **数据库配置延迟校验**
+
+**强制要求**: 数据库配置不得在 `require` 时立即校验
+
+```javascript
+// ✅ 正确：延迟到实际连接时校验
+// config/database.js
+function validateDatabaseConfig() {
+  const required = ['DB_HOST', 'DB_PORT', 'DB_USER', 'DB_PASSWORD', 'DB_NAME']
+  const missing = required.filter(v => !process.env[v])
+  if (missing.length > 0) {
+    throw new Error(`缺少必需的环境变量: ${missing.join(', ')}`)
+  }
+}
+
+async function testConnection() {
+  validateDatabaseConfig()  // ✅ 连接时才校验
+  await sequelize.authenticate()
+}
+
+module.exports = { sequelize, testConnection }
+
+// ❌ 禁止：require 时立即校验
+validateDatabaseConfig()  // ❌ 放在文件顶层，require 即触发
+module.exports = { sequelize }
+```
+
+**替代方案**: 添加跳过标志
+
+```javascript
+// ✅ 方案2：允许跳过校验
+if (!process.env.SKIP_DB_VALIDATION) {
+  validateDatabaseConfig()
+}
+
+// 工具脚本中使用
+// SKIP_DB_VALIDATION=1 node scripts/generate-docs.js
+```
+
+---
+
+## 4️⃣ **WebSocket安全强制标准**
+
+### **握手阶段强制JWT鉴权**
+
+**强制要求**: WebSocket 连接必须在握手阶段验证 JWT
+
+```javascript
+// ✅ 握手强制鉴权
+const jwt = require('jsonwebtoken')
+
+this.io.use((socket, next) => {
+  const token = socket.handshake.auth?.token
+  
+  if (!token) {
+    wsLogger.warn('WebSocket握手失败：缺少token', { 
+      socket_id: socket.id, 
+      ip: socket.handshake.address 
+    })
+    return next(new Error('Authentication required: missing token'))
+  }
+  
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET)
+    socket.user = decoded  // 挂载用户信息
+    wsLogger.info('WebSocket握手成功', { 
+      user_id: decoded.user_id, 
+      role: decoded.role 
+    })
+    next()
+  } catch (error) {
+    wsLogger.warn('WebSocket握手失败：token无效', { 
+      error: error.message 
+    })
+    next(new Error('Authentication failed: invalid token'))
+  }
+})
+
+// ❌ 禁止：无鉴权直接连接
+this.io.on('connection', socket => {
+  // ❌ 直接连接，无身份验证
+})
+```
+
+### **服务端判定身份原则**
+
+**强制要求**: 用户身份和权限必须由服务端从 JWT 判定，禁止信任客户端声明
+
+```javascript
+// ✅ 服务端判定身份
+this.io.on('connection', socket => {
+  // 从 JWT 获取身份（服务端判定）
+  const userId = socket.user.user_id
+  const isAdmin = socket.user.role === 'admin' || socket.user.is_admin === true
+  
+  // 根据身份注册连接
+  if (isAdmin) {
+    this.connectedAdmins.set(userId, socket.id)
+  } else {
+    this.connectedUsers.set(userId, socket.id)
+  }
+  
+  wsLogger.info('用户身份已确定', { 
+    user_id: userId, 
+    is_admin: isAdmin,
+    source: 'JWT' 
+  })
+})
+
+// ❌ 禁止：信任客户端声明
+socket.on('register_user', data => {
+  const { user_id, user_type } = data  // ❌ 客户端可伪造
+  
+  if (user_type === 'admin') {
+    this.connectedAdmins.set(user_id, socket.id)  // ❌ 可冒充管理员
+  }
+})
+```
+
+### **WebSocket CORS 白名单**
+
+**强制要求**: WebSocket 必须使用 CORS 白名单，禁止 `origin: '*'`
+
+```javascript
+// ✅ CORS 白名单配置
+this.io = socketIO(server, {
+  cors: {
+    origin: (origin, callback) => {
+      const allowedOrigins = process.env.ALLOWED_ORIGINS
+        ? process.env.ALLOWED_ORIGINS.split(',')
+        : ['http://localhost:3000', 'http://localhost:8080']
+      
+      // 微信小程序特殊处理
+      if (!origin || origin.includes('servicewechat.com')) {
+        return callback(null, true)
+      }
+      
+      // 白名单检查
+      if (allowedOrigins.includes(origin)) {
+        return callback(null, true)
+      }
+      
+      wsLogger.warn('WebSocket连接被CORS拒绝', { origin })
+      callback(new Error('Not allowed by CORS'))
+    },
+    credentials: true
+  }
+})
+
+// ❌ 禁止：完全开放
+this.io = socketIO(server, {
+  cors: { origin: '*' }  // ❌ 任意域名可连接
+})
+```
+
+---
+
+## 5️⃣ **数据库迁移与双轨架构标准**
+
+### **双轨架构禁止长期存在**
+
+**强制要求**: 新旧表并存的双轨架构必须设置明确的迁移截止日期
+
+```javascript
+// ✅ 设置迁移截止日期
+const MIGRATION_CUTOFF_DATE = new Date('2025-12-17')
+const now = new Date()
+
+if (now > MIGRATION_CUTOFF_DATE) {
+  // 截止日期后：仅使用新表
+  const items = await ItemInstance.findAll({ where: { owner_user_id: userId } })
+  
+} else {
+  // 截止日期前：双轨读取（降级方案）
+  const [newItems, oldItems] = await Promise.all([
+    ItemInstance.findAll({ where: { owner_user_id: userId } }),
+    UserInventory.findAll({ where: { user_id: userId } })
+  ])
+  // 合并数据...
+}
+
+// ❌ 禁止：无期限的双轨逻辑
+const [newItems, oldItems] = await Promise.all([...])  // ❌ 永久双轨
+```
+
+### **旧接口废弃标准流程**
+
+**强制要求**: 废弃的接口必须返回 410 Gone 并提供迁移引导
+
+```javascript
+// ✅ 标准废弃接口
+router.get('/old-endpoint/:id', (req, res) => {
+  logger.warn('访问已废弃的接口', {
+    deprecated_endpoint: '/api/v4/old-endpoint',
+    new_endpoint: '/api/v4/new-endpoint',
+    deprecation_date: '2025-12-17',
+    user_id: req.user?.user_id
+  })
+  
+  return res.apiError(
+    '此接口已废弃，请使用新接口',
+    'ENDPOINT_DEPRECATED',
+    {
+      deprecated_since: '2025-12-17',
+      new_endpoint: '/api/v4/new-endpoint',
+      migration_guide: 'https://docs.example.com/migration'
+    },
+    410  // HTTP 410 Gone
+  )
+})
+
+// ❌ 禁止：删除接口但不返回任何信息
+// router.get('/old-endpoint/:id', ...)  // ❌ 直接删除，前端404
+```
+
+### **外键约束和索引强制要求**
+
+**强制要求**: 所有关联表必须添加外键约束和关键索引
+
+```javascript
+// ✅ 模型定义包含外键和索引
+// models/MarketListing.js
+MarketListing.init({
+  seller_user_id: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+    references: {
+      model: 'users',     // ✅ 外键约束
+      key: 'user_id'
+    },
+    onDelete: 'RESTRICT',
+    onUpdate: 'CASCADE'
+  }
+}, {
+  indexes: [
+    {
+      fields: ['seller_user_id', 'status'],  // ✅ 联合索引
+      name: 'idx_seller_status'
+    },
+    {
+      unique: true,
+      fields: ['business_id'],  // ✅ 幂等键唯一索引
+      name: 'uk_business_id'
+    }
+  ]
+})
+
+// ❌ 禁止：缺少外键和索引
+MarketListing.init({
+  seller_user_id: {
+    type: DataTypes.INTEGER  // ❌ 无外键约束
+  }
+}, {
+  // ❌ 无索引定义
+})
+```
+
+---
+
+## 6️⃣ **事务并发与幂等性标准**
+
+### **幂等键数据库层唯一约束**
+
+**强制要求**: 所有幂等键（business_id）必须有数据库层唯一约束
+
+```javascript
+// ✅ 模型层声明唯一约束
+// models/MarketListing.js
+MarketListing.init({
+  business_id: {
+    type: DataTypes.STRING(100),
+    allowNull: false,
+    unique: true,  // ✅ 字段级唯一约束
+    comment: '业务唯一ID，用于幂等性控制'
+  }
+}, {
+  indexes: [
+    {
+      unique: true,
+      fields: ['business_id'],  // ✅ 索引级唯一约束
+      name: 'uk_business_id'
+    }
+  ]
+})
+
+// ✅ 迁移文件添加约束
+await queryInterface.addConstraint('market_listings', {
+  fields: ['business_id'],
+  type: 'unique',
+  name: 'uk_market_listings_business_id'
+})
+
+// ❌ 禁止：仅在代码层判断重复
+const existing = await MarketListing.findOne({ 
+  where: { business_id } 
+})
+if (existing) {
+  throw new Error('重复')  // ❌ 并发场景下不可靠
+}
+await MarketListing.create({ business_id, ... })
+```
+
+### **事务边界清晰性原则**
+
+**强制要求**: 业务操作和审计日志必须在同一事务内，或使用消息队列解耦
+
+```javascript
+// ✅ 方案1：审计日志在事务内（推荐用于关键操作）
+const transaction = await sequelize.transaction()
+try {
+  // 业务操作
+  await item.update({ status: 'used' }, { transaction })
+  
+  // 审计日志（同一事务）
+  await AuditLogService.logInventoryUse({
+    operator_id: userId,
+    item_id: itemId,
+    action: 'use'
+  }, { transaction })
+  
+  // 统一提交
+  await transaction.commit()
+} catch (error) {
+  await transaction.rollback()
+  throw error
+}
+
+// ✅ 方案2：消息队列异步（解耦）
+await transaction.commit()  // 业务先提交
+
+await auditQueue.publish('inventory.used', {  // 异步审计
+  operator_id: userId,
+  item_id: itemId,
+  timestamp: Date.now()
+})
+
+// ❌ 禁止：事务外异步写入
+await transaction.commit()  // 已提交
+
+try {
+  await AuditLogService.log({ ... })  // ❌ 事务外，可能丢失
+} catch (error) {
+  logger.error('审计日志失败')  // ❌ 业务成功但日志失败
+}
+```
+
+### **悲观锁索引支持**
+
+**强制要求**: 使用悲观锁的查询条件必须有索引支持，避免表锁
+
+```javascript
+// ✅ 索引支持的悲观锁
+const item = await ItemInstance.findOne({
+  where: { 
+    item_instance_id: itemId,  // ✅ 主键
+    owner_user_id: userId       // ✅ 有联合索引
+  },
+  lock: transaction.LOCK.UPDATE,
+  transaction
+})
+
+// 确保索引存在
+// CREATE INDEX idx_item_owner ON item_instances(item_instance_id, owner_user_id)
+
+// ❌ 危险：无索引支持的悲观锁
+const item = await ItemInstance.findOne({
+  where: { 
+    name: itemName  // ❌ 无索引，退化为表锁
+  },
+  lock: transaction.LOCK.UPDATE,
+  transaction
+})
+```
+
+---
+
+## 7️⃣ **性能优化强制标准**
+
+### **禁止N+1查询**
+
+**强制要求**: 批量数据必须使用批量查询，禁止循环查询
+
+```javascript
+// ✅ 批量查询
+async function getUserAssets(userId) {
+  // 1. 查询所有资产账户
+  const accounts = await AssetAccount.findAll({
+    where: { user_id: userId, balance: { [Op.gt]: 0 } }
+  })
+  
+  // 2. 批量查询资产类型
+  const assetCodes = [...new Set(accounts.map(a => a.asset_code))]
+  const assetTypes = await MaterialAssetType.findAll({
+    where: { asset_code: { [Op.in]: assetCodes } }
+  })
+  
+  // 3. 建立映射
+  const typeMap = new Map()
+  assetTypes.forEach(t => typeMap.set(t.asset_code, t))
+  
+  // 4. 组装数据
+  return accounts.map(account => ({
+    ...account.toJSON(),
+    type: typeMap.get(account.asset_code)
+  }))
+}
+
+// ❌ 禁止：N+1查询
+async function getUserAssets(userId) {
+  const accounts = await AssetAccount.findAll({ 
+    where: { user_id: userId } 
+  })
+  
+  // ❌ 循环查询（N+1）
+  for (const account of accounts) {
+    const type = await MaterialAssetType.findOne({
+      where: { asset_code: account.asset_code }
+    })
+    account.type = type
+  }
+  
+  return accounts
+}
+```
+
+### **Redis SCAN 替代 KEYS**
+
+**强制要求**: Redis 生产环境禁止使用 `KEYS` 命令，必须使用 `SCAN`
+
+```javascript
+// ✅ 使用 SCAN 迭代
+async function _scanKeys(client, pattern) {
+  const keys = new Set()
+  let cursor = '0'
+  
+  do {
+    const result = await client.scan(cursor, 'MATCH', pattern, 'COUNT', 100)
+    cursor = result[0]
+    const matchedKeys = result[1]
+    matchedKeys.forEach(key => keys.add(key))
+  } while (cursor !== '0')
+  
+  return Array.from(keys)
+}
+
+async function getStats(keyPattern = 'rate_limit:*') {
+  const client = await this.redisClient.ensureConnection()
+  const keys = await this._scanKeys(client, keyPattern)  // ✅ SCAN
+  // ...
+}
+
+// ❌ 禁止：生产环境使用 KEYS
+async function getStats(keyPattern) {
+  const keys = await client.keys(keyPattern)  // ❌ 阻塞Redis主线程
+  // ...
+}
+```
+
+### **慢查询监控和索引优化**
+
+**强制要求**: 必须开启慢查询日志并定期分析
+
+```sql
+-- ✅ 开启慢查询日志
+SET GLOBAL slow_query_log = 'ON';
+SET GLOBAL long_query_time = 1;  -- 1秒以上算慢查询
+SET GLOBAL log_queries_not_using_indexes = 'ON';
+
+-- ✅ 分析慢查询
+-- mysqldumpslow -s t -t 10 /var/log/mysql/slow.log
+
+-- ✅ 常见必需索引
+CREATE INDEX idx_item_instances_owner_status 
+  ON item_instances(owner_user_id, status);
+
+CREATE INDEX idx_market_listings_status_created 
+  ON market_listings(status, created_at DESC);
+
+CREATE INDEX idx_asset_balances_user_asset 
+  ON account_asset_balances(user_id, asset_code);
+```
+
+---
+
+## 8️⃣ **权限缓存失效强制标准**
+
+### **权限变更自动失效缓存**
+
+**强制要求**: 所有权限变更操作必须自动失效相关缓存
+
+```javascript
+// ✅ 权限变更自动失效缓存
+class UserRoleService {
+  static async updateUserRole(userId, roleName, options = {}) {
+    const { transaction } = options
+    
+    // 1. 更新角色
+    await UserRole.update(
+      { role_name: roleName },
+      { where: { user_id: userId }, transaction }
+    )
+    
+    // 2. 自动清除权限缓存（必需）
+    await invalidateUserPermissions(userId, `role_change_${roleName}`)
+    logger.info('权限缓存已清除', { 
+      user_id: userId, 
+      reason: `角色变更 ${roleName}` 
+    })
+    
+    // 3. 权限降级时强制断开WebSocket
+    if (targetRole.role_level < 100) {
+      try {
+        const ChatWebSocketService = require('./ChatWebSocketService')
+        ChatWebSocketService.disconnectUser(userId, 'admin')
+        logger.info('用户权限降级，已断开WebSocket', { user_id: userId })
+      } catch (wsError) {
+        logger.warn('断开WebSocket失败（非致命）', { error: wsError.message })
+      }
+    }
+  }
+}
+
+// ❌ 禁止：权限变更但不失效缓存
+static async updateUserRole(userId, roleName) {
+  await UserRole.update({ role_name: roleName }, { where: { user_id: userId } })
+  // ❌ 缺少 invalidateUserPermissions()
+  // 结果：用户仍以旧权限访问
+}
+```
+
+### **账号禁用强制断开连接**
+
+**强制要求**: 账号禁用/停用时必须断开所有WebSocket连接
+
+```javascript
+// ✅ 账号禁用自动断开连接
+class UserRoleService {
+  static async updateUserStatus(userId, status, options = {}) {
+    const { transaction } = options
+    
+    // 1. 更新状态
+    await User.update(
+      { status: status },
+      { where: { user_id: userId }, transaction }
+    )
+    
+    // 2. 自动清除权限缓存
+    await invalidateUserPermissions(userId, `status_change_${status}`)
+    
+    // 3. 禁用/停用时断开所有连接（必需）
+    if (status === 'inactive' || status === 'banned') {
+      try {
+        const ChatWebSocketService = require('./ChatWebSocketService')
+        ChatWebSocketService.disconnectUser(userId, 'user')
+        ChatWebSocketService.disconnectUser(userId, 'admin')
+        logger.info('用户被禁用，已断开所有WebSocket', { 
+          user_id: userId,
+          new_status: status 
+        })
+      } catch (wsError) {
+        logger.warn('断开WebSocket失败（非致命）', { error: wsError.message })
+      }
+    }
+  }
+}
+
+// ❌ 禁止：账号禁用但不断开连接
+static async updateUserStatus(userId, status) {
+  await User.update({ status }, { where: { user_id: userId } })
+  // ❌ 缺少断开连接逻辑
+  // 结果：被禁用用户仍可收发WebSocket消息
+}
+```
+
+### **缓存失效函数标准实现**
+
+**强制要求**: 必须实现统一的缓存失效函数
+
+```javascript
+// ✅ 统一缓存失效函数
+const memoryCache = new Map()
+const { getRedisClient } = require('./utils/UnifiedRedisClient')
+
+async function invalidateUserPermissions(user_id, reason = 'unknown') {
+  // 1. 清除内存缓存
+  memoryCache.delete(`permissions_${user_id}`)
+  
+  // 2. 清除Redis缓存
+  try {
+    const redisClient = await getRedisClient()
+    await redisClient.del(`permissions:${user_id}`)
+  } catch (error) {
+    logger.error('清除Redis缓存失败', { 
+      user_id, 
+      error: error.message 
+    })
+  }
+  
+  // 3. 记录日志
+  logger.info('清除用户权限缓存', { 
+    user_id, 
+    reason,
+    timestamp: new Date().toISOString()
+  })
+}
+
+module.exports = { invalidateUserPermissions }
+
+// ❌ 禁止：缓存失效不完整
+async function invalidateUserPermissions(user_id) {
+  memoryCache.delete(`permissions_${user_id}`)
+  // ❌ 遗漏Redis缓存
+  // ❌ 无日志记录
+}
+```
+
+---
+
+## 9️⃣ **质量检查清单**
+
+### **P0级（影响安全/数据一致性）**
+
+- [ ] 所有API响应使用统一格式（success/code/message/data/timestamp/version/request_id）
+- [ ] HTTP状态码与业务码明确分离（HTTP仅传输层，code字段业务层）
+- [ ] WebSocket握手强制JWT鉴权
+- [ ] WebSocket身份由服务端从JWT判定，禁止信任客户端声明
+- [ ] 所有幂等键（business_id）有数据库层唯一约束
+- [ ] 生产环境不使用 `dotenv` 的 `override` 模式
+- [ ] `/health` 端点真实检查数据库和Redis连接
+
+### **P1级（影响性能/运维）**
+
+- [ ] 禁止在服务代码中使用 `console.log/warn/error`（启动阶段除外）
+- [ ] 所有日志包含 `request_id` 用于链路追踪
+- [ ] 启动时强制执行 `validateConfig()` 校验环境变量
+- [ ] 数据库配置不在 `require` 时立即校验
+- [ ] WebSocket CORS使用白名单，禁止 `origin: '*'`
+- [ ] 批量查询避免N+1问题
+- [ ] Redis使用 `SCAN` 替代 `KEYS`
+- [ ] 权限变更自动失效缓存并断开WebSocket
+- [ ] 账号禁用自动断开所有WebSocket连接
+- [ ] 双轨架构有明确的迁移截止日期
+
+### **P2级（技术债务）**
+
+- [ ] 开启慢查询日志并定期分析
+- [ ] 关键查询有索引支持（owner_user_id, status, created_at等）
+- [ ] 悲观锁查询条件有索引支持（避免表锁）
+- [ ] 审计日志在事务内或使用消息队列
+- [ ] 外键约束完整（所有关联表）
+- [ ] 废弃接口返回410并提供迁移引导
+
+---
+
+## 📋 **核心原则总结**
+
+1. **契约优先**: API响应格式、错误码、字段集合必须统一
+2. **安全第一**: WebSocket鉴权、权限缓存、幂等性控制不可妥协
+3. **真实检查**: 健康检查、配置校验必须真实执行，禁止占位实现
+4. **可观测性**: 结构化日志、request_id、错误追踪必须完整
+5. **性能保证**: 禁止N+1查询、KEYS扫描、无索引的悲观锁
+6. **缓存一致性**: 权限变更必须立即失效缓存并断开连接
+7. **迁移可控**: 双轨架构必须有截止日期，旧接口有废弃引导
+
+---
+
+**核心理念**: 从"问题修复"到"问题预防"，将技术债务转化为强制标准，建立可落地的质量保证体系。
