@@ -22,7 +22,7 @@ class PointsTransaction extends Model {
    * @param {Object} models - 所有模型的引用
    * @returns {void}
    */
-  static associate (models) {
+  static associate(models) {
     // 多对一：多个交易记录属于一个用户
     PointsTransaction.belongsTo(models.User, {
       foreignKey: 'user_id',
@@ -57,15 +57,13 @@ class PointsTransaction extends Model {
       },
       comment: '关联的消费记录（用于消费奖励积分）'
     })
-
-    // 🗑️ 关联业务事件已删除 - BusinessEvent模型已删除 - 2025年01月21日
   }
 
   /**
    * 获取交易类型的友好显示名称
    * @returns {string} 显示名称
    */
-  getTransactionTypeName () {
+  getTransactionTypeName() {
     const typeNames = {
       earn: '积分获得',
       consume: '积分消耗',
@@ -79,7 +77,7 @@ class PointsTransaction extends Model {
    * 获取业务类型的友好显示名称
    * @returns {string} 显示名称
    */
-  getBusinessTypeName () {
+  getBusinessTypeName() {
     const businessNames = {
       task_complete: '任务完成',
       lottery_consume: '抽奖消耗',
@@ -98,7 +96,7 @@ class PointsTransaction extends Model {
    * 检查交易是否为积分增加
    * @returns {boolean} 是否为积分增加
    */
-  isPointsIncrease () {
+  isPointsIncrease() {
     return this.points_amount > 0
   }
 
@@ -106,7 +104,7 @@ class PointsTransaction extends Model {
    * 检查交易是否为积分减少
    * @returns {boolean} 是否为积分减少
    */
-  isPointsDecrease () {
+  isPointsDecrease() {
     return this.points_amount < 0
   }
 
@@ -114,7 +112,7 @@ class PointsTransaction extends Model {
    * 获取积分变化的绝对值
    * @returns {number} 积分变化绝对值
    */
-  getAbsoluteAmount () {
+  getAbsoluteAmount() {
     return Math.abs(parseFloat(this.points_amount))
   }
 
@@ -122,7 +120,7 @@ class PointsTransaction extends Model {
    * 计算交易对账户余额的影响
    * @returns {Object} 余额影响分析
    */
-  getBalanceImpact () {
+  getBalanceImpact() {
     const amount = parseFloat(this.points_amount)
     const balanceBefore = parseFloat(this.points_balance_before)
     const balanceAfter = parseFloat(this.points_balance_after)
@@ -142,7 +140,7 @@ class PointsTransaction extends Model {
    * 检查交易是否有效
    * @returns {Object} 有效性检查结果
    */
-  validateTransaction () {
+  validateTransaction() {
     const errors = []
     const warnings = []
 
@@ -185,7 +183,7 @@ class PointsTransaction extends Model {
    * 生成交易摘要
    * @returns {Object} 交易摘要
    */
-  toSummary () {
+  toSummary() {
     const balanceImpact = this.getBalanceImpact()
     const validation = this.validateTransaction()
 
@@ -224,7 +222,7 @@ class PointsTransaction extends Model {
    * 格式化显示信息
    * @returns {string} 显示信息
    */
-  toDisplayString () {
+  toDisplayString() {
     const typeName = this.getTransactionTypeName()
     const businessName = this.getBusinessTypeName()
     const amount = this.getAbsoluteAmount()
@@ -238,7 +236,7 @@ class PointsTransaction extends Model {
    * @param {Array} transactions - 交易记录数组
    * @returns {Object} 批量验证结果
    */
-  static batchValidate (transactions) {
+  static batchValidate(transactions) {
     const results = transactions.map(transaction => ({
       transaction_id: transaction.transaction_id,
       validation: transaction.validateTransaction()
@@ -261,7 +259,7 @@ class PointsTransaction extends Model {
    * @param {Array} transactions - 交易记录数组
    * @returns {Object} 趋势分析
    */
-  static analyzeTrends (transactions) {
+  static analyzeTrends(transactions) {
     const earnTransactions = transactions.filter(t => t.transaction_type === 'earn')
     const consumeTransactions = transactions.filter(t => t.transaction_type === 'consume')
 
@@ -327,7 +325,7 @@ module.exports = sequelize => {
          * 获取积分数量（自动转换为浮点数）
          * @returns {number} 积分数量
          */
-        get () {
+        get() {
           const value = this.getDataValue('points_amount')
           return value ? parseFloat(value) : 0
         }
@@ -340,7 +338,7 @@ module.exports = sequelize => {
          * 获取交易前余额（自动转换为浮点数）
          * @returns {number} 交易前积分余额
          */
-        get () {
+        get() {
           const value = this.getDataValue('points_balance_before')
           return value ? parseFloat(value) : 0
         }
@@ -353,7 +351,7 @@ module.exports = sequelize => {
          * 获取交易后余额（自动转换为浮点数）
          * @returns {number} 交易后积分余额
          */
-        get () {
+        get() {
           const value = this.getDataValue('points_balance_after')
           return value ? parseFloat(value) : 0
         }
@@ -450,7 +448,8 @@ module.exports = sequelize => {
         type: DataTypes.ENUM('pending', 'completed', 'failed', 'cancelled'),
         allowNull: false,
         defaultValue: 'pending', // ✅ 与数据库默认值保持一致（Database Default: pending）
-        comment: '交易状态（Transaction Status: pending=待处理/冻结, completed=已完成, failed=失败, cancelled=已取消）'
+        comment:
+          '交易状态（Transaction Status: pending=待处理/冻结, completed=已完成, failed=失败, cancelled=已取消）'
       },
 
       failure_reason: {

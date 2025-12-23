@@ -42,10 +42,10 @@
 - **现状**: 只有 `POST /api/v4/lottery/draw`，路由层无 `/execute`
 - **证据**: `routes/v4/lottery/draw.js` 只定义了 `/draw`
 
-#### 5. 幂等性与审计（✅ 数据库层100%完成）
+#### 5. 幂等性与审计（✅ 100%完成 - 数据库层+模型层）
 
-- **现状**: 关键表的 `business_id` 唯一约束已落库且字段 NOT NULL
-- **证据**:
+- **现状**: 关键表的 `business_id` 唯一约束已落库且字段 NOT NULL，Sequelize 模型定义同步一致
+- **数据库层证据**:
   - `trade_orders.business_id`：唯一索引 `business_id`
   - `market_listings.business_id`：唯一索引 `uk_market_listings_business_id`
   - `lottery_draws.business_id`：唯一索引 `uk_lottery_draws_business_id`
@@ -54,6 +54,10 @@
   - `asset_transactions`：复合唯一索引 `uk_business_idempotency(business_id,business_type)`
   - `redemption_orders.code_hash`：唯一索引 `code_hash`
   - `account_asset_balances`：复合唯一索引 `uk_account_asset(account_id,asset_code)`
+- **模型层证据**（P1修复 - 2025-12-23）:
+  - `models/ConsumptionRecord.js`：`business_id` 已改为 `allowNull: false, unique: true`
+  - `models/MarketListing.js`：`business_id` 已改为 `allowNull: false`，索引定义包含 `uk_market_listings_business_id`
+  - 迁移脚本：`migrations/20251223000100-add-idempotency-constraints-p1-fix.js`
 - **数据验证**: 所有幂等字段当前数据 NULL 数量为 0
 
 ---
@@ -98,6 +102,7 @@
   - 规范要求：改为 `wx_code` 或 `js_code`
 
 - **问题2**: `routes/v4/shop/redemption/fulfill.js` 第53行
+
   ```javascript
   const { code } = req.body // 核销码
   ```

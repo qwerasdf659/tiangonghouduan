@@ -25,7 +25,7 @@ class UserPointsAccount extends Model {
    * @param {Object} models - Sequelize所有模型的集合对象
    * @returns {void} 无返回值，仅定义关联关系
    */
-  static associate (models) {
+  static associate(models) {
     // 一对多：一个用户只有一个积分账户
     UserPointsAccount.belongsTo(models.User, {
       foreignKey: 'user_id',
@@ -41,8 +41,6 @@ class UserPointsAccount extends Model {
       onDelete: 'CASCADE',
       comment: '积分交易记录'
     })
-
-    // 🗑️ 通过业务事件关联已删除 - BusinessEvent模型已删除 - 2025年01月21日
   }
 
   /**
@@ -53,7 +51,7 @@ class UserPointsAccount extends Model {
    * @param {number} data.total_consumed - 累计消耗积分
    * @returns {Object} 验证结果对象 {is_valid: boolean, errors: Array<string>}
    */
-  static validateAccount (data) {
+  static validateAccount(data) {
     const errors = []
 
     if (data.available_points < 0) {
@@ -103,12 +101,13 @@ module.exports = sequelize => {
         type: DataTypes.DECIMAL(10, 2),
         allowNull: false,
         defaultValue: 0.0,
-        comment: '可用积分余额（用户当前可用于兑换、抽奖的积分数量，业务规则：消费奖励审核通过后增加、兑换抽奖时扣除、审核拒绝退回时增加，计算公式：total_earned - total_consumed，范围：≥0，用途：兑换商品、参与抽奖、余额查询、权限判断）',
+        comment:
+          '可用积分余额（用户当前可用于兑换、抽奖的积分数量，业务规则：消费奖励审核通过后增加、兑换抽奖时扣除、审核拒绝退回时增加，计算公式：total_earned - total_consumed，范围：≥0，用途：兑换商品、参与抽奖、余额查询、权限判断）',
         /**
          * 获取可用积分的浮点数值
          * @returns {number} 可用积分（浮点数格式）
          */
-        get () {
+        get() {
           const value = this.getDataValue('available_points')
           return value ? parseFloat(value) : 0
         }
@@ -117,12 +116,13 @@ module.exports = sequelize => {
         type: DataTypes.DECIMAL(10, 2),
         allowNull: false,
         defaultValue: 0.0,
-        comment: '累计获得积分（用户历史累计获得的所有积分，只增不减，业务来源：消费奖励、活动奖励、管理员手动调整，积分规则：1元消费=1积分（四舍五入），用途：用户积分报表、等级判定、统计分析、财务对账）',
+        comment:
+          '累计获得积分（用户历史累计获得的所有积分，只增不减，业务来源：消费奖励、活动奖励、管理员手动调整，积分规则：1元消费=1积分（四舍五入），用途：用户积分报表、等级判定、统计分析、财务对账）',
         /**
          * 获取累计获得积分的浮点数值
          * @returns {number} 累计获得积分（浮点数格式）
          */
-        get () {
+        get() {
           const value = this.getDataValue('total_earned')
           return value ? parseFloat(value) : 0
         }
@@ -131,12 +131,13 @@ module.exports = sequelize => {
         type: DataTypes.DECIMAL(10, 2),
         allowNull: false,
         defaultValue: 0.0,
-        comment: '累计消耗积分（用户历史累计消耗的所有积分，只增不减，业务场景：兑换商品、参与抽奖，用途：用户消费行为分析、积分流水对账、退款凭证计算，业务规则：消费时增加，退款时不减少但available_points增加）',
+        comment:
+          '累计消耗积分（用户历史累计消耗的所有积分，只增不减，业务场景：兑换商品、参与抽奖，用途：用户消费行为分析、积分流水对账、退款凭证计算，业务规则：消费时增加，退款时不减少但available_points增加）',
         /**
          * 获取累计消耗积分的浮点数值
          * @returns {number} 累计消耗积分（浮点数格式）
          */
-        get () {
+        get() {
           const value = this.getDataValue('total_consumed')
           return value ? parseFloat(value) : 0
         }
@@ -183,7 +184,7 @@ module.exports = sequelize => {
          * 获取冻结积分的浮点数值
          * @returns {number} 冻结积分（浮点数格式）
          */
-        get () {
+        get() {
           const value = this.getDataValue('frozen_points')
           return value ? parseFloat(value) : 0
         }

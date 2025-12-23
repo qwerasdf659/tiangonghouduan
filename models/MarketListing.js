@@ -88,12 +88,12 @@ module.exports = sequelize => {
         }
       },
 
-      // 幂等键（业务ID）
+      // 幂等键（业务ID）- P1修复：强制必填
       business_id: {
         type: DataTypes.STRING(128),
-        allowNull: true,
+        allowNull: false, // P1修复：业务ID必填，确保幂等性控制
         comment:
-          '业务ID（Business ID - 幂等键）：所有写操作必须由客户端提供；用于防止重复挂牌与对账定位（同一business_id重复请求返回同结果，参数不一致返回409）'
+          '业务ID（Business ID - 幂等键）：所有写操作必须由客户端提供；用于防止重复挂牌与对账定位（同一business_id重复请求返回同结果，参数不一致返回409）- 必填字段'
       },
 
       // 标的资产（Offer）- 不可叠加物品
@@ -178,6 +178,12 @@ module.exports = sequelize => {
       updatedAt: 'updated_at',
       underscored: true,
       indexes: [
+        {
+          unique: true,
+          fields: ['business_id'],
+          name: 'uk_market_listings_business_id',
+          comment: '业务ID全局唯一索引（幂等保证 - P1修复）'
+        },
         {
           unique: true,
           fields: ['seller_user_id', 'business_id'],

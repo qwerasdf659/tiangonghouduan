@@ -2,15 +2,20 @@
  * 餐厅积分抽奖系统 V4.0 - 客服聊天API路由
  *
  * 功能：
- * - 创建聊天会话（并发安全）
- * - 获取用户聊天会话列表
- * - 获取聊天历史记录
- * - 发送聊天消息
+ * - 创建聊天会话（POST /chat/sessions）
+ * - 获取用户聊天会话列表（GET /chat/sessions）
+ * - 获取聊天历史记录（GET /chat/sessions/:session_id/messages）
+ * - 发送聊天消息（POST /chat/sessions/:session_id/messages）
  *
  * 路由前缀：/api/v4/system
  *
+ * 规范遵循：
+ * - API设计与契约标准规范 v2.0（2025-12-23）
+ * - RESTful资源嵌套（原则3：资源嵌套规范）
+ * - 硬切断旧路径策略（不保留 /chat/create, /chat/send, /chat/history）
+ *
  * 创建时间：2025年12月22日
- * 拆分自：system.js（符合Controller拆分规范 150-250行）
+ * 重构时间：2025年12月23日（符合API设计与契约标准规范）
  */
 
 const express = require('express')
@@ -22,24 +27,25 @@ const BeijingTimeHelper = require('../../../utils/timeHelper')
 const ChatRateLimitService = require('../../../services/ChatRateLimitService')
 
 /**
- * @route POST /api/v4/system/chat/create
+ * @route POST /api/v4/system/chat/sessions
  * @desc 创建聊天会话（并发安全）
  * @access Private
+ *
+ * Canonical Path：POST /api/v4/system/chat/sessions
  *
  * 并发控制策略：
  * 1. 频率限制：每10秒最多3次创建请求（防止恶意重复创建）
  * 2. 悲观锁：使用SELECT FOR UPDATE锁定用户的活跃会话查询
  * 3. 重试机制：遇到锁等待超时时自动重试（最多3次）
  *
+ * @body {string} source - 会话来源（可选，默认mobile）
+ *
  * @returns {Object} 会话信息
  */
-router.post('/chat/create', authenticateToken, async (req, res) => {
+router.post('/chat/sessions', authenticateToken, async (req, res) => {
   const userId = req.user.user_id
 
-  /*
-   * 🔴 步骤1：频率限制检查（防止恶意重复创建）
-   * ✅ 使用 ChatRateLimitService 统一管理频率限制（P2-F架构重构）
-   */
+  // 频率限制检查（防止恶意重复创建）
   const rateLimitCheck = ChatRateLimitService.checkCreateSessionRateLimit(userId)
   if (!rateLimitCheck.allowed) {
     logger.info(
@@ -57,13 +63,16 @@ router.post('/chat/create', authenticateToken, async (req, res) => {
     )
   }
 
-  // ✅ 通过 ServiceManager 获取 CustomerServiceSessionService（符合TR-005规范）
+  // 通过 ServiceManager 获取服务（符合TR-005规范）
   const CustomerServiceSessionService = req.app.locals.services.getService('customerServiceSession')
 
   try {
-    // ✅ 使用 Service 层方法创建或获取会话（不直接操作models）
+    // 获取请求体中的来源参数（可选）
+    const { source = 'mobile' } = req.body
+
+    // 使用 Service 层方法创建或获取会话（不直接操作models）
     const session = await CustomerServiceSessionService.getOrCreateSession(userId, {
-      source: 'mobile',
+      source,
       priority: 1
     })
 
@@ -87,6 +96,8 @@ router.post('/chat/create', authenticateToken, async (req, res) => {
  * @desc 获取用户聊天会话列表
  * @access Private
  *
+ * Canonical Path：GET /api/v4/system/chat/sessions
+ *
  * @query {number} page - 页码（默认1）
  * @query {number} limit - 每页数量（默认10，最大50）
  *
@@ -97,15 +108,11 @@ router.get('/chat/sessions', authenticateToken, async (req, res) => {
     // 获取分页参数（默认第1页，每页10条）
     const { page = 1, limit = 10 } = req.query
 
-    // 🔄 通过 ServiceManager 获取 CustomerServiceSessionService（符合TR-005规范）
+    // 通过 ServiceManager 获取服务（符合TR-005规范）
     const CustomerServiceSessionService =
       req.app.locals.services.getService('customerServiceSession')
 
-    /*
-     * ✅ 使用 CustomerServiceSessionService 获取会话列表
-     * 参数说明：user_id（用户ID）、page（页码）、page_size（每页数量）、
-     * include_last_message（包含最后一条消息）、calculate_unread（计算未读消息数）
-     */
+    // 使用 CustomerServiceSessionService 获取会话列表
     const result = await CustomerServiceSessionService.getSessionList({
       user_id: req.user.user_id, // 用户数据隔离（只能查询自己的会话）
       page: parseInt(page),
@@ -116,7 +123,7 @@ router.get('/chat/sessions', authenticateToken, async (req, res) => {
       sort_order: 'DESC' // 倒序排列（最新的会话在前）
     })
 
-    // ✅ P1实现：返回分页信息（支持前端分页组件）
+    // 返回分页信息（支持前端分页组件）
     return res.apiSuccess(
       {
         sessions: result.sessions,
@@ -136,36 +143,31 @@ router.get('/chat/sessions', authenticateToken, async (req, res) => {
 })
 
 /**
- * @route GET /api/v4/system/chat/history/:sessionId
+ * @route GET /api/v4/system/chat/sessions/:session_id/messages
  * @desc 获取聊天历史记录
  * @access Private
  *
- * @param {string} sessionId - 会话ID
+ * Canonical Path：GET /api/v4/system/chat/sessions/:session_id/messages
+ *
+ * @param {string} session_id - 会话ID
  * @query {number} page - 页码（默认1）
  * @query {number} limit - 每页数量（默认50，最大100）
  *
  * @returns {Object} 消息列表和分页信息
  */
-router.get('/chat/history/:sessionId', authenticateToken, async (req, res) => {
+router.get('/chat/sessions/:session_id/messages', authenticateToken, async (req, res) => {
   try {
-    const { sessionId } = req.params
+    const { session_id } = req.params
     const { page = 1, limit = 50 } = req.query
-    // 🎯 分页安全保护：最大100条记录（普通用户聊天历史）
+    // 分页安全保护：最大100条记录
     const finalLimit = Math.min(parseInt(limit), 100)
 
-    // 🔄 通过 ServiceManager 获取 CustomerServiceSessionService（符合TR-005规范）
+    // 通过 ServiceManager 获取服务（符合TR-005规范）
     const CustomerServiceSessionService =
       req.app.locals.services.getService('customerServiceSession')
 
-    /*
-     * ✅ 使用 CustomerServiceSessionService 获取会话消息
-     * 参数说明：
-     * - user_id：用户ID验证（只能查看自己的会话）
-     * - page/limit：分页参数
-     * - mark_as_read：自动标记管理员消息为已读
-     * - include_all_fields：包含所有字段（metadata等）
-     */
-    const result = await CustomerServiceSessionService.getSessionMessages(sessionId, {
+    // 使用 CustomerServiceSessionService 获取会话消息
+    const result = await CustomerServiceSessionService.getSessionMessages(session_id, {
       user_id: req.user.user_id, // 权限验证：用户只能查看自己的会话
       page: parseInt(page),
       limit: finalLimit,
@@ -192,25 +194,25 @@ router.get('/chat/history/:sessionId', authenticateToken, async (req, res) => {
 })
 
 /**
- * @route POST /api/v4/system/chat/send
+ * @route POST /api/v4/system/chat/sessions/:session_id/messages
  * @desc 发送聊天消息
  * @access Private
  *
- * @body {string} session_id - 会话ID
- * @body {string} content - 消息内容
+ * Canonical Path：POST /api/v4/system/chat/sessions/:session_id/messages
+ *
+ * @param {string} session_id - 会话ID
+ * @body {string} content - 消息内容（必需）
  * @body {string} message_type - 消息类型（默认text）
  *
  * @returns {Object} 发送的消息信息
  */
-router.post('/chat/send', authenticateToken, async (req, res) => {
+router.post('/chat/sessions/:session_id/messages', authenticateToken, async (req, res) => {
   try {
-    const { session_id, content, message_type = 'text' } = req.body
+    const { session_id } = req.params
+    const { content, message_type = 'text' } = req.body
     const businessConfig = require('../../../config/business.config')
 
-    /*
-     * ⚡ Step 1: 频率限制检查（Rate Limit Check）
-     * ✅ 使用 ChatRateLimitService 统一管理频率限制（P2-F架构重构）
-     */
+    // 频率限制检查（Rate Limit Check）
     const userId = req.user.user_id
     const role_level = req.user.role_level || 0 // 获取用户角色等级
     const rateLimitCheck = ChatRateLimitService.checkMessageRateLimit(userId, role_level)
@@ -232,9 +234,9 @@ router.post('/chat/send', authenticateToken, async (req, res) => {
       )
     }
 
-    // Step 2: 参数验证
-    if (!session_id || !content) {
-      return res.apiError('会话ID和消息内容不能为空', 'BAD_REQUEST', null, 400)
+    // 参数验证
+    if (!content) {
+      return res.apiError('消息内容不能为空', 'BAD_REQUEST', null, 400)
     }
 
     // 从配置文件读取消息长度限制
@@ -248,9 +250,7 @@ router.post('/chat/send', authenticateToken, async (req, res) => {
       )
     }
 
-    /*
-     * Step 2.5: 内容安全过滤（XSS防护 + 敏感词检测）
-     */
+    // 内容安全过滤（XSS防护 + 敏感词检测）
     const sanitized_content = content.trim()
 
     // 敏感词过滤（从配置文件读取）
@@ -265,25 +265,19 @@ router.post('/chat/send', authenticateToken, async (req, res) => {
       }
     }
 
-    // 🔄 通过 ServiceManager 获取服务（符合TR-005规范）
+    // 通过 ServiceManager 获取服务（符合TR-005规范）
     const CustomerServiceSessionService =
       req.app.locals.services.getService('customerServiceSession')
     const ChatWebSocketService = req.app.locals.services.getService('chatWebSocket')
 
-    /*
-     * ✅ 使用 CustomerServiceSessionService 发送用户消息
-     * 服务负责：验证会话权限、检查会话状态、创建消息、更新会话
-     */
+    // 使用 CustomerServiceSessionService 发送用户消息
     const message = await CustomerServiceSessionService.sendUserMessage(session_id, {
       user_id: userId,
       content: sanitized_content,
       message_type
     })
 
-    /*
-     * ✅ 通过WebSocket实时推送消息给客服（带自动重试机制）
-     * ✅ 使用 ChatRateLimitService 统一管理WebSocket推送重试（P2-F架构重构）
-     */
+    // 通过WebSocket实时推送消息给客服（带自动重试机制）
     try {
       // 构建消息数据（用于WebSocket推送）
       const messageData = {
@@ -292,10 +286,7 @@ router.post('/chat/send', authenticateToken, async (req, res) => {
         timestamp: BeijingTimeHelper.timestamp()
       }
 
-      /*
-       * 使用带重试机制的推送函数（最多重试3次）
-       * 传入session_admin_id而非整个session对象，避免直接访问模型
-       */
+      // 使用带重试机制的推送函数（最多重试3次）
       await ChatRateLimitService.pushMessageWithRetry(
         ChatWebSocketService,
         message.session_admin_id,

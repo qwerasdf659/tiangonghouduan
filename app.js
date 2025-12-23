@@ -222,15 +222,12 @@ const fallbackLimiter = rateLimit({
 })
 app.use('/api/', fallbackLimiter)
 
-// 字段转换器功能已删除 - 使用统一的snake_case命名格式
-
 // 🔧 请求日志中间件
 app.use((req, res, next) => {
   appLogger.debug('API请求', {
     method: req.method,
     path: req.path,
     ip: req.ip,
-    // 🗑️ user_agent 字段已删除 - 2025年01月21日
     timestamp: BeijingTimeHelper.apiTimestamp()
   })
   next()
@@ -393,7 +390,7 @@ app.get('/api/v4/docs', (req, res) => {
       unified_engine: {
         description: 'V4统一抽奖引擎提供完整的抽奖执行和管理功能',
         endpoints: {
-          'POST /api/v4/lottery/execute': '执行抽奖',
+          'POST /api/v4/lottery/draw': '执行抽奖',
           'GET /api/v4/lottery/strategies': '获取策略列表',
           'GET /api/v4/lottery/metrics': '获取引擎指标',
           'POST /api/v4/lottery/validate': '验证抽奖条件'
@@ -673,7 +670,7 @@ app.use('*', (req, res) => {
         'POST /api/v4/auth/register',
         'POST /api/v4/auth/logout',
         'GET /api/v4/auth/verify',
-        'POST /api/v4/lottery/execute',
+        'POST /api/v4/lottery/draw',
         'GET /api/v4/lottery/strategies',
         'GET /api/v4/admin/system/dashboard',
         'GET /api/v4/permissions/user/:userId',

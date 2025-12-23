@@ -27,8 +27,12 @@ const logger = require('../../../../utils/logger').logger
  * - 标记订单为已核销（status = fulfilled）
  * - 标记物品为已使用（ItemInstance.status = used）
  *
+ * 规范遵循：
+ * - API设计与契约标准规范 v2.0（2025-12-23）
+ * - 参数命名规范：禁止语义不清的裸 code，使用 redeem_code 替代
+ *
  * 请求参数：
- * @body {string} code - 12位Base32核销码（格式：XXXX-YYYY-ZZZZ）
+ * @body {string} redeem_code - 12位Base32核销码（格式：XXXX-YYYY-ZZZZ）
  *
  * 权限要求：
  * - 商户（role_level >= 50）或管理员
@@ -50,12 +54,12 @@ const logger = require('../../../../utils/logger').logger
  */
 router.post('/fulfill', authenticateToken, async (req, res) => {
   try {
-    const { code } = req.body
+    const { redeem_code } = req.body
     const redeemerUserId = req.user.user_id
 
-    // 参数验证
-    if (!code || typeof code !== 'string') {
-      return res.apiError('核销码不能为空', 'BAD_REQUEST', null, 400)
+    // 参数验证（使用语义明确的 redeem_code 参数名）
+    if (!redeem_code || typeof redeem_code !== 'string') {
+      return res.apiError('核销码不能为空', 'REDEEM_CODE_REQUIRED', null, 400)
     }
 
     // 权限验证（只允许商户或管理员核销）
@@ -71,13 +75,16 @@ router.post('/fulfill', authenticateToken, async (req, res) => {
     }
 
     logger.info('开始核销订单', {
-      code_partial: code.slice(0, 4) + '****',
+      redeem_code_partial: redeem_code.slice(0, 4) + '****',
       redeemer_user_id: redeemerUserId
     })
 
     // 调用RedemptionService核销订单
     const RedemptionService = req.app.locals.services.getService('redemptionOrder')
-    const order = await RedemptionService.fulfillOrder(code.trim().toUpperCase(), redeemerUserId)
+    const order = await RedemptionService.fulfillOrder(
+      redeem_code.trim().toUpperCase(),
+      redeemerUserId
+    )
 
     // 异步发送通知（不阻塞响应）
     const NotificationService = req.app.locals.services.getService('notification')
@@ -131,7 +138,7 @@ router.post('/fulfill', authenticateToken, async (req, res) => {
   } catch (error) {
     logger.error('核销失败', {
       error: error.message,
-      code_partial: req.body.code ? req.body.code.slice(0, 4) + '****' : 'N/A',
+      redeem_code_partial: req.body.redeem_code ? req.body.redeem_code.slice(0, 4) + '****' : 'N/A',
       redeemer_user_id: req.user?.user_id
     })
 

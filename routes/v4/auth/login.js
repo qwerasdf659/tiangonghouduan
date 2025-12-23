@@ -160,25 +160,34 @@ router.post('/login', async (req, res) => {
  *
  * 功能说明: 解密微信加密的手机号数据，返回明文手机号
  *
- * @param {string} code - 微信登录凭证（wx.login获取）
+ * 规范遵循：
+ * - API设计与契约标准规范 v2.0（2025-12-23）
+ * - 参数命名规范：禁止语义不清的裸 code，使用 wx_code 替代
+ *
+ * @param {string} wx_code - 微信登录凭证（wx.login获取）
  * @param {string} encryptedData - 加密的手机号数据
  * @param {string} iv - 加密算法的初始向量
  */
 router.post('/decrypt-phone', async (req, res) => {
-  const { code, encryptedData, iv } = req.body
+  const { wx_code, encryptedData, iv } = req.body
 
-  // 参数验证
-  if (!code || !encryptedData || !iv) {
-    return res.apiError('参数不完整，需要code、encryptedData和iv', 'INVALID_PARAMS', null, 400)
+  // 参数验证（使用语义明确的 wx_code 参数名）
+  if (!wx_code || !encryptedData || !iv) {
+    return res.apiError(
+      '参数不完整，需要 wx_code、encryptedData 和 iv',
+      'INVALID_PARAMS',
+      null,
+      400
+    )
   }
 
   logger.info('📱 微信手机号解密请求...')
 
-  // 使用code换取session_key
+  // 使用 wx_code 换取 session_key
   const WXBizDataCrypt = require('../../../utils/WXBizDataCrypt')
   const axios = require('axios')
 
-  const wxApiUrl = `https://api.weixin.qq.com/sns/jscode2session?appid=${process.env.WX_APPID}&secret=${process.env.WX_SECRET}&js_code=${code}&grant_type=authorization_code`
+  const wxApiUrl = `https://api.weixin.qq.com/sns/jscode2session?appid=${process.env.WX_APPID}&secret=${process.env.WX_SECRET}&js_code=${wx_code}&grant_type=authorization_code`
 
   logger.info('🔄 请求微信API获取session_key...')
   const wxRes = await axios.get(wxApiUrl)

@@ -16,7 +16,7 @@ const execAsync = util.promisify(exec)
 const axios = require('axios')
 
 class FinalQualityChecker {
-  constructor () {
+  constructor() {
     this.results = {
       codeQuality: null,
       apiHealth: null,
@@ -29,7 +29,7 @@ class FinalQualityChecker {
   }
 
   // 运行所有质量检查
-  async runAllChecks () {
+  async runAllChecks() {
     console.log('�� === 开始最终项目质量检查 ===')
     console.log(`📅 开始时间: ${BeijingTimeHelper.nowLocale()}`)
     console.log('')
@@ -62,7 +62,7 @@ class FinalQualityChecker {
   }
 
   // 1. 代码质量检查
-  async checkCodeQuality () {
+  async checkCodeQuality() {
     console.log('📋 === 代码质量检查 ===')
 
     try {
@@ -96,13 +96,18 @@ class FinalQualityChecker {
   }
 
   // 2. API健康检查
-  async checkAPIHealth () {
+  async checkAPIHealth() {
     console.log('�� === API健康检查 ===')
 
     const endpoints = [
       { name: '健康检查', url: 'http://localhost:3000/health', method: 'GET' },
       { name: 'V4基础', url: 'http://localhost:3000/api/v4', method: 'GET' },
-      { name: '认证登录', url: 'http://localhost:3000/api/v4/auth/login', method: 'POST', data: { mobile: '13612227930', verification_code: '123456' } }
+      {
+        name: '认证登录',
+        url: 'http://localhost:3000/api/v4/auth/login',
+        method: 'POST',
+        data: { mobile: '13612227930', verification_code: '123456' }
+      }
     ]
 
     const results = []
@@ -150,14 +155,17 @@ class FinalQualityChecker {
   }
 
   // 3. 数据库健康检查
-  async checkDatabaseHealth () {
-    console.log('��️ === 数据库健康检查 ===')
+  async checkDatabaseHealth() {
+    console.log('🗄️ === 数据库健康检查 ===')
 
     try {
-      const dbCheck = await execAsync('node scripts/database_check.js 2>&1')
+      const dbCheck = await execAsync(
+        'node scripts/database/database-toolkit.js --action=check 2>&1'
+      )
 
       this.results.databaseHealth = {
-        success: !dbCheck.stderr && dbCheck.stdout.includes('✅'),
+        success:
+          !dbCheck.stderr && (dbCheck.stdout.includes('✅') || dbCheck.stdout.includes('成功')),
         output: dbCheck.stdout.substring(0, 1000)
       }
 
@@ -171,7 +179,7 @@ class FinalQualityChecker {
   }
 
   // 4. 服务健康检查
-  async checkServiceHealth () {
+  async checkServiceHealth() {
     console.log('⚙️ === 服务健康检查 ===')
 
     try {
@@ -202,7 +210,7 @@ class FinalQualityChecker {
   }
 
   // 5. 安全检查
-  async checkSecurity () {
+  async checkSecurity() {
     console.log('🔒 === 安全检查 ===')
 
     try {
@@ -223,7 +231,9 @@ class FinalQualityChecker {
       }
 
       envCheck.forEach(env => {
-        console.log(`${env.hasValue ? '✅' : '❌'} ${env.name}: ${env.hasValue ? '已设置' : '未设置'}`)
+        console.log(
+          `${env.hasValue ? '✅' : '❌'} ${env.name}: ${env.hasValue ? '已设置' : '未设置'}`
+        )
       })
     } catch (error) {
       console.error('❌ 安全检查失败:', error.message)
@@ -234,7 +244,7 @@ class FinalQualityChecker {
   }
 
   // 6. 性能检查
-  async checkPerformance () {
+  async checkPerformance() {
     console.log('⚡ === 性能检查 ===')
 
     try {
@@ -245,7 +255,9 @@ class FinalQualityChecker {
       const diskCheck = await execAsync('df -h . 2>&1')
 
       // 检查进程资源使用
-      const processCheck = await execAsync('ps aux | grep "node.*app.js" | grep -v grep 2>&1 || echo "进程未找到"')
+      const processCheck = await execAsync(
+        'ps aux | grep "node.*app.js" | grep -v grep 2>&1 || echo "进程未找到"'
+      )
 
       this.results.performanceCheck = {
         memory: memCheck.stdout,
@@ -264,7 +276,7 @@ class FinalQualityChecker {
   }
 
   // 生成最终报告
-  generateFinalReport () {
+  generateFinalReport() {
     const endTime = Date.now()
     const duration = Math.round((endTime - this.startTime) / 1000)
 
@@ -301,7 +313,8 @@ class FinalQualityChecker {
 
     // 安全检查评分 (15分)
     maxScore += 15
-    const secureEnvVars = this.results.securityCheck?.envVars?.filter(env => env.hasValue).length || 0
+    const secureEnvVars =
+      this.results.securityCheck?.envVars?.filter(env => env.hasValue).length || 0
     const totalEnvVars = this.results.securityCheck?.envVars?.length || 1
     totalScore += Math.round((secureEnvVars / totalEnvVars) * 15)
 
@@ -321,10 +334,14 @@ class FinalQualityChecker {
     // 详细结果
     console.log('')
     console.log('📋 详细检查结果:')
-    console.log(`  📋 代码质量: ${this.results.codeQuality?.eslint?.success && this.results.codeQuality?.prettier?.success ? '✅ 通过' : '❌ 需要改进'}`)
+    console.log(
+      `  📋 代码质量: ${this.results.codeQuality?.eslint?.success && this.results.codeQuality?.prettier?.success ? '✅ 通过' : '❌ 需要改进'}`
+    )
     console.log(`  🌐 API健康: ${successfulAPIs}/${totalAPIs} 端点正常`)
     console.log(`  🗄️ 数据库: ${this.results.databaseHealth?.success ? '✅ 正常' : '❌ 异常'}`)
-    console.log(`  ⚙️ 服务状态: PM2:${serviceHealth?.pm2 ? '✅' : '❌'} 端口:${serviceHealth?.port ? '✅' : '❌'} Redis:${serviceHealth?.redis ? '✅' : '❌'}`)
+    console.log(
+      `  ⚙️ 服务状态: PM2:${serviceHealth?.pm2 ? '✅' : '❌'} 端口:${serviceHealth?.port ? '✅' : '❌'} Redis:${serviceHealth?.redis ? '✅' : '❌'}`
+    )
     console.log(`  🔒 安全配置: ${secureEnvVars}/${totalEnvVars} 环境变量已配置`)
 
     // 改进建议
@@ -371,7 +388,8 @@ class FinalQualityChecker {
 // 如果直接运行此文件，执行质量检查
 if (require.main === module) {
   const checker = new FinalQualityChecker()
-  checker.runAllChecks()
+  checker
+    .runAllChecks()
     .then(result => {
       process.exit(result?.percentage >= 70 ? 0 : 1)
     })

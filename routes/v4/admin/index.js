@@ -22,7 +22,6 @@ const analyticsRoutes = require('./analytics')
 const customerServiceRoutes = require('./customer-service') // 模块化重构：拆分为子模块
 const marketplaceRoutes = require('./marketplace') // 🆕 市场统计管理
 const materialRoutes = require('./material') // 🆕 材料系统管理（V4.5.0）
-// 钻石系统管理已废弃（Phase 4），统一迁移到资产管理模块
 const popupBannersRoutes = require('./popup-banners') // 🆕 弹窗Banner管理（2025-12-22）
 
 // 挂载子模块路由

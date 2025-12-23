@@ -79,6 +79,69 @@ class PopupBannerService {
   }
 
   /**
+   * 根据状态获取弹窗列表（供管理员查询draft/expired状态）
+   *
+   * 业务规则：
+   * - draft（草稿）：is_active = false
+   * - expired（过期）：end_time < 当前时间
+   * - active：使用 getActiveBanners 方法
+   *
+   * @param {Object} options - 查询选项
+   * @param {string} options.status - 状态（draft/expired）
+   * @param {string} options.position - 显示位置（默认 home）
+   * @param {number} options.limit - 返回数量限制（默认 10）
+   * @returns {Promise<Array>} 弹窗列表
+   */
+  static async getBannersByStatus(options = {}) {
+    const { status, position = 'home', limit = 10 } = options
+    const now = BeijingTimeHelper.createBeijingTime()
+
+    try {
+      const whereClause = { position }
+
+      if (status === 'draft') {
+        // 草稿状态：is_active = false
+        whereClause.is_active = false
+      } else if (status === 'expired') {
+        // 过期状态：end_time < 当前时间
+        whereClause.end_time = { [Op.lt]: now }
+      }
+
+      const banners = await PopupBanner.findAll({
+        where: whereClause,
+        order: [
+          ['display_order', 'ASC'],
+          ['created_at', 'DESC']
+        ],
+        limit: parseInt(limit) || 10,
+        // 返回更多字段供管理员查看
+        attributes: [
+          'banner_id',
+          'title',
+          'image_url',
+          'link_url',
+          'link_type',
+          'is_active',
+          'position',
+          'start_time',
+          'end_time'
+        ]
+      })
+
+      logger.info('根据状态获取弹窗成功', {
+        status,
+        position,
+        count: banners.length
+      })
+
+      return banners.map(banner => banner.toJSON())
+    } catch (error) {
+      logger.error('根据状态获取弹窗失败', { error: error.message, status, position })
+      throw error
+    }
+  }
+
+  /**
    * 获取管理后台弹窗列表（包含全部信息）
    *
    * @param {Object} options - 查询选项

@@ -395,12 +395,19 @@ module.exports = sequelize => {
        */
       business_id: {
         type: DataTypes.STRING(100),
-        allowNull: true, // 允许为空，兼容历史数据
+        allowNull: false, // P1修复：业务ID为必填字段，确保幂等性
+        unique: true, // P1修复：唯一约束，数据库层已有 uk_consumption_records_business_id
         comment:
           // eslint-disable-next-line no-template-curly-in-string
-          '业务关联ID，用于幂等控制（格式：consumption_${userId}_${merchantId}_${timestamp}）',
+          '业务关联ID，用于幂等控制（格式：consumption_${userId}_${merchantId}_${timestamp}）- 唯一约束',
         validate: {
-          len: [0, 100]
+          notEmpty: {
+            msg: '业务ID不能为空'
+          },
+          len: {
+            args: [1, 100],
+            msg: '业务ID长度必须在1-100字符之间'
+          }
         }
       },
 
@@ -495,6 +502,12 @@ module.exports = sequelize => {
 
       // 索引定义（与数据库迁移保持一致）
       indexes: [
+        {
+          name: 'uk_consumption_records_business_id',
+          fields: ['business_id'],
+          unique: true,
+          comment: '业务ID唯一索引，用于幂等控制（P1修复）'
+        },
         {
           name: 'idx_user_status',
           fields: ['user_id', 'status', 'created_at'],
