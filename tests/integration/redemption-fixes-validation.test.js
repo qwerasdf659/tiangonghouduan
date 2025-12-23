@@ -248,8 +248,8 @@ describe('核销系统修复验证测试', () => {
       )
 
       // 调用过期清理方法
-      const RedemptionOrderService = require('../../services/RedemptionOrderService')
-      const expiredCount = await RedemptionOrderService.expireOrders()
+      const RedemptionService = require('../../services/RedemptionService')
+      const expiredCount = await RedemptionService.expireOrders()
 
       expect(expiredCount).toBeGreaterThan(0)
 

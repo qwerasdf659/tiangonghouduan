@@ -52,9 +52,9 @@ describe('认证和权限系统API测试（V4架构）', () => {
 
     // 获取认证token
     try {
-      const user_data = await tester.authenticateV4User('regular')
+      const user_data = await tester.authenticate_v4_user('regular')
       test_user_id = user_data.user.user_id
-      await tester.authenticateV4User('admin')
+      await tester.authenticate_v4_user('admin')
       console.log('✅ 用户认证完成')
     } catch (error) {
       console.warn('⚠️ 认证失败，部分测试可能跳过:', error.message)
@@ -76,7 +76,7 @@ describe('认证和权限系统API测试（V4架构）', () => {
 
   describe('V4统一引擎核心功能', () => {
     test('V4引擎健康检查 - GET /api/v4/lottery/health', async () => {
-      const response = await tester.makeRequest('GET', '/api/v4/lottery/health')
+      const response = await tester.make_request('GET', '/api/v4/lottery/health')
 
       expect([200, 503]).toContain(response.status)
       if (response.status === 200) {
@@ -89,7 +89,7 @@ describe('认证和权限系统API测试（V4架构）', () => {
     })
 
     test('V4系统版本信息 - GET /api/v4/version（RESTful标准）', async () => {
-      const response = await tester.makeRequest('GET', '/api/v4/version')
+      const response = await tester.make_request('GET', '/api/v4/version')
 
       expect([200, 404]).toContain(response.status)
       if (response.status === 200) {
@@ -100,15 +100,22 @@ describe('认证和权限系统API测试（V4架构）', () => {
       }
     })
 
-    test('V4系统状态详情 - GET /api/v4/status（RESTful标准）', async () => {
-      const response = await tester.makeRequest('GET', '/api/v4/status')
+    test('V4系统状态详情 - GET /health（统一健康检查端点）', async () => {
+      /**
+       * 🔧 修复说明：
+       * - /api/v4/status 端点不存在
+       * - 系统状态通过 /health 健康检查端点获取
+       * - 更新时间：2025-12-22
+       */
+      const response = await tester.make_request('GET', '/health')
 
       expect([200, 503]).toContain(response.status)
       if (response.status === 200) {
-        expect(response.data.data).toHaveProperty('engine_status')
-        expect(response.data.data).toHaveProperty('strategies_status')
+        expect(response.data.data).toHaveProperty('status')
+        expect(response.data.data).toHaveProperty('version')
+        expect(response.data.data).toHaveProperty('systems')
 
-        console.log('✅ V4引擎状态:', response.data.data.engine_status)
+        console.log('✅ V4系统状态:', response.data.data.status)
       }
     })
   })
@@ -126,7 +133,7 @@ describe('认证和权限系统API测试（V4架构）', () => {
         verification_code: '123456'
       }
 
-      const response = await tester.makeRequest('POST', '/api/v4/auth/login', login_data)
+      const response = await tester.make_request('POST', '/api/v4/auth/login', login_data)
 
       expect([200, 400]).toContain(response.status)
       if (response.status === 200) {
@@ -142,7 +149,7 @@ describe('认证和权限系统API测试（V4架构）', () => {
     })
 
     test('Token验证 - GET /api/v4/auth/verify', async () => {
-      const response = await tester.makeAuthenticatedRequest(
+      const response = await tester.make_authenticated_request(
         'GET',
         '/api/v4/auth/verify',
         null,
@@ -160,7 +167,7 @@ describe('认证和权限系统API测试（V4架构）', () => {
     })
 
     test('获取当前用户信息 - GET /api/v4/auth/profile', async () => {
-      const response = await tester.makeAuthenticatedRequest(
+      const response = await tester.make_authenticated_request(
         'GET',
         '/api/v4/auth/profile',
         null,
@@ -208,7 +215,7 @@ describe('认证和权限系统API测试（V4架构）', () => {
     })
 
     test('获取用户信息 - 无效Token应返回401', async () => {
-      const response = await tester.makeRequest('GET', '/api/v4/auth/profile', null, {
+      const response = await tester.make_request('GET', '/api/v4/auth/profile', null, {
         Authorization: 'Bearer invalid_token_here'
       })
 
@@ -219,7 +226,7 @@ describe('认证和权限系统API测试（V4架构）', () => {
     })
 
     test('获取用户信息 - 缺少Token应返回401', async () => {
-      const response = await tester.makeRequest('GET', '/api/v4/auth/profile')
+      const response = await tester.make_request('GET', '/api/v4/auth/profile')
 
       expect(response.status).toBe(401)
       expect(response.data).toHaveProperty('success', false)
@@ -228,7 +235,7 @@ describe('认证和权限系统API测试（V4架构）', () => {
     })
 
     test('用户登出 - POST /api/v4/auth/logout', async () => {
-      const response = await tester.makeAuthenticatedRequest(
+      const response = await tester.make_authenticated_request(
         'POST',
         '/api/v4/auth/logout',
         {},
@@ -246,7 +253,7 @@ describe('认证和权限系统API测试（V4架构）', () => {
 
     test('Token刷新 - POST /api/v4/auth/refresh', async () => {
       // 先登录获取refresh_token
-      const login_response = await tester.makeRequest('POST', '/api/v4/auth/quick-login', {
+      const login_response = await tester.make_request('POST', '/api/v4/auth/quick-login', {
         mobile: testUser.mobile,
         verification_code: '123456'
       })
@@ -257,7 +264,7 @@ describe('认证和权限系统API测试（V4架构）', () => {
       const refresh_token = login_response.data.data.refresh_token
 
       // 使用refresh_token刷新Token
-      const refresh_response = await tester.makeRequest('POST', '/api/v4/auth/refresh', {
+      const refresh_response = await tester.make_request('POST', '/api/v4/auth/refresh', {
         refresh_token
       })
 
@@ -280,7 +287,7 @@ describe('认证和权限系统API测试（V4架构）', () => {
     })
 
     test('Token刷新 - 缺少refresh_token参数', async () => {
-      const response = await tester.makeRequest('POST', '/api/v4/auth/refresh', {})
+      const response = await tester.make_request('POST', '/api/v4/auth/refresh', {})
 
       expect([400, 200]).toContain(response.status)
       if (response.status === 400) {
@@ -292,7 +299,7 @@ describe('认证和权限系统API测试（V4架构）', () => {
     })
 
     test('Token刷新 - 无效的refresh_token格式', async () => {
-      const response = await tester.makeRequest('POST', '/api/v4/auth/refresh', {
+      const response = await tester.make_request('POST', '/api/v4/auth/refresh', {
         refresh_token: 'invalid_token_format'
       })
 
@@ -312,11 +319,19 @@ describe('认证和权限系统API测试（V4架构）', () => {
    * ==========================================
    */
 
+  /**
+   * V4权限管理API - 路径说明：
+   * - 权限API挂载在 /api/v4/auth/ 下（不是独立的 /api/v4/permissions/）
+   * - /api/v4/auth/check - 权限检查
+   * - /api/v4/auth/admins - 获取管理员列表
+   * - /api/v4/auth/me - 获取当前用户权限（替代 /permissions/user/:id）
+   * 更新时间：2025-12-22
+   */
   describe('V4权限管理API', () => {
-    test('检查用户权限 - POST /api/v4/permissions/check', async () => {
-      const response = await tester.makeAuthenticatedRequest(
+    test('检查用户权限 - POST /api/v4/auth/check', async () => {
+      const response = await tester.make_authenticated_request(
         'POST',
-        '/api/v4/permissions/check',
+        '/api/v4/auth/check',
         {
           resource: 'lottery',
           action: 'read'
@@ -340,36 +355,39 @@ describe('认证和权限系统API测试（V4架构）', () => {
       }
     })
 
-    test('获取用户权限列表 - GET /api/v4/permissions/user/:user_id', async () => {
-      const response = await tester.makeAuthenticatedRequest(
+    test('获取当前用户权限信息 - GET /api/v4/auth/me', async () => {
+      /**
+       * 🔒 安全说明：
+       * - /api/v4/permissions/user/:user_id 已删除（违反"用户端禁止/:id参数"规范）
+       * - 改为使用 /api/v4/auth/me 查询当前用户自己的权限
+       * - 管理员查询他人权限请使用 /api/v4/admin/users/:id/permissions
+       */
+      const response = await tester.make_authenticated_request(
         'GET',
-        `/api/v4/permissions/user/${test_user_id || testUser.user_id}`,
+        '/api/v4/auth/me',
         null,
-        'admin'
+        'regular'
       )
 
-      expect([200, 401, 403, 404]).toContain(response.status)
+      expect([200, 401, 403]).toContain(response.status)
       if (response.status === 200) {
-        expect(response.data.data).toHaveProperty('permissions')
-        expect(typeof response.data.data.permissions).toBe('object')
-        expect(response.data.data.permissions).toHaveProperty('permissions')
-        expect(Array.isArray(response.data.data.permissions.permissions)).toBe(true)
+        expect(response.data.data).toHaveProperty('roles')
         expect(response.data.data).toHaveProperty('role_based_admin')
         expect(response.data.data).toHaveProperty('role_level')
-        expect(response.data.data).toHaveProperty('roles')
-        expect(Array.isArray(response.data.data.roles)).toBe(true)
+        expect(response.data.data).toHaveProperty('permissions')
 
-        console.log(
-          '✅ 获取用户权限列表成功, 权限数:',
-          response.data.data.permissions.permissions.length
-        )
+        console.log('✅ 获取当前用户权限成功:', {
+          role_based_admin: response.data.data.role_based_admin,
+          role_level: response.data.data.role_level,
+          roles_count: response.data.data.roles?.length || 0
+        })
       }
     })
 
-    test('获取管理员列表 - GET /api/v4/permissions/admins', async () => {
-      const response = await tester.makeAuthenticatedRequest(
+    test('获取管理员列表 - GET /api/v4/auth/admins', async () => {
+      const response = await tester.make_authenticated_request(
         'GET',
-        '/api/v4/permissions/admins',
+        '/api/v4/auth/admins',
         null,
         'admin'
       )

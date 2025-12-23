@@ -18,7 +18,7 @@ const TestCoordinator = require('../api/TestCoordinator')
 
 // 辅助函数
 async function getUserPoints(tester, user_id) {
-  const response = await tester.makeAuthenticatedRequest(
+  const response = await tester.make_authenticated_request(
     'GET',
     `/api/v4/points/balance/${user_id}`,
     null,
@@ -40,7 +40,7 @@ async function getUserPoints(tester, user_id) {
  * - items: 不可叠加物品（优惠券、实物商品等）
  */
 async function getUserInventory(tester, user_id) {
-  const response = await tester.makeAuthenticatedRequest(
+  const response = await tester.make_authenticated_request(
     'GET',
     `/api/v4/inventory/backpack/user/${user_id}`,
     null,
@@ -52,7 +52,7 @@ async function getUserInventory(tester, user_id) {
 
 async function getAvailableCampaign(tester) {
   // campaigns接口需要认证
-  const response = await tester.makeAuthenticatedRequest(
+  const response = await tester.make_authenticated_request(
     'GET',
     '/api/v4/lottery/campaigns',
     null,
@@ -80,12 +80,12 @@ describe('🧮 核心业务逻辑测试', () => {
     })
 
     // 获取测试用户数据
-    const userData = await tester.authenticateUser('regular')
+    const userData = await tester.authenticate_user('regular')
     test_user_id = userData.user.user_id
     _initialUserData = userData.user
 
     // 确保管理员权限
-    await tester.authenticateUser('admin')
+    await tester.authenticate_user('admin')
   })
 
   afterAll(() => {
@@ -99,7 +99,7 @@ describe('🧮 核心业务逻辑测试', () => {
       console.log('📋 测试每日抽奖次数限制业务规则...')
 
       // 获取可用的抽奖活动（需要认证）
-      const campaignsResponse = await tester.makeAuthenticatedRequest(
+      const campaignsResponse = await tester.make_authenticated_request(
         'GET',
         '/api/v4/lottery/campaigns',
         null,
@@ -115,7 +115,7 @@ describe('🧮 核心业务逻辑测试', () => {
       const campaign_id = campaign.campaign_id
 
       // 获取今日抽奖记录
-      const historyResponse = await tester.makeAuthenticatedRequest(
+      const historyResponse = await tester.make_authenticated_request(
         'GET',
         `/api/v4/lottery/history/${test_user_id}`,
         null,
@@ -141,7 +141,7 @@ describe('🧮 核心业务逻辑测试', () => {
 
       if (todayDrawCount >= maxDailyDraws) {
         // 应该拒绝抽奖
-        const drawResponse = await tester.makeAuthenticatedRequest(
+        const drawResponse = await tester.make_authenticated_request(
           'POST',
           '/api/v4/lottery/draw',
           { campaign_id, draw_type: 'single' },
@@ -181,7 +181,7 @@ describe('🧮 核心业务逻辑测试', () => {
           `📋 请求数据: user_id=${low_points_user_id}, campaign_id=${campaign.campaign_id}, draw_count=1`
         )
 
-        const drawResponse = await tester.makeAuthenticatedRequest(
+        const drawResponse = await tester.make_authenticated_request(
           'POST',
           '/api/v4/lottery/draw',
           { user_id: low_points_user_id, campaign_id: campaign.campaign_id, draw_count: 1 },
@@ -223,7 +223,7 @@ describe('🧮 核心业务逻辑测试', () => {
       }
 
       // 执行抽奖
-      const drawResponse = await tester.makeAuthenticatedRequest(
+      const drawResponse = await tester.make_authenticated_request(
         'POST',
         '/api/v4/lottery/draw',
         { campaign_id: campaign.campaign_id, draw_type: 'single' },
@@ -248,7 +248,7 @@ describe('🧮 核心业务逻辑测试', () => {
         console.log(`💰 积分变化: ${beforePoints} → ${afterPoints} (预期: ${expectedPointsAfter})`)
 
         // 验证抽奖记录存在
-        const historyResponse = await tester.makeAuthenticatedRequest(
+        const historyResponse = await tester.make_authenticated_request(
           'GET',
           `/api/v4/lottery/history/${test_user_id}`,
           null,
@@ -289,49 +289,51 @@ describe('🧮 核心业务逻辑测试', () => {
           return
         }
 
-        // 执行抽奖
-        const drawResponse = await tester.makeAuthenticatedRequest(
+        /**
+         * ✅ 修复：使用正确的抽奖API
+         * - 路由: POST /api/v4/lottery/draw（不是 /execute）
+         * - 参数: campaign_code + draw_count（不是 campaign_id + strategy）
+         * - 2025-12-22 更新
+         */
+        const drawResponse = await tester.make_authenticated_request(
           'POST',
-          '/api/v4/lottery/execute',
+          '/api/v4/lottery/draw',
           {
-            user_id: test_user_id,
-            campaign_id: campaign.campaign_id,
-            strategy: 'basic',
-            drawType: 'single'
+            campaign_code: campaign.campaign_code || 'DAILY_LOTTERY',
+            draw_count: 1
           },
           'regular'
         )
 
         if (drawResponse.status === 200) {
           const drawResult = drawResponse.data.data
-          console.log(`🎰 抽奖结果: ${JSON.stringify(drawResult.drawResult?.result)}`)
+          console.log(`🎰 抽奖结果: 共${drawResult.prizes?.length || 0}个奖品`)
 
           // ✅ 验证API响应使用is_winner业务标准字段
-          if (drawResult.drawResult?.result) {
-            expect(drawResult.drawResult.result).toHaveProperty('is_winner')
-            expect(typeof drawResult.drawResult.result.is_winner).toBe('boolean')
-            console.log(
-              `✅ API响应is_winner字段验证通过: ${drawResult.drawResult.result.is_winner}`
-            )
+          if (drawResult.prizes && drawResult.prizes.length > 0) {
+            const firstPrize = drawResult.prizes[0]
+            expect(firstPrize).toHaveProperty('is_winner')
+            expect(typeof firstPrize.is_winner).toBe('boolean')
+            console.log(`✅ API响应is_winner字段验证通过: ${firstPrize.is_winner}`)
           }
 
-          // ✅ 验证数据库记录使用is_winner字段
-          const historyResponse = await tester.makeAuthenticatedRequest(
+          // ✅ 验证数据库记录使用is_winner字段（通过抽奖历史接口）
+          const historyResponse = await tester.make_authenticated_request(
             'GET',
             `/api/v4/lottery/history/${test_user_id}`,
             null,
             'regular'
           )
 
-          if (historyResponse.status === 200 && historyResponse.data.data.length > 0) {
-            const latestRecord = historyResponse.data.data[0]
+          if (historyResponse.status === 200 && historyResponse.data.data?.records?.length > 0) {
+            const latestRecord = historyResponse.data.data.records[0]
             expect(latestRecord).toHaveProperty('is_winner')
             expect(typeof latestRecord.is_winner).toBe('boolean')
             console.log(`✅ 数据库记录is_winner字段验证通过: ${latestRecord.is_winner}`)
 
             // ✅ 验证API响应与数据库记录的is_winner一致性
-            if (drawResult.drawResult?.result?.is_winner !== undefined) {
-              expect(latestRecord.is_winner).toBe(drawResult.drawResult.result.is_winner)
+            if (drawResult.prizes?.[0]?.is_winner !== undefined) {
+              expect(latestRecord.is_winner).toBe(drawResult.prizes[0].is_winner)
               console.log('✅ API响应与数据库is_winner字段一致性验证通过')
             }
           }
@@ -342,7 +344,7 @@ describe('🧮 核心业务逻辑测试', () => {
         console.log('📋 测试is_winner业务语义逻辑一致性...')
 
         // 获取多条抽奖历史记录验证业务语义
-        const historyResponse = await tester.makeAuthenticatedRequest(
+        const historyResponse = await tester.make_authenticated_request(
           'GET',
           `/api/v4/lottery/history/${test_user_id}`,
           null,
@@ -383,7 +385,7 @@ describe('🧮 核心业务逻辑测试', () => {
         console.log('📋 测试业务状态字段的统一性和一致性...')
 
         // ✅ 验证积分交易状态
-        const pointsResponse = await tester.makeAuthenticatedRequest(
+        const pointsResponse = await tester.make_authenticated_request(
           'GET',
           `/api/v4/points/transactions/${test_user_id}`,
           null,
@@ -450,7 +452,7 @@ describe('🧮 核心业务逻辑测试', () => {
       }
       console.log('📋 积分调整请求:', earnData)
 
-      const earnResponse = await tester.makeAuthenticatedRequest(
+      const earnResponse = await tester.make_authenticated_request(
         'POST',
         '/api/v4/admin/points/adjust',
         earnData,
@@ -493,7 +495,7 @@ describe('🧮 核心业务逻辑测试', () => {
         context: 'test_spend'
       }
 
-      const spendResponse = await tester.makeAuthenticatedRequest(
+      const spendResponse = await tester.make_authenticated_request(
         'POST',
         '/api/v4/points/spend',
         spendData,
@@ -531,8 +533,8 @@ describe('🧮 核心业务逻辑测试', () => {
       const drawData = { campaign_id: campaign.campaign_id, draw_type: 'single' }
 
       const [response1, response2] = await Promise.all([
-        tester.makeAuthenticatedRequest('POST', '/api/v4/lottery/draw', drawData, 'regular'),
-        tester.makeAuthenticatedRequest('POST', '/api/v4/lottery/draw', drawData, 'regular')
+        tester.make_authenticated_request('POST', '/api/v4/lottery/draw', drawData, 'regular'),
+        tester.make_authenticated_request('POST', '/api/v4/lottery/draw', drawData, 'regular')
       ])
 
       // 至少有一个请求应该被拒绝（防重复机制）
@@ -564,7 +566,7 @@ describe('🧮 核心业务逻辑测试', () => {
       }
 
       // API路径：POST /api/v4/shop/points/admin/adjust（管理员积分调整接口）
-      const invalidResponse = await tester.makeAuthenticatedRequest(
+      const invalidResponse = await tester.make_authenticated_request(
         'POST',
         '/api/v4/shop/points/admin/adjust',
         invalidData,
@@ -605,7 +607,7 @@ describe('🧮 核心业务逻辑测试', () => {
 
       // 并发执行多个积分消费操作
       const spendPromises = Array.from({ length: 3 }, () =>
-        tester.makeAuthenticatedRequest(
+        tester.make_authenticated_request(
           'POST',
           '/api/v4/points/spend',
           { amount: 10, reason: '并发测试', context: 'concurrent_test' },
@@ -637,7 +639,7 @@ describe('🧮 核心业务逻辑测试', () => {
 
   afterAll(() => {
     if (tester) {
-      const report = tester.generateTestReport()
+      const report = tester.generate_test_report()
       console.log('\n📊 业务逻辑测试报告:')
       console.log('='.repeat(60))
       console.log(`📋 总测试数: ${report.summary.total}`)

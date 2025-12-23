@@ -19,8 +19,8 @@
  */
 
 const cron = require('node-cron')
-// 服务重命名（2025-10-12）：AuditManagementService → ExchangeMarketService
-const ExchangeMarketService = require('../../services/ExchangeMarketService')
+// 服务重命名（2025-10-12）：AuditManagementService → ExchangeService
+const ExchangeService = require('../../services/ExchangeService')
 const ManagementStrategy = require('../../services/UnifiedLotteryEngine/strategies/ManagementStrategy')
 const AdminLotteryService = require('../../services/AdminLotteryService')
 const logger = require('../../utils/logger')
@@ -34,7 +34,7 @@ const { monitor: databaseMonitor } = require('./database-performance-monitor')
 const TradeOrderService = require('../../services/TradeOrderService')
 // 2025-12-17新增：每日资产对账任务（Phase 1）
 const DailyAssetReconciliation = require('../../jobs/daily-asset-reconciliation')
-// 🔴 移除 RedemptionOrderService 直接引用（2025-12-17 P1-2）
+// 🔴 移除 RedemptionService 直接引用（2025-12-17 P1-2）
 // 原因：统一通过 jobs/daily-redemption-order-expiration.js 作为唯一入口
 // 避免多处直接调用服务层方法，确保业务逻辑和报告格式统一
 
@@ -100,7 +100,7 @@ class ScheduledTasks {
     cron.schedule('0 * * * *', async () => {
       try {
         logger.info('[定时任务] 开始执行24小时超时订单检查...')
-        const result = await ExchangeMarketService.checkTimeoutAndAlert(24)
+        const result = await ExchangeService.checkTimeoutAndAlert(24)
 
         if (result.hasTimeout) {
           logger.warn(`[定时任务] 发现${result.count}个超时订单（24小时）`)
@@ -124,7 +124,7 @@ class ScheduledTasks {
     cron.schedule('0 9,18 * * *', async () => {
       try {
         logger.info('[定时任务] 开始执行72小时紧急超时订单检查...')
-        const result = await ExchangeMarketService.checkTimeoutAndAlert(72)
+        const result = await ExchangeService.checkTimeoutAndAlert(72)
 
         if (result.hasTimeout) {
           logger.error(`[定时任务] 🚨 发现${result.count}个紧急超时订单（72小时）`)
@@ -161,7 +161,7 @@ class ScheduledTasks {
         })
 
         // 获取待审核订单统计
-        const statistics = await ExchangeMarketService.getPendingOrdersStatistics()
+        const statistics = await ExchangeService.getPendingOrdersStatistics()
 
         logger.info('[定时任务] 待审核订单统计', {
           total: statistics.total,
@@ -201,7 +201,7 @@ class ScheduledTasks {
   static async manualTimeoutCheck() {
     logger.info('[手动触发] 执行24小时超时订单检查...')
     try {
-      const result = await ExchangeMarketService.checkTimeoutAndAlert(24)
+      const result = await ExchangeService.checkTimeoutAndAlert(24)
       logger.info('[手动触发] 检查完成', { result })
       return result
     } catch (error) {
@@ -217,7 +217,7 @@ class ScheduledTasks {
   static async manualUrgentTimeoutCheck() {
     logger.info('[手动触发] 执行72小时紧急超时订单检查...')
     try {
-      const result = await ExchangeMarketService.checkTimeoutAndAlert(72)
+      const result = await ExchangeService.checkTimeoutAndAlert(72)
       logger.info('[手动触发] 检查完成', { result })
       return result
     } catch (error) {
@@ -884,7 +884,7 @@ class ScheduledTasks {
    * 创建时间：2025-12-17（Phase 1）
    * 统一入口（2025-12-17 P1-2）：
    * - 调用 jobs/daily-redemption-order-expiration.js 作为唯一权威入口
-   * - 避免直接调用 RedemptionOrderService，确保业务逻辑和报告统一
+   * - 避免直接调用 RedemptionService，确保业务逻辑和报告统一
    * - 所有过期清理逻辑集中在 DailyRedemptionOrderExpiration 类中
    *
    * @returns {void}

@@ -370,7 +370,7 @@ class LotteryHistoryService {
    */
   async get_today_lottery_statistics(user_id) {
     try {
-      const today_start = BeijingTimeHelper.getTodayStart()
+      const today_start = BeijingTimeHelper.todayStart()
       const today_end = BeijingTimeHelper.getTodayEnd()
 
       return await this.get_user_lottery_statistics(user_id, {

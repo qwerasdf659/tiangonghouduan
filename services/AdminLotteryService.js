@@ -204,7 +204,7 @@ class AdminLotteryService {
       }
 
       // 🎯 获取ManagementStrategy（通过sharedComponents）
-      const { sharedComponents } = require('../routes/v4/unified-engine/admin/shared/middleware')
+      const { sharedComponents } = require('../routes/v4/admin/shared/middleware')
       const managementStrategy = sharedComponents.managementStrategy
 
       // 🎯 调用管理策略设置强制中奖
@@ -341,7 +341,7 @@ class AdminLotteryService {
       }
 
       // 🎯 获取ManagementStrategy
-      const { sharedComponents } = require('../routes/v4/unified-engine/admin/shared/middleware')
+      const { sharedComponents } = require('../routes/v4/admin/shared/middleware')
       const managementStrategy = sharedComponents.managementStrategy
 
       // 🎯 调用管理策略设置强制不中奖
@@ -671,7 +671,7 @@ class AdminLotteryService {
       }
 
       // 🎯 获取ManagementStrategy
-      const { sharedComponents } = require('../routes/v4/unified-engine/admin/shared/middleware')
+      const { sharedComponents } = require('../routes/v4/admin/shared/middleware')
       const managementStrategy = sharedComponents.managementStrategy
 
       // 🎯 调用管理策略设置用户队列
@@ -789,7 +789,7 @@ class AdminLotteryService {
       }
 
       // 🎯 获取ManagementStrategy
-      const { sharedComponents } = require('../routes/v4/unified-engine/admin/shared/middleware')
+      const { sharedComponents } = require('../routes/v4/admin/shared/middleware')
       const managementStrategy = sharedComponents.managementStrategy
 
       // 🎯 获取用户管理状态
@@ -876,7 +876,7 @@ class AdminLotteryService {
       }
 
       // 🎯 获取ManagementStrategy
-      const { sharedComponents } = require('../routes/v4/unified-engine/admin/shared/middleware')
+      const { sharedComponents } = require('../routes/v4/admin/shared/middleware')
       const managementStrategy = sharedComponents.managementStrategy
 
       // 🎯 调用管理策略清除用户设置

@@ -23,7 +23,7 @@ class PermissionAuditLogger {
   /**
    * 构造函数 - 初始化审计日志系统
    */
-  constructor () {
+  constructor() {
     // 日志文件路径
     this.logDir = path.join(__dirname, '../logs')
     this.permissionCheckLogFile = path.join(this.logDir, 'permission_check_audit.log')
@@ -45,7 +45,7 @@ class PermissionAuditLogger {
    * @private
    * @returns {Promise<void>} 创建日志目录
    */
-  async _ensureLogDirectory () {
+  async _ensureLogDirectory() {
     try {
       await fs.mkdir(this.logDir, { recursive: true })
     } catch (error) {
@@ -72,7 +72,7 @@ class PermissionAuditLogger {
    * 日志格式（JSON Lines格式，每行一个JSON对象）：
    * {"action":"PERMISSION_CHECK","user_id":123,"resource":"lottery","action_type":"participate","has_permission":true,"is_admin":false,"role_level":0,"ip_address":"127.0.0.1","user_agent":"Mozilla/5.0...","timestamp":"2025-11-10T18:30:00.000+08:00"}
    */
-  async logPermissionCheck (data) {
+  async logPermissionCheck(data) {
     try {
       const auditLog = {
         action: 'PERMISSION_CHECK', // 操作类型标识
@@ -116,8 +116,8 @@ class PermissionAuditLogger {
    * @param {string} data.reason - 操作原因
    * @returns {Promise<void>} 异步执行，返回Promise
    */
-  async logPermissionChange (data) {
-    // 兼容性处理：支持旧的调用方式
+  async logPermissionChange(data) {
+    // 转换为配置变更记录格式
     return this.logPermissionConfig({
       operator_id: data.operator_id,
       target_user_id: data.user_id,
@@ -144,7 +144,7 @@ class PermissionAuditLogger {
    * 日志格式：
    * {"action":"CHANGE_USER_ROLE","operator_id":1,"target_user_id":123,"old_role":"user","new_role":"admin","reason":"用户升级","level":"WARNING","ip_address":"127.0.0.1","timestamp":"2025-11-10T18:30:00.000+08:00"}
    */
-  async logPermissionConfig (data) {
+  async logPermissionConfig(data) {
     try {
       const auditLog = {
         action: 'CHANGE_USER_ROLE', // 操作类型标识
@@ -187,7 +187,7 @@ class PermissionAuditLogger {
    * 📊 获取审计日志统计信息
    * @returns {Object} 统计信息
    */
-  getStats () {
+  getStats() {
     return {
       total_check_logs: this.stats.totalCheckLogs, // 权限检查日志总数
       total_config_logs: this.stats.totalConfigLogs, // 权限配置日志总数
@@ -205,7 +205,7 @@ class PermissionAuditLogger {
    * 注意：此方法仅用于小数据量场景（<10000条日志）
    * 大数据量场景建议使用专业日志分析工具（如ELK、Loki、Grafana）
    */
-  async getRecentCheckLogs (limit = 100) {
+  async getRecentCheckLogs(limit = 100) {
     try {
       // 读取日志文件
       const content = await fs.readFile(this.permissionCheckLogFile, 'utf8')
@@ -238,7 +238,7 @@ class PermissionAuditLogger {
    * @param {number} limit - 返回记录数量（默认50条）
    * @returns {Promise<Array>} 日志记录数组
    */
-  async getRecentConfigLogs (limit = 50) {
+  async getRecentConfigLogs(limit = 50) {
     try {
       const content = await fs.readFile(this.permissionConfigLogFile, 'utf8')
       const lines = content.trim().split('\n')

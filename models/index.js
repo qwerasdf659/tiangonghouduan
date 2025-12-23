@@ -106,7 +106,7 @@ models.Product = require('./Product')(sequelize, DataTypes)
  * ❌ UserInventory 模型已删除（2025-12-21 暴力重构）
  *    - 数据已迁移至 item_instances 表
  *    - 核销码功能已迁移至 redemption_orders 表
- *    - 替代服务：BackpackService + RedemptionOrderService
+ *    - 替代服务：BackpackService + RedemptionService
  */
 
 models.ItemInstance = require('./ItemInstance')(sequelize, DataTypes)
@@ -157,6 +157,15 @@ models.SystemSettings = require('./SystemSettings')(sequelize, DataTypes)
  *    - 业务场景：系统配置管理、参数调整、策略控制
  */
 
+models.PopupBanner = require('./PopupBanner')(sequelize, DataTypes)
+/*
+ * ✅ PopupBanner：弹窗Banner配置（首页弹窗管理）
+ *    - 用途：管理微信小程序首页弹窗图片和跳转链接
+ *    - 特点：支持多弹窗位、时间范围控制、点击跳转、显示顺序
+ *    - 表名：popup_banners，主键：banner_id，外键：created_by
+ *    - 业务场景：首页活动弹窗、公告展示、运营推广
+ */
+
 // 🔴 图片和存储系统
 models.ImageResources = require('./ImageResources')(sequelize, DataTypes)
 // 🔥 V14.1合并优化：UploadReview模型已合并到ImageResources统一资源管理模型
@@ -182,13 +191,14 @@ models.ExchangeItem = require('./ExchangeItem')(sequelize, DataTypes)
  *    - 业务场景：用户抽奖获得虚拟奖品（水晶等）→ 使用虚拟奖品价值兑换商品
  */
 
-models.ExchangeMarketRecord = require('./ExchangeMarketRecord')(sequelize, DataTypes)
+models.ExchangeRecord = require('./ExchangeRecord')(sequelize, DataTypes)
 /*
- * ✅ ExchangeMarketRecord：兑换市场订单记录表
- *    - 用途：记录用户在兑换市场中的兑换订单
- *    - 特点：虚拟奖品价值/积分支付、订单管理、发货追踪
- *    - 表名：exchange_market_records，主键：record_id
- *    - 业务场景：用户选择商品 → 扣除虚拟奖品价值 → 创建订单 → 发货
+ * ✅ ExchangeRecord：B2C兑换订单记录表
+ *    - 用途：记录用户在B2C官方商城的兑换订单
+ *    - 特点：材料资产支付、订单管理、发货追踪
+ *    - 表名：exchange_records（原exchange_market_records，2025-12-22重命名），主键：record_id
+ *    - 业务场景：用户选择商品 → 扣除材料资产 → 创建订单 → 发货
+ *    - API路由：/api/v4/shop/exchange（从 /api/v4/market 迁移）
  */
 
 // 🔥 统一资产底座系统（2025年12月15日新增）
@@ -206,8 +216,9 @@ models.AssetTransaction = require('./AssetTransaction')(sequelize, DataTypes)
  * ✅ AssetTransaction：资产流水表（记录所有资产变动流水）
  *    - 用途：记录DIAMOND和材料资产的所有变动流水
  *    - 特点：支持幂等性控制（business_id + business_type唯一约束），delta_amount可正可负，记录变动后余额
- *    - 表名：asset_transactions，主键：transaction_id，外键：user_id
+ *    - 表名：asset_transactions，主键：transaction_id，外键：account_id
  *    - 业务场景：市场购买（买家扣减、卖家入账、平台手续费）、兑换扣减、材料转换、对账审计
+ *    - 更新：2025-12-22 删除 user_id 字段，完全迁移到 account_id 体系
  */
 
 // 🔥 统一账户体系（2025年12月15日新增 - Phase 1）

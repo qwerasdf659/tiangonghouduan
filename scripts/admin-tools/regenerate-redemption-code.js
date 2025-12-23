@@ -22,7 +22,7 @@
  */
 
 const { sequelize, RedemptionOrder, ItemInstance } = require('../../models')
-const RedemptionOrderService = require('../../services/RedemptionOrderService')
+const RedemptionService = require('../../services/RedemptionService')
 const logger = require('../../utils/logger').logger
 
 /**
@@ -109,7 +109,7 @@ class RegenerateRedemptionCodeTool {
       }
 
       // === 第4步：创建新订单 ===
-      const new_order_result = await RedemptionOrderService.createOrder(item_instance_id, {
+      const new_order_result = await RedemptionService.createOrder(item_instance_id, {
         transaction
       })
 

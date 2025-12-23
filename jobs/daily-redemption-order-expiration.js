@@ -3,7 +3,7 @@
  *
  * 职责：
  * - 自动扫描并标记过期的兑换订单
- * - 调用 RedemptionOrderService.expireOrders()
+ * - 调用 RedemptionService.expireOrders()
  * - 记录清理数量和日志
  *
  * 执行策略：
@@ -15,7 +15,7 @@
  * 使用模型：Claude Sonnet 4.5
  */
 
-const RedemptionOrderService = require('../services/RedemptionOrderService')
+const RedemptionService = require('../services/RedemptionService')
 
 const logger = require('../utils/logger').logger
 
@@ -41,7 +41,7 @@ class DailyRedemptionOrderExpiration {
 
     try {
       // 调用服务层方法清理过期订单
-      const expired_count = await RedemptionOrderService.expireOrders()
+      const expired_count = await RedemptionService.expireOrders()
 
       // 生成报告
       const duration_ms = Date.now() - start_time

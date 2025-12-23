@@ -37,8 +37,8 @@ router.get(
       // 通过 ServiceManager 获取 AdminLotteryService
       const AdminLotteryService = req.app.locals.services.getService('adminLottery')
 
-      // 调用服务层方法获取用户状态
-      const result = await AdminLotteryService.getUserLotteryStatus(validatedUserId)
+      // 🔧 V4.3修复：调用正确的服务层方法名 getUserManagementStatus
+      const result = await AdminLotteryService.getUserManagementStatus(validatedUserId)
 
       return res.apiSuccess(result, '用户抽奖控制状态查询成功')
     } catch (error) {
@@ -71,10 +71,11 @@ router.delete(
       // 通过 ServiceManager 获取 AdminLotteryService
       const AdminLotteryService = req.app.locals.services.getService('adminLottery')
 
-      // 调用服务层方法清理用户设置
-      const result = await AdminLotteryService.clearUserLotterySettings(
+      // 🔧 V4.3修复：调用正确的服务层方法名 clearUserSettings，参数顺序为(adminId, userId, settingType, reason)
+      const result = await AdminLotteryService.clearUserSettings(
         req.user?.user_id || req.user?.id,
         validatedUserId,
+        null, // settingType: null表示清除所有设置
         reason
       )
 

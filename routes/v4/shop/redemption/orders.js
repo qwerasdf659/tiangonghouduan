@@ -86,9 +86,9 @@ router.post('/orders', authenticateToken, async (req, res) => {
       })
     }
 
-    // 调用RedemptionOrderService生成订单（传入创建者ID用于服务层兜底）
-    const RedemptionOrderService = req.app.locals.services.getService('redemptionOrder')
-    const result = await RedemptionOrderService.createOrder(item_instance_id, {
+    // 调用RedemptionService生成订单（传入创建者ID用于服务层兜底）
+    const RedemptionService = req.app.locals.services.getService('redemptionOrder')
+    const result = await RedemptionService.createOrder(item_instance_id, {
       creator_user_id: userId // 传入创建者ID，供服务层兜底校验
     })
 
@@ -158,8 +158,8 @@ router.post('/orders/:order_id/cancel', authenticateToken, async (req, res) => {
       user_id: req.user.user_id
     })
 
-    const RedemptionOrderService = req.app.locals.services.getService('redemptionOrder')
-    const order = await RedemptionOrderService.cancelOrder(order_id)
+    const RedemptionService = req.app.locals.services.getService('redemptionOrder')
+    const order = await RedemptionService.cancelOrder(order_id)
 
     return res.apiSuccess(
       {

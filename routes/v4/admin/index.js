@@ -23,6 +23,7 @@ const customerServiceRoutes = require('./customer-service') // 模块化重构�
 const marketplaceRoutes = require('./marketplace') // 🆕 市场统计管理
 const materialRoutes = require('./material') // 🆕 材料系统管理（V4.5.0）
 // 钻石系统管理已废弃（Phase 4），统一迁移到资产管理模块
+const popupBannersRoutes = require('./popup-banners') // 🆕 弹窗Banner管理（2025-12-22）
 
 // 挂载子模块路由
 router.use('/auth', authRoutes)
@@ -42,6 +43,7 @@ router.use('/analytics', analyticsRoutes)
 router.use('/customer-service', customerServiceRoutes) // 🆕 客服管理路由
 router.use('/marketplace', marketplaceRoutes) // 🆕 市场统计路由
 router.use('/material', materialRoutes) // 🆕 材料系统管理路由（V4.5.0）
+router.use('/popup-banners', popupBannersRoutes) // 🆕 弹窗Banner管理路由（2025-12-22）
 
 /**
  * GET / - Admin API根路径信息
@@ -151,6 +153,17 @@ router.get('/', (req, res) => {
           '/diamond/transactions'
         ],
         note: '用户钻石余额查询/调整、钻石流水查询'
+      },
+      popup_banners: {
+        description: '弹窗Banner管理（2025-12-22）',
+        endpoints: [
+          '/popup-banners',
+          '/popup-banners/statistics',
+          '/popup-banners/:id',
+          '/popup-banners/:id/toggle',
+          '/popup-banners/order'
+        ],
+        note: '首页弹窗图片管理、支持Sealos图片上传、时间范围控制、点击跳转'
       }
       // ⚠️ campaign_permissions模块暂未实现，待实现后再添加到此列表
     },

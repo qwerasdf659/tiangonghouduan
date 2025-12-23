@@ -14,7 +14,7 @@ class LotteryPrize extends Model {
    * @param {Object} models - 所有模型的引用
    * @returns {void}
    */
-  static associate (models) {
+  static associate(models) {
     // 关联到抽奖活动
     LotteryPrize.belongsTo(models.LotteryCampaign, {
       foreignKey: 'campaign_id',
@@ -54,7 +54,7 @@ class LotteryPrize extends Model {
    * 获取奖品类型名称
    * @returns {string} 奖品类型的友好显示名称
    */
-  getPrizeTypeName () {
+  getPrizeTypeName() {
     const types = {
       points: '积分奖励',
       physical: '实物奖品',
@@ -69,7 +69,7 @@ class LotteryPrize extends Model {
    * 获取奖品状态名称
    * @returns {string} 奖品状态的友好显示名称
    */
-  getStatusName () {
+  getStatusName() {
     const statuses = {
       active: '激活中',
       inactive: '已停用',
@@ -84,7 +84,7 @@ class LotteryPrize extends Model {
    * 业务规则：必须同时满足状态激活、有库存、未达到每日中奖上限
    * @returns {boolean} 奖品是否可用
    */
-  isAvailable () {
+  isAvailable() {
     if (this.status !== 'active') return false
     if (this.stock_quantity !== null && this.stock_quantity <= 0) return false
     if (this.max_daily_wins !== null && this.daily_win_count >= this.max_daily_wins) return false
@@ -95,7 +95,7 @@ class LotteryPrize extends Model {
    * 检查奖品是否缺货
    * @returns {boolean} 奖品是否缺货
    */
-  isOutOfStock () {
+  isOutOfStock() {
     return this.stock_quantity !== null && this.stock_quantity <= 0
   }
 
@@ -103,7 +103,7 @@ class LotteryPrize extends Model {
    * 获取中奖概率百分比
    * @returns {string} 中奖概率百分比字符串（保留2位小数）
    */
-  getWinProbabilityPercent () {
+  getWinProbabilityPercent() {
     return (this.win_probability * 100).toFixed(2)
   }
 
@@ -114,7 +114,7 @@ class LotteryPrize extends Model {
    * @param {Object} transaction - Sequelize事务对象
    * @returns {Promise<boolean>} 是否更新成功
    */
-  async updateStock (change, transaction = null) {
+  async updateStock(change, transaction = null) {
     if (this.stock_quantity === null) return true // 无限库存
 
     const newStock = this.stock_quantity + change
@@ -137,7 +137,7 @@ class LotteryPrize extends Model {
    * @param {Object} transaction - Sequelize事务对象
    * @returns {Promise<void>} 无返回值
    */
-  async incrementWinCount (transaction = null) {
+  async incrementWinCount(transaction = null) {
     await this.increment(['total_win_count', 'daily_win_count'], { transaction })
   }
 
@@ -146,7 +146,7 @@ class LotteryPrize extends Model {
    * 业务场景：API响应、管理后台展示
    * @returns {Object} 奖品摘要对象
    */
-  toSummary () {
+  toSummary() {
     return {
       prize_id: this.prize_id,
       prize_name: this.prize_name,
@@ -172,7 +172,7 @@ class LotteryPrize extends Model {
    * @param {number} data.win_probability - 中奖概率
    * @returns {Array<string>} 错误信息数组（为空表示验证通过）
    */
-  static validatePrize (data) {
+  static validatePrize(data) {
     const errors = []
 
     if (!data.prize_name || data.prize_name.trim().length === 0) {
@@ -322,22 +322,22 @@ module.exports = sequelize => {
         comment: '奖品价值积分（统一价值单位）'
       },
       /**
-       * 虚拟奖品数量（水晶、贵金属等）
-       * 仅当type='virtual'且category为crystal/metal时有效
+       * 材料资产代码（用于材料类型奖品）
+       * 关联 material_asset_types 表的 asset_code 字段
        */
-      virtual_amount: {
-        type: DataTypes.INTEGER,
+      material_asset_code: {
+        type: DataTypes.STRING(32),
         allowNull: true,
-        comment: '虚拟奖品数量（水晶等）'
+        comment: '材料资产代码（如CRYSTAL, GOLD等）'
       },
       /**
-       * 奖品分类（扩展字段）
-       * 用于区分虚拟奖品类型：crystal（水晶）/metal（贵金属）/physical（实物）/empty（空奖）
+       * 材料发放数量
+       * 仅当 material_asset_code 有值时有效
        */
-      category: {
-        type: DataTypes.STRING(50),
+      material_amount: {
+        type: DataTypes.BIGINT,
         allowNull: true,
-        comment: '分类:crystal/metal/physical/empty/virtual'
+        comment: '材料发放数量'
       },
       created_at: {
         type: DataTypes.DATE,

@@ -49,7 +49,7 @@ describe('审计日志功能测试', () => {
       /**
        * 测试说明：
        * - 旧兑换订单（ExchangeRecords）相关测试已删除
-       * - 审计日志功能通过其他集成测试验证（如兑换市场订单ExchangeMarketRecord）
+       * - 审计日志功能通过其他集成测试验证（如兑换市场订单ExchangeRecord）
        * - 此测试仅验证审计日志模块基本可用
        */
       expect(true).toBe(true)

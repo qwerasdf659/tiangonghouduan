@@ -166,7 +166,7 @@ exports.logExchangeAudit = async (
   return exports.logOperation(
     req,
     'exchange_audit',
-    'ExchangeMarketRecord',
+    'ExchangeRecord',
     exchangeId,
     action,
     beforeExchange,

@@ -457,7 +457,7 @@ function getRedisClient() {
 }
 
 /**
- * 获取原生ioredis客户端（向后兼容）
+ * 获取原生ioredis客户端
  * @returns {Redis} 原生ioredis客户端
  */
 function getRawClient() {

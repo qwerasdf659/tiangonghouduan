@@ -42,8 +42,8 @@ router.get('/orders/:order_id', authenticateToken, async (req, res) => {
       user_id: req.user.user_id
     })
 
-    const RedemptionOrderService = req.app.locals.services.getService('redemptionOrder')
-    const order = await RedemptionOrderService.getOrderDetail(order_id, {
+    const RedemptionService = req.app.locals.services.getService('redemptionOrder')
+    const order = await RedemptionService.getOrderDetail(order_id, {
       include_item: true,
       include_redeemer: true
     })
@@ -102,8 +102,8 @@ router.get(
         user_id: req.user.user_id
       })
 
-      const RedemptionOrderService = req.app.locals.services.getService('redemptionOrder')
-      const order = await RedemptionOrderService.getOrderByItem(itemInstanceId)
+      const RedemptionService = req.app.locals.services.getService('redemptionOrder')
+      const order = await RedemptionService.getOrderByItem(itemInstanceId)
 
       if (!order) {
         return res.apiSuccess({ has_order: false, order: null }, '该物品尚未生成核销订单')

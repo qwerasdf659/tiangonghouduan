@@ -298,11 +298,10 @@ class AssetService {
         { transaction }
       )
 
-      // 创建资产流水记录（包含account_id和balance_before）
+      // 创建资产流水记录
       const transaction_record = await AssetTransaction.create(
         {
           account_id: account.account_id,
-          user_id: user_id || null, // 兼容历史字段
           asset_code,
           delta_amount,
           balance_before,
@@ -316,7 +315,6 @@ class AssetService {
 
       logger.info('✅ 资产变动成功', {
         account_id: account.account_id,
-        user_id,
         system_code,
         asset_code,
         delta_amount,
@@ -486,7 +484,6 @@ class AssetService {
       const transaction_record = await AssetTransaction.create(
         {
           account_id: account.account_id,
-          user_id: user_id || null,
           asset_code,
           delta_amount: -amount, // 负数表示从available扣减
           balance_before: available_before,
@@ -505,7 +502,6 @@ class AssetService {
 
       logger.info('✅ 资产冻结成功', {
         account_id: account.account_id,
-        user_id,
         system_code,
         asset_code,
         amount,
@@ -676,7 +672,6 @@ class AssetService {
       const transaction_record = await AssetTransaction.create(
         {
           account_id: account.account_id,
-          user_id: user_id || null,
           asset_code,
           delta_amount: amount, // 正数表示增加到available
           balance_before: available_before,
@@ -695,7 +690,6 @@ class AssetService {
 
       logger.info('✅ 资产解冻成功', {
         account_id: account.account_id,
-        user_id,
         system_code,
         asset_code,
         amount,
@@ -865,7 +859,6 @@ class AssetService {
       const transaction_record = await AssetTransaction.create(
         {
           account_id: account.account_id,
-          user_id: user_id || null,
           asset_code,
           delta_amount: 0, // available不变
           balance_before: available_before,
@@ -885,7 +878,6 @@ class AssetService {
 
       logger.info('✅ 从冻结余额结算成功', {
         account_id: account.account_id,
-        user_id,
         system_code,
         asset_code,
         amount,

@@ -73,7 +73,7 @@ const migrationContent = `/**
  * 1. 用户认证系统 (4表): users, roles, user_roles, user_sessions
  * 2. 积分系统 (3表): user_points_accounts, points_transactions, exchange_records
  * 3. 抽奖系统 (4表): lottery_campaigns, lottery_prizes, lottery_draws, lottery_presets
- * 4. 商品交易系统 (3表): products, trade_records, user_inventory
+ * 4. 商品交易系统 (3表): products, trade_records, item_instances
  * 5. 客服系统 (3表): customer_sessions, chat_messages, feedbacks
  * 6. 审计系统 (2表): audit_logs, audit_records
  * 7. 系统管理 (2表): system_announcements, image_resources
@@ -109,7 +109,7 @@ module.exports = {
       
       console.log('📦 [4/7] 创建商品交易系统表...')
       
-      // TODO: products, trade_records, user_inventory
+      // TODO: products, trade_records, item_instances
       
       // ==================== 5. 客服系统（3表）====================
       
@@ -201,7 +201,7 @@ module.exports = {
         'feedbacks',
         'chat_messages',
         'customer_sessions',
-        'user_inventory',
+        'item_instances',
         'trade_records',
         'products',
         'lottery_presets',

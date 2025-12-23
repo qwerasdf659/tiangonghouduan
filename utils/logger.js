@@ -338,7 +338,7 @@ const smartLogger = new SmartLogger()
 module.exports = {
   logger: smartLogger,
 
-  // 兼容旧代码
+  // 快捷方法导出
   error: (msg, meta) => smartLogger.error(msg, meta),
   warn: (msg, meta) => smartLogger.warn(msg, meta),
   info: (msg, meta) => smartLogger.info(msg, meta),

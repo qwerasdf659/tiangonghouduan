@@ -15,7 +15,7 @@ const { ThumbnailService } = require('./ThumbnailService') // 🎯 导入类
 
 // V4 领域服务
 const PointsService = require('./PointsService')
-const ExchangeMarketService = require('./ExchangeMarketService')
+const ExchangeService = require('./ExchangeService')
 const ContentAuditEngine = require('./ContentAuditEngine')
 const AnnouncementService = require('./AnnouncementService')
 const NotificationService = require('./NotificationService')
@@ -35,6 +35,7 @@ const AdminSystemService = require('./AdminSystemService') // 管理后台系统
 const AdminLotteryService = require('./AdminLotteryService') // 管理后台抽奖管理服务
 const AdminCustomerServiceService = require('./AdminCustomerServiceService') // 管理后台客服管理服务
 const MaterialManagementService = require('./MaterialManagementService') // 材料系统运营管理服务（V4.5.0）
+const PopupBannerService = require('./PopupBannerService') // 弹窗Banner管理服务（2025-12-22）
 
 // V4 架构重构新增服务（2025-12-10）
 const LotteryPresetService = require('./LotteryPresetService') // 抽奖预设管理服务
@@ -52,7 +53,7 @@ const AssetService = require('./AssetService') // 统一资产服务（账户体
 const AssetConversionService = require('./AssetConversionService') // 资产转换服务（材料转钻石）
 
 // V4.2 背包双轨架构服务（Phase 1 - 核销码系统）
-const RedemptionOrderService = require('./RedemptionOrderService') // 兑换订单服务（12位Base32核销码 + SHA-256哈希）
+const RedemptionService = require('./RedemptionService') // 兑换订单服务（12位Base32核销码 + SHA-256哈希）
 const BackpackService = require('./BackpackService') // 背包双轨查询服务（assets[] + items[]）
 
 // V4.2 交易市场服务（2025-12-21 暴力重构）
@@ -191,7 +192,7 @@ class ServiceManager {
 
       // ✅ 注册领域服务（Domain Services）
       this._services.set('points', PointsService)
-      this._services.set('exchangeMarket', ExchangeMarketService)
+      this._services.set('exchangeMarket', ExchangeService)
       this._services.set('contentAudit', ContentAuditEngine)
       this._services.set('announcement', AnnouncementService)
       this._services.set('notification', NotificationService)
@@ -208,10 +209,11 @@ class ServiceManager {
       this._services.set('premium', PremiumService) // 高级空间服务
       this._services.set('feedback', FeedbackService) // 反馈管理服务
       this._services.set('adminSystem', AdminSystemService) // 管理后台系统服务（已合并SystemSettingsService）
-      // this._services.set('adminMarketplace', AdminMarketplaceService) // 管理后台市场管理服务 - 已合并到ExchangeMarketService
+      // this._services.set('adminMarketplace', AdminMarketplaceService) // 管理后台市场管理服务 - 已合并到ExchangeService
       this._services.set('adminLottery', AdminLotteryService) // 管理后台抽奖管理服务
       this._services.set('adminCustomerService', AdminCustomerServiceService) // 管理后台客服管理服务
       this._services.set('materialManagement', MaterialManagementService) // 材料系统运营管理服务（管理员）
+      this._services.set('popupBanner', PopupBannerService) // 弹窗Banner管理服务（2025-12-22）
 
       // ✅ 注册架构重构新增服务（P0优先级 - 2025-12-10）
       this._services.set('lotteryPreset', LotteryPresetService) // 抽奖预设管理服务
@@ -230,7 +232,7 @@ class ServiceManager {
       this._services.set('assetConversion', AssetConversionService) // 资产转换服务（材料转钻石）
 
       // 注册V4.2背包双轨架构服务（Phase 1 - 核销码系统）
-      this._services.set('redemptionOrder', RedemptionOrderService) // 兑换订单服务（12位Base32核销码 + SHA-256哈希）
+      this._services.set('redemptionOrder', RedemptionService) // 兑换订单服务（12位Base32核销码 + SHA-256哈希）
       this._services.set('backpack', BackpackService) // 背包双轨查询服务（assets[] + items[]）
 
       // 注册V4.2交易市场服务（2025-12-21 暴力重构）
@@ -252,7 +254,7 @@ class ServiceManager {
       if (typeof AdminLotteryService.initialize === 'function') {
         AdminLotteryService.initialize(this)
       }
-      // AdminMarketplaceService已合并到ExchangeMarketService，不再需要初始化
+      // AdminMarketplaceService已合并到ExchangeService，不再需要初始化
 
       logger.info('✅ Service依赖注入完成')
 

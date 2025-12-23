@@ -7,24 +7,28 @@
  *    - 转让历史记录查询
  *    - 管理员库存统计
  *
- * 2. market/（市场交易功能，已拆分为子模块）：
- *    - listings.js - 市场商品列表查询
- *    - sell.js     - 商品上架
- *    - buy.js      - 商品购买
- *    - manage.js   - 撤回/管理
+ * ❌ 注意：市场交易功能已迁移到 /api/v4/market 域
+ *    - 原路径 /api/v4/inventory/market/* 已弃用
+ *    - 新路径 /api/v4/market/* （C2C交易市场）
  *
- * 注意：兑换功能已迁移到 /api/v4/exchange_market
+ * ❌ 注意：兑换功能已迁移到 /api/v4/shop/exchange 域
+ *    - 原路径 /api/v4/market/exchange/* 已弃用
+ *    - 新路径 /api/v4/shop/exchange/* （B2C兑换市场）
  *
  * 创建时间：2025-12-11
- * 更新时间：2025-12-21 - 暴力重构清理
+ * 更新时间：2025-12-22 - API命名规范重构（游戏风格方案）
  */
 
 const express = require('express')
 const router = express.Router()
 
-// 引入子路由模块
+// 引入子路由模块（仅核心库存功能）
 const inventoryCoreRoutes = require('./inventory-core')
-const inventoryMarketRoutes = require('./market/index')
+
+/*
+ * ❌ 移除库存市场路由（已迁移到 /market 域）
+ * const inventoryMarketRoutes = require('./market/index')
+ */
 
 /**
  * 路由映射表（Route Mapping Table）
@@ -34,35 +38,34 @@ const inventoryMarketRoutes = require('./market/index')
  * - GET    /transfer-history        - 获取转让历史
  * - GET    /admin/statistics        - 获取管理员统计
  *
- * 市场交易功能（inventory-market.js）：
- * - GET    /market/listings                        - 获取市场挂牌列表
- * - GET    /market/listings/:listing_id            - 获取市场挂牌详情
- * - POST   /market/listings/:listing_id/purchase   - 购买市场挂牌
- * - POST   /market/listings/:listing_id/withdraw   - 撤回市场挂牌
- * - POST   /market/list                            - 上架商品到市场
- * - GET    /market/listing-status                  - 获取用户上架状态
+ * ❌ 市场交易功能（已迁移）：
+ *    - 新路径：/api/v4/market/listings
+ *    - 新路径：/api/v4/market/sell/list
+ *    - 新路径：/api/v4/market/buy/listings/:listing_id/purchase
  */
 
 /*
  * 挂载子路由（Mount Sub-Routes）
- * 所有子路由都挂载到当前路由的根路径
  */
 router.use('/', inventoryCoreRoutes)
-router.use('/', inventoryMarketRoutes)
+
+/*
+ * ❌ 移除市场路由
+ * router.use('/', inventoryMarketRoutes)
+ */
 
 /**
  * 导出路由聚合器（Export Route Aggregator）
  *
  * 使用方式（Usage in app.js）：
  * ```javascript
- * const inventoryRoutes = require('./routes/v4/unified-engine/inventory');
+ * const inventoryRoutes = require('./routes/v4/inventory/inventory');
  * app.use('/api/v4/inventory', inventoryRoutes);
  * ```
  *
  * 完整API访问路径示例（API Path Examples）：
- * - GET  /api/v4/inventory/user/:user_id
- * - POST /api/v4/inventory/use/:item_id
- * - GET  /api/v4/inventory/market/listings
- * - POST /api/v4/inventory/market/listings/:listing_id/purchase
+ * - GET  /api/v4/inventory/item/:item_id
+ * - GET  /api/v4/inventory/transfer-history
+ * - GET  /api/v4/inventory/admin/statistics
  */
 module.exports = router

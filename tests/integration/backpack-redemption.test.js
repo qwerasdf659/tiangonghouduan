@@ -3,7 +3,7 @@
  *
  * 测试场景：
  * - 完整流程：创建订单 → 生成核销码 → 核销 → 背包查询
- * - 跨服务交互：RedemptionOrderService + BackpackService
+ * - 跨服务交互：RedemptionService + BackpackService
  * - 端到端验证：从API到数据库的完整链路
  *
  * 创建时间：2025-12-17
@@ -11,7 +11,7 @@
  */
 
 const { sequelize, ItemInstance, User, RedemptionOrder } = require('../../models')
-const RedemptionOrderService = require('../../services/RedemptionOrderService')
+const RedemptionService = require('../../services/RedemptionService')
 const BackpackService = require('../../services/BackpackService')
 
 // 测试数据库配置
@@ -88,9 +88,7 @@ describe('背包与兑换集成测试', () => {
       const _items_count_before = backpack_before.items.length
 
       // === 第2步：创建兑换订单（生成核销码） ===
-      const create_result = await RedemptionOrderService.createOrder(
-        test_item_instance.item_instance_id
-      )
+      const create_result = await RedemptionService.createOrder(test_item_instance.item_instance_id)
 
       expect(create_result).toHaveProperty('order')
       expect(create_result).toHaveProperty('code')
@@ -108,7 +106,7 @@ describe('背包与兑换集成测试', () => {
       )
 
       // === 第3步：核销订单 ===
-      const fulfilled_order = await RedemptionOrderService.fulfillOrder(code, test_user.user_id)
+      const fulfilled_order = await RedemptionService.fulfillOrder(code, test_user.user_id)
 
       // 验证核销结果
       expect(fulfilled_order.status).toBe('fulfilled')
@@ -155,14 +153,14 @@ describe('背包与兑换集成测试', () => {
 
       try {
         // 为两个物品创建兑换订单
-        const order_1 = await RedemptionOrderService.createOrder(item_1.item_instance_id)
-        const order_2 = await RedemptionOrderService.createOrder(item_2.item_instance_id)
+        const order_1 = await RedemptionService.createOrder(item_1.item_instance_id)
+        const order_2 = await RedemptionService.createOrder(item_2.item_instance_id)
 
         // 验证生成了不同的核销码
         expect(order_1.code).not.toBe(order_2.code)
 
         // 核销第一个订单
-        await RedemptionOrderService.fulfillOrder(order_1.code, test_user.user_id)
+        await RedemptionService.fulfillOrder(order_1.code, test_user.user_id)
 
         // 查询背包
         const backpack = await BackpackService.getUserBackpack(test_user.user_id, test_user.user_id)
@@ -203,14 +201,14 @@ describe('背包与兑换集成测试', () => {
   describe('异常流程处理', () => {
     it('应该正确处理核销失败的情况', async () => {
       // 创建订单
-      const result = await RedemptionOrderService.createOrder(test_item_instance.item_instance_id)
+      const result = await RedemptionService.createOrder(test_item_instance.item_instance_id)
       const code = result.code
 
       // 第一次核销（成功）
-      await RedemptionOrderService.fulfillOrder(code, test_user.user_id)
+      await RedemptionService.fulfillOrder(code, test_user.user_id)
 
       // 第二次核销（应该失败）
-      await expect(RedemptionOrderService.fulfillOrder(code, test_user.user_id)).rejects.toThrow(
+      await expect(RedemptionService.fulfillOrder(code, test_user.user_id)).rejects.toThrow(
         '核销码已被使用'
       )
 
@@ -226,7 +224,7 @@ describe('背包与兑换集成测试', () => {
 
     it('应该正确处理订单过期的情况', async () => {
       // 创建订单
-      const result = await RedemptionOrderService.createOrder(test_item_instance.item_instance_id)
+      const result = await RedemptionService.createOrder(test_item_instance.item_instance_id)
       const order = result.order
       const code = result.code
 
@@ -236,7 +234,7 @@ describe('背包与兑换集成测试', () => {
       })
 
       // 尝试核销（应该失败）
-      await expect(RedemptionOrderService.fulfillOrder(code, test_user.user_id)).rejects.toThrow(
+      await expect(RedemptionService.fulfillOrder(code, test_user.user_id)).rejects.toThrow(
         /过期|有效期/
       )
 
@@ -258,15 +256,15 @@ describe('背包与兑换集成测试', () => {
 
     it('应该正确处理取消订单的情况', async () => {
       // 创建订单
-      const result = await RedemptionOrderService.createOrder(test_item_instance.item_instance_id)
+      const result = await RedemptionService.createOrder(test_item_instance.item_instance_id)
       const order = result.order
       const code = result.code
 
       // 取消订单
-      await RedemptionOrderService.cancelOrder(order.order_id)
+      await RedemptionService.cancelOrder(order.order_id)
 
       // 尝试核销已取消的订单（应该失败）
-      await expect(RedemptionOrderService.fulfillOrder(code, test_user.user_id)).rejects.toThrow()
+      await expect(RedemptionService.fulfillOrder(code, test_user.user_id)).rejects.toThrow()
 
       // 查询背包（物品应该仍在背包中）
       const _backpack2 = await BackpackService.getUserBackpack(test_user.user_id, test_user.user_id)
@@ -297,9 +295,7 @@ describe('背包与兑换集成测试', () => {
 
       try {
         // 并发创建订单
-        const promises = items.map(item =>
-          RedemptionOrderService.createOrder(item.item_instance_id)
-        )
+        const promises = items.map(item => RedemptionService.createOrder(item.item_instance_id))
 
         const results = await Promise.all(promises)
 
@@ -327,14 +323,14 @@ describe('背包与兑换集成测试', () => {
 
     it('应该防止并发核销同一个订单', async () => {
       // 创建订单
-      const result = await RedemptionOrderService.createOrder(test_item_instance.item_instance_id)
+      const result = await RedemptionService.createOrder(test_item_instance.item_instance_id)
       const code = result.code
 
       // 并发核销
       const promises = [
-        RedemptionOrderService.fulfillOrder(code, test_user.user_id),
-        RedemptionOrderService.fulfillOrder(code, test_user.user_id),
-        RedemptionOrderService.fulfillOrder(code, test_user.user_id)
+        RedemptionService.fulfillOrder(code, test_user.user_id),
+        RedemptionService.fulfillOrder(code, test_user.user_id),
+        RedemptionService.fulfillOrder(code, test_user.user_id)
       ]
 
       const results = await Promise.allSettled(promises)
@@ -355,12 +351,12 @@ describe('背包与兑换集成测试', () => {
   describe('数据一致性', () => {
     it('核销后物品状态应该与订单状态一致', async () => {
       // 创建订单
-      const result = await RedemptionOrderService.createOrder(test_item_instance.item_instance_id)
+      const result = await RedemptionService.createOrder(test_item_instance.item_instance_id)
       const order = result.order
       const code = result.code
 
       // 核销订单
-      await RedemptionOrderService.fulfillOrder(code, test_user.user_id)
+      await RedemptionService.fulfillOrder(code, test_user.user_id)
 
       // 重新加载订单和物品
       await order.reload()

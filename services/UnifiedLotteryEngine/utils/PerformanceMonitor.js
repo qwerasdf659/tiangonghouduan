@@ -272,8 +272,8 @@ class PerformanceMonitor {
     const report = {
       monitorId,
       operation: monitor.operation,
-      duration: totalDuration, // ✅ 修复：测试期望的字段名
-      totalDuration, // 保持向后兼容
+      duration: totalDuration, // 耗时（毫秒）
+      totalDuration, // 总耗时（同 duration）
       memoryUsage: {
         start: monitor.startMemory,
         end: endMemory,

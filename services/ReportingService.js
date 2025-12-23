@@ -97,7 +97,7 @@ class ReportingService {
           where: whereClause,
           attributes: [
             [fn('DATE', col('created_at')), 'date'],
-            [fn('COUNT', '*'), 'draws'],
+            [fn('COUNT', col('draw_id')), 'draws'], // 🔧 V4.3修复：使用col('draw_id')
             [fn('SUM', literal('CASE WHEN is_winner THEN 1 ELSE 0 END')), 'wins']
           ],
           group: [fn('DATE', col('created_at'))],
@@ -110,11 +110,11 @@ class ReportingService {
           where: whereClause,
           attributes: [
             'user_id',
-            [fn('COUNT', '*'), 'draws'],
+            [fn('COUNT', col('draw_id')), 'draws'], // 🔧 V4.3修复：使用col('draw_id')
             [fn('SUM', literal('CASE WHEN is_winner THEN 1 ELSE 0 END')), 'wins']
           ],
           group: ['user_id'],
-          order: [[fn('COUNT', '*'), 'DESC']],
+          order: [[fn('COUNT', col('draw_id')), 'DESC']], // 🔧 V4.3修复：使用col('draw_id')
           limit: 20,
           raw: true
         })
@@ -222,7 +222,7 @@ class ReportingService {
           },
           attributes: [
             [fn('DATE_FORMAT', col('created_at'), dateFormat), 'period'],
-            [fn('COUNT', '*'), 'total_draws'],
+            [fn('COUNT', col('draw_id')), 'total_draws'], // 🔧 V4.3修复：使用col('draw_id')而不是'*'
             [fn('SUM', literal('CASE WHEN is_winner THEN 1 ELSE 0 END')), 'wins'],
             [fn('COUNT', fn('DISTINCT', col('user_id'))), 'unique_users']
           ],
@@ -241,14 +241,14 @@ class ReportingService {
           },
           attributes: [
             [fn('DATE_FORMAT', col('last_login'), dateFormat), 'period'],
-            [fn('COUNT', '*'), 'active_users']
+            [fn('COUNT', col('user_id')), 'active_users'] // 🔧 V4.3修复：使用col('user_id')而不是'*'
           ],
           group: [fn('DATE_FORMAT', col('last_login'), dateFormat)],
           order: [[fn('DATE_FORMAT', col('last_login'), dateFormat), 'ASC']],
           raw: true
         }),
 
-        // 奖品发放趋势
+        // 奖品发放趋势（统计奖品池中奖品的创建情况）
         models.LotteryPrize
           ? models.LotteryPrize.findAll({
               where: {
@@ -259,7 +259,7 @@ class ReportingService {
               },
               attributes: [
                 [fn('DATE_FORMAT', col('created_at'), dateFormat), 'period'],
-                [fn('COUNT', col('draw_id')), 'prizes_added'],
+                [fn('COUNT', col('prize_id')), 'prizes_added'], // 🔧 V4.3修复：使用prize_id（lottery_prizes表主键）
                 [fn('SUM', col('stock_quantity')), 'total_quantity']
               ],
               group: [fn('DATE_FORMAT', col('created_at'), dateFormat)],

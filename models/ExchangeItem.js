@@ -122,7 +122,7 @@ module.exports = sequelize => {
    */
   ExchangeItem.associate = function (models) {
     // 一对多：商品有多个兑换记录
-    ExchangeItem.hasMany(models.ExchangeMarketRecord, {
+    ExchangeItem.hasMany(models.ExchangeRecord, {
       foreignKey: 'item_id',
       as: 'exchangeRecords'
     })

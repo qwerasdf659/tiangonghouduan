@@ -4,7 +4,7 @@
  * @description 管理员查看市场统计信息和管理兑换商品
  * @version 3.0.0（P2-C架构重构版）
  * @created 2025-12-05
- * @updated 2025-12-11（P2-C重构：AdminMarketplaceService合并到ExchangeMarketService）
+ * @updated 2025-12-11（P2-C重构：AdminMarketplaceService合并到ExchangeService）
  *
  * 核心功能：
  * - 查询所有用户的上架统计
@@ -16,7 +16,7 @@
  * - 路由层不直连 models（所有数据库操作通过 Service 层）
  * - 路由层不开启事务（事务管理在 Service 层）
  * - 通过 ServiceManager 统一获取服务实例
- * - 使用 ExchangeMarketService 统一管理兑换市场业务
+ * - 使用 ExchangeService 统一管理兑换市场业务
  */
 
 const express = require('express')
@@ -59,11 +59,11 @@ router.get('/listing-stats', authenticateToken, requireAdmin, async (req, res) =
       filter
     })
 
-    // 🎯 P2-C架构重构：通过 ServiceManager 获取 ExchangeMarketService
-    const ExchangeMarketService = req.app.locals.services.getService('exchangeMarket')
+    // 🎯 P2-C架构重构：通过 ServiceManager 获取 ExchangeService
+    const ExchangeService = req.app.locals.services.getService('exchangeMarket')
 
     // 🎯 调用服务层方法获取用户上架统计
-    const result = await ExchangeMarketService.getUserListingStats({
+    const result = await ExchangeService.getUserListingStats({
       page,
       limit,
       filter,
@@ -127,11 +127,11 @@ router.post('/exchange_market/items', authenticateToken, requireAdmin, async (re
       stock
     })
 
-    // 🎯 P2-C架构重构：通过 ServiceManager 获取 ExchangeMarketService
-    const ExchangeMarketService = req.app.locals.services.getService('exchangeMarket')
+    // 🎯 P2-C架构重构：通过 ServiceManager 获取 ExchangeService
+    const ExchangeService = req.app.locals.services.getService('exchangeMarket')
 
     // 🎯 调用服务层方法创建商品（V4.5.0 材料资产支付）
-    const result = await ExchangeMarketService.createExchangeItem(
+    const result = await ExchangeService.createExchangeItem(
       {
         item_name,
         item_description,
@@ -212,11 +212,11 @@ router.put('/exchange_market/items/:item_id', authenticateToken, requireAdmin, a
       return res.apiError('无效的商品ID', 'BAD_REQUEST', null, 400)
     }
 
-    // 🎯 P2-C架构重构：通过 ServiceManager 获取 ExchangeMarketService
-    const ExchangeMarketService = req.app.locals.services.getService('exchangeMarket')
+    // 🎯 P2-C架构重构：通过 ServiceManager 获取 ExchangeService
+    const ExchangeService = req.app.locals.services.getService('exchangeMarket')
 
     // 🎯 调用服务层方法更新商品（V4.5.0 材料资产支付）
-    const result = await ExchangeMarketService.updateExchangeItem(itemId, {
+    const result = await ExchangeService.updateExchangeItem(itemId, {
       item_name,
       item_description,
       cost_asset_code,
@@ -288,11 +288,11 @@ router.delete(
         return res.apiError('无效的商品ID', 'BAD_REQUEST', null, 400)
       }
 
-      // 🎯 P2-C架构重构：通过 ServiceManager 获取 ExchangeMarketService
-      const ExchangeMarketService = req.app.locals.services.getService('exchangeMarket')
+      // 🎯 P2-C架构重构：通过 ServiceManager 获取 ExchangeService
+      const ExchangeService = req.app.locals.services.getService('exchangeMarket')
 
       // 🎯 调用服务层方法删除商品
-      const result = await ExchangeMarketService.deleteExchangeItem(itemId)
+      const result = await ExchangeService.deleteExchangeItem(itemId)
 
       logger.info('兑换商品删除操作完成', {
         admin_id,

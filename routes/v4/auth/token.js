@@ -83,7 +83,7 @@ router.get('/verify', authenticateToken, verifyRateLimiter, async (req, res) => 
       created_at: BeijingTimeHelper.formatToISO(user.created_at),
       last_login: BeijingTimeHelper.formatToISO(user.last_login),
       login_count: user.login_count,
-      valid: true, // 向后兼容旧测试
+      valid: true, // Token有效标识
       token_valid: true, // 新字段
       timestamp: BeijingTimeHelper.apiTimestamp()
     },

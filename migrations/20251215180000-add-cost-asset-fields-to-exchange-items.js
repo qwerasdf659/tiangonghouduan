@@ -15,7 +15,7 @@
  * - exchange_items表结构
  * - 兑换市场商品管理接口
  * - 兑换市场下单接口
- * - ExchangeMarketService相关方法
+ * - ExchangeService相关方法
  *
  * 创建时间：2025-12-15
  */
@@ -35,7 +35,7 @@ module.exports = {
    * @param {Object} Sequelize - Sequelize对象
    * @returns {Promise<void>}
    */
-  async up (queryInterface, Sequelize) {
+  async up(queryInterface, Sequelize) {
     const transaction = await queryInterface.sequelize.transaction()
 
     try {
@@ -46,7 +46,8 @@ module.exports = {
         {
           type: Sequelize.STRING(50),
           allowNull: true,
-          comment: '成本资产代码（Cost Asset Code - 兑换商品消耗的材料资产类型）：red_shard-碎红水晶、red_crystal-完整红水晶等；业务规则：新商品必填，历史商品可为null；支持多种材料资产扩展；用途：兑换支付资产类型、库存扣减依据、成本核算基础'
+          comment:
+            '成本资产代码（Cost Asset Code - 兑换商品消耗的材料资产类型）：red_shard-碎红水晶、red_crystal-完整红水晶等；业务规则：新商品必填，历史商品可为null；支持多种材料资产扩展；用途：兑换支付资产类型、库存扣减依据、成本核算基础'
         },
         { transaction }
       )
@@ -58,7 +59,8 @@ module.exports = {
         {
           type: Sequelize.BIGINT,
           allowNull: true,
-          comment: '成本数量（Cost Amount - 兑换单件商品需要的材料数量）：单位根据cost_asset_code确定（如10个碎红水晶）；业务规则：新商品必填，历史商品可为null；使用BIGINT避免浮点精度问题；数据范围：1-1000000；用途：兑换扣减材料数量、成本核算、商品定价参考'
+          comment:
+            '成本数量（Cost Amount - 兑换单件商品需要的材料数量）：单位根据cost_asset_code确定（如10个碎红水晶）；业务规则：新商品必填，历史商品可为null；使用BIGINT避免浮点精度问题；数据范围：1-1000000；用途：兑换扣减材料数量、成本核算、商品定价参考'
         },
         { transaction }
       )
@@ -86,7 +88,7 @@ module.exports = {
    * @param {Object} Sequelize - Sequelize对象
    * @returns {Promise<void>}
    */
-  async down (queryInterface, Sequelize) {
+  async down(queryInterface, Sequelize) {
     const transaction = await queryInterface.sequelize.transaction()
 
     try {
@@ -101,7 +103,7 @@ module.exports = {
       if (count > 0) {
         throw new Error(
           `无法回滚：数据库中存在${count}条使用cost_asset_code或cost_amount的记录。` +
-          '请先将数据迁移回virtual_value_price字段，或手动清理数据，然后再执行回滚。'
+            '请先将数据迁移回virtual_value_price字段，或手动清理数据，然后再执行回滚。'
         )
       }
 

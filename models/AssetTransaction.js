@@ -21,9 +21,10 @@
  * 命名规范（snake_case）：
  * - 表名：asset_transactions
  * - 主键：transaction_id
- * - 外键：user_id
+ * - 外键：account_id（关联 accounts 表）
  *
  * 创建时间：2025-12-15
+ * 更新时间：2025-12-22（删除 user_id 字段，完全迁移到 account_id 体系）
  */
 
 'use strict'
@@ -43,16 +44,7 @@ class AssetTransaction extends Model {
    * @returns {void} 无返回值，仅定义关联关系
    */
   static associate(models) {
-    // 多对一：流水归属于用户（历史兼容字段）
-    AssetTransaction.belongsTo(models.User, {
-      foreignKey: 'user_id',
-      as: 'user',
-      onDelete: 'RESTRICT', // 用户删除时保护流水数据
-      onUpdate: 'CASCADE',
-      comment: '关联用户信息（流水所属用户，历史兼容字段）'
-    })
-
-    // 多对一：流水归属于账户（新账户体系）
+    // 多对一：流水归属于账户（Account 体系）
     AssetTransaction.belongsTo(models.Account, {
       foreignKey: 'account_id',
       as: 'account',
@@ -130,20 +122,12 @@ module.exports = sequelize => {
         comment: '流水ID（主键）'
       },
 
-      // 用户ID（User ID - 流水所属用户，历史兼容字段）
-      user_id: {
-        type: DataTypes.INTEGER,
-        allowNull: true, // 系统账户时为NULL
-        comment:
-          '用户ID（User ID - 流水所属用户，历史兼容字段）：关联users.user_id，标识这笔流水属于哪个用户，系统账户时为NULL，新业务应使用account_id'
-      },
-
-      // 账户ID（Account ID - 流水所属账户，新账户体系）
+      // 账户ID（Account ID - 流水所属账户）
       account_id: {
         type: DataTypes.BIGINT,
-        allowNull: true, // 允许NULL（兼容历史数据）
+        allowNull: false,
         comment:
-          '账户ID（Account ID - 流水所属账户）：关联accounts.account_id，支持用户账户和系统账户（平台手续费、铸币、销毁、托管），新业务必填'
+          '账户ID（Account ID - 流水所属账户）：关联accounts.account_id，支持用户账户和系统账户（平台手续费、铸币、销毁、托管）'
       },
 
       // 资产代码（Asset Code - 资产类型标识）
@@ -218,14 +202,9 @@ module.exports = sequelize => {
           comment: '唯一索引：业务ID + 业务类型（幂等性保证，防止重复扣款/入账）'
         },
         {
-          fields: ['user_id', 'asset_code', 'created_at'],
-          name: 'idx_user_asset_time',
-          comment: '索引：用户ID + 资产代码 + 创建时间（用于查询用户的资产流水历史，历史兼容）'
-        },
-        {
           fields: ['account_id', 'asset_code', 'created_at'],
           name: 'idx_account_asset_time',
-          comment: '索引：账户ID + 资产代码 + 创建时间（用于查询账户的资产流水历史，新账户体系）'
+          comment: '索引：账户ID + 资产代码 + 创建时间（用于查询账户的资产流水历史）'
         },
         {
           fields: ['business_type', 'created_at'],

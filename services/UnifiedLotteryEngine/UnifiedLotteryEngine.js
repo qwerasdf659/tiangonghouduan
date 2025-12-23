@@ -1059,14 +1059,25 @@ class UnifiedLotteryEngine {
         throw new Error('抽奖次数必须在1-10之间')
       }
 
-      // 获取用户积分信息
-      const userAccount = await models.UserPointsAccount.findOne({
-        where: { user_id },
-        transaction // 🎯 关键：在事务中查询，确保数据一致性
-      })
-
-      if (!userAccount) {
+      // 🔧 V4.3修复：使用新的资产系统获取用户积分信息
+      const AssetService = require('../AssetService')
+      const userAccountEntity = await AssetService.getOrCreateAccount({ user_id }, { transaction })
+      if (!userAccountEntity || userAccountEntity.status !== 'active') {
+        throw new Error('用户账户不存在或已冻结')
+      }
+      const userPointsBalance = await AssetService.getOrCreateBalance(
+        userAccountEntity.account_id,
+        'POINTS',
+        { transaction }
+      )
+      if (!userPointsBalance) {
         throw new Error('用户积分账户不存在')
+      }
+      // 兼容旧代码：构造类似UserPointsAccount结构的对象
+      const userAccount = {
+        account_id: userAccountEntity.account_id,
+        user_id,
+        available_points: userPointsBalance ? Number(userPointsBalance.available_amount) : 0
       }
 
       // 🔴 获取活动配置（用于读取定价配置）
@@ -1122,21 +1133,28 @@ class UnifiedLotteryEngine {
        * - 传递skip_points_deduction标识给策略，避免重复扣除
        * - 确保事务一致性：统一扣除 + 循环抽奖 + 发放奖品
        */
-      const PointsService = require('../../services/PointsService')
+      // 🔧 V4.3修复：使用AssetService替代PointsService
       const batchDrawId = `batch_${BeijingTimeHelper.generateIdTimestamp()}_${user_id}` // 批次ID用于幂等性控制
 
       // 步骤1：统一扣除折扣后的总积分（在事务中执行）
-      await PointsService.consumePoints(user_id, requiredPoints, {
-        transaction,
-        business_id: batchDrawId, // 使用批次ID实现幂等性
-        business_type: 'lottery_consume',
-        source_type: 'system',
-        title: draw_count === 1 ? '抽奖消耗积分' : `${draw_count}连抽消耗积分`,
-        description:
-          draw_count === 1
-            ? `单次抽奖消耗${requiredPoints}积分`
-            : `${draw_count}连抽消耗${requiredPoints}积分（${pricing.label}，原价${draw_count * 100}积分，节省${draw_count * 100 - requiredPoints}积分）`
-      })
+      await AssetService.changeBalance(
+        {
+          user_id,
+          asset_code: 'POINTS',
+          delta_amount: -requiredPoints, // 扣减为负数
+          business_id: batchDrawId, // 使用批次ID实现幂等性
+          business_type: 'lottery_consume',
+          meta: {
+            source_type: 'system',
+            title: draw_count === 1 ? '抽奖消耗积分' : `${draw_count}连抽消耗积分`,
+            description:
+              draw_count === 1
+                ? `单次抽奖消耗${requiredPoints}积分`
+                : `${draw_count}连抽消耗${requiredPoints}积分（${pricing.label}，原价${draw_count * 100}积分，节省${draw_count * 100 - requiredPoints}积分）`
+          }
+        },
+        { transaction }
+      )
 
       this.logInfo('连抽积分统一扣除成功', {
         user_id,
@@ -1219,13 +1237,18 @@ class UnifiedLotteryEngine {
        */
       await transaction.commit()
 
-      // 🆕 事务提交后重新查询实际积分余额（确保数据准确）
-      const updatedAccount = await models.UserPointsAccount.findOne({
-        where: { user_id }
-      })
+      /**
+       * 🆕 事务提交后重新查询实际积分余额（确保数据准确）
+       * 🔧 V4.3修复：使用新的资产系统查询余额
+       */
+      const updatedAccountEntity = await AssetService.getOrCreateAccount({ user_id })
+      const updatedPointsBalance = await AssetService.getOrCreateBalance(
+        updatedAccountEntity.account_id,
+        'POINTS'
+      )
 
-      const remainingPoints = updatedAccount
-        ? updatedAccount.available_points
+      const remainingPoints = updatedPointsBalance
+        ? Number(updatedPointsBalance.available_amount)
         : userAccount.available_points - requiredPoints
 
       this.logInfo('抽奖执行完成（事务已提交）', {
@@ -1445,7 +1468,7 @@ class UnifiedLotteryEngine {
       const userDrawCounts = {}
       if (user_id) {
         // Step 1: 获取今日开始时间（北京时间00:00:00）
-        const today = BeijingTimeHelper.getTodayStart()
+        const today = BeijingTimeHelper.todayStart()
 
         // Step 2: 提取所有活动ID数组，示例：[1, 2, 3, 4, 5]
         const campaignIds = campaigns.map(c => c.campaign_id)
@@ -1636,7 +1659,7 @@ class UnifiedLotteryEngine {
        * 📊 业务场景（Business Scenario）：显示"今日已抽奖3次"，激励用户继续参与
        * 📊 性能评估（Performance）：单次查询耗时约25-30ms
        */
-      const today = BeijingTimeHelper.getTodayStart()
+      const today = BeijingTimeHelper.todayStart()
       const todayDraws = await models.LotteryDraw.count({
         where: {
           user_id,

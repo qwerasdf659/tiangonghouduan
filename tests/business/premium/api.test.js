@@ -50,7 +50,7 @@ describe('高级空间解锁API测试', () => {
 
     // 获取认证token
     try {
-      await tester.authenticateV4User('regular')
+      await tester.authenticate_v4_user('regular')
       console.log('✅ 用户认证完成')
     } catch (error) {
       console.warn('⚠️ 认证失败，部分测试可能跳过:', error.message)
@@ -67,7 +67,7 @@ describe('高级空间解锁API测试', () => {
   // ========== 查询高级空间状态测试 ==========
   describe('查询高级空间状态API', () => {
     test('✅ 查询高级空间状态 - GET /api/v4/premium/status', async () => {
-      const response = await tester.makeAuthenticatedRequest(
+      const response = await tester.make_authenticated_request(
         'GET',
         '/api/v4/premium/status',
         null,
@@ -110,7 +110,7 @@ describe('高级空间解锁API测试', () => {
     })
 
     test('✅ 验证状态数据结构完整性', async () => {
-      const response = await tester.makeAuthenticatedRequest(
+      const response = await tester.make_authenticated_request(
         'GET',
         '/api/v4/premium/status',
         null,
@@ -154,7 +154,7 @@ describe('高级空间解锁API测试', () => {
     beforeAll(async () => {
       // 保存原始状态
       try {
-        const response = await tester.makeAuthenticatedRequest(
+        const response = await tester.make_authenticated_request(
           'GET',
           '/api/v4/premium/status',
           null,
@@ -196,7 +196,7 @@ describe('高级空间解锁API测试', () => {
 
       if (history_points < THRESHOLD) {
         // 如果不满足条件，测试应该返回403
-        const response = await tester.makeAuthenticatedRequest(
+        const response = await tester.make_authenticated_request(
           'POST',
           '/api/v4/premium/unlock',
           null,
@@ -231,7 +231,7 @@ describe('高级空间解锁API测试', () => {
 
       if (available_points < UNLOCK_COST) {
         // 如果不满足条件，测试应该返回403
-        const response = await tester.makeAuthenticatedRequest(
+        const response = await tester.make_authenticated_request(
           'POST',
           '/api/v4/premium/unlock',
           null,
@@ -252,7 +252,7 @@ describe('高级空间解锁API测试', () => {
 
     test('✅ 解锁高级空间 - POST /api/v4/premium/unlock', async () => {
       // 先检查是否已解锁且有效
-      const status_response = await tester.makeAuthenticatedRequest(
+      const status_response = await tester.make_authenticated_request(
         'GET',
         '/api/v4/premium/status',
         null,
@@ -268,7 +268,7 @@ describe('高级空间解锁API测试', () => {
 
         // 测试重复解锁应该被拒绝（axios会对4xx抛出错误，需要try-catch处理）
         try {
-          const response = await tester.makeAuthenticatedRequest(
+          const response = await tester.make_authenticated_request(
             'POST',
             '/api/v4/premium/unlock',
             null,
@@ -295,7 +295,7 @@ describe('高级空间解锁API测试', () => {
       }
 
       // 执行解锁
-      const response = await tester.makeAuthenticatedRequest(
+      const response = await tester.make_authenticated_request(
         'POST',
         '/api/v4/premium/unlock',
         null,
@@ -324,7 +324,7 @@ describe('高级空间解锁API测试', () => {
     })
 
     test('✅ 验证解锁后状态变化', async () => {
-      const response = await tester.makeAuthenticatedRequest(
+      const response = await tester.make_authenticated_request(
         'GET',
         '/api/v4/premium/status',
         null,
@@ -348,7 +348,7 @@ describe('高级空间解锁API测试', () => {
   describe('积分扣除验证', () => {
     test('✅ 验证积分账户扣除正确', async () => {
       // 查询积分交易记录 - 使用正确的路由路径
-      const response = await tester.makeAuthenticatedRequest(
+      const response = await tester.make_authenticated_request(
         'GET',
         `/api/v4/points/transactions/${test_account.user_id}?page=1&page_size=10`,
         null,

@@ -22,15 +22,15 @@ const results = {
   warnings: []
 }
 
-// 1. 检查ExchangeMarketService是否使用AssetService
+// 1. 检查ExchangeService是否使用AssetService
 console.log('\n📋 1. 检查兑换市场服务迁移...')
-const exchangeServicePath = path.join(__dirname, '../services/ExchangeMarketService.js')
+const exchangeServicePath = path.join(__dirname, '../services/ExchangeService.js')
 const exchangeServiceContent = fs.readFileSync(exchangeServicePath, 'utf8')
 
 if (exchangeServiceContent.includes("AssetService = require('./AssetService')")) {
-  results.passed.push('✅ ExchangeMarketService已引入AssetService')
+  results.passed.push('✅ ExchangeService已引入AssetService')
 } else {
-  results.failed.push('❌ ExchangeMarketService未引入AssetService')
+  results.failed.push('❌ ExchangeService未引入AssetService')
 }
 
 if (exchangeServiceContent.includes("business_type: 'exchange_debit'")) {
@@ -47,9 +47,9 @@ const codeOnly = exchangeServiceContent
 
 const materialConsumeMatches = codeOnly.match(/MaterialService\.consume\(/g)
 if (materialConsumeMatches && materialConsumeMatches.length > 0) {
-  results.failed.push('❌ ExchangeMarketService仍在使用MaterialService.consume()')
+  results.failed.push('❌ ExchangeService仍在使用MaterialService.consume()')
 } else {
-  results.passed.push('✅ ExchangeMarketService已停止使用MaterialService.consume()')
+  results.passed.push('✅ ExchangeService已停止使用MaterialService.consume()')
 }
 
 // 2. 检查AssetConversionService是否使用统一账本双分录
@@ -140,9 +140,9 @@ if (fs.existsSync(testFilePath)) {
 console.log('\n📋 5. 检查文档注释更新...')
 
 if (exchangeServiceContent.includes('Phase 3') || exchangeServiceContent.includes('统一账本')) {
-  results.passed.push('✅ ExchangeMarketService更新了注释说明')
+  results.passed.push('✅ ExchangeService更新了注释说明')
 } else {
-  results.warnings.push('⚠️ ExchangeMarketService建议更新注释说明')
+  results.warnings.push('⚠️ ExchangeService建议更新注释说明')
 }
 
 if (

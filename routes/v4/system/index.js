@@ -38,6 +38,9 @@ const statisticsRoutes = require('./statistics')
 // 系统通知路由
 const notificationsRoutes = require('./notifications')
 
+// 弹窗Banner路由（2025-12-22 新增）
+const popupBannersRoutes = require('./popup-banners')
+
 // 挂载公告路由
 router.use('/', announcementsRoutes)
 
@@ -58,5 +61,8 @@ router.use('/statistics', statisticsRoutes)
 
 // 挂载系统通知路由
 router.use('/notifications', notificationsRoutes)
+
+// 挂载弹窗Banner路由（2025-12-22 新增）
+router.use('/', popupBannersRoutes)
 
 module.exports = router

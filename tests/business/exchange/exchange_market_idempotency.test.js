@@ -28,13 +28,8 @@
  */
 
 const request = require('supertest')
-const {
-  sequelize,
-  ExchangeItem,
-  ExchangeMarketRecord,
-  UserAssetAccount
-} = require('../../../models')
-const ExchangeMarketService = require('../../../services/ExchangeMarketService')
+const { sequelize, ExchangeItem, ExchangeRecord, UserAssetAccount } = require('../../../models')
+const ExchangeService = require('../../../services/ExchangeService')
 const AssetService = require('../../../services/AssetService')
 const BeijingTimeHelper = require('../../../utils/timeHelper')
 
@@ -159,7 +154,7 @@ describe('兑换市场幂等性测试 (Exchange Market Idempotency - V4.5.0 材�
   afterAll(async () => {
     // 清理测试数据
     if (testItem) {
-      await ExchangeMarketRecord.destroy({
+      await ExchangeRecord.destroy({
         where: { item_id: testItem.item_id }
       })
       await testItem.destroy()
@@ -303,7 +298,7 @@ describe('兑换市场幂等性测试 (Exchange Market Idempotency - V4.5.0 材�
       console.log(`   - 订单号匹配: ${response2.body.data.order.order_no === firstOrderNo}`)
 
       // 验证数据库中只有一条订单记录
-      const orderCount = await ExchangeMarketRecord.count({
+      const orderCount = await ExchangeRecord.count({
         where: { business_id }
       })
 
@@ -493,15 +488,10 @@ describe('兑换市场幂等性测试 (Exchange Market Idempotency - V4.5.0 材�
         console.log('🔄 创建外部事务')
 
         // 调用Service时传入外部事务
-        const result = await ExchangeMarketService.exchangeItem(
-          testUser.user_id,
-          testItem.item_id,
-          1,
-          {
-            business_id,
-            transaction: externalTransaction // ✅ 传入外部事务
-          }
-        )
+        const result = await ExchangeService.exchangeItem(testUser.user_id, testItem.item_id, 1, {
+          business_id,
+          transaction: externalTransaction // ✅ 传入外部事务
+        })
 
         expect(result.success).toBe(true)
         expect(result.order.order_no).toBeDefined()
@@ -514,7 +504,7 @@ describe('兑换市场幂等性测试 (Exchange Market Idempotency - V4.5.0 材�
         console.log('✅ 外部事务手动提交成功')
 
         // 验证订单已创建
-        const order = await ExchangeMarketRecord.findOne({
+        const order = await ExchangeRecord.findOne({
           where: { business_id }
         })
 
@@ -539,7 +529,7 @@ describe('兑换市场幂等性测试 (Exchange Market Idempotency - V4.5.0 材�
 
       try {
         // 调用Service
-        await ExchangeMarketService.exchangeItem(testUser.user_id, testItem.item_id, 1, {
+        await ExchangeService.exchangeItem(testUser.user_id, testItem.item_id, 1, {
           business_id,
           transaction: externalTransaction
         })
@@ -605,7 +595,7 @@ describe('兑换市场幂等性测试 (Exchange Market Idempotency - V4.5.0 材�
       })
 
       // 验证数据库中只有一条订单记录
-      const orderCount = await ExchangeMarketRecord.count({
+      const orderCount = await ExchangeRecord.count({
         where: { business_id }
       })
 

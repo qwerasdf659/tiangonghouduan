@@ -14,11 +14,52 @@ const _logger = require('../../../utils/logger').logger
 
 const BeijingTimeHelper = require('../../../utils/timeHelper')
 const LotteryStrategy = require('../core/LotteryStrategy')
-const { LotteryDraw, UserPointsAccount } = require('../../../models')
+const { LotteryDraw, Account, AccountAssetBalance } = require('../../../models') // 🔧 V4.3修复：使用新的资产系统模型
 // 🎯 V4新增：集成测试账号权限管理
 const { hasTestPrivilege } = require('../../../utils/TestAccountManager')
-// 🔥 V4.3新增：统一积分服务
-const PointsService = require('../../PointsService')
+// 🔥 V4.3新增：统一资产服务（替代PointsService）
+const AssetService = require('../../AssetService')
+
+/**
+ * 🔧 V4.3辅助函数：获取用户积分余额（兼容新资产系统）
+ *
+ * @param {number} user_id - 用户ID
+ * @param {Object} options - 选项 {transaction, lock}
+ * @returns {Promise<Object>} 模拟UserPointsAccount结构的对象 {available_points}
+ */
+async function getUserPointsBalance(user_id, options = {}) {
+  const { transaction, lock } = options
+
+  // 查询用户账户
+  const account = await Account.findOne({
+    where: { user_id, account_type: 'user' },
+    transaction
+  })
+
+  if (!account) {
+    return null
+  }
+
+  // 查询 POINTS 资产余额
+  const pointsBalance = await AccountAssetBalance.findOne({
+    where: { account_id: account.account_id, asset_code: 'POINTS' },
+    transaction,
+    lock: lock ? transaction.LOCK.UPDATE : undefined
+  })
+
+  if (!pointsBalance) {
+    return {
+      available_points: 0,
+      account_id: account.account_id
+    }
+  }
+
+  return {
+    available_points: Number(pointsBalance.available_amount),
+    account_id: account.account_id,
+    balance_id: pointsBalance.balance_id
+  }
+}
 
 /**
  * 基础抽奖保底策略类
@@ -114,7 +155,7 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
 
     try {
       // 验证用户积分是否足够
-      const userAccount = await UserPointsAccount.findOne({ where: { user_id } })
+      const userAccount = await getUserPointsBalance(user_id) // 🔧 V4.3修复：使用新资产系统
       if (!userAccount || userAccount.available_points < this.config.pointsCostPerDraw) {
         this.logError('用户积分不足', {
           user_id,
@@ -125,7 +166,7 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
       }
 
       // 验证今日抽奖次数是否超限
-      const today = BeijingTimeHelper.getTodayStart()
+      const today = BeijingTimeHelper.todayStart()
       const todayDrawCount = await LotteryDraw.count({
         where: {
           user_id,
@@ -346,13 +387,11 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
       try {
         /*
          * 获取用户信息（包括积分余额）
-         * 🔒 双账户模型关键修复：对用户积分账户加行级锁（FOR UPDATE）
-         * 目的：避免并发抽奖导致 remaining_budget_points / used_budget_points 发生“丢失更新”，从而使预算控制失效
+         * 🔧 V4.3修复：使用新资产系统获取用户积分
          */
-        const userAccount = await UserPointsAccount.findOne({
-          where: { user_id },
+        const userAccount = await getUserPointsBalance(user_id, {
           transaction: internalTransaction,
-          lock: internalTransaction.LOCK.UPDATE
+          lock: true // 使用行级锁防止并发问题
         })
 
         /*
@@ -415,44 +454,26 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
           await this.distributePrize(user_id, prize, internalTransaction, { draw_id })
 
           /*
-           * 🔥 步骤3.5: 双账户模型 - 扣除预算积分和记录审计字段
+           * 🎯 步骤3.5: 记录奖品价值积分（用于历史记录和统计）
            * 业务规则：
-           * - 扣除用户的预算积分（remaining_budget_points - prize_value_points）
-           * - 更新统计字段（total_draw_count、won_count、last_draw_at）
-           * - 记录预算审计字段（budget_points_before、budget_points_after）
+           * - 记录奖品价值积分（用于统计和分析）
+           * - 积分扣除已在execute_draw中统一处理，此处仅记录
            */
           const prizeValuePoints = prize.prize_value_points || 0
-          const budgetBefore = userAccount.remaining_budget_points || 0
-          const budgetAfter = Math.max(0, budgetBefore - prizeValuePoints)
 
-          await userAccount.update(
-            {
-              remaining_budget_points: budgetAfter,
-              used_budget_points: (userAccount.used_budget_points || 0) + prizeValuePoints,
-              total_draw_count: (userAccount.total_draw_count || 0) + 1,
-              won_count: (userAccount.won_count || 0) + 1,
-              last_draw_at: BeijingTimeHelper.createDatabaseTime()
-            },
-            { transaction: internalTransaction }
-          )
-
-          this.logInfo('双账户模型：预算扣除成功', {
+          this.logInfo('奖品价值记录', {
             user_id,
             prize_id: prize.prize_id,
-            prize_value_points: prizeValuePoints,
-            budget_before: budgetBefore,
-            budget_after: budgetAfter
+            prize_value_points: prizeValuePoints
           })
 
-          // 🎯 步骤4: 记录抽奖历史（传入draw_id、transaction和预算审计字段）
+          // 🎯 步骤4: 记录抽奖历史（传入draw_id、transaction）
           await this.recordLotteryHistory(
             context,
             {
               is_winner: true,
               prize,
-              prize_value_points: prizeValuePoints,
-              budget_points_before: budgetBefore,
-              budget_points_after: budgetAfter
+              prize_value_points: prizeValuePoints
             },
             1.0,
             draw_id,
@@ -753,8 +774,8 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
     try {
       // 1. 检查用户积分（保底抽奖也需要积分）
       const pointsCost = this.config.pointsCostPerDraw
-      const userAccount = await models.UserPointsAccount.findOne({
-        where: { user_id },
+      // 🔧 V4.3修复：使用新资产系统获取用户积分
+      const userAccount = await getUserPointsBalance(user_id, {
         transaction: internalTransaction
       })
 
@@ -815,15 +836,22 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
        * 修复：检查context.skip_points_deduction标识，连抽场景跳过积分扣除
        */
       if (!context.skip_points_deduction) {
-        // 4. 单抽场景 - 扣除用户积分（使用统一积分服务 + 幂等性控制）
-        await PointsService.consumePoints(user_id, pointsCost, {
-          transaction: internalTransaction,
-          business_id: draw_id, // ✅ 添加business_id用于幂等性控制
-          business_type: 'lottery_consume',
-          source_type: 'system',
-          title: '保底抽奖消耗积分',
-          description: `第${drawNumber}次抽奖触发保底机制，消耗${pointsCost}积分`
-        })
+        // 🔧 V4.3修复：使用AssetService替代PointsService
+        await AssetService.changeBalance(
+          {
+            user_id,
+            asset_code: 'POINTS',
+            delta_amount: -pointsCost, // 扣减为负数
+            business_id: draw_id, // ✅ 添加business_id用于幂等性控制
+            business_type: 'lottery_consume',
+            meta: {
+              source_type: 'system',
+              title: '保底抽奖消耗积分',
+              description: `第${drawNumber}次抽奖触发保底机制，消耗${pointsCost}积分`
+            }
+          },
+          { transaction: internalTransaction }
+        )
       } else {
         // 连抽场景 - 跳过积分扣除（外层已统一扣除折扣后的总积分）
         this.logInfo('连抽保底场景：跳过积分扣除（外层已统一扣除）', {
@@ -966,8 +994,8 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
       // 🔴 修复：详细的积分检查，优先使用context中的user_status
       let available_points = user_status?.available_points
       if (available_points === undefined) {
-        // 回退到数据库查询
-        const userAccount = await UserPointsAccount.findOne({ where: { user_id } })
+        // 🔧 V4.3修复：使用新资产系统查询积分
+        const userAccount = await getUserPointsBalance(user_id)
         available_points = userAccount?.available_points || 0
       }
 
@@ -984,7 +1012,7 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
       }
 
       // 调用其他验证逻辑（排除积分检查，避免重复）
-      const today = BeijingTimeHelper.getTodayStart()
+      const today = BeijingTimeHelper.todayStart()
       const todayDrawCount = await LotteryDraw.count({
         where: {
           user_id,
@@ -1331,7 +1359,7 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
    * @returns {Promise<Array>} 可用奖品列表（已按业务规则过滤）
    */
   async getAvailablePrizes(campaignId, userId = null, options = {}) {
-    const { LotteryPrize, UserPointsAccount } = require('../../../models')
+    const { LotteryPrize } = require('../../../models') // 🔧 V4.3修复：移除废弃的UserPointsAccount
     const { transaction = null } = options
 
     try {
@@ -1346,9 +1374,7 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
           'prize_name', // ✅ 修复：使用正确的数据库字段名
           'prize_type',
           'prize_value',
-          'prize_value_points', // 🔥 双账户模型：奖品价值积分
-          'virtual_amount', // 🔥 双账户模型：虚拟奖品数量
-          'category', // 🔥 双账户模型：奖品分类
+          'prize_value_points', // 🔥 V4.3：奖品价值积分
           'win_probability',
           'stock_quantity',
           'max_daily_wins',
@@ -1377,16 +1403,14 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
       let filteredPrizes = prizes
 
       if (userId) {
-        // 查询用户的剩余预算积分
-        const userAccount = await UserPointsAccount.findOne({
-          where: { user_id: userId },
-          attributes: ['remaining_budget_points'],
+        // 🔧 V4.3修复：使用新资产系统查询用户可用积分作为预算
+        const userAccount = await getUserPointsBalance(userId, {
           transaction: transaction || undefined,
-          lock: transaction ? transaction.LOCK.UPDATE : undefined
+          lock: !!transaction
         })
 
         if (userAccount) {
-          const remainingBudget = userAccount.remaining_budget_points || 0
+          const remainingBudget = userAccount.available_points || 0 // 🔧 使用available_points作为预算
 
           // 根据预算筛选奖品池
           filteredPrizes = prizes.filter(prize => {
@@ -1394,7 +1418,7 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
             return prizeValuePoints <= remainingBudget
           })
 
-          this.logInfo('双账户模型：预算过滤完成', {
+          this.logInfo('V4.3：使用可用积分作为预算过滤完成', {
             userId,
             campaignId,
             remainingBudget,
@@ -1452,14 +1476,22 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
    * await strategy.deductPoints(10001, 100, 'draw_123', transaction)
    */
   async deductPoints(user_id, pointsCost, draw_id, transaction = null) {
-    await PointsService.consumePoints(user_id, pointsCost, {
-      transaction,
-      business_id: draw_id, // ✅ 添加business_id用于幂等性控制（解决问题4）
-      business_type: 'lottery_consume',
-      source_type: 'system',
-      title: '抽奖消耗积分',
-      description: `基础抽奖消耗${pointsCost}积分`
-    })
+    // 🔧 V4.3修复：使用AssetService替代PointsService
+    await AssetService.changeBalance(
+      {
+        user_id,
+        asset_code: 'POINTS',
+        delta_amount: -pointsCost, // 扣减为负数
+        business_id: draw_id, // ✅ 添加business_id用于幂等性控制
+        business_type: 'lottery_consume',
+        meta: {
+          source_type: 'system',
+          title: '抽奖消耗积分',
+          description: `基础抽奖消耗${pointsCost}积分`
+        }
+      },
+      { transaction }
+    )
 
     this.logDebug('扣除用户积分（使用PointsService）', { user_id, pointsCost, draw_id })
   }
@@ -1549,16 +1581,24 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
     // 根据奖品类型进行不同的发放逻辑
     switch (prize.prize_type) {
       case 'points':
-        // 积分奖励：使用统一积分服务（传入transaction确保事务一致性）
-        await PointsService.addPoints(user_id, parseInt(prize.prize_value), {
-          transaction, // 🎯 传入事务对象，确保积分操作在同一事务中
-          business_type: 'lottery_reward',
-          source_type: 'system',
-          title: `抽奖奖励：${prize.prize_name}`,
-          description: `获得${prize.prize_value}积分奖励`
-        })
+        // 🔧 V4.3修复：使用AssetService替代PointsService
+        await AssetService.changeBalance(
+          {
+            user_id,
+            asset_code: 'POINTS',
+            delta_amount: parseInt(prize.prize_value), // 增加积分为正数
+            business_id: options.draw_id || `prize_${prize.prize_id}_${Date.now()}`,
+            business_type: 'lottery_reward',
+            meta: {
+              source_type: 'system',
+              title: `抽奖奖励：${prize.prize_name}`,
+              description: `获得${prize.prize_value}积分奖励`
+            }
+          },
+          { transaction } // 🎯 传入事务对象，确保积分操作在同一事务中
+        )
 
-        this.logInfo('发放积分奖励（使用PointsService + 事务）', {
+        this.logInfo('发放积分奖励（使用AssetService + 事务）', {
           user_id,
           prizeId: prize.prize_id,
           prizeName: prize.prize_name,
@@ -1881,9 +1921,8 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
       // ✅ 统一业务标准：使用snake_case参数解构
       const { user_id, campaign_id } = context
 
-      // 获取用户积分信息（在事务中查询）
-      const userAccount = await UserPointsAccount.findOne({
-        where: { user_id },
+      // 🔧 V4.3修复：使用新资产系统获取用户积分信息
+      const userAccount = await getUserPointsBalance(user_id, {
         transaction // 🎯 在事务中查询
       })
 

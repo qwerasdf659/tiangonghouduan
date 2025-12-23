@@ -44,26 +44,20 @@ describe('P1 修复简化验证', () => {
     })
   })
 
-  describe('P1-3：asset_transactions.user_id 重复外键清理', () => {
-    test('应该只有一条 user_id 外键约束', async () => {
-      const [fks] = await sequelize.query(`
-        SELECT 
-          CONSTRAINT_NAME,
-          COLUMN_NAME,
-          REFERENCED_TABLE_NAME
-        FROM information_schema.KEY_COLUMN_USAGE
+  describe('P1-3：asset_transactions.user_id 字段已删除', () => {
+    test('user_id 字段应该不存在（已迁移到 account_id）', async () => {
+      const [columns] = await sequelize.query(`
+        SELECT COLUMN_NAME
+        FROM information_schema.COLUMNS
         WHERE TABLE_SCHEMA = DATABASE()
           AND TABLE_NAME = 'asset_transactions'
           AND COLUMN_NAME = 'user_id'
-          AND REFERENCED_TABLE_NAME IS NOT NULL
       `)
 
-      // 验证：只有一条外键
-      expect(fks).toHaveLength(1)
-      expect(fks[0].CONSTRAINT_NAME).toBe('fk_asset_transactions_user_id')
-      expect(fks[0].REFERENCED_TABLE_NAME).toBe('users')
+      // 验证：user_id 字段已删除
+      expect(columns).toHaveLength(0)
 
-      console.log('✅ P1-3：asset_transactions.user_id 外键已修复为单一标准外键')
+      console.log('✅ P1-3：asset_transactions.user_id 字段已删除，完全迁移到 account_id 体系')
     })
   })
 })

@@ -42,9 +42,9 @@ describe('管理员和系统管理API测试', () => {
 
     // 获取认证token
     try {
-      const user_data = await tester.authenticateV4User('regular')
+      const user_data = await tester.authenticate_v4_user('regular')
       test_user_id = user_data.user.user_id
-      await tester.authenticateV4User('admin')
+      await tester.authenticate_v4_user('admin')
       console.log('✅ 用户认证完成')
     } catch (error) {
       console.warn('⚠️ 认证失败，部分测试可能跳过:', error.message)
@@ -61,7 +61,7 @@ describe('管理员和系统管理API测试', () => {
   // ========== 管理员系统API ==========
   describe('管理员系统API', () => {
     test('✅ 管理员仪表板 - GET /api/v4/admin/dashboard', async () => {
-      const response = await tester.makeAuthenticatedRequest(
+      const response = await tester.make_authenticated_request(
         'GET',
         '/api/v4/admin/dashboard',
         null,
@@ -78,7 +78,7 @@ describe('管理员和系统管理API测试', () => {
     })
 
     test('✅ 获取系统统计数据 - GET /api/v4/admin/statistics', async () => {
-      const response = await tester.makeAuthenticatedRequest(
+      const response = await tester.make_authenticated_request(
         'GET',
         '/api/v4/admin/statistics',
         null,
@@ -94,7 +94,7 @@ describe('管理员和系统管理API测试', () => {
     })
 
     test('✅ 获取活跃用户列表 - GET /api/v4/admin/users/active', async () => {
-      const response = await tester.makeAuthenticatedRequest(
+      const response = await tester.make_authenticated_request(
         'GET',
         '/api/v4/admin/users/active',
         null,
@@ -110,7 +110,7 @@ describe('管理员和系统管理API测试', () => {
     })
 
     test('✅ 系统状态 - GET /api/v4/admin/status', async () => {
-      const response = await tester.makeAuthenticatedRequest(
+      const response = await tester.make_authenticated_request(
         'GET',
         '/api/v4/admin/status',
         null,
@@ -127,7 +127,7 @@ describe('管理员和系统管理API测试', () => {
     })
 
     test('✅ 决策分析 - GET /api/v4/admin/decisions/analytics', async () => {
-      const response = await tester.makeAuthenticatedRequest(
+      const response = await tester.make_authenticated_request(
         'GET',
         '/api/v4/admin/decisions/analytics',
         null,
@@ -142,7 +142,7 @@ describe('管理员和系统管理API测试', () => {
     })
 
     test('✅ WebSocket服务状态 - GET /api/v4/system/chat/ws-status', async () => {
-      const response = await tester.makeAuthenticatedRequest(
+      const response = await tester.make_authenticated_request(
         'GET',
         '/api/v4/system/chat/ws-status',
         null,
@@ -184,7 +184,7 @@ describe('管理员和系统管理API测试', () => {
   // ========== 调度系统API ==========
   describe('调度系统API', () => {
     test('✅ 获取调度任务列表 - GET /api/v4/schedule/tasks', async () => {
-      const response = await tester.makeAuthenticatedRequest(
+      const response = await tester.make_authenticated_request(
         'GET',
         '/api/v4/schedule/tasks',
         null,
@@ -210,7 +210,7 @@ describe('管理员和系统管理API测试', () => {
         }
       }
 
-      const response = await tester.makeAuthenticatedRequest(
+      const response = await tester.make_authenticated_request(
         'POST',
         '/api/v4/schedule/tasks',
         task_data,
@@ -226,7 +226,7 @@ describe('管理员和系统管理API测试', () => {
     })
 
     test('✅ 获取任务执行历史 - GET /api/v4/schedule/tasks/history', async () => {
-      const response = await tester.makeAuthenticatedRequest(
+      const response = await tester.make_authenticated_request(
         'GET',
         '/api/v4/schedule/tasks/history',
         null,
@@ -245,7 +245,7 @@ describe('管理员和系统管理API测试', () => {
   // ========== 智能系统API ==========
   describe('智能系统API', () => {
     test('✅ 获取智能推荐 - GET /api/v4/smart/recommendations', async () => {
-      const response = await tester.makeAuthenticatedRequest(
+      const response = await tester.make_authenticated_request(
         'GET',
         `/api/v4/smart/recommendations?user_id=${test_user_id || test_account.user_id}`,
         null,
@@ -261,7 +261,7 @@ describe('管理员和系统管理API测试', () => {
     })
 
     test('✅ 智能分析报告 - GET /api/v4/smart/analysis', async () => {
-      const response = await tester.makeAuthenticatedRequest(
+      const response = await tester.make_authenticated_request(
         'GET',
         '/api/v4/smart/analysis',
         null,
@@ -284,7 +284,7 @@ describe('管理员和系统管理API测试', () => {
         include_metrics: ['lottery_participation', 'points_activity', 'user_retention']
       }
 
-      const response = await tester.makeAuthenticatedRequest(
+      const response = await tester.make_authenticated_request(
         'POST',
         '/api/v4/smart/optimize',
         optimization_data,
@@ -304,7 +304,12 @@ describe('管理员和系统管理API测试', () => {
   // ========== 事件系统API ==========
   describe('事件系统API', () => {
     test('✅ 获取事件列表 - GET /api/v4/events', async () => {
-      const response = await tester.makeAuthenticatedRequest('GET', '/api/v4/events', null, 'admin')
+      const response = await tester.make_authenticated_request(
+        'GET',
+        '/api/v4/events',
+        null,
+        'admin'
+      )
 
       // 当前版本可能未开放事件系统模块，允许 404（不做向后兼容时属于预期行为）
       expect([200, 401, 403, 404]).toContain(response.status)
@@ -328,7 +333,7 @@ describe('管理员和系统管理API测试', () => {
         schedule_time: new Date(Date.now() + 60000).toISOString() // 1分钟后
       }
 
-      const response = await tester.makeAuthenticatedRequest(
+      const response = await tester.make_authenticated_request(
         'POST',
         '/api/v4/events/publish',
         event_data,
@@ -358,7 +363,7 @@ describe('管理员和系统管理API测试', () => {
         }
       }
 
-      const response = await tester.makeAuthenticatedRequest(
+      const response = await tester.make_authenticated_request(
         'POST',
         '/api/v4/events/subscribe',
         subscription_data,
@@ -375,7 +380,7 @@ describe('管理员和系统管理API测试', () => {
     })
 
     test('✅ 获取事件处理状态 - GET /api/v4/events/processing/status', async () => {
-      const response = await tester.makeAuthenticatedRequest(
+      const response = await tester.make_authenticated_request(
         'GET',
         '/api/v4/events/processing/status',
         null,

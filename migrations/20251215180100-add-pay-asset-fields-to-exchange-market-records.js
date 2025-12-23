@@ -15,7 +15,7 @@
  * - exchange_market_records表结构
  * - 兑换市场下单接口
  * - 兑换市场订单查询接口
- * - ExchangeMarketService相关方法
+ * - ExchangeService相关方法
  *
  * 创建时间：2025-12-15
  */
@@ -35,7 +35,7 @@ module.exports = {
    * @param {Object} Sequelize - Sequelize对象
    * @returns {Promise<void>}
    */
-  async up (queryInterface, Sequelize) {
+  async up(queryInterface, Sequelize) {
     const transaction = await queryInterface.sequelize.transaction()
 
     try {
@@ -46,7 +46,8 @@ module.exports = {
         {
           type: Sequelize.STRING(50),
           allowNull: true,
-          comment: '支付资产代码（Pay Asset Code - 兑换订单实际扣减的材料资产类型）：red_shard-碎红水晶、red_crystal-完整红水晶等；业务规则：新订单必填，历史订单可为null；与exchange_items.cost_asset_code对应；用途：订单支付对账、材料消耗统计、成本核算依据'
+          comment:
+            '支付资产代码（Pay Asset Code - 兑换订单实际扣减的材料资产类型）：red_shard-碎红水晶、red_crystal-完整红水晶等；业务规则：新订单必填，历史订单可为null；与exchange_items.cost_asset_code对应；用途：订单支付对账、材料消耗统计、成本核算依据'
         },
         { transaction }
       )
@@ -58,7 +59,8 @@ module.exports = {
         {
           type: Sequelize.BIGINT,
           allowNull: true,
-          comment: '支付数量（Pay Amount - 兑换订单实际扣减的材料总数量）：计算公式：cost_amount * quantity；单位根据pay_asset_code确定；业务规则：新订单必填，历史订单可为null；使用BIGINT避免浮点精度问题；用途：订单支付对账、材料消耗统计、成本核算'
+          comment:
+            '支付数量（Pay Amount - 兑换订单实际扣减的材料总数量）：计算公式：cost_amount * quantity；单位根据pay_asset_code确定；业务规则：新订单必填，历史订单可为null；使用BIGINT避免浮点精度问题；用途：订单支付对账、材料消耗统计、成本核算'
         },
         { transaction }
       )
@@ -86,7 +88,7 @@ module.exports = {
    * @param {Object} Sequelize - Sequelize对象
    * @returns {Promise<void>}
    */
-  async down (queryInterface, Sequelize) {
+  async down(queryInterface, Sequelize) {
     const transaction = await queryInterface.sequelize.transaction()
 
     try {
@@ -101,7 +103,7 @@ module.exports = {
       if (count > 0) {
         throw new Error(
           `无法回滚：数据库中存在${count}条使用pay_asset_code或pay_amount的记录。` +
-          '请先将数据迁移回virtual_value_paid字段，或手动清理数据，然后再执行回滚。'
+            '请先将数据迁移回virtual_value_paid字段，或手动清理数据，然后再执行回滚。'
         )
       }
 

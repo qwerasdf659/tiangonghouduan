@@ -67,17 +67,17 @@ async function verifyDatabaseTables() {
     )
     verify(balancesSchema.length === 5, 'account_asset_balances表结构完整（5个核心字段）')
 
-    // 检查asset_transactions表升级
+    // 检查asset_transactions表升级（已完成 user_id → account_id 迁移）
     const [transactionsSchema] = await sequelize.query(
       "SHOW COLUMNS FROM asset_transactions WHERE Field IN ('account_id', 'balance_before', 'balance_after')"
     )
     verify(transactionsSchema.length === 3, 'asset_transactions表已升级（3个新字段）')
 
-    // 检查user_id是否允许NULL
+    // 检查user_id字段已删除（2025-12-22 迁移完成）
     const [userIdColumn] = await sequelize.query(
       "SHOW COLUMNS FROM asset_transactions WHERE Field = 'user_id'"
     )
-    verify(userIdColumn[0].Null === 'YES', 'asset_transactions.user_id允许NULL（系统账户支持）')
+    verify(userIdColumn.length === 0, 'asset_transactions.user_id已删除（已迁移到account_id体系）')
   } catch (error) {
     verify(false, `数据库表结构验证失败: ${error.message}`)
   }

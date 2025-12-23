@@ -42,7 +42,7 @@ describe('抽奖预设系统API测试（V4架构）', () => {
 
     // 获取管理员认证token
     try {
-      const admin_data = await tester.authenticateV4User('admin')
+      const admin_data = await tester.authenticate_v4_user('admin')
       test_user_id = admin_data.user.user_id
       console.log('✅ 管理员认证完成')
     } catch (error) {
@@ -61,7 +61,7 @@ describe('抽奖预设系统API测试（V4架构）', () => {
   // ========== 获取预设统计API测试 ==========
   describe('GET /api/v4/lottery-preset/stats - 获取预设统计', () => {
     test('✅ 应该返回正确的预设统计数据结构', async () => {
-      const response = await tester.makeAuthenticatedRequest(
+      const response = await tester.make_authenticated_request(
         'GET',
         '/api/v4/lottery-preset/stats',
         null,
@@ -101,7 +101,7 @@ describe('抽奖预设系统API测试（V4架构）', () => {
     })
 
     test('✅ 应该正确计算使用率', async () => {
-      const response = await tester.makeAuthenticatedRequest(
+      const response = await tester.make_authenticated_request(
         'GET',
         '/api/v4/lottery-preset/stats',
         null,
@@ -119,7 +119,7 @@ describe('抽奖预设系统API测试（V4架构）', () => {
     })
 
     test('✅ 应该正确统计奖品类型分布', async () => {
-      const response = await tester.makeAuthenticatedRequest(
+      const response = await tester.make_authenticated_request(
         'GET',
         '/api/v4/lottery-preset/stats',
         null,
@@ -141,7 +141,7 @@ describe('抽奖预设系统API测试（V4架构）', () => {
     })
 
     test('✅ 待使用和已使用数量之和应等于总数', async () => {
-      const response = await tester.makeAuthenticatedRequest(
+      const response = await tester.make_authenticated_request(
         'GET',
         '/api/v4/lottery-preset/stats',
         null,
@@ -160,7 +160,7 @@ describe('抽奖预设系统API测试（V4架构）', () => {
     test('❌ 非管理员应无权访问统计接口', async () => {
       try {
         // 尝试用普通用户token访问
-        const response = await tester.makeAuthenticatedRequest(
+        const response = await tester.make_authenticated_request(
           'GET',
           '/api/v4/lottery-preset/stats',
           null,
@@ -182,7 +182,7 @@ describe('抽奖预设系统API测试（V4架构）', () => {
     test('✅ 响应时间应在合理范围内（<200ms）', async () => {
       const start_time = Date.now()
 
-      await tester.makeAuthenticatedRequest('GET', '/api/v4/lottery-preset/stats', null, 'admin')
+      await tester.make_authenticated_request('GET', '/api/v4/lottery-preset/stats', null, 'admin')
 
       const duration = Date.now() - start_time
 
@@ -224,7 +224,7 @@ describe('抽奖预设系统API测试（V4架构）', () => {
         presets: [{ prize_id: prize.prize_id, queue_order: 1 }]
       }
 
-      const response = await tester.makeAuthenticatedRequest(
+      const response = await tester.make_authenticated_request(
         'POST',
         '/api/v4/lottery-preset/create',
         create_data,
@@ -265,7 +265,7 @@ describe('抽奖预设系统API测试（V4架构）', () => {
         }))
       }
 
-      const response = await tester.makeAuthenticatedRequest(
+      const response = await tester.make_authenticated_request(
         'POST',
         '/api/v4/lottery-preset/create',
         create_data,
@@ -288,7 +288,7 @@ describe('抽奖预设系统API测试（V4架构）', () => {
     })
 
     test('❌ 缺少必需参数应返回错误', async () => {
-      const response = await tester.makeAuthenticatedRequest(
+      const response = await tester.make_authenticated_request(
         'POST',
         '/api/v4/lottery-preset/create',
         {}, // 缺少user_id和presets
@@ -314,7 +314,7 @@ describe('抽奖预设系统API测试（V4架构）', () => {
       }
 
       try {
-        const response = await tester.makeAuthenticatedRequest(
+        const response = await tester.make_authenticated_request(
           'POST',
           '/api/v4/lottery-preset/create',
           {
@@ -351,7 +351,7 @@ describe('抽奖预设系统API测试（V4架构）', () => {
         ]
       }
 
-      const response = await tester.makeAuthenticatedRequest(
+      const response = await tester.make_authenticated_request(
         'POST',
         '/api/v4/lottery-preset/create',
         create_data,
@@ -388,7 +388,7 @@ describe('抽奖预设系统API测试（V4架构）', () => {
         presets
       }
 
-      const response = await tester.makeAuthenticatedRequest(
+      const response = await tester.make_authenticated_request(
         'POST',
         '/api/v4/lottery-preset/create',
         create_data,
@@ -421,7 +421,7 @@ describe('抽奖预设系统API测试（V4架构）', () => {
         presets: [{ prize_id: prize.prize_id, queue_order: 0 }]
       }
 
-      const response_zero = await tester.makeAuthenticatedRequest(
+      const response_zero = await tester.make_authenticated_request(
         'POST',
         '/api/v4/lottery-preset/create',
         create_data_zero,
@@ -438,7 +438,7 @@ describe('抽奖预设系统API测试（V4架构）', () => {
         presets: [{ prize_id: prize.prize_id, queue_order: -1 }]
       }
 
-      const response_negative = await tester.makeAuthenticatedRequest(
+      const response_negative = await tester.make_authenticated_request(
         'POST',
         '/api/v4/lottery-preset/create',
         create_data_negative,
@@ -456,7 +456,7 @@ describe('抽奖预设系统API测试（V4架构）', () => {
   // ========== 获取用户预设API测试 ==========
   describe('GET /api/v4/lottery-preset/user/:user_id - 获取用户预设', () => {
     test('✅ 应该返回正确的用户预设列表结构', async () => {
-      const response = await tester.makeAuthenticatedRequest(
+      const response = await tester.make_authenticated_request(
         'GET',
         `/api/v4/lottery-preset/user/${test_user_id}`,
         null,
@@ -488,7 +488,7 @@ describe('抽奖预设系统API测试（V4架构）', () => {
     })
 
     test('✅ 预设列表应包含关联的奖品和管理员信息', async () => {
-      const response = await tester.makeAuthenticatedRequest(
+      const response = await tester.make_authenticated_request(
         'GET',
         `/api/v4/lottery-preset/user/${test_user_id}`,
         null,
@@ -513,7 +513,7 @@ describe('抽奖预设系统API测试（V4架构）', () => {
     })
 
     test('❌ 查询不存在的用户应返回400错误', async () => {
-      const response = await tester.makeAuthenticatedRequest(
+      const response = await tester.make_authenticated_request(
         'GET',
         '/api/v4/lottery-preset/user/999999',
         null,
@@ -585,7 +585,7 @@ describe('抽奖预设系统API测试（V4架构）', () => {
         return
       }
 
-      const response = await tester.makeAuthenticatedRequest(
+      const response = await tester.make_authenticated_request(
         'DELETE',
         `/api/v4/lottery-preset/user/${temp_user_id}`,
         null,
@@ -616,7 +616,7 @@ describe('抽奖预设系统API测试（V4架构）', () => {
         force: true
       })
 
-      const response = await tester.makeAuthenticatedRequest(
+      const response = await tester.make_authenticated_request(
         'DELETE',
         `/api/v4/lottery-preset/user/${temp_user_id}`,
         null,
@@ -632,7 +632,7 @@ describe('抽奖预设系统API测试（V4架构）', () => {
 
     test('❌ 非管理员应无权清理预设', async () => {
       try {
-        const response = await tester.makeAuthenticatedRequest(
+        const response = await tester.make_authenticated_request(
           'DELETE',
           `/api/v4/lottery-preset/user/${temp_user_id}`,
           null,
@@ -648,7 +648,7 @@ describe('抽奖预设系统API测试（V4架构）', () => {
     })
 
     test('❌ 清理不存在的用户应返回404错误', async () => {
-      const response = await tester.makeAuthenticatedRequest(
+      const response = await tester.make_authenticated_request(
         'DELETE',
         '/api/v4/lottery-preset/user/999999',
         null,
@@ -747,7 +747,7 @@ describe('抽奖预设系统API测试（V4架构）', () => {
       const promises = Array(concurrent_requests)
         .fill(null)
         .map(() =>
-          tester.makeAuthenticatedRequest('GET', '/api/v4/lottery-preset/stats', null, 'admin')
+          tester.make_authenticated_request('GET', '/api/v4/lottery-preset/stats', null, 'admin')
         )
 
       const responses = await Promise.all(promises)

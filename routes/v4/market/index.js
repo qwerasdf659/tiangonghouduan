@@ -1,30 +1,46 @@
 /**
- * market域 - 交易市场业务域聚合
+ * market域 - C2C用户交易市场聚合入口
  *
- * 顶层路径：/api/v4/market
- * 内部目录：routes/v4/market/
+ * @route /api/v4/market
+ * @description C2C用户间交易市场（类似Steam市场、BUFF），用户可以上架/购买物品
  *
- * 职责：
- * - 商品上架/下架
- * - 商品搜索/列表
- * - 商品购买
- * - 交易记录查询
+ * 📌 重构记录（2025-12-22）：
+ * - 从 /api/v4/market 迁移到 /api/v4/market
+ * - 明确业务语义：market域专门负责C2C用户间交易
+ * - shop/exchange 负责B2C官方兑换
  *
- * 📌 遵循规范：
- * - 统一使用/market作为顶层路径（不再使用/exchange-market）
- * - 用户端禁止/:id参数
+ * 子模块划分（按业务职责）：
+ * - listings.js - 市场挂单查询（GET /listings, GET /listings/:listing_id, GET /listing-status）
+ * - sell.js     - 上架商品（POST /list, POST /fungible-assets/list）
+ * - buy.js      - 购买商品（POST /listings/:listing_id/purchase）
+ * - manage.js   - 撤回/管理（POST /listings/:listing_id/withdraw, POST /fungible-assets/:listing_id/withdraw）
  *
- * 创建时间：2025年01月21日
- * 适用区域：中国（北京时间 Asia/Shanghai）
+ * 业务说明：
+ * - 用户可以将 inventory 中的物品挂单出售
+ * - 其他用户可以购买挂单的物品
+ * - 涉及资产冻结、交易订单、资产结算
+ *
+ * 架构规范：
+ * - 符合技术架构标准TR-005：路由文件150-250行正常，>300行必须拆分
+ * - 统一使用 res.apiSuccess / res.apiError 响应
+ * - 通过 ServiceManager 获取 TradeOrderService
+ *
+ * 创建时间：2025年12月22日
  */
 
 const express = require('express')
 const router = express.Router()
 
-// 交易市场核心路由（已拆分为子模块：items.js, exchange.js, orders.js, statistics.js）
-const exchangeMarketRoutes = require('./exchange/index')
+// 导入子模块
+const listingsRoutes = require('./listings')
+const sellRoutes = require('./sell')
+const buyRoutes = require('./buy')
+const manageRoutes = require('./manage')
 
-// 挂载路由
-router.use('/', exchangeMarketRoutes)
+// 挂载子路由
+router.use('/', listingsRoutes) // 市场列表查询
+router.use('/', sellRoutes) // 上架商品
+router.use('/', buyRoutes) // 购买商品
+router.use('/', manageRoutes) // 撤回/管理
 
 module.exports = router

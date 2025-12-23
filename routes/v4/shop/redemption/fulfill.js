@@ -75,12 +75,9 @@ router.post('/fulfill', authenticateToken, async (req, res) => {
       redeemer_user_id: redeemerUserId
     })
 
-    // 调用RedemptionOrderService核销订单
-    const RedemptionOrderService = req.app.locals.services.getService('redemptionOrder')
-    const order = await RedemptionOrderService.fulfillOrder(
-      code.trim().toUpperCase(),
-      redeemerUserId
-    )
+    // 调用RedemptionService核销订单
+    const RedemptionService = req.app.locals.services.getService('redemptionOrder')
+    const order = await RedemptionService.fulfillOrder(code.trim().toUpperCase(), redeemerUserId)
 
     // 异步发送通知（不阻塞响应）
     const NotificationService = req.app.locals.services.getService('notification')

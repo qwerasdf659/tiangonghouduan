@@ -54,17 +54,17 @@ describe('消费记录API测试套件', () => {
     // 登录获取token（既是用户也是管理员）
     try {
       // 登录为普通用户
-      const loginResponse = await tester.authenticateV4User('regular')
+      const loginResponse = await tester.authenticate_v4_user('regular')
       // eslint-disable-next-line require-atomic-updates
       test_account.user_id = loginResponse.user.user_id
       console.log(`✅ 测试账号登录成功（regular），用户ID: ${test_account.user_id}`)
 
       // 同时登录为管理员（使用同一账号）
-      await tester.authenticateV4User('admin')
+      await tester.authenticate_v4_user('admin')
       console.log('✅ 管理员认证成功（admin）')
 
       // 生成测试二维码（用于后续测试）
-      const qrResponse = await tester.makeAuthenticatedRequest(
+      const qrResponse = await tester.make_authenticated_request(
         'GET',
         `/api/v4/consumption/qrcode/${test_account.user_id}`,
         {},
@@ -97,7 +97,7 @@ describe('消费记录API测试套件', () => {
     test('GET /api/v4/consumption/qrcode/:user_id - 生成用户固定身份二维码', async () => {
       console.log('\n🔐 测试：生成用户固定身份二维码')
 
-      const response = await tester.makeAuthenticatedRequest(
+      const response = await tester.make_authenticated_request(
         'GET',
         `/api/v4/consumption/qrcode/${test_account.user_id}`,
         {},
@@ -127,7 +127,7 @@ describe('消费记录API测试套件', () => {
     test('GET /api/v4/consumption/user-info - 验证二维码并获取用户信息', async () => {
       console.log('\n✅ 测试：验证二维码并获取用户信息（管理员功能）')
 
-      const response = await tester.makeAuthenticatedRequest(
+      const response = await tester.make_authenticated_request(
         'GET',
         `/api/v4/consumption/user-info?qr_code=${test_qr_code}`,
         null,
@@ -155,7 +155,7 @@ describe('消费记录API测试套件', () => {
     test('GET /api/v4/consumption/user-info - 验证无效二维码', async () => {
       console.log('\n❌ 测试：验证无效二维码（应该失败）')
 
-      const response = await tester.makeAuthenticatedRequest(
+      const response = await tester.make_authenticated_request(
         'GET',
         '/api/v4/consumption/user-info?qr_code=QR_999_invalid_signature',
         null,
@@ -190,7 +190,7 @@ describe('消费记录API测试套件', () => {
       }
       console.log('提交数据:', JSON.stringify(consumption_data, null, 2))
 
-      const response = await tester.makeAuthenticatedRequest(
+      const response = await tester.make_authenticated_request(
         'POST',
         '/api/v4/consumption/submit',
         consumption_data,
@@ -232,7 +232,7 @@ describe('消费记录API测试套件', () => {
         merchant_notes: '重复提交测试'
       }
 
-      const response = await tester.makeAuthenticatedRequest(
+      const response = await tester.make_authenticated_request(
         'POST',
         '/api/v4/consumption/submit',
         consumption_data,
@@ -253,7 +253,7 @@ describe('消费记录API测试套件', () => {
     test('POST /api/v4/consumption/submit - 消费金额验证（必须大于0）', async () => {
       console.log('\n❌ 测试：消费金额验证（金额为0应该失败）')
 
-      const response = await tester.makeAuthenticatedRequest(
+      const response = await tester.make_authenticated_request(
         'POST',
         '/api/v4/consumption/submit',
         {
@@ -284,7 +284,7 @@ describe('消费记录API测试套件', () => {
     test('GET /api/v4/consumption/user/:user_id - 查询用户消费记录列表', async () => {
       console.log('\n📋 测试：查询用户消费记录列表')
 
-      const response = await tester.makeAuthenticatedRequest(
+      const response = await tester.make_authenticated_request(
         'GET',
         `/api/v4/consumption/user/${test_account.user_id}`,
         { page: 1, page_size: 10 },
@@ -313,7 +313,7 @@ describe('消费记录API测试套件', () => {
     test('GET /api/v4/consumption/user/:user_id - 按状态筛选（pending）', async () => {
       console.log('\n🔍 测试：按状态筛选（待审核）')
 
-      const response = await tester.makeAuthenticatedRequest(
+      const response = await tester.make_authenticated_request(
         'GET',
         `/api/v4/consumption/user/${test_account.user_id}`,
         { status: 'pending', page: 1, page_size: 10 },
@@ -344,7 +344,7 @@ describe('消费记录API测试套件', () => {
 
       console.log('\n📝 测试：查询消费记录详情')
 
-      const response = await tester.makeAuthenticatedRequest(
+      const response = await tester.make_authenticated_request(
         'GET',
         `/api/v4/consumption/detail/${test_record_id}`,
         {},
@@ -372,7 +372,7 @@ describe('消费记录API测试套件', () => {
     test('GET /api/v4/consumption/pending - 查询待审核消费记录', async () => {
       console.log('\n👔 测试：管理员查询待审核记录')
 
-      const response = await tester.makeAuthenticatedRequest(
+      const response = await tester.make_authenticated_request(
         'GET',
         '/api/v4/consumption/pending',
         { page: 1, page_size: 10 },
@@ -398,7 +398,7 @@ describe('消费记录API测试套件', () => {
 
       console.log('\n✅ 测试：管理员审核通过消费记录')
 
-      const response = await tester.makeAuthenticatedRequest(
+      const response = await tester.make_authenticated_request(
         'POST',
         `/api/v4/consumption/approve/${test_record_id}`,
         { admin_notes: '测试审核通过，金额核实无误' },
@@ -426,7 +426,7 @@ describe('消费记录API测试套件', () => {
 
       console.log('\n🚫 测试：重复审核（应该失败）')
 
-      const response = await tester.makeAuthenticatedRequest(
+      const response = await tester.make_authenticated_request(
         'POST',
         `/api/v4/consumption/approve/${test_record_id}`,
         { admin_notes: '重复审核测试' },
@@ -460,7 +460,7 @@ describe('消费记录API测试套件', () => {
        * 等待3分钟窗口过去（实际上跳过，用新数据模拟）
        * 这里使用不同的金额来绕过防重机制
        */
-      const response = await tester.makeAuthenticatedRequest(
+      const response = await tester.make_authenticated_request(
         'POST',
         '/api/v4/consumption/submit',
         {
@@ -487,7 +487,7 @@ describe('消费记录API测试套件', () => {
 
       console.log('\n❌ 测试：管理员审核拒绝消费记录')
 
-      const response = await tester.makeAuthenticatedRequest(
+      const response = await tester.make_authenticated_request(
         'POST',
         `/api/v4/consumption/reject/${reject_record_id}`,
         { admin_notes: '测试审核拒绝：消费金额与实际不符' },
@@ -510,7 +510,7 @@ describe('消费记录API测试套件', () => {
       // 创建临时记录ID用于测试（使用不存在的ID）
       const temp_record_id = 999999
 
-      const response = await tester.makeAuthenticatedRequest(
+      const response = await tester.make_authenticated_request(
         'POST',
         `/api/v4/consumption/reject/${temp_record_id}`,
         { admin_notes: '' }, // 空原因

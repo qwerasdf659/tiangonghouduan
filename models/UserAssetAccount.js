@@ -41,7 +41,7 @@ class UserAssetAccount extends Model {
    * @param {Object} models - Sequelize所有模型的集合对象
    * @returns {void} 无返回值，仅定义关联关系
    */
-  static associate (models) {
+  static associate(models) {
     // 多对一：账户归属于用户
     UserAssetAccount.belongsTo(models.User, {
       foreignKey: 'user_id',
@@ -51,13 +51,11 @@ class UserAssetAccount extends Model {
       comment: '关联用户信息（账户所有者）'
     })
 
-    // 一对多：一个账户有多个资产流水记录
-    UserAssetAccount.hasMany(models.AssetTransaction, {
-      foreignKey: 'user_id',
-      as: 'transactions',
-      sourceKey: 'user_id', // 使用user_id作为关联键
-      comment: '资产流水记录（关联用户的所有资产变动）'
-    })
+    /**
+     * 🔧 V4.3修复：移除已废弃的AssetTransaction关联
+     * AssetTransaction现在通过account_id关联Account表，不再直接关联UserAssetAccount
+     * 查询用户资产流水应使用：Account -> AssetTransaction路径
+     */
   }
 
   /**
@@ -67,7 +65,7 @@ class UserAssetAccount extends Model {
    * @param {number} data.available_amount - 可用余额
    * @returns {Object} 验证结果对象 {is_valid: boolean, errors: Array<string>}
    */
-  static validateAccount (data) {
+  static validateAccount(data) {
     const errors = []
 
     // 验证可用余额不能为负数
@@ -103,8 +101,7 @@ module.exports = sequelize => {
       user_id: {
         type: DataTypes.INTEGER,
         allowNull: false,
-        comment:
-          '用户ID（User ID - 账户所有者）：关联users.user_id，标识这个资产账户属于哪个用户'
+        comment: '用户ID（User ID - 账户所有者）：关联users.user_id，标识这个资产账户属于哪个用户'
       },
 
       // 资产代码（Asset Code - 资产类型标识）

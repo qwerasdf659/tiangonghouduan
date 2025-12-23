@@ -350,44 +350,23 @@ class BaseTestManager {
     }
   }
 
-  /*
-   * ============================================
-   * V4兼容性方法 - 支持现有测试文件，避免大规模重构
-   * 注意：这些方法仅为向后兼容，新测试应使用snake_case方法
-   * ============================================
-   */
-
   /**
-   * 兼容旧版makeRequest方法
-   * @param {string} method - HTTP方法
-   * @param {string} url - 请求URL
-   * @param {*} data - 请求数据
-   * @param {Object} options - 请求选项（已废弃，保留参数兼容）
-   * @returns {Promise<Object>} 响应数据
+   * 用户认证（统一入口）
+   * 自动处理 regular/user 类型映射，统一使用测试手机号
+   * @param {string} user_type - 用户类型：'regular'/'user'/'admin'
+   * @returns {Promise<Object>} 登录数据（包含 access_token 和 user 对象）
    */
-  async makeRequest(method, url, data = null, _options = {}) {
-    return await this.make_request(method, url, data)
-  }
+  async authenticate_user(user_type = 'regular') {
+    const mobile = '13612227930' // 测试账号：既是用户也是管理员
+    const token_type = user_type === 'admin' ? 'admin' : 'user'
 
-  /**
-   * 兼容旧版authenticateUser方法
-   * 保留原始userType作为token key，避免'regular'和'user'不匹配问题
-   * @param {string} userType - 用户类型
-   * @returns {Promise<Object>} 登录数据
-   */
-  async authenticateUser(userType = 'regular') {
-    const mobile = userType === 'admin' ? '13612227930' : '13612227930'
-    const result = await this.authenticate(
-      mobile,
-      '123456',
-      userType === 'admin' ? 'admin' : userType
-    )
+    const result = await this.authenticate(mobile, '123456', token_type)
 
-    // 如果是'regular'，同时保存一份到'user' key，保持向后兼容
-    if (userType === 'regular' && this.tokens[userType]) {
-      this.tokens.user = this.tokens[userType]
-      if (this.user_data && this.user_data[userType]) {
-        this.user_data.user = this.user_data[userType]
+    // 统一 regular 和 user 类型：都映射到 user
+    if (user_type === 'regular' && this.tokens.user) {
+      this.tokens.regular = this.tokens.user
+      if (this.user_data?.user) {
+        this.user_data.regular = this.user_data.user
       }
     }
 
@@ -395,41 +374,38 @@ class BaseTestManager {
   }
 
   /**
-   * 兼容旧版makeAuthenticatedRequest方法
-   * @param {string} method - HTTP方法
-   * @param {string} url - 请求URL
-   * @param {*} data - 请求数据
-   * @param {string} userType - 用户类型
-   * @returns {Promise<Object>} 响应数据
+   * V4用户认证（authenticate_user 的别名）
+   * @param {string} user_type - 用户类型
+   * @returns {Promise<Object>} 登录数据
    */
-  async makeAuthenticatedRequest(method, url, data = null, userType = 'user') {
-    return await this.make_authenticated_request(method, url, data, userType)
+  async authenticate_v4_user(user_type = 'regular') {
+    return await this.authenticate_user(user_type)
   }
 
   /**
-   * 兼容旧版testAuthorizationLevels方法
+   * 测试授权级别验证
    * @param {string} url - 请求URL
    * @param {string} method - HTTP方法
    * @param {*} data - 请求数据
-   * @param {Object} expectedResults - 预期结果
+   * @param {Object} expected_results - 预期结果 { user_type: expected_status }
    * @returns {Promise<Array>} 测试结果数组
    */
-  async testAuthorizationLevels(url, method, data, expectedResults) {
+  async test_authorization_levels(url, method, data, expected_results) {
     const results = []
 
-    for (const [userType, expectedStatus] of Object.entries(expectedResults)) {
+    for (const [user_type, expected_status] of Object.entries(expected_results)) {
       try {
-        const response = await this.make_authenticated_request(method, url, data, userType)
+        const response = await this.make_authenticated_request(method, url, data, user_type)
         results.push({
-          userType,
+          user_type,
           status: response.status,
-          success: response.status === expectedStatus,
-          expected: expectedStatus,
+          success: response.status === expected_status,
+          expected: expected_status,
           actual: response.status
         })
       } catch (error) {
         results.push({
-          userType,
+          user_type,
           status: 'error',
           success: false,
           error: error.message
@@ -441,66 +417,57 @@ class BaseTestManager {
   }
 
   /**
-   * 兼容旧版testConcurrentRequests方法
+   * 测试并发请求
    * @param {string} url - 请求URL
    * @param {string} method - HTTP方法
    * @param {*} data - 请求数据
    * @param {number} concurrency - 并发数
    * @returns {Promise<Object>} 并发测试结果
    */
-  async testConcurrentRequests(url, method, data, concurrency = 5) {
+  async test_concurrent_requests(url, method, data, concurrency = 5) {
     const promises = []
-    const startTime = Date.now()
+    const start_time = Date.now()
 
     for (let i = 0; i < concurrency; i++) {
       promises.push(
         this.make_request(method, url, data)
-          .then(response => ({ success: true, response, workerId: i }))
-          .catch(error => ({ success: false, error: error.message, workerId: i }))
+          .then(response => ({ success: true, response, worker_id: i }))
+          .catch(error => ({ success: false, error: error.message, worker_id: i }))
       )
     }
 
     const results = await Promise.all(promises)
-    const successCount = results.filter(r => r.success).length
-    const errorCount = results.filter(r => !r.success).length
-    const totalTime = Date.now() - startTime
+    const success_count = results.filter(r => r.success).length
+    const error_count = results.filter(r => !r.success).length
+    const total_time = Date.now() - start_time
 
     return {
       total: concurrency,
-      successCount,
-      errorCount,
-      totalTime,
-      averageTime: Math.round(totalTime / concurrency),
+      success_count,
+      error_count,
+      total_time,
+      average_time: Math.round(total_time / concurrency),
       results
     }
   }
 
   /**
-   * 兼容旧版authenticateV4User方法
-   * @param {string} userType - 用户类型
-   * @returns {Promise<Object>} 登录数据
-   */
-  async authenticateV4User(userType = 'regular') {
-    return await this.authenticateUser(userType)
-  }
-
-  /**
-   * 兼容旧版testParameterValidation方法
+   * 测试参数验证
    * @param {string} url - 请求URL
    * @param {string} method - HTTP方法
-   * @param {Object} validParams - 有效参数
-   * @param {Array} requiredFields - 必需字段
+   * @param {Object} valid_params - 有效参数
+   * @param {Array} required_fields - 必需字段
    * @returns {Promise<Array>} 验证结果数组
    */
-  async testParameterValidation(url, method, validParams, requiredFields) {
+  async test_parameter_validation(url, method, valid_params, required_fields) {
     const results = []
 
-    for (const field of requiredFields) {
-      const testParams = { ...validParams }
-      delete testParams[field]
+    for (const field of required_fields) {
+      const test_params = { ...valid_params }
+      delete test_params[field]
 
       try {
-        const response = await this.make_request(method, url, testParams)
+        const response = await this.make_request(method, url, test_params)
         results.push({
           field,
           status: response.status,
@@ -553,7 +520,6 @@ class BaseTestManager {
       return result
     } catch (error) {
       console.error('❌ 健康检查失败:', error.message)
-      // 如果检查失败，不缓存结果
       throw error
     }
   }
@@ -572,10 +538,10 @@ class BaseTestManager {
   }
 
   /**
-   * 兼容旧版generateTestReport方法
+   * 生成测试报告
    * @returns {Object} 测试报告对象
    */
-  generateTestReport() {
+  generate_test_report() {
     return {
       summary: {
         total: this.test_results.length,
