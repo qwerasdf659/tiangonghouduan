@@ -180,7 +180,7 @@ cat > "$REPORT_FILE" << EOF
 
 下一步操作
 ----------
-1. 重启服务: pm2 restart all
+1. 重启服务: npm run pm:restart
 2. 验证旧接口404: curl http://localhost:3000/api/v4/system/chat/admin-reply
 3. 验证新接口正常: curl http://localhost:3000/api/v4/admin/customer-service/sessions
 4. 前端功能测试: 访问 http://localhost:3000/admin/customer-service.html
@@ -203,7 +203,7 @@ echo "   ✅ 备份文件: $BACKUP"
 echo "   ✅ 删除报告: $REPORT_FILE"
 echo ""
 echo "⚠️ 重要提示:"
-echo "   1. 请立即重启服务: pm2 restart all"
+echo "   1. 请立即重启服务: npm run pm:restart"
 echo "   2. 执行验证脚本: bash scripts/verify_old_apis_deleted.sh"
 echo "   3. 测试前端功能: 访问客服工作台"
 echo "   4. 如有问题，使用备份恢复: cp $BACKUP $FILE"

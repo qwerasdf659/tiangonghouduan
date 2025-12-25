@@ -166,7 +166,7 @@ async function main() {
 
     logInfo('重启后端服务...')
     try {
-      execSync('pm2 restart all', { stdio: 'inherit' })
+      execSync('pm2 restart restaurant-lottery-backend --update-env', { stdio: 'inherit' })
       log('✅ 后端服务已重启')
     } catch (error) {
       logError(`服务重启失败: ${error.message}`)
@@ -251,16 +251,18 @@ async function main() {
     logError('需要手动处理：')
     logError('1. 检查错误日志')
     logError('2. 如需回滚，请查看 scripts/migration/post-migration-verification.md 末尾的回滚命令')
-    logError('3. 重启服务: pm2 restart all')
+    logError(
+      '3. 重启服务: npm run pm:restart 或 pm2 restart restaurant-lottery-backend --update-env'
+    )
     logError('═══════════════════════════════════════════════════════')
 
     // 尝试重启服务
     try {
       logInfo('尝试重启服务...')
-      execSync('pm2 restart all', { stdio: 'inherit' })
+      execSync('pm2 restart restaurant-lottery-backend --update-env', { stdio: 'inherit' })
       log('✅ 服务已重启')
     } catch (restartError) {
-      logError('服务重启失败，请手动执行: pm2 restart all')
+      logError('服务重启失败，请手动执行: npm run pm:restart')
     }
 
     process.exit(1)

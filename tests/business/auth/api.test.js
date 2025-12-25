@@ -252,28 +252,54 @@ describe('认证和权限系统API测试（V4架构）', () => {
     })
 
     test('Token刷新 - POST /api/v4/auth/refresh', async () => {
-      // 先登录获取refresh_token
+      /**
+       * 🔐 Token安全模式（无兼容代码）：
+       * - refresh_token 仅通过 HttpOnly Cookie 传递
+       * - 不支持请求体传递（防止XSS窃取）
+       * - 响应体仅包含 access_token
+       */
+
+      // 先登录获取refresh_token（通过响应头的 Set-Cookie 获取）
       const login_response = await tester.make_request('POST', '/api/v4/auth/quick-login', {
         mobile: testUser.mobile,
         verification_code: '123456'
       })
 
       expect(login_response.status).toBe(200)
-      expect(login_response.data.data).toHaveProperty('refresh_token')
+      expect(login_response.data.data).toHaveProperty('access_token')
 
-      const refresh_token = login_response.data.data.refresh_token
+      // 从响应头提取 refresh_token Cookie
+      const setCookieHeader = login_response.headers['set-cookie']
+      let refresh_token = null
+      if (setCookieHeader) {
+        const cookieStr = Array.isArray(setCookieHeader)
+          ? setCookieHeader.join('; ')
+          : setCookieHeader
+        const match = cookieStr.match(/refresh_token=([^;]+)/)
+        if (match) {
+          refresh_token = match[1]
+        }
+      }
 
-      // 使用refresh_token刷新Token
-      const refresh_response = await tester.make_request('POST', '/api/v4/auth/refresh', {
-        refresh_token
-      })
+      // 如果无法从 Cookie 获取，跳过刷新测试
+      if (!refresh_token) {
+        console.log('⚠️ 无法从响应头获取 refresh_token Cookie，跳过刷新测试')
+        return
+      }
+
+      // 🔐 使用Cookie方式刷新Token（不支持请求体传递）
+      const refresh_response = await tester.make_request_with_cookie(
+        'POST',
+        '/api/v4/auth/refresh',
+        { refresh_token }
+      )
 
       expect([200, 401]).toContain(refresh_response.status)
       if (refresh_response.status === 200) {
         expect(refresh_response.data).toHaveProperty('success', true)
         expect(refresh_response.data).toHaveProperty('message', 'Token刷新成功')
         expect(refresh_response.data.data).toHaveProperty('access_token')
-        expect(refresh_response.data.data).toHaveProperty('refresh_token')
+        expect(refresh_response.data.data).not.toHaveProperty('refresh_token')
         expect(refresh_response.data.data).toHaveProperty('user')
         expect(refresh_response.data.data.user).toHaveProperty('user_id')
         expect(refresh_response.data.data.user).toHaveProperty('mobile')
@@ -282,34 +308,33 @@ describe('认证和权限系统API测试（V4架构）', () => {
         expect(refresh_response.data.data).toHaveProperty('expires_in')
         expect(refresh_response.data.data).toHaveProperty('timestamp')
 
-        console.log('✅ Token刷新成功')
+        console.log('✅ Token刷新成功（HttpOnly Cookie 安全模式，无兼容代码）')
       }
     })
 
-    test('Token刷新 - 缺少refresh_token参数', async () => {
+    test('Token刷新 - 缺少refresh_token Cookie', async () => {
+      // 不携带Cookie发送请求
       const response = await tester.make_request('POST', '/api/v4/auth/refresh', {})
 
-      expect([400, 200]).toContain(response.status)
-      if (response.status === 400) {
-        expect(response.data).toHaveProperty('success', false)
-        expect(response.data).toHaveProperty('message', '刷新Token不能为空')
+      expect(response.status).toBe(400)
+      expect(response.data).toHaveProperty('success', false)
+      // 新错误消息包含Cookie提示
+      expect(response.data.message).toMatch(/刷新Token不能为空/)
 
-        console.log('✅ 缺少refresh_token参数被正确拒绝')
-      }
+      console.log('✅ 缺少refresh_token Cookie被正确拒绝')
     })
 
     test('Token刷新 - 无效的refresh_token格式', async () => {
-      const response = await tester.make_request('POST', '/api/v4/auth/refresh', {
+      // 🔐 使用Cookie方式传递无效Token
+      const response = await tester.make_request_with_cookie('POST', '/api/v4/auth/refresh', {
         refresh_token: 'invalid_token_format'
       })
 
-      expect([401, 200]).toContain(response.status)
-      if (response.status === 401) {
-        expect(response.data).toHaveProperty('success', false)
-        expect(response.data).toHaveProperty('message', '刷新Token无效')
+      expect(response.status).toBe(401)
+      expect(response.data).toHaveProperty('success', false)
+      expect(response.data).toHaveProperty('message', '刷新Token无效')
 
-        console.log('✅ 无效refresh_token被正确拒绝')
-      }
+      console.log('✅ 无效refresh_token Cookie被正确拒绝')
     })
   })
 

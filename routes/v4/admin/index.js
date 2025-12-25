@@ -23,6 +23,7 @@ const customerServiceRoutes = require('./customer-service') // 模块化重构�
 const marketplaceRoutes = require('./marketplace') // 🆕 市场统计管理
 const materialRoutes = require('./material') // 🆕 材料系统管理（V4.5.0）
 const popupBannersRoutes = require('./popup-banners') // 🆕 弹窗Banner管理（2025-12-22）
+const lotteryQuotaRoutes = require('./lottery-quota') // 🆕 抽奖配额管理（2025-12-23）
 
 // 挂载子模块路由
 router.use('/auth', authRoutes)
@@ -43,6 +44,7 @@ router.use('/customer-service', customerServiceRoutes) // 🆕 客服管理路�
 router.use('/marketplace', marketplaceRoutes) // 🆕 市场统计路由
 router.use('/material', materialRoutes) // 🆕 材料系统管理路由（V4.5.0）
 router.use('/popup-banners', popupBannersRoutes) // 🆕 弹窗Banner管理路由（2025-12-22）
+router.use('/lottery-quota', lotteryQuotaRoutes) // 🆕 抽奖配额管理路由（2025-12-23）
 
 /**
  * GET / - Admin API根路径信息
@@ -163,6 +165,17 @@ router.get('/', (req, res) => {
           '/popup-banners/order'
         ],
         note: '首页弹窗图片管理、支持Sealos图片上传、时间范围控制、点击跳转'
+      },
+      lottery_quota: {
+        description: '抽奖配额管理（2025-12-23）',
+        endpoints: [
+          '/lottery-quota/rules',
+          '/lottery-quota/rules/:rule_id/disable',
+          '/lottery-quota/users/:user_id/status',
+          '/lottery-quota/users/:user_id/bonus',
+          '/lottery-quota/users/:user_id/check'
+        ],
+        note: '四维度配额规则（全局/活动/角色/用户）、客服临时加次数、原子扣减'
       }
       // ⚠️ campaign_permissions模块暂未实现，待实现后再添加到此列表
     },

@@ -96,15 +96,29 @@ router.get('/verify', authenticateToken, verifyRateLimiter, async (req, res) => 
  * 🛡️ 刷新访问Token
  * POST /api/v4/auth/refresh
  *
- * @body {string} refresh_token - 刷新Token
- * @returns {Object} 新的访问Token和刷新Token
+ * 🔐 Token安全升级：
+ * - 优先从HttpOnly Cookie读取refresh_token（安全方式）
+ * - 响应时重新设置Cookie实现Token旋转
+ * - 响应体仅返回access_token
+ *
+ * @returns {Object} 新的访问Token
  */
 router.post('/refresh', async (req, res) => {
-  const { refresh_token } = req.body
+  /**
+   * 🔐 安全模式：仅从HttpOnly Cookie读取refresh_token
+   * - Cookie由浏览器自动携带（credentials: 'include'）
+   * - 不支持请求体传递（防止XSS窃取）
+   */
+  const refresh_token = req.cookies.refresh_token
 
   // 验证必需参数
   if (!refresh_token) {
-    return res.apiError('刷新Token不能为空', 'REFRESH_TOKEN_REQUIRED', null, 400)
+    return res.apiError(
+      '刷新Token不能为空，请确保请求携带Cookie',
+      'REFRESH_TOKEN_REQUIRED',
+      { hint: '前端请求需要添加 credentials: "include"' },
+      400
+    )
   }
 
   // 验证刷新Token
@@ -112,6 +126,13 @@ router.post('/refresh', async (req, res) => {
   const verifyResult = await verifyRefreshToken(refresh_token)
 
   if (!verifyResult.valid) {
+    // 🔐 Token无效时清除Cookie
+    res.clearCookie('refresh_token', {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      path: '/api/v4/auth'
+    })
     return res.apiError('刷新Token无效', 'INVALID_REFRESH_TOKEN', null, 401)
   }
 
@@ -127,9 +148,21 @@ router.post('/refresh', async (req, res) => {
   // 获取用户角色信息
   const userRoles = await getUserRoles(user.user_id)
 
+  /**
+   * 🔐 Token旋转：重新设置HttpOnly Cookie
+   * 每次刷新都生成新的refresh_token，提高安全性
+   */
+  res.cookie('refresh_token', tokens.refresh_token, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'strict',
+    maxAge: 7 * 24 * 60 * 60 * 1000, // 7天（毫秒）
+    path: '/api/v4/auth'
+  })
+
   const responseData = {
     access_token: tokens.access_token,
-    refresh_token: tokens.refresh_token,
+    // 🔐 安全升级：refresh_token不再通过响应体返回
     user: {
       user_id: user.user_id,
       mobile: user.mobile,
@@ -148,12 +181,24 @@ router.post('/refresh', async (req, res) => {
  * 🛡️ 用户退出登录
  * POST /api/v4/auth/logout
  *
- * 业务场景：
- * - 用户主动退出登录，清除服务端权限缓存
+ * 🔐 Token安全升级：
+ * - 清除HttpOnly Cookie中的refresh_token
+ * - 清除服务端权限缓存
  * - 确保下次刷新Token时重新验证账户状态
  */
 router.post('/logout', authenticateToken, async (req, res) => {
   const user_id = req.user.user_id
+
+  /**
+   * 🔐 安全升级：清除refresh_token Cookie
+   * 必须与设置时的参数一致才能正确清除
+   */
+  res.clearCookie('refresh_token', {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'strict',
+    path: '/api/v4/auth'
+  })
 
   // 清除用户权限缓存
   await invalidateUserPermissions(user_id, 'user_logout', user_id)

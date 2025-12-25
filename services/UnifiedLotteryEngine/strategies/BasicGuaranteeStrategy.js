@@ -15,8 +15,17 @@ const _logger = require('../../../utils/logger').logger
 const BeijingTimeHelper = require('../../../utils/timeHelper')
 const LotteryStrategy = require('../core/LotteryStrategy')
 const { LotteryDraw, Account, AccountAssetBalance } = require('../../../models') // 🔧 V4.3修复：使用新的资产系统模型
-// 🎯 V4新增：集成测试账号权限管理
-const { hasTestPrivilege } = require('../../../utils/TestAccountManager')
+/**
+ * 🎯 V4.5 配额控制：测试账号权限管理已迁移到 LotteryQuotaService（2025-12-23）
+ *
+ * 原导入（已废弃）：
+ * const { hasTestPrivilege } = require('../../../utils/TestAccountManager')
+ *
+ * 新逻辑：
+ * - 测试账号绕过抽奖次数限制的功能已迁移到 LotteryQuotaService
+ * - 通过配额规则（user级别）实现测试账号的特殊配额
+ * - 策略层不再直接检查测试账号权限
+ */
 // 🔥 V4.3新增：统一资产服务（替代PointsService）
 const AssetService = require('../../AssetService')
 
@@ -165,41 +174,20 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
         return false
       }
 
-      // 验证今日抽奖次数是否超限
-      const today = BeijingTimeHelper.todayStart()
-      const todayDrawCount = await LotteryDraw.count({
-        where: {
-          user_id,
-          campaign_id,
-          draw_type: 'single',
-          created_at: {
-            [require('sequelize').Op.gte]: today
-          }
-        }
-      })
-
-      // 🎯 V4新增：测试账号无限次抽奖权限检查
-      if (todayDrawCount >= this.config.maxDrawsPerDay) {
-        // 检查是否为测试账号且有绕过每日限制的权限
-        if (hasTestPrivilege(user_id, 'bypass_daily_limit')) {
-          this.logInfo('测试账号绕过每日抽奖次数限制', {
-            user_id,
-            campaign_id,
-            todayDrawCount,
-            maxDrawsPerDay: this.config.maxDrawsPerDay,
-            privilege: 'bypass_daily_limit'
-          })
-          return true // 允许继续抽奖
-        }
-
-        this.logError('今日抽奖次数已达上限', {
-          user_id,
-          campaign_id,
-          todayDrawCount,
-          maxDrawsPerDay: this.config.maxDrawsPerDay
-        })
-        return false
-      }
+      /**
+       * 🎯 V4.5 配额控制：每日抽奖次数限制已迁移到 LotteryQuotaService（2025-12-23）
+       *
+       * 原逻辑（已废弃）：
+       * - 使用 LotteryDraw.count() 统计今日抽奖次数
+       * - 与 config.maxDrawsPerDay 硬编码值比较
+       *
+       * 新逻辑（引擎层统一处理）：
+       * - 由 UnifiedLotteryEngine.execute_draw() 调用 LotteryQuotaService.tryDeductQuota()
+       * - 原子扣减配额，避免并发窗口期问题
+       * - 支持四维度规则（全局/活动/角色/用户）
+       *
+       * 策略层不再检查每日次数，避免双重限制
+       */
 
       return true
     } catch (error) {
@@ -1011,33 +999,22 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
         }
       }
 
-      // 调用其他验证逻辑（排除积分检查，避免重复）
-      const today = BeijingTimeHelper.todayStart()
-      const todayDrawCount = await LotteryDraw.count({
-        where: {
-          user_id,
-          campaign_id,
-          draw_type: 'single',
-          created_at: {
-            [require('sequelize').Op.gte]: today
-          }
-        }
-      })
-
-      // 🔧 测试账号绕过抽奖次数限制
-      const { hasTestPrivilege } = require('../../../utils/TestAccountManager')
-      const canBypassLimit = await hasTestPrivilege(user_id, 'bypass_daily_limit')
-
-      if (!canBypassLimit && todayDrawCount >= this.config.maxDrawsPerDay) {
-        return {
-          valid: false,
-          reason: '今日抽奖次数已达上限',
-          details: {
-            today_count: todayDrawCount,
-            max_draws: this.config.maxDrawsPerDay
-          }
-        }
-      }
+      /**
+       * 🎯 V4.5 配额控制：每日抽奖次数限制已迁移到 LotteryQuotaService（2025-12-23）
+       *
+       * 原逻辑（已废弃）：
+       * - 使用 LotteryDraw.count() 统计今日抽奖次数
+       * - 与 config.maxDrawsPerDay 硬编码值比较
+       * - 支持测试账号绕过限制
+       *
+       * 新逻辑（引擎层统一处理）：
+       * - 由 UnifiedLotteryEngine.execute_draw() 调用 LotteryQuotaService.tryDeductQuota()
+       * - 原子扣减配额，避免并发窗口期问题
+       * - 支持四维度规则（全局/活动/角色/用户）
+       * - 支持客服临时加次数（bonus_draw_count）
+       *
+       * 策略层不再检查每日次数，避免双重限制
+       */
 
       return {
         valid: true,

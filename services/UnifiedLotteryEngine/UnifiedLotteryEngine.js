@@ -1114,6 +1114,62 @@ class UnifiedLotteryEngine {
         shortage: Math.max(0, requiredPoints - userAccount.available_points) // 不足金额
       })
 
+      /**
+       * 🎯 V4.5 配额控制：原子扣减每日抽奖次数配额（2025-12-23 新增）
+       *
+       * 业务场景：
+       * - 实现四维度（全局/活动/角色/用户）抽奖次数配额控制
+       * - 支持连抽场景的原子性扣减（10连抽一次扣减10次）
+       * - 避免并发窗口期问题，保证配额不超限
+       *
+       * 执行流程：
+       * 1. 确保用户当日配额行存在（不存在则根据规则自动创建）
+       * 2. 原子扣减配额（UPDATE ... WHERE 条件扣减）
+       * 3. 如果配额不足，返回 403 错误（整笔拒绝，不支持部分成功）
+       */
+      const LotteryQuotaService = require('../lottery/LotteryQuotaService')
+
+      // 原子扣减配额（事务内执行，支持连抽）
+      const quotaResult = await LotteryQuotaService.tryDeductQuota(
+        {
+          user_id,
+          campaign_id,
+          draw_count
+        },
+        { transaction }
+      )
+
+      if (!quotaResult.success) {
+        // 配额不足，抛出标准错误（带 statusCode 和 errorCode）
+        const quotaError = new Error(
+          quotaResult.message ||
+            `今日抽奖次数已达上限（${quotaResult.limit + quotaResult.bonus}次），剩余${quotaResult.remaining}次`
+        )
+        quotaError.statusCode = 403 // 关键：明确设置 403 Forbidden
+        quotaError.errorCode = 'DAILY_DRAW_LIMIT_EXCEEDED' // 关键：明确设置业务码
+        quotaError.data = {
+          user_id,
+          campaign_id,
+          requested_count: draw_count,
+          remaining_quota: quotaResult.remaining || 0,
+          limit_value: quotaResult.limit || 0,
+          bonus_value: quotaResult.bonus || 0,
+          used_count: quotaResult.used || 0,
+          matched_rule_id: quotaResult.matched_rule_id || null
+        }
+        throw quotaError
+      }
+
+      this.logInfo('配额扣减成功', {
+        user_id,
+        campaign_id,
+        draw_count,
+        remaining: quotaResult.remaining,
+        limit: quotaResult.limit,
+        bonus: quotaResult.bonus,
+        used: quotaResult.used
+      })
+
       // 🆕 积分充足性预检查（连抽事务安全的关键保护）
       if (userAccount.available_points < requiredPoints) {
         throw new Error(

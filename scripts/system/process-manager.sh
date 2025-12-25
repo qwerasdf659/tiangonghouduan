@@ -270,6 +270,112 @@ main() {
             cleanup_all_node_processes
             log_success "服务已停止"
             ;;
+        "logs")
+            # 查看实时日志
+            log_info "查看实时日志（按Ctrl+C退出）..."
+            if command -v pm2 &> /dev/null; then
+                pm2 logs $APP_NAME --lines 50
+            else
+                log_error "PM2未安装，无法查看日志"
+                exit 1
+            fi
+            ;;
+        "show"|"details")
+            # 查看服务详细信息
+            log_info "查看服务详细信息..."
+            if command -v pm2 &> /dev/null; then
+                pm2 show $APP_NAME
+            else
+                log_error "PM2未安装"
+                exit 1
+            fi
+            ;;
+        "flush-logs")
+            # 清理PM2日志
+            log_info "清理PM2日志..."
+            if command -v pm2 &> /dev/null; then
+                pm2 flush
+                log_success "PM2日志已清理"
+            else
+                log_error "PM2未安装"
+                exit 1
+            fi
+
+            log_info "项目日志目录:"
+            ls -lh "$PROJECT_DIR/logs/" 2>/dev/null || log_warning "logs目录不存在"
+            ;;
+        "reload-env"|"reload")
+            # 重新加载环境变量并重启服务（修改.env后必用）
+            log_info "重新加载环境变量并重启服务..."
+            if command -v pm2 &> /dev/null; then
+                pm2 reload ecosystem.config.js --update-env
+                sleep 2
+                pm2 save
+                log_success "环境变量已重新加载并保存状态"
+                pm2 status
+            else
+                log_error "PM2未安装，无法执行reload"
+                exit 1
+            fi
+            ;;
+        "health")
+            # 执行健康检查
+            log_info "执行健康检查..."
+            echo ""
+
+            # API健康检查
+            log_info "1️⃣ API健康状态:"
+            if curl -s -m 5 http://localhost:${PORT}/health > /tmp/health_response.json 2>/dev/null; then
+                if command -v python3 &> /dev/null; then
+                    python3 -c "
+import sys, json
+try:
+    with open('/tmp/health_response.json') as f:
+        data = json.load(f)
+    print(f\"  ✅ 状态: {data.get('data', {}).get('status', 'unknown')}\")
+    print(f\"  ✅ 版本: {data.get('data', {}).get('version', 'unknown')}\")
+    systems = data.get('data', {}).get('systems', {})
+    print(f\"  ✅ 数据库: {systems.get('database', 'unknown')}\")
+    print(f\"  ✅ Redis: {systems.get('redis', 'unknown')}\")
+    print(f\"  ✅ Node.js: {systems.get('nodejs', 'unknown')}\")
+except Exception as e:
+    print(f'  ❌ 解析失败: {e}')
+" 2>/dev/null
+                else
+                    cat /tmp/health_response.json
+                fi
+            else
+                log_error "API无响应"
+            fi
+            rm -f /tmp/health_response.json
+
+            # PM2状态检查
+            echo ""
+            log_info "2️⃣ PM2进程状态:"
+            if command -v pm2 &> /dev/null && pm2 list 2>/dev/null | grep -q "online"; then
+                log_success "PM2进程正常运行"
+            else
+                log_error "PM2进程异常或未安装"
+            fi
+
+            # 端口检查
+            echo ""
+            log_info "3️⃣ 端口监听状态:"
+            if netstat -tlnp 2>/dev/null | grep -q ":${PORT} "; then
+                log_success "${PORT}端口正常监听"
+            else
+                log_error "${PORT}端口未监听"
+            fi
+
+            # Redis检查
+            echo ""
+            log_info "4️⃣ Redis连接状态:"
+            if command -v redis-cli &> /dev/null && redis-cli ping 2>/dev/null | grep -q "PONG"; then
+                log_success "Redis连接正常"
+            else
+                log_warning "Redis连接失败或未安装redis-cli"
+            fi
+            ;;
         "help"|"--help"|"-h")
             echo "用法: $0 <command> [options]"
             echo ""
@@ -279,13 +385,20 @@ main() {
             echo "  start [mode]    启动服务 (auto|pm2|dev|prod)"
             echo "  restart [mode]  重启服务 (auto|pm2|dev|prod)"
             echo "  stop            停止所有服务"
+            echo "  logs            查看实时日志"
+            echo "  show            查看服务详细信息"
+            echo "  flush-logs      清理PM2日志"
+            echo "  reload-env      重新加载环境变量并重启"
+            echo "  health          执行健康检查"
             echo "  help            显示帮助信息"
             echo ""
             echo "示例:"
             echo "  $0 status              # 检查状态"
             echo "  $0 start pm2           # 使用PM2启动"
             echo "  $0 restart dev         # 重启为开发模式"
-            echo "  $0 cleanup             # 清理冲突进程"
+            echo "  $0 reload-env          # 重新加载.env配置"
+            echo "  $0 logs                # 查看实时日志"
+            echo "  $0 health              # 健康检查"
             ;;
         *)
             log_error "未知命令: $command"

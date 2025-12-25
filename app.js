@@ -18,14 +18,14 @@ const cors = require('cors')
 const helmet = require('helmet')
 const compression = require('compression')
 const rateLimit = require('express-rate-limit')
-// 🔴 dotenv配置：仅development允许override（P0修复 - 严格模式）
-if (process.env.NODE_ENV === 'development') {
-  require('dotenv').config({ override: true })
-  console.log('⚠️ [Development] 使用 dotenv override 模式')
-} else {
-  require('dotenv').config()
-  console.log('✅ [Production/Staging] 使用平台注入配置，禁止 override')
-}
+const cookieParser = require('cookie-parser') // 🔐 Cookie解析中间件（Token安全升级）
+/**
+ * ✅ dotenv配置：所有环境统一禁止 override（单一真相源方案）
+ * 优先级模型：PM2 env_file 注入 > .env 补齐（跨环境一致、可预测）
+ * 参考：docs/Devbox单环境统一配置方案.md
+ */
+require('dotenv').config()
+console.log(`✅ [${process.env.NODE_ENV || 'unknown'}] 环境变量已加载，配置源：.env 文件`)
 
 // 🔧 配置校验（仅staging/production强制退出）
 const { validateConfig, isDevelopment } = require('./config/environment')
@@ -144,6 +144,9 @@ app.use(
 // 🔧 请求体解析
 app.use(express.json({ limit: '10mb' }))
 app.use(express.urlencoded({ extended: true, limit: '10mb' }))
+
+// 🔐 Cookie解析中间件（Token安全升级 - 用于读取HttpOnly refresh_token）
+app.use(cookieParser())
 
 // 🔧 压缩响应
 app.use(compression())

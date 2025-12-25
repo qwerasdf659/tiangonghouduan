@@ -260,6 +260,57 @@ class BaseTestManager {
   }
 
   /**
+   * 携带Cookie的请求（用于Token刷新等需要HttpOnly Cookie的场景）
+   * @param {string} method HTTP方法
+   * @param {string} url 请求路径
+   * @param {Object} cookies Cookie对象 { name: value }
+   * @param {any} data 请求数据
+   * @returns {Promise<Object>} 响应数据 { status, data, headers }
+   */
+  async make_request_with_cookie(method, url, cookies = {}, data = null) {
+    const startTime = performance.now()
+
+    try {
+      console.log(`[API请求+Cookie] ${method.toUpperCase()} ${url}`)
+
+      // 构建Cookie字符串
+      const cookieStr = Object.entries(cookies)
+        .map(([name, value]) => `${name}=${value}`)
+        .join('; ')
+
+      let req = this._getRequest()
+        [method.toLowerCase()](url)
+        .set('Content-Type', 'application/json')
+        .set('Cookie', cookieStr)
+        .timeout(this.timeout)
+
+      // 根据方法类型处理数据
+      if (data && ['post', 'put', 'patch'].includes(method.toLowerCase())) {
+        req = req.send(data)
+      } else if (data && method.toLowerCase() === 'get') {
+        req = req.query(data)
+      }
+
+      const response = await req
+
+      const duration = performance.now() - startTime
+      this._recordPerformance(url, method, duration, response.status)
+      console.log(`[API响应] ${response.status} - ${Math.round(duration)}ms`)
+
+      return {
+        status: response.status,
+        data: response.body,
+        headers: response.headers
+      }
+    } catch (error) {
+      const duration = performance.now() - startTime
+      this._recordPerformance(url, method, duration, 0, error.message)
+      console.error(`[请求失败] ${method} ${url}: ${error.message}`)
+      throw error
+    }
+  }
+
+  /**
    * 批量认证测试用户
    * @returns {Promise<Object>} 认证结果
    */

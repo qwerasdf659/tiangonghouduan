@@ -111,9 +111,25 @@ router.post('/login', async (req, res) => {
   // 生成Token
   const tokens = await generateTokens(user)
 
+  /**
+   * 🔐 Token安全升级：通过HttpOnly Cookie设置refresh_token
+   * - httpOnly: true → JavaScript无法读取，防御XSS攻击
+   * - secure: 生产环境强制HTTPS
+   * - sameSite: 'strict' → 防御CSRF攻击
+   * - maxAge: 7天 → 与refresh_token有效期一致
+   * - path: '/api/v4/auth' → 仅在认证路径下携带
+   */
+  res.cookie('refresh_token', tokens.refresh_token, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'strict',
+    maxAge: 7 * 24 * 60 * 60 * 1000, // 7天（毫秒）
+    path: '/api/v4/auth'
+  })
+
   const responseData = {
     access_token: tokens.access_token,
-    refresh_token: tokens.refresh_token,
+    // 🔐 安全升级：refresh_token不再通过响应体返回，改为HttpOnly Cookie
     user: {
       user_id: user.user_id,
       mobile: user.mobile,
@@ -287,9 +303,25 @@ router.post('/quick-login', async (req, res) => {
   // 生成JWT Token
   const tokens = await generateTokens(user)
 
+  /**
+   * 🔐 Token安全升级：通过HttpOnly Cookie设置refresh_token
+   * - httpOnly: true → JavaScript无法读取，防御XSS攻击
+   * - secure: 生产环境强制HTTPS
+   * - sameSite: 'strict' → 防御CSRF攻击
+   * - maxAge: 7天 → 与refresh_token有效期一致
+   * - path: '/api/v4/auth' → 仅在认证路径下携带
+   */
+  res.cookie('refresh_token', tokens.refresh_token, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'strict',
+    maxAge: 7 * 24 * 60 * 60 * 1000, // 7天（毫秒）
+    path: '/api/v4/auth'
+  })
+
   const responseData = {
     access_token: tokens.access_token,
-    refresh_token: tokens.refresh_token,
+    // 🔐 安全升级：refresh_token不再通过响应体返回，改为HttpOnly Cookie
     user: {
       user_id: user.user_id,
       mobile: user.mobile,

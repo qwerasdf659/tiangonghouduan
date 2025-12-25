@@ -89,6 +89,25 @@ models.LotteryManagementSetting = require('./LotteryManagementSetting')(sequeliz
  *    - 业务场景：活动补偿、VIP特权、防刷保护、精准运营、测试验证
  */
 
+// 🔴 抽奖次数配额控制系统（2025-12-23新增）
+models.LotteryDrawQuotaRule = require('./LotteryDrawQuotaRule')(sequelize, DataTypes)
+/*
+ * ✅ LotteryDrawQuotaRule：抽奖次数配额规则表（规则层）
+ *    - 用途：统一事实源，实现四维度（全局/活动/角色/用户）配额规则管理
+ *    - 特点：优先级链（user > role > campaign > global）、生效期管理、状态管理
+ *    - 表名：lottery_draw_quota_rules，主键：rule_id
+ *    - 业务场景：管理员配置抽奖次数上限规则、客服补偿、风控限制
+ */
+
+models.LotteryUserDailyDrawQuota = require('./LotteryUserDailyDrawQuota')(sequelize, DataTypes)
+/*
+ * ✅ LotteryUserDailyDrawQuota：用户每日抽奖配额表（强一致扣减层）
+ *    - 用途：原子操作避免并发窗口期问题，支持连抽场景
+ *    - 特点：原子扣减（UPDATE ... WHERE）、配额初始化、临时补偿（bonus_draw_count）
+ *    - 表名：lottery_user_daily_draw_quota，主键：quota_id，唯一索引：user_id + campaign_id + quota_date
+ *    - 业务场景：抽奖前配额检查、原子扣减、连抽支持（10连抽一次扣减10次）
+ */
+
 /*
  * 🔴 业务功能模型（商品和库存系统）
  * 🗑️ models.BusinessEvent模型已删除 - 过度设计，使用现有业务记录模型替代 - 2025年01月21日

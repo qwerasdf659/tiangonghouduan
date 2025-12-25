@@ -9,6 +9,7 @@
 
 const LotteryUserService = require('./LotteryUserService')
 const LotteryHistoryService = require('./LotteryHistoryService')
+const LotteryQuotaService = require('./LotteryQuotaService')
 
 /**
  * 抽奖服务容器
@@ -70,7 +71,7 @@ class LotteryServiceContainer {
    *
    * @constructor
    */
-  constructor () {
+  constructor() {
     // LotteryUserService 和 LotteryHistoryService 都是类，需要实例化
     this.user_service = new LotteryUserService()
     this.history_service = new LotteryHistoryService()
@@ -80,7 +81,7 @@ class LotteryServiceContainer {
    * 获取用户服务实例
    * @returns {LotteryUserService} 用户抽奖资格验证服务实例
    */
-  get_user_service () {
+  get_user_service() {
     return this.user_service
   }
 
@@ -88,7 +89,7 @@ class LotteryServiceContainer {
    * 获取历史服务实例
    * @returns {LotteryHistoryService} 抽奖历史查询服务实例
    */
-  get_history_service () {
+  get_history_service() {
     return this.history_service
   }
 
@@ -96,7 +97,7 @@ class LotteryServiceContainer {
    * 获取所有服务实例
    * @returns {Object} 包含所有服务实例的对象 {user_service, history_service}
    */
-  get_all_services () {
+  get_all_services() {
     return {
       user_service: this.user_service,
       history_service: this.history_service
@@ -110,6 +111,7 @@ const lottery_service_container = new LotteryServiceContainer()
 module.exports = {
   LotteryUserService,
   LotteryHistoryService,
+  LotteryQuotaService,
   LotteryServiceContainer,
   lottery_service_container
 }

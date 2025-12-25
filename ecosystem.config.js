@@ -23,33 +23,9 @@ module.exports = {
       exec_mode: 'fork', // 单进程模式（开发环境推荐）
       instances: 1, // 进程实例数量
 
-      // 环境变量
-      env: {
-        NODE_ENV: 'development',
-        PORT: 3000,
-        // 🕐 时区设置 - 确保所有时间显示为北京时间
-        TZ: 'Asia/Shanghai',
-        JWT_SECRET:
-          'd40eea7e85733495336cd79fa57f20032259d262483732ae0687dbb3ed5eda4eaf0826f20e55f25975686fa9b1cb978509f51819f840758e658ca09029259c2b',
-        JWT_REFRESH_SECRET:
-          '197f92d1b1a24fba5db3227d2b1f25419499880dd95c332d2904eab13fdfabccfc775391992cf6bee6d5822c56699b59f876d2108dd00d93df1d838b377a01e0',
-        JWT_EXPIRES_IN: '2h',
-        JWT_REFRESH_EXPIRES_IN: '7d',
-        // 🔴 数据库配置 - 使用正确的生产数据库
-        DB_HOST: 'dbconn.sealosbja.site',
-        DB_PORT: '42569',
-        DB_NAME: 'restaurant_points_dev',
-        DB_USER: 'root',
-        DB_PASSWORD: 'mc6r9cgb',
-        DB_TIMEZONE: '+08:00',
-        REDIS_URL: 'redis://localhost:6379'
-      },
-
-      // 生产环境变量
-      env_production: {
-        NODE_ENV: 'production',
-        PORT: 3000
-      },
+      // ✅ env 完全清空 - 所有配置只来自 .env 文件（单一真相源）
+      // 不保留任何业务配置或默认值，包括 NODE_ENV/PORT/TZ
+      // 参考：docs/Devbox单环境统一配置方案.md
 
       // 进程管理配置
       watch: false, // 禁用文件监控（避免开发时频繁重启）
