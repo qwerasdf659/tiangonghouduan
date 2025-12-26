@@ -1,5 +1,5 @@
 /**
- * 统一资产服务 - AssetService（升级版：支持账户体系 + 冻结模型）
+ * 统一资产服务 - AssetService（升级版：支持账户体系 + 冻结模型 + 业界标准幂等架构）
  * 管理DIAMOND和材料资产的核心服务
  *
  * 业务场景：
@@ -20,10 +20,14 @@
  *
  * 设计原则：
  * - 所有资产操作支持外部事务传入
- * - 所有资产变动支持幂等性控制（business_id + business_type）
+ * - 所有资产变动支持幂等性控制（idempotency_key 唯一约束）
  * - 余额不足时直接抛出异常，不允许负余额
  * - 记录变动前后余额用于完整对账（before + delta = after）
  * - 冻结模型：交易市场购买和资产挂牌必须走冻结→结算链路
+ *
+ * 幂等性机制（方案B - 业界标准）：
+ * - idempotency_key：每条事务记录的独立幂等键（唯一约束）
+ * - lottery_session_id：抽奖会话ID（仅抽奖业务使用，非抽奖业务可为NULL）
  *
  * 命名规范（snake_case）：
  * - 所有方法、参数、字段使用snake_case
@@ -31,6 +35,7 @@
  *
  * 创建时间：2025-12-15
  * 升级时间：2025-12-15（Phase 1-4：支持账户体系 + 冻结模型）
+ * 升级时间：2025-12-26（方案B：业界标准幂等架构，删除 business_id 参数）
  */
 
 'use strict'
@@ -38,7 +43,6 @@
 const { Account, AccountAssetBalance, AssetTransaction, User } = require('../models')
 const { sequelize } = require('../config/database')
 const logger = require('../utils/logger')
-const { generateStandaloneIdempotencyKey } = require('../utils/IdempotencyHelper')
 
 /**
  * 资产服务类（V2升级版）
@@ -157,28 +161,26 @@ class AssetService {
   }
 
   /**
-   * 改变可用余额（核心方法 - 支持方案A幂等机制）
+   * 改变可用余额（核心方法 - 方案B业界标准幂等机制）
    *
    * 业务规则：
-   * - 支持幂等性控制（idempotency_key唯一约束 + business_id + business_type兼容索引）
+   * - 支持幂等性控制（idempotency_key唯一约束）
    * - 扣减时必须验证可用余额充足
    * - 记录变动前后余额用于完整对账（before + delta = after）
    * - 支持外部事务传入
    *
-   * 幂等机制（方案A）：
+   * 幂等机制（方案B - 业界标准）：
    * - idempotency_key：独立幂等键（每条记录唯一）
-   * - lottery_session_id：抽奖会话ID（一次抽奖的多条流水共享）
-   * - 如果未提供，自动生成默认值
+   * - lottery_session_id：抽奖会话ID（仅抽奖业务使用，非抽奖业务可为NULL）
    *
    * @param {Object} params - 参数对象
    * @param {number} params.user_id - 用户ID（用户账户）
    * @param {string} params.system_code - 系统账户代码（系统账户）
    * @param {string} params.asset_code - 资产代码
    * @param {number} params.delta_amount - 变动金额（正数=增加，负数=扣减）
-   * @param {string} params.business_id - 业务唯一ID（幂等键，必填）
    * @param {string} params.business_type - 业务类型（必填）
-   * @param {string} params.idempotency_key - 独立幂等键（可选，不提供则自动生成）
-   * @param {string} params.lottery_session_id - 抽奖会话ID（可选，不提供则使用business_id）
+   * @param {string} params.idempotency_key - 独立幂等键（必填）
+   * @param {string} params.lottery_session_id - 抽奖会话ID（可选，仅抽奖业务使用）
    * @param {Object} params.meta - 扩展信息（可选）
    * @param {Object} options - 选项
    * @param {Object} options.transaction - Sequelize事务对象（可选）
@@ -190,7 +192,6 @@ class AssetService {
       system_code,
       asset_code,
       delta_amount,
-      business_id,
       business_type,
       idempotency_key,
       lottery_session_id,
@@ -199,8 +200,8 @@ class AssetService {
     const { transaction: externalTransaction } = options
 
     // 参数验证
-    if (!business_id) {
-      throw new Error('business_id是必填参数（幂等性控制）')
+    if (!idempotency_key) {
+      throw new Error('idempotency_key是必填参数（幂等性控制）')
     }
     if (!business_type) {
       throw new Error('business_type是必填参数（业务场景分类）')
@@ -219,16 +220,13 @@ class AssetService {
     try {
       // 🔥 幂等性检查：通过唯一约束兜底
       const existingTransaction = await AssetTransaction.findOne({
-        where: {
-          business_id,
-          business_type
-        },
+        where: { idempotency_key },
         transaction
       })
 
       if (existingTransaction) {
         logger.info('⚠️ 幂等性检查：资产变动已存在，返回原结果', {
-          business_id,
+          idempotency_key,
           business_type,
           transaction_id: existingTransaction.transaction_id
         })
@@ -308,15 +306,7 @@ class AssetService {
         { transaction }
       )
 
-      /**
-       * 方案A幂等机制：生成独立幂等键和会话ID
-       * 如果没有提供，自动根据业务类型生成
-       */
-      const final_lottery_session_id = lottery_session_id || business_id
-      const final_idempotency_key =
-        idempotency_key || generateStandaloneIdempotencyKey(business_type, account.account_id)
-
-      // 创建资产流水记录
+      // 创建资产流水记录（方案B：无 business_id）
       const transaction_record = await AssetTransaction.create(
         {
           account_id: account.account_id,
@@ -324,10 +314,9 @@ class AssetService {
           delta_amount,
           balance_before,
           balance_after,
-          business_id,
           business_type,
-          lottery_session_id: final_lottery_session_id,
-          idempotency_key: final_idempotency_key,
+          lottery_session_id: lottery_session_id || null, // 非抽奖业务可为NULL
+          idempotency_key,
           meta
         },
         { transaction }
@@ -340,10 +329,9 @@ class AssetService {
         delta_amount,
         balance_before,
         balance_after,
-        business_id,
         business_type,
-        lottery_session_id: final_lottery_session_id,
-        idempotency_key: final_idempotency_key,
+        lottery_session_id: lottery_session_id || null,
+        idempotency_key,
         transaction_id: transaction_record.transaction_id
       })
 
@@ -369,8 +357,8 @@ class AssetService {
         system_code,
         asset_code,
         delta_amount,
-        business_id,
         business_type,
+        idempotency_key,
         error: error.message
       })
       throw error
@@ -382,7 +370,7 @@ class AssetService {
    *
    * 业务规则：
    * - 从available_amount扣减，增加到frozen_amount
-   * - 支持幂等性控制
+   * - 支持幂等性控制（idempotency_key唯一约束）
    * - 记录冻结流水
    *
    * @param {Object} params - 参数对象
@@ -390,8 +378,8 @@ class AssetService {
    * @param {string} params.system_code - 系统账户代码（系统账户）
    * @param {string} params.asset_code - 资产代码
    * @param {number} params.amount - 冻结金额（必须为正数）
-   * @param {string} params.business_id - 业务唯一ID（幂等键，必填）
    * @param {string} params.business_type - 业务类型（必填，如order_freeze_buyer）
+   * @param {string} params.idempotency_key - 独立幂等键（必填）
    * @param {Object} params.meta - 扩展信息（可选）
    * @param {Object} options - 选项
    * @param {Object} options.transaction - Sequelize事务对象（可选）
@@ -403,15 +391,15 @@ class AssetService {
       system_code,
       asset_code,
       amount,
-      business_id,
       business_type,
+      idempotency_key,
       meta = {}
     } = params
     const { transaction: externalTransaction } = options
 
     // 参数验证
-    if (!business_id) {
-      throw new Error('business_id是必填参数（幂等性控制）')
+    if (!idempotency_key) {
+      throw new Error('idempotency_key是必填参数（幂等性控制）')
     }
     if (!business_type) {
       throw new Error('business_type是必填参数（业务场景分类）')
@@ -430,16 +418,13 @@ class AssetService {
     try {
       // 🔥 幂等性检查
       const existingTransaction = await AssetTransaction.findOne({
-        where: {
-          business_id,
-          business_type
-        },
+        where: { idempotency_key },
         transaction
       })
 
       if (existingTransaction) {
         logger.info('⚠️ 幂等性检查：冻结操作已存在，返回原结果', {
-          business_id,
+          idempotency_key,
           business_type,
           transaction_id: existingTransaction.transaction_id
         })
@@ -502,14 +487,7 @@ class AssetService {
         { transaction }
       )
 
-      /**
-       * 创建冻结流水记录（delta_amount为负数表示从available扣减）
-       * 方案A幂等机制：生成独立幂等键
-       */
-      const freeze_idempotency_key = generateStandaloneIdempotencyKey(
-        business_type,
-        account.account_id
-      )
+      // 创建冻结流水记录（delta_amount为负数表示从available扣减）
       const transaction_record = await AssetTransaction.create(
         {
           account_id: account.account_id,
@@ -517,10 +495,9 @@ class AssetService {
           delta_amount: -amount, // 负数表示从available扣减
           balance_before: available_before,
           balance_after: available_after,
-          business_id,
           business_type,
-          lottery_session_id: business_id,
-          idempotency_key: freeze_idempotency_key,
+          lottery_session_id: null, // 冻结操作不关联抽奖会话
+          idempotency_key,
           meta: {
             ...meta,
             freeze_amount: amount,
@@ -540,8 +517,8 @@ class AssetService {
         available_after,
         frozen_before,
         frozen_after,
-        business_id,
         business_type,
+        idempotency_key,
         transaction_id: transaction_record.transaction_id
       })
 
@@ -566,8 +543,8 @@ class AssetService {
         system_code,
         asset_code,
         amount,
-        business_id,
         business_type,
+        idempotency_key,
         error: error.message
       })
       throw error
@@ -579,7 +556,7 @@ class AssetService {
    *
    * 业务规则：
    * - 从frozen_amount扣减，增加到available_amount
-   * - 支持幂等性控制
+   * - 支持幂等性控制（idempotency_key唯一约束）
    * - 记录解冻流水
    *
    * @param {Object} params - 参数对象
@@ -587,8 +564,8 @@ class AssetService {
    * @param {string} params.system_code - 系统账户代码（系统账户）
    * @param {string} params.asset_code - 资产代码
    * @param {number} params.amount - 解冻金额（必须为正数）
-   * @param {string} params.business_id - 业务唯一ID（幂等键，必填）
    * @param {string} params.business_type - 业务类型（必填，如order_unfreeze_buyer）
+   * @param {string} params.idempotency_key - 独立幂等键（必填）
    * @param {Object} params.meta - 扩展信息（可选）
    * @param {Object} options - 选项
    * @param {Object} options.transaction - Sequelize事务对象（可选）
@@ -600,15 +577,15 @@ class AssetService {
       system_code,
       asset_code,
       amount,
-      business_id,
       business_type,
+      idempotency_key,
       meta = {}
     } = params
     const { transaction: externalTransaction } = options
 
     // 参数验证
-    if (!business_id) {
-      throw new Error('business_id是必填参数（幂等性控制）')
+    if (!idempotency_key) {
+      throw new Error('idempotency_key是必填参数（幂等性控制）')
     }
     if (!business_type) {
       throw new Error('business_type是必填参数（业务场景分类）')
@@ -627,16 +604,13 @@ class AssetService {
     try {
       // 🔥 幂等性检查
       const existingTransaction = await AssetTransaction.findOne({
-        where: {
-          business_id,
-          business_type
-        },
+        where: { idempotency_key },
         transaction
       })
 
       if (existingTransaction) {
         logger.info('⚠️ 幂等性检查：解冻操作已存在，返回原结果', {
-          business_id,
+          idempotency_key,
           business_type,
           transaction_id: existingTransaction.transaction_id
         })
@@ -699,14 +673,7 @@ class AssetService {
         { transaction }
       )
 
-      /**
-       * 创建解冻流水记录（delta_amount为正数表示增加到available）
-       * 方案A幂等机制：生成独立幂等键
-       */
-      const unfreeze_idempotency_key = generateStandaloneIdempotencyKey(
-        business_type,
-        account.account_id
-      )
+      // 创建解冻流水记录（delta_amount为正数表示增加到available）
       const transaction_record = await AssetTransaction.create(
         {
           account_id: account.account_id,
@@ -714,10 +681,9 @@ class AssetService {
           delta_amount: amount, // 正数表示增加到available
           balance_before: available_before,
           balance_after: available_after,
-          business_id,
           business_type,
-          lottery_session_id: business_id,
-          idempotency_key: unfreeze_idempotency_key,
+          lottery_session_id: null, // 解冻操作不关联抽奖会话
+          idempotency_key,
           meta: {
             ...meta,
             unfreeze_amount: amount,
@@ -737,8 +703,8 @@ class AssetService {
         available_after,
         frozen_before,
         frozen_after,
-        business_id,
         business_type,
+        idempotency_key,
         transaction_id: transaction_record.transaction_id
       })
 
@@ -763,8 +729,8 @@ class AssetService {
         system_code,
         asset_code,
         amount,
-        business_id,
         business_type,
+        idempotency_key,
         error: error.message
       })
       throw error
@@ -776,7 +742,7 @@ class AssetService {
    *
    * 业务规则：
    * - 从frozen_amount扣减（不增加到available）
-   * - 支持幂等性控制
+   * - 支持幂等性控制（idempotency_key唯一约束）
    * - 记录结算流水
    *
    * @param {Object} params - 参数对象
@@ -784,8 +750,8 @@ class AssetService {
    * @param {string} params.system_code - 系统账户代码（系统账户）
    * @param {string} params.asset_code - 资产代码
    * @param {number} params.amount - 结算金额（必须为正数）
-   * @param {string} params.business_id - 业务唯一ID（幂等键，必填）
    * @param {string} params.business_type - 业务类型（必填，如order_settle_buyer_debit）
+   * @param {string} params.idempotency_key - 独立幂等键（必填）
    * @param {Object} params.meta - 扩展信息（可选）
    * @param {Object} options - 选项
    * @param {Object} options.transaction - Sequelize事务对象（可选）
@@ -797,15 +763,15 @@ class AssetService {
       system_code,
       asset_code,
       amount,
-      business_id,
       business_type,
+      idempotency_key,
       meta = {}
     } = params
     const { transaction: externalTransaction } = options
 
     // 参数验证
-    if (!business_id) {
-      throw new Error('business_id是必填参数（幂等性控制）')
+    if (!idempotency_key) {
+      throw new Error('idempotency_key是必填参数（幂等性控制）')
     }
     if (!business_type) {
       throw new Error('business_type是必填参数（业务场景分类）')
@@ -824,16 +790,13 @@ class AssetService {
     try {
       // 🔥 幂等性检查
       const existingTransaction = await AssetTransaction.findOne({
-        where: {
-          business_id,
-          business_type
-        },
+        where: { idempotency_key },
         transaction
       })
 
       if (existingTransaction) {
         logger.info('⚠️ 幂等性检查：结算操作已存在，返回原结果', {
-          business_id,
+          idempotency_key,
           business_type,
           transaction_id: existingTransaction.transaction_id
         })
@@ -895,14 +858,7 @@ class AssetService {
         { transaction }
       )
 
-      /**
-       * 创建结算流水记录（delta_amount为0，因为available不变）
-       * 方案A幂等机制：生成独立幂等键
-       */
-      const settle_idempotency_key = generateStandaloneIdempotencyKey(
-        business_type,
-        account.account_id
-      )
+      // 创建结算流水记录（delta_amount为0，因为available不变）
       const transaction_record = await AssetTransaction.create(
         {
           account_id: account.account_id,
@@ -910,10 +866,9 @@ class AssetService {
           delta_amount: 0, // available不变
           balance_before: available_before,
           balance_after: available_after,
-          business_id,
           business_type,
-          lottery_session_id: business_id,
-          idempotency_key: settle_idempotency_key,
+          lottery_session_id: null, // 结算操作不关联抽奖会话
+          idempotency_key,
           meta: {
             ...meta,
             settle_amount: amount,
@@ -934,8 +889,8 @@ class AssetService {
         available_after,
         frozen_before,
         frozen_after,
-        business_id,
         business_type,
+        idempotency_key,
         transaction_id: transaction_record.transaction_id
       })
 
@@ -960,8 +915,8 @@ class AssetService {
         system_code,
         asset_code,
         amount,
-        business_id,
         business_type,
+        idempotency_key,
         error: error.message
       })
       throw error

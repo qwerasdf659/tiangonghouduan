@@ -49,6 +49,9 @@ const ReportingService = require('./ReportingService') // 统一报表服务（�
 const AssetService = require('./AssetService') // 统一资产服务（账户体系 + 冻结模型）
 const AssetConversionService = require('./AssetConversionService') // 资产转换服务（材料转钻石）
 
+// V4.6.0 业界标准幂等架构服务（2025-12-26 方案B）
+const IdempotencyService = require('./IdempotencyService') // 入口幂等服务（重试返回首次结果）
+
 // V4.2 背包双轨架构服务（Phase 1 - 核销码系统）
 const RedemptionService = require('./RedemptionService') // 兑换订单服务（12位Base32核销码 + SHA-256哈希）
 const BackpackService = require('./BackpackService') // 背包双轨查询服务（assets[] + items[]）
@@ -224,6 +227,9 @@ class ServiceManager {
       // 注册V4.5.0材料系统服务（2025-12-15）
       this._services.set('asset', AssetService) // 统一资产服务（余额/冻结/流水/幂等）
       this._services.set('assetConversion', AssetConversionService) // 资产转换服务（材料转钻石）
+
+      // 注册V4.6.0业界标准幂等架构服务（2025-12-26 方案B）
+      this._services.set('idempotency', IdempotencyService) // 入口幂等服务（重试返回首次结果）
 
       // 注册V4.2背包双轨架构服务（Phase 1 - 核销码系统）
       this._services.set('redemptionOrder', RedemptionService) // 兑换订单服务（12位Base32核销码 + SHA-256哈希）

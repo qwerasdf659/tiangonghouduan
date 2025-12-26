@@ -22,12 +22,18 @@ class SealosStorageService {
    * @constructor
    */
   constructor() {
-    // 🔴 使用用户提供的真实Sealos配置 - 强制使用正确桶名
+    /*
+     * 🔴 Sealos对象存储配置 - 禁止硬编码默认值，必须从环境变量读取
+     * 遵循 fail-fast 原则：缺失必需配置时立即抛错，防止使用不安全的默认值
+     */
+    this._validateRequiredConfig()
+
     this.config = {
-      endpoint: process.env.SEALOS_ENDPOINT || 'https://objectstorageapi.bja.sealos.run',
-      bucket: 'br0za7uc-tiangong', // 强制使用正确的桶名
-      accessKeyId: process.env.SEALOS_ACCESS_KEY || 'br0za7uc',
-      secretAccessKey: process.env.SEALOS_SECRET_KEY || 'skxg8mk5gqfhf9xz'
+      endpoint: process.env.SEALOS_ENDPOINT,
+      bucket: process.env.SEALOS_BUCKET,
+      accessKeyId: process.env.SEALOS_ACCESS_KEY,
+      secretAccessKey: process.env.SEALOS_SECRET_KEY,
+      region: process.env.SEALOS_REGION
     }
 
     // 初始化S3客户端
@@ -35,7 +41,7 @@ class SealosStorageService {
       endpoint: this.config.endpoint,
       accessKeyId: this.config.accessKeyId,
       secretAccessKey: this.config.secretAccessKey,
-      region: process.env.SEALOS_REGION || 'bja',
+      region: this.config.region,
       s3ForcePathStyle: true, // Sealos需要path-style访问
       signatureVersion: 'v4'
     })
@@ -43,8 +49,40 @@ class SealosStorageService {
     logger.info('🔗 Sealos存储初始化完成:', {
       endpoint: this.config.endpoint,
       bucket: this.config.bucket,
-      accessKey: this.config.accessKeyId
+      region: this.config.region
     })
+  }
+
+  /**
+   * 验证必需的环境变量配置
+   * @throws {Error} 缺失必需配置时抛出错误
+   * @returns {void} 无返回值，验证失败时抛出异常
+   * @private
+   */
+  _validateRequiredConfig() {
+    const requiredEnvVars = [
+      { key: 'SEALOS_ENDPOINT', description: 'Sealos对象存储端点地址' },
+      { key: 'SEALOS_BUCKET', description: 'Sealos存储桶名称' },
+      { key: 'SEALOS_ACCESS_KEY', description: 'Sealos访问密钥ID' },
+      { key: 'SEALOS_SECRET_KEY', description: 'Sealos密钥访问密钥' },
+      { key: 'SEALOS_REGION', description: 'Sealos存储区域' }
+    ]
+
+    const missingVars = requiredEnvVars.filter(v => !process.env[v.key])
+
+    if (missingVars.length > 0) {
+      const errorMessage = [
+        '❌ Sealos对象存储配置缺失（fail-fast安全策略）',
+        '缺失的环境变量:',
+        ...missingVars.map(v => `  - ${v.key}: ${v.description}`),
+        '',
+        '请在 .env 文件中配置以下环境变量:',
+        ...missingVars.map(v => `  ${v.key}=your_${v.key.toLowerCase()}_here`)
+      ].join('\n')
+
+      logger.error(errorMessage)
+      throw new Error(`Sealos配置缺失: ${missingVars.map(v => v.key).join(', ')}`)
+    }
   }
 
   /**

@@ -184,8 +184,8 @@ class BaseTestManager {
       console.log(`[API请求] ${method.toUpperCase()} ${url}`)
 
       const methodName = method.toLowerCase()
-      let req = this._getRequest()
-        [methodName](url)
+      const request = this._getRequest()
+      let req = request[methodName](url)
         .set('Authorization', `Bearer ${token}`)
         .set('Content-Type', 'application/json')
         .timeout(this.timeout)
@@ -230,8 +230,8 @@ class BaseTestManager {
       console.log(`[API请求] ${method.toUpperCase()} ${url}`)
 
       const methodName = method.toLowerCase()
-      let req = this._getRequest()
-        [methodName](url)
+      const request = this._getRequest()
+      let req = request[methodName](url)
         .set('Content-Type', 'application/json')
         .timeout(this.timeout)
 
@@ -281,8 +281,8 @@ class BaseTestManager {
         .join('; ')
 
       const methodName = method.toLowerCase()
-      let req = this._getRequest()
-        [methodName](url)
+      const request = this._getRequest()
+      let req = request[methodName](url)
         .set('Content-Type', 'application/json')
         .set('Cookie', cookieStr)
         .timeout(this.timeout)

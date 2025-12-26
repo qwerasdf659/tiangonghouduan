@@ -45,16 +45,16 @@ describe('GET /api/v4/admin/ - 管理员模块信息API', () => {
 
   /**
    * 测试3：模块数量验证
-   * 验证返回的模块数量（当前应为8个实际挂载的模块）
+   * 验证返回的模块数量（当前应为14个实际挂载的模块）
    */
-  test('应该返回8个已实现的模块', async () => {
+  test('应该返回14个已实现的模块', async () => {
     const response = await request(app).get('/api/v4/admin/')
     const { modules } = response.body.data
 
     const moduleCount = Object.keys(modules).length
-    expect(moduleCount).toBe(8) // 实际挂载的路由数量
+    expect(moduleCount).toBe(14) // 实际挂载的路由数量
 
-    // 验证必需的模块是否存在
+    // 验证必需的模块是否存在（原有8个）
     expect(modules).toHaveProperty('auth')
     expect(modules).toHaveProperty('system')
     expect(modules).toHaveProperty('config')
@@ -62,7 +62,15 @@ describe('GET /api/v4/admin/ - 管理员模块信息API', () => {
     expect(modules).toHaveProperty('user_management')
     expect(modules).toHaveProperty('lottery_management')
     expect(modules).toHaveProperty('analytics')
-    expect(modules).toHaveProperty('audit')
+
+    // 验证新增的模块（V4.5.0+）
+    expect(modules).toHaveProperty('settings')
+    expect(modules).toHaveProperty('customer_service')
+    expect(modules).toHaveProperty('marketplace')
+    expect(modules).toHaveProperty('material')
+    expect(modules).toHaveProperty('diamond')
+    expect(modules).toHaveProperty('popup_banners')
+    expect(modules).toHaveProperty('lottery_quota')
   })
 
   /**

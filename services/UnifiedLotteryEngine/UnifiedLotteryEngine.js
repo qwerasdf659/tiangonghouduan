@@ -758,14 +758,24 @@ class UnifiedLotteryEngine {
   }
 
   /**
-   * 生成执行ID
+   * 生成执行ID（已重命名为 lottery_session_id 格式，符合业界标准）
    *
-   * @returns {string} 唯一执行ID
+   * @returns {string} 唯一执行ID（格式：lottery_tx_{timestamp}_{random}_{seq}）
    */
   generateExecutionId() {
-    const timestamp = BeijingTimeHelper.timestamp()
-    const random = Math.random().toString(36).substr(2, 6)
-    return `exec_${timestamp}_${random}`
+    // 使用 IdempotencyHelper 生成标准的 lottery_session_id
+    const { generateLotterySessionId } = require('../../utils/IdempotencyHelper')
+    return generateLotterySessionId()
+  }
+
+  /**
+   * 生成抽奖会话ID（lottery_session_id）
+   * 用途：把同一次抽奖的多条流水（consume + reward）关联起来
+   *
+   * @returns {string} 抽奖会话ID
+   */
+  generateLotterySessionId() {
+    return this.generateExecutionId()
   }
 
   /**
@@ -880,7 +890,8 @@ class UnifiedLotteryEngine {
         order: [
           ['sort_order', 'ASC'],
           ['prize_id', 'ASC']
-        ]
+        ],
+        raw: true // 返回普通JSON对象，而非Sequelize模型实例
       })
 
       this.logInfo('获取活动奖品列表', {
@@ -1018,12 +1029,28 @@ class UnifiedLotteryEngine {
    *
    * 🎯 核心改动：添加统一事务保护，确保连抽操作的原子性
    *
+   * 幂等性机制（方案B - 业界标准）：
+   * - 入口幂等：通过路由层 IdempotencyService 实现"重试返回首次结果"
+   * - 流水幂等：通过派生 idempotency_key 保证每条流水唯一
+   *
    * @param {number} user_id - 用户ID
    * @param {number} campaign_id - 活动ID
    * @param {number} draw_count - 抽奖次数（默认1次）
+   * @param {Object} options - 选项参数
+   * @param {string} options.idempotency_key - 请求级幂等键（用于派生事务级幂等键）
+   * @param {string} options.request_source - 请求来源标识
    * @returns {Promise<Object>} 抽奖结果
    */
-  async execute_draw(user_id, campaign_id, draw_count = 1) {
+  async execute_draw(user_id, campaign_id, draw_count = 1, options = {}) {
+    // 方案B：从请求参数获取或生成幂等键
+    const {
+      generateLotterySessionId,
+      deriveTransactionIdempotencyKey
+    } = require('../../utils/IdempotencyHelper')
+    const requestIdempotencyKey =
+      options.idempotency_key ||
+      require('../../utils/IdempotencyHelper').generateRequestIdempotencyKey()
+    const lotterySessionId = generateLotterySessionId()
     /*
      * 🎯 核心改动1：开启统一事务（新增代码）
      *
@@ -1189,8 +1216,14 @@ class UnifiedLotteryEngine {
        * - 传递skip_points_deduction标识给策略，避免重复扣除
        * - 确保事务一致性：统一扣除 + 循环抽奖 + 发放奖品
        */
-      // 🔧 V4.3修复：使用AssetService替代PointsService
-      const batchDrawId = `batch_${BeijingTimeHelper.generateIdTimestamp()}_${user_id}` // 批次ID用于幂等性控制
+      /*
+       * 🔧 V4.3修复：使用AssetService替代PointsService
+       * 方案B：使用派生幂等键（从请求幂等键派生消费幂等键）
+       */
+      const consumeIdempotencyKey = deriveTransactionIdempotencyKey(
+        requestIdempotencyKey,
+        'consume'
+      )
 
       // 步骤1：统一扣除折扣后的总积分（在事务中执行）
       await AssetService.changeBalance(
@@ -1198,15 +1231,19 @@ class UnifiedLotteryEngine {
           user_id,
           asset_code: 'POINTS',
           delta_amount: -requiredPoints, // 扣减为负数
-          business_id: batchDrawId, // 使用批次ID实现幂等性
           business_type: 'lottery_consume',
+          idempotency_key: consumeIdempotencyKey, // 方案B：使用派生幂等键
+          lottery_session_id: lotterySessionId, // 方案B：关联抽奖会话
           meta: {
             source_type: 'system',
             title: draw_count === 1 ? '抽奖消耗积分' : `${draw_count}连抽消耗积分`,
             description:
               draw_count === 1
                 ? `单次抽奖消耗${requiredPoints}积分`
-                : `${draw_count}连抽消耗${requiredPoints}积分（${pricing.label}，原价${draw_count * 100}积分，节省${draw_count * 100 - requiredPoints}积分）`
+                : `${draw_count}连抽消耗${requiredPoints}积分（${pricing.label}，原价${draw_count * 100}积分，节省${draw_count * 100 - requiredPoints}积分）`,
+            request_idempotency_key: requestIdempotencyKey,
+            campaign_id,
+            draw_count
           }
         },
         { transaction }
@@ -1217,7 +1254,8 @@ class UnifiedLotteryEngine {
         draw_count,
         requiredPoints,
         pricing,
-        batchDrawId
+        lotterySessionId,
+        consumeIdempotencyKey
       })
 
       const results = []
@@ -1225,17 +1263,19 @@ class UnifiedLotteryEngine {
       // 步骤2：执行多次抽奖（不再重复扣除积分）
       for (let i = 0; i < draw_count; i++) {
         /**
-         * 🎯 P0-6修复：生成唯一的business_id用于幂等控制
+         * 🎯 方案B修复：使用派生幂等键用于每次抽奖记录
          *
          * 业务场景：防止用户重复提交创建多条抽奖记录
-         * 幂等规则：
-         * - 格式：lottery_draw_${userId}_${campaignId}_${batchDrawId}_${drawNumber}
-         * - 同一business_id只能创建一条记录
+         * 幂等规则（方案B - 业界标准）：
+         * - 格式：{request_idempotency_key}:reward_{draw_number}
+         * - 从请求幂等键派生，而非抽奖会话ID
+         * - 同一 idempotency_key 只能创建一条记录
          * - 重复提交返回已有记录（幂等）
-         *
-         * P0-3规范：所有资产变动必须有business_id幂等控制
          */
-        const drawBusinessId = `lottery_draw_${user_id}_${campaign_id}_${batchDrawId}_${i + 1}`
+        const drawIdempotencyKey = deriveTransactionIdempotencyKey(
+          requestIdempotencyKey,
+          `reward_${i + 1}`
+        )
 
         const context = {
           user_id,
@@ -1243,8 +1283,9 @@ class UnifiedLotteryEngine {
           draw_number: i + 1,
           total_draws: draw_count,
           skip_points_deduction: true, // 🎯 关键标识：告诉策略不要再扣除积分
-          batch_draw_id: batchDrawId, // 传递批次ID
-          business_id: drawBusinessId, // 🎯 P0-6修复：添加business_id用于幂等控制
+          lottery_session_id: lotterySessionId, // 方案B：传递抽奖会话ID
+          idempotency_key: drawIdempotencyKey, // 方案B：派生幂等键
+          request_idempotency_key: requestIdempotencyKey, // 请求级幂等键
           user_status: {
             available_points: userAccount.available_points - requiredPoints // 显示扣除后的余额
           }
@@ -1338,6 +1379,7 @@ class UnifiedLotteryEngine {
        */
       return {
         success: true,
+        execution_id: lotterySessionId, // 方案B：返回抽奖会话ID（用于关联查询和入口幂等表）
         draw_count, // 抽奖次数
         prizes: results, // 抽奖结果数组
         total_points_cost: requiredPoints, // 实际消耗积分（折后价）

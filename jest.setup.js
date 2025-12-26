@@ -11,8 +11,9 @@
 // 设置测试环境变量（显式设置，不依赖.env文件）
 process.env.NODE_ENV = 'test'
 process.env.JWT_SECRET = 'test-jwt-secret-key-for-development-only'
-process.env.DB_HOST = 'test-db-mysql.ns-br0za7uc.svc'
-process.env.DB_PORT = '3306'
+// 🔴 统一数据库配置：测试/开发/生产全部连接唯一真实库 restaurant_points_dev
+process.env.DB_HOST = 'dbconn.sealosbja.site'
+process.env.DB_PORT = '42569'
 process.env.DB_USER = 'root'
 process.env.DB_PASSWORD = 'mc6r9cgb'
 process.env.DB_NAME = 'restaurant_points_dev'

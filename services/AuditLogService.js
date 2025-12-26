@@ -135,7 +135,13 @@ class AuditLogService {
         'session_assign',
         'inventory_operation', // 库存操作
         'inventory_transfer', // 物品转让
-        'consumption_audit' // 消费审核
+        'consumption_audit', // 消费审核
+        // 抽奖管理操作类型（V4.5.0新增）
+        'lottery_force_win', // 强制中奖
+        'lottery_force_lose', // 强制不中奖
+        'lottery_probability_adjust', // 概率调整
+        'lottery_user_queue', // 用户队列
+        'lottery_clear_settings' // 清除设置
       ]
 
       if (!validOperationTypes.includes(operation_type)) {
@@ -177,6 +183,52 @@ class AuditLogService {
       logger.error(error.stack)
       return null
     }
+  }
+
+  /**
+   * 记录管理员操作（抽奖管理专用）
+   *
+   * 用于抽奖管理模块的审计日志记录，自动映射参数到logOperation格式
+   *
+   * @param {Object} params - 参数
+   * @param {number} params.admin_id - 管理员ID
+   * @param {string} params.operation_type - 操作类型
+   * @param {string} params.operation_target - 操作目标
+   * @param {number} params.target_id - 目标ID
+   * @param {Object} params.operation_details - 操作详情
+   * @param {string} params.ip_address - IP地址
+   * @param {string} params.user_agent - 用户代理
+   * @param {Object} options - 选项
+   * @param {Object} options.transaction - 事务对象
+   * @returns {Promise<AdminOperationLog|null>} 审计日志记录
+   */
+  static async logAdminOperation(params, options = {}) {
+    const {
+      admin_id,
+      operation_type,
+      operation_target,
+      target_id,
+      operation_details = {},
+      ip_address = null,
+      user_agent = null
+    } = params
+    const { transaction = null } = options
+
+    // 映射到logOperation的参数格式
+    return this.logOperation({
+      operator_id: admin_id,
+      operation_type,
+      target_type: operation_target,
+      target_id: target_id || 0,
+      action: operation_type,
+      before_data: null,
+      after_data: operation_details,
+      reason: operation_details.reason || null,
+      business_id: null,
+      ip_address,
+      user_agent,
+      transaction
+    })
   }
 
   /**

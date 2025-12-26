@@ -11,8 +11,13 @@
  * - 连抽限制：连续抽奖最多10次，单次事务保证原子性
  * - 积分扣除：抽奖前检查余额，抽奖后立即扣除，使用事务保护
  *
+ * 幂等性保证（方案B - 业界标准）：
+ * - 入口幂等：通过 IdempotencyService 实现"重试返回首次结果"
+ * - 流水幂等：通过派生 idempotency_key 保证每条流水唯一
+ *
  * 创建时间：2025年12月22日
  * 拆分自：lottery.js（符合Controller拆分规范 150-250行）
+ * 更新时间：2025年12月26日（方案B - 业界标准幂等架构）
  */
 
 const express = require('express')
@@ -23,16 +28,25 @@ const dataAccessControl = require('../../../middleware/dataAccessControl')
 const { handleServiceError } = require('../../../middleware/validation')
 const DataSanitizer = require('../../../services/DataSanitizer')
 const { requestDeduplication, lotteryRateLimiter } = require('./middleware')
+// 方案B：业界标准幂等架构
+const IdempotencyService = require('../../../services/IdempotencyService')
+const { generateRequestIdempotencyKey } = require('../../../utils/IdempotencyHelper')
 
 /**
  * @route POST /api/v4/lottery/draw
  * @desc 执行抽奖 - 支持单次和连续抽奖
  * @access Private
  *
+ * @header {string} Idempotency-Key - 幂等键（可选，客户端生成或服务端生成）
  * @body {string} campaign_code - 活动代码（必需）
  * @body {number} draw_count - 抽奖次数（1-10，默认1）
  *
  * @returns {Object} 抽奖结果
+ *
+ * 幂等性保证（方案B）：
+ * - 相同幂等键的重复请求返回首次结果
+ * - 参数冲突时返回 409 错误
+ * - 处理中的请求返回 409 错误
  *
  * 并发控制：
  * - 请求去重：5秒内相同请求返回"处理中"
@@ -45,6 +59,10 @@ router.post(
   lotteryRateLimiter,
   dataAccessControl,
   async (req, res) => {
+    // 获取或生成幂等键（客户端可通过请求头传入）
+    const idempotency_key =
+      req.headers['idempotency-key'] || req.body.idempotency_key || generateRequestIdempotencyKey()
+
     try {
       const { campaign_code, draw_count = 1 } = req.body
       const user_id = req.user.user_id
@@ -53,15 +71,49 @@ router.post(
         return res.apiError('缺少必需参数: campaign_code', 'MISSING_PARAMETER', {}, 400)
       }
 
+      /*
+       * 【入口幂等检查】防止同一次请求被重复提交
+       */
+      const idempotencyResult = await IdempotencyService.getOrCreateRequest(idempotency_key, {
+        api_path: '/api/v4/lottery/draw',
+        http_method: 'POST',
+        request_params: { campaign_code, draw_count },
+        user_id
+      })
+
+      // 如果已完成，直接返回首次结果（幂等性要求）
+      if (!idempotencyResult.should_process) {
+        logger.info('🔄 入口幂等拦截：重复请求，返回首次结果', {
+          idempotency_key,
+          user_id,
+          campaign_code
+        })
+        return res.apiSuccess(
+          idempotencyResult.response,
+          '抽奖成功（重试返回首次结果）',
+          'DRAW_SUCCESS'
+        )
+      }
+
+      /*
+       * 【执行抽奖】通过 UnifiedLotteryEngine 处理
+       */
+
       // ✅ 通过Service获取并验证活动（不再直连models）
       const lottery_engine = req.app.locals.services.getService('unifiedLotteryEngine')
       const campaign = await lottery_engine.getCampaignByCode(campaign_code, {
         checkStatus: true // 只获取active状态的活动
       })
+
+      // 传递幂等键到抽奖引擎（用于派生流水幂等键）
       const drawResult = await lottery_engine.execute_draw(
         user_id,
         campaign.campaign_id,
-        draw_count
+        draw_count,
+        {
+          idempotency_key, // 请求级幂等键，用于派生事务级幂等键
+          request_source: 'api_v4_lottery_draw' // 请求来源标识
+        }
       )
 
       // 🔍 调试日志：查看策略返回的原始数据
@@ -83,6 +135,7 @@ router.post(
       const sanitizedResult = {
         success: drawResult.success,
         campaign_code: campaign.campaign_code, // 返回campaign_code
+        lottery_session_id: drawResult.execution_id, // 返回抽奖会话ID（用于关联查询）
         prizes: drawResult.prizes.map(prize => {
           // ✅ 未中奖时返回特殊标记，不包含prize详情
           if (!prize.is_winner || !prize.prize) {
@@ -126,17 +179,43 @@ router.post(
         draw_type: drawResult.draw_type // 抽奖类型显示（如"10连抽(九折)"）
       }
 
+      /*
+       * 【标记请求完成】保存结果快照到入口幂等表
+       */
+      await IdempotencyService.markAsCompleted(
+        idempotency_key,
+        drawResult.execution_id, // 业务事件ID = lottery_session_id
+        sanitizedResult
+      )
+
       // 记录抽奖日志（脱敏）
       const logData = DataSanitizer.sanitizeLogs({
         user_id,
         campaign_code: campaign.campaign_code,
         draw_count,
+        idempotency_key,
+        lottery_session_id: drawResult.execution_id,
         result: 'success'
       })
-      logger.info('[LotteryDraw]', logData)
+      logger.info('[LotteryDraw] 抽奖成功', logData)
 
       return res.apiSuccess(sanitizedResult, '抽奖成功', 'DRAW_SUCCESS')
     } catch (error) {
+      // 标记幂等请求为失败状态（允许重试）
+      await IdempotencyService.markAsFailed(idempotency_key, error.message).catch(markError => {
+        logger.error('标记幂等请求失败状态时出错:', markError)
+      })
+
+      // 处理幂等键冲突错误（409状态码）
+      if (error.statusCode === 409) {
+        logger.warn('幂等性错误:', {
+          idempotency_key,
+          error_code: error.errorCode,
+          message: error.message
+        })
+        return res.apiError(error.message, error.errorCode || 'IDEMPOTENCY_ERROR', {}, 409)
+      }
+
       logger.error('抽奖失败:', error)
       return handleServiceError(error, res, '抽奖失败')
     }

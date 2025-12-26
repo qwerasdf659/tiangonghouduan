@@ -415,11 +415,16 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
            * - 如果为false（单抽场景），正常扣除积分
            */
           if (!context.skip_points_deduction) {
-            // 步骤1: 单抽场景 - 扣减积分（传入draw_id和transaction用于幂等性控制和事务管理）
+            // 步骤1: 单抽场景 - 扣减积分（方案B：传入幂等上下文）
             await this.deductPoints(
               user_id,
               this.config.pointsCostPerDraw,
-              draw_id,
+              {
+                idempotency_key: context.idempotency_key
+                  ? `${context.idempotency_key}:consume`
+                  : `consume_${draw_id}`,
+                lottery_session_id: context.lottery_session_id
+              },
               internalTransaction
             )
           } else {
@@ -437,9 +442,14 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
 
           /*
            * 🎯 步骤3: 发放奖品（在事务中执行，确保顺序）
-           * 🔴 统一幂等键：使用 draw_id 贯穿扣款/发奖/流水，避免重试重复发放
+           * 🔴 方案B修复：传递完整幂等上下文（idempotency_key + lottery_session_id）
+           * 不再依赖 distributePrize 内部生成随机key
            */
-          await this.distributePrize(user_id, prize, internalTransaction, { draw_id })
+          await this.distributePrize(user_id, prize, internalTransaction, {
+            draw_id,
+            idempotency_key: context.idempotency_key,
+            lottery_session_id: context.lottery_session_id
+          })
 
           /*
            * 🎯 步骤3.5: 记录奖品价值积分（用于历史记录和统计）
@@ -517,7 +527,12 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
           await this.deductPoints(
             user_id,
             this.config.pointsCostPerDraw,
-            fallback_draw_id,
+            {
+              idempotency_key: context.idempotency_key
+                ? `${context.idempotency_key}:consume`
+                : `consume_${fallback_draw_id}`,
+              lottery_session_id: context.lottery_session_id
+            },
             internalTransaction
           )
         }
@@ -796,9 +811,11 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
       // 2. 生成唯一的抽奖ID（用于幂等性控制）
       const draw_id = `draw_${BeijingTimeHelper.generateIdTimestamp()}_${user_id}_${Math.random().toString(36).substr(2, 6)}`
 
-      // 🎯 生成business_id（格式：lottery_draw_${userId}_${campaignId}_${timestamp}）
+      // 方案B：使用 idempotency_key 作为 business_id（兼容现有数据库约束）
       const businessId =
-        context.business_id || `lottery_draw_${user_id}_${campaignId}_${Date.now()}`
+        context.idempotency_key ||
+        context.lottery_session_id ||
+        `lottery_draw_${user_id}_${campaignId}_${Date.now()}`
 
       // 3. 获取九八折券奖品信息（使用悲观锁防止超卖）
       const guaranteePrize = await models.LotteryPrize.findOne({
@@ -824,13 +841,20 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
        * 修复：检查context.skip_points_deduction标识，连抽场景跳过积分扣除
        */
       if (!context.skip_points_deduction) {
+        // 方案B：使用 context 中传入的幂等键和抽奖会话ID
+        const consumeIdempotencyKey = context.idempotency_key
+          ? `${context.idempotency_key}:guarantee_consume`
+          : `guarantee_consume_${draw_id}`
+        const lotterySessionId = context.lottery_session_id || null
+
         // 🔧 V4.3修复：使用AssetService替代PointsService
         await AssetService.changeBalance(
           {
             user_id,
             asset_code: 'POINTS',
             delta_amount: -pointsCost, // 扣减为负数
-            business_id: draw_id, // ✅ 添加business_id用于幂等性控制
+            idempotency_key: consumeIdempotencyKey, // 方案B：使用派生幂等键
+            lottery_session_id: lotterySessionId, // 方案B：关联抽奖会话
             business_type: 'lottery_consume',
             meta: {
               source_type: 'system',
@@ -846,7 +870,7 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
           user_id,
           campaignId,
           drawNumber,
-          batch_draw_id: context.batch_draw_id
+          lottery_session_id: context.lottery_session_id
         })
       }
 
@@ -1437,29 +1461,38 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
   }
 
   /**
-   * 扣除用户积分 - 使用统一积分服务
+   * 扣除用户积分 - 使用统一积分服务（方案B - 业界标准幂等架构）
    *
    * 业务场景：抽奖前扣除用户积分，使用统一积分服务确保积分操作的一致性和幂等性
    *
    * @param {number} user_id - 用户ID
    * @param {number} pointsCost - 扣除积分数
-   * @param {string} draw_id - 抽奖ID（用于幂等性控制）
+   * @param {Object} options - 幂等性控制参数
+   * @param {string} options.idempotency_key - 幂等键（必填）
+   * @param {string} options.lottery_session_id - 抽奖会话ID（可选）
    * @param {Transaction} [transaction=null] - 事务对象（可选）
    * @returns {Promise<void>} 无返回值，扣除成功则正常返回，失败则抛出异常
    *
    * @throws {Error} 当用户积分不足时抛出错误
    *
    * @example
-   * await strategy.deductPoints(10001, 100, 'draw_123', transaction)
+   * await strategy.deductPoints(10001, 100, { idempotency_key: 'xxx:consume', lottery_session_id: 'xxx' }, transaction)
    */
-  async deductPoints(user_id, pointsCost, draw_id, transaction = null) {
+  async deductPoints(user_id, pointsCost, options = {}, transaction = null) {
+    const { idempotency_key, lottery_session_id } = options
+
+    if (!idempotency_key) {
+      throw new Error('deductPoints 需要 idempotency_key 参数（方案B幂等架构）')
+    }
+
     // 🔧 V4.3修复：使用AssetService替代PointsService
     await AssetService.changeBalance(
       {
         user_id,
         asset_code: 'POINTS',
         delta_amount: -pointsCost, // 扣减为负数
-        business_id: draw_id, // ✅ 添加business_id用于幂等性控制
+        idempotency_key, // 方案B：使用幂等键
+        lottery_session_id: lottery_session_id || null, // 方案B：关联抽奖会话
         business_type: 'lottery_consume',
         meta: {
           source_type: 'system',
@@ -1470,7 +1503,12 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
       { transaction }
     )
 
-    this.logDebug('扣除用户积分（使用PointsService）', { user_id, pointsCost, draw_id })
+    this.logDebug('扣除用户积分（使用AssetService）', {
+      user_id,
+      pointsCost,
+      idempotency_key,
+      lottery_session_id
+    })
   }
 
   /**
@@ -1544,27 +1582,36 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
    * @param {string} prize.prize_value - 奖品价值
    * @param {Transaction} [transaction=null] - 事务对象（可选）
    * @param {Object} [options={}] - 可选项
-   * @param {string} [options.draw_id] - 抽奖ID（幂等/对账业务单据ID）
-   * @param {string} [options.business_id] - 幂等/对账业务单据ID（若提供则优先使用draw_id）
+   * @param {string} [options.idempotency_key] - 幂等键（方案B）
+   * @param {string} [options.lottery_session_id] - 抽奖会话ID（方案B）
+   * @param {string} [options.draw_id] - 抽奖ID
    * @returns {Promise<void>} 无返回值，发放成功则正常返回，失败则抛出异常
    *
    * @throws {Error} 当发放奖品失败时抛出错误
    *
    * @example
    * const prize = { id: 9, prize_name: '九八折券', prize_type: 'coupon', prize_value: '98%' }
-   * await strategy.distributePrize(10001, prize, transaction)
+   * await strategy.distributePrize(10001, prize, transaction, { idempotency_key: 'xxx', lottery_session_id: 'xxx' })
    */
   async distributePrize(user_id, prize, transaction = null, options = {}) {
+    // 方案B：强制要求传入幂等键（不再允许随机生成）
+    const idempotencyKey = options.idempotency_key
+    if (!idempotencyKey) {
+      throw new Error('distributePrize 必须传入 idempotency_key（方案B幂等架构）')
+    }
+    const lotterySessionId = options.lottery_session_id || null
+
     // 根据奖品类型进行不同的发放逻辑
     switch (prize.prize_type) {
       case 'points':
-        // 🔧 V4.3修复：使用AssetService替代PointsService
+        // 🔧 V4.3修复：使用AssetService替代PointsService（方案B幂等）
         await AssetService.changeBalance(
           {
             user_id,
             asset_code: 'POINTS',
             delta_amount: parseInt(prize.prize_value), // 增加积分为正数
-            business_id: options.draw_id || `prize_${prize.prize_id}_${Date.now()}`,
+            idempotency_key: `${idempotencyKey}:points`, // 方案B：派生幂等键
+            lottery_session_id: lotterySessionId, // 方案B：关联抽奖会话
             business_type: 'lottery_reward',
             meta: {
               source_type: 'system',
@@ -1580,6 +1627,8 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
           prizeId: prize.prize_id,
           prizeName: prize.prize_name,
           points: prize.prize_value,
+          idempotencyKey,
+          lotterySessionId,
           inTransaction: !!transaction
         })
         break
@@ -1659,7 +1708,7 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
      * 业务场景：
      * - 抽奖时可以发放材料（碎红水晶、完整红水晶等）
      * - 与积分、虚拟奖品发放并行，不影响现有功能
-     * - 支持幂等性控制（使用 draw_id），防止重复发放
+     * - 支持幂等性控制（使用 idempotency_key），防止重复发放
      *
      * 数据来源：
      * - material_asset_code: 材料资产代码（如red_shard、red_crystal）
@@ -1668,20 +1717,19 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
      * 业务规则：
      * - 只有当material_asset_code和material_amount都存在时才发放材料
      * - 传入transaction确保事务一致性
-     * - 使用 draw_id 作为幂等/对账业务单据ID（business_id），通过 business_type 区分分录
+     * - 使用派生幂等键，通过 business_type 区分分录
      */
     if (prize.material_asset_code && prize.material_amount) {
-      // 🔴 V4 Unified：材料余额真相归账本（account_asset_balances/asset_transactions），禁止走已删除的 MaterialService
+      // 🔴 V4 Unified：材料余额真相归账本（account_asset_balances/asset_transactions）
       const AssetService = require('../../AssetService')
 
-      const business_id = options.draw_id || options.business_id
-      if (!business_id) {
-        throw new Error('缺少幂等键：distributePrize(material) 必须传入 draw_id 或 business_id')
-      }
+      // 方案B：使用派生幂等键
+      const materialIdempotencyKey = `${idempotencyKey}:material`
 
       await AssetService.changeBalance(
         {
-          business_id,
+          idempotency_key: materialIdempotencyKey, // 方案B：派生幂等键
+          lottery_session_id: lotterySessionId, // 方案B：关联抽奖会话
           business_type: 'lottery_reward_material_credit',
           user_id,
           asset_code: prize.material_asset_code,
@@ -1703,7 +1751,8 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
         prize_name: prize.prize_name,
         material_asset_code: prize.material_asset_code,
         material_amount: prize.material_amount,
-        business_id,
+        idempotencyKey: materialIdempotencyKey,
+        lotterySessionId,
         inTransaction: !!transaction
       })
     }
@@ -1743,11 +1792,10 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
    *
    * 幂等控制：
    * - 通过business_id防止重复提交
-   * - 同一business_id只能创建一条记录
+   * - 同一 lottery_session_id/idempotency_key 只能创建一条记录
    * - 重复提交返回已有记录
    *
-   * P0-3规范：所有资产变动必须有business_id幂等控制
-   * P0-6任务：抽奖结果未使用business_id幂等控制（已修复）
+   * 方案B更新：使用 idempotency_key 和 lottery_session_id 替代 business_id
    *
    * @param {Object} context - 抽奖上下文
    * @param {Object} result - 抽奖结果
@@ -1774,8 +1822,14 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
       draw_id ||
       `draw_${BeijingTimeHelper.generateIdTimestamp()}_${user_id}_${Math.random().toString(36).substr(2, 6)}`
 
-    // 🎯 生成business_id（格式：lottery_draw_${userId}_${campaignId}_${timestamp}）
-    const businessId = context.business_id || `lottery_draw_${user_id}_${campaign_id}_${Date.now()}`
+    /*
+     * 方案B：使用 idempotency_key 作为 business_id（兼容现有数据库约束）
+     * 优先使用 context.idempotency_key，回退到 lottery_session_id，最后使用传统格式
+     */
+    const businessId =
+      context.idempotency_key ||
+      context.lottery_session_id ||
+      `lottery_draw_${user_id}_${campaign_id}_${Date.now()}`
 
     // 🔥 P0-6修复：添加幂等检查，防止重复提交创建多条抽奖记录
     if (businessId) {
@@ -1789,7 +1843,8 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
           business_id: businessId,
           draw_id: existingDraw.draw_id,
           user_id,
-          campaign_id
+          campaign_id,
+          lottery_session_id: context.lottery_session_id
         })
         // 返回已有记录（幂等）
         return existingDraw
@@ -1800,7 +1855,7 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
     const lotteryDraw = await LotteryDraw.create(
       {
         draw_id: finalDrawId,
-        business_id: businessId, // 🎯 添加business_id字段
+        business_id: businessId, // 兼容现有字段，值来源于 idempotency_key 或 lottery_session_id
         user_id,
         lottery_id: campaign_id,
         campaign_id,
@@ -1827,7 +1882,8 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
       draw_id: finalDrawId,
       user_id,
       campaign_id,
-      is_winner: result.is_winner
+      is_winner: result.is_winner,
+      lottery_session_id: context.lottery_session_id
     })
 
     return lotteryDraw
@@ -1908,15 +1964,29 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
 
       // 🔥 修复：连抽场景跳过积分扣除（预设奖品也遵循相同逻辑）
       if (!context.skip_points_deduction) {
-        // 扣减积分（预设结果也需要消耗积分，保持抽奖流程一致性）
-        await this.deductPoints(user_id, this.config.pointsCostPerDraw, draw_id, transaction)
+        // 扣减积分（方案B：传入幂等上下文）
+        await this.deductPoints(
+          user_id,
+          this.config.pointsCostPerDraw,
+          {
+            idempotency_key: context.idempotency_key
+              ? `${context.idempotency_key}:consume`
+              : `consume_${draw_id}`,
+            lottery_session_id: context.lottery_session_id
+          },
+          transaction
+        )
       }
 
       /*
        * 🎯 发放预设奖品（在事务中执行）
-       * 🔴 统一幂等键：使用 draw_id 贯穿扣款/发奖/流水，避免重试重复发放
+       * 🔴 方案B修复：传递完整幂等上下文（idempotency_key + lottery_session_id）
        */
-      await this.distributePrize(user_id, preset.prize, transaction, { draw_id })
+      await this.distributePrize(user_id, preset.prize, transaction, {
+        draw_id,
+        idempotency_key: context.idempotency_key,
+        lottery_session_id: context.lottery_session_id
+      })
 
       // 🎯 标记预设为已使用（在事务中执行）
       await preset.markAsUsed(transaction)

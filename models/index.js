@@ -234,10 +234,20 @@ models.AssetTransaction = require('./AssetTransaction')(sequelize, DataTypes)
 /*
  * ✅ AssetTransaction：资产流水表（记录所有资产变动流水）
  *    - 用途：记录DIAMOND和材料资产的所有变动流水
- *    - 特点：支持幂等性控制（business_id + business_type唯一约束），delta_amount可正可负，记录变动后余额
+ *    - 特点：业界标准幂等架构（idempotency_key唯一约束），delta_amount可正可负，记录变动后余额
  *    - 表名：asset_transactions，主键：transaction_id，外键：account_id
  *    - 业务场景：市场购买（买家扣减、卖家入账、平台手续费）、兑换扣减、材料转换、对账审计
- *    - 更新：2025-12-22 删除 user_id 字段，完全迁移到 account_id 体系
+ *    - 更新：2025-12-26 升级到业界标准幂等架构（方案B），删除 business_id 字段
+ */
+
+models.ApiIdempotencyRequest = require('./ApiIdempotencyRequest')(sequelize, DataTypes)
+/*
+ * ✅ ApiIdempotencyRequest：API入口幂等表（业界标准）
+ *    - 用途：记录每次API请求的处理状态和结果快照，实现重试返回首次结果
+ *    - 特点：idempotency_key唯一约束、状态机（processing/completed/failed）、响应快照
+ *    - 表名：api_idempotency_requests，主键：request_id
+ *    - 业务场景：抽奖请求幂等、支付请求幂等、任何需要幂等保证的请求
+ *    - 创建：2025-12-26 业界标准幂等架构（方案B）
  */
 
 // 🔥 统一账户体系（2025年12月15日新增 - Phase 1）

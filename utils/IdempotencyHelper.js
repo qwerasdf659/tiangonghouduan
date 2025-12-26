@@ -3,21 +3,23 @@
  *
  * 用于生成各种业务场景的幂等键，防止重复操作
  *
- * 幂等架构：入口幂等 + 内部派生（业界标准）
+ * 幂等架构：入口幂等 + 内部派生（业界标准 - 方案B）
  * - 入口幂等：防止"同一个业务请求"被重复提交（重试/超时/重复点击）
  * - 内部派生：同一个业务请求内部产生多条事务记录，各自有独立幂等键
  *
  * 设计理念：
- * - lottery_session_id: 只负责"关联同一业务事件的多条记录"
- * - idempotency_key: 独立承担"防止重复入账"的责任
+ * - lottery_session_id: 只负责"关联同一业务事件的多条记录"（业务关联）
+ * - idempotency_key: 独立承担"防止重复入账"的责任（幂等保证）
+ * - request_idempotency_key: 入口层的请求级幂等键（派生源）
  *
- * 命名规范：
+ * 命名规范（方案B - 从请求幂等键派生）：
+ * - 请求幂等键: req_{timestamp}_{random8}_{seq}
  * - 抽奖会话ID: lottery_tx_{timestamp}_{random6}_{seq}
- * - 抽奖派生键: {lottery_session_id}:consume、{lottery_session_id}:reward
+ * - 抽奖派生键: {req_key}:consume、{req_key}:reward_1（从请求幂等键派生）
  * - 独立幂等键: {business_type}_{account_id}_{timestamp}_{random6}
  *
  * 创建时间：2025-12-26
- * 版本：1.0.0
+ * 版本：2.0.0 - 方案B业界标准版
  */
 
 'use strict'
@@ -48,29 +50,34 @@ function generateLotterySessionId() {
 }
 
 /**
- * 从抽奖会话ID派生事务级幂等键
+ * 从请求幂等键派生事务级幂等键（Transaction-Level Idempotency Key）
  *
  * 用途：同一请求内的多条事务记录，各自有独立的幂等键
  *
- * 格式：{lottery_session_id}:{transaction_type}
- * - lottery_session_id: 抽奖会话ID
- * - transaction_type: 事务类型（consume/reward/refund等）
+ * 格式：{request_idempotency_key}:{transaction_type}
+ * - request_idempotency_key: 请求级幂等键（来自入口层）
+ * - transaction_type: 事务类型（consume/reward/reward_1/reward_2/refund等）
  *
- * @param {string} lotterySessionId - 抽奖会话ID
- * @param {string} transactionType - 事务类型（consume/reward/refund等）
+ * 业界标准（方案B）：
+ * - 入口幂等：api_idempotency_requests 表存储请求级幂等键
+ * - 派生幂等：从请求级幂等键派生事务级幂等键
+ * - 职责分离：lottery_session_id 只负责关联记录，idempotency_key 负责防重复
+ *
+ * @param {string} requestIdempotencyKey - 请求级幂等键（必须从入口层传递）
+ * @param {string} transactionType - 事务类型（consume/reward/reward_1/refund等）
  * @returns {string} 事务级幂等键
  *
  * @example
- * const consumeKey = deriveTransactionIdempotencyKey('lottery_tx_xxx', 'consume')
- * // => 'lottery_tx_xxx:consume'
- * const rewardKey = deriveTransactionIdempotencyKey('lottery_tx_xxx', 'reward')
- * // => 'lottery_tx_xxx:reward'
+ * const consumeKey = deriveTransactionIdempotencyKey('req_1703511234567_a1b2c3d4_001', 'consume')
+ * // => 'req_1703511234567_a1b2c3d4_001:consume'
+ * const rewardKey = deriveTransactionIdempotencyKey('req_1703511234567_a1b2c3d4_001', 'reward_1')
+ * // => 'req_1703511234567_a1b2c3d4_001:reward_1'
  */
-function deriveTransactionIdempotencyKey(lotterySessionId, transactionType) {
-  if (!lotterySessionId || !transactionType) {
-    throw new Error('lotterySessionId 和 transactionType 不能为空')
+function deriveTransactionIdempotencyKey(requestIdempotencyKey, transactionType) {
+  if (!requestIdempotencyKey || !transactionType) {
+    throw new Error('requestIdempotencyKey 和 transactionType 不能为空')
   }
-  return `${lotterySessionId}:${transactionType}`
+  return `${requestIdempotencyKey}:${transactionType}`
 }
 
 /**
@@ -128,7 +135,7 @@ function generateRequestIdempotencyKey() {
  * 验证幂等键格式是否有效
  *
  * @param {string} key - 待验证的幂等键
- * @param {string} type - 预期的键类型（lottery_session/lottery_derived/standalone/request）
+ * @param {string} type - 预期的键类型（lottery_session/request_derived/lottery_derived/standalone/request）
  * @returns {boolean} 是否有效
  */
 function isValidIdempotencyKey(key, type) {
@@ -141,8 +148,12 @@ function isValidIdempotencyKey(key, type) {
       // lottery_tx_{timestamp}_{random6}_{seq}
       return /^lottery_tx_\d+_[a-f0-9]{6}_\d{3}$/.test(key)
 
+    case 'request_derived':
+      // {req_key}:{type} - 方案B标准格式（从请求幂等键派生）
+      return /^req_\d+_[a-f0-9]{8}_\d{3}:(consume|reward|refund|reward_\d+)$/.test(key)
+
     case 'lottery_derived':
-      // {lottery_session_id}:{type}
+      // {lottery_session_id}:{type} - 旧格式（保留兼容历史数据验证）
       return /^lottery_tx_\d+_[a-f0-9]{6}_\d{3}:(consume|reward|refund)$/.test(key)
 
     case 'standalone':
@@ -159,21 +170,38 @@ function isValidIdempotencyKey(key, type) {
 }
 
 /**
- * 从幂等键解析出会话信息（仅支持抽奖派生键）
+ * 从幂等键解析出会话信息（支持请求派生键和抽奖派生键）
  *
  * @param {string} idempotencyKey - 幂等键
  * @returns {Object|null} 解析结果，失败返回null
  *
  * @example
- * const info = parseIdempotencyKey('lottery_tx_1703511234567_a1b2c3_001:consume')
- * // => { lotterySessionId: 'lottery_tx_1703511234567_a1b2c3_001', transactionType: 'consume' }
+ * // 解析请求派生键（方案B标准格式）
+ * const info = parseIdempotencyKey('req_1703511234567_a1b2c3d4_001:consume')
+ * // => { type: 'request_derived', requestIdempotencyKey: 'req_1703511234567_a1b2c3d4_001', transactionType: 'consume' }
+ *
+ * // 解析抽奖派生键（旧格式，历史数据兼容）
+ * const info2 = parseIdempotencyKey('lottery_tx_1703511234567_a1b2c3_001:consume')
+ * // => { type: 'lottery_derived', lotterySessionId: 'lottery_tx_1703511234567_a1b2c3_001', transactionType: 'consume' }
  */
 function parseIdempotencyKey(idempotencyKey) {
   if (!idempotencyKey || typeof idempotencyKey !== 'string') {
     return null
   }
 
-  // 尝试解析抽奖派生键
+  // 尝试解析请求派生键（方案B标准格式）
+  const requestDerivedMatch = idempotencyKey.match(
+    /^(req_\d+_[a-f0-9]{8}_\d{3}):(consume|reward|refund|reward_\d+)$/
+  )
+  if (requestDerivedMatch) {
+    return {
+      type: 'request_derived',
+      requestIdempotencyKey: requestDerivedMatch[1],
+      transactionType: requestDerivedMatch[2]
+    }
+  }
+
+  // 尝试解析抽奖派生键（旧格式，历史数据兼容）
   const lotteryDerivedMatch = idempotencyKey.match(
     /^(lottery_tx_\d+_[a-f0-9]{6}_\d{3}):(consume|reward|refund)$/
   )
@@ -182,6 +210,14 @@ function parseIdempotencyKey(idempotencyKey) {
       type: 'lottery_derived',
       lotterySessionId: lotteryDerivedMatch[1],
       transactionType: lotteryDerivedMatch[2]
+    }
+  }
+
+  // 尝试解析请求级幂等键
+  if (/^req_\d+_[a-f0-9]{8}_\d{3}$/.test(idempotencyKey)) {
+    return {
+      type: 'request',
+      requestIdempotencyKey: idempotencyKey
     }
   }
 

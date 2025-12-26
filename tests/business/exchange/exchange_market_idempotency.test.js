@@ -28,10 +28,17 @@
  */
 
 const request = require('supertest')
-const { sequelize, ExchangeItem, ExchangeRecord, UserAssetAccount } = require('../../../models')
+const {
+  sequelize,
+  ExchangeItem,
+  ExchangeRecord,
+  Account,
+  AccountAssetBalance
+} = require('../../../models')
 const ExchangeService = require('../../../services/ExchangeService')
 const AssetService = require('../../../services/AssetService')
 const BeijingTimeHelper = require('../../../utils/timeHelper')
+const { generateStandaloneIdempotencyKey } = require('../../../utils/IdempotencyHelper')
 
 describe('兑换市场幂等性测试 (Exchange Market Idempotency - V4.5.0 材料资产支付)', () => {
   let app
@@ -86,23 +93,38 @@ describe('兑换市场幂等性测试 (Exchange Market Idempotency - V4.5.0 材�
       updated_at: BeijingTimeHelper.createDatabaseTime()
     })
 
-    // 初始化测试用户的材料资产账户（red_shard）
-    let assetAccount = await UserAssetAccount.findOne({
+    /*
+     * 初始化测试用户的材料资产账户（red_shard）
+     * 方案B：使用 Account + AccountAssetBalance 模型
+     */
+    let account = await Account.findOne({
       where: {
+        account_type: 'user',
+        user_id: testUser.user_id
+      }
+    })
+
+    if (!account) {
+      account = await Account.create({
+        account_type: 'user',
         user_id: testUser.user_id,
+        status: 'active'
+      })
+    }
+
+    let assetBalance = await AccountAssetBalance.findOne({
+      where: {
+        account_id: account.account_id,
         asset_code: 'red_shard'
       }
     })
 
-    if (!assetAccount) {
-      assetAccount = await UserAssetAccount.create({
-        user_id: testUser.user_id,
+    if (!assetBalance) {
+      assetBalance = await AccountAssetBalance.create({
+        account_id: account.account_id,
         asset_code: 'red_shard',
-        balance: 0,
-        total_earned: 0,
-        total_consumed: 0,
-        created_at: BeijingTimeHelper.createDatabaseTime(),
-        updated_at: BeijingTimeHelper.createDatabaseTime()
+        available_amount: 0,
+        frozen_amount: 0
       })
     }
 
@@ -117,29 +139,40 @@ describe('兑换市场幂等性测试 (Exchange Market Idempotency - V4.5.0 材�
    * 确保每个测试开始时都有足够的材料资产
    */
   beforeEach(async () => {
-    // 查询用户当前材料资产余额
-    const assetAccount = await UserAssetAccount.findOne({
+    // 方案B：使用 Account + AccountAssetBalance 模型查询余额
+    const account = await Account.findOne({
       where: {
-        user_id: testUser.user_id,
-        asset_code: 'red_shard'
+        account_type: 'user',
+        user_id: testUser.user_id
       }
     })
 
-    const currentBalance = assetAccount ? assetAccount.balance : 0
+    let currentBalance = 0
+    if (account) {
+      const assetBalance = await AccountAssetBalance.findOne({
+        where: {
+          account_id: account.account_id,
+          asset_code: 'red_shard'
+        }
+      })
+      currentBalance = assetBalance ? Number(assetBalance.available_amount) : 0
+    }
+
     console.log(`🔍 测试前检查材料资产余额: ${currentBalance} red_shard`)
 
     // 如果余额不足1000，充值到1000
     if (currentBalance < 1000) {
       console.log(`⚠️ 材料资产不足(${currentBalance} < 1000)，充值到1000`)
 
-      await AssetService.changeBalance(
-        testUser.user_id,
-        'red_shard',
-        1000 - currentBalance,
-        'test_recharge',
-        `test_recharge_${Date.now()}`,
-        '测试充值'
-      )
+      // 方案B：使用新的 AssetService.changeBalance 参数格式
+      await AssetService.changeBalance({
+        user_id: testUser.user_id,
+        asset_code: 'red_shard',
+        delta_amount: 1000 - currentBalance,
+        business_type: 'test_recharge',
+        idempotency_key: generateStandaloneIdempotencyKey('test_recharge', testUser.user_id),
+        meta: { description: '测试充值' }
+      })
 
       console.log(`✅ 已充值 ${1000 - currentBalance} red_shard`)
     } else {
@@ -310,14 +343,14 @@ describe('兑换市场幂等性测试 (Exchange Market Idempotency - V4.5.0 材�
     test('材料资产应该只扣除一次', async () => {
       const business_id = `test_asset_deduct_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`
 
-      // 获取初始材料资产余额
-      const assetAccountBefore = await UserAssetAccount.findOne({
-        where: {
-          user_id: testUser.user_id,
-          asset_code: 'red_shard'
-        }
+      // 获取初始材料资产余额（使用新模型结构 Account + AccountAssetBalance）
+      const accountBefore = await Account.findOne({
+        where: { user_id: testUser.user_id, account_type: 'user' }
       })
-      const balanceBefore = assetAccountBefore.balance
+      const assetBalanceBefore = await AccountAssetBalance.findOne({
+        where: { account_id: accountBefore.account_id, asset_code: 'red_shard' }
+      })
+      const balanceBefore = Number(assetBalanceBefore.available_amount)
       console.log(`🔍 初始材料资产余额: ${balanceBefore} red_shard`)
 
       // 第一次兑换
@@ -332,13 +365,10 @@ describe('兑换市场幂等性测试 (Exchange Market Idempotency - V4.5.0 材�
         .expect(200)
 
       // 查询第一次兑换后的余额
-      const assetAccountAfterFirst = await UserAssetAccount.findOne({
-        where: {
-          user_id: testUser.user_id,
-          asset_code: 'red_shard'
-        }
+      const assetBalanceAfterFirst = await AccountAssetBalance.findOne({
+        where: { account_id: accountBefore.account_id, asset_code: 'red_shard' }
       })
-      const balanceAfterFirst = assetAccountAfterFirst.balance
+      const balanceAfterFirst = Number(assetBalanceAfterFirst.available_amount)
       const deducted = balanceBefore - balanceAfterFirst
 
       console.log(`✅ 第一次兑换完成，扣除材料资产: ${deducted} red_shard`)
@@ -357,13 +387,10 @@ describe('兑换市场幂等性测试 (Exchange Market Idempotency - V4.5.0 材�
         .expect(200)
 
       // 查询第二次兑换后的余额
-      const assetAccountAfterSecond = await UserAssetAccount.findOne({
-        where: {
-          user_id: testUser.user_id,
-          asset_code: 'red_shard'
-        }
+      const assetBalanceAfterSecond = await AccountAssetBalance.findOne({
+        where: { account_id: accountBefore.account_id, asset_code: 'red_shard' }
       })
-      const balanceAfterSecond = assetAccountAfterSecond.balance
+      const balanceAfterSecond = Number(assetBalanceAfterSecond.available_amount)
 
       console.log('✅ 第二次兑换完成（幂等）')
       expect(balanceAfterSecond).toBe(balanceAfterFirst) // ✅ 材料资产不应该再次扣除

@@ -477,21 +477,23 @@ class ExchangeService {
         user_id,
         asset_code: item.cost_asset_code,
         amount: totalPayAmount,
-        business_id: `${business_id}`
+        idempotency_key: `exchange_debit_${business_id}`
       })
 
       /*
        * 扣减材料资产（使用统一账本AssetService）
        * business_type: exchange_debit（兑换市场材料扣减）
+       * 方案B：使用 idempotency_key 替代 business_id
        */
       const materialResult = await AssetService.changeBalance(
         {
           user_id,
           asset_code: item.cost_asset_code,
           delta_amount: -totalPayAmount, // 负数表示扣减
-          business_id: `${business_id}`, // 幂等键：使用订单级business_id
+          idempotency_key: `exchange_debit_${business_id}`, // 方案B：幂等键
           business_type: 'exchange_debit', // 业务类型：兑换市场扣减
           meta: {
+            business_id, // 保留原业务ID用于追溯
             item_id,
             item_name: item.name,
             quantity,

@@ -164,7 +164,8 @@ describe('用户个性化中奖率设置功能测试', () => {
       const { data } = response.body
       expect(data.user_id).toBe(testUserId)
       expect(data.adjustment_type).toBe('global_multiplier')
-      expect(data.probability_multiplier).toBe(2.0)
+      // 🔧 修复：API返回 multiplier 而非 probability_multiplier
+      expect(data.multiplier).toBe(2.0)
       expect(data.setting_id).toBeDefined()
     })
 
@@ -214,7 +215,9 @@ describe('用户个性化中奖率设置功能测试', () => {
       expect(management_status).toHaveProperty('probability_adjust')
 
       if (management_status.probability_adjust) {
-        expect(management_status.probability_adjust.adjustment_type).toBeDefined()
+        // 🔧 修复：adjustment_type 在 setting_data 内部
+        expect(management_status.probability_adjust.setting_data).toBeDefined()
+        expect(management_status.probability_adjust.setting_data.adjustment_type).toBeDefined()
         expect(management_status.probability_adjust.status).toBe('active')
       }
     })
@@ -424,8 +427,10 @@ describe('用户个性化中奖率设置功能测试', () => {
 
       const { management_status } = statusResponse.body.data
       expect(management_status.probability_adjust).not.toBeNull()
-      expect(management_status.probability_adjust.multiplier).toBeDefined()
-      expect([2.0, 3.0]).toContain(management_status.probability_adjust.multiplier)
+      // 🔧 修复：multiplier 在 setting_data 内部
+      expect(management_status.probability_adjust.setting_data).toBeDefined()
+      expect(management_status.probability_adjust.setting_data.multiplier).toBeDefined()
+      expect([2.0, 3.0]).toContain(management_status.probability_adjust.setting_data.multiplier)
     })
   })
 

@@ -14,7 +14,7 @@ const fs = require('fs')
  * 项目启动前综合检查
  * @returns {Promise<boolean>} 是否通过所有检查
  */
-async function preStartCheck () {
+async function preStartCheck() {
   console.log('🚀 项目启动前检查...\n')
 
   const checks = []
@@ -24,9 +24,7 @@ async function preStartCheck () {
   console.log('1️⃣  路由文件完整性检查')
   console.log('-'.repeat(60))
   const validator = new RouteValidator()
-  const routeResult = validator.validateAppRoutes(
-    path.resolve(__dirname, '../../app.js')
-  )
+  const routeResult = validator.validateAppRoutes(path.resolve(__dirname, '../../app.js'))
   checks.push({
     name: '路由文件完整性',
     passed: routeResult.valid,
@@ -114,10 +112,16 @@ async function preStartCheck () {
  * 检查必需的环境变量
  * @returns {Object} 检查结果
  */
-function checkEnvironmentVariables () {
+function checkEnvironmentVariables() {
   const required = [
-    'DB_HOST', 'DB_PORT', 'DB_NAME', 'DB_USER', 'DB_PASSWORD',
-    'JWT_SECRET', 'PORT', 'NODE_ENV'
+    'DB_HOST',
+    'DB_PORT',
+    'DB_NAME',
+    'DB_USER',
+    'DB_PASSWORD',
+    'JWT_SECRET',
+    'PORT',
+    'NODE_ENV'
   ]
 
   const missing = []
@@ -150,14 +154,8 @@ function checkEnvironmentVariables () {
  * 检查必需文件
  * @returns {Object} 检查结果
  */
-function checkRequiredFiles () {
-  const requiredFiles = [
-    'app.js',
-    'package.json',
-    '.env',
-    'models/index.js',
-    'config/database.js'
-  ]
+function checkRequiredFiles() {
+  const requiredFiles = ['app.js', 'package.json', '.env', 'models/index.js', 'config/database.js']
 
   const missing = []
 
@@ -181,11 +179,9 @@ function checkRequiredFiles () {
  * 检查数据库连接
  * @returns {Promise<Object>} 检查结果
  */
-async function checkDatabaseConnection () {
+async function checkDatabaseConnection() {
   try {
-    // 动态加载，避免.env未加载问题
-    require('dotenv').config({ path: path.resolve(__dirname, '../../.env') })
-
+    // 动态加载 models（此时环境变量已在入口加载）
     const { sequelize } = require('../../models')
 
     // 设置超时时间
@@ -211,12 +207,14 @@ if (require.main === module) {
   // 加载环境变量
   require('dotenv').config({ path: path.resolve(__dirname, '../../.env') })
 
-  preStartCheck().then(passed => {
-    process.exit(passed ? 0 : 1)
-  }).catch(error => {
-    console.error('❌ 启动前检查异常:', error)
-    process.exit(1)
-  })
+  preStartCheck()
+    .then(passed => {
+      process.exit(passed ? 0 : 1)
+    })
+    .catch(error => {
+      console.error('❌ 启动前检查异常:', error)
+      process.exit(1)
+    })
 }
 
 module.exports = preStartCheck

@@ -318,7 +318,7 @@ class AssetConversionService {
           user_id,
           asset_code: from_asset_code,
           delta_amount: -from_amount, // 负数表示扣减
-          business_id: `${business_id}`, // 幂等键：转换业务ID
+          idempotency_key: `${business_id}:debit`, // 幂等键：派生键（扣减）
           business_type: 'material_convert_debit', // 业务类型：材料转换扣减
           meta: {
             ...meta,
@@ -342,7 +342,7 @@ class AssetConversionService {
           user_id,
           asset_code: to_asset_code,
           delta_amount: to_amount, // 正数表示增加
-          business_id: `${business_id}`, // 同一个business_id，不同business_type实现双分录
+          idempotency_key: `${business_id}:credit`, // 幂等键：派生键（入账）
           business_type: 'material_convert_credit', // 业务类型：材料转换入账
           meta: {
             ...meta,

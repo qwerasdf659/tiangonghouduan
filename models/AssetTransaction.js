@@ -13,13 +13,12 @@
  * - delta_amount可正可负（正数表示增加，负数表示扣减）
  * - 记录变动后余额（balance_after）用于快速对账
  *
- * 幂等性机制（方案A - 入口幂等 + 内部派生）：
+ * 幂等性机制（方案B - 业界标准 - 入口幂等 + 内部派生）：
  * - idempotency_key：每条事务记录的独立幂等键（唯一约束）
- * - lottery_session_id：抽奖会话ID（一次抽奖对应多条事务，如 consume + reward）
- * - business_id + business_type：兼容旧逻辑的组合唯一索引
+ * - lottery_session_id：抽奖会话ID（一次抽奖对应多条事务，如 consume + reward），非抽奖业务可为NULL
  *
  * 幂等键生成规则：
- * - 抽奖场景：从请求幂等键派生，如 {lottery_session_id}:consume、{lottery_session_id}:reward
+ * - 抽奖场景：从请求幂等键派生，如 {request_key}:consume、{request_key}:reward
  * - 独立场景：{business_type}_{account_id}_{timestamp}_{random}
  *
  * 命名规范（snake_case）：
@@ -28,7 +27,7 @@
  * - 外键：account_id（关联 accounts 表）
  *
  * 创建时间：2025-12-15
- * 更新时间：2025-12-26（方案A幂等性修复：新增 idempotency_key 和 lottery_session_id）
+ * 更新时间：2025-12-26（方案B - 业界标准幂等架构：删除 business_id，lottery_session_id 允许 NULL）
  */
 
 'use strict'
@@ -170,13 +169,6 @@ module.exports = sequelize => {
           '变动后余额（Balance After - 本次变动后的资产余额）：用于快速查询和对账，记录当前账户余额状态，不能为负数'
       },
 
-      // 业务唯一标识（Business ID - 兼容旧逻辑）
-      business_id: {
-        type: DataTypes.STRING(100),
-        allowNull: false,
-        comment: '业务唯一标识（Business ID）：与business_type组合确保幂等性，兼容旧逻辑'
-      },
-
       // 业务类型（Business Type - 业务场景分类）
       business_type: {
         type: DataTypes.STRING(50),
@@ -188,9 +180,9 @@ module.exports = sequelize => {
       // 抽奖会话ID（Lottery Session ID - 一次抽奖对应多条事务）
       lottery_session_id: {
         type: DataTypes.STRING(100),
-        allowNull: false,
+        allowNull: true, // 方案B：非抽奖业务可为 NULL
         comment:
-          '抽奖会话ID（一次抽奖对应多条事务记录，如 consume + reward）：用于把同一次抽奖的多条流水关联起来'
+          '抽奖会话ID（仅抽奖业务使用，非抽奖业务可为NULL）：用于把同一次抽奖的多条流水（consume + reward）关联起来'
       },
 
       // 幂等键（Idempotency Key - 每条事务记录唯一）
@@ -199,7 +191,7 @@ module.exports = sequelize => {
         allowNull: false,
         unique: true,
         comment:
-          '幂等键（每条事务记录唯一）：格式 {type}_{account}_{timestamp}_{random}，抽奖场景从请求key派生如 {lottery_session_id}:consume'
+          '幂等键（每条流水唯一）：抽奖格式 {request_key}:consume/{request_key}:reward，其他格式 {type}_{account}_{ts}_{random}'
       },
 
       // 扩展信息（Meta - JSON格式存储业务扩展信息）
@@ -220,7 +212,7 @@ module.exports = sequelize => {
       underscored: true,
       comment: '资产流水表（记录所有资产变动，支持幂等性控制和审计追溯）',
       indexes: [
-        // 主幂等键唯一索引（方案A - 每条事务记录唯一）
+        // 主幂等键唯一索引（方案B - 每条事务记录唯一）
         {
           fields: ['idempotency_key'],
           unique: true,
@@ -232,13 +224,6 @@ module.exports = sequelize => {
           fields: ['lottery_session_id'],
           name: 'idx_lottery_session_id',
           comment: '索引：抽奖会话ID（用于查询同一次抽奖的所有流水）'
-        },
-        // 兼容旧逻辑的幂等索引
-        {
-          fields: ['business_id', 'business_type'],
-          unique: true,
-          name: 'uk_business_idempotency',
-          comment: '唯一索引：业务ID + 业务类型（兼容旧逻辑）'
         },
         {
           fields: ['account_id', 'asset_code', 'created_at'],
