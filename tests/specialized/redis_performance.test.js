@@ -6,11 +6,12 @@
 
 const Redis = require('ioredis')
 
-// Redis客户端配置
-const redis = new Redis({
-  host: process.env.REDIS_HOST || 'localhost',
-  port: process.env.REDIS_PORT || 6379,
-  db: process.env.REDIS_DB || 0,
+/**
+ * Redis客户端配置
+ * 统一使用REDIS_URL（单一真相源方案）
+ * 参考：docs/Devbox单环境统一配置方案.md
+ */
+const redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379', {
   maxRetriesPerRequest: 3,
   retryDelayOnFailover: 100,
   connectTimeout: 10000,

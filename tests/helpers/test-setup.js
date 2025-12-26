@@ -5,9 +5,9 @@
  * 🔴 更新：统一使用生产数据库，移除内存数据库配置，清除所有Mock数据
  */
 
-// 🔧 修复：测试环境变量配置 - 解决环境变量缺失问题
+// 🔧 测试环境变量配置
+// ✅ 强制方案1：不加载dotenv，纯手动设置（docs/Devbox单环境统一配置方案新.md）
 const BeijingTimeHelper = require('../../utils/timeHelper')
-require('dotenv').config()
 
 // 🔧 修复：设置必需的环境变量
 process.env.NODE_ENV = 'test'
@@ -31,8 +31,9 @@ if (typeof jest !== 'undefined') {
   jest.setTimeout(30000)
 }
 
-// 🔧 禁用Redis连接（测试环境可选）
-process.env.DISABLE_REDIS = 'false' // 启用Redis，因为我们有真实的Redis
+// ✅ Redis配置：必须连接（不允许禁用，方案A：只用REDIS_URL）
+process.env.REDIS_URL = 'redis://localhost:6379'
+// ❌ 移除DISABLE_REDIS设置（Redis为必需依赖，不允许禁用）
 
 /**
  * 测试断言工具

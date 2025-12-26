@@ -38,6 +38,7 @@
 const { Account, AccountAssetBalance, AssetTransaction, User } = require('../models')
 const { sequelize } = require('../config/database')
 const logger = require('../utils/logger')
+const { generateStandaloneIdempotencyKey } = require('../utils/IdempotencyHelper')
 
 /**
  * 资产服务类（V2升级版）
@@ -156,13 +157,18 @@ class AssetService {
   }
 
   /**
-   * 改变可用余额（核心方法）
+   * 改变可用余额（核心方法 - 支持方案A幂等机制）
    *
    * 业务规则：
-   * - 支持幂等性控制（business_id + business_type唯一约束）
+   * - 支持幂等性控制（idempotency_key唯一约束 + business_id + business_type兼容索引）
    * - 扣减时必须验证可用余额充足
    * - 记录变动前后余额用于完整对账（before + delta = after）
    * - 支持外部事务传入
+   *
+   * 幂等机制（方案A）：
+   * - idempotency_key：独立幂等键（每条记录唯一）
+   * - lottery_session_id：抽奖会话ID（一次抽奖的多条流水共享）
+   * - 如果未提供，自动生成默认值
    *
    * @param {Object} params - 参数对象
    * @param {number} params.user_id - 用户ID（用户账户）
@@ -171,6 +177,8 @@ class AssetService {
    * @param {number} params.delta_amount - 变动金额（正数=增加，负数=扣减）
    * @param {string} params.business_id - 业务唯一ID（幂等键，必填）
    * @param {string} params.business_type - 业务类型（必填）
+   * @param {string} params.idempotency_key - 独立幂等键（可选，不提供则自动生成）
+   * @param {string} params.lottery_session_id - 抽奖会话ID（可选，不提供则使用business_id）
    * @param {Object} params.meta - 扩展信息（可选）
    * @param {Object} options - 选项
    * @param {Object} options.transaction - Sequelize事务对象（可选）
@@ -184,6 +192,8 @@ class AssetService {
       delta_amount,
       business_id,
       business_type,
+      idempotency_key,
+      lottery_session_id,
       meta = {}
     } = params
     const { transaction: externalTransaction } = options
@@ -298,6 +308,14 @@ class AssetService {
         { transaction }
       )
 
+      /**
+       * 方案A幂等机制：生成独立幂等键和会话ID
+       * 如果没有提供，自动根据业务类型生成
+       */
+      const final_lottery_session_id = lottery_session_id || business_id
+      const final_idempotency_key =
+        idempotency_key || generateStandaloneIdempotencyKey(business_type, account.account_id)
+
       // 创建资产流水记录
       const transaction_record = await AssetTransaction.create(
         {
@@ -308,6 +326,8 @@ class AssetService {
           balance_after,
           business_id,
           business_type,
+          lottery_session_id: final_lottery_session_id,
+          idempotency_key: final_idempotency_key,
           meta
         },
         { transaction }
@@ -322,6 +342,8 @@ class AssetService {
         balance_after,
         business_id,
         business_type,
+        lottery_session_id: final_lottery_session_id,
+        idempotency_key: final_idempotency_key,
         transaction_id: transaction_record.transaction_id
       })
 
@@ -480,7 +502,14 @@ class AssetService {
         { transaction }
       )
 
-      // 创建冻结流水记录（delta_amount为负数表示从available扣减）
+      /**
+       * 创建冻结流水记录（delta_amount为负数表示从available扣减）
+       * 方案A幂等机制：生成独立幂等键
+       */
+      const freeze_idempotency_key = generateStandaloneIdempotencyKey(
+        business_type,
+        account.account_id
+      )
       const transaction_record = await AssetTransaction.create(
         {
           account_id: account.account_id,
@@ -490,6 +519,8 @@ class AssetService {
           balance_after: available_after,
           business_id,
           business_type,
+          lottery_session_id: business_id,
+          idempotency_key: freeze_idempotency_key,
           meta: {
             ...meta,
             freeze_amount: amount,
@@ -668,7 +699,14 @@ class AssetService {
         { transaction }
       )
 
-      // 创建解冻流水记录（delta_amount为正数表示增加到available）
+      /**
+       * 创建解冻流水记录（delta_amount为正数表示增加到available）
+       * 方案A幂等机制：生成独立幂等键
+       */
+      const unfreeze_idempotency_key = generateStandaloneIdempotencyKey(
+        business_type,
+        account.account_id
+      )
       const transaction_record = await AssetTransaction.create(
         {
           account_id: account.account_id,
@@ -678,6 +716,8 @@ class AssetService {
           balance_after: available_after,
           business_id,
           business_type,
+          lottery_session_id: business_id,
+          idempotency_key: unfreeze_idempotency_key,
           meta: {
             ...meta,
             unfreeze_amount: amount,
@@ -855,7 +895,14 @@ class AssetService {
         { transaction }
       )
 
-      // 创建结算流水记录（delta_amount为0，因为available不变）
+      /**
+       * 创建结算流水记录（delta_amount为0，因为available不变）
+       * 方案A幂等机制：生成独立幂等键
+       */
+      const settle_idempotency_key = generateStandaloneIdempotencyKey(
+        business_type,
+        account.account_id
+      )
       const transaction_record = await AssetTransaction.create(
         {
           account_id: account.account_id,
@@ -865,6 +912,8 @@ class AssetService {
           balance_after: available_after,
           business_id,
           business_type,
+          lottery_session_id: business_id,
+          idempotency_key: settle_idempotency_key,
           meta: {
             ...meta,
             settle_amount: amount,

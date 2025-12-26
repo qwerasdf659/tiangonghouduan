@@ -4,10 +4,12 @@
  * @description 统一管理不同环境的配置，提供环境感知能力
  * @file config/environment.js
  * @date 2025-11-23
+ *
+ * 注意：dotenv只在app.js中加载一次（单一真相源方案）
+ * 参考：docs/Devbox单环境统一配置方案.md
  */
 
 const path = require('path')
-require('dotenv').config()
 
 /**
  * 当前环境
@@ -92,27 +94,38 @@ function getCurrentConfig() {
 /**
  * 验证环境配置
  *
- * @description 检查必需的环境变量是否存在
+ * @description 检查必需的环境变量是否存在（单一真相源方案）
  * @throws {Error} 缺少必需环境变量时抛出错误
  * @returns {void} 无返回值，验证失败时直接退出进程
+ *
+ * Redis配置规范（docs/Devbox单环境统一配置方案.md）：
+ * - 统一使用REDIS_URL，不再支持REDIS_HOST/REDIS_PORT
+ * - 所有环境必须配置Redis（fail-fast，不允许降级运行）
+ * - 检测到旧配置时报错提示删除
  */
 function validateConfig() {
-  const required = ['NODE_ENV', 'PORT', 'DB_HOST', 'DB_PORT', 'DB_NAME']
-
-  // Redis配置可以是REDIS_URL或REDIS_HOST
-  const hasRedisConfig = process.env.REDIS_URL || process.env.REDIS_HOST
+  // 必需的环境变量（包含REDIS_URL）
+  const required = ['NODE_ENV', 'PORT', 'DB_HOST', 'DB_PORT', 'DB_NAME', 'REDIS_URL']
 
   const missing = required.filter(key => !process.env[key])
 
   if (missing.length > 0) {
     console.error('❌ 缺少必需的环境变量:')
     missing.forEach(key => console.error(`   - ${key}`))
+    if (missing.includes('REDIS_URL')) {
+      console.error('   提示：REDIS_URL格式示例 - redis://localhost:6379')
+    }
     process.exit(1)
   }
 
-  if (!hasRedisConfig) {
-    console.warn('⚠️ 缺少Redis配置: Redis功能将降级运行')
-    console.warn('   建议配置: REDIS_URL 或 REDIS_HOST')
+  // 检测到已废弃的旧配置时报错（不兼容旧写法）
+  if (process.env.REDIS_HOST || process.env.REDIS_PORT) {
+    console.error('❌ 检测到已废弃的Redis配置:')
+    if (process.env.REDIS_HOST) console.error('   - REDIS_HOST（已废弃，请删除）')
+    if (process.env.REDIS_PORT) console.error('   - REDIS_PORT（已废弃，请删除）')
+    console.error('   请只使用 REDIS_URL 配置Redis连接')
+    console.error('   参考：docs/Devbox单环境统一配置方案.md')
+    process.exit(1)
   }
 
   console.log(`✅ 环境配置验证通过: ${getCurrentConfig().displayName}`)

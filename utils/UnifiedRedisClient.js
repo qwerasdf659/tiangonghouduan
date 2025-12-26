@@ -79,11 +79,50 @@ class UnifiedRedisClient {
       return UnifiedRedisClient.instance
     }
 
-    // 统一配置 - 基于项目实际需求
+    /**
+     * Redis配置规范（单一真相源方案）
+     * 统一使用REDIS_URL，不再支持REDIS_HOST/REDIS_PORT
+     * 参考：docs/Devbox单环境统一配置方案.md
+     */
+    const redisUrl = process.env.REDIS_URL
+
+    // 强制检查REDIS_URL存在（fail-fast）
+    if (!redisUrl) {
+      throw new Error(
+        '❌ 缺少必需环境变量: REDIS_URL。请在.env中配置，例如：REDIS_URL=redis://localhost:6379'
+      )
+    }
+
+    // 检测到旧配置时发出警告
+    if (process.env.REDIS_HOST || process.env.REDIS_PORT) {
+      console.warn(
+        '⚠️ [UnifiedRedisClient] 检测到已废弃的REDIS_HOST/REDIS_PORT配置，请删除，仅保留REDIS_URL'
+      )
+    }
+
+    // 解析URL获取配置信息（用于日志显示）
+    let urlParts = {}
+    try {
+      const url = new URL(redisUrl)
+      urlParts = {
+        host: url.hostname || 'localhost',
+        port: url.port || 6379,
+        db: parseInt(url.pathname?.slice(1) || '0', 10)
+      }
+    } catch {
+      urlParts = { host: 'unknown', port: 6379, db: 0 }
+    }
+
+    // 保存配置信息（用于状态显示）
     this.config = {
-      host: process.env.REDIS_HOST || 'localhost',
-      port: process.env.REDIS_PORT || 6379,
-      db: process.env.REDIS_DB || 0,
+      url: redisUrl,
+      host: urlParts.host,
+      port: urlParts.port,
+      db: urlParts.db
+    }
+
+    // ioredis连接配置选项
+    const redisOptions = {
       retryDelayOnFailover: 100,
       maxRetriesPerRequest: 3,
       lazyConnect: true, // 延迟连接，提高性能
@@ -93,12 +132,12 @@ class UnifiedRedisClient {
       family: 4 // IPv4
     }
 
-    // 创建主客户端
-    this.client = new Redis(this.config)
+    // 创建主客户端（使用URL初始化）
+    this.client = new Redis(redisUrl, redisOptions)
 
-    // 创建发布/订阅客户端（如果需要）
-    this.pubClient = new Redis(this.config)
-    this.subClient = new Redis(this.config)
+    // 创建发布/订阅客户端（使用相同的URL配置）
+    this.pubClient = new Redis(redisUrl, redisOptions)
+    this.subClient = new Redis(redisUrl, redisOptions)
 
     // 连接状态管理
     this.isConnected = false

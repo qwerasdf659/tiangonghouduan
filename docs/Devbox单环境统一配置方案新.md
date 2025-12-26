@@ -1,8 +1,8 @@
 # Devbox 单环境统一配置方案
 
-**文档版本**: v1.1.0  
+**文档版本**: v1.2.0  
 **创建日期**: 2025年12月25日  
-**最后更新**: 2025年12月25日（新增决策确认与执行清单）  
+**最后更新**: 2025年12月26日（✅ 确认方案A：Redis统一REDIS_URL，不兼容旧写法）  
 **适用环境**: Sealos Devbox（单环境运行）  
 **目标**: 解决配置源重复、环境变量优先级混乱、PM2重启不生效等问题
 
@@ -23,22 +23,101 @@
 - ✅ 测试链路：强制方案1（不加载 dotenv，纯手动设置）
 - ✅ 数据库时区：应用层强制会话时区 +08:00
 
-### 执行进度：已启动
+### 🔴 当前实际状态审计结果（2025-12-26）
 
-**短期（1-2周）强制执行清单**：
+**已完成项（代码层面已实施）**：
 
-- [ ] **P0-1**: 清空 `ecosystem.config.js` 的 `env:{...}`
-- [ ] **P0-2**: 修改 `app.js` 移除 `override: true`
-- [x] **P0-3**: 补充 `.env` 中的 `REDIS_URL`（✅ 已确认：`redis://localhost:6379`）
-- [ ] **P0-4**: 增强 `scripts/system/process-manager.sh`（添加 5 个新命令）
-- [ ] **P0-5**: 更新 `package.json` 添加 `pm:logs` 等 5 个新命令
-- [ ] **P0-6**: 删除 `start-service.sh`、`快速管理脚本.sh`
-- [ ] **P1-1**: 更新 4 个脚本中的 `pm2 restart` 命令
-- [ ] **P1-2**: 验证配置加载
-- [ ] **P2-1**: 清理 `config.example` 敏感项
-- [ ] **P2-2**: 测试环境共用库风险告知
+- ✅ **ecosystem.config.js env 已完全清空**（仅保留 `env_file: '.env'`）
+- ✅ **app.js 已移除 `override: true`**（统一使用 `dotenv.config()`）
+- ✅ **REDIS_URL 已配置**（`redis://localhost:6379`）
+- ✅ **process-manager.sh 已增强**（包含 `logs`/`show`/`flush-logs`/`reload-env`/`health` 命令）
+- ✅ **package.json 已更新**（包含 `pm:logs` 等新命令）
+- ✅ **config/database.js 顶层副作用已移除**（`validateDatabaseConfig()` 移至 `testConnection()` 内）
+- ✅ **数据库时区已正确配置**（Sequelize `timezone: '+08:00'`，会话时区验证通过）
+- ✅ **WebSocket JWT 鉴权已实施**（握手阶段强制验证 token）
 
-**详细清单见下文"后续优化建议"章节**
+**待修复的关键问题（P0/P1）**：
+
+### 🔴 P0 级（生产质量 - 立即修复）
+
+- [ ] **P0-1**: 移除 `services/sealosStorage.js` 中的硬编码默认密钥
+  - **当前问题**：存在 `accessKeyId: process.env.SEALOS_ACCESS_KEY || 'br0za7uc'`
+  - **安全风险**：环境变量缺失时使用默认凭据，可能误操作生产资源
+  - **修复要求**：移除默认值，缺失时直接抛错（fail-fast）
+  - **执行步骤（先迁移到 .env 再删除，避免二次补配置）**：
+    - **步骤 1：把当前代码里的值迁移到 `.env`（不在文档中展示明文）**
+      - 从 `services/sealosStorage.js` 中找到当前正在使用的 Sealos 配置值（例如 endpoint / bucket / accessKey / secretKey）。
+      - 将它们写入 `/home/devbox/project/.env`（如果 `.env` 已有对应键，直接更新值即可）：
+        - `SEALOS_ENDPOINT=...`
+        - `SEALOS_BUCKET=...`
+        - `SEALOS_ACCESS_KEY=...`
+        - `SEALOS_SECRET_KEY=...`
+      - **注意**：只把值写进 `.env`，不要把值复制到文档/日志/脚本输出里。
+    - **步骤 2：让服务进程加载最新 `.env`**
+      - 执行：`npm run pm:reload-env`（等价：`pm2 reload ecosystem.config.js --update-env`）
+      - 验证（不要打印密钥）：`pm2 show restaurant-lottery-backend | grep -E "SEALOS_ENDPOINT|SEALOS_BUCKET"`
+    - **步骤 3：删除 `services/sealosStorage.js` 里的默认值兜底**
+      - 将 `process.env.SEALOS_ACCESS_KEY || '...'` / `process.env.SEALOS_SECRET_KEY || '...'` 改为仅使用 `process.env.SEALOS_ACCESS_KEY` / `process.env.SEALOS_SECRET_KEY`（同理 endpoint/bucket 也不应有默认值兜底）。
+      - 增加缺失校验：缺必需字段直接抛错（fail-fast）。
+    - **步骤 4：回归验证**
+      - 服务能正常启动、且相关功能（如上传/下载）正常。
+      - 临时注释 `.env` 中任一 Sealos 必需字段 → 启动应失败（符合“干净架构，不兼容兜底”的预期）。
+    - **步骤 5：安全检查**
+      - 确认 `.env` 已在 `.gitignore` 中：`git check-ignore .env`（预期输出：`.env`）
+
+- [ ] **P0-2**: 移除 `tests/helpers/test-setup.js` 中的 `dotenv.config()`
+  - **当前问题**：违反"测试链路强制方案1"（不加载 dotenv）
+  - **影响**：测试配置来源不明确，可能因 `.env` 变化导致测试行为不一致
+  - **修复要求**：删除 `require('dotenv').config()` 行，仅保留手动设置的 `process.env.*`
+
+- [ ] **P0-3**: 统一 `jest.setup.js` 测试数据库配置
+  - **当前问题**：`DB_HOST` 设置为 `test-db-mysql.ns-br0za7uc.svc`，与实际共用库不一致
+  - **决策冲突**：文档要求"测试环境允许连真实库（`restaurant_points_dev`）"
+  - **修复要求**：改为从 `.env` 读取（通过 `process.env.DB_HOST || 'dbconn.sealosbja.site'`）或完全移除（直接使用 `app.js` 加载的配置）
+
+- [ ] **P0-4**: 修复 `config.example` 中的废弃 Redis 配置
+  - **当前问题**：仍包含 `REDIS_HOST/REDIS_PORT/REDIS_PASSWORD` 字段
+  - **决策冲突**：方案 A 要求"只用 `REDIS_URL`，完全废弃旧写法"
+  - **修复要求**：删除这些字段，仅保留 `REDIS_URL` 示例
+
+### 🟡 P1 级（数据完整性 - 本周修复）
+
+- [ ] **P1-1**: 调查并修复 `asset_transactions` 表中的 `business_id` 重复问题
+  - **发现问题**：数据库中存在重复的 `business_id` 值（despite unique index）
+  - **样本数据**：
+    - `lottery_tx_1735132917537_2e3d58_001`（2 条记录）
+    - `lottery_tx_1735133337431_7a84f2_001`（2 条记录）
+    - `lottery_tx_1735133510826_6d6e1b_001`（2 条记录）
+  - **模式分析**：重复的 `business_id` 都对应 `lottery_consume` 和 `lottery_reward` 事务对
+  - **根因推测**：可能 `business_id` 设计为"抽奖业务ID"而非"事务幂等键"，或存在索引失效/逻辑漏洞
+  - **修复要求**：
+    1. 明确 `business_id` 的语义：是"业务关联ID"还是"幂等键"？
+    2. 如果是幂等键：调查为何 unique index 未生效，修复数据 + 强化约束
+    3. 如果是业务ID：评估是否需要独立的 `idempotency_key` 字段
+
+- [ ] **P1-2**: 清理所有脚本中的多点 `dotenv.config()` 调用
+  - **当前问题**：多个脚本文件独立加载 dotenv，违反"应用单点"原则
+  - **影响范围**：增加"配置到底在哪生效"的排查复杂度
+  - **修复要求**：
+    - 统一脚本规则：仅在入口顶部加载一次
+    - 使用绝对路径：`require('dotenv').config({ path: path.resolve(__dirname, '../../.env') })`
+    - 禁止 `override: true`（无例外）
+
+- [ ] **P1-3**: 验证所有 PM2 重启命令使用 `--update-env`
+  - **已修复文件**：`scripts/migration/execute-migration-now.js`（已确认使用 `--update-env`）
+  - **待验证文件**：其他脚本中的 `pm2 restart` 调用（需全量扫描）
+
+### 📊 P2 级（技术债务清理 - 本月内）
+
+- [ ] **P2-1**: 移除 `tests/helpers/test-setup.js` 中的冗余 `DISABLE_REDIS='false'` 设置
+  - **当前问题**：显式设置 `DISABLE_REDIS='false'` 是冗余的（Redis 为必需依赖）
+  - **修复要求**：删除该行，Redis 连接失败应由 `UnifiedRedisClient` 自然抛错
+
+- [ ] **P2-2**: 清理 `config.example` 中的敏感占位值
+  - **当前问题**：包含 `your_jwt_secret_key_replace_with_strong_random_string` 等提示性文本
+  - **修复要求**：改为更明确的占位符（如 `CHANGE_ME_xxxxx`）
+
+**详细修复方案见下文"强制执行的Remediation Plan"章节**
 
 ---
 
@@ -1089,6 +1168,7 @@ pm2 show restaurant-lottery-backend | grep "TEST_ENV_VAR"
 | v1.0.0 | 2025-12-25 | 初版：定义 Devbox 单环境统一配置方案                                                                                                                                                                                                                                                                                                                                                                          | -          |
 | v1.0.1 | 2025-12-25 | 基于当前仓库代码 + `.env` 实际连接DB：对齐示例/检查清单，补充新增问题（明文凭据/默认密钥、dotenv 多点加载、副作用校验、脚本重启不一致）                                                                                                                                                                                                                                                                       | -          |
 | v1.1.0 | 2025-12-25 | 新增"现有脚本能力对比与合并方案"章节：详细对比 `快速管理脚本.sh`/`start-service.sh`/`pm:*` 三者能力差异，提供完整的合并方案（增强 `process-manager.sh` + 新增 `pm:logs`/`pm:show`/`pm:reload-env` 等命令），明确删除旧脚本的前置条件检查清单。**所有 6 项关键决策已确认**（dotenv 禁用 override、ecosystem env 清空、Redis 统一 URL、进程管理单入口、测试连真实库、历史敏感信息不处理），文档进入"可执行"状态 | 项目负责人 |
+| v1.2.0 | 2025-12-26 | ✅ **正式确认方案A为Redis配置唯一方案**：不再提供方案B选项，文档中所有相关章节更新为"方案A为最终方案"。明确`REDIS_URL`为唯一Redis配置方式，`REDIS_HOST/REDIS_PORT`立即废弃，不做兼容处理。更新决策表和执行清单中的方案确认状态。                                                                                                                                                                              | 项目负责人 |
 
 ---
 
@@ -1452,7 +1532,465 @@ REDIS_URL=redis://:password@host:port/db_index
 
 ---
 
-## 🎯 后续优化建议
+## 🔧 强制执行的 Remediation Plan（基于2025-12-26实际审计）
+
+### 🔴 P0 级修复（立即执行 - 影响生产安全）
+
+#### P0-1: 移除 Sealos 存储服务的硬编码默认密钥
+
+**文件**: `services/sealosStorage.js`
+
+**当前代码**:
+
+```javascript
+this.config = {
+  endpoint: process.env.SEALOS_ENDPOINT || 'https://objectstorageapi.bja.sealos.run',
+  bucket: 'br0za7uc-tiangong',
+  accessKeyId: process.env.SEALOS_ACCESS_KEY || 'br0za7uc', // ❌ 硬编码默认值
+  secretAccessKey: process.env.SEALOS_SECRET_KEY || 'skxg8mk5gqfhf9xz' // ❌ 硬编码默认值
+}
+```
+
+**修复方案**:
+
+```javascript
+this.config = {
+  endpoint: process.env.SEALOS_ENDPOINT,
+  bucket: process.env.SEALOS_BUCKET,
+  accessKeyId: process.env.SEALOS_ACCESS_KEY,
+  secretAccessKey: process.env.SEALOS_SECRET_KEY
+}
+
+// 构造函数末尾添加校验（fail-fast）
+const requiredFields = ['endpoint', 'bucket', 'accessKeyId', 'secretAccessKey']
+const missing = requiredFields.filter(field => !this.config[field])
+if (missing.length > 0) {
+  throw new Error(`❌ Sealos存储配置缺失必需字段: ${missing.join(', ')}`)
+}
+```
+
+**验证方式**:
+
+1. 临时注释 `.env` 中的 `SEALOS_ACCESS_KEY`
+2. 启动应用 → 应立即失败并提示缺失字段
+3. 恢复 `.env` 配置 → 应正常启动
+
+---
+
+#### P0-2: 移除测试配置中的 dotenv 加载
+
+**文件**: `tests/helpers/test-setup.js`
+
+**当前代码**:
+
+```javascript
+require('dotenv').config() // ❌ 违反"测试链路强制方案1"
+// ...
+process.env.DB_HOST = process.env.DB_HOST || 'dbconn.sealosbja.site'
+process.env.DISABLE_REDIS = 'false' // ❌ 冗余设置
+```
+
+**修复方案**:
+
+```javascript
+// ✅ 测试环境：纯手动设置（不加载 dotenv）
+
+// 数据库配置：使用实际库（与文档决策对齐）
+process.env.DB_HOST = 'dbconn.sealosbja.site'
+process.env.DB_PORT = '42569'
+process.env.DB_USER = 'root'
+process.env.DB_PASSWORD = 'mc6r9cgb' // 测试库密码（非敏感）
+process.env.DB_NAME = 'restaurant_points_dev'
+
+// Redis配置：必须连接（不允许禁用）
+process.env.REDIS_URL = 'redis://localhost:6379'
+// ❌ 移除 DISABLE_REDIS 设置（Redis为必需依赖）
+
+// JWT配置
+process.env.JWT_SECRET = 'test-jwt-secret-key-for-development-only'
+process.env.JWT_REFRESH_SECRET = 'test-jwt-refresh-secret-key'
+
+// Node环境
+process.env.NODE_ENV = 'test'
+process.env.TZ = 'Asia/Shanghai'
+```
+
+**验证方式**:
+
+1. 运行测试：`npm test`
+2. 确认测试配置完全来自 `jest.setup.js`/`test-setup.js` 手动设置
+3. 修改 `.env` → 测试行为不应受影响
+
+---
+
+#### P0-3: 统一 jest.setup.js 测试数据库配置
+
+**文件**: `jest.setup.js`
+
+**当前代码**:
+
+```javascript
+process.env.DB_HOST = 'test-db-mysql.ns-br0za7uc.svc' // ❌ 与实际共用库决策冲突
+process.env.DB_PORT = '3306'
+process.env.DB_USER = 'root'
+process.env.DB_PASSWORD = 'mc6r9cgb'
+process.env.DB_NAME = 'restaurant_points_dev'
+```
+
+**修复方案（与文档决策对齐）**:
+
+```javascript
+// 设置测试环境变量（显式设置，不依赖.env文件）
+process.env.NODE_ENV = 'test'
+process.env.JWT_SECRET = 'test-jwt-secret-key-for-development-only'
+
+// ✅ 测试环境连接真实库（与开发环境共用 restaurant_points_dev）
+process.env.DB_HOST = 'dbconn.sealosbja.site' // 统一使用实际库
+process.env.DB_PORT = '42569'
+process.env.DB_USER = 'root'
+process.env.DB_PASSWORD = 'mc6r9cgb'
+process.env.DB_NAME = 'restaurant_points_dev'
+
+// Redis配置：统一使用REDIS_URL（必须配置，不允许禁用）
+process.env.REDIS_URL = 'redis://localhost:6379'
+```
+
+**验证方式**:
+
+1. 运行测试：`npm test`
+2. 检查测试日志中的数据库连接地址 → 应为 `dbconn.sealosbja.site:42569`
+3. 确认测试数据写入实际库（团队需知晓风险）
+
+---
+
+#### P0-4: 清理 config.example 中的废弃 Redis 配置
+
+**文件**: `config.example`
+
+**当前代码**:
+
+```bash
+# 🔴 Redis配置（缓存和会话）
+REDIS_HOST=localhost  # ❌ 已废弃
+REDIS_PORT=6379       # ❌ 已废弃
+REDIS_PASSWORD=       # ❌ 已废弃
+REDIS_DB=0            # ❌ 已废弃
+```
+
+**修复方案**:
+
+```bash
+# 🔴 Redis配置（缓存和会话） - 只用 REDIS_URL
+REDIS_URL=redis://localhost:6379
+# 或带密码：REDIS_URL=redis://:your_password@host:6379/0
+# 或 TLS：REDIS_URL=rediss://host:6380/0
+# ❌ 注意：不再使用 REDIS_HOST/REDIS_PORT（已废弃，不做兼容）
+```
+
+**验证方式**:
+
+1. 全局搜索 `REDIS_HOST`/`REDIS_PORT` → 应仅在文档说明中出现
+2. 新环境部署时参考 `config.example` → 应只配置 `REDIS_URL`
+
+---
+
+### 🟡 P1 级修复（本周完成 - 数据完整性）
+
+#### P1-1: 调查并修复 asset_transactions 表的 business_id 重复问题
+
+**发现问题**: 数据库审计发现 `asset_transactions` 表存在重复的 `business_id` 值（despite unique index `uk_business_idempotency`）
+
+**样本数据**:
+| transaction_id | business_id | business_type | asset_code | delta_amount | account_id | created_at |
+|---|---|---|---|---|---|---|
+| 826 | lottery_tx_1735132917537_2e3d58_001 | lottery_consume | POINT | -1 | 6 | 2024-12-25 20:28:38 |
+| 827 | lottery_tx_1735132917537_2e3d58_001 | lottery_reward | POINT | 5 | 6 | 2024-12-25 20:28:38 |
+| 828 | lottery_tx_1735133337431_7a84f2_001 | lottery_consume | POINT | -1 | 6 | 2024-12-25 20:35:37 |
+| 829 | lottery_tx_1735133337431_7a84f2_001 | lottery_reward | POINT | 5 | 6 | 2024-12-25 20:35:37 |
+
+**根因分析**:
+
+- **模式**: 所有重复的 `business_id` 都对应 `lottery_consume`（扣1积分）+ `lottery_reward`（奖励5积分）的事务对
+- **推测1**: `business_id` 可能被设计为"抽奖业务关联ID"而非"事务幂等键"
+- **推测2**: Unique index 可能未生效，或在事务中被绕过
+
+**修复方案（选择其一）**:
+
+**方案A: 如果 business_id 是"业务关联ID"（允许重复）**
+
+1. **重命名字段**: `business_id` → `lottery_session_id`（语义更清晰）
+2. **新增字段**: `idempotency_key VARCHAR(100) UNIQUE NOT NULL`（真正的幂等键）
+3. **生成规则**: `idempotency_key = transaction_id.toString()` 或 `{business_type}_{account_id}_{timestamp}_{random}`
+4. **迁移脚本**:
+
+```sql
+ALTER TABLE asset_transactions
+ADD COLUMN idempotency_key VARCHAR(100) AFTER business_id;
+
+UPDATE asset_transactions
+SET idempotency_key = CONCAT(business_type, '_', account_id, '_', transaction_id);
+
+ALTER TABLE asset_transactions
+ADD UNIQUE INDEX uk_idempotency_key (idempotency_key);
+
+-- 可选：移除旧的 uk_business_idempotency 索引
+-- ALTER TABLE asset_transactions DROP INDEX uk_business_idempotency;
+```
+
+**方案B: 如果 business_id 是"幂等键"（不应重复）**
+
+1. **调查数据来源**: 检查插入代码，确认为何 unique index 未生效
+2. **修复数据**: 为重复记录生成新的 `business_id`
+
+```sql
+-- 为重复记录重新生成 business_id
+UPDATE asset_transactions
+SET business_id = CONCAT(business_id, '_dup_', transaction_id)
+WHERE transaction_id IN (827, 829, 831, 833, 835, ...);  -- 重复记录的ID列表
+```
+
+3. **强化约束**: 确认 unique index 生效
+
+```sql
+SHOW INDEX FROM asset_transactions WHERE Key_name = 'uk_business_idempotency';
+-- 如果不存在，重新创建
+CREATE UNIQUE INDEX uk_business_idempotency ON asset_transactions(business_id);
+```
+
+**推荐方案**: **方案A**（更符合抽奖业务逻辑：一次抽奖 = 1个业务ID + 2条事务记录）
+
+**验证方式**:
+
+1. 执行迁移脚本
+2. 查询验证：`SELECT business_id, COUNT(*) FROM asset_transactions GROUP BY business_id HAVING COUNT(*) > 1;` → 应返回0行（方案B）或保持现状（方案A）
+3. 测试幂等性：重复调用抽奖接口 → 应拒绝重复请求（通过 `idempotency_key` 校验）
+
+---
+
+#### P1-2: 清理所有脚本中的多点 dotenv.config() 调用
+
+**影响范围**: 多个脚本文件（需全量扫描）
+
+**修复模板**:
+
+**修改前**:
+
+```javascript
+// 脚本中间位置
+function someFunction() {
+  require('dotenv').config({ override: true }) // ❌ 函数内加载 + override
+  // ...
+}
+```
+
+**修改后**:
+
+```javascript
+// 脚本顶部唯一加载点
+const path = require('path')
+require('dotenv').config({
+  path: path.resolve(__dirname, '../../.env') // ✅ 绝对路径
+}) // ✅ 不使用 override
+
+// 函数内不再加载
+function someFunction() {
+  // 直接使用 process.env
+  const dbHost = process.env.DB_HOST
+  // ...
+}
+```
+
+**执行步骤**:
+
+1. 扫描所有脚本: `grep -r "dotenv\.config" scripts/ --include="*.js"`
+2. 逐个文件修复（按模板统一）
+3. 特别检查 `scripts/validation/pre-start-check.js:187, 212`
+4. 特别检查 `scripts/fix-technical-debt-p0.js:47`（移除 `override: true`）
+
+**验证方式**:
+
+1. 全局搜索: `grep -r "override.*true" scripts/` → 应返回0结果
+2. 全局搜索: `grep -r "dotenv\.config" scripts/` → 每个文件应仅在顶部出现1次
+3. 运行脚本验证功能不受影响
+
+---
+
+#### P1-3: 验证所有 PM2 重启命令使用 --update-env
+
+**已确认正确的文件**:
+
+- ✅ `scripts/migration/execute-migration-now.js` (2处)
+
+**需要全量扫描**:
+
+```bash
+grep -r "pm2 restart" scripts/ --include="*.js" --include="*.sh"
+grep -r "pm2 reload" scripts/ --include="*.js" --include="*.sh"
+```
+
+**修复模板**:
+
+```bash
+# ❌ 错误
+pm2 restart restaurant-lottery-backend
+pm2 restart all
+
+# ✅ 正确
+pm2 restart restaurant-lottery-backend --update-env
+pm2 reload restaurant-lottery-backend --update-env  # reload比restart更平滑
+```
+
+**验证方式**:
+
+1. 修改 `.env` 中的测试配置（如 `LOG_LEVEL=debug`）
+2. 执行脚本
+3. 检查 PM2 进程环境变量: `pm2 show restaurant-lottery-backend | grep LOG_LEVEL`
+4. 应反映新配置值
+
+---
+
+### 📊 P2 级修复（本月内 - 技术债务清理）
+
+#### P2-1: 移除 tests/helpers/test-setup.js 中的冗余 DISABLE_REDIS 设置
+
+**文件**: `tests/helpers/test-setup.js`
+
+**当前代码**:
+
+```javascript
+process.env.DISABLE_REDIS = 'false' // ❌ 冗余（Redis为必需依赖）
+```
+
+**修复方案**:
+
+```javascript
+// ✅ 直接删除该行（Redis连接失败会自然抛错）
+```
+
+**理由**:
+
+- Redis 为系统必需依赖（不允许禁用）
+- `UnifiedRedisClient` 会在缺少 `REDIS_URL` 时自动抛错（fail-fast）
+- 显式设置 `'false'` 是多余的
+
+---
+
+#### P2-2: 清理 config.example 中的敏感占位值
+
+**文件**: `config.example`
+
+**当前代码**:
+
+```bash
+JWT_SECRET=your_jwt_secret_key_replace_with_strong_random_string
+SEALOS_ACCESS_KEY=your_access_key_here
+```
+
+**修复方案**:
+
+```bash
+# ✅ 更明确的占位符
+JWT_SECRET=CHANGE_ME_jwt_secret_min_32_chars
+JWT_REFRESH_SECRET=CHANGE_ME_jwt_refresh_secret_min_32_chars
+
+SEALOS_ACCESS_KEY=CHANGE_ME_sealos_access_key
+SEALOS_SECRET_KEY=CHANGE_ME_sealos_secret_key
+
+# 添加生成提示
+# 生成强随机密钥: node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+```
+
+---
+
+### 📋 修复执行清单（可复制到任务系统）
+
+```markdown
+## P0 级（本周内必须完成）
+
+- [ ] P0-1: 修复 services/sealosStorage.js 硬编码密钥
+  - [ ] 移除 `accessKeyId` 和 `secretAccessKey` 的默认值
+  - [ ] 添加 fail-fast 校验
+  - [ ] 补充 `.env` 中的 SEALOS 配置
+  - [ ] 测试验证（临时删配置 → 应启动失败）
+
+- [ ] P0-2: 移除 tests/helpers/test-setup.js 的 dotenv.config()
+  - [ ] 删除 `require('dotenv').config()` 行
+  - [ ] 删除 `DISABLE_REDIS='false'` 行
+  - [ ] 运行测试验证行为不变
+
+- [ ] P0-3: 统一 jest.setup.js 测试数据库配置
+  - [ ] 修改 `DB_HOST` 为 `dbconn.sealosbja.site`
+  - [ ] 修改 `DB_PORT` 为 `42569`
+  - [ ] 运行测试确认连接实际库
+  - [ ] 团队通知：测试共用开发库风险
+
+- [ ] P0-4: 清理 config.example 废弃 Redis 配置
+  - [ ] 删除 `REDIS_HOST`/`REDIS_PORT`/`REDIS_PASSWORD`/`REDIS_DB`
+  - [ ] 仅保留 `REDIS_URL` 示例
+  - [ ] 添加使用说明
+
+## P1 级（本周内完成）
+
+- [ ] P1-1: 调查 asset_transactions 表 business_id 重复问题
+  - [ ] 确认 `business_id` 语义（业务关联ID vs 幂等键）
+  - [ ] 选择修复方案（A: 新增 idempotency_key / B: 修复数据+索引）
+  - [ ] 编写并执行迁移脚本
+  - [ ] 验证幂等性（重复请求应拒绝）
+  - [ ] 更新代码文档说明字段用途
+
+- [ ] P1-2: 清理脚本中的多点 dotenv.config()
+  - [ ] 扫描所有脚本：`grep -r "dotenv\.config" scripts/`
+  - [ ] 修复 `scripts/validation/pre-start-check.js`
+  - [ ] 修复 `scripts/fix-technical-debt-p0.js`（移除 override）
+  - [ ] 全局验证：每个脚本仅在顶部加载一次
+  - [ ] 全局验证：无 `override: true` 残留
+
+- [ ] P1-3: 验证所有 PM2 重启命令
+  - [ ] 扫描：`grep -r "pm2 restart\|pm2 reload" scripts/`
+  - [ ] 逐个修改为 `--update-env`
+  - [ ] 测试验证：修改 `.env` → 重启 → 配置生效
+
+## P2 级（本月内完成）
+
+- [ ] P2-1: 移除 DISABLE_REDIS 冗余设置
+  - [ ] 删除 `tests/helpers/test-setup.js` 中的该行
+  - [ ] 运行测试确认 Redis 必须连接
+
+- [ ] P2-2: 清理 config.example 敏感占位值
+  - [ ] 修改为 `CHANGE_ME_*` 格式
+  - [ ] 添加密钥生成提示命令
+
+## 验收标准
+
+- [ ] 所有 P0 项通过测试（启动失败能 fail-fast）
+- [ ] 所有 P1 项通过验证（数据完整性 + 配置一致性）
+- [ ] 全局搜索无 `override: true` 残留
+- [ ] 全局搜索 `REDIS_HOST`/`REDIS_PORT` 仅在文档中出现
+- [ ] `business_id` 重复问题已修复（选择方案后验证）
+- [ ] 测试环境连接实际库（团队已知晓风险）
+```
+
+---
+
+### 🎯 执行时间估算
+
+| 优先级 | 任务数 | 预估时间 | 累计时间 |
+| ------ | ------ | -------- | -------- |
+| P0 级  | 4      | 2-3 小时 | 2-3 小时 |
+| P1 级  | 3      | 3-5 小时 | 5-8 小时 |
+| P2 级  | 2      | 1 小时   | 6-9 小时 |
+
+**执行建议**:
+
+1. **今天完成 P0**（2-3小时）→ 解决生产安全隐患
+2. **本周完成 P1**（3-5小时）→ 确保数据完整性
+3. **本月完成 P2**（1小时）→ 技术债务清理
+
+**风险提示**:
+
+- **P1-1（business_id 重复）**需要业务团队参与决策（确认字段语义）
+- **P0-3（测试库统一）**需要团队知晓风险（测试可能影响开发数据）
+- 所有数据库迁移建议先在备份环境验证
 
 ### 短期（1-2周）- 强制执行清单（✅ 决策已确认 2025-12-25）
 
@@ -1464,9 +2002,10 @@ REDIS_URL=redis://:password@host:port/db_index
 - [ ] **P0-2** 修改 `app.js`：移除 `dotenv.config({ override: true })`，统一为 `dotenv.config()`（所有环境禁止 override）
   - 决策依据：✅ 已确认"dotenv 全环境禁用 override"
   - 影响：统一优先级模型（系统/PM2 > .env 补齐）
-- [x] **P0-3** Redis 配置统一为 `REDIS_URL`（✅ 已采用方案 A：不兼容旧写法，暴力升级）
+- [x] **P0-3** Redis 配置统一为 `REDIS_URL`（✅ **已采用方案 A**：不兼容旧写法，暴力升级，2025-12-26确认）
   - 决策依据：✅ 已确认"Redis 统一 REDIS_URL，不做兼容回退"
   - **已采用配置（2025-12-25 确认）**：`REDIS_URL=redis://localhost:6379`
+  - **正式确认（2025-12-26）**：✅ **方案A为最终方案，不提供方案B选项**
   - 格式说明：
     - 基础格式（✅ 当前使用）：`REDIS_URL=redis://localhost:6379`
     - 带密码格式：`REDIS_URL=redis://:password@host:6379/0`
@@ -1565,22 +2104,26 @@ REDIS_URL=redis://:password@host:port/db_index
 
 ---
 
-## 📋 决策记录（已拍板 - 2025-12-25）
+## 📋 决策记录（已拍板 - 2025-12-26）
 
-| 决策项                    | 选择方案                                                                | 决策结果            | 理由                                                                                                                                                                                 | 影响面                                                                                                                                                                                                                        |
-| ------------------------- | ----------------------------------------------------------------------- | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| dotenv 优先级策略         | 全仓库禁止 override（无例外）                                           | ✅ **已确认**       | 统一优先级模型（系统/PM2 > .env 补齐），跨环境一致、可预测                                                                                                                           | 需修改 `app.js`（移除 `override: true`）；所有脚本禁止使用 `override: true`（无例外）                                                                                                                                         |
-| ecosystem.config.js env   | 完全清空（不保留默认值）                                                | ✅ **已确认**       | 强制单一真相源（`.env` 唯一配置来源）                                                                                                                                                | `.env` 必须包含所有必需配置（包括 `NODE_ENV`/`PORT`/`TZ`）                                                                                                                                                                    |
-| Redis 配置规范            | **方案 A：只用 `REDIS_URL`（✅ 已采用，不兼容旧写法，必须要有 Redis）** | ✅ **已确认并执行** | 统一配置源，支持密码/TLS/DB index；**不做兼容回退**（`REDIS_HOST/REDIS_PORT` 立即失效）；**所有环境必须配置 Redis**（fail-fast）；**已采用配置**：`REDIS_URL=redis://localhost:6379` | **破坏性变更**：删除 `.env` 旧键、修改 Redis 客户端初始化（解析 URL）、校验改为强制 `REDIS_URL`（所有环境）、移除 `DISABLE_REDIS` 降级逻辑、`app.js` 启动校验统一（移除 development try/catch 忽略）                          |
-| Redis 依赖管理            | 方案 A：外部服务，脚本不拉起                                            | ✅ **已确认**       | 职责清晰、环境一致、避免技术债；Sealos Devbox 应单一职责                                                                                                                             | 应用脚本不支持 `--with-redis`；Redis 由平台/docker/手工管理；应用启动只验证 `REDIS_URL` 连通性（fail-fast）                                                                                                                   |
-| 进程管理入口              | 唯一入口：`npm run pm:*`                                                | ✅ **已确认**       | 防止回归，统一操作，减少维护成本                                                                                                                                                     | 删除 `start-service.sh`、`快速管理脚本.sh`（先完成 `pm:*` 增强）                                                                                                                                                              |
-| 测试环境策略              | 允许连真实库（共用 `restaurant_points_dev`）                            | ✅ **已确认**       | 简化环境管理，避免维护独立测试库                                                                                                                                                     | 团队需知晓共用库风险（测试脚本可能影响开发数据）                                                                                                                                                                              |
-| 历史敏感信息              | 不做密钥轮换/git 历史清理                                               | ✅ **已确认**       | 接受现状，降低执行成本（历史已公开按"已知"处理）                                                                                                                                     | 已泄露信息（DB密码、JWT密钥等）按"已公开"处理，不影响单环境方案实施                                                                                                                                                           |
-| config/database.js 副作用 | 移除模块顶层副作用，改为按需校验/打印                                   | ✅ **已确认**       | 避免脚本/测试被误伤，减少敏感信息泄露，同时在 `app.js` 保留 fail-fast                                                                                                                | 需移除顶层 `validateDatabaseConfig()` / `console.log` / `dotenv.config()`；在 `app.js` 启动阶段显式调用 `testConnection()`                                                                                                    |
-| dotenv 多点加载收敛（P2） | 应用单点 + 脚本规范 + 测试强制方案1                                     | ✅ **已确认**       | 降低"配置到底在哪生效"的排查复杂度，便于配置来源追踪                                                                                                                                 | **应用**：移除 `config/environment.js` / `config/database.js` 的 dotenv（只保留 `app.js`）；**脚本**：统一入口顶部加载 + 禁止 override + 绝对路径；**测试**：✅ 强制方案1 - 不加载 dotenv，纯手动设置（禁止创建 `.env.test`） |
-| 数据库时区策略            | 应用层强制会话时区 `+08:00`，不修改 DB global                           | ✅ **已确认**       | 低风险、可控；当前 Sequelize 已实现；不依赖 DBA 权限；不影响同库其他客户端                                                                                                           | 需确认 `config/database.js` 的 Sequelize 配置包含 `timezone: '+08:00'` 和 `dialectOptions` 时区设置；所有查询时间戳与北京时间一致                                                                                             |
+| 决策项                    | 选择方案                                                                      | 决策结果            | 理由                                                                                                                                                                                 | 影响面                                                                                                                                                                                                                        |
+| ------------------------- | ----------------------------------------------------------------------------- | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| dotenv 优先级策略         | 全仓库禁止 override（无例外）                                                 | ✅ **已确认**       | 统一优先级模型（系统/PM2 > .env 补齐），跨环境一致、可预测                                                                                                                           | 需修改 `app.js`（移除 `override: true`）；所有脚本禁止使用 `override: true`（无例外）                                                                                                                                         |
+| ecosystem.config.js env   | 完全清空（不保留默认值）                                                      | ✅ **已确认**       | 强制单一真相源（`.env` 唯一配置来源）                                                                                                                                                | `.env` 必须包含所有必需配置（包括 `NODE_ENV`/`PORT`/`TZ`）                                                                                                                                                                    |
+| Redis 配置规范            | **方案 A：只用 `REDIS_URL`（✅ 2025-12-26 正式确认为唯一方案，不提供方案B）** | ✅ **已确认并执行** | 统一配置源，支持密码/TLS/DB index；**不做兼容回退**（`REDIS_HOST/REDIS_PORT` 立即失效）；**所有环境必须配置 Redis**（fail-fast）；**已采用配置**：`REDIS_URL=redis://localhost:6379` | **破坏性变更**：删除 `.env` 旧键、修改 Redis 客户端初始化（解析 URL）、校验改为强制 `REDIS_URL`（所有环境）、移除 `DISABLE_REDIS` 降级逻辑、`app.js` 启动校验统一（移除 development try/catch 忽略）                          |
+| Redis 依赖管理            | 方案 A：外部服务，脚本不拉起                                                  | ✅ **已确认**       | 职责清晰、环境一致、避免技术债；Sealos Devbox 应单一职责                                                                                                                             | 应用脚本不支持 `--with-redis`；Redis 由平台/docker/手工管理；应用启动只验证 `REDIS_URL` 连通性（fail-fast）                                                                                                                   |
+| 进程管理入口              | 唯一入口：`npm run pm:*`                                                      | ✅ **已确认**       | 防止回归，统一操作，减少维护成本                                                                                                                                                     | 删除 `start-service.sh`、`快速管理脚本.sh`（先完成 `pm:*` 增强）                                                                                                                                                              |
+| 测试环境策略              | 允许连真实库（共用 `restaurant_points_dev`）                                  | ✅ **已确认**       | 简化环境管理，避免维护独立测试库                                                                                                                                                     | 团队需知晓共用库风险（测试脚本可能影响开发数据）                                                                                                                                                                              |
+| 历史敏感信息              | 不做密钥轮换/git 历史清理                                                     | ✅ **已确认**       | 接受现状，降低执行成本（历史已公开按"已知"处理）                                                                                                                                     | 已泄露信息（DB密码、JWT密钥等）按"已公开"处理，不影响单环境方案实施                                                                                                                                                           |
+| config/database.js 副作用 | 移除模块顶层副作用，改为按需校验/打印                                         | ✅ **已确认**       | 避免脚本/测试被误伤，减少敏感信息泄露，同时在 `app.js` 保留 fail-fast                                                                                                                | 需移除顶层 `validateDatabaseConfig()` / `console.log` / `dotenv.config()`；在 `app.js` 启动阶段显式调用 `testConnection()`                                                                                                    |
+| dotenv 多点加载收敛（P2） | 应用单点 + 脚本规范 + 测试强制方案1                                           | ✅ **已确认**       | 降低"配置到底在哪生效"的排查复杂度，便于配置来源追踪                                                                                                                                 | **应用**：移除 `config/environment.js` / `config/database.js` 的 dotenv（只保留 `app.js`）；**脚本**：统一入口顶部加载 + 禁止 override + 绝对路径；**测试**：✅ 强制方案1 - 不加载 dotenv，纯手动设置（禁止创建 `.env.test`） |
+| 数据库时区策略            | 应用层强制会话时区 `+08:00`，不修改 DB global                                 | ✅ **已确认**       | 低风险、可控；当前 Sequelize 已实现；不依赖 DBA 权限；不影响同库其他客户端                                                                                                           | 需确认 `config/database.js` 的 Sequelize 配置包含 `timezone: '+08:00'` 和 `dialectOptions` 时区设置；所有查询时间戳与北京时间一致                                                                                             |
 
-**决策生效时间**：2025年12月25日  
+**决策生效时间**：
+
+- 2025年12月25日：初始决策确认
+- 2025年12月26日：✅ **Redis方案A正式确认为唯一方案**
+
 **决策人**：项目负责人  
 **执行期限**：短期（1-2周内完成 P0 项，见下文"执行清单"）
 

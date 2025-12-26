@@ -32,31 +32,45 @@ function log(message, color = 'reset') {
 }
 
 /**
- * 修复1: app.js dotenv override配置
+ * 修复1: app.js dotenv配置（全仓库禁止override）
+ * 规范说明：docs/Devbox单环境统一配置方案.md
  */
 async function fixDotenvOverride() {
-  log('\n=== 修复1: dotenv override配置 ===', 'blue')
+  log('\n=== 修复1: dotenv配置检查（全仓库禁止override）===', 'blue')
 
   const appPath = path.join(__dirname, '../app.js')
   let content = await fs.readFile(appPath, 'utf8')
 
-  // 替换 override: true 为环境判断
-  const oldPattern = /require\('dotenv'\)\.config\(\{ override: true \}\)\s*\/\/\s*🔴.*$/m
-  const newCode = `// 🔴 dotenv配置：仅development允许override（P0修复）
-if ((process.env.NODE_ENV || 'development') === 'development') {
-  require('dotenv').config({ override: true })
-  console.log('⚠️ [Development] 使用 dotenv override 模式')
-} else {
-  require('dotenv').config()
-  console.log('✅ [Production/Staging] 使用平台注入配置，禁止 override')
-}`
+  // 检查是否有override: true（现在全仓库禁止）
+  const hasOverride = content.includes('override: true')
 
-  if (content.match(oldPattern)) {
-    content = content.replace(oldPattern, newCode)
+  if (hasOverride) {
+    // 移除所有override配置
+    const newCode = `/**
+ * ✅ dotenv配置：所有环境统一禁止 override（单一真相源方案）
+ * 优先级模型：PM2 env_file 注入 > .env 补齐（跨环境一致、可预测）
+ * 参考：docs/Devbox单环境统一配置方案.md
+ */
+require('dotenv').config()
+console.log(\`✅ [\${process.env.NODE_ENV || 'unknown'}] 环境变量已加载，配置源：.env 文件\`)`
+
+    // 匹配旧的override模式或条件判断模式
+    const oldPatterns = [
+      /\/\/ 🔴 dotenv配置.*?\n(?:if.*?\{[\s\S]*?\}[\s\S]*?\}|require\('dotenv'\)\.config\(\{ override: true \}\).*?)\n/m,
+      /require\('dotenv'\)\.config\(\{ override: true \}\).*?\n/m
+    ]
+
+    for (const pattern of oldPatterns) {
+      if (content.match(pattern)) {
+        content = content.replace(pattern, newCode + '\n')
+        break
+      }
+    }
+
     await fs.writeFile(appPath, content, 'utf8')
-    log('✅ dotenv override 已修复（仅development允许）', 'green')
+    log('✅ dotenv override 已移除（全仓库禁止override）', 'green')
   } else {
-    log('⚠️ 未找到匹配的dotenv配置，请手动检查', 'yellow')
+    log('✅ dotenv配置正确（无override）', 'green')
   }
 }
 

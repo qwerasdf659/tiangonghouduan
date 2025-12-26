@@ -9,7 +9,10 @@
  */
 
 const { Sequelize } = require('sequelize')
-require('dotenv').config()
+/*
+ * 注意：dotenv只在app.js中加载一次（单一真相源方案）
+ * 参考：docs/Devbox单环境统一配置方案.md
+ */
 
 // ⚡ 慢查询监控配置（2025年01月21日新增）
 const SLOW_QUERY_THRESHOLD = 1000 // 1秒阈值
@@ -64,14 +67,14 @@ const dbConfig = {
   logging:
     process.env.NODE_ENV === 'development'
       ? (sql, timing) => {
-        // 开发环境：记录所有查询和慢查询
-        console.log(sql)
-        if (timing) slowQueryLogger(sql, timing)
-      }
+          // 开发环境：记录所有查询和慢查询
+          console.log(sql)
+          if (timing) slowQueryLogger(sql, timing)
+        }
       : (sql, timing) => {
-        // 生产环境：只记录慢查询
-        if (timing) slowQueryLogger(sql, timing)
-      },
+          // 生产环境：只记录慢查询
+          if (timing) slowQueryLogger(sql, timing)
+        },
   benchmark: true, // ⚡ 启用查询时间记录（必需）
   pool: {
     max: 40, // ⭐ 最大连接数（优化：从50降到40）- 支持多实例部署
@@ -124,7 +127,7 @@ const dbConfig = {
  * validateDatabaseConfig()
  * // 成功则继续，失败则抛出错误阻止启动
  */
-function validateDatabaseConfig () {
+function validateDatabaseConfig() {
   const requiredVars = ['DB_HOST', 'DB_PORT', 'DB_USER', 'DB_PASSWORD', 'DB_NAME']
   const missingVars = requiredVars.filter(varName => !process.env[varName])
 
@@ -138,8 +141,11 @@ function validateDatabaseConfig () {
   }
 }
 
-// 执行配置验证
-validateDatabaseConfig()
+/*
+ * 注意：validateDatabaseConfig() 不再在模块顶层执行
+ * 改为在 testConnection() 内部调用，避免脚本/测试被误伤
+ * 参考：docs/Devbox单环境统一配置方案.md - 问题F
+ */
 
 // 🔴 所有环境使用相同配置 - 统一架构
 const unifiedConfig = {
@@ -154,7 +160,11 @@ const unifiedConfig = {
 const env = process.env.NODE_ENV || 'development'
 const config = unifiedConfig[env]
 
-console.log(`🔗 统一数据库配置: ${config.host}:${config.port}/${config.database} (环境: ${env})`)
+/*
+ * 注意：移除顶层 console.log 打印连接信息（避免敏感信息泄露到日志）
+ * 连接信息在 testConnection() 成功后打印（且会脱敏）
+ * 参考：docs/Devbox单环境统一配置方案.md - 问题F
+ */
 
 // 创建Sequelize实例
 const sequelize = new Sequelize(config.database, config.username, config.password, config)
@@ -188,9 +198,16 @@ const sequelize = new Sequelize(config.database, config.username, config.passwor
  *   process.exit(1)
  * }
  */
-async function testConnection () {
+async function testConnection() {
   try {
+    /*
+     * 在测试连接前先验证配置完整性（fail-fast）
+     * 这样 app.js 启动时调用 testConnection() 可以在连接前发现配置问题
+     */
+    validateDatabaseConfig()
+
     await sequelize.authenticate()
+    // 脱敏输出：只显示 host:port/database，不显示完整连接信息
     console.log('✅ 数据库连接成功:', config.host + ':' + config.port + '/' + config.database)
     return true
   } catch (error) {
@@ -237,7 +254,7 @@ async function testConnection () {
  * // ❌ 禁止：生产环境使用此方法
  * // ✅ 正确：使用迁移 npm run migrate
  */
-async function syncDatabase (force = false) {
+async function syncDatabase(force = false) {
   try {
     console.log('开始同步数据库...')
     await sequelize.sync({ force, alter: !force })
