@@ -245,12 +245,6 @@ module.exports = sequelize => {
         defaultValue: '#FF6B6B',
         comment: '奖品颜色代码'
       },
-      probability: {
-        type: DataTypes.DECIMAL(6, 4),
-        allowNull: false,
-        defaultValue: 0.0,
-        comment: '中奖概率'
-      },
       is_activity: {
         type: DataTypes.BOOLEAN,
         allowNull: false,

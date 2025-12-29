@@ -33,7 +33,7 @@ const colors = {
   cyan: '\x1b[36m'
 }
 
-function log (message, color = 'reset') {
+function log(message, color = 'reset') {
   console.log(`${colors[color]}${message}${colors.reset}`)
 }
 
@@ -42,7 +42,7 @@ function log (message, color = 'reset') {
 /**
  * 分析抽奖积分数据
  */
-async function analyzeLotteryPoints () {
+async function analyzeLotteryPoints() {
   log('\n📊 分析抽奖积分数据', 'cyan')
   log('='.repeat(60), 'cyan')
 
@@ -59,7 +59,7 @@ async function analyzeLotteryPoints () {
       const drawCount = await LotteryDraw.count({
         where: { prize_id: prize.prize_id }
       })
-      const percentage = totalDraws > 0 ? (drawCount / totalDraws * 100).toFixed(2) : 0
+      const percentage = totalDraws > 0 ? ((drawCount / totalDraws) * 100).toFixed(2) : 0
 
       log(`   ${prize.name}: ${drawCount}次 (${percentage}%)`, 'yellow')
     }
@@ -86,7 +86,7 @@ async function analyzeLotteryPoints () {
 /**
  * 更新奖品信息
  */
-async function updatePrizes () {
+async function updatePrizes() {
   log('\n🎁 更新奖品信息', 'cyan')
   log('='.repeat(60), 'cyan')
 
@@ -98,7 +98,7 @@ async function updatePrizes () {
       log(`\n${index + 1}. ${prize.name}`, 'cyan')
       log(`   ID: ${prize.prize_id}`, 'yellow')
       log(`   价值: ${prize.points_value}积分`, 'yellow')
-      log(`   概率: ${prize.probability || '未设置'}`, 'yellow')
+      log(`   概率: ${prize.win_probability || '未设置'}`, 'yellow')
       log(`   库存: ${prize.stock || '未设置'}`, 'yellow')
     })
 
@@ -111,7 +111,7 @@ async function updatePrizes () {
 /**
  * 更新奖品概率
  */
-async function updatePrizeProbabilities () {
+async function updatePrizeProbabilities() {
   log('\n🎲 更新奖品概率', 'cyan')
   log('='.repeat(60), 'cyan')
 
@@ -122,7 +122,7 @@ async function updatePrizeProbabilities () {
     let totalProbability = 0
 
     prizes.forEach((prize, index) => {
-      const prob = parseFloat(prize.probability || 0)
+      const prob = parseFloat(prize.win_probability || 0)
       totalProbability += prob
       log(`${index + 1}. ${prize.name}: ${prob}`, prob > 0 ? 'green' : 'red')
     })
@@ -141,7 +141,7 @@ async function updatePrizeProbabilities () {
 
 // ==================== 主菜单 ====================
 
-async function showMenu () {
+async function showMenu() {
   log('\n' + '='.repeat(60), 'cyan')
   log('  🎁 业务维护统一工具包 (Business Toolkit V2.0)', 'cyan')
   log('='.repeat(60), 'cyan')
@@ -184,20 +184,20 @@ async function showMenu () {
   }
 }
 
-async function executeAction (action) {
+async function executeAction(action) {
   try {
     switch (action) {
-    case 'analyze':
-      await analyzeLotteryPoints()
-      break
-    case 'prizes':
-      await updatePrizes()
-      break
-    case 'probabilities':
-      await updatePrizeProbabilities()
-      break
-    default:
-      log(`\n❌ 未知操作: ${action}`, 'red')
+      case 'analyze':
+        await analyzeLotteryPoints()
+        break
+      case 'prizes':
+        await updatePrizes()
+        break
+      case 'probabilities':
+        await updatePrizeProbabilities()
+        break
+      default:
+        log(`\n❌ 未知操作: ${action}`, 'red')
     }
   } catch (error) {
     log(`\n❌ 执行失败: ${error.message}`, 'red')
@@ -206,7 +206,7 @@ async function executeAction (action) {
 
 // ==================== 主程序入口 ====================
 
-async function main () {
+async function main() {
   try {
     const args = process.argv.slice(2)
     if (args.length > 0) {

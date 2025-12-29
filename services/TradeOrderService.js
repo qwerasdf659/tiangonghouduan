@@ -527,7 +527,7 @@ class TradeOrderService {
 
       // 3. 转移物品所有权或交付可叠加资产
       if (listing.listing_kind === 'item_instance' && listing.offer_item_instance_id) {
-        // 🔴 P0-2 修复：使用 ItemInstance 模型作为物品所有权真相
+        // 🔴 统一资产域架构：使用 AssetService.transferItem() 转移物品所有权
         const { ItemInstance } = require('../models')
         const itemInstance = await ItemInstance.findOne({
           where: { item_instance_id: listing.offer_item_instance_id },
@@ -544,18 +544,27 @@ class TradeOrderService {
           throw new Error('物品所有权异常：物品不属于卖家，禁止成交转移')
         }
 
-        // 转移所有权（使用 owner_user_id 字段）
-        await itemInstance.update(
+        // 使用 AssetService.transferItem() 转移所有权（自动记录事件）
+        const AssetService = require('./AssetService')
+        await AssetService.transferItem(
           {
-            owner_user_id: order.buyer_user_id,
-            status: 'transferred',
-            locked_by_order_id: null,
-            locked_at: null
+            item_instance_id: itemInstance.item_instance_id,
+            new_owner_id: order.buyer_user_id,
+            business_type: 'market_transfer',
+            business_id: order.order_id,
+            meta: {
+              listing_id: order.listing_id,
+              from_user: order.seller_user_id,
+              to_user: order.buyer_user_id,
+              gross_amount: order.gross_amount,
+              fee_amount: order.fee_amount,
+              net_amount: order.net_amount
+            }
           },
           { transaction }
         )
 
-        logger.info('[TradeOrderService] 物品所有权已转移', {
+        logger.info('[TradeOrderService] 物品所有权已转移（通过 AssetService.transferItem）', {
           item_instance_id: itemInstance.item_instance_id,
           from: order.seller_user_id,
           to: order.buyer_user_id

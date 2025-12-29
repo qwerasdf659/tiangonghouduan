@@ -50,12 +50,6 @@ class UserAssetAccount extends Model {
       onUpdate: 'CASCADE',
       comment: '关联用户信息（账户所有者）'
     })
-
-    /**
-     * 🔧 V4.3修复：移除已废弃的AssetTransaction关联
-     * AssetTransaction现在通过account_id关联Account表，不再直接关联UserAssetAccount
-     * 查询用户资产流水应使用：Account -> AssetTransaction路径
-     */
   }
 
   /**

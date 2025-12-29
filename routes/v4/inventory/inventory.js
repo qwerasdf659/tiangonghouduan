@@ -7,16 +7,7 @@
  *    - 转让历史记录查询
  *    - 管理员库存统计
  *
- * ❌ 注意：市场交易功能已迁移到 /api/v4/market 域
- *    - 原路径 /api/v4/inventory/market/* 已弃用
- *    - 新路径 /api/v4/market/* （C2C交易市场）
- *
- * ❌ 注意：兑换功能已迁移到 /api/v4/shop/exchange 域
- *    - 原路径 /api/v4/market/exchange/* 已弃用
- *    - 新路径 /api/v4/shop/exchange/* （B2C兑换市场）
- *
  * 创建时间：2025-12-11
- * 更新时间：2025-12-22 - API命名规范重构（游戏风格方案）
  */
 
 const express = require('express')
@@ -25,11 +16,6 @@ const router = express.Router()
 // 引入子路由模块（仅核心库存功能）
 const inventoryCoreRoutes = require('./inventory-core')
 
-/*
- * ❌ 移除库存市场路由（已迁移到 /market 域）
- * const inventoryMarketRoutes = require('./market/index')
- */
-
 /**
  * 路由映射表（Route Mapping Table）
  *
@@ -37,22 +23,10 @@ const inventoryCoreRoutes = require('./inventory-core')
  * - GET    /item/:item_id           - 获取库存物品详情
  * - GET    /transfer-history        - 获取转让历史
  * - GET    /admin/statistics        - 获取管理员统计
- *
- * ❌ 市场交易功能（已迁移）：
- *    - 新路径：/api/v4/market/listings
- *    - 新路径：/api/v4/market/sell/list
- *    - 新路径：/api/v4/market/buy/listings/:listing_id/purchase
  */
 
-/*
- * 挂载子路由（Mount Sub-Routes）
- */
+// 挂载子路由（Mount Sub-Routes）
 router.use('/', inventoryCoreRoutes)
-
-/*
- * ❌ 移除市场路由
- * router.use('/', inventoryMarketRoutes)
- */
 
 /**
  * 导出路由聚合器（Export Route Aggregator）

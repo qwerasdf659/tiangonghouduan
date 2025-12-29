@@ -93,13 +93,6 @@ class UnifiedRedisClient {
       )
     }
 
-    // 检测到旧配置时发出警告
-    if (process.env.REDIS_HOST || process.env.REDIS_PORT) {
-      console.warn(
-        '⚠️ [UnifiedRedisClient] 检测到已废弃的REDIS_HOST/REDIS_PORT配置，请删除，仅保留REDIS_URL'
-      )
-    }
-
     // 解析URL获取配置信息（用于日志显示）
     let urlParts = {}
     try {

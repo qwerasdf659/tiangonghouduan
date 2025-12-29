@@ -11,7 +11,6 @@
  * - 使用统一响应 res.apiSuccess / res.apiError
  *
  * 创建时间：2025-12-22
- * 来源：从 auth.js 拆分
  */
 
 const express = require('express')
@@ -79,7 +78,6 @@ router.get('/verify', authenticateToken, verifyRateLimiter, async (req, res) => 
       roles: userRoles.roles,
       role_level: userRoles.maxLevel,
       is_admin: userRoles.isAdmin,
-      role_based_admin: userRoles.isAdmin,
       created_at: BeijingTimeHelper.formatToISO(user.created_at),
       last_login: BeijingTimeHelper.formatToISO(user.last_login),
       login_count: user.login_count,
@@ -166,7 +164,7 @@ router.post('/refresh', async (req, res) => {
     user: {
       user_id: user.user_id,
       mobile: user.mobile,
-      role_based_admin: userRoles.isAdmin,
+      is_admin: userRoles.isAdmin,
       roles: userRoles.roles,
       status: user.status
     },

@@ -131,7 +131,7 @@ module.exports = sequelize => {
         comment: '奖励积分数量'
       },
 
-      // 来源模块标识（🔄 已删除 'user_upload' - 旧拍照上传业务已废弃）
+      // 来源模块标识
       source_module: {
         type: DataTypes.ENUM('system', 'lottery', 'exchange', 'admin'),
         defaultValue: 'system',
@@ -222,12 +222,12 @@ module.exports = sequelize => {
       // 提供缩略图URLs
       thumbnails: values.thumbnail_paths
         ? {
-          small: values.thumbnail_paths.small ? `/uploads/${values.thumbnail_paths.small}` : null,
-          medium: values.thumbnail_paths.medium
-            ? `/uploads/${values.thumbnail_paths.medium}`
-            : null,
-          large: values.thumbnail_paths.large ? `/uploads/${values.thumbnail_paths.large}` : null
-        }
+            small: values.thumbnail_paths.small ? `/uploads/${values.thumbnail_paths.small}` : null,
+            medium: values.thumbnail_paths.medium
+              ? `/uploads/${values.thumbnail_paths.medium}`
+              : null,
+            large: values.thumbnail_paths.large ? `/uploads/${values.thumbnail_paths.large}` : null
+          }
         : {},
       // 移除服务器文件路径敏感信息
       file_path: undefined,

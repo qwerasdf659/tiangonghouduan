@@ -1,6 +1,5 @@
 /**
  * 认证和权限系统API测试 (V4架构)
- * 迁移自 tests/api/auth-api.test.js
  *
  * 测试覆盖：
  * 1. V4统一引擎核心功能（健康检查、版本、状态）
@@ -188,7 +187,7 @@ describe('认证和权限系统API测试（V4架构）', () => {
         expect(user).toHaveProperty('mobile')
         expect(user).toHaveProperty('nickname')
         expect(user).toHaveProperty('status')
-        expect(user).toHaveProperty('role_based_admin')
+        expect(user).toHaveProperty('is_admin')
         expect(user).toHaveProperty('roles')
         expect(user).toHaveProperty('consecutive_fail_count')
         expect(user).toHaveProperty('history_total_points')
@@ -204,12 +203,12 @@ describe('认证和权限系统API测试（V4架构）', () => {
 
         // 验证角色信息
         expect(Array.isArray(user.roles)).toBe(true)
-        expect(typeof user.role_based_admin).toBe('boolean')
+        expect(typeof user.is_admin).toBe('boolean')
 
         console.log('✅ 获取用户信息成功:', {
           user_id: user.user_id,
           mobile: user.mobile,
-          role_based_admin: user.role_based_admin
+          is_admin: user.is_admin
         })
       }
     })
@@ -303,7 +302,7 @@ describe('认证和权限系统API测试（V4架构）', () => {
         expect(refresh_response.data.data).toHaveProperty('user')
         expect(refresh_response.data.data.user).toHaveProperty('user_id')
         expect(refresh_response.data.data.user).toHaveProperty('mobile')
-        expect(refresh_response.data.data.user).toHaveProperty('role_based_admin')
+        expect(refresh_response.data.data.user).toHaveProperty('is_admin')
         expect(refresh_response.data.data.user).toHaveProperty('roles')
         expect(refresh_response.data.data).toHaveProperty('expires_in')
         expect(refresh_response.data.data).toHaveProperty('timestamp')
@@ -369,7 +368,7 @@ describe('认证和权限系统API测试（V4架构）', () => {
         expect(response.data.data).toHaveProperty('has_permission')
         expect(response.data.data).toHaveProperty('resource')
         expect(response.data.data).toHaveProperty('action')
-        expect(response.data.data).toHaveProperty('role_based_admin')
+        expect(response.data.data).toHaveProperty('is_admin')
         expect(response.data.data).toHaveProperty('role_level')
 
         console.log('✅ 权限检查成功:', {
@@ -397,12 +396,12 @@ describe('认证和权限系统API测试（V4架构）', () => {
       expect([200, 401, 403]).toContain(response.status)
       if (response.status === 200) {
         expect(response.data.data).toHaveProperty('roles')
-        expect(response.data.data).toHaveProperty('role_based_admin')
+        expect(response.data.data).toHaveProperty('is_admin')
         expect(response.data.data).toHaveProperty('role_level')
         expect(response.data.data).toHaveProperty('permissions')
 
         console.log('✅ 获取当前用户权限成功:', {
-          role_based_admin: response.data.data.role_based_admin,
+          is_admin: response.data.data.is_admin,
           role_level: response.data.data.role_level,
           roles_count: response.data.data.roles?.length || 0
         })

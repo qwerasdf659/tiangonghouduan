@@ -9,7 +9,6 @@
  * - 使用统一响应 res.apiSuccess / res.apiError
  *
  * 创建时间：2025-12-22
- * 来源：从 auth.js 拆分
  */
 
 const express = require('express')
@@ -40,7 +39,7 @@ router.get('/profile', authenticateToken, async (req, res) => {
       user_id: user.user_id,
       mobile: user.mobile,
       nickname: user.nickname,
-      role_based_admin: userRoles.isAdmin,
+      is_admin: userRoles.isAdmin,
       roles: userRoles.roles,
       status: user.status,
       consecutive_fail_count: user.consecutive_fail_count,

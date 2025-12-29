@@ -7,7 +7,6 @@
  * - 积分查询限流（60次/分钟/用户）
  *
  * 创建时间：2025年12月22日
- * 拆分自：lottery.js（符合Controller拆分规范 150-250行）
  */
 
 const logger = require('../../../utils/logger').logger

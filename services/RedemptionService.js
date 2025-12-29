@@ -284,9 +284,23 @@ class RedemptionService {
         { transaction: tx }
       )
 
-      // 6. 标记物品实例为已使用
+      // 6. 使用 AssetService.consumeItem() 消耗物品实例（自动记录事件）
       if (order.item_instance) {
-        await order.item_instance.update({ status: 'used' }, { transaction: tx })
+        const AssetService = require('./AssetService')
+        await AssetService.consumeItem(
+          {
+            item_instance_id: order.item_instance.item_instance_id,
+            operator_user_id: redeemer_user_id,
+            business_type: 'redemption_use',
+            business_id: order.order_id,
+            meta: {
+              order_id: order.order_id,
+              redeemer_user_id,
+              item_name: order.item_instance.meta?.name
+            }
+          },
+          { transaction: tx }
+        )
       }
 
       if (shouldCommit) await tx.commit()

@@ -67,8 +67,6 @@ module.exports = sequelize => {
         comment: '用户昵称'
       },
 
-      // 🗑️ is_admin 字段已删除 - 使用UUID角色系统替代 - 2025年01月21日
-
       // 🔧 保留的业务辅助字段
       status: {
         type: DataTypes.ENUM('active', 'inactive', 'banned'),
@@ -220,12 +218,6 @@ module.exports = sequelize => {
         as: 'socialLotteryMembers'
       })
     }
-
-    /*
-     * ❌ UserInventory 关联已删除（2025-12-21 暴力重构）
-     * 替代方案：使用 ItemInstance 模型
-     * User.hasMany(models.ItemInstance, { foreignKey: 'owner_user_id', as: 'items' })
-     */
 
     // VIP等级关联
     if (models.VipLevel) {

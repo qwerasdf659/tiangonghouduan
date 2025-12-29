@@ -47,14 +47,8 @@ module.exports = {
     `)
 
     if (consumptionNulls[0].null_count > 0) {
-      console.log(`发现 ${consumptionNulls[0].null_count} 条 NULL 记录，生成业务ID...`)
-      // 为 NULL 记录生成唯一的 business_id
-      await queryInterface.sequelize.query(`
-        UPDATE consumption_records
-        SET business_id = CONCAT('consumption_legacy_', record_id, '_', UNIX_TIMESTAMP(created_at))
-        WHERE business_id IS NULL
-      `)
-      console.log('✅ 已为历史记录生成 business_id')
+      // 数据库已清理完毕，不应该存在 NULL 记录
+      throw new Error(`发现 ${consumptionNulls[0].null_count} 条 NULL 记录，请先手动处理历史数据`)
     } else {
       console.log('✅ 无 NULL 记录')
     }
@@ -112,14 +106,8 @@ module.exports = {
     `)
 
     if (marketNulls[0].null_count > 0) {
-      console.log(`发现 ${marketNulls[0].null_count} 条 NULL 记录，生成业务ID...`)
-      // 为 NULL 记录生成唯一的 business_id
-      await queryInterface.sequelize.query(`
-        UPDATE market_listings
-        SET business_id = CONCAT('listing_legacy_', listing_id, '_', seller_user_id, '_', UNIX_TIMESTAMP(created_at))
-        WHERE business_id IS NULL
-      `)
-      console.log('✅ 已为历史记录生成 business_id')
+      // 数据库已清理完毕，不应该存在 NULL 记录
+      throw new Error(`发现 ${marketNulls[0].null_count} 条 NULL 记录，请先手动处理历史数据`)
     } else {
       console.log('✅ 无 NULL 记录')
     }

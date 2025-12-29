@@ -116,7 +116,7 @@ class PrizePoolService {
 
       // 1. 验证概率总和必须为1
       const totalProbability = prizes.reduce((sum, p) => {
-        const prob = parseFloat(p.probability) || 0
+        const prob = parseFloat(p.win_probability || p.probability) || 0
         return sum + prob
       }, 0)
 
@@ -172,8 +172,7 @@ class PrizePoolService {
                 : null,
             category: prizeData.category || null,
             stock_quantity: parseInt(prizeData.quantity), // 前端字段映射：quantity → stock_quantity
-            win_probability: prizeData.probability || 0, // 中奖概率
-            probability: prizeData.wheelProbability || prizeData.probability || 0, // 转盘显示概率
+            win_probability: prizeData.win_probability || prizeData.probability || 0, // 中奖概率（前端兼容）
             prize_description: prizeData.description || '', // 前端字段映射：description → prize_description
             image_id: prizeData.image_id || null, // 图片ID
             angle: prizeData.angle || 0, // 转盘角度
@@ -278,7 +277,6 @@ class PrizePoolService {
           'category',
           'stock_quantity',
           'win_probability',
-          'probability',
           'prize_description',
           'image_id',
           'angle',
@@ -316,7 +314,6 @@ class PrizePoolService {
         stock_quantity: prize.stock_quantity,
         remaining_quantity: Math.max(0, (prize.stock_quantity || 0) - (prize.total_win_count || 0)),
         win_probability: prize.win_probability,
-        probability: prize.probability,
         prize_description: prize.prize_description,
         image_id: prize.image_id,
         angle: prize.angle,
@@ -407,7 +404,6 @@ class PrizePoolService {
           'daily_win_count',
           'max_daily_wins',
           'win_probability',
-          'probability',
           'prize_description',
           'image_id',
           'angle',
@@ -454,7 +450,6 @@ class PrizePoolService {
         daily_win_count: prize.daily_win_count || 0,
         max_daily_wins: prize.max_daily_wins,
         win_probability: prize.win_probability,
-        probability: prize.probability,
         prize_description: prize.prize_description,
         image_id: prize.image_id,
         angle: prize.angle,
@@ -533,8 +528,8 @@ class PrizePoolService {
         virtual_amount: 'virtual_amount',
         category: 'category',
         quantity: 'stock_quantity',
-        probability: 'win_probability',
-        wheelProbability: 'probability',
+        probability: 'win_probability', // 前端probability映射到数据库win_probability
+        win_probability: 'win_probability',
         description: 'prize_description',
         image_id: 'image_id',
         angle: 'angle',
@@ -638,7 +633,6 @@ class PrizePoolService {
           (updatedPrize.stock_quantity || 0) - (updatedPrize.total_win_count || 0)
         ),
         win_probability: updatedPrize.win_probability,
-        probability: updatedPrize.probability,
         prize_description: updatedPrize.prize_description,
         image_id: updatedPrize.image_id,
         angle: updatedPrize.angle,

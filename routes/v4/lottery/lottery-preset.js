@@ -95,12 +95,6 @@ router.post('/create', authenticateToken, requireAdmin, async (req, res) => {
   }
 })
 
-/*
- * ❌ 已删除：GET /user/:user_id 和 DELETE /user/:user_id
- * 原因：违反"用户端禁止/:id参数"规范
- * 迁移至：/api/v4/admin/users/:user_id/lottery-presets（管理端操作用户预设）
- */
-
 /**
  * 获取所有预设列表（管理员视角）
  * GET /api/v4/lottery-preset/list

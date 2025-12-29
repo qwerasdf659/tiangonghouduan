@@ -943,7 +943,6 @@ class AdminLotteryService {
    *
    * @description
    * 每日定时任务，重置所有奖品的 daily_win_count 为 0。
-   * 该方法从 LotteryPrize 模型迁移而来，负责定时任务的批量数据更新。
    *
    * 业务场景：
    * - 每日凌晨定时任务执行
@@ -999,8 +998,6 @@ class AdminLotteryService {
    * 定时任务，自动同步抽奖活动状态：
    * - 将到达开始时间的draft状态活动更新为active
    * - 将已过结束时间的active状态活动更新为ended
-   *
-   * 该方法从 LotteryCampaign 模型迁移而来，负责定时任务的批量状态管理。
    *
    * 业务场景：
    * - 定时任务自动执行
@@ -1083,7 +1080,6 @@ class AdminLotteryService {
    *
    * @description
    * 查询当前活跃的抽奖活动列表（status=active且在有效时间范围内）。
-   * 该方法从 LotteryCampaign 模型迁移而来，负责活动列表查询业务逻辑。
    *
    * 业务场景：
    * - 定时任务获取活动列表

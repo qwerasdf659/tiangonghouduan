@@ -1,6 +1,5 @@
 /**
  * 积分余额查询API测试 - P0优化验证
- * 迁移自 tests/api/test-get-user-points-balance-p0.test.js
  *
  * 测试目标API: GET /api/v4/points/balance/:user_id
  *

@@ -37,8 +37,6 @@ models.AuthenticationSession = require('./AuthenticationSession')(sequelize, Dat
  *    - 业务场景：用户登录后生成Token、Token续期、退出登录时失效Token
  */
 
-// ✅ LoginLog模型已删除 - 过度设计，改用User.last_login字段统计活跃用户 - 2025年09月22日
-
 // 🔴 积分和账户系统模型（用户相关功能分散 - 有业务合理性）
 models.UserPointsAccount = require('./UserPointsAccount')(sequelize, DataTypes)
 /*
@@ -73,12 +71,7 @@ models.UserPremiumStatus = require('./UserPremiumStatus')(sequelize, DataTypes)
 models.LotteryCampaign = require('./LotteryCampaign')(sequelize, DataTypes)
 models.LotteryPrize = require('./LotteryPrize')(sequelize, DataTypes)
 models.LotteryDraw = require('./LotteryDraw')(sequelize, DataTypes)
-/*
- * 🔥 LotteryRecord 已完全合并到 LotteryDraw，不保留向后兼容性 - 2025年01月21日
- * 🗑️ LotteryPity模型已删除 - 100%未使用的废弃表，功能已被LotteryDraw+User替代 - 2025年10月01日
- */
 models.LotteryPreset = require('./LotteryPreset')(sequelize, DataTypes)
-// 🗑️ UserSpecificPrizeQueue模型已删除 - 功能过于复杂，实际业务中未使用 - 2025年09月22日
 
 models.LotteryManagementSetting = require('./LotteryManagementSetting')(sequelize, DataTypes)
 /*
@@ -108,24 +101,13 @@ models.LotteryUserDailyDrawQuota = require('./LotteryUserDailyDrawQuota')(sequel
  *    - 业务场景：抽奖前配额检查、原子扣减、连抽支持（10连抽一次扣减10次）
  */
 
-/*
- * 🔴 业务功能模型（商品和库存系统）
- * 🗑️ models.BusinessEvent模型已删除 - 过度设计，使用现有业务记录模型替代 - 2025年01月21日
- * 🗑️ models.BusinessConfigs模型已删除 - 使用硬编码10%概率替代 - 2025年01月21日
- */
+// 🔴 业务功能模型（商品和库存系统）
 models.Product = require('./Product')(sequelize, DataTypes)
 /*
  * ✅ Product：商品信息管理
  *    - 用途：管理可兑换的商品信息（实物、虚拟商品、服务等）
  *    - 特点：商品名称、价格、库存、状态、描述
  *    - 表名：products，主键：product_id
- */
-
-/*
- * ❌ UserInventory 模型已删除（2025-12-21 暴力重构）
- *    - 数据已迁移至 item_instances 表
- *    - 核销码功能已迁移至 redemption_orders 表
- *    - 替代服务：BackpackService + RedemptionService
  */
 
 models.ItemInstance = require('./ItemInstance')(sequelize, DataTypes)
@@ -136,6 +118,17 @@ models.ItemInstance = require('./ItemInstance')(sequelize, DataTypes)
  *    - 表名：item_instances，主键：item_instance_id，外键：owner_user_id
  *    - 业务场景：物品上架、购买转移、使用核销、过期管理
  *    - 状态流转：available → locked → transferred/used/expired
+ *    - 锁TTL：3分钟（2025-12-28从15分钟优化）
+ */
+
+models.ItemInstanceEvent = require('./ItemInstanceEvent')(sequelize, DataTypes)
+/*
+ * ✅ ItemInstanceEvent：物品实例事件（事件溯源 - 2025-12-28新增）
+ *    - 用途：记录物品实例的所有变更事件（铸造/锁定/解锁/转移/使用/过期/销毁）
+ *    - 特点：事件溯源、业务幂等（business_type + business_id 唯一约束）
+ *    - 表名：item_instance_events，主键：event_id，外键：item_instance_id
+ *    - 业务场景：物品审计追踪、所有权历史、状态变更溯源
+ *    - 事件类型：mint/lock/unlock/transfer/use/expire/destroy
  */
 
 models.TradeRecord = require('./TradeRecord')(sequelize, DataTypes)
@@ -187,20 +180,9 @@ models.PopupBanner = require('./PopupBanner')(sequelize, DataTypes)
 
 // 🔴 图片和存储系统
 models.ImageResources = require('./ImageResources')(sequelize, DataTypes)
-// 🔥 V14.1合并优化：UploadReview模型已合并到ImageResources统一资源管理模型
 
-/*
- * 🔴 任务系统模型已移除 - 与抽奖系统无关
- * 已删除：TaskTemplate, UserTask, TaskProgressLog, ScheduledTask
- */
+// 🔴 兑换市场系统
 
-/*
- * 🔴 多池系统模型 - 已删除
- * 多池配置模型已删除 - 使用简化三策略系统
- * UserPoolAccess模型已删除 - 功能合并到User表的pool_access_level字段 (2025年09月22日)
- */
-
-// 🔥 双账户模型：兑换市场系统（2025年12月06日新增）
 models.ExchangeItem = require('./ExchangeItem')(sequelize, DataTypes)
 /*
  * ✅ ExchangeItem：兑换市场商品配置表
@@ -379,15 +361,6 @@ models.RedemptionOrder = require('./RedemptionOrder')(sequelize, DataTypes)
  *    - 特点：12位Base32核销码 + SHA-256哈希存储 + 30天TTL
  *    - 表名：redemption_orders，主键：order_id（UUID），唯一约束：code_hash
  *    - 业务场景：生成核销码→核销验证→过期清理
- */
-
-/*
- * 🔴 统一决策引擎V4.0模型
- * 🗑️ models.DecisionRecord模型已删除 - 过度设计，餐厅抽奖系统不需要决策过程分析 - 2025年01月21日
- * ⚠️ 临时禁用 ProbabilityLog 模型 - 2025年01月21日
- * models.ProbabilityLog = require('./unified/ProbabilityLog')(sequelize, DataTypes)
- * ⚠️ 删除 SystemMetrics 模型 - 过度设计，不符合业务需求 - 2025年01月21日
- * models.SystemMetrics = require('./unified/SystemMetrics')(sequelize, DataTypes)
  */
 
 // 🔴 设置模型关联关系

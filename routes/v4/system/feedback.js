@@ -9,7 +9,6 @@
  * 路由前缀：/api/v4/system
  *
  * 创建时间：2025年12月22日
- * 拆分自：system.js（符合Controller拆分规范 150-250行）
  */
 
 const express = require('express')

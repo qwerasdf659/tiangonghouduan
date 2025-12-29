@@ -60,11 +60,9 @@ class PermissionAuditLogger {
    * @param {string} data.resource - 资源名称
    * @param {string} data.action - 操作类型
    * @param {boolean} data.has_permission - 是否有权限
-   * @param {boolean} data.is_admin - 是否管理员（兼容role_based_admin）
-   * @param {boolean} data.role_based_admin - 是否管理员（兼容字段）
+   * @param {boolean} data.is_admin - 是否管理员
    * @param {number} data.role_level - 角色级别
-   * @param {string} data.ip_address - IP地址（兼容ip字段）
-   * @param {string} data.ip - IP地址（兼容字段）
+   * @param {string} data.ip_address - IP地址
    * @param {string} data.user_agent - 用户代理
    * @param {number} data.batch_count - 批量检查数量（可选）
    * @returns {Promise<void>}
@@ -80,9 +78,9 @@ class PermissionAuditLogger {
         resource: data.resource, // 资源名称（如lottery、inventory）
         action_type: data.action, // 操作类型（如read、participate）
         has_permission: data.has_permission, // 权限检查结果
-        is_admin: data.is_admin || data.role_based_admin || false, // 是否管理员（兼容两种字段名）
+        is_admin: data.is_admin || false, // 是否管理员
         role_level: data.role_level || 0, // 角色级别
-        ip_address: data.ip_address || data.ip || 'unknown', // 来源IP地址（兼容两种字段名）
+        ip_address: data.ip_address || 'unknown', // 来源IP地址
         user_agent: data.user_agent || 'unknown', // 用户代理字符串
         timestamp: BeijingTimeHelper.now() // 北京时间时间戳
       }

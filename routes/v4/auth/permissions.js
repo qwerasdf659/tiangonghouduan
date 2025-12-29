@@ -62,13 +62,6 @@ const validatePermissionParams = (req, res, next) => {
   }
 }
 
-/*
- * ❌ 已删除：GET /user/:user_id
- * 原因：违反"用户端禁止/:id参数"规范
- * 迁移至：/api/v4/admin/users/:id/permissions（管理端查询用户权限）
- * 用户自查权限请使用：GET /me（第109行）
- */
-
 /**
  * GET /api/v4/permissions/me - 获取我的权限信息
  *
@@ -86,12 +79,12 @@ router.get('/me', authenticateToken, async (req, res) => {
     const response_data = {
       user_id: parseInt(user_id),
       roles: permissions.roles,
-      role_based_admin: permissions.role_based_admin,
+      is_admin: permissions.is_admin,
       role_level: permissions.role_level,
       permissions,
-      can_manage_lottery: permissions.role_based_admin,
-      can_view_admin_panel: permissions.role_based_admin,
-      can_modify_user_permissions: permissions.role_based_admin
+      can_manage_lottery: permissions.is_admin,
+      can_view_admin_panel: permissions.is_admin,
+      can_modify_user_permissions: permissions.is_admin
     }
 
     return res.apiSuccess(response_data, '当前用户权限信息获取成功')
@@ -124,7 +117,7 @@ router.post('/check', authenticateToken, validatePermissionParams, async (req, r
       resource,
       action,
       has_permission,
-      role_based_admin: user_roles.isAdmin,
+      is_admin: user_roles.isAdmin,
       role_level: user_roles.role_level,
       ip_address: req.ip,
       user_agent: req.get('user-agent')
@@ -135,7 +128,7 @@ router.post('/check', authenticateToken, validatePermissionParams, async (req, r
       resource,
       action,
       has_permission,
-      role_based_admin: user_roles.isAdmin,
+      is_admin: user_roles.isAdmin,
       role_level: user_roles.role_level, // 🔄 统一命名：使用role_level
       checked_at: BeijingTimeHelper.now()
     }
@@ -168,7 +161,7 @@ router.get('/admins', authenticateToken, async (req, res) => {
       total_count: admins.length,
       admins: admins.map(admin => ({
         ...admin,
-        role_based_admin: admin.role_based_admin
+        is_admin: admin.is_admin
       })),
       retrieved_at: BeijingTimeHelper.now()
     }
@@ -295,7 +288,7 @@ router.get('/statistics', authenticateToken, async (req, res) => {
 
     const response_data = {
       ...statistics,
-      role_based_admin: request_user_roles.isAdmin,
+      is_admin: request_user_roles.isAdmin,
       retrieved_by: request_user_id
     }
 

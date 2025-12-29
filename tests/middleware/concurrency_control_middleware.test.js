@@ -11,7 +11,7 @@ describe('ConcurrencyControlMiddleware 中间件测试 - 真实业务逻辑', ()
   const testUser = {
     user_id: 31, // 正确的user_id（手机号13612227930对应的用户ID）
     mobile: '13612227930',
-    role_based_admin: false
+    is_admin: false
   }
 
   beforeEach(() => {

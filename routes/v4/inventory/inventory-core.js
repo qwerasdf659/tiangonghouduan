@@ -1,10 +1,5 @@
 /**
- * 餐厅积分抽奖系统 V4.0 - 用户库存核心功能API（重构版）
- *
- * ⚠️ 2025-12-21 暴力重构：
- * - 移除对已删除 InventoryService 的依赖
- * - 使用 BackpackService + ItemInstance 模型实现功能
- * - 转让历史查询通过 TradeRecord 模型直接查询
+ * 餐厅积分抽奖系统 V4.0 - 用户库存核心功能API
  *
  * 业务范围：
  * - 用户背包物品详情查看 → 使用 ItemInstance 模型

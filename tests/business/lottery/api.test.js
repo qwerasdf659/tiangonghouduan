@@ -1,6 +1,5 @@
 /**
  * 抽奖系统API测试 (V4架构)
- * 迁移自 tests/api/lottery-api.test.js
  *
  * 测试覆盖：
  * 1. 抽奖系统API（策略、执行、历史、指标、统计）
@@ -270,7 +269,7 @@ describe('抽奖系统API测试（V4架构）', () => {
     test('获取用户抽奖统计（权限验证逻辑测试）- GET /api/v4/lottery/statistics/:user_id', async () => {
       /**
        * 测试说明：
-       * 由于测试账号13612227930同时具有普通用户和管理员权限（role_based_admin: true），
+       * 由于测试账号13612227930同时具有普通用户和管理员权限（is_admin: true），
        * 所以即使以'regular'身份登录，仍然具有管理员权限，可以查看任何用户的统计。
        *
        * 权限验证逻辑：

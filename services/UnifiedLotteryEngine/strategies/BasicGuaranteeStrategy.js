@@ -1636,41 +1636,40 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
       case 'coupon':
       case 'physical': {
         /**
-         * 🔥 背包双轨架构：优惠券/实物奖品发放到 ItemInstance（不可叠加物品轨）
+         * 🔥 统一资产域架构：优惠券/实物奖品通过 AssetService.mintItem() 发放
          *
          * 业务场景：
          * - 抽奖中奖后，将优惠券/实物奖品写入 item_instances 表
-         * - 用户可在背包中查看物品实例
-         * - 每个物品都有独立的 item_instance_id
+         * - 自动记录物品铸造事件到 item_instance_events 表
+         * - 支持幂等性控制（通过 source_type + source_id）
          */
-        const { ItemInstance } = require('../../../models')
-
-        await ItemInstance.create(
+        await AssetService.mintItem(
           {
-            owner_user_id: user_id,
-            item_name: prize.prize_name,
-            item_description: prize.prize_description || `抽奖获得：${prize.prize_name}`,
+            user_id,
             item_type: prize.prize_type === 'coupon' ? 'voucher' : 'product',
-            item_value: Math.round(parseFloat(prize.prize_value) || 0),
-            status: 'available',
             source_type: 'lottery',
-            source_id: options.draw_id || null,
-            acquisition_method: 'lottery',
-            acquisition_cost: this.config.pointsCostPerDraw,
-            can_transfer: true,
-            can_use: true,
-            acquired_at: BeijingTimeHelper.createDatabaseTime(),
-            created_at: BeijingTimeHelper.createDatabaseTime(),
-            updated_at: BeijingTimeHelper.createDatabaseTime()
+            source_id: `${idempotencyKey}:item`,
+            meta: {
+              name: prize.prize_name,
+              description: prize.prize_description || `抽奖获得：${prize.prize_name}`,
+              value: Math.round(parseFloat(prize.prize_value) || 0),
+              prize_id: prize.prize_id,
+              prize_type: prize.prize_type,
+              acquisition_method: 'lottery',
+              acquisition_cost: this.config.pointsCostPerDraw,
+              can_transfer: true,
+              can_use: true
+            }
           },
           { transaction }
         )
 
-        this.logInfo('发放物品到背包（ItemInstance）', {
+        this.logInfo('发放物品到背包（通过 AssetService.mintItem）', {
           user_id,
           prizeId: prize.prize_id,
           prizeName: prize.prize_name,
           prizeType: prize.prize_type,
+          idempotencyKey,
           inTransaction: !!transaction
         })
         break

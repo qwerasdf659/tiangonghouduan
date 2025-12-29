@@ -135,7 +135,7 @@ function generateRequestIdempotencyKey() {
  * 验证幂等键格式是否有效
  *
  * @param {string} key - 待验证的幂等键
- * @param {string} type - 预期的键类型（lottery_session/request_derived/lottery_derived/standalone/request）
+ * @param {string} type - 预期的键类型（lottery_session/request_derived/standalone/request）
  * @returns {boolean} 是否有效
  */
 function isValidIdempotencyKey(key, type) {
@@ -152,10 +152,6 @@ function isValidIdempotencyKey(key, type) {
       // {req_key}:{type} - 方案B标准格式（从请求幂等键派生）
       return /^req_\d+_[a-f0-9]{8}_\d{3}:(consume|reward|refund|reward_\d+)$/.test(key)
 
-    case 'lottery_derived':
-      // {lottery_session_id}:{type} - 旧格式（保留兼容历史数据验证）
-      return /^lottery_tx_\d+_[a-f0-9]{6}_\d{3}:(consume|reward|refund)$/.test(key)
-
     case 'standalone':
       // {business_type}_{account_id}_{timestamp}_{random6}
       return /^[a-z_]+_\d+_\d+_[a-f0-9]{6}$/.test(key)
@@ -170,7 +166,7 @@ function isValidIdempotencyKey(key, type) {
 }
 
 /**
- * 从幂等键解析出会话信息（支持请求派生键和抽奖派生键）
+ * 从幂等键解析出会话信息
  *
  * @param {string} idempotencyKey - 幂等键
  * @returns {Object|null} 解析结果，失败返回null
@@ -179,10 +175,6 @@ function isValidIdempotencyKey(key, type) {
  * // 解析请求派生键（方案B标准格式）
  * const info = parseIdempotencyKey('req_1703511234567_a1b2c3d4_001:consume')
  * // => { type: 'request_derived', requestIdempotencyKey: 'req_1703511234567_a1b2c3d4_001', transactionType: 'consume' }
- *
- * // 解析抽奖派生键（旧格式，历史数据兼容）
- * const info2 = parseIdempotencyKey('lottery_tx_1703511234567_a1b2c3_001:consume')
- * // => { type: 'lottery_derived', lotterySessionId: 'lottery_tx_1703511234567_a1b2c3_001', transactionType: 'consume' }
  */
 function parseIdempotencyKey(idempotencyKey) {
   if (!idempotencyKey || typeof idempotencyKey !== 'string') {
@@ -198,18 +190,6 @@ function parseIdempotencyKey(idempotencyKey) {
       type: 'request_derived',
       requestIdempotencyKey: requestDerivedMatch[1],
       transactionType: requestDerivedMatch[2]
-    }
-  }
-
-  // 尝试解析抽奖派生键（旧格式，历史数据兼容）
-  const lotteryDerivedMatch = idempotencyKey.match(
-    /^(lottery_tx_\d+_[a-f0-9]{6}_\d{3}):(consume|reward|refund)$/
-  )
-  if (lotteryDerivedMatch) {
-    return {
-      type: 'lottery_derived',
-      lotterySessionId: lotteryDerivedMatch[1],
-      transactionType: lotteryDerivedMatch[2]
     }
   }
 

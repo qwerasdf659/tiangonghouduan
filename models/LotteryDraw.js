@@ -1,9 +1,6 @@
 /**
- * 抽奖记录模型（重构版）
+ * 抽奖记录模型
  * 专注于数据定义、关联关系和基础实例方法
- * 业务逻辑已迁移至LotteryDrawService
- * 数据访问已迁移至LotteryDrawRepository
- * 数据格式化已迁移至LotteryDrawFormatter
  */
 
 const { DataTypes, Model } = require('sequelize')

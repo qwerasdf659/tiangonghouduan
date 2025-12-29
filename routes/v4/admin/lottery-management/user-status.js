@@ -10,7 +10,6 @@
  * - 使用 AdminLotteryService 封装所有抽奖管理逻辑
  *
  * 创建时间：2025-12-22
- * 来源：从 lottery_management.js 拆分
  */
 
 const express = require('express')

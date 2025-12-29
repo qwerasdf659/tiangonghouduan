@@ -62,7 +62,16 @@ module.exports = sequelize => {
         type: DataTypes.STRING(50),
         allowNull: false,
         comment:
-          '资产代码（Asset Code）：如 DIAMOND、red_shard、red_crystal 等；唯一约束：(account_id, asset_code)'
+          '资产代码（Asset Code）：如 DIAMOND、POINTS、BUDGET_POINTS、red_shard 等；唯一约束：(account_id, asset_code, campaign_id)'
+      },
+
+      // ==================== 活动ID（BUDGET_POINTS专用） ====================
+      campaign_id: {
+        type: DataTypes.STRING(50),
+        allowNull: true,
+        defaultValue: null,
+        comment:
+          '活动ID（Campaign ID）：仅 BUDGET_POINTS 需要，其他资产为 NULL；业务规则：BUDGET_POINTS 必须关联活动，实现多活动预算隔离'
       },
 
       // ==================== 可用余额 ====================
@@ -91,9 +100,9 @@ module.exports = sequelize => {
       underscored: true,
       indexes: [
         {
-          name: 'uk_account_asset',
+          name: 'uk_account_asset_campaign',
           unique: true,
-          fields: ['account_id', 'asset_code']
+          fields: ['account_id', 'asset_code', 'campaign_id']
         },
         {
           name: 'idx_account_asset_balances_asset_code',
@@ -102,6 +111,10 @@ module.exports = sequelize => {
         {
           name: 'idx_account_asset_balances_account_id',
           fields: ['account_id']
+        },
+        {
+          name: 'idx_account_asset_balances_campaign_id',
+          fields: ['campaign_id']
         }
       ],
       comment: '账户资产余额表（可用余额 + 冻结余额）'

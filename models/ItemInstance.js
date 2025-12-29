@@ -11,11 +11,12 @@
  * 硬约束（来自文档）：
  * - **单一真相**：物品所有权只能来自 item_instances 表
  * - **状态机**：available→locked→transferred/used/expired
- * - **锁超时**：15分钟（locked_at 超时自动解锁）
+ * - **锁超时**：3分钟（locked_at 超时自动解锁）
  *
  * 表名（snake_case）：item_instances
  * 主键命名：item_instance_id
  * 创建时间：2025-12-15
+ * 更新时间：2025-12-28（锁TTL从15分钟改为3分钟）
  */
 
 'use strict'
@@ -52,7 +53,7 @@ class ItemInstance extends Model {
   }
 
   /**
-   * 检查锁定是否超时（15分钟）
+   * 检查锁定是否超时（3分钟）
    *
    * @returns {boolean} 是否超时 - true表示超时，false表示未超时
    */
@@ -63,7 +64,7 @@ class ItemInstance extends Model {
     const lockTime = new Date(this.locked_at)
     const diffMinutes = (now - lockTime) / 1000 / 60
 
-    return diffMinutes > 15 // 15分钟超时
+    return diffMinutes > 3 // 3分钟超时（从15分钟优化为3分钟）
   }
 
   /**

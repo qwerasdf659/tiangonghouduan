@@ -1,6 +1,5 @@
 /**
  * 用户管理安全修复测试 (V4架构)
- * 迁移自 tests/api/user-management-security-fixes.test.js
  *
  * 测试目标：
  * - 风险1：验证权限级别检查（低级别管理员无法修改高级别管理员）

@@ -563,11 +563,6 @@ module.exports = sequelize => {
           }
         },
 
-        // 未删除的记录（前端只负责数据展示，现在这个scope已由defaultScope处理，保留用于兼容）
-        notDeleted: {
-          where: { is_deleted: 0 }
-        },
-
         // 已删除的记录（管理员可查看和恢复）
         deleted: {
           where: { is_deleted: 1 }

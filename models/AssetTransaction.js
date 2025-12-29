@@ -156,9 +156,9 @@ module.exports = sequelize => {
       // 变动前余额（Balance Before - 变动前的资产余额）
       balance_before: {
         type: DataTypes.BIGINT,
-        allowNull: true, // 允许NULL（兼容历史数据）
-        comment:
-          '变动前余额（Balance Before - 本次变动前的资产余额）：与balance_after配合用于完整对账（before + delta = after），新业务必填'
+        allowNull: false,
+        defaultValue: 0,
+        comment: '变动前余额：与balance_after配合用于完整对账（before + delta = after）'
       },
 
       // 变动后余额（Balance After - 变动后的资产余额）

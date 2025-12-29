@@ -57,7 +57,7 @@ class UserPermissionModule {
       if (!user) {
         return {
           exists: false,
-          role_based_admin: false,
+          is_admin: false,
           role_level: 0,
           permissions: [],
           roles: []
@@ -88,7 +88,7 @@ class UserPermissionModule {
         mobile: user.mobile,
         nickname: user.nickname,
         status: user.status,
-        role_based_admin: maxRoleLevel >= 100, // 🛡️ 基于角色级别计算管理员权限
+        is_admin: maxRoleLevel >= 100, // 🛡️ 基于角色级别计算管理员权限
         role_level: maxRoleLevel,
         permissions: Array.from(allPermissions),
         roles: user.roles.map(role => ({
@@ -101,7 +101,7 @@ class UserPermissionModule {
       console.error('❌ 获取用户权限失败:', error.message)
       return {
         exists: false,
-        role_based_admin: false,
+        is_admin: false,
         role_level: 0,
         permissions: [],
         roles: []
@@ -125,7 +125,7 @@ class UserPermissionModule {
       }
 
       // 管理员拥有所有权限
-      if (userPermissions.role_based_admin) {
+      if (userPermissions.is_admin) {
         return true
       }
 
@@ -171,7 +171,7 @@ class UserPermissionModule {
 
       return {
         user_id: userId,
-        role_based_admin: userPermissions.role_based_admin,
+        is_admin: userPermissions.is_admin,
         role_level: userPermissions.role_level,
         permissions: results,
         checked_at: BeijingTimeHelper.now()
@@ -199,7 +199,7 @@ class UserPermissionModule {
       }
 
       // 检查管理员权限要求
-      if (requiredLevel === 'admin' && !operatorPermissions.role_based_admin) {
+      if (requiredLevel === 'admin' && !operatorPermissions.is_admin) {
         return { valid: false, reason: 'ADMIN_REQUIRED' }
       }
 
@@ -213,7 +213,7 @@ class UserPermissionModule {
 
       return {
         valid: true,
-        role_based_admin: operatorPermissions.role_based_admin,
+        is_admin: operatorPermissions.is_admin,
         role_level: operatorPermissions.role_level,
         permissions: operatorPermissions.permissions
       }
@@ -231,7 +231,7 @@ class UserPermissionModule {
   async isAdmin(userId) {
     try {
       const permissions = await this.getUserPermissions(userId)
-      return permissions.role_based_admin
+      return permissions.is_admin
     } catch (error) {
       console.error('❌ 管理员权限检查失败:', error.message)
       return false
@@ -282,7 +282,7 @@ class UserPermissionModule {
         return { valid: false, reason: 'ADMIN_NOT_FOUND' }
       }
 
-      if (!userPermissions.role_based_admin) {
+      if (!userPermissions.is_admin) {
         return { valid: false, reason: 'NOT_ADMIN' }
       }
 
@@ -291,7 +291,7 @@ class UserPermissionModule {
         admin_id: userPermissions.user_id,
         mobile: userPermissions.mobile,
         nickname: userPermissions.nickname,
-        role_based_admin: true,
+        is_admin: true,
         role_level: userPermissions.role_level,
         roles: userPermissions.roles
       }
@@ -354,14 +354,14 @@ class UserPermissionModule {
         change_type: 'role_assignment',
         old_role: null, // 旧角色已删除，不记录
         new_role: targetRoleName,
-        role_based_admin: isAdmin,
+        is_admin: isAdmin,
         role_level: targetRole.role_level
       })
 
       return {
         user_id: userId,
         role_name: targetRoleName,
-        role_based_admin: isAdmin,
+        is_admin: isAdmin,
         role_level: targetRole.role_level,
         assigned_by: operatorId,
         timestamp: BeijingTimeHelper.now()
@@ -406,7 +406,7 @@ class UserPermissionModule {
         mobile: this._maskMobile(user.mobile), // ✅ P0修复：手机号脱敏处理（138****8000）
         nickname: user.nickname,
         status: user.status,
-        role_based_admin: true, // 固定值：基于角色的管理员标识
+        is_admin: true, // 固定值：基于角色的管理员标识
         role_level: user.roles[0]?.role_level || 100, // ✅ P1修复：从数据库读取真实值，兜底值100
         roles: user.roles.map(r => ({
           // 返回完整角色信息数组

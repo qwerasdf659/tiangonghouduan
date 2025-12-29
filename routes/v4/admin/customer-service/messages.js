@@ -11,7 +11,6 @@
  * - 通过 ServiceManager 统一获取服务实例
  *
  * 创建时间：2025-12-22
- * 来源：从 admin/customer_service.js 拆分
  */
 
 const express = require('express')

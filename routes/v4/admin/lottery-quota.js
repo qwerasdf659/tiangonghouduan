@@ -32,20 +32,8 @@ function formatQuotaRuleForApi(ruleInstanceOrPlain) {
       ? ruleInstanceOrPlain.get({ plain: true })
       : { ...(ruleInstanceOrPlain || {}) }
 
-  const scopeType = rule.scope_type
-  const scopeId = rule.scope_id
-
   return {
-    ...rule,
-
-    // Backward-compatible fields for admin UI / older clients
-    rule_type: scopeType,
-    is_active: rule.status === 'active',
-
-    // Derived fields (schema stores only scope_type + scope_id)
-    campaign_id: scopeType === 'campaign' ? parseInt(scopeId) : null,
-    role_uuid: scopeType === 'role' ? scopeId : null,
-    target_user_id: scopeType === 'user' ? parseInt(scopeId) : null
+    ...rule
   }
 }
 

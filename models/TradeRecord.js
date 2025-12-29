@@ -177,7 +177,6 @@ module.exports = sequelize => {
         allowNull: true,
         comment: '安全验证码'
       },
-      // 🗑️ risk_level 字段已删除 - 2025年01月21日
 
       // 交易环境信息
       client_ip: {

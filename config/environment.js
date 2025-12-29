@@ -118,16 +118,6 @@ function validateConfig() {
     process.exit(1)
   }
 
-  // 检测到已废弃的旧配置时报错（不兼容旧写法）
-  if (process.env.REDIS_HOST || process.env.REDIS_PORT) {
-    console.error('❌ 检测到已废弃的Redis配置:')
-    if (process.env.REDIS_HOST) console.error('   - REDIS_HOST（已废弃，请删除）')
-    if (process.env.REDIS_PORT) console.error('   - REDIS_PORT（已废弃，请删除）')
-    console.error('   请只使用 REDIS_URL 配置Redis连接')
-    console.error('   参考：docs/Devbox单环境统一配置方案.md')
-    process.exit(1)
-  }
-
   console.log(`✅ 环境配置验证通过: ${getCurrentConfig().displayName}`)
 }
 

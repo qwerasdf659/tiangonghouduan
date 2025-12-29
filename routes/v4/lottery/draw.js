@@ -16,8 +16,6 @@
  * - 流水幂等：通过派生 idempotency_key 保证每条流水唯一
  *
  * 创建时间：2025年12月22日
- * 拆分自：lottery.js（符合Controller拆分规范 150-250行）
- * 更新时间：2025年12月26日（方案B - 业界标准幂等架构）
  */
 
 const express = require('express')
