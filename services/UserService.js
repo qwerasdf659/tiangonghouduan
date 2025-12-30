@@ -11,14 +11,14 @@
  * 设计原则：
  * - **事务安全保障**：所有写操作支持外部事务传入，确保原子性
  * - **业务规则集中**：用户注册流程的所有步骤集中在Service层
- * - **依赖服务协调**：协调 PointsService、UserRoleService 等服务
+ * - **依赖服务协调**：协调 AssetService、UserRoleService 等服务
  *
  * 创建时间：2025年12月09日
  * 使用模型：Claude Sonnet 4.5
  */
 
 const { User, Role, UserRole } = require('../models')
-const PointsService = require('./PointsService')
+const AssetService = require('./AssetService')
 const BeijingTimeHelper = require('../utils/timeHelper')
 const logger = require('../utils/logger')
 
@@ -37,7 +37,7 @@ class UserService {
    * @returns {Object} 创建的用户对象
    * @throws {Error} 业务错误（手机号已存在、角色不存在等）
    */
-  static async registerUser (mobile, options = {}) {
+  static async registerUser(mobile, options = {}) {
     const { transaction: externalTransaction, nickname, status = 'active' } = options
 
     // 如果没有外部事务，创建内部事务
@@ -78,10 +78,10 @@ class UserService {
         mobile: mobile.substring(0, 3) + '****' + mobile.substring(7)
       })
 
-      // 步骤3: 创建积分账户
-      await PointsService.createPointsAccount(user.user_id, transaction)
+      // 步骤3: 创建资产账户（AssetService 会自动创建关联的余额记录）
+      await AssetService.getOrCreateAccount({ user_id: user.user_id }, { transaction })
 
-      logger.info('用户积分账户创建成功', { user_id: user.user_id })
+      logger.info('用户资产账户创建成功', { user_id: user.user_id })
 
       // 步骤4: 分配普通用户角色
       const userRole = await Role.findOne({
@@ -160,7 +160,7 @@ class UserService {
    * @param {Object} options.transaction - 外部事务对象（可选）
    * @returns {Object|null} 用户对象或null
    */
-  static async findByMobile (mobile, options = {}) {
+  static async findByMobile(mobile, options = {}) {
     const { transaction } = options
 
     try {
@@ -191,7 +191,7 @@ class UserService {
    * @param {Object} options.transaction - 外部事务对象（可选）
    * @returns {Object} 更新后的用户对象
    */
-  static async updateLoginStats (user_id, options = {}) {
+  static async updateLoginStats(user_id, options = {}) {
     const { transaction } = options
 
     try {
@@ -239,7 +239,7 @@ class UserService {
    * @returns {Object|null} 用户对象或null
    * @throws {Error} 业务错误（用户不存在等）
    */
-  static async getUserById (user_id, options = {}) {
+  static async getUserById(user_id, options = {}) {
     const { transaction } = options
 
     try {
@@ -281,7 +281,7 @@ class UserService {
    * @returns {Object} 用户对象
    * @throws {Error} 业务错误（用户不存在、账户已被禁用等）
    */
-  static async getUserWithValidation (userId, options = {}) {
+  static async getUserWithValidation(userId, options = {}) {
     const { attributes, checkStatus = true, transaction } = options
 
     try {
@@ -355,7 +355,7 @@ class UserService {
    * @returns {Object} 包含用户和角色信息的对象
    * @throws {Error} 业务错误（验证码错误、用户不存在、权限不足等）
    */
-  static async adminLogin (mobile, verificationCode, options = {}) {
+  static async adminLogin(mobile, verificationCode, options = {}) {
     const { transaction } = options
 
     try {
@@ -471,7 +471,7 @@ class UserService {
    * @returns {Promise<Object>} 包含用户信息和积分账户信息的对象
    * @throws {Error} 用户不存在、用户被禁用、积分账户不存在、积分账户被冻结
    */
-  static async getUserWithPoints (userId, options = {}) {
+  static async getUserWithPoints(userId, options = {}) {
     const { checkPointsAccount = true, checkStatus = true, transaction = null } = options
 
     try {

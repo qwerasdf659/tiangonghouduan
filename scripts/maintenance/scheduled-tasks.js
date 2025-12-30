@@ -13,9 +13,11 @@
  * 7. 抽奖活动状态同步（每小时检查）- 2025-12-11新增
  * 8. 交易市场锁超时解锁（每5分钟检查）- 2025-12-15新增（Phase 2）
  * 9. 核销码过期清理（每天凌晨2点）- 2025-12-17新增（Phase 1）
+ * 10. 商家审核超时告警（每小时）- 2025-12-29新增（资产域标准架构）
+ * 11. 交易市场超时解锁（每小时）- 2025-12-29新增（资产域标准架构）
  *
  * 创建时间：2025-10-10
- * 更新时间：2025-12-17（新增核销码过期清理任务，符合背包双轨架构）
+ * 更新时间：2025-12-29（新增资产域标准架构定时任务）
  */
 
 const cron = require('node-cron')
@@ -37,6 +39,10 @@ const DailyAssetReconciliation = require('../../jobs/daily-asset-reconciliation'
 // 🔴 移除 RedemptionService 直接引用（2025-12-17 P1-2）
 // 原因：统一通过 jobs/daily-redemption-order-expiration.js 作为唯一入口
 // 避免多处直接调用服务层方法，确保业务逻辑和报告格式统一
+
+// 2025-12-29新增：资产域标准架构定时任务
+const HourlyAlertTimeoutReviews = require('../../jobs/hourly-alert-timeout-reviews')
+const HourlyUnlockTimeoutTradeOrders = require('../../jobs/hourly-unlock-timeout-trade-orders')
 
 /**
  * 定时任务管理类
@@ -87,6 +93,12 @@ class ScheduledTasks {
 
     // 任务12: 每天凌晨2点执行资产对账（2025-12-17新增）
     this.scheduleDailyAssetReconciliation()
+
+    // 任务13: 每小时告警超时商家审核单（2025-12-29新增 - 资产域标准架构）
+    this.scheduleHourlyAlertTimeoutReviews()
+
+    // 任务14: 每小时解锁超时交易订单（2025-12-29新增 - 资产域标准架构）
+    this.scheduleHourlyUnlockTimeoutTradeOrders()
 
     logger.info('所有定时任务已初始化完成')
   }
@@ -1064,6 +1076,112 @@ class ScheduledTasks {
       return report
     } catch (error) {
       logger.error('[手动触发] 清理失败', { error: error.message })
+      throw error
+    }
+  }
+
+  /**
+   * 定时任务13: 每小时告警超时商家审核单
+   * Cron表达式: 0 * * * * (每小时的0分)
+   *
+   * 业务规则（拍板决策）：
+   * - 只要没审核通过就不可以增加到可用积分中
+   * - 冻结会无限期存在，接受用户资产长期不可用
+   * - 超时兜底：仅推进状态 + 告警，不自动解冻
+   *
+   * 创建时间：2025-12-29（资产域标准架构）
+   * @returns {void}
+   */
+  static scheduleHourlyAlertTimeoutReviews() {
+    cron.schedule('0 * * * *', async () => {
+      try {
+        logger.info('[定时任务] 开始执行商家审核超时告警任务...')
+        const report = await HourlyAlertTimeoutReviews.execute()
+
+        if (report.timeout_count > 0) {
+          logger.warn(`[定时任务] 发现${report.timeout_count}个超时商家审核单`, {
+            action: report.action,
+            reviews: report.reviews
+          })
+        } else {
+          logger.info('[定时任务] 商家审核超时告警任务完成，无超时审核单')
+        }
+      } catch (error) {
+        logger.error('[定时任务] 商家审核超时告警任务失败', { error: error.message })
+      }
+    })
+
+    logger.info('✅ 定时任务已设置: 商家审核超时告警（每小时执行）')
+  }
+
+  /**
+   * 定时任务14: 每小时解锁超时交易订单
+   * Cron表达式: 0 * * * * (每小时的0分)
+   *
+   * 业务规则：
+   * - 物品锁定超时时间：3分钟
+   * - 订单超时后：自动取消并解冻资产（与商家审核不同，可以自动解冻）
+   * - 记录超时解锁事件到 item_instance_events
+   *
+   * 创建时间：2025-12-29（资产域标准架构）
+   * @returns {void}
+   */
+  static scheduleHourlyUnlockTimeoutTradeOrders() {
+    cron.schedule('0 * * * *', async () => {
+      try {
+        logger.info('[定时任务] 开始执行交易市场超时解锁任务...')
+        const report = await HourlyUnlockTimeoutTradeOrders.execute()
+
+        if (report.total_released_items > 0 || report.total_cancelled_orders > 0) {
+          logger.warn('[定时任务] 交易市场超时解锁完成（有超时数据）', {
+            released_items: report.total_released_items,
+            cancelled_orders: report.total_cancelled_orders,
+            unfrozen_amount: report.total_unfrozen_amount
+          })
+        } else {
+          logger.info('[定时任务] 交易市场超时解锁任务完成（无超时数据）')
+        }
+      } catch (error) {
+        logger.error('[定时任务] 交易市场超时解锁任务失败', { error: error.message })
+      }
+    })
+
+    logger.info('✅ 定时任务已设置: 交易市场超时解锁（每小时执行）')
+  }
+
+  /**
+   * 手动触发商家审核超时告警（用于测试）
+   *
+   * @returns {Promise<Object>} 告警报告对象
+   */
+  static async manualHourlyAlertTimeoutReviews() {
+    logger.info('[手动触发] 执行商家审核超时告警...')
+    try {
+      const report = await HourlyAlertTimeoutReviews.execute()
+      logger.info('[手动触发] 商家审核超时告警完成', { timeout_count: report.timeout_count })
+      return report
+    } catch (error) {
+      logger.error('[手动触发] 商家审核超时告警失败', { error: error.message })
+      throw error
+    }
+  }
+
+  /**
+   * 手动触发交易市场超时解锁（用于测试）
+   *
+   * @returns {Promise<Object>} 解锁报告对象
+   */
+  static async manualHourlyUnlockTimeoutTradeOrders() {
+    logger.info('[手动触发] 执行交易市场超时解锁...')
+    try {
+      const report = await HourlyUnlockTimeoutTradeOrders.execute()
+      logger.info('[手动触发] 交易市场超时解锁完成', {
+        released_items: report.total_released_items,
+        cancelled_orders: report.total_cancelled_orders
+      })
+      return report
+    } catch (error) {
+      logger.error('[手动触发] 交易市场超时解锁失败', { error: error.message })
       throw error
     }
   }

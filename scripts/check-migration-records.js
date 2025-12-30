@@ -8,21 +8,10 @@
 
 const { Sequelize } = require('sequelize')
 require('dotenv').config()
+// 🔴 复用主 sequelize 实例（单一配置源）
+const { sequelize } = require('../config/database')
 
-async function checkMigrationRecords () {
-  // 创建数据库连接
-  const sequelize = new Sequelize(
-    process.env.DB_NAME || 'restaurant_points_dev',
-    process.env.DB_USER || 'root',
-    process.env.DB_PASSWORD || '',
-    {
-      host: process.env.DB_HOST || 'localhost',
-      port: process.env.DB_PORT || 3306,
-      dialect: 'mysql',
-      logging: false
-    }
-  )
-
+async function checkMigrationRecords() {
   try {
     // 测试连接
     await sequelize.authenticate()
@@ -30,9 +19,7 @@ async function checkMigrationRecords () {
 
     // 查询所有迁移记录
     console.log('\n📊 检查 sequelizemeta 表中的迁移记录...')
-    const [allMigrations] = await sequelize.query(
-      'SELECT name FROM sequelizemeta ORDER BY name'
-    )
+    const [allMigrations] = await sequelize.query('SELECT name FROM sequelizemeta ORDER BY name')
 
     console.log(`\n📝 当前迁移记录总数: ${allMigrations.length}`)
 
@@ -42,9 +29,7 @@ async function checkMigrationRecords () {
       '20251109235900-add-user-exchange-time-index-to-exchange-records.js'
     ]
 
-    const foundMigrations = allMigrations.filter(m =>
-      targetMigrations.includes(m.name)
-    )
+    const foundMigrations = allMigrations.filter(m => targetMigrations.includes(m.name))
 
     if (foundMigrations.length === 0) {
       console.log('\n✅ 未找到需要删除的迁移记录')
@@ -58,10 +43,9 @@ async function checkMigrationRecords () {
       // 删除这些迁移记录
       console.log('\n🗑️  开始删除迁移记录...')
       for (const migration of targetMigrations) {
-        const [result] = await sequelize.query(
-          'DELETE FROM sequelizemeta WHERE name = ?',
-          { replacements: [migration] }
-        )
+        const [result] = await sequelize.query('DELETE FROM sequelizemeta WHERE name = ?', {
+          replacements: [migration]
+        })
 
         if (result.affectedRows > 0) {
           console.log(`   ✅ 已删除: ${migration}`)

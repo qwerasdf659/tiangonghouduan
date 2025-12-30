@@ -1,12 +1,7 @@
 const { Sequelize } = require('sequelize')
 require('dotenv').config()
-
-const sequelize = new Sequelize(process.env.DB_NAME, process.env.DB_USER, process.env.DB_PASSWORD, {
-  host: process.env.DB_HOST,
-  port: process.env.DB_PORT,
-  dialect: 'mysql',
-  logging: false
-})
+// 🔴 复用主 sequelize 实例（单一配置源）
+const { sequelize } = require('../config/database')
 
 async function checkMigrations() {
   try {

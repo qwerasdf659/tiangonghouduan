@@ -13,7 +13,7 @@
  */
 
 const { ImageResources } = require('../models')
-const PointsService = require('../services/PointsService')
+const AssetService = require('../services/AssetService')
 const NotificationService = require('../services/NotificationService')
 const BeijingTimeHelper = require('../utils/timeHelper')
 
@@ -52,16 +52,22 @@ module.exports = {
 
       // 3. 发放积分奖励（如果有配置）
       if (image.points_awarded && image.points_awarded > 0) {
-        await PointsService.addPoints(image.uploaded_by, image.points_awarded, {
-          transaction,
-          business_type: 'reward',
-          // 🔴 幂等性：使用确定性 business_id，避免回调重复触发导致重复发放
-          business_id: `image_reward_${imageId}`,
-          source_type: 'image_review',
-          title: '图片审核通过奖励',
-          description: `图片${imageId}审核通过，奖励${image.points_awarded}积分`,
-          operator_id: auditRecord.auditor_id
-        })
+        await AssetService.changeBalance(
+          {
+            user_id: image.uploaded_by,
+            asset_code: 'POINTS',
+            delta_amount: image.points_awarded,
+            business_type: 'reward',
+            idempotency_key: `image_reward_${imageId}`,
+            meta: {
+              source_type: 'image_review',
+              title: '图片审核通过奖励',
+              description: `图片${imageId}审核通过，奖励${image.points_awarded}积分`,
+              operator_id: auditRecord.auditor_id
+            }
+          },
+          { transaction }
+        )
 
         console.log(
           `[图片审核回调] 积分奖励已发放: user_id=${image.uploaded_by}, points=${image.points_awarded}`

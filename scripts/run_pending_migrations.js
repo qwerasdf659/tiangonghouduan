@@ -16,18 +16,8 @@ async function runSpecificMigration(migrationName) {
     process.env.DB_HOST + ':' + process.env.DB_PORT + '/' + process.env.DB_NAME
   )
 
-  // 创建独立的Sequelize实例
-  const sequelize = new Sequelize(
-    process.env.DB_NAME,
-    process.env.DB_USER,
-    process.env.DB_PASSWORD,
-    {
-      host: process.env.DB_HOST,
-      port: parseInt(process.env.DB_PORT),
-      dialect: 'mysql',
-      logging: false
-    }
-  )
+  // 🔴 复用主 sequelize 实例（单一配置源）
+  const { sequelize } = require('../config/database')
 
   try {
     // 测试连接

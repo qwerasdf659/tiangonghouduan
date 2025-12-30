@@ -13,7 +13,10 @@ const logger = require('../utils/logger').logger
 const { UnifiedLotteryEngine } = require('./UnifiedLotteryEngine/UnifiedLotteryEngine')
 const { ThumbnailService } = require('./ThumbnailService') // 🎯 导入类
 
-// V4 领域服务
+/*
+ * V4 领域服务
+ * ⚠️ PointsService 已废弃，仅为 ConsumptionService 保留，新代码使用 AssetService
+ */
 const PointsService = require('./PointsService')
 const ExchangeService = require('./ExchangeService')
 const ContentAuditEngine = require('./ContentAuditEngine')
@@ -58,6 +61,9 @@ const BackpackService = require('./BackpackService') // 背包双轨查询服务
 
 // V4.2 交易市场服务（2025-12-21 暴力重构）
 const TradeOrderService = require('./TradeOrderService') // 交易订单服务（市场交易核心）
+
+// 资产域标准架构服务（2025-12-29）
+const MerchantReviewService = require('./MerchantReviewService') // 商家审核服务（扫码审核冻结积分）
 
 // V4 模块化服务
 const { lottery_service_container } = require('./lottery')
@@ -190,7 +196,10 @@ class ServiceManager {
       // ✅ 注册缩略图服务
       this._services.set('thumbnail', new ThumbnailService(this.models))
 
-      // ✅ 注册领域服务（Domain Services）
+      /*
+       * 注册领域服务（Domain Services）
+       * ⚠️ points 服务已废弃，仅为 ConsumptionService 兼容保留
+       */
       this._services.set('points', PointsService)
       this._services.set('exchangeMarket', ExchangeService)
       this._services.set('contentAudit', ContentAuditEngine)
@@ -237,6 +246,9 @@ class ServiceManager {
 
       // 注册V4.2交易市场服务（2025-12-21 暴力重构）
       this._services.set('tradeOrder', TradeOrderService) // 交易订单服务（市场交易核心）
+
+      // 注册资产域标准架构服务（2025-12-29）
+      this._services.set('merchantReview', MerchantReviewService) // 商家审核服务（扫码审核冻结积分）
 
       // 注册模块化抽奖服务容器
       this._services.set('lotteryContainer', lottery_service_container)

@@ -7,20 +7,10 @@ const { Sequelize } = require('sequelize')
 const fs = require('fs')
 const path = require('path')
 require('dotenv').config()
+// 🔴 复用主 sequelize 实例（单一配置源）
+const { sequelize } = require('../config/database')
 
-const sequelize = new Sequelize(
-  process.env.DB_NAME,
-  process.env.DB_USER,
-  process.env.DB_PASSWORD,
-  {
-    host: process.env.DB_HOST,
-    port: process.env.DB_PORT,
-    dialect: 'mysql',
-    logging: sql => console.log('📝', sql.substring(0, 100) + '...')
-  }
-)
-
-async function executeMigration () {
+async function executeMigration() {
   try {
     console.log('🚀 开始执行数据库迁移...\n')
 

@@ -9,19 +9,8 @@ const { Sequelize } = require('sequelize')
 // 加载环境变量
 require('dotenv').config()
 
-// 数据库连接配置
-const sequelize = new Sequelize(
-  process.env.DB_NAME || 'restaurant_points_dev',
-  process.env.DB_USER || 'root',
-  process.env.DB_PASSWORD || '',
-  {
-    host: process.env.DB_HOST || 'localhost',
-    port: process.env.DB_PORT || 3306,
-    dialect: 'mysql',
-    logging: false,
-    timezone: '+08:00'
-  }
-)
+// 🔴 复用主 sequelize 实例（单一配置源）
+const { sequelize } = require('../config/database')
 
 // 需要验证的表和字段
 const TABLES_TO_VERIFY = {
@@ -45,29 +34,11 @@ const TABLES_TO_VERIFY = {
     'created_at'
   ],
   user_inventory: ['selling_asset_code', 'selling_amount'],
-  trade_records: [
-    'asset_code',
-    'gross_amount',
-    'fee_amount',
-    'net_amount',
-    'business_id'
-  ],
+  trade_records: ['asset_code', 'gross_amount', 'fee_amount', 'net_amount', 'business_id'],
   exchange_items: ['cost_asset_code', 'cost_amount'],
   exchange_market_records: ['pay_asset_code', 'pay_amount'],
-  material_asset_types: [
-    'asset_code',
-    'display_name',
-    'group_code',
-    'form',
-    'tier',
-    'is_enabled'
-  ],
-  user_material_balances: [
-    'balance_id',
-    'user_id',
-    'asset_code',
-    'balance'
-  ],
+  material_asset_types: ['asset_code', 'display_name', 'group_code', 'form', 'tier', 'is_enabled'],
+  user_material_balances: ['balance_id', 'user_id', 'asset_code', 'balance'],
   material_conversion_rules: [
     'rule_id',
     'from_asset_code',
@@ -87,11 +58,7 @@ const TABLES_TO_VERIFY = {
     'business_id',
     'business_type'
   ],
-  user_diamond_accounts: [
-    'account_id',
-    'user_id',
-    'balance'
-  ],
+  user_diamond_accounts: ['account_id', 'user_id', 'balance'],
   diamond_transactions: [
     'tx_id',
     'user_id',
@@ -107,17 +74,15 @@ const TABLES_TO_VERIFY = {
 /**
  * 查询表结构
  */
-async function getTableColumns (tableName) {
-  const [results] = await sequelize.query(
-    `SHOW COLUMNS FROM \`${tableName}\``
-  )
-  return results.map((col) => col.Field)
+async function getTableColumns(tableName) {
+  const [results] = await sequelize.query(`SHOW COLUMNS FROM \`${tableName}\``)
+  return results.map(col => col.Field)
 }
 
 /**
  * 验证表和字段
  */
-async function verifySchema () {
+async function verifySchema() {
   console.log('========================================')
   console.log('  数据库表结构验证')
   console.log('========================================\n')
@@ -128,9 +93,7 @@ async function verifySchema () {
   for (const [tableName, expectedFields] of Object.entries(TABLES_TO_VERIFY)) {
     try {
       // 检查表是否存在
-      const [tableExists] = await sequelize.query(
-        `SHOW TABLES LIKE '${tableName}'`
-      )
+      const [tableExists] = await sequelize.query(`SHOW TABLES LIKE '${tableName}'`)
 
       if (tableExists.length === 0) {
         results.push({
@@ -146,9 +109,7 @@ async function verifySchema () {
       const actualColumns = await getTableColumns(tableName)
 
       // 检查字段是否存在
-      const missingFields = expectedFields.filter(
-        (field) => !actualColumns.includes(field)
-      )
+      const missingFields = expectedFields.filter(field => !actualColumns.includes(field))
 
       if (missingFields.length > 0) {
         results.push({
@@ -176,7 +137,7 @@ async function verifySchema () {
 
   // 打印结果
   console.log('验证结果：\n')
-  results.forEach((result) => {
+  results.forEach(result => {
     console.log(`[${result.status}] ${result.table}`)
     console.log(`    ${result.message}\n`)
   })
@@ -195,7 +156,7 @@ async function verifySchema () {
 /**
  * 验证索引
  */
-async function verifyIndexes () {
+async function verifyIndexes() {
   console.log('========================================')
   console.log('  数据库索引验证')
   console.log('========================================\n')
@@ -212,19 +173,15 @@ async function verifyIndexes () {
 
   let allPassed = true
 
-  for (const [tableName, expectedIndexes] of Object.entries(
-    INDEXES_TO_VERIFY
-  )) {
+  for (const [tableName, expectedIndexes] of Object.entries(INDEXES_TO_VERIFY)) {
     try {
       const [indexes] = await sequelize.query(`SHOW INDEX FROM \`${tableName}\``)
-      const indexNames = [...new Set(indexes.map((idx) => idx.Key_name))]
+      const indexNames = [...new Set(indexes.map(idx => idx.Key_name))]
 
       console.log(`表: ${tableName}`)
-      expectedIndexes.forEach((indexName) => {
+      expectedIndexes.forEach(indexName => {
         const exists = indexNames.includes(indexName)
-        console.log(
-          `  ${exists ? '✅' : '❌'} 索引: ${indexName} ${exists ? '存在' : '缺失'}`
-        )
+        console.log(`  ${exists ? '✅' : '❌'} 索引: ${indexName} ${exists ? '存在' : '缺失'}`)
         if (!exists) allPassed = false
       })
       console.log()
@@ -248,7 +205,7 @@ async function verifyIndexes () {
 /**
  * 主函数
  */
-async function main () {
+async function main() {
   try {
     // 测试数据库连接
     await sequelize.authenticate()

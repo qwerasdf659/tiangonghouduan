@@ -5,20 +5,10 @@
 
 const { Sequelize } = require('sequelize')
 require('dotenv').config()
+// 🔴 复用主 sequelize 实例（单一配置源）
+const { sequelize } = require('../config/database')
 
-const sequelize = new Sequelize(
-  process.env.DB_NAME,
-  process.env.DB_USER,
-  process.env.DB_PASSWORD,
-  {
-    host: process.env.DB_HOST,
-    port: process.env.DB_PORT,
-    dialect: 'mysql',
-    logging: false
-  }
-)
-
-async function checkDatabaseSchema () {
+async function checkDatabaseSchema() {
   try {
     console.log('🔍 正在连接数据库...')
     await sequelize.authenticate()
@@ -50,11 +40,7 @@ async function checkDatabaseSchema () {
     console.log('\n📋 检查 lottery_prizes 表结构:')
     const [prizeFields] = await sequelize.query('DESCRIBE lottery_prizes')
 
-    const prizeRequiredFields = [
-      'prize_value_points',
-      'virtual_amount',
-      'category'
-    ]
+    const prizeRequiredFields = ['prize_value_points', 'virtual_amount', 'category']
 
     const prizeExistingFields = prizeFields.map(f => f.Field)
     prizeRequiredFields.forEach(field => {
@@ -66,11 +52,7 @@ async function checkDatabaseSchema () {
     console.log('\n📋 检查 lottery_draws 表结构:')
     const [drawFields] = await sequelize.query('DESCRIBE lottery_draws')
 
-    const drawRequiredFields = [
-      'prize_value_points',
-      'budget_points_before',
-      'budget_points_after'
-    ]
+    const drawRequiredFields = ['prize_value_points', 'budget_points_before', 'budget_points_after']
 
     const drawExistingFields = drawFields.map(f => f.Field)
     drawRequiredFields.forEach(field => {
@@ -82,11 +64,7 @@ async function checkDatabaseSchema () {
     console.log('\n📋 检查 user_inventory 表结构:')
     const [inventoryFields] = await sequelize.query('DESCRIBE user_inventory')
 
-    const inventoryRequiredFields = [
-      'item_type',
-      'virtual_amount',
-      'virtual_value_points'
-    ]
+    const inventoryRequiredFields = ['item_type', 'virtual_amount', 'virtual_value_points']
 
     const inventoryExistingFields = inventoryFields.map(f => f.Field)
     inventoryRequiredFields.forEach(field => {

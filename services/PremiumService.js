@@ -18,8 +18,8 @@
  */
 
 const BeijingTimeHelper = require('../utils/timeHelper')
-const { User, UserPointsAccount, UserPremiumStatus } = require('../models')
-const PointsService = require('./PointsService')
+const { User, UserPremiumStatus } = require('../models')
+const AssetService = require('./AssetService')
 const logger = require('../utils/logger')
 
 /**
@@ -42,7 +42,7 @@ class PremiumService {
    * @returns {Object} 解锁结果
    * @throws {Error} 业务错误（用户不存在、条件不满足、余额不足等）
    */
-  static async unlockPremium (user_id, options = {}) {
+  static async unlockPremium(user_id, options = {}) {
     const { transaction: externalTransaction } = options
 
     // 如果没有外部事务，创建内部事务
@@ -88,17 +88,10 @@ class PremiumService {
 
       /*
        * ========================================
-       * 步骤2: 查询用户信息和积分账户（使用行锁防止并发问题）
+       * 步骤2: 查询用户信息和积分余额
        * ========================================
        */
       const user = await User.findByPk(user_id, {
-        include: [
-          {
-            model: UserPointsAccount,
-            as: 'pointsAccount',
-            required: true
-          }
-        ],
         transaction,
         lock: transaction.LOCK.UPDATE
       })
@@ -110,12 +103,11 @@ class PremiumService {
         throw error
       }
 
-      if (!user.pointsAccount) {
-        const error = new Error('用户积分账户不存在，请联系管理员初始化积分账户')
-        error.code = 'ACCOUNT_NOT_FOUND'
-        error.statusCode = 404
-        throw error
-      }
+      // 通过 AssetService 获取积分余额
+      const pointsBalance = await AssetService.getBalance(
+        { user_id, asset_code: 'POINTS' },
+        { transaction }
+      )
 
       /*
        * ========================================
@@ -147,7 +139,7 @@ class PremiumService {
        * 步骤4: 验证解锁条件2 - 当前积分余额充足
        * ========================================
        */
-      const availablePoints = parseFloat(user.pointsAccount.available_points) || 0
+      const availablePoints = Number(pointsBalance.available_amount) || 0
       const balanceSufficient = availablePoints >= UNLOCK_COST
 
       if (!balanceSufficient) {
@@ -169,27 +161,34 @@ class PremiumService {
 
       /*
        * ========================================
-       * 步骤5: 扣除100积分（通过PointsService统一处理）
+       * 步骤5: 扣除100积分（通过AssetService统一处理）
        * ========================================
-       * ✅ 架构规范：所有积分操作必须通过PointsService，不得直接操作UserPointsAccount
-       * - PointsService.consumePoints()自动处理账户更新、交易记录创建、审计日志
-       * - 支持幂等性控制（通过business_id）
+       * ✅ 架构规范：所有积分操作必须通过AssetService，不得直接操作账户表
+       * - AssetService.changeBalance()自动处理账户更新、交易记录创建、审计日志
+       * - 支持幂等性控制（通过idempotency_key）
        * - 支持事务传递（transaction）
        */
       const unlockTime = BeijingTimeHelper.createBeijingTime()
-      const business_id = `premium_unlock_${user_id}_${BeijingTimeHelper.generateIdTimestamp()}`
+      const idempotency_key = `premium_unlock_${user_id}_${BeijingTimeHelper.generateIdTimestamp()}`
 
-      const consumeResult = await PointsService.consumePoints(user_id, UNLOCK_COST, {
-        transaction,
-        business_id,
-        business_type: 'premium_unlock',
-        source_type: 'user',
-        title: '解锁高级空间',
-        description: `支付${UNLOCK_COST}积分解锁高级空间功能，有效期${VALIDITY_HOURS}小时`,
-        operator_id: user_id
-      })
+      const consumeResult = await AssetService.changeBalance(
+        {
+          user_id,
+          asset_code: 'POINTS',
+          delta_amount: -UNLOCK_COST,
+          business_type: 'premium_unlock',
+          idempotency_key,
+          meta: {
+            source_type: 'user',
+            title: '解锁高级空间',
+            description: `支付${UNLOCK_COST}积分解锁高级空间功能，有效期${VALIDITY_HOURS}小时`,
+            operator_id: user_id
+          }
+        },
+        { transaction }
+      )
 
-      const newAvailablePoints = consumeResult.new_balance
+      const newAvailablePoints = consumeResult.balance_after
 
       logger.info('高级空间解锁-积分扣除', {
         user_id,
@@ -286,7 +285,7 @@ class PremiumService {
    * @param {number} user_id - 用户ID
    * @returns {Object} 状态查询结果
    */
-  static async getPremiumStatus (user_id) {
+  static async getPremiumStatus(user_id) {
     try {
       // 查询解锁状态
       const premiumStatus = await UserPremiumStatus.findOne({
@@ -302,15 +301,7 @@ class PremiumService {
       const isExpired = isUnlocked && !isValid
 
       // 查询用户信息
-      const user = await User.findByPk(user_id, {
-        include: [
-          {
-            model: UserPointsAccount,
-            as: 'pointsAccount',
-            required: false
-          }
-        ]
-      })
+      const user = await User.findByPk(user_id)
 
       if (!user) {
         const error = new Error('用户不存在')
@@ -319,10 +310,11 @@ class PremiumService {
         throw error
       }
 
+      // 通过 AssetService 获取积分余额
+      const pointsBalance = await AssetService.getBalance({ user_id, asset_code: 'POINTS' })
+
       const historyPoints = user.history_total_points || 0
-      const availablePoints = user.pointsAccount
-        ? parseFloat(user.pointsAccount.available_points)
-        : 0
+      const availablePoints = Number(pointsBalance.available_amount) || 0
 
       // 如果未解锁或已过期，返回解锁条件进度
       if (!isValid) {

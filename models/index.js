@@ -315,6 +315,17 @@ models.RoleChangeLog = require('./RoleChangeLog')(sequelize, DataTypes)
  *    - 业务场景：停用业务员权限→批量停用业务经理及下属→权限变更审计
  */
 
+// 🔴 商家审核系统（2025年12月29日新增 - 资产域标准架构）
+models.MerchantPointsReview = require('./MerchantPointsReview')(sequelize, DataTypes)
+/*
+ * ✅ MerchantPointsReview：商家积分审核（扫码审核冻结积分）
+ *    - 用途：管理商家扫码审核冻结用户积分的业务流程
+ *    - 特点：冻结归属约束、状态机（pending→approved/rejected/expired→cancelled）
+ *    - 表名：merchant_points_reviews，主键：review_id（UUID格式）
+ *    - 业务场景：商家扫码提交审核→冻结积分→审核通过从冻结结算/拒绝需客服处理
+ *    - 拍板决策：审核拒绝/超时积分不退回，需客服手工处理
+ */
+
 models.WebSocketStartupLog = require('./WebSocketStartupLog')(sequelize, DataTypes)
 /*
  * ✅ WebSocketStartupLog：WebSocket服务启动日志

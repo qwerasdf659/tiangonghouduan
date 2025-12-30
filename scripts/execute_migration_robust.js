@@ -5,20 +5,10 @@
 
 const { Sequelize, QueryTypes } = require('sequelize')
 require('dotenv').config()
+// 🔴 复用主 sequelize 实例（单一配置源）
+const { sequelize } = require('../config/database')
 
-const sequelize = new Sequelize(
-  process.env.DB_NAME,
-  process.env.DB_USER,
-  process.env.DB_PASSWORD,
-  {
-    host: process.env.DB_HOST,
-    port: process.env.DB_PORT,
-    dialect: 'mysql',
-    logging: false // 关闭详细日志
-  }
-)
-
-async function executeMigration () {
+async function executeMigration() {
   try {
     console.log('🚀 开始执行数据库迁移...\n')
     await sequelize.authenticate()
@@ -27,7 +17,8 @@ async function executeMigration () {
     // 1. 扩展 user_points_accounts
     console.log('📋 1. 扩展 user_points_accounts 表...')
     try {
-      await sequelize.query(`
+      await sequelize.query(
+        `
         ALTER TABLE user_points_accounts
         ADD COLUMN frozen_points DECIMAL(10,2) DEFAULT 0 COMMENT '冻结积分（审核中）',
         ADD COLUMN budget_points INT DEFAULT 0 COMMENT '预算积分总额（系统内部）',
@@ -39,7 +30,9 @@ async function executeMigration () {
         ADD COLUMN last_draw_at DATETIME COMMENT '最后抽奖时间',
         ADD COLUMN last_redeem_at DATETIME COMMENT '最后兑换时间',
         ADD INDEX idx_remaining_budget (remaining_budget_points)
-      `, { type: QueryTypes.RAW })
+      `,
+        { type: QueryTypes.RAW }
+      )
       console.log('✅ user_points_accounts 表扩展成功\n')
     } catch (error) {
       if (error.message.includes('Duplicate column name')) {
@@ -52,17 +45,23 @@ async function executeMigration () {
     // 2. 扩展 lottery_prizes
     console.log('📋 2. 扩展 lottery_prizes 表...')
     try {
-      await sequelize.query(`
+      await sequelize.query(
+        `
         ALTER TABLE lottery_prizes
         ADD COLUMN prize_value_points INT DEFAULT 0 COMMENT '奖品价值积分（统一单位）',
         ADD COLUMN virtual_amount INT COMMENT '虚拟奖品数量（水晶等）',
         ADD COLUMN category VARCHAR(50) COMMENT '分类:crystal/metal/physical/empty/virtual',
         ADD INDEX idx_value_points (prize_value_points),
         ADD INDEX idx_category (category)
-      `, { type: QueryTypes.RAW })
+      `,
+        { type: QueryTypes.RAW }
+      )
       console.log('✅ lottery_prizes 表扩展成功\n')
     } catch (error) {
-      if (error.message.includes('Duplicate column name') || error.message.includes('Duplicate key name')) {
+      if (
+        error.message.includes('Duplicate column name') ||
+        error.message.includes('Duplicate key name')
+      ) {
         console.log('⚠️  字段已存在，跳过\n')
       } else {
         throw error
@@ -72,12 +71,15 @@ async function executeMigration () {
     // 3. 扩展 lottery_draws
     console.log('📋 3. 扩展 lottery_draws 表...')
     try {
-      await sequelize.query(`
+      await sequelize.query(
+        `
         ALTER TABLE lottery_draws
         ADD COLUMN prize_value_points INT DEFAULT 0 COMMENT '奖品价值积分消耗',
         ADD COLUMN budget_points_before INT COMMENT '抽奖前预算积分',
         ADD COLUMN budget_points_after INT COMMENT '抽奖后预算积分'
-      `, { type: QueryTypes.RAW })
+      `,
+        { type: QueryTypes.RAW }
+      )
       console.log('✅ lottery_draws 表扩展成功\n')
     } catch (error) {
       if (error.message.includes('Duplicate column name')) {
@@ -90,13 +92,16 @@ async function executeMigration () {
     // 4. 扩展 user_inventory
     console.log('📋 4. 扩展 user_inventory 表...')
     try {
-      await sequelize.query(`
+      await sequelize.query(
+        `
         ALTER TABLE user_inventory
         ADD COLUMN virtual_amount INT DEFAULT 0 COMMENT '虚拟奖品数量',
         ADD COLUMN virtual_value_points INT DEFAULT 0 COMMENT '虚拟奖品价值积分',
         ADD COLUMN lottery_record_id VARCHAR(50) COMMENT '关联抽奖记录',
         ADD COLUMN exchange_record_id BIGINT COMMENT '关联兑换记录'
-      `, { type: QueryTypes.RAW })
+      `,
+        { type: QueryTypes.RAW }
+      )
       console.log('✅ user_inventory 表扩展成功\n')
     } catch (error) {
       if (error.message.includes('Duplicate column name')) {
@@ -109,7 +114,8 @@ async function executeMigration () {
     // 5. 创建 exchange_items 表
     console.log('📋 5. 创建 exchange_items 表...')
     try {
-      await sequelize.query(`
+      await sequelize.query(
+        `
         CREATE TABLE IF NOT EXISTS exchange_items (
           item_id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '商品唯一标识',
           name VARCHAR(200) NOT NULL COMMENT '商品名称',
@@ -133,7 +139,9 @@ async function executeMigration () {
           INDEX idx_category (category)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
         COMMENT='兑换市场商品表'
-      `, { type: QueryTypes.RAW })
+      `,
+        { type: QueryTypes.RAW }
+      )
       console.log('✅ exchange_items 表创建成功\n')
     } catch (error) {
       console.log('⚠️  exchange_items 表可能已存在\n')
@@ -142,7 +150,8 @@ async function executeMigration () {
     // 6. 创建 exchange_market_records 表
     console.log('📋 6. 创建 exchange_market_records 表...')
     try {
-      await sequelize.query(`
+      await sequelize.query(
+        `
         CREATE TABLE IF NOT EXISTS exchange_market_records (
           record_id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '兑换记录唯一标识',
           user_id INT NOT NULL COMMENT '用户ID',
@@ -164,7 +173,9 @@ async function executeMigration () {
           FOREIGN KEY (item_id) REFERENCES exchange_items(item_id) ON DELETE RESTRICT
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
         COMMENT='兑换市场记录表'
-      `, { type: QueryTypes.RAW })
+      `,
+        { type: QueryTypes.RAW }
+      )
       console.log('✅ exchange_market_records 表创建成功\n')
     } catch (error) {
       console.log('⚠️  exchange_market_records 表可能已存在\n')
@@ -175,19 +186,27 @@ async function executeMigration () {
 
     const [accountFields] = await sequelize.query('DESCRIBE user_points_accounts')
     const hasBudgetFields = accountFields.some(f => f.Field === 'budget_points')
-    console.log(`✅ user_points_accounts: ${hasBudgetFields ? '已添加预算字段' : '❌ 预算字段未添加'}`)
+    console.log(
+      `✅ user_points_accounts: ${hasBudgetFields ? '已添加预算字段' : '❌ 预算字段未添加'}`
+    )
 
     const [prizeFields] = await sequelize.query('DESCRIBE lottery_prizes')
     const hasValuePoints = prizeFields.some(f => f.Field === 'prize_value_points')
-    console.log(`✅ lottery_prizes: ${hasValuePoints ? '已添加价值积分字段' : '❌ 价值积分字段未添加'}`)
+    console.log(
+      `✅ lottery_prizes: ${hasValuePoints ? '已添加价值积分字段' : '❌ 价值积分字段未添加'}`
+    )
 
     const [drawFields] = await sequelize.query('DESCRIBE lottery_draws')
     const hasBudgetAudit = drawFields.some(f => f.Field === 'prize_value_points')
-    console.log(`✅ lottery_draws: ${hasBudgetAudit ? '已添加预算审计字段' : '❌ 预算审计字段未添加'}`)
+    console.log(
+      `✅ lottery_draws: ${hasBudgetAudit ? '已添加预算审计字段' : '❌ 预算审计字段未添加'}`
+    )
 
     const [inventoryFields] = await sequelize.query('DESCRIBE user_inventory')
     const hasVirtualFields = inventoryFields.some(f => f.Field === 'virtual_amount')
-    console.log(`✅ user_inventory: ${hasVirtualFields ? '已添加虚拟奖品字段' : '❌ 虚拟奖品字段未添加'}`)
+    console.log(
+      `✅ user_inventory: ${hasVirtualFields ? '已添加虚拟奖品字段' : '❌ 虚拟奖品字段未添加'}`
+    )
 
     const [tables] = await sequelize.query('SHOW TABLES')
     const tableNames = tables.map(t => Object.values(t)[0])

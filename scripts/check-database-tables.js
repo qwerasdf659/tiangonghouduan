@@ -6,20 +6,10 @@
 
 const { Sequelize } = require('sequelize')
 require('dotenv').config()
+// 🔴 复用主 sequelize 实例（单一配置源）
+const { sequelize } = require('../config/database')
 
-async function checkDatabaseTables () {
-  const sequelize = new Sequelize(
-    process.env.DB_NAME || 'restaurant_points_dev',
-    process.env.DB_USER || 'root',
-    process.env.DB_PASSWORD || '',
-    {
-      host: process.env.DB_HOST || 'localhost',
-      port: process.env.DB_PORT || 3306,
-      dialect: 'mysql',
-      logging: false
-    }
-  )
-
+async function checkDatabaseTables() {
   try {
     await sequelize.authenticate()
     console.log('✅ 数据库连接成功\n')

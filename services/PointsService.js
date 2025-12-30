@@ -3,6 +3,21 @@ const logger = require('../utils/logger').logger
 /**
  * 餐厅积分抽奖系统 V4.0统一引擎架构 - 积分服务（PointsService）
  *
+ * ⚠️ 废弃警告（2025-12-29）：
+ * 本服务已被 AssetService 取代，仅为 ConsumptionService 的 pending points 工作流保留。
+ * 新代码应使用 AssetService.changeBalance() 进行积分操作。
+ *
+ * 迁移状态：
+ * - ImageAuditCallback.js → 已迁移至 AssetService
+ * - UserService.js → 已迁移至 AssetService
+ * - PremiumService.js → 已迁移至 AssetService
+ * - ConsumptionService.js → 待迁移（依赖 pending points 工作流）
+ *
+ * 待办事项：
+ * 1. 在 AssetService 中实现 pending balance 概念
+ * 2. 迁移 ConsumptionService 至 AssetService
+ * 3. 删除本服务和相关模型（UserPointsAccount, PointsTransaction）
+ *
  * 业务场景：管理用户积分的完整生命周期，包括积分获取、消费、冻结、退回等所有积分相关业务
  *
  * 核心功能：

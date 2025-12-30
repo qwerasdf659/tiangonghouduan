@@ -7,19 +7,8 @@
 
 require('dotenv').config()
 const { Sequelize, QueryTypes } = require('sequelize')
-
-// 数据库连接配置
-const sequelize = new Sequelize(
-  process.env.DB_NAME || 'restaurant_points_dev',
-  process.env.DB_USER || 'root',
-  process.env.DB_PASSWORD || '',
-  {
-    host: process.env.DB_HOST || 'localhost',
-    port: process.env.DB_PORT || 3306,
-    dialect: 'mysql',
-    logging: false
-  }
-)
+// 🔴 复用主 sequelize 实例（单一配置源）
+const { sequelize } = require('../config/database')
 
 // 验证结果存储
 const results = {

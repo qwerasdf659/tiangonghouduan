@@ -8,24 +8,13 @@
 require('dotenv').config()
 const { Sequelize } = require('sequelize')
 const sealosStorage = require('../services/sealosStorage')
-
-// 数据库连接
-const sequelize = new Sequelize(
-  process.env.DB_NAME,
-  process.env.DB_USER,
-  process.env.DB_PASSWORD,
-  {
-    host: process.env.DB_HOST,
-    dialect: 'mysql',
-    logging: false,
-    timezone: '+08:00'
-  }
-)
+// 🔴 复用主 sequelize 实例（单一配置源）
+const { sequelize } = require('../../config/database')
 
 /**
  * 获取数据库中所有有效的图片文件路径
  */
-async function getDatabaseFilePaths () {
+async function getDatabaseFilePaths() {
   const [results] = await sequelize.query(
     'SELECT file_path FROM image_resources WHERE status = "active"'
   )
@@ -35,7 +24,7 @@ async function getDatabaseFilePaths () {
 /**
  * 列出Sealos中所有文件
  */
-async function listSealosFiles () {
+async function listSealosFiles() {
   try {
     // 获取S3客户端
     const s3 = sealosStorage.s3
@@ -57,7 +46,7 @@ async function listSealosFiles () {
 /**
  * 识别孤儿文件
  */
-async function identifyOrphanFiles () {
+async function identifyOrphanFiles() {
   console.log('🔍 开始识别Sealos对象存储孤儿文件...\n')
 
   try {
