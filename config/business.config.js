@@ -1,10 +1,10 @@
 /**
  * 餐厅积分抽奖系统 - 统一业务配置
- * 
+ *
  * @description 集中管理所有业务规则，配置即文档
  * @version 1.0.0
  * @created 2025-10-21
- * 
+ *
  * 核心原则：
  * 1. 配置即文档：配置文件就是业务规则说明书
  * 2. 单一数据源：所有业务规则都在这里定义
@@ -19,61 +19,71 @@ module.exports = {
   lottery: {
     /**
      * 连抽定价配置
-     * 
+     *
      * @description 定义不同抽奖类型的价格和折扣
-     * @业务规则 
+     * @业务规则
      * - 单抽/3连抽/5连抽：无折扣，按100积分/次计算
      * - 10连抽：九折优惠，900积分（节省100积分）
+     *
+     * @配置来源 单抽价格（single.total_cost）已迁移到 DB system_settings
+     * @优先级 DB > Code（此处值仅作为兜底默认值）
+     * @参考文档 docs/配置管理三层分离与校验统一方案.md
+     * @业务决策 2025-12-30：lottery_cost_points 保留在 DB，运营可调（范围 50-500）
      */
     draw_pricing: {
-      single: { 
-        total_cost: 100,    // 总消耗积分
-        count: 1,           // 抽奖次数
-        discount: 1.0,      // 折扣率（1.0=无折扣）
-        per_draw: 100,      // 单次价格
-        label: '单抽'       // 前端显示名称
+      single: {
+        total_cost: 100, // 🔴 兜底值：实际值从 DB points/lottery_cost_points 读取
+        count: 1, // 抽奖次数
+        discount: 1.0, // 折扣率（1.0=无折扣）
+        per_draw: 100, // 🔴 兜底值：实际值从 DB 读取
+        label: '单抽' // 前端显示名称
       },
-      triple: { 
-        total_cost: 300,    // 3次共300积分
-        count: 3, 
-        discount: 1.0,      // 无折扣
-        per_draw: 100, 
-        label: '3连抽' 
+      triple: {
+        total_cost: 300, // 3次共300积分
+        count: 3,
+        discount: 1.0, // 无折扣
+        per_draw: 100,
+        label: '3连抽'
       },
-      five: { 
-        total_cost: 500,    // 5次共500积分
-        count: 5, 
-        discount: 1.0,      // 无折扣
-        per_draw: 100, 
-        label: '5连抽' 
+      five: {
+        total_cost: 500, // 5次共500积分
+        count: 5,
+        discount: 1.0, // 无折扣
+        per_draw: 100,
+        label: '5连抽'
       },
-      ten: { 
-        total_cost: 900,    // 🎁 10次仅需900积分（节省100积分）
-        count: 10, 
-        discount: 0.9,      // 九折优惠
-        per_draw: 90,       // 折后单价
-        label: '10连抽(九折)' 
+      ten: {
+        total_cost: 900, // 🎁 10次仅需900积分（节省100积分）
+        count: 10,
+        discount: 0.9, // 九折优惠
+        per_draw: 90, // 折后单价
+        label: '10连抽(九折)'
       }
     },
-    
+
     /**
      * 每日抽奖次数限制
-     * 
+     *
      * @description 所有用户类型统一限制，防止刷奖
      * @业务规则 普通用户和管理员都是每日50次上限
+     *
+     * @配置来源 daily_limit.all 已迁移到 DB system_settings
+     * @优先级 DB > Code（此处值仅作为兜底默认值）
+     * @参考文档 docs/配置管理三层分离与校验统一方案.md
+     * @业务决策 2025-12-30：daily_lottery_limit 保留在 DB，运营可调（范围 10-200）
      */
     daily_limit: {
-      all: 50,  // 所有用户类型统一50次/日
-      reset_time: '00:00:00'  // 每日0点重置（北京时间）
+      all: 50, // 🔴 兜底值：实际值从 DB points/daily_lottery_limit 读取
+      reset_time: '00:00:00' // 每日0点重置（北京时间）
     },
-    
+
     /**
      * 免费抽奖控制
-     * 
+     *
      * @description 是否允许免费抽奖（cost_per_draw=0）
      * @业务规则 禁止免费抽奖，所有抽奖必须消耗积分
      */
-    free_draw_allowed: false  // false=禁止免费抽奖
+    free_draw_allowed: false // false=禁止免费抽奖
   },
 
   // ====================================
@@ -82,33 +92,33 @@ module.exports = {
   points: {
     /**
      * 积分余额限制
-     * 
+     *
      * @description 用户可持有的积分上下限
      * @数据库支持 DECIMAL(10,2) 最大值：99,999,999.99
-     * @业务规则 
+     * @业务规则
      * - 上限：99,999,999.99（数据库技术上限）
      * - 下限：0（不能为负数）
      */
-    max_balance: 99999999.99,  // 积分上限（约1亿积分）
-    min_balance: 0,            // 积分下限（不能为负）
-    
+    max_balance: 99999999.99, // 积分上限（约1亿积分）
+    min_balance: 0, // 积分下限（不能为负）
+
     /**
      * 积分显示名称
-     * 
+     *
      * @description 前端统一显示名称
      * @业务规则 统一显示为"积分"，不可调整
      */
     display_name: '积分',
-    
+
     /**
      * 积分操作验证规则
-     * 
+     *
      * @description 所有积分操作必须遵守的规则
      */
     validation: {
-      allow_negative: false,        // 禁止负数积分
-      allow_zero_balance: true,      // 允许余额为0
-      enforce_transaction: true     // 强制事务保护
+      allow_negative: false, // 禁止负数积分
+      allow_zero_balance: true, // 允许余额为0
+      enforce_transaction: true // 强制事务保护
     }
   },
 
@@ -118,25 +128,25 @@ module.exports = {
   user: {
     /**
      * 昵称长度限制
-     * 
+     *
      * @description 前后端统一验证规则
      * @业务规则 2-50个字符（中文、字母、数字、下划线）
      */
-    nickname: { 
-      min_length: 2,      // 最小2个字符
-      max_length: 50,     // 最大50个字符
-      pattern: /^[\u4e00-\u9fa5a-zA-Z0-9_]+$/  // 允许的字符
+    nickname: {
+      min_length: 2, // 最小2个字符
+      max_length: 50, // 最大50个字符
+      pattern: /^[\u4e00-\u9fa5a-zA-Z0-9_]+$/ // 允许的字符
     },
-    
+
     /**
      * 验证码有效期
-     * 
+     *
      * @description 短信验证码/邮箱验证码有效期
      * @业务规则 前后端统一300秒（5分钟）
      */
-    verification_code: { 
-      expiry_seconds: 300,  // 300秒（5分钟）
-      resend_interval: 60   // 60秒后才能重新发送
+    verification_code: {
+      expiry_seconds: 300, // 300秒（5分钟）
+      resend_interval: 60 // 60秒后才能重新发送
     }
   },
 
@@ -146,18 +156,18 @@ module.exports = {
   upload: {
     /**
      * 图片上传限制
-     * 
+     *
      * @description 拍照功能的文件类型和大小限制
-     * @业务规则 
+     * @业务规则
      * - 普通用户和管理员权限相同
      * - 仅支持图片类型
      * - 单次上传1张
      */
-    image: { 
-      max_size_mb: 10,              // 最大10MB
-      max_size_bytes: 10485760,     // 10MB = 10 * 1024 * 1024
-      max_count: 1,                // 单次上传1张
-      allowed_types: ['image/*'],  // 允许所有图片格式
+    image: {
+      max_size_mb: 10, // 最大10MB
+      max_size_bytes: 10485760, // 10MB = 10 * 1024 * 1024
+      max_count: 1, // 单次上传1张
+      allowed_types: ['image/*'], // 允许所有图片格式
       allowed_extensions: ['.jpg', '.jpeg', '.png', '.gif', '.webp']
     }
   },
@@ -168,24 +178,24 @@ module.exports = {
   pagination: {
     /**
      * 普通用户分页配置
-     * 
+     *
      * @description 列表查询的默认和最大分页数
      * @业务规则 默认20条，最大50条
      */
-    user: { 
-      default: 20,  // 默认每页20条
-      max: 50       // 最大每页50条
+    user: {
+      default: 20, // 默认每页20条
+      max: 50 // 最大每页50条
     },
-    
+
     /**
      * 管理员分页配置
-     * 
+     *
      * @description 管理员可查看更多数据
      * @业务规则 默认20-50条可配置，最大100-200条
      */
-    admin: { 
-      default: 50,   // 默认每页50条
-      max: 200       // 最大每页200条
+    admin: {
+      default: 50, // 默认每页50条
+      max: 200 // 最大每页200条
     }
   },
 
@@ -195,24 +205,24 @@ module.exports = {
   chat: {
     /**
      * 消息内容限制
-     * 
+     *
      * @description 聊天消息的长度限制
-     * @业务规则 
+     * @业务规则
      * - 最小长度：1字符（不能为空）
      * - 最大长度：5000字符
      * - 空白字符：不允许
      */
     message: {
-      min_length: 1,        // 最小1字符
-      max_length: 5000,     // 最大5000字符
-      allow_blank: false    // 不允许空白字符
+      min_length: 1, // 最小1字符
+      max_length: 5000, // 最大5000字符
+      allow_blank: false // 不允许空白字符
     },
 
     /**
      * 消息频率限制（防止消息轰炸）
-     * 
+     *
      * @description 限制用户/管理员的消息发送频率
-     * @业务规则 
+     * @业务规则
      * - 普通用户：每分钟最多20条消息
      * - 管理员：每分钟最多30条消息
      * - 时间窗口：60秒滚动窗口
@@ -220,20 +230,20 @@ module.exports = {
      */
     rate_limit: {
       user: {
-        max_messages_per_minute: 20,    // 普通用户每分钟最多20条
-        time_window_seconds: 60         // 时间窗口60秒
+        max_messages_per_minute: 20, // 普通用户每分钟最多20条
+        time_window_seconds: 60 // 时间窗口60秒
       },
       admin: {
-        max_messages_per_minute: 30,    // 管理员每分钟最多30条
-        time_window_seconds: 60         // 时间窗口60秒
+        max_messages_per_minute: 30, // 管理员每分钟最多30条
+        time_window_seconds: 60 // 时间窗口60秒
       }
     },
 
     /**
      * 创建会话频率限制（防止并发重复创建）
-     * 
+     *
      * @description 限制用户创建聊天会话的频率，防止并发创建导致重复会话
-     * @业务规则 
+     * @业务规则
      * - 所有用户：每10秒最多创建3次会话
      * - 时间窗口：10秒滚动窗口
      * - 超过限制返回429错误
@@ -241,25 +251,25 @@ module.exports = {
      * @并发控制 采用方案C（悲观锁事务）替代方案A（部分唯一索引，MySQL版本不支持）
      */
     create_session_limit: {
-      max_creates_per_window: 3,        // 10秒内最多3次创建
-      time_window_seconds: 10           // 时间窗口10秒
+      max_creates_per_window: 3, // 10秒内最多3次创建
+      time_window_seconds: 10 // 时间窗口10秒
     },
 
     /**
      * 敏感词过滤配置
-     * 
+     *
      * @description 内容安全过滤规则
-     * @业务规则 
+     * @业务规则
      * - 包含敏感词的消息将被拒绝发送
      * - 建议定期更新敏感词库
      * - 生产环境建议接入专业内容审核服务（如阿里云内容安全）
-     * @维护建议 
+     * @维护建议
      * - 定期审查敏感词列表
      * - 根据实际业务调整敏感词
      * - 考虑接入第三方内容审核API
      */
     content_filter: {
-      enabled: true,  // 是否启用敏感词过滤
+      enabled: true, // 是否启用敏感词过滤
       sensitive_words: [
         // 示例敏感词（实际使用时应根据业务需求配置）
         '测试敏感词1',
@@ -267,21 +277,20 @@ module.exports = {
         // 生产环境建议从数据库或外部配置文件加载
         // 或接入专业的内容审核服务
       ],
-      reject_on_match: true  // true=拒绝发送，false=仅记录日志
+      reject_on_match: true // true=拒绝发送，false=仅记录日志
     },
 
     /**
      * XSS防护配置
-     * 
+     *
      * @description HTML内容转义规则
      * @业务规则 所有用户输入的内容必须进行HTML转义
      * @安全级别 高（强制启用）
      */
     xss_protection: {
-      enabled: true,  // 强制启用XSS防护
-      escape_html: true,  // 转义HTML特殊字符
-      allowed_tags: []  // 不允许任何HTML标签
+      enabled: true, // 强制启用XSS防护
+      escape_html: true, // 转义HTML特殊字符
+      allowed_tags: [] // 不允许任何HTML标签
     }
   }
 }
-

@@ -39,20 +39,38 @@ fi
 
 echo "✅ 依赖安装完成"
 
-# 🔴 环境变量配置
-echo "⚙️ 配置环境变量..."
+# 🔴 环境变量配置（fail-fast 规范）
+# 参考：docs/Devbox单环境统一配置规范.md
+# 禁止自动 cp config.example .env（必须手工创建）
+echo "⚙️ 检查环境变量配置..."
 
 if [ ! -f ".env" ]; then
-    echo "📝 创建.env文件..."
-    cp config.example .env
-    
-    echo "⚠️ 请编辑.env文件，配置正确的数据库连接信息："
-    echo "   - DB_HOST=test-db-mysql.ns-br0za7uc.svc"
-    echo "   - DB_PORT=3306"
-    echo "   - DB_USER=root"
-    echo "   - DB_PASSWORD=mc6r9cgb"
-    echo "   - NODE_ENV=production"
+    echo ""
+    echo "❌ 错误：缺少 .env 配置文件（fail-fast 策略）"
+    echo ""
+    echo "📋 请手工创建 .env 文件，参考 config.example 填写必需配置："
+    echo ""
+    echo "   touch .env"
+    echo "   chmod 600 .env"
+    echo "   # 编辑 .env 填写以下必需配置："
+    echo "   - NODE_ENV=development"
+    echo "   - PORT=3000"
+    echo "   - TZ=Asia/Shanghai"
+    echo "   - DB_HOST=your_database_host"
+    echo "   - DB_PORT=your_database_port"
+    echo "   - DB_NAME=your_database_name"
+    echo "   - DB_USER=your_username"
+    echo "   - DB_PASSWORD=your_password"
+    echo "   - JWT_SECRET=your_jwt_secret"
+    echo "   - JWT_REFRESH_SECRET=your_refresh_secret"
+    echo "   - REDIS_URL=redis://localhost:6379"
+    echo ""
+    echo "⚠️ 禁止直接使用 cp config.example .env（会包含占位符）"
+    echo ""
+    exit 1
 fi
+
+echo "✅ .env 文件存在"
 
 # 🔴 创建必要的目录
 echo "📁 创建目录结构..."

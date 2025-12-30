@@ -186,6 +186,121 @@ async function cleanupIncompleteLotteryData(dryRun = false) {
   }
 }
 
+// ==================== 积分域数据清理 ====================
+
+/**
+ * 清理脏 pending 积分交易（消费奖励工作流迁移专用）
+ *
+ * 业务场景：
+ * - 消费记录已 rejected/expired，但对应的积分交易仍为 pending 状态
+ * - 属于双表同步失效导致的脏数据
+ * - 清理策略：将这些 pending 积分交易标记为 cancelled
+ *
+ * 数据来源：
+ * - points_transactions.status='pending' AND business_type='consumption_reward'
+ * - consumption_records.status IN ('rejected', 'expired')
+ *
+ * @param {boolean} dryRun - 是否预览模式（true=仅预览不执行）
+ * @returns {Promise<Object>} 清理结果 { cleaned: number, preview?: number, details: Array }
+ */
+async function cleanupDirtyPendingPoints(dryRun = false) {
+  log('\n🧹 ━━━ 清理脏 pending 积分交易 ━━━', 'cyan')
+  log(`执行时间: ${BeijingTimeHelper.nowLocale()}`, 'blue')
+  log(`执行模式: ${dryRun ? 'DRY-RUN（预览）' : '实际清理'}\n`, 'blue')
+
+  try {
+    // 1. 查找脏数据（消费已 rejected/expired 但积分仍 pending）
+    const [dirtyTransactions] = await sequelize.query(`
+      SELECT
+        pt.transaction_id,
+        pt.user_id,
+        pt.points_amount,
+        pt.reference_id as record_id,
+        pt.created_at as tx_created_at,
+        cr.status as consumption_status,
+        cr.consumption_amount,
+        cr.updated_at as consumption_updated_at
+      FROM points_transactions pt
+      JOIN consumption_records cr ON cr.record_id = pt.reference_id
+      WHERE pt.is_deleted = 0
+        AND pt.status = 'pending'
+        AND pt.transaction_type = 'earn'
+        AND pt.business_type = 'consumption_reward'
+        AND pt.reference_type = 'consumption'
+        AND cr.status IN ('rejected', 'expired')
+      ORDER BY pt.created_at DESC
+    `)
+
+    log(`📊 找到 ${dirtyTransactions.length} 条脏 pending 积分交易`, 'blue')
+
+    if (dirtyTransactions.length === 0) {
+      log('✅ 无脏数据需要清理\n', 'green')
+      return { cleaned: 0, details: [] }
+    }
+
+    // 显示详情
+    const totalPoints = dirtyTransactions.reduce((sum, t) => sum + parseFloat(t.points_amount), 0)
+    log(`📊 涉及积分总额: ${totalPoints} 分\n`, 'blue')
+
+    dirtyTransactions.slice(0, 10).forEach((t, i) => {
+      log(
+        `   ${i + 1}. tx_id=${t.transaction_id}, user=${t.user_id}, 积分=${t.points_amount}, 消费状态=${t.consumption_status}`,
+        'yellow'
+      )
+    })
+    if (dirtyTransactions.length > 10) {
+      log(`   ... 还有 ${dirtyTransactions.length - 10} 条\n`, 'yellow')
+    }
+
+    if (dryRun) {
+      log('\n🔍 预览模式：以上积分交易将被标记为 cancelled\n', 'yellow')
+      return {
+        cleaned: 0,
+        preview: dirtyTransactions.length,
+        totalPoints,
+        details: dirtyTransactions
+      }
+    }
+
+    // 2. 执行清理
+    const transaction = await sequelize.transaction()
+
+    try {
+      // 批量更新为 cancelled
+      const transactionIds = dirtyTransactions.map(t => t.transaction_id)
+
+      await sequelize.query(
+        `
+        UPDATE points_transactions
+        SET
+          status = 'cancelled',
+          failure_reason = '关联消费记录已审核拒绝/过期，自动取消积分交易',
+          updated_at = NOW()
+        WHERE transaction_id IN (${transactionIds.join(',')})
+      `,
+        { transaction }
+      )
+
+      await transaction.commit()
+
+      log(`\n✅ 成功清理 ${dirtyTransactions.length} 条脏 pending 积分交易`, 'green')
+      log(`✅ 涉及积分总额: ${totalPoints} 分\n`, 'green')
+
+      return {
+        cleaned: dirtyTransactions.length,
+        totalPoints,
+        details: dirtyTransactions
+      }
+    } catch (error) {
+      await transaction.rollback()
+      throw error
+    }
+  } catch (error) {
+    log(`❌ 清理失败: ${error.message}`, 'red')
+    throw error
+  }
+}
+
 // ==================== 资产域数据清理 ====================
 
 /**
@@ -653,16 +768,17 @@ function showHelp() {
   node scripts/maintenance/cleanup.js [选项]
 
 选项:
-  --action=orphans        清理孤儿聊天消息
-  --action=lottery        清理不完整的抽奖数据
-  --action=old-sessions   清理过期会话（30天前）
-  --action=asset-domain   清理资产域脏数据（冻结归属、孤儿锁、超时锁）
-  --action=frozen         仅清理冻结归属违规
-  --action=orphan-locks   仅清理孤儿锁
-  --action=timeout-locks  仅清理超时锁
-  --action=all            执行所有清理任务
-  --dry-run               预览模式（不实际删除数据）
-  --help                  显示此帮助信息
+  --action=orphans              清理孤儿聊天消息
+  --action=lottery              清理不完整的抽奖数据
+  --action=old-sessions         清理过期会话（30天前）
+  --action=asset-domain         清理资产域脏数据（冻结归属、孤儿锁、超时锁）
+  --action=frozen               仅清理冻结归属违规
+  --action=orphan-locks         仅清理孤儿锁
+  --action=timeout-locks        仅清理超时锁
+  --action=dirty-pending-points 清理脏pending积分交易（消费已rejected/expired但积分仍pending）
+  --action=all                  执行所有清理任务
+  --dry-run                     预览模式（不实际删除数据）
+  --help                        显示此帮助信息
 
 示例:
   # 预览资产域清理
@@ -762,6 +878,10 @@ async function main() {
         await cleanupTimeoutItemLocks(options.dryRun)
         break
 
+      case 'dirty-pending-points':
+        await cleanupDirtyPendingPoints(options.dryRun)
+        break
+
       default:
         log(`❌ 未知操作: ${options.action}`, 'red')
         log('使用 --help 查看帮助信息', 'yellow')
@@ -797,5 +917,6 @@ module.exports = {
   cleanupOrphanFrozenAssets,
   cleanupOrphanItemLocks,
   cleanupTimeoutItemLocks,
-  cleanupAssetDomain
+  cleanupAssetDomain,
+  cleanupDirtyPendingPoints
 }

@@ -1065,27 +1065,14 @@ class AssetService {
     }
 
     // 需要动态引入模型（避免循环依赖）
-    const { UserPointsAccount, ItemInstance, MaterialAssetType } = require('../models')
+    const { ItemInstance, MaterialAssetType } = require('../models')
 
-    // 1. 获取积分余额
-    const pointsAccount = await UserPointsAccount.findOne({
-      where: { user_id },
-      transaction
-    })
+    /*
+     * 🆕 方案C：统一从 AccountAssetBalance 查询所有资产余额
+     * 不再使用 UserPointsAccount，积分余额从 asset_code='POINTS' 获取
+     */
 
-    const points = pointsAccount
-      ? {
-          available: Number(pointsAccount.available_points),
-          total_earned: Number(pointsAccount.history_total_points || 0),
-          total_consumed: Number(pointsAccount.consumed_total_points || 0)
-        }
-      : {
-          available: 0,
-          total_earned: 0,
-          total_consumed: 0
-        }
-
-    // 2. 获取可叠加资产余额
+    // 1. 获取或创建用户账户
     let account = null
     try {
       account = await this.getOrCreateAccount({ user_id }, { transaction })
@@ -1094,7 +1081,10 @@ class AssetService {
       logger.info('用户暂无资产账户', { user_id })
     }
 
+    // 2. 获取所有可叠加资产余额
     const fungible_assets = []
+    let points = { available: 0, total_earned: 0, total_consumed: 0 }
+
     if (account) {
       const balances = await AccountAssetBalance.findAll({
         where: { account_id: account.account_id },
@@ -1113,6 +1103,17 @@ class AssetService {
 
       for (const balance of balances) {
         const materialInfo = materialTypeMap.get(balance.asset_code)
+
+        // 🆕 方案C：从 POINTS 资产中提取积分数据
+        if (balance.asset_code === 'POINTS') {
+          points = {
+            available: Number(balance.available_amount),
+            frozen: Number(balance.frozen_amount),
+            total_earned: Number(balance.total_earned || 0),
+            total_consumed: Number(balance.total_consumed || 0)
+          }
+        }
+
         fungible_assets.push({
           asset_code: balance.asset_code,
           display_name: materialInfo?.display_name || balance.asset_code,

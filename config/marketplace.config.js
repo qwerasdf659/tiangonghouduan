@@ -2,14 +2,19 @@
  * 餐厅积分抽奖系统 - 交易市场配置
  *
  * @description 集中管理市场交易的业务规则，配置即文档
- * @version 1.0.0
+ * @version 1.0.1
  * @created 2025-12-05
+ * @updated 2025-12-30 配置管理三层分离方案
  *
  * 核心原则：
  * 1. 实用主义：仅限制上架数量，不限制仓库持有
  * 2. 零技术债务：独立配置，不动现有代码
  * 3. 易于调整：修改配置即可调整业务规则
  * 4. 代码即文档：配置文件就是业务规则说明书
+ *
+ * @配置来源 max_active_listings 已迁移到 DB system_settings
+ * @优先级 DB > Code（此处值仅作为兜底默认值）
+ * @参考文档 docs/配置管理三层分离与校验统一方案.md
  */
 
 module.exports = {
@@ -26,12 +31,15 @@ module.exports = {
    * - 18个用户规模，10件足够使用
    * - 预防刷屏，引导精选
    *
+   * @配置来源 已迁移到 DB system_settings（marketplace/max_active_listings）
+   * @优先级 DB > Code（此处值仅作为兜底默认值）
+   * @业务决策 2025-12-30：max_active_listings 保留在 DB，运营可调（范围 1-50）
+   *
    * @调整建议
-   * - 观察3-6个月后根据实际数据调整
-   * - 如果用户投诉限制太少，可调整为15-20件
-   * - 如果出现垄断问题，可降低为5-8件
+   * - 通过管理后台调整 DB 配置即可生效
+   * - 无需修改代码或重新部署
    */
-  max_active_listings: 10,
+  max_active_listings: 10, // 🔴 兜底值：实际值从 DB marketplace/max_active_listings 读取
 
   // ====================================
   // 💰 价格验证配置

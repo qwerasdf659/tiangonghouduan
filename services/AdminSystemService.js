@@ -123,6 +123,16 @@ const { Op } = require('sequelize')
 const logger = require('../utils/logger').logger
 
 /**
+ * 白名单校验模块（2025-12-30 配置管理三层分离方案）
+ * @see docs/配置管理三层分离与校验统一方案.md
+ */
+const {
+  getWhitelist,
+  isForbidden,
+  validateSettingValue
+} = require('../config/system-settings-whitelist')
+
+/**
  * 管理后台系统监控服务类
  */
 class AdminSystemService {
@@ -508,6 +518,7 @@ class AdminSystemService {
    * @param {number} userId - 操作用户ID
    * @param {Object} options - 选项
    * @param {Object} options.transaction - 外部事务对象（可选）
+   * @param {string} options.reason - 变更原因（用于审计日志）
    * @returns {Promise<Object>} 更新结果
    * @returns {string} return.category - 配置分类
    * @returns {number} return.total_requested - 请求更新的配置项数量
@@ -516,16 +527,23 @@ class AdminSystemService {
    * @returns {Array<Object>} return.updates - 更新成功的配置项列表
    * @returns {Array<Object>} return.errors - 更新失败的配置项列表（如果有）
    * @returns {string} return.timestamp - 更新时间戳
+   *
+   * @description
+   * 配置管理三层分离方案（2025-12-30）：
+   * - 所有配置修改必须通过白名单校验
+   * - 范围约束是硬性防护，超出范围直接拒绝
+   * - 高影响配置（businessImpact: HIGH/CRITICAL）强制审计日志
+   * @see docs/配置管理三层分离与校验统一方案.md
    */
   static async updateSettings(category, settingsToUpdate, userId, options = {}) {
-    const { transaction } = options
+    const { transaction, reason } = options
 
     // 创建内部事务（如果外部没有传入）
     const internalTransaction = transaction || (await sequelize.transaction())
 
     try {
-      // 验证分类是否合法（删除lottery，抽奖算法配置在代码中管理）
-      const validCategories = ['basic', 'points', 'notification', 'security']
+      // 验证分类是否合法（2025-12-30 新增 marketplace 分类）
+      const validCategories = ['basic', 'points', 'notification', 'security', 'marketplace']
       if (!validCategories.includes(category)) {
         throw new Error(`无效的设置分类: ${category}。有效分类: ${validCategories.join(', ')}`)
       }
@@ -546,6 +564,52 @@ class AdminSystemService {
       // 批量更新配置项
       for (const settingKey of settingKeys) {
         try {
+          // 构建完整的白名单键名（格式：category/setting_key）
+          const whitelistKey = `${category}/${settingKey}`
+
+          // ========== 白名单校验（2025-12-30 配置管理三层分离方案）==========
+
+          // 1. 黑名单检查（防止误操作存储敏感信息）
+          if (isForbidden(settingKey)) {
+            errors.push({
+              setting_key: settingKey,
+              error: `配置项 ${settingKey} 属于禁止类（密钥/结算逻辑），不允许存储在数据库`
+            })
+            continue
+          }
+
+          // 2. 白名单检查
+          const whitelist = getWhitelist(whitelistKey)
+          if (!whitelist) {
+            errors.push({
+              setting_key: settingKey,
+              error: `配置项 ${whitelistKey} 不在白名单内，禁止修改。请联系技术团队添加白名单。`
+            })
+            continue
+          }
+
+          // 3. 只读检查（白名单定义）
+          if (whitelist.readonly) {
+            errors.push({
+              setting_key: settingKey,
+              error: `配置项 ${settingKey} 为只读（白名单定义），禁止修改`
+            })
+            continue
+          }
+
+          // 4. 类型/范围校验
+          const newValue = settingsToUpdate[settingKey]
+          const validation = validateSettingValue(whitelistKey, newValue)
+          if (!validation.valid) {
+            errors.push({
+              setting_key: settingKey,
+              error: validation.error
+            })
+            continue
+          }
+
+          // ========== 数据库操作 ==========
+
           // 查找配置项
           const setting = await SystemSettings.findOne({
             where: {
@@ -558,33 +622,54 @@ class AdminSystemService {
           if (!setting) {
             errors.push({
               setting_key: settingKey,
-              error: '配置项不存在'
+              error: '配置项不存在于数据库中'
             })
             continue
           }
 
-          // 检查是否为只读配置
+          // 检查数据库级别的只读标记
           if (setting.is_readonly) {
             errors.push({
               setting_key: settingKey,
-              error: '此配置项为只读，不可修改'
+              error: '此配置项在数据库中标记为只读，不可修改'
             })
             continue
           }
 
-          // 更新配置值（使用模型的setValue方法自动类型转换）
-          const newValue = settingsToUpdate[settingKey]
+          // 记录旧值（用于审计）
+          const oldValue = setting.setting_value
+
+          // 更新配置值
           setting.setValue(newValue)
           setting.updated_by = userId
           setting.updated_at = BeijingTimeHelper.createBeijingTime()
 
           await setting.save({ transaction: internalTransaction })
 
+          // ========== 审计日志（高影响配置）==========
+          if (
+            whitelist.auditRequired ||
+            whitelist.businessImpact === 'HIGH' ||
+            whitelist.businessImpact === 'CRITICAL'
+          ) {
+            logger.warn('高影响配置修改', {
+              setting_key: whitelistKey,
+              business_impact: whitelist.businessImpact,
+              operator_id: userId,
+              old_value: oldValue,
+              new_value: newValue,
+              reason: reason || '未提供变更原因',
+              audit_required: true,
+              timestamp: BeijingTimeHelper.apiTimestamp()
+            })
+          }
+
           updateResults.push({
             setting_key: settingKey,
-            old_value: setting.setting_value,
+            old_value: oldValue,
             new_value: newValue,
-            success: true
+            success: true,
+            business_impact: whitelist.businessImpact
           })
 
           logger.info('系统设置更新成功', {

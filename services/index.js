@@ -15,7 +15,8 @@ const { ThumbnailService } = require('./ThumbnailService') // 🎯 导入类
 
 /*
  * V4 领域服务
- * ⚠️ PointsService 已废弃，仅为 ConsumptionService 保留，新代码使用 AssetService
+ * ⚠️ PointsService 保留用于积分查询/统计路由（/api/v4/shop/points/*）
+ * 🆕 积分变动操作统一使用 AssetService.changeBalance()
  */
 const PointsService = require('./PointsService')
 const ExchangeService = require('./ExchangeService')
@@ -198,7 +199,7 @@ class ServiceManager {
 
       /*
        * 注册领域服务（Domain Services）
-       * ⚠️ points 服务已废弃，仅为 ConsumptionService 兼容保留
+       * ⚠️ points 服务保留用于积分查询/统计路由
        */
       this._services.set('points', PointsService)
       this._services.set('exchangeMarket', ExchangeService)

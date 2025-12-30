@@ -498,24 +498,40 @@ class UserService {
         throw error
       }
 
-      // 步骤3：检查积分账户（如果需要）
+      // 步骤3：检查积分账户（如果需要）- 使用 AssetService 统一账户体系
       let pointsAccount = null
       if (checkPointsAccount) {
-        const { UserPointsAccount } = require('../models')
-        pointsAccount = await UserPointsAccount.findOne({
-          where: { user_id: userId },
-          attributes: [
-            'account_id',
-            'user_id',
-            'available_points',
-            'total_earned',
-            'total_consumed',
-            'is_active'
-          ],
-          transaction
-        })
+        const AssetService = require('./AssetService')
+        try {
+          // 使用 AssetService 获取用户账户和积分余额
+          const account = await AssetService.getOrCreateAccount(
+            { user_id: userId },
+            { transaction }
+          )
+          const balance = await AssetService.getOrCreateBalance(account.account_id, 'POINTS', {
+            transaction
+          })
 
-        if (!pointsAccount) {
+          pointsAccount = {
+            account_id: account.account_id,
+            user_id: userId,
+            available_points: Number(balance.available_amount) || 0,
+            total_earned: Number(balance.total_earned) || 0,
+            total_consumed: Number(balance.total_consumed) || 0,
+            is_active: account.status === 'active'
+          }
+
+          if (account.status !== 'active') {
+            const error = new Error('积分账户已被冻结')
+            error.code = 'ACCOUNT_FROZEN'
+            error.statusCode = 403
+            error.data = { user_id: userId }
+            throw error
+          }
+        } catch (accountError) {
+          if (accountError.code) {
+            throw accountError
+          }
           const error = new Error('该用户尚未开通积分账户')
           error.code = 'POINTS_ACCOUNT_NOT_FOUND'
           error.statusCode = 404
@@ -523,14 +539,6 @@ class UserService {
             user_id: userId,
             suggestion: '用户需要先进行消费或参与活动才会开通积分账户'
           }
-          throw error
-        }
-
-        if (!pointsAccount.is_active) {
-          const error = new Error('积分账户已被冻结')
-          error.code = 'ACCOUNT_FROZEN'
-          error.statusCode = 403
-          error.data = { user_id: userId }
           throw error
         }
       }

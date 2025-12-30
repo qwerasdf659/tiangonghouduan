@@ -56,10 +56,10 @@ describe('管理员和系统管理API测试', () => {
 
   // ========== 管理员系统API ==========
   describe('管理员系统API', () => {
-    test('✅ 管理员仪表板 - GET /api/v4/admin/dashboard', async () => {
+    test('✅ 管理员仪表板 - GET /api/v4/admin/system/dashboard', async () => {
       const response = await tester.make_authenticated_request(
         'GET',
-        '/api/v4/admin/dashboard',
+        '/api/v4/admin/system/dashboard',
         null,
         'admin'
       )
@@ -73,10 +73,10 @@ describe('管理员和系统管理API测试', () => {
       }
     })
 
-    test('✅ 系统状态 - GET /api/v4/admin/status', async () => {
+    test('✅ 系统状态 - GET /api/v4/admin/system/status', async () => {
       const response = await tester.make_authenticated_request(
         'GET',
-        '/api/v4/admin/status',
+        '/api/v4/admin/system/status',
         null,
         'admin'
       )
@@ -89,10 +89,10 @@ describe('管理员和系统管理API测试', () => {
       }
     })
 
-    test('✅ 管理状态 - GET /api/v4/admin/management-status', async () => {
+    test('✅ 管理状态 - GET /api/v4/admin/system/management-status', async () => {
       const response = await tester.make_authenticated_request(
         'GET',
-        '/api/v4/admin/management-status',
+        '/api/v4/admin/system/management-status',
         null,
         'admin'
       )

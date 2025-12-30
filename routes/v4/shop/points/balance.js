@@ -204,13 +204,13 @@ router.get('/overview', authenticateToken, async (req, res) => {
       logger.warn('⚠️ [PointsOverview] 慢查询告警', {
         query_time_ms: queryTime,
         user_id,
-        record_count: overview.frozen_transactions?.length || 0,
+        record_count: overview.pending_records?.length || 0,
         threshold_ms: 500,
         suggestion: '检查数据库索引是否失效，或数据量是否异常增长'
       })
     } else {
       logger.info(
-        `✅ 积分概览获取成功 - 用户ID: ${user_id}, 可用: ${overview.available_points}, 冻结: ${overview.frozen_points}, 耗时: ${queryTime}ms`
+        `✅ 积分概览获取成功 - 用户ID: ${user_id}, 可用: ${overview.available_points}, 待审核: ${overview.pending_points}, 耗时: ${queryTime}ms`
       )
     }
 
@@ -229,15 +229,15 @@ router.get('/overview', authenticateToken, async (req, res) => {
 })
 
 /**
- * GET /frozen - 获取用户冻结积分明细（分页）
+ * GET /pending - 获取用户待审核积分明细（分页）
  *
- * @description 提供冻结积分的详细列表，支持分页查询
- * @route GET /api/v4/shop/points/frozen
+ * @description 提供待审核积分的详细列表，支持分页查询
+ * @route GET /api/v4/shop/points/pending
  * @query {number} page - 页码（默认1）
  * @query {number} page_size - 每页数量（默认20，最大50）
  * @access Private (需要认证)
  */
-router.get('/frozen', authenticateToken, async (req, res) => {
+router.get('/pending', authenticateToken, async (req, res) => {
   const startTime = Date.now()
 
   try {
@@ -245,9 +245,9 @@ router.get('/frozen', authenticateToken, async (req, res) => {
     const user_id = req.user.user_id
     const { page = 1, page_size = 20 } = req.query
 
-    logger.info(`📋 获取冻结积分明细 - 用户ID: ${user_id}, 页码: ${page}, 每页: ${page_size}`)
+    logger.info(`📋 获取待审核积分明细 - 用户ID: ${user_id}, 页码: ${page}, 每页: ${page_size}`)
 
-    const frozenDetails = await PointsService.getUserFrozenPoints(user_id, {
+    const pendingDetails = await PointsService.getUserPendingPoints(user_id, {
       page: parseInt(page),
       page_size: parseInt(page_size)
     })
@@ -255,25 +255,25 @@ router.get('/frozen', authenticateToken, async (req, res) => {
     const queryTime = Date.now() - startTime
 
     if (queryTime > 500) {
-      logger.warn('⚠️ [FrozenPoints] 慢查询告警', {
+      logger.warn('⚠️ [PendingPoints] 慢查询告警', {
         query_time_ms: queryTime,
         user_id,
         page: parseInt(page),
         page_size: parseInt(page_size),
-        record_count: frozenDetails.total_count,
+        record_count: pendingDetails.total_count,
         threshold_ms: 500,
         suggestion: '检查数据库索引是否失效，或数据量是否异常增长'
       })
     } else {
       logger.info(
-        `✅ 冻结积分明细获取成功 - 用户ID: ${user_id}, 记录数: ${frozenDetails.total_count}, 耗时: ${queryTime}ms`
+        `✅ 待审核积分明细获取成功 - 用户ID: ${user_id}, 记录数: ${pendingDetails.total_count}, 耗时: ${queryTime}ms`
       )
     }
 
-    return res.apiSuccess(frozenDetails, '冻结积分明细获取成功')
+    return res.apiSuccess(pendingDetails, '待审核积分明细获取成功')
   } catch (error) {
     const queryTime = Date.now() - startTime
-    logger.error('❌ 获取冻结积分明细失败:', {
+    logger.error('❌ 获取待审核积分明细失败:', {
       error_message: error.message,
       error_stack: error.stack,
       user_id: req.user?.user_id,
@@ -282,7 +282,7 @@ router.get('/frozen', authenticateToken, async (req, res) => {
       query_time_ms: queryTime,
       timestamp: BeijingTimeHelper.now()
     })
-    return handleServiceError(error, res, '获取冻结积分明细失败')
+    return handleServiceError(error, res, '获取待审核积分明细失败')
   }
 })
 

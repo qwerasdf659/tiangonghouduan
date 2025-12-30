@@ -378,100 +378,97 @@ describe('积分服务层测试（V4架构）', () => {
 
   /*
    * ==========================================
-   * ❄️ 积分概览功能测试（冻结积分）
+   * ⏳ 积分概览功能测试（待审核积分）
    * ==========================================
    */
 
-  describe('积分概览功能（冻结积分）', () => {
-    test('应该能获取用户积分概览（包含冻结积分）', async () => {
+  describe('积分概览功能（待审核积分）', () => {
+    test('应该能获取用户积分概览（包含待审核积分）', async () => {
       const overview = await PointsService.getUserPointsOverview(testUser.user_id)
 
       expect(overview).toBeDefined()
       expect(typeof overview.available_points).toBe('number')
-      expect(typeof overview.frozen_points).toBe('number')
+      expect(typeof overview.pending_points).toBe('number')
       expect(typeof overview.total_earned).toBe('number')
       expect(typeof overview.total_consumed).toBe('number')
-      expect(Array.isArray(overview.frozen_transactions)).toBe(true)
+      expect(Array.isArray(overview.pending_records)).toBe(true)
       expect(overview.message).toBeDefined()
 
       // 验证数值合理性
-      expect(overview.frozen_points).toBeGreaterThanOrEqual(0)
+      expect(overview.pending_points).toBeGreaterThanOrEqual(0)
       expect(overview.available_points).toBeGreaterThanOrEqual(0)
       expect(overview.total_earned).toBeGreaterThanOrEqual(overview.total_consumed)
 
       console.log(
-        `❄️ 积分概览 - 可用: ${overview.available_points}, 冻结: ${overview.frozen_points}`
+        `⏳ 积分概览 - 可用: ${overview.available_points}, 待审核: ${overview.pending_points}`
       )
 
-      // 如果有冻结交易，验证其结构
-      if (overview.frozen_transactions.length > 0) {
-        const frozenTx = overview.frozen_transactions[0]
-        expect(frozenTx).toHaveProperty('transaction_id')
-        expect(frozenTx).toHaveProperty('points_amount')
-        expect(frozenTx).toHaveProperty('consumption_amount')
-        expect(frozenTx).toHaveProperty('merchant_notes')
-        expect(frozenTx).toHaveProperty('created_at')
-        expect(frozenTx).toHaveProperty('status_text')
-        expect(frozenTx.status_text).toBe('审核中')
-        expect(frozenTx).toHaveProperty('estimated_arrival')
+      // 如果有待审核记录，验证其结构（单一真相源：consumption_records）
+      if (overview.pending_records.length > 0) {
+        const pendingRecord = overview.pending_records[0]
+        expect(pendingRecord).toHaveProperty('record_id')
+        expect(pendingRecord).toHaveProperty('points_to_award')
+        expect(pendingRecord).toHaveProperty('consumption_amount')
+        expect(pendingRecord).toHaveProperty('merchant_notes')
+        expect(pendingRecord).toHaveProperty('created_at')
+        expect(pendingRecord).toHaveProperty('status_text')
+        expect(pendingRecord.status_text).toBe('审核中')
+        expect(pendingRecord).toHaveProperty('estimated_arrival')
 
-        console.log(`   冻结交易: ${overview.frozen_transactions.length}笔`)
+        console.log(`   待审核记录: ${overview.pending_records.length}笔`)
       }
     })
 
-    test('应该能获取用户冻结积分明细（分页）', async () => {
-      const frozenDetails = await PointsService.getUserFrozenPoints(testUser.user_id, {
+    test('应该能获取用户待审核积分明细（分页）', async () => {
+      const pendingDetails = await PointsService.getUserPendingPoints(testUser.user_id, {
         page: 1,
         page_size: 10
       })
 
-      expect(frozenDetails).toBeDefined()
-      expect(typeof frozenDetails.total_count).toBe('number')
-      expect(frozenDetails.current_page).toBe(1)
-      expect(frozenDetails.page_size).toBe(10)
-      expect(typeof frozenDetails.total_pages).toBe('number')
-      expect(typeof frozenDetails.total_frozen_points).toBe('number')
-      expect(Array.isArray(frozenDetails.frozen_transactions)).toBe(true)
+      expect(pendingDetails).toBeDefined()
+      expect(typeof pendingDetails.total_count).toBe('number')
+      expect(pendingDetails.current_page).toBe(1)
+      expect(pendingDetails.page_size).toBe(10)
+      expect(typeof pendingDetails.total_pages).toBe('number')
+      expect(typeof pendingDetails.total_pending_points).toBe('number')
+      expect(Array.isArray(pendingDetails.pending_records)).toBe(true)
 
       // 验证分页逻辑
-      expect(frozenDetails.frozen_transactions.length).toBeLessThanOrEqual(10)
-      expect(frozenDetails.total_frozen_points).toBeGreaterThanOrEqual(0)
+      expect(pendingDetails.pending_records.length).toBeLessThanOrEqual(10)
+      expect(pendingDetails.total_pending_points).toBeGreaterThanOrEqual(0)
 
       console.log(
-        `❄️ 冻结明细 - 总数: ${frozenDetails.total_count}, 总冻结: ${frozenDetails.total_frozen_points}`
+        `⏳ 待审核明细 - 总数: ${pendingDetails.total_count}, 总待审核: ${pendingDetails.total_pending_points}`
       )
 
-      // 如果有冻结交易，验证其结构
-      if (frozenDetails.frozen_transactions.length > 0) {
-        const frozenTx = frozenDetails.frozen_transactions[0]
-        expect(frozenTx).toHaveProperty('transaction_id')
-        expect(frozenTx).toHaveProperty('points_amount')
-        expect(frozenTx).toHaveProperty('record_id')
-        expect(frozenTx).toHaveProperty('consumption_amount')
-        expect(frozenTx).toHaveProperty('merchant_notes')
-        expect(frozenTx).toHaveProperty('merchant_id')
-        expect(frozenTx).toHaveProperty('status')
-        expect(frozenTx.status).toBe('pending')
-        expect(frozenTx).toHaveProperty('status_text')
-        expect(frozenTx.status_text).toBe('审核中')
-        expect(frozenTx).toHaveProperty('created_at')
-        expect(frozenTx).toHaveProperty('estimated_arrival')
+      // 如果有待审核记录，验证其结构（单一真相源：consumption_records）
+      if (pendingDetails.pending_records.length > 0) {
+        const pendingRecord = pendingDetails.pending_records[0]
+        expect(pendingRecord).toHaveProperty('record_id')
+        expect(pendingRecord).toHaveProperty('points_to_award')
+        expect(pendingRecord).toHaveProperty('consumption_amount')
+        expect(pendingRecord).toHaveProperty('merchant_notes')
+        expect(pendingRecord).toHaveProperty('merchant_id')
+        expect(pendingRecord).toHaveProperty('status_text')
+        expect(pendingRecord.status_text).toBe('审核中')
+        expect(pendingRecord).toHaveProperty('created_at')
+        expect(pendingRecord).toHaveProperty('estimated_arrival')
       }
     })
 
     test('应该正确处理分页参数', async () => {
       // 测试第2页
-      const page2 = await PointsService.getUserFrozenPoints(testUser.user_id, {
+      const page2 = await PointsService.getUserPendingPoints(testUser.user_id, {
         page: 2,
         page_size: 5
       })
 
       expect(page2.current_page).toBe(2)
       expect(page2.page_size).toBe(5)
-      expect(page2.frozen_transactions.length).toBeLessThanOrEqual(5)
+      expect(page2.pending_records.length).toBeLessThanOrEqual(5)
 
       // 测试最大page_size限制（应该限制在50）
-      const largePage = await PointsService.getUserFrozenPoints(testUser.user_id, {
+      const largePage = await PointsService.getUserPendingPoints(testUser.user_id, {
         page: 1,
         page_size: 100
       })
@@ -479,7 +476,7 @@ describe('积分服务层测试（V4架构）', () => {
       expect(largePage.page_size).toBeLessThanOrEqual(50)
 
       console.log(
-        `📄 分页测试 - 第2页: ${page2.frozen_transactions.length}条, 大页面限制: ${largePage.page_size}`
+        `📄 分页测试 - 第2页: ${page2.pending_records.length}条, 大页面限制: ${largePage.page_size}`
       )
     })
   })

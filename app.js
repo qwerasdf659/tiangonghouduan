@@ -27,19 +27,17 @@ const cookieParser = require('cookie-parser') // 🔐 Cookie解析中间件（To
 require('dotenv').config()
 console.log(`✅ [${process.env.NODE_ENV || 'unknown'}] 环境变量已加载，配置源：.env 文件`)
 
-// 🔧 配置校验（仅staging/production强制退出）
-const { validateConfig, isDevelopment } = require('./config/environment')
-if (!isDevelopment()) {
-  // staging/production环境：缺配置直接退出（fail-fast）
-  validateConfig()
-} else {
-  // development环境：仅警告，不退出（提升开发体验）
-  try {
-    validateConfig()
-  } catch (error) {
-    console.warn('⚠️ [Development] 配置校验失败（已忽略）:', error.message)
-  }
-}
+// 🔧 配置校验（统一 fail-fast 模式）
+const { validateConfig } = require('./config/environment')
+/**
+ * 配置校验架构升级（2025-12-30 配置管理三层分离方案）
+ * - 所有环境统一 fail-fast（移除 development 的 try/catch 忽略）
+ * - 校验逻辑统一到 ConfigValidator（基于 CONFIG_SCHEMA 权威定义）
+ * - 避免"开发能跑、生产炸"的环境差异问题
+ *
+ * 参考文档：docs/配置管理三层分离与校验统一方案.md
+ */
+validateConfig(true) // failFast=true，所有环境遇错即退出
 
 // 🕐 北京时间工具导入
 const BeijingTimeHelper = require('./utils/timeHelper')

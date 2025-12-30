@@ -15,7 +15,8 @@ const logger = require('../utils/logger').logger
  * @date 2025-11-26
  */
 
-const { User, UserPointsAccount, Role } = require('../models')
+const { User, Role } = require('../models')
+const AssetService = require('./AssetService')
 const BeijingTimeHelper = require('../utils/timeHelper')
 
 /**
@@ -169,10 +170,19 @@ class ActivityConditionValidator {
       throw new Error(`用户不存在: ${userId}`)
     }
 
-    // 查询用户积分
-    const pointsAccount = await UserPointsAccount.findOne({
-      where: { user_id: userId }
-    })
+    // 查询用户积分 - 使用 AssetService 统一账户体系
+    let pointsBalance = null
+    try {
+      const account = await AssetService.getOrCreateAccount({ user_id: userId })
+      const balance = await AssetService.getOrCreateBalance(account.account_id, 'POINTS')
+      pointsBalance = {
+        available_points: Number(balance.available_amount) || 0,
+        is_active: account.status === 'active'
+      }
+    } catch (error) {
+      // 账户不存在时返回默认值
+      pointsBalance = { available_points: 0, is_active: true }
+    }
 
     // 计算注册天数
     const now = BeijingTimeHelper.createBeijingTime()
@@ -197,14 +207,14 @@ class ActivityConditionValidator {
     // 返回完整用户数据
     return {
       user_id: userId,
-      user_points: pointsAccount ? pointsAccount.available_points : 0,
+      user_points: pointsBalance.available_points,
       user_type: userType,
       registration_days: registrationDays,
       consecutive_fail_count: user.consecutive_fail_count || 0,
       // 附加原始数据供调用方使用
       _raw: {
         user,
-        pointsAccount
+        pointsBalance
       }
     }
   }

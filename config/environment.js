@@ -94,31 +94,26 @@ function getCurrentConfig() {
 /**
  * 验证环境配置
  *
- * @description 检查必需的环境变量是否存在（单一真相源方案）
- * @throws {Error} 缺少必需环境变量时抛出错误
- * @returns {void} 无返回值，验证失败时直接退出进程
+ * @description 统一配置校验入口（基于 CONFIG_SCHEMA 权威定义）
+ * @param {boolean} failFast - 是否遇错即退出（默认 true）
+ * @returns {Object} { valid: boolean, errors: [], warnings: [] }
  *
- * Redis配置规范（docs/Devbox单环境统一配置方案.md）：
- * - 统一使用REDIS_URL，不再支持REDIS_HOST/REDIS_PORT
- * - 所有环境必须配置Redis（fail-fast，不允许降级运行）
- * - 检测到旧配置时报错提示删除
+ * 架构升级（2025-12-30 配置管理三层分离方案）：
+ * - 所有校验逻辑统一到 ConfigValidator（基于 CONFIG_SCHEMA）
+ * - 应用启动、脚本检查、CI 检查共用同一份校验逻辑
+ * - 所有环境统一 fail-fast（移除 development 的 try/catch 忽略）
+ *
+ * 参考文档：docs/配置管理三层分离与校验统一方案.md
  */
-function validateConfig() {
-  // 必需的环境变量（包含REDIS_URL）
-  const required = ['NODE_ENV', 'PORT', 'DB_HOST', 'DB_PORT', 'DB_NAME', 'REDIS_URL']
+function validateConfig(failFast = true) {
+  const { ConfigValidator } = require('./validator')
+  const result = ConfigValidator.validate(NODE_ENV, failFast)
 
-  const missing = required.filter(key => !process.env[key])
-
-  if (missing.length > 0) {
-    console.error('❌ 缺少必需的环境变量:')
-    missing.forEach(key => console.error(`   - ${key}`))
-    if (missing.includes('REDIS_URL')) {
-      console.error('   提示：REDIS_URL格式示例 - redis://localhost:6379')
-    }
-    process.exit(1)
+  if (result.valid) {
+    console.log(`✅ 环境配置验证通过: ${getCurrentConfig().displayName}`)
   }
 
-  console.log(`✅ 环境配置验证通过: ${getCurrentConfig().displayName}`)
+  return result
 }
 
 /**

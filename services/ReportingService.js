@@ -41,6 +41,7 @@
 
 const BeijingTimeHelper = require('../utils/timeHelper')
 const DataSanitizer = require('./DataSanitizer')
+const AssetService = require('./AssetService')
 const models = require('../models')
 const { Op, fn, col, literal } = require('sequelize')
 
@@ -1312,11 +1313,21 @@ class ReportingService {
             raw: true
           }),
 
-          // 用户积分账户
-          models.UserPointsAccount.findOne({
-            where: { user_id },
-            attributes: ['available_points', 'total_earned', 'total_consumed']
-          }),
+          // 用户积分账户 - 使用 AssetService 统一账户体系
+          (async () => {
+            try {
+              const account = await AssetService.getOrCreateAccount({ user_id })
+              const balance = await AssetService.getOrCreateBalance(account.account_id, 'POINTS')
+              return {
+                available_points: Number(balance.available_amount) || 0,
+                total_earned: Number(balance.total_earned) || 0,
+                total_consumed: Number(balance.total_consumed) || 0
+              }
+            } catch (error) {
+              logger.warn('获取用户积分账户失败:', error.message)
+              return { available_points: 0, total_earned: 0, total_consumed: 0 }
+            }
+          })(),
 
           // 消费记录统计
           (async () => {

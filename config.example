@@ -1,103 +1,118 @@
-# 餐厅积分抽奖系统 - 环境变量配置
-# 🔴 重要：生产环境部署前必须修改所有配置
+# 餐厅积分抽奖系统 V4.0 - 环境变量配置模板
+# 🔴 重要：生产环境部署前必须修改所有 CHANGE_ME_* 占位符
+# 生成时间：2025/12/30 21:31:03
 
-# 服务器配置
+# === 运行环境 ===
+# 运行环境标识（development/staging/production） (必需)
 NODE_ENV=development
-PORT=3000
-WS_PORT=10081
-TZ=Asia/Shanghai  # 🕐 时区设置：北京时间（中国区域）
 
-# 🔴 数据库配置 - 请填写真实数据库连接信息
-# 外网数据库示例
+# HTTP 服务端口 (必需)
+PORT=3000
+
+# 监听地址 (可选)
+HOST=0.0.0.0
+
+# 时区设置（固定 Asia/Shanghai） (必需)
+TZ=Asia/Shanghai
+
+# === 数据库配置 ===
+# MySQL 数据库主机地址 (必需)
 DB_HOST=your_database_host
+
+# MySQL 数据库端口 (必需)
 DB_PORT=3306
-DB_USER=your_username
-DB_PASSWORD=your_password_here
+
+# 数据库名称 (必需)
 DB_NAME=your_database_name
 
-# 内网数据库（可选配置示例）
-# DB_HOST=internal-db.svc.cluster.local
-# DB_PORT=3306
-# DB_USER=your_username
-# DB_PASSWORD=your_password_here
-# DB_NAME=your_database_name
+# 数据库用户名 (必需)
+DB_USER=your_username
 
-# 🔴 JWT配置 - 生产环境必须更换为强随机字符串
-# 生成强随机密钥: node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
-JWT_SECRET=CHANGE_ME_jwt_secret_min_32_chars
-JWT_REFRESH_SECRET=CHANGE_ME_jwt_refresh_secret_min_32_chars
-JWT_EXPIRES_IN=2h
-JWT_REFRESH_EXPIRES_IN=7d
+# 数据库密码 (必需)
+DB_PASSWORD=CHANGE_ME_db_password_min_1_chars
 
-# 🔴 加密配置 - 生产环境必须更换为强随机字符串（32位）
-ENCRYPTION_KEY=your_32_char_encryption_key_here
-
-# 🔴 Redis配置（缓存和会话）- 只用 REDIS_URL（方案A）
-# 基础格式：redis://localhost:6379
-# 带密码格式：redis://:your_password@host:6379/0
-# TLS格式：rediss://host:6380/0
-# ❌ 注意：不再使用REDIS_HOST/REDIS_PORT/REDIS_PASSWORD/REDIS_DB（已废弃，不做兼容）
+# === 缓存配置 ===
+# Redis 连接 URL（格式：redis://host:port 或 redis://:password@host:port/db） (必需)
 REDIS_URL=redis://localhost:6379
 
-# 🔴 Sealos对象存储配置 - 请填写真实配置
-# ⚠️ 敏感信息，禁止硬编码默认值，缺失时应用应fail-fast
-SEALOS_ENDPOINT=CHANGE_ME_sealos_endpoint
-SEALOS_INTERNAL_ENDPOINT=CHANGE_ME_sealos_internal_endpoint
-SEALOS_BUCKET=CHANGE_ME_bucket_name
+# === JWT配置 ===
+# JWT 签名密钥（至少 32 字符） (必需)
+JWT_SECRET=CHANGE_ME_jwt_secret_min_32_chars
+
+# JWT 刷新令牌密钥（至少 32 字符） (必需)
+JWT_REFRESH_SECRET=CHANGE_ME_jwt_refresh_secret_min_32_chars
+
+# JWT Token 有效期（默认 2h） (可选)
+JWT_EXPIRES_IN=2h
+
+# JWT 刷新令牌有效期（默认 7d） (可选)
+JWT_REFRESH_EXPIRES_IN=7d
+
+# === 加密配置 ===
+# 数据加密密钥（必须 32 字符） (必需)
+ENCRYPTION_KEY=CHANGE_ME_encryption_key_min_32_chars
+
+# === 对象存储 ===
+# Sealos 对象存储端点 (必需)
+SEALOS_ENDPOINT=your_value_here
+
+# Sealos 内网端点（仅 Sealos 部署需要） (可选)
+SEALOS_INTERNAL_ENDPOINT=your_value_here
+
+# Sealos 存储桶名称 (必需)
+SEALOS_BUCKET=your_value_here
+
+# Sealos 访问密钥 (必需)
 SEALOS_ACCESS_KEY=CHANGE_ME_sealos_access_key
+
+# Sealos 密钥 (必需)
 SEALOS_SECRET_KEY=CHANGE_ME_sealos_secret_key
-SEALOS_REGION=CHANGE_ME_region
 
-# 🔴 OCR服务配置（图片识别）
-# 生产环境请配置真实的OCR服务提供商
-OCR_PROVIDER=baidu_ocr
-OCR_API_KEY=your_baidu_ocr_api_key
-OCR_SECRET_KEY=your_baidu_ocr_secret_key
+# Sealos 区域 (必需)
+SEALOS_REGION=your_value_here
 
-# 🔴 短信验证码服务配置（生产环境必须配置真实短信服务）
-# 开发环境可暂时跳过短信发送，使用万能验证码123456
-SMS_PROVIDER=aliyun_sms
-SMS_ACCESS_KEY=your_aliyun_sms_access_key
-SMS_SECRET_KEY=your_aliyun_sms_secret_key
-SMS_SIGN_NAME=餐厅积分系统
-SMS_TEMPLATE_CODE=SMS_123456789
+# === 微信小程序 ===
+# 微信小程序 AppID (必需)
+WX_APPID=wx1234567890abcdef
 
-# 🔴 微信小程序配置（微信授权一键登录功能必需）
-# 获取方式：
-# 1. 登录微信公众平台: https://mp.weixin.qq.com/
-# 2. 进入"开发" → "开发管理" → "开发设置"
-# 3. 复制AppID和AppSecret
-# ⚠️ 注意：WX_SECRET为敏感信息，请勿泄露
-WX_APPID=your_wechat_mini_program_appid
-WX_SECRET=your_wechat_mini_program_secret
+# 微信小程序 AppSecret (必需)
+WX_SECRET=CHANGE_ME_wx_secret
 
-# 🔴 服务器地址配置 - 请根据实际部署环境配置
-# 内网地址
-INTERNAL_BASE_URL=http://your-devbox.svc.cluster.local:3000
-INTERNAL_WS_URL=ws://your-devbox.svc.cluster.local:8080
+# === CORS白名单 ===
+# CORS 允许的域名列表（逗号分隔） (必需)
+ALLOWED_ORIGINS=http://localhost:3000,https://your-domain.com
 
-# 公网地址
-PUBLIC_BASE_URL=https://your-public-domain.site
-PUBLIC_WS_URL=wss://your-public-domain.site/ws
+# === 日志配置 ===
+# 日志级别（debug/info/warn/error） (可选)
+LOG_LEVEL=debug
 
-# 系统配置
-LOG_LEVEL=info
-MAX_FILE_SIZE=10485760
-ENABLE_CORS=true
-ENABLE_RATE_LIMIT=true
+# === 性能监控 ===
+# 是否启用连接池监控 (可选)
+ENABLE_POOL_MONITORING=true
 
-# 抽奖系统配置
-LOTTERY_COST_POINTS=100
-DAILY_LOTTERY_LIMIT=10
-NEW_USER_POINTS=1000
+# === OCR服务 ===
+# OCR 服务提供商（baidu_ocr 等） (可选)
+OCR_PROVIDER=your_value_here
 
-# 积分系统配置  
-PHOTO_POINTS_RATE=10
-MIN_POINTS_AWARD=50
-MAX_POINTS_AWARD=2000
+# OCR 服务 API Key (可选)
+OCR_API_KEY=CHANGE_ME_ocr_api_key
 
-# 🔴 安全警告和使用说明：
-# 1. 复制此文件为 .env: cp config.example .env
-# 2. 生产环境必须修改JWT_SECRET和ENCRYPTION_KEY
-# 3. Sealos配置已使用用户提供的真实配置
-# 4. OCR和SMS服务设置为mock模式，生产环境需要真实配置 
+# OCR 服务 Secret Key (可选)
+OCR_SECRET_KEY=CHANGE_ME_ocr_secret_key
+
+# === 短信服务 ===
+# 短信服务提供商（aliyun_sms 等） (可选)
+SMS_PROVIDER=your_value_here
+
+# 短信服务访问密钥 (可选)
+SMS_ACCESS_KEY=CHANGE_ME_sms_access_key
+
+# 短信服务密钥 (可选)
+SMS_SECRET_KEY=CHANGE_ME_sms_secret_key
+
+# 短信签名名称 (可选)
+SMS_SIGN_NAME=your_value_here
+
+# 短信模板代码 (可选)
+SMS_TEMPLATE_CODE=your_value_here
+

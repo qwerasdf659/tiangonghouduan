@@ -9,12 +9,12 @@ const logger = require('../utils/logger').logger
  * 主要功能：
  * 1. 商家提交消费记录（扫码录入）
  * 2. 管理员审核（通过/拒绝）
- * 3. 审核通过自动奖励积分（通过PointsService）
+ * 3. 审核通过自动奖励积分（通过AssetService）
  * 4. 用户查询自己的消费记录
  * 5. 防重复提交检查（3分钟防误操作窗口）
  *
  * 集成服务：
- * - PointsService：积分奖励
+ * - AssetService：积分奖励（资产域统一架构）
  * - QRCodeValidator：二维码验证
  * - ContentReviewRecord：审核记录
  *
@@ -22,14 +22,8 @@ const logger = require('../utils/logger').logger
  * 最后更新：2025年10月30日
  */
 
-const {
-  ConsumptionRecord,
-  ContentReviewRecord,
-  User,
-  PointsTransaction,
-  UserPointsAccount
-} = require('../models')
-const PointsService = require('./PointsService')
+const { ConsumptionRecord, ContentReviewRecord, User } = require('../models')
+const AssetService = require('./AssetService')
 const QRCodeValidator = require('../utils/QRCodeValidator')
 const BeijingTimeHelper = require('../utils/timeHelper')
 const { Sequelize, Transaction } = require('sequelize')
@@ -296,27 +290,12 @@ class ConsumptionService {
         `✅ 消费记录创建成功 (ID: ${consumptionRecord.record_id}, business_id: ${business_id})`
       )
 
-      // 🔒 步骤8：创建pending积分交易（Step 8: Create Pending Points Transaction - Within Transaction）
       /*
-       * 💡 核心逻辑：商家提交时就创建pending状态的积分交易，用户可以看到"冻结积分"
-       * ⭐ 重要：这些冻结的积分不会影响用户原有的可用积分
+       * ✅ 方案C：不再创建 pending 积分交易
+       * 待审核积分直接从 consumption_records.status='pending' 展示
+       * 审核通过后直接调用 AssetService.changeBalance 发放积分
        */
-      const pointsTransaction = await PointsService.createPendingPointsForConsumption(
-        {
-          user_id: userId,
-          points: pointsToAward,
-          reference_type: 'consumption',
-          reference_id: consumptionRecord.record_id,
-          business_type: 'consumption_reward',
-          transaction_title: '消费奖励（待审核）',
-          transaction_description: `消费${data.consumption_amount}元，预计奖励${pointsToAward}分，审核通过后到账`
-        },
-        transaction
-      ) // ✅ 传递transaction参数
-
-      logger.info(
-        `✅ Pending积分交易创建成功 (ID: ${pointsTransaction.transaction_id}, points=${pointsToAward}分)`
-      )
+      logger.info(`✅ 消费记录创建成功，预计奖励${pointsToAward}分（审核通过后发放）`)
 
       // 🔒 步骤9：创建审核记录（Step 9: Create Review Record - Within Transaction）
       await ContentReviewRecord.create(
@@ -340,7 +319,7 @@ class ConsumptionService {
       logger.info('🎉 事务提交成功，3个表数据一致性已保证')
 
       logger.info(
-        `✅ 消费记录完整创建: record_id=${consumptionRecord.record_id}, user_id=${userId}, amount=${data.consumption_amount}元, frozen_points=${pointsToAward}分`
+        `✅ 消费记录完整创建: record_id=${consumptionRecord.record_id}, user_id=${userId}, amount=${data.consumption_amount}元, pending_points=${pointsToAward}分`
       )
 
       return consumptionRecord
@@ -423,31 +402,29 @@ class ConsumptionService {
       )
 
       /*
-       * 5. 激活pending积分交易（审核通过后，pending → completed）
-       * 5.1 查找对应的pending积分交易
+       * 5. ✅ 方案C：审核通过时直接发放积分（使用 AssetService）
+       * 幂等键命名规则：<business_type>:<action>:<entity_id>
        */
-      const pendingTransaction = await PointsTransaction.findOne({
-        where: {
-          reference_type: 'consumption',
-          reference_id: recordId,
-          transaction_type: 'earn',
-          status: 'pending'
-        },
-        transaction
-      })
-
-      if (!pendingTransaction) {
-        throw new Error(`找不到对应的pending积分交易（消费记录ID: ${recordId}）`)
-      }
-
-      // 5.2 激活pending交易
-      const pointsResult = await PointsService.activatePendingPoints(
-        pendingTransaction.transaction_id,
+      const pointsResult = await AssetService.changeBalance(
         {
-          transaction,
-          operator_id: reviewData.reviewer_id,
-          activation_notes: `【审核通过】消费${record.consumption_amount}元，奖励${record.points_to_award}积分`
-        }
+          user_id: record.user_id,
+          asset_code: 'POINTS',
+          delta_amount: record.points_to_award,
+          business_type: 'consumption_reward',
+          idempotency_key: `consumption_reward:approve:${recordId}`,
+          meta: {
+            reference_type: 'consumption',
+            reference_id: recordId,
+            title: `消费奖励${record.points_to_award}分`,
+            description: `【审核通过】消费${record.consumption_amount}元，奖励${record.points_to_award}积分`,
+            operator_id: reviewData.reviewer_id
+          }
+        },
+        { transaction }
+      )
+
+      logger.info(
+        `✅ 积分发放成功: user_id=${record.user_id}, 积分=${record.points_to_award}, 幂等=${pointsResult.is_duplicate ? '重复' : '新增'}`
       )
 
       /*
@@ -467,26 +444,31 @@ class ConsumptionService {
       )
 
       if (budgetPointsToAllocate > 0) {
-        const userAccount = await UserPointsAccount.findOne({
-          where: { user_id: record.user_id },
-          transaction,
-          lock: transaction.LOCK.UPDATE
-        })
+        /*
+         * ✅ 使用 AssetService 分配预算积分
+         * asset_code: BUDGET_POINTS（预算积分）
+         */
+        const budgetResult = await AssetService.changeBalance(
+          {
+            user_id: record.user_id,
+            asset_code: 'BUDGET_POINTS',
+            delta_amount: budgetPointsToAllocate,
+            business_type: 'consumption_budget_allocation',
+            idempotency_key: `consumption_budget:approve:${recordId}`,
+            meta: {
+              reference_type: 'consumption',
+              reference_id: recordId,
+              consumption_amount: record.consumption_amount,
+              budget_ratio: budgetRatio,
+              description: `消费${record.consumption_amount}元，分配预算积分${budgetPointsToAllocate}`
+            }
+          },
+          { transaction }
+        )
 
-        if (userAccount) {
-          // 更新预算积分字段
-          await userAccount.update(
-            {
-              budget_points: userAccount.budget_points + budgetPointsToAllocate,
-              remaining_budget_points: userAccount.remaining_budget_points + budgetPointsToAllocate
-            },
-            { transaction }
-          )
-
-          logger.info(
-            `💰 预算分配成功: user_id=${record.user_id}, 预算积分=${budgetPointsToAllocate}, 剩余预算=${userAccount.remaining_budget_points + budgetPointsToAllocate}`
-          )
-        }
+        logger.info(
+          `💰 预算分配成功: user_id=${record.user_id}, 预算积分=${budgetPointsToAllocate}, 幂等=${budgetResult.is_duplicate ? '重复' : '新增'}`
+        )
       }
 
       // 6. 提交事务
