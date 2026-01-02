@@ -406,6 +406,182 @@ class LotteryQuotaService {
       throw error
     }
   }
+
+  // ==================== 规则管理方法（2025-12-31 新增） ====================
+
+  /**
+   * 查询配额规则列表
+   *
+   * @param {Object} params - 查询参数
+   * @param {string} params.rule_type - 规则类型（global/campaign/role/user，可选）
+   * @param {number} params.campaign_id - 活动ID（可选）
+   * @param {boolean} params.is_active - 是否激活（可选）
+   * @param {number} params.page - 页码（默认1）
+   * @param {number} params.page_size - 每页数量（默认20）
+   * @returns {Promise<Object>} { rules, pagination }
+   */
+  static async getRulesList({ rule_type, campaign_id, is_active, page = 1, page_size = 20 }) {
+    const { LotteryDrawQuotaRule } = require('../../models')
+
+    // 构建查询条件
+    const whereClause = {}
+
+    if (rule_type) {
+      whereClause.scope_type = rule_type
+    }
+
+    if (campaign_id) {
+      // 当前表结构仅对 campaign 维度存储 campaign_id（scope_id）
+      if (!rule_type || rule_type === 'campaign') {
+        whereClause.scope_type = 'campaign'
+        whereClause.scope_id = String(parseInt(campaign_id))
+      }
+    }
+
+    if (is_active !== undefined) {
+      const active = is_active === 'true' || is_active === true
+      whereClause.status = active ? 'active' : 'inactive'
+    }
+
+    // 分页查询
+    const offset = (parseInt(page) - 1) * parseInt(page_size)
+    const { rows, count } = await LotteryDrawQuotaRule.findAndCountAll({
+      where: whereClause,
+      order: [
+        ['priority', 'DESC'], // 高优先级在前
+        ['created_at', 'DESC']
+      ],
+      limit: parseInt(page_size),
+      offset
+    })
+
+    logger.info('查询配额规则列表', {
+      filters: { rule_type, campaign_id, is_active },
+      total: count
+    })
+
+    return {
+      rules: rows,
+      pagination: {
+        current_page: parseInt(page),
+        page_size: parseInt(page_size),
+        total_count: count,
+        total_pages: Math.ceil(count / parseInt(page_size))
+      }
+    }
+  }
+
+  /**
+   * 创建配额规则
+   *
+   * @param {Object} params - 规则参数
+   * @param {string} params.rule_type - 规则类型（global/campaign/role/user）
+   * @param {number} params.campaign_id - 活动ID（campaign类型必填）
+   * @param {string} params.role_uuid - 角色UUID（role类型必填）
+   * @param {number} params.target_user_id - 目标用户ID（user类型必填）
+   * @param {number} params.limit_value - 每日抽奖次数上限
+   * @param {string} params.effective_from - 生效开始时间（可选）
+   * @param {string} params.effective_to - 生效结束时间（可选）
+   * @param {string} params.reason - 创建原因（可选）
+   * @param {number} params.created_by - 创建人ID
+   * @returns {Promise<Object>} 创建的规则
+   */
+  static async createRule({
+    rule_type,
+    campaign_id,
+    role_uuid,
+    target_user_id,
+    limit_value,
+    effective_from,
+    effective_to,
+    reason,
+    created_by
+  }) {
+    const { LotteryDrawQuotaRule } = require('../../models')
+
+    // 优先级映射（user:100 > role:80 > campaign:50 > global:10）
+    const priorityMap = {
+      user: 100,
+      role: 80,
+      campaign: 50,
+      global: 10
+    }
+
+    // 计算 scope_id（当前表结构以 scope_type + scope_id 表达四维度规则）
+    let scope_id = 'global'
+    if (rule_type === 'campaign') {
+      scope_id = String(parseInt(campaign_id))
+    } else if (rule_type === 'role') {
+      scope_id = role_uuid
+    } else if (rule_type === 'user') {
+      scope_id = String(parseInt(target_user_id))
+    }
+
+    // 创建规则
+    const rule = await LotteryDrawQuotaRule.create({
+      scope_type: rule_type,
+      scope_id,
+      limit_value: parseInt(limit_value),
+      priority: priorityMap[rule_type],
+      effective_from: effective_from ? new Date(effective_from) : null,
+      effective_to: effective_to ? new Date(effective_to) : null,
+      status: 'active',
+      created_by,
+      updated_by: created_by,
+      reason: reason || null
+    })
+
+    logger.info('创建配额规则成功', {
+      rule_id: rule.rule_id,
+      rule_type,
+      limit_value,
+      created_by
+    })
+
+    return rule
+  }
+
+  /**
+   * 禁用配额规则
+   *
+   * @param {Object} params - 参数
+   * @param {number} params.rule_id - 规则ID
+   * @param {number} params.updated_by - 更新人ID
+   * @returns {Promise<Object>} 更新后的规则
+   * @throws {Error} 规则不存在或已禁用
+   */
+  static async disableRule({ rule_id, updated_by }) {
+    const { LotteryDrawQuotaRule } = require('../../models')
+
+    const rule = await LotteryDrawQuotaRule.findByPk(rule_id)
+
+    if (!rule) {
+      const error = new Error('配额规则不存在')
+      error.code = 'RULE_NOT_FOUND'
+      error.status = 404
+      throw error
+    }
+
+    if (rule.status === 'inactive') {
+      const error = new Error('规则已禁用')
+      error.code = 'RULE_ALREADY_DISABLED'
+      error.status = 400
+      throw error
+    }
+
+    await rule.update({
+      status: 'inactive',
+      updated_by
+    })
+
+    logger.info('禁用配额规则成功', {
+      rule_id: rule.rule_id,
+      rule_type: rule.scope_type,
+      updated_by
+    })
+
+    return rule
+  }
 }
 
 module.exports = LotteryQuotaService

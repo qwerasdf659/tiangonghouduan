@@ -137,11 +137,12 @@ class UnifiedDatabaseHelper {
       },
       lottery_draws: {
         primaryKey: 'draw_id',
-        requiredFields: ['user_id', 'draw_time', 'is_winner'],
+        // V4.0语义更新：使用 reward_tier 替代 is_winner
+        requiredFields: ['user_id', 'draw_time', 'reward_tier'],
         indexes: [
           { columns: ['user_id'], unique: false },
           { columns: ['draw_time'], unique: false },
-          { columns: ['is_winner'], unique: false }
+          { columns: ['reward_tier'], unique: false }
         ]
       },
       lottery_prizes: {

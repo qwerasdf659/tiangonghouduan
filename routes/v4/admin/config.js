@@ -122,7 +122,7 @@ router.post(
         }
       }
 
-      // 统计结果
+      // 统计结果（V4.0语义更新：使用 high_tier_rate 替代 win_rate）
       const wins = simulationResults.filter(r => r.result === 'win').length
       const losses = simulationResults.filter(r => r.result === 'lose').length
       const errors = simulationResults.filter(r => r.result === 'error').length
@@ -132,7 +132,8 @@ router.post(
         wins,
         losses,
         errors,
-        win_rate: times > 0 ? ((wins / times) * 100).toFixed(2) : 0,
+        // V4.0语义：高档奖励率（模拟测试中 result='win' 视为高档奖励）
+        high_tier_rate: times > 0 ? ((wins / times) * 100).toFixed(2) : 0,
         strategy_type,
         user_id: parseInt(user_id),
         timestamp: BeijingTimeHelper.apiTimestamp()

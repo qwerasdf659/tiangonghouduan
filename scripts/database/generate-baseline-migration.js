@@ -31,13 +31,16 @@ modelFiles.forEach((file, index) => {
 })
 
 // 表名映射（模型名 -> 表名）- 预留用于未来功能
+// 🔧 2025-12-30 清理：移除已废弃的 UserPointsAccount 和 PointsTransaction 映射
+// 新架构使用 Account + AccountAssetBalance + AssetTransaction
 const _tableNameMap = {
   'User.js': 'users',
   'Role.js': 'roles',
   'UserRole.js': 'user_roles',
   'AuthenticationSession.js': 'authentication_sessions',
-  'UserPointsAccount.js': 'user_points_accounts',
-  'PointsTransaction.js': 'points_transactions',
+  'Account.js': 'accounts', // 统一账户主体表
+  'AccountAssetBalance.js': 'account_asset_balances', // 账户资产余额表
+  'AssetTransaction.js': 'asset_transactions', // 资产流水表
   'ExchangeRecords.js': 'exchange_records',
   'LotteryCampaign.js': 'lottery_campaigns',
   'LotteryPrize.js': 'lottery_prizes',
@@ -70,8 +73,8 @@ const migrationContent = `/**
  * - 3个基础角色初始数据
  * 
  * 业务系统分类:
- * 1. 用户认证系统 (4表): users, roles, user_roles, user_sessions
- * 2. 积分系统 (3表): user_points_accounts, points_transactions, exchange_records
+ * 1. 用户认证系统 (4表): users, roles, user_roles, authentication_sessions
+ * 2. 资产系统 (3表): accounts, account_asset_balances, asset_transactions
  * 3. 抽奖系统 (4表): lottery_campaigns, lottery_prizes, lottery_draws, lottery_presets
  * 4. 商品交易系统 (3表): products, trade_records, item_instances
  * 5. 客服系统 (3表): customer_sessions, chat_messages, feedbacks
@@ -93,11 +96,11 @@ module.exports = {
       // TODO: 这里需要手动添加users, roles, user_roles, user_sessions的createTable语句
       // 由于自动提取Sequelize模型定义比较复杂，建议手动编写
       
-      // ==================== 2. 积分系统（3表）====================
-      
-      console.log('📦 [2/7] 创建积分系统表...')
-      
-      // TODO: user_points_accounts, points_transactions, exchange_records
+      // ==================== 2. 资产系统（3表）====================
+
+      console.log('📦 [2/7] 创建资产系统表...')
+
+      // TODO: accounts, account_asset_balances, asset_transactions
       
       // ==================== 3. 抽奖系统（4表）====================
       
@@ -209,9 +212,10 @@ module.exports = {
         'lottery_prizes',
         'lottery_campaigns',
         'exchange_records',
-        'points_transactions',
-        'user_points_accounts',
-        'user_sessions',
+        'asset_transactions',
+        'account_asset_balances',
+        'accounts',
+        'authentication_sessions',
         'user_roles',
         'roles',
         'users'

@@ -230,13 +230,15 @@ class LotteryCampaign extends Model {
    * @returns {Object} 参与统计
    */
   getParticipationStats() {
-    const winRate = this.total_draws > 0 ? (this.total_prizes_awarded / this.total_draws) * 100 : 0
+    // V4.0语义更新：high_tier_rate 替代 win_rate
+    const highTierRate =
+      this.total_draws > 0 ? (this.total_prizes_awarded / this.total_draws) * 100 : 0
 
     return {
       total_participants: this.total_participants,
       total_draws: this.total_draws,
       total_prizes_awarded: this.total_prizes_awarded,
-      win_rate: winRate,
+      high_tier_rate: highTierRate,
       avg_draws_per_participant:
         this.total_participants > 0 ? this.total_draws / this.total_participants : 0
     }
@@ -311,12 +313,12 @@ class LotteryCampaign extends Model {
       })
     }
 
-    // 检查参与率
+    // 检查高档奖励率（V4.0语义更新）
     const participationStats = this.getParticipationStats()
-    if (this.isActive() && participationStats.win_rate > 90) {
+    if (this.isActive() && participationStats.high_tier_rate > 90) {
       warnings.push({
-        type: 'high_win_rate',
-        message: '中奖率过高，可能影响活动效果'
+        type: 'high_tier_rate_warning',
+        message: '高档奖励率过高，可能影响活动效果'
       })
     }
 

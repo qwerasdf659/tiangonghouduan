@@ -236,13 +236,13 @@ class AdminSystemService {
             }
           }
         }),
-        // 今日中奖次数
+        // V4.0语义更新：今日高档奖励次数（替代原中奖次数）
         models.LotteryDraw.count({
           where: {
             created_at: {
               [Op.gte]: todayStart
             },
-            is_winner: true
+            reward_tier: 'high'
           }
         }),
         // 今日新增用户
@@ -296,13 +296,16 @@ class AdminSystemService {
           total_users: systemStats.users.total,
           active_users: systemStats.users.active,
           total_lotteries: systemStats.lottery.total,
-          win_rate: systemStats.lottery.win_rate
+          // V4.0语义更新：使用 high_tier_rate 替代 win_rate
+          high_tier_rate: systemStats.lottery.high_tier_rate
         },
         today: {
           new_users: todayNewUsers,
           lottery_draws: todayLotteries,
-          wins: todayWins,
-          win_rate: todayLotteries > 0 ? ((todayWins / todayLotteries) * 100).toFixed(2) : '0.00',
+          // V4.0语义更新：使用 high_tier_wins 替代 wins
+          high_tier_wins: todayWins,
+          high_tier_rate:
+            todayLotteries > 0 ? ((todayWins / todayLotteries) * 100).toFixed(2) : '0.00',
           points_consumed: todayPointsConsumed
         },
         customer_service: {
@@ -360,8 +363,8 @@ class AdminSystemService {
    */
   static async _getSimpleSystemStats() {
     try {
-      // 并行查询统计数据
-      const [totalUsers, activeUsers, totalLotteries, totalWins] = await Promise.all([
+      // V4.0语义更新：统计高档奖励次数（替代原中奖次数）
+      const [totalUsers, activeUsers, totalLotteries, totalHighTierWins] = await Promise.all([
         models.User.count(),
         models.User.count({
           where: {
@@ -373,12 +376,13 @@ class AdminSystemService {
         models.LotteryDraw.count(),
         models.LotteryDraw.count({
           where: {
-            is_winner: true
+            reward_tier: 'high'
           }
         })
       ])
 
-      const winRate = totalLotteries > 0 ? ((totalWins / totalLotteries) * 100).toFixed(2) : '0.00'
+      const highTierRate =
+        totalLotteries > 0 ? ((totalHighTierWins / totalLotteries) * 100).toFixed(2) : '0.00'
 
       return {
         users: {
@@ -387,8 +391,9 @@ class AdminSystemService {
         },
         lottery: {
           total: totalLotteries,
-          wins: totalWins,
-          win_rate: winRate
+          // V4.0语义更新：使用 high_tier_wins 替代 wins
+          high_tier_wins: totalHighTierWins,
+          high_tier_rate: highTierRate
         },
         system: {
           uptime: process.uptime(),
@@ -723,6 +728,214 @@ class AdminSystemService {
         category
       })
       throw error
+    }
+  }
+
+  // ==================== 系统配置读取方法（2025-12-30 配置管理三层分离方案） ====================
+
+  /**
+   * 获取单个系统配置值
+   *
+   * @description 从数据库读取指定配置项的值，自动解析类型
+   *
+   * 业务场景：
+   * - 抽奖服务读取 lottery_cost_points（单抽消耗积分）
+   * - 抽奖服务读取 daily_lottery_limit（每日抽奖次数上限）
+   * - 市场服务读取 max_active_listings（最大上架数量）
+   * - 消费服务读取 budget_allocation_ratio（预算分配系数）
+   *
+   * 技术实现：
+   * - 从 system_settings 表查询配置
+   * - 使用 SystemSettings.getParsedValue() 自动解析类型
+   * - 配置不存在或查询失败时：
+   *   - strict=true（严格模式）：直接抛错，不使用默认值兜底
+   *   - strict=false（默认）：返回默认值，确保业务不中断
+   *
+   * 严格模式使用场景（2025-12-31 兜底策略升级）：
+   * - 关键积分规则配置（lottery_cost_points, budget_allocation_ratio）
+   * - 影响业务核心逻辑的配置，静默兜底会造成规则漂移且难以排查
+   *
+   * @param {string} category - 配置分类（points/marketplace/security等）
+   * @param {string} setting_key - 配置项键名
+   * @param {any} default_value - 默认值（配置不存在时返回，严格模式下无效）
+   * @param {Object} options - 选项
+   * @param {boolean} options.strict - 严格模式（true=配置缺失直接报错，不兜底）
+   * @returns {Promise<any>} 解析后的配置值
+   * @throws {Error} 严格模式下配置缺失/读取失败时抛出错误（业务码：CONFIG_MISSING）
+   *
+   * @example
+   * // 普通模式：获取单抽消耗积分（默认100），配置缺失时返回默认值
+   * const cost = await AdminSystemService.getSettingValue('points', 'lottery_cost_points', 100)
+   *
+   * // 严格模式：获取单抽消耗积分，配置缺失时直接报错
+   * const cost = await AdminSystemService.getSettingValue('points', 'lottery_cost_points', null, { strict: true })
+   *
+   * // 获取每日抽奖上限（默认50）
+   * const limit = await AdminSystemService.getSettingValue('points', 'daily_lottery_limit', 50)
+   *
+   * // 获取最大上架数量（默认10）
+   * const max = await AdminSystemService.getSettingValue('marketplace', 'max_active_listings', 10)
+   *
+   * @see docs/配置管理三层分离与校验统一方案.md
+   */
+  static async getSettingValue(category, setting_key, default_value = null, options = {}) {
+    const { strict = false } = options
+    const configKey = `${category}/${setting_key}`
+
+    try {
+      // 从数据库查询配置项
+      const setting = await SystemSettings.findOne({
+        where: {
+          category,
+          setting_key
+        }
+      })
+
+      if (setting) {
+        // 使用模型方法自动解析类型（number/boolean/json/string）
+        const parsed_value = setting.getParsedValue()
+
+        logger.debug('[系统配置] 读取成功', {
+          category,
+          setting_key,
+          value: parsed_value,
+          value_type: setting.value_type
+        })
+
+        return parsed_value
+      }
+
+      // 配置不存在
+      if (strict) {
+        // 严格模式：直接报错，不使用默认值兜底
+        const error = new Error(`关键配置缺失: ${configKey}`)
+        error.code = 'CONFIG_MISSING'
+        error.config_key = configKey
+        error.category = category
+        error.setting_key = setting_key
+
+        logger.error('[系统配置] 严格模式：关键配置缺失，拒绝兜底', {
+          category,
+          setting_key,
+          config_key: configKey,
+          strict: true
+        })
+
+        throw error
+      }
+
+      // 普通模式：返回默认值
+      logger.warn('[系统配置] 未找到配置项，使用默认值', {
+        category,
+        setting_key,
+        default_value
+      })
+
+      return default_value
+    } catch (error) {
+      // 如果是我们主动抛出的 CONFIG_MISSING 错误，直接向上传递
+      if (error.code === 'CONFIG_MISSING') {
+        throw error
+      }
+
+      // 数据库查询失败
+      if (strict) {
+        // 严格模式：直接报错，不使用默认值兜底
+        const configError = new Error(`关键配置读取失败: ${configKey}（${error.message}）`)
+        configError.code = 'CONFIG_READ_FAILED'
+        configError.config_key = configKey
+        configError.category = category
+        configError.setting_key = setting_key
+        configError.originalError = error.message
+
+        logger.error('[系统配置] 严格模式：配置读取失败，拒绝兜底', {
+          category,
+          setting_key,
+          config_key: configKey,
+          error: error.message,
+          strict: true
+        })
+
+        throw configError
+      }
+
+      // 普通模式：查询失败时返回默认值，确保业务不中断
+      logger.error('[系统配置] 读取失败，使用默认值', {
+        category,
+        setting_key,
+        default_value,
+        error: error.message
+      })
+
+      return default_value
+    }
+  }
+
+  /**
+   * 批量获取多个系统配置值
+   *
+   * @description 一次性获取多个配置项，减少数据库查询次数
+   *
+   * @param {Array<Object>} config_list - 配置列表
+   * @param {string} config_list[].category - 配置分类
+   * @param {string} config_list[].setting_key - 配置项键名
+   * @param {any} config_list[].default_value - 默认值
+   * @returns {Promise<Object>} 配置值对象（键为 setting_key）
+   *
+   * @example
+   * const configs = await AdminSystemService.getSettingValues([
+   *   { category: 'points', setting_key: 'lottery_cost_points', default_value: 100 },
+   *   { category: 'points', setting_key: 'daily_lottery_limit', default_value: 50 }
+   * ])
+   * // 返回: { lottery_cost_points: 100, daily_lottery_limit: 50 }
+   */
+  static async getSettingValues(config_list) {
+    const result = {}
+
+    try {
+      // 构建 OR 查询条件
+      const where_conditions = config_list.map(({ category, setting_key }) => ({
+        category,
+        setting_key
+      }))
+
+      // 批量查询
+      const settings = await SystemSettings.findAll({
+        where: {
+          [Op.or]: where_conditions
+        }
+      })
+
+      // 构建结果映射
+      const setting_map = new Map()
+      settings.forEach(setting => {
+        setting_map.set(setting.setting_key, setting.getParsedValue())
+      })
+
+      // 填充结果，未找到的使用默认值
+      config_list.forEach(({ setting_key, default_value }) => {
+        result[setting_key] = setting_map.has(setting_key)
+          ? setting_map.get(setting_key)
+          : default_value
+      })
+
+      logger.debug('[系统配置] 批量读取完成', {
+        requested: config_list.length,
+        found: settings.length
+      })
+
+      return result
+    } catch (error) {
+      // 查询失败时返回所有默认值
+      logger.error('[系统配置] 批量读取失败，使用默认值', {
+        error: error.message
+      })
+
+      config_list.forEach(({ setting_key, default_value }) => {
+        result[setting_key] = default_value
+      })
+
+      return result
     }
   }
 

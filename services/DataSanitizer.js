@@ -704,10 +704,10 @@ class DataSanitizer {
       account_created: statistics.account_created,
       last_activity: statistics.last_activity,
 
-      // 抽奖统计（用户应该看到自己的抽奖记录）
+      // 抽奖统计（用户应该看到自己的抽奖记录）- V4.0语义更新
       lottery_count: statistics.lottery_count,
-      lottery_wins: statistics.lottery_wins, // 🔥 方案A修复：添加中奖次数
-      lottery_win_rate: statistics.lottery_win_rate, // 🔥 方案A修复：添加中奖率
+      lottery_high_tier_wins: statistics.lottery_high_tier_wins, // V4.0：高档奖励次数
+      lottery_high_tier_rate: statistics.lottery_high_tier_rate, // V4.0：高档奖励率
 
       // 库存统计（用户应该看到自己的库存）
       inventory_total: statistics.inventory_total, // 🔥 方案A修复：添加库存总数

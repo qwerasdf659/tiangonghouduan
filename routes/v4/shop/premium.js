@@ -8,13 +8,19 @@
  *
  * 🎯 双重条件AND关系（缺一不可）：
  * - 条件1: users.history_total_points ≥ 100000（历史累计10万积分门槛）
- * - 条件2: user_points_accounts.available_points ≥ 100（当前余额≥100积分）
+ * - 条件2: account_asset_balances.available_amount ≥ 100（当前POINTS余额≥100积分）
  *
  * API端点：
  * - POST /api/v4/premium/unlock - 解锁高级空间
  * - GET /api/v4/premium/status - 查询解锁状态
  *
+ * 架构说明：
+ * - 路由层通过 ServiceManager 获取 PremiumService
+ * - PremiumService 内部使用 AssetService 统一处理资产操作
+ * - 所有积分操作记录到 asset_transactions 表
+ *
  * 创建时间：2025-11-02
+ * 最后更新：2025-12-30（迁移到统一资产架构）
  */
 
 const express = require('express')
@@ -40,13 +46,13 @@ const VALIDITY_HOURS = 24 // 有效期：24小时（固定值）
  * 📍 路由: POST /api/v4/premium/unlock
  * 🔐 认证: 需要JWT认证（authenticateToken中间件）
  *
- * 📊 业务逻辑（基于实际数据库结构，极简清晰）：
+ * 📊 业务逻辑（基于统一资产架构，极简清晰）：
  * 步骤1: 检查当前解锁状态（如果有效期内，拒绝重复解锁，返回409冲突）
- * 步骤2: 关联查询用户信息和积分账户（User.findByPk + include UserPointsAccount）
+ * 步骤2: 通过 AssetService.getBalance 获取用户 POINTS 余额
  * 步骤3: 验证解锁条件1 - 历史积分门槛（users.history_total_points ≥ 100000）
- * 步骤4: 验证解锁条件2 - 当前余额充足（user_points_accounts.available_points ≥ 100）
- * 步骤5: 扣除积分（available_points - 100，total_consumed + 100，last_consume_time更新）
- * 步骤6: 记录积分交易（points_transactions表，business_type='premium_unlock'）
+ * 步骤4: 验证解锁条件2 - 当前余额充足（account_asset_balances.available_amount ≥ 100）
+ * 步骤5: 扣除积分（通过 AssetService.changeBalance 统一处理）
+ * 步骤6: 自动记录资产流水（asset_transactions表，business_type='premium_unlock'）
  * 步骤7: 创建/更新解锁记录（user_premium_status表，expires_at = unlock_time + 24小时）
  * 步骤8: 提交事务，返回解锁结果
  *
@@ -127,7 +133,7 @@ router.post('/unlock', authenticateToken, async (req, res) => {
  * 📊 业务逻辑（纯查询，无扣费操作）：
  * 步骤1: 查询用户的高级空间解锁状态（user_premium_status表）
  * 步骤2: 判断是否过期（expires_at > NOW()）
- * 步骤3: 关联查询用户信息和积分账户（获取历史积分和当前余额）
+ * 步骤3: 通过 AssetService.getBalance 获取用户 POINTS 余额
  * 步骤4: 计算解锁条件进度（条件1：历史积分进度，条件2：余额充足情况）
  * 步骤5: 返回解锁状态和条件进度（含剩余时间、是否可解锁等信息）
  *

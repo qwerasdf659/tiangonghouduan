@@ -266,7 +266,7 @@ const validateTestData = {
    * @param {Object} userData - 用户数据
    * @returns {boolean} 是否有效
    */
-  user: (userData) => {
+  user: userData => {
     if (!userData) return false
     if (!userData.user_id || !userData.mobile) return false
     // 验证手机号格式
@@ -279,7 +279,7 @@ const validateTestData = {
    * @param {Object} pointsData - 积分数据
    * @returns {boolean} 是否有效
    */
-  points: (pointsData) => {
+  points: pointsData => {
     if (!pointsData) return false
     if (!pointsData.user_id || typeof pointsData.amount !== 'number') return false
     // 积分不能为负数
@@ -325,7 +325,10 @@ const testDataGenerator = {
   generatePointsLogs: (userId = 31, count = 10, types = ['earn', 'spend', 'expire']) => {
     return Array.from({ length: count }, (_, index) => {
       const type = types[index % types.length]
-      const amount = type === 'earn' ? Math.floor(Math.random() * 100) + 10 : -(Math.floor(Math.random() * 50) + 5)
+      const amount =
+        type === 'earn'
+          ? Math.floor(Math.random() * 100) + 10
+          : -(Math.floor(Math.random() * 50) + 5)
 
       return {
         user_id: userId,
@@ -350,14 +353,18 @@ const testDataGenerator = {
    */
   generateLotteryRecords: (userId = 31, campaignId = 2, count = 10) => {
     return Array.from({ length: count }, (_, index) => {
-      const isWinner = Math.random() > 0.3 // 70%中奖率
+      // V4.0语义更新：使用 reward_tier 替代 is_winner
+      // 按奖品价值档位分布：low(<300), mid(300-699), high(>=700)
+      const tierRandom = Math.random()
+      const rewardTier = tierRandom < 0.5 ? 'low' : tierRandom < 0.85 ? 'mid' : 'high'
+      const prizeValues = { low: [50, 100, 200], mid: [300, 400, 500], high: [700, 800, 1000] }
 
       return {
         user_id: userId,
         campaign_id: campaignId,
-        prize_id: isWinner ? (index % 3) + 1 : 3, // 奖品ID轮换
-        is_winner: isWinner,
-        prize_value: isWinner ? [100, 50, 20][index % 3] : 0,
+        prize_id: (index % 3) + 1, // 奖品ID轮换（V4.0：每次抽奖必得奖品）
+        reward_tier: rewardTier, // V4.0语义更新：替代 is_winner
+        prize_value: prizeValues[rewardTier][index % 3],
         lottery_time: BeijingTimeHelper.getHoursAgo(index), // 使用北京时间，每条记录间隔1小时
         status: 'completed'
       }
@@ -383,11 +390,12 @@ const testDataGenerator = {
     const start = new Date(startDate).getTime()
     const end = new Date(endDate).getTime()
 
-    const intervalMs = {
-      hour: 60 * 60 * 1000,
-      day: 24 * 60 * 60 * 1000,
-      week: 7 * 24 * 60 * 60 * 1000
-    }[interval] || 24 * 60 * 60 * 1000
+    const intervalMs =
+      {
+        hour: 60 * 60 * 1000,
+        day: 24 * 60 * 60 * 1000,
+        week: 7 * 24 * 60 * 60 * 1000
+      }[interval] || 24 * 60 * 60 * 1000
 
     for (let time = start; time <= end; time += intervalMs) {
       // 转换为北京时间ISO格式
@@ -405,7 +413,7 @@ const testDataGenerator = {
    * 使用示例：
    * const boundaries = testDataGenerator.generateBoundaryData('points')
    */
-  generateBoundaryData: (dataType) => {
+  generateBoundaryData: dataType => {
     const boundaries = {
       points: {
         validMin: 1,
@@ -441,36 +449,37 @@ const testDataGenerator = {
 const testScenarios = {
   /**
    * 场景1: 新用户首次抽奖
-   * 业务规则: 首次抽奖100%获得积分奖品
+   * 业务规则: 首次抽奖100%获得积分奖品（V4.0：每次必得奖品，首次保底高档）
    */
   newUserFirstLottery: {
     user: createTestData.user(),
     campaign_id: TEST_DATA.lottery.testCampaign.campaign_id,
     is_first_lottery: true,
     expected_result: {
-      is_winner: true,
+      // V4.0语义更新：使用 reward_tier 替代 is_winner
+      reward_tier: 'high', // 首次抽奖保底高档奖励
       prize_type: 'points'
     }
   },
 
   /**
-   * 场景2: 老用户5次未中保底
-   * 业务规则: 5次未中奖后第6次必中
+   * 场景2: 老用户5次未中高档保底
+   * 业务规则: 5次未获得高档奖励后第6次必得高档（V4.0语义更新）
    */
   oldUserGuarantee: {
     user: createTestData.user(),
     campaign_id: TEST_DATA.lottery.testCampaign.campaign_id,
     previous_lottery_count: 5,
-    all_previous_lost: true,
+    all_previous_low_tier: true, // V4.0：改为低档计数
     expected_result: {
-      is_winner: true,
+      reward_tier: 'high', // V4.0语义更新：替代 is_winner
       trigger_reason: 'guarantee_mechanism'
     }
   },
 
   /**
-   * 场景3: 管理策略定向中奖
-   * 业务规则: 特定用户100%中奖
+   * 场景3: 管理策略定向高档奖励
+   * 业务规则: 特定用户100%获得高档奖励（V4.0语义更新）
    */
   managementTargetWin: {
     user: createTestData.user(),
@@ -478,7 +487,7 @@ const testScenarios = {
     is_management_target: true,
     custom_probability: 1.0,
     expected_result: {
-      is_winner: true,
+      reward_tier: 'high', // V4.0语义更新：替代 is_winner
       trigger_reason: 'management_strategy'
     }
   },

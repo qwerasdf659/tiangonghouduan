@@ -2,10 +2,15 @@
  * @file 管理员抽奖配额管理路由（V4.5 配额控制方案）
  * @description 抽奖次数配额规则管理接口
  *
+ * 架构原则（2025-12-31 重构）：
+ * - 路由层不直连 models（所有数据库操作通过 Service 层）
+ * - 路由层不开启事务（事务管理在 Service 层）
+ * - 通过 LotteryQuotaService 统一处理配额业务逻辑
+ *
  * 业务场景：
  * - 配额规则查询（支持四维度：全局/活动/角色/用户）
  * - 配额规则新增（版本化，保留历史）
- * - 配额规则禁用（is_active = false）
+ * - 配额规则禁用（status = inactive）
  * - 用户配额状态查询（今日已用/剩余/上限）
  * - 客服临时加次数（bonus_draw_count）
  *
@@ -13,6 +18,7 @@
  * - user > role > campaign > global
  *
  * 创建时间：2025-12-23
+ * 重构时间：2025-12-31（移除直接 Model 操作，统一通过 Service）
  */
 
 const express = require('express')
@@ -54,55 +60,25 @@ router.get('/rules', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const { rule_type, campaign_id, is_active, page = 1, page_size = 20 } = req.query
 
-    const { LotteryDrawQuotaRule } = require('../../../models')
-
-    // 构建查询条件
-    const whereClause = {}
-
-    if (rule_type) {
-      whereClause.scope_type = rule_type
-    }
-
-    if (campaign_id) {
-      // 当前表结构仅对 campaign 维度存储 campaign_id（scope_id）
-      if (!rule_type || rule_type === 'campaign') {
-        whereClause.scope_type = 'campaign'
-        whereClause.scope_id = String(parseInt(campaign_id))
-      }
-    }
-
-    if (is_active !== undefined) {
-      const active = is_active === 'true' || is_active === true
-      whereClause.status = active ? 'active' : 'inactive'
-    }
-
-    // 分页查询
-    const offset = (parseInt(page) - 1) * parseInt(page_size)
-    const { rows, count } = await LotteryDrawQuotaRule.findAndCountAll({
-      where: whereClause,
-      order: [
-        ['priority', 'DESC'], // 高优先级在前
-        ['created_at', 'DESC']
-      ],
-      limit: parseInt(page_size),
-      offset
+    // 通过 Service 层查询规则列表（2025-12-31 重构：移除直接 Model 操作）
+    const { rules, pagination } = await LotteryQuotaService.getRulesList({
+      rule_type,
+      campaign_id,
+      is_active,
+      page,
+      page_size
     })
 
     logger.info('查询配额规则列表', {
       admin_id: req.user.user_id,
       filters: { rule_type, campaign_id, is_active },
-      total: count
+      total: pagination.total_count
     })
 
     return res.apiSuccess(
       {
-        rules: rows.map(formatQuotaRuleForApi),
-        pagination: {
-          current_page: parseInt(page),
-          page_size: parseInt(page_size),
-          total_count: count,
-          total_pages: Math.ceil(count / parseInt(page_size))
-        }
+        rules: rules.map(formatQuotaRuleForApi),
+        pagination
       },
       '查询配额规则成功'
     )
@@ -168,38 +144,17 @@ router.post('/rules', authenticateToken, requireAdmin, async (req, res) => {
       return res.apiError('user类型规则必须指定 target_user_id', 'MISSING_USER_PARAMS', null, 400)
     }
 
-    const { LotteryDrawQuotaRule } = require('../../../models')
-
-    // 计算优先级（user:100 > role:80 > campaign:50 > global:10）
-    const priorityMap = {
-      user: 100,
-      role: 80,
-      campaign: 50,
-      global: 10
-    }
-
-    // 计算 scope_id（当前表结构以 scope_type + scope_id 表达四维度规则）
-    let scope_id = 'global'
-    if (rule_type === 'campaign') {
-      scope_id = String(parseInt(campaign_id))
-    } else if (rule_type === 'role') {
-      scope_id = role_uuid
-    } else if (rule_type === 'user') {
-      scope_id = String(parseInt(target_user_id))
-    }
-
-    // 创建规则
-    const rule = await LotteryDrawQuotaRule.create({
-      scope_type: rule_type,
-      scope_id,
-      limit_value: parseInt(limit_value),
-      priority: priorityMap[rule_type],
-      effective_from: effective_from ? new Date(effective_from) : null,
-      effective_to: effective_to ? new Date(effective_to) : null,
-      status: 'active',
-      created_by: req.user.user_id,
-      updated_by: req.user.user_id,
-      reason: reason || null
+    // 通过 Service 层创建规则（2025-12-31 重构：移除直接 Model 操作）
+    const rule = await LotteryQuotaService.createRule({
+      rule_type,
+      campaign_id,
+      role_uuid,
+      target_user_id,
+      limit_value,
+      effective_from,
+      effective_to,
+      reason,
+      created_by: req.user.user_id
     })
 
     logger.info('创建配额规则成功', {
@@ -222,7 +177,7 @@ router.post('/rules', authenticateToken, requireAdmin, async (req, res) => {
  *
  * 硬约束：
  * - 禁止修改 limit_value 等核心字段
- * - 只允许修改 is_active 为 false
+ * - 只允许修改 status 为 inactive
  * - 保留历史规则用于审计
  *
  * 返回：更新后的规则信息
@@ -230,33 +185,26 @@ router.post('/rules', authenticateToken, requireAdmin, async (req, res) => {
 router.put('/rules/:rule_id/disable', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const { rule_id } = req.params
-    const { LotteryDrawQuotaRule } = require('../../../models')
 
-    const rule = await LotteryDrawQuotaRule.findByPk(rule_id)
-
-    if (!rule) {
-      return res.apiError('配额规则不存在', 'RULE_NOT_FOUND', null, 404)
-    }
-
-    if (rule.status === 'inactive') {
-      return res.apiError('规则已禁用', 'RULE_ALREADY_DISABLED', null, 400)
-    }
-
-    await rule.update({
-      status: 'inactive',
+    // 通过 Service 层禁用规则（2025-12-31 重构：移除直接 Model 操作）
+    const rule = await LotteryQuotaService.disableRule({
+      rule_id,
       updated_by: req.user.user_id
     })
 
     logger.info('禁用配额规则成功', {
       admin_id: req.user.user_id,
       rule_id: rule.rule_id,
-      rule_type: rule.rule_type
+      rule_type: rule.scope_type
     })
 
     return res.apiSuccess(formatQuotaRuleForApi(rule), '禁用配额规则成功')
   } catch (error) {
     logger.error('禁用配额规则失败:', error)
-    return res.apiError(`禁用配额规则失败：${error.message}`, 'DISABLE_RULE_FAILED', null, 500)
+    // 处理 Service 层抛出的业务错误
+    const statusCode = error.status || 500
+    const errorCode = error.code || 'DISABLE_RULE_FAILED'
+    return res.apiError(error.message, errorCode, null, statusCode)
   }
 })
 

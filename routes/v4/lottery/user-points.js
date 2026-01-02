@@ -91,21 +91,21 @@ router.get('/points/:user_id', authenticateToken, pointsRateLimiter, async (req,
  *
  * @param {number} user_id - 用户ID
  *
- * @returns {Object} 用户抽奖统计数据（11个统计字段）
+ * @returns {Object} 用户抽奖统计数据（V4.0语义）
  *
- * 返回数据结构：
+ * 返回数据结构（V4.0语义更新）：
  * - user_id: 用户ID
  * - total_draws: 总抽奖次数
- * - total_wins: 总中奖次数
- * - guarantee_wins: 保底中奖次数
- * - normal_wins: 正常中奖次数
- * - win_rate: 中奖率（百分比数字）
+ * - total_high_tier_wins: 总高档奖励次数（V4.0语义）
+ * - guarantee_wins: 保底触发次数
+ * - normal_high_tier_wins: 正常高档奖励次数
+ * - high_tier_rate: 高档奖励率（百分比数字，V4.0语义）
  * - today_draws: 今日抽奖次数
- * - today_wins: 今日中奖次数
- * - today_win_rate: 今日中奖率
+ * - today_high_tier_wins: 今日高档奖励次数
+ * - today_high_tier_rate: 今日高档奖励率（V4.0语义）
  * - total_points_cost: 总消耗积分
- * - prize_type_distribution: 奖品类型分布
- * - last_win: 最近一次中奖记录
+ * - reward_tier_distribution: 奖励档位分布（V4.0语义）
+ * - last_high_tier_win: 最近一次高档奖励记录
  */
 router.get('/statistics/:user_id', authenticateToken, async (req, res) => {
   try {

@@ -1172,38 +1172,36 @@ class ConsumptionService {
   }
 
   /**
-   * 获取预算分配系数（动态读取配置）
+   * 获取预算分配系数（严格模式读取配置）
    *
-   * @description 从system_settings表动态读取预算分配系数
-   * @returns {Promise<number>} 预算系数（默认0.24）
+   * @description 从 DB system_settings 读取预算分配系数
+   * @returns {Promise<number>} 预算系数
+   * @throws {Error} 配置缺失或读取失败时抛出错误（业务码：CONFIG_MISSING/CONFIG_READ_FAILED）
    *
-   * 业务规则：
-   * - 从数据库读取 budget_allocation_ratio 配置项
-   * - 配置不存在或读取失败时返回默认值 0.24
-   * - 异常时降级到默认值，确保业务不中断
+   * 业务规则（配置管理三层分离方案 2025-12-30）：
+   * - 从数据库读取 points/budget_allocation_ratio 配置项
+   * - 严格模式：配置缺失/读取失败直接报错，不使用默认值兜底
+   * - 预算系数直接影响积分经济，静默兜底会造成规则漂移
+   *
+   * 调用方处理：
+   * - 调用方需要 try/catch 捕获异常并返回友好错误
+   * - 此设计使配置问题暴露在请求层而非静默失败
+   *
+   * @see docs/配置管理三层分离与校验统一方案.md
    */
   static async getBudgetRatio() {
-    try {
-      const { SystemSettings } = require('../models')
+    const AdminSystemService = require('./AdminSystemService')
 
-      // 查询预算系数配置
-      const setting = await SystemSettings.findOne({
-        where: { setting_key: 'budget_allocation_ratio' }
-      })
+    // 严格模式读取：配置缺失/读取失败直接报错
+    const ratio = await AdminSystemService.getSettingValue(
+      'points',
+      'budget_allocation_ratio',
+      null,
+      { strict: true }
+    )
 
-      if (setting) {
-        const ratio = setting.getParsedValue() // 使用已有解析方法
-        logger.info(`[配置] 预算系数: ${ratio}`)
-        return ratio
-      }
-
-      // 配置不存在时返回默认值
-      logger.warn('[配置] 未找到预算系数配置，使用默认值: 0.24')
-      return 0.24
-    } catch (error) {
-      logger.error('[配置] 获取预算系数失败:', error.message)
-      return 0.24 // 异常时返回安全默认值
-    }
+    logger.info('[配置] 预算系数读取成功', { ratio })
+    return ratio
   }
 }
 

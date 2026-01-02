@@ -260,7 +260,7 @@ class AuditLogService {
     return this.logOperation({
       operator_id,
       operation_type: 'points_adjust',
-      target_type: 'UserPointsAccount',
+      target_type: 'AccountAssetBalance', // 更新到统一资产架构
       target_id: user_id,
       action: 'add',
       before_data: {
@@ -304,7 +304,7 @@ class AuditLogService {
     return this.logOperation({
       operator_id,
       operation_type: 'points_adjust',
-      target_type: 'UserPointsAccount',
+      target_type: 'AccountAssetBalance', // 更新到统一资产架构
       target_id: user_id,
       action: 'consume',
       before_data: {
@@ -346,7 +346,7 @@ class AuditLogService {
     return this.logOperation({
       operator_id,
       operation_type: 'points_adjust',
-      target_type: 'PointsTransaction',
+      target_type: 'AssetTransaction', // 更新到统一资产架构
       target_id: transaction_id,
       action: 'activate',
       before_data: {

@@ -71,7 +71,8 @@ describe('抽奖积分集成测试 - V4.5', () => {
 
         console.log('\n🎲 抽奖结果：', {
           success: result.success,
-          is_winner: result.is_winner,
+          // V4.0语义更新：使用 reward_tier 替代 is_winner
+          reward_tier: result.reward_tier,
           prize: result.prize?.prize_name
         })
 
@@ -163,7 +164,8 @@ describe('抽奖积分集成测试 - V4.5', () => {
 
           attempts++
 
-          if (result.is_winner && result.prize?.prize_type === 'points') {
+          // V4.0语义更新：使用 reward_tier 替代 is_winner（每次抽奖必得奖品）
+          if (result.reward_tier && result.prize?.prize_type === 'points') {
             rewardResult = result
             console.log(
               `\n🎉 第${attempts}次抽奖中奖！奖励：${result.prize.prize_name} (${result.prize.prize_value}积分)`

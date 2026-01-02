@@ -199,7 +199,7 @@ class LotteryUserService {
   /**
    * 🛡️ 获取用户统计信息
    *
-   * 业务场景：获取用户的统计数据，包括抽奖参与次数、中奖次数、中奖率等
+   * 业务场景：获取用户的统计数据，包括抽奖参与次数、高档奖励次数、高档奖励率等
    *
    * @param {number} user_id - 用户ID（users表主键）
    * @returns {Promise<Object>} 用户统计信息对象
@@ -214,14 +214,14 @@ class LotteryUserService {
    * @returns {Date} return.created_at - 创建时间
    * @returns {Object} return.stats - 统计数据对象
    * @returns {number} return.stats.total_lottery_participations - 总抽奖参与次数
-   * @returns {number} return.stats.total_wins - 总中奖次数
-   * @returns {number} return.stats.win_rate - 中奖率
+   * @returns {number} return.stats.total_high_tier_wins - 总高档奖励次数（V4.0语义）
+   * @returns {number} return.stats.high_tier_rate - 高档奖励率（V4.0语义）
    *
    * @throws {Error} 当用户不存在时抛出错误
    *
    * @example
    * const stats = await userService.getUserStats(10001)
-   * logger.info('用户中奖率:', stats.stats.win_rate)
+   * logger.info('用户高档奖励率:', stats.stats.high_tier_rate)
    */
   async getUserStats(user_id) {
     try {
@@ -243,11 +243,11 @@ class LotteryUserService {
         login_count: user.login_count || 0,
         last_login: user.last_login,
         created_at: user.created_at,
-        // 统计数据
+        // 统计数据（V4.0语义更新：使用 high_tier_rate 替代 win_rate）
         stats: {
           total_lottery_participations: 0, // 需要从抽奖记录中统计
-          total_wins: 0, // 需要从中奖记录中统计
-          win_rate: 0 // 计算中奖率
+          total_high_tier_wins: 0, // V4.0：高档奖励次数
+          high_tier_rate: 0 // V4.0：高档奖励率
         }
       }
     } catch (error) {

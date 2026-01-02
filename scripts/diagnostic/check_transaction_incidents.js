@@ -7,7 +7,7 @@
 const { sequelize } = require('../config/database')
 const fs = require('fs')
 
-async function runIncidentCheck () {
+async function runIncidentCheck() {
   console.log('🔍 开始连抽事务安全事故检查...\n')
   console.log('检查时间范围：最近30天')
   console.log('检查维度：8项核心指标\n')
@@ -39,7 +39,7 @@ async function runIncidentCheck () {
         user_id,
         DATE(created_at) as draw_date,
         COUNT(*) as actual_draw_count,
-        CASE 
+        CASE
           WHEN COUNT(*) = 1 THEN '✅ 单抽（正常）'
           WHEN COUNT(*) = 3 THEN '✅ 3连抽完整'
           WHEN COUNT(*) = 5 THEN '✅ 5连抽完整'
@@ -50,7 +50,7 @@ async function runIncidentCheck () {
           WHEN COUNT(*) BETWEEN 6 AND 9 THEN '🚨 异常：6-9次（5或10连抽失败）'
           ELSE CONCAT('🚨 异常：', COUNT(*), '次抽奖')
         END as status,
-        GROUP_CONCAT(is_winner ORDER BY created_at) as win_sequence,
+        GROUP_CONCAT(reward_tier ORDER BY created_at) as tier_sequence,
         MIN(created_at) as first_draw_time,
         MAX(created_at) as last_draw_time,
         TIMESTAMPDIFF(SECOND, MIN(created_at), MAX(created_at)) as duration_seconds
@@ -78,7 +78,7 @@ async function runIncidentCheck () {
         console.log(`     状态: ${row.status}`)
         console.log(`     实际抽奖次数: ${row.actual_draw_count}`)
         console.log(`     持续时间: ${row.duration_seconds}秒`)
-        console.log(`     中奖序列: ${row.win_sequence}`)
+        console.log(`     档位序列: ${row.tier_sequence}`)
       })
 
       if (incompleteDraws.length > 10) {
@@ -124,7 +124,9 @@ async function runIncidentCheck () {
       console.log('\n抽奖类型分布：')
       drawDistribution.forEach(row => {
         const icon = row.draw_type.includes('异常') ? '🚨' : '📊'
-        console.log(`  ${icon} ${row.draw_type}: ${row.user_count}次 (${row.percentage}%), 总抽奖${row.total_draws}次`)
+        console.log(
+          `  ${icon} ${row.draw_type}: ${row.user_count}次 (${row.percentage}%), 总抽奖${row.total_draws}次`
+        )
       })
 
       const hasAbnormal = drawDistribution.some(d => d.draw_type.includes('异常'))
@@ -317,7 +319,9 @@ async function runIncidentCheck () {
 
     console.log('\n业务数据统计：')
     businessStats.forEach(row => {
-      console.log(`  📊 ${row.metric}: ${row.value} ${row.percentage !== '-' ? '(' + row.percentage + ')' : ''}`)
+      console.log(
+        `  📊 ${row.metric}: ${row.value} ${row.percentage !== '-' ? '(' + row.percentage + ')' : ''}`
+      )
     })
 
     report.details.push({
@@ -382,9 +386,11 @@ async function runIncidentCheck () {
 }
 
 // 执行检查
-runIncidentCheck().then(() => {
-  process.exit(0)
-}).catch(error => {
-  console.error('❌ 检查失败:', error)
-  process.exit(1)
-})
+runIncidentCheck()
+  .then(() => {
+    process.exit(0)
+  })
+  .catch(error => {
+    console.error('❌ 检查失败:', error)
+    process.exit(1)
+  })

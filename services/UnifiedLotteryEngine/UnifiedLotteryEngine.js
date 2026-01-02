@@ -447,13 +447,13 @@ class UnifiedLotteryEngine {
       return result
     }
 
-    // 处理is_winner格式
-    if (result.is_winner !== undefined) {
+    // V4.0语义更新：处理 reward_tier 格式（替代原 is_winner）
+    if (result.reward_tier !== undefined) {
       return {
         success: true,
         data: {
           draw_result: {
-            is_winner: result.is_winner,
+            reward_tier: result.reward_tier, // V4.0：奖励档位
             prize_id: result.prize?.id || null,
             prize_name: result.prize?.name || null,
             prize_type: result.prize?.type || null,
@@ -991,7 +991,7 @@ class UnifiedLotteryEngine {
    * getDrawPricing(10, campaign)
    * // 返回：{ total_cost: 900, per_draw: 90, discount: 0.9, count: 10, label: '10连抽(九折)' }
    */
-  getDrawPricing(draw_count, campaign) {
+  async getDrawPricing(draw_count, campaign) {
     // 步骤1：从活动配置中读取定价配置（JSON字段）
     const pricingConfig = campaign.prize_distribution_config?.draw_pricing || {}
 
@@ -1004,20 +1004,52 @@ class UnifiedLotteryEngine {
     }
     const drawKey = drawKeys[draw_count] || 'single'
 
-    // 步骤3：获取对应的定价配置，如果不存在则使用默认值
-    const pricing = pricingConfig[drawKey] || {
-      total_cost: draw_count * 100, // 默认定价（无折扣）
-      per_draw: 100, // 单次价格
-      discount: 1.0, // 无折扣
-      count: draw_count, // 抽奖次数
-      label: `${draw_count}连抽` // 显示名称
+    /**
+     * 步骤3：从数据库读取单抽积分消耗配置（严格模式 2025-12-30）
+     *
+     * 配置管理三层分离方案：
+     * - 严格模式读取：配置缺失直接报错，不使用默认值兜底
+     * - 单抽价格直接影响积分经济，静默兜底会造成规则漂移
+     *
+     * 读取优先级：
+     * 1. 活动配置 prize_distribution_config.draw_pricing（活动级覆盖）
+     * 2. 数据库 system_settings.lottery_cost_points（全局配置）
+     *
+     * @see docs/配置管理三层分离与校验统一方案.md
+     */
+    const AdminSystemService = require('../AdminSystemService')
+    const defaultPerDraw = await AdminSystemService.getSettingValue(
+      'points',
+      'lottery_cost_points',
+      null,
+      { strict: true } // 🔴 严格模式：配置缺失直接报错
+    )
+
+    // 步骤4：从代码配置获取折扣信息
+    const businessConfig = require('../../config/business.config')
+    const drawTypes = businessConfig.lottery.draw_types
+    const drawTypeConfig = drawTypes[drawKey] || {
+      count: draw_count,
+      discount: 1.0,
+      label: `${draw_count}连抽`
     }
 
-    // 步骤4：记录日志（便于调试和问题排查）
+    // 步骤5：获取对应的定价配置，如果活动有自定义配置则使用活动配置
+    const pricing = pricingConfig[drawKey] || {
+      total_cost: Math.floor(draw_count * defaultPerDraw * drawTypeConfig.discount), // 使用DB配置 + 折扣
+      per_draw: Math.floor(defaultPerDraw * drawTypeConfig.discount), // 折后单价
+      discount: drawTypeConfig.discount, // 折扣率
+      count: draw_count, // 抽奖次数
+      label: drawTypeConfig.label // 显示名称
+    }
+
+    // 步骤6：记录日志（便于调试和问题排查）
     this.logInfo('获取连抽定价配置', {
       draw_count, // 请求的抽奖次数
       drawKey, // 映射的配置key
       pricing, // 最终的定价配置
+      default_per_draw: defaultPerDraw, // 数据库配置的单抽积分
+      discount: drawTypeConfig.discount, // 折扣率
       is_custom: !!pricingConfig[drawKey] // 是否使用了自定义配置
     })
 
@@ -1128,7 +1160,7 @@ class UnifiedLotteryEngine {
        * - 修改定价只需改配置，无需改代码
        * - 支持灵活的折扣策略
        */
-      const pricing = this.getDrawPricing(draw_count, campaign) // 从配置读取定价
+      const pricing = await this.getDrawPricing(draw_count, campaign) // 从DB配置读取定价
       const requiredPoints = pricing.total_cost // 使用配置的总价格
 
       // 记录详细的积分计算日志
@@ -1303,7 +1335,8 @@ class UnifiedLotteryEngine {
         if (drawResult.success) {
           results.push({
             draw_number: i + 1,
-            is_winner: drawResult.data?.draw_result?.is_winner || false,
+            // V4.0语义更新：使用 reward_tier 替代 is_winner
+            reward_tier: drawResult.data?.draw_result?.reward_tier || 'low',
             prize: drawResult.data?.draw_result?.prize_id
               ? {
                   id: drawResult.data.draw_result.prize_id,
@@ -1354,7 +1387,8 @@ class UnifiedLotteryEngine {
         draw_count,
         actualPointsCost: requiredPoints, // 🔥 修复：实际扣除的积分数（含折扣）
         remainingPoints,
-        winners: results.filter(r => r.is_winner).length,
+        // V4.0语义更新：统计高档奖励次数（替代原中奖次数统计）
+        highTierWins: results.filter(r => r.reward_tier === 'high').length,
         pricing
       })
 
@@ -1461,7 +1495,7 @@ class UnifiedLotteryEngine {
           'user_id',
           'campaign_id',
           'prize_id',
-          'is_winner',
+          'reward_tier', // V4.0：使用 reward_tier 替代 is_winner
           'draw_type',
           'cost_points',
           // 🎯 移除win_probability（LotteryDraw中不存在此字段）
@@ -1488,7 +1522,8 @@ class UnifiedLotteryEngine {
           draw_id: record.draw_id,
           campaign_id: record.campaign_id,
           campaign_name: record.campaign?.campaign_name || '未知活动',
-          is_winner: record.is_winner,
+          // V4.0语义更新：使用 reward_tier 替代 is_winner
+          reward_tier: record.reward_tier,
           prize: record.prize
             ? {
                 id: record.prize.prize_id,
@@ -1679,21 +1714,21 @@ class UnifiedLotteryEngine {
    * // 调用示例
    * const statistics = await lottery_engine.get_user_statistics(1)
    * logger.info(statistics)
-   * // 返回示例：
+   * // 返回示例（V4.0语义）：
    * // {
    * //   user_id: 1,
-   * //   total_draws: 50,           // 总抽奖次数
-   * //   total_wins: 48,            // 总中奖次数
-   * //   guarantee_wins: 15,        // 保底中奖次数
-   * //   normal_wins: 33,           // 正常中奖次数
-   * //   win_rate: 96.00,           // 中奖率（百分比数字）
-   * //   today_draws: 3,            // 今日抽奖次数
-   * //   today_wins: 3,             // 今日中奖次数
-   * //   today_win_rate: 100.00,    // 今日中奖率
-   * //   total_points_cost: 5000,   // 总消耗积分
-   * //   prize_type_distribution: { points: 20, product: 18, coupon: 10 },  // 奖品类型分布
-   * //   last_win: { ... },         // 最近一次中奖记录
-   * //   timestamp: '2025-11-11 05:24:05'  // 北京时间响应时间戳
+   * //   total_draws: 50,                   // 总抽奖次数
+   * //   total_high_tier_wins: 15,          // 高档奖励总次数（V4.0语义）
+   * //   guarantee_wins: 5,                 // 保底触发次数
+   * //   normal_high_tier_wins: 10,         // 正常高档奖励次数
+   * //   high_tier_rate: 30.00,             // 高档奖励率（V4.0语义）
+   * //   today_draws: 3,                    // 今日抽奖次数
+   * //   today_high_tier_wins: 1,           // 今日高档奖励次数（V4.0语义）
+   * //   today_high_tier_rate: 33.33,       // 今日高档奖励率（V4.0语义）
+   * //   total_points_cost: 5000,           // 总消耗积分
+   * //   reward_tier_distribution: { high: 15, mid: 18, low: 17 },  // 奖励档位分布（V4.0语义）
+   * //   last_high_tier_win: { ... },       // 最近一次高档奖励记录（V4.0语义）
+   * //   timestamp: '2025-11-11 05:24:05'   // 北京时间响应时间戳
    * // }
    */
   async get_user_statistics(user_id) {
@@ -1715,25 +1750,27 @@ class UnifiedLotteryEngine {
       })
 
       /*
-       * ========== 第2次查询：统计总中奖次数 ==========
-       * 📊 业务含义（Business Meaning）：用户获得有价值奖品的总次数（is_winner=true表示中奖）
-       * 📊 查询方式（Query Method）：COUNT(*) WHERE user_id = ? AND is_winner = true
-       * 📊 索引命中（Index Hit）：user_id索引
-       * 📊 数据类型（Data Type）：整数（Integer），如：48表示中奖48次
-       * 📊 业务场景（Business Scenario）：计算中奖率，显示"中奖48次"
+       * ========== 第2次查询：统计高档奖励次数（V4.0语义更新） ==========
+       * 📊 业务含义（Business Meaning）：用户获得高档奖励的总次数（reward_tier='high'）
+       * 📊 V4.0更新：每次抽奖100%获得奖品，根据奖品价值判断档位（low/mid/high）
+       * 📊 查询方式（Query Method）：COUNT(*) WHERE user_id = ? AND reward_tier = 'high'
+       * 📊 索引命中（Index Hit）：user_id + reward_tier 索引
+       * 📊 数据类型（Data Type）：整数（Integer），如：15表示获得高档奖励15次
+       * 📊 业务场景（Business Scenario）：显示"获得高档奖励15次"
        * 📊 性能评估（Performance）：单次查询耗时约20-25ms
        */
-      const totalWins = await models.LotteryDraw.count({
+      const totalHighTierWins = await models.LotteryDraw.count({
         where: {
           user_id,
-          is_winner: true
+          reward_tier: 'high'
         }
       })
 
       /*
-       * ========== 第3次查询：统计保底中奖次数 ==========
-       * 📊 业务含义（Business Meaning）：通过保底机制获得奖品的次数（用于验证保底机制是否正常工作）
-       * 📊 查询方式（Query Method）：COUNT(*) WHERE user_id = ? AND is_winner = true AND guarantee_triggered = true
+       * ========== 第3次查询：统计保底高档奖励次数（V4.0语义更新） ==========
+       * 📊 业务含义（Business Meaning）：通过保底机制获得高档奖品的次数（用于验证保底机制是否正常工作）
+       * 📊 V4.0更新：保底必得高档奖励（reward_tier='high'）
+       * 📊 查询方式（Query Method）：COUNT(*) WHERE user_id = ? AND reward_tier = 'high' AND guarantee_triggered = true
        * 📊 索引命中（Index Hit）：user_id索引
        * 📊 数据类型（Data Type）：整数（Integer），如：15表示保底触发15次
        * 📊 业务场景（Business Scenario）：运营分析保底机制触发频率，评估保底机制效果
@@ -1742,7 +1779,7 @@ class UnifiedLotteryEngine {
       const guaranteeWins = await models.LotteryDraw.count({
         where: {
           user_id,
-          is_winner: true,
+          reward_tier: 'high',
           guarantee_triggered: true
         }
       })
@@ -1768,18 +1805,19 @@ class UnifiedLotteryEngine {
       })
 
       /*
-       * ========== 第5次查询：统计今日中奖次数 ==========
-       * 📊 业务含义（Business Meaning）：用户今天中奖的次数（用于展示今日运气）
-       * 📊 查询方式（Query Method）：COUNT(*) WHERE user_id = ? AND is_winner = true AND created_at >= '今日00:00:00'
+       * ========== 第5次查询：统计今日高档奖励次数（V4.0语义更新） ==========
+       * 📊 业务含义（Business Meaning）：用户今天获得高档奖励的次数（用于展示今日运气）
+       * 📊 V4.0更新：统计今日高档奖励次数，替代原"今日中奖次数"
+       * 📊 查询方式（Query Method）：COUNT(*) WHERE user_id = ? AND reward_tier = 'high' AND created_at >= '今日00:00:00'
        * 📊 索引命中（Index Hit）：user_id + created_at复合索引
-       * 📊 数据类型（Data Type）：整数（Integer），如：3表示今日中奖3次
-       * 📊 业务场景（Business Scenario）：显示"今日中奖3次"，提升用户满意度
+       * 📊 数据类型（Data Type）：整数（Integer），如：3表示今日获得高档奖励3次
+       * 📊 业务场景（Business Scenario）：显示"今日获得高档奖励3次"，提升用户满意度
        * 📊 性能评估（Performance）：单次查询耗时约25-30ms
        */
-      const todayWins = await models.LotteryDraw.count({
+      const todayHighTierWins = await models.LotteryDraw.count({
         where: {
           user_id,
-          is_winner: true,
+          reward_tier: 'high',
           created_at: {
             [Op.gte]: today
           }
@@ -1802,41 +1840,42 @@ class UnifiedLotteryEngine {
         })) || 0
 
       /*
-       * ========== 第7次查询：统计各类奖品中奖次数分布 ==========
-       * 📊 业务含义（Business Meaning）：用户中奖的奖品类型分布（如：积分20次、商品18次、优惠券10次）
-       * 📊 业务价值（Business Value）：了解用户偏好的奖品类型，指导活动奖品配置
-       * 📊 查询方式（Query Method）：SELECT prize_type, COUNT(*) FROM lottery_draws WHERE user_id = ? AND is_winner = true AND prize_type IS NOT NULL GROUP BY prize_type
-       * 📊 索引命中（Index Hit）：user_id索引
-       * 📊 数据类型（Data Type）：对象（Object），如：{ points: 20, product: 18, coupon: 10 }
-       * 📊 业务场景（Business Scenario）：运营分析用户偏好，如果用户更喜欢实物商品，可以增加商品奖品的投放
+       * ========== 第7次查询：统计各档位奖励次数分布（V4.0语义更新） ==========
+       * 📊 业务含义（Business Meaning）：用户获得的奖励档位分布（如：高档15次、中档18次、低档17次）
+       * 📊 V4.0更新：改为统计 reward_tier 分布，替代原 prize_type 分布
+       * 📊 业务价值（Business Value）：了解用户获得的奖励档位分布，指导活动奖品配置
+       * 📊 查询方式（Query Method）：SELECT reward_tier, COUNT(*) FROM lottery_draws WHERE user_id = ? AND reward_tier IS NOT NULL GROUP BY reward_tier
+       * 📊 索引命中（Index Hit）：user_id + reward_tier 索引
+       * 📊 数据类型（Data Type）：对象（Object），如：{ high: 15, mid: 18, low: 17 }
+       * 📊 业务场景（Business Scenario）：运营分析用户奖励档位分布，评估抽奖体验
        * 📊 性能评估（Performance）：单次查询耗时约30-35ms（包含GROUP BY操作）
        */
-      const prizeTypeStats = await models.LotteryDraw.findAll({
+      const rewardTierStats = await models.LotteryDraw.findAll({
         where: {
           user_id,
-          is_winner: true,
-          prize_type: { [Op.ne]: null }
+          reward_tier: { [Op.ne]: null }
         },
-        attributes: ['prize_type', [models.sequelize.fn('COUNT', '*'), 'count']],
-        group: ['prize_type'],
+        attributes: ['reward_tier', [models.sequelize.fn('COUNT', '*'), 'count']],
+        group: ['reward_tier'],
         raw: true
       })
 
       /*
-       * ========== 第8次查询：查询最近一次中奖记录 ==========
-       * 📊 业务含义（Business Meaning）：用户最近一次中奖的详细信息（奖品名称、中奖时间、是否保底）
-       * 📊 业务价值（Business Value）：让用户快速回顾最近中奖情况
-       * 📊 查询方式（Query Method）：SELECT * FROM lottery_draws WHERE user_id = ? AND is_winner = true ORDER BY created_at DESC LIMIT 1
+       * ========== 第8次查询：查询最近一次高档奖励记录（V4.0语义更新） ==========
+       * 📊 业务含义（Business Meaning）：用户最近一次获得高档奖励的详细信息（奖品名称、中奖时间、是否保底）
+       * 📊 V4.0更新：查询最近的高档奖励记录（reward_tier='high'）
+       * 📊 业务价值（Business Value）：让用户快速回顾最近高档奖励情况
+       * 📊 查询方式（Query Method）：SELECT * FROM lottery_draws WHERE user_id = ? AND reward_tier = 'high' ORDER BY created_at DESC LIMIT 1
        * 📊 关联查询（Join Query）：关联lottery_prizes表获取奖品详情（奖品名称、类型、价值）
-       * 📊 索引命中（Index Hit）：user_id + created_at复合索引（ORDER BY优化）
+       * 📊 索引命中（Index Hit）：user_id + reward_tier + created_at复合索引（ORDER BY优化）
        * 📊 数据类型（Data Type）：对象（Object），包含draw_id、campaign_id、prize、is_guarantee、win_time
-       * 📊 业务场景（Business Scenario）：显示"您最近一次中奖：100积分（2025-11-11 05:24:05）"
+       * 📊 业务场景（Business Scenario）：显示"您最近一次高档奖励：100积分（2025-11-11 05:24:05）"
        * 📊 性能评估（Performance）：单次查询耗时约25-30ms（包含JOIN操作）
        */
-      const lastWin = await models.LotteryDraw.findOne({
+      const lastHighTierWin = await models.LotteryDraw.findOne({
         where: {
           user_id,
-          is_winner: true
+          reward_tier: 'high'
         },
         include: [
           {
@@ -1850,62 +1889,67 @@ class UnifiedLotteryEngine {
       })
 
       /*
-       * ========== 数据处理和计算：计算中奖率 ==========
-       * 📐 中奖率计算（Win Rate Calculation）：(总中奖次数 ÷ 总抽奖次数) × 100%
-       * 📐 业务含义（Business Meaning）：用户的历史中奖概率
-       * 📐 数据类型（Data Type）：百分比数字（如96.00表示96%），前端直接显示，无需再计算
-       * 📐 边界处理（Edge Case Handling）：如果总抽奖次数为0，中奖率为0（避免除以0错误）
-       * 📐 精度控制（Precision Control）：保留2位小数（toFixed(2)），如96.00
-       * 📐 业务场景（Business Scenario）：显示"您的中奖率为96%"
+       * ========== 数据处理和计算：计算高档奖励率（V4.0语义更新） ==========
+       * 📐 高档奖励率计算（High Tier Rate Calculation）：(高档奖励次数 ÷ 总抽奖次数) × 100%
+       * 📐 V4.0更新：计算高档奖励率，替代原"中奖率"
+       * 📐 业务含义（Business Meaning）：用户获得高档奖励的概率
+       * 📐 数据类型（Data Type）：百分比数字（如15.00表示15%），前端直接显示，无需再计算
+       * 📐 边界处理（Edge Case Handling）：如果总抽奖次数为0，高档奖励率为0（避免除以0错误）
+       * 📐 精度控制（Precision Control）：保留2位小数（toFixed(2)），如15.00
+       * 📐 业务场景（Business Scenario）：显示"您的高档奖励率为15%"
        */
-      const winRate = totalDraws > 0 ? ((totalWins / totalDraws) * 100).toFixed(2) : 0
-      const todayWinRate = todayDraws > 0 ? ((todayWins / todayDraws) * 100).toFixed(2) : 0
+      const highTierRate = totalDraws > 0 ? ((totalHighTierWins / totalDraws) * 100).toFixed(2) : 0
+      const todayHighTierRate =
+        todayDraws > 0 ? ((todayHighTierWins / todayDraws) * 100).toFixed(2) : 0
 
       // ========== 日志记录：便于调试和问题追踪 ==========
       this.logInfo('获取用户抽奖统计', {
         user_id,
         totalDraws,
-        totalWins,
-        winRate
+        totalHighTierWins,
+        highTierRate
       })
 
       /*
-       * ========== 返回统计结果：构造标准化的JSON对象 ==========
+       * ========== 返回统计结果：构造标准化的JSON对象（V4.0语义更新） ==========
        * 🎉 返回11个统计字段（完整的用户抽奖统计数据）
-       * 📊 字段命名规范（Field Naming Convention）：统一使用snake_case（蛇形命名），如total_draws、win_rate
+       * 📊 V4.0更新：使用奖励档位分布替代中奖统计
+       * 📊 字段命名规范（Field Naming Convention）：统一使用snake_case（蛇形命名），如total_draws、high_tier_rate
        * 📊 数据类型转换（Data Type Conversion）：确保数字类型（parseFloat、parseInt），避免字符串类型
        */
       return {
         user_id, // 用户ID（整数 - Integer）
         total_draws: totalDraws, // 总抽奖次数（整数 - Integer），展示用户参与度
-        total_wins: totalWins, // 总中奖次数（整数 - Integer），展示中奖情况
-        guarantee_wins: guaranteeWins, // 保底中奖次数（整数 - Integer），验证保底机制
-        normal_wins: totalWins - guaranteeWins, // 正常中奖次数（整数 - Integer），计算：总中奖-保底中奖
-        win_rate: parseFloat(winRate), // 中奖率（浮点数 - Float），百分比数字如96.00
+        // V4.0语义更新：使用高档奖励统计替代中奖统计
+        total_high_tier_wins: totalHighTierWins, // 高档奖励总次数（整数 - Integer）
+        guarantee_wins: guaranteeWins, // 保底高档奖励次数（整数 - Integer），验证保底机制
+        normal_high_tier_wins: totalHighTierWins - guaranteeWins, // 正常高档奖励次数（整数 - Integer）
+        high_tier_rate: parseFloat(highTierRate), // 高档奖励率（浮点数 - Float），百分比数字如15.00
         today_draws: todayDraws, // 今日抽奖次数（整数 - Integer），展示今日活跃度
-        today_wins: todayWins, // 今日中奖次数（整数 - Integer），展示今日运气
-        today_win_rate: parseFloat(todayWinRate), // 今日中奖率（浮点数 - Float），百分比数字
+        today_high_tier_wins: todayHighTierWins, // 今日高档奖励次数（整数 - Integer）
+        today_high_tier_rate: parseFloat(todayHighTierRate), // 今日高档奖励率（浮点数 - Float）
         total_points_cost: parseInt(totalPointsCost), // 总消耗积分（整数 - Integer），分析用户价值
-        prize_type_distribution: prizeTypeStats.reduce((acc, stat) => {
-          acc[stat.prize_type] = parseInt(stat.count)
+        // V4.0语义更新：使用奖励档位分布替代奖品类型分布
+        reward_tier_distribution: rewardTierStats.reduce((acc, stat) => {
+          acc[stat.reward_tier] = parseInt(stat.count)
           return acc
-        }, {}), // 奖品类型分布（对象 - Object），如 { points: 20, product: 18, coupon: 10 }
-        last_win: lastWin
+        }, {}), // 奖励档位分布（对象 - Object），如 { high: 15, mid: 18, low: 17 }
+        last_high_tier_win: lastHighTierWin
           ? {
-              draw_id: lastWin.draw_id, // 抽奖记录ID
-              campaign_id: lastWin.campaign_id, // 抽奖活动ID
-              prize: lastWin.prize
+              draw_id: lastHighTierWin.draw_id, // 抽奖记录ID
+              campaign_id: lastHighTierWin.campaign_id, // 抽奖活动ID
+              prize: lastHighTierWin.prize
                 ? {
-                    id: lastWin.prize.prize_id, // 奖品ID
-                    name: lastWin.prize.prize_name, // 奖品名称（如："100积分"）
-                    type: lastWin.prize.prize_type, // 奖品类型（如："points"）
-                    value: lastWin.prize.prize_value // 奖品价值（如：100）
+                    id: lastHighTierWin.prize.prize_id, // 奖品ID
+                    name: lastHighTierWin.prize.prize_name, // 奖品名称（如："100积分"）
+                    type: lastHighTierWin.prize.prize_type, // 奖品类型（如："points"）
+                    value: lastHighTierWin.prize.prize_value // 奖品价值（如：100）
                   }
                 : null,
-              is_guarantee: lastWin.guarantee_triggered || false, // 是否保底中奖
-              win_time: lastWin.created_at // 中奖时间（北京时间 - Beijing Time）
+              is_guarantee: lastHighTierWin.guarantee_triggered || false, // 是否保底获得
+              win_time: lastHighTierWin.created_at // 获得时间（北京时间 - Beijing Time）
             }
-          : null, // 最近一次中奖记录（如果没有中奖记录则为null）
+          : null, // 最近一次高档奖励记录（如果没有则为null）
         timestamp: BeijingTimeHelper.formatForAPI(new Date()).iso // 响应时间戳（ISO 8601格式）
       }
     } catch (error) {

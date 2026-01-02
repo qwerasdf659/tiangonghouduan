@@ -762,35 +762,65 @@ app.use((error, req, res, _next) => {
   return ApiResponse.send(res, resp)
 })
 
-// 🔧 初始化Service层（移到这里，确保测试环境也能使用）
-try {
-  const models = require('./models')
-  const { initializeServices } = require('./services')
-  const services = initializeServices(models)
+/**
+ * 🔴 应用初始化流程（同步阻塞模式）
+ *
+ * 初始化顺序：
+ * 1. Service层初始化
+ * 2. 关键 SystemSettings 启动预检（阻塞式）
+ * 3. 启动服务器监听端口
+ *
+ * 配置管理三层分离方案（2025-12-30）：
+ * - 预检失败会 process.exit(1)，阻止服务启动
+ * - 使用 await 确保预检在服务器启动前完成
+ *
+ * @returns {Promise<void>} 无返回值，初始化失败时直接退出进程
+ * @see docs/配置管理三层分离与校验统一方案.md
+ */
+async function initializeApp() {
+  // 步骤1：初始化 Service 层
+  try {
+    const models = require('./models')
+    const { initializeServices } = require('./services')
+    const services = initializeServices(models)
 
-  // 将Service容器和Models添加到app实例中，供路由使用
-  app.locals.services = services
-  app.locals.models = models // 注入models供路由层使用
+    // 将Service容器和Models添加到app实例中，供路由使用
+    app.locals.services = services
+    app.locals.models = models // 注入models供路由层使用
 
-  appLogger.info('Service层初始化完成', {
-    services: Array.from(services.getAllServices().keys())
-  })
-
-  // 🔴 运行时自检：打印连接池配置（2025-12-30 新增）
-  const pool = models.sequelize.connectionManager.pool
-  if (pool && pool._factory) {
-    appLogger.info('数据库连接池配置', {
-      source: 'config/database.js',
-      max: pool._factory.max || 0,
-      min: pool._factory.min || 0,
-      acquire: pool._factory.acquireTimeoutMillis || 0,
-      idle: pool.idleTimeoutMillis || 0,
-      evict: pool.reapIntervalMillis || 0,
-      note: '单一配置源 - 禁止其他地方自建连接池'
+    appLogger.info('Service层初始化完成', {
+      services: Array.from(services.getAllServices().keys())
     })
+
+    // 运行时自检：打印连接池配置
+    const pool = models.sequelize.connectionManager.pool
+    if (pool && pool._factory) {
+      appLogger.info('数据库连接池配置', {
+        source: 'config/database.js',
+        max: pool._factory.max || 0,
+        min: pool._factory.min || 0,
+        acquire: pool._factory.acquireTimeoutMillis || 0,
+        idle: pool.idleTimeoutMillis || 0,
+        evict: pool.reapIntervalMillis || 0,
+        note: '单一配置源 - 禁止其他地方自建连接池'
+      })
+    }
+  } catch (error) {
+    appLogger.error('Service层初始化失败', { error: error.message })
+    process.exit(1)
   }
-} catch (error) {
-  appLogger.error('Service层初始化失败', { error: error.message })
+
+  // 步骤2：关键 SystemSettings 启动预检（同步阻塞）
+  try {
+    const { validateCriticalSettings } = require('./config/system-settings-validator')
+    await validateCriticalSettings() // 🔴 使用 await 确保同步阻塞
+    appLogger.info('✅ SystemSettings 启动预检通过')
+  } catch (error) {
+    // 预检器内部已经 process.exit(1)，这里仅作日志记录
+    appLogger.error('SystemSettings 启动预检失败', { error: error.message })
+    // 确保进程退出
+    process.exit(1)
+  }
 }
 
 // 🚀 启动服务器
@@ -802,141 +832,149 @@ if (require.main === module) {
   const http = require('http')
   const server = http.createServer(app)
 
-  server.listen(PORT, HOST, async () => {
-    console.log('🔄 [DEBUG] 服务器启动监听完成')
+  // 🔴 先执行初始化（包含预检），再启动服务器监听
+  initializeApp()
+    .then(() => {
+      server.listen(PORT, HOST, async () => {
+        console.log('🔄 [DEBUG] 服务器启动监听完成')
 
-    // 🔌 初始化聊天WebSocket服务（新增）
-    try {
-      const ChatWebSocketService = require('./services/ChatWebSocketService')
-      ChatWebSocketService.initialize(server)
-      appLogger.info('聊天WebSocket服务已启动', {
-        path: '/socket.io',
-        transports: ['websocket', 'polling']
-      })
-    } catch (error) {
-      appLogger.error('聊天WebSocket服务初始化失败', { error: error.message })
-    }
-
-    // 初始化定时任务
-    try {
-      const ScheduledTasks = require('./scripts/maintenance/scheduled-tasks')
-      ScheduledTasks.initialize()
-      appLogger.info('定时任务初始化完成')
-    } catch (error) {
-      appLogger.error('定时任务初始化失败', { error: error.message })
-    }
-
-    /*
-     * 🔴 连接池持续监控（2025-12-30 方案A已拍板）
-     * 功能：每60s打点到应用日志，建立连接池可观测性
-     * 环境：生产环境已确认允许（噪音可接受）
-     * 告警条件：waiting > 5（严重）、usage_rate > 80%（警告）
-     */
-    if (process.env.ENABLE_POOL_MONITORING !== 'false') {
-      const { sequelize } = require('./models')
-
-      setInterval(() => {
-        const pool = sequelize.connectionManager.pool
-        if (!pool) return
-
-        const metrics = {
-          size: pool.size || 0,
-          available: pool.available || 0,
-          using: pool.using || 0,
-          waiting: pool.waiting || 0,
-          max: pool.max || 0,
-          usage_rate: pool.max > 0 ? ((pool.using / pool.max) * 100).toFixed(1) + '%' : '0%'
+        // 🔌 初始化聊天WebSocket服务
+        try {
+          const ChatWebSocketService = require('./services/ChatWebSocketService')
+          ChatWebSocketService.initialize(server)
+          appLogger.info('聊天WebSocket服务已启动', {
+            path: '/socket.io',
+            transports: ['websocket', 'polling']
+          })
+        } catch (error) {
+          appLogger.error('聊天WebSocket服务初始化失败', { error: error.message })
         }
 
-        // 正常状态：info 级别（可通过日志级别过滤）
-        appLogger.info('连接池状态', metrics)
+        // 初始化定时任务
+        try {
+          const ScheduledTasks = require('./scripts/maintenance/scheduled-tasks')
+          ScheduledTasks.initialize()
+          appLogger.info('定时任务初始化完成')
+        } catch (error) {
+          appLogger.error('定时任务初始化失败', { error: error.message })
+        }
 
-        // 告警条件1：等待连接过多（严重）- 阈值已拍板
-        if (metrics.waiting > 5) {
-          appLogger.error('连接池告警: 等待连接过多', {
-            ...metrics,
-            alert_type: 'HIGH_WAITING_COUNT',
-            severity: 'CRITICAL',
-            recommendation: '立即排查慢查询或增加 pool.max',
-            threshold: 'waiting > 5（已拍板，先跑一周再调整）'
+        /*
+         * 🔴 连接池持续监控（2025-12-30 方案A已拍板）
+         * 功能：每60s打点到应用日志，建立连接池可观测性
+         * 环境：生产环境已确认允许（噪音可接受）
+         * 告警条件：waiting > 5（严重）、usage_rate > 80%（警告）
+         */
+        if (process.env.ENABLE_POOL_MONITORING !== 'false') {
+          const { sequelize } = require('./models')
+
+          setInterval(() => {
+            const pool = sequelize.connectionManager.pool
+            if (!pool) return
+
+            const metrics = {
+              size: pool.size || 0,
+              available: pool.available || 0,
+              using: pool.using || 0,
+              waiting: pool.waiting || 0,
+              max: pool.max || 0,
+              usage_rate: pool.max > 0 ? ((pool.using / pool.max) * 100).toFixed(1) + '%' : '0%'
+            }
+
+            // 正常状态：info 级别（可通过日志级别过滤）
+            appLogger.info('连接池状态', metrics)
+
+            // 告警条件1：等待连接过多（严重）- 阈值已拍板
+            if (metrics.waiting > 5) {
+              appLogger.error('连接池告警: 等待连接过多', {
+                ...metrics,
+                alert_type: 'HIGH_WAITING_COUNT',
+                severity: 'CRITICAL',
+                recommendation: '立即排查慢查询或增加 pool.max',
+                threshold: 'waiting > 5（已拍板，先跑一周再调整）'
+              })
+            }
+
+            // 告警条件2：使用率过高（警告）- 阈值已拍板
+            if (pool.using / pool.max > 0.8) {
+              appLogger.warn('连接池告警: 使用率过高', {
+                ...metrics,
+                alert_type: 'HIGH_USAGE_RATE',
+                severity: 'WARNING',
+                recommendation: '评估是否需要增加 pool.max 或优化查询',
+                threshold: 'usage_rate > 80%（已拍板，先跑一周再调整）'
+              })
+            }
+          }, 60000) // 每分钟
+
+          appLogger.info('✅ 连接池监控已启动', {
+            interval: '60s',
+            alert_thresholds: { waiting: 5, usage_rate: '80%' },
+            log_level: 'info',
+            environment: process.env.NODE_ENV,
+            disable_with: 'ENABLE_POOL_MONITORING=false'
           })
         }
 
-        // 告警条件2：使用率过高（警告）- 阈值已拍板
-        if (pool.using / pool.max > 0.8) {
-          appLogger.warn('连接池告警: 使用率过高', {
-            ...metrics,
-            alert_type: 'HIGH_USAGE_RATE',
-            severity: 'WARNING',
-            recommendation: '评估是否需要增加 pool.max 或优化查询',
-            threshold: 'usage_rate > 80%（已拍板，先跑一周再调整）'
-          })
+        // V4统一决策引擎启动完成
+        appLogger.info('餐厅积分抽奖系统V4.0统一引擎启动成功', {
+          host: HOST,
+          port: PORT,
+          environment: process.env.NODE_ENV || 'development',
+          start_time: BeijingTimeHelper.apiTimestamp(),
+          endpoints: {
+            health: `http://${HOST}:${PORT}/health`,
+            lottery: `http://${HOST}:${PORT}/api/v4/lottery`,
+            admin: `http://${HOST}:${PORT}/api/v4/admin`,
+            websocket: `ws://${HOST}:${PORT}/socket.io` // 新增WebSocket端点
+          }
+        })
+
+        // ✅ V4架构已完全启用，无需传统定时任务服务
+        appLogger.info('V4统一决策引擎架构完全就绪', {
+          architecture: '现代化微服务架构',
+          websocket: '实时通信已启用'
+        })
+
+        /*
+         * 🔌 优雅关闭处理（2025年11月08日新增）
+         * 功能：服务关闭时记录WebSocket停止事件到数据库
+         * 用途：服务维护、部署更新、异常追踪、SLA统计
+         */
+        const gracefulShutdown = async signal => {
+          appLogger.info(`收到${signal}信号，开始优雅关闭...`)
+
+          try {
+            // 记录WebSocket服务停止事件
+            const ChatWebSocketService = require('./services/ChatWebSocketService')
+            await ChatWebSocketService.shutdown(`收到${signal}信号`)
+            appLogger.info('WebSocket服务已优雅关闭')
+          } catch (error) {
+            appLogger.error('WebSocket关闭失败', { error: error.message })
+          }
+
+          // 关闭数据库连接
+          try {
+            const { sequelize } = require('./models')
+            await sequelize.close()
+            appLogger.info('数据库连接已关闭')
+          } catch (error) {
+            appLogger.error('数据库关闭失败', { error: error.message })
+          }
+
+          appLogger.info('服务已优雅关闭')
+          process.exit(0)
         }
-      }, 60000) // 每分钟
 
-      appLogger.info('✅ 连接池监控已启动', {
-        interval: '60s',
-        alert_thresholds: { waiting: 5, usage_rate: '80%' },
-        log_level: 'info',
-        environment: process.env.NODE_ENV,
-        disable_with: 'ENABLE_POOL_MONITORING=false'
+        // 注册信号处理
+        process.on('SIGTERM', () => gracefulShutdown('SIGTERM'))
+        process.on('SIGINT', () => gracefulShutdown('SIGINT'))
       })
-    }
-
-    // V4统一决策引擎启动完成
-    appLogger.info('餐厅积分抽奖系统V4.0统一引擎启动成功', {
-      host: HOST,
-      port: PORT,
-      environment: process.env.NODE_ENV || 'development',
-      start_time: BeijingTimeHelper.apiTimestamp(),
-      endpoints: {
-        health: `http://${HOST}:${PORT}/health`,
-        lottery: `http://${HOST}:${PORT}/api/v4/lottery`,
-        admin: `http://${HOST}:${PORT}/api/v4/admin`,
-        websocket: `ws://${HOST}:${PORT}/socket.io` // 新增WebSocket端点
-      }
     })
-
-    // ✅ V4架构已完全启用，无需传统定时任务服务
-    appLogger.info('V4统一决策引擎架构完全就绪', {
-      architecture: '现代化微服务架构',
-      websocket: '实时通信已启用'
+    .catch(error => {
+      appLogger.error('应用初始化失败', { error: error.message })
+      process.exit(1)
     })
-
-    /*
-     * 🔌 优雅关闭处理（2025年11月08日新增）
-     * 功能：服务关闭时记录WebSocket停止事件到数据库
-     * 用途：服务维护、部署更新、异常追踪、SLA统计
-     */
-    const gracefulShutdown = async signal => {
-      appLogger.info(`收到${signal}信号，开始优雅关闭...`)
-
-      try {
-        // 记录WebSocket服务停止事件
-        const ChatWebSocketService = require('./services/ChatWebSocketService')
-        await ChatWebSocketService.shutdown(`收到${signal}信号`)
-        appLogger.info('WebSocket服务已优雅关闭')
-      } catch (error) {
-        appLogger.error('WebSocket关闭失败', { error: error.message })
-      }
-
-      // 关闭数据库连接
-      try {
-        const { sequelize } = require('./models')
-        await sequelize.close()
-        appLogger.info('数据库连接已关闭')
-      } catch (error) {
-        appLogger.error('数据库关闭失败', { error: error.message })
-      }
-
-      appLogger.info('服务已优雅关闭')
-      process.exit(0)
-    }
-
-    // 注册信号处理
-    process.on('SIGTERM', () => gracefulShutdown('SIGTERM'))
-    process.on('SIGINT', () => gracefulShutdown('SIGINT'))
-  })
 }
 
 module.exports = app

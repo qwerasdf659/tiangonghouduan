@@ -122,20 +122,21 @@ exports.logOperation = async (
 }
 
 /**
- * 记录积分调整操作
+ * 记录资产调整操作（统一资产架构）
  *
+ * @description 适用于通过 AssetService 进行的所有资产调整操作（积分、钻石、材料等）
  * @param {Object} req - Express请求对象
  * @param {number} userId - 用户ID
- * @param {Object} beforeAccount - 调整前账户数据
+ * @param {Object} beforeAccount - 调整前账户数据（asset_code、available_amount、frozen_amount）
  * @param {Object} afterAccount - 调整后账户数据
  * @param {string} reason - 调整原因
  * @returns {Promise<AdminOperationLog>} 审计日志记录
  */
-exports.logPointsAdjust = async (req, userId, beforeAccount, afterAccount, reason) => {
+exports.logAssetAdjust = async (req, userId, beforeAccount, afterAccount, reason) => {
   return exports.logOperation(
     req,
-    'points_adjust',
-    'UserPointsAccount',
+    'points_adjust', // 操作类型保持兼容
+    'AccountAssetBalance', // 目标类型更新为新架构模型
     userId,
     'update',
     beforeAccount,

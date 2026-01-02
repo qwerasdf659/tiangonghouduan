@@ -282,10 +282,10 @@ describe('🧮 核心业务逻辑测试', () => {
       }
     })
 
-    // ✅ is_winner业务标准专项测试 - 扩展现有抽奖测试功能
-    describe('🎯 is_winner业务标准验证', () => {
-      test('✅ is_winner字段一致性验证 - 数据库vs API响应', async () => {
-        console.log('📋 测试is_winner业务标准字段一致性...')
+    // ✅ V4.0语义更新：使用 reward_tier 替代 is_winner
+    describe('🎯 reward_tier业务标准验证（V4.0语义更新）', () => {
+      test('✅ reward_tier字段一致性验证 - 数据库vs API响应', async () => {
+        console.log('📋 测试reward_tier业务标准字段一致性...')
 
         // 获取抽奖活动
         const campaign = await getAvailableCampaign(tester)
@@ -314,15 +314,15 @@ describe('🧮 核心业务逻辑测试', () => {
           const drawResult = drawResponse.data.data
           console.log(`🎰 抽奖结果: 共${drawResult.prizes?.length || 0}个奖品`)
 
-          // ✅ 验证API响应使用is_winner业务标准字段
+          // ✅ V4.0验证：API响应使用reward_tier业务标准字段
           if (drawResult.prizes && drawResult.prizes.length > 0) {
             const firstPrize = drawResult.prizes[0]
-            expect(firstPrize).toHaveProperty('is_winner')
-            expect(typeof firstPrize.is_winner).toBe('boolean')
-            console.log(`✅ API响应is_winner字段验证通过: ${firstPrize.is_winner}`)
+            expect(firstPrize).toHaveProperty('reward_tier')
+            expect(['low', 'mid', 'high']).toContain(firstPrize.reward_tier)
+            console.log(`✅ API响应reward_tier字段验证通过: ${firstPrize.reward_tier}`)
           }
 
-          // ✅ 验证数据库记录使用is_winner字段（通过抽奖历史接口）
+          // ✅ V4.0验证：数据库记录使用reward_tier字段（通过抽奖历史接口）
           const historyResponse = await tester.make_authenticated_request(
             'GET',
             `/api/v4/lottery/history/${test_user_id}`,
@@ -332,21 +332,21 @@ describe('🧮 核心业务逻辑测试', () => {
 
           if (historyResponse.status === 200 && historyResponse.data.data?.records?.length > 0) {
             const latestRecord = historyResponse.data.data.records[0]
-            expect(latestRecord).toHaveProperty('is_winner')
-            expect(typeof latestRecord.is_winner).toBe('boolean')
-            console.log(`✅ 数据库记录is_winner字段验证通过: ${latestRecord.is_winner}`)
+            expect(latestRecord).toHaveProperty('reward_tier')
+            expect(['low', 'mid', 'high']).toContain(latestRecord.reward_tier)
+            console.log(`✅ 数据库记录reward_tier字段验证通过: ${latestRecord.reward_tier}`)
 
-            // ✅ 验证API响应与数据库记录的is_winner一致性
-            if (drawResult.prizes?.[0]?.is_winner !== undefined) {
-              expect(latestRecord.is_winner).toBe(drawResult.prizes[0].is_winner)
-              console.log('✅ API响应与数据库is_winner字段一致性验证通过')
+            // ✅ V4.0验证：API响应与数据库记录的reward_tier一致性
+            if (drawResult.prizes?.[0]?.reward_tier !== undefined) {
+              expect(latestRecord.reward_tier).toBe(drawResult.prizes[0].reward_tier)
+              console.log('✅ API响应与数据库reward_tier字段一致性验证通过')
             }
           }
         }
       })
 
-      test('✅ is_winner业务语义验证 - 中奖必有奖品，未中奖无奖品', async () => {
-        console.log('📋 测试is_winner业务语义逻辑一致性...')
+      test('✅ V4.0业务语义验证 - 每次抽奖必得奖品，档位决定价值', async () => {
+        console.log('📋 测试V4.0抽奖业务语义：100%获奖，档位分布...')
 
         // 获取多条抽奖历史记录验证业务语义
         const historyResponse = await tester.make_authenticated_request(
@@ -358,29 +358,22 @@ describe('🧮 核心业务逻辑测试', () => {
 
         if (historyResponse.status === 200 && historyResponse.data.data.length > 0) {
           const records = historyResponse.data.data
-          console.log(`📊 检查${records.length}条抽奖记录的业务语义一致性`)
+          console.log(`📊 检查${records.length}条抽奖记录的V4.0业务语义一致性`)
 
           for (const record of records) {
-            // ✅ 业务规则验证：is_winner = true 必须有奖品
-            if (record.is_winner === true) {
-              expect(record.prize_id || record.prize).toBeDefined()
-              expect(record.prize_name || record.prize?.name).toBeDefined()
-              console.log(`✅ 中奖记录业务语义验证通过: ${record.prize_name || record.prize?.name}`)
-            }
+            // ✅ V4.0业务规则：每次抽奖必有奖品（100%中奖）
+            expect(record.prize_id || record.prize).toBeDefined()
+            expect(record.prize_name || record.prize?.name).toBeDefined()
+            console.log(`✅ 奖品记录验证通过: ${record.prize_name || record.prize?.name}`)
 
-            // ✅ 业务规则验证：is_winner = false 不应有奖品
-            if (record.is_winner === false) {
-              expect(record.prize_id || record.prize).toBeUndefined()
-              console.log('✅ 未中奖记录业务语义验证通过: 无奖品信息')
-            }
-
-            // ✅ 验证is_winner字段不能为null或undefined
-            expect(record.is_winner).not.toBeNull()
-            expect(record.is_winner).not.toBeUndefined()
-            expect(typeof record.is_winner).toBe('boolean')
+            // ✅ V4.0业务规则：reward_tier必须是有效档位
+            expect(record.reward_tier).not.toBeNull()
+            expect(record.reward_tier).not.toBeUndefined()
+            expect(['low', 'mid', 'high']).toContain(record.reward_tier)
+            console.log(`✅ 档位验证通过: ${record.reward_tier}`)
           }
 
-          console.log('✅ 所有记录的is_winner业务语义验证通过')
+          console.log('✅ 所有记录的V4.0 reward_tier业务语义验证通过')
         } else {
           console.log('⚠️ 没有抽奖历史记录，跳过业务语义验证')
         }
@@ -556,26 +549,26 @@ describe('🧮 核心业务逻辑测试', () => {
       console.log('📋 测试数据完整性约束...')
 
       /**
-       * API参数规范：POST /api/v4/shop/points/admin/adjust
-       * - user_id: number - 目标用户ID（必填）
-       * - amount: number - 积分调整数量（必填，正数增加，负数扣减）
-       * - reason: string - 调整原因（必填）
-       * - type: string - 调整类型，默认'admin_adjust'
+       * API参数规范：POST /api/v4/lottery/draw
+       * - campaign_id: number - 活动ID（必填）
+       * - draws_count: number - 抽奖次数（必填，正整数）
+       * - idempotency_key: string - 幂等键（必填）
        *
-       * 验证场景：提交无效积分数值应返回验证错误
+       * 验证场景：提交无效参数应返回验证错误
+       * 注：原 /api/v4/shop/points/admin/adjust 已迁移到 AssetService
        */
       const invalidData = {
-        user_id: 31, // 使用确定存在的管理员用户
-        amount: -999999, // 使用正确的字段名 amount
-        reason: '业务逻辑测试-无效数据'
+        campaign_id: -1, // 无效的活动ID
+        draws_count: -999, // 无效的抽奖次数
+        idempotency_key: `invalid_test_${Date.now()}`
       }
 
-      // API路径：POST /api/v4/shop/points/admin/adjust（管理员积分调整接口）
+      // API路径：POST /api/v4/lottery/draw（抽奖接口）
       const invalidResponse = await tester.make_authenticated_request(
         'POST',
-        '/api/v4/shop/points/admin/adjust',
+        '/api/v4/lottery/draw',
         invalidData,
-        'admin'
+        'regular'
       )
 
       // API验证行为：无效参数返回HTTP 400 + 业务错误码

@@ -37,24 +37,12 @@ models.AuthenticationSession = require('./AuthenticationSession')(sequelize, Dat
  *    - 业务场景：用户登录后生成Token、Token续期、退出登录时失效Token
  */
 
-// 🔴 积分和账户系统模型（用户相关功能分散 - 有业务合理性）
-models.UserPointsAccount = require('./UserPointsAccount')(sequelize, DataTypes)
+// 🔴 积分和账户系统模型 - 已迁移到统一资产体系
 /*
- * ✅ UserPointsAccount：用户积分账户（一对一关系）
- *    - 用途：管理用户积分余额和账户状态
- *    - 特点：记录可用积分、累计获得、累计消耗、账户冻结状态
- *    - 表名：user_points_accounts，主键：account_id，外键：user_id
- *    - 业务场景：积分余额查询、账户健康检查、推荐数据生成
- */
-
-models.PointsTransaction = require('./PointsTransaction')(sequelize, DataTypes)
-/*
- * ✅ PointsTransaction：积分交易记录（一对多关系）
- *    - 用途：记录用户所有的积分变动历史
- *    - 特点：记录交易类型、金额、来源、事务ID、交易时间
- *    - 表名：points_transactions，主键：transaction_id，外键：account_id
- *    - 业务场景：积分获得、积分消耗、交易查询、报表生成
- * ⚠️ PointsRecord.js 已被 PointsTransaction.js 替代并删除
+ * ⚠️ UserPointsAccount 和 PointsTransaction 已废弃
+ * 新架构使用：
+ * - Account + AccountAssetBalance（账户余额）
+ * - AssetTransaction（资产流水）
  */
 
 models.UserPremiumStatus = require('./UserPremiumStatus')(sequelize, DataTypes)
@@ -202,14 +190,10 @@ models.ExchangeRecord = require('./ExchangeRecord')(sequelize, DataTypes)
  *    - API路由：/api/v4/shop/exchange（从 /api/v4/market 迁移）
  */
 
-// 🔥 统一资产底座系统（2025年12月15日新增）
-models.UserAssetAccount = require('./UserAssetAccount')(sequelize, DataTypes)
 /*
- * ✅ UserAssetAccount：用户资产账户表（统一管理DIAMOND和材料资产余额）
- *    - 用途：管理用户的DIAMOND资产和材料资产余额
- *    - 特点：DIAMOND和所有材料使用同一套账本（通过asset_code区分），user_id + asset_code组合唯一
- *    - 表名：user_asset_accounts，主键：asset_account_id，外键：user_id
- *    - 业务场景：交易市场DIAMOND结算、兑换市场材料资产扣减、材料转换（碎红水晶→DIAMOND）
+ * 🔥 统一资产底座系统（2025年12月15日新增）
+ *    ⚠️ UserAssetAccount 已废弃并删除（2025-12-31）
+ *    新架构使用：Account + AccountAssetBalance + AssetTransaction
  */
 
 models.AssetTransaction = require('./AssetTransaction')(sequelize, DataTypes)

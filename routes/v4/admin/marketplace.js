@@ -22,7 +22,6 @@
 const express = require('express')
 const router = express.Router()
 const { authenticateToken, requireAdmin } = require('../../../middleware/auth')
-const marketplaceConfig = require('../../../config/marketplace.config')
 
 const logger = require('../../../utils/logger').logger
 
@@ -50,7 +49,22 @@ const logger = require('../../../utils/logger').logger
 router.get('/listing-stats', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const { page = 1, limit = 20, filter = 'all' } = req.query
-    const maxListings = marketplaceConfig.max_active_listings
+
+    /**
+     * 从数据库读取最大上架数量配置（2025-12-30 配置管理三层分离方案）
+     *
+     * 读取优先级：
+     * 1. DB system_settings.max_active_listings（全局配置）
+     * 2. 代码默认值 10（兜底降级）
+     *
+     * @see docs/配置管理三层分离与校验统一方案.md
+     */
+    const AdminSystemService = req.app.locals.services.getService('adminSystem')
+    const maxListings = await AdminSystemService.getSettingValue(
+      'marketplace',
+      'max_active_listings',
+      10
+    )
 
     logger.info('管理员查询用户上架状态', {
       admin_id: req.user.user_id,

@@ -305,9 +305,14 @@ describe('用户个性化中奖率设置功能测试', () => {
       if (drawResponse.body.success) {
         const prizes = drawResponse.body.data.prizes || []
         if (prizes.length > 0) {
-          // 由于设置了100%中奖率，应该中奖
-          const wonPrize = prizes.find(p => p.is_winner)
-          console.log('✅ 抽奖结果:', wonPrize ? `中奖：${wonPrize.prize_name}` : '未中奖')
+          // V4.0语义更新：每次抽奖必得奖品，使用 reward_tier 判断价值档位
+          const highTierPrize = prizes.find(p => p.reward_tier === 'high')
+          console.log(
+            '✅ 抽奖结果:',
+            highTierPrize
+              ? `高档奖励：${highTierPrize.prize_name}`
+              : `普通奖励：${prizes[0]?.prize_name}`
+          )
         }
       } else {
         console.warn('⚠️ 抽奖失败:', drawResponse.body.message)

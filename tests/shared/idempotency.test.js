@@ -19,16 +19,16 @@
  * ```javascript
  * const { IdempotencyTestSuite } = require('./shared/idempotency.test')
  *
- * // 测试积分操作幂等性
+ * // 测试资产操作幂等性
  * await IdempotencyTestSuite.testBusinessIdIdempotency(
- *   () => PointsService.addPoints(user_id, amount, { business_id }),
- *   'consumption_reward_12345'
+ *   () => AssetService.changeBalance(params),
+ *   'lottery_reward_12345'
  * )
  * ```
  *
  * 创建时间：2025-11-14
  * 符合规范：01-核心开发质量标准.mdc
- * 最后更新：2025-11-14
+ * 最后更新：2025-12-30（迁移到AssetService）
  * 使用模型：Claude 4 Sonnet
  */
 
@@ -215,67 +215,77 @@ class IdempotencyTestSuite {
   }
 
   /**
-   * 测试积分服务的幂等性（项目特定）
+   * 测试资产服务的幂等性（项目特定）
    *
    * 验证内容：
-   * - 相同business_id的积分操作只执行一次
+   * - 相同idempotency_key的资产操作只执行一次
    * - 账户余额只变更一次
-   * - 交易记录只创建一次
+   * - 流水记录只创建一次
    *
    * @param {number} userId - 用户ID
-   * @param {number} amount - 积分数量
-   * @param {string} businessId - 业务唯一标识
-   * @param {Object} PointsService - 积分服务实例
+   * @param {number} amount - 资产数量
+   * @param {string} idempotencyKey - 幂等性键
+   * @param {Object} AssetService - 资产服务实例
    * @returns {Promise<Object>} 测试结果
    * @throws {Error} 如果幂等性保护失效
    */
-  static async testPointsServiceIdempotency(userId, amount, businessId, PointsService) {
-    console.log(`💰 测试积分服务幂等性: user_id=${userId}, business_id=${businessId}`)
+  static async testAssetServiceIdempotency(userId, amount, idempotencyKey, AssetService) {
+    console.log(`💰 测试资产服务幂等性: user_id=${userId}, idempotency_key=${idempotencyKey}`)
 
     // 获取初始余额
-    const accountBefore = await PointsService.getUserPointsAccount(userId)
-    const balanceBefore = accountBefore.available_points
+    const balanceBefore = await AssetService.getBalance({ user_id: userId, asset_code: 'POINTS' })
+    const availableBefore = Number(balanceBefore.available_amount)
 
-    // 第一次添加积分
-    await PointsService.addPoints(userId, amount, {
-      business_id: businessId,
+    // 第一次添加资产
+    await AssetService.changeBalance({
+      user_id: userId,
+      asset_code: 'POINTS',
+      delta_amount: amount,
       business_type: 'idempotency_test',
-      title: '幂等性测试积分'
+      idempotency_key: idempotencyKey
     })
 
     // 验证余额变更
-    const accountAfterFirst = await PointsService.getUserPointsAccount(userId)
-    const balanceAfterFirst = accountAfterFirst.available_points
+    const balanceAfterFirst = await AssetService.getBalance({
+      user_id: userId,
+      asset_code: 'POINTS'
+    })
+    const availableAfterFirst = Number(balanceAfterFirst.available_amount)
 
-    if (balanceAfterFirst !== balanceBefore + amount) {
+    if (availableAfterFirst !== availableBefore + amount) {
       throw new Error('❌ 第一次执行异常: 余额变更不正确')
     }
 
-    // 第二次添加积分（相同business_id）
-    await PointsService.addPoints(userId, amount, {
-      business_id: businessId, // 相同business_id
+    // 第二次添加资产（相同idempotency_key）
+    await AssetService.changeBalance({
+      user_id: userId,
+      asset_code: 'POINTS',
+      delta_amount: amount,
       business_type: 'idempotency_test',
-      title: '幂等性测试积分（重复）'
+      idempotency_key: idempotencyKey // 相同idempotency_key
     })
 
     // 验证余额未再次变更
-    const accountAfterSecond = await PointsService.getUserPointsAccount(userId)
-    const balanceAfterSecond = accountAfterSecond.available_points
+    const balanceAfterSecond = await AssetService.getBalance({
+      user_id: userId,
+      asset_code: 'POINTS'
+    })
+    const availableAfterSecond = Number(balanceAfterSecond.available_amount)
 
-    if (balanceAfterSecond !== balanceAfterFirst) {
+    if (availableAfterSecond !== availableAfterFirst) {
       throw new Error('❌ 幂等性失败: 重复执行导致余额再次变更')
     }
 
-    console.log('✅ 积分服务幂等性保护有效')
+    console.log('✅ 资产服务幂等性保护有效')
 
     return {
       success: true,
       userId,
       amount,
-      businessId,
-      balanceBefore,
-      balanceAfterFirst,
-      balanceAfterSecond,
+      idempotencyKey,
+      balanceBefore: availableBefore,
+      balanceAfterFirst: availableAfterFirst,
+      balanceAfterSecond: availableAfterSecond,
       isIdempotent: true
     }
   }

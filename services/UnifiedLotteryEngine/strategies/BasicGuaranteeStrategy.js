@@ -1,4 +1,5 @@
 const _logger = require('../../../utils/logger').logger
+const LotteryDrawFormatter = require('../../../utils/formatters/LotteryDrawFormatter')
 
 /**
  * 基础抽奖保底策略
@@ -7,9 +8,15 @@ const _logger = require('../../../utils/logger').logger
  * @description V4.1版本：直接根据奖品概率分配，移除基础中奖率限制
  * - 每次抽奖必定从奖品池中选择一个奖品（根据win_probability分配）
  * - 保底机制：每累计10次抽奖，第10次必中九八折券
- * @version 4.1.0
- * @date 2025-10-07
- * @changes V4.1: 移除基础10%中奖率判断，直接使用奖品概率分配
+ *
+ * V4.0语义更新（2026-01-01）：
+ * - 删除 is_winner 字段（"中/没中"二分法已废弃）
+ * - 新增 reward_tier 字段（奖励档位：low/mid/high）
+ * - 每次抽奖100%从奖品池选择一个奖品，只讨论"抽到了什么"
+ *
+ * @version 4.1.1
+ * @date 2026-01-01
+ * @changes V4.1.1: 语义清理 - 删除is_winner，使用reward_tier
  */
 
 const BeijingTimeHelper = require('../../../utils/timeHelper')
@@ -293,7 +300,8 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
         const executionTime = BeijingTimeHelper.timestamp() - startTime
         return {
           success: true,
-          is_winner: true, // ✅ 业务字段：保底必中
+          // V4.0语义清理：使用 reward_tier 替代 is_winner
+          reward_tier: 'high', // 保底必得高档奖励
           prize: {
             ...guaranteeResult.prize,
             sort_order: guaranteeResult.prize.sort_order // 🎯 方案3：包含sort_order用于前端计算索引
@@ -328,7 +336,8 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
         this.logInfo('基础抽奖保底策略（自动化预设奖品）执行完成', {
           user_id,
           campaignId,
-          result: result.is_winner,
+          // V4.0语义更新：使用 reward_tier 替代 is_winner
+          reward_tier: result.reward_tier,
           prize: result.prize,
           executionTime
         })
@@ -465,11 +474,15 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
             prize_value_points: prizeValuePoints
           })
 
-          // 🎯 步骤4: 记录抽奖历史（传入draw_id、transaction）
+          /*
+           * 🎯 步骤4: 记录抽奖历史（传入draw_id、transaction）
+           * V4.0语义清理：使用 reward_tier 替代 is_winner
+           */
+          const prizeRewardTier = LotteryDrawFormatter.inferRewardTier(prizeValuePoints)
           await this.recordLotteryHistory(
             context,
             {
-              is_winner: true,
+              reward_tier: prizeRewardTier,
               prize,
               prize_value_points: prizeValuePoints
             },
@@ -498,7 +511,8 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
 
           return {
             success: true, // ✅ 技术字段：操作是否成功
-            is_winner: true, // ✅ 业务字段：是否中奖（符合接口规范）
+            // V4.0语义清理：使用 reward_tier 替代 is_winner
+            reward_tier: prizeRewardTier,
             prize: {
               id: prize.prize_id,
               name: prize.prize_name,
@@ -539,7 +553,7 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
 
         await this.recordLotteryHistory(
           context,
-          { is_winner: false },
+          { reward_tier: 'low' }, // V4.0：fallback 场景返回低档
           0,
           fallback_draw_id,
           internalTransaction
@@ -561,7 +575,8 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
 
         return {
           success: true, // ✅ 技术字段：操作成功执行
-          is_winner: false, // ✅ 业务字段：未中奖（异常情况）
+          // V4.0语义清理：使用 reward_tier
+          reward_tier: 'low', // fallback 场景返回低档
           prize: null,
           probability: 0,
           pointsCost: this.config.pointsCostPerDraw,
@@ -874,7 +889,10 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
         })
       }
 
-      // 5. 创建抽奖记录
+      /*
+       * 5. 创建抽奖记录
+       * V4.0语义清理：使用 reward_tier 替代 is_winner
+       */
       const lotteryRecord = await models.LotteryDraw.create(
         {
           draw_id,
@@ -888,7 +906,7 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
           prize_value: guaranteePrize.prize_value,
           cost_points: pointsCost,
           result_type: 'guarantee_award', // 标记为保底中奖
-          is_winner: true, // ✅ 修复：统一使用业务标准字段
+          reward_tier: 'high', // V4.0：保底必得高档奖励
           probability_used: 1.0, // 保底中奖概率100%
           random_value: 0, // 保底不使用随机数
           guarantee_triggered: true,
@@ -1767,7 +1785,7 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
    * @param {number} context.campaign_id - 活动ID
    * @param {Object} result - 抽奖结果
    * @param {Object} result.prize - 奖品信息
-   * @param {boolean} result.is_winner - 是否中奖
+   * @param {string} result.reward_tier - 奖励档位（V4.0语义：low/mid/high）
    * @param {number} probability - 中奖概率
    * @param {string} [draw_id=null] - 抽奖ID（可选，如果不提供则自动生成）
    * @param {Transaction} [transaction=null] - 事务对象（可选）
@@ -1778,7 +1796,7 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
    * @example
    * await strategy.recordLotteryHistory(
    *   { user_id: 10001, campaign_id: 1 },
-   *   { prize: { id: 9, name: '九八折券' }, is_winner: true },
+   *   { prize: { id: 9, name: '九八折券' }, reward_tier: 'high' },
    *   0.1,
    *   'draw_123',
    *   transaction
@@ -1806,7 +1824,7 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
    * @example
    * await strategy.recordLotteryHistory(
    *   context,
-   *   { is_winner: true, prize: {...} },
+   *   { reward_tier: 'high', prize: {...} },
    *   1.0,
    *   'draw_123',
    *   transaction
@@ -1850,7 +1868,12 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
       }
     }
 
-    // 创建新的抽奖记录
+    /*
+     * 创建新的抽奖记录
+     * V4.0语义清理：使用 reward_tier 替代 is_winner
+     */
+    const rewardTier =
+      result.reward_tier || LotteryDrawFormatter.inferRewardTier(result.prize_value_points)
     const lotteryDraw = await LotteryDraw.create(
       {
         draw_id: finalDrawId,
@@ -1864,7 +1887,7 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
         prize_type: result.prize?.prize_type || result.prize?.type || null, // ✅ 修复Bug：支持两种字段名格式
         prize_value: result.prize?.prize_value || result.prize?.value || null, // ✅ 修复Bug：支持两种字段名格式
         cost_points: this.config.pointsCostPerDraw, // ✅ 修复：使用正确的字段名cost_points
-        is_winner: result.is_winner,
+        reward_tier: rewardTier, // V4.0：奖励档位
         win_probability: probability,
         // 🔥 双账户模型：预算审计字段
         prize_value_points: result.prize_value_points || 0,
@@ -1881,7 +1904,7 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
       draw_id: finalDrawId,
       user_id,
       campaign_id,
-      is_winner: result.is_winner,
+      reward_tier: rewardTier, // V4.0：使用 reward_tier
       lottery_session_id: context.lottery_session_id
     })
 
@@ -1990,11 +2013,17 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
       // 🎯 标记预设为已使用（在事务中执行）
       await preset.markAsUsed(transaction)
 
-      // ✅ 记录抽奖历史使用业务标准字段（在事务中执行）
+      /*
+       * ✅ 记录抽奖历史使用业务标准字段（在事务中执行）
+       * V4.0语义清理：使用 reward_tier 替代 is_winner
+       */
+      const presetRewardTier = LotteryDrawFormatter.inferRewardTier(
+        preset.prize?.prize_value_points || preset.prize?.prize_value || 0
+      )
       await this.recordLotteryHistory(
         context,
         {
-          is_winner: true, // ✅ 预设结果必中
+          reward_tier: presetRewardTier, // V4.0：使用 reward_tier
           prize: preset.prize,
           isPresetPrize: true, // 🎯 标记为预设结果
           presetId: preset.preset_id,
@@ -2017,7 +2046,8 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
       // ✅ 修复：返回业务标准数据，确保前端使用统一标准
       return {
         success: true,
-        is_winner: true, // ✅ 修复：使用业务标准字段
+        // V4.0语义清理：使用 reward_tier 替代 is_winner
+        reward_tier: presetRewardTier,
         prize: {
           id: preset.prize.prize_id,
           name: preset.prize.name,

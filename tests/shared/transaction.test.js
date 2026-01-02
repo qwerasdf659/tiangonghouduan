@@ -27,19 +27,19 @@ class TransactionTestSuite {
    * @example
    * await TransactionTestSuite.testTransactionCommit(
    *   async (transaction) => {
-   *     await UserPointsAccount.update({ available_points: 1000 }, {
-   *       where: { user_id: 31 },
+   *     await AccountAssetBalance.update({ available_amount: 1000 }, {
+   *       where: { account_id: 1, asset_code: 'POINTS' },
    *       transaction
    *     })
-   *     await UserPointsLog.create({ user_id: 31, amount: 100 }, { transaction })
+   *     await AssetTransaction.create({ account_id: 1, delta_amount: 100 }, { transaction })
    *   },
    *   async () => {
-   *     const account = await UserPointsAccount.findOne({ where: { user_id: 31 } })
-   *     expect(account.available_points).toBe(1000)
+   *     const balance = await AccountAssetBalance.findOne({ where: { account_id: 1 } })
+   *     expect(balance.available_amount).toBe(1000)
    *   }
    * )
    */
-  static async testTransactionCommit (transactionOperation, verifyFunction) {
+  static async testTransactionCommit(transactionOperation, verifyFunction) {
     const transaction = await sequelize.transaction()
 
     try {
@@ -75,19 +75,23 @@ class TransactionTestSuite {
    * @example
    * await TransactionTestSuite.testTransactionRollback(
    *   async (transaction) => {
-   *     await UserPointsAccount.update({ available_points: 999 }, {
-   *       where: { user_id: 31 },
+   *     await AccountAssetBalance.update({ available_amount: 999 }, {
+   *       where: { account_id: 1, asset_code: 'POINTS' },
    *       transaction
    *     })
    *     throw new Error('模拟业务错误')
    *   },
    *   async (originalValue) => {
-   *     const account = await UserPointsAccount.findOne({ where: { user_id: 31 } })
-   *     expect(account.available_points).toBe(originalValue)
+   *     const balance = await AccountAssetBalance.findOne({ where: { account_id: 1 } })
+   *     expect(balance.available_amount).toBe(originalValue)
    *   }
    * )
    */
-  static async testTransactionRollback (transactionOperation, verifyRollback, getOriginalValue = null) {
+  static async testTransactionRollback(
+    transactionOperation,
+    verifyRollback,
+    getOriginalValue = null
+  ) {
     // 1. 记录原始值
     let originalValue = null
     if (getOriginalValue) {
@@ -130,17 +134,14 @@ class TransactionTestSuite {
    * @param {Function} verifyIsolation - 验证隔离的函数
    * @returns {Promise<void>} 无返回值
    */
-  static async testTransactionIsolation (transaction1, transaction2, verifyIsolation) {
+  static async testTransactionIsolation(transaction1, transaction2, verifyIsolation) {
     const t1 = await sequelize.transaction()
     const t2 = await sequelize.transaction()
 
     try {
       // 1. 并发执行两个事务
       console.log('🔄 并发执行两个事务...')
-      await Promise.all([
-        transaction1(t1),
-        transaction2(t2)
-      ])
+      await Promise.all([transaction1(t1), transaction2(t2)])
 
       // 2. 提交两个事务
       await t1.commit()
@@ -169,21 +170,21 @@ class TransactionTestSuite {
    * @example
    * await TransactionTestSuite.testMultiTableTransaction([
    *   {
-   *     model: UserPointsAccount,
+   *     model: AccountAssetBalance,
    *     action: 'update',
-   *     where: { user_id: 31 },
-   *     data: { available_points: 1000 }
+   *     where: { account_id: 1, asset_code: 'POINTS' },
+   *     data: { available_amount: 1000 }
    *   },
    *   {
-   *     model: UserPointsLog,
+   *     model: AssetTransaction,
    *     action: 'create',
-   *     data: { user_id: 31, amount: 100, type: 'earn' }
+   *     data: { account_id: 1, delta_amount: 100, business_type: 'earn' }
    *   }
    * ], async () => {
    *   // 验证所有表的变更
    * })
    */
-  static async testMultiTableTransaction (operations, verifyAllChanges) {
+  static async testMultiTableTransaction(operations, verifyAllChanges) {
     const transaction = await sequelize.transaction()
 
     try {
@@ -229,7 +230,7 @@ class TransactionTestSuite {
    * @param {number} timeoutMs - 超时时间(毫秒)
    * @returns {Promise<void>} 无返回值
    */
-  static async testTransactionTimeout (longRunningOperation, timeoutMs = 5000) {
+  static async testTransactionTimeout(longRunningOperation, timeoutMs = 5000) {
     const transaction = await sequelize.transaction()
     let timeoutOccurred = false
 
@@ -244,10 +245,7 @@ class TransactionTestSuite {
 
       // 2. 执行操作或超时
       console.log(`🔄 执行操作(${timeoutMs}ms超时)...`)
-      await Promise.race([
-        longRunningOperation(transaction),
-        timeoutPromise
-      ])
+      await Promise.race([longRunningOperation(transaction), timeoutPromise])
 
       await transaction.commit()
     } catch (error) {
@@ -273,7 +271,7 @@ class TransactionHelpers {
    *
    * @returns {Promise<Transaction>} Sequelize事务实例
    */
-  static async createTestTransaction () {
+  static async createTestTransaction() {
     return await sequelize.transaction()
   }
 
@@ -283,7 +281,7 @@ class TransactionHelpers {
    * @param {Transaction} transaction - 事务实例
    * @returns {Promise<void>} 无返回值
    */
-  static async safeRollback (transaction) {
+  static async safeRollback(transaction) {
     if (transaction && !transaction.finished) {
       try {
         await transaction.rollback()
@@ -300,7 +298,7 @@ class TransactionHelpers {
    * @param {Transaction} transaction - 事务实例
    * @returns {Object} 事务状态
    */
-  static getTransactionStatus (transaction) {
+  static getTransactionStatus(transaction) {
     return {
       finished: transaction.finished,
       committed: transaction.finished && !transaction.options.rollback,
@@ -319,7 +317,7 @@ class TransactionHelpers {
    * @param {Object} record2Id - 第二条记录ID
    * @returns {Promise<boolean>} 是否发生死锁
    */
-  static async simulateDeadlock (t1, t2, Model1, Model2, record1Id, record2Id) {
+  static async simulateDeadlock(t1, t2, Model1, Model2, record1Id, record2Id) {
     let deadlockOccurred = false
 
     try {

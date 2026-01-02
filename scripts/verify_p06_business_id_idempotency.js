@@ -13,7 +13,7 @@
 const models = require('../models')
 const { sequelize } = models
 
-async function verifyP06Completion () {
+async function verifyP06Completion() {
   console.log('\n📋 P0-6任务完成度验证开始...\n')
 
   try {
@@ -97,7 +97,8 @@ async function verifyP06Completion () {
         user_id: testUserId, // 使用真实用户ID
         campaign_id: 1,
         lottery_id: 1,
-        is_winner: false,
+        // V4.0语义更新：使用 reward_tier 替代 is_winner
+        reward_tier: 'low',
         cost_points: 100,
         win_probability: 0.1,
         draw_type: 'single'
@@ -106,7 +107,9 @@ async function verifyP06Completion () {
       // 第一次创建记录
       console.log('  尝试创建第一条测试记录...')
       const firstRecord = await LotteryDraw.create(testData)
-      console.log(`✅ 第一条记录创建成功: draw_id=${firstRecord.draw_id}, business_id=${firstRecord.business_id}`)
+      console.log(
+        `✅ 第一条记录创建成功: draw_id=${firstRecord.draw_id}, business_id=${firstRecord.business_id}`
+      )
 
       // 尝试创建相同business_id的记录（应该被幂等逻辑拦截）
       console.log('  尝试创建相同business_id的第二条记录...')
@@ -124,7 +127,10 @@ async function verifyP06Completion () {
           where: { draw_id: testData2.draw_id }
         })
       } catch (error) {
-        if (error.name === 'SequelizeUniqueConstraintError' || error.message.includes('Duplicate entry')) {
+        if (
+          error.name === 'SequelizeUniqueConstraintError' ||
+          error.message.includes('Duplicate entry')
+        ) {
           console.log('✅ 数据库层阻止了重复记录（通过唯一索引）')
         } else {
           console.error('❌ 错误：', error.message)
@@ -148,7 +154,10 @@ async function verifyP06Completion () {
     const path = require('path')
 
     // 检查BasicGuaranteeStrategy.js
-    const strategyPath = path.join(__dirname, '../services/UnifiedLotteryEngine/strategies/BasicGuaranteeStrategy.js')
+    const strategyPath = path.join(
+      __dirname,
+      '../services/UnifiedLotteryEngine/strategies/BasicGuaranteeStrategy.js'
+    )
     const strategyCode = fs.readFileSync(strategyPath, 'utf8')
 
     if (!strategyCode.includes('existingDraw = await LotteryDraw.findOne')) {
@@ -164,10 +173,16 @@ async function verifyP06Completion () {
     console.log('✅ BasicGuaranteeStrategy包含幂等检查逻辑')
 
     // 检查UnifiedLotteryEngine.js
-    const enginePath = path.join(__dirname, '../services/UnifiedLotteryEngine/UnifiedLotteryEngine.js')
+    const enginePath = path.join(
+      __dirname,
+      '../services/UnifiedLotteryEngine/UnifiedLotteryEngine.js'
+    )
     const engineCode = fs.readFileSync(enginePath, 'utf8')
 
-    if (!engineCode.includes('drawBusinessId') || !engineCode.includes('business_id: drawBusinessId')) {
+    if (
+      !engineCode.includes('drawBusinessId') ||
+      !engineCode.includes('business_id: drawBusinessId')
+    ) {
       console.error('❌ 错误：UnifiedLotteryEngine未生成和传递business_id')
       process.exit(1)
     }
@@ -191,13 +206,16 @@ async function verifyP06Completion () {
       records_with_business_id: stats[0].records_with_business_id,
       unique_business_ids: stats[0].unique_business_ids,
       records_without_business_id: stats[0].records_without_business_id,
-      coverage_rate: stats[0].total_records > 0
-        ? ((stats[0].records_with_business_id / stats[0].total_records) * 100).toFixed(2) + '%'
-        : 'N/A'
+      coverage_rate:
+        stats[0].total_records > 0
+          ? ((stats[0].records_with_business_id / stats[0].total_records) * 100).toFixed(2) + '%'
+          : 'N/A'
     })
 
     if (stats[0].records_without_business_id > 0) {
-      console.log(`⚠️ 提示：有${stats[0].records_without_business_id}条历史记录没有business_id（历史数据正常）`)
+      console.log(
+        `⚠️ 提示：有${stats[0].records_without_business_id}条历史记录没有business_id（历史数据正常）`
+      )
     }
 
     // ========== 验证总结 ==========

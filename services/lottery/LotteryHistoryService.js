@@ -272,7 +272,8 @@ class LotteryHistoryService {
       return {
         batch_id,
         total_count: records.length,
-        success_count: records.filter(r => r.is_winner).length,
+        // V4.0语义更新：统计高档奖励次数（替代原success_count）
+        high_tier_count: records.filter(r => r.reward_tier === 'high').length,
         records: processed_records,
         timestamp: BeijingTimeHelper.apiTimestamp()
       }
@@ -305,32 +306,29 @@ class LotteryHistoryService {
         where: where_conditions
       })
 
-      // 中奖次数
-      const winning_draws = await models.LotteryDraw.count({
+      // V4.0语义更新：高档奖励次数（替代原winning_draws）
+      const high_tier_draws = await models.LotteryDraw.count({
         where: {
           ...where_conditions,
-          is_winner: true
+          reward_tier: 'high'
         }
       })
 
-      // 按奖品类型统计
-      const prize_type_stats = await models.LotteryDraw.findAll({
-        where: {
-          ...where_conditions,
-          is_winner: true
-        },
+      // V4.0语义更新：按奖励档位统计（替代原按奖品类型统计is_winner=true）
+      const tier_distribution_stats = await models.LotteryDraw.findAll({
+        where: where_conditions,
         attributes: [
-          'prize_type',
+          'reward_tier',
           [models.sequelize.fn('COUNT', models.sequelize.col('*')), 'count']
         ],
-        group: ['prize_type']
+        group: ['reward_tier']
       })
 
-      // 最近中奖记录
-      const recent_wins = await models.LotteryDraw.findAll({
+      // V4.0语义更新：最近高档奖励记录（替代原recent_wins）
+      const recent_high_tier = await models.LotteryDraw.findAll({
         where: {
           ...where_conditions,
-          is_winner: true
+          reward_tier: 'high'
         },
         include: [
           {
@@ -343,17 +341,19 @@ class LotteryHistoryService {
         limit: 5
       })
 
+      // V4.0语义更新：返回档位分布统计（替代原中奖率）
       return {
         user_id,
         total_draws,
-        winning_draws,
-        winning_rate:
-          total_draws > 0 ? ((winning_draws / total_draws) * 100).toFixed(2) + '%' : '0%',
-        prize_type_distribution: prize_type_stats.map(stat => ({
-          prize_type: stat.prize_type,
+        high_tier_draws, // V4.0：替代 winning_draws
+        // V4.0：替代 winning_rate
+        high_tier_rate:
+          total_draws > 0 ? ((high_tier_draws / total_draws) * 100).toFixed(2) + '%' : '0%',
+        tier_distribution: tier_distribution_stats.map(stat => ({
+          reward_tier: stat.reward_tier,
           count: parseInt(stat.getDataValue('count'))
         })),
-        recent_wins: recent_wins.map(win => this.format_lottery_record(win)),
+        recent_high_tier: recent_high_tier.map(record => this.format_lottery_record(record)),
         date_range,
         timestamp: BeijingTimeHelper.apiTimestamp()
       }
@@ -394,7 +394,8 @@ class LotteryHistoryService {
       user_id: record.user_id,
       campaign_id: record.campaign_id,
       prize_id: record.prize_id,
-      is_winner: record.is_winner,
+      // V4.0语义更新：使用 reward_tier 替代 is_winner
+      reward_tier: record.reward_tier,
       prize_type: record.prize_type,
       prize_value: record.prize_value,
       draw_time: record.created_at,
@@ -432,12 +433,14 @@ class LotteryHistoryService {
    * @returns {string} 显示名称
    */
   get_prize_type_name(type) {
+    // V4.0语义更新：移除 'none' 类型（prize_type='empty' 已废弃）
     const type_map = {
       points: '积分奖励',
       product: '实物奖品',
       virtual: '虚拟奖品',
       coupon: '优惠券',
-      none: '谢谢参与'
+      physical: '实物奖品',
+      service: '服务类奖品'
     }
     return type_map[type] || '未知类型'
   }

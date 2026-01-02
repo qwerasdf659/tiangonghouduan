@@ -39,7 +39,7 @@ const { handleServiceError } = require('../../../middleware/validation')
  * @returns {Object} 200 - 成功返回图表数据
  * @returns {Object} data.user_growth - 用户增长趋势 [{date, count, cumulative}]
  * @returns {Object} data.user_types - 用户类型分布 {regular, merchant, premium}
- * @returns {Object} data.lottery_trend - 抽奖趋势 [{date, count, win_count, win_rate}]
+ * @returns {Object} data.lottery_trend - 抽奖趋势 [{date, count, high_tier_count, high_tier_rate}]
  * @returns {Object} data.consumption_trend - 消费趋势 [{date, count, amount, avg_amount}]
  * @returns {Object} data.points_flow - 积分流水 [{date, earned, spent, balance_change}]
  * @returns {Object} data.top_prizes - 热门奖品TOP10 [{prize_name, count, percentage}]
@@ -172,14 +172,15 @@ router.get('/export', authenticateToken, requireAdmin, async (req, res) => {
     ])
     XLSX.utils.book_append_sheet(workbook, user_types_sheet, '用户类型分布')
 
-    // 7. 抽奖趋势表（如果有数据）
+    // 7. 抽奖趋势表（如果有数据）- V4.0语义更新
     if (lottery_trend.length > 0) {
       const lottery_trend_sheet = XLSX.utils.json_to_sheet(
         lottery_trend.map(item => ({
           日期: item.date,
           抽奖次数: item.count,
-          中奖次数: item.win_count,
-          中奖率: item.win_rate + '%'
+          // V4.0语义更新：使用高档奖励替代中奖
+          高档奖励次数: item.high_tier_count || 0,
+          高档奖励率: (item.high_tier_rate || 0) + '%'
         }))
       )
       XLSX.utils.book_append_sheet(workbook, lottery_trend_sheet, '抽奖趋势')

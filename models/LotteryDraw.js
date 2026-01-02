@@ -1,6 +1,11 @@
 /**
  * 抽奖记录模型
  * 专注于数据定义、关联关系和基础实例方法
+ *
+ * 语义更新（V4.0 - 2026-01-01）：
+ * - 删除 is_winner 字段（"中/没中"二分法已废弃）
+ * - 新增 reward_tier 字段（奖励档位：low/mid/high，配置驱动）
+ * - 每次抽奖100%从奖品池选择一个奖品，只讨论"抽到了什么"
  */
 
 const { DataTypes, Model } = require('sequelize')
@@ -8,10 +13,10 @@ const BeijingTimeHelper = require('../utils/timeHelper')
 const LotteryDrawFormatter = require('../utils/formatters/LotteryDrawFormatter')
 
 /**
- * 抽奖记录模型（重构版）
+ * 抽奖记录模型（重构版 - V4.0语义清理）
  * 职责：记录用户的每次抽奖行为和结果
  * 设计模式：数据模型分离 - 业务逻辑在Service层，数据定义在Model层
- * 业务含义：每次抽奖100%从奖品池选择一个奖品，只是价值不同
+ * 业务含义：每次抽奖100%从奖品池选择一个奖品（只是价值不同）
  */
 class LotteryDraw extends Model {
   /**
@@ -35,35 +40,20 @@ class LotteryDraw extends Model {
       comment: '关联的抽奖活动'
     })
 
-    // 关联到奖品（可能为空）
+    // 关联到奖品
     LotteryDraw.belongsTo(models.LotteryPrize, {
       foreignKey: 'prize_id',
       as: 'prize',
-      comment: '中奖奖品'
+      comment: '获得的奖品'
     })
-
-    /*
-     * 🎯 注释掉分发记录关联 - 新的简化预设系统不需要此关联
-     * 简化设计：抽奖记录就是最终结果，不需要额外的分发管理
-     * LotteryDraw.hasMany(models.LotteryPreset, {
-     *   foreignKey: 'draw_id',
-     *   sourceKey: 'draw_id',
-     *   as: 'presets',
-     *   comment: '关联的预设记录（已简化，不再使用）'
-     * })
-     */
   }
 
   /**
-   * 基础实例方法 - 保留简单的数据访问方法
+   * 获取奖励档位显示文本
+   * @returns {string} 奖励档位文本（如"低档奖励"、"中档奖励"、"高档奖励"）
    */
-
-  /**
-   * 获取抽奖结果显示文本
-   * @returns {string} 抽奖结果文本（如"中奖"、"未中奖"）
-   */
-  getDrawResultName() {
-    return LotteryDrawFormatter.getDrawResultText(this.is_winner)
+  getRewardTierName() {
+    return LotteryDrawFormatter.getRewardTierText(this.reward_tier)
   }
 
   /**
@@ -72,15 +62,6 @@ class LotteryDraw extends Model {
    */
   getPrizeStatusName() {
     return LotteryDrawFormatter.getPrizeStatusText(this.prize_status)
-  }
-
-  /**
-   * 检查是否中奖
-   * 业务含义：是否获得有价值的奖品（非空奖）
-   * @returns {boolean} 是否中奖
-   */
-  isWinner() {
-    return this.is_winner
   }
 
   /**
@@ -96,7 +77,8 @@ class LotteryDraw extends Model {
    * @returns {boolean} 奖品是否可领取
    */
   isPrizeClaimable() {
-    return LotteryDrawFormatter.isPrizeClaimable(this.is_winner, this.prize_status)
+    // V4.0：每次都获得奖品，根据档位判断是否需要领取流程
+    return this.reward_tier === 'high' && !LotteryDrawFormatter.isPrizeDelivered(this.prize_status)
   }
 
   /**
@@ -126,7 +108,7 @@ class LotteryDraw extends Model {
    * @param {Object} data - 抽奖记录数据
    * @param {number} data.user_id - 用户ID
    * @param {number} data.campaign_id - 活动ID
-   * @param {boolean} data.is_winner - 是否中奖
+   * @param {string} data.reward_tier - 奖励档位
    * @returns {Array<string>} 错误信息数组（为空表示验证通过）
    */
   static validateBasicData(data) {
@@ -140,8 +122,8 @@ class LotteryDraw extends Model {
       errors.push('活动ID无效')
     }
 
-    if (typeof data.is_winner !== 'boolean') {
-      errors.push('中奖状态无效，必须是布尔值')
+    if (!data.reward_tier || !['low', 'mid', 'high'].includes(data.reward_tier)) {
+      errors.push('奖励档位无效，必须是 low/mid/high 之一')
     }
 
     return errors
@@ -286,31 +268,29 @@ module.exports = sequelize => {
         comment: '批次抽奖ID（连抽时使用，用于关联同一批次的多次抽奖）'
       },
 
-      // 核心业务字段
+      // 核心业务字段（V4.0语义清理版）
       /**
-       * 是否中奖的业务标准字段（核心业务标准）
+       * 奖励档位（V4.0新增，替代原 is_winner 字段）
        *
        * 业务含义：
-       * - true: 本次抽奖中获得有价值奖品（非空奖、非谢谢参与）
-       * - false: 本次抽奖未中奖或获得无价值奖励
+       * - 每次抽奖100%从奖品池选择一个奖品，根据奖品价值判定档位
+       * - 不再区分"中没中"，只讨论"抽到了什么及其价值层级"
        *
-       * 业务逻辑：
-       * - 直接Boolean字段，由抽奖引擎根据抽奖结果设置
-       * - 中奖判断标准：获得的奖品具有实际价值（积分>0、实物商品、优惠券等）
-       * - 保底机制触发时，通常设置为true
+       * 档位规则（配置驱动，可通过 LotteryManagementSetting 调整）：
+       * - low: 低档奖励（prize_value_points < 300）
+       * - mid: 中档奖励（300 <= prize_value_points < 700）
+       * - high: 高档奖励（prize_value_points >= 700）
        *
        * 使用场景：
-       * - 中奖统计：COUNT(*) WHERE is_winner = true
-       * - 中奖率计算：AVG(is_winner) * 100%
-       * - 保底机制触发条件：连续N次is_winner = false
-       * - 前端显示抽奖结果："恭喜中奖" vs "谢谢参与"
-       * - 奖品发放流程：只有is_winner = true才发放奖品
+       * - 前端展示：根据档位显示不同动画效果
+       * - 统计分析：奖励档位分布统计（替代原"中奖率"统计）
+       * - 客服话术：统一对外承诺"每次必得奖励"
        */
-      is_winner: {
-        type: DataTypes.BOOLEAN,
+      reward_tier: {
+        type: DataTypes.STRING(32),
         allowNull: false,
-        defaultValue: false,
-        comment: '是否中奖（获得有价值奖品）'
+        defaultValue: 'mid',
+        comment: '奖励档位code（配置驱动，如 low/mid/high 或 tier_1..tier_n）'
       },
       guarantee_triggered: {
         type: DataTypes.BOOLEAN,
@@ -406,7 +386,7 @@ module.exports = sequelize => {
       created_at: 'created_at',
       updated_at: 'updated_at',
       underscored: true,
-      comment: '抽奖记录表（重构版 - 仅数据定义）',
+      comment: '抽奖记录表（V4.0语义清理版 - 删除is_winner，使用reward_tier）',
       indexes: [
         {
           name: 'idx_user_id',
@@ -415,7 +395,7 @@ module.exports = sequelize => {
         {
           name: 'uk_lottery_draws_business_id',
           fields: ['business_id'],
-          unique: true, // P1-1修复：唯一索引，同步数据库约束
+          unique: true,
           comment: '业务ID唯一索引，用于幂等控制'
         },
         {
@@ -442,13 +422,21 @@ module.exports = sequelize => {
           name: 'idx_user_created',
           fields: ['user_id', 'created_at']
         },
+        // V4.0语义清理：用 reward_tier 替代原 is_winner 索引
         {
-          name: 'idx_campaign_result',
-          fields: ['campaign_id', 'is_winner']
+          name: 'idx_reward_tier',
+          fields: ['reward_tier'],
+          comment: '奖励档位索引（用于档位分布统计）'
         },
         {
-          name: 'idx_result_time',
-          fields: ['is_winner', 'created_at']
+          name: 'idx_user_reward_tier',
+          fields: ['user_id', 'reward_tier'],
+          comment: '用户档位索引（查询用户各档位奖励）'
+        },
+        {
+          name: 'idx_created_reward_tier',
+          fields: ['created_at', 'reward_tier'],
+          comment: '时间档位索引（按时间查询档位分布）'
         }
       ]
     }

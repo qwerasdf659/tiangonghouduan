@@ -130,9 +130,10 @@ describe('抽奖系统API测试（V4架构）', () => {
 
         const firstPrize = response.data.data.prizes[0]
         if (firstPrize) {
-          expect(firstPrize).toHaveProperty('is_winner')
+          // V4.0语义更新：使用 reward_tier 替代 is_winner
+          expect(firstPrize).toHaveProperty('reward_tier')
           console.log('✅ 抽奖执行成功:', {
-            is_winner: firstPrize.is_winner,
+            reward_tier: firstPrize.reward_tier,
             name: firstPrize.name
           })
         }
@@ -191,50 +192,50 @@ describe('抽奖系统API测试（V4架构）', () => {
       if (response.status === 200) {
         const stats = response.data.data
 
-        // 验证基础字段存在性
+        // 验证基础字段存在性（V4.0语义更新）
         expect(stats).toHaveProperty('user_id')
         expect(stats).toHaveProperty('total_draws')
-        expect(stats).toHaveProperty('total_wins')
+        expect(stats).toHaveProperty('total_high_tier_wins') // V4.0：替代 total_wins
         expect(stats).toHaveProperty('guarantee_wins')
-        expect(stats).toHaveProperty('normal_wins')
-        expect(stats).toHaveProperty('win_rate')
+        expect(stats).toHaveProperty('normal_high_tier_wins') // V4.0：替代 normal_wins
+        expect(stats).toHaveProperty('high_tier_rate') // V4.0：替代 win_rate
         expect(stats).toHaveProperty('today_draws')
-        expect(stats).toHaveProperty('today_wins')
-        expect(stats).toHaveProperty('today_win_rate')
+        expect(stats).toHaveProperty('today_high_tier_wins') // V4.0：替代 today_wins
+        expect(stats).toHaveProperty('today_high_tier_rate') // V4.0：替代 today_win_rate
         expect(stats).toHaveProperty('total_points_cost')
-        expect(stats).toHaveProperty('prize_type_distribution')
-        expect(stats).toHaveProperty('last_win')
+        expect(stats).toHaveProperty('reward_tier_distribution') // V4.0：替代 prize_type_distribution
+        expect(stats).toHaveProperty('last_high_tier_win') // V4.0：替代 last_win
         expect(stats).toHaveProperty('timestamp')
 
-        // 验证数据类型和逻辑一致性
+        // 验证数据类型和逻辑一致性（V4.0语义更新）
         expect(stats.user_id).toBe(target_user_id)
         expect(typeof stats.total_draws).toBe('number')
-        expect(typeof stats.total_wins).toBe('number')
+        expect(typeof stats.total_high_tier_wins).toBe('number')
         expect(typeof stats.guarantee_wins).toBe('number')
-        expect(typeof stats.normal_wins).toBe('number')
-        expect(typeof stats.win_rate).toBe('number')
+        expect(typeof stats.normal_high_tier_wins).toBe('number')
+        expect(typeof stats.high_tier_rate).toBe('number')
         expect(typeof stats.today_draws).toBe('number')
-        expect(typeof stats.today_wins).toBe('number')
-        expect(typeof stats.today_win_rate).toBe('number')
+        expect(typeof stats.today_high_tier_wins).toBe('number')
+        expect(typeof stats.today_high_tier_rate).toBe('number')
         expect(typeof stats.total_points_cost).toBe('number')
-        expect(typeof stats.prize_type_distribution).toBe('object')
+        expect(typeof stats.reward_tier_distribution).toBe('object')
 
-        // 验证业务逻辑一致性
-        expect(stats.total_wins).toBeGreaterThanOrEqual(0)
-        expect(stats.total_wins).toBeLessThanOrEqual(stats.total_draws)
-        expect(stats.guarantee_wins + stats.normal_wins).toBe(stats.total_wins)
-        expect(stats.today_wins).toBeLessThanOrEqual(stats.today_draws)
+        // 验证业务逻辑一致性（V4.0语义更新）
+        expect(stats.total_high_tier_wins).toBeGreaterThanOrEqual(0)
+        expect(stats.total_high_tier_wins).toBeLessThanOrEqual(stats.total_draws)
+        expect(stats.guarantee_wins + stats.normal_high_tier_wins).toBe(stats.total_high_tier_wins)
+        expect(stats.today_high_tier_wins).toBeLessThanOrEqual(stats.today_draws)
 
         // 验证北京时间格式
         expect(stats.timestamp).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/)
 
-        console.log('✅ 用户抽奖统计测试通过:', {
+        console.log('✅ 用户抽奖统计测试通过（V4.0语义）:', {
           user_id: stats.user_id,
           total_draws: stats.total_draws,
-          total_wins: stats.total_wins,
-          win_rate: `${stats.win_rate}%`,
+          total_high_tier_wins: stats.total_high_tier_wins,
+          high_tier_rate: `${stats.high_tier_rate}%`,
           today_draws: stats.today_draws,
-          today_wins: stats.today_wins
+          today_high_tier_wins: stats.today_high_tier_wins
         })
       }
     })
@@ -258,10 +259,11 @@ describe('抽奖系统API测试（V4架构）', () => {
         expect(stats).toHaveProperty('user_id')
         expect(stats.user_id).toBe(target_user_id)
 
-        console.log('✅ 管理员查看用户统计测试通过:', {
+        // V4.0语义更新：使用 high_tier_rate 替代 win_rate
+        console.log('✅ 管理员查看用户统计测试通过（V4.0语义）:', {
           user_id: stats.user_id,
           total_draws: stats.total_draws,
-          win_rate: `${stats.win_rate}%`
+          high_tier_rate: `${stats.high_tier_rate}%`
         })
       }
     })
@@ -295,18 +297,18 @@ describe('抽奖系统API测试（V4架构）', () => {
       if (response.status === 200) {
         const stats = response.data.data
 
-        // 验证不存在的用户统计数据全为0
+        // 验证不存在的用户统计数据全为0（V4.0语义更新）
         expect(stats.user_id).toBe(non_existent_user_id)
         expect(stats.total_draws).toBe(0)
-        expect(stats.total_wins).toBe(0)
-        expect(stats.win_rate).toBe(0)
+        expect(stats.total_high_tier_wins).toBe(0) // V4.0：替代 total_wins
+        expect(stats.high_tier_rate).toBe(0) // V4.0：替代 win_rate
         expect(stats.today_draws).toBe(0)
-        expect(stats.today_wins).toBe(0)
+        expect(stats.today_high_tier_wins).toBe(0) // V4.0：替代 today_wins
 
         console.log('✅ 权限验证测试通过: 管理员可以查看不存在用户的统计（全为0）', {
           user_id: stats.user_id,
           total_draws: stats.total_draws,
-          total_wins: stats.total_wins
+          total_high_tier_wins: stats.total_high_tier_wins
         })
       }
     })

@@ -122,10 +122,8 @@ const SYSTEM_SETTINGS_WHITELIST = {
     changeRequiresRestart: false,
     businessImpact: 'HIGH',
     auditRequired: true, // ✅ 强制审计：记录谁改的、改前改后值、改动原因
-    approvalRequired: false, // ✅ 业务决策：无需审批，运营主管可直接修改
-    conflict: {
-      resolution: '删除 config/business.config.js 中的 draw_pricing.single_draw，统一使用 DB 配置'
-    }
+    approvalRequired: false // ✅ 业务决策：无需审批，运营主管可直接修改
+    // 代码配置已删除：config/business.config.js 中不再包含 single_draw，统一使用 DB 配置
   },
 
   'points/budget_allocation_ratio': {
@@ -152,10 +150,8 @@ const SYSTEM_SETTINGS_WHITELIST = {
     changeRequiresRestart: false,
     businessImpact: 'HIGH',
     auditRequired: true,
-    approvalRequired: false,
-    conflict: {
-      resolution: '删除 config/business.config.js 中的 daily_limit.all，统一使用 DB 配置'
-    }
+    approvalRequired: false
+    // 代码配置已删除：config/business.config.js 中不再包含 daily_limit.all，统一使用 DB 配置
   },
 
   // ===== 市场设置（运营可调）=====
@@ -169,10 +165,8 @@ const SYSTEM_SETTINGS_WHITELIST = {
     changeRequiresRestart: false,
     businessImpact: 'MEDIUM',
     auditRequired: true,
-    approvalRequired: false,
-    conflict: {
-      resolution: '删除 config/marketplace.config.js 中的 max_active_listings，统一使用 DB 配置'
-    }
+    approvalRequired: false
+    // 代码配置已删除：config/marketplace.config.js 中不再包含 max_active_listings，统一使用 DB 配置
   },
 
   // ===== 安全设置（运营可调）=====

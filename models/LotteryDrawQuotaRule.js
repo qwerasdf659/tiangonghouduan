@@ -289,12 +289,27 @@ module.exports = sequelize => {
     })
 
     if (rules.length === 0) {
-      // 无任何规则，返回兜底默认值
+      /**
+       * 无任何规则，从数据库读取兜底默认值（2025-12-30 配置管理三层分离方案）
+       *
+       * 读取优先级：
+       * 1. DB system_settings.daily_lottery_limit（全局配置）
+       * 2. 代码默认值 50（兜底降级）
+       *
+       * @see docs/配置管理三层分离与校验统一方案.md
+       */
+      const AdminSystemService = require('../services/AdminSystemService')
+      const fallbackLimit = await AdminSystemService.getSettingValue(
+        'points',
+        'daily_lottery_limit',
+        50
+      )
+
       return {
-        limit_value: 50,
+        limit_value: fallbackLimit,
         matched_rule: null,
         priority: 0,
-        debug: { no_rules_found: true, fallback_limit: 50 }
+        debug: { no_rules_found: true, fallback_limit: fallbackLimit, source: 'db_system_settings' }
       }
     }
 

@@ -7,7 +7,7 @@
  * - 记录用户通过商家扫码提交的消费记录
  * - 支持待审核→已通过/已拒绝/已过期的状态流转
  * - 与content_review_records表配合实现审核功能
- * - 审核通过后自动奖励积分（通过PointsService）
+ * - 审核通过后自动奖励积分（通过AssetService）
  *
  * 业务流程：
  * 1. 用户出示固定身份码（QR_{user_id}_{signature}）
@@ -21,7 +21,7 @@
  * 主键：record_id（BIGINT，自增）
  *
  * 创建时间：2025年10月30日
- * 最后更新：2025年10月30日
+ * 最后更新：2025年12月30日
  */
 
 'use strict'
@@ -77,18 +77,23 @@ class ConsumptionRecord extends Model {
     })
 
     /*
-     * 一对一：一个消费记录对应一个积分交易记录（审核通过后）
+     * 一对一：一个消费记录对应一个资产交易记录（审核通过后）
      * 注意：通过reference_type='consumption' + reference_id=record_id关联
+     *
+     * ⚠️ 原 PointsTransaction 已废弃，使用 AssetTransaction 替代
+     * @see models/index.js 第40-46行注释
      */
-    ConsumptionRecord.hasOne(models.PointsTransaction, {
-      foreignKey: 'reference_id',
-      constraints: false,
-      scope: {
-        reference_type: 'consumption'
-      },
-      as: 'points_transaction',
-      comment: '关联的积分交易记录'
-    })
+    if (models.AssetTransaction) {
+      ConsumptionRecord.hasOne(models.AssetTransaction, {
+        foreignKey: 'reference_id',
+        constraints: false,
+        scope: {
+          reference_type: 'consumption'
+        },
+        as: 'asset_transaction',
+        comment: '关联的资产交易记录'
+      })
+    }
   }
 
   /**

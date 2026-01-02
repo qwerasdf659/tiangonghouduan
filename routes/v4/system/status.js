@@ -78,18 +78,46 @@ router.get('/status', optionalAuth, dataAccessControl, async (req, res) => {
  *
  * @description
  * 返回统一的业务配置，包括：
- * - 连抽定价配置（单抽/3连抽/5连抽/10连抽）
+ * - 连抽定价配置（单抽/3连抽/5连抽/10连抽）- 从 DB 动态读取单抽价格
+ * - 每日抽奖上限 - 从 DB 动态读取
  * - 积分系统规则（上限/下限/验证规则）
  * - 用户系统配置（昵称规则/验证码有效期）
  * - 图片上传限制（文件大小/类型/数量）
  * - 分页配置（用户/管理员）
  *
+ * @配置来源
+ * - lottery_cost_points: DB system_settings（运营可调）
+ * - daily_lottery_limit: DB system_settings（运营可调）
+ * - 其他配置: config/business.config.js（代码层固定）
+ *
  * @returns {Object} 业务配置信息
  */
 router.get('/business-config', optionalAuth, dataAccessControl, async (req, res) => {
   try {
-    // 读取业务配置文件
+    // 读取代码层固定配置
     const businessConfig = require('../../../config/business.config')
+
+    // 🔴 从 DB 读取运营可调参数（严格模式：配置缺失直接报错）
+    const AdminSystemService = require('../../../services/AdminSystemService')
+
+    // 读取单抽价格和每日上限（严格模式）
+    const [singleDrawCost, dailyLimit] = await Promise.all([
+      AdminSystemService.getSettingValue('points', 'lottery_cost_points', null, { strict: true }),
+      AdminSystemService.getSettingValue('points', 'daily_lottery_limit', null, { strict: true })
+    ])
+
+    // 动态计算连抽定价（基于 DB 读取的单抽价格）
+    const drawTypes = businessConfig.lottery.draw_types
+    const drawPricing = {}
+    for (const [type, config] of Object.entries(drawTypes)) {
+      drawPricing[type] = {
+        count: config.count,
+        discount: config.discount,
+        label: config.label,
+        per_draw: Math.floor(singleDrawCost * config.discount), // 折后单价
+        total_cost: Math.floor(singleDrawCost * config.count * config.discount) // 总价
+      }
+    }
 
     // 根据用户角色返回不同级别的配置
     const dataLevel = req.isAdmin ? 'full' : 'public'
@@ -97,8 +125,8 @@ router.get('/business-config', optionalAuth, dataAccessControl, async (req, res)
     // 公开配置（所有用户可见）
     const publicConfig = {
       lottery: {
-        draw_pricing: businessConfig.lottery.draw_pricing, // 连抽定价配置
-        daily_limit: businessConfig.lottery.daily_limit.all, // 每日抽奖上限
+        draw_pricing: drawPricing, // 连抽定价配置（动态计算）
+        daily_limit: dailyLimit, // 每日抽奖上限（从 DB 读取）
         free_draw_allowed: businessConfig.lottery.free_draw_allowed // 是否允许免费抽奖
       },
       points: {
@@ -132,14 +160,19 @@ router.get('/business-config', optionalAuth, dataAccessControl, async (req, res)
     // 管理员可见的完整配置
     if (dataLevel === 'full') {
       publicConfig.points.validation = businessConfig.points.validation // 积分验证规则（仅管理员可见）
-      publicConfig.lottery.daily_limit_reset_time = businessConfig.lottery.daily_limit.reset_time // 每日限制重置时间（仅管理员可见）
+      publicConfig.lottery.daily_reset_time = businessConfig.lottery.daily_reset_time // 每日限制重置时间（仅管理员可见）
     }
 
     return res.apiSuccess(
       {
         config: publicConfig,
         version: '4.0.0',
-        last_updated: '2025-10-21'
+        last_updated: '2025-12-30', // 更新日期：配置管理三层分离方案实施
+        config_source: {
+          lottery_cost_points: 'DB system_settings',
+          daily_lottery_limit: 'DB system_settings',
+          other: 'config/business.config.js'
+        }
       },
       '获取业务配置成功'
     )

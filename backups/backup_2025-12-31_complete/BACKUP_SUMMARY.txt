@@ -1,0 +1,75 @@
+
+========================================
+完整数据库备份摘要
+========================================
+
+备份时间: 2025/12/31 02:08:12 - 2025/12/31 02:08:13
+数据库: restaurant_points_dev
+
+备份文件:
+- SQL文件: complete_backup_2025-12-31-02-08-12.sql
+  MD5: 2e48d417588f7cea01ff1cc9446997f5
+  大小: 1.94 MB
+
+- JSON文件: complete_backup_2025-12-31-02-08-12.json
+  MD5: bfe4c3d0fa0fcaa2e0d324d60d0fce41
+  大小: 6.04 MB
+
+数据统计:
+- 表数量: 48
+- 总行数: 9367
+- 总大小: 9.83 MB
+
+表详情:
+- account_asset_balances: 11行, 16.00KB数据, 48.00KB索引
+- accounts: 13行, 16.00KB数据, 48.00KB索引
+- admin_operation_logs: 997行, 288.00KB数据, 368.00KB索引
+- api_idempotency_requests: 28行, 64.00KB数据, 64.00KB索引
+- asset_transactions: 205行, 96.00KB数据, 80.00KB索引
+- asset_transactions_archive_20251226: 1174行, 320.00KB数据, 0.00KB索引
+- audit_records: 0行, 16.00KB数据, 64.00KB索引
+- authentication_sessions: 0行, 16.00KB数据, 176.00KB索引
+- chat_messages: 20行, 16.00KB数据, 96.00KB索引
+- consumption_records: 175行, 64.00KB数据, 128.00KB索引
+- content_review_records: 175行, 48.00KB数据, 80.00KB索引
+- customer_service_sessions: 3行, 16.00KB数据, 96.00KB索引
+- exchange_items: 16行, 16.00KB数据, 32.00KB索引
+- exchange_records: 0行, 16.00KB数据, 112.00KB索引
+- feedbacks: 26行, 16.00KB数据, 32.00KB索引
+- image_resources: 3行, 16.00KB数据, 112.00KB索引
+- item_instance_events: 174行, 96.00KB数据, 80.00KB索引
+- item_instances: 1016行, 160.00KB数据, 160.00KB索引
+- item_template_aliases: 0行, 16.00KB数据, 32.00KB索引
+- lottery_campaigns: 1行, 16.00KB数据, 144.00KB索引
+- lottery_draw_quota_rules: 1行, 16.00KB数据, 0.00KB索引
+- lottery_draws: 3582行, 512.00KB数据, 3376.00KB索引
+- lottery_management_settings: 281行, 64.00KB数据, 80.00KB索引
+- lottery_presets: 2行, 16.00KB数据, 80.00KB索引
+- lottery_prizes: 9行, 16.00KB数据, 144.00KB索引
+- lottery_user_daily_draw_quota: 5行, 16.00KB数据, 48.00KB索引
+- market_listings: 1行, 16.00KB数据, 144.00KB索引
+- material_asset_types: 3行, 16.00KB数据, 64.00KB索引
+- material_conversion_rules: 1行, 16.00KB数据, 0.00KB索引
+- merchant_points_reviews: 0行, 16.00KB数据, 48.00KB索引
+- points_transactions: 105行, 48.00KB数据, 96.00KB索引
+- popup_banners: 0行, 16.00KB数据, 16.00KB索引
+- products: 52行, 16.00KB数据, 208.00KB索引
+- redemption_orders: 321行, 80.00KB数据, 144.00KB索引
+- role_change_logs: 0行, 16.00KB数据, 96.00KB索引
+- roles: 6行, 16.00KB数据, 160.00KB索引
+- sequelizemeta: 181行, 16.00KB数据, 16.00KB索引
+- stores: 0行, 16.00KB数据, 80.00KB索引
+- system_announcements: 5行, 16.00KB数据, 64.00KB索引
+- system_settings: 18行, 16.00KB数据, 80.00KB索引
+- trade_orders: 0行, 16.00KB数据, 64.00KB索引
+- trade_records: 2行, 16.00KB数据, 176.00KB索引
+- user_hierarchy: 0行, 16.00KB数据, 96.00KB索引
+- user_points_accounts: 3行, 16.00KB数据, 64.00KB索引
+- user_premium_status: 1行, 16.00KB数据, 64.00KB索引
+- user_roles: 13行, 16.00KB数据, 64.00KB索引
+- users: 22行, 16.00KB数据, 80.00KB索引
+- websocket_startup_logs: 716行, 96.00KB数据, 64.00KB索引
+
+备份完整性: ✅ 完整
+备份状态: ✅ 成功
+========================================

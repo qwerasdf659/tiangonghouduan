@@ -29,7 +29,7 @@
  * - User：用户表
  * - LotteryDraw：抽奖记录表
  * - ConsumptionRecord：消费记录表
- * - PointsTransaction：积分交易表
+ * - AssetTransaction：资产流水表（已替换废弃的PointsTransaction）
  * - ItemInstance：物品实例表（背包双轨架构 - 不可叠加物品轨）
  * - CustomerServiceSession：客服会话表
  * - ChatMessage：聊天消息表
@@ -83,14 +83,17 @@ class ReportingService {
         whereClause.user_id = parseInt(userFilter)
       }
 
-      // 并行获取统计数据
-      const [totalDraws, winningDraws, dailyStats, userDistribution] = await Promise.all([
+      /*
+       * 并行获取统计数据
+       * V4.0语义更新：使用 highTierDraws 替代 winningDraws
+       */
+      const [totalDraws, highTierDraws, dailyStats, userDistribution] = await Promise.all([
         // 总抽奖次数
         models.LotteryDraw.count({ where: whereClause }),
 
-        // 中奖次数
+        // V4.0语义更新：高档奖励次数（替代原中奖次数）
         models.LotteryDraw.count({
-          where: { ...whereClause, is_winner: true }
+          where: { ...whereClause, reward_tier: 'high' }
         }),
 
         // 按日期统计
@@ -99,7 +102,11 @@ class ReportingService {
           attributes: [
             [fn('DATE', col('created_at')), 'date'],
             [fn('COUNT', col('draw_id')), 'draws'], // 🔧 V4.3修复：使用col('draw_id')
-            [fn('SUM', literal('CASE WHEN is_winner THEN 1 ELSE 0 END')), 'wins']
+            // V4.0语义更新：统计高档奖励次数
+            [
+              fn('SUM', literal("CASE WHEN reward_tier = 'high' THEN 1 ELSE 0 END")),
+              'high_tier_wins'
+            ]
           ],
           group: [fn('DATE', col('created_at'))],
           order: [[fn('DATE', col('created_at')), 'ASC']],
@@ -112,7 +119,11 @@ class ReportingService {
           attributes: [
             'user_id',
             [fn('COUNT', col('draw_id')), 'draws'], // 🔧 V4.3修复：使用col('draw_id')
-            [fn('SUM', literal('CASE WHEN is_winner THEN 1 ELSE 0 END')), 'wins']
+            // V4.0语义更新：统计高档奖励次数
+            [
+              fn('SUM', literal("CASE WHEN reward_tier = 'high' THEN 1 ELSE 0 END")),
+              'high_tier_wins'
+            ]
           ],
           group: ['user_id'],
           order: [[fn('COUNT', col('draw_id')), 'DESC']], // 🔧 V4.3修复：使用col('draw_id')
@@ -121,23 +132,27 @@ class ReportingService {
         })
       ])
 
-      // 计算整体统计
-      const overallWinRate = totalDraws > 0 ? ((winningDraws / totalDraws) * 100).toFixed(2) : 0
+      // V4.0语义更新：计算高档奖励率（替代原中奖率）
+      const highTierRate = totalDraws > 0 ? ((highTierDraws / totalDraws) * 100).toFixed(2) : 0
 
       // 处理每日统计数据
       const processedDailyStats = dailyStats.map(stat => ({
         date: stat.date,
         draws: parseInt(stat.draws),
-        wins: parseInt(stat.wins),
-        win_rate: stat.draws > 0 ? ((stat.wins / stat.draws) * 100).toFixed(2) : 0
+        // V4.0语义更新：使用 high_tier_wins 替代 wins
+        high_tier_wins: parseInt(stat.high_tier_wins || 0),
+        high_tier_rate:
+          stat.draws > 0 ? ((parseInt(stat.high_tier_wins || 0) / stat.draws) * 100).toFixed(2) : 0
       }))
 
       // 处理用户分布数据
       const processedUserDistribution = userDistribution.map(stat => ({
         user_id: stat.user_id,
         draws: parseInt(stat.draws),
-        wins: parseInt(stat.wins),
-        personal_win_rate: stat.draws > 0 ? ((stat.wins / stat.draws) * 100).toFixed(2) : 0
+        // V4.0语义更新：使用 high_tier_wins 替代 wins
+        high_tier_wins: parseInt(stat.high_tier_wins || 0),
+        personal_high_tier_rate:
+          stat.draws > 0 ? ((parseInt(stat.high_tier_wins || 0) / stat.draws) * 100).toFixed(2) : 0
       }))
 
       const analyticsData = {
@@ -148,8 +163,9 @@ class ReportingService {
         },
         overview: {
           total_draws: totalDraws,
-          winning_draws: winningDraws,
-          overall_win_rate: overallWinRate,
+          // V4.0语义更新：使用 high_tier_draws 和 high_tier_rate 替代原中奖统计
+          high_tier_draws: highTierDraws,
+          high_tier_rate: highTierRate,
           average_daily_draws: dayCount > 0 ? Math.round(totalDraws / dayCount) : 0
         },
         trends: {
@@ -224,7 +240,11 @@ class ReportingService {
           attributes: [
             [fn('DATE_FORMAT', col('created_at'), dateFormat), 'period'],
             [fn('COUNT', col('draw_id')), 'total_draws'], // 🔧 V4.3修复：使用col('draw_id')而不是'*'
-            [fn('SUM', literal('CASE WHEN is_winner THEN 1 ELSE 0 END')), 'wins'],
+            // V4.0语义更新：统计高档奖励次数
+            [
+              fn('SUM', literal("CASE WHEN reward_tier = 'high' THEN 1 ELSE 0 END")),
+              'high_tier_wins'
+            ],
             [fn('COUNT', fn('DISTINCT', col('user_id'))), 'unique_users']
           ],
           group: [fn('DATE_FORMAT', col('created_at'), dateFormat)],
@@ -270,13 +290,19 @@ class ReportingService {
           : Promise.resolve([])
       ])
 
-      // 处理数据
+      /*
+       * 处理数据
+       * V4.0语义更新：使用 high_tier_wins 替代 wins
+       */
       const processedLotteryTrends = lotteryTrends.map(trend => ({
         period: trend.period,
         total_draws: parseInt(trend.total_draws),
-        wins: parseInt(trend.wins),
+        high_tier_wins: parseInt(trend.high_tier_wins || 0),
         unique_users: parseInt(trend.unique_users),
-        win_rate: trend.total_draws > 0 ? ((trend.wins / trend.total_draws) * 100).toFixed(2) : 0
+        high_tier_rate:
+          trend.total_draws > 0
+            ? ((parseInt(trend.high_tier_wins || 0) / trend.total_draws) * 100).toFixed(2)
+            : 0
       }))
 
       const processedUserTrends = userTrends.map(trend => ({
@@ -304,10 +330,11 @@ class ReportingService {
           total_periods: processedLotteryTrends.length,
           peak_draws: Math.max(...processedLotteryTrends.map(t => t.total_draws), 0),
           peak_users: Math.max(...processedUserTrends.map(t => t.active_users), 0),
-          average_win_rate:
+          // V4.0语义更新：使用 average_high_tier_rate 替代 average_win_rate
+          average_high_tier_rate:
             processedLotteryTrends.length > 0
               ? (
-                  processedLotteryTrends.reduce((sum, t) => sum + parseFloat(t.win_rate), 0) /
+                  processedLotteryTrends.reduce((sum, t) => sum + parseFloat(t.high_tier_rate), 0) /
                   processedLotteryTrends.length
                 ).toFixed(2)
               : 0
@@ -434,7 +461,8 @@ class ReportingService {
 
         // 抽奖数据
         todayLotteryDraws,
-        todayWinningDraws,
+        // V4.0语义更新：使用 todayHighTierDraws 替代 todayWinningDraws
+        todayHighTierDraws,
         todayTotalPointsConsumed,
 
         // 积分系统数据
@@ -482,13 +510,14 @@ class ReportingService {
             }
           }
         }),
+        // V4.0语义更新：高档奖励次数
         models.LotteryDraw.count({
           where: {
             created_at: {
               [Op.gte]: todayStart,
               [Op.lte]: todayEnd
             },
-            is_winner: true
+            reward_tier: 'high'
           }
         }),
         models.LotteryDraw.sum('cost_points', {
@@ -500,33 +529,45 @@ class ReportingService {
           }
         }) || 0,
 
-        // 积分交易统计
-        models.PointsTransaction.count({
+        // 积分交易统计（使用 AssetTransaction，过滤 asset_code='POINTS'）
+        models.AssetTransaction.count({
           where: {
+            asset_code: 'POINTS',
             created_at: {
               [Op.gte]: todayStart,
               [Op.lte]: todayEnd
             }
           }
         }),
-        models.PointsTransaction.sum('points_amount', {
+        // 积分收入（delta_amount > 0 表示增加）
+        models.AssetTransaction.sum('delta_amount', {
           where: {
+            asset_code: 'POINTS',
             created_at: {
               [Op.gte]: todayStart,
               [Op.lte]: todayEnd
             },
-            transaction_type: 'earn'
+            delta_amount: {
+              [Op.gt]: 0
+            }
           }
         }) || 0,
-        models.PointsTransaction.sum('points_amount', {
-          where: {
-            created_at: {
-              [Op.gte]: todayStart,
-              [Op.lte]: todayEnd
-            },
-            transaction_type: 'consume'
-          }
-        }) || 0,
+        // 积分支出（delta_amount < 0 表示扣减，取绝对值）
+        (async () => {
+          const spent = await models.AssetTransaction.sum('delta_amount', {
+            where: {
+              asset_code: 'POINTS',
+              created_at: {
+                [Op.gte]: todayStart,
+                [Op.lte]: todayEnd
+              },
+              delta_amount: {
+                [Op.lt]: 0
+              }
+            }
+          })
+          return Math.abs(spent || 0)
+        })(),
 
         // 库存统计（使用新表 ItemInstance）
         models.ItemInstance.count({
@@ -587,9 +628,12 @@ class ReportingService {
           : 0
       ])
 
-      // 计算统计指标
-      const winRate =
-        todayLotteryDraws > 0 ? ((todayWinningDraws / todayLotteryDraws) * 100).toFixed(2) : 0
+      /*
+       * 计算统计指标
+       * V4.0语义更新：使用 highTierRate 替代 winRate
+       */
+      const highTierRate =
+        todayLotteryDraws > 0 ? ((todayHighTierDraws / todayLotteryDraws) * 100).toFixed(2) : 0
       const avgPointsPerDraw =
         todayLotteryDraws > 0 ? (todayTotalPointsConsumed / todayLotteryDraws).toFixed(1) : 0
       const activeUserRate = totalUsers > 0 ? ((todayActiveUsers / totalUsers) * 100).toFixed(2) : 0
@@ -611,8 +655,9 @@ class ReportingService {
         // 抽奖系统统计
         lottery_stats: {
           draws_today: todayLotteryDraws,
-          winning_draws_today: todayWinningDraws,
-          win_rate: parseFloat(winRate),
+          // V4.0语义更新：使用 high_tier_draws_today 和 high_tier_rate 替代原中奖统计
+          high_tier_draws_today: todayHighTierDraws,
+          high_tier_rate: parseFloat(highTierRate),
           total_points_consumed: todayTotalPointsConsumed,
           avg_points_per_draw: parseFloat(avgPointsPerDraw)
         },
@@ -676,30 +721,35 @@ class ReportingService {
       const today = BeijingTimeHelper.createBeijingTime()
       const todayStart = new Date(today.setHours(0, 0, 0, 0))
 
-      // 并行获取基础统计
-      const [totalUsers, activeUsers, newUsers, totalLotteries, winLotteries] = await Promise.all([
-        models.User.count(),
-        models.User.count({
-          where: {
-            last_login: {
-              [Op.gte]: new Date(BeijingTimeHelper.timestamp() - 30 * 24 * 60 * 60 * 1000)
+      /*
+       * 并行获取基础统计
+       * V4.0语义更新：使用 highTierLotteries 替代 winLotteries
+       */
+      const [totalUsers, activeUsers, newUsers, totalLotteries, highTierLotteries] =
+        await Promise.all([
+          models.User.count(),
+          models.User.count({
+            where: {
+              last_login: {
+                [Op.gte]: new Date(BeijingTimeHelper.timestamp() - 30 * 24 * 60 * 60 * 1000)
+              }
             }
-          }
-        }),
-        models.User.count({
-          where: {
-            created_at: {
-              [Op.gte]: todayStart
+          }),
+          models.User.count({
+            where: {
+              created_at: {
+                [Op.gte]: todayStart
+              }
             }
-          }
-        }),
-        models.LotteryDraw.count(),
-        models.LotteryDraw.count({
-          where: {
-            is_winner: true
-          }
-        })
-      ])
+          }),
+          models.LotteryDraw.count(),
+          // V4.0语义更新：高档奖励次数
+          models.LotteryDraw.count({
+            where: {
+              reward_tier: 'high'
+            }
+          })
+        ])
 
       return {
         users: {
@@ -709,8 +759,10 @@ class ReportingService {
         },
         lottery: {
           total: totalLotteries,
-          wins: winLotteries,
-          win_rate: totalLotteries > 0 ? ((winLotteries / totalLotteries) * 100).toFixed(2) : 0
+          // V4.0语义更新：使用 high_tier_wins 和 high_tier_rate
+          high_tier_wins: highTierLotteries,
+          high_tier_rate:
+            totalLotteries > 0 ? ((highTierLotteries / totalLotteries) * 100).toFixed(2) : 0
         },
         system: {
           uptime: process.uptime(),
@@ -981,7 +1033,11 @@ class ReportingService {
         attributes: [
           [fn('DATE', col('created_at')), 'date'],
           [fn('COUNT', col('draw_id')), 'count'],
-          [fn('SUM', literal('CASE WHEN is_winner = 1 THEN 1 ELSE 0 END')), 'win_count']
+          // V4.0语义更新：统计高档奖励次数
+          [
+            fn('SUM', literal("CASE WHEN reward_tier = 'high' THEN 1 ELSE 0 END")),
+            'high_tier_count'
+          ]
         ],
         where: {
           created_at: {
@@ -1003,14 +1059,16 @@ class ReportingService {
 
         const day_data = daily_lottery.find(item => item.date === date_str)
         const count = day_data ? parseInt(day_data.count) : 0
-        const win_count = day_data ? parseInt(day_data.win_count) : 0
-        const win_rate = count > 0 ? ((win_count / count) * 100).toFixed(2) : '0.00'
+        // V4.0语义更新：使用 high_tier_count 替代 win_count
+        const high_tier_count = day_data ? parseInt(day_data.high_tier_count || 0) : 0
+        const high_tier_rate = count > 0 ? ((high_tier_count / count) * 100).toFixed(2) : '0.00'
 
         trend_data.push({
           date: date_str,
           count,
-          win_count,
-          win_rate
+          // V4.0语义更新：使用 high_tier_count 和 high_tier_rate 替代 win_count 和 win_rate
+          high_tier_count,
+          high_tier_rate
         })
       }
 
@@ -1089,36 +1147,27 @@ class ReportingService {
    */
   static async getPointsFlowData(start_date, end_date, days) {
     try {
-      // 查询每天积分流水（区分收入和支出）
-      const daily_points = await models.PointsTransaction.findAll({
+      /**
+       * 查询每天积分流水（使用 AssetTransaction，过滤 asset_code='POINTS'）
+       * delta_amount > 0 表示收入，delta_amount < 0 表示支出
+       */
+      const daily_points = await models.AssetTransaction.findAll({
         attributes: [
-          [fn('DATE', col('transaction_time')), 'date'],
+          [fn('DATE', col('created_at')), 'date'],
+          [fn('SUM', literal('CASE WHEN delta_amount > 0 THEN delta_amount ELSE 0 END')), 'earned'],
           [
-            fn(
-              'SUM',
-              literal(
-                "CASE WHEN transaction_type IN ('earn', 'admin_add', 'refund') THEN amount ELSE 0 END"
-              )
-            ),
-            'earned'
-          ],
-          [
-            fn(
-              'SUM',
-              literal(
-                "CASE WHEN transaction_type IN ('spend', 'admin_deduct') THEN amount ELSE 0 END"
-              )
-            ),
+            fn('SUM', literal('CASE WHEN delta_amount < 0 THEN ABS(delta_amount) ELSE 0 END')),
             'spent'
           ]
         ],
         where: {
-          transaction_time: {
+          asset_code: 'POINTS',
+          created_at: {
             [Op.between]: [start_date, end_date]
           }
         },
-        group: [fn('DATE', col('transaction_time'))],
-        order: [[fn('DATE', col('transaction_time')), 'ASC']],
+        group: [fn('DATE', col('created_at'))],
+        order: [[fn('DATE', col('created_at')), 'ASC']],
         raw: true
       })
 
@@ -1161,14 +1210,14 @@ class ReportingService {
    */
   static async getTopPrizesData(start_date, end_date) {
     try {
-      // 查询中奖记录，统计各奖品的中奖次数
+      // V4.0语义更新：查询高档奖励记录，统计各奖品的获得次数
       const prize_stats = await models.LotteryDraw.findAll({
         attributes: ['prize_name', [fn('COUNT', col('draw_id')), 'count']],
         where: {
           created_at: {
             [Op.between]: [start_date, end_date]
           },
-          is_winner: true,
+          reward_tier: 'high', // V4.0：只统计高档奖励
           prize_name: {
             [Op.ne]: null
           }
@@ -1270,12 +1319,15 @@ class ReportingService {
             attributes: ['user_id', 'nickname', 'created_at', 'updated_at']
           }),
 
-          // 抽奖统计
+          /*
+           * 抽奖统计
+           * V4.0语义更新：统计高档奖励次数
+           */
           models.LotteryDraw.findAll({
             where: { user_id },
             attributes: [
               [fn('COUNT', col('*')), 'total_draws'],
-              [fn('COUNT', literal('CASE WHEN is_winner = 1 THEN 1 END')), 'winning_draws']
+              [fn('COUNT', literal("CASE WHEN reward_tier = 'high' THEN 1 END")), 'high_tier_draws']
             ],
             raw: true
           }),
@@ -1290,28 +1342,45 @@ class ReportingService {
             raw: true
           }),
 
-          // 积分统计
-          models.PointsTransaction.findAll({
-            where: { user_id },
-            attributes: [
-              [
-                fn(
-                  'SUM',
-                  literal('CASE WHEN transaction_type = "earn" THEN points_amount ELSE 0 END')
-                ),
-                'total_earned'
-              ],
-              [
-                fn(
-                  'SUM',
-                  literal('CASE WHEN transaction_type = "consume" THEN points_amount ELSE 0 END')
-                ),
-                'total_consumed'
-              ],
-              [fn('COUNT', col('*')), 'total_transactions']
-            ],
-            raw: true
-          }),
+          // 积分统计（使用 AssetTransaction，通过 Account 关联查询用户积分流水）
+          (async () => {
+            try {
+              // 先获取用户的 account_id
+              const account = await models.Account.findOne({
+                where: { user_id, account_type: 'user' },
+                attributes: ['account_id']
+              })
+              if (!account) {
+                return { total_earned: 0, total_consumed: 0, total_transactions: 0 }
+              }
+              // 统计积分流水（asset_code='POINTS'）
+              const stats = await models.AssetTransaction.findAll({
+                where: {
+                  account_id: account.account_id,
+                  asset_code: 'POINTS'
+                },
+                attributes: [
+                  [
+                    fn('SUM', literal('CASE WHEN delta_amount > 0 THEN delta_amount ELSE 0 END')),
+                    'total_earned'
+                  ],
+                  [
+                    fn(
+                      'SUM',
+                      literal('CASE WHEN delta_amount < 0 THEN ABS(delta_amount) ELSE 0 END')
+                    ),
+                    'total_consumed'
+                  ],
+                  [fn('COUNT', col('transaction_id')), 'total_transactions']
+                ],
+                raw: true
+              })
+              return stats[0] || { total_earned: 0, total_consumed: 0, total_transactions: 0 }
+            } catch (error) {
+              logger.warn('获取用户积分统计失败:', error.message)
+              return { total_earned: 0, total_consumed: 0, total_transactions: 0 }
+            }
+          })(),
 
           // 用户积分账户 - 使用 AssetService 统一账户体系
           (async () => {
@@ -1364,11 +1433,12 @@ class ReportingService {
 
         // 抽奖统计
         lottery_count: parseInt(lotteryStats[0]?.total_draws || 0),
-        lottery_wins: parseInt(lotteryStats[0]?.winning_draws || 0),
-        lottery_win_rate:
+        // V4.0语义更新：使用 high_tier_draws 和 high_tier_rate 替代原中奖统计
+        high_tier_draws: parseInt(lotteryStats[0]?.high_tier_draws || 0),
+        high_tier_rate:
           lotteryStats[0]?.total_draws > 0
             ? (
-                ((lotteryStats[0]?.winning_draws || 0) / lotteryStats[0]?.total_draws) *
+                ((lotteryStats[0]?.high_tier_draws || 0) / lotteryStats[0]?.total_draws) *
                 100
               ).toFixed(1) + '%'
             : '0%',
@@ -1405,7 +1475,8 @@ class ReportingService {
       if (statistics.lottery_count >= 10) {
         statistics.achievements.push({ name: '抽奖达人', icon: '🎰', unlocked: true })
       }
-      if (statistics.lottery_win_rate && parseFloat(statistics.lottery_win_rate) >= 30) {
+      // V4.0语义更新：使用 high_tier_rate 替代 lottery_win_rate
+      if (statistics.high_tier_rate && parseFloat(statistics.high_tier_rate) >= 30) {
         statistics.achievements.push({ name: '幸运之星', icon: '⭐', unlocked: true })
       }
       if (statistics.exchange_count >= 5) {
@@ -1462,7 +1533,10 @@ class ReportingService {
           raw: true
         }),
 
-        // 抽奖统计
+        /*
+         * 抽奖统计
+         * V4.0语义更新：统计高档奖励次数
+         */
         models.LotteryDraw.findAll({
           attributes: [
             [fn('COUNT', col('*')), 'total_draws'],
@@ -1470,29 +1544,26 @@ class ReportingService {
               fn('COUNT', literal('CASE WHEN DATE(created_at) = CURDATE() THEN 1 END')),
               'draws_today'
             ],
-            [fn('COUNT', literal('CASE WHEN is_winner = 1 THEN 1 END')), 'total_wins']
+            [
+              fn('COUNT', literal("CASE WHEN reward_tier = 'high' THEN 1 END")),
+              'total_high_tier_wins'
+            ]
           ],
           raw: true
         }),
 
-        // 积分统计（过滤已删除记录）
-        models.PointsTransaction.findAll({
+        // 积分统计（使用 AssetTransaction，过滤 asset_code='POINTS'）
+        models.AssetTransaction.findAll({
           where: {
-            is_deleted: 0
+            asset_code: 'POINTS'
           },
           attributes: [
             [
-              fn(
-                'SUM',
-                literal('CASE WHEN transaction_type = "earn" THEN points_amount ELSE 0 END')
-              ),
+              fn('SUM', literal('CASE WHEN delta_amount > 0 THEN delta_amount ELSE 0 END')),
               'total_points_issued'
             ],
             [
-              fn(
-                'SUM',
-                literal('CASE WHEN transaction_type = "consume" THEN points_amount ELSE 0 END')
-              ),
+              fn('SUM', literal('CASE WHEN delta_amount < 0 THEN ABS(delta_amount) ELSE 0 END')),
               'total_points_consumed'
             ],
             [
@@ -1525,12 +1596,14 @@ class ReportingService {
         lottery: {
           total_draws: parseInt(lotteryStats[0]?.total_draws || 0),
           draws_today: parseInt(lotteryStats[0]?.draws_today || 0),
-          total_wins: parseInt(lotteryStats[0]?.total_wins || 0),
-          win_rate:
+          // V4.0语义更新：使用 total_high_tier_wins 和 high_tier_rate 替代原中奖统计
+          total_high_tier_wins: parseInt(lotteryStats[0]?.total_high_tier_wins || 0),
+          high_tier_rate:
             lotteryStats[0]?.total_draws > 0
-              ? (((lotteryStats[0]?.total_wins || 0) / lotteryStats[0]?.total_draws) * 100).toFixed(
-                  1
-                ) + '%'
+              ? (
+                  ((lotteryStats[0]?.total_high_tier_wins || 0) / lotteryStats[0]?.total_draws) *
+                  100
+                ).toFixed(1) + '%'
               : '0%'
         },
 

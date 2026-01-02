@@ -132,12 +132,17 @@ module.exports = sequelize => {
       as: 'uploadedImages'
     })
 
-    // 🔥 用户的积分账户（一对一关系）
-    User.hasOne(models.UserPointsAccount, {
-      foreignKey: 'user_id',
-      as: 'pointsAccount',
-      comment: '用户积分账户'
-    })
+    /**
+     * 🔥 用户资产系统关联（新架构）
+     *
+     * 新架构使用：
+     * - Account（账户主体）
+     * - AccountAssetBalance（账户资产余额）
+     * - AssetTransaction（资产流水）
+     *
+     * ⚠️ UserAssetAccount 已废弃并删除（2025-12-31）
+     * ⚠️ UserPointsAccount 和 PointsTransaction 已废弃
+     */
 
     // 🔥 用户的高级空间状态（一对一关系）
     User.hasOne(models.UserPremiumStatus, {
@@ -146,12 +151,14 @@ module.exports = sequelize => {
       comment: '用户高级空间解锁状态（100积分解锁，24小时有效期）'
     })
 
-    // 🔥 用户的积分交易记录（一对多关系）
-    User.hasMany(models.PointsTransaction, {
-      foreignKey: 'user_id',
-      as: 'pointsTransactions',
-      comment: '积分交易记录'
-    })
+    // 用户资产交易流水（新架构）
+    if (models.AssetTransaction) {
+      User.hasMany(models.AssetTransaction, {
+        foreignKey: 'user_id',
+        as: 'assetTransactions',
+        comment: '资产交易流水'
+      })
+    }
 
     // 🔥 用户的交易记录（作为发送方）
     if (models.TradeRecord) {

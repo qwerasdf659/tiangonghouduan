@@ -20,10 +20,21 @@
  */
 module.exports = {
   async up(queryInterface, Sequelize) {
-    // 删除probability列
-    await queryInterface.removeColumn('lottery_prizes', 'probability')
+    // 检查列是否存在
+    const [columns] = await queryInterface.sequelize.query(
+      `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+       WHERE TABLE_SCHEMA = DATABASE()
+       AND TABLE_NAME = 'lottery_prizes'
+       AND COLUMN_NAME = 'probability'`
+    )
 
-    console.log('✅ 已删除lottery_prizes.probability列')
+    if (columns.length > 0) {
+      // 删除probability列
+      await queryInterface.removeColumn('lottery_prizes', 'probability')
+      console.log('✅ 已删除lottery_prizes.probability列')
+    } else {
+      console.log('⏭️ lottery_prizes.probability列已不存在，跳过')
+    }
   },
 
   async down(queryInterface, Sequelize) {

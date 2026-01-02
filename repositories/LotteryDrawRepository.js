@@ -37,7 +37,8 @@ class LotteryDrawRepository {
     const {
       drawType = null,
       prizeType = null,
-      isWinner = null,
+      // V4.0语义更新：使用 rewardTier 替代 isWinner
+      rewardTier = null,
       limit = 20,
       offset = 0,
       startDate = null,
@@ -50,7 +51,8 @@ class LotteryDrawRepository {
     // 构建查询条件
     if (drawType) where.draw_type = drawType
     if (prizeType) where.prize_type = prizeType
-    if (isWinner !== null) where.is_winner = isWinner
+    // V4.0：根据奖励档位过滤
+    if (rewardTier !== null) where.reward_tier = rewardTier
 
     // 时间范围查询
     if (startDate || endDate) {
@@ -91,7 +93,8 @@ class LotteryDrawRepository {
     const {
       drawType = null,
       prizeType = null,
-      isWinner = null,
+      // V4.0语义更新：使用 rewardTier 替代 isWinner
+      rewardTier = null,
       limit = 20,
       offset = 0,
       startDate = null,
@@ -104,7 +107,8 @@ class LotteryDrawRepository {
     // 构建查询条件
     if (drawType) where.draw_type = drawType
     if (prizeType) where.prize_type = prizeType
-    if (isWinner !== null) where.is_winner = isWinner
+    // V4.0：根据奖励档位过滤
+    if (rewardTier !== null) where.reward_tier = rewardTier
 
     // 时间范围查询
     if (startDate || endDate) {
@@ -136,7 +140,7 @@ class LotteryDrawRepository {
   }
 
   /**
-   * 获取用户抽奖统计数据
+   * 获取用户抽奖统计数据（V4.0语义更新）
    * @param {Number} userId - 用户ID
    * @returns {Object} 统计数据
    */
@@ -145,7 +149,7 @@ class LotteryDrawRepository {
       `
       SELECT
         COUNT(*) as total_draws,
-        COUNT(CASE WHEN is_winner = 1 THEN 1 END) as wins,
+        COUNT(CASE WHEN reward_tier = 'high' THEN 1 END) as high_tier_wins,
         COUNT(CASE WHEN guarantee_triggered = 1 THEN 1 END) as pity_wins,
         COALESCE(SUM(cost_points), 0) as total_cost,
         COALESCE(SUM(CASE WHEN prize_type = 'points' THEN prize_value ELSE 0 END), 0) as points_won
@@ -162,20 +166,20 @@ class LotteryDrawRepository {
   }
 
   /**
-   * 批量分析抽奖数据
+   * 批量分析抽奖数据（V4.0语义更新）
    * @param {Object} conditions - 分析条件
    * @returns {Object} 分析结果
    */
   async batchAnalyze(conditions = {}) {
     const baseWhere = { ...conditions }
 
-    const [totalDraws, winDraws, prizeStats] = await Promise.all([
+    const [totalDraws, highTierDraws, prizeStats] = await Promise.all([
       // 总抽奖次数
       this.LotteryDraw.count({ where: baseWhere }),
 
-      // 中奖次数
+      // V4.0：高档奖励次数
       this.LotteryDraw.count({
-        where: { ...baseWhere, is_winner: true }
+        where: { ...baseWhere, reward_tier: 'high' }
       }),
 
       // 奖品发放状态统计
@@ -184,18 +188,18 @@ class LotteryDrawRepository {
           'prize_status',
           [this.sequelize.fn('COUNT', this.sequelize.col('*')), 'count']
         ],
-        where: { ...baseWhere, is_winner: true },
+        where: { ...baseWhere, reward_tier: 'high' },
         group: ['prize_status'],
         raw: true
       })
     ])
 
-    const winRate = totalDraws > 0 ? ((winDraws / totalDraws) * 100).toFixed(2) : '0.00'
+    const highTierRate = totalDraws > 0 ? ((highTierDraws / totalDraws) * 100).toFixed(2) : '0.00'
 
     return {
       total_draws: totalDraws,
-      win_draws: winDraws,
-      win_rate: winRate,
+      high_tier_draws: highTierDraws, // V4.0：替代 win_draws
+      high_tier_rate: highTierRate, // V4.0：替代 win_rate
       prize_delivery_stats: prizeStats.reduce((acc, stat) => {
         acc[stat.prize_status] = parseInt(stat.count)
         return acc
@@ -204,7 +208,7 @@ class LotteryDrawRepository {
   }
 
   /**
-   * 获取抽奖历史记录（支持复杂条件）
+   * 获取抽奖历史记录（支持复杂条件）（V4.0语义更新）
    * @param {Object} options - 查询选项
    * @returns {Object} {count, rows}
    */
@@ -212,7 +216,8 @@ class LotteryDrawRepository {
     const {
       userId = null,
       campaignId = null,
-      isWinner = null,
+      // V4.0语义更新：使用 rewardTier 替代 isWinner
+      rewardTier = null,
       prizeType = null,
       startDate = null,
       endDate = null,
@@ -227,7 +232,8 @@ class LotteryDrawRepository {
     // 构建查询条件
     if (userId) where.user_id = userId
     if (campaignId) where.campaign_id = campaignId
-    if (isWinner !== null) where.is_winner = isWinner
+    // V4.0：根据奖励档位过滤
+    if (rewardTier !== null) where.reward_tier = rewardTier
     if (prizeType) where.prize_type = prizeType
 
     // 时间范围查询
@@ -259,7 +265,7 @@ class LotteryDrawRepository {
   }
 
   /**
-   * 获取今日抽奖统计
+   * 获取今日抽奖统计（V4.0语义更新）
    * @returns {Object} 今日统计数据
    */
   async getTodayStats() {
@@ -269,7 +275,7 @@ class LotteryDrawRepository {
     const todayEnd = BeijingTimeHelper.createBeijingTime()
     todayEnd.setHours(23, 59, 59, 999)
 
-    const [totalDraws, totalWins] = await Promise.all([
+    const [totalDraws, totalHighTierWins] = await Promise.all([
       this.LotteryDraw.count({
         where: {
           created_at: {
@@ -278,21 +284,22 @@ class LotteryDrawRepository {
           }
         }
       }),
+      // V4.0：高档奖励次数
       this.LotteryDraw.count({
         where: {
           created_at: {
             [Op.gte]: todayStart,
             [Op.lte]: todayEnd
           },
-          is_winner: true
+          reward_tier: 'high'
         }
       })
     ])
 
     return {
       total_draws: totalDraws,
-      total_wins: totalWins,
-      win_rate: totalDraws > 0 ? ((totalWins / totalDraws) * 100).toFixed(2) : '0.00'
+      total_high_tier_wins: totalHighTierWins, // V4.0：替代 total_wins
+      high_tier_rate: totalDraws > 0 ? ((totalHighTierWins / totalDraws) * 100).toFixed(2) : '0.00' // V4.0：替代 win_rate
     }
   }
 
@@ -317,12 +324,13 @@ class LotteryDrawRepository {
       attributes: [
         [this.sequelize.fn('DATE', this.sequelize.col('created_at')), 'date'],
         [this.sequelize.fn('COUNT', this.sequelize.col('*')), 'total_draws'],
+        // V4.0语义更新：统计高档奖励次数（替代原中奖次数）
         [
           this.sequelize.fn(
             'SUM',
-            this.sequelize.literal('CASE WHEN is_winner = 1 THEN 1 ELSE 0 END')
+            this.sequelize.literal("CASE WHEN reward_tier = 'high' THEN 1 ELSE 0 END")
           ),
-          'total_wins'
+          'total_high_tier_wins'
         ]
       ],
       where,
@@ -385,7 +393,8 @@ class LotteryDrawRepository {
    * @returns {Array} 抽奖记录数组
    */
   async findByUserIds(userIds, options = {}) {
-    const { isWinner = null, startDate = null, endDate = null, limit = null } = options
+    // V4.0语义更新：使用 rewardTier 替代 isWinner
+    const { rewardTier = null, startDate = null, endDate = null, limit = null } = options
 
     const where = {
       user_id: {
@@ -393,7 +402,8 @@ class LotteryDrawRepository {
       }
     }
 
-    if (isWinner !== null) where.is_winner = isWinner
+    // V4.0：根据奖励档位过滤
+    if (rewardTier !== null) where.reward_tier = rewardTier
 
     if (startDate || endDate) {
       where.created_at = {}

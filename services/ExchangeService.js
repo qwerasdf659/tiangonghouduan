@@ -318,13 +318,13 @@ class ExchangeService {
       throw new Error('business_id 参数不能为空，用于幂等性控制')
     }
 
-    // 🔥 支持外部传入的事务（与PointsService对齐）
+    // 🔥 支持外部传入的事务（统一事务管理模式）
     const transaction = externalTransaction || (await sequelize.transaction())
     const shouldCommit = !externalTransaction // 只有自己创建的事务才提交/回滚
 
     try {
       /*
-       * ✅ 幂等性检查：以 business_id 为唯一键（与PointsService对齐）
+       * ✅ 幂等性检查：以 business_id 为唯一键（统一幂等架构）
        * 🔴 P1-1-5: 不使用悲观锁，依赖数据库唯一约束防止并发创建重复订单
        * 原因：多个事务同时使用 FOR UPDATE 竞争同一行会导致死锁
        * 解决方案：利用唯一索引约束，并发插入时自动捕获冲突
@@ -780,7 +780,7 @@ class ExchangeService {
   static async updateOrderStatus(order_no, new_status, operator_id, remark = '', options = {}) {
     const { transaction: externalTransaction } = options
 
-    // 🔥 支持外部传入的事务（与PointsService对齐）
+    // 🔥 支持外部传入的事务（统一事务管理模式）
     const transaction = externalTransaction || (await sequelize.transaction())
     const shouldCommit = !externalTransaction // 只有自己创建的事务才提交/回滚
 
@@ -1105,7 +1105,7 @@ class ExchangeService {
   static async deleteExchangeItem(item_id, options = {}) {
     const { transaction: externalTransaction } = options
 
-    // 🔥 支持外部传入的事务（与PointsService对齐）
+    // 🔥 支持外部传入的事务（统一事务管理模式）
     const transaction = externalTransaction || (await sequelize.transaction())
     const shouldCommit = !externalTransaction // 只有自己创建的事务才提交/回滚
 

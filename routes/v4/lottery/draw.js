@@ -6,16 +6,18 @@
  *
  * 路由前缀：/api/v4/lottery
  *
- * 业务规则：
- * - 100%中奖：每次抽奖必定从奖品池选择一个奖品（只是价值不同）
+ * 业务规则（V4.0语义更新 2026-01-01）：
+ * - 100%获奖：每次抽奖必定从奖品池选择一个奖品（只是价值不同）
  * - 连抽限制：连续抽奖最多10次，单次事务保证原子性
  * - 积分扣除：抽奖前检查余额，抽奖后立即扣除，使用事务保护
+ * - 奖励档位：使用 reward_tier (low/mid/high) 替代原 is_winner
  *
  * 幂等性保证（方案B - 业界标准）：
  * - 入口幂等：通过 IdempotencyService 实现"重试返回首次结果"
  * - 流水幂等：通过派生 idempotency_key 保证每条流水唯一
  *
  * 创建时间：2025年12月22日
+ * 更新时间：2026年01月01日 - V4.0语义清理
  */
 
 const express = require('express')
@@ -25,6 +27,7 @@ const { authenticateToken } = require('../../../middleware/auth')
 const dataAccessControl = require('../../../middleware/dataAccessControl')
 const { handleServiceError } = require('../../../middleware/validation')
 const DataSanitizer = require('../../../services/DataSanitizer')
+const LotteryDrawFormatter = require('../../../utils/formatters/LotteryDrawFormatter')
 const { requestDeduplication, lotteryRateLimiter } = require('./middleware')
 // 方案B：业界标准幂等架构
 const IdempotencyService = require('../../../services/IdempotencyService')
@@ -119,7 +122,7 @@ router.post(
         '[DEBUG] drawResult.prizes:',
         JSON.stringify(
           drawResult.prizes.map(p => ({
-            is_winner: p.is_winner,
+            reward_tier: p.reward_tier, // V4.0：使用 reward_tier
             has_prize: !!p.prize,
             prize_keys: p.prize ? Object.keys(p.prize) : [],
             sort_order: p.prize?.sort_order
@@ -129,42 +132,33 @@ router.post(
         )
       )
 
-      // 对抽奖结果进行脱敏处理
+      // 对抽奖结果进行脱敏处理（V4.0语义更新）
       const sanitizedResult = {
         success: drawResult.success,
         campaign_code: campaign.campaign_code, // 返回campaign_code
         lottery_session_id: drawResult.execution_id, // 返回抽奖会话ID（用于关联查询）
         prizes: drawResult.prizes.map(prize => {
-          // ✅ 未中奖时返回特殊标记，不包含prize详情
-          if (!prize.is_winner || !prize.prize) {
-            return {
-              is_winner: false,
-              name: '未中奖',
-              type: 'empty',
-              sort_order: null,
-              icon: '💨',
-              rarity: 'common',
-              display_points: 0
-            }
-          }
-
-          // ✅ 中奖时返回完整奖品信息
+          // V4.0：所有抽奖都有奖品，使用 reward_tier 表示档位
+          const rewardTier =
+            prize.reward_tier ||
+            LotteryDrawFormatter.inferRewardTier(prize.prize?.prize_value_points || 0)
           return {
-            is_winner: true,
-            id: prize.prize.id,
-            name: prize.prize.name,
-            type: prize.prize.type,
-            sort_order: prize.prize.sort_order, // 🎯 前端用于计算索引（index = sort_order - 1）
-            icon: DataSanitizer.getPrizeIcon(prize.prize.type),
-            rarity: DataSanitizer.calculateRarity(prize.prize.type),
+            reward_tier: rewardTier,
+            reward_tier_text: LotteryDrawFormatter.getRewardTierText(rewardTier),
+            id: prize.prize?.id,
+            name: prize.prize?.name || '奖励',
+            type: prize.prize?.type,
+            sort_order: prize.prize?.sort_order, // 🎯 前端用于计算索引（index = sort_order - 1）
+            icon: DataSanitizer.getPrizeIcon(prize.prize?.type),
+            rarity: DataSanitizer.calculateRarity(prize.prize?.type),
             display_points:
-              typeof prize.prize.value === 'number'
+              typeof prize.prize?.value === 'number'
                 ? prize.prize.value
-                : parseFloat(prize.prize.value) || 0,
+                : parseFloat(prize.prize?.value) || 0,
             display_value: DataSanitizer.getDisplayValue(
-              typeof prize.prize.value === 'number'
+              typeof prize.prize?.value === 'number'
                 ? prize.prize.value
-                : parseFloat(prize.prize.value) || 0
+                : parseFloat(prize.prize?.value) || 0
             )
           }
         }),

@@ -5,7 +5,6 @@
  * 内部目录：routes/v4/shop/
  *
  * 职责：
- * - 积分管理（查询、记录）
  * - B2C材料兑换（官方商城兑换商品）
  * - 核销系统（兑换码核销）
  * - 消费记录
@@ -16,10 +15,11 @@
  * - 统一使用/shop作为顶层路径
  * - /exchange 子路径用于B2C材料兑换（从market域迁移）
  * - 用户端禁止/:id参数（使用/me端点）
+ * - /assets 子路径用于资产余额和流水查询（替代旧 /points 路由）
  *
- * 📌 重构记录（2025-12-22）：
- * - 新增 /exchange 子路由（B2C材料兑换，从 /api/v4/market 迁移）
- * - 明确区分：shop/exchange 是B2C兑换，market 是C2C交易
+ * 📌 重构记录（2025-12-30）：
+ * - 移除 /points 子路由（已迁移到 /assets）
+ * - 积分操作统一使用 AssetService
  *
  * 创建时间：2025年01月21日
  * 适用区域：中国（北京时间 Asia/Shanghai）
@@ -27,9 +27,6 @@
 
 const express = require('express')
 const router = express.Router()
-
-// 积分管理路由（已拆分为子模块：balance.js, transactions.js, statistics.js, admin.js）
-const pointsRoutes = require('./points/index')
 
 /*
  * B2C材料兑换路由（已拆分为子模块：items.js, exchange.js, orders.js, statistics.js）
@@ -50,11 +47,10 @@ const premiumRoutes = require('./premium')
 const assetsRoutes = require('./assets/index')
 
 // 挂载路由
-router.use('/points', pointsRoutes)
 router.use('/exchange', exchangeRoutes) // B2C材料兑换（从 /api/v4/market 迁移）
 router.use('/redemption', redemptionRoutes)
 router.use('/consumption', consumptionRoutes)
 router.use('/premium', premiumRoutes)
-router.use('/assets', assetsRoutes)
+router.use('/assets', assetsRoutes) // 资产余额和流水查询（替代旧 /points 路由）
 
 module.exports = router

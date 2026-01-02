@@ -55,10 +55,9 @@ class ModelAssociationManager {
         hasMany: [
           { model: 'LotteryDraw', foreignKey: 'user_id', as: 'lotteryDraws' },
           { model: 'PrizeDistribution', foreignKey: 'user_id', as: 'prizeDistributions' },
-          { model: 'PointsTransaction', foreignKey: 'user_id', as: 'pointsTransactions' },
           { model: 'ItemInstance', foreignKey: 'owner_user_id', as: 'itemInstances' }
         ],
-        hasOne: [{ model: 'UserPointsAccount', foreignKey: 'user_id', as: 'pointsAccount' }],
+        hasOne: [],
         belongsTo: []
       },
       LotteryDraw: {
@@ -116,11 +115,6 @@ class ModelAssociationManager {
           },
           { model: 'LotteryPrize', foreignKey: 'prize_id', as: 'prize' }
         ]
-      },
-      UserPointsAccount: {
-        hasMany: [{ model: 'PointsTransaction', foreignKey: 'account_id', as: 'transactions' }],
-        hasOne: [],
-        belongsTo: [{ model: 'User', foreignKey: 'user_id', as: 'user' }]
       }
     }
   }
