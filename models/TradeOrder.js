@@ -69,13 +69,13 @@ module.exports = sequelize => {
         comment: '订单ID（主键）'
       },
 
-      // 幂等键
-      business_id: {
+      // 幂等键（业界标准形态 - 2026-01-02）
+      idempotency_key: {
         type: DataTypes.STRING(100),
         allowNull: false,
         unique: true,
         comment:
-          '业务唯一ID（Business ID）：全局唯一的业务单据ID，用于幂等性控制；业务规则：客户端生成并传入，同一 business_id 重试返回同一结果，参数不同返回 409 冲突'
+          '幂等键（业界标准命名）：全局唯一，用于幂等性控制；业务规则：客户端生成并传入，同一 idempotency_key 重试返回同一结果，参数不同返回 409 冲突'
       },
 
       // 关联挂牌
@@ -181,8 +181,9 @@ module.exports = sequelize => {
       underscored: true,
       indexes: [
         {
-          fields: ['business_id'],
-          unique: true
+          fields: ['idempotency_key'],
+          unique: true,
+          name: 'uk_trade_orders_idempotency_key'
         },
         {
           fields: ['listing_id']

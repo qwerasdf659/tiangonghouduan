@@ -10,13 +10,17 @@
  *
  * 业务规则（强制）：
  * - ✅ 本期只支持：red_shard → DIAMOND（1:20比例）
- * - ✅ 必须传入幂等键（business_id或Idempotency-Key）
+ * - ✅ 必须传入幂等键（Header Idempotency-Key）
  * - ✅ 同一幂等键重复请求返回原结果（is_duplicate=true）
  * - ✅ 材料余额不足直接失败，不允许负余额
  * - ❌ 不在兑换流程中隐式触发转换（必须显式调用）
  *
+ * 幂等性保证（业界标准形态 - 破坏性重构 2026-01-02）：
+ * - 统一只接受 Header Idempotency-Key
+ * - 缺失幂等键直接返回 400
+ *
  * 创建时间：2025年12月22日
- * 使用 Claude Sonnet 4.5 模型
+ * 更新时间：2026年01月02日 - 业界标准形态破坏性重构
  */
 
 const express = require('express')
@@ -24,6 +28,8 @@ const router = express.Router()
 const { authenticateToken } = require('../../../../middleware/auth')
 const { handleServiceError } = require('../../../../middleware/validation')
 const logger = require('../../../../utils/logger').logger
+// 业界标准幂等架构 - 统一入口幂等服务
+const IdempotencyService = require('../../../../services/IdempotencyService')
 
 /**
  * 材料转换接口（显式转换）
@@ -35,11 +41,10 @@ const logger = require('../../../../utils/logger').logger
  * - 本期只支持red_shard → DIAMOND转换
  *
  * 请求参数：
+ * @header {string} Idempotency-Key - 幂等键（必填，不接受body参数）
  * @body {string} from_asset_code - 源材料资产代码（当前只支持"red_shard"）
  * @body {string} to_asset_code - 目标资产代码（当前只支持"DIAMOND"）
  * @body {number} from_amount - 转换数量（源材料数量，必须大于0）
- * @body {string} business_id - 业务唯一ID（幂等键，必填）
- * @header {string} Idempotency-Key - 幂等键（与business_id二选一）
  *
  * 响应数据：
  * {
@@ -59,31 +64,36 @@ const logger = require('../../../../utils/logger').logger
  * }
  *
  * 错误码：
+ * - 400 MISSING_IDEMPOTENCY_KEY: 缺少幂等键
  * - 400 BAD_REQUEST: 缺少必填参数、转换规则不支持、数量不符合限制
  * - 403 INSUFFICIENT_BALANCE: 余额不足
  * - 500 INTERNAL_ERROR: 服务器内部错误
  *
- * 幂等性说明：
- * - 客户端必须传入business_id或Idempotency-Key（二选一）
- * - 同一幂等键的请求只会执行一次转换
- * - 重复请求返回原结果，并标记is_duplicate=true
- * - 不会重复扣减材料或重复增加钻石
+ * 幂等性控制（业界标准形态）：统一通过 Header Idempotency-Key 防止重复转换
  */
 router.post('/convert', authenticateToken, async (req, res) => {
+  // 【业界标准形态】强制从 Header 获取幂等键，不接受 body
+  const idempotency_key = req.headers['idempotency-key']
+
+  // 缺失幂等键直接返回 400
+  if (!idempotency_key) {
+    return res.apiError(
+      '缺少必需的幂等键：请在 Header 中提供 Idempotency-Key。' +
+        '重试时必须复用同一幂等键以防止重复转换。',
+      'MISSING_IDEMPOTENCY_KEY',
+      {
+        required_header: 'Idempotency-Key',
+        example: 'Idempotency-Key: convert_<timestamp>_<random>'
+      },
+      400
+    )
+  }
+
   try {
     // 通过 ServiceManager 获取 AssetConversionService（符合TR-005规范）
     const AssetConversionService = req.app.locals.services.getService('assetConversion')
 
     const { from_asset_code, to_asset_code, from_amount } = req.body
-
-    // 获取幂等键（Body business_id 或 Header Idempotency-Key 二选一）
-    let business_id = req.body.business_id
-    const idempotencyKey = req.headers['idempotency-key'] || req.headers['Idempotency-Key']
-
-    if (!business_id && idempotencyKey) {
-      business_id = idempotencyKey
-    }
-
     const user_id = req.user.user_id
 
     logger.info('收到材料转换请求', {
@@ -91,7 +101,7 @@ router.post('/convert', authenticateToken, async (req, res) => {
       from_asset_code,
       to_asset_code,
       from_amount,
-      business_id: business_id ? '已提供' : '未提供'
+      idempotency_key
     })
 
     /*
@@ -115,21 +125,7 @@ router.post('/convert', authenticateToken, async (req, res) => {
       return res.apiError('缺少必填参数：from_amount（转换数量）', 'BAD_REQUEST', null, 400)
     }
 
-    // 2. 幂等键验证（强制要求）
-    if (!business_id) {
-      return res.apiError(
-        '缺少幂等键：请在Body中提供business_id，或在Header中提供Idempotency-Key',
-        'BAD_REQUEST',
-        {
-          hint: '幂等键是必填参数，用于防止重复转换',
-          example_business_id: 'convert_to_diamond_1734220800000',
-          example_header: 'Idempotency-Key: convert_to_diamond_1734220800000'
-        },
-        400
-      )
-    }
-
-    // 3. 转换数量验证
+    // 转换数量验证
     const parsedAmount = parseInt(from_amount)
     if (isNaN(parsedAmount) || parsedAmount <= 0) {
       return res.apiError(
@@ -167,14 +163,42 @@ router.post('/convert', authenticateToken, async (req, res) => {
       )
     }
 
-    // 调用服务层执行转换
+    /*
+     * 【入口幂等检查】防止同一次请求被重复提交
+     * 统一使用 IdempotencyService 进行请求级幂等控制
+     */
+    const idempotencyResult = await IdempotencyService.getOrCreateRequest(idempotency_key, {
+      api_path: '/api/v4/assets/convert',
+      http_method: 'POST',
+      request_params: { from_asset_code, to_asset_code, from_amount: parsedAmount },
+      user_id
+    })
+
+    // 如果已完成，直接返回首次结果（幂等性要求）+ is_duplicate 标记
+    if (!idempotencyResult.should_process) {
+      logger.info('🔄 入口幂等拦截：重复请求，返回首次结果', {
+        idempotency_key,
+        user_id,
+        from_asset_code,
+        to_asset_code
+      })
+      const duplicateResponse = {
+        ...idempotencyResult.response,
+        is_duplicate: true
+      }
+      return res.apiSuccess(duplicateResponse, '材料转换记录已存在（幂等返回）')
+    }
+
+    /*
+     * 调用服务层执行转换（传递 idempotency_key）
+     */
     const result = await AssetConversionService.convertMaterial(
       user_id,
       from_asset_code,
       to_asset_code,
       parsedAmount,
       {
-        business_id,
+        idempotency_key,
         title: '碎红水晶分解为钻石',
         meta: {
           source: 'api',
@@ -184,55 +208,62 @@ router.post('/convert', authenticateToken, async (req, res) => {
       }
     )
 
-    // 判断是否为重复请求
-    const isDuplicate = result.is_duplicate === true
-
-    if (isDuplicate) {
-      logger.info('材料转换（幂等返回）', {
-        user_id,
-        from_asset_code,
-        to_asset_code,
-        from_amount: parsedAmount,
-        to_amount: result.to_amount,
-        business_id,
-        is_duplicate: true
-      })
-    } else {
-      logger.info('材料转换成功', {
-        user_id,
-        from_asset_code,
-        to_asset_code,
-        from_amount: parsedAmount,
-        to_amount: result.to_amount,
-        from_tx_id: result.from_tx_id,
-        to_tx_id: result.to_tx_id,
-        business_id,
-        is_duplicate: false
-      })
+    // 构建响应数据
+    const responseData = {
+      from_asset_code: result.from_asset_code,
+      to_asset_code: result.to_asset_code,
+      from_amount: result.from_amount,
+      to_amount: result.to_amount,
+      from_tx_id: result.from_tx_id,
+      to_tx_id: result.to_tx_id,
+      from_balance: result.from_balance,
+      to_balance: result.to_balance,
+      is_duplicate: false,
+      conversion_rate: 20, // 转换比例：1碎红水晶 = 20钻石
+      conversion_info: {
+        rule_description: '碎红水晶分解为钻石',
+        rate_description: '1碎红水晶 = 20钻石',
+        display_icon: '💎'
+      }
     }
 
-    // 返回成功响应
-    return res.apiSuccess(
-      {
-        from_asset_code: result.from_asset_code,
-        to_asset_code: result.to_asset_code,
-        from_amount: result.from_amount,
-        to_amount: result.to_amount,
-        from_tx_id: result.from_tx_id,
-        to_tx_id: result.to_tx_id,
-        from_balance: result.from_balance,
-        to_balance: result.to_balance,
-        is_duplicate: isDuplicate,
-        conversion_rate: 20, // 转换比例：1碎红水晶 = 20钻石
-        conversion_info: {
-          rule_description: '碎红水晶分解为钻石',
-          rate_description: '1碎红水晶 = 20钻石',
-          display_icon: '💎'
-        }
-      },
-      isDuplicate ? '材料转换记录已存在（幂等返回）' : '材料转换成功'
+    /*
+     * 【标记请求完成】保存结果快照到入口幂等表
+     */
+    await IdempotencyService.markAsCompleted(
+      idempotency_key,
+      `${result.from_tx_id}:${result.to_tx_id}`, // 业务事件ID = 交易ID组合
+      responseData
     )
+
+    logger.info('材料转换成功', {
+      user_id,
+      from_asset_code,
+      to_asset_code,
+      from_amount: parsedAmount,
+      to_amount: result.to_amount,
+      from_tx_id: result.from_tx_id,
+      to_tx_id: result.to_tx_id,
+      idempotency_key
+    })
+
+    return res.apiSuccess(responseData, '材料转换成功')
   } catch (error) {
+    // 标记幂等请求失败（允许重试）
+    await IdempotencyService.markAsFailed(idempotency_key, error.message).catch(markError => {
+      logger.error('标记幂等请求失败状态时出错:', markError)
+    })
+
+    // 处理幂等键冲突错误（409状态码）
+    if (error.statusCode === 409) {
+      logger.warn('幂等性错误:', {
+        idempotency_key,
+        error_code: error.errorCode,
+        message: error.message
+      })
+      return res.apiError(error.message, error.errorCode || 'IDEMPOTENCY_ERROR', {}, 409)
+    }
+
     // 错误日志记录
     logger.error('材料转换失败', {
       error: error.message,
@@ -241,7 +272,7 @@ router.post('/convert', authenticateToken, async (req, res) => {
       from_asset_code: req.body.from_asset_code,
       to_asset_code: req.body.to_asset_code,
       from_amount: req.body.from_amount,
-      business_id: req.body.business_id || req.headers['idempotency-key']
+      idempotency_key
     })
 
     // 余额不足错误（特殊处理）

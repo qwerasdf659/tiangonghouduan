@@ -1,3 +1,6 @@
+// 加载环境变量（sequelize-cli 必需）
+require('dotenv').config();
+
 const path = require('path');
 
 module.exports = {
@@ -5,4 +8,4 @@ module.exports = {
   'models-path': path.resolve('models'),
   'seeders-path': path.resolve('seeders'),
   'migrations-path': path.resolve('migrations')
-}; 
+};

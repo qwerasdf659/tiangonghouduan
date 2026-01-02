@@ -823,6 +823,26 @@ async function initializeApp() {
   }
 }
 
+/*
+ * 🧪 测试环境自动初始化 ServiceManager
+ * 问题：测试通过 require('app') 加载时，initializeApp() 不会被调用
+ * 解决：检测测试环境并自动初始化 Service 层
+ */
+if (process.env.NODE_ENV === 'test' && !app.locals.services) {
+  try {
+    const models = require('./models')
+    const { initializeServices } = require('./services')
+    const services = initializeServices(models)
+    app.locals.services = services
+    app.locals.models = models
+    appLogger.info('🧪 测试环境 Service 层自动初始化完成', {
+      services: Array.from(services.getAllServices().keys())
+    })
+  } catch (error) {
+    appLogger.error('🧪 测试环境 Service 层初始化失败', { error: error.message })
+  }
+}
+
 // 🚀 启动服务器
 const PORT = process.env.PORT || 3000
 const HOST = process.env.HOST || '0.0.0.0'

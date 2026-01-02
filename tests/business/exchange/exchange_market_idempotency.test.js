@@ -5,7 +5,7 @@
  *
  * 业务场景：测试兑换市场的幂等性保护机制，确保不会产生重复订单
  *
- * P1-1待办任务：兑换市场 `/api/v4/exchange_market/exchange` 的 business_id 策略
+ * P1-1待办任务：兑换市场 `/api/v4/shop/exchange/exchange` 的 business_id 策略
  *
  * 核心功能测试：
  * 1. 强制幂等键验证 - 缺少business_id和Idempotency-Key时返回400
@@ -198,66 +198,37 @@ describe('兑换市场幂等性测试 (Exchange Market Idempotency - V4.5.0 材�
 
   /**
    * 测试1：强制幂等键验证
-   * 验证：缺少business_id且缺少Idempotency-Key时返回400错误
+   * 验证：缺少 Idempotency-Key Header 时返回400错误
+   * 业界标准形态（2026-01-02）：只接受 Header Idempotency-Key，不接受 body 中的 business_id
    */
   describe('P1-1-1: 强制幂等键验证', () => {
-    test('缺少business_id且缺少Idempotency-Key时应返回400', async () => {
+    test('缺少 Idempotency-Key Header 时应返回400', async () => {
       const response = await request(app)
-        .post('/api/v4/exchange_market/exchange')
+        .post('/api/v4/shop/exchange/exchange')
         .set('Authorization', `Bearer ${testToken}`)
         .send({
           item_id: testItem.item_id,
           quantity: 1
-          // 🔴 故意不提供 business_id 和 Idempotency-Key
+          // 🔴 故意不提供 Idempotency-Key Header
         })
         .expect(400)
 
       expect(response.body).toMatchObject({
         success: false,
-        code: 'BAD_REQUEST'
+        code: 'MISSING_IDEMPOTENCY_KEY'
       })
 
-      expect(response.body.message).toContain('缺少幂等键')
-      expect(response.body.message).toContain('business_id')
+      expect(response.body.message).toContain('幂等键')
       expect(response.body.message).toContain('Idempotency-Key')
 
       console.log('✅ 强制幂等键验证通过：缺失时正确拒绝')
     })
 
-    test('提供business_id时应正常处理', async () => {
-      const business_id = `test_idempotency_body_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`
-
-      const response = await request(app)
-        .post('/api/v4/exchange_market/exchange')
-        .set('Authorization', `Bearer ${testToken}`)
-        .send({
-          item_id: testItem.item_id,
-          quantity: 1,
-          business_id // ✅ 通过Body提供business_id
-        })
-        .expect(200)
-
-      expect(response.body).toMatchObject({
-        success: true,
-        data: {
-          business_id, // 应该回传business_id
-          order: expect.objectContaining({
-            order_no: expect.any(String),
-            status: 'pending'
-          })
-        }
-      })
-
-      console.log('✅ Body中的business_id验证通过')
-      console.log(`   - business_id: ${business_id}`)
-      console.log(`   - order_no: ${response.body.data.order.order_no}`)
-    })
-
-    test('提供Idempotency-Key时应正常处理', async () => {
+    test('通过 Header Idempotency-Key 提供幂等键应正常处理', async () => {
       const idempotencyKey = `test_idempotency_header_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`
 
       const response = await request(app)
-        .post('/api/v4/exchange_market/exchange')
+        .post('/api/v4/shop/exchange/exchange')
         .set('Authorization', `Bearer ${testToken}`)
         .set('Idempotency-Key', idempotencyKey) // ✅ 通过Header提供Idempotency-Key
         .send({
@@ -269,7 +240,6 @@ describe('兑换市场幂等性测试 (Exchange Market Idempotency - V4.5.0 材�
       expect(response.body).toMatchObject({
         success: true,
         data: {
-          business_id: idempotencyKey, // 应该使用Idempotency-Key作为business_id
           order: expect.objectContaining({
             order_no: expect.any(String),
             status: 'pending'
@@ -277,7 +247,7 @@ describe('兑换市场幂等性测试 (Exchange Market Idempotency - V4.5.0 材�
         }
       })
 
-      console.log('✅ Header中的Idempotency-Key验证通过')
+      console.log('✅ Header Idempotency-Key 验证通过')
       console.log(`   - idempotency_key: ${idempotencyKey}`)
       console.log(`   - order_no: ${response.body.data.order.order_no}`)
     })
@@ -285,39 +255,40 @@ describe('兑换市场幂等性测试 (Exchange Market Idempotency - V4.5.0 材�
 
   /**
    * 测试2：幂等性保护
-   * 验证：相同business_id重复请求只创建一笔订单
+   * 验证：相同 Idempotency-Key 重复请求只创建一笔订单
+   * 业界标准形态：统一使用 Header Idempotency-Key
    */
-  describe('P1-1-2: 幂等性保护（相同business_id只创建一笔订单）', () => {
-    test('相同business_id重复请求应返回相同结果', async () => {
-      const business_id = `test_same_business_id_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`
+  describe('P1-1-2: 幂等性保护（相同Idempotency-Key只创建一笔订单）', () => {
+    test('相同 Idempotency-Key 重复请求应返回相同结果', async () => {
+      const idempotencyKey = `test_same_key_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`
 
       // 第一次请求
       const response1 = await request(app)
-        .post('/api/v4/exchange_market/exchange')
+        .post('/api/v4/shop/exchange/exchange')
         .set('Authorization', `Bearer ${testToken}`)
+        .set('Idempotency-Key', idempotencyKey)
         .send({
           item_id: testItem.item_id,
-          quantity: 1,
-          business_id
+          quantity: 1
         })
         .expect(200)
 
       expect(response1.body.success).toBe(true)
-      expect(response1.body.data.is_duplicate).toBeUndefined() // 第一次不应该标记为重复
+      expect(response1.body.data.is_duplicate).toBe(false) // 首次请求 is_duplicate 应为 false
       const firstOrderNo = response1.body.data.order.order_no
 
       console.log('✅ 第一次请求成功')
       console.log(`   - order_no: ${firstOrderNo}`)
       console.log(`   - is_duplicate: ${response1.body.data.is_duplicate || false}`)
 
-      // 第二次请求（相同business_id）
+      // 第二次请求（相同 Idempotency-Key）
       const response2 = await request(app)
-        .post('/api/v4/exchange_market/exchange')
+        .post('/api/v4/shop/exchange/exchange')
         .set('Authorization', `Bearer ${testToken}`)
+        .set('Idempotency-Key', idempotencyKey) // 🔄 相同的 Idempotency-Key
         .send({
           item_id: testItem.item_id,
-          quantity: 1,
-          business_id // 🔄 相同的business_id
+          quantity: 1
         })
         .expect(200)
 
@@ -332,7 +303,7 @@ describe('兑换市场幂等性测试 (Exchange Market Idempotency - V4.5.0 材�
 
       // 验证数据库中只有一条订单记录
       const orderCount = await ExchangeRecord.count({
-        where: { business_id }
+        where: { idempotency_key: idempotencyKey }
       })
 
       expect(orderCount).toBe(1) // ✅ 数据库中只有一条记录
@@ -341,7 +312,7 @@ describe('兑换市场幂等性测试 (Exchange Market Idempotency - V4.5.0 材�
     })
 
     test('材料资产应该只扣除一次', async () => {
-      const business_id = `test_asset_deduct_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`
+      const idempotencyKey = `test_asset_deduct_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`
 
       // 获取初始材料资产余额（使用新模型结构 Account + AccountAssetBalance）
       const accountBefore = await Account.findOne({
@@ -355,12 +326,12 @@ describe('兑换市场幂等性测试 (Exchange Market Idempotency - V4.5.0 材�
 
       // 第一次兑换
       const response1 = await request(app)
-        .post('/api/v4/exchange_market/exchange')
+        .post('/api/v4/shop/exchange/exchange')
         .set('Authorization', `Bearer ${testToken}`)
+        .set('Idempotency-Key', idempotencyKey)
         .send({
           item_id: testItem.item_id,
-          quantity: 1,
-          business_id
+          quantity: 1
         })
         .expect(200)
 
@@ -375,14 +346,14 @@ describe('兑换市场幂等性测试 (Exchange Market Idempotency - V4.5.0 材�
       console.log(`   - order_no: ${response1.body.data.order.order_no}`)
       expect(deducted).toBe(testItem.cost_amount) // 应该扣除商品成本
 
-      // 第二次兑换（相同business_id）
+      // 第二次兑换（相同 Idempotency-Key）
       const response2 = await request(app)
-        .post('/api/v4/exchange_market/exchange')
+        .post('/api/v4/shop/exchange/exchange')
         .set('Authorization', `Bearer ${testToken}`)
+        .set('Idempotency-Key', idempotencyKey) // 🔄 相同的 Idempotency-Key
         .send({
           item_id: testItem.item_id,
-          quantity: 1,
-          business_id // 🔄 相同的business_id
+          quantity: 1
         })
         .expect(200)
 
@@ -409,17 +380,17 @@ describe('兑换市场幂等性测试 (Exchange Market Idempotency - V4.5.0 材�
    * 验证：同一幂等键但不同参数时返回409错误
    */
   describe('P1-1-3: 冲突保护（同一幂等键但不同参数返回409）', () => {
-    test('同一business_id但不同item_id应返回409', async () => {
-      const business_id = `test_conflict_item_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`
+    test('同一 Idempotency-Key 但不同 item_id 应返回409', async () => {
+      const idempotencyKey = `test_conflict_item_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`
 
       // 第一次请求
       const response1 = await request(app)
-        .post('/api/v4/exchange_market/exchange')
+        .post('/api/v4/shop/exchange/exchange')
         .set('Authorization', `Bearer ${testToken}`)
+        .set('Idempotency-Key', idempotencyKey)
         .send({
           item_id: testItem.item_id,
-          quantity: 1,
-          business_id
+          quantity: 1
         })
         .expect(200)
 
@@ -441,20 +412,19 @@ describe('兑换市场幂等性测试 (Exchange Market Idempotency - V4.5.0 材�
         updated_at: BeijingTimeHelper.createDatabaseTime()
       })
 
-      // 第二次请求（相同business_id，但不同item_id）
+      // 第二次请求（相同 Idempotency-Key，但不同 item_id）
       const response2 = await request(app)
-        .post('/api/v4/exchange_market/exchange')
+        .post('/api/v4/shop/exchange/exchange')
         .set('Authorization', `Bearer ${testToken}`)
+        .set('Idempotency-Key', idempotencyKey) // 🔄 相同的 Idempotency-Key
         .send({
           item_id: anotherItem.item_id, // 🔴 不同的item_id
-          quantity: 1,
-          business_id // 🔄 相同的business_id
+          quantity: 1
         })
         .expect(409) // ✅ 应该返回409冲突
 
       expect(response2.body.success).toBe(false)
-      expect(response2.body.message).toContain('幂等键冲突')
-      expect(response2.body.message).toContain(business_id)
+      expect(response2.body.message).toContain('幂等')
 
       console.log('✅ 冲突保护验证通过：不同item_id返回409')
       console.log(`   - 错误码: ${response2.body.code}`)
@@ -464,17 +434,17 @@ describe('兑换市场幂等性测试 (Exchange Market Idempotency - V4.5.0 材�
       await anotherItem.destroy()
     })
 
-    test('同一business_id但不同quantity应返回409', async () => {
-      const business_id = `test_conflict_quantity_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`
+    test('同一 Idempotency-Key 但不同 quantity 应返回409', async () => {
+      const idempotencyKey = `test_conflict_quantity_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`
 
       // 第一次请求
       const response1 = await request(app)
-        .post('/api/v4/exchange_market/exchange')
+        .post('/api/v4/shop/exchange/exchange')
         .set('Authorization', `Bearer ${testToken}`)
+        .set('Idempotency-Key', idempotencyKey)
         .send({
           item_id: testItem.item_id,
-          quantity: 1,
-          business_id
+          quantity: 1
         })
         .expect(200)
 
@@ -482,19 +452,19 @@ describe('兑换市场幂等性测试 (Exchange Market Idempotency - V4.5.0 材�
       console.log('   - quantity: 1')
       console.log(`   - order_no: ${response1.body.data.order.order_no}`)
 
-      // 第二次请求（相同business_id，但不同quantity）
+      // 第二次请求（相同 Idempotency-Key，但不同 quantity）
       const response2 = await request(app)
-        .post('/api/v4/exchange_market/exchange')
+        .post('/api/v4/shop/exchange/exchange')
         .set('Authorization', `Bearer ${testToken}`)
+        .set('Idempotency-Key', idempotencyKey) // 🔄 相同的 Idempotency-Key
         .send({
           item_id: testItem.item_id,
-          quantity: 2, // 🔴 不同的quantity
-          business_id // 🔄 相同的business_id
+          quantity: 2 // 🔴 不同的quantity
         })
         .expect(409) // ✅ 应该返回409冲突
 
       expect(response2.body.success).toBe(false)
-      expect(response2.body.message).toContain('幂等键冲突')
+      expect(response2.body.message).toContain('幂等')
 
       console.log('✅ 冲突保护验证通过：不同quantity返回409')
     })
@@ -506,7 +476,7 @@ describe('兑换市场幂等性测试 (Exchange Market Idempotency - V4.5.0 材�
    */
   describe('P1-1-4: 外部事务支持', () => {
     test('Service应支持外部事务传入', async () => {
-      const business_id = `test_external_transaction_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`
+      const idempotencyKey = `test_external_transaction_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`
 
       // 创建外部事务
       const externalTransaction = await sequelize.transaction()
@@ -516,7 +486,7 @@ describe('兑换市场幂等性测试 (Exchange Market Idempotency - V4.5.0 材�
 
         // 调用Service时传入外部事务
         const result = await ExchangeService.exchangeItem(testUser.user_id, testItem.item_id, 1, {
-          business_id,
+          idempotency_key: idempotencyKey,
           transaction: externalTransaction // ✅ 传入外部事务
         })
 
@@ -532,7 +502,7 @@ describe('兑换市场幂等性测试 (Exchange Market Idempotency - V4.5.0 材�
 
         // 验证订单已创建
         const order = await ExchangeRecord.findOne({
-          where: { business_id }
+          where: { idempotency_key: idempotencyKey }
         })
 
         expect(order).not.toBeNull()
@@ -549,7 +519,7 @@ describe('兑换市场幂等性测试 (Exchange Market Idempotency - V4.5.0 材�
     })
 
     test('Service不应该二次commit外部事务', async () => {
-      const business_id = `test_no_double_commit_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`
+      const idempotencyKey = `test_no_double_commit_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`
 
       // 创建外部事务
       const externalTransaction = await sequelize.transaction()
@@ -557,7 +527,7 @@ describe('兑换市场幂等性测试 (Exchange Market Idempotency - V4.5.0 材�
       try {
         // 调用Service
         await ExchangeService.exchangeItem(testUser.user_id, testItem.item_id, 1, {
-          business_id,
+          idempotency_key: idempotencyKey,
           transaction: externalTransaction
         })
 
@@ -591,45 +561,72 @@ describe('兑换市场幂等性测试 (Exchange Market Idempotency - V4.5.0 材�
 
   /**
    * 测试5：并发幂等性保护
-   * 验证：高并发下相同business_id只创建一笔订单
+   * 验证：高并发下相同 Idempotency-Key 只创建一笔订单
+   *
+   * 业务场景说明：
+   * - 并发请求同一幂等键时，只有一个请求能获得锁并处理
+   * - 其他请求会收到 409（REQUEST_PROCESSING - 请求正在处理中）
+   * - 或者在首次请求完成后收到 200 + is_duplicate=true（幂等返回）
+   * - 核心保证：数据库中只创建一条订单记录
    */
   describe('P1-1-5: 并发幂等性保护', () => {
-    test('并发请求相同business_id应只创建一笔订单', async () => {
-      const business_id = `test_concurrent_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`
+    test('并发请求相同 Idempotency-Key 应只创建一笔订单', async () => {
+      const idempotencyKey = `test_concurrent_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`
 
       console.log('🔄 开始并发幂等性测试（5个并发请求）')
 
       // 并发发送5个相同的请求
       const promises = Array.from({ length: 5 }, () =>
         request(app)
-          .post('/api/v4/exchange_market/exchange')
+          .post('/api/v4/shop/exchange/exchange')
           .set('Authorization', `Bearer ${testToken}`)
+          .set('Idempotency-Key', idempotencyKey) // 🔄 相同的 Idempotency-Key
           .send({
             item_id: testItem.item_id,
-            quantity: 1,
-            business_id // 🔄 相同的business_id
+            quantity: 1
           })
       )
 
       const responses = await Promise.all(promises)
 
-      // 验证所有请求都成功
+      // 统计响应结果
+      let successCount = 0 // 200 成功
+      let processingCount = 0 // 409 正在处理中
+
       responses.forEach((response, index) => {
-        expect(response.status).toBe(200)
-        console.log(
-          `   - 请求${index + 1}: ${response.body.data.is_duplicate ? '幂等返回' : '首次创建'}`
-        )
+        if (response.status === 200) {
+          successCount++
+          console.log(
+            `   - 请求${index + 1}: 200 ${response.body.data.is_duplicate ? '(幂等返回)' : '(首次创建)'}`
+          )
+        } else if (response.status === 409) {
+          processingCount++
+          console.log(`   - 请求${index + 1}: 409 (正在处理中)`)
+        } else {
+          console.log(`   - 请求${index + 1}: ${response.status} (异常)`)
+        }
       })
 
-      // 验证数据库中只有一条订单记录
+      /*
+       * 业务验证：
+       * 1. 至少有一个请求成功（200）
+       */
+      expect(successCount).toBeGreaterThanOrEqual(1)
+
+      // 2. 所有响应要么是 200（成功/幂等返回），要么是 409（正在处理中）
+      expect(successCount + processingCount).toBe(responses.length)
+
+      // 3. 数据库中只有一条订单记录（核心保证）
       const orderCount = await ExchangeRecord.count({
-        where: { business_id }
+        where: { idempotency_key: idempotencyKey }
       })
 
       expect(orderCount).toBe(1) // ✅ 只有一条记录
 
       console.log('✅ 并发幂等性保护验证通过')
-      console.log('   - 并发请求数: 5')
+      console.log(`   - 并发请求数: ${responses.length}`)
+      console.log(`   - 成功响应: ${successCount}`)
+      console.log(`   - 处理中响应: ${processingCount}`)
       console.log(`   - 数据库订单数: ${orderCount}`)
     })
   })

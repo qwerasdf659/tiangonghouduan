@@ -292,7 +292,7 @@ class RedemptionService {
             item_instance_id: order.item_instance.item_instance_id,
             operator_user_id: redeemer_user_id,
             business_type: 'redemption_use',
-            business_id: order.order_id,
+            idempotency_key: order.order_id,
             meta: {
               order_id: order.order_id,
               redeemer_user_id,

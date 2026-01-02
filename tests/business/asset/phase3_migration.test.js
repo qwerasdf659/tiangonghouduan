@@ -45,7 +45,7 @@ describe('Phase 3迁移测试：统一账本域', () => {
       // 只清理测试相关的业务数据
       await AssetTransaction.destroy({
         where: {
-          business_id: { [Op.like]: 'test_phase3_%' }
+          idempotency_key: { [Op.like]: 'test_phase3_%' }
         }
       })
 
@@ -58,7 +58,7 @@ describe('Phase 3迁移测试：统一账本域', () => {
       // 清理之前的测试数据
       await AssetTransaction.destroy({
         where: {
-          business_id: { [Op.like]: 'test_phase3_convert_%' }
+          idempotency_key: { [Op.like]: 'test_phase3_convert_%' }
         }
       })
 
@@ -68,7 +68,7 @@ describe('Phase 3迁移测试：统一账本域', () => {
           user_id: testUser.user_id,
           asset_code: 'red_shard',
           delta_amount: 100, // 添加100个red_shard
-          business_id: `test_phase3_init_${Date.now()}`,
+          idempotency_key: `test_phase3_init_${Date.now()}`,
           business_type: 'admin_adjustment',
           meta: { reason: 'Phase 3测试初始化' }
         },
@@ -77,7 +77,7 @@ describe('Phase 3迁移测试：统一账本域', () => {
     })
 
     test('材料转换应使用统一账本双分录', async () => {
-      const business_id = `test_phase3_convert_${Date.now()}`
+      const idempotency_key = `test_phase3_convert_${Date.now()}`
 
       // 记录转换前的余额
       const before_red_shard = await AssetService.getBalance(
@@ -95,7 +95,7 @@ describe('Phase 3迁移测试：统一账本域', () => {
         'red_shard',
         'DIAMOND',
         10,
-        { business_id }
+        { idempotency_key }
       )
 
       expect(result.success).toBe(true)
@@ -105,10 +105,13 @@ describe('Phase 3迁移测试：统一账本域', () => {
       expect(result.to_amount).toBe(200) // 1:20比例
       expect(result.is_duplicate).toBe(false)
 
-      // 验证双分录都写入了asset_transactions表
+      /*
+       * 验证双分录都写入了asset_transactions表
+       * 注意：AssetConversionService 使用派生键格式 ${idempotency_key}:debit 和 ${idempotency_key}:credit
+       */
       const debit_tx = await AssetTransaction.findOne({
         where: {
-          business_id,
+          idempotency_key: `${idempotency_key}:debit`,
           business_type: 'material_convert_debit',
           asset_code: 'red_shard'
         }
@@ -116,7 +119,7 @@ describe('Phase 3迁移测试：统一账本域', () => {
 
       const credit_tx = await AssetTransaction.findOne({
         where: {
-          business_id,
+          idempotency_key: `${idempotency_key}:credit`,
           business_type: 'material_convert_credit',
           asset_code: 'DIAMOND'
         }
@@ -144,7 +147,7 @@ describe('Phase 3迁移测试：统一账本域', () => {
     })
 
     test('材料转换幂等性测试（参数相同）', async () => {
-      const business_id = `test_phase3_convert_idempotent_${Date.now()}`
+      const idempotency_key = `test_phase3_convert_idempotent_${Date.now()}`
 
       // 记录转换前的余额
       const before_balance = await AssetService.getBalance(
@@ -158,7 +161,7 @@ describe('Phase 3迁移测试：统一账本域', () => {
         'red_shard',
         'DIAMOND',
         5,
-        { business_id }
+        { idempotency_key }
       )
 
       expect(result1.success).toBe(true)
@@ -170,7 +173,7 @@ describe('Phase 3迁移测试：统一账本域', () => {
         'red_shard',
         'DIAMOND',
         5,
-        { business_id }
+        { idempotency_key }
       )
 
       expect(result2.success).toBe(true)
@@ -190,27 +193,27 @@ describe('Phase 3迁移测试：统一账本域', () => {
     })
 
     test('材料转换409冲突检查（参数不同）', async () => {
-      const business_id = `test_phase3_convert_conflict_${Date.now()}`
+      const idempotency_key = `test_phase3_convert_conflict_${Date.now()}`
 
       // 第一次转换：5个red_shard
       await AssetConversionService.convertMaterial(testUser.user_id, 'red_shard', 'DIAMOND', 5, {
-        business_id
+        idempotency_key
       })
 
-      // 第二次转换：相同business_id，但不同数量（10个）
+      // 第二次转换：相同idempotency_key，但不同数量（10个）
       await expect(
         AssetConversionService.convertMaterial(
           testUser.user_id,
           'red_shard',
           'DIAMOND',
           10, // 不同数量
-          { business_id }
+          { idempotency_key }
         )
       ).rejects.toThrow(/幂等键冲突/)
 
       try {
         await AssetConversionService.convertMaterial(testUser.user_id, 'red_shard', 'DIAMOND', 10, {
-          business_id
+          idempotency_key
         })
       } catch (error) {
         expect(error.statusCode).toBe(409)
@@ -224,7 +227,7 @@ describe('Phase 3迁移测试：统一账本域', () => {
 
   describe('2. 业务类型（business_type）验证', () => {
     test('验证材料转换的business_type', async () => {
-      const business_id = `test_phase3_business_type_${Date.now()}`
+      const idempotency_key = `test_phase3_business_type_${Date.now()}`
 
       // 添加red_shard余额
       await AssetService.changeBalance(
@@ -232,7 +235,7 @@ describe('Phase 3迁移测试：统一账本域', () => {
           user_id: testUser.user_id,
           asset_code: 'red_shard',
           delta_amount: 20,
-          business_id: `test_init_${Date.now()}`,
+          idempotency_key: `test_init_${Date.now()}`,
           business_type: 'admin_adjustment',
           meta: {}
         },
@@ -241,21 +244,21 @@ describe('Phase 3迁移测试：统一账本域', () => {
 
       // 执行转换
       await AssetConversionService.convertMaterial(testUser.user_id, 'red_shard', 'DIAMOND', 10, {
-        business_id
+        idempotency_key
       })
 
-      // 验证扣减分录的business_type
+      // 验证扣减分录的business_type（使用派生键格式）
       const debit_tx = await AssetTransaction.findOne({
         where: {
-          business_id,
+          idempotency_key: `${idempotency_key}:debit`,
           asset_code: 'red_shard'
         }
       })
 
-      // 验证入账分录的business_type
+      // 验证入账分录的business_type（使用派生键格式）
       const credit_tx = await AssetTransaction.findOne({
         where: {
-          business_id,
+          idempotency_key: `${idempotency_key}:credit`,
           asset_code: 'DIAMOND'
         }
       })
@@ -271,7 +274,7 @@ describe('Phase 3迁移测试：统一账本域', () => {
 
   describe('3. 账本域统一验证', () => {
     test('验证所有资产变动都记录在asset_transactions表', async () => {
-      const business_id = `test_phase3_unified_ledger_${Date.now()}`
+      const idempotency_key = `test_phase3_unified_ledger_${Date.now()}`
 
       // 添加red_shard余额
       await AssetService.changeBalance(
@@ -279,7 +282,7 @@ describe('Phase 3迁移测试：统一账本域', () => {
           user_id: testUser.user_id,
           asset_code: 'red_shard',
           delta_amount: 30,
-          business_id: `test_init_${Date.now()}`,
+          idempotency_key: `test_init_${Date.now()}`,
           business_type: 'admin_adjustment',
           meta: {}
         },
@@ -288,12 +291,14 @@ describe('Phase 3迁移测试：统一账本域', () => {
 
       // 执行转换
       await AssetConversionService.convertMaterial(testUser.user_id, 'red_shard', 'DIAMOND', 15, {
-        business_id
+        idempotency_key
       })
 
-      // 查询asset_transactions表
+      // 查询asset_transactions表（使用 LIKE 匹配派生键）
       const transactions = await AssetTransaction.findAll({
-        where: { business_id },
+        where: {
+          idempotency_key: { [Op.like]: `${idempotency_key}:%` }
+        },
         order: [['created_at', 'ASC']]
       })
 

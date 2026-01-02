@@ -140,7 +140,7 @@ module.exports = sequelize => {
         comment: '抽奖记录唯一ID'
       },
       /**
-       * 业务关联ID（幂等控制字段）
+       * 幂等键（业界标准形态 - 2026-01-02）
        *
        * 业务含义：
        * - 用于防止重复提交创建多条抽奖记录
@@ -149,22 +149,19 @@ module.exports = sequelize => {
        *
        * 技术规范：
        * - 格式：lottery_draw_用户ID_活动ID_时间戳
-       * - 同一business_id只能创建一条记录
+       * - 同一 idempotency_key 只能创建一条记录
        * - 重复提交返回已有记录（幂等）
        *
        * 使用场景：
-       * - 用户抽奖时生成business_id，防止重复提交
-       * - 通过business_id查询是否已存在记录
+       * - 用户抽奖时生成 idempotency_key，防止重复提交
+       * - 通过 idempotency_key 查询是否已存在记录
        * - 实现幂等性保护，避免数据重复
-       *
-       * P0-3规范：所有资产变动必须有business_id幂等控制
-       * P0-6任务：抽奖结果未使用business_id幂等控制（已修复）
        */
-      business_id: {
+      idempotency_key: {
         type: DataTypes.STRING(100),
-        allowNull: false, // P1-1修复：同步数据库约束，业务ID为必需字段
-        unique: true, // P1-1修复：唯一约束，确保幂等性
-        comment: '业务关联ID，用于幂等控制（唯一，不可为空）'
+        allowNull: false,
+        unique: true,
+        comment: '幂等键（业界标准命名），用于防止重复提交，客户端通过 Header Idempotency-Key 传入'
       },
       user_id: {
         type: DataTypes.INTEGER,
@@ -393,10 +390,10 @@ module.exports = sequelize => {
           fields: ['user_id']
         },
         {
-          name: 'uk_lottery_draws_business_id',
-          fields: ['business_id'],
+          name: 'uk_lottery_draws_idempotency_key',
+          fields: ['idempotency_key'],
           unique: true,
-          comment: '业务ID唯一索引，用于幂等控制'
+          comment: '幂等键唯一索引（业界标准形态）'
         },
         {
           name: 'idx_prize_id',

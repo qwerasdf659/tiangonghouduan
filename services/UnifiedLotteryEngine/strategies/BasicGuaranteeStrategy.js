@@ -826,8 +826,8 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
       // 2. 生成唯一的抽奖ID（用于幂等性控制）
       const draw_id = `draw_${BeijingTimeHelper.generateIdTimestamp()}_${user_id}_${Math.random().toString(36).substr(2, 6)}`
 
-      // 方案B：使用 idempotency_key 作为 business_id（兼容现有数据库约束）
-      const businessId =
+      // 使用 idempotency_key 进行幂等控制（业界标准形态）
+      const idempotencyKey =
         context.idempotency_key ||
         context.lottery_session_id ||
         `lottery_draw_${user_id}_${campaignId}_${Date.now()}`
@@ -896,7 +896,7 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
       const lotteryRecord = await models.LotteryDraw.create(
         {
           draw_id,
-          business_id: businessId, // 🎯 P0-6修复：添加business_id用于幂等控制
+          idempotency_key: idempotencyKey, // 业界标准形态：使用 idempotency_key 进行幂等控制
           user_id,
           lottery_id: campaignId,
           campaign_id: campaignId,
@@ -1808,11 +1808,11 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
    * 业务场景：创建抽奖记录，防止重复提交
    *
    * 幂等控制：
-   * - 通过business_id防止重复提交
+   * - 通过 idempotency_key 防止重复提交（业界标准形态）
    * - 同一 lottery_session_id/idempotency_key 只能创建一条记录
    * - 重复提交返回已有记录
    *
-   * 方案B更新：使用 idempotency_key 和 lottery_session_id 替代 business_id
+   * 业界标准形态：统一使用 idempotency_key 进行幂等控制
    *
    * @param {Object} context - 抽奖上下文
    * @param {Object} result - 抽奖结果
@@ -1840,24 +1840,24 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
       `draw_${BeijingTimeHelper.generateIdTimestamp()}_${user_id}_${Math.random().toString(36).substr(2, 6)}`
 
     /*
-     * 方案B：使用 idempotency_key 作为 business_id（兼容现有数据库约束）
+     * 业界标准形态：使用 idempotency_key 进行幂等控制
      * 优先使用 context.idempotency_key，回退到 lottery_session_id，最后使用传统格式
      */
-    const businessId =
+    const idempotencyKey =
       context.idempotency_key ||
       context.lottery_session_id ||
       `lottery_draw_${user_id}_${campaign_id}_${Date.now()}`
 
-    // 🔥 P0-6修复：添加幂等检查，防止重复提交创建多条抽奖记录
-    if (businessId) {
+    // 幂等检查：防止重复提交创建多条抽奖记录
+    if (idempotencyKey) {
       const existingDraw = await LotteryDraw.findOne({
-        where: { business_id: businessId },
+        where: { idempotency_key: idempotencyKey },
         transaction: transaction || undefined
       })
 
       if (existingDraw) {
         this.logInfo('抽奖记录已存在（幂等）', {
-          business_id: businessId,
+          idempotency_key: idempotencyKey,
           draw_id: existingDraw.draw_id,
           user_id,
           campaign_id,
@@ -1877,7 +1877,7 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
     const lotteryDraw = await LotteryDraw.create(
       {
         draw_id: finalDrawId,
-        business_id: businessId, // 兼容现有字段，值来源于 idempotency_key 或 lottery_session_id
+        idempotency_key: idempotencyKey, // 业界标准形态：使用 idempotency_key 进行幂等控制
         user_id,
         lottery_id: campaign_id,
         campaign_id,
@@ -1900,7 +1900,7 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
     ) // 🎯 传入事务对象
 
     this.logInfo('抽奖记录创建成功', {
-      business_id: businessId,
+      idempotency_key: idempotencyKey,
       draw_id: finalDrawId,
       user_id,
       campaign_id,

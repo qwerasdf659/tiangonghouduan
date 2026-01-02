@@ -340,7 +340,7 @@ describe('BackpackService - 背包服务', () => {
           user_id: new_user.user_id,
           asset_code: 'MATERIAL_001',
           delta_amount: 100,
-          business_id: `test_${Date.now()}`,
+          idempotency_key: `test_${Date.now()}`,
           business_type: 'test',
           meta: { description: '测试' }
         })

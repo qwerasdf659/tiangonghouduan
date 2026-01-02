@@ -100,12 +100,12 @@ module.exports = sequelize => {
           '卖家实收金额（Net Amount - 卖家实际收到的金额，扣除手续费后）：使用BIGINT避免浮点精度问题；业务规则：net_amount = gross_amount - fee_amount；用途：卖家入账金额、收益统计、对账验证'
       },
 
-      // 幂等性控制字段（Idempotency Control Field - 用于防止重复交易）- V4.2新增
-      business_id: {
+      // 幂等键（业界标准形态 - 2026-01-02）
+      idempotency_key: {
         type: DataTypes.STRING(100),
         allowNull: true,
         comment:
-          '业务唯一标识（Business ID - 幂等键，用于防止重复扣款）：客户端必传，格式如mp_20251215_xxx；业务规则：同一business_id只能创建一条记录，重复请求返回原结果；用途：幂等性控制、重复交易防护、对账追溯'
+          '幂等键（业界标准命名）：客户端必传，格式如 mp_20251215_xxx；业务规则：同一 idempotency_key 只能创建一条记录，重复请求返回原结果'
       },
 
       // 交易状态

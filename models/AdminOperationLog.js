@@ -160,11 +160,11 @@ module.exports = sequelize => {
         comment: '用户代理字符串（浏览器信息）'
       },
 
-      // 业务关联
-      business_id: {
+      // 幂等键（业界标准形态 - 2026-01-02）
+      idempotency_key: {
         type: DataTypes.STRING(100),
         allowNull: true,
-        comment: '业务关联ID（如兑换单号、交易单号等）'
+        comment: '幂等键（业界标准命名），用于关联业务操作（如兑换单号、交易单号等）'
       },
 
       // 时间字段
@@ -212,9 +212,9 @@ module.exports = sequelize => {
           comment: '创建时间索引'
         },
         {
-          name: 'idx_audit_logs_business_id',
-          fields: ['business_id'],
-          comment: '业务关联ID索引'
+          name: 'idx_audit_logs_idempotency_key',
+          fields: ['idempotency_key'],
+          comment: '幂等键索引（业界标准形态）'
         },
         {
           name: 'idx_audit_logs_ip',

@@ -84,11 +84,12 @@ module.exports = sequelize => {
         unique: true,
         comment: '订单号'
       },
-      business_id: {
+      // 幂等键（业界标准形态 - 2026-01-02）
+      idempotency_key: {
         type: DataTypes.STRING(100),
         allowNull: true,
         unique: true,
-        comment: '业务唯一标识（用于幂等性控制，防止重复提交）'
+        comment: '幂等键（业界标准命名），用于防止重复提交，客户端通过 Header Idempotency-Key 传入'
       },
       item_snapshot: {
         type: DataTypes.JSON,
@@ -136,7 +137,7 @@ module.exports = sequelize => {
       underscored: true,
       indexes: [
         { fields: ['order_no'], unique: true },
-        { fields: ['business_id'], unique: true, name: 'idx_business_id_unique' },
+        { fields: ['idempotency_key'], unique: true, name: 'uk_exchange_records_idempotency_key' },
         { fields: ['user_id'] },
         { fields: ['status'] },
         { fields: ['created_at'] }

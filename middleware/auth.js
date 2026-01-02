@@ -187,7 +187,7 @@ async function invalidateUserPermissions(user_id, reason = 'unknown', operator_i
         before_data: null,
         after_data: null,
         reason,
-        business_id: `permissions_cache_invalidate_${user_id}_${BeijingTimeHelper.timestamp()}`
+        idempotency_key: `permissions_cache_invalidate_${user_id}_${BeijingTimeHelper.timestamp()}`
       })
     } catch (auditError) {
       logger.warn('⚠️ [Auth] 权限缓存失效审计日志记录失败（非致命）:', auditError.message)

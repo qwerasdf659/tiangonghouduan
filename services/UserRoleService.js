@@ -243,7 +243,7 @@ class UserRoleService {
           role_level: targetRole.role_level
         },
         reason: reason || `角色变更: ${oldRoles} → ${role_name}`,
-        business_id: `role_change_${user_id}_${Date.now()}`,
+        idempotency_key: `role_change_${user_id}_${Date.now()}`,
         ip_address,
         user_agent,
         transaction: internalTransaction

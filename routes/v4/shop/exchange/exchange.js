@@ -16,8 +16,12 @@
  * - 材料扣减通过AssetService执行
  * - 订单记录pay_asset_code和pay_amount字段
  *
+ * 幂等性保证（业界标准形态 - 破坏性重构 2026-01-02）：
+ * - 统一只接受 Header Idempotency-Key
+ * - 缺失幂等键直接返回 400
+ *
  * 创建时间：2025年12月22日
- * 从exchange_market.js拆分而来
+ * 更新时间：2026年01月02日 - 业界标准形态破坏性重构
  */
 
 const express = require('express')
@@ -25,64 +29,58 @@ const router = express.Router()
 const { authenticateToken } = require('../../../../middleware/auth')
 const { handleServiceError } = require('../../../../middleware/validation')
 const logger = require('../../../../utils/logger').logger
+// 业界标准幂等架构 - 统一入口幂等服务
+const IdempotencyService = require('../../../../services/IdempotencyService')
 
 /**
  * @route POST /api/v4/exchange_market/exchange
  * @desc 兑换商品（V4.5.0 材料资产支付）
  * @access Private (需要登录)
  *
+ * @header {string} Idempotency-Key - 幂等键（必填，不接受body参数）
  * @body {number} item_id - 商品ID（必填）
  * @body {number} quantity - 兑换数量（默认1，最大10）
- * @body {string} business_id - 业务唯一ID（必填，用于幂等性控制）
- * @header {string} Idempotency-Key - 幂等键（可选，Header方式，与business_id二选一）
  *
  * @returns {Object} 兑换结果
  * @returns {Object} data.order - 订单信息（包含pay_asset_code, pay_amount）
  * @returns {Object} data.remaining - 剩余余额
- * @returns {string} data.business_id - 幂等键（供前端确认）
- * @returns {boolean} data.is_duplicate - 是否为幂等请求（仅重复时返回）
+ * @returns {boolean} data.is_duplicate - 是否为幂等回放请求
  *
- * 🔴 业务幂等性设计（P1-1强制规范）：
- * 1. 强制幂等键：客户端必须提供幂等键，支持两种方式：
- *    - 方式A：Body中的 business_id（推荐，业务交易号语义）
- *    - 方式B：Header中的 Idempotency-Key（兼容标准HTTP幂等设计）
- * 2. 缺失即拒绝：两者都未提供时，直接返回 400 错误
- * 3. 禁止后端兜底生成：不再自动生成 business_id（防止重复下单）
+ * 业务场景：用户使用材料资产兑换商品
+ * 幂等性控制（业界标准形态）：统一通过 Header Idempotency-Key 防止重复下单
  */
 router.post('/exchange', authenticateToken, async (req, res) => {
+  // 【业界标准形态】强制从 Header 获取幂等键，不接受 body
+  const idempotency_key = req.headers['idempotency-key']
+
+  // 缺失幂等键直接返回 400
+  if (!idempotency_key) {
+    logger.warn('缺少幂等键', { user_id: req.user?.user_id, item_id: req.body?.item_id })
+    return res.apiError(
+      '缺少必需的幂等键：请在 Header 中提供 Idempotency-Key。' +
+        '重试时必须复用同一幂等键以防止重复下单。',
+      'MISSING_IDEMPOTENCY_KEY',
+      {
+        required_header: 'Idempotency-Key',
+        example: 'Idempotency-Key: exchange_<timestamp>_<random>'
+      },
+      400
+    )
+  }
+
   try {
     // 🔄 通过 ServiceManager 获取 ExchangeService（符合TR-005规范）
     const ExchangeService = req.app.locals.services.getService('exchangeMarket')
 
-    const { item_id, quantity = 1, business_id: bodyBusinessId } = req.body
-    const headerIdempotencyKey = req.headers['idempotency-key']
+    const { item_id, quantity = 1 } = req.body
     const user_id = req.user.user_id
 
     logger.info('用户兑换商品请求', {
       user_id,
       item_id,
       quantity,
-      body_business_id: bodyBusinessId,
-      header_idempotency_key: headerIdempotencyKey
+      idempotency_key
     })
-
-    // 🔴 P1-1强制校验：必须提供幂等键（business_id 或 Idempotency-Key）
-    if (!bodyBusinessId && !headerIdempotencyKey) {
-      logger.warn('缺少幂等键', { user_id, item_id })
-      return res.apiError(
-        '缺少幂等键：请在请求Body中提供 business_id 或在Header中提供 Idempotency-Key。' +
-          '重试时必须复用同一幂等键以防止重复下单。',
-        'BAD_REQUEST',
-        {
-          required_fields: ['business_id (Body)', 'Idempotency-Key (Header)'],
-          requirement: 'at_least_one'
-        },
-        400
-      )
-    }
-
-    // 🔴 优先使用 Body 中的 business_id，如果没有则使用 Header 中的 Idempotency-Key
-    const business_id = bodyBusinessId || headerIdempotencyKey
 
     // 参数验证：商品ID必填
     if (!item_id || item_id === undefined) {
@@ -100,38 +98,87 @@ router.post('/exchange', authenticateToken, async (req, res) => {
       return res.apiError('兑换数量必须在1-10之间', 'BAD_REQUEST', null, 400)
     }
 
-    // 🔴 P1-1冲突保护：调用服务层（Service内部会验证幂等性和参数冲突）
-    const result = await ExchangeService.exchangeItem(user_id, itemId, exchangeQuantity, {
-      business_id
+    /*
+     * 【入口幂等检查】防止同一次请求被重复提交
+     * 统一使用 IdempotencyService 进行请求级幂等控制
+     */
+    const idempotencyResult = await IdempotencyService.getOrCreateRequest(idempotency_key, {
+      api_path: '/api/v4/exchange_market/exchange',
+      http_method: 'POST',
+      request_params: { item_id: itemId, quantity: exchangeQuantity },
+      user_id
     })
+
+    // 如果已完成，直接返回首次结果（幂等性要求）+ is_duplicate 标记
+    if (!idempotencyResult.should_process) {
+      logger.info('🔄 入口幂等拦截：重复请求，返回首次结果', {
+        idempotency_key,
+        user_id,
+        item_id: itemId
+      })
+      const duplicateResponse = {
+        ...idempotencyResult.response,
+        is_duplicate: true
+      }
+      return res.apiSuccess(duplicateResponse, '兑换成功（幂等回放）')
+    }
+
+    /*
+     * 调用服务层（传递 idempotency_key）
+     * 服务层内部使用此幂等键生成派生子事务幂等键
+     */
+    const result = await ExchangeService.exchangeItem(user_id, itemId, exchangeQuantity, {
+      idempotency_key
+    })
+
+    // 构建响应数据
+    const responseData = {
+      order: result.order,
+      remaining: result.remaining,
+      is_duplicate: false
+    }
+
+    /*
+     * 【标记请求完成】保存结果快照到入口幂等表
+     */
+    await IdempotencyService.markAsCompleted(
+      idempotency_key,
+      result.order.order_no, // 业务事件ID = 订单号
+      responseData
+    )
 
     logger.info('兑换成功', {
       user_id,
       item_id: itemId,
       quantity: exchangeQuantity,
-      business_id,
+      idempotency_key,
       order_no: result.order.order_no,
       pay_asset_code: result.order.pay_asset_code,
-      pay_amount: result.order.pay_amount,
-      is_duplicate: result.is_duplicate || false
+      pay_amount: result.order.pay_amount
     })
 
-    // ✅ 在响应中返回 business_id 和材料资产支付信息，供前端确认幂等键
-    return res.apiSuccess(
-      {
-        order: result.order,
-        remaining: result.remaining,
-        business_id,
-        ...(result.is_duplicate && { is_duplicate: true })
-      },
-      result.message
-    )
+    return res.apiSuccess(responseData, result.message)
   } catch (error) {
+    // 标记幂等请求失败（允许重试）
+    await IdempotencyService.markAsFailed(idempotency_key, error.message).catch(markError => {
+      logger.error('标记幂等请求失败状态时出错:', markError)
+    })
+
+    // 处理幂等键冲突错误（409状态码）
+    if (error.statusCode === 409) {
+      logger.warn('幂等性错误:', {
+        idempotency_key,
+        error_code: error.errorCode,
+        message: error.message
+      })
+      return res.apiError(error.message, error.errorCode || 'IDEMPOTENCY_ERROR', {}, 409)
+    }
+
     logger.error('兑换商品失败', {
       error: error.message,
       user_id: req.user?.user_id,
       item_id: req.body?.item_id,
-      business_id: req.body?.business_id || req.headers['idempotency-key']
+      idempotency_key
     })
     return handleServiceError(error, res, '兑换失败')
   }

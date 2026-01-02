@@ -250,7 +250,7 @@ const createTestData = {
   lotteryRequest: (overrides = {}) => ({
     user_id: TEST_DATA.users.testUser.user_id,
     campaign_id: TEST_DATA.lottery.testCampaign.campaign_id,
-    timestamp: BeijingTimeHelper.createBeijingISO(), // 使用北京时间
+    timestamp: BeijingTimeHelper.formatToISO(), // 使用北京时间ISO格式
     ...overrides
   })
 }

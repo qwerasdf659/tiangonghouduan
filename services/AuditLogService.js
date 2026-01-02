@@ -35,7 +35,7 @@ const logger = require('../utils/logger').logger
  *   after_points: 200,
  *   points_amount: 100,
  *   reason: '消费奖励',
- *   business_id: 'consumption_12345',
+ *   idempotency_key: 'consumption_12345',
  *   transaction
  * });
  *
@@ -87,7 +87,7 @@ class AuditLogService {
    * @param {Object} params.before_data - 操作前数据（可选）
    * @param {Object} params.after_data - 操作后数据（可选）
    * @param {string} params.reason - 操作原因（可选）
-   * @param {string} params.business_id - 业务关联ID（可选）
+   * @param {string} params.idempotency_key - 业务关联ID（可选）
    * @param {string} params.ip_address - IP地址（可选）
    * @param {string} params.user_agent - 用户代理（可选）
    * @param {Object} params.transaction - 事务对象（可选）
@@ -104,7 +104,7 @@ class AuditLogService {
         before_data = null,
         after_data = null,
         reason = null,
-        business_id = null,
+        idempotency_key = null,
         ip_address = null,
         user_agent = null,
         transaction = null
@@ -166,7 +166,7 @@ class AuditLogService {
           reason,
           ip_address,
           user_agent,
-          business_id,
+          idempotency_key,
           created_at: BeijingTimeHelper.createDatabaseTime()
         },
         { transaction }
@@ -224,7 +224,7 @@ class AuditLogService {
       before_data: null,
       after_data: operation_details,
       reason: operation_details.reason || null,
-      business_id: null,
+      idempotency_key: null,
       ip_address,
       user_agent,
       transaction
@@ -241,7 +241,7 @@ class AuditLogService {
    * @param {number} params.after_points - 操作后积分
    * @param {number} params.points_amount - 积分数量
    * @param {string} params.reason - 操作原因
-   * @param {string} params.business_id - 业务ID
+   * @param {string} params.idempotency_key - 业务ID
    * @param {Object} params.transaction - 事务对象
    * @returns {Promise<AdminOperationLog|null>} 审计日志记录（失败返回null，不阻塞业务流程）
    */
@@ -253,7 +253,7 @@ class AuditLogService {
       after_points,
       points_amount,
       reason,
-      business_id,
+      idempotency_key,
       transaction
     } = params
 
@@ -270,7 +270,7 @@ class AuditLogService {
         available_points: after_points
       },
       reason: reason || `增加积分${points_amount}分`,
-      business_id,
+      idempotency_key,
       transaction
     })
   }
@@ -285,7 +285,7 @@ class AuditLogService {
    * @param {number} params.after_points - 操作后积分
    * @param {number} params.points_amount - 积分数量
    * @param {string} params.reason - 操作原因
-   * @param {string} params.business_id - 业务ID
+   * @param {string} params.idempotency_key - 业务ID
    * @param {Object} params.transaction - 事务对象
    * @returns {Promise<AdminOperationLog|null>} 审计日志记录（失败返回null，不阻塞业务流程）
    */
@@ -297,7 +297,7 @@ class AuditLogService {
       after_points,
       points_amount,
       reason,
-      business_id,
+      idempotency_key,
       transaction
     } = params
 
@@ -314,7 +314,7 @@ class AuditLogService {
         available_points: after_points
       },
       reason: reason || `消费积分${points_amount}分`,
-      business_id,
+      idempotency_key,
       transaction
     })
   }
@@ -328,7 +328,7 @@ class AuditLogService {
    * @param {number} params.transaction_id - 积分交易ID
    * @param {number} params.points_amount - 激活的积分数量
    * @param {string} params.reason - 操作原因
-   * @param {string} params.business_id - 业务ID
+   * @param {string} params.idempotency_key - 业务ID
    * @param {Object} params.transaction - 事务对象
    * @returns {Promise<AdminOperationLog|null>} 审计日志记录（失败返回null，不阻塞业务流程）
    */
@@ -339,7 +339,7 @@ class AuditLogService {
       transaction_id,
       points_amount,
       reason,
-      business_id,
+      idempotency_key,
       transaction
     } = params
 
@@ -358,7 +358,7 @@ class AuditLogService {
         points_amount
       },
       reason: reason || `激活pending积分${points_amount}分（用户${user_id}）`,
-      business_id,
+      idempotency_key,
       transaction
     })
   }
@@ -371,12 +371,12 @@ class AuditLogService {
    * @param {number} params.item_id - 物品ID
    * @param {string} params.item_name - 物品名称
    * @param {string} params.reason - 操作原因
-   * @param {string} params.business_id - 业务ID
+   * @param {string} params.idempotency_key - 业务ID
    * @param {Object} params.transaction - 事务对象
    * @returns {Promise<AdminOperationLog|null>} 审计日志记录（失败返回null，不阻塞业务流程）
    */
   static async logInventoryUse(params) {
-    const { operator_id, item_id, item_name, reason, business_id, transaction } = params
+    const { operator_id, item_id, item_name, reason, idempotency_key, transaction } = params
 
     return this.logOperation({
       operator_id,
@@ -391,7 +391,7 @@ class AuditLogService {
         status: 'used'
       },
       reason: reason || `使用物品：${item_name}`,
-      business_id,
+      idempotency_key,
       transaction
     })
   }
@@ -409,7 +409,7 @@ class AuditLogService {
    * @param {number} params.to_user_id - 接收方ID
    * @param {string} params.item_name - 物品名称
    * @param {string} params.reason - 操作原因
-   * @param {string} params.business_id - 业务ID
+   * @param {string} params.idempotency_key - 业务ID
    * @param {Object} params.transaction - 事务对象
    * @returns {Promise<AdminOperationLog|null>} 审计日志记录（失败返回null，不阻塞业务流程）
    */
@@ -421,7 +421,7 @@ class AuditLogService {
       to_user_id,
       item_name,
       reason,
-      business_id,
+      idempotency_key,
       transaction
     } = params
 
@@ -438,7 +438,7 @@ class AuditLogService {
         user_id: to_user_id
       },
       reason: reason || `物品转让：${item_name}（${from_user_id} → ${to_user_id}）`,
-      business_id,
+      idempotency_key,
       transaction
     })
   }
@@ -453,7 +453,7 @@ class AuditLogService {
    * @param {string} params.item_name - 物品名称
    * @param {string} params.verification_code - 核销码
    * @param {string} params.reason - 操作原因
-   * @param {string} params.business_id - 业务ID
+   * @param {string} params.idempotency_key - 业务ID
    * @param {Object} params.transaction - 事务对象
    * @returns {Promise<AdminOperationLog|null>} 审计日志记录（失败返回null，不阻塞业务流程）
    */
@@ -465,7 +465,7 @@ class AuditLogService {
       item_name,
       verification_code,
       reason,
-      business_id,
+      idempotency_key,
       transaction
     } = params
 
@@ -484,7 +484,7 @@ class AuditLogService {
         verification_code: null
       },
       reason: reason || `核销物品：${item_name}（用户${user_id}）`,
-      business_id,
+      idempotency_key,
       transaction
     })
   }
@@ -499,7 +499,7 @@ class AuditLogService {
    * @param {string} params.before_status - 审核前状态
    * @param {string} params.after_status - 审核后状态
    * @param {string} params.reason - 操作原因
-   * @param {string} params.business_id - 业务ID
+   * @param {string} params.idempotency_key - 业务ID
    * @param {Object} params.transaction - 事务对象
    * @returns {Promise<AdminOperationLog|null>} 审计日志记录（失败返回null，不阻塞业务流程）
    */
@@ -511,7 +511,7 @@ class AuditLogService {
       before_status,
       after_status,
       reason,
-      business_id,
+      idempotency_key,
       transaction
     } = params
 
@@ -528,7 +528,7 @@ class AuditLogService {
         audit_status: after_status
       },
       reason,
-      business_id,
+      idempotency_key,
       transaction
     })
   }
@@ -544,7 +544,7 @@ class AuditLogService {
    * @param {string} params.after_status - 审核后状态
    * @param {number} params.points_amount - 涉及积分数量
    * @param {string} params.reason - 操作原因
-   * @param {string} params.business_id - 业务ID
+   * @param {string} params.idempotency_key - 业务ID
    * @param {Object} params.transaction - 事务对象
    * @returns {Promise<AdminOperationLog|null>} 审计日志记录（失败返回null，不阻塞业务流程）
    */
@@ -557,7 +557,7 @@ class AuditLogService {
       after_status,
       points_amount,
       reason,
-      business_id,
+      idempotency_key,
       transaction
     } = params
 
@@ -575,7 +575,7 @@ class AuditLogService {
         points_awarded: points_amount
       },
       reason,
-      business_id,
+      idempotency_key,
       transaction
     })
   }

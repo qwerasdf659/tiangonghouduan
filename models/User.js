@@ -151,14 +151,12 @@ module.exports = sequelize => {
       comment: '用户高级空间解锁状态（100积分解锁，24小时有效期）'
     })
 
-    // 用户资产交易流水（新架构）
-    if (models.AssetTransaction) {
-      User.hasMany(models.AssetTransaction, {
-        foreignKey: 'user_id',
-        as: 'assetTransactions',
-        comment: '资产交易流水'
-      })
-    }
+    /*
+     * ⚠️ 已废弃关联（2026-01-02）：
+     * 新架构中 AssetTransaction 通过 Account 间接关联 User：
+     * User → Account (user_id) → AssetTransaction (account_id)
+     * 直接关联已移除，避免 Sequelize 尝试查询不存在的 user_id 列
+     */
 
     // 🔥 用户的交易记录（作为发送方）
     if (models.TradeRecord) {

@@ -12,7 +12,13 @@
  * 使用模型：Claude Sonnet 4.5
  */
 
-const { sequelize, RedemptionOrder, ItemInstance, User } = require('../../models')
+const {
+  sequelize,
+  RedemptionOrder,
+  ItemInstance,
+  ItemInstanceEvent,
+  User
+} = require('../../models')
 const RedemptionService = require('../../services/RedemptionService')
 const RedemptionCodeGenerator = require('../../utils/RedemptionCodeGenerator')
 
@@ -63,7 +69,14 @@ describe('RedemptionService - 兑换订单服务', () => {
         }
       })
 
-      // 清理测试物品实例
+      // 先清理物品实例事件（外键约束：onDelete: 'RESTRICT'）
+      await ItemInstanceEvent.destroy({
+        where: {
+          item_instance_id: test_item_instance.item_instance_id
+        }
+      })
+
+      // 再清理测试物品实例
       await ItemInstance.destroy({
         where: {
           item_instance_id: test_item_instance.item_instance_id

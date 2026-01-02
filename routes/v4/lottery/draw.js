@@ -12,12 +12,13 @@
  * - 积分扣除：抽奖前检查余额，抽奖后立即扣除，使用事务保护
  * - 奖励档位：使用 reward_tier (low/mid/high) 替代原 is_winner
  *
- * 幂等性保证（方案B - 业界标准）：
- * - 入口幂等：通过 IdempotencyService 实现"重试返回首次结果"
+ * 幂等性保证（业界标准形态 - 破坏性重构 2026-01-02）：
+ * - 入口幂等：统一只接受 Header Idempotency-Key，不接受 body，不服务端生成
+ * - 缺失幂等键：直接返回 400 BAD_REQUEST
  * - 流水幂等：通过派生 idempotency_key 保证每条流水唯一
  *
  * 创建时间：2025年12月22日
- * 更新时间：2026年01月01日 - V4.0语义清理
+ * 更新时间：2026年01月02日 - 业界标准形态破坏性重构
  */
 
 const express = require('express')
@@ -29,25 +30,26 @@ const { handleServiceError } = require('../../../middleware/validation')
 const DataSanitizer = require('../../../services/DataSanitizer')
 const LotteryDrawFormatter = require('../../../utils/formatters/LotteryDrawFormatter')
 const { requestDeduplication, lotteryRateLimiter } = require('./middleware')
-// 方案B：业界标准幂等架构
+// 业界标准幂等架构 - 统一入口幂等服务
 const IdempotencyService = require('../../../services/IdempotencyService')
-const { generateRequestIdempotencyKey } = require('../../../utils/IdempotencyHelper')
 
 /**
  * @route POST /api/v4/lottery/draw
  * @desc 执行抽奖 - 支持单次和连续抽奖
  * @access Private
  *
- * @header {string} Idempotency-Key - 幂等键（可选，客户端生成或服务端生成）
+ * @header {string} Idempotency-Key - 幂等键（必填，客户端生成，不接受body参数，不服务端兜底生成）
  * @body {string} campaign_code - 活动代码（必需）
  * @body {number} draw_count - 抽奖次数（1-10，默认1）
  *
  * @returns {Object} 抽奖结果
  *
- * 幂等性保证（方案B）：
- * - 相同幂等键的重复请求返回首次结果
- * - 参数冲突时返回 409 错误
- * - 处理中的请求返回 409 错误
+ * 幂等性保证（业界标准形态 - 破坏性重构）：
+ * - 所有写接口统一只收 Idempotency-Key（Header），缺失即 400
+ * - 禁止 body 中的幂等键参数，禁止服务端兜底生成
+ * - 相同幂等键的重复请求返回首次结果（is_duplicate: true）
+ * - 同 key 不同参数返回 409 IDEMPOTENCY_KEY_CONFLICT
+ * - 处理中的请求返回 409 REQUEST_PROCESSING
  *
  * 并发控制：
  * - 请求去重：5秒内相同请求返回"处理中"
@@ -60,9 +62,22 @@ router.post(
   lotteryRateLimiter,
   dataAccessControl,
   async (req, res) => {
-    // 获取或生成幂等键（客户端可通过请求头传入）
-    const idempotency_key =
-      req.headers['idempotency-key'] || req.body.idempotency_key || generateRequestIdempotencyKey()
+    // 【业界标准形态】强制从 Header 获取幂等键，不接受 body，不服务端生成
+    const idempotency_key = req.headers['idempotency-key']
+
+    // 缺失幂等键直接返回 400
+    if (!idempotency_key) {
+      return res.apiError(
+        '缺少必需的幂等键：请在 Header 中提供 Idempotency-Key。' +
+          '重试时必须复用同一幂等键以防止重复抽奖。',
+        'MISSING_IDEMPOTENCY_KEY',
+        {
+          required_header: 'Idempotency-Key',
+          example: 'Idempotency-Key: lottery_draw_<timestamp>_<random>'
+        },
+        400
+      )
+    }
 
     try {
       const { campaign_code, draw_count = 1 } = req.body
@@ -82,18 +97,19 @@ router.post(
         user_id
       })
 
-      // 如果已完成，直接返回首次结果（幂等性要求）
+      // 如果已完成，直接返回首次结果（幂等性要求）+ is_duplicate 标记
       if (!idempotencyResult.should_process) {
         logger.info('🔄 入口幂等拦截：重复请求，返回首次结果', {
           idempotency_key,
           user_id,
           campaign_code
         })
-        return res.apiSuccess(
-          idempotencyResult.response,
-          '抽奖成功（重试返回首次结果）',
-          'DRAW_SUCCESS'
-        )
+        // 业界标准形态：回放返回首次结果 + is_duplicate: true
+        const duplicateResponse = {
+          ...idempotencyResult.response,
+          is_duplicate: true
+        }
+        return res.apiSuccess(duplicateResponse, '抽奖成功（幂等回放）', 'DRAW_SUCCESS')
       }
 
       /*

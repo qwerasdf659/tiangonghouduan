@@ -6,7 +6,7 @@
  * 业务场景：
  * - 记录物品实例的所有变更事件（铸造/锁定/解锁/转移/使用/过期/销毁）
  * - 支持物品所有权和状态的完整审计追踪
- * - 支持业务幂等（business_type + business_id 唯一约束）
+ * - 支持业务幂等（business_type + idempotency_key 唯一约束）
  *
  * 事件类型（event_type）：
  * - mint：物品铸造（抽奖获得、活动发放）
@@ -22,6 +22,7 @@
  * 外键：item_instance_id → item_instances.item_instance_id（RESTRICT删除，CASCADE更新）
  *
  * 创建时间：2025-12-28
+ * 更新时间：2026-01-02 - 业界标准形态：business_id → idempotency_key
  * 基于文档：统一资产域架构设计方案.md
  */
 
@@ -100,10 +101,11 @@ module.exports = sequelize => {
         allowNull: true,
         comment: '业务类型（lottery_reward/market_transfer/redemption_use/admin_adjust）'
       },
-      business_id: {
+      idempotency_key: {
         type: DataTypes.STRING(100),
-        allowNull: true,
-        comment: '业务ID（幂等键/订单ID）'
+        allowNull: false,
+        field: 'idempotency_key',
+        comment: '幂等键（业界标准命名）：派生自父级幂等键，用于事件去重（NOT NULL - 文档4.2要求）'
       },
 
       // ==================== 扩展信息 ====================
@@ -143,7 +145,13 @@ module.exports = sequelize => {
         },
         {
           name: 'idx_item_instance_events_business',
-          fields: ['business_type', 'business_id']
+          fields: ['business_type', 'idempotency_key']
+        },
+        {
+          // 文档4.2建议：联合唯一索引 (item_instance_id, idempotency_key)
+          name: 'uk_item_instance_events_instance_idempotency',
+          fields: ['item_instance_id', 'idempotency_key'],
+          unique: true
         }
       ],
       comment: '物品实例事件表（记录所有物品变更事件）'
@@ -178,6 +186,7 @@ module.exports = sequelize => {
    * @param {Object} params - 参数对象
    * @param {number} params.item_instance_id - 物品实例ID
    * @param {string} params.event_type - 事件类型
+   * @param {string} params.idempotency_key - 幂等键（必填 - 文档4.2要求）
    * @param {number|null} params.operator_user_id - 操作者用户ID
    * @param {string} params.operator_type - 操作者类型（user/admin/system）
    * @param {string|null} params.status_before - 变更前状态
@@ -185,14 +194,19 @@ module.exports = sequelize => {
    * @param {number|null} params.owner_before - 变更前所有者
    * @param {number|null} params.owner_after - 变更后所有者
    * @param {string|null} params.business_type - 业务类型
-   * @param {string|null} params.business_id - 业务ID
    * @param {Object|null} params.meta - 事件元数据
    * @param {Object} options - 选项
    * @param {Transaction} options.transaction - 事务对象
    * @returns {Promise<ItemInstanceEvent>} 创建的事件记录
+   * @throws {Error} 如果缺少必填参数 idempotency_key
    */
   ItemInstanceEvent.recordEvent = async function (params, options = {}) {
     const { transaction } = options
+
+    // 业界标准形态：idempotency_key 必填（文档4.2要求）
+    if (!params.idempotency_key) {
+      throw new Error('ItemInstanceEvent.recordEvent: idempotency_key 是必填参数（文档4.2要求）')
+    }
 
     return await ItemInstanceEvent.create(
       {
@@ -205,7 +219,7 @@ module.exports = sequelize => {
         owner_before: params.owner_before || null,
         owner_after: params.owner_after || null,
         business_type: params.business_type || null,
-        business_id: params.business_id || null,
+        idempotency_key: params.idempotency_key,
         meta: params.meta || null
       },
       { transaction }

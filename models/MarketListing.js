@@ -88,12 +88,12 @@ module.exports = sequelize => {
         }
       },
 
-      // 幂等键（业务ID）- P1修复：强制必填
-      business_id: {
+      // 幂等键（业界标准形态 - 2026-01-02）
+      idempotency_key: {
         type: DataTypes.STRING(128),
-        allowNull: false, // P1修复：业务ID必填，确保幂等性控制
+        allowNull: false,
         comment:
-          '业务ID（Business ID - 幂等键）：所有写操作必须由客户端提供；用于防止重复挂牌与对账定位（同一business_id重复请求返回同结果，参数不一致返回409）- 必填字段'
+          '幂等键（业界标准命名）：所有写操作必须由客户端提供；用于防止重复挂牌与对账定位（同一 idempotency_key 重复请求返回同结果，参数不一致返回409）- 必填字段'
       },
 
       // 标的资产（Offer）- 不可叠加物品
@@ -180,15 +180,15 @@ module.exports = sequelize => {
       indexes: [
         {
           unique: true,
-          fields: ['business_id'],
-          name: 'uk_market_listings_business_id',
-          comment: '业务ID全局唯一索引（幂等保证 - P1修复）'
+          fields: ['idempotency_key'],
+          name: 'uk_market_listings_idempotency_key',
+          comment: '幂等键全局唯一索引（业界标准形态）'
         },
         {
           unique: true,
-          fields: ['seller_user_id', 'business_id'],
-          name: 'uk_market_listings_seller_business_id',
-          comment: '卖家+业务ID唯一索引（幂等保证 - P0修复）'
+          fields: ['seller_user_id', 'idempotency_key'],
+          name: 'uk_market_listings_seller_idempotency',
+          comment: '卖家+幂等键唯一索引（幂等保证）'
         },
         {
           fields: ['seller_user_id']

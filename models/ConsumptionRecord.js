@@ -77,23 +77,12 @@ class ConsumptionRecord extends Model {
     })
 
     /*
-     * 一对一：一个消费记录对应一个资产交易记录（审核通过后）
-     * 注意：通过reference_type='consumption' + reference_id=record_id关联
-     *
-     * ⚠️ 原 PointsTransaction 已废弃，使用 AssetTransaction 替代
-     * @see models/index.js 第40-46行注释
+     * ⚠️ 已废弃关联（2026-01-02）：
+     * 新架构中 AssetTransaction 不再有 reference_id 列
+     * 引用信息存储在 meta JSON 字段中：
+     * meta: { reference_type: 'consumption', reference_id: record_id, ... }
+     * 通过 meta 字段查询替代直接关联
      */
-    if (models.AssetTransaction) {
-      ConsumptionRecord.hasOne(models.AssetTransaction, {
-        foreignKey: 'reference_id',
-        constraints: false,
-        scope: {
-          reference_type: 'consumption'
-        },
-        as: 'asset_transaction',
-        comment: '关联的资产交易记录'
-      })
-    }
   }
 
   /**
@@ -395,23 +384,21 @@ module.exports = sequelize => {
 
       /*
        * ========================================
-       * 业务幂等控制
+       * 幂等键（业界标准形态 - 2026-01-02）
        * ========================================
        */
-      business_id: {
+      idempotency_key: {
         type: DataTypes.STRING(100),
-        allowNull: false, // P1修复：业务ID为必填字段，确保幂等性
-        unique: true, // P1修复：唯一约束，数据库层已有 uk_consumption_records_business_id
-        comment:
-          // eslint-disable-next-line no-template-curly-in-string
-          '业务关联ID，用于幂等控制（格式：consumption_${userId}_${merchantId}_${timestamp}）- 唯一约束',
+        allowNull: false,
+        unique: true,
+        comment: '幂等键（业界标准命名），用于防止重复提交，客户端通过 Header Idempotency-Key 传入',
         validate: {
           notEmpty: {
-            msg: '业务ID不能为空'
+            msg: '幂等键不能为空'
           },
           len: {
             args: [1, 100],
-            msg: '业务ID长度必须在1-100字符之间'
+            msg: '幂等键长度必须在1-100字符之间'
           }
         }
       },
@@ -508,10 +495,10 @@ module.exports = sequelize => {
       // 索引定义（与数据库迁移保持一致）
       indexes: [
         {
-          name: 'uk_consumption_records_business_id',
-          fields: ['business_id'],
+          name: 'uk_consumption_records_idempotency_key',
+          fields: ['idempotency_key'],
           unique: true,
-          comment: '业务ID唯一索引，用于幂等控制（P1修复）'
+          comment: '幂等键唯一索引，用于防止重复提交（业界标准形态）'
         },
         {
           name: 'idx_user_status',
@@ -635,15 +622,11 @@ module.exports = sequelize => {
           ]
         },
 
-        // 包含积分交易记录
-        withPointsTransaction: {
-          include: [
-            {
-              association: 'points_transaction',
-              required: false
-            }
-          ]
-        },
+        /*
+         * ⚠️ 已废弃 scope（2026-01-02）：
+         * points_transaction 关联已移除
+         * 新架构中通过 meta 字段查询 AssetTransaction
+         */
 
         // 完整信息（包含所有关联）
         full: {
@@ -659,11 +642,11 @@ module.exports = sequelize => {
             {
               association: 'reviewer',
               attributes: ['user_id', 'mobile', 'nickname', 'role']
-            },
-            {
-              association: 'points_transaction',
-              required: false
             }
+            /*
+             * ⚠️ points_transaction 已移除（2026-01-02）
+             * 新架构中通过 meta 字段查询 AssetTransaction
+             */
           ]
         }
       },

@@ -35,7 +35,7 @@
  *
  * 创建时间：2025-12-15
  * 升级时间：2025-12-15（Phase 1-4：支持账户体系 + 冻结模型）
- * 升级时间：2025-12-26（方案B：业界标准幂等架构，删除 business_id 参数）
+ * 升级时间：2025-12-26（方案B：业界标准幂等架构，删除旧参数）
  */
 
 'use strict'
@@ -306,7 +306,7 @@ class AssetService {
         { transaction }
       )
 
-      // 创建资产流水记录（方案B：无 business_id）
+      // 创建资产流水记录（方案B：使用 idempotency_key）
       const transaction_record = await AssetTransaction.create(
         {
           account_id: account.account_id,
@@ -1240,14 +1240,14 @@ class AssetService {
 
     try {
       /*
-       * 幂等性检查：通过 item_instance_events 表的 business_type + business_id 检查
+       * 幂等性检查：通过 item_instance_events 表的 business_type + idempotency_key 检查
        * 注意：实际项目中建议在数据库层添加 source_type + source_id 的唯一约束
        */
       const existingEvent = await ItemInstanceEvent.findOne({
         where: {
           event_type: 'mint',
           business_type: source_type,
-          business_id: source_id
+          idempotency_key: source_id
         },
         transaction
       })
@@ -1297,7 +1297,7 @@ class AssetService {
           owner_before: null,
           owner_after: user_id,
           business_type: source_type,
-          business_id: source_id,
+          idempotency_key: source_id,
           meta: { source_type, source_id, ...meta }
         },
         { transaction }
@@ -1410,7 +1410,7 @@ class AssetService {
           status_before,
           status_after: 'locked',
           business_type: business_type || 'item_lock',
-          business_id: locked_by_order_id,
+          idempotency_key: locked_by_order_id,
           meta: { locked_by_order_id, ...meta }
         },
         { transaction }
@@ -1448,14 +1448,14 @@ class AssetService {
    * @param {Object} params - 参数对象
    * @param {number} params.item_instance_id - 物品实例ID
    * @param {string} params.business_type - 业务类型
-   * @param {string} params.business_id - 业务ID
+   * @param {string} params.idempotency_key - 业务ID
    * @param {Object} params.meta - 解锁元数据
    * @param {Object} options - 选项
    * @param {Object} options.transaction - Sequelize事务对象
    * @returns {Promise<Object>} 解锁后的物品实例
    */
   static async unlockItem(params, options = {}) {
-    const { item_instance_id, business_type, business_id, meta = {} } = params
+    const { item_instance_id, business_type, idempotency_key, meta = {} } = params
     const { transaction: externalTransaction } = options
 
     if (!item_instance_id) {
@@ -1496,7 +1496,7 @@ class AssetService {
           status_before: 'locked',
           status_after: 'available',
           business_type: business_type || 'item_unlock',
-          business_id: business_id || old_order_id,
+          idempotency_key,
           meta: { previous_order_id: old_order_id, ...meta }
         },
         { transaction }
@@ -1533,14 +1533,14 @@ class AssetService {
    * @param {number} params.item_instance_id - 物品实例ID
    * @param {number} params.new_owner_id - 新所有者用户ID
    * @param {string} params.business_type - 业务类型（market_transfer/gift_transfer）
-   * @param {string} params.business_id - 业务ID（订单ID）
+   * @param {string} params.idempotency_key - 业务ID（订单ID）
    * @param {Object} params.meta - 转移元数据
    * @param {Object} options - 选项
    * @param {Object} options.transaction - Sequelize事务对象
    * @returns {Promise<Object>} 转移后的物品实例
    */
   static async transferItem(params, options = {}) {
-    const { item_instance_id, new_owner_id, business_type, business_id, meta = {} } = params
+    const { item_instance_id, new_owner_id, business_type, idempotency_key, meta = {} } = params
     const { transaction: externalTransaction } = options
 
     if (!item_instance_id) {
@@ -1549,8 +1549,8 @@ class AssetService {
     if (!new_owner_id) {
       throw new Error('new_owner_id 是必填参数')
     }
-    if (!business_id) {
-      throw new Error('business_id 是必填参数（幂等性控制）')
+    if (!idempotency_key) {
+      throw new Error('idempotency_key 是必填参数（幂等性控制）')
     }
 
     const { ItemInstance, ItemInstanceEvent } = require('../models')
@@ -1564,7 +1564,7 @@ class AssetService {
         where: {
           item_instance_id,
           event_type: 'transfer',
-          business_id
+          idempotency_key
         },
         transaction
       })
@@ -1572,7 +1572,7 @@ class AssetService {
       if (existingEvent) {
         logger.info('⚠️ 幂等性检查：物品转移已存在，返回原结果', {
           item_instance_id,
-          business_id,
+          idempotency_key,
           event_id: existingEvent.event_id
         })
 
@@ -1618,7 +1618,7 @@ class AssetService {
           owner_before: old_owner_id,
           owner_after: new_owner_id,
           business_type: business_type || 'item_transfer',
-          business_id,
+          idempotency_key,
           meta: { from_user: old_owner_id, to_user: new_owner_id, ...meta }
         },
         { transaction }
@@ -1628,7 +1628,7 @@ class AssetService {
         item_instance_id,
         from_user: old_owner_id,
         to_user: new_owner_id,
-        business_id
+        idempotency_key
       })
 
       if (shouldCommit) {
@@ -1661,21 +1661,21 @@ class AssetService {
    * @param {number} params.item_instance_id - 物品实例ID
    * @param {number} params.operator_user_id - 操作者用户ID
    * @param {string} params.business_type - 业务类型（redemption_use/item_use）
-   * @param {string} params.business_id - 业务ID（订单ID）
+   * @param {string} params.idempotency_key - 业务ID（订单ID）
    * @param {Object} params.meta - 消耗元数据
    * @param {Object} options - 选项
    * @param {Object} options.transaction - Sequelize事务对象
    * @returns {Promise<Object>} 消耗后的物品实例
    */
   static async consumeItem(params, options = {}) {
-    const { item_instance_id, operator_user_id, business_type, business_id, meta = {} } = params
+    const { item_instance_id, operator_user_id, business_type, idempotency_key, meta = {} } = params
     const { transaction: externalTransaction } = options
 
     if (!item_instance_id) {
       throw new Error('item_instance_id 是必填参数')
     }
-    if (!business_id) {
-      throw new Error('business_id 是必填参数（幂等性控制）')
+    if (!idempotency_key) {
+      throw new Error('idempotency_key 是必填参数（幂等性控制）')
     }
 
     const { ItemInstance, ItemInstanceEvent } = require('../models')
@@ -1689,7 +1689,7 @@ class AssetService {
         where: {
           item_instance_id,
           event_type: 'use',
-          business_id
+          idempotency_key
         },
         transaction
       })
@@ -1697,7 +1697,7 @@ class AssetService {
       if (existingEvent) {
         logger.info('⚠️ 幂等性检查：物品消耗已存在，返回原结果', {
           item_instance_id,
-          business_id,
+          idempotency_key,
           event_id: existingEvent.event_id
         })
 
@@ -1741,7 +1741,7 @@ class AssetService {
           status_before,
           status_after: 'used',
           business_type: business_type || 'item_consume',
-          business_id,
+          idempotency_key,
           meta: { operator_user_id, ...meta }
         },
         { transaction }
@@ -1750,7 +1750,7 @@ class AssetService {
       logger.info('✅ 物品消耗成功', {
         item_instance_id,
         operator_user_id,
-        business_id
+        idempotency_key
       })
 
       if (shouldCommit) {
@@ -1789,7 +1789,7 @@ class AssetService {
    * @param {number|null} params.owner_before - 变更前所有者
    * @param {number|null} params.owner_after - 变更后所有者
    * @param {string|null} params.business_type - 业务类型
-   * @param {string|null} params.business_id - 业务ID
+   * @param {string|null} params.idempotency_key - 业务ID
    * @param {Object|null} params.meta - 事件元数据
    * @param {Object} options - 选项
    * @param {Object} options.transaction - Sequelize事务对象

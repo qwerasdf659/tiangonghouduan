@@ -104,7 +104,7 @@ exports.logOperation = async (
       reason,
       ip_address: ipAddress,
       user_agent: userAgent,
-      business_id: options.businessId || null,
+      idempotency_key: options.idempotencyKey || null,
       created_at: BeijingTimeHelper.createDatabaseTime()
     })
 
@@ -173,7 +173,7 @@ exports.logExchangeAudit = async (
     beforeExchange,
     afterExchange,
     reason,
-    { businessId: `exchange_${exchangeId}` }
+    { idempotencyKey: `exchange_${exchangeId}` }
   )
 }
 

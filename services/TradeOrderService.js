@@ -6,7 +6,7 @@
  * - 统一管理交易订单的创建、取消、完成
  * - 协调资产冻结/解冻/结算（调用 AssetService）
  * - 协调物品所有权变更（调用 ItemInstance）
- * - 提供强幂等性保证（business_id）
+ * - 提供强幂等性保证（idempotency_key）
  *
  * 业务流程：
  * 1. 创建订单（createOrder）：
@@ -23,7 +23,7 @@
  *    - 更新订单状态（TradeOrder.status = cancelled）
  *
  * 创建时间：2025-12-15（Phase 2）
- * 更新时间：2025-12-21 - 暴力重构移除 UserInventory 引用
+ * 更新时间：2026-01-02 - 业界标准形态：统一使用 idempotency_key
  */
 
 const { sequelize, TradeOrder, MarketListing, ItemInstance } = require('../models')
@@ -41,60 +41,59 @@ class TradeOrderService {
    * 创建交易订单
    *
    * 业务流程：
-   * 1. 幂等性检查（business_id）
+   * 1. 幂等性检查（idempotency_key）
    * 2. 验证挂牌状态（on_sale）
    * 3. 锁定挂牌（status = locked）
    * 4. 冻结买家资产（AssetService.freeze）
    * 5. 创建订单记录（status = frozen）
    *
    * 幂等性规则：
-   * - 相同 business_id + 相同参数 → 返回已有订单（is_duplicate=true）
-   * - 相同 business_id + 不同参数 → 返回 409 冲突错误
+   * - 相同 idempotency_key + 相同参数 → 返回已有订单（is_duplicate=true）
+   * - 相同 idempotency_key + 不同参数 → 返回 409 冲突错误
    *
    * @param {Object} params - 订单参数
-   * @param {string} params.business_id - 业务幂等ID（必需，格式：buy_listing_{listing_id}_{timestamp}）
+   * @param {string} params.idempotency_key - 幂等键（必需，格式：market_purchase_<timestamp>_<random>）
    * @param {number} params.listing_id - 挂牌ID
-   * @param {number} params.buyer_user_id - 买家用户ID
+   * @param {number} params.buyer_id - 买家用户ID
    * @param {Object} [options] - 事务选项
    * @param {Object} [options.transaction] - Sequelize事务对象（可选，用于外部事务）
-   * @returns {Promise<Object>} 订单创建结果 {order, is_duplicate}
+   * @returns {Promise<Object>} 订单创建结果 {order_id, is_duplicate}
    * @throws {Error} 参数验证失败、挂牌不存在、挂牌状态异常、余额不足等
    */
   static async createOrder(params, options = {}) {
-    const { business_id, listing_id, buyer_user_id } = params
+    const { idempotency_key, listing_id, buyer_id } = params
 
     // 1. 参数验证
-    if (!business_id) {
-      throw new Error('business_id 是必需参数')
+    if (!idempotency_key) {
+      throw new Error('idempotency_key 是必需参数')
     }
     if (!listing_id) {
       throw new Error('listing_id 是必需参数')
     }
-    if (!buyer_user_id) {
-      throw new Error('buyer_user_id 是必需参数')
+    if (!buyer_id) {
+      throw new Error('buyer_id 是必需参数')
     }
 
-    // 2. 幂等性检查
+    // 2. 幂等性检查（使用业界标准字段名 idempotency_key）
     const existingOrder = await TradeOrder.findOne({
-      where: { business_id },
+      where: { idempotency_key },
       transaction: options.transaction
     })
 
     if (existingOrder) {
       /**
-       * 🔴 Phase 3 - P3-7：补齐交易市场 409 冲突校验（参数一致性）
-       * 🔴 P1-2 强化：幂等回放路径也强制校验 DIAMOND-only
+       * 幂等性校验：参数一致性检查
        *
-       * 参数一致性指纹（来自文档）：
+       * 参数一致性指纹：
        * - listing_id
        * - buyer_user_id
        * - gross_amount（或 price_amount）
        * - asset_code（强制 DIAMOND）
        *
-       * 目的：防止同一 business_id 被用于不同的业务参数
+       * 目的：防止同一 idempotency_key 被用于不同的业务参数
        */
 
-      // 🔴 P1-2 关键修复：幂等回放路径强制校验已有订单的 asset_code 必须为 DIAMOND
+      // 强制校验已有订单的 asset_code 必须为 DIAMOND
       if (existingOrder.asset_code !== 'DIAMOND') {
         const error = new Error(
           `幂等回放发现异常订单：订单 ${existingOrder.order_id} 的 asset_code=${existingOrder.asset_code}，` +
@@ -104,7 +103,7 @@ class TradeOrderService {
         error.statusCode = 500 // 数据异常，服务端错误
         error.details = {
           order_id: existingOrder.order_id,
-          business_id: existingOrder.business_id,
+          idempotency_key: existingOrder.idempotency_key,
           asset_code: existingOrder.asset_code,
           expected: 'DIAMOND'
         }
@@ -121,7 +120,7 @@ class TradeOrderService {
         throw new Error(`挂牌不存在: ${listing_id}`)
       }
 
-      // 🔴 P1-2 关键修复：幂等回放路径强制校验当前挂牌的 price_asset_code 必须为 DIAMOND
+      // 强制校验当前挂牌的 price_asset_code 必须为 DIAMOND
       if (tempListing.price_asset_code !== 'DIAMOND') {
         const error = new Error(
           `挂牌定价资产不合法: ${tempListing.price_asset_code}（交易市场只允许 DIAMOND）`
@@ -145,8 +144,8 @@ class TradeOrderService {
       if (existingOrder.listing_id !== listing_id) {
         parameterMismatch.push(`listing_id: ${existingOrder.listing_id} ≠ ${listing_id}`)
       }
-      if (existingOrder.buyer_user_id !== buyer_user_id) {
-        parameterMismatch.push(`buyer_user_id: ${existingOrder.buyer_user_id} ≠ ${buyer_user_id}`)
+      if (existingOrder.buyer_user_id !== buyer_id) {
+        parameterMismatch.push(`buyer_user_id: ${existingOrder.buyer_user_id} ≠ ${buyer_id}`)
       }
       if (existingOrder.gross_amount !== currentGrossAmount) {
         parameterMismatch.push(
@@ -158,11 +157,11 @@ class TradeOrderService {
       }
 
       if (parameterMismatch.length > 0) {
-        const error = new Error(`business_id 冲突：${business_id} 已存在但参数不一致`)
+        const error = new Error(`idempotency_key 冲突：${idempotency_key} 已存在但参数不一致`)
         error.code = 'CONFLICT'
         error.statusCode = 409
         error.details = {
-          business_id,
+          idempotency_key,
           existing_order_id: existingOrder.order_id,
           mismatched_parameters: parameterMismatch
         }
@@ -171,7 +170,7 @@ class TradeOrderService {
 
       logger.info(`[TradeOrderService] 幂等返回已有订单: ${existingOrder.order_id}`)
       return {
-        order: existingOrder,
+        order_id: existingOrder.order_id,
         is_duplicate: true
       }
     }
@@ -190,7 +189,7 @@ class TradeOrderService {
             required: false
           }
         ],
-        // 🔴 并发保护：对挂牌行加 FOR UPDATE，避免并发双买
+        // 并发保护：对挂牌行加 FOR UPDATE，避免并发双买
         lock: transaction.LOCK.UPDATE,
         transaction
       })
@@ -203,16 +202,16 @@ class TradeOrderService {
         throw new Error(`挂牌状态异常: ${listing.status}，期望 on_sale`)
       }
 
-      if (listing.seller_user_id === buyer_user_id) {
+      if (listing.seller_user_id === buyer_id) {
         throw new Error('不能购买自己的挂牌')
       }
 
-      // 🔴 文档硬约束：交易市场结算币种只允许 DIAMOND
+      // 交易市场结算币种只允许 DIAMOND
       if (listing.price_asset_code !== 'DIAMOND') {
         throw new Error(`挂牌定价资产不合法: ${listing.price_asset_code}（只允许 DIAMOND）`)
       }
 
-      // 🔴 文档硬约束：可叠加资产挂牌购买时必须校验卖家标的已冻结
+      // 可叠加资产挂牌购买时必须校验卖家标的已冻结
       if (listing.listing_kind === 'fungible_asset') {
         if (!listing.seller_offer_frozen) {
           throw new Error('卖家标的资产未冻结，挂牌状态异常（seller_offer_frozen=false）')
@@ -226,7 +225,7 @@ class TradeOrderService {
         }
       }
 
-      // 🔴 文档硬约束：不可叠加物品购买时必须校验并锁定 item_instances（所有权真相）
+      // 不可叠加物品购买时必须校验并锁定 item_instances（所有权真相）
       if (listing.listing_kind === 'item_instance') {
         if (!listing.offer_item_instance_id) {
           throw new Error('挂牌缺少标的物品实例ID（offer_item_instance_id）')
@@ -266,8 +265,8 @@ class TradeOrderService {
 
       if (feeEnabled) {
         /*
-         * 🔴 文档硬约束：统一 5% 手续费 + min_fee=1（计算由 FeeCalculator 读取配置）
-         * - item_instance：优先取 ItemInstance.meta.value 作为“价值锚点”
+         * 统一 5% 手续费 + min_fee=1（计算由 FeeCalculator 读取配置）
+         * - item_instance：优先取 ItemInstance.meta.value 作为"价值锚点"
          * - fungible_asset：用 price_amount 作为价值锚点（当前单档位等价）
          */
         const itemValue =
@@ -311,7 +310,7 @@ class TradeOrderService {
       )
 
       /**
-       * 🔴 关键可靠性修复：避免“孤儿冻结”
+       * 关键可靠性修复：避免"孤儿冻结"
        * 先创建订单（created）并把 listing.locked_by_order_id 绑定到订单，
        * 再冻结买家资产，最后把订单推进到 frozen。
        *
@@ -321,9 +320,9 @@ class TradeOrderService {
       // 3.4 创建订单记录（created）
       const order = await TradeOrder.create(
         {
-          business_id,
+          idempotency_key,
           listing_id,
-          buyer_user_id,
+          buyer_user_id: buyer_id,
           seller_user_id: listing.seller_user_id,
           asset_code: listing.price_asset_code,
           gross_amount: grossAmount,
@@ -348,9 +347,9 @@ class TradeOrderService {
       // 3.6 冻结买家资产
       const freezeResult = await AssetService.freeze(
         {
-          business_id, // 使用同一 business_id
+          idempotency_key, // 使用同一幂等键
           business_type: 'order_freeze_buyer', // 通过 business_type 区分冻结分录
-          user_id: buyer_user_id,
+          user_id: buyer_id,
           asset_code: listing.price_asset_code,
           amount: grossAmount,
           meta: {
@@ -381,13 +380,13 @@ class TradeOrderService {
       }
 
       logger.info(`[TradeOrderService] 订单创建成功: ${order.order_id}`, {
-        business_id,
+        idempotency_key,
         listing_id,
-        buyer_user_id
+        buyer_id
       })
 
       return {
-        order,
+        order_id: order.order_id,
         is_duplicate: false
       }
     } catch (error) {
@@ -397,9 +396,9 @@ class TradeOrderService {
       }
 
       logger.error(`[TradeOrderService] 订单创建失败: ${error.message}`, {
-        business_id,
+        idempotency_key,
         listing_id,
-        buyer_user_id
+        buyer_id
       })
 
       throw error
@@ -418,21 +417,18 @@ class TradeOrderService {
    *
    * @param {Object} params - 完成订单参数
    * @param {number} params.order_id - 订单ID
-   * @param {string} params.business_id - 业务幂等ID（必需）
+   * @param {number} params.buyer_id - 买家用户ID（用于验证）
    * @param {Object} [options] - 事务选项
    * @param {Object} [options.transaction] - Sequelize事务对象（可选）
-   * @returns {Promise<Object>} 完成结果 {order, settlement}
+   * @returns {Promise<Object>} 完成结果 {order, fee_amount, net_amount}
    * @throws {Error} 订单不存在、状态异常等
    */
   static async completeOrder(params, options = {}) {
-    const { order_id, business_id } = params
+    const { order_id, buyer_id: _buyer_id } = params
 
     // 参数验证
     if (!order_id) {
       throw new Error('order_id 是必需参数')
-    }
-    if (!business_id) {
-      throw new Error('business_id 是必需参数')
     }
 
     const transaction = options.transaction || (await sequelize.transaction())
@@ -460,12 +456,15 @@ class TradeOrderService {
 
       const listing = order.listing
 
+      // 从订单记录获取幂等键（用于派生子事务幂等键）
+      const idempotency_key = order.idempotency_key
+
       // 2. 从冻结资产结算（三笔：买家扣减、卖家入账、平台手续费）
 
       // 2.1 买家从冻结资产扣减
       await AssetService.settleFromFrozen(
         {
-          business_id, // 使用同一 business_id
+          idempotency_key: `${idempotency_key}:settle_buyer`, // 派生子幂等键
           business_type: 'order_settle_buyer_debit',
           user_id: order.buyer_user_id,
           asset_code: order.asset_code,
@@ -485,7 +484,7 @@ class TradeOrderService {
       if (order.net_amount > 0) {
         await AssetService.changeBalance(
           {
-            business_id, // 使用同一 business_id
+            idempotency_key: `${idempotency_key}:credit_seller`, // 派生子幂等键
             business_type: 'order_settle_seller_credit',
             user_id: order.seller_user_id,
             asset_code: order.asset_code,
@@ -507,7 +506,7 @@ class TradeOrderService {
       if (order.fee_amount > 0) {
         await AssetService.changeBalance(
           {
-            business_id, // 使用同一 business_id
+            idempotency_key: `${idempotency_key}:credit_platform_fee`, // 派生子幂等键
             business_type: 'order_settle_platform_fee_credit',
             system_code: 'SYSTEM_PLATFORM_FEE',
             asset_code: order.asset_code,
@@ -527,7 +526,7 @@ class TradeOrderService {
 
       // 3. 转移物品所有权或交付可叠加资产
       if (listing.listing_kind === 'item_instance' && listing.offer_item_instance_id) {
-        // 🔴 统一资产域架构：使用 AssetService.transferItem() 转移物品所有权
+        // 统一资产域架构：使用 AssetService.transferItem() 转移物品所有权
         const { ItemInstance } = require('../models')
         const itemInstance = await ItemInstance.findOne({
           where: { item_instance_id: listing.offer_item_instance_id },
@@ -551,7 +550,7 @@ class TradeOrderService {
             item_instance_id: itemInstance.item_instance_id,
             new_owner_id: order.buyer_user_id,
             business_type: 'market_transfer',
-            business_id: order.order_id,
+            idempotency_key: `${idempotency_key}:transfer_item`, // 派生子幂等键
             meta: {
               listing_id: order.listing_id,
               from_user: order.seller_user_id,
@@ -571,7 +570,7 @@ class TradeOrderService {
         })
       } else if (listing.listing_kind === 'fungible_asset' && listing.offer_asset_code) {
         /**
-         * 🔴 Phase 3 - P3-6：可叠加资产成交交付（双分录）
+         * 可叠加资产成交交付（双分录）
          *
          * 业务流程：
          * - 卖家：从冻结扣减标的资产（listing_settle_seller_offer_debit）
@@ -581,7 +580,7 @@ class TradeOrderService {
         // 3.2.1 卖家：从冻结扣减标的资产
         await AssetService.settleFromFrozen(
           {
-            business_id, // 使用同一 business_id
+            idempotency_key: `${idempotency_key}:settle_seller_offer`, // 派生子幂等键
             business_type: 'listing_settle_seller_offer_debit',
             user_id: order.seller_user_id,
             asset_code: listing.offer_asset_code,
@@ -608,7 +607,7 @@ class TradeOrderService {
         // 3.2.2 买家：收到标的资产入账
         await AssetService.changeBalance(
           {
-            business_id, // 使用同一 business_id
+            idempotency_key: `${idempotency_key}:credit_buyer_offer`, // 派生子幂等键
             business_type: 'listing_transfer_buyer_offer_credit',
             user_id: order.buyer_user_id,
             asset_code: listing.offer_asset_code,
@@ -658,7 +657,7 @@ class TradeOrderService {
       }
 
       logger.info(`[TradeOrderService] 订单完成: ${order_id}`, {
-        business_id,
+        idempotency_key,
         buyer_user_id: order.buyer_user_id,
         seller_user_id: order.seller_user_id,
         gross_amount: order.gross_amount,
@@ -667,7 +666,9 @@ class TradeOrderService {
       })
 
       return {
-        order
+        order,
+        fee_amount: order.fee_amount,
+        net_amount: order.net_amount
       }
     } catch (error) {
       // 回滚事务
@@ -676,8 +677,7 @@ class TradeOrderService {
       }
 
       logger.error(`[TradeOrderService] 订单完成失败: ${error.message}`, {
-        order_id,
-        business_id
+        order_id
       })
 
       throw error
@@ -695,7 +695,6 @@ class TradeOrderService {
    *
    * @param {Object} params - 取消订单参数
    * @param {number} params.order_id - 订单ID
-   * @param {string} params.business_id - 业务幂等ID（必需）
    * @param {string} [params.cancel_reason] - 取消原因（可选）
    * @param {Object} [options] - 事务选项
    * @param {Object} [options.transaction] - Sequelize事务对象（可选）
@@ -703,14 +702,11 @@ class TradeOrderService {
    * @throws {Error} 订单不存在、状态异常等
    */
   static async cancelOrder(params, options = {}) {
-    const { order_id, business_id, cancel_reason } = params
+    const { order_id, cancel_reason } = params
 
     // 参数验证
     if (!order_id) {
       throw new Error('order_id 是必需参数')
-    }
-    if (!business_id) {
-      throw new Error('business_id 是必需参数')
     }
 
     const transaction = options.transaction || (await sequelize.transaction())
@@ -738,10 +734,13 @@ class TradeOrderService {
 
       const listing = order.listing
 
+      // 从订单记录获取幂等键（用于派生子事务幂等键）
+      const idempotency_key = order.idempotency_key
+
       // 2. 解冻买家资产
       const unfreezeResult = await AssetService.unfreeze(
         {
-          business_id, // 使用同一 business_id
+          idempotency_key: `${idempotency_key}:unfreeze_buyer`, // 派生子幂等键
           business_type: 'order_unfreeze_buyer', // 通过 business_type 区分解冻分录
           user_id: order.buyer_user_id,
           asset_code: order.asset_code,
@@ -784,7 +783,7 @@ class TradeOrderService {
       }
 
       logger.info(`[TradeOrderService] 订单取消: ${order_id}`, {
-        business_id,
+        idempotency_key,
         cancel_reason
       })
 
@@ -799,8 +798,7 @@ class TradeOrderService {
       }
 
       logger.error(`[TradeOrderService] 订单取消失败: ${error.message}`, {
-        order_id,
-        business_id
+        order_id
       })
 
       throw error

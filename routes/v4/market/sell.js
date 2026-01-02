@@ -11,10 +11,14 @@
  * 业务场景：
  * - 用户将库存物品上架到交易市场出售
  * - 上架限制：最多同时上架10件商品
- * - 使用 business_id 进行幂等控制
+ * - 使用 Idempotency-Key（Header）进行幂等控制
+ *
+ * 幂等性保证（业界标准形态 - 破坏性重构 2026-01-02）：
+ * - 统一只接受 Header Idempotency-Key，不接受 body 中的 business_id
+ * - 缺失幂等键直接返回 400
  *
  * 创建时间：2025年12月22日
- * 从inventory-market.js拆分而来
+ * 更新时间：2026年01月02日 - 业界标准形态破坏性重构
  */
 
 const express = require('express')
@@ -23,22 +27,25 @@ const { authenticateToken } = require('../../../middleware/auth')
 const { handleServiceError } = require('../../../middleware/validation')
 const logger = require('../../../utils/logger').logger
 const { MarketListing, ItemInstance, sequelize } = require('../../../models')
+// 业界标准幂等架构 - 统一入口幂等服务
+const IdempotencyService = require('../../../services/IdempotencyService')
 
 /**
  * @route POST /api/v4/market/list
  * @desc 上架商品到交易市场
  * @access Private (需要登录)
  *
+ * @header {string} Idempotency-Key - 幂等键（必填，不接受body参数）
  * @body {number} item_instance_id - 物品实例ID（必填）
  * @body {number} price_amount - 售价（DIAMOND，必填，大于0的整数）
  * @body {string} condition - 物品状态（可选，默认good）
- * @body {string} business_id - 幂等键（必填，或使用Header: Idempotency-Key）
  *
  * @returns {Object} 上架结果
  * @returns {Object} data.listing - 挂牌信息
  * @returns {number} data.listing.listing_id - 挂牌ID
  * @returns {number} data.listing.item_instance_id - 物品实例ID
  * @returns {number} data.listing.price_amount - 售价
+ * @returns {boolean} data.listing.is_duplicate - 是否为幂等回放请求
  * @returns {Object} data.listing_status - 上架状态
  * @returns {number} data.listing_status.current - 当前上架数量
  * @returns {number} data.listing_status.limit - 上架上限
@@ -46,22 +53,29 @@ const { MarketListing, ItemInstance, sequelize } = require('../../../models')
  *
  * 业务场景：用户将库存物品上架到交易市场出售
  * 上架限制：最多同时上架10件商品
+ * 幂等性控制（业界标准形态）：统一通过 Header Idempotency-Key 防止重复上架
  */
 router.post('/list', authenticateToken, async (req, res) => {
+  // 【业界标准形态】强制从 Header 获取幂等键，不接受 body
+  const idempotency_key = req.headers['idempotency-key']
+
+  // 缺失幂等键直接返回 400
+  if (!idempotency_key) {
+    return res.apiError(
+      '缺少必需的幂等键：请在 Header 中提供 Idempotency-Key。' +
+        '重试时必须复用同一幂等键以防止重复上架。',
+      'MISSING_IDEMPOTENCY_KEY',
+      {
+        required_header: 'Idempotency-Key',
+        example: 'Idempotency-Key: market_list_<timestamp>_<random>'
+      },
+      400
+    )
+  }
+
   try {
     const userId = req.user.user_id
     const { item_instance_id, price_amount } = req.body
-
-    // 🔴 强幂等：business_id（Body）或 Idempotency-Key（Header）二选一
-    const businessId = req.body.business_id || req.headers['idempotency-key']
-    if (!businessId) {
-      return res.apiError(
-        '缺少幂等键：请在 Body 中提供 business_id 或在 Header 中提供 Idempotency-Key',
-        'BAD_REQUEST',
-        null,
-        400
-      )
-    }
 
     // 【不做兼容】参数命名严格对齐最终方案（snake_case）
     if (req.body.inventory_id !== undefined || req.body.selling_amount !== undefined) {
@@ -93,51 +107,29 @@ router.post('/list', authenticateToken, async (req, res) => {
       return res.apiError('售价必须是大于0的整数（DIAMOND）', 'BAD_REQUEST', null, 400)
     }
 
-    // 幂等性检查（强幂等：同一 business_id 只能成功创建一次）
-    const existingListing = await MarketListing.findOne({
-      where: { business_id: businessId }
+    /*
+     * 【入口幂等检查】防止同一次请求被重复提交
+     * 统一使用 IdempotencyService 进行请求级幂等控制
+     */
+    const idempotencyResult = await IdempotencyService.getOrCreateRequest(idempotency_key, {
+      api_path: '/api/v4/market/list',
+      http_method: 'POST',
+      request_params: { item_instance_id: itemId, price_amount: priceAmountValue },
+      user_id: userId
     })
 
-    if (existingListing) {
-      // 防御性：如果业务ID被他人占用，不能返回他人的挂牌信息
-      if (existingListing.seller_user_id !== userId) {
-        return res.apiError(
-          '幂等键冲突：该 business_id 已被其他用户使用，请更换 business_id',
-          'IDEMPOTENCY_KEY_CONFLICT',
-          { business_id: businessId },
-          409
-        )
+    // 如果已完成，直接返回首次结果（幂等性要求）+ is_duplicate 标记
+    if (!idempotencyResult.should_process) {
+      logger.info('🔄 入口幂等拦截：重复请求，返回首次结果', {
+        idempotency_key,
+        user_id: userId,
+        item_instance_id: itemId
+      })
+      const duplicateResponse = {
+        ...idempotencyResult.response,
+        is_duplicate: true
       }
-
-      logger.info('上架请求幂等命中', {
-        business_id: businessId,
-        listing_id: existingListing.listing_id
-      })
-
-      // 查询上架状态
-      const onSaleCount = await MarketListing.count({
-        where: {
-          seller_user_id: userId,
-          status: 'on_sale'
-        }
-      })
-
-      return res.apiSuccess(
-        {
-          listing: {
-            listing_id: existingListing.listing_id,
-            item_instance_id: existingListing.offer_item_instance_id,
-            price_amount: existingListing.price_amount,
-            is_duplicate: true
-          },
-          listing_status: {
-            current: onSaleCount,
-            limit: 10,
-            remaining: 10 - onSaleCount
-          }
-        },
-        '上架成功（幂等请求）'
-      )
+      return res.apiSuccess(duplicateResponse, '上架成功（幂等回放）')
     }
 
     // 检查上架数量限制
@@ -149,6 +141,7 @@ router.post('/list', authenticateToken, async (req, res) => {
     })
 
     if (onSaleCount >= 10) {
+      await IdempotencyService.markAsFailed(idempotency_key, '上架数量已达上限')
       return res.apiError(
         '上架数量已达上限（10件）',
         'LIMIT_EXCEEDED',
@@ -167,6 +160,7 @@ router.post('/list', authenticateToken, async (req, res) => {
     })
 
     if (!item) {
+      await IdempotencyService.markAsFailed(idempotency_key, '物品不存在或不可上架')
       return res.apiError('物品不存在或不可上架', 'NOT_FOUND', null, 404)
     }
 
@@ -177,7 +171,7 @@ router.post('/list', authenticateToken, async (req, res) => {
       // 锁定物品
       await item.update({ status: 'locked' }, { transaction })
 
-      // 创建挂牌记录
+      // 创建挂牌记录（使用 idempotency_key 字段名）
       const listing = await MarketListing.create(
         {
           listing_kind: 'item_instance',
@@ -187,45 +181,71 @@ router.post('/list', authenticateToken, async (req, res) => {
           price_asset_code: 'DIAMOND',
           seller_offer_frozen: false,
           status: 'on_sale',
-          business_id: businessId
+          idempotency_key
         },
         { transaction }
       )
 
       await transaction.commit()
 
+      // 构建响应数据
+      const responseData = {
+        listing: {
+          listing_id: listing.listing_id,
+          item_instance_id: itemId,
+          price_amount: priceAmountValue,
+          is_duplicate: false
+        },
+        listing_status: {
+          current: onSaleCount + 1,
+          limit: 10,
+          remaining: 10 - onSaleCount - 1
+        }
+      }
+
+      /*
+       * 【标记请求完成】保存结果快照到入口幂等表
+       */
+      await IdempotencyService.markAsCompleted(
+        idempotency_key,
+        listing.listing_id, // 业务事件ID = 挂牌ID
+        responseData
+      )
+
       logger.info('商品上架成功', {
         user_id: userId,
         item_instance_id: itemId,
         listing_id: listing.listing_id,
-        business_id: businessId,
+        idempotency_key,
         price_amount: priceAmountValue,
         current_listings: onSaleCount + 1
       })
 
-      return res.apiSuccess(
-        {
-          listing: {
-            listing_id: listing.listing_id,
-            item_instance_id: itemId,
-            price_amount: priceAmountValue
-          },
-          listing_status: {
-            current: onSaleCount + 1,
-            limit: 10,
-            remaining: 10 - onSaleCount - 1
-          }
-        },
-        '上架成功'
-      )
+      return res.apiSuccess(responseData, '上架成功')
     } catch (innerError) {
       await transaction.rollback()
       throw innerError
     }
   } catch (error) {
+    // 标记幂等请求失败（允许重试）
+    await IdempotencyService.markAsFailed(idempotency_key, error.message).catch(markError => {
+      logger.error('标记幂等请求失败状态时出错:', markError)
+    })
+
+    // 处理幂等键冲突错误（409状态码）
+    if (error.statusCode === 409) {
+      logger.warn('幂等性错误:', {
+        idempotency_key,
+        error_code: error.errorCode,
+        message: error.message
+      })
+      return res.apiError(error.message, error.errorCode || 'IDEMPOTENCY_ERROR', {}, 409)
+    }
+
     logger.error('上架失败', {
       error: error.message,
-      user_id: req.user?.user_id
+      user_id: req.user?.user_id,
+      idempotency_key
     })
 
     return handleServiceError(error, res, '上架失败')

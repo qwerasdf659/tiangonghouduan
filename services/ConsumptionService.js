@@ -80,7 +80,7 @@ const CONSUMPTION_ATTRIBUTES = {
     'status', // 状态：pending/approved/rejected/expired（Status）
     'qr_code', // 二维码（QR Code）
     'merchant_notes', // 商家备注（Merchant Notes）
-    'business_id', // 业务ID（Business ID - 用于幂等性）
+    'idempotency_key', // 幂等键（业界标准形态）
     'created_at', // 创建时间（Created At）
     'updated_at', // 更新时间（Updated At）
     'is_deleted' // 是否删除（Is Deleted）
@@ -100,7 +100,7 @@ const CONSUMPTION_ATTRIBUTES = {
     'status', // 状态（Status）
     'qr_code', // 二维码（QR Code）
     'merchant_notes', // 商家备注（Merchant Notes）
-    'business_id', // 业务ID（Business ID）
+    'idempotency_key', // 幂等键（业界标准形态）
     'reviewed_at', // 审核时间（Reviewed At）
     'created_at', // 创建时间（Created At）
     'updated_at', // 更新时间（Updated At）
@@ -121,7 +121,7 @@ const CONSUMPTION_ATTRIBUTES = {
     'status', // 状态（Status）
     'qr_code', // 二维码（QR Code）
     'merchant_notes', // 商家备注（Merchant Notes）
-    'business_id', // 业务ID（Business ID）
+    'idempotency_key', // 幂等键（业界标准形态）
     'reviewed_by', // 审核员ID（Reviewed By - 敏感信息，仅管理员可见）
     'reviewed_at', // 审核时间（Reviewed At）
     'admin_notes', // 管理员备注（Admin Notes - 敏感信息，仅管理员可见）
@@ -145,7 +145,7 @@ const CONSUMPTION_ATTRIBUTES = {
     'status', // 状态（Status）
     'qr_code', // 二维码（QR Code）
     'merchant_notes', // 商家备注（Merchant Notes）
-    'business_id', // 业务ID（Business ID）
+    'idempotency_key', // 幂等键（业界标准形态）
     'created_at', // 创建时间（Created At）
     'updated_at' // 更新时间（Updated At）
   ]
@@ -214,6 +214,10 @@ class ConsumptionService {
       if (!data.merchant_id) {
         throw new Error('商家ID不能为空')
       }
+      // 【业界标准形态】幂等键必须由路由层传入，不再服务端生成
+      if (!data.idempotency_key) {
+        throw new Error('缺少幂等键：idempotency_key 必须由调用方提供')
+      }
 
       // 步骤2：验证QR码签名（Step 2: Validate QR Code Signature - HMAC-SHA256，UUID版本）
       const qrValidation = QRCodeValidator.validateQRCode(data.qr_code)
@@ -236,27 +240,26 @@ class ConsumptionService {
       const userId = user.user_id // 获取内部user_id用于后续业务逻辑
 
       /*
-       * 步骤4：生成业务ID（Business ID Generation - For Idempotency Control）
-       * 格式：consumption_${userId}_${merchantId}_${timestamp}
-       * 用途：永久幂等控制，防止重复提交创建多条记录
+       * 步骤4：使用传入的幂等键（Idempotency Key - For Idempotency Control）
+       * 【业界标准形态 2026-01-02】幂等键由路由层从 Header 获取后传入
        */
-      const business_id = `consumption_${userId}_${data.merchant_id}_${BeijingTimeHelper.generateIdTimestamp()}`
+      const idempotency_key = data.idempotency_key
 
-      logger.info(`生成业务ID: ${business_id}`)
+      logger.info(`使用传入的幂等键: ${idempotency_key}`)
 
       /*
        * 步骤5：幂等性检查（Idempotency Check - Prevent Duplicate Submission）
-       * 规范要求：P0-3 - 所有资产变动必须有 business_id 幂等控制
+       * 规范要求：P0-3 - 所有资产变动必须有幂等键控制
        */
       const existingRecord = await ConsumptionRecord.findOne({
         where: {
-          business_id
+          idempotency_key
         },
         transaction // ✅ 在事务中查询
       })
 
       if (existingRecord) {
-        logger.info(`⚠️ 幂等性检查: business_id=${business_id}已存在，返回已有记录（幂等）`)
+        logger.info(`⚠️ 幂等性检查: idempotency_key=${idempotency_key}已存在，返回已有记录（幂等）`)
         await transaction.commit()
         return {
           success: true,
@@ -278,7 +281,7 @@ class ConsumptionService {
           points_to_award: pointsToAward,
           status: 'pending', // 待审核状态（Pending Status - Waiting for Admin Review）
           qr_code: data.qr_code,
-          business_id, // ✅ 业务ID（用于幂等控制）
+          idempotency_key, // ✅ 幂等键（业界标准形态）
           merchant_notes: data.merchant_notes || null,
           created_at: BeijingTimeHelper.createDatabaseTime(),
           updated_at: BeijingTimeHelper.createDatabaseTime()
@@ -287,7 +290,7 @@ class ConsumptionService {
       ) // ✅ 在事务中创建
 
       logger.info(
-        `✅ 消费记录创建成功 (ID: ${consumptionRecord.record_id}, business_id: ${business_id})`
+        `✅ 消费记录创建成功 (ID: ${consumptionRecord.record_id}, idempotency_key: ${idempotency_key})`
       )
 
       /*
@@ -484,7 +487,7 @@ class ConsumptionService {
           after_status: 'approved',
           points_amount: record.points_to_award,
           reason: reviewData.admin_notes || '审核通过',
-          business_id: `consumption_${recordId}`,
+          idempotency_key: `consumption_${recordId}`,
           transaction: null // 事务已提交，不传transaction
         })
       } catch (auditError) {
@@ -588,7 +591,7 @@ class ConsumptionService {
           after_status: 'rejected',
           points_amount: 0,
           reason: reviewData.admin_notes,
-          business_id: `consumption_${recordId}`,
+          idempotency_key: `consumption_${recordId}`,
           transaction: null // 事务已提交，不传transaction
         })
       } catch (auditError) {

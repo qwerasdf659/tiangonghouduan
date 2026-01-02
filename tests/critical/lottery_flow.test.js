@@ -88,21 +88,18 @@ describe('🎲 用户完整抽奖流程（核心关键路径 - V4架构）', () 
         verification_code: TEST_DATA.auth.verificationCode // 123456万能验证码
       }
 
-      const response = await request(app)
-        .post('/api/v4/auth/login')
-        .send(loginData)
-        .expect(200)
+      const response = await request(app).post('/api/v4/auth/login').send(loginData).expect(200)
 
       // 验证业务标准API响应格式
       TestAssertions.validateApiResponse(response.body, true)
 
       // 验证返回的数据结构
       expect(response.body.data).toHaveProperty('user')
-      expect(response.body.data).toHaveProperty('token')
+      expect(response.body.data).toHaveProperty('access_token')
 
       // 保存用户信息和token供后续测试使用
       testUser = response.body.data.user
-      authToken = response.body.data.token
+      authToken = response.body.data.access_token
 
       // 验证用户信息
       expect(testUser).toHaveProperty('user_id')
@@ -121,10 +118,7 @@ describe('🎲 用户完整抽奖流程（核心关键路径 - V4架构）', () 
         verification_code: '000000' // 错误的验证码
       }
 
-      await request(app)
-        .post('/api/v4/auth/login')
-        .send(loginData)
-        .expect(401)
+      await request(app).post('/api/v4/auth/login').send(loginData).expect(401)
 
       console.log('✅ 无效验证码被正确拒绝')
     })

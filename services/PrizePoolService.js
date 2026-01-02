@@ -203,7 +203,7 @@ class PrizePoolService {
           prize_ids: createdPrizes.map(p => p.prize_id)
         },
         reason: `批量添加${createdPrizes.length}个奖品到活动${campaign_id}`,
-        business_id: `prize_batch_create_${campaign_id}_${Date.now()}`, // 业务关联ID（唯一标识）
+        idempotency_key: `prize_batch_create_${campaign_id}_${Date.now()}`, // 业务关联ID（唯一标识）
         transaction: internalTransaction // 事务对象
       })
 
@@ -597,7 +597,7 @@ class PrizePoolService {
         before_data: beforeData,
         after_data: afterData,
         reason: operationDetail,
-        business_id: `prize_update_${prize_id}_${Date.now()}`, // 业务关联ID（唯一标识）
+        idempotency_key: `prize_update_${prize_id}_${Date.now()}`, // 业务关联ID（唯一标识）
         transaction: internalTransaction // 事务对象
       })
 
@@ -723,7 +723,7 @@ class PrizePoolService {
           stock_quantity: newQuantity
         },
         reason: `奖品库存调整: ${oldQuantity} → ${newQuantity}（补充${quantity}）`,
-        business_id: `stock_adjust_${prize_id}_${Date.now()}`, // 业务关联ID（唯一标识）
+        idempotency_key: `stock_adjust_${prize_id}_${Date.now()}`, // 业务关联ID（唯一标识）
         transaction: internalTransaction // 事务对象
       })
 
@@ -806,7 +806,7 @@ class PrizePoolService {
         },
         after_data: null, // 删除操作后数据为空
         reason: `删除奖品：${prize.prize_name}（ID: ${prize_id}）`,
-        business_id: `prize_delete_${prize_id}_${Date.now()}`, // 业务关联ID（唯一标识）
+        idempotency_key: `prize_delete_${prize_id}_${Date.now()}`, // 业务关联ID（唯一标识）
         transaction: internalTransaction // 事务对象
       })
 

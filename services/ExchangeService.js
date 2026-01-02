@@ -15,7 +15,7 @@ const logger = require('../utils/logger').logger
  * - ✅ 材料资产支付：从统一账本扣除材料资产（cost_asset_code + cost_amount）
  * - ✅ 材料扣减通过 AssetService.changeBalance() 执行
  * - ✅ 业务类型：exchange_debit（兑换市场材料扣减）
- * - ✅ 支持幂等性控制（business_id 唯一约束）
+ * - ✅ 支持幂等性控制（idempotency_key 唯一约束）
  *
  * 业务规则（强制）：
  * - ✅ 兑换只能使用材料资产（必须配置cost_asset_code和cost_amount）
@@ -306,16 +306,16 @@ class ExchangeService {
    * @param {number} item_id - 商品ID
    * @param {number} quantity - 兑换数量
    * @param {Object} options - 选项
-   * @param {string} options.business_id - 业务唯一ID（必填，用于幂等性）
+   * @param {string} options.idempotency_key - 幂等键（必填，用于幂等性）
    * @param {Transaction} options.transaction - 外部事务对象（可选）
    * @returns {Promise<Object>} 兑换结果和订单信息
    */
   static async exchangeItem(user_id, item_id, quantity = 1, options = {}) {
-    const { business_id, transaction: externalTransaction } = options
+    const { idempotency_key, transaction: externalTransaction } = options
 
     // 🔥 必填参数校验
-    if (!business_id) {
-      throw new Error('business_id 参数不能为空，用于幂等性控制')
+    if (!idempotency_key) {
+      throw new Error('idempotency_key 参数不能为空，用于幂等性控制')
     }
 
     // 🔥 支持外部传入的事务（统一事务管理模式）
@@ -324,22 +324,22 @@ class ExchangeService {
 
     try {
       /*
-       * ✅ 幂等性检查：以 business_id 为唯一键（统一幂等架构）
+       * ✅ 幂等性检查：以 idempotency_key 为唯一键（统一幂等架构）
        * 🔴 P1-1-5: 不使用悲观锁，依赖数据库唯一约束防止并发创建重复订单
        * 原因：多个事务同时使用 FOR UPDATE 竞争同一行会导致死锁
        * 解决方案：利用唯一索引约束，并发插入时自动捕获冲突
        */
       const existingOrder = await ExchangeRecord.findOne({
         where: {
-          business_id
+          idempotency_key
         },
         // 移除悲观锁，避免死锁
         transaction
       })
 
       if (existingOrder) {
-        logger.info('[兑换市场] ⚠️ 幂等性检查：business_id已存在，验证参数一致性', {
-          business_id,
+        logger.info('[兑换市场] ⚠️ 幂等性检查：idempotency_key已存在，验证参数一致性', {
+          idempotency_key,
           order_no: existingOrder.order_no,
           existing_item_id: existingOrder.item_id,
           existing_quantity: existingOrder.quantity,
@@ -353,7 +353,7 @@ class ExchangeService {
           Number(existingOrder.quantity) !== Number(quantity)
         ) {
           const conflictError = new Error(
-            `幂等键冲突：business_id="${business_id}" 已被使用于不同参数的订单。` +
+            `幂等键冲突：idempotency_key="${idempotency_key}" 已被使用于不同参数的订单。` +
               `原订单：商品ID=${existingOrder.item_id}, 数量=${existingOrder.quantity}；` +
               `当前请求：商品ID=${item_id}, 数量=${quantity}。` +
               '请使用不同的幂等键或确认请求参数正确。'
@@ -364,7 +364,7 @@ class ExchangeService {
         }
 
         logger.info('[兑换市场] ✅ 参数一致性验证通过，返回原结果（幂等）', {
-          business_id,
+          idempotency_key,
           order_no: existingOrder.order_no
         })
 
@@ -391,7 +391,7 @@ class ExchangeService {
           Number(existingOrder.pay_amount) !== Number(expectedPayAmount)
         ) {
           const conflictError = new Error(
-            `幂等键冲突：business_id="${business_id}" 已被使用于不同支付参数的订单。` +
+            `幂等键冲突：idempotency_key="${idempotency_key}" 已被使用于不同支付参数的订单。` +
               `原订单：pay_asset_code=${existingOrder.pay_asset_code}, pay_amount=${existingOrder.pay_amount}；` +
               `当前请求：pay_asset_code=${expectedPayAssetCode}, pay_amount=${expectedPayAmount}。`
           )
@@ -430,7 +430,7 @@ class ExchangeService {
       }
 
       logger.info(
-        `[兑换市场] 用户${user_id}兑换商品${item_id}，数量${quantity}，business_id=${business_id}`
+        `[兑换市场] 用户${user_id}兑换商品${item_id}，数量${quantity}，idempotency_key=${idempotency_key}`
       )
 
       // 1. 获取商品信息（加锁防止超卖）
@@ -477,23 +477,22 @@ class ExchangeService {
         user_id,
         asset_code: item.cost_asset_code,
         amount: totalPayAmount,
-        idempotency_key: `exchange_debit_${business_id}`
+        idempotency_key: `exchange_debit_${idempotency_key}`
       })
 
       /*
        * 扣减材料资产（使用统一账本AssetService）
        * business_type: exchange_debit（兑换市场材料扣减）
-       * 方案B：使用 idempotency_key 替代 business_id
        */
       const materialResult = await AssetService.changeBalance(
         {
           user_id,
           asset_code: item.cost_asset_code,
           delta_amount: -totalPayAmount, // 负数表示扣减
-          idempotency_key: `exchange_debit_${business_id}`, // 方案B：幂等键
+          idempotency_key: `exchange_debit_${idempotency_key}`, // 派生幂等键
           business_type: 'exchange_debit', // 业务类型：兑换市场扣减
           meta: {
-            business_id, // 保留原业务ID用于追溯
+            idempotency_key, // 保留原幂等键用于追溯
             item_id,
             item_name: item.name,
             quantity,
@@ -509,11 +508,11 @@ class ExchangeService {
       // 如果是重复扣减，说明之前已经创建过订单但事务未提交，需要查询订单
       if (materialResult.is_duplicate) {
         logger.info('[兑换市场] ⚠️ 材料扣减幂等返回，查询已存在订单', {
-          business_id
+          idempotency_key
         })
 
         const existingRecord = await ExchangeRecord.findOne({
-          where: { business_id },
+          where: { idempotency_key },
           transaction
         })
 
@@ -549,7 +548,7 @@ class ExchangeService {
       const order_no = this._generateOrderNo()
 
       /*
-       * 5. 创建兑换订单（✅ 包含 business_id 和材料支付字段）
+       * 5. 创建兑换订单（✅ 包含 idempotency_key 和材料支付字段）
        * 🔴 P1-1-5: 捕获唯一约束冲突（并发场景）
        */
       let record
@@ -557,7 +556,7 @@ class ExchangeService {
         record = await ExchangeRecord.create(
           {
             order_no,
-            business_id, // ✅ 记录 business_id 用于幂等性
+            idempotency_key, // ✅ 记录 idempotency_key 用于幂等性（业界标准形态）
             user_id,
             item_id,
             item_snapshot: {
@@ -578,13 +577,15 @@ class ExchangeService {
           { transaction }
         )
       } catch (createError) {
-        // 🔴 捕获唯一约束冲突（并发场景下，多个事务同时插入相同 business_id）
+        // 🔴 捕获唯一约束冲突（并发场景下，多个事务同时插入相同 idempotency_key）
         if (
           createError.name === 'SequelizeUniqueConstraintError' ||
           createError.message?.includes('Duplicate entry') ||
-          createError.message?.includes('idx_business_id_unique')
+          createError.message?.includes('idx_idempotency_key_unique')
         ) {
-          logger.info('[兑换市场] ⚠️ 并发冲突：business_id已存在，重试查询', { business_id })
+          logger.info('[兑换市场] ⚠️ 并发冲突：idempotency_key已存在，重试查询', {
+            idempotency_key
+          })
 
           // 回滚当前事务的本地更改，重新查询已存在的订单
           if (shouldCommit) {
@@ -593,7 +594,7 @@ class ExchangeService {
 
           // 重新查询已经创建的订单
           const concurrentOrder = await ExchangeRecord.findOne({
-            where: { business_id }
+            where: { idempotency_key }
           })
 
           if (concurrentOrder) {
@@ -603,7 +604,7 @@ class ExchangeService {
               Number(concurrentOrder.quantity) !== Number(quantity)
             ) {
               const conflictError = new Error(
-                `幂等键冲突：business_id="${business_id}" 已被使用于不同参数的订单。` +
+                `幂等键冲突：idempotency_key="${idempotency_key}" 已被使用于不同参数的订单。` +
                   `原订单：商品ID=${concurrentOrder.item_id}, 数量=${concurrentOrder.quantity}；` +
                   `当前请求：商品ID=${item_id}, 数量=${quantity}。` +
                   '请使用不同的幂等键或确认请求参数正确。'

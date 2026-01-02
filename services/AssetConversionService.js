@@ -14,8 +14,8 @@
  * Phase 3改造要点：
  * - ✅ 使用AssetService.changeBalance()替代MaterialService + DiamondService
  * - ✅ 双分录模型：material_convert_debit（扣减）+ material_convert_credit（入账）
- * - ✅ 统一business_id：两个分录使用同一个business_id，通过business_type区分
- * - ✅ 409冲突检查：同一business_id但参数不同时返回409 IDEMPOTENCY_KEY_CONFLICT
+ * - ✅ 统一idempotency_key：两个分录使用同一个idempotency_key，通过business_type区分
+ * - ✅ 409冲突检查：同一idempotency_key但参数不同时返回409 IDEMPOTENCY_KEY_CONFLICT
  * - ✅ 余额来源：统一从account_asset_balances读取，不再依赖旧余额表
  *
  * 业务流程：
@@ -27,8 +27,8 @@
  *    - 写入统一流水记录（asset_transactions表）→ 转换完成
  *
  * 2. **幂等性保护（Phase 3强化）**
- *    - 客户端必须传入business_id（幂等键）
- *    - 同一business_id只能转换一次
+ *    - 客户端必须传入idempotency_key（幂等键）
+ *    - 同一idempotency_key只能转换一次
  *    - 重复请求（参数相同）：返回原结果（is_duplicate=true）
  *    - 重复请求（参数不同）：返回409冲突错误（IDEMPOTENCY_KEY_CONFLICT）
  *
@@ -42,7 +42,7 @@
  * 设计原则：
  * - **统一账本**：所有资产变动通过AssetService统一管理（Single Source of Truth）
  * - **事务原子性**：扣减和入账在同一事务中完成，要么全成功要么全失败
- * - **幂等性保证**：通过business_id防止重复转换，参数不同返回409
+ * - **幂等性保证**：通过idempotency_key防止重复转换，参数不同返回409
  * - **规则配置化**：转换规则来自数据库配置表（material_conversion_rules），支持版本化（effective_at）
  * - **完整审计**：每次转换都有完整的流水记录（asset_transactions）
  * - **不隐式触发**：只提供显式API，不在兑换等流程中自动转换
@@ -58,8 +58,8 @@
  *   - business_type: material_convert_credit（钻石入账分录）
  *
  * 幂等性保证（Phase 3强化）：
- * - 通过business_id（业务唯一标识）防止重复转换
- * - 同一business_id的转换操作只会执行一次
+ * - 通过idempotency_key（业务唯一标识）防止重复转换
+ * - 同一idempotency_key的转换操作只会执行一次
  * - 参数一致：返回原结果（is_duplicate=true）
  * - 参数不一致：返回409冲突错误（IDEMPOTENCY_KEY_CONFLICT）
  *
@@ -76,7 +76,7 @@
  *   1, // user_id
  *   50, // red_shard_amount（50个碎红水晶）
  *   {
- *     business_id: `convert_to_diamond_${Date.now()}` // 幂等键
+ *     idempotency_key: `convert_to_diamond_${Date.now()}` // 幂等键
  *   }
  * )
  * // 结果：扣减50个碎红水晶，增加1000个钻石（50 * 20 = 1000）
@@ -88,7 +88,7 @@
  *   'DIAMOND', // to_asset_code
  *   20, // from_amount
  *   {
- *     business_id: `material_convert_${Date.now()}`
+ *     idempotency_key: `material_convert_${Date.now()}`
  *   }
  * )
  * // 结果：扣减20个碎红水晶，增加400个钻石（20 * 20 = 400）
@@ -128,7 +128,7 @@ class AssetConversionService {
    * @param {string} to_asset_code - 目标资产代码（Target Asset Code）如：DIAMOND
    * @param {number} from_amount - 源材料数量（Source Material Amount）必须大于0
    * @param {Object} options - 选项参数（Options）
-   * @param {string} options.business_id - 业务唯一ID（Business ID）必填，用于幂等性控制
+   * @param {string} options.idempotency_key - 业务唯一ID（Business ID）必填，用于幂等性控制
    * @param {string} options.title - 转换标题（Title）可选，默认为"材料转换"
    * @param {Object} options.meta - 元数据（Meta）可选，额外的业务信息
    * @returns {Promise<Object>} 转换结果（Conversion Result）
@@ -166,8 +166,8 @@ class AssetConversionService {
       throw new Error('转换数量必须大于0')
     }
 
-    if (!options.business_id) {
-      throw new Error('business_id不能为空（幂等性控制必需）')
+    if (!options.idempotency_key) {
+      throw new Error('idempotency_key不能为空（幂等性控制必需）')
     }
 
     // 🔴 P1-3 修改：从 DB 读取转换规则（支持版本化查询）
@@ -192,7 +192,7 @@ class AssetConversionService {
     // 计算转换后的目标资产数量（Calculate converted amount）
     const to_amount = Math.floor((from_amount / rule.from_amount) * rule.to_amount)
 
-    const business_id = options.business_id
+    const idempotency_key = options.idempotency_key
     const title = options.title || `材料转换：${from_asset_code} → ${to_asset_code}`
     const meta = {
       ...options.meta,
@@ -224,9 +224,10 @@ class AssetConversionService {
         { transaction }
       )
 
-      // 检查是否存在相同business_id的记录
+      // 检查是否存在相同idempotency_key的记录（派生键格式：${idempotency_key}:debit）
+      const debit_idempotency_key = `${idempotency_key}:debit`
       const existing_record = existing_debit_tx.transactions.find(
-        tx => tx.business_id === business_id
+        tx => tx.idempotency_key === debit_idempotency_key
       )
 
       if (existing_record) {
@@ -240,7 +241,7 @@ class AssetConversionService {
         if (!is_params_match) {
           // 参数不一致，返回409冲突
           const conflictError = new Error(
-            `幂等键冲突：business_id="${business_id}" 已被使用于不同参数的转换操作。` +
+            `幂等键冲突：idempotency_key="${idempotency_key}" 已被使用于不同参数的转换操作。` +
               `原转换：${existing_meta.from_asset_code || 'unknown'} → ${existing_meta.to_asset_code || 'unknown'}, ` +
               `数量=${Math.abs(existing_record.delta_amount || 0)}；` +
               `当前请求：${from_asset_code} → ${to_asset_code}, 数量=${from_amount}。` +
@@ -264,7 +265,7 @@ class AssetConversionService {
           to_asset_code,
           from_amount,
           to_amount,
-          business_id
+          idempotency_key
         })
 
         // 查询对应的目标资产入账记录
@@ -318,7 +319,7 @@ class AssetConversionService {
           user_id,
           asset_code: from_asset_code,
           delta_amount: -from_amount, // 负数表示扣减
-          idempotency_key: `${business_id}:debit`, // 幂等键：派生键（扣减）
+          idempotency_key: `${idempotency_key}:debit`, // 幂等键：派生键（扣减）
           business_type: 'material_convert_debit', // 业务类型：材料转换扣减
           meta: {
             ...meta,
@@ -342,7 +343,7 @@ class AssetConversionService {
           user_id,
           asset_code: to_asset_code,
           delta_amount: to_amount, // 正数表示增加
-          idempotency_key: `${business_id}:credit`, // 幂等键：派生键（入账）
+          idempotency_key: `${idempotency_key}:credit`, // 幂等键：派生键（入账）
           business_type: 'material_convert_credit', // 业务类型：材料转换入账
           meta: {
             ...meta,
@@ -370,7 +371,7 @@ class AssetConversionService {
         to_amount,
         from_tx_id: from_result.transaction_record.transaction_id,
         to_tx_id: to_result.transaction_record.transaction_id,
-        business_id
+        idempotency_key
       })
 
       return {
@@ -397,7 +398,7 @@ class AssetConversionService {
         to_asset_code,
         from_amount,
         to_amount,
-        business_id,
+        idempotency_key,
         error: error.message
       })
 
@@ -416,7 +417,7 @@ class AssetConversionService {
    * @param {number} user_id - 用户ID（User ID）
    * @param {number} red_shard_amount - 碎红水晶数量（Red Shard Amount）必须大于0
    * @param {Object} options - 选项参数（Options）
-   * @param {string} options.business_id - 业务唯一ID（Business ID）必填，用于幂等性控制
+   * @param {string} options.idempotency_key - 业务唯一ID（Business ID）必填，用于幂等性控制
    * @returns {Promise<Object>} 转换结果（Conversion Result）
    *
    * 使用示例：
@@ -426,14 +427,14 @@ class AssetConversionService {
    *   1, // user_id
    *   50, // red_shard_amount
    *   {
-   *     business_id: `convert_${Date.now()}`
+   *     idempotency_key: `convert_${Date.now()}`
    *   }
    * )
    * ```
    */
   static async convertRedShardToDiamond(user_id, red_shard_amount, options = {}) {
-    if (!options.business_id) {
-      throw new Error('business_id不能为空（幂等性控制必需）')
+    if (!options.idempotency_key) {
+      throw new Error('idempotency_key不能为空（幂等性控制必需）')
     }
 
     return await this.convertMaterial(
