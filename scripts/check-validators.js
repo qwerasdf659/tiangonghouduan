@@ -15,7 +15,7 @@ const path = require('path')
  * 验证器完整性检查器
  */
 class ValidatorChecker {
-  constructor () {
+  constructor() {
     this.usedValidators = new Set()
     this.implementedValidators = new Set()
   }
@@ -23,7 +23,7 @@ class ValidatorChecker {
   /**
    * 扫描路由文件中使用的验证器
    */
-  scanUsedValidators () {
+  scanUsedValidators() {
     console.log('🔍 扫描路由文件中使用的验证器...\n')
 
     const routeFiles = glob.sync('routes/**/*.js')
@@ -47,7 +47,7 @@ class ValidatorChecker {
   /**
    * 扫描已实现的验证器
    */
-  scanImplementedValidators () {
+  scanImplementedValidators() {
     console.log('\n🔍 扫描已实现的验证器...\n')
 
     const middlewareFile = 'routes/v4/unified-engine/admin/shared/middleware.js'
@@ -70,7 +70,7 @@ class ValidatorChecker {
   /**
    * 检查缺失的验证器
    */
-  checkMissing () {
+  checkMissing() {
     console.log('\n🔍 检查缺失的验证器...\n')
 
     const missing = []
@@ -101,7 +101,7 @@ class ValidatorChecker {
   /**
    * 执行完整检查
    */
-  run () {
+  run() {
     this.scanUsedValidators()
     this.scanImplementedValidators()
     return this.checkMissing()

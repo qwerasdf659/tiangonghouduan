@@ -29,7 +29,7 @@ const { glob } = require('glob')
  * 静态资源检查器类
  */
 class StaticResourceChecker {
-  constructor (options = {}) {
+  constructor(options = {}) {
     this.rootDir = options.rootDir || process.cwd()
     this.publicDir = path.join(this.rootDir, 'public')
     this.htmlPattern = options.htmlPattern || 'public/**/*.html'
@@ -44,7 +44,7 @@ class StaticResourceChecker {
    * 执行检查
    * @returns {Promise<Object>} 检查结果
    */
-  async check () {
+  async check() {
     console.log('🔍 前端静态资源自动化检查工具 v1.0.0')
     console.log('='.repeat(60))
     console.log(`📂 根目录: ${this.rootDir}`)
@@ -92,7 +92,7 @@ class StaticResourceChecker {
    * 检查单个HTML文件
    * @param {string} filePath - 文件路径
    */
-  async checkFile (filePath) {
+  async checkFile(filePath) {
     const fullPath = path.join(this.rootDir, filePath)
     const content = fs.readFileSync(fullPath, 'utf8')
 
@@ -122,7 +122,7 @@ class StaticResourceChecker {
    * @param {string} filePath - 文件路径
    * @returns {Array} 资源列表
    */
-  extractResources (content, filePath) {
+  extractResources(content, filePath) {
     const resources = []
 
     // 1. 匹配 <img src="...">
@@ -180,7 +180,7 @@ class StaticResourceChecker {
    * @param {string} path - 资源路径
    * @returns {boolean}
    */
-  shouldCheckResource (path) {
+  shouldCheckResource(path) {
     // 跳过data URI
     if (path.startsWith('data:')) return false
 
@@ -208,7 +208,7 @@ class StaticResourceChecker {
    * @param {number} index - 字符索引
    * @returns {number} 行号
    */
-  getLineNumber (content, index) {
+  getLineNumber(content, index) {
     return content.substring(0, index).split('\n').length
   }
 
@@ -216,7 +216,7 @@ class StaticResourceChecker {
    * 检查资源是否存在
    * @param {Object} resource - 资源对象
    */
-  async checkResource (resource) {
+  async checkResource(resource) {
     this.checked++
 
     // 构建完整路径
@@ -252,7 +252,7 @@ class StaticResourceChecker {
    * @param {Object} resource - 资源对象
    * @returns {string} 完整文件路径
    */
-  resolveResourcePath (resource) {
+  resolveResourcePath(resource) {
     let fullPath
 
     if (resource.path.startsWith('/')) {
@@ -277,7 +277,7 @@ class StaticResourceChecker {
    * @param {Object} resource - 资源对象
    * @returns {string} 建议
    */
-  getSuggestion (resource) {
+  getSuggestion(resource) {
     if (resource.path.includes('default-avatar')) {
       return '建议使用 ResourceConfig.getImage("defaultAvatar") 替代硬编码路径'
     }
@@ -300,7 +300,7 @@ class StaticResourceChecker {
   /**
    * 生成检查报告
    */
-  generateReport () {
+  generateReport() {
     console.log('\n' + '='.repeat(60))
     console.log('📊 检查报告')
     console.log('='.repeat(60))
@@ -313,9 +313,7 @@ class StaticResourceChecker {
     console.log(`  ⚠  发现警告: ${this.warnings.length} 个`)
 
     // 成功率
-    const successRate = this.checked > 0
-      ? ((this.passed / this.checked) * 100).toFixed(1)
-      : 100
+    const successRate = this.checked > 0 ? ((this.passed / this.checked) * 100).toFixed(1) : 100
     console.log(`  📊 成功率: ${successRate}%`)
 
     // 错误详情
@@ -361,7 +359,7 @@ class StaticResourceChecker {
 /**
  * 主函数
  */
-async function main () {
+async function main() {
   const args = process.argv.slice(2)
   const verbose = args.includes('--verbose') || args.includes('-v')
 

@@ -4,7 +4,7 @@
 
 const { sequelize } = require('../models')
 
-async function checkIndexes () {
+async function checkIndexes() {
   try {
     console.log('🔍 开始检查 admin_operation_logs 表的索引\n')
 
@@ -49,7 +49,8 @@ async function checkIndexes () {
 
     for (const [indexName, expectedColumns] of Object.entries(requiredIndexes)) {
       const actualColumns = indexMap[indexName]
-      const exists = actualColumns && JSON.stringify(actualColumns) === JSON.stringify(expectedColumns)
+      const exists =
+        actualColumns && JSON.stringify(actualColumns) === JSON.stringify(expectedColumns)
       console.log(`   - ${indexName}: ${exists ? '✅' : '❌'}`)
       if (!exists && actualColumns) {
         console.log(`     预期: [${expectedColumns.join(', ')}]`)

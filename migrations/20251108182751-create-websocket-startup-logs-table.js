@@ -44,7 +44,7 @@ module.exports = {
    * @param {import('sequelize')} Sequelize - Sequelize实例
    * @returns {Promise<void>}
    */
-  async up (queryInterface, Sequelize) {
+  async up(queryInterface, Sequelize) {
     const transaction = await queryInterface.sequelize.transaction()
 
     try {
@@ -191,29 +191,13 @@ module.exports = {
       }
 
       // 创建索引
-      await createIndexSafely(
-        'websocket_startup_logs',
-        'idx_start_time',
-        ['start_time']
-      )
+      await createIndexSafely('websocket_startup_logs', 'idx_start_time', ['start_time'])
 
-      await createIndexSafely(
-        'websocket_startup_logs',
-        'idx_status',
-        ['status']
-      )
+      await createIndexSafely('websocket_startup_logs', 'idx_status', ['status'])
 
-      await createIndexSafely(
-        'websocket_startup_logs',
-        'idx_created_at',
-        ['created_at']
-      )
+      await createIndexSafely('websocket_startup_logs', 'idx_created_at', ['created_at'])
 
-      await createIndexSafely(
-        'websocket_startup_logs',
-        'idx_process_id',
-        ['process_id']
-      )
+      await createIndexSafely('websocket_startup_logs', 'idx_process_id', ['process_id'])
 
       /*
        * ========================================
@@ -222,10 +206,9 @@ module.exports = {
        */
       console.log('步骤3：验证表结构')
 
-      const [tableInfo] = await queryInterface.sequelize.query(
-        'DESCRIBE websocket_startup_logs',
-        { transaction }
-      )
+      const [tableInfo] = await queryInterface.sequelize.query('DESCRIBE websocket_startup_logs', {
+        transaction
+      })
 
       console.log('  ✅ 表结构验证通过，字段数量:', tableInfo.length)
 
@@ -246,7 +229,7 @@ module.exports = {
    * @param {import('sequelize')} Sequelize - Sequelize实例
    * @returns {Promise<void>}
    */
-  async down (queryInterface, Sequelize) {
+  async down(queryInterface, Sequelize) {
     const transaction = await queryInterface.sequelize.transaction()
 
     try {

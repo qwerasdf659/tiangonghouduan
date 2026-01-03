@@ -1,6 +1,12 @@
 const logger = require('../utils/logger').logger
 
 /**
+ * 业务缓存助手（2026-01-03 Redis L2 缓存方案）
+ * @see docs/Redis缓存策略现状与DB压力风险评估-2026-01-02.md
+ */
+const { BusinessCacheHelper } = require('../utils/BusinessCacheHelper')
+
+/**
  * 餐厅积分抽奖系统 V4.5.0 - 兑换市场服务（ExchangeService）
  * 材料资产支付兑换市场核心服务（V4.5.0统一版）
  *
@@ -215,6 +221,7 @@ class ExchangeService {
    * @param {number} [options.page_size=20] - 每页数量
    * @param {string} [options.sort_by='sort_order'] - 排序字段
    * @param {string} [options.sort_order='ASC'] - 排序方向
+   * @param {boolean} [options.refresh=false] - 强制刷新缓存
    * @returns {Promise<Object>} 商品列表和分页信息
    */
   static async getMarketItems(options = {}) {
@@ -224,10 +231,28 @@ class ExchangeService {
       page = 1,
       page_size = 20,
       sort_by = 'sort_order',
-      sort_order = 'ASC'
+      sort_order = 'ASC',
+      refresh = false
     } = options
 
     try {
+      // ========== Redis 缓存读取（2026-01-03 P1 缓存优化）==========
+      const cacheParams = {
+        status,
+        asset_code: asset_code || 'all',
+        page,
+        page_size,
+        sort_by,
+        sort_order
+      }
+      if (!refresh) {
+        const cached = await BusinessCacheHelper.getExchangeItems(cacheParams)
+        if (cached) {
+          logger.debug('[兑换市场] 缓存命中', cacheParams)
+          return cached
+        }
+      }
+
       logger.info('[兑换市场] 查询商品列表', { status, asset_code, page, page_size })
 
       // 构建查询条件
@@ -251,7 +276,7 @@ class ExchangeService {
 
       logger.info(`[兑换市场] 找到${count}个商品，返回第${page}页（${rows.length}个）`)
 
-      return {
+      const result = {
         success: true,
         items: rows,
         pagination: {
@@ -262,6 +287,11 @@ class ExchangeService {
         },
         timestamp: BeijingTimeHelper.now()
       }
+
+      // ========== 写入 Redis 缓存（60s TTL）==========
+      await BusinessCacheHelper.setExchangeItems(cacheParams, result)
+
+      return result
     } catch (error) {
       logger.error('[兑换市场] 查询商品列表失败:', error.message)
       throw new Error(`查询商品列表失败: ${error.message}`)
@@ -652,6 +682,12 @@ class ExchangeService {
       // 7. 提交事务（只有自己创建的事务才提交）
       if (shouldCommit) {
         await transaction.commit()
+
+        /*
+         * ========== 缓存失效（2026-01-03 P1 缓存优化）==========
+         * 兑换成功后失效商品列表缓存（库存已变化）
+         */
+        await BusinessCacheHelper.invalidateExchangeItems('exchange_success')
       }
 
       logger.info(`[兑换市场] 兑换成功，订单号：${order_no}`)

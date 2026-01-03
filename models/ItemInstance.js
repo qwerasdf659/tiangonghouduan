@@ -2,26 +2,52 @@
  * 物品实例模型（Item Instance Model）
  *
  * Phase 3 - P3-1：物品实例真相模型
+ * 升级时间：2026-01-03（方案B：JSON多级锁定机制）
  *
  * 业务场景：
  * - 不可叠加物品的所有权真相（装备、卡牌、兑换券、二手商品等）
  * - 支持物品实例状态机（available/locked/transferred/used/expired）
- * - 支持并发控制（locked_by_order_id/locked_at）
+ * - 支持多级锁定机制（locks JSON字段）
+ *
+ * 多级锁定机制：
+ * - trade: 交易订单锁定（3分钟TTL，自动释放）
+ * - redemption: 兑换码锁定（30天TTL，手动释放）
+ * - security: 风控冻结锁定（无限期，仅管理员显式解锁）
+ *
+ * 锁覆盖规则：
+ * - 优先级: security(3) > redemption(2) > trade(1)
+ * - security 可覆盖 trade/redemption（用于紧急风控冻结）
+ * - 互斥原则：一个物品同时只能有一种锁
  *
  * 硬约束（来自文档）：
  * - **单一真相**：物品所有权只能来自 item_instances 表
  * - **状态机**：available→locked→transferred/used/expired
- * - **锁超时**：3分钟（locked_at 超时自动解锁）
+ * - **锁超时**：trade 3分钟，redemption 30天，security 无限期
  *
  * 表名（snake_case）：item_instances
  * 主键命名：item_instance_id
  * 创建时间：2025-12-15
- * 更新时间：2025-12-28（锁TTL从15分钟改为3分钟）
+ * 更新时间：2026-01-03（方案B：JSON多级锁定，移除旧字段）
  */
 
 'use strict'
 
 const { Model, DataTypes } = require('sequelize')
+
+/**
+ * 锁类型优先级映射
+ * 数值越大优先级越高
+ */
+const LOCK_PRIORITY = {
+  trade: 1, // 交易订单锁：最低优先级
+  redemption: 2, // 兑换码锁：中优先级
+  security: 3 // 风控锁：最高优先级
+}
+
+/**
+ * 有效的锁类型列表
+ */
+const VALID_LOCK_TYPES = ['trade', 'redemption', 'security']
 
 /**
  * ItemInstance 类定义（物品实例模型）
@@ -49,60 +75,281 @@ class ItemInstance extends Model {
    * @returns {boolean} 是否可用 - true表示可用，false表示不可用
    */
   isAvailable() {
-    return this.status === 'available' && !this.locked_by_order_id
+    const locks = this.locks || []
+    return this.status === 'available' && locks.length === 0
   }
 
   /**
-   * 检查锁定是否超时（3分钟）
+   * 检查是否有任何锁定
    *
-   * @returns {boolean} 是否超时 - true表示超时，false表示未超时
+   * @returns {boolean} 是否有锁定 - true表示有锁定
    */
-  isLockTimeout() {
-    if (!this.locked_at) return false
+  isLocked() {
+    const locks = this.locks || []
+    return locks.length > 0
+  }
 
+  /**
+   * 检查是否有指定类型的锁
+   *
+   * @param {string} lockType - 锁类型（trade/redemption/security）
+   * @returns {boolean} 是否有该类型锁
+   */
+  hasLock(lockType) {
+    const locks = this.locks || []
+    return locks.some(lock => lock.lock_type === lockType)
+  }
+
+  /**
+   * 获取所有锁的类型列表
+   *
+   * @returns {Array<string>} 锁类型数组
+   */
+  getLockTypes() {
+    const locks = this.locks || []
+    return locks.map(lock => lock.lock_type)
+  }
+
+  /**
+   * 获取最高优先级的锁
+   *
+   * @returns {Object|null} 最高优先级锁对象，无锁返回null
+   */
+  getHighestPriorityLock() {
+    const locks = this.locks || []
+    if (locks.length === 0) return null
+
+    return locks.reduce((highest, lock) => {
+      const currentPriority = LOCK_PRIORITY[lock.lock_type] || 0
+      const highestPriority = LOCK_PRIORITY[highest.lock_type] || 0
+      return currentPriority > highestPriority ? lock : highest
+    }, locks[0])
+  }
+
+  /**
+   * 获取指定类型的锁
+   *
+   * @param {string} lockType - 锁类型
+   * @returns {Object|null} 锁对象，不存在返回null
+   */
+  getLock(lockType) {
+    const locks = this.locks || []
+    return locks.find(lock => lock.lock_type === lockType) || null
+  }
+
+  /**
+   * 获取指定订单ID的锁
+   *
+   * @param {string} lockId - 锁ID（订单ID）
+   * @returns {Object|null} 锁对象，不存在返回null
+   */
+  getLockById(lockId) {
+    const locks = this.locks || []
+    return locks.find(lock => lock.lock_id === lockId) || null
+  }
+
+  /**
+   * 验证 lock_id 格式（security 必须是业务单号）
+   *
+   * @param {string} lockType - 锁类型
+   * @param {string} lockId - 锁ID
+   * @throws {Error} 当 security 锁的 lock_id 格式不正确时抛出错误
+   * @returns {boolean} 验证通过返回 true
+   */
+  static validateLockId(lockType, lockId) {
+    if (lockType === 'security') {
+      // security 必须是业务单号格式：risk_case_xxx 或 appeal_xxx
+      if (!lockId.match(/^(risk_case_|appeal_)\w+$/)) {
+        throw new Error(
+          `security 锁的 lock_id 必须是业务单号格式（risk_case_xxx 或 appeal_xxx），当前: ${lockId}`
+        )
+      }
+    }
+    return true
+  }
+
+  /**
+   * 检查是否可以添加指定类型的锁
+   * 基于互斥规则和优先级规则
+   *
+   * @param {string} newLockType - 要添加的锁类型
+   * @returns {Object} { canLock: boolean, reason: string, needOverride: boolean, existingLock: Object|null }
+   */
+  canAddLock(newLockType) {
+    const locks = this.locks || []
+
+    // 没有现有锁，可以添加
+    if (locks.length === 0) {
+      return { canLock: true, reason: '无现有锁定', needOverride: false, existingLock: null }
+    }
+
+    const existingLock = locks[0] // 互斥规则：只有一个锁
+    const existingPriority = LOCK_PRIORITY[existingLock.lock_type] || 0
+    const newPriority = LOCK_PRIORITY[newLockType] || 0
+
+    // 高优先级锁可以覆盖低优先级锁
+    if (newPriority > existingPriority) {
+      return {
+        canLock: true,
+        reason: `高优先级锁 ${newLockType} 可覆盖 ${existingLock.lock_type}`,
+        needOverride: true,
+        existingLock
+      }
+    }
+
+    // 低优先级或同优先级无法添加
+    return {
+      canLock: false,
+      reason: `物品已被 ${existingLock.lock_type} 锁定（订单: ${existingLock.lock_id}），${newLockType} 优先级不足`,
+      needOverride: false,
+      existingLock
+    }
+  }
+
+  /**
+   * 检查锁定是否超时
+   * 仅对 auto_release=true 的锁有效
+   *
+   * @returns {boolean} 是否有超时的锁
+   */
+  hasTimeoutLock() {
+    const locks = this.locks || []
     const now = new Date()
-    const lockTime = new Date(this.locked_at)
-    const diffMinutes = (now - lockTime) / 1000 / 60
 
-    return diffMinutes > 3 // 3分钟超时（从15分钟优化为3分钟）
+    return locks.some(lock => {
+      if (!lock.auto_release) return false
+      const expiresAt = new Date(lock.expires_at)
+      return expiresAt < now
+    })
+  }
+
+  /**
+   * 获取所有超时的锁
+   *
+   * @returns {Array<Object>} 超时锁数组
+   */
+  getTimeoutLocks() {
+    const locks = this.locks || []
+    const now = new Date()
+
+    return locks.filter(lock => {
+      if (!lock.auto_release) return false
+      const expiresAt = new Date(lock.expires_at)
+      return expiresAt < now
+    })
   }
 
   /**
    * 锁定物品（用于订单下单）
+   * 注意：推荐使用 AssetService.lockItem()，此方法仅用于内部调用
    *
-   * @param {string} orderId - 订单ID
+   * @param {string} lockId - 锁ID（订单ID）
+   * @param {string} lockType - 锁类型（trade/redemption/security）
+   * @param {Date} expiresAt - 过期时间
    * @param {Object} options - 选项参数
    * @param {Sequelize.Transaction} options.transaction - 事务对象
-   * @returns {Promise<void>} 无返回值
+   * @param {string} options.reason - 锁定原因
+   * @returns {Promise<Object>} 新创建的锁对象
    */
-  async lock(orderId, options = {}) {
-    if (this.locked_by_order_id && !this.isLockTimeout()) {
-      throw new Error(`物品已被订单 ${this.locked_by_order_id} 锁定`)
+  async lock(lockId, lockType, expiresAt, options = {}) {
+    const { transaction, reason = '' } = options
+
+    // 验证锁类型
+    if (!VALID_LOCK_TYPES.includes(lockType)) {
+      throw new Error(`无效的锁类型: ${lockType}，有效值: ${VALID_LOCK_TYPES.join(', ')}`)
     }
+
+    // 验证 lock_id 格式
+    ItemInstance.validateLockId(lockType, lockId)
+
+    // 检查是否可以添加锁
+    const { canLock, reason: lockReason } = this.canAddLock(lockType)
+    if (!canLock) {
+      throw new Error(lockReason)
+    }
+
+    // 构建北京时间格式的时间字符串
+    const now = new Date()
+    const lockedAtStr = this._formatBeijingTime(now)
+    const expiresAtStr = this._formatBeijingTime(expiresAt)
+
+    // 创建新锁对象
+    const newLock = {
+      lock_type: lockType,
+      lock_id: lockId,
+      locked_at: lockedAtStr,
+      expires_at: expiresAtStr,
+      auto_release: lockType === 'trade', // 仅交易锁自动释放
+      reason: reason || `${lockType} 锁定`
+    }
+
+    // 互斥规则：替换现有锁（如果有覆盖则记录日志）
+    const newLocks = [newLock]
 
     await this.update(
       {
         status: 'locked',
-        locked_by_order_id: orderId,
-        locked_at: new Date()
+        locks: newLocks
       },
-      options
+      { transaction }
     )
+
+    return newLock
   }
 
   /**
    * 解锁物品（用于订单取消/超时）
+   * 注意：推荐使用 AssetService.unlockItem()，此方法仅用于内部调用
+   *
+   * @param {string} lockId - 锁ID
+   * @param {string} lockType - 锁类型
+   * @param {Object} options - 选项参数
+   * @param {Sequelize.Transaction} options.transaction - 事务对象
+   * @returns {Promise<boolean>} 解锁成功返回 true
+   */
+  async unlock(lockId, lockType, options = {}) {
+    const { transaction } = options
+    const locks = this.locks || []
+
+    // 查找要移除的锁
+    const lockIndex = locks.findIndex(
+      lock => lock.lock_type === lockType && lock.lock_id === lockId
+    )
+
+    if (lockIndex === -1) {
+      // 未找到锁，不抛出异常但返回 false
+      return false
+    }
+
+    // 移除指定锁
+    locks.splice(lockIndex, 1)
+
+    // 状态一致性规则：locks 为空才变为 available
+    const newStatus = locks.length === 0 ? 'available' : 'locked'
+
+    await this.update(
+      {
+        status: newStatus,
+        locks: locks.length > 0 ? locks : null // 空数组存为 null
+      },
+      { transaction }
+    )
+
+    return true
+  }
+
+  /**
+   * 强制清除所有锁定（仅用于系统管理）
    *
    * @param {Object} options - 选项参数
    * @param {Sequelize.Transaction} options.transaction - 事务对象
    * @returns {Promise<void>} 无返回值
    */
-  async unlock(options = {}) {
+  async clearAllLocks(options = {}) {
     await this.update(
       {
         status: 'available',
-        locked_by_order_id: null,
-        locked_at: null
+        locks: null
       },
       options
     )
@@ -121,8 +368,7 @@ class ItemInstance extends Model {
       {
         owner_user_id: newOwnerId,
         status: 'transferred',
-        locked_by_order_id: null,
-        locked_at: null
+        locks: null // 转移后清除所有锁定
       },
       options
     )
@@ -138,7 +384,8 @@ class ItemInstance extends Model {
   async markAsUsed(options = {}) {
     await this.update(
       {
-        status: 'used'
+        status: 'used',
+        locks: null // 使用后清除所有锁定
       },
       options
     )
@@ -154,10 +401,34 @@ class ItemInstance extends Model {
   async markAsExpired(options = {}) {
     await this.update(
       {
-        status: 'expired'
+        status: 'expired',
+        locks: null // 过期后清除所有锁定
       },
       options
     )
+  }
+
+  /**
+   * 格式化为北京时间 ISO8601 字符串
+   *
+   * @private
+   * @param {Date} date - 日期对象
+   * @returns {string} 北京时间格式字符串 (YYYY-MM-DDTHH:mm:ss.SSS+08:00)
+   */
+  _formatBeijingTime(date) {
+    // 获取北京时间（UTC+8）
+    const beijingOffset = 8 * 60 * 60 * 1000
+    const beijingDate = new Date(date.getTime() + beijingOffset)
+
+    const year = beijingDate.getUTCFullYear()
+    const month = String(beijingDate.getUTCMonth() + 1).padStart(2, '0')
+    const day = String(beijingDate.getUTCDate()).padStart(2, '0')
+    const hours = String(beijingDate.getUTCHours()).padStart(2, '0')
+    const minutes = String(beijingDate.getUTCMinutes()).padStart(2, '0')
+    const seconds = String(beijingDate.getUTCSeconds()).padStart(2, '0')
+    const ms = String(beijingDate.getUTCMilliseconds()).padStart(3, '0')
+
+    return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}.${ms}+08:00`
   }
 }
 
@@ -219,18 +490,14 @@ module.exports = sequelize => {
         }
       },
 
-      // 锁定订单ID（Locked By Order ID - 并发控制）
-      locked_by_order_id: {
-        type: DataTypes.STRING(100),
+      // 锁定记录（Locks - JSON多级锁定机制）
+      locks: {
+        type: DataTypes.JSON,
         allowNull: true,
-        comment: '锁定此物品的订单ID（并发控制，防止重复购买）'
-      },
-
-      // 锁定时间（Locked At - 超时解锁）
-      locked_at: {
-        type: DataTypes.DATE,
-        allowNull: true,
-        comment: '锁定时间（用于超时解锁，默认15分钟超时）'
+        defaultValue: null,
+        comment:
+          '锁定记录数组。格式: [{lock_type, lock_id, locked_at, expires_at, auto_release, reason}]。' +
+          'lock_type: trade(交易锁3分钟)/redemption(兑换码锁30天)/security(风控锁无限期)'
       },
 
       // 创建时间（Created At）
@@ -255,7 +522,7 @@ module.exports = sequelize => {
       tableName: 'item_instances',
       timestamps: true,
       underscored: true,
-      comment: '物品实例表（不可叠加物品所有权真相）',
+      comment: '物品实例表（不可叠加物品所有权真相，支持多级锁定）',
 
       // 索引定义
       indexes: [
@@ -270,10 +537,6 @@ module.exports = sequelize => {
         {
           name: 'idx_item_instances_type_template',
           fields: ['item_type', 'item_template_id']
-        },
-        {
-          name: 'idx_item_instances_locked_by_order',
-          fields: ['locked_by_order_id']
         }
       ]
     }

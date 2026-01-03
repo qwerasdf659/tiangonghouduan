@@ -25,6 +25,7 @@ const materialRoutes = require('./material') // 🆕 材料系统管理（V4.5.0
 const popupBannersRoutes = require('./popup-banners') // 🆕 弹窗Banner管理（2025-12-22）
 const lotteryQuotaRoutes = require('./lottery-quota') // 🆕 抽奖配额管理（2025-12-23）
 const assetAdjustmentRoutes = require('./asset-adjustment') // 🆕 资产调整管理（2025-12-30）
+const campaignBudgetRoutes = require('./campaign-budget') // 🆕 活动预算管理（2026-01-03 BUDGET_POINTS架构）
 
 // 挂载子模块路由
 router.use('/auth', authRoutes)
@@ -41,6 +42,7 @@ router.use('/material', materialRoutes) // 🆕 材料系统管理路由（V4.5.
 router.use('/popup-banners', popupBannersRoutes) // 🆕 弹窗Banner管理路由（2025-12-22）
 router.use('/lottery-quota', lotteryQuotaRoutes) // 🆕 抽奖配额管理路由（2025-12-23）
 router.use('/asset-adjustment', assetAdjustmentRoutes) // 🆕 资产调整管理路由（2025-12-30）
+router.use('/campaign-budget', campaignBudgetRoutes) // 🆕 活动预算管理路由（2026-01-03 BUDGET_POINTS架构）
 
 /**
  * GET / - Admin API根路径信息
@@ -181,6 +183,17 @@ router.get('/', (req, res) => {
           '/asset-adjustment/user/:user_id/balances'
         ],
         note: '管理员调整用户积分、预算积分、钻石等资产，支持批量操作和幂等控制'
+      },
+      campaign_budget: {
+        description: '活动预算管理（2026-01-03 BUDGET_POINTS架构）',
+        endpoints: [
+          '/campaign-budget/campaigns/:campaign_id',
+          '/campaign-budget/campaigns/:campaign_id/validate',
+          '/campaign-budget/campaigns/:campaign_id/pool/add',
+          '/campaign-budget/campaigns/:campaign_id/budget-status',
+          '/campaign-budget/users/:user_id'
+        ],
+        note: '活动预算配置（budget_mode）、空奖约束验证、活动池预算补充、用户BUDGET_POINTS查询'
       }
       // ⚠️ campaign_permissions模块暂未实现，待实现后再添加到此列表
     },

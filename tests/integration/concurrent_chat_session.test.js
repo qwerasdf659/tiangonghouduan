@@ -130,7 +130,9 @@ describe('创建聊天会话API并发测试（方案A：唯一索引+重试）',
      * 核心验证：唯一的session_id应该 ≤ 并发请求数（说明有些请求复用了会话）
      */
     expect(uniqueSessionIds.length).toBeLessThanOrEqual(concurrentRequests)
-    console.log(`✅ 唯一session_id数量(${uniqueSessionIds.length}) ≤ 并发请求数(${concurrentRequests})，说明有请求复用了会话`)
+    console.log(
+      `✅ 唯一session_id数量(${uniqueSessionIds.length}) ≤ 并发请求数(${concurrentRequests})，说明有请求复用了会话`
+    )
 
     // 数据库验证：查询实际创建的会话数量（包括所有状态）
     const actualSessions = await CustomerServiceSession.findAll({
@@ -165,7 +167,9 @@ describe('创建聊天会话API并发测试（方案A：唯一索引+重试）',
     const businessConfig = require('../../config/business.config')
     const rateLimit = businessConfig.chat.create_session_limit.max_creates_per_window
 
-    console.log(`📊 频率限制配置: ${rateLimit}次/${businessConfig.chat.create_session_limit.time_window_seconds}秒`)
+    console.log(
+      `📊 频率限制配置: ${rateLimit}次/${businessConfig.chat.create_session_limit.time_window_seconds}秒`
+    )
 
     const requests = []
 

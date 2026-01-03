@@ -33,7 +33,7 @@ const colors = {
  * @param {string} content - 文件内容
  * @returns {Array} 问题列表
  */
-function checkInlineEvents (filePath, content) {
+function checkInlineEvents(filePath, content) {
   const issues = []
 
   // 匹配 on* 属性（onclick, onchange, onsubmit等）
@@ -64,7 +64,7 @@ function checkInlineEvents (filePath, content) {
  * @param {string} content - 文件内容
  * @returns {Array} 问题列表
  */
-function checkJavaScriptProtocol (filePath, content) {
+function checkJavaScriptProtocol(filePath, content) {
   const issues = []
 
   // 匹配 javascript: 伪协议
@@ -94,7 +94,7 @@ function checkJavaScriptProtocol (filePath, content) {
  * @param {string} content - 文件内容
  * @returns {Array} 问题列表
  */
-function checkInlineScripts (filePath, content) {
+function checkInlineScripts(filePath, content) {
   const issues = []
 
   // 匹配 <script>标签但不包含src属性（内联脚本）
@@ -106,7 +106,11 @@ function checkInlineScripts (filePath, content) {
 
     // 忽略空的script标签和只包含注释的script标签
     const scriptContent = match[0].replace(/<\/?script[^>]*>/gi, '').trim()
-    if (scriptContent.length > 0 && !scriptContent.startsWith('//') && !scriptContent.startsWith('/*')) {
+    if (
+      scriptContent.length > 0 &&
+      !scriptContent.startsWith('//') &&
+      !scriptContent.startsWith('/*')
+    ) {
       issues.push({
         file: filePath,
         line: lineNumber,
@@ -125,7 +129,7 @@ function checkInlineScripts (filePath, content) {
  * 打印检查结果
  * @param {Array} issues - 问题列表
  */
-function printResults (issues) {
+function printResults(issues) {
   if (issues.length === 0) {
     console.log(`${colors.green}✅ 所有HTML文件通过安全检查${colors.reset}`)
     return
@@ -162,11 +166,12 @@ function printResults (issues) {
 
   console.log(`${colors.yellow}问题统计:${colors.reset}`)
   Object.entries(typeCount).forEach(([type, count]) => {
-    const typeName = {
-      INLINE_EVENT: '内联事件处理器',
-      JS_PROTOCOL: 'JavaScript伪协议',
-      INLINE_SCRIPT: '内联脚本'
-    }[type] || type
+    const typeName =
+      {
+        INLINE_EVENT: '内联事件处理器',
+        JS_PROTOCOL: 'JavaScript伪协议',
+        INLINE_SCRIPT: '内联脚本'
+      }[type] || type
     console.log(`  - ${typeName}: ${count}个`)
   })
   console.log()
@@ -175,7 +180,7 @@ function printResults (issues) {
 /**
  * 主函数
  */
-async function main () {
+async function main() {
   console.log(`${colors.blue}🔍 开始HTML安全检查...${colors.reset}\n`)
 
   try {

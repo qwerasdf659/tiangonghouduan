@@ -4,7 +4,7 @@
  */
 
 class TestQualityReporter {
-  constructor (globalConfig, options) {
+  constructor(globalConfig, options) {
     this.globalConfig = globalConfig
     this.options = options
     this.qualityIssues = []
@@ -14,7 +14,7 @@ class TestQualityReporter {
   /**
    * Jest报告器接口：测试运行开始
    */
-  onRunStart () {
+  onRunStart() {
     console.log('🔍 测试质量检查启动...')
     this.qualityIssues = []
   }
@@ -22,7 +22,7 @@ class TestQualityReporter {
   /**
    * Jest报告器接口：测试套件完成
    */
-  onTestResult (test, testResult) {
+  onTestResult(test, testResult) {
     // 分析测试结果
     this.analyzeTestResult(test, testResult)
   }
@@ -30,14 +30,14 @@ class TestQualityReporter {
   /**
    * Jest报告器接口：所有测试完成
    */
-  onRunComplete () {
+  onRunComplete() {
     this.generateQualityReport()
   }
 
   /**
    * 分析单个测试结果
    */
-  analyzeTestResult (test, testResult) {
+  analyzeTestResult(test, testResult) {
     const testFilePath = test.path
 
     testResult.testResults.forEach(result => {
@@ -66,7 +66,7 @@ class TestQualityReporter {
   /**
    * 检查测试名称中的危险模式
    */
-  checkTestNamePattern (testTitle, filePath) {
+  checkTestNamePattern(testTitle, filePath) {
     const dangerousPatterns = [
       {
         pattern: /应该.*返回.*basic/i,
@@ -102,7 +102,7 @@ class TestQualityReporter {
   /**
    * 分析失败消息
    */
-  analyzeFailureMessages (failureMessages, filePath) {
+  analyzeFailureMessages(failureMessages, filePath) {
     failureMessages.forEach(message => {
       // 检查是否是因为业务语义不匹配而失败
       if (message.includes('distributed') && message.includes('completed')) {
@@ -131,7 +131,7 @@ class TestQualityReporter {
   /**
    * 生成质量报告
    */
-  generateQualityReport () {
+  generateQualityReport() {
     if (this.qualityIssues.length === 0) {
       console.log('✅ 测试质量检查通过，未发现问题')
       return
@@ -180,7 +180,7 @@ class TestQualityReporter {
   /**
    * 根据问题类型获取建议
    */
-  getSuggestionForType (type) {
+  getSuggestionForType(type) {
     const suggestions = {
       LOWERED_STANDARD: '验证完整的业务对象属性，而不是简化的标识符',
       BUSINESS_SEMANTIC: '检查业务文档，确保使用正确的业务术语',

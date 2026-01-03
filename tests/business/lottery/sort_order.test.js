@@ -161,7 +161,9 @@ describe('🎰 抽奖接口 sort_order 字段测试（V4架构 - 方案3验证�
         expect(prize.sort_order).toBeGreaterThanOrEqual(1)
         expect(prize.sort_order).toBeLessThanOrEqual(9)
 
-        console.log(`  中奖${index + 1}: ${prize.name}, sort_order=${prize.sort_order}, index=${prize.sort_order - 1}`)
+        console.log(
+          `  中奖${index + 1}: ${prize.name}, sort_order=${prize.sort_order}, index=${prize.sort_order - 1}`
+        )
       })
 
       console.log(`✅ 10次抽奖中${wonPrizes.length}次中奖，sort_order验证通过`)

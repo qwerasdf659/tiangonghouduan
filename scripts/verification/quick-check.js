@@ -13,7 +13,7 @@ const path = require('path')
 const { execSync } = require('child_process')
 
 class QuickIntegrityChecker {
-  constructor () {
+  constructor() {
     this.errors = []
     this.warnings = []
     this.passed = []
@@ -22,7 +22,7 @@ class QuickIntegrityChecker {
   /**
    * 运行所有检查
    */
-  async run () {
+  async run() {
     console.log('🔍 快速完整性检查工具 v1.0.0')
     console.log('='.repeat(60))
     console.log('')
@@ -46,7 +46,7 @@ class QuickIntegrityChecker {
   /**
    * 检查1：模型与服务层字段匹配
    */
-  async checkModelServiceFieldsMatch () {
+  async checkModelServiceFieldsMatch() {
     console.log('📊 检查1: 模型与服务层匹配')
     console.log('-'.repeat(60))
 
@@ -131,7 +131,7 @@ class QuickIntegrityChecker {
   /**
    * 检查2：路由注册情况
    */
-  async checkRouteRegistration () {
+  async checkRouteRegistration() {
     console.log('📊 检查2: 路由注册情况')
     console.log('-'.repeat(60))
 
@@ -149,8 +149,8 @@ class QuickIntegrityChecker {
       const content = fs.readFileSync(adminIndexPath, 'utf8')
 
       // 检查customer-service路由
-      const hasCustomerServiceImport = content.includes('require(\'./customer_service\')')
-      const hasCustomerServiceMount = content.includes('router.use(\'/customer-service\'')
+      const hasCustomerServiceImport = content.includes("require('./customer_service')")
+      const hasCustomerServiceMount = content.includes("router.use('/customer-service'")
 
       if (hasCustomerServiceImport && hasCustomerServiceMount) {
         console.log('✅ customer-service 路由已正确注册')
@@ -176,7 +176,7 @@ class QuickIntegrityChecker {
   /**
    * 检查3：Middleware引入路径
    */
-  async checkMiddlewareImports () {
+  async checkMiddlewareImports() {
     console.log('📊 检查3: Middleware引入路径')
     console.log('-'.repeat(60))
 
@@ -195,7 +195,7 @@ class QuickIntegrityChecker {
             }
 
             // 检查正确的middleware引入
-            const hasCorrectImport = content.includes('require(\'../../../../middleware/auth\')')
+            const hasCorrectImport = content.includes("require('../../../../middleware/auth')")
             if (content.includes('authenticateToken') && !hasCorrectImport) {
               const currentImport = content.match(/require\(['"]([^'"]*auth[^'"]*)['"]\)/)
               if (currentImport) {
@@ -225,7 +225,7 @@ class QuickIntegrityChecker {
   /**
    * 检查4：服务启动验证
    */
-  async checkServiceStartup () {
+  async checkServiceStartup() {
     console.log('📊 检查4: 服务启动验证')
     console.log('-'.repeat(60))
 
@@ -241,9 +241,12 @@ class QuickIntegrityChecker {
 
         // 测试API端点
         try {
-          execSync('curl -s http://localhost:3000/api/v4/admin/customer-service/sessions > /dev/null 2>&1', {
-            timeout: 5000
-          })
+          execSync(
+            'curl -s http://localhost:3000/api/v4/admin/customer-service/sessions > /dev/null 2>&1',
+            {
+              timeout: 5000
+            }
+          )
           console.log('✅ customer-service API端点可访问')
           this.passed.push('服务启动验证')
         } catch (error) {
@@ -268,7 +271,7 @@ class QuickIntegrityChecker {
   /**
    * 生成最终报告
    */
-  generateReport () {
+  generateReport() {
     console.log('='.repeat(60))
     console.log('📋 检查完成')
     console.log('='.repeat(60))

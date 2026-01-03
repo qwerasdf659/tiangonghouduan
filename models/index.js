@@ -368,6 +368,7 @@ Object.keys(models).forEach(modelName => {
 // 🔴 导出sequelize实例和所有模型
 models.sequelize = sequelize
 models.Sequelize = Sequelize
+models.Op = Sequelize.Op
 
 console.log(
   '✅ V15.0 Models loaded:',

@@ -24,14 +24,14 @@ const colors = {
   cyan: '\x1b[36m'
 }
 
-function log (message, color = 'reset') {
+function log(message, color = 'reset') {
   console.log(`${colors[color]}${message}${colors.reset}`)
 }
 
 /**
  * 1. 检查前端HTML文件中的不安全DOM操作
  */
-function checkUnsafeDOMOperations () {
+function checkUnsafeDOMOperations() {
   log('\n📋 检查1: 前端不安全DOM操作', 'cyan')
   log('='.repeat(60), 'cyan')
 
@@ -117,7 +117,7 @@ function checkUnsafeDOMOperations () {
 /**
  * 2. 检查后端API路由的完整性
  */
-function checkBackendAPICompleteness () {
+function checkBackendAPICompleteness() {
   log('\n📋 检查2: 后端API路由完整性', 'cyan')
   log('='.repeat(60), 'cyan')
 
@@ -128,8 +128,16 @@ function checkBackendAPICompleteness () {
   const requiredAPIs = [
     { path: 'v4/unified-engine/auth.js', endpoint: 'POST /login', description: '用户登录' },
     { path: 'v4/unified-engine/auth.js', endpoint: 'POST /logout', description: '用户登出' },
-    { path: 'v4/unified-engine/lottery-preset.js', endpoint: 'GET /list', description: '获取预设列表' },
-    { path: 'v4/unified-engine/lottery-preset.js', endpoint: 'POST /create', description: '创建预设' },
+    {
+      path: 'v4/unified-engine/lottery-preset.js',
+      endpoint: 'GET /list',
+      description: '获取预设列表'
+    },
+    {
+      path: 'v4/unified-engine/lottery-preset.js',
+      endpoint: 'POST /create',
+      description: '创建预设'
+    },
     { path: 'v4/unified-engine/admin.js', endpoint: 'GET /dashboard', description: '管理员仪表板' }
   ]
 
@@ -150,7 +158,9 @@ function checkBackendAPICompleteness () {
     const route = api.endpoint.split(' ')[1]
 
     // 检查是否定义了该端点
-    const routePattern = new RegExp(`router\\.${method}\\(['"](${route}|${route.replace(/\//g, '\\/')})['"\\s,]`)
+    const routePattern = new RegExp(
+      `router\\.${method}\\(['"](${route}|${route.replace(/\//g, '\\/')})['"\\s,]`
+    )
 
     if (!routePattern.test(content)) {
       issues.push({
@@ -182,7 +192,7 @@ function checkBackendAPICompleteness () {
 /**
  * 3. 检查数据库模型关联完整性
  */
-function checkDatabaseModelAssociations () {
+function checkDatabaseModelAssociations() {
   log('\n📋 检查3: 数据库模型关联完整性', 'cyan')
   log('='.repeat(60), 'cyan')
 
@@ -193,9 +203,7 @@ function checkDatabaseModelAssociations () {
     return { issues: ['models目录不存在'] }
   }
 
-  const modelFiles = fs.readdirSync(modelsDir).filter(f =>
-    f.endsWith('.js') && f !== 'index.js'
-  )
+  const modelFiles = fs.readdirSync(modelsDir).filter(f => f.endsWith('.js') && f !== 'index.js')
 
   const issues = []
   const modelAssociations = {}
@@ -232,8 +240,9 @@ function checkDatabaseModelAssociations () {
 
       // 检查是否有对应的belongsTo关联
       const relatedModel = foreignKey.replace(/_id$/, '')
-      const hasBelongsTo = content.includes(`belongsTo(models.${relatedModel}`) ||
-                          content.includes(`belongsTo(models.${capitalize(relatedModel)}`)
+      const hasBelongsTo =
+        content.includes(`belongsTo(models.${relatedModel}`) ||
+        content.includes(`belongsTo(models.${capitalize(relatedModel)}`)
 
       if (!hasBelongsTo && relatedModel !== 'created' && relatedModel !== 'updated') {
         issues.push({
@@ -252,7 +261,10 @@ function checkDatabaseModelAssociations () {
     // 显示关联统计
     Object.entries(modelAssociations).forEach(([model, assoc]) => {
       if (assoc.total > 0) {
-        log(`   📋 ${model}: ${assoc.hasMany} hasMany, ${assoc.belongsTo} belongsTo, ${assoc.belongsToMany} belongsToMany`, 'reset')
+        log(
+          `   📋 ${model}: ${assoc.hasMany} hasMany, ${assoc.belongsTo} belongsTo, ${assoc.belongsToMany} belongsToMany`,
+          'reset'
+        )
       }
     })
   } else {
@@ -269,14 +281,14 @@ function checkDatabaseModelAssociations () {
 /**
  * 4. 检查API错误处理完整性
  */
-function checkAPIErrorHandling () {
+function checkAPIErrorHandling() {
   log('\n📋 检查4: API错误处理完整性', 'cyan')
   log('='.repeat(60), 'cyan')
 
   const routesDir = path.join(__dirname, '../routes')
   const issues = []
 
-  function scanRoutes (dir) {
+  function scanRoutes(dir) {
     const files = fs.readdirSync(dir)
 
     files.forEach(file => {
@@ -340,19 +352,26 @@ function checkAPIErrorHandling () {
 /**
  * 5. 检查环境变量完整性
  */
-function checkEnvironmentVariables () {
+function checkEnvironmentVariables() {
   log('\n📋 检查5: 环境变量完整性', 'cyan')
   log('='.repeat(60), 'cyan')
 
   const requiredEnvVars = [
     // 数据库配置
-    'DB_HOST', 'DB_PORT', 'DB_NAME', 'DB_USER', 'DB_PASSWORD',
+    'DB_HOST',
+    'DB_PORT',
+    'DB_NAME',
+    'DB_USER',
+    'DB_PASSWORD',
     // 服务配置
-    'PORT', 'NODE_ENV', 'JWT_SECRET',
+    'PORT',
+    'NODE_ENV',
+    'JWT_SECRET',
     // Redis配置
     'REDIS_URL',
     // Sealos对象存储
-    'SEALOS_ACCESS_KEY', 'SEALOS_SECRET_KEY'
+    'SEALOS_ACCESS_KEY',
+    'SEALOS_SECRET_KEY'
   ]
 
   const missing = []
@@ -387,14 +406,14 @@ function checkEnvironmentVariables () {
 /**
  * 辅助函数：首字母大写
  */
-function capitalize (str) {
+function capitalize(str) {
   return str.charAt(0).toUpperCase() + str.slice(1)
 }
 
 /**
  * 生成完整的排查报告
  */
-function generateReport (results) {
+function generateReport(results) {
   log('\n' + '='.repeat(60), 'cyan')
   log('📊 DevBox全面系统排查报告', 'cyan')
   log('='.repeat(60), 'cyan')
@@ -469,7 +488,7 @@ function generateReport (results) {
 /**
  * 主函数
  */
-function main () {
+function main() {
   log('\n🚀 开始DevBox全面系统排查...', 'cyan')
   log('检查范围: 后端数据库 + Web端后台管理前端', 'blue')
   log('开始时间: ' + new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' }), 'blue')

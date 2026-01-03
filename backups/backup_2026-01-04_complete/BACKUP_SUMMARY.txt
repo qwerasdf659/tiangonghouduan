@@ -1,0 +1,96 @@
+# 数据库完整备份摘要 - 2026-01-04
+
+## 备份信息
+- **备份时间**: 2026/01/04 06:05:41
+- **数据库名**: restaurant_points_dev
+- **数据库主机**: dbconn.sealosbja.site:42569
+- **表总数**: 45
+
+## 备份文件
+- **SQL文件**: complete_backup_2026-01-04_2026-01-04_06-05-40.sql (3.99 MB)
+- **JSON文件**: complete_backup_2026-01-04_2026-01-04_06-05-40.json (5.89 MB)
+
+## 表详情
+
+| 表名 | 行数 | 列数 | 索引数 | 外键数 |
+|------|------|------|--------|--------|
+| account_asset_balances | 11 | 8 | 4 | 1 |
+| accounts | 14 | 7 | 4 | 1 |
+| admin_operation_logs | 1006 | 14 | 7 | 1 |
+| api_idempotency_requests | 69 | 14 | 5 | 0 |
+| asset_transactions | 216 | 11 | 6 | 1 |
+| audit_records | 0 | 12 | 5 | 1 |
+| authentication_sessions | 0 | 10 | 6 | 1 |
+| chat_messages | 0 | 13 | 7 | 2 |
+| consumption_records | 184 | 16 | 9 | 3 |
+| content_review_records | 184 | 12 | 6 | 1 |
+| customer_service_sessions | 1 | 14 | 7 | 3 |
+| exchange_items | 24 | 14 | 3 | 0 |
+| exchange_records | 0 | 17 | 8 | 2 |
+| feedbacks | 26 | 16 | 5 | 2 |
+| image_resources | 3 | 20 | 8 | 2 |
+| item_instance_events | 306 | 13 | 6 | 1 |
+| item_instances | 1211 | 9 | 5 | 1 |
+| item_template_aliases | 0 | 5 | 3 | 0 |
+| lottery_campaigns | 1 | 28 | 10 | 0 |
+| lottery_draw_quota_rules | 1 | 15 | 3 | 0 |
+| lottery_draws | 2841 | 29 | 25 | 3 |
+| lottery_management_settings | 343 | 9 | 6 | 2 |
+| lottery_presets | 2 | 7 | 6 | 3 |
+| lottery_prizes | 9 | 23 | 11 | 1 |
+| lottery_user_daily_draw_quota | 6 | 11 | 4 | 0 |
+| market_listings | 1 | 15 | 11 | 2 |
+| material_asset_types | 3 | 12 | 5 | 0 |
+| material_conversion_rules | 1 | 10 | 3 | 0 |
+| merchant_points_reviews | 0 | 11 | 6 | 2 |
+| popup_banners | 0 | 13 | 5 | 1 |
+| products | 52 | 30 | 14 | 0 |
+| redemption_orders | 397 | 9 | 6 | 2 |
+| role_change_logs | 0 | 10 | 7 | 4 |
+| roles | 6 | 9 | 5 | 0 |
+| sequelizemeta | 197 | 1 | 2 | 0 |
+| stores | 0 | 13 | 7 | 2 |
+| system_announcements | 5 | 13 | 5 | 1 |
+| system_settings | 18 | 11 | 6 | 0 |
+| trade_orders | 0 | 15 | 8 | 3 |
+| trade_records | 2 | 32 | 12 | 3 |
+| user_hierarchy | 0 | 12 | 7 | 5 |
+| user_premium_status | 1 | 9 | 4 | 1 |
+| user_roles | 13 | 8 | 5 | 2 |
+| users | 22 | 11 | 6 | 0 |
+| websocket_startup_logs | 735 | 13 | 5 | 0 |
+
+## 备份内容完整性
+
+✅ **表结构**: 所有表的CREATE TABLE语句
+✅ **表数据**: 所有表的完整数据（包括空表）
+✅ **索引定义**: 所有索引（PRIMARY KEY, UNIQUE, INDEX等）
+✅ **外键约束**: 所有FOREIGN KEY约束
+✅ **列信息**: 所有列的类型、默认值、约束等
+✅ **字符集**: utf8mb4
+✅ **时区**: 北京时间 (Asia/Shanghai, +08:00)
+
+## 备份验证
+
+- SQL文件MD5: `7fd2a73155c445e153ce725e475f4cab`
+- JSON文件MD5: `0a169a8137076fac5d0058e5349b0d2b`
+
+## 恢复方法
+
+### 从SQL文件恢复（完整恢复）
+```bash
+mysql -h${DB_HOST} -P${DB_PORT} -u${DB_USER} -p${DB_PASSWORD} ${DB_NAME} < complete_backup_2026-01-04_2026-01-04_06-05-40.sql
+```
+
+### 使用Node.js恢复
+```bash
+node scripts/restore_backup.js complete_backup_2026-01-04_2026-01-04_06-05-40.sql
+```
+
+### 验证恢复结果
+```bash
+mysql -h${DB_HOST} -P${DB_PORT} -u${DB_USER} -p${DB_PASSWORD} ${DB_NAME} -e "SHOW TABLES"
+```
+
+---
+备份完成时间: 2026/01/04 06:05:41

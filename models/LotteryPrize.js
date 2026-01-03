@@ -201,6 +201,158 @@ class LotteryPrize extends Model {
 
     return errors
   }
+
+  /**
+   * 验证活动奖品池配置（BUDGET_POINTS 架构：空奖约束）
+   *
+   * 业务规则：
+   * - 每个抽奖活动必须至少有一个 prize_value_points = 0 的空奖
+   * - 确保预算耗尽时用户仍可参与抽奖（只能抽到空奖）
+   * - 空奖的 status 必须为 'active'
+   *
+   * @param {number} campaignId - 活动ID
+   * @param {Object} options - 选项
+   * @param {Object} options.transaction - Sequelize事务对象
+   * @returns {Promise<Object>} 验证结果 {valid: boolean, error?: string, emptyPrizes: Array}
+   */
+  static async validateEmptyPrizeConstraint(campaignId, options = {}) {
+    const { transaction } = options
+
+    if (!campaignId) {
+      return {
+        valid: false,
+        error: '活动ID不能为空',
+        emptyPrizes: []
+      }
+    }
+
+    // 查询活动的所有空奖（prize_value_points = 0 或 NULL）
+    const emptyPrizes = await this.findAll({
+      where: {
+        campaign_id: campaignId,
+        status: 'active',
+        [require('sequelize').Op.or]: [{ prize_value_points: 0 }, { prize_value_points: null }]
+      },
+      attributes: ['prize_id', 'prize_name', 'prize_value_points', 'win_probability'],
+      transaction
+    })
+
+    if (emptyPrizes.length === 0) {
+      return {
+        valid: false,
+        error: `活动 ${campaignId} 缺少空奖配置（prize_value_points = 0）：BUDGET_POINTS 架构要求至少有一个空奖，确保预算耗尽时用户仍可抽奖`,
+        emptyPrizes: []
+      }
+    }
+
+    // 检查空奖是否有概率配置
+    const emptyPrizesWithProbability = emptyPrizes.filter(
+      p => p.win_probability && parseFloat(p.win_probability) > 0
+    )
+
+    if (emptyPrizesWithProbability.length === 0) {
+      return {
+        valid: false,
+        error: `活动 ${campaignId} 的空奖概率配置无效：至少需要一个空奖有大于0的中奖概率`,
+        emptyPrizes: emptyPrizes.map(p => p.toJSON())
+      }
+    }
+
+    return {
+      valid: true,
+      emptyPrizes: emptyPrizes.map(p => p.toJSON()),
+      message: `活动 ${campaignId} 空奖配置有效：${emptyPrizes.length} 个空奖`
+    }
+  }
+
+  /**
+   * 获取活动的预算配置校验结果
+   *
+   * 业务场景：管理后台配置活动时校验
+   *
+   * @param {number} campaignId - 活动ID
+   * @param {Object} options - 选项
+   * @returns {Promise<Object>} 校验结果
+   */
+  static async validateCampaignBudgetConfig(campaignId, options = {}) {
+    const { transaction } = options
+
+    // 查询活动所有奖品
+    const allPrizes = await this.findAll({
+      where: {
+        campaign_id: campaignId,
+        status: 'active'
+      },
+      attributes: ['prize_id', 'prize_name', 'prize_value_points', 'win_probability'],
+      transaction
+    })
+
+    if (allPrizes.length === 0) {
+      return {
+        valid: false,
+        error: `活动 ${campaignId} 没有配置任何激活状态的奖品`,
+        prizes: []
+      }
+    }
+
+    // 按 prize_value_points 分组统计
+    const prizesByValue = {
+      empty: [], // prize_value_points = 0 或 null
+      low: [], // 1-99
+      mid: [], // 100-499
+      high: [] // 500+
+    }
+
+    for (const prize of allPrizes) {
+      const valuePoints = prize.prize_value_points || 0
+      const prizeInfo = {
+        prize_id: prize.prize_id,
+        prize_name: prize.prize_name,
+        prize_value_points: valuePoints,
+        win_probability: parseFloat(prize.win_probability) || 0
+      }
+
+      if (valuePoints === 0) {
+        prizesByValue.empty.push(prizeInfo)
+      } else if (valuePoints < 100) {
+        prizesByValue.low.push(prizeInfo)
+      } else if (valuePoints < 500) {
+        prizesByValue.mid.push(prizeInfo)
+      } else {
+        prizesByValue.high.push(prizeInfo)
+      }
+    }
+
+    // 计算各档位概率总和
+    const probabilitySum = {
+      empty: prizesByValue.empty.reduce((sum, p) => sum + p.win_probability, 0),
+      low: prizesByValue.low.reduce((sum, p) => sum + p.win_probability, 0),
+      mid: prizesByValue.mid.reduce((sum, p) => sum + p.win_probability, 0),
+      high: prizesByValue.high.reduce((sum, p) => sum + p.win_probability, 0)
+    }
+
+    const totalProbability = Object.values(probabilitySum).reduce((a, b) => a + b, 0)
+
+    // 空奖约束检查
+    const emptyPrizeValid = prizesByValue.empty.length > 0 && probabilitySum.empty > 0
+
+    return {
+      valid: emptyPrizeValid,
+      error: emptyPrizeValid ? null : '缺少有效的空奖配置（prize_value_points = 0 且概率 > 0）',
+      summary: {
+        total_prizes: allPrizes.length,
+        empty_prizes: prizesByValue.empty.length,
+        total_probability: (totalProbability * 100).toFixed(2) + '%',
+        probability_by_tier: {
+          empty: (probabilitySum.empty * 100).toFixed(2) + '%',
+          low: (probabilitySum.low * 100).toFixed(2) + '%',
+          mid: (probabilitySum.mid * 100).toFixed(2) + '%',
+          high: (probabilitySum.high * 100).toFixed(2) + '%'
+        }
+      },
+      prizes_by_tier: prizesByValue
+    }
+  }
 }
 
 module.exports = sequelize => {

@@ -406,36 +406,42 @@ async function cleanupOrphanFrozenAssets(dryRun = false) {
 }
 
 /**
- * 清理孤儿锁
+ * 清理孤儿锁（方案B：JSON 多级锁定版本）
  * 释放状态为 locked 但无对应 pending 订单的物品实例
  *
  * 业务规则：
  * - locked 物品必须有对应的 pending/frozen 订单
  * - 无对应订单的锁视为孤儿锁，需释放
+ * - 使用 locks JSON 字段存储锁定信息
  *
  * @param {boolean} dryRun - 是否预览模式
  * @returns {Promise<Object>} 清理结果
  */
 async function cleanupOrphanItemLocks(dryRun = false) {
-  log('\n🧹 ━━━ 清理孤儿锁 ━━━', 'cyan')
+  log('\n🧹 ━━━ 清理孤儿锁（JSON多级锁定版本） ━━━', 'cyan')
   log(`执行时间: ${BeijingTimeHelper.nowLocale()}`, 'blue')
   log(`执行模式: ${dryRun ? 'DRY-RUN（预览）' : '实际清理'}\n`, 'blue')
 
   try {
-    // 查找孤儿锁
+    // 查找孤儿锁：locks JSON 中存在锁但对应订单已不在 pending/frozen 状态
     const [orphanLocks] = await sequelize.query(`
-      SELECT i.item_instance_id, i.owner_user_id, i.locked_by_order_id, i.locked_at,
-             TIMESTAMPDIFF(SECOND, i.locked_at, NOW()) as locked_seconds
+      SELECT i.item_instance_id, i.owner_user_id, i.locks,
+             JSON_UNQUOTE(JSON_EXTRACT(i.locks, '$[0].lock_id')) as lock_id,
+             JSON_UNQUOTE(JSON_EXTRACT(i.locks, '$[0].lock_type')) as lock_type,
+             JSON_UNQUOTE(JSON_EXTRACT(i.locks, '$[0].locked_at')) as locked_at
       FROM item_instances i
       WHERE i.status = 'locked'
+        AND i.locks IS NOT NULL
+        AND JSON_LENGTH(i.locks) > 0
         AND NOT EXISTS (
           SELECT 1 FROM redemption_orders r
-          WHERE r.order_id = i.locked_by_order_id AND r.status = 'pending'
+          WHERE r.order_id = JSON_UNQUOTE(JSON_EXTRACT(i.locks, '$[0].lock_id')) AND r.status = 'pending'
         )
         AND NOT EXISTS (
           SELECT 1 FROM trade_orders t
-          WHERE t.order_id = i.locked_by_order_id AND t.status = 'frozen'
+          WHERE t.order_id = JSON_UNQUOTE(JSON_EXTRACT(i.locks, '$[0].lock_id')) AND t.status = 'frozen'
         )
+        AND JSON_UNQUOTE(JSON_EXTRACT(i.locks, '$[0].lock_type')) != 'security'
     `)
 
     log(`📊 找到 ${orphanLocks.length} 条孤儿锁`, 'blue')
@@ -447,10 +453,8 @@ async function cleanupOrphanItemLocks(dryRun = false) {
 
     // 显示详情
     orphanLocks.forEach((l, i) => {
-      const hours = Math.floor(Math.abs(l.locked_seconds) / 3600)
-      const mins = Math.floor((Math.abs(l.locked_seconds) % 3600) / 60)
       log(
-        `   ${i + 1}. item=${l.item_instance_id}, owner=${l.owner_user_id}, order=${l.locked_by_order_id}, 锁定=${hours}h${mins}m`,
+        `   ${i + 1}. item=${l.item_instance_id}, owner=${l.owner_user_id}, lock_id=${l.lock_id}, type=${l.lock_type}`,
         'yellow'
       )
     })
@@ -463,12 +467,12 @@ async function cleanupOrphanItemLocks(dryRun = false) {
     const transaction = await sequelize.transaction()
 
     try {
-      // 批量释放孤儿锁
+      // 批量释放孤儿锁（清空 locks JSON 并设置状态为 available）
       const itemIds = orphanLocks.map(l => l.item_instance_id)
       await sequelize.query(
         `
         UPDATE item_instances
-        SET status = 'available', locked_by_order_id = NULL, locked_at = NULL, updated_at = NOW()
+        SET status = 'available', locks = NULL, updated_at = NOW()
         WHERE item_instance_id IN (${itemIds.join(',')})
       `,
         { transaction }
@@ -477,14 +481,19 @@ async function cleanupOrphanItemLocks(dryRun = false) {
       // 记录解锁事件到 item_instance_events
       for (const l of orphanLocks) {
         const businessId = `orphan_cleanup_${l.item_instance_id}_${Date.now()}`
+        const meta = JSON.stringify({
+          reason: '孤儿锁清理：无对应订单',
+          previous_lock_id: l.lock_id,
+          previous_lock_type: l.lock_type
+        })
         await sequelize.query(
           `
           INSERT INTO item_instance_events
           (item_instance_id, event_type, operator_user_id, operator_type, status_before, status_after,
-           owner_before, owner_after, business_type, business_id, meta, created_at)
+           owner_before, owner_after, business_type, idempotency_key, meta, created_at)
           VALUES (${l.item_instance_id}, 'unlock', NULL, 'system', 'locked', 'available',
                   ${l.owner_user_id}, ${l.owner_user_id}, 'orphan_lock_cleanup', '${businessId}',
-                  '{"reason": "孤儿锁清理：无对应订单", "previous_order_id": "${l.locked_by_order_id}"}', NOW())
+                  '${meta}', NOW())
         `,
           { transaction }
         )
@@ -505,34 +514,43 @@ async function cleanupOrphanItemLocks(dryRun = false) {
 }
 
 /**
- * 清理超时锁
- * 释放锁定超过 3 分钟的物品实例
+ * 清理超时锁（方案B：JSON 多级锁定版本）
+ * 释放锁定超过有效期的物品实例
  *
- * 业务规则：
- * - 物品锁定超时时间为 3 分钟（180 秒）
- * - 超时后自动释放锁定
+ * 业务规则（2026-01-03 升级）：
+ * - trade 锁超时时间为 3 分钟，auto_release=true
+ * - redemption 锁超时时间为 30 天，auto_release=false（不自动释放）
+ * - security 锁无限期，auto_release=false（不自动释放）
+ * - 仅释放 auto_release=true 且已过期的锁
  *
  * @param {boolean} dryRun - 是否预览模式
  * @returns {Promise<Object>} 清理结果
  */
 async function cleanupTimeoutItemLocks(dryRun = false) {
-  log('\n🧹 ━━━ 清理超时锁 ━━━', 'cyan')
+  log('\n🧹 ━━━ 清理超时锁（JSON多级锁定版本） ━━━', 'cyan')
   log(`执行时间: ${BeijingTimeHelper.nowLocale()}`, 'blue')
   log(`执行模式: ${dryRun ? 'DRY-RUN（预览）' : '实际清理'}\n`, 'blue')
 
-  const LOCK_TIMEOUT_SECONDS = 180 // 3 分钟
-
   try {
-    // 查找超时锁
+    // 查找超时锁：auto_release=true 且 expires_at 已过期
     const [timeoutLocks] = await sequelize.query(`
-      SELECT i.item_instance_id, i.owner_user_id, i.locked_by_order_id, i.locked_at,
-             TIMESTAMPDIFF(SECOND, i.locked_at, NOW()) as locked_seconds
+      SELECT i.item_instance_id, i.owner_user_id, i.locks,
+             JSON_UNQUOTE(JSON_EXTRACT(i.locks, '$[0].lock_id')) as lock_id,
+             JSON_UNQUOTE(JSON_EXTRACT(i.locks, '$[0].lock_type')) as lock_type,
+             JSON_UNQUOTE(JSON_EXTRACT(i.locks, '$[0].locked_at')) as locked_at,
+             JSON_UNQUOTE(JSON_EXTRACT(i.locks, '$[0].expires_at')) as expires_at
       FROM item_instances i
       WHERE i.status = 'locked'
-        AND TIMESTAMPDIFF(SECOND, i.locked_at, NOW()) > ${LOCK_TIMEOUT_SECONDS}
+        AND i.locks IS NOT NULL
+        AND JSON_LENGTH(i.locks) > 0
+        AND JSON_EXTRACT(i.locks, '$[0].auto_release') = true
+        AND STR_TO_DATE(
+          REPLACE(JSON_UNQUOTE(JSON_EXTRACT(i.locks, '$[0].expires_at')), '+08:00', ''),
+          '%Y-%m-%dT%H:%i:%s.000'
+        ) < NOW()
     `)
 
-    log(`📊 找到 ${timeoutLocks.length} 条超时锁（超过 ${LOCK_TIMEOUT_SECONDS / 60} 分钟）`, 'blue')
+    log(`📊 找到 ${timeoutLocks.length} 条超时锁（auto_release=true 且已过期）`, 'blue')
 
     if (timeoutLocks.length === 0) {
       log('✅ 无超时锁需要清理\n', 'green')
@@ -541,10 +559,8 @@ async function cleanupTimeoutItemLocks(dryRun = false) {
 
     // 显示详情
     timeoutLocks.forEach((l, i) => {
-      const hours = Math.floor(l.locked_seconds / 3600)
-      const mins = Math.floor((l.locked_seconds % 3600) / 60)
       log(
-        `   ${i + 1}. item=${l.item_instance_id}, owner=${l.owner_user_id}, 锁定=${hours}h${mins}m`,
+        `   ${i + 1}. item=${l.item_instance_id}, owner=${l.owner_user_id}, type=${l.lock_type}, expires=${l.expires_at}`,
         'yellow'
       )
     })
@@ -557,12 +573,12 @@ async function cleanupTimeoutItemLocks(dryRun = false) {
     const transaction = await sequelize.transaction()
 
     try {
-      // 批量释放超时锁
+      // 批量释放超时锁（清空 locks JSON 并设置状态为 available）
       const itemIds = timeoutLocks.map(l => l.item_instance_id)
       await sequelize.query(
         `
         UPDATE item_instances
-        SET status = 'available', locked_by_order_id = NULL, locked_at = NULL, updated_at = NOW()
+        SET status = 'available', locks = NULL, updated_at = NOW()
         WHERE item_instance_id IN (${itemIds.join(',')})
       `,
         { transaction }
@@ -571,15 +587,20 @@ async function cleanupTimeoutItemLocks(dryRun = false) {
       // 记录解锁事件到 item_instance_events
       for (const l of timeoutLocks) {
         const businessId = `timeout_cleanup_${l.item_instance_id}_${Date.now()}`
-        const timeoutMinutes = LOCK_TIMEOUT_SECONDS / 60
+        const meta = JSON.stringify({
+          reason: '超时锁清理：锁已过期',
+          previous_lock_id: l.lock_id,
+          previous_lock_type: l.lock_type,
+          expires_at: l.expires_at
+        })
         await sequelize.query(
           `
           INSERT INTO item_instance_events
           (item_instance_id, event_type, operator_user_id, operator_type, status_before, status_after,
-           owner_before, owner_after, business_type, business_id, meta, created_at)
+           owner_before, owner_after, business_type, idempotency_key, meta, created_at)
           VALUES (${l.item_instance_id}, 'unlock', NULL, 'system', 'locked', 'available',
                   ${l.owner_user_id}, ${l.owner_user_id}, 'timeout_lock_cleanup', '${businessId}',
-                  '{"reason": "超时锁清理：锁定超过${timeoutMinutes}分钟", "locked_seconds": ${l.locked_seconds}, "previous_order_id": "${l.locked_by_order_id}"}', NOW())
+                  '${meta}', NOW())
         `,
           { transaction }
         )

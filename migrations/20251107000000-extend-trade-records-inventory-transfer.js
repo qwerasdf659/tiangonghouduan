@@ -35,7 +35,7 @@ module.exports = {
    * @param {Object} Sequelize - Sequelize实例
    * @returns {Promise<void>} Promise对象
    */
-  async up (queryInterface, Sequelize) {
+  async up(queryInterface, Sequelize) {
     const transaction = await queryInterface.sequelize.transaction()
 
     try {
@@ -74,7 +74,8 @@ module.exports = {
         {
           type: Sequelize.INTEGER,
           allowNull: true,
-          comment: '物品ID（关联user_inventory.inventory_id，仅用于inventory_transfer类型，用于追踪物品转让历史）'
+          comment:
+            '物品ID（关联user_inventory.inventory_id，仅用于inventory_transfer类型，用于追踪物品转让历史）'
         },
         { transaction }
       )
@@ -93,7 +94,8 @@ module.exports = {
         {
           type: Sequelize.STRING(100),
           allowNull: true,
-          comment: '物品名称（Item Name - 仅用于inventory_transfer类型，冗余字段用于快速查询显示；统一使用name字段，与UserInventory保持一致）'
+          comment:
+            '物品名称（Item Name - 仅用于inventory_transfer类型，冗余字段用于快速查询显示；统一使用name字段，与UserInventory保持一致）'
         },
         { transaction }
       )
@@ -123,14 +125,10 @@ module.exports = {
        * 为item_id创建索引，用于快速查询物品的转让历史
        */
       console.log('5. 创建item_id索引...')
-      await queryInterface.addIndex(
-        'trade_records',
-        ['item_id', 'trade_type', 'created_at'],
-        {
-          name: 'idx_item_transfer_history',
-          transaction
-        }
-      )
+      await queryInterface.addIndex('trade_records', ['item_id', 'trade_type', 'created_at'], {
+        name: 'idx_item_transfer_history',
+        transaction
+      })
 
       await transaction.commit()
       console.log('✅ trade_records表扩展完成，已支持物品转让记录')
@@ -152,7 +150,7 @@ module.exports = {
    * @param {Object} _Sequelize - Sequelize实例（未使用）
    * @returns {Promise<void>} Promise对象
    */
-  async down (queryInterface, _Sequelize) {
+  async down(queryInterface, _Sequelize) {
     const transaction = await queryInterface.sequelize.transaction()
 
     try {
@@ -160,7 +158,7 @@ module.exports = {
 
       // 检查是否有inventory_transfer类型的记录
       const [results] = await queryInterface.sequelize.query(
-        'SELECT COUNT(*) as count FROM trade_records WHERE trade_type = \'inventory_transfer\'',
+        "SELECT COUNT(*) as count FROM trade_records WHERE trade_type = 'inventory_transfer'",
         { transaction }
       )
 
@@ -170,14 +168,16 @@ module.exports = {
 
         // 删除inventory_transfer类型的记录
         await queryInterface.sequelize.query(
-          'DELETE FROM trade_records WHERE trade_type = \'inventory_transfer\'',
+          "DELETE FROM trade_records WHERE trade_type = 'inventory_transfer'",
           { transaction }
         )
       }
 
       // 删除索引
       console.log('1. 删除idx_item_transfer_history索引...')
-      await queryInterface.removeIndex('trade_records', 'idx_item_transfer_history', { transaction })
+      await queryInterface.removeIndex('trade_records', 'idx_item_transfer_history', {
+        transaction
+      })
 
       // 删除字段
       console.log('2. 删除transfer_note字段...')

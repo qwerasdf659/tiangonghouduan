@@ -35,7 +35,7 @@ module.exports = {
    * @param {Object} Sequelize - Sequelize实例
    * @returns {Promise<void>} Promise对象
    */
-  async up (queryInterface, Sequelize) {
+  async up(queryInterface, Sequelize) {
     const transaction = await queryInterface.sequelize.transaction()
 
     try {
@@ -81,14 +81,16 @@ module.exports = {
               'user_queue' // 用户专属队列（预设用户未来抽奖结果序列）
             ),
             allowNull: false,
-            comment: '设置类型：force_win-强制中奖，force_lose-强制不中奖，probability_adjust-概率调整，user_queue-用户专属队列'
+            comment:
+              '设置类型：force_win-强制中奖，force_lose-强制不中奖，probability_adjust-概率调整，user_queue-用户专属队列'
           },
 
           // 设置详情：JSON格式存储设置参数
           setting_data: {
             type: Sequelize.JSON,
             allowNull: false,
-            comment: '设置详情（JSON格式）：force_win={prize_id,reason}，force_lose={count,remaining,reason}，probability_adjust={multiplier,reason}，user_queue={queue_type,priority_level,custom_strategy}'
+            comment:
+              '设置详情（JSON格式）：force_win={prize_id,reason}，force_lose={count,remaining,reason}，probability_adjust={multiplier,reason}，user_queue={queue_type,priority_level,custom_strategy}'
           },
 
           // 过期时间：设置自动失效时间（北京时间GMT+8）
@@ -145,7 +147,8 @@ module.exports = {
           engine: 'InnoDB',
           charset: 'utf8mb4',
           collate: 'utf8mb4_unicode_ci',
-          comment: '抽奖管理设置表：存储管理员的抽奖干预设置（强制中奖、强制不中奖、概率调整、用户专属队列）'
+          comment:
+            '抽奖管理设置表：存储管理员的抽奖干预设置（强制中奖、强制不中奖、概率调整、用户专属队列）'
         }
       )
 
@@ -158,44 +161,28 @@ module.exports = {
       console.log('2. 创建索引...')
 
       // 索引1：快速查询用户的active设置（抽奖时查询）- 最高频
-      await queryInterface.addIndex(
-        'lottery_management_settings',
-        ['user_id', 'status'],
-        {
-          name: 'idx_user_status',
-          transaction
-        }
-      )
+      await queryInterface.addIndex('lottery_management_settings', ['user_id', 'status'], {
+        name: 'idx_user_status',
+        transaction
+      })
 
       // 索引2：定时任务查询过期设置（清理expired设置）
-      await queryInterface.addIndex(
-        'lottery_management_settings',
-        ['expires_at'],
-        {
-          name: 'idx_expires_at',
-          transaction
-        }
-      )
+      await queryInterface.addIndex('lottery_management_settings', ['expires_at'], {
+        name: 'idx_expires_at',
+        transaction
+      })
 
       // 索引3：按类型查询active设置（统计功能）
-      await queryInterface.addIndex(
-        'lottery_management_settings',
-        ['setting_type', 'status'],
-        {
-          name: 'idx_type_status',
-          transaction
-        }
-      )
+      await queryInterface.addIndex('lottery_management_settings', ['setting_type', 'status'], {
+        name: 'idx_type_status',
+        transaction
+      })
 
       // 索引4：审计查询管理员操作记录
-      await queryInterface.addIndex(
-        'lottery_management_settings',
-        ['created_by', 'created_at'],
-        {
-          name: 'idx_created_by',
-          transaction
-        }
-      )
+      await queryInterface.addIndex('lottery_management_settings', ['created_by', 'created_at'], {
+        name: 'idx_created_by',
+        transaction
+      })
 
       // 索引5：复合索引，查询用户特定类型的active设置
       await queryInterface.addIndex(
@@ -228,7 +215,7 @@ module.exports = {
    * @param {Object} _Sequelize - Sequelize实例（未使用）
    * @returns {Promise<void>} Promise对象
    */
-  async down (queryInterface, _Sequelize) {
+  async down(queryInterface, _Sequelize) {
     const transaction = await queryInterface.sequelize.transaction()
 
     try {

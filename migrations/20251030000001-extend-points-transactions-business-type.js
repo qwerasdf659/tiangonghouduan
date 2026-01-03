@@ -28,7 +28,7 @@ module.exports = {
    * @param {import('sequelize')} Sequelize - Sequelize实例
    * @returns {Promise<void>}
    */
-  async up (queryInterface, Sequelize) {
+  async up(queryInterface, Sequelize) {
     const transaction = await queryInterface.sequelize.transaction()
 
     try {
@@ -71,7 +71,7 @@ module.exports = {
    * @param {import('sequelize')} Sequelize - Sequelize实例
    * @returns {Promise<void>}
    */
-  async down (queryInterface, Sequelize) {
+  async down(queryInterface, Sequelize) {
     const transaction = await queryInterface.sequelize.transaction()
 
     try {
@@ -79,7 +79,7 @@ module.exports = {
 
       // 检查是否有consumption_reward类型的记录
       const [results] = await queryInterface.sequelize.query(
-        'SELECT COUNT(*) as count FROM points_transactions WHERE business_type = \'consumption_reward\'',
+        "SELECT COUNT(*) as count FROM points_transactions WHERE business_type = 'consumption_reward'",
         { transaction }
       )
 
@@ -89,7 +89,7 @@ module.exports = {
 
         // 删除consumption_reward类型的记录
         await queryInterface.sequelize.query(
-          'DELETE FROM points_transactions WHERE business_type = \'consumption_reward\'',
+          "DELETE FROM points_transactions WHERE business_type = 'consumption_reward'",
           { transaction }
         )
       }

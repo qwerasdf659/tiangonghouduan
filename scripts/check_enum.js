@@ -1,6 +1,6 @@
-const { sequelize } = require('../models');
+const { sequelize } = require('../models')
 
-(async () => {
+;(async () => {
   try {
     const [results] = await sequelize.query(`
       SELECT COLUMN_TYPE

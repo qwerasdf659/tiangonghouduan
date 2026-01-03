@@ -23,7 +23,7 @@ const { AdminOperationLog } = require('../models')
 /**
  * 验证审计日志功能
  */
-async function verifyAuditLogs () {
+async function verifyAuditLogs() {
   console.log('==========================================')
   console.log('  P0-3 奖品库存调整审计日志功能验证')
   console.log('==========================================\n')
@@ -127,8 +127,9 @@ async function verifyAuditLogs () {
     )
 
     // 检查 addStock 方法中是否调用 AuditLogService.logOperation
-    const hasAddStockAuditLog = prizePoolServiceCode.includes('AuditLogService.logOperation') &&
-      prizePoolServiceCode.includes('operation_type: \'prize_stock_adjust\'')
+    const hasAddStockAuditLog =
+      prizePoolServiceCode.includes('AuditLogService.logOperation') &&
+      prizePoolServiceCode.includes("operation_type: 'prize_stock_adjust'")
 
     if (hasAddStockAuditLog) {
       console.log('✅ addStock 方法中正确调用了 AuditLogService.logOperation')
@@ -137,8 +138,9 @@ async function verifyAuditLogs () {
     }
 
     // 检查 updatePrize 方法中是否调用 AuditLogService.logOperation
-    const hasUpdatePrizeAuditLog = prizePoolServiceCode.includes('AuditLogService.logOperation') &&
-      prizePoolServiceCode.includes('operation_type: \'prize_config\'')
+    const hasUpdatePrizeAuditLog =
+      prizePoolServiceCode.includes('AuditLogService.logOperation') &&
+      prizePoolServiceCode.includes("operation_type: 'prize_config'")
 
     if (hasUpdatePrizeAuditLog) {
       console.log('✅ updatePrize 方法中正确调用了 AuditLogService.logOperation')
@@ -155,8 +157,16 @@ async function verifyAuditLogs () {
     console.log('✅ PrizePoolService.addStock 方法存在')
     console.log('✅ PrizePoolService.updatePrize 方法存在')
     console.log('✅ AuditLogService.logOperation 方法存在')
-    console.log(hasAddStockAuditLog ? '✅ addStock 方法正确调用审计日志' : '❌ addStock 方法未正确调用审计日志')
-    console.log(hasUpdatePrizeAuditLog ? '✅ updatePrize 方法正确调用审计日志' : '❌ updatePrize 方法未正确调用审计日志')
+    console.log(
+      hasAddStockAuditLog
+        ? '✅ addStock 方法正确调用审计日志'
+        : '❌ addStock 方法未正确调用审计日志'
+    )
+    console.log(
+      hasUpdatePrizeAuditLog
+        ? '✅ updatePrize 方法正确调用审计日志'
+        : '❌ updatePrize 方法未正确调用审计日志'
+    )
     console.log(`✅ 找到 ${recentLogs.length} 条奖品相关审计日志记录`)
     console.log('\n==========================================')
     console.log('  P0-3 任务验证完成 ✅')

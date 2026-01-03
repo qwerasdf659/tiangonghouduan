@@ -19,15 +19,17 @@ console.log('='.repeat(50))
  *
  * @returns {Array<Object>} 问题列表
  */
-function checkAppConfig () {
+function checkAppConfig() {
   const appFile = path.join(process.cwd(), 'app.js')
 
   if (!fs.existsSync(appFile)) {
-    return [{
-      type: 'ERROR',
-      file: 'app.js',
-      message: 'app.js文件不存在'
-    }]
+    return [
+      {
+        type: 'ERROR',
+        file: 'app.js',
+        message: 'app.js文件不存在'
+      }
+    ]
   }
 
   const content = fs.readFileSync(appFile, 'utf8')
@@ -73,15 +75,17 @@ function checkAppConfig () {
  *
  * @returns {Array<Object>} 问题列表
  */
-function checkEnvFile () {
+function checkEnvFile() {
   const envFile = path.join(process.cwd(), '.env')
 
   if (!fs.existsSync(envFile)) {
-    return [{
-      type: 'WARNING',
-      file: '.env',
-      message: '.env文件不存在（建议创建.env文件配置环境变量）'
-    }]
+    return [
+      {
+        type: 'WARNING',
+        file: '.env',
+        message: '.env文件不存在（建议创建.env文件配置环境变量）'
+      }
+    ]
   }
 
   const content = fs.readFileSync(envFile, 'utf8')
@@ -107,15 +111,17 @@ function checkEnvFile () {
  *
  * @returns {Array<Object>} 问题列表
  */
-function checkEnvironmentConfig () {
+function checkEnvironmentConfig() {
   const configFile = path.join(process.cwd(), 'config', 'environment.js')
 
   if (!fs.existsSync(configFile)) {
-    return [{
-      type: 'INFO',
-      file: 'config/environment.js',
-      message: '未找到环境配置管理器（建议创建统一的环境配置管理）'
-    }]
+    return [
+      {
+        type: 'INFO',
+        file: 'config/environment.js',
+        message: '未找到环境配置管理器（建议创建统一的环境配置管理）'
+      }
+    ]
   }
 
   return []
@@ -126,12 +132,8 @@ function checkEnvironmentConfig () {
  *
  * @returns {number} 退出码（0=成功，1=有错误）
  */
-function runChecks () {
-  const allIssues = [
-    ...checkAppConfig(),
-    ...checkEnvFile(),
-    ...checkEnvironmentConfig()
-  ]
+function runChecks() {
+  const allIssues = [...checkAppConfig(), ...checkEnvFile(), ...checkEnvironmentConfig()]
 
   // 统计各类型问题数量
   const errorCount = allIssues.filter(i => i.type === 'ERROR').length

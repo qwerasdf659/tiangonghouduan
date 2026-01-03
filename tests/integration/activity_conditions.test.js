@@ -39,12 +39,10 @@ describe('🎯 活动条件API集成测试', () => {
       }
 
       // 登录获取token
-      const loginResponse = await request(app)
-        .post('/api/v4/auth/login')
-        .send({
-          mobile: REAL_TEST_USER_CONFIG.mobile,
-          verification_code: '123456'
-        })
+      const loginResponse = await request(app).post('/api/v4/auth/login').send({
+        mobile: REAL_TEST_USER_CONFIG.mobile,
+        verification_code: '123456'
+      })
 
       if (!loginResponse.body.success) {
         throw new Error('登录失败: ' + loginResponse.body.message)
@@ -137,8 +135,7 @@ describe('🎯 活动条件API集成测试', () => {
    * 测试5：未授权访问应该返回401
    */
   test('未授权访问应该返回401', async () => {
-    const response = await request(app)
-      .get('/api/v4/activities/available')
+    const response = await request(app).get('/api/v4/activities/available')
 
     expect(response.status).toBe(401)
   })

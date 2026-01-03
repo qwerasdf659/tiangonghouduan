@@ -133,6 +133,12 @@ const {
 } = require('../config/system-settings-whitelist')
 
 /**
+ * 业务缓存助手（2026-01-03 Redis L2 缓存方案）
+ * @see docs/Redis缓存策略现状与DB压力风险评估-2026-01-02.md
+ */
+const { BusinessCacheHelper } = require('../utils/BusinessCacheHelper')
+
+/**
  * 管理后台系统监控服务类
  */
 class AdminSystemService {
@@ -694,6 +700,18 @@ class AdminSystemService {
       // 如果没有外部事务，提交内部事务
       if (!transaction) {
         await internalTransaction.commit()
+
+        /*
+         * ========== 缓存失效（2026-01-03 P0 缓存优化）==========
+         * 事务提交后，逐个失效成功更新的配置缓存（秒级生效）
+         */
+        for (const update of updateResults) {
+          await BusinessCacheHelper.invalidateSysConfig(
+            category,
+            update.setting_key,
+            'config_updated'
+          )
+        }
       }
 
       // 返回更新结果
@@ -783,6 +801,20 @@ class AdminSystemService {
     const configKey = `${category}/${setting_key}`
 
     try {
+      /*
+       * ========== Redis 缓存读取（2026-01-03 P0 缓存优化）==========
+       * 尝试从 Redis 缓存读取（失败时降级查库，不抛异常）
+       */
+      const cached = await BusinessCacheHelper.getSysConfig(category, setting_key)
+      if (cached !== null) {
+        logger.debug('[系统配置] Redis 缓存命中', {
+          category,
+          setting_key,
+          value: cached
+        })
+        return cached
+      }
+
       // 从数据库查询配置项
       const setting = await SystemSettings.findOne({
         where: {
@@ -795,7 +827,10 @@ class AdminSystemService {
         // 使用模型方法自动解析类型（number/boolean/json/string）
         const parsed_value = setting.getParsedValue()
 
-        logger.debug('[系统配置] 读取成功', {
+        // ========== 写入 Redis 缓存（60s TTL，带抖动）==========
+        await BusinessCacheHelper.setSysConfig(category, setting_key, parsed_value)
+
+        logger.debug('[系统配置] 读取成功（已缓存）', {
           category,
           setting_key,
           value: parsed_value,
@@ -957,28 +992,40 @@ class AdminSystemService {
       let clearedCount = 0
       const cachePattern = pattern || '*' // 默认清除所有
 
-      // 使用SCAN命令安全地获取匹配的keys（避免KEYS命令阻塞）
-      const keys = await rawClient.keys(cachePattern)
+      /*
+       * ✅ 使用 SCAN 安全遍历（避免 KEYS 阻塞 Redis）
+       * - SCAN 是增量游标遍历，不会阻塞主线程
+       * - 分批 DEL，避免一次性传入过多 keys
+       */
+      let cursor = '0'
+      let matchedKeys = 0
+      const batchSize = 200
 
-      if (keys && keys.length > 0) {
-        // 批量删除keys
-        if (keys.length === 1) {
-          clearedCount = await rawClient.del(keys[0])
-        } else {
-          clearedCount = await rawClient.del(...keys)
+      do {
+        // ioredis: scan returns [cursor, keys]
+        // eslint-disable-next-line no-await-in-loop
+        const scanResult = await rawClient.scan(cursor, 'MATCH', cachePattern, 'COUNT', batchSize)
+        cursor = scanResult?.[0] ?? '0'
+        const keys = scanResult?.[1] ?? []
+
+        if (keys.length > 0) {
+          matchedKeys += keys.length
+          // eslint-disable-next-line no-await-in-loop
+          const deleted = await rawClient.del(...keys)
+          clearedCount += Number(deleted) || 0
         }
+      } while (cursor !== '0')
 
-        logger.info('系统缓存清除成功', {
-          pattern: cachePattern,
-          cleared_count: clearedCount,
-          total_keys: keys.length
-        })
-      }
+      logger.info('系统缓存清除完成', {
+        pattern: cachePattern,
+        cleared_count: clearedCount,
+        matched_keys: matchedKeys
+      })
 
       return {
         pattern: cachePattern,
         cleared_count: clearedCount,
-        matched_keys: keys ? keys.length : 0,
+        matched_keys: matchedKeys,
         timestamp: BeijingTimeHelper.apiTimestamp()
       }
     } catch (error) {

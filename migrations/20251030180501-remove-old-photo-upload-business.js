@@ -28,7 +28,7 @@ module.exports = {
       // 1️⃣ 删除 source_module='user_upload' 的旧数据（如果不需要保留）
       console.log('📊 检查 source_module=user_upload 的数据数量...')
       const [oldDataCount] = await queryInterface.sequelize.query(
-        'SELECT COUNT(*) as count FROM image_resources WHERE source_module=\'user_upload\'',
+        "SELECT COUNT(*) as count FROM image_resources WHERE source_module='user_upload'",
         { transaction }
       )
       console.log(`📋 发现 ${oldDataCount[0].count} 条旧数据`)
@@ -36,7 +36,7 @@ module.exports = {
       if (oldDataCount[0].count > 0) {
         console.log('🗑️ 删除 source_module=user_upload 的旧数据...')
         await queryInterface.sequelize.query(
-          'DELETE FROM image_resources WHERE source_module=\'user_upload\'',
+          "DELETE FROM image_resources WHERE source_module='user_upload'",
           { transaction }
         )
         console.log(`✅ 已删除 ${oldDataCount[0].count} 条旧数据`)
@@ -45,7 +45,7 @@ module.exports = {
       // 2️⃣ 删除 is_upload_review 字段（如果存在）
       console.log('🔄 检查 is_upload_review 字段是否存在...')
       const [columns] = await queryInterface.sequelize.query(
-        'SHOW COLUMNS FROM image_resources LIKE \'is_upload_review\'',
+        "SHOW COLUMNS FROM image_resources LIKE 'is_upload_review'",
         { transaction }
       )
 
@@ -69,7 +69,7 @@ module.exports = {
         `,
         { transaction }
       )
-      console.log('✅ source_module 枚举已更新（已移除 \'user_upload\'）')
+      console.log("✅ source_module 枚举已更新（已移除 'user_upload'）")
 
       // 4️⃣ 提交事务
       await transaction.commit()
@@ -77,7 +77,7 @@ module.exports = {
       console.log('📊 清理总结：')
       console.log(`   - 删除旧数据：${oldDataCount[0].count} 条`)
       console.log('   - 删除字段：is_upload_review')
-      console.log('   - 更新枚举：source_module（移除 \'user_upload\'）')
+      console.log("   - 更新枚举：source_module（移除 'user_upload'）")
     } catch (error) {
       // 5️⃣ 出错回滚
       await transaction.rollback()
@@ -96,7 +96,7 @@ module.exports = {
       console.log('🔄 开始恢复旧的拍照上传业务字段...')
 
       // 1️⃣ 恢复 source_module 枚举
-      console.log('🔄 恢复 source_module 枚举（添加回 \'user_upload\'）...')
+      console.log("🔄 恢复 source_module 枚举（添加回 'user_upload'）...")
       await queryInterface.sequelize.query(
         `
         ALTER TABLE image_resources 
@@ -107,7 +107,7 @@ module.exports = {
         `,
         { transaction }
       )
-      console.log('✅ source_module 枚举已恢复（添加回 \'user_upload\'）')
+      console.log("✅ source_module 枚举已恢复（添加回 'user_upload'）")
 
       // 2️⃣ 恢复 is_upload_review 字段
       console.log('🔄 恢复 is_upload_review 字段...')

@@ -62,11 +62,21 @@ const VALIDATION_RULES = {
     message: '文件名必须符合格式: {YYYYMMDD}{HHMMSS}-{action}-{target}.js'
   },
   allowedActions: [
-    'create-table', 'alter-table', 'drop-table', 'rename-table',
-    'add-column', 'alter-column', 'drop-column', 'rename-column',
-    'create-index', 'alter-index', 'drop-index',
-    'add-constraint', 'drop-constraint',
-    'migrate-data', 'seed-data',
+    'create-table',
+    'alter-table',
+    'drop-table',
+    'rename-table',
+    'add-column',
+    'alter-column',
+    'drop-column',
+    'rename-column',
+    'create-index',
+    'alter-index',
+    'drop-index',
+    'add-constraint',
+    'drop-constraint',
+    'migrate-data',
+    'seed-data',
     'baseline'
   ],
   forbiddenActions: ['fix', 'temp', 'test', 'update', 'change', 'modify'],
@@ -83,14 +93,14 @@ const colors = {
   cyan: '\x1b[36m'
 }
 
-function log (message, color = 'reset') {
+function log(message, color = 'reset') {
   console.log(`${colors[color]}${message}${colors.reset}`)
 }
 
 // ==================== 迁移模板 ====================
 
 const MIGRATION_TEMPLATES = {
-  'create-table': (data) => `/**
+  'create-table': data => `/**
  * 创建表: ${data.target}
  * 
  * 创建时间: ${data.timestamp}
@@ -136,7 +146,7 @@ module.exports = {
 }
 `,
 
-  'add-column': (data) => `/**
+  'add-column': data => `/**
  * 添加列: ${data.target}
  * 
  * 创建时间: ${data.timestamp}
@@ -161,7 +171,7 @@ module.exports = {
 }
 `,
 
-  'alter-column': (data) => `/**
+  'alter-column': data => `/**
  * 修改列: ${data.target}
  * 
  * 创建时间: ${data.timestamp}
@@ -190,7 +200,7 @@ module.exports = {
 }
 `,
 
-  'create-index': (data) => `/**
+  'create-index': data => `/**
  * 创建索引: ${data.target}
  * 
  * 创建时间: ${data.timestamp}
@@ -214,7 +224,7 @@ module.exports = {
 }
 `,
 
-  default: (data) => `/**
+  default: data => `/**
  * ${ALLOWED_ACTIONS[data.actionType]?.desc || '数据库操作'}: ${data.target}
  * 
  * 创建时间: ${data.timestamp}
@@ -241,7 +251,7 @@ module.exports = {
 /**
  * 创建新迁移文件
  */
-async function createMigration () {
+async function createMigration() {
   log('\n📝 创建新迁移文件', 'cyan')
   log('='.repeat(50), 'cyan')
 
@@ -270,7 +280,7 @@ async function createMigration () {
         type: 'input',
         name: 'target',
         message: '请输入目标对象（表名/列名等）:',
-        validate: (input) => {
+        validate: input => {
           if (!input || input.trim().length === 0) {
             return '目标对象不能为空'
           }
@@ -288,7 +298,7 @@ async function createMigration () {
         type: 'input',
         name: 'reason',
         message: '请输入创建原因（必填）:',
-        validate: (input) => input.trim().length > 0 || '创建原因不能为空'
+        validate: input => input.trim().length > 0 || '创建原因不能为空'
       }
     ])
 
@@ -332,7 +342,7 @@ async function createMigration () {
 /**
  * 验证所有迁移文件
  */
-async function verifyMigrations () {
+async function verifyMigrations() {
   log('\n🔍 验证迁移文件', 'cyan')
   log('='.repeat(50), 'cyan')
 
@@ -344,7 +354,8 @@ async function verifyMigrations () {
     }
 
     // 2. 读取所有迁移文件
-    const files = fs.readdirSync(MIGRATIONS_DIR)
+    const files = fs
+      .readdirSync(MIGRATIONS_DIR)
       .filter(f => f.endsWith('.js') && f !== 'VERSION.js')
       .sort()
 
@@ -387,8 +398,10 @@ async function verifyMigrations () {
         const timestamp = parts[0]
         if (timestamp.length === 14) {
           const year = parseInt(timestamp.substring(0, 4))
-          if (year < VALIDATION_RULES.timestampRange.minYear ||
-              year > VALIDATION_RULES.timestampRange.maxYear) {
+          if (
+            year < VALIDATION_RULES.timestampRange.minYear ||
+            year > VALIDATION_RULES.timestampRange.maxYear
+          ) {
             warnings.push(`时间戳年份超出合理范围: ${year}`)
           }
         }
@@ -433,7 +446,7 @@ async function verifyMigrations () {
 /**
  * 检查迁移同步状态
  */
-async function checkMigrationSync () {
+async function checkMigrationSync() {
   log('\n🔄 检查迁移同步状态', 'cyan')
   log('='.repeat(50), 'cyan')
 
@@ -465,7 +478,7 @@ async function checkMigrationSync () {
 /**
  * 执行迁移（上线）
  */
-async function runMigrationUp () {
+async function runMigrationUp() {
   log('\n🚀 执行迁移（上线）', 'cyan')
   log('='.repeat(50), 'cyan')
 
@@ -501,7 +514,7 @@ async function runMigrationUp () {
 /**
  * 回滚迁移
  */
-async function runMigrationDown () {
+async function runMigrationDown() {
   log('\n⏪ 回滚迁移', 'cyan')
   log('='.repeat(50), 'cyan')
 
@@ -537,7 +550,7 @@ async function runMigrationDown () {
 /**
  * 查看迁移状态
  */
-async function checkMigrationStatus () {
+async function checkMigrationStatus() {
   return checkMigrationSync()
 }
 
@@ -546,7 +559,7 @@ async function checkMigrationStatus () {
 /**
  * 生成时间戳 (YYYYMMDDHHMMSS)
  */
-function generateTimestamp () {
+function generateTimestamp() {
   const now = new Date()
   const year = now.getFullYear()
   const month = String(now.getMonth() + 1).padStart(2, '0')
@@ -560,7 +573,7 @@ function generateTimestamp () {
 
 // ==================== 主菜单 ====================
 
-async function showMenu () {
+async function showMenu() {
   log('\n' + '='.repeat(60), 'cyan')
   log('  🛠️  数据库迁移统一工具包 (Migration Toolkit V2.0)', 'cyan')
   log('='.repeat(60), 'cyan')
@@ -607,34 +620,34 @@ async function showMenu () {
   }
 }
 
-async function executeAction (action) {
+async function executeAction(action) {
   switch (action) {
-  case 'create':
-    await createMigration()
-    break
-  case 'verify':
-    await verifyMigrations()
-    break
-  case 'sync':
-    await checkMigrationSync()
-    break
-  case 'up':
-    await runMigrationUp()
-    break
-  case 'down':
-    await runMigrationDown()
-    break
-  case 'status':
-    await checkMigrationStatus()
-    break
-  default:
-    log(`\n❌ 未知操作: ${action}`, 'red')
+    case 'create':
+      await createMigration()
+      break
+    case 'verify':
+      await verifyMigrations()
+      break
+    case 'sync':
+      await checkMigrationSync()
+      break
+    case 'up':
+      await runMigrationUp()
+      break
+    case 'down':
+      await runMigrationDown()
+      break
+    case 'status':
+      await checkMigrationStatus()
+      break
+    default:
+      log(`\n❌ 未知操作: ${action}`, 'red')
   }
 }
 
 // ==================== 主程序入口 ====================
 
-async function main () {
+async function main() {
   try {
     // 检查是否通过命令行参数直接执行
     const args = process.argv.slice(2)

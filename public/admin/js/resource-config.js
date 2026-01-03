@@ -28,25 +28,29 @@ const ResourceConfig = {
      * 尺寸: 64x64
      * 颜色: #ccc (浅灰色)
      */
-    defaultAvatar: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2NCIgaGVpZ2h0PSI2NCIgZmlsbD0iI2NjYyIgY2xhc3M9ImJpIGJpLXBlcnNvbi1jaXJjbGUiIHZpZXdCb3g9IjAgMCAxNiAxNiI+PHBhdGggZD0iTTExIDZhMyAzIDAgMSAxLTYgMCAzIDMgMCAwIDEgNiAweiIvPjxwYXRoIGZpbGwtcnVsZT0iZXZlbm9kZCIgZD0iTTAgOGE4IDggMCAxIDEgMTYgMEE4IDggMCAwIDEgMCA4em04IDdhNyA3IDAgMCAwIDUuMzg3LTIuNTAzQTEzLjkzMyAxMy45MzMgMCAwIDAgOCAxMS41YTEzLjkzMyAxMy45MzMgMCAwIDAtNS4zODcgMS4wMDdBNyA3IDAgMCAwIDggMTV6Ii8+PC9zdmc+',
+    defaultAvatar:
+      'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2NCIgaGVpZ2h0PSI2NCIgZmlsbD0iI2NjYyIgY2xhc3M9ImJpIGJpLXBlcnNvbi1jaXJjbGUiIHZpZXdCb3g9IjAgMCAxNiAxNiI+PHBhdGggZD0iTTExIDZhMyAzIDAgMSAxLTYgMCAzIDMgMCAwIDEgNiAweiIvPjxwYXRoIGZpbGwtcnVsZT0iZXZlbm9kZCIgZD0iTTAgOGE4IDggMCAxIDEgMTYgMEE4IDggMCAwIDEgMCA4em04IDdhNyA3IDAgMCAwIDUuMzg3LTIuNTAzQTEzLjkzMyAxMy45MzMgMCAwIDAgOCAxMS41YTEzLjkzMyAxMy45MzMgMCAwIDAtNS4zODcgMS4wMDdBNyA3IDAgMCAwIDggMTV6Ii8+PC9zdmc+',
 
     /**
      * 默认商品图
      * 来源: Bootstrap Icons - box-seam
      */
-    defaultProduct: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2NCIgaGVpZ2h0PSI2NCIgZmlsbD0iI2NjYyIgY2xhc3M9ImJpIGJpLWJveC1zZWFtIiB2aWV3Qm94PSIwIDAgMTYgMTYiPjxwYXRoIGQ9Ik04LjE4NiAxLjExM2EuNS41IDAgMCAwLS4zNzIgMEwxLjg0NiA0LjVsNC4zIDEuNzg2YS40MS40MSAwIDAgMSAuMDU4LjA4TDEyIDkuNXY0LjYzNGwuNjU0LS4yN2EuNS41IDAgMCAwIC4yOTQtLjQ1N1YzLjQyOGEuNS41IDAgMCAwLS4yOS0uNDVsLTQuNDY4LTEuODY0ek00IDkuNWw0LjE3OCAyLjczMi4wNDItLjAyM1Y5LjV6bTQuMTg2IDYuMTA2YS41LjUgMCAwIDAtLjM3MiAwTDEuODQ2IDEyLjVsNC4zLTEuNzg2YS40MS40MSAwIDAgMSAuMDU4LS4wOEwxMiA3LjV2NC42MzRsLS42NTQuMjdhLjUuNSAwIDAgMC0uMjk0LjQ1N3Y2LjQ5M2EuNS41IDAgMCAwIC4yOS40NWw0LjQ2OCAxLjg2NGEuNS41IDAgMCAwIC42NS0uMTI4em0tMi40NzctLjI4M0E0MS41IDQxLjUgMCAwIDAgOCAxNC41YTQxLjUgNDEuNSAwIDAgMC0xLjcwOS4zMjN6Ii8+PC9zdmc+',
+    defaultProduct:
+      'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2NCIgaGVpZ2h0PSI2NCIgZmlsbD0iI2NjYyIgY2xhc3M9ImJpIGJpLWJveC1zZWFtIiB2aWV3Qm94PSIwIDAgMTYgMTYiPjxwYXRoIGQ9Ik04LjE4NiAxLjExM2EuNS41IDAgMCAwLS4zNzIgMEwxLjg0NiA0LjVsNC4zIDEuNzg2YS40MS40MSAwIDAgMSAuMDU4LjA4TDEyIDkuNXY0LjYzNGwuNjU0LS4yN2EuNS41IDAgMCAwIC4yOTQtLjQ1N1YzLjQyOGEuNS41IDAgMCAwLS4yOS0uNDVsLTQuNDY4LTEuODY0ek00IDkuNWw0LjE3OCAyLjczMi4wNDItLjAyM1Y5LjV6bTQuMTg2IDYuMTA2YS41LjUgMCAwIDAtLjM3MiAwTDEuODQ2IDEyLjVsNC4zLTEuNzg2YS40MS40MSAwIDAgMSAuMDU4LS4wOEwxMiA3LjV2NC42MzRsLS42NTQuMjdhLjUuNSAwIDAgMC0uMjk0LjQ1N3Y2LjQ5M2EuNS41IDAgMCAwIC4yOS40NWw0LjQ2OCAxLjg2NGEuNS41IDAgMCAwIC42NS0uMTI4em0tMi40NzctLjI4M0E0MS41IDQxLjUgMCAwIDAgOCAxNC41YTQxLjUgNDEuNSAwIDAgMC0xLjcwOS4zMjN6Ii8+PC9zdmc+',
 
     /**
      * 默认奖品图
      * 来源: Bootstrap Icons - gift
      */
-    defaultPrize: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2NCIgaGVpZ2h0PSI2NCIgZmlsbD0iI2ZmYzEwNyIgY2xhc3M9ImJpIGJpLWdpZnQiIHZpZXdCb3g9IjAgMCAxNiAxNiI+PHBhdGggZD0iTTMgMi41YTIuNSAyLjUgMCAwIDEgNSAwIDIuNSAyLjUgMCAwIDEgNSAwdjV2LS41YS41LjUgMCAwIDEgMS0uMDAxVjhsMSA4YS41LjUgMCAwIDEtLjUuNWgtMTJhLjUuNSAwIDAgMS0uNS0uNUwyIDh2LS41YS41LjUgMCAwIDEgMS0uMDAxVjh6bTEgLS41djRoOHYtNGEuNS41IDAgMCAwLTEgMFY2SDV2LS41YS41LjUgMCAwIDAtMSAwem0wIDV2N2gzVjdINHptNCAwdjdoM1Y3SDh6bS02IDBoM3Y3SDJ6bTEyIDB2N2gzVjdoLTN6Ii8+PC9zdmc+',
+    defaultPrize:
+      'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2NCIgaGVpZ2h0PSI2NCIgZmlsbD0iI2ZmYzEwNyIgY2xhc3M9ImJpIGJpLWdpZnQiIHZpZXdCb3g9IjAgMCAxNiAxNiI+PHBhdGggZD0iTTMgMi41YTIuNSAyLjUgMCAwIDEgNSAwIDIuNSAyLjUgMCAwIDEgNSAwdjV2LS41YS41LjUgMCAwIDEgMS0uMDAxVjhsMSA4YS41LjUgMCAwIDEtLjUuNWgtMTJhLjUuNSAwIDAgMS0uNS0uNUwyIDh2LS41YS41LjUgMCAwIDEgMS0uMDAxVjh6bTEgLS41djRoOHYtNGEuNS41IDAgMCAwLTEgMFY2SDV2LS41YS41LjUgMCAwIDAtMSAwem0wIDV2N2gzVjdINHptNCAwdjdoM1Y3SDh6bS02IDBoM3Y3SDJ6bTEyIDB2N2gzVjdoLTN6Ii8+PC9zdmc+',
 
     /**
      * 空状态插图
      * 来源: Bootstrap Icons - inbox
      */
-    emptyState: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2NCIgaGVpZ2h0PSI2NCIgZmlsbD0iIzk5OSIgY2xhc3M9ImJpIGJpLWluYm94IiB2aWV3Qm94PSIwIDAgMTYgMTYiPjxwYXRoIGQ9Ik00LjkzOCA4LjVINWExIDEgMCAwIDAgLjk2Mi43MjVsLjAyLjAzNyAxIC0yYTEgMSAwIDAgMCAuOTguNzM4SDEwYTEgMSAwIDAgMCAuOTgtLjczOGwxIDJhLjAzNy4wMzcgMCAwIDAgLjAyLS4wMzdBMSAxIDAgMCAwIDExIDguNWgwYS45MzguOTM4IDAgMCAwLS45MzgtLjkzOGgtNS4xMjR6TTEyLjUgMmgtOUEzLjUgMy41IDAgMCAwIDAgNS41djVBMy41IDMuNSAwIDAgMCAzLjUgMTRoOWEzLjUgMy41IDAgMCAwIDMuNS0zLjV2LTVBMS41IDEuNSAwIDAgMCAxMi41IDJ6bS05IDFoOWEyLjUgMi41IDAgMCAxIDIuNSAyLjV2NS41SDFWNi41QTIuNSAyLjUgMCAwIDEgMy41IDN6Ii8+PC9zdmc+'
+    emptyState:
+      'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2NCIgaGVpZ2h0PSI2NCIgZmlsbD0iIzk5OSIgY2xhc3M9ImJpIGJpLWluYm94IiB2aWV3Qm94PSIwIDAgMTYgMTYiPjxwYXRoIGQ9Ik00LjkzOCA4LjVINWExIDEgMCAwIDAgLjk2Mi43MjVsLjAyLjAzNyAxIC0yYTEgMSAwIDAgMCAuOTguNzM4SDEwYTEgMSAwIDAgMCAuOTgtLjczOGwxIDJhLjAzNy4wMzcgMCAwIDAgLjAyLS4wMzdBMSAxIDAgMCAwIDExIDguNWgwYS45MzguOTM4IDAgMCAwLS45MzgtLjkzOGgtNS4xMjR6TTEyLjUgMmgtOUEzLjUgMy41IDAgMCAwIDAgNS41djVBMy41IDMuNSAwIDAgMCAzLjUgMTRoOWEzLjUgMy41IDAgMCAwIDMuNS0zLjV2LTVBMS41IDEuNSAwIDAgMCAxMi41IDJ6bS05IDFoOWEyLjUgMi41IDAgMCAxIDIuNSAyLjV2NS41SDFWNi41QTIuNSAyLjUgMCAwIDEgMy41IDN6Ii8+PC9zdmc+'
   },
 
   /**
@@ -79,7 +83,7 @@ const ResourceConfig = {
    * // 使用自定义备用资源
    * const avatar = ResourceConfig.getImage('customAvatar', defaultAvatar);
    */
-  getImage (key, fallback = null) {
+  getImage(key, fallback = null) {
     return this.images[key] || fallback || this.images.defaultAvatar
   },
 
@@ -89,7 +93,7 @@ const ResourceConfig = {
    * @param {string} key - 样式资源key
    * @returns {string|null} CSS文件路径
    */
-  getStyle (key) {
+  getStyle(key) {
     return this.styles[key] || null
   },
 
@@ -99,7 +103,7 @@ const ResourceConfig = {
    * @param {string} key - 脚本资源key
    * @returns {string|null} JS文件路径
    */
-  getScript (key) {
+  getScript(key) {
     return this.scripts[key] || null
   },
 
@@ -115,7 +119,7 @@ const ResourceConfig = {
    *   console.warn('资源不存在');
    * }
    */
-  async checkResource (url) {
+  async checkResource(url) {
     try {
       const response = await fetch(url, { method: 'HEAD', cache: 'no-cache' })
       return response.ok
@@ -131,11 +135,11 @@ const ResourceConfig = {
    * @param {string[]} urls - 资源URL数组
    * @returns {Promise<Object>} 检查结果 {url: boolean}
    */
-  async checkResources (urls) {
+  async checkResources(urls) {
     const results = {}
 
     await Promise.all(
-      urls.map(async (url) => {
+      urls.map(async url => {
         results[url] = await this.checkResource(url)
       })
     )
@@ -149,7 +153,7 @@ const ResourceConfig = {
    * @param {string} url - 图片URL
    * @returns {Promise<void>}
    */
-  preloadImage (url) {
+  preloadImage(url) {
     return new Promise((resolve, reject) => {
       const img = new Image()
       img.onload = () => resolve()

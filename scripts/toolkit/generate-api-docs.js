@@ -17,7 +17,7 @@ const apiEndpoints = []
 /**
  * 解析路由文件，提取API端点信息
  */
-function parseRouteFile (filePath, routePrefix = '') {
+function parseRouteFile(filePath, routePrefix = '') {
   const content = fs.readFileSync(filePath, 'utf-8')
   const lines = content.split('\n')
 
@@ -102,7 +102,7 @@ function parseRouteFile (filePath, routePrefix = '') {
 /**
  * 扫描routes目录下的所有路由文件
  */
-function scanRoutes (baseDir) {
+function scanRoutes(baseDir) {
   // V4统一引擎路由
   const v4Routes = [
     { file: 'routes/v4/unified-engine/auth.js', prefix: '/api/v4/auth' },
@@ -127,7 +127,7 @@ function scanRoutes (baseDir) {
 /**
  * 生成Markdown格式的API文档
  */
-function generateMarkdownDoc () {
+function generateMarkdownDoc() {
   let markdown = `# 后端API接口规范文档（自动生成）
 
 **生成时间**: ${new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })}  
@@ -165,81 +165,84 @@ function generateMarkdownDoc () {
   })
 
   // 生成目录
-  Object.keys(groupedAPIs).sort().forEach(category => {
-    markdown += `- [${category.toUpperCase()}模块](#${category}模块) (${groupedAPIs[category].length}个)\n`
-  })
+  Object.keys(groupedAPIs)
+    .sort()
+    .forEach(category => {
+      markdown += `- [${category.toUpperCase()}模块](#${category}模块) (${groupedAPIs[category].length}个)\n`
+    })
 
   markdown += '\n---\n\n'
 
   // 生成详细API列表
-  Object.keys(groupedAPIs).sort().forEach(category => {
-    markdown += `## ${category.toUpperCase()}模块\n\n`
+  Object.keys(groupedAPIs)
+    .sort()
+    .forEach(category => {
+      markdown += `## ${category.toUpperCase()}模块\n\n`
 
-    groupedAPIs[category].forEach((api, index) => {
-      markdown += `### ${index + 1}. ${api.method} ${api.path}\n\n`
-      markdown += `**描述**: ${api.description}\n\n`
+      groupedAPIs[category].forEach((api, index) => {
+        markdown += `### ${index + 1}. ${api.method} ${api.path}\n\n`
+        markdown += `**描述**: ${api.description}\n\n`
 
-      if (api.middlewares.length > 0) {
-        markdown += `**权限要求**: ${api.middlewares.join(', ')}\n\n`
-      }
-
-      if (api.pathParams.length > 0) {
-        markdown += '**路径参数**:\n'
-        api.pathParams.forEach(param => {
-          markdown += `- \`${param}\`: （路径参数）\n`
-        })
-        markdown += '\n'
-      }
-
-      if (api.queryParams.length > 0) {
-        markdown += '**查询参数**:\n'
-        api.queryParams.forEach(param => {
-          markdown += `- \`${param}\`: （查询参数）\n`
-        })
-        markdown += '\n'
-      }
-
-      if (api.bodyParams.length > 0) {
-        markdown += '**请求体参数**:\n'
-        api.bodyParams.forEach(param => {
-          markdown += `- \`${param}\`: （请求体参数）\n`
-        })
-        markdown += '\n'
-      }
-
-      markdown += '**示例请求**:\n'
-      markdown += '```javascript\n'
-
-      if (api.method === 'GET') {
-        const queryString = api.queryParams.length > 0
-          ? '?' + api.queryParams.map(p => `${p}=value`).join('&')
-          : ''
-        markdown += `fetch('${api.path}${queryString}', {\n`
-        markdown += `  method: '${api.method}',\n`
-        markdown += '  headers: { \'Authorization\': \'Bearer <token>\' }\n'
-        markdown += '})\n'
-      } else {
-        markdown += `fetch('${api.path}', {\n`
-        markdown += `  method: '${api.method}',\n`
-        markdown += '  headers: {\n'
-        markdown += '    \'Content-Type\': \'application/json\',\n'
-        markdown += '    \'Authorization\': \'Bearer <token>\'\n'
-        markdown += '  },\n'
-        if (api.bodyParams.length > 0) {
-          markdown += '  body: JSON.stringify({\n'
-          api.bodyParams.forEach((param, i) => {
-            markdown += `    ${param}: 'value'${i < api.bodyParams.length - 1 ? ',' : ''}\n`
-          })
-          markdown += '  })\n'
+        if (api.middlewares.length > 0) {
+          markdown += `**权限要求**: ${api.middlewares.join(', ')}\n\n`
         }
-        markdown += '})\n'
-      }
 
-      markdown += '```\n\n'
-      markdown += `**来源文件**: \`${api.file}\`\n\n`
-      markdown += '---\n\n'
+        if (api.pathParams.length > 0) {
+          markdown += '**路径参数**:\n'
+          api.pathParams.forEach(param => {
+            markdown += `- \`${param}\`: （路径参数）\n`
+          })
+          markdown += '\n'
+        }
+
+        if (api.queryParams.length > 0) {
+          markdown += '**查询参数**:\n'
+          api.queryParams.forEach(param => {
+            markdown += `- \`${param}\`: （查询参数）\n`
+          })
+          markdown += '\n'
+        }
+
+        if (api.bodyParams.length > 0) {
+          markdown += '**请求体参数**:\n'
+          api.bodyParams.forEach(param => {
+            markdown += `- \`${param}\`: （请求体参数）\n`
+          })
+          markdown += '\n'
+        }
+
+        markdown += '**示例请求**:\n'
+        markdown += '```javascript\n'
+
+        if (api.method === 'GET') {
+          const queryString =
+            api.queryParams.length > 0 ? '?' + api.queryParams.map(p => `${p}=value`).join('&') : ''
+          markdown += `fetch('${api.path}${queryString}', {\n`
+          markdown += `  method: '${api.method}',\n`
+          markdown += "  headers: { 'Authorization': 'Bearer <token>' }\n"
+          markdown += '})\n'
+        } else {
+          markdown += `fetch('${api.path}', {\n`
+          markdown += `  method: '${api.method}',\n`
+          markdown += '  headers: {\n'
+          markdown += "    'Content-Type': 'application/json',\n"
+          markdown += "    'Authorization': 'Bearer <token>'\n"
+          markdown += '  },\n'
+          if (api.bodyParams.length > 0) {
+            markdown += '  body: JSON.stringify({\n'
+            api.bodyParams.forEach((param, i) => {
+              markdown += `    ${param}: 'value'${i < api.bodyParams.length - 1 ? ',' : ''}\n`
+            })
+            markdown += '  })\n'
+          }
+          markdown += '})\n'
+        }
+
+        markdown += '```\n\n'
+        markdown += `**来源文件**: \`${api.file}\`\n\n`
+        markdown += '---\n\n'
+      })
     })
-  })
 
   // 生成问题反馈指南
   markdown += `## 📞 问题反馈
@@ -263,7 +266,7 @@ function generateMarkdownDoc () {
 /**
  * 生成前端TypeScript类型定义
  */
-function generateTypeScriptDefinitions () {
+function generateTypeScriptDefinitions() {
   let typescript = `/**
  * 后端API接口类型定义（自动生成）
  * 生成时间: ${new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })}
@@ -282,11 +285,7 @@ export enum ApiEndpoint {
 `
 
   apiEndpoints.forEach(api => {
-    const enumName = api.path
-      .replace(/\//g, '_')
-      .replace(/:/g, '')
-      .replace(/-/g, '_')
-      .toUpperCase()
+    const enumName = api.path.replace(/\//g, '_').replace(/:/g, '').replace(/-/g, '_').toUpperCase()
     typescript += `  ${enumName} = '${api.path}',\n`
   })
 
@@ -306,14 +305,16 @@ export const API_ENDPOINTS = {
     groupedAPIs[category].push(api)
   })
 
-  Object.keys(groupedAPIs).sort().forEach(category => {
-    typescript += `  ${category}: {\n`
-    groupedAPIs[category].forEach(api => {
-      const methodName = api.path.split('/').pop().replace(/:/g, '')
-      typescript += `    ${api.method.toLowerCase()}_${methodName}: '${api.path}',\n`
+  Object.keys(groupedAPIs)
+    .sort()
+    .forEach(category => {
+      typescript += `  ${category}: {\n`
+      groupedAPIs[category].forEach(api => {
+        const methodName = api.path.split('/').pop().replace(/:/g, '')
+        typescript += `    ${api.method.toLowerCase()}_${methodName}: '${api.path}',\n`
+      })
+      typescript += '  },\n'
     })
-    typescript += '  },\n'
-  })
 
   typescript += `};
 `
@@ -324,7 +325,7 @@ export const API_ENDPOINTS = {
 /**
  * 主函数
  */
-function main () {
+function main() {
   console.log('🚀 开始生成API规范文档...\n')
 
   const projectRoot = path.resolve(__dirname, '..')

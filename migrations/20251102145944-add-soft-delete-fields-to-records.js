@@ -95,15 +95,11 @@ module.exports = {
 
       try {
         // 添加索引（加速查询已删除记录）
-        await queryInterface.addIndex(
-          'consumption_records',
-          ['is_deleted'],
-          {
-            name: 'idx_consumption_is_deleted',
-            comment: '软删除标记索引（用于过滤已删除记录和管理员查询）',
-            transaction
-          }
-        )
+        await queryInterface.addIndex('consumption_records', ['is_deleted'], {
+          name: 'idx_consumption_is_deleted',
+          comment: '软删除标记索引（用于过滤已删除记录和管理员查询）',
+          transaction
+        })
         console.log('   ✅ 添加 is_deleted 索引成功')
       } catch (error) {
         if (error.message.includes('Duplicate key')) {
@@ -165,15 +161,11 @@ module.exports = {
       }
 
       try {
-        await queryInterface.addIndex(
-          'exchange_records',
-          ['is_deleted'],
-          {
-            name: 'idx_exchange_is_deleted',
-            comment: '软删除标记索引',
-            transaction
-          }
-        )
+        await queryInterface.addIndex('exchange_records', ['is_deleted'], {
+          name: 'idx_exchange_is_deleted',
+          comment: '软删除标记索引',
+          transaction
+        })
         console.log('   ✅ 添加 is_deleted 索引成功')
       } catch (error) {
         if (error.message.includes('Duplicate key')) {
@@ -235,15 +227,11 @@ module.exports = {
       }
 
       try {
-        await queryInterface.addIndex(
-          'points_transactions',
-          ['is_deleted'],
-          {
-            name: 'idx_points_transactions_is_deleted',
-            comment: '软删除标记索引',
-            transaction
-          }
-        )
+        await queryInterface.addIndex('points_transactions', ['is_deleted'], {
+          name: 'idx_points_transactions_is_deleted',
+          comment: '软删除标记索引',
+          transaction
+        })
         console.log('   ✅ 添加 is_deleted 索引成功')
       } catch (error) {
         if (error.message.includes('Duplicate key')) {
@@ -288,7 +276,9 @@ module.exports = {
       // 1. 回滚 consumption_records 表
       console.log('1️⃣ 回滚 consumption_records 表...')
       try {
-        await queryInterface.removeIndex('consumption_records', 'idx_consumption_is_deleted', { transaction })
+        await queryInterface.removeIndex('consumption_records', 'idx_consumption_is_deleted', {
+          transaction
+        })
         console.log('   ✅ 删除索引成功')
       } catch (error) {
         console.log('   ⚠️  索引可能不存在，跳过')
@@ -311,7 +301,9 @@ module.exports = {
       // 2. 回滚 exchange_records 表
       console.log('\n2️⃣ 回滚 exchange_records 表...')
       try {
-        await queryInterface.removeIndex('exchange_records', 'idx_exchange_is_deleted', { transaction })
+        await queryInterface.removeIndex('exchange_records', 'idx_exchange_is_deleted', {
+          transaction
+        })
         console.log('   ✅ 删除索引成功')
       } catch (error) {
         console.log('   ⚠️  索引可能不存在，跳过')
@@ -334,7 +326,11 @@ module.exports = {
       // 3. 回滚 points_transactions 表
       console.log('\n3️⃣ 回滚 points_transactions 表...')
       try {
-        await queryInterface.removeIndex('points_transactions', 'idx_points_transactions_is_deleted', { transaction })
+        await queryInterface.removeIndex(
+          'points_transactions',
+          'idx_points_transactions_is_deleted',
+          { transaction }
+        )
         console.log('   ✅ 删除索引成功')
       } catch (error) {
         console.log('   ⚠️  索引可能不存在，跳过')

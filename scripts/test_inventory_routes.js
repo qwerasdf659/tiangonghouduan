@@ -19,9 +19,15 @@ try {
   // 测试1：验证子路由模块是否可以正常加载
   console.log('测试1：验证子路由模块加载...')
 
-  const inventoryCoreRoutes = require(path.join(__dirname, '../routes/v4/unified-engine/inventory-core'))
-  const inventoryMarketRoutes = require(path.join(__dirname, '../routes/v4/unified-engine/inventory-market'))
-  const inventoryExchangeRoutes = require(path.join(__dirname, '../routes/v4/unified-engine/inventory-exchange'))
+  const inventoryCoreRoutes = require(
+    path.join(__dirname, '../routes/v4/unified-engine/inventory-core')
+  )
+  const inventoryMarketRoutes = require(
+    path.join(__dirname, '../routes/v4/unified-engine/inventory-market')
+  )
+  const inventoryExchangeRoutes = require(
+    path.join(__dirname, '../routes/v4/unified-engine/inventory-exchange')
+  )
 
   console.log('✅ inventory-core.js 加载成功')
   console.log('✅ inventory-market.js 加载成功')

@@ -168,13 +168,20 @@ class RedemptionService {
         { transaction: tx }
       )
 
-      // 5. 立即锁定物品实例（防止码已发出但物品被转让/重复生成码）
-      await item.lock(order.order_id, { transaction: tx })
+      /*
+       * 5. 立即锁定物品实例（防止码已发出但物品被转让/重复生成码）
+       * 方案B升级：使用多级锁定机制，redemption 锁有效期 30 天
+       */
+      await item.lock(order.order_id, 'redemption', expiresAt, {
+        transaction: tx,
+        reason: '兑换订单锁定'
+      })
 
       logger.info('物品已锁定', {
         item_instance_id,
         order_id: order.order_id,
-        locked_at: item.locked_at
+        lock_type: 'redemption',
+        expires_at: expiresAt
       })
 
       if (shouldCommit) await tx.commit()
@@ -367,13 +374,20 @@ class RedemptionService {
       // 更新订单状态为cancelled
       await order.update({ status: 'cancelled' }, { transaction: tx })
 
-      // 释放物品锁定（如果物品被该订单锁定）
-      if (order.item_instance && order.item_instance.locked_by_order_id === order_id) {
-        await order.item_instance.unlock({ transaction: tx })
-        logger.info('物品锁定已释放', {
-          item_instance_id: order.item_instance_id,
-          order_id
-        })
+      /*
+       * 释放物品锁定（如果物品被该订单锁定）
+       * 方案B升级：使用多级锁定机制，通过 lock_id 精确匹配
+       */
+      if (order.item_instance) {
+        const existingLock = order.item_instance.getLockById(order_id)
+        if (existingLock && existingLock.lock_type === 'redemption') {
+          await order.item_instance.unlock(order_id, 'redemption', { transaction: tx })
+          logger.info('物品锁定已释放', {
+            item_instance_id: order.item_instance_id,
+            order_id,
+            lock_type: 'redemption'
+          })
+        }
       }
 
       if (shouldCommit) await tx.commit()
@@ -442,12 +456,18 @@ class RedemptionService {
         }
       )
 
-      // 3. 释放被这些订单锁定的物品
+      /*
+       * 3. 释放被这些订单锁定的物品
+       * 方案B升级：使用多级锁定机制，通过 lock_id 精确匹配
+       */
       let unlockedCount = 0
       for (const order of expiredOrders) {
-        if (order.item_instance && order.item_instance.locked_by_order_id === order.order_id) {
-          await order.item_instance.unlock({ transaction: tx })
-          unlockedCount++
+        if (order.item_instance) {
+          const existingLock = order.item_instance.getLockById(order.order_id)
+          if (existingLock && existingLock.lock_type === 'redemption') {
+            await order.item_instance.unlock(order.order_id, 'redemption', { transaction: tx })
+            unlockedCount++
+          }
         }
       }
 

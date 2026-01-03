@@ -18,10 +18,10 @@ const path = require('path')
  * @param {string} dir - 前端代码目录
  * @returns {Set<string>} API路径集合
  */
-function extractFrontendAPIs (dir) {
+function extractFrontendAPIs(dir) {
   const apis = new Set()
 
-  function scanDir (currentDir) {
+  function scanDir(currentDir) {
     if (!fs.existsSync(currentDir)) {
       return
     }
@@ -76,10 +76,10 @@ function extractFrontendAPIs (dir) {
  * @param {string} dir - 后端路由目录
  * @returns {Map<string, string>} API路径到文件路径的映射
  */
-function extractBackendAPIs (dir) {
+function extractBackendAPIs(dir) {
   const apis = new Map()
 
-  function scanDir (currentDir) {
+  function scanDir(currentDir) {
     if (!fs.existsSync(currentDir)) {
       return
     }
@@ -141,7 +141,7 @@ function extractBackendAPIs (dir) {
  * @param {Map} backendAPIs - 后端API映射
  * @returns {boolean} 是否匹配
  */
-function isAPIMatched (frontendAPI, backendAPIs) {
+function isAPIMatched(frontendAPI, backendAPIs) {
   // 尝试匹配所有HTTP方法
   const methods = ['GET', 'POST', 'PUT', 'DELETE', 'PATCH']
 
@@ -165,7 +165,7 @@ function isAPIMatched (frontendAPI, backendAPIs) {
 /**
  * 执行一致性检查
  */
-function checkAPIConsistency () {
+function checkAPIConsistency() {
   console.log('🚀 开始前后端API路径一致性检查...')
   console.log('='.repeat(60))
 
@@ -177,13 +177,9 @@ function checkAPIConsistency () {
   frontendAPIs.forEach(api => console.log(`   - ${api}`))
 
   // 提取后端API定义
-  const backendDirs = [
-    path.join(__dirname, '../routes')
-  ]
+  const backendDirs = [path.join(__dirname, '../routes')]
 
-  const backendFiles = [
-    path.join(__dirname, '../app.js')
-  ]
+  const backendFiles = [path.join(__dirname, '../app.js')]
 
   console.log('\n📁 扫描后端目录:')
   backendDirs.forEach(dir => {

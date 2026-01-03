@@ -39,7 +39,7 @@ const colors = {
   magenta: '\x1b[35m'
 }
 
-function log (message, color = 'reset') {
+function log(message, color = 'reset') {
   console.log(`${colors[color]}${message}${colors.reset}`)
 }
 
@@ -48,7 +48,7 @@ function log (message, color = 'reset') {
 /**
  * 对比模型与数据库结构
  */
-async function compareModelsAndDatabase () {
+async function compareModelsAndDatabase() {
   log('\n📊 对比模型与数据库结构', 'cyan')
   log('='.repeat(60), 'cyan')
 
@@ -140,7 +140,7 @@ async function compareModelsAndDatabase () {
 /**
  * 综合数据库检查
  */
-async function comprehensiveDatabaseCheck () {
+async function comprehensiveDatabaseCheck() {
   log('\n🔍 综合数据库检查', 'cyan')
   log('='.repeat(60), 'cyan')
 
@@ -170,10 +170,11 @@ async function comprehensiveDatabaseCheck () {
     log('\n📊 综合检查报告:', 'cyan')
     log('='.repeat(60))
 
-    const allPassed = comparison.isConsistent &&
-                      integrityResult.allValid &&
-                      indexResult.allValid &&
-                      foreignKeyResult.allValid
+    const allPassed =
+      comparison.isConsistent &&
+      integrityResult.allValid &&
+      indexResult.allValid &&
+      foreignKeyResult.allValid
 
     if (allPassed) {
       log('\n✅ 所有检查项目通过!', 'green')
@@ -212,7 +213,7 @@ async function comprehensiveDatabaseCheck () {
 /**
  * 检查数据完整性
  */
-async function checkDataIntegrity () {
+async function checkDataIntegrity() {
   try {
     const issues = []
 
@@ -240,7 +241,7 @@ async function checkDataIntegrity () {
 /**
  * 检查索引状态
  */
-async function checkIndexes () {
+async function checkIndexes() {
   try {
     const [results] = await sequelize.query(`
       SELECT 
@@ -266,7 +267,7 @@ async function checkIndexes () {
 /**
  * 检查外键约束
  */
-async function checkForeignKeys () {
+async function checkForeignKeys() {
   try {
     const [results] = await sequelize.query(`
       SELECT 
@@ -294,7 +295,7 @@ async function checkForeignKeys () {
 /**
  * 测试重建准备度
  */
-async function testRebuildReadiness () {
+async function testRebuildReadiness() {
   log('\n🧪 测试数据库重建准备度', 'cyan')
   log('='.repeat(60), 'cyan')
 
@@ -311,34 +312,47 @@ async function testRebuildReadiness () {
 
     // 2. 检查模型文件
     log('\n2️⃣  模型文件检查...', 'blue')
-    const modelCount = Object.keys(models).filter(k => k !== 'sequelize' && k !== 'Sequelize').length
+    const modelCount = Object.keys(models).filter(
+      k => k !== 'sequelize' && k !== 'Sequelize'
+    ).length
     log(`   ✅ 找到 ${modelCount} 个模型`, 'green')
 
     // 3. 检查初始化数据
     log('\n3️⃣  初始化数据检查...', 'blue')
-    const { stdout: seedFiles } = await execAsync('ls -1 seeders/*.js 2>/dev/null | wc -l || echo "0"', {
-      cwd: require('path').join(__dirname, '../..')
-    })
+    const { stdout: seedFiles } = await execAsync(
+      'ls -1 seeders/*.js 2>/dev/null | wc -l || echo "0"',
+      {
+        cwd: require('path').join(__dirname, '../..')
+      }
+    )
     const seedCount = parseInt(seedFiles.trim())
-    log(`   ${seedCount > 0 ? '✅' : '⚠️'}  找到 ${seedCount} 个种子文件`, seedCount > 0 ? 'green' : 'yellow')
+    log(
+      `   ${seedCount > 0 ? '✅' : '⚠️'}  找到 ${seedCount} 个种子文件`,
+      seedCount > 0 ? 'green' : 'yellow'
+    )
 
     // 4. 检查备份
     log('\n4️⃣  备份检查...', 'blue')
     try {
-      const { stdout: backupFiles } = await execAsync('ls -1 backups/*.sql 2>/dev/null | wc -l || echo "0"', {
-        cwd: require('path').join(__dirname, '../..')
-      })
+      const { stdout: backupFiles } = await execAsync(
+        'ls -1 backups/*.sql 2>/dev/null | wc -l || echo "0"',
+        {
+          cwd: require('path').join(__dirname, '../..')
+        }
+      )
       const backupCount = parseInt(backupFiles.trim())
-      log(`   ${backupCount > 0 ? '✅' : '⚠️'}  找到 ${backupCount} 个备份文件`, backupCount > 0 ? 'green' : 'yellow')
+      log(
+        `   ${backupCount > 0 ? '✅' : '⚠️'}  找到 ${backupCount} 个备份文件`,
+        backupCount > 0 ? 'green' : 'yellow'
+      )
     } catch {
       log('   ⚠️  未找到备份目录', 'yellow')
     }
 
     // 总结
     log('\n📊 准备度评估:', 'cyan')
-    const readinessScore = (migrationCount > 0 ? 40 : 0) +
-                          (modelCount > 0 ? 40 : 0) +
-                          (seedCount > 0 ? 20 : 0)
+    const readinessScore =
+      (migrationCount > 0 ? 40 : 0) + (modelCount > 0 ? 40 : 0) + (seedCount > 0 ? 20 : 0)
 
     log(`   准备度评分: ${readinessScore}/100`, readinessScore >= 80 ? 'green' : 'yellow')
 
@@ -360,7 +374,7 @@ async function testRebuildReadiness () {
 /**
  * 快速验证（用于启动时检查）
  */
-async function quickValidation () {
+async function quickValidation() {
   log('\n⚡ 快速验证', 'cyan')
   log('='.repeat(60), 'cyan')
 
@@ -372,10 +386,9 @@ async function quickValidation () {
     // 2. 检查关键表
     const keyTables = ['users', 'user_roles', 'lottery_prizes', 'lottery_draws']
     for (const table of keyTables) {
-      const [result] = await sequelize.query(
-        `SELECT COUNT(*) as count FROM ${table}`,
-        { type: require('sequelize').QueryTypes.SELECT }
-      )
+      const [result] = await sequelize.query(`SELECT COUNT(*) as count FROM ${table}`, {
+        type: require('sequelize').QueryTypes.SELECT
+      })
       log(`   ✅ ${table}: ${result.count} 条记录`, 'green')
     }
 
@@ -389,7 +402,7 @@ async function quickValidation () {
 
 // ==================== 主菜单 ====================
 
-async function showMenu () {
+async function showMenu() {
   log('\n' + '='.repeat(60), 'cyan')
   log('  🔍 数据库验证统一工具包 (Validation Toolkit V2.0)', 'cyan')
   log('='.repeat(60), 'cyan')
@@ -434,23 +447,23 @@ async function showMenu () {
   }
 }
 
-async function executeAction (action) {
+async function executeAction(action) {
   try {
     switch (action) {
-    case 'compare':
-      await compareModelsAndDatabase()
-      break
-    case 'comprehensive':
-      await comprehensiveDatabaseCheck()
-      break
-    case 'readiness':
-      await testRebuildReadiness()
-      break
-    case 'quick':
-      await quickValidation()
-      break
-    default:
-      log(`\n❌ 未知操作: ${action}`, 'red')
+      case 'compare':
+        await compareModelsAndDatabase()
+        break
+      case 'comprehensive':
+        await comprehensiveDatabaseCheck()
+        break
+      case 'readiness':
+        await testRebuildReadiness()
+        break
+      case 'quick':
+        await quickValidation()
+        break
+      default:
+        log(`\n❌ 未知操作: ${action}`, 'red')
     }
   } catch (error) {
     log(`\n❌ 执行失败: ${error.message}`, 'red')
@@ -464,7 +477,7 @@ async function executeAction (action) {
 
 // ==================== 主程序入口 ====================
 
-async function main () {
+async function main() {
   try {
     // 检查是否通过命令行参数直接执行
     const args = process.argv.slice(2)

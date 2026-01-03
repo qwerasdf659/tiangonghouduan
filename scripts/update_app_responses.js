@@ -13,7 +13,8 @@ const appJsPath = path.join(__dirname, '../app.js')
 let content = fs.readFileSync(appJsPath, 'utf8')
 
 // 1. 修改 /health 端点
-const oldHealthEndpoint = /\/\/ 📊 健康检查端点\napp\.get\('\/health', async \(req, res\) => \{[\s\S]*?\n\}\)\n/
+const oldHealthEndpoint =
+  /\/\/ 📊 健康检查端点\napp\.get\('\/health', async \(req, res\) => \{[\s\S]*?\n\}\)\n/
 
 const newHealthEndpoint = `// 📊 健康检查端点
 app.get('/health', async (req, res) => {
@@ -98,7 +99,8 @@ app.get('/health', async (req, res) => {
 `
 
 // 2. 修改 /api/v4 端点 - 注意：此端点在 /api/ 路径下，有ApiResponse中间件注入
-const oldApiV4Endpoint = /\/\/ 📊 V4统一引擎信息端点\napp\.get\('\/api\/v4', \(req, res\) => \{[\s\S]*?\n\}\)\n/
+const oldApiV4Endpoint =
+  /\/\/ 📊 V4统一引擎信息端点\napp\.get\('\/api\/v4', \(req, res\) => \{[\s\S]*?\n\}\)\n/
 
 const newApiV4Endpoint = `// 📊 V4统一引擎信息端点
 app.get('/api/v4', (req, res) => {
@@ -134,7 +136,8 @@ app.get('/api/v4', (req, res) => {
 `
 
 // 3. 修改 /api/v4/docs 端点
-const oldApiDocsEndpoint = /\/\/ 📚 V4统一引擎API文档端点\napp\.get\('\/api\/v4\/docs', \(req, res\) => \{[\s\S]*?\n\}\)\n/
+const oldApiDocsEndpoint =
+  /\/\/ 📚 V4统一引擎API文档端点\napp\.get\('\/api\/v4\/docs', \(req, res\) => \{[\s\S]*?\n\}\)\n/
 
 const newApiDocsEndpoint = `// 📚 V4统一引擎API文档端点
 app.get('/api/v4/docs', (req, res) => {
@@ -204,7 +207,8 @@ app.get('/api/v4/docs', (req, res) => {
 `
 
 // 4. 修改 / 根路径端点
-const oldRootEndpoint = /\/\*\n \* 🛣️ 基础路由配置\n \* 根路径\n \*\/\napp\.get\('\/', \(req, res\) => \{[\s\S]*?\n\}\)\n/
+const oldRootEndpoint =
+  /\/\*\n \* 🛣️ 基础路由配置\n \* 根路径\n \*\/\napp\.get\('\/', \(req, res\) => \{[\s\S]*?\n\}\)\n/
 
 const newRootEndpoint = `/*
  * 🛣️ 基础路由配置

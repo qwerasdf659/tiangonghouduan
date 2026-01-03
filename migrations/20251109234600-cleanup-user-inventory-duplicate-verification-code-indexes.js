@@ -63,7 +63,7 @@ module.exports = {
         } catch (error) {
           if (
             error.message.includes('check that column/key exists') ||
-            error.message.includes('doesn\'t exist')
+            error.message.includes("doesn't exist")
           ) {
             console.log(`  ⚠️ 索引不存在（已跳过）: ${indexName}`)
             skipCount++
@@ -74,14 +74,12 @@ module.exports = {
       }
 
       console.log('\n✅ user_inventory 表索引清理完成')
-      console.log(
-        `📊 清理统计: 成功删除${successCount}个索引，跳过${skipCount}个不存在的索引`
-      )
+      console.log(`📊 清理统计: 成功删除${successCount}个索引，跳过${skipCount}个不存在的索引`)
 
       // 验证剩余索引
       console.log('\n🔍 验证剩余的verification_code相关索引...')
       const [remainingIndexes] = await queryInterface.sequelize.query(
-        'SHOW INDEX FROM user_inventory WHERE Column_name = \'verification_code\''
+        "SHOW INDEX FROM user_inventory WHERE Column_name = 'verification_code'"
       )
       console.log('📋 保留的verification_code索引列表:')
       remainingIndexes.forEach(idx => {

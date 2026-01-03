@@ -1,23 +1,24 @@
 /**
- * 交易市场超时解锁任务
+ * 交易市场超时解锁任务（JSON多级锁定版本）
  *
  * 职责：
- * - 每小时扫描超时锁定的物品（超过3分钟）
- * - 释放超时的物品锁定（status: locked → available）
+ * - 每小时扫描超时锁定的物品（trade 锁超过3分钟）
+ * - 释放超时的物品锁定（使用 locks JSON 字段）
  * - 取消关联的超时订单（status: frozen → cancelled）
  * - 解冻买家冻结的资产
  *
- * 业务规则（拍板决策）：
+ * 业务规则（2026-01-03 方案B升级）：
+ * - 仅处理 lock_type='trade' 且 auto_release=true 的锁
  * - 物品锁定超时时间：3分钟
- * - 订单超时后：自动取消并解冻资产（与商家审核不同，可以自动解冻）
- * - 记录超时解锁事件到 item_instance_events
+ * - 不处理 redemption 锁和 security 锁
+ * - 订单超时后：自动取消并解冻资产
  *
  * 执行策略：
  * - 定时执行：每小时整点
  * - 并发安全：使用事务 + 悲观锁
  *
  * 创建时间：2025-12-29
- * 使用模型：Claude Opus 4.5
+ * 更新时间：2026-01-03（方案B：JSON多级锁定）
  */
 
 'use strict'
@@ -37,7 +38,7 @@ const logger = require('../utils/logger')
  * 交易市场超时解锁任务类
  *
  * @class HourlyUnlockTimeoutTradeOrders
- * @description 释放超时锁定的物品和取消超时订单
+ * @description 释放超时锁定的物品和取消超时订单（仅处理 trade 锁）
  */
 class HourlyUnlockTimeoutTradeOrders {
   /**
@@ -52,10 +53,10 @@ class HourlyUnlockTimeoutTradeOrders {
    */
   static async execute() {
     const start_time = Date.now()
-    logger.info('开始执行交易市场超时解锁任务')
+    logger.info('开始执行交易市场超时解锁任务（JSON多级锁定版本）')
 
     try {
-      // 1. 释放超时锁定的物品
+      // 1. 释放超时锁定的物品（仅 trade 锁）
       const items_result = await this._releaseTimeoutLockedItems()
 
       // 2. 取消超时的交易订单并解冻资产
@@ -87,7 +88,8 @@ class HourlyUnlockTimeoutTradeOrders {
   }
 
   /**
-   * 释放超时锁定的物品
+   * 释放超时锁定的物品（JSON多级锁定版本）
+   * 仅处理 lock_type='trade' 且 auto_release=true 的锁
    *
    * @private
    * @returns {Promise<Object>} 释放结果
@@ -96,14 +98,11 @@ class HourlyUnlockTimeoutTradeOrders {
     const transaction = await sequelize.transaction()
 
     try {
-      // 查找超时锁定的物品（locked_at 超过3分钟）
       const timeout_threshold = new Date(Date.now() - this.LOCK_TIMEOUT_MINUTES * 60 * 1000)
 
+      // 查询所有 locked 状态的物品
       const locked_items = await ItemInstance.findAll({
-        where: {
-          status: 'locked',
-          locked_at: { [Op.lt]: timeout_threshold }
-        },
+        where: { status: 'locked' },
         lock: transaction.LOCK.UPDATE,
         transaction
       })
@@ -116,79 +115,85 @@ class HourlyUnlockTimeoutTradeOrders {
         }
       }
 
+      logger.info(`找到 ${locked_items.length} 个锁定物品，开始过滤超时的 trade 锁`)
+
       const released_items = []
 
       for (const item of locked_items) {
-        // 检查是否有关联的进行中订单
-        // eslint-disable-next-line no-await-in-loop
-        const pending_order = await TradeOrder.findOne({
-          where: {
-            [Op.or]: [
-              { listing_id: { [Op.not]: null } } // 通过 listing 关联的订单
-            ],
-            status: 'frozen'
-          },
-          include: [
+        const locks = item.locks || []
+
+        // 过滤出超时的 trade 锁（auto_release=true）
+        const timeout_trade_locks = locks.filter(lock => {
+          if (lock.lock_type !== 'trade') return false
+          if (!lock.auto_release) return false
+          const expires_at = new Date(lock.expires_at)
+          return expires_at < timeout_threshold
+        })
+
+        if (timeout_trade_locks.length === 0) {
+          continue
+        }
+
+        // 处理每个超时的 trade 锁
+        for (const lock of timeout_trade_locks) {
+          // 移除该锁
+          const remaining_locks = locks.filter(
+            l => !(l.lock_type === lock.lock_type && l.lock_id === lock.lock_id)
+          )
+
+          // eslint-disable-next-line no-await-in-loop
+          await item.update(
             {
-              model: MarketListing,
-              as: 'listing',
-              where: {
-                offer_item_instance_id: item.item_instance_id
+              status: remaining_locks.length === 0 ? 'available' : 'locked',
+              locks: remaining_locks.length > 0 ? remaining_locks : null
+            },
+            { transaction }
+          )
+
+          // 记录解锁事件
+          // eslint-disable-next-line no-await-in-loop
+          await ItemInstanceEvent.create(
+            {
+              item_instance_id: item.item_instance_id,
+              event_type: 'unlock',
+              operator_user_id: null,
+              operator_type: 'system',
+              status_before: 'locked',
+              status_after: remaining_locks.length === 0 ? 'available' : 'locked',
+              owner_before: item.owner_user_id,
+              owner_after: item.owner_user_id,
+              business_type: 'trade_timeout_release',
+              idempotency_key: `timeout_${lock.lock_id}_${Date.now()}`,
+              meta: {
+                lock_type: lock.lock_type,
+                lock_id: lock.lock_id,
+                locked_at: lock.locked_at,
+                expires_at: lock.expires_at,
+                release_reason: `trade 锁超时自动释放（${this.LOCK_TIMEOUT_MINUTES}分钟）`
               }
-            }
-          ],
-          transaction
-        })
+            },
+            { transaction }
+          )
 
-        // 如果没有关联订单，或者订单已经不是 frozen 状态，直接释放锁
-        // eslint-disable-next-line no-await-in-loop
-        await item.update(
-          {
-            status: 'available',
-            locked_by_order_id: null,
-            locked_at: null
-          },
-          { transaction }
-        )
-
-        // 记录解锁事件
-        // eslint-disable-next-line no-await-in-loop
-        await ItemInstanceEvent.create(
-          {
+          released_items.push({
             item_instance_id: item.item_instance_id,
-            event_type: 'unlock',
-            operator_user_id: null,
-            operator_type: 'system',
-            status_before: 'locked',
-            status_after: 'available',
-            owner_before: item.owner_user_id,
-            owner_after: item.owner_user_id,
-            business_type: 'timeout_release',
-            business_id: `timeout_${item.item_instance_id}_${Date.now()}`,
-            meta: {
-              locked_by_order_id: item.locked_by_order_id,
-              locked_at: item.locked_at,
-              release_reason: `锁超时自动释放（${this.LOCK_TIMEOUT_MINUTES}分钟）`,
-              has_pending_order: !!pending_order
-            }
-          },
-          { transaction }
-        )
-
-        released_items.push({
-          item_instance_id: item.item_instance_id,
-          owner_user_id: item.owner_user_id,
-          locked_by_order_id: item.locked_by_order_id,
-          locked_at: item.locked_at
-        })
+            owner_user_id: item.owner_user_id,
+            lock_type: lock.lock_type,
+            lock_id: lock.lock_id,
+            locked_at: lock.locked_at,
+            expires_at: lock.expires_at
+          })
+        }
       }
 
       await transaction.commit()
 
-      logger.info('✅ 批量释放超时锁定物品', {
-        released_count: released_items.length,
-        items: released_items
-      })
+      if (released_items.length > 0) {
+        logger.info('✅ 批量释放超时 trade 锁', {
+          released_count: released_items.length,
+          items: released_items
+        })
+      }
 
       return {
         released_count: released_items.length,
@@ -256,20 +261,20 @@ class HourlyUnlockTimeoutTradeOrders {
 
           total_unfrozen_amount += Number(order.gross_amount)
 
-          // 解锁挂牌
+          // 解锁挂牌（更新为新的 JSON 格式）
           if (order.listing_id) {
             // eslint-disable-next-line no-await-in-loop
-            await MarketListing.update(
-              {
-                status: 'on_sale',
-                locked_by_order_id: null,
-                locked_at: null
-              },
-              {
-                where: { listing_id: order.listing_id },
-                transaction
-              }
-            )
+            const listing = await MarketListing.findByPk(order.listing_id, { transaction })
+            if (listing) {
+              // 清除挂牌的锁定状态
+              // eslint-disable-next-line no-await-in-loop
+              await listing.update(
+                {
+                  status: 'on_sale'
+                },
+                { transaction }
+              )
+            }
           }
 
           // 更新订单状态
@@ -277,7 +282,7 @@ class HourlyUnlockTimeoutTradeOrders {
           await order.update(
             {
               status: 'cancelled',
-              cancel_reason: '订单超时自动取消',
+              cancel_reason: '订单超时自动取消（3分钟）',
               cancelled_at: new Date()
             },
             { transaction }
@@ -302,11 +307,13 @@ class HourlyUnlockTimeoutTradeOrders {
 
       await transaction.commit()
 
-      logger.info('✅ 批量取消超时交易订单', {
-        cancelled_count: cancelled_orders.length,
-        total_unfrozen_amount,
-        orders: cancelled_orders
-      })
+      if (cancelled_orders.length > 0) {
+        logger.info('✅ 批量取消超时交易订单', {
+          cancelled_count: cancelled_orders.length,
+          total_unfrozen_amount,
+          orders: cancelled_orders
+        })
+      }
 
       return {
         cancelled_count: cancelled_orders.length,

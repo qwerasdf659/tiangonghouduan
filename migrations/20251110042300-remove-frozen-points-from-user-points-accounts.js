@@ -130,8 +130,7 @@ module.exports = {
           type: Sequelize.DECIMAL(10, 2),
           allowNull: false,
           defaultValue: 0.0,
-          comment:
-            '冻结积分（遗留字段，不推荐使用，应从points_transactions动态计算）- DEPRECATED',
+          comment: '冻结积分（遗留字段，不推荐使用，应从points_transactions动态计算）- DEPRECATED',
           after: 'available_points'
         },
         { transaction }

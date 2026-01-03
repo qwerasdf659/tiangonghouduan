@@ -36,7 +36,7 @@ module.exports = {
       console.log('----------------------------------------')
 
       const [existingIndexes] = await queryInterface.sequelize.query(
-        'SHOW INDEX FROM lottery_prizes WHERE Key_name = \'idx_unique_campaign_sort_order\''
+        "SHOW INDEX FROM lottery_prizes WHERE Key_name = 'idx_unique_campaign_sort_order'"
       )
 
       if (existingIndexes.length > 0) {
@@ -61,7 +61,9 @@ module.exports = {
       if (duplicates.length > 0) {
         console.error('  ❌ 发现重复数据，无法创建唯一索引:')
         duplicates.forEach(dup => {
-          console.error(`     活动ID: ${dup.campaign_id}, sort_order: ${dup.sort_order}, 奖品ID: ${dup.prize_ids}`)
+          console.error(
+            `     活动ID: ${dup.campaign_id}, sort_order: ${dup.sort_order}, 奖品ID: ${dup.prize_ids}`
+          )
         })
         throw new Error('数据存在重复，请先修复数据后再执行迁移')
       }
@@ -84,7 +86,7 @@ module.exports = {
 
       // 步骤4：验证索引创建成功
       const [createdIndexes] = await queryInterface.sequelize.query(
-        'SHOW INDEX FROM lottery_prizes WHERE Key_name = \'idx_unique_campaign_sort_order\''
+        "SHOW INDEX FROM lottery_prizes WHERE Key_name = 'idx_unique_campaign_sort_order'"
       )
 
       if (createdIndexes.length === 0) {
@@ -110,7 +112,7 @@ module.exports = {
 
       // 检查索引是否存在
       const [existingIndexes] = await queryInterface.sequelize.query(
-        'SHOW INDEX FROM lottery_prizes WHERE Key_name = \'idx_unique_campaign_sort_order\''
+        "SHOW INDEX FROM lottery_prizes WHERE Key_name = 'idx_unique_campaign_sort_order'"
       )
 
       if (existingIndexes.length === 0) {

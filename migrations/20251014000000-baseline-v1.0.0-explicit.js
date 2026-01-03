@@ -44,309 +44,325 @@ module.exports = {
 
       // 1.1 roles - 角色表
       console.log('   创建表: roles')
-      await queryInterface.createTable('roles', {
-        role_id: {
-          type: Sequelize.INTEGER,
-          primaryKey: true,
-          autoIncrement: true,
-          comment: '角色ID'
+      await queryInterface.createTable(
+        'roles',
+        {
+          role_id: {
+            type: Sequelize.INTEGER,
+            primaryKey: true,
+            autoIncrement: true,
+            comment: '角色ID'
+          },
+          role_uuid: {
+            type: Sequelize.UUID,
+            allowNull: false,
+            unique: true,
+            defaultValue: Sequelize.UUIDV4,
+            comment: '角色UUID（外部标识）'
+          },
+          role_name: {
+            type: Sequelize.STRING(50),
+            allowNull: false,
+            unique: true,
+            comment: '角色名称（英文标识）'
+          },
+          role_display_name: {
+            type: Sequelize.STRING(50),
+            allowNull: true,
+            comment: '角色显示名称（中文）'
+          },
+          role_level: {
+            type: Sequelize.INTEGER,
+            allowNull: false,
+            defaultValue: 0,
+            comment: '角色等级（数字越大权限越高）'
+          },
+          permissions: {
+            type: Sequelize.JSON,
+            allowNull: true,
+            comment: '角色权限配置'
+          },
+          description: {
+            type: Sequelize.TEXT,
+            allowNull: true,
+            comment: '角色描述'
+          },
+          is_active: {
+            type: Sequelize.BOOLEAN,
+            allowNull: false,
+            defaultValue: true,
+            comment: '角色是否激活'
+          },
+          created_at: {
+            type: Sequelize.DATE,
+            allowNull: false,
+            defaultValue: Sequelize.literal('CURRENT_TIMESTAMP'),
+            comment: '创建时间'
+          },
+          updated_at: {
+            type: Sequelize.DATE,
+            allowNull: false,
+            defaultValue: Sequelize.literal('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'),
+            comment: '更新时间'
+          }
         },
-        role_uuid: {
-          type: Sequelize.UUID,
-          allowNull: false,
-          unique: true,
-          defaultValue: Sequelize.UUIDV4,
-          comment: '角色UUID（外部标识）'
-        },
-        role_name: {
-          type: Sequelize.STRING(50),
-          allowNull: false,
-          unique: true,
-          comment: '角色名称（英文标识）'
-        },
-        role_display_name: {
-          type: Sequelize.STRING(50),
-          allowNull: true,
-          comment: '角色显示名称（中文）'
-        },
-        role_level: {
-          type: Sequelize.INTEGER,
-          allowNull: false,
-          defaultValue: 0,
-          comment: '角色等级（数字越大权限越高）'
-        },
-        permissions: {
-          type: Sequelize.JSON,
-          allowNull: true,
-          comment: '角色权限配置'
-        },
-        description: {
-          type: Sequelize.TEXT,
-          allowNull: true,
-          comment: '角色描述'
-        },
-        is_active: {
-          type: Sequelize.BOOLEAN,
-          allowNull: false,
-          defaultValue: true,
-          comment: '角色是否激活'
-        },
-        created_at: {
-          type: Sequelize.DATE,
-          allowNull: false,
-          defaultValue: Sequelize.literal('CURRENT_TIMESTAMP'),
-          comment: '创建时间'
-        },
-        updated_at: {
-          type: Sequelize.DATE,
-          allowNull: false,
-          defaultValue: Sequelize.literal('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'),
-          comment: '更新时间'
-        }
-      }, { transaction, comment: '角色表' })
+        { transaction, comment: '角色表' }
+      )
 
       // 1.2 users - 用户表
       console.log('   创建表: users')
-      await queryInterface.createTable('users', {
-        user_id: {
-          type: Sequelize.INTEGER,
-          primaryKey: true,
-          autoIncrement: true,
-          comment: '用户ID'
+      await queryInterface.createTable(
+        'users',
+        {
+          user_id: {
+            type: Sequelize.INTEGER,
+            primaryKey: true,
+            autoIncrement: true,
+            comment: '用户ID'
+          },
+          user_uuid: {
+            type: Sequelize.UUID,
+            allowNull: false,
+            unique: true,
+            defaultValue: Sequelize.UUIDV4,
+            comment: '用户UUID（外部标识）'
+          },
+          mobile: {
+            type: Sequelize.STRING(20),
+            allowNull: false,
+            unique: true,
+            comment: '手机号码'
+          },
+          nickname: {
+            type: Sequelize.STRING(50),
+            allowNull: true,
+            comment: '用户昵称'
+          },
+          avatar_url: {
+            type: Sequelize.STRING(255),
+            allowNull: true,
+            comment: '头像URL'
+          },
+          real_name: {
+            type: Sequelize.STRING(50),
+            allowNull: true,
+            comment: '真实姓名'
+          },
+          id_card: {
+            type: Sequelize.STRING(18),
+            allowNull: true,
+            comment: '身份证号'
+          },
+          email: {
+            type: Sequelize.STRING(100),
+            allowNull: true,
+            comment: '电子邮箱'
+          },
+          birthday: {
+            type: Sequelize.DATEONLY,
+            allowNull: true,
+            comment: '生日'
+          },
+          gender: {
+            type: Sequelize.ENUM('male', 'female', 'unknown'),
+            allowNull: false,
+            defaultValue: 'unknown',
+            comment: '性别'
+          },
+          vip_level: {
+            type: Sequelize.INTEGER,
+            allowNull: false,
+            defaultValue: 0,
+            comment: 'VIP等级'
+          },
+          vip_expire_at: {
+            type: Sequelize.DATE,
+            allowNull: true,
+            comment: 'VIP过期时间'
+          },
+          points_balance: {
+            type: Sequelize.INTEGER,
+            allowNull: false,
+            defaultValue: 0,
+            comment: '积分余额'
+          },
+          registration_source: {
+            type: Sequelize.STRING(50),
+            allowNull: true,
+            comment: '注册来源'
+          },
+          last_login: {
+            type: Sequelize.DATE,
+            allowNull: true,
+            comment: '最后登录时间'
+          },
+          last_login_ip: {
+            type: Sequelize.STRING(45),
+            allowNull: true,
+            comment: '最后登录IP'
+          },
+          is_active: {
+            type: Sequelize.BOOLEAN,
+            allowNull: false,
+            defaultValue: true,
+            comment: '账户是否激活'
+          },
+          is_verified: {
+            type: Sequelize.BOOLEAN,
+            allowNull: false,
+            defaultValue: false,
+            comment: '是否实名认证'
+          },
+          created_at: {
+            type: Sequelize.DATE,
+            allowNull: false,
+            defaultValue: Sequelize.literal('CURRENT_TIMESTAMP'),
+            comment: '创建时间'
+          },
+          updated_at: {
+            type: Sequelize.DATE,
+            allowNull: false,
+            defaultValue: Sequelize.literal('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'),
+            comment: '更新时间'
+          }
         },
-        user_uuid: {
-          type: Sequelize.UUID,
-          allowNull: false,
-          unique: true,
-          defaultValue: Sequelize.UUIDV4,
-          comment: '用户UUID（外部标识）'
-        },
-        mobile: {
-          type: Sequelize.STRING(20),
-          allowNull: false,
-          unique: true,
-          comment: '手机号码'
-        },
-        nickname: {
-          type: Sequelize.STRING(50),
-          allowNull: true,
-          comment: '用户昵称'
-        },
-        avatar_url: {
-          type: Sequelize.STRING(255),
-          allowNull: true,
-          comment: '头像URL'
-        },
-        real_name: {
-          type: Sequelize.STRING(50),
-          allowNull: true,
-          comment: '真实姓名'
-        },
-        id_card: {
-          type: Sequelize.STRING(18),
-          allowNull: true,
-          comment: '身份证号'
-        },
-        email: {
-          type: Sequelize.STRING(100),
-          allowNull: true,
-          comment: '电子邮箱'
-        },
-        birthday: {
-          type: Sequelize.DATEONLY,
-          allowNull: true,
-          comment: '生日'
-        },
-        gender: {
-          type: Sequelize.ENUM('male', 'female', 'unknown'),
-          allowNull: false,
-          defaultValue: 'unknown',
-          comment: '性别'
-        },
-        vip_level: {
-          type: Sequelize.INTEGER,
-          allowNull: false,
-          defaultValue: 0,
-          comment: 'VIP等级'
-        },
-        vip_expire_at: {
-          type: Sequelize.DATE,
-          allowNull: true,
-          comment: 'VIP过期时间'
-        },
-        points_balance: {
-          type: Sequelize.INTEGER,
-          allowNull: false,
-          defaultValue: 0,
-          comment: '积分余额'
-        },
-        registration_source: {
-          type: Sequelize.STRING(50),
-          allowNull: true,
-          comment: '注册来源'
-        },
-        last_login: {
-          type: Sequelize.DATE,
-          allowNull: true,
-          comment: '最后登录时间'
-        },
-        last_login_ip: {
-          type: Sequelize.STRING(45),
-          allowNull: true,
-          comment: '最后登录IP'
-        },
-        is_active: {
-          type: Sequelize.BOOLEAN,
-          allowNull: false,
-          defaultValue: true,
-          comment: '账户是否激活'
-        },
-        is_verified: {
-          type: Sequelize.BOOLEAN,
-          allowNull: false,
-          defaultValue: false,
-          comment: '是否实名认证'
-        },
-        created_at: {
-          type: Sequelize.DATE,
-          allowNull: false,
-          defaultValue: Sequelize.literal('CURRENT_TIMESTAMP'),
-          comment: '创建时间'
-        },
-        updated_at: {
-          type: Sequelize.DATE,
-          allowNull: false,
-          defaultValue: Sequelize.literal('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'),
-          comment: '更新时间'
-        }
-      }, { transaction, comment: '用户表' })
+        { transaction, comment: '用户表' }
+      )
 
       // 1.3 user_roles - 用户角色关联表 ⭐ 重点！包含所有业务字段
       console.log('   创建表: user_roles (包含完整业务字段)')
-      await queryInterface.createTable('user_roles', {
-        user_id: {
-          type: Sequelize.INTEGER,
-          allowNull: false,
-          primaryKey: true,
-          comment: '用户ID'
+      await queryInterface.createTable(
+        'user_roles',
+        {
+          user_id: {
+            type: Sequelize.INTEGER,
+            allowNull: false,
+            primaryKey: true,
+            comment: '用户ID'
+          },
+          role_id: {
+            type: Sequelize.INTEGER,
+            allowNull: false,
+            primaryKey: true,
+            comment: '角色ID'
+          },
+          // ✅ 业务字段必须显式定义（sync()会忽略这些）
+          assigned_at: {
+            type: Sequelize.DATE,
+            allowNull: true,
+            comment: '角色分配时间'
+          },
+          assigned_by: {
+            type: Sequelize.INTEGER,
+            allowNull: true,
+            comment: '角色分配者ID（关联users表）'
+          },
+          is_active: {
+            type: Sequelize.BOOLEAN,
+            allowNull: false,
+            defaultValue: true,
+            comment: '角色是否激活'
+          },
+          created_at: {
+            type: Sequelize.DATE,
+            allowNull: false,
+            defaultValue: Sequelize.literal('CURRENT_TIMESTAMP'),
+            comment: '创建时间'
+          },
+          updated_at: {
+            type: Sequelize.DATE,
+            allowNull: false,
+            defaultValue: Sequelize.literal('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'),
+            comment: '更新时间'
+          }
         },
-        role_id: {
-          type: Sequelize.INTEGER,
-          allowNull: false,
-          primaryKey: true,
-          comment: '角色ID'
-        },
-        // ✅ 业务字段必须显式定义（sync()会忽略这些）
-        assigned_at: {
-          type: Sequelize.DATE,
-          allowNull: true,
-          comment: '角色分配时间'
-        },
-        assigned_by: {
-          type: Sequelize.INTEGER,
-          allowNull: true,
-          comment: '角色分配者ID（关联users表）'
-        },
-        is_active: {
-          type: Sequelize.BOOLEAN,
-          allowNull: false,
-          defaultValue: true,
-          comment: '角色是否激活'
-        },
-        created_at: {
-          type: Sequelize.DATE,
-          allowNull: false,
-          defaultValue: Sequelize.literal('CURRENT_TIMESTAMP'),
-          comment: '创建时间'
-        },
-        updated_at: {
-          type: Sequelize.DATE,
-          allowNull: false,
-          defaultValue: Sequelize.literal('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'),
-          comment: '更新时间'
-        }
-      }, { transaction, comment: '用户角色关联表' })
+        { transaction, comment: '用户角色关联表' }
+      )
 
       // 1.4 user_sessions - 用户会话表
       console.log('   创建表: user_sessions')
-      await queryInterface.createTable('user_sessions', {
-        session_id: {
-          type: Sequelize.INTEGER,
-          primaryKey: true,
-          autoIncrement: true,
-          comment: '会话ID'
+      await queryInterface.createTable(
+        'user_sessions',
+        {
+          session_id: {
+            type: Sequelize.INTEGER,
+            primaryKey: true,
+            autoIncrement: true,
+            comment: '会话ID'
+          },
+          user_id: {
+            type: Sequelize.INTEGER,
+            allowNull: false,
+            comment: '用户ID'
+          },
+          session_token: {
+            type: Sequelize.STRING(255),
+            allowNull: false,
+            unique: true,
+            comment: '会话令牌'
+          },
+          refresh_token: {
+            type: Sequelize.STRING(255),
+            allowNull: true,
+            comment: '刷新令牌'
+          },
+          device_type: {
+            type: Sequelize.STRING(50),
+            allowNull: true,
+            comment: '设备类型'
+          },
+          device_id: {
+            type: Sequelize.STRING(100),
+            allowNull: true,
+            comment: '设备ID'
+          },
+          ip_address: {
+            type: Sequelize.STRING(45),
+            allowNull: true,
+            comment: '登录IP地址'
+          },
+          user_agent: {
+            type: Sequelize.TEXT,
+            allowNull: true,
+            comment: '用户代理'
+          },
+          login_at: {
+            type: Sequelize.DATE,
+            allowNull: false,
+            defaultValue: Sequelize.literal('CURRENT_TIMESTAMP'),
+            comment: '登录时间'
+          },
+          expire_at: {
+            type: Sequelize.DATE,
+            allowNull: false,
+            comment: '过期时间'
+          },
+          last_active_at: {
+            type: Sequelize.DATE,
+            allowNull: true,
+            comment: '最后活跃时间'
+          },
+          is_active: {
+            type: Sequelize.BOOLEAN,
+            allowNull: false,
+            defaultValue: true,
+            comment: '会话是否有效'
+          },
+          created_at: {
+            type: Sequelize.DATE,
+            allowNull: false,
+            defaultValue: Sequelize.literal('CURRENT_TIMESTAMP'),
+            comment: '创建时间'
+          },
+          updated_at: {
+            type: Sequelize.DATE,
+            allowNull: false,
+            defaultValue: Sequelize.literal('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'),
+            comment: '更新时间'
+          }
         },
-        user_id: {
-          type: Sequelize.INTEGER,
-          allowNull: false,
-          comment: '用户ID'
-        },
-        session_token: {
-          type: Sequelize.STRING(255),
-          allowNull: false,
-          unique: true,
-          comment: '会话令牌'
-        },
-        refresh_token: {
-          type: Sequelize.STRING(255),
-          allowNull: true,
-          comment: '刷新令牌'
-        },
-        device_type: {
-          type: Sequelize.STRING(50),
-          allowNull: true,
-          comment: '设备类型'
-        },
-        device_id: {
-          type: Sequelize.STRING(100),
-          allowNull: true,
-          comment: '设备ID'
-        },
-        ip_address: {
-          type: Sequelize.STRING(45),
-          allowNull: true,
-          comment: '登录IP地址'
-        },
-        user_agent: {
-          type: Sequelize.TEXT,
-          allowNull: true,
-          comment: '用户代理'
-        },
-        login_at: {
-          type: Sequelize.DATE,
-          allowNull: false,
-          defaultValue: Sequelize.literal('CURRENT_TIMESTAMP'),
-          comment: '登录时间'
-        },
-        expire_at: {
-          type: Sequelize.DATE,
-          allowNull: false,
-          comment: '过期时间'
-        },
-        last_active_at: {
-          type: Sequelize.DATE,
-          allowNull: true,
-          comment: '最后活跃时间'
-        },
-        is_active: {
-          type: Sequelize.BOOLEAN,
-          allowNull: false,
-          defaultValue: true,
-          comment: '会话是否有效'
-        },
-        created_at: {
-          type: Sequelize.DATE,
-          allowNull: false,
-          defaultValue: Sequelize.literal('CURRENT_TIMESTAMP'),
-          comment: '创建时间'
-        },
-        updated_at: {
-          type: Sequelize.DATE,
-          allowNull: false,
-          defaultValue: Sequelize.literal('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'),
-          comment: '更新时间'
-        }
-      }, { transaction, comment: '用户会话表' })
+        { transaction, comment: '用户会话表' }
+      )
 
       // ==================== 2. 创建索引和外键 ====================
 
@@ -458,55 +474,59 @@ module.exports = {
       console.log('📊 插入初始数据...')
 
       // 插入3个基础角色（使用英文标识符）
-      await queryInterface.bulkInsert('roles', [
-        {
-          role_uuid: uuidv4(),
-          role_name: 'super_admin', // ✅ 英文标识符
-          role_display_name: '超级管理员', // ✅ 中文显示名
-          role_level: 100,
-          permissions: JSON.stringify({
-            all: true,
-            description: '拥有系统所有权限'
-          }),
-          description: '系统最高权限管理员',
-          is_active: true,
-          created_at: new Date(),
-          updated_at: new Date()
-        },
-        {
-          role_uuid: uuidv4(),
-          role_name: 'admin', // ✅ 英文标识符
-          role_display_name: '管理员',
-          role_level: 50,
-          permissions: JSON.stringify({
-            manage_users: true,
-            manage_lottery: true,
-            manage_products: true,
-            view_reports: true,
-            description: '普通管理权限'
-          }),
-          description: '普通管理员，负责日常运营',
-          is_active: true,
-          created_at: new Date(),
-          updated_at: new Date()
-        },
-        {
-          role_uuid: uuidv4(),
-          role_name: 'user', // ✅ 英文标识符
-          role_display_name: '普通用户',
-          role_level: 0,
-          permissions: JSON.stringify({
-            lottery: true,
-            points: true,
-            chat: true,
-            description: '普通用户基础权限'
-          }),
-          description: '普通用户',
-          is_active: true,
-          created_at: new Date(),
-          updated_at: new Date()
-        }
-      ], { transaction })
+      await queryInterface.bulkInsert(
+        'roles',
+        [
+          {
+            role_uuid: uuidv4(),
+            role_name: 'super_admin', // ✅ 英文标识符
+            role_display_name: '超级管理员', // ✅ 中文显示名
+            role_level: 100,
+            permissions: JSON.stringify({
+              all: true,
+              description: '拥有系统所有权限'
+            }),
+            description: '系统最高权限管理员',
+            is_active: true,
+            created_at: new Date(),
+            updated_at: new Date()
+          },
+          {
+            role_uuid: uuidv4(),
+            role_name: 'admin', // ✅ 英文标识符
+            role_display_name: '管理员',
+            role_level: 50,
+            permissions: JSON.stringify({
+              manage_users: true,
+              manage_lottery: true,
+              manage_products: true,
+              view_reports: true,
+              description: '普通管理权限'
+            }),
+            description: '普通管理员，负责日常运营',
+            is_active: true,
+            created_at: new Date(),
+            updated_at: new Date()
+          },
+          {
+            role_uuid: uuidv4(),
+            role_name: 'user', // ✅ 英文标识符
+            role_display_name: '普通用户',
+            role_level: 0,
+            permissions: JSON.stringify({
+              lottery: true,
+              points: true,
+              chat: true,
+              description: '普通用户基础权限'
+            }),
+            description: '普通用户',
+            is_active: true,
+            created_at: new Date(),
+            updated_at: new Date()
+          }
+        ],
+        { transaction }
+      )
 
       console.log('✅ 3个基础角色已创建')
 
@@ -535,7 +555,7 @@ module.exports = {
 
       // 验证user_roles表字段完整性
       const [userRolesFields] = await queryInterface.sequelize.query(
-        'SHOW COLUMNS FROM user_roles WHERE Field IN (\'assigned_at\', \'assigned_by\', \'is_active\')',
+        "SHOW COLUMNS FROM user_roles WHERE Field IN ('assigned_at', 'assigned_by', 'is_active')",
         { transaction }
       )
 
@@ -582,12 +602,7 @@ module.exports = {
 
     try {
       // 按依赖关系反向删除表
-      const tablesToDrop = [
-        'user_sessions',
-        'user_roles',
-        'users',
-        'roles'
-      ]
+      const tablesToDrop = ['user_sessions', 'user_roles', 'users', 'roles']
 
       for (const tableName of tablesToDrop) {
         console.log(`   删除表: ${tableName}`)

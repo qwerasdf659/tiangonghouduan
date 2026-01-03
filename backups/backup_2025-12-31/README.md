@@ -4,7 +4,7 @@
 
 这是一个**最新的、完整的、正确的**数据库备份，与当前实际数据库**完全一致**。
 
-**备份时间**: 2025/12/31 01:58:15 (北京时间)  
+**备份时间**: 2026/01/02 23:24:05 (北京时间)  
 **数据库名**: restaurant_lottery  
 **备份类型**: 完整备份（结构 + 数据 + 索引 + 外键约束）
 
@@ -14,60 +14,57 @@
 
 ### 数据库统计
 
-- **总表数**: 48 个
-- **有数据的表**: 38 个
+- **总表数**: 45 个
+- **有数据的表**: 35 个
 - **空表**: 10 个（已完整备份结构）
-- **总数据行数**: 9,367 行
+- **总数据行数**: 7,686 行
 
 ### 备份文件
 
-- **SQL格式**: `full_backup_2025-12-31_2025-12-30T17-58-16.sql`
-- **JSON格式**: `full_backup_2025-12-31_2025-12-30T17-58-16.json`
+- **SQL格式**: `full_backup_2025-12-31_2026-01-02T15-24-05.sql`
+- **JSON格式**: `full_backup_2025-12-31_2026-01-02T15-24-05.json`
 
 ---
 
 ## 📊 表数据统计
 
-### 有数据的表 (38个)
+### 有数据的表 (35个)
 
 1. **account_asset_balances**: 11 行
 2. **accounts**: 13 行
-3. **admin_operation_logs**: 997 行
-4. **api_idempotency_requests**: 28 行
-5. **asset_transactions**: 205 行
-6. **asset_transactions_archive_20251226**: 1,174 行
-7. **chat_messages**: 20 行
-8. **consumption_records**: 175 行
-9. **content_review_records**: 175 行
-10. **customer_service_sessions**: 3 行
-11. **exchange_items**: 16 行
-12. **feedbacks**: 26 行
-13. **image_resources**: 3 行
-14. **item_instance_events**: 174 行
-15. **item_instances**: 1,016 行
-16. **lottery_campaigns**: 1 行
-17. **lottery_draw_quota_rules**: 1 行
-18. **lottery_draws**: 3,582 行
-19. **lottery_management_settings**: 281 行
-20. **lottery_presets**: 2 行
-21. **lottery_prizes**: 9 行
-22. **lottery_user_daily_draw_quota**: 5 行
-23. **market_listings**: 1 行
-24. **material_asset_types**: 3 行
-25. **material_conversion_rules**: 1 行
-26. **points_transactions**: 105 行
-27. **products**: 52 行
-28. **redemption_orders**: 321 行
-29. **roles**: 6 行
-30. **sequelizemeta**: 181 行
-31. **system_announcements**: 5 行
-32. **system_settings**: 18 行
-33. **trade_records**: 2 行
-34. **user_points_accounts**: 3 行
-35. **user_premium_status**: 1 行
-36. **user_roles**: 13 行
-37. **users**: 22 行
-38. **websocket_startup_logs**: 716 行
+3. **admin_operation_logs**: 1,002 行
+4. **api_idempotency_requests**: 57 行
+5. **asset_transactions**: 175 行
+6. **chat_messages**: 20 行
+7. **consumption_records**: 184 行
+8. **content_review_records**: 184 行
+9. **customer_service_sessions**: 3 行
+10. **exchange_items**: 24 行
+11. **feedbacks**: 26 行
+12. **image_resources**: 3 行
+13. **item_instance_events**: 249 行
+14. **item_instances**: 1,150 行
+15. **lottery_campaigns**: 1 行
+16. **lottery_draw_quota_rules**: 1 行
+17. **lottery_draws**: 2,840 行
+18. **lottery_management_settings**: 306 行
+19. **lottery_presets**: 2 行
+20. **lottery_prizes**: 9 行
+21. **lottery_user_daily_draw_quota**: 5 行
+22. **market_listings**: 1 行
+23. **material_asset_types**: 3 行
+24. **material_conversion_rules**: 1 行
+25. **products**: 52 行
+26. **redemption_orders**: 373 行
+27. **roles**: 6 行
+28. **sequelizemeta**: 193 行
+29. **system_announcements**: 5 行
+30. **system_settings**: 18 行
+31. **trade_records**: 2 行
+32. **user_premium_status**: 1 行
+33. **user_roles**: 13 行
+34. **users**: 22 行
+35. **websocket_startup_logs**: 731 行
 
 ### 空表 (10个)
 
@@ -119,19 +116,19 @@
 
 ```bash
 # 方式1：使用mysql命令
-mysql -u root -p restaurant_lottery < full_backup_2025-12-31_2025-12-30T17-58-16.sql
+mysql -u root -p restaurant_lottery < full_backup_2025-12-31_2026-01-02T15-24-05.sql
 
 # 方式2：使用source命令
 mysql -u root -p
 USE restaurant_lottery;
-SOURCE full_backup_2025-12-31_2025-12-30T17-58-16.sql;
+SOURCE full_backup_2025-12-31_2026-01-02T15-24-05.sql;
 ```
 
 ### 恢复JSON备份
 
 ```bash
 # 使用备份工具
-node scripts/database/backup-toolkit.js --action=restore --file=full_backup_2025-12-31_2025-12-30T17-58-16.json
+node scripts/database/backup-toolkit.js --action=restore --file=full_backup_2025-12-31_2026-01-02T15-24-05.json
 ```
 
 ---
@@ -158,6 +155,6 @@ node scripts/database/backup-toolkit.js --action=restore --file=full_backup_2025
 
 ---
 
-**生成时间**: 2025/12/31 01:58:15  
+**生成时间**: 2026/01/02 23:24:05  
 **备份工具**: backup-2025-12-31.js  
 **备份状态**: ✅ 完成

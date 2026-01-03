@@ -41,7 +41,7 @@
  *
  * @returns {string|null} 管理员Token
  */
-function getToken () {
+function getToken() {
   const token = localStorage.getItem('admin_token')
   if (!token) {
     window.location.href = '/admin/login.html'
@@ -55,21 +55,21 @@ function getToken () {
  *
  * @param {string} token - JWT Token字符串
  */
-function saveToken (token) {
+function saveToken(token) {
   localStorage.setItem('admin_token', token)
 }
 
 /**
  * 清除所有本地存储的数据
  */
-function clearToken () {
+function clearToken() {
   localStorage.clear()
 }
 
 /**
  * 退出登录
  */
-function logout () {
+function logout() {
   clearToken()
   window.location.href = '/admin/login.html'
 }
@@ -83,7 +83,7 @@ function logout () {
  *
  * @returns {boolean} 是否有管理员权限
  */
-function checkAdminPermission () {
+function checkAdminPermission() {
   const userStr = localStorage.getItem('admin_user')
   if (!userStr) {
     logout()
@@ -94,9 +94,8 @@ function checkAdminPermission () {
     const user = JSON.parse(userStr)
 
     // ✅ 权限检查：后端通过user_roles表关联查询，会在user对象中包含roles数组
-    const hasAdminAccess = user.roles && user.roles.some(role =>
-      role.role_name === 'admin' || role.role_level >= 100
-    )
+    const hasAdminAccess =
+      user.roles && user.roles.some(role => role.role_name === 'admin' || role.role_level >= 100)
 
     if (!hasAdminAccess) {
       alert('您没有管理员权限，请联系系统管理员分配权限')
@@ -117,7 +116,7 @@ function checkAdminPermission () {
  *
  * @returns {User|null} 用户信息对象
  */
-function getCurrentUser () {
+function getCurrentUser() {
   const userStr = localStorage.getItem('admin_user')
   return userStr ? JSON.parse(userStr) : null
 }
@@ -127,7 +126,7 @@ function getCurrentUser () {
  *
  * @returns {number|null} 用户ID
  */
-function getCurrentUserId () {
+function getCurrentUserId() {
   const user = getCurrentUser()
   return user ? user.user_id : null
 }
@@ -142,7 +141,7 @@ function getCurrentUserId () {
  * @param {Object} [options={}] - fetch请求选项
  * @returns {Promise<ApiResponse>} API响应对象
  */
-async function apiRequest (url, options = {}) {
+async function apiRequest(url, options = {}) {
   const defaultOptions = {
     headers: {
       Authorization: `Bearer ${getToken()}`,
@@ -193,7 +192,7 @@ async function apiRequest (url, options = {}) {
  * @param {string|Date} dateString - 日期字符串或Date对象
  * @returns {string} 格式化后的北京时间字符串
  */
-function formatDate (dateString) {
+function formatDate(dateString) {
   try {
     const date = new Date(dateString)
     return date.toLocaleString('zh-CN', {
@@ -217,7 +216,7 @@ function formatDate (dateString) {
  * @param {string|Date} dateString - 日期字符串或Date对象
  * @returns {string} 相对时间描述
  */
-function formatRelativeTime (dateString) {
+function formatRelativeTime(dateString) {
   const now = new Date()
   const past = new Date(dateString)
   const diffMs = now - past
@@ -241,7 +240,7 @@ function formatRelativeTime (dateString) {
  * @param {number} num - 数字
  * @returns {string} 格式化后的字符串
  */
-function formatNumber (num) {
+function formatNumber(num) {
   try {
     return num.toLocaleString('zh-CN')
   } catch (error) {
@@ -256,7 +255,7 @@ function formatNumber (num) {
  * @param {string} phone - 手机号
  * @returns {string} 脱敏后的手机号
  */
-function maskPhone (phone) {
+function maskPhone(phone) {
   if (!phone || phone.length !== 11) return phone
   return phone.replace(/(\d{3})\d{4}(\d{4})/, '$1****$2')
 }
@@ -269,7 +268,7 @@ function maskPhone (phone) {
  * @param {string} phone - 手机号码
  * @returns {boolean} 是否为有效手机号
  */
-function validatePhone (phone) {
+function validatePhone(phone) {
   const phoneRegex = /^1[3-9]\d{9}$/
   return phoneRegex.test(phone)
 }
@@ -280,7 +279,7 @@ function validatePhone (phone) {
  * @param {string} email - 邮箱地址
  * @returns {boolean} 是否为有效邮箱
  */
-function validateEmail (email) {
+function validateEmail(email) {
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
   return emailRegex.test(email)
 }
@@ -293,7 +292,7 @@ function validateEmail (email) {
  * @param {Error} error - 错误对象
  * @param {string} [context=''] - 错误上下文
  */
-function handleApiError (error, context = '') {
+function handleApiError(error, context = '') {
   console.error(`${context} API错误:`, error)
 
   if (error.message.includes('权限')) {

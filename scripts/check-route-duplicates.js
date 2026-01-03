@@ -8,7 +8,7 @@ const fs = require('fs')
 const path = require('path')
 
 // 解析 app.js 中的挂载点
-function parseAppMounts () {
+function parseAppMounts() {
   const appPath = path.join(__dirname, '../app.js')
   const content = fs.readFileSync(appPath, 'utf8')
   const mounts = {}
@@ -29,7 +29,7 @@ function parseAppMounts () {
 }
 
 // 解析路由文件中的端点
-function parseRouteFile (filePath, prefix) {
+function parseRouteFile(filePath, prefix) {
   try {
     const content = fs.readFileSync(filePath, 'utf8')
     const routes = []
@@ -57,7 +57,7 @@ function parseRouteFile (filePath, prefix) {
 }
 
 // 主函数
-function main () {
+function main() {
   console.log('🔍 开始检测路由重复...\n')
 
   // 1. 解析挂载点
@@ -129,8 +129,10 @@ function main () {
     if (path.includes('exchange') || path.includes('兑换')) categories.exchange.push(route)
     if (path.includes('inventory') || path.includes('库存')) categories.inventory.push(route)
     if (path.includes('point') || path.includes('积分')) categories.points.push(route)
-    if (path.includes('lottery') || path.includes('抽奖') || path.includes('draw')) categories.lottery.push(route)
-    if (path.includes('auth') || path.includes('login') || path.includes('register')) categories.auth.push(route)
+    if (path.includes('lottery') || path.includes('抽奖') || path.includes('draw'))
+      categories.lottery.push(route)
+    if (path.includes('auth') || path.includes('login') || path.includes('register'))
+      categories.auth.push(route)
     if (path.includes('admin')) categories.admin.push(route)
     if (path.includes('announcement') || path.includes('公告')) categories.announcement.push(route)
     if (path.includes('notification') || path.includes('通知')) categories.notification.push(route)

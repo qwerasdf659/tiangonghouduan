@@ -35,100 +35,105 @@ module.exports = {
    * @param {Object} Sequelize - Sequelize库
    * @returns {Promise<void>}
    */
-  async up (queryInterface, Sequelize) {
+  async up(queryInterface, Sequelize) {
     const { DataTypes } = Sequelize
 
     // 步骤1：创建system_settings表
-    await queryInterface.createTable('system_settings', {
-      // 主键：设置项唯一标识
-      setting_id: {
-        type: DataTypes.INTEGER,
-        primaryKey: true,
-        autoIncrement: true,
-        comment: '设置项唯一标识（自增主键）'
-      },
+    await queryInterface.createTable(
+      'system_settings',
+      {
+        // 主键：设置项唯一标识
+        setting_id: {
+          type: DataTypes.INTEGER,
+          primaryKey: true,
+          autoIncrement: true,
+          comment: '设置项唯一标识（自增主键）'
+        },
 
-      // 配置分类
-      category: {
-        type: DataTypes.ENUM('basic', 'lottery', 'points', 'notification', 'security'),
-        allowNull: false,
-        comment: '配置分类：basic-基础设置，lottery-抽奖设置，points-积分设置，notification-通知设置，security-安全设置'
-      },
+        // 配置分类
+        category: {
+          type: DataTypes.ENUM('basic', 'lottery', 'points', 'notification', 'security'),
+          allowNull: false,
+          comment:
+            '配置分类：basic-基础设置，lottery-抽奖设置，points-积分设置，notification-通知设置，security-安全设置'
+        },
 
-      // 配置键名
-      setting_key: {
-        type: DataTypes.STRING(100),
-        allowNull: false,
-        unique: true,
-        comment: '配置键名（唯一，如system_name、base_win_rate等）'
-      },
+        // 配置键名
+        setting_key: {
+          type: DataTypes.STRING(100),
+          allowNull: false,
+          unique: true,
+          comment: '配置键名（唯一，如system_name、base_win_rate等）'
+        },
 
-      // 配置值
-      setting_value: {
-        type: DataTypes.TEXT,
-        allowNull: false,
-        defaultValue: '',
-        comment: '配置值（根据value_type解析）'
-      },
+        // 配置值
+        setting_value: {
+          type: DataTypes.TEXT,
+          allowNull: false,
+          defaultValue: '',
+          comment: '配置值（根据value_type解析）'
+        },
 
-      // 值类型
-      value_type: {
-        type: DataTypes.ENUM('string', 'number', 'boolean', 'json'),
-        allowNull: false,
-        defaultValue: 'string',
-        comment: '值类型：string-字符串，number-数字，boolean-布尔值，json-JSON对象'
-      },
+        // 值类型
+        value_type: {
+          type: DataTypes.ENUM('string', 'number', 'boolean', 'json'),
+          allowNull: false,
+          defaultValue: 'string',
+          comment: '值类型：string-字符串，number-数字，boolean-布尔值，json-JSON对象'
+        },
 
-      // 配置描述
-      description: {
-        type: DataTypes.STRING(500),
-        allowNull: true,
-        comment: '配置描述（说明此配置项的用途）'
-      },
+        // 配置描述
+        description: {
+          type: DataTypes.STRING(500),
+          allowNull: true,
+          comment: '配置描述（说明此配置项的用途）'
+        },
 
-      // 是否可见
-      is_visible: {
-        type: DataTypes.BOOLEAN,
-        allowNull: false,
-        defaultValue: true,
-        comment: '是否在管理后台显示'
-      },
+        // 是否可见
+        is_visible: {
+          type: DataTypes.BOOLEAN,
+          allowNull: false,
+          defaultValue: true,
+          comment: '是否在管理后台显示'
+        },
 
-      // 是否只读
-      is_readonly: {
-        type: DataTypes.BOOLEAN,
-        allowNull: false,
-        defaultValue: false,
-        comment: '是否只读（不可通过管理后台修改）'
-      },
+        // 是否只读
+        is_readonly: {
+          type: DataTypes.BOOLEAN,
+          allowNull: false,
+          defaultValue: false,
+          comment: '是否只读（不可通过管理后台修改）'
+        },
 
-      // 更新管理员ID
-      updated_by: {
-        type: DataTypes.INTEGER,
-        allowNull: true,
-        comment: '最后更新管理员ID'
-      },
+        // 更新管理员ID
+        updated_by: {
+          type: DataTypes.INTEGER,
+          allowNull: true,
+          comment: '最后更新管理员ID'
+        },
 
-      // 创建时间
-      created_at: {
-        type: DataTypes.DATE,
-        allowNull: false,
-        defaultValue: Sequelize.literal('CURRENT_TIMESTAMP'),
-        comment: '创建时间'
-      },
+        // 创建时间
+        created_at: {
+          type: DataTypes.DATE,
+          allowNull: false,
+          defaultValue: Sequelize.literal('CURRENT_TIMESTAMP'),
+          comment: '创建时间'
+        },
 
-      // 更新时间
-      updated_at: {
-        type: DataTypes.DATE,
-        allowNull: false,
-        defaultValue: Sequelize.literal('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'),
-        comment: '更新时间'
+        // 更新时间
+        updated_at: {
+          type: DataTypes.DATE,
+          allowNull: false,
+          defaultValue: Sequelize.literal('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'),
+          comment: '更新时间'
+        }
+      },
+      {
+        comment: '系统设置表：存储系统各模块的配置设置',
+        charset: 'utf8mb4',
+        collate: 'utf8mb4_unicode_ci'
       }
-    }, {
-      comment: '系统设置表：存储系统各模块的配置设置',
-      charset: 'utf8mb4',
-      collate: 'utf8mb4_unicode_ci'
-    })
+    )
 
     console.log('✅ 已创建system_settings表')
 
@@ -388,7 +393,7 @@ module.exports = {
    * @param {Object} Sequelize - Sequelize库
    * @returns {Promise<void>}
    */
-  async down (queryInterface, Sequelize) {
+  async down(queryInterface, Sequelize) {
     // 删除表（会自动删除所有索引和数据）
     await queryInterface.dropTable('system_settings')
     console.log('🔄 回滚完成：system_settings表已删除')

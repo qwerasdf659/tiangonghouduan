@@ -35,7 +35,7 @@ module.exports = {
    * @param {Object} Sequelize - Sequelize对象
    * @returns {Promise<void>}
    */
-  async up (queryInterface, Sequelize) {
+  async up(queryInterface, Sequelize) {
     const transaction = await queryInterface.sequelize.transaction()
 
     try {
@@ -121,7 +121,8 @@ module.exports = {
         },
         {
           transaction,
-          comment: '资产流水表（Asset Transactions）- 记录所有资产变动流水，支持幂等性控制和审计追溯'
+          comment:
+            '资产流水表（Asset Transactions）- 记录所有资产变动流水，支持幂等性控制和审计追溯'
         }
       )
 
@@ -174,7 +175,7 @@ module.exports = {
    * @param {Object} Sequelize - Sequelize对象
    * @returns {Promise<void>}
    */
-  async down (queryInterface, Sequelize) {
+  async down(queryInterface, Sequelize) {
     const transaction = await queryInterface.sequelize.transaction()
 
     try {
@@ -188,8 +189,7 @@ module.exports = {
 
       if (count > 0) {
         throw new Error(
-          `无法回滚：asset_transactions表中存在${count}条记录。` +
-          '请先备份数据，然后再执行回滚。'
+          `无法回滚：asset_transactions表中存在${count}条记录。` + '请先备份数据，然后再执行回滚。'
         )
       }
 

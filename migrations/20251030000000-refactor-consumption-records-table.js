@@ -37,7 +37,7 @@ module.exports = {
    * @param {import('sequelize')} Sequelize - Sequelize实例
    * @returns {Promise<void>}
    */
-  async up (queryInterface, Sequelize) {
+  async up(queryInterface, Sequelize) {
     const transaction = await queryInterface.sequelize.transaction()
 
     try {
@@ -51,9 +51,11 @@ module.exports = {
       console.log('步骤1：删除外键约束')
 
       // 检查并删除外键约束（有些约束可能已被删除）
-      const removeConstraintSafely = async (constraintName) => {
+      const removeConstraintSafely = async constraintName => {
         try {
-          await queryInterface.removeConstraint('consumption_records', constraintName, { transaction })
+          await queryInterface.removeConstraint('consumption_records', constraintName, {
+            transaction
+          })
           console.log(`  已删除外键约束: ${constraintName}`)
         } catch (error) {
           if (error.message.includes('does not exist')) {
@@ -75,12 +77,12 @@ module.exports = {
       console.log('步骤2：删除现有索引')
 
       // 检查并删除索引（有些索引可能已被删除）
-      const removeIndexSafely = async (indexName) => {
+      const removeIndexSafely = async indexName => {
         try {
           await queryInterface.removeIndex('consumption_records', indexName, { transaction })
           console.log(`  已删除索引: ${indexName}`)
         } catch (error) {
-          if (error.message.includes('Can\'t DROP')) {
+          if (error.message.includes("Can't DROP")) {
             console.log(`  索引不存在，跳过: ${indexName}`)
           } else {
             throw error
@@ -104,12 +106,16 @@ module.exports = {
       console.log('步骤3：删除不需要的字段')
 
       // 检查并删除字段（有些字段可能已被删除）
-      const removeColumnSafely = async (columnName) => {
+      const removeColumnSafely = async columnName => {
         try {
           await queryInterface.removeColumn('consumption_records', columnName, { transaction })
           console.log(`  已删除字段: ${columnName}`)
         } catch (error) {
-          if (error.message.includes('check that') || error.message.includes('doesn\'t exist') || error.message.includes('Can\'t DROP')) {
+          if (
+            error.message.includes('check that') ||
+            error.message.includes("doesn't exist") ||
+            error.message.includes("Can't DROP")
+          ) {
             console.log(`  字段不存在，跳过: ${columnName}`)
           } else {
             throw error
@@ -136,7 +142,7 @@ module.exports = {
 
       // 检查audit_records表是否存在
       const [auditTableExists] = await queryInterface.sequelize.query(
-        'SELECT COUNT(*) as count FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = \'restaurant_points_dev\' AND TABLE_NAME = \'audit_records\'',
+        "SELECT COUNT(*) as count FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = 'restaurant_points_dev' AND TABLE_NAME = 'audit_records'",
         { transaction }
       )
 
@@ -145,19 +151,23 @@ module.exports = {
 
         // 检查audit_records中的字段名
         const [auditColumns] = await queryInterface.sequelize.query(
-          'SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = \'restaurant_points_dev\' AND TABLE_NAME = \'audit_records\' AND COLUMN_NAME IN (\'consumption_id\', \'record_id\')',
+          "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = 'restaurant_points_dev' AND TABLE_NAME = 'audit_records' AND COLUMN_NAME IN ('consumption_id', 'record_id')",
           { transaction }
         )
 
         const hasConsumptionId = auditColumns.some(col => col.COLUMN_NAME === 'consumption_id')
         const hasRecordId = auditColumns.some(col => col.COLUMN_NAME === 'record_id')
 
-        console.log(`  audit_records字段检查: consumption_id=${hasConsumptionId}, record_id=${hasRecordId}`)
+        console.log(
+          `  audit_records字段检查: consumption_id=${hasConsumptionId}, record_id=${hasRecordId}`
+        )
 
         if (hasConsumptionId) {
           // 删除audit_records对consumption_records的外键
           try {
-            await queryInterface.removeConstraint('audit_records', 'audit_records_ibfk_1', { transaction })
+            await queryInterface.removeConstraint('audit_records', 'audit_records_ibfk_1', {
+              transaction
+            })
             console.log('  已删除audit_records表的外键约束: audit_records_ibfk_1')
           } catch (error) {
             if (error.message.includes('does not exist')) {
@@ -169,7 +179,9 @@ module.exports = {
 
           // 重命名audit_records中的consumption_id字段为record_id
           try {
-            await queryInterface.renameColumn('audit_records', 'consumption_id', 'record_id', { transaction })
+            await queryInterface.renameColumn('audit_records', 'consumption_id', 'record_id', {
+              transaction
+            })
             console.log('  已重命名audit_records.consumption_id为record_id')
           } catch (error) {
             console.warn('  重命名audit_records.consumption_id失败:', error.message)
@@ -188,10 +200,24 @@ module.exports = {
        */
       console.log('步骤5：重命名主键字段')
 
-      await queryInterface.renameColumn('consumption_records', 'consumption_id', 'record_id', { transaction })
-      await queryInterface.renameColumn('consumption_records', 'points_to_earn', 'points_to_award', { transaction })
-      await queryInterface.renameColumn('consumption_records', 'qr_code_data', 'qr_code', { transaction })
-      await queryInterface.renameColumn('consumption_records', 'merchant_remarks', 'merchant_notes', { transaction })
+      await queryInterface.renameColumn('consumption_records', 'consumption_id', 'record_id', {
+        transaction
+      })
+      await queryInterface.renameColumn(
+        'consumption_records',
+        'points_to_earn',
+        'points_to_award',
+        { transaction }
+      )
+      await queryInterface.renameColumn('consumption_records', 'qr_code_data', 'qr_code', {
+        transaction
+      })
+      await queryInterface.renameColumn(
+        'consumption_records',
+        'merchant_remarks',
+        'merchant_notes',
+        { transaction }
+      )
 
       /*
        * ========================================
@@ -201,26 +227,42 @@ module.exports = {
       console.log('步骤6：修改字段类型')
 
       // 修改qr_code字段：从TEXT改为VARCHAR(100)
-      await queryInterface.changeColumn('consumption_records', 'qr_code', {
-        type: Sequelize.STRING(100),
-        allowNull: false,
-        comment: '用户固定身份码（格式：QR_{user_id}_{signature}）'
-      }, { transaction })
+      await queryInterface.changeColumn(
+        'consumption_records',
+        'qr_code',
+        {
+          type: Sequelize.STRING(100),
+          allowNull: false,
+          comment: '用户固定身份码（格式：QR_{user_id}_{signature}）'
+        },
+        { transaction }
+      )
 
       // 修改points_to_award字段：从DECIMAL改为INT
-      await queryInterface.changeColumn('consumption_records', 'points_to_award', {
-        type: Sequelize.INTEGER,
-        allowNull: false,
-        comment: '预计奖励积分数（单位：分），计算规则：Math.round(consumption_amount)，即1元=1分，四舍五入'
-      }, { transaction })
+      await queryInterface.changeColumn(
+        'consumption_records',
+        'points_to_award',
+        {
+          type: Sequelize.INTEGER,
+          allowNull: false,
+          comment:
+            '预计奖励积分数（单位：分），计算规则：Math.round(consumption_amount)，即1元=1分，四舍五入'
+        },
+        { transaction }
+      )
 
       // 修改status枚举值
-      await queryInterface.changeColumn('consumption_records', 'status', {
-        type: Sequelize.ENUM('pending', 'approved', 'rejected', 'expired'),
-        allowNull: false,
-        defaultValue: 'pending',
-        comment: '状态：pending-待审核，approved-已通过，rejected-已拒绝，expired-已过期'
-      }, { transaction })
+      await queryInterface.changeColumn(
+        'consumption_records',
+        'status',
+        {
+          type: Sequelize.ENUM('pending', 'approved', 'rejected', 'expired'),
+          allowNull: false,
+          defaultValue: 'pending',
+          comment: '状态：pending-待审核，approved-已通过，rejected-已拒绝，expired-已过期'
+        },
+        { transaction }
+      )
 
       /*
        * ========================================
@@ -230,25 +272,40 @@ module.exports = {
       console.log('步骤7：添加新字段')
 
       // 添加admin_notes字段（平台审核备注）
-      await queryInterface.addColumn('consumption_records', 'admin_notes', {
-        type: Sequelize.TEXT,
-        allowNull: true,
-        comment: '平台审核备注（审核员填写）'
-      }, { transaction })
+      await queryInterface.addColumn(
+        'consumption_records',
+        'admin_notes',
+        {
+          type: Sequelize.TEXT,
+          allowNull: true,
+          comment: '平台审核备注（审核员填写）'
+        },
+        { transaction }
+      )
 
       // 添加reviewed_by字段（审核员ID）
-      await queryInterface.addColumn('consumption_records', 'reviewed_by', {
-        type: Sequelize.INTEGER,
-        allowNull: true,
-        comment: '审核员ID（谁审核的？）'
-      }, { transaction })
+      await queryInterface.addColumn(
+        'consumption_records',
+        'reviewed_by',
+        {
+          type: Sequelize.INTEGER,
+          allowNull: true,
+          comment: '审核员ID（谁审核的？）'
+        },
+        { transaction }
+      )
 
       // 添加reviewed_at字段（审核时间）
-      await queryInterface.addColumn('consumption_records', 'reviewed_at', {
-        type: Sequelize.DATE,
-        allowNull: true,
-        comment: '审核时间（什么时候审核的？），时区：北京时间（GMT+8）'
-      }, { transaction })
+      await queryInterface.addColumn(
+        'consumption_records',
+        'reviewed_at',
+        {
+          type: Sequelize.DATE,
+          allowNull: true,
+          comment: '审核时间（什么时候审核的？），时区：北京时间（GMT+8）'
+        },
+        { transaction }
+      )
 
       /*
        * ========================================
@@ -294,11 +351,16 @@ module.exports = {
        */
       console.log('步骤9：修改merchant_id为允许NULL')
 
-      await queryInterface.changeColumn('consumption_records', 'merchant_id', {
-        type: Sequelize.INTEGER,
-        allowNull: true,
-        comment: '商家ID（录入人，可为空）'
-      }, { transaction })
+      await queryInterface.changeColumn(
+        'consumption_records',
+        'merchant_id',
+        {
+          type: Sequelize.INTEGER,
+          allowNull: true,
+          comment: '商家ID（录入人，可为空）'
+        },
+        { transaction }
+      )
 
       /*
        * ========================================
@@ -396,7 +458,7 @@ module.exports = {
    * @param {import('sequelize')} Sequelize - Sequelize实例
    * @returns {Promise<void>}
    */
-  async down (queryInterface, Sequelize) {
+  async down(queryInterface, Sequelize) {
     const transaction = await queryInterface.sequelize.transaction()
 
     try {
@@ -415,57 +477,116 @@ module.exports = {
       await queryInterface.removeColumn('consumption_records', 'reviewed_at', { transaction })
 
       // 重命名字段（恢复原名）
-      await queryInterface.renameColumn('consumption_records', 'record_id', 'consumption_id', { transaction })
-      await queryInterface.renameColumn('consumption_records', 'points_to_award', 'points_to_earn', { transaction })
-      await queryInterface.renameColumn('consumption_records', 'qr_code', 'qr_code_data', { transaction })
-      await queryInterface.renameColumn('consumption_records', 'merchant_notes', 'merchant_remarks', { transaction })
+      await queryInterface.renameColumn('consumption_records', 'record_id', 'consumption_id', {
+        transaction
+      })
+      await queryInterface.renameColumn(
+        'consumption_records',
+        'points_to_award',
+        'points_to_earn',
+        { transaction }
+      )
+      await queryInterface.renameColumn('consumption_records', 'qr_code', 'qr_code_data', {
+        transaction
+      })
+      await queryInterface.renameColumn(
+        'consumption_records',
+        'merchant_notes',
+        'merchant_remarks',
+        { transaction }
+      )
 
       // 恢复原字段
-      await queryInterface.addColumn('consumption_records', 'consumption_code', {
-        type: Sequelize.STRING(50),
-        allowNull: false,
-        unique: true
-      }, { transaction })
+      await queryInterface.addColumn(
+        'consumption_records',
+        'consumption_code',
+        {
+          type: Sequelize.STRING(50),
+          allowNull: false,
+          unique: true
+        },
+        { transaction }
+      )
 
-      await queryInterface.addColumn('consumption_records', 'consumption_description', {
-        type: Sequelize.STRING(500),
-        allowNull: true
-      }, { transaction })
+      await queryInterface.addColumn(
+        'consumption_records',
+        'consumption_description',
+        {
+          type: Sequelize.STRING(500),
+          allowNull: true
+        },
+        { transaction }
+      )
 
-      await queryInterface.addColumn('consumption_records', 'receipt_images', {
-        type: Sequelize.JSON,
-        allowNull: true
-      }, { transaction })
+      await queryInterface.addColumn(
+        'consumption_records',
+        'receipt_images',
+        {
+          type: Sequelize.JSON,
+          allowNull: true
+        },
+        { transaction }
+      )
 
-      await queryInterface.addColumn('consumption_records', 'scan_time', {
-        type: Sequelize.DATE,
-        allowNull: false
-      }, { transaction })
+      await queryInterface.addColumn(
+        'consumption_records',
+        'scan_time',
+        {
+          type: Sequelize.DATE,
+          allowNull: false
+        },
+        { transaction }
+      )
 
-      await queryInterface.addColumn('consumption_records', 'submitted_at', {
-        type: Sequelize.DATE,
-        allowNull: false
-      }, { transaction })
+      await queryInterface.addColumn(
+        'consumption_records',
+        'submitted_at',
+        {
+          type: Sequelize.DATE,
+          allowNull: false
+        },
+        { transaction }
+      )
 
-      await queryInterface.addColumn('consumption_records', 'expires_at', {
-        type: Sequelize.DATE,
-        allowNull: false
-      }, { transaction })
+      await queryInterface.addColumn(
+        'consumption_records',
+        'expires_at',
+        {
+          type: Sequelize.DATE,
+          allowNull: false
+        },
+        { transaction }
+      )
 
-      await queryInterface.addColumn('consumption_records', 'audited_at', {
-        type: Sequelize.DATE,
-        allowNull: true
-      }, { transaction })
+      await queryInterface.addColumn(
+        'consumption_records',
+        'audited_at',
+        {
+          type: Sequelize.DATE,
+          allowNull: true
+        },
+        { transaction }
+      )
 
-      await queryInterface.addColumn('consumption_records', 'client_ip', {
-        type: Sequelize.STRING(45),
-        allowNull: true
-      }, { transaction })
+      await queryInterface.addColumn(
+        'consumption_records',
+        'client_ip',
+        {
+          type: Sequelize.STRING(45),
+          allowNull: true
+        },
+        { transaction }
+      )
 
-      await queryInterface.addColumn('consumption_records', 'device_info', {
-        type: Sequelize.JSON,
-        allowNull: true
-      }, { transaction })
+      await queryInterface.addColumn(
+        'consumption_records',
+        'device_info',
+        {
+          type: Sequelize.JSON,
+          allowNull: true
+        },
+        { transaction }
+      )
 
       // 恢复原索引
       await queryInterface.addIndex('consumption_records', ['consumption_code'], {

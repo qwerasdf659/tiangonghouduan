@@ -244,6 +244,129 @@ class LotteryCampaign extends Model {
     }
   }
 
+  // ==================== 预算积分相关方法（BUDGET_POINTS 架构） ====================
+
+  /**
+   * 检查活动是否使用用户预算模式
+   * @returns {boolean} 是否使用用户预算
+   */
+  isUserBudgetMode() {
+    return this.budget_mode === 'user'
+  }
+
+  /**
+   * 检查活动是否使用活动池预算模式
+   * @returns {boolean} 是否使用活动池预算
+   */
+  isPoolBudgetMode() {
+    return this.budget_mode === 'pool'
+  }
+
+  /**
+   * 检查活动是否无预算限制（测试模式）
+   * @returns {boolean} 是否无预算限制
+   */
+  isNoBudgetMode() {
+    return this.budget_mode === 'none'
+  }
+
+  /**
+   * 检查某个活动来源的预算是否可用于本活动
+   * @param {number} source_campaign_id - 预算来源活动ID
+   * @returns {boolean} 是否允许使用
+   */
+  isAllowedBudgetSource(source_campaign_id) {
+    // 非用户预算模式，不检查来源
+    if (!this.isUserBudgetMode()) {
+      return true
+    }
+
+    // allowed_campaign_ids 为 null 表示无限制
+    if (this.allowed_campaign_ids === null) {
+      return true
+    }
+
+    // 检查来源活动ID是否在允许列表中
+    const allowedIds = Array.isArray(this.allowed_campaign_ids) ? this.allowed_campaign_ids : []
+
+    return allowedIds.includes(source_campaign_id)
+  }
+
+  /**
+   * 获取活动池预算统计（仅 budget_mode=pool 时有意义）
+   * @returns {Object} 预算统计
+   */
+  getPoolBudgetStats() {
+    if (!this.isPoolBudgetMode()) {
+      return {
+        is_pool_mode: false,
+        total: null,
+        remaining: null,
+        consumed: null,
+        consumption_rate: null,
+        is_depleted: null
+      }
+    }
+
+    const total = Number(this.pool_budget_total) || 0
+    const remaining = Number(this.pool_budget_remaining) || 0
+    const consumed = total - remaining
+
+    return {
+      is_pool_mode: true,
+      total,
+      remaining,
+      consumed,
+      consumption_rate: total > 0 ? (consumed / total) * 100 : 0,
+      is_depleted: remaining <= 0
+    }
+  }
+
+  /**
+   * 检查活动池预算是否足够
+   * @param {number} required_amount - 需要的预算金额
+   * @returns {Object} 检查结果
+   */
+  checkPoolBudgetSufficient(required_amount) {
+    if (!this.isPoolBudgetMode()) {
+      return {
+        is_sufficient: true,
+        reason: '非活动池预算模式，无需检查'
+      }
+    }
+
+    const remaining = Number(this.pool_budget_remaining) || 0
+
+    return {
+      is_sufficient: remaining >= required_amount,
+      remaining,
+      required: required_amount,
+      shortage: Math.max(0, required_amount - remaining)
+    }
+  }
+
+  /**
+   * 扣减活动池预算（仅 budget_mode=pool 时使用）
+   * @param {number} amount - 扣减金额
+   * @param {Object} options - 选项
+   * @param {Object} options.transaction - Sequelize事务对象
+   * @returns {Promise<boolean>} 是否扣减成功
+   */
+  async deductPoolBudget(amount, options = {}) {
+    if (!this.isPoolBudgetMode()) {
+      return false
+    }
+
+    const remaining = Number(this.pool_budget_remaining) || 0
+    if (remaining < amount) {
+      return false
+    }
+
+    await this.update({ pool_budget_remaining: remaining - amount }, options)
+
+    return true
+  }
+
   /**
    * 更新活动统计信息
    * 业务场景：每次抽奖后更新活动的参与人数、抽奖次数、中奖次数、剩余奖池
@@ -536,6 +659,59 @@ module.exports = sequelize => {
         allowNull: false,
         defaultValue: 'draft',
         comment: '活动状态'
+      },
+      /**
+       * 预算模式
+       * @type {string}
+       * @业务含义 控制抽奖时从哪里扣减预算积分（BUDGET_POINTS）
+       * @枚举值
+       * - user：从用户预算账户扣减（用户自己的 BUDGET_POINTS）
+       * - pool：从活动池预算扣减（SYSTEM_CAMPAIGN_POOL 账户）
+       * - none：不限制预算（测试用途，生产禁用）
+       */
+      budget_mode: {
+        type: DataTypes.ENUM('user', 'pool', 'none'),
+        allowNull: false,
+        defaultValue: 'user',
+        comment: '预算模式：user=用户预算账户扣减，pool=活动池预算扣减，none=不限制预算（测试用）'
+      },
+      /**
+       * 活动池总预算
+       * @type {number}
+       * @业务含义 仅 budget_mode=pool 时使用，设置活动的预算池上限
+       * @场景 运营人员在创建活动时配置，控制活动总体成本
+       */
+      pool_budget_total: {
+        type: DataTypes.BIGINT,
+        allowNull: true,
+        defaultValue: null,
+        comment: '活动池总预算（仅 budget_mode=pool 时使用）'
+      },
+      /**
+       * 活动池剩余预算
+       * @type {number}
+       * @业务含义 仅 budget_mode=pool 时使用，实时记录剩余可用预算
+       * @场景 每次抽奖后扣减，当剩余预算不足时只能抽到空奖
+       */
+      pool_budget_remaining: {
+        type: DataTypes.BIGINT,
+        allowNull: true,
+        defaultValue: null,
+        comment: '活动池剩余预算（仅 budget_mode=pool 时使用，实时扣减）'
+      },
+      /**
+       * 允许使用的用户预算来源活动ID列表
+       * @type {Array<number>}
+       * @业务含义 仅 budget_mode=user 时使用，控制用户哪些活动来源的预算可用于本活动
+       * @场景 跨活动预算隔离：活动A充值的预算只能在活动A使用
+       * @示例 [1, 2, 3] 表示允许使用来自活动1、2、3的用户预算
+       * @注意 null 表示无限制，允许使用所有来源的预算
+       */
+      allowed_campaign_ids: {
+        type: DataTypes.JSON,
+        allowNull: true,
+        defaultValue: null,
+        comment: '允许使用的用户预算来源活动ID列表（JSON数组，仅 budget_mode=user 时使用）'
       },
       total_participants: {
         type: DataTypes.INTEGER,

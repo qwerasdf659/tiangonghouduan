@@ -123,9 +123,13 @@ module.exports = {
       console.log('  ✅ 已恢复索引: idx_user_sessions_token')
 
       // 恢复 user_sessions_user_type_user_id_is_active
-      await queryInterface.addIndex('authentication_sessions', ['user_type', 'user_id', 'is_active'], {
-        name: 'user_sessions_user_type_user_id_is_active'
-      })
+      await queryInterface.addIndex(
+        'authentication_sessions',
+        ['user_type', 'user_id', 'is_active'],
+        {
+          name: 'user_sessions_user_type_user_id_is_active'
+        }
+      )
       console.log('  ✅ 已恢复索引: user_sessions_user_type_user_id_is_active')
 
       // 恢复 user_sessions_expires_at_is_active

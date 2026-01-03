@@ -14,7 +14,7 @@ const BASE_URL = 'http://localhost:3000'
 const TEST_ADMIN = { mobile: '13612227930', verification_code: '123456' }
 
 class ComprehensiveChecker {
-  constructor () {
+  constructor() {
     this.backendAPIs = []
     this.frontendAPIs = []
     this.testResults = []
@@ -24,7 +24,7 @@ class ComprehensiveChecker {
   /**
    * 扫描所有后端路由文件
    */
-  scanBackendRoutes (routesDir) {
+  scanBackendRoutes(routesDir) {
     console.log('🔍 扫描后端路由文件...\n')
 
     this.scanDirectory(routesDir)
@@ -36,7 +36,7 @@ class ComprehensiveChecker {
   /**
    * 递归扫描目录
    */
-  scanDirectory (dir) {
+  scanDirectory(dir) {
     if (!fs.existsSync(dir)) return
 
     const files = fs.readdirSync(dir)
@@ -56,7 +56,7 @@ class ComprehensiveChecker {
   /**
    * 解析路由文件
    */
-  parseRouteFile (filePath) {
+  parseRouteFile(filePath) {
     const content = fs.readFileSync(filePath, 'utf8')
     const lines = content.split('\n')
 
@@ -84,7 +84,7 @@ class ComprehensiveChecker {
   /**
    * 从JSDoc注释提取完整路径
    */
-  extractFullPathFromComment (lines, lineNumber) {
+  extractFullPathFromComment(lines, lineNumber) {
     // 向上查找最近的@route注释
     for (let i = lineNumber - 1; i >= Math.max(0, lineNumber - 30); i--) {
       const line = lines[i]
@@ -99,7 +99,7 @@ class ComprehensiveChecker {
   /**
    * 根据文件路径推断完整API路径
    */
-  guessFullPath (filePath, routePath) {
+  guessFullPath(filePath, routePath) {
     // 从app.js的注册信息推断
     const appContent = fs.readFileSync(path.resolve(__dirname, '../../app.js'), 'utf8')
 
@@ -108,7 +108,10 @@ class ComprehensiveChecker {
     const requirePath = relativePath.replace('./', '')
 
     // 查找app.use注册
-    const usePattern = new RegExp(`app\\.use\\(['"]([^'"]+)['"],\\s*require\\(['"]${requirePath.replace('.js', '')}`, 'g')
+    const usePattern = new RegExp(
+      `app\\.use\\(['"]([^'"]+)['"],\\s*require\\(['"]${requirePath.replace('.js', '')}`,
+      'g'
+    )
     const useMatch = usePattern.exec(appContent)
 
     if (useMatch) {
@@ -133,7 +136,7 @@ class ComprehensiveChecker {
   /**
    * 扫描前端API调用
    */
-  scanFrontendAPIs (publicDir) {
+  scanFrontendAPIs(publicDir) {
     console.log('🔍 扫描前端API调用...\n')
 
     this.scanFrontendDirectory(publicDir)
@@ -145,7 +148,7 @@ class ComprehensiveChecker {
   /**
    * 扫描前端目录
    */
-  scanFrontendDirectory (dir) {
+  scanFrontendDirectory(dir) {
     if (!fs.existsSync(dir)) return
 
     const files = fs.readdirSync(dir)
@@ -165,7 +168,7 @@ class ComprehensiveChecker {
   /**
    * 解析前端文件
    */
-  parseFrontendFile (filePath) {
+  parseFrontendFile(filePath) {
     const content = fs.readFileSync(filePath, 'utf8')
 
     // API调用模式
@@ -194,7 +197,7 @@ class ComprehensiveChecker {
   /**
    * 登录获取Token
    */
-  async login () {
+  async login() {
     try {
       const response = await axios.post(`${BASE_URL}/api/v4/auth/login`, TEST_ADMIN)
       this.token = response.data.data.access_token
@@ -209,7 +212,7 @@ class ComprehensiveChecker {
   /**
    * 实际测试所有后端API
    */
-  async testAllAPIs () {
+  async testAllAPIs() {
     console.log('🧪 开始实际HTTP测试所有API...\n')
 
     const headers = { Authorization: `Bearer ${this.token}` }
@@ -229,7 +232,7 @@ class ComprehensiveChecker {
   /**
    * 去重API
    */
-  deduplicateAPIs (apis) {
+  deduplicateAPIs(apis) {
     const seen = new Map()
 
     apis.forEach(api => {
@@ -245,7 +248,7 @@ class ComprehensiveChecker {
   /**
    * 测试单个API
    */
-  async testSingleAPI (api, headers) {
+  async testSingleAPI(api, headers) {
     // 跳过包含参数占位符的路径
     if (api.fullPath.includes(':') || api.fullPath.includes('${')) {
       this.testResults.push({
@@ -306,7 +309,7 @@ class ComprehensiveChecker {
   /**
    * 生成详细报告
    */
-  generateReport () {
+  generateReport() {
     console.log('\n' + '='.repeat(70))
     console.log('📊 API完整性检查报告')
     console.log('='.repeat(70))
@@ -324,7 +327,9 @@ class ComprehensiveChecker {
     console.log(`  ❌ 404未找到: ${summary.notFound} 个`)
     console.log(`  ⚠️  其他错误: ${summary.error} 个`)
     console.log(`  ⏭️  跳过（含参数）: ${summary.skip} 个`)
-    console.log(`\n成功率: ${((summary.success / (summary.total - summary.skip)) * 100).toFixed(1)}%`)
+    console.log(
+      `\n成功率: ${((summary.success / (summary.total - summary.skip)) * 100).toFixed(1)}%`
+    )
 
     // 404 API详情
     const notFoundAPIs = this.testResults.filter(r => r.status === 'NOT_FOUND')
@@ -338,11 +343,18 @@ class ComprehensiveChecker {
 
     // 保存JSON报告
     const reportPath = path.resolve(__dirname, '../../docs/comprehensive-check-report.json')
-    fs.writeFileSync(reportPath, JSON.stringify({
-      timestamp: new Date().toISOString(),
-      summary,
-      results: this.testResults
-    }, null, 2))
+    fs.writeFileSync(
+      reportPath,
+      JSON.stringify(
+        {
+          timestamp: new Date().toISOString(),
+          summary,
+          results: this.testResults
+        },
+        null,
+        2
+      )
+    )
 
     console.log(`\n✅ 详细报告已保存: ${reportPath}`)
     console.log('='.repeat(70))
@@ -353,7 +365,7 @@ class ComprehensiveChecker {
   /**
    * 执行完整检查流程
    */
-  async run () {
+  async run() {
     console.log('🚀 开始全面API完整性检查\n')
     console.log('='.repeat(70))
 
@@ -384,17 +396,20 @@ class ComprehensiveChecker {
 if (require.main === module) {
   const checker = new ComprehensiveChecker()
 
-  checker.run().then(summary => {
-    if (summary && summary.notFound > 0) {
-      console.error('\n❌ 发现API缺失问题')
+  checker
+    .run()
+    .then(summary => {
+      if (summary && summary.notFound > 0) {
+        console.error('\n❌ 发现API缺失问题')
+        process.exit(1)
+      }
+      console.log('\n✅ 检查完成')
+      process.exit(0)
+    })
+    .catch(error => {
+      console.error('❌ 检查失败:', error)
       process.exit(1)
-    }
-    console.log('\n✅ 检查完成')
-    process.exit(0)
-  }).catch(error => {
-    console.error('❌ 检查失败:', error)
-    process.exit(1)
-  })
+    })
 }
 
 module.exports = ComprehensiveChecker

@@ -156,8 +156,15 @@ class UnifiedDatabaseHelper {
       }
     }
 
-    // 核心表列表
-    this.coreTables = ['users', 'lottery_draws', 'lottery_prizes', 'user_points_accounts']
+    // 核心表列表（V4.3 更新：对齐新账本架构）
+    this.coreTables = [
+      'users',
+      'lottery_draws',
+      'lottery_prizes',
+      'accounts',
+      'account_asset_balances',
+      'asset_transactions'
+    ]
 
     UnifiedDatabaseHelper.instance = this
     console.log('[UnifiedDatabaseHelper] 初始化完成')

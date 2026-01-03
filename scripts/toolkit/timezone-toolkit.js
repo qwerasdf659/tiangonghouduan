@@ -103,7 +103,7 @@ const FIX_RULES = [
 /**
  * 验证数据库时区配置
  */
-async function verifyDatabaseTimezone () {
+async function verifyDatabaseTimezone() {
   console.log(`\n${colors.blue}━━━ 1. 验证数据库时区配置 ━━━${colors.reset}`)
 
   try {
@@ -116,7 +116,9 @@ async function verifyDatabaseTimezone () {
     console.log(`${colors.green}✅ 数据库配置时区正确：+08:00${colors.reset}`)
 
     // 查询数据库实际时区
-    const [result] = await sequelize.query('SELECT @@global.time_zone AS global_tz, @@session.time_zone AS session_tz, NOW() AS db_now')
+    const [result] = await sequelize.query(
+      'SELECT @@global.time_zone AS global_tz, @@session.time_zone AS session_tz, NOW() AS db_now'
+    )
     const dbTimezone = result[0]
 
     console.log('📊 数据库时区信息:')
@@ -134,7 +136,7 @@ async function verifyDatabaseTimezone () {
 /**
  * 验证应用层时间创建
  */
-function verifyApplicationTimeCreation () {
+function verifyApplicationTimeCreation() {
   console.log(`\n${colors.blue}━━━ 2. 验证应用层时间创建 ━━━${colors.reset}`)
 
   try {
@@ -175,7 +177,7 @@ function verifyApplicationTimeCreation () {
 /**
  * 扫描代码中的时区问题
  */
-function scanTimezoneIssues (targetDirs = null) {
+function scanTimezoneIssues(targetDirs = null) {
   console.log(`\n${colors.blue}━━━ 3. 扫描代码时区问题 ━━━${colors.reset}`)
 
   const directories = targetDirs || ['models', 'services', 'routes', 'middleware']
@@ -208,7 +210,7 @@ function scanTimezoneIssues (targetDirs = null) {
   return issues
 }
 
-function scanDirectory (dir, relativePath) {
+function scanDirectory(dir, relativePath) {
   const issues = []
   const files = fs.readdirSync(dir)
 
@@ -255,15 +257,16 @@ function scanDirectory (dir, relativePath) {
 /**
  * 检查文件是否需要导入BeijingTimeHelper
  */
-function needsImport (content) {
-  return !content.includes('BeijingTimeHelper') &&
-         !content.includes('require(\'../utils/timeHelper\')')
+function needsImport(content) {
+  return (
+    !content.includes('BeijingTimeHelper') && !content.includes("require('../utils/timeHelper')")
+  )
 }
 
 /**
  * 添加导入语句
  */
-function addImport (content, filePath) {
+function addImport(content, filePath) {
   const lines = content.split('\n')
   let insertIndex = 0
   let foundFirstRequire = false
@@ -311,7 +314,7 @@ function addImport (content, filePath) {
 /**
  * 修复单个文件
  */
-function fixFile (filePath, dryRun = false) {
+function fixFile(filePath, dryRun = false) {
   let content = fs.readFileSync(filePath, 'utf8')
   let modified = false
   const appliedRules = []
@@ -346,7 +349,7 @@ function fixFile (filePath, dryRun = false) {
 /**
  * 递归修复目录
  */
-function fixDirectory (dir, dryRun = false) {
+function fixDirectory(dir, dryRun = false) {
   const results = {
     totalFiles: 0,
     modifiedFiles: 0,
@@ -388,7 +391,7 @@ function fixDirectory (dir, dryRun = false) {
 /**
  * 执行修复操作
  */
-async function performFix (options = {}) {
+async function performFix(options = {}) {
   const { target = 'all', dryRun = false } = options
 
   console.log(`\n${colors.blue}🔧 开始修复时区处理问题...${colors.reset}`)
@@ -436,7 +439,9 @@ async function performFix (options = {}) {
   console.log(`${'='.repeat(80)}\n`)
 
   console.log(`${colors.green}✅ 总计扫描: ${allResults.totalFiles}个文件${colors.reset}`)
-  console.log(`${colors.green}✅ ${dryRun ? '将' : '成功'}修复: ${allResults.modifiedFiles}个文件${colors.reset}\n`)
+  console.log(
+    `${colors.green}✅ ${dryRun ? '将' : '成功'}修复: ${allResults.modifiedFiles}个文件${colors.reset}\n`
+  )
 
   if (allResults.modifiedFiles > 0) {
     console.log(`${colors.yellow}📋 修改详情:${colors.reset}\n`)
@@ -461,15 +466,19 @@ async function performFix (options = {}) {
 
     fs.writeFileSync(
       reportPath,
-      JSON.stringify({
-        timestamp: BeijingTimeHelper.now(),
-        options: { target, dryRun },
-        summary: {
-          totalFiles: allResults.totalFiles,
-          modifiedFiles: allResults.modifiedFiles
+      JSON.stringify(
+        {
+          timestamp: BeijingTimeHelper.now(),
+          options: { target, dryRun },
+          summary: {
+            totalFiles: allResults.totalFiles,
+            modifiedFiles: allResults.modifiedFiles
+          },
+          modifiedFiles: allResults.files
         },
-        modifiedFiles: allResults.files
-      }, null, 2)
+        null,
+        2
+      )
     )
 
     console.log(`${colors.green}✅ 修复报告已生成: ${reportPath}${colors.reset}\n`)
@@ -480,7 +489,7 @@ async function performFix (options = {}) {
 
 // ==================== 主函数 ====================
 
-async function main () {
+async function main() {
   // 解析命令行参数
   const args = process.argv.slice(2)
   const options = {
@@ -545,9 +554,15 @@ ${colors.blue}时区处理统一工具包 (Timezone Toolkit)${colors.reset}
       console.log(`${colors.blue}检查结果汇总${colors.reset}`)
       console.log(`${colors.blue}${'='.repeat(80)}${colors.reset}\n`)
 
-      console.log(`数据库时区配置: ${dbCheck ? colors.green + '✅ 正常' : colors.red + '❌ 异常'}${colors.reset}`)
-      console.log(`应用层时间创建: ${appCheck ? colors.green + '✅ 正常' : colors.red + '❌ 异常'}${colors.reset}`)
-      console.log(`代码时区问题: ${codeIssues.length === 0 ? colors.green + '✅ 无问题' : colors.yellow + `⚠️ ${codeIssues.length}个问题`}${colors.reset}`)
+      console.log(
+        `数据库时区配置: ${dbCheck ? colors.green + '✅ 正常' : colors.red + '❌ 异常'}${colors.reset}`
+      )
+      console.log(
+        `应用层时间创建: ${appCheck ? colors.green + '✅ 正常' : colors.red + '❌ 异常'}${colors.reset}`
+      )
+      console.log(
+        `代码时区问题: ${codeIssues.length === 0 ? colors.green + '✅ 无问题' : colors.yellow + `⚠️ ${codeIssues.length}个问题`}${colors.reset}`
+      )
 
       if (!dbCheck || !appCheck || codeIssues.length > 0) {
         console.log(`\n${colors.yellow}💡 建议运行修复命令:${colors.reset}`)

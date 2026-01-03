@@ -43,7 +43,7 @@ module.exports = {
    * @param {import('sequelize')} Sequelize - Sequelize实例
    * @returns {Promise<void>}
    */
-  async up (queryInterface, Sequelize) {
+  async up(queryInterface, Sequelize) {
     const transaction = await queryInterface.sequelize.transaction()
 
     try {
@@ -62,14 +62,10 @@ module.exports = {
       // 🔑 索引1：复合索引（type + is_active）- 首页公告查询核心索引
       if (!existingIndexNames.has('idx_announcements_type_active')) {
         console.log('➕ 创建索引: idx_announcements_type_active (type, is_active)')
-        await queryInterface.addIndex(
-          'system_announcements',
-          ['type', 'is_active'],
-          {
-            name: 'idx_announcements_type_active',
-            transaction
-          }
-        )
+        await queryInterface.addIndex('system_announcements', ['type', 'is_active'], {
+          name: 'idx_announcements_type_active',
+          transaction
+        })
         console.log('✅ 索引创建成功: idx_announcements_type_active')
       } else {
         console.log('⏭️  索引已存在，跳过: idx_announcements_type_active')
@@ -78,14 +74,10 @@ module.exports = {
       // 🔑 索引2：复合索引（priority + expires_at）- 优化排序和过期查询
       if (!existingIndexNames.has('idx_announcements_priority_expires')) {
         console.log('➕ 创建索引: idx_announcements_priority_expires (priority, expires_at)')
-        await queryInterface.addIndex(
-          'system_announcements',
-          ['priority', 'expires_at'],
-          {
-            name: 'idx_announcements_priority_expires',
-            transaction
-          }
-        )
+        await queryInterface.addIndex('system_announcements', ['priority', 'expires_at'], {
+          name: 'idx_announcements_priority_expires',
+          transaction
+        })
         console.log('✅ 索引创建成功: idx_announcements_priority_expires')
       } else {
         console.log('⏭️  索引已存在，跳过: idx_announcements_priority_expires')
@@ -94,14 +86,10 @@ module.exports = {
       // 🔑 索引3：单列索引（created_at）- 优化按创建时间排序
       if (!existingIndexNames.has('idx_announcements_created_at')) {
         console.log('➕ 创建索引: idx_announcements_created_at (created_at)')
-        await queryInterface.addIndex(
-          'system_announcements',
-          ['created_at'],
-          {
-            name: 'idx_announcements_created_at',
-            transaction
-          }
-        )
+        await queryInterface.addIndex('system_announcements', ['created_at'], {
+          name: 'idx_announcements_created_at',
+          transaction
+        })
         console.log('✅ 索引创建成功: idx_announcements_created_at')
       } else {
         console.log('⏭️  索引已存在，跳过: idx_announcements_created_at')
@@ -127,7 +115,7 @@ module.exports = {
    * @param {import('sequelize')} Sequelize - Sequelize实例
    * @returns {Promise<void>}
    */
-  async down (queryInterface, Sequelize) {
+  async down(queryInterface, Sequelize) {
     const transaction = await queryInterface.sequelize.transaction()
 
     try {

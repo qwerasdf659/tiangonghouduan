@@ -36,7 +36,7 @@ module.exports = {
    * @param {Object} Sequelize - Sequelize实例
    * @returns {Promise<void>} Promise对象
    */
-  async up (queryInterface, Sequelize) {
+  async up(queryInterface, Sequelize) {
     const transaction = await queryInterface.sequelize.transaction()
 
     try {
@@ -59,97 +59,105 @@ module.exports = {
        * 第2步：创建 material_asset_types 表
        * ========================================
        */
-      await queryInterface.createTable('material_asset_types', {
-        // 主键：资产代码（如：red_shard、red_crystal、orange_shard、orange_crystal）
-        asset_code: {
-          type: Sequelize.STRING(32),
-          primaryKey: true,
-          allowNull: false,
-          comment: '资产代码（主键），如：red_shard（碎红水晶）、red_crystal（完整红水晶）、orange_shard（橙碎片）、orange_crystal（完整橙水晶）'
-        },
+      await queryInterface.createTable(
+        'material_asset_types',
+        {
+          // 主键：资产代码（如：red_shard、red_crystal、orange_shard、orange_crystal）
+          asset_code: {
+            type: Sequelize.STRING(32),
+            primaryKey: true,
+            allowNull: false,
+            comment:
+              '资产代码（主键），如：red_shard（碎红水晶）、red_crystal（完整红水晶）、orange_shard（橙碎片）、orange_crystal（完整橙水晶）'
+          },
 
-        // 展示名称（用于前端显示）
-        display_name: {
-          type: Sequelize.STRING(64),
-          allowNull: false,
-          comment: '展示名称（用于前端显示），如：碎红水晶、完整红水晶、橙碎片、完整橙水晶'
-        },
+          // 展示名称（用于前端显示）
+          display_name: {
+            type: Sequelize.STRING(64),
+            allowNull: false,
+            comment: '展示名称（用于前端显示），如：碎红水晶、完整红水晶、橙碎片、完整橙水晶'
+          },
 
-        // 材料组代码（用于运营分组、UI展示与规则配置的分组边界）
-        group_code: {
-          type: Sequelize.STRING(16),
-          allowNull: false,
-          comment: '材料组代码（用于分组管理），如：red（红系）、orange（橙系）、purple（紫系）'
-        },
+          // 材料组代码（用于运营分组、UI展示与规则配置的分组边界）
+          group_code: {
+            type: Sequelize.STRING(16),
+            allowNull: false,
+            comment: '材料组代码（用于分组管理），如：red（红系）、orange（橙系）、purple（紫系）'
+          },
 
-        // 形态（碎片或完整体）
-        form: {
-          type: Sequelize.ENUM('shard', 'crystal'),
-          allowNull: false,
-          comment: '形态：shard（碎片）、crystal（完整体/水晶）'
-        },
+          // 形态（碎片或完整体）
+          form: {
+            type: Sequelize.ENUM('shard', 'crystal'),
+            allowNull: false,
+            comment: '形态：shard（碎片）、crystal（完整体/水晶）'
+          },
 
-        // 层级（红=1、橙=2、紫=3...，用于限制升级方向，避免循环转换）
-        tier: {
-          type: Sequelize.INTEGER,
-          allowNull: false,
-          comment: '层级（红=1、橙=2、紫=3...），用于限制升级方向，避免循环转换'
-        },
+          // 层级（红=1、橙=2、紫=3...，用于限制升级方向，避免循环转换）
+          tier: {
+            type: Sequelize.INTEGER,
+            allowNull: false,
+            comment: '层级（红=1、橙=2、紫=3...），用于限制升级方向，避免循环转换'
+          },
 
-        // 可见价值（积分口径，用于展示、对齐门票单位、解释成本）
-        visible_value_points: {
-          type: Sequelize.BIGINT,
-          allowNull: false,
-          defaultValue: 0,
-          comment: '可见价值（积分口径），用于展示、对齐门票单位、解释成本。例如：碎红水晶=10、完整红水晶=100'
-        },
+          // 可见价值（积分口径，用于展示、对齐门票单位、解释成本）
+          visible_value_points: {
+            type: Sequelize.BIGINT,
+            allowNull: false,
+            defaultValue: 0,
+            comment:
+              '可见价值（积分口径），用于展示、对齐门票单位、解释成本。例如：碎红水晶=10、完整红水晶=100'
+          },
 
-        // 预算价值（积分口径，用于预算控奖、系统成本口径）
-        budget_value_points: {
-          type: Sequelize.BIGINT,
-          allowNull: false,
-          defaultValue: 0,
-          comment: '预算价值（积分口径），用于预算控奖、系统成本口径。例如：碎红水晶=10、完整红水晶=100'
-        },
+          // 预算价值（积分口径，用于预算控奖、系统成本口径）
+          budget_value_points: {
+            type: Sequelize.BIGINT,
+            allowNull: false,
+            defaultValue: 0,
+            comment:
+              '预算价值（积分口径），用于预算控奖、系统成本口径。例如：碎红水晶=10、完整红水晶=100'
+          },
 
-        // 排序顺序（用于前端展示排序）
-        sort_order: {
-          type: Sequelize.INTEGER,
-          allowNull: false,
-          defaultValue: 0,
-          comment: '排序顺序（数字越小越靠前），用于前端展示排序'
-        },
+          // 排序顺序（用于前端展示排序）
+          sort_order: {
+            type: Sequelize.INTEGER,
+            allowNull: false,
+            defaultValue: 0,
+            comment: '排序顺序（数字越小越靠前），用于前端展示排序'
+          },
 
-        // 是否启用（1=启用，0=禁用）
-        is_enabled: {
-          type: Sequelize.TINYINT(1),
-          allowNull: false,
-          defaultValue: 1,
-          comment: '是否启用（1=启用，0=禁用）。禁用后不再出现在前端选择列表中'
-        },
+          // 是否启用（1=启用，0=禁用）
+          is_enabled: {
+            type: Sequelize.TINYINT(1),
+            allowNull: false,
+            defaultValue: 1,
+            comment: '是否启用（1=启用，0=禁用）。禁用后不再出现在前端选择列表中'
+          },
 
-        // 创建时间
-        created_at: {
-          type: Sequelize.DATE,
-          allowNull: false,
-          defaultValue: Sequelize.literal('CURRENT_TIMESTAMP'),
-          comment: '创建时间（北京时间）'
-        },
+          // 创建时间
+          created_at: {
+            type: Sequelize.DATE,
+            allowNull: false,
+            defaultValue: Sequelize.literal('CURRENT_TIMESTAMP'),
+            comment: '创建时间（北京时间）'
+          },
 
-        // 更新时间
-        updated_at: {
-          type: Sequelize.DATE,
-          allowNull: false,
-          defaultValue: Sequelize.literal('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'),
-          comment: '更新时间（北京时间）'
+          // 更新时间
+          updated_at: {
+            type: Sequelize.DATE,
+            allowNull: false,
+            defaultValue: Sequelize.literal('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'),
+            comment: '更新时间（北京时间）'
+          }
+        },
+        {
+          transaction,
+          comment:
+            '材料资产类型表（定义系统中存在的材料种类：碎红水晶、完整红水晶、橙碎片、完整橙水晶等）',
+          charset: 'utf8mb4',
+          collate: 'utf8mb4_unicode_ci',
+          engine: 'InnoDB'
         }
-      }, {
-        transaction,
-        comment: '材料资产类型表（定义系统中存在的材料种类：碎红水晶、完整红水晶、橙碎片、完整橙水晶等）',
-        charset: 'utf8mb4',
-        collate: 'utf8mb4_unicode_ci',
-        engine: 'InnoDB'
-      })
+      )
 
       console.log('✓ material_asset_types 表创建成功')
 
@@ -194,7 +202,7 @@ module.exports = {
    * @param {Object} Sequelize - Sequelize实例
    * @returns {Promise<void>} Promise对象
    */
-  async down (queryInterface, Sequelize) {
+  async down(queryInterface, Sequelize) {
     const transaction = await queryInterface.sequelize.transaction()
 
     try {

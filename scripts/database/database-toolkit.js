@@ -42,7 +42,7 @@ const colors = {
   magenta: '\x1b[35m'
 }
 
-function log (message, color = 'reset') {
+function log(message, color = 'reset') {
   console.log(`${colors[color]}${message}${colors.reset}`)
 }
 
@@ -52,7 +52,7 @@ function log (message, color = 'reset') {
  * 定义需要修复的外键规则
  * 基于业务分析报告中的推荐配置
  */
-function getForeignKeyFixes () {
+function getForeignKeyFixes() {
   return [
     {
       table: 'user_roles',
@@ -107,7 +107,7 @@ function getForeignKeyFixes () {
 /**
  * 检查数据库完整性
  */
-async function checkDatabaseIntegrity () {
+async function checkDatabaseIntegrity() {
   log('\n🔍 ━━━ 数据库完整性检查 ━━━', 'cyan')
   log(`检查时间: ${BeijingTimeHelper.nowLocale()}\n`, 'blue')
 
@@ -150,7 +150,10 @@ async function checkDatabaseIntegrity () {
         const orphanCount = orphans[0].count
 
         if (orphanCount > 0) {
-          log(`❌ ${fk.TABLE_NAME}.${fk.COLUMN_NAME} → ${fk.REFERENCED_TABLE_NAME}: ${orphanCount}条孤儿记录`, 'red')
+          log(
+            `❌ ${fk.TABLE_NAME}.${fk.COLUMN_NAME} → ${fk.REFERENCED_TABLE_NAME}: ${orphanCount}条孤儿记录`,
+            'red'
+          )
 
           // 获取示例孤儿ID
           const [samples] = await sequelize.query(`
@@ -175,7 +178,10 @@ async function checkDatabaseIntegrity () {
             samples: samples.map(s => s[fk.COLUMN_NAME])
           })
         } else {
-          log(`✅ ${fk.TABLE_NAME}.${fk.COLUMN_NAME} → ${fk.REFERENCED_TABLE_NAME}: 数据一致`, 'green')
+          log(
+            `✅ ${fk.TABLE_NAME}.${fk.COLUMN_NAME} → ${fk.REFERENCED_TABLE_NAME}: 数据一致`,
+            'green'
+          )
         }
       } catch (error) {
         log(`⚠️ ${fk.TABLE_NAME}.${fk.COLUMN_NAME}: 检查失败 - ${error.message}`, 'yellow')
@@ -209,7 +215,7 @@ async function checkDatabaseIntegrity () {
 /**
  * 检查外键约束规则
  */
-async function checkForeignKeyRules () {
+async function checkForeignKeyRules() {
   log('\n🔍 ━━━ 外键约束规则检查 ━━━', 'cyan')
 
   try {
@@ -236,10 +242,11 @@ async function checkForeignKeyRules () {
     const recommendations = []
 
     constraints.forEach(constraint => {
-      const fix = fixes.find(f =>
-        f.table === constraint.TABLE_NAME &&
-        f.column === constraint.COLUMN_NAME &&
-        f.referenced_table === constraint.REFERENCED_TABLE_NAME
+      const fix = fixes.find(
+        f =>
+          f.table === constraint.TABLE_NAME &&
+          f.column === constraint.COLUMN_NAME &&
+          f.referenced_table === constraint.REFERENCED_TABLE_NAME
       )
 
       if (fix) {
@@ -249,8 +256,14 @@ async function checkForeignKeyRules () {
 
         if (needsFix) {
           log(`⚠️ ${constraint.TABLE_NAME}.${constraint.COLUMN_NAME}:`, 'yellow')
-          log(`   当前规则: ON DELETE ${constraint.DELETE_RULE}, ON UPDATE ${constraint.UPDATE_RULE}`, 'yellow')
-          log(`   推荐规则: ON DELETE ${fix.recommended.delete}, ON UPDATE ${fix.recommended.update}`, 'green')
+          log(
+            `   当前规则: ON DELETE ${constraint.DELETE_RULE}, ON UPDATE ${constraint.UPDATE_RULE}`,
+            'yellow'
+          )
+          log(
+            `   推荐规则: ON DELETE ${fix.recommended.delete}, ON UPDATE ${fix.recommended.update}`,
+            'green'
+          )
           log(`   原因: ${fix.reason}\n`, 'cyan')
 
           recommendations.push({
@@ -268,7 +281,10 @@ async function checkForeignKeyRules () {
           log(`✅ ${constraint.TABLE_NAME}.${constraint.COLUMN_NAME}: 规则符合推荐`, 'green')
         }
       } else {
-        log(`ℹ️ ${constraint.TABLE_NAME}.${constraint.COLUMN_NAME}: ${constraint.DELETE_RULE}/${constraint.UPDATE_RULE}`, 'reset')
+        log(
+          `ℹ️ ${constraint.TABLE_NAME}.${constraint.COLUMN_NAME}: ${constraint.DELETE_RULE}/${constraint.UPDATE_RULE}`,
+          'reset'
+        )
       }
     })
 
@@ -292,7 +308,7 @@ async function checkForeignKeyRules () {
 /**
  * 获取数据库统计信息
  */
-async function getDatabaseStats () {
+async function getDatabaseStats() {
   log('\n📊 ━━━ 数据库统计信息 ━━━', 'cyan')
 
   try {
@@ -330,9 +346,11 @@ async function getDatabaseStats () {
     })
 
     log('─'.repeat(80), 'blue')
-    log(`总计 (${tables.length}个表)`.padEnd(28) +
+    log(
+      `总计 (${tables.length}个表)`.padEnd(28) +
         ` ${String(totalRows).padEnd(10)} ${String(totalDataSize.toFixed(2)).padEnd(10)} ${String(totalIndexSize.toFixed(2)).padEnd(10)} ${String((totalDataSize + totalIndexSize).toFixed(2)).padEnd(10)}`,
-    'cyan')
+      'cyan'
+    )
 
     return { tables, totalRows, totalDataSize, totalIndexSize }
   } catch (error) {
@@ -346,7 +364,7 @@ async function getDatabaseStats () {
 /**
  * 修复外键规则
  */
-async function fixForeignKeyRules (options = {}) {
+async function fixForeignKeyRules(options = {}) {
   const { dryRun = false } = options
 
   log('\n🔧 ━━━ 修复外键约束规则 ━━━', 'cyan')
@@ -370,7 +388,10 @@ async function fixForeignKeyRules (options = {}) {
       recommendations.forEach((rec, index) => {
         log(`\n${index + 1}. ${rec.table}.${rec.column}:`, 'yellow')
         log(`   删除外键: DROP FOREIGN KEY ${rec.constraint}`, 'reset')
-        log(`   重建外键: ADD CONSTRAINT ... ON DELETE ${rec.recommended.delete} ON UPDATE ${rec.recommended.update}`, 'reset')
+        log(
+          `   重建外键: ADD CONSTRAINT ... ON DELETE ${rec.recommended.delete} ON UPDATE ${rec.recommended.update}`,
+          'reset'
+        )
       })
       log('\n提示：去掉 --dry-run 参数执行实际修复', 'cyan')
       return { fixed: 0, recommendations }
@@ -383,7 +404,7 @@ async function fixForeignKeyRules (options = {}) {
       log(`\n修复 ${rec.table}.${rec.column}...`, 'cyan')
 
       try {
-        await sequelize.transaction(async (t) => {
+        await sequelize.transaction(async t => {
           // 1. 删除旧外键
           await sequelize.query(
             `ALTER TABLE \`${rec.table}\` DROP FOREIGN KEY \`${rec.constraint}\``,
@@ -416,7 +437,10 @@ async function fixForeignKeyRules (options = {}) {
     }
 
     log(`\n${'='.repeat(80)}`, 'cyan')
-    log(`修复完成: ${fixedCount}/${recommendations.length} 个外键规则已更新`, fixedCount === recommendations.length ? 'green' : 'yellow')
+    log(
+      `修复完成: ${fixedCount}/${recommendations.length} 个外键规则已更新`,
+      fixedCount === recommendations.length ? 'green' : 'yellow'
+    )
 
     return { fixed: fixedCount, recommendations }
   } catch (error) {
@@ -428,7 +452,7 @@ async function fixForeignKeyRules (options = {}) {
 /**
  * 全面检查
  */
-async function performFullCheck () {
+async function performFullCheck() {
   log('\n' + '='.repeat(80), 'cyan')
   log('数据库全面检查', 'cyan')
   log('='.repeat(80) + '\n', 'cyan')
@@ -452,7 +476,10 @@ async function performFullCheck () {
 
     log(`\n📊 数据库表: ${results.stats.tables.length}个`, 'blue')
     log(`📊 总行数: ${results.stats.totalRows}`, 'blue')
-    log(`📊 总大小: ${(results.stats.totalDataSize + results.stats.totalIndexSize).toFixed(2)} MB`, 'blue')
+    log(
+      `📊 总大小: ${(results.stats.totalDataSize + results.stats.totalIndexSize).toFixed(2)} MB`,
+      'blue'
+    )
 
     if (results.integrity.totalOrphans > 0) {
       log(`\n❌ 数据完整性: 发现${results.integrity.totalOrphans}条孤儿记录`, 'red')
@@ -478,10 +505,14 @@ async function performFullCheck () {
 
     fs.writeFileSync(
       reportPath,
-      JSON.stringify({
-        timestamp: BeijingTimeHelper.now(),
-        results
-      }, null, 2)
+      JSON.stringify(
+        {
+          timestamp: BeijingTimeHelper.now(),
+          results
+        },
+        null,
+        2
+      )
     )
 
     log(`\n📄 详细报告已生成: ${reportPath}`, 'green')
@@ -495,7 +526,7 @@ async function performFullCheck () {
 
 // ==================== 主函数 ====================
 
-async function main () {
+async function main() {
   // 解析命令行参数
   const args = process.argv.slice(2)
   const options = {
@@ -552,27 +583,27 @@ ${colors.blue}数据库管理统一工具包 (Database Toolkit)${colors.reset}
 
   try {
     switch (options.action) {
-    case 'check':
-    case 'orphan-check':
-      await checkDatabaseIntegrity()
-      break
+      case 'check':
+      case 'orphan-check':
+        await checkDatabaseIntegrity()
+        break
 
-    case 'check-foreign-keys':
-      await checkForeignKeyRules()
-      break
+      case 'check-foreign-keys':
+        await checkForeignKeyRules()
+        break
 
-    case 'fix-foreign-keys':
-      await fixForeignKeyRules(options)
-      break
+      case 'fix-foreign-keys':
+        await fixForeignKeyRules(options)
+        break
 
-    case 'stats':
-      await getDatabaseStats()
-      break
+      case 'stats':
+        await getDatabaseStats()
+        break
 
-    case 'full-check':
-    default:
-      await performFullCheck()
-      break
+      case 'full-check':
+      default:
+        await performFullCheck()
+        break
     }
 
     await sequelize.close()

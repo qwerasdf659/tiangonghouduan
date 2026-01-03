@@ -38,7 +38,7 @@ const colors = {
   magenta: '\x1b[35m'
 }
 
-function log (message, color = 'reset') {
+function log(message, color = 'reset') {
   console.log(`${colors[color]}${message}${colors.reset}`)
 }
 
@@ -58,19 +58,9 @@ const TABLE_GROUPS = {
     'lottery_presets'
   ],
   // 交易和库存表
-  transaction: [
-    'exchange_records',
-    'trade_records',
-    'user_inventory',
-    'products'
-  ],
+  transaction: ['exchange_records', 'trade_records', 'user_inventory', 'products'],
   // 客服和反馈表
-  support: [
-    'customer_service_sessions',
-    'chat_messages',
-    'feedbacks',
-    'content_review_records'
-  ],
+  support: ['customer_service_sessions', 'chat_messages', 'feedbacks', 'content_review_records'],
   // 系统配置表
   system: [
     'roles',
@@ -81,13 +71,9 @@ const TABLE_GROUPS = {
     'sequelizemeta'
   ],
   // 资源表
-  resource: [
-    'image_resources'
-  ],
+  resource: ['image_resources'],
   // 备份表（完整备份时会包含，防止数据丢失）
-  backup: [
-    'user_roles_backup_20251009'
-  ]
+  backup: ['user_roles_backup_20251009']
 }
 
 // ==================== 备份功能 ====================
@@ -96,7 +82,7 @@ const TABLE_GROUPS = {
  * 完整数据库备份（包含SQL和JSON双格式）
  * 包含：表结构、数据、索引、外键约束
  */
-async function backupFullDatabase () {
+async function backupFullDatabase() {
   log('\n💾 ━━━ 完整数据库备份（SQL + JSON 双格式）━━━', 'cyan')
   log(`备份时间: ${BeijingTimeHelper.nowLocale()}\n`, 'blue')
 
@@ -113,8 +99,7 @@ async function backupFullDatabase () {
     log(`📁 JSON备份文件: ${backupFileJSON}\n`, 'blue')
 
     // 获取所有表（包含backup组 - 确保完整备份所有表）
-    const allTables = Object.entries(TABLE_GROUPS)
-      .flatMap(([, tables]) => tables)
+    const allTables = Object.entries(TABLE_GROUPS).flatMap(([, tables]) => tables)
 
     // 获取数据库版本信息
     const [versionResult] = await sequelize.query('SELECT VERSION() as version')
@@ -293,7 +278,7 @@ SET FOREIGN_KEY_CHECKS = 1;
 /**
  * 积分数据备份
  */
-async function backupPointsData () {
+async function backupPointsData() {
   log('\n💾 ━━━ 积分数据备份 ━━━', 'cyan')
   log(`备份时间: ${BeijingTimeHelper.nowLocale()}\n`, 'blue')
 
@@ -349,7 +334,7 @@ async function backupPointsData () {
  * 指定表备份
  * @param {string[]} tables - 要备份的表名数组
  */
-async function backupSpecifiedTables (tables) {
+async function backupSpecifiedTables(tables) {
   log('\n💾 ━━━ 指定表备份 ━━━', 'cyan')
   log(`备份时间: ${BeijingTimeHelper.nowLocale()}`, 'blue')
   log(`备份表: ${tables.join(', ')}\n`, 'blue')
@@ -407,7 +392,7 @@ async function backupSpecifiedTables (tables) {
  * 恢复数据
  * @param {string} backupFile - 备份文件路径
  */
-async function restoreData (backupFile) {
+async function restoreData(backupFile) {
   log('\n🔄 ━━━ 数据恢复 ━━━', 'cyan')
   log(`恢复文件: ${backupFile}\n`, 'blue')
 
@@ -468,16 +453,25 @@ async function restoreData (backupFile) {
         if (Array.isArray(rows) && rows.length > 0) {
           // 批量插入数据
           const columns = Object.keys(rows[0])
-          const values = rows.map(row => {
-            return '(' + columns.map(col => {
-              const value = row[col]
-              if (value === null) return 'NULL'
-              if (typeof value === 'number') return value
-              if (typeof value === 'boolean') return value ? 1 : 0
-              if (value instanceof Date) return `'${value.toISOString().slice(0, 19).replace('T', ' ')}'`
-              return `'${String(value).replace(/'/g, '\\\'')}'`
-            }).join(', ') + ')'
-          }).join(',\n')
+          const values = rows
+            .map(row => {
+              return (
+                '(' +
+                columns
+                  .map(col => {
+                    const value = row[col]
+                    if (value === null) return 'NULL'
+                    if (typeof value === 'number') return value
+                    if (typeof value === 'boolean') return value ? 1 : 0
+                    if (value instanceof Date)
+                      return `'${value.toISOString().slice(0, 19).replace('T', ' ')}'`
+                    return `'${String(value).replace(/'/g, "\\'")}'`
+                  })
+                  .join(', ') +
+                ')'
+              )
+            })
+            .join(',\n')
 
           await sequelize.query(
             `INSERT INTO ${tableName} (${columns.join(', ')}) VALUES ${values}`,
@@ -515,7 +509,7 @@ async function restoreData (backupFile) {
  * @param {Array} rows - 数据行
  * @returns {string} INSERT语句
  */
-function generateInsertStatements (tableName, rows) {
+function generateInsertStatements(tableName, rows) {
   if (rows.length === 0) return ''
 
   const statements = []
@@ -528,7 +522,7 @@ function generateInsertStatements (tableName, rows) {
       if (typeof value === 'boolean') return value ? 1 : 0
       if (value instanceof Date) return `'${value.toISOString().slice(0, 19).replace('T', ' ')}'`
       // 字符串需要转义单引号
-      return `'${String(value).replace(/'/g, '\\\'')}' `
+      return `'${String(value).replace(/'/g, "\\'")}' `
     })
 
     statements.push(
@@ -542,7 +536,7 @@ function generateInsertStatements (tableName, rows) {
 /**
  * 列出所有备份
  */
-async function listBackups () {
+async function listBackups() {
   log('\n📋 ━━━ 备份文件列表 ━━━', 'cyan')
 
   try {
@@ -577,7 +571,7 @@ async function listBackups () {
 /**
  * 显示帮助信息
  */
-function showHelp () {
+function showHelp() {
   console.log(`
 备份管理统一工具包 (Backup Toolkit)
 
@@ -628,7 +622,7 @@ function showHelp () {
 
 // ==================== 主函数 ====================
 
-async function main () {
+async function main() {
   const args = process.argv.slice(2)
 
   // 解析参数
@@ -650,40 +644,40 @@ async function main () {
 
   try {
     switch (options.action) {
-    case 'full':
-      await backupFullDatabase()
-      break
+      case 'full':
+        await backupFullDatabase()
+        break
 
-    case 'points':
-      await backupPointsData()
-      break
+      case 'points':
+        await backupPointsData()
+        break
 
-    case 'tables': {
-      if (!options.tables) {
-        log('❌ 请指定要备份的表名: --tables=table1,table2', 'red')
-        process.exit(1)
+      case 'tables': {
+        if (!options.tables) {
+          log('❌ 请指定要备份的表名: --tables=table1,table2', 'red')
+          process.exit(1)
+        }
+        const tables = options.tables.split(',').map(t => t.trim())
+        await backupSpecifiedTables(tables)
+        break
       }
-      const tables = options.tables.split(',').map(t => t.trim())
-      await backupSpecifiedTables(tables)
-      break
-    }
 
-    case 'restore':
-      if (!options.file) {
-        log('❌ 请指定备份文件: --file=backup.json', 'red')
+      case 'restore':
+        if (!options.file) {
+          log('❌ 请指定备份文件: --file=backup.json', 'red')
+          process.exit(1)
+        }
+        await restoreData(options.file)
+        break
+
+      case 'list':
+        await listBackups()
+        break
+
+      default:
+        log(`❌ 未知操作: ${options.action}`, 'red')
+        log('使用 --help 查看帮助信息', 'yellow')
         process.exit(1)
-      }
-      await restoreData(options.file)
-      break
-
-    case 'list':
-      await listBackups()
-      break
-
-    default:
-      log(`❌ 未知操作: ${options.action}`, 'red')
-      log('使用 --help 查看帮助信息', 'yellow')
-      process.exit(1)
     }
 
     log('✅ 操作成功完成\n', 'green')

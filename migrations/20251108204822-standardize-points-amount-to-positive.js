@@ -36,7 +36,7 @@ module.exports = {
    * @param {import('sequelize')} Sequelize - Sequelize实例
    * @returns {Promise<void>}
    */
-  async up (queryInterface, Sequelize) {
+  async up(queryInterface, Sequelize) {
     const transaction = await queryInterface.sequelize.transaction()
 
     try {
@@ -68,7 +68,9 @@ module.exports = {
       } else {
         negativeStats.forEach(row => {
           console.log(`   ${row.transaction_type}: ${row.count}条记录`)
-          console.log(`      范围: ${parseFloat(row.min_amount).toFixed(2)} ~ ${parseFloat(row.max_amount).toFixed(2)}`)
+          console.log(
+            `      范围: ${parseFloat(row.min_amount).toFixed(2)} ~ ${parseFloat(row.max_amount).toFixed(2)}`
+          )
         })
       }
 
@@ -170,7 +172,7 @@ module.exports = {
    * @param {import('sequelize')} Sequelize - Sequelize实例
    * @returns {Promise<void>}
    */
-  async down (queryInterface, Sequelize) {
+  async down(queryInterface, Sequelize) {
     const transaction = await queryInterface.sequelize.transaction()
 
     try {
@@ -183,7 +185,7 @@ module.exports = {
        * ========================================
        */
       const [consumeCount] = await queryInterface.sequelize.query(
-        'SELECT COUNT(*) as count FROM points_transactions WHERE is_deleted = 0 AND transaction_type = \'consume\'',
+        "SELECT COUNT(*) as count FROM points_transactions WHERE is_deleted = 0 AND transaction_type = 'consume'",
         { transaction }
       )
 
@@ -228,7 +230,9 @@ module.exports = {
       verifyStats.forEach(row => {
         console.log(`   ${row.transaction_type}:`)
         console.log(`      记录数: ${row.count}`)
-        console.log(`      范围: ${parseFloat(row.min_amount).toFixed(2)} ~ ${parseFloat(row.max_amount).toFixed(2)}`)
+        console.log(
+          `      范围: ${parseFloat(row.min_amount).toFixed(2)} ~ ${parseFloat(row.max_amount).toFixed(2)}`
+        )
       })
 
       await transaction.commit()

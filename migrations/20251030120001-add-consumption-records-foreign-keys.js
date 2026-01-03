@@ -30,7 +30,7 @@ module.exports = {
    * @param {import('sequelize')} Sequelize - Sequelize实例
    * @returns {Promise<void>}
    */
-  async up (queryInterface, Sequelize) {
+  async up(queryInterface, Sequelize) {
     const transaction = await queryInterface.sequelize.transaction()
 
     try {
@@ -62,10 +62,12 @@ module.exports = {
        */
       console.log('步骤2：删除旧外键约束（如果存在）')
 
-      const removeConstraintSafely = async (constraintName) => {
+      const removeConstraintSafely = async constraintName => {
         if (existingFKs.includes(constraintName)) {
           try {
-            await queryInterface.removeConstraint('consumption_records', constraintName, { transaction })
+            await queryInterface.removeConstraint('consumption_records', constraintName, {
+              transaction
+            })
             console.log(`  已删除旧外键约束: ${constraintName}`)
           } catch (error) {
             console.log(`  删除外键约束失败: ${constraintName}, ${error.message}`)
@@ -86,17 +88,27 @@ module.exports = {
        */
       console.log('步骤3：确保merchant_id和reviewed_by字段允许NULL')
 
-      await queryInterface.changeColumn('consumption_records', 'merchant_id', {
-        type: Sequelize.INTEGER,
-        allowNull: true,
-        comment: '商家ID（录入人，可为空）'
-      }, { transaction })
+      await queryInterface.changeColumn(
+        'consumption_records',
+        'merchant_id',
+        {
+          type: Sequelize.INTEGER,
+          allowNull: true,
+          comment: '商家ID（录入人，可为空）'
+        },
+        { transaction }
+      )
 
-      await queryInterface.changeColumn('consumption_records', 'reviewed_by', {
-        type: Sequelize.INTEGER,
-        allowNull: true,
-        comment: '审核员ID（谁审核的？可为空）'
-      }, { transaction })
+      await queryInterface.changeColumn(
+        'consumption_records',
+        'reviewed_by',
+        {
+          type: Sequelize.INTEGER,
+          allowNull: true,
+          comment: '审核员ID（谁审核的？可为空）'
+        },
+        { transaction }
+      )
 
       /*
        * ========================================
@@ -182,16 +194,28 @@ module.exports = {
    * @param {import('sequelize')} Sequelize - Sequelize实例
    * @returns {Promise<void>}
    */
-  async down (queryInterface, Sequelize) {
+  async down(queryInterface, Sequelize) {
     const transaction = await queryInterface.sequelize.transaction()
 
     try {
       console.log('开始删除consumption_records表外键约束...')
 
       // 删除外键约束
-      await queryInterface.removeConstraint('consumption_records', 'fk_consumption_records_user_id', { transaction })
-      await queryInterface.removeConstraint('consumption_records', 'fk_consumption_records_merchant_id', { transaction })
-      await queryInterface.removeConstraint('consumption_records', 'fk_consumption_records_reviewed_by', { transaction })
+      await queryInterface.removeConstraint(
+        'consumption_records',
+        'fk_consumption_records_user_id',
+        { transaction }
+      )
+      await queryInterface.removeConstraint(
+        'consumption_records',
+        'fk_consumption_records_merchant_id',
+        { transaction }
+      )
+      await queryInterface.removeConstraint(
+        'consumption_records',
+        'fk_consumption_records_reviewed_by',
+        { transaction }
+      )
 
       await transaction.commit()
       console.log('✅ consumption_records表外键约束删除完成')

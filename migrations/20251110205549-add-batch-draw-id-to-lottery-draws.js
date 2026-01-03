@@ -34,7 +34,7 @@ module.exports = {
    * @param {Object} Sequelize - Sequelize库
    * @returns {Promise<void>}
    */
-  async up (queryInterface, Sequelize) {
+  async up(queryInterface, Sequelize) {
     const { DataTypes } = Sequelize
 
     // 步骤1：添加batch_draw_id字段到lottery_draws表
@@ -72,7 +72,7 @@ module.exports = {
    * @param {Object} Sequelize - Sequelize库
    * @returns {Promise<void>}
    */
-  async down (queryInterface, Sequelize) {
+  async down(queryInterface, Sequelize) {
     // 步骤1：删除组合索引
     await queryInterface.removeIndex('lottery_draws', 'idx_lottery_draws_user_batch')
     console.log('✅ 已删除user_id + batch_draw_id组合索引')

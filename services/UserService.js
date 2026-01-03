@@ -21,6 +21,7 @@ const { User, Role, UserRole } = require('../models')
 const AssetService = require('./AssetService')
 const BeijingTimeHelper = require('../utils/timeHelper')
 const logger = require('../utils/logger')
+const { BusinessCacheHelper } = require('../utils/BusinessCacheHelper')
 
 /**
  * 用户服务类
@@ -155,19 +156,46 @@ class UserService {
   /**
    * 根据手机号查找用户
    *
+   * @description 支持 Redis 缓存（P2 缓存优化），提升登录场景性能
+   *
    * @param {string} mobile - 手机号
    * @param {Object} options - 选项参数
    * @param {Object} options.transaction - 外部事务对象（可选）
+   * @param {boolean} options.useCache - 是否使用缓存（默认 true，事务场景自动禁用）
    * @returns {Object|null} 用户对象或null
    */
   static async findByMobile(mobile, options = {}) {
-    const { transaction } = options
+    const { transaction, useCache = true } = options
+
+    // 事务场景下禁用缓存（确保数据一致性）
+    const shouldUseCache = useCache && !transaction
 
     try {
+      // ========== Redis 缓存读取（2026-01-03 P2 缓存优化）==========
+      if (shouldUseCache) {
+        const cached = await BusinessCacheHelper.getUserByMobile(mobile)
+        if (cached) {
+          logger.debug('[用户服务] 缓存命中', {
+            mobile: mobile.substring(0, 3) + '****' + mobile.substring(7)
+          })
+          // 返回普通对象（与数据库查询结果结构一致）
+          return cached
+        }
+      }
+
       const user = await User.findOne({
         where: { mobile },
         transaction
       })
+
+      // ========== 写入 Redis 缓存（120s TTL）==========
+      if (shouldUseCache && user) {
+        // 转换为普通对象（Sequelize 实例不可序列化）
+        const userData = user.get({ plain: true })
+        await BusinessCacheHelper.setUserByMobile(mobile, userData)
+        // 同时按 ID 维度缓存（双向索引，提升后续查询效率）
+        await BusinessCacheHelper.setUserById(user.user_id, userData)
+      }
 
       return user
     } catch (error) {
@@ -185,6 +213,8 @@ class UserService {
 
   /**
    * 更新用户登录统计
+   *
+   * @description 更新后自动失效用户缓存（P2 缓存优化）
    *
    * @param {number} user_id - 用户ID
    * @param {Object} options - 选项参数
@@ -212,6 +242,12 @@ class UserService {
         { transaction }
       )
 
+      // ========== 失效用户缓存（登录统计已更新）==========
+      await BusinessCacheHelper.invalidateUser(
+        { user_id, mobile: user.mobile },
+        'login_stats_updated'
+      )
+
       return user
     } catch (error) {
       logger.error('更新登录统计失败', {
@@ -233,16 +269,31 @@ class UserService {
   /**
    * 根据用户ID查找用户
    *
+   * @description 支持 Redis 缓存（P2 缓存优化），提升认证后场景性能
+   *
    * @param {number} user_id - 用户ID
    * @param {Object} options - 选项参数
    * @param {Object} options.transaction - 外部事务对象（可选）
+   * @param {boolean} options.useCache - 是否使用缓存（默认 true，事务场景自动禁用）
    * @returns {Object|null} 用户对象或null
    * @throws {Error} 业务错误（用户不存在等）
    */
   static async getUserById(user_id, options = {}) {
-    const { transaction } = options
+    const { transaction, useCache = true } = options
+
+    // 事务场景下禁用缓存（确保数据一致性）
+    const shouldUseCache = useCache && !transaction
 
     try {
+      // ========== Redis 缓存读取（2026-01-03 P2 缓存优化）==========
+      if (shouldUseCache) {
+        const cached = await BusinessCacheHelper.getUserById(user_id)
+        if (cached) {
+          logger.debug('[用户服务] ID 缓存命中', { user_id })
+          return cached
+        }
+      }
+
       const user = await User.findByPk(user_id, { transaction })
 
       if (!user) {
@@ -250,6 +301,16 @@ class UserService {
         error.code = 'USER_NOT_FOUND'
         error.statusCode = 404
         throw error
+      }
+
+      // ========== 写入 Redis 缓存（120s TTL）==========
+      if (shouldUseCache) {
+        const userData = user.get({ plain: true })
+        await BusinessCacheHelper.setUserById(user_id, userData)
+        // 同时按手机号维度缓存
+        if (user.mobile) {
+          await BusinessCacheHelper.setUserByMobile(user.mobile, userData)
+        }
       }
 
       return user

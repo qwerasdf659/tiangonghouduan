@@ -1,7 +1,7 @@
 // 测试预算系数动态配置功能
 const ConsumptionService = require('./services/ConsumptionService')
 
-async function testBudgetRatio () {
+async function testBudgetRatio() {
   try {
     console.log('🧪 测试预算系数动态配置功能')
     console.log('='.repeat(50))

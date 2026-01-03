@@ -11,7 +11,7 @@ const fs = require('fs').promises
 const path = require('path')
 
 class JSModuleAnalyzer {
-  constructor () {
+  constructor() {
     this.projectRoot = process.cwd()
     this.modules = new Map()
     this.duplicates = new Map()
@@ -54,7 +54,7 @@ class JSModuleAnalyzer {
   /**
    * 分析所有JS文件
    */
-  async analyzeAllModules () {
+  async analyzeAllModules() {
     console.log('🔍 开始分析项目JS模块...')
     console.log('='.repeat(50))
 
@@ -67,7 +67,7 @@ class JSModuleAnalyzer {
   /**
    * 递归扫描目录
    */
-  async scanDirectory (dirPath, relativePath = '') {
+  async scanDirectory(dirPath, relativePath = '') {
     try {
       const items = fs.readdirSync(dirPath)
 
@@ -95,14 +95,14 @@ class JSModuleAnalyzer {
   /**
    * 判断是否为JS文件
    */
-  isJSFile (filename) {
+  isJSFile(filename) {
     return filename.endsWith('.js') && !filename.endsWith('.test.js')
   }
 
   /**
    * 分析单个文件
    */
-  async analyzeFile (fullPath, relativePath) {
+  async analyzeFile(fullPath, relativePath) {
     try {
       const content = fs.readFileSync(fullPath, 'utf8')
       const analysis = this.analyzeFileContent(content, relativePath)
@@ -122,7 +122,7 @@ class JSModuleAnalyzer {
   /**
    * 分析文件内容
    */
-  analyzeFileContent (content, relativePath) {
+  analyzeFileContent(content, relativePath) {
     const analysis = {
       exports: this.extractExports(content),
       imports: this.extractImports(content),
@@ -140,7 +140,7 @@ class JSModuleAnalyzer {
   /**
    * 提取导出项
    */
-  extractExports (content) {
+  extractExports(content) {
     const exports = []
 
     // module.exports
@@ -161,7 +161,7 @@ class JSModuleAnalyzer {
   /**
    * 提取导入项
    */
-  extractImports (content) {
+  extractImports(content) {
     const imports = []
 
     // require()
@@ -176,7 +176,7 @@ class JSModuleAnalyzer {
   /**
    * 提取函数
    */
-  extractFunctions (content) {
+  extractFunctions(content) {
     const functions = []
 
     // function declarations
@@ -197,7 +197,7 @@ class JSModuleAnalyzer {
   /**
    * 提取类
    */
-  extractClasses (content) {
+  extractClasses(content) {
     const classes = []
     const classMatches = content.match(/class\s+(\w+)/g)
     if (classMatches) {
@@ -209,7 +209,7 @@ class JSModuleAnalyzer {
   /**
    * 推断用途
    */
-  inferPurpose (content, relativePath) {
+  inferPurpose(content, relativePath) {
     const purposes = []
 
     // 基于路径推断
@@ -236,7 +236,7 @@ class JSModuleAnalyzer {
   /**
    * 按路径分类
    */
-  categorizeByPath (relativePath) {
+  categorizeByPath(relativePath) {
     const pathParts = relativePath.split(path.sep)
     const firstDir = pathParts[0]
 
@@ -259,7 +259,7 @@ class JSModuleAnalyzer {
   /**
    * 计算复杂度
    */
-  calculateComplexity (content) {
+  calculateComplexity(content) {
     const lines = content.split('\n').length
     const functions = (content.match(/function/g) || []).length
     const classes = (content.match(/class /g) || []).length
@@ -277,7 +277,7 @@ class JSModuleAnalyzer {
   /**
    * 提取依赖
    */
-  extractDependencies (content) {
+  extractDependencies(content) {
     const deps = new Set()
 
     // 外部模块依赖
@@ -297,7 +297,7 @@ class JSModuleAnalyzer {
   /**
    * 分类模块
    */
-  categorizeModules () {
+  categorizeModules() {
     for (const [_path, module] of this.modules) {
       const category = module.category
 
@@ -312,7 +312,7 @@ class JSModuleAnalyzer {
   /**
    * 检测重复功能
    */
-  detectDuplicates () {
+  detectDuplicates() {
     console.log('\n🔍 检测重复和相似功能...')
 
     // 按功能用途分组检测
@@ -341,7 +341,7 @@ class JSModuleAnalyzer {
   /**
    * 查找相似模块
    */
-  findSimilarModules (modules) {
+  findSimilarModules(modules) {
     const similar = []
 
     for (let i = 0; i < modules.length; i++) {
@@ -364,7 +364,7 @@ class JSModuleAnalyzer {
   /**
    * 计算相似度
    */
-  calculateSimilarity (module1, module2) {
+  calculateSimilarity(module1, module2) {
     let score = 0
 
     // 用途相似度
@@ -387,7 +387,7 @@ class JSModuleAnalyzer {
   /**
    * 获取相似原因
    */
-  getSimilarityReason (module1, module2) {
+  getSimilarityReason(module1, module2) {
     const reasons = []
 
     const commonPurposes = module1.purpose.filter(p => module2.purpose.includes(p))
@@ -411,7 +411,7 @@ class JSModuleAnalyzer {
   /**
    * 生成分析报告
    */
-  generateReport () {
+  generateReport() {
     console.log('\n📊 JS模块分析报告')
     console.log('='.repeat(50))
 
@@ -465,7 +465,7 @@ class JSModuleAnalyzer {
   /**
    * 生成合并建议
    */
-  generateMergeRecommendations () {
+  generateMergeRecommendations() {
     if (this.duplicates.size === 0) {
       console.log('\n✅ 无需合并，代码结构良好')
       return
@@ -508,7 +508,7 @@ class JSModuleAnalyzer {
    * 🆕 扩展功能：检测Mock数据使用
    * 从V4ProjectQualityManager.js合并的功能
    */
-  async detectMockDataUsage () {
+  async detectMockDataUsage() {
     console.log('🔍 检测项目中的Mock数据使用...')
 
     const mockFiles = []
@@ -536,7 +536,7 @@ class JSModuleAnalyzer {
   /**
    * 🆕 扩展功能：检测V3兼容代码
    */
-  async detectV3CompatibilityCode () {
+  async detectV3CompatibilityCode() {
     console.log('🔍 检测项目中的V3兼容代码...')
 
     const v3Files = []
@@ -564,7 +564,7 @@ class JSModuleAnalyzer {
   /**
    * 🆕 扩展功能：获取Mock数据清理优先级
    */
-  getMockCleanupPriority (filePath) {
+  getMockCleanupPriority(filePath) {
     if (filePath.includes('/tests/')) return 10 // 测试文件最高优先级
     if (filePath.includes('/services/')) return 8 // 服务层高优先级
     if (filePath.includes('/models/')) return 7 // 模型层
@@ -575,7 +575,7 @@ class JSModuleAnalyzer {
   /**
    * 🆕 扩展功能：获取V3清理优先级
    */
-  getV3CleanupPriority (filePath) {
+  getV3CleanupPriority(filePath) {
     if (filePath.includes('strategy') || filePath.includes('Strategy')) return 10
     if (filePath.includes('/services/')) return 9
     if (filePath.includes('/models/')) return 8
@@ -586,7 +586,7 @@ class JSModuleAnalyzer {
   /**
    * 🆕 扩展功能：生成完整的代码质量分析报告
    */
-  async generateCompleteQualityReport () {
+  async generateCompleteQualityReport() {
     console.log('📈 生成完整的代码质量分析报告...')
 
     try {

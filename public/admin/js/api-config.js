@@ -95,7 +95,7 @@ class API {
    * API.buildURL('/api/v4/users/:user_id', { user_id: 123 })
    * // 返回: '/api/v4/users/123'
    */
-  static buildURL (endpoint, pathParams = {}) {
+  static buildURL(endpoint, pathParams = {}) {
     let url = endpoint
 
     // 替换路径参数
@@ -111,7 +111,7 @@ class API {
    * @param {Object} queryParams - 查询参数对象
    * @returns {string} 查询字符串（如：?page=1&size=20）
    */
-  static buildQueryString (queryParams = {}) {
+  static buildQueryString(queryParams = {}) {
     if (Object.keys(queryParams).length === 0) {
       return ''
     }
@@ -132,14 +132,8 @@ class API {
    *   queryParams: { page: 1, page_size: 20 }
    * });
    */
-  static async request (endpoint, options = {}) {
-    const {
-      method = 'GET',
-      pathParams = {},
-      queryParams = {},
-      body = null,
-      headers = {}
-    } = options
+  static async request(endpoint, options = {}) {
+    const { method = 'GET', pathParams = {}, queryParams = {}, body = null, headers = {} } = options
 
     try {
       // 构建完整URL
@@ -186,7 +180,7 @@ class API {
    * @param {number} params.page_size - 每页数量
    * @returns {Promise} API响应
    */
-  static async getPresetList (params = {}) {
+  static async getPresetList(params = {}) {
     return await this.request(API_ENDPOINTS.PRESET.LIST, {
       queryParams: params
     })
@@ -198,7 +192,7 @@ class API {
    * @param {Object} params - 查询参数
    * @returns {Promise} API响应
    */
-  static async getUserPresets (userId, params = {}) {
+  static async getUserPresets(userId, params = {}) {
     return await this.request(API_ENDPOINTS.PRESET.USER_LIST, {
       pathParams: { user_id: userId },
       queryParams: params
@@ -210,7 +204,7 @@ class API {
    * @param {Object} data - 预设数据
    * @returns {Promise} API响应
    */
-  static async createPreset (data) {
+  static async createPreset(data) {
     return await this.request(API_ENDPOINTS.PRESET.CREATE, {
       method: 'POST',
       body: data
@@ -222,7 +216,7 @@ class API {
    * @param {number} userId - 用户ID
    * @returns {Promise} API响应
    */
-  static async deleteUserPresets (userId) {
+  static async deleteUserPresets(userId) {
     return await this.request(API_ENDPOINTS.PRESET.DELETE, {
       method: 'DELETE',
       pathParams: { user_id: userId }
@@ -233,7 +227,7 @@ class API {
    * 获取预设统计信息
    * @returns {Promise} API响应
    */
-  static async getPresetStats () {
+  static async getPresetStats() {
     return await this.request(API_ENDPOINTS.PRESET.STATS)
   }
 
@@ -245,7 +239,7 @@ class API {
    * @param {string} verification_code - 验证码
    * @returns {Promise} API响应
    */
-  static async login (mobile, verification_code) {
+  static async login(mobile, verification_code) {
     return await this.request(API_ENDPOINTS.AUTH.LOGIN, {
       method: 'POST',
       body: { mobile, verification_code }
@@ -256,7 +250,7 @@ class API {
    * 用户登出
    * @returns {Promise} API响应
    */
-  static async logout () {
+  static async logout() {
     return await this.request(API_ENDPOINTS.AUTH.LOGOUT, {
       method: 'POST'
     })
@@ -266,7 +260,7 @@ class API {
    * 验证token
    * @returns {Promise} API响应
    */
-  static async verifyToken () {
+  static async verifyToken() {
     return await this.request(API_ENDPOINTS.AUTH.VERIFY)
   }
 
@@ -277,7 +271,7 @@ class API {
    * @param {Object} params - 查询参数
    * @returns {Promise} API响应
    */
-  static async getPrizeList (params = {}) {
+  static async getPrizeList(params = {}) {
     return await this.request(API_ENDPOINTS.PRIZE.LIST, {
       queryParams: params
     })
@@ -288,7 +282,7 @@ class API {
    * @param {Object} data - 奖品数据
    * @returns {Promise} API响应
    */
-  static async createPrize (data) {
+  static async createPrize(data) {
     return await this.request(API_ENDPOINTS.PRIZE.CREATE, {
       method: 'POST',
       body: data
@@ -301,7 +295,7 @@ class API {
    * @param {Object} data - 更新数据
    * @returns {Promise} API响应
    */
-  static async updatePrize (prizeId, data) {
+  static async updatePrize(prizeId, data) {
     return await this.request(API_ENDPOINTS.PRIZE.UPDATE, {
       method: 'PUT',
       pathParams: { prize_id: prizeId },
@@ -314,7 +308,7 @@ class API {
    * @param {number} prizeId - 奖品ID
    * @returns {Promise} API响应
    */
-  static async deletePrize (prizeId) {
+  static async deletePrize(prizeId) {
     return await this.request(API_ENDPOINTS.PRIZE.DELETE, {
       method: 'DELETE',
       pathParams: { prize_id: prizeId }
@@ -327,7 +321,7 @@ class API {
    * 获取系统仪表板数据
    * @returns {Promise} API响应
    */
-  static async getDashboard () {
+  static async getDashboard() {
     return await this.request(API_ENDPOINTS.SYSTEM.DASHBOARD)
   }
 
@@ -335,7 +329,7 @@ class API {
    * 健康检查
    * @returns {Promise} API响应
    */
-  static async healthCheck () {
+  static async healthCheck() {
     return await this.request(API_ENDPOINTS.SYSTEM.HEALTH)
   }
 }

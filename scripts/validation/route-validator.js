@@ -10,7 +10,7 @@ const fs = require('fs')
 const path = require('path')
 
 class RouteValidator {
-  constructor () {
+  constructor() {
     this.errors = []
     this.warnings = []
     this.validated = []
@@ -21,7 +21,7 @@ class RouteValidator {
    * @param {string} appFilePath - app.js文件路径
    * @returns {Object} 验证结果
    */
-  validateAppRoutes (appFilePath) {
+  validateAppRoutes(appFilePath) {
     console.log('🔍 开始验证路由文件完整性...\n')
 
     if (!fs.existsSync(appFilePath)) {
@@ -78,7 +78,7 @@ class RouteValidator {
    * @param {string} basePath - 基础路径
    * @returns {string} 实际文件路径
    */
-  resolveRequirePath (requirePath, basePath) {
+  resolveRequirePath(requirePath, basePath) {
     // 处理相对路径
     if (requirePath.startsWith('./') || requirePath.startsWith('../')) {
       let filePath = path.resolve(basePath, requirePath)
@@ -103,7 +103,7 @@ class RouteValidator {
    * 生成验证报告
    * @returns {Object} 验证结果对象
    */
-  generateReport () {
+  generateReport() {
     const hasErrors = this.errors.length > 0
     const hasWarnings = this.warnings.length > 0
 

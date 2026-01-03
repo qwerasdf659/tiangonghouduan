@@ -29,7 +29,7 @@ module.exports = {
    * @param {Object} Sequelize - Sequelize类型定义
    * @returns {Promise<void>}
    */
-  async up (queryInterface, Sequelize) {
+  async up(queryInterface, Sequelize) {
     const transaction = await queryInterface.sequelize.transaction()
 
     try {
@@ -96,10 +96,10 @@ module.exports = {
        * 3. 添加CHECK约束：material_asset_code非空时，material_amount必须>0
        * 注意：MySQL的CHECK约束在8.0.16及以上版本才支持
        */
-      const dbVersion = await queryInterface.sequelize.query(
-        'SELECT VERSION() as version',
-        { transaction, type: Sequelize.QueryTypes.SELECT }
-      )
+      const dbVersion = await queryInterface.sequelize.query('SELECT VERSION() as version', {
+        transaction,
+        type: Sequelize.QueryTypes.SELECT
+      })
       const versionString = dbVersion[0].version
       const majorVersion = parseInt(versionString.split('.')[0])
       const minorVersion = parseInt(versionString.split('.')[1])
@@ -117,14 +117,10 @@ module.exports = {
       }
 
       // 4. 添加索引：material_asset_code
-      await queryInterface.addIndex(
-        'lottery_prizes',
-        ['material_asset_code'],
-        {
-          name: 'idx_lp_material_asset_code',
-          transaction
-        }
-      )
+      await queryInterface.addIndex('lottery_prizes', ['material_asset_code'], {
+        name: 'idx_lp_material_asset_code',
+        transaction
+      })
       console.log('  ✓ 添加material_asset_code索引成功')
 
       /*
@@ -171,7 +167,7 @@ module.exports = {
    * @param {Object} Sequelize - Sequelize类型定义
    * @returns {Promise<void>}
    */
-  async down (queryInterface, Sequelize) {
+  async down(queryInterface, Sequelize) {
     const transaction = await queryInterface.sequelize.transaction()
 
     try {
@@ -201,11 +197,9 @@ module.exports = {
       )
 
       if (fkExists[0].count > 0) {
-        await queryInterface.removeConstraint(
-          'lottery_prizes',
-          'fk_lp_material_asset_code',
-          { transaction }
-        )
+        await queryInterface.removeConstraint('lottery_prizes', 'fk_lp_material_asset_code', {
+          transaction
+        })
         console.log('  ✓ 删除外键约束成功')
       }
 

@@ -48,6 +48,12 @@ const { Op, fn, col, literal } = require('sequelize')
 const logger = require('../utils/logger').logger
 
 /**
+ * 业务缓存助手（2026-01-03 Redis L2 缓存方案）
+ * @see docs/Redis缓存策略现状与DB压力风险评估-2026-01-02.md
+ */
+const { BusinessCacheHelper } = require('../utils/BusinessCacheHelper')
+
+/**
  * 统一报表服务类
  *
  * @class ReportingService
@@ -60,12 +66,26 @@ class ReportingService {
    *
    * @param {number} days - 统计天数（1-90）
    * @param {number|null} userFilter - 用户ID过滤（可选）
+   * @param {Object} options - 选项
+   * @param {boolean} options.refresh - 强制刷新缓存
    * @returns {Promise<Object>} 决策分析数据
    */
-  static async getDecisionAnalytics(days = 7, userFilter = null) {
+  static async getDecisionAnalytics(days = 7, userFilter = null, options = {}) {
+    const { refresh = false } = options
+
     try {
       // 参数验证
       const dayCount = Math.min(Math.max(parseInt(days) || 7, 1), 90)
+
+      // ========== Redis 缓存读取（2026-01-03 P1 缓存优化）==========
+      const cacheParams = { days: dayCount, user: userFilter || 'all' }
+      if (!refresh) {
+        const cached = await BusinessCacheHelper.getStats('decision', cacheParams)
+        if (cached) {
+          logger.debug('[报表缓存] decision 命中', { days: dayCount, userFilter })
+          return cached
+        }
+      }
 
       // 计算时间范围
       const endDate = BeijingTimeHelper.createBeijingTime()
@@ -183,6 +203,9 @@ class ReportingService {
         total_draws: totalDraws
       })
 
+      // ========== 写入 Redis 缓存（60s TTL）==========
+      await BusinessCacheHelper.setStats('decision', cacheParams, analyticsData)
+
       return analyticsData
     } catch (error) {
       logger.error('决策分析数据获取失败', { error: error.message })
@@ -195,10 +218,24 @@ class ReportingService {
    *
    * @param {string} period - 时间周期（day、week、month、quarter）
    * @param {string} granularity - 时间粒度（hourly、daily）
+   * @param {Object} options - 选项
+   * @param {boolean} options.refresh - 强制刷新缓存
    * @returns {Promise<Object>} 趋势分析数据
    */
-  static async getLotteryTrends(period = 'week', granularity = 'daily') {
+  static async getLotteryTrends(period = 'week', granularity = 'daily', options = {}) {
+    const { refresh = false } = options
+
     try {
+      // ========== Redis 缓存读取（2026-01-03 P1 缓存优化）==========
+      const cacheParams = { period, granularity }
+      if (!refresh) {
+        const cached = await BusinessCacheHelper.getStats('trends', cacheParams)
+        if (cached) {
+          logger.debug('[报表缓存] trends 命中', { period, granularity })
+          return cached
+        }
+      }
+
       // 计算时间范围
       let days = 7
       switch (period) {
@@ -348,6 +385,9 @@ class ReportingService {
         total_periods: processedLotteryTrends.length
       })
 
+      // ========== 写入 Redis 缓存（60s TTL）==========
+      await BusinessCacheHelper.setStats('trends', cacheParams, trendsData)
+
       return trendsData
     } catch (error) {
       logger.error('趋势分析数据获取失败', { error: error.message })
@@ -443,10 +483,24 @@ class ReportingService {
   /**
    * 获取今日统计数据
    *
+   * @param {Object} options - 选项
+   * @param {boolean} options.refresh - 强制刷新缓存
    * @returns {Promise<Object>} 今日统计数据
    */
-  static async getTodayStats() {
+  static async getTodayStats(options = {}) {
+    const { refresh = false } = options
+
     try {
+      // ========== Redis 缓存读取（2026-01-03 P1 缓存优化）==========
+      const cacheParams = { type: 'today' }
+      if (!refresh) {
+        const cached = await BusinessCacheHelper.getStats('today', cacheParams)
+        if (cached) {
+          logger.debug('[报表缓存] today 命中')
+          return cached
+        }
+      }
+
       // 获取今日时间范围（北京时间）
       const todayStart = BeijingTimeHelper.todayStart()
       const todayEnd = BeijingTimeHelper.todayEnd()
@@ -698,6 +752,9 @@ class ReportingService {
         active_users: todayActiveUsers
       })
 
+      // ========== 写入 Redis 缓存（60s TTL）==========
+      await BusinessCacheHelper.setStats('today', cacheParams, todayStats)
+
       return todayStats
     } catch (error) {
       logger.error('今日统计数据获取失败', {
@@ -785,16 +842,30 @@ class ReportingService {
    * @description 获取多维度的图表统计数据，支持不同时间周期
    *
    * @param {number} days - 统计天数（7/30/90）
+   * @param {Object} options - 选项
+   * @param {boolean} options.refresh - 强制刷新缓存
    * @returns {Promise<Object>} 包含所有图表数据的对象
    * @throws {Error} 参数错误、数据库查询失败等
    */
-  static async getChartsData(days = 30) {
+  static async getChartsData(days = 30, options = {}) {
+    const { refresh = false } = options
+
     // 1. 验证查询参数
     if (![7, 30, 90].includes(days)) {
       const error = new Error('参数错误：days必须是7、30或90')
       error.code = 'INVALID_DAYS_PARAMETER'
       error.allowedValues = [7, 30, 90]
       throw error
+    }
+
+    // ========== Redis 缓存读取（2026-01-03 P1 缓存优化）==========
+    const cacheParams = { days }
+    if (!refresh) {
+      const cached = await BusinessCacheHelper.getStats('charts', cacheParams)
+      if (cached) {
+        logger.debug('[报表缓存] charts 命中', { days })
+        return cached
+      }
     }
 
     logger.info(`开始查询图表数据，时间范围: 最近${days}天`)
@@ -841,7 +912,7 @@ class ReportingService {
     logger.info(`图表数据查询完成，耗时: ${query_time}ms`)
 
     // 4. 组装响应数据
-    return {
+    const chartsData = {
       user_growth,
       user_types,
       lottery_trend,
@@ -859,6 +930,11 @@ class ReportingService {
         generated_at: beijing_now.toISOString().replace('Z', '+08:00')
       }
     }
+
+    // ========== 写入 Redis 缓存（60s TTL）==========
+    await BusinessCacheHelper.setStats('charts', cacheParams, chartsData)
+
+    return chartsData
   }
 
   /**

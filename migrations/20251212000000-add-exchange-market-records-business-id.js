@@ -38,7 +38,7 @@ module.exports = {
    * @param {Object} Sequelize - Sequelize实例
    * @returns {Promise<void>} Promise对象
    */
-  async up (queryInterface, Sequelize) {
+  async up(queryInterface, Sequelize) {
     const transaction = await queryInterface.sequelize.transaction()
 
     try {
@@ -49,7 +49,9 @@ module.exports = {
        * 第1步：检查表是否存在
        * ========================================
        */
-      const tableExists = await queryInterface.tableExists('exchange_market_records', { transaction })
+      const tableExists = await queryInterface.tableExists('exchange_market_records', {
+        transaction
+      })
       if (!tableExists) {
         throw new Error('表 exchange_market_records 不存在，请先创建该表')
       }
@@ -215,21 +217,17 @@ module.exports = {
 
       // 检查索引是否已存在
       const [existingIndexes] = await queryInterface.sequelize.query(
-        'SHOW INDEX FROM exchange_market_records WHERE Key_name = \'idx_business_id_unique\'',
+        "SHOW INDEX FROM exchange_market_records WHERE Key_name = 'idx_business_id_unique'",
         { transaction }
       )
 
       if (existingIndexes.length === 0 && !existingColumnNames.includes('business_id')) {
         // 只有当 business_id 字段存在且索引不存在时才创建索引
-        await queryInterface.addIndex(
-          'exchange_market_records',
-          ['business_id'],
-          {
-            name: 'idx_business_id_unique',
-            unique: true,
-            transaction
-          }
-        )
+        await queryInterface.addIndex('exchange_market_records', ['business_id'], {
+          name: 'idx_business_id_unique',
+          unique: true,
+          transaction
+        })
         console.log('   ✓ business_id 唯一索引创建成功')
       } else if (existingIndexes.length > 0) {
         console.log('   ✓ business_id 唯一索引已存在，跳过')
@@ -254,7 +252,7 @@ module.exports = {
    * @param {Object} Sequelize - Sequelize实例
    * @returns {Promise<void>} Promise对象
    */
-  async down (queryInterface, Sequelize) {
+  async down(queryInterface, Sequelize) {
     const transaction = await queryInterface.sequelize.transaction()
 
     try {
@@ -267,11 +265,9 @@ module.exports = {
        */
       console.log('1. 删除 business_id 唯一索引...')
       try {
-        await queryInterface.removeIndex(
-          'exchange_market_records',
-          'idx_business_id_unique',
-          { transaction }
-        )
+        await queryInterface.removeIndex('exchange_market_records', 'idx_business_id_unique', {
+          transaction
+        })
         console.log('   ✓ business_id 唯一索引删除成功')
       } catch (error) {
         console.log('   ✓ business_id 唯一索引不存在，跳过')

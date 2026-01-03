@@ -34,7 +34,7 @@ const { TEST_DATA } = require('./test-data')
  * const token = await getTestUserToken(app)
  * // 返回: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
  */
-async function getTestUserToken (app, mobile = TEST_DATA.users.testUser.mobile, code = '123456') {
+async function getTestUserToken(app, mobile = TEST_DATA.users.testUser.mobile, code = '123456') {
   // 1. 发送登录请求
   const response = await request(app)
     .post('/api/v4/auth/login')
@@ -44,9 +44,9 @@ async function getTestUserToken (app, mobile = TEST_DATA.users.testUser.mobile, 
   if (!response.body.success) {
     throw new Error(
       `❌ 登录失败: ${response.body.message || '未知错误'}\n` +
-      `手机号: ${mobile}\n` +
-      `响应状态: ${response.status}\n` +
-      `完整响应: ${JSON.stringify(response.body, null, 2)}`
+        `手机号: ${mobile}\n` +
+        `响应状态: ${response.status}\n` +
+        `完整响应: ${JSON.stringify(response.body, null, 2)}`
     )
   }
 
@@ -54,8 +54,7 @@ async function getTestUserToken (app, mobile = TEST_DATA.users.testUser.mobile, 
   const token = response.body.data?.token || response.body.data?.access_token
   if (!token) {
     throw new Error(
-      '❌ 登录成功但未返回token\n' +
-      `响应数据: ${JSON.stringify(response.body.data, null, 2)}`
+      '❌ 登录成功但未返回token\n' + `响应数据: ${JSON.stringify(response.body.data, null, 2)}`
     )
   }
 
@@ -72,13 +71,9 @@ async function getTestUserToken (app, mobile = TEST_DATA.users.testUser.mobile, 
  * @example
  * const adminToken = await loginAsAdmin(app)
  */
-async function loginAsAdmin (app) {
+async function loginAsAdmin(app) {
   // 使用相同账号,但后续请求会根据角色权限判断
-  const token = await getTestUserToken(
-    app,
-    TEST_DATA.users.adminUser.mobile,
-    '123456'
-  )
+  const token = await getTestUserToken(app, TEST_DATA.users.adminUser.mobile, '123456')
 
   console.log('✅ 管理员登录成功')
   return token
@@ -95,7 +90,7 @@ async function loginAsAdmin (app) {
  * const isValid = await verifyToken(app, token)
  * if (!isValid) throw new Error('Token已失效')
  */
-async function verifyToken (app, token) {
+async function verifyToken(app, token) {
   try {
     const response = await request(app)
       .get('/api/v4/user/profile')
@@ -119,7 +114,7 @@ async function verifyToken (app, token) {
  * const userInfo = await getUserInfo(app, token)
  * console.log(userInfo.user_id, userInfo.mobile)
  */
-async function getUserInfo (app, token) {
+async function getUserInfo(app, token) {
   const response = await request(app)
     .get('/api/v4/user/profile')
     .set('Authorization', `Bearer ${token}`)
@@ -142,7 +137,7 @@ async function getUserInfo (app, token) {
  * const tokens = await batchLogin(app, ['13612227930', '13800138000'])
  * const token1 = tokens.get('13612227930')
  */
-async function batchLogin (app, mobiles) {
+async function batchLogin(app, mobiles) {
   const tokenMap = new Map()
 
   for (const mobile of mobiles) {
@@ -169,11 +164,9 @@ async function batchLogin (app, mobiles) {
  * @example
  * await logout(app, token)
  */
-async function logout (app, token) {
+async function logout(app, token) {
   try {
-    await request(app)
-      .post('/api/v4/auth/logout')
-      .set('Authorization', `Bearer ${token}`)
+    await request(app).post('/api/v4/auth/logout').set('Authorization', `Bearer ${token}`)
 
     console.log('✅ 登出成功')
   } catch (error) {

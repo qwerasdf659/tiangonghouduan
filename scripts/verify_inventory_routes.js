@@ -60,10 +60,7 @@ try {
   console.log('✅ 成功加载路由，共找到', routes.length, '个端点\n')
 
   const coreRoutes = routes.filter(
-    r =>
-      !r.path.includes('market') &&
-      !r.path.includes('products') &&
-      !r.path.includes('exchange')
+    r => !r.path.includes('market') && !r.path.includes('products') && !r.path.includes('exchange')
   )
   const marketRoutes = routes.filter(r => r.path.includes('market'))
   const exchangeRoutes = routes.filter(

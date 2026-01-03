@@ -22,7 +22,7 @@ class DOMUtils {
    *   button.disabled = false;
    * }
    */
-  static getElement (elementId, errorMsg = null) {
+  static getElement(elementId, errorMsg = null) {
     const element = document.getElementById(elementId)
 
     if (!element) {
@@ -30,9 +30,11 @@ class DOMUtils {
       console.error(`❌ ${message}`)
 
       // 开发环境显示明显提示
-      if (window.location.hostname === 'localhost' ||
-          window.location.hostname.includes('devbox') ||
-          window.location.hostname.includes('127.0.0.1')) {
+      if (
+        window.location.hostname === 'localhost' ||
+        window.location.hostname.includes('devbox') ||
+        window.location.hostname.includes('127.0.0.1')
+      ) {
         console.warn(`💡 开发提示: 请检查HTML中是否存在 id="${elementId}" 的元素`)
       }
     }
@@ -51,7 +53,7 @@ class DOMUtils {
    * @example
    * DOMUtils.safeAddEventListener('submitBtn', 'click', handleSubmit);
    */
-  static safeAddEventListener (elementId, eventType, handler, options = {}) {
+  static safeAddEventListener(elementId, eventType, handler, options = {}) {
     const element = this.getElement(elementId)
 
     if (element && typeof handler === 'function') {
@@ -79,7 +81,7 @@ class DOMUtils {
    *   { id: 'nameInput', event: 'input', handler: validateName }
    * ]);
    */
-  static batchBindEvents (bindings) {
+  static batchBindEvents(bindings) {
     const results = bindings.map(({ id, event, handler, options }) => ({
       id,
       event,
@@ -93,9 +95,11 @@ class DOMUtils {
 
     if (failedCount > 0) {
       console.warn(`⚠️ ${failedCount}个事件绑定失败`)
-      results.filter(r => !r.success).forEach(r => {
-        console.warn(`   - #${r.id} (${r.event})`)
-      })
+      results
+        .filter(r => !r.success)
+        .forEach(r => {
+          console.warn(`   - #${r.id} (${r.event})`)
+        })
     }
 
     return {
@@ -115,7 +119,7 @@ class DOMUtils {
    * @example
    * DOMUtils.safeSetHTML('resultsList', '<div>数据加载完成</div>');
    */
-  static safeSetHTML (elementId, content) {
+  static safeSetHTML(elementId, content) {
     const element = this.getElement(elementId)
 
     if (element) {
@@ -135,7 +139,7 @@ class DOMUtils {
    * @example
    * DOMUtils.safeSetText('userName', '张三');
    */
-  static safeSetText (elementId, text) {
+  static safeSetText(elementId, text) {
     const element = this.getElement(elementId)
 
     if (element) {
@@ -156,7 +160,7 @@ class DOMUtils {
    * const name = DOMUtils.safeGetValue('nameInput', '');
    * const age = DOMUtils.safeGetValue('ageInput', 0);
    */
-  static safeGetValue (elementId, defaultValue = '') {
+  static safeGetValue(elementId, defaultValue = '') {
     const element = this.getElement(elementId)
     return element ? element.value : defaultValue
   }
@@ -170,7 +174,7 @@ class DOMUtils {
    * @example
    * DOMUtils.safeSetValue('nameInput', '张三');
    */
-  static safeSetValue (elementId, value) {
+  static safeSetValue(elementId, value) {
     const element = this.getElement(elementId)
 
     if (element) {
@@ -191,7 +195,7 @@ class DOMUtils {
    * DOMUtils.safeAddClass('alertBox', 'show');
    * DOMUtils.safeAddClass('alertBox', ['show', 'fade-in']);
    */
-  static safeAddClass (elementId, classNames) {
+  static safeAddClass(elementId, classNames) {
     const element = this.getElement(elementId)
 
     if (element) {
@@ -212,7 +216,7 @@ class DOMUtils {
    * @example
    * DOMUtils.safeRemoveClass('alertBox', 'show');
    */
-  static safeRemoveClass (elementId, classNames) {
+  static safeRemoveClass(elementId, classNames) {
     const element = this.getElement(elementId)
 
     if (element) {
@@ -233,7 +237,7 @@ class DOMUtils {
    * @example
    * DOMUtils.safeToggleClass('menu', 'active');
    */
-  static safeToggleClass (elementId, className) {
+  static safeToggleClass(elementId, className) {
     const element = this.getElement(elementId)
 
     if (element) {
@@ -253,7 +257,7 @@ class DOMUtils {
    * DOMUtils.safeShow('loadingSpinner');
    * DOMUtils.safeShow('userMenu', 'flex');
    */
-  static safeShow (elementId, displayType = 'block') {
+  static safeShow(elementId, displayType = 'block') {
     const element = this.getElement(elementId)
 
     if (element) {
@@ -272,7 +276,7 @@ class DOMUtils {
    * @example
    * DOMUtils.safeHide('loadingSpinner');
    */
-  static safeHide (elementId) {
+  static safeHide(elementId) {
     const element = this.getElement(elementId)
 
     if (element) {
@@ -293,7 +297,7 @@ class DOMUtils {
    * DOMUtils.safeSetDisabled('submitBtn', true);  // 禁用
    * DOMUtils.safeSetDisabled('submitBtn', false); // 启用
    */
-  static safeSetDisabled (elementId, disabled) {
+  static safeSetDisabled(elementId, disabled) {
     const element = this.getElement(elementId)
 
     if (element) {
@@ -313,7 +317,7 @@ class DOMUtils {
    * const formData = DOMUtils.batchGetFormData(['name', 'email', 'phone']);
    * // 返回: { name: '张三', email: 'test@example.com', phone: '13800138000' }
    */
-  static batchGetFormData (fieldIds) {
+  static batchGetFormData(fieldIds) {
     const formData = {}
 
     fieldIds.forEach(id => {
@@ -335,7 +339,7 @@ class DOMUtils {
    *   phone: '13800138000'
    * });
    */
-  static batchSetFormData (data) {
+  static batchSetFormData(data) {
     let successCount = 0
     let failedCount = 0
 

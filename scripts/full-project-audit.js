@@ -12,14 +12,14 @@ const glob = require('glob')
 const path = require('path')
 
 class ProjectAuditor {
-  constructor () {
+  constructor() {
     this.issues = []
   }
 
   /**
    * 1. 检查前端API调用与后端实现的一致性
    */
-  async checkFrontendBackendSync () {
+  async checkFrontendBackendSync() {
     console.log('\n=== 🔍 检查1：前后端API同步性 ===\n')
 
     const htmlFiles = glob.sync('public/admin/*.html')
@@ -32,7 +32,9 @@ class ProjectAuditor {
       const filename = path.basename(file)
 
       // 匹配 apiRequest('/api/v4/...')
-      const matches = content.matchAll(/apiRequest\(['"]([^'"]+)['"],?\s*\{[^}]*method:\s*['"](\w+)['"]/g)
+      const matches = content.matchAll(
+        /apiRequest\(['"]([^'"]+)['"],?\s*\{[^}]*method:\s*['"](\w+)['"]/g
+      )
       for (const match of matches) {
         const api = `${match[2]} ${match[1]}`
         apiCalls.add(api)
@@ -72,7 +74,7 @@ class ProjectAuditor {
   /**
    * 2. 检查可能的Sequelize对象展开问题
    */
-  checkSequelizeSpread () {
+  checkSequelizeSpread() {
     console.log('\n=== 🔍 检查2：Sequelize对象展开问题 ===\n')
 
     const jsFiles = glob.sync('{routes,services}/**/*.js')
@@ -84,7 +86,12 @@ class ProjectAuditor {
 
       lines.forEach((line, index) => {
         // 检测可疑的展开操作
-        if (line.includes('...') && line.includes('map') && !line.includes('toJSON') && !line.includes('dataValues')) {
+        if (
+          line.includes('...') &&
+          line.includes('map') &&
+          !line.includes('toJSON') &&
+          !line.includes('dataValues')
+        ) {
           // 排除注释行
           if (!line.trim().startsWith('//') && !line.trim().startsWith('*')) {
             suspiciousCode.push({
@@ -125,7 +132,7 @@ class ProjectAuditor {
   /**
    * 3. 检查配置在数据库和代码中的重复定义
    */
-  async checkConfigDuplication () {
+  async checkConfigDuplication() {
     console.log('=== 🔍 检查3：配置重复定义 ===\n')
 
     try {
@@ -177,7 +184,7 @@ class ProjectAuditor {
   /**
    * 4. 检查前端页面中的过时提示和警告
    */
-  checkFrontendWarnings () {
+  checkFrontendWarnings() {
     console.log('=== 🔍 检查4：前端过时警告 ===\n')
 
     const htmlFiles = glob.sync('public/admin/*.html')
@@ -232,7 +239,7 @@ class ProjectAuditor {
   /**
    * 5. 检查路由中使用但未实现的验证器
    */
-  checkValidators () {
+  checkValidators() {
     console.log('=== 🔍 检查5：验证器完整性 ===\n')
 
     const routeFiles = glob.sync('routes/**/*.js')
@@ -293,7 +300,7 @@ class ProjectAuditor {
   /**
    * 6. 检查数据库模型注册完整性
    */
-  async checkModelRegistration () {
+  async checkModelRegistration() {
     console.log('=== 🔍 检查6：数据库模型注册 ===\n')
 
     try {
@@ -334,7 +341,7 @@ class ProjectAuditor {
   /**
    * 生成审计报告
    */
-  generateReport () {
+  generateReport() {
     console.log('\n' + '='.repeat(60))
     console.log('📋 项目审计报告')
     console.log('='.repeat(60) + '\n')
@@ -361,7 +368,7 @@ class ProjectAuditor {
   /**
    * 执行完整审计
    */
-  async run () {
+  async run() {
     console.log('🔍 开始项目全面审计...')
     console.log('时间:', new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' }))
 
@@ -377,7 +384,7 @@ class ProjectAuditor {
 }
 
 // 执行审计
-(async () => {
+;(async () => {
   try {
     const auditor = new ProjectAuditor()
     const report = await auditor.run()

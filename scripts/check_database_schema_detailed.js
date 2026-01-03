@@ -5,7 +5,7 @@
 
 const { sequelize } = require('../config/database')
 
-async function checkDatabaseSchema () {
+async function checkDatabaseSchema() {
   try {
     console.log('===== 开始检查数据库表结构 =====\n')
 

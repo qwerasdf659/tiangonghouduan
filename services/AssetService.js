@@ -45,6 +45,23 @@ const { sequelize } = require('../config/database')
 const logger = require('../utils/logger')
 
 /**
+ * 事务边界检查（开发阶段用于发现问题，生产阶段可优雅降级）
+ *
+ * @param {Object} transaction - 事务对象
+ * @param {string} methodName - 方法名
+ * @returns {void}
+ */
+function checkTransactionBoundary(transaction, methodName) {
+  if (!transaction) {
+    logger.warn(`⚠️ [事务边界警告] ${methodName} 未接收到外部事务，将自行创建事务。`, {
+      methodName,
+      timestamp: new Date().toISOString(),
+      recommendation: '建议从 TransactionManager.execute() 传入事务以确保原子性'
+    })
+  }
+}
+
+/**
  * 资产服务类（V2升级版）
  * 负责所有资产相关的业务逻辑
  */
@@ -125,27 +142,53 @@ class AssetService {
   /**
    * 获取或创建资产余额记录
    *
+   * 业务规则（BUDGET_POINTS 架构）：
+   * - BUDGET_POINTS 必须指定 campaign_id（活动隔离）
+   * - 其他资产类型 campaign_id 可选
+   *
    * @param {number} account_id - 账户ID
-   * @param {string} asset_code - 资产代码（如DIAMOND、red_shard）
+   * @param {string} asset_code - 资产代码（如DIAMOND、red_shard、BUDGET_POINTS）
    * @param {Object} options - 选项
    * @param {Object} options.transaction - Sequelize事务对象
+   * @param {string|number} options.campaign_id - 活动ID（BUDGET_POINTS 必填，其他资产可选）
    * @returns {Promise<Object>} 资产余额对象
    */
   static async getOrCreateBalance(account_id, asset_code, options = {}) {
-    const { transaction } = options
+    const { transaction, campaign_id } = options
+
+    // 🔥 BUDGET_POINTS 必须指定 campaign_id
+    if (asset_code === 'BUDGET_POINTS' && !campaign_id) {
+      throw new Error('BUDGET_POINTS 必须指定 campaign_id 参数（活动隔离规则）')
+    }
+
+    // 构建查询条件
+    const whereCondition = {
+      account_id,
+      asset_code
+    }
+
+    // BUDGET_POINTS 按活动隔离
+    if (asset_code === 'BUDGET_POINTS' && campaign_id) {
+      whereCondition.campaign_id = String(campaign_id)
+    }
+
+    // 默认值
+    const defaults = {
+      account_id,
+      asset_code,
+      available_amount: 0,
+      frozen_amount: 0
+    }
+
+    // BUDGET_POINTS 需要记录 campaign_id
+    if (asset_code === 'BUDGET_POINTS' && campaign_id) {
+      defaults.campaign_id = String(campaign_id)
+    }
 
     // 查找或创建资产余额记录（使用findOrCreate确保原子性）
     const [balance, created] = await AccountAssetBalance.findOrCreate({
-      where: {
-        account_id,
-        asset_code
-      },
-      defaults: {
-        account_id,
-        asset_code,
-        available_amount: 0,
-        frozen_amount: 0
-      },
+      where: whereCondition,
+      defaults,
       transaction
     })
 
@@ -153,7 +196,8 @@ class AssetService {
       logger.info('✅ 创建新资产余额记录', {
         balance_id: balance.balance_id,
         account_id,
-        asset_code
+        asset_code,
+        campaign_id: campaign_id || null
       })
     }
 
@@ -168,6 +212,7 @@ class AssetService {
    * - 扣减时必须验证可用余额充足
    * - 记录变动前后余额用于完整对账（before + delta = after）
    * - 支持外部事务传入
+   * - BUDGET_POINTS 必须指定 campaign_id（活动隔离）
    *
    * 幂等机制（方案B - 业界标准）：
    * - idempotency_key：独立幂等键（每条记录唯一）
@@ -181,9 +226,10 @@ class AssetService {
    * @param {string} params.business_type - 业务类型（必填）
    * @param {string} params.idempotency_key - 独立幂等键（必填）
    * @param {string} params.lottery_session_id - 抽奖会话ID（可选，仅抽奖业务使用）
+   * @param {string|number} params.campaign_id - 活动ID（BUDGET_POINTS 必填，其他资产可选）
    * @param {Object} params.meta - 扩展信息（可选）
    * @param {Object} options - 选项
-   * @param {Object} options.transaction - Sequelize事务对象（可选）
+   * @param {Object} options.transaction - Sequelize事务对象（强烈建议传入）
    * @returns {Promise<Object>} 结果对象 {account, balance, transaction_record, is_duplicate}
    */
   static async changeBalance(params, options = {}) {
@@ -195,9 +241,13 @@ class AssetService {
       business_type,
       idempotency_key,
       lottery_session_id,
+      campaign_id,
       meta = {}
     } = params
     const { transaction: externalTransaction } = options
+
+    // 🔒 事务边界检查：警告未传入事务的情况
+    checkTransactionBoundary(externalTransaction, 'AssetService.changeBalance')
 
     // 参数验证
     if (!idempotency_key) {
@@ -211,6 +261,11 @@ class AssetService {
     }
     if (!asset_code) {
       throw new Error('asset_code是必填参数')
+    }
+
+    // 🔥 BUDGET_POINTS 必须指定 campaign_id（活动隔离规则）
+    if (asset_code === 'BUDGET_POINTS' && !campaign_id) {
+      throw new Error('BUDGET_POINTS 必须指定 campaign_id 参数（活动隔离规则）')
     }
 
     // 支持外部事务传入
@@ -234,7 +289,8 @@ class AssetService {
         // 获取当前账户和余额状态
         const account = await this.getOrCreateAccount({ user_id, system_code }, { transaction })
         const balance = await this.getOrCreateBalance(account.account_id, asset_code, {
-          transaction
+          transaction,
+          campaign_id // 传递 campaign_id
         })
 
         if (shouldCommit) {
@@ -252,12 +308,20 @@ class AssetService {
       // 获取或创建账户
       const account = await this.getOrCreateAccount({ user_id, system_code }, { transaction })
 
+      // 构建余额查询条件（BUDGET_POINTS 需要按活动隔离）
+      const balanceWhereCondition = {
+        account_id: account.account_id,
+        asset_code
+      }
+
+      // BUDGET_POINTS 按活动隔离查询
+      if (asset_code === 'BUDGET_POINTS' && campaign_id) {
+        balanceWhereCondition.campaign_id = String(campaign_id)
+      }
+
       // 获取或创建余额记录（加行级锁）
       const balance = await AccountAssetBalance.findOne({
-        where: {
-          account_id: account.account_id,
-          asset_code
-        },
+        where: balanceWhereCondition,
         lock: transaction.LOCK.UPDATE, // 行级锁，防止并发问题
         transaction
       })
@@ -269,7 +333,8 @@ class AssetService {
           throw new Error(`余额不足：账户不存在且尝试扣减${Math.abs(delta_amount)}个${asset_code}`)
         }
         finalBalance = await this.getOrCreateBalance(account.account_id, asset_code, {
-          transaction
+          transaction,
+          campaign_id // 传递 campaign_id
         })
       } else {
         finalBalance = balance
@@ -317,7 +382,10 @@ class AssetService {
           business_type,
           lottery_session_id: lottery_session_id || null, // 非抽奖业务可为NULL
           idempotency_key,
-          meta
+          meta: {
+            ...meta,
+            campaign_id: campaign_id || null // 记录活动ID到 meta 中
+          }
         },
         { transaction }
       )
@@ -331,6 +399,7 @@ class AssetService {
         balance_after,
         business_type,
         lottery_session_id: lottery_session_id || null,
+        campaign_id: campaign_id || null,
         idempotency_key,
         transaction_id: transaction_record.transaction_id
       })
@@ -358,6 +427,7 @@ class AssetService {
         asset_code,
         delta_amount,
         business_type,
+        campaign_id: campaign_id || null,
         idempotency_key,
         error: error.message
       })
@@ -396,6 +466,9 @@ class AssetService {
       meta = {}
     } = params
     const { transaction: externalTransaction } = options
+
+    // 🔒 事务边界检查：警告未传入事务的情况
+    checkTransactionBoundary(externalTransaction, 'AssetService.freeze')
 
     // 参数验证
     if (!idempotency_key) {
@@ -583,6 +656,9 @@ class AssetService {
     } = params
     const { transaction: externalTransaction } = options
 
+    // 🔒 事务边界检查：警告未传入事务的情况
+    checkTransactionBoundary(externalTransaction, 'AssetService.unfreeze')
+
     // 参数验证
     if (!idempotency_key) {
       throw new Error('idempotency_key是必填参数（幂等性控制）')
@@ -769,6 +845,9 @@ class AssetService {
     } = params
     const { transaction: externalTransaction } = options
 
+    // 🔒 事务边界检查：警告未传入事务的情况
+    checkTransactionBoundary(externalTransaction, 'AssetService.settleFromFrozen')
+
     // 参数验证
     if (!idempotency_key) {
       throw new Error('idempotency_key是必填参数（幂等性控制）')
@@ -930,20 +1009,35 @@ class AssetService {
    * @param {number} params.user_id - 用户ID（用户账户）
    * @param {string} params.system_code - 系统账户代码（系统账户）
    * @param {string} params.asset_code - 资产代码
+   * @param {string|number} params.campaign_id - 活动ID（BUDGET_POINTS 必填，其他资产可选）
    * @param {Object} options - 选项
    * @param {Object} options.transaction - Sequelize事务对象（可选）
    * @returns {Promise<Object>} 余额对象 {available_amount, frozen_amount, total_amount}
    */
   static async getBalance(params, options = {}) {
-    const { user_id, system_code, asset_code } = params
+    const { user_id, system_code, asset_code, campaign_id } = params
     const { transaction } = options
 
+    // 🔥 BUDGET_POINTS 必须指定 campaign_id
+    if (asset_code === 'BUDGET_POINTS' && !campaign_id) {
+      throw new Error('BUDGET_POINTS 必须指定 campaign_id 参数（活动隔离规则）')
+    }
+
     const account = await this.getOrCreateAccount({ user_id, system_code }, { transaction })
+
+    // 构建查询条件（BUDGET_POINTS 需要按活动隔离）
+    const whereCondition = {
+      account_id: account.account_id,
+      asset_code
+    }
+
+    // BUDGET_POINTS 按活动隔离
+    if (asset_code === 'BUDGET_POINTS' && campaign_id) {
+      whereCondition.campaign_id = String(campaign_id)
+    }
+
     const balance = await AccountAssetBalance.findOne({
-      where: {
-        account_id: account.account_id,
-        asset_code
-      },
+      where: whereCondition,
       transaction
     })
 
@@ -951,14 +1045,16 @@ class AssetService {
       return {
         available_amount: 0,
         frozen_amount: 0,
-        total_amount: 0
+        total_amount: 0,
+        campaign_id: campaign_id || null
       }
     }
 
     return {
       available_amount: Number(balance.available_amount),
       frozen_amount: Number(balance.frozen_amount),
-      total_amount: Number(balance.available_amount) + Number(balance.frozen_amount)
+      total_amount: Number(balance.available_amount) + Number(balance.frozen_amount),
+      campaign_id: balance.campaign_id || null
     }
   }
 
@@ -1335,41 +1431,70 @@ class AssetService {
   }
 
   /**
-   * 锁定物品实例（交易/核销下单）
+   * 锁定物品实例（多级锁定版本）
    *
-   * 业务规则：
-   * - 只能锁定 available 状态的物品
-   * - 锁定超时时间为 3 分钟
-   * - 如果物品已锁定但超时，自动释放后重新锁定
-   * - 必须记录锁定事件到 item_instance_events 表
+   * 业务规则（2026-01-03 方案B升级）：
+   * - 支持多级锁定：trade（3分钟）/ redemption（30天）/ security（无限期）
+   * - 优先级规则：security > redemption > trade
+   * - 互斥规则：一个物品同时只能有一种锁
+   * - 高优先级锁可覆盖低优先级锁（security 可覆盖 trade/redemption）
+   * - security 锁覆盖 trade 时，强制取消对应的 TradeOrder
+   * - 时间格式：统一使用北京时间 +08:00 ISO8601
    *
    * @param {Object} params - 参数对象
    * @param {number} params.item_instance_id - 物品实例ID
-   * @param {string} params.locked_by_order_id - 锁定订单ID
-   * @param {string} params.business_type - 业务类型（market_listing/trade_order/redemption_order）
-   * @param {Object} params.meta - 锁定元数据
+   * @param {string} params.lock_id - 锁ID（订单ID或业务单号）
+   * @param {string} params.lock_type - 锁类型（trade/redemption/security）
+   * @param {Date} params.expires_at - 过期时间
+   * @param {string} params.business_type - 业务类型（可选）
+   * @param {string} params.reason - 锁定原因（可选）
+   * @param {Object} params.meta - 锁定元数据（可选）
    * @param {Object} options - 选项
-   * @param {Object} options.transaction - Sequelize事务对象
+   * @param {Object} options.transaction - Sequelize事务对象（必需）
    * @returns {Promise<Object>} 锁定后的物品实例
    */
   static async lockItem(params, options = {}) {
-    const { item_instance_id, locked_by_order_id, business_type, meta = {} } = params
+    const {
+      item_instance_id,
+      lock_id,
+      lock_type,
+      expires_at,
+      business_type,
+      reason = '',
+      meta = {}
+    } = params
     const { transaction: externalTransaction } = options
 
+    // 参数验证
     if (!item_instance_id) {
       throw new Error('item_instance_id 是必填参数')
     }
-    if (!locked_by_order_id) {
-      throw new Error('locked_by_order_id 是必填参数')
+    if (!lock_id) {
+      throw new Error('lock_id 是必填参数')
+    }
+    if (!lock_type) {
+      throw new Error('lock_type 是必填参数（trade/redemption/security）')
+    }
+    if (!expires_at) {
+      throw new Error('expires_at 是必填参数')
     }
 
-    const { ItemInstance, ItemInstanceEvent } = require('../models')
+    // 验证锁类型
+    const validLockTypes = ['trade', 'redemption', 'security']
+    if (!validLockTypes.includes(lock_type)) {
+      throw new Error(`无效的锁类型: ${lock_type}，有效值: ${validLockTypes.join(', ')}`)
+    }
+
+    const { ItemInstance, ItemInstanceEvent, TradeOrder } = require('../models')
 
     const transaction = externalTransaction || (await sequelize.transaction())
     const shouldCommit = !externalTransaction
 
     try {
-      // 获取物品实例（加行锁）
+      // 验证 lock_id 格式（security 必须是业务单号）
+      ItemInstance.validateLockId(lock_type, lock_id)
+
+      // 获取物品实例（悲观锁）
       const item_instance = await ItemInstance.findByPk(item_instance_id, {
         lock: transaction.LOCK.UPDATE,
         transaction
@@ -1379,26 +1504,64 @@ class AssetService {
         throw new Error(`物品实例不存在：item_instance_id=${item_instance_id}`)
       }
 
-      // 检查物品状态
-      if (item_instance.status === 'locked') {
-        // 检查是否超时
-        if (item_instance.isLockTimeout()) {
-          logger.warn('⚠️ 检测到超时锁，自动释放后重新锁定', {
-            item_instance_id,
-            old_order_id: item_instance.locked_by_order_id
-          })
-          // 超时锁会在下面的 lock() 方法中自动释放
-        } else {
-          throw new Error(`物品已被订单 ${item_instance.locked_by_order_id} 锁定`)
+      // 检查是否可以添加锁
+      const {
+        canLock,
+        reason: lockReason,
+        needOverride,
+        existingLock
+      } = item_instance.canAddLock(lock_type)
+
+      if (!canLock) {
+        throw new Error(lockReason)
+      }
+
+      // 如果需要覆盖，处理被覆盖的锁
+      if (needOverride && existingLock) {
+        logger.warn('⚠️ 高优先级锁覆盖低优先级锁', {
+          item_instance_id,
+          old_lock: existingLock,
+          new_lock: { lock_type, lock_id }
+        })
+
+        // 如果 security 覆盖了 trade 锁，强制取消对应的 TradeOrder
+        if (lock_type === 'security' && existingLock.lock_type === 'trade') {
+          try {
+            const [updatedCount] = await TradeOrder.update(
+              {
+                status: 'cancelled',
+                cancel_reason: `风控冻结（业务单号: ${lock_id}）`,
+                cancelled_at: new Date()
+              },
+              {
+                where: { order_id: existingLock.lock_id },
+                transaction
+              }
+            )
+
+            if (updatedCount > 0) {
+              logger.info('✅ 风控覆盖导致交易订单被取消', {
+                trade_order_id: existingLock.lock_id,
+                security_lock_id: lock_id
+              })
+            }
+          } catch (error) {
+            logger.error('❌ 取消交易订单失败', {
+              trade_order_id: existingLock.lock_id,
+              error: error.message
+            })
+            // 不阻断锁定流程，仅记录错误
+          }
         }
-      } else if (item_instance.status !== 'available') {
-        throw new Error(`物品状态不可锁定：${item_instance.status}`)
       }
 
       const status_before = item_instance.status
 
-      // 执行锁定
-      await item_instance.lock(locked_by_order_id, { transaction })
+      // 执行锁定（使用模型的 lock 方法）
+      await item_instance.lock(lock_id, lock_type, expires_at, {
+        transaction,
+        reason: reason || `${lock_type} 锁定`
+      })
 
       // 记录锁定事件
       await ItemInstanceEvent.recordEvent(
@@ -1409,17 +1572,25 @@ class AssetService {
           operator_type: 'system',
           status_before,
           status_after: 'locked',
-          business_type: business_type || 'item_lock',
-          idempotency_key: locked_by_order_id,
-          meta: { locked_by_order_id, ...meta }
+          business_type: business_type || `item_lock_${lock_type}`,
+          idempotency_key: lock_id,
+          meta: {
+            lock_type,
+            lock_id,
+            expires_at: expires_at.toISOString(),
+            override_info: needOverride ? { overridden_lock: existingLock } : null,
+            ...meta
+          }
         },
         { transaction }
       )
 
       logger.info('✅ 物品锁定成功', {
         item_instance_id,
-        locked_by_order_id,
-        business_type
+        lock_type,
+        lock_id,
+        expires_at: expires_at.toISOString(),
+        overridden: needOverride
       })
 
       if (shouldCommit) {
@@ -1435,7 +1606,8 @@ class AssetService {
       }
       logger.error('❌ 物品锁定失败', {
         item_instance_id,
-        locked_by_order_id,
+        lock_type,
+        lock_id,
         error: error.message
       })
       throw error
@@ -1443,23 +1615,36 @@ class AssetService {
   }
 
   /**
-   * 解锁物品实例（订单取消/超时解锁）
+   * 解锁物品实例（多级锁定版本）
+   *
+   * 业务规则（2026-01-03 方案B升级）：
+   * - 需要指定 lock_id 和 lock_type 精确匹配
+   * - 只有匹配的锁才会被移除
+   * - locks 为空时状态变为 available
    *
    * @param {Object} params - 参数对象
    * @param {number} params.item_instance_id - 物品实例ID
-   * @param {string} params.business_type - 业务类型
-   * @param {string} params.idempotency_key - 业务ID
-   * @param {Object} params.meta - 解锁元数据
+   * @param {string} params.lock_id - 锁ID
+   * @param {string} params.lock_type - 锁类型（trade/redemption/security）
+   * @param {string} params.business_type - 业务类型（可选）
+   * @param {Object} params.meta - 解锁元数据（可选）
    * @param {Object} options - 选项
-   * @param {Object} options.transaction - Sequelize事务对象
+   * @param {Object} options.transaction - Sequelize事务对象（必需）
    * @returns {Promise<Object>} 解锁后的物品实例
    */
   static async unlockItem(params, options = {}) {
-    const { item_instance_id, business_type, idempotency_key, meta = {} } = params
+    const { item_instance_id, lock_id, lock_type, business_type, meta = {} } = params
     const { transaction: externalTransaction } = options
 
+    // 参数验证
     if (!item_instance_id) {
       throw new Error('item_instance_id 是必填参数')
+    }
+    if (!lock_id) {
+      throw new Error('lock_id 是必填参数')
+    }
+    if (!lock_type) {
+      throw new Error('lock_type 是必填参数（trade/redemption/security）')
     }
 
     const { ItemInstance, ItemInstanceEvent } = require('../models')
@@ -1477,14 +1662,35 @@ class AssetService {
         throw new Error(`物品实例不存在：item_instance_id=${item_instance_id}`)
       }
 
-      if (item_instance.status !== 'locked') {
-        throw new Error(`物品状态不是 locked，无法解锁：${item_instance.status}`)
+      // 查找指定的锁
+      const existingLock = item_instance.getLockById(lock_id)
+      if (!existingLock) {
+        logger.warn('⚠️ 未找到要解锁的锁', {
+          item_instance_id,
+          lock_id,
+          lock_type,
+          existing_locks: item_instance.locks
+        })
+        // 未找到锁但不抛出异常，返回当前状态
+        if (shouldCommit) {
+          await transaction.commit()
+        }
+        return item_instance
       }
 
-      const old_order_id = item_instance.locked_by_order_id
+      // 验证锁类型匹配
+      if (existingLock.lock_type !== lock_type) {
+        throw new Error(`锁类型不匹配：期望 ${lock_type}，实际 ${existingLock.lock_type}`)
+      }
 
-      // 执行解锁
-      await item_instance.unlock({ transaction })
+      const status_before = item_instance.status
+
+      // 执行解锁（使用模型的 unlock 方法）
+      const unlockResult = await item_instance.unlock(lock_id, lock_type, { transaction })
+
+      if (!unlockResult) {
+        logger.warn('⚠️ 解锁操作返回 false', { item_instance_id, lock_id, lock_type })
+      }
 
       // 记录解锁事件
       await ItemInstanceEvent.recordEvent(
@@ -1493,18 +1699,25 @@ class AssetService {
           event_type: 'unlock',
           operator_user_id: null,
           operator_type: 'system',
-          status_before: 'locked',
-          status_after: 'available',
-          business_type: business_type || 'item_unlock',
-          idempotency_key,
-          meta: { previous_order_id: old_order_id, ...meta }
+          status_before,
+          status_after: item_instance.status,
+          business_type: business_type || `item_unlock_${lock_type}`,
+          idempotency_key: lock_id,
+          meta: {
+            lock_type,
+            lock_id,
+            previous_lock: existingLock,
+            ...meta
+          }
         },
         { transaction }
       )
 
       logger.info('✅ 物品解锁成功', {
         item_instance_id,
-        previous_order_id: old_order_id
+        lock_type,
+        lock_id,
+        new_status: item_instance.status
       })
 
       if (shouldCommit) {
@@ -1520,6 +1733,8 @@ class AssetService {
       }
       logger.error('❌ 物品解锁失败', {
         item_instance_id,
+        lock_type,
+        lock_id,
         error: error.message
       })
       throw error

@@ -23,7 +23,7 @@ const { sequelize } = require('../models')
 /**
  * 全面验证审计日志功能
  */
-async function comprehensiveVerification () {
+async function comprehensiveVerification() {
   console.log('==================================================')
   console.log('  P0-3 奖品管理审计日志功能全面验证')
   console.log('==================================================\n')
@@ -82,8 +82,9 @@ async function comprehensiveVerification () {
 
     // 2.1 检查 addStock 方法
     console.log('2.1 检查 addStock 方法...')
-    const hasAddStockAudit = prizePoolServiceCode.includes('AuditLogService.logOperation') &&
-      prizePoolServiceCode.includes('operation_type: \'prize_stock_adjust\'') &&
+    const hasAddStockAudit =
+      prizePoolServiceCode.includes('AuditLogService.logOperation') &&
+      prizePoolServiceCode.includes("operation_type: 'prize_stock_adjust'") &&
       prizePoolServiceCode.includes('奖品库存调整')
 
     if (hasAddStockAudit) {
@@ -96,8 +97,9 @@ async function comprehensiveVerification () {
 
     // 2.2 检查 updatePrize 方法
     console.log('2.2 检查 updatePrize 方法...')
-    const hasUpdatePrizeAudit = prizePoolServiceCode.includes('AuditLogService.logOperation') &&
-      prizePoolServiceCode.includes('operation_type: \'prize_config\'') &&
+    const hasUpdatePrizeAudit =
+      prizePoolServiceCode.includes('AuditLogService.logOperation') &&
+      prizePoolServiceCode.includes("operation_type: 'prize_config'") &&
       prizePoolServiceCode.includes('奖品配置修改')
 
     if (hasUpdatePrizeAudit) {
@@ -110,8 +112,9 @@ async function comprehensiveVerification () {
 
     // 2.3 检查 deletePrize 方法
     console.log('2.3 检查 deletePrize 方法...')
-    const hasDeletePrizeAudit = prizePoolServiceCode.includes('AuditLogService.logOperation') &&
-      prizePoolServiceCode.includes('operation_type: \'prize_delete\'') &&
+    const hasDeletePrizeAudit =
+      prizePoolServiceCode.includes('AuditLogService.logOperation') &&
+      prizePoolServiceCode.includes("operation_type: 'prize_delete'") &&
       prizePoolServiceCode.includes('删除奖品')
 
     if (hasDeletePrizeAudit) {
@@ -124,8 +127,9 @@ async function comprehensiveVerification () {
 
     // 2.4 检查 batchAddPrizes 方法
     console.log('2.4 检查 batchAddPrizes 方法...')
-    const hasBatchAddPrizesAudit = prizePoolServiceCode.includes('AuditLogService.logOperation') &&
-      prizePoolServiceCode.includes('operation_type: \'prize_create\'') &&
+    const hasBatchAddPrizesAudit =
+      prizePoolServiceCode.includes('AuditLogService.logOperation') &&
+      prizePoolServiceCode.includes("operation_type: 'prize_create'") &&
       prizePoolServiceCode.includes('批量添加')
 
     if (hasBatchAddPrizesAudit) {
@@ -140,7 +144,10 @@ async function comprehensiveVerification () {
     console.log('\n【第三部分】路由层验证')
     console.log('─────────────────────────────────────────────────\n')
 
-    const prizePoolRoutePath = path.join(__dirname, '../routes/v4/unified-engine/admin/prize_pool.js')
+    const prizePoolRoutePath = path.join(
+      __dirname,
+      '../routes/v4/unified-engine/admin/prize_pool.js'
+    )
     const prizePoolRouteCode = fs.readFileSync(prizePoolRoutePath, 'utf8')
 
     // 3.1 检查路由层是否传入操作员ID
@@ -177,7 +184,8 @@ async function comprehensiveVerification () {
     ]
 
     transactionChecks.forEach(check => {
-      const hasInternalTx = prizePoolServiceCode.includes(`${check.method}`) &&
+      const hasInternalTx =
+        prizePoolServiceCode.includes(`${check.method}`) &&
         prizePoolServiceCode.includes('internalTransaction')
       const hasRollback = prizePoolServiceCode.includes('rollback')
 
@@ -199,15 +207,21 @@ async function comprehensiveVerification () {
 
     console.log('【数据库验证】')
     console.log(`  状态: ${databasePassed ? '✅ 通过' : '❌ 失败'}`)
-    console.log(`  详情: ${results.database.length} 个检查项，${results.database.filter(r => r.status === 'pass').length} 个通过\n`)
+    console.log(
+      `  详情: ${results.database.length} 个检查项，${results.database.filter(r => r.status === 'pass').length} 个通过\n`
+    )
 
     console.log('【代码验证】')
     console.log(`  状态: ${codePassed ? '✅ 通过' : '❌ 失败'}`)
-    console.log(`  详情: ${results.code.length} 个检查项，${results.code.filter(r => r.status === 'pass').length} 个通过\n`)
+    console.log(
+      `  详情: ${results.code.length} 个检查项，${results.code.filter(r => r.status === 'pass').length} 个通过\n`
+    )
 
     console.log('【路由验证】')
     console.log(`  状态: ${routePassed ? '✅ 通过' : '❌ 失败'}`)
-    console.log(`  详情: ${results.route.length} 个检查项，${results.route.filter(r => r.status === 'pass').length} 个通过\n`)
+    console.log(
+      `  详情: ${results.route.length} 个检查项，${results.route.filter(r => r.status === 'pass').length} 个通过\n`
+    )
 
     const allPassed = databasePassed && codePassed && routePassed
 

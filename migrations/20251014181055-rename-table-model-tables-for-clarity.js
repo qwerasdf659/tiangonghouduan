@@ -37,7 +37,9 @@ module.exports = {
 
       // 3. 重命名 customer_sessions → customer_service_sessions
       console.log('📋 [3/4] 重命名表: customer_sessions → customer_service_sessions')
-      await queryInterface.renameTable('customer_sessions', 'customer_service_sessions', { transaction })
+      await queryInterface.renameTable('customer_sessions', 'customer_service_sessions', {
+        transaction
+      })
       console.log('✅ 完成: customer_sessions → customer_service_sessions\n')
 
       // 4. 重命名 user_sessions → authentication_sessions
@@ -68,7 +70,9 @@ module.exports = {
       console.log('✅ 完成\n')
 
       console.log('📋 [2/4] 回滚: customer_service_sessions → customer_sessions')
-      await queryInterface.renameTable('customer_service_sessions', 'customer_sessions', { transaction })
+      await queryInterface.renameTable('customer_service_sessions', 'customer_sessions', {
+        transaction
+      })
       console.log('✅ 完成\n')
 
       console.log('📋 [3/4] 回滚: content_review_records → audit_records')

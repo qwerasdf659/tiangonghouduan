@@ -30,7 +30,7 @@ module.exports = {
    * @param {Object} Sequelize - Sequelize对象
    * @returns {Promise<void>}
    */
-  async up (queryInterface, Sequelize) {
+  async up(queryInterface, Sequelize) {
     const transaction = await queryInterface.sequelize.transaction()
 
     try {
@@ -75,13 +75,13 @@ module.exports = {
    * @param {Object} Sequelize - Sequelize对象
    * @returns {Promise<void>}
    */
-  async down (queryInterface, Sequelize) {
+  async down(queryInterface, Sequelize) {
     const transaction = await queryInterface.sequelize.transaction()
 
     try {
       // 检查是否有使用market_purchase的记录
       const [results] = await queryInterface.sequelize.query(
-        'SELECT COUNT(*) as count FROM trade_records WHERE trade_type = \'market_purchase\'',
+        "SELECT COUNT(*) as count FROM trade_records WHERE trade_type = 'market_purchase'",
         { transaction }
       )
 
@@ -90,7 +90,7 @@ module.exports = {
       if (count > 0) {
         throw new Error(
           `无法回滚：数据库中存在${count}条trade_type=market_purchase的记录。` +
-          '请先手动处理这些记录，然后再执行回滚。'
+            '请先手动处理这些记录，然后再执行回滚。'
         )
       }
 

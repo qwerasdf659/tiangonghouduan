@@ -19,7 +19,7 @@ module.exports = {
     try {
       // 检查索引是否已存在（避免重复创建）
       const [existingIndexes] = await queryInterface.sequelize.query(
-        'SELECT INDEX_NAME FROM INFORMATION_SCHEMA.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = \'feedbacks\'',
+        "SELECT INDEX_NAME FROM INFORMATION_SCHEMA.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'feedbacks'",
         { transaction }
       )
 
@@ -28,14 +28,10 @@ module.exports = {
       // 1. 添加核心查询索引：user_id + status（支持"获取我的反馈列表"API）
       if (!indexNames.includes('idx_feedbacks_user_status')) {
         console.log('  📋 创建索引: idx_feedbacks_user_status (user_id, status)')
-        await queryInterface.addIndex(
-          'feedbacks',
-          ['user_id', 'status'],
-          {
-            name: 'idx_feedbacks_user_status',
-            transaction
-          }
-        )
+        await queryInterface.addIndex('feedbacks', ['user_id', 'status'], {
+          name: 'idx_feedbacks_user_status',
+          transaction
+        })
         console.log('  ✅ 索引idx_feedbacks_user_status创建成功')
       } else {
         console.log('  ⏭️  索引idx_feedbacks_user_status已存在，跳过')
@@ -44,14 +40,10 @@ module.exports = {
       // 2. 添加分类+优先级索引（支持管理员按分类和优先级筛选）
       if (!indexNames.includes('idx_feedbacks_category_priority')) {
         console.log('  📋 创建索引: idx_feedbacks_category_priority (category, priority)')
-        await queryInterface.addIndex(
-          'feedbacks',
-          ['category', 'priority'],
-          {
-            name: 'idx_feedbacks_category_priority',
-            transaction
-          }
-        )
+        await queryInterface.addIndex('feedbacks', ['category', 'priority'], {
+          name: 'idx_feedbacks_category_priority',
+          transaction
+        })
         console.log('  ✅ 索引idx_feedbacks_category_priority创建成功')
       } else {
         console.log('  ⏭️  索引idx_feedbacks_category_priority已存在，跳过')
@@ -60,14 +52,10 @@ module.exports = {
       // 3. 添加状态+创建时间索引（支持按状态和时间排序查询）
       if (!indexNames.includes('idx_feedbacks_status_created')) {
         console.log('  📋 创建索引: idx_feedbacks_status_created (status, created_at)')
-        await queryInterface.addIndex(
-          'feedbacks',
-          ['status', 'created_at'],
-          {
-            name: 'idx_feedbacks_status_created',
-            transaction
-          }
-        )
+        await queryInterface.addIndex('feedbacks', ['status', 'created_at'], {
+          name: 'idx_feedbacks_status_created',
+          transaction
+        })
         console.log('  ✅ 索引idx_feedbacks_status_created创建成功')
       } else {
         console.log('  ⏭️  索引idx_feedbacks_status_created已存在，跳过')
@@ -76,14 +64,10 @@ module.exports = {
       // 4. 添加管理员ID索引（支持按管理员查询已处理反馈）
       if (!indexNames.includes('idx_feedbacks_admin_id')) {
         console.log('  📋 创建索引: idx_feedbacks_admin_id (admin_id)')
-        await queryInterface.addIndex(
-          'feedbacks',
-          ['admin_id'],
-          {
-            name: 'idx_feedbacks_admin_id',
-            transaction
-          }
-        )
+        await queryInterface.addIndex('feedbacks', ['admin_id'], {
+          name: 'idx_feedbacks_admin_id',
+          transaction
+        })
         console.log('  ✅ 索引idx_feedbacks_admin_id创建成功')
       } else {
         console.log('  ⏭️  索引idx_feedbacks_admin_id已存在，跳过')

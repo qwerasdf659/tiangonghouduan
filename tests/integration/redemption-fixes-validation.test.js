@@ -150,11 +150,12 @@ describe('核销系统修复验证测试', () => {
       expect(response.status).toBe(200)
       expect(response.body.success).toBe(true)
 
-      // 验证物品已锁定
+      // 验证物品已锁定（方案B：使用 locks JSON 字段）
       await concurrentTestItem.reload()
       expect(concurrentTestItem.status).toBe('locked')
-      expect(concurrentTestItem.locked_by_order_id).toBe(response.body.data.order.order_id)
-      expect(concurrentTestItem.locked_at).not.toBeNull()
+      expect(concurrentTestItem.locks).not.toBeNull()
+      expect(concurrentTestItem.isLocked()).toBe(true)
+      expect(concurrentTestItem.hasLock('redemption')).toBe(true)
     })
   })
 
@@ -233,11 +234,11 @@ describe('核销系统修复验证测试', () => {
       expect(response.status).toBe(200)
       expect(response.body.success).toBe(true)
 
-      // 验证物品锁定已释放
+      // 验证物品锁定已释放（方案B：使用 locks JSON 字段）
       await orderTestItem.reload()
       expect(orderTestItem.status).toBe('available')
-      expect(orderTestItem.locked_by_order_id).toBeNull()
-      expect(orderTestItem.locked_at).toBeNull()
+      expect(orderTestItem.locks).toBeNull()
+      expect(orderTestItem.isLocked()).toBe(false)
     })
 
     test('过期订单清理后应释放物品锁定', async () => {
@@ -257,10 +258,11 @@ describe('核销系统修复验证测试', () => {
       const order = await RedemptionOrder.findByPk(createdOrder.order_id)
       expect(order.status).toBe('expired')
 
-      // 验证物品锁定已释放
+      // 验证物品锁定已释放（方案B：使用 locks JSON 字段）
       await orderTestItem.reload()
       expect(orderTestItem.status).toBe('available')
-      expect(orderTestItem.locked_by_order_id).toBeNull()
+      expect(orderTestItem.locks).toBeNull()
+      expect(orderTestItem.isLocked()).toBe(false)
     })
   })
 })

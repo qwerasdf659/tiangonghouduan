@@ -1,6 +1,6 @@
-const { sequelize } = require('../models');
+const { sequelize } = require('../models')
 
-(async () => {
+;(async () => {
   try {
     console.log('📝 开始迁移：添加role_change操作类型\n')
 

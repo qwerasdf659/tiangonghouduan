@@ -90,20 +90,16 @@ module.exports = {
 
       // 5. 检查索引是否已存在
       const [indexes] = await queryInterface.sequelize.query(
-        'SHOW INDEX FROM points_transactions WHERE Key_name = \'idx_restored_by_time\'',
+        "SHOW INDEX FROM points_transactions WHERE Key_name = 'idx_restored_by_time'",
         { transaction }
       )
 
       if (indexes.length === 0) {
         // 添加审计查询索引（加速按操作员和时间查询）
-        await queryInterface.addIndex(
-          'points_transactions',
-          ['restored_by', 'restored_at'],
-          {
-            name: 'idx_restored_by_time',
-            transaction
-          }
-        )
+        await queryInterface.addIndex('points_transactions', ['restored_by', 'restored_at'], {
+          name: 'idx_restored_by_time',
+          transaction
+        })
         console.log('✅ idx_restored_by_time索引添加成功')
       } else {
         console.log('⏭️ idx_restored_by_time索引已存在，跳过')
@@ -154,16 +150,14 @@ module.exports = {
 
       // 1. 删除索引
       const [indexes] = await queryInterface.sequelize.query(
-        'SHOW INDEX FROM points_transactions WHERE Key_name = \'idx_restored_by_time\'',
+        "SHOW INDEX FROM points_transactions WHERE Key_name = 'idx_restored_by_time'",
         { transaction }
       )
 
       if (indexes.length > 0) {
-        await queryInterface.removeIndex(
-          'points_transactions',
-          'idx_restored_by_time',
-          { transaction }
-        )
+        await queryInterface.removeIndex('points_transactions', 'idx_restored_by_time', {
+          transaction
+        })
         console.log('✅ idx_restored_by_time索引删除成功')
       }
 

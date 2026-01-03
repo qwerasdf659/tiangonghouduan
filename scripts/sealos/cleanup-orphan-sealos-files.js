@@ -19,21 +19,19 @@ const ORPHAN_FILES = [
    * 格式: 'file_path' (从迁移前的数据库记录中提取)
    * 示例: 'mh3jkbis_34a12469-9874-434e-88bc-3e6601b92c48.jpg'
    */
-
   /*
    * ⚠️ 注意: 由于数据库记录已删除，需要从以下来源手动填写文件路径:
    * 1. 数据库备份文件
    * 2. 迁移执行前的数据导出
    * 3. Sealos对象存储控制台文件列表
    */
-
   // 📝 如果不确定哪些文件需要删除，建议先不执行清理
 ]
 
 /**
  * 主清理函数
  */
-async function cleanupOrphanFiles () {
+async function cleanupOrphanFiles() {
   console.log('🧹 Sealos对象存储孤儿文件清理\n')
 
   if (ORPHAN_FILES.length === 0) {

@@ -6,7 +6,7 @@
 
 const { sequelize } = require('../models')
 
-async function checkUsersTable () {
+async function checkUsersTable() {
   try {
     console.log('🔍 检查users表结构...\n')
 
@@ -18,7 +18,9 @@ async function checkUsersTable () {
     console.log('📋 users表字段列表:')
     console.log('='.repeat(80))
     results.forEach(column => {
-      console.log(`字段: ${column.Field.padEnd(30)} | 类型: ${column.Type.padEnd(20)} | 允许NULL: ${column.Null}`)
+      console.log(
+        `字段: ${column.Field.padEnd(30)} | 类型: ${column.Type.padEnd(20)} | 允许NULL: ${column.Null}`
+      )
     })
     console.log('='.repeat(80))
     console.log(`\n总共 ${results.length} 个字段\n`)

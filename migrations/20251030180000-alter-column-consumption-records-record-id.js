@@ -8,7 +8,7 @@
 'use strict'
 
 module.exports = {
-  async up (queryInterface, Sequelize) {
+  async up(queryInterface, Sequelize) {
     const transaction = await queryInterface.sequelize.transaction()
 
     try {
@@ -16,7 +16,7 @@ module.exports = {
 
       // 修改record_id字段，添加AUTO_INCREMENT
       await queryInterface.sequelize.query(
-        'ALTER TABLE `consumption_records` MODIFY COLUMN `record_id` BIGINT NOT NULL AUTO_INCREMENT COMMENT \'消费记录ID（主键，自增）\'',
+        "ALTER TABLE `consumption_records` MODIFY COLUMN `record_id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '消费记录ID（主键，自增）'",
         { transaction }
       )
 
@@ -31,14 +31,14 @@ module.exports = {
     }
   },
 
-  async down (queryInterface, Sequelize) {
+  async down(queryInterface, Sequelize) {
     const transaction = await queryInterface.sequelize.transaction()
 
     try {
       console.log('回滚：移除AUTO_INCREMENT属性...')
 
       await queryInterface.sequelize.query(
-        'ALTER TABLE `consumption_records` MODIFY COLUMN `record_id` BIGINT NOT NULL COMMENT \'消费记录ID（主键）\'',
+        "ALTER TABLE `consumption_records` MODIFY COLUMN `record_id` BIGINT NOT NULL COMMENT '消费记录ID（主键）'",
         { transaction }
       )
 

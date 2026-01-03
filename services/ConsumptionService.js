@@ -437,6 +437,11 @@ class ConsumptionService {
        * - 抽成的80%作为预算积分
        * - 价值系数为3（1元预算 = 3预算积分）
        * 计算公式：budget_points = consumption_amount × 系数（动态配置，默认0.24）
+       *
+       * 🔥 BUDGET_POINTS 架构（2026-01-03）：
+       * - 发放预算时必须指定 campaign_id（活动隔离规则）
+       * - 消费产生的预算使用 'CONSUMPTION_DEFAULT' 作为默认来源活动
+       * - 后续抽奖时，根据活动的 allowed_campaign_ids 配置决定是否可用
        */
       // 动态读取预算系数
       const budgetRatio = await ConsumptionService.getBudgetRatio()
@@ -450,6 +455,9 @@ class ConsumptionService {
         /*
          * ✅ 使用 AssetService 分配预算积分
          * asset_code: BUDGET_POINTS（预算积分）
+         * campaign_id: 'CONSUMPTION_DEFAULT' - 消费产生的预算来源标识
+         *
+         * 🔥 BUDGET_POINTS 必须指定 campaign_id（活动隔离规则）
          */
         const budgetResult = await AssetService.changeBalance(
           {
@@ -458,6 +466,7 @@ class ConsumptionService {
             delta_amount: budgetPointsToAllocate,
             business_type: 'consumption_budget_allocation',
             idempotency_key: `consumption_budget:approve:${recordId}`,
+            campaign_id: 'CONSUMPTION_DEFAULT', // 🔥 消费产生的预算来源活动标识
             meta: {
               reference_type: 'consumption',
               reference_id: recordId,
@@ -470,7 +479,7 @@ class ConsumptionService {
         )
 
         logger.info(
-          `💰 预算分配成功: user_id=${record.user_id}, 预算积分=${budgetPointsToAllocate}, 幂等=${budgetResult.is_duplicate ? '重复' : '新增'}`
+          `💰 预算分配成功: user_id=${record.user_id}, 预算积分=${budgetPointsToAllocate}, campaign_id=CONSUMPTION_DEFAULT, 幂等=${budgetResult.is_duplicate ? '重复' : '新增'}`
         )
       }
 

@@ -51,7 +51,8 @@ module.exports = sequelize => {
       operation_type: {
         type: DataTypes.ENUM('activate', 'deactivate', 'role_change', 'batch_deactivate'),
         allowNull: false,
-        comment: '操作类型：activate-激活权限，deactivate-停用权限，role_change-角色变更，batch_deactivate-批量停用'
+        comment:
+          '操作类型：activate-激活权限，deactivate-停用权限，role_change-角色变更，batch_deactivate-批量停用'
       },
 
       // 原角色ID

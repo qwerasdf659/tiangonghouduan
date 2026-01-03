@@ -119,7 +119,11 @@ module.exports = sequelize => {
       updatedAt: 'updated_at',
       underscored: true,
       indexes: [
-        { unique: true, fields: ['user_id', 'role_id'], comment: '一个用户在同一角色下只能有一条层级记录' },
+        {
+          unique: true,
+          fields: ['user_id', 'role_id'],
+          comment: '一个用户在同一角色下只能有一条层级记录'
+        },
         { fields: ['superior_user_id'], comment: '查询某个上级的所有直接下属' },
         { fields: ['is_active'], comment: '筛选激活/停用状态' }
       ],

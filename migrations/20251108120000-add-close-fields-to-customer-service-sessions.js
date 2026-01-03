@@ -33,7 +33,7 @@ module.exports = {
    * @param {import('sequelize').QueryInterface} queryInterface - Sequelize查询接口
    * @param {import('sequelize')} Sequelize - Sequelize构造函数
    */
-  async up (queryInterface, Sequelize) {
+  async up(queryInterface, Sequelize) {
     const transaction = await queryInterface.sequelize.transaction()
 
     try {
@@ -86,14 +86,10 @@ module.exports = {
 
       if (!indexExists) {
         console.log('➕ 创建索引：idx_closed_by')
-        await queryInterface.addIndex(
-          'customer_service_sessions',
-          ['closed_by'],
-          {
-            name: 'idx_closed_by',
-            transaction
-          }
-        )
+        await queryInterface.addIndex('customer_service_sessions', ['closed_by'], {
+          name: 'idx_closed_by',
+          transaction
+        })
         console.log('✅ 索引创建成功')
       } else {
         console.log('⏭️  索引已存在：idx_closed_by')
@@ -117,7 +113,7 @@ module.exports = {
    * @param {import('sequelize').QueryInterface} queryInterface - Sequelize查询接口
    * @param {import('sequelize')} Sequelize - Sequelize构造函数
    */
-  async down (queryInterface, Sequelize) {
+  async down(queryInterface, Sequelize) {
     const transaction = await queryInterface.sequelize.transaction()
 
     try {
@@ -129,7 +125,9 @@ module.exports = {
 
       if (indexExists) {
         console.log('🗑️  删除索引：idx_closed_by')
-        await queryInterface.removeIndex('customer_service_sessions', 'idx_closed_by', { transaction })
+        await queryInterface.removeIndex('customer_service_sessions', 'idx_closed_by', {
+          transaction
+        })
         console.log('✅ 索引删除成功')
       }
 
@@ -146,7 +144,9 @@ module.exports = {
       // 4️⃣ 删除close_reason字段
       if (tableDescription.close_reason) {
         console.log('🗑️  删除字段：close_reason')
-        await queryInterface.removeColumn('customer_service_sessions', 'close_reason', { transaction })
+        await queryInterface.removeColumn('customer_service_sessions', 'close_reason', {
+          transaction
+        })
         console.log('✅ close_reason字段删除成功')
       }
 

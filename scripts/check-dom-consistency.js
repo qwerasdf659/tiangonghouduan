@@ -18,7 +18,7 @@ const path = require('path')
  * @param {string} htmlContent - HTML文件内容
  * @returns {Set<string>} ID集合
  */
-function extractHTMLIds (htmlContent) {
+function extractHTMLIds(htmlContent) {
   // 匹配 id="xxx" 或 id='xxx' 格式
   const idPattern = /id=["']([^"']+)["']/g
   const ids = new Set()
@@ -36,7 +36,7 @@ function extractHTMLIds (htmlContent) {
  * @param {string} jsContent - JavaScript代码内容
  * @returns {Set<string>} ID集合
  */
-function extractJSIds (jsContent) {
+function extractJSIds(jsContent) {
   const patterns = [
     // document.getElementById('xxx')
     /getElementById\(['"]([^'"]+)['"]\)/g,
@@ -63,7 +63,7 @@ function extractJSIds (jsContent) {
  * @param {string} filePath - 文件路径
  * @returns {Object} 检查结果
  */
-function checkFile (filePath) {
+function checkFile(filePath) {
   console.log(`\n🔍 检查文件: ${path.basename(filePath)}`)
 
   try {
@@ -141,7 +141,7 @@ function checkFile (filePath) {
 /**
  * 批量检查所有HTML文件
  */
-function checkAllFiles () {
+function checkAllFiles() {
   console.log('🚀 开始前端DOM元素ID一致性检查...')
   console.log('='.repeat(60))
 

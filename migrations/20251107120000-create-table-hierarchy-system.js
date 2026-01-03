@@ -30,83 +30,87 @@ module.exports = {
        */
       console.log('\n📦 第1部分：创建stores表...')
 
-      await queryInterface.createTable('stores', {
-        store_id: {
-          type: Sequelize.INTEGER,
-          primaryKey: true,
-          autoIncrement: true,
-          comment: '门店ID（主键）'
+      await queryInterface.createTable(
+        'stores',
+        {
+          store_id: {
+            type: Sequelize.INTEGER,
+            primaryKey: true,
+            autoIncrement: true,
+            comment: '门店ID（主键）'
+          },
+          store_name: {
+            type: Sequelize.STRING(100),
+            allowNull: false,
+            comment: '门店名称（如：某某餐厅XX店）'
+          },
+          store_code: {
+            type: Sequelize.STRING(50),
+            allowNull: true,
+            unique: true,
+            comment: '门店编号（唯一标识，如：ST20250101001）'
+          },
+          store_address: {
+            type: Sequelize.STRING(200),
+            allowNull: true,
+            comment: '门店地址（详细地址）'
+          },
+          contact_name: {
+            type: Sequelize.STRING(50),
+            allowNull: true,
+            comment: '门店联系人姓名'
+          },
+          contact_mobile: {
+            type: Sequelize.STRING(20),
+            allowNull: true,
+            comment: '门店联系电话'
+          },
+          region: {
+            type: Sequelize.STRING(50),
+            allowNull: true,
+            comment: '所属区域（如：东城区、西城区）'
+          },
+          status: {
+            type: Sequelize.ENUM('active', 'inactive', 'pending'),
+            allowNull: false,
+            defaultValue: 'active',
+            comment: '门店状态：active-正常营业，inactive-已关闭，pending-待审核'
+          },
+          assigned_to: {
+            type: Sequelize.INTEGER,
+            allowNull: true,
+            comment: '分配给哪个业务员（外键关联users.user_id）'
+          },
+          merchant_id: {
+            type: Sequelize.INTEGER,
+            allowNull: true,
+            comment: '商户ID（关联商家用户，外键关联users.user_id）'
+          },
+          notes: {
+            type: Sequelize.TEXT,
+            allowNull: true,
+            comment: '备注信息'
+          },
+          created_at: {
+            type: Sequelize.DATE,
+            allowNull: false,
+            defaultValue: Sequelize.literal('CURRENT_TIMESTAMP'),
+            comment: '创建时间（门店信息录入时间），时区：北京时间（GMT+8）'
+          },
+          updated_at: {
+            type: Sequelize.DATE,
+            allowNull: false,
+            defaultValue: Sequelize.literal('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'),
+            comment: '更新时间（最后修改时间），时区：北京时间（GMT+8）'
+          }
         },
-        store_name: {
-          type: Sequelize.STRING(100),
-          allowNull: false,
-          comment: '门店名称（如：某某餐厅XX店）'
-        },
-        store_code: {
-          type: Sequelize.STRING(50),
-          allowNull: true,
-          unique: true,
-          comment: '门店编号（唯一标识，如：ST20250101001）'
-        },
-        store_address: {
-          type: Sequelize.STRING(200),
-          allowNull: true,
-          comment: '门店地址（详细地址）'
-        },
-        contact_name: {
-          type: Sequelize.STRING(50),
-          allowNull: true,
-          comment: '门店联系人姓名'
-        },
-        contact_mobile: {
-          type: Sequelize.STRING(20),
-          allowNull: true,
-          comment: '门店联系电话'
-        },
-        region: {
-          type: Sequelize.STRING(50),
-          allowNull: true,
-          comment: '所属区域（如：东城区、西城区）'
-        },
-        status: {
-          type: Sequelize.ENUM('active', 'inactive', 'pending'),
-          allowNull: false,
-          defaultValue: 'active',
-          comment: '门店状态：active-正常营业，inactive-已关闭，pending-待审核'
-        },
-        assigned_to: {
-          type: Sequelize.INTEGER,
-          allowNull: true,
-          comment: '分配给哪个业务员（外键关联users.user_id）'
-        },
-        merchant_id: {
-          type: Sequelize.INTEGER,
-          allowNull: true,
-          comment: '商户ID（关联商家用户，外键关联users.user_id）'
-        },
-        notes: {
-          type: Sequelize.TEXT,
-          allowNull: true,
-          comment: '备注信息'
-        },
-        created_at: {
-          type: Sequelize.DATE,
-          allowNull: false,
-          defaultValue: Sequelize.literal('CURRENT_TIMESTAMP'),
-          comment: '创建时间（门店信息录入时间），时区：北京时间（GMT+8）'
-        },
-        updated_at: {
-          type: Sequelize.DATE,
-          allowNull: false,
-          defaultValue: Sequelize.literal('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'),
-          comment: '更新时间（最后修改时间），时区：北京时间（GMT+8）'
+        {
+          transaction,
+          charset: 'utf8mb4',
+          collate: 'utf8mb4_unicode_ci',
+          comment: '门店信息表（用于记录合作商家门店，业务员分派依据）'
         }
-      }, {
-        transaction,
-        charset: 'utf8mb4',
-        collate: 'utf8mb4_unicode_ci',
-        comment: '门店信息表（用于记录合作商家门店，业务员分派依据）'
-      })
+      )
 
       console.log('  ✅ stores表创建成功')
 
@@ -117,77 +121,81 @@ module.exports = {
        */
       console.log('\n📦 第2部分：创建user_hierarchy表（简化版）...')
 
-      await queryInterface.createTable('user_hierarchy', {
-        hierarchy_id: {
-          type: Sequelize.INTEGER,
-          primaryKey: true,
-          autoIncrement: true,
-          comment: '层级关系ID（主键）'
+      await queryInterface.createTable(
+        'user_hierarchy',
+        {
+          hierarchy_id: {
+            type: Sequelize.INTEGER,
+            primaryKey: true,
+            autoIncrement: true,
+            comment: '层级关系ID（主键）'
+          },
+          user_id: {
+            type: Sequelize.INTEGER,
+            allowNull: false,
+            comment: '用户ID（当前用户）'
+          },
+          superior_user_id: {
+            type: Sequelize.INTEGER,
+            allowNull: true,
+            comment: '上级用户ID（NULL表示顶级区域负责人）'
+          },
+          role_id: {
+            type: Sequelize.INTEGER,
+            allowNull: false,
+            comment: '当前角色ID（关联roles表）'
+          },
+          store_id: {
+            type: Sequelize.INTEGER,
+            allowNull: true,
+            comment: '所属门店ID（仅业务员有值，业务经理和区域负责人为NULL）'
+          },
+          is_active: {
+            type: Sequelize.BOOLEAN,
+            allowNull: false,
+            defaultValue: true,
+            comment: '层级关系是否有效（1=激活，0=已停用）'
+          },
+          activated_at: {
+            type: Sequelize.DATE,
+            allowNull: true,
+            comment: '激活时间（首次激活或重新激活时记录），时区：北京时间（GMT+8）'
+          },
+          deactivated_at: {
+            type: Sequelize.DATE,
+            allowNull: true,
+            comment: '停用时间（停用时记录），时区：北京时间（GMT+8）'
+          },
+          deactivated_by: {
+            type: Sequelize.INTEGER,
+            allowNull: true,
+            comment: '停用操作人ID（谁停用的？外键关联users.user_id）'
+          },
+          deactivation_reason: {
+            type: Sequelize.TEXT,
+            allowNull: true,
+            comment: '停用原因（如：离职、调动、违规等）'
+          },
+          created_at: {
+            type: Sequelize.DATE,
+            allowNull: false,
+            defaultValue: Sequelize.literal('CURRENT_TIMESTAMP'),
+            comment: '创建时间，时区：北京时间（GMT+8）'
+          },
+          updated_at: {
+            type: Sequelize.DATE,
+            allowNull: false,
+            defaultValue: Sequelize.literal('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'),
+            comment: '更新时间，时区：北京时间（GMT+8）'
+          }
         },
-        user_id: {
-          type: Sequelize.INTEGER,
-          allowNull: false,
-          comment: '用户ID（当前用户）'
-        },
-        superior_user_id: {
-          type: Sequelize.INTEGER,
-          allowNull: true,
-          comment: '上级用户ID（NULL表示顶级区域负责人）'
-        },
-        role_id: {
-          type: Sequelize.INTEGER,
-          allowNull: false,
-          comment: '当前角色ID（关联roles表）'
-        },
-        store_id: {
-          type: Sequelize.INTEGER,
-          allowNull: true,
-          comment: '所属门店ID（仅业务员有值，业务经理和区域负责人为NULL）'
-        },
-        is_active: {
-          type: Sequelize.BOOLEAN,
-          allowNull: false,
-          defaultValue: true,
-          comment: '层级关系是否有效（1=激活，0=已停用）'
-        },
-        activated_at: {
-          type: Sequelize.DATE,
-          allowNull: true,
-          comment: '激活时间（首次激活或重新激活时记录），时区：北京时间（GMT+8）'
-        },
-        deactivated_at: {
-          type: Sequelize.DATE,
-          allowNull: true,
-          comment: '停用时间（停用时记录），时区：北京时间（GMT+8）'
-        },
-        deactivated_by: {
-          type: Sequelize.INTEGER,
-          allowNull: true,
-          comment: '停用操作人ID（谁停用的？外键关联users.user_id）'
-        },
-        deactivation_reason: {
-          type: Sequelize.TEXT,
-          allowNull: true,
-          comment: '停用原因（如：离职、调动、违规等）'
-        },
-        created_at: {
-          type: Sequelize.DATE,
-          allowNull: false,
-          defaultValue: Sequelize.literal('CURRENT_TIMESTAMP'),
-          comment: '创建时间，时区：北京时间（GMT+8）'
-        },
-        updated_at: {
-          type: Sequelize.DATE,
-          allowNull: false,
-          defaultValue: Sequelize.literal('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'),
-          comment: '更新时间，时区：北京时间（GMT+8）'
+        {
+          transaction,
+          charset: 'utf8mb4',
+          collate: 'utf8mb4_unicode_ci',
+          comment: '用户层级关系表（简化版：仅保留核心字段和必要索引）'
         }
-      }, {
-        transaction,
-        charset: 'utf8mb4',
-        collate: 'utf8mb4_unicode_ci',
-        comment: '用户层级关系表（简化版：仅保留核心字段和必要索引）'
-      })
+      )
 
       console.log('  ✅ user_hierarchy表创建成功')
 
@@ -198,66 +206,71 @@ module.exports = {
        */
       console.log('\n📦 第3部分：创建role_change_logs表...')
 
-      await queryInterface.createTable('role_change_logs', {
-        log_id: {
-          type: Sequelize.INTEGER,
-          primaryKey: true,
-          autoIncrement: true,
-          comment: '日志ID（主键）'
+      await queryInterface.createTable(
+        'role_change_logs',
+        {
+          log_id: {
+            type: Sequelize.INTEGER,
+            primaryKey: true,
+            autoIncrement: true,
+            comment: '日志ID（主键）'
+          },
+          target_user_id: {
+            type: Sequelize.INTEGER,
+            allowNull: false,
+            comment: '目标用户ID（被操作的用户，如被停用权限的业务员）'
+          },
+          operator_user_id: {
+            type: Sequelize.INTEGER,
+            allowNull: false,
+            comment: '操作人ID（执行操作的用户，如区域负责人或业务经理）'
+          },
+          operation_type: {
+            type: Sequelize.ENUM('activate', 'deactivate', 'role_change', 'batch_deactivate'),
+            allowNull: false,
+            comment:
+              '操作类型：activate-激活权限，deactivate-停用权限，role_change-角色变更，batch_deactivate-批量停用'
+          },
+          old_role_id: {
+            type: Sequelize.INTEGER,
+            allowNull: true,
+            comment: '原角色ID（角色变更时记录，如从业务员变为业务经理）'
+          },
+          new_role_id: {
+            type: Sequelize.INTEGER,
+            allowNull: true,
+            comment: '新角色ID（角色变更时记录，如从业务员变为业务经理）'
+          },
+          affected_count: {
+            type: Sequelize.INTEGER,
+            allowNull: false,
+            defaultValue: 1,
+            comment: '影响的用户数量（批量操作时记录，如停用1个业务经理及其10个业务员，则为11）'
+          },
+          reason: {
+            type: Sequelize.TEXT,
+            allowNull: true,
+            comment: '操作原因（如：离职、调动、违规、权限调整等）'
+          },
+          ip_address: {
+            type: Sequelize.STRING(50),
+            allowNull: true,
+            comment: '操作IP地址（用于安全审计）'
+          },
+          created_at: {
+            type: Sequelize.DATE,
+            allowNull: false,
+            defaultValue: Sequelize.literal('CURRENT_TIMESTAMP'),
+            comment: '日志记录时间，时区：北京时间（GMT+8）'
+          }
         },
-        target_user_id: {
-          type: Sequelize.INTEGER,
-          allowNull: false,
-          comment: '目标用户ID（被操作的用户，如被停用权限的业务员）'
-        },
-        operator_user_id: {
-          type: Sequelize.INTEGER,
-          allowNull: false,
-          comment: '操作人ID（执行操作的用户，如区域负责人或业务经理）'
-        },
-        operation_type: {
-          type: Sequelize.ENUM('activate', 'deactivate', 'role_change', 'batch_deactivate'),
-          allowNull: false,
-          comment: '操作类型：activate-激活权限，deactivate-停用权限，role_change-角色变更，batch_deactivate-批量停用'
-        },
-        old_role_id: {
-          type: Sequelize.INTEGER,
-          allowNull: true,
-          comment: '原角色ID（角色变更时记录，如从业务员变为业务经理）'
-        },
-        new_role_id: {
-          type: Sequelize.INTEGER,
-          allowNull: true,
-          comment: '新角色ID（角色变更时记录，如从业务员变为业务经理）'
-        },
-        affected_count: {
-          type: Sequelize.INTEGER,
-          allowNull: false,
-          defaultValue: 1,
-          comment: '影响的用户数量（批量操作时记录，如停用1个业务经理及其10个业务员，则为11）'
-        },
-        reason: {
-          type: Sequelize.TEXT,
-          allowNull: true,
-          comment: '操作原因（如：离职、调动、违规、权限调整等）'
-        },
-        ip_address: {
-          type: Sequelize.STRING(50),
-          allowNull: true,
-          comment: '操作IP地址（用于安全审计）'
-        },
-        created_at: {
-          type: Sequelize.DATE,
-          allowNull: false,
-          defaultValue: Sequelize.literal('CURRENT_TIMESTAMP'),
-          comment: '日志记录时间，时区：北京时间（GMT+8）'
+        {
+          transaction,
+          charset: 'utf8mb4',
+          collate: 'utf8mb4_unicode_ci',
+          comment: '角色权限变更日志表（用于审计和追踪所有权限变更操作）'
         }
-      }, {
-        transaction,
-        charset: 'utf8mb4',
-        collate: 'utf8mb4_unicode_ci',
-        comment: '角色权限变更日志表（用于审计和追踪所有权限变更操作）'
-      })
+      )
 
       console.log('  ✅ role_change_logs表创建成功')
 
@@ -486,55 +499,59 @@ module.exports = {
       const { v4: uuidv4 } = require('uuid')
 
       // 插入3个业务角色
-      await queryInterface.bulkInsert('roles', [
-        {
-          role_uuid: uuidv4(),
-          role_name: 'regional_manager',
-          role_level: 80,
-          permissions: JSON.stringify({
-            users: ['read', 'create', 'update', 'delete'],
-            stores: ['read', 'create', 'update', 'delete'],
-            hierarchy: ['read', 'create', 'update', 'delete'],
-            staff: ['read', 'create', 'update', 'delete'],
-            consumption: ['read', 'create', 'update', 'delete'],
-            reports: ['read']
-          }),
-          description: '区域负责人（可管理业务经理和业务员，查看所有业务数据，权限级别80）',
-          is_active: true,
-          created_at: new Date(),
-          updated_at: new Date()
-        },
-        {
-          role_uuid: uuidv4(),
-          role_name: 'business_manager',
-          role_level: 60,
-          permissions: JSON.stringify({
-            stores: ['read', 'update'],
-            staff: ['read', 'create', 'update'],
-            consumption: ['read', 'create', 'update', 'delete'],
-            reports: ['read'],
-            hierarchy: ['read']
-          }),
-          description: '业务经理（可管理业务员，录入和管理消费记录，查看业务报表，权限级别60）',
-          is_active: true,
-          created_at: new Date(),
-          updated_at: new Date()
-        },
-        {
-          role_uuid: uuidv4(),
-          role_name: 'sales_staff',
-          role_level: 40,
-          permissions: JSON.stringify({
-            stores: ['read'],
-            consumption: ['read', 'create'],
-            profile: ['read', 'update']
-          }),
-          description: '业务员（可录入消费记录，查看分配门店信息，管理个人信息，权限级别40）',
-          is_active: true,
-          created_at: new Date(),
-          updated_at: new Date()
-        }
-      ], { transaction })
+      await queryInterface.bulkInsert(
+        'roles',
+        [
+          {
+            role_uuid: uuidv4(),
+            role_name: 'regional_manager',
+            role_level: 80,
+            permissions: JSON.stringify({
+              users: ['read', 'create', 'update', 'delete'],
+              stores: ['read', 'create', 'update', 'delete'],
+              hierarchy: ['read', 'create', 'update', 'delete'],
+              staff: ['read', 'create', 'update', 'delete'],
+              consumption: ['read', 'create', 'update', 'delete'],
+              reports: ['read']
+            }),
+            description: '区域负责人（可管理业务经理和业务员，查看所有业务数据，权限级别80）',
+            is_active: true,
+            created_at: new Date(),
+            updated_at: new Date()
+          },
+          {
+            role_uuid: uuidv4(),
+            role_name: 'business_manager',
+            role_level: 60,
+            permissions: JSON.stringify({
+              stores: ['read', 'update'],
+              staff: ['read', 'create', 'update'],
+              consumption: ['read', 'create', 'update', 'delete'],
+              reports: ['read'],
+              hierarchy: ['read']
+            }),
+            description: '业务经理（可管理业务员，录入和管理消费记录，查看业务报表，权限级别60）',
+            is_active: true,
+            created_at: new Date(),
+            updated_at: new Date()
+          },
+          {
+            role_uuid: uuidv4(),
+            role_name: 'sales_staff',
+            role_level: 40,
+            permissions: JSON.stringify({
+              stores: ['read'],
+              consumption: ['read', 'create'],
+              profile: ['read', 'update']
+            }),
+            description: '业务员（可录入消费记录，查看分配门店信息，管理个人信息，权限级别40）',
+            is_active: true,
+            created_at: new Date(),
+            updated_at: new Date()
+          }
+        ],
+        { transaction }
+      )
 
       console.log('  ✅ 业务角色插入完成（regional_manager, business_manager, sales_staff）')
 
@@ -557,7 +574,7 @@ module.exports = {
 
       // 验证角色数据
       const [roles] = await queryInterface.sequelize.query(
-        'SELECT COUNT(*) as count FROM roles WHERE role_name IN (\'regional_manager\', \'business_manager\', \'sales_staff\')',
+        "SELECT COUNT(*) as count FROM roles WHERE role_name IN ('regional_manager', 'business_manager', 'sales_staff')",
         { transaction }
       )
 
@@ -598,7 +615,7 @@ module.exports = {
     try {
       // 删除业务角色
       await queryInterface.sequelize.query(
-        'DELETE FROM roles WHERE role_name IN (\'regional_manager\', \'business_manager\', \'sales_staff\')',
+        "DELETE FROM roles WHERE role_name IN ('regional_manager', 'business_manager', 'sales_staff')",
         { transaction }
       )
 

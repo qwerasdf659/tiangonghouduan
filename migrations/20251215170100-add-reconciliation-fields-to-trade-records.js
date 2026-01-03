@@ -42,7 +42,7 @@ module.exports = {
    * @param {Object} Sequelize - Sequelize对象
    * @returns {Promise<void>}
    */
-  async up (queryInterface, Sequelize) {
+  async up(queryInterface, Sequelize) {
     const transaction = await queryInterface.sequelize.transaction()
 
     try {
@@ -53,7 +53,8 @@ module.exports = {
         {
           type: Sequelize.STRING(50),
           allowNull: true,
-          comment: '结算资产代码（Asset Code - 交易结算使用的资产类型）：DIAMOND-钻石资产（交易市场唯一结算币种）；业务规则：仅trade_type=market_purchase时使用，固定为DIAMOND；用途：资产结算类型、多资产扩展预留、对账验证'
+          comment:
+            '结算资产代码（Asset Code - 交易结算使用的资产类型）：DIAMOND-钻石资产（交易市场唯一结算币种）；业务规则：仅trade_type=market_purchase时使用，固定为DIAMOND；用途：资产结算类型、多资产扩展预留、对账验证'
         },
         { transaction }
       )
@@ -65,7 +66,8 @@ module.exports = {
         {
           type: Sequelize.BIGINT,
           allowNull: true,
-          comment: '买家支付总金额（Gross Amount - 买家支付的总金额，包含手续费）：使用BIGINT避免浮点精度问题；业务规则：gross_amount = fee_amount + net_amount（对账公式）；用途：买家扣款金额、对账验证、交易金额统计'
+          comment:
+            '买家支付总金额（Gross Amount - 买家支付的总金额，包含手续费）：使用BIGINT避免浮点精度问题；业务规则：gross_amount = fee_amount + net_amount（对账公式）；用途：买家扣款金额、对账验证、交易金额统计'
         },
         { transaction }
       )
@@ -78,7 +80,8 @@ module.exports = {
           type: Sequelize.BIGINT,
           allowNull: true,
           defaultValue: 0,
-          comment: '平台手续费金额（Fee Amount - 平台收取的手续费金额）：使用BIGINT避免浮点精度问题；业务规则：按fee_rules配置计算，向上取整；用途：平台收入对账、手续费统计、商家成本分析'
+          comment:
+            '平台手续费金额（Fee Amount - 平台收取的手续费金额）：使用BIGINT避免浮点精度问题；业务规则：按fee_rules配置计算，向上取整；用途：平台收入对账、手续费统计、商家成本分析'
         },
         { transaction }
       )
@@ -90,7 +93,8 @@ module.exports = {
         {
           type: Sequelize.BIGINT,
           allowNull: true,
-          comment: '卖家实收金额（Net Amount - 卖家实际收到的金额，扣除手续费后）：使用BIGINT避免浮点精度问题；业务规则：net_amount = gross_amount - fee_amount；用途：卖家入账金额、收益统计、对账验证'
+          comment:
+            '卖家实收金额（Net Amount - 卖家实际收到的金额，扣除手续费后）：使用BIGINT避免浮点精度问题；业务规则：net_amount = gross_amount - fee_amount；用途：卖家入账金额、收益统计、对账验证'
         },
         { transaction }
       )
@@ -102,7 +106,8 @@ module.exports = {
         {
           type: Sequelize.STRING(100),
           allowNull: true,
-          comment: '业务唯一标识（Business ID - 幂等键，用于防止重复扣款）：客户端必传，格式如mp_20251215_xxx；业务规则：同一business_id只能创建一条记录，重复请求返回原结果；用途：幂等性控制、重复交易防护、对账追溯'
+          comment:
+            '业务唯一标识（Business ID - 幂等键，用于防止重复扣款）：客户端必传，格式如mp_20251215_xxx；业务规则：同一business_id只能创建一条记录，重复请求返回原结果；用途：幂等性控制、重复交易防护、对账追溯'
         },
         { transaction }
       )
@@ -145,7 +150,7 @@ module.exports = {
    * @param {Object} Sequelize - Sequelize对象
    * @returns {Promise<void>}
    */
-  async down (queryInterface, Sequelize) {
+  async down(queryInterface, Sequelize) {
     const transaction = await queryInterface.sequelize.transaction()
 
     try {
@@ -160,16 +165,14 @@ module.exports = {
       if (count > 0) {
         throw new Error(
           `无法回滚：数据库中存在${count}条使用business_id的记录。` +
-          '请先手动清理数据或将数据迁移到其他表，然后再执行回滚。'
+            '请先手动清理数据或将数据迁移到其他表，然后再执行回滚。'
         )
       }
 
       // 删除business_id唯一索引
-      await queryInterface.removeIndex(
-        'trade_records',
-        'uk_trade_records_business_id',
-        { transaction }
-      )
+      await queryInterface.removeIndex('trade_records', 'uk_trade_records_business_id', {
+        transaction
+      })
 
       // 删除字段（按添加的逆序删除）
       await queryInterface.removeColumn('trade_records', 'business_id', {

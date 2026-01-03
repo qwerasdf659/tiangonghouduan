@@ -26,39 +26,24 @@
 // ========== 基础通用工具 ==========
 
 // 软删除测试工具
-const {
-  SoftDeleteTestSuite,
-  SoftDeleteHelpers
-} = require('./soft_delete.test')
+const { SoftDeleteTestSuite, SoftDeleteHelpers } = require('./soft_delete.test')
 
 // 分页测试工具
-const {
-  PaginationTestSuite,
-  PaginationHelpers
-} = require('./pagination.test')
+const { PaginationTestSuite, PaginationHelpers } = require('./pagination.test')
 
 // 事务保护测试工具
-const {
-  TransactionTestSuite,
-  TransactionHelpers
-} = require('./transaction.test')
+const { TransactionTestSuite, TransactionHelpers } = require('./transaction.test')
 
 // ========== 项目架构特定工具 ==========
 
 // 北京时间测试工具（符合项目UTC+8标准）
-const {
-  BeijingTimeTestSuite
-} = require('./beijing_time.test')
+const { BeijingTimeTestSuite } = require('./beijing_time.test')
 
 // 幂等性测试工具（符合项目business_id标准）
-const {
-  IdempotencyTestSuite
-} = require('./idempotency.test')
+const { IdempotencyTestSuite } = require('./idempotency.test')
 
 // 服务层测试工具（符合项目服务架构）
-const {
-  ServiceTestSuite
-} = require('./service.test')
+const { ServiceTestSuite } = require('./service.test')
 
 // ========== 统一导出 ==========
 

@@ -44,12 +44,10 @@ describe('GET /api/v4/system/feedback/my - 获取我的反馈列表', () => {
     test_user_id = test_user.user_id
 
     // 2. 登录获取token
-    const login_response = await request(app)
-      .post('/api/v4/auth/login')
-      .send({
-        mobile: test_mobile,
-        verification_code: TEST_DATA.auth.verificationCode // 使用统一验证码
-      })
+    const login_response = await request(app).post('/api/v4/auth/login').send({
+      mobile: test_mobile,
+      verification_code: TEST_DATA.auth.verificationCode // 使用统一验证码
+    })
 
     if (login_response.status !== 200) {
       throw new Error(`登录失败：${JSON.stringify(login_response.body)}`)
@@ -324,7 +322,9 @@ describe('GET /api/v4/system/feedback/my - 获取我的反馈列表', () => {
         for (let i = 0; i < feedbacks.length - 1; i++) {
           expect(feedbacks[i]).toHaveProperty('created_at_timestamp')
           expect(feedbacks[i + 1]).toHaveProperty('created_at_timestamp')
-          expect(feedbacks[i].created_at_timestamp).toBeGreaterThanOrEqual(feedbacks[i + 1].created_at_timestamp)
+          expect(feedbacks[i].created_at_timestamp).toBeGreaterThanOrEqual(
+            feedbacks[i + 1].created_at_timestamp
+          )
         }
       }
     })

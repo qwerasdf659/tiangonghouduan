@@ -12,7 +12,9 @@
  * @date 2025-01-21 (重构)
  */
 
-const { UnifiedLotteryEngine } = require('../../../services/UnifiedLotteryEngine/UnifiedLotteryEngine')
+const {
+  UnifiedLotteryEngine
+} = require('../../../services/UnifiedLotteryEngine/UnifiedLotteryEngine')
 const BeijingTimeHelper = require('../../../utils/timeHelper')
 const models = require('../../../models')
 const { User, LotteryCampaign } = models

@@ -28,7 +28,9 @@ describe('AnnouncementService', () => {
           expires_at: null,
           view_count: 10,
           created_at: '2025-12-01T10:00:00+08:00',
-          toJSON: function () { return this }
+          toJSON: function () {
+            return this
+          }
         },
         {
           announcement_id: 2,
@@ -40,7 +42,9 @@ describe('AnnouncementService', () => {
           expires_at: '2025-12-31T23:59:59+08:00',
           view_count: 5,
           created_at: '2025-12-02T10:00:00+08:00',
-          toJSON: function () { return this }
+          toJSON: function () {
+            return this
+          }
         }
       ]
 
@@ -65,7 +69,10 @@ describe('AnnouncementService', () => {
           where: expect.objectContaining({
             is_active: true
           }),
-          order: [['priority', 'DESC'], ['created_at', 'DESC']],
+          order: [
+            ['priority', 'DESC'],
+            ['created_at', 'DESC']
+          ],
           limit: 20,
           offset: 0
         })
@@ -187,7 +194,9 @@ describe('AnnouncementService', () => {
         content: '内容',
         type: 'system',
         priority: 'high',
-        toJSON: function () { return this }
+        toJSON: function () {
+          return this
+        }
       }
 
       SystemAnnouncement.findByPk.mockResolvedValue(mockAnnouncement)
@@ -360,7 +369,9 @@ describe('AnnouncementService', () => {
         created_by: 100,
         is_active: true,
         view_count: 0,
-        toJSON: function () { return this }
+        toJSON: function () {
+          return this
+        }
       }
 
       SystemAnnouncement.create.mockResolvedValue(mockCreatedAnnouncement)
@@ -394,7 +405,9 @@ describe('AnnouncementService', () => {
         announcement_id: 1,
         title: '旧标题',
         update: jest.fn().mockResolvedValue(true),
-        toJSON: function () { return { ...this, title: '新标题' } }
+        toJSON: function () {
+          return { ...this, title: '新标题' }
+        }
       }
 
       SystemAnnouncement.findByPk.mockResolvedValue(mockAnnouncement)

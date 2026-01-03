@@ -75,8 +75,10 @@ module.exports = {
           console.log(`  ✅ 已删除冗余索引: ${indexName}`)
           successCount++
         } catch (error) {
-          if (error.message.includes('check that column/key exists') ||
-              error.message.includes('doesn\'t exist')) {
+          if (
+            error.message.includes('check that column/key exists') ||
+            error.message.includes("doesn't exist")
+          ) {
             console.log(`  ⚠️ 索引不存在（已跳过）: ${indexName}`)
             skipCount++
           } else {
@@ -90,9 +92,7 @@ module.exports = {
 
       // 验证剩余索引
       console.log('\n🔍 验证剩余索引...')
-      const [remainingIndexes] = await queryInterface.sequelize.query(
-        'SHOW INDEX FROM users'
-      )
+      const [remainingIndexes] = await queryInterface.sequelize.query('SHOW INDEX FROM users')
       const indexNames = [...new Set(remainingIndexes.map(idx => idx.Key_name))]
       console.log('📋 保留的索引列表:')
       indexNames.forEach(name => {

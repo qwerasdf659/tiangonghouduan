@@ -130,6 +130,12 @@ const PerformanceMonitor = require('./utils/PerformanceMonitor')
 const CacheManager = require('./utils/CacheManager')
 
 /**
+ * 业务缓存助手（2026-01-03 Redis L2 缓存方案）
+ * @see docs/Redis缓存策略现状与DB压力风险评估-2026-01-02.md
+ */
+const { BusinessCacheHelper } = require('../../utils/BusinessCacheHelper')
+
+/**
  * V4统一抽奖引擎核心类
  *
  * 职责：统一管理抽奖策略、执行流程、性能监控、缓存管理
@@ -912,10 +918,23 @@ class UnifiedLotteryEngine {
   /**
    * 获取活动配置信息
    * @param {number} campaign_id - 活动ID
+   * @param {Object} options - 选项
+   * @param {boolean} options.refresh - 强制刷新缓存
    * @returns {Promise<Object>} 活动配置
    */
-  async get_campaign_config(campaign_id) {
+  async get_campaign_config(campaign_id, options = {}) {
+    const { refresh = false } = options
+
     try {
+      // ========== Redis 缓存读取（2026-01-03 P1 缓存优化）==========
+      if (!refresh) {
+        const cached = await BusinessCacheHelper.getLotteryCampaign(campaign_id)
+        if (cached) {
+          this.logDebug('[活动配置缓存] 命中', { campaign_id })
+          return cached
+        }
+      }
+
       const models = require('../../models')
 
       const campaign = await models.LotteryCampaign.findOne({
@@ -953,10 +972,15 @@ class UnifiedLotteryEngine {
         status: campaign.status
       })
 
-      return {
+      const config = {
         ...campaign.toJSON(),
         guarantee_rule: guaranteeRule // 添加保底规则信息
       }
+
+      // ========== 写入 Redis 缓存（60s TTL）==========
+      await BusinessCacheHelper.setLotteryCampaign(campaign_id, config)
+
+      return config
     } catch (error) {
       this.logError('获取活动配置失败', {
         campaign_id,

@@ -58,13 +58,15 @@ module.exports = sequelize => {
         type: DataTypes.INTEGER,
         allowNull: false,
         defaultValue: 0,
-        comment: '兑换所需积分（单个商品的积分价格，业务规则：根据商品价值定价，1积分≈1元人民币价值，用途：用户兑换时扣除积分、计算total_points、显示商品价格，范围：0-99999，定价建议：参考市场价格和商品成本）'
+        comment:
+          '兑换所需积分（单个商品的积分价格，业务规则：根据商品价值定价，1积分≈1元人民币价值，用途：用户兑换时扣除积分、计算total_points、显示商品价格，范围：0-99999，定价建议：参考市场价格和商品成本）'
       },
       stock: {
         type: DataTypes.INTEGER,
         allowNull: false,
         defaultValue: 0,
-        comment: '库存数量（商品的可兑换数量，业务规则：用户兑换时扣减、审核拒绝/取消时恢复、库存为0时不可兑换，库存管理：低于low_stock_threshold时预警，用途：兑换前验证、库存统计、补货提醒，更新方式：使用Product.increment/decrement原子操作）'
+        comment:
+          '库存数量（商品的可兑换数量，业务规则：用户兑换时扣减、审核拒绝/取消时恢复、库存为0时不可兑换，库存管理：低于low_stock_threshold时预警，用途：兑换前验证、库存统计、补货提醒，更新方式：使用Product.increment/decrement原子操作）'
       },
       original_price: {
         type: DataTypes.DECIMAL(10, 2),
@@ -239,36 +241,44 @@ module.exports = sequelize => {
     }
 
     // 基础信息（所有空间共享） - 返回纯JSON对象
-    const base_info = JSON.parse(JSON.stringify({
-      product_id: this.product_id,
-      name: this.name,
-      description: this.description,
-      category: this.category,
-      status: this.status,
-      is_hot: this.is_hot,
-      is_new: this.is_new,
-      is_limited: this.is_limited,
-      sort_order: this.sort_order,
-      rating: this.rating,
-      warranty: this.warranty,
-      delivery_info: this.delivery_info,
-      expires_at: this.expires_at,
-      original_price: this.original_price,
-      discount: this.discount,
-      created_at: this.created_at,
-      updated_at: this.updated_at
-    }))
+    const base_info = JSON.parse(
+      JSON.stringify({
+        product_id: this.product_id,
+        name: this.name,
+        description: this.description,
+        category: this.category,
+        status: this.status,
+        is_hot: this.is_hot,
+        is_new: this.is_new,
+        is_limited: this.is_limited,
+        sort_order: this.sort_order,
+        rating: this.rating,
+        warranty: this.warranty,
+        delivery_info: this.delivery_info,
+        expires_at: this.expires_at,
+        original_price: this.original_price,
+        discount: this.discount,
+        created_at: this.created_at,
+        updated_at: this.updated_at
+      })
+    )
 
     // 臻选空间且商品支持both：使用premium_*字段（如果有）
     if (request_space === 'premium' && this.space === 'both') {
       return {
         ...base_info,
         space: request_space, // 标记为premium空间
-        exchange_points: this.premium_exchange_points !== null ? this.premium_exchange_points : this.exchange_points,
+        exchange_points:
+          this.premium_exchange_points !== null
+            ? this.premium_exchange_points
+            : this.exchange_points,
         stock: this.premium_stock !== null ? this.premium_stock : this.stock,
         image: this.premium_image || this.image,
         // 额外标记：是否使用了专属配置
-        using_premium_config: this.premium_exchange_points !== null || this.premium_stock !== null || this.premium_image !== null
+        using_premium_config:
+          this.premium_exchange_points !== null ||
+          this.premium_stock !== null ||
+          this.premium_image !== null
       }
     }
 

@@ -5,7 +5,7 @@
 
 const { User, UserRole, Role } = require('../models')
 
-async function checkTask14 () {
+async function checkTask14() {
   console.log('===================================================================')
   console.log('任务 1.4 完整性检查')
   console.log('===================================================================\n')
@@ -16,7 +16,15 @@ async function checkTask14 () {
     // 检查 1: User 表结构
     console.log('✓ 检查 1: User 表结构')
     const userDesc = await User.describe()
-    const requiredFields = ['user_id', 'mobile', 'nickname', 'status', 'created_at', 'last_login', 'login_count']
+    const requiredFields = [
+      'user_id',
+      'mobile',
+      'nickname',
+      'status',
+      'created_at',
+      'last_login',
+      'login_count'
+    ]
     const missingFields = requiredFields.filter(f => !userDesc[f])
     if (missingFields.length > 0) {
       console.log('  ❌ 缺少字段:', missingFields)
@@ -67,7 +75,12 @@ async function checkTask14 () {
     // 检查 4: UserService 方法完整性
     console.log('\n✓ 检查 4: UserService 方法完整性')
     const UserService = require('../services/UserService')
-    const requiredMethods = ['adminLogin', 'getUserWithValidation', 'findByMobile', 'updateLoginStats']
+    const requiredMethods = [
+      'adminLogin',
+      'getUserWithValidation',
+      'findByMobile',
+      'updateLoginStats'
+    ]
     const missingMethods = requiredMethods.filter(m => typeof UserService[m] !== 'function')
     if (missingMethods.length > 0) {
       console.log('  ❌ UserService 缺少方法:', missingMethods)

@@ -461,12 +461,29 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
           })
 
           /*
-           * 🎯 步骤3.5: 记录奖品价值积分（用于历史记录和统计）
+           * 🎯 步骤3.5: 扣减预算积分（BUDGET_POINTS 架构）
            * 业务规则：
-           * - 记录奖品价值积分（用于统计和分析）
-           * - 积分扣除已在execute_draw中统一处理，此处仅记录
+           * - budget_mode='user': 从用户 BUDGET_POINTS 扣减
+           * - budget_mode='pool': 从活动池 pool_budget_remaining 扣减
+           * - budget_mode='none': 不扣减（测试用）
            */
           const prizeValuePoints = prize.prize_value_points || 0
+
+          if (prizeValuePoints > 0) {
+            await this.deductBudgetPoints(
+              campaignId,
+              user_id,
+              prizeValuePoints,
+              {
+                idempotency_key: context.idempotency_key
+                  ? `${context.idempotency_key}:budget`
+                  : `budget_${draw_id}`,
+                prize_id: prize.prize_id,
+                prize_name: prize.prize_name
+              },
+              internalTransaction
+            )
+          }
 
           this.logInfo('奖品价值记录', {
             user_id,
@@ -1365,11 +1382,14 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
   }
 
   /**
-   * 获取可用奖品池（双账户模型：根据预算过滤）
+   * 获取可用奖品池（BUDGET_POINTS 预算架构：根据活动预算模式过滤）
    *
    * 业务场景：
    * - 抽奖前拉取活动奖品池（100% 从奖品池中选择一个奖品）
-   * - 若传入 userId，则按“预算积分 remaining_budget_points”过滤可抽取的奖品
+   * - 根据活动的 budget_mode 决定预算来源：
+   *   - user: 从用户 BUDGET_POINTS 余额过滤（按 campaign_id 隔离）
+   *   - pool: 从活动池 pool_budget_remaining 过滤
+   *   - none: 不做预算过滤（测试用）
    *
    * @param {number} campaignId - 活动ID
    * @param {number|null} userId - 用户ID（用于预算过滤；不传则不做预算过滤）
@@ -1378,7 +1398,7 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
    * @returns {Promise<Array>} 可用奖品列表（已按业务规则过滤）
    */
   async getAvailablePrizes(campaignId, userId = null, options = {}) {
-    const { LotteryPrize } = require('../../../models') // 🔧 V4.3修复：移除废弃的UserPointsAccount
+    const { LotteryPrize, LotteryCampaign } = require('../../../models')
     const { transaction = null } = options
 
     try {
@@ -1390,21 +1410,22 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
         },
         attributes: [
           'prize_id',
-          'prize_name', // ✅ 修复：使用正确的数据库字段名
+          'prize_name',
           'prize_type',
           'prize_value',
-          'prize_value_points', // 🔥 V4.3：奖品价值积分
+          'prize_value_points', // 🔥 BUDGET_POINTS 架构：奖品价值积分
           'win_probability',
           'stock_quantity',
           'max_daily_wins',
           'daily_win_count',
-          'sort_order', // 🎯 方案3：查询sort_order用于前端计算索引
+          'sort_order',
           'status'
         ],
         order: [
-          ['win_probability', 'DESC'], // 按中奖概率排序，提高选择效率
-          ['created_at', 'ASC'] // 相同概率按创建时间排序
-        ]
+          ['win_probability', 'DESC'],
+          ['created_at', 'ASC']
+        ],
+        transaction
       })
 
       if (prizes.length === 0) {
@@ -1413,47 +1434,109 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
       }
 
       /*
-       * ========== 双账户模型：预算过滤逻辑 ==========
+       * ========== BUDGET_POINTS 预算架构：预算过滤逻辑 ==========
        * 业务规则：
-       * - 根据用户剩余预算积分筛选奖品池
-       * - 只能抽中 prize_value_points <= remaining_budget_points 的奖品
+       * - budget_mode='user': 根据用户 BUDGET_POINTS 余额筛选奖品池
+       * - budget_mode='pool': 根据活动池 pool_budget_remaining 筛选奖品池
+       * - budget_mode='none': 不做预算过滤（测试用）
+       * - 只能抽中 prize_value_points <= remaining_budget 的奖品
        * - 预算用完后只能中0成本空奖（prize_value_points = 0）
        */
       let filteredPrizes = prizes
 
-      if (userId) {
-        // 🔧 V4.3修复：使用新资产系统查询用户可用积分作为预算
-        const userAccount = await getUserPointsBalance(userId, {
-          transaction: transaction || undefined,
-          lock: !!transaction
+      // 获取活动配置
+      const campaign = await LotteryCampaign.findByPk(campaignId, {
+        attributes: ['campaign_id', 'budget_mode', 'pool_budget_remaining', 'allowed_campaign_ids'],
+        transaction
+      })
+
+      if (!campaign) {
+        this.logError('活动不存在', { campaignId })
+        throw new Error(`活动不存在：campaign_id=${campaignId}`)
+      }
+
+      const budgetMode = campaign.budget_mode || 'user'
+
+      this.logInfo('BUDGET_POINTS 架构：开始预算过滤', {
+        campaignId,
+        userId,
+        budgetMode,
+        totalPrizes: prizes.length
+      })
+
+      // 根据 budget_mode 决定预算过滤逻辑
+      if (budgetMode === 'none') {
+        // 🎯 无预算限制模式（测试用）：不做预算过滤
+        this.logInfo('budget_mode=none：跳过预算过滤', { campaignId, userId })
+      } else if (budgetMode === 'pool') {
+        // 🎯 活动池预算模式：从 pool_budget_remaining 过滤
+        const poolBudgetRemaining = Number(campaign.pool_budget_remaining) || 0
+
+        filteredPrizes = prizes.filter(prize => {
+          const prizeValuePoints = prize.prize_value_points || 0
+          return prizeValuePoints <= poolBudgetRemaining
         })
 
-        if (userAccount) {
-          const remainingBudget = userAccount.available_points || 0 // 🔧 使用available_points作为预算
+        this.logInfo('budget_mode=pool：使用活动池预算过滤', {
+          campaignId,
+          poolBudgetRemaining,
+          totalPrizes: prizes.length,
+          filteredPrizes: filteredPrizes.length,
+          budgetExhausted: poolBudgetRemaining === 0
+        })
 
-          // 根据预算筛选奖品池
-          filteredPrizes = prizes.filter(prize => {
-            const prizeValuePoints = prize.prize_value_points || 0
-            return prizeValuePoints <= remainingBudget
+        // 如果预算用完了，至少保证有空奖可抽
+        if (filteredPrizes.length === 0) {
+          filteredPrizes = prizes.filter(p => (p.prize_value_points || 0) === 0)
+          this.logWarn('活动池预算耗尽，仅保留0成本空奖', {
+            campaignId,
+            emptyPrizesCount: filteredPrizes.length
           })
+        }
+      } else if (budgetMode === 'user' && userId) {
+        // 🎯 用户预算模式：从用户 BUDGET_POINTS 余额过滤
+        let remainingBudget = 0
 
-          this.logInfo('V4.3：使用可用积分作为预算过滤完成', {
+        // 获取用户的 BUDGET_POINTS 余额（考虑 allowed_campaign_ids 限制）
+        const allowedCampaignIds = campaign.allowed_campaign_ids
+
+        if (allowedCampaignIds === null) {
+          // 无限制：查询用户所有 BUDGET_POINTS 总和
+          remainingBudget = await this.getUserTotalBudgetPoints(userId, { transaction })
+        } else if (Array.isArray(allowedCampaignIds) && allowedCampaignIds.length > 0) {
+          // 有限制：只查询指定 campaign_id 的 BUDGET_POINTS 总和
+          remainingBudget = await this.getUserBudgetPointsByCampaigns(userId, allowedCampaignIds, {
+            transaction
+          })
+        } else {
+          // 空数组：无可用预算来源
+          remainingBudget = 0
+        }
+
+        // 根据预算筛选奖品池
+        filteredPrizes = prizes.filter(prize => {
+          const prizeValuePoints = prize.prize_value_points || 0
+          return prizeValuePoints <= remainingBudget
+        })
+
+        this.logInfo('budget_mode=user：使用用户 BUDGET_POINTS 过滤', {
+          userId,
+          campaignId,
+          remainingBudget,
+          allowedCampaignIds,
+          totalPrizes: prizes.length,
+          filteredPrizes: filteredPrizes.length,
+          budgetExhausted: remainingBudget === 0
+        })
+
+        // 如果预算用完了，至少保证有空奖可抽
+        if (filteredPrizes.length === 0) {
+          filteredPrizes = prizes.filter(p => (p.prize_value_points || 0) === 0)
+          this.logWarn('用户预算耗尽，仅保留0成本空奖', {
             userId,
             campaignId,
-            remainingBudget,
-            totalPrizes: prizes.length,
-            filteredPrizes: filteredPrizes.length,
-            budgetExhausted: remainingBudget === 0
+            emptyPrizesCount: filteredPrizes.length
           })
-
-          // 如果预算用完了，至少保证有空奖可抽
-          if (filteredPrizes.length === 0) {
-            filteredPrizes = prizes.filter(p => (p.prize_value_points || 0) === 0)
-            this.logWarn('预算耗尽，仅保留0成本空奖', {
-              userId,
-              emptyPrizesCount: filteredPrizes.length
-            })
-          }
         }
       }
 
@@ -1465,6 +1548,7 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
       this.logInfo('奖品池查询完成', {
         campaignId,
         userId,
+        budgetMode,
         totalPrizes,
         activePrizes,
         totalStock,
@@ -1475,6 +1559,212 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
     } catch (error) {
       this.logError('获取奖品池失败', { campaignId, userId, error: error.message })
       throw new Error(`获取奖品池失败: ${error.message}`)
+    }
+  }
+
+  /**
+   * 获取用户所有 BUDGET_POINTS 总和（无 campaign_id 限制）
+   *
+   * @param {number} userId - 用户ID
+   * @param {Object} options - 选项
+   * @param {Object|null} options.transaction - 事务对象
+   * @returns {Promise<number>} BUDGET_POINTS 总和
+   */
+  async getUserTotalBudgetPoints(userId, options = {}) {
+    const { transaction } = options
+    const { Account, AccountAssetBalance } = require('../../../models')
+
+    try {
+      // 查询用户账户
+      const account = await Account.findOne({
+        where: { user_id: userId, account_type: 'user' },
+        transaction
+      })
+
+      if (!account) {
+        return 0
+      }
+
+      // 汇总所有 BUDGET_POINTS 余额
+      const result = await AccountAssetBalance.sum('available_amount', {
+        where: {
+          account_id: account.account_id,
+          asset_code: 'BUDGET_POINTS'
+        },
+        transaction
+      })
+
+      return Number(result) || 0
+    } catch (error) {
+      this.logError('获取用户 BUDGET_POINTS 总和失败', { userId, error: error.message })
+      return 0
+    }
+  }
+
+  /**
+   * 获取用户指定 campaign_id 的 BUDGET_POINTS 总和
+   *
+   * @param {number} userId - 用户ID
+   * @param {Array<string|number>} campaignIds - 允许的 campaign_id 列表
+   * @param {Object} options - 选项
+   * @param {Object|null} options.transaction - 事务对象
+   * @returns {Promise<number>} BUDGET_POINTS 总和
+   */
+  async getUserBudgetPointsByCampaigns(userId, campaignIds, options = {}) {
+    const { transaction } = options
+    const { Account, AccountAssetBalance } = require('../../../models')
+    const { Op } = require('sequelize')
+
+    try {
+      // 查询用户账户
+      const account = await Account.findOne({
+        where: { user_id: userId, account_type: 'user' },
+        transaction
+      })
+
+      if (!account) {
+        return 0
+      }
+
+      // 将 campaignIds 转为字符串数组（campaign_id 在表中为字符串类型）
+      const campaignIdStrings = campaignIds.map(id => String(id))
+
+      // 汇总指定 campaign_id 的 BUDGET_POINTS 余额
+      const result = await AccountAssetBalance.sum('available_amount', {
+        where: {
+          account_id: account.account_id,
+          asset_code: 'BUDGET_POINTS',
+          campaign_id: { [Op.in]: campaignIdStrings }
+        },
+        transaction
+      })
+
+      return Number(result) || 0
+    } catch (error) {
+      this.logError('获取用户指定活动 BUDGET_POINTS 失败', {
+        userId,
+        campaignIds,
+        error: error.message
+      })
+      return 0
+    }
+  }
+
+  /**
+   * 扣减预算积分（BUDGET_POINTS 架构）
+   *
+   * 业务规则：
+   * - budget_mode='user': 从用户 BUDGET_POINTS 扣减（按 allowed_campaign_ids 优先级）
+   * - budget_mode='pool': 从活动池 pool_budget_remaining 扣减
+   * - budget_mode='none': 不扣减（测试用）
+   *
+   * @param {number} campaignId - 活动ID
+   * @param {number} userId - 用户ID
+   * @param {number} amount - 扣减金额
+   * @param {Object} options - 选项
+   * @param {string} options.idempotency_key - 幂等键
+   * @param {number} options.prize_id - 奖品ID
+   * @param {string} options.prize_name - 奖品名称
+   * @param {Object} transaction - 事务对象
+   * @returns {Promise<void>} 无返回值，成功则正常返回，失败则抛出异常
+   */
+  async deductBudgetPoints(campaignId, userId, amount, options = {}, transaction = null) {
+    const { LotteryCampaign } = require('../../../models')
+    const { idempotency_key, prize_id, prize_name } = options
+
+    if (!amount || amount <= 0) {
+      return // 无需扣减
+    }
+
+    try {
+      // 获取活动配置
+      const campaign = await LotteryCampaign.findByPk(campaignId, {
+        attributes: ['campaign_id', 'budget_mode', 'pool_budget_remaining', 'allowed_campaign_ids'],
+        transaction
+      })
+
+      if (!campaign) {
+        this.logError('扣减预算时活动不存在', { campaignId })
+        return
+      }
+
+      const budgetMode = campaign.budget_mode || 'user'
+
+      if (budgetMode === 'none') {
+        // 无预算限制模式：不扣减
+        this.logInfo('budget_mode=none：跳过预算扣减', {
+          campaignId,
+          userId,
+          amount
+        })
+        return
+      }
+
+      if (budgetMode === 'pool') {
+        // 活动池预算模式：扣减 pool_budget_remaining
+        const newRemaining = Math.max(0, Number(campaign.pool_budget_remaining) - amount)
+        await campaign.update({ pool_budget_remaining: newRemaining }, { transaction })
+
+        this.logInfo('budget_mode=pool：活动池预算扣减成功', {
+          campaignId,
+          amount,
+          before: campaign.pool_budget_remaining,
+          after: newRemaining,
+          prize_id,
+          prize_name
+        })
+        return
+      }
+
+      if (budgetMode === 'user') {
+        // 用户预算模式：从用户 BUDGET_POINTS 扣减
+        const allowedCampaignIds = campaign.allowed_campaign_ids
+
+        // 确定扣减的 campaign_id（优先使用 CONSUMPTION_DEFAULT 或 allowed_campaign_ids 中的第一个）
+        let deductCampaignId = 'CONSUMPTION_DEFAULT'
+        if (Array.isArray(allowedCampaignIds) && allowedCampaignIds.length > 0) {
+          deductCampaignId = String(allowedCampaignIds[0])
+        }
+
+        // 使用 AssetService 扣减用户 BUDGET_POINTS
+        await AssetService.changeBalance(
+          {
+            user_id: userId,
+            asset_code: 'BUDGET_POINTS',
+            delta_amount: -amount, // 扣减为负数
+            campaign_id: deductCampaignId, // 🔥 BUDGET_POINTS 必须指定 campaign_id
+            business_type: 'lottery_budget_deduct',
+            idempotency_key:
+              idempotency_key || `budget_deduct_${campaignId}_${userId}_${Date.now()}`,
+            meta: {
+              campaign_id: campaignId,
+              prize_id,
+              prize_name,
+              deduct_from_campaign: deductCampaignId,
+              description: `抽奖中奖扣减预算积分：${prize_name}（${amount}分）`
+            }
+          },
+          { transaction }
+        )
+
+        this.logInfo('budget_mode=user：用户预算扣减成功', {
+          userId,
+          campaignId,
+          amount,
+          deductCampaignId,
+          prize_id,
+          prize_name,
+          idempotency_key
+        })
+      }
+    } catch (error) {
+      this.logError('扣减预算积分失败', {
+        campaignId,
+        userId,
+        amount,
+        error: error.message
+      })
+      throw error // 重新抛出异常，让事务回滚
     }
   }
 

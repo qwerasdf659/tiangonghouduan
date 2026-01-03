@@ -51,7 +51,7 @@ class BeijingTimeTestSuite {
    * @returns {Promise<Object>} 测试结果
    * @throws {Error} 如果时间不符合北京时间标准
    */
-  static async testTimeGeneration () {
+  static async testTimeGeneration() {
     console.log('🕐 测试北京时间生成...')
 
     // 生成北京时间
@@ -93,7 +93,7 @@ class BeijingTimeTestSuite {
    * @returns {Promise<Object>} 测试结果，包含时间字段值
    * @throws {Error} 如果记录不存在或时间格式错误
    */
-  static async testDatabaseTime (Model, recordId, primaryKey = 'id') {
+  static async testDatabaseTime(Model, recordId, primaryKey = 'id') {
     console.log(`🕐 测试数据库时间: ${Model.name} (${primaryKey}: ${recordId})`)
 
     // 查询记录
@@ -153,7 +153,7 @@ class BeijingTimeTestSuite {
    * @returns {Promise<Object>} 验证结果
    * @throws {Error} 如果时间格式不符合标准
    */
-  static async testAPIResponseTime (apiResponse, timeFields = ['created_at', 'updated_at']) {
+  static async testAPIResponseTime(apiResponse, timeFields = ['created_at', 'updated_at']) {
     console.log('🕐 测试API响应时间格式...')
 
     const results = {}
@@ -167,9 +167,8 @@ class BeijingTimeTestSuite {
       }
 
       // 验证时间格式
-      const beijingISO = typeof timeValue === 'string'
-        ? timeValue
-        : BeijingTimeHelper.toISO(new Date(timeValue))
+      const beijingISO =
+        typeof timeValue === 'string' ? timeValue : BeijingTimeHelper.toISO(new Date(timeValue))
 
       if (!beijingISO.includes('+08:00')) {
         throw new Error(`❌ API时间字段${field}时区错误: ${beijingISO}`)
@@ -203,7 +202,7 @@ class BeijingTimeTestSuite {
    * @returns {Promise<Object>} 配置验证结果
    * @throws {Error} 如果时区配置错误
    */
-  static async testSequelizeTimezone (sequelize) {
+  static async testSequelizeTimezone(sequelize) {
     console.log('🕐 测试Sequelize时区配置...')
 
     // 检查Sequelize配置
@@ -215,7 +214,9 @@ class BeijingTimeTestSuite {
     }
 
     // 执行数据库时区查询
-    const [results] = await sequelize.query('SELECT @@session.time_zone as timezone, NOW() as current_time')
+    const [results] = await sequelize.query(
+      'SELECT @@session.time_zone as timezone, NOW() as current_time'
+    )
     const dbTimezone = results[0].timezone
     const dbCurrentTime = results[0].current_time
 
@@ -246,7 +247,7 @@ class BeijingTimeTestSuite {
    * @returns {Promise<Object>} 查询结果和验证信息
    * @throws {Error} 如果时间范围无效
    */
-  static async testTimeRangeQuery (Model, startTime, endTime, timeField = 'created_at') {
+  static async testTimeRangeQuery(Model, startTime, endTime, timeField = 'created_at') {
     console.log(`🕐 测试时间范围查询: ${startTime} ~ ${endTime}`)
 
     // 验证时间格式

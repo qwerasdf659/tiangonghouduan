@@ -22,7 +22,7 @@
 'use strict'
 
 module.exports = {
-  async up (queryInterface, Sequelize) {
+  async up(queryInterface, Sequelize) {
     const transaction = await queryInterface.sequelize.transaction()
 
     try {
@@ -55,14 +55,10 @@ module.exports = {
       console.log('✅ 添加reference_id字段成功')
 
       // 3. 创建联合索引，优化查询性能
-      await queryInterface.addIndex(
-        'points_transactions',
-        ['reference_type', 'reference_id'],
-        {
-          name: 'idx_reference_type_id',
-          transaction
-        }
-      )
+      await queryInterface.addIndex('points_transactions', ['reference_type', 'reference_id'], {
+        name: 'idx_reference_type_id',
+        transaction
+      })
       console.log('✅ 创建idx_reference_type_id索引成功')
 
       await transaction.commit()
@@ -74,34 +70,24 @@ module.exports = {
     }
   },
 
-  async down (queryInterface, Sequelize) {
+  async down(queryInterface, Sequelize) {
     const transaction = await queryInterface.sequelize.transaction()
 
     try {
       console.log('开始回滚points_transactions表的reference字段...')
 
       // 1. 删除索引
-      await queryInterface.removeIndex(
-        'points_transactions',
-        'idx_reference_type_id',
-        { transaction }
-      )
+      await queryInterface.removeIndex('points_transactions', 'idx_reference_type_id', {
+        transaction
+      })
       console.log('✅ 删除idx_reference_type_id索引成功')
 
       // 2. 删除reference_id字段
-      await queryInterface.removeColumn(
-        'points_transactions',
-        'reference_id',
-        { transaction }
-      )
+      await queryInterface.removeColumn('points_transactions', 'reference_id', { transaction })
       console.log('✅ 删除reference_id字段成功')
 
       // 3. 删除reference_type字段
-      await queryInterface.removeColumn(
-        'points_transactions',
-        'reference_type',
-        { transaction }
-      )
+      await queryInterface.removeColumn('points_transactions', 'reference_type', { transaction })
       console.log('✅ 删除reference_type字段成功')
 
       await transaction.commit()

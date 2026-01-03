@@ -17,7 +17,7 @@ class ConfigConflictDetector {
   /**
    * 从代码配置中提取所有配置键
    */
-  extractCodeConfigKeys (config, prefix = '') {
+  extractCodeConfigKeys(config, prefix = '') {
     const keys = []
 
     Object.entries(config).forEach(([key, value]) => {
@@ -37,7 +37,7 @@ class ConfigConflictDetector {
   /**
    * 检测配置冲突
    */
-  async detect () {
+  async detect() {
     try {
       console.log('🔍 开始检测配置冲突...\n')
 
@@ -58,9 +58,10 @@ class ConfigConflictDetector {
       const conflicts = []
       dbKeys.forEach(dbKey => {
         // 检查是否在代码配置中存在相似键名
-        const similarCodeKeys = codeKeys.filter(codeKey =>
-          codeKey.toLowerCase().includes(dbKey.toLowerCase()) ||
-          dbKey.toLowerCase().includes(codeKey.toLowerCase())
+        const similarCodeKeys = codeKeys.filter(
+          codeKey =>
+            codeKey.toLowerCase().includes(dbKey.toLowerCase()) ||
+            dbKey.toLowerCase().includes(codeKey.toLowerCase())
         )
 
         if (similarCodeKeys.length > 0) {
@@ -99,7 +100,7 @@ class ConfigConflictDetector {
 }
 
 // 执行检测
-(async () => {
+;(async () => {
   try {
     const detector = new ConfigConflictDetector()
     const result = await detector.detect()

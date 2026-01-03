@@ -192,15 +192,13 @@ class LightweightMonitor {
     const memUsage = process.memoryUsage()
     const heapUsed = memUsage.heapUsed
     const heapTotal = memUsage.heapTotal
-    const memPercent = (heapUsed / heapTotal * 100).toFixed(1)
+    const memPercent = ((heapUsed / heapTotal) * 100).toFixed(1)
 
     const status = memPercent < this.config.memoryThreshold ? 'OK' : 'WARNING'
 
     return {
       status,
-      message: status === 'OK'
-        ? `内存使用正常: ${memPercent}%`
-        : `内存使用过高: ${memPercent}%`,
+      message: status === 'OK' ? `内存使用正常: ${memPercent}%` : `内存使用过高: ${memPercent}%`,
       value: parseFloat(memPercent),
       threshold: this.config.memoryThreshold,
       details: {
@@ -225,9 +223,8 @@ class LightweightMonitor {
 
       return {
         status,
-        message: status === 'OK'
-          ? `磁盘使用正常: ${usagePercent}%`
-          : `磁盘空间不足: ${usagePercent}%`,
+        message:
+          status === 'OK' ? `磁盘使用正常: ${usagePercent}%` : `磁盘空间不足: ${usagePercent}%`,
         value: usagePercent,
         threshold: this.config.diskThreshold,
         details: {
@@ -263,9 +260,10 @@ class LightweightMonitor {
 
       return {
         status,
-        message: status === 'OK'
-          ? `慢查询数量正常: ${slowQueryCount}个`
-          : `慢查询过多: ${slowQueryCount}个`,
+        message:
+          status === 'OK'
+            ? `慢查询数量正常: ${slowQueryCount}个`
+            : `慢查询过多: ${slowQueryCount}个`,
         value: slowQueryCount,
         threshold,
         details: {
@@ -352,9 +350,9 @@ class LightweightMonitor {
       })
 
       // 构建告警消息
-      const alertMessages = alerts.map(alert =>
-        `[${alert.level}] ${alert.check}: ${alert.message}`
-      ).join('\n')
+      const alertMessages = alerts
+        .map(alert => `[${alert.level}] ${alert.check}: ${alert.message}`)
+        .join('\n')
 
       const message = {
         msgtype: 'text',
@@ -483,12 +481,15 @@ if (require.main === module) {
   // 单次检查模式
   if (onceMode) {
     const monitor = new LightweightMonitor(config)
-    monitor.performCheck().then(() => {
-      process.exit(0)
-    }).catch(error => {
-      console.error('检查失败:', error)
-      process.exit(1)
-    })
+    monitor
+      .performCheck()
+      .then(() => {
+        process.exit(0)
+      })
+      .catch(error => {
+        console.error('检查失败:', error)
+        process.exit(1)
+      })
   } else {
     // 持续监控模式
     const monitor = new LightweightMonitor(config)
@@ -509,4 +510,3 @@ if (require.main === module) {
 }
 
 module.exports = LightweightMonitor
-

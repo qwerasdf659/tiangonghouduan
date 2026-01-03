@@ -39,7 +39,7 @@ class DatabasePerformanceMonitor {
    *
    * 初始化监控配置和慢查询统计数据
    */
-  constructor () {
+  constructor() {
     // 监控配置（基于文档建议的阈值）
     this.config = {
       // 数据库连接数告警阈值（连接池max=40，告警阈值设为80%）
@@ -83,7 +83,7 @@ class DatabasePerformanceMonitor {
    * @returns {string} return.status - 状态（normal/warning/critical）
    * @returns {string} return.message - 状态说明
    */
-  async checkConnectionCount () {
+  async checkConnectionCount() {
     try {
       // 检查sequelize对象是否已初始化
       if (!sequelize || !sequelize.query) {
@@ -171,7 +171,7 @@ class DatabasePerformanceMonitor {
    * @param {number} _timing - 查询时间（毫秒）（保留参数用于未来扩展）
    * @returns {void} 无返回值
    */
-  recordSlowQuery (_sql, _timing) {
+  recordSlowQuery(_sql, _timing) {
     this.slowQueryStats.count++
 
     // 每小时重置计数器
@@ -214,7 +214,7 @@ class DatabasePerformanceMonitor {
    * @returns {number} return.hours_elapsed - 统计时长（小时）
    * @returns {number} return.hourly_rate - 每小时慢查询次数
    */
-  getSlowQueryStats () {
+  getSlowQueryStats() {
     const now = Date.now()
     const hoursElapsed = (now - this.slowQueryStats.lastResetTime) / (1000 * 60 * 60)
     const hourlyRate = this.slowQueryStats.count / hoursElapsed
@@ -237,7 +237,7 @@ class DatabasePerformanceMonitor {
    *
    * @returns {Promise<Object>} 综合监控结果
    */
-  async performFullCheck () {
+  async performFullCheck() {
     logger.info('[性能监控] 开始执行数据库性能监控...')
 
     const results = {
@@ -278,7 +278,7 @@ class DatabasePerformanceMonitor {
    * @param {Object} monitorResults - performFullCheck()的返回结果
    * @returns {string} 格式化的监控报告
    */
-  generateReport (monitorResults) {
+  generateReport(monitorResults) {
     const lines = []
     lines.push('='.repeat(60))
     lines.push('📊 数据库性能监控报告')
@@ -358,7 +358,7 @@ const monitor = new DatabasePerformanceMonitor()
  *
  * @returns {void} 无返回值
  */
-function startScheduledMonitoring () {
+function startScheduledMonitoring() {
   logger.info('[性能监控] 启动数据库性能定时监控（间隔5分钟）')
 
   setInterval(async () => {
@@ -393,7 +393,7 @@ function startScheduledMonitoring () {
  * const report = await manualCheck()
  * console.log(report)
  */
-async function manualCheck () {
+async function manualCheck() {
   const results = await monitor.performFullCheck()
   const report = monitor.generateReport(results)
   console.log(report)
