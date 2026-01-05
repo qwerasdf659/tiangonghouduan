@@ -57,7 +57,7 @@ const ApiResponse = require('./utils/ApiResponse')
  * @param {Object} req - Express请求对象
  * @returns {string} 请求ID
  */
-function getRequestId(req) {
+function getRequestId (req) {
   return (
     req.id ||
     req.headers['x-request-id'] ||
@@ -84,16 +84,16 @@ app.use(
   helmet({
     contentSecurityPolicy: {
       directives: {
-        defaultSrc: ["'self'"],
-        styleSrc: ["'self'", "'unsafe-inline'", 'https://cdn.jsdelivr.net', 'https://unpkg.com'],
-        scriptSrc: ["'self'", "'unsafe-inline'", 'https://unpkg.com', 'https://cdn.jsdelivr.net'],
-        imgSrc: ["'self'", 'data:', 'https:'],
-        baseUri: ["'self'"],
-        fontSrc: ["'self'", 'https:', 'data:'],
-        formAction: ["'self'"],
-        frameAncestors: ["'self'"],
-        objectSrc: ["'none'"],
-        scriptSrcAttr: ["'none'"],
+        defaultSrc: ['\'self\''],
+        styleSrc: ['\'self\'', '\'unsafe-inline\'', 'https://cdn.jsdelivr.net', 'https://unpkg.com'],
+        scriptSrc: ['\'self\'', '\'unsafe-inline\'', 'https://unpkg.com', 'https://cdn.jsdelivr.net'],
+        imgSrc: ['\'self\'', 'data:', 'https:'],
+        baseUri: ['\'self\''],
+        fontSrc: ['\'self\'', 'https:', 'data:'],
+        formAction: ['\'self\''],
+        frameAncestors: ['\'self\''],
+        objectSrc: ['\'none\''],
+        scriptSrcAttr: ['\'none\''],
         upgradeInsecureRequests: []
       }
     }
@@ -777,7 +777,7 @@ app.use((error, req, res, _next) => {
  * @returns {Promise<void>} 无返回值，初始化失败时直接退出进程
  * @see docs/配置管理三层分离与校验统一方案.md
  */
-async function initializeApp() {
+async function initializeApp () {
   // 步骤1：初始化 Service 层
   try {
     const models = require('./models')

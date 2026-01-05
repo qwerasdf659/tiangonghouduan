@@ -18,8 +18,13 @@ const logger = require('../utils/logger').logger
  * - ChatWebSocketService：实时消息推送
  * - NotificationService：通知推送
  *
+ * 事务边界治理（2026-01-05 改造）：
+ * - 所有写操作支持外部事务传入（options.transaction）
+ * - 未提供事务时自建事务，由方法自行管理提交/回滚
+ * - 符合"服务层支持外部事务"的统一编排模式
+ *
  * 创建时间：2025年11月23日
- * 最后更新：2025年11月23日
+ * 最后更新：2026年01月05日（事务边界治理改造）
  */
 
 const { CustomerServiceSession, ChatMessage, User } = require('../models')
@@ -41,7 +46,7 @@ const businessConfig = require('../config/business.config')
  * @param {string} content - 原始内容
  * @returns {string} 脱敏/转义后的安全内容
  */
-function sanitizeContent(content) {
+function sanitizeContent (content) {
   return content
     .trim()
     .replace(/&/g, '&amp;')
@@ -61,7 +66,7 @@ function sanitizeContent(content) {
  * @returns {boolean} result.passed - 是否通过检测（true-通过，false-不通过）
  * @returns {string} [result.matchedWord] - 命中的敏感词（仅当 passed=false 时返回）
  */
-function checkSensitiveWords(content) {
+function checkSensitiveWords (content) {
   const { content_filter: contentFilter } = businessConfig.chat
 
   if (!contentFilter.enabled) {
@@ -113,7 +118,7 @@ class CustomerServiceSessionService {
    * @param {boolean} [options.calculate_unread=false] - 是否计算未读消息数
    * @returns {Object} 会话列表和分页信息
    */
-  static async getSessionList(options = {}) {
+  static async getSessionList (options = {}) {
     try {
       const {
         page = 1,
@@ -157,11 +162,11 @@ class CustomerServiceSessionService {
           // 搜索条件
           where: search
             ? {
-                [Op.or]: [
-                  { nickname: { [Op.like]: `%${search}%` } },
-                  { mobile: { [Op.like]: `%${search}%` } }
-                ]
-              }
+              [Op.or]: [
+                { nickname: { [Op.like]: `%${search}%` } },
+                { mobile: { [Op.like]: `%${search}%` } }
+              ]
+            }
             : undefined,
           required: !!search
         },
@@ -202,16 +207,16 @@ class CustomerServiceSessionService {
         session_id: session.session_id,
         user: session.user
           ? {
-              user_id: session.user.user_id,
-              nickname: session.user.nickname,
-              mobile: session.user.mobile
-            }
+            user_id: session.user.user_id,
+            nickname: session.user.nickname,
+            mobile: session.user.mobile
+          }
           : null,
         admin: session.admin
           ? {
-              user_id: session.admin.user_id,
-              nickname: session.admin.nickname
-            }
+            user_id: session.admin.user_id,
+            nickname: session.admin.nickname
+          }
           : null,
         status: session.status,
         priority: session.priority,
@@ -279,7 +284,7 @@ class CustomerServiceSessionService {
    * @param {boolean} [options.include_all_fields=false] - 是否包含所有消息字段（包括metadata等）
    * @returns {Object} 会话详情和消息列表
    */
-  static async getSessionMessages(session_id, options = {}) {
+  static async getSessionMessages (session_id, options = {}) {
     try {
       const {
         limit = 50,
@@ -435,16 +440,16 @@ class CustomerServiceSessionService {
           session_id: session.session_id,
           user: session.user
             ? {
-                user_id: session.user.user_id,
-                nickname: session.user.nickname,
-                mobile: session.user.mobile
-              }
+              user_id: session.user.user_id,
+              nickname: session.user.nickname,
+              mobile: session.user.mobile
+            }
             : null,
           admin: session.admin
             ? {
-                user_id: session.admin.user_id,
-                nickname: session.admin.nickname
-              }
+              user_id: session.admin.user_id,
+              nickname: session.admin.nickname
+            }
             : null,
           status: session.status,
           priority: session.priority,
@@ -467,16 +472,23 @@ class CustomerServiceSessionService {
    * - 客服在管理后台回复用户消息
    * - 自动更新会话状态和最后消息时间
    *
+   * 事务边界治理（2026-01-05）：
+   * - 支持外部事务传入（options.transaction）
+   * - 未提供事务时自建事务，由方法自行管理提交/回滚
+   *
    * @param {number} session_id - 会话ID
    * @param {Object} data - 消息数据
    * @param {number} data.admin_id - 发送客服的ID
    * @param {string} data.content - 消息内容
    * @param {string} [data.message_type='text'] - 消息类型（text/image/system）
+   * @param {Object} [options={}] - 选项
+   * @param {Object} [options.transaction] - 外部事务对象（可选）
    * @returns {Object} 创建的消息对象
    */
-  static async sendMessage(session_id, data) {
+  static async sendMessage (session_id, data, options = {}) {
     const sequelize = CustomerServiceSession.sequelize
-    const transaction = await sequelize.transaction({
+    const externalTransaction = options.transaction
+    const transaction = externalTransaction || await sequelize.transaction({
       isolationLevel: Transaction.ISOLATION_LEVELS.READ_COMMITTED
     })
 
@@ -565,7 +577,10 @@ class CustomerServiceSessionService {
         { transaction }
       )
 
-      await transaction.commit()
+      // 仅在自建事务时提交
+      if (!externalTransaction) {
+        await transaction.commit()
+      }
 
       logger.info(`✅ 消息发送成功，消息ID: ${message.message_id}`)
 
@@ -604,7 +619,10 @@ class CustomerServiceSessionService {
         pushed // 标识是否实时推送成功
       }
     } catch (error) {
-      await transaction.rollback()
+      // 仅在自建事务时回滚
+      if (!externalTransaction) {
+        await transaction.rollback()
+      }
       logger.error('❌ 发送消息失败:', error)
       throw error
     }
@@ -618,17 +636,24 @@ class CustomerServiceSessionService {
    * - 自动验证会话权限（用户只能向自己的会话发送消息）
    * - 检查会话状态（已关闭的会话无法发送）
    *
+   * 事务边界治理（2026-01-05）：
+   * - 支持外部事务传入（options.transaction）
+   * - 未提供事务时自建事务，由方法自行管理提交/回滚
+   *
    * @param {number} session_id - 会话ID
    * @param {Object} data - 消息数据
    * @param {number} data.user_id - 发送用户的ID
    * @param {string} data.content - 消息内容（应该已经过滤和验证）
    * @param {string} [data.message_type='text'] - 消息类型（text/image）
+   * @param {Object} [options={}] - 选项
+   * @param {Object} [options.transaction] - 外部事务对象（可选）
    * @returns {Object} 创建的消息对象
    * @throws {Error} 会话不存在、无权限、会话已关闭等错误
    */
-  static async sendUserMessage(session_id, data) {
+  static async sendUserMessage (session_id, data, options = {}) {
     const sequelize = CustomerServiceSession.sequelize
-    const transaction = await sequelize.transaction({
+    const externalTransaction = options.transaction
+    const transaction = externalTransaction || await sequelize.transaction({
       isolationLevel: Transaction.ISOLATION_LEVELS.READ_COMMITTED
     })
 
@@ -679,7 +704,10 @@ class CustomerServiceSessionService {
         { transaction }
       )
 
-      await transaction.commit()
+      // 仅在自建事务时提交
+      if (!externalTransaction) {
+        await transaction.commit()
+      }
 
       logger.info(`✅ 用户消息发送成功，消息ID: ${message.message_id}`)
 
@@ -695,7 +723,10 @@ class CustomerServiceSessionService {
         session_admin_id: session.admin_id // 🔴 返回会话的admin_id（用于WebSocket推送）
       }
     } catch (error) {
-      await transaction.rollback()
+      // 仅在自建事务时回滚
+      if (!externalTransaction) {
+        await transaction.rollback()
+      }
       logger.error('❌ 用户发送消息失败:', error)
       throw error
     }
@@ -711,7 +742,7 @@ class CustomerServiceSessionService {
    * @param {number} admin_id - 管理员ID
    * @returns {Object} 更新结果
    */
-  static async markSessionAsRead(session_id, admin_id) {
+  static async markSessionAsRead (session_id, admin_id) {
     try {
       logger.info(`👁️ 管理员 ${admin_id} 标记会话 ${session_id} 为已读`)
 
@@ -758,14 +789,21 @@ class CustomerServiceSessionService {
    * - 当前客服无法处理，转接给其他客服
    * - 自动创建系统消息记录转接操作
    *
+   * 事务边界治理（2026-01-05）：
+   * - 支持外部事务传入（options.transaction）
+   * - 未提供事务时自建事务，由方法自行管理提交/回滚
+   *
    * @param {number} session_id - 会话ID
    * @param {number} current_admin_id - 当前客服ID
    * @param {number} target_admin_id - 目标客服ID
+   * @param {Object} [options={}] - 选项
+   * @param {Object} [options.transaction] - 外部事务对象（可选）
    * @returns {Object} 转接结果
    */
-  static async transferSession(session_id, current_admin_id, target_admin_id) {
+  static async transferSession (session_id, current_admin_id, target_admin_id, options = {}) {
     const sequelize = CustomerServiceSession.sequelize
-    const transaction = await sequelize.transaction({
+    const externalTransaction = options.transaction
+    const transaction = externalTransaction || await sequelize.transaction({
       isolationLevel: Transaction.ISOLATION_LEVELS.READ_COMMITTED
     })
 
@@ -820,7 +858,10 @@ class CustomerServiceSessionService {
         { transaction }
       )
 
-      await transaction.commit()
+      // 仅在自建事务时提交
+      if (!externalTransaction) {
+        await transaction.commit()
+      }
 
       logger.info('✅ 会话转接成功')
 
@@ -838,7 +879,10 @@ class CustomerServiceSessionService {
         system_message_id: systemMessage.message_id
       }
     } catch (error) {
-      await transaction.rollback()
+      // 仅在自建事务时回滚
+      if (!externalTransaction) {
+        await transaction.rollback()
+      }
       logger.error('❌ 转接会话失败:', error)
       throw error
     }
@@ -851,15 +895,22 @@ class CustomerServiceSessionService {
    * - 客服处理完成，关闭会话
    * - 记录关闭原因和关闭时间
    *
+   * 事务边界治理（2026-01-05）：
+   * - 支持外部事务传入（options.transaction）
+   * - 未提供事务时自建事务，由方法自行管理提交/回滚
+   *
    * @param {number} session_id - 会话ID
    * @param {Object} data - 关闭数据
    * @param {number} data.admin_id - 操作客服ID
    * @param {string} [data.close_reason] - 关闭原因
+   * @param {Object} [options={}] - 选项
+   * @param {Object} [options.transaction] - 外部事务对象（可选）
    * @returns {Object} 关闭结果
    */
-  static async closeSession(session_id, data) {
+  static async closeSession (session_id, data, options = {}) {
     const sequelize = CustomerServiceSession.sequelize
-    const transaction = await sequelize.transaction({
+    const externalTransaction = options.transaction
+    const transaction = externalTransaction || await sequelize.transaction({
       isolationLevel: Transaction.ISOLATION_LEVELS.READ_COMMITTED
     })
 
@@ -908,7 +959,10 @@ class CustomerServiceSessionService {
         { transaction }
       )
 
-      await transaction.commit()
+      // 仅在自建事务时提交
+      if (!externalTransaction) {
+        await transaction.commit()
+      }
 
       logger.info('✅ 会话关闭成功')
 
@@ -918,7 +972,10 @@ class CustomerServiceSessionService {
         closed_at: BeijingTimeHelper.formatForAPI(new Date()).iso
       }
     } catch (error) {
-      await transaction.rollback()
+      // 仅在自建事务时回滚
+      if (!externalTransaction) {
+        await transaction.rollback()
+      }
       logger.error('❌ 关闭会话失败:', error)
       throw error
     }
@@ -934,7 +991,7 @@ class CustomerServiceSessionService {
    * @param {number} [admin_id] - 指定客服ID（可选）
    * @returns {Object} 统计信息
    */
-  static async getSessionStats(admin_id) {
+  static async getSessionStats (admin_id) {
     try {
       const baseWhere = admin_id ? { admin_id } : {}
 
@@ -982,7 +1039,7 @@ class CustomerServiceSessionService {
    * @returns {Date} return.created_at - 创建时间
    * @returns {boolean} return.is_new - 是否为新创建的会话
    */
-  static async getOrCreateSession(user_id, options = {}) {
+  static async getOrCreateSession (user_id, options = {}) {
     try {
       const { source = 'mobile', priority = 1 } = options
 
@@ -1093,7 +1150,7 @@ class CustomerServiceSessionService {
    * @returns {boolean} return.valid - 是否通过验证
    * @returns {Array<string>} return.warnings - 警告信息列表
    */
-  static validateStatistics(stats) {
+  static validateStatistics (stats) {
     const warnings = []
 
     // 1️⃣ 基础数值合理性检查（数值必须>=0）
@@ -1199,7 +1256,7 @@ class CustomerServiceSessionService {
    * @param {Date} endTime - 结束时间
    * @returns {Promise<number>} 平均响应时间（秒），无数据时返回60
    */
-  static async calculateAverageResponseTime(startTime, endTime) {
+  static async calculateAverageResponseTime (startTime, endTime) {
     try {
       // 1️⃣ 查询已响应的会话（排除未响应的waiting状态）
       const sessions = await CustomerServiceSession.findAll({

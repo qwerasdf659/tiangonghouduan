@@ -42,7 +42,7 @@ class UserRoleService {
    * @param {number} user_id - 用户ID
    * @returns {Promise<Object>} 用户信息和权限数据，包含user_id、mobile、nickname、roles数组、is_admin、highest_role_level等字段
    */
-  static async getUserWithRoles(user_id) {
+  static async getUserWithRoles (user_id) {
     const user = await User.findByPk(user_id, {
       include: [
         {
@@ -91,7 +91,7 @@ class UserRoleService {
    * @param {string} action - 操作类型
    * @returns {Promise<boolean>} 是否拥有指定资源的操作权限
    */
-  static async checkUserPermission(user_id, resource, action = 'read') {
+  static async checkUserPermission (user_id, resource, action = 'read') {
     const user = await User.findByPk(user_id)
     if (!user) {
       return false
@@ -105,7 +105,7 @@ class UserRoleService {
    * @param {Array} userIds - 用户ID数组
    * @returns {Promise<Array>} 用户角色信息数组，每项包含user_id、mobile、nickname、roles、highest_role_level字段
    */
-  static async getBatchUsersWithRoles(userIds) {
+  static async getBatchUsersWithRoles (userIds) {
     const users = await User.findAll({
       where: { user_id: userIds },
       include: [
@@ -132,7 +132,7 @@ class UserRoleService {
    * 📊 获取角色统计信息
    * @returns {Promise<Array>} 角色统计信息数组，每项包含role_name、role_level、user_count、description字段
    */
-  static async getRoleStatistics() {
+  static async getRoleStatistics () {
     const roles = await Role.findAll({
       where: { is_active: true },
       include: [
@@ -166,7 +166,7 @@ class UserRoleService {
    * @param {string} options.user_agent - 用户代理（可选）
    * @returns {Promise<Object>} 更新结果
    */
-  static async updateUserRole(user_id, role_name, operator_id, options = {}) {
+  static async updateUserRole (user_id, role_name, operator_id, options = {}) {
     const { transaction, reason, ip_address, user_agent } = options
     const { getUserRoles, invalidateUserPermissions } = require('../middleware/auth')
     const { sequelize } = require('../models')
@@ -311,7 +311,7 @@ class UserRoleService {
    * @param {Object} options - 选项参数
    * @returns {Promise<Object>} 更新结果
    */
-  static async updateUserStatus(user_id, status, operator_id, options = {}) {
+  static async updateUserStatus (user_id, status, operator_id, options = {}) {
     const { reason = '' } = options
     const { invalidateUserPermissions } = require('../middleware/auth')
 
@@ -384,7 +384,7 @@ class UserRoleService {
    * @param {Object} filters - 过滤条件
    * @returns {Promise<Object>} 用户列表和分页信息
    */
-  static async getUserList(filters = {}) {
+  static async getUserList (filters = {}) {
     const { Op } = require('sequelize')
     const { page = 1, limit = 20, search, role_filter } = filters
 
@@ -471,7 +471,7 @@ class UserRoleService {
    * @param {number} user_id - 用户ID
    * @returns {Promise<Object>} 用户详情
    */
-  static async getUserDetail(user_id) {
+  static async getUserDetail (user_id) {
     // 查询用户信息（包含角色信息）
     const user = await User.findOne({
       where: { user_id },
@@ -527,7 +527,7 @@ class UserRoleService {
    *
    * @returns {Promise<Object>} 角色列表
    */
-  static async getRoleList() {
+  static async getRoleList () {
     // 查询所有激活的角色
     const roles = await Role.findAll({
       where: { is_active: true },

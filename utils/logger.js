@@ -124,7 +124,7 @@ if (process.env.NODE_ENV !== 'production') {
  * @param {Object|null} data - 待脱敏的对象（可为空）
  * @returns {Object|null} 脱敏后的对象（若入参为空则原样返回）
  */
-function sanitize(data) {
+function sanitize (data) {
   if (!data) return data
 
   const sensitive = ['password', 'token', 'secret', 'key', 'authorization']
@@ -136,7 +136,7 @@ function sanitize(data) {
    * @param {Object|null} obj - 待处理对象
    * @returns {void} 无返回值，直接修改 obj
    */
-  function maskValue(obj) {
+  function maskValue (obj) {
     if (typeof obj !== 'object' || obj === null) return
 
     for (const key in obj) {
@@ -169,7 +169,7 @@ class SmartLogger {
    * @param {Object} meta - 附加信息（会被脱敏后输出）
    * @returns {void} 无返回值
    */
-  log(level, message, meta = {}) {
+  log (level, message, meta = {}) {
     const { userId, sessionId, requestId } = meta
 
     // 🔍 检查是否需要为此用户/会话记录详细日志
@@ -195,7 +195,7 @@ class SmartLogger {
    * @param {Object} meta - 附加信息
    * @returns {void} 无返回值
    */
-  error(message, meta = {}) {
+  error (message, meta = {}) {
     this.log('error', message, { ...meta, stack: new Error().stack })
   }
 
@@ -206,7 +206,7 @@ class SmartLogger {
    * @param {Object} meta - 附加信息
    * @returns {void} 无返回值
    */
-  warn(message, meta = {}) {
+  warn (message, meta = {}) {
     this.log('warn', message, meta)
   }
 
@@ -217,7 +217,7 @@ class SmartLogger {
    * @param {Object} meta - 附加信息
    * @returns {void} 无返回值
    */
-  info(message, meta = {}) {
+  info (message, meta = {}) {
     this.log('info', message, meta)
   }
 
@@ -228,7 +228,7 @@ class SmartLogger {
    * @param {Object} meta - 附加信息
    * @returns {void} 无返回值
    */
-  debug(message, meta = {}) {
+  debug (message, meta = {}) {
     this.log('debug', message, meta)
   }
 
@@ -239,7 +239,7 @@ class SmartLogger {
    * @param {Object} meta - 附加信息
    * @returns {void} 无返回值
    */
-  trace(message, meta = {}) {
+  trace (message, meta = {}) {
     this.log('trace', message, meta)
   }
 
@@ -250,7 +250,7 @@ class SmartLogger {
    * @param {number} durationMinutes - 开启时长（分钟，默认30）
    * @returns {void} 无返回值
    */
-  enableDebugForUser(userId, durationMinutes = 30) {
+  enableDebugForUser (userId, durationMinutes = 30) {
     debugUsers.add(userId)
     this.info('为用户开启调试模式', { userId, duration: `${durationMinutes}分钟` })
 
@@ -271,7 +271,7 @@ class SmartLogger {
    * @param {number} durationMinutes - 开启时长（分钟，默认30）
    * @returns {void} 无返回值
    */
-  enableDebugForSession(sessionId, durationMinutes = 30) {
+  enableDebugForSession (sessionId, durationMinutes = 30) {
     debugSessions.add(sessionId)
     this.info('为会话开启调试模式', { sessionId, duration: `${durationMinutes}分钟` })
 
@@ -293,7 +293,7 @@ class SmartLogger {
    * @param {string} level - 日志级别（error/warn/info/debug/trace）
    * @returns {boolean} 是否设置成功
    */
-  setLogLevel(level) {
+  setLogLevel (level) {
     if (!Object.prototype.hasOwnProperty.call(LOG_LEVELS, level)) {
       this.error('无效的日志级别', { level, validLevels: Object.keys(LOG_LEVELS) })
       return false
@@ -310,7 +310,7 @@ class SmartLogger {
    *
    * @returns {Object} 当前配置（currentLevel/debugUsers/debugSessions/availableLevels）
    */
-  getConfig() {
+  getConfig () {
     return {
       currentLevel: CURRENT_LOG_LEVEL,
       debugUsers: Array.from(debugUsers),
@@ -324,7 +324,7 @@ class SmartLogger {
    *
    * @returns {void} 无返回值
    */
-  clearAllDebugSessions() {
+  clearAllDebugSessions () {
     const count = debugUsers.size + debugSessions.size
     debugUsers.clear()
     debugSessions.clear()

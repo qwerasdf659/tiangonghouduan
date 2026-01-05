@@ -42,7 +42,7 @@ const cacheStats = {
  * 功能：监控缓存命中率、数据库查询频率，便于性能优化决策
  * @returns {void}
  */
-function reportCacheStats() {
+function reportCacheStats () {
   const now = Date.now()
   const timeSinceLastReport = now - cacheStats.lastReportTime
 
@@ -83,7 +83,7 @@ function reportCacheStats() {
  * @param {number} user_id - 用户ID
  * @returns {Promise<Object|null>} 用户权限对象或null
  */
-async function getUserPermissionsFromCache(user_id) {
+async function getUserPermissionsFromCache (user_id) {
   cacheStats.totalQueries++
   reportCacheStats() // 📊 定期输出统计信息
 
@@ -128,7 +128,7 @@ async function getUserPermissionsFromCache(user_id) {
  * @param {Object} data - 权限数据对象
  * @returns {Promise<void>} 无返回值
  */
-async function setUserPermissionsCache(user_id, data) {
+async function setUserPermissionsCache (user_id, data) {
   // 设置内存缓存
   const memoryKey = `permissions_${user_id}`
   memoryCache.set(memoryKey, {
@@ -154,7 +154,7 @@ async function setUserPermissionsCache(user_id, data) {
  * @param {number|null} operator_id - 操作人ID（用于审计，可选）
  * @returns {Promise<void>} 无返回值
  */
-async function invalidateUserPermissions(user_id, reason = 'unknown', operator_id = null) {
+async function invalidateUserPermissions (user_id, reason = 'unknown', operator_id = null) {
   // 清除内存缓存
   const memoryKey = `permissions_${user_id}`
   memoryCache.delete(memoryKey)
@@ -201,7 +201,7 @@ async function invalidateUserPermissions(user_id, reason = 'unknown', operator_i
  * @param {boolean} forceRefresh - 强制刷新缓存
  * @returns {Promise<Object>} 用户角色信息
  */
-async function getUserRoles(user_id, forceRefresh = false) {
+async function getUserRoles (user_id, forceRefresh = false) {
   try {
     // 如果不强制刷新，先尝试从缓存获取
     if (!forceRefresh) {
@@ -298,7 +298,7 @@ async function getUserRoles(user_id, forceRefresh = false) {
  * @param {Object} user - 用户对象
  * @returns {Promise<Object>} Token信息
  */
-async function generateTokens(user) {
+async function generateTokens (user) {
   try {
     // 获取用户角色信息
     const userRoles = await getUserRoles(user.user_id)
@@ -360,7 +360,7 @@ async function generateTokens(user) {
  * @param {string} refresh_token - 刷新Token
  * @returns {Promise<Object>} 验证结果
  */
-async function verifyRefreshToken(refresh_token) {
+async function verifyRefreshToken (refresh_token) {
   try {
     const decoded = jwt.verify(
       refresh_token,
@@ -409,7 +409,7 @@ async function verifyRefreshToken(refresh_token) {
  * @param {Function} next - 下一个中间件
  * @returns {Promise<void>} 无返回值
  */
-async function authenticateToken(req, res, next) {
+async function authenticateToken (req, res, next) {
   try {
     const authHeader = req.headers.authorization
     const token = authHeader && authHeader.split(' ')[1]
@@ -497,7 +497,7 @@ async function authenticateToken(req, res, next) {
  * @param {Function} next - 下一个中间件
  * @returns {Promise<void>} 无返回值（验证通过调用next()，失败返回错误响应）
  */
-async function requireAdmin(req, res, next) {
+async function requireAdmin (req, res, next) {
   try {
     if (!req.user) {
       return res.status(401).json({
@@ -534,7 +534,7 @@ async function requireAdmin(req, res, next) {
  * @param {Function} next - 下一个中间件
  * @returns {Promise<void>} 无返回值（总是调用next()，允许继续处理请求）
  */
-async function optionalAuth(req, res, next) {
+async function optionalAuth (req, res, next) {
   try {
     const authHeader = req.headers.authorization
     const token = authHeader && authHeader.split(' ')[1]
@@ -598,7 +598,7 @@ async function optionalAuth(req, res, next) {
  * @param {string} requiredPermission - 需要的权限
  * @returns {Function} 中间件函数
  */
-function requirePermission(requiredPermission) {
+function requirePermission (requiredPermission) {
   return async (req, res, next) => {
     try {
       if (!req.user) {
@@ -660,9 +660,9 @@ const PermissionManager = {
     hitRate:
       cacheStats.totalQueries > 0
         ? (
-            ((cacheStats.memoryHits + cacheStats.redisHits) / cacheStats.totalQueries) *
+          ((cacheStats.memoryHits + cacheStats.redisHits) / cacheStats.totalQueries) *
             100
-          ).toFixed(1) + '%'
+        ).toFixed(1) + '%'
         : '0%',
     redisAvailable: !!redisClient
   }),

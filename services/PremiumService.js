@@ -42,7 +42,7 @@ class PremiumService {
    * @returns {Object} 解锁结果
    * @throws {Error} 业务错误（用户不存在、条件不满足、余额不足等）
    */
-  static async unlockPremium(user_id, options = {}) {
+  static async unlockPremium (user_id, options = {}) {
     const { transaction: externalTransaction } = options
 
     // 如果没有外部事务，创建内部事务
@@ -285,7 +285,7 @@ class PremiumService {
    * @param {number} user_id - 用户ID
    * @returns {Object} 状态查询结果
    */
-  static async getPremiumStatus(user_id) {
+  static async getPremiumStatus (user_id) {
     try {
       // 查询解锁状态
       const premiumStatus = await UserPremiumStatus.findOne({

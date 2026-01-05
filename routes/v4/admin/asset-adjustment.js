@@ -28,6 +28,7 @@ const express = require('express')
 const router = express.Router()
 const { authenticateToken, requireAdmin } = require('../../../middleware/auth')
 const { v4: uuidv4 } = require('uuid')
+const TransactionManager = require('../../../utils/TransactionManager')
 
 /**
  * 错误处理包装器
@@ -35,7 +36,7 @@ const { v4: uuidv4 } = require('uuid')
  * @param {Function} fn - 异步处理函数
  * @returns {Function} 包装后的中间件函数
  */
-function asyncHandler(fn) {
+function asyncHandler (fn) {
   return (req, res, next) => {
     Promise.resolve(fn(req, res, next)).catch(next)
   }
@@ -90,20 +91,28 @@ router.post(
     const AuditLogService = req.app.locals.services.getService('auditLog')
 
     try {
-      // 执行资产调整
-      const result = await AssetService.changeBalance({
-        user_id,
-        asset_code,
-        delta_amount: Number(amount),
-        business_type: 'admin_adjustment',
-        idempotency_key: finalIdempotencyKey,
-        campaign_id: campaign_id || null,
-        meta: {
-          admin_id,
-          reason,
-          adjusted_at: new Date().toISOString()
-        }
-      })
+      // 执行资产调整（使用 TransactionManager 确保事务边界）
+      const result = await TransactionManager.execute(
+        async (transaction) => {
+          return await AssetService.changeBalance(
+            {
+              user_id,
+              asset_code,
+              delta_amount: Number(amount),
+              business_type: 'admin_adjustment',
+              idempotency_key: finalIdempotencyKey,
+              campaign_id: campaign_id || null,
+              meta: {
+                admin_id,
+                reason,
+                adjusted_at: new Date().toISOString()
+              }
+            },
+            { transaction }
+          )
+        },
+        { description: `管理员资产调整: user_id=${user_id}, asset_code=${asset_code}` }
+      )
 
       // 记录审计日志
       try {
@@ -203,19 +212,27 @@ router.post(
       const idempotencyKey = `batch_adjust_${admin_id}_${user_id}_${asset_code}_${Date.now()}_${uuidv4().slice(0, 8)}`
 
       try {
-        const result = await AssetService.changeBalance({
-          user_id,
-          asset_code,
-          delta_amount: Number(amount),
-          business_type: 'admin_adjustment',
-          idempotency_key: idempotencyKey,
-          campaign_id: campaign_id || null,
-          meta: {
-            admin_id,
-            reason: batch_reason,
-            batch: true
-          }
-        })
+        const result = await TransactionManager.execute(
+          async (transaction) => {
+            return await AssetService.changeBalance(
+              {
+                user_id,
+                asset_code,
+                delta_amount: Number(amount),
+                business_type: 'admin_adjustment',
+                idempotency_key: idempotencyKey,
+                campaign_id: campaign_id || null,
+                meta: {
+                  admin_id,
+                  reason: batch_reason,
+                  batch: true
+                }
+              },
+              { transaction }
+            )
+          },
+          { description: `批量资产调整: user_id=${user_id}, asset_code=${asset_code}` }
+        )
 
         results.push({
           user_id,

@@ -39,7 +39,7 @@ class QRCodeValidator {
   /**
    * 构造函数
    */
-  constructor() {
+  constructor () {
     // 从环境变量获取签名密钥（强制要求配置，移除默认密钥以提升安全性）
     this.secret = process.env.JWT_SECRET
 
@@ -62,7 +62,7 @@ class QRCodeValidator {
    * 用于生成每日签名的基准时间
    * @returns {number} 当天0点的时间戳
    */
-  _getTodayStartTimestamp() {
+  _getTodayStartTimestamp () {
     const todayStart = BeijingTimeHelper.todayStart()
     return todayStart.getTime()
   }
@@ -72,7 +72,7 @@ class QRCodeValidator {
    * @param {string} data - 要签名的数据
    * @returns {string} 签名结果（32位十六进制）
    */
-  _generateSignature(data) {
+  _generateSignature (data) {
     const hmac = crypto.createHmac(this.algorithm, this.secret)
     hmac.update(data)
     return hmac.digest('hex')
@@ -96,7 +96,7 @@ class QRCodeValidator {
    * - UUID格式防止用户ID枚举攻击
    * - 配合防误操作窗口机制保证安全性
    */
-  generateQRCode(userUuid) {
+  generateQRCode (userUuid) {
     // 参数验证：检查是否为有效UUID格式
     if (!userUuid || typeof userUuid !== 'string') {
       throw new Error('用户UUID必须是字符串')
@@ -141,7 +141,7 @@ class QRCodeValidator {
    *   console.log('验证失败:', result.error)
    * }
    */
-  validateQRCode(qrCode) {
+  validateQRCode (qrCode) {
     try {
       // 基本格式验证
       if (!qrCode || typeof qrCode !== 'string') {
@@ -230,7 +230,7 @@ class QRCodeValidator {
    *   console.log(result.message) // "请等待XX秒后再试"
    * }
    */
-  checkAntiMisoperation(qrCode, lastScanTime) {
+  checkAntiMisoperation (qrCode, lastScanTime) {
     // 如果没有上次扫码时间，允许操作
     if (!lastScanTime) {
       return {
@@ -273,7 +273,7 @@ class QRCodeValidator {
    *   - invalid_count {number}: 无效数量
    *   - results {Array<Object>}: 详细验证结果数组
    */
-  batchValidate(qrCodes) {
+  batchValidate (qrCodes) {
     if (!Array.isArray(qrCodes)) {
       throw new Error('参数必须是数组')
     }
@@ -301,7 +301,7 @@ class QRCodeValidator {
    * @param {string} qrCode - 二维码字符串
    * @returns {string|null} 用户UUID（失败返回null）
    */
-  extractUuid(qrCode) {
+  extractUuid (qrCode) {
     try {
       if (!qrCode || typeof qrCode !== 'string') {
         return null
@@ -327,7 +327,7 @@ class QRCodeValidator {
    * @param {string} qrCode - 二维码字符串
    * @returns {string|null} 签名（失败返回null）
    */
-  extractSignature(qrCode) {
+  extractSignature (qrCode) {
     try {
       if (!qrCode || typeof qrCode !== 'string') {
         return null
@@ -356,7 +356,7 @@ class QRCodeValidator {
    * - 签名基于user_uuid，永久不变
    * - UUID格式防止用户ID枚举攻击
    */
-  generateQRCodeInfo(userUuid) {
+  generateQRCodeInfo (userUuid) {
     const qrCode = this.generateQRCode(userUuid)
 
     return {

@@ -299,7 +299,7 @@ const FORBIDDEN_IN_DB = {
  *   throw new Error('配置项不在白名单内')
  * }
  */
-function getWhitelist(settingKey) {
+function getWhitelist (settingKey) {
   return SYSTEM_SETTINGS_WHITELIST[settingKey] || null
 }
 
@@ -314,7 +314,7 @@ function getWhitelist(settingKey) {
  *   throw new Error('该配置禁止存储在数据库')
  * }
  */
-function isForbidden(settingKey) {
+function isForbidden (settingKey) {
   // 检查精确匹配
   if (FORBIDDEN_IN_DB.exactMatch.includes(settingKey)) {
     return true
@@ -351,7 +351,7 @@ function isForbidden(settingKey) {
  *   throw new Error(result.error)
  * }
  */
-function validateSettingValue(settingKey, value) {
+function validateSettingValue (settingKey, value) {
   const whitelist = getWhitelist(settingKey)
 
   if (!whitelist) {
@@ -413,7 +413,7 @@ function validateSettingValue(settingKey, value) {
  *
  * @returns {string[]} 白名单配置项列表
  */
-function getAllWhitelistKeys() {
+function getAllWhitelistKeys () {
   return Object.keys(SYSTEM_SETTINGS_WHITELIST)
 }
 
@@ -422,7 +422,7 @@ function getAllWhitelistKeys() {
  *
  * @returns {string[]} 需要审计的配置项列表
  */
-function getAuditRequiredKeys() {
+function getAuditRequiredKeys () {
   return Object.entries(SYSTEM_SETTINGS_WHITELIST)
     .filter(([, schema]) => schema.auditRequired)
     .map(([key]) => key)

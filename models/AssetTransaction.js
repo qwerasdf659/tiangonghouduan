@@ -46,7 +46,7 @@ class AssetTransaction extends Model {
    * @param {Object} models - Sequelize所有模型的集合对象
    * @returns {void} 无返回值，仅定义关联关系
    */
-  static associate(models) {
+  static associate (models) {
     // 多对一：流水归属于账户（Account 体系）
     AssetTransaction.belongsTo(models.Account, {
       foreignKey: 'account_id',
@@ -65,7 +65,7 @@ class AssetTransaction extends Model {
    * @param {number} data.balance_after - 变动后余额
    * @returns {Object} 验证结果对象 {is_valid: boolean, errors: Array<string>}
    */
-  static validateTransaction(data) {
+  static validateTransaction (data) {
     const errors = []
 
     /**

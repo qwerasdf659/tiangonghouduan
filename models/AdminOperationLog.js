@@ -177,7 +177,7 @@ module.exports = sequelize => {
          * 获取北京时间格式的操作时间
          * @returns {string} 北京时间格式的日期字符串（YYYY年MM月DD日 HH:mm:ss）
          */
-        get() {
+        get () {
           return BeijingTimeHelper.formatChinese(this.getDataValue('created_at'))
         }
       }

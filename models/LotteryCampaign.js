@@ -22,7 +22,7 @@ class LotteryCampaign extends Model {
    * @param {Object} models - 所有模型的引用
    * @returns {void}
    */
-  static associate(models) {
+  static associate (models) {
     // 一对多：一个活动有多个奖品
     LotteryCampaign.hasMany(models.LotteryPrize, {
       foreignKey: 'campaign_id',
@@ -49,7 +49,7 @@ class LotteryCampaign extends Model {
    * 获取活动类型的友好显示名称
    * @returns {string} 显示名称
    */
-  getCampaignTypeName() {
+  getCampaignTypeName () {
     const typeNames = {
       daily: '每日抽奖',
       weekly: '每周抽奖',
@@ -63,7 +63,7 @@ class LotteryCampaign extends Model {
    * 获取活动状态的友好显示名称
    * @returns {string} 显示名称
    */
-  getStatusName() {
+  getStatusName () {
     const statusNames = {
       draft: '草稿',
       active: '进行中',
@@ -78,7 +78,7 @@ class LotteryCampaign extends Model {
    * 检查活动是否正在进行中
    * @returns {boolean} 是否进行中
    */
-  isActive() {
+  isActive () {
     const now = BeijingTimeHelper.createBeijingTime()
     const startTime = new Date(this.start_time)
     const endTime = new Date(this.end_time)
@@ -89,7 +89,7 @@ class LotteryCampaign extends Model {
    * 检查活动是否即将开始
    * @returns {boolean} 是否即将开始
    */
-  isUpcoming() {
+  isUpcoming () {
     const now = BeijingTimeHelper.createBeijingTime()
     return this.status === 'active' && this.start_time > now
   }
@@ -98,7 +98,7 @@ class LotteryCampaign extends Model {
    * 检查活动是否已结束
    * @returns {boolean} 是否已结束
    */
-  isEnded() {
+  isEnded () {
     const now = BeijingTimeHelper.createBeijingTime()
     return this.status === 'ended' || this.end_time < now
   }
@@ -107,7 +107,7 @@ class LotteryCampaign extends Model {
    * 获取活动剩余时间（分钟）
    * @returns {number|null} 剩余分钟数，null表示已结束
    */
-  getRemainingTimeMinutes() {
+  getRemainingTimeMinutes () {
     if (this.isEnded()) return null
 
     const now = BeijingTimeHelper.createBeijingTime()
@@ -121,7 +121,7 @@ class LotteryCampaign extends Model {
    * 获取活动进度百分比
    * @returns {number} 进度百分比 (0-100)
    */
-  getProgress() {
+  getProgress () {
     const now = BeijingTimeHelper.createBeijingTime()
     const startTime = new Date(this.start_time)
     const endTime = new Date(this.end_time)
@@ -142,7 +142,7 @@ class LotteryCampaign extends Model {
    * @param {number} userDrawsTotal - 用户总抽奖次数
    * @returns {Object} 检查结果
    */
-  canUserParticipate(user_id, userDrawsToday = 0, userDrawsTotal = 0) {
+  canUserParticipate (user_id, userDrawsToday = 0, userDrawsTotal = 0) {
     const issues = []
 
     // 检查活动状态
@@ -196,7 +196,7 @@ class LotteryCampaign extends Model {
    * @param {number} userPoints - 用户积分余额
    * @returns {Object} 成本检查结果
    */
-  checkDrawCost(userPoints) {
+  checkDrawCost (userPoints) {
     const cost = parseFloat(this.cost_per_draw)
 
     return {
@@ -211,7 +211,7 @@ class LotteryCampaign extends Model {
    * 获取奖池统计信息
    * @returns {Object} 奖池统计
    */
-  getPrizePoolStats() {
+  getPrizePoolStats () {
     const totalPool = parseFloat(this.total_prize_pool)
     const remainingPool = parseFloat(this.remaining_prize_pool)
     const consumedPool = totalPool - remainingPool
@@ -229,7 +229,7 @@ class LotteryCampaign extends Model {
    * 获取参与统计信息
    * @returns {Object} 参与统计
    */
-  getParticipationStats() {
+  getParticipationStats () {
     // V4.0语义更新：high_tier_rate 替代 win_rate
     const highTierRate =
       this.total_draws > 0 ? (this.total_prizes_awarded / this.total_draws) * 100 : 0
@@ -250,7 +250,7 @@ class LotteryCampaign extends Model {
    * 检查活动是否使用用户预算模式
    * @returns {boolean} 是否使用用户预算
    */
-  isUserBudgetMode() {
+  isUserBudgetMode () {
     return this.budget_mode === 'user'
   }
 
@@ -258,7 +258,7 @@ class LotteryCampaign extends Model {
    * 检查活动是否使用活动池预算模式
    * @returns {boolean} 是否使用活动池预算
    */
-  isPoolBudgetMode() {
+  isPoolBudgetMode () {
     return this.budget_mode === 'pool'
   }
 
@@ -266,7 +266,7 @@ class LotteryCampaign extends Model {
    * 检查活动是否无预算限制（测试模式）
    * @returns {boolean} 是否无预算限制
    */
-  isNoBudgetMode() {
+  isNoBudgetMode () {
     return this.budget_mode === 'none'
   }
 
@@ -275,7 +275,7 @@ class LotteryCampaign extends Model {
    * @param {number} source_campaign_id - 预算来源活动ID
    * @returns {boolean} 是否允许使用
    */
-  isAllowedBudgetSource(source_campaign_id) {
+  isAllowedBudgetSource (source_campaign_id) {
     // 非用户预算模式，不检查来源
     if (!this.isUserBudgetMode()) {
       return true
@@ -296,7 +296,7 @@ class LotteryCampaign extends Model {
    * 获取活动池预算统计（仅 budget_mode=pool 时有意义）
    * @returns {Object} 预算统计
    */
-  getPoolBudgetStats() {
+  getPoolBudgetStats () {
     if (!this.isPoolBudgetMode()) {
       return {
         is_pool_mode: false,
@@ -327,7 +327,7 @@ class LotteryCampaign extends Model {
    * @param {number} required_amount - 需要的预算金额
    * @returns {Object} 检查结果
    */
-  checkPoolBudgetSufficient(required_amount) {
+  checkPoolBudgetSufficient (required_amount) {
     if (!this.isPoolBudgetMode()) {
       return {
         is_sufficient: true,
@@ -352,7 +352,7 @@ class LotteryCampaign extends Model {
    * @param {Object} options.transaction - Sequelize事务对象
    * @returns {Promise<boolean>} 是否扣减成功
    */
-  async deductPoolBudget(amount, options = {}) {
+  async deductPoolBudget (amount, options = {}) {
     if (!this.isPoolBudgetMode()) {
       return false
     }
@@ -377,7 +377,7 @@ class LotteryCampaign extends Model {
    * @param {number} [stats.prize_value] - 中奖奖品价值
    * @returns {Promise<void>} 无返回值
    */
-  async updateStats(stats) {
+  async updateStats (stats) {
     const updates = {}
 
     if (stats.new_participant) {
@@ -404,7 +404,7 @@ class LotteryCampaign extends Model {
    * 获取活动健康状态
    * @returns {Object} 健康状态
    */
-  getHealthStatus() {
+  getHealthStatus () {
     const issues = []
     const warnings = []
 
@@ -457,7 +457,7 @@ class LotteryCampaign extends Model {
    * 生成活动摘要
    * @returns {Object} 活动摘要
    */
-  toSummary() {
+  toSummary () {
     const poolStats = this.getPrizePoolStats()
     const participationStats = this.getParticipationStats()
     const healthStatus = this.getHealthStatus()
@@ -533,7 +533,7 @@ module.exports = sequelize => {
          * 获取每次抽奖消耗积分（自动转换为浮点数）
          * @returns {number} 抽奖消耗积分
          */
-        get() {
+        get () {
           const value = this.getDataValue('cost_per_draw')
           return value ? parseFloat(value) : 0
         }
@@ -558,7 +558,7 @@ module.exports = sequelize => {
          * 获取总奖池价值（自动转换为浮点数）
          * @returns {number} 总奖池价值
          */
-        get() {
+        get () {
           const value = this.getDataValue('total_prize_pool')
           return value ? parseFloat(value) : 0
         }
@@ -572,7 +572,7 @@ module.exports = sequelize => {
          * 获取剩余奖池价值（自动转换为浮点数）
          * @returns {number} 剩余奖池价值
          */
-        get() {
+        get () {
           const value = this.getDataValue('remaining_prize_pool')
           return value ? parseFloat(value) : 0
         }

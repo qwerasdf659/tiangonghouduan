@@ -209,7 +209,7 @@ router.post('/admin/:review_id/handle', authenticateToken, async (req, res) => {
 
     // 参数验证
     if (!['unfreeze', 'confiscate'].includes(action)) {
-      return res.apiError("action 必须是 'unfreeze' 或 'confiscate'", 'BAD_REQUEST', null, 400)
+      return res.apiError('action 必须是 \'unfreeze\' 或 \'confiscate\'', 'BAD_REQUEST', null, 400)
     }
 
     logger.info('客服处理冻结积分请求', {

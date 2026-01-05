@@ -222,12 +222,12 @@ module.exports = sequelize => {
       // 提供缩略图URLs
       thumbnails: values.thumbnail_paths
         ? {
-            small: values.thumbnail_paths.small ? `/uploads/${values.thumbnail_paths.small}` : null,
-            medium: values.thumbnail_paths.medium
-              ? `/uploads/${values.thumbnail_paths.medium}`
-              : null,
-            large: values.thumbnail_paths.large ? `/uploads/${values.thumbnail_paths.large}` : null
-          }
+          small: values.thumbnail_paths.small ? `/uploads/${values.thumbnail_paths.small}` : null,
+          medium: values.thumbnail_paths.medium
+            ? `/uploads/${values.thumbnail_paths.medium}`
+            : null,
+          large: values.thumbnail_paths.large ? `/uploads/${values.thumbnail_paths.large}` : null
+        }
         : {},
       // 移除服务器文件路径敏感信息
       file_path: undefined,

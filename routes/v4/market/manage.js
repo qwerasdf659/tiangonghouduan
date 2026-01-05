@@ -21,7 +21,9 @@ const router = express.Router()
 const { authenticateToken } = require('../../../middleware/auth')
 const { validatePositiveInteger, handleServiceError } = require('../../../middleware/validation')
 const logger = require('../../../utils/logger').logger
-const { MarketListing, ItemInstance, sequelize } = require('../../../models')
+const { MarketListing, ItemInstance } = require('../../../models')
+// 事务边界治理 - 统一事务管理器
+const TransactionManager = require('../../../utils/TransactionManager')
 
 /**
  * @route POST /api/v4/market/listings/:listing_id/withdraw
@@ -61,50 +63,46 @@ router.post(
         return res.apiError('挂牌不存在或已下架', 'NOT_FOUND', null, 404)
       }
 
-      // 使用事务处理撤回操作
-      const transaction = await sequelize.transaction()
-
-      try {
-        // 更新挂牌状态
-        await listing.update(
-          {
-            status: 'withdrawn'
-          },
-          { transaction }
-        )
-
-        // 恢复物品状态为可用（仅 item_instance 类型需要）
-        if (listing.listing_kind === 'item_instance' && listing.offer_item_instance_id) {
-          await ItemInstance.update(
-            { status: 'available' },
+      // 使用 TransactionManager 处理撤回操作
+      await TransactionManager.execute(
+        async transaction => {
+          // 更新挂牌状态
+          await listing.update(
             {
-              where: { item_instance_id: listing.offer_item_instance_id },
-              transaction
-            }
+              status: 'withdrawn'
+            },
+            { transaction }
           )
-        }
 
-        await transaction.commit()
+          // 恢复物品状态为可用（仅 item_instance 类型需要）
+          if (listing.listing_kind === 'item_instance' && listing.offer_item_instance_id) {
+            await ItemInstance.update(
+              { status: 'available' },
+              {
+                where: { item_instance_id: listing.offer_item_instance_id },
+                transaction
+              }
+            )
+          }
+        },
+        { description: 'market_listing_withdraw' }
+      )
 
-        logger.info('市场挂牌撤回成功', {
+      logger.info('市场挂牌撤回成功', {
+        listing_id: listingId,
+        seller_id: sellerId,
+        item_instance_id: listing.offer_item_instance_id,
+        withdraw_reason: withdraw_reason || '用户主动撤回'
+      })
+
+      return res.apiSuccess(
+        {
           listing_id: listingId,
-          seller_id: sellerId,
           item_instance_id: listing.offer_item_instance_id,
-          withdraw_reason: withdraw_reason || '用户主动撤回'
-        })
-
-        return res.apiSuccess(
-          {
-            listing_id: listingId,
-            item_instance_id: listing.offer_item_instance_id,
-            withdrawn_at: new Date().toISOString()
-          },
-          '撤回成功。您可以重新编辑后再次上架。'
-        )
-      } catch (innerError) {
-        await transaction.rollback()
-        throw innerError
-      }
+          withdrawn_at: new Date().toISOString()
+        },
+        '撤回成功。您可以重新编辑后再次上架。'
+      )
     } catch (error) {
       logger.error('撤回市场挂牌失败', {
         error: error.message,

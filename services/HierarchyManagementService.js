@@ -51,7 +51,7 @@ class HierarchyManagementService {
    * 示例：业务经理（user_id=10）添加业务员（user_id=20）到门店（store_id=5）
    * await createHierarchy(20, 10, role_id, 5)
    */
-  static async createHierarchy(user_id, superior_user_id, role_id, store_id = null) {
+  static async createHierarchy (user_id, superior_user_id, role_id, store_id = null) {
     try {
       // 1. 验证用户和角色存在
       const user = await User.findByPk(user_id)
@@ -119,7 +119,7 @@ class HierarchyManagementService {
    *
    * 安全增强：添加循环检测和深度限制，防止数据异常导致无限递归
    */
-  static async getAllSubordinates(
+  static async getAllSubordinates (
     user_id,
     include_inactive = false,
     maxDepth = 10,
@@ -217,7 +217,7 @@ class HierarchyManagementService {
    * 示例2：业务经理离职，停用其本人及所有下级业务员（需要明确传入true）
    * await batchDeactivatePermissions(10, 1, '业务经理离职', true)
    */
-  static async batchDeactivatePermissions(
+  static async batchDeactivatePermissions (
     target_user_id,
     operator_user_id,
     reason,
@@ -319,7 +319,7 @@ class HierarchyManagementService {
    * @param {boolean} include_subordinates - 是否同时激活所有下级（默认false）
    * @returns {Promise<Object>} { success, activated_count, activated_users, message }
    */
-  static async batchActivatePermissions(
+  static async batchActivatePermissions (
     target_user_id,
     operator_user_id,
     include_subordinates = false
@@ -418,7 +418,7 @@ class HierarchyManagementService {
    *
    * 简化说明：使用简单的递归查询判断上下级关系，不依赖 hierarchy_path
    */
-  static async canManageUser(operator_user_id, target_user_id) {
+  static async canManageUser (operator_user_id, target_user_id) {
     try {
       // 1. 获取操作人的角色级别
       const operatorHierarchy = await UserHierarchy.findOne({
@@ -480,7 +480,7 @@ class HierarchyManagementService {
    *
    * 简化说明：按角色类型统计，而不是按层级深度统计（更直观）
    */
-  static async getHierarchyStats(user_id) {
+  static async getHierarchyStats (user_id) {
     try {
       // 1. 获取所有下级
       const allSubordinates = await this.getAllSubordinates(user_id, false)

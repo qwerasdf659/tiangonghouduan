@@ -32,7 +32,7 @@ class PaginationTestSuite {
    *   userToken
    * )
    */
-  static async testPaginationParams(app, apiEndpoint, authToken = null) {
+  static async testPaginationParams (app, apiEndpoint, authToken = null) {
     describe(`分页参数验证 - ${apiEndpoint}`, () => {
       /**
        * 测试: 应该拒绝page < 1
@@ -115,7 +115,7 @@ class PaginationTestSuite {
    * @param {string} authToken - 认证Token(可选)
    * @returns {Promise<void>} 无返回值
    */
-  static async testPaginationStructure(app, apiEndpoint, authToken = null) {
+  static async testPaginationStructure (app, apiEndpoint, authToken = null) {
     const req = request(app).get(apiEndpoint)
     if (authToken) req.set('Authorization', `Bearer ${authToken}`)
 
@@ -155,7 +155,7 @@ class PaginationTestSuite {
    * @param {string} authToken - 认证Token(可选)
    * @returns {Promise<void>} 无返回值
    */
-  static async testPaginationLogic(app, apiEndpoint, authToken = null) {
+  static async testPaginationLogic (app, apiEndpoint, authToken = null) {
     // 1. 获取总数
     const req1 = request(app).get(`${apiEndpoint}?page=1&limit=5`)
     if (authToken) req1.set('Authorization', `Bearer ${authToken}`)
@@ -204,7 +204,7 @@ class PaginationHelpers {
    * @param {number} limit - 每页数量
    * @returns {Object} 分页信息
    */
-  static calculatePagination(total, page = 1, limit = 10) {
+  static calculatePagination (total, page = 1, limit = 10) {
     const totalPages = Math.ceil(total / limit)
     const offset = (page - 1) * limit
     const hasNextPage = page < totalPages
@@ -228,7 +228,7 @@ class PaginationHelpers {
    * @param {number} limit - 每页数量
    * @returns {Object} 验证结果
    */
-  static validatePaginationParams(page, limit) {
+  static validatePaginationParams (page, limit) {
     const errors = []
 
     if (page < 1) {
@@ -254,7 +254,7 @@ class PaginationHelpers {
    * @param {number} limit - 每页数量
    * @returns {Array} 每页应该有的数据量
    */
-  static generatePageSizes(totalCount, limit = 10) {
+  static generatePageSizes (totalCount, limit = 10) {
     const totalPages = Math.ceil(totalCount / limit)
     const pageSizes = []
 

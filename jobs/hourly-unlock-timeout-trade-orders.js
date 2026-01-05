@@ -51,7 +51,7 @@ class HourlyUnlockTimeoutTradeOrders {
    *
    * @returns {Promise<Object>} 执行报告
    */
-  static async execute() {
+  static async execute () {
     const start_time = Date.now()
     logger.info('开始执行交易市场超时解锁任务（JSON多级锁定版本）')
 
@@ -94,7 +94,7 @@ class HourlyUnlockTimeoutTradeOrders {
    * @private
    * @returns {Promise<Object>} 释放结果
    */
-  static async _releaseTimeoutLockedItems() {
+  static async _releaseTimeoutLockedItems () {
     const transaction = await sequelize.transaction()
 
     try {
@@ -212,7 +212,7 @@ class HourlyUnlockTimeoutTradeOrders {
    * @private
    * @returns {Promise<Object>} 取消结果
    */
-  static async _cancelTimeoutOrders() {
+  static async _cancelTimeoutOrders () {
     const transaction = await sequelize.transaction()
 
     try {

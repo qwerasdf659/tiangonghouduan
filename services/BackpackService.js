@@ -67,7 +67,7 @@ class BackpackService {
    * @param {Object} [options.transaction] - Sequelize事务对象
    * @returns {Promise<Object>} {assets, items}
    */
-  static async getUserBackpack(user_id, options = {}) {
+  static async getUserBackpack (user_id, options = {}) {
     const { viewer_user_id, transaction = null } = options
 
     try {
@@ -124,7 +124,7 @@ class BackpackService {
    * @param {Object} [options.transaction] - Sequelize事务对象
    * @returns {Promise<Array>} 资产列表
    */
-  static async _getAssets(user_id, options = {}) {
+  static async _getAssets (user_id, options = {}) {
     const { transaction = null } = options
 
     try {
@@ -201,7 +201,7 @@ class BackpackService {
    * @param {Object} [options.transaction] - Sequelize事务对象
    * @returns {Promise<Array>} 物品列表
    */
-  static async _getItems(user_id, options = {}) {
+  static async _getItems (user_id, options = {}) {
     const { transaction = null } = options
 
     try {
@@ -303,7 +303,7 @@ class BackpackService {
    *
    * @throws {Error} FORBIDDEN - 无权查看此物品
    */
-  static async getItemDetail(item_instance_id, options = {}) {
+  static async getItemDetail (item_instance_id, options = {}) {
     const { viewer_user_id, is_admin = false, transaction = null } = options
 
     try {
@@ -385,7 +385,7 @@ class BackpackService {
    *   total_asset_value: 1000   // 资产总价值（按类型统计）
    * }
    */
-  static async getBackpackStats(user_id, options = {}) {
+  static async getBackpackStats (user_id, options = {}) {
     const { transaction = null } = options
 
     try {
@@ -448,7 +448,7 @@ class BackpackService {
    *   }
    * }
    */
-  static async getTransferHistory(user_id, options = {}) {
+  static async getTransferHistory (user_id, options = {}) {
     const {
       type = 'all',
       item_instance_id,

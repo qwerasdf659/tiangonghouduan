@@ -52,7 +52,7 @@ class IdempotencyTestSuite {
    * @returns {Promise<Object>} 测试结果
    * @throws {Error} 如果幂等性保护失效
    */
-  static async testBusinessIdIdempotency(operation, businessId, verifyResult = null) {
+  static async testBusinessIdIdempotency (operation, businessId, verifyResult = null) {
     console.log(`🔒 测试幂等性: business_id=${businessId}`)
 
     // 第一次执行
@@ -95,7 +95,7 @@ class IdempotencyTestSuite {
    * @returns {Promise<Object>} 测试结果
    * @throws {Error} 如果检测到幂等性失败
    */
-  static async testIdempotencyFailureDetection(operation, getRecordCount, businessId) {
+  static async testIdempotencyFailureDetection (operation, getRecordCount, businessId) {
     console.log(`🔍 检测幂等性失败: business_id=${businessId}`)
 
     // 执行前的记录数
@@ -146,7 +146,7 @@ class IdempotencyTestSuite {
    * @returns {Promise<Object>} 测试结果
    * @throws {Error} 如果并发幂等性保护失效
    */
-  static async testConcurrentIdempotency(operation, concurrentCount = 5) {
+  static async testConcurrentIdempotency (operation, concurrentCount = 5) {
     console.log(`🔒 测试并发幂等性: ${concurrentCount}个并发请求`)
 
     // 并发执行多个相同请求
@@ -188,7 +188,7 @@ class IdempotencyTestSuite {
    * @returns {Promise<Object>} 测试结果
    * @throws {Error} 如果独立性测试失败
    */
-  static async testBusinessIdIndependence(createOperation, businessIds) {
+  static async testBusinessIdIndependence (createOperation, businessIds) {
     console.log(`🔍 测试business_id独立性: ${businessIds.length}个ID`)
 
     const results = []
@@ -229,7 +229,7 @@ class IdempotencyTestSuite {
    * @returns {Promise<Object>} 测试结果
    * @throws {Error} 如果幂等性保护失效
    */
-  static async testAssetServiceIdempotency(userId, amount, idempotencyKey, AssetService) {
+  static async testAssetServiceIdempotency (userId, amount, idempotencyKey, AssetService) {
     console.log(`💰 测试资产服务幂等性: user_id=${userId}, idempotency_key=${idempotencyKey}`)
 
     // 获取初始余额
@@ -305,7 +305,7 @@ class IdempotencyTestSuite {
    * @returns {Promise<Object>} 测试结果
    * @throws {Error} 如果幂等性保护失效
    */
-  static async testLotteryIdempotency(userId, campaignId, idempotencyKey, LotteryEngine) {
+  static async testLotteryIdempotency (userId, campaignId, idempotencyKey, LotteryEngine) {
     console.log(`🎲 测试抽奖幂等性: user_id=${userId}, key=${idempotencyKey}`)
 
     const { LotteryDraw } = require('../../models')

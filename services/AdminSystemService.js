@@ -153,7 +153,7 @@ class AdminSystemService {
    * @returns {Object} return.lottery_engine - 抽奖引擎状态
    * @returns {Object} return.api - API版本信息
    */
-  static async getSystemStatus(lotteryEngine = null, performanceMonitor = null) {
+  static async getSystemStatus (lotteryEngine = null, performanceMonitor = null) {
     try {
       logger.info('获取系统状态')
 
@@ -215,7 +215,7 @@ class AdminSystemService {
    * @returns {Object} return.engine - 引擎性能
    * @returns {string} return.last_updated - 最后更新时间
    */
-  static async getDashboardData(_lotteryEngine = null, performanceMonitor = null) {
+  static async getDashboardData (_lotteryEngine = null, performanceMonitor = null) {
     try {
       logger.info('获取仪表板数据')
 
@@ -343,7 +343,7 @@ class AdminSystemService {
    * @param {Object} managementStrategy - 管理策略实例
    * @returns {Promise<Object>} 管理策略状态
    */
-  static async getManagementStatus(managementStrategy) {
+  static async getManagementStatus (managementStrategy) {
     try {
       logger.info('获取管理策略状态')
 
@@ -367,7 +367,7 @@ class AdminSystemService {
    * @private
    * @returns {Promise<Object>} 系统统计信息
    */
-  static async _getSimpleSystemStats() {
+  static async _getSimpleSystemStats () {
     try {
       // V4.0语义更新：统计高档奖励次数（替代原中奖次数）
       const [totalUsers, activeUsers, totalLotteries, totalHighTierWins] = await Promise.all([
@@ -425,7 +425,7 @@ class AdminSystemService {
    * @returns {number} return.count - 配置项数量
    * @returns {Array<Object>} return.settings - 配置项列表
    */
-  static async getSettingsByCategory(category) {
+  static async getSettingsByCategory (category) {
     try {
       // 验证分类是否合法
       const validCategories = ['basic', 'points', 'notification', 'security']
@@ -487,7 +487,7 @@ class AdminSystemService {
    * @returns {number} return.total_settings - 总配置项数量
    * @returns {Object} return.categories - 各分类的配置项数量
    */
-  static async getSettingsSummary() {
+  static async getSettingsSummary () {
     try {
       // 查询所有分类的配置数量
       const categoryCounts = await SystemSettings.findAll({
@@ -546,7 +546,7 @@ class AdminSystemService {
    * - 高影响配置（businessImpact: HIGH/CRITICAL）强制审计日志
    * @see docs/配置管理三层分离与校验统一方案.md
    */
-  static async updateSettings(category, settingsToUpdate, userId, options = {}) {
+  static async updateSettings (category, settingsToUpdate, userId, options = {}) {
     const { transaction, reason } = options
 
     // 创建内部事务（如果外部没有传入）
@@ -796,7 +796,7 @@ class AdminSystemService {
    *
    * @see docs/配置管理三层分离与校验统一方案.md
    */
-  static async getSettingValue(category, setting_key, default_value = null, options = {}) {
+  static async getSettingValue (category, setting_key, default_value = null, options = {}) {
     const { strict = false } = options
     const configKey = `${category}/${setting_key}`
 
@@ -924,7 +924,7 @@ class AdminSystemService {
    * ])
    * // 返回: { lottery_cost_points: 100, daily_lottery_limit: 50 }
    */
-  static async getSettingValues(config_list) {
+  static async getSettingValues (config_list) {
     const result = {}
 
     try {
@@ -984,7 +984,7 @@ class AdminSystemService {
    * @returns {number} return.matched_keys - 匹配的key数量
    * @returns {string} return.timestamp - 清除时间戳
    */
-  static async clearCache(pattern = '*') {
+  static async clearCache (pattern = '*') {
     try {
       const { getRawClient } = require('../utils/UnifiedRedisClient')
       const rawClient = getRawClient()

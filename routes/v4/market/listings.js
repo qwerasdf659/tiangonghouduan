@@ -54,16 +54,16 @@ router.get('/listings', authenticateToken, async (req, res) => {
     // 排序逻辑
     let orderClause
     switch (sort) {
-      case 'price_asc':
-        orderClause = [['price_amount', 'ASC']]
-        break
-      case 'price_desc':
-        orderClause = [['price_amount', 'DESC']]
-        break
-      case 'newest':
-      default:
-        orderClause = [['created_at', 'DESC']]
-        break
+    case 'price_asc':
+      orderClause = [['price_amount', 'ASC']]
+      break
+    case 'price_desc':
+      orderClause = [['price_amount', 'DESC']]
+      break
+    case 'newest':
+    default:
+      orderClause = [['created_at', 'DESC']]
+      break
     }
 
     // 分页查询

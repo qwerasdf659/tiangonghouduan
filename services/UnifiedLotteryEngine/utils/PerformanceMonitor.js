@@ -119,7 +119,7 @@ class PerformanceMonitor {
    * // 自定义阈值
    * monitor.thresholds.decisionTime = 300 // 调整为300ms
    */
-  constructor() {
+  constructor () {
     this.logger = require('../../../utils/logger').logger
     this.metrics = new Map()
     this.thresholds = {
@@ -144,7 +144,7 @@ class PerformanceMonitor {
    * @param {Object} context - 上下文信息
    * @returns {Object} 监控句柄
    */
-  startMonitoring(operationName, context = {}) {
+  startMonitoring (operationName, context = {}) {
     const monitorId = this.generateMonitorId()
     const startTime = process.hrtime.bigint()
     const startMemory = process.memoryUsage()
@@ -219,7 +219,7 @@ class PerformanceMonitor {
    *   prize_name: '50元优惠券'
    * })
    */
-  addCheckpoint(monitorId, checkpointName, data = {}) {
+  addCheckpoint (monitorId, checkpointName, data = {}) {
     const monitor = this.metrics.get(monitorId)
     if (!monitor) {
       this.logger.warn('监控句柄不存在', { monitorId })
@@ -257,7 +257,7 @@ class PerformanceMonitor {
    * @param {Object} result - 操作结果
    * @returns {Object} 性能报告
    */
-  finishMonitoring(monitorId, result = {}) {
+  finishMonitoring (monitorId, result = {}) {
     const monitor = this.metrics.get(monitorId)
     if (!monitor) {
       this.logger.warn('监控句柄不存在', { monitorId })
@@ -325,7 +325,7 @@ class PerformanceMonitor {
    * @param {Object} result - 操作结果
    * @returns {Object} 性能报告
    */
-  endMonitoring(monitorId, result = {}) {
+  endMonitoring (monitorId, result = {}) {
     return this.finishMonitoring(monitorId, result)
   }
 
@@ -334,7 +334,7 @@ class PerformanceMonitor {
    * @param {Object} report - 性能报告
    * @returns {Object} 性能分析结果
    */
-  analyzePerformance(report) {
+  analyzePerformance (report) {
     const bottlenecks = []
     const recommendations = []
     let overallRating = 'excellent'
@@ -397,7 +397,7 @@ class PerformanceMonitor {
    * @param {Array} bottlenecks - 瓶颈列表
    * @returns {number} 性能评分 (0-100)
    */
-  calculatePerformanceScore(report, bottlenecks) {
+  calculatePerformanceScore (report, bottlenecks) {
     let score = 100
 
     // 根据瓶颈数量和严重程度扣分
@@ -418,7 +418,7 @@ class PerformanceMonitor {
    * 获取统计信息 - 新增方法
    * @returns {Object} 统计信息
    */
-  getStatistics() {
+  getStatistics () {
     const stats = {
       // ✅ 修复：添加测试期望的顶级字段
       totalOperations: this.globalStats.totalOperations,
@@ -449,7 +449,7 @@ class PerformanceMonitor {
    * 计算内存趋势 - 新增方法
    * @returns {Object} 内存趋势信息
    */
-  calculateMemoryTrends() {
+  calculateMemoryTrends () {
     return {
       trend: 'stable',
       recent: [],
@@ -484,7 +484,7 @@ class PerformanceMonitor {
    *   duration: 65 // 超过50ms阈值，触发告警
    * })
    */
-  checkThresholds(params) {
+  checkThresholds (params) {
     const { operation, duration, type } = params
     this.checkThreshold(operation || type, 'manual', duration)
   }
@@ -495,7 +495,7 @@ class PerformanceMonitor {
    * @param {BigInt} endTime - 结束时间
    * @returns {number} 持续时间（毫秒）
    */
-  calculateDuration(startTime, endTime) {
+  calculateDuration (startTime, endTime) {
     return Number(endTime - startTime) / 1000000
   }
 
@@ -547,7 +547,7 @@ class PerformanceMonitor {
    *   })
    * })
    */
-  registerAlert(operation, callback) {
+  registerAlert (operation, callback) {
     this.alertCallbacks.set(operation, callback)
     this.logger.debug(`注册告警回调: ${operation}`)
   }
@@ -589,7 +589,7 @@ class PerformanceMonitor {
    * const operations = ['决策流程', 'probabilityCalc', 'contextBuild']
    * operations.forEach(op => monitor.unregisterAlert(op))
    */
-  unregisterAlert(operation) {
+  unregisterAlert (operation) {
     this.alertCallbacks.delete(operation)
     this.logger.debug(`注销告警回调: ${operation}`)
   }
@@ -598,7 +598,7 @@ class PerformanceMonitor {
    * 获取实时指标 - 新增方法
    * @returns {Object} 实时指标
    */
-  getRealTimeMetrics() {
+  getRealTimeMetrics () {
     const now = BeijingTimeHelper.timestamp()
     const metrics = {
       timestamp: BeijingTimeHelper.now(),
@@ -672,7 +672,7 @@ class PerformanceMonitor {
    *   logger.info(`[${new Date().toLocaleString()}] 清理了${count}个过期指标`)
    * }, 300000) // 5分钟
    */
-  cleanupExpiredMetrics(maxAge = 300000) {
+  cleanupExpiredMetrics (maxAge = 300000) {
     // 默认5分钟
     const now = BeijingTimeHelper.timestamp()
     let cleanedCount = 0
@@ -700,7 +700,7 @@ class PerformanceMonitor {
    * @param {Array} reports - 性能报告列表
    * @returns {Object} 内存趋势分析
    */
-  analyzeMemoryTrend(reports) {
+  analyzeMemoryTrend (reports) {
     if (!reports || reports.length < 2) {
       return {
         trend: 'insufficient_data',
@@ -784,7 +784,7 @@ class PerformanceMonitor {
    * @see {@link registerAlert} - 注册告警回调函数
    * @see {@link checkThresholds} - 公共阈值检查接口
    */
-  checkThreshold(operation, phase, duration) {
+  checkThreshold (operation, phase, duration) {
     const threshold = this.thresholds[operation] || this.thresholds.decisionTime
 
     if (duration > threshold) {
@@ -862,7 +862,7 @@ class PerformanceMonitor {
    * }
    * await monitor.recordPerformanceData(report)
    */
-  async recordPerformanceData(report) {
+  async recordPerformanceData (report) {
     try {
       /*
        * ✅ 移除过度设计的SystemMetrics数据库集成
@@ -937,7 +937,7 @@ class PerformanceMonitor {
    * logger.info('平均耗时:', stats.avgTime.toFixed(2), 'ms')
    * logger.info('最大耗时:', stats.maxTime.toFixed(2), 'ms')
    */
-  storeInMemoryStats(report) {
+  storeInMemoryStats (report) {
     const key = `${report.operation}_stats`
     const existing = this.metrics.get(key) || {
       count: 0,
@@ -961,7 +961,7 @@ class PerformanceMonitor {
    * @param {string} operation - 操作名称
    * @returns {Object} 统计信息
    */
-  getStats(operation = null) {
+  getStats (operation = null) {
     if (operation) {
       return this.metrics.get(`${operation}_stats`) || null
     }
@@ -981,7 +981,7 @@ class PerformanceMonitor {
    * 生成监控ID
    * @returns {string} 唯一监控ID
    */
-  generateMonitorId() {
+  generateMonitorId () {
     return `monitor_${BeijingTimeHelper.generateIdTimestamp()}_${Math.random().toString(36).substr(2, 9)}`
   }
 
@@ -990,7 +990,7 @@ class PerformanceMonitor {
    * @param {Object} memoryUsage - 内存使用对象
    * @returns {string} 格式化的内存使用量
    */
-  formatMemoryUsage(memoryUsage) {
+  formatMemoryUsage (memoryUsage) {
     return {
       rss: `${(memoryUsage.rss / 1024 / 1024).toFixed(2)}MB`,
       heapUsed: `${(memoryUsage.heapUsed / 1024 / 1024).toFixed(2)}MB`,
@@ -1003,7 +1003,7 @@ class PerformanceMonitor {
    * @param {Object} monitor - 监控对象
    * @returns {Object} 峰值内存使用量
    */
-  calculatePeakMemory(monitor) {
+  calculatePeakMemory (monitor) {
     let peakRss = monitor.startMemory.rss
     let peakHeapUsed = monitor.startMemory.heapUsed
 
@@ -1021,7 +1021,7 @@ class PerformanceMonitor {
    * @param {Object} endMemory - 结束时内存
    * @returns {Object} 内存增量
    */
-  calculateMemoryDelta(startMemory, endMemory) {
+  calculateMemoryDelta (startMemory, endMemory) {
     return {
       rss: `${((endMemory.rss - startMemory.rss) / 1024 / 1024).toFixed(2)}MB`,
       heapUsed: `${((endMemory.heapUsed - startMemory.heapUsed) / 1024 / 1024).toFixed(2)}MB`

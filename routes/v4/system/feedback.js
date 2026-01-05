@@ -196,19 +196,19 @@ router.get('/feedback/:id', authenticateToken, async (req, res) => {
       // 用户信息
       user_info: feedback.user
         ? {
-            user_id: feedback.user.user_id,
-            mobile: userRoles.isAdmin ? feedback.user.mobile : '****',
-            nickname: feedback.user.nickname || '匿名用户'
-          }
+          user_id: feedback.user.user_id,
+          mobile: userRoles.isAdmin ? feedback.user.mobile : '****',
+          nickname: feedback.user.nickname || '匿名用户'
+        }
         : null,
 
       // 处理信息（✅ 使用正确的字段名reply_content）
       reply_content: feedback.reply_content,
       admin_info: feedback.admin
         ? {
-            admin_id: feedback.admin.user_id,
-            admin_name: feedback.admin.nickname || '管理员'
-          }
+          admin_id: feedback.admin.user_id,
+          admin_name: feedback.admin.nickname || '管理员'
+        }
         : null,
 
       // 时间信息（✅ 仅使用存在的字段）

@@ -408,7 +408,7 @@ const CONFIG_CATEGORIES = {
  * @param {string} _targetEnv - 目标环境（development/staging/production）
  * @returns {string[]} 必需的环境变量列表
  */
-function getRequiredKeys(_targetEnv = 'development') {
+function getRequiredKeys (_targetEnv = 'development') {
   return Object.entries(CONFIG_SCHEMA)
     .filter(([, schema]) => schema.required)
     .map(([key]) => key)
@@ -419,7 +419,7 @@ function getRequiredKeys(_targetEnv = 'development') {
  *
  * @returns {string[]} 可选的环境变量列表
  */
-function getOptionalKeys() {
+function getOptionalKeys () {
   return Object.entries(CONFIG_SCHEMA)
     .filter(([, schema]) => !schema.required)
     .map(([key]) => key)

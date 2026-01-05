@@ -39,6 +39,8 @@ const ExchangeService = require('../../../services/ExchangeService')
 const AssetService = require('../../../services/AssetService')
 const BeijingTimeHelper = require('../../../utils/timeHelper')
 const { generateStandaloneIdempotencyKey } = require('../../../utils/IdempotencyHelper')
+// 事务边界治理 - 统一事务管理器
+const TransactionManager = require('../../../utils/TransactionManager')
 
 describe('兑换市场幂等性测试 (Exchange Market Idempotency - V4.5.0 材料资产支付)', () => {
   let app
@@ -164,15 +166,20 @@ describe('兑换市场幂等性测试 (Exchange Market Idempotency - V4.5.0 材�
     if (currentBalance < 1000) {
       console.log(`⚠️ 材料资产不足(${currentBalance} < 1000)，充值到1000`)
 
-      // 方案B：使用新的 AssetService.changeBalance 参数格式
-      await AssetService.changeBalance({
-        user_id: testUser.user_id,
-        asset_code: 'red_shard',
-        delta_amount: 1000 - currentBalance,
-        business_type: 'test_recharge',
-        idempotency_key: generateStandaloneIdempotencyKey('test_recharge', testUser.user_id),
-        meta: { description: '测试充值' }
-      })
+      // 事务边界治理：使用 TransactionManager 包裹 AssetService 调用
+      await TransactionManager.execute(
+        async transaction => {
+          await AssetService.changeBalance({
+            user_id: testUser.user_id,
+            asset_code: 'red_shard',
+            delta_amount: 1000 - currentBalance,
+            business_type: 'test_recharge',
+            idempotency_key: generateStandaloneIdempotencyKey('test_recharge', testUser.user_id),
+            meta: { description: '测试充值' }
+          }, { transaction })
+        },
+        { description: 'test_recharge_asset' }
+      )
 
       console.log(`✅ 已充值 ${1000 - currentBalance} red_shard`)
     } else {

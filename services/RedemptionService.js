@@ -65,7 +65,7 @@ class RedemptionService {
    * logger.info('订单ID:', result.order.order_id)
    * logger.info('过期时间:', result.order.expires_at)
    */
-  static async createOrder(item_instance_id, options = {}) {
+  static async createOrder (item_instance_id, options = {}) {
     const { transaction: externalTx, creator_user_id } = options
     const tx = externalTx || (await sequelize.transaction())
     const shouldCommit = !externalTx
@@ -226,7 +226,7 @@ class RedemptionService {
    * const order = await RedemptionService.fulfillOrder('3K7J-2MQP-WXYZ', 123)
    * logger.info('核销成功:', order.order_id)
    */
-  static async fulfillOrder(code, redeemer_user_id, options = {}) {
+  static async fulfillOrder (code, redeemer_user_id, options = {}) {
     const { transaction: externalTx } = options
     const tx = externalTx || (await sequelize.transaction())
     const shouldCommit = !externalTx
@@ -337,7 +337,7 @@ class RedemptionService {
    * @returns {Promise<RedemptionOrder>} 取消后的订单对象
    * @throws {Error} 订单不存在、订单已核销等
    */
-  static async cancelOrder(order_id, options = {}) {
+  static async cancelOrder (order_id, options = {}) {
     const { transaction: externalTx } = options
     const tx = externalTx || (await sequelize.transaction())
     const shouldCommit = !externalTx
@@ -414,7 +414,7 @@ class RedemptionService {
    *
    * @returns {Promise<number>} 过期订单数量
    */
-  static async expireOrders() {
+  static async expireOrders () {
     const tx = await sequelize.transaction()
 
     try {
@@ -496,7 +496,7 @@ class RedemptionService {
    * @param {Object} [options.transaction] - Sequelize事务对象
    * @returns {Promise<RedemptionOrder>} 订单对象
    */
-  static async getOrderDetail(order_id, options = {}) {
+  static async getOrderDetail (order_id, options = {}) {
     const { include_item = false, include_redeemer = false, transaction = null } = options
 
     const include = []
@@ -536,7 +536,7 @@ class RedemptionService {
    * @param {Object} [options.transaction] - Sequelize事务对象
    * @returns {Promise<RedemptionOrder|null>} 订单对象或null
    */
-  static async getOrderByItem(item_instance_id, options = {}) {
+  static async getOrderByItem (item_instance_id, options = {}) {
     const { transaction = null } = options
 
     const order = await RedemptionOrder.findOne({

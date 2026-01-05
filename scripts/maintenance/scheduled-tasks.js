@@ -15,9 +15,10 @@
  * 9. 核销码过期清理（每天凌晨2点）- 2025-12-17新增（Phase 1）
  * 10. 商家审核超时告警（每小时）- 2025-12-29新增（资产域标准架构）
  * 11. 交易市场超时解锁（每小时）- 2025-12-29新增（资产域标准架构）
+ * 12. 业务记录关联对账（每小时第5分钟）- 2026-01-05新增（事务边界治理）
  *
  * 创建时间：2025-10-10
- * 更新时间：2025-12-29（新增资产域标准架构定时任务）
+ * 更新时间：2026-01-05（新增事务边界治理对账任务）
  */
 
 const cron = require('node-cron')
@@ -99,6 +100,9 @@ class ScheduledTasks {
 
     // 任务14: 每小时解锁超时交易订单（2025-12-29新增 - 资产域标准架构）
     this.scheduleHourlyUnlockTimeoutTradeOrders()
+
+    // 任务15: 每小时执行业务记录关联对账（2026-01-05新增 - 事务边界治理）
+    this.scheduleHourlyBusinessRecordReconciliation()
 
     logger.info('所有定时任务已初始化完成')
   }
@@ -1182,6 +1186,76 @@ class ScheduledTasks {
       return report
     } catch (error) {
       logger.error('[手动触发] 交易市场超时解锁失败', { error: error.message })
+      throw error
+    }
+  }
+
+  /**
+   * 定时任务15: 每小时执行业务记录关联对账
+   * Cron表达式: 5 * * * * (每小时的第5分钟)
+   *
+   * 业务场景（事务边界治理 P1-3）：
+   * - 检查 lottery_draws 与 asset_transactions 的关联完整性
+   * - 检查 consumption_records（已审核通过）与 asset_transactions 的关联
+   * - 检查 exchange_records 与 asset_transactions 的关联
+   * - 发现问题时发送告警通知给管理员
+   *
+   * 创建时间：2026-01-05（事务边界治理）
+   * @returns {void}
+   */
+  static scheduleHourlyBusinessRecordReconciliation() {
+    cron.schedule('5 * * * *', async () => {
+      try {
+        logger.info('[定时任务] 开始执行业务记录关联对账（事务边界治理）...')
+
+        // 调用 DailyAssetReconciliation 的业务记录对账方法
+        const report = await DailyAssetReconciliation.executeBusinessRecordReconciliation()
+
+        if (report.total_issues > 0) {
+          logger.warn(`[定时任务] 业务记录关联对账完成：发现${report.total_issues}个问题`, {
+            lottery_draws: report.lottery_draws.total_checked,
+            consumption_records: report.consumption_records.total_checked,
+            exchange_records: report.exchange_records.total_checked
+          })
+        } else {
+          logger.info('[定时任务] 业务记录关联对账完成：无问题')
+        }
+      } catch (error) {
+        logger.error('[定时任务] 业务记录关联对账失败', { error: error.message })
+      }
+    })
+
+    logger.info('✅ 定时任务已设置: 业务记录关联对账（每小时第5分钟执行）')
+  }
+
+  /**
+   * 手动触发业务记录关联对账（用于测试）
+   *
+   * 业务场景：手动执行业务记录关联对账，用于开发调试和即时检查
+   *
+   * @returns {Promise<Object>} 对账报告对象
+   *
+   * @example
+   * const ScheduledTasks = require('./scripts/maintenance/scheduled-tasks')
+   * const report = await ScheduledTasks.manualBusinessRecordReconciliation()
+   * console.log('问题数量:', report.total_issues)
+   */
+  static async manualBusinessRecordReconciliation() {
+    try {
+      logger.info('[手动触发] 开始执行业务记录关联对账...')
+      const report = await DailyAssetReconciliation.executeBusinessRecordReconciliation()
+
+      logger.info('[手动触发] 业务记录关联对账完成', {
+        status: report.status,
+        total_issues: report.total_issues,
+        lottery_draws_checked: report.lottery_draws.total_checked,
+        consumption_records_checked: report.consumption_records.total_checked,
+        exchange_records_checked: report.exchange_records.total_checked
+      })
+
+      return report
+    } catch (error) {
+      logger.error('[手动触发] 业务记录关联对账失败', { error: error.message })
       throw error
     }
   }

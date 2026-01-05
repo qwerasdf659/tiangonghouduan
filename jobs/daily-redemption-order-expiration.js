@@ -35,7 +35,7 @@ class DailyRedemptionOrderExpiration {
    * @returns {string} report.timestamp - 执行时间
    * @returns {number} report.duration_ms - 执行耗时(毫秒)
    */
-  static async execute() {
+  static async execute () {
     const start_time = Date.now()
     logger.info('开始每日兑换订单过期清理')
 
@@ -86,7 +86,7 @@ class DailyRedemptionOrderExpiration {
    * @returns {void}
    * @private
    */
-  static _outputReport(report) {
+  static _outputReport (report) {
     console.log('\n' + '='.repeat(80))
     console.log('📦 每日兑换订单过期清理报告')
     console.log('='.repeat(80))

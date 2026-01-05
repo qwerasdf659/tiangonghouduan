@@ -322,7 +322,7 @@ exports.logRoleAssign = async (req, userId, action, beforeRoles, afterRoles, rea
  * @param {Object} req - Express请求对象
  * @returns {string} IP地址
  */
-function getClientIP(req) {
+function getClientIP (req) {
   // 优先从代理头获取真实IP
   const forwarded = req.headers['x-forwarded-for']
   if (forwarded) {

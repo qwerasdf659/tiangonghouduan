@@ -30,7 +30,7 @@ class LotteryManagementSetting extends Model {
    * @param {Object} models - 所有模型的引用
    * @returns {void} 无返回值，仅定义模型关联关系
    */
-  static associate(models) {
+  static associate (models) {
     // 关联到目标用户（设置对哪个用户生效）
     LotteryManagementSetting.belongsTo(models.User, {
       foreignKey: 'user_id',
@@ -56,7 +56,7 @@ class LotteryManagementSetting extends Model {
    *   console.log('设置已过期')
    * }
    */
-  isExpired() {
+  isExpired () {
     if (!this.expires_at) return false
     return new Date(this.expires_at) < new Date()
   }
@@ -71,7 +71,7 @@ class LotteryManagementSetting extends Model {
    *   console.log('设置生效中')
    * }
    */
-  isActive() {
+  isActive () {
     return this.status === 'active' && !this.isExpired()
   }
 
@@ -86,7 +86,7 @@ class LotteryManagementSetting extends Model {
    *   await setting.markAsUsed()
    * }
    */
-  async markAsUsed() {
+  async markAsUsed () {
     this.status = 'used'
     await this.save()
   }
@@ -100,7 +100,7 @@ class LotteryManagementSetting extends Model {
    * const setting = await LotteryManagementSetting.findByPk(setting_id)
    * await setting.cancel()
    */
-  async cancel() {
+  async cancel () {
     this.status = 'cancelled'
     await this.save()
   }

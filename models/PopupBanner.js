@@ -81,7 +81,7 @@ module.exports = sequelize => {
            * @returns {void}
            * @throws {Error} 当跳转类型不为 none 且链接为空时抛出错误
            */
-          linkUrlRequired(value) {
+          linkUrlRequired (value) {
             if (this.link_type !== 'none' && (!value || value.trim() === '')) {
               throw new Error('当跳转类型不为 none 时，跳转链接不能为空')
             }
@@ -157,7 +157,7 @@ module.exports = sequelize => {
            * @returns {void}
            * @throws {Error} 当结束时间早于或等于开始时间时抛出错误
            */
-          isAfterStartTime(value) {
+          isAfterStartTime (value) {
             if (value && this.start_time && new Date(value) <= new Date(this.start_time)) {
               throw new Error('结束时间必须晚于开始时间')
             }
@@ -186,7 +186,7 @@ module.exports = sequelize => {
          * 获取北京时间格式的创建时间
          * @returns {string} 北京时间格式的日期字符串（YYYY年MM月DD日 HH:mm:ss）
          */
-        get() {
+        get () {
           return BeijingTimeHelper.formatChinese(this.getDataValue('created_at'))
         },
         comment: '创建时间'
@@ -201,7 +201,7 @@ module.exports = sequelize => {
          * 获取北京时间格式的更新时间
          * @returns {string} 北京时间格式的日期字符串（YYYY年MM月DD日 HH:mm:ss）
          */
-        get() {
+        get () {
           return BeijingTimeHelper.formatChinese(this.getDataValue('updated_at'))
         },
         comment: '更新时间'

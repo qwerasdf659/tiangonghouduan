@@ -34,7 +34,7 @@ class LotteryStrategy {
    *   version: '4.0.0'
    * })
    */
-  constructor(strategyName, config = {}) {
+  constructor (strategyName, config = {}) {
     this.strategyName = strategyName
     this.config = config
     this.enabled = config.enabled !== false
@@ -60,7 +60,7 @@ class LotteryStrategy {
    * @param {Transaction} _transaction - 外部事务对象（可选，用于连抽统一事务保护）
    * @returns {Promise<Object>} 策略执行结果
    */
-  async execute(_context, _transaction = null) {
+  async execute (_context, _transaction = null) {
     throw new Error(`Strategy ${this.strategyName} must implement execute method`)
   }
 
@@ -70,7 +70,7 @@ class LotteryStrategy {
    * @param {Object} context - 执行上下文
    * @returns {Promise<boolean>} 是否可以执行
    */
-  async validate(context) {
+  async validate (context) {
     if (!this.enabled) {
       return false
     }
@@ -83,7 +83,7 @@ class LotteryStrategy {
    * @param {Object} _context - 执行上下文
    * @returns {Promise<boolean>} 验证结果
    */
-  async validateStrategy(_context) {
+  async validateStrategy (_context) {
     return true
   }
 
@@ -92,7 +92,7 @@ class LotteryStrategy {
    *
    * @returns {Object} 策略配置
    */
-  getConfig() {
+  getConfig () {
     return {
       name: this.strategyName,
       enabled: this.enabled,
@@ -106,7 +106,7 @@ class LotteryStrategy {
    *
    * @returns {Object} 策略信息
    */
-  getStrategyInfo() {
+  getStrategyInfo () {
     return {
       name: this.constructor.name,
       strategyName: this.strategyName,
@@ -136,7 +136,7 @@ class LotteryStrategy {
    * @example
    * strategy.updateConfig({ enabled: false, description: '暂停策略' })
    */
-  updateConfig(newConfig) {
+  updateConfig (newConfig) {
     this.config = { ...this.config, ...newConfig }
     if (Object.prototype.hasOwnProperty.call(newConfig, 'enabled')) {
       this.enabled = newConfig.enabled
@@ -158,7 +158,7 @@ class LotteryStrategy {
    * const duration = Date.now() - startTime
    * strategy.recordMetrics(duration, true)
    */
-  recordMetrics(executionTime, success) {
+  recordMetrics (executionTime, success) {
     this.metrics.executionCount++
     if (success) {
       this.metrics.successCount++
@@ -178,7 +178,7 @@ class LotteryStrategy {
    *
    * @returns {string} 北京时间字符串
    */
-  getBeijingTime() {
+  getBeijingTime () {
     return BeijingTimeHelper.toDatabaseFormat(new Date())
   }
 
@@ -187,7 +187,7 @@ class LotteryStrategy {
    *
    * @returns {string} ISO格式的北京时间戳
    */
-  getBeijingTimestamp() {
+  getBeijingTimestamp () {
     return BeijingTimeHelper.apiTimestamp()
   }
 
@@ -200,7 +200,7 @@ class LotteryStrategy {
    * @param {Object} metadata - 元数据
    * @returns {Object} 统一格式的结果
    */
-  createResult(success, data = {}, message = '', metadata = {}) {
+  createResult (success, data = {}, message = '', metadata = {}) {
     return {
       success,
       strategy: this.strategyName,
@@ -221,7 +221,7 @@ class LotteryStrategy {
    * @param {Object} details - 错误详情
    * @returns {Object} 错误结果
    */
-  createError(error, details = {}) {
+  createError (error, details = {}) {
     return this.createResult(false, {}, error, {
       error: true,
       details
@@ -236,7 +236,7 @@ class LotteryStrategy {
    * @param {Object} metadata - 元数据
    * @returns {Object} 成功结果
    */
-  createSuccess(data, message = '执行成功', metadata = {}) {
+  createSuccess (data, message = '执行成功', metadata = {}) {
     return this.createResult(true, data, message, metadata)
   }
 
@@ -253,7 +253,7 @@ class LotteryStrategy {
    * @example
    * strategy.log('INFO', '策略执行成功', { duration: 150, result: 'win' })
    */
-  log(level, message, data = {}) {
+  log (level, message, data = {}) {
     const timestamp = this.getBeijingTime()
     logger.info(
       JSON.stringify({
@@ -278,7 +278,7 @@ class LotteryStrategy {
    * @example
    * strategy.logInfo('开始执行抽奖策略', { user_id: 10001 })
    */
-  logInfo(message, data = {}) {
+  logInfo (message, data = {}) {
     this.log('INFO', message, data)
   }
 
@@ -294,7 +294,7 @@ class LotteryStrategy {
    * @example
    * strategy.logError('策略执行失败', { error: err.message, user_id: 10001 })
    */
-  logError(message, data = {}) {
+  logError (message, data = {}) {
     this.log('ERROR', message, data)
   }
 
@@ -310,7 +310,7 @@ class LotteryStrategy {
    * @example
    * strategy.logDebug('计算中奖概率', { probability: 0.15, pools: [1, 2, 3] })
    */
-  logDebug(message, data = {}) {
+  logDebug (message, data = {}) {
     this.log('DEBUG', message, data)
   }
 
@@ -326,7 +326,7 @@ class LotteryStrategy {
    * @example
    * strategy.logWarn('策略执行时间过长', { duration: 3500, threshold: 3000 })
    */
-  logWarn(message, data = {}) {
+  logWarn (message, data = {}) {
     this.log('WARN', message, data)
   }
 }

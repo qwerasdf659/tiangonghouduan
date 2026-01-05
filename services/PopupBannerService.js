@@ -39,7 +39,7 @@ class PopupBannerService {
    * @param {number} options.limit - 返回数量限制（默认 10）
    * @returns {Promise<Array>} 有效弹窗列表（仅包含小程序需要的字段）
    */
-  static async getActiveBanners(options = {}) {
+  static async getActiveBanners (options = {}) {
     const { position = 'home', limit = 10 } = options
     const now = BeijingTimeHelper.createBeijingTime()
 
@@ -92,7 +92,7 @@ class PopupBannerService {
    * @param {number} options.limit - 返回数量限制（默认 10）
    * @returns {Promise<Array>} 弹窗列表
    */
-  static async getBannersByStatus(options = {}) {
+  static async getBannersByStatus (options = {}) {
     const { status, position = 'home', limit = 10 } = options
     const now = BeijingTimeHelper.createBeijingTime()
 
@@ -151,7 +151,7 @@ class PopupBannerService {
    * @param {number} options.offset - 偏移量
    * @returns {Promise<Object>} { banners: Array, total: number }
    */
-  static async getAdminBannerList(options = {}) {
+  static async getAdminBannerList (options = {}) {
     const { position = null, is_active = null, limit = 20, offset = 0 } = options
 
     try {
@@ -206,7 +206,7 @@ class PopupBannerService {
    * @param {number} bannerId - 弹窗ID
    * @returns {Promise<Object|null>} 弹窗详情
    */
-  static async getBannerById(bannerId) {
+  static async getBannerById (bannerId) {
     try {
       const banner = await PopupBanner.findByPk(bannerId, {
         include: [
@@ -245,7 +245,7 @@ class PopupBannerService {
    * @param {number} creatorId - 创建人ID
    * @returns {Promise<Object>} 创建的弹窗
    */
-  static async createBanner(data, creatorId) {
+  static async createBanner (data, creatorId) {
     try {
       const {
         title,
@@ -295,7 +295,7 @@ class PopupBannerService {
    * @param {string} originalName - 原始文件名
    * @returns {Promise<string>} 图片访问URL
    */
-  static async uploadBannerImage(fileBuffer, originalName) {
+  static async uploadBannerImage (fileBuffer, originalName) {
     try {
       const storageService = new SealosStorageService()
       const imageUrl = await storageService.uploadImage(fileBuffer, originalName, 'popup-banners')
@@ -319,7 +319,7 @@ class PopupBannerService {
    * @param {Object} data - 更新数据
    * @returns {Promise<Object|null>} 更新后的弹窗
    */
-  static async updateBanner(bannerId, data) {
+  static async updateBanner (bannerId, data) {
     try {
       const banner = await PopupBanner.findByPk(bannerId)
       if (!banner) return null
@@ -376,7 +376,7 @@ class PopupBannerService {
    * @param {number} bannerId - 弹窗ID
    * @returns {Promise<boolean>} 是否成功
    */
-  static async deleteBanner(bannerId) {
+  static async deleteBanner (bannerId) {
     try {
       const banner = await PopupBanner.findByPk(bannerId)
       if (!banner) return false
@@ -400,7 +400,7 @@ class PopupBannerService {
    * @param {number} bannerId - 弹窗ID
    * @returns {Promise<Object|null>} 更新后的弹窗
    */
-  static async toggleBannerActive(bannerId) {
+  static async toggleBannerActive (bannerId) {
     try {
       const banner = await PopupBanner.findByPk(bannerId)
       if (!banner) return null
@@ -426,7 +426,7 @@ class PopupBannerService {
    *
    * @returns {Promise<Object>} 统计数据
    */
-  static async getStatistics() {
+  static async getStatistics () {
     try {
       const now = BeijingTimeHelper.createBeijingTime()
 
@@ -468,7 +468,7 @@ class PopupBannerService {
    * @param {Array<{banner_id: number, display_order: number}>} orderList - 排序列表
    * @returns {Promise<number>} 更新的记录数
    */
-  static async updateDisplayOrder(orderList) {
+  static async updateDisplayOrder (orderList) {
     try {
       // 使用 Promise.all 并行处理批量更新，提升性能
       const updatePromises = orderList.map(item =>

@@ -35,7 +35,7 @@ class CacheManager {
    * @example
    * const cacheManager = new CacheManager()
    */
-  constructor() {
+  constructor () {
     this.cache = new Map()
     this.stats = {
       hits: 0,
@@ -67,7 +67,7 @@ class CacheManager {
    * @example
    * await cacheManager.set('activity_1', activityData, 600) // 缓存10分钟
    */
-  async set(key, value, ttl = 300) {
+  async set (key, value, ttl = 300) {
     const expireAt = BeijingTimeHelper.timestamp() + ttl * 1000
     this.cache.set(key, {
       value,
@@ -93,7 +93,7 @@ class CacheManager {
    *   logger.info('缓存未命中，需要查询数据库')
    * }
    */
-  async get(key) {
+  async get (key) {
     const item = this.cache.get(key)
 
     if (!item) {
@@ -122,7 +122,7 @@ class CacheManager {
    * @example
    * await cacheManager.delete('activity_1') // 删除活动缓存
    */
-  async delete(key) {
+  async delete (key) {
     const deleted = this.cache.delete(key)
     if (deleted) {
       this.stats.deletes++
@@ -141,7 +141,7 @@ class CacheManager {
    * const cleaned = cacheManager.cleanup()
    * logger.info('清理了', cleaned, '个过期缓存')
    */
-  cleanup() {
+  cleanup () {
     const now = BeijingTimeHelper.timestamp()
     let cleaned = 0
 
@@ -172,7 +172,7 @@ class CacheManager {
    * const stats = await cacheManager.getStats()
    * logger.info('缓存命中率:', (stats.hitRate * 100).toFixed(2) + '%')
    */
-  async getStats() {
+  async getStats () {
     const hitRate =
       this.stats.hits + this.stats.misses > 0
         ? this.stats.hits / (this.stats.hits + this.stats.misses)
@@ -195,7 +195,7 @@ class CacheManager {
    * @example
    * cacheManager.clear() // 清空所有缓存
    */
-  clear() {
+  clear () {
     this.cache.clear()
     this.stats = {
       hits: 0,
@@ -216,7 +216,7 @@ class CacheManager {
    * // 应用关闭时
    * cacheManager.destroy()
    */
-  destroy() {
+  destroy () {
     if (this.cleanupInterval) {
       clearInterval(this.cleanupInterval)
       this.cleanupInterval = null

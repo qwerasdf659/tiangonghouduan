@@ -88,7 +88,7 @@ class FeedbackService {
    * @returns {Array<Object>} return.feedbacks - 反馈列表
    * @returns {number} return.total - 总数量
    */
-  static async getFeedbackList(filters = {}) {
+  static async getFeedbackList (filters = {}) {
     try {
       const {
         user_id = null,
@@ -167,7 +167,7 @@ class FeedbackService {
    * @param {Object} data.device_info - 设备信息
    * @returns {Promise<Object>} 创建的反馈对象
    */
-  static async createFeedback(data) {
+  static async createFeedback (data) {
     try {
       const {
         user_id,
@@ -242,7 +242,7 @@ class FeedbackService {
    * @param {string|null} internalNotes - 内部备注（可选）
    * @returns {Promise<Object>} 更新后的反馈对象
    */
-  static async replyFeedback(feedbackId, replyContent, adminId, internalNotes = null) {
+  static async replyFeedback (feedbackId, replyContent, adminId, internalNotes = null) {
     try {
       logger.info('开始回复反馈', {
         feedback_id: feedbackId,
@@ -292,7 +292,7 @@ class FeedbackService {
    * @param {number} feedbackId - 反馈ID
    * @returns {Promise<Object|null>} 反馈详情对象，不存在则返回null
    */
-  static async getFeedbackById(feedbackId) {
+  static async getFeedbackById (feedbackId) {
     try {
       logger.info('获取反馈详情', { feedback_id: feedbackId })
 
@@ -341,7 +341,7 @@ class FeedbackService {
    * @param {string|null} internalNotes - 内部备注（可选）
    * @returns {Promise<Object>} 更新后的反馈对象
    */
-  static async updateFeedbackStatus(feedbackId, status, internalNotes = null) {
+  static async updateFeedbackStatus (feedbackId, status, internalNotes = null) {
     try {
       logger.info('开始更新反馈状态', {
         feedback_id: feedbackId,

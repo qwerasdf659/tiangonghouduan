@@ -39,7 +39,7 @@ class MaterialConversionRule extends Model {
    * @param {Object} models - Sequelize所有模型的集合对象
    * @returns {void} 无返回值，仅定义关联关系
    */
-  static associate(models) {
+  static associate (models) {
     // 材料转换规则与创建人的关联（可选）
     MaterialConversionRule.belongsTo(models.User, {
       foreignKey: 'created_by',
@@ -79,7 +79,7 @@ class MaterialConversionRule extends Model {
    * @param {Object} options - Sequelize查询选项
    * @returns {Promise<MaterialConversionRule|null>} 生效的转换规则或null
    */
-  static async getEffectiveRule(from_asset_code, to_asset_code, asOf = new Date(), options = {}) {
+  static async getEffectiveRule (from_asset_code, to_asset_code, asOf = new Date(), options = {}) {
     return await MaterialConversionRule.findOne({
       where: {
         from_asset_code,

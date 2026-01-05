@@ -25,7 +25,7 @@ const { authenticateToken } = require('../../../middleware/auth')
  * @param {Function} fn - 异步处理函数
  * @returns {Function} 包装后的中间件函数
  */
-function asyncHandler(fn) {
+function asyncHandler (fn) {
   return (req, res, next) => {
     Promise.resolve(fn(req, res, next)).catch(next)
   }

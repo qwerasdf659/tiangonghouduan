@@ -41,23 +41,35 @@
 'use strict'
 
 const { Account, AccountAssetBalance, AssetTransaction, User } = require('../models')
-const { sequelize } = require('../config/database')
+const { sequelize: _sequelize } = require('../config/database')
 const logger = require('../utils/logger')
 
 /**
- * 事务边界检查（开发阶段用于发现问题，生产阶段可优雅降级）
+ * 事务边界检查（强制模式 - 2026-01-05 治理决策）
+ *
+ * 治理决策：采用"强硬模式"，跨表写入方法不允许"没传 transaction 就自建事务"
+ * - 必须在事务内调用，缺失直接报错
+ * - 防止"外层回滚但资产已提交"的部分成功风险
  *
  * @param {Object} transaction - 事务对象
  * @param {string} methodName - 方法名
+ * @throws {Error} 当 transaction 未传入时抛出错误
  * @returns {void}
  */
-function checkTransactionBoundary(transaction, methodName) {
+function checkTransactionBoundary (transaction, methodName) {
   if (!transaction) {
-    logger.warn(`⚠️ [事务边界警告] ${methodName} 未接收到外部事务，将自行创建事务。`, {
+    const error = new Error(
+      `[事务边界错误] ${methodName} 必须在事务中调用。\n` +
+      '请使用 TransactionManager.execute() 包裹调用，或显式传入 { transaction } 参数。\n' +
+      '治理决策：跨表写入方法强制要求事务边界，防止部分成功风险。'
+    )
+    error.code = 'TRANSACTION_REQUIRED'
+    logger.error(`❌ [事务边界错误] ${methodName} 未接收到事务对象`, {
       methodName,
       timestamp: new Date().toISOString(),
-      recommendation: '建议从 TransactionManager.execute() 传入事务以确保原子性'
+      action: '抛出错误，拒绝执行'
     })
+    throw error
   }
 }
 
@@ -76,7 +88,7 @@ class AssetService {
    * @param {Object} options.transaction - Sequelize事务对象
    * @returns {Promise<Object>} 账户对象
    */
-  static async getOrCreateAccount(params, options = {}) {
+  static async getOrCreateAccount (params, options = {}) {
     const { user_id, system_code } = params
     const { transaction } = options
 
@@ -153,7 +165,7 @@ class AssetService {
    * @param {string|number} options.campaign_id - 活动ID（BUDGET_POINTS 必填，其他资产可选）
    * @returns {Promise<Object>} 资产余额对象
    */
-  static async getOrCreateBalance(account_id, asset_code, options = {}) {
+  static async getOrCreateBalance (account_id, asset_code, options = {}) {
     const { transaction, campaign_id } = options
 
     // 🔥 BUDGET_POINTS 必须指定 campaign_id
@@ -232,7 +244,7 @@ class AssetService {
    * @param {Object} options.transaction - Sequelize事务对象（强烈建议传入）
    * @returns {Promise<Object>} 结果对象 {account, balance, transaction_record, is_duplicate}
    */
-  static async changeBalance(params, options = {}) {
+  static async changeBalance (params, options = {}) {
     const {
       user_id,
       system_code,
@@ -244,10 +256,10 @@ class AssetService {
       campaign_id,
       meta = {}
     } = params
-    const { transaction: externalTransaction } = options
+    const { transaction } = options
 
-    // 🔒 事务边界检查：警告未传入事务的情况
-    checkTransactionBoundary(externalTransaction, 'AssetService.changeBalance')
+    // 🔒 事务边界检查：强制要求传入事务（2026-01-05 治理决策）
+    checkTransactionBoundary(transaction, 'AssetService.changeBalance')
 
     // 参数验证
     if (!idempotency_key) {
@@ -267,10 +279,6 @@ class AssetService {
     if (asset_code === 'BUDGET_POINTS' && !campaign_id) {
       throw new Error('BUDGET_POINTS 必须指定 campaign_id 参数（活动隔离规则）')
     }
-
-    // 支持外部事务传入
-    const transaction = externalTransaction || (await sequelize.transaction())
-    const shouldCommit = !externalTransaction
 
     try {
       // 🔥 幂等性检查：通过唯一约束兜底
@@ -292,10 +300,6 @@ class AssetService {
           transaction,
           campaign_id // 传递 campaign_id
         })
-
-        if (shouldCommit) {
-          await transaction.commit()
-        }
 
         return {
           account,
@@ -404,12 +408,8 @@ class AssetService {
         transaction_id: transaction_record.transaction_id
       })
 
-      if (shouldCommit) {
-        await transaction.commit()
-      }
-
       // 刷新余额数据
-      await finalBalance.reload({ transaction: externalTransaction })
+      await finalBalance.reload({ transaction })
 
       return {
         account,
@@ -418,9 +418,6 @@ class AssetService {
         is_duplicate: false
       }
     } catch (error) {
-      if (shouldCommit) {
-        await transaction.rollback()
-      }
       logger.error('❌ 资产变动失败', {
         user_id,
         system_code,
@@ -455,7 +452,7 @@ class AssetService {
    * @param {Object} options.transaction - Sequelize事务对象（可选）
    * @returns {Promise<Object>} 结果对象 {account, balance, transaction_record, is_duplicate}
    */
-  static async freeze(params, options = {}) {
+  static async freeze (params, options = {}) {
     const {
       user_id,
       system_code,
@@ -465,10 +462,10 @@ class AssetService {
       idempotency_key,
       meta = {}
     } = params
-    const { transaction: externalTransaction } = options
+    const { transaction } = options
 
-    // 🔒 事务边界检查：警告未传入事务的情况
-    checkTransactionBoundary(externalTransaction, 'AssetService.freeze')
+    // 🔒 事务边界检查：强制要求传入事务（2026-01-05 治理决策）
+    checkTransactionBoundary(transaction, 'AssetService.freeze')
 
     // 参数验证
     if (!idempotency_key) {
@@ -483,10 +480,6 @@ class AssetService {
     if (!asset_code) {
       throw new Error('asset_code是必填参数')
     }
-
-    // 支持外部事务传入
-    const transaction = externalTransaction || (await sequelize.transaction())
-    const shouldCommit = !externalTransaction
 
     try {
       // 🔥 幂等性检查
@@ -506,10 +499,6 @@ class AssetService {
         const balance = await this.getOrCreateBalance(account.account_id, asset_code, {
           transaction
         })
-
-        if (shouldCommit) {
-          await transaction.commit()
-        }
 
         return {
           account,
@@ -595,11 +584,7 @@ class AssetService {
         transaction_id: transaction_record.transaction_id
       })
 
-      if (shouldCommit) {
-        await transaction.commit()
-      }
-
-      await balance.reload({ transaction: externalTransaction })
+      await balance.reload({ transaction })
 
       return {
         account,
@@ -608,9 +593,6 @@ class AssetService {
         is_duplicate: false
       }
     } catch (error) {
-      if (shouldCommit) {
-        await transaction.rollback()
-      }
       logger.error('❌ 资产冻结失败', {
         user_id,
         system_code,
@@ -644,7 +626,7 @@ class AssetService {
    * @param {Object} options.transaction - Sequelize事务对象（可选）
    * @returns {Promise<Object>} 结果对象 {account, balance, transaction_record, is_duplicate}
    */
-  static async unfreeze(params, options = {}) {
+  static async unfreeze (params, options = {}) {
     const {
       user_id,
       system_code,
@@ -654,10 +636,10 @@ class AssetService {
       idempotency_key,
       meta = {}
     } = params
-    const { transaction: externalTransaction } = options
+    const { transaction } = options
 
-    // 🔒 事务边界检查：警告未传入事务的情况
-    checkTransactionBoundary(externalTransaction, 'AssetService.unfreeze')
+    // 🔒 事务边界检查：强制要求传入事务（2026-01-05 治理决策）
+    checkTransactionBoundary(transaction, 'AssetService.unfreeze')
 
     // 参数验证
     if (!idempotency_key) {
@@ -672,10 +654,6 @@ class AssetService {
     if (!asset_code) {
       throw new Error('asset_code是必填参数')
     }
-
-    // 支持外部事务传入
-    const transaction = externalTransaction || (await sequelize.transaction())
-    const shouldCommit = !externalTransaction
 
     try {
       // 🔥 幂等性检查
@@ -695,10 +673,6 @@ class AssetService {
         const balance = await this.getOrCreateBalance(account.account_id, asset_code, {
           transaction
         })
-
-        if (shouldCommit) {
-          await transaction.commit()
-        }
 
         return {
           account,
@@ -784,11 +758,7 @@ class AssetService {
         transaction_id: transaction_record.transaction_id
       })
 
-      if (shouldCommit) {
-        await transaction.commit()
-      }
-
-      await balance.reload({ transaction: externalTransaction })
+      await balance.reload({ transaction })
 
       return {
         account,
@@ -797,9 +767,6 @@ class AssetService {
         is_duplicate: false
       }
     } catch (error) {
-      if (shouldCommit) {
-        await transaction.rollback()
-      }
       logger.error('❌ 资产解冻失败', {
         user_id,
         system_code,
@@ -833,7 +800,7 @@ class AssetService {
    * @param {Object} options.transaction - Sequelize事务对象（可选）
    * @returns {Promise<Object>} 结果对象 {account, balance, transaction_record, is_duplicate}
    */
-  static async settleFromFrozen(params, options = {}) {
+  static async settleFromFrozen (params, options = {}) {
     const {
       user_id,
       system_code,
@@ -843,10 +810,10 @@ class AssetService {
       idempotency_key,
       meta = {}
     } = params
-    const { transaction: externalTransaction } = options
+    const { transaction } = options
 
-    // 🔒 事务边界检查：警告未传入事务的情况
-    checkTransactionBoundary(externalTransaction, 'AssetService.settleFromFrozen')
+    // 🔒 事务边界检查：强制要求传入事务（2026-01-05 治理决策）
+    checkTransactionBoundary(transaction, 'AssetService.settleFromFrozen')
 
     // 参数验证
     if (!idempotency_key) {
@@ -861,10 +828,6 @@ class AssetService {
     if (!asset_code) {
       throw new Error('asset_code是必填参数')
     }
-
-    // 支持外部事务传入
-    const transaction = externalTransaction || (await sequelize.transaction())
-    const shouldCommit = !externalTransaction
 
     try {
       // 🔥 幂等性检查
@@ -884,10 +847,6 @@ class AssetService {
         const balance = await this.getOrCreateBalance(account.account_id, asset_code, {
           transaction
         })
-
-        if (shouldCommit) {
-          await transaction.commit()
-        }
 
         return {
           account,
@@ -973,11 +932,7 @@ class AssetService {
         transaction_id: transaction_record.transaction_id
       })
 
-      if (shouldCommit) {
-        await transaction.commit()
-      }
-
-      await balance.reload({ transaction: externalTransaction })
+      await balance.reload({ transaction })
 
       return {
         account,
@@ -986,9 +941,6 @@ class AssetService {
         is_duplicate: false
       }
     } catch (error) {
-      if (shouldCommit) {
-        await transaction.rollback()
-      }
       logger.error('❌ 从冻结余额结算失败', {
         user_id,
         system_code,
@@ -1014,7 +966,7 @@ class AssetService {
    * @param {Object} options.transaction - Sequelize事务对象（可选）
    * @returns {Promise<Object>} 余额对象 {available_amount, frozen_amount, total_amount}
    */
-  static async getBalance(params, options = {}) {
+  static async getBalance (params, options = {}) {
     const { user_id, system_code, asset_code, campaign_id } = params
     const { transaction } = options
 
@@ -1068,7 +1020,7 @@ class AssetService {
    * @param {Object} options.transaction - Sequelize事务对象（可选）
    * @returns {Promise<Array>} 资产余额列表
    */
-  static async getAllBalances(params, options = {}) {
+  static async getAllBalances (params, options = {}) {
     const { user_id, system_code } = params
     const { transaction } = options
 
@@ -1098,7 +1050,7 @@ class AssetService {
    * @param {Object} options.transaction - Sequelize事务对象（可选）
    * @returns {Promise<Object>} 流水记录列表和分页信息
    */
-  static async getTransactions(params, filters = {}, options = {}) {
+  static async getTransactions (params, filters = {}, options = {}) {
     const { user_id, system_code } = params
     const { asset_code, business_type, page = 1, page_size = 20 } = filters
     const { transaction } = options
@@ -1152,7 +1104,7 @@ class AssetService {
    * @param {boolean} options.include_items - 是否包含物品列表（默认false，仅返回统计数据）
    * @returns {Promise<Object>} 资产总览对象
    */
-  static async getAssetPortfolio(params, options = {}) {
+  static async getAssetPortfolio (params, options = {}) {
     const { user_id } = params
     const { transaction, include_items = false } = options
 
@@ -1313,9 +1265,12 @@ class AssetService {
    * @param {Object} options.transaction - Sequelize事务对象
    * @returns {Promise<Object>} 创建的物品实例对象
    */
-  static async mintItem(params, options = {}) {
+  static async mintItem (params, options = {}) {
     const { user_id, item_type, source_type, source_id, meta = {} } = params
-    const { transaction: externalTransaction } = options
+    const { transaction } = options
+
+    // 🔒 事务边界检查：强制要求传入事务（2026-01-05 治理决策）
+    checkTransactionBoundary(transaction, 'AssetService.mintItem')
 
     // 参数验证
     if (!user_id) {
@@ -1330,9 +1285,6 @@ class AssetService {
 
     // 动态引入模型（避免循环依赖）
     const { ItemInstance, ItemInstanceEvent } = require('../models')
-
-    const transaction = externalTransaction || (await sequelize.transaction())
-    const shouldCommit = !externalTransaction
 
     try {
       /*
@@ -1359,10 +1311,6 @@ class AssetService {
         const existingInstance = await ItemInstance.findByPk(existingEvent.item_instance_id, {
           transaction
         })
-
-        if (shouldCommit) {
-          await transaction.commit()
-        }
 
         return {
           item_instance: existingInstance,
@@ -1407,18 +1355,11 @@ class AssetService {
         source_id
       })
 
-      if (shouldCommit) {
-        await transaction.commit()
-      }
-
       return {
         item_instance,
         is_duplicate: false
       }
     } catch (error) {
-      if (shouldCommit) {
-        await transaction.rollback()
-      }
       logger.error('❌ 物品铸造失败', {
         user_id,
         item_type,
@@ -1453,7 +1394,7 @@ class AssetService {
    * @param {Object} options.transaction - Sequelize事务对象（必需）
    * @returns {Promise<Object>} 锁定后的物品实例
    */
-  static async lockItem(params, options = {}) {
+  static async lockItem (params, options = {}) {
     const {
       item_instance_id,
       lock_id,
@@ -1463,7 +1404,10 @@ class AssetService {
       reason = '',
       meta = {}
     } = params
-    const { transaction: externalTransaction } = options
+    const { transaction } = options
+
+    // 🔒 事务边界检查：强制要求传入事务（2026-01-05 治理决策）
+    checkTransactionBoundary(transaction, 'AssetService.lockItem')
 
     // 参数验证
     if (!item_instance_id) {
@@ -1486,9 +1430,6 @@ class AssetService {
     }
 
     const { ItemInstance, ItemInstanceEvent, TradeOrder } = require('../models')
-
-    const transaction = externalTransaction || (await sequelize.transaction())
-    const shouldCommit = !externalTransaction
 
     try {
       // 验证 lock_id 格式（security 必须是业务单号）
@@ -1593,17 +1534,10 @@ class AssetService {
         overridden: needOverride
       })
 
-      if (shouldCommit) {
-        await transaction.commit()
-      }
-
-      await item_instance.reload({ transaction: externalTransaction })
+      await item_instance.reload({ transaction })
 
       return item_instance
     } catch (error) {
-      if (shouldCommit) {
-        await transaction.rollback()
-      }
       logger.error('❌ 物品锁定失败', {
         item_instance_id,
         lock_type,
@@ -1632,9 +1566,12 @@ class AssetService {
    * @param {Object} options.transaction - Sequelize事务对象（必需）
    * @returns {Promise<Object>} 解锁后的物品实例
    */
-  static async unlockItem(params, options = {}) {
+  static async unlockItem (params, options = {}) {
     const { item_instance_id, lock_id, lock_type, business_type, meta = {} } = params
-    const { transaction: externalTransaction } = options
+    const { transaction } = options
+
+    // 🔒 事务边界检查：强制要求传入事务（2026-01-05 治理决策）
+    checkTransactionBoundary(transaction, 'AssetService.unlockItem')
 
     // 参数验证
     if (!item_instance_id) {
@@ -1648,9 +1585,6 @@ class AssetService {
     }
 
     const { ItemInstance, ItemInstanceEvent } = require('../models')
-
-    const transaction = externalTransaction || (await sequelize.transaction())
-    const shouldCommit = !externalTransaction
 
     try {
       const item_instance = await ItemInstance.findByPk(item_instance_id, {
@@ -1672,9 +1606,6 @@ class AssetService {
           existing_locks: item_instance.locks
         })
         // 未找到锁但不抛出异常，返回当前状态
-        if (shouldCommit) {
-          await transaction.commit()
-        }
         return item_instance
       }
 
@@ -1720,17 +1651,10 @@ class AssetService {
         new_status: item_instance.status
       })
 
-      if (shouldCommit) {
-        await transaction.commit()
-      }
-
-      await item_instance.reload({ transaction: externalTransaction })
+      await item_instance.reload({ transaction })
 
       return item_instance
     } catch (error) {
-      if (shouldCommit) {
-        await transaction.rollback()
-      }
       logger.error('❌ 物品解锁失败', {
         item_instance_id,
         lock_type,
@@ -1754,9 +1678,12 @@ class AssetService {
    * @param {Object} options.transaction - Sequelize事务对象
    * @returns {Promise<Object>} 转移后的物品实例
    */
-  static async transferItem(params, options = {}) {
+  static async transferItem (params, options = {}) {
     const { item_instance_id, new_owner_id, business_type, idempotency_key, meta = {} } = params
-    const { transaction: externalTransaction } = options
+    const { transaction } = options
+
+    // 🔒 事务边界检查：强制要求传入事务（2026-01-05 治理决策）
+    checkTransactionBoundary(transaction, 'AssetService.transferItem')
 
     if (!item_instance_id) {
       throw new Error('item_instance_id 是必填参数')
@@ -1769,9 +1696,6 @@ class AssetService {
     }
 
     const { ItemInstance, ItemInstanceEvent } = require('../models')
-
-    const transaction = externalTransaction || (await sequelize.transaction())
-    const shouldCommit = !externalTransaction
 
     try {
       // 幂等性检查
@@ -1792,10 +1716,6 @@ class AssetService {
         })
 
         const existingInstance = await ItemInstance.findByPk(item_instance_id, { transaction })
-
-        if (shouldCommit) {
-          await transaction.commit()
-        }
 
         return {
           item_instance: existingInstance,
@@ -1846,20 +1766,13 @@ class AssetService {
         idempotency_key
       })
 
-      if (shouldCommit) {
-        await transaction.commit()
-      }
-
-      await item_instance.reload({ transaction: externalTransaction })
+      await item_instance.reload({ transaction })
 
       return {
         item_instance,
         is_duplicate: false
       }
     } catch (error) {
-      if (shouldCommit) {
-        await transaction.rollback()
-      }
       logger.error('❌ 物品转移失败', {
         item_instance_id,
         new_owner_id,
@@ -1882,9 +1795,12 @@ class AssetService {
    * @param {Object} options.transaction - Sequelize事务对象
    * @returns {Promise<Object>} 消耗后的物品实例
    */
-  static async consumeItem(params, options = {}) {
+  static async consumeItem (params, options = {}) {
     const { item_instance_id, operator_user_id, business_type, idempotency_key, meta = {} } = params
-    const { transaction: externalTransaction } = options
+    const { transaction } = options
+
+    // 🔒 事务边界检查：强制要求传入事务（2026-01-05 治理决策）
+    checkTransactionBoundary(transaction, 'AssetService.consumeItem')
 
     if (!item_instance_id) {
       throw new Error('item_instance_id 是必填参数')
@@ -1894,9 +1810,6 @@ class AssetService {
     }
 
     const { ItemInstance, ItemInstanceEvent } = require('../models')
-
-    const transaction = externalTransaction || (await sequelize.transaction())
-    const shouldCommit = !externalTransaction
 
     try {
       // 幂等性检查
@@ -1917,10 +1830,6 @@ class AssetService {
         })
 
         const existingInstance = await ItemInstance.findByPk(item_instance_id, { transaction })
-
-        if (shouldCommit) {
-          await transaction.commit()
-        }
 
         return {
           item_instance: existingInstance,
@@ -1968,20 +1877,13 @@ class AssetService {
         idempotency_key
       })
 
-      if (shouldCommit) {
-        await transaction.commit()
-      }
-
-      await item_instance.reload({ transaction: externalTransaction })
+      await item_instance.reload({ transaction })
 
       return {
         item_instance,
         is_duplicate: false
       }
     } catch (error) {
-      if (shouldCommit) {
-        await transaction.rollback()
-      }
       logger.error('❌ 物品消耗失败', {
         item_instance_id,
         operator_user_id,
@@ -2010,7 +1912,7 @@ class AssetService {
    * @param {Object} options.transaction - Sequelize事务对象
    * @returns {Promise<Object>} 创建的事件记录
    */
-  static async recordItemEvent(params, options = {}) {
+  static async recordItemEvent (params, options = {}) {
     const { ItemInstanceEvent } = require('../models')
     return await ItemInstanceEvent.recordEvent(params, options)
   }
@@ -2028,7 +1930,7 @@ class AssetService {
    * @param {Object} options.transaction - Sequelize事务对象
    * @returns {Promise<Object>} 事件列表和分页信息
    */
-  static async getItemEvents(params, options = {}) {
+  static async getItemEvents (params, options = {}) {
     const { item_instance_id, user_id, event_types, page = 1, limit = 20 } = params
     const { transaction } = options
 

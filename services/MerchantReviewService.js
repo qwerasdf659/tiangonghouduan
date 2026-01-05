@@ -54,7 +54,7 @@ class MerchantReviewService {
    * @param {Object} options.transaction - Sequelize事务对象
    * @returns {Promise<Object>} { review, freeze_result }
    */
-  static async submitReview(params, options = {}) {
+  static async submitReview (params, options = {}) {
     const { user_id, merchant_id, points_amount, qr_code_data, metadata = {} } = params
     const { transaction: externalTransaction } = options
 
@@ -178,7 +178,7 @@ class MerchantReviewService {
    * @param {Object} options.transaction - Sequelize事务对象
    * @returns {Promise<Object>} { review, settle_result }
    */
-  static async approveReview(params, options = {}) {
+  static async approveReview (params, options = {}) {
     const { review_id, operator_user_id } = params
     const { transaction: externalTransaction } = options
 
@@ -282,7 +282,7 @@ class MerchantReviewService {
    * @param {Object} options.transaction - Sequelize事务对象
    * @returns {Promise<Object>} { review, frozen_points }
    */
-  static async rejectReview(params, options = {}) {
+  static async rejectReview (params, options = {}) {
     const { review_id, reject_reason, operator_user_id } = params
     const { transaction: externalTransaction } = options
 
@@ -359,7 +359,7 @@ class MerchantReviewService {
    *
    * @returns {Promise<Object>} { timeout_count, reviews, action }
    */
-  static async alertTimeoutReviews() {
+  static async alertTimeoutReviews () {
     const transaction = await sequelize.transaction()
 
     try {
@@ -443,7 +443,7 @@ class MerchantReviewService {
    * @param {Object} options.transaction - Sequelize事务对象
    * @returns {Promise<Object>} { review, action, result }
    */
-  static async adminHandleFrozenReview(params, options = {}) {
+  static async adminHandleFrozenReview (params, options = {}) {
     const { review_id, action, admin_user_id, handle_reason } = params
     const { transaction: externalTransaction } = options
 
@@ -451,7 +451,7 @@ class MerchantReviewService {
       throw new Error('review_id 是必填参数')
     }
     if (!['unfreeze', 'confiscate'].includes(action)) {
-      throw new Error("action 必须是 'unfreeze' 或 'confiscate'")
+      throw new Error('action 必须是 \'unfreeze\' 或 \'confiscate\'')
     }
     if (!admin_user_id) {
       throw new Error('admin_user_id 是必填参数')
@@ -585,7 +585,7 @@ class MerchantReviewService {
    * @param {number} params.page_size - 每页数量（默认20）
    * @returns {Promise<Object>} { reviews, total, page, page_size }
    */
-  static async getUserReviews(params) {
+  static async getUserReviews (params) {
     const { user_id, status, page = 1, page_size = 20 } = params
 
     const where = { user_id }
@@ -619,7 +619,7 @@ class MerchantReviewService {
    * @param {number} params.page_size - 每页数量（默认20）
    * @returns {Promise<Object>} { reviews, total, page, page_size }
    */
-  static async getMerchantReviews(params) {
+  static async getMerchantReviews (params) {
     const { merchant_id, status, page = 1, page_size = 20 } = params
 
     const where = { merchant_id }
@@ -648,7 +648,7 @@ class MerchantReviewService {
    *
    * @returns {Promise<Object>} 统计数据
    */
-  static async getNeedsHandleStats() {
+  static async getNeedsHandleStats () {
     const [result] = await sequelize.query(`
       SELECT
         status,

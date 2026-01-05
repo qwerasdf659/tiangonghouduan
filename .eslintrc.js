@@ -167,19 +167,19 @@ module.exports = {
           'error',
           {
             selector:
-              "CallExpression[callee.type='MemberExpression'][callee.object.name='res'][callee.property.name='json']",
+              'CallExpression[callee.type=\'MemberExpression\'][callee.object.name=\'res\'][callee.property.name=\'json\']',
             message:
               '❌ 禁止在路由中直接使用res.json()！请使用统一的res.apiSuccess()或res.apiError()方法以确保响应格式一致性。'
           },
           {
             selector:
-              "CallExpression[callee.type='MemberExpression'][callee.object.type='CallExpression'][callee.object.callee.property.name='status'][callee.property.name='json']",
+              'CallExpression[callee.type=\'MemberExpression\'][callee.object.type=\'CallExpression\'][callee.object.callee.property.name=\'status\'][callee.property.name=\'json\']',
             message:
               '❌ 禁止使用res.status().json()！请使用res.apiError(message, code, details, statusCode)方法。'
           },
           {
             selector:
-              "CallExpression[callee.object.name='ApiResponse'][callee.property.name='send']",
+              'CallExpression[callee.object.name=\'ApiResponse\'][callee.property.name=\'send\']',
             message:
               '❌ 禁止使用ApiResponse.send()！请使用res.apiSuccess()等中间件方法以保持代码简洁和一致性。'
           }

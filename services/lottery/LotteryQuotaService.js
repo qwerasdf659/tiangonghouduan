@@ -82,7 +82,7 @@ class LotteryQuotaService {
    * @param {number} params.campaign_id - 活动ID
    * @returns {Promise<Object>} { limit_value, matched_rule, priority, debug }
    */
-  static async getEffectiveDailyLimit({ user_id, campaign_id }) {
+  static async getEffectiveDailyLimit ({ user_id, campaign_id }) {
     try {
       const { LotteryDrawQuotaRule, UserRole, Role } = require('../../models')
 
@@ -139,7 +139,7 @@ class LotteryQuotaService {
    * @param {Object} options - 选项 { transaction }
    * @returns {Promise<Object>} 配额行对象
    */
-  static async ensureDailyQuota({ user_id, campaign_id }, options = {}) {
+  static async ensureDailyQuota ({ user_id, campaign_id }, options = {}) {
     try {
       const { LotteryUserDailyDrawQuota, UserRole, Role } = require('../../models')
 
@@ -206,7 +206,7 @@ class LotteryQuotaService {
    * @param {Object} options - 选项 { transaction }（必需）
    * @returns {Promise<Object>} { success, remaining, limit, used, message }
    */
-  static async tryDeductQuota({ user_id, campaign_id, draw_count = 1 }, options = {}) {
+  static async tryDeductQuota ({ user_id, campaign_id, draw_count = 1 }, options = {}) {
     const { transaction } = options
 
     if (!transaction) {
@@ -264,7 +264,7 @@ class LotteryQuotaService {
    * @param {Object} options - 选项 { transaction }
    * @returns {Promise<Object|null>} 配额状态对象或null
    */
-  static async getDailyQuotaStatus({ user_id, campaign_id }, options = {}) {
+  static async getDailyQuotaStatus ({ user_id, campaign_id }, options = {}) {
     try {
       const { LotteryUserDailyDrawQuota } = require('../../models')
 
@@ -294,7 +294,7 @@ class LotteryQuotaService {
    * @param {Object} options - 选项 { transaction, admin_id }
    * @returns {Promise<Object>} 更新后的配额状态
    */
-  static async addBonusDrawCount({ user_id, campaign_id, bonus_count, reason }, options = {}) {
+  static async addBonusDrawCount ({ user_id, campaign_id, bonus_count, reason }, options = {}) {
     try {
       const { LotteryUserDailyDrawQuota } = require('../../models')
 
@@ -336,7 +336,7 @@ class LotteryQuotaService {
    * @param {number} params.campaign_id - 活动ID
    * @returns {Promise<Object>} 配额状态对象
    */
-  static async getOrInitQuotaStatus({ user_id, campaign_id }) {
+  static async getOrInitQuotaStatus ({ user_id, campaign_id }) {
     try {
       // 先尝试获取现有配额状态
       const status = await this.getDailyQuotaStatus({ user_id, campaign_id })
@@ -383,7 +383,7 @@ class LotteryQuotaService {
    * @param {number} params.draw_count - 本次抽奖次数
    * @returns {Promise<Object>} { sufficient, remaining, limit, message }
    */
-  static async checkQuotaSufficient({ user_id, campaign_id, draw_count = 1 }) {
+  static async checkQuotaSufficient ({ user_id, campaign_id, draw_count = 1 }) {
     try {
       const status = await this.getOrInitQuotaStatus({ user_id, campaign_id })
 
@@ -420,7 +420,7 @@ class LotteryQuotaService {
    * @param {number} params.page_size - 每页数量（默认20）
    * @returns {Promise<Object>} { rules, pagination }
    */
-  static async getRulesList({ rule_type, campaign_id, is_active, page = 1, page_size = 20 }) {
+  static async getRulesList ({ rule_type, campaign_id, is_active, page = 1, page_size = 20 }) {
     const { LotteryDrawQuotaRule } = require('../../models')
 
     // 构建查询条件
@@ -486,7 +486,7 @@ class LotteryQuotaService {
    * @param {number} params.created_by - 创建人ID
    * @returns {Promise<Object>} 创建的规则
    */
-  static async createRule({
+  static async createRule ({
     rule_type,
     campaign_id,
     role_uuid,
@@ -550,7 +550,7 @@ class LotteryQuotaService {
    * @returns {Promise<Object>} 更新后的规则
    * @throws {Error} 规则不存在或已禁用
    */
-  static async disableRule({ rule_id, updated_by }) {
+  static async disableRule ({ rule_id, updated_by }) {
     const { LotteryDrawQuotaRule } = require('../../models')
 
     const rule = await LotteryDrawQuotaRule.findByPk(rule_id)

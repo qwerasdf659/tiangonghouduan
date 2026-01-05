@@ -25,7 +25,7 @@ module.exports = {
    * @param {Object} transaction - 数据库事务
    * @returns {Promise<{success: boolean}>} 回调处理结果（success=true 表示处理完成）
    */
-  async approved(feedbackId, auditRecord, transaction) {
+  async approved (feedbackId, auditRecord, transaction) {
     console.log(`[反馈审核回调] 审核通过: feedback_id=${feedbackId}`)
 
     try {
@@ -83,7 +83,7 @@ module.exports = {
    * @param {Object} transaction - 数据库事务
    * @returns {Promise<{success: boolean}>} 回调处理结果（success=true 表示处理完成）
    */
-  async rejected(feedbackId, auditRecord, transaction) {
+  async rejected (feedbackId, auditRecord, transaction) {
     console.log(`[反馈审核回调] 审核拒绝: feedback_id=${feedbackId}`)
 
     try {

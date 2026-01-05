@@ -35,7 +35,7 @@ class DecimalConverter {
    * DecimalConverter.toNumber(null)      // 返回: 0
    * DecimalConverter.toNumber(undefined) // 返回: 0
    */
-  static toNumber(value, defaultValue = 0) {
+  static toNumber (value, defaultValue = 0) {
     if (value === null || value === undefined || value === '') {
       return defaultValue
     }
@@ -55,7 +55,7 @@ class DecimalConverter {
    * DecimalConverter.convertFields(prize, ['prize_value'])
    * // 返回: { prize_value: 100.5, name: "奖品" }
    */
-  static convertFields(obj, fields) {
+  static convertFields (obj, fields) {
     if (!obj || typeof obj !== 'object') {
       return obj
     }
@@ -83,7 +83,7 @@ class DecimalConverter {
    * ]
    * DecimalConverter.convertArray(prizes, ['prize_value'])
    */
-  static convertArray(array, fields) {
+  static convertArray (array, fields) {
     if (!Array.isArray(array)) {
       return array
     }
@@ -101,7 +101,7 @@ class DecimalConverter {
    * DecimalConverter.convertPrizeData(prize)
    * // 返回: { prize_value: 100.5, probability: 0.1 }
    */
-  static convertPrizeData(data) {
+  static convertPrizeData (data) {
     const prizeFields = [
       'prize_value', // 奖品价值
       'win_probability', // 中奖概率
@@ -125,7 +125,7 @@ class DecimalConverter {
    * DecimalConverter.convertUserData(user)
    * // 返回: { points_balance: 1500 }
    */
-  static convertUserData(data) {
+  static convertUserData (data) {
     const userFields = [
       'points_balance' // 积分余额
     ]
@@ -142,7 +142,7 @@ class DecimalConverter {
    * @param {Object|Array} data - 交易记录数据
    * @returns {Object|Array} 转换后的交易记录数据
    */
-  static convertTransactionData(data) {
+  static convertTransactionData (data) {
     const transactionFields = [
       'amount', // 金额
       'points_before', // 交易前积分
@@ -162,7 +162,7 @@ class DecimalConverter {
    * @param {Object|Array} data - 商品数据
    * @returns {Object|Array} 转换后的商品数据
    */
-  static convertProductData(data) {
+  static convertProductData (data) {
     const productFields = [
       'price', // 价格
       'original_price', // 原价
@@ -188,25 +188,25 @@ class DecimalConverter {
    * DecimalConverter.convert(userData, 'user')
    * DecimalConverter.convert(customData, 'custom', ['field1', 'field2'])
    */
-  static convert(data, dataType = 'prize', customFields = []) {
+  static convert (data, dataType = 'prize', customFields = []) {
     switch (dataType) {
-      case 'prize':
-        return this.convertPrizeData(data)
-      case 'user':
-        return this.convertUserData(data)
-      case 'transaction':
-        return this.convertTransactionData(data)
-      case 'product':
-        return this.convertProductData(data)
-      case 'custom':
-        if (Array.isArray(data)) {
-          return this.convertArray(data, customFields)
-        } else {
-          return this.convertFields(data, customFields)
-        }
-      default:
-        console.warn(`未知数据类型: ${dataType}，返回原始数据`)
-        return data
+    case 'prize':
+      return this.convertPrizeData(data)
+    case 'user':
+      return this.convertUserData(data)
+    case 'transaction':
+      return this.convertTransactionData(data)
+    case 'product':
+      return this.convertProductData(data)
+    case 'custom':
+      if (Array.isArray(data)) {
+        return this.convertArray(data, customFields)
+      } else {
+        return this.convertFields(data, customFields)
+      }
+    default:
+      console.warn(`未知数据类型: ${dataType}，返回原始数据`)
+      return data
     }
   }
 }

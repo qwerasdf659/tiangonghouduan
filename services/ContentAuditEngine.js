@@ -46,7 +46,7 @@ class ContentAuditEngine {
    * @param {Object} options.transaction - 数据库事务
    * @returns {Promise<ContentReviewRecord>} 审核记录
    */
-  static async submitForAudit(auditableType, auditableId, options = {}) {
+  static async submitForAudit (auditableType, auditableId, options = {}) {
     const { priority = 'medium', auditData = {}, transaction = null } = options
 
     logger.info(`[审核服务] 提交审核: ${auditableType} ID=${auditableId}, 优先级=${priority}`)
@@ -105,7 +105,7 @@ class ContentAuditEngine {
    * @param {Object} options - 选项
    * @returns {Promise<Object>} 审核结果
    */
-  static async approve(auditId, auditorId, reason = null, options = {}) {
+  static async approve (auditId, auditorId, reason = null, options = {}) {
     const shouldCommit = !options.transaction
     const transaction = options.transaction || (await sequelize.transaction())
 
@@ -169,7 +169,7 @@ class ContentAuditEngine {
    * @param {Object} options - 选项
    * @returns {Promise<Object>} 审核结果
    */
-  static async reject(auditId, auditorId, reason, options = {}) {
+  static async reject (auditId, auditorId, reason, options = {}) {
     if (!reason || reason.trim().length < 5) {
       throw new Error('拒绝原因必须提供，且不少于5个字符')
     }
@@ -236,7 +236,7 @@ class ContentAuditEngine {
    * @param {Object} options - 选项
    * @returns {Promise<Object>} 取消结果
    */
-  static async cancel(auditId, reason = null, options = {}) {
+  static async cancel (auditId, reason = null, options = {}) {
     const transaction = options.transaction || null
 
     logger.info(`[审核服务] 取消审核: audit_id=${auditId}`)
@@ -282,7 +282,7 @@ class ContentAuditEngine {
    * @returns {Promise<void>} 无返回值，回调执行失败不影响审核结果
    * @private
    */
-  static async triggerAuditCallback(auditRecord, result, transaction) {
+  static async triggerAuditCallback (auditRecord, result, transaction) {
     try {
       logger.info(`[审核回调] 触发回调: type=${auditRecord.auditable_type}, result=${result}`)
 
@@ -330,7 +330,7 @@ class ContentAuditEngine {
    * @param {Object} options - 查询选项
    * @returns {Promise<Array>} 审核记录列表
    */
-  static async getPendingAudits(options = {}) {
+  static async getPendingAudits (options = {}) {
     const { auditableType = null, priority = null, limit = 20, offset = 0 } = options
 
     const whereClause = {
@@ -364,7 +364,7 @@ class ContentAuditEngine {
    * @param {number} auditId - 审核记录ID
    * @returns {Promise<ContentReviewRecord>} 审核记录
    */
-  static async getAuditById(auditId) {
+  static async getAuditById (auditId) {
     const audit = await ContentReviewRecord.findByPk(auditId)
 
     if (!audit) {
@@ -381,7 +381,7 @@ class ContentAuditEngine {
    * @param {number} auditableId - 审核对象ID
    * @returns {Promise<Array>} 审核记录列表
    */
-  static async getAuditsByAuditable(auditableType, auditableId) {
+  static async getAuditsByAuditable (auditableType, auditableId) {
     const audits = await ContentReviewRecord.findAll({
       where: {
         auditable_type: auditableType,
@@ -399,7 +399,7 @@ class ContentAuditEngine {
    * @param {string} auditableType - 审核对象类型（可选）
    * @returns {Promise<Object>} 统计信息
    */
-  static async getAuditStatistics(auditableType = null) {
+  static async getAuditStatistics (auditableType = null) {
     const whereClause = auditableType ? { auditable_type: auditableType } : {}
 
     const [total, pending, approved, rejected, cancelled] = await Promise.all([

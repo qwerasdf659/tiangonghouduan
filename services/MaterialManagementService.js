@@ -33,7 +33,7 @@ class MaterialManagementService {
    * @param {Object|null} details - 附加信息（可选）
    * @returns {never} 直接抛错
    */
-  static _throw(status_code, error_code, message, details = null) {
+  static _throw (status_code, error_code, message, details = null) {
     const err = new Error(message)
     err.status_code = status_code
     err.error_code = error_code
@@ -52,7 +52,7 @@ class MaterialManagementService {
    * @param {number|string} [query.page_size=20] - 每页数量
    * @returns {Promise<Object>} 查询结果
    */
-  static async listConversionRules(query = {}) {
+  static async listConversionRules (query = {}) {
     const { from_asset_code, to_asset_code, is_enabled, page = 1, page_size = 20 } = query
 
     const where = {}
@@ -110,7 +110,7 @@ class MaterialManagementService {
    * @param {number} created_by - 创建人 user_id（管理员）
    * @returns {Promise<Object>} 创建结果
    */
-  static async createConversionRule(payload, created_by) {
+  static async createConversionRule (payload, created_by) {
     const transaction = await sequelize.transaction()
     try {
       const {
@@ -198,7 +198,7 @@ class MaterialManagementService {
    * @param {number|string} rule_id - 规则ID
    * @returns {Promise<Object>} 禁用结果
    */
-  static async disableConversionRule(rule_id) {
+  static async disableConversionRule (rule_id) {
     const transaction = await sequelize.transaction()
     try {
       const rule = await MaterialConversionRule.findByPk(rule_id, { transaction })
@@ -226,7 +226,7 @@ class MaterialManagementService {
    * @param {string|boolean} [query.is_enabled] - 是否启用
    * @returns {Promise<Object>} 查询结果
    */
-  static async listAssetTypes(query = {}) {
+  static async listAssetTypes (query = {}) {
     const { group_code, is_enabled } = query
     const where = {}
     if (group_code) where.group_code = group_code
@@ -250,7 +250,7 @@ class MaterialManagementService {
    * @param {Object} payload - 资产类型内容
    * @returns {Promise<Object>} 创建结果
    */
-  static async createAssetType(payload) {
+  static async createAssetType (payload) {
     const transaction = await sequelize.transaction()
     try {
       const {
@@ -310,7 +310,7 @@ class MaterialManagementService {
    * @param {string} asset_code - 资产代码
    * @returns {Promise<Object>} 禁用结果
    */
-  static async disableAssetType(asset_code) {
+  static async disableAssetType (asset_code) {
     const transaction = await sequelize.transaction()
     try {
       const assetType = await MaterialAssetType.findOne({ where: { asset_code }, transaction })

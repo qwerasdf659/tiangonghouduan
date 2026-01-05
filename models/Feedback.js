@@ -199,7 +199,7 @@ module.exports = sequelize => {
          * getter方法：将replied_at时间格式化为中文显示格式
          * @returns {string|null} 格式化后的中文时间字符串（如：2025年10月30日 23:15:00），未回复时返回null
          */
-        get() {
+        get () {
           const value = this.getDataValue('replied_at')
           return value ? BeijingTimeHelper.formatChinese(value) : null
         },
@@ -226,7 +226,7 @@ module.exports = sequelize => {
          * getter方法：将created_at时间格式化为中文显示格式
          * @returns {string} 格式化后的中文时间字符串（如：2025年10月30日 23:15:00）
          */
-        get() {
+        get () {
           return BeijingTimeHelper.formatChinese(this.getDataValue('created_at'))
         },
         comment:
@@ -242,7 +242,7 @@ module.exports = sequelize => {
          * getter方法：将updated_at时间格式化为中文显示格式
          * @returns {string} 格式化后的中文时间字符串（如：2025年10月30日 23:15:00）
          */
-        get() {
+        get () {
           return BeijingTimeHelper.formatChinese(this.getDataValue('updated_at'))
         },
         comment:
@@ -279,7 +279,7 @@ module.exports = sequelize => {
          *   console.log('等待管理员回复中...')
          * }
          */
-        isReplied() {
+        isReplied () {
           return this.status === 'replied' && this.reply_content && this.replied_at
         },
 
@@ -299,7 +299,7 @@ module.exports = sequelize => {
          * const feedback = await Feedback.findByPk(feedbackId)
          * console.log('当前状态：', feedback.getStatusDescription()) // 输出：待处理
          */
-        getStatusDescription() {
+        getStatusDescription () {
           const statusMap = {
             pending: '待处理',
             processing: '处理中',
@@ -327,7 +327,7 @@ module.exports = sequelize => {
          * const feedback = await Feedback.findByPk(feedbackId)
          * console.log('反馈类型：', feedback.getCategoryDescription()) // 输出：技术问题
          */
-        getCategoryDescription() {
+        getCategoryDescription () {
           const categoryMap = {
             technical: '技术问题',
             feature: '功能建议',
@@ -384,7 +384,7 @@ module.exports = sequelize => {
          *   await transaction.rollback()
          * }
          */
-        async setReply(content, adminId, transaction = null) {
+        async setReply (content, adminId, transaction = null) {
           return this.update(
             {
               reply_content: content,
@@ -416,7 +416,7 @@ module.exports = sequelize => {
          * const feedbackId = Feedback.generateFeedbackId()
          * console.log(feedbackId) // fb_20251030231500123_a1b2c3
          */
-        generateFeedbackId() {
+        generateFeedbackId () {
           const timestamp = BeijingTimeHelper.generateIdTimestamp()
           const random = Math.random().toString(36).substr(2, 6)
           return `fb_${timestamp}_${random}`
@@ -472,7 +472,7 @@ module.exports = sequelize => {
          * )
          * console.log('反馈已提交，ID：', feedback.feedback_id)
          */
-        async createFeedback(data, userInfo = {}) {
+        async createFeedback (data, userInfo = {}) {
           /*
            * ✅ P0修复：删除手动生成的feedbackId，让数据库自动生成feedback_id
            * 原因：feedback_id是自增主键（INTEGER AUTO_INCREMENT），数据库会自动分配
@@ -511,7 +511,7 @@ module.exports = sequelize => {
          * const responseTime = Feedback.calculateEstimatedResponseTime('high')
          * console.log('预计响应时间：', responseTime) // 4小时内
          */
-        calculateEstimatedResponseTime(priority) {
+        calculateEstimatedResponseTime (priority) {
           const responseTimeMap = {
             high: '4小时内',
             medium: '24小时内',
@@ -553,7 +553,7 @@ module.exports = sequelize => {
          * })
          * console.log('用户共有', repliedFeedbacks.length, '条已回复的反馈')
          */
-        async getUserFeedbacks(user_id, options = {}) {
+        async getUserFeedbacks (user_id, options = {}) {
           const { status = null, limit = 10, offset = 0 } = options
 
           const whereClause = { user_id }
@@ -621,7 +621,7 @@ module.exports = sequelize => {
          *   status: 'replied'
          * })
          */
-        async getAdminFeedbacks(options = {}) {
+        async getAdminFeedbacks (options = {}) {
           const {
             status = null,
             category = null,

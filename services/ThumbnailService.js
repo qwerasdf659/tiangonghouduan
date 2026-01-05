@@ -21,7 +21,7 @@ class ThumbnailService {
    * 构造函数 - 初始化缩略图服务和目录配置
    * @constructor
    */
-  constructor() {
+  constructor () {
     this.uploadsDir = path.join(__dirname, '../uploads')
     this.thumbnailsDir = path.join(this.uploadsDir, 'thumbnails')
     this.ensureDirectories()
@@ -31,7 +31,7 @@ class ThumbnailService {
    * 确保缩略图目录存在
    * @returns {Promise<void>} 无返回值，确保thumbnails目录存在并可访问
    */
-  async ensureDirectories() {
+  async ensureDirectories () {
     try {
       await fs.access(this.thumbnailsDir)
     } catch {
@@ -46,7 +46,7 @@ class ThumbnailService {
    * @param {Object} options - 生成选项
    * @returns {Object} 缩略图路径对象
    */
-  async generateThumbnails(originalPath, options = {}) {
+  async generateThumbnails (originalPath, options = {}) {
     const {
       sizes = {
         small: { width: 150, height: 150 },
@@ -107,7 +107,7 @@ class ThumbnailService {
    * @param {Object} thumbnailPaths - 缩略图路径对象
    * @returns {Promise<void>} 无返回值，删除指定的缩略图文件
    */
-  async deleteThumbnails(thumbnailPaths) {
+  async deleteThumbnails (thumbnailPaths) {
     if (!thumbnailPaths) return
 
     for (const [sizeName, relativePath] of Object.entries(thumbnailPaths)) {
@@ -128,7 +128,7 @@ class ThumbnailService {
    * @param {Object} thumbnails - 已生成的缩略图
    * @returns {Promise<void>} 无返回值，清理失败生成的缩略图文件
    */
-  async cleanupThumbnails(thumbnails) {
+  async cleanupThumbnails (thumbnails) {
     for (const [, relativePath] of Object.entries(thumbnails)) {
       if (!relativePath) continue
 
@@ -147,7 +147,7 @@ class ThumbnailService {
    * @param {string} mimeType - MIME类型
    * @returns {boolean} 是否为支持的图片格式（jpeg/jpg/png/webp/tiff/bmp）
    */
-  isSupportedImageType(mimeType) {
+  isSupportedImageType (mimeType) {
     const supportedTypes = [
       'image/jpeg',
       'image/jpg',
@@ -164,7 +164,7 @@ class ThumbnailService {
    * @param {Array} imagePaths - 图片路径数组
    * @returns {Promise<Array>} 生成结果数组，每项包含originalPath、thumbnails、success字段
    */
-  async batchGenerateThumbnails(imagePaths) {
+  async batchGenerateThumbnails (imagePaths) {
     const results = []
 
     for (const imagePath of imagePaths) {
@@ -191,7 +191,7 @@ class ThumbnailService {
    * 获取缩略图统计信息
    * @returns {Promise<Object>} 统计信息对象，包含totalFiles、totalSize、totalSizeFormatted、files数组
    */
-  async getThumbnailStats() {
+  async getThumbnailStats () {
     try {
       const files = await fs.readdir(this.thumbnailsDir)
       const stats = await Promise.all(
@@ -230,7 +230,7 @@ class ThumbnailService {
    * @param {number} bytes - 字节数
    * @returns {string} 格式化后的文件大小（如 "2.5 MB"、"150 KB"）
    */
-  formatFileSize(bytes) {
+  formatFileSize (bytes) {
     if (bytes === 0) return '0 B'
     const k = 1024
     const sizes = ['B', 'KB', 'MB', 'GB']

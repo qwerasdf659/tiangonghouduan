@@ -154,7 +154,7 @@ class UnifiedLotteryEngine {
    * @param {number} config.maxExecutionTime - 最大执行时间（毫秒），默认30000
    * @param {boolean} config.maintenanceMode - 维护模式，默认false
    */
-  constructor(config = {}) {
+  constructor (config = {}) {
     // 基础配置初始化
     this.version = config.engineVersion || '4.0.0'
     this.config = {
@@ -199,7 +199,7 @@ class UnifiedLotteryEngine {
    *
    * @returns {void} 无返回值
    */
-  initializeStrategies() {
+  initializeStrategies () {
     try {
       // 基础抽奖保底策略（合并了基础抽奖和保底机制）
       const basicGuaranteeStrategy = new BasicGuaranteeStrategy()
@@ -224,7 +224,7 @@ class UnifiedLotteryEngine {
    * @param {Transaction} transaction 外部事务对象（可选，用于连抽统一事务保护）
    * @returns {Object} 抽奖结果
    */
-  async executeLottery(context, transaction = null) {
+  async executeLottery (context, transaction = null) {
     const startTime = BeijingTimeHelper.timestamp()
     const executionId = this.generateExecutionId()
 
@@ -381,7 +381,7 @@ class UnifiedLotteryEngine {
    * @param {Object} context - 抽奖上下文
    * @returns {Array<string>} 策略名称数组
    */
-  getExecutionChain(context) {
+  getExecutionChain (context) {
     // 管理员操作优先使用管理策略
     if (context.operationType === 'admin_preset' || context.operation_type === 'admin_preset') {
       return ['management']
@@ -398,7 +398,7 @@ class UnifiedLotteryEngine {
    * @param {Object} context - 抽奖上下文
    * @returns {Promise<boolean>} 策略是否可用
    */
-  async validateStrategy(strategy, context) {
+  async validateStrategy (strategy, context) {
     try {
       if (typeof strategy.validate === 'function') {
         return await strategy.validate(context)
@@ -429,7 +429,7 @@ class UnifiedLotteryEngine {
    * @param {Transaction} transaction - 外部事务对象（可选）
    * @returns {Promise<Object>} 策略执行结果
    */
-  async executeWithTimeout(strategy, context, transaction = null) {
+  async executeWithTimeout (strategy, context, transaction = null) {
     const timeout = this.config.maxExecutionTime
 
     return Promise.race([
@@ -447,7 +447,7 @@ class UnifiedLotteryEngine {
    * @param {string} strategyName - 策略名称
    * @returns {Object} 标准化后的结果
    */
-  normalizeStrategyResult(result, strategyName) {
+  normalizeStrategyResult (result, strategyName) {
     // 如果已经是统一格式，直接返回
     if (result.success !== undefined && result.data !== undefined) {
       return result
@@ -501,7 +501,7 @@ class UnifiedLotteryEngine {
    * @param {Object} data - 附加数据
    * @returns {Object} 统一错误响应格式
    */
-  createEngineError(message, data = {}) {
+  createEngineError (message, data = {}) {
     return {
       success: false,
       code: 'ENGINE_ERROR',
@@ -522,7 +522,7 @@ class UnifiedLotteryEngine {
    * @param {string|null} strategyUsed - 使用的策略名称
    * @returns {void} 无返回值
    */
-  updateMetrics(startTime, success, strategyUsed) {
+  updateMetrics (startTime, success, strategyUsed) {
     const executionTime = Math.max(BeijingTimeHelper.timestamp() - startTime, 1) // 最小1ms
 
     this.metrics.totalExecutions++
@@ -555,7 +555,7 @@ class UnifiedLotteryEngine {
    * @param {string} strategyType - 策略类型
    * @returns {Object|null} 策略状态信息，不存在时返回null
    */
-  getStrategyStatus(strategyType) {
+  getStrategyStatus (strategyType) {
     const strategy = this.strategies.get(strategyType)
     if (!strategy) {
       return null
@@ -591,7 +591,7 @@ class UnifiedLotteryEngine {
    * @param {Object} newConfig - 新配置对象
    * @returns {boolean} 更新是否成功
    */
-  updateStrategyConfig(strategyType, newConfig) {
+  updateStrategyConfig (strategyType, newConfig) {
     const strategy = this.strategies.get(strategyType)
     if (!strategy) {
       return false
@@ -619,7 +619,7 @@ class UnifiedLotteryEngine {
    *
    * @returns {Object} 引擎性能指标数据
    */
-  getMetrics() {
+  getMetrics () {
     const uptime = BeijingTimeHelper.timestamp() - this.startTime
     const successRate =
       this.metrics.totalExecutions > 0
@@ -641,7 +641,7 @@ class UnifiedLotteryEngine {
    * @param {number} ms - 毫秒数
    * @returns {string} 格式化后的时间字符串
    */
-  formatUptime(ms) {
+  formatUptime (ms) {
     const seconds = Math.floor(ms / 1000)
     const minutes = Math.floor(seconds / 60)
     const hours = Math.floor(minutes / 60)
@@ -660,7 +660,7 @@ class UnifiedLotteryEngine {
    *
    * @returns {Object} 引擎健康状态信息
    */
-  getHealthStatus() {
+  getHealthStatus () {
     try {
       const enabledStrategies = Array.from(this.strategies.entries()).filter(
         ([_, strategy]) => strategy.enabled !== false
@@ -720,7 +720,7 @@ class UnifiedLotteryEngine {
    *
    * @returns {Promise<Object>} 健康检查结果
    */
-  async healthCheck() {
+  async healthCheck () {
     const startTime = BeijingTimeHelper.timestamp()
 
     try {
@@ -759,7 +759,7 @@ class UnifiedLotteryEngine {
    * @param {string} strategyType - 策略类型
    * @returns {Object|null} 策略实例，不存在时返回null
    */
-  getStrategy(strategyType) {
+  getStrategy (strategyType) {
     return this.strategies.get(strategyType) || null
   }
 
@@ -768,7 +768,7 @@ class UnifiedLotteryEngine {
    *
    * @returns {string} 唯一执行ID（格式：lottery_tx_{timestamp}_{random}_{seq}）
    */
-  generateExecutionId() {
+  generateExecutionId () {
     // 使用 IdempotencyHelper 生成标准的 lottery_session_id
     const { generateLotterySessionId } = require('../../utils/IdempotencyHelper')
     return generateLotterySessionId()
@@ -780,7 +780,7 @@ class UnifiedLotteryEngine {
    *
    * @returns {string} 抽奖会话ID
    */
-  generateLotterySessionId() {
+  generateLotterySessionId () {
     return this.generateExecutionId()
   }
 
@@ -789,7 +789,7 @@ class UnifiedLotteryEngine {
    *
    * @returns {string} 北京时间格式化字符串
    */
-  getBeijingTimestamp() {
+  getBeijingTimestamp () {
     return BeijingTimeHelper.now()
   }
 
@@ -801,7 +801,7 @@ class UnifiedLotteryEngine {
    * @param {Object} data - 附加数据
    * @returns {void} 无返回值
    */
-  log(level, message, data = {}) {
+  log (level, message, data = {}) {
     const logEntry = {
       timestamp: this.getBeijingTimestamp(),
       level: level.toUpperCase(),
@@ -820,7 +820,7 @@ class UnifiedLotteryEngine {
    * @param {Object} data - 附加数据
    * @returns {void} 无返回值
    */
-  logInfo(message, data = {}) {
+  logInfo (message, data = {}) {
     this.log('info', message, data)
   }
 
@@ -831,7 +831,7 @@ class UnifiedLotteryEngine {
    * @param {Object} data - 附加数据
    * @returns {void} 无返回值
    */
-  logError(message, data = {}) {
+  logError (message, data = {}) {
     this.log('error', message, data)
   }
 
@@ -842,7 +842,7 @@ class UnifiedLotteryEngine {
    * @param {Object} data - 附加数据
    * @returns {void} 无返回值
    */
-  logDebug(message, data = {}) {
+  logDebug (message, data = {}) {
     this.log('debug', message, data)
   }
 
@@ -853,7 +853,7 @@ class UnifiedLotteryEngine {
    * @param {Object} data - 附加数据
    * @returns {void} 无返回值
    */
-  logWarn(message, data = {}) {
+  logWarn (message, data = {}) {
     this.log('warn', message, data)
   }
 
@@ -869,7 +869,7 @@ class UnifiedLotteryEngine {
    * @param {number} campaign_id - 活动ID
    * @returns {Promise<Array>} 奖品列表
    */
-  async get_campaign_prizes(campaign_id) {
+  async get_campaign_prizes (campaign_id) {
     try {
       const models = require('../../models')
 
@@ -922,7 +922,7 @@ class UnifiedLotteryEngine {
    * @param {boolean} options.refresh - 强制刷新缓存
    * @returns {Promise<Object>} 活动配置
    */
-  async get_campaign_config(campaign_id, options = {}) {
+  async get_campaign_config (campaign_id, options = {}) {
     const { refresh = false } = options
 
     try {
@@ -1015,7 +1015,7 @@ class UnifiedLotteryEngine {
    * getDrawPricing(10, campaign)
    * // 返回：{ total_cost: 900, per_draw: 90, discount: 0.9, count: 10, label: '10连抽(九折)' }
    */
-  async getDrawPricing(draw_count, campaign) {
+  async getDrawPricing (draw_count, campaign) {
     // 步骤1：从活动配置中读取定价配置（JSON字段）
     const pricingConfig = campaign.prize_distribution_config?.draw_pricing || {}
 
@@ -1097,7 +1097,7 @@ class UnifiedLotteryEngine {
    * @param {string} options.request_source - 请求来源标识
    * @returns {Promise<Object>} 抽奖结果
    */
-  async execute_draw(user_id, campaign_id, draw_count = 1, options = {}) {
+  async execute_draw (user_id, campaign_id, draw_count = 1, options = {}) {
     // 方案B：从请求参数获取或生成幂等键
     const {
       generateLotterySessionId,
@@ -1363,12 +1363,12 @@ class UnifiedLotteryEngine {
             reward_tier: drawResult.data?.draw_result?.reward_tier || 'low',
             prize: drawResult.data?.draw_result?.prize_id
               ? {
-                  id: drawResult.data.draw_result.prize_id,
-                  name: drawResult.data.draw_result.prize_name,
-                  type: drawResult.data.draw_result.prize_type,
-                  value: drawResult.data.draw_result.prize_value,
-                  sort_order: drawResult.data.draw_result.sort_order // 🎯 方案3：传递sort_order给路由层
-                }
+                id: drawResult.data.draw_result.prize_id,
+                name: drawResult.data.draw_result.prize_name,
+                type: drawResult.data.draw_result.prize_type,
+                value: drawResult.data.draw_result.prize_value,
+                sort_order: drawResult.data.draw_result.sort_order // 🎯 方案3：传递sort_order给路由层
+              }
               : null,
             points_cost: drawResult.data?.draw_result?.points_cost || 0
           })
@@ -1478,7 +1478,7 @@ class UnifiedLotteryEngine {
    * @param {Object} options - 查询选项 {page, limit, campaign_id}
    * @returns {Promise<Object>} 抽奖历史记录
    */
-  async get_user_history(user_id, options = {}) {
+  async get_user_history (user_id, options = {}) {
     try {
       const models = require('../../models')
       const { page = 1, limit = 20, campaign_id } = options
@@ -1550,12 +1550,12 @@ class UnifiedLotteryEngine {
           reward_tier: record.reward_tier,
           prize: record.prize
             ? {
-                id: record.prize.prize_id,
-                name: record.prize.prize_name,
-                type: record.prize.prize_type,
-                value: record.prize.prize_value,
-                image_id: record.prize.image_id
-              }
+              id: record.prize.prize_id,
+              name: record.prize.prize_name,
+              type: record.prize.prize_type,
+              value: record.prize.prize_value,
+              image_id: record.prize.image_id
+            }
             : null,
           points_cost: record.cost_points,
           probability: record.prize?.win_probability || 0, // 🎯 从关联的奖品中获取概率
@@ -1584,7 +1584,7 @@ class UnifiedLotteryEngine {
    * @param {Object} options - 查询选项 {status, user_id}
    * @returns {Promise<Array>} 活动列表
    */
-  async get_campaigns(options = {}) {
+  async get_campaigns (options = {}) {
     try {
       const models = require('../../models')
       const { status = 'active', user_id } = options
@@ -1755,7 +1755,7 @@ class UnifiedLotteryEngine {
    * //   timestamp: '2025-11-11 05:24:05'   // 北京时间响应时间戳
    * // }
    */
-  async get_user_statistics(user_id) {
+  async get_user_statistics (user_id) {
     try {
       const models = require('../../models')
       const { Op } = require('sequelize')
@@ -1960,19 +1960,19 @@ class UnifiedLotteryEngine {
         }, {}), // 奖励档位分布（对象 - Object），如 { high: 15, mid: 18, low: 17 }
         last_high_tier_win: lastHighTierWin
           ? {
-              draw_id: lastHighTierWin.draw_id, // 抽奖记录ID
-              campaign_id: lastHighTierWin.campaign_id, // 抽奖活动ID
-              prize: lastHighTierWin.prize
-                ? {
-                    id: lastHighTierWin.prize.prize_id, // 奖品ID
-                    name: lastHighTierWin.prize.prize_name, // 奖品名称（如："100积分"）
-                    type: lastHighTierWin.prize.prize_type, // 奖品类型（如："points"）
-                    value: lastHighTierWin.prize.prize_value // 奖品价值（如：100）
-                  }
-                : null,
-              is_guarantee: lastHighTierWin.guarantee_triggered || false, // 是否保底获得
-              win_time: lastHighTierWin.created_at // 获得时间（北京时间 - Beijing Time）
-            }
+            draw_id: lastHighTierWin.draw_id, // 抽奖记录ID
+            campaign_id: lastHighTierWin.campaign_id, // 抽奖活动ID
+            prize: lastHighTierWin.prize
+              ? {
+                id: lastHighTierWin.prize.prize_id, // 奖品ID
+                name: lastHighTierWin.prize.prize_name, // 奖品名称（如："100积分"）
+                type: lastHighTierWin.prize.prize_type, // 奖品类型（如："points"）
+                value: lastHighTierWin.prize.prize_value // 奖品价值（如：100）
+              }
+              : null,
+            is_guarantee: lastHighTierWin.guarantee_triggered || false, // 是否保底获得
+            win_time: lastHighTierWin.created_at // 获得时间（北京时间 - Beijing Time）
+          }
           : null, // 最近一次高档奖励记录（如果没有则为null）
         timestamp: BeijingTimeHelper.formatForAPI(new Date()).iso // 响应时间戳（ISO 8601格式）
       }
@@ -1997,7 +1997,7 @@ class UnifiedLotteryEngine {
    * @returns {Promise<Object>} 活动对象
    * @throws {Error} 活动不存在或状态不可用
    */
-  async getCampaignByCode(campaign_code, options = {}) {
+  async getCampaignByCode (campaign_code, options = {}) {
     const { checkStatus = true } = options
 
     try {
@@ -2061,7 +2061,7 @@ class UnifiedLotteryEngine {
    * @param {string} campaign_code - 活动代码
    * @returns {Promise<Object>} 包含活动信息和奖品列表的对象
    */
-  async getCampaignWithPrizes(campaign_code) {
+  async getCampaignWithPrizes (campaign_code) {
     try {
       // 步骤1：获取并验证活动
       const campaign = await this.getCampaignByCode(campaign_code)
@@ -2098,7 +2098,7 @@ class UnifiedLotteryEngine {
    * @param {boolean} options.checkStatus - 是否检查活动状态（默认true）
    * @returns {Promise<Object>} 活动配置对象
    */
-  async getCampaignConfigByCode(campaign_code, options = {}) {
+  async getCampaignConfigByCode (campaign_code, options = {}) {
     try {
       // 步骤1：获取并验证活动
       const campaign = await this.getCampaignByCode(campaign_code, options)

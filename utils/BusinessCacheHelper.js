@@ -85,7 +85,7 @@ let monitorIntervalId = null
  * @param {Object} stat - 统计对象
  * @returns {string} 命中率百分比
  */
-function calculateHitRate(stat) {
+function calculateHitRate (stat) {
   const total = stat.hits + stat.misses
   return total > 0 ? ((stat.hits / total) * 100).toFixed(1) : '0.0'
 }
@@ -96,7 +96,7 @@ function calculateHitRate(stat) {
  * @param {number} jitterPercent - 抖动百分比（默认10%）
  * @returns {number} 带抖动的 TTL
  */
-function addTTLJitter(baseTTL, jitterPercent = 10) {
+function addTTLJitter (baseTTL, jitterPercent = 10) {
   const jitterRange = Math.floor((baseTTL * jitterPercent) / 100)
   const jitter = Math.floor(Math.random() * (jitterRange * 2 + 1)) - jitterRange
   return Math.max(1, baseTTL + jitter) // 确保至少 1 秒
@@ -106,7 +106,7 @@ function addTTLJitter(baseTTL, jitterPercent = 10) {
  * 获取 Redis 原始客户端（带懒加载）
  * @returns {Object|null} Redis 客户端或 null
  */
-function getRedisClient() {
+function getRedisClient () {
   try {
     const { getRawClient } = require('./UnifiedRedisClient')
     return getRawClient()
@@ -121,7 +121,7 @@ function getRedisClient() {
  * @param {string} key - 缓存 key
  * @returns {string|null} 统计分类名称
  */
-function getStatsCategoryFromKey(key) {
+function getStatsCategoryFromKey (key) {
   if (key.startsWith('sysconfig:')) return 'sysconfig'
   if (key.startsWith('lottery:')) return 'lottery'
   if (key.startsWith('exchange:')) return 'exchange'
@@ -150,7 +150,7 @@ class BusinessCacheHelper {
    * }
    * // 未命中，查库
    */
-  static async get(key) {
+  static async get (key) {
     const redisClient = getRedisClient()
     if (!redisClient) {
       return null
@@ -198,7 +198,7 @@ class BusinessCacheHelper {
    * @example
    * await BusinessCacheHelper.set('sysconfig:points:lottery_cost_points', 100, 60)
    */
-  static async set(key, value, ttl = DEFAULT_TTL.SYSCONFIG, withJitter = true) {
+  static async set (key, value, ttl = DEFAULT_TTL.SYSCONFIG, withJitter = true) {
     const redisClient = getRedisClient()
     if (!redisClient) {
       return false
@@ -231,7 +231,7 @@ class BusinessCacheHelper {
    * @example
    * await BusinessCacheHelper.del('sysconfig:points:lottery_cost_points', 'config_updated')
    */
-  static async del(key, reason = 'unknown') {
+  static async del (key, reason = 'unknown') {
     const redisClient = getRedisClient()
     if (!redisClient) {
       return false
@@ -269,7 +269,7 @@ class BusinessCacheHelper {
    * @example
    * await BusinessCacheHelper.delByPattern('exchange:items:list:*', 'item_created')
    */
-  static async delByPattern(pattern, reason = 'unknown') {
+  static async delByPattern (pattern, reason = 'unknown') {
     const redisClient = getRedisClient()
     if (!redisClient) {
       return 0
@@ -330,7 +330,7 @@ class BusinessCacheHelper {
    * const key = BusinessCacheHelper.buildSysConfigKey('points', 'lottery_cost_points')
    * // 返回: 'sysconfig:points:lottery_cost_points'
    */
-  static buildSysConfigKey(category, setting_key) {
+  static buildSysConfigKey (category, setting_key) {
     return `${CACHE_PREFIX.SYSCONFIG}:${category}:${setting_key}`
   }
 
@@ -341,7 +341,7 @@ class BusinessCacheHelper {
    * @param {string} setting_key - 配置项键名
    * @returns {Promise<any|null>} 缓存数据或 null
    */
-  static async getSysConfig(category, setting_key) {
+  static async getSysConfig (category, setting_key) {
     const key = this.buildSysConfigKey(category, setting_key)
     return await this.get(key)
   }
@@ -354,7 +354,7 @@ class BusinessCacheHelper {
    * @param {any} value - 配置值
    * @returns {Promise<boolean>} 是否写入成功
    */
-  static async setSysConfig(category, setting_key, value) {
+  static async setSysConfig (category, setting_key, value) {
     const key = this.buildSysConfigKey(category, setting_key)
     return await this.set(key, value, DEFAULT_TTL.SYSCONFIG)
   }
@@ -367,7 +367,7 @@ class BusinessCacheHelper {
    * @param {string} reason - 失效原因
    * @returns {Promise<boolean>} 是否失效成功
    */
-  static async invalidateSysConfig(category, setting_key, reason = 'config_updated') {
+  static async invalidateSysConfig (category, setting_key, reason = 'config_updated') {
     const key = this.buildSysConfigKey(category, setting_key)
     return await this.del(key, reason)
   }
@@ -380,7 +380,7 @@ class BusinessCacheHelper {
    * @param {number} campaign_id - 活动 ID
    * @returns {string} 缓存 key
    */
-  static buildLotteryCampaignKey(campaign_id) {
+  static buildLotteryCampaignKey (campaign_id) {
     return `${CACHE_PREFIX.LOTTERY}:cfg:${campaign_id}`
   }
 
@@ -390,7 +390,7 @@ class BusinessCacheHelper {
    * @param {number} campaign_id - 活动 ID
    * @returns {Promise<Object|null>} 缓存数据或 null
    */
-  static async getLotteryCampaign(campaign_id) {
+  static async getLotteryCampaign (campaign_id) {
     const key = this.buildLotteryCampaignKey(campaign_id)
     return await this.get(key)
   }
@@ -402,7 +402,7 @@ class BusinessCacheHelper {
    * @param {Object} config - 活动配置对象
    * @returns {Promise<boolean>} 是否写入成功
    */
-  static async setLotteryCampaign(campaign_id, config) {
+  static async setLotteryCampaign (campaign_id, config) {
     const key = this.buildLotteryCampaignKey(campaign_id)
     return await this.set(key, config, DEFAULT_TTL.LOTTERY)
   }
@@ -414,7 +414,7 @@ class BusinessCacheHelper {
    * @param {string} reason - 失效原因
    * @returns {Promise<boolean>} 是否失效成功
    */
-  static async invalidateLotteryCampaign(campaign_id, reason = 'campaign_updated') {
+  static async invalidateLotteryCampaign (campaign_id, reason = 'campaign_updated') {
     const key = this.buildLotteryCampaignKey(campaign_id)
     return await this.del(key, reason)
   }
@@ -427,7 +427,7 @@ class BusinessCacheHelper {
    * @param {Object} params - 查询参数
    * @returns {string} 缓存 key
    */
-  static buildExchangeItemsKey(params = {}) {
+  static buildExchangeItemsKey (params = {}) {
     const {
       status = 'active',
       asset_code = 'all',
@@ -445,7 +445,7 @@ class BusinessCacheHelper {
    * @param {Object} params - 查询参数
    * @returns {Promise<Object|null>} 缓存数据或 null
    */
-  static async getExchangeItems(params) {
+  static async getExchangeItems (params) {
     const key = this.buildExchangeItemsKey(params)
     return await this.get(key)
   }
@@ -457,7 +457,7 @@ class BusinessCacheHelper {
    * @param {Object} data - 商品列表数据
    * @returns {Promise<boolean>} 是否写入成功
    */
-  static async setExchangeItems(params, data) {
+  static async setExchangeItems (params, data) {
     const key = this.buildExchangeItemsKey(params)
     return await this.set(key, data, DEFAULT_TTL.EXCHANGE)
   }
@@ -468,7 +468,7 @@ class BusinessCacheHelper {
    * @param {string} reason - 失效原因
    * @returns {Promise<number>} 失效的 key 数量
    */
-  static async invalidateExchangeItems(reason = 'items_updated') {
+  static async invalidateExchangeItems (reason = 'items_updated') {
     return await this.delByPattern(`${CACHE_PREFIX.EXCHANGE}:items:list:*`, reason)
   }
 
@@ -480,7 +480,7 @@ class BusinessCacheHelper {
    * @param {Object} params - 查询参数
    * @returns {string} 缓存 key
    */
-  static buildMarketListingsKey(params = {}) {
+  static buildMarketListingsKey (params = {}) {
     const {
       status = 'active',
       category = 'all',
@@ -497,7 +497,7 @@ class BusinessCacheHelper {
    * @param {Object} params - 查询参数
    * @returns {Promise<Object|null>} 缓存数据或 null
    */
-  static async getMarketListings(params) {
+  static async getMarketListings (params) {
     const key = this.buildMarketListingsKey(params)
     return await this.get(key)
   }
@@ -509,7 +509,7 @@ class BusinessCacheHelper {
    * @param {Object} data - 列表数据
    * @returns {Promise<boolean>} 是否写入成功
    */
-  static async setMarketListings(params, data) {
+  static async setMarketListings (params, data) {
     const key = this.buildMarketListingsKey(params)
     return await this.set(key, data, DEFAULT_TTL.MARKET)
   }
@@ -520,7 +520,7 @@ class BusinessCacheHelper {
    * @param {string} reason - 失效原因
    * @returns {Promise<number>} 失效的 key 数量
    */
-  static async invalidateMarketListings(reason = 'listings_updated') {
+  static async invalidateMarketListings (reason = 'listings_updated') {
     return await this.delByPattern(`${CACHE_PREFIX.MARKET}:listings:*`, reason)
   }
 
@@ -533,7 +533,7 @@ class BusinessCacheHelper {
    * @param {Object} params - 查询参数
    * @returns {string} 缓存 key
    */
-  static buildStatsKey(type, params = {}) {
+  static buildStatsKey (type, params = {}) {
     const paramsStr =
       Object.entries(params)
         .sort(([a], [b]) => a.localeCompare(b))
@@ -549,7 +549,7 @@ class BusinessCacheHelper {
    * @param {Object} params - 查询参数
    * @returns {Promise<Object|null>} 缓存数据或 null
    */
-  static async getStats(type, params) {
+  static async getStats (type, params) {
     const key = this.buildStatsKey(type, params)
     return await this.get(key)
   }
@@ -562,7 +562,7 @@ class BusinessCacheHelper {
    * @param {Object} data - 报表数据
    * @returns {Promise<boolean>} 是否写入成功
    */
-  static async setStats(type, params, data) {
+  static async setStats (type, params, data) {
     const key = this.buildStatsKey(type, params)
     return await this.set(key, data, DEFAULT_TTL.STATS)
   }
@@ -573,7 +573,7 @@ class BusinessCacheHelper {
    * @param {string} reason - 失效原因
    * @returns {Promise<number>} 失效的 key 数量
    */
-  static async invalidateStats(reason = 'data_updated') {
+  static async invalidateStats (reason = 'data_updated') {
     return await this.delByPattern(`${CACHE_PREFIX.STATS}:*`, reason)
   }
 
@@ -589,7 +589,7 @@ class BusinessCacheHelper {
    * const key = BusinessCacheHelper.buildUserMobileKey('13612227930')
    * // 返回: 'user:mobile:13612227930'
    */
-  static buildUserMobileKey(mobile) {
+  static buildUserMobileKey (mobile) {
     return `${CACHE_PREFIX.USER}:mobile:${mobile}`
   }
 
@@ -603,7 +603,7 @@ class BusinessCacheHelper {
    * const key = BusinessCacheHelper.buildUserIdKey(1)
    * // 返回: 'user:id:1'
    */
-  static buildUserIdKey(user_id) {
+  static buildUserIdKey (user_id) {
     return `${CACHE_PREFIX.USER}:id:${user_id}`
   }
 
@@ -615,7 +615,7 @@ class BusinessCacheHelper {
    * @param {string} mobile - 用户手机号
    * @returns {Promise<Object|null>} 用户数据或 null
    */
-  static async getUserByMobile(mobile) {
+  static async getUserByMobile (mobile) {
     const key = this.buildUserMobileKey(mobile)
     return await this.get(key)
   }
@@ -627,7 +627,7 @@ class BusinessCacheHelper {
    * @param {Object} userData - 用户数据对象（需要包含可序列化字段）
    * @returns {Promise<boolean>} 是否写入成功
    */
-  static async setUserByMobile(mobile, userData) {
+  static async setUserByMobile (mobile, userData) {
     const key = this.buildUserMobileKey(mobile)
     return await this.set(key, userData, DEFAULT_TTL.USER)
   }
@@ -640,7 +640,7 @@ class BusinessCacheHelper {
    * @param {number} user_id - 用户ID
    * @returns {Promise<Object|null>} 用户数据或 null
    */
-  static async getUserById(user_id) {
+  static async getUserById (user_id) {
     const key = this.buildUserIdKey(user_id)
     return await this.get(key)
   }
@@ -652,7 +652,7 @@ class BusinessCacheHelper {
    * @param {Object} userData - 用户数据对象
    * @returns {Promise<boolean>} 是否写入成功
    */
-  static async setUserById(user_id, userData) {
+  static async setUserById (user_id, userData) {
     const key = this.buildUserIdKey(user_id)
     return await this.set(key, userData, DEFAULT_TTL.USER)
   }
@@ -672,7 +672,7 @@ class BusinessCacheHelper {
    * // 用户更新昵称后失效缓存
    * await BusinessCacheHelper.invalidateUser({ user_id: 1, mobile: '13612227930' }, 'profile_updated')
    */
-  static async invalidateUser(params, reason = 'user_updated') {
+  static async invalidateUser (params, reason = 'user_updated') {
     const { user_id, mobile } = params
     let success = true
 
@@ -700,7 +700,7 @@ class BusinessCacheHelper {
    * @param {string} reason - 失效原因
    * @returns {Promise<number>} 失效的 key 数量
    */
-  static async invalidateAllUsers(reason = 'batch_operation') {
+  static async invalidateAllUsers (reason = 'batch_operation') {
     return await this.delByPattern(`${CACHE_PREFIX.USER}:*`, reason)
   }
 
@@ -711,7 +711,7 @@ class BusinessCacheHelper {
    *
    * @returns {Object} 各业务域的缓存统计
    */
-  static getStatsSnapshot() {
+  static getStatsSnapshot () {
     const snapshot = {}
 
     Object.keys(cacheStats).forEach(prefix => {
@@ -730,7 +730,7 @@ class BusinessCacheHelper {
    * 重置缓存统计数据
    * @returns {void}
    */
-  static resetStats() {
+  static resetStats () {
     Object.keys(cacheStats).forEach(prefix => {
       cacheStats[prefix].hits = 0
       cacheStats[prefix].misses = 0
@@ -745,7 +745,7 @@ class BusinessCacheHelper {
    * @param {number} intervalMs - 输出间隔（毫秒），默认 10 分钟
    * @returns {void}
    */
-  static startMonitor(intervalMs = 10 * 60 * 1000) {
+  static startMonitor (intervalMs = 10 * 60 * 1000) {
     if (monitorIntervalId) {
       logger.warn('[业务缓存] 监控已在运行')
       return
@@ -772,7 +772,7 @@ class BusinessCacheHelper {
    * 停止缓存监控
    * @returns {void}
    */
-  static stopMonitor() {
+  static stopMonitor () {
     if (monitorIntervalId) {
       clearInterval(monitorIntervalId)
       monitorIntervalId = null

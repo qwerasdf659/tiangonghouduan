@@ -36,7 +36,7 @@ class MaterialAssetType extends Model {
    * @param {Object} _models - Sequelize所有模型的集合对象（当前未使用）
    * @returns {void} 无返回值，仅定义关联关系
    */
-  static associate(_models) {
+  static associate (_models) {
     /*
      * 材料资产类型与材料转换规则的关联说明：
      * - 本表只存“材料展示与分组配置”

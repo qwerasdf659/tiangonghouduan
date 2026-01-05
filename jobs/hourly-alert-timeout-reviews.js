@@ -39,7 +39,7 @@ class HourlyAlertTimeoutReviews {
    * @returns {Array<Object>} report.reviews - 超时审核单列表
    * @returns {string} report.action - 执行的动作：alert_only_no_unfreeze
    */
-  static async execute() {
+  static async execute () {
     const start_time = Date.now()
     logger.info('开始执行商家审核超时告警任务')
 

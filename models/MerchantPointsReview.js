@@ -39,7 +39,7 @@ class MerchantPointsReview extends Model {
    * @param {Object} models - 所有模型的映射对象
    * @returns {void} 无返回值
    */
-  static associate(models) {
+  static associate (models) {
     // 审核单属于用户（申请审核的用户）
     MerchantPointsReview.belongsTo(models.User, {
       foreignKey: 'user_id',
@@ -62,7 +62,7 @@ class MerchantPointsReview extends Model {
    *
    * @returns {boolean} 是否超时 - true表示超时，false表示未超时
    */
-  isExpired() {
+  isExpired () {
     if (!this.expires_at) return false
     return new Date() > new Date(this.expires_at)
   }
@@ -72,7 +72,7 @@ class MerchantPointsReview extends Model {
    *
    * @returns {boolean} 是否可批准 - true表示可批准，false表示不可批准
    */
-  canApprove() {
+  canApprove () {
     return this.status === 'pending' && !this.isExpired()
   }
 
@@ -81,7 +81,7 @@ class MerchantPointsReview extends Model {
    *
    * @returns {boolean} 是否可拒绝 - true表示可拒绝，false表示不可拒绝
    */
-  canReject() {
+  canReject () {
     return this.status === 'pending'
   }
 
@@ -90,7 +90,7 @@ class MerchantPointsReview extends Model {
    *
    * @returns {boolean} 是否需要客服处理
    */
-  needsAdminHandle() {
+  needsAdminHandle () {
     return ['rejected', 'expired'].includes(this.status)
   }
 
@@ -99,7 +99,7 @@ class MerchantPointsReview extends Model {
    *
    * @returns {string} UUID格式的审核单ID
    */
-  static generateReviewId() {
+  static generateReviewId () {
     return `review_${uuidv4()}`
   }
 
@@ -111,7 +111,7 @@ class MerchantPointsReview extends Model {
    * @param {number} points_amount - 积分金额
    * @returns {string} 幂等键
    */
-  static generateIdempotencyKey(user_id, merchant_id, points_amount) {
+  static generateIdempotencyKey (user_id, merchant_id, points_amount) {
     const timestamp = Date.now()
     return `merchant_review_${user_id}_${merchant_id}_${points_amount}_${timestamp}`
   }
@@ -122,7 +122,7 @@ class MerchantPointsReview extends Model {
    * @param {string} review_id - 审核单ID
    * @returns {string} 冻结幂等键
    */
-  static generateFreezeIdempotencyKey(review_id) {
+  static generateFreezeIdempotencyKey (review_id) {
     return `${review_id}:freeze`
   }
 
@@ -132,7 +132,7 @@ class MerchantPointsReview extends Model {
    * @param {string} review_id - 审核单ID
    * @returns {string} 结算幂等键
    */
-  static generateSettleIdempotencyKey(review_id) {
+  static generateSettleIdempotencyKey (review_id) {
     return `${review_id}:settle`
   }
 
@@ -142,7 +142,7 @@ class MerchantPointsReview extends Model {
    * @param {string} review_id - 审核单ID
    * @returns {string} 解冻幂等键
    */
-  static generateUnfreezeIdempotencyKey(review_id) {
+  static generateUnfreezeIdempotencyKey (review_id) {
     return `${review_id}:unfreeze`
   }
 
@@ -151,7 +151,7 @@ class MerchantPointsReview extends Model {
    *
    * @returns {Date} 超时时间
    */
-  static calculateExpiresAt() {
+  static calculateExpiresAt () {
     const now = new Date()
     return new Date(now.getTime() + 24 * 60 * 60 * 1000)
   }

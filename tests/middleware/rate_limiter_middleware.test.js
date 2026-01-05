@@ -36,7 +36,7 @@ describe('RateLimiterMiddleware 中间件测试 - 请求频率限制', () => {
   })
 
   // 创建Mock请求和响应对象的辅助函数
-  function createMockReqRes(options = {}) {
+  function createMockReqRes (options = {}) {
     const req = {
       user: options.user || null,
       ip: options.ip || '127.0.0.1',

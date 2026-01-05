@@ -26,9 +26,11 @@ const router = express.Router()
 const { authenticateToken } = require('../../../middleware/auth')
 const { handleServiceError } = require('../../../middleware/validation')
 const logger = require('../../../utils/logger').logger
-const { MarketListing, ItemInstance, sequelize } = require('../../../models')
+const { MarketListing, ItemInstance } = require('../../../models')
 // 业界标准幂等架构 - 统一入口幂等服务
 const IdempotencyService = require('../../../services/IdempotencyService')
+// 事务边界治理 - 统一事务管理器
+const TransactionManager = require('../../../utils/TransactionManager')
 
 /**
  * @route POST /api/v4/market/list
@@ -164,68 +166,68 @@ router.post('/list', authenticateToken, async (req, res) => {
       return res.apiError('物品不存在或不可上架', 'NOT_FOUND', null, 404)
     }
 
-    // 使用事务处理上架操作
-    const transaction = await sequelize.transaction()
+    // 使用 TransactionManager 处理上架操作
+    const responseData = await TransactionManager.execute(
+      async transaction => {
+        // 锁定物品
+        await item.update({ status: 'locked' }, { transaction })
 
-    try {
-      // 锁定物品
-      await item.update({ status: 'locked' }, { transaction })
+        // 创建挂牌记录（使用 idempotency_key 字段名）
+        const listing = await MarketListing.create(
+          {
+            listing_kind: 'item_instance',
+            seller_user_id: userId,
+            offer_item_instance_id: itemId,
+            price_amount: priceAmountValue,
+            price_asset_code: 'DIAMOND',
+            seller_offer_frozen: false,
+            status: 'on_sale',
+            idempotency_key
+          },
+          { transaction }
+        )
 
-      // 创建挂牌记录（使用 idempotency_key 字段名）
-      const listing = await MarketListing.create(
-        {
-          listing_kind: 'item_instance',
-          seller_user_id: userId,
-          offer_item_instance_id: itemId,
-          price_amount: priceAmountValue,
-          price_asset_code: 'DIAMOND',
-          seller_offer_frozen: false,
-          status: 'on_sale',
-          idempotency_key
-        },
-        { transaction }
-      )
-
-      await transaction.commit()
-
-      // 构建响应数据
-      const responseData = {
-        listing: {
-          listing_id: listing.listing_id,
-          item_instance_id: itemId,
-          price_amount: priceAmountValue,
-          is_duplicate: false
-        },
-        listing_status: {
-          current: onSaleCount + 1,
-          limit: 10,
-          remaining: 10 - onSaleCount - 1
+        // 构建响应数据
+        return {
+          listing: {
+            listing_id: listing.listing_id,
+            item_instance_id: itemId,
+            price_amount: priceAmountValue,
+            is_duplicate: false
+          },
+          listing_status: {
+            current: onSaleCount + 1,
+            limit: 10,
+            remaining: 10 - onSaleCount - 1
+          },
+          _listing_id: listing.listing_id // 内部使用，记录幂等
         }
-      }
+      },
+      { description: 'market_list_item' }
+    )
 
-      /*
-       * 【标记请求完成】保存结果快照到入口幂等表
-       */
-      await IdempotencyService.markAsCompleted(
-        idempotency_key,
-        listing.listing_id, // 业务事件ID = 挂牌ID
-        responseData
-      )
+    /*
+     * 【标记请求完成】保存结果快照到入口幂等表
+     */
+    await IdempotencyService.markAsCompleted(
+      idempotency_key,
+      responseData._listing_id, // 业务事件ID = 挂牌ID
+      { listing: responseData.listing, listing_status: responseData.listing_status }
+    )
 
-      logger.info('商品上架成功', {
-        user_id: userId,
-        item_instance_id: itemId,
-        listing_id: listing.listing_id,
-        idempotency_key,
-        price_amount: priceAmountValue,
-        current_listings: onSaleCount + 1
-      })
+    logger.info('商品上架成功', {
+      user_id: userId,
+      item_instance_id: itemId,
+      listing_id: responseData._listing_id,
+      idempotency_key,
+      price_amount: priceAmountValue,
+      current_listings: onSaleCount + 1
+    })
 
-      return res.apiSuccess(responseData, '上架成功')
-    } catch (innerError) {
-      await transaction.rollback()
-      throw innerError
-    }
+    return res.apiSuccess(
+      { listing: responseData.listing, listing_status: responseData.listing_status },
+      '上架成功'
+    )
   } catch (error) {
     // 标记幂等请求失败（允许重试）
     await IdempotencyService.markAsFailed(idempotency_key, error.message).catch(markError => {

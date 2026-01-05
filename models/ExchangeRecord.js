@@ -2,6 +2,11 @@
  * B2C兑换记录模型 - ExchangeRecord
  * 材料资产支付兑换订单表（V4.5.0统一版）
  *
+ * ⚠️ 重要提示：此表未废弃，请勿删除！
+ * - 表名：exchange_records（原 exchange_market_records）
+ * - 用途：B2C 官方兑换订单表，用户使用材料资产兑换商品
+ * - 状态：正常使用中（2026-01-04 确认）
+ *
  * 📌 重构记录（2025-12-22）：
  * - 模型重命名：ExchangeMarketRecord → ExchangeRecord
  * - 表名重命名：exchange_market_records → exchange_records
@@ -90,6 +95,19 @@ module.exports = sequelize => {
         allowNull: true,
         unique: true,
         comment: '幂等键（业界标准命名），用于防止重复提交，客户端通过 Header Idempotency-Key 传入'
+      },
+      /**
+       * 关联扣减流水ID（逻辑外键，用于对账）
+       *
+       * 事务边界治理（2026-01-05）：
+       * - 兑换扣减资产时，记录对应的 asset_transactions.transaction_id
+       * - 用于定时对账脚本检查数据一致性
+       * - 不使用物理外键约束，支持未来分库分表
+       */
+      debit_transaction_id: {
+        type: DataTypes.BIGINT,
+        allowNull: true, // 历史数据可能为 NULL
+        comment: '关联扣减流水ID（逻辑外键，用于对账）'
       },
       item_snapshot: {
         type: DataTypes.JSON,

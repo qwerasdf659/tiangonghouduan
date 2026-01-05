@@ -51,7 +51,7 @@ class IdempotencyService {
    * @param {Object} body - 原始请求体
    * @returns {Object} 过滤后的请求体
    */
-  static filterBodyForFingerprint(body) {
+  static filterBodyForFingerprint (body) {
     if (!body || typeof body !== 'object') {
       return {}
     }
@@ -82,7 +82,7 @@ class IdempotencyService {
    * @param {string} path - 原始API路径
    * @returns {string} 规范化后的路径
    */
-  static normalizePath(path) {
+  static normalizePath (path) {
     if (!path) return ''
 
     /*
@@ -101,7 +101,7 @@ class IdempotencyService {
    * @param {*} obj - 需要排序的对象
    * @returns {*} 排序后的对象
    */
-  static deepSortObject(obj) {
+  static deepSortObject (obj) {
     if (obj === null || obj === undefined) {
       return obj
     }
@@ -134,7 +134,7 @@ class IdempotencyService {
    * @param {Object} context.body - 请求体
    * @returns {string} SHA-256哈希值
    */
-  static generateRequestFingerprint(context) {
+  static generateRequestFingerprint (context) {
     const { user_id, http_method, api_path, query, body } = context
 
     // 过滤请求体
@@ -166,7 +166,7 @@ class IdempotencyService {
    * @returns {string} SHA-256哈希值
    * @deprecated 使用 generateRequestFingerprint 替代
    */
-  static generateRequestHash(params) {
+  static generateRequestHash (params) {
     // 兼容旧调用方式，仅对 body 进行哈希
     const sortedParams = JSON.stringify(params, Object.keys(params || {}).sort())
     return crypto.createHash('sha256').update(sortedParams).digest('hex')
@@ -190,7 +190,7 @@ class IdempotencyService {
    * @param {number} request_data.user_id - 用户ID
    * @returns {Promise<Object>} { is_new, request, should_process, response }
    */
-  static async getOrCreateRequest(idempotency_key, request_data) {
+  static async getOrCreateRequest (idempotency_key, request_data) {
     // 延迟加载模型，避免循环依赖
     const { ApiIdempotencyRequest } = require('../models')
 
@@ -327,7 +327,7 @@ class IdempotencyService {
    * @param {Object} response_data - 响应数据
    * @returns {Promise<void>} 无返回值
    */
-  static async markAsCompleted(idempotency_key, business_event_id, response_data) {
+  static async markAsCompleted (idempotency_key, business_event_id, response_data) {
     const { ApiIdempotencyRequest } = require('../models')
 
     await ApiIdempotencyRequest.update(
@@ -357,7 +357,7 @@ class IdempotencyService {
    * @param {string} error_message - 错误信息
    * @returns {Promise<void>} 无返回值
    */
-  static async markAsFailed(idempotency_key, error_message) {
+  static async markAsFailed (idempotency_key, error_message) {
     const { ApiIdempotencyRequest } = require('../models')
 
     await ApiIdempotencyRequest.update(
@@ -383,7 +383,7 @@ class IdempotencyService {
    *
    * @returns {Promise<Object>} { updated_count }
    */
-  static async autoFailProcessingTimeout() {
+  static async autoFailProcessingTimeout () {
     const { ApiIdempotencyRequest } = require('../models')
     const { Op } = require('sequelize')
 
@@ -420,7 +420,7 @@ class IdempotencyService {
    *
    * @returns {Promise<Object>} { deleted_count }
    */
-  static async cleanupExpired() {
+  static async cleanupExpired () {
     const { ApiIdempotencyRequest } = require('../models')
     const { Op } = require('sequelize')
 
@@ -448,7 +448,7 @@ class IdempotencyService {
    * @param {string} idempotency_key - 幂等键
    * @returns {Promise<Object|null>} 请求记录或null
    */
-  static async findByKey(idempotency_key) {
+  static async findByKey (idempotency_key) {
     const { ApiIdempotencyRequest } = require('../models')
 
     return await ApiIdempotencyRequest.findOne({
@@ -462,7 +462,7 @@ class IdempotencyService {
    * @param {string} business_event_id - 业务事件ID
    * @returns {Promise<Object|null>} 请求记录或null
    */
-  static async findByBusinessEventId(business_event_id) {
+  static async findByBusinessEventId (business_event_id) {
     const { ApiIdempotencyRequest } = require('../models')
 
     return await ApiIdempotencyRequest.findOne({

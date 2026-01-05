@@ -68,5 +68,10 @@ server.log
 # Claude AI配置（保留所有内容）
 # .claude目录不忽略
 
+# 禁止手动迁移脚本（强制规范 - 2026-01-04拍板）
+# 所有数据库变更必须走标准迁移流程，无例外
+migrations/manual/
+**/manual/*.sql
+
 # Environment variables
 .env

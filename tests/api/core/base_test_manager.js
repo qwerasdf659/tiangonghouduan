@@ -26,7 +26,7 @@ class BaseTestManager {
    * 创建基础测试管理器实例
    * @param {Object} app - Express应用实例（推荐）或基础URL字符串（兼容模式）
    */
-  constructor(app = null) {
+  constructor (app = null) {
     /*
      * 支持两种初始化方式：
      * 1. 传入 Express app 实例（推荐，使用supertest进程内测试）
@@ -71,7 +71,7 @@ class BaseTestManager {
    * 设置 Express app 实例（延迟初始化）
    * @param {Object} app - Express应用实例
    */
-  setApp(app) {
+  setApp (app) {
     this.app = app
     console.log('[BaseTestManager] app 实例已设置')
   }
@@ -81,7 +81,7 @@ class BaseTestManager {
    * @returns {Object} supertest request 对象
    * @private
    */
-  _getRequest() {
+  _getRequest () {
     if (this.app) {
       return request(this.app)
     } else if (this.baseUrl) {
@@ -102,7 +102,7 @@ class BaseTestManager {
    * @param {string} [error] - 错误信息
    * @private
    */
-  _recordPerformance(url, method, duration, status, error = null) {
+  _recordPerformance (url, method, duration, status, error = null) {
     const record = {
       url,
       method: method.toUpperCase(),
@@ -123,7 +123,7 @@ class BaseTestManager {
    * @param {string} user_type 用户类型
    * @returns {Promise<Object>} 登录数据（包含 access_token 和 user 对象）
    */
-  async authenticate(phone, code = '123456', user_type = 'user') {
+  async authenticate (phone, code = '123456', user_type = 'user') {
     const startTime = performance.now()
 
     try {
@@ -172,7 +172,7 @@ class BaseTestManager {
    * @param {string} token_type token类型
    * @returns {Promise<Object>} 响应数据 { status, data, headers }
    */
-  async make_authenticated_request(method, url, data = null, token_type = 'user') {
+  async make_authenticated_request (method, url, data = null, token_type = 'user') {
     const token = this.tokens[token_type]
     if (!token) {
       throw new Error(`请先进行${token_type}认证`)
@@ -223,7 +223,7 @@ class BaseTestManager {
    * @param {any} data 请求数据
    * @returns {Promise<Object>} 响应数据 { status, data, headers }
    */
-  async make_request(method, url, data = null) {
+  async make_request (method, url, data = null) {
     const startTime = performance.now()
 
     try {
@@ -269,7 +269,7 @@ class BaseTestManager {
    * @param {any} data 请求数据
    * @returns {Promise<Object>} 响应数据 { status, data, headers }
    */
-  async make_request_with_cookie(method, url, cookies = {}, data = null) {
+  async make_request_with_cookie (method, url, cookies = {}, data = null) {
     const startTime = performance.now()
 
     try {
@@ -317,7 +317,7 @@ class BaseTestManager {
    * 批量认证测试用户
    * @returns {Promise<Object>} 认证结果
    */
-  async authenticate_test_users() {
+  async authenticate_test_users () {
     const test_users = {
       user: { phone: TestConfig.realData.testUser.mobile, type: 'user' },
       admin: { phone: TestConfig.realData.adminUser.mobile, type: 'admin' }
@@ -342,7 +342,7 @@ class BaseTestManager {
    * 获取测试统计信息
    * @returns {Object} 统计信息
    */
-  get_test_stats() {
+  get_test_stats () {
     const stats = {
       total_requests: this.performance_data.length,
       average_response_time: 0,
@@ -370,7 +370,7 @@ class BaseTestManager {
    * 重置测试数据
    * @returns {void}
    */
-  reset() {
+  reset () {
     this.test_results = []
     this.performance_data = []
     console.log('[BaseTestManager] 测试数据已重置')
@@ -380,7 +380,7 @@ class BaseTestManager {
    * 清理测试资源
    * @returns {Promise<void>} Promise对象
    */
-  async cleanup() {
+  async cleanup () {
     try {
       console.log('🧹 开始清理测试资源...')
 
@@ -410,7 +410,7 @@ class BaseTestManager {
    * @param {string} user_type - 用户类型：'regular'/'user'/'admin'
    * @returns {Promise<Object>} 登录数据（包含 access_token 和 user 对象）
    */
-  async authenticate_user(user_type = 'regular') {
+  async authenticate_user (user_type = 'regular') {
     const mobile = '13612227930' // 测试账号：既是用户也是管理员
     const token_type = user_type === 'admin' ? 'admin' : 'user'
 
@@ -432,7 +432,7 @@ class BaseTestManager {
    * @param {string} user_type - 用户类型
    * @returns {Promise<Object>} 登录数据
    */
-  async authenticate_v4_user(user_type = 'regular') {
+  async authenticate_v4_user (user_type = 'regular') {
     return await this.authenticate_user(user_type)
   }
 
@@ -444,7 +444,7 @@ class BaseTestManager {
    * @param {Object} expected_results - 预期结果 { user_type: expected_status }
    * @returns {Promise<Array>} 测试结果数组
    */
-  async test_authorization_levels(url, method, data, expected_results) {
+  async test_authorization_levels (url, method, data, expected_results) {
     const results = []
 
     for (const [user_type, expected_status] of Object.entries(expected_results)) {
@@ -478,7 +478,7 @@ class BaseTestManager {
    * @param {number} concurrency - 并发数
    * @returns {Promise<Object>} 并发测试结果
    */
-  async test_concurrent_requests(url, method, data, concurrency = 5) {
+  async test_concurrent_requests (url, method, data, concurrency = 5) {
     const promises = []
     const start_time = Date.now()
 
@@ -513,7 +513,7 @@ class BaseTestManager {
    * @param {Array} required_fields - 必需字段
    * @returns {Promise<Array>} 验证结果数组
    */
-  async test_parameter_validation(url, method, valid_params, required_fields) {
+  async test_parameter_validation (url, method, valid_params, required_fields) {
     const results = []
 
     for (const field of required_fields) {
@@ -545,7 +545,7 @@ class BaseTestManager {
    * @param {boolean} force_refresh - 是否强制刷新
    * @returns {Promise<Object>} 健康检查结果
    */
-  async health_check_with_cache(force_refresh = false) {
+  async health_check_with_cache (force_refresh = false) {
     const now = Date.now()
 
     // 检查缓存是否有效
@@ -582,7 +582,7 @@ class BaseTestManager {
    * 清理健康检查缓存
    * @returns {void}
    */
-  clear_health_cache() {
+  clear_health_cache () {
     this.health_check_cache = {
       result: null,
       timestamp: 0,
@@ -595,7 +595,7 @@ class BaseTestManager {
    * 生成测试报告
    * @returns {Object} 测试报告对象
    */
-  generate_test_report() {
+  generate_test_report () {
     return {
       summary: {
         total: this.test_results.length,

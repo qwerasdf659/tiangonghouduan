@@ -40,7 +40,7 @@ class ConsumptionRecord extends Model {
    * @param {Object} models - 所有模型的引用
    * @returns {void}
    */
-  static associate(models) {
+  static associate (models) {
     // 多对一：多个消费记录属于一个用户
     ConsumptionRecord.belongsTo(models.User, {
       foreignKey: 'user_id',
@@ -89,7 +89,7 @@ class ConsumptionRecord extends Model {
    * 获取状态的友好显示名称
    * @returns {string} 状态显示名称
    */
-  getStatusName() {
+  getStatusName () {
     const statusNames = {
       pending: '待审核',
       approved: '已通过',
@@ -103,7 +103,7 @@ class ConsumptionRecord extends Model {
    * 获取状态颜色（用于前端显示）
    * @returns {string} 状态颜色
    */
-  getStatusColor() {
+  getStatusColor () {
     const statusColors = {
       pending: 'warning',
       approved: 'success',
@@ -117,7 +117,7 @@ class ConsumptionRecord extends Model {
    * 检查是否为待审核状态
    * @returns {boolean} 是否为待审核
    */
-  isPending() {
+  isPending () {
     return this.status === 'pending'
   }
 
@@ -125,7 +125,7 @@ class ConsumptionRecord extends Model {
    * 检查是否已审核通过
    * @returns {boolean} 是否已通过
    */
-  isApproved() {
+  isApproved () {
     return this.status === 'approved'
   }
 
@@ -133,7 +133,7 @@ class ConsumptionRecord extends Model {
    * 检查是否已拒绝
    * @returns {boolean} 是否已拒绝
    */
-  isRejected() {
+  isRejected () {
     return this.status === 'rejected'
   }
 
@@ -141,7 +141,7 @@ class ConsumptionRecord extends Model {
    * 检查是否已过期
    * @returns {boolean} 是否已过期
    */
-  isExpired() {
+  isExpired () {
     return this.status === 'expired'
   }
 
@@ -149,7 +149,7 @@ class ConsumptionRecord extends Model {
    * 计算预计奖励积分（1元=1分，四舍五入）
    * @returns {number} 预计奖励积分
    */
-  calculateRewardPoints() {
+  calculateRewardPoints () {
     return Math.round(parseFloat(this.consumption_amount || 0))
   }
 
@@ -157,7 +157,7 @@ class ConsumptionRecord extends Model {
    * 验证消费记录的有效性
    * @returns {Object} 验证结果
    */
-  validateRecord() {
+  validateRecord () {
     const errors = []
     const warnings = []
 
@@ -198,7 +198,7 @@ class ConsumptionRecord extends Model {
    * 检查是否可以审核
    * @returns {Object} 可审核性检查结果
    */
-  canBeReviewed() {
+  canBeReviewed () {
     const reasons = []
 
     if (!this.isPending()) {
@@ -219,7 +219,7 @@ class ConsumptionRecord extends Model {
    * 获取记录的年龄（创建多久了）
    * @returns {string} 友好的时间显示
    */
-  getAge() {
+  getAge () {
     if (!this.created_at) return '未知'
     return BeijingTimeHelper.formatRelativeTime(this.created_at)
   }
@@ -228,7 +228,7 @@ class ConsumptionRecord extends Model {
    * 获取审核耗时（从创建到审核完成）
    * @returns {string|null} 审核耗时（友好显示）
    */
-  getReviewDuration() {
+  getReviewDuration () {
     if (!this.reviewed_at) return null
     const durationMs = BeijingTimeHelper.timeDiff(this.created_at, this.reviewed_at)
     return BeijingTimeHelper.formatDuration(durationMs)
@@ -238,7 +238,7 @@ class ConsumptionRecord extends Model {
    * 转换为API响应格式（数据脱敏）
    * @returns {Object} API响应对象
    */
-  toAPIResponse() {
+  toAPIResponse () {
     return {
       id: parseInt(this.record_id), // 通用id字段（数据脱敏）
       record_id: parseInt(this.record_id), // 保留业务字段（确保返回数字类型）
@@ -265,7 +265,7 @@ class ConsumptionRecord extends Model {
    * 转换为简化的API响应格式（列表页使用）
    * @returns {Object} 简化的API响应对象
    */
-  toSimpleAPIResponse() {
+  toSimpleAPIResponse () {
     return {
       id: this.record_id,
       consumption_amount: parseFloat(this.consumption_amount),
@@ -401,6 +401,21 @@ module.exports = sequelize => {
             msg: '幂等键长度必须在1-100字符之间'
           }
         }
+      },
+
+      /**
+       * 关联奖励积分流水ID（逻辑外键，用于对账）
+       *
+       * 事务边界治理（2026-01-05）：
+       * - 审核通过后发放奖励积分时，记录对应的 asset_transactions.transaction_id
+       * - 用于定时对账脚本检查数据一致性
+       * - 审核拒绝或待审核时为 NULL
+       * - 不使用物理外键约束，支持未来分库分表
+       */
+      reward_transaction_id: {
+        type: DataTypes.BIGINT,
+        allowNull: true, // 审核拒绝或待审核时为 NULL
+        comment: '关联奖励积分流水ID（逻辑外键，用于对账，审核通过后填充）'
       },
 
       /*
@@ -659,7 +674,7 @@ module.exports = sequelize => {
          * @returns {void}
          * @throws {Error} 当积分计算不正确时抛出错误
          */
-        validatePointsCalculation() {
+        validatePointsCalculation () {
           const expected = Math.round(parseFloat(this.consumption_amount || 0))
           if (this.points_to_award !== expected) {
             throw new Error(
@@ -674,7 +689,7 @@ module.exports = sequelize => {
          * @returns {void}
          * @throws {Error} 当审核信息不完整时抛出错误
          */
-        validateReviewInfo() {
+        validateReviewInfo () {
           if (this.status === 'approved' || this.status === 'rejected') {
             if (!this.reviewed_by) {
               throw new Error('已审核的记录必须有审核员信息')

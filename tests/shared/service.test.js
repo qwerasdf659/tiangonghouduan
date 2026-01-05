@@ -52,7 +52,7 @@ class ServiceTestSuite {
    * @returns {Promise<Object>} 测试结果
    * @throws {Error} 如果单例模式验证失败
    */
-  static async testSingletonPattern(serviceManager, serviceName) {
+  static async testSingletonPattern (serviceManager, serviceName) {
     console.log(`🔍 测试单例模式: ${serviceName}`)
 
     // 第一次获取服务
@@ -92,7 +92,7 @@ class ServiceTestSuite {
    * @returns {Promise<Object>} 测试结果
    * @throws {Error} 如果初始化验证失败
    */
-  static async testServiceInitialization(serviceManager) {
+  static async testServiceInitialization (serviceManager) {
     console.log('🔍 测试服务初始化...')
 
     // 检查服务管理器是否已初始化
@@ -131,7 +131,7 @@ class ServiceTestSuite {
    * @returns {Promise<Object>} 测试结果
    * @throws {Error} 如果健康检查失败
    */
-  static async testServiceHealth(service, requiredMethods = []) {
+  static async testServiceHealth (service, requiredMethods = []) {
     console.log('🏥 测试服务健康状态...')
 
     if (!service) {
@@ -180,7 +180,7 @@ class ServiceTestSuite {
    * @returns {Promise<Object>} 测试结果
    * @throws {Error} 如果依赖注入验证失败
    */
-  static async testDependencyInjection(service, expectedDependencies = []) {
+  static async testDependencyInjection (service, expectedDependencies = []) {
     console.log('🔍 测试服务依赖注入...')
 
     const missingDependencies = []
@@ -220,7 +220,7 @@ class ServiceTestSuite {
    * @returns {Promise<Object>} 测试结果
    * @throws {Error} 如果方法调用失败
    */
-  static async testServiceMethod(service, methodName, methodArgs = [], validateResult = null) {
+  static async testServiceMethod (service, methodName, methodArgs = [], validateResult = null) {
     console.log(`🔍 测试服务方法: ${methodName}`)
 
     // 检查方法存在
@@ -262,7 +262,7 @@ class ServiceTestSuite {
    * @returns {Promise<Object>} 测试结果
    * @throws {Error} 如果错误处理验证失败
    */
-  static async testServiceErrorHandling(service, methodName, invalidArgs = []) {
+  static async testServiceErrorHandling (service, methodName, invalidArgs = []) {
     console.log(`🔍 测试服务错误处理: ${methodName}`)
 
     let errorCaught = false
@@ -302,7 +302,7 @@ class ServiceTestSuite {
    * @returns {Promise<Object>} 测试结果
    * @throws {Error} 如果验证失败
    */
-  static async testUnifiedLotteryEngine(UnifiedLotteryEngine) {
+  static async testUnifiedLotteryEngine (UnifiedLotteryEngine) {
     console.log('🎲 测试UnifiedLotteryEngine...')
 
     // 验证核心方法
@@ -351,7 +351,7 @@ class ServiceTestSuite {
    * @returns {Promise<Object>} 测试结果
    * @throws {Error} 如果验证失败
    */
-  static async testAssetService(AssetService) {
+  static async testAssetService (AssetService) {
     console.log('💰 测试AssetService...')
 
     // 验证核心方法（资产域统一架构）
@@ -386,7 +386,7 @@ class ServiceTestSuite {
    * @returns {Promise<Object>} 测试结果
    * @throws {Error} 如果验证失败
    */
-  static async testServiceManager(serviceManager) {
+  static async testServiceManager (serviceManager) {
     console.log('🏭 测试ServiceManager...')
 
     // 测试初始化

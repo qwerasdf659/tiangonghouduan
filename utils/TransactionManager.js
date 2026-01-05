@@ -64,7 +64,7 @@ class TransactionManager {
    * @param {TransactionOptions} options - 选项
    * @returns {Promise<any>} 操作结果
    */
-  static async execute(operation, options = {}) {
+  static async execute (operation, options = {}) {
     const {
       maxRetries = 3,
       timeout = 30000,
@@ -190,7 +190,7 @@ class TransactionManager {
    * @param {TransactionOptions} options - 选项
    * @returns {Promise<any>} 操作结果
    */
-  static async executeReadOnly(operation, options = {}) {
+  static async executeReadOnly (operation, options = {}) {
     return this.execute(operation, {
       maxRetries: 1,
       timeout: options.timeout || 10000,
@@ -207,7 +207,7 @@ class TransactionManager {
    * @param {Error} error - 错误对象
    * @returns {ErrorAnalysis} 错误分析结果
    */
-  static analyzeError(error) {
+  static analyzeError (error) {
     const msg = (error.message || '').toLowerCase()
     const code = error.code || ''
 
@@ -299,7 +299,7 @@ class TransactionManager {
    * @param {number} ms - 毫秒数
    * @returns {Promise<void>} 延迟后解析的 Promise
    */
-  static sleep(ms) {
+  static sleep (ms) {
     return new Promise(function (resolve) {
       setTimeout(resolve, ms)
     })
@@ -312,7 +312,7 @@ class TransactionManager {
    * @param {boolean} options.required - 是否必需
    * @returns {Object|null} 事务对象
    */
-  static getCurrentTransaction(options = {}) {
+  static getCurrentTransaction (options = {}) {
     return TransactionContext.getTransaction(options)
   }
 
@@ -321,7 +321,7 @@ class TransactionManager {
    *
    * @returns {boolean} 是否在事务中
    */
-  static isInTransaction() {
+  static isInTransaction () {
     return TransactionContext.hasTransaction()
   }
 }

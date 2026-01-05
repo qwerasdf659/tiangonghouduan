@@ -148,7 +148,7 @@ class AssetConversionService {
    *   is_duplicate: false // 是否为重复请求
    * }
    */
-  static async convertMaterial(user_id, from_asset_code, to_asset_code, from_amount, options = {}) {
+  static async convertMaterial (user_id, from_asset_code, to_asset_code, from_amount, options = {}) {
     // 参数验证（Parameter validation）
     if (!user_id || user_id <= 0) {
       throw new Error('用户ID无效')
@@ -432,7 +432,7 @@ class AssetConversionService {
    * )
    * ```
    */
-  static async convertRedShardToDiamond(user_id, red_shard_amount, options = {}) {
+  static async convertRedShardToDiamond (user_id, red_shard_amount, options = {}) {
     if (!options.idempotency_key) {
       throw new Error('idempotency_key不能为空（幂等性控制必需）')
     }
@@ -465,7 +465,7 @@ class AssetConversionService {
    * @param {Date} options.as_of_time - 查询生效时间点（可选，默认当前时间）
    * @returns {Promise<Array<Object>>} 规则列表（含 rule_id/from_asset_code/to_asset_code/from_amount/to_amount/effective_at/is_enabled）
    */
-  static async getConversionRules(options = {}) {
+  static async getConversionRules (options = {}) {
     const { transaction, as_of_time } = options
     const asOfTime = as_of_time || new Date()
 

@@ -45,7 +45,7 @@ class TransactionContext {
    * @param {Object} transaction - Sequelize 事务对象
    * @returns {Promise<any>} 操作结果 - 返回操作函数的执行结果
    */
-  static async run(operation, transaction) {
+  static async run (operation, transaction) {
     return transactionStorage.run({ transaction }, operation)
   }
 
@@ -57,7 +57,7 @@ class TransactionContext {
    * @returns {Object|null} 事务对象 - 返回当前上下文中的事务对象，不存在时返回 null
    * @throws {Error} 当 required=true 且不存在事务时抛出错误
    */
-  static getTransaction(options = {}) {
+  static getTransaction (options = {}) {
     const store = transactionStorage.getStore()
     const transaction = store?.transaction
 
@@ -79,7 +79,7 @@ class TransactionContext {
    *
    * @returns {boolean} 是否在事务中 - true 表示当前在事务上下文中
    */
-  static hasTransaction() {
+  static hasTransaction () {
     const store = transactionStorage.getStore()
     return !!store?.transaction
   }
@@ -89,7 +89,7 @@ class TransactionContext {
    *
    * @returns {string|null} 事务ID - 返回当前事务的ID，不存在时返回 null
    */
-  static getTransactionId() {
+  static getTransactionId () {
     const transaction = this.getTransaction()
     return transaction?.id || null
   }
@@ -99,7 +99,7 @@ class TransactionContext {
    *
    * @returns {Object|undefined} 存储对象 - 返回 AsyncLocalStorage 中的存储对象
    */
-  static getStore() {
+  static getStore () {
     return transactionStorage.getStore()
   }
 }

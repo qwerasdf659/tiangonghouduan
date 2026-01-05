@@ -101,7 +101,7 @@ class PrizePoolService {
    * @returns {number} return.added_prizes - 添加的奖品数量
    * @returns {Array<Object>} return.prizes - 添加的奖品列表
    */
-  static async batchAddPrizes(campaign_id, prizes, options = {}) {
+  static async batchAddPrizes (campaign_id, prizes, options = {}) {
     const { transaction, created_by } = options
 
     // 创建内部事务（如果外部没有传入）
@@ -249,7 +249,7 @@ class PrizePoolService {
    * @returns {Object} return.statistics - 统计信息
    * @returns {Array<Object>} return.prizes - 奖品列表
    */
-  static async getPrizesByCampaign(campaign_code) {
+  static async getPrizesByCampaign (campaign_code) {
     try {
       logger.info('获取活动奖品池', { campaign_code })
 
@@ -368,7 +368,7 @@ class PrizePoolService {
    * @param {string} filters.status - 状态（可选）
    * @returns {Promise<Object>} 奖品列表和统计信息
    */
-  static async getAllPrizes(filters = {}) {
+  static async getAllPrizes (filters = {}) {
     try {
       const { campaign_id, status } = filters
 
@@ -486,7 +486,7 @@ class PrizePoolService {
    * @param {number} options.updated_by - 更新者ID（可选）
    * @returns {Promise<Object>} 更新结果
    */
-  static async updatePrize(prize_id, updateData, options = {}) {
+  static async updatePrize (prize_id, updateData, options = {}) {
     const { transaction, updated_by } = options
 
     // 创建内部事务（如果外部没有传入）
@@ -676,7 +676,7 @@ class PrizePoolService {
    * @param {number} options.operated_by - 操作者ID（可选）
    * @returns {Promise<Object>} 补充结果
    */
-  static async addStock(prize_id, quantity, options = {}) {
+  static async addStock (prize_id, quantity, options = {}) {
     const { transaction, operated_by } = options
 
     // 创建内部事务（如果外部没有传入）
@@ -767,7 +767,7 @@ class PrizePoolService {
    * @param {number} options.deleted_by - 删除者ID（可选）
    * @returns {Promise<Object>} 删除结果
    */
-  static async deletePrize(prize_id, options = {}) {
+  static async deletePrize (prize_id, options = {}) {
     const { transaction, deleted_by } = options
 
     // 创建内部事务（如果外部没有传入）
@@ -847,7 +847,7 @@ class PrizePoolService {
    * @returns {Promise<Object>} 奖品信息
    * @throws {Error} 奖品不存在
    */
-  static async getPrizeById(prize_id, options = {}) {
+  static async getPrizeById (prize_id, options = {}) {
     const { transaction } = options
 
     try {

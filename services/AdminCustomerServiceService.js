@@ -100,7 +100,7 @@ class AdminCustomerServiceService {
    * // 在ServiceManager.initialize()中调用
    * AdminCustomerServiceService.initialize(serviceManager)
    */
-  static initialize(serviceManager) {
+  static initialize (serviceManager) {
     // 🎯 直接从_services Map获取，避免触发初始化检查
     this._dependencies.customerServiceSession =
       serviceManager._services.get('customerServiceSession')
@@ -142,7 +142,7 @@ class AdminCustomerServiceService {
    *   sort_order: 'DESC'
    * });
    */
-  static async getSessionList(options) {
+  static async getSessionList (options) {
     try {
       logger.info('管理员获取会话列表', {
         page: options.page,
@@ -198,7 +198,7 @@ class AdminCustomerServiceService {
    * // 或查看特定客服的统计
    * const statsForAdmin = await AdminCustomerServiceService.getSessionStats(10001);
    */
-  static async getSessionStats(adminId = undefined) {
+  static async getSessionStats (adminId = undefined) {
     try {
       logger.info('管理员获取会话统计', {
         admin_id: adminId
@@ -259,7 +259,7 @@ class AdminCustomerServiceService {
    *   before_message_id: result.messages[0].message_id
    * });
    */
-  static async getSessionMessages(sessionId, options = {}) {
+  static async getSessionMessages (sessionId, options = {}) {
     try {
       logger.info('管理员获取会话消息', {
         session_id: sessionId,
@@ -323,7 +323,7 @@ class AdminCustomerServiceService {
    *   role_level: 2
    * });
    */
-  static async sendMessage(sessionId, messageData) {
+  static async sendMessage (sessionId, messageData) {
     try {
       logger.info('管理员发送消息', {
         session_id: sessionId,
@@ -377,7 +377,7 @@ class AdminCustomerServiceService {
    * @example
    * const result = await AdminCustomerServiceService.markSessionAsRead(123, 10001);
    */
-  static async markSessionAsRead(sessionId, adminId) {
+  static async markSessionAsRead (sessionId, adminId) {
     try {
       logger.info('管理员标记会话已读', {
         session_id: sessionId,
@@ -433,7 +433,7 @@ class AdminCustomerServiceService {
    * @example
    * const result = await AdminCustomerServiceService.transferSession(123, 10001, 10002);
    */
-  static async transferSession(sessionId, currentAdminId, targetAdminId) {
+  static async transferSession (sessionId, currentAdminId, targetAdminId) {
     try {
       logger.info('管理员转接会话', {
         session_id: sessionId,
@@ -499,7 +499,7 @@ class AdminCustomerServiceService {
    *   close_reason: '问题已解决'
    * });
    */
-  static async closeSession(sessionId, closeData) {
+  static async closeSession (sessionId, closeData) {
     try {
       logger.info('管理员关闭会话', {
         session_id: sessionId,

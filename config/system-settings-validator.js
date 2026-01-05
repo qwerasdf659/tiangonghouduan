@@ -44,7 +44,7 @@ const CRITICAL_SETTINGS_REQUIRED_AT_STARTUP = [
  * const { validateCriticalSettings } = require('./config/system-settings-validator')
  * await validateCriticalSettings()
  */
-async function validateCriticalSettings() {
+async function validateCriticalSettings () {
   // 延迟加载 models，避免循环依赖
   const models = require('../models')
   const { SystemSettings } = models
@@ -154,7 +154,7 @@ async function validateCriticalSettings() {
  *
  * @returns {string[]} 关键配置键名列表
  */
-function getCriticalSettingKeys() {
+function getCriticalSettingKeys () {
   return [...CRITICAL_SETTINGS_REQUIRED_AT_STARTUP]
 }
 
@@ -164,7 +164,7 @@ function getCriticalSettingKeys() {
  * @param {string} whitelistKey - 配置键名（格式：category/setting_key）
  * @returns {boolean} 是否为关键配置
  */
-function isCriticalSetting(whitelistKey) {
+function isCriticalSetting (whitelistKey) {
   return CRITICAL_SETTINGS_REQUIRED_AT_STARTUP.includes(whitelistKey)
 }
 

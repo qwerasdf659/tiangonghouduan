@@ -29,6 +29,7 @@
 const { sequelize, TradeOrder, MarketListing, ItemInstance } = require('../models')
 const AssetService = require('./AssetService')
 const logger = require('../utils/logger')
+// const { assertAndGetTransaction } = require('../utils/transactionHelpers') // 暂时未使用
 
 /**
  * 交易订单服务类
@@ -60,7 +61,7 @@ class TradeOrderService {
    * @returns {Promise<Object>} 订单创建结果 {order_id, is_duplicate}
    * @throws {Error} 参数验证失败、挂牌不存在、挂牌状态异常、余额不足等
    */
-  static async createOrder(params, options = {}) {
+  static async createOrder (params, options = {}) {
     const { idempotency_key, listing_id, buyer_id } = params
 
     // 1. 参数验证
@@ -175,11 +176,10 @@ class TradeOrderService {
       }
     }
 
-    // 3. 创建新订单（使用事务）
-    const transaction = options.transaction || (await sequelize.transaction())
+    // 3. 创建新订单（强制要求事务边界 - 2026-01-05 治理决策）
+    const transaction = assertAndGetTransaction(options, 'TradeOrderService.createOrder')
 
-    try {
-      // 3.1 查询挂牌信息
+    // 3.1 查询挂牌信息
       const listing = await MarketListing.findOne({
         where: { listing_id },
         include: [
@@ -423,7 +423,7 @@ class TradeOrderService {
    * @returns {Promise<Object>} 完成结果 {order, fee_amount, net_amount}
    * @throws {Error} 订单不存在、状态异常等
    */
-  static async completeOrder(params, options = {}) {
+  static async completeOrder (params, options = {}) {
     const { order_id, buyer_id: _buyer_id } = params
 
     // 参数验证
@@ -701,7 +701,7 @@ class TradeOrderService {
    * @returns {Promise<Object>} 取消结果 {order, unfreeze}
    * @throws {Error} 订单不存在、状态异常等
    */
-  static async cancelOrder(params, options = {}) {
+  static async cancelOrder (params, options = {}) {
     const { order_id, cancel_reason } = params
 
     // 参数验证
@@ -811,7 +811,7 @@ class TradeOrderService {
    * @param {number} order_id - 订单ID
    * @returns {Promise<Object>} 订单详情
    */
-  static async getOrderDetail(order_id) {
+  static async getOrderDetail (order_id) {
     const order = await TradeOrder.findOne({
       where: { order_id },
       include: [
@@ -846,7 +846,7 @@ class TradeOrderService {
    * @param {number} [params.page_size=20] - 每页数量
    * @returns {Promise<Object>} 订单列表 {orders, total, page, page_size}
    */
-  static async getUserOrders(params) {
+  static async getUserOrders (params) {
     const { user_id, role, status, page = 1, page_size = 20 } = params
 
     const where = {}

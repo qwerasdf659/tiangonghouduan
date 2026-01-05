@@ -17,7 +17,7 @@ const BeijingTimeHelper = require('../../utils/timeHelper')
 const TestCoordinator = require('../api/TestCoordinator')
 
 // 辅助函数
-async function getUserPoints(tester, user_id) {
+async function getUserPoints (tester, user_id) {
   const response = await tester.make_authenticated_request(
     'GET',
     `/api/v4/points/balance/${user_id}`,
@@ -39,7 +39,7 @@ async function getUserPoints(tester, user_id) {
  * - assets: 可叠加资产（材料、碎片等）
  * - items: 不可叠加物品（优惠券、实物商品等）
  */
-async function getUserInventory(tester, user_id) {
+async function getUserInventory (tester, user_id) {
   const response = await tester.make_authenticated_request(
     'GET',
     `/api/v4/inventory/backpack/user/${user_id}`,
@@ -50,7 +50,7 @@ async function getUserInventory(tester, user_id) {
   return response.status === 200 ? response.data.data?.items || [] : []
 }
 
-async function getAvailableCampaign(tester) {
+async function getAvailableCampaign (tester) {
   // campaigns接口需要认证
   const response = await tester.make_authenticated_request(
     'GET',

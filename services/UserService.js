@@ -38,7 +38,7 @@ class UserService {
    * @returns {Object} 创建的用户对象
    * @throws {Error} 业务错误（手机号已存在、角色不存在等）
    */
-  static async registerUser(mobile, options = {}) {
+  static async registerUser (mobile, options = {}) {
     const { transaction: externalTransaction, nickname, status = 'active' } = options
 
     // 如果没有外部事务，创建内部事务
@@ -164,7 +164,7 @@ class UserService {
    * @param {boolean} options.useCache - 是否使用缓存（默认 true，事务场景自动禁用）
    * @returns {Object|null} 用户对象或null
    */
-  static async findByMobile(mobile, options = {}) {
+  static async findByMobile (mobile, options = {}) {
     const { transaction, useCache = true } = options
 
     // 事务场景下禁用缓存（确保数据一致性）
@@ -221,7 +221,7 @@ class UserService {
    * @param {Object} options.transaction - 外部事务对象（可选）
    * @returns {Object} 更新后的用户对象
    */
-  static async updateLoginStats(user_id, options = {}) {
+  static async updateLoginStats (user_id, options = {}) {
     const { transaction } = options
 
     try {
@@ -278,7 +278,7 @@ class UserService {
    * @returns {Object|null} 用户对象或null
    * @throws {Error} 业务错误（用户不存在等）
    */
-  static async getUserById(user_id, options = {}) {
+  static async getUserById (user_id, options = {}) {
     const { transaction, useCache = true } = options
 
     // 事务场景下禁用缓存（确保数据一致性）
@@ -342,7 +342,7 @@ class UserService {
    * @returns {Object} 用户对象
    * @throws {Error} 业务错误（用户不存在、账户已被禁用等）
    */
-  static async getUserWithValidation(userId, options = {}) {
+  static async getUserWithValidation (userId, options = {}) {
     const { attributes, checkStatus = true, transaction } = options
 
     try {
@@ -416,7 +416,7 @@ class UserService {
    * @returns {Object} 包含用户和角色信息的对象
    * @throws {Error} 业务错误（验证码错误、用户不存在、权限不足等）
    */
-  static async adminLogin(mobile, verificationCode, options = {}) {
+  static async adminLogin (mobile, verificationCode, options = {}) {
     const { transaction } = options
 
     try {
@@ -532,7 +532,7 @@ class UserService {
    * @returns {Promise<Object>} 包含用户信息和积分账户信息的对象
    * @throws {Error} 用户不存在、用户被禁用、积分账户不存在、积分账户被冻结
    */
-  static async getUserWithPoints(userId, options = {}) {
+  static async getUserWithPoints (userId, options = {}) {
     const { checkPointsAccount = true, checkStatus = true, transaction = null } = options
 
     try {

@@ -25,6 +25,7 @@ const {
   asyncHandler,
   validators
 } = require('./shared/middleware')
+const TransactionManager = require('../../../utils/TransactionManager')
 
 /**
  * GET /campaigns/:campaign_id - 获取活动预算配置
@@ -408,47 +409,49 @@ router.post(
       }
 
       const { LotteryCampaign } = require('../../../models')
-      const { sequelize } = require('../../../config/database')
 
-      // 使用事务保护
-      const result = await sequelize.transaction(async transaction => {
-        // 获取活动（加锁）
-        const campaign = await LotteryCampaign.findByPk(parseInt(campaign_id), {
-          lock: transaction.LOCK.UPDATE,
-          transaction
-        })
+      // 使用 TransactionManager 保护事务
+      const result = await TransactionManager.execute(
+        async transaction => {
+          // 获取活动（加锁）
+          const campaign = await LotteryCampaign.findByPk(parseInt(campaign_id), {
+            lock: transaction.LOCK.UPDATE,
+            transaction
+          })
 
-        if (!campaign) {
-          throw new Error('活动不存在')
-        }
+          if (!campaign) {
+            throw new Error('活动不存在')
+          }
 
-        if (campaign.budget_mode !== 'pool') {
-          throw new Error(`活动不是活动池预算模式（当前模式：${campaign.budget_mode}）`)
-        }
+          if (campaign.budget_mode !== 'pool') {
+            throw new Error(`活动不是活动池预算模式（当前模式：${campaign.budget_mode}）`)
+          }
 
-        const oldTotal = Number(campaign.pool_budget_total) || 0
-        const oldRemaining = Number(campaign.pool_budget_remaining) || 0
+          const oldTotal = Number(campaign.pool_budget_total) || 0
+          const oldRemaining = Number(campaign.pool_budget_remaining) || 0
 
-        // 更新预算
-        await campaign.update(
-          {
-            pool_budget_total: oldTotal + amount,
-            pool_budget_remaining: oldRemaining + amount
-          },
-          { transaction }
-        )
+          // 更新预算
+          await campaign.update(
+            {
+              pool_budget_total: oldTotal + amount,
+              pool_budget_remaining: oldRemaining + amount
+            },
+            { transaction }
+          )
 
-        return {
-          campaign_id: campaign.campaign_id,
-          campaign_name: campaign.name,
-          amount_added: amount,
-          old_total: oldTotal,
-          new_total: oldTotal + amount,
-          old_remaining: oldRemaining,
-          new_remaining: oldRemaining + amount,
-          reason: reason.trim()
-        }
-      })
+          return {
+            campaign_id: campaign.campaign_id,
+            campaign_name: campaign.name,
+            amount_added: amount,
+            old_total: oldTotal,
+            new_total: oldTotal + amount,
+            old_remaining: oldRemaining,
+            new_remaining: oldRemaining + amount,
+            reason: reason.trim()
+          }
+        },
+        { description: 'campaign_budget_pool_add' }
+      )
 
       sharedComponents.logger.info('活动池预算补充成功', {
         campaign_id,
@@ -539,10 +542,10 @@ router.get(
           usage_rate:
             campaign.pool_budget_total > 0
               ? (
-                  (((campaign.pool_budget_total || 0) - (campaign.pool_budget_remaining || 0)) /
+                (((campaign.pool_budget_total || 0) - (campaign.pool_budget_remaining || 0)) /
                     campaign.pool_budget_total) *
                   100
-                ).toFixed(2) + '%'
+              ).toFixed(2) + '%'
               : 'N/A'
         },
         statistics: {

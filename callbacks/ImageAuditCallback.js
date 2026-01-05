@@ -26,7 +26,7 @@ module.exports = {
    * @param {Object} transaction - 数据库事务
    * @returns {Promise<{success: boolean, points_awarded: number}>} 回调处理结果（含发放积分数量）
    */
-  async approved(imageId, auditRecord, transaction) {
+  async approved (imageId, auditRecord, transaction) {
     console.log(`[图片审核回调] 审核通过: image_id=${imageId}`)
 
     try {
@@ -109,7 +109,7 @@ module.exports = {
    * @param {Object} transaction - 数据库事务
    * @returns {Promise<{success: boolean}>} 回调处理结果（success=true 表示处理完成）
    */
-  async rejected(imageId, auditRecord, transaction) {
+  async rejected (imageId, auditRecord, transaction) {
     console.log(`[图片审核回调] 审核拒绝: image_id=${imageId}`)
 
     try {

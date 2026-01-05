@@ -42,7 +42,7 @@ const crypto = require('crypto')
  * const sessionId = generateLotterySessionId()
  * // => 'lottery_tx_1703511234567_a1b2c3_001'
  */
-function generateLotterySessionId() {
+function generateLotterySessionId () {
   const timestamp = Date.now()
   const random = crypto.randomBytes(3).toString('hex') // 6位16进制
   const seq = String(Math.floor(Math.random() * 1000)).padStart(3, '0')
@@ -73,7 +73,7 @@ function generateLotterySessionId() {
  * const rewardKey = deriveTransactionIdempotencyKey('req_1703511234567_a1b2c3d4_001', 'reward_1')
  * // => 'req_1703511234567_a1b2c3d4_001:reward_1'
  */
-function deriveTransactionIdempotencyKey(requestIdempotencyKey, transactionType) {
+function deriveTransactionIdempotencyKey (requestIdempotencyKey, transactionType) {
   if (!requestIdempotencyKey || !transactionType) {
     throw new Error('requestIdempotencyKey 和 transactionType 不能为空')
   }
@@ -99,7 +99,7 @@ function deriveTransactionIdempotencyKey(requestIdempotencyKey, transactionType)
  * const key = generateStandaloneIdempotencyKey('admin_adjustment', 123)
  * // => 'admin_adjustment_123_1703511234567_a1b2c3'
  */
-function generateStandaloneIdempotencyKey(businessType, accountId) {
+function generateStandaloneIdempotencyKey (businessType, accountId) {
   if (!businessType || accountId === undefined || accountId === null) {
     throw new Error('businessType 和 accountId 不能为空')
   }
@@ -124,7 +124,7 @@ function generateStandaloneIdempotencyKey(businessType, accountId) {
  * const reqKey = generateRequestIdempotencyKey()
  * // => 'req_1703511234567_a1b2c3d4_001'
  */
-function generateRequestIdempotencyKey() {
+function generateRequestIdempotencyKey () {
   const timestamp = Date.now()
   const random = crypto.randomBytes(4).toString('hex') // 8位16进制
   const seq = String(Math.floor(Math.random() * 1000)).padStart(3, '0')
@@ -138,30 +138,30 @@ function generateRequestIdempotencyKey() {
  * @param {string} type - 预期的键类型（lottery_session/request_derived/standalone/request）
  * @returns {boolean} 是否有效
  */
-function isValidIdempotencyKey(key, type) {
+function isValidIdempotencyKey (key, type) {
   if (!key || typeof key !== 'string') {
     return false
   }
 
   switch (type) {
-    case 'lottery_session':
-      // lottery_tx_{timestamp}_{random6}_{seq}
-      return /^lottery_tx_\d+_[a-f0-9]{6}_\d{3}$/.test(key)
+  case 'lottery_session':
+    // lottery_tx_{timestamp}_{random6}_{seq}
+    return /^lottery_tx_\d+_[a-f0-9]{6}_\d{3}$/.test(key)
 
-    case 'request_derived':
-      // {req_key}:{type} - 方案B标准格式（从请求幂等键派生）
-      return /^req_\d+_[a-f0-9]{8}_\d{3}:(consume|reward|refund|reward_\d+)$/.test(key)
+  case 'request_derived':
+    // {req_key}:{type} - 方案B标准格式（从请求幂等键派生）
+    return /^req_\d+_[a-f0-9]{8}_\d{3}:(consume|reward|refund|reward_\d+)$/.test(key)
 
-    case 'standalone':
-      // {business_type}_{account_id}_{timestamp}_{random6}
-      return /^[a-z_]+_\d+_\d+_[a-f0-9]{6}$/.test(key)
+  case 'standalone':
+    // {business_type}_{account_id}_{timestamp}_{random6}
+    return /^[a-z_]+_\d+_\d+_[a-f0-9]{6}$/.test(key)
 
-    case 'request':
-      // req_{timestamp}_{random8}_{seq}
-      return /^req_\d+_[a-f0-9]{8}_\d{3}$/.test(key)
+  case 'request':
+    // req_{timestamp}_{random8}_{seq}
+    return /^req_\d+_[a-f0-9]{8}_\d{3}$/.test(key)
 
-    default:
-      return false
+  default:
+    return false
   }
 }
 
@@ -176,7 +176,7 @@ function isValidIdempotencyKey(key, type) {
  * const info = parseIdempotencyKey('req_1703511234567_a1b2c3d4_001:consume')
  * // => { type: 'request_derived', requestIdempotencyKey: 'req_1703511234567_a1b2c3d4_001', transactionType: 'consume' }
  */
-function parseIdempotencyKey(idempotencyKey) {
+function parseIdempotencyKey (idempotencyKey) {
   if (!idempotencyKey || typeof idempotencyKey !== 'string') {
     return null
   }
