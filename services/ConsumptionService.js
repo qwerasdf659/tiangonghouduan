@@ -26,9 +26,10 @@ const { ConsumptionRecord, ContentReviewRecord, User } = require('../models')
 const AssetService = require('./AssetService')
 const QRCodeValidator = require('../utils/QRCodeValidator')
 const BeijingTimeHelper = require('../utils/timeHelper')
-const { Sequelize, Transaction } = require('sequelize')
+const { Sequelize } = require('sequelize')
 const { Op } = Sequelize
 const AuditLogService = require('./AuditLogService')
+const { assertAndGetTransaction } = require('../utils/transactionHelpers')
 
 /**
  * 🎯 统一数据输出视图常量（Data Output View Constants）
@@ -179,7 +180,7 @@ class ConsumptionService {
    * 5. 管理员审核通过后，积分自动激活到账
    *
    * 技术特点（Technical Features）：
-   * - ✅ 使用Sequelize事务确保3个表数据一致性（ACID保证）
+   * - ✅ 强制事务边界：必须由入口层传入事务（2026-01-05 治理决策）
    * - ✅ HMAC-SHA256验证QR码签名，防止伪造二维码攻击
    * - ✅ 3分钟防重复提交窗口，避免商家误操作多次点击
    * - ✅ 1元=1分的积分计算规则，四舍五入处理
@@ -191,155 +192,137 @@ class ConsumptionService {
    * @param {number} data.merchant_id - 商家ID（必填，Merchant ID - Required）
    * @param {number} data.consumption_amount - 消费金额，单位元（必填，>0，Consumption Amount in Yuan - Required）
    * @param {string} [data.merchant_notes] - 商家备注（可选，Merchant Notes - Optional）
+   * @param {Object} options - 选项
+   * @param {Object} options.transaction - Sequelize事务对象（必填）
    * @returns {Object} 消费记录对象（Consumption Record Object）
    */
-  static async merchantSubmitConsumption (data) {
-    // 🔒 创建数据库事务（Database Transaction - Ensure ACID）
-    const sequelize = ConsumptionRecord.sequelize
-    const transaction = await sequelize.transaction({
-      isolationLevel: Transaction.ISOLATION_LEVELS.READ_COMMITTED
+  static async merchantSubmitConsumption (data, options = {}) {
+    // 强制要求事务边界 - 2026-01-05 治理决策
+    const transaction = assertAndGetTransaction(options, 'ConsumptionService.merchantSubmitConsumption')
+
+    logger.info('📊 开始处理商家消费记录提交（使用事务保护）...')
+    logger.info('📋 提交数据:', JSON.stringify(data, null, 2))
+
+    // 步骤1：验证必填参数
+    if (!data.qr_code) {
+      throw new Error('二维码不能为空')
+    }
+    if (!data.consumption_amount || data.consumption_amount <= 0) {
+      throw new Error('消费金额必须大于0')
+    }
+    if (!data.merchant_id) {
+      throw new Error('商家ID不能为空')
+    }
+    // 【业界标准形态】幂等键必须由路由层传入，不再服务端生成
+    if (!data.idempotency_key) {
+      throw new Error('缺少幂等键：idempotency_key 必须由调用方提供')
+    }
+
+    // 步骤2：验证QR码签名（Step 2: Validate QR Code Signature - HMAC-SHA256，UUID版本）
+    const qrValidation = QRCodeValidator.validateQRCode(data.qr_code)
+    if (!qrValidation.valid) {
+      throw new Error(`二维码验证失败：${qrValidation.error}`)
+    }
+
+    const userUuid = qrValidation.user_uuid
+
+    // 步骤3：根据UUID查找用户（Step 3: Find User by UUID）
+    const user = await User.findOne({
+      where: { user_uuid: userUuid },
+      transaction
+    }) // ✅ 在事务中查询
+
+    if (!user) {
+      throw new Error(`用户不存在（UUID: ${userUuid}）`)
+    }
+
+    const userId = user.user_id // 获取内部user_id用于后续业务逻辑
+
+    /*
+     * 步骤4：使用传入的幂等键（Idempotency Key - For Idempotency Control）
+     * 【业界标准形态 2026-01-02】幂等键由路由层从 Header 获取后传入
+     */
+    const idempotency_key = data.idempotency_key
+
+    logger.info(`使用传入的幂等键: ${idempotency_key}`)
+
+    /*
+     * 步骤5：幂等性检查（Idempotency Check - Prevent Duplicate Submission）
+     * 规范要求：P0-3 - 所有资产变动必须有幂等键控制
+     */
+    const existingRecord = await ConsumptionRecord.findOne({
+      where: {
+        idempotency_key
+      },
+      transaction // ✅ 在事务中查询
     })
 
-    try {
-      logger.info('📊 开始处理商家消费记录提交（使用事务保护）...')
-      logger.info('📋 提交数据:', JSON.stringify(data, null, 2))
-
-      // 步骤1：验证必填参数
-      if (!data.qr_code) {
-        throw new Error('二维码不能为空')
+    if (existingRecord) {
+      logger.info(`⚠️ 幂等性检查: idempotency_key=${idempotency_key}已存在，返回已有记录（幂等）`)
+      return {
+        success: true,
+        message: '消费记录已存在（幂等保护）',
+        is_duplicate: true,
+        record: existingRecord
       }
-      if (!data.consumption_amount || data.consumption_amount <= 0) {
-        throw new Error('消费金额必须大于0')
-      }
-      if (!data.merchant_id) {
-        throw new Error('商家ID不能为空')
-      }
-      // 【业界标准形态】幂等键必须由路由层传入，不再服务端生成
-      if (!data.idempotency_key) {
-        throw new Error('缺少幂等键：idempotency_key 必须由调用方提供')
-      }
-
-      // 步骤2：验证QR码签名（Step 2: Validate QR Code Signature - HMAC-SHA256，UUID版本）
-      const qrValidation = QRCodeValidator.validateQRCode(data.qr_code)
-      if (!qrValidation.valid) {
-        throw new Error(`二维码验证失败：${qrValidation.error}`)
-      }
-
-      const userUuid = qrValidation.user_uuid
-
-      // 步骤3：根据UUID查找用户（Step 3: Find User by UUID）
-      const user = await User.findOne({
-        where: { user_uuid: userUuid },
-        transaction
-      }) // ✅ 在事务中查询
-
-      if (!user) {
-        throw new Error(`用户不存在（UUID: ${userUuid}）`)
-      }
-
-      const userId = user.user_id // 获取内部user_id用于后续业务逻辑
-
-      /*
-       * 步骤4：使用传入的幂等键（Idempotency Key - For Idempotency Control）
-       * 【业界标准形态 2026-01-02】幂等键由路由层从 Header 获取后传入
-       */
-      const idempotency_key = data.idempotency_key
-
-      logger.info(`使用传入的幂等键: ${idempotency_key}`)
-
-      /*
-       * 步骤5：幂等性检查（Idempotency Check - Prevent Duplicate Submission）
-       * 规范要求：P0-3 - 所有资产变动必须有幂等键控制
-       */
-      const existingRecord = await ConsumptionRecord.findOne({
-        where: {
-          idempotency_key
-        },
-        transaction // ✅ 在事务中查询
-      })
-
-      if (existingRecord) {
-        logger.info(`⚠️ 幂等性检查: idempotency_key=${idempotency_key}已存在，返回已有记录（幂等）`)
-        await transaction.commit()
-        return {
-          success: true,
-          message: '消费记录已存在（幂等保护）',
-          is_duplicate: true,
-          record: existingRecord
-        }
-      }
-
-      // 步骤6：计算奖励积分（Step 6: Calculate Points Reward - 1 Yuan = 1 Point, Rounded）
-      const pointsToAward = Math.round(parseFloat(data.consumption_amount))
-
-      // 🔒 步骤7：创建消费记录（Step 7: Create Consumption Record - Within Transaction）
-      const consumptionRecord = await ConsumptionRecord.create(
-        {
-          user_id: userId,
-          merchant_id: data.merchant_id,
-          consumption_amount: data.consumption_amount,
-          points_to_award: pointsToAward,
-          status: 'pending', // 待审核状态（Pending Status - Waiting for Admin Review）
-          qr_code: data.qr_code,
-          idempotency_key, // ✅ 幂等键（业界标准形态）
-          merchant_notes: data.merchant_notes || null,
-          created_at: BeijingTimeHelper.createDatabaseTime(),
-          updated_at: BeijingTimeHelper.createDatabaseTime()
-        },
-        { transaction }
-      ) // ✅ 在事务中创建
-
-      logger.info(
-        `✅ 消费记录创建成功 (ID: ${consumptionRecord.record_id}, idempotency_key: ${idempotency_key})`
-      )
-
-      /*
-       * ✅ 方案C：不再创建 pending 积分交易
-       * 待审核积分直接从 consumption_records.status='pending' 展示
-       * 审核通过后直接调用 AssetService.changeBalance 发放积分
-       */
-      logger.info(`✅ 消费记录创建成功，预计奖励${pointsToAward}分（审核通过后发放）`)
-
-      // 🔒 步骤9：创建审核记录（Step 9: Create Review Record - Within Transaction）
-      await ContentReviewRecord.create(
-        {
-          auditable_type: 'consumption',
-          auditable_id: consumptionRecord.record_id,
-          audit_status: 'pending', // 待审核状态（Pending Status - Waiting for Admin Review）
-          auditor_id: null, // 审核员ID（暂无，Auditor ID - None Yet）
-          audit_reason: null, // 审核原因（暂无，Audit Reason - None Yet）
-          submitted_at: BeijingTimeHelper.createDatabaseTime(),
-          created_at: BeijingTimeHelper.createDatabaseTime(),
-          updated_at: BeijingTimeHelper.createDatabaseTime()
-        },
-        { transaction }
-      ) // ✅ 在事务中创建
-
-      logger.info('✅ 审核记录创建成功')
-
-      // 🎉 提交事务（Commit Transaction - All 3 Tables Updated Successfully）
-      await transaction.commit()
-      logger.info('🎉 事务提交成功，3个表数据一致性已保证')
-
-      logger.info(
-        `✅ 消费记录完整创建: record_id=${consumptionRecord.record_id}, user_id=${userId}, amount=${data.consumption_amount}元, pending_points=${pointsToAward}分`
-      )
-
-      return consumptionRecord
-    } catch (error) {
-      // ⚠️ 发生错误，回滚事务（Error Occurred - Rollback Transaction）
-      await transaction.rollback()
-      logger.error('❌ 商家消费记录提交失败（事务已回滚）:', error.message)
-      logger.error('错误堆栈:', error.stack)
-
-      // 打印Sequelize验证错误的详细信息
-      if (error.name === 'SequelizeValidationError' && error.errors) {
-        error.errors.forEach(err => {
-          logger.error(`   验证错误 - 字段: ${err.path}, 值: ${err.value}, 原因: ${err.message}`)
-        })
-      }
-      throw error
     }
+
+    // 步骤6：计算奖励积分（Step 6: Calculate Points Reward - 1 Yuan = 1 Point, Rounded）
+    const pointsToAward = Math.round(parseFloat(data.consumption_amount))
+
+    // 🔒 步骤7：创建消费记录（Step 7: Create Consumption Record - Within Transaction）
+    const consumptionRecord = await ConsumptionRecord.create(
+      {
+        user_id: userId,
+        merchant_id: data.merchant_id,
+        consumption_amount: data.consumption_amount,
+        points_to_award: pointsToAward,
+        status: 'pending', // 待审核状态（Pending Status - Waiting for Admin Review）
+        qr_code: data.qr_code,
+        idempotency_key, // ✅ 幂等键（业界标准形态）
+        merchant_notes: data.merchant_notes || null,
+        created_at: BeijingTimeHelper.createDatabaseTime(),
+        updated_at: BeijingTimeHelper.createDatabaseTime()
+      },
+      { transaction }
+    ) // ✅ 在事务中创建
+
+    logger.info(
+      `✅ 消费记录创建成功 (ID: ${consumptionRecord.record_id}, idempotency_key: ${idempotency_key})`
+    )
+
+    /*
+     * ✅ 方案C：不再创建 pending 积分交易
+     * 待审核积分直接从 consumption_records.status='pending' 展示
+     * 审核通过后直接调用 AssetService.changeBalance 发放积分
+     */
+    logger.info(`✅ 消费记录创建成功，预计奖励${pointsToAward}分（审核通过后发放）`)
+
+    // 🔒 步骤9：创建审核记录（Step 9: Create Review Record - Within Transaction）
+    await ContentReviewRecord.create(
+      {
+        auditable_type: 'consumption',
+        auditable_id: consumptionRecord.record_id,
+        audit_status: 'pending', // 待审核状态（Pending Status - Waiting for Admin Review）
+        auditor_id: null, // 审核员ID（暂无，Auditor ID - None Yet）
+        audit_reason: null, // 审核原因（暂无，Audit Reason - None Yet）
+        submitted_at: BeijingTimeHelper.createDatabaseTime(),
+        created_at: BeijingTimeHelper.createDatabaseTime(),
+        updated_at: BeijingTimeHelper.createDatabaseTime()
+      },
+      { transaction }
+    ) // ✅ 在事务中创建
+
+    logger.info('✅ 审核记录创建成功')
+
+    // 事务由入口层统一管理，此处不提交
+    logger.info('🎉 消费记录处理完成，等待入口层提交事务')
+
+    logger.info(
+      `✅ 消费记录完整创建: record_id=${consumptionRecord.record_id}, user_id=${userId}, amount=${data.consumption_amount}元, pending_points=${pointsToAward}分`
+    )
+
+    return consumptionRecord
   }
 
   /**
@@ -351,174 +334,162 @@ class ConsumptionService {
    * @param {string} reviewData.admin_notes - 审核备注（可选）
    * @returns {Object} 审核结果
    */
-  static async approveConsumption (recordId, reviewData) {
-    // 使用数据库事务确保数据一致性
-    const sequelize = ConsumptionRecord.sequelize
-    const transaction = await sequelize.transaction({
-      isolationLevel: Transaction.ISOLATION_LEVELS.READ_COMMITTED
+  static async approveConsumption (recordId, reviewData, options = {}) {
+    // 强制要求事务边界 - 2026-01-05 治理决策
+    const transaction = assertAndGetTransaction(options, 'ConsumptionService.approveConsumption')
+
+    // 1. 查询消费记录（加锁防止并发）
+    const record = await ConsumptionRecord.findByPk(recordId, {
+      transaction,
+      lock: transaction.LOCK.UPDATE
     })
 
-    try {
-      // 1. 查询消费记录（加锁防止并发）
-      const record = await ConsumptionRecord.findByPk(recordId, {
-        transaction,
-        lock: transaction.LOCK.UPDATE
-      })
+    if (!record) {
+      throw new Error(`消费记录不存在（ID: ${recordId}）`)
+    }
 
-      if (!record) {
-        throw new Error(`消费记录不存在（ID: ${recordId}）`)
-      }
+    // 2. 检查是否可以审核
+    const canReview = record.canBeReviewed()
+    if (!canReview.can_review) {
+      throw new Error(`不能审核：${canReview.reasons.join('；')}`)
+    }
 
-      // 2. 检查是否可以审核
-      const canReview = record.canBeReviewed()
-      if (!canReview.can_review) {
-        throw new Error(`不能审核：${canReview.reasons.join('；')}`)
-      }
+    // 3. 更新消费记录状态
+    await record.update(
+      {
+        status: 'approved',
+        reviewed_by: reviewData.reviewer_id,
+        reviewed_at: BeijingTimeHelper.createDatabaseTime(),
+        admin_notes: reviewData.admin_notes || null,
+        updated_at: BeijingTimeHelper.createDatabaseTime()
+      },
+      { transaction }
+    )
 
-      // 3. 更新消费记录状态
-      await record.update(
-        {
-          status: 'approved',
-          reviewed_by: reviewData.reviewer_id,
-          reviewed_at: BeijingTimeHelper.createDatabaseTime(),
-          admin_notes: reviewData.admin_notes || null,
-          updated_at: BeijingTimeHelper.createDatabaseTime()
+    // 4. 更新审核记录表
+    await ContentReviewRecord.update(
+      {
+        audit_status: 'approved',
+        auditor_id: reviewData.reviewer_id,
+        audit_reason: reviewData.admin_notes || '审核通过',
+        updated_at: BeijingTimeHelper.createDatabaseTime()
+      },
+      {
+        where: {
+          auditable_type: 'consumption',
+          auditable_id: recordId
         },
-        { transaction }
-      )
+        transaction
+      }
+    )
 
-      // 4. 更新审核记录表
-      await ContentReviewRecord.update(
-        {
-          audit_status: 'approved',
-          auditor_id: reviewData.reviewer_id,
-          audit_reason: reviewData.admin_notes || '审核通过',
-          updated_at: BeijingTimeHelper.createDatabaseTime()
-        },
-        {
-          where: {
-            auditable_type: 'consumption',
-            auditable_id: recordId
-          },
-          transaction
+    /*
+     * 5. ✅ 方案C：审核通过时直接发放积分（使用 AssetService）
+     * 幂等键命名规则：<business_type>:<action>:<entity_id>
+     */
+    const pointsResult = await AssetService.changeBalance(
+      {
+        user_id: record.user_id,
+        asset_code: 'POINTS',
+        delta_amount: record.points_to_award,
+        business_type: 'consumption_reward',
+        idempotency_key: `consumption_reward:approve:${recordId}`,
+        meta: {
+          reference_type: 'consumption',
+          reference_id: recordId,
+          title: `消费奖励${record.points_to_award}分`,
+          description: `【审核通过】消费${record.consumption_amount}元，奖励${record.points_to_award}积分`,
+          operator_id: reviewData.reviewer_id
         }
-      )
+      },
+      { transaction }
+    )
 
+    logger.info(
+      `✅ 积分发放成功: user_id=${record.user_id}, 积分=${record.points_to_award}, 幂等=${pointsResult.is_duplicate ? '重复' : '新增'}`
+    )
+
+    /*
+     * ========== 双账户模型：预算分配逻辑 ==========
+     * 业务规则：
+     * - 平台抽成10%用于奖品预算
+     * - 抽成的80%作为预算积分
+     * - 价值系数为3（1元预算 = 3预算积分）
+     * 计算公式：budget_points = consumption_amount × 系数（动态配置，默认0.24）
+     *
+     * 🔥 BUDGET_POINTS 架构（2026-01-03）：
+     * - 发放预算时必须指定 campaign_id（活动隔离规则）
+     * - 消费产生的预算使用 'CONSUMPTION_DEFAULT' 作为默认来源活动
+     * - 后续抽奖时，根据活动的 allowed_campaign_ids 配置决定是否可用
+     */
+    // 动态读取预算系数
+    const budgetRatio = await ConsumptionService.getBudgetRatio()
+    const budgetPointsToAllocate = Math.round(record.consumption_amount * budgetRatio)
+
+    logger.info(
+      `💰 预算分配: 消费${record.consumption_amount}元 × ${budgetRatio} = ${budgetPointsToAllocate}积分`
+    )
+
+    if (budgetPointsToAllocate > 0) {
       /*
-       * 5. ✅ 方案C：审核通过时直接发放积分（使用 AssetService）
-       * 幂等键命名规则：<business_type>:<action>:<entity_id>
+       * ✅ 使用 AssetService 分配预算积分
+       * asset_code: BUDGET_POINTS（预算积分）
+       * campaign_id: 'CONSUMPTION_DEFAULT' - 消费产生的预算来源标识
+       *
+       * 🔥 BUDGET_POINTS 必须指定 campaign_id（活动隔离规则）
        */
-      const pointsResult = await AssetService.changeBalance(
+      const budgetResult = await AssetService.changeBalance(
         {
           user_id: record.user_id,
-          asset_code: 'POINTS',
-          delta_amount: record.points_to_award,
-          business_type: 'consumption_reward',
-          idempotency_key: `consumption_reward:approve:${recordId}`,
+          asset_code: 'BUDGET_POINTS',
+          delta_amount: budgetPointsToAllocate,
+          business_type: 'consumption_budget_allocation',
+          idempotency_key: `consumption_budget:approve:${recordId}`,
+          campaign_id: 'CONSUMPTION_DEFAULT', // 🔥 消费产生的预算来源活动标识
           meta: {
             reference_type: 'consumption',
             reference_id: recordId,
-            title: `消费奖励${record.points_to_award}分`,
-            description: `【审核通过】消费${record.consumption_amount}元，奖励${record.points_to_award}积分`,
-            operator_id: reviewData.reviewer_id
+            consumption_amount: record.consumption_amount,
+            budget_ratio: budgetRatio,
+            description: `消费${record.consumption_amount}元，分配预算积分${budgetPointsToAllocate}`
           }
         },
         { transaction }
       )
 
       logger.info(
-        `✅ 积分发放成功: user_id=${record.user_id}, 积分=${record.points_to_award}, 幂等=${pointsResult.is_duplicate ? '重复' : '新增'}`
+        `💰 预算分配成功: user_id=${record.user_id}, 预算积分=${budgetPointsToAllocate}, campaign_id=CONSUMPTION_DEFAULT, 幂等=${budgetResult.is_duplicate ? '重复' : '新增'}`
       )
+    }
 
-      /*
-       * ========== 双账户模型：预算分配逻辑 ==========
-       * 业务规则：
-       * - 平台抽成10%用于奖品预算
-       * - 抽成的80%作为预算积分
-       * - 价值系数为3（1元预算 = 3预算积分）
-       * 计算公式：budget_points = consumption_amount × 系数（动态配置，默认0.24）
-       *
-       * 🔥 BUDGET_POINTS 架构（2026-01-03）：
-       * - 发放预算时必须指定 campaign_id（活动隔离规则）
-       * - 消费产生的预算使用 'CONSUMPTION_DEFAULT' 作为默认来源活动
-       * - 后续抽奖时，根据活动的 allowed_campaign_ids 配置决定是否可用
-       */
-      // 动态读取预算系数
-      const budgetRatio = await ConsumptionService.getBudgetRatio()
-      const budgetPointsToAllocate = Math.round(record.consumption_amount * budgetRatio)
+    // 📝 记录审计日志（异步，失败不影响业务）
+    // 注意：事务由入口层管理，审计日志在事务提交前调用
+    try {
+      await AuditLogService.logConsumptionAudit({
+        operator_id: reviewData.reviewer_id,
+        consumption_id: recordId,
+        action: 'approve',
+        before_status: 'pending',
+        after_status: 'approved',
+        points_amount: record.points_to_award,
+        reason: reviewData.admin_notes || '审核通过',
+        idempotency_key: `consumption_${recordId}`,
+        transaction: null // 审计日志独立于业务事务
+      })
+    } catch (auditError) {
+      logger.error('[ConsumptionService] 审计日志记录失败:', auditError.message)
+    }
 
-      logger.info(
-        `💰 预算分配: 消费${record.consumption_amount}元 × ${budgetRatio} = ${budgetPointsToAllocate}积分`
-      )
+    logger.info(
+      `✅ 消费记录审核通过: record_id=${recordId}, 奖励积分=${record.points_to_award}, 预算积分=${budgetPointsToAllocate}`
+    )
 
-      if (budgetPointsToAllocate > 0) {
-        /*
-         * ✅ 使用 AssetService 分配预算积分
-         * asset_code: BUDGET_POINTS（预算积分）
-         * campaign_id: 'CONSUMPTION_DEFAULT' - 消费产生的预算来源标识
-         *
-         * 🔥 BUDGET_POINTS 必须指定 campaign_id（活动隔离规则）
-         */
-        const budgetResult = await AssetService.changeBalance(
-          {
-            user_id: record.user_id,
-            asset_code: 'BUDGET_POINTS',
-            delta_amount: budgetPointsToAllocate,
-            business_type: 'consumption_budget_allocation',
-            idempotency_key: `consumption_budget:approve:${recordId}`,
-            campaign_id: 'CONSUMPTION_DEFAULT', // 🔥 消费产生的预算来源活动标识
-            meta: {
-              reference_type: 'consumption',
-              reference_id: recordId,
-              consumption_amount: record.consumption_amount,
-              budget_ratio: budgetRatio,
-              description: `消费${record.consumption_amount}元，分配预算积分${budgetPointsToAllocate}`
-            }
-          },
-          { transaction }
-        )
-
-        logger.info(
-          `💰 预算分配成功: user_id=${record.user_id}, 预算积分=${budgetPointsToAllocate}, campaign_id=CONSUMPTION_DEFAULT, 幂等=${budgetResult.is_duplicate ? '重复' : '新增'}`
-        )
-      }
-
-      // 6. 提交事务
-      await transaction.commit()
-
-      // 📝 记录审计日志（异步，失败不影响业务）
-      try {
-        await AuditLogService.logConsumptionAudit({
-          operator_id: reviewData.reviewer_id,
-          consumption_id: recordId,
-          action: 'approve',
-          before_status: 'pending',
-          after_status: 'approved',
-          points_amount: record.points_to_award,
-          reason: reviewData.admin_notes || '审核通过',
-          idempotency_key: `consumption_${recordId}`,
-          transaction: null // 事务已提交，不传transaction
-        })
-      } catch (auditError) {
-        logger.error('[ConsumptionService] 审计日志记录失败:', auditError.message)
-      }
-
-      logger.info(
-        `✅ 消费记录审核通过: record_id=${recordId}, 奖励积分=${record.points_to_award}, 预算积分=${budgetPointsToAllocate}`
-      )
-
-      return {
-        consumption_record: record,
-        points_transaction: pointsResult.transaction,
-        points_awarded: record.points_to_award,
-        budget_points_allocated: budgetPointsToAllocate,
-        new_balance: pointsResult.new_balance
-      }
-    } catch (error) {
-      // 回滚事务
-      await transaction.rollback()
-      logger.error('❌ 审核通过失败:', error.message)
-      throw error
+    return {
+      consumption_record: record,
+      points_transaction: pointsResult.transaction,
+      points_awarded: record.points_to_award,
+      budget_points_allocated: budgetPointsToAllocate,
+      new_balance: pointsResult.new_balance
     }
   }
 
@@ -529,112 +500,87 @@ class ConsumptionService {
    * @param {Object} reviewData - 审核数据
    * @param {number} reviewData.reviewer_id - 审核员ID
    * @param {string} reviewData.admin_notes - 拒绝原因（必填）
+   * @param {Object} options - 选项
+   * @param {Object} options.transaction - Sequelize事务对象（必填）
    * @returns {Object} 审核结果
    */
-  static async rejectConsumption (recordId, reviewData) {
-    // 使用数据库事务
-    const sequelize = ConsumptionRecord.sequelize
-    const transaction = await sequelize.transaction()
+  static async rejectConsumption (recordId, reviewData, options = {}) {
+    // 强制要求事务边界 - 2026-01-05 治理决策
+    const transaction = assertAndGetTransaction(options, 'ConsumptionService.rejectConsumption')
 
+    // 1. 验证拒绝原因
+    if (!reviewData.admin_notes) {
+      throw new Error('拒绝原因不能为空')
+    }
+
+    // 2. 查询消费记录
+    const record = await ConsumptionRecord.findByPk(recordId, {
+      transaction,
+      lock: transaction.LOCK.UPDATE
+    })
+
+    if (!record) {
+      throw new Error(`消费记录不存在（ID: ${recordId}）`)
+    }
+
+    // 3. 检查是否可以审核
+    const canReview = record.canBeReviewed()
+    if (!canReview.can_review) {
+      throw new Error(`不能审核：${canReview.reasons.join('；')}`)
+    }
+
+    // 4. 更新消费记录状态
+    await record.update(
+      {
+        status: 'rejected',
+        reviewed_by: reviewData.reviewer_id,
+        reviewed_at: BeijingTimeHelper.createDatabaseTime(),
+        admin_notes: reviewData.admin_notes,
+        updated_at: BeijingTimeHelper.createDatabaseTime()
+      },
+      { transaction }
+    )
+
+    // 5. 更新审核记录表
+    await ContentReviewRecord.update(
+      {
+        audit_status: 'rejected',
+        auditor_id: reviewData.reviewer_id,
+        audit_reason: reviewData.admin_notes,
+        updated_at: BeijingTimeHelper.createDatabaseTime()
+      },
+      {
+        where: {
+          auditable_type: 'consumption',
+          auditable_id: recordId
+        },
+        transaction
+      }
+    )
+
+    // 📝 记录审计日志（异步，失败不影响业务）
+    // 注意：事务由入口层管理，审计日志在事务提交前调用
     try {
-      // 1. 验证拒绝原因
-      if (!reviewData.admin_notes) {
-        throw new Error('拒绝原因不能为空')
-      }
-
-      // 2. 查询消费记录
-      const record = await ConsumptionRecord.findByPk(recordId, {
-        transaction,
-        lock: transaction.LOCK.UPDATE
+      await AuditLogService.logConsumptionAudit({
+        operator_id: reviewData.reviewer_id,
+        consumption_id: recordId,
+        action: 'reject',
+        before_status: 'pending',
+        after_status: 'rejected',
+        points_amount: 0,
+        reason: reviewData.admin_notes,
+        idempotency_key: `consumption_${recordId}`,
+        transaction: null // 审计日志独立于业务事务
       })
+    } catch (auditError) {
+      logger.error('[ConsumptionService] 审计日志记录失败:', auditError.message)
+    }
 
-      if (!record) {
-        throw new Error(`消费记录不存在（ID: ${recordId}）`)
-      }
+    logger.info(`✅ 消费记录审核拒绝: record_id=${recordId}, 原因=${reviewData.admin_notes}`)
 
-      // 3. 检查是否可以审核
-      const canReview = record.canBeReviewed()
-      if (!canReview.can_review) {
-        throw new Error(`不能审核：${canReview.reasons.join('；')}`)
-      }
-
-      // 4. 更新消费记录状态
-      await record.update(
-        {
-          status: 'rejected',
-          reviewed_by: reviewData.reviewer_id,
-          reviewed_at: BeijingTimeHelper.createDatabaseTime(),
-          admin_notes: reviewData.admin_notes,
-          updated_at: BeijingTimeHelper.createDatabaseTime()
-        },
-        { transaction }
-      )
-
-      // 5. 更新审核记录表
-      await ContentReviewRecord.update(
-        {
-          audit_status: 'rejected',
-          auditor_id: reviewData.reviewer_id,
-          audit_reason: reviewData.admin_notes,
-          updated_at: BeijingTimeHelper.createDatabaseTime()
-        },
-        {
-          where: {
-            auditable_type: 'consumption',
-            auditable_id: recordId
-          },
-          transaction
-        }
-      )
-
-      // 6. 提交事务
-      await transaction.commit()
-
-      // 📝 记录审计日志（异步，失败不影响业务）
-      try {
-        await AuditLogService.logConsumptionAudit({
-          operator_id: reviewData.reviewer_id,
-          consumption_id: recordId,
-          action: 'reject',
-          before_status: 'pending',
-          after_status: 'rejected',
-          points_amount: 0,
-          reason: reviewData.admin_notes,
-          idempotency_key: `consumption_${recordId}`,
-          transaction: null // 事务已提交，不传transaction
-        })
-      } catch (auditError) {
-        logger.error('[ConsumptionService] 审计日志记录失败:', auditError.message)
-      }
-
-      logger.info(`✅ 消费记录审核拒绝: record_id=${recordId}, 原因=${reviewData.admin_notes}`)
-
-      return {
-        consumption_record: record,
-        reject_reason: reviewData.admin_notes
-      }
-    } catch (error) {
-      // ⭐ P0优化：完善事务回滚异常处理
-      try {
-        await transaction.rollback()
-        logger.info('🔄 事务已回滚')
-      } catch (rollbackError) {
-        // ❌ 严重错误：事务回滚失败意味着数据可能不一致
-        logger.error('❌❌❌ 严重错误：事务回滚失败（数据可能不一致）', {
-          recordId,
-          originalError: error.message, // 原始业务错误
-          rollbackError: rollbackError.message, // 回滚失败错误
-          timestamp: BeijingTimeHelper.createDatabaseTime(),
-          severity: 'CRITICAL' // 严重级别
-        })
-
-        // 将回滚错误附加到原始错误中
-        error.rollbackFailed = true
-        error.rollbackError = rollbackError.message
-      }
-
-      logger.error('❌ 审核拒绝失败:', error.message)
-      throw error
+    return {
+      consumption_record: record,
+      reject_reason: reviewData.admin_notes
     }
   }
 

@@ -29,6 +29,7 @@ const { MerchantPointsReview, User, sequelize } = require('../models')
 const AssetService = require('./AssetService')
 const logger = require('../utils/logger')
 const { Op } = require('sequelize')
+const { assertAndGetTransaction } = require('../utils/transactionHelpers')
 
 /**
  * 商家审核服务类
@@ -56,7 +57,6 @@ class MerchantReviewService {
    */
   static async submitReview (params, options = {}) {
     const { user_id, merchant_id, points_amount, qr_code_data, metadata = {} } = params
-    const { transaction: externalTransaction } = options
 
     // 参数验证
     if (!user_id) {
@@ -69,98 +69,80 @@ class MerchantReviewService {
       throw new Error('points_amount 必须大于 0')
     }
 
-    // 支持外部事务传入
-    const transaction = externalTransaction || (await sequelize.transaction())
-    const shouldCommit = !externalTransaction
+    // 强制要求事务边界 - 2026-01-05 治理决策
+    const transaction = assertAndGetTransaction(options, 'MerchantReviewService.submitReview')
 
-    try {
-      // 1. 验证用户存在
-      const user = await User.findByPk(user_id, { transaction })
-      if (!user) {
-        throw new Error(`用户不存在: user_id=${user_id}`)
-      }
+    // 1. 验证用户存在
+    const user = await User.findByPk(user_id, { transaction })
+    if (!user) {
+      throw new Error(`用户不存在: user_id=${user_id}`)
+    }
 
-      // 2. 验证商家存在
-      const merchant = await User.findByPk(merchant_id, { transaction })
-      if (!merchant) {
-        throw new Error(`商家不存在: merchant_id=${merchant_id}`)
-      }
+    // 2. 验证商家存在
+    const merchant = await User.findByPk(merchant_id, { transaction })
+    if (!merchant) {
+      throw new Error(`商家不存在: merchant_id=${merchant_id}`)
+    }
 
-      // 3. 生成审核单ID和幂等键
-      const review_id = MerchantPointsReview.generateReviewId()
-      const idempotency_key = MerchantPointsReview.generateIdempotencyKey(
-        user_id,
-        merchant_id,
-        points_amount
-      )
+    // 3. 生成审核单ID和幂等键
+    const review_id = MerchantPointsReview.generateReviewId()
+    const idempotency_key = MerchantPointsReview.generateIdempotencyKey(
+      user_id,
+      merchant_id,
+      points_amount
+    )
 
-      // 4. 创建审核单（pending 状态）
-      const review = await MerchantPointsReview.create(
-        {
-          review_id,
-          user_id,
-          merchant_id,
-          points_amount,
-          status: 'pending',
-          expires_at: MerchantPointsReview.calculateExpiresAt(),
-          idempotency_key,
-          qr_code_data,
-          metadata: {
-            ...metadata,
-            submit_time: new Date().toISOString(),
-            merchant_name: merchant.nickname || merchant.mobile
-          }
-        },
-        { transaction }
-      )
-
-      // 5. 冻结用户积分（归属约束：review_id）
-      const freeze_idempotency_key = MerchantPointsReview.generateFreezeIdempotencyKey(review_id)
-
-      const freeze_result = await AssetService.freeze(
-        {
-          user_id,
-          asset_code: 'POINTS',
-          amount: points_amount,
-          business_type: 'merchant_review_freeze',
-          idempotency_key: freeze_idempotency_key,
-          meta: {
-            review_id,
-            merchant_id,
-            freeze_reason: '商家扫码审核冻结'
-          }
-        },
-        { transaction }
-      )
-
-      logger.info('✅ 商家审核提交成功', {
+    // 4. 创建审核单（pending 状态）
+    const review = await MerchantPointsReview.create(
+      {
         review_id,
         user_id,
         merchant_id,
         points_amount,
-        expires_at: review.expires_at
-      })
+        status: 'pending',
+        expires_at: MerchantPointsReview.calculateExpiresAt(),
+        idempotency_key,
+        qr_code_data,
+        metadata: {
+          ...metadata,
+          submit_time: new Date().toISOString(),
+          merchant_name: merchant.nickname || merchant.mobile
+        }
+      },
+      { transaction }
+    )
 
-      if (shouldCommit) {
-        await transaction.commit()
-      }
+    // 5. 冻结用户积分（归属约束：review_id）
+    const freeze_idempotency_key = MerchantPointsReview.generateFreezeIdempotencyKey(review_id)
 
-      return {
-        review,
-        freeze_result,
-        is_duplicate: false
-      }
-    } catch (error) {
-      if (shouldCommit) {
-        await transaction.rollback()
-      }
-      logger.error('❌ 商家审核提交失败', {
+    const freeze_result = await AssetService.freeze(
+      {
         user_id,
-        merchant_id,
-        points_amount,
-        error: error.message
-      })
-      throw error
+        asset_code: 'POINTS',
+        amount: points_amount,
+        business_type: 'merchant_review_freeze',
+        idempotency_key: freeze_idempotency_key,
+        meta: {
+          review_id,
+          merchant_id,
+          freeze_reason: '商家扫码审核冻结'
+        }
+      },
+      { transaction }
+    )
+
+    logger.info('✅ 商家审核提交成功', {
+      review_id,
+      user_id,
+      merchant_id,
+      points_amount,
+      expires_at: review.expires_at
+    })
+
+    return {
+      review,
+      freeze_result,
+      is_duplicate: false
     }
   }
 
@@ -180,92 +162,76 @@ class MerchantReviewService {
    */
   static async approveReview (params, options = {}) {
     const { review_id, operator_user_id } = params
-    const { transaction: externalTransaction } = options
 
     if (!review_id) {
       throw new Error('review_id 是必填参数')
     }
 
-    const transaction = externalTransaction || (await sequelize.transaction())
-    const shouldCommit = !externalTransaction
+    // 强制要求事务边界 - 2026-01-05 治理决策
+    const transaction = assertAndGetTransaction(options, 'MerchantReviewService.approveReview')
 
-    try {
-      // 1. 获取审核单（加锁）
-      const review = await MerchantPointsReview.findByPk(review_id, {
-        lock: transaction.LOCK.UPDATE,
-        transaction
-      })
+    // 1. 获取审核单（加锁）
+    const review = await MerchantPointsReview.findByPk(review_id, {
+      lock: transaction.LOCK.UPDATE,
+      transaction
+    })
 
-      if (!review) {
-        throw new Error(`审核单不存在: review_id=${review_id}`)
+    if (!review) {
+      throw new Error(`审核单不存在: review_id=${review_id}`)
+    }
+
+    // 2. 检查状态
+    if (!review.canApprove()) {
+      if (review.isExpired()) {
+        throw new Error(`审核单已超时，无法通过: review_id=${review_id}`)
       }
+      throw new Error(`审核单状态不允许通过: status=${review.status}`)
+    }
 
-      // 2. 检查状态
-      if (!review.canApprove()) {
-        if (review.isExpired()) {
-          throw new Error(`审核单已超时，无法通过: review_id=${review_id}`)
-        }
-        throw new Error(`审核单状态不允许通过: status=${review.status}`)
-      }
+    // 3. 从冻结结算（真正扣款）
+    const settle_idempotency_key = MerchantPointsReview.generateSettleIdempotencyKey(review_id)
 
-      // 3. 从冻结结算（真正扣款）
-      const settle_idempotency_key = MerchantPointsReview.generateSettleIdempotencyKey(review_id)
-
-      const settle_result = await AssetService.settleFromFrozen(
-        {
-          user_id: review.user_id,
-          asset_code: 'POINTS',
-          amount: review.points_amount,
-          business_type: 'merchant_review_settle',
-          idempotency_key: settle_idempotency_key,
-          meta: {
-            review_id,
-            merchant_id: review.merchant_id,
-            settle_reason: '审核通过结算',
-            operator_user_id
-          }
-        },
-        { transaction }
-      )
-
-      // 4. 更新审核单状态
-      await review.update(
-        {
-          status: 'approved',
-          metadata: {
-            ...review.metadata,
-            approve_time: new Date().toISOString(),
-            operator_user_id
-          }
-        },
-        { transaction }
-      )
-
-      logger.info('✅ 商家审核通过', {
-        review_id,
+    const settle_result = await AssetService.settleFromFrozen(
+      {
         user_id: review.user_id,
-        merchant_id: review.merchant_id,
-        points_amount: review.points_amount,
-        operator_user_id
-      })
+        asset_code: 'POINTS',
+        amount: review.points_amount,
+        business_type: 'merchant_review_settle',
+        idempotency_key: settle_idempotency_key,
+        meta: {
+          review_id,
+          merchant_id: review.merchant_id,
+          settle_reason: '审核通过结算',
+          operator_user_id
+        }
+      },
+      { transaction }
+    )
 
-      if (shouldCommit) {
-        await transaction.commit()
-      }
+    // 4. 更新审核单状态
+    await review.update(
+      {
+        status: 'approved',
+        metadata: {
+          ...review.metadata,
+          approve_time: new Date().toISOString(),
+          operator_user_id
+        }
+      },
+      { transaction }
+    )
 
-      return {
-        review,
-        settle_result
-      }
-    } catch (error) {
-      if (shouldCommit) {
-        await transaction.rollback()
-      }
-      logger.error('❌ 商家审核通过失败', {
-        review_id,
-        error: error.message
-      })
-      throw error
+    logger.info('✅ 商家审核通过', {
+      review_id,
+      user_id: review.user_id,
+      merchant_id: review.merchant_id,
+      points_amount: review.points_amount,
+      operator_user_id
+    })
+
+    return {
+      review,
+      settle_result
     }
   }
 
@@ -284,71 +250,55 @@ class MerchantReviewService {
    */
   static async rejectReview (params, options = {}) {
     const { review_id, reject_reason, operator_user_id } = params
-    const { transaction: externalTransaction } = options
 
     if (!review_id) {
       throw new Error('review_id 是必填参数')
     }
 
-    const transaction = externalTransaction || (await sequelize.transaction())
-    const shouldCommit = !externalTransaction
+    // 强制要求事务边界 - 2026-01-05 治理决策
+    const transaction = assertAndGetTransaction(options, 'MerchantReviewService.rejectReview')
 
-    try {
-      // 1. 获取审核单（加锁）
-      const review = await MerchantPointsReview.findByPk(review_id, {
-        lock: transaction.LOCK.UPDATE,
-        transaction
-      })
+    // 1. 获取审核单（加锁）
+    const review = await MerchantPointsReview.findByPk(review_id, {
+      lock: transaction.LOCK.UPDATE,
+      transaction
+    })
 
-      if (!review) {
-        throw new Error(`审核单不存在: review_id=${review_id}`)
-      }
+    if (!review) {
+      throw new Error(`审核单不存在: review_id=${review_id}`)
+    }
 
-      // 2. 检查状态
-      if (!review.canReject()) {
-        throw new Error(`审核单状态不允许拒绝: status=${review.status}`)
-      }
+    // 2. 检查状态
+    if (!review.canReject()) {
+      throw new Error(`审核单状态不允许拒绝: status=${review.status}`)
+    }
 
-      // 3. 拍板决策：积分不退回（仍冻结），只更新审核单状态
-      await review.update(
-        {
-          status: 'rejected',
-          metadata: {
-            ...review.metadata,
-            reject_time: new Date().toISOString(),
-            reject_reason,
-            operator_user_id
-          }
-        },
-        { transaction }
-      )
+    // 3. 拍板决策：积分不退回（仍冻结），只更新审核单状态
+    await review.update(
+      {
+        status: 'rejected',
+        metadata: {
+          ...review.metadata,
+          reject_time: new Date().toISOString(),
+          reject_reason,
+          operator_user_id
+        }
+      },
+      { transaction }
+    )
 
-      // 4. 记录警告日志（需客服处理）
-      logger.warn('⚠️ 审核拒绝，积分仍冻结（需客服处理）', {
-        review_id,
-        user_id: review.user_id,
-        frozen_points: review.points_amount,
-        reject_reason,
-        operator_user_id
-      })
+    // 4. 记录警告日志（需客服处理）
+    logger.warn('⚠️ 审核拒绝，积分仍冻结（需客服处理）', {
+      review_id,
+      user_id: review.user_id,
+      frozen_points: review.points_amount,
+      reject_reason,
+      operator_user_id
+    })
 
-      if (shouldCommit) {
-        await transaction.commit()
-      }
-
-      return {
-        review,
-        frozen_points: review.points_amount
-      }
-    } catch (error) {
-      if (shouldCommit) {
-        await transaction.rollback()
-      }
-      logger.error('❌ 商家审核拒绝失败', {
-        review_id,
-        error: error.message
-      })
-      throw error
+    return {
+      review,
+      frozen_points: review.points_amount
     }
   }
 
@@ -357,75 +307,69 @@ class MerchantReviewService {
    *
    * 拍板决策：仅推进状态到 expired 并告警，不自动解冻
    *
+   * @param {Object} options - 选项
+   * @param {Object} options.transaction - Sequelize事务对象（必填）
    * @returns {Promise<Object>} { timeout_count, reviews, action }
    */
-  static async alertTimeoutReviews () {
-    const transaction = await sequelize.transaction()
+  static async alertTimeoutReviews (options = {}) {
+    // 强制要求事务边界 - 2026-01-05 治理决策
+    const transaction = assertAndGetTransaction(options, 'MerchantReviewService.alertTimeoutReviews')
 
-    try {
-      // 1. 查找超时的审核单
-      const timeoutReviews = await MerchantPointsReview.findAll({
-        where: {
-          status: 'pending',
-          expires_at: { [Op.lt]: new Date() }
-        },
-        transaction
-      })
+    // 1. 查找超时的审核单
+    const timeoutReviews = await MerchantPointsReview.findAll({
+      where: {
+        status: 'pending',
+        expires_at: { [Op.lt]: new Date() }
+      },
+      transaction
+    })
 
-      if (timeoutReviews.length === 0) {
-        await transaction.commit()
-        return {
-          timeout_count: 0,
-          reviews: [],
-          action: 'no_timeout_reviews'
-        }
-      }
-
-      // 2. 推进状态到 expired（不解冻）
-      const processedReviews = []
-
-      for (const review of timeoutReviews) {
-        // eslint-disable-next-line no-await-in-loop
-        await review.update(
-          {
-            status: 'expired',
-            metadata: {
-              ...review.metadata,
-              expire_time: new Date().toISOString(),
-              expire_reason: '审核超时未处理'
-            }
-          },
-          { transaction }
-        )
-
-        processedReviews.push({
-          review_id: review.review_id,
-          user_id: review.user_id,
-          merchant_id: review.merchant_id,
-          points_amount: review.points_amount,
-          created_at: review.created_at,
-          expires_at: review.expires_at
-        })
-      }
-
-      await transaction.commit()
-
-      // 3. 发送告警日志（可扩展：企业微信/钉钉告警）
-      logger.error('🚨 检测到超时审核单（积分仍冻结，需客服处理）', {
-        timeout_count: processedReviews.length,
-        review_ids: processedReviews.map(r => r.review_id),
-        total_frozen_points: processedReviews.reduce((sum, r) => sum + Number(r.points_amount), 0)
-      })
-
+    if (timeoutReviews.length === 0) {
       return {
-        timeout_count: processedReviews.length,
-        reviews: processedReviews,
-        action: 'alert_only_no_unfreeze'
+        timeout_count: 0,
+        reviews: [],
+        action: 'no_timeout_reviews'
       }
-    } catch (error) {
-      await transaction.rollback()
-      logger.error('❌ 超时审核扫描失败', { error: error.message })
-      throw error
+    }
+
+    // 2. 推进状态到 expired（不解冻）
+    const processedReviews = []
+
+    for (const review of timeoutReviews) {
+      // eslint-disable-next-line no-await-in-loop
+      await review.update(
+        {
+          status: 'expired',
+          metadata: {
+            ...review.metadata,
+            expire_time: new Date().toISOString(),
+            expire_reason: '审核超时未处理'
+          }
+        },
+        { transaction }
+      )
+
+      processedReviews.push({
+        review_id: review.review_id,
+        user_id: review.user_id,
+        merchant_id: review.merchant_id,
+        points_amount: review.points_amount,
+        created_at: review.created_at,
+        expires_at: review.expires_at
+      })
+    }
+
+    // 3. 发送告警日志（可扩展：企业微信/钉钉告警）
+    logger.error('🚨 检测到超时审核单（积分仍冻结，需客服处理）', {
+      timeout_count: processedReviews.length,
+      review_ids: processedReviews.map(r => r.review_id),
+      total_frozen_points: processedReviews.reduce((sum, r) => sum + Number(r.points_amount), 0)
+    })
+
+    return {
+      timeout_count: processedReviews.length,
+      reviews: processedReviews,
+      action: 'alert_only_no_unfreeze'
     }
   }
 
@@ -440,12 +384,11 @@ class MerchantReviewService {
    * @param {number} params.admin_user_id - 客服用户ID
    * @param {string} params.handle_reason - 处理原因
    * @param {Object} options - 选项
-   * @param {Object} options.transaction - Sequelize事务对象
+   * @param {Object} options.transaction - Sequelize事务对象（必填）
    * @returns {Promise<Object>} { review, action, result }
    */
   static async adminHandleFrozenReview (params, options = {}) {
     const { review_id, action, admin_user_id, handle_reason } = params
-    const { transaction: externalTransaction } = options
 
     if (!review_id) {
       throw new Error('review_id 是必填参数')
@@ -457,121 +400,104 @@ class MerchantReviewService {
       throw new Error('admin_user_id 是必填参数')
     }
 
-    const transaction = externalTransaction || (await sequelize.transaction())
-    const shouldCommit = !externalTransaction
+    // 强制要求事务边界 - 2026-01-05 治理决策
+    const transaction = assertAndGetTransaction(options, 'MerchantReviewService.adminHandleFrozenReview')
 
-    try {
-      // 1. 获取审核单
-      const review = await MerchantPointsReview.findByPk(review_id, {
-        lock: transaction.LOCK.UPDATE,
-        transaction
-      })
+    // 1. 获取审核单
+    const review = await MerchantPointsReview.findByPk(review_id, {
+      lock: transaction.LOCK.UPDATE,
+      transaction
+    })
 
-      if (!review) {
-        throw new Error(`审核单不存在: review_id=${review_id}`)
-      }
+    if (!review) {
+      throw new Error(`审核单不存在: review_id=${review_id}`)
+    }
 
-      // 2. 检查状态：只能处理 rejected/expired 状态的审核单
-      if (!review.needsAdminHandle()) {
-        throw new Error(`只能处理 rejected/expired 状态的审核单（当前状态: ${review.status}）`)
-      }
+    // 2. 检查状态：只能处理 rejected/expired 状态的审核单
+    if (!review.needsAdminHandle()) {
+      throw new Error(`只能处理 rejected/expired 状态的审核单（当前状态: ${review.status}）`)
+    }
 
-      let result
+    let result
 
-      if (action === 'unfreeze') {
-        // 3a. 解冻退回（用户无责/系统异常）
-        const unfreeze_idempotency_key =
-          MerchantPointsReview.generateUnfreezeIdempotencyKey(review_id)
+    if (action === 'unfreeze') {
+      // 3a. 解冻退回（用户无责/系统异常）
+      const unfreeze_idempotency_key =
+        MerchantPointsReview.generateUnfreezeIdempotencyKey(review_id)
 
-        result = await AssetService.unfreeze(
-          {
-            user_id: review.user_id,
-            asset_code: 'POINTS',
-            amount: review.points_amount,
-            business_type: 'merchant_review_admin_unfreeze',
-            idempotency_key: unfreeze_idempotency_key,
-            meta: {
-              review_id,
-              admin_user_id,
-              admin_action: 'unfreeze',
-              handle_reason
-            }
-          },
-          { transaction }
-        )
-
-        logger.info('✅ 客服解冻审核单积分', {
-          review_id,
-          user_id: review.user_id,
-          points_amount: review.points_amount,
-          admin_user_id,
-          handle_reason
-        })
-      } else if (action === 'confiscate') {
-        // 3b. 从冻结作废（用户违约/恶意逃单）
-        const settle_idempotency_key = `${review_id}:admin_confiscate`
-
-        result = await AssetService.settleFromFrozen(
-          {
-            user_id: review.user_id,
-            asset_code: 'POINTS',
-            amount: review.points_amount,
-            business_type: 'merchant_review_admin_confiscate',
-            idempotency_key: settle_idempotency_key,
-            meta: {
-              review_id,
-              admin_user_id,
-              admin_action: 'confiscate',
-              handle_reason
-            }
-          },
-          { transaction }
-        )
-
-        logger.info('✅ 客服作废审核单积分', {
-          review_id,
-          user_id: review.user_id,
-          points_amount: review.points_amount,
-          admin_user_id,
-          handle_reason
-        })
-      }
-
-      // 4. 更新审核单状态为 cancelled（已处理）
-      await review.update(
+      result = await AssetService.unfreeze(
         {
-          status: 'cancelled',
-          metadata: {
-            ...review.metadata,
-            admin_handled_at: new Date().toISOString(),
+          user_id: review.user_id,
+          asset_code: 'POINTS',
+          amount: review.points_amount,
+          business_type: 'merchant_review_admin_unfreeze',
+          idempotency_key: unfreeze_idempotency_key,
+          meta: {
+            review_id,
             admin_user_id,
-            admin_action: action,
+            admin_action: 'unfreeze',
             handle_reason
           }
         },
         { transaction }
       )
 
-      if (shouldCommit) {
-        await transaction.commit()
-      }
-
-      return {
-        review,
-        action,
-        result
-      }
-    } catch (error) {
-      if (shouldCommit) {
-        await transaction.rollback()
-      }
-      logger.error('❌ 客服处理冻结积分失败', {
+      logger.info('✅ 客服解冻审核单积分', {
         review_id,
-        action,
+        user_id: review.user_id,
+        points_amount: review.points_amount,
         admin_user_id,
-        error: error.message
+        handle_reason
       })
-      throw error
+    } else if (action === 'confiscate') {
+      // 3b. 从冻结作废（用户违约/恶意逃单）
+      const settle_idempotency_key = `${review_id}:admin_confiscate`
+
+      result = await AssetService.settleFromFrozen(
+        {
+          user_id: review.user_id,
+          asset_code: 'POINTS',
+          amount: review.points_amount,
+          business_type: 'merchant_review_admin_confiscate',
+          idempotency_key: settle_idempotency_key,
+          meta: {
+            review_id,
+            admin_user_id,
+            admin_action: 'confiscate',
+            handle_reason
+          }
+        },
+        { transaction }
+      )
+
+      logger.info('✅ 客服作废审核单积分', {
+        review_id,
+        user_id: review.user_id,
+        points_amount: review.points_amount,
+        admin_user_id,
+        handle_reason
+      })
+    }
+
+    // 4. 更新审核单状态为 cancelled（已处理）
+    await review.update(
+      {
+        status: 'cancelled',
+        metadata: {
+          ...review.metadata,
+          admin_handled_at: new Date().toISOString(),
+          admin_user_id,
+          admin_action: action,
+          handle_reason
+        }
+      },
+      { transaction }
+    )
+
+    return {
+      review,
+      action,
+      result
     }
   }
 

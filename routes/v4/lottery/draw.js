@@ -12,13 +12,18 @@
  * - 积分扣除：抽奖前检查余额，抽奖后立即扣除，使用事务保护
  * - 奖励档位：使用 reward_tier (low/mid/high) 替代原 is_winner
  *
+ * 事务边界治理（2026-01-05 决策）：
+ * - 使用 TransactionManager.execute() 统一管理事务
+ * - 传递 transaction 到 execute_draw()
+ * - 事务内包含：积分扣除、奖品发放、保底计数、抽奖记录创建
+ *
  * 幂等性保证（业界标准形态 - 破坏性重构 2026-01-02）：
  * - 入口幂等：统一只接受 Header Idempotency-Key，不接受 body，不服务端生成
  * - 缺失幂等键：直接返回 400 BAD_REQUEST
  * - 流水幂等：通过派生 idempotency_key 保证每条流水唯一
  *
  * 创建时间：2025年12月22日
- * 更新时间：2026年01月02日 - 业界标准形态破坏性重构
+ * 更新时间：2026年01月05日 - 事务边界治理改造
  */
 
 const express = require('express')
@@ -32,6 +37,8 @@ const LotteryDrawFormatter = require('../../../utils/formatters/LotteryDrawForma
 const { requestDeduplication, lotteryRateLimiter } = require('./middleware')
 // 业界标准幂等架构 - 统一入口幂等服务
 const IdempotencyService = require('../../../services/IdempotencyService')
+// 事务边界治理（2026-01-05 决策）- 统一事务管理器
+const TransactionManager = require('../../../utils/TransactionManager')
 
 /**
  * @route POST /api/v4/lottery/draw
@@ -114,6 +121,10 @@ router.post(
 
       /*
        * 【执行抽奖】通过 UnifiedLotteryEngine 处理
+       * 🔒 事务边界治理（2026-01-05 决策）
+       *    - 使用 TransactionManager.execute() 统一管理事务
+       *    - 传递 transaction 到 execute_draw()
+       *    - 事务内包含：积分扣除、奖品发放、保底计数、抽奖记录创建
        */
 
       // ✅ 通过Service获取并验证活动（不再直连models）
@@ -122,14 +133,24 @@ router.post(
         checkStatus: true // 只获取active状态的活动
       })
 
-      // 传递幂等键到抽奖引擎（用于派生流水幂等键）
-      const drawResult = await lottery_engine.execute_draw(
-        user_id,
-        campaign.campaign_id,
-        draw_count,
+      // 使用 TransactionManager 统一管理事务边界
+      const drawResult = await TransactionManager.execute(
+        async (transaction) => {
+          // 传递幂等键和事务到抽奖引擎
+          return await lottery_engine.execute_draw(
+            user_id,
+            campaign.campaign_id,
+            draw_count,
+            {
+              idempotency_key, // 请求级幂等键，用于派生事务级幂等键
+              request_source: 'api_v4_lottery_draw', // 请求来源标识
+              transaction // 🔒 关键：传递事务对象
+            }
+          )
+        },
         {
-          idempotency_key, // 请求级幂等键，用于派生事务级幂等键
-          request_source: 'api_v4_lottery_draw' // 请求来源标识
+          timeout: 30000,
+          description: `抽奖执行 user_id=${user_id} campaign_id=${campaign.campaign_id} draw_count=${draw_count}`
         }
       )
 

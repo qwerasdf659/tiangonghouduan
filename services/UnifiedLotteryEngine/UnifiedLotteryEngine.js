@@ -1083,7 +1083,10 @@ class UnifiedLotteryEngine {
   /**
    * 执行抽奖（路由层调用接口）
    *
-   * 🎯 核心改动：添加统一事务保护，确保连抽操作的原子性
+   * 🔒 事务边界治理（2026-01-05 决策）：
+   * - 支持外部事务传入（options.transaction），由路由层统一开事务
+   * - 如果未传入外部事务，则自建事务（保持向后兼容）
+   * - 外部事务模式下，不在方法内 commit/rollback（由外部控制）
    *
    * 幂等性机制（方案B - 业界标准）：
    * - 入口幂等：通过路由层 IdempotencyService 实现"重试返回首次结果"
@@ -1095,6 +1098,7 @@ class UnifiedLotteryEngine {
    * @param {Object} options - 选项参数
    * @param {string} options.idempotency_key - 请求级幂等键（用于派生事务级幂等键）
    * @param {string} options.request_source - 请求来源标识
+   * @param {Object} options.transaction - Sequelize事务对象（可选，由路由层 TransactionManager 传入）
    * @returns {Promise<Object>} 抽奖结果
    */
   async execute_draw (user_id, campaign_id, draw_count = 1, options = {}) {
@@ -1107,21 +1111,26 @@ class UnifiedLotteryEngine {
       options.idempotency_key ||
       require('../../utils/IdempotencyHelper').generateRequestIdempotencyKey()
     const lotterySessionId = generateLotterySessionId()
+
     /*
-     * 🎯 核心改动1：开启统一事务（新增代码）
+     * 🔒 事务边界治理（2026-01-05 决策）
+     *
+     * 改造说明：
+     * - 支持外部事务传入（options.transaction），由路由层统一开事务
+     * - 如果未传入外部事务，则自建事务（保持向后兼容）
+     * - 外部事务模式下，不在方法内 commit/rollback（由外部控制）
      *
      * 业务价值：
      * - 防止出现"扣了600积分但只抽了6次"的部分失败情况
      * - 确保保底计数的准确性（如果失败，保底计数自动回滚）
-     *
-     * 🔥 修复方案1：添加事务超时保护（立即执行）
-     * - timeout: 30000ms (30秒)，防止长事务卡死
-     * - isolationLevel: READ_COMMITTED，防止脏读
-     * - 业务含义：就像设置闹钟，超过30秒自动退出
+     * - 符合"路由层统一开事务"的架构规范
      */
     const models = require('../../models')
     const { Sequelize } = require('sequelize')
-    const transaction = await models.sequelize.transaction({
+
+    // 判断是否使用外部事务
+    const externalTransaction = options.transaction
+    const transaction = externalTransaction || await models.sequelize.transaction({
       timeout: 30000, // 30秒超时自动回滚，防止长事务卡死
       isolationLevel: Sequelize.Transaction.ISOLATION_LEVELS.READ_COMMITTED // 读已提交，防止脏读
     })
@@ -1384,12 +1393,16 @@ class UnifiedLotteryEngine {
       }
 
       /*
-       * 🎯 核心改动3：统一提交事务（关键步骤）
+       * 🔒 事务边界治理（2026-01-05 决策）
        *
        * 提交时机：所有抽奖都成功后
        * 提交效果：所有数据库操作（积分扣除、奖品发放、抽奖记录、保底计数等）一次性生效
+       *
+       * 改造说明：仅在自建事务时提交，外部事务由调用方控制
        */
-      await transaction.commit()
+      if (!externalTransaction) {
+        await transaction.commit()
+      }
 
       /**
        * 🆕 事务提交后重新查询实际积分余额（确保数据准确）
@@ -1449,10 +1462,12 @@ class UnifiedLotteryEngine {
       }
     } catch (error) {
       /*
-       * 🎯 核心改动4：统一回滚事务（关键步骤）
+       * 🔒 事务边界治理（2026-01-05 决策）
        *
        * 回滚时机：任何一次抽奖失败时
        * 回滚效果：所有已执行的数据库操作都会被撤销
+       *
+       * 改造说明：仅在自建事务时回滚，外部事务由调用方控制
        *
        * 具体回滚内容：
        * 1. 已扣除的积分 → 自动退回
@@ -1460,7 +1475,9 @@ class UnifiedLotteryEngine {
        * 3. 已保存的抽奖记录 → 自动删除
        * 4. 已更新的保底计数 → 自动恢复
        */
-      await transaction.rollback()
+      if (!externalTransaction) {
+        await transaction.rollback()
+      }
 
       this.logError('抽奖执行失败，事务已回滚', {
         user_id,

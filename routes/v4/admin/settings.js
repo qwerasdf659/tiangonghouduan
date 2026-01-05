@@ -4,15 +4,17 @@
  * @description 系统配置管理相关路由（基础设置、抽奖设置、积分设置、通知设置、安全设置）
  * @version 4.0.0
  * @date 2025-11-23 北京时间
+ * @updated 2026-01-05（事务边界治理改造）
  *
  * 架构原则：
  * - 路由层不直连 models（所有数据库操作通过 Service 层）
- * - 路由层不开启事务（事务管理在 Service 层）
+ * - 写操作使用 TransactionManager.execute() 统一管理事务
  * - 通过 ServiceManager 统一获取服务实例
  */
 
 const express = require('express')
 const router = express.Router()
+const TransactionManager = require('../../../utils/TransactionManager')
 const { sharedComponents, adminAuthMiddleware, asyncHandler } = require('./shared/middleware')
 
 /**
@@ -84,15 +86,20 @@ router.put(
       const { category } = req.params
       const { settings: settingsToUpdate } = req.body
 
-      // 获取管理后台系统服务（P2-C架构重构）
+      // 获取管理后台系统服务（P2-C架构重构：已合并SystemSettingsService）
       const AdminSystemService = req.app.locals.services.getService('adminSystem')
 
-      // 调用服务层方法（服务层负责事务管理、验证和更新逻辑）
-      const result = await AdminSystemService.updateSettings(
-        category,
-        settingsToUpdate,
-        req.user.user_id
-        // 注意：不传入事务对象，由服务层内部管理事务
+      // 使用 TransactionManager 统一管理事务（2026-01-05 事务边界治理）
+      const result = await TransactionManager.execute(
+        async transaction => {
+          return await AdminSystemService.updateSettings(
+            category,
+            settingsToUpdate,
+            req.user.user_id,
+            { transaction }
+          )
+        },
+        { description: 'updateSettings' }
       )
 
       // 根据更新结果返回响应

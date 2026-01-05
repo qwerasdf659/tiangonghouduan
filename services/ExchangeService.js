@@ -64,6 +64,7 @@ const { BusinessCacheHelper } = require('../utils/BusinessCacheHelper')
 const { ExchangeItem, ExchangeRecord, sequelize } = require('../models')
 const { Op } = require('sequelize')
 const BeijingTimeHelper = require('../utils/timeHelper')
+const { assertAndGetTransaction } = require('../utils/transactionHelpers')
 
 /**
  * 🎯 统一数据输出视图常量（Data Output View Constants）
@@ -341,382 +342,324 @@ class ExchangeService {
    * @returns {Promise<Object>} 兑换结果和订单信息
    */
   static async exchangeItem (user_id, item_id, quantity = 1, options = {}) {
-    const { idempotency_key, transaction: externalTransaction } = options
+    const { idempotency_key } = options
 
     // 🔥 必填参数校验
     if (!idempotency_key) {
       throw new Error('idempotency_key 参数不能为空，用于幂等性控制')
     }
 
-    // 🔥 支持外部传入的事务（统一事务管理模式）
-    const transaction = externalTransaction || (await sequelize.transaction())
-    const shouldCommit = !externalTransaction // 只有自己创建的事务才提交/回滚
+    // 强制要求事务边界 - 2026-01-05 治理决策
+    const transaction = assertAndGetTransaction(options, 'ExchangeService.exchangeItem')
 
-    try {
-      /*
-       * ✅ 幂等性检查：以 idempotency_key 为唯一键（统一幂等架构）
-       * 🔴 P1-1-5: 不使用悲观锁，依赖数据库唯一约束防止并发创建重复订单
-       * 原因：多个事务同时使用 FOR UPDATE 竞争同一行会导致死锁
-       * 解决方案：利用唯一索引约束，并发插入时自动捕获冲突
-       */
-      const existingOrder = await ExchangeRecord.findOne({
-        where: {
-          idempotency_key
-        },
-        // 移除悲观锁，避免死锁
-        transaction
+    /*
+     * ✅ 幂等性检查：以 idempotency_key 为唯一键（统一幂等架构）
+     * 🔴 P1-1-5: 不使用悲观锁，依赖数据库唯一约束防止并发创建重复订单
+     * 原因：多个事务同时使用 FOR UPDATE 竞争同一行会导致死锁
+     * 解决方案：利用唯一索引约束，并发插入时自动捕获冲突
+     */
+    const existingOrder = await ExchangeRecord.findOne({
+      where: {
+        idempotency_key
+      },
+      // 移除悲观锁，避免死锁
+      transaction
+    })
+
+    if (existingOrder) {
+      logger.info('[兑换市场] ⚠️ 幂等性检查：idempotency_key已存在，验证参数一致性', {
+        idempotency_key,
+        order_no: existingOrder.order_no,
+        existing_item_id: existingOrder.item_id,
+        existing_quantity: existingOrder.quantity,
+        request_item_id: item_id,
+        request_quantity: quantity
       })
 
-      if (existingOrder) {
-        logger.info('[兑换市场] ⚠️ 幂等性检查：idempotency_key已存在，验证参数一致性', {
-          idempotency_key,
-          order_no: existingOrder.order_no,
-          existing_item_id: existingOrder.item_id,
-          existing_quantity: existingOrder.quantity,
-          request_item_id: item_id,
-          request_quantity: quantity
-        })
-
-        // 🔴 P1-1冲突保护：验证请求参数是否一致（确保类型一致）
-        if (
-          Number(existingOrder.item_id) !== Number(item_id) ||
-          Number(existingOrder.quantity) !== Number(quantity)
-        ) {
-          const conflictError = new Error(
-            `幂等键冲突：idempotency_key="${idempotency_key}" 已被使用于不同参数的订单。` +
-              `原订单：商品ID=${existingOrder.item_id}, 数量=${existingOrder.quantity}；` +
-              `当前请求：商品ID=${item_id}, 数量=${quantity}。` +
-              '请使用不同的幂等键或确认请求参数正确。'
-          )
-          conflictError.statusCode = 409 // HTTP 409 Conflict
-          conflictError.errorCode = 'IDEMPOTENCY_KEY_CONFLICT'
-          throw conflictError
-        }
-
-        logger.info('[兑换市场] ✅ 参数一致性验证通过，返回原结果（幂等）', {
-          idempotency_key,
-          order_no: existingOrder.order_no
-        })
-
-        /*
-         * 🔴 幂等回放：补齐指纹字段（pay_asset_code/pay_amount）并修复 AssetService.getBalance 参数签名
-         * 文档要求：兑换市场幂等指纹 = item_id + quantity + pay_asset_code + pay_amount
-         */
-        const AssetService = require('./AssetService')
-        const currentItem = await ExchangeItem.findOne({
-          where: { item_id },
-          transaction
-        })
-        if (!currentItem) {
-          throw new Error('商品不存在')
-        }
-        if (!currentItem.cost_asset_code || !currentItem.cost_amount) {
-          throw new Error('商品未配置材料资产支付方式（cost_asset_code/cost_amount缺失）')
-        }
-        const expectedPayAssetCode = currentItem.cost_asset_code
-        const expectedPayAmount = currentItem.cost_amount * quantity
-
-        if (
-          existingOrder.pay_asset_code !== expectedPayAssetCode ||
-          Number(existingOrder.pay_amount) !== Number(expectedPayAmount)
-        ) {
-          const conflictError = new Error(
-            `幂等键冲突：idempotency_key="${idempotency_key}" 已被使用于不同支付参数的订单。` +
-              `原订单：pay_asset_code=${existingOrder.pay_asset_code}, pay_amount=${existingOrder.pay_amount}；` +
-              `当前请求：pay_asset_code=${expectedPayAssetCode}, pay_amount=${expectedPayAmount}。`
-          )
-          conflictError.statusCode = 409
-          conflictError.errorCode = 'IDEMPOTENCY_KEY_CONFLICT'
-          throw conflictError
-        }
-
-        let materialBalance = 0
-        if (existingOrder.pay_asset_code) {
-          const balanceResult = await AssetService.getBalance(
-            { user_id, asset_code: existingOrder.pay_asset_code },
-            { transaction }
-          )
-          materialBalance = balanceResult.available_amount || 0
-        }
-
-        return {
-          success: true,
-          message: '兑换订单已存在',
-          order: {
-            order_no: existingOrder.order_no,
-            record_id: existingOrder.record_id,
-            item_name: existingOrder.item_snapshot?.item_name || '未知商品',
-            quantity: existingOrder.quantity,
-            pay_asset_code: existingOrder.pay_asset_code,
-            pay_amount: existingOrder.pay_amount,
-            status: existingOrder.status
-          },
-          remaining: {
-            material_balance: materialBalance
-          },
-          is_duplicate: true, // ✅ 标记为重复请求
-          timestamp: BeijingTimeHelper.now()
-        }
+      // 🔴 P1-1冲突保护：验证请求参数是否一致（确保类型一致）
+      if (
+        Number(existingOrder.item_id) !== Number(item_id) ||
+        Number(existingOrder.quantity) !== Number(quantity)
+      ) {
+        const conflictError = new Error(
+          `幂等键冲突：idempotency_key="${idempotency_key}" 已被使用于不同参数的订单。` +
+            `原订单：商品ID=${existingOrder.item_id}, 数量=${existingOrder.quantity}；` +
+            `当前请求：商品ID=${item_id}, 数量=${quantity}。` +
+            '请使用不同的幂等键或确认请求参数正确。'
+        )
+        conflictError.statusCode = 409 // HTTP 409 Conflict
+        conflictError.errorCode = 'IDEMPOTENCY_KEY_CONFLICT'
+        throw conflictError
       }
 
-      logger.info(
-        `[兑换市场] 用户${user_id}兑换商品${item_id}，数量${quantity}，idempotency_key=${idempotency_key}`
-      )
-
-      // 1. 获取商品信息（加锁防止超卖）
-      const item = await ExchangeItem.findOne({
-        where: { item_id },
-        lock: transaction.LOCK.UPDATE,
-        transaction
+      logger.info('[兑换市场] ✅ 参数一致性验证通过，返回原结果（幂等）', {
+        idempotency_key,
+        order_no: existingOrder.order_no
       })
 
-      if (!item) {
+      /*
+       * 🔴 幂等回放：补齐指纹字段（pay_asset_code/pay_amount）并修复 AssetService.getBalance 参数签名
+       * 文档要求：兑换市场幂等指纹 = item_id + quantity + pay_asset_code + pay_amount
+       */
+      const AssetService = require('./AssetService')
+      const currentItem = await ExchangeItem.findOne({
+        where: { item_id },
+        transaction
+      })
+      if (!currentItem) {
         throw new Error('商品不存在')
       }
-
-      if (item.status !== 'active') {
-        throw new Error('商品已下架')
+      if (!currentItem.cost_asset_code || !currentItem.cost_amount) {
+        throw new Error('商品未配置材料资产支付方式（cost_asset_code/cost_amount缺失）')
       }
+      const expectedPayAssetCode = currentItem.cost_asset_code
+      const expectedPayAmount = currentItem.cost_amount * quantity
 
-      if (item.stock < quantity) {
-        throw new Error(`库存不足，当前库存：${item.stock}`)
-      }
-
-      // V4.5.0: 验证商品是否配置了材料资产支付
-      if (!item.cost_asset_code || !item.cost_amount) {
-        throw new Error(
-          '商品未配置材料资产支付方式（cost_asset_code/cost_amount缺失）。' +
-            '请联系管理员更新商品配置。'
+      if (
+        existingOrder.pay_asset_code !== expectedPayAssetCode ||
+        Number(existingOrder.pay_amount) !== Number(expectedPayAmount)
+      ) {
+        const conflictError = new Error(
+          `幂等键冲突：idempotency_key="${idempotency_key}" 已被使用于不同支付参数的订单。` +
+            `原订单：pay_asset_code=${existingOrder.pay_asset_code}, pay_amount=${existingOrder.pay_amount}；` +
+            `当前请求：pay_asset_code=${expectedPayAssetCode}, pay_amount=${expectedPayAmount}。`
         )
+        conflictError.statusCode = 409
+        conflictError.errorCode = 'IDEMPOTENCY_KEY_CONFLICT'
+        throw conflictError
       }
 
-      // 2. 计算总支付金额
-      const totalPayAmount = item.cost_amount * quantity
-
-      logger.info('[兑换市场] 材料资产支付计算', {
-        cost_asset_code: item.cost_asset_code,
-        cost_amount: item.cost_amount,
-        quantity,
-        totalPayAmount
-      })
-
-      // 3. 使用AssetService统一账本扣减材料资产（Phase 3迁移）
-      const AssetService = require('./AssetService')
-
-      logger.info('[兑换市场] 开始扣减材料资产（统一账本）', {
-        user_id,
-        asset_code: item.cost_asset_code,
-        amount: totalPayAmount,
-        idempotency_key: `exchange_debit_${idempotency_key}`
-      })
-
-      /*
-       * 扣减材料资产（使用统一账本AssetService）
-       * business_type: exchange_debit（兑换市场材料扣减）
-       */
-      const materialResult = await AssetService.changeBalance(
-        {
-          user_id,
-          asset_code: item.cost_asset_code,
-          delta_amount: -totalPayAmount, // 负数表示扣减
-          idempotency_key: `exchange_debit_${idempotency_key}`, // 派生幂等键
-          business_type: 'exchange_debit', // 业务类型：兑换市场扣减
-          meta: {
-            idempotency_key, // 保留原幂等键用于追溯
-            item_id,
-            item_name: item.name,
-            quantity,
-            cost_amount: item.cost_amount,
-            total_pay_amount: totalPayAmount
-          }
-        },
-        {
-          transaction
-        }
-      )
-
-      // 如果是重复扣减，说明之前已经创建过订单但事务未提交，需要查询订单
-      if (materialResult.is_duplicate) {
-        logger.info('[兑换市场] ⚠️ 材料扣减幂等返回，查询已存在订单', {
-          idempotency_key
-        })
-
-        const existingRecord = await ExchangeRecord.findOne({
-          where: { idempotency_key },
-          transaction
-        })
-
-        if (existingRecord) {
-          if (shouldCommit) {
-            await transaction.commit()
-          }
-
-          // 获取当前材料余额
-          const currentBalance = await AssetService.getBalance(
-            { user_id, asset_code: item.cost_asset_code },
-            { transaction }
-          )
-
-          return {
-            success: true,
-            message: '兑换订单已存在（材料扣减幂等）',
-            order: existingRecord.toJSON(),
-            remaining: {
-              material_balance: currentBalance.available_amount
-            },
-            is_duplicate: true,
-            timestamp: BeijingTimeHelper.now()
-          }
-        }
-      }
-
-      logger.info(
-        `[兑换市场] 材料扣减成功：${totalPayAmount}个${item.cost_asset_code}，剩余余额通过统一账本管理`
-      )
-
-      // 4. 生成订单号
-      const order_no = this._generateOrderNo()
-
-      /*
-       * 5. 创建兑换订单（✅ 包含 idempotency_key 和材料支付字段）
-       * 🔴 P1-1-5: 捕获唯一约束冲突（并发场景）
-       */
-      let record
-      try {
-        record = await ExchangeRecord.create(
-          {
-            order_no,
-            idempotency_key, // ✅ 记录 idempotency_key 用于幂等性（业界标准形态）
-            user_id,
-            item_id,
-            item_snapshot: {
-              item_id: item.item_id,
-              item_name: item.name,
-              item_description: item.description,
-              cost_asset_code: item.cost_asset_code,
-              cost_amount: item.cost_amount
-            },
-            quantity,
-            // V4.5.0 材料资产支付（唯一支付方式）
-            pay_asset_code: item.cost_asset_code,
-            pay_amount: totalPayAmount,
-            total_cost: (item.cost_price || 0) * quantity,
-            status: 'pending',
-            exchange_time: BeijingTimeHelper.createDatabaseTime()
-          },
+      let materialBalance = 0
+      if (existingOrder.pay_asset_code) {
+        const balanceResult = await AssetService.getBalance(
+          { user_id, asset_code: existingOrder.pay_asset_code },
           { transaction }
         )
-      } catch (createError) {
-        // 🔴 捕获唯一约束冲突（并发场景下，多个事务同时插入相同 idempotency_key）
-        if (
-          createError.name === 'SequelizeUniqueConstraintError' ||
-          createError.message?.includes('Duplicate entry') ||
-          createError.message?.includes('idx_idempotency_key_unique')
-        ) {
-          logger.info('[兑换市场] ⚠️ 并发冲突：idempotency_key已存在，重试查询', {
-            idempotency_key
-          })
-
-          // 回滚当前事务的本地更改，重新查询已存在的订单
-          if (shouldCommit) {
-            await transaction.rollback()
-          }
-
-          // 重新查询已经创建的订单
-          const concurrentOrder = await ExchangeRecord.findOne({
-            where: { idempotency_key }
-          })
-
-          if (concurrentOrder) {
-            // 验证参数一致性
-            if (
-              Number(concurrentOrder.item_id) !== Number(item_id) ||
-              Number(concurrentOrder.quantity) !== Number(quantity)
-            ) {
-              const conflictError = new Error(
-                `幂等键冲突：idempotency_key="${idempotency_key}" 已被使用于不同参数的订单。` +
-                  `原订单：商品ID=${concurrentOrder.item_id}, 数量=${concurrentOrder.quantity}；` +
-                  `当前请求：商品ID=${item_id}, 数量=${quantity}。` +
-                  '请使用不同的幂等键或确认请求参数正确。'
-              )
-              conflictError.statusCode = 409
-              conflictError.errorCode = 'IDEMPOTENCY_KEY_CONFLICT'
-              throw conflictError
-            }
-
-            // 🔴 P0-5 修复：使用 AssetService.getBalance() 替代已删除的 MaterialService
-            const AssetService = require('./AssetService')
-            let materialBalance = 0
-            if (concurrentOrder.pay_asset_code) {
-              const balanceResult = await AssetService.getBalance(
-                user_id,
-                concurrentOrder.pay_asset_code
-              )
-              materialBalance = balanceResult.available_amount || 0
-            }
-
-            return {
-              success: true,
-              order: concurrentOrder.toJSON(),
-              remaining: {
-                material_balance: materialBalance
-              },
-              is_duplicate: true,
-              message: '兑换成功（并发幂等返回）'
-            }
-          }
-        }
-        // 非唯一约束错误，直接抛出
-        throw createError
+        materialBalance = balanceResult.available_amount || 0
       }
-
-      // 6. 扣减商品库存
-      await item.update(
-        {
-          stock: item.stock - quantity,
-          sold_count: (item.sold_count || 0) + quantity
-        },
-        { transaction }
-      )
-
-      // 7. 提交事务（只有自己创建的事务才提交）
-      if (shouldCommit) {
-        await transaction.commit()
-
-        /*
-         * ========== 缓存失效（2026-01-03 P1 缓存优化）==========
-         * 兑换成功后失效商品列表缓存（库存已变化）
-         */
-        await BusinessCacheHelper.invalidateExchangeItems('exchange_success')
-      }
-
-      logger.info(`[兑换市场] 兑换成功，订单号：${order_no}`)
 
       return {
         success: true,
-        message: '兑换成功',
+        message: '兑换订单已存在',
         order: {
-          order_no,
-          record_id: record.record_id,
-          item_name: item.name,
-          quantity,
-          pay_asset_code: item.cost_asset_code,
-          pay_amount: totalPayAmount,
-          status: 'pending'
+          order_no: existingOrder.order_no,
+          record_id: existingOrder.record_id,
+          item_name: existingOrder.item_snapshot?.item_name || '未知商品',
+          quantity: existingOrder.quantity,
+          pay_asset_code: existingOrder.pay_asset_code,
+          pay_amount: existingOrder.pay_amount,
+          status: existingOrder.status
         },
         remaining: {
-          material_balance: materialResult.new_balance
+          material_balance: materialBalance
         },
+        is_duplicate: true, // ✅ 标记为重复请求
         timestamp: BeijingTimeHelper.now()
       }
-    } catch (error) {
-      // 回滚事务（只有自己创建的事务才回滚）
-      if (shouldCommit && transaction && !transaction.finished) {
-        await transaction.rollback()
-      }
+    }
 
-      logger.error(`[兑换市场] 兑换失败(user_id:${user_id}, item_id:${item_id}):`, error.message)
-      throw error
+    logger.info(
+      `[兑换市场] 用户${user_id}兑换商品${item_id}，数量${quantity}，idempotency_key=${idempotency_key}`
+    )
+
+    // 1. 获取商品信息（加锁防止超卖）
+    const item = await ExchangeItem.findOne({
+      where: { item_id },
+      lock: transaction.LOCK.UPDATE,
+      transaction
+    })
+
+    if (!item) {
+      throw new Error('商品不存在')
+    }
+
+    if (item.status !== 'active') {
+      throw new Error('商品已下架')
+    }
+
+    if (item.stock < quantity) {
+      throw new Error(`库存不足，当前库存：${item.stock}`)
+    }
+
+    // V4.5.0: 验证商品是否配置了材料资产支付
+    if (!item.cost_asset_code || !item.cost_amount) {
+      throw new Error(
+        '商品未配置材料资产支付方式（cost_asset_code/cost_amount缺失）。' +
+          '请联系管理员更新商品配置。'
+      )
+    }
+
+    // 2. 计算总支付金额
+    const totalPayAmount = item.cost_amount * quantity
+
+    logger.info('[兑换市场] 材料资产支付计算', {
+      cost_asset_code: item.cost_asset_code,
+      cost_amount: item.cost_amount,
+      quantity,
+      totalPayAmount
+    })
+
+    // 3. 使用AssetService统一账本扣减材料资产（Phase 3迁移）
+    const AssetService = require('./AssetService')
+
+    logger.info('[兑换市场] 开始扣减材料资产（统一账本）', {
+      user_id,
+      asset_code: item.cost_asset_code,
+      amount: totalPayAmount,
+      idempotency_key: `exchange_debit_${idempotency_key}`
+    })
+
+    /*
+     * 扣减材料资产（使用统一账本AssetService）
+     * business_type: exchange_debit（兑换市场材料扣减）
+     */
+    const materialResult = await AssetService.changeBalance(
+      {
+        user_id,
+        asset_code: item.cost_asset_code,
+        delta_amount: -totalPayAmount, // 负数表示扣减
+        idempotency_key: `exchange_debit_${idempotency_key}`, // 派生幂等键
+        business_type: 'exchange_debit', // 业务类型：兑换市场扣减
+        meta: {
+          idempotency_key, // 保留原幂等键用于追溯
+          item_id,
+          item_name: item.name,
+          quantity,
+          cost_amount: item.cost_amount,
+          total_pay_amount: totalPayAmount
+        }
+      },
+      {
+        transaction
+      }
+    )
+
+    // 如果是重复扣减，说明之前已经创建过订单但事务未提交，需要查询订单
+    if (materialResult.is_duplicate) {
+      logger.info('[兑换市场] ⚠️ 材料扣减幂等返回，查询已存在订单', {
+        idempotency_key
+      })
+
+      const existingRecord = await ExchangeRecord.findOne({
+        where: { idempotency_key },
+        transaction
+      })
+
+      if (existingRecord) {
+        // 获取当前材料余额
+        const currentBalance = await AssetService.getBalance(
+          { user_id, asset_code: item.cost_asset_code },
+          { transaction }
+        )
+
+        return {
+          success: true,
+          message: '兑换订单已存在（材料扣减幂等）',
+          order: existingRecord.toJSON(),
+          remaining: {
+            material_balance: currentBalance.available_amount
+          },
+          is_duplicate: true,
+          timestamp: BeijingTimeHelper.now()
+        }
+      }
+    }
+
+    logger.info(
+      `[兑换市场] 材料扣减成功：${totalPayAmount}个${item.cost_asset_code}，剩余余额通过统一账本管理`
+    )
+
+    // 4. 生成订单号
+    const order_no = this._generateOrderNo()
+
+    /*
+     * 5. 创建兑换订单（✅ 包含 idempotency_key 和材料支付字段）
+     * 🔴 P1-1-5: 捕获唯一约束冲突（并发场景）
+     */
+    let record
+    try {
+      record = await ExchangeRecord.create(
+        {
+          order_no,
+          idempotency_key, // ✅ 记录 idempotency_key 用于幂等性（业界标准形态）
+          user_id,
+          item_id,
+          item_snapshot: {
+            item_id: item.item_id,
+            item_name: item.name,
+            item_description: item.description,
+            cost_asset_code: item.cost_asset_code,
+            cost_amount: item.cost_amount
+          },
+          quantity,
+          // V4.5.0 材料资产支付（唯一支付方式）
+          pay_asset_code: item.cost_asset_code,
+          pay_amount: totalPayAmount,
+          total_cost: (item.cost_price || 0) * quantity,
+          status: 'pending',
+          exchange_time: BeijingTimeHelper.createDatabaseTime()
+        },
+        { transaction }
+      )
+    } catch (createError) {
+      // 🔴 捕获唯一约束冲突（并发场景下，多个事务同时插入相同 idempotency_key）
+      if (
+        createError.name === 'SequelizeUniqueConstraintError' ||
+        createError.message?.includes('Duplicate entry') ||
+        createError.message?.includes('idx_idempotency_key_unique')
+      ) {
+        logger.info('[兑换市场] ⚠️ 并发冲突：idempotency_key已存在，抛出错误让调用方处理', {
+          idempotency_key
+        })
+
+        // 2026-01-05 治理决策：事务由入口层管理，并发冲突抛出错误
+        // 不再尝试 rollback 后查询，因为事务控制权在入口层
+        const conflictError = new Error(
+          `并发冲突：idempotency_key="${idempotency_key}" 已被其他请求使用。请重试。`
+        )
+        conflictError.statusCode = 409
+        conflictError.errorCode = 'CONCURRENT_CONFLICT'
+        conflictError.originalError = createError
+        throw conflictError
+      }
+      // 非唯一约束错误，直接抛出
+      throw createError
+    }
+
+    // 6. 扣减商品库存
+    await item.update(
+      {
+        stock: item.stock - quantity,
+        sold_count: (item.sold_count || 0) + quantity
+      },
+      { transaction }
+    )
+
+    /*
+     * ========== 缓存失效（2026-01-03 P1 缓存优化）==========
+     * 兑换成功后失效商品列表缓存（库存已变化）
+     * 注：事务提交由入口层统一管理，此处只做缓存失效标记
+     */
+    await BusinessCacheHelper.invalidateExchangeItems('exchange_success')
+
+    logger.info(`[兑换市场] 兑换成功，订单号：${order_no}`)
+
+    return {
+      success: true,
+      message: '兑换成功',
+      order: {
+        order_no,
+        record_id: record.record_id,
+        item_name: item.name,
+        quantity,
+        pay_asset_code: item.cost_asset_code,
+        pay_amount: totalPayAmount,
+        status: 'pending'
+      },
+      remaining: {
+        material_balance: materialResult.new_balance
+      },
+      timestamp: BeijingTimeHelper.now()
     }
   }
 
@@ -815,69 +758,51 @@ class ExchangeService {
    * @returns {Promise<Object>} 更新结果
    */
   static async updateOrderStatus (order_no, new_status, operator_id, remark = '', options = {}) {
-    const { transaction: externalTransaction } = options
+    // 强制要求事务边界 - 2026-01-05 治理决策
+    const transaction = assertAndGetTransaction(options, 'ExchangeService.updateOrderStatus')
 
-    // 🔥 支持外部传入的事务（统一事务管理模式）
-    const transaction = externalTransaction || (await sequelize.transaction())
-    const shouldCommit = !externalTransaction // 只有自己创建的事务才提交/回滚
+    logger.info(`[兑换市场] 更新订单状态：${order_no} -> ${new_status}`)
 
-    try {
-      logger.info(`[兑换市场] 更新订单状态：${order_no} -> ${new_status}`)
+    const order = await ExchangeRecord.findOne({
+      where: { order_no },
+      lock: transaction.LOCK.UPDATE,
+      transaction
+    })
 
-      const order = await ExchangeRecord.findOne({
-        where: { order_no },
-        lock: transaction.LOCK.UPDATE,
-        transaction
-      })
+    if (!order) {
+      throw new Error('订单不存在')
+    }
 
-      if (!order) {
-        throw new Error('订单不存在')
-      }
+    // 更新订单状态
+    await order.update(
+      {
+        status: new_status,
+        admin_remark: remark,
+        updated_at: BeijingTimeHelper.createDatabaseTime()
+      },
+      { transaction }
+    )
 
-      // 更新订单状态
+    // 如果是发货，记录发货时间
+    if (new_status === 'shipped') {
       await order.update(
         {
-          status: new_status,
-          admin_remark: remark,
-          updated_at: BeijingTimeHelper.createDatabaseTime()
+          shipped_at: BeijingTimeHelper.createDatabaseTime()
         },
         { transaction }
       )
+    }
 
-      // 如果是发货，记录发货时间
-      if (new_status === 'shipped') {
-        await order.update(
-          {
-            shipped_at: BeijingTimeHelper.createDatabaseTime()
-          },
-          { transaction }
-        )
-      }
+    logger.info(`[兑换市场] 订单状态更新成功：${order_no} -> ${new_status}`)
 
-      // 提交事务（只有自己创建的事务才提交）
-      if (shouldCommit) {
-        await transaction.commit()
-      }
-
-      logger.info(`[兑换市场] 订单状态更新成功：${order_no} -> ${new_status}`)
-
-      return {
-        success: true,
-        message: '订单状态更新成功',
-        order: {
-          order_no,
-          status: new_status
-        },
-        timestamp: BeijingTimeHelper.now()
-      }
-    } catch (error) {
-      // 回滚事务（只有自己创建的事务才回滚）
-      if (shouldCommit && transaction && !transaction.finished) {
-        await transaction.rollback()
-      }
-
-      logger.error(`[兑换市场] 更新订单状态失败(order_no:${order_no}):`, error.message)
-      throw error
+    return {
+      success: true,
+      message: '订单状态更新成功',
+      order: {
+        order_no,
+        status: new_status
+      },
+      timestamp: BeijingTimeHelper.now()
     }
   }
 
@@ -1140,77 +1065,54 @@ class ExchangeService {
    * @returns {Promise<Object>} 删除结果
    */
   static async deleteExchangeItem (item_id, options = {}) {
-    const { transaction: externalTransaction } = options
+    // 强制要求事务边界 - 2026-01-05 治理决策
+    const transaction = assertAndGetTransaction(options, 'ExchangeService.deleteExchangeItem')
 
-    // 🔥 支持外部传入的事务（统一事务管理模式）
-    const transaction = externalTransaction || (await sequelize.transaction())
-    const shouldCommit = !externalTransaction // 只有自己创建的事务才提交/回滚
+    logger.info('[兑换市场] 管理员删除商品', { item_id })
 
-    try {
-      logger.info('[兑换市场] 管理员删除商品', { item_id })
+    // 查询商品
+    const item = await ExchangeItem.findByPk(item_id, { transaction })
+    if (!item) {
+      throw new Error('商品不存在')
+    }
 
-      // 查询商品
-      const item = await ExchangeItem.findByPk(item_id, { transaction })
-      if (!item) {
-        throw new Error('商品不存在')
-      }
+    // 检查是否有相关订单
+    const orderCount = await ExchangeRecord.count({
+      where: { item_id },
+      transaction
+    })
 
-      // 检查是否有相关订单
-      const orderCount = await ExchangeRecord.count({
-        where: { item_id },
-        transaction
-      })
+    if (orderCount > 0) {
+      // 如果有订单，只能下架不能删除
+      await item.update(
+        {
+          status: 'inactive',
+          updated_at: BeijingTimeHelper.createDatabaseTime()
+        },
+        { transaction }
+      )
 
-      if (orderCount > 0) {
-        // 如果有订单，只能下架不能删除
-        await item.update(
-          {
-            status: 'inactive',
-            updated_at: BeijingTimeHelper.createDatabaseTime()
-          },
-          { transaction }
-        )
-
-        // 提交事务（只有自己创建的事务才提交）
-        if (shouldCommit) {
-          await transaction.commit()
-        }
-
-        logger.info(`[兑换市场] 商品有${orderCount}个关联订单，已下架而非删除`)
-
-        return {
-          success: true,
-          action: 'deactivated',
-          message: `该商品有${orderCount}个关联订单，已自动下架而非删除`,
-          item: item.toJSON(),
-          timestamp: BeijingTimeHelper.now()
-        }
-      }
-
-      // 删除商品
-      await item.destroy({ transaction })
-
-      // 提交事务（只有自己创建的事务才提交）
-      if (shouldCommit) {
-        await transaction.commit()
-      }
-
-      logger.info(`[兑换市场] 商品删除成功，item_id: ${item_id}`)
+      logger.info(`[兑换市场] 商品有${orderCount}个关联订单，已下架而非删除`)
 
       return {
         success: true,
-        action: 'deleted',
-        message: '商品删除成功',
+        action: 'deactivated',
+        message: `该商品有${orderCount}个关联订单，已自动下架而非删除`,
+        item: item.toJSON(),
         timestamp: BeijingTimeHelper.now()
       }
-    } catch (error) {
-      // 回滚事务（只有自己创建的事务才回滚）
-      if (shouldCommit && transaction && !transaction.finished) {
-        await transaction.rollback()
-      }
+    }
 
-      logger.error(`[兑换市场] 删除商品失败(item_id:${item_id}):`, error.message)
-      throw error
+    // 删除商品
+    await item.destroy({ transaction })
+
+    logger.info(`[兑换市场] 商品删除成功，item_id: ${item_id}`)
+
+    return {
+      success: true,
+      action: 'deleted',
+      message: '商品删除成功',
+      timestamp: BeijingTimeHelper.now()
     }
   }
 

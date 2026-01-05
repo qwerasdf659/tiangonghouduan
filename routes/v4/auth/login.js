@@ -18,6 +18,7 @@ const router = express.Router()
 const logger = require('../../../utils/logger').logger
 const { generateTokens, getUserRoles } = require('../../../middleware/auth')
 const BeijingTimeHelper = require('../../../utils/timeHelper')
+const TransactionManager = require('../../../utils/TransactionManager')
 
 /**
  * 🛡️ 用户登录（支持自动注册）
@@ -73,11 +74,13 @@ router.post('/login', async (req, res) => {
   let isNewUser = false
 
   if (!user) {
-    // 用户不存在，自动注册（Service 内部管理事务）
+    // 用户不存在，使用 TransactionManager 统一事务边界（符合治理决策）
     logger.info(`用户 ${mobile} 不存在，开始自动注册...`)
 
     try {
-      user = await UserService.registerUser(mobile)
+      user = await TransactionManager.execute(async (transaction) => {
+        return await UserService.registerUser(mobile, { transaction })
+      })
       isNewUser = true
       logger.info(`用户 ${mobile} 注册流程完成（用户+积分账户+角色）`)
     } catch (error) {
@@ -267,7 +270,10 @@ router.post('/quick-login', async (req, res) => {
     logger.info(`用户 ${mobile} 不存在，开始自动注册...`)
 
     try {
-      user = await UserService.registerUser(mobile)
+      // 使用 TransactionManager 统一事务边界（符合治理决策）
+      user = await TransactionManager.execute(async (transaction) => {
+        return await UserService.registerUser(mobile, { transaction })
+      })
       logger.info(`✅ 用户 ${mobile} 注册流程完成（用户+积分账户+角色）`)
     } catch (error) {
       logger.error(`❌ 用户 ${mobile} 注册失败:`, error)

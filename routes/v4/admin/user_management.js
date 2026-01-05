@@ -1,14 +1,15 @@
 const logger = require('../../../utils/logger').logger
+const TransactionManager = require('../../../utils/TransactionManager')
 
 /**
  * 管理员用户管理路由 - V4.0 UUID角色系统版本
  * 权限管理：完全使用UUID角色系统，移除is_admin字段依赖
  * 创建时间：2025年01月21日
- * 更新时间：2025年01月28日
+ * 更新时间：2026年01月05日（事务边界治理改造）
  *
  * 架构原则：
  * - 路由层不直连 models（所有数据库操作通过 Service 层）
- * - 路由层不开启事务（事务管理在 Service 层）
+ * - 写操作使用 TransactionManager.execute() 统一管理事务
  * - 通过 req.app.locals.services 统一获取服务实例
  */
 
@@ -90,12 +91,39 @@ router.put('/users/:user_id/role', async (req, res) => {
     // 通过 ServiceManager 获取 UserRoleService
     const UserRoleService = req.app.locals.services.getService('userRole')
 
-    // 调用 Service 层方法（Service 层负责事务管理、权限验证、缓存清除、审计日志记录）
-    const result = await UserRoleService.updateUserRole(user_id, role_name, req.user.user_id, {
-      reason,
-      ip_address: req.ip,
-      user_agent: req.headers['user-agent']
-    })
+    // 使用 TransactionManager 统一管理事务（2026-01-05 事务边界治理）
+    const result = await TransactionManager.execute(
+      async transaction => {
+        return await UserRoleService.updateUserRole(user_id, role_name, req.user.user_id, {
+          reason,
+          ip_address: req.ip,
+          user_agent: req.headers['user-agent'],
+          transaction
+        })
+      },
+      { description: 'updateUserRole' }
+    )
+
+    // 事务提交后处理副作用（缓存失效、WebSocket断开）
+    if (result.post_commit_actions) {
+      const { invalidateUserPermissions } = require('../../../middleware/auth')
+
+      if (result.post_commit_actions.invalidate_cache) {
+        await invalidateUserPermissions(user_id, `role_change_to_${role_name}`, req.user.user_id)
+        logger.info(`✅ 权限缓存已清除: user_id=${user_id}`)
+      }
+
+      if (result.post_commit_actions.disconnect_ws) {
+        try {
+          const ChatWebSocketService = require('../../../services/ChatWebSocketService')
+          ChatWebSocketService.disconnectUser(user_id, 'user')
+          ChatWebSocketService.disconnectUser(user_id, 'admin')
+          logger.info(`✅ WebSocket连接已断开: user_id=${user_id}`)
+        } catch (wsError) {
+          logger.warn('断开WebSocket连接失败（非致命）', { user_id, error: wsError.message })
+        }
+      }
+    }
 
     logger.info(
       `✅ 用户角色更新成功: user_id=${user_id}, new_role=${role_name}, operator=${req.user.user_id}`

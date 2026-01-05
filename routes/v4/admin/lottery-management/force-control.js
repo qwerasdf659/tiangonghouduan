@@ -7,14 +7,17 @@
  *
  * 架构规范：
  * - 路由层不直连 models（通过 Service 层）
+ * - 写操作使用 TransactionManager.execute() 统一管理事务
  * - 使用 AdminLotteryService 封装所有抽奖管理逻辑
  *
  * 创建时间：2025-12-22
+ * 更新时间：2026-01-05（事务边界治理改造）
  */
 
 const express = require('express')
 const router = express.Router()
 const BeijingTimeHelper = require('../../../../utils/timeHelper')
+const TransactionManager = require('../../../../utils/TransactionManager')
 const { adminAuthMiddleware, asyncHandler, validators } = require('../shared/middleware')
 
 /**
@@ -44,13 +47,19 @@ router.post(
       // 通过 ServiceManager 获取 AdminLotteryService
       const AdminLotteryService = req.app.locals.services.getService('adminLottery')
 
-      // 调用服务层方法（内部会验证用户/奖品、调用ManagementStrategy、记录审计日志）
-      const result = await AdminLotteryService.forceWinForUser(
-        req.user?.user_id || req.user?.id,
-        validatedUserId,
-        validatedPrizeId,
-        reason,
-        expiresAt
+      // 使用 TransactionManager 统一管理事务（2026-01-05 事务边界治理）
+      const result = await TransactionManager.execute(
+        async transaction => {
+          return await AdminLotteryService.forceWinForUser(
+            req.user?.user_id || req.user?.id,
+            validatedUserId,
+            validatedPrizeId,
+            reason,
+            expiresAt,
+            { transaction }
+          )
+        },
+        { description: 'forceWinForUser' }
       )
 
       return res.apiSuccess(result, '强制中奖设置成功')
@@ -99,13 +108,19 @@ router.post(
       // 通过 ServiceManager 获取 AdminLotteryService
       const AdminLotteryService = req.app.locals.services.getService('adminLottery')
 
-      // 调用服务层方法
-      const result = await AdminLotteryService.forceLoseForUser(
-        req.user?.user_id || req.user?.id,
-        validatedUserId,
-        parseInt(count),
-        reason,
-        expiresAt
+      // 使用 TransactionManager 统一管理事务（2026-01-05 事务边界治理）
+      const result = await TransactionManager.execute(
+        async transaction => {
+          return await AdminLotteryService.forceLoseForUser(
+            req.user?.user_id || req.user?.id,
+            validatedUserId,
+            parseInt(count),
+            reason,
+            expiresAt,
+            { transaction }
+          )
+        },
+        { description: 'forceLoseForUser' }
       )
 
       return res.apiSuccess(result, `强制不中奖设置成功，将在接下来${count}次抽奖中不中奖`)

@@ -24,6 +24,7 @@ const { authenticateToken, requireAdmin } = require('../../../../middleware/auth
 const { handleServiceError } = require('../../../../middleware/validation')
 const logger = require('../../../../utils/logger').logger
 const BeijingTimeHelper = require('../../../../utils/timeHelper')
+const TransactionManager = require('../../../../utils/TransactionManager')
 
 /**
  * @route GET /api/v4/shop/consumption/pending
@@ -144,10 +145,13 @@ router.post('/approve/:record_id', authenticateToken, requireAdmin, async (req, 
       reviewer_id: reviewerId
     })
 
-    // 调用服务层处理
-    const result = await ConsumptionService.approveConsumption(parseInt(record_id), {
-      reviewer_id: reviewerId,
-      admin_notes
+    // 使用 TransactionManager 统一事务边界（符合治理决策）
+    const result = await TransactionManager.execute(async (transaction) => {
+      return await ConsumptionService.approveConsumption(parseInt(record_id), {
+        reviewer_id: reviewerId,
+        admin_notes,
+        transaction
+      })
     })
 
     logger.info('✅ 消费记录审核通过', {
@@ -220,10 +224,13 @@ router.post('/reject/:record_id', authenticateToken, requireAdmin, async (req, r
       reviewer_id: reviewerId
     })
 
-    // 调用服务层处理
-    const result = await ConsumptionService.rejectConsumption(parseInt(record_id), {
-      reviewer_id: reviewerId,
-      admin_notes
+    // 使用 TransactionManager 统一事务边界（符合治理决策）
+    const result = await TransactionManager.execute(async (transaction) => {
+      return await ConsumptionService.rejectConsumption(parseInt(record_id), {
+        reviewer_id: reviewerId,
+        admin_notes,
+        transaction
+      })
     })
 
     logger.info('✅ 消费记录审核拒绝', {

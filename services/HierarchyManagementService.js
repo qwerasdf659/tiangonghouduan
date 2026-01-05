@@ -4,6 +4,7 @@ const logger = require('../utils/logger').logger
  * 层级权限管理服务（简化版） - 餐厅积分抽奖系统 V4.0 统一引擎架构
  * 业务场景：管理区域负责人→业务经理→业务员三级层级关系和权限操作
  * 创建时间：2025年11月07日
+ * 最后更新：2026年01月05日（事务边界治理改造）
  * 设计理念：简单实用，避免过度设计
  *
  * 核心功能：
@@ -12,6 +13,11 @@ const logger = require('../utils/logger').logger
  * 3. 查询所有下级用户（如：区域负责人查看所有业务经理和业务员）
  * 4. 权限变更日志记录（审计追踪）
  * 5. 门店分配管理（业务员分配到门店）
+ *
+ * 事务边界治理（2026-01-05 决策）：
+ * - 所有写操作 **强制要求** 外部事务传入（options.transaction）
+ * - 未提供事务时直接报错（使用 assertAndGetTransaction）
+ * - 服务层禁止自建事务，由入口层统一使用 TransactionManager.execute()
  *
  * 简化内容：
  * - 移除 hierarchy_path 和 hierarchy_level 计算（直接使用递归查询）
@@ -30,6 +36,7 @@ const { User, Role, UserRole, UserHierarchy, RoleChangeLog } = require('../model
 const { Op } = require('sequelize')
 const BeijingTimeHelper = require('../utils/timeHelper')
 const { PermissionManager } = require('../middleware/auth')
+const { assertAndGetTransaction } = require('../utils/transactionHelpers')
 
 /**
  * 层级权限管理服务类
@@ -205,106 +212,105 @@ class HierarchyManagementService {
    *
    * ⚠️ 安全设计：默认仅停用目标用户本人，需要批量停用所有下级时必须明确传入true
    *
+   * 事务边界治理（2026-01-05 决策）：
+   * - 强制要求外部事务传入（options.transaction）
+   * - 未提供事务时直接报错，由入口层统一管理事务
+   *
    * @param {number} target_user_id - 目标用户ID（被停用的用户）
    * @param {number} operator_user_id - 操作人ID（执行停用的用户）
    * @param {string} reason - 停用原因（如：离职、违规、调动等）
    * @param {boolean} include_subordinates - 是否同时停用所有下级（默认false，需要主动选择）
+   * @param {Object} options - 选项
+   * @param {Object} options.transaction - 外部事务对象（必填）
    * @returns {Promise<Object>} { success, deactivated_count, deactivated_users, message }
    *
    * 示例1：仅停用业务员权限（默认行为）
-   * await batchDeactivatePermissions(20, 10, '业务员违规')
+   * await batchDeactivatePermissions(20, 10, '业务员违规', false, { transaction })
    *
    * 示例2：业务经理离职，停用其本人及所有下级业务员（需要明确传入true）
-   * await batchDeactivatePermissions(10, 1, '业务经理离职', true)
+   * await batchDeactivatePermissions(10, 1, '业务经理离职', true, { transaction })
    */
   static async batchDeactivatePermissions (
     target_user_id,
     operator_user_id,
     reason,
-    include_subordinates = false
+    include_subordinates = false,
+    options = {}
   ) {
-    const transaction = await UserHierarchy.sequelize.transaction()
+    // 强制要求事务边界 - 2026-01-05 治理决策
+    const transaction = assertAndGetTransaction(options, 'HierarchyManagementService.batchDeactivatePermissions')
 
-    try {
-      // 1. 验证操作权限（操作人必须是目标用户的上级，且角色级别更高）
-      const canOperate = await this.canManageUser(operator_user_id, target_user_id)
-      if (!canOperate) {
-        throw new Error(`无权限操作该用户: operator=${operator_user_id}, target=${target_user_id}`)
-      }
+    // 1. 验证操作权限（操作人必须是目标用户的上级，且角色级别更高）
+    const canOperate = await this.canManageUser(operator_user_id, target_user_id)
+    if (!canOperate) {
+      throw new Error(`无权限操作该用户: operator=${operator_user_id}, target=${target_user_id}`)
+    }
 
-      // 2. 获取要停用的用户列表
-      let usersToDeactivate = [target_user_id]
+    // 2. 获取要停用的用户列表
+    let usersToDeactivate = [target_user_id]
 
-      if (include_subordinates) {
-        const subordinates = await this.getAllSubordinates(target_user_id, false)
-        usersToDeactivate = [target_user_id, ...subordinates.map(sub => sub.user_id)]
-      }
+    if (include_subordinates) {
+      const subordinates = await this.getAllSubordinates(target_user_id, false)
+      usersToDeactivate = [target_user_id, ...subordinates.map(sub => sub.user_id)]
+    }
 
-      logger.info(
-        `🚫 准备停用${usersToDeactivate.length}个用户的权限（目标用户: ${target_user_id}，包含下级: ${include_subordinates}）`
-      )
+    logger.info(
+      `🚫 准备停用${usersToDeactivate.length}个用户的权限（目标用户: ${target_user_id}，包含下级: ${include_subordinates}）`
+    )
 
-      // 3. 批量停用层级关系（设置is_active=false，记录停用时间、操作人、原因）
-      await UserHierarchy.update(
-        {
-          is_active: false,
-          deactivated_at: BeijingTimeHelper.createDatabaseTime(),
-          deactivated_by: operator_user_id,
-          deactivation_reason: reason
+    // 3. 批量停用层级关系（设置is_active=false，记录停用时间、操作人、原因）
+    await UserHierarchy.update(
+      {
+        is_active: false,
+        deactivated_at: BeijingTimeHelper.createDatabaseTime(),
+        deactivated_by: operator_user_id,
+        deactivation_reason: reason
+      },
+      {
+        where: {
+          user_id: { [Op.in]: usersToDeactivate },
+          is_active: true
         },
-        {
-          where: {
-            user_id: { [Op.in]: usersToDeactivate },
-            is_active: true
-          },
-          transaction
-        }
-      )
-
-      // 4. 批量停用用户角色关联（同步更新user_roles表）
-      await UserRole.update(
-        {
-          is_active: false
-        },
-        {
-          where: {
-            user_id: { [Op.in]: usersToDeactivate },
-            is_active: true
-          },
-          transaction
-        }
-      )
-
-      // 5. 记录操作日志（用于审计追踪）
-      await RoleChangeLog.create(
-        {
-          target_user_id,
-          operator_user_id,
-          operation_type: include_subordinates ? 'batch_deactivate' : 'deactivate',
-          affected_count: usersToDeactivate.length,
-          reason
-        },
-        { transaction }
-      )
-
-      // 6. 🔄 清除受影响用户的权限缓存（在事务提交前执行，确保数据一致性）
-      await PermissionManager.invalidateMultipleUsers(usersToDeactivate, 'hierarchy_deactivate')
-
-      // 7. 提交事务（缓存失效成功后才提交，保证数据一致性）
-      await transaction.commit()
-
-      logger.info(`✅ 成功停用${usersToDeactivate.length}个用户的权限，并清除缓存`)
-
-      return {
-        success: true,
-        deactivated_count: usersToDeactivate.length,
-        deactivated_users: usersToDeactivate,
-        message: `成功停用${usersToDeactivate.length}个用户的权限`
+        transaction
       }
-    } catch (error) {
-      await transaction.rollback()
-      logger.error('❌ 批量停用权限失败:', error.message)
-      throw error
+    )
+
+    // 4. 批量停用用户角色关联（同步更新user_roles表）
+    await UserRole.update(
+      {
+        is_active: false
+      },
+      {
+        where: {
+          user_id: { [Op.in]: usersToDeactivate },
+          is_active: true
+        },
+        transaction
+      }
+    )
+
+    // 5. 记录操作日志（用于审计追踪）
+    await RoleChangeLog.create(
+      {
+        target_user_id,
+        operator_user_id,
+        operation_type: include_subordinates ? 'batch_deactivate' : 'deactivate',
+        affected_count: usersToDeactivate.length,
+        reason
+      },
+      { transaction }
+    )
+
+    // 6. 🔄 清除受影响用户的权限缓存（事务提交后由入口层处理也可）
+    await PermissionManager.invalidateMultipleUsers(usersToDeactivate, 'hierarchy_deactivate')
+
+    logger.info(`✅ 成功停用${usersToDeactivate.length}个用户的权限，并清除缓存`)
+
+    return {
+      success: true,
+      deactivated_count: usersToDeactivate.length,
+      deactivated_users: usersToDeactivate,
+      message: `成功停用${usersToDeactivate.length}个用户的权限`
     }
   }
 
@@ -314,95 +320,94 @@ class HierarchyManagementService {
    * - 业务员调动回归：重新激活其权限
    * - 临时禁用解除：恢复业务员权限
    *
+   * 事务边界治理（2026-01-05 决策）：
+   * - 强制要求外部事务传入（options.transaction）
+   * - 未提供事务时直接报错，由入口层统一管理事务
+   *
    * @param {number} target_user_id - 目标用户ID
    * @param {number} operator_user_id - 操作人ID
    * @param {boolean} include_subordinates - 是否同时激活所有下级（默认false）
+   * @param {Object} options - 选项
+   * @param {Object} options.transaction - 外部事务对象（必填）
    * @returns {Promise<Object>} { success, activated_count, activated_users, message }
    */
   static async batchActivatePermissions (
     target_user_id,
     operator_user_id,
-    include_subordinates = false
+    include_subordinates = false,
+    options = {}
   ) {
-    const transaction = await UserHierarchy.sequelize.transaction()
+    // 强制要求事务边界 - 2026-01-05 治理决策
+    const transaction = assertAndGetTransaction(options, 'HierarchyManagementService.batchActivatePermissions')
 
-    try {
-      // 1. 验证操作权限
-      const canOperate = await this.canManageUser(operator_user_id, target_user_id)
-      if (!canOperate) {
-        throw new Error('无权限操作该用户')
-      }
+    // 1. 验证操作权限
+    const canOperate = await this.canManageUser(operator_user_id, target_user_id)
+    if (!canOperate) {
+      throw new Error('无权限操作该用户')
+    }
 
-      // 2. 获取要激活的用户列表
-      let usersToActivate = [target_user_id]
+    // 2. 获取要激活的用户列表
+    let usersToActivate = [target_user_id]
 
-      if (include_subordinates) {
-        const subordinates = await this.getAllSubordinates(target_user_id, true)
-        usersToActivate = [target_user_id, ...subordinates.map(sub => sub.user_id)]
-      }
+    if (include_subordinates) {
+      const subordinates = await this.getAllSubordinates(target_user_id, true)
+      usersToActivate = [target_user_id, ...subordinates.map(sub => sub.user_id)]
+    }
 
-      logger.info(`✅ 准备激活${usersToActivate.length}个用户的权限`)
+    logger.info(`✅ 准备激活${usersToActivate.length}个用户的权限`)
 
-      // 3. 批量激活层级关系（恢复is_active=true，清除停用记录）
-      await UserHierarchy.update(
-        {
-          is_active: true,
-          activated_at: BeijingTimeHelper.createDatabaseTime(),
-          deactivated_at: null,
-          deactivated_by: null,
-          deactivation_reason: null
+    // 3. 批量激活层级关系（恢复is_active=true，清除停用记录）
+    await UserHierarchy.update(
+      {
+        is_active: true,
+        activated_at: BeijingTimeHelper.createDatabaseTime(),
+        deactivated_at: null,
+        deactivated_by: null,
+        deactivation_reason: null
+      },
+      {
+        where: {
+          user_id: { [Op.in]: usersToActivate }
         },
-        {
-          where: {
-            user_id: { [Op.in]: usersToActivate }
-          },
-          transaction
-        }
-      )
-
-      // 4. 批量激活用户角色关联
-      await UserRole.update(
-        {
-          is_active: true
-        },
-        {
-          where: {
-            user_id: { [Op.in]: usersToActivate }
-          },
-          transaction
-        }
-      )
-
-      // 5. 记录操作日志
-      await RoleChangeLog.create(
-        {
-          target_user_id,
-          operator_user_id,
-          operation_type: 'activate',
-          affected_count: usersToActivate.length,
-          reason: '批量激活权限'
-        },
-        { transaction }
-      )
-
-      // 6. 🔄 清除受影响用户的权限缓存（在事务提交前执行，确保数据一致性）
-      await PermissionManager.invalidateMultipleUsers(usersToActivate, 'hierarchy_activate')
-
-      // 7. 提交事务（缓存失效成功后才提交，保证数据一致性）
-      await transaction.commit()
-
-      logger.info(`✅ 成功激活${usersToActivate.length}个用户的权限，并清除缓存`)
-
-      return {
-        success: true,
-        activated_count: usersToActivate.length,
-        activated_users: usersToActivate,
-        message: `成功激活${usersToActivate.length}个用户的权限`
+        transaction
       }
-    } catch (error) {
-      await transaction.rollback()
-      logger.error('❌ 批量激活权限失败:', error.message)
-      throw error
+    )
+
+    // 4. 批量激活用户角色关联
+    await UserRole.update(
+      {
+        is_active: true
+      },
+      {
+        where: {
+          user_id: { [Op.in]: usersToActivate }
+        },
+        transaction
+      }
+    )
+
+    // 5. 记录操作日志
+    await RoleChangeLog.create(
+      {
+        target_user_id,
+        operator_user_id,
+        operation_type: 'activate',
+        affected_count: usersToActivate.length,
+        reason: '批量激活权限'
+      },
+      { transaction }
+    )
+
+    // 6. 🔄 清除受影响用户的权限缓存（事务提交后由入口层处理也可）
+    await PermissionManager.invalidateMultipleUsers(usersToActivate, 'hierarchy_activate')
+
+    logger.info(`✅ 成功激活${usersToActivate.length}个用户的权限，并清除缓存`)
+
+    return {
+      success: true,
+      activated_count: usersToActivate.length,
+      activated_users: usersToActivate,
+      message: `成功激活${usersToActivate.length}个用户的权限`
     }
   }
 

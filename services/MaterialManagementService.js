@@ -7,18 +7,26 @@
  *
  * 架构约束（强制）：
  * - 路由层禁止直接访问 models；写操作必须收口到 Service
- * - 事务由 Service 统一管理；路由层禁止跨表事务
  * - 规则风控校验（循环拦截/套利闭环）在 Service 中执行（保存/启用时触发）
+ *
+ * 事务边界治理（2026-01-05 决策）：
+ * - 所有写操作 **强制要求** 外部事务传入（options.transaction）
+ * - 未提供事务时直接报错（使用 assertAndGetTransaction）
+ * - 服务层禁止自建事务，由入口层统一使用 TransactionManager.execute()
  *
  * 命名与语义：
  * - API 参数使用 snake_case（如 from_asset_code/to_asset_code/effective_at）
- * - “版本化”意味着：改比例必须新增规则（禁止 UPDATE 覆盖历史），禁用仅允许修改 is_enabled
+ * - "版本化"意味着：改比例必须新增规则（禁止 UPDATE 覆盖历史），禁用仅允许修改 is_enabled
+ *
+ * 创建时间：2025年12月
+ * 最后更新：2026年01月05日（事务边界治理改造）
  */
 
 'use strict'
 
-const { sequelize, MaterialConversionRule, MaterialAssetType, User } = require('../models')
+const { MaterialConversionRule, MaterialAssetType, User } = require('../models')
 const MaterialConversionValidator = require('../utils/materialConversionValidator')
+const { assertAndGetTransaction } = require('../utils/transactionHelpers')
 
 /**
  * 材料系统运营管理服务
@@ -96,6 +104,10 @@ class MaterialManagementService {
   /**
    * 创建材料转换规则（管理员）
    *
+   * 事务边界治理（2026-01-05 决策）：
+   * - 强制要求外部事务传入（options.transaction）
+   * - 未提供事务时直接报错，由入口层统一管理事务
+   *
    * 强约束：
    * - 改比例必须新增规则（禁止 UPDATE 覆盖历史）
    * - 保存时触发风控校验：循环拦截 + 套利闭环检测
@@ -108,114 +120,114 @@ class MaterialManagementService {
    * @param {string|Date} payload.effective_at - 生效时间（ISO8601字符串或Date）
    * @param {boolean|string} [payload.is_enabled=true] - 是否启用
    * @param {number} created_by - 创建人 user_id（管理员）
+   * @param {Object} options - 选项
+   * @param {Object} options.transaction - Sequelize事务对象（必填）
    * @returns {Promise<Object>} 创建结果
    */
-  static async createConversionRule (payload, created_by) {
-    const transaction = await sequelize.transaction()
-    try {
-      const {
-        from_asset_code,
-        to_asset_code,
-        from_amount,
-        to_amount,
-        effective_at,
-        is_enabled = true
-      } = payload || {}
+  static async createConversionRule (payload, created_by, options = {}) {
+    // 强制要求事务边界 - 2026-01-05 治理决策
+    const transaction = assertAndGetTransaction(options, 'MaterialManagementService.createConversionRule')
 
-      if (!from_asset_code || !to_asset_code) {
-        this._throw(400, 'missing_params', '缺少必填参数：from_asset_code 和 to_asset_code')
-      }
-      if (!from_amount || parseInt(from_amount) <= 0) {
-        this._throw(400, 'invalid_from_amount', 'from_amount 必须大于0')
-      }
-      if (!to_amount || parseInt(to_amount) <= 0) {
-        this._throw(400, 'invalid_to_amount', 'to_amount 必须大于0')
-      }
-      if (!effective_at) {
-        this._throw(400, 'missing_effective_at', '缺少必填参数：effective_at（生效时间）')
-      }
+    const {
+      from_asset_code,
+      to_asset_code,
+      from_amount,
+      to_amount,
+      effective_at,
+      is_enabled = true
+    } = payload || {}
 
-      const effectiveDate = effective_at instanceof Date ? effective_at : new Date(effective_at)
-      if (isNaN(effectiveDate.getTime())) {
-        this._throw(
-          400,
-          'invalid_date_format',
-          'effective_at 格式无效（请使用 ISO8601 格式，如 2025-12-20T00:00:00.000+08:00）'
-        )
-      }
+    if (!from_asset_code || !to_asset_code) {
+      this._throw(400, 'missing_params', '缺少必填参数：from_asset_code 和 to_asset_code')
+    }
+    if (!from_amount || parseInt(from_amount) <= 0) {
+      this._throw(400, 'invalid_from_amount', 'from_amount 必须大于0')
+    }
+    if (!to_amount || parseInt(to_amount) <= 0) {
+      this._throw(400, 'invalid_to_amount', 'to_amount 必须大于0')
+    }
+    if (!effective_at) {
+      this._throw(400, 'missing_effective_at', '缺少必填参数：effective_at（生效时间）')
+    }
 
-      // 🔴 风控校验：循环拦截 + 套利闭环检测（保存/启用时触发）
-      const tempRule = {
+    const effectiveDate = effective_at instanceof Date ? effective_at : new Date(effective_at)
+    if (isNaN(effectiveDate.getTime())) {
+      this._throw(
+        400,
+        'invalid_date_format',
+        'effective_at 格式无效（请使用 ISO8601 格式，如 2025-12-20T00:00:00.000+08:00）'
+      )
+    }
+
+    // 🔴 风控校验：循环拦截 + 套利闭环检测（保存/启用时触发）
+    const tempRule = {
+      from_asset_code,
+      to_asset_code,
+      from_amount: parseInt(from_amount),
+      to_amount: parseInt(to_amount),
+      effective_at: effectiveDate,
+      is_enabled: is_enabled === true || is_enabled === 'true',
+      rule_id: null
+    }
+    const validationResult = await MaterialConversionValidator.validate(tempRule, { transaction })
+    if (!validationResult.valid) {
+      this._throw(
+        422,
+        'risk_validation_failed',
+        `风控校验失败：${validationResult.errors.join(' | ')}`,
+        { errors: validationResult.errors }
+      )
+    }
+
+    const rule = await MaterialConversionRule.create(
+      {
         from_asset_code,
         to_asset_code,
         from_amount: parseInt(from_amount),
         to_amount: parseInt(to_amount),
         effective_at: effectiveDate,
         is_enabled: is_enabled === true || is_enabled === 'true',
-        rule_id: null
-      }
-      const validationResult = await MaterialConversionValidator.validate(tempRule, { transaction })
-      if (!validationResult.valid) {
-        this._throw(
-          422,
-          'risk_validation_failed',
-          `风控校验失败：${validationResult.errors.join(' | ')}`,
-          { errors: validationResult.errors }
-        )
-      }
+        created_by
+      },
+      { transaction }
+    )
 
-      const rule = await MaterialConversionRule.create(
-        {
-          from_asset_code,
-          to_asset_code,
-          from_amount: parseInt(from_amount),
-          to_amount: parseInt(to_amount),
-          effective_at: effectiveDate,
-          is_enabled: is_enabled === true || is_enabled === 'true',
-          created_by
-        },
-        { transaction }
-      )
-
-      await transaction.commit()
-      return {
-        rule: rule.toJSON(),
-        conversion_rate: parseInt(to_amount) / parseInt(from_amount)
-      }
-    } catch (error) {
-      await transaction.rollback()
-      throw error
+    return {
+      rule: rule.toJSON(),
+      conversion_rate: parseInt(to_amount) / parseInt(from_amount)
     }
   }
 
   /**
    * 禁用材料转换规则（管理员）
    *
+   * 事务边界治理（2026-01-05 决策）：
+   * - 强制要求外部事务传入（options.transaction）
+   * - 未提供事务时直接报错，由入口层统一管理事务
+   *
    * 强约束：
    * - 禁止 UPDATE 覆盖 from_amount/to_amount/effective_at
    * - 只允许修改 is_enabled=false（禁用）
    *
    * @param {number|string} rule_id - 规则ID
+   * @param {Object} options - 选项
+   * @param {Object} options.transaction - Sequelize事务对象（必填）
    * @returns {Promise<Object>} 禁用结果
    */
-  static async disableConversionRule (rule_id) {
-    const transaction = await sequelize.transaction()
-    try {
-      const rule = await MaterialConversionRule.findByPk(rule_id, { transaction })
-      if (!rule) {
-        this._throw(404, 'rule_not_found', '规则不存在')
-      }
-      if (!rule.is_enabled) {
-        this._throw(400, 'rule_already_disabled', '规则已经禁用')
-      }
+  static async disableConversionRule (rule_id, options = {}) {
+    // 强制要求事务边界 - 2026-01-05 治理决策
+    const transaction = assertAndGetTransaction(options, 'MaterialManagementService.disableConversionRule')
 
-      await rule.update({ is_enabled: false }, { transaction })
-      await transaction.commit()
-      return { rule: rule.toJSON() }
-    } catch (error) {
-      await transaction.rollback()
-      throw error
+    const rule = await MaterialConversionRule.findByPk(rule_id, { transaction })
+    if (!rule) {
+      this._throw(404, 'rule_not_found', '规则不存在')
     }
+    if (!rule.is_enabled) {
+      this._throw(400, 'rule_already_disabled', '规则已经禁用')
+    }
+
+    await rule.update({ is_enabled: false }, { transaction })
+    return { rule: rule.toJSON() }
   }
 
   /**
@@ -247,87 +259,91 @@ class MaterialManagementService {
   /**
    * 创建材料资产类型（管理员）
    *
+   * 事务边界治理（2026-01-05 决策）：
+   * - 强制要求外部事务传入（options.transaction）
+   * - 未提供事务时直接报错，由入口层统一管理事务
+   *
    * @param {Object} payload - 资产类型内容
+   * @param {Object} options - 选项
+   * @param {Object} options.transaction - Sequelize事务对象（必填）
    * @returns {Promise<Object>} 创建结果
    */
-  static async createAssetType (payload) {
-    const transaction = await sequelize.transaction()
-    try {
-      const {
+  static async createAssetType (payload, options = {}) {
+    // 强制要求事务边界 - 2026-01-05 治理决策
+    const transaction = assertAndGetTransaction(options, 'MaterialManagementService.createAssetType')
+
+    const {
+      asset_code,
+      display_name,
+      group_code,
+      form,
+      tier,
+      sort_order = 0,
+      visible_value_points,
+      budget_value_points,
+      is_enabled = true
+    } = payload || {}
+
+    if (!asset_code || !display_name || !group_code || !form || tier === undefined) {
+      this._throw(
+        400,
+        'missing_params',
+        '缺少必填参数：asset_code/display_name/group_code/form/tier'
+      )
+    }
+    if (!['shard', 'crystal'].includes(form)) {
+      this._throw(400, 'invalid_form', 'form 必须为 shard 或 crystal')
+    }
+
+    const existing = await MaterialAssetType.findOne({ where: { asset_code }, transaction })
+    if (existing) {
+      this._throw(409, 'asset_code_exists', `资产代码 ${asset_code} 已存在`)
+    }
+
+    const assetType = await MaterialAssetType.create(
+      {
         asset_code,
         display_name,
         group_code,
         form,
-        tier,
-        sort_order = 0,
-        visible_value_points,
-        budget_value_points,
-        is_enabled = true
-      } = payload || {}
+        tier: parseInt(tier),
+        sort_order: parseInt(sort_order),
+        visible_value_points: visible_value_points ? parseInt(visible_value_points) : null,
+        budget_value_points: budget_value_points ? parseInt(budget_value_points) : null,
+        is_enabled: is_enabled === true || is_enabled === 'true'
+      },
+      { transaction }
+    )
 
-      if (!asset_code || !display_name || !group_code || !form || tier === undefined) {
-        this._throw(
-          400,
-          'missing_params',
-          '缺少必填参数：asset_code/display_name/group_code/form/tier'
-        )
-      }
-      if (!['shard', 'crystal'].includes(form)) {
-        this._throw(400, 'invalid_form', 'form 必须为 shard 或 crystal')
-      }
-
-      const existing = await MaterialAssetType.findOne({ where: { asset_code }, transaction })
-      if (existing) {
-        this._throw(409, 'asset_code_exists', `资产代码 ${asset_code} 已存在`)
-      }
-
-      const assetType = await MaterialAssetType.create(
-        {
-          asset_code,
-          display_name,
-          group_code,
-          form,
-          tier: parseInt(tier),
-          sort_order: parseInt(sort_order),
-          visible_value_points: visible_value_points ? parseInt(visible_value_points) : null,
-          budget_value_points: budget_value_points ? parseInt(budget_value_points) : null,
-          is_enabled: is_enabled === true || is_enabled === 'true'
-        },
-        { transaction }
-      )
-
-      await transaction.commit()
-      return { asset_type: assetType.toJSON() }
-    } catch (error) {
-      await transaction.rollback()
-      throw error
-    }
+    return { asset_type: assetType.toJSON() }
   }
 
   /**
    * 禁用材料资产类型（管理员）
    *
+   * 事务边界治理（2026-01-05 决策）：
+   * - 强制要求外部事务传入（options.transaction）
+   * - 未提供事务时直接报错，由入口层统一管理事务
+   *
    * @param {string} asset_code - 资产代码
+   * @param {Object} options - 选项
+   * @param {Object} options.transaction - Sequelize事务对象（必填）
    * @returns {Promise<Object>} 禁用结果
    */
-  static async disableAssetType (asset_code) {
-    const transaction = await sequelize.transaction()
-    try {
-      const assetType = await MaterialAssetType.findOne({ where: { asset_code }, transaction })
-      if (!assetType) {
-        this._throw(404, 'asset_type_not_found', '材料资产类型不存在')
-      }
-      if (!assetType.is_enabled) {
-        this._throw(400, 'asset_type_already_disabled', '材料资产类型已经禁用')
-      }
+  static async disableAssetType (asset_code, options = {}) {
+    // 强制要求事务边界 - 2026-01-05 治理决策
+    const transaction = assertAndGetTransaction(options, 'MaterialManagementService.disableAssetType')
 
-      await assetType.update({ is_enabled: false }, { transaction })
-      await transaction.commit()
-      return { asset_type: assetType.toJSON() }
-    } catch (error) {
-      await transaction.rollback()
-      throw error
+    const assetType = await MaterialAssetType.findOne({ where: { asset_code }, transaction })
+    if (!assetType) {
+      this._throw(404, 'asset_type_not_found', '材料资产类型不存在')
     }
+    if (!assetType.is_enabled) {
+      this._throw(400, 'asset_type_already_disabled', '材料资产类型已经禁用')
+    }
+
+    await assetType.update({ is_enabled: false }, { transaction })
+    return { asset_type: assetType.toJSON() }
   }
 }
 

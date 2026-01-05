@@ -19,8 +19,12 @@
  * - 统一只接受 Header Idempotency-Key
  * - 缺失幂等键直接返回 400
  *
+ * 事务边界治理（2026-01-05 决策）：
+ * - 写操作使用 TransactionManager.execute() 统一管理事务
+ * - IdempotencyService 在事务外执行（独立幂等检查）
+ *
  * 创建时间：2025年12月22日
- * 更新时间：2026年01月02日 - 业界标准形态破坏性重构
+ * 更新时间：2026年01月05日 - 事务边界治理改造
  */
 
 const express = require('express')
@@ -28,6 +32,7 @@ const router = express.Router()
 const { authenticateToken } = require('../../../../middleware/auth')
 const { handleServiceError } = require('../../../../middleware/validation')
 const logger = require('../../../../utils/logger').logger
+const TransactionManager = require('../../../../utils/TransactionManager')
 // 业界标准幂等架构 - 统一入口幂等服务
 const IdempotencyService = require('../../../../services/IdempotencyService')
 
@@ -190,22 +195,29 @@ router.post('/convert', authenticateToken, async (req, res) => {
     }
 
     /*
-     * 调用服务层执行转换（传递 idempotency_key）
+     * 调用服务层执行转换（使用 TransactionManager 统一管理事务）
+     * 2026-01-05 事务边界治理：路由层提供事务，服务层不再自建事务
      */
-    const result = await AssetConversionService.convertMaterial(
-      user_id,
-      from_asset_code,
-      to_asset_code,
-      parsedAmount,
-      {
-        idempotency_key,
-        title: '碎红水晶分解为钻石',
-        meta: {
-          source: 'api',
-          endpoint: '/api/v4/assets/convert',
-          request_time: new Date().toISOString()
-        }
-      }
+    const result = await TransactionManager.execute(
+      async transaction => {
+        return await AssetConversionService.convertMaterial(
+          user_id,
+          from_asset_code,
+          to_asset_code,
+          parsedAmount,
+          {
+            idempotency_key,
+            title: '碎红水晶分解为钻石',
+            meta: {
+              source: 'api',
+              endpoint: '/api/v4/assets/convert',
+              request_time: new Date().toISOString()
+            },
+            transaction
+          }
+        )
+      },
+      { description: 'convertMaterial' }
     )
 
     // 构建响应数据

@@ -7,13 +7,16 @@
  *
  * 架构规范：
  * - 路由层不直连 models（通过 Service 层）
+ * - 写操作使用 TransactionManager.execute() 统一管理事务
  * - 使用 AdminLotteryService 封装所有抽奖管理逻辑
  *
  * 创建时间：2025-12-22
+ * 更新时间：2026-01-05（事务边界治理改造）
  */
 
 const express = require('express')
 const router = express.Router()
+const TransactionManager = require('../../../../utils/TransactionManager')
 const { adminAuthMiddleware, asyncHandler, validators } = require('../shared/middleware')
 
 /**
@@ -70,12 +73,18 @@ router.delete(
       // 通过 ServiceManager 获取 AdminLotteryService
       const AdminLotteryService = req.app.locals.services.getService('adminLottery')
 
-      // 🔧 V4.3修复：调用正确的服务层方法名 clearUserSettings，参数顺序为(adminId, userId, settingType, reason)
-      const result = await AdminLotteryService.clearUserSettings(
-        req.user?.user_id || req.user?.id,
-        validatedUserId,
-        null, // settingType: null表示清除所有设置
-        reason
+      // 使用 TransactionManager 统一管理事务（2026-01-05 事务边界治理）
+      const result = await TransactionManager.execute(
+        async transaction => {
+          return await AdminLotteryService.clearUserSettings(
+            req.user?.user_id || req.user?.id,
+            validatedUserId,
+            null, // settingType: null表示清除所有设置
+            reason,
+            { transaction }
+          )
+        },
+        { description: 'clearUserSettings' }
       )
 
       return res.apiSuccess(result, '用户抽奖设置清理成功')

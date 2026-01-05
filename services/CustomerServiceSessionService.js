@@ -18,10 +18,10 @@ const logger = require('../utils/logger').logger
  * - ChatWebSocketService：实时消息推送
  * - NotificationService：通知推送
  *
- * 事务边界治理（2026-01-05 改造）：
- * - 所有写操作支持外部事务传入（options.transaction）
- * - 未提供事务时自建事务，由方法自行管理提交/回滚
- * - 符合"服务层支持外部事务"的统一编排模式
+ * 事务边界治理（2026-01-05 决策）：
+ * - 所有写操作 **强制要求** 外部事务传入（options.transaction）
+ * - 未提供事务时直接报错（使用 assertAndGetTransaction）
+ * - 服务层禁止自建事务，由入口层统一使用 TransactionManager.execute()
  *
  * 创建时间：2025年11月23日
  * 最后更新：2026年01月05日（事务边界治理改造）
@@ -29,7 +29,8 @@ const logger = require('../utils/logger').logger
 
 const { CustomerServiceSession, ChatMessage, User } = require('../models')
 const BeijingTimeHelper = require('../utils/timeHelper')
-const { Sequelize, Transaction } = require('sequelize')
+const { Sequelize } = require('sequelize')
+const { assertAndGetTransaction } = require('../utils/transactionHelpers')
 const { Op } = Sequelize
 const businessConfig = require('../config/business.config')
 
@@ -472,159 +473,117 @@ class CustomerServiceSessionService {
    * - 客服在管理后台回复用户消息
    * - 自动更新会话状态和最后消息时间
    *
-   * 事务边界治理（2026-01-05）：
-   * - 支持外部事务传入（options.transaction）
-   * - 未提供事务时自建事务，由方法自行管理提交/回滚
+   * 事务边界治理（2026-01-05 决策）：
+   * - 强制要求外部事务传入（options.transaction）
+   * - 未提供事务时直接报错，由入口层统一管理事务
    *
    * @param {number} session_id - 会话ID
    * @param {Object} data - 消息数据
    * @param {number} data.admin_id - 发送客服的ID
    * @param {string} data.content - 消息内容
    * @param {string} [data.message_type='text'] - 消息类型（text/image/system）
-   * @param {Object} [options={}] - 选项
-   * @param {Object} [options.transaction] - 外部事务对象（可选）
+   * @param {Object} options - 选项
+   * @param {Object} options.transaction - 外部事务对象（必填）
    * @returns {Object} 创建的消息对象
    */
   static async sendMessage (session_id, data, options = {}) {
-    const sequelize = CustomerServiceSession.sequelize
-    const externalTransaction = options.transaction
-    const transaction = externalTransaction || await sequelize.transaction({
-      isolationLevel: Transaction.ISOLATION_LEVELS.READ_COMMITTED
+    // 强制要求事务边界 - 2026-01-05 治理决策
+    const transaction = assertAndGetTransaction(options, 'CustomerServiceSessionService.sendMessage')
+
+    const { admin_id, content, message_type = 'text', role_level = 100 } = data
+
+    logger.info(`📤 管理员 ${admin_id} 向会话 ${session_id} 发送消息`)
+
+    // ✅ 1. XSS内容安全过滤
+    const sanitized_content = sanitizeContent(content)
+
+    // ✅ 2. 敏感词检测
+    const sensitiveCheck = checkSensitiveWords(sanitized_content)
+    if (!sensitiveCheck.passed) {
+      throw new Error(`消息包含敏感词：${sensitiveCheck.matchedWord}`)
+    }
+
+    /*
+     * ✅ 3. 频率限制检查
+     * ✅ P2-F架构重构：使用 ChatRateLimitService 统一管理频率限制
+     * 管理员使用 role_level >= 100 标识
+     */
+    const rateLimitCheck = ChatRateLimitService.checkMessageRateLimit(admin_id, 100)
+    if (!rateLimitCheck.allowed) {
+      throw new Error(`发送消息过于频繁，每分钟最多${rateLimitCheck.limit}条`)
+    }
+
+    // ✅ 4. 验证会话是否存在
+    const session = await CustomerServiceSession.findOne({
+      where: { session_id },
+      transaction
     })
 
-    try {
-      const { admin_id, content, message_type = 'text', role_level = 100 } = data
+    if (!session) {
+      throw new Error('会话不存在')
+    }
 
-      logger.info(`📤 管理员 ${admin_id} 向会话 ${session_id} 发送消息`)
+    // ✅ 4.5. 验证会话状态（只有waiting/assigned/active可回复）
+    const ACTIVE_STATUS = ['waiting', 'assigned', 'active']
+    if (!ACTIVE_STATUS.includes(session.status)) {
+      throw new Error(`会话已关闭，无法发送消息（当前状态：${session.status}）`)
+    }
 
-      // ✅ 1. XSS内容安全过滤
-      const sanitized_content = sanitizeContent(content)
-
-      // ✅ 2. 敏感词检测
-      const sensitiveCheck = checkSensitiveWords(sanitized_content)
-      if (!sensitiveCheck.passed) {
-        throw new Error(`消息包含敏感词：${sensitiveCheck.matchedWord}`)
+    // ✅ 5. 权限细分控制（支持超级管理员接管）
+    if (session.admin_id && session.admin_id !== admin_id) {
+      if (role_level < 200) {
+        throw new Error('无权限操作此会话，需要超级管理员权限')
       }
+      logger.info(`⚠️ 超级管理员 ${admin_id} 接管会话 ${session_id}`)
+    }
 
-      /*
-       * ✅ 3. 频率限制检查
-       * ✅ P2-F架构重构：使用 ChatRateLimitService 统一管理频率限制
-       * 管理员使用 role_level >= 100 标识
-       */
-      const rateLimitCheck = ChatRateLimitService.checkMessageRateLimit(admin_id, 100)
-      if (!rateLimitCheck.allowed) {
-        throw new Error(`发送消息过于频繁，每分钟最多${rateLimitCheck.limit}条`)
-      }
-
-      // ✅ 4. 验证会话是否存在
-      const session = await CustomerServiceSession.findOne({
-        where: { session_id },
-        transaction
-      })
-
-      if (!session) {
-        throw new Error('会话不存在')
-      }
-
-      // ✅ 4.5. 验证会话状态（只有waiting/assigned/active可回复）
-      const ACTIVE_STATUS = ['waiting', 'assigned', 'active']
-      if (!ACTIVE_STATUS.includes(session.status)) {
-        throw new Error(`会话已关闭，无法发送消息（当前状态：${session.status}）`)
-      }
-
-      // ✅ 5. 权限细分控制（支持超级管理员接管）
-      if (session.admin_id && session.admin_id !== admin_id) {
-        if (role_level < 200) {
-          throw new Error('无权限操作此会话，需要超级管理员权限')
-        }
-        logger.info(`⚠️ 超级管理员 ${admin_id} 接管会话 ${session_id}`)
-      }
-
-      // ✅ 6. 自动分配未分配的会话
-      if (!session.admin_id) {
-        await session.update(
-          {
-            admin_id,
-            status: 'assigned'
-          },
-          { transaction }
-        )
-      }
-
-      // ✅ 7. 创建消息记录（使用过滤后的内容）
-      const message = await ChatMessage.create(
-        {
-          session_id,
-          sender_id: admin_id,
-          sender_type: 'admin',
-          message_source: 'admin_client',
-          content: sanitized_content,
-          message_type,
-          status: 'sent'
-        },
-        { transaction }
-      )
-
-      // ✅ 8. 更新会话的最后消息时间
+    // ✅ 6. 自动分配未分配的会话
+    if (!session.admin_id) {
       await session.update(
         {
-          last_message_at: new Date(),
-          status:
-            session.status === 'waiting' || session.status === 'assigned'
-              ? 'active'
-              : session.status
+          admin_id,
+          status: 'assigned'
         },
         { transaction }
       )
+    }
 
-      // 仅在自建事务时提交
-      if (!externalTransaction) {
-        await transaction.commit()
-      }
-
-      logger.info(`✅ 消息发送成功，消息ID: ${message.message_id}`)
-
-      // ✅ 9. WebSocket实时推送（事务外执行）
-      let pushed = false
-      try {
-        const ChatWebSocketService = require('./ChatWebSocketService')
-        const messageData = {
-          message_id: message.message_id,
-          session_id,
-          sender_id: admin_id,
-          sender_type: 'admin',
-          content: sanitized_content,
-          message_type: message.message_type,
-          created_at: message.created_at
-        }
-        pushed = ChatWebSocketService.pushMessageToUser(session.user_id, messageData)
-
-        if (pushed) {
-          logger.info(`📤 消息已实时推送给用户 ${session.user_id}`)
-        } else {
-          logger.info(`⚠️ 用户 ${session.user_id} 不在线，消息已保存`)
-        }
-      } catch (wsError) {
-        logger.error('❌ WebSocket推送失败:', wsError)
-        // 不影响消息发送成功
-      }
-
-      // ✅ 10. 返回详细结果
-      return {
-        message_id: message.message_id,
+    // ✅ 7. 创建消息记录（使用过滤后的内容）
+    const message = await ChatMessage.create(
+      {
+        session_id,
+        sender_id: admin_id,
+        sender_type: 'admin',
+        message_source: 'admin_client',
         content: sanitized_content,
-        sender_type: message.sender_type,
-        message_type: message.message_type,
-        created_at: BeijingTimeHelper.formatForAPI(message.created_at).iso,
-        pushed // 标识是否实时推送成功
-      }
-    } catch (error) {
-      // 仅在自建事务时回滚
-      if (!externalTransaction) {
-        await transaction.rollback()
-      }
-      logger.error('❌ 发送消息失败:', error)
-      throw error
+        message_type,
+        status: 'sent'
+      },
+      { transaction }
+    )
+
+    // ✅ 8. 更新会话的最后消息时间
+    await session.update(
+      {
+        last_message_at: new Date(),
+        status:
+          session.status === 'waiting' || session.status === 'assigned'
+            ? 'active'
+            : session.status
+      },
+      { transaction }
+    )
+
+    logger.info(`✅ 消息发送成功，消息ID: ${message.message_id}`)
+
+    // ✅ 9. 返回结果（WebSocket推送由入口层事务提交后处理）
+    return {
+      message_id: message.message_id,
+      content: sanitized_content,
+      sender_type: message.sender_type,
+      message_type: message.message_type,
+      created_at: BeijingTimeHelper.formatForAPI(message.created_at).iso,
+      session_user_id: session.user_id // 供入口层推送WebSocket使用
     }
   }
 
@@ -636,99 +595,82 @@ class CustomerServiceSessionService {
    * - 自动验证会话权限（用户只能向自己的会话发送消息）
    * - 检查会话状态（已关闭的会话无法发送）
    *
-   * 事务边界治理（2026-01-05）：
-   * - 支持外部事务传入（options.transaction）
-   * - 未提供事务时自建事务，由方法自行管理提交/回滚
+   * 事务边界治理（2026-01-05 决策）：
+   * - 强制要求外部事务传入（options.transaction）
+   * - 未提供事务时直接报错，由入口层统一管理事务
    *
    * @param {number} session_id - 会话ID
    * @param {Object} data - 消息数据
    * @param {number} data.user_id - 发送用户的ID
    * @param {string} data.content - 消息内容（应该已经过滤和验证）
    * @param {string} [data.message_type='text'] - 消息类型（text/image）
-   * @param {Object} [options={}] - 选项
-   * @param {Object} [options.transaction] - 外部事务对象（可选）
+   * @param {Object} options - 选项
+   * @param {Object} options.transaction - 外部事务对象（必填）
    * @returns {Object} 创建的消息对象
    * @throws {Error} 会话不存在、无权限、会话已关闭等错误
    */
   static async sendUserMessage (session_id, data, options = {}) {
-    const sequelize = CustomerServiceSession.sequelize
-    const externalTransaction = options.transaction
-    const transaction = externalTransaction || await sequelize.transaction({
-      isolationLevel: Transaction.ISOLATION_LEVELS.READ_COMMITTED
+    // 强制要求事务边界 - 2026-01-05 治理决策
+    const transaction = assertAndGetTransaction(options, 'CustomerServiceSessionService.sendUserMessage')
+
+    const { user_id, content, message_type = 'text' } = data
+
+    logger.info(`📤 用户 ${user_id} 向会话 ${session_id} 发送消息`)
+
+    // ✅ 1. 验证会话是否存在且属于该用户
+    const session = await CustomerServiceSession.findOne({
+      where: {
+        session_id,
+        user_id // 用户只能向自己的会话发送消息
+      },
+      transaction
     })
 
-    try {
-      const { user_id, content, message_type = 'text' } = data
+    if (!session) {
+      throw new Error('会话不存在或无权限访问')
+    }
 
-      logger.info(`📤 用户 ${user_id} 向会话 ${session_id} 发送消息`)
+    // ✅ 2. 检查会话状态（只有waiting/assigned/active可发送消息）
+    const ACTIVE_STATUS = ['waiting', 'assigned', 'active']
+    if (!ACTIVE_STATUS.includes(session.status)) {
+      throw new Error(`会话已关闭，无法发送消息（当前状态：${session.status}）`)
+    }
 
-      // ✅ 1. 验证会话是否存在且属于该用户
-      const session = await CustomerServiceSession.findOne({
-        where: {
-          session_id,
-          user_id // 用户只能向自己的会话发送消息
-        },
-        transaction
-      })
-
-      if (!session) {
-        throw new Error('会话不存在或无权限访问')
-      }
-
-      // ✅ 2. 检查会话状态（只有waiting/assigned/active可发送消息）
-      const ACTIVE_STATUS = ['waiting', 'assigned', 'active']
-      if (!ACTIVE_STATUS.includes(session.status)) {
-        throw new Error(`会话已关闭，无法发送消息（当前状态：${session.status}）`)
-      }
-
-      // ✅ 3. 创建消息记录
-      const message = await ChatMessage.create(
-        {
-          session_id,
-          sender_id: user_id,
-          sender_type: 'user',
-          message_source: 'user_client',
-          content,
-          message_type,
-          status: 'sent'
-        },
-        { transaction }
-      )
-
-      // ✅ 4. 更新会话的最后消息时间
-      await session.update(
-        {
-          last_message_at: new Date(),
-          updated_at: new Date()
-        },
-        { transaction }
-      )
-
-      // 仅在自建事务时提交
-      if (!externalTransaction) {
-        await transaction.commit()
-      }
-
-      logger.info(`✅ 用户消息发送成功，消息ID: ${message.message_id}`)
-
-      // ✅ 5. 返回消息数据（供WebSocket推送使用）
-      return {
-        message_id: message.message_id,
+    // ✅ 3. 创建消息记录
+    const message = await ChatMessage.create(
+      {
         session_id,
         sender_id: user_id,
         sender_type: 'user',
-        content: message.content,
-        message_type: message.message_type,
-        created_at: BeijingTimeHelper.formatForAPI(message.created_at).iso,
-        session_admin_id: session.admin_id // 🔴 返回会话的admin_id（用于WebSocket推送）
-      }
-    } catch (error) {
-      // 仅在自建事务时回滚
-      if (!externalTransaction) {
-        await transaction.rollback()
-      }
-      logger.error('❌ 用户发送消息失败:', error)
-      throw error
+        message_source: 'user_client',
+        content,
+        message_type,
+        status: 'sent'
+      },
+      { transaction }
+    )
+
+    // ✅ 4. 更新会话的最后消息时间
+    await session.update(
+      {
+        last_message_at: new Date(),
+        updated_at: new Date()
+      },
+      { transaction }
+    )
+
+    logger.info(`✅ 用户消息发送成功，消息ID: ${message.message_id}`)
+
+    // ✅ 5. 返回消息数据（供入口层WebSocket推送使用）
+    return {
+      message_id: message.message_id,
+      session_id,
+      sender_id: user_id,
+      sender_type: 'user',
+      content: message.content,
+      message_type: message.message_type,
+      created_at: BeijingTimeHelper.formatForAPI(message.created_at).iso,
+      session_admin_id: session.admin_id // 返回会话的admin_id（用于WebSocket推送）
     }
   }
 
@@ -789,102 +731,78 @@ class CustomerServiceSessionService {
    * - 当前客服无法处理，转接给其他客服
    * - 自动创建系统消息记录转接操作
    *
-   * 事务边界治理（2026-01-05）：
-   * - 支持外部事务传入（options.transaction）
-   * - 未提供事务时自建事务，由方法自行管理提交/回滚
+   * 事务边界治理（2026-01-05 决策）：
+   * - 强制要求外部事务传入（options.transaction）
+   * - 未提供事务时直接报错，由入口层统一管理事务
    *
    * @param {number} session_id - 会话ID
    * @param {number} current_admin_id - 当前客服ID
    * @param {number} target_admin_id - 目标客服ID
-   * @param {Object} [options={}] - 选项
-   * @param {Object} [options.transaction] - 外部事务对象（可选）
+   * @param {Object} options - 选项
+   * @param {Object} options.transaction - 外部事务对象（必填）
    * @returns {Object} 转接结果
    */
   static async transferSession (session_id, current_admin_id, target_admin_id, options = {}) {
-    const sequelize = CustomerServiceSession.sequelize
-    const externalTransaction = options.transaction
-    const transaction = externalTransaction || await sequelize.transaction({
-      isolationLevel: Transaction.ISOLATION_LEVELS.READ_COMMITTED
+    // 强制要求事务边界 - 2026-01-05 治理决策
+    const transaction = assertAndGetTransaction(options, 'CustomerServiceSessionService.transferSession')
+
+    logger.info(`🔄 转接会话 ${session_id}: ${current_admin_id} → ${target_admin_id}`)
+
+    // 验证会话
+    const session = await CustomerServiceSession.findOne({
+      where: { session_id },
+      transaction
     })
 
-    try {
-      logger.info(`🔄 转接会话 ${session_id}: ${current_admin_id} → ${target_admin_id}`)
+    if (!session) {
+      throw new Error('会话不存在')
+    }
 
-      // 验证会话
-      const session = await CustomerServiceSession.findOne({
-        where: { session_id },
-        transaction
-      })
+    // 验证权限
+    if (session.admin_id && session.admin_id !== current_admin_id) {
+      throw new Error('无权限转接此会话')
+    }
 
-      if (!session) {
-        throw new Error('会话不存在')
-      }
+    // 获取客服信息
+    const [currentAdmin, targetAdmin] = await Promise.all([
+      User.findByPk(current_admin_id, { attributes: ['nickname'], transaction }),
+      User.findByPk(target_admin_id, { attributes: ['nickname'], transaction })
+    ])
 
-      // 验证权限
-      if (session.admin_id && session.admin_id !== current_admin_id) {
-        throw new Error('无权限转接此会话')
-      }
+    if (!targetAdmin) {
+      throw new Error('目标客服不存在')
+    }
 
-      // 获取客服信息
-      const [currentAdmin, targetAdmin] = await Promise.all([
-        User.findByPk(current_admin_id, { attributes: ['nickname'], transaction }),
-        User.findByPk(target_admin_id, { attributes: ['nickname'], transaction })
-      ])
+    // 更新会话的客服
+    await session.update(
+      {
+        admin_id: target_admin_id,
+        status: 'assigned'
+      },
+      { transaction }
+    )
 
-      if (!targetAdmin) {
-        throw new Error('目标客服不存在')
-      }
-
-      // 更新会话的客服
-      await session.update(
-        {
-          admin_id: target_admin_id,
-          status: 'assigned'
-        },
-        { transaction }
-      )
-
-      // 创建系统消息记录转接操作
-      const systemMessage = await ChatMessage.create(
-        {
-          session_id,
-          sender_id: null,
-          sender_type: 'admin',
-          message_source: 'system',
-          content: `会话已从 ${currentAdmin?.nickname || '客服'} 转接给 ${targetAdmin.nickname}`,
-          message_type: 'system',
-          status: 'sent'
-        },
-        { transaction }
-      )
-
-      // 仅在自建事务时提交
-      if (!externalTransaction) {
-        await transaction.commit()
-      }
-
-      logger.info('✅ 会话转接成功')
-
-      /**
-       * 通知目标客服有新会话（设计预留）
-       *
-       * 当前实现：通过WebSocket实时推送通知
-       * 扩展方式：如需接入其他通知渠道（如APP推送），可在此处集成NotificationService
-       */
-
-      return {
+    // 创建系统消息记录转接操作
+    const systemMessage = await ChatMessage.create(
+      {
         session_id,
-        new_admin_id: target_admin_id,
-        new_admin_name: targetAdmin.nickname,
-        system_message_id: systemMessage.message_id
-      }
-    } catch (error) {
-      // 仅在自建事务时回滚
-      if (!externalTransaction) {
-        await transaction.rollback()
-      }
-      logger.error('❌ 转接会话失败:', error)
-      throw error
+        sender_id: null,
+        sender_type: 'admin',
+        message_source: 'system',
+        content: `会话已从 ${currentAdmin?.nickname || '客服'} 转接给 ${targetAdmin.nickname}`,
+        message_type: 'system',
+        status: 'sent'
+      },
+      { transaction }
+    )
+
+    logger.info('✅ 会话转接成功')
+
+    return {
+      session_id,
+      new_admin_id: target_admin_id,
+      new_admin_name: targetAdmin.nickname,
+      system_message_id: systemMessage.message_id
     }
   }
 
@@ -895,89 +813,72 @@ class CustomerServiceSessionService {
    * - 客服处理完成，关闭会话
    * - 记录关闭原因和关闭时间
    *
-   * 事务边界治理（2026-01-05）：
-   * - 支持外部事务传入（options.transaction）
-   * - 未提供事务时自建事务，由方法自行管理提交/回滚
+   * 事务边界治理（2026-01-05 决策）：
+   * - 强制要求外部事务传入（options.transaction）
+   * - 未提供事务时直接报错，由入口层统一管理事务
    *
    * @param {number} session_id - 会话ID
    * @param {Object} data - 关闭数据
    * @param {number} data.admin_id - 操作客服ID
    * @param {string} [data.close_reason] - 关闭原因
-   * @param {Object} [options={}] - 选项
-   * @param {Object} [options.transaction] - 外部事务对象（可选）
+   * @param {Object} options - 选项
+   * @param {Object} options.transaction - 外部事务对象（必填）
    * @returns {Object} 关闭结果
    */
   static async closeSession (session_id, data, options = {}) {
-    const sequelize = CustomerServiceSession.sequelize
-    const externalTransaction = options.transaction
-    const transaction = externalTransaction || await sequelize.transaction({
-      isolationLevel: Transaction.ISOLATION_LEVELS.READ_COMMITTED
+    // 强制要求事务边界 - 2026-01-05 治理决策
+    const transaction = assertAndGetTransaction(options, 'CustomerServiceSessionService.closeSession')
+
+    const { admin_id, close_reason = '问题已解决' } = data
+
+    logger.info(`🔒 管理员 ${admin_id} 关闭会话 ${session_id}`)
+
+    // 验证会话
+    const session = await CustomerServiceSession.findOne({
+      where: { session_id },
+      transaction
     })
 
-    try {
-      const { admin_id, close_reason = '问题已解决' } = data
+    if (!session) {
+      throw new Error('会话不存在')
+    }
 
-      logger.info(`🔒 管理员 ${admin_id} 关闭会话 ${session_id}`)
+    // 验证权限
+    if (session.admin_id && session.admin_id !== admin_id) {
+      throw new Error('无权限关闭此会话')
+    }
 
-      // 验证会话
-      const session = await CustomerServiceSession.findOne({
-        where: { session_id },
-        transaction
-      })
-
-      if (!session) {
-        throw new Error('会话不存在')
-      }
-
-      // 验证权限
-      if (session.admin_id && session.admin_id !== admin_id) {
-        throw new Error('无权限关闭此会话')
-      }
-
-      // 更新会话状态
-      await session.update(
-        {
-          status: 'closed',
-          closed_at: new Date(),
-          closed_by: admin_id,
-          close_reason
-        },
-        { transaction }
-      )
-
-      // 创建系统消息
-      await ChatMessage.create(
-        {
-          session_id,
-          sender_id: null,
-          sender_type: 'admin',
-          message_source: 'system',
-          content: `会话已关闭：${close_reason}`,
-          message_type: 'system',
-          status: 'sent'
-        },
-        { transaction }
-      )
-
-      // 仅在自建事务时提交
-      if (!externalTransaction) {
-        await transaction.commit()
-      }
-
-      logger.info('✅ 会话关闭成功')
-
-      return {
-        session_id,
+    // 更新会话状态
+    await session.update(
+      {
         status: 'closed',
-        closed_at: BeijingTimeHelper.formatForAPI(new Date()).iso
-      }
-    } catch (error) {
-      // 仅在自建事务时回滚
-      if (!externalTransaction) {
-        await transaction.rollback()
-      }
-      logger.error('❌ 关闭会话失败:', error)
-      throw error
+        closed_at: new Date(),
+        closed_by: admin_id,
+        close_reason
+      },
+      { transaction }
+    )
+
+    // 创建系统消息
+    await ChatMessage.create(
+      {
+        session_id,
+        sender_id: null,
+        sender_type: 'admin',
+        message_source: 'system',
+        content: `会话已关闭：${close_reason}`,
+        message_type: 'system',
+        status: 'sent'
+      },
+      { transaction }
+    )
+
+    logger.info('✅ 会话关闭成功')
+
+    return {
+      session_id,
+      status: 'closed',
+      closed_at: BeijingTimeHelper.formatForAPI(new Date()).iso
     }
   }
 

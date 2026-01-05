@@ -4,14 +4,16 @@
  * @description 奖品池管理相关路由，包括奖品添加、查询、修改等
  * @version 4.0.0
  * @date 2025-09-24
+ * @updated 2026-01-05（事务边界治理改造）
  *
  * 架构原则：
  * - 路由层不直连 models（所有数据库操作通过 Service 层）
- * - 路由层不开启事务（事务管理在 Service 层）
+ * - 写操作使用 TransactionManager.execute() 统一管理事务
  * - 通过 ServiceManager 统一获取服务实例
  */
 
 const express = require('express')
+const TransactionManager = require('../../../utils/TransactionManager')
 const router = express.Router()
 const {
   sharedComponents,
@@ -55,10 +57,16 @@ router.post(
       // 通过 ServiceManager 获取 PrizePoolService
       const PrizePoolService = req.app.locals.services.getService('prizePool')
 
-      // 调用 Service 层方法（Service 内部管理事务）
-      const result = await PrizePoolService.batchAddPrizes(campaign_id, prizes, {
-        created_by: req.user?.id
-      })
+      // 使用 TransactionManager 统一管理事务（2026-01-05 事务边界治理）
+      const result = await TransactionManager.execute(
+        async transaction => {
+          return await PrizePoolService.batchAddPrizes(campaign_id, prizes, {
+            created_by: req.user?.id,
+            transaction
+          })
+        },
+        { description: 'batchAddPrizes' }
+      )
 
       sharedComponents.logger.info('批量添加奖品成功', {
         campaign_id,
@@ -192,10 +200,16 @@ router.put(
       // 通过 ServiceManager 获取 PrizePoolService
       const PrizePoolService = req.app.locals.services.getService('prizePool')
 
-      // 调用 Service 层方法
-      const result = await PrizePoolService.updatePrize(prize_id, updateData, {
-        updated_by: req.user?.id
-      })
+      // 使用 TransactionManager 统一管理事务（2026-01-05 事务边界治理）
+      const result = await TransactionManager.execute(
+        async transaction => {
+          return await PrizePoolService.updatePrize(prize_id, updateData, {
+            updated_by: req.user?.id,
+            transaction
+          })
+        },
+        { description: 'updatePrize' }
+      )
 
       sharedComponents.logger.info('奖品信息更新成功', {
         prize_id,
@@ -249,10 +263,16 @@ router.post(
       // 通过 ServiceManager 获取 PrizePoolService
       const PrizePoolService = req.app.locals.services.getService('prizePool')
 
-      // 调用 Service 层方法（Service 内部管理事务）
-      const result = await PrizePoolService.addStock(prizeId, quantity, {
-        operated_by: req.user?.id
-      })
+      // 使用 TransactionManager 统一管理事务（2026-01-05 事务边界治理）
+      const result = await TransactionManager.execute(
+        async transaction => {
+          return await PrizePoolService.addStock(prizeId, quantity, {
+            operated_by: req.user?.id,
+            transaction
+          })
+        },
+        { description: 'addStock' }
+      )
 
       sharedComponents.logger.info('库存补充成功', {
         prize_id: prizeId,
@@ -291,10 +311,16 @@ router.delete(
       // 通过 ServiceManager 获取 PrizePoolService
       const PrizePoolService = req.app.locals.services.getService('prizePool')
 
-      // 调用 Service 层方法（Service 内部管理事务）
-      const result = await PrizePoolService.deletePrize(prizeId, {
-        deleted_by: req.user?.id
-      })
+      // 使用 TransactionManager 统一管理事务（2026-01-05 事务边界治理）
+      const result = await TransactionManager.execute(
+        async transaction => {
+          return await PrizePoolService.deletePrize(prizeId, {
+            deleted_by: req.user?.id,
+            transaction
+          })
+        },
+        { description: 'deletePrize' }
+      )
 
       sharedComponents.logger.info('奖品删除成功', {
         prize_id: prizeId,

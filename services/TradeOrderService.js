@@ -29,7 +29,7 @@
 const { sequelize, TradeOrder, MarketListing, ItemInstance } = require('../models')
 const AssetService = require('./AssetService')
 const logger = require('../utils/logger')
-// const { assertAndGetTransaction } = require('../utils/transactionHelpers') // 暂时未使用
+const { assertAndGetTransaction } = require('../utils/transactionHelpers')
 
 /**
  * 交易订单服务类
@@ -180,228 +180,209 @@ class TradeOrderService {
     const transaction = assertAndGetTransaction(options, 'TradeOrderService.createOrder')
 
     // 3.1 查询挂牌信息
-      const listing = await MarketListing.findOne({
-        where: { listing_id },
-        include: [
-          {
-            model: ItemInstance,
-            as: 'offerItem',
-            required: false
-          }
-        ],
-        // 并发保护：对挂牌行加 FOR UPDATE，避免并发双买
+    const listing = await MarketListing.findOne({
+      where: { listing_id },
+      include: [
+        {
+          model: ItemInstance,
+          as: 'offerItem',
+          required: false
+        }
+      ],
+      // 并发保护：对挂牌行加 FOR UPDATE，避免并发双买
+      lock: transaction.LOCK.UPDATE,
+      transaction
+    })
+
+    if (!listing) {
+      throw new Error(`挂牌不存在: ${listing_id}`)
+    }
+
+    if (listing.status !== 'on_sale') {
+      throw new Error(`挂牌状态异常: ${listing.status}，期望 on_sale`)
+    }
+
+    if (listing.seller_user_id === buyer_id) {
+      throw new Error('不能购买自己的挂牌')
+    }
+
+    // 交易市场结算币种只允许 DIAMOND
+    if (listing.price_asset_code !== 'DIAMOND') {
+      throw new Error(`挂牌定价资产不合法: ${listing.price_asset_code}（只允许 DIAMOND）`)
+    }
+
+    // 可叠加资产挂牌购买时必须校验卖家标的已冻结
+    if (listing.listing_kind === 'fungible_asset') {
+      if (!listing.seller_offer_frozen) {
+        throw new Error('卖家标的资产未冻结，挂牌状态异常（seller_offer_frozen=false）')
+      }
+      if (
+        !listing.offer_asset_code ||
+        !listing.offer_amount ||
+        Number(listing.offer_amount) <= 0
+      ) {
+        throw new Error('可叠加资产挂牌标的信息缺失（offer_asset_code/offer_amount）')
+      }
+    }
+
+    // 不可叠加物品购买时必须校验并锁定 item_instances（所有权真相）
+    if (listing.listing_kind === 'item_instance') {
+      if (!listing.offer_item_instance_id) {
+        throw new Error('挂牌缺少标的物品实例ID（offer_item_instance_id）')
+      }
+
+      const itemInstance = await ItemInstance.findOne({
+        where: { item_instance_id: listing.offer_item_instance_id },
         lock: transaction.LOCK.UPDATE,
         transaction
       })
 
-      if (!listing) {
-        throw new Error(`挂牌不存在: ${listing_id}`)
+      if (!itemInstance) {
+        throw new Error(`物品实例不存在: ${listing.offer_item_instance_id}`)
       }
-
-      if (listing.status !== 'on_sale') {
-        throw new Error(`挂牌状态异常: ${listing.status}，期望 on_sale`)
+      if (Number(itemInstance.owner_user_id) !== Number(listing.seller_user_id)) {
+        throw new Error('物品所有权异常：物品不属于当前卖家，禁止购买')
       }
-
-      if (listing.seller_user_id === buyer_id) {
-        throw new Error('不能购买自己的挂牌')
+      const allowedStatuses = ['locked', 'available']
+      if (!allowedStatuses.includes(itemInstance.status)) {
+        throw new Error(`物品实例状态不可购买：${itemInstance.status}`)
       }
+    }
 
-      // 交易市场结算币种只允许 DIAMOND
-      if (listing.price_asset_code !== 'DIAMOND') {
-        throw new Error(`挂牌定价资产不合法: ${listing.price_asset_code}（只允许 DIAMOND）`)
-      }
+    // 3.2 计算手续费
+    const FeeCalculator = require('./FeeCalculator')
+    const FEE_RULES = require('../config/fee_rules')
 
-      // 可叠加资产挂牌购买时必须校验卖家标的已冻结
-      if (listing.listing_kind === 'fungible_asset') {
-        if (!listing.seller_offer_frozen) {
-          throw new Error('卖家标的资产未冻结，挂牌状态异常（seller_offer_frozen=false）')
-        }
-        if (
-          !listing.offer_asset_code ||
-          !listing.offer_amount ||
-          Number(listing.offer_amount) <= 0
-        ) {
-          throw new Error('可叠加资产挂牌标的信息缺失（offer_asset_code/offer_amount）')
-        }
-      }
+    let feeAmount = 0
+    let feeRate = 0
 
-      // 不可叠加物品购买时必须校验并锁定 item_instances（所有权真相）
-      if (listing.listing_kind === 'item_instance') {
-        if (!listing.offer_item_instance_id) {
-          throw new Error('挂牌缺少标的物品实例ID（offer_item_instance_id）')
-        }
+    // 检查手续费开关
+    const feeEnabled =
+      FEE_RULES.enabled &&
+      FEE_RULES.trade_type_fees &&
+      FEE_RULES.trade_type_fees.market_purchase &&
+      FEE_RULES.trade_type_fees.market_purchase.enabled
 
-        const itemInstance = await ItemInstance.findOne({
-          where: { item_instance_id: listing.offer_item_instance_id },
-          lock: transaction.LOCK.UPDATE,
-          transaction
-        })
-
-        if (!itemInstance) {
-          throw new Error(`物品实例不存在: ${listing.offer_item_instance_id}`)
-        }
-        if (Number(itemInstance.owner_user_id) !== Number(listing.seller_user_id)) {
-          throw new Error('物品所有权异常：物品不属于当前卖家，禁止购买')
-        }
-        const allowedStatuses = ['locked', 'available']
-        if (!allowedStatuses.includes(itemInstance.status)) {
-          throw new Error(`物品实例状态不可购买：${itemInstance.status}`)
-        }
-      }
-
-      // 3.2 计算手续费
-      const FeeCalculator = require('./FeeCalculator')
-      const FEE_RULES = require('../config/fee_rules')
-
-      let feeAmount = 0
-      let feeRate = 0
-
-      // 检查手续费开关
-      const feeEnabled =
-        FEE_RULES.enabled &&
-        FEE_RULES.trade_type_fees &&
-        FEE_RULES.trade_type_fees.market_purchase &&
-        FEE_RULES.trade_type_fees.market_purchase.enabled
-
-      if (feeEnabled) {
-        /*
-         * 统一 5% 手续费 + min_fee=1（计算由 FeeCalculator 读取配置）
-         * - item_instance：优先取 ItemInstance.meta.value 作为"价值锚点"
-         * - fungible_asset：用 price_amount 作为价值锚点（当前单档位等价）
-         */
-        const itemValue =
-          listing.listing_kind === 'item_instance'
-            ? listing.offerItem?.meta?.value || listing.price_amount
-            : listing.price_amount
-
-        const feeInfo = FeeCalculator.calculateItemFee(itemValue, listing.price_amount)
-        feeAmount = feeInfo.fee
-        feeRate = feeInfo.rate
-
-        logger.info('[TradeOrderService] 手续费计算完成', {
-          item_value: itemValue,
-          price_amount: listing.price_amount,
-          fee_amount: feeAmount,
-          fee_rate: feeRate,
-          tier: feeInfo.tier
-        })
-      } else {
-        logger.info('[TradeOrderService] 手续费已禁用或物品信息缺失，跳过手续费计算')
-      }
-
-      // 计算对账金额
-      const grossAmount = listing.price_amount
-      const netAmount = listing.price_amount - feeAmount
-
-      // 验证对账公式
-      if (grossAmount !== feeAmount + netAmount) {
-        throw new Error(
-          `对账金额错误：gross_amount(${grossAmount}) ≠ fee_amount(${feeAmount}) + net_amount(${netAmount})`
-        )
-      }
-
-      // 3.3 锁定挂牌
-      await listing.update(
-        {
-          status: 'locked',
-          locked_at: new Date()
-        },
-        { transaction }
-      )
-
-      /**
-       * 关键可靠性修复：避免"孤儿冻结"
-       * 先创建订单（created）并把 listing.locked_by_order_id 绑定到订单，
-       * 再冻结买家资产，最后把订单推进到 frozen。
-       *
-       * 这样即使后续异常，定时任务也能通过 locked_by_order_id 找到订单并走 cancelOrder 解冻。
+    if (feeEnabled) {
+      /*
+       * 统一 5% 手续费 + min_fee=1（计算由 FeeCalculator 读取配置）
+       * - item_instance：优先取 ItemInstance.meta.value 作为"价值锚点"
+       * - fungible_asset：用 price_amount 作为价值锚点（当前单档位等价）
        */
+      const itemValue =
+        listing.listing_kind === 'item_instance'
+          ? listing.offerItem?.meta?.value || listing.price_amount
+          : listing.price_amount
 
-      // 3.4 创建订单记录（created）
-      const order = await TradeOrder.create(
-        {
-          idempotency_key,
+      const feeInfo = FeeCalculator.calculateItemFee(itemValue, listing.price_amount)
+      feeAmount = feeInfo.fee
+      feeRate = feeInfo.rate
+
+      logger.info('[TradeOrderService] 手续费计算完成', {
+        item_value: itemValue,
+        price_amount: listing.price_amount,
+        fee_amount: feeAmount,
+        fee_rate: feeRate,
+        tier: feeInfo.tier
+      })
+    } else {
+      logger.info('[TradeOrderService] 手续费已禁用或物品信息缺失，跳过手续费计算')
+    }
+
+    // 计算对账金额
+    const grossAmount = listing.price_amount
+    const netAmount = listing.price_amount - feeAmount
+
+    // 验证对账公式
+    if (grossAmount !== feeAmount + netAmount) {
+      throw new Error(
+        `对账金额错误：gross_amount(${grossAmount}) ≠ fee_amount(${feeAmount}) + net_amount(${netAmount})`
+      )
+    }
+
+    // 3.3 锁定挂牌
+    await listing.update(
+      {
+        status: 'locked',
+        locked_at: new Date()
+      },
+      { transaction }
+    )
+
+    /**
+     * 关键可靠性修复：避免"孤儿冻结"
+     * 先创建订单（created）并把 listing.locked_by_order_id 绑定到订单，
+     * 再冻结买家资产，最后把订单推进到 frozen。
+     *
+     * 这样即使后续异常，定时任务也能通过 locked_by_order_id 找到订单并走 cancelOrder 解冻。
+     */
+
+    // 3.4 创建订单记录（created）
+    const order = await TradeOrder.create(
+      {
+        idempotency_key,
+        listing_id,
+        buyer_user_id: buyer_id,
+        seller_user_id: listing.seller_user_id,
+        asset_code: listing.price_asset_code,
+        gross_amount: grossAmount,
+        fee_amount: feeAmount,
+        net_amount: netAmount,
+        status: 'created',
+        meta: {
+          fee_rate: feeRate
+        }
+      },
+      { transaction }
+    )
+
+    // 3.5 更新挂牌的锁定订单ID（绑定订单）
+    await listing.update(
+      {
+        locked_by_order_id: order.order_id
+      },
+      { transaction }
+    )
+
+    // 3.6 冻结买家资产
+    const freezeResult = await AssetService.freeze(
+      {
+        idempotency_key, // 使用同一幂等键
+        business_type: 'order_freeze_buyer', // 通过 business_type 区分冻结分录
+        user_id: buyer_id,
+        asset_code: listing.price_asset_code,
+        amount: grossAmount,
+        meta: {
+          order_action: 'freeze',
+          order_id: order.order_id,
           listing_id,
-          buyer_user_id: buyer_id,
-          seller_user_id: listing.seller_user_id,
-          asset_code: listing.price_asset_code,
-          gross_amount: grossAmount,
-          fee_amount: feeAmount,
-          net_amount: netAmount,
-          status: 'created',
-          meta: {
-            fee_rate: feeRate
-          }
-        },
-        { transaction }
-      )
+          freeze_reason: `购买挂牌 ${listing_id}`
+        }
+      },
+      { transaction }
+    )
 
-      // 3.5 更新挂牌的锁定订单ID（绑定订单）
-      await listing.update(
-        {
-          locked_by_order_id: order.order_id
-        },
-        { transaction }
-      )
+    // 3.7 推进订单状态：created -> frozen
+    await order.update(
+      {
+        status: 'frozen',
+        meta: {
+          ...order.meta,
+          freeze_transaction_id: freezeResult?.transaction_record?.transaction_id || null
+        }
+      },
+      { transaction }
+    )
 
-      // 3.6 冻结买家资产
-      const freezeResult = await AssetService.freeze(
-        {
-          idempotency_key, // 使用同一幂等键
-          business_type: 'order_freeze_buyer', // 通过 business_type 区分冻结分录
-          user_id: buyer_id,
-          asset_code: listing.price_asset_code,
-          amount: grossAmount,
-          meta: {
-            order_action: 'freeze',
-            order_id: order.order_id,
-            listing_id,
-            freeze_reason: `购买挂牌 ${listing_id}`
-          }
-        },
-        { transaction }
-      )
+    logger.info(`[TradeOrderService] 订单创建成功: ${order.order_id}`, {
+      idempotency_key,
+      listing_id,
+      buyer_id
+    })
 
-      // 3.7 推进订单状态：created -> frozen
-      await order.update(
-        {
-          status: 'frozen',
-          meta: {
-            ...order.meta,
-            freeze_transaction_id: freezeResult?.transaction_record?.transaction_id || null
-          }
-        },
-        { transaction }
-      )
-
-      // 提交事务
-      if (!options.transaction) {
-        await transaction.commit()
-      }
-
-      logger.info(`[TradeOrderService] 订单创建成功: ${order.order_id}`, {
-        idempotency_key,
-        listing_id,
-        buyer_id
-      })
-
-      return {
-        order_id: order.order_id,
-        is_duplicate: false
-      }
-    } catch (error) {
-      // 回滚事务
-      if (!options.transaction) {
-        await transaction.rollback()
-      }
-
-      logger.error(`[TradeOrderService] 订单创建失败: ${error.message}`, {
-        idempotency_key,
-        listing_id,
-        buyer_id
-      })
-
-      throw error
+    return {
+      order_id: order.order_id,
+      is_duplicate: false
     }
   }
 
@@ -431,47 +412,130 @@ class TradeOrderService {
       throw new Error('order_id 是必需参数')
     }
 
-    const transaction = options.transaction || (await sequelize.transaction())
+    // 强制要求事务边界 - 2026-01-05 治理决策
+    const transaction = assertAndGetTransaction(options, 'TradeOrderService.completeOrder')
 
-    try {
-      // 1. 查询订单
-      const order = await TradeOrder.findOne({
-        where: { order_id },
-        include: [
-          {
-            model: MarketListing,
-            as: 'listing'
-          }
-        ],
-        transaction
-      })
-
-      if (!order) {
-        throw new Error(`订单不存在: ${order_id}`)
-      }
-
-      if (order.status !== 'frozen') {
-        throw new Error(`订单状态异常: ${order.status}，期望 frozen`)
-      }
-
-      const listing = order.listing
-
-      // 从订单记录获取幂等键（用于派生子事务幂等键）
-      const idempotency_key = order.idempotency_key
-
-      // 2. 从冻结资产结算（三笔：买家扣减、卖家入账、平台手续费）
-
-      // 2.1 买家从冻结资产扣减
-      await AssetService.settleFromFrozen(
+    // 1. 查询订单
+    const order = await TradeOrder.findOne({
+      where: { order_id },
+      include: [
         {
-          idempotency_key: `${idempotency_key}:settle_buyer`, // 派生子幂等键
-          business_type: 'order_settle_buyer_debit',
-          user_id: order.buyer_user_id,
+          model: MarketListing,
+          as: 'listing'
+        }
+      ],
+      transaction
+    })
+
+    if (!order) {
+      throw new Error(`订单不存在: ${order_id}`)
+    }
+
+    if (order.status !== 'frozen') {
+      throw new Error(`订单状态异常: ${order.status}，期望 frozen`)
+    }
+
+    const listing = order.listing
+
+    // 从订单记录获取幂等键（用于派生子事务幂等键）
+    const idempotency_key = order.idempotency_key
+
+    // 2. 从冻结资产结算（三笔：买家扣减、卖家入账、平台手续费）
+
+    // 2.1 买家从冻结资产扣减
+    await AssetService.settleFromFrozen(
+      {
+        idempotency_key: `${idempotency_key}:settle_buyer`, // 派生子幂等键
+        business_type: 'order_settle_buyer_debit',
+        user_id: order.buyer_user_id,
+        asset_code: order.asset_code,
+        amount: order.gross_amount,
+        meta: {
+          order_id: order.order_id,
+          listing_id: order.listing_id,
+          gross_amount: order.gross_amount,
+          fee_amount: order.fee_amount,
+          net_amount: order.net_amount
+        }
+      },
+      { transaction }
+    )
+
+    // 2.2 卖家入账（实收金额）
+    if (order.net_amount > 0) {
+      await AssetService.changeBalance(
+        {
+          idempotency_key: `${idempotency_key}:credit_seller`, // 派生子幂等键
+          business_type: 'order_settle_seller_credit',
+          user_id: order.seller_user_id,
           asset_code: order.asset_code,
-          amount: order.gross_amount,
+          delta_amount: order.net_amount,
           meta: {
             order_id: order.order_id,
             listing_id: order.listing_id,
+            buyer_user_id: order.buyer_user_id,
+            gross_amount: order.gross_amount,
+            fee_amount: order.fee_amount,
+            net_amount: order.net_amount
+          }
+        },
+        { transaction }
+      )
+    }
+
+    // 2.3 平台手续费入账（如果手续费>0）
+    if (order.fee_amount > 0) {
+      await AssetService.changeBalance(
+        {
+          idempotency_key: `${idempotency_key}:credit_platform_fee`, // 派生子幂等键
+          business_type: 'order_settle_platform_fee_credit',
+          system_code: 'SYSTEM_PLATFORM_FEE',
+          asset_code: order.asset_code,
+          delta_amount: order.fee_amount,
+          meta: {
+            order_id: order.order_id,
+            listing_id: order.listing_id,
+            buyer_user_id: order.buyer_user_id,
+            seller_user_id: order.seller_user_id,
+            gross_amount: order.gross_amount,
+            fee_amount: order.fee_amount
+          }
+        },
+        { transaction }
+      )
+    }
+
+    // 3. 转移物品所有权或交付可叠加资产
+    if (listing.listing_kind === 'item_instance' && listing.offer_item_instance_id) {
+      // 统一资产域架构：使用 AssetService.transferItem() 转移物品所有权
+      const { ItemInstance } = require('../models')
+      const itemInstance = await ItemInstance.findOne({
+        where: { item_instance_id: listing.offer_item_instance_id },
+        lock: transaction.LOCK.UPDATE,
+        transaction
+      })
+
+      if (!itemInstance) {
+        throw new Error(`物品实例不存在: ${listing.offer_item_instance_id}`)
+      }
+
+      // 所有权一致性校验（防止异常数据导致越权转移）
+      if (Number(itemInstance.owner_user_id) !== Number(order.seller_user_id)) {
+        throw new Error('物品所有权异常：物品不属于卖家，禁止成交转移')
+      }
+
+      // 使用 AssetService.transferItem() 转移所有权（自动记录事件）
+      const AssetService = require('./AssetService')
+      await AssetService.transferItem(
+        {
+          item_instance_id: itemInstance.item_instance_id,
+          new_owner_id: order.buyer_user_id,
+          business_type: 'market_transfer',
+          idempotency_key: `${idempotency_key}:transfer_item`, // 派生子幂等键
+          meta: {
+            listing_id: order.listing_id,
+            from_user: order.seller_user_id,
+            to_user: order.buyer_user_id,
             gross_amount: order.gross_amount,
             fee_amount: order.fee_amount,
             net_amount: order.net_amount
@@ -480,207 +544,107 @@ class TradeOrderService {
         { transaction }
       )
 
-      // 2.2 卖家入账（实收金额）
-      if (order.net_amount > 0) {
-        await AssetService.changeBalance(
-          {
-            idempotency_key: `${idempotency_key}:credit_seller`, // 派生子幂等键
-            business_type: 'order_settle_seller_credit',
-            user_id: order.seller_user_id,
-            asset_code: order.asset_code,
-            delta_amount: order.net_amount,
-            meta: {
-              order_id: order.order_id,
-              listing_id: order.listing_id,
-              buyer_user_id: order.buyer_user_id,
-              gross_amount: order.gross_amount,
-              fee_amount: order.fee_amount,
-              net_amount: order.net_amount
-            }
-          },
-          { transaction }
-        )
-      }
+      logger.info('[TradeOrderService] 物品所有权已转移（通过 AssetService.transferItem）', {
+        item_instance_id: itemInstance.item_instance_id,
+        from: order.seller_user_id,
+        to: order.buyer_user_id
+      })
+    } else if (listing.listing_kind === 'fungible_asset' && listing.offer_asset_code) {
+      /**
+       * 可叠加资产成交交付（双分录）
+       *
+       * 业务流程：
+       * - 卖家：从冻结扣减标的资产（listing_settle_seller_offer_debit）
+       * - 买家：收到标的资产入账（listing_transfer_buyer_offer_credit）
+       */
 
-      // 2.3 平台手续费入账（如果手续费>0）
-      if (order.fee_amount > 0) {
-        await AssetService.changeBalance(
-          {
-            idempotency_key: `${idempotency_key}:credit_platform_fee`, // 派生子幂等键
-            business_type: 'order_settle_platform_fee_credit',
-            system_code: 'SYSTEM_PLATFORM_FEE',
-            asset_code: order.asset_code,
-            delta_amount: order.fee_amount,
-            meta: {
-              order_id: order.order_id,
-              listing_id: order.listing_id,
-              buyer_user_id: order.buyer_user_id,
-              seller_user_id: order.seller_user_id,
-              gross_amount: order.gross_amount,
-              fee_amount: order.fee_amount
-            }
-          },
-          { transaction }
-        )
-      }
-
-      // 3. 转移物品所有权或交付可叠加资产
-      if (listing.listing_kind === 'item_instance' && listing.offer_item_instance_id) {
-        // 统一资产域架构：使用 AssetService.transferItem() 转移物品所有权
-        const { ItemInstance } = require('../models')
-        const itemInstance = await ItemInstance.findOne({
-          where: { item_instance_id: listing.offer_item_instance_id },
-          lock: transaction.LOCK.UPDATE,
-          transaction
-        })
-
-        if (!itemInstance) {
-          throw new Error(`物品实例不存在: ${listing.offer_item_instance_id}`)
-        }
-
-        // 所有权一致性校验（防止异常数据导致越权转移）
-        if (Number(itemInstance.owner_user_id) !== Number(order.seller_user_id)) {
-          throw new Error('物品所有权异常：物品不属于卖家，禁止成交转移')
-        }
-
-        // 使用 AssetService.transferItem() 转移所有权（自动记录事件）
-        const AssetService = require('./AssetService')
-        await AssetService.transferItem(
-          {
-            item_instance_id: itemInstance.item_instance_id,
-            new_owner_id: order.buyer_user_id,
-            business_type: 'market_transfer',
-            idempotency_key: `${idempotency_key}:transfer_item`, // 派生子幂等键
-            meta: {
-              listing_id: order.listing_id,
-              from_user: order.seller_user_id,
-              to_user: order.buyer_user_id,
-              gross_amount: order.gross_amount,
-              fee_amount: order.fee_amount,
-              net_amount: order.net_amount
-            }
-          },
-          { transaction }
-        )
-
-        logger.info('[TradeOrderService] 物品所有权已转移（通过 AssetService.transferItem）', {
-          item_instance_id: itemInstance.item_instance_id,
-          from: order.seller_user_id,
-          to: order.buyer_user_id
-        })
-      } else if (listing.listing_kind === 'fungible_asset' && listing.offer_asset_code) {
-        /**
-         * 可叠加资产成交交付（双分录）
-         *
-         * 业务流程：
-         * - 卖家：从冻结扣减标的资产（listing_settle_seller_offer_debit）
-         * - 买家：收到标的资产入账（listing_transfer_buyer_offer_credit）
-         */
-
-        // 3.2.1 卖家：从冻结扣减标的资产
-        await AssetService.settleFromFrozen(
-          {
-            idempotency_key: `${idempotency_key}:settle_seller_offer`, // 派生子幂等键
-            business_type: 'listing_settle_seller_offer_debit',
-            user_id: order.seller_user_id,
-            asset_code: listing.offer_asset_code,
-            amount: listing.offer_amount,
-            meta: {
-              order_id: order.order_id,
-              listing_id: order.listing_id,
-              buyer_user_id: order.buyer_user_id,
-              offer_asset_code: listing.offer_asset_code,
-              offer_amount: listing.offer_amount,
-              action: 'seller_offer_debit'
-            }
-          },
-          { transaction }
-        )
-
-        logger.info('[TradeOrderService] 卖家标的资产已从冻结扣减', {
-          order_id,
-          seller_user_id: order.seller_user_id,
-          asset_code: listing.offer_asset_code,
-          amount: listing.offer_amount
-        })
-
-        // 3.2.2 买家：收到标的资产入账
-        await AssetService.changeBalance(
-          {
-            idempotency_key: `${idempotency_key}:credit_buyer_offer`, // 派生子幂等键
-            business_type: 'listing_transfer_buyer_offer_credit',
-            user_id: order.buyer_user_id,
-            asset_code: listing.offer_asset_code,
-            delta_amount: listing.offer_amount,
-            meta: {
-              order_id: order.order_id,
-              listing_id: order.listing_id,
-              seller_user_id: order.seller_user_id,
-              offer_asset_code: listing.offer_asset_code,
-              offer_amount: listing.offer_amount,
-              action: 'buyer_offer_credit'
-            }
-          },
-          { transaction }
-        )
-
-        logger.info('[TradeOrderService] 买家已收到标的资产', {
-          order_id,
-          buyer_user_id: order.buyer_user_id,
-          asset_code: listing.offer_asset_code,
-          amount: listing.offer_amount
-        })
-      }
-
-      // 4. 更新订单状态
-      await order.update(
+      // 3.2.1 卖家：从冻结扣减标的资产
+      await AssetService.settleFromFrozen(
         {
-          status: 'completed',
-          completed_at: new Date()
+          idempotency_key: `${idempotency_key}:settle_seller_offer`, // 派生子幂等键
+          business_type: 'listing_settle_seller_offer_debit',
+          user_id: order.seller_user_id,
+          asset_code: listing.offer_asset_code,
+          amount: listing.offer_amount,
+          meta: {
+            order_id: order.order_id,
+            listing_id: order.listing_id,
+            buyer_user_id: order.buyer_user_id,
+            offer_asset_code: listing.offer_asset_code,
+            offer_amount: listing.offer_amount,
+            action: 'seller_offer_debit'
+          }
         },
         { transaction }
       )
 
-      // 5. 更新挂牌状态
-      await listing.update(
-        {
-          status: 'sold',
-          locked_by_order_id: null,
-          locked_at: null
-        },
-        { transaction }
-      )
-
-      // 提交事务
-      if (!options.transaction) {
-        await transaction.commit()
-      }
-
-      logger.info(`[TradeOrderService] 订单完成: ${order_id}`, {
-        idempotency_key,
-        buyer_user_id: order.buyer_user_id,
+      logger.info('[TradeOrderService] 卖家标的资产已从冻结扣减', {
+        order_id,
         seller_user_id: order.seller_user_id,
-        gross_amount: order.gross_amount,
-        fee_amount: order.fee_amount,
-        net_amount: order.net_amount
+        asset_code: listing.offer_asset_code,
+        amount: listing.offer_amount
       })
 
-      return {
-        order,
-        fee_amount: order.fee_amount,
-        net_amount: order.net_amount
-      }
-    } catch (error) {
-      // 回滚事务
-      if (!options.transaction) {
-        await transaction.rollback()
-      }
+      // 3.2.2 买家：收到标的资产入账
+      await AssetService.changeBalance(
+        {
+          idempotency_key: `${idempotency_key}:credit_buyer_offer`, // 派生子幂等键
+          business_type: 'listing_transfer_buyer_offer_credit',
+          user_id: order.buyer_user_id,
+          asset_code: listing.offer_asset_code,
+          delta_amount: listing.offer_amount,
+          meta: {
+            order_id: order.order_id,
+            listing_id: order.listing_id,
+            seller_user_id: order.seller_user_id,
+            offer_asset_code: listing.offer_asset_code,
+            offer_amount: listing.offer_amount,
+            action: 'buyer_offer_credit'
+          }
+        },
+        { transaction }
+      )
 
-      logger.error(`[TradeOrderService] 订单完成失败: ${error.message}`, {
-        order_id
+      logger.info('[TradeOrderService] 买家已收到标的资产', {
+        order_id,
+        buyer_user_id: order.buyer_user_id,
+        asset_code: listing.offer_asset_code,
+        amount: listing.offer_amount
       })
+    }
 
-      throw error
+    // 4. 更新订单状态
+    await order.update(
+      {
+        status: 'completed',
+        completed_at: new Date()
+      },
+      { transaction }
+    )
+
+    // 5. 更新挂牌状态
+    await listing.update(
+      {
+        status: 'sold',
+        locked_by_order_id: null,
+        locked_at: null
+      },
+      { transaction }
+    )
+
+    logger.info(`[TradeOrderService] 订单完成: ${order_id}`, {
+      idempotency_key,
+      buyer_user_id: order.buyer_user_id,
+      seller_user_id: order.seller_user_id,
+      gross_amount: order.gross_amount,
+      fee_amount: order.fee_amount,
+      net_amount: order.net_amount
+    })
+
+    return {
+      order,
+      fee_amount: order.fee_amount,
+      net_amount: order.net_amount
     }
   }
 
@@ -709,99 +673,82 @@ class TradeOrderService {
       throw new Error('order_id 是必需参数')
     }
 
-    const transaction = options.transaction || (await sequelize.transaction())
+    // 强制要求事务边界 - 2026-01-05 治理决策
+    const transaction = assertAndGetTransaction(options, 'TradeOrderService.cancelOrder')
 
-    try {
-      // 1. 查询订单
-      const order = await TradeOrder.findOne({
-        where: { order_id },
-        include: [
-          {
-            model: MarketListing,
-            as: 'listing'
-          }
-        ],
-        transaction
-      })
-
-      if (!order) {
-        throw new Error(`订单不存在: ${order_id}`)
-      }
-
-      if (order.status !== 'frozen' && order.status !== 'created') {
-        throw new Error(`订单状态异常: ${order.status}，期望 frozen 或 created`)
-      }
-
-      const listing = order.listing
-
-      // 从订单记录获取幂等键（用于派生子事务幂等键）
-      const idempotency_key = order.idempotency_key
-
-      // 2. 解冻买家资产
-      const unfreezeResult = await AssetService.unfreeze(
+    // 1. 查询订单
+    const order = await TradeOrder.findOne({
+      where: { order_id },
+      include: [
         {
-          idempotency_key: `${idempotency_key}:unfreeze_buyer`, // 派生子幂等键
-          business_type: 'order_unfreeze_buyer', // 通过 business_type 区分解冻分录
-          user_id: order.buyer_user_id,
-          asset_code: order.asset_code,
-          amount: order.gross_amount,
-          meta: {
-            order_action: 'unfreeze',
-            order_id,
-            unfreeze_reason: cancel_reason || `取消订单 ${order_id}`
-          }
-        },
-        { transaction }
-      )
+          model: MarketListing,
+          as: 'listing'
+        }
+      ],
+      transaction
+    })
 
-      // 3. 解锁挂牌
-      await listing.update(
-        {
-          status: 'on_sale',
-          locked_by_order_id: null,
-          locked_at: null
-        },
-        { transaction }
-      )
+    if (!order) {
+      throw new Error(`订单不存在: ${order_id}`)
+    }
 
-      // 4. 更新订单状态
-      await order.update(
-        {
-          status: 'cancelled',
-          cancelled_at: new Date(),
-          meta: {
-            ...order.meta,
-            cancel_reason: cancel_reason || '用户取消'
-          }
-        },
-        { transaction }
-      )
+    if (order.status !== 'frozen' && order.status !== 'created') {
+      throw new Error(`订单状态异常: ${order.status}，期望 frozen 或 created`)
+    }
 
-      // 提交事务
-      if (!options.transaction) {
-        await transaction.commit()
-      }
+    const listing = order.listing
 
-      logger.info(`[TradeOrderService] 订单取消: ${order_id}`, {
-        idempotency_key,
-        cancel_reason
-      })
+    // 从订单记录获取幂等键（用于派生子事务幂等键）
+    const idempotency_key = order.idempotency_key
 
-      return {
-        order,
-        unfreeze: unfreezeResult
-      }
-    } catch (error) {
-      // 回滚事务
-      if (!options.transaction) {
-        await transaction.rollback()
-      }
+    // 2. 解冻买家资产
+    const unfreezeResult = await AssetService.unfreeze(
+      {
+        idempotency_key: `${idempotency_key}:unfreeze_buyer`, // 派生子幂等键
+        business_type: 'order_unfreeze_buyer', // 通过 business_type 区分解冻分录
+        user_id: order.buyer_user_id,
+        asset_code: order.asset_code,
+        amount: order.gross_amount,
+        meta: {
+          order_action: 'unfreeze',
+          order_id,
+          unfreeze_reason: cancel_reason || `取消订单 ${order_id}`
+        }
+      },
+      { transaction }
+    )
 
-      logger.error(`[TradeOrderService] 订单取消失败: ${error.message}`, {
-        order_id
-      })
+    // 3. 解锁挂牌
+    await listing.update(
+      {
+        status: 'on_sale',
+        locked_by_order_id: null,
+        locked_at: null
+      },
+      { transaction }
+    )
 
-      throw error
+    // 4. 更新订单状态
+    await order.update(
+      {
+        status: 'cancelled',
+        cancelled_at: new Date(),
+        meta: {
+          ...order.meta,
+          cancel_reason: cancel_reason || '用户取消'
+        }
+      },
+      { transaction }
+    )
+
+    logger.info(`[TradeOrderService] 订单取消: ${order_id}`, {
+      idempotency_key,
+      cancel_reason
+    })
+
+    return {
+      order,
+      unfreeze: unfreezeResult
     }
   }
 

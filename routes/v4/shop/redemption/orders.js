@@ -15,6 +15,7 @@ const router = express.Router()
 const { authenticateToken } = require('../../../../middleware/auth')
 const { handleServiceError } = require('../../../../middleware/validation')
 const logger = require('../../../../utils/logger').logger
+const TransactionManager = require('../../../../utils/TransactionManager')
 
 /**
  * 生成核销订单（Generate Redemption Order）
@@ -86,10 +87,16 @@ router.post('/orders', authenticateToken, async (req, res) => {
       })
     }
 
-    // 调用RedemptionService生成订单（传入创建者ID用于服务层兜底）
+    /*
+     * 调用RedemptionService生成订单（传入创建者ID用于服务层兜底）
+     * 使用 TransactionManager 统一事务边界（符合治理决策）
+     */
     const RedemptionService = req.app.locals.services.getService('redemptionOrder')
-    const result = await RedemptionService.createOrder(item_instance_id, {
-      creator_user_id: userId // 传入创建者ID，供服务层兜底校验
+    const result = await TransactionManager.execute(async (transaction) => {
+      return await RedemptionService.createOrder(item_instance_id, {
+        creator_user_id: userId, // 传入创建者ID，供服务层兜底校验
+        transaction
+      })
     })
 
     logger.info('核销订单生成成功', {
@@ -158,8 +165,11 @@ router.post('/orders/:order_id/cancel', authenticateToken, async (req, res) => {
       user_id: req.user.user_id
     })
 
+    // 使用 TransactionManager 统一事务边界（符合治理决策）
     const RedemptionService = req.app.locals.services.getService('redemptionOrder')
-    const order = await RedemptionService.cancelOrder(order_id)
+    const order = await TransactionManager.execute(async (transaction) => {
+      return await RedemptionService.cancelOrder(order_id, { transaction })
+    })
 
     return res.apiSuccess(
       {

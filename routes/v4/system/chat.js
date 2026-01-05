@@ -25,6 +25,7 @@ const { authenticateToken } = require('../../../middleware/auth')
 const { handleServiceError } = require('../../../middleware/validation')
 const BeijingTimeHelper = require('../../../utils/timeHelper')
 const ChatRateLimitService = require('../../../services/ChatRateLimitService')
+const TransactionManager = require('../../../utils/TransactionManager')
 
 /**
  * @route POST /api/v4/system/chat/sessions
@@ -270,11 +271,13 @@ router.post('/chat/sessions/:session_id/messages', authenticateToken, async (req
       req.app.locals.services.getService('customerServiceSession')
     const ChatWebSocketService = req.app.locals.services.getService('chatWebSocket')
 
-    // 使用 CustomerServiceSessionService 发送用户消息
-    const message = await CustomerServiceSessionService.sendUserMessage(session_id, {
-      user_id: userId,
-      content: sanitized_content,
-      message_type
+    // 使用 TransactionManager 统一事务边界（符合治理决策）
+    const message = await TransactionManager.execute(async (transaction) => {
+      return await CustomerServiceSessionService.sendUserMessage(session_id, {
+        user_id: userId,
+        content: sanitized_content,
+        message_type
+      }, { transaction })
     })
 
     // 通过WebSocket实时推送消息给客服（带自动重试机制）

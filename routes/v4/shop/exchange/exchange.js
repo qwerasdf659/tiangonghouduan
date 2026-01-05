@@ -31,6 +31,7 @@ const { handleServiceError } = require('../../../../middleware/validation')
 const logger = require('../../../../utils/logger').logger
 // 业界标准幂等架构 - 统一入口幂等服务
 const IdempotencyService = require('../../../../services/IdempotencyService')
+const TransactionManager = require('../../../../utils/TransactionManager')
 
 /**
  * @route POST /api/v4/exchange_market/exchange
@@ -125,10 +126,14 @@ router.post('/exchange', authenticateToken, async (req, res) => {
 
     /*
      * 调用服务层（传递 idempotency_key）
+     * 使用 TransactionManager 统一事务边界（符合治理决策）
      * 服务层内部使用此幂等键生成派生子事务幂等键
      */
-    const result = await ExchangeService.exchangeItem(user_id, itemId, exchangeQuantity, {
-      idempotency_key
+    const result = await TransactionManager.execute(async (transaction) => {
+      return await ExchangeService.exchangeItem(user_id, itemId, exchangeQuantity, {
+        idempotency_key,
+        transaction
+      })
     })
 
     // 构建响应数据

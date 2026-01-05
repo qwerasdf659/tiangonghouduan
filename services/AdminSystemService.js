@@ -119,6 +119,7 @@ const BeijingTimeHelper = require('../utils/timeHelper')
 const models = require('../models')
 const { SystemSettings, sequelize } = models
 const { Op } = require('sequelize')
+const { assertAndGetTransaction } = require('../utils/transactionHelpers')
 
 const logger = require('../utils/logger').logger
 
@@ -545,208 +546,182 @@ class AdminSystemService {
    * - 范围约束是硬性防护，超出范围直接拒绝
    * - 高影响配置（businessImpact: HIGH/CRITICAL）强制审计日志
    * @see docs/配置管理三层分离与校验统一方案.md
+   *
+   * 事务边界治理（2026-01-05 决策）：
+   * - 强制要求外部事务传入（options.transaction）
+   * - 未提供事务时直接报错，由入口层统一管理事务
+   * - 缓存失效应在事务提交后由调用方处理（使用 return.updates 信息）
    */
   static async updateSettings (category, settingsToUpdate, userId, options = {}) {
-    const { transaction, reason } = options
+    // 强制要求事务边界 - 2026-01-05 治理决策
+    const transaction = assertAndGetTransaction(options, 'AdminSystemService.updateSettings')
+    const { reason } = options
 
-    // 创建内部事务（如果外部没有传入）
-    const internalTransaction = transaction || (await sequelize.transaction())
+    // 验证分类是否合法（2025-12-30 新增 marketplace 分类）
+    const validCategories = ['basic', 'points', 'notification', 'security', 'marketplace']
+    if (!validCategories.includes(category)) {
+      throw new Error(`无效的设置分类: ${category}。有效分类: ${validCategories.join(', ')}`)
+    }
 
-    try {
-      // 验证分类是否合法（2025-12-30 新增 marketplace 分类）
-      const validCategories = ['basic', 'points', 'notification', 'security', 'marketplace']
-      if (!validCategories.includes(category)) {
-        throw new Error(`无效的设置分类: ${category}。有效分类: ${validCategories.join(', ')}`)
-      }
+    // 验证更新数据
+    if (
+      !settingsToUpdate ||
+      typeof settingsToUpdate !== 'object' ||
+      Object.keys(settingsToUpdate).length === 0
+    ) {
+      throw new Error('请提供要更新的设置项')
+    }
 
-      // 验证更新数据
-      if (
-        !settingsToUpdate ||
-        typeof settingsToUpdate !== 'object' ||
-        Object.keys(settingsToUpdate).length === 0
-      ) {
-        throw new Error('请提供要更新的设置项')
-      }
+    const settingKeys = Object.keys(settingsToUpdate)
+    const updateResults = []
+    const errors = []
 
-      const settingKeys = Object.keys(settingsToUpdate)
-      const updateResults = []
-      const errors = []
+    // 批量更新配置项
+    for (const settingKey of settingKeys) {
+      try {
+        // 构建完整的白名单键名（格式：category/setting_key）
+        const whitelistKey = `${category}/${settingKey}`
 
-      // 批量更新配置项
-      for (const settingKey of settingKeys) {
-        try {
-          // 构建完整的白名单键名（格式：category/setting_key）
-          const whitelistKey = `${category}/${settingKey}`
+        // ========== 白名单校验（2025-12-30 配置管理三层分离方案）==========
 
-          // ========== 白名单校验（2025-12-30 配置管理三层分离方案）==========
-
-          // 1. 黑名单检查（防止误操作存储敏感信息）
-          if (isForbidden(settingKey)) {
-            errors.push({
-              setting_key: settingKey,
-              error: `配置项 ${settingKey} 属于禁止类（密钥/结算逻辑），不允许存储在数据库`
-            })
-            continue
-          }
-
-          // 2. 白名单检查
-          const whitelist = getWhitelist(whitelistKey)
-          if (!whitelist) {
-            errors.push({
-              setting_key: settingKey,
-              error: `配置项 ${whitelistKey} 不在白名单内，禁止修改。请联系技术团队添加白名单。`
-            })
-            continue
-          }
-
-          // 3. 只读检查（白名单定义）
-          if (whitelist.readonly) {
-            errors.push({
-              setting_key: settingKey,
-              error: `配置项 ${settingKey} 为只读（白名单定义），禁止修改`
-            })
-            continue
-          }
-
-          // 4. 类型/范围校验
-          const newValue = settingsToUpdate[settingKey]
-          const validation = validateSettingValue(whitelistKey, newValue)
-          if (!validation.valid) {
-            errors.push({
-              setting_key: settingKey,
-              error: validation.error
-            })
-            continue
-          }
-
-          // ========== 数据库操作 ==========
-
-          // 查找配置项
-          const setting = await SystemSettings.findOne({
-            where: {
-              category,
-              setting_key: settingKey
-            },
-            transaction: internalTransaction
-          })
-
-          if (!setting) {
-            errors.push({
-              setting_key: settingKey,
-              error: '配置项不存在于数据库中'
-            })
-            continue
-          }
-
-          // 检查数据库级别的只读标记
-          if (setting.is_readonly) {
-            errors.push({
-              setting_key: settingKey,
-              error: '此配置项在数据库中标记为只读，不可修改'
-            })
-            continue
-          }
-
-          // 记录旧值（用于审计）
-          const oldValue = setting.setting_value
-
-          // 更新配置值
-          setting.setValue(newValue)
-          setting.updated_by = userId
-          setting.updated_at = BeijingTimeHelper.createBeijingTime()
-
-          await setting.save({ transaction: internalTransaction })
-
-          // ========== 审计日志（高影响配置）==========
-          if (
-            whitelist.auditRequired ||
-            whitelist.businessImpact === 'HIGH' ||
-            whitelist.businessImpact === 'CRITICAL'
-          ) {
-            logger.warn('高影响配置修改', {
-              setting_key: whitelistKey,
-              business_impact: whitelist.businessImpact,
-              operator_id: userId,
-              old_value: oldValue,
-              new_value: newValue,
-              reason: reason || '未提供变更原因',
-              audit_required: true,
-              timestamp: BeijingTimeHelper.apiTimestamp()
-            })
-          }
-
-          updateResults.push({
-            setting_key: settingKey,
-            old_value: oldValue,
-            new_value: newValue,
-            success: true,
-            business_impact: whitelist.businessImpact
-          })
-
-          logger.info('系统设置更新成功', {
-            user_id: userId,
-            category,
-            setting_key: settingKey,
-            new_value: newValue
-          })
-        } catch (error) {
+        // 1. 黑名单检查（防止误操作存储敏感信息）
+        if (isForbidden(settingKey)) {
           errors.push({
             setting_key: settingKey,
-            error: error.message
+            error: `配置项 ${settingKey} 属于禁止类（密钥/结算逻辑），不允许存储在数据库`
+          })
+          continue
+        }
+
+        // 2. 白名单检查
+        const whitelist = getWhitelist(whitelistKey)
+        if (!whitelist) {
+          errors.push({
+            setting_key: settingKey,
+            error: `配置项 ${whitelistKey} 不在白名单内，禁止修改。请联系技术团队添加白名单。`
+          })
+          continue
+        }
+
+        // 3. 只读检查（白名单定义）
+        if (whitelist.readonly) {
+          errors.push({
+            setting_key: settingKey,
+            error: `配置项 ${settingKey} 为只读（白名单定义），禁止修改`
+          })
+          continue
+        }
+
+        // 4. 类型/范围校验
+        const newValue = settingsToUpdate[settingKey]
+        const validation = validateSettingValue(whitelistKey, newValue)
+        if (!validation.valid) {
+          errors.push({
+            setting_key: settingKey,
+            error: validation.error
+          })
+          continue
+        }
+
+        // ========== 数据库操作 ==========
+
+        // 查找配置项
+        const setting = await SystemSettings.findOne({
+          where: {
+            category,
+            setting_key: settingKey
+          },
+          transaction
+        })
+
+        if (!setting) {
+          errors.push({
+            setting_key: settingKey,
+            error: '配置项不存在于数据库中'
+          })
+          continue
+        }
+
+        // 检查数据库级别的只读标记
+        if (setting.is_readonly) {
+          errors.push({
+            setting_key: settingKey,
+            error: '此配置项在数据库中标记为只读，不可修改'
+          })
+          continue
+        }
+
+        // 记录旧值（用于审计）
+        const oldValue = setting.setting_value
+
+        // 更新配置值
+        setting.setValue(newValue)
+        setting.updated_by = userId
+        setting.updated_at = BeijingTimeHelper.createBeijingTime()
+
+        await setting.save({ transaction })
+
+        // ========== 审计日志（高影响配置）==========
+        if (
+          whitelist.auditRequired ||
+          whitelist.businessImpact === 'HIGH' ||
+          whitelist.businessImpact === 'CRITICAL'
+        ) {
+          logger.warn('高影响配置修改', {
+            setting_key: whitelistKey,
+            business_impact: whitelist.businessImpact,
+            operator_id: userId,
+            old_value: oldValue,
+            new_value: newValue,
+            reason: reason || '未提供变更原因',
+            audit_required: true,
+            timestamp: BeijingTimeHelper.apiTimestamp()
           })
         }
+
+        updateResults.push({
+          setting_key: settingKey,
+          old_value: oldValue,
+          new_value: newValue,
+          success: true,
+          business_impact: whitelist.businessImpact
+        })
+
+        logger.info('系统设置更新成功', {
+          user_id: userId,
+          category,
+          setting_key: settingKey,
+          new_value: newValue
+        })
+      } catch (error) {
+        errors.push({
+          setting_key: settingKey,
+          error: error.message
+        })
       }
-
-      // 如果没有外部事务，提交内部事务
-      if (!transaction) {
-        await internalTransaction.commit()
-
-        /*
-         * ========== 缓存失效（2026-01-03 P0 缓存优化）==========
-         * 事务提交后，逐个失效成功更新的配置缓存（秒级生效）
-         */
-        for (const update of updateResults) {
-          await BusinessCacheHelper.invalidateSysConfig(
-            category,
-            update.setting_key,
-            'config_updated'
-          )
-        }
-      }
-
-      // 返回更新结果
-      const responseData = {
-        category,
-        total_requested: settingKeys.length,
-        success_count: updateResults.length,
-        error_count: errors.length,
-        updates: updateResults,
-        timestamp: BeijingTimeHelper.apiTimestamp()
-      }
-
-      if (errors.length > 0) {
-        responseData.errors = errors
-      }
-
-      logger.info('批量更新系统设置完成', {
-        category,
-        success_count: updateResults.length,
-        error_count: errors.length
-      })
-
-      return responseData
-    } catch (error) {
-      // 如果没有外部事务，回滚内部事务
-      if (!transaction) {
-        await internalTransaction.rollback()
-      }
-
-      logger.error('批量更新系统设置失败', {
-        error: error.message,
-        category
-      })
-      throw error
     }
+
+    // 返回更新结果（缓存失效应在事务提交后由调用方使用 updates 信息处理）
+    const responseData = {
+      category,
+      total_requested: settingKeys.length,
+      success_count: updateResults.length,
+      error_count: errors.length,
+      updates: updateResults,
+      timestamp: BeijingTimeHelper.apiTimestamp()
+    }
+
+    if (errors.length > 0) {
+      responseData.errors = errors
+    }
+
+    logger.info('批量更新系统设置完成', {
+      category,
+      success_count: updateResults.length,
+      error_count: errors.length
+    })
+
+    return responseData
   }
 
   // ==================== 系统配置读取方法（2025-12-30 配置管理三层分离方案） ====================

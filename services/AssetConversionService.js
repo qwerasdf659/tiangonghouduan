@@ -11,6 +11,11 @@
  * 4. 规则验证（转换规则存在性、启用状态、数量限制）
  * 5. 完整的流水记录（统一账本双分录：material_convert_debit + material_convert_credit）
  *
+ * 事务边界治理（2026-01-05 决策）：
+ * - 所有写操作 **强制要求** 外部事务传入（options.transaction）
+ * - 未提供事务时直接报错（使用 assertAndGetTransaction）
+ * - 服务层禁止自建事务，由入口层统一使用 TransactionManager.execute()
+ *
  * Phase 3改造要点：
  * - ✅ 使用AssetService.changeBalance()替代MaterialService + DiamondService
  * - ✅ 双分录模型：material_convert_debit（扣减）+ material_convert_credit（入账）
@@ -64,7 +69,7 @@
  * - 参数不一致：返回409冲突错误（IDEMPOTENCY_KEY_CONFLICT）
  *
  * 事务支持：
- * - 所有转换操作都在事务中完成
+ * - 所有转换操作强制要求外部事务传入（options.transaction参数）
  * - 扣减材料和增加钻石必须在同一事务中
  * - 任何异常都会自动回滚事务，确保数据一致性
  *
@@ -76,6 +81,7 @@
  *   1, // user_id
  *   50, // red_shard_amount（50个碎红水晶）
  *   {
+ *     transaction, // 必须传入事务
  *     idempotency_key: `convert_to_diamond_${Date.now()}` // 幂等键
  *   }
  * )
@@ -88,6 +94,7 @@
  *   'DIAMOND', // to_asset_code
  *   20, // from_amount
  *   {
+ *     transaction, // 必须传入事务
  *     idempotency_key: `material_convert_${Date.now()}`
  *   }
  * )
@@ -95,7 +102,7 @@
  * ```
  *
  * 创建时间：2025-12-15
- * 最后更新：2025-12-15
+ * 最后更新：2026-01-05（事务边界治理改造）
  * 使用模型：Claude Sonnet 4.5
  */
 
@@ -107,6 +114,7 @@ const AssetService = require('./AssetService') // Phase 3: 使用统一账本服
 const { MaterialConversionRule } = require('../models')
 // const MaterialAssetType = require('../models/MaterialAssetType') // P1-3: 材料类型配置（预留未来使用）
 const logger = require('../utils/logger')
+const { assertAndGetTransaction } = require('../utils/transactionHelpers')
 
 /**
  * 资产转换服务类
@@ -116,6 +124,10 @@ const logger = require('../utils/logger')
 class AssetConversionService {
   /**
    * 材料转换（核心方法）
+   *
+   * 事务边界治理（2026-01-05 决策）：
+   * - 强制要求外部事务传入（options.transaction）
+   * - 未提供事务时直接报错，由入口层统一管理事务
    *
    * 业务规则：
    * - 根据转换规则配置进行材料转换
@@ -128,6 +140,7 @@ class AssetConversionService {
    * @param {string} to_asset_code - 目标资产代码（Target Asset Code）如：DIAMOND
    * @param {number} from_amount - 源材料数量（Source Material Amount）必须大于0
    * @param {Object} options - 选项参数（Options）
+   * @param {Object} options.transaction - Sequelize事务对象（必填）
    * @param {string} options.idempotency_key - 业务唯一ID（Business ID）必填，用于幂等性控制
    * @param {string} options.title - 转换标题（Title）可选，默认为"材料转换"
    * @param {Object} options.meta - 元数据（Meta）可选，额外的业务信息
@@ -149,6 +162,9 @@ class AssetConversionService {
    * }
    */
   static async convertMaterial (user_id, from_asset_code, to_asset_code, from_amount, options = {}) {
+    // 强制要求事务边界 - 2026-01-05 治理决策
+    const transaction = assertAndGetTransaction(options, 'AssetConversionService.convertMaterial')
+
     // 参数验证（Parameter validation）
     if (!user_id || user_id <= 0) {
       throw new Error('用户ID无效')
@@ -175,7 +191,7 @@ class AssetConversionService {
       from_asset_code,
       to_asset_code,
       new Date(), // 查询当前生效的规则
-      { transaction: options.transaction }
+      { transaction }
     )
 
     if (!rule) {
@@ -207,172 +223,76 @@ class AssetConversionService {
       rule_to_amount: rule.to_amount // 规则目标数量
     }
 
-    // 🔥 在事务中执行转换操作（Phase 3：使用统一账本双分录）
-    const externalTransaction = options.transaction
-    const transaction = externalTransaction || (await sequelize.transaction())
-    const shouldCommit = !externalTransaction
+    // 🔴 Phase 3: 409幂等冲突检查 - 查询是否已存在转换记录
+    const existing_debit_tx = await AssetService.getTransactions(
+      { user_id },
+      {
+        asset_code: from_asset_code,
+        business_type: 'material_convert_debit',
+        page_size: 1000 // 获取足够多的记录用于查找
+      },
+      { transaction }
+    )
 
-    try {
-      // 🔴 Phase 3: 409幂等冲突检查 - 查询是否已存在转换记录
-      const existing_debit_tx = await AssetService.getTransactions(
-        { user_id },
-        {
-          asset_code: from_asset_code,
-          business_type: 'material_convert_debit',
-          page_size: 1000 // 获取足够多的记录用于查找
-        },
-        { transaction }
-      )
+    // 检查是否存在相同idempotency_key的记录（派生键格式：${idempotency_key}:debit）
+    const debit_idempotency_key = `${idempotency_key}:debit`
+    const existing_record = existing_debit_tx.transactions.find(
+      tx => tx.idempotency_key === debit_idempotency_key
+    )
 
-      // 检查是否存在相同idempotency_key的记录（派生键格式：${idempotency_key}:debit）
-      const debit_idempotency_key = `${idempotency_key}:debit`
-      const existing_record = existing_debit_tx.transactions.find(
-        tx => tx.idempotency_key === debit_idempotency_key
-      )
+    if (existing_record) {
+      // 参数一致性验证（409冲突保护）
+      const existing_meta = existing_record.meta || {}
+      const is_params_match =
+        existing_meta.from_asset_code === from_asset_code &&
+        existing_meta.to_asset_code === to_asset_code &&
+        Math.abs(existing_record.delta_amount) === from_amount
 
-      if (existing_record) {
-        // 参数一致性验证（409冲突保护）
-        const existing_meta = existing_record.meta || {}
-        const is_params_match =
-          existing_meta.from_asset_code === from_asset_code &&
-          existing_meta.to_asset_code === to_asset_code &&
-          Math.abs(existing_record.delta_amount) === from_amount
-
-        if (!is_params_match) {
-          // 参数不一致，返回409冲突
-          const conflictError = new Error(
-            `幂等键冲突：idempotency_key="${idempotency_key}" 已被使用于不同参数的转换操作。` +
-              `原转换：${existing_meta.from_asset_code || 'unknown'} → ${existing_meta.to_asset_code || 'unknown'}, ` +
-              `数量=${Math.abs(existing_record.delta_amount || 0)}；` +
-              `当前请求：${from_asset_code} → ${to_asset_code}, 数量=${from_amount}。` +
-              '请使用不同的幂等键或确认请求参数正确。'
-          )
-          conflictError.statusCode = 409 // HTTP 409 Conflict
-          conflictError.errorCode = 'IDEMPOTENCY_KEY_CONFLICT'
-
-          // 安全回滚事务（检查是否已完成）
-          if (transaction && !transaction.finished) {
-            await transaction.rollback()
-          }
-
-          throw conflictError
-        }
-
-        // 参数一致，返回幂等结果
-        logger.info('⚠️ 幂等性检查：材料转换已存在，参数一致，返回原结果', {
-          user_id,
-          from_asset_code,
-          to_asset_code,
-          from_amount,
-          to_amount,
-          idempotency_key
-        })
-
-        // 查询对应的目标资产入账记录
-        const to_transactions_result = await AssetService.getTransactions(
-          { user_id },
-          {
-            asset_code: to_asset_code,
-            business_type: 'material_convert_credit',
-            page_size: 1
-          },
-          { transaction }
+      if (!is_params_match) {
+        // 参数不一致，返回409冲突
+        const conflictError = new Error(
+          `幂等键冲突：idempotency_key="${idempotency_key}" 已被使用于不同参数的转换操作。` +
+            `原转换：${existing_meta.from_asset_code || 'unknown'} → ${existing_meta.to_asset_code || 'unknown'}, ` +
+            `数量=${Math.abs(existing_record.delta_amount || 0)}；` +
+            `当前请求：${from_asset_code} → ${to_asset_code}, 数量=${from_amount}。` +
+            '请使用不同的幂等键或确认请求参数正确。'
         )
+        conflictError.statusCode = 409 // HTTP 409 Conflict
+        conflictError.errorCode = 'IDEMPOTENCY_KEY_CONFLICT'
 
-        // 获取当前余额
-        const from_balance_obj = await AssetService.getBalance(
-          { user_id, asset_code: from_asset_code },
-          { transaction }
-        )
-        const to_balance_obj = await AssetService.getBalance(
-          { user_id, asset_code: to_asset_code },
-          { transaction }
-        )
-
-        if (shouldCommit) {
-          await transaction.commit()
-        }
-
-        return {
-          success: true,
-          from_asset_code,
-          to_asset_code,
-          from_amount,
-          to_amount,
-          from_tx_id: existing_record.transaction_id,
-          to_tx_id:
-            to_transactions_result.transactions.length > 0
-              ? to_transactions_result.transactions[0].transaction_id
-              : null,
-          from_balance: from_balance_obj.available_amount,
-          to_balance: to_balance_obj.available_amount,
-          is_duplicate: true
-        }
+        throw conflictError
       }
 
-      /*
-       * 步骤1：扣减源材料（使用统一账本AssetService）
-       * business_type: material_convert_debit
-       */
-      const from_result = await AssetService.changeBalance(
-        {
-          user_id,
-          asset_code: from_asset_code,
-          delta_amount: -from_amount, // 负数表示扣减
-          idempotency_key: `${idempotency_key}:debit`, // 幂等键：派生键（扣减）
-          business_type: 'material_convert_debit', // 业务类型：材料转换扣减
-          meta: {
-            ...meta,
-            to_asset_code,
-            to_amount,
-            conversion_rate: to_amount / from_amount,
-            title: `${title}（扣减${from_asset_code}）`
-          }
-        },
-        {
-          transaction
-        }
-      )
-
-      /*
-       * 步骤2：增加目标资产（使用统一账本AssetService）
-       * business_type: material_convert_credit
-       */
-      const to_result = await AssetService.changeBalance(
-        {
-          user_id,
-          asset_code: to_asset_code,
-          delta_amount: to_amount, // 正数表示增加
-          idempotency_key: `${idempotency_key}:credit`, // 幂等键：派生键（入账）
-          business_type: 'material_convert_credit', // 业务类型：材料转换入账
-          meta: {
-            ...meta,
-            from_asset_code,
-            from_amount,
-            conversion_rate: to_amount / from_amount,
-            title: `${title}（获得${to_asset_code}）`
-          }
-        },
-        {
-          transaction
-        }
-      )
-
-      // 提交事务（Commit transaction）
-      if (shouldCommit) {
-        await transaction.commit()
-      }
-
-      logger.info('✅ 材料转换成功（统一账本双分录）', {
+      // 参数一致，返回幂等结果
+      logger.info('⚠️ 幂等性检查：材料转换已存在，参数一致，返回原结果', {
         user_id,
         from_asset_code,
         to_asset_code,
         from_amount,
         to_amount,
-        from_tx_id: from_result.transaction_record.transaction_id,
-        to_tx_id: to_result.transaction_record.transaction_id,
         idempotency_key
       })
+
+      // 查询对应的目标资产入账记录
+      const to_transactions_result = await AssetService.getTransactions(
+        { user_id },
+        {
+          asset_code: to_asset_code,
+          business_type: 'material_convert_credit',
+          page_size: 1
+        },
+        { transaction }
+      )
+
+      // 获取当前余额
+      const from_balance_obj = await AssetService.getBalance(
+        { user_id, asset_code: from_asset_code },
+        { transaction }
+      )
+      const to_balance_obj = await AssetService.getBalance(
+        { user_id, asset_code: to_asset_code },
+        { transaction }
+      )
 
       return {
         success: true,
@@ -380,29 +300,87 @@ class AssetConversionService {
         to_asset_code,
         from_amount,
         to_amount,
-        from_tx_id: from_result.transaction_record.transaction_id,
-        to_tx_id: to_result.transaction_record.transaction_id,
-        from_balance: from_result.balance.available_amount,
-        to_balance: to_result.balance.available_amount,
-        is_duplicate: false
+        from_tx_id: existing_record.transaction_id,
+        to_tx_id:
+          to_transactions_result.transactions.length > 0
+            ? to_transactions_result.transactions[0].transaction_id
+            : null,
+        from_balance: from_balance_obj.available_amount,
+        to_balance: to_balance_obj.available_amount,
+        is_duplicate: true
       }
-    } catch (error) {
-      // 回滚事务（Rollback transaction）- 只有在未回滚时才回滚
-      if (shouldCommit && !transaction.finished) {
-        await transaction.rollback()
-      }
+    }
 
-      logger.error('❌ 材料转换失败', {
+    /*
+     * 步骤1：扣减源材料（使用统一账本AssetService）
+     * business_type: material_convert_debit
+     */
+    const from_result = await AssetService.changeBalance(
+      {
         user_id,
-        from_asset_code,
-        to_asset_code,
-        from_amount,
-        to_amount,
-        idempotency_key,
-        error: error.message
-      })
+        asset_code: from_asset_code,
+        delta_amount: -from_amount, // 负数表示扣减
+        idempotency_key: `${idempotency_key}:debit`, // 幂等键：派生键（扣减）
+        business_type: 'material_convert_debit', // 业务类型：材料转换扣减
+        meta: {
+          ...meta,
+          to_asset_code,
+          to_amount,
+          conversion_rate: to_amount / from_amount,
+          title: `${title}（扣减${from_asset_code}）`
+        }
+      },
+      {
+        transaction
+      }
+    )
 
-      throw error
+    /*
+     * 步骤2：增加目标资产（使用统一账本AssetService）
+     * business_type: material_convert_credit
+     */
+    const to_result = await AssetService.changeBalance(
+      {
+        user_id,
+        asset_code: to_asset_code,
+        delta_amount: to_amount, // 正数表示增加
+        idempotency_key: `${idempotency_key}:credit`, // 幂等键：派生键（入账）
+        business_type: 'material_convert_credit', // 业务类型：材料转换入账
+        meta: {
+          ...meta,
+          from_asset_code,
+          from_amount,
+          conversion_rate: to_amount / from_amount,
+          title: `${title}（获得${to_asset_code}）`
+        }
+      },
+      {
+        transaction
+      }
+    )
+
+    logger.info('✅ 材料转换成功（统一账本双分录）', {
+      user_id,
+      from_asset_code,
+      to_asset_code,
+      from_amount,
+      to_amount,
+      from_tx_id: from_result.transaction_record.transaction_id,
+      to_tx_id: to_result.transaction_record.transaction_id,
+      idempotency_key
+    })
+
+    return {
+      success: true,
+      from_asset_code,
+      to_asset_code,
+      from_amount,
+      to_amount,
+      from_tx_id: from_result.transaction_record.transaction_id,
+      to_tx_id: to_result.transaction_record.transaction_id,
+      from_balance: from_result.balance.available_amount,
+      to_balance: to_result.balance.available_amount,
+      is_duplicate: false
     }
   }
 

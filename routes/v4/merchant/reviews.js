@@ -29,6 +29,7 @@ const router = express.Router()
 const { authenticateToken } = require('../../../middleware/auth')
 const { handleServiceError } = require('../../../middleware/validation')
 const logger = require('../../../utils/logger').logger
+const TransactionManager = require('../../../utils/TransactionManager')
 
 /**
  * @route POST /api/v4/merchant/reviews/submit
@@ -63,12 +64,15 @@ router.post('/submit', authenticateToken, async (req, res) => {
       points_amount
     })
 
-    const result = await MerchantReviewService.submitReview({
-      user_id,
-      merchant_id,
-      points_amount,
-      qr_code_data,
-      metadata
+    // 使用 TransactionManager 统一事务边界（符合治理决策）
+    const result = await TransactionManager.execute(async (transaction) => {
+      return await MerchantReviewService.submitReview({
+        user_id,
+        merchant_id,
+        points_amount,
+        qr_code_data,
+        metadata
+      }, { transaction })
     })
 
     logger.info('积分审核提交成功', {
@@ -113,9 +117,12 @@ router.post('/:review_id/approve', authenticateToken, async (req, res) => {
 
     logger.info('审核通过请求', { review_id, operator_user_id })
 
-    const result = await MerchantReviewService.approveReview({
-      review_id,
-      operator_user_id
+    // 使用 TransactionManager 统一事务边界（符合治理决策）
+    const result = await TransactionManager.execute(async (transaction) => {
+      return await MerchantReviewService.approveReview({
+        review_id,
+        operator_user_id
+      }, { transaction })
     })
 
     logger.info('审核通过成功', {
@@ -160,10 +167,13 @@ router.post('/:review_id/reject', authenticateToken, async (req, res) => {
 
     logger.info('审核拒绝请求', { review_id, operator_user_id, reject_reason })
 
-    const result = await MerchantReviewService.rejectReview({
-      review_id,
-      reject_reason,
-      operator_user_id
+    // 使用 TransactionManager 统一事务边界（符合治理决策）
+    const result = await TransactionManager.execute(async (transaction) => {
+      return await MerchantReviewService.rejectReview({
+        review_id,
+        reject_reason,
+        operator_user_id
+      }, { transaction })
     })
 
     logger.warn('审核拒绝，积分仍冻结', {
@@ -219,11 +229,14 @@ router.post('/admin/:review_id/handle', authenticateToken, async (req, res) => {
       handle_reason
     })
 
-    const result = await MerchantReviewService.adminHandleFrozenReview({
-      review_id,
-      action,
-      admin_user_id,
-      handle_reason
+    // 使用 TransactionManager 统一事务边界（符合治理决策）
+    const result = await TransactionManager.execute(async (transaction) => {
+      return await MerchantReviewService.adminHandleFrozenReview({
+        review_id,
+        action,
+        admin_user_id,
+        handle_reason
+      }, { transaction })
     })
 
     const message = action === 'unfreeze' ? '积分已解冻退回用户' : '积分已作废'

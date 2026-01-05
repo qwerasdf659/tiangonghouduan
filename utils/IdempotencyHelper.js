@@ -212,11 +212,181 @@ function parseIdempotencyKey (idempotencyKey) {
   return null
 }
 
+/**
+ * ============================================================================
+ * BusinessIdGenerator - 业务唯一键生成器
+ * ============================================================================
+ *
+ * 治理决策（2026-01-05 拍板）：
+ * - idempotency_key：请求级幂等（防止同一请求重复提交）
+ * - business_id：业务级幂等（防止同一业务操作从不同请求重复执行）
+ *
+ * 区别示例：
+ * - 用户连续点击两次"下单"，idempotency_key 相同，第二次被拦截 ✅
+ * - 用户刷新页面后重新下单，idempotency_key 不同，但 business_id 相同，第二次被拦截 ✅
+ *
+ * @see docs/事务边界治理现状核查报告.md 建议9.1
+ */
+
+/**
+ * 生成抽奖记录业务唯一键
+ *
+ * 格式：lottery_draw_{user_id}_{session_id}_{draw_index}
+ *
+ * @param {number|string} userId - 用户ID
+ * @param {string} lotterySessionId - 抽奖会话ID
+ * @param {number} drawIndex - 本次抽奖在会话中的序号（从0开始）
+ * @returns {string} 业务唯一键
+ *
+ * @example
+ * generateLotteryDrawBusinessId(123, 'lottery_tx_1703511234567_a1b2c3_001', 0)
+ * // => 'lottery_draw_123_lottery_tx_1703511234567_a1b2c3_001_0'
+ */
+function generateLotteryDrawBusinessId (userId, lotterySessionId, drawIndex) {
+  if (!userId || !lotterySessionId || drawIndex === undefined) {
+    throw new Error('userId, lotterySessionId 和 drawIndex 不能为空')
+  }
+  return `lottery_draw_${userId}_${lotterySessionId}_${drawIndex}`
+}
+
+/**
+ * 生成消费记录业务唯一键
+ *
+ * 格式：consumption_{merchant_id}_{timestamp}_{random}
+ *
+ * 业务语义：同一商家在同一时间点（毫秒级）只能提交一笔消费记录
+ *
+ * @param {number|string} merchantId - 商家ID
+ * @param {number} [timestamp] - 时间戳（可选，默认当前时间）
+ * @param {string} [randomSuffix] - 随机后缀（可选，默认生成6位随机数）
+ * @returns {string} 业务唯一键
+ *
+ * @example
+ * generateConsumptionBusinessId(456)
+ * // => 'consumption_456_1703511234567_a1b2c3'
+ */
+function generateConsumptionBusinessId (merchantId, timestamp, randomSuffix) {
+  if (!merchantId) {
+    throw new Error('merchantId 不能为空')
+  }
+  const ts = timestamp || Date.now()
+  const random = randomSuffix || crypto.randomBytes(3).toString('hex')
+  return `consumption_${merchantId}_${ts}_${random}`
+}
+
+/**
+ * 生成兑换记录业务唯一键
+ *
+ * 格式：exchange_{user_id}_{item_id}_{timestamp}
+ *
+ * 业务语义：同一用户在同一时间点（毫秒级）只能兑换一次同一商品
+ *
+ * @param {number|string} userId - 用户ID
+ * @param {number|string} exchangeItemId - 兑换商品ID
+ * @param {number} [timestamp] - 时间戳（可选，默认当前时间）
+ * @returns {string} 业务唯一键
+ *
+ * @example
+ * generateExchangeBusinessId(123, 789)
+ * // => 'exchange_123_789_1703511234567'
+ */
+function generateExchangeBusinessId (userId, exchangeItemId, timestamp) {
+  if (!userId || !exchangeItemId) {
+    throw new Error('userId 和 exchangeItemId 不能为空')
+  }
+  const ts = timestamp || Date.now()
+  return `exchange_${userId}_${exchangeItemId}_${ts}`
+}
+
+/**
+ * 生成交易订单业务唯一键
+ *
+ * 格式：trade_order_{buyer_id}_{listing_id}_{timestamp}
+ *
+ * 业务语义：同一买家在同一时间点（毫秒级）只能对同一挂牌下单一次
+ *
+ * @param {number|string} buyerId - 买家ID
+ * @param {number|string} listingId - 挂牌ID
+ * @param {number} [timestamp] - 时间戳（可选，默认当前时间）
+ * @returns {string} 业务唯一键
+ *
+ * @example
+ * generateTradeOrderBusinessId(123, 456)
+ * // => 'trade_order_123_456_1703511234567'
+ */
+function generateTradeOrderBusinessId (buyerId, listingId, timestamp) {
+  if (!buyerId || !listingId) {
+    throw new Error('buyerId 和 listingId 不能为空')
+  }
+  const ts = timestamp || Date.now()
+  return `trade_order_${buyerId}_${listingId}_${ts}`
+}
+
+/**
+ * 验证业务唯一键格式是否有效
+ *
+ * @param {string} businessId - 待验证的业务唯一键
+ * @param {string} type - 预期的键类型（lottery_draw/consumption/exchange/trade_order）
+ * @returns {boolean} 是否有效
+ */
+function isValidBusinessId (businessId, type) {
+  if (!businessId || typeof businessId !== 'string') {
+    return false
+  }
+
+  switch (type) {
+  case 'lottery_draw':
+    // lottery_draw_{user_id}_{session_id}_{draw_index}
+    return /^lottery_draw_\d+_lottery_tx_\d+_[a-f0-9]{6}_\d{3}_\d+$/.test(businessId)
+
+  case 'consumption':
+    // consumption_{merchant_id}_{timestamp}_{random}
+    return /^consumption_\d+_\d+_[a-f0-9]{6}$/.test(businessId)
+
+  case 'exchange':
+    // exchange_{user_id}_{item_id}_{timestamp}
+    return /^exchange_\d+_\d+_\d+$/.test(businessId)
+
+  case 'trade_order':
+    // trade_order_{buyer_id}_{listing_id}_{timestamp}
+    return /^trade_order_\d+_\d+_\d+$/.test(businessId)
+
+  default:
+    return false
+  }
+}
+
+/**
+ * BusinessIdGenerator 类封装（便于对象形式调用）
+ *
+ * @example
+ * BusinessIdGenerator.generateLotteryDrawId(123, 'session_001', 0)
+ * BusinessIdGenerator.generateConsumptionId(456)
+ */
+const BusinessIdGenerator = {
+  generateLotteryDrawId: generateLotteryDrawBusinessId,
+  generateConsumptionId: generateConsumptionBusinessId,
+  generateExchangeId: generateExchangeBusinessId,
+  generateTradeOrderId: generateTradeOrderBusinessId,
+  isValidBusinessId
+}
+
 module.exports = {
+  // 原有的幂等键生成函数
   generateLotterySessionId,
   deriveTransactionIdempotencyKey,
   generateStandaloneIdempotencyKey,
   generateRequestIdempotencyKey,
   isValidIdempotencyKey,
-  parseIdempotencyKey
+  parseIdempotencyKey,
+
+  // 新增：业务唯一键生成函数
+  generateLotteryDrawBusinessId,
+  generateConsumptionBusinessId,
+  generateExchangeBusinessId,
+  generateTradeOrderBusinessId,
+  isValidBusinessId,
+
+  // 新增：BusinessIdGenerator 类封装
+  BusinessIdGenerator
 }

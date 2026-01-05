@@ -161,6 +161,7 @@ async function check_lottery_consistency() {
     `, { replacements: [CUTOFF_DATE] })
 
     // 3. 检查孤立的流水（有流水但无对应 lottery_draws）
+    // 排除测试数据：lottery_session_id 包含 test_ 的流水是测试产生的，不参与对账
     const [orphan_transactions] = await sequelize.query(`
       SELECT
         atx.transaction_id,
@@ -172,6 +173,8 @@ async function check_lottery_consistency() {
       WHERE atx.business_type = 'lottery_consume'
         AND atx.created_at >= ?
         AND ld.draw_id IS NULL
+        AND atx.lottery_session_id NOT LIKE '%test_%'
+        AND atx.idempotency_key NOT LIKE '%test_%'
       LIMIT 20
     `, { replacements: [CUTOFF_DATE] })
 

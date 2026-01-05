@@ -11,31 +11,15 @@
  * 5. 管理状态查询（获取用户当前所有管理设置）
  * 6. 设置清除管理（清除用户的所有或特定类型设置）
  *
- * 业务流程：
- *
- * 1. **强制中奖流程**
- *    - 验证user_id和prize_id → 调用UserService和PrizePoolService → 调用ManagementStrategy.forceWin → 记录审计日志 → 返回结果
- *
- * 2. **强制不中奖流程**
- *    - 验证user_id → 调用UserService → 调用ManagementStrategy.forceLose → 记录审计日志 → 返回结果
- *
- * 3. **概率调整流程**
- *    - 验证user_id（可选prize_id） → 调用UserService（可选PrizePoolService） → 创建LotteryManagementSetting → 记录审计日志 → 返回结果
- *
- * 4. **用户队列设置流程**
- *    - 验证user_id → 调用UserService → 调用ManagementStrategy.setUserQueue → 记录审计日志 → 返回结果
- *
- * 5. **管理状态查询流程**
- *    - 验证user_id → 调用UserService → 调用ManagementStrategy.getUserManagementStatus → 返回状态信息
- *
- * 6. **设置清除流程**
- *    - 验证user_id → 调用UserService → 调用ManagementStrategy.clearUserSettings → 记录审计日志 → 返回结果
- *
  * 设计原则：
- * - **编排层职责**：本服务负责用户/奖品验证、事务管理、审计日志记录
+ * - **编排层职责**：本服务负责用户/奖品验证、审计日志记录
  * - **委托给策略**：具体的管理逻辑委托给ManagementStrategy处理
- * - **事务管理**：所有写操作在事务中执行，确保数据一致性
  * - **审计日志**：所有管理操作都记录到AdminOperationLog
+ *
+ * 事务边界治理（2026-01-05 决策）：
+ * - 所有写操作 **强制要求** 外部事务传入（options.transaction）
+ * - 未提供事务时直接报错（使用 assertAndGetTransaction）
+ * - 服务层禁止自建事务，由入口层统一使用 TransactionManager.execute()
  *
  * 依赖服务：
  * - UserService：用户验证
@@ -43,50 +27,14 @@
  * - ManagementStrategy：抽奖管理策略（通过sharedComponents获取）
  * - AuditLogService：审计日志记录
  *
- * 关键方法列表：
- * - forceWinForUser(adminId, userId, prizeId, reason, expiresAt) - 强制用户中奖
- * - forceLoseForUser(adminId, userId, count, reason, expiresAt) - 强制用户不中奖
- * - adjustUserProbability(adminId, userId, adjustmentData, expiresAt) - 调整用户中奖概率
- * - setUserQueue(adminId, userId, queueConfig, reason, expiresAt) - 设置用户专属队列
- * - getUserManagementStatus(userId) - 获取用户管理状态
- * - clearUserSettings(adminId, userId, settingType) - 清除用户设置
- *
- * 数据模型关联：
- * - User：用户表（验证用户存在）
- * - LotteryPrize：奖品表（验证奖品存在）
- * - LotteryManagementSetting：抽奖管理设置表（存储管理配置）
- * - AdminOperationLog：管理员操作日志表（审计记录）
- *
- * 使用示例：
- * ```javascript
- * const serviceManager = require('./services');
- * const AdminLotteryService = serviceManager.getService('adminLottery');
- *
- * // 示例1：强制用户中奖
- * const result = await AdminLotteryService.forceWinForUser(
- *   adminId,
- *   userId,
- *   prizeId,
- *   '补偿用户',
- *   expiresAt
- * );
- *
- * // 示例2：调整用户概率
- * const result = await AdminLotteryService.adjustUserProbability(
- *   adminId,
- *   userId,
- *   { multiplier: 2.0, adjustment_type: 'global_multiplier' },
- *   expiresAt
- * );
- * ```
- *
  * 创建时间：2025年12月09日
- * 使用模型：Claude Sonnet 4.5
+ * 最后更新：2026年01月05日（事务边界治理改造）
  */
 
 const BeijingTimeHelper = require('../utils/timeHelper')
 const models = require('../models')
 const AuditLogService = require('./AuditLogService')
+const { assertAndGetTransaction } = require('../utils/transactionHelpers')
 
 const logger = require('../utils/logger').logger
 
@@ -130,471 +78,326 @@ class AdminLotteryService {
   /**
    * 强制用户中奖
    *
-   * @description
-   * 管理员强制指定用户在下次抽奖中获得指定奖品。
-   * 该方法负责验证用户和奖品的存在性，然后调用ManagementStrategy完成实际操作。
-   *
-   * 业务场景：
-   * - 用户补偿：因系统故障需要补偿用户
-   * - 测试验证：测试抽奖系统的强制中奖功能
-   * - 特殊活动：运营活动需要指定用户中奖
+   * 事务边界治理（2026-01-05 决策）：
+   * - 强制要求外部事务传入（options.transaction）
+   * - 未提供事务时直接报错，由入口层统一管理事务
    *
    * @param {number} adminId - 管理员ID
    * @param {number} userId - 目标用户ID
    * @param {number} prizeId - 奖品ID
    * @param {string} [reason='管理员强制中奖'] - 操作原因
    * @param {Date|null} [expiresAt=null] - 过期时间（null表示永不过期）
+   * @param {Object} options - 选项
+   * @param {Object} options.transaction - Sequelize事务对象（必填）
    * @returns {Promise<Object>} 操作结果
-   * @returns {boolean} result.success - 操作是否成功
-   * @returns {string} result.setting_id - 设置记录ID
-   * @returns {number} result.user_id - 目标用户ID
-   * @returns {number} result.prize_id - 奖品ID
-   * @returns {string} result.user_mobile - 用户手机号
-   * @returns {string} result.prize_name - 奖品名称
-   * @returns {string} result.status - 状态标识（'force_win_set'）
-   * @returns {string} result.reason - 操作原因
-   * @returns {Date} result.expires_at - 过期时间
-   * @returns {number} result.admin_id - 管理员ID
-   * @returns {string} result.timestamp - 操作时间戳
-   *
-   * @throws {Error} 当用户不存在时抛出错误（code: 'USER_NOT_FOUND'）
-   * @throws {Error} 当奖品不存在时抛出错误
-   * @throws {Error} 当管理策略执行失败时抛出错误
-   *
-   * @example
-   * const result = await AdminLotteryService.forceWinForUser(
-   *   10001,
-   *   20001,
-   *   30001,
-   *   '系统补偿',
-   *   new Date(Date.now() + 3600000) // 1小时后过期
-   * );
    */
   static async forceWinForUser (
     adminId,
     userId,
     prizeId,
     reason = '管理员强制中奖',
-    expiresAt = null
+    expiresAt = null,
+    options = {}
   ) {
-    const transaction = await models.sequelize.transaction()
+    // 强制要求事务边界 - 2026-01-05 治理决策
+    const transaction = assertAndGetTransaction(options, 'AdminLotteryService.forceWinForUser')
 
-    try {
-      logger.info('管理员强制中奖操作开始', {
+    logger.info('管理员强制中奖操作开始', {
+      admin_id: adminId,
+      user_id: userId,
+      prize_id: prizeId,
+      reason
+    })
+
+    // 🎯 使用初始化时注入的依赖
+    const UserService = this._dependencies.user
+    const PrizePoolService = this._dependencies.prizePool
+
+    // 🔍 验证用户存在
+    const user = await UserService.getUserById(userId)
+    if (!user) {
+      throw new Error('用户不存在')
+    }
+
+    // 🔍 验证奖品存在
+    const prize = await PrizePoolService.getPrizeById(prizeId)
+    if (!prize) {
+      throw new Error('奖品不存在')
+    }
+
+    // 🎯 获取ManagementStrategy（通过sharedComponents）
+    const { sharedComponents } = require('../routes/v4/admin/shared/middleware')
+    const managementStrategy = sharedComponents.managementStrategy
+
+    // 🎯 调用管理策略设置强制中奖
+    const result = await managementStrategy.forceWin(adminId, userId, prizeId, reason, expiresAt)
+
+    if (!result.success) {
+      throw new Error(result.error || '强制中奖设置失败')
+    }
+
+    // 📝 记录审计日志
+    await AuditLogService.logAdminOperation(
+      {
         admin_id: adminId,
-        user_id: userId,
-        prize_id: prizeId,
-        reason
-      })
-
-      // 🎯 使用初始化时注入的依赖
-      const UserService = this._dependencies.user
-      const PrizePoolService = this._dependencies.prizePool
-
-      // 🔍 验证用户存在
-      const user = await UserService.getUserById(userId)
-      if (!user) {
-        throw new Error('用户不存在')
-      }
-
-      // 🔍 验证奖品存在
-      const prize = await PrizePoolService.getPrizeById(prizeId)
-      if (!prize) {
-        throw new Error('奖品不存在')
-      }
-
-      // 🎯 获取ManagementStrategy（通过sharedComponents）
-      const { sharedComponents } = require('../routes/v4/admin/shared/middleware')
-      const managementStrategy = sharedComponents.managementStrategy
-
-      // 🎯 调用管理策略设置强制中奖
-      const result = await managementStrategy.forceWin(adminId, userId, prizeId, reason, expiresAt)
-
-      if (!result.success) {
-        throw new Error(result.error || '强制中奖设置失败')
-      }
-
-      // 📝 记录审计日志
-      await AuditLogService.logAdminOperation(
-        {
-          admin_id: adminId,
-          operation_type: 'lottery_force_win',
-          operation_target: 'lottery_management_setting',
-          target_id: result.setting_id,
-          operation_details: {
-            user_id: userId,
-            user_mobile: user.mobile,
-            prize_id: prizeId,
-            prize_name: prize.prize_name,
-            reason,
-            expires_at: expiresAt
-          },
-          ip_address: null, // 路由层会填充
-          user_agent: null // 路由层会填充
+        operation_type: 'lottery_force_win',
+        operation_target: 'lottery_management_setting',
+        target_id: result.setting_id,
+        operation_details: {
+          user_id: userId,
+          user_mobile: user.mobile,
+          prize_id: prizeId,
+          prize_name: prize.prize_name,
+          reason,
+          expires_at: expiresAt
         },
-        { transaction }
-      )
+        ip_address: null, // 路由层会填充
+        user_agent: null // 路由层会填充
+      },
+      { transaction }
+    )
 
-      await transaction.commit()
+    logger.info('管理员强制中奖操作成功', {
+      setting_id: result.setting_id,
+      admin_id: adminId,
+      user_id: userId,
+      prize_id: prizeId
+    })
 
-      logger.info('管理员强制中奖操作成功', {
-        setting_id: result.setting_id,
-        admin_id: adminId,
-        user_id: userId,
-        prize_id: prizeId
-      })
-
-      return {
-        success: true,
-        setting_id: result.setting_id,
-        user_id: userId,
-        prize_id: prizeId,
-        user_mobile: user.mobile,
-        prize_name: prize.prize_name,
-        status: 'force_win_set',
-        reason,
-        expires_at: expiresAt,
-        admin_id: adminId,
-        timestamp: result.timestamp
-      }
-    } catch (error) {
-      await transaction.rollback()
-
-      logger.error('管理员强制中奖操作失败', {
-        admin_id: adminId,
-        user_id: userId,
-        prize_id: prizeId,
-        error: error.message,
-        stack: error.stack
-      })
-
-      throw error
+    return {
+      success: true,
+      setting_id: result.setting_id,
+      user_id: userId,
+      prize_id: prizeId,
+      user_mobile: user.mobile,
+      prize_name: prize.prize_name,
+      status: 'force_win_set',
+      reason,
+      expires_at: expiresAt,
+      admin_id: adminId,
+      timestamp: result.timestamp
     }
   }
 
   /**
    * 强制用户不中奖
    *
-   * @description
-   * 管理员强制指定用户在接下来N次抽奖中不中奖。
-   * 该方法负责验证用户的存在性，然后调用ManagementStrategy完成实际操作。
-   *
-   * 业务场景：
-   * - 防刷保护：检测到用户异常行为，临时限制中奖
-   * - 测试验证：测试抽奖系统的强制不中奖功能
-   * - 特殊活动：运营活动需要控制用户中奖节奏
+   * 事务边界治理（2026-01-05 决策）：
+   * - 强制要求外部事务传入（options.transaction）
+   * - 未提供事务时直接报错，由入口层统一管理事务
    *
    * @param {number} adminId - 管理员ID
    * @param {number} userId - 目标用户ID
    * @param {number} [count=1] - 不中奖次数（1-100）
    * @param {string} [reason='管理员强制不中奖'] - 操作原因
    * @param {Date|null} [expiresAt=null] - 过期时间（null表示永不过期）
+   * @param {Object} options - 选项
+   * @param {Object} options.transaction - Sequelize事务对象（必填）
    * @returns {Promise<Object>} 操作结果
-   * @returns {boolean} result.success - 操作是否成功
-   * @returns {string} result.setting_id - 设置记录ID
-   * @returns {number} result.user_id - 目标用户ID
-   * @returns {string} result.user_mobile - 用户手机号
-   * @returns {string} result.status - 状态标识（'force_lose_set'）
-   * @returns {number} result.count - 总次数
-   * @returns {number} result.remaining - 剩余次数
-   * @returns {string} result.reason - 操作原因
-   * @returns {Date} result.expires_at - 过期时间
-   * @returns {number} result.admin_id - 管理员ID
-   * @returns {string} result.timestamp - 操作时间戳
-   *
-   * @throws {Error} 当用户不存在时抛出错误（code: 'USER_NOT_FOUND'）
-   * @throws {Error} 当count超出范围时抛出错误
-   * @throws {Error} 当管理策略执行失败时抛出错误
-   *
-   * @example
-   * const result = await AdminLotteryService.forceLoseForUser(
-   *   10001,
-   *   20001,
-   *   5,
-   *   '防刷保护'
-   * );
    */
   static async forceLoseForUser (
     adminId,
     userId,
     count = 1,
     reason = '管理员强制不中奖',
-    expiresAt = null
+    expiresAt = null,
+    options = {}
   ) {
-    const transaction = await models.sequelize.transaction()
+    // 强制要求事务边界 - 2026-01-05 治理决策
+    const transaction = assertAndGetTransaction(options, 'AdminLotteryService.forceLoseForUser')
 
-    try {
-      logger.info('管理员强制不中奖操作开始', {
+    logger.info('管理员强制不中奖操作开始', {
+      admin_id: adminId,
+      user_id: userId,
+      count,
+      reason
+    })
+
+    // 🎯 使用初始化时注入的依赖
+    const UserService = this._dependencies.user
+
+    // 🔍 验证用户存在
+    const user = await UserService.getUserById(userId)
+    if (!user) {
+      throw new Error('用户不存在')
+    }
+
+    // 🎯 获取ManagementStrategy
+    const { sharedComponents } = require('../routes/v4/admin/shared/middleware')
+    const managementStrategy = sharedComponents.managementStrategy
+
+    // 🎯 调用管理策略设置强制不中奖
+    const result = await managementStrategy.forceLose(adminId, userId, count, reason, expiresAt)
+
+    if (!result.success) {
+      throw new Error(result.error || '强制不中奖设置失败')
+    }
+
+    // 📝 记录审计日志
+    await AuditLogService.logAdminOperation(
+      {
         admin_id: adminId,
-        user_id: userId,
-        count,
-        reason
-      })
-
-      // 🎯 使用初始化时注入的依赖
-      const UserService = this._dependencies.user
-
-      // 🔍 验证用户存在
-      const user = await UserService.getUserById(userId)
-      if (!user) {
-        throw new Error('用户不存在')
-      }
-
-      // 🎯 获取ManagementStrategy
-      const { sharedComponents } = require('../routes/v4/admin/shared/middleware')
-      const managementStrategy = sharedComponents.managementStrategy
-
-      // 🎯 调用管理策略设置强制不中奖
-      const result = await managementStrategy.forceLose(adminId, userId, count, reason, expiresAt)
-
-      if (!result.success) {
-        throw new Error(result.error || '强制不中奖设置失败')
-      }
-
-      // 📝 记录审计日志
-      await AuditLogService.logAdminOperation(
-        {
-          admin_id: adminId,
-          operation_type: 'lottery_force_lose',
-          operation_target: 'lottery_management_setting',
-          target_id: result.setting_id,
-          operation_details: {
-            user_id: userId,
-            user_mobile: user.mobile,
-            count,
-            remaining: result.remaining,
-            reason,
-            expires_at: expiresAt
-          },
-          ip_address: null,
-          user_agent: null
+        operation_type: 'lottery_force_lose',
+        operation_target: 'lottery_management_setting',
+        target_id: result.setting_id,
+        operation_details: {
+          user_id: userId,
+          user_mobile: user.mobile,
+          count,
+          remaining: result.remaining,
+          reason,
+          expires_at: expiresAt
         },
-        { transaction }
-      )
+        ip_address: null,
+        user_agent: null
+      },
+      { transaction }
+    )
 
-      await transaction.commit()
+    logger.info('管理员强制不中奖操作成功', {
+      setting_id: result.setting_id,
+      admin_id: adminId,
+      user_id: userId,
+      count
+    })
 
-      logger.info('管理员强制不中奖操作成功', {
-        setting_id: result.setting_id,
-        admin_id: adminId,
-        user_id: userId,
-        count
-      })
-
-      return {
-        success: true,
-        setting_id: result.setting_id,
-        user_id: userId,
-        user_mobile: user.mobile,
-        status: 'force_lose_set',
-        count,
-        remaining: result.remaining,
-        reason,
-        expires_at: expiresAt,
-        admin_id: adminId,
-        timestamp: result.timestamp
-      }
-    } catch (error) {
-      await transaction.rollback()
-
-      logger.error('管理员强制不中奖操作失败', {
-        admin_id: adminId,
-        user_id: userId,
-        count,
-        error: error.message,
-        stack: error.stack
-      })
-
-      throw error
+    return {
+      success: true,
+      setting_id: result.setting_id,
+      user_id: userId,
+      user_mobile: user.mobile,
+      status: 'force_lose_set',
+      count,
+      remaining: result.remaining,
+      reason,
+      expires_at: expiresAt,
+      admin_id: adminId,
+      timestamp: result.timestamp
     }
   }
 
   /**
    * 调整用户中奖概率
    *
-   * @description
-   * 管理员调整指定用户的中奖概率。
-   * 支持两种模式：
-   * 1. 全局概率倍数调整（adjustmentData.multiplier）
-   * 2. 特定奖品概率调整（adjustmentData.prize_id + adjustmentData.custom_probability）
-   *
-   * 业务场景：
-   * - 用户挽留：提升流失用户的中奖概率
-   * - 活跃激励：提升活跃用户的中奖概率
-   * - 精准运营：为特定用户设置特定奖品的中奖概率
+   * 事务边界治理（2026-01-05 决策）：
+   * - 强制要求外部事务传入（options.transaction）
+   * - 未提供事务时直接报错，由入口层统一管理事务
    *
    * @param {number} adminId - 管理员ID
    * @param {number} userId - 目标用户ID
    * @param {Object} adjustmentData - 概率调整数据
-   * @param {number} [adjustmentData.multiplier] - 全局概率倍数（0.1-10，用于全局调整模式）
-   * @param {number} [adjustmentData.prize_id] - 奖品ID（用于特定奖品调整模式）
-   * @param {number} [adjustmentData.custom_probability] - 自定义概率（0.01-1.0，用于特定奖品调整模式）
-   * @param {string} adjustmentData.adjustment_type - 调整类型（'global_multiplier' 或 'specific_prize'）
-   * @param {string} [adjustmentData.reason='管理员概率调整'] - 操作原因
    * @param {Date|null} expiresAt - 过期时间（null表示永不过期）
+   * @param {Object} options - 选项
+   * @param {Object} options.transaction - Sequelize事务对象（必填）
    * @returns {Promise<Object>} 操作结果
-   * @returns {boolean} result.success - 操作是否成功
-   * @returns {string} result.setting_id - 设置记录ID
-   * @returns {number} result.user_id - 目标用户ID
-   * @returns {string} result.user_mobile - 用户手机号
-   * @returns {string} result.status - 状态标识（'probability_adjusted'）
-   * @returns {string} result.adjustment_type - 调整类型
-   * @returns {number} [result.multiplier] - 概率倍数（全局调整模式）
-   * @returns {number} [result.prize_id] - 奖品ID（特定奖品调整模式）
-   * @returns {string} [result.prize_name] - 奖品名称（特定奖品调整模式）
-   * @returns {number} [result.custom_probability] - 自定义概率（特定奖品调整模式）
-   * @returns {string} result.reason - 操作原因
-   * @returns {Date} result.expires_at - 过期时间
-   * @returns {number} result.admin_id - 管理员ID
-   * @returns {string} result.timestamp - 操作时间戳
-   *
-   * @throws {Error} 当用户不存在时抛出错误（code: 'USER_NOT_FOUND'）
-   * @throws {Error} 当奖品不存在时抛出错误（特定奖品调整模式）
-   * @throws {Error} 当概率参数非法时抛出错误
-   *
-   * @example
-   * // 全局倍数调整
-   * const result1 = await AdminLotteryService.adjustUserProbability(
-   *   10001,
-   *   20001,
-   *   { multiplier: 2.0, adjustment_type: 'global_multiplier', reason: '用户挽留' },
-   *   expiresAt
-   * );
-   *
-   * // 特定奖品调整
-   * const result2 = await AdminLotteryService.adjustUserProbability(
-   *   10001,
-   *   20001,
-   *   {
-   *     prize_id: 30001,
-   *     custom_probability: 0.5,
-   *     adjustment_type: 'specific_prize',
-   *     reason: '精准运营'
-   *   },
-   *   expiresAt
-   * );
    */
-  static async adjustUserProbability (adminId, userId, adjustmentData, expiresAt = null) {
-    const transaction = await models.sequelize.transaction()
+  static async adjustUserProbability (adminId, userId, adjustmentData, expiresAt = null, options = {}) {
+    // 强制要求事务边界 - 2026-01-05 治理决策
+    const transaction = assertAndGetTransaction(options, 'AdminLotteryService.adjustUserProbability')
 
-    try {
-      logger.info('管理员调整用户概率操作开始', {
-        admin_id: adminId,
-        user_id: userId,
-        adjustment_type: adjustmentData.adjustment_type
-      })
+    logger.info('管理员调整用户概率操作开始', {
+      admin_id: adminId,
+      user_id: userId,
+      adjustment_type: adjustmentData.adjustment_type
+    })
 
-      // 🎯 使用初始化时注入的依赖
-      const UserService = this._dependencies.user
+    // 🎯 使用初始化时注入的依赖
+    const UserService = this._dependencies.user
 
-      // 🔍 验证用户存在
-      const user = await UserService.getUserById(userId)
-      if (!user) {
-        throw new Error('用户不存在')
-      }
-
-      // 🔍 如果是特定奖品调整，验证奖品存在
-      let prize = null
-      if (adjustmentData.adjustment_type === 'specific_prize' && adjustmentData.prize_id) {
-        const PrizePoolService = this._dependencies.prizePool
-        prize = await PrizePoolService.getPrizeById(adjustmentData.prize_id)
-        if (!prize) {
-          throw new Error('奖品不存在')
-        }
-      }
-
-      // 🎯 准备设置数据
-      const settingData = {
-        adjustment_type: adjustmentData.adjustment_type,
-        reason: adjustmentData.reason || '管理员概率调整'
-      }
-
-      if (adjustmentData.adjustment_type === 'specific_prize') {
-        settingData.prize_id = adjustmentData.prize_id
-        settingData.prize_name = prize.prize_name
-        settingData.custom_probability = adjustmentData.custom_probability
-        settingData.auto_adjust_others = true
-      } else {
-        settingData.multiplier = adjustmentData.multiplier
-      }
-
-      // 💾 创建数据库记录（概率调整直接操作数据库，不通过ManagementStrategy）
-      const setting = await models.LotteryManagementSetting.create(
-        {
-          user_id: userId,
-          setting_type: 'probability_adjust',
-          setting_data: settingData,
-          expires_at: expiresAt,
-          status: 'active',
-          created_by: adminId
-        },
-        { transaction }
-      )
-
-      // 📝 记录审计日志
-      await AuditLogService.logAdminOperation(
-        {
-          admin_id: adminId,
-          operation_type: 'lottery_probability_adjust',
-          operation_target: 'lottery_management_setting',
-          target_id: setting.setting_id,
-          operation_details: {
-            user_id: userId,
-            user_mobile: user.mobile,
-            adjustment_type: adjustmentData.adjustment_type,
-            setting_data: settingData,
-            expires_at: expiresAt
-          },
-          ip_address: null,
-          user_agent: null
-        },
-        { transaction }
-      )
-
-      await transaction.commit()
-
-      logger.info('管理员调整用户概率操作成功', {
-        setting_id: setting.setting_id,
-        admin_id: adminId,
-        user_id: userId,
-        adjustment_type: adjustmentData.adjustment_type
-      })
-
-      const result = {
-        success: true,
-        setting_id: setting.setting_id,
-        user_id: userId,
-        user_mobile: user.mobile,
-        status: 'probability_adjusted',
-        adjustment_type: adjustmentData.adjustment_type,
-        reason: settingData.reason,
-        expires_at: expiresAt,
-        admin_id: adminId,
-        timestamp: BeijingTimeHelper.now()
-      }
-
-      // 添加具体调整信息
-      if (adjustmentData.adjustment_type === 'specific_prize') {
-        result.prize_id = settingData.prize_id
-        result.prize_name = settingData.prize_name
-        result.custom_probability = settingData.custom_probability
-      } else {
-        result.multiplier = settingData.multiplier
-      }
-
-      return result
-    } catch (error) {
-      await transaction.rollback()
-
-      logger.error('管理员调整用户概率操作失败', {
-        admin_id: adminId,
-        user_id: userId,
-        error: error.message,
-        stack: error.stack
-      })
-
-      throw error
+    // 🔍 验证用户存在
+    const user = await UserService.getUserById(userId)
+    if (!user) {
+      throw new Error('用户不存在')
     }
+
+    // 🔍 如果是特定奖品调整，验证奖品存在
+    let prize = null
+    if (adjustmentData.adjustment_type === 'specific_prize' && adjustmentData.prize_id) {
+      const PrizePoolService = this._dependencies.prizePool
+      prize = await PrizePoolService.getPrizeById(adjustmentData.prize_id)
+      if (!prize) {
+        throw new Error('奖品不存在')
+      }
+    }
+
+    // 🎯 准备设置数据
+    const settingData = {
+      adjustment_type: adjustmentData.adjustment_type,
+      reason: adjustmentData.reason || '管理员概率调整'
+    }
+
+    if (adjustmentData.adjustment_type === 'specific_prize') {
+      settingData.prize_id = adjustmentData.prize_id
+      settingData.prize_name = prize.prize_name
+      settingData.custom_probability = adjustmentData.custom_probability
+      settingData.auto_adjust_others = true
+    } else {
+      settingData.multiplier = adjustmentData.multiplier
+    }
+
+    // 💾 创建数据库记录（概率调整直接操作数据库，不通过ManagementStrategy）
+    const setting = await models.LotteryManagementSetting.create(
+      {
+        user_id: userId,
+        setting_type: 'probability_adjust',
+        setting_data: settingData,
+        expires_at: expiresAt,
+        status: 'active',
+        created_by: adminId
+      },
+      { transaction }
+    )
+
+    // 📝 记录审计日志
+    await AuditLogService.logAdminOperation(
+      {
+        admin_id: adminId,
+        operation_type: 'lottery_probability_adjust',
+        operation_target: 'lottery_management_setting',
+        target_id: setting.setting_id,
+        operation_details: {
+          user_id: userId,
+          user_mobile: user.mobile,
+          adjustment_type: adjustmentData.adjustment_type,
+          setting_data: settingData,
+          expires_at: expiresAt
+        },
+        ip_address: null,
+        user_agent: null
+      },
+      { transaction }
+    )
+
+    logger.info('管理员调整用户概率操作成功', {
+      setting_id: setting.setting_id,
+      admin_id: adminId,
+      user_id: userId,
+      adjustment_type: adjustmentData.adjustment_type
+    })
+
+    const result = {
+      success: true,
+      setting_id: setting.setting_id,
+      user_id: userId,
+      user_mobile: user.mobile,
+      status: 'probability_adjusted',
+      adjustment_type: adjustmentData.adjustment_type,
+      reason: settingData.reason,
+      expires_at: expiresAt,
+      admin_id: adminId,
+      timestamp: BeijingTimeHelper.now()
+    }
+
+    // 添加具体调整信息
+    if (adjustmentData.adjustment_type === 'specific_prize') {
+      result.prize_id = settingData.prize_id
+      result.prize_name = settingData.prize_name
+      result.custom_probability = settingData.custom_probability
+    } else {
+      result.multiplier = settingData.multiplier
+    }
+
+    return result
   }
 
   /**
@@ -608,6 +411,10 @@ class AdminLotteryService {
    * - 精准运营：为特定用户设计抽奖体验路径
    * - 活动定制：为活动参与用户设置专属奖品队列
    *
+   * 事务边界治理（2026-01-05 决策）：
+   * - 强制要求外部事务传入（options.transaction）
+   * - 未提供事务时直接报错，由入口层统一管理事务
+   *
    * @param {number} adminId - 管理员ID
    * @param {number} userId - 目标用户ID
    * @param {Object} queueConfig - 队列配置
@@ -616,6 +423,8 @@ class AdminLotteryService {
    * @param {Array<number>} queueConfig.prize_queue - 奖品ID队列
    * @param {string} [reason='管理员设置特定队列'] - 操作原因
    * @param {Date|null} expiresAt - 过期时间（null表示永不过期）
+   * @param {Object} options - 选项
+   * @param {Object} options.transaction - Sequelize事务对象（必填）
    * @returns {Promise<Object>} 操作结果
    * @returns {boolean} result.success - 操作是否成功
    * @returns {string} result.setting_id - 设置记录ID
@@ -642,7 +451,9 @@ class AdminLotteryService {
    *     priority_level: 8,
    *     prize_queue: [30001, 30002, 30003]
    *   },
-   *   'VIP用户专属队列'
+   *   'VIP用户专属队列',
+   *   null,
+   *   { transaction }
    * );
    */
   static async setUserQueue (
@@ -650,96 +461,83 @@ class AdminLotteryService {
     userId,
     queueConfig,
     reason = '管理员设置特定队列',
-    expiresAt = null
+    expiresAt = null,
+    options = {}
   ) {
-    const transaction = await models.sequelize.transaction()
+    // 强制要求事务边界 - 2026-01-05 治理决策
+    const transaction = assertAndGetTransaction(options, 'AdminLotteryService.setUserQueue')
 
-    try {
-      logger.info('管理员设置用户队列操作开始', {
+    logger.info('管理员设置用户队列操作开始', {
+      admin_id: adminId,
+      user_id: userId,
+      queue_type: queueConfig.queue_type
+    })
+
+    // 🎯 使用初始化时注入的依赖
+    const UserService = this._dependencies.user
+
+    // 🔍 验证用户存在
+    const user = await UserService.getUserById(userId)
+    if (!user) {
+      throw new Error('用户不存在')
+    }
+
+    // 🎯 获取ManagementStrategy
+    const { sharedComponents } = require('../routes/v4/admin/shared/middleware')
+    const managementStrategy = sharedComponents.managementStrategy
+
+    // 🎯 调用管理策略设置用户队列
+    const result = await managementStrategy.setUserQueue(
+      adminId,
+      userId,
+      queueConfig,
+      reason,
+      expiresAt
+    )
+
+    if (!result.success) {
+      throw new Error(result.error || '用户队列设置失败')
+    }
+
+    // 📝 记录审计日志
+    await AuditLogService.logAdminOperation(
+      {
         admin_id: adminId,
-        user_id: userId,
-        queue_type: queueConfig.queue_type
-      })
-
-      // 🎯 使用初始化时注入的依赖
-      const UserService = this._dependencies.user
-
-      // 🔍 验证用户存在
-      const user = await UserService.getUserById(userId)
-      if (!user) {
-        throw new Error('用户不存在')
-      }
-
-      // 🎯 获取ManagementStrategy
-      const { sharedComponents } = require('../routes/v4/admin/shared/middleware')
-      const managementStrategy = sharedComponents.managementStrategy
-
-      // 🎯 调用管理策略设置用户队列
-      const result = await managementStrategy.setUserQueue(
-        adminId,
-        userId,
-        queueConfig,
-        reason,
-        expiresAt
-      )
-
-      if (!result.success) {
-        throw new Error(result.error || '用户队列设置失败')
-      }
-
-      // 📝 记录审计日志
-      await AuditLogService.logAdminOperation(
-        {
-          admin_id: adminId,
-          operation_type: 'lottery_user_queue',
-          operation_target: 'lottery_management_setting',
-          target_id: result.setting_id,
-          operation_details: {
-            user_id: userId,
-            user_mobile: user.mobile,
-            queue_config: result.queue_config,
-            reason,
-            expires_at: expiresAt
-          },
-          ip_address: null,
-          user_agent: null
+        operation_type: 'lottery_user_queue',
+        operation_target: 'lottery_management_setting',
+        target_id: result.setting_id,
+        operation_details: {
+          user_id: userId,
+          user_mobile: user.mobile,
+          queue_config: result.queue_config,
+          reason,
+          expires_at: expiresAt
         },
-        { transaction }
-      )
+        ip_address: null,
+        user_agent: null
+      },
+      { transaction }
+    )
 
-      await transaction.commit()
+    logger.info('管理员设置用户队列操作成功', {
+      setting_id: result.setting_id,
+      admin_id: adminId,
+      user_id: userId,
+      queue_type: queueConfig.queue_type
+    })
 
-      logger.info('管理员设置用户队列操作成功', {
-        setting_id: result.setting_id,
-        admin_id: adminId,
-        user_id: userId,
-        queue_type: queueConfig.queue_type
-      })
-
-      return {
-        success: true,
-        setting_id: result.setting_id,
-        user_id: userId,
-        user_mobile: user.mobile,
-        status: 'user_queue_set',
-        queue_type: result.queue_config.queue_type,
-        priority_level: result.queue_config.priority_level,
-        reason,
-        expires_at: expiresAt,
-        admin_id: adminId,
-        timestamp: result.timestamp
-      }
-    } catch (error) {
-      await transaction.rollback()
-
-      logger.error('管理员设置用户队列操作失败', {
-        admin_id: adminId,
-        user_id: userId,
-        error: error.message,
-        stack: error.stack
-      })
-
-      throw error
+    return {
+      success: true,
+      setting_id: result.setting_id,
+      user_id: userId,
+      user_mobile: user.mobile,
+      status: 'user_queue_set',
+      queue_type: result.queue_config.queue_type,
+      priority_level: result.queue_config.priority_level,
+      reason,
+      expires_at: expiresAt,
+      admin_id: adminId,
+      timestamp: result.timestamp
     }
   }
 
@@ -832,10 +630,16 @@ class AdminLotteryService {
    * - 测试结束后清理设置
    * - 取消特定管理操作
    *
+   * 事务边界治理（2026-01-05 决策）：
+   * - 强制要求外部事务传入（options.transaction）
+   * - 未提供事务时直接报错，由入口层统一管理事务
+   *
    * @param {number} adminId - 管理员ID
    * @param {number} userId - 目标用户ID
    * @param {string|null} [settingType=null] - 设置类型（null表示清除所有类型）
    * @param {string} [reason='管理员清除设置'] - 操作原因
+   * @param {Object} options - 选项
+   * @param {Object} options.transaction - Sequelize事务对象（必填）
    * @returns {Promise<Object>} 操作结果
    * @returns {boolean} result.success - 操作是否成功
    * @returns {number} result.user_id - 目标用户ID
@@ -851,90 +655,76 @@ class AdminLotteryService {
    *
    * @example
    * // 清除所有设置
-   * const result = await AdminLotteryService.clearUserSettings(10001, 20001, null);
+   * const result = await AdminLotteryService.clearUserSettings(10001, 20001, null, '管理员清除设置', { transaction });
    *
    * // 清除特定类型设置
-   * const result = await AdminLotteryService.clearUserSettings(10001, 20001, 'force_win');
+   * const result = await AdminLotteryService.clearUserSettings(10001, 20001, 'force_win', '管理员清除设置', { transaction });
    */
-  static async clearUserSettings (adminId, userId, settingType = null, reason = '管理员清除设置') {
-    const transaction = await models.sequelize.transaction()
+  static async clearUserSettings (adminId, userId, settingType = null, reason = '管理员清除设置', options = {}) {
+    // 强制要求事务边界 - 2026-01-05 治理决策
+    const transaction = assertAndGetTransaction(options, 'AdminLotteryService.clearUserSettings')
 
-    try {
-      logger.info('管理员清除用户设置操作开始', {
+    logger.info('管理员清除用户设置操作开始', {
+      admin_id: adminId,
+      user_id: userId,
+      setting_type: settingType
+    })
+
+    // 🎯 使用初始化时注入的依赖
+    const UserService = this._dependencies.user
+
+    // 🔍 验证用户存在
+    const user = await UserService.getUserById(userId)
+    if (!user) {
+      throw new Error('用户不存在')
+    }
+
+    // 🎯 获取ManagementStrategy
+    const { sharedComponents } = require('../routes/v4/admin/shared/middleware')
+    const managementStrategy = sharedComponents.managementStrategy
+
+    // 🎯 调用管理策略清除用户设置
+    const result = await managementStrategy.clearUserSettings(adminId, userId, settingType)
+
+    if (!result.success) {
+      throw new Error(result.error || '清除用户设置失败')
+    }
+
+    // 📝 记录审计日志
+    await AuditLogService.logAdminOperation(
+      {
         admin_id: adminId,
-        user_id: userId,
-        setting_type: settingType
-      })
-
-      // 🎯 使用初始化时注入的依赖
-      const UserService = this._dependencies.user
-
-      // 🔍 验证用户存在
-      const user = await UserService.getUserById(userId)
-      if (!user) {
-        throw new Error('用户不存在')
-      }
-
-      // 🎯 获取ManagementStrategy
-      const { sharedComponents } = require('../routes/v4/admin/shared/middleware')
-      const managementStrategy = sharedComponents.managementStrategy
-
-      // 🎯 调用管理策略清除用户设置
-      const result = await managementStrategy.clearUserSettings(adminId, userId, settingType)
-
-      if (!result.success) {
-        throw new Error(result.error || '清除用户设置失败')
-      }
-
-      // 📝 记录审计日志
-      await AuditLogService.logAdminOperation(
-        {
-          admin_id: adminId,
-          operation_type: 'lottery_clear_settings',
-          operation_target: 'lottery_management_setting',
-          target_id: null, // 清除操作没有单一目标ID
-          operation_details: {
-            user_id: userId,
-            user_mobile: user.mobile,
-            setting_type: settingType || 'all',
-            cleared_count: result.cleared_count,
-            reason
-          },
-          ip_address: null,
-          user_agent: null
+        operation_type: 'lottery_clear_settings',
+        operation_target: 'lottery_management_setting',
+        target_id: null, // 清除操作没有单一目标ID
+        operation_details: {
+          user_id: userId,
+          user_mobile: user.mobile,
+          setting_type: settingType || 'all',
+          cleared_count: result.cleared_count,
+          reason
         },
-        { transaction }
-      )
+        ip_address: null,
+        user_agent: null
+      },
+      { transaction }
+    )
 
-      await transaction.commit()
+    logger.info('管理员清除用户设置操作成功', {
+      admin_id: adminId,
+      user_id: userId,
+      cleared_count: result.cleared_count
+    })
 
-      logger.info('管理员清除用户设置操作成功', {
-        admin_id: adminId,
-        user_id: userId,
-        cleared_count: result.cleared_count
-      })
-
-      return {
-        success: true,
-        user_id: userId,
-        user_mobile: user.mobile,
-        status: 'settings_cleared',
-        cleared_count: result.cleared_count,
-        reason,
-        admin_id: adminId,
-        timestamp: result.timestamp
-      }
-    } catch (error) {
-      await transaction.rollback()
-
-      logger.error('管理员清除用户设置操作失败', {
-        admin_id: adminId,
-        user_id: userId,
-        error: error.message,
-        stack: error.stack
-      })
-
-      throw error
+    return {
+      success: true,
+      user_id: userId,
+      user_mobile: user.mobile,
+      status: 'settings_cleared',
+      cleared_count: result.cleared_count,
+      reason,
+      admin_id: adminId,
+      timestamp: result.timestamp
     }
   }
 

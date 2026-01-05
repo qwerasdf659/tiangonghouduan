@@ -164,6 +164,23 @@ module.exports = sequelize => {
         comment: '幂等键（业界标准命名），用于防止重复提交，客户端通过 Header Idempotency-Key 传入'
       },
       /**
+       * 业务唯一键（business_id）- 事务边界治理（2026-01-05）
+       *
+       * 与 idempotency_key 的区别：
+       * - idempotency_key：请求级幂等（防止同一请求重复提交）
+       * - business_id：业务级幂等（防止同一业务操作从不同请求重复执行）
+       *
+       * 格式：lottery_draw_{user_id}_{session_id}_{draw_index}
+       *
+       * @see docs/事务边界治理现状核查报告.md 建议9.1
+       */
+      business_id: {
+        type: DataTypes.STRING(150),
+        allowNull: true, // 暂时允许 NULL（历史数据需要回填）
+        unique: true,
+        comment: '业务唯一键（格式：lottery_draw_{user_id}_{session_id}_{draw_index}）'
+      },
+      /**
        * 抽奖会话ID（lottery_session_id）
        *
        * 事务边界治理（2026-01-05）：

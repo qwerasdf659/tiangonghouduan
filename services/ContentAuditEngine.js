@@ -22,11 +22,18 @@ const logger = require('../utils/logger').logger
  * - 基础设施层：提供通用审核能力
  * - 区别于ExchangeOperationService（应用层运营工具）
  *
+ * 事务边界治理（2026-01-05 决策）：
+ * - 所有写操作 **强制要求** 外部事务传入（options.transaction）
+ * - 未提供事务时直接报错（使用 assertAndGetTransaction）
+ * - 服务层禁止自建事务，由入口层统一使用 TransactionManager.execute()
+ *
  * 创建时间：2025-10-11
+ * 最后更新：2026年01月05日（事务边界治理改造）
  */
 
-const { ContentReviewRecord, sequelize } = require('../models')
+const { ContentReviewRecord } = require('../models')
 const BeijingTimeHelper = require('../utils/timeHelper')
+const { assertAndGetTransaction } = require('../utils/transactionHelpers')
 
 /**
  * 内容审核引擎类
@@ -99,74 +106,72 @@ class ContentAuditEngine {
   /**
    * 审核通过
    *
+   * 事务边界治理（2026-01-05 决策）：
+   * - 强制要求外部事务传入（options.transaction）
+   * - 未提供事务时直接报错，由入口层统一管理事务
+   *
    * @param {number} auditId - 审核记录ID
    * @param {number} auditorId - 审核员ID
    * @param {string} reason - 审核意见
    * @param {Object} options - 选项
+   * @param {Object} options.transaction - Sequelize事务对象（必填）
    * @returns {Promise<Object>} 审核结果
    */
   static async approve (auditId, auditorId, reason = null, options = {}) {
-    const shouldCommit = !options.transaction
-    const transaction = options.transaction || (await sequelize.transaction())
+    // 强制要求事务边界 - 2026-01-05 治理决策
+    const transaction = assertAndGetTransaction(options, 'ContentAuditEngine.approve')
 
-    try {
-      logger.info(`[审核服务] 审核通过: audit_id=${auditId}, auditor_id=${auditorId}`)
+    logger.info(`[审核服务] 审核通过: audit_id=${auditId}, auditor_id=${auditorId}`)
 
-      // 1. 获取审核记录
-      const auditRecord = await ContentReviewRecord.findByPk(auditId, { transaction })
+    // 1. 获取审核记录
+    const auditRecord = await ContentReviewRecord.findByPk(auditId, { transaction })
 
-      if (!auditRecord) {
-        throw new Error(`审核记录不存在: audit_id=${auditId}`)
-      }
+    if (!auditRecord) {
+      throw new Error(`审核记录不存在: audit_id=${auditId}`)
+    }
 
-      // 2. 验证审核状态
-      if (auditRecord.audit_status !== 'pending') {
-        throw new Error(
-          `审核记录状态不正确: 当前状态=${auditRecord.audit_status}，期望状态=pending`
-        )
-      }
-
-      // 3. 更新审核记录
-      await auditRecord.update(
-        {
-          audit_status: 'approved',
-          auditor_id: auditorId,
-          audit_reason: reason,
-          audited_at: BeijingTimeHelper.createDatabaseTime()
-        },
-        { transaction }
+    // 2. 验证审核状态
+    if (auditRecord.audit_status !== 'pending') {
+      throw new Error(
+        `审核记录状态不正确: 当前状态=${auditRecord.audit_status}，期望状态=pending`
       )
+    }
 
-      // 4. 触发审核通过回调
-      await this.triggerAuditCallback(auditRecord, 'approved', transaction)
+    // 3. 更新审核记录
+    await auditRecord.update(
+      {
+        audit_status: 'approved',
+        auditor_id: auditorId,
+        audit_reason: reason,
+        audited_at: BeijingTimeHelper.createDatabaseTime()
+      },
+      { transaction }
+    )
 
-      if (shouldCommit) {
-        await transaction.commit()
-      }
+    // 4. 触发审核通过回调
+    await this.triggerAuditCallback(auditRecord, 'approved', transaction)
 
-      logger.info(`[审核服务] 审核通过成功: audit_id=${auditId}`)
+    logger.info(`[审核服务] 审核通过成功: audit_id=${auditId}`)
 
-      return {
-        success: true,
-        audit_record: auditRecord,
-        message: '审核通过'
-      }
-    } catch (error) {
-      if (shouldCommit) {
-        await transaction.rollback()
-      }
-      logger.error(`[审核服务] 审核通过失败: ${error.message}`)
-      throw error
+    return {
+      success: true,
+      audit_record: auditRecord,
+      message: '审核通过'
     }
   }
 
   /**
    * 审核拒绝
    *
+   * 事务边界治理（2026-01-05 决策）：
+   * - 强制要求外部事务传入（options.transaction）
+   * - 未提供事务时直接报错，由入口层统一管理事务
+   *
    * @param {number} auditId - 审核记录ID
    * @param {number} auditorId - 审核员ID
    * @param {string} reason - 拒绝原因（必需）
    * @param {Object} options - 选项
+   * @param {Object} options.transaction - Sequelize事务对象（必填）
    * @returns {Promise<Object>} 审核结果
    */
   static async reject (auditId, auditorId, reason, options = {}) {
@@ -174,57 +179,45 @@ class ContentAuditEngine {
       throw new Error('拒绝原因必须提供，且不少于5个字符')
     }
 
-    const shouldCommit = !options.transaction
-    const transaction = options.transaction || (await sequelize.transaction())
+    // 强制要求事务边界 - 2026-01-05 治理决策
+    const transaction = assertAndGetTransaction(options, 'ContentAuditEngine.reject')
 
-    try {
-      logger.info(`[审核服务] 审核拒绝: audit_id=${auditId}, auditor_id=${auditorId}`)
+    logger.info(`[审核服务] 审核拒绝: audit_id=${auditId}, auditor_id=${auditorId}`)
 
-      // 1. 获取审核记录
-      const auditRecord = await ContentReviewRecord.findByPk(auditId, { transaction })
+    // 1. 获取审核记录
+    const auditRecord = await ContentReviewRecord.findByPk(auditId, { transaction })
 
-      if (!auditRecord) {
-        throw new Error(`审核记录不存在: audit_id=${auditId}`)
-      }
+    if (!auditRecord) {
+      throw new Error(`审核记录不存在: audit_id=${auditId}`)
+    }
 
-      // 2. 验证审核状态
-      if (auditRecord.audit_status !== 'pending') {
-        throw new Error(
-          `审核记录状态不正确: 当前状态=${auditRecord.audit_status}，期望状态=pending`
-        )
-      }
-
-      // 3. 更新审核记录
-      await auditRecord.update(
-        {
-          audit_status: 'rejected',
-          auditor_id: auditorId,
-          audit_reason: reason,
-          audited_at: BeijingTimeHelper.createDatabaseTime()
-        },
-        { transaction }
+    // 2. 验证审核状态
+    if (auditRecord.audit_status !== 'pending') {
+      throw new Error(
+        `审核记录状态不正确: 当前状态=${auditRecord.audit_status}，期望状态=pending`
       )
+    }
 
-      // 4. 触发审核拒绝回调
-      await this.triggerAuditCallback(auditRecord, 'rejected', transaction)
+    // 3. 更新审核记录
+    await auditRecord.update(
+      {
+        audit_status: 'rejected',
+        auditor_id: auditorId,
+        audit_reason: reason,
+        audited_at: BeijingTimeHelper.createDatabaseTime()
+      },
+      { transaction }
+    )
 
-      if (shouldCommit) {
-        await transaction.commit()
-      }
+    // 4. 触发审核拒绝回调
+    await this.triggerAuditCallback(auditRecord, 'rejected', transaction)
 
-      logger.info(`[审核服务] 审核拒绝成功: audit_id=${auditId}`)
+    logger.info(`[审核服务] 审核拒绝成功: audit_id=${auditId}`)
 
-      return {
-        success: true,
-        audit_record: auditRecord,
-        message: '审核拒绝'
-      }
-    } catch (error) {
-      if (shouldCommit) {
-        await transaction.rollback()
-      }
-      logger.error(`[审核服务] 审核拒绝失败: ${error.message}`)
-      throw error
+    return {
+      success: true,
+      audit_record: auditRecord,
+      message: '审核拒绝'
     }
   }
 

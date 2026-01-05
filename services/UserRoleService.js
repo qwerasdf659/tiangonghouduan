@@ -1,9 +1,16 @@
 /**
  * 用户角色服务 - 统一用户权限操作接口
  * 创建时间：2025年01月21日
+ * 最后更新：2026年01月05日（事务边界治理改造）
  *
  * 🎯 目的：简化用户权限操作，而不合并User和Role模型
  * 🛡️ 优势：保持模型分离的同时提供便捷的业务接口
+ *
+ * 事务边界治理（2026-01-05 决策）：
+ * - 所有写操作 **强制要求** 外部事务传入（options.transaction）
+ * - 未提供事务时直接报错（使用 assertAndGetTransaction）
+ * - 服务层禁止自建事务，由入口层统一使用 TransactionManager.execute()
+ * - 缓存失效、WebSocket断开等副作用应在事务提交后由调用方处理
  *
  * ⚠️ 【安全使用指南】
  * ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -26,6 +33,7 @@
  */
 
 const { User, Role, UserRole } = require('../models')
+const { assertAndGetTransaction } = require('../utils/transactionHelpers')
 const BeijingTimeHelper = require('../utils/timeHelper')
 const logger = require('../utils/logger')
 const AuditLogService = require('./AuditLogService')
@@ -156,149 +164,117 @@ class UserRoleService {
   /**
    * 🔄 更新用户角色（管理后台专用）
    *
+   * 事务边界治理（2026-01-05 决策）：
+   * - 强制要求外部事务传入（options.transaction）
+   * - 未提供事务时直接报错，由入口层统一管理事务
+   * - 缓存失效、WebSocket断开等副作用应在事务提交后由调用方处理
+   *
    * @param {number} user_id - 用户ID
    * @param {string} role_name - 新角色名称
    * @param {number} operator_id - 操作者ID
    * @param {Object} options - 选项参数
-   * @param {Object} options.transaction - 外部事务对象（可选）
+   * @param {Object} options.transaction - Sequelize事务对象（必填）
    * @param {string} options.reason - 操作原因（可选）
    * @param {string} options.ip_address - IP地址（可选）
    * @param {string} options.user_agent - 用户代理（可选）
-   * @returns {Promise<Object>} 更新结果
+   * @returns {Promise<Object>} 更新结果（包含 post_commit_actions 供调用方处理副作用）
    */
   static async updateUserRole (user_id, role_name, operator_id, options = {}) {
-    const { transaction, reason, ip_address, user_agent } = options
-    const { getUserRoles, invalidateUserPermissions } = require('../middleware/auth')
-    const { sequelize } = require('../models')
+    // 强制要求事务边界 - 2026-01-05 治理决策
+    const transaction = assertAndGetTransaction(options, 'UserRoleService.updateUserRole')
+    const { reason, ip_address, user_agent } = options
+    const { getUserRoles } = require('../middleware/auth')
 
-    // 创建内部事务（如果外部没有传入）
-    const internalTransaction = transaction || (await sequelize.transaction())
+    // 验证目标用户
+    const targetUser = await User.findByPk(user_id, { transaction })
+    if (!targetUser) {
+      throw new Error('用户不存在')
+    }
 
-    try {
-      // 验证目标用户
-      const targetUser = await User.findByPk(user_id, { transaction: internalTransaction })
-      if (!targetUser) {
-        throw new Error('用户不存在')
-      }
+    // 验证操作者权限级别（防止低级别管理员修改高级别管理员）
+    const operatorRoles = await getUserRoles(operator_id)
+    const operatorMaxLevel =
+      operatorRoles.roles.length > 0 ? Math.max(...operatorRoles.roles.map(r => r.role_level)) : 0
 
-      // 验证操作者权限级别（防止低级别管理员修改高级别管理员）
-      const operatorRoles = await getUserRoles(operator_id)
-      const operatorMaxLevel =
-        operatorRoles.roles.length > 0 ? Math.max(...operatorRoles.roles.map(r => r.role_level)) : 0
+    const targetUserRoles = await getUserRoles(user_id)
+    const targetMaxLevel =
+      targetUserRoles.roles.length > 0
+        ? Math.max(...targetUserRoles.roles.map(r => r.role_level))
+        : 0
 
-      const targetUserRoles = await getUserRoles(user_id)
-      const targetMaxLevel =
-        targetUserRoles.roles.length > 0
-          ? Math.max(...targetUserRoles.roles.map(r => r.role_level))
-          : 0
-
-      // 操作者权限必须高于目标用户
-      if (operatorMaxLevel <= targetMaxLevel) {
-        throw new Error(
-          `权限不足：无法修改同级或更高级别用户的角色（操作者级别: ${operatorMaxLevel}, 目标用户级别: ${targetMaxLevel}）`
-        )
-      }
-
-      // 验证目标角色
-      const targetRole = await Role.findOne({
-        where: { role_name },
-        transaction: internalTransaction
-      })
-      if (!targetRole) {
-        throw new Error('角色不存在')
-      }
-
-      // 保存旧角色信息（用于审计日志）
-      const oldRoles = targetUserRoles.roles.map(r => r.role_name).join(', ') || '无角色'
-      const oldRoleLevel = targetMaxLevel
-
-      // 移除用户现有角色
-      await UserRole.destroy({ where: { user_id }, transaction: internalTransaction })
-
-      // 分配新角色
-      await UserRole.create(
-        {
-          user_id,
-          role_id: targetRole.role_id,
-          assigned_at: BeijingTimeHelper.createBeijingTime(),
-          assigned_by: operator_id,
-          is_active: true
-        },
-        { transaction: internalTransaction }
+    // 操作者权限必须高于目标用户
+    if (operatorMaxLevel <= targetMaxLevel) {
+      throw new Error(
+        `权限不足：无法修改同级或更高级别用户的角色（操作者级别: ${operatorMaxLevel}, 目标用户级别: ${targetMaxLevel}）`
       )
+    }
 
-      // 记录审计日志（权限变更属于高敏感操作）
-      await AuditLogService.logOperation({
-        operator_id,
-        operation_type: 'role_change',
-        target_type: 'User',
-        target_id: user_id,
-        action: 'update',
-        before_data: {
-          roles: oldRoles,
-          role_level: oldRoleLevel
-        },
-        after_data: {
-          roles: role_name,
-          role_level: targetRole.role_level
-        },
-        reason: reason || `角色变更: ${oldRoles} → ${role_name}`,
-        idempotency_key: `role_change_${user_id}_${Date.now()}`,
-        ip_address,
-        user_agent,
-        transaction: internalTransaction
-      })
+    // 验证目标角色
+    const targetRole = await Role.findOne({
+      where: { role_name },
+      transaction
+    })
+    if (!targetRole) {
+      throw new Error('角色不存在')
+    }
 
-      // 如果没有外部事务，提交内部事务
-      if (!transaction) {
-        await internalTransaction.commit()
-      }
+    // 保存旧角色信息（用于审计日志）
+    const oldRoles = targetUserRoles.roles.map(r => r.role_name).join(', ') || '无角色'
+    const oldRoleLevel = targetMaxLevel
 
-      // 自动清除用户权限缓存
-      await invalidateUserPermissions(user_id, `role_change_${role_name}`, operator_id)
-      logger.info('权限缓存已清除', { user_id, reason: `角色变更 ${role_name}` })
+    // 移除用户现有角色
+    await UserRole.destroy({ where: { user_id }, transaction })
 
-      // P1安全修复：如果权限降级，强制断开WebSocket连接（用户需重新连接鉴权）
-      if (targetRole.role_level < 100) {
-        try {
-          const ChatWebSocketService = require('./ChatWebSocketService')
-          const disconnected = ChatWebSocketService.disconnectUser(user_id, 'admin')
-          if (disconnected) {
-            logger.info('用户权限降级，已断开WebSocket连接', {
-              user_id,
-              old_role: oldRoles,
-              new_role: role_name,
-              reason: '需要重新鉴权'
-            })
-          }
-        } catch (wsError) {
-          logger.warn('断开WebSocket连接失败（非致命错误）', {
-            user_id,
-            error: wsError.message
-          })
-        }
-      }
-
-      // 获取更新后的用户角色信息
-      const updatedUserRoles = await getUserRoles(user_id)
-
-      logger.info('用户角色更新成功', { user_id, new_role: role_name, operator_id })
-
-      return {
+    // 分配新角色
+    await UserRole.create(
+      {
         user_id,
-        new_role: role_name,
-        new_role_level: targetRole.role_level,
-        roles: updatedUserRoles.roles,
-        operator_id,
-        reason
+        role_id: targetRole.role_id,
+        assigned_at: BeijingTimeHelper.createBeijingTime(),
+        assigned_by: operator_id,
+        is_active: true
+      },
+      { transaction }
+    )
+
+    // 记录审计日志（权限变更属于高敏感操作）
+    await AuditLogService.logOperation({
+      operator_id,
+      operation_type: 'role_change',
+      target_type: 'User',
+      target_id: user_id,
+      action: 'update',
+      before_data: {
+        roles: oldRoles,
+        role_level: oldRoleLevel
+      },
+      after_data: {
+        roles: role_name,
+        role_level: targetRole.role_level
+      },
+      reason: reason || `角色变更: ${oldRoles} → ${role_name}`,
+      idempotency_key: `role_change_${user_id}_${Date.now()}`,
+      ip_address,
+      user_agent,
+      transaction
+    })
+
+    logger.info('用户角色更新成功', { user_id, new_role: role_name, operator_id })
+
+    // 返回结果（包含 post_commit_actions 供调用方在事务提交后处理副作用）
+    return {
+      user_id,
+      new_role: role_name,
+      new_role_level: targetRole.role_level,
+      old_roles: oldRoles,
+      old_role_level: oldRoleLevel,
+      operator_id,
+      reason,
+      // 事务提交后由调用方处理的副作用
+      post_commit_actions: {
+        invalidate_cache: true,
+        disconnect_ws: targetRole.role_level < 100 // 权限降级需断开WebSocket
       }
-    } catch (error) {
-      // 如果没有外部事务，回滚内部事务
-      if (!transaction && internalTransaction && !internalTransaction.finished) {
-        await internalTransaction.rollback()
-      }
-      logger.error('更新用户角色失败', { user_id, role_name, error: error.message })
-      throw error
     }
   }
 

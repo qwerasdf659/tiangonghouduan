@@ -16,6 +16,7 @@ const router = express.Router()
 const { authenticateToken } = require('../../../../middleware/auth')
 const { handleServiceError } = require('../../../../middleware/validation')
 const logger = require('../../../../utils/logger').logger
+const TransactionManager = require('../../../../utils/TransactionManager')
 
 /**
  * 核销订单（Fulfill Redemption Order）
@@ -79,12 +80,18 @@ router.post('/fulfill', authenticateToken, async (req, res) => {
       redeemer_user_id: redeemerUserId
     })
 
-    // 调用RedemptionService核销订单
+    /*
+     * 调用RedemptionService核销订单
+     * 使用 TransactionManager 统一事务边界（符合治理决策）
+     */
     const RedemptionService = req.app.locals.services.getService('redemptionOrder')
-    const order = await RedemptionService.fulfillOrder(
-      redeem_code.trim().toUpperCase(),
-      redeemerUserId
-    )
+    const order = await TransactionManager.execute(async (transaction) => {
+      return await RedemptionService.fulfillOrder(
+        redeem_code.trim().toUpperCase(),
+        redeemerUserId,
+        { transaction }
+      )
+    })
 
     // 异步发送通知（不阻塞响应）
     const NotificationService = req.app.locals.services.getService('notification')

@@ -13,8 +13,13 @@
  * - **业务规则集中**：用户注册流程的所有步骤集中在Service层
  * - **依赖服务协调**：协调 AssetService、UserRoleService 等服务
  *
+ * 事务边界治理（2026-01-05 决策）：
+ * - 所有写操作 **强制要求** 外部事务传入（options.transaction）
+ * - 未提供事务时直接报错（使用 assertAndGetTransaction）
+ * - 服务层禁止自建事务，由入口层统一使用 TransactionManager.execute()
+ *
  * 创建时间：2025年12月09日
- * 使用模型：Claude Sonnet 4.5
+ * 最后更新：2026年01月05日（事务边界治理改造）
  */
 
 const { User, Role, UserRole } = require('../models')
@@ -22,6 +27,7 @@ const AssetService = require('./AssetService')
 const BeijingTimeHelper = require('../utils/timeHelper')
 const logger = require('../utils/logger')
 const { BusinessCacheHelper } = require('../utils/BusinessCacheHelper')
+const { assertAndGetTransaction } = require('../utils/transactionHelpers')
 
 /**
  * 用户服务类
@@ -30,127 +36,99 @@ class UserService {
   /**
    * 注册新用户（完整流程：创建用户 + 积分账户 + 角色分配）
    *
+   * 事务边界治理（2026-01-05 决策）：
+   * - 强制要求外部事务传入（options.transaction）
+   * - 未提供事务时直接报错，由入口层统一管理事务
+   *
    * @param {string} mobile - 手机号
    * @param {Object} options - 选项参数
-   * @param {Object} options.transaction - 外部事务对象（可选）
+   * @param {Object} options.transaction - 外部事务对象（必填）
    * @param {string} options.nickname - 用户昵称（可选，默认"用户+后4位"）
    * @param {string} options.status - 账户状态（可选，默认"active"）
    * @returns {Object} 创建的用户对象
    * @throws {Error} 业务错误（手机号已存在、角色不存在等）
    */
   static async registerUser (mobile, options = {}) {
-    const { transaction: externalTransaction, nickname, status = 'active' } = options
+    // 强制要求事务边界 - 2026-01-05 治理决策
+    const transaction = assertAndGetTransaction(options, 'UserService.registerUser')
 
-    // 如果没有外部事务，创建内部事务
-    const sequelize = require('../config/database')
-    const transaction = externalTransaction || (await sequelize.transaction())
-    const isInternalTransaction = !externalTransaction
+    const { nickname, status = 'active' } = options
 
-    try {
-      // 步骤1: 检查手机号是否已存在
-      const existingUser = await User.findOne({
-        where: { mobile },
-        transaction
-      })
+    // 步骤1: 检查手机号是否已存在
+    const existingUser = await User.findOne({
+      where: { mobile },
+      transaction
+    })
 
-      if (existingUser) {
-        const error = new Error('该手机号已注册')
-        error.code = 'MOBILE_EXISTS'
-        error.statusCode = 400
-        error.data = { user_id: existingUser.user_id }
-        throw error
-      }
-
-      // 步骤2: 创建用户账户
-      const user = await User.create(
-        {
-          mobile,
-          nickname: nickname || `用户${mobile.slice(-4)}`,
-          status,
-          consecutive_fail_count: 0,
-          history_total_points: 0,
-          login_count: 0
-        },
-        { transaction }
-      )
-
-      logger.info('用户注册成功', {
-        user_id: user.user_id,
-        mobile: mobile.substring(0, 3) + '****' + mobile.substring(7)
-      })
-
-      // 步骤3: 创建资产账户（AssetService 会自动创建关联的余额记录）
-      await AssetService.getOrCreateAccount({ user_id: user.user_id }, { transaction })
-
-      logger.info('用户资产账户创建成功', { user_id: user.user_id })
-
-      // 步骤4: 分配普通用户角色
-      const userRole = await Role.findOne({
-        where: { role_name: 'user' },
-        transaction
-      })
-
-      if (userRole) {
-        // 检查角色是否已分配（避免重复分配）
-        const existingUserRole = await UserRole.findOne({
-          where: {
-            user_id: user.user_id,
-            role_id: userRole.role_id
-          },
-          transaction
-        })
-
-        if (!existingUserRole) {
-          await UserRole.create(
-            {
-              user_id: user.user_id,
-              role_id: userRole.role_id,
-              is_active: true,
-              assigned_at: BeijingTimeHelper.createBeijingTime()
-            },
-            { transaction }
-          )
-          logger.info('用户角色分配成功', { user_id: user.user_id, role: 'user' })
-        }
-      } else {
-        logger.warn('普通用户角色不存在，无法分配角色', { user_id: user.user_id })
-      }
-
-      // 提交内部事务
-      if (isInternalTransaction) {
-        await transaction.commit()
-      }
-
-      logger.info('用户注册流程完成', {
-        user_id: user.user_id,
-        mobile: mobile.substring(0, 3) + '****' + mobile.substring(7)
-      })
-
-      return user
-    } catch (error) {
-      // 回滚内部事务
-      if (isInternalTransaction && transaction) {
-        await transaction.rollback()
-      }
-
-      // 如果是业务错误，直接抛出
-      if (error.code) {
-        throw error
-      }
-
-      // 其他错误包装后抛出
-      logger.error('用户注册失败', {
-        mobile: mobile.substring(0, 3) + '****' + mobile.substring(7),
-        error: error.message,
-        stack: error.stack
-      })
-
-      const wrappedError = new Error('用户注册失败')
-      wrappedError.code = 'REGISTRATION_FAILED'
-      wrappedError.statusCode = 500
-      wrappedError.originalError = error
-      throw wrappedError
+    if (existingUser) {
+      const error = new Error('该手机号已注册')
+      error.code = 'MOBILE_EXISTS'
+      error.statusCode = 400
+      error.data = { user_id: existingUser.user_id }
+      throw error
     }
+
+    // 步骤2: 创建用户账户
+    const user = await User.create(
+      {
+        mobile,
+        nickname: nickname || `用户${mobile.slice(-4)}`,
+        status,
+        consecutive_fail_count: 0,
+        history_total_points: 0,
+        login_count: 0
+      },
+      { transaction }
+    )
+
+    logger.info('用户注册成功', {
+      user_id: user.user_id,
+      mobile: mobile.substring(0, 3) + '****' + mobile.substring(7)
+    })
+
+    // 步骤3: 创建资产账户（AssetService 会自动创建关联的余额记录）
+    await AssetService.getOrCreateAccount({ user_id: user.user_id }, { transaction })
+
+    logger.info('用户资产账户创建成功', { user_id: user.user_id })
+
+    // 步骤4: 分配普通用户角色
+    const userRole = await Role.findOne({
+      where: { role_name: 'user' },
+      transaction
+    })
+
+    if (userRole) {
+      // 检查角色是否已分配（避免重复分配）
+      const existingUserRole = await UserRole.findOne({
+        where: {
+          user_id: user.user_id,
+          role_id: userRole.role_id
+        },
+        transaction
+      })
+
+      if (!existingUserRole) {
+        await UserRole.create(
+          {
+            user_id: user.user_id,
+            role_id: userRole.role_id,
+            is_active: true,
+            assigned_at: BeijingTimeHelper.createBeijingTime()
+          },
+          { transaction }
+        )
+        logger.info('用户角色分配成功', { user_id: user.user_id, role: 'user' })
+      }
+    } else {
+      logger.warn('普通用户角色不存在，无法分配角色', { user_id: user.user_id })
+    }
+
+    logger.info('用户注册流程完成', {
+      user_id: user.user_id,
+      mobile: mobile.substring(0, 3) + '****' + mobile.substring(7)
+    })
+
+    return user
   }
 
   /**

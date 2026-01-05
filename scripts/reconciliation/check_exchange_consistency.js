@@ -136,6 +136,7 @@ async function check_exchange_consistency() {
     `, { replacements: [CUTOFF_DATE] })
 
     // 3. 检查孤立的扣款流水（有流水但无对应兑换记录）
+    // 排除测试数据：idempotency_key 包含 test_ 的流水是测试产生的，不参与对账
     const [orphan_debits] = await sequelize.query(`
       SELECT
         atx.transaction_id,
@@ -149,6 +150,7 @@ async function check_exchange_consistency() {
       WHERE atx.business_type = 'exchange_debit'
         AND atx.created_at >= ?
         AND er.record_id IS NULL
+        AND atx.idempotency_key NOT LIKE '%test_%'
       LIMIT 20
     `, { replacements: [CUTOFF_DATE] })
 
@@ -162,6 +164,7 @@ async function check_exchange_consistency() {
       WHERE created_at >= ?
     `, { replacements: [CUTOFF_DATE] })
 
+    // 统计时也排除测试数据
     const [tx_stats] = await sequelize.query(`
       SELECT
         COUNT(*) as total_debit_txns,
@@ -169,6 +172,7 @@ async function check_exchange_consistency() {
       FROM asset_transactions
       WHERE business_type = 'exchange_debit'
         AND created_at >= ?
+        AND idempotency_key NOT LIKE '%test_%'
     `, { replacements: [CUTOFF_DATE] })
 
     console.log('\n📊 对账统计:')

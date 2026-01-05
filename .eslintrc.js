@@ -185,6 +185,51 @@ module.exports = {
           }
         ]
       }
+    },
+    {
+      /**
+       * 🔒 服务文件事务边界规则（2026-01-05 事务边界治理）
+       *
+       * 目的：防止"忘传 transaction"导致脱离事务边界
+       * 检查方式：警告直接调用 AssetService 写操作，提醒传递 transaction
+       */
+      files: ['services/**/*.js'],
+      excludedFiles: ['services/AssetService.js', 'services/IdempotencyService.js'],
+      rules: {
+        'no-restricted-syntax': [
+          'warn',
+          {
+            selector: 'CallExpression[callee.object.name=\'AssetService\'][callee.property.name=\'changeBalance\']',
+            message:
+              '⚠️ [事务边界] AssetService.changeBalance() 必须传递 { transaction }！' +
+              '请确保调用时传入事务对象，避免脱离事务边界。'
+          },
+          {
+            selector: 'CallExpression[callee.object.name=\'AssetService\'][callee.property.name=\'freeze\']',
+            message:
+              '⚠️ [事务边界] AssetService.freeze() 必须传递 { transaction }！' +
+              '请确保调用时传入事务对象，避免脱离事务边界。'
+          },
+          {
+            selector: 'CallExpression[callee.object.name=\'AssetService\'][callee.property.name=\'unfreeze\']',
+            message:
+              '⚠️ [事务边界] AssetService.unfreeze() 必须传递 { transaction }！' +
+              '请确保调用时传入事务对象，避免脱离事务边界。'
+          },
+          {
+            selector: 'CallExpression[callee.object.name=\'AssetService\'][callee.property.name=\'settleFromFrozen\']',
+            message:
+              '⚠️ [事务边界] AssetService.settleFromFrozen() 必须传递 { transaction }！' +
+              '请确保调用时传入事务对象，避免脱离事务边界。'
+          },
+          {
+            selector: 'CallExpression[callee.object.name=\'AssetService\'][callee.property.name=\'transferItem\']',
+            message:
+              '⚠️ [事务边界] AssetService.transferItem() 必须传递 { transaction }！' +
+              '请确保调用时传入事务对象，避免脱离事务边界。'
+          }
+        ]
+      }
     }
   ],
 

@@ -16,12 +16,18 @@
  *   - 循环拦截：不得出现 A→B→...→A 的闭环路径
  *   - 套利拦截：不得出现"沿环路换一圈资产数量不减反增"（负环检测）
  *
+ * 事务边界治理（2026-01-05 决策）：
+ * - 写操作使用 TransactionManager.execute() 统一管理事务
+ * - 通过 ServiceManager 统一获取服务实例
+ *
  * 创建时间：2025-12-15
+ * 更新时间：2026-01-05（事务边界治理改造）
  */
 
 const express = require('express')
 const router = express.Router()
 const { authenticateToken, requireAdmin } = require('../../../middleware/auth')
+const TransactionManager = require('../../../utils/TransactionManager')
 // const { Op } = require('sequelize') // 预留未来使用
 
 /**
@@ -129,18 +135,26 @@ router.post('/conversion-rules', authenticateToken, requireAdmin, async (req, re
       )
     }
 
-    // ✅ 路由层只做参数校验，业务逻辑/风控校验/事务由 Service 统一处理
+    // ✅ 路由层只做参数校验，业务逻辑/风控校验由 Service 统一处理
     const MaterialManagementService = req.app.locals.services.getService('materialManagement')
-    const result = await MaterialManagementService.createConversionRule(
-      {
-        from_asset_code,
-        to_asset_code,
-        from_amount: parseInt(from_amount),
-        to_amount: parseInt(to_amount),
-        effective_at: effectiveDate,
-        is_enabled: is_enabled === true || is_enabled === 'true'
+
+    // 使用 TransactionManager 统一管理事务（2026-01-05 事务边界治理）
+    const result = await TransactionManager.execute(
+      async transaction => {
+        return await MaterialManagementService.createConversionRule(
+          {
+            from_asset_code,
+            to_asset_code,
+            from_amount: parseInt(from_amount),
+            to_amount: parseInt(to_amount),
+            effective_at: effectiveDate,
+            is_enabled: is_enabled === true || is_enabled === 'true'
+          },
+          req.user.user_id,
+          { transaction }
+        )
       },
-      req.user.user_id
+      { description: 'createConversionRule' }
     )
 
     return res.apiSuccess(result, '创建材料转换规则成功')
@@ -173,7 +187,15 @@ router.put(
     try {
       const { rule_id } = req.params
       const MaterialManagementService = req.app.locals.services.getService('materialManagement')
-      const result = await MaterialManagementService.disableConversionRule(rule_id)
+
+      // 使用 TransactionManager 统一管理事务（2026-01-05 事务边界治理）
+      const result = await TransactionManager.execute(
+        async transaction => {
+          return await MaterialManagementService.disableConversionRule(rule_id, { transaction })
+        },
+        { description: 'disableConversionRule' }
+      )
+
       return res.apiSuccess(result, '禁用材料转换规则成功')
     } catch (error) {
       return res.apiError(
@@ -256,17 +278,27 @@ router.post('/asset-types', authenticateToken, requireAdmin, async (req, res) =>
     }
 
     const MaterialManagementService = req.app.locals.services.getService('materialManagement')
-    const result = await MaterialManagementService.createAssetType({
-      asset_code,
-      display_name,
-      group_code,
-      form,
-      tier: parseInt(tier),
-      sort_order: parseInt(sort_order),
-      visible_value_points: visible_value_points ? parseInt(visible_value_points) : null,
-      budget_value_points: budget_value_points ? parseInt(budget_value_points) : null,
-      is_enabled: is_enabled === true || is_enabled === 'true'
-    })
+
+    // 使用 TransactionManager 统一管理事务（2026-01-05 事务边界治理）
+    const result = await TransactionManager.execute(
+      async transaction => {
+        return await MaterialManagementService.createAssetType(
+          {
+            asset_code,
+            display_name,
+            group_code,
+            form,
+            tier: parseInt(tier),
+            sort_order: parseInt(sort_order),
+            visible_value_points: visible_value_points ? parseInt(visible_value_points) : null,
+            budget_value_points: budget_value_points ? parseInt(budget_value_points) : null,
+            is_enabled: is_enabled === true || is_enabled === 'true'
+          },
+          { transaction }
+        )
+      },
+      { description: 'createAssetType' }
+    )
 
     return res.apiSuccess(result, '创建材料资产类型成功')
   } catch (error) {
@@ -293,7 +325,15 @@ router.put(
     try {
       const { asset_code } = req.params
       const MaterialManagementService = req.app.locals.services.getService('materialManagement')
-      const result = await MaterialManagementService.disableAssetType(asset_code)
+
+      // 使用 TransactionManager 统一管理事务（2026-01-05 事务边界治理）
+      const result = await TransactionManager.execute(
+        async transaction => {
+          return await MaterialManagementService.disableAssetType(asset_code, { transaction })
+        },
+        { description: 'disableAssetType' }
+      )
+
       return res.apiSuccess(result, '禁用材料资产类型成功')
     } catch (error) {
       return res.apiError(
