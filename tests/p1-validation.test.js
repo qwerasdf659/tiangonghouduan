@@ -16,49 +16,52 @@ describe('P1 修复验证测试', () => {
   let testDataCreated = false
 
   beforeAll(async () => {
-    // 准备测试材料数据（在所有测试前创建）
+    // 准备测试材料数据（使用 upsert 确保数据存在）
+    const testMaterials = [
+      {
+        asset_code: 'test_red_shard',
+        display_name: '测试红色碎片',
+        group_code: 'red',
+        form: 'shard',
+        tier: 1,
+        visible_value_points: 20,
+        budget_value_points: 20,
+        sort_order: 1,
+        is_enabled: true
+      },
+      {
+        asset_code: 'test_orange_shard',
+        display_name: '测试橙色碎片',
+        group_code: 'orange',
+        form: 'shard',
+        tier: 2,
+        visible_value_points: 50,
+        budget_value_points: 50,
+        sort_order: 1,
+        is_enabled: true
+      },
+      {
+        asset_code: 'test_red_crystal',
+        display_name: '测试红色水晶',
+        group_code: 'red',
+        form: 'crystal',
+        tier: 1,
+        visible_value_points: 200,
+        budget_value_points: 200,
+        sort_order: 2,
+        is_enabled: true
+      }
+    ]
+
     try {
-      await MaterialAssetType.bulkCreate(
-        [
-          {
-            asset_code: 'test_red_shard',
-            display_name: '测试红色碎片',
-            group_code: 'red',
-            form: 'shard',
-            tier: 1,
-            visible_value_points: 20,
-            budget_value_points: 20,
-            sort_order: 1,
-            is_enabled: true
-          },
-          {
-            asset_code: 'test_orange_shard',
-            display_name: '测试橙色碎片',
-            group_code: 'orange',
-            form: 'shard',
-            tier: 2,
-            visible_value_points: 50,
-            budget_value_points: 50,
-            sort_order: 1,
-            is_enabled: true
-          },
-          {
-            asset_code: 'test_red_crystal',
-            display_name: '测试红色水晶',
-            group_code: 'red',
-            form: 'crystal',
-            tier: 1,
-            visible_value_points: 200,
-            budget_value_points: 200,
-            sort_order: 2,
-            is_enabled: true
-          }
-        ],
-        { ignoreDuplicates: true }
-      )
+      // 使用 upsert 确保数据存在，避免 MySQL ignoreDuplicates 问题
+      for (const material of testMaterials) {
+        await MaterialAssetType.upsert(material)
+      }
       testDataCreated = true
+      console.log('✅ P1-1 测试数据创建成功')
     } catch (error) {
-      console.log('测试数据创建失败（可能已存在）:', error.message)
+      console.log('测试数据创建失败:', error.message)
     }
   })
 

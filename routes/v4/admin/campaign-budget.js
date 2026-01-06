@@ -2,8 +2,8 @@
  * 活动预算管理模块（BUDGET_POINTS 架构）
  *
  * @description 管理活动预算配置、用户预算积分查询、奖品配置验证
- * @version 1.0.0
- * @date 2026-01-03
+ * @version 1.1.0
+ * @date 2026-01-06
  *
  * 核心功能：
  * - 活动预算配置（budget_mode、pool_budget_remaining、allowed_campaign_ids）
@@ -11,10 +11,13 @@
  * - 奖品配置验证（空奖约束）
  * - 活动池预算补充
  *
- * 架构原则：
- * - 路由层不直连 models（所有数据库操作通过 Service 层）
+ * 架构原则（决策7）：
+ * - 读操作（GET）可直接查库
+ * - 写操作（PUT/POST）通过 Service 层，缓存失效在 Service 层处理
  * - 通过 req.app.locals.services 获取服务实例
  * - 所有资产变动必须有幂等键控制
+ *
+ * 更新时间：2026年01月06日 - 写操作收口到 Service 层（决策7）
  */
 
 const express = require('express')
@@ -25,7 +28,8 @@ const {
   asyncHandler,
   validators
 } = require('./shared/middleware')
-const TransactionManager = require('../../../utils/TransactionManager')
+// 决策7：写操作通过 Service 层处理（包含缓存失效）
+const AdminLotteryService = require('../../../services/AdminLotteryService')
 
 /**
  * GET /campaigns/:campaign_id - 获取活动预算配置
@@ -95,13 +99,16 @@ router.get(
 /**
  * PUT /campaigns/:campaign_id - 更新活动预算配置
  *
- * @description 更新活动的预算模式和相关配置
+ * @description 更新活动的预算模式和相关配置，通过 Service 层处理（包含缓存失效）
  * @route PUT /api/v4/admin/campaign-budget/campaigns/:campaign_id
  * @access Private (需要管理员权限)
  *
  * @body {string} budget_mode - 预算模式（user/pool/none）
  * @body {number} pool_budget_total - 活动池总预算（budget_mode=pool时使用）
  * @body {Array<string|number>} allowed_campaign_ids - 允许使用的预算来源活动ID列表
+ *
+ * 缓存策略（决策3/7）：
+ * - 更新成功后在 Service 层精准失效活动配置缓存
  */
 router.put(
   '/campaigns/:campaign_id',
@@ -115,77 +122,26 @@ router.put(
         return res.apiError('无效的活动ID', 'INVALID_CAMPAIGN_ID')
       }
 
-      // 验证 budget_mode
-      const validBudgetModes = ['user', 'pool', 'none']
-      if (budget_mode && !validBudgetModes.includes(budget_mode)) {
-        return res.apiError(
-          `无效的预算模式：${budget_mode}，有效值：${validBudgetModes.join(', ')}`,
-          'INVALID_BUDGET_MODE'
-        )
-      }
-
-      const { LotteryCampaign } = require('../../../models')
-
-      // 获取活动
-      const campaign = await LotteryCampaign.findByPk(parseInt(campaign_id))
-      if (!campaign) {
-        return res.apiError('活动不存在', 'CAMPAIGN_NOT_FOUND', { campaign_id })
-      }
-
-      // 构建更新数据
-      const updateData = {}
-
-      if (budget_mode) {
-        updateData.budget_mode = budget_mode
-
-        // 如果切换到 pool 模式，需要设置初始预算
-        if (budget_mode === 'pool') {
-          if (pool_budget_total && pool_budget_total > 0) {
-            updateData.pool_budget_total = pool_budget_total
-            updateData.pool_budget_remaining = pool_budget_total // 初始剩余等于总预算
-          } else if (!campaign.pool_budget_total) {
-            return res.apiError(
-              '切换到活动池预算模式时，必须设置 pool_budget_total',
-              'MISSING_POOL_BUDGET'
-            )
-          }
-        }
-      }
-
-      if (pool_budget_total !== undefined && pool_budget_total >= 0) {
-        updateData.pool_budget_total = pool_budget_total
-        // 如果调整总预算，同步调整剩余预算（仅在增加时）
-        const currentRemaining = Number(campaign.pool_budget_remaining) || 0
-        const currentTotal = Number(campaign.pool_budget_total) || 0
-        const usedBudget = currentTotal - currentRemaining
-        updateData.pool_budget_remaining = Math.max(0, pool_budget_total - usedBudget)
-      }
-
-      if (allowed_campaign_ids !== undefined) {
-        // 验证格式：必须是数组或 null
-        if (allowed_campaign_ids !== null && !Array.isArray(allowed_campaign_ids)) {
-          return res.apiError('allowed_campaign_ids 必须是数组或 null', 'INVALID_ALLOWED_CAMPAIGNS')
-        }
-        updateData.allowed_campaign_ids = allowed_campaign_ids
-      }
-
-      if (Object.keys(updateData).length === 0) {
-        return res.apiError('未提供任何更新字段', 'NO_UPDATE_DATA')
-      }
-
-      // 执行更新
-      await campaign.update(updateData)
+      // 决策7：通过 Service 层更新活动预算（包含缓存失效）
+      const result = await AdminLotteryService.updateCampaignBudget(
+        parseInt(campaign_id),
+        { budget_mode, pool_budget_total, allowed_campaign_ids },
+        { operated_by: req.user?.id }
+      )
 
       sharedComponents.logger.info('活动预算配置更新成功', {
         campaign_id,
-        updated_fields: Object.keys(updateData),
+        updated_fields: result.updated_fields,
         operated_by: req.user?.id
       })
 
+      // 重新加载活动获取最新数据
+      const campaign = await result.campaign
+
       return res.apiSuccess(
         {
-          campaign_id: campaign.campaign_id,
-          updated_fields: Object.keys(updateData),
+          campaign_id: parseInt(campaign_id),
+          updated_fields: result.updated_fields,
           current_config: {
             budget_mode: campaign.budget_mode,
             pool_budget_total: campaign.pool_budget_total,
@@ -197,6 +153,12 @@ router.put(
       )
     } catch (error) {
       sharedComponents.logger.error('活动预算配置更新失败', { error: error.message })
+
+      // 处理 Service 层抛出的业务错误
+      if (error.code && error.statusCode) {
+        return res.apiError(error.message, error.code, null, error.statusCode)
+      }
+
       return res.apiInternalError(
         '活动预算配置更新失败',
         error.message,
@@ -381,12 +343,15 @@ router.get(
 /**
  * POST /campaigns/:campaign_id/pool/add - 补充活动池预算
  *
- * @description 为活动池模式的活动补充预算
+ * @description 为活动池模式的活动补充预算，通过 Service 层处理（包含缓存失效）
  * @route POST /api/v4/admin/campaign-budget/campaigns/:campaign_id/pool/add
  * @access Private (需要管理员权限)
  *
  * @body {number} amount - 补充金额（必须为正数）
  * @body {string} reason - 补充原因
+ *
+ * 缓存策略（决策3/7）：
+ * - 补充成功后在 Service 层精准失效活动配置缓存
  */
 router.post(
   '/campaigns/:campaign_id/pool/add',
@@ -400,57 +365,15 @@ router.post(
         return res.apiError('无效的活动ID', 'INVALID_CAMPAIGN_ID')
       }
 
-      if (!amount || amount <= 0) {
-        return res.apiError('补充金额必须为正数', 'INVALID_AMOUNT')
-      }
-
       if (!reason || reason.trim().length === 0) {
         return res.apiError('必须提供补充原因', 'MISSING_REASON')
       }
 
-      const { LotteryCampaign } = require('../../../models')
-
-      // 使用 TransactionManager 保护事务
-      const result = await TransactionManager.execute(
-        async transaction => {
-          // 获取活动（加锁）
-          const campaign = await LotteryCampaign.findByPk(parseInt(campaign_id), {
-            lock: transaction.LOCK.UPDATE,
-            transaction
-          })
-
-          if (!campaign) {
-            throw new Error('活动不存在')
-          }
-
-          if (campaign.budget_mode !== 'pool') {
-            throw new Error(`活动不是活动池预算模式（当前模式：${campaign.budget_mode}）`)
-          }
-
-          const oldTotal = Number(campaign.pool_budget_total) || 0
-          const oldRemaining = Number(campaign.pool_budget_remaining) || 0
-
-          // 更新预算
-          await campaign.update(
-            {
-              pool_budget_total: oldTotal + amount,
-              pool_budget_remaining: oldRemaining + amount
-            },
-            { transaction }
-          )
-
-          return {
-            campaign_id: campaign.campaign_id,
-            campaign_name: campaign.name,
-            amount_added: amount,
-            old_total: oldTotal,
-            new_total: oldTotal + amount,
-            old_remaining: oldRemaining,
-            new_remaining: oldRemaining + amount,
-            reason: reason.trim()
-          }
-        },
-        { description: 'campaign_budget_pool_add' }
+      // 决策7：通过 Service 层补充预算（包含缓存失效）
+      const result = await AdminLotteryService.supplementCampaignBudget(
+        parseInt(campaign_id),
+        amount,
+        { operated_by: req.user?.id }
       )
 
       sharedComponents.logger.info('活动池预算补充成功', {
@@ -460,16 +383,23 @@ router.post(
         operated_by: req.user?.id
       })
 
-      return res.apiSuccess(result, '活动池预算补充成功')
+      return res.apiSuccess(
+        {
+          campaign_id: parseInt(campaign_id),
+          campaign_name: result.campaign.name,
+          amount_added: result.amount,
+          new_remaining: result.new_remaining,
+          new_total: result.new_total,
+          reason: reason.trim()
+        },
+        '活动池预算补充成功'
+      )
     } catch (error) {
       sharedComponents.logger.error('活动池预算补充失败', { error: error.message })
 
-      if (error.message === '活动不存在') {
-        return res.apiError(error.message, 'CAMPAIGN_NOT_FOUND', { campaign_id })
-      }
-
-      if (error.message.includes('不是活动池预算模式')) {
-        return res.apiError(error.message, 'INVALID_BUDGET_MODE')
+      // 处理 Service 层抛出的业务错误
+      if (error.code && error.statusCode) {
+        return res.apiError(error.message, error.code, null, error.statusCode)
       }
 
       return res.apiInternalError('活动池预算补充失败', error.message, 'POOL_BUDGET_ADD_ERROR')
@@ -542,10 +472,10 @@ router.get(
           usage_rate:
             campaign.pool_budget_total > 0
               ? (
-                (((campaign.pool_budget_total || 0) - (campaign.pool_budget_remaining || 0)) /
+                  (((campaign.pool_budget_total || 0) - (campaign.pool_budget_remaining || 0)) /
                     campaign.pool_budget_total) *
                   100
-              ).toFixed(2) + '%'
+                ).toFixed(2) + '%'
               : 'N/A'
         },
         statistics: {

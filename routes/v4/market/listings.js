@@ -5,7 +5,7 @@
  * @description 交易市场商品列表查询与详情获取
  *
  * API列表：
- * - GET /listings - 获取交易市场挂牌列表
+ * - GET /listings - 获取交易市场挂牌列表（带缓存）
  * - GET /listings/:listing_id - 获取市场挂牌详情
  * - GET /listing-status - 获取用户上架状态
  *
@@ -14,8 +14,12 @@
  * - 查看市场商品的详细信息
  * - 查询用户当前上架商品数量和剩余上架额度
  *
+ * 架构原则（决策7）：
+ * - 路由层不直连 models，所有数据库操作通过 Service 层
+ * - 缓存读取/写入/失效统一在 Service 层处理
+ *
  * 创建时间：2025年12月22日
- * 从inventory-market.js拆分而来
+ * 更新时间：2026年01月06日 - 收口到 Service 层 + 缓存支持
  */
 
 const express = require('express')
@@ -23,11 +27,12 @@ const router = express.Router()
 const { authenticateToken } = require('../../../middleware/auth')
 const { validatePositiveInteger, handleServiceError } = require('../../../middleware/validation')
 const logger = require('../../../utils/logger').logger
-const { MarketListing, ItemInstance } = require('../../../models')
+// 决策7：路由层不直连 models，通过 Service 层操作
+const MarketListingService = require('../../../services/MarketListingService')
 
 /**
  * @route GET /api/v4/market/listings
- * @desc 获取交易市场挂牌列表
+ * @desc 获取交易市场挂牌列表（带缓存）
  * @access Private (需要登录)
  *
  * @query {number} page - 页码（默认1）
@@ -39,79 +44,40 @@ const { MarketListing, ItemInstance } = require('../../../models')
  * @returns {Array} data.products - 商品列表
  * @returns {Object} data.pagination - 分页信息
  *
+ * 缓存策略（决策4）：
+ * - TTL: 20秒（交易市场变化频繁需快速反映）
+ * - 缓存命中率目标：>80%
+ *
  * 业务场景：用户浏览交易市场中其他用户上架的商品
  */
 router.get('/listings', authenticateToken, async (req, res) => {
   try {
     const { page = 1, limit = 20, category, sort = 'newest' } = req.query
 
-    // 构建查询条件 - 只查询上架中的商品
-    const whereClause = { status: 'on_sale' }
-    if (category) {
-      whereClause.category = category
-    }
-
-    // 排序逻辑
-    let orderClause
-    switch (sort) {
-    case 'price_asc':
-      orderClause = [['price_amount', 'ASC']]
-      break
-    case 'price_desc':
-      orderClause = [['price_amount', 'DESC']]
-      break
-    case 'newest':
-    default:
-      orderClause = [['created_at', 'DESC']]
-      break
-    }
-
-    // 分页查询
-    const offset = (parseInt(page, 10) - 1) * parseInt(limit, 10)
-    const { count, rows } = await MarketListing.findAndCountAll({
-      where: whereClause,
-      include: [
-        {
-          model: ItemInstance,
-          as: 'offerItem', // 🔧 V4.3修复：使用MarketListing模型中定义的正确别名
-          attributes: ['item_instance_id', 'item_type', 'meta'] // 🔧 V4.3修复：移除不存在的item_name字段
-        }
-      ],
-      order: orderClause,
-      limit: parseInt(limit, 10),
-      offset
+    // 决策7：通过 Service 层获取市场列表（带缓存）
+    const result = await MarketListingService.getMarketListings({
+      page: parseInt(page, 10),
+      page_size: parseInt(limit, 10),
+      category,
+      sort
     })
-
-    // 格式化返回数据（商品名称从meta.name或item_type获取）
-    const products = rows.map(listing => ({
-      listing_id: listing.listing_id,
-      item_instance_id: listing.offer_item_instance_id, // 🔧 V4.3修复：使用正确的外键字段名
-      item_name: listing.offerItem?.meta?.name || listing.offerItem?.item_type || '未知商品', // 🔧 从meta.name获取名称
-      item_type: listing.offerItem?.item_type || 'unknown',
-      price_amount: listing.price_amount,
-      price_asset_code: listing.price_asset_code || 'DIAMOND',
-      seller_user_id: listing.seller_user_id,
-      status: listing.status,
-      listed_at: listing.created_at,
-      rarity: listing.offerItem?.meta?.rarity || 'common'
-    }))
 
     logger.info('获取交易市场挂牌列表成功', {
       user_id: req.user.user_id,
       category,
       sort,
-      total: count,
-      returned: products.length
+      total: result.pagination.total,
+      returned: result.products.length
     })
 
     return res.apiSuccess(
       {
-        products,
+        products: result.products,
         pagination: {
-          total: count,
-          page: parseInt(page, 10),
-          limit: parseInt(limit, 10),
-          total_pages: Math.ceil(count / parseInt(limit, 10))
+          total: result.pagination.total,
+          page: result.pagination.page,
+          limit: result.pagination.page_size,
+          total_pages: result.pagination.total_pages
         }
       },
       '获取市场挂牌列表成功'
@@ -158,27 +124,18 @@ router.get(
     try {
       const listingId = req.validated.listing_id
 
-      // 查询挂牌详情
-      const listing = await MarketListing.findOne({
-        where: { listing_id: listingId },
-        include: [
-          {
-            model: ItemInstance,
-            as: 'offerItem', // 🔧 V4.3修复：使用MarketListing模型中定义的正确别名
-            attributes: ['item_instance_id', 'item_type', 'meta', 'status'] // 🔧 V4.3修复：移除不存在的item_name字段
-          }
-        ]
-      })
+      // 决策7：通过 Service 层获取挂牌详情
+      const listing = await MarketListingService.getListingById(listingId)
 
       if (!listing) {
         return res.apiError('挂牌不存在', 'NOT_FOUND', null, 404)
       }
 
-      // 格式化返回数据（商品名称从meta.name或item_type获取）
+      // 格式化返回数据（商品名称从 meta.name 或 item_type 获取）
       const listingDetail = {
         listing_id: listing.listing_id,
-        item_instance_id: listing.offer_item_instance_id, // 🔧 V4.3修复：使用正确的外键字段名
-        item_name: listing.offerItem?.meta?.name || listing.offerItem?.item_type || '未知商品', // 🔧 从meta.name获取名称
+        item_instance_id: listing.offer_item_instance_id,
+        item_name: listing.offerItem?.meta?.name || listing.offerItem?.item_type || '未知商品',
         item_type: listing.offerItem?.item_type || 'unknown',
         price_amount: listing.price_amount,
         price_asset_code: listing.price_asset_code || 'DIAMOND',
@@ -225,14 +182,15 @@ router.get('/listing-status', authenticateToken, async (req, res) => {
   try {
     const userId = req.user.user_id
 
-    // 直接查询 MarketListing 表
-    const onSaleCount = await MarketListing.count({
-      where: {
-        seller_user_id: userId,
-        status: 'on_sale'
-      }
+    // 决策7：通过 Service 层获取用户上架列表
+    const result = await MarketListingService.getUserListings({
+      seller_user_id: userId,
+      status: 'on_sale',
+      page: 1,
+      page_size: 1 // 只需要获取 total 计数
     })
 
+    const onSaleCount = result.total
     const maxListings = 10
 
     logger.info('查询上架状态', {

@@ -196,9 +196,12 @@ class ConsumptionService {
    * @param {Object} options.transaction - Sequelize事务对象（必填）
    * @returns {Object} 消费记录对象（Consumption Record Object）
    */
-  static async merchantSubmitConsumption (data, options = {}) {
+  static async merchantSubmitConsumption(data, options = {}) {
     // 强制要求事务边界 - 2026-01-05 治理决策
-    const transaction = assertAndGetTransaction(options, 'ConsumptionService.merchantSubmitConsumption')
+    const transaction = assertAndGetTransaction(
+      options,
+      'ConsumptionService.merchantSubmitConsumption'
+    )
 
     logger.info('📊 开始处理商家消费记录提交（使用事务保护）...')
     logger.info('📋 提交数据:', JSON.stringify(data, null, 2))
@@ -270,9 +273,14 @@ class ConsumptionService {
     // 步骤6：计算奖励积分（Step 6: Calculate Points Reward - 1 Yuan = 1 Point, Rounded）
     const pointsToAward = Math.round(parseFloat(data.consumption_amount))
 
+    // 生成业务唯一键（格式：consumption_{merchant_id}_{timestamp}_{random}）
+    const randomSuffix = Math.random().toString(36).substr(2, 6)
+    const business_id = `consumption_${data.merchant_id}_${Date.now()}_${randomSuffix}`
+
     // 🔒 步骤7：创建消费记录（Step 7: Create Consumption Record - Within Transaction）
     const consumptionRecord = await ConsumptionRecord.create(
       {
+        business_id, // ✅ 业务唯一键（事务边界治理 - 2026-01-05）
         user_id: userId,
         merchant_id: data.merchant_id,
         consumption_amount: data.consumption_amount,
@@ -332,9 +340,11 @@ class ConsumptionService {
    * @param {Object} reviewData - 审核数据
    * @param {number} reviewData.reviewer_id - 审核员ID
    * @param {string} reviewData.admin_notes - 审核备注（可选）
+   * @param {Object} options - 选项
+   * @param {Object} options.transaction - Sequelize事务对象（必填）
    * @returns {Object} 审核结果
    */
-  static async approveConsumption (recordId, reviewData, options = {}) {
+  static async approveConsumption(recordId, reviewData, options = {}) {
     // 强制要求事务边界 - 2026-01-05 治理决策
     const transaction = assertAndGetTransaction(options, 'ConsumptionService.approveConsumption')
 
@@ -462,8 +472,10 @@ class ConsumptionService {
       )
     }
 
-    // 📝 记录审计日志（异步，失败不影响业务）
-    // 注意：事务由入口层管理，审计日志在事务提交前调用
+    /*
+     * 📝 记录审计日志（异步，失败不影响业务）
+     * 注意：事务由入口层管理，审计日志在事务提交前调用
+     */
     try {
       await AuditLogService.logConsumptionAudit({
         operator_id: reviewData.reviewer_id,
@@ -504,7 +516,7 @@ class ConsumptionService {
    * @param {Object} options.transaction - Sequelize事务对象（必填）
    * @returns {Object} 审核结果
    */
-  static async rejectConsumption (recordId, reviewData, options = {}) {
+  static async rejectConsumption(recordId, reviewData, options = {}) {
     // 强制要求事务边界 - 2026-01-05 治理决策
     const transaction = assertAndGetTransaction(options, 'ConsumptionService.rejectConsumption')
 
@@ -558,8 +570,10 @@ class ConsumptionService {
       }
     )
 
-    // 📝 记录审计日志（异步，失败不影响业务）
-    // 注意：事务由入口层管理，审计日志在事务提交前调用
+    /*
+     * 📝 记录审计日志（异步，失败不影响业务）
+     * 注意：事务由入口层管理，审计日志在事务提交前调用
+     */
     try {
       await AuditLogService.logConsumptionAudit({
         operator_id: reviewData.reviewer_id,
@@ -594,7 +608,7 @@ class ConsumptionService {
    * @param {number} options.page_size - 每页数量（默认20）
    * @returns {Object} 查询结果
    */
-  static async getUserConsumptionRecords (userId, options = {}) {
+  static async getUserConsumptionRecords(userId, options = {}) {
     try {
       const page = options.page || 1
       const pageSize = options.page_size || 20
@@ -691,7 +705,7 @@ class ConsumptionService {
    * @param {number} userId - 用户ID
    * @returns {Object} 统计信息
    */
-  static async getUserConsumptionStats (userId) {
+  static async getUserConsumptionStats(userId) {
     try {
       // 统计各状态的记录数和金额
       const stats = await ConsumptionRecord.findAll({
@@ -748,7 +762,7 @@ class ConsumptionService {
    * @param {number} options.page_size - 每页数量（默认20）
    * @returns {Object} 查询结果
    */
-  static async getPendingConsumptionRecords (options = {}) {
+  static async getPendingConsumptionRecords(options = {}) {
     try {
       const page = options.page || 1
       const pageSize = options.page_size || 20
@@ -799,7 +813,7 @@ class ConsumptionService {
    * @param {string} options.search - 搜索关键词（手机号、用户昵称）
    * @returns {Object} { records, pagination, statistics }
    */
-  static async getAdminRecords (options = {}) {
+  static async getAdminRecords(options = {}) {
     try {
       const page = options.page || 1
       const pageSize = Math.min(options.page_size || 20, 100)
@@ -825,11 +839,11 @@ class ConsumptionService {
           required: false,
           where: search
             ? {
-              [Op.or]: [
-                { mobile: { [Op.like]: `%${search}%` } },
-                { nickname: { [Op.like]: `%${search}%` } }
-              ]
-            }
+                [Op.or]: [
+                  { mobile: { [Op.like]: `%${search}%` } },
+                  { nickname: { [Op.like]: `%${search}%` } }
+                ]
+              }
             : undefined
         },
         {
@@ -937,7 +951,7 @@ class ConsumptionService {
    * - 权限通过后再查询完整数据（包含关联查询，响应~200ms）
    * - 无权限查询节省约75%时间和80%数据库资源
    */
-  static async getConsumptionDetailWithAuth (recordId, viewerId, isAdmin = false, options = {}) {
+  static async getConsumptionDetailWithAuth(recordId, viewerId, isAdmin = false, options = {}) {
     try {
       /*
        * ✅ 步骤1：轻量查询验证权限（仅查询3个字段，响应<50ms）
@@ -984,7 +998,7 @@ class ConsumptionService {
    * @param {boolean} options.include_points_transaction - 是否包含积分交易记录
    * @returns {Object} 消费记录详情
    */
-  static async getConsumptionRecordDetail (recordId, options = {}) {
+  static async getConsumptionRecordDetail(recordId, options = {}) {
     try {
       // 构建include数组
       const include = [
@@ -1046,7 +1060,7 @@ class ConsumptionService {
    * @param {boolean} options.includeDeleted - 是否包含已删除记录（默认false，管理员恢复时需要true）
    * @returns {Object|null} 消费记录实例或null
    */
-  static async getRecordById (recordId, options = {}) {
+  static async getRecordById(recordId, options = {}) {
     try {
       const { includeDeleted = false } = options
 
@@ -1084,7 +1098,7 @@ class ConsumptionService {
    * 2. 根据user_uuid查询用户基本信息（仅返回必要字段）
    * 3. 返回用户昵称、UUID和完整手机号码
    */
-  static async getUserInfoByQRCode (qrCode) {
+  static async getUserInfoByQRCode(qrCode) {
     try {
       logger.info(
         '🔍 [ConsumptionService] 开始验证二维码（UUID版本）:',
@@ -1147,7 +1161,7 @@ class ConsumptionService {
    *
    * @see docs/配置管理三层分离与校验统一方案.md
    */
-  static async getBudgetRatio () {
+  static async getBudgetRatio() {
     const AdminSystemService = require('./AdminSystemService')
 
     // 严格模式读取：配置缺失/读取失败直接报错

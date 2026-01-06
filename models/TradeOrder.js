@@ -78,6 +78,24 @@ module.exports = sequelize => {
           '幂等键（业界标准命名）：全局唯一，用于幂等性控制；业务规则：客户端生成并传入，同一 idempotency_key 重试返回同一结果，参数不同返回 409 冲突'
       },
 
+      /**
+       * 业务唯一键（business_id）- 事务边界治理（2026-01-05）
+       *
+       * 与 idempotency_key 的区别：
+       * - idempotency_key：请求级幂等（防止同一请求重复提交）
+       * - business_id：业务级幂等（防止同一业务操作从不同请求重复执行）
+       *
+       * 格式：trade_order_{buyer_id}_{listing_id}_{timestamp}
+       *
+       * @see docs/事务边界治理现状核查报告.md 建议9.1
+       */
+      business_id: {
+        type: DataTypes.STRING(150),
+        allowNull: false, // 业务唯一键必填（历史数据已回填完成 - 2026-01-05）
+        unique: true,
+        comment: '业务唯一键（格式：trade_order_{buyer_id}_{listing_id}_{timestamp}）- 必填'
+      },
+
       // 关联挂牌
       listing_id: {
         type: DataTypes.BIGINT,
@@ -184,6 +202,11 @@ module.exports = sequelize => {
           fields: ['idempotency_key'],
           unique: true,
           name: 'uk_trade_orders_idempotency_key'
+        },
+        {
+          fields: ['business_id'],
+          unique: true,
+          name: 'uk_trade_orders_business_id'
         },
         {
           fields: ['listing_id']

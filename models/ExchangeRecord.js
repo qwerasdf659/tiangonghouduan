@@ -92,9 +92,27 @@ module.exports = sequelize => {
       // 幂等键（业界标准形态 - 2026-01-02）
       idempotency_key: {
         type: DataTypes.STRING(100),
-        allowNull: true,
+        allowNull: false,
         unique: true,
-        comment: '幂等键（业界标准命名），用于防止重复提交，客户端通过 Header Idempotency-Key 传入'
+        comment:
+          '幂等键（业界标准命名 - 必填），用于防止重复提交，客户端通过 Header Idempotency-Key 传入'
+      },
+      /**
+       * 业务唯一键（business_id）- 事务边界治理（2026-01-05）
+       *
+       * 与 idempotency_key 的区别：
+       * - idempotency_key：请求级幂等（防止同一请求重复提交）
+       * - business_id：业务级幂等（防止同一业务操作从不同请求重复执行）
+       *
+       * 格式：exchange_{user_id}_{item_id}_{timestamp}
+       *
+       * @see docs/事务边界治理现状核查报告.md 建议9.1
+       */
+      business_id: {
+        type: DataTypes.STRING(150),
+        allowNull: false, // 业务唯一键必填（历史数据已回填完成 - 2026-01-05）
+        unique: true,
+        comment: '业务唯一键（格式：exchange_{user_id}_{item_id}_{timestamp}）- 必填'
       },
       /**
        * 关联扣减流水ID（逻辑外键，用于对账）
@@ -156,6 +174,7 @@ module.exports = sequelize => {
       indexes: [
         { fields: ['order_no'], unique: true },
         { fields: ['idempotency_key'], unique: true, name: 'uk_exchange_records_idempotency_key' },
+        { fields: ['business_id'], unique: true, name: 'uk_exchange_records_business_id' },
         { fields: ['user_id'] },
         { fields: ['status'] },
         { fields: ['created_at'] }

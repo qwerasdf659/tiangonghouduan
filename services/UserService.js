@@ -48,7 +48,7 @@ class UserService {
    * @returns {Object} 创建的用户对象
    * @throws {Error} 业务错误（手机号已存在、角色不存在等）
    */
-  static async registerUser (mobile, options = {}) {
+  static async registerUser(mobile, options = {}) {
     // 强制要求事务边界 - 2026-01-05 治理决策
     const transaction = assertAndGetTransaction(options, 'UserService.registerUser')
 
@@ -142,7 +142,7 @@ class UserService {
    * @param {boolean} options.useCache - 是否使用缓存（默认 true，事务场景自动禁用）
    * @returns {Object|null} 用户对象或null
    */
-  static async findByMobile (mobile, options = {}) {
+  static async findByMobile(mobile, options = {}) {
     const { transaction, useCache = true } = options
 
     // 事务场景下禁用缓存（确保数据一致性）
@@ -199,7 +199,7 @@ class UserService {
    * @param {Object} options.transaction - 外部事务对象（可选）
    * @returns {Object} 更新后的用户对象
    */
-  static async updateLoginStats (user_id, options = {}) {
+  static async updateLoginStats(user_id, options = {}) {
     const { transaction } = options
 
     try {
@@ -256,7 +256,7 @@ class UserService {
    * @returns {Object|null} 用户对象或null
    * @throws {Error} 业务错误（用户不存在等）
    */
-  static async getUserById (user_id, options = {}) {
+  static async getUserById(user_id, options = {}) {
     const { transaction, useCache = true } = options
 
     // 事务场景下禁用缓存（确保数据一致性）
@@ -312,19 +312,63 @@ class UserService {
   /**
    * 获取用户信息（含状态验证）- 用于认证路由
    *
+   * @description 支持 Redis 缓存（决策10 P0 优化），提升认证链路性能
+   *              每次请求只查一次 users 表，缓存命中率目标 >85%
+   *
+   * 决策依据（2026-01-06 Redis缓存策略报告）：
+   * - 准则1：认证接口 QPS 高 + 结果重复度高 → 必须上缓存
+   * - 决策10 A+B 方案：登录禁缓存（findByMobile useCache:false）+ 其他走缓存
+   * - TTL = 120s（DEFAULT_TTL.USER）
+   * - 注意：当传入自定义 attributes 时禁用缓存（避免缓存不完整数据）
+   *
    * @param {number} userId - 用户ID
    * @param {Object} options - 选项参数
    * @param {Array<string>} options.attributes - 需要返回的字段列表（可选）
    * @param {boolean} options.checkStatus - 是否检查用户状态（默认 true）
+   * @param {boolean} options.useCache - 是否使用缓存（默认 true，事务场景自动禁用）
    * @param {Object} options.transaction - 外部事务对象（可选）
    * @returns {Object} 用户对象
    * @throws {Error} 业务错误（用户不存在、账户已被禁用等）
    */
-  static async getUserWithValidation (userId, options = {}) {
-    const { attributes, checkStatus = true, transaction } = options
+  static async getUserWithValidation(userId, options = {}) {
+    const { attributes, checkStatus = true, useCache = true, transaction } = options
+
+    /*
+     * 缓存策略（决策10 P0 认证链路优化）：
+     * - 事务场景禁用缓存（确保数据一致性）
+     * - 自定义属性场景禁用缓存（避免缓存不完整数据污染后续请求）
+     */
+    const shouldUseCache = useCache && !transaction && !attributes
 
     try {
-      // 默认返回字段（用户视图）
+      // ========== Redis 缓存读取（决策10 P0 认证链路优化）==========
+      if (shouldUseCache) {
+        const cached = await BusinessCacheHelper.getUserById(userId)
+        if (cached) {
+          logger.debug('[用户服务] getUserWithValidation 缓存命中', { user_id: userId })
+
+          // 缓存命中后检查用户状态（状态变更时会失效缓存，所以缓存数据可信）
+          if (checkStatus && cached.status !== 'active') {
+            logger.warn('用户账户状态异常（缓存）', {
+              user_id: userId,
+              status: cached.status
+            })
+
+            const error = new Error('用户账户已被禁用')
+            error.code = 'USER_INACTIVE'
+            error.statusCode = 403
+            throw error
+          }
+
+          // 返回缓存数据（普通对象）
+          return cached
+        }
+      }
+
+      /*
+       * 缓存未命中，查库
+       * 默认返回字段（用户视图）
+       */
       const defaultAttributes = [
         'user_id',
         'mobile',
@@ -362,7 +406,22 @@ class UserService {
         throw error
       }
 
-      return user
+      // ========== 写入 Redis 缓存（120s TTL）==========
+      if (shouldUseCache) {
+        const userData = user.get({ plain: true })
+        await BusinessCacheHelper.setUserById(userId, userData)
+        // 同时按手机号维度缓存（双向索引）
+        if (user.mobile) {
+          await BusinessCacheHelper.setUserByMobile(user.mobile, userData)
+        }
+        logger.debug('[用户服务] getUserWithValidation 缓存写入', { user_id: userId })
+      }
+
+      /*
+       * 统一返回普通对象（与缓存命中时保持一致）
+       * 避免路由层通过 Sequelize getter 访问属性时返回 undefined
+       */
+      return user.get({ plain: true })
     } catch (error) {
       // 如果是业务错误，直接抛出
       if (error.code) {
@@ -394,7 +453,7 @@ class UserService {
    * @returns {Object} 包含用户和角色信息的对象
    * @throws {Error} 业务错误（验证码错误、用户不存在、权限不足等）
    */
-  static async adminLogin (mobile, verificationCode, options = {}) {
+  static async adminLogin(mobile, verificationCode, options = {}) {
     const { transaction } = options
 
     try {
@@ -510,7 +569,7 @@ class UserService {
    * @returns {Promise<Object>} 包含用户信息和积分账户信息的对象
    * @throws {Error} 用户不存在、用户被禁用、积分账户不存在、积分账户被冻结
    */
-  static async getUserWithPoints (userId, options = {}) {
+  static async getUserWithPoints(userId, options = {}) {
     const { checkPointsAccount = true, checkStatus = true, transaction = null } = options
 
     try {

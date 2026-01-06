@@ -10,10 +10,11 @@
  * Phase 3实施
  */
 
-const { User, AssetTransaction } = require('../../../models')
+const { User, AssetTransaction, sequelize } = require('../../../models')
 const { Op } = require('sequelize')
 const AssetService = require('../../../services/AssetService')
 const AssetConversionService = require('../../../services/AssetConversionService')
+const TransactionManager = require('../../../utils/TransactionManager')
 
 describe('Phase 3迁移测试：统一账本域', () => {
   let testUser
@@ -62,18 +63,20 @@ describe('Phase 3迁移测试：统一账本域', () => {
         }
       })
 
-      // 给测试用户添加red_shard余额
-      await AssetService.changeBalance(
-        {
-          user_id: testUser.user_id,
-          asset_code: 'red_shard',
-          delta_amount: 100, // 添加100个red_shard
-          idempotency_key: `test_phase3_init_${Date.now()}`,
-          business_type: 'admin_adjustment',
-          meta: { reason: 'Phase 3测试初始化' }
-        },
-        {}
-      )
+      // 给测试用户添加red_shard余额（使用事务包裹）
+      await TransactionManager.execute(async transaction => {
+        await AssetService.changeBalance(
+          {
+            user_id: testUser.user_id,
+            asset_code: 'red_shard',
+            delta_amount: 100, // 添加100个red_shard
+            idempotency_key: `test_phase3_init_${Date.now()}`,
+            business_type: 'admin_adjustment',
+            meta: { reason: 'Phase 3测试初始化' }
+          },
+          { transaction }
+        )
+      })
     })
 
     test('材料转换应使用统一账本双分录', async () => {
@@ -89,14 +92,16 @@ describe('Phase 3迁移测试：统一账本域', () => {
         {}
       )
 
-      // 执行转换：10个red_shard → 200个DIAMOND
-      const result = await AssetConversionService.convertMaterial(
-        testUser.user_id,
-        'red_shard',
-        'DIAMOND',
-        10,
-        { idempotency_key }
-      )
+      // 执行转换：10个red_shard → 200个DIAMOND（使用事务包裹）
+      const result = await TransactionManager.execute(async transaction => {
+        return await AssetConversionService.convertMaterial(
+          testUser.user_id,
+          'red_shard',
+          'DIAMOND',
+          10,
+          { idempotency_key, transaction }
+        )
+      })
 
       expect(result.success).toBe(true)
       expect(result.from_asset_code).toBe('red_shard')
@@ -155,26 +160,30 @@ describe('Phase 3迁移测试：统一账本域', () => {
         {}
       )
 
-      // 第一次转换
-      const result1 = await AssetConversionService.convertMaterial(
-        testUser.user_id,
-        'red_shard',
-        'DIAMOND',
-        5,
-        { idempotency_key }
-      )
+      // 第一次转换（使用事务包裹）
+      const result1 = await TransactionManager.execute(async transaction => {
+        return await AssetConversionService.convertMaterial(
+          testUser.user_id,
+          'red_shard',
+          'DIAMOND',
+          5,
+          { idempotency_key, transaction }
+        )
+      })
 
       expect(result1.success).toBe(true)
       expect(result1.is_duplicate).toBe(false)
 
-      // 第二次转换（相同参数）
-      const result2 = await AssetConversionService.convertMaterial(
-        testUser.user_id,
-        'red_shard',
-        'DIAMOND',
-        5,
-        { idempotency_key }
-      )
+      // 第二次转换（相同参数，使用事务包裹）
+      const result2 = await TransactionManager.execute(async transaction => {
+        return await AssetConversionService.convertMaterial(
+          testUser.user_id,
+          'red_shard',
+          'DIAMOND',
+          5,
+          { idempotency_key, transaction }
+        )
+      })
 
       expect(result2.success).toBe(true)
       expect(result2.is_duplicate).toBe(true) // 幂等返回
@@ -195,25 +204,45 @@ describe('Phase 3迁移测试：统一账本域', () => {
     test('材料转换409冲突检查（参数不同）', async () => {
       const idempotency_key = `test_phase3_convert_conflict_${Date.now()}`
 
-      // 第一次转换：5个red_shard
-      await AssetConversionService.convertMaterial(testUser.user_id, 'red_shard', 'DIAMOND', 5, {
-        idempotency_key
+      // 第一次转换：5个red_shard（使用事务包裹）
+      await TransactionManager.execute(async transaction => {
+        return await AssetConversionService.convertMaterial(
+          testUser.user_id,
+          'red_shard',
+          'DIAMOND',
+          5,
+          {
+            idempotency_key,
+            transaction
+          }
+        )
       })
 
       // 第二次转换：相同idempotency_key，但不同数量（10个）
       await expect(
-        AssetConversionService.convertMaterial(
-          testUser.user_id,
-          'red_shard',
-          'DIAMOND',
-          10, // 不同数量
-          { idempotency_key }
-        )
+        TransactionManager.execute(async transaction => {
+          return await AssetConversionService.convertMaterial(
+            testUser.user_id,
+            'red_shard',
+            'DIAMOND',
+            10, // 不同数量
+            { idempotency_key, transaction }
+          )
+        })
       ).rejects.toThrow(/幂等键冲突/)
 
       try {
-        await AssetConversionService.convertMaterial(testUser.user_id, 'red_shard', 'DIAMOND', 10, {
-          idempotency_key
+        await TransactionManager.execute(async transaction => {
+          return await AssetConversionService.convertMaterial(
+            testUser.user_id,
+            'red_shard',
+            'DIAMOND',
+            10,
+            {
+              idempotency_key,
+              transaction
+            }
+          )
         })
       } catch (error) {
         expect(error.statusCode).toBe(409)
@@ -229,22 +258,33 @@ describe('Phase 3迁移测试：统一账本域', () => {
     test('验证材料转换的business_type', async () => {
       const idempotency_key = `test_phase3_business_type_${Date.now()}`
 
-      // 添加red_shard余额
-      await AssetService.changeBalance(
-        {
-          user_id: testUser.user_id,
-          asset_code: 'red_shard',
-          delta_amount: 20,
-          idempotency_key: `test_init_${Date.now()}`,
-          business_type: 'admin_adjustment',
-          meta: {}
-        },
-        {}
-      )
+      // 添加red_shard余额（使用事务包裹）
+      await TransactionManager.execute(async transaction => {
+        await AssetService.changeBalance(
+          {
+            user_id: testUser.user_id,
+            asset_code: 'red_shard',
+            delta_amount: 20,
+            idempotency_key: `test_init_${Date.now()}`,
+            business_type: 'admin_adjustment',
+            meta: {}
+          },
+          { transaction }
+        )
+      })
 
-      // 执行转换
-      await AssetConversionService.convertMaterial(testUser.user_id, 'red_shard', 'DIAMOND', 10, {
-        idempotency_key
+      // 执行转换（使用事务包裹）
+      await TransactionManager.execute(async transaction => {
+        return await AssetConversionService.convertMaterial(
+          testUser.user_id,
+          'red_shard',
+          'DIAMOND',
+          10,
+          {
+            idempotency_key,
+            transaction
+          }
+        )
       })
 
       // 验证扣减分录的business_type（使用派生键格式）
@@ -276,22 +316,33 @@ describe('Phase 3迁移测试：统一账本域', () => {
     test('验证所有资产变动都记录在asset_transactions表', async () => {
       const idempotency_key = `test_phase3_unified_ledger_${Date.now()}`
 
-      // 添加red_shard余额
-      await AssetService.changeBalance(
-        {
-          user_id: testUser.user_id,
-          asset_code: 'red_shard',
-          delta_amount: 30,
-          idempotency_key: `test_init_${Date.now()}`,
-          business_type: 'admin_adjustment',
-          meta: {}
-        },
-        {}
-      )
+      // 添加red_shard余额（使用事务包裹）
+      await TransactionManager.execute(async transaction => {
+        await AssetService.changeBalance(
+          {
+            user_id: testUser.user_id,
+            asset_code: 'red_shard',
+            delta_amount: 30,
+            idempotency_key: `test_init_${Date.now()}`,
+            business_type: 'admin_adjustment',
+            meta: {}
+          },
+          { transaction }
+        )
+      })
 
-      // 执行转换
-      await AssetConversionService.convertMaterial(testUser.user_id, 'red_shard', 'DIAMOND', 15, {
-        idempotency_key
+      // 执行转换（使用事务包裹）
+      await TransactionManager.execute(async transaction => {
+        return await AssetConversionService.convertMaterial(
+          testUser.user_id,
+          'red_shard',
+          'DIAMOND',
+          15,
+          {
+            idempotency_key,
+            transaction
+          }
+        )
       })
 
       // 查询asset_transactions表（使用 LIKE 匹配派生键）

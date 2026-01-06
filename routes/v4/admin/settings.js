@@ -89,7 +89,10 @@ router.put(
       // 获取管理后台系统服务（P2-C架构重构：已合并SystemSettingsService）
       const AdminSystemService = req.app.locals.services.getService('adminSystem')
 
-      // 使用 TransactionManager 统一管理事务（2026-01-05 事务边界治理）
+      /*
+       * 使用 TransactionManager 统一管理事务（2026-01-05 事务边界治理）
+       * 缓存失效已在 Service 层处理（决策7：失效逻辑归 Service 层）
+       */
       const result = await TransactionManager.execute(
         async transaction => {
           return await AdminSystemService.updateSettings(

@@ -12,6 +12,8 @@ const BeijingTimeHelper = require('../../utils/timeHelper')
 // 🔧 修复：设置必需的环境变量
 process.env.NODE_ENV = 'test'
 process.env.JWT_SECRET = process.env.JWT_SECRET || 'test-jwt-secret-key-for-development-only'
+// 决策25：全环境强制PII_HASH_SECRET（测试环境使用固定测试密钥）
+process.env.PII_HASH_SECRET = process.env.PII_HASH_SECRET || 'test-pii-hash-secret-key-32chars!'
 // ✅ 测试环境关闭限流（避免 429 干扰业务断言）
 process.env.DISABLE_RATE_LIMITER = 'true'
 

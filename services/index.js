@@ -60,6 +60,7 @@ const BackpackService = require('./BackpackService') // 背包双轨查询服务
 
 // V4.2 交易市场服务（2025-12-21 暴力重构）
 const TradeOrderService = require('./TradeOrderService') // 交易订单服务（市场交易核心）
+const MarketListingService = require('./MarketListingService') // 市场挂牌服务（决策5B/0C：统一收口）
 
 // 资产域标准架构服务（2025-12-29）
 const MerchantReviewService = require('./MerchantReviewService') // 商家审核服务（扫码审核冻结积分）
@@ -158,7 +159,7 @@ class ServiceManager {
    *
    * @constructor
    */
-  constructor () {
+  constructor() {
     this.models = models
     this._services = new Map()
     this._initialized = false
@@ -181,7 +182,7 @@ class ServiceManager {
    * @returns {Promise<void>} 初始化完成后resolve，失败则抛出错误
    * @throws {Error} 当服务初始化失败时抛出错误
    */
-  async initialize () {
+  async initialize() {
     if (this._initialized) {
       return
     }
@@ -244,6 +245,7 @@ class ServiceManager {
 
       // 注册V4.2交易市场服务（2025-12-21 暴力重构）
       this._services.set('tradeOrder', TradeOrderService) // 交易订单服务（市场交易核心）
+      this._services.set('marketListing', MarketListingService) // 市场挂牌服务（决策5B/0C：统一收口）
 
       // 注册资产域标准架构服务（2025-12-29）
       this._services.set('merchantReview', MerchantReviewService) // 商家审核服务（扫码审核冻结积分）
@@ -282,7 +284,7 @@ class ServiceManager {
    * @param {string} serviceName - 服务名称
    * @returns {Object} 服务实例
    */
-  getService (serviceName) {
+  getService(serviceName) {
     if (!this._initialized) {
       throw new Error('服务管理器尚未初始化，请先调用 initialize()')
     }
@@ -301,7 +303,7 @@ class ServiceManager {
    * @param {string} serviceName - 服务名称
    * @returns {boolean} 服务存在返回true，否则返回false
    */
-  hasService (serviceName) {
+  hasService(serviceName) {
     return this._services.has(serviceName)
   }
 
@@ -309,7 +311,7 @@ class ServiceManager {
    * 获取所有服务列表
    * @returns {Array<string>} 所有已注册服务的名称数组
    */
-  getServiceList () {
+  getServiceList() {
     return Array.from(this._services.keys())
   }
 
@@ -336,7 +338,7 @@ class ServiceManager {
    * @async
    * @returns {Promise<Object>} 包含所有服务健康状态的对象
    */
-  async getHealthStatus () {
+  async getHealthStatus() {
     const status = {
       initialized: this._initialized,
       totalServices: this._services.size,
@@ -385,7 +387,7 @@ class ServiceManager {
    * @async
    * @returns {Promise<void>} 所有服务关闭完成后resolve
    */
-  async shutdown () {
+  async shutdown() {
     logger.info('🛑 开始关闭服务管理器...')
 
     for (const [serviceName, service] of this._services.entries()) {
@@ -414,7 +416,7 @@ const serviceManager = new ServiceManager()
  * @param {Object} _models - 数据库模型
  * @returns {Object} 服务容器
  */
-function initializeServices (_models) {
+function initializeServices(_models) {
   const container = {
     // 提供getService方法来获取服务
     getService: serviceName => serviceManager.getService(serviceName),

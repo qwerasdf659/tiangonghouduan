@@ -109,8 +109,11 @@ module.exports = {
     'require-atomic-updates': 'error',
     'no-promise-executor-return': 'error',
 
-    // 🔷 代码风格规则
-    'space-before-function-paren': ['error', 'always'],
+    /*
+     * 🔷 代码风格规则
+     * 'space-before-function-paren': ['error', 'always'], // 禁用：与 Prettier 默认格式化行为冲突
+     */
+    'space-before-function-paren': 'off',
     quotes: ['error', 'single'],
     semi: ['error', 'never'],
     indent: ['error', 2],
@@ -167,19 +170,19 @@ module.exports = {
           'error',
           {
             selector:
-              'CallExpression[callee.type=\'MemberExpression\'][callee.object.name=\'res\'][callee.property.name=\'json\']',
+              "CallExpression[callee.type='MemberExpression'][callee.object.name='res'][callee.property.name='json']",
             message:
               '❌ 禁止在路由中直接使用res.json()！请使用统一的res.apiSuccess()或res.apiError()方法以确保响应格式一致性。'
           },
           {
             selector:
-              'CallExpression[callee.type=\'MemberExpression\'][callee.object.type=\'CallExpression\'][callee.object.callee.property.name=\'status\'][callee.property.name=\'json\']',
+              "CallExpression[callee.type='MemberExpression'][callee.object.type='CallExpression'][callee.object.callee.property.name='status'][callee.property.name='json']",
             message:
               '❌ 禁止使用res.status().json()！请使用res.apiError(message, code, details, statusCode)方法。'
           },
           {
             selector:
-              'CallExpression[callee.object.name=\'ApiResponse\'][callee.property.name=\'send\']',
+              "CallExpression[callee.object.name='ApiResponse'][callee.property.name='send']",
             message:
               '❌ 禁止使用ApiResponse.send()！请使用res.apiSuccess()等中间件方法以保持代码简洁和一致性。'
           }
@@ -199,31 +202,36 @@ module.exports = {
         'no-restricted-syntax': [
           'warn',
           {
-            selector: 'CallExpression[callee.object.name=\'AssetService\'][callee.property.name=\'changeBalance\']',
+            selector:
+              "CallExpression[callee.object.name='AssetService'][callee.property.name='changeBalance']",
             message:
               '⚠️ [事务边界] AssetService.changeBalance() 必须传递 { transaction }！' +
               '请确保调用时传入事务对象，避免脱离事务边界。'
           },
           {
-            selector: 'CallExpression[callee.object.name=\'AssetService\'][callee.property.name=\'freeze\']',
+            selector:
+              "CallExpression[callee.object.name='AssetService'][callee.property.name='freeze']",
             message:
               '⚠️ [事务边界] AssetService.freeze() 必须传递 { transaction }！' +
               '请确保调用时传入事务对象，避免脱离事务边界。'
           },
           {
-            selector: 'CallExpression[callee.object.name=\'AssetService\'][callee.property.name=\'unfreeze\']',
+            selector:
+              "CallExpression[callee.object.name='AssetService'][callee.property.name='unfreeze']",
             message:
               '⚠️ [事务边界] AssetService.unfreeze() 必须传递 { transaction }！' +
               '请确保调用时传入事务对象，避免脱离事务边界。'
           },
           {
-            selector: 'CallExpression[callee.object.name=\'AssetService\'][callee.property.name=\'settleFromFrozen\']',
+            selector:
+              "CallExpression[callee.object.name='AssetService'][callee.property.name='settleFromFrozen']",
             message:
               '⚠️ [事务边界] AssetService.settleFromFrozen() 必须传递 { transaction }！' +
               '请确保调用时传入事务对象，避免脱离事务边界。'
           },
           {
-            selector: 'CallExpression[callee.object.name=\'AssetService\'][callee.property.name=\'transferItem\']',
+            selector:
+              "CallExpression[callee.object.name='AssetService'][callee.property.name='transferItem']",
             message:
               '⚠️ [事务边界] AssetService.transferItem() 必须传递 { transaction }！' +
               '请确保调用时传入事务对象，避免脱离事务边界。'

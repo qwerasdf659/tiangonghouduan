@@ -4,24 +4,100 @@
  * @description 提供业务热点数据的 Redis 缓存读写、失效、监控功能
  *
  * 业务场景：
- * - 系统配置缓存（sysconfig:{category}:{key}）
- * - 活动配置缓存（lottery:cfg:{campaign_id}）
- * - 商品列表缓存（exchange:items:list:*）
- * - 交易市场缓存（market:listings:*）
- * - 统计报表缓存（stats:{type}:{params}）
+ * - 系统配置缓存（app:v4:{env}:api:sysconfig:{category}:{key}）
+ * - 活动配置缓存（app:v4:{env}:api:lottery:cfg:{campaign_id}）
+ * - 商品列表缓存（app:v4:{env}:api:exchange:items:list:*）
+ * - 交易市场缓存（app:v4:{env}:api:market:listings:*）
+ * - 统计报表缓存（app:v4:{env}:api:stats:{type}:{params}）
+ * - 用户信息缓存（app:v4:{env}:api:user:id:{id} / user:mobile_hash:{hash}）
  *
  * 设计原则：
  * - 所有缓存读取包裹 try-catch，失败时降级查库（不抛异常）
  * - 所有缓存失效失败时记录 WARN 日志（不阻塞主流程）
  * - TTL 加随机抖动（±10%）避免缓存雪崩
  * - 使用 SCAN 而非 KEYS 批量删除（避免阻塞 Redis）
+ * - Redis Key 强制命名空间隔离（决策5：多环境/多实例安全）
+ * - 手机号 PII 治理（决策6B/24：HMAC-SHA256 hash，禁止明文）
  *
- * @see docs/Redis缓存策略现状与DB压力风险评估-2026-01-02.md
+ * @see docs/Redis缓存策略现状核查报告.md
  *
  * 创建时间：2026年01月03日
+ * 更新时间：2026年01月05日（决策5/6B/20-25实施）
  */
 
 const logger = require('./logger').logger
+const crypto = require('crypto')
+
+// ==================== 决策5：Redis Key 命名空间隔离 ====================
+
+/**
+ * 环境归一化映射（决策5.1）
+ * @description 将各种 NODE_ENV 值统一映射到标准环境标识
+ * @constant
+ */
+const ENV_MAP = {
+  development: 'dev',
+  dev: 'dev',
+  local: 'dev',
+  staging: 'staging',
+  test: 'staging',
+  uat: 'staging',
+  production: 'prod',
+  prod: 'prod'
+}
+
+/**
+ * 环境归一化函数
+ * @param {string} env - 原始 NODE_ENV 值
+ * @returns {string} 归一化后的环境标识（dev/staging/prod）
+ */
+function normalizeEnv(env) {
+  return ENV_MAP[env] || 'dev'
+}
+
+/**
+ * 服务标识（决策5.2）
+ * @description 当前固定为 api，未来多服务可扩展为 api/worker/admin
+ * @constant
+ */
+const SERVICE_NAME = 'api'
+
+/**
+ * 全局 Key 前缀（决策5）
+ * @description 格式：app:v4:{env}:{service}:
+ * @example app:v4:dev:api:sysconfig:points:lottery_cost_points
+ * @constant
+ */
+const KEY_PREFIX = `app:v4:${normalizeEnv(process.env.NODE_ENV)}:${SERVICE_NAME}:`
+
+// ==================== 决策6B/24：手机号 PII 治理 ====================
+
+/**
+ * 获取 PII Hash 密钥（决策6.1/25）
+ * @description 优先使用独立的 PII_HASH_SECRET，决策25要求全环境强制配置
+ * @returns {string} Hash 密钥
+ * @throws {Error} 如果 PII_HASH_SECRET 未配置（决策25：全环境拒绝启动）
+ */
+function getPiiHashSecret() {
+  const secret = process.env.PII_HASH_SECRET
+  if (!secret) {
+    // 决策25：全环境强制配置，这里是兜底检查（启动时应已验证）
+    throw new Error('[BusinessCacheHelper] PII_HASH_SECRET 未配置（决策25：全环境强制）')
+  }
+  return secret
+}
+
+/**
+ * 手机号 HMAC-SHA256 Hash（决策6B/24）
+ * @description 用于生成手机号缓存 key，避免明文手机号出现在 Redis
+ * @param {string} mobile - 用户手机号
+ * @returns {string} 64字符 hex 字符串
+ * @example hashMobile('13612227930') => 'a1b2c3d4e5f6...'
+ */
+function hashMobile(mobile) {
+  const secret = getPiiHashSecret()
+  return crypto.createHmac('sha256', secret).update(mobile).digest('hex')
+}
 
 /**
  * 缓存 Key 前缀常量
@@ -44,20 +120,21 @@ const CACHE_PREFIX = {
 
 /**
  * 默认 TTL 配置（秒）
+ * @description 基于决策拍板值（2026-01-06最终版）
  * @constant
  */
 const DEFAULT_TTL = {
-  /** 系统配置 TTL（60秒，最终拍板值） */
+  /** 系统配置 TTL（60秒，决策2A/20：精准失效+立刻生效） */
   SYSCONFIG: 60,
-  /** 活动配置 TTL（60秒） */
+  /** 活动配置 TTL（60秒，决策3：精准失效） */
   LOTTERY: 60,
-  /** 商品列表 TTL（60秒） */
+  /** 商品列表 TTL（60秒，决策4/22：写后失效） */
   EXCHANGE: 60,
-  /** 交易市场 TTL（60秒） */
-  MARKET: 60,
-  /** 统计报表 TTL（60秒） */
-  STATS: 60,
-  /** 用户信息 TTL（120秒，用户数据变更频率较低） */
+  /** 交易市场 TTL（20秒，决策4：变化频繁需快速反映） */
+  MARKET: 20,
+  /** 统计报表 TTL（180秒，决策23：准实时1-5分钟可接受） */
+  STATS: 180,
+  /** 用户信息 TTL（120秒，决策21：登录禁缓存+其他走缓存） */
   USER: 120
 }
 
@@ -85,7 +162,7 @@ let monitorIntervalId = null
  * @param {Object} stat - 统计对象
  * @returns {string} 命中率百分比
  */
-function calculateHitRate (stat) {
+function calculateHitRate(stat) {
   const total = stat.hits + stat.misses
   return total > 0 ? ((stat.hits / total) * 100).toFixed(1) : '0.0'
 }
@@ -96,7 +173,7 @@ function calculateHitRate (stat) {
  * @param {number} jitterPercent - 抖动百分比（默认10%）
  * @returns {number} 带抖动的 TTL
  */
-function addTTLJitter (baseTTL, jitterPercent = 10) {
+function addTTLJitter(baseTTL, jitterPercent = 10) {
   const jitterRange = Math.floor((baseTTL * jitterPercent) / 100)
   const jitter = Math.floor(Math.random() * (jitterRange * 2 + 1)) - jitterRange
   return Math.max(1, baseTTL + jitter) // 确保至少 1 秒
@@ -106,7 +183,7 @@ function addTTLJitter (baseTTL, jitterPercent = 10) {
  * 获取 Redis 原始客户端（带懒加载）
  * @returns {Object|null} Redis 客户端或 null
  */
-function getRedisClient () {
+function getRedisClient() {
   try {
     const { getRawClient } = require('./UnifiedRedisClient')
     return getRawClient()
@@ -117,17 +194,22 @@ function getRedisClient () {
 }
 
 /**
- * 根据 key 前缀获取统计分类
+ * 根据 key 前缀获取统计分类（决策5适配）
+ * @description 兼容新的带命名空间的 key 格式
  * @param {string} key - 缓存 key
  * @returns {string|null} 统计分类名称
  */
-function getStatsCategoryFromKey (key) {
-  if (key.startsWith('sysconfig:')) return 'sysconfig'
-  if (key.startsWith('lottery:')) return 'lottery'
-  if (key.startsWith('exchange:')) return 'exchange'
-  if (key.startsWith('market:')) return 'market'
-  if (key.startsWith('stats:')) return 'stats'
-  if (key.startsWith('user:')) return 'user'
+function getStatsCategoryFromKey(key) {
+  /*
+   * 新格式：app:v4:{env}:{service}:{domain}:...
+   * 提取 domain 部分进行匹配
+   */
+  if (key.includes(':sysconfig:')) return 'sysconfig'
+  if (key.includes(':lottery:')) return 'lottery'
+  if (key.includes(':exchange:')) return 'exchange'
+  if (key.includes(':market:')) return 'market'
+  if (key.includes(':stats:')) return 'stats'
+  if (key.includes(':user:')) return 'user'
   return null
 }
 
@@ -150,7 +232,7 @@ class BusinessCacheHelper {
    * }
    * // 未命中，查库
    */
-  static async get (key) {
+  static async get(key) {
     const redisClient = getRedisClient()
     if (!redisClient) {
       return null
@@ -198,7 +280,7 @@ class BusinessCacheHelper {
    * @example
    * await BusinessCacheHelper.set('sysconfig:points:lottery_cost_points', 100, 60)
    */
-  static async set (key, value, ttl = DEFAULT_TTL.SYSCONFIG, withJitter = true) {
+  static async set(key, value, ttl = DEFAULT_TTL.SYSCONFIG, withJitter = true) {
     const redisClient = getRedisClient()
     if (!redisClient) {
       return false
@@ -231,7 +313,7 @@ class BusinessCacheHelper {
    * @example
    * await BusinessCacheHelper.del('sysconfig:points:lottery_cost_points', 'config_updated')
    */
-  static async del (key, reason = 'unknown') {
+  static async del(key, reason = 'unknown') {
     const redisClient = getRedisClient()
     if (!redisClient) {
       return false
@@ -269,7 +351,7 @@ class BusinessCacheHelper {
    * @example
    * await BusinessCacheHelper.delByPattern('exchange:items:list:*', 'item_created')
    */
-  static async delByPattern (pattern, reason = 'unknown') {
+  static async delByPattern(pattern, reason = 'unknown') {
     const redisClient = getRedisClient()
     if (!redisClient) {
       return 0
@@ -320,7 +402,7 @@ class BusinessCacheHelper {
   // ==================== 系统配置缓存专用方法 ====================
 
   /**
-   * 构建系统配置缓存 key
+   * 构建系统配置缓存 key（决策5适配）
    *
    * @param {string} category - 配置分类
    * @param {string} setting_key - 配置项键名
@@ -328,10 +410,10 @@ class BusinessCacheHelper {
    *
    * @example
    * const key = BusinessCacheHelper.buildSysConfigKey('points', 'lottery_cost_points')
-   * // 返回: 'sysconfig:points:lottery_cost_points'
+   * // 返回: 'app:v4:dev:api:sysconfig:points:lottery_cost_points'
    */
-  static buildSysConfigKey (category, setting_key) {
-    return `${CACHE_PREFIX.SYSCONFIG}:${category}:${setting_key}`
+  static buildSysConfigKey(category, setting_key) {
+    return `${KEY_PREFIX}${CACHE_PREFIX.SYSCONFIG}:${category}:${setting_key}`
   }
 
   /**
@@ -341,7 +423,7 @@ class BusinessCacheHelper {
    * @param {string} setting_key - 配置项键名
    * @returns {Promise<any|null>} 缓存数据或 null
    */
-  static async getSysConfig (category, setting_key) {
+  static async getSysConfig(category, setting_key) {
     const key = this.buildSysConfigKey(category, setting_key)
     return await this.get(key)
   }
@@ -354,7 +436,7 @@ class BusinessCacheHelper {
    * @param {any} value - 配置值
    * @returns {Promise<boolean>} 是否写入成功
    */
-  static async setSysConfig (category, setting_key, value) {
+  static async setSysConfig(category, setting_key, value) {
     const key = this.buildSysConfigKey(category, setting_key)
     return await this.set(key, value, DEFAULT_TTL.SYSCONFIG)
   }
@@ -367,7 +449,7 @@ class BusinessCacheHelper {
    * @param {string} reason - 失效原因
    * @returns {Promise<boolean>} 是否失效成功
    */
-  static async invalidateSysConfig (category, setting_key, reason = 'config_updated') {
+  static async invalidateSysConfig(category, setting_key, reason = 'config_updated') {
     const key = this.buildSysConfigKey(category, setting_key)
     return await this.del(key, reason)
   }
@@ -375,13 +457,14 @@ class BusinessCacheHelper {
   // ==================== 活动配置缓存专用方法 ====================
 
   /**
-   * 构建活动配置缓存 key
+   * 构建活动配置缓存 key（决策5适配）
    *
    * @param {number} campaign_id - 活动 ID
    * @returns {string} 缓存 key
+   * @example 返回: 'app:v4:dev:api:lottery:cfg:1'
    */
-  static buildLotteryCampaignKey (campaign_id) {
-    return `${CACHE_PREFIX.LOTTERY}:cfg:${campaign_id}`
+  static buildLotteryCampaignKey(campaign_id) {
+    return `${KEY_PREFIX}${CACHE_PREFIX.LOTTERY}:cfg:${campaign_id}`
   }
 
   /**
@@ -390,7 +473,7 @@ class BusinessCacheHelper {
    * @param {number} campaign_id - 活动 ID
    * @returns {Promise<Object|null>} 缓存数据或 null
    */
-  static async getLotteryCampaign (campaign_id) {
+  static async getLotteryCampaign(campaign_id) {
     const key = this.buildLotteryCampaignKey(campaign_id)
     return await this.get(key)
   }
@@ -402,7 +485,7 @@ class BusinessCacheHelper {
    * @param {Object} config - 活动配置对象
    * @returns {Promise<boolean>} 是否写入成功
    */
-  static async setLotteryCampaign (campaign_id, config) {
+  static async setLotteryCampaign(campaign_id, config) {
     const key = this.buildLotteryCampaignKey(campaign_id)
     return await this.set(key, config, DEFAULT_TTL.LOTTERY)
   }
@@ -414,7 +497,7 @@ class BusinessCacheHelper {
    * @param {string} reason - 失效原因
    * @returns {Promise<boolean>} 是否失效成功
    */
-  static async invalidateLotteryCampaign (campaign_id, reason = 'campaign_updated') {
+  static async invalidateLotteryCampaign(campaign_id, reason = 'campaign_updated') {
     const key = this.buildLotteryCampaignKey(campaign_id)
     return await this.del(key, reason)
   }
@@ -422,12 +505,13 @@ class BusinessCacheHelper {
   // ==================== 商品列表缓存专用方法 ====================
 
   /**
-   * 构建商品列表缓存 key
+   * 构建商品列表缓存 key（决策5适配）
    *
    * @param {Object} params - 查询参数
    * @returns {string} 缓存 key
+   * @example 返回: 'app:v4:dev:api:exchange:items:list:active:all:1:20:sort_order:ASC'
    */
-  static buildExchangeItemsKey (params = {}) {
+  static buildExchangeItemsKey(params = {}) {
     const {
       status = 'active',
       asset_code = 'all',
@@ -436,7 +520,7 @@ class BusinessCacheHelper {
       sort_by = 'sort_order',
       sort_order = 'ASC'
     } = params
-    return `${CACHE_PREFIX.EXCHANGE}:items:list:${status}:${asset_code}:${page}:${page_size}:${sort_by}:${sort_order}`
+    return `${KEY_PREFIX}${CACHE_PREFIX.EXCHANGE}:items:list:${status}:${asset_code}:${page}:${page_size}:${sort_by}:${sort_order}`
   }
 
   /**
@@ -445,7 +529,7 @@ class BusinessCacheHelper {
    * @param {Object} params - 查询参数
    * @returns {Promise<Object|null>} 缓存数据或 null
    */
-  static async getExchangeItems (params) {
+  static async getExchangeItems(params) {
     const key = this.buildExchangeItemsKey(params)
     return await this.get(key)
   }
@@ -457,30 +541,31 @@ class BusinessCacheHelper {
    * @param {Object} data - 商品列表数据
    * @returns {Promise<boolean>} 是否写入成功
    */
-  static async setExchangeItems (params, data) {
+  static async setExchangeItems(params, data) {
     const key = this.buildExchangeItemsKey(params)
     return await this.set(key, data, DEFAULT_TTL.EXCHANGE)
   }
 
   /**
-   * 失效所有商品列表缓存
+   * 失效所有商品列表缓存（决策5适配）
    *
    * @param {string} reason - 失效原因
    * @returns {Promise<number>} 失效的 key 数量
    */
-  static async invalidateExchangeItems (reason = 'items_updated') {
-    return await this.delByPattern(`${CACHE_PREFIX.EXCHANGE}:items:list:*`, reason)
+  static async invalidateExchangeItems(reason = 'items_updated') {
+    return await this.delByPattern(`${KEY_PREFIX}${CACHE_PREFIX.EXCHANGE}:items:list:*`, reason)
   }
 
   // ==================== 交易市场缓存专用方法 ====================
 
   /**
-   * 构建交易市场列表缓存 key
+   * 构建交易市场列表缓存 key（决策5适配）
    *
    * @param {Object} params - 查询参数
    * @returns {string} 缓存 key
+   * @example 返回: 'app:v4:dev:api:market:listings:active:all:created_desc:1:20'
    */
-  static buildMarketListingsKey (params = {}) {
+  static buildMarketListingsKey(params = {}) {
     const {
       status = 'active',
       category = 'all',
@@ -488,7 +573,7 @@ class BusinessCacheHelper {
       page = 1,
       page_size = 20
     } = params
-    return `${CACHE_PREFIX.MARKET}:listings:${status}:${category}:${sort}:${page}:${page_size}`
+    return `${KEY_PREFIX}${CACHE_PREFIX.MARKET}:listings:${status}:${category}:${sort}:${page}:${page_size}`
   }
 
   /**
@@ -497,7 +582,7 @@ class BusinessCacheHelper {
    * @param {Object} params - 查询参数
    * @returns {Promise<Object|null>} 缓存数据或 null
    */
-  static async getMarketListings (params) {
+  static async getMarketListings(params) {
     const key = this.buildMarketListingsKey(params)
     return await this.get(key)
   }
@@ -509,37 +594,38 @@ class BusinessCacheHelper {
    * @param {Object} data - 列表数据
    * @returns {Promise<boolean>} 是否写入成功
    */
-  static async setMarketListings (params, data) {
+  static async setMarketListings(params, data) {
     const key = this.buildMarketListingsKey(params)
     return await this.set(key, data, DEFAULT_TTL.MARKET)
   }
 
   /**
-   * 失效所有交易市场列表缓存
+   * 失效所有交易市场列表缓存（决策5适配）
    *
    * @param {string} reason - 失效原因
    * @returns {Promise<number>} 失效的 key 数量
    */
-  static async invalidateMarketListings (reason = 'listings_updated') {
-    return await this.delByPattern(`${CACHE_PREFIX.MARKET}:listings:*`, reason)
+  static async invalidateMarketListings(reason = 'listings_updated') {
+    return await this.delByPattern(`${KEY_PREFIX}${CACHE_PREFIX.MARKET}:listings:*`, reason)
   }
 
   // ==================== 统计报表缓存专用方法 ====================
 
   /**
-   * 构建统计报表缓存 key
+   * 构建统计报表缓存 key（决策5适配）
    *
    * @param {string} type - 报表类型（decision/trends/today/charts）
    * @param {Object} params - 查询参数
    * @returns {string} 缓存 key
+   * @example 返回: 'app:v4:dev:api:stats:today:date:2026-01-05'
    */
-  static buildStatsKey (type, params = {}) {
+  static buildStatsKey(type, params = {}) {
     const paramsStr =
       Object.entries(params)
         .sort(([a], [b]) => a.localeCompare(b))
         .map(([k, v]) => `${k}:${v}`)
         .join(':') || 'default'
-    return `${CACHE_PREFIX.STATS}:${type}:${paramsStr}`
+    return `${KEY_PREFIX}${CACHE_PREFIX.STATS}:${type}:${paramsStr}`
   }
 
   /**
@@ -549,7 +635,7 @@ class BusinessCacheHelper {
    * @param {Object} params - 查询参数
    * @returns {Promise<Object|null>} 缓存数据或 null
    */
-  static async getStats (type, params) {
+  static async getStats(type, params) {
     const key = this.buildStatsKey(type, params)
     return await this.get(key)
   }
@@ -562,72 +648,77 @@ class BusinessCacheHelper {
    * @param {Object} data - 报表数据
    * @returns {Promise<boolean>} 是否写入成功
    */
-  static async setStats (type, params, data) {
+  static async setStats(type, params, data) {
     const key = this.buildStatsKey(type, params)
     return await this.set(key, data, DEFAULT_TTL.STATS)
   }
 
   /**
-   * 失效所有统计报表缓存
+   * 失效所有统计报表缓存（决策5适配）
    *
    * @param {string} reason - 失效原因
    * @returns {Promise<number>} 失效的 key 数量
    */
-  static async invalidateStats (reason = 'data_updated') {
-    return await this.delByPattern(`${CACHE_PREFIX.STATS}:*`, reason)
+  static async invalidateStats(reason = 'data_updated') {
+    return await this.delByPattern(`${KEY_PREFIX}${CACHE_PREFIX.STATS}:*`, reason)
   }
 
-  // ==================== 用户信息缓存专用方法（P2 缓存优化 2026-01-03）====================
+  // ==================== 用户信息缓存专用方法（决策6B/10/21：PII治理+认证链路优化）====================
 
   /**
-   * 构建用户信息缓存 key（按手机号）
+   * 构建用户信息缓存 key（按手机号hash，决策6B/24：PII治理）
    *
-   * @param {string} mobile - 用户手机号
+   * @description 使用 HMAC-SHA256 对手机号进行 hash，避免明文手机号出现在 Redis
+   * @param {string} mobile - 用户手机号（明文）
    * @returns {string} 缓存 key
    *
    * @example
    * const key = BusinessCacheHelper.buildUserMobileKey('13612227930')
-   * // 返回: 'user:mobile:13612227930'
+   * // 返回: 'app:v4:dev:api:user:mobile_hash:a1b2c3d4...'（64字符hex）
    */
-  static buildUserMobileKey (mobile) {
-    return `${CACHE_PREFIX.USER}:mobile:${mobile}`
+  static buildUserMobileKey(mobile) {
+    const mobileHash = hashMobile(mobile)
+    return `${KEY_PREFIX}${CACHE_PREFIX.USER}:mobile_hash:${mobileHash}`
   }
 
   /**
-   * 构建用户信息缓存 key（按用户ID）
+   * 构建用户信息缓存 key（按用户ID，决策5适配）
    *
    * @param {number} user_id - 用户ID
    * @returns {string} 缓存 key
    *
    * @example
    * const key = BusinessCacheHelper.buildUserIdKey(1)
-   * // 返回: 'user:id:1'
+   * // 返回: 'app:v4:dev:api:user:id:1'
    */
-  static buildUserIdKey (user_id) {
-    return `${CACHE_PREFIX.USER}:id:${user_id}`
+  static buildUserIdKey(user_id) {
+    return `${KEY_PREFIX}${CACHE_PREFIX.USER}:id:${user_id}`
   }
 
   /**
-   * 获取用户信息缓存（按手机号）
+   * 获取用户信息缓存（按手机号hash）
    *
-   * @description 用于登录场景，根据手机号查找用户
+   * @description 决策10A：登录场景禁止走缓存，此方法仅用于非登录场景
+   * @deprecated 登录场景应直接查库，不应调用此方法
    *
    * @param {string} mobile - 用户手机号
    * @returns {Promise<Object|null>} 用户数据或 null
    */
-  static async getUserByMobile (mobile) {
+  static async getUserByMobile(mobile) {
     const key = this.buildUserMobileKey(mobile)
     return await this.get(key)
   }
 
   /**
-   * 写入用户信息缓存（按手机号）
+   * 写入用户信息缓存（按手机号hash）
+   *
+   * @description 决策10A：登录场景禁止写缓存，此方法仅用于非登录场景
    *
    * @param {string} mobile - 用户手机号
    * @param {Object} userData - 用户数据对象（需要包含可序列化字段）
    * @returns {Promise<boolean>} 是否写入成功
    */
-  static async setUserByMobile (mobile, userData) {
+  static async setUserByMobile(mobile, userData) {
     const key = this.buildUserMobileKey(mobile)
     return await this.set(key, userData, DEFAULT_TTL.USER)
   }
@@ -635,12 +726,12 @@ class BusinessCacheHelper {
   /**
    * 获取用户信息缓存（按用户ID）
    *
-   * @description 用于认证后场景，根据用户ID获取用户信息
+   * @description 决策10B：认证后场景走缓存，用于 JWT 验证后获取用户详情
    *
    * @param {number} user_id - 用户ID
    * @returns {Promise<Object|null>} 用户数据或 null
    */
-  static async getUserById (user_id) {
+  static async getUserById(user_id) {
     const key = this.buildUserIdKey(user_id)
     return await this.get(key)
   }
@@ -648,23 +739,26 @@ class BusinessCacheHelper {
   /**
    * 写入用户信息缓存（按用户ID）
    *
+   * @description 决策10B：认证后场景走缓存
+   *
    * @param {number} user_id - 用户ID
    * @param {Object} userData - 用户数据对象
    * @returns {Promise<boolean>} 是否写入成功
    */
-  static async setUserById (user_id, userData) {
+  static async setUserById(user_id, userData) {
     const key = this.buildUserIdKey(user_id)
     return await this.set(key, userData, DEFAULT_TTL.USER)
   }
 
   /**
-   * 失效用户缓存（同时失效 mobile 和 id 两个维度）
+   * 失效用户缓存（同时失效 mobile_hash 和 id 两个维度）
    *
-   * @description 用户信息变更时调用，确保缓存一致性
+   * @description 决策7A：用户信息变更时调用，确保缓存一致性
+   * 注意：日志不输出明文手机号（决策6B/24：PII保护）
    *
    * @param {Object} params - 失效参数
    * @param {number} params.user_id - 用户ID（必填）
-   * @param {string} params.mobile - 用户手机号（可选，如果提供则同时失效）
+   * @param {string} params.mobile - 用户手机号（可选，如果提供则同时失效hash维度）
    * @param {string} reason - 失效原因（用于日志）
    * @returns {Promise<boolean>} 是否成功
    *
@@ -672,7 +766,7 @@ class BusinessCacheHelper {
    * // 用户更新昵称后失效缓存
    * await BusinessCacheHelper.invalidateUser({ user_id: 1, mobile: '13612227930' }, 'profile_updated')
    */
-  static async invalidateUser (params, reason = 'user_updated') {
+  static async invalidateUser(params, reason = 'user_updated') {
     const { user_id, mobile } = params
     let success = true
 
@@ -682,26 +776,31 @@ class BusinessCacheHelper {
       success = success && idResult
     }
 
-    // 失效手机号维度缓存
+    // 失效手机号hash维度缓存
     if (mobile) {
       const mobileResult = await this.del(this.buildUserMobileKey(mobile), reason)
       success = success && mobileResult
     }
 
-    logger.info('[业务缓存] 用户缓存已失效', { user_id, mobile, reason })
+    // 决策6B/24：日志不输出明文手机号
+    logger.info('[业务缓存] 用户缓存已失效', {
+      user_id,
+      has_mobile: !!mobile,
+      reason
+    })
     return success
   }
 
   /**
-   * 失效所有用户缓存
+   * 失效所有用户缓存（决策5适配）
    *
    * @description 批量操作或数据迁移后调用
    *
    * @param {string} reason - 失效原因
    * @returns {Promise<number>} 失效的 key 数量
    */
-  static async invalidateAllUsers (reason = 'batch_operation') {
-    return await this.delByPattern(`${CACHE_PREFIX.USER}:*`, reason)
+  static async invalidateAllUsers(reason = 'batch_operation') {
+    return await this.delByPattern(`${KEY_PREFIX}${CACHE_PREFIX.USER}:*`, reason)
   }
 
   // ==================== 缓存监控方法 ====================
@@ -711,7 +810,7 @@ class BusinessCacheHelper {
    *
    * @returns {Object} 各业务域的缓存统计
    */
-  static getStatsSnapshot () {
+  static getStatsSnapshot() {
     const snapshot = {}
 
     Object.keys(cacheStats).forEach(prefix => {
@@ -730,7 +829,7 @@ class BusinessCacheHelper {
    * 重置缓存统计数据
    * @returns {void}
    */
-  static resetStats () {
+  static resetStats() {
     Object.keys(cacheStats).forEach(prefix => {
       cacheStats[prefix].hits = 0
       cacheStats[prefix].misses = 0
@@ -745,7 +844,7 @@ class BusinessCacheHelper {
    * @param {number} intervalMs - 输出间隔（毫秒），默认 10 分钟
    * @returns {void}
    */
-  static startMonitor (intervalMs = 10 * 60 * 1000) {
+  static startMonitor(intervalMs = 10 * 60 * 1000) {
     if (monitorIntervalId) {
       logger.warn('[业务缓存] 监控已在运行')
       return
@@ -772,7 +871,7 @@ class BusinessCacheHelper {
    * 停止缓存监控
    * @returns {void}
    */
-  static stopMonitor () {
+  static stopMonitor() {
     if (monitorIntervalId) {
       clearInterval(monitorIntervalId)
       monitorIntervalId = null
@@ -785,5 +884,13 @@ class BusinessCacheHelper {
 module.exports = {
   BusinessCacheHelper,
   CACHE_PREFIX,
-  DEFAULT_TTL
+  DEFAULT_TTL,
+  // 决策5：命名空间相关
+  KEY_PREFIX,
+  ENV_MAP,
+  normalizeEnv,
+  SERVICE_NAME,
+  // 决策6B/24：PII治理相关
+  hashMobile,
+  getPiiHashSecret
 }

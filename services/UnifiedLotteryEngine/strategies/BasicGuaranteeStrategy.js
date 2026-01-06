@@ -43,7 +43,7 @@ const AssetService = require('../../AssetService')
  * @param {Object} options - 选项 {transaction, lock}
  * @returns {Promise<Object>} 模拟UserPointsAccount结构的对象 {available_points}
  */
-async function getUserPointsBalance (user_id, options = {}) {
+async function getUserPointsBalance(user_id, options = {}) {
   const { transaction, lock } = options
 
   // 查询用户账户
@@ -118,7 +118,7 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
    *   guaranteeRule: { triggerCount: 10, guaranteePrizeId: 9 }
    * })
    */
-  constructor (config = {}) {
+  constructor(config = {}) {
     super('basic_guarantee', {
       enabled: true,
       defaultProbability: 1.0, // 🎯 V4.1: 移除基础中奖率限制，直接根据奖品概率分配（原10%已废弃）
@@ -156,7 +156,7 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
    * @param {Object} context - 执行上下文
    * @returns {Promise<boolean>} 验证结果
    */
-  async validateStrategy (context) {
+  async validateStrategy(context) {
     // 🔴 参数验证：检查context是否为null或undefined
     if (!context || typeof context !== 'object') {
       this.logError('验证失败：context参数无效', {
@@ -210,7 +210,7 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
    * @param {Transaction} transaction - 外部事务对象（可选，用于连抽统一事务保护）
    * @returns {Promise<Object>} 抽奖结果
    */
-  async execute (context, transaction = null) {
+  async execute(context, transaction = null) {
     const startTime = BeijingTimeHelper.timestamp()
 
     try {
@@ -680,7 +680,7 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
    * @param {number} campaignId - 活动ID
    * @returns {Promise<Object>} 保底检查结果
    */
-  async checkGuaranteeRule (user_id, campaignId) {
+  async checkGuaranteeRule(user_id, campaignId) {
     try {
       // 获取用户累计抽奖次数
       const drawCount = await this.getUserDrawCount(user_id, campaignId)
@@ -734,7 +734,7 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
    * const drawCount = await strategy.getUserDrawCount(10001, 1)
    * logger.info('累计抽奖次数:', drawCount)
    */
-  async getUserDrawCount (user_id, campaignId) {
+  async getUserDrawCount(user_id, campaignId) {
     try {
       const models = require('../../../models')
 
@@ -802,7 +802,7 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
    *   skip_points_deduction: true
    * })
    */
-  async executeGuaranteeAward (user_id, campaignId, drawNumber, transaction = null, context = {}) {
+  async executeGuaranteeAward(user_id, campaignId, drawNumber, transaction = null, context = {}) {
     /*
      * 🔥 统一事务保护机制
      * - 如果有外部事务（连抽场景），使用外部事务，不提交/回滚
@@ -918,9 +918,13 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
        * 5. 创建抽奖记录
        * V4.0语义清理：使用 reward_tier 替代 is_winner
        */
+      // 生成业务唯一键（格式：lottery_draw_{user_id}_{session_id}_{draw_index}）
+      const business_id = `lottery_draw_${user_id}_${context.lottery_session_id || 'no_session'}_${drawNumber}`
+
       const lotteryRecord = await models.LotteryDraw.create(
         {
           draw_id,
+          business_id, // ✅ 业务唯一键（事务边界治理 - 2026-01-05）
           idempotency_key: idempotencyKey, // 业界标准形态：使用 idempotency_key 进行幂等控制
           user_id,
           lottery_id: campaignId,
@@ -1033,7 +1037,7 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
    * @param {Object} context - 执行上下文
    * @returns {Promise<Object>} {valid: boolean, reason: string}
    */
-  async canExecute (context) {
+  async canExecute(context) {
     try {
       // ✅ 统一业务标准：使用snake_case参数解构
       const { user_id, campaign_id, user_status } = context
@@ -1102,7 +1106,7 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
    * @param {Object} context - 执行上下文
    * @returns {number} 计算后的中奖概率
    */
-  calculateProbability (context) {
+  calculateProbability(context) {
     try {
       // ✅ 统一业务标准：使用snake_case参数解构
       const { user_id, campaign_id } = context
@@ -1163,7 +1167,7 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
    * @param {number} user_id - 用户ID（用于查询个性化概率设置）
    * @returns {Promise<Object>} 选中的奖品
    */
-  async selectPrize (prizes, user_id = null) {
+  async selectPrize(prizes, user_id = null) {
     if (!prizes || prizes.length === 0) {
       this.logError('奖品列表为空，无法选择奖品')
       return null
@@ -1252,7 +1256,7 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
    * // 用户A：一等奖设置为50%，其他奖品自动缩减
    * const adjustedPrizes = await this.applyUserProbabilityAdjustment(prizes, userA_id)
    */
-  async applyUserProbabilityAdjustment (prizes, user_id) {
+  async applyUserProbabilityAdjustment(prizes, user_id) {
     try {
       const { LotteryManagementSetting } = require('../../../models')
 
@@ -1309,7 +1313,7 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
    * 调整设置：一等奖设置为50%
    * 调整结果：一等奖50%、二等奖18.75%、三等奖31.25%
    */
-  adjustSpecificPrizeProbability (prizes, settingData) {
+  adjustSpecificPrizeProbability(prizes, settingData) {
     const { prize_id, custom_probability } = settingData
 
     // 找到要调整的奖品
@@ -1405,7 +1409,7 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
    * @param {Object|null} options.transaction - 事务对象（可选）
    * @returns {Promise<Array>} 可用奖品列表（已按业务规则过滤）
    */
-  async getAvailablePrizes (campaignId, userId = null, options = {}) {
+  async getAvailablePrizes(campaignId, userId = null, options = {}) {
     const { LotteryPrize, LotteryCampaign } = require('../../../models')
     const { transaction = null } = options
 
@@ -1578,7 +1582,7 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
    * @param {Object|null} options.transaction - 事务对象
    * @returns {Promise<number>} BUDGET_POINTS 总和
    */
-  async getUserTotalBudgetPoints (userId, options = {}) {
+  async getUserTotalBudgetPoints(userId, options = {}) {
     const { transaction } = options
     const { Account, AccountAssetBalance } = require('../../../models')
 
@@ -1618,7 +1622,7 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
    * @param {Object|null} options.transaction - 事务对象
    * @returns {Promise<number>} BUDGET_POINTS 总和
    */
-  async getUserBudgetPointsByCampaigns (userId, campaignIds, options = {}) {
+  async getUserBudgetPointsByCampaigns(userId, campaignIds, options = {}) {
     const { transaction } = options
     const { Account, AccountAssetBalance } = require('../../../models')
     const { Op } = require('sequelize')
@@ -1676,7 +1680,7 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
    * @param {Object} transaction - 事务对象
    * @returns {Promise<void>} 无返回值，成功则正常返回，失败则抛出异常
    */
-  async deductBudgetPoints (campaignId, userId, amount, options = {}, transaction = null) {
+  async deductBudgetPoints(campaignId, userId, amount, options = {}, transaction = null) {
     const { LotteryCampaign } = require('../../../models')
     const { idempotency_key, prize_id, prize_name } = options
 
@@ -1797,7 +1801,7 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
    * const result = await strategy.deductPoints(10001, 100, { idempotency_key: 'xxx:consume', lottery_session_id: 'xxx' }, transaction)
    * console.log(result.asset_transaction_id) // 用于写入 lottery_draws.asset_transaction_id
    */
-  async deductPoints (user_id, pointsCost, options = {}, transaction = null) {
+  async deductPoints(user_id, pointsCost, options = {}, transaction = null) {
     const { idempotency_key, lottery_session_id } = options
 
     if (!idempotency_key) {
@@ -1859,7 +1863,7 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
    * @example
    * await strategy.deductPrizeStock(prize, transaction)
    */
-  async deductPrizeStock (prize, transaction) {
+  async deductPrizeStock(prize, transaction) {
     // 如果库存为null，表示无限库存，无需扣减
     if (prize.stock_quantity === null) {
       this.logInfo('无限库存奖品，跳过库存扣减', {
@@ -1922,7 +1926,7 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
    * const prize = { id: 9, prize_name: '九八折券', prize_type: 'coupon', prize_value: '98%' }
    * await strategy.distributePrize(10001, prize, transaction, { idempotency_key: 'xxx', lottery_session_id: 'xxx' })
    */
-  async distributePrize (user_id, prize, transaction = null, options = {}) {
+  async distributePrize(user_id, prize, transaction = null, options = {}) {
     // 方案B：强制要求传入幂等键（不再允许随机生成）
     const idempotencyKey = options.idempotency_key
     if (!idempotencyKey) {
@@ -1932,102 +1936,102 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
 
     // 根据奖品类型进行不同的发放逻辑
     switch (prize.prize_type) {
-    case 'points':
-      // 🔧 V4.3修复：使用AssetService替代PointsService（方案B幂等）
-      await AssetService.changeBalance(
-        {
+      case 'points':
+        // 🔧 V4.3修复：使用AssetService替代PointsService（方案B幂等）
+        await AssetService.changeBalance(
+          {
+            user_id,
+            asset_code: 'POINTS',
+            delta_amount: parseInt(prize.prize_value), // 增加积分为正数
+            idempotency_key: `${idempotencyKey}:points`, // 方案B：派生幂等键
+            lottery_session_id: lotterySessionId, // 方案B：关联抽奖会话
+            business_type: 'lottery_reward',
+            meta: {
+              source_type: 'system',
+              title: `抽奖奖励：${prize.prize_name}`,
+              description: `获得${prize.prize_value}积分奖励`
+            }
+          },
+          { transaction } // 🎯 传入事务对象，确保积分操作在同一事务中
+        )
+
+        this.logInfo('发放积分奖励（使用AssetService + 事务）', {
           user_id,
-          asset_code: 'POINTS',
-          delta_amount: parseInt(prize.prize_value), // 增加积分为正数
-          idempotency_key: `${idempotencyKey}:points`, // 方案B：派生幂等键
-          lottery_session_id: lotterySessionId, // 方案B：关联抽奖会话
-          business_type: 'lottery_reward',
-          meta: {
-            source_type: 'system',
-            title: `抽奖奖励：${prize.prize_name}`,
-            description: `获得${prize.prize_value}积分奖励`
-          }
-        },
-        { transaction } // 🎯 传入事务对象，确保积分操作在同一事务中
-      )
-
-      this.logInfo('发放积分奖励（使用AssetService + 事务）', {
-        user_id,
-        prizeId: prize.prize_id,
-        prizeName: prize.prize_name,
-        points: prize.prize_value,
-        idempotencyKey,
-        lotterySessionId,
-        inTransaction: !!transaction
-      })
-      break
-
-    case 'coupon':
-    case 'physical': {
-      /**
-       * 🔥 统一资产域架构：优惠券/实物奖品通过 AssetService.mintItem() 发放
-       *
-       * 业务场景：
-       * - 抽奖中奖后，将优惠券/实物奖品写入 item_instances 表
-       * - 自动记录物品铸造事件到 item_instance_events 表
-       * - 支持幂等性控制（通过 source_type + source_id）
-       */
-      await AssetService.mintItem(
-        {
-          user_id,
-          item_type: prize.prize_type === 'coupon' ? 'voucher' : 'product',
-          source_type: 'lottery',
-          source_id: `${idempotencyKey}:item`,
-          meta: {
-            name: prize.prize_name,
-            description: prize.prize_description || `抽奖获得：${prize.prize_name}`,
-            value: Math.round(parseFloat(prize.prize_value) || 0),
-            prize_id: prize.prize_id,
-            prize_type: prize.prize_type,
-            acquisition_method: 'lottery',
-            acquisition_cost: this.config.pointsCostPerDraw,
-            can_transfer: true,
-            can_use: true
-          }
-        },
-        { transaction }
-      )
-
-      this.logInfo('发放物品到背包（通过 AssetService.mintItem）', {
-        user_id,
-        prizeId: prize.prize_id,
-        prizeName: prize.prize_name,
-        prizeType: prize.prize_type,
-        idempotencyKey,
-        inTransaction: !!transaction
-      })
-      break
-    }
-
-    case 'virtual': {
-      /**
-       * 🔥 背包双轨架构：虚拟资产发放到 AssetService（可叠加资产轨）
-       *
-       * 业务场景：
-       * - 抽奖中奖后，虚拟资产（材料/碎片）通过 AssetService 发放
-       * - 自动累加到用户资产余额
-       * - 支持幂等性控制
-       */
-      /*
-       * 虚拟奖品通过材料系统发放（见下方 material_asset_code 逻辑）
-       * 如果没有配置 material_asset_code，则记录警告
-       */
-      if (!prize.material_asset_code) {
-        this.logWarn('虚拟奖品未配置 material_asset_code，跳过发放', {
-          prize_id: prize.prize_id,
-          prize_name: prize.prize_name
+          prizeId: prize.prize_id,
+          prizeName: prize.prize_name,
+          points: prize.prize_value,
+          idempotencyKey,
+          lotterySessionId,
+          inTransaction: !!transaction
         })
-      }
-      break
-    }
+        break
 
-    default:
-      this.logError('未知奖品类型', { prizeType: prize.prize_type })
+      case 'coupon':
+      case 'physical': {
+        /**
+         * 🔥 统一资产域架构：优惠券/实物奖品通过 AssetService.mintItem() 发放
+         *
+         * 业务场景：
+         * - 抽奖中奖后，将优惠券/实物奖品写入 item_instances 表
+         * - 自动记录物品铸造事件到 item_instance_events 表
+         * - 支持幂等性控制（通过 source_type + source_id）
+         */
+        await AssetService.mintItem(
+          {
+            user_id,
+            item_type: prize.prize_type === 'coupon' ? 'voucher' : 'product',
+            source_type: 'lottery',
+            source_id: `${idempotencyKey}:item`,
+            meta: {
+              name: prize.prize_name,
+              description: prize.prize_description || `抽奖获得：${prize.prize_name}`,
+              value: Math.round(parseFloat(prize.prize_value) || 0),
+              prize_id: prize.prize_id,
+              prize_type: prize.prize_type,
+              acquisition_method: 'lottery',
+              acquisition_cost: this.config.pointsCostPerDraw,
+              can_transfer: true,
+              can_use: true
+            }
+          },
+          { transaction }
+        )
+
+        this.logInfo('发放物品到背包（通过 AssetService.mintItem）', {
+          user_id,
+          prizeId: prize.prize_id,
+          prizeName: prize.prize_name,
+          prizeType: prize.prize_type,
+          idempotencyKey,
+          inTransaction: !!transaction
+        })
+        break
+      }
+
+      case 'virtual': {
+        /**
+         * 🔥 背包双轨架构：虚拟资产发放到 AssetService（可叠加资产轨）
+         *
+         * 业务场景：
+         * - 抽奖中奖后，虚拟资产（材料/碎片）通过 AssetService 发放
+         * - 自动累加到用户资产余额
+         * - 支持幂等性控制
+         */
+        /*
+         * 虚拟奖品通过材料系统发放（见下方 material_asset_code 逻辑）
+         * 如果没有配置 material_asset_code，则记录警告
+         */
+        if (!prize.material_asset_code) {
+          this.logWarn('虚拟奖品未配置 material_asset_code，跳过发放', {
+            prize_id: prize.prize_id,
+            prize_name: prize.prize_name
+          })
+        }
+        break
+      }
+
+      default:
+        this.logError('未知奖品类型', { prizeType: prize.prize_type })
     }
 
     /**
@@ -2141,7 +2145,7 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
    *   transaction
    * )
    */
-  async recordLotteryHistory (context, result, probability, draw_id = null, transaction = null) {
+  async recordLotteryHistory(context, result, probability, draw_id = null, transaction = null) {
     // ✅ 统一业务标准：使用snake_case参数解构
     const { user_id, campaign_id } = context
 
@@ -2186,9 +2190,14 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
      */
     const rewardTier =
       result.reward_tier || LotteryDrawFormatter.inferRewardTier(result.prize_value_points)
+
+    // 生成业务唯一键（格式：lottery_draw_{user_id}_{session_id}_{draw_id}）
+    const business_id = `lottery_draw_${user_id}_${context.lottery_session_id || 'no_session'}_${finalDrawId}`
+
     const lotteryDraw = await LotteryDraw.create(
       {
         draw_id: finalDrawId,
+        business_id, // ✅ 业务唯一键（事务边界治理 - 2026-01-05）
         idempotency_key: idempotencyKey, // 业界标准形态：使用 idempotency_key 进行幂等控制
         // 🔥 事务边界治理：写入对账关联字段
         lottery_session_id: context.lottery_session_id || null, // 抽奖会话ID
@@ -2246,7 +2255,7 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
    *   logger.info('使用预设结果:', preset.prize_name)
    * }
    */
-  async checkUserPresetQueue (user_id, _campaignId, transaction = null) {
+  async checkUserPresetQueue(user_id, _campaignId, transaction = null) {
     try {
       const models = require('../../../models')
 
@@ -2287,7 +2296,7 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
    * @param {Transaction} transaction - 外部事务对象（可选，连抽场景传入）
    * @returns {Object} 抽奖结果
    */
-  async executePresetPrizeAward (context, preset, transaction = null) {
+  async executePresetPrizeAward(context, preset, transaction = null) {
     try {
       // ✅ 统一业务标准：使用snake_case参数解构
       const { user_id, campaign_id } = context

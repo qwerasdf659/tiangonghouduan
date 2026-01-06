@@ -67,14 +67,14 @@ const dbConfig = {
   logging:
     process.env.NODE_ENV === 'development'
       ? (sql, timing) => {
-        // 开发环境：记录所有查询和慢查询
-        console.log(sql)
-        if (timing) slowQueryLogger(sql, timing)
-      }
+          // 开发环境：记录所有查询和慢查询
+          console.log(sql)
+          if (timing) slowQueryLogger(sql, timing)
+        }
       : (sql, timing) => {
-        // 生产环境：只记录慢查询
-        if (timing) slowQueryLogger(sql, timing)
-      },
+          // 生产环境：只记录慢查询
+          if (timing) slowQueryLogger(sql, timing)
+        },
   benchmark: true, // ⚡ 启用查询时间记录（必需）
   pool: {
     max: 40, // ✅ 最大连接数 - 单实例场景合理，长期固定40（2025-12-30 已拍板）
@@ -127,7 +127,7 @@ const dbConfig = {
  * validateDatabaseConfig()
  * // 成功则继续，失败则抛出错误阻止启动
  */
-function validateDatabaseConfig () {
+function validateDatabaseConfig() {
   const requiredVars = ['DB_HOST', 'DB_PORT', 'DB_USER', 'DB_PASSWORD', 'DB_NAME']
   const missingVars = requiredVars.filter(varName => !process.env[varName])
 
@@ -198,7 +198,7 @@ const sequelize = new Sequelize(config.database, config.username, config.passwor
  *   process.exit(1)
  * }
  */
-async function testConnection () {
+async function testConnection() {
   try {
     /*
      * 在测试连接前先验证配置完整性（fail-fast）
@@ -254,7 +254,7 @@ async function testConnection () {
  * // ❌ 禁止：生产环境使用此方法
  * // ✅ 正确：使用迁移 npm run migrate
  */
-async function syncDatabase (force = false) {
+async function syncDatabase(force = false) {
   try {
     console.log('开始同步数据库...')
     await sequelize.sync({ force, alter: !force })
@@ -268,6 +268,7 @@ async function syncDatabase (force = false) {
 
 module.exports = {
   sequelize,
+  Sequelize, // 导出 Sequelize 类供 TransactionManager 等使用
   testConnection,
   syncDatabase,
   config,

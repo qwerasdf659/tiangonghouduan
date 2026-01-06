@@ -33,7 +33,7 @@ class MaterialConversionValidator {
    * @param {Array<MaterialConversionRule>} rules - 规则列表
    * @returns {Object} 有向图对象 { nodes: Set, edges: Array }
    */
-  static buildRuleGraph (rules) {
+  static buildRuleGraph(rules) {
     const nodes = new Set()
     const edges = []
 
@@ -61,7 +61,7 @@ class MaterialConversionValidator {
    * @param {Object} graph - 有向图对象 { nodes, edges }
    * @returns {Object} { hasCycle: boolean, cycle: Array<string> }
    */
-  static detectCycle (graph) {
+  static detectCycle(graph) {
     const { nodes, edges } = graph
 
     // 构建邻接表
@@ -101,7 +101,7 @@ class MaterialConversionValidator {
    * @param {Array} path - 路径记录
    * @returns {boolean} 是否找到环
    */
-  static dfs (node, adjList, visited, recStack, path) {
+  static dfs(node, adjList, visited, recStack, path) {
     visited.add(node)
     recStack.add(node)
     path.push(node)
@@ -134,7 +134,7 @@ class MaterialConversionValidator {
    * @param {Object} graph - 有向图对象 { nodes, edges }
    * @returns {Object} { hasNegativeCycle: boolean, cycle: Array<string> }
    */
-  static detectNegativeCycle (graph) {
+  static detectNegativeCycle(graph) {
     const { nodes, edges } = graph
 
     // 初始化距离数组
@@ -187,7 +187,7 @@ class MaterialConversionValidator {
    * @param {Map} predecessor - 前驱节点映射
    * @returns {Array<string>} 负环路径
    */
-  static traceNegativeCycle (node, predecessor) {
+  static traceNegativeCycle(node, predecessor) {
     const visited = new Set()
     let current = node
 
@@ -222,17 +222,23 @@ class MaterialConversionValidator {
    * @param {Sequelize.Transaction} options.transaction - 事务对象（可选）
    * @returns {Promise<Object>} { valid: boolean, errors: Array<string> }
    */
-  static async validate (newRule, options = {}) {
+  static async validate(newRule, options = {}) {
     const errors = []
 
     try {
       // 🔴 P1-1 关键修复：必须先获取新规则涉及的材料的 group_code
       const { MaterialAssetType } = require('../models')
 
-      // 查询源材料和目标材料的 group_code
+      // 查询源材料和目标材料的 group_code（使用 asset_code 查询，非主键）
       const [fromMaterial, toMaterial] = await Promise.all([
-        MaterialAssetType.findByPk(newRule.from_asset_code, { transaction: options.transaction }),
-        MaterialAssetType.findByPk(newRule.to_asset_code, { transaction: options.transaction })
+        MaterialAssetType.findOne({
+          where: { asset_code: newRule.from_asset_code },
+          transaction: options.transaction
+        }),
+        MaterialAssetType.findOne({
+          where: { asset_code: newRule.to_asset_code },
+          transaction: options.transaction
+        })
       ])
 
       if (!fromMaterial) {

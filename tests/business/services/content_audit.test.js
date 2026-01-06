@@ -16,6 +16,7 @@ const ContentAuditEngine = require('../../../services/ContentAuditEngine')
 const { ContentReviewRecord, User, sequelize } = require('../../../models')
 const BeijingTimeHelper = require('../../../utils/timeHelper')
 const { TEST_DATA } = require('../../helpers/test-data')
+const TransactionManager = require('../../../utils/TransactionManager')
 
 describe('ContentAuditEngine - 内容审核引擎测试', () => {
   let testUser, testContentReviewRecord
@@ -76,11 +77,14 @@ describe('ContentAuditEngine - 内容审核引擎测试', () => {
     })
 
     it('应该成功审核通过', async () => {
-      const result = await ContentAuditEngine.approve(
-        approveContentReviewRecord.audit_id,
-        testUser.user_id,
-        '测试审核通过'
-      )
+      const result = await TransactionManager.execute(async transaction => {
+        return await ContentAuditEngine.approve(
+          approveContentReviewRecord.audit_id,
+          testUser.user_id,
+          '测试审核通过',
+          { transaction }
+        )
+      })
 
       expect(result.success).toBe(true)
       expect(result.audit_record.audit_status).toBe('approved')
@@ -89,18 +93,23 @@ describe('ContentAuditEngine - 内容审核引擎测试', () => {
     })
 
     it('应该拒绝审核不存在的记录', async () => {
-      await expect(ContentAuditEngine.approve(999999, testUser.user_id, '测试')).rejects.toThrow(
-        '审核记录不存在'
-      )
+      await expect(
+        TransactionManager.execute(async transaction => {
+          return await ContentAuditEngine.approve(999999, testUser.user_id, '测试', { transaction })
+        })
+      ).rejects.toThrow('审核记录不存在')
     })
 
     it('应该拒绝审核已处理的记录', async () => {
       await expect(
-        ContentAuditEngine.approve(
-          approveContentReviewRecord.audit_id,
-          testUser.user_id,
-          '重复审核'
-        )
+        TransactionManager.execute(async transaction => {
+          return await ContentAuditEngine.approve(
+            approveContentReviewRecord.audit_id,
+            testUser.user_id,
+            '重复审核',
+            { transaction }
+          )
+        })
       ).rejects.toThrow('审核记录状态不正确')
     })
   })
@@ -120,11 +129,14 @@ describe('ContentAuditEngine - 内容审核引擎测试', () => {
     })
 
     it('应该成功审核拒绝', async () => {
-      const result = await ContentAuditEngine.reject(
-        rejectContentReviewRecord.audit_id,
-        testUser.user_id,
-        '测试审核拒绝原因'
-      )
+      const result = await TransactionManager.execute(async transaction => {
+        return await ContentAuditEngine.reject(
+          rejectContentReviewRecord.audit_id,
+          testUser.user_id,
+          '测试审核拒绝原因',
+          { transaction }
+        )
+      })
 
       expect(result.success).toBe(true)
       expect(result.audit_record.audit_status).toBe('rejected')
@@ -141,7 +153,11 @@ describe('ContentAuditEngine - 内容审核引擎测试', () => {
       })
 
       await expect(
-        ContentAuditEngine.reject(newRecord.audit_id, testUser.user_id, '')
+        TransactionManager.execute(async transaction => {
+          return await ContentAuditEngine.reject(newRecord.audit_id, testUser.user_id, '', {
+            transaction
+          })
+        })
       ).rejects.toThrow('拒绝原因必须提供')
     })
   })

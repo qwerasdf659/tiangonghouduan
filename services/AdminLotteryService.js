@@ -35,6 +35,7 @@ const BeijingTimeHelper = require('../utils/timeHelper')
 const models = require('../models')
 const AuditLogService = require('./AuditLogService')
 const { assertAndGetTransaction } = require('../utils/transactionHelpers')
+const { BusinessCacheHelper } = require('../utils/BusinessCacheHelper')
 
 const logger = require('../utils/logger').logger
 
@@ -68,7 +69,7 @@ class AdminLotteryService {
    * // 在ServiceManager.initialize()中调用
    * AdminLotteryService.initialize(serviceManager)
    */
-  static initialize (serviceManager) {
+  static initialize(serviceManager) {
     // 🎯 直接从_services Map获取，避免触发初始化检查
     this._dependencies.user = serviceManager._services.get('user')
     this._dependencies.prizePool = serviceManager._services.get('prizePool')
@@ -91,7 +92,7 @@ class AdminLotteryService {
    * @param {Object} options.transaction - Sequelize事务对象（必填）
    * @returns {Promise<Object>} 操作结果
    */
-  static async forceWinForUser (
+  static async forceWinForUser(
     adminId,
     userId,
     prizeId,
@@ -195,7 +196,7 @@ class AdminLotteryService {
    * @param {Object} options.transaction - Sequelize事务对象（必填）
    * @returns {Promise<Object>} 操作结果
    */
-  static async forceLoseForUser (
+  static async forceLoseForUser(
     adminId,
     userId,
     count = 1,
@@ -291,9 +292,18 @@ class AdminLotteryService {
    * @param {Object} options.transaction - Sequelize事务对象（必填）
    * @returns {Promise<Object>} 操作结果
    */
-  static async adjustUserProbability (adminId, userId, adjustmentData, expiresAt = null, options = {}) {
+  static async adjustUserProbability(
+    adminId,
+    userId,
+    adjustmentData,
+    expiresAt = null,
+    options = {}
+  ) {
     // 强制要求事务边界 - 2026-01-05 治理决策
-    const transaction = assertAndGetTransaction(options, 'AdminLotteryService.adjustUserProbability')
+    const transaction = assertAndGetTransaction(
+      options,
+      'AdminLotteryService.adjustUserProbability'
+    )
 
     logger.info('管理员调整用户概率操作开始', {
       admin_id: adminId,
@@ -456,7 +466,7 @@ class AdminLotteryService {
    *   { transaction }
    * );
    */
-  static async setUserQueue (
+  static async setUserQueue(
     adminId,
     userId,
     queueConfig,
@@ -571,7 +581,7 @@ class AdminLotteryService {
    * const status = await AdminLotteryService.getUserManagementStatus(20001);
    * // status.management_status.force_win: { setting_id, prize_id, reason, expires_at, status }
    */
-  static async getUserManagementStatus (userId) {
+  static async getUserManagementStatus(userId) {
     try {
       logger.info('查询用户管理状态', {
         user_id: userId
@@ -660,7 +670,13 @@ class AdminLotteryService {
    * // 清除特定类型设置
    * const result = await AdminLotteryService.clearUserSettings(10001, 20001, 'force_win', '管理员清除设置', { transaction });
    */
-  static async clearUserSettings (adminId, userId, settingType = null, reason = '管理员清除设置', options = {}) {
+  static async clearUserSettings(
+    adminId,
+    userId,
+    settingType = null,
+    reason = '管理员清除设置',
+    options = {}
+  ) {
     // 强制要求事务边界 - 2026-01-05 治理决策
     const transaction = assertAndGetTransaction(options, 'AdminLotteryService.clearUserSettings')
 
@@ -752,7 +768,7 @@ class AdminLotteryService {
    * 创建时间：2025年12月11日（从LotteryPrize.resetDailyWinCount迁移）
    * 迁移原因：符合"Model层纯净度"架构原则（任务2.1）
    */
-  static async resetDailyWinCounts () {
+  static async resetDailyWinCounts() {
     try {
       logger.info('[批处理任务] 开始重置每日中奖次数...')
 
@@ -812,13 +828,33 @@ class AdminLotteryService {
    * 创建时间：2025年12月11日（从LotteryCampaign.batchUpdateStatus迁移）
    * 迁移原因：符合"Model层纯净度"架构原则（任务2.1）
    */
-  static async syncCampaignStatus () {
+  static async syncCampaignStatus() {
     try {
       logger.info('[批处理任务] 开始同步活动状态...')
 
       const { LotteryCampaign } = models
       const { Op } = models.sequelize.Sequelize
       const now = BeijingTimeHelper.createBeijingTime()
+
+      // 决策8B：先查询受影响的活动ID，用于后续精准缓存失效
+      const toStartCampaigns = await LotteryCampaign.findAll({
+        where: {
+          status: 'draft',
+          start_time: { [Op.lte]: now },
+          end_time: { [Op.gte]: now }
+        },
+        attributes: ['campaign_id'],
+        raw: true
+      })
+
+      const toEndCampaigns = await LotteryCampaign.findAll({
+        where: {
+          status: 'active',
+          end_time: { [Op.lt]: now }
+        },
+        attributes: ['campaign_id'],
+        raw: true
+      })
 
       // 1. 自动开始符合条件的活动（status=draft且已到开始时间但未到结束时间）
       const startResult = await LotteryCampaign.update(
@@ -843,9 +879,41 @@ class AdminLotteryService {
         }
       )
 
+      // 决策8B：精准失效受影响活动的缓存（Service层）
+      const invalidatedCampaigns = []
+      for (const campaign of toStartCampaigns) {
+        try {
+          await BusinessCacheHelper.invalidateLotteryCampaign(
+            campaign.campaign_id,
+            'status_sync_started'
+          )
+          invalidatedCampaigns.push({ campaign_id: campaign.campaign_id, action: 'started' })
+        } catch (cacheError) {
+          logger.warn('[缓存] 活动缓存失效失败（非致命）', {
+            campaign_id: campaign.campaign_id,
+            error: cacheError.message
+          })
+        }
+      }
+      for (const campaign of toEndCampaigns) {
+        try {
+          await BusinessCacheHelper.invalidateLotteryCampaign(
+            campaign.campaign_id,
+            'status_sync_ended'
+          )
+          invalidatedCampaigns.push({ campaign_id: campaign.campaign_id, action: 'ended' })
+        } catch (cacheError) {
+          logger.warn('[缓存] 活动缓存失效失败（非致命）', {
+            campaign_id: campaign.campaign_id,
+            error: cacheError.message
+          })
+        }
+      }
+
       logger.info('[批处理任务] 活动状态同步完成', {
         started_count: startResult[0],
         ended_count: endResult[0],
+        invalidated_campaigns: invalidatedCampaigns,
         timestamp: now
       })
 
@@ -895,7 +963,7 @@ class AdminLotteryService {
    * 创建时间：2025年12月11日（从LotteryCampaign.getActiveCampaigns迁移）
    * 迁移原因：符合"Model层纯净度"架构原则（任务2.1）
    */
-  static async getActiveCampaigns (options = {}) {
+  static async getActiveCampaigns(options = {}) {
     try {
       const { limit = 10, includePrizes = true } = options
 
@@ -940,6 +1008,223 @@ class AdminLotteryService {
       })
 
       throw error
+    }
+  }
+
+  // ==================== 活动预算管理（决策7：失效归Service层）====================
+
+  /**
+   * 更新活动预算配置
+   *
+   * @description 更新活动的预算模式和相关配置，更新后精准失效缓存（决策3/7）
+   * @param {number} campaign_id - 活动ID
+   * @param {Object} updateData - 更新数据
+   * @param {string} [updateData.budget_mode] - 预算模式（user/pool/none）
+   * @param {number} [updateData.pool_budget_total] - 活动池总预算
+   * @param {Array} [updateData.allowed_campaign_ids] - 允许使用的预算来源活动ID列表
+   * @param {Object} [options] - 选项
+   * @param {number} [options.operated_by] - 操作者ID（管理员）
+   * @param {Object} [options.transaction] - Sequelize事务对象（可选）
+   * @returns {Promise<Object>} 更新结果 {campaign, updated_fields}
+   *
+   * 缓存策略（决策3/7）：
+   * - 更新成功后精准失效活动配置缓存
+   * - 缓存失效失败不阻塞主流程（记录WARN日志）
+   */
+  static async updateCampaignBudget(campaign_id, updateData, options = {}) {
+    const { operated_by, transaction } = options
+    const { LotteryCampaign } = models
+
+    // 验证 budget_mode
+    const validBudgetModes = ['user', 'pool', 'none']
+    if (updateData.budget_mode && !validBudgetModes.includes(updateData.budget_mode)) {
+      const error = new Error(`无效的预算模式：${updateData.budget_mode}`)
+      error.code = 'INVALID_BUDGET_MODE'
+      error.statusCode = 400
+      throw error
+    }
+
+    // 获取活动
+    const campaign = await LotteryCampaign.findByPk(parseInt(campaign_id), { transaction })
+    if (!campaign) {
+      const error = new Error('活动不存在')
+      error.code = 'CAMPAIGN_NOT_FOUND'
+      error.statusCode = 404
+      throw error
+    }
+
+    // 构建更新数据
+    const fieldsToUpdate = {}
+    const { budget_mode, pool_budget_total, allowed_campaign_ids } = updateData
+
+    if (budget_mode) {
+      fieldsToUpdate.budget_mode = budget_mode
+
+      // 如果切换到 pool 模式，需要设置初始预算
+      if (budget_mode === 'pool') {
+        if (pool_budget_total && pool_budget_total > 0) {
+          fieldsToUpdate.pool_budget_total = pool_budget_total
+          fieldsToUpdate.pool_budget_remaining = pool_budget_total // 初始剩余等于总预算
+        } else if (!campaign.pool_budget_total) {
+          const error = new Error('切换到活动池预算模式时，必须设置 pool_budget_total')
+          error.code = 'MISSING_POOL_BUDGET'
+          error.statusCode = 400
+          throw error
+        }
+      }
+    }
+
+    if (pool_budget_total !== undefined && pool_budget_total >= 0) {
+      fieldsToUpdate.pool_budget_total = pool_budget_total
+      // 如果调整总预算，同步调整剩余预算（仅在增加时）
+      const currentRemaining = Number(campaign.pool_budget_remaining) || 0
+      const currentTotal = Number(campaign.pool_budget_total) || 0
+      const usedBudget = currentTotal - currentRemaining
+      fieldsToUpdate.pool_budget_remaining = Math.max(0, pool_budget_total - usedBudget)
+    }
+
+    if (allowed_campaign_ids !== undefined) {
+      // 验证格式：必须是数组或 null
+      if (allowed_campaign_ids !== null && !Array.isArray(allowed_campaign_ids)) {
+        const error = new Error('allowed_campaign_ids 必须是数组或 null')
+        error.code = 'INVALID_ALLOWED_CAMPAIGNS'
+        error.statusCode = 400
+        throw error
+      }
+      fieldsToUpdate.allowed_campaign_ids = allowed_campaign_ids
+    }
+
+    if (Object.keys(fieldsToUpdate).length === 0) {
+      const error = new Error('未提供任何更新字段')
+      error.code = 'NO_UPDATE_DATA'
+      error.statusCode = 400
+      throw error
+    }
+
+    // 执行更新
+    await campaign.update(fieldsToUpdate, { transaction })
+
+    // ========== 决策3/7：活动配置更新后精准失效缓存 ==========
+    try {
+      await BusinessCacheHelper.invalidateLotteryCampaign(
+        parseInt(campaign_id),
+        'campaign_budget_updated'
+      )
+      logger.info('[缓存] 活动配置缓存已失效', {
+        campaign_id: parseInt(campaign_id),
+        operated_by
+      })
+    } catch (cacheError) {
+      // 缓存失效失败不阻塞主流程
+      logger.warn('[缓存] 活动配置缓存失效失败（非致命）', {
+        error: cacheError.message,
+        campaign_id
+      })
+    }
+
+    logger.info('活动预算配置更新成功', {
+      campaign_id,
+      updated_fields: Object.keys(fieldsToUpdate),
+      operated_by
+    })
+
+    return {
+      campaign: campaign.reload({ transaction }),
+      updated_fields: Object.keys(fieldsToUpdate)
+    }
+  }
+
+  /**
+   * 补充活动池预算
+   *
+   * @description 为活动池补充预算，补充后精准失效缓存（决策3/7）
+   * @param {number} campaign_id - 活动ID
+   * @param {number} amount - 补充金额
+   * @param {Object} [options] - 选项
+   * @param {number} [options.operated_by] - 操作者ID（管理员）
+   * @param {Object} [options.transaction] - Sequelize事务对象（可选）
+   * @returns {Promise<Object>} 补充结果 {campaign, amount, new_remaining}
+   *
+   * 缓存策略（决策3/7）：
+   * - 补充成功后精准失效活动配置缓存
+   * - 缓存失效失败不阻塞主流程（记录WARN日志）
+   */
+  static async supplementCampaignBudget(campaign_id, amount, options = {}) {
+    const { operated_by, transaction } = options
+    const { LotteryCampaign } = models
+
+    // 验证金额
+    if (!amount || amount <= 0) {
+      const error = new Error('补充金额必须大于0')
+      error.code = 'INVALID_AMOUNT'
+      error.statusCode = 400
+      throw error
+    }
+
+    // 获取活动
+    const campaign = await LotteryCampaign.findByPk(parseInt(campaign_id), { transaction })
+    if (!campaign) {
+      const error = new Error('活动不存在')
+      error.code = 'CAMPAIGN_NOT_FOUND'
+      error.statusCode = 404
+      throw error
+    }
+
+    // 验证预算模式
+    if (campaign.budget_mode !== 'pool') {
+      const error = new Error('只有活动池预算模式才能补充预算')
+      error.code = 'INVALID_BUDGET_MODE'
+      error.statusCode = 400
+      throw error
+    }
+
+    // 计算新的剩余预算和总预算
+    const currentRemaining = Number(campaign.pool_budget_remaining) || 0
+    const currentTotal = Number(campaign.pool_budget_total) || 0
+    const newRemaining = currentRemaining + amount
+    const newTotal = currentTotal + amount
+
+    // 更新活动
+    await campaign.update(
+      {
+        pool_budget_remaining: newRemaining,
+        pool_budget_total: newTotal
+      },
+      { transaction }
+    )
+
+    // ========== 决策3/7：预算补充后精准失效缓存 ==========
+    try {
+      await BusinessCacheHelper.invalidateLotteryCampaign(
+        parseInt(campaign_id),
+        'campaign_budget_supplemented'
+      )
+      logger.info('[缓存] 活动配置缓存已失效', {
+        campaign_id: parseInt(campaign_id),
+        reason: 'budget_supplement',
+        operated_by
+      })
+    } catch (cacheError) {
+      // 缓存失效失败不阻塞主流程
+      logger.warn('[缓存] 活动配置缓存失效失败（非致命）', {
+        error: cacheError.message,
+        campaign_id
+      })
+    }
+
+    logger.info('活动池预算补充成功', {
+      campaign_id,
+      amount,
+      new_remaining: newRemaining,
+      new_total: newTotal,
+      operated_by
+    })
+
+    return {
+      campaign: await campaign.reload({ transaction }),
+      amount,
+      new_remaining: newRemaining,
+      new_total: newTotal
     }
   }
 }

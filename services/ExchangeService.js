@@ -225,7 +225,7 @@ class ExchangeService {
    * @param {boolean} [options.refresh=false] - 强制刷新缓存
    * @returns {Promise<Object>} 商品列表和分页信息
    */
-  static async getMarketItems (options = {}) {
+  static async getMarketItems(options = {}) {
     const {
       status = 'active',
       asset_code = null,
@@ -305,7 +305,7 @@ class ExchangeService {
    * @param {number} item_id - 商品ID
    * @returns {Promise<Object>} 商品详情
    */
-  static async getItemDetail (item_id) {
+  static async getItemDetail(item_id) {
     try {
       const item = await ExchangeItem.findOne({
         where: { item_id },
@@ -341,7 +341,7 @@ class ExchangeService {
    * @param {Transaction} options.transaction - 外部事务对象（可选）
    * @returns {Promise<Object>} 兑换结果和订单信息
    */
-  static async exchangeItem (user_id, item_id, quantity = 1, options = {}) {
+  static async exchangeItem(user_id, item_id, quantity = 1, options = {}) {
     const { idempotency_key } = options
 
     // 🔥 必填参数校验
@@ -578,10 +578,14 @@ class ExchangeService {
      */
     let record
     try {
+      // 生成业务唯一键（格式：exchange_{user_id}_{item_id}_{timestamp}）
+      const business_id = `exchange_${user_id}_${item_id}_${Date.now()}`
+
       record = await ExchangeRecord.create(
         {
           order_no,
           idempotency_key, // ✅ 记录 idempotency_key 用于幂等性（业界标准形态）
+          business_id, // ✅ 业务唯一键（事务边界治理 - 2026-01-05）
           user_id,
           item_id,
           item_snapshot: {
@@ -612,8 +616,10 @@ class ExchangeService {
           idempotency_key
         })
 
-        // 2026-01-05 治理决策：事务由入口层管理，并发冲突抛出错误
-        // 不再尝试 rollback 后查询，因为事务控制权在入口层
+        /*
+         * 2026-01-05 治理决策：事务由入口层管理，并发冲突抛出错误
+         * 不再尝试 rollback 后查询，因为事务控制权在入口层
+         */
         const conflictError = new Error(
           `并发冲突：idempotency_key="${idempotency_key}" 已被其他请求使用。请重试。`
         )
@@ -673,7 +679,7 @@ class ExchangeService {
    * @param {number} [options.page_size=20] - 每页数量
    * @returns {Promise<Object>} 订单列表和分页信息
    */
-  static async getUserOrders (user_id, options = {}) {
+  static async getUserOrders(user_id, options = {}) {
     const { status = null, page = 1, page_size = 20 } = options
 
     try {
@@ -724,7 +730,7 @@ class ExchangeService {
    * @param {string} order_no - 订单号
    * @returns {Promise<Object>} 订单详情
    */
-  static async getOrderDetail (user_id, order_no) {
+  static async getOrderDetail(user_id, order_no) {
     try {
       const order = await ExchangeRecord.findOne({
         where: { user_id, order_no },
@@ -757,7 +763,7 @@ class ExchangeService {
    * @param {Transaction} options.transaction - 外部事务对象（可选）
    * @returns {Promise<Object>} 更新结果
    */
-  static async updateOrderStatus (order_no, new_status, operator_id, remark = '', options = {}) {
+  static async updateOrderStatus(order_no, new_status, operator_id, remark = '', options = {}) {
     // 强制要求事务边界 - 2026-01-05 治理决策
     const transaction = assertAndGetTransaction(options, 'ExchangeService.updateOrderStatus')
 
@@ -812,7 +818,7 @@ class ExchangeService {
    * @returns {string} 订单号
    * @private
    */
-  static _generateOrderNo () {
+  static _generateOrderNo() {
     const timestamp = Date.now()
     const random = Math.random().toString(36).substr(2, 6).toUpperCase()
     return `EM${timestamp}${random}`
@@ -823,7 +829,7 @@ class ExchangeService {
    *
    * @returns {Promise<Object>} 统计数据
    */
-  static async getMarketStatistics () {
+  static async getMarketStatistics() {
     try {
       logger.info('[兑换市场] 查询统计数据')
 
@@ -893,7 +899,7 @@ class ExchangeService {
    * @param {number} created_by - 创建者ID
    * @returns {Promise<Object>} 创建结果
    */
-  static async createExchangeItem (itemData, created_by) {
+  static async createExchangeItem(itemData, created_by) {
     try {
       logger.info('[兑换市场] 管理员创建商品', {
         item_name: itemData.item_name,
@@ -951,6 +957,14 @@ class ExchangeService {
 
       logger.info(`[兑换市场] 商品创建成功，item_id: ${item.item_id}`)
 
+      // 决策4+22：商品创建后失效列表缓存
+      try {
+        const { BusinessCacheHelper } = require('../utils/BusinessCacheHelper')
+        await BusinessCacheHelper.invalidateExchangeItems('item_created')
+      } catch (cacheError) {
+        logger.warn('[兑换市场] 缓存失效失败（非致命）:', cacheError.message)
+      }
+
       return {
         success: true,
         item: item.toJSON(),
@@ -969,7 +983,7 @@ class ExchangeService {
    * @param {Object} updateData - 更新数据
    * @returns {Promise<Object>} 更新结果
    */
-  static async updateExchangeItem (item_id, updateData) {
+  static async updateExchangeItem(item_id, updateData) {
     try {
       logger.info('[兑换市场] 管理员更新商品', { item_id })
 
@@ -1045,6 +1059,14 @@ class ExchangeService {
 
       logger.info(`[兑换市场] 商品更新成功，item_id: ${item_id}`)
 
+      // 决策4+22：商品更新后失效列表缓存
+      try {
+        const { BusinessCacheHelper } = require('../utils/BusinessCacheHelper')
+        await BusinessCacheHelper.invalidateExchangeItems('item_updated')
+      } catch (cacheError) {
+        logger.warn('[兑换市场] 缓存失效失败（非致命）:', cacheError.message)
+      }
+
       return {
         success: true,
         item: item.toJSON(),
@@ -1064,7 +1086,7 @@ class ExchangeService {
    * @param {Transaction} options.transaction - 外部事务对象（可选）
    * @returns {Promise<Object>} 删除结果
    */
-  static async deleteExchangeItem (item_id, options = {}) {
+  static async deleteExchangeItem(item_id, options = {}) {
     // 强制要求事务边界 - 2026-01-05 治理决策
     const transaction = assertAndGetTransaction(options, 'ExchangeService.deleteExchangeItem')
 
@@ -1094,6 +1116,14 @@ class ExchangeService {
 
       logger.info(`[兑换市场] 商品有${orderCount}个关联订单，已下架而非删除`)
 
+      // 决策4+22：商品下架后失效列表缓存
+      try {
+        const { BusinessCacheHelper } = require('../utils/BusinessCacheHelper')
+        await BusinessCacheHelper.invalidateExchangeItems('item_deactivated')
+      } catch (cacheError) {
+        logger.warn('[兑换市场] 缓存失效失败（非致命）:', cacheError.message)
+      }
+
       return {
         success: true,
         action: 'deactivated',
@@ -1107,6 +1137,14 @@ class ExchangeService {
     await item.destroy({ transaction })
 
     logger.info(`[兑换市场] 商品删除成功，item_id: ${item_id}`)
+
+    // 决策4+22：商品删除后失效列表缓存
+    try {
+      const { BusinessCacheHelper } = require('../utils/BusinessCacheHelper')
+      await BusinessCacheHelper.invalidateExchangeItems('item_deleted')
+    } catch (cacheError) {
+      logger.warn('[兑换市场] 缓存失效失败（非致命）:', cacheError.message)
+    }
 
     return {
       success: true,
@@ -1150,7 +1188,7 @@ class ExchangeService {
    *   max_listings: 3
    * });
    */
-  static async getUserListingStats (options) {
+  static async getUserListingStats(options) {
     try {
       const { page = 1, limit = 20, filter = 'all', max_listings = 3 } = options
 
@@ -1282,7 +1320,7 @@ class ExchangeService {
    *   console.log(`发现${result.count}个超时订单`);
    * }
    */
-  static async checkTimeoutAndAlert (hours = 24) {
+  static async checkTimeoutAndAlert(hours = 24) {
     try {
       // 计算超时时间点（北京时间）
       const timeoutThreshold = new Date(Date.now() - hours * 60 * 60 * 1000)

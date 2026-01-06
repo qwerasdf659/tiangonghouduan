@@ -60,6 +60,7 @@ const { LotteryPrize, LotteryCampaign } = require('../models')
 const DecimalConverter = require('../utils/formatters/DecimalConverter')
 const AuditLogService = require('./AuditLogService') // 审计日志服务
 const { assertAndGetTransaction } = require('../utils/transactionHelpers')
+const { BusinessCacheHelper } = require('../utils/BusinessCacheHelper') // 缓存失效服务
 
 const logger = require('../utils/logger').logger
 
@@ -86,7 +87,7 @@ class PrizePoolService {
    * @returns {number} return.added_prizes - 添加的奖品数量
    * @returns {Array<Object>} return.prizes - 添加的奖品列表
    */
-  static async batchAddPrizes (campaign_id, prizes, options = {}) {
+  static async batchAddPrizes(campaign_id, prizes, options = {}) {
     // 强制要求事务边界 - 2026-01-05 治理决策
     const transaction = assertAndGetTransaction(options, 'PrizePoolService.batchAddPrizes')
     const { created_by } = options
@@ -126,8 +127,7 @@ class PrizePoolService {
     const createdPrizes = []
     for (const prizeData of prizes) {
       // sort_order唯一性保证：如果前端没提供，自动分配递增的唯一值
-      const sortOrder =
-        prizeData.sort_order !== undefined ? prizeData.sort_order : nextSortOrder++
+      const sortOrder = prizeData.sort_order !== undefined ? prizeData.sort_order : nextSortOrder++
 
       // eslint-disable-next-line no-await-in-loop -- 需要在事务中顺序创建奖品，确保原子性和sort_order验证
       const prize = await LotteryPrize.create(
@@ -199,6 +199,21 @@ class PrizePoolService {
     // 6. 转换DECIMAL字段为数字类型（修复前端TypeError）
     const convertedPrizes = DecimalConverter.convertPrizeData(createdPrizes.map(p => p.toJSON()))
 
+    // 7. 缓存失效：奖品池变更后立即失效活动配置缓存
+    try {
+      await BusinessCacheHelper.invalidateLotteryCampaign(
+        parseInt(campaign_id),
+        'prizes_batch_added'
+      )
+      logger.info('[缓存] 活动配置缓存已失效（奖品批量添加）', { campaign_id })
+    } catch (cacheError) {
+      // 缓存失效失败不阻塞主流程，依赖 TTL 过期
+      logger.warn('[缓存] 活动配置缓存失效失败（非致命）', {
+        error: cacheError.message,
+        campaign_id
+      })
+    }
+
     return {
       campaign_id: parseInt(campaign_id),
       added_prizes: createdPrizes.length,
@@ -215,7 +230,7 @@ class PrizePoolService {
    * @returns {Object} return.statistics - 统计信息
    * @returns {Array<Object>} return.prizes - 奖品列表
    */
-  static async getPrizesByCampaign (campaign_code) {
+  static async getPrizesByCampaign(campaign_code) {
     try {
       logger.info('获取活动奖品池', { campaign_code })
 
@@ -334,7 +349,7 @@ class PrizePoolService {
    * @param {string} filters.status - 状态（可选）
    * @returns {Promise<Object>} 奖品列表和统计信息
    */
-  static async getAllPrizes (filters = {}) {
+  static async getAllPrizes(filters = {}) {
     try {
       const { campaign_id, status } = filters
 
@@ -456,7 +471,7 @@ class PrizePoolService {
    * @param {number} options.updated_by - 更新者ID（可选）
    * @returns {Promise<Object>} 更新结果
    */
-  static async updatePrize (prize_id, updateData, options = {}) {
+  static async updatePrize(prize_id, updateData, options = {}) {
     // 强制要求事务边界 - 2026-01-05 治理决策
     const transaction = assertAndGetTransaction(options, 'PrizePoolService.updatePrize')
     const { updated_by } = options
@@ -613,6 +628,22 @@ class PrizePoolService {
     // 8. 转换DECIMAL字段为数字类型
     const convertedPrizeData = DecimalConverter.convertPrizeData(updatedPrizeData)
 
+    // 9. 缓存失效：奖品配置变更后立即失效活动配置缓存
+    try {
+      await BusinessCacheHelper.invalidateLotteryCampaign(prize.campaign_id, 'prize_updated')
+      logger.info('[缓存] 活动配置缓存已失效（奖品更新）', {
+        prize_id,
+        campaign_id: prize.campaign_id
+      })
+    } catch (cacheError) {
+      // 缓存失效失败不阻塞主流程，依赖 TTL 过期
+      logger.warn('[缓存] 活动配置缓存失效失败（非致命）', {
+        error: cacheError.message,
+        prize_id,
+        campaign_id: prize.campaign_id
+      })
+    }
+
     return {
       prize_id: updatedPrize.prize_id,
       updated_fields: Object.keys(filteredUpdateData),
@@ -634,7 +665,7 @@ class PrizePoolService {
    * @param {number} options.operated_by - 操作者ID（可选）
    * @returns {Promise<Object>} 补充结果
    */
-  static async addStock (prize_id, quantity, options = {}) {
+  static async addStock(prize_id, quantity, options = {}) {
     // 强制要求事务边界 - 2026-01-05 治理决策
     const transaction = assertAndGetTransaction(options, 'PrizePoolService.addStock')
     const { operated_by } = options
@@ -691,6 +722,22 @@ class PrizePoolService {
       operated_by
     })
 
+    // 6. 缓存失效：库存变更后立即失效活动配置缓存
+    try {
+      await BusinessCacheHelper.invalidateLotteryCampaign(prize.campaign_id, 'prize_stock_added')
+      logger.info('[缓存] 活动配置缓存已失效（库存补充）', {
+        prize_id,
+        campaign_id: prize.campaign_id
+      })
+    } catch (cacheError) {
+      // 缓存失效失败不阻塞主流程，依赖 TTL 过期
+      logger.warn('[缓存] 活动配置缓存失效失败（非致命）', {
+        error: cacheError.message,
+        prize_id,
+        campaign_id: prize.campaign_id
+      })
+    }
+
     return {
       prize_id,
       old_quantity: oldQuantity,
@@ -713,7 +760,7 @@ class PrizePoolService {
    * @param {number} options.deleted_by - 删除者ID（可选）
    * @returns {Promise<Object>} 删除结果
    */
-  static async deletePrize (prize_id, options = {}) {
+  static async deletePrize(prize_id, options = {}) {
     // 强制要求事务边界 - 2026-01-05 治理决策
     const transaction = assertAndGetTransaction(options, 'PrizePoolService.deletePrize')
     const { deleted_by } = options
@@ -754,7 +801,10 @@ class PrizePoolService {
       transaction // 事务对象
     })
 
-    // 4. 删除奖品
+    // 4. 保存关联的活动ID（删除前，用于缓存失效）
+    const campaignIdForCache = prize.campaign_id
+
+    // 5. 删除奖品
     await prize.destroy({ transaction })
 
     logger.info('奖品删除成功', {
@@ -762,6 +812,22 @@ class PrizePoolService {
       prize_name: prize.prize_name,
       deleted_by
     })
+
+    // 6. 缓存失效：奖品删除后立即失效活动配置缓存
+    try {
+      await BusinessCacheHelper.invalidateLotteryCampaign(campaignIdForCache, 'prize_deleted')
+      logger.info('[缓存] 活动配置缓存已失效（奖品删除）', {
+        prize_id,
+        campaign_id: campaignIdForCache
+      })
+    } catch (cacheError) {
+      // 缓存失效失败不阻塞主流程，依赖 TTL 过期
+      logger.warn('[缓存] 活动配置缓存失效失败（非致命）', {
+        error: cacheError.message,
+        prize_id,
+        campaign_id: campaignIdForCache
+      })
+    }
 
     return {
       prize_id
@@ -777,7 +843,7 @@ class PrizePoolService {
    * @returns {Promise<Object>} 奖品信息
    * @throws {Error} 奖品不存在
    */
-  static async getPrizeById (prize_id, options = {}) {
+  static async getPrizeById(prize_id, options = {}) {
     const { transaction } = options
 
     try {

@@ -138,25 +138,33 @@ router.post(
        * 使用 TransactionManager 统一事务边界（符合治理决策）
        * 传递 idempotency_key 给服务层（业界标准形态命名）
        */
-      const { orderResult, completeResult } = await TransactionManager.execute(async (transaction) => {
-        const orderResult = await TradeOrderService.createOrder({
-          buyer_id,
-          seller_id: listing.seller_user_id,
-          listing_id,
-          item_instance_id: listing.offer_item_instance_id,
-          price_amount: listing.price_amount,
-          price_asset_code: listing.price_asset_code || 'DIAMOND',
-          idempotency_key // 业界标准形态：统一使用 idempotency_key
-        }, { transaction })
+      const { orderResult, completeResult } = await TransactionManager.execute(
+        async transaction => {
+          const orderResult = await TradeOrderService.createOrder(
+            {
+              buyer_id,
+              seller_id: listing.seller_user_id,
+              listing_id,
+              item_instance_id: listing.offer_item_instance_id,
+              price_amount: listing.price_amount,
+              price_asset_code: listing.price_asset_code || 'DIAMOND',
+              idempotency_key // 业界标准形态：统一使用 idempotency_key
+            },
+            { transaction }
+          )
 
-        // 完成订单
-        const completeResult = await TradeOrderService.completeOrder({
-          order_id: orderResult.order_id,
-          buyer_id
-        }, { transaction })
+          // 完成订单
+          const completeResult = await TradeOrderService.completeOrder(
+            {
+              order_id: orderResult.order_id,
+              buyer_id
+            },
+            { transaction }
+          )
 
-        return { orderResult, completeResult }
-      })
+          return { orderResult, completeResult }
+        }
+      )
 
       // 构建响应数据
       const responseData = {
@@ -179,6 +187,8 @@ router.post(
         orderResult.order_id, // 业务事件ID = 订单ID
         responseData
       )
+
+      // 缓存失效已在 TradeOrderService.completeOrder 中处理（决策5B：Service层统一收口）
 
       logger.info('市场商品购买成功', {
         listing_id,

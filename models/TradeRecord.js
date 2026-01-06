@@ -103,9 +103,9 @@ module.exports = sequelize => {
       // 幂等键（业界标准形态 - 2026-01-02）
       idempotency_key: {
         type: DataTypes.STRING(100),
-        allowNull: true,
+        allowNull: false,
         comment:
-          '幂等键（业界标准命名）：客户端必传，格式如 mp_20251215_xxx；业务规则：同一 idempotency_key 只能创建一条记录，重复请求返回原结果'
+          '幂等键（业界标准命名 - 必填）：客户端必传，格式如 mp_20251215_xxx；业务规则：同一 idempotency_key 只能创建一条记录，重复请求返回原结果'
       },
 
       // 交易状态

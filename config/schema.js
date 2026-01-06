@@ -177,6 +177,21 @@ const CONFIG_SCHEMA = {
     }
   },
 
+  // ===== PII 保护配置（决策25：全环境强制） =====
+  PII_HASH_SECRET: {
+    type: 'string',
+    required: true, // 决策25：全环境强制配置，不允许缺失
+    minLength: 32, // 决策6.1：至少 32 字符
+    envDiff: true,
+    description:
+      'PII 数据 Hash 密钥（决策6B/24/25：用于手机号等敏感数据脱敏，必须独立于 JWT_SECRET）',
+    production: {
+      minLength: 64, // 生产环境更严格
+      forbiddenValues: ['CHANGE_ME_*', 'your_*', 'test_*', 'dev_*'], // 占位符黑名单
+      mustDifferFrom: ['JWT_SECRET', 'JWT_REFRESH_SECRET', 'ENCRYPTION_KEY'] // 必须独立
+    }
+  },
+
   // ===== Sealos 对象存储配置 =====
   SEALOS_ENDPOINT: {
     type: 'string',
@@ -379,7 +394,7 @@ const CONFIG_CATEGORIES = {
   数据库配置: ['DB_HOST', 'DB_PORT', 'DB_NAME', 'DB_USER', 'DB_PASSWORD'],
   缓存配置: ['REDIS_URL'],
   JWT配置: ['JWT_SECRET', 'JWT_REFRESH_SECRET', 'JWT_EXPIRES_IN', 'JWT_REFRESH_EXPIRES_IN'],
-  加密配置: ['ENCRYPTION_KEY'],
+  加密配置: ['ENCRYPTION_KEY', 'PII_HASH_SECRET'],
   对象存储: [
     'SEALOS_ENDPOINT',
     'SEALOS_INTERNAL_ENDPOINT',
@@ -408,7 +423,7 @@ const CONFIG_CATEGORIES = {
  * @param {string} _targetEnv - 目标环境（development/staging/production）
  * @returns {string[]} 必需的环境变量列表
  */
-function getRequiredKeys (_targetEnv = 'development') {
+function getRequiredKeys(_targetEnv = 'development') {
   return Object.entries(CONFIG_SCHEMA)
     .filter(([, schema]) => schema.required)
     .map(([key]) => key)
@@ -419,7 +434,7 @@ function getRequiredKeys (_targetEnv = 'development') {
  *
  * @returns {string[]} 可选的环境变量列表
  */
-function getOptionalKeys () {
+function getOptionalKeys() {
   return Object.entries(CONFIG_SCHEMA)
     .filter(([, schema]) => !schema.required)
     .map(([key]) => key)

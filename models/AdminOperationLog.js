@@ -163,8 +163,8 @@ module.exports = sequelize => {
       // 幂等键（业界标准形态 - 2026-01-02）
       idempotency_key: {
         type: DataTypes.STRING(100),
-        allowNull: true,
-        comment: '幂等键（业界标准命名），用于关联业务操作（如兑换单号、交易单号等）'
+        allowNull: false,
+        comment: '幂等键（业界标准命名 - 必填），用于关联业务操作（如兑换单号、交易单号等）'
       },
 
       // 时间字段
@@ -177,7 +177,7 @@ module.exports = sequelize => {
          * 获取北京时间格式的操作时间
          * @returns {string} 北京时间格式的日期字符串（YYYY年MM月DD日 HH:mm:ss）
          */
-        get () {
+        get() {
           return BeijingTimeHelper.formatChinese(this.getDataValue('created_at'))
         }
       }

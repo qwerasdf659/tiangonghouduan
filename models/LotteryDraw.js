@@ -25,7 +25,7 @@ class LotteryDraw extends Model {
    * @param {Object} models - 所有模型的引用
    * @returns {void}
    */
-  static associate (models) {
+  static associate(models) {
     // 关联到用户
     LotteryDraw.belongsTo(models.User, {
       foreignKey: 'user_id',
@@ -52,7 +52,7 @@ class LotteryDraw extends Model {
    * 获取奖励档位显示文本
    * @returns {string} 奖励档位文本（如"低档奖励"、"中档奖励"、"高档奖励"）
    */
-  getRewardTierName () {
+  getRewardTierName() {
     return LotteryDrawFormatter.getRewardTierText(this.reward_tier)
   }
 
@@ -60,7 +60,7 @@ class LotteryDraw extends Model {
    * 获取奖品发放状态名称
    * @returns {string} 奖品发放状态文本（如"待发放"、"已发放"）
    */
-  getPrizeStatusName () {
+  getPrizeStatusName() {
     return LotteryDrawFormatter.getPrizeStatusText(this.prize_status)
   }
 
@@ -68,7 +68,7 @@ class LotteryDraw extends Model {
    * 检查奖品是否已发放
    * @returns {boolean} 奖品是否已发放
    */
-  isPrizeDelivered () {
+  isPrizeDelivered() {
     return LotteryDrawFormatter.isPrizeDelivered(this.prize_status)
   }
 
@@ -76,7 +76,7 @@ class LotteryDraw extends Model {
    * 检查奖品是否可领取
    * @returns {boolean} 奖品是否可领取
    */
-  isPrizeClaimable () {
+  isPrizeClaimable() {
     // V4.0：每次都获得奖品，根据档位判断是否需要领取流程
     return this.reward_tier === 'high' && !LotteryDrawFormatter.isPrizeDelivered(this.prize_status)
   }
@@ -85,7 +85,7 @@ class LotteryDraw extends Model {
    * 输出摘要格式（使用Formatter）
    * @returns {Object} 抽奖记录摘要对象
    */
-  toSummary () {
+  toSummary() {
     return LotteryDrawFormatter.formatToSummary(this)
   }
 
@@ -94,7 +94,7 @@ class LotteryDraw extends Model {
    * 业务场景：API响应数据格式化
    * @returns {Object} JSON格式的抽奖记录
    */
-  toJSON () {
+  toJSON() {
     return LotteryDrawFormatter.formatToJSON(this)
   }
 
@@ -111,7 +111,7 @@ class LotteryDraw extends Model {
    * @param {string} data.reward_tier - 奖励档位
    * @returns {Array<string>} 错误信息数组（为空表示验证通过）
    */
-  static validateBasicData (data) {
+  static validateBasicData(data) {
     const errors = []
 
     if (!data.user_id || data.user_id <= 0) {
@@ -176,9 +176,9 @@ module.exports = sequelize => {
        */
       business_id: {
         type: DataTypes.STRING(150),
-        allowNull: true, // 暂时允许 NULL（历史数据需要回填）
+        allowNull: false, // 业务唯一键必填（历史数据已回填完成 - 2026-01-05）
         unique: true,
-        comment: '业务唯一键（格式：lottery_draw_{user_id}_{session_id}_{draw_index}）'
+        comment: '业务唯一键（格式：lottery_draw_{user_id}_{session_id}_{draw_index}）- 必填'
       },
       /**
        * 抽奖会话ID（lottery_session_id）
@@ -446,6 +446,12 @@ module.exports = sequelize => {
           fields: ['idempotency_key'],
           unique: true,
           comment: '幂等键唯一索引（业界标准形态）'
+        },
+        {
+          name: 'uk_lottery_draws_business_id',
+          fields: ['business_id'],
+          unique: true,
+          comment: '业务唯一键索引（用于业务级幂等保护）'
         },
         {
           name: 'idx_prize_id',

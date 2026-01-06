@@ -69,8 +69,11 @@ router.post('/login', async (req, res) => {
   // 通过ServiceManager获取UserService
   const UserService = req.app.locals.services.getService('user')
 
-  // 查找用户或自动注册
-  let user = await UserService.findByMobile(mobile)
+  /*
+   * 查找用户或自动注册
+   * 决策21：登录场景禁用缓存，强制查库获取最新用户状态
+   */
+  let user = await UserService.findByMobile(mobile, { useCache: false })
   let isNewUser = false
 
   if (!user) {
@@ -78,7 +81,7 @@ router.post('/login', async (req, res) => {
     logger.info(`用户 ${mobile} 不存在，开始自动注册...`)
 
     try {
-      user = await TransactionManager.execute(async (transaction) => {
+      user = await TransactionManager.execute(async transaction => {
         return await UserService.registerUser(mobile, { transaction })
       })
       isNewUser = true
@@ -88,8 +91,11 @@ router.post('/login', async (req, res) => {
 
       // 处理业务错误
       if (error.code === 'MOBILE_EXISTS') {
-        // 并发情况下可能出现：检查时不存在，注册时已存在
-        user = await UserService.findByMobile(mobile)
+        /*
+         * 并发情况下可能出现：检查时不存在，注册时已存在
+         * 决策21：登录场景禁用缓存
+         */
+        user = await UserService.findByMobile(mobile, { useCache: false })
         if (!user) {
           return res.apiError('用户注册失败', 'REGISTRATION_FAILED', { error: error.message }, 500)
         }
@@ -262,8 +268,11 @@ router.post('/quick-login', async (req, res) => {
   // 通过ServiceManager获取UserService
   const UserService = req.app.locals.services.getService('user')
 
-  // 查找用户
-  let user = await UserService.findByMobile(mobile)
+  /*
+   * 查找用户
+   * 决策21：登录场景禁用缓存，强制查库获取最新用户状态
+   */
+  let user = await UserService.findByMobile(mobile, { useCache: false })
 
   // 如果用户不存在，自动创建用户账户
   if (!user) {
@@ -271,7 +280,7 @@ router.post('/quick-login', async (req, res) => {
 
     try {
       // 使用 TransactionManager 统一事务边界（符合治理决策）
-      user = await TransactionManager.execute(async (transaction) => {
+      user = await TransactionManager.execute(async transaction => {
         return await UserService.registerUser(mobile, { transaction })
       })
       logger.info(`✅ 用户 ${mobile} 注册流程完成（用户+积分账户+角色）`)
@@ -279,7 +288,8 @@ router.post('/quick-login', async (req, res) => {
       logger.error(`❌ 用户 ${mobile} 注册失败:`, error)
 
       if (error.code === 'MOBILE_EXISTS') {
-        user = await UserService.findByMobile(mobile)
+        // 决策21：登录场景禁用缓存
+        user = await UserService.findByMobile(mobile, { useCache: false })
         if (!user) {
           return res.apiError('用户注册失败', 'REGISTRATION_FAILED', { error: error.message }, 500)
         }

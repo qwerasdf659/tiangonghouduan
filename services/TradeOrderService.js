@@ -30,6 +30,7 @@ const { sequelize, TradeOrder, MarketListing, ItemInstance } = require('../model
 const AssetService = require('./AssetService')
 const logger = require('../utils/logger')
 const { assertAndGetTransaction } = require('../utils/transactionHelpers')
+const { BusinessCacheHelper } = require('../utils/BusinessCacheHelper')
 
 /**
  * 交易订单服务类
@@ -61,7 +62,7 @@ class TradeOrderService {
    * @returns {Promise<Object>} 订单创建结果 {order_id, is_duplicate}
    * @throws {Error} 参数验证失败、挂牌不存在、挂牌状态异常、余额不足等
    */
-  static async createOrder (params, options = {}) {
+  static async createOrder(params, options = {}) {
     const { idempotency_key, listing_id, buyer_id } = params
 
     // 1. 参数验证
@@ -216,11 +217,7 @@ class TradeOrderService {
       if (!listing.seller_offer_frozen) {
         throw new Error('卖家标的资产未冻结，挂牌状态异常（seller_offer_frozen=false）')
       }
-      if (
-        !listing.offer_asset_code ||
-        !listing.offer_amount ||
-        Number(listing.offer_amount) <= 0
-      ) {
+      if (!listing.offer_asset_code || !listing.offer_amount || Number(listing.offer_amount) <= 0) {
         throw new Error('可叠加资产挂牌标的信息缺失（offer_asset_code/offer_amount）')
       }
     }
@@ -317,9 +314,15 @@ class TradeOrderService {
      * 这样即使后续异常，定时任务也能通过 locked_by_order_id 找到订单并走 cancelOrder 解冻。
      */
 
-    // 3.4 创建订单记录（created）
+    /*
+     * 3.4 创建订单记录（created）
+     * 生成业务唯一键（格式：trade_order_{buyer_id}_{listing_id}_{timestamp}）
+     */
+    const business_id = `trade_order_${buyer_id}_${listing_id}_${Date.now()}`
+
     const order = await TradeOrder.create(
       {
+        business_id, // ✅ 业务唯一键（事务边界治理 - 2026-01-05）
         idempotency_key,
         listing_id,
         buyer_user_id: buyer_id,
@@ -404,7 +407,7 @@ class TradeOrderService {
    * @returns {Promise<Object>} 完成结果 {order, fee_amount, net_amount}
    * @throws {Error} 订单不存在、状态异常等
    */
-  static async completeOrder (params, options = {}) {
+  static async completeOrder(params, options = {}) {
     const { order_id, buyer_id: _buyer_id } = params
 
     // 参数验证
@@ -632,6 +635,13 @@ class TradeOrderService {
       { transaction }
     )
 
+    // 决策5B：成交后失效市场列表缓存（Service层）
+    try {
+      await BusinessCacheHelper.invalidateMarketListings('listing_sold')
+    } catch (cacheError) {
+      logger.warn('[交易市场] 缓存失效失败（非致命）:', cacheError.message)
+    }
+
     logger.info(`[TradeOrderService] 订单完成: ${order_id}`, {
       idempotency_key,
       buyer_user_id: order.buyer_user_id,
@@ -665,7 +675,7 @@ class TradeOrderService {
    * @returns {Promise<Object>} 取消结果 {order, unfreeze}
    * @throws {Error} 订单不存在、状态异常等
    */
-  static async cancelOrder (params, options = {}) {
+  static async cancelOrder(params, options = {}) {
     const { order_id, cancel_reason } = params
 
     // 参数验证
@@ -728,6 +738,13 @@ class TradeOrderService {
       { transaction }
     )
 
+    // 决策5B：取消订单后失效市场列表缓存（Service层）
+    try {
+      await BusinessCacheHelper.invalidateMarketListings('listing_relisted')
+    } catch (cacheError) {
+      logger.warn('[交易市场] 缓存失效失败（非致命）:', cacheError.message)
+    }
+
     // 4. 更新订单状态
     await order.update(
       {
@@ -758,7 +775,7 @@ class TradeOrderService {
    * @param {number} order_id - 订单ID
    * @returns {Promise<Object>} 订单详情
    */
-  static async getOrderDetail (order_id) {
+  static async getOrderDetail(order_id) {
     const order = await TradeOrder.findOne({
       where: { order_id },
       include: [
@@ -793,7 +810,7 @@ class TradeOrderService {
    * @param {number} [params.page_size=20] - 每页数量
    * @returns {Promise<Object>} 订单列表 {orders, total, page, page_size}
    */
-  static async getUserOrders (params) {
+  static async getUserOrders(params) {
     const { user_id, role, status, page = 1, page_size = 20 } = params
 
     const where = {}

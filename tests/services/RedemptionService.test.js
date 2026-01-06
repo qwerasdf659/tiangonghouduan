@@ -21,6 +21,7 @@ const {
 } = require('../../models')
 const RedemptionService = require('../../services/RedemptionService')
 const RedemptionCodeGenerator = require('../../utils/RedemptionCodeGenerator')
+const TransactionManager = require('../../utils/TransactionManager')
 
 // 测试数据库配置
 jest.setTimeout(30000)
@@ -94,8 +95,12 @@ describe('RedemptionService - 兑换订单服务', () => {
 
   describe('createOrder - 创建兑换订单', () => {
     it('应该成功创建兑换订单并返回12位Base32核销码', async () => {
-      // 执行创建
-      const result = await RedemptionService.createOrder(test_item_instance.item_instance_id)
+      // 执行创建（使用事务包裹）
+      const result = await TransactionManager.execute(async transaction => {
+        return await RedemptionService.createOrder(test_item_instance.item_instance_id, {
+          transaction
+        })
+      })
 
       // 验证返回结果
       expect(result).toHaveProperty('order')
@@ -128,7 +133,11 @@ describe('RedemptionService - 兑换订单服务', () => {
 
       // 尝试创建订单（应该失败）
       await expect(
-        RedemptionService.createOrder(test_item_instance.item_instance_id)
+        TransactionManager.execute(async transaction => {
+          return await RedemptionService.createOrder(test_item_instance.item_instance_id, {
+            transaction
+          })
+        })
       ).rejects.toThrow('物品实例不可用')
     })
 
@@ -136,7 +145,11 @@ describe('RedemptionService - 兑换订单服务', () => {
       const non_existent_id = 999999999
 
       // 尝试创建订单（应该失败）
-      await expect(RedemptionService.createOrder(non_existent_id)).rejects.toThrow('物品实例不存在')
+      await expect(
+        TransactionManager.execute(async transaction => {
+          return await RedemptionService.createOrder(non_existent_id, { transaction })
+        })
+      ).rejects.toThrow('物品实例不存在')
     })
   })
 
@@ -147,15 +160,21 @@ describe('RedemptionService - 兑换订单服务', () => {
     let test_code
 
     beforeEach(async () => {
-      // 创建测试兑换订单
-      const result = await RedemptionService.createOrder(test_item_instance.item_instance_id)
+      // 创建测试兑换订单（使用事务包裹）
+      const result = await TransactionManager.execute(async transaction => {
+        return await RedemptionService.createOrder(test_item_instance.item_instance_id, {
+          transaction
+        })
+      })
       test_order = result.order
       test_code = result.code
     })
 
     it('应该成功核销有效的兑换订单', async () => {
-      // 执行核销
-      const fulfilled_order = await RedemptionService.fulfillOrder(test_code, test_user.user_id)
+      // 执行核销（使用事务包裹）
+      const fulfilled_order = await TransactionManager.execute(async transaction => {
+        return await RedemptionService.fulfillOrder(test_code, test_user.user_id, { transaction })
+      })
 
       // 验证订单状态
       expect(fulfilled_order.status).toBe('fulfilled')
@@ -168,22 +187,30 @@ describe('RedemptionService - 兑换订单服务', () => {
     })
 
     it('应该拒绝重复核销同一个订单', async () => {
-      // 第一次核销（成功）
-      await RedemptionService.fulfillOrder(test_code, test_user.user_id)
+      // 第一次核销（成功，使用事务包裹）
+      await TransactionManager.execute(async transaction => {
+        return await RedemptionService.fulfillOrder(test_code, test_user.user_id, { transaction })
+      })
 
       // 第二次核销（应该失败）
-      await expect(RedemptionService.fulfillOrder(test_code, test_user.user_id)).rejects.toThrow(
-        '核销码已被使用'
-      )
+      await expect(
+        TransactionManager.execute(async transaction => {
+          return await RedemptionService.fulfillOrder(test_code, test_user.user_id, { transaction })
+        })
+      ).rejects.toThrow('核销码已被使用')
     })
 
     it('应该拒绝核销格式错误的核销码', async () => {
       const invalid_code = 'INVALID-CODE'
 
       // 尝试核销（应该失败）
-      await expect(RedemptionService.fulfillOrder(invalid_code, test_user.user_id)).rejects.toThrow(
-        '核销码格式错误'
-      )
+      await expect(
+        TransactionManager.execute(async transaction => {
+          return await RedemptionService.fulfillOrder(invalid_code, test_user.user_id, {
+            transaction
+          })
+        })
+      ).rejects.toThrow('核销码格式错误')
     })
 
     it('应该拒绝核销不存在的核销码', async () => {
@@ -191,7 +218,11 @@ describe('RedemptionService - 兑换订单服务', () => {
 
       // 尝试核销（应该失败）
       await expect(
-        RedemptionService.fulfillOrder(non_existent_code, test_user.user_id)
+        TransactionManager.execute(async transaction => {
+          return await RedemptionService.fulfillOrder(non_existent_code, test_user.user_id, {
+            transaction
+          })
+        })
       ).rejects.toThrow(/核销码不存在|订单不存在/)
     })
 
@@ -202,9 +233,11 @@ describe('RedemptionService - 兑换订单服务', () => {
       })
 
       // 尝试核销（应该失败）
-      await expect(RedemptionService.fulfillOrder(test_code, test_user.user_id)).rejects.toThrow(
-        /过期|有效期/
-      )
+      await expect(
+        TransactionManager.execute(async transaction => {
+          return await RedemptionService.fulfillOrder(test_code, test_user.user_id, { transaction })
+        })
+      ).rejects.toThrow(/过期|有效期/)
     })
   })
 
@@ -215,37 +248,49 @@ describe('RedemptionService - 兑换订单服务', () => {
     let test_code
 
     beforeEach(async () => {
-      // 创建测试兑换订单
-      const result = await RedemptionService.createOrder(test_item_instance.item_instance_id)
+      // 创建测试兑换订单（使用事务包裹）
+      const result = await TransactionManager.execute(async transaction => {
+        return await RedemptionService.createOrder(test_item_instance.item_instance_id, {
+          transaction
+        })
+      })
       test_order = result.order
       test_code = result.code
     })
 
     it('应该成功取消待核销的订单', async () => {
-      // 执行取消
-      const cancelled_order = await RedemptionService.cancelOrder(test_order.order_id)
+      // 执行取消（使用事务包裹）
+      const cancelled_order = await TransactionManager.execute(async transaction => {
+        return await RedemptionService.cancelOrder(test_order.order_id, { transaction })
+      })
 
       // 验证订单状态
       expect(cancelled_order.status).toBe('cancelled')
     })
 
     it('应该拒绝取消已核销的订单', async () => {
-      // 先核销订单
-      await RedemptionService.fulfillOrder(test_code, test_user.user_id)
+      // 先核销订单（使用事务包裹）
+      await TransactionManager.execute(async transaction => {
+        return await RedemptionService.fulfillOrder(test_code, test_user.user_id, { transaction })
+      })
 
       // 尝试取消（应该失败）
-      await expect(RedemptionService.cancelOrder(test_order.order_id)).rejects.toThrow(
-        /只能取消pending状态的订单|订单已核销，不能取消/
-      )
+      await expect(
+        TransactionManager.execute(async transaction => {
+          return await RedemptionService.cancelOrder(test_order.order_id, { transaction })
+        })
+      ).rejects.toThrow(/只能取消pending状态的订单|订单已核销，不能取消/)
     })
 
     it('应该拒绝取消不存在的订单', async () => {
       const non_existent_id = 'non-existent-uuid'
 
       // 尝试取消（应该失败）
-      await expect(RedemptionService.cancelOrder(non_existent_id)).rejects.toThrow(
-        /兑换订单不存在|订单不存在/
-      )
+      await expect(
+        TransactionManager.execute(async transaction => {
+          return await RedemptionService.cancelOrder(non_existent_id, { transaction })
+        })
+      ).rejects.toThrow(/兑换订单不存在|订单不存在/)
     })
   })
 
@@ -257,8 +302,12 @@ describe('RedemptionService - 兑换订单服务', () => {
     let valid_order
 
     beforeEach(async () => {
-      // 创建3个订单
-      const result1 = await RedemptionService.createOrder(test_item_instance.item_instance_id)
+      // 创建3个订单（使用事务包裹）
+      const result1 = await TransactionManager.execute(async transaction => {
+        return await RedemptionService.createOrder(test_item_instance.item_instance_id, {
+          transaction
+        })
+      })
       expired_order_1 = result1.order
 
       // 创建第二个物品实例和订单
@@ -268,7 +317,9 @@ describe('RedemptionService - 兑换订单服务', () => {
         status: 'available',
         meta: { name: '测试优惠券2' }
       })
-      const result2 = await RedemptionService.createOrder(test_item_2.item_instance_id)
+      const result2 = await TransactionManager.execute(async transaction => {
+        return await RedemptionService.createOrder(test_item_2.item_instance_id, { transaction })
+      })
       expired_order_2 = result2.order
 
       // 创建第三个物品实例和订单（不过期）
@@ -278,7 +329,9 @@ describe('RedemptionService - 兑换订单服务', () => {
         status: 'available',
         meta: { name: '测试优惠券3' }
       })
-      const result3 = await RedemptionService.createOrder(test_item_3.item_instance_id)
+      const result3 = await TransactionManager.execute(async transaction => {
+        return await RedemptionService.createOrder(test_item_3.item_instance_id, { transaction })
+      })
       valid_order = result3.order
 
       // 手动设置前两个订单为过期
@@ -291,8 +344,10 @@ describe('RedemptionService - 兑换订单服务', () => {
     })
 
     it('应该批量标记所有过期订单', async () => {
-      // 执行过期清理
-      const expired_count = await RedemptionService.expireOrders()
+      // 执行过期清理（使用事务包裹）
+      const expired_count = await TransactionManager.execute(async transaction => {
+        return await RedemptionService.expireOrders({ transaction })
+      })
 
       // 验证清理数量
       expect(expired_count).toBeGreaterThanOrEqual(2)
@@ -317,8 +372,10 @@ describe('RedemptionService - 兑换订单服务', () => {
         fulfilled_at: new Date()
       })
 
-      // 执行过期清理
-      await RedemptionService.expireOrders()
+      // 执行过期清理（使用事务包裹）
+      await TransactionManager.execute(async transaction => {
+        return await RedemptionService.expireOrders({ transaction })
+      })
 
       // 验证已核销订单状态不变
       await expired_order_1.reload()
@@ -333,16 +390,24 @@ describe('RedemptionService - 兑换订单服务', () => {
     let test_code
 
     beforeEach(async () => {
-      // 创建测试兑换订单
-      const result = await RedemptionService.createOrder(test_item_instance.item_instance_id)
+      // 创建测试兑换订单（使用事务包裹）
+      const result = await TransactionManager.execute(async transaction => {
+        return await RedemptionService.createOrder(test_item_instance.item_instance_id, {
+          transaction
+        })
+      })
       _test_order = result.order
       test_code = result.code
     })
 
     it('应该防止并发核销同一个订单', async () => {
-      // 并发发起两个核销请求
-      const promise1 = RedemptionService.fulfillOrder(test_code, test_user.user_id)
-      const promise2 = RedemptionService.fulfillOrder(test_code, test_user.user_id)
+      // 并发发起两个核销请求（使用事务包裹）
+      const promise1 = TransactionManager.execute(async transaction => {
+        return await RedemptionService.fulfillOrder(test_code, test_user.user_id, { transaction })
+      })
+      const promise2 = TransactionManager.execute(async transaction => {
+        return await RedemptionService.fulfillOrder(test_code, test_user.user_id, { transaction })
+      })
 
       // 等待两个请求完成
       const results = await Promise.allSettled([promise1, promise2])
