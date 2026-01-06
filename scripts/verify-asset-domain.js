@@ -459,30 +459,18 @@ async function verifyApiLayer() {
     fail('检查 /assets/item-events 路由失败', err.message)
   }
 
-  // 检查 /api/v4/inventory/* 是否返回 410
-  console.log('\n【检查3】/api/v4/inventory/* 废弃状态')
+  // 检查 /api/v4/inventory 目录是否已彻底删除（不再接受 410 过渡状态）
+  console.log('\n【检查3】/api/v4/inventory 彻底删除验收')
   try {
-    const inventoryIndexPath = path.join(__dirname, '..', 'routes', 'v4', 'inventory', 'index.js')
+    const inventoryDir = path.join(__dirname, '..', 'routes', 'v4', 'inventory')
 
-    if (fs.existsSync(inventoryIndexPath)) {
-      const content = fs.readFileSync(inventoryIndexPath, 'utf-8')
-
-      if (content.includes('410') || content.includes('ENDPOINT_DEPRECATED')) {
-        pass('/api/v4/inventory/* 已返回 410 Gone')
-      } else {
-        fail('/api/v4/inventory/* 未返回 410 Gone（仍有业务逻辑）')
-      }
+    if (!fs.existsSync(inventoryDir)) {
+      pass('/api/v4/inventory 目录已彻底删除（符合暴力重构标准）')
     } else {
-      // 可能是目录被删除了
-      const inventoryDir = path.join(__dirname, '..', 'routes', 'v4', 'inventory')
-      if (!fs.existsSync(inventoryDir)) {
-        pass('/api/v4/inventory 目录已删除')
-      } else {
-        warn('/api/v4/inventory/index.js 不存在')
-      }
+      fail('/api/v4/inventory 目录仍存在，需要彻底删除')
     }
   } catch (err) {
-    fail('检查 /inventory/* 废弃状态失败', err.message)
+    fail('检查 /inventory 彻底删除状态失败', err.message)
   }
 }
 

@@ -15,7 +15,7 @@ echo "🚀 开始暴力重构：对齐技术架构标准"
 echo "========================================"
 echo "⚠️  本脚本将："
 echo "  1. 删除 routes/v4/unified-engine（旧架构）"
-echo "  2. 创建标准8域目录：market/shop/user/lottery/inventory/admin/auth/system"
+echo "  2. 创建标准7域目录：market/shop/user/lottery/admin/auth/system"
 echo "  3. 迁移所有路由到对应域"
 echo "  4. 清理TODO/注释代码/410测试"
 echo "  5. 修改app.js挂载点"
@@ -41,16 +41,15 @@ rm -rf routes/v4/hierarchy  # 合并到admin
 echo "✅ 旧架构已删除"
 
 echo ""
-echo "📁 第3步：创建标准8域目录"
+echo "📁 第3步：创建标准7域目录"
 mkdir -p routes/v4/market
 mkdir -p routes/v4/shop
 mkdir -p routes/v4/user
 mkdir -p routes/v4/lottery
-mkdir -p routes/v4/inventory
 mkdir -p routes/v4/admin
 mkdir -p routes/v4/auth
 mkdir -p routes/v4/system
-echo "✅ 8个标准域目录已创建"
+echo "✅ 7个标准域目录已创建"
 
 echo ""
 echo "⏳ 第4步：调用Node.js脚本执行路由迁移..."

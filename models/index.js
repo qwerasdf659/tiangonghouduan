@@ -37,14 +37,6 @@ models.AuthenticationSession = require('./AuthenticationSession')(sequelize, Dat
  *    - 业务场景：用户登录后生成Token、Token续期、退出登录时失效Token
  */
 
-// 🔴 积分和账户系统模型 - 已迁移到统一资产体系
-/*
- * ⚠️ UserPointsAccount 和 PointsTransaction 已废弃
- * 新架构使用：
- * - Account + AccountAssetBalance（账户余额）
- * - AssetTransaction（资产流水）
- */
-
 models.UserPremiumStatus = require('./UserPremiumStatus')(sequelize, DataTypes)
 /*
  * ✅ UserPremiumStatus：用户高级空间状态（一对一关系）
@@ -185,7 +177,7 @@ models.ExchangeRecord = require('./ExchangeRecord')(sequelize, DataTypes)
  * ✅ ExchangeRecord：B2C兑换订单记录表
  *    - 用途：记录用户在B2C官方商城的兑换订单
  *    - 特点：材料资产支付、订单管理、发货追踪
- *    - 表名：exchange_records（原exchange_market_records，2025-12-22重命名），主键：record_id
+ *    - 表名：exchange_records，主键：record_id
  *    - 业务场景：用户选择商品 → 扣除材料资产 → 创建订单 → 发货
  *    - API路由：/api/v4/shop/exchange（从 /api/v4/market 迁移）
  */
@@ -223,7 +215,7 @@ models.Account = require('./Account')(sequelize, DataTypes)
  *    - 用途：统一账户体系，区分用户账户（account_type=user）和系统账户（account_type=system）
  *    - 特点：用户账户关联user_id（唯一），系统账户使用system_code（唯一），如SYSTEM_PLATFORM_FEE（平台手续费）
  *    - 表名：accounts，主键：account_id，外键：user_id
- *    - 业务场景：替换PLATFORM_USER_ID方案，手续费入系统账户，支持系统发放/销毁/托管账户
+ *    - 业务场景：系统账户收取手续费，支持系统发放/销毁/托管账户
  *    - 系统账户：SYSTEM_PLATFORM_FEE（手续费）、SYSTEM_MINT（发放）、SYSTEM_BURN（销毁）、SYSTEM_ESCROW（托管）
  */
 
@@ -244,7 +236,7 @@ models.ConsumptionRecord = require('./ConsumptionRecord')(sequelize, DataTypes)
  *    - 特点：消费金额、预计积分、二维码、审核状态、商家备注
  *    - 表名：consumption_records，主键：record_id，外键：user_id、merchant_id
  *    - 业务场景：商家扫码录入消费→积分冻结→平台审核→积分到账
- *    - 关联：PointsTransaction（积分冻结）、ContentReviewRecord（审核流程）
+ *    - 关联：AssetTransaction（资产冻结）、ContentReviewRecord（审核流程）
  */
 
 // 🔴 审核系统：两个完全不同的业务概念（⚠️ 最容易混淆，务必区分！）
@@ -352,7 +344,7 @@ models.TradeOrder = require('./TradeOrder')(sequelize, DataTypes)
 models.RedemptionOrder = require('./RedemptionOrder')(sequelize, DataTypes)
 /*
  * ✅ RedemptionOrder：兑换订单
- *    - 用途：管理核销码生成和核销流程（替代 UserInventory.verification_code）
+ *    - 用途：管理核销码生成和核销流程
  *    - 特点：12位Base32核销码 + SHA-256哈希存储 + 30天TTL
  *    - 表名：redemption_orders，主键：order_id（UUID），唯一约束：code_hash
  *    - 业务场景：生成核销码→核销验证→过期清理

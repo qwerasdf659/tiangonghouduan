@@ -133,15 +133,12 @@ module.exports = sequelize => {
     })
 
     /**
-     * 🔥 用户资产系统关联（新架构）
+     * 用户资产系统关联
      *
-     * 新架构使用：
+     * 架构说明：
      * - Account（账户主体）
      * - AccountAssetBalance（账户资产余额）
      * - AssetTransaction（资产流水）
-     *
-     * ⚠️ UserAssetAccount 已废弃并删除（2025-12-31）
-     * ⚠️ UserPointsAccount 和 PointsTransaction 已废弃
      */
 
     // 🔥 用户的高级空间状态（一对一关系）

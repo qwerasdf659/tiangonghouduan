@@ -16,33 +16,58 @@
 const BeijingTimeHelper = require('../../utils/timeHelper')
 const TestCoordinator = require('../api/TestCoordinator')
 
-// 辅助函数
-async function getUserPoints (tester, user_id) {
+/**
+ * 获取用户积分余额
+ *
+ * @param {TestCoordinator} tester - 测试协调器实例
+ * @param {number} user_id - 用户ID（用于日志，实际通过token获取）
+ * @returns {Promise<number>} 用户可用积分余额
+ *
+ * 数据来源：GET /api/v4/backpack
+ * - 从背包双轨架构的 assets[] 中筛选 asset_code === 'POINTS'
+ * - 返回 available_balance（可用余额）
+ *
+ * 设计说明：
+ * - 决策8已决定不提供 /api/v4/points/* 接口
+ * - 积分统一从背包接口获取，与其他可叠加资产（DIAMOND、材料）同一口径
+ */
+async function getUserPoints(tester, user_id) {
   const response = await tester.make_authenticated_request(
     'GET',
-    `/api/v4/points/balance/${user_id}`,
+    '/api/v4/backpack',
     null,
     'regular'
   )
-  return response.status === 200 ? response.data.data?.available_points || 0 : 0
+
+  if (response.status !== 200) {
+    console.warn(`获取用户${user_id}背包失败: ${response.status}`)
+    return 0
+  }
+
+  // 从 assets 数组中查找 POINTS 资产
+  const assets = response.data.data?.assets || []
+  const pointsAsset = assets.find(asset => asset.asset_code === 'POINTS')
+
+  // 返回可用余额（available_balance），如果没有则返回 0
+  return pointsAsset?.available_balance || pointsAsset?.balance || 0
 }
 
 /**
  * 获取用户背包物品列表
  *
  * @param {TestCoordinator} tester - 测试协调器实例
- * @param {number} user_id - 用户ID
+ * @param {number} user_id - 用户ID（用于验证权限，实际通过token获取）
  * @returns {Promise<Array>} 用户背包中的物品列表（不可叠加物品）
  *
- * API路径：GET /api/v4/inventory/backpack/user/:user_id
+ * API路径：GET /api/v4/backpack（用户端唯一背包入口）
  * 背包双轨架构返回：{ assets: [], items: [] }
  * - assets: 可叠加资产（材料、碎片等）
  * - items: 不可叠加物品（优惠券、实物商品等）
  */
-async function getUserInventory (tester, user_id) {
+async function getUserBackpack(tester, user_id) {
   const response = await tester.make_authenticated_request(
     'GET',
-    `/api/v4/inventory/backpack/user/${user_id}`,
+    '/api/v4/backpack',
     null,
     'regular'
   )
@@ -50,7 +75,7 @@ async function getUserInventory (tester, user_id) {
   return response.status === 200 ? response.data.data?.items || [] : []
 }
 
-async function getAvailableCampaign (tester) {
+async function getAvailableCampaign(tester) {
   // campaigns接口需要认证
   const response = await tester.make_authenticated_request(
     'GET',
@@ -212,7 +237,7 @@ describe('🧮 核心业务逻辑测试', () => {
 
       // 获取抽奖前状态
       const beforePoints = await getUserPoints(tester, test_user_id)
-      const beforeInventory = await getUserInventory(tester, test_user_id)
+      const beforeInventory = await getUserBackpack(tester, test_user_id)
 
       // 获取可用活动
       const campaign = await getAvailableCampaign(tester)
@@ -245,7 +270,7 @@ describe('🧮 核心业务逻辑测试', () => {
 
         // 获取抽奖后状态
         const afterPoints = await getUserPoints(tester, test_user_id)
-        const afterInventory = await getUserInventory(tester, test_user_id)
+        const afterInventory = await getUserBackpack(tester, test_user_id)
 
         // 验证积分正确扣除
         const expectedPointsAfter = beforePoints - (campaign.points_cost || 50)
@@ -408,7 +433,7 @@ describe('🧮 核心业务逻辑测试', () => {
         }
 
         // ✅ 验证用户库存(兑换记录)的is_successful概念
-        const inventoryResponse = await getUserInventory(tester, test_user_id)
+        const inventoryResponse = await getUserBackpack(tester, test_user_id)
         if (inventoryResponse.length > 0) {
           console.log(`📊 检查${inventoryResponse.length}条库存物品的状态语义`)
 

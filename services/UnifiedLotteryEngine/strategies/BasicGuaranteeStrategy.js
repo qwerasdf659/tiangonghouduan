@@ -41,7 +41,7 @@ const AssetService = require('../../AssetService')
  *
  * @param {number} user_id - 用户ID
  * @param {Object} options - 选项 {transaction, lock}
- * @returns {Promise<Object>} 模拟UserPointsAccount结构的对象 {available_points}
+ * @returns {Promise<Object>} 积分余额对象 {available_points}
  */
 async function getUserPointsBalance(user_id, options = {}) {
   const { transaction, lock } = options

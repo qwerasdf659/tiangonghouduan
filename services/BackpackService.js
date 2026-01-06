@@ -4,7 +4,6 @@
  * 职责：
  * - 背包双轨架构查询服务
  * - 统一返回 assets[] (可叠加资产) 和 items[] (不可叠加物品)
- * - 替代 InventoryService.getUserInventory 的单轨查询
  *
  * 双轨设计：
  * 1. assets（可叠加资产）：
@@ -67,7 +66,7 @@ class BackpackService {
    * @param {Object} [options.transaction] - Sequelize事务对象
    * @returns {Promise<Object>} {assets, items}
    */
-  static async getUserBackpack (user_id, options = {}) {
+  static async getUserBackpack(user_id, options = {}) {
     const { viewer_user_id, transaction = null } = options
 
     try {
@@ -124,11 +123,15 @@ class BackpackService {
    * @param {Object} [options.transaction] - Sequelize事务对象
    * @returns {Promise<Array>} 资产列表
    */
-  static async _getAssets (user_id, options = {}) {
+  static async _getAssets(user_id, options = {}) {
     const { transaction = null } = options
 
     try {
-      // 1. 查询所有资产余额（包括冻结余额）
+      /*
+       * 1. 查询所有资产余额（包括冻结余额）
+       * AssetService.getAllBalances 返回 AccountAssetBalance 模型实例数组
+       * 字段：available_amount（可用余额）、frozen_amount（冻结余额）
+       */
       const assetAccounts = await AssetService.getAllBalances(
         { user_id },
         {
@@ -136,8 +139,13 @@ class BackpackService {
         }
       )
 
-      // 2. 过滤余额 > 0 的资产
-      const validAssets = assetAccounts.filter(account => account.balance > 0)
+      /*
+       * 2. 过滤总余额 > 0 的资产
+       * 总余额 = available_amount + frozen_amount
+       */
+      const validAssets = assetAccounts.filter(
+        account => account.available_amount + account.frozen_amount > 0
+      )
 
       // ✅ 修复N+1查询问题：批量查询所有资产类型信息
       if (validAssets.length === 0) {
@@ -162,16 +170,23 @@ class BackpackService {
         assetTypeMap.set(assetType.asset_code, assetType)
       })
 
-      // 3. 格式化资产数据（从 Map 中读取，避免重复查询）
+      /*
+       * 3. 格式化资产数据（从 Map 中读取，避免重复查询）
+       * 字段映射：available_amount → available_balance, frozen_amount → frozen_balance
+       * 注意：BIGINT 类型需要显式转换为数字类型，避免字符串拼接问题
+       */
       const formattedAssets = validAssets.map(account => {
         const assetType = assetTypeMap.get(account.asset_code)
+        const availableAmount = Number(account.available_amount) || 0
+        const frozenAmount = Number(account.frozen_amount) || 0
+        const totalBalance = availableAmount + frozenAmount
 
         return {
           asset_code: account.asset_code,
           display_name: assetType?.display_name || account.asset_code,
-          balance: account.balance,
-          frozen_balance: account.frozen_balance,
-          available_balance: account.available_balance,
+          balance: totalBalance, // 总余额（可用 + 冻结）
+          frozen_balance: frozenAmount, // 冻结余额
+          available_balance: availableAmount, // 可用余额
           category: assetType?.category || 'unknown',
           rarity: assetType?.rarity || 'common'
         }
@@ -201,7 +216,7 @@ class BackpackService {
    * @param {Object} [options.transaction] - Sequelize事务对象
    * @returns {Promise<Array>} 物品列表
    */
-  static async _getItems (user_id, options = {}) {
+  static async _getItems(user_id, options = {}) {
     const { transaction = null } = options
 
     try {
@@ -303,7 +318,7 @@ class BackpackService {
    *
    * @throws {Error} FORBIDDEN - 无权查看此物品
    */
-  static async getItemDetail (item_instance_id, options = {}) {
+  static async getItemDetail(item_instance_id, options = {}) {
     const { viewer_user_id, is_admin = false, transaction = null } = options
 
     try {
@@ -385,7 +400,7 @@ class BackpackService {
    *   total_asset_value: 1000   // 资产总价值（按类型统计）
    * }
    */
-  static async getBackpackStats (user_id, options = {}) {
+  static async getBackpackStats(user_id, options = {}) {
     const { transaction = null } = options
 
     try {
@@ -448,7 +463,7 @@ class BackpackService {
    *   }
    * }
    */
-  static async getTransferHistory (user_id, options = {}) {
+  static async getTransferHistory(user_id, options = {}) {
     const {
       type = 'all',
       item_instance_id,

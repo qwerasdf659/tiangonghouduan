@@ -188,16 +188,16 @@ async function main() {
       logWarn(`健康检查失败: ${error.message}`)
     }
 
-    logInfo('测试旧背包接口（应返回410）...')
+    logInfo('测试旧背包接口（应返回404 - 已彻底删除）...')
     try {
       const oldEndpointTest = execSync(
         'curl -s -o /dev/null -w "%{http_code}" http://localhost:3000/api/v4/inventory/user/1',
         { encoding: 'utf8' }
       )
-      if (oldEndpointTest.trim() === '410') {
-        log('✅ 旧背包接口已正确禁用（返回410 Gone）')
+      if (oldEndpointTest.trim() === '404') {
+        log('✅ 旧背包接口已彻底删除（返回404 Not Found）')
       } else {
-        logWarn(`旧背包接口返回 ${oldEndpointTest}（预期410）`)
+        logWarn(`旧背包接口返回 ${oldEndpointTest}（预期404）`)
       }
     } catch (error) {
       logWarn(`旧接口测试失败: ${error.message}`)
@@ -206,7 +206,7 @@ async function main() {
     logInfo('测试新背包接口（应返回200或401）...')
     try {
       const newEndpointTest = execSync(
-        'curl -s -o /dev/null -w "%{http_code}" http://localhost:3000/api/v4/backpack/user/1',
+        'curl -s -o /dev/null -w "%{http_code}" http://localhost:3000/api/v4/backpack',
         { encoding: 'utf8' }
       )
       if (newEndpointTest.trim() === '200' || newEndpointTest.trim() === '401') {

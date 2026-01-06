@@ -1,23 +1,26 @@
 'use strict'
 
 /**
- * 资产总览接口 - 统一资产域入口
+ * 资产总览接口 - 统一资产域入口（后台/运营使用）
  *
  * 路由路径：GET /api/v4/shop/assets/portfolio
  *
  * 功能说明：
- * - 整合三个资产域，提供统一的资产查询入口
- * - 积分（POINTS） - 来自 user_points_accounts
- * - 可叠加资产（DIAMOND、材料） - 来自 account_asset_balances
- * - 不可叠加物品 - 来自 item_instances
+ * - 整合两类资产域，提供统一的资产查询入口
+ * - 可叠加资产（POINTS、DIAMOND、材料） - 来自 account_asset_balances 表
+ * - 不可叠加物品（优惠券、实物商品） - 来自 item_instances 表
  *
  * 业务场景：
- * - 用户背包页面展示
+ * - 后台/运营"用户资产总览"查询
  * - 资产统计仪表盘
- * - 用户资产概览
+ * - 客服"用户资产查账"
+ *
+ * 边界说明（决策1已拍板）：
+ * - 用户端唯一背包入口：/api/v4/backpack
+ * - 后台/运营资产查询：/api/v4/shop/assets/portfolio（本接口）
  *
  * 创建时间：2025-12-28
- * 基于文档：统一资产域架构设计方案.md
+ * 更新时间：2025-01-07（修正数据来源注释，与暴力重构方案对齐）
  */
 
 const express = require('express')

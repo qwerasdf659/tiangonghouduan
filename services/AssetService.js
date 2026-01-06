@@ -56,12 +56,12 @@ const logger = require('../utils/logger')
  * @throws {Error} 当 transaction 未传入时抛出错误
  * @returns {void}
  */
-function checkTransactionBoundary (transaction, methodName) {
+function checkTransactionBoundary(transaction, methodName) {
   if (!transaction) {
     const error = new Error(
       `[事务边界错误] ${methodName} 必须在事务中调用。\n` +
-      '请使用 TransactionManager.execute() 包裹调用，或显式传入 { transaction } 参数。\n' +
-      '治理决策：跨表写入方法强制要求事务边界，防止部分成功风险。'
+        '请使用 TransactionManager.execute() 包裹调用，或显式传入 { transaction } 参数。\n' +
+        '治理决策：跨表写入方法强制要求事务边界，防止部分成功风险。'
     )
     error.code = 'TRANSACTION_REQUIRED'
     logger.error(`❌ [事务边界错误] ${methodName} 未接收到事务对象`, {
@@ -88,7 +88,7 @@ class AssetService {
    * @param {Object} options.transaction - Sequelize事务对象
    * @returns {Promise<Object>} 账户对象
    */
-  static async getOrCreateAccount (params, options = {}) {
+  static async getOrCreateAccount(params, options = {}) {
     const { user_id, system_code } = params
     const { transaction } = options
 
@@ -165,7 +165,7 @@ class AssetService {
    * @param {string|number} options.campaign_id - 活动ID（BUDGET_POINTS 必填，其他资产可选）
    * @returns {Promise<Object>} 资产余额对象
    */
-  static async getOrCreateBalance (account_id, asset_code, options = {}) {
+  static async getOrCreateBalance(account_id, asset_code, options = {}) {
     const { transaction, campaign_id } = options
 
     // 🔥 BUDGET_POINTS 必须指定 campaign_id
@@ -244,7 +244,7 @@ class AssetService {
    * @param {Object} options.transaction - Sequelize事务对象（强烈建议传入）
    * @returns {Promise<Object>} 结果对象 {account, balance, transaction_record, is_duplicate}
    */
-  static async changeBalance (params, options = {}) {
+  static async changeBalance(params, options = {}) {
     const {
       user_id,
       system_code,
@@ -452,7 +452,7 @@ class AssetService {
    * @param {Object} options.transaction - Sequelize事务对象（可选）
    * @returns {Promise<Object>} 结果对象 {account, balance, transaction_record, is_duplicate}
    */
-  static async freeze (params, options = {}) {
+  static async freeze(params, options = {}) {
     const {
       user_id,
       system_code,
@@ -626,7 +626,7 @@ class AssetService {
    * @param {Object} options.transaction - Sequelize事务对象（可选）
    * @returns {Promise<Object>} 结果对象 {account, balance, transaction_record, is_duplicate}
    */
-  static async unfreeze (params, options = {}) {
+  static async unfreeze(params, options = {}) {
     const {
       user_id,
       system_code,
@@ -800,7 +800,7 @@ class AssetService {
    * @param {Object} options.transaction - Sequelize事务对象（可选）
    * @returns {Promise<Object>} 结果对象 {account, balance, transaction_record, is_duplicate}
    */
-  static async settleFromFrozen (params, options = {}) {
+  static async settleFromFrozen(params, options = {}) {
     const {
       user_id,
       system_code,
@@ -966,7 +966,7 @@ class AssetService {
    * @param {Object} options.transaction - Sequelize事务对象（可选）
    * @returns {Promise<Object>} 余额对象 {available_amount, frozen_amount, total_amount}
    */
-  static async getBalance (params, options = {}) {
+  static async getBalance(params, options = {}) {
     const { user_id, system_code, asset_code, campaign_id } = params
     const { transaction } = options
 
@@ -1020,7 +1020,7 @@ class AssetService {
    * @param {Object} options.transaction - Sequelize事务对象（可选）
    * @returns {Promise<Array>} 资产余额列表
    */
-  static async getAllBalances (params, options = {}) {
+  static async getAllBalances(params, options = {}) {
     const { user_id, system_code } = params
     const { transaction } = options
 
@@ -1050,7 +1050,7 @@ class AssetService {
    * @param {Object} options.transaction - Sequelize事务对象（可选）
    * @returns {Promise<Object>} 流水记录列表和分页信息
    */
-  static async getTransactions (params, filters = {}, options = {}) {
+  static async getTransactions(params, filters = {}, options = {}) {
     const { user_id, system_code } = params
     const { asset_code, business_type, page = 1, page_size = 20 } = filters
     const { transaction } = options
@@ -1088,7 +1088,7 @@ class AssetService {
    * 获取用户资产总览（统一资产域入口）
    *
    * 整合三个资产域：
-   * 1. 积分（POINTS） - 来自 user_points_accounts
+   * 1. 积分（POINTS） - 来自 account_asset_balances（asset_code='POINTS'）
    * 2. 可叠加资产（DIAMOND、材料） - 来自 account_asset_balances
    * 3. 不可叠加物品 - 来自 item_instances
    *
@@ -1104,7 +1104,7 @@ class AssetService {
    * @param {boolean} options.include_items - 是否包含物品列表（默认false，仅返回统计数据）
    * @returns {Promise<Object>} 资产总览对象
    */
-  static async getAssetPortfolio (params, options = {}) {
+  static async getAssetPortfolio(params, options = {}) {
     const { user_id } = params
     const { transaction, include_items = false } = options
 
@@ -1116,8 +1116,8 @@ class AssetService {
     const { ItemInstance, MaterialAssetType } = require('../models')
 
     /*
-     * 🆕 方案C：统一从 AccountAssetBalance 查询所有资产余额
-     * 不再使用 UserPointsAccount，积分余额从 asset_code='POINTS' 获取
+     * 统一从 AccountAssetBalance 查询所有资产余额
+     * 积分余额从 asset_code='POINTS' 获取
      */
 
     // 1. 获取或创建用户账户
@@ -1265,7 +1265,7 @@ class AssetService {
    * @param {Object} options.transaction - Sequelize事务对象
    * @returns {Promise<Object>} 创建的物品实例对象
    */
-  static async mintItem (params, options = {}) {
+  static async mintItem(params, options = {}) {
     const { user_id, item_type, source_type, source_id, meta = {} } = params
     const { transaction } = options
 
@@ -1394,7 +1394,7 @@ class AssetService {
    * @param {Object} options.transaction - Sequelize事务对象（必需）
    * @returns {Promise<Object>} 锁定后的物品实例
    */
-  static async lockItem (params, options = {}) {
+  static async lockItem(params, options = {}) {
     const {
       item_instance_id,
       lock_id,
@@ -1566,7 +1566,7 @@ class AssetService {
    * @param {Object} options.transaction - Sequelize事务对象（必需）
    * @returns {Promise<Object>} 解锁后的物品实例
    */
-  static async unlockItem (params, options = {}) {
+  static async unlockItem(params, options = {}) {
     const { item_instance_id, lock_id, lock_type, business_type, meta = {} } = params
     const { transaction } = options
 
@@ -1678,7 +1678,7 @@ class AssetService {
    * @param {Object} options.transaction - Sequelize事务对象
    * @returns {Promise<Object>} 转移后的物品实例
    */
-  static async transferItem (params, options = {}) {
+  static async transferItem(params, options = {}) {
     const { item_instance_id, new_owner_id, business_type, idempotency_key, meta = {} } = params
     const { transaction } = options
 
@@ -1795,7 +1795,7 @@ class AssetService {
    * @param {Object} options.transaction - Sequelize事务对象
    * @returns {Promise<Object>} 消耗后的物品实例
    */
-  static async consumeItem (params, options = {}) {
+  static async consumeItem(params, options = {}) {
     const { item_instance_id, operator_user_id, business_type, idempotency_key, meta = {} } = params
     const { transaction } = options
 
@@ -1912,7 +1912,7 @@ class AssetService {
    * @param {Object} options.transaction - Sequelize事务对象
    * @returns {Promise<Object>} 创建的事件记录
    */
-  static async recordItemEvent (params, options = {}) {
+  static async recordItemEvent(params, options = {}) {
     const { ItemInstanceEvent } = require('../models')
     return await ItemInstanceEvent.recordEvent(params, options)
   }
@@ -1930,7 +1930,7 @@ class AssetService {
    * @param {Object} options.transaction - Sequelize事务对象
    * @returns {Promise<Object>} 事件列表和分页信息
    */
-  static async getItemEvents (params, options = {}) {
+  static async getItemEvents(params, options = {}) {
     const { item_instance_id, user_id, event_types, page = 1, limit = 20 } = params
     const { transaction } = options
 

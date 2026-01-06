@@ -18,8 +18,6 @@ const _logger = require('../utils/logger').logger
  * 使用示例：
  * const feeInfo = FeeCalculator.calculateItemFee(item.meta.value, listing.price_amount);
  * // 返回：{ fee: 30, rate: 0.05, netAmount: 570, tier: '中价值档' }
- *
- * 更新时间：2025-12-21 - 暴力重构移除 UserInventory 引用
  */
 
 const FEE_RULES = require('../config/fee_rules')
@@ -56,7 +54,7 @@ class FeeCalculator {
    * const result = FeeCalculator.calculateItemFee(500, 480);
    * // 返回：{ fee: 24, rate: 0.05, net_amount: 456, tier: '中价值档' }
    */
-  static calculateItemFee (itemValue, sellingPrice) {
+  static calculateItemFee(itemValue, sellingPrice) {
     // 全局开关检查（Global Enable Check - 是否启用手续费）
     if (!FEE_RULES.enabled) {
       return {
@@ -123,7 +121,7 @@ class FeeCalculator {
    * const result = FeeCalculator.calculateOrderFee(orderItems);
    * // 返回：{ total_fee: 32, total_selling_price: 730, total_net_amount: 698, breakdown: [...] }
    */
-  static calculateOrderFee (orderItems) {
+  static calculateOrderFee(orderItems) {
     const breakdown = []
     let totalFee = 0
     let totalSellingPrice = 0
@@ -172,7 +170,7 @@ class FeeCalculator {
    * const rate = FeeCalculator.getRate(450);
    * logger.info(`手续费率：${rate * 100}%`); // 输出：手续费率：5%
    */
-  static getRate (itemValue) {
+  static getRate(itemValue) {
     const tier = FEE_RULES.tiers.find(t => itemValue < t.max_value)
     return tier ? tier.rate : 0
   }
@@ -192,7 +190,7 @@ class FeeCalculator {
    * const description = FeeCalculator.getFeeDescription(200);
    * logger.info(description); // 输出：3%（低价值档）- 普通优惠券、小额商品
    */
-  static getFeeDescription (itemValue) {
+  static getFeeDescription(itemValue) {
     const tier = FEE_RULES.tiers.find(t => itemValue < t.max_value)
     if (!tier) return '未知档位'
 
@@ -215,7 +213,7 @@ class FeeCalculator {
    * @example
    * const tradeRecord = await FeeCalculator.createTradeRecord(item, buyerId, sellerId, transaction);
    */
-  static async createTradeRecord (item, buyerId, sellerId, transaction) {
+  static async createTradeRecord(item, buyerId, sellerId, transaction) {
     const { TradeRecord } = require('../models')
 
     // 计算手续费（Calculate Fee - 基于商品价值和售价）

@@ -5,8 +5,6 @@
  * 1. 积分消费记录完整性（通过AssetService查询）
  * 2. 积分奖励记录完整性
  * 3. 资产流水记录正确性
- *
- * 🔧 V4.5更新：从UserPointsAccount迁移到AssetService（Account + AccountAssetBalance）
  */
 
 const {
@@ -29,7 +27,7 @@ describe('抽奖积分集成测试 - V4.5', () => {
   /**
    * 辅助函数：获取用户POINTS余额（使用新资产系统）
    */
-  async function getPointsBalance (userId) {
+  async function getPointsBalance(userId) {
     const result = await AssetService.getBalance({ user_id: userId, asset_code: 'POINTS' })
     return result ? Number(result.available_amount) : 0
   }

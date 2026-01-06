@@ -239,8 +239,8 @@ describe('核销系统修复验证测试', () => {
         .set('Authorization', `Bearer ${authToken}`)
         .send({ verification_code: '123456' })
 
-      // 可能返回404、401或410状态码
-      expect([404, 401, 410]).toContain(response.status)
+      // 旧接口已彻底删除，只允许返回404（不再接受410过渡状态）
+      expect(response.status).toBe(404)
     })
 
     test('POST /api/v4/inventory/transfer 应返回404 Not Found', async () => {
@@ -255,8 +255,8 @@ describe('核销系统修复验证测试', () => {
         .set('Authorization', `Bearer ${authToken}`)
         .send({ item_id: 1, target_user_id: 2 })
 
-      // 可能返回404、401或410状态码
-      expect([404, 401, 410]).toContain(response.status)
+      // 旧接口已彻底删除，只允许返回404（不再接受410过渡状态）
+      expect(response.status).toBe(404)
     })
   })
 

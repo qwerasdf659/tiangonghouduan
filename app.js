@@ -57,7 +57,7 @@ const ApiResponse = require('./utils/ApiResponse')
  * @param {Object} req - Express请求对象
  * @returns {string} 请求ID
  */
-function getRequestId (req) {
+function getRequestId(req) {
   return (
     req.id ||
     req.headers['x-request-id'] ||
@@ -84,16 +84,16 @@ app.use(
   helmet({
     contentSecurityPolicy: {
       directives: {
-        defaultSrc: ['\'self\''],
-        styleSrc: ['\'self\'', '\'unsafe-inline\'', 'https://cdn.jsdelivr.net', 'https://unpkg.com'],
-        scriptSrc: ['\'self\'', '\'unsafe-inline\'', 'https://unpkg.com', 'https://cdn.jsdelivr.net'],
-        imgSrc: ['\'self\'', 'data:', 'https:'],
-        baseUri: ['\'self\''],
-        fontSrc: ['\'self\'', 'https:', 'data:'],
-        formAction: ['\'self\''],
-        frameAncestors: ['\'self\''],
-        objectSrc: ['\'none\''],
-        scriptSrcAttr: ['\'none\''],
+        defaultSrc: ["'self'"],
+        styleSrc: ["'self'", "'unsafe-inline'", 'https://cdn.jsdelivr.net', 'https://unpkg.com'],
+        scriptSrc: ["'self'", "'unsafe-inline'", 'https://unpkg.com', 'https://cdn.jsdelivr.net'],
+        imgSrc: ["'self'", 'data:', 'https:'],
+        baseUri: ["'self'"],
+        fontSrc: ["'self'", 'https:', 'data:'],
+        formAction: ["'self'"],
+        frameAncestors: ["'self'"],
+        objectSrc: ["'none'"],
+        scriptSrcAttr: ["'none'"],
         upgradeInsecureRequests: []
       }
     }
@@ -549,7 +549,7 @@ appLogger.info('✅ Web管理后台静态文件托管已配置', {
  * - /market    交易市场
  * - /shop      积分商城（积分、兑换、消费、会员）
  * - /lottery   抽奖系统
- * - /inventory 库存管理
+ * - /backpack  背包系统（用户资产统一入口）
  * - /user      用户中心
  * - /admin     管理后台
  * - /auth      认证授权
@@ -586,15 +586,7 @@ try {
 
   /*
    * ========================================
-   * 4. /inventory - 库存管理域
-   * ========================================
-   */
-  app.use('/api/v4/inventory', require('./routes/v4/inventory'))
-  appLogger.info('✅ inventory域加载成功', { route: '/api/v4/inventory' })
-
-  /*
-   * ========================================
-   * 5. /market - 交易市场域
+   * 4. /market - 交易市场域
    * ========================================
    */
   app.use('/api/v4/market', require('./routes/v4/market'))
@@ -602,7 +594,7 @@ try {
 
   /*
    * ========================================
-   * 6. /shop - 积分商城域
+   * 5. /shop - 积分商城域
    * ========================================
    */
   app.use('/api/v4/shop', require('./routes/v4/shop'))
@@ -610,7 +602,7 @@ try {
 
   /*
    * ========================================
-   * 7. /system - 系统功能域
+   * 6. /system - 系统功能域
    * ========================================
    */
   app.use('/api/v4/system', require('./routes/v4/system'))
@@ -618,7 +610,7 @@ try {
 
   /*
    * ========================================
-   * 8. /user - 用户中心域
+   * 7. /user - 用户中心域
    * ========================================
    */
   app.use('/api/v4/user', require('./routes/v4/user'))
@@ -626,7 +618,7 @@ try {
 
   /*
    * ========================================
-   * 9. /merchant - 商家业务域（2025-12-29 资产域标准架构新增）
+   * 8. /merchant - 商家业务域（2025-12-29 资产域标准架构新增）
    * ========================================
    */
   app.use('/api/v4/merchant', require('./routes/v4/merchant'))
@@ -634,7 +626,7 @@ try {
 
   /*
    * ========================================
-   * 10. /assets - 资产查询域（2025-12-29 资产域标准架构新增）
+   * 9. /assets - 资产查询域（2025-12-29 资产域标准架构新增）
    * ========================================
    */
   app.use('/api/v4/assets', require('./routes/v4/assets'))
@@ -642,7 +634,7 @@ try {
 
   /*
    * ========================================
-   * 11. /backpack - 背包查询域（2025-12-29 资产域标准架构新增）
+   * 10. /backpack - 背包查询域（2025-12-29 资产域标准架构新增）
    * ========================================
    */
   app.use('/api/v4/backpack', require('./routes/v4/backpack'))
@@ -666,7 +658,6 @@ try {
       '/auth',
       '/admin',
       '/lottery',
-      '/inventory',
       '/market',
       '/shop',
       '/system',
@@ -777,7 +768,7 @@ app.use((error, req, res, _next) => {
  * @returns {Promise<void>} 无返回值，初始化失败时直接退出进程
  * @see docs/配置管理三层分离与校验统一方案.md
  */
-async function initializeApp () {
+async function initializeApp() {
   // 步骤1：初始化 Service 层
   try {
     const models = require('./models')
