@@ -7,13 +7,13 @@
 const request = require('supertest')
 const app = require('../../../app')
 
-describe('GET /api/v4/admin/ - 管理员模块信息API', () => {
+describe('GET /api/v4/console/ - 管理员模块信息API', () => {
   /**
    * 测试1：基础功能测试
    * 验证API是否正常返回数据
    */
   test('应该返回200状态码和成功响应', async () => {
-    const response = await request(app).get('/api/v4/admin/')
+    const response = await request(app).get('/api/v4/console/')
 
     expect(response.status).toBe(200)
     expect(response.body.success).toBe(true)
@@ -26,7 +26,7 @@ describe('GET /api/v4/admin/ - 管理员模块信息API', () => {
    * 验证返回的数据结构是否符合预期
    */
   test('应该返回正确的数据结构', async () => {
-    const response = await request(app).get('/api/v4/admin/')
+    const response = await request(app).get('/api/v4/console/')
     const { data } = response.body
 
     // 验证必需字段
@@ -48,7 +48,7 @@ describe('GET /api/v4/admin/ - 管理员模块信息API', () => {
    * 验证返回的模块数量（当前应为16个实际挂载的模块）
    */
   test('应该返回16个已实现的模块', async () => {
-    const response = await request(app).get('/api/v4/admin/')
+    const response = await request(app).get('/api/v4/console/')
     const { modules } = response.body.data
 
     const moduleCount = Object.keys(modules).length
@@ -78,7 +78,7 @@ describe('GET /api/v4/admin/ - 管理员模块信息API', () => {
    * 验证每个模块的信息格式是否正确
    */
   test('每个模块应该包含description和endpoints字段', async () => {
-    const response = await request(app).get('/api/v4/admin/')
+    const response = await request(app).get('/api/v4/console/')
     const { modules } = response.body.data
 
     Object.entries(modules).forEach(([_moduleName, moduleInfo]) => {
@@ -96,14 +96,14 @@ describe('GET /api/v4/admin/ - 管理员模块信息API', () => {
    * 这个测试会自动捕获未来的不一致问题
    */
   test('列出的所有模块端点都应该有对应的路由', async () => {
-    const response = await request(app).get('/api/v4/admin/')
+    const response = await request(app).get('/api/v4/console/')
     const { modules } = response.body.data
 
     // 遍历所有模块的端点
     for (const [moduleName, moduleInfo] of Object.entries(modules)) {
       for (const endpoint of moduleInfo.endpoints) {
         // 构建完整路径
-        const fullPath = `/api/v4/admin${endpoint}`
+        const fullPath = `/api/v4/console${endpoint}`
 
         /*
          * 使用OPTIONS请求测试路由是否存在
@@ -131,7 +131,7 @@ describe('GET /api/v4/admin/ - 管理员模块信息API', () => {
    * 验证版本号是否符合语义化版本规范
    */
   test('版本号应该符合语义化版本格式', async () => {
-    const response = await request(app).get('/api/v4/admin/')
+    const response = await request(app).get('/api/v4/console/')
     const { version } = response.body.data
 
     // 验证版本号格式：x.y.z
@@ -144,7 +144,7 @@ describe('GET /api/v4/admin/ - 管理员模块信息API', () => {
    * 验证时间戳是否为有效的北京时间ISO 8601格式
    */
   test('时间戳应该是有效的北京时间ISO格式', async () => {
-    const response = await request(app).get('/api/v4/admin/')
+    const response = await request(app).get('/api/v4/console/')
     const { timestamp } = response.body.data
 
     /*
@@ -169,7 +169,7 @@ describe('GET /api/v4/admin/ - 管理员模块信息API', () => {
   test('API响应时间应该小于100ms', async () => {
     const startTime = Date.now()
 
-    await request(app).get('/api/v4/admin/')
+    await request(app).get('/api/v4/console/')
 
     const endTime = Date.now()
     const responseTime = endTime - startTime
@@ -183,7 +183,7 @@ describe('GET /api/v4/admin/ - 管理员模块信息API', () => {
    */
   test('应该可以无需JWT token访问（公开接口）', async () => {
     // 不传递Authorization头
-    const response = await request(app).get('/api/v4/admin/')
+    const response = await request(app).get('/api/v4/console/')
 
     expect(response.status).toBe(200) // 应该成功返回，不需要认证
   })
@@ -194,7 +194,7 @@ describe('GET /api/v4/admin/ - 管理员模块信息API', () => {
    */
   test('应该支持跨域访问（CORS）', async () => {
     const response = await request(app)
-      .options('/api/v4/admin/')
+      .options('/api/v4/console/')
       .set('Origin', 'http://localhost:8080') // 模拟前端域名
 
     // 验证CORS相关头是否存在

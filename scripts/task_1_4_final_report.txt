@@ -53,11 +53,11 @@
    - 无需数据库迁移
 
 5. ✅ 功能测试
-   - POST /api/v4/admin/auth/login
+   - POST /api/v4/console/auth/login
      * 输入: mobile=13612227930, verification_code=123456
      * 输出: ✅ access_token + refresh_token + 用户信息
 
-   - GET /api/v4/admin/auth/profile
+   - GET /api/v4/console/auth/profile
      * 输入: Authorization: Bearer <token>
      * 输出: ✅ 用户信息 (user_id: 31, role_level: 100)
 

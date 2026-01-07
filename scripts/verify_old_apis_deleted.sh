@@ -92,15 +92,15 @@ echo ""
 
 echo "[额外] 测试新版接口: 获取会话列表"
 echo "   方法: GET"
-echo "   路径: /api/v4/admin/customer-service/sessions"
+echo "   路径: /api/v4/console/customer-service/sessions"
 
 if [ -n "$TOKEN" ]; then
   NEW_API_RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" -X GET \
-    "$BASE_URL/api/v4/admin/customer-service/sessions" \
+    "$BASE_URL/api/v4/console/customer-service/sessions" \
     -H "Authorization: Bearer $TOKEN" 2>/dev/null)
 else
   NEW_API_RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" -X GET \
-    "$BASE_URL/api/v4/admin/customer-service/sessions" 2>/dev/null)
+    "$BASE_URL/api/v4/console/customer-service/sessions" 2>/dev/null)
 fi
 
 if [ "$NEW_API_RESPONSE" = "200" ] || [ "$NEW_API_RESPONSE" = "401" ]; then

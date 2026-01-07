@@ -109,7 +109,7 @@ function scanRoutes(baseDir) {
     { file: 'routes/v4/unified-engine/lottery.js', prefix: '/api/v4/lottery' },
     { file: 'routes/v4/unified-engine/points.js', prefix: '/api/v4/points' },
     { file: 'routes/v4/unified-engine/consumption.js', prefix: '/api/v4/consumption' },
-    { file: 'routes/v4/unified-engine/admin.js', prefix: '/api/v4/admin' },
+    { file: 'routes/v4/unified-engine/admin.js', prefix: '/api/v4/console' },
     { file: 'routes/v4/system.js', prefix: '/api/v4/system' },
     { file: 'routes/v4/permissions.js', prefix: '/api/v4/permissions' }
   ]

@@ -343,8 +343,8 @@
       showLoading();
       
       try {
-        // 适配后端已有路径：/api/v4/admin/prize-pool/list
-        const response = await apiRequest('/api/v4/admin/prize-pool/list');
+        // 适配后端已有路径：/api/v4/console/prize-pool/list
+        const response = await apiRequest('/api/v4/console/prize-pool/list');
         
         if (response && response.success) {
           currentPrizes = response.data.prizes || response.data.list || [];
@@ -528,7 +528,7 @@
       showLoading();
       
       try {
-        // 适配后端batch-add API：/api/v4/admin/prize-pool/batch-add
+        // 适配后端batch-add API：/api/v4/console/prize-pool/batch-add
         // ⚠️ 注意：batch-add要求概率总和=1，所以单个奖品时必须设probability=1
         const prizeData = {
           name: document.getElementById('prizeName').value,
@@ -542,7 +542,7 @@
           color: '#FF6B6B'
         };
         
-        const response = await apiRequest('/api/v4/admin/prize-pool/batch-add', {
+        const response = await apiRequest('/api/v4/console/prize-pool/batch-add', {
           method: 'POST',
           body: JSON.stringify({
             campaign_id: 1, // 默认使用活动ID=1 (BASIC_LOTTERY)
@@ -619,7 +619,7 @@
       showLoading();
       
       try {
-        // 适配后端API：PUT /api/v4/admin/prize-pool/prize/:id
+        // 适配后端API：PUT /api/v4/console/prize-pool/prize/:id
         // ⚠️ 后端期望前端字段名（name/type/value等），会自动映射到数据库字段
         const updateData = {
           name: document.getElementById('editPrizeName').value,
@@ -630,7 +630,7 @@
           // image_id暂不支持修改
         };
         
-        const result = await apiRequest(`/api/v4/admin/prize-pool/prize/${prizeId}`, {
+        const result = await apiRequest(`/api/v4/console/prize-pool/prize/${prizeId}`, {
           method: 'PUT',
           body: JSON.stringify(updateData)
         });
@@ -664,8 +664,8 @@
       showLoading();
       
       try {
-        // 适配后端API：POST /api/v4/admin/prize-pool/prize/:id/add-stock
-        const response = await apiRequest(`/api/v4/admin/prize-pool/prize/${prizeId}/add-stock`, {
+        // 适配后端API：POST /api/v4/console/prize-pool/prize/:id/add-stock
+        const response = await apiRequest(`/api/v4/console/prize-pool/prize/${prizeId}/add-stock`, {
           method: 'POST',
           body: JSON.stringify({ quantity: parseInt(quantity) })
         });
@@ -696,8 +696,8 @@
       showLoading();
       
       try {
-        // 适配后端API：DELETE /api/v4/admin/prize-pool/prize/:id
-        const response = await apiRequest(`/api/v4/admin/prize-pool/prize/${prizeId}`, {
+        // 适配后端API：DELETE /api/v4/console/prize-pool/prize/:id
+        const response = await apiRequest(`/api/v4/console/prize-pool/prize/${prizeId}`, {
           method: 'DELETE'
         });
         

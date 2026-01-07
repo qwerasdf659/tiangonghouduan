@@ -39,7 +39,10 @@ const { assertAndGetTransaction } = require('../utils/transactionHelpers')
  * 内容审核引擎类
  * 业务职责：提供统一的审核流程管理和回调机制
  * 设计模式：通用基础设施层，解耦审核逻辑与业务逻辑
- * 支持类型：exchange（兑换）、image（图片）、feedback（反馈）
+ * 支持类型：exchange（兑换）、feedback（反馈）
+ *
+ * 变更记录：
+ * - 2026-01-08: 移除 image 类型支持（用户上传凭证审核业务已废弃）
  */
 class ContentAuditEngine {
   /**
@@ -53,13 +56,16 @@ class ContentAuditEngine {
    * @param {Object} options.transaction - 数据库事务
    * @returns {Promise<ContentReviewRecord>} 审核记录
    */
-  static async submitForAudit (auditableType, auditableId, options = {}) {
+  static async submitForAudit(auditableType, auditableId, options = {}) {
     const { priority = 'medium', auditData = {}, transaction = null } = options
 
     logger.info(`[审核服务] 提交审核: ${auditableType} ID=${auditableId}, 优先级=${priority}`)
 
-    // 验证审核对象类型
-    const validTypes = ['exchange', 'image', 'feedback']
+    /*
+     * 验证审核对象类型
+     * 注意：image 类型已于 2026-01-08 移除（用户上传凭证审核业务已废弃）
+     */
+    const validTypes = ['exchange', 'feedback']
     if (!validTypes.includes(auditableType)) {
       throw new Error(`不支持的审核类型: ${auditableType}，仅支持: ${validTypes.join(', ')}`)
     }
@@ -117,7 +123,7 @@ class ContentAuditEngine {
    * @param {Object} options.transaction - Sequelize事务对象（必填）
    * @returns {Promise<Object>} 审核结果
    */
-  static async approve (auditId, auditorId, reason = null, options = {}) {
+  static async approve(auditId, auditorId, reason = null, options = {}) {
     // 强制要求事务边界 - 2026-01-05 治理决策
     const transaction = assertAndGetTransaction(options, 'ContentAuditEngine.approve')
 
@@ -132,9 +138,7 @@ class ContentAuditEngine {
 
     // 2. 验证审核状态
     if (auditRecord.audit_status !== 'pending') {
-      throw new Error(
-        `审核记录状态不正确: 当前状态=${auditRecord.audit_status}，期望状态=pending`
-      )
+      throw new Error(`审核记录状态不正确: 当前状态=${auditRecord.audit_status}，期望状态=pending`)
     }
 
     // 3. 更新审核记录
@@ -174,7 +178,7 @@ class ContentAuditEngine {
    * @param {Object} options.transaction - Sequelize事务对象（必填）
    * @returns {Promise<Object>} 审核结果
    */
-  static async reject (auditId, auditorId, reason, options = {}) {
+  static async reject(auditId, auditorId, reason, options = {}) {
     if (!reason || reason.trim().length < 5) {
       throw new Error('拒绝原因必须提供，且不少于5个字符')
     }
@@ -193,9 +197,7 @@ class ContentAuditEngine {
 
     // 2. 验证审核状态
     if (auditRecord.audit_status !== 'pending') {
-      throw new Error(
-        `审核记录状态不正确: 当前状态=${auditRecord.audit_status}，期望状态=pending`
-      )
+      throw new Error(`审核记录状态不正确: 当前状态=${auditRecord.audit_status}，期望状态=pending`)
     }
 
     // 3. 更新审核记录
@@ -229,7 +231,7 @@ class ContentAuditEngine {
    * @param {Object} options - 选项
    * @returns {Promise<Object>} 取消结果
    */
-  static async cancel (auditId, reason = null, options = {}) {
+  static async cancel(auditId, reason = null, options = {}) {
     const transaction = options.transaction || null
 
     logger.info(`[审核服务] 取消审核: audit_id=${auditId}`)
@@ -275,14 +277,16 @@ class ContentAuditEngine {
    * @returns {Promise<void>} 无返回值，回调执行失败不影响审核结果
    * @private
    */
-  static async triggerAuditCallback (auditRecord, result, transaction) {
+  static async triggerAuditCallback(auditRecord, result, transaction) {
     try {
       logger.info(`[审核回调] 触发回调: type=${auditRecord.auditable_type}, result=${result}`)
 
-      // 动态加载对应的回调处理器
+      /*
+       * 动态加载对应的回调处理器
+       * 注意：image 类型已于 2026-01-08 移除（用户上传凭证审核业务已废弃）
+       */
       const callbackMap = {
         exchange: '../callbacks/ExchangeAuditCallback',
-        image: '../callbacks/ImageAuditCallback',
         feedback: '../callbacks/FeedbackAuditCallback'
       }
 
@@ -323,7 +327,7 @@ class ContentAuditEngine {
    * @param {Object} options - 查询选项
    * @returns {Promise<Array>} 审核记录列表
    */
-  static async getPendingAudits (options = {}) {
+  static async getPendingAudits(options = {}) {
     const { auditableType = null, priority = null, limit = 20, offset = 0 } = options
 
     const whereClause = {
@@ -357,7 +361,7 @@ class ContentAuditEngine {
    * @param {number} auditId - 审核记录ID
    * @returns {Promise<ContentReviewRecord>} 审核记录
    */
-  static async getAuditById (auditId) {
+  static async getAuditById(auditId) {
     const audit = await ContentReviewRecord.findByPk(auditId)
 
     if (!audit) {
@@ -374,7 +378,7 @@ class ContentAuditEngine {
    * @param {number} auditableId - 审核对象ID
    * @returns {Promise<Array>} 审核记录列表
    */
-  static async getAuditsByAuditable (auditableType, auditableId) {
+  static async getAuditsByAuditable(auditableType, auditableId) {
     const audits = await ContentReviewRecord.findAll({
       where: {
         auditable_type: auditableType,
@@ -392,7 +396,7 @@ class ContentAuditEngine {
    * @param {string} auditableType - 审核对象类型（可选）
    * @returns {Promise<Object>} 统计信息
    */
-  static async getAuditStatistics (auditableType = null) {
+  static async getAuditStatistics(auditableType = null) {
     const whereClause = auditableType ? { auditable_type: auditableType } : {}
 
     const [total, pending, approved, rejected, cancelled] = await Promise.all([

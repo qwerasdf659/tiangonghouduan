@@ -1,14 +1,30 @@
 const logger = require('../utils/logger').logger
 
 /**
- * 缩略图生成服务
- * 支持多种尺寸的缩略图生成，优化图片加载性能
+ * 缩略图生成服务（已废弃）
+ *
+ * @deprecated 2026-01-08 废弃，改用 URL 参数化缩略图
+ *
+ * 🎯 架构决策（2026-01-08 拍板）：
+ * - 废弃本地缩略图生成，改用 URL 参数化缩略图
+ * - CDN/对象存储支持 ?width=x&height=y 参数
+ * - 使用 ImageUrlHelper.getThumbnailUrl() 生成缩略图 URL
+ *
+ * @see utils/ImageUrlHelper.js - 新的缩略图 URL 生成方式
+ *
+ * ⚠️ 本服务仅保留用于历史兼容，不再推荐使用
+ * 新代码请使用：
+ *   const { getThumbnailUrl } = require('../utils/ImageUrlHelper')
+ *   const smallUrl = getThumbnailUrl(objectKey, 'small')
  */
 
 const sharp = require('sharp')
 const path = require('path')
 const fs = require('fs').promises
 const { v4: uuidv4 } = require('uuid')
+
+// 🔴 废弃警告标志
+const DEPRECATED_WARNING_SHOWN = new Set()
 
 /**
  * 缩略图生成服务类
@@ -19,9 +35,18 @@ const { v4: uuidv4 } = require('uuid')
 class ThumbnailService {
   /**
    * 构造函数 - 初始化缩略图服务和目录配置
+   *
+   * @deprecated 2026-01-08 废弃，改用 URL 参数化缩略图
    * @constructor
    */
-  constructor () {
+  constructor() {
+    // 🔴 废弃警告（仅显示一次）
+    if (!DEPRECATED_WARNING_SHOWN.has('constructor')) {
+      DEPRECATED_WARNING_SHOWN.add('constructor')
+      logger.warn('⚠️ ThumbnailService 已废弃（2026-01-08）：改用 URL 参数化缩略图')
+      logger.warn('   请使用：const { getThumbnailUrl } = require("../utils/ImageUrlHelper")')
+    }
+
     this.uploadsDir = path.join(__dirname, '../uploads')
     this.thumbnailsDir = path.join(this.uploadsDir, 'thumbnails')
     this.ensureDirectories()
@@ -31,7 +56,7 @@ class ThumbnailService {
    * 确保缩略图目录存在
    * @returns {Promise<void>} 无返回值，确保thumbnails目录存在并可访问
    */
-  async ensureDirectories () {
+  async ensureDirectories() {
     try {
       await fs.access(this.thumbnailsDir)
     } catch {
@@ -41,12 +66,17 @@ class ThumbnailService {
   }
 
   /**
-   * 生成缩略图
+   * 生成缩略图（已废弃）
+   *
+   * @deprecated 2026-01-08 废弃，改用 URL 参数化缩略图
    * @param {string} originalPath - 原始图片路径
    * @param {Object} options - 生成选项
    * @returns {Object} 缩略图路径对象
    */
-  async generateThumbnails (originalPath, options = {}) {
+  async generateThumbnails(originalPath, options = {}) {
+    // 🔴 废弃警告
+    logger.warn('⚠️ ThumbnailService.generateThumbnails() 已废弃')
+    logger.warn('   请改用：ImageUrlHelper.getThumbnailUrl(objectKey, size)')
     const {
       sizes = {
         small: { width: 150, height: 150 },
@@ -107,7 +137,7 @@ class ThumbnailService {
    * @param {Object} thumbnailPaths - 缩略图路径对象
    * @returns {Promise<void>} 无返回值，删除指定的缩略图文件
    */
-  async deleteThumbnails (thumbnailPaths) {
+  async deleteThumbnails(thumbnailPaths) {
     if (!thumbnailPaths) return
 
     for (const [sizeName, relativePath] of Object.entries(thumbnailPaths)) {
@@ -128,7 +158,7 @@ class ThumbnailService {
    * @param {Object} thumbnails - 已生成的缩略图
    * @returns {Promise<void>} 无返回值，清理失败生成的缩略图文件
    */
-  async cleanupThumbnails (thumbnails) {
+  async cleanupThumbnails(thumbnails) {
     for (const [, relativePath] of Object.entries(thumbnails)) {
       if (!relativePath) continue
 
@@ -147,7 +177,7 @@ class ThumbnailService {
    * @param {string} mimeType - MIME类型
    * @returns {boolean} 是否为支持的图片格式（jpeg/jpg/png/webp/tiff/bmp）
    */
-  isSupportedImageType (mimeType) {
+  isSupportedImageType(mimeType) {
     const supportedTypes = [
       'image/jpeg',
       'image/jpg',
@@ -164,7 +194,7 @@ class ThumbnailService {
    * @param {Array} imagePaths - 图片路径数组
    * @returns {Promise<Array>} 生成结果数组，每项包含originalPath、thumbnails、success字段
    */
-  async batchGenerateThumbnails (imagePaths) {
+  async batchGenerateThumbnails(imagePaths) {
     const results = []
 
     for (const imagePath of imagePaths) {
@@ -191,7 +221,7 @@ class ThumbnailService {
    * 获取缩略图统计信息
    * @returns {Promise<Object>} 统计信息对象，包含totalFiles、totalSize、totalSizeFormatted、files数组
    */
-  async getThumbnailStats () {
+  async getThumbnailStats() {
     try {
       const files = await fs.readdir(this.thumbnailsDir)
       const stats = await Promise.all(
@@ -230,7 +260,7 @@ class ThumbnailService {
    * @param {number} bytes - 字节数
    * @returns {string} 格式化后的文件大小（如 "2.5 MB"、"150 KB"）
    */
-  formatFileSize (bytes) {
+  formatFileSize(bytes) {
     if (bytes === 0) return '0 B'
     const k = 1024
     const sizes = ['B', 'KB', 'MB', 'GB']

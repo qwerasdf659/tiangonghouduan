@@ -384,7 +384,7 @@ describe('认证和权限系统API测试（V4架构）', () => {
        * 🔒 安全说明：
        * - /api/v4/permissions/user/:user_id 已删除（违反"用户端禁止/:id参数"规范）
        * - 改为使用 /api/v4/auth/me 查询当前用户自己的权限
-       * - 管理员查询他人权限请使用 /api/v4/admin/users/:id/permissions
+       * - 管理员查询他人权限请使用 /api/v4/console/users/:id/permissions
        */
       const response = await tester.make_authenticated_request(
         'GET',

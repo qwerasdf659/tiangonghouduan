@@ -31,7 +31,7 @@ async function testMaterialSystemAPIs() {
 
     // 2. 测试管理侧API - 查询资产类型
     console.log('2. 测试查询材料资产类型...')
-    const assetTypesRes = await axios.get(`${BASE_URL}/api/v4/admin/material/asset-types`, {
+    const assetTypesRes = await axios.get(`${BASE_URL}/api/v4/console/material/asset-types`, {
       headers
     })
     console.log(`✅ 资产类型数量: ${assetTypesRes.data.data?.length || 0}`)
@@ -44,7 +44,7 @@ async function testMaterialSystemAPIs() {
 
     // 3. 测试管理侧API - 查询转换规则
     console.log('3. 测试查询材料转换规则...')
-    const rulesRes = await axios.get(`${BASE_URL}/api/v4/admin/material/conversion-rules`, {
+    const rulesRes = await axios.get(`${BASE_URL}/api/v4/console/material/conversion-rules`, {
       headers
     })
     console.log(`✅ 转换规则数量: ${rulesRes.data.data?.length || 0}`)
@@ -74,7 +74,7 @@ async function testMaterialSystemAPIs() {
     console.log('6. 测试查询用户钻石余额...')
     try {
       const diamondRes = await axios.get(
-        `${BASE_URL}/api/v4/admin/diamond/users/${userId}/balance`,
+        `${BASE_URL}/api/v4/console/diamond/users/${userId}/balance`,
         { headers }
       )
       console.log(`✅ 用户钻石余额: ${diamondRes.data.data?.balance || 0}`)
@@ -90,7 +90,7 @@ async function testMaterialSystemAPIs() {
     // 7. 测试管理侧API - 查询材料流水
     console.log('7. 测试查询材料流水...')
     const txRes = await axios.get(
-      `${BASE_URL}/api/v4/admin/material/transactions?user_id=${userId}`,
+      `${BASE_URL}/api/v4/console/material/transactions?user_id=${userId}`,
       { headers }
     )
     console.log(`✅ 材料流水记录数: ${txRes.data.data?.transactions?.length || 0}`)

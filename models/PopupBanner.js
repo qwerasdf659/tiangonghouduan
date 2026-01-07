@@ -55,19 +55,23 @@ module.exports = sequelize => {
         comment: '弹窗标题（便于后台管理识别）'
       },
 
-      // 图片URL（Sealos对象存储）
+      /*
+       * 图片存储路径（Sealos对象存储 key 或完整 URL）
+       * 🎯 架构决策（2026-01-08 拍板）：
+       * - 新创建的 Banner 存储对象 key（如 popup-banners/xxx.jpg）
+       * - 历史数据可能是完整 URL，通过 ImageUrlHelper 兼容处理
+       * - 前端显示时统一通过 ImageUrlHelper.getImageUrl() 生成完整 CDN URL
+       */
       image_url: {
         type: DataTypes.STRING(500),
         allowNull: false,
         validate: {
           notEmpty: {
-            msg: '弹窗图片URL不能为空'
-          },
-          isUrl: {
-            msg: '弹窗图片URL格式不正确'
+            msg: '弹窗图片路径不能为空'
           }
+          // 🔴 移除 isUrl 校验：新架构存储对象 key，不是完整 URL
         },
-        comment: '弹窗图片URL（Sealos对象存储）'
+        comment: '图片存储路径（对象 key 或历史完整 URL）'
       },
 
       // 点击跳转链接（可选）
@@ -81,7 +85,7 @@ module.exports = sequelize => {
            * @returns {void}
            * @throws {Error} 当跳转类型不为 none 且链接为空时抛出错误
            */
-          linkUrlRequired (value) {
+          linkUrlRequired(value) {
             if (this.link_type !== 'none' && (!value || value.trim() === '')) {
               throw new Error('当跳转类型不为 none 时，跳转链接不能为空')
             }
@@ -157,7 +161,7 @@ module.exports = sequelize => {
            * @returns {void}
            * @throws {Error} 当结束时间早于或等于开始时间时抛出错误
            */
-          isAfterStartTime (value) {
+          isAfterStartTime(value) {
             if (value && this.start_time && new Date(value) <= new Date(this.start_time)) {
               throw new Error('结束时间必须晚于开始时间')
             }
@@ -186,7 +190,7 @@ module.exports = sequelize => {
          * 获取北京时间格式的创建时间
          * @returns {string} 北京时间格式的日期字符串（YYYY年MM月DD日 HH:mm:ss）
          */
-        get () {
+        get() {
           return BeijingTimeHelper.formatChinese(this.getDataValue('created_at'))
         },
         comment: '创建时间'
@@ -201,7 +205,7 @@ module.exports = sequelize => {
          * 获取北京时间格式的更新时间
          * @returns {string} 北京时间格式的日期字符串（YYYY年MM月DD日 HH:mm:ss）
          */
-        get () {
+        get() {
           return BeijingTimeHelper.formatChinese(this.getDataValue('updated_at'))
         },
         comment: '更新时间'

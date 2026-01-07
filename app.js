@@ -369,7 +369,7 @@ app.get('/api/v4', (req, res) => {
       },
       endpoints: {
         lottery: '/api/v4/lottery',
-        admin: '/api/v4/admin',
+        admin: '/api/v4/console',
         health: '/health'
       },
       features: ['统一抽奖引擎', '智能策略选择', '实时决策处理', '完整审计日志', '高性能优化']
@@ -404,10 +404,10 @@ app.get('/api/v4/docs', (req, res) => {
       admin_system: {
         description: 'V4管理系统提供引擎配置、监控和维护功能',
         endpoints: {
-          'GET /api/v4/admin/system/dashboard': '管理仪表板',
-          'POST /api/v4/admin/config': '更新引擎配置',
-          'GET /api/v4/admin/logs': '获取执行日志',
-          'POST /api/v4/admin/maintenance': '维护模式控制'
+          'GET /api/v4/console/system/dashboard': '管理仪表板',
+          'POST /api/v4/console/config': '更新引擎配置',
+          'GET /api/v4/console/logs': '获取执行日志',
+          'POST /api/v4/console/maintenance': '维护模式控制'
         },
         features: ['引擎监控', '配置管理', '日志分析', '性能优化']
       },
@@ -436,7 +436,7 @@ app.get('/api/v4/docs', (req, res) => {
         contact: {
           api: '/api/v4',
           lottery: '/api/v4/lottery',
-          admin: '/api/v4/admin'
+          admin: '/api/v4/console'
         }
       }
     },
@@ -463,7 +463,7 @@ app.get('/', (req, res) => {
         health: '/health',
         api: '/api/v4',
         lottery_engine: '/api/v4/lottery',
-        admin_panel: '/api/v4/admin',
+        admin_panel: '/api/v4/console',
         docs: '/api/v4/docs'
       }
     },
@@ -481,9 +481,9 @@ app.get('/api', (req, res) => {
       architecture: 'unified_decision_engine',
       v4_features: {
         unified_engine: '/api/v4/lottery',
-        admin_panel: '/api/v4/admin',
-        performance_metrics: '/api/v4/admin/system/status',
-        decision_analytics: '/api/v4/admin/analytics/decisions/analytics'
+        admin_panel: '/api/v4/console',
+        performance_metrics: '/api/v4/console/system/status',
+        decision_analytics: '/api/v4/console/analytics/decisions/analytics'
       }
     },
     'API服务正常',
@@ -570,11 +570,11 @@ try {
 
   /*
    * ========================================
-   * 2. /admin - 管理后台域
+   * 2. /console - 后台控制台域（从 admin 迁移）
    * ========================================
    */
-  app.use('/api/v4/admin', require('./routes/v4/admin'))
-  appLogger.info('✅ admin域加载成功', { route: '/api/v4/admin' })
+  app.use('/api/v4/console', require('./routes/v4/console'))
+  appLogger.info('✅ console域加载成功', { route: '/api/v4/console' })
 
   /*
    * ========================================
@@ -691,7 +691,7 @@ app.use('*', (req, res) => {
         'GET /api/v4/auth/verify',
         'POST /api/v4/lottery/draw',
         'GET /api/v4/lottery/strategies',
-        'GET /api/v4/admin/system/dashboard',
+        'GET /api/v4/console/system/dashboard',
         'GET /api/v4/permissions/user/:userId',
         'POST /api/v4/permissions/check',
         'POST /api/v4/permissions/promote',
@@ -936,7 +936,7 @@ if (require.main === module) {
           endpoints: {
             health: `http://${HOST}:${PORT}/health`,
             lottery: `http://${HOST}:${PORT}/api/v4/lottery`,
-            admin: `http://${HOST}:${PORT}/api/v4/admin`,
+            admin: `http://${HOST}:${PORT}/api/v4/console`,
             websocket: `ws://${HOST}:${PORT}/socket.io` // 新增WebSocket端点
           }
         })

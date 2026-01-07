@@ -95,12 +95,14 @@ TEST_USER_ID="1"
 echo "测试参数："
 echo "  - photo: $TEST_FILE"
 echo "  - user_id: $TEST_USER_ID"
-echo "  - business_type: user_upload_review"
+echo "  - business_type: uploads"
 
+# 注意：原 user_upload_review 业务类型已在 2026-01-08 删除
+# 有效的 business_type 值: lottery, exchange, trade, uploads
 RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "$SEALOS_URL$UPLOAD_ENDPOINT" \
   -F "photo=@$TEST_FILE" \
   -F "user_id=$TEST_USER_ID" \
-  -F "business_type=user_upload_review" 2>&1)
+  -F "business_type=uploads" 2>&1)
 HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
 BODY=$(echo "$RESPONSE" | head -n-1)
 

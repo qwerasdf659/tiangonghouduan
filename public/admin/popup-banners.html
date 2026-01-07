@@ -677,7 +677,7 @@
        */
       async function loadStatistics () {
         try {
-          const response = await apiRequest('/api/v4/admin/popup-banners/statistics')
+          const response = await apiRequest('/api/v4/console/popup-banners/statistics')
           
           if (response && response.success) {
             const stats = response.data
@@ -710,7 +710,7 @@
           if (status) params.append('is_active', status)
           if (keyword) params.append('keyword', keyword)
           
-          const response = await apiRequest(`/api/v4/admin/popup-banners?${params.toString()}`)
+          const response = await apiRequest(`/api/v4/console/popup-banners?${params.toString()}`)
           
           if (response && response.success) {
             const data = response.data
@@ -896,7 +896,7 @@
         showLoading()
         
         try {
-          const response = await apiRequest(`/api/v4/admin/popup-banners/${id}`)
+          const response = await apiRequest(`/api/v4/console/popup-banners/${id}`)
           
           if (response && response.success) {
             currentBannerId = id
@@ -985,7 +985,7 @@
         showLoading()
         
         try {
-          const response = await apiRequest(`/api/v4/admin/popup-banners/${id}`)
+          const response = await apiRequest(`/api/v4/console/popup-banners/${id}`)
           
           if (response && response.success) {
             const banner = response.data
@@ -1052,7 +1052,7 @@
         showLoading()
         
         try {
-          const response = await apiRequest(`/api/v4/admin/popup-banners/${id}/toggle`, {
+          const response = await apiRequest(`/api/v4/console/popup-banners/${id}/toggle`, {
             method: 'PATCH'
           })
           
@@ -1089,7 +1089,7 @@
         showLoading()
         
         try {
-          const response = await apiRequest(`/api/v4/admin/popup-banners/${currentBannerId}`, {
+          const response = await apiRequest(`/api/v4/console/popup-banners/${currentBannerId}`, {
             method: 'DELETE'
           })
           
@@ -1160,8 +1160,8 @@
           }
           
           const url = isEdit 
-            ? `/api/v4/admin/popup-banners/${bannerId}`
-            : '/api/v4/admin/popup-banners'
+            ? `/api/v4/console/popup-banners/${bannerId}`
+            : '/api/v4/console/popup-banners'
           const method = isEdit ? 'PUT' : 'POST'
           
           const response = await fetch(url, {

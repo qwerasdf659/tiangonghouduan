@@ -457,7 +457,7 @@ describe('抽奖预设系统API测试（V4架构）', () => {
 
   /*
    * ========== 获取用户预设API测试 ==========
-   * 注意：这些路由已迁移到 /api/v4/admin/users/:id/lottery-presets，暂时跳过测试
+   * 注意：这些路由已迁移到 /api/v4/console/users/:id/lottery-presets，暂时跳过测试
    */
   describe.skip('GET /api/v4/lottery/preset/user/:user_id - 获取用户预设', () => {
     test('✅ 应该返回正确的用户预设列表结构', async () => {
@@ -536,7 +536,7 @@ describe('抽奖预设系统API测试（V4架构）', () => {
 
   /*
    * ========== 清理用户预设API测试 ==========
-   * 注意：这些路由已迁移到 /api/v4/admin/users/:id/lottery-presets，暂时跳过测试
+   * 注意：这些路由已迁移到 /api/v4/console/users/:id/lottery-presets，暂时跳过测试
    */
   describe.skip('DELETE /api/v4/lottery/preset/user/:user_id - 清理用户预设', () => {
     let temp_user_id

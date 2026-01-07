@@ -336,7 +336,7 @@
      */
     async function loadAssetTypes() {
       try {
-        const response = await apiRequest('/api/v4/admin/material/asset-types');
+        const response = await apiRequest('/api/v4/console/material/asset-types');
         if (response && response.success) {
           assetTypes = response.data || [];
           populateAssetSelects();
@@ -379,7 +379,7 @@
       `;
 
       try {
-        const response = await apiRequest('/api/v4/admin/material/conversion-rules');
+        const response = await apiRequest('/api/v4/console/material/conversion-rules');
 
         if (response && response.success) {
           currentRules = response.data || [];
@@ -528,7 +528,7 @@
         submitBtn.disabled = true;
         submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>提交中...';
 
-        const response = await apiRequest('/api/v4/admin/material/conversion-rules', {
+        const response = await apiRequest('/api/v4/console/material/conversion-rules', {
           method: 'POST',
           body: JSON.stringify(data)
         });
@@ -595,7 +595,7 @@
         submitBtn.disabled = true;
         submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>保存中...';
 
-        const response = await apiRequest(`/api/v4/admin/material/conversion-rules/${ruleId}`, {
+        const response = await apiRequest(`/api/v4/console/material/conversion-rules/${ruleId}`, {
           method: 'PUT',
           body: JSON.stringify(data)
         });
@@ -632,7 +632,7 @@
       }
 
       try {
-        const response = await apiRequest(`/api/v4/admin/material/conversion-rules/${ruleId}`, {
+        const response = await apiRequest(`/api/v4/console/material/conversion-rules/${ruleId}`, {
           method: 'PUT',
           body: JSON.stringify({ is_enabled: newStatus })
         });

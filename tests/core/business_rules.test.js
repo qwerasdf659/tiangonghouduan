@@ -477,7 +477,7 @@ describe('🧮 核心业务逻辑测试', () => {
 
       const earnResponse = await tester.make_authenticated_request(
         'POST',
-        '/api/v4/admin/points/adjust',
+        '/api/v4/console/points/adjust',
         earnData,
         'admin'
       )

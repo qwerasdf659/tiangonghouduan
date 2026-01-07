@@ -1,6 +1,12 @@
 /**
  * 餐厅积分抽奖系统 - 简化图片资源管理模型
  * 移除过度设计的功能，保留核心业务需求
+ *
+ * 变更记录：
+ * - 2026-01-08: 移除审核相关字段和方法（用户上传凭证审核业务已废弃）
+ *   - 删除字段: review_status, reviewer_id, review_reason, reviewed_at, points_awarded
+ *   - 删除方法: approve(), reject(), isPending()
+ *   - 移除 user_upload_review 业务类型
  */
 
 const BeijingTimeHelper = require('../utils/timeHelper')
@@ -95,41 +101,10 @@ module.exports = sequelize => {
         comment: '资源状态'
       },
 
-      // 审核字段（保留，这是核心业务功能）
-      review_status: {
-        type: DataTypes.ENUM('pending', 'approved', 'rejected', 'reviewing'),
-        allowNull: true,
-        comment: '审核状态'
-      },
-
-      reviewer_id: {
-        type: DataTypes.INTEGER,
-        allowNull: true,
-        comment: '审核员ID',
-        references: {
-          model: 'users',
-          key: 'user_id'
-        }
-      },
-
-      review_reason: {
-        type: DataTypes.TEXT,
-        allowNull: true,
-        comment: '审核说明'
-      },
-
-      reviewed_at: {
-        type: DataTypes.DATE,
-        allowNull: true,
-        comment: '审核时间'
-      },
-
-      points_awarded: {
-        type: DataTypes.INTEGER,
-        allowNull: true,
-        defaultValue: 0,
-        comment: '奖励积分数量'
-      },
+      /*
+       * 注意: 审核字段已于 2026-01-08 删除（用户上传凭证审核业务已废弃）
+       * 积分审核现在由 merchant_points_reviews 表单独管理
+       */
 
       // 来源模块标识
       source_module: {
@@ -165,11 +140,7 @@ module.exports = sequelize => {
           name: 'idx_business_type_user',
           fields: ['business_type', 'user_id', 'created_at']
         },
-        // 审核查询优化
-        {
-          name: 'idx_review_status_business',
-          fields: ['review_status', 'business_type', 'created_at']
-        },
+        /* 注意: idx_review_status_business 索引已于 2026-01-08 删除（审核字段已移除） */
         // 业务查询索引
         {
           name: 'idx_business_category',
@@ -196,72 +167,68 @@ module.exports = sequelize => {
 
   // 模型关联关系
   ImageResources.associate = function (models) {
-    // 关联用户表
+    // 关联用户表（上传者）
     ImageResources.belongsTo(models.User, {
       foreignKey: 'user_id',
       as: 'uploader',
       constraints: false
     })
-
-    // 关联审核员
-    ImageResources.belongsTo(models.User, {
-      foreignKey: 'reviewer_id',
-      as: 'reviewer',
-      constraints: false
-    })
+    /* 注意: reviewer 关联已于 2026-01-08 删除（审核字段已移除） */
   }
 
-  // 安全输出方法（支持缩略图）
+  /**
+   * 安全输出方法（支持对象 key 转 URL）
+   * 🎯 架构决策（2026-01-08 拍板）：file_path 存储对象 key，通过 ImageUrlHelper 生成 URL
+   * @returns {Object} 安全的图片资源对象（包含 CDN URL，不含敏感路径）
+   */
   ImageResources.prototype.toSafeJSON = function () {
     const values = this.get({ plain: true })
+    const { getImageUrl, getThumbnailUrl } = require('../utils/ImageUrlHelper')
 
     return {
       ...values,
-      // 提供安全的访问URL（使用file_path生成）
-      imageUrl: `/uploads/${values.file_path}`,
-      // 提供缩略图URLs
-      thumbnails: values.thumbnail_paths
-        ? {
-          small: values.thumbnail_paths.small ? `/uploads/${values.thumbnail_paths.small}` : null,
-          medium: values.thumbnail_paths.medium
-            ? `/uploads/${values.thumbnail_paths.medium}`
-            : null,
-          large: values.thumbnail_paths.large ? `/uploads/${values.thumbnail_paths.large}` : null
-        }
-        : {},
+      // 提供安全的访问URL（使用 ImageUrlHelper 生成）
+      imageUrl: getImageUrl(values.file_path),
+      // 提供缩略图URLs（使用 URL 参数化）
+      thumbnails: {
+        small: getThumbnailUrl(values.file_path, 'small'),
+        medium: getThumbnailUrl(values.file_path, 'medium'),
+        large: getThumbnailUrl(values.file_path, 'large')
+      },
       // 移除服务器文件路径敏感信息
       file_path: undefined,
       thumbnail_paths: undefined
     }
   }
 
-  // 缩略图生成方法
-  ImageResources.prototype.generateThumbnails = async function () {
-    const ThumbnailService = require('../services/ThumbnailService')
+  /**
+   * 获取 URL 参数化缩略图 URL
+   *
+   * 🎯 架构决策（2026-01-08 拍板）：
+   * - 废弃本地缩略图生成（ThumbnailService）
+   * - 使用 URL 参数化缩略图（CDN/存储服务支持的 ?width=x&height=y）
+   * - 本方法现在返回 URL 参数化的缩略图 URL，不再生成本地文件
+   *
+   * @deprecated 不再生成本地缩略图，改用 toSafeJSON().thumbnails
+   * @returns {Object} 缩略图 URL 对象 { small, medium, large }
+   */
+  ImageResources.prototype.generateThumbnails = function () {
+    const { getThumbnailUrl } = require('../utils/ImageUrlHelper')
 
     if (!this.file_path) {
-      throw new Error('文件路径不存在，无法生成缩略图')
+      console.warn('⚠️ generateThumbnails 已废弃：请使用 toSafeJSON().thumbnails')
+      return null
     }
 
-    try {
-      const thumbnails = await ThumbnailService.generateThumbnails(this.file_path, {
-        sizes: {
-          small: { width: 150, height: 150 },
-          medium: { width: 300, height: 300 },
-          large: { width: 600, height: 600 }
-        },
-        quality: 80,
-        format: 'jpg'
-      })
-
-      this.thumbnail_paths = thumbnails
-      await this.save()
-
-      return thumbnails
-    } catch (error) {
-      console.error('缩略图生成失败:', error)
-      throw new Error('缩略图生成失败: ' + error.message)
+    // 返回 URL 参数化缩略图（不生成本地文件）
+    const thumbnails = {
+      small: getThumbnailUrl(this.file_path, 'small'),
+      medium: getThumbnailUrl(this.file_path, 'medium'),
+      large: getThumbnailUrl(this.file_path, 'large')
     }
+
+    console.warn('⚠️ generateThumbnails 已废弃：返回 URL 参数化缩略图，不再生成本地文件')
+    return thumbnails
   }
 
   // 检查是否有缩略图
@@ -272,29 +239,18 @@ module.exports = sequelize => {
     )
   }
 
-  // 审核实例方法（保留，核心业务功能）
-  ImageResources.prototype.approve = function (reviewerId, pointsAwarded = 0, notes = null) {
-    this.review_status = 'approved'
-    this.reviewer_id = reviewerId
-    this.reviewed_at = BeijingTimeHelper.createBeijingTime()
-    this.points_awarded = pointsAwarded
-    this.review_reason = notes
-    return this.save()
-  }
+  /*
+   * 注意: 审核实例方法（approve, reject, isPending）已于 2026-01-08 删除
+   * 积分审核功能现在由 MerchantReviewService 提供
+   */
 
-  ImageResources.prototype.reject = function (reviewerId, reason, notes = null) {
-    this.review_status = 'rejected'
-    this.reviewer_id = reviewerId
-    this.reviewed_at = BeijingTimeHelper.createBeijingTime()
-    this.review_reason = notes || reason
-    return this.save()
-  }
-
-  ImageResources.prototype.isPending = function () {
-    return this.review_status === 'pending'
-  }
-
-  // 简化的类方法
+  /**
+   * 按业务类型查询图片资源
+   * @param {string} businessType - 业务类型：lottery|exchange|trade|uploads
+   * @param {string} category - 资源分类
+   * @param {Object} options - 查询选项
+   * @returns {Promise<{count: number, rows: Array}>} 分页查询结果
+   */
   ImageResources.findByBusiness = function (businessType, category, options = {}) {
     const {
       _limit = 20,

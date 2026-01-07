@@ -187,7 +187,7 @@
     
     /**
      * 加载仪表盘数据
-     * 使用现有管理API：/api/v4/admin/system/dashboard
+     * 使用现有管理API：/api/v4/console/system/dashboard
      * 
      * 后端数据结构（V4统一抽奖引擎）：
      * {
@@ -199,7 +199,7 @@
      */
     async function loadDashboardData() {
       try {
-        const response = await apiRequest('/api/v4/admin/system/dashboard');
+        const response = await apiRequest('/api/v4/console/system/dashboard');
         
         if (response && response.success && response.data) {
           const data = response.data;

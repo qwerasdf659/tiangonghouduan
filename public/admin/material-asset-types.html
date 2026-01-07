@@ -368,7 +368,7 @@
       `;
 
       try {
-        const response = await apiRequest('/api/v4/admin/material/asset-types');
+        const response = await apiRequest('/api/v4/console/material/asset-types');
 
         if (response && response.success) {
           currentAssetTypes = response.data || [];
@@ -489,7 +489,7 @@
         submitBtn.disabled = true;
         submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>提交中...';
 
-        const response = await apiRequest('/api/v4/admin/material/asset-types', {
+        const response = await apiRequest('/api/v4/console/material/asset-types', {
           method: 'POST',
           body: JSON.stringify(data)
         });
@@ -557,7 +557,7 @@
         submitBtn.disabled = true;
         submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>保存中...';
 
-        const response = await apiRequest(`/api/v4/admin/material/asset-types/${assetCode}`, {
+        const response = await apiRequest(`/api/v4/console/material/asset-types/${assetCode}`, {
           method: 'PUT',
           body: JSON.stringify(data)
         });
@@ -591,7 +591,7 @@
       }
 
       try {
-        const response = await apiRequest(`/api/v4/admin/material/asset-types/${assetCode}`, {
+        const response = await apiRequest(`/api/v4/console/material/asset-types/${assetCode}`, {
           method: 'PUT',
           body: JSON.stringify({ is_enabled: newStatus })
         });

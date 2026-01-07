@@ -377,9 +377,9 @@ describe('🎲 用户完整抽奖流程（核心关键路径 - V4架构）', () 
     /**
      * 业务场景：运营人员设置特定用户必中指定奖品
      * API路径：
-     * 1. POST /api/v4/admin/lottery/set-target - 设置定向中奖
+     * 1. POST /api/v4/console/lottery/set-target - 设置定向中奖
      * 2. POST /api/v4/lottery/draw - 用户抽奖
-     * 3. GET /api/v4/admin/lottery/management-logs - 查询管理日志
+     * 3. GET /api/v4/console/lottery/management-logs - 查询管理日志
      *
      * 预期行为：
      * 1. 管理员设置用户为"管理目标"

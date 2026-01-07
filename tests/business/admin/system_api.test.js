@@ -56,10 +56,10 @@ describe('管理员和系统管理API测试', () => {
 
   // ========== 管理员系统API ==========
   describe('管理员系统API', () => {
-    test('✅ 管理员仪表板 - GET /api/v4/admin/system/dashboard', async () => {
+    test('✅ 管理员仪表板 - GET /api/v4/console/system/dashboard', async () => {
       const response = await tester.make_authenticated_request(
         'GET',
-        '/api/v4/admin/system/dashboard',
+        '/api/v4/console/system/dashboard',
         null,
         'admin'
       )
@@ -73,10 +73,10 @@ describe('管理员和系统管理API测试', () => {
       }
     })
 
-    test('✅ 系统状态 - GET /api/v4/admin/system/status', async () => {
+    test('✅ 系统状态 - GET /api/v4/console/system/status', async () => {
       const response = await tester.make_authenticated_request(
         'GET',
-        '/api/v4/admin/system/status',
+        '/api/v4/console/system/status',
         null,
         'admin'
       )
@@ -89,10 +89,10 @@ describe('管理员和系统管理API测试', () => {
       }
     })
 
-    test('✅ 管理状态 - GET /api/v4/admin/system/management-status', async () => {
+    test('✅ 管理状态 - GET /api/v4/console/system/management-status', async () => {
       const response = await tester.make_authenticated_request(
         'GET',
-        '/api/v4/admin/system/management-status',
+        '/api/v4/console/system/management-status',
         null,
         'admin'
       )
@@ -126,10 +126,10 @@ describe('管理员和系统管理API测试', () => {
 
   // ========== 公告管理API ==========
   describe('公告管理API', () => {
-    test('✅ 获取公告列表 - GET /api/v4/admin/system/announcements', async () => {
+    test('✅ 获取公告列表 - GET /api/v4/console/system/announcements', async () => {
       const response = await tester.make_authenticated_request(
         'GET',
-        '/api/v4/admin/system/announcements',
+        '/api/v4/console/system/announcements',
         null,
         'admin'
       )
@@ -150,10 +150,10 @@ describe('管理员和系统管理API测试', () => {
 
   // ========== 反馈管理API ==========
   describe('反馈管理API', () => {
-    test('✅ 获取反馈列表 - GET /api/v4/admin/system/feedbacks', async () => {
+    test('✅ 获取反馈列表 - GET /api/v4/console/system/feedbacks', async () => {
       const response = await tester.make_authenticated_request(
         'GET',
-        '/api/v4/admin/system/feedbacks',
+        '/api/v4/console/system/feedbacks',
         null,
         'admin'
       )

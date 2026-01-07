@@ -182,7 +182,7 @@ cat > "$REPORT_FILE" << EOF
 ----------
 1. 重启服务: npm run pm:restart
 2. 验证旧接口404: curl http://localhost:3000/api/v4/system/chat/admin-reply
-3. 验证新接口正常: curl http://localhost:3000/api/v4/admin/customer-service/sessions
+3. 验证新接口正常: curl http://localhost:3000/api/v4/console/customer-service/sessions
 4. 前端功能测试: 访问 http://localhost:3000/admin/customer-service.html
 5. Git提交: git add $FILE && git commit -m "feat: 彻底删除旧版客服接口"
 

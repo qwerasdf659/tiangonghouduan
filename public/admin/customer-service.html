@@ -535,7 +535,7 @@
           }
 
           const response = await apiRequest(
-            `/api/v4/admin/customer-service/sessions?${params.toString()}`
+            `/api/v4/console/customer-service/sessions?${params.toString()}`
           )
 
           if (response && response.success) {
@@ -654,7 +654,7 @@
         try {
           // 获取会话详情和消息历史
           const response = await apiRequest(
-            `/api/v4/admin/customer-service/sessions/${sessionId}/messages`
+            `/api/v4/console/customer-service/sessions/${sessionId}/messages`
           )
 
           if (response && response.success) {
@@ -762,7 +762,7 @@
 
         try {
           const response = await apiRequest(
-            `/api/v4/admin/customer-service/sessions/${currentSessionId}/send`,
+            `/api/v4/console/customer-service/sessions/${currentSessionId}/send`,
             {
               method: 'POST',
               body: JSON.stringify({ content: content })
@@ -813,7 +813,7 @@
        */
       async function markAsRead(sessionId) {
         try {
-          await apiRequest(`/api/v4/admin/customer-service/sessions/${sessionId}/mark-read`, {
+          await apiRequest(`/api/v4/console/customer-service/sessions/${sessionId}/mark-read`, {
             method: 'POST'
           })
         } catch (error) {
@@ -833,9 +833,9 @@
           const session = allSessions.find(s => s.session_id === currentSessionId)
           if (!session) return
 
-          // 使用后端实际API路径：/api/v4/admin/user-management/users/:user_id
+          // 使用后端实际API路径：/api/v4/console/user-management/users/:user_id
           const response = await apiRequest(
-            `/api/v4/admin/user-management/users/${session.user_id}`
+            `/api/v4/console/user-management/users/${session.user_id}`
           )
 
           if (response && response.success) {
@@ -885,8 +885,8 @@
        */
       async function loadAdminList() {
         try {
-          // 使用后端实际API路径：/api/v4/admin/user-management/users + role_filter参数
-          const response = await apiRequest('/api/v4/admin/user-management/users?role_filter=admin')
+          // 使用后端实际API路径：/api/v4/console/user-management/users + role_filter参数
+          const response = await apiRequest('/api/v4/console/user-management/users?role_filter=admin')
           if (response && response.success) {
             // 注意：返回数据结构为 { users: [...], pagination: {...} }
             const admins = response.data.users || []
@@ -927,7 +927,7 @@
 
         try {
           const response = await apiRequest(
-            `/api/v4/admin/customer-service/sessions/${currentSessionId}/transfer`,
+            `/api/v4/console/customer-service/sessions/${currentSessionId}/transfer`,
             {
               method: 'POST',
               body: JSON.stringify({ target_admin_id: parseInt(targetId) })
@@ -960,7 +960,7 @@
 
         try {
           const response = await apiRequest(
-            `/api/v4/admin/customer-service/sessions/${currentSessionId}/close`,
+            `/api/v4/console/customer-service/sessions/${currentSessionId}/close`,
             {
               method: 'POST'
             }

@@ -242,7 +242,7 @@ class QuickIntegrityChecker {
         // 测试API端点
         try {
           execSync(
-            'curl -s http://localhost:3000/api/v4/admin/customer-service/sessions > /dev/null 2>&1',
+            'curl -s http://localhost:3000/api/v4/console/customer-service/sessions > /dev/null 2>&1',
             {
               timeout: 5000
             }

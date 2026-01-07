@@ -87,8 +87,8 @@ async function verifyDatabaseLayer() {
        FROM account_asset_balances WHERE asset_code = 'CREDITS'`,
       { type: QueryTypes.SELECT }
     )
-    const creditsCount = creditsBalance[0]?.count || 0
-    const creditsTotal = creditsBalance[0]?.total || 0
+    const creditsCount = parseInt(creditsBalance[0]?.count) || 0
+    const creditsTotal = parseFloat(creditsBalance[0]?.total) || 0
 
     if (creditsCount === 0) {
       pass('CREDITS 已从 account_asset_balances 清除')
@@ -104,10 +104,11 @@ async function verifyDatabaseLayer() {
       `SELECT COUNT(*) as count FROM asset_transactions WHERE asset_code = 'CREDITS'`,
       { type: QueryTypes.SELECT }
     )
-    if (creditsTransactions[0]?.count === 0) {
+    const transCount = parseInt(creditsTransactions[0]?.count) || 0
+    if (transCount === 0) {
       pass('CREDITS 已从 asset_transactions 清除')
     } else {
-      fail('CREDITS 仍存在于 asset_transactions', `${creditsTransactions[0]?.count} 条记录`)
+      fail('CREDITS 仍存在于 asset_transactions', `${transCount} 条记录`)
     }
 
     // 检查 material_asset_types
@@ -115,37 +116,46 @@ async function verifyDatabaseLayer() {
       `SELECT COUNT(*) as count FROM material_asset_types WHERE asset_code = 'CREDITS'`,
       { type: QueryTypes.SELECT }
     )
-    if (creditsType[0]?.count === 0) {
+    const typeCount = parseInt(creditsType[0]?.count) || 0
+    if (typeCount === 0) {
       pass('CREDITS 已从 material_asset_types 清除')
     } else {
-      fail('CREDITS 仍存在于 material_asset_types', `${creditsType[0]?.count} 条记录`)
+      fail('CREDITS 仍存在于 material_asset_types', `${typeCount} 条记录`)
     }
   } catch (err) {
     fail('检查 CREDITS 清理状态失败', err.message)
   }
 
-  // 2. 检查 campaign_id 字段
-  console.log('\n【检查2】BUDGET_POINTS 迁移状态 (campaign_id 字段)')
+  // 2. 检查 campaign_id 字段和 campaign_key 归一化列（2026-01-07 P0数据一致性加固）
+  console.log('\n【检查2】BUDGET_POINTS 迁移状态 (campaign_id + campaign_key 字段)')
   try {
     const hasCampaignId = await columnExists('account_asset_balances', 'campaign_id')
     if (hasCampaignId) {
       pass('account_asset_balances 表已添加 campaign_id 字段')
 
-      // 检查唯一索引
+      // 检查 campaign_key 归一化列
+      const hasCampaignKey = await columnExists('account_asset_balances', 'campaign_key')
+      if (hasCampaignKey) {
+        pass('account_asset_balances 表已添加 campaign_key 归一化列')
+      } else {
+        fail('缺少 campaign_key 归一化列')
+      }
+
+      // 检查新唯一索引（uk_account_asset_campaign_key 替代旧的 uk_account_asset_campaign）
       const [indexes] = await sequelize.query(
-        `SHOW INDEX FROM account_asset_balances WHERE Key_name = 'uk_account_asset_campaign'`,
+        `SHOW INDEX FROM account_asset_balances WHERE Key_name = 'uk_account_asset_campaign_key'`,
         { type: QueryTypes.SELECT, raw: true }
       )
       if (indexes) {
-        pass('已创建 uk_account_asset_campaign 唯一索引')
+        pass('已创建 uk_account_asset_campaign_key 唯一索引')
       } else {
-        fail('缺少 uk_account_asset_campaign 唯一索引')
+        fail('缺少 uk_account_asset_campaign_key 唯一索引')
       }
     } else {
       fail('account_asset_balances 表缺少 campaign_id 字段')
     }
   } catch (err) {
-    fail('检查 campaign_id 字段失败', err.message)
+    fail('检查 campaign_id/campaign_key 字段失败', err.message)
   }
 
   // 3. 检查 item_instance_events 表
@@ -193,7 +203,7 @@ async function verifyDatabaseLayer() {
     fail('检查 item_template_aliases 表失败', err.message)
   }
 
-  // 6. 检查 locked 物品状态
+  // 6. 检查 locked 物品状态（使用 locks JSON 字段解析）
   console.log('\n【检查6】物品锁超时修复状态')
   try {
     const lockedItems = await sequelize.query(
@@ -205,16 +215,35 @@ async function verifyDatabaseLayer() {
     if (lockedCount === 0) {
       pass('所有超时锁已修复', '无 locked 状态物品')
     } else {
-      // 检查有多少是超时的
+      /*
+       * 2026-01-07 修正：使用 locks JSON 字段检查超时
+       * locks 格式: [{lock_type, lock_id, locked_at, expires_at, auto_release, reason}]
+       * 超时判断逻辑：
+       * - 如果 expires_at 存在且已过期 → 超时
+       * - 如果 expires_at 为空，检查 locked_at + 3分钟是否超时
+       */
       const timeoutLocked = await sequelize.query(
         `SELECT COUNT(*) as count FROM item_instances
-         WHERE status = 'locked' AND locked_at < DATE_SUB(NOW(), INTERVAL 3 MINUTE)`,
+         WHERE status = 'locked'
+           AND locks IS NOT NULL
+           AND JSON_LENGTH(locks) > 0
+           AND EXISTS (
+             SELECT 1 FROM JSON_TABLE(
+               locks, '$[*]' COLUMNS (
+                 locked_at DATETIME PATH '$.locked_at',
+                 expires_at DATETIME PATH '$.expires_at'
+               )
+             ) AS jt
+             WHERE
+               (jt.expires_at IS NOT NULL AND jt.expires_at < NOW())
+               OR (jt.expires_at IS NULL AND jt.locked_at < DATE_SUB(NOW(), INTERVAL 3 MINUTE))
+           )`,
         { type: QueryTypes.SELECT }
       )
       const timeoutCount = timeoutLocked[0]?.count || 0
 
       if (timeoutCount > 0) {
-        fail('存在超时锁定的物品', `${timeoutCount} 条超过3分钟锁定`)
+        fail('存在超时锁定的物品', `${timeoutCount} 条锁已超时（需清理）`)
       } else {
         warn('存在锁定物品但未超时', `${lockedCount} 条处于 locked 状态`)
       }
@@ -399,14 +428,22 @@ async function verifyApiLayer() {
   const fs = require('fs')
   const path = require('path')
 
-  // 检查 /api/v4/assets/portfolio 路由
-  console.log('【检查1】/api/v4/assets/portfolio 路由')
+  /*
+   * 2026-01-07 架构重构：资产总览接口迁移到 console 域
+   * - 用户端背包：/api/v4/backpack
+   * - 后台运营资产查询：/api/v4/console/assets/portfolio（admin/ops权限）
+   * - 基础资产能力：/api/v4/assets/*（跨业务域底座）
+   */
+
+  // 检查 /api/v4/console/assets/portfolio 路由（后台运营资产中心）
+  console.log('【检查1】/api/v4/console/assets/portfolio 路由（后台运营）')
   try {
     const routesDir = path.join(__dirname, '..', 'routes', 'v4')
 
-    // 查找 assets 相关路由文件
+    // 查找 assets 相关路由文件（优先检查 console 域）
     const assetsRouteFiles = [
-      path.join(routesDir, 'shop', 'assets.js'),
+      path.join(routesDir, 'console', 'assets', 'portfolio.js'),
+      path.join(routesDir, 'console', 'assets', 'index.js'),
       path.join(routesDir, 'assets', 'index.js'),
       path.join(routesDir, 'assets.js')
     ]
@@ -417,25 +454,29 @@ async function verifyApiLayer() {
         const content = fs.readFileSync(file, 'utf-8')
         if (content.includes('portfolio') || content.includes('getAssetPortfolio')) {
           foundPortfolio = true
-          pass('/api/v4/assets/portfolio 路由已实现', `在 ${path.relative(__dirname, file)}`)
+          const routePath = file.includes('console')
+            ? '/api/v4/console/assets/portfolio'
+            : '/api/v4/assets/portfolio'
+          pass(`${routePath} 路由已实现`, `在 ${path.relative(__dirname, file)}`)
           break
         }
       }
     }
 
     if (!foundPortfolio) {
-      fail('/api/v4/assets/portfolio 路由不存在')
+      fail('/api/v4/console/assets/portfolio 路由不存在')
     }
   } catch (err) {
-    fail('检查 /assets/portfolio 路由失败', err.message)
+    fail('检查 /console/assets/portfolio 路由失败', err.message)
   }
 
-  // 检查 /api/v4/assets/item-events 路由
-  console.log('\n【检查2】/api/v4/assets/item-events 路由')
+  // 检查 /api/v4/console/assets/item-events 路由（后台运营资产中心）
+  console.log('\n【检查2】/api/v4/console/assets/item-events 路由（后台运营）')
   try {
     const routesDir = path.join(__dirname, '..', 'routes', 'v4')
     const assetsRouteFiles = [
-      path.join(routesDir, 'shop', 'assets.js'),
+      path.join(routesDir, 'console', 'assets', 'portfolio.js'),
+      path.join(routesDir, 'console', 'assets', 'index.js'),
       path.join(routesDir, 'assets', 'index.js'),
       path.join(routesDir, 'assets.js')
     ]
@@ -446,17 +487,20 @@ async function verifyApiLayer() {
         const content = fs.readFileSync(file, 'utf-8')
         if (content.includes('item-events') || content.includes('getItemEvents')) {
           foundItemEvents = true
-          pass('/api/v4/assets/item-events 路由已实现', `在 ${path.relative(__dirname, file)}`)
+          const routePath = file.includes('console')
+            ? '/api/v4/console/assets/item-events'
+            : '/api/v4/assets/item-events'
+          pass(`${routePath} 路由已实现`, `在 ${path.relative(__dirname, file)}`)
           break
         }
       }
     }
 
     if (!foundItemEvents) {
-      fail('/api/v4/assets/item-events 路由不存在')
+      fail('/api/v4/console/assets/item-events 路由不存在')
     }
   } catch (err) {
-    fail('检查 /assets/item-events 路由失败', err.message)
+    fail('检查 /console/assets/item-events 路由失败', err.message)
   }
 
   // 检查 /api/v4/inventory 目录是否已彻底删除（不再接受 410 过渡状态）

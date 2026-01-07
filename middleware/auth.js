@@ -664,6 +664,103 @@ function requirePermission(requiredPermission) {
 }
 
 /**
+ * 🛡️ 角色检查中间件（支持多角色 + 读写权限区分）
+ *
+ * 功能说明（2026-01-07 架构重构）：
+ * - 支持多角色检查：requireRole(['admin', 'ops'])
+ * - 按能力细分：ops 只读、admin 可写
+ * - 普通用户：访问 console 接口返回 403
+ *
+ * 权限模型（已拍板 2026-01-07）：
+ * - admin 角色（role_level >= 100）：可读可写所有 console 接口
+ * - ops 角色（role_level = 30）：仅可读（GET 请求）；POST/PUT/DELETE 返回 403
+ * - 普通用户（role_level < 30）：访问 console 接口返回 403
+ *
+ * @param {string|string[]} allowedRoles - 允许的角色名称（单个或数组）
+ * @param {Object} _options - 配置选项（保留，未来扩展用）
+ * @returns {Function} 中间件函数
+ *
+ * @example
+ * // 允许 admin 和 ops 角色访问，ops 只能读
+ * router.get('/portfolio', authenticateToken, requireRole(['admin', 'ops']), handler)
+ *
+ * // 仅允许 admin 角色访问（写操作）
+ * router.post('/adjust', authenticateToken, requireRole('admin'), handler)
+ */
+function requireRole(allowedRoles, _options = {}) {
+  // 统一转换为数组
+  const roles = Array.isArray(allowedRoles) ? allowedRoles : [allowedRoles]
+
+  return async (req, res, next) => {
+    try {
+      // 1. 验证是否已认证
+      if (!req.user) {
+        return res.status(401).json({
+          success: false,
+          error: 'UNAUTHENTICATED',
+          message: '未认证用户'
+        })
+      }
+
+      // 2. 获取用户角色名称列表
+      const userRoleNames = req.user.roles?.map(r => r.role_name) || []
+      const userRoleLevel = req.user.role_level || 0
+
+      // 3. 检查是否有匹配的角色
+      const hasMatchingRole = roles.some(role => {
+        // 角色名称匹配
+        if (userRoleNames.includes(role)) {
+          return true
+        }
+
+        // 角色级别匹配（admin = 100+, ops = 30）
+        if (role === 'admin' && userRoleLevel >= 100) {
+          return true
+        }
+
+        return false
+      })
+
+      if (!hasMatchingRole) {
+        logger.warn(
+          `🚫 [Auth] 角色权限不足: user_id=${req.user.user_id}, 需要角色=[${roles.join(',')}], 用户角色=[${userRoleNames.join(',')}]`
+        )
+        return res.status(403).json({
+          success: false,
+          error: 'INSUFFICIENT_ROLE',
+          message: '角色权限不足，需要 ' + roles.join(' 或 ') + ' 角色'
+        })
+      }
+
+      // 4. 检查 ops 角色的读写权限（ops 只能读，不能写）
+      const isOpsRole = userRoleNames.includes('ops') && userRoleLevel < 100
+      const isWriteOperation = ['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)
+
+      if (isOpsRole && isWriteOperation) {
+        logger.warn(
+          `🚫 [Auth] ops角色不能执行写操作: user_id=${req.user.user_id}, method=${req.method}, path=${req.path}`
+        )
+        return res.status(403).json({
+          success: false,
+          error: 'OPS_READ_ONLY',
+          message: 'ops 角色仅可读，不能执行写操作（POST/PUT/PATCH/DELETE）'
+        })
+      }
+
+      // 5. 通过权限检查
+      next()
+    } catch (error) {
+      logger.error('❌ 角色权限检查失败:', error.message)
+      return res.status(500).json({
+        success: false,
+        error: 'ROLE_CHECK_FAILED',
+        message: '角色权限验证失败'
+      })
+    }
+  }
+}
+
+/**
  * 🎯 权限管理工具
  */
 const PermissionManager = {
@@ -700,6 +797,7 @@ module.exports = {
   authenticateToken,
   optionalAuth, // 可选认证中间件（用于公开接口）
   requireAdmin,
+  requireRole, // 🆕 角色检查中间件（支持多角色 + 读写权限区分）
   requirePermission,
   PermissionManager,
   invalidateUserPermissions

@@ -42,7 +42,6 @@ const DailyAssetReconciliation = require('../../jobs/daily-asset-reconciliation'
 // 避免多处直接调用服务层方法，确保业务逻辑和报告格式统一
 
 // 2025-12-29新增：资产域标准架构定时任务
-const HourlyAlertTimeoutReviews = require('../../jobs/hourly-alert-timeout-reviews')
 const HourlyUnlockTimeoutTradeOrders = require('../../jobs/hourly-unlock-timeout-trade-orders')
 
 /**
@@ -95,10 +94,7 @@ class ScheduledTasks {
     // 任务12: 每天凌晨2点执行资产对账（2025-12-17新增）
     this.scheduleDailyAssetReconciliation()
 
-    // 任务13: 每小时告警超时商家审核单（2025-12-29新增 - 资产域标准架构）
-    this.scheduleHourlyAlertTimeoutReviews()
-
-    // 任务14: 每小时解锁超时交易订单（2025-12-29新增 - 资产域标准架构）
+    // 任务13: 每小时解锁超时交易订单（2025-12-29新增 - 资产域标准架构）
     this.scheduleHourlyUnlockTimeoutTradeOrders()
 
     // 任务15: 每小时执行业务记录关联对账（2026-01-05新增 - 事务边界治理）
@@ -1096,30 +1092,9 @@ class ScheduledTasks {
    * 创建时间：2025-12-29（资产域标准架构）
    * @returns {void}
    */
-  static scheduleHourlyAlertTimeoutReviews() {
-    cron.schedule('0 * * * *', async () => {
-      try {
-        logger.info('[定时任务] 开始执行商家审核超时告警任务...')
-        const report = await HourlyAlertTimeoutReviews.execute()
-
-        if (report.timeout_count > 0) {
-          logger.warn(`[定时任务] 发现${report.timeout_count}个超时商家审核单`, {
-            action: report.action,
-            reviews: report.reviews
-          })
-        } else {
-          logger.info('[定时任务] 商家审核超时告警任务完成，无超时审核单')
-        }
-      } catch (error) {
-        logger.error('[定时任务] 商家审核超时告警任务失败', { error: error.message })
-      }
-    })
-
-    logger.info('✅ 定时任务已设置: 商家审核超时告警（每小时执行）')
-  }
 
   /**
-   * 定时任务14: 每小时解锁超时交易订单
+   * 定时任务13: 每小时解锁超时交易订单
    * Cron表达式: 0 * * * * (每小时的0分)
    *
    * 业务规则：
@@ -1151,23 +1126,6 @@ class ScheduledTasks {
     })
 
     logger.info('✅ 定时任务已设置: 交易市场超时解锁（每小时执行）')
-  }
-
-  /**
-   * 手动触发商家审核超时告警（用于测试）
-   *
-   * @returns {Promise<Object>} 告警报告对象
-   */
-  static async manualHourlyAlertTimeoutReviews() {
-    logger.info('[手动触发] 执行商家审核超时告警...')
-    try {
-      const report = await HourlyAlertTimeoutReviews.execute()
-      logger.info('[手动触发] 商家审核超时告警完成', { timeout_count: report.timeout_count })
-      return report
-    } catch (error) {
-      logger.error('[手动触发] 商家审核超时告警失败', { error: error.message })
-      throw error
-    }
   }
 
   /**

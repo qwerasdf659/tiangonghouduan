@@ -26,7 +26,7 @@ const { authenticateToken } = require('../../../middleware/auth')
  * @param {Function} fn - 异步处理函数
  * @returns {Function} 包装后的中间件函数
  */
-function asyncHandler (fn) {
+function asyncHandler(fn) {
   return (req, res, next) => {
     Promise.resolve(fn(req, res, next)).catch(next)
   }
@@ -55,11 +55,12 @@ router.get(
 
     const balance = await AssetService.getBalance({ user_id, asset_code })
 
+    // 返回字段命名与 AssetService.getBalance() 保持一致（全链路统一）
     return res.apiSuccess({
       asset_code,
-      available: Number(balance.available_amount),
-      frozen: Number(balance.frozen_amount),
-      total: Number(balance.available_amount) + Number(balance.frozen_amount)
+      available_amount: Number(balance.available_amount),
+      frozen_amount: Number(balance.frozen_amount),
+      total_amount: Number(balance.available_amount) + Number(balance.frozen_amount)
     })
   })
 )
@@ -81,12 +82,13 @@ router.get(
 
     const balances = await AssetService.getAllBalances({ user_id })
 
+    // 返回字段命名与 AssetService.getBalance() 保持一致（全链路统一）
     return res.apiSuccess({
       balances: balances.map(b => ({
         asset_code: b.asset_code,
-        available: Number(b.available_amount),
-        frozen: Number(b.frozen_amount),
-        total: Number(b.available_amount) + Number(b.frozen_amount)
+        available_amount: Number(b.available_amount),
+        frozen_amount: Number(b.frozen_amount),
+        total_amount: Number(b.available_amount) + Number(b.frozen_amount)
       }))
     })
   })

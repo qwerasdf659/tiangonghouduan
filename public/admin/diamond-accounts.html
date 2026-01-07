@@ -324,7 +324,7 @@
       let targetUserId = userId;
       if (mobile && !userId) {
         try {
-          const userResponse = await apiRequest(`/api/v4/admin/users/search?mobile=${mobile}`);
+          const userResponse = await apiRequest(`/api/v4/console/users/search?mobile=${mobile}`);
           if (userResponse && userResponse.success && userResponse.data) {
             targetUserId = userResponse.data.user_id;
           } else {
@@ -349,7 +349,7 @@
       currentPage = 1;
 
       try {
-        const response = await apiRequest(`/api/v4/admin/diamond/users/${userId}/balance`);
+        const response = await apiRequest(`/api/v4/console/diamond/users/${userId}/balance`);
 
         if (response && response.success) {
           const { user, account } = response.data;
@@ -407,7 +407,7 @@
       }
 
       try {
-        const response = await apiRequest(`/api/v4/admin/diamond/transactions?${params.toString()}`);
+        const response = await apiRequest(`/api/v4/console/diamond/transactions?${params.toString()}`);
 
         if (response && response.success) {
           const { transactions, pagination } = response.data;
@@ -583,7 +583,7 @@
         submitBtn.disabled = true;
         submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>提交中...';
 
-        const response = await apiRequest(`/api/v4/admin/diamond/users/${currentUserId}/adjust`, {
+        const response = await apiRequest(`/api/v4/console/diamond/users/${currentUserId}/adjust`, {
           method: 'POST',
           body: JSON.stringify(data)
         });

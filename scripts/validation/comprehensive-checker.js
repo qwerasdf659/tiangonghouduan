@@ -125,8 +125,8 @@ class ComprehensiveChecker {
       if (subPath) {
         const moduleName = subPath[1].replace(/_/g, '-')
         return routePath === '/'
-          ? `/api/v4/admin/${moduleName}`
-          : `/api/v4/admin/${moduleName}${routePath}`
+          ? `/api/v4/console/${moduleName}`
+          : `/api/v4/console/${moduleName}${routePath}`
       }
     }
 

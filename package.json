@@ -254,7 +254,7 @@
       "auth": "/api/v4/auth - 用户认证系统（登录、登出、Token验证）",
       "lottery": "/api/v4/lottery - 抽奖系统（单次抽奖、连续抽奖、抽奖历史）",
       "points": "/api/v4/points - 积分管理系统（余额查询、交易历史、统计分析）",
-      "admin": "/api/v4/admin - 管理后台系统（用户管理、抽奖管理、数据分析）"
+      "console": "/api/v4/console - 管理后台系统（用户管理、抽奖管理、数据分析）"
     },
     "features": [
       "RESTful标准化设计",

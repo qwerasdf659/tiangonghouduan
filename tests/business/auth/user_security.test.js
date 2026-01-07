@@ -128,7 +128,7 @@ describe('用户管理安全修复测试 (风险1、2、3 - V4架构)', () => {
 
       // 管理员修改低级别用户的角色
       const response = await request(app)
-        .put(`/api/v4/admin/user-management/users/${regularUser1.user_id}/role`)
+        .put(`/api/v4/console/user-management/users/${regularUser1.user_id}/role`)
         .set('Authorization', `Bearer ${adminToken}`)
         .send({
           role_name: 'user',
@@ -204,7 +204,7 @@ describe('用户管理安全修复测试 (风险1、2、3 - V4架构)', () => {
       console.log(`\n测试：管理员 修改 用户1(ID=${regularUser1.user_id}) 的状态`)
 
       const response = await request(app)
-        .put(`/api/v4/admin/user-management/users/${regularUser1.user_id}/status`)
+        .put(`/api/v4/console/user-management/users/${regularUser1.user_id}/status`)
         .set('Authorization', `Bearer ${adminToken}`)
         .send({
           status: 'active',
@@ -228,7 +228,7 @@ describe('用户管理安全修复测试 (风险1、2、3 - V4架构)', () => {
       console.log(`\n测试：管理员 尝试修改 自己(ID=${adminUser.user_id}) 的状态`)
 
       const response = await request(app)
-        .put(`/api/v4/admin/user-management/users/${adminUser.user_id}/status`)
+        .put(`/api/v4/console/user-management/users/${adminUser.user_id}/status`)
         .set('Authorization', `Bearer ${adminToken}`)
         .send({
           status: 'inactive',
@@ -264,7 +264,7 @@ describe('用户管理安全修复测试 (风险1、2、3 - V4架构)', () => {
       console.log('\n测试：尝试分配不存在的角色，验证事务回滚')
 
       const response = await request(app)
-        .put(`/api/v4/admin/user-management/users/${regularUser1.user_id}/role`)
+        .put(`/api/v4/console/user-management/users/${regularUser1.user_id}/role`)
         .set('Authorization', `Bearer ${adminToken}`)
         .send({
           role_name: 'nonexistent_role_test_123',
@@ -305,7 +305,7 @@ describe('用户管理安全修复测试 (风险1、2、3 - V4架构)', () => {
       const nonexistentUserId = 99999999
 
       const response = await request(app)
-        .put(`/api/v4/admin/user-management/users/${nonexistentUserId}/role`)
+        .put(`/api/v4/console/user-management/users/${nonexistentUserId}/role`)
         .set('Authorization', `Bearer ${adminToken}`)
         .send({
           role_name: 'user',
@@ -347,7 +347,7 @@ describe('用户管理安全修复测试 (风险1、2、3 - V4架构)', () => {
       // 2. 验证自我保护机制
       console.log('  2️⃣ 验证自我保护机制...')
       const selfModifyRes = await request(app)
-        .put(`/api/v4/admin/user-management/users/${adminUser.user_id}/status`)
+        .put(`/api/v4/console/user-management/users/${adminUser.user_id}/status`)
         .set('Authorization', `Bearer ${adminToken}`)
         .send({ status: 'inactive', reason: '测试' })
 
@@ -359,7 +359,7 @@ describe('用户管理安全修复测试 (风险1、2、3 - V4架构)', () => {
       // 3. 验证事务回滚
       console.log('  3️⃣ 验证事务回滚机制...')
       const invalidRoleRes = await request(app)
-        .put(`/api/v4/admin/user-management/users/${regularUser1.user_id}/role`)
+        .put(`/api/v4/console/user-management/users/${regularUser1.user_id}/role`)
         .set('Authorization', `Bearer ${adminToken}`)
         .send({ role_name: 'invalid_role_xyz', reason: '测试' })
 

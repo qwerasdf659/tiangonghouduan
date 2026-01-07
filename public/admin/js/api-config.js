@@ -34,26 +34,26 @@ const API_ENDPOINTS = {
 
   // ===== 奖品池管理API =====
   PRIZE: {
-    LIST: '/api/v4/admin/prize-pool/list', // 获取奖品列表
-    BATCH_ADD: '/api/v4/admin/prize-pool/batch-add', // 批量添加奖品
-    UPDATE: '/api/v4/admin/prize-pool/prize/:prize_id', // 更新奖品
-    DELETE: '/api/v4/admin/prize-pool/prize/:prize_id', // 删除奖品
-    DETAIL: '/api/v4/admin/prize-pool/prize/:prize_id', // 获取奖品详情
-    ADD_STOCK: '/api/v4/admin/prize-pool/prize/:prize_id/add-stock' // 增加库存
+    LIST: '/api/v4/console/prize-pool/list', // 获取奖品列表
+    BATCH_ADD: '/api/v4/console/prize-pool/batch-add', // 批量添加奖品
+    UPDATE: '/api/v4/console/prize-pool/prize/:prize_id', // 更新奖品
+    DELETE: '/api/v4/console/prize-pool/prize/:prize_id', // 删除奖品
+    DETAIL: '/api/v4/console/prize-pool/prize/:prize_id', // 获取奖品详情
+    ADD_STOCK: '/api/v4/console/prize-pool/prize/:prize_id/add-stock' // 增加库存
   },
 
   // ===== 用户管理API =====
   USER: {
-    LIST: '/api/v4/admin/user-management/users', // 获取用户列表
-    DETAIL: '/api/v4/admin/user-management/users/:user_id', // 获取用户详情
-    UPDATE_ROLE: '/api/v4/admin/user-management/users/:user_id/role', // 更新用户角色
-    UPDATE_STATUS: '/api/v4/admin/user-management/users/:user_id/status', // 更新用户状态
-    DELETE: '/api/v4/admin/user-management/users/:user_id' // 删除用户
+    LIST: '/api/v4/console/user-management/users', // 获取用户列表
+    DETAIL: '/api/v4/console/user-management/users/:user_id', // 获取用户详情
+    UPDATE_ROLE: '/api/v4/console/user-management/users/:user_id/role', // 更新用户角色
+    UPDATE_STATUS: '/api/v4/console/user-management/users/:user_id/status', // 更新用户状态
+    DELETE: '/api/v4/console/user-management/users/:user_id' // 删除用户
   },
 
   // ===== 角色管理API =====
   ROLE: {
-    LIST: '/api/v4/admin/user-management/roles' // 获取角色列表
+    LIST: '/api/v4/console/user-management/roles' // 获取角色列表
   },
 
   // ===== 抽奖管理API =====
@@ -74,7 +74,7 @@ const API_ENDPOINTS = {
 
   // ===== 系统管理API =====
   SYSTEM: {
-    DASHBOARD: '/api/v4/admin/system/dashboard', // 系统仪表板
+    DASHBOARD: '/api/v4/console/system/dashboard', // 系统仪表板
     HEALTH: '/health', // 健康检查
     VERSION: '/api/v4' // 版本信息
   }

@@ -48,7 +48,18 @@ module.exports = sequelize => {
       image_url: {
         type: DataTypes.STRING(500),
         allowNull: true,
-        comment: '商品图片URL'
+        comment: '商品图片URL（废弃字段，保留兼容过渡）'
+      },
+      primary_image_id: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+        comment: '主图片ID，关联 image_resources.image_id（2026-01-08 图片存储架构）',
+        references: {
+          model: 'image_resources',
+          key: 'image_id'
+        },
+        onUpdate: 'CASCADE',
+        onDelete: 'SET NULL'
       },
 
       // V4.5.0 材料资产支付字段（唯一支付方式）
@@ -125,6 +136,12 @@ module.exports = sequelize => {
     ExchangeItem.hasMany(models.ExchangeRecord, {
       foreignKey: 'item_id',
       as: 'exchangeRecords'
+    })
+
+    // 多对一：商品关联主图片（2026-01-08 图片存储架构）
+    ExchangeItem.belongsTo(models.ImageResources, {
+      foreignKey: 'primary_image_id',
+      as: 'primaryImage'
     })
   }
 

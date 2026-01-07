@@ -154,6 +154,35 @@ const SYSTEM_SETTINGS_WHITELIST = {
     // 代码配置已删除：config/business.config.js 中不再包含 daily_limit.all，统一使用 DB 配置
   },
 
+  // ===== 商家审核设置（2026-01-08 新增）=====
+  'points/merchant_review_budget_ratio': {
+    type: 'number',
+    min: 0.05, // 最低 5%（防止预算过低无激励效果）
+    max: 0.5, // 最高 50%（防止预算过高导致成本失控）
+    step: 0.01, // 精度：0.01（即 1%）
+    default: 0.24,
+    readonly: false, // 运营可调
+    description: '商家审核预算积分比例（审核通过时发放的预算积分 = 奖励积分 × 该比例）',
+    changeRequiresRestart: false,
+    businessImpact: 'HIGH',
+    auditRequired: true,
+    approvalRequired: false
+  },
+
+  'points/merchant_review_campaign_id': {
+    type: 'string',
+    minLength: 5,
+    maxLength: 50,
+    pattern: /^[A-Z0-9_]+$/, // 大写字母、数字、下划线
+    default: 'MERCHANT_REVIEW_DEFAULT',
+    readonly: false, // 运营可调
+    description: '商家审核预算积分活动标识（用于区分不同来源的预算积分）',
+    changeRequiresRestart: false,
+    businessImpact: 'MEDIUM',
+    auditRequired: true,
+    approvalRequired: false
+  },
+
   // ===== 市场设置（运营可调）=====
   'marketplace/max_active_listings': {
     type: 'number',
@@ -299,7 +328,7 @@ const FORBIDDEN_IN_DB = {
  *   throw new Error('配置项不在白名单内')
  * }
  */
-function getWhitelist (settingKey) {
+function getWhitelist(settingKey) {
   return SYSTEM_SETTINGS_WHITELIST[settingKey] || null
 }
 
@@ -314,7 +343,7 @@ function getWhitelist (settingKey) {
  *   throw new Error('该配置禁止存储在数据库')
  * }
  */
-function isForbidden (settingKey) {
+function isForbidden(settingKey) {
   // 检查精确匹配
   if (FORBIDDEN_IN_DB.exactMatch.includes(settingKey)) {
     return true
@@ -351,7 +380,7 @@ function isForbidden (settingKey) {
  *   throw new Error(result.error)
  * }
  */
-function validateSettingValue (settingKey, value) {
+function validateSettingValue(settingKey, value) {
   const whitelist = getWhitelist(settingKey)
 
   if (!whitelist) {
@@ -413,7 +442,7 @@ function validateSettingValue (settingKey, value) {
  *
  * @returns {string[]} 白名单配置项列表
  */
-function getAllWhitelistKeys () {
+function getAllWhitelistKeys() {
   return Object.keys(SYSTEM_SETTINGS_WHITELIST)
 }
 
@@ -422,7 +451,7 @@ function getAllWhitelistKeys () {
  *
  * @returns {string[]} 需要审计的配置项列表
  */
-function getAuditRequiredKeys () {
+function getAuditRequiredKeys() {
   return Object.entries(SYSTEM_SETTINGS_WHITELIST)
     .filter(([, schema]) => schema.auditRequired)
     .map(([key]) => key)

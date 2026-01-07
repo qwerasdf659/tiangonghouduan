@@ -164,7 +164,10 @@ describe('ContentAuditEngine - 内容审核引擎测试', () => {
 
   describe('getPendingAudits - 获取待审核记录', () => {
     beforeAll(async () => {
-      // 创建多个测试审核记录
+      /*
+       * 创建多个测试审核记录
+       * 2026-01-08 修复：移除 auditable_type='image'（image 审核已废弃）
+       */
       await ContentReviewRecord.bulkCreate([
         {
           auditable_type: 'exchange',
@@ -174,7 +177,7 @@ describe('ContentAuditEngine - 内容审核引擎测试', () => {
           submitted_at: BeijingTimeHelper.createDatabaseTime()
         },
         {
-          auditable_type: 'image',
+          auditable_type: 'feedback',
           auditable_id: 102,
           audit_status: 'pending',
           priority: 'medium',
@@ -229,11 +232,14 @@ describe('ContentAuditEngine - 内容审核引擎测试', () => {
   })
 
   afterAll(async () => {
-    // 清理测试数据
+    /*
+     * 清理测试数据
+     * 2026-01-08 修复：移除 'image' 类型（image 审核已废弃）
+     */
     try {
       await ContentReviewRecord.destroy({
         where: {
-          auditable_type: ['exchange', 'feedback', 'image'],
+          auditable_type: ['exchange', 'feedback'],
           auditable_id: { [require('sequelize').Op.in]: [1, 999, 998, 997, 101, 102] }
         }
       })

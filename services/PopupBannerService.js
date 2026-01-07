@@ -7,7 +7,7 @@
  *
  * 服务对象：
  * - /api/v4/popup-banners/active（小程序端 - 获取有效弹窗）
- * - /api/v4/admin/popup-banners（管理端 - CRUD操作）
+ * - /api/v4/console/popup-banners（管理端 - CRUD操作）
  *
  * 创建时间：2025-12-22
  */
@@ -17,6 +17,7 @@ const { PopupBanner, User } = require('../models')
 const { Op } = require('sequelize')
 const BeijingTimeHelper = require('../utils/timeHelper')
 const SealosStorageService = require('./sealosStorage')
+const { getImageUrl } = require('../utils/ImageUrlHelper')
 
 /**
  * 弹窗Banner服务类
@@ -39,7 +40,7 @@ class PopupBannerService {
    * @param {number} options.limit - 返回数量限制（默认 10）
    * @returns {Promise<Array>} 有效弹窗列表（仅包含小程序需要的字段）
    */
-  static async getActiveBanners (options = {}) {
+  static async getActiveBanners(options = {}) {
     const { position = 'home', limit = 10 } = options
     const now = BeijingTimeHelper.createBeijingTime()
 
@@ -71,7 +72,8 @@ class PopupBannerService {
         count: banners.length
       })
 
-      return banners.map(banner => banner.toJSON())
+      // 🔴 转换 image_url：对象 key → 完整 CDN URL
+      return banners.map(banner => PopupBannerService._transformBannerImageUrl(banner.toJSON()))
     } catch (error) {
       logger.error('获取有效弹窗失败', { error: error.message, position })
       throw error
@@ -92,7 +94,7 @@ class PopupBannerService {
    * @param {number} options.limit - 返回数量限制（默认 10）
    * @returns {Promise<Array>} 弹窗列表
    */
-  static async getBannersByStatus (options = {}) {
+  static async getBannersByStatus(options = {}) {
     const { status, position = 'home', limit = 10 } = options
     const now = BeijingTimeHelper.createBeijingTime()
 
@@ -134,7 +136,8 @@ class PopupBannerService {
         count: banners.length
       })
 
-      return banners.map(banner => banner.toJSON())
+      // 🔴 转换 image_url：对象 key → 完整 CDN URL
+      return banners.map(banner => PopupBannerService._transformBannerImageUrl(banner.toJSON()))
     } catch (error) {
       logger.error('根据状态获取弹窗失败', { error: error.message, status, position })
       throw error
@@ -151,7 +154,7 @@ class PopupBannerService {
    * @param {number} options.offset - 偏移量
    * @returns {Promise<Object>} { banners: Array, total: number }
    */
-  static async getAdminBannerList (options = {}) {
+  static async getAdminBannerList(options = {}) {
     const { position = null, is_active = null, limit = 20, offset = 0 } = options
 
     try {
@@ -176,11 +179,12 @@ class PopupBannerService {
         ]
       })
 
-      // 添加状态描述
+      // 添加状态描述 + 转换 image_url
       const bannersWithStatus = banners.map(banner => {
         const plain = banner.toJSON()
         plain.status_description = banner.getStatusDescription()
-        return plain
+        // 🔴 转换 image_url：对象 key → 完整 CDN URL
+        return PopupBannerService._transformBannerImageUrl(plain)
       })
 
       logger.info('获取管理后台弹窗列表成功', {
@@ -206,7 +210,7 @@ class PopupBannerService {
    * @param {number} bannerId - 弹窗ID
    * @returns {Promise<Object|null>} 弹窗详情
    */
-  static async getBannerById (bannerId) {
+  static async getBannerById(bannerId) {
     try {
       const banner = await PopupBanner.findByPk(bannerId, {
         include: [
@@ -222,7 +226,8 @@ class PopupBannerService {
 
       const plain = banner.toJSON()
       plain.status_description = banner.getStatusDescription()
-      return plain
+      // 🔴 转换 image_url：对象 key → 完整 CDN URL
+      return PopupBannerService._transformBannerImageUrl(plain)
     } catch (error) {
       logger.error('获取弹窗详情失败', { error: error.message, banner_id: bannerId })
       throw error
@@ -245,7 +250,7 @@ class PopupBannerService {
    * @param {number} creatorId - 创建人ID
    * @returns {Promise<Object>} 创建的弹窗
    */
-  static async createBanner (data, creatorId) {
+  static async createBanner(data, creatorId) {
     try {
       const {
         title,
@@ -281,7 +286,8 @@ class PopupBannerService {
         created_by: creatorId
       })
 
-      return banner.toJSON()
+      // 🔴 转换 image_url：对象 key → 完整 CDN URL
+      return PopupBannerService._transformBannerImageUrl(banner.toJSON())
     } catch (error) {
       logger.error('创建弹窗Banner失败', { error: error.message, data })
       throw error
@@ -291,24 +297,57 @@ class PopupBannerService {
   /**
    * 上传弹窗图片到Sealos对象存储
    *
+   * 🎯 架构决策（2026-01-08 拍板）：
+   * - 返回对象 key（如 popup-banners/xxx.jpg）存入数据库
+   * - 同时返回完整 URL 供前端预览使用
+   *
    * @param {Buffer} fileBuffer - 文件缓冲区
    * @param {string} originalName - 原始文件名
-   * @returns {Promise<string>} 图片访问URL
+   * @returns {Promise<{objectKey: string, publicUrl: string}>} 对象 key 和公网 URL
    */
-  static async uploadBannerImage (fileBuffer, originalName) {
+  static async uploadBannerImage(fileBuffer, originalName) {
     try {
       const storageService = new SealosStorageService()
-      const imageUrl = await storageService.uploadImage(fileBuffer, originalName, 'popup-banners')
+
+      // uploadImage 现在返回对象 key（非完整 URL）
+      const objectKey = await storageService.uploadImage(fileBuffer, originalName, 'popup-banners')
+
+      // 生成公网访问 URL（供前端预览）
+      const publicUrl = storageService.getPublicUrl(objectKey)
 
       logger.info('上传弹窗图片成功', {
         original_name: originalName,
-        image_url: imageUrl
+        object_key: objectKey,
+        public_url: publicUrl
       })
 
-      return imageUrl
+      // 返回对象 key（存入数据库）和 URL（供前端预览）
+      return {
+        objectKey,
+        publicUrl
+      }
     } catch (error) {
       logger.error('上传弹窗图片失败', { error: error.message, original_name: originalName })
       throw error
+    }
+  }
+
+  /**
+   * 根据对象 key 生成公网访问 URL
+   *
+   * @param {string} objectKey - 对象 key（如 popup-banners/xxx.jpg）
+   * @param {Object} options - URL 选项（width/height/fit）
+   * @returns {string|null} 公网访问 URL
+   */
+  static getImageUrl(objectKey, options = {}) {
+    if (!objectKey) return null
+
+    try {
+      const storageService = new SealosStorageService()
+      return storageService.getPublicUrl(objectKey, options)
+    } catch (error) {
+      logger.warn('生成图片 URL 失败', { object_key: objectKey, error: error.message })
+      return null
     }
   }
 
@@ -319,7 +358,7 @@ class PopupBannerService {
    * @param {Object} data - 更新数据
    * @returns {Promise<Object|null>} 更新后的弹窗
    */
-  static async updateBanner (bannerId, data) {
+  static async updateBanner(bannerId, data) {
     try {
       const banner = await PopupBanner.findByPk(bannerId)
       if (!banner) return null
@@ -376,7 +415,7 @@ class PopupBannerService {
    * @param {number} bannerId - 弹窗ID
    * @returns {Promise<boolean>} 是否成功
    */
-  static async deleteBanner (bannerId) {
+  static async deleteBanner(bannerId) {
     try {
       const banner = await PopupBanner.findByPk(bannerId)
       if (!banner) return false
@@ -400,7 +439,7 @@ class PopupBannerService {
    * @param {number} bannerId - 弹窗ID
    * @returns {Promise<Object|null>} 更新后的弹窗
    */
-  static async toggleBannerActive (bannerId) {
+  static async toggleBannerActive(bannerId) {
     try {
       const banner = await PopupBanner.findByPk(bannerId)
       if (!banner) return null
@@ -426,7 +465,7 @@ class PopupBannerService {
    *
    * @returns {Promise<Object>} 统计数据
    */
-  static async getStatistics () {
+  static async getStatistics() {
     try {
       const now = BeijingTimeHelper.createBeijingTime()
 
@@ -468,7 +507,7 @@ class PopupBannerService {
    * @param {Array<{banner_id: number, display_order: number}>} orderList - 排序列表
    * @returns {Promise<number>} 更新的记录数
    */
-  static async updateDisplayOrder (orderList) {
+  static async updateDisplayOrder(orderList) {
     try {
       // 使用 Promise.all 并行处理批量更新，提升性能
       const updatePromises = orderList.map(item =>
@@ -493,6 +532,33 @@ class PopupBannerService {
       logger.error('批量更新显示顺序失败', { error: error.message })
       throw error
     }
+  }
+
+  /**
+   * 转换 banner 的 image_url 为完整 CDN URL
+   *
+   * 🎯 架构决策（2026-01-08 拍板）：
+   * - 数据库存储对象 key（如 popup-banners/xxx.jpg）
+   * - API 返回完整 CDN URL（如 https://cdn.example.com/bucket/popup-banners/xxx.jpg）
+   * - 兼容历史数据：如果已是完整 URL，则原样返回
+   *
+   * @private
+   * @param {Object} banner - banner 对象（plain JSON）
+   * @returns {Object} 转换后的 banner 对象
+   */
+  static _transformBannerImageUrl(banner) {
+    if (!banner || !banner.image_url) {
+      return banner
+    }
+
+    // 如果已经是完整 URL（http/https 开头），原样返回（兼容历史数据）
+    if (banner.image_url.startsWith('http://') || banner.image_url.startsWith('https://')) {
+      return banner
+    }
+
+    // 将对象 key 转换为完整 CDN URL
+    banner.image_url = getImageUrl(banner.image_url)
+    return banner
   }
 }
 

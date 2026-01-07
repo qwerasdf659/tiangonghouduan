@@ -32,7 +32,7 @@ const BeijingTimeHelper = require('../../../../utils/timeHelper')
  *
  * 📌 规范说明：
  * - 用户查询自己的记录使用/me端点，通过token识别用户身份
- * - 管理员查询指定用户记录请使用：/api/v4/admin/users/:user_id/consumption
+ * - 管理员查询指定用户记录请使用：/api/v4/console/users/:user_id/consumption
  */
 router.get('/me', authenticateToken, async (req, res) => {
   try {

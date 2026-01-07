@@ -70,10 +70,10 @@ describe('用户个性化中奖率设置功能测试', () => {
    * 测试1：特定奖品概率调整
    * 业务场景：管理员为用户B设置一等奖中奖率50%
    */
-  describe('POST /api/v4/admin/lottery-management/probability-adjust - 特定奖品调整', () => {
+  describe('POST /api/v4/console/lottery-management/probability-adjust - 特定奖品调整', () => {
     test('应该成功设置用户特定奖品的中奖率', async () => {
       const response = await request(app)
-        .post('/api/v4/admin/lottery-management/probability-adjust')
+        .post('/api/v4/console/lottery-management/probability-adjust')
         .set('Authorization', `Bearer ${adminToken}`)
         .send({
           user_id: testUserId,
@@ -109,7 +109,7 @@ describe('用户个性化中奖率设置功能测试', () => {
 
     test('应该拒绝无效的概率值', async () => {
       const response = await request(app)
-        .post('/api/v4/admin/lottery-management/probability-adjust')
+        .post('/api/v4/console/lottery-management/probability-adjust')
         .set('Authorization', `Bearer ${adminToken}`)
         .send({
           user_id: testUserId,
@@ -125,7 +125,7 @@ describe('用户个性化中奖率设置功能测试', () => {
 
     test('应该拒绝不存在的奖品ID', async () => {
       const response = await request(app)
-        .post('/api/v4/admin/lottery-management/probability-adjust')
+        .post('/api/v4/console/lottery-management/probability-adjust')
         .set('Authorization', `Bearer ${adminToken}`)
         .send({
           user_id: testUserId,
@@ -144,10 +144,10 @@ describe('用户个性化中奖率设置功能测试', () => {
    * 测试2：全局倍数调整
    * 业务场景：管理员为用户A设置2倍中奖率
    */
-  describe('POST /api/v4/admin/lottery-management/probability-adjust - 全局倍数调整', () => {
+  describe('POST /api/v4/console/lottery-management/probability-adjust - 全局倍数调整', () => {
     test('应该成功设置用户全局概率倍数', async () => {
       const response = await request(app)
-        .post('/api/v4/admin/lottery-management/probability-adjust')
+        .post('/api/v4/console/lottery-management/probability-adjust')
         .set('Authorization', `Bearer ${adminToken}`)
         .send({
           user_id: testUserId,
@@ -171,7 +171,7 @@ describe('用户个性化中奖率设置功能测试', () => {
 
     test('应该拒绝无效的倍数值', async () => {
       const response = await request(app)
-        .post('/api/v4/admin/lottery-management/probability-adjust')
+        .post('/api/v4/console/lottery-management/probability-adjust')
         .set('Authorization', `Bearer ${adminToken}`)
         .send({
           user_id: testUserId,
@@ -188,11 +188,11 @@ describe('用户个性化中奖率设置功能测试', () => {
    * 测试3：用户管理状态查询
    * 业务场景：查询用户当前生效的概率调整设置
    */
-  describe('GET /api/v4/admin/lottery-management/user-status/:user_id', () => {
+  describe('GET /api/v4/console/lottery-management/user-status/:user_id', () => {
     test('应该返回用户的概率调整状态', async () => {
       // 先设置一个配置
       await request(app)
-        .post('/api/v4/admin/lottery-management/probability-adjust')
+        .post('/api/v4/console/lottery-management/probability-adjust')
         .set('Authorization', `Bearer ${adminToken}`)
         .send({
           user_id: testUserId,
@@ -204,7 +204,7 @@ describe('用户个性化中奖率设置功能测试', () => {
 
       // 查询状态
       const response = await request(app)
-        .get(`/api/v4/admin/lottery-management/user-status/${testUserId}`)
+        .get(`/api/v4/console/lottery-management/user-status/${testUserId}`)
         .set('Authorization', `Bearer ${adminToken}`)
 
       expect(response.status).toBe(200)
@@ -224,7 +224,7 @@ describe('用户个性化中奖率设置功能测试', () => {
 
     test('应该拒绝非管理员访问', async () => {
       const response = await request(app).get(
-        `/api/v4/admin/lottery-management/user-status/${testUserId}`
+        `/api/v4/console/lottery-management/user-status/${testUserId}`
       )
       // 不设置token
 
@@ -236,11 +236,11 @@ describe('用户个性化中奖率设置功能测试', () => {
    * 测试4：清除用户设置
    * 业务场景：管理员取消用户的概率调整设置
    */
-  describe('DELETE /api/v4/admin/lottery-management/clear-user-settings/:user_id', () => {
+  describe('DELETE /api/v4/console/lottery-management/clear-user-settings/:user_id', () => {
     test('应该成功清除用户的管理设置', async () => {
       // 先设置一个配置
       await request(app)
-        .post('/api/v4/admin/lottery-management/probability-adjust')
+        .post('/api/v4/console/lottery-management/probability-adjust')
         .set('Authorization', `Bearer ${adminToken}`)
         .send({
           user_id: testUserId,
@@ -251,7 +251,7 @@ describe('用户个性化中奖率设置功能测试', () => {
 
       // 清除设置
       const response = await request(app)
-        .delete(`/api/v4/admin/lottery-management/clear-user-settings/${testUserId}`)
+        .delete(`/api/v4/console/lottery-management/clear-user-settings/${testUserId}`)
         .set('Authorization', `Bearer ${adminToken}`)
         .send({
           reason: '测试清除'
@@ -263,7 +263,7 @@ describe('用户个性化中奖率设置功能测试', () => {
 
       // 验证设置已清除
       const statusResponse = await request(app)
-        .get(`/api/v4/admin/lottery-management/user-status/${testUserId}`)
+        .get(`/api/v4/console/lottery-management/user-status/${testUserId}`)
         .set('Authorization', `Bearer ${adminToken}`)
 
       const { management_status } = statusResponse.body.data
@@ -279,7 +279,7 @@ describe('用户个性化中奖率设置功能测试', () => {
     test('应该在抽奖时应用用户的个性化概率', async () => {
       // 1. 设置用户个性化概率
       await request(app)
-        .post('/api/v4/admin/lottery-management/probability-adjust')
+        .post('/api/v4/console/lottery-management/probability-adjust')
         .set('Authorization', `Bearer ${adminToken}`)
         .send({
           user_id: testUserId,
@@ -320,7 +320,7 @@ describe('用户个性化中奖率设置功能测试', () => {
 
       // 4. 清理配置
       await request(app)
-        .delete(`/api/v4/admin/lottery-management/clear-user-settings/${testUserId}`)
+        .delete(`/api/v4/console/lottery-management/clear-user-settings/${testUserId}`)
         .set('Authorization', `Bearer ${adminToken}`)
         .send({ reason: '测试清理' })
     })
@@ -371,7 +371,7 @@ describe('用户个性化中奖率设置功能测试', () => {
       }
 
       const response = await request(app)
-        .post('/api/v4/admin/lottery-management/probability-adjust')
+        .post('/api/v4/console/lottery-management/probability-adjust')
         .set('Authorization', `Bearer ${adminToken}`)
         .send(frontendData)
 
@@ -395,13 +395,13 @@ describe('用户个性化中奖率设置功能测试', () => {
     test('应该允许为同一用户多次设置配置', async () => {
       // 先清除旧配置
       await request(app)
-        .delete(`/api/v4/admin/lottery-management/clear-user-settings/${testUserId}`)
+        .delete(`/api/v4/console/lottery-management/clear-user-settings/${testUserId}`)
         .set('Authorization', `Bearer ${adminToken}`)
         .send({ reason: '测试前清理' })
 
       // 第一次设置
       const response1 = await request(app)
-        .post('/api/v4/admin/lottery-management/probability-adjust')
+        .post('/api/v4/console/lottery-management/probability-adjust')
         .set('Authorization', `Bearer ${adminToken}`)
         .send({
           user_id: testUserId,
@@ -414,7 +414,7 @@ describe('用户个性化中奖率设置功能测试', () => {
 
       // 第二次设置（新配置，可能与第一次配置并存）
       const response2 = await request(app)
-        .post('/api/v4/admin/lottery-management/probability-adjust')
+        .post('/api/v4/console/lottery-management/probability-adjust')
         .set('Authorization', `Bearer ${adminToken}`)
         .send({
           user_id: testUserId,
@@ -427,7 +427,7 @@ describe('用户个性化中奖率设置功能测试', () => {
 
       // 查询用户状态，应该返回一个有效配置
       const statusResponse = await request(app)
-        .get(`/api/v4/admin/lottery-management/user-status/${testUserId}`)
+        .get(`/api/v4/console/lottery-management/user-status/${testUserId}`)
         .set('Authorization', `Bearer ${adminToken}`)
 
       const { management_status } = statusResponse.body.data
@@ -446,7 +446,7 @@ describe('用户个性化中奖率设置功能测试', () => {
   describe('权限验证', () => {
     test('未登录不能设置概率', async () => {
       const response = await request(app)
-        .post('/api/v4/admin/lottery-management/probability-adjust')
+        .post('/api/v4/console/lottery-management/probability-adjust')
         // 不设置Authorization header
         .send({
           user_id: testUserId,
