@@ -32,11 +32,12 @@ const logger = require('../utils/logger').logger
  * - 所有操作记录到role_change_logs表
  */
 
-const { User, Role, UserRole, UserHierarchy, RoleChangeLog } = require('../models')
+const { User, Role, UserRole, UserHierarchy } = require('../models')
 const { Op } = require('sequelize')
 const BeijingTimeHelper = require('../utils/timeHelper')
 const { PermissionManager } = require('../middleware/auth')
 const { assertAndGetTransaction } = require('../utils/transactionHelpers')
+const AuditLogService = require('./AuditLogService')
 
 /**
  * 层级权限管理服务类
@@ -58,7 +59,7 @@ class HierarchyManagementService {
    * 示例：业务经理（user_id=10）添加业务员（user_id=20）到门店（store_id=5）
    * await createHierarchy(20, 10, role_id, 5)
    */
-  static async createHierarchy (user_id, superior_user_id, role_id, store_id = null) {
+  static async createHierarchy(user_id, superior_user_id, role_id, store_id = null) {
     try {
       // 1. 验证用户和角色存在
       const user = await User.findByPk(user_id)
@@ -126,7 +127,7 @@ class HierarchyManagementService {
    *
    * 安全增强：添加循环检测和深度限制，防止数据异常导致无限递归
    */
-  static async getAllSubordinates (
+  static async getAllSubordinates(
     user_id,
     include_inactive = false,
     maxDepth = 10,
@@ -230,7 +231,7 @@ class HierarchyManagementService {
    * 示例2：业务经理离职，停用其本人及所有下级业务员（需要明确传入true）
    * await batchDeactivatePermissions(10, 1, '业务经理离职', true, { transaction })
    */
-  static async batchDeactivatePermissions (
+  static async batchDeactivatePermissions(
     target_user_id,
     operator_user_id,
     reason,
@@ -238,7 +239,10 @@ class HierarchyManagementService {
     options = {}
   ) {
     // 强制要求事务边界 - 2026-01-05 治理决策
-    const transaction = assertAndGetTransaction(options, 'HierarchyManagementService.batchDeactivatePermissions')
+    const transaction = assertAndGetTransaction(
+      options,
+      'HierarchyManagementService.batchDeactivatePermissions'
+    )
 
     // 1. 验证操作权限（操作人必须是目标用户的上级，且角色级别更高）
     const canOperate = await this.canManageUser(operator_user_id, target_user_id)
@@ -289,17 +293,23 @@ class HierarchyManagementService {
       }
     )
 
-    // 5. 记录操作日志（用于审计追踪）
-    await RoleChangeLog.create(
-      {
-        target_user_id,
-        operator_user_id,
-        operation_type: include_subordinates ? 'batch_deactivate' : 'deactivate',
-        affected_count: usersToDeactivate.length,
-        reason
+    /*
+     * 5. 记录操作日志（用于审计追踪）
+     * 根据功能重复检查报告决策（2026-01-09）：改用 AdminOperationLog
+     */
+    await AuditLogService.logOperation({
+      operator_id: operator_user_id,
+      operation_type: 'user_status_change',
+      target_type: 'User',
+      target_id: target_user_id,
+      action: include_subordinates ? 'batch_deactivate' : 'deactivate',
+      changes: {
+        affected_users: usersToDeactivate,
+        affected_count: usersToDeactivate.length
       },
-      { transaction }
-    )
+      reason,
+      transaction
+    })
 
     // 6. 🔄 清除受影响用户的权限缓存（事务提交后由入口层处理也可）
     await PermissionManager.invalidateMultipleUsers(usersToDeactivate, 'hierarchy_deactivate')
@@ -331,14 +341,17 @@ class HierarchyManagementService {
    * @param {Object} options.transaction - 外部事务对象（必填）
    * @returns {Promise<Object>} { success, activated_count, activated_users, message }
    */
-  static async batchActivatePermissions (
+  static async batchActivatePermissions(
     target_user_id,
     operator_user_id,
     include_subordinates = false,
     options = {}
   ) {
     // 强制要求事务边界 - 2026-01-05 治理决策
-    const transaction = assertAndGetTransaction(options, 'HierarchyManagementService.batchActivatePermissions')
+    const transaction = assertAndGetTransaction(
+      options,
+      'HierarchyManagementService.batchActivatePermissions'
+    )
 
     // 1. 验证操作权限
     const canOperate = await this.canManageUser(operator_user_id, target_user_id)
@@ -386,17 +399,23 @@ class HierarchyManagementService {
       }
     )
 
-    // 5. 记录操作日志
-    await RoleChangeLog.create(
-      {
-        target_user_id,
-        operator_user_id,
-        operation_type: 'activate',
-        affected_count: usersToActivate.length,
-        reason: '批量激活权限'
+    /*
+     * 5. 记录操作日志
+     * 根据功能重复检查报告决策（2026-01-09）：改用 AdminOperationLog
+     */
+    await AuditLogService.logOperation({
+      operator_id: operator_user_id,
+      operation_type: 'user_status_change',
+      target_type: 'User',
+      target_id: target_user_id,
+      action: 'activate',
+      changes: {
+        affected_users: usersToActivate,
+        affected_count: usersToActivate.length
       },
-      { transaction }
-    )
+      reason: '批量激活权限',
+      transaction
+    })
 
     // 6. 🔄 清除受影响用户的权限缓存（事务提交后由入口层处理也可）
     await PermissionManager.invalidateMultipleUsers(usersToActivate, 'hierarchy_activate')
@@ -423,7 +442,7 @@ class HierarchyManagementService {
    *
    * 简化说明：使用简单的递归查询判断上下级关系，不依赖 hierarchy_path
    */
-  static async canManageUser (operator_user_id, target_user_id) {
+  static async canManageUser(operator_user_id, target_user_id) {
     try {
       // 1. 获取操作人的角色级别
       const operatorHierarchy = await UserHierarchy.findOne({
@@ -485,7 +504,7 @@ class HierarchyManagementService {
    *
    * 简化说明：按角色类型统计，而不是按层级深度统计（更直观）
    */
-  static async getHierarchyStats (user_id) {
+  static async getHierarchyStats(user_id) {
     try {
       // 1. 获取所有下级
       const allSubordinates = await this.getAllSubordinates(user_id, false)

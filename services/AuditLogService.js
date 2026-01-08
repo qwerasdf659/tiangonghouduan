@@ -82,6 +82,9 @@ const {
   isCriticalOperation
 } = require('../constants/AuditOperationTypes')
 
+// 引用 target_type 规范化工具（P0-5 实施 - 2026-01-09）
+const { normalizeTargetType, isValidTargetType } = require('../constants/AuditTargetTypes')
+
 /**
  * 审计日志服务类
  * 职责：为服务层提供统一的审计日志记录接口
@@ -173,6 +176,27 @@ class AuditLogService {
         return null
       }
 
+      // 2.1 规范化 target_type（P0-5 实施 - 2026-01-09）
+      const normalizedTargetType = normalizeTargetType(target_type)
+      const targetTypeRaw = target_type !== normalizedTargetType ? target_type : null
+
+      // 2.2 校验规范化后的 target_type
+      if (!isValidTargetType(normalizedTargetType)) {
+        const warnMsg =
+          `[审计日志] 未知的 target_type: ${target_type}（规范化后: ${normalizedTargetType}），` +
+          '请在 constants/AuditTargetTypes.js 中定义'
+
+        // 关键操作使用未知 target_type 时抛出错误
+        if (isCritical) {
+          const error = new Error(warnMsg)
+          error.code = 'AUDIT_INVALID_TARGET_TYPE'
+          throw error
+        }
+
+        // 非关键操作仅警告，继续使用原始值
+        logger.warn(warnMsg)
+      }
+
       // 3. 决策6：关键操作强制要求 idempotency_key，禁止兜底
       if (isCritical && !idempotency_key) {
         const error = new Error(
@@ -186,25 +210,29 @@ class AuditLogService {
       // 4. 计算变更字段
       const changedFields = AdminOperationLog.compareObjects(before_data, after_data)
 
-      // 5. 创建审计日志
-      const auditLog = await AdminOperationLog.create(
-        {
-          operator_id,
-          operation_type,
-          target_type,
-          target_id,
-          action,
-          before_data,
-          after_data,
-          changed_fields: changedFields,
-          reason,
-          ip_address,
-          user_agent,
-          idempotency_key,
-          created_at: BeijingTimeHelper.createDatabaseTime()
-        },
-        { transaction }
-      )
+      // 5. 创建审计日志（使用规范化后的 target_type）
+      const logData = {
+        operator_id,
+        operation_type,
+        target_type: normalizedTargetType, // P0-5: 使用规范化后的 target_type
+        target_id,
+        action,
+        before_data,
+        after_data,
+        changed_fields: changedFields,
+        reason,
+        ip_address,
+        user_agent,
+        idempotency_key,
+        created_at: BeijingTimeHelper.createDatabaseTime()
+      }
+
+      // P0-5: 如果原始值与规范化后不同，保存原始值到 target_type_raw
+      if (targetTypeRaw) {
+        logData.target_type_raw = targetTypeRaw
+      }
+
+      const auditLog = await AdminOperationLog.create(logData, { transaction })
 
       logger.info(
         `[审计日志] 记录成功: log_id=${auditLog.log_id}, 操作员=${operator_id}, ` +
@@ -826,7 +854,8 @@ class AuditLogService {
     }
 
     if (target_type) {
-      whereClause.target_type = target_type
+      // P0-5: 查询时也规范化（前端传入 PascalCase 也能查到）
+      whereClause.target_type = normalizeTargetType(target_type)
     }
 
     if (target_id) {

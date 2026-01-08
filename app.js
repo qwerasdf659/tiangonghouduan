@@ -631,11 +631,7 @@ try {
 
   /*
    * ========================================
-   * 8. /merchant - 商家业务域（2025-12-29 资产域标准架构新增）
-   * ========================================
    */
-  app.use('/api/v4/merchant', require('./routes/v4/merchant'))
-  appLogger.info('✅ merchant域加载成功', { route: '/api/v4/merchant' })
 
   /*
    * ========================================
@@ -675,7 +671,7 @@ try {
       '/shop',
       '/system',
       '/user',
-      '/merchant',
+
       '/assets',
       '/backpack'
     ],

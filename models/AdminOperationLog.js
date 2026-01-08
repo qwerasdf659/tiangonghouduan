@@ -93,7 +93,12 @@ module.exports = sequelize => {
       target_type: {
         type: DataTypes.STRING(50),
         allowNull: false,
-        comment: '目标对象类型（User/Product/Prize/ExchangeRecord等）'
+        comment: '目标对象类型（统一snake_case资源码，如 user/account_asset_balance/item_instance）'
+      },
+      target_type_raw: {
+        type: DataTypes.STRING(100),
+        allowNull: true,
+        comment: '原始 target_type 值（P0-5用于审计追溯，保存PascalCase/历史遗留名等原始输入值）'
       },
       target_id: {
         type: DataTypes.BIGINT,

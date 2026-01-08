@@ -63,8 +63,8 @@ const BackpackService = require('./BackpackService') // 背包双轨查询服务
 const TradeOrderService = require('./TradeOrderService') // 交易订单服务（市场交易核心）
 const MarketListingService = require('./MarketListingService') // 市场挂牌服务（决策5B/0C：统一收口）
 
-// 资产域标准架构服务（2025-12-29，2026-01-08 重构为奖励发放模式）
-const MerchantReviewService = require('./MerchantReviewService') // 商家审核服务（扫码审核→奖励发放）
+// P0-2 孤儿冻结清理服务（2026-01-09）
+const OrphanFrozenCleanupService = require('./OrphanFrozenCleanupService') // 孤儿冻结清理唯一入口
 
 // V4 模块化服务
 const { lottery_service_container } = require('./lottery')
@@ -252,8 +252,8 @@ class ServiceManager {
       this._services.set('tradeOrder', TradeOrderService) // 交易订单服务（市场交易核心）
       this._services.set('marketListing', MarketListingService) // 市场挂牌服务（决策5B/0C：统一收口）
 
-      // 注册资产域标准架构服务（2025-12-29，2026-01-08 重构）
-      this._services.set('merchantReview', MerchantReviewService) // 商家审核服务（扫码审核→奖励发放模式）
+      // 注册 P0-2 孤儿冻结清理服务（2026-01-09）
+      this._services.set('orphanFrozenCleanup', OrphanFrozenCleanupService) // 孤儿冻结清理唯一入口
 
       // 注册模块化抽奖服务容器
       this._services.set('lotteryContainer', lottery_service_container)

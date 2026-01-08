@@ -28,6 +28,7 @@ const assetAdjustmentRoutes = require('./asset-adjustment') // 🆕 资产调整
 const campaignBudgetRoutes = require('./campaign-budget') // 🆕 活动预算管理（2026-01-03 BUDGET_POINTS架构）
 const assetsRoutes = require('./assets') // 🆕 后台运营资产中心（2026-01-07 架构重构）
 const imagesRoutes = require('./images') // 🆕 通用图片上传（2026-01-08 图片存储架构）
+const orphanFrozenRoutes = require('./orphan-frozen') // 🆕 孤儿冻结清理（P0-2 2026-01-09）
 
 // 挂载子模块路由
 router.use('/auth', authRoutes)
@@ -47,6 +48,7 @@ router.use('/asset-adjustment', assetAdjustmentRoutes) // 🆕 资产调整管�
 router.use('/campaign-budget', campaignBudgetRoutes) // 🆕 活动预算管理路由（2026-01-03 BUDGET_POINTS架构）
 router.use('/assets', assetsRoutes) // 🆕 后台运营资产中心路由（2026-01-07 架构重构）
 router.use('/images', imagesRoutes) // 🆕 通用图片上传路由（2026-01-08 图片存储架构）
+router.use('/orphan-frozen', orphanFrozenRoutes) // 🆕 孤儿冻结清理路由（P0-2 2026-01-09）
 
 /**
  * GET / - Admin API根路径信息
@@ -219,6 +221,11 @@ router.get('/', (req, res) => {
           '/images/:image_id (DELETE)'
         ],
         note: '统一图片上传接口，存储到 Sealos 对象存储，返回 image_id + CDN URL；支持 lottery/exchange/trade/uploads 业务类型'
+      },
+      orphan_frozen: {
+        description: '孤儿冻结清理（P0-2 2026-01-09）',
+        endpoints: ['/orphan-frozen/detect', '/orphan-frozen/stats', '/orphan-frozen/cleanup'],
+        note: '检测和清理孤儿冻结（frozen_amount > 活跃挂牌冻结），唯一入口设计，支持干跑模式'
       }
       // ⚠️ campaign_permissions模块暂未实现，待实现后再添加到此列表
     },

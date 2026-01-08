@@ -275,25 +275,32 @@ const TestConfig = {
     timeout: 10000
   },
 
-  // 真实测试数据配置 - 使用统一的测试账号
+  /**
+   * 🔴 P0-1修复：真实测试数据配置
+   * 说明：这里只保存 mobile 作为查询key，user_id 和 campaign_id 通过 initRealTestData() 动态获取
+   * 避免硬编码导致的测试数据不一致问题
+   */
   realData: {
-    // ✅ 统一测试用户信息 - 使用13612227930测试账号
+    // ✅ 统一测试用户手机号 - 实际 user_id 通过 initRealTestData() 查询
     testUser: {
       mobile: '13612227930', // 统一测试用户手机号
-      user_id: 31 // 统一测试用户ID (需要从数据库确认)
+      user_id: null // 🔴 P0-1修复：移除硬编码，通过 initRealTestData() 动态获取
     },
 
     // ✅ 统一管理员信息 - 同一账号既是用户也是管理员
     adminUser: {
       mobile: '13612227930', // 统一管理员手机号
-      user_id: 31 // 统一管理员用户ID (需要从数据库确认)
+      user_id: null // 🔴 P0-1修复：移除硬编码，通过 initRealTestData() 动态获取
     },
 
-    // ✅ 测试活动信息 - 使用主体功能文档中的活动
+    // ✅ 测试活动信息 - 通过 initRealTestData() 动态获取活跃活动
     testCampaign: {
-      campaign_id: 2, // 默认测试活动ID (餐厅积分抽奖)
-      campaignName: '餐厅积分抽奖活动' // 测试活动名称
-    }
+      campaign_id: null, // 🔴 P0-1修复：移除硬编码，通过 initRealTestData() 动态获取
+      campaignName: null // 测试活动名称，动态获取
+    },
+
+    // 🔴 P0-1新增：标记测试数据是否已初始化
+    _initialized: false
   },
 
   // V4抽奖策略配置验证
@@ -303,6 +310,99 @@ const TestConfig = {
     // 期待的策略数量
     expectedCount: 2
   }
+}
+
+/**
+ * 🔴 P0-1修复：初始化真实测试数据
+ *
+ * 解决问题：
+ * - 测试数据硬编码（user_id=31, campaign_id=2）
+ * - 数据库变更后测试失败
+ *
+ * 解决方案：
+ * - 通过 mobile 查询用户真实 user_id
+ * - 通过 status='active' 查询活跃活动
+ *
+ * @param {string} mobile - 测试用户手机号，默认 '13612227930'
+ * @returns {Promise<Object>} 真实测试数据 { testUser, adminUser, testCampaign }
+ */
+async function initRealTestData(mobile = '13612227930') {
+  // 避免重复初始化
+  if (TestConfig.realData._initialized) {
+    return TestConfig.realData
+  }
+
+  try {
+    // 延迟加载 models，避免循环依赖
+    const { User, LotteryCampaign } = require('../../models')
+
+    // 1. 查询测试用户
+    const user = await User.findOne({
+      where: { mobile, status: 'active' },
+      attributes: ['user_id', 'mobile', 'nickname']
+    })
+
+    if (!user) {
+      console.warn(`⚠️ initRealTestData: 未找到测试用户 mobile=${mobile}`)
+      // 不抛错，允许测试继续（某些测试可能不需要用户）
+    } else {
+      TestConfig.realData.testUser.user_id = user.user_id
+      TestConfig.realData.testUser.mobile = user.mobile
+      TestConfig.realData.adminUser.user_id = user.user_id
+      TestConfig.realData.adminUser.mobile = user.mobile
+      console.log(`✅ initRealTestData: 测试用户 user_id=${user.user_id}, mobile=${user.mobile}`)
+    }
+
+    // 2. 查询活跃的测试活动
+    const campaign = await LotteryCampaign.findOne({
+      where: { status: 'active' },
+      order: [['campaign_id', 'ASC']], // 取第一个活跃活动
+      attributes: ['campaign_id', 'campaign_name', 'status']
+    })
+
+    if (!campaign) {
+      console.warn('⚠️ initRealTestData: 未找到活跃的测试活动')
+      // 不抛错，允许测试继续（某些测试可能不需要活动）
+    } else {
+      TestConfig.realData.testCampaign.campaign_id = campaign.campaign_id
+      TestConfig.realData.testCampaign.campaignName = campaign.campaign_name
+      console.log(
+        `✅ initRealTestData: 测试活动 campaign_id=${campaign.campaign_id}, name=${campaign.campaign_name}`
+      )
+    }
+
+    TestConfig.realData._initialized = true
+    return TestConfig.realData
+  } catch (error) {
+    console.error('❌ initRealTestData 失败:', error.message)
+    // 不抛错，允许测试继续
+    return TestConfig.realData
+  }
+}
+
+/**
+ * 🔴 P0-1新增：获取真实测试用户ID
+ *
+ * @param {string} mobile - 测试用户手机号
+ * @returns {Promise<number|null>} 用户ID
+ */
+async function getRealTestUserId(mobile = '13612227930') {
+  if (!TestConfig.realData._initialized) {
+    await initRealTestData(mobile)
+  }
+  return TestConfig.realData.testUser.user_id
+}
+
+/**
+ * 🔴 P0-1新增：获取真实测试活动ID
+ *
+ * @returns {Promise<number|null>} 活动ID
+ */
+async function getRealTestCampaignId() {
+  if (!TestConfig.realData._initialized) {
+    await initRealTestData()
+  }
+  return TestConfig.realData.testCampaign.campaign_id
 }
 
 /**
@@ -379,5 +479,9 @@ module.exports = {
   TestAssertions,
   TestTimeHelper,
   PerformanceHelper,
-  TestConfig
+  TestConfig,
+  // 🔴 P0-1修复：导出测试数据初始化函数
+  initRealTestData,
+  getRealTestUserId,
+  getRealTestCampaignId
 }

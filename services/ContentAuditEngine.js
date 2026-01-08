@@ -63,9 +63,14 @@ class ContentAuditEngine {
 
     /*
      * 验证审核对象类型
+     * 2026-01-09 扩展：添加 consumption 和 merchant_points 类型（功能重复检查报告决策）
+     * - consumption: 消费审核（ConsumptionService）
+     * - merchant_points: 商家积分审核（原 MerchantReviewService，已迁移）
+     * - exchange: 兑换审核（ExchangeService）
+     * - feedback: 反馈审核（FeedbackService）
      * 注意：image 类型已于 2026-01-08 移除（用户上传凭证审核业务已废弃）
      */
-    const validTypes = ['exchange', 'feedback']
+    const validTypes = ['exchange', 'feedback', 'consumption', 'merchant_points']
     if (!validTypes.includes(auditableType)) {
       throw new Error(`不支持的审核类型: ${auditableType}，仅支持: ${validTypes.join(', ')}`)
     }
@@ -283,11 +288,14 @@ class ContentAuditEngine {
 
       /*
        * 动态加载对应的回调处理器
+       * 2026-01-09 扩展：添加 consumption 和 merchant_points 回调（功能重复检查报告决策）
        * 注意：image 类型已于 2026-01-08 移除（用户上传凭证审核业务已废弃）
        */
       const callbackMap = {
         exchange: '../callbacks/ExchangeAuditCallback',
-        feedback: '../callbacks/FeedbackAuditCallback'
+        feedback: '../callbacks/FeedbackAuditCallback',
+        consumption: '../callbacks/ConsumptionAuditCallback',
+        merchant_points: '../callbacks/MerchantPointsAuditCallback'
       }
 
       const callbackPath = callbackMap[auditRecord.auditable_type]

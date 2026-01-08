@@ -8,6 +8,11 @@
  * - 事务状态检查（防止重复提交/回滚）
  * - 集成事务上下文（AsyncLocalStorage）
  *
+ * 重试策略（P0-3 决策 2026-01-09）：
+ * - 4xx/业务码：永不重试（立即抛出）
+ * - 未知错误：最多重试 1 次（总共执行 2 次）
+ * - 死锁/超时类：重试 3 次（指数退避）
+ *
  * 设计原则：
  * - 事务创建权收敛到"入口编排层"
  * - 内部服务方法必须接受 transaction 参数
@@ -26,7 +31,7 @@
  * ```
  *
  * @since 2026-01-03
- * @version 1.0.0
+ * @version 1.1.0（P0-3 重试策略优化）
  */
 
 'use strict'
@@ -34,6 +39,7 @@
 const { sequelize, Sequelize } = require('../config/database')
 const logger = require('./logger')
 const TransactionContext = require('./TransactionContext')
+const { getRetryStrategy } = require('../constants/ErrorCodes')
 
 /**
  * 事务配置选项
@@ -58,15 +64,20 @@ const TransactionContext = require('./TransactionContext')
  */
 class TransactionManager {
   /**
-   * 执行事务操作
+   * 执行事务操作（P0-3 优化：智能重试策略）
+   *
+   * 重试策略（P0-3 决策 2026-01-09）：
+   * - 4xx/业务码：永不重试（立即抛出）
+   * - 未知错误：最多重试 1 次（总共执行 2 次）
+   * - 死锁/超时类：重试 3 次（指数退避）
    *
    * @param {Function} operation - 事务操作函数 (transaction) => Promise<result>
    * @param {TransactionOptions} options - 选项
    * @returns {Promise<any>} 操作结果
    */
-  static async execute (operation, options = {}) {
+  static async execute(operation, options = {}) {
     const {
-      maxRetries = 3,
+      maxRetries = 3, // 最大重试次数上限（实际重试次数由错误类型决定）
       timeout = 30000,
       isolationLevel = 'READ_COMMITTED',
       description = 'TransactionManager.execute',
@@ -75,8 +86,10 @@ class TransactionManager {
 
     const startTime = Date.now()
     let transaction = null
+    let attempt = 0
+    let effectiveMaxRetries = maxRetries // 实际使用的重试次数，首次执行后由错误类型决定
 
-    for (let attempt = 0; attempt < maxRetries; attempt++) {
+    while (attempt < effectiveMaxRetries) {
       try {
         // 创建事务
         transaction = await sequelize.transaction({
@@ -89,7 +102,7 @@ class TransactionManager {
         logger.info('🔄 事务开始', {
           transactionId,
           attempt: attempt + 1,
-          maxRetries,
+          maxRetries: effectiveMaxRetries,
           timeout,
           isolationLevel,
           description
@@ -146,20 +159,40 @@ class TransactionManager {
           }
         }
 
-        // 错误分析
+        // 错误分析（P0-3：使用智能重试策略）
         const errorAnalysis = this.analyzeError(error)
 
-        // 可重试错误且未达到最大重试次数
-        if (enableRetry && errorAnalysis.retryable && attempt < maxRetries - 1) {
+        /*
+         * P0-3 优化：根据错误类型动态调整重试次数
+         * 首次失败时，根据错误类型设置实际重试次数
+         */
+        if (attempt === 0 && errorAnalysis.maxRetries !== undefined) {
+          /*
+           * 使用错误类型建议的重试次数，但不超过配置的上限
+           * +1 是因为第一次执行不算重试
+           */
+          effectiveMaxRetries = Math.min(errorAnalysis.maxRetries + 1, maxRetries)
+        }
+
+        // 计算剩余重试次数
+        const remainingRetries = effectiveMaxRetries - attempt - 1
+
+        // 判断是否应该重试
+        const shouldRetry = enableRetry && errorAnalysis.retryable && remainingRetries > 0
+
+        if (shouldRetry) {
           const delay = Math.min(1000 * Math.pow(2, attempt), 5000)
           logger.warn('⏳ 事务失败，' + delay + 'ms 后重试', {
-            attempt: attempt + 1 + '/' + maxRetries,
+            attempt: attempt + 1 + '/' + effectiveMaxRetries,
+            remainingRetries,
             error: error.message,
             reason: errorAnalysis.reason,
             code: errorAnalysis.code,
+            errorMaxRetries: errorAnalysis.maxRetries,
             description
           })
           await this.sleep(delay)
+          attempt++
           continue
         }
 
@@ -171,6 +204,7 @@ class TransactionManager {
           retryable: errorAnalysis.retryable,
           reason: errorAnalysis.reason,
           code: errorAnalysis.code,
+          errorMaxRetries: errorAnalysis.maxRetries,
           description
         })
 
@@ -178,6 +212,7 @@ class TransactionManager {
         error.transactionAttempts = attempt + 1
         error.transactionDuration = duration
         error.transactionErrorCode = errorAnalysis.code
+        error.transactionErrorReason = errorAnalysis.reason
         throw error
       }
     }
@@ -190,7 +225,7 @@ class TransactionManager {
    * @param {TransactionOptions} options - 选项
    * @returns {Promise<any>} 操作结果
    */
-  static async executeReadOnly (operation, options = {}) {
+  static async executeReadOnly(operation, options = {}) {
     return this.execute(operation, {
       maxRetries: 1,
       timeout: options.timeout || 10000,
@@ -202,16 +237,21 @@ class TransactionManager {
   }
 
   /**
-   * 分析错误类型
+   * 分析错误类型（P0-3 优化：使用统一错误码系统）
+   *
+   * 决策规则（P0-3 2026-01-09 已拍板）：
+   * - 4xx/业务码：永不重试（maxRetries=0）
+   * - 可重试错误（死锁/超时）：重试 3 次（maxRetries=3）
+   * - 未知错误：重试 1 次（maxRetries=1，总共执行 2 次）
    *
    * @param {Error} error - 错误对象
-   * @returns {ErrorAnalysis} 错误分析结果
+   * @returns {ErrorAnalysis} 错误分析结果（含 maxRetries）
    */
-  static analyzeError (error) {
+  static analyzeError(error) {
     const msg = (error.message || '').toLowerCase()
     const code = error.code || ''
 
-    // 事务已完成错误 (不可重试)
+    // ========== 特殊处理：事务已完成错误（立即返回，不重试）==========
     if (
       msg.includes('transaction cannot be rolled back') ||
       msg.includes('has been finished') ||
@@ -219,60 +259,13 @@ class TransactionManager {
     ) {
       return {
         retryable: false,
+        maxRetries: 0,
         reason: 'transaction_already_finished',
         code: 'TX_FINISHED'
       }
     }
 
-    // 死锁错误 (可重试)
-    if (msg.includes('deadlock') || msg.includes('lock wait timeout')) {
-      return {
-        retryable: true,
-        reason: 'database_deadlock',
-        code: 'TX_DEADLOCK'
-      }
-    }
-
-    // 连接超时 (可重试)
-    if (msg.includes('timeout') || msg.includes('connection') || code === 'TRANSACTION_TIMEOUT') {
-      return {
-        retryable: true,
-        reason: 'connection_timeout',
-        code: 'TX_TIMEOUT'
-      }
-    }
-
-    // 业务逻辑错误 (不可重试)
-    if (
-      msg.includes('余额不足') ||
-      msg.includes('库存不足') ||
-      msg.includes('权限不足') ||
-      msg.includes('不存在') ||
-      msg.includes('已存在') ||
-      msg.includes('状态不正确') ||
-      code === 'BUSINESS_ERROR'
-    ) {
-      return {
-        retryable: false,
-        reason: 'business_logic_error',
-        code: 'TX_BUSINESS'
-      }
-    }
-
-    // 事务边界错误 (不可重试 - 开发阶段问题)
-    if (
-      msg.includes('必须在事务中调用') ||
-      msg.includes('transaction 参数') ||
-      code === 'TRANSACTION_REQUIRED'
-    ) {
-      return {
-        retryable: false,
-        reason: 'transaction_boundary_error',
-        code: 'TX_REQUIRED'
-      }
-    }
-
-    // 唯一约束冲突 (不可重试 - 幂等性触发)
+    // ========== 特殊处理：唯一约束冲突（幂等性触发，不重试）==========
     if (
       msg.includes('unique constraint') ||
       msg.includes('duplicate entry') ||
@@ -280,16 +273,21 @@ class TransactionManager {
     ) {
       return {
         retryable: false,
+        maxRetries: 0,
         reason: 'unique_constraint_violation',
         code: 'TX_DUPLICATE'
       }
     }
 
-    // 其他未知错误 (默认可重试一次)
+    // ========== 使用统一错误码系统进行分类 ==========
+    const strategy = getRetryStrategy(error)
+
+    // 转换为 TransactionManager 内部格式
     return {
-      retryable: true,
-      reason: 'unknown_error',
-      code: 'TX_UNKNOWN'
+      retryable: strategy.retryable,
+      maxRetries: strategy.maxRetries,
+      reason: strategy.reason,
+      code: strategy.code
     }
   }
 
@@ -299,7 +297,7 @@ class TransactionManager {
    * @param {number} ms - 毫秒数
    * @returns {Promise<void>} 延迟后解析的 Promise
    */
-  static sleep (ms) {
+  static sleep(ms) {
     return new Promise(function (resolve) {
       setTimeout(resolve, ms)
     })
@@ -312,7 +310,7 @@ class TransactionManager {
    * @param {boolean} options.required - 是否必需
    * @returns {Object|null} 事务对象
    */
-  static getCurrentTransaction (options = {}) {
+  static getCurrentTransaction(options = {}) {
     return TransactionContext.getTransaction(options)
   }
 
@@ -321,7 +319,7 @@ class TransactionManager {
    *
    * @returns {boolean} 是否在事务中
    */
-  static isInTransaction () {
+  static isInTransaction() {
     return TransactionContext.hasTransaction()
   }
 }

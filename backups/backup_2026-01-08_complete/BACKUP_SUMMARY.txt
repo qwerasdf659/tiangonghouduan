@@ -1,0 +1,66 @@
+# 数据库备份摘要报告
+## 备份信息
+- 备份日期: 2026-01-08
+- 备份时间: 2026/01/08 21:09:26
+- 数据库: restaurant_points_dev
+- 主机: dbconn.sealosbja.site:42569
+
+## 备份统计
+- 总表数: 44
+- 总行数: 011151120408124302000324026230656101101183129663105224872330521001515423801
+- 空表数: 0
+- 错误表数: 0
+
+## 备份文件
+- JSON备份: complete_backup_2026-01-08_2026-01-08_21-09-25.json (4.04 MB)
+- SQL备份: complete_backup_2026-01-08_2026-01-08_21-09-25.sql (1.20 MB)
+- MD5校验: BACKUP_MD5.txt
+
+## 表详情
+✅ account_asset_balances: 11 行
+✅ accounts: 15 行
+✅ admin_operation_logs: 1120 行
+✅ api_idempotency_requests: 408 行
+✅ asset_transactions: 1243 行
+✅ authentication_sessions: 0 行
+✅ chat_messages: 20 行
+✅ consumption_records: 0 行
+✅ content_review_records: 0 行
+✅ customer_service_sessions: 3 行
+✅ exchange_items: 24 行
+✅ exchange_records: 0 行
+✅ feedbacks: 26 行
+✅ image_resources: 2 行
+✅ item_instance_events: 306 行
+✅ item_instances: 561 行
+✅ item_template_aliases: 0 行
+✅ lottery_campaigns: 1 行
+✅ lottery_clear_setting_records: 10 行
+✅ lottery_draw_quota_rules: 1 行
+✅ lottery_draws: 1 行
+✅ lottery_management_settings: 831 行
+✅ lottery_presets: 2 行
+✅ lottery_prizes: 9 行
+✅ lottery_user_daily_draw_quota: 6 行
+✅ market_listings: 6 行
+✅ material_asset_types: 3 行
+✅ material_conversion_rules: 1 行
+✅ popup_banners: 0 行
+✅ products: 52 行
+✅ redemption_orders: 248 行
+✅ roles: 7 行
+✅ sequelizemeta: 233 行
+✅ stores: 0 行
+✅ system_announcements: 5 行
+✅ system_settings: 21 行
+✅ trade_orders: 0 行
+✅ user_hierarchy: 0 行
+✅ user_premium_status: 1 行
+✅ user_role_change_records: 5 行
+✅ user_roles: 15 行
+✅ user_status_change_records: 4 行
+✅ users: 23 行
+✅ websocket_startup_logs: 801 行
+
+## 备份完成
+✅ 备份已成功完成于 2026/01/08 21:09:26

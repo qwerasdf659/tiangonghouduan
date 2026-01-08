@@ -364,33 +364,42 @@ class ConsumptionService {
       throw new Error(`不能审核：${canReview.reasons.join('；')}`)
     }
 
-    // 3. 更新消费记录状态
+    // 3. 更新消费记录状态（2026-01-09 添加业务结果态字段）
     await record.update(
       {
         status: 'approved',
         reviewed_by: reviewData.reviewer_id,
         reviewed_at: BeijingTimeHelper.createDatabaseTime(),
         admin_notes: reviewData.admin_notes || null,
+        final_status: 'approved', // 业务最终状态
+        settled_at: BeijingTimeHelper.createDatabaseTime(), // 结算时间
         updated_at: BeijingTimeHelper.createDatabaseTime()
       },
       { transaction }
     )
 
-    // 4. 更新审核记录表
-    await ContentReviewRecord.update(
+    // 4. 更新审核记录表并获取review_id（2026-01-09 审计日志指向规则）
+    const reviewRecord = await ContentReviewRecord.findOne({
+      where: {
+        auditable_type: 'consumption',
+        auditable_id: recordId
+      },
+      transaction
+    })
+
+    if (!reviewRecord) {
+      throw new Error(`审核记录不存在: consumption_id=${recordId}`)
+    }
+
+    await reviewRecord.update(
       {
         audit_status: 'approved',
         auditor_id: reviewData.reviewer_id,
         audit_reason: reviewData.admin_notes || '审核通过',
+        audited_at: BeijingTimeHelper.createDatabaseTime(),
         updated_at: BeijingTimeHelper.createDatabaseTime()
       },
-      {
-        where: {
-          auditable_type: 'consumption',
-          auditable_id: recordId
-        },
-        transaction
-      }
+      { transaction }
     )
 
     /*
@@ -473,20 +482,31 @@ class ConsumptionService {
     }
 
     /*
-     * 📝 记录审计日志（异步，失败不影响业务）
-     * 注意：事务由入口层管理，审计日志在事务提交前调用
+     * 📝 记录审计日志（2026-01-09 审计日志指向规则：指向审批流表）
+     * 根据功能重复检查报告决策：
+     * - target_type = 'ContentReviewRecord'（固定指向审批流表）
+     * - target_id = review_id（审批流记录 ID）
+     * - details 字段记录关联的业务主表 ID（consumption_record_id）
      */
     try {
-      await AuditLogService.logConsumptionAudit({
+      await AuditLogService.logOperation({
         operator_id: reviewData.reviewer_id,
-        consumption_id: recordId,
+        operation_type: 'consumption_audit',
+        target_type: 'ContentReviewRecord',
+        target_id: reviewRecord.review_id,
         action: 'approve',
-        before_status: 'pending',
-        after_status: 'approved',
-        points_amount: record.points_to_award,
+        changes: {
+          audit_status: 'approved',
+          points_awarded: record.points_to_award
+        },
+        details: {
+          consumption_record_id: recordId,
+          amount: record.consumption_amount,
+          points_to_award: record.points_to_award
+        },
         reason: reviewData.admin_notes || '审核通过',
-        idempotency_key: `consumption_${recordId}`,
-        transaction: null // 审计日志独立于业务事务
+        idempotency_key: `consumption_audit:approve:${reviewRecord.review_id}`,
+        transaction
       })
     } catch (auditError) {
       logger.error('[ConsumptionService] 审计日志记录失败:', auditError.message)
@@ -541,50 +561,69 @@ class ConsumptionService {
       throw new Error(`不能审核：${canReview.reasons.join('；')}`)
     }
 
-    // 4. 更新消费记录状态
+    // 4. 更新消费记录状态（2026-01-09 添加业务结果态字段）
     await record.update(
       {
         status: 'rejected',
         reviewed_by: reviewData.reviewer_id,
         reviewed_at: BeijingTimeHelper.createDatabaseTime(),
         admin_notes: reviewData.admin_notes,
+        final_status: 'rejected', // 业务最终状态
+        settled_at: BeijingTimeHelper.createDatabaseTime(), // 结算时间
         updated_at: BeijingTimeHelper.createDatabaseTime()
       },
       { transaction }
     )
 
-    // 5. 更新审核记录表
-    await ContentReviewRecord.update(
+    // 5. 更新审核记录表并获取review_id（2026-01-09 审计日志指向规则）
+    const reviewRecord = await ContentReviewRecord.findOne({
+      where: {
+        auditable_type: 'consumption',
+        auditable_id: recordId
+      },
+      transaction
+    })
+
+    if (!reviewRecord) {
+      throw new Error(`审核记录不存在: consumption_id=${recordId}`)
+    }
+
+    await reviewRecord.update(
       {
         audit_status: 'rejected',
         auditor_id: reviewData.reviewer_id,
         audit_reason: reviewData.admin_notes,
+        audited_at: BeijingTimeHelper.createDatabaseTime(),
         updated_at: BeijingTimeHelper.createDatabaseTime()
       },
-      {
-        where: {
-          auditable_type: 'consumption',
-          auditable_id: recordId
-        },
-        transaction
-      }
+      { transaction }
     )
 
     /*
-     * 📝 记录审计日志（异步，失败不影响业务）
-     * 注意：事务由入口层管理，审计日志在事务提交前调用
+     * 📝 记录审计日志（2026-01-09 审计日志指向规则：指向审批流表）
+     * 根据功能重复检查报告决策：
+     * - target_type = 'ContentReviewRecord'（固定指向审批流表）
+     * - target_id = review_id（审批流记录 ID）
+     * - details 字段记录关联的业务主表 ID（consumption_record_id）
      */
     try {
-      await AuditLogService.logConsumptionAudit({
+      await AuditLogService.logOperation({
         operator_id: reviewData.reviewer_id,
-        consumption_id: recordId,
+        operation_type: 'consumption_audit',
+        target_type: 'ContentReviewRecord',
+        target_id: reviewRecord.review_id,
         action: 'reject',
-        before_status: 'pending',
-        after_status: 'rejected',
-        points_amount: 0,
+        changes: {
+          audit_status: 'rejected'
+        },
+        details: {
+          consumption_record_id: recordId,
+          amount: record.consumption_amount,
+          reject_reason: reviewData.admin_notes
+        },
         reason: reviewData.admin_notes,
-        idempotency_key: `consumption_${recordId}`,
-        transaction: null // 审计日志独立于业务事务
+        idempotency_key: `consumption_audit:reject:${reviewRecord.review_id}`,
+        transaction
       })
     } catch (auditError) {
       logger.error('[ConsumptionService] 审计日志记录失败:', auditError.message)

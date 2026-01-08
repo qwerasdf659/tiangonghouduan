@@ -48,6 +48,13 @@ const OPERATION_TYPES = Object.freeze({
    */
   ASSET_ADJUSTMENT: 'asset_adjustment',
 
+  /**
+   * 孤儿冻结清理（P0-2唯一入口）
+   * @description 清理孤儿冻结余额（frozen_amount > 活跃挂牌冻结总额）
+   * @example 管理员孤儿冻结清理路由 /api/v4/console/orphan-frozen/cleanup
+   */
+  ASSET_ORPHAN_CLEANUP: 'asset_orphan_cleanup',
+
   // ==================== 商品管理类 ====================
   /**
    * 兑换审核（审核通过/拒绝）
@@ -232,6 +239,7 @@ const OPERATION_TYPE_DESCRIPTIONS = Object.freeze({
   // 积分资产类
   [OPERATION_TYPES.POINTS_ADJUST]: '积分调整',
   [OPERATION_TYPES.ASSET_ADJUSTMENT]: '资产调整',
+  [OPERATION_TYPES.ASSET_ORPHAN_CLEANUP]: '孤儿冻结清理',
 
   // 商品管理类
   [OPERATION_TYPES.EXCHANGE_AUDIT]: '兑换审核',

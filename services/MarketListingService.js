@@ -758,6 +758,21 @@ class MarketListingService {
     }
 
     // ========== 5. 校验资产类型是否存在、启用且可交易 ==========
+
+    /*
+     * 🔴 P0-4修复：首先检查硬编码黑名单（优先级最高）
+     * POINTS 和 BUDGET_POINTS 永远禁止C2C交易，即使数据库is_tradable=true
+     */
+    const {
+      isBlacklistedForC2C,
+      createC2CBlacklistError
+    } = require('../constants/TradableAssetTypes')
+
+    if (isBlacklistedForC2C(offer_asset_code)) {
+      throw createC2CBlacklistError(offer_asset_code, offer_asset_code)
+    }
+
+    // 检查数据库中的资产类型配置
     const assetType = await MaterialAssetType.findOne({
       where: {
         asset_code: offer_asset_code
@@ -779,6 +794,7 @@ class MarketListingService {
       throw error
     }
 
+    // 数据库层面的 is_tradable 检查（作为第二道防线）
     if (!assetType.is_tradable) {
       const error = new Error(`该资产类型不可交易: ${offer_asset_code}`)
       error.code = 'ASSET_NOT_TRADABLE'

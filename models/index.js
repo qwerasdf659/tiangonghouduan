@@ -287,13 +287,11 @@ models.UserHierarchy = require('./UserHierarchy')(sequelize, DataTypes)
  *    - 简化设计：小数据量（<1000用户），使用递归查询而非hierarchy_path字段
  */
 
-models.RoleChangeLog = require('./RoleChangeLog')(sequelize, DataTypes)
 /*
- * ✅ RoleChangeLog：角色权限变更日志
- *    - 用途：记录所有权限变更操作，用于审计和追踪（离职、调动、权限变更等）
- *    - 特点：操作类型、目标用户、操作人、影响数量、操作原因、IP地址
- *    - 表名：role_change_logs，主键：log_id
- *    - 业务场景：停用业务员权限→批量停用业务经理及下属→权限变更审计
+ * ❌ RoleChangeLog：已废弃（2026-01-09 功能重复检查报告决策）
+ *    - 原因：表中无数据（0行），改用 UserRoleChangeRecord + AdminOperationLog 组合
+ *    - 迁移：20260109120000-drop-deprecated-audit-tables.js
+ *    - 替代方案：UserRoleChangeRecord（业务事件主键）+ AdminOperationLog（审计真相源）
  */
 
 // 🔴 审计业务记录表（2026-01-08 决策9实现 - 为无天然业务主键的操作提供审计锚点）
@@ -326,15 +324,12 @@ models.LotteryClearSettingRecord = require('./LotteryClearSettingRecord')(sequel
  *    - 解决问题：原 target_id: null 导致关键操作被阻断
  */
 
-// 🔴 商家审核系统（2025年12月29日新增 - 资产域标准架构）
-models.MerchantPointsReview = require('./MerchantPointsReview')(sequelize, DataTypes)
 /*
- * ✅ MerchantPointsReview：商家积分审核（扫码审核冻结积分）
- *    - 用途：管理商家扫码审核冻结用户积分的业务流程
- *    - 特点：冻结归属约束、状态机（pending→approved/rejected/expired→cancelled）
- *    - 表名：merchant_points_reviews，主键：review_id（UUID格式）
- *    - 业务场景：商家扫码提交审核→冻结积分→审核通过从冻结结算/拒绝需客服处理
- *    - 拍板决策：审核拒绝/超时积分不退回，需客服手工处理
+ * ❌ MerchantPointsReview：已废弃（2026-01-09 功能重复检查报告决策）
+ *    - 原因：表中无数据（0行），已决策迁移到统一审批流（ContentReviewRecord）
+ *    - 迁移：20260109120000-drop-deprecated-audit-tables.js
+ *    - 替代方案：ContentReviewRecord（auditable_type='merchant_points'）
+ *    - 业务逻辑：冻结-审核-结算链路保留，但状态管理统一走 ContentReviewRecord
  */
 
 models.WebSocketStartupLog = require('./WebSocketStartupLog')(sequelize, DataTypes)

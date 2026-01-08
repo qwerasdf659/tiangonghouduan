@@ -478,6 +478,24 @@ module.exports = sequelize => {
 
       /*
        * ========================================
+       * 业务结果态字段（2026-01-09 功能重复检查报告决策）
+       * ========================================
+       */
+      final_status: {
+        type: DataTypes.ENUM('pending_review', 'approved', 'rejected'),
+        allowNull: false,
+        defaultValue: 'pending_review',
+        comment: '业务最终状态（审批通过/拒绝后落地）'
+      },
+
+      settled_at: {
+        type: DataTypes.DATE,
+        allowNull: true,
+        comment: '结算时间（审批完成时落地，北京时间）'
+      },
+
+      /*
+       * ========================================
        * 时间戳（自动管理）
        * ========================================
        */
