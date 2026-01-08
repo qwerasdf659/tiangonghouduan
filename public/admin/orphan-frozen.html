@@ -1,0 +1,637 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>孤儿冻结清理 - 管理后台</title>
+
+  <!-- Bootstrap 5 - UI框架 -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+
+  <!-- Bootstrap Icons - 图标库 -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+
+  <!-- 公共样式表 - 统一主题和响应式设计 -->
+  <link href="/admin/css/common.css" rel="stylesheet">
+
+  <style>
+    .orphan-card {
+      border-left: 4px solid #dc3545;
+    }
+    .frozen-card {
+      border-left: 4px solid #17a2b8;
+    }
+  </style>
+</head>
+<body class="bg-light">
+  <!-- 顶部导航 -->
+  <nav class="navbar navbar-dark bg-primary">
+    <div class="container-fluid">
+      <a href="/admin/dashboard.html" class="navbar-brand">
+        <i class="bi bi-arrow-left me-2"></i>管理后台 - 孤儿冻结清理
+      </a>
+      <div>
+        <span class="text-light me-3" id="welcomeText">欢迎，管理员</span>
+        <button class="btn btn-outline-light btn-sm" id="logoutBtn">退出登录</button>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container-fluid mt-4">
+    <!-- 统计概览 -->
+    <div class="row g-3 mb-4">
+      <div class="col-md-3">
+        <div class="card orphan-card">
+          <div class="card-body text-center">
+            <i class="bi bi-exclamation-triangle text-danger" style="font-size: 2rem;"></i>
+            <h4 class="mt-2 text-danger" id="orphanCount">0</h4>
+            <small class="text-muted">孤儿数据</small>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="card frozen-card">
+          <div class="card-body text-center">
+            <i class="bi bi-snow2 text-info" style="font-size: 2rem;"></i>
+            <h4 class="mt-2 text-info" id="frozenCount">0</h4>
+            <small class="text-muted">冻结数据</small>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="card">
+          <div class="card-body text-center">
+            <i class="bi bi-clock-history text-warning" style="font-size: 2rem;"></i>
+            <h4 class="mt-2 text-warning" id="expiredCount">0</h4>
+            <small class="text-muted">过期冻结</small>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="card">
+          <div class="card-body text-center">
+            <i class="bi bi-cash-coin text-success" style="font-size: 2rem;"></i>
+            <h4 class="mt-2 text-success" id="totalValue">¥0</h4>
+            <small class="text-muted">涉及金额</small>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 操作区域 -->
+    <div class="card mb-3">
+      <div class="card-body">
+        <div class="row g-3 align-items-end">
+          <div class="col-md-2">
+            <label class="form-label">数据类型</label>
+            <select class="form-select" id="dataTypeFilter">
+              <option value="">全部类型</option>
+              <option value="orphan">孤儿数据</option>
+              <option value="frozen">冻结数据</option>
+              <option value="expired">过期冻结</option>
+            </select>
+          </div>
+          <div class="col-md-2">
+            <label class="form-label">资产类型</label>
+            <select class="form-select" id="assetTypeFilter">
+              <option value="">全部资产</option>
+              <option value="points">积分</option>
+              <option value="diamond">钻石</option>
+              <option value="material">材料</option>
+            </select>
+          </div>
+          <div class="col-md-2">
+            <label class="form-label">时间范围</label>
+            <select class="form-select" id="timeRangeFilter">
+              <option value="">全部时间</option>
+              <option value="7">最近7天</option>
+              <option value="30">最近30天</option>
+              <option value="90">最近90天</option>
+            </select>
+          </div>
+          <div class="col-md-2">
+            <button class="btn btn-primary w-100" id="refreshBtn">
+              <i class="bi bi-arrow-repeat"></i> 刷新
+            </button>
+          </div>
+          <div class="col-md-2">
+            <button class="btn btn-warning w-100" id="scanBtn">
+              <i class="bi bi-search"></i> 扫描孤儿
+            </button>
+          </div>
+          <div class="col-md-2">
+            <button class="btn btn-danger w-100" id="batchCleanBtn" disabled>
+              <i class="bi bi-trash"></i> 批量清理
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 数据列表 -->
+    <div class="card">
+      <div class="card-header bg-white d-flex justify-content-between align-items-center">
+        <h5 class="mb-0"><i class="bi bi-list-ul"></i> 孤儿/冻结数据列表</h5>
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" id="selectAll">
+          <label class="form-check-label" for="selectAll">全选</label>
+        </div>
+      </div>
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-hover mb-0">
+            <thead class="table-light">
+              <tr>
+                <th width="40"><input type="checkbox" class="form-check-input" id="headerCheckbox"></th>
+                <th>ID</th>
+                <th>类型</th>
+                <th>资产类型</th>
+                <th>金额/数量</th>
+                <th>用户</th>
+                <th>来源</th>
+                <th>创建时间</th>
+                <th>过期时间</th>
+                <th>状态</th>
+                <th>操作</th>
+              </tr>
+            </thead>
+            <tbody id="dataTableBody">
+              <tr>
+                <td colspan="11" class="text-center py-5 text-muted">
+                  <i class="bi bi-inbox" style="font-size: 3rem;"></i>
+                  <p class="mt-2">点击"刷新"或"扫描孤儿"开始检查</p>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="card-footer bg-white">
+        <nav id="paginationNav"></nav>
+      </div>
+    </div>
+  </div>
+
+  <!-- 清理确认模态框 -->
+  <div class="modal fade" id="cleanConfirmModal" tabindex="-1">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title text-danger"><i class="bi bi-exclamation-triangle"></i> 确认清理</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="alert alert-danger">
+            <i class="bi bi-exclamation-triangle-fill"></i> 此操作不可恢复！
+          </div>
+          <p>您即将清理以下数据：</p>
+          <ul id="cleanSummaryList">
+            <!-- 动态生成 -->
+          </ul>
+          <div class="mb-3">
+            <label class="form-label">清理原因 <span class="text-danger">*</span></label>
+            <textarea class="form-control" id="cleanReason" rows="2" required placeholder="请输入清理原因"></textarea>
+          </div>
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" id="confirmClean" required>
+            <label class="form-check-label" for="confirmClean">
+              我已了解此操作的风险，确认执行清理
+            </label>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+          <button type="button" class="btn btn-danger" id="confirmCleanBtn" disabled>确认清理</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 加载遮罩层 -->
+  <div class="loading-overlay" id="loadingOverlay">
+    <div class="spinner-border text-light" style="width: 3rem; height: 3rem;" role="status">
+      <span class="visually-hidden">处理中...</span>
+    </div>
+  </div>
+
+  <!-- Bootstrap JS -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+  <!-- 引入通用工具库 -->
+  <script src="/admin/js/admin-common.js"></script>
+
+  <script>
+    /**
+     * 孤儿冻结清理页面
+     * @description 管理系统中的孤儿数据和过期冻结数据
+     * @created 2026-01-09
+     */
+
+    // 全局变量
+    let currentPage = 1;
+    const pageSize = 20;
+    let selectedItems = new Set();
+
+    /**
+     * 页面初始化
+     */
+    document.addEventListener('DOMContentLoaded', function() {
+      // 显示用户信息
+      const userInfo = getCurrentUser();
+      if (userInfo && userInfo.nickname) {
+        document.getElementById('welcomeText').textContent = `欢迎，${userInfo.nickname}`;
+      }
+
+      // 事件监听器
+      document.getElementById('logoutBtn').addEventListener('click', logout);
+      document.getElementById('refreshBtn').addEventListener('click', loadData);
+      document.getElementById('scanBtn').addEventListener('click', scanOrphans);
+      document.getElementById('batchCleanBtn').addEventListener('click', showCleanConfirmModal);
+      document.getElementById('dataTypeFilter').addEventListener('change', loadData);
+      document.getElementById('assetTypeFilter').addEventListener('change', loadData);
+      document.getElementById('timeRangeFilter').addEventListener('change', loadData);
+      
+      document.getElementById('headerCheckbox').addEventListener('change', toggleSelectAll);
+      document.getElementById('confirmClean').addEventListener('change', function() {
+        document.getElementById('confirmCleanBtn').disabled = !this.checked;
+      });
+      document.getElementById('confirmCleanBtn').addEventListener('click', executeClean);
+
+      // Token和权限验证
+      if (!getToken() || !checkAdminPermission()) {
+        return;
+      }
+
+      // 加载数据
+      loadData();
+    });
+
+    /**
+     * 加载数据
+     */
+    async function loadData() {
+      showLoading(true);
+      const tbody = document.getElementById('dataTableBody');
+
+      try {
+        const dataType = document.getElementById('dataTypeFilter').value;
+        const assetType = document.getElementById('assetTypeFilter').value;
+        const timeRange = document.getElementById('timeRangeFilter').value;
+
+        const params = new URLSearchParams({
+          page: currentPage,
+          page_size: pageSize
+        });
+
+        if (dataType) params.append('data_type', dataType);
+        if (assetType) params.append('asset_type', assetType);
+        if (timeRange) params.append('days', timeRange);
+
+        const response = await apiRequest(`/api/v4/console/system/orphan-frozen?${params.toString()}`);
+
+        if (response && response.success) {
+          const { records, statistics, pagination } = response.data;
+
+          // 更新统计
+          document.getElementById('orphanCount').textContent = statistics?.orphan_count || 0;
+          document.getElementById('frozenCount').textContent = statistics?.frozen_count || 0;
+          document.getElementById('expiredCount').textContent = statistics?.expired_count || 0;
+          document.getElementById('totalValue').textContent = '¥' + (statistics?.total_value || 0).toFixed(2);
+
+          // 渲染表格
+          renderTable(records || []);
+
+          // 渲染分页
+          if (pagination) {
+            renderPagination(pagination);
+          }
+        } else {
+          tbody.innerHTML = `
+            <tr>
+              <td colspan="11" class="text-center py-5 text-muted">
+                <i class="bi bi-inbox" style="font-size: 3rem;"></i>
+                <p class="mt-2">暂无数据</p>
+              </td>
+            </tr>
+          `;
+        }
+      } catch (error) {
+        console.error('加载数据失败:', error);
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="11" class="text-center py-5 text-danger">
+              <i class="bi bi-exclamation-triangle" style="font-size: 2rem;"></i>
+              <p class="mt-2">加载失败：${error.message}</p>
+            </td>
+          </tr>
+        `;
+      } finally {
+        showLoading(false);
+      }
+    }
+
+    /**
+     * 渲染表格
+     */
+    function renderTable(records) {
+      const tbody = document.getElementById('dataTableBody');
+
+      if (!records || records.length === 0) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="11" class="text-center py-5 text-muted">
+              <i class="bi bi-check-circle" style="font-size: 3rem;"></i>
+              <p class="mt-2">暂无孤儿或冻结数据</p>
+            </td>
+          </tr>
+        `;
+        return;
+      }
+
+      tbody.innerHTML = records.map(record => {
+        const typeBadge = {
+          'orphan': '<span class="badge bg-danger">孤儿</span>',
+          'frozen': '<span class="badge bg-info">冻结</span>',
+          'expired': '<span class="badge bg-warning">过期</span>'
+        }[record.data_type] || '<span class="badge bg-secondary">未知</span>';
+
+        const statusBadge = record.is_cleaned
+          ? '<span class="badge bg-secondary">已清理</span>'
+          : '<span class="badge bg-warning">待清理</span>';
+
+        const isChecked = selectedItems.has(record.record_id);
+
+        return `
+          <tr>
+            <td>
+              <input type="checkbox" class="form-check-input row-checkbox" 
+                     data-id="${record.record_id}" 
+                     ${isChecked ? 'checked' : ''}
+                     ${record.is_cleaned ? 'disabled' : ''}
+                     onchange="toggleRowSelection(${record.record_id})">
+            </td>
+            <td>${record.record_id}</td>
+            <td>${typeBadge}</td>
+            <td>${record.asset_type_name || record.asset_type || '-'}</td>
+            <td>${record.amount || 0}</td>
+            <td>${record.user_nickname || record.user_id || '-'}</td>
+            <td>${record.source || '-'}</td>
+            <td>${formatDate(record.created_at)}</td>
+            <td>${formatDate(record.expired_at) || '-'}</td>
+            <td>${statusBadge}</td>
+            <td>
+              ${!record.is_cleaned ? `
+                <button class="btn btn-sm btn-outline-primary" onclick="restoreRecord(${record.record_id})">
+                  <i class="bi bi-arrow-counterclockwise"></i>
+                </button>
+                <button class="btn btn-sm btn-outline-danger" onclick="cleanSingle(${record.record_id})">
+                  <i class="bi bi-trash"></i>
+                </button>
+              ` : '-'}
+            </td>
+          </tr>
+        `;
+      }).join('');
+
+      updateBatchButton();
+    }
+
+    /**
+     * 切换行选择
+     */
+    function toggleRowSelection(recordId) {
+      if (selectedItems.has(recordId)) {
+        selectedItems.delete(recordId);
+      } else {
+        selectedItems.add(recordId);
+      }
+      updateBatchButton();
+    }
+
+    /**
+     * 切换全选
+     */
+    function toggleSelectAll() {
+      const isChecked = document.getElementById('headerCheckbox').checked;
+      const checkboxes = document.querySelectorAll('.row-checkbox:not(:disabled)');
+      
+      checkboxes.forEach(checkbox => {
+        checkbox.checked = isChecked;
+        const recordId = parseInt(checkbox.dataset.id);
+        if (isChecked) {
+          selectedItems.add(recordId);
+        } else {
+          selectedItems.delete(recordId);
+        }
+      });
+
+      updateBatchButton();
+    }
+
+    /**
+     * 更新批量操作按钮状态
+     */
+    function updateBatchButton() {
+      document.getElementById('batchCleanBtn').disabled = selectedItems.size === 0;
+    }
+
+    /**
+     * 扫描孤儿数据
+     */
+    async function scanOrphans() {
+      showLoading(true);
+
+      try {
+        const response = await apiRequest('/api/v4/console/system/orphan-frozen/scan', {
+          method: 'POST'
+        });
+
+        if (response && response.success) {
+          showSuccessToast(`扫描完成，发现 ${response.data.found_count || 0} 条孤儿数据`);
+          loadData();
+        } else {
+          showErrorToast(response?.message || '扫描失败');
+        }
+      } catch (error) {
+        console.error('扫描失败:', error);
+        showErrorToast('扫描失败：' + error.message);
+      } finally {
+        showLoading(false);
+      }
+    }
+
+    /**
+     * 显示清理确认模态框
+     */
+    function showCleanConfirmModal() {
+      if (selectedItems.size === 0) {
+        showErrorToast('请先选择要清理的数据');
+        return;
+      }
+
+      document.getElementById('cleanSummaryList').innerHTML = `
+        <li>选中数据数量：<strong>${selectedItems.size}</strong> 条</li>
+      `;
+      document.getElementById('cleanReason').value = '';
+      document.getElementById('confirmClean').checked = false;
+      document.getElementById('confirmCleanBtn').disabled = true;
+
+      new bootstrap.Modal(document.getElementById('cleanConfirmModal')).show();
+    }
+
+    /**
+     * 执行清理
+     */
+    async function executeClean() {
+      const reason = document.getElementById('cleanReason').value.trim();
+      if (!reason) {
+        showErrorToast('请输入清理原因');
+        return;
+      }
+
+      showLoading(true);
+
+      try {
+        const response = await apiRequest('/api/v4/console/system/orphan-frozen/clean', {
+          method: 'POST',
+          body: JSON.stringify({
+            record_ids: Array.from(selectedItems),
+            reason: reason
+          })
+        });
+
+        if (response && response.success) {
+          showSuccessToast(`成功清理 ${response.data.cleaned_count || selectedItems.size} 条数据`);
+          bootstrap.Modal.getInstance(document.getElementById('cleanConfirmModal')).hide();
+          selectedItems.clear();
+          loadData();
+        } else {
+          showErrorToast(response?.message || '清理失败');
+        }
+      } catch (error) {
+        console.error('清理失败:', error);
+        showErrorToast('清理失败：' + error.message);
+      } finally {
+        showLoading(false);
+      }
+    }
+
+    /**
+     * 清理单条记录
+     */
+    async function cleanSingle(recordId) {
+      if (!confirm('确定要清理这条数据吗？此操作不可恢复。')) {
+        return;
+      }
+
+      showLoading(true);
+
+      try {
+        const response = await apiRequest(`/api/v4/console/system/orphan-frozen/${recordId}/clean`, {
+          method: 'POST',
+          body: JSON.stringify({
+            reason: '管理员手动清理'
+          })
+        });
+
+        if (response && response.success) {
+          showSuccessToast('清理成功');
+          loadData();
+        } else {
+          showErrorToast(response?.message || '清理失败');
+        }
+      } catch (error) {
+        console.error('清理失败:', error);
+        showErrorToast('清理失败：' + error.message);
+      } finally {
+        showLoading(false);
+      }
+    }
+
+    /**
+     * 恢复记录
+     */
+    async function restoreRecord(recordId) {
+      if (!confirm('确定要恢复这条数据吗？')) {
+        return;
+      }
+
+      showLoading(true);
+
+      try {
+        const response = await apiRequest(`/api/v4/console/system/orphan-frozen/${recordId}/restore`, {
+          method: 'POST'
+        });
+
+        if (response && response.success) {
+          showSuccessToast('恢复成功');
+          loadData();
+        } else {
+          showErrorToast(response?.message || '恢复失败');
+        }
+      } catch (error) {
+        console.error('恢复失败:', error);
+        showErrorToast('恢复失败：' + error.message);
+      } finally {
+        showLoading(false);
+      }
+    }
+
+    /**
+     * 渲染分页
+     */
+    function renderPagination(pagination) {
+      const nav = document.getElementById('paginationNav');
+      if (!pagination || pagination.total_pages <= 1) {
+        nav.innerHTML = '';
+        return;
+      }
+
+      let html = '<ul class="pagination pagination-sm justify-content-center mb-0">';
+
+      html += `
+        <li class="page-item ${currentPage === 1 ? 'disabled' : ''}">
+          <a class="page-link" href="#" onclick="goToPage(${currentPage - 1}); return false;">上一页</a>
+        </li>
+      `;
+
+      for (let i = 1; i <= pagination.total_pages; i++) {
+        if (i === 1 || i === pagination.total_pages || (i >= currentPage - 2 && i <= currentPage + 2)) {
+          html += `
+            <li class="page-item ${i === currentPage ? 'active' : ''}">
+              <a class="page-link" href="#" onclick="goToPage(${i}); return false;">${i}</a>
+            </li>
+          `;
+        } else if (i === currentPage - 3 || i === currentPage + 3) {
+          html += '<li class="page-item disabled"><span class="page-link">...</span></li>';
+        }
+      }
+
+      html += `
+        <li class="page-item ${currentPage === pagination.total_pages ? 'disabled' : ''}">
+          <a class="page-link" href="#" onclick="goToPage(${currentPage + 1}); return false;">下一页</a>
+        </li>
+      `;
+
+      html += '</ul>';
+      nav.innerHTML = html;
+    }
+
+    /**
+     * 跳转到指定页
+     */
+    function goToPage(page) {
+      currentPage = page;
+      loadData();
+    }
+
+    /**
+     * 显示/隐藏加载状态
+     */
+    function showLoading(show) {
+      document.getElementById('loadingOverlay').classList.toggle('show', show);
+    }
+  </script>
+</body>
+</html>
+

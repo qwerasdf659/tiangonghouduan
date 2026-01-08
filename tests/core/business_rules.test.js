@@ -668,7 +668,7 @@ describe('🧮 核心业务逻辑测试', () => {
       console.log(`📋 总测试数: ${report.summary.total}`)
       console.log(`✅ 成功: ${report.summary.success}`)
       console.log(`❌ 失败: ${report.summary.failed}`)
-      console.log(`📈 成功率: ${report.summary.successRate}`)
+      console.log(`📈 成功率: ${report.summary.success_rate}`)
       console.log('='.repeat(60))
       console.log('🎯 业务逻辑覆盖:')
       console.log('   ✅ 抽奖业务规则验证')

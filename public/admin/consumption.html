@@ -320,7 +320,7 @@
 
           // ✅ 调用新的管理员查询API
           const response = await apiRequest(
-            `/api/v4/consumption/admin/records?${params.toString()}`
+            `/api/v4/shop/consumption/admin/records?${params.toString()}`
           )
 
           if (response && response.success) {
@@ -596,8 +596,8 @@
         try {
           const endpoint =
             currentAction === 'approve'
-              ? `/api/v4/consumption/approve/${currentRecordId}`
-              : `/api/v4/consumption/reject/${currentRecordId}`
+              ? `/api/v4/shop/consumption/approve/${currentRecordId}`
+              : `/api/v4/shop/consumption/reject/${currentRecordId}`
 
           // ✅ 修正：后端期望的参数名是 admin_notes 而不是 admin_remark
           const response = await apiRequest(endpoint, {

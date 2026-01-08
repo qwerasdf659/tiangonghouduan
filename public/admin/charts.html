@@ -245,7 +245,8 @@
       
       try {
         const days = document.getElementById('periodSelect').value;
-        const response = await apiRequest(`/api/v4/statistics/charts?days=${days}`);
+        // ✅ 对齐到正确的system/statistics路径（文档5.2决策）
+        const response = await apiRequest(`/api/v4/system/statistics/charts?days=${days}`);
         
         if (response && response.success) {
           const data = response.data;

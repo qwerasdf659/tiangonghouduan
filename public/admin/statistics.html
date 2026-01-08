@@ -461,7 +461,7 @@
         }
         
         // 调用API
-        const response = await apiRequest(`/api/v4/statistics/report?${params.toString()}`);
+        const response = await apiRequest(`/api/v4/system/statistics/report?${params.toString()}`);
         
         if (response && response.success) {
           renderStatistics(response.data);
@@ -647,7 +647,7 @@
           params.append('end_date', document.getElementById('endDate').value);
         }
         
-        const response = await fetch(`/api/v4/statistics/export?${params.toString()}`, {
+        const response = await fetch(`/api/v4/system/statistics/export?${params.toString()}`, {
           headers: {
             'Authorization': `Bearer ${getToken()}`
           }
@@ -694,7 +694,7 @@
           params.append('end_date', document.getElementById('endDate').value);
         }
         
-        const response = await fetch(`/api/v4/statistics/export?${params.toString()}`, {
+        const response = await fetch(`/api/v4/system/statistics/export?${params.toString()}`, {
           headers: {
             'Authorization': `Bearer ${getToken()}`
           }

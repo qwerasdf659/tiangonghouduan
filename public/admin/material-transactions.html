@@ -230,7 +230,7 @@
      */
     async function loadAssetTypes() {
       try {
-        const response = await apiRequest('/api/v4/console/material/asset-types');
+        const response = await apiRequest('/api/v4/console/asset-adjustment/asset-types');
         if (response && response.success) {
           assetTypes = response.data || [];
           populateAssetSelect();
@@ -317,7 +317,7 @@
       params.append('page_size', pageSize);
 
       try {
-        const response = await apiRequest(`/api/v4/console/material/transactions?${params.toString()}`);
+        const response = await apiRequest(`/api/v4/console/assets/transactions?${params.toString()}`);
 
         if (response && response.success) {
           const { transactions, pagination } = response.data;

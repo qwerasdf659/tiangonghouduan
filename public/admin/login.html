@@ -86,7 +86,8 @@
       showStatus('正在登录...');
       
       try {
-        const response = await fetch('/api/v4/auth/login', {
+        // ✅ 统一使用console auth认证端点（文档决策：管理后台统一到console auth）
+        const response = await fetch('/api/v4/console/auth/login', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ 

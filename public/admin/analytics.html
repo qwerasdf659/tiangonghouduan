@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>运营分析 - 管理后台</title>
+
+  <!-- Bootstrap 5 - UI框架 -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+
+  <!-- Bootstrap Icons - 图标库 -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+
+  <!-- Chart.js - 图表库 -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+
+  <!-- 公共样式表 - 统一主题和响应式设计 -->
+  <link href="/admin/css/common.css" rel="stylesheet">
+
+  <style>
+    .stat-card {
+      border-left: 4px solid #0d6efd;
+      transition: transform 0.2s;
+    }
+    .stat-card:hover {
+      transform: translateY(-3px);
+    }
+    .stat-card.growth-up { border-left-color: #198754; }
+    .stat-card.growth-down { border-left-color: #dc3545; }
+    .chart-container {
+      position: relative;
+      height: 300px;
+    }
+  </style>
+</head>
+<body class="bg-light">
+  <!-- 顶部导航 -->
+  <nav class="navbar navbar-dark bg-primary">
+    <div class="container-fluid">
+      <a href="/admin/dashboard.html" class="navbar-brand">
+        <i class="bi bi-arrow-left me-2"></i>管理后台 - 运营分析
+      </a>
+      <div>
+        <span class="text-light me-3" id="welcomeText">欢迎，管理员</span>
+        <button class="btn btn-outline-light btn-sm" id="logoutBtn">退出登录</button>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container-fluid mt-4">
+    <!-- 时间筛选 -->
+    <div class="card mb-3">
+      <div class="card-body">
+        <div class="row g-3 align-items-end">
+          <div class="col-md-3">
+            <label class="form-label">时间范围</label>
+            <select class="form-select" id="timeRangeFilter">
+              <option value="7">最近7天</option>
+              <option value="30" selected>最近30天</option>
+              <option value="90">最近90天</option>
+              <option value="custom">自定义</option>
+            </select>
+          </div>
+          <div class="col-md-2" id="customDateStart" style="display: none;">
+            <label class="form-label">开始日期</label>
+            <input type="date" class="form-control" id="startDate">
+          </div>
+          <div class="col-md-2" id="customDateEnd" style="display: none;">
+            <label class="form-label">结束日期</label>
+            <input type="date" class="form-control" id="endDate">
+          </div>
+          <div class="col-md-2">
+            <button class="btn btn-primary w-100" id="refreshBtn">
+              <i class="bi bi-arrow-repeat"></i> 刷新数据
+            </button>
+          </div>
+          <div class="col-md-2">
+            <button class="btn btn-outline-success w-100" id="exportBtn">
+              <i class="bi bi-download"></i> 导出报表
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 核心指标 -->
+    <div class="row g-3 mb-4">
+      <div class="col-md-3">
+        <div class="card stat-card">
+          <div class="card-body">
+            <div class="d-flex justify-content-between align-items-center">
+              <div>
+                <small class="text-muted">活跃用户</small>
+                <h3 class="mb-0" id="activeUsers">-</h3>
+                <small id="activeUsersGrowth" class="text-muted">-</small>
+              </div>
+              <i class="bi bi-people text-primary" style="font-size: 2rem;"></i>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="card stat-card">
+          <div class="card-body">
+            <div class="d-flex justify-content-between align-items-center">
+              <div>
+                <small class="text-muted">抽奖次数</small>
+                <h3 class="mb-0" id="lotteryCount">-</h3>
+                <small id="lotteryCountGrowth" class="text-muted">-</small>
+              </div>
+              <i class="bi bi-gift text-success" style="font-size: 2rem;"></i>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="card stat-card">
+          <div class="card-body">
+            <div class="d-flex justify-content-between align-items-center">
+              <div>
+                <small class="text-muted">积分发放</small>
+                <h3 class="mb-0" id="pointsIssued">-</h3>
+                <small id="pointsIssuedGrowth" class="text-muted">-</small>
+              </div>
+              <i class="bi bi-star text-warning" style="font-size: 2rem;"></i>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="card stat-card">
+          <div class="card-body">
+            <div class="d-flex justify-content-between align-items-center">
+              <div>
+                <small class="text-muted">兑换订单</small>
+                <h3 class="mb-0" id="exchangeOrders">-</h3>
+                <small id="exchangeOrdersGrowth" class="text-muted">-</small>
+              </div>
+              <i class="bi bi-cart text-info" style="font-size: 2rem;"></i>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="row g-3">
+      <!-- 用户趋势图 -->
+      <div class="col-md-6">
+        <div class="card">
+          <div class="card-header bg-white">
+            <h6 class="mb-0"><i class="bi bi-graph-up"></i> 用户活跃趋势</h6>
+          </div>
+          <div class="card-body">
+            <div class="chart-container">
+              <canvas id="userTrendChart"></canvas>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 抽奖趋势图 -->
+      <div class="col-md-6">
+        <div class="card">
+          <div class="card-header bg-white">
+            <h6 class="mb-0"><i class="bi bi-gift"></i> 抽奖活动趋势</h6>
+          </div>
+          <div class="card-body">
+            <div class="chart-container">
+              <canvas id="lotteryTrendChart"></canvas>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 积分流转图 -->
+      <div class="col-md-6">
+        <div class="card">
+          <div class="card-header bg-white">
+            <h6 class="mb-0"><i class="bi bi-star"></i> 积分流转分析</h6>
+          </div>
+          <div class="card-body">
+            <div class="chart-container">
+              <canvas id="pointsFlowChart"></canvas>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 用户来源分布 -->
+      <div class="col-md-6">
+        <div class="card">
+          <div class="card-header bg-white">
+            <h6 class="mb-0"><i class="bi bi-pie-chart"></i> 用户来源分布</h6>
+          </div>
+          <div class="card-body">
+            <div class="chart-container">
+              <canvas id="userSourceChart"></canvas>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 详细数据表格 -->
+    <div class="card mt-3">
+      <div class="card-header bg-white">
+        <h6 class="mb-0"><i class="bi bi-table"></i> 运营数据明细</h6>
+      </div>
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-hover mb-0">
+            <thead class="table-light">
+              <tr>
+                <th>日期</th>
+                <th>新增用户</th>
+                <th>活跃用户</th>
+                <th>抽奖次数</th>
+                <th>积分发放</th>
+                <th>积分消耗</th>
+                <th>兑换订单</th>
+                <th>交易额</th>
+              </tr>
+            </thead>
+            <tbody id="detailTableBody">
+              <tr>
+                <td colspan="8" class="text-center py-5 text-muted">
+                  <i class="bi bi-inbox" style="font-size: 3rem;"></i>
+                  <p class="mt-2">加载中...</p>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 加载遮罩层 -->
+  <div class="loading-overlay" id="loadingOverlay">
+    <div class="spinner-border text-light" style="width: 3rem; height: 3rem;" role="status">
+      <span class="visually-hidden">处理中...</span>
+    </div>
+  </div>
+
+  <!-- Bootstrap JS -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+  <!-- 引入通用工具库 -->
+  <script src="/admin/js/admin-common.js"></script>
+
+  <script>
+    /**
+     * 运营分析页面
+     * @description 展示系统运营核心指标和趋势图表
+     * @created 2026-01-09
+     */
+
+    // 图表实例
+    let userTrendChart = null;
+    let lotteryTrendChart = null;
+    let pointsFlowChart = null;
+    let userSourceChart = null;
+
+    /**
+     * 页面初始化
+     */
+    document.addEventListener('DOMContentLoaded', function() {
+      // 显示用户信息
+      const userInfo = getCurrentUser();
+      if (userInfo && userInfo.nickname) {
+        document.getElementById('welcomeText').textContent = `欢迎，${userInfo.nickname}`;
+      }
+
+      // 事件监听器
+      document.getElementById('logoutBtn').addEventListener('click', logout);
+      document.getElementById('refreshBtn').addEventListener('click', loadAllData);
+      document.getElementById('exportBtn').addEventListener('click', exportReport);
+      document.getElementById('timeRangeFilter').addEventListener('change', handleTimeRangeChange);
+
+      // Token和权限验证
+      if (!getToken() || !checkAdminPermission()) {
+        return;
+      }
+
+      // 初始化图表
+      initCharts();
+      // 加载数据
+      loadAllData();
+    });
+
+    /**
+     * 处理时间范围变更
+     */
+    function handleTimeRangeChange() {
+      const value = document.getElementById('timeRangeFilter').value;
+      const showCustom = value === 'custom';
+      
+      document.getElementById('customDateStart').style.display = showCustom ? 'block' : 'none';
+      document.getElementById('customDateEnd').style.display = showCustom ? 'block' : 'none';
+
+      if (!showCustom) {
+        loadAllData();
+      }
+    }
+
+    /**
+     * 初始化图表
+     */
+    function initCharts() {
+      // 用户趋势图
+      const userCtx = document.getElementById('userTrendChart').getContext('2d');
+      userTrendChart = new Chart(userCtx, {
+        type: 'line',
+        data: {
+          labels: [],
+          datasets: [{
+            label: '活跃用户',
+            data: [],
+            borderColor: '#0d6efd',
+            backgroundColor: 'rgba(13, 110, 253, 0.1)',
+            fill: true,
+            tension: 0.4
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false }
+          },
+          scales: {
+            y: { beginAtZero: true }
+          }
+        }
+      });
+
+      // 抽奖趋势图
+      const lotteryCtx = document.getElementById('lotteryTrendChart').getContext('2d');
+      lotteryTrendChart = new Chart(lotteryCtx, {
+        type: 'bar',
+        data: {
+          labels: [],
+          datasets: [{
+            label: '抽奖次数',
+            data: [],
+            backgroundColor: '#198754'
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false }
+          },
+          scales: {
+            y: { beginAtZero: true }
+          }
+        }
+      });
+
+      // 积分流转图
+      const pointsCtx = document.getElementById('pointsFlowChart').getContext('2d');
+      pointsFlowChart = new Chart(pointsCtx, {
+        type: 'line',
+        data: {
+          labels: [],
+          datasets: [
+            {
+              label: '积分发放',
+              data: [],
+              borderColor: '#ffc107',
+              backgroundColor: 'rgba(255, 193, 7, 0.1)',
+              fill: false
+            },
+            {
+              label: '积分消耗',
+              data: [],
+              borderColor: '#dc3545',
+              backgroundColor: 'rgba(220, 53, 69, 0.1)',
+              fill: false
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            y: { beginAtZero: true }
+          }
+        }
+      });
+
+      // 用户来源饼图
+      const sourceCtx = document.getElementById('userSourceChart').getContext('2d');
+      userSourceChart = new Chart(sourceCtx, {
+        type: 'doughnut',
+        data: {
+          labels: ['微信小程序', 'Web端', 'App', '其他'],
+          datasets: [{
+            data: [0, 0, 0, 0],
+            backgroundColor: ['#0d6efd', '#198754', '#ffc107', '#6c757d']
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false
+        }
+      });
+    }
+
+    /**
+     * 加载所有数据
+     */
+    async function loadAllData() {
+      showLoading(true);
+
+      try {
+        await Promise.all([
+          loadSummaryData(),
+          loadTrendData(),
+          loadDetailData()
+        ]);
+      } catch (error) {
+        console.error('加载数据失败:', error);
+        showErrorToast('加载数据失败：' + error.message);
+      } finally {
+        showLoading(false);
+      }
+    }
+
+    /**
+     * 加载汇总数据
+     */
+    async function loadSummaryData() {
+      const days = document.getElementById('timeRangeFilter').value;
+
+      try {
+        const response = await apiRequest(`/api/v4/console/analytics/summary?days=${days}`);
+
+        if (response && response.success) {
+          const { current, previous } = response.data;
+
+          // 活跃用户
+          document.getElementById('activeUsers').textContent = formatNumber(current.active_users || 0);
+          updateGrowth('activeUsersGrowth', current.active_users, previous?.active_users);
+
+          // 抽奖次数
+          document.getElementById('lotteryCount').textContent = formatNumber(current.lottery_count || 0);
+          updateGrowth('lotteryCountGrowth', current.lottery_count, previous?.lottery_count);
+
+          // 积分发放
+          document.getElementById('pointsIssued').textContent = formatNumber(current.points_issued || 0);
+          updateGrowth('pointsIssuedGrowth', current.points_issued, previous?.points_issued);
+
+          // 兑换订单
+          document.getElementById('exchangeOrders').textContent = formatNumber(current.exchange_orders || 0);
+          updateGrowth('exchangeOrdersGrowth', current.exchange_orders, previous?.exchange_orders);
+        }
+      } catch (error) {
+        console.error('加载汇总数据失败:', error);
+      }
+    }
+
+    /**
+     * 更新增长率显示
+     */
+    function updateGrowth(elementId, current, previous) {
+      const element = document.getElementById(elementId);
+      if (!previous || previous === 0) {
+        element.textContent = '暂无对比数据';
+        element.className = 'text-muted';
+        return;
+      }
+
+      const growth = ((current - previous) / previous * 100).toFixed(1);
+      const isUp = growth >= 0;
+      
+      element.textContent = `${isUp ? '↑' : '↓'} ${Math.abs(growth)}%`;
+      element.className = isUp ? 'text-success' : 'text-danger';
+    }
+
+    /**
+     * 加载趋势数据
+     */
+    async function loadTrendData() {
+      const days = document.getElementById('timeRangeFilter').value;
+
+      try {
+        const response = await apiRequest(`/api/v4/console/analytics/trends?days=${days}`);
+
+        if (response && response.success) {
+          const { dates, users, lottery, points_in, points_out, sources } = response.data;
+
+          // 更新用户趋势图
+          userTrendChart.data.labels = dates || [];
+          userTrendChart.data.datasets[0].data = users || [];
+          userTrendChart.update();
+
+          // 更新抽奖趋势图
+          lotteryTrendChart.data.labels = dates || [];
+          lotteryTrendChart.data.datasets[0].data = lottery || [];
+          lotteryTrendChart.update();
+
+          // 更新积分流转图
+          pointsFlowChart.data.labels = dates || [];
+          pointsFlowChart.data.datasets[0].data = points_in || [];
+          pointsFlowChart.data.datasets[1].data = points_out || [];
+          pointsFlowChart.update();
+
+          // 更新用户来源分布
+          if (sources) {
+            userSourceChart.data.labels = Object.keys(sources);
+            userSourceChart.data.datasets[0].data = Object.values(sources);
+            userSourceChart.update();
+          }
+        }
+      } catch (error) {
+        console.error('加载趋势数据失败:', error);
+      }
+    }
+
+    /**
+     * 加载详细数据
+     */
+    async function loadDetailData() {
+      const days = document.getElementById('timeRangeFilter').value;
+      const tbody = document.getElementById('detailTableBody');
+
+      try {
+        const response = await apiRequest(`/api/v4/console/analytics/daily?days=${days}`);
+
+        if (response && response.success) {
+          const dailyData = response.data.daily || [];
+
+          if (dailyData.length === 0) {
+            tbody.innerHTML = `
+              <tr>
+                <td colspan="8" class="text-center py-5 text-muted">
+                  <i class="bi bi-inbox" style="font-size: 3rem;"></i>
+                  <p class="mt-2">暂无数据</p>
+                </td>
+              </tr>
+            `;
+            return;
+          }
+
+          tbody.innerHTML = dailyData.map(day => `
+            <tr>
+              <td>${day.date}</td>
+              <td>${day.new_users || 0}</td>
+              <td>${day.active_users || 0}</td>
+              <td>${day.lottery_count || 0}</td>
+              <td class="text-success">+${day.points_issued || 0}</td>
+              <td class="text-danger">-${day.points_consumed || 0}</td>
+              <td>${day.exchange_orders || 0}</td>
+              <td>¥${(day.transaction_amount || 0).toFixed(2)}</td>
+            </tr>
+          `).join('');
+        }
+      } catch (error) {
+        console.error('加载详细数据失败:', error);
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="8" class="text-center py-5 text-danger">
+              <i class="bi bi-exclamation-triangle" style="font-size: 2rem;"></i>
+              <p class="mt-2">加载失败</p>
+            </td>
+          </tr>
+        `;
+      }
+    }
+
+    /**
+     * 导出报表
+     */
+    function exportReport() {
+      const days = document.getElementById('timeRangeFilter').value;
+      window.open(`/api/v4/console/analytics/export?days=${days}&token=${getToken()}`);
+    }
+
+    /**
+     * 格式化数字
+     */
+    function formatNumber(num) {
+      if (num >= 1000000) {
+        return (num / 1000000).toFixed(2) + 'M';
+      } else if (num >= 1000) {
+        return (num / 1000).toFixed(1) + 'K';
+      }
+      return num.toString();
+    }
+
+    /**
+     * 显示/隐藏加载状态
+     */
+    function showLoading(show) {
+      document.getElementById('loadingOverlay').classList.toggle('show', show);
+    }
+  </script>
+</body>
+</html>
+

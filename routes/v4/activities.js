@@ -1,28 +1,26 @@
 /**
- * 餐厅积分抽奖系统 V4.0 - 活动条件管理API路由（管理员专用）
+ * 餐厅积分抽奖系统 V4.0 - 活动条件API路由
  *
  * 顶层路径：/api/v4/activities
  *
  * 功能：
  * - 获取可参与的活动列表（管理员查看）
- * - 检查用户活动参与资格（管理员验证）
- * - 参与活动验证（管理员测试）
- * - 配置活动参与条件（管理员配置）
+ * - 检查用户活动参与资格（管理员测试）
+ * - 参与活动验证（管理员模拟测试）
+ * - 配置活动参与条件（管理员）
  *
- * 权限控制（2026-01-09 决策）：
- * - 所有接口均需要管理员权限
- * - 微信小程序用户只需调用 /api/v4/lottery/draw 即可完成抽奖
- * - 活动条件验证逻辑内置于抽奖流程中，无需单独调用
+ * 权限控制（2026-01-08已决策）：
+ * - **所有端点仅管理员可调用**（文档0.2决策：activities上线范围 = 仅管理员）
+ * - 普通用户不开放此域接口
  *
- * 业务规则（2026-01-09 更新）：
- * - 本域所有端点仅服务于 admin 后台管理需要
- * - available 端点：管理员查看用户满足条件的活动
- * - check-eligibility：管理员验证指定用户的活动资格
- * - participate：管理员测试参与验证逻辑
- * - configure-conditions：管理员配置活动条件
+ * 业务规则：
+ * - available 端点：返回所有活动列表（管理员查看）
+ * - check-eligibility：管理员测试校验用户资格
+ * - participate：管理员模拟测试参与资格
+ * - configure-conditions：仅管理员可配置活动条件
  *
  * 创建时间：2026年01月08日
- * 更新时间：2026年01月09日
+ * 更新时间：2026年01月09日（权限收紧：全部端点仅管理员）
  * 适用区域：中国（北京时间 Asia/Shanghai）
  */
 
@@ -34,22 +32,16 @@ const ActivityService = require('../../services/ActivityService')
 
 /**
  * @route GET /api/v4/activities/available
- * @desc 获取指定用户可参与的活动列表（管理员专用）
- * @access Private（需要管理员权限）
+ * @desc 获取活动列表（管理员查看）
+ * @access Private（仅管理员 - 文档0.2决策）
  *
- * @query {number} [user_id] - 可选，指定查询的用户ID，默认为当前登录用户
- *
- * @returns {Object} 可参与的活动列表
+ * @returns {Object} 活动列表
  * @returns {boolean} return.success - 请求是否成功
  * @returns {string} return.code - 业务状态码
  * @returns {string} return.message - 提示消息
  * @returns {Object} return.data - 业务数据
  * @returns {Array} return.data.activities - 活动列表
  * @returns {number} return.data.total - 活动总数
- *
- * 业务说明：
- * - 此端点仅供管理员后台使用
- * - 微信小程序用户无需调用此接口，抽奖时自动验证活动资格
  */
 router.get('/available', authenticateToken, requireAdmin, async (req, res) => {
   try {
@@ -88,11 +80,10 @@ router.get('/available', authenticateToken, requireAdmin, async (req, res) => {
 
 /**
  * @route GET /api/v4/activities/:idOrCode/check-eligibility
- * @desc 检查用户是否满足特定活动的参与条件（管理员专用）
- * @access Private（需要管理员权限）
+ * @desc 检查用户是否满足特定活动的参与条件（管理员测试校验用）
+ * @access Private（仅管理员 - 文档0.2决策）
  *
  * @param {string|number} idOrCode - 活动ID或活动代码
- * @query {number} [user_id] - 可选，指定检查的用户ID，默认为当前登录用户
  *
  * @returns {Object} 资格检查结果
  * @returns {boolean} return.data.eligible - 是否满足条件
@@ -100,10 +91,6 @@ router.get('/available', authenticateToken, requireAdmin, async (req, res) => {
  * @returns {string} return.data.activity_name - 活动名称
  * @returns {Array} return.data.failed_conditions - 未满足的条件列表
  * @returns {Array} return.data.messages - 提示消息列表
- *
- * 业务说明：
- * - 此端点仅供管理员后台验证用户资格使用
- * - 微信小程序用户无需调用此接口，抽奖时自动验证活动资格
  */
 router.get('/:idOrCode/check-eligibility', authenticateToken, requireAdmin, async (req, res) => {
   try {
@@ -157,22 +144,18 @@ router.get('/:idOrCode/check-eligibility', authenticateToken, requireAdmin, asyn
 
 /**
  * @route POST /api/v4/activities/:idOrCode/participate
- * @desc 验证活动参与条件（管理员测试专用）
- * @access Private（需要管理员权限）
+ * @desc 尝试参与活动（管理员模拟测试用）
+ * @access Private（仅管理员 - 文档0.2决策）
  *
  * @param {string|number} idOrCode - 活动ID或活动代码
- * @body {number} [user_id] - 可选，指定验证的用户ID，默认为当前登录用户
  *
- * @returns {Object} 参与验证结果
+ * @returns {Object} 参与结果
  * @returns {boolean} return.data.can_participate - 是否可以参与
  * @returns {number} return.data.activity_id - 活动ID
  * @returns {string} return.data.activity_name - 活动名称
  * @returns {Array} return.data.reasons - 不能参与的原因（如果不能参与）
  *
- * 业务说明：
- * - 此接口仅供管理员测试活动参与条件验证逻辑
- * - 微信小程序用户无需调用此接口，直接调用 /api/v4/lottery/draw 即可
- * - 抽奖接口内部已包含完整的活动资格验证流程
+ * 注意：此接口仅验证参与资格，实际抽奖需要调用 /api/v4/lottery/draw
  */
 router.post('/:idOrCode/participate', authenticateToken, requireAdmin, async (req, res) => {
   try {

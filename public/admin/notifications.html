@@ -396,7 +396,7 @@
           if (type !== 'all') params.append('type', type)
           if (status !== 'all') params.append('status', status)
 
-          const response = await apiRequest(`/api/v4/notifications?${params.toString()}`)
+          const response = await apiRequest(`/api/v4/system/notifications?${params.toString()}`)
 
           if (response && response.success) {
             allNotifications = response.data.notifications || []
@@ -542,7 +542,7 @@
         showLoading()
 
         try {
-          const response = await apiRequest(`/api/v4/notifications/${notificationId}`)
+          const response = await apiRequest(`/api/v4/system/notifications/${notificationId}`)
 
           if (response && response.success) {
             const notif = response.data.notification || response.data
@@ -613,7 +613,7 @@
        */
       async function markAsRead(notificationId) {
         try {
-          await apiRequest(`/api/v4/notifications/${notificationId}/read`, {
+          await apiRequest(`/api/v4/system/notifications/${notificationId}/read`, {
             method: 'POST'
           })
         } catch (error) {
@@ -632,7 +632,7 @@
         showLoading()
 
         try {
-          const response = await apiRequest('/api/v4/notifications/read-all', {
+          const response = await apiRequest('/api/v4/system/notifications/read-all', {
             method: 'POST'
           })
 
@@ -661,7 +661,7 @@
         showLoading()
 
         try {
-          const response = await apiRequest('/api/v4/notifications/clear', {
+          const response = await apiRequest('/api/v4/system/notifications/clear', {
             method: 'DELETE'
           })
 
@@ -697,7 +697,7 @@
         showLoading()
 
         try {
-          const response = await apiRequest('/api/v4/notifications/send', {
+          const response = await apiRequest('/api/v4/system/notifications/send', {
             method: 'POST',
             body: JSON.stringify({
               type: type,

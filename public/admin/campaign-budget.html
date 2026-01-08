@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>活动预算配置 - 管理后台</title>
+
+  <!-- Bootstrap 5 - UI框架 -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+
+  <!-- Bootstrap Icons - 图标库 -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+
+  <!-- 公共样式表 - 统一主题和响应式设计 -->
+  <link href="/admin/css/common.css" rel="stylesheet">
+
+  <style>
+    .budget-card {
+      border-left: 4px solid #198754;
+    }
+    .budget-value {
+      font-size: 1.8rem;
+      font-weight: bold;
+    }
+    .progress-label {
+      font-size: 0.85rem;
+    }
+  </style>
+</head>
+<body class="bg-light">
+  <!-- 顶部导航 -->
+  <nav class="navbar navbar-dark bg-primary">
+    <div class="container-fluid">
+      <a href="/admin/dashboard.html" class="navbar-brand">
+        <i class="bi bi-arrow-left me-2"></i>管理后台 - 活动预算配置
+      </a>
+      <div>
+        <span class="text-light me-3" id="welcomeText">欢迎，管理员</span>
+        <button class="btn btn-outline-light btn-sm" id="logoutBtn">退出登录</button>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container-fluid mt-4">
+    <!-- 预算概览 -->
+    <div class="row g-3 mb-4">
+      <div class="col-md-3">
+        <div class="card budget-card">
+          <div class="card-body text-center">
+            <i class="bi bi-wallet2 text-success" style="font-size: 2rem;"></i>
+            <div class="budget-value mt-2 text-success" id="totalBudget">¥0</div>
+            <small class="text-muted">总预算</small>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="card budget-card">
+          <div class="card-body text-center">
+            <i class="bi bi-cash-stack text-primary" style="font-size: 2rem;"></i>
+            <div class="budget-value mt-2 text-primary" id="usedBudget">¥0</div>
+            <small class="text-muted">已使用</small>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="card budget-card">
+          <div class="card-body text-center">
+            <i class="bi bi-piggy-bank text-warning" style="font-size: 2rem;"></i>
+            <div class="budget-value mt-2 text-warning" id="remainingBudget">¥0</div>
+            <small class="text-muted">剩余预算</small>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="card budget-card">
+          <div class="card-body text-center">
+            <i class="bi bi-calendar-event text-info" style="font-size: 2rem;"></i>
+            <div class="budget-value mt-2 text-info" id="activeCampaigns">0</div>
+            <small class="text-muted">进行中活动</small>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 操作区域 -->
+    <div class="card mb-3">
+      <div class="card-body">
+        <div class="row g-3 align-items-end">
+          <div class="col-md-3">
+            <label class="form-label">活动状态</label>
+            <select class="form-select" id="statusFilter">
+              <option value="">全部状态</option>
+              <option value="active">进行中</option>
+              <option value="pending">待开始</option>
+              <option value="ended">已结束</option>
+            </select>
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">预算类型</label>
+            <select class="form-select" id="budgetTypeFilter">
+              <option value="">全部类型</option>
+              <option value="daily">每日预算</option>
+              <option value="total">总预算</option>
+            </select>
+          </div>
+          <div class="col-md-3">
+            <button class="btn btn-primary w-100" id="refreshBtn">
+              <i class="bi bi-arrow-repeat"></i> 刷新数据
+            </button>
+          </div>
+          <div class="col-md-3">
+            <button class="btn btn-success w-100" data-bs-toggle="modal" data-bs-target="#setBudgetModal">
+              <i class="bi bi-plus-lg"></i> 设置预算
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 预算列表 -->
+    <div class="card">
+      <div class="card-header bg-white">
+        <h5 class="mb-0"><i class="bi bi-list-ul"></i> 活动预算列表</h5>
+      </div>
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-hover mb-0">
+            <thead class="table-light">
+              <tr>
+                <th>活动ID</th>
+                <th>活动名称</th>
+                <th>预算类型</th>
+                <th>总预算</th>
+                <th>已使用</th>
+                <th>使用率</th>
+                <th>状态</th>
+                <th>有效期</th>
+                <th>操作</th>
+              </tr>
+            </thead>
+            <tbody id="budgetTableBody">
+              <tr>
+                <td colspan="9" class="text-center py-5 text-muted">
+                  <i class="bi bi-inbox" style="font-size: 3rem;"></i>
+                  <p class="mt-2">点击"刷新数据"加载预算信息</p>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="card-footer bg-white">
+        <nav id="paginationNav"></nav>
+      </div>
+    </div>
+  </div>
+
+  <!-- 设置预算模态框 -->
+  <div class="modal fade" id="setBudgetModal" tabindex="-1">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title"><i class="bi bi-wallet2"></i> 设置活动预算</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <form id="setBudgetForm">
+            <div class="mb-3">
+              <label class="form-label">选择活动 <span class="text-danger">*</span></label>
+              <select class="form-select" id="modalActivitySelect" required>
+                <option value="">请选择活动</option>
+              </select>
+            </div>
+            <div class="mb-3">
+              <label class="form-label">预算类型 <span class="text-danger">*</span></label>
+              <select class="form-select" id="budgetType" required>
+                <option value="total">总预算</option>
+                <option value="daily">每日预算</option>
+              </select>
+            </div>
+            <div class="mb-3">
+              <label class="form-label">预算金额（元） <span class="text-danger">*</span></label>
+              <input type="number" class="form-control" id="budgetAmount" min="0" step="0.01" required>
+            </div>
+            <div class="mb-3">
+              <label class="form-label">预警阈值（%）</label>
+              <input type="number" class="form-control" id="alertThreshold" min="0" max="100" value="80">
+              <small class="text-muted">当使用率达到此阈值时发送预警通知</small>
+            </div>
+            <div class="mb-3">
+              <label class="form-label">备注</label>
+              <textarea class="form-control" id="budgetRemark" rows="2" placeholder="可选备注信息"></textarea>
+            </div>
+          </form>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+          <button type="button" class="btn btn-primary" id="submitBudgetBtn">确认设置</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 加载遮罩层 -->
+  <div class="loading-overlay" id="loadingOverlay">
+    <div class="spinner-border text-light" style="width: 3rem; height: 3rem;" role="status">
+      <span class="visually-hidden">处理中...</span>
+    </div>
+  </div>
+
+  <!-- Bootstrap JS -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+  <!-- 引入通用工具库 -->
+  <script src="/admin/js/admin-common.js"></script>
+
+  <script>
+    /**
+     * 活动预算配置页面
+     * @description 管理抽奖活动的预算分配和使用情况
+     * @created 2026-01-09
+     */
+
+    // 全局变量
+    let currentPage = 1;
+    const pageSize = 20;
+
+    /**
+     * 页面初始化
+     */
+    document.addEventListener('DOMContentLoaded', function() {
+      // 显示用户信息
+      const userInfo = getCurrentUser();
+      if (userInfo && userInfo.nickname) {
+        document.getElementById('welcomeText').textContent = `欢迎，${userInfo.nickname}`;
+      }
+
+      // 事件监听器
+      document.getElementById('logoutBtn').addEventListener('click', logout);
+      document.getElementById('refreshBtn').addEventListener('click', loadBudgetData);
+      document.getElementById('submitBudgetBtn').addEventListener('click', submitBudget);
+      document.getElementById('statusFilter').addEventListener('change', loadBudgetData);
+      document.getElementById('budgetTypeFilter').addEventListener('change', loadBudgetData);
+
+      // Token和权限验证
+      if (!getToken() || !checkAdminPermission()) {
+        return;
+      }
+
+      // 加载活动列表
+      loadActivities();
+      // 加载预算数据
+      loadBudgetData();
+    });
+
+    /**
+     * 加载活动列表
+     */
+    async function loadActivities() {
+      try {
+        const response = await apiRequest('/api/v4/console/activities');
+        if (response && response.success) {
+          const activities = response.data.activities || response.data || [];
+          const select = document.getElementById('modalActivitySelect');
+
+          activities.forEach(activity => {
+            const option = document.createElement('option');
+            option.value = activity.activity_id;
+            option.textContent = activity.name;
+            select.appendChild(option);
+          });
+        }
+      } catch (error) {
+        console.error('加载活动列表失败:', error);
+      }
+    }
+
+    /**
+     * 加载预算数据
+     */
+    async function loadBudgetData() {
+      showLoading(true);
+      const tbody = document.getElementById('budgetTableBody');
+
+      try {
+        const status = document.getElementById('statusFilter').value;
+        const budgetType = document.getElementById('budgetTypeFilter').value;
+
+        const params = new URLSearchParams({
+          page: currentPage,
+          page_size: pageSize
+        });
+
+        if (status) params.append('status', status);
+        if (budgetType) params.append('budget_type', budgetType);
+
+        // ✅ 使用console/campaign模块的预算管理端点
+        const response = await apiRequest(`/api/v4/console/campaign/budgets?${params.toString()}`);
+
+        if (response && response.success) {
+          const { budgets, statistics, pagination } = response.data;
+
+          // 更新统计卡片
+          document.getElementById('totalBudget').textContent = '¥' + (statistics?.total_budget || 0).toFixed(2);
+          document.getElementById('usedBudget').textContent = '¥' + (statistics?.used_budget || 0).toFixed(2);
+          document.getElementById('remainingBudget').textContent = '¥' + (statistics?.remaining_budget || 0).toFixed(2);
+          document.getElementById('activeCampaigns').textContent = statistics?.active_count || 0;
+
+          // 渲染表格
+          renderBudgetTable(budgets || []);
+
+          // 渲染分页
+          if (pagination) {
+            renderPagination(pagination);
+          }
+        } else {
+          showErrorToast(response?.message || '加载失败');
+        }
+      } catch (error) {
+        console.error('加载预算数据失败:', error);
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="9" class="text-center py-5 text-danger">
+              <i class="bi bi-exclamation-triangle" style="font-size: 2rem;"></i>
+              <p class="mt-2">加载失败：${error.message}</p>
+            </td>
+          </tr>
+        `;
+      } finally {
+        showLoading(false);
+      }
+    }
+
+    /**
+     * 渲染预算表格
+     */
+    function renderBudgetTable(budgets) {
+      const tbody = document.getElementById('budgetTableBody');
+
+      if (!budgets || budgets.length === 0) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="9" class="text-center py-5 text-muted">
+              <i class="bi bi-inbox" style="font-size: 3rem;"></i>
+              <p class="mt-2">暂无预算数据</p>
+            </td>
+          </tr>
+        `;
+        return;
+      }
+
+      tbody.innerHTML = budgets.map(budget => {
+        const usageRate = budget.total_budget > 0 
+          ? ((budget.used_budget / budget.total_budget) * 100).toFixed(1) 
+          : 0;
+        const usageClass = usageRate >= 90 ? 'bg-danger' : usageRate >= 70 ? 'bg-warning' : 'bg-success';
+        
+        const statusBadge = {
+          'active': '<span class="badge bg-success">进行中</span>',
+          'pending': '<span class="badge bg-warning">待开始</span>',
+          'ended': '<span class="badge bg-secondary">已结束</span>'
+        }[budget.status] || '<span class="badge bg-secondary">未知</span>';
+
+        return `
+          <tr>
+            <td>${budget.activity_id}</td>
+            <td>${budget.activity_name || '-'}</td>
+            <td>${budget.budget_type === 'daily' ? '每日预算' : '总预算'}</td>
+            <td>¥${(budget.total_budget || 0).toFixed(2)}</td>
+            <td>¥${(budget.used_budget || 0).toFixed(2)}</td>
+            <td>
+              <div class="progress" style="height: 20px;">
+                <div class="progress-bar ${usageClass}" role="progressbar" 
+                     style="width: ${usageRate}%;" 
+                     aria-valuenow="${usageRate}" aria-valuemin="0" aria-valuemax="100">
+                  ${usageRate}%
+                </div>
+              </div>
+            </td>
+            <td>${statusBadge}</td>
+            <td>${formatDate(budget.valid_until) || '永久'}</td>
+            <td>
+              <button class="btn btn-sm btn-outline-primary" onclick="editBudget(${budget.budget_id})">
+                <i class="bi bi-pencil"></i>
+              </button>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    /**
+     * 渲染分页
+     */
+    function renderPagination(pagination) {
+      const nav = document.getElementById('paginationNav');
+      if (!pagination || pagination.total_pages <= 1) {
+        nav.innerHTML = '';
+        return;
+      }
+
+      let html = '<ul class="pagination pagination-sm justify-content-center mb-0">';
+
+      html += `
+        <li class="page-item ${currentPage === 1 ? 'disabled' : ''}">
+          <a class="page-link" href="#" onclick="goToPage(${currentPage - 1}); return false;">上一页</a>
+        </li>
+      `;
+
+      for (let i = 1; i <= pagination.total_pages; i++) {
+        if (i === 1 || i === pagination.total_pages || (i >= currentPage - 2 && i <= currentPage + 2)) {
+          html += `
+            <li class="page-item ${i === currentPage ? 'active' : ''}">
+              <a class="page-link" href="#" onclick="goToPage(${i}); return false;">${i}</a>
+            </li>
+          `;
+        } else if (i === currentPage - 3 || i === currentPage + 3) {
+          html += '<li class="page-item disabled"><span class="page-link">...</span></li>';
+        }
+      }
+
+      html += `
+        <li class="page-item ${currentPage === pagination.total_pages ? 'disabled' : ''}">
+          <a class="page-link" href="#" onclick="goToPage(${currentPage + 1}); return false;">下一页</a>
+        </li>
+      `;
+
+      html += '</ul>';
+      nav.innerHTML = html;
+    }
+
+    /**
+     * 跳转到指定页
+     */
+    function goToPage(page) {
+      currentPage = page;
+      loadBudgetData();
+    }
+
+    /**
+     * 提交预算设置
+     */
+    async function submitBudget() {
+      const form = document.getElementById('setBudgetForm');
+      if (!form.checkValidity()) {
+        form.reportValidity();
+        return;
+      }
+
+      const data = {
+        activity_id: parseInt(document.getElementById('modalActivitySelect').value),
+        budget_type: document.getElementById('budgetType').value,
+        total_budget: parseFloat(document.getElementById('budgetAmount').value),
+        alert_threshold: parseInt(document.getElementById('alertThreshold').value),
+        remark: document.getElementById('budgetRemark').value.trim()
+      };
+
+      try {
+        const submitBtn = document.getElementById('submitBudgetBtn');
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>提交中...';
+
+        const response = await apiRequest('/api/v4/console/campaign/budgets', {
+          method: 'POST',
+          body: JSON.stringify(data)
+        });
+
+        if (response && response.success) {
+          showSuccessToast('预算设置成功');
+          bootstrap.Modal.getInstance(document.getElementById('setBudgetModal')).hide();
+          form.reset();
+          loadBudgetData();
+        } else {
+          showErrorToast(response?.message || '设置失败');
+        }
+      } catch (error) {
+        console.error('预算设置失败:', error);
+        showErrorToast(error.message);
+      } finally {
+        const submitBtn = document.getElementById('submitBudgetBtn');
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = '确认设置';
+      }
+    }
+
+    /**
+     * 编辑预算
+     */
+    function editBudget(budgetId) {
+      showInfoToast('编辑功能开发中...');
+    }
+
+    /**
+     * 显示/隐藏加载状态
+     */
+    function showLoading(show) {
+      document.getElementById('loadingOverlay').classList.toggle('show', show);
+    }
+  </script>
+</body>
+</html>
+

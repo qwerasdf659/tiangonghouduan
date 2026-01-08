@@ -319,7 +319,7 @@
         showLoading(true);
         const token = getToken();
 
-        const response = await fetch('/api/v4/exchange_market/statistics', {
+        const response = await fetch('/api/v4/shop/exchange/statistics', {
           headers: { 'Authorization': `Bearer ${token}` }
         });
 

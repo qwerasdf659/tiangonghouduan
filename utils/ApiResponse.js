@@ -371,7 +371,7 @@ class ApiResponse {
         total: totalCount,
         success: successCount,
         failed: failureCount,
-        successRate: totalCount > 0 ? ((successCount / totalCount) * 100).toFixed(1) + '%' : '0%',
+        success_rate: totalCount > 0 ? ((successCount / totalCount) * 100).toFixed(1) + '%' : '0%',
         ...summary
       },
       timestamp: BeijingTimeHelper.apiTimestamp() // 🕐 北京时间API时间戳

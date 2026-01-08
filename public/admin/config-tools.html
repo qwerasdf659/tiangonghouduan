@@ -1,0 +1,770 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>配置工具 - 管理后台</title>
+
+  <!-- Bootstrap 5 - UI框架 -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+
+  <!-- Bootstrap Icons - 图标库 -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+
+  <!-- 公共样式表 - 统一主题和响应式设计 -->
+  <link href="/admin/css/common.css" rel="stylesheet">
+
+  <style>
+    .config-card {
+      transition: all 0.2s;
+    }
+    .config-card:hover {
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+    .config-value {
+      font-family: 'Courier New', monospace;
+      background-color: #f8f9fa;
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+    .tool-card {
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .tool-card:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    }
+    .json-editor {
+      font-family: 'Courier New', monospace;
+      font-size: 13px;
+    }
+  </style>
+</head>
+<body class="bg-light">
+  <!-- 顶部导航 -->
+  <nav class="navbar navbar-dark bg-primary">
+    <div class="container-fluid">
+      <a href="/admin/dashboard.html" class="navbar-brand">
+        <i class="bi bi-arrow-left me-2"></i>管理后台 - 配置工具
+      </a>
+      <div>
+        <span class="text-light me-3" id="welcomeText">欢迎，管理员</span>
+        <button class="btn btn-outline-light btn-sm" id="logoutBtn">退出登录</button>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container-fluid mt-4">
+    <!-- 快捷工具 -->
+    <div class="row g-3 mb-4">
+      <div class="col-md-3">
+        <div class="card tool-card" onclick="showCacheManagement()">
+          <div class="card-body text-center py-4">
+            <i class="bi bi-database text-primary" style="font-size: 3rem;"></i>
+            <h6 class="mt-3 mb-0">缓存管理</h6>
+            <small class="text-muted">清理/刷新缓存</small>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="card tool-card" onclick="showSystemConfig()">
+          <div class="card-body text-center py-4">
+            <i class="bi bi-gear text-success" style="font-size: 3rem;"></i>
+            <h6 class="mt-3 mb-0">系统配置</h6>
+            <small class="text-muted">全局系统参数</small>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="card tool-card" onclick="showFeatureFlags()">
+          <div class="card-body text-center py-4">
+            <i class="bi bi-toggles text-warning" style="font-size: 3rem;"></i>
+            <h6 class="mt-3 mb-0">功能开关</h6>
+            <small class="text-muted">灰度/功能控制</small>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="card tool-card" onclick="showMaintenanceMode()">
+          <div class="card-body text-center py-4">
+            <i class="bi bi-tools text-danger" style="font-size: 3rem;"></i>
+            <h6 class="mt-3 mb-0">维护模式</h6>
+            <small class="text-muted">系统维护控制</small>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="row g-3">
+      <!-- 左侧：配置项列表 -->
+      <div class="col-md-4">
+        <div class="card">
+          <div class="card-header bg-white d-flex justify-content-between align-items-center">
+            <h6 class="mb-0"><i class="bi bi-list-ul"></i> 配置列表</h6>
+            <button class="btn btn-sm btn-primary" onclick="showAddConfig()">
+              <i class="bi bi-plus"></i> 新增
+            </button>
+          </div>
+          <div class="card-body p-0">
+            <div class="list-group list-group-flush" id="configList">
+              <div class="text-center py-4 text-muted">
+                <div class="spinner-border spinner-border-sm" role="status"></div>
+                <p class="mt-2 mb-0">加载中...</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 右侧：配置详情/编辑 -->
+      <div class="col-md-8">
+        <div class="card">
+          <div class="card-header bg-white">
+            <h6 class="mb-0" id="detailTitle"><i class="bi bi-info-circle"></i> 配置详情</h6>
+          </div>
+          <div class="card-body" id="configDetail">
+            <div class="text-center py-5 text-muted">
+              <i class="bi bi-hand-index" style="font-size: 3rem;"></i>
+              <p class="mt-3">请从左侧选择一个配置项</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 缓存管理模态框 -->
+  <div class="modal fade" id="cacheModal" tabindex="-1">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title"><i class="bi bi-database"></i> 缓存管理</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="list-group">
+            <div class="list-group-item d-flex justify-content-between align-items-center">
+              <div>
+                <strong>用户缓存</strong>
+                <p class="text-muted mb-0 small">用户会话、权限信息</p>
+              </div>
+              <button class="btn btn-outline-danger btn-sm" onclick="clearCache('user')">清理</button>
+            </div>
+            <div class="list-group-item d-flex justify-content-between align-items-center">
+              <div>
+                <strong>配置缓存</strong>
+                <p class="text-muted mb-0 small">系统配置项、开关状态</p>
+              </div>
+              <button class="btn btn-outline-danger btn-sm" onclick="clearCache('config')">清理</button>
+            </div>
+            <div class="list-group-item d-flex justify-content-between align-items-center">
+              <div>
+                <strong>活动缓存</strong>
+                <p class="text-muted mb-0 small">抽奖活动、奖品信息</p>
+              </div>
+              <button class="btn btn-outline-danger btn-sm" onclick="clearCache('activity')">清理</button>
+            </div>
+            <div class="list-group-item d-flex justify-content-between align-items-center">
+              <div>
+                <strong>全部缓存</strong>
+                <p class="text-muted mb-0 small">清理所有Redis缓存</p>
+              </div>
+              <button class="btn btn-danger btn-sm" onclick="clearCache('all')">全部清理</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 功能开关模态框 -->
+  <div class="modal fade" id="featureFlagsModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title"><i class="bi bi-toggles"></i> 功能开关</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body" id="featureFlagsContent">
+          <div class="text-center py-4">
+            <div class="spinner-border" role="status"></div>
+            <p class="mt-2">加载中...</p>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+          <button type="button" class="btn btn-primary" onclick="saveFeatureFlags()">保存更改</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 维护模式模态框 -->
+  <div class="modal fade" id="maintenanceModal" tabindex="-1">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title"><i class="bi bi-tools"></i> 维护模式</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="alert alert-warning">
+            <i class="bi bi-exclamation-triangle"></i>
+            <strong>警告：</strong>开启维护模式后，普通用户将无法访问系统。
+          </div>
+          <div class="mb-3">
+            <label class="form-label">维护状态</label>
+            <div class="form-check form-switch">
+              <input class="form-check-input" type="checkbox" id="maintenanceSwitch" style="width: 3em; height: 1.5em;">
+              <label class="form-check-label" for="maintenanceSwitch" id="maintenanceLabel">关闭</label>
+            </div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">维护公告</label>
+            <textarea class="form-control" id="maintenanceMessage" rows="3" 
+              placeholder="请输入向用户展示的维护公告...">系统正在升级维护中，预计30分钟后恢复，给您带来不便敬请谅解。</textarea>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">预计恢复时间</label>
+            <input type="datetime-local" class="form-control" id="maintenanceEndTime">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+          <button type="button" class="btn btn-danger" onclick="saveMaintenanceMode()">保存设置</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 新增配置模态框 -->
+  <div class="modal fade" id="addConfigModal" tabindex="-1">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title"><i class="bi bi-plus-circle"></i> 新增配置</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <form id="addConfigForm">
+            <div class="mb-3">
+              <label class="form-label">配置键名 <span class="text-danger">*</span></label>
+              <input type="text" class="form-control" id="newConfigKey" required
+                placeholder="如：system.max_lottery_times">
+            </div>
+            <div class="mb-3">
+              <label class="form-label">配置值 <span class="text-danger">*</span></label>
+              <textarea class="form-control json-editor" id="newConfigValue" rows="4" required
+                placeholder="支持JSON格式"></textarea>
+            </div>
+            <div class="mb-3">
+              <label class="form-label">配置说明</label>
+              <input type="text" class="form-control" id="newConfigDescription"
+                placeholder="配置项的用途说明">
+            </div>
+            <div class="mb-3">
+              <label class="form-label">配置类型</label>
+              <select class="form-select" id="newConfigType">
+                <option value="string">字符串</option>
+                <option value="number">数字</option>
+                <option value="boolean">布尔值</option>
+                <option value="json">JSON对象</option>
+              </select>
+            </div>
+          </form>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+          <button type="button" class="btn btn-primary" onclick="addConfig()">添加配置</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 加载遮罩层 -->
+  <div class="loading-overlay" id="loadingOverlay">
+    <div class="spinner-border text-light" style="width: 3rem; height: 3rem;" role="status">
+      <span class="visually-hidden">处理中...</span>
+    </div>
+  </div>
+
+  <!-- Bootstrap JS -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+  <!-- 引入通用工具库 -->
+  <script src="/admin/js/admin-common.js"></script>
+
+  <script>
+    /**
+     * 配置工具页面
+     * @description 系统配置管理和运维工具
+     * @created 2026-01-09
+     */
+
+    let currentConfigKey = null;
+    let configData = [];
+
+    /**
+     * 页面初始化
+     */
+    document.addEventListener('DOMContentLoaded', function() {
+      // 显示用户信息
+      const userInfo = getCurrentUser();
+      if (userInfo && userInfo.nickname) {
+        document.getElementById('welcomeText').textContent = `欢迎，${userInfo.nickname}`;
+      }
+
+      // 事件监听器
+      document.getElementById('logoutBtn').addEventListener('click', logout);
+      document.getElementById('maintenanceSwitch').addEventListener('change', function() {
+        document.getElementById('maintenanceLabel').textContent = this.checked ? '开启' : '关闭';
+      });
+
+      // Token和权限验证
+      if (!getToken() || !checkAdminPermission()) {
+        return;
+      }
+
+      // 加载配置列表
+      loadConfigList();
+    });
+
+    /**
+     * 加载配置列表
+     */
+    async function loadConfigList() {
+      const listContainer = document.getElementById('configList');
+
+      try {
+        // ✅ 使用console/system/config端点
+        const response = await apiRequest('/api/v4/console/system/config');
+
+        if (response && response.success) {
+          configData = response.data || [];
+
+          if (configData.length === 0) {
+            listContainer.innerHTML = `
+              <div class="text-center py-4 text-muted">
+                <i class="bi bi-inbox"></i>
+                <p class="mt-2 mb-0">暂无配置项</p>
+              </div>
+            `;
+            return;
+          }
+
+          listContainer.innerHTML = configData.map(config => `
+            <a href="javascript:void(0)" class="list-group-item list-group-item-action" 
+               onclick="showConfigDetail('${config.config_key}')">
+              <div class="d-flex justify-content-between align-items-start">
+                <div>
+                  <h6 class="mb-1">${config.config_key}</h6>
+                  <small class="text-muted">${config.description || '无描述'}</small>
+                </div>
+                <span class="badge bg-secondary">${config.config_type || 'string'}</span>
+              </div>
+            </a>
+          `).join('');
+        }
+      } catch (error) {
+        console.error('加载配置列表失败:', error);
+        listContainer.innerHTML = `
+          <div class="text-center py-4 text-danger">
+            <i class="bi bi-exclamation-triangle"></i>
+            <p class="mt-2 mb-0">加载失败</p>
+          </div>
+        `;
+      }
+    }
+
+    /**
+     * 显示配置详情
+     */
+    function showConfigDetail(configKey) {
+      currentConfigKey = configKey;
+      const config = configData.find(c => c.config_key === configKey);
+      
+      if (!config) {
+        showErrorToast('配置项不存在');
+        return;
+      }
+
+      document.getElementById('detailTitle').innerHTML = `<i class="bi bi-pencil"></i> 编辑配置：${configKey}`;
+      
+      document.getElementById('configDetail').innerHTML = `
+        <form id="editConfigForm">
+          <div class="mb-3">
+            <label class="form-label">配置键名</label>
+            <input type="text" class="form-control" value="${config.config_key}" readonly>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">配置值 <span class="text-danger">*</span></label>
+            <textarea class="form-control json-editor" id="editConfigValue" rows="6">${formatConfigValue(config.config_value)}</textarea>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">配置说明</label>
+            <input type="text" class="form-control" id="editConfigDescription" value="${config.description || ''}">
+          </div>
+          <div class="mb-3">
+            <label class="form-label">配置类型</label>
+            <select class="form-select" id="editConfigType">
+              <option value="string" ${config.config_type === 'string' ? 'selected' : ''}>字符串</option>
+              <option value="number" ${config.config_type === 'number' ? 'selected' : ''}>数字</option>
+              <option value="boolean" ${config.config_type === 'boolean' ? 'selected' : ''}>布尔值</option>
+              <option value="json" ${config.config_type === 'json' ? 'selected' : ''}>JSON对象</option>
+            </select>
+          </div>
+          <div class="d-flex gap-2">
+            <button type="button" class="btn btn-primary" onclick="saveConfig()">
+              <i class="bi bi-save"></i> 保存配置
+            </button>
+            <button type="button" class="btn btn-outline-danger" onclick="deleteConfig()">
+              <i class="bi bi-trash"></i> 删除配置
+            </button>
+          </div>
+        </form>
+      `;
+    }
+
+    /**
+     * 格式化配置值显示
+     */
+    function formatConfigValue(value) {
+      if (typeof value === 'object') {
+        return JSON.stringify(value, null, 2);
+      }
+      return String(value);
+    }
+
+    /**
+     * 保存配置
+     */
+    async function saveConfig() {
+      if (!currentConfigKey) return;
+
+      const configValue = document.getElementById('editConfigValue').value;
+      const description = document.getElementById('editConfigDescription').value;
+      const configType = document.getElementById('editConfigType').value;
+
+      showLoading(true);
+
+      try {
+        const response = await apiRequest(`/api/v4/console/system/config/${currentConfigKey}`, {
+          method: 'PUT',
+          body: JSON.stringify({
+            config_value: configValue,
+            description: description,
+            config_type: configType
+          })
+        });
+
+        if (response && response.success) {
+          showSuccessToast('配置保存成功');
+          loadConfigList();
+        } else {
+          throw new Error(response?.message || '保存失败');
+        }
+      } catch (error) {
+        console.error('保存配置失败:', error);
+        showErrorToast('保存失败：' + error.message);
+      } finally {
+        showLoading(false);
+      }
+    }
+
+    /**
+     * 删除配置
+     */
+    async function deleteConfig() {
+      if (!currentConfigKey) return;
+
+      if (!confirm(`确定要删除配置项 "${currentConfigKey}" 吗？此操作不可恢复！`)) {
+        return;
+      }
+
+      showLoading(true);
+
+      try {
+        const response = await apiRequest(`/api/v4/console/system/config/${currentConfigKey}`, {
+          method: 'DELETE'
+        });
+
+        if (response && response.success) {
+          showSuccessToast('配置删除成功');
+          currentConfigKey = null;
+          document.getElementById('configDetail').innerHTML = `
+            <div class="text-center py-5 text-muted">
+              <i class="bi bi-hand-index" style="font-size: 3rem;"></i>
+              <p class="mt-3">请从左侧选择一个配置项</p>
+            </div>
+          `;
+          loadConfigList();
+        } else {
+          throw new Error(response?.message || '删除失败');
+        }
+      } catch (error) {
+        console.error('删除配置失败:', error);
+        showErrorToast('删除失败：' + error.message);
+      } finally {
+        showLoading(false);
+      }
+    }
+
+    /**
+     * 显示新增配置模态框
+     */
+    function showAddConfig() {
+      document.getElementById('addConfigForm').reset();
+      new bootstrap.Modal(document.getElementById('addConfigModal')).show();
+    }
+
+    /**
+     * 添加配置
+     */
+    async function addConfig() {
+      const configKey = document.getElementById('newConfigKey').value.trim();
+      const configValue = document.getElementById('newConfigValue').value;
+      const description = document.getElementById('newConfigDescription').value;
+      const configType = document.getElementById('newConfigType').value;
+
+      if (!configKey) {
+        showErrorToast('请输入配置键名');
+        return;
+      }
+
+      showLoading(true);
+
+      try {
+        const response = await apiRequest('/api/v4/console/system/config', {
+          method: 'POST',
+          body: JSON.stringify({
+            config_key: configKey,
+            config_value: configValue,
+            description: description,
+            config_type: configType
+          })
+        });
+
+        if (response && response.success) {
+          showSuccessToast('配置添加成功');
+          bootstrap.Modal.getInstance(document.getElementById('addConfigModal')).hide();
+          loadConfigList();
+        } else {
+          throw new Error(response?.message || '添加失败');
+        }
+      } catch (error) {
+        console.error('添加配置失败:', error);
+        showErrorToast('添加失败：' + error.message);
+      } finally {
+        showLoading(false);
+      }
+    }
+
+    /**
+     * 显示缓存管理
+     */
+    function showCacheManagement() {
+      new bootstrap.Modal(document.getElementById('cacheModal')).show();
+    }
+
+    /**
+     * 清理缓存
+     */
+    async function clearCache(type) {
+      if (!confirm(`确定要清理 ${type === 'all' ? '全部' : type} 缓存吗？`)) {
+        return;
+      }
+
+      showLoading(true);
+
+      try {
+        const response = await apiRequest('/api/v4/console/system/cache/clear', {
+          method: 'POST',
+          body: JSON.stringify({ cache_type: type })
+        });
+
+        if (response && response.success) {
+          showSuccessToast('缓存清理成功');
+        } else {
+          throw new Error(response?.message || '清理失败');
+        }
+      } catch (error) {
+        console.error('清理缓存失败:', error);
+        showErrorToast('清理失败：' + error.message);
+      } finally {
+        showLoading(false);
+      }
+    }
+
+    /**
+     * 显示系统配置
+     */
+    function showSystemConfig() {
+      window.location.href = '/admin/system-config.html';
+    }
+
+    /**
+     * 显示功能开关
+     */
+    async function showFeatureFlags() {
+      const modal = new bootstrap.Modal(document.getElementById('featureFlagsModal'));
+      modal.show();
+
+      const content = document.getElementById('featureFlagsContent');
+
+      try {
+        const response = await apiRequest('/api/v4/console/system/feature-flags');
+
+        if (response && response.success) {
+          const flags = response.data || [];
+
+          if (flags.length === 0) {
+            content.innerHTML = `
+              <div class="text-center py-4 text-muted">
+                <i class="bi bi-inbox"></i>
+                <p class="mt-2">暂无功能开关配置</p>
+              </div>
+            `;
+            return;
+          }
+
+          content.innerHTML = `
+            <table class="table">
+              <thead>
+                <tr>
+                  <th>功能名称</th>
+                  <th>说明</th>
+                  <th style="width: 100px;">状态</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${flags.map(flag => `
+                  <tr>
+                    <td><code>${flag.flag_key}</code></td>
+                    <td>${flag.description || '-'}</td>
+                    <td>
+                      <div class="form-check form-switch">
+                        <input class="form-check-input feature-flag" type="checkbox" 
+                          data-key="${flag.flag_key}" ${flag.enabled ? 'checked' : ''}>
+                      </div>
+                    </td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          `;
+        }
+      } catch (error) {
+        console.error('加载功能开关失败:', error);
+        content.innerHTML = `
+          <div class="text-center py-4 text-danger">
+            <i class="bi bi-exclamation-triangle"></i>
+            <p class="mt-2">加载失败</p>
+          </div>
+        `;
+      }
+    }
+
+    /**
+     * 保存功能开关
+     */
+    async function saveFeatureFlags() {
+      const flags = [];
+      document.querySelectorAll('.feature-flag').forEach(checkbox => {
+        flags.push({
+          flag_key: checkbox.dataset.key,
+          enabled: checkbox.checked
+        });
+      });
+
+      showLoading(true);
+
+      try {
+        const response = await apiRequest('/api/v4/console/system/feature-flags', {
+          method: 'PUT',
+          body: JSON.stringify({ flags })
+        });
+
+        if (response && response.success) {
+          showSuccessToast('功能开关保存成功');
+          bootstrap.Modal.getInstance(document.getElementById('featureFlagsModal')).hide();
+        } else {
+          throw new Error(response?.message || '保存失败');
+        }
+      } catch (error) {
+        console.error('保存功能开关失败:', error);
+        showErrorToast('保存失败：' + error.message);
+      } finally {
+        showLoading(false);
+      }
+    }
+
+    /**
+     * 显示维护模式
+     */
+    async function showMaintenanceMode() {
+      const modal = new bootstrap.Modal(document.getElementById('maintenanceModal'));
+      modal.show();
+
+      try {
+        const response = await apiRequest('/api/v4/console/system/maintenance');
+
+        if (response && response.success) {
+          const maintenance = response.data || {};
+          document.getElementById('maintenanceSwitch').checked = maintenance.enabled || false;
+          document.getElementById('maintenanceLabel').textContent = maintenance.enabled ? '开启' : '关闭';
+          document.getElementById('maintenanceMessage').value = maintenance.message || '';
+          
+          if (maintenance.end_time) {
+            document.getElementById('maintenanceEndTime').value = maintenance.end_time.slice(0, 16);
+          }
+        }
+      } catch (error) {
+        console.error('加载维护模式配置失败:', error);
+      }
+    }
+
+    /**
+     * 保存维护模式
+     */
+    async function saveMaintenanceMode() {
+      const enabled = document.getElementById('maintenanceSwitch').checked;
+      const message = document.getElementById('maintenanceMessage').value;
+      const endTime = document.getElementById('maintenanceEndTime').value;
+
+      showLoading(true);
+
+      try {
+        const response = await apiRequest('/api/v4/console/system/maintenance', {
+          method: 'PUT',
+          body: JSON.stringify({
+            enabled: enabled,
+            message: message,
+            end_time: endTime ? new Date(endTime).toISOString() : null
+          })
+        });
+
+        if (response && response.success) {
+          showSuccessToast('维护模式设置成功');
+          bootstrap.Modal.getInstance(document.getElementById('maintenanceModal')).hide();
+        } else {
+          throw new Error(response?.message || '保存失败');
+        }
+      } catch (error) {
+        console.error('保存维护模式失败:', error);
+        showErrorToast('保存失败：' + error.message);
+      } finally {
+        showLoading(false);
+      }
+    }
+
+    /**
+     * 显示/隐藏加载状态
+     */
+    function showLoading(show) {
+      document.getElementById('loadingOverlay').classList.toggle('show', show);
+    }
+  </script>
+</body>
+</html>
+

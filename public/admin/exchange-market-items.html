@@ -375,7 +375,7 @@
         if (currentFilters.status) params.append('status', currentFilters.status);
         if (currentFilters.price_type) params.append('price_type', currentFilters.price_type);
 
-        const response = await fetch(`/api/v4/exchange_market/items?${params}`, {
+        const response = await fetch(`/api/v4/shop/exchange/items?${params}`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
 
@@ -501,7 +501,7 @@
         data.sort_order = parseInt(data.sort_order) || 100;
 
         const token = getToken();
-        const response = await fetch('/api/v4/console/exchange_market/items', {
+        const response = await fetch('/api/v4/console/marketplace/exchange_market/items', {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -534,7 +534,7 @@
         showLoading(true);
         const token = getToken();
 
-        const response = await fetch(`/api/v4/exchange_market/items/${itemId}`, {
+        const response = await fetch(`/api/v4/shop/exchange/items/${itemId}`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
 
@@ -591,7 +591,7 @@
         data.sort_order = parseInt(data.sort_order) || 100;
 
         const token = getToken();
-        const response = await fetch(`/api/v4/console/exchange_market/items/${itemId}`, {
+        const response = await fetch(`/api/v4/console/marketplace/exchange_market/items/${itemId}`, {
           method: 'PUT',
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -627,7 +627,7 @@
         showLoading(true);
         const token = getToken();
 
-        const response = await fetch(`/api/v4/console/exchange_market/items/${itemId}`, {
+        const response = await fetch(`/api/v4/console/marketplace/exchange_market/items/${itemId}`, {
           method: 'DELETE',
           headers: { 'Authorization': `Bearer ${token}` }
         });
