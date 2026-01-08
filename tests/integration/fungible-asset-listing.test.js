@@ -63,7 +63,18 @@ describe('C2C 材料交易功能集成测试', () => {
     }
   })
 
-  // 每个测试后清理数据（使用正确的撤回方法解冻资产，避免孤儿冻结）
+  /**
+   * 每个测试后清理数据
+   *
+   * 🔴 P0-2 修复：禁止使用 MarketListing.destroy() 直接删除
+   * 所有挂牌清理必须通过正确的业务流程（撤回方法），确保资产解冻
+   *
+   * 清理策略：
+   * 1. on_sale + fungible_asset：使用 withdrawFungibleAssetListing 撤回并解冻
+   * 2. on_sale + item_instance：使用 withdrawItemInstanceListing 撤回
+   * 3. 其他状态（sold/withdrawn/locked）：已完成的业务流程，无需清理
+   * 4. 撤回失败：记录警告日志，交由每日孤儿冻结检测任务处理
+   */
   afterEach(async () => {
     if (skipTests) return
 
@@ -77,7 +88,16 @@ describe('C2C 材料交易功能集成测试', () => {
           continue
         }
 
-        if (listing.status === 'on_sale' && listing.listing_kind === 'fungible_asset') {
+        /*
+         * 🔴 P0-2：只有 on_sale 状态的挂牌才需要撤回
+         * 其他状态（sold/withdrawn/admin_withdrawn/locked）说明业务已完成，无需清理
+         */
+        if (listing.status !== 'on_sale') {
+          console.log(`⏭️ 挂牌状态已变更，无需清理: ${listingId} (status=${listing.status})`)
+          continue
+        }
+
+        if (listing.listing_kind === 'fungible_asset') {
           // 使用正确的撤回方法解冻资产
           await TransactionManager.execute(
             async transaction => {
@@ -93,19 +113,31 @@ describe('C2C 材料交易功能集成测试', () => {
             { description: `test_cleanup_${listingId}` }
           )
           console.log(`✅ 撤回挂牌并解冻: ${listingId}`)
-        } else {
-          // 非 on_sale 或非 fungible_asset，直接删除
-          await MarketListing.destroy({ where: { listing_id: listingId } })
-          console.log(`✅ 清理挂牌记录: ${listingId} (status=${listing.status})`)
+        } else if (listing.listing_kind === 'item_instance') {
+          // item_instance 类型的撤回
+          await TransactionManager.execute(
+            async transaction => {
+              await MarketListingService.withdrawItemInstanceListing(
+                {
+                  listing_id: listingId,
+                  seller_user_id: listing.seller_user_id,
+                  withdraw_reason: '测试清理'
+                },
+                { transaction }
+              )
+            },
+            { description: `test_cleanup_${listingId}` }
+          )
+          console.log(`✅ 撤回物品实例挂牌: ${listingId}`)
         }
       } catch (error) {
-        // 撤回失败时尝试直接删除（避免测试阻塞）
-        try {
-          await MarketListing.destroy({ where: { listing_id: listingId } })
-          console.warn(`⚠️ 撤回失败，强制删除: ${listingId} (${error.message})`)
-        } catch (deleteError) {
-          console.warn(`⚠️ 清理挂牌记录失败 ${listingId}:`, deleteError.message)
-        }
+        /*
+         * 🔴 P0-2 修复：撤回失败时不再直接删除，而是记录警告
+         * 孤儿冻结将由每日定时任务（DailyOrphanFrozenCheck）自动检测和清理
+         */
+        console.warn(
+          `⚠️ 测试清理撤回失败: ${listingId} (${error.message})，` + '将由孤儿冻结检测任务处理'
+        )
       }
     }
     createdListingIds = []

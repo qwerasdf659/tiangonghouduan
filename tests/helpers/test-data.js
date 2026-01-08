@@ -2,11 +2,11 @@
  * 🎯 统一测试数据管理中心
  *
  * 创建时间: 2025年11月12日
- * 版本: V4.0
+ * 版本: V4.1
  *
  * 业务背景：
  * - 项目使用真实MySQL数据库进行测试(restaurant_points_dev)
- * - 所有测试共用一个测试用户(mobile: 13612227930, user_id: 31)
+ * - 所有测试共用一个测试用户(mobile: 13612227930)
  * - 需要避免测试数据冲突和不一致
  *
  * 设计原则：
@@ -15,39 +15,79 @@
  * - 易于维护：修改测试数据只需要改这一个文件
  * - 真实数据：不使用Mock数据,使用真实数据库数据
  * - 北京时间标准：所有时间数据使用BeijingTimeHelper生成，确保时区一致性
+ *
+ * 🔴 P0-1修复（2026-01-08）：
+ * - 移除硬编码的 user_id=31、campaign_id=2
+ * - 通过 getTestUserId()、getTestCampaignId() 从 global.testData 动态获取
+ * - 测试数据由 jest.setup.js 在测试启动时从数据库加载
  */
 
 // 引入北京时间辅助工具
 const BeijingTimeHelper = require('../../utils/timeHelper')
 
+/**
+ * 🔴 P0-1修复：获取动态测试用户ID
+ *
+ * @description 从 global.testData 获取测试用户ID，如果未初始化则返回 null
+ * @returns {number|null} 用户ID
+ */
+function getTestUserId() {
+  if (global.testData && global.testData.testUser && global.testData.testUser.user_id) {
+    return global.testData.testUser.user_id
+  }
+  console.warn('⚠️ [test-data] global.testData.testUser.user_id 未初始化')
+  return null
+}
+
+/**
+ * 🔴 P0-1修复：获取动态测试活动ID
+ *
+ * @description 从 global.testData 获取测试活动ID，如果未初始化则返回 null
+ * @returns {number|null} 活动ID
+ */
+function getTestCampaignId() {
+  if (global.testData && global.testData.testCampaign && global.testData.testCampaign.campaign_id) {
+    return global.testData.testCampaign.campaign_id
+  }
+  console.warn('⚠️ [test-data] global.testData.testCampaign.campaign_id 未初始化')
+  return null
+}
+
 const TEST_DATA = {
   /*
    * ==========================================
    * 📱 测试用户数据（基于项目实际使用）
+   * 🔴 P0-1修复：user_id 通过 getter 动态获取，不再硬编码
    * ==========================================
    */
   users: {
     // 默认测试用户（基于 tests/helpers/test-setup.js）
-    testUser: {
-      user_id: 31, // 用户ID（项目约定的测试用户）
-      mobile: '13612227930', // 测试手机号
-      nickname: '测试用户' // 用户昵称
-      /*
-       * 业务含义：默认测试用户，用于所有需要用户身份的测试场景
-       * 使用场景：积分测试、抽奖测试、订单测试等
-       */
+    // 🔴 P0-1修复：user_id 使用 getter 动态获取
+    get testUser() {
+      return {
+        user_id: getTestUserId(), // 🔴 P0-1修复：动态获取，不再硬编码
+        mobile: '13612227930', // 测试手机号
+        nickname: '测试用户' // 用户昵称
+        /*
+         * 业务含义：默认测试用户，用于所有需要用户身份的测试场景
+         * 使用场景：积分测试、抽奖测试、订单测试等
+         */
+      }
     },
 
     // 管理员测试用户（同一账号既是用户也是管理员）
-    adminUser: {
-      user_id: 31, // 管理员用户ID
-      mobile: '13612227930', // 管理员手机号
-      role: 'admin' // 角色：管理员
-      /*
-       * 业务含义：管理员用户，用于测试后台管理功能
-       * 使用场景：商家审核、订单管理、数据统计等
-       * 注意：在真实系统中,同一账号可能同时拥有用户和管理员权限
-       */
+    // 🔴 P0-1修复：user_id 使用 getter 动态获取
+    get adminUser() {
+      return {
+        user_id: getTestUserId(), // 🔴 P0-1修复：动态获取，不再硬编码
+        mobile: '13612227930', // 管理员手机号
+        role: 'admin' // 角色：管理员
+        /*
+         * 业务含义：管理员用户，用于测试后台管理功能
+         * 使用场景：商家审核、订单管理、数据统计等
+         * 注意：在真实系统中,同一账号可能同时拥有用户和管理员权限
+         */
+      }
     }
   },
 
@@ -131,54 +171,67 @@ const TEST_DATA = {
   /*
    * ==========================================
    * 🎲 测试抽奖数据（基于UnifiedLotteryEngine）
+   * 🔴 P0-1修复：campaign_id 和 user_id 通过 getter 动态获取
    * ==========================================
    */
   lottery: {
     // 测试活动信息
-    testCampaign: {
-      campaign_id: 2, // 测试活动ID（基于test-setup.js）
-      name: '餐厅积分抽奖活动'
-      /*
-       * 业务含义：默认测试活动
-       * 使用场景：所有抽奖相关测试
-       */
+    // 🔴 P0-1修复：campaign_id 使用 getter 动态获取
+    get testCampaign() {
+      return {
+        campaign_id: getTestCampaignId(), // 🔴 P0-1修复：动态获取，不再硬编码
+        name: global.testData?.testCampaign?.campaign_name || '餐厅积分抽奖活动'
+        /*
+         * 业务含义：默认测试活动
+         * 使用场景：所有抽奖相关测试
+         */
+      }
     },
 
     // 基础保底策略配置（对应 BasicGuaranteeStrategy）
-    basicGuarantee: {
-      user_id: 31,
-      is_first_lottery: false,
-      last_win_date: null,
-      lottery_count: 5 // 5次不中必中
-      /*
-       * 业务含义：基础保底策略测试数据
-       * 使用场景：测试普通用户抽奖（5次不中必中）
-       * 技术背景：对应 UnifiedLotteryEngine 的 BasicGuaranteeStrategy
-       */
+    // 🔴 P0-1修复：user_id 使用 getter 动态获取
+    get basicGuarantee() {
+      return {
+        user_id: getTestUserId(), // 🔴 P0-1修复：动态获取，不再硬编码
+        is_first_lottery: false,
+        last_win_date: null,
+        lottery_count: 5 // 5次不中必中
+        /*
+         * 业务含义：基础保底策略测试数据
+         * 使用场景：测试普通用户抽奖（5次不中必中）
+         * 技术背景：对应 UnifiedLotteryEngine 的 BasicGuaranteeStrategy
+         */
+      }
     },
 
     // 管理策略配置（对应 ManagementStrategy）
-    management: {
-      user_id: 31,
-      is_management_target: true,
-      custom_probability: 1.0 // 100%必中
-      /*
-       * 业务含义：管理策略测试数据
-       * 使用场景：测试特定用户的定向中奖
-       * 技术背景：对应 UnifiedLotteryEngine 的 ManagementStrategy
-       */
+    // 🔴 P0-1修复：user_id 使用 getter 动态获取
+    get management() {
+      return {
+        user_id: getTestUserId(), // 🔴 P0-1修复：动态获取，不再硬编码
+        is_management_target: true,
+        custom_probability: 1.0 // 100%必中
+        /*
+         * 业务含义：管理策略测试数据
+         * 使用场景：测试特定用户的定向中奖
+         * 技术背景：对应 UnifiedLotteryEngine 的 ManagementStrategy
+         */
+      }
     },
 
     // 首次抽奖特殊场景
-    firstLottery: {
-      user_id: 31,
-      is_first_lottery: true,
-      guaranteed_prize: 100 // 首次必得100积分
-      /*
-       * 业务含义：首次抽奖测试数据
-       * 使用场景：测试新用户首次抽奖100%中奖
-       * 技术背景：V4架构的首次抽奖保底机制
-       */
+    // 🔴 P0-1修复：user_id 使用 getter 动态获取
+    get firstLottery() {
+      return {
+        user_id: getTestUserId(), // 🔴 P0-1修复：动态获取，不再硬编码
+        is_first_lottery: true,
+        guaranteed_prize: 100 // 首次必得100积分
+        /*
+         * 业务含义：首次抽奖测试数据
+         * 使用场景：测试新用户首次抽奖100%中奖
+         * 技术背景：V4架构的首次抽奖保底机制
+         */
+      }
     }
   },
 
@@ -209,6 +262,7 @@ const TEST_DATA = {
  * 🛠️ 测试数据工厂函数
  *
  * 用于创建可变的测试数据副本，避免测试间数据污染
+ * 🔴 P0-1修复：所有 user_id 和 campaign_id 通过动态获取
  */
 const createTestData = {
   /**
@@ -218,6 +272,8 @@ const createTestData = {
    *
    * 使用示例：
    * const user = createTestData.user({ nickname: '新昵称' });
+   *
+   * 🔴 P0-1修复：user_id 动态获取
    */
   user: (overrides = {}) => ({
     ...TEST_DATA.users.testUser,
@@ -231,9 +287,11 @@ const createTestData = {
    *
    * 使用示例：
    * const points = createTestData.points({ amount: 200, source: 'daily' });
+   *
+   * 🔴 P0-1修复：user_id 动态获取
    */
   points: (overrides = {}) => ({
-    user_id: TEST_DATA.users.testUser.user_id,
+    user_id: getTestUserId(), // 🔴 P0-1修复：动态获取
     amount: TEST_DATA.points.standard.lottery,
     source: 'lottery',
     ...overrides
@@ -245,11 +303,13 @@ const createTestData = {
    * @returns {Object} 抽奖请求数据
    *
    * 使用示例：
-   * const lotteryRequest = createTestData.lotteryRequest({ campaign_id: 2 });
+   * const lotteryRequest = createTestData.lotteryRequest();
+   *
+   * 🔴 P0-1修复：user_id 和 campaign_id 动态获取
    */
   lotteryRequest: (overrides = {}) => ({
-    user_id: TEST_DATA.users.testUser.user_id,
-    campaign_id: TEST_DATA.lottery.testCampaign.campaign_id,
+    user_id: getTestUserId(), // 🔴 P0-1修复：动态获取
+    campaign_id: getTestCampaignId(), // 🔴 P0-1修复：动态获取
     timestamp: BeijingTimeHelper.formatToISO(), // 使用北京时间ISO格式
     ...overrides
   })
@@ -314,15 +374,19 @@ const testDataGenerator = {
 
   /**
    * 生成批量积分日志数据
-   * @param {number} userId - 用户ID
+   * @param {number} userId - 用户ID（默认使用动态测试用户ID）
    * @param {number} count - 生成数量
    * @param {Array<string>} types - 积分类型数组
    * @returns {Array} 积分日志数据数组
    *
    * 使用示例：
-   * const logs = testDataGenerator.generatePointsLogs(31, 20, ['earn', 'spend'])
+   * const logs = testDataGenerator.generatePointsLogs(null, 20, ['earn', 'spend'])
+   *
+   * 🔴 P0-1修复：userId 默认动态获取
    */
-  generatePointsLogs: (userId = 31, count = 10, types = ['earn', 'spend', 'expire']) => {
+  generatePointsLogs: (userId = null, count = 10, types = ['earn', 'spend', 'expire']) => {
+    // 🔴 P0-1修复：如果 userId 为 null，使用动态获取的测试用户ID
+    const actualUserId = userId !== null ? userId : getTestUserId()
     return Array.from({ length: count }, (_, index) => {
       const type = types[index % types.length]
       const amount =
@@ -331,7 +395,7 @@ const testDataGenerator = {
           : -(Math.floor(Math.random() * 50) + 5)
 
       return {
-        user_id: userId,
+        user_id: actualUserId, // 🔴 P0-1修复：使用 actualUserId
         amount,
         type,
         source: type === 'earn' ? 'lottery' : 'exchange',
@@ -343,15 +407,21 @@ const testDataGenerator = {
 
   /**
    * 生成批量抽奖记录数据
-   * @param {number} userId - 用户ID
-   * @param {number} campaignId - 活动ID
+   * @param {number} userId - 用户ID（默认使用动态测试用户ID）
+   * @param {number} campaignId - 活动ID（默认使用动态测试活动ID）
    * @param {number} count - 生成数量
    * @returns {Array} 抽奖记录数据数组
    *
    * 使用示例：
-   * const records = testDataGenerator.generateLotteryRecords(31, 2, 15)
+   * const records = testDataGenerator.generateLotteryRecords(null, null, 15)
+   *
+   * 🔴 P0-1修复：userId 和 campaignId 默认动态获取
    */
-  generateLotteryRecords: (userId = 31, campaignId = 2, count = 10) => {
+  generateLotteryRecords: (userId = null, campaignId = null, count = 10) => {
+    // 🔴 P0-1修复：如果为 null，使用动态获取的测试数据
+    const actualUserId = userId !== null ? userId : getTestUserId()
+    const actualCampaignId = campaignId !== null ? campaignId : getTestCampaignId()
+
     return Array.from({ length: count }, (_, index) => {
       // V4.0语义更新：使用 reward_tier 替代 is_winner
       // 按奖品价值档位分布：low(<300), mid(300-699), high(>=700)
@@ -360,8 +430,8 @@ const testDataGenerator = {
       const prizeValues = { low: [50, 100, 200], mid: [300, 400, 500], high: [700, 800, 1000] }
 
       return {
-        user_id: userId,
-        campaign_id: campaignId,
+        user_id: actualUserId, // 🔴 P0-1修复：使用 actualUserId
+        campaign_id: actualCampaignId, // 🔴 P0-1修复：使用 actualCampaignId
         prize_id: (index % 3) + 1, // 奖品ID轮换（V4.0：每次抽奖必得奖品）
         reward_tier: rewardTier, // V4.0语义更新：替代 is_winner
         prize_value: prizeValues[rewardTier][index % 3],
@@ -529,5 +599,8 @@ module.exports = {
   createTestData, // 测试数据工厂（创建副本）
   validateTestData, // 测试数据验证工具
   testDataGenerator, // 测试数据生成器（批量生成）
-  testScenarios // 测试场景模板（完整业务场景）
+  testScenarios, // 测试场景模板（完整业务场景）
+  // 🔴 P0-1修复：导出动态获取函数
+  getTestUserId, // 获取动态测试用户ID
+  getTestCampaignId // 获取动态测试活动ID
 }

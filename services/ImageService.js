@@ -410,9 +410,11 @@ class ImageService {
       for (const image of unboundImages) {
         try {
           // 删除 Sealos 对象（原图 + 缩略图）
+          // eslint-disable-next-line no-await-in-loop -- 批量清理需要逐个处理，错误隔离
           await storageService.deleteImageWithThumbnails(image.file_path, image.thumbnail_paths)
 
           // 物理删除数据库记录
+          // eslint-disable-next-line no-await-in-loop -- 批量清理需要逐个删除
           await ImageResources.destroy({
             where: { image_id: image.image_id }
           })

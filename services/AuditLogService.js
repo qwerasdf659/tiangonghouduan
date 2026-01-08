@@ -799,6 +799,7 @@ class AuditLogService {
 
     for (const item of logItems) {
       try {
+        // eslint-disable-next-line no-await-in-loop -- 批量审计日志需要逐条记录，错误隔离
         await this.logOperation(item)
         results.success++
       } catch (error) {
@@ -815,6 +816,139 @@ class AuditLogService {
     )
 
     return results
+  }
+
+  /**
+   * 管理员获取审计日志列表（Admin Only）
+   *
+   * @description 管理员查看所有审计日志，支持分页、筛选、排序
+   *
+   * 业务场景：
+   * - 管理后台审计日志管理页面
+   * - 操作追溯和审计查询
+   * - 安全事件分析
+   *
+   * @param {Object} options - 查询选项
+   * @param {number} [options.operator_id] - 操作员ID筛选
+   * @param {string} [options.operation_type] - 操作类型筛选
+   * @param {string} [options.target_type] - 目标类型筛选
+   * @param {number} [options.target_id] - 目标ID筛选
+   * @param {string} [options.start_date] - 开始日期
+   * @param {string} [options.end_date] - 结束日期
+   * @param {number} [options.page=1] - 页码
+   * @param {number} [options.page_size=20] - 每页数量
+   * @param {string} [options.sort_by='created_at'] - 排序字段
+   * @param {string} [options.sort_order='DESC'] - 排序方向
+   * @returns {Promise<Object>} 审计日志列表和分页信息
+   *
+   * @example
+   * // 获取所有积分调整日志
+   * const result = await AuditLogService.getAdminAuditLogs({
+   *   operation_type: 'points_adjust',
+   *   page: 1,
+   *   page_size: 20
+   * });
+   */
+  static async getAdminAuditLogs(options = {}) {
+    const {
+      operator_id = null,
+      operation_type = null,
+      target_type = null,
+      target_id = null,
+      start_date = null,
+      end_date = null,
+      page = 1,
+      page_size = 20,
+      sort_by = 'created_at',
+      sort_order = 'DESC'
+    } = options
+
+    const { Op } = require('sequelize')
+
+    logger.info('[审计日志] 管理员查询审计日志列表', {
+      operator_id,
+      operation_type,
+      target_type,
+      target_id,
+      page,
+      page_size
+    })
+
+    // 构建查询条件
+    const whereClause = {}
+
+    if (operator_id) {
+      whereClause.operator_id = operator_id
+    }
+
+    if (operation_type) {
+      whereClause.operation_type = operation_type
+    }
+
+    if (target_type) {
+      // P0-5: 查询时也规范化（前端传入 PascalCase 也能查到）
+      whereClause.target_type = normalizeTargetType(target_type)
+    }
+
+    if (target_id) {
+      whereClause.target_id = target_id
+    }
+
+    if (start_date || end_date) {
+      whereClause.created_at = {}
+      if (start_date) {
+        whereClause.created_at[Op.gte] = start_date
+      }
+      if (end_date) {
+        whereClause.created_at[Op.lte] = end_date
+      }
+    }
+
+    // 分页参数
+    const offset = (page - 1) * page_size
+    const limit = page_size
+
+    try {
+      const { count, rows } = await AdminOperationLog.findAndCountAll({
+        where: whereClause,
+        include: [
+          {
+            model: require('../models').User,
+            as: 'operator',
+            attributes: ['user_id', 'nickname', 'mobile']
+          }
+        ],
+        limit,
+        offset,
+        order: [[sort_by, sort_order]]
+      })
+
+      logger.info(
+        `[审计日志] 管理员查询成功：找到${count}条日志，返回第${page}页（${rows.length}条）`
+      )
+
+      return {
+        success: true,
+        logs: rows,
+        pagination: {
+          total: count,
+          page,
+          page_size,
+          total_pages: Math.ceil(count / page_size)
+        },
+        filters: {
+          operator_id,
+          operation_type,
+          target_type,
+          target_id,
+          start_date,
+          end_date
+        }
+      }
+    } catch (error) {
+      logger.error('[审计日志] 管理员查询失败:', error.message)
+      throw new Error(`查询审计日志失败: ${error.message}`)
+    }
   }
 
   /**

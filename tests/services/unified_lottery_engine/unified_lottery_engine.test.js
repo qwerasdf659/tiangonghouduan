@@ -6,8 +6,10 @@
  * - 移除所有占位测试和Mock代码
  * - 统一使用snake_case命名规范
  * - 基于真实业务逻辑验证功能
- * - 使用真实测试用户 13612227930 (user_id: 31)
+ * - 使用真实测试用户 13612227930
  * - 只测试实际存在的2个策略：basic_guarantee、ManagementStrategy
+ *
+ * 🔴 P0-1修复（2026-01-08）：移除硬编码 user_id=31，从 global.testData 动态获取
  *
  * @date 2025-01-21 (重构)
  */
@@ -24,10 +26,13 @@ describe('V4统一抽奖引擎主引擎测试 - 重构版', () => {
   let real_test_user = null
   let test_campaign = null
 
-  // 🔧 真实测试用户配置 - 使用统一测试标准
+  /*
+   * 🔧 真实测试用户配置 - 使用统一测试标准
+   * 🔴 P0-1修复：移除硬编码 user_id，在 beforeAll 中动态获取
+   */
   const REAL_TEST_USER_CONFIG = {
     mobile: '13612227930',
-    user_id: 31, // 数据库确认的真实用户ID
+    // 🔴 P0-1修复：user_id 在 beforeAll 中从数据库查询确认
     required_points: 1000 // 确保测试时有足够积分
   }
 
@@ -56,19 +61,33 @@ describe('V4统一抽奖引擎主引擎测试 - 重构版', () => {
     console.log('🔍 初始化V4真实业务测试环境...')
 
     try {
-      // 验证真实测试用户存在
-      real_test_user = await User.findOne({
-        where: { mobile: REAL_TEST_USER_CONFIG.mobile }
-      })
+      // 🔴 P0-1修复：优先使用 global.testData 中的用户
+      if (global.testData?.testUser?.user_id) {
+        real_test_user = await User.findOne({
+          where: { user_id: global.testData.testUser.user_id }
+        })
+        console.log(`✅ 使用 global.testData 中的测试用户: user_id=${real_test_user?.user_id}`)
+      } else {
+        // 备用：通过手机号查询
+        real_test_user = await User.findOne({
+          where: { mobile: REAL_TEST_USER_CONFIG.mobile }
+        })
+        console.log(
+          `⚠️ global.testData 未初始化，通过手机号查询: user_id=${real_test_user?.user_id}`
+        )
+      }
 
       if (!real_test_user) {
         throw new Error(`测试用户 ${REAL_TEST_USER_CONFIG.mobile} 不存在`)
       }
 
-      // 验证用户ID匹配
-      if (real_test_user.user_id !== REAL_TEST_USER_CONFIG.user_id) {
+      // 🔴 P0-1修复：验证 global.testData 一致性
+      if (
+        global.testData?.testUser?.user_id &&
+        global.testData.testUser.user_id !== real_test_user.user_id
+      ) {
         console.warn(
-          `⚠️ 用户ID不匹配：期望 ${REAL_TEST_USER_CONFIG.user_id}，实际 ${real_test_user.user_id}`
+          `⚠️ global.testData 与数据库不一致：期望 ${global.testData.testUser.user_id}，实际 ${real_test_user.user_id}`
         )
       }
 
@@ -215,7 +234,7 @@ describe('V4统一抽奖引擎主引擎测试 - 重构版', () => {
       expect(health_status).toBeDefined()
       expect(health_status.status).toBeDefined()
       expect(health_status.version).toBeDefined()
-      expect(health_status.enabledStrategies).toBe(V4_ACTUAL_STRATEGIES.expected_count)
+      expect(health_status.enabled_strategies).toBe(V4_ACTUAL_STRATEGIES.expected_count)
 
       console.log(`✅ 引擎健康状态: ${health_status.status}`)
     })
@@ -242,8 +261,8 @@ describe('V4统一抽奖引擎主引擎测试 - 重构版', () => {
       const stats = engine.getMetrics()
 
       expect(stats).toBeDefined()
-      expect(stats.totalExecutions).toBeGreaterThanOrEqual(0)
-      expect(stats.strategiesUsed).toBeDefined()
+      expect(stats.total_executions).toBeGreaterThanOrEqual(0)
+      expect(stats.strategies_used).toBeDefined()
 
       // 验证策略使用统计
       const strategy_usage = Object.keys(stats.strategies_used)
@@ -260,14 +279,14 @@ describe('V4统一抽奖引擎主引擎测试 - 重构版', () => {
 
       expect(stats).toBeDefined()
 
-      if (stats.totalExecutions > 0) {
-        expect(stats.successRate).toBeGreaterThanOrEqual(0)
-        expect(stats.successRate).toBeLessThanOrEqual(100)
+      if (stats.total_executions > 0) {
+        expect(stats.success_rate).toBeGreaterThanOrEqual(0)
+        expect(stats.success_rate).toBeLessThanOrEqual(100)
 
-        console.log(`✅ 成功率计算正确: ${stats.successRate.toFixed(2)}%`)
+        console.log(`✅ 成功率计算正确: ${stats.success_rate.toFixed(2)}%`)
       } else {
         console.log('ℹ️ 暂无执行统计数据')
-        expect(stats.successRate).toBe(0)
+        expect(stats.success_rate).toBe(0)
       }
     })
   })

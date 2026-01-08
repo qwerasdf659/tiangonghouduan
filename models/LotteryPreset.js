@@ -229,7 +229,7 @@ module.exports = (sequelize, DataTypes) => {
          * getter方法：将created_at时间格式化为中文显示格式
          * @returns {string} 格式化后的中文时间字符串（如：2025年10月30日 12:34:56）
          */
-        get () {
+        get() {
           return BeijingTimeHelper.formatChinese(this.getDataValue('created_at'))
         }
       }
@@ -480,6 +480,7 @@ module.exports = (sequelize, DataTypes) => {
       const createdPresets = []
 
       for (const preset of presets) {
+        // eslint-disable-next-line no-await-in-loop -- 事务内串行创建预设
         const newPreset = await LotteryPreset.create(
           {
             user_id,

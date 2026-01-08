@@ -99,6 +99,7 @@ router.post(
 
       for (let i = 0; i < times; i++) {
         try {
+          // eslint-disable-next-line no-await-in-loop -- 抽奖模拟测试需要串行执行，记录每轮结果
           const simulationResult = await sharedComponents.lotteryEngine.simulate({
             user_id: parseInt(user_id),
             strategy: strategy_type,

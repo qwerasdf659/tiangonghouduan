@@ -109,8 +109,9 @@ router.get(
  * @body {boolean} [dry_run=true] - 干跑模式（默认true，仅检测不清理）
  * @body {number} [user_id] - 指定用户ID（可选，不传则清理所有）
  * @body {string} [asset_code] - 指定资产代码（可选）
- * @body {string} [reason] - 清理原因（可选）
- * @access Admin
+ * @body {string} reason - 清理原因（🔴 P0-2 必填：实际清理时必须提供）
+ * @body {string} operator_name - 操作人姓名（🔴 P0-2 必填：实际清理时必须提供）
+ * @access SuperAdmin（role_level >= 100 且 is_super_admin = true）
  * @returns {Object} 清理结果报告
  */
 router.post(
@@ -119,7 +120,40 @@ router.post(
   requireAdmin,
   asyncHandler(async (req, res) => {
     const admin_id = req.user.user_id
-    const { dry_run = true, user_id, asset_code, reason } = req.body
+    const admin_role_level = req.user.role_level || 0
+    const { dry_run = true, user_id, asset_code, reason, operator_name } = req.body
+
+    // 🔴 P0-2 决策：实际清理操作（dry_run=false）仅限超级管理员
+    if (!dry_run) {
+      // 超级管理员权限校验：role_level >= 100
+      if (admin_role_level < 100) {
+        return res.apiError(
+          '孤儿冻结清理操作仅限超级管理员执行',
+          'SUPER_ADMIN_REQUIRED',
+          { required_role_level: 100, current_role_level: admin_role_level },
+          403
+        )
+      }
+
+      // 🔴 P0-2 决策：实际清理必须提供 reason 和 operator_name
+      if (!reason || !reason.trim()) {
+        return res.apiError(
+          '实际清理操作必须提供清理原因（reason）',
+          'REASON_REQUIRED',
+          { field: 'reason' },
+          400
+        )
+      }
+
+      if (!operator_name || !operator_name.trim()) {
+        return res.apiError(
+          '实际清理操作必须提供操作人姓名（operator_name）',
+          'OPERATOR_NAME_REQUIRED',
+          { field: 'operator_name' },
+          400
+        )
+      }
+    }
 
     // 通过 ServiceManager 获取服务
     const OrphanFrozenCleanupService = req.app.locals.services.getService('orphanFrozenCleanup')
@@ -129,7 +163,9 @@ router.post(
       user_id: user_id ? Number(user_id) : undefined,
       asset_code,
       operator_id: admin_id,
-      reason: reason || `管理员手动清理孤儿冻结（admin_id=${admin_id}）`
+      reason: reason
+        ? `${reason.trim()}（操作人: ${operator_name || '未提供'}）`
+        : `管理员手动清理孤儿冻结（admin_id=${admin_id}）`
     })
 
     // 根据 dry_run 状态返回不同消息

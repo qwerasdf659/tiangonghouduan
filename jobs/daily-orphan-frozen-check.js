@@ -25,7 +25,7 @@
 
 const logger = require('../utils/logger').logger
 const NotificationService = require('../services/NotificationService')
-const { ServiceManager } = require('../services')
+const serviceManager = require('../services')
 
 /**
  * 每日孤儿冻结检测与清理任务类
@@ -49,8 +49,8 @@ class DailyOrphanFrozenCheck {
     logger.info('开始每日孤儿冻结检测任务', { dryRun })
 
     try {
-      // 获取孤儿冻结清理服务
-      const orphanFrozenService = ServiceManager.getService('orphanFrozenCleanup')
+      // 获取孤儿冻结清理服务（通过 serviceManager 实例获取）
+      const orphanFrozenService = serviceManager.getService('orphanFrozenCleanup')
 
       if (!orphanFrozenService) {
         throw new Error('OrphanFrozenCleanupService 未注册到 ServiceManager')

@@ -241,7 +241,7 @@ describe('P0-5: 审计日志 target_type 命名统一测试', () => {
 
   describe('迁移数据完整性验证', () => {
     test('所有历史遗留值都映射到有效的标准资源码', () => {
-      Object.entries(TARGET_TYPE_LEGACY_MAPPING).forEach(([legacy, standard]) => {
+      Object.entries(TARGET_TYPE_LEGACY_MAPPING).forEach(([_legacy, standard]) => {
         expect(isValidTargetType(standard)).toBe(true)
       })
     })

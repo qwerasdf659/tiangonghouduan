@@ -1,3 +1,5 @@
+/* eslint-disable no-await-in-loop -- 事务重试逻辑必须串行执行 */
+
 /**
  * 统一事务管理器 - TransactionManager
  *

@@ -183,8 +183,8 @@ class HierarchyManagementService {
         allSubordinates.push(...directSubordinates)
 
         // 3. 递归查询每个直接下级的下级（深度优先遍历）
-        // eslint-disable-next-line no-await-in-loop
         for (const subordinate of directSubordinates) {
+          // eslint-disable-next-line no-await-in-loop -- 递归查询层级结构需要串行执行
           await findSubordinates(subordinate.user_id, new Set(currentVisited))
         }
       }

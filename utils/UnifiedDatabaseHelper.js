@@ -1,3 +1,5 @@
+/* eslint-disable no-await-in-loop -- 数据库批量操作和验证需要串行执行确保一致性 */
+
 /**
  * 统一数据库助手 V4 - 整合版
  * 消除过度拆分的技术债务，提供完整的数据库管理功能
@@ -106,7 +108,7 @@ class UnifiedDatabaseHelper {
    *
    * @constructor
    */
-  constructor () {
+  constructor() {
     // 单例模式
     if (UnifiedDatabaseHelper.instance) {
       return UnifiedDatabaseHelper.instance
@@ -174,7 +176,7 @@ class UnifiedDatabaseHelper {
    * 确保数据库连接
    * @returns {Promise<Sequelize>} 连接的Sequelize实例
    */
-  async ensureConnection () {
+  async ensureConnection() {
     if (this.isConnected) {
       return this.sequelize
     }
@@ -191,7 +193,7 @@ class UnifiedDatabaseHelper {
    * 连接数据库
    * @returns {Promise<void>} 连接成功或抛出错误
    */
-  async connect () {
+  async connect() {
     try {
       await this.sequelize.authenticate()
       this.isConnected = true
@@ -208,7 +210,7 @@ class UnifiedDatabaseHelper {
    * @param {Error} error 连接错误
    * @returns {Promise<void>} 重连成功或抛出错误
    */
-  async handleConnectionError (error) {
+  async handleConnectionError(error) {
     this.reconnectAttempts++
 
     if (this.reconnectAttempts <= this.maxReconnectAttempts) {
@@ -234,7 +236,7 @@ class UnifiedDatabaseHelper {
    * 数据库健康检查 - 整合版
    * @returns {Promise<Object>} 健康检查结果
    */
-  async healthCheck () {
+  async healthCheck() {
     const checkTime = BeijingTimeHelper.now()
 
     try {
@@ -279,7 +281,7 @@ class UnifiedDatabaseHelper {
    * 测试基础数据库连接
    * @returns {Promise<Object>} 连接测试结果（成功状态、响应时间、消息）
    */
-  async testBasicConnection () {
+  async testBasicConnection() {
     try {
       const startTime = Date.now()
       await this.sequelize.authenticate()
@@ -303,7 +305,7 @@ class UnifiedDatabaseHelper {
    * 测试数据库权限
    * @returns {Promise<Object>} 权限测试结果（成功状态、消息、错误信息）
    */
-  async testDatabasePermissions () {
+  async testDatabasePermissions() {
     try {
       // 测试基本查询权限
       await this.sequelize.query('SELECT 1', { type: QueryTypes.SELECT })
@@ -328,7 +330,7 @@ class UnifiedDatabaseHelper {
    * 检查核心表存在性
    * @returns {Promise<Object>} 核心表检查结果（成功状态、存在表数量、缺失表列表、消息）
    */
-  async checkCoreTables () {
+  async checkCoreTables() {
     try {
       const existingTables = await this.sequelize.query('SHOW TABLES', {
         type: QueryTypes.SELECT
@@ -357,7 +359,7 @@ class UnifiedDatabaseHelper {
    * 检查数据一致性
    * @returns {Promise<Object>} 数据一致性检查结果（成功状态、问题列表、消息）
    */
-  async checkDataConsistency () {
+  async checkDataConsistency() {
     try {
       const issues = []
 
@@ -401,7 +403,7 @@ class UnifiedDatabaseHelper {
    * @param {string} tableName 表名
    * @returns {Promise<number>} 记录数量
    */
-  async getTableRecordCount (tableName) {
+  async getTableRecordCount(tableName) {
     try {
       const result = await this.sequelize.query(`SELECT COUNT(*) as count FROM ${tableName}`, {
         type: QueryTypes.SELECT
@@ -417,7 +419,7 @@ class UnifiedDatabaseHelper {
    * 获取数据库统计信息
    * @returns {Promise<Object>} 统计信息（时间戳、表列表、总记录数、数据库大小）
    */
-  async getStats () {
+  async getStats() {
     const stats = {
       timestamp: BeijingTimeHelper.now(),
       tables: [],
@@ -483,7 +485,7 @@ class UnifiedDatabaseHelper {
    * @param {string} tableName 表名
    * @returns {Promise<boolean>} 表是否存在
    */
-  async tableExists (tableName) {
+  async tableExists(tableName) {
     try {
       await this.ensureConnection()
       const result = await this.sequelize.query(
@@ -505,7 +507,7 @@ class UnifiedDatabaseHelper {
    * @param {string} tableName 表名
    * @returns {Promise<Array>} 表结构信息
    */
-  async getTableStructure (tableName) {
+  async getTableStructure(tableName) {
     try {
       await this.ensureConnection()
       return await this.sequelize.query(`DESCRIBE ${tableName}`, {
@@ -523,7 +525,7 @@ class UnifiedDatabaseHelper {
    * @param {string} columnName 列名
    * @returns {Promise<boolean>} 列是否存在
    */
-  async columnExists (tableName, columnName) {
+  async columnExists(tableName, columnName) {
     try {
       const structure = await this.getTableStructure(tableName)
       return structure.some(column => column.Field === columnName)
@@ -543,7 +545,7 @@ class UnifiedDatabaseHelper {
    * @param {Object} options 选项
    * @returns {Promise<Array>} 查询结果
    */
-  async query (sql, params = [], options = {}) {
+  async query(sql, params = [], options = {}) {
     await this.ensureConnection()
     return this.sequelize.query(sql, {
       replacements: params,
@@ -558,7 +560,7 @@ class UnifiedDatabaseHelper {
    * @param {Object} options 事务选项
    * @returns {Promise<any>} 执行结果
    */
-  async executeTransaction (callback, options = {}) {
+  async executeTransaction(callback, options = {}) {
     await this.ensureConnection()
     return this.sequelize.transaction(options, async transaction => {
       return callback(transaction)
@@ -572,7 +574,7 @@ class UnifiedDatabaseHelper {
    * @param {Object} options 选项
    * @returns {Promise<Object>} 插入结果
    */
-  async bulkInsert (tableName, records, options = {}) {
+  async bulkInsert(tableName, records, options = {}) {
     if (!records || records.length === 0) {
       return { inserted: 0, message: '没有记录需要插入' }
     }
@@ -600,7 +602,7 @@ class UnifiedDatabaseHelper {
    * 数据库性能检查
    * @returns {Promise<Object>} 性能检查结果（类型、成功状态、指标、建议）
    */
-  async checkDatabasePerformance () {
+  async checkDatabasePerformance() {
     try {
       await this.ensureConnection()
 
@@ -648,7 +650,7 @@ class UnifiedDatabaseHelper {
    * @param {number} metrics.connections - 连接数
    * @returns {Array<string>} 性能建议列表
    */
-  generatePerformanceRecommendations (metrics) {
+  generatePerformanceRecommendations(metrics) {
     const recommendations = []
 
     if (metrics.slowQueries > 5) {
@@ -670,7 +672,7 @@ class UnifiedDatabaseHelper {
    * 关闭数据库连接
    * @returns {Promise<void>} 连接关闭完成
    */
-  async disconnect () {
+  async disconnect() {
     if (this.sequelize) {
       await this.sequelize.close()
       this.isConnected = false
@@ -683,7 +685,7 @@ class UnifiedDatabaseHelper {
    * 获取连接状态
    * @returns {Object} 连接状态对象（连接状态、重连次数、数据库信息等）
    */
-  getConnectionStatus () {
+  getConnectionStatus() {
     return {
       isConnected: this.isConnected,
       reconnectAttempts: this.reconnectAttempts,
@@ -698,7 +700,7 @@ class UnifiedDatabaseHelper {
    * 获取Sequelize实例
    * @returns {Sequelize} Sequelize实例
    */
-  getSequelize () {
+  getSequelize() {
     return this.sequelize
   }
 
@@ -706,7 +708,7 @@ class UnifiedDatabaseHelper {
    * 快速健康检查
    * @returns {Promise<boolean>} 是否健康
    */
-  async isHealthy () {
+  async isHealthy() {
     try {
       const result = await this.healthCheck()
       return result.connected
@@ -720,7 +722,7 @@ class UnifiedDatabaseHelper {
    * @param {Object} _options 清理选项（预留参数）
    * @returns {Promise<Object>} 清理结果
    */
-  async systemCleanup (_options = {}) {
+  async systemCleanup(_options = {}) {
     const results = {
       tablesChecked: 0,
       issuesFound: 0,
@@ -761,7 +763,7 @@ let databaseHelper = null
  * 获取统一数据库助手实例
  * @returns {UnifiedDatabaseHelper} 数据库助手实例
  */
-function getDatabaseHelper () {
+function getDatabaseHelper() {
   if (!databaseHelper) {
     databaseHelper = new UnifiedDatabaseHelper()
   }
@@ -772,7 +774,7 @@ function getDatabaseHelper () {
  * 获取Sequelize实例
  * @returns {Sequelize} Sequelize实例
  */
-function getSequelize () {
+function getSequelize() {
   return getDatabaseHelper().getSequelize()
 }
 
@@ -780,7 +782,7 @@ function getSequelize () {
  * 快速健康检查
  * @returns {Promise<boolean>} 是否健康
  */
-async function isDatabaseHealthy () {
+async function isDatabaseHealthy() {
   try {
     const helper = getDatabaseHelper()
     return await helper.isHealthy()

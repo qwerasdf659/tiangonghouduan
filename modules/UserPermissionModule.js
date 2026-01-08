@@ -17,7 +17,7 @@ class UserPermissionModule {
   /**
    * 构造函数 - 初始化权限模块
    */
-  constructor () {
+  constructor() {
     this.name = 'UserPermissionModule'
     this.version = '4.0.0'
 
@@ -38,7 +38,7 @@ class UserPermissionModule {
    * @param {number} userId - 用户ID
    * @returns {Promise<Object>} 用户权限信息
    */
-  async getUserPermissions (userId) {
+  async getUserPermissions(userId) {
     try {
       const user = await User.findOne({
         where: { user_id: userId, status: 'active' },
@@ -116,7 +116,7 @@ class UserPermissionModule {
    * @param {string} action - 操作类型
    * @returns {Promise<boolean>} 是否有权限
    */
-  async checkUserPermission (userId, resource, action = 'read') {
+  async checkUserPermission(userId, resource, action = 'read') {
     try {
       const userPermissions = await this.getUserPermissions(userId)
 
@@ -148,7 +148,7 @@ class UserPermissionModule {
    * @param {Array} permissions - 权限数组 [{ resource, action }]
    * @returns {Promise<Array>} 权限检查结果数组
    */
-  async batchCheckUserPermissions (userId, permissions) {
+  async batchCheckUserPermissions(userId, permissions) {
     try {
       if (!Array.isArray(permissions) || permissions.length === 0) {
         throw new Error('permissions必须为非空数组')
@@ -190,7 +190,7 @@ class UserPermissionModule {
    * @param {string} action - 操作类型
    * @returns {Promise<Object>} 验证结果
    */
-  async validateOperation (operatorId, requiredLevel = 'user', resource = null, action = 'read') {
+  async validateOperation(operatorId, requiredLevel = 'user', resource = null, action = 'read') {
     try {
       const operatorPermissions = await this.getUserPermissions(operatorId)
 
@@ -228,7 +228,7 @@ class UserPermissionModule {
    * @param {number} userId - 用户ID
    * @returns {Promise<boolean>} 是否为管理员
    */
-  async isAdmin (userId) {
+  async isAdmin(userId) {
     try {
       const permissions = await this.getUserPermissions(userId)
       return permissions.is_admin
@@ -243,7 +243,7 @@ class UserPermissionModule {
    * @param {Array} userPermissionChecks - 权限检查列表
    * @returns {Promise<Object>} 批量检查结果
    */
-  async batchPermissionCheck (userPermissionChecks) {
+  async batchPermissionCheck(userPermissionChecks) {
     try {
       // 🚀 使用Promise.all并行检查，避免串行等待
       const checkPromises = userPermissionChecks.map(check => {
@@ -274,7 +274,7 @@ class UserPermissionModule {
    * @param {number} adminId - 管理员ID
    * @returns {Promise<Object>} 管理员信息
    */
-  async getAdminInfo (adminId) {
+  async getAdminInfo(adminId) {
     try {
       const userPermissions = await this.getUserPermissions(adminId)
 
@@ -303,17 +303,37 @@ class UserPermissionModule {
 
   /**
    * 🛡️ 设置用户角色（只支持user/admin两种角色）
+   *
+   * @deprecated 此方法已废弃（2026-01-09）
+   * 请使用 UserRoleService.updateUserRole() 代替，它提供：
+   * - ✅ 事务保护（强制外部事务）
+   * - ✅ 创建 UserRoleChangeRecord 记录（为审计日志提供业务主键）
+   * - ✅ 统一的审计日志（AuditLogService）
+   * - ✅ 权限级别校验（防止越级操作）
+   * - ✅ 返回 post_commit_actions 供调用方处理副作用
+   *
+   * 迁移示例：
+   * ```javascript
+   * // ❌ 旧方式（已废弃）
+   * await permission_module.setUserRole(userId, true, operatorId);
+   *
+   * // ✅ 新方式（推荐）
+   * const UserRoleService = req.app.locals.services.getService('userRole');
+   * await TransactionManager.execute(async (transaction) => {
+   *   return await UserRoleService.updateUserRole(userId, 'admin', operatorId, { transaction });
+   * });
+   * ```
+   *
    * @param {number} userId - 用户ID
    * @param {boolean} isAdmin - 是否为管理员
    * @param {number} operatorId - 操作者ID
    * @returns {Promise<Object>} 操作结果
-   *
-   * 🔄 P0修复（2025-11-10）：权限修改后自动清除缓存
-   * - 调用 invalidateUserPermissions 清除用户权限缓存
-   * - 确保权限变更实时生效（无需等待缓存过期）
-   * - 清除原因记录：role_changed（便于审计追踪）
+   * @throws {Error} 调用此方法会打印警告日志
    */
-  async setUserRole (userId, isAdmin, operatorId) {
+  async setUserRole(userId, isAdmin, operatorId) {
+    console.warn(
+      '⚠️ [DEPRECATED] UserPermissionModule.setUserRole 已废弃，请使用 UserRoleService.updateUserRole 代替'
+    )
     try {
       // 验证用户是否存在
       const user = await User.findByPk(userId)
@@ -381,7 +401,7 @@ class UserPermissionModule {
    * - ✅ role_level从数据库动态读取（不再硬编码100）
    * - ✅ 按创建时间降序排序（最新管理员在前）
    */
-  async getAllAdmins () {
+  async getAllAdmins() {
     try {
       const adminUsers = await User.findAll({
         where: { status: 'active' }, // 只查询激活状态的用户
@@ -438,7 +458,7 @@ class UserPermissionModule {
    * 法律依据：《中华人民共和国个人信息保护法》第29条
    * 要求：处理敏感个人信息应采取必要的保护措施
    */
-  _maskMobile (mobile) {
+  _maskMobile(mobile) {
     // 异常处理：非11位手机号返回原值
     if (!mobile || mobile.length !== 11) {
       return mobile
@@ -487,7 +507,7 @@ class UserPermissionModule {
    *   }
    * }
    */
-  async getPermissionStatistics () {
+  async getPermissionStatistics() {
     // ⏱️ 记录查询开始时间（用于性能监控）
     const startTime = Date.now()
 

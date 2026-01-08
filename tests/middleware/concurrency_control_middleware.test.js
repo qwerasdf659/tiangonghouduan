@@ -2,20 +2,29 @@
  * ConcurrencyControlMiddleware 中间件测试套件
  * 🔧 V4版本 - 使用真实数据替代mock，测试实际业务逻辑
  * 更新时间：2025年09月23日 22:43:20 UTC
+ * 🔴 P0-1修复（2026-01-08）：移除硬编码 user_id=31，从 global.testData 动态获取
  */
 
 const ConcurrencyControlMiddleware = require('../../middleware/ConcurrencyControlMiddleware.js')
 
 describe('ConcurrencyControlMiddleware 中间件测试 - 真实业务逻辑', () => {
   let middleware
-  const testUser = {
-    user_id: 31, // 正确的user_id（手机号13612227930对应的用户ID）
+  // 🔴 P0-1修复：testUser 改为函数内部获取，确保 global.testData 已初始化
+  const getTestUser = () => ({
+    user_id: global.testData?.testUser?.user_id, // 🔴 P0-1修复：动态获取
     mobile: '13612227930',
     is_admin: false
-  }
+  })
+  // 兼容现有测试代码的静态引用
+  let testUser
 
   beforeEach(() => {
     middleware = new ConcurrencyControlMiddleware()
+    // 🔴 P0-1修复：每次测试前获取最新的 testUser
+    testUser = getTestUser()
+    if (!testUser.user_id) {
+      console.warn('⚠️ [concurrency_control_middleware.test.js] testUser.user_id 未初始化')
+    }
   })
 
   afterAll(async () => {

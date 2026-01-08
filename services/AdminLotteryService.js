@@ -956,6 +956,7 @@ class AdminLotteryService {
       const invalidatedCampaigns = []
       for (const campaign of toStartCampaigns) {
         try {
+          // eslint-disable-next-line no-await-in-loop -- 缓存失效需要逐个处理异常
           await BusinessCacheHelper.invalidateLotteryCampaign(
             campaign.campaign_id,
             'status_sync_started'
@@ -970,6 +971,7 @@ class AdminLotteryService {
       }
       for (const campaign of toEndCampaigns) {
         try {
+          // eslint-disable-next-line no-await-in-loop -- 缓存失效需要逐个处理异常
           await BusinessCacheHelper.invalidateLotteryCampaign(
             campaign.campaign_id,
             'status_sync_ended'

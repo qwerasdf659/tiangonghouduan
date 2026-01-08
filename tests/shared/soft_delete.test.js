@@ -22,13 +22,14 @@ class SoftDeleteTestSuite {
    * @returns {Promise<Object>} 被软删除的记录
    *
    * @example
+   * // 🔴 P0-1修复：使用 global.testData 获取动态 user_id
    * const deletedRecord = await SoftDeleteTestSuite.testSoftDelete(
    *   UserPointsLog,
-   *   { user_id: 31, amount: 100, type: 'earn' },
+   *   { user_id: global.testData.testUser.user_id, amount: 100, type: 'earn' },
    *   'log_id'
    * )
    */
-  static async testSoftDelete (Model, testData, primaryKey = 'id') {
+  static async testSoftDelete(Model, testData, primaryKey = 'id') {
     // 1. 创建测试记录
     const record = await Model.create(testData)
     expect(record).toBeDefined()
@@ -70,7 +71,7 @@ class SoftDeleteTestSuite {
    *   'log_id'
    * )
    */
-  static async testRestore (Model, recordId, primaryKey = 'id') {
+  static async testRestore(Model, recordId, primaryKey = 'id') {
     // 1. 查找被软删除的记录
     const deletedRecord = await Model.findByPk(recordId, {
       paranoid: false
@@ -106,7 +107,7 @@ class SoftDeleteTestSuite {
    * @param {string} primaryKey - 主键字段名
    * @returns {Promise<void>} 无返回值
    */
-  static async testSoftDeleteIsolation (Model, testDataList, deleteIndex, primaryKey = 'id') {
+  static async testSoftDeleteIsolation(Model, testDataList, deleteIndex, primaryKey = 'id') {
     // 1. 批量创建测试记录
     const records = await Model.bulkCreate(testDataList)
     expect(records.length).toBe(testDataList.length)
@@ -144,7 +145,7 @@ class SoftDeleteTestSuite {
    * @param {string} primaryKey - 主键字段名
    * @returns {Promise<number>} 被删除的记录数
    */
-  static async testBulkSoftDelete (Model, testDataList, primaryKey = 'id') {
+  static async testBulkSoftDelete(Model, testDataList, primaryKey = 'id') {
     // 1. 批量创建测试记录
     const records = await Model.bulkCreate(testDataList)
     const ids = records.map(r => r[primaryKey])
@@ -204,7 +205,7 @@ class SoftDeleteHelpers {
    * @param {number} count - 创建数量
    * @returns {Array} 测试数据数组
    */
-  static createTestData (baseData, count = 3) {
+  static createTestData(baseData, count = 3) {
     return Array.from({ length: count }, (_, index) => ({
       ...baseData,
       // 添加索引以区分不同记录
@@ -218,7 +219,7 @@ class SoftDeleteHelpers {
    * @param {Object} Model - Sequelize模型类
    * @returns {Object} 配置验证结果
    */
-  static validateModelConfig (Model) {
+  static validateModelConfig(Model) {
     const options = Model.options
     const result = {
       hasParanoid: options.paranoid === true,

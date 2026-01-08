@@ -47,7 +47,7 @@ const businessConfig = require('../config/business.config')
  * @param {string} content - 原始内容
  * @returns {string} 脱敏/转义后的安全内容
  */
-function sanitizeContent (content) {
+function sanitizeContent(content) {
   return content
     .trim()
     .replace(/&/g, '&amp;')
@@ -67,7 +67,7 @@ function sanitizeContent (content) {
  * @returns {boolean} result.passed - 是否通过检测（true-通过，false-不通过）
  * @returns {string} [result.matchedWord] - 命中的敏感词（仅当 passed=false 时返回）
  */
-function checkSensitiveWords (content) {
+function checkSensitiveWords(content) {
   const { content_filter: contentFilter } = businessConfig.chat
 
   if (!contentFilter.enabled) {
@@ -119,7 +119,7 @@ class CustomerServiceSessionService {
    * @param {boolean} [options.calculate_unread=false] - 是否计算未读消息数
    * @returns {Object} 会话列表和分页信息
    */
-  static async getSessionList (options = {}) {
+  static async getSessionList(options = {}) {
     try {
       const {
         page = 1,
@@ -163,11 +163,11 @@ class CustomerServiceSessionService {
           // 搜索条件
           where: search
             ? {
-              [Op.or]: [
-                { nickname: { [Op.like]: `%${search}%` } },
-                { mobile: { [Op.like]: `%${search}%` } }
-              ]
-            }
+                [Op.or]: [
+                  { nickname: { [Op.like]: `%${search}%` } },
+                  { mobile: { [Op.like]: `%${search}%` } }
+                ]
+              }
             : undefined,
           required: !!search
         },
@@ -208,16 +208,16 @@ class CustomerServiceSessionService {
         session_id: session.session_id,
         user: session.user
           ? {
-            user_id: session.user.user_id,
-            nickname: session.user.nickname,
-            mobile: session.user.mobile
-          }
+              user_id: session.user.user_id,
+              nickname: session.user.nickname,
+              mobile: session.user.mobile
+            }
           : null,
         admin: session.admin
           ? {
-            user_id: session.admin.user_id,
-            nickname: session.admin.nickname
-          }
+              user_id: session.admin.user_id,
+              nickname: session.admin.nickname
+            }
           : null,
         status: session.status,
         priority: session.priority,
@@ -285,7 +285,7 @@ class CustomerServiceSessionService {
    * @param {boolean} [options.include_all_fields=false] - 是否包含所有消息字段（包括metadata等）
    * @returns {Object} 会话详情和消息列表
    */
-  static async getSessionMessages (session_id, options = {}) {
+  static async getSessionMessages(session_id, options = {}) {
     try {
       const {
         limit = 50,
@@ -441,16 +441,16 @@ class CustomerServiceSessionService {
           session_id: session.session_id,
           user: session.user
             ? {
-              user_id: session.user.user_id,
-              nickname: session.user.nickname,
-              mobile: session.user.mobile
-            }
+                user_id: session.user.user_id,
+                nickname: session.user.nickname,
+                mobile: session.user.mobile
+              }
             : null,
           admin: session.admin
             ? {
-              user_id: session.admin.user_id,
-              nickname: session.admin.nickname
-            }
+                user_id: session.admin.user_id,
+                nickname: session.admin.nickname
+              }
             : null,
           status: session.status,
           priority: session.priority,
@@ -486,9 +486,12 @@ class CustomerServiceSessionService {
    * @param {Object} options.transaction - 外部事务对象（必填）
    * @returns {Object} 创建的消息对象
    */
-  static async sendMessage (session_id, data, options = {}) {
+  static async sendMessage(session_id, data, options = {}) {
     // 强制要求事务边界 - 2026-01-05 治理决策
-    const transaction = assertAndGetTransaction(options, 'CustomerServiceSessionService.sendMessage')
+    const transaction = assertAndGetTransaction(
+      options,
+      'CustomerServiceSessionService.sendMessage'
+    )
 
     const { admin_id, content, message_type = 'text', role_level = 100 } = data
 
@@ -567,9 +570,7 @@ class CustomerServiceSessionService {
       {
         last_message_at: new Date(),
         status:
-          session.status === 'waiting' || session.status === 'assigned'
-            ? 'active'
-            : session.status
+          session.status === 'waiting' || session.status === 'assigned' ? 'active' : session.status
       },
       { transaction }
     )
@@ -609,9 +610,12 @@ class CustomerServiceSessionService {
    * @returns {Object} 创建的消息对象
    * @throws {Error} 会话不存在、无权限、会话已关闭等错误
    */
-  static async sendUserMessage (session_id, data, options = {}) {
+  static async sendUserMessage(session_id, data, options = {}) {
     // 强制要求事务边界 - 2026-01-05 治理决策
-    const transaction = assertAndGetTransaction(options, 'CustomerServiceSessionService.sendUserMessage')
+    const transaction = assertAndGetTransaction(
+      options,
+      'CustomerServiceSessionService.sendUserMessage'
+    )
 
     const { user_id, content, message_type = 'text' } = data
 
@@ -684,7 +688,7 @@ class CustomerServiceSessionService {
    * @param {number} admin_id - 管理员ID
    * @returns {Object} 更新结果
    */
-  static async markSessionAsRead (session_id, admin_id) {
+  static async markSessionAsRead(session_id, admin_id) {
     try {
       logger.info(`👁️ 管理员 ${admin_id} 标记会话 ${session_id} 为已读`)
 
@@ -742,9 +746,12 @@ class CustomerServiceSessionService {
    * @param {Object} options.transaction - 外部事务对象（必填）
    * @returns {Object} 转接结果
    */
-  static async transferSession (session_id, current_admin_id, target_admin_id, options = {}) {
+  static async transferSession(session_id, current_admin_id, target_admin_id, options = {}) {
     // 强制要求事务边界 - 2026-01-05 治理决策
-    const transaction = assertAndGetTransaction(options, 'CustomerServiceSessionService.transferSession')
+    const transaction = assertAndGetTransaction(
+      options,
+      'CustomerServiceSessionService.transferSession'
+    )
 
     logger.info(`🔄 转接会话 ${session_id}: ${current_admin_id} → ${target_admin_id}`)
 
@@ -825,9 +832,12 @@ class CustomerServiceSessionService {
    * @param {Object} options.transaction - 外部事务对象（必填）
    * @returns {Object} 关闭结果
    */
-  static async closeSession (session_id, data, options = {}) {
+  static async closeSession(session_id, data, options = {}) {
     // 强制要求事务边界 - 2026-01-05 治理决策
-    const transaction = assertAndGetTransaction(options, 'CustomerServiceSessionService.closeSession')
+    const transaction = assertAndGetTransaction(
+      options,
+      'CustomerServiceSessionService.closeSession'
+    )
 
     const { admin_id, close_reason = '问题已解决' } = data
 
@@ -892,7 +902,7 @@ class CustomerServiceSessionService {
    * @param {number} [admin_id] - 指定客服ID（可选）
    * @returns {Object} 统计信息
    */
-  static async getSessionStats (admin_id) {
+  static async getSessionStats(admin_id) {
     try {
       const baseWhere = admin_id ? { admin_id } : {}
 
@@ -940,7 +950,7 @@ class CustomerServiceSessionService {
    * @returns {Date} return.created_at - 创建时间
    * @returns {boolean} return.is_new - 是否为新创建的会话
    */
-  static async getOrCreateSession (user_id, options = {}) {
+  static async getOrCreateSession(user_id, options = {}) {
     try {
       const { source = 'mobile', priority = 1 } = options
 
@@ -1051,7 +1061,7 @@ class CustomerServiceSessionService {
    * @returns {boolean} return.valid - 是否通过验证
    * @returns {Array<string>} return.warnings - 警告信息列表
    */
-  static validateStatistics (stats) {
+  static validateStatistics(stats) {
     const warnings = []
 
     // 1️⃣ 基础数值合理性检查（数值必须>=0）
@@ -1157,7 +1167,7 @@ class CustomerServiceSessionService {
    * @param {Date} endTime - 结束时间
    * @returns {Promise<number>} 平均响应时间（秒），无数据时返回60
    */
-  static async calculateAverageResponseTime (startTime, endTime) {
+  static async calculateAverageResponseTime(startTime, endTime) {
     try {
       // 1️⃣ 查询已响应的会话（排除未响应的waiting状态）
       const sessions = await CustomerServiceSession.findAll({
@@ -1185,6 +1195,7 @@ class CustomerServiceSessionService {
       // 3️⃣ 计算每个会话的响应时间
       for (const session of sessions) {
         // 并行查询该会话的第一条用户消息和第一条客服消息
+        // eslint-disable-next-line no-await-in-loop -- 批量计算会话响应时间需要逐个处理
         const [firstUserMsg, firstAdminMsg] = await Promise.all([
           ChatMessage.findOne({
             where: {

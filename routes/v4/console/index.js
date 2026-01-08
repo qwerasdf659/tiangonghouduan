@@ -29,6 +29,7 @@ const campaignBudgetRoutes = require('./campaign-budget') // 🆕 活动预算�
 const assetsRoutes = require('./assets') // 🆕 后台运营资产中心（2026-01-07 架构重构）
 const imagesRoutes = require('./images') // 🆕 通用图片上传（2026-01-08 图片存储架构）
 const orphanFrozenRoutes = require('./orphan-frozen') // 🆕 孤儿冻结清理（P0-2 2026-01-09）
+const merchantPointsRoutes = require('./merchant-points') // 🆕 商家积分审核管理（P1 2026-01-09）
 
 // 挂载子模块路由
 router.use('/auth', authRoutes)
@@ -49,6 +50,7 @@ router.use('/campaign-budget', campaignBudgetRoutes) // 🆕 活动预算管理�
 router.use('/assets', assetsRoutes) // 🆕 后台运营资产中心路由（2026-01-07 架构重构）
 router.use('/images', imagesRoutes) // 🆕 通用图片上传路由（2026-01-08 图片存储架构）
 router.use('/orphan-frozen', orphanFrozenRoutes) // 🆕 孤儿冻结清理路由（P0-2 2026-01-09）
+router.use('/merchant-points', merchantPointsRoutes) // 🆕 商家积分审核管理路由（P1 2026-01-09）
 
 /**
  * GET / - Admin API根路径信息
@@ -226,6 +228,17 @@ router.get('/', (req, res) => {
         description: '孤儿冻结清理（P0-2 2026-01-09）',
         endpoints: ['/orphan-frozen/detect', '/orphan-frozen/stats', '/orphan-frozen/cleanup'],
         note: '检测和清理孤儿冻结（frozen_amount > 活跃挂牌冻结），唯一入口设计，支持干跑模式'
+      },
+      merchant_points: {
+        description: '商家积分审核管理（P1 2026-01-09）',
+        endpoints: [
+          '/merchant-points',
+          '/merchant-points/:audit_id',
+          '/merchant-points/:audit_id/approve',
+          '/merchant-points/:audit_id/reject',
+          '/merchant-points/stats/pending'
+        ],
+        note: '商家积分申请审核管理，基于统一审核引擎（ContentAuditEngine），审核通过后自动发放积分'
       }
       // ⚠️ campaign_permissions模块暂未实现，待实现后再添加到此列表
     },

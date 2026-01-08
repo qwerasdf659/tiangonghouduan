@@ -1,3 +1,5 @@
+/* eslint-disable no-await-in-loop -- 分布式锁重试和续期逻辑必须串行执行 */
+
 /**
  * 统一分布式锁管理器 V4
  * 整合并优化了原有的分布式锁功能，消除重复代码
@@ -106,7 +108,7 @@ class UnifiedDistributedLock {
    *
    * @constructor
    */
-  constructor () {
+  constructor() {
     // 使用统一Redis客户端，消除重复连接
     this.redis = getRawClient()
     this.lockPrefix = 'lock:'
@@ -123,7 +125,7 @@ class UnifiedDistributedLock {
    * @param {number} retryDelay 重试延迟(毫秒)，默认100ms
    * @returns {Promise<Object>} 包含锁信息的对象或null
    */
-  async acquireLock (resource, ttl = this.defaultTTL, maxRetries = 3, retryDelay = 100) {
+  async acquireLock(resource, ttl = this.defaultTTL, maxRetries = 3, retryDelay = 100) {
     const lockKey = `${this.lockPrefix}${resource}`
     const lockValue = uuidv4()
 
@@ -166,7 +168,7 @@ class UnifiedDistributedLock {
    * @param {Object} lock 锁对象
    * @returns {Promise<boolean>} 是否成功释放锁
    */
-  async releaseLock (lock) {
+  async releaseLock(lock) {
     if (!lock || !lock.lockKey || !lock.lockValue) {
       console.warn('[UnifiedDistributedLock] 释放锁失败: 无效的锁对象')
       return false
@@ -206,7 +208,7 @@ class UnifiedDistributedLock {
    * @param {number} extendTTL 延长时间(毫秒)
    * @returns {Promise<boolean>} 是否成功续期
    */
-  async extendLock (lock, extendTTL = this.defaultTTL) {
+  async extendLock(lock, extendTTL = this.defaultTTL) {
     if (!lock || !lock.lockKey || !lock.lockValue) {
       console.warn('[UnifiedDistributedLock] 续期锁失败: 无效的锁对象')
       return false
@@ -249,7 +251,7 @@ class UnifiedDistributedLock {
    * @param {Object} options 配置选项
    * @returns {Promise<any>} 临界区函数的返回值
    */
-  async withLock (resource, criticalSection, options = {}) {
+  async withLock(resource, criticalSection, options = {}) {
     const {
       ttl = this.defaultTTL,
       maxRetries = 3,
@@ -308,7 +310,7 @@ class UnifiedDistributedLock {
    * @param {number} maxRetries 最大重试次数
    * @returns {Promise<Array<Object>|null>} 锁对象列表或null
    */
-  async acquireMultipleLocks (resources, ttl = this.defaultTTL, maxRetries = 3) {
+  async acquireMultipleLocks(resources, ttl = this.defaultTTL, maxRetries = 3) {
     if (!Array.isArray(resources) || resources.length === 0) {
       throw new Error('资源列表不能为空')
     }
@@ -342,7 +344,7 @@ class UnifiedDistributedLock {
    * @param {Array<Object>} locks 锁对象列表
    * @returns {Promise<boolean>} 是否全部成功释放
    */
-  async releaseMultipleLocks (locks) {
+  async releaseMultipleLocks(locks) {
     if (!Array.isArray(locks) || locks.length === 0) {
       return true
     }
@@ -366,7 +368,7 @@ class UnifiedDistributedLock {
    * @param {string} resource 资源标识
    * @returns {Promise<Object|null>} 锁状态信息
    */
-  async getLockStatus (resource) {
+  async getLockStatus(resource) {
     const lockKey = `${this.lockPrefix}${resource}`
 
     try {
@@ -395,7 +397,7 @@ class UnifiedDistributedLock {
    * @param {string} resource 资源标识
    * @returns {Promise<boolean>} 是否成功删除锁
    */
-  async forceReleaseLock (resource) {
+  async forceReleaseLock(resource) {
     const lockKey = `${this.lockPrefix}${resource}`
 
     try {
@@ -420,7 +422,7 @@ class UnifiedDistributedLock {
    * @param {string} pattern 锁模式，默认清理所有锁
    * @returns {Promise<number>} 清理的锁数量
    */
-  async cleanupExpiredLocks (pattern = `${this.lockPrefix}*`) {
+  async cleanupExpiredLocks(pattern = `${this.lockPrefix}*`) {
     try {
       const keys = await this.redis.keys(pattern)
 
@@ -459,7 +461,7 @@ class UnifiedDistributedLock {
    * @param {number} ms 睡眠时间(毫秒)
    * @returns {Promise<void>} 返回Promise，延迟指定毫秒后resolve
    */
-  sleep (ms) {
+  sleep(ms) {
     return new Promise(resolve => {
       setTimeout(resolve, ms)
     })
@@ -469,7 +471,7 @@ class UnifiedDistributedLock {
    * 获取统计信息
    * @returns {Promise<Object>} 统计信息
    */
-  async getStats () {
+  async getStats() {
     try {
       const pattern = `${this.lockPrefix}*`
       const keys = await this.redis.keys(pattern)
@@ -522,7 +524,7 @@ class UnifiedDistributedLock {
    * @async
    * @returns {Promise<void>} 返回Promise，断开连接完成后resolve
    */
-  async disconnect () {
+  async disconnect() {
     try {
       console.log('[UnifiedDistributedLock] 正在断开连接...')
       if (this.redis && typeof this.redis.disconnect === 'function') {

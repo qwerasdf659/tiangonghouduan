@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>C2C交易订单管理 - 管理后台</title>
+
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+  <link href="/admin/css/common.css" rel="stylesheet">
+</head>
+<body class="bg-light">
+  <!-- 顶部导航 -->
+  <nav class="navbar navbar-dark bg-primary">
+    <div class="container-fluid">
+      <a href="/admin/dashboard.html" class="navbar-brand">
+        <i class="bi bi-arrow-left me-2"></i>🔄 C2C交易订单管理
+      </a>
+      <div>
+        <span class="text-light me-3" id="welcomeText">欢迎，管理员</span>
+        <button class="btn btn-outline-light btn-sm" id="logoutBtn">退出登录</button>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container-fluid mt-4">
+    <!-- 统计卡片 -->
+    <div class="row g-3 mb-3">
+      <div class="col-md-3">
+        <div class="card">
+          <div class="card-body text-center">
+            <h6 class="text-muted">订单总数</h6>
+            <h3 class="text-primary" id="totalOrders">-</h3>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="card border-warning">
+          <div class="card-body text-center">
+            <h6 class="text-muted">进行中</h6>
+            <h3 class="text-warning" id="createdOrders">-</h3>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="card border-info">
+          <div class="card-body text-center">
+            <h6 class="text-muted">冻结中</h6>
+            <h3 class="text-info" id="frozenOrders">-</h3>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="card border-success">
+          <div class="card-body text-center">
+            <h6 class="text-muted">已完成</h6>
+            <h3 class="text-success" id="completedOrders">-</h3>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 筛选区域 -->
+    <div class="card mb-3">
+      <div class="card-body">
+        <div class="row g-3">
+          <div class="col-md-2">
+            <label class="form-label">订单状态</label>
+            <select class="form-select" id="statusFilter">
+              <option value="">全部状态</option>
+              <option value="created">进行中</option>
+              <option value="frozen">冻结中</option>
+              <option value="completed">已完成</option>
+              <option value="cancelled">已取消</option>
+            </select>
+          </div>
+          <div class="col-md-2">
+            <label class="form-label">买家ID</label>
+            <input type="number" class="form-control" id="buyerIdFilter" placeholder="买家用户ID">
+          </div>
+          <div class="col-md-2">
+            <label class="form-label">卖家ID</label>
+            <input type="number" class="form-control" id="sellerIdFilter" placeholder="卖家用户ID">
+          </div>
+          <div class="col-md-2">
+            <label class="form-label">挂牌ID</label>
+            <input type="number" class="form-control" id="listingIdFilter" placeholder="挂牌ID">
+          </div>
+          <div class="col-md-2">
+            <label class="form-label">排序方式</label>
+            <select class="form-select" id="sortOrder">
+              <option value="DESC">最新在前</option>
+              <option value="ASC">最早在前</option>
+            </select>
+          </div>
+          <div class="col-md-2">
+            <label class="form-label">&nbsp;</label>
+            <button class="btn btn-primary w-100" id="searchBtn">
+              <i class="bi bi-search"></i> 查询
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 订单列表 -->
+    <div class="card">
+      <div class="card-body">
+        <div class="table-responsive">
+          <table class="table table-hover align-middle">
+            <thead class="table-light">
+              <tr>
+                <th style="width: 80px;">订单ID</th>
+                <th>挂牌信息</th>
+                <th>买家</th>
+                <th>卖家</th>
+                <th>交易金额</th>
+                <th>手续费</th>
+                <th>状态</th>
+                <th>创建时间</th>
+                <th style="width: 120px;">操作</th>
+              </tr>
+            </thead>
+            <tbody id="ordersTableBody">
+              <tr>
+                <td colspan="9" class="text-center py-5">
+                  <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">加载中...</span>
+                  </div>
+                  <p class="mt-2 text-muted">正在加载数据...</p>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- 分页 -->
+        <nav aria-label="分页" class="mt-3">
+          <ul class="pagination justify-content-end" id="pagination"></ul>
+        </nav>
+      </div>
+    </div>
+  </div>
+
+  <!-- 订单详情模态框 -->
+  <div class="modal fade" id="orderDetailModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">
+            <i class="bi bi-receipt"></i> 交易订单详情
+          </h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="row g-3">
+            <!-- 订单基本信息 -->
+            <div class="col-12">
+              <h6 class="border-bottom pb-2 text-primary">
+                <i class="bi bi-info-circle"></i> 订单信息
+              </h6>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label text-muted">订单ID</label>
+              <p id="detailOrderId" class="fw-bold">-</p>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label text-muted">订单状态</label>
+              <p id="detailStatus">-</p>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label text-muted">创建时间</label>
+              <p id="detailCreatedAt">-</p>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label text-muted">完成时间</label>
+              <p id="detailCompletedAt">-</p>
+            </div>
+
+            <!-- 挂牌信息 -->
+            <div class="col-12">
+              <h6 class="border-bottom pb-2 text-primary">
+                <i class="bi bi-tag"></i> 挂牌信息
+              </h6>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label text-muted">挂牌ID</label>
+              <p id="detailListingId">-</p>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label text-muted">资产类型</label>
+              <p id="detailAssetCode">-</p>
+            </div>
+
+            <!-- 交易双方 -->
+            <div class="col-12">
+              <h6 class="border-bottom pb-2 text-primary">
+                <i class="bi bi-people"></i> 交易双方
+              </h6>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label text-muted">买家ID</label>
+              <p id="detailBuyerId">-</p>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label text-muted">卖家ID</label>
+              <p id="detailSellerId">-</p>
+            </div>
+
+            <!-- 金额信息 -->
+            <div class="col-12">
+              <h6 class="border-bottom pb-2 text-primary">
+                <i class="bi bi-currency-exchange"></i> 金额信息
+              </h6>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label text-muted">交易金额</label>
+              <p id="detailTotalPrice" class="fw-bold text-success">-</p>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label text-muted">手续费</label>
+              <p id="detailFee" class="text-warning">-</p>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label text-muted">卖家实收</label>
+              <p id="detailSellerReceive" class="text-info">-</p>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 加载遮罩层 -->
+  <div class="loading-overlay" id="loadingOverlay" style="display:none;">
+    <div class="spinner-border text-light" style="width: 3rem; height: 3rem;" role="status">
+      <span class="visually-hidden">处理中...</span>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="/admin/js/admin-common.js"></script>
+
+  <script>
+    // 全局变量
+    let currentPage = 1;
+    const pageSize = 20;
+
+    // 页面加载
+    document.addEventListener('DOMContentLoaded', function() {
+      checkAuth();
+      loadTradeOrders();
+      bindEvents();
+    });
+
+    // 权限检查
+    function checkAuth() {
+      const token = getToken();
+      if (!token) {
+        window.location.href = '/admin/login.html';
+        return false;
+      }
+      checkAdminPermission();
+      return true;
+    }
+
+    // 绑定事件
+    function bindEvents() {
+      document.getElementById('logoutBtn').addEventListener('click', logout);
+      document.getElementById('searchBtn').addEventListener('click', handleSearch);
+    }
+
+    // 处理搜索
+    function handleSearch() {
+      currentPage = 1;
+      loadTradeOrders();
+    }
+
+    // 加载交易订单列表
+    async function loadTradeOrders() {
+      try {
+        showLoading(true);
+        
+        const status = document.getElementById('statusFilter').value;
+        const buyerId = document.getElementById('buyerIdFilter').value.trim();
+        const sellerId = document.getElementById('sellerIdFilter').value.trim();
+        const listingId = document.getElementById('listingIdFilter').value.trim();
+        const sortOrder = document.getElementById('sortOrder').value;
+        
+        const params = new URLSearchParams({
+          page: currentPage,
+          page_size: pageSize,
+          sort_order: sortOrder
+        });
+        
+        if (status) params.append('status', status);
+        if (buyerId) params.append('buyer_user_id', buyerId);
+        if (sellerId) params.append('seller_user_id', sellerId);
+        if (listingId) params.append('listing_id', listingId);
+        
+        const response = await apiRequest(`/api/v4/console/marketplace/trade_orders?${params}`);
+        
+        if (response && response.success) {
+          const orders = response.data.orders || response.data.list || [];
+          renderOrders(orders);
+          renderPagination(response.data.pagination);
+          updateStats(orders);
+        } else {
+          showError(response?.message || '加载失败');
+        }
+      } catch (error) {
+        console.error('加载交易订单失败', error);
+        showError('加载失败，请稍后重试');
+      } finally {
+        showLoading(false);
+      }
+    }
+
+    // 渲染订单列表
+    function renderOrders(orders) {
+      const tbody = document.getElementById('ordersTableBody');
+      
+      if (!orders || orders.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="9" class="text-center text-muted py-4">暂无数据</td></tr>';
+        return;
+      }
+      
+      tbody.innerHTML = orders.map(order => {
+        const id = order.trade_order_id || order.id;
+        const statusBadge = getStatusBadge(order.status);
+        const fee = order.platform_fee || order.fee || 0;
+        const sellerReceive = (order.total_price || 0) - fee;
+        
+        return `
+          <tr>
+            <td><code>${id}</code></td>
+            <td>
+              <div><strong>挂牌#${order.listing_id || '-'}</strong></div>
+              <small class="text-muted">${escapeHtml(order.asset_code || '-')}</small>
+            </td>
+            <td>ID: ${order.buyer_user_id || '-'}</td>
+            <td>ID: ${order.seller_user_id || '-'}</td>
+            <td><span class="badge bg-success">${order.total_price || 0} 积分</span></td>
+            <td><span class="badge bg-warning">${fee} 积分</span></td>
+            <td>${statusBadge}</td>
+            <td>${formatDate(order.created_at)}</td>
+            <td>
+              <button class="btn btn-sm btn-outline-info" onclick="viewOrderDetail(${id})">
+                <i class="bi bi-eye"></i> 详情
+              </button>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    // 更新统计数据
+    function updateStats(orders) {
+      const stats = {
+        total: orders.length,
+        created: orders.filter(o => o.status === 'created').length,
+        frozen: orders.filter(o => o.status === 'frozen').length,
+        completed: orders.filter(o => o.status === 'completed').length
+      };
+      
+      document.getElementById('totalOrders').textContent = stats.total;
+      document.getElementById('createdOrders').textContent = stats.created;
+      document.getElementById('frozenOrders').textContent = stats.frozen;
+      document.getElementById('completedOrders').textContent = stats.completed;
+    }
+
+    // 查看订单详情
+    async function viewOrderDetail(id) {
+      try {
+        showLoading(true);
+        const response = await apiRequest(`/api/v4/console/marketplace/trade_orders/${id}`);
+        
+        if (response && response.success) {
+          const order = response.data.order || response.data;
+          const fee = order.platform_fee || order.fee || 0;
+          const sellerReceive = (order.total_price || 0) - fee;
+          
+          document.getElementById('detailOrderId').textContent = order.trade_order_id || order.id;
+          document.getElementById('detailStatus').innerHTML = getStatusBadge(order.status);
+          document.getElementById('detailCreatedAt').textContent = formatDate(order.created_at);
+          document.getElementById('detailCompletedAt').textContent = order.completed_at ? formatDate(order.completed_at) : '-';
+          document.getElementById('detailListingId').textContent = order.listing_id || '-';
+          document.getElementById('detailAssetCode').textContent = order.asset_code || '-';
+          document.getElementById('detailBuyerId').textContent = order.buyer_user_id || '-';
+          document.getElementById('detailSellerId').textContent = order.seller_user_id || '-';
+          document.getElementById('detailTotalPrice').textContent = `${order.total_price || 0} 积分`;
+          document.getElementById('detailFee').textContent = `${fee} 积分`;
+          document.getElementById('detailSellerReceive').textContent = `${sellerReceive} 积分`;
+          
+          new bootstrap.Modal(document.getElementById('orderDetailModal')).show();
+        } else {
+          showError(response?.message || '获取详情失败');
+        }
+      } catch (error) {
+        console.error('获取订单详情失败', error);
+        showError('获取失败，请稍后重试');
+      } finally {
+        showLoading(false);
+      }
+    }
+
+    // 渲染分页
+    function renderPagination(pagination) {
+      const paginationEl = document.getElementById('pagination');
+      if (!pagination || pagination.total_pages <= 1) {
+        paginationEl.innerHTML = '';
+        return;
+      }
+      
+      let html = '';
+      for (let i = 1; i <= Math.min(pagination.total_pages, 10); i++) {
+        html += `
+          <li class="page-item ${i === currentPage ? 'active' : ''}">
+            <a class="page-link" href="#" onclick="changePage(${i}); return false;">${i}</a>
+          </li>
+        `;
+      }
+      paginationEl.innerHTML = html;
+    }
+
+    function changePage(page) {
+      currentPage = page;
+      loadTradeOrders();
+    }
+
+    // 工具函数
+    function getStatusBadge(status) {
+      const map = {
+        'created': '<span class="badge bg-warning">进行中</span>',
+        'frozen': '<span class="badge bg-info">冻结中</span>',
+        'completed': '<span class="badge bg-success">已完成</span>',
+        'cancelled': '<span class="badge bg-secondary">已取消</span>'
+      };
+      return map[status] || `<span class="badge bg-secondary">${status}</span>`;
+    }
+
+    function escapeHtml(text) {
+      if (!text) return '';
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    function showLoading(show) {
+      document.getElementById('loadingOverlay').style.display = show ? 'flex' : 'none';
+    }
+
+    function showSuccess(message) {
+      alert(message);
+    }
+
+    function showError(message) {
+      alert(message);
+    }
+  </script>
+</body>
+</html>
+

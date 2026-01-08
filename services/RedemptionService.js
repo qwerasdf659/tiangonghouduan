@@ -75,7 +75,7 @@ class RedemptionService {
    * logger.info('订单ID:', result.order.order_id)
    * logger.info('过期时间:', result.order.expires_at)
    */
-  static async createOrder (item_instance_id, options = {}) {
+  static async createOrder(item_instance_id, options = {}) {
     // 强制要求事务边界 - 2026-01-05 治理决策
     const transaction = assertAndGetTransaction(options, 'RedemptionService.createOrder')
     const { creator_user_id } = options
@@ -229,7 +229,7 @@ class RedemptionService {
    * const order = await RedemptionService.fulfillOrder('3K7J-2MQP-WXYZ', 123, { transaction })
    * logger.info('核销成功:', order.order_id)
    */
-  static async fulfillOrder (code, redeemer_user_id, options = {}) {
+  static async fulfillOrder(code, redeemer_user_id, options = {}) {
     // 强制要求事务边界 - 2026-01-05 治理决策
     const transaction = assertAndGetTransaction(options, 'RedemptionService.fulfillOrder')
 
@@ -332,7 +332,7 @@ class RedemptionService {
    * @returns {Promise<RedemptionOrder>} 取消后的订单对象
    * @throws {Error} 订单不存在、订单已核销等
    */
-  static async cancelOrder (order_id, options = {}) {
+  static async cancelOrder(order_id, options = {}) {
     // 强制要求事务边界 - 2026-01-05 治理决策
     const transaction = assertAndGetTransaction(options, 'RedemptionService.cancelOrder')
 
@@ -402,7 +402,7 @@ class RedemptionService {
    * @param {Object} options.transaction - Sequelize事务对象（必填）
    * @returns {Promise<number>} 过期订单数量
    */
-  static async expireOrders (options = {}) {
+  static async expireOrders(options = {}) {
     // 强制要求事务边界 - 2026-01-05 治理决策
     const transaction = assertAndGetTransaction(options, 'RedemptionService.expireOrders')
 
@@ -452,6 +452,7 @@ class RedemptionService {
       if (order.item_instance) {
         const existingLock = order.item_instance.getLockById(order.order_id)
         if (existingLock && existingLock.lock_type === 'redemption') {
+          // eslint-disable-next-line no-await-in-loop -- 批量解锁需要在事务内串行执行
           await order.item_instance.unlock(order.order_id, 'redemption', { transaction })
           unlockedCount++
         }
@@ -476,7 +477,7 @@ class RedemptionService {
    * @param {Object} [options.transaction] - Sequelize事务对象
    * @returns {Promise<RedemptionOrder>} 订单对象
    */
-  static async getOrderDetail (order_id, options = {}) {
+  static async getOrderDetail(order_id, options = {}) {
     const { include_item = false, include_redeemer = false, transaction = null } = options
 
     const include = []
@@ -516,7 +517,7 @@ class RedemptionService {
    * @param {Object} [options.transaction] - Sequelize事务对象
    * @returns {Promise<RedemptionOrder|null>} 订单对象或null
    */
-  static async getOrderByItem (item_instance_id, options = {}) {
+  static async getOrderByItem(item_instance_id, options = {}) {
     const { transaction = null } = options
 
     const order = await RedemptionOrder.findOne({

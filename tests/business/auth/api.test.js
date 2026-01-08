@@ -22,7 +22,6 @@ const BeijingTimeHelper = require('../../../utils/timeHelper')
 
 describe('认证和权限系统API测试（V4架构）', () => {
   let tester = null
-  let test_user_id = null
   // ✅ 修复：统一使用TEST_DATA而非TestConfig.real_data
   const testUser = TEST_DATA.users.testUser
 
@@ -51,8 +50,7 @@ describe('认证和权限系统API测试（V4架构）', () => {
 
     // 获取认证token
     try {
-      const user_data = await tester.authenticate_v4_user('regular')
-      test_user_id = user_data.user.user_id
+      await tester.authenticate_v4_user('regular')
       await tester.authenticate_v4_user('admin')
       console.log('✅ 用户认证完成')
     } catch (error) {
@@ -475,7 +473,8 @@ describe('认证和权限系统API测试（V4架构）', () => {
 
     test('权限缓存失效 - 普通用户失效他人缓存应被拒绝', async () => {
       /**
-       * 注意：由于测试账号 13612227930 既是用户也是管理员（user_id=31）
+       * 注意：由于测试账号 13612227930 既是用户也是管理员
+       * 🔴 P0-1修复：user_id 现在从 global.testData 动态获取，不再硬编码
        * 这里测试普通用户尝试失效一个不存在的用户ID
        * 如果要测试真正的403场景，需要创建两个不同的测试用户
        */

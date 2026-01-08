@@ -66,6 +66,9 @@ const MarketListingService = require('./MarketListingService') // 市场挂牌�
 // P0-2 孤儿冻结清理服务（2026-01-09）
 const OrphanFrozenCleanupService = require('./OrphanFrozenCleanupService') // 孤儿冻结清理唯一入口
 
+// P1 商家积分审核服务（2026-01-09 统一审批流）
+const MerchantPointsService = require('./MerchantPointsService') // 商家积分申请审核服务
+
 // V4 模块化服务
 const { lottery_service_container } = require('./lottery')
 
@@ -254,6 +257,9 @@ class ServiceManager {
 
       // 注册 P0-2 孤儿冻结清理服务（2026-01-09）
       this._services.set('orphanFrozenCleanup', OrphanFrozenCleanupService) // 孤儿冻结清理唯一入口
+
+      // 注册 P1 商家积分审核服务（2026-01-09 统一审批流）
+      this._services.set('merchantPoints', MerchantPointsService) // 商家积分申请审核服务
 
       // 注册模块化抽奖服务容器
       this._services.set('lotteryContainer', lottery_service_container)

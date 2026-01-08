@@ -26,6 +26,10 @@ const { Account, AccountAssetBalance, MarketListing } = require('../models')
 const AssetService = require('./AssetService')
 const AuditLogService = require('./AuditLogService')
 const logger = require('../utils/logger')
+const UnifiedDistributedLock = require('../utils/UnifiedDistributedLock')
+
+// 分布式锁实例（防止多实例并发执行）
+const distributedLock = new UnifiedDistributedLock()
 
 /**
  * 孤儿冻结清理服务
@@ -84,9 +88,13 @@ class OrphanFrozenCleanupService {
       return []
     }
 
-    // 3. 获取所有活跃挂牌的冻结总额（按 seller_user_id + asset_code 分组）
+    /*
+     * 3. 获取所有活跃挂牌的冻结总额（按 seller_user_id + asset_code 分组）
+     * 🔴 P0-2修复：MarketListing 状态枚举为 on_sale/locked/sold/withdrawn/admin_withdrawn
+     * 只有 on_sale 状态的挂牌才有冻结（locked 状态已经有买家锁定）
+     */
     const listingWhere = {
-      status: 'active'
+      status: 'on_sale'
     }
 
     if (user_id) {
@@ -155,6 +163,7 @@ class OrphanFrozenCleanupService {
    * 清理孤儿冻结（解冻到可用余额）
    *
    * 🔴 P0-2唯一入口：所有孤儿冻结清理必须通过此方法
+   * 🔴 P0-2分布式锁：使用 Redis 分布式锁防止多实例并发执行
    *
    * @param {Object} options - 选项
    * @param {boolean} options.dry_run - 干跑模式（仅检测不清理）
@@ -186,117 +195,147 @@ class OrphanFrozenCleanupService {
       reason
     })
 
-    // 1. 检测孤儿冻结
-    const orphanList = await this.detectOrphanFrozen({ user_id, asset_code })
-
-    const result = {
-      detected: orphanList.length,
-      cleaned: 0,
-      failed: 0,
-      total_amount: orphanList.reduce((sum, item) => sum + item.orphan_amount, 0),
-      details: [],
-      dry_run
-    }
-
-    if (orphanList.length === 0) {
-      logger.info('[孤儿冻结清理] 未发现孤儿冻结，无需清理')
-      return result
-    }
-
-    if (dry_run) {
-      logger.info(
-        `[孤儿冻结清理] 干跑模式：发现 ${orphanList.length} 条孤儿冻结，总额 ${result.total_amount}`
-      )
-      result.details = orphanList
-      return result
-    }
-
-    // 2. 实际清理（事务保护）
-    const transaction = await sequelize.transaction()
+    // 🔴 P0-2：使用分布式锁防止并发执行
+    const lockKey = 'orphan_frozen_cleanup'
+    const lockTTL = 600000 // 10分钟超时，防止清理过程中锁过期
 
     try {
-      for (const orphan of orphanList) {
-        const detail = {
-          user_id: orphan.user_id,
-          account_id: orphan.account_id,
-          asset_code: orphan.asset_code,
-          orphan_amount: orphan.orphan_amount,
-          status: 'pending'
-        }
+      return await distributedLock.withLock(
+        lockKey,
+        async () => {
+          logger.info('[孤儿冻结清理] 成功获取分布式锁，开始执行清理')
 
-        try {
-          // 2.1 执行解冻操作
-          const idempotencyKey = `orphan_cleanup_service_${orphan.account_id}_${orphan.asset_code}_${Date.now()}`
+          // 1. 检测孤儿冻结
+          const orphanList = await this.detectOrphanFrozen({ user_id, asset_code })
 
-          await AssetService.unfreeze(
-            {
-              user_id: orphan.user_id,
-              asset_code: orphan.asset_code,
-              amount: orphan.orphan_amount,
-              business_type: 'orphan_frozen_cleanup',
-              idempotency_key: idempotencyKey,
-              meta: {
-                cleanup_reason: reason,
-                operator_id,
-                original_frozen: orphan.frozen_amount,
-                original_listed: orphan.listed_amount,
+          const result = {
+            detected: orphanList.length,
+            cleaned: 0,
+            failed: 0,
+            total_amount: orphanList.reduce((sum, item) => sum + item.orphan_amount, 0),
+            details: [],
+            dry_run
+          }
+
+          if (orphanList.length === 0) {
+            logger.info('[孤儿冻结清理] 未发现孤儿冻结，无需清理')
+            return result
+          }
+
+          if (dry_run) {
+            logger.info(
+              `[孤儿冻结清理] 干跑模式：发现 ${orphanList.length} 条孤儿冻结，总额 ${result.total_amount}`
+            )
+            result.details = orphanList
+            return result
+          }
+
+          // 2. 实际清理（事务保护）
+          const transaction = await sequelize.transaction()
+
+          try {
+            for (const orphan of orphanList) {
+              const detail = {
+                user_id: orphan.user_id,
+                account_id: orphan.account_id,
+                asset_code: orphan.asset_code,
                 orphan_amount: orphan.orphan_amount,
-                cleanup_time: new Date().toISOString(),
-                cleanup_source: 'OrphanFrozenCleanupService'
+                status: 'pending'
               }
-            },
-            { transaction }
-          )
 
-          // 2.2 记录审计日志
-          await AuditLogService.logAdminAction(
-            {
-              admin_user_id: operator_id,
-              operation_type: 'asset_orphan_cleanup',
-              target_type: 'account_asset_balance',
-              target_id: `${orphan.account_id}_${orphan.asset_code}`,
-              before_data: {
-                frozen_amount: orphan.frozen_amount,
-                available_amount: orphan.available_amount
-              },
-              after_data: {
-                frozen_amount: orphan.frozen_amount - orphan.orphan_amount,
-                available_amount: orphan.available_amount + orphan.orphan_amount
-              },
-              details: {
-                cleanup_reason: reason,
-                orphan_amount: orphan.orphan_amount,
-                listed_amount: orphan.listed_amount
-              },
-              ip_address: '0.0.0.0' // 系统自动操作
-            },
-            { transaction }
-          )
+              try {
+                // 2.1 执行解冻操作
+                const idempotencyKey = `orphan_cleanup_service_${orphan.account_id}_${orphan.asset_code}_${Date.now()}`
 
-          detail.status = 'success'
-          result.cleaned++
-          logger.info(
-            `[孤儿冻结清理] 清理成功：用户 ${orphan.user_id}, ${orphan.asset_code} 解冻 ${orphan.orphan_amount}`
-          )
-        } catch (error) {
-          detail.status = 'failed'
-          detail.error = error.message
-          result.failed++
-          logger.error(`[孤儿冻结清理] 清理失败：用户 ${orphan.user_id}, ${orphan.asset_code}`, {
-            error: error.message
-          })
+                // eslint-disable-next-line no-await-in-loop, no-restricted-syntax -- 事务内串行执行，已传递 transaction
+                await AssetService.unfreeze(
+                  {
+                    user_id: orphan.user_id,
+                    asset_code: orphan.asset_code,
+                    amount: orphan.orphan_amount,
+                    business_type: 'orphan_frozen_cleanup',
+                    idempotency_key: idempotencyKey,
+                    meta: {
+                      cleanup_reason: reason,
+                      operator_id,
+                      original_frozen: orphan.frozen_amount,
+                      original_listed: orphan.listed_amount,
+                      orphan_amount: orphan.orphan_amount,
+                      cleanup_time: new Date().toISOString(),
+                      cleanup_source: 'OrphanFrozenCleanupService'
+                    }
+                  },
+                  { transaction }
+                )
+
+                // 2.2 记录审计日志（使用 logOperation 方法）
+                // eslint-disable-next-line no-await-in-loop -- 批量清理需要逐条审计
+                await AuditLogService.logOperation({
+                  operator_id: operator_id || 0, // 系统自动操作时使用 0
+                  operation_type: 'asset_adjust', // 使用标准操作类型
+                  target_type: 'AccountAssetBalance',
+                  target_id: orphan.account_id,
+                  action: 'orphan_frozen_cleanup',
+                  before_data: {
+                    frozen_amount: orphan.frozen_amount,
+                    available_amount: orphan.available_amount
+                  },
+                  after_data: {
+                    frozen_amount: orphan.frozen_amount - orphan.orphan_amount,
+                    available_amount: orphan.available_amount + orphan.orphan_amount
+                  },
+                  reason,
+                  idempotency_key: idempotencyKey,
+                  ip_address: '0.0.0.0', // 系统自动操作
+                  transaction,
+                  is_critical_operation: true // 关键操作，审计失败时阻断业务
+                })
+
+                detail.status = 'success'
+                result.cleaned++
+                logger.info(
+                  `[孤儿冻结清理] 清理成功：用户 ${orphan.user_id}, ${orphan.asset_code} 解冻 ${orphan.orphan_amount}`
+                )
+              } catch (error) {
+                detail.status = 'failed'
+                detail.error = error.message
+                result.failed++
+                logger.error(
+                  `[孤儿冻结清理] 清理失败：用户 ${orphan.user_id}, ${orphan.asset_code}`,
+                  {
+                    error: error.message
+                  }
+                )
+              }
+
+              result.details.push(detail)
+            }
+
+            await transaction.commit()
+
+            logger.info(`[孤儿冻结清理] 清理完成：成功 ${result.cleaned}，失败 ${result.failed}`)
+            return result
+          } catch (error) {
+            await transaction.rollback()
+            logger.error('[孤儿冻结清理] 清理事务失败，已回滚', { error: error.message })
+            throw error
+          }
+        },
+        {
+          ttl: lockTTL,
+          maxRetries: 3,
+          retryDelay: 1000
         }
-
-        result.details.push(detail)
-      }
-
-      await transaction.commit()
-
-      logger.info(`[孤儿冻结清理] 清理完成：成功 ${result.cleaned}，失败 ${result.failed}`)
-      return result
+      )
     } catch (error) {
-      await transaction.rollback()
-      logger.error('[孤儿冻结清理] 清理事务失败，已回滚', { error: error.message })
+      // 检查是否是锁获取失败
+      if (error.message.includes('Failed to acquire lock')) {
+        logger.warn('[孤儿冻结清理] 获取分布式锁失败，可能有其他实例正在执行清理', {
+          lockKey,
+          error: error.message
+        })
+        throw new Error('孤儿冻结清理任务正在执行中，请稍后重试')
+      }
       throw error
     }
   }

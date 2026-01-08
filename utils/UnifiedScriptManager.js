@@ -1,3 +1,5 @@
+/* eslint-disable no-await-in-loop -- 脚本批量执行需要按依赖顺序串行执行 */
+
 /**
  * 统一脚本管理工具 V4
  * 整合并优化scripts中重复的数据库连接和通用功能
@@ -77,7 +79,7 @@ class UnifiedScriptManager {
    *
    * @constructor
    */
-  constructor () {
+  constructor() {
     // 单例模式
     if (UnifiedScriptManager.instance) {
       return UnifiedScriptManager.instance
@@ -162,7 +164,7 @@ class UnifiedScriptManager {
    * 获取所有可用脚本
    * @returns {Promise<Array>} 脚本列表
    */
-  async getAvailableScripts () {
+  async getAvailableScripts() {
     try {
       const files = await fs.readdir(this.scriptsPath)
       const scriptFiles = files.filter(file => file.endsWith('.js'))
@@ -193,7 +195,7 @@ class UnifiedScriptManager {
    * @param {string} scriptName 脚本名称
    * @returns {Promise<Object>} 依赖检查结果
    */
-  async checkDependencies (scriptName) {
+  async checkDependencies(scriptName) {
     const dependencies = this.scriptDependencies[scriptName] || []
     const result = {
       scriptName,
@@ -223,7 +225,7 @@ class UnifiedScriptManager {
    * @param {Object} options 执行选项
    * @returns {Promise<Object>} 执行结果
    */
-  async executeScript (scriptName, options = {}) {
+  async executeScript(scriptName, options = {}) {
     const {
       checkDependencies = true,
       timeout = 300000, // 5分钟超时
@@ -321,7 +323,7 @@ class UnifiedScriptManager {
    * @param {Object} options 执行选项
    * @returns {Promise<Array>} 执行结果数组
    */
-  async executeBatch (scriptNames, options = {}) {
+  async executeBatch(scriptNames, options = {}) {
     const { parallel = false, stopOnError = true } = options
     const results = []
 
@@ -379,7 +381,7 @@ class UnifiedScriptManager {
    * @param {Object} options 执行选项
    * @returns {Promise<Object>} 维护结果
    */
-  async runMaintenanceScripts (options = {}) {
+  async runMaintenanceScripts(options = {}) {
     const maintenanceScripts = [
       'backup-database.js',
       'fix-database-field-mismatches.js',
@@ -412,7 +414,7 @@ class UnifiedScriptManager {
    * @param {Object} options 执行选项
    * @returns {Promise<Object>} 检查结果
    */
-  async runSystemChecks (options = {}) {
+  async runSystemChecks(options = {}) {
     const checkScripts = [
       'v4_environment_check.js',
       'verify-main-features.js',
@@ -446,7 +448,7 @@ class UnifiedScriptManager {
    * @param {Object} options 执行选项
    * @returns {Promise<Object>} 业务逻辑执行结果
    */
-  async runBusinessLogicScripts (options = {}) {
+  async runBusinessLogicScripts(options = {}) {
     const businessLogicScripts = [
       'update-main-feature-prizes.js',
       'fix-lottery-records-campaign-link.js',
@@ -482,7 +484,7 @@ class UnifiedScriptManager {
    * @param {Object} options 执行选项
    * @returns {Promise<Object>} 测试验证结果
    */
-  async runTestingScripts (options = {}) {
+  async runTestingScripts(options = {}) {
     const testingScripts = [
       'verify-main-features.js',
       'test-fix-engine.js',
@@ -520,7 +522,7 @@ class UnifiedScriptManager {
    * @param {Object} options 执行选项
    * @returns {Promise<Object>} 数据验证结果
    */
-  async runDataValidationScripts (options = {}) {
+  async runDataValidationScripts(options = {}) {
     const dataValidationScripts = [
       'check-prize-weight-field.js',
       'check-real-users.js',
@@ -559,7 +561,7 @@ class UnifiedScriptManager {
    * @param {Array} testResults 测试结果数组
    * @returns {number} 覆盖率百分比
    */
-  calculateTestCoverage (testResults) {
+  calculateTestCoverage(testResults) {
     const totalTests = testResults.length
     const passedTests = testResults.filter(r => r.success).length
     return totalTests > 0 ? (passedTests / totalTests) * 100 : 0
@@ -570,7 +572,7 @@ class UnifiedScriptManager {
    * @param {Array} validationResults 验证结果数组
    * @returns {number} 完整性评分 (0-100)
    */
-  calculateDataIntegrityScore (validationResults) {
+  calculateDataIntegrityScore(validationResults) {
     const weights = {
       'check-foreign-keys.js': 30,
       'check-real-users.js': 25,
@@ -598,7 +600,7 @@ class UnifiedScriptManager {
    * 基于真实数据分析覆盖率问题并提供解决方案
    * @returns {Promise<Object>} 检查结果（成功状态、覆盖率数据、问题、解决方案、报告）
    */
-  async checkV4ArchitectureCoverage () {
+  async checkV4ArchitectureCoverage() {
     console.log('\n🔍 V4架构覆盖率系统性检查开始...')
     const startTime = Date.now()
 
@@ -643,7 +645,7 @@ class UnifiedScriptManager {
    * 使用npm test获取真实的覆盖率数据，不使用模拟数据
    * @returns {Promise<Object>} 覆盖率数据对象（主引擎、核心组件、策略、API层、整体）
    */
-  async collectRealCoverageData () {
+  async collectRealCoverageData() {
     console.log('📊 收集真实覆盖率数据...')
 
     const { exec } = require('child_process')
@@ -687,7 +689,7 @@ class UnifiedScriptManager {
    * @param {string} stdout - npm test的标准输出
    * @returns {Object} 解析后的覆盖率数据对象
    */
-  parseCoverageOutput (stdout) {
+  parseCoverageOutput(stdout) {
     const lines = stdout.split('\n')
     const coverageData = {
       mainEngine: null,
@@ -757,7 +759,7 @@ class UnifiedScriptManager {
    * 🔍 获取API层覆盖率数据
    * @returns {Promise<Object>} API层覆盖率对象
    */
-  async getApiLayerCoverage () {
+  async getApiLayerCoverage() {
     try {
       // 检查API测试文件是否存在
       const apiTestPath = path.join(__dirname, '../tests/api')
@@ -778,7 +780,7 @@ class UnifiedScriptManager {
    * 📊 获取基础覆盖率数据(fallback)
    * @returns {Object} 基础覆盖率数据对象
    */
-  getBasicCoverageData () {
+  getBasicCoverageData() {
     return {
       mainEngine: { statements: 82.83, branches: 78.31, functions: 92.1, lines: 82.89 },
       coreComponents: {
@@ -804,7 +806,7 @@ class UnifiedScriptManager {
    * @param {Object} coverageData - 覆盖率数据对象
    * @returns {Array} 问题列表数组
    */
-  analyzeCoverageProblems (coverageData) {
+  analyzeCoverageProblems(coverageData) {
     const problems = []
     const standards = this.v4CoverageConfig.coverageStandards
 
@@ -873,70 +875,70 @@ class UnifiedScriptManager {
    * @param {Array} problems - 问题列表数组
    * @returns {Promise<Array>} 解决方案列表
    */
-  async generateCoverageSolutions (problems) {
+  async generateCoverageSolutions(problems) {
     const solutions = []
 
     for (const problem of problems) {
       switch (problem.component) {
-      case 'strategy':
-        if (problem.strategyName === 'ManagementStrategy') {
+        case 'strategy':
+          if (problem.strategyName === 'ManagementStrategy') {
+            solutions.push({
+              component: problem.component,
+              strategyName: problem.strategyName,
+              priority: 'critical',
+              actions: [
+                '创建ManagementStrategy专项测试套件',
+                '补充管理员权限验证测试',
+                '添加概率调整功能测试',
+                '增加预设奖品队列测试',
+                '完善错误处理测试'
+              ],
+              estimatedImprovement: '+60%',
+              estimatedTime: '2-3小时'
+            })
+          } else {
+            solutions.push({
+              component: problem.component,
+              strategyName: problem.strategyName,
+              priority: 'high',
+              actions: [
+                `扩展${problem.strategyName}测试用例`,
+                '增加边界条件测试',
+                '补充异常场景测试'
+              ],
+              estimatedImprovement: `+${Math.round(problem.gap * 0.7)}%`,
+              estimatedTime: '1-2小时'
+            })
+          }
+          break
+
+        case 'coreComponent':
+          if (problem.componentName === 'DecisionCore') {
+            solutions.push({
+              component: problem.component,
+              componentName: problem.componentName,
+              priority: 'critical',
+              actions: [
+                '创建DecisionCore完整测试套件',
+                '测试决策链执行逻辑',
+                '验证策略选择算法',
+                '测试性能监控功能'
+              ],
+              estimatedImprovement: '+65%',
+              estimatedTime: '3-4小时'
+            })
+          }
+          break
+
+        case 'overall':
           solutions.push({
             component: problem.component,
-            strategyName: problem.strategyName,
-            priority: 'critical',
-            actions: [
-              '创建ManagementStrategy专项测试套件',
-              '补充管理员权限验证测试',
-              '添加概率调整功能测试',
-              '增加预设奖品队列测试',
-              '完善错误处理测试'
-            ],
-            estimatedImprovement: '+60%',
-            estimatedTime: '2-3小时'
-          })
-        } else {
-          solutions.push({
-            component: problem.component,
-            strategyName: problem.strategyName,
             priority: 'high',
-            actions: [
-              `扩展${problem.strategyName}测试用例`,
-              '增加边界条件测试',
-              '补充异常场景测试'
-            ],
-            estimatedImprovement: `+${Math.round(problem.gap * 0.7)}%`,
-            estimatedTime: '1-2小时'
+            actions: ['执行系统性测试用例补充', '增强集成测试覆盖', '完善端到端测试场景'],
+            estimatedImprovement: `+${Math.round(problem.gap * 0.8)}%`,
+            estimatedTime: '4-6小时'
           })
-        }
-        break
-
-      case 'coreComponent':
-        if (problem.componentName === 'DecisionCore') {
-          solutions.push({
-            component: problem.component,
-            componentName: problem.componentName,
-            priority: 'critical',
-            actions: [
-              '创建DecisionCore完整测试套件',
-              '测试决策链执行逻辑',
-              '验证策略选择算法',
-              '测试性能监控功能'
-            ],
-            estimatedImprovement: '+65%',
-            estimatedTime: '3-4小时'
-          })
-        }
-        break
-
-      case 'overall':
-        solutions.push({
-          component: problem.component,
-          priority: 'high',
-          actions: ['执行系统性测试用例补充', '增强集成测试覆盖', '完善端到端测试场景'],
-          estimatedImprovement: `+${Math.round(problem.gap * 0.8)}%`,
-          estimatedTime: '4-6小时'
-        })
-        break
+          break
       }
     }
 
@@ -950,7 +952,7 @@ class UnifiedScriptManager {
    * @param {Array} solutions - 解决方案列表
    * @returns {string} 生成的Markdown格式报告
    */
-  generateCoverageReport (coverageData, problems, solutions) {
+  generateCoverageReport(coverageData, problems, solutions) {
     const timestamp = BeijingTimeHelper.now().toString()
 
     let report = `
@@ -1024,7 +1026,7 @@ class UnifiedScriptManager {
    * @param {number} threshold - 阈值百分比
    * @returns {string} 状态标识（✅/⚠️/❌/❓）
    */
-  getCoverageStatus (coverage, threshold) {
+  getCoverageStatus(coverage, threshold) {
     if (!coverage) return '❓'
     if (coverage >= threshold) return '✅'
     if (coverage >= threshold * 0.8) return '⚠️'
@@ -1036,7 +1038,7 @@ class UnifiedScriptManager {
    * @param {Object} filters 过滤条件
    * @returns {Array} 执行历史
    */
-  getExecutionHistory (filters = {}) {
+  getExecutionHistory(filters = {}) {
     const { scriptName, success, limit = 20 } = filters
 
     let history = [...this.executionHistory]
@@ -1059,38 +1061,38 @@ class UnifiedScriptManager {
    * 获取脚本执行统计
    * @returns {Object} 统计信息
    */
-  getExecutionStats () {
+  getExecutionStats() {
     const stats = {
-      totalExecutions: this.executionHistory.length,
-      successCount: this.executionHistory.filter(h => h.success).length,
-      failureCount: this.executionHistory.filter(h => !h.success).length,
-      averageDuration: 0,
-      runningScripts: Array.from(this.runningScripts),
-      lastExecution: null,
-      scriptStats: {},
+      total_executions: this.executionHistory.length,
+      success_count: this.executionHistory.filter(h => h.success).length,
+      failure_count: this.executionHistory.filter(h => !h.success).length,
+      average_duration: 0,
+      running_scripts: Array.from(this.runningScripts),
+      last_execution: null,
+      script_stats: {},
       timestamp: BeijingTimeHelper.apiTimestamp()
     }
 
-    if (stats.totalExecutions > 0) {
-      stats.averageDuration = Math.round(
-        this.executionHistory.reduce((sum, h) => sum + h.duration, 0) / stats.totalExecutions
+    if (stats.total_executions > 0) {
+      stats.average_duration = Math.round(
+        this.executionHistory.reduce((sum, h) => sum + h.duration, 0) / stats.total_executions
       )
 
-      stats.lastExecution = this.executionHistory.sort((a, b) => b.startTime - a.startTime)[0]
+      stats.last_execution = this.executionHistory.sort((a, b) => b.startTime - a.startTime)[0]
 
       // 按脚本统计
       this.executionHistory.forEach(h => {
-        if (!stats.scriptStats[h.scriptName]) {
-          stats.scriptStats[h.scriptName] = {
+        if (!stats.script_stats[h.scriptName]) {
+          stats.script_stats[h.scriptName] = {
             total: 0,
             success: 0,
             failure: 0,
-            averageDuration: 0,
-            lastExecution: null
+            average_duration: 0,
+            last_execution: null
           }
         }
 
-        const scriptStat = stats.scriptStats[h.scriptName]
+        const scriptStat = stats.script_stats[h.scriptName]
         scriptStat.total++
         if (h.success) {
           scriptStat.success++
@@ -1098,22 +1100,24 @@ class UnifiedScriptManager {
           scriptStat.failure++
         }
 
-        if (!scriptStat.lastExecution || h.startTime > scriptStat.lastExecution.startTime) {
-          scriptStat.lastExecution = h
+        if (!scriptStat.last_execution || h.startTime > scriptStat.last_execution.startTime) {
+          scriptStat.last_execution = h
         }
       })
 
       // 计算每个脚本的平均执行时间
-      Object.keys(stats.scriptStats).forEach(scriptName => {
+      Object.keys(stats.script_stats).forEach(scriptName => {
         const scriptExecutions = this.executionHistory.filter(h => h.scriptName === scriptName)
-        stats.scriptStats[scriptName].averageDuration = Math.round(
+        stats.script_stats[scriptName].average_duration = Math.round(
           scriptExecutions.reduce((sum, h) => sum + h.duration, 0) / scriptExecutions.length
         )
       })
     }
 
-    stats.successRate =
-      stats.totalExecutions > 0 ? Math.round((stats.successCount / stats.totalExecutions) * 100) : 0
+    stats.success_rate =
+      stats.total_executions > 0
+        ? Math.round((stats.success_count / stats.total_executions) * 100)
+        : 0
 
     return stats
   }
@@ -1123,7 +1127,7 @@ class UnifiedScriptManager {
    * @param {Object} options 清理选项
    * @returns {Object} 清理结果统计
    */
-  cleanupHistory (options = {}) {
+  cleanupHistory(options = {}) {
     const { keepLast = 20, olderThanDays = 7 } = options
 
     const cutoffTime = Date.now() - olderThanDays * 24 * 60 * 60 * 1000
@@ -1147,7 +1151,7 @@ class UnifiedScriptManager {
    * 健康检查
    * @returns {Promise<Object>} 健康检查结果
    */
-  async healthCheck () {
+  async healthCheck() {
     const health = {
       timestamp: BeijingTimeHelper.apiTimestamp(),
       database: false,
@@ -1208,7 +1212,7 @@ let scriptManager = null
  * 获取统一脚本管理器实例
  * @returns {UnifiedScriptManager} 脚本管理器实例
  */
-function getScriptManager () {
+function getScriptManager() {
   if (!scriptManager) {
     scriptManager = new UnifiedScriptManager()
   }
@@ -1221,7 +1225,7 @@ function getScriptManager () {
  * @param {Object} options 执行选项
  * @returns {Promise<Object>} 执行结果
  */
-async function runScript (scriptName, options = {}) {
+async function runScript(scriptName, options = {}) {
   const manager = getScriptManager()
   return await manager.executeScript(scriptName, options)
 }
@@ -1231,7 +1235,7 @@ async function runScript (scriptName, options = {}) {
  * @param {Object} options 执行选项
  * @returns {Promise<Object>} 维护结果
  */
-async function runMaintenance (options = {}) {
+async function runMaintenance(options = {}) {
   const manager = getScriptManager()
   return await manager.runMaintenanceScripts(options)
 }
@@ -1241,7 +1245,7 @@ async function runMaintenance (options = {}) {
  * @param {Object} options 执行选项
  * @returns {Promise<Object>} 检查结果
  */
-async function runSystemCheck (options = {}) {
+async function runSystemCheck(options = {}) {
   const manager = getScriptManager()
   return await manager.runSystemChecks(options)
 }
@@ -1251,7 +1255,7 @@ async function runSystemCheck (options = {}) {
  * @param {Object} options 执行选项
  * @returns {Promise<Object>} 业务逻辑执行结果
  */
-async function runBusinessLogic (options = {}) {
+async function runBusinessLogic(options = {}) {
   const manager = getScriptManager()
   return await manager.runBusinessLogicScripts(options)
 }
@@ -1261,7 +1265,7 @@ async function runBusinessLogic (options = {}) {
  * @param {Object} options 执行选项
  * @returns {Promise<Object>} 测试验证结果
  */
-async function runTesting (options = {}) {
+async function runTesting(options = {}) {
   const manager = getScriptManager()
   return await manager.runTestingScripts(options)
 }
@@ -1271,7 +1275,7 @@ async function runTesting (options = {}) {
  * @param {Object} options 执行选项
  * @returns {Promise<Object>} 数据验证结果
  */
-async function runDataValidation (options = {}) {
+async function runDataValidation(options = {}) {
   const manager = getScriptManager()
   return await manager.runDataValidationScripts(options)
 }

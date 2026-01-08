@@ -25,7 +25,9 @@ module.exports = {
   ],
 
   // 设置文件
-  setupFilesAfterEnv: ['<rootDir>/tests/helpers/test-setup.js'],
+  // - jest.setup.js：负责全局测试数据初始化（global.testData），作为所有测试用例的单一真相源
+  // - tests/helpers/test-setup.js：测试工具与通用断言（不含mock数据）
+  setupFilesAfterEnv: ['<rootDir>/jest.setup.js', '<rootDir>/tests/helpers/test-setup.js'],
 
   // 模块路径映射
   moduleNameMapper: {

@@ -10,7 +10,7 @@
  * Phase 3实施
  */
 
-const { User, AssetTransaction, sequelize } = require('../../../models')
+const { User, AssetTransaction, sequelize: _sequelize } = require('../../../models')
 const { Op } = require('sequelize')
 const AssetService = require('../../../services/AssetService')
 const AssetConversionService = require('../../../services/AssetConversionService')

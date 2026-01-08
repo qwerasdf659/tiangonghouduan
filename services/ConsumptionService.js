@@ -406,6 +406,7 @@ class ConsumptionService {
      * 5. ✅ 方案C：审核通过时直接发放积分（使用 AssetService）
      * 幂等键命名规则：<business_type>:<action>:<entity_id>
      */
+    // eslint-disable-next-line no-restricted-syntax -- 已传递 transaction
     const pointsResult = await AssetService.changeBalance(
       {
         user_id: record.user_id,
@@ -457,6 +458,7 @@ class ConsumptionService {
        *
        * 🔥 BUDGET_POINTS 必须指定 campaign_id（活动隔离规则）
        */
+      // eslint-disable-next-line no-restricted-syntax -- 已传递 transaction
       const budgetResult = await AssetService.changeBalance(
         {
           user_id: record.user_id,

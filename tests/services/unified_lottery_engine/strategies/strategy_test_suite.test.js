@@ -8,6 +8,8 @@
  * - 统一使用snake_case命名
  * - 使用真实的策略配置和业务逻辑
  *
+ * 🔴 P0-1修复（2026-01-08）：移除硬编码 user_id=31，从 global.testData 动态获取
+ *
  * @date 2025-01-21 (重构)
  */
 
@@ -23,19 +25,28 @@ describe('V4统一策略测试套件 - 重构版', () => {
   let management_strategy
   let test_user
 
-  // 使用真实测试用户配置
+  // 🔴 P0-1修复：移除硬编码的 user_id，改为动态获取
   const TEST_USER_CONFIG = {
-    user_id: 31,
     mobile: '13612227930'
+    // 🔴 P0-1修复：user_id 从 global.testData 或数据库动态获取
   }
 
   beforeAll(async () => {
     console.log('🔍 初始化V4策略测试环境...')
 
-    // 验证测试用户存在
-    test_user = await User.findByPk(TEST_USER_CONFIG.user_id)
+    // 🔴 P0-1修复：优先使用 global.testData 中的用户ID
+    const testUserId = global.testData?.testUser?.user_id
+    if (testUserId) {
+      test_user = await User.findByPk(testUserId)
+      console.log(`✅ 使用 global.testData 中的测试用户: user_id=${testUserId}`)
+    } else {
+      // 备用：通过手机号查询
+      test_user = await User.findOne({ where: { mobile: TEST_USER_CONFIG.mobile } })
+      console.log(`⚠️ global.testData 未初始化，通过手机号查询: user_id=${test_user?.user_id}`)
+    }
+
     if (!test_user) {
-      throw new Error(`测试用户 ${TEST_USER_CONFIG.user_id} 不存在`)
+      throw new Error(`测试用户 ${TEST_USER_CONFIG.mobile} 不存在`)
     }
 
     // 初始化策略实例
@@ -71,7 +82,7 @@ describe('V4统一策略测试套件 - 重构版', () => {
 
     test('应该能够验证抽奖上下文', async () => {
       const test_context = {
-        user_id: TEST_USER_CONFIG.user_id,
+        user_id: test_user.user_id,
         campaign_id: 1
       }
 
@@ -83,7 +94,7 @@ describe('V4统一策略测试套件 - 重构版', () => {
 
     test('应该能够执行抽奖逻辑', async () => {
       const test_context = {
-        user_id: TEST_USER_CONFIG.user_id,
+        user_id: test_user.user_id,
         campaign_id: 1,
         request_id: `test_${Date.now()}`
       }
@@ -128,7 +139,7 @@ describe('V4统一策略测试套件 - 重构版', () => {
       try {
         // 测试用户13612227930具有管理员权限
         const validation_result = await management_strategy.validateAdminPermission(
-          TEST_USER_CONFIG.user_id
+          test_user.user_id
         )
 
         expect(validation_result).toBeDefined()
@@ -148,8 +159,8 @@ describe('V4统一策略测试套件 - 重构版', () => {
     test('应该能够执行管理员强制中奖', async () => {
       try {
         const force_win_result = await management_strategy.forceWin(
-          TEST_USER_CONFIG.user_id, // 管理员ID
-          TEST_USER_CONFIG.user_id, // 目标用户ID（自己）
+          test_user.user_id, // 管理员ID
+          test_user.user_id, // 目标用户ID（自己）
           9, // 奖品ID（九八折券）
           'V4策略测试'
         )
@@ -172,10 +183,9 @@ describe('V4统一策略测试套件 - 重构版', () => {
 
     test('应该能够查询抽奖历史', async () => {
       try {
-        const history_result = await management_strategy.getLotteryHistory(
-          TEST_USER_CONFIG.user_id,
-          { limit: 10 }
-        )
+        const history_result = await management_strategy.getLotteryHistory(test_user.user_id, {
+          limit: 10
+        })
 
         expect(history_result).toBeDefined()
 
@@ -194,7 +204,7 @@ describe('V4统一策略测试套件 - 重构版', () => {
     test('应该能够生成管理员操作日志', async () => {
       try {
         const log_result = await management_strategy.logAdminOperation(
-          TEST_USER_CONFIG.user_id,
+          test_user.user_id,
           'test_operation',
           { test: 'V4策略测试' }
         )
@@ -225,7 +235,7 @@ describe('V4统一策略测试套件 - 重构版', () => {
     test('应该能够处理不同类型的抽奖请求', async () => {
       // 普通抽奖请求
       const normal_context = {
-        user_id: TEST_USER_CONFIG.user_id,
+        user_id: test_user.user_id,
         campaign_id: 1,
         type: 'normal'
       }
@@ -237,7 +247,7 @@ describe('V4统一策略测试套件 - 重构版', () => {
       // 测试管理策略权限验证（管理员类型请求）
       try {
         const admin_validation = await management_strategy.validateAdminPermission(
-          TEST_USER_CONFIG.user_id
+          test_user.user_id
         )
         expect(admin_validation).toBeDefined()
       } catch (error) {

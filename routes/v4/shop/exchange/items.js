@@ -1,7 +1,7 @@
 /**
- * 兑换市场模块 - 商品列表/详情
+ * B2C材料兑换模块 - 商品列表/详情
  *
- * @route /api/v4/exchange_market
+ * @route /api/v4/shop/exchange
  * @description 获取兑换市场商品列表和详情
  *
  * API列表：
@@ -24,7 +24,7 @@ const DataSanitizer = require('../../../../services/DataSanitizer')
 const logger = require('../../../../utils/logger').logger
 
 /**
- * @route GET /api/v4/exchange_market/items
+ * @route GET /api/v4/shop/exchange/items
  * @desc 获取兑换市场商品列表
  * @access Private (需要登录)
  *
@@ -128,7 +128,7 @@ router.get('/items', authenticateToken, async (req, res) => {
 })
 
 /**
- * @route GET /api/v4/exchange_market/items/:item_id
+ * @route GET /api/v4/shop/exchange/items/:item_id
  * @desc 获取商品详情
  * @access Private (需要登录)
  *

@@ -3,7 +3,7 @@
  */
 
 const AnnouncementService = require('../../services/AnnouncementService')
-const { SystemAnnouncement, User } = require('../../models')
+const { SystemAnnouncement } = require('../../models')
 const BeijingTimeHelper = require('../../utils/timeHelper')
 
 // Mock数据库模型

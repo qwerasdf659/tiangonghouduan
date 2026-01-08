@@ -651,6 +651,24 @@ try {
 
   /*
    * ========================================
+   * 11. /merchant-points - 商家积分申请域（P1 2026-01-09 统一审批流）
+   * ========================================
+   */
+  app.use('/api/v4/merchant-points', require('./routes/v4/merchant-points'))
+  appLogger.info('✅ merchant-points域加载成功', { route: '/api/v4/merchant-points' })
+
+  /*
+   * ========================================
+   * 12. /activities - 活动条件域（2026-01-08 活动条件API）
+   * ========================================
+   * 功能：活动列表查询、参与条件验证、条件配置（管理员）
+   * 详见：docs/web管理平台前端功能完善方案-2026-01-08.md
+   */
+  app.use('/api/v4/activities', require('./routes/v4/activities'))
+  appLogger.info('✅ activities域加载成功', { route: '/api/v4/activities' })
+
+  /*
+   * ========================================
    * 🔧 调试控制接口（仅管理员）
    * ========================================
    */
@@ -710,6 +728,11 @@ app.use('*', (req, res) => {
         // 抽奖域
         'POST /api/v4/lottery/draw',
         'GET /api/v4/lottery/strategies',
+        // 活动域
+        'GET /api/v4/activities/available',
+        'GET /api/v4/activities/:idOrCode/check-eligibility',
+        'POST /api/v4/activities/:idOrCode/participate',
+        'POST /api/v4/activities/:code/configure-conditions',
         // 控制台域
         'GET /api/v4/console/system/dashboard'
       ]
@@ -852,6 +875,38 @@ async function initializeApp() {
   } catch (error) {
     appLogger.warn('审计 ENUM 校验出错（非致命）', { error: error.message })
     // 校验函数内部已记录详细错误，不阻断启动
+  }
+
+  // 步骤4：审计日志 target_type 一致性校验（P0-5 实施 - 2026-01-09）
+  try {
+    const { validateTargetTypeConsistency } = require('./constants/AuditTargetTypes')
+    const { sequelize } = app.locals.models
+    const targetTypeResult = await validateTargetTypeConsistency(sequelize)
+
+    if (!targetTypeResult.valid) {
+      appLogger.error('❌ 审计日志 target_type 一致性校验失败', {
+        unknown: targetTypeResult.unknown,
+        stats: targetTypeResult.stats,
+        solution: '请检查 constants/AuditTargetTypes.js 中的 AUDIT_TARGET_TYPES 定义'
+      })
+      /*
+       * target_type 不一致可能导致审计追溯问题，但不强制退出
+       * 仅记录错误，运维人员根据情况处理
+       */
+    } else if (targetTypeResult.warning) {
+      appLogger.warn('⚠️ target_type 存在可规范化的值，建议执行数据迁移', {
+        unknown: targetTypeResult.unknown
+      })
+    } else if (targetTypeResult.skipped) {
+      appLogger.info('ℹ️ target_type 校验跳过（表为空）')
+    } else {
+      appLogger.info('✅ 审计日志 target_type 一致性校验通过', {
+        total_types: targetTypeResult.stats?.total_types,
+        total_records: targetTypeResult.stats?.total_records
+      })
+    }
+  } catch (error) {
+    appLogger.warn('target_type 校验出错（非致命）', { error: error.message })
   }
 }
 

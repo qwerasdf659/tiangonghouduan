@@ -1,3 +1,5 @@
+/* eslint-disable no-await-in-loop -- 已废弃服务，串行图片处理逻辑保持不变 */
+
 const logger = require('../utils/logger').logger
 
 /**

@@ -894,6 +894,7 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
         const lotterySessionId = context.lottery_session_id || null
 
         // 🔧 V4.3修复：使用AssetService替代PointsService
+        // eslint-disable-next-line no-restricted-syntax -- 已传递 transaction: internalTransaction
         await AssetService.changeBalance(
           {
             user_id,
@@ -1753,6 +1754,7 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
             '缺少必需的 idempotency_key，无法执行预算扣减（决策6：幂等键必须由业务派生）'
           )
         }
+        // eslint-disable-next-line no-restricted-syntax -- 已传递 transaction
         await AssetService.changeBalance(
           {
             user_id: userId,
@@ -1822,6 +1824,7 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
     }
 
     // 🔧 V4.3修复：使用AssetService替代PointsService，并获取返回值
+    // eslint-disable-next-line no-restricted-syntax -- 已传递 transaction
     const result = await AssetService.changeBalance(
       {
         user_id,
@@ -1951,6 +1954,7 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
     switch (prize.prize_type) {
       case 'points':
         // 🔧 V4.3修复：使用AssetService替代PointsService（方案B幂等）
+        // eslint-disable-next-line no-restricted-syntax -- 已传递 transaction
         await AssetService.changeBalance(
           {
             user_id,
@@ -2071,6 +2075,7 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
       // 方案B：使用派生幂等键
       const materialIdempotencyKey = `${idempotencyKey}:material`
 
+      // eslint-disable-next-line no-restricted-syntax -- 已传递 transaction
       await AssetService.changeBalance(
         {
           idempotency_key: materialIdempotencyKey, // 方案B：派生幂等键

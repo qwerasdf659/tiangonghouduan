@@ -2,6 +2,7 @@
  * RateLimiterMiddleware 中间件测试套件
  * 🔧 V4版本 - 测试API请求频率限制功能
  * 创建时间：2025年10月12日 北京时间
+ * 🔴 P0-1修复（2026-01-08）：移除硬编码 user_id=31，从 global.testData 动态获取
  */
 
 // 🔧 本套件需要真实验证 429 行为，必须显式开启限流（全局测试环境会默认关闭以避免干扰其他业务测试）
@@ -13,15 +14,21 @@ const { getRedisClient } = require('../../utils/UnifiedRedisClient')
 describe('RateLimiterMiddleware 中间件测试 - 请求频率限制', () => {
   let rateLimiter
   let redisClient
-  const testUser = {
-    user_id: 31, // 正确的user_id（手机号13612227930对应的用户ID）
-    mobile: '13612227930'
-  }
+  // 🔴 P0-1修复：testUser 在 beforeAll 中初始化
+  let testUser
 
   beforeAll(async () => {
     rateLimiter = getRateLimiter()
     redisClient = getRedisClient()
     await redisClient.ensureConnection()
+    // 🔴 P0-1修复：从 global.testData 获取动态测试用户ID
+    testUser = {
+      user_id: global.testData?.testUser?.user_id, // 🔴 P0-1修复：动态获取
+      mobile: '13612227930'
+    }
+    if (!testUser.user_id) {
+      console.warn('⚠️ [rate_limiter_middleware.test.js] testUser.user_id 未初始化')
+    }
   })
 
   beforeEach(async () => {
@@ -182,8 +189,10 @@ describe('RateLimiterMiddleware 中间件测试 - 请求频率限制', () => {
         keyGenerator: 'user'
       })
 
-      const user1 = { user_id: 31, mobile: '13612227930' }
-      const user2 = { user_id: 32, mobile: '13612227931' }
+      // 🔴 P0-1修复：user1 使用动态测试用户ID
+      const user1 = { user_id: testUser.user_id, mobile: '13612227930' }
+      // user2 使用虚拟用户ID（仅测试隔离性，无需真实数据库记录）
+      const user2 = { user_id: (testUser.user_id || 31) + 1, mobile: '13612227931' }
 
       // 用户1发送2个请求
       for (let i = 0; i < 2; i++) {

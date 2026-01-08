@@ -398,6 +398,155 @@ router.delete(
 )
 
 /**
+ * 管理员获取C2C交易订单列表（Admin Only）
+ * GET /api/v4/console/marketplace/trade_orders
+ *
+ * @description 管理员查看所有C2C交易订单，支持状态筛选、分页、排序
+ *
+ * 业务场景：
+ * - 管理后台C2C交易订单管理页面
+ * - 订单状态筛选和查看
+ * - 交易纠纷处理
+ *
+ * @query {string} status - 订单状态筛选（created/frozen/completed/cancelled）
+ * @query {number} buyer_user_id - 买家ID筛选（可选）
+ * @query {number} seller_user_id - 卖家ID筛选（可选）
+ * @query {number} listing_id - 挂牌ID筛选（可选）
+ * @query {number} page - 页码（默认1）
+ * @query {number} page_size - 每页数量（默认20）
+ * @query {string} sort_by - 排序字段（默认created_at）
+ * @query {string} sort_order - 排序方向（默认DESC）
+ *
+ * @returns {Object} 订单列表和分页信息
+ *
+ * @security JWT + Admin权限
+ *
+ * @created 2026-01-09（web管理平台功能完善）
+ */
+router.get('/trade_orders', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const {
+      status,
+      buyer_user_id,
+      seller_user_id,
+      listing_id,
+      page = 1,
+      page_size = 20,
+      sort_by = 'created_at',
+      sort_order = 'DESC'
+    } = req.query
+    const admin_id = req.user.user_id
+
+    logger.info('管理员查询C2C交易订单列表', {
+      admin_id,
+      status,
+      buyer_user_id,
+      seller_user_id,
+      listing_id,
+      page,
+      page_size
+    })
+
+    // 导入 TradeOrderService
+    const TradeOrderService = require('../../../services/TradeOrderService')
+
+    // 调用服务层方法获取订单列表
+    const result = await TradeOrderService.getAdminOrders({
+      status,
+      buyer_user_id: buyer_user_id ? parseInt(buyer_user_id) : null,
+      seller_user_id: seller_user_id ? parseInt(seller_user_id) : null,
+      listing_id: listing_id ? parseInt(listing_id) : null,
+      page: parseInt(page),
+      page_size: parseInt(page_size),
+      sort_by,
+      sort_order
+    })
+
+    logger.info('管理员查询C2C交易订单成功', {
+      admin_id,
+      total: result.pagination.total,
+      page: result.pagination.page
+    })
+
+    return res.apiSuccess(result, 'C2C交易订单列表查询成功')
+  } catch (error) {
+    logger.error('管理员查询C2C交易订单失败', {
+      error: error.message,
+      stack: error.stack,
+      admin_id: req.user?.user_id
+    })
+
+    return res.apiError(error.message || '查询订单列表失败', 'INTERNAL_ERROR', null, 500)
+  }
+})
+
+/**
+ * 管理员获取C2C交易订单详情（Admin Only）
+ * GET /api/v4/console/marketplace/trade_orders/:order_id
+ *
+ * @description 管理员查看C2C交易订单详情，返回完整信息
+ *
+ * @param {number} order_id - 订单ID
+ *
+ * @returns {Object} 订单详情
+ *
+ * @security JWT + Admin权限
+ *
+ * @created 2026-01-09（web管理平台功能完善）
+ */
+router.get('/trade_orders/:order_id', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const { order_id } = req.params
+    const admin_id = req.user.user_id
+
+    logger.info('管理员查询C2C交易订单详情', {
+      admin_id,
+      order_id
+    })
+
+    // 参数验证
+    const orderId = parseInt(order_id)
+    if (isNaN(orderId) || orderId <= 0) {
+      return res.apiError('无效的订单ID', 'BAD_REQUEST', null, 400)
+    }
+
+    // 导入 TradeOrderService
+    const TradeOrderService = require('../../../services/TradeOrderService')
+
+    // 调用服务层方法获取订单详情
+    const order = await TradeOrderService.getOrderDetail(orderId)
+
+    logger.info('管理员获取C2C交易订单详情成功', {
+      admin_id,
+      order_id: orderId,
+      status: order?.status
+    })
+
+    return res.apiSuccess(
+      {
+        success: true,
+        order
+      },
+      'C2C交易订单详情查询成功'
+    )
+  } catch (error) {
+    logger.error('管理员查询C2C交易订单详情失败', {
+      error: error.message,
+      stack: error.stack,
+      admin_id: req.user?.user_id,
+      order_id: req.params.order_id
+    })
+
+    // 业务错误处理
+    if (error.message.includes('不存在')) {
+      return res.apiError(error.message, 'NOT_FOUND', null, 404)
+    }
+
+    return res.apiError(error.message || '查询订单详情失败', 'INTERNAL_ERROR', null, 500)
+  }
+})
+
+/**
  * 客服强制撤回挂牌（管理员操作）
  * POST /api/v4/console/marketplace/listings/:listing_id/force-withdraw
  *
@@ -521,5 +670,270 @@ router.post(
     }
   }
 )
+
+/**
+ * 管理员获取兑换订单列表（Admin Only）
+ * GET /api/v4/console/marketplace/exchange_market/orders
+ *
+ * @description 管理员查看所有兑换订单，支持状态筛选、分页、排序
+ *
+ * 业务场景：
+ * - 管理后台订单管理页面
+ * - 订单状态筛选和批量处理
+ * - 订单详情查看
+ *
+ * @query {string} status - 订单状态筛选（pending/completed/shipped/cancelled）
+ * @query {number} user_id - 用户ID筛选（可选）
+ * @query {number} item_id - 商品ID筛选（可选）
+ * @query {string} order_no - 订单号模糊搜索（可选）
+ * @query {number} page - 页码（默认1）
+ * @query {number} page_size - 每页数量（默认20）
+ * @query {string} sort_by - 排序字段（默认created_at）
+ * @query {string} sort_order - 排序方向（默认DESC）
+ *
+ * @returns {Object} 订单列表和分页信息
+ *
+ * @security JWT + Admin权限
+ *
+ * @created 2026-01-09（web管理平台功能完善）
+ */
+router.get('/exchange_market/orders', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const {
+      status,
+      user_id,
+      item_id,
+      order_no,
+      page = 1,
+      page_size = 20,
+      sort_by = 'created_at',
+      sort_order = 'DESC'
+    } = req.query
+    const admin_id = req.user.user_id
+
+    logger.info('管理员查询兑换订单列表', {
+      admin_id,
+      status,
+      user_id,
+      item_id,
+      order_no,
+      page,
+      page_size
+    })
+
+    // 🎯 通过 ServiceManager 获取 ExchangeService
+    const ExchangeService = req.app.locals.services.getService('exchangeMarket')
+
+    // 调用服务层方法获取订单列表
+    const result = await ExchangeService.getAdminOrders({
+      status,
+      user_id: user_id ? parseInt(user_id) : null,
+      item_id: item_id ? parseInt(item_id) : null,
+      order_no,
+      page: parseInt(page),
+      page_size: parseInt(page_size),
+      sort_by,
+      sort_order
+    })
+
+    logger.info('管理员查询兑换订单成功', {
+      admin_id,
+      total: result.pagination.total,
+      page: result.pagination.page
+    })
+
+    return res.apiSuccess(result, '订单列表查询成功')
+  } catch (error) {
+    logger.error('管理员查询兑换订单失败', {
+      error: error.message,
+      stack: error.stack,
+      admin_id: req.user?.user_id
+    })
+
+    return res.apiError(error.message || '查询订单列表失败', 'INTERNAL_ERROR', null, 500)
+  }
+})
+
+/**
+ * 管理员获取兑换订单详情（Admin Only）
+ * GET /api/v4/console/marketplace/exchange_market/orders/:order_no
+ *
+ * @description 管理员查看订单详情，返回所有字段（包含敏感信息）
+ *
+ * @param {string} order_no - 订单号
+ *
+ * @returns {Object} 订单详情
+ *
+ * @security JWT + Admin权限
+ *
+ * @created 2026-01-09（web管理平台功能完善）
+ */
+router.get(
+  '/exchange_market/orders/:order_no',
+  authenticateToken,
+  requireAdmin,
+  async (req, res) => {
+    try {
+      const { order_no } = req.params
+      const admin_id = req.user.user_id
+
+      logger.info('管理员查询兑换订单详情', {
+        admin_id,
+        order_no
+      })
+
+      // 🎯 通过 ServiceManager 获取 ExchangeService
+      const ExchangeService = req.app.locals.services.getService('exchangeMarket')
+
+      // 调用服务层方法获取订单详情
+      const result = await ExchangeService.getAdminOrderDetail(order_no)
+
+      logger.info('管理员获取兑换订单详情成功', {
+        admin_id,
+        order_no,
+        status: result.order?.status
+      })
+
+      return res.apiSuccess(result, '订单详情查询成功')
+    } catch (error) {
+      logger.error('管理员查询兑换订单详情失败', {
+        error: error.message,
+        stack: error.stack,
+        admin_id: req.user?.user_id,
+        order_no: req.params.order_no
+      })
+
+      // 业务错误处理
+      if (error.errorCode === 'ORDER_NOT_FOUND' || error.statusCode === 404) {
+        return res.apiError(error.message, 'NOT_FOUND', null, 404)
+      }
+
+      return res.apiError(error.message || '查询订单详情失败', 'INTERNAL_ERROR', null, 500)
+    }
+  }
+)
+
+/**
+ * 查看C2C可交易资产配置
+ * GET /api/v4/console/marketplace/tradable-assets
+ *
+ * P0-4: 管理端查看"C2C可交易资产配置"的接口
+ *
+ * 业务场景：
+ * - 管理员查看所有材料类资产及其可交易状态
+ * - 显示硬编码黑名单、数据库配置、最终有效状态
+ * - 帮助运营人员了解哪些资产允许在C2C市场交易
+ *
+ * 响应字段说明：
+ * - asset_code: 资产代码
+ * - display_name: 资产显示名称
+ * - is_tradable: 数据库配置的可交易状态
+ * - is_enabled: 资产是否启用
+ * - in_blacklist: 是否在硬编码黑名单中（POINTS/BUDGET_POINTS）
+ * - effective_tradable: 最终有效的可交易状态（综合数据库配置和黑名单）
+ * - blacklist_reason: 如在黑名单中，显示原因
+ *
+ * @security JWT + Admin权限
+ *
+ * @returns {Object} 可交易资产配置列表
+ * @returns {Array} data.assets - 资产配置列表
+ * @returns {Object} data.summary - 统计摘要
+ *
+ * @created 2026-01-09（P0-4）
+ */
+router.get('/tradable-assets', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const admin_id = req.user.user_id
+
+    logger.info('管理员查看C2C可交易资产配置', { admin_id })
+
+    // 导入黑名单相关常量和函数
+    const {
+      C2C_BLACKLISTED_ASSET_CODES,
+      isBlacklistedForC2C,
+      getBlacklistReason
+    } = require('../../../constants/TradableAssetTypes')
+
+    // 获取 MaterialAssetType 模型
+    const { MaterialAssetType } = require('../../../models')
+
+    // 查询所有材料类资产
+    const assets = await MaterialAssetType.findAll({
+      attributes: [
+        'asset_code',
+        'display_name',
+        'group_code',
+        'form',
+        'tier',
+        'is_tradable',
+        'is_enabled',
+        'sort_order'
+      ],
+      order: [
+        ['sort_order', 'ASC'],
+        ['asset_code', 'ASC']
+      ]
+    })
+
+    // 构建响应数据，添加黑名单检查结果
+    const assetConfigs = assets.map(asset => {
+      const inBlacklist = isBlacklistedForC2C(asset.asset_code)
+      const blacklistReason = getBlacklistReason(asset.asset_code)
+
+      /*
+       * 最终有效的可交易状态计算：
+       * 1. 必须是启用状态（is_enabled = true）
+       * 2. 数据库配置允许交易（is_tradable = true）
+       * 3. 不在硬编码黑名单中（!inBlacklist）
+       */
+      const effectiveTradable = asset.is_enabled && asset.is_tradable && !inBlacklist
+
+      return {
+        asset_code: asset.asset_code,
+        display_name: asset.display_name,
+        group_code: asset.group_code,
+        form: asset.form,
+        tier: asset.tier,
+        is_tradable: asset.is_tradable,
+        is_enabled: asset.is_enabled,
+        in_blacklist: inBlacklist,
+        blacklist_reason: blacklistReason,
+        effective_tradable: effectiveTradable
+      }
+    })
+
+    // 统计摘要
+    const summary = {
+      total_assets: assetConfigs.length,
+      enabled_count: assetConfigs.filter(a => a.is_enabled).length,
+      tradable_count: assetConfigs.filter(a => a.effective_tradable).length,
+      blacklisted_count: assetConfigs.filter(a => a.in_blacklist).length,
+      blacklisted_codes: [...C2C_BLACKLISTED_ASSET_CODES]
+    }
+
+    logger.info('C2C可交易资产配置查询成功', {
+      admin_id,
+      total: summary.total_assets,
+      tradable: summary.tradable_count,
+      blacklisted: summary.blacklisted_count
+    })
+
+    return res.apiSuccess(
+      {
+        assets: assetConfigs,
+        summary
+      },
+      'C2C可交易资产配置'
+    )
+  } catch (error) {
+    logger.error('查看C2C可交易资产配置失败', {
+      error: error.message,
+      stack: error.stack,
+      admin_id: req.user?.user_id
+    })
+
+    return res.apiError(error.message || '查询失败', 'INTERNAL_ERROR', null, 500)
+  }
+})
 
 module.exports = router

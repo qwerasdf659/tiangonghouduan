@@ -121,10 +121,10 @@ module.exports = sequelize => {
 
     return role
       ? {
-        level: role.role_level,
-        permissions: role.permissions,
-        name: role.role_name
-      }
+          level: role.role_level,
+          permissions: role.permissions,
+          name: role.role_name
+        }
       : null
   }
 
@@ -178,11 +178,13 @@ module.exports = sequelize => {
     ]
 
     for (const roleData of defaultRoles) {
+      // eslint-disable-next-line no-await-in-loop -- 初始化角色需要串行检查
       const existing = await this.findOne({
         where: { role_name: roleData.role_name }
       })
 
       if (!existing) {
+        // eslint-disable-next-line no-await-in-loop -- 初始化角色需要串行创建
         await this.create(roleData)
         console.log(`✅ 创建默认角色: ${roleData.role_name}`)
       }

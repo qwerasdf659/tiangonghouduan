@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>公告管理 - 管理后台</title>
+
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+  <link href="/admin/css/common.css" rel="stylesheet">
+</head>
+<body class="bg-light">
+  <!-- 顶部导航 -->
+  <nav class="navbar navbar-dark bg-primary">
+    <div class="container-fluid">
+      <a href="/admin/dashboard.html" class="navbar-brand">
+        <i class="bi bi-arrow-left me-2"></i>📢 系统公告管理
+      </a>
+      <div>
+        <span class="text-light me-3" id="welcomeText">欢迎，管理员</span>
+        <button class="btn btn-outline-light btn-sm" id="logoutBtn">退出登录</button>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container-fluid mt-4">
+    <!-- 操作按钮 -->
+    <div class="d-flex justify-content-between mb-3">
+      <h5><i class="bi bi-megaphone"></i> 公告列表</h5>
+      <button class="btn btn-primary" id="addAnnouncementBtn">
+        <i class="bi bi-plus-lg"></i> 发布新公告
+      </button>
+    </div>
+
+    <!-- 筛选区域 -->
+    <div class="card mb-3">
+      <div class="card-body">
+        <div class="row g-3">
+          <div class="col-md-3">
+            <label class="form-label">公告状态</label>
+            <select class="form-select" id="statusFilter">
+              <option value="">全部状态</option>
+              <option value="active">已发布</option>
+              <option value="inactive">已下线</option>
+              <option value="draft">草稿</option>
+            </select>
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">公告类型</label>
+            <select class="form-select" id="typeFilter">
+              <option value="">全部类型</option>
+              <option value="notice">通知</option>
+              <option value="activity">活动</option>
+              <option value="update">更新</option>
+              <option value="warning">警告</option>
+            </select>
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">关键词搜索</label>
+            <input type="text" class="form-control" id="keywordSearch" placeholder="搜索标题或内容">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">&nbsp;</label>
+            <button class="btn btn-primary w-100" id="searchBtn">
+              <i class="bi bi-search"></i> 查询
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 公告列表 -->
+    <div class="card">
+      <div class="card-body">
+        <div class="table-responsive">
+          <table class="table table-hover align-middle">
+            <thead class="table-light">
+              <tr>
+                <th style="width: 60px;">ID</th>
+                <th>标题</th>
+                <th>类型</th>
+                <th>状态</th>
+                <th>排序</th>
+                <th>发布时间</th>
+                <th>过期时间</th>
+                <th style="width: 200px;">操作</th>
+              </tr>
+            </thead>
+            <tbody id="announcementsTableBody">
+              <tr>
+                <td colspan="8" class="text-center py-5">
+                  <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">加载中...</span>
+                  </div>
+                  <p class="mt-2 text-muted">正在加载数据...</p>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- 分页 -->
+        <nav aria-label="分页" class="mt-3">
+          <ul class="pagination justify-content-end" id="pagination"></ul>
+        </nav>
+      </div>
+    </div>
+  </div>
+
+  <!-- 新增/编辑公告模态框 -->
+  <div class="modal fade" id="announcementModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="modalTitle">
+            <i class="bi bi-megaphone"></i> 发布新公告
+          </h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <input type="hidden" id="announcementId">
+          <div class="row g-3">
+            <div class="col-12">
+              <label class="form-label">公告标题 <span class="text-danger">*</span></label>
+              <input type="text" class="form-control" id="announcementTitle" placeholder="请输入公告标题" maxlength="100" required>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">公告类型 <span class="text-danger">*</span></label>
+              <select class="form-select" id="announcementType" required>
+                <option value="notice">通知</option>
+                <option value="activity">活动</option>
+                <option value="update">更新</option>
+                <option value="warning">警告</option>
+              </select>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">公告状态 <span class="text-danger">*</span></label>
+              <select class="form-select" id="announcementStatus" required>
+                <option value="draft">草稿</option>
+                <option value="active">发布</option>
+                <option value="inactive">下线</option>
+              </select>
+            </div>
+            <div class="col-12">
+              <label class="form-label">公告内容 <span class="text-danger">*</span></label>
+              <textarea class="form-control" id="announcementContent" rows="6" placeholder="请输入公告内容" required></textarea>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">排序权重</label>
+              <input type="number" class="form-control" id="announcementSort" value="0" min="0">
+              <small class="text-muted">数字越大越靠前</small>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">生效时间</label>
+              <input type="datetime-local" class="form-control" id="startTime">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">过期时间</label>
+              <input type="datetime-local" class="form-control" id="endTime">
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+          <button type="button" class="btn btn-primary" id="submitAnnouncementBtn">
+            <i class="bi bi-check-lg"></i> 保存
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 加载遮罩层 -->
+  <div class="loading-overlay" id="loadingOverlay" style="display:none;">
+    <div class="spinner-border text-light" style="width: 3rem; height: 3rem;" role="status">
+      <span class="visually-hidden">处理中...</span>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="/admin/js/admin-common.js"></script>
+
+  <script>
+    // 全局变量
+    let currentPage = 1;
+    const pageSize = 20;
+    let editingId = null;
+    let announcementModal = null;
+
+    // 页面加载
+    document.addEventListener('DOMContentLoaded', function() {
+      checkAuth();
+      announcementModal = new bootstrap.Modal(document.getElementById('announcementModal'));
+      loadAnnouncements();
+      bindEvents();
+    });
+
+    // 权限检查
+    function checkAuth() {
+      const token = getToken();
+      if (!token) {
+        window.location.href = '/admin/login.html';
+        return false;
+      }
+      checkAdminPermission();
+      return true;
+    }
+
+    // 绑定事件
+    function bindEvents() {
+      document.getElementById('logoutBtn').addEventListener('click', logout);
+      document.getElementById('searchBtn').addEventListener('click', handleSearch);
+      document.getElementById('addAnnouncementBtn').addEventListener('click', openAddModal);
+      document.getElementById('submitAnnouncementBtn').addEventListener('click', handleSubmit);
+    }
+
+    // 处理搜索
+    function handleSearch() {
+      currentPage = 1;
+      loadAnnouncements();
+    }
+
+    // 加载公告列表
+    async function loadAnnouncements() {
+      try {
+        showLoading(true);
+        
+        const status = document.getElementById('statusFilter').value;
+        const type = document.getElementById('typeFilter').value;
+        const keyword = document.getElementById('keywordSearch').value.trim();
+        
+        const params = new URLSearchParams({
+          page: currentPage,
+          page_size: pageSize
+        });
+        
+        if (status) params.append('status', status);
+        if (type) params.append('type', type);
+        if (keyword) params.append('keyword', keyword);
+        
+        const response = await apiRequest(`/api/v4/console/system/announcements?${params}`);
+        
+        if (response && response.success) {
+          renderAnnouncements(response.data.announcements || response.data.list || []);
+          renderPagination(response.data.pagination);
+        } else {
+          showError(response?.message || '加载失败');
+        }
+      } catch (error) {
+        console.error('加载公告列表失败', error);
+        showError('加载失败，请稍后重试');
+      } finally {
+        showLoading(false);
+      }
+    }
+
+    // 渲染公告列表
+    function renderAnnouncements(announcements) {
+      const tbody = document.getElementById('announcementsTableBody');
+      
+      if (!announcements || announcements.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-4">暂无数据</td></tr>';
+        return;
+      }
+      
+      tbody.innerHTML = announcements.map(item => {
+        const statusBadge = getStatusBadge(item.status);
+        const typeBadge = getTypeBadge(item.type || item.announcement_type);
+        
+        return `
+          <tr>
+            <td>${item.announcement_id || item.id}</td>
+            <td>
+              <div class="fw-bold">${escapeHtml(item.title)}</div>
+              <small class="text-muted">${escapeHtml((item.content || '').substring(0, 50))}...</small>
+            </td>
+            <td>${typeBadge}</td>
+            <td>${statusBadge}</td>
+            <td>${item.sort_order || 0}</td>
+            <td>${formatDate(item.start_time || item.created_at)}</td>
+            <td>${item.end_time ? formatDate(item.end_time) : '<span class="text-muted">永久</span>'}</td>
+            <td>
+              <button class="btn btn-sm btn-outline-primary" onclick="editAnnouncement(${item.announcement_id || item.id})">
+                <i class="bi bi-pencil"></i> 编辑
+              </button>
+              <button class="btn btn-sm btn-outline-danger" onclick="deleteAnnouncement(${item.announcement_id || item.id})">
+                <i class="bi bi-trash"></i> 删除
+              </button>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    // 打开新增模态框
+    function openAddModal() {
+      editingId = null;
+      document.getElementById('modalTitle').innerHTML = '<i class="bi bi-megaphone"></i> 发布新公告';
+      document.getElementById('announcementId').value = '';
+      document.getElementById('announcementTitle').value = '';
+      document.getElementById('announcementType').value = 'notice';
+      document.getElementById('announcementStatus').value = 'draft';
+      document.getElementById('announcementContent').value = '';
+      document.getElementById('announcementSort').value = '0';
+      document.getElementById('startTime').value = '';
+      document.getElementById('endTime').value = '';
+      announcementModal.show();
+    }
+
+    // 编辑公告
+    async function editAnnouncement(id) {
+      try {
+        showLoading(true);
+        const response = await apiRequest(`/api/v4/console/system/announcements/${id}`);
+        
+        if (response && response.success) {
+          const item = response.data.announcement || response.data;
+          editingId = id;
+          document.getElementById('modalTitle').innerHTML = '<i class="bi bi-pencil"></i> 编辑公告';
+          document.getElementById('announcementId').value = id;
+          document.getElementById('announcementTitle').value = item.title || '';
+          document.getElementById('announcementType').value = item.type || item.announcement_type || 'notice';
+          document.getElementById('announcementStatus').value = item.status || 'draft';
+          document.getElementById('announcementContent').value = item.content || '';
+          document.getElementById('announcementSort').value = item.sort_order || 0;
+          
+          // 处理时间字段
+          if (item.start_time) {
+            document.getElementById('startTime').value = formatDateTimeLocal(item.start_time);
+          }
+          if (item.end_time) {
+            document.getElementById('endTime').value = formatDateTimeLocal(item.end_time);
+          }
+          
+          announcementModal.show();
+        } else {
+          showError(response?.message || '获取公告详情失败');
+        }
+      } catch (error) {
+        console.error('获取公告详情失败', error);
+        showError('获取失败，请稍后重试');
+      } finally {
+        showLoading(false);
+      }
+    }
+
+    // 提交表单
+    async function handleSubmit() {
+      const title = document.getElementById('announcementTitle').value.trim();
+      const type = document.getElementById('announcementType').value;
+      const status = document.getElementById('announcementStatus').value;
+      const content = document.getElementById('announcementContent').value.trim();
+      const sortOrder = parseInt(document.getElementById('announcementSort').value) || 0;
+      const startTime = document.getElementById('startTime').value;
+      const endTime = document.getElementById('endTime').value;
+      
+      if (!title) {
+        showError('请输入公告标题');
+        return;
+      }
+      if (!content) {
+        showError('请输入公告内容');
+        return;
+      }
+      
+      try {
+        showLoading(true);
+        
+        const payload = {
+          title,
+          type,
+          status,
+          content,
+          sort_order: sortOrder,
+          start_time: startTime || null,
+          end_time: endTime || null
+        };
+        
+        let response;
+        if (editingId) {
+          response = await apiRequest(`/api/v4/console/system/announcements/${editingId}`, {
+            method: 'PUT',
+            body: JSON.stringify(payload)
+          });
+        } else {
+          response = await apiRequest('/api/v4/console/system/announcements', {
+            method: 'POST',
+            body: JSON.stringify(payload)
+          });
+        }
+        
+        if (response && response.success) {
+          showSuccess(editingId ? '更新成功' : '发布成功');
+          announcementModal.hide();
+          loadAnnouncements();
+        } else {
+          showError(response?.message || '操作失败');
+        }
+      } catch (error) {
+        console.error('保存公告失败', error);
+        showError('保存失败，请稍后重试');
+      } finally {
+        showLoading(false);
+      }
+    }
+
+    // 删除公告
+    async function deleteAnnouncement(id) {
+      if (!confirm('确定要删除这条公告吗？此操作不可恢复。')) {
+        return;
+      }
+      
+      try {
+        showLoading(true);
+        const response = await apiRequest(`/api/v4/console/system/announcements/${id}`, {
+          method: 'DELETE'
+        });
+        
+        if (response && response.success) {
+          showSuccess('删除成功');
+          loadAnnouncements();
+        } else {
+          showError(response?.message || '删除失败');
+        }
+      } catch (error) {
+        console.error('删除公告失败', error);
+        showError('删除失败，请稍后重试');
+      } finally {
+        showLoading(false);
+      }
+    }
+
+    // 渲染分页
+    function renderPagination(pagination) {
+      const paginationEl = document.getElementById('pagination');
+      if (!pagination || pagination.total_pages <= 1) {
+        paginationEl.innerHTML = '';
+        return;
+      }
+      
+      let html = '';
+      for (let i = 1; i <= pagination.total_pages; i++) {
+        html += `
+          <li class="page-item ${i === currentPage ? 'active' : ''}">
+            <a class="page-link" href="#" onclick="changePage(${i}); return false;">${i}</a>
+          </li>
+        `;
+      }
+      paginationEl.innerHTML = html;
+    }
+
+    function changePage(page) {
+      currentPage = page;
+      loadAnnouncements();
+    }
+
+    // 工具函数
+    function getStatusBadge(status) {
+      const map = {
+        'active': '<span class="badge bg-success">已发布</span>',
+        'inactive': '<span class="badge bg-secondary">已下线</span>',
+        'draft': '<span class="badge bg-warning">草稿</span>'
+      };
+      return map[status] || `<span class="badge bg-secondary">${status}</span>`;
+    }
+
+    function getTypeBadge(type) {
+      const map = {
+        'notice': '<span class="badge bg-info">通知</span>',
+        'activity': '<span class="badge bg-success">活动</span>',
+        'update': '<span class="badge bg-primary">更新</span>',
+        'warning': '<span class="badge bg-danger">警告</span>'
+      };
+      return map[type] || `<span class="badge bg-secondary">${type}</span>`;
+    }
+
+    function formatDateTimeLocal(dateStr) {
+      if (!dateStr) return '';
+      const date = new Date(dateStr);
+      return date.toISOString().slice(0, 16);
+    }
+
+    function escapeHtml(text) {
+      if (!text) return '';
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    function showLoading(show) {
+      document.getElementById('loadingOverlay').style.display = show ? 'flex' : 'none';
+    }
+
+    function showSuccess(message) {
+      alert(message);
+    }
+
+    function showError(message) {
+      alert(message);
+    }
+  </script>
+</body>
+</html>
+

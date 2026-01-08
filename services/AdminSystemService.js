@@ -626,6 +626,7 @@ class AdminSystemService {
         // ========== 数据库操作 ==========
 
         // 查找配置项
+        // eslint-disable-next-line no-await-in-loop -- 批量配置更新需要串行处理事务
         const setting = await SystemSettings.findOne({
           where: {
             category,
@@ -659,6 +660,7 @@ class AdminSystemService {
         setting.updated_by = userId
         setting.updated_at = BeijingTimeHelper.createBeijingTime()
 
+        // eslint-disable-next-line no-await-in-loop -- 批量配置更新需要串行保存
         await setting.save({ transaction })
 
         // ========== 审计日志（高影响配置）==========

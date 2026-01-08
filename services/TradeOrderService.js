@@ -348,6 +348,7 @@ class TradeOrderService {
     )
 
     // 3.6 冻结买家资产（幂等键派生规则：${root_idempotency_key}:freeze_buyer）
+    // eslint-disable-next-line no-restricted-syntax -- 已传递 transaction
     const freezeResult = await AssetService.freeze(
       {
         idempotency_key: `${idempotency_key}:freeze_buyer`, // 派生幂等键（文档规范：统一以根幂等键派生）
@@ -446,6 +447,7 @@ class TradeOrderService {
     // 2. 从冻结资产结算（三笔：买家扣减、卖家入账、平台手续费）
 
     // 2.1 买家从冻结资产扣减
+    // eslint-disable-next-line no-restricted-syntax -- 已传递 transaction
     await AssetService.settleFromFrozen(
       {
         idempotency_key: `${idempotency_key}:settle_buyer`, // 派生子幂等键
@@ -466,6 +468,7 @@ class TradeOrderService {
 
     // 2.2 卖家入账（实收金额）
     if (order.net_amount > 0) {
+      // eslint-disable-next-line no-restricted-syntax -- 已传递 transaction
       await AssetService.changeBalance(
         {
           idempotency_key: `${idempotency_key}:credit_seller`, // 派生子幂等键
@@ -488,6 +491,7 @@ class TradeOrderService {
 
     // 2.3 平台手续费入账（如果手续费>0）
     if (order.fee_amount > 0) {
+      // eslint-disable-next-line no-restricted-syntax -- 已传递 transaction
       await AssetService.changeBalance(
         {
           idempotency_key: `${idempotency_key}:credit_platform_fee`, // 派生子幂等键
@@ -529,6 +533,7 @@ class TradeOrderService {
 
       // 使用 AssetService.transferItem() 转移所有权（自动记录事件）
       const AssetService = require('./AssetService')
+      // eslint-disable-next-line no-restricted-syntax -- 已传递 transaction
       await AssetService.transferItem(
         {
           item_instance_id: itemInstance.item_instance_id,
@@ -562,6 +567,7 @@ class TradeOrderService {
        */
 
       // 3.2.1 卖家：从冻结扣减标的资产
+      // eslint-disable-next-line no-restricted-syntax -- 已传递 transaction
       await AssetService.settleFromFrozen(
         {
           idempotency_key: `${idempotency_key}:settle_seller_offer`, // 派生子幂等键
@@ -589,6 +595,7 @@ class TradeOrderService {
       })
 
       // 3.2.2 买家：收到标的资产入账
+      // eslint-disable-next-line no-restricted-syntax -- 已传递 transaction
       await AssetService.changeBalance(
         {
           idempotency_key: `${idempotency_key}:credit_buyer_offer`, // 派生子幂等键
@@ -739,6 +746,7 @@ class TradeOrderService {
     const idempotency_key = order.idempotency_key
 
     // 2. 解冻买家资产
+    // eslint-disable-next-line no-restricted-syntax -- 已传递 transaction
     const unfreezeResult = await AssetService.unfreeze(
       {
         idempotency_key: `${idempotency_key}:unfreeze_buyer`, // 派生子幂等键
@@ -824,6 +832,114 @@ class TradeOrderService {
     }
 
     return order
+  }
+
+  /**
+   * 管理员获取全量交易订单列表（Admin Only）
+   *
+   * @description 管理员查看所有交易订单，支持状态筛选、分页、排序
+   *
+   * 业务场景：
+   * - 管理后台订单管理页面
+   * - 订单状态筛选和查看
+   * - 交易纠纷处理
+   *
+   * @param {Object} options - 查询选项
+   * @param {string} [options.status] - 订单状态筛选（created/frozen/completed/cancelled）
+   * @param {number} [options.buyer_user_id] - 买家ID筛选（可选）
+   * @param {number} [options.seller_user_id] - 卖家ID筛选（可选）
+   * @param {number} [options.listing_id] - 挂牌ID筛选（可选）
+   * @param {number} [options.page=1] - 页码
+   * @param {number} [options.page_size=20] - 每页数量
+   * @param {string} [options.sort_by='created_at'] - 排序字段
+   * @param {string} [options.sort_order='DESC'] - 排序方向
+   * @returns {Promise<Object>} 订单列表和分页信息
+   *
+   * @example
+   * // 获取所有冻结中订单
+   * const result = await TradeOrderService.getAdminOrders({ status: 'frozen', page: 1 });
+   */
+  static async getAdminOrders(options = {}) {
+    const {
+      status = null,
+      buyer_user_id = null,
+      seller_user_id = null,
+      listing_id = null,
+      page = 1,
+      page_size = 20,
+      sort_by = 'created_at',
+      sort_order = 'DESC'
+    } = options
+
+    logger.info('[TradeOrderService] 管理员查询全量订单列表', {
+      status,
+      buyer_user_id,
+      seller_user_id,
+      listing_id,
+      page,
+      page_size
+    })
+
+    // 构建查询条件
+    const where = {}
+    if (status) {
+      where.status = status
+    }
+    if (buyer_user_id) {
+      where.buyer_user_id = buyer_user_id
+    }
+    if (seller_user_id) {
+      where.seller_user_id = seller_user_id
+    }
+    if (listing_id) {
+      where.listing_id = listing_id
+    }
+
+    // 分页参数
+    const offset = (page - 1) * page_size
+    const limit = page_size
+
+    // 查询订单列表
+    const { count, rows } = await TradeOrder.findAndCountAll({
+      where,
+      include: [
+        {
+          model: MarketListing,
+          as: 'listing',
+          include: [
+            {
+              model: ItemInstance,
+              as: 'offerItem',
+              required: false
+            }
+          ]
+        }
+      ],
+      limit,
+      offset,
+      order: [[sort_by, sort_order]]
+    })
+
+    logger.info(
+      `[TradeOrderService] 管理员查询订单成功：找到${count}个订单，返回第${page}页（${rows.length}个）`
+    )
+
+    return {
+      success: true,
+      orders: rows,
+      pagination: {
+        total: count,
+        page,
+        page_size,
+        total_pages: Math.ceil(count / page_size)
+      },
+      filters: {
+        status,
+        buyer_user_id,
+        seller_user_id,
+        listing_id
+      }
+    }
   }
 
   /**

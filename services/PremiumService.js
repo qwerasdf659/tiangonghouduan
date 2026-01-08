@@ -52,7 +52,7 @@ class PremiumService {
    * @returns {Object} 解锁结果
    * @throws {Error} 业务错误（用户不存在、条件不满足、余额不足等）
    */
-  static async unlockPremium (user_id, options = {}) {
+  static async unlockPremium(user_id, options = {}) {
     // 强制要求事务边界 - 2026-01-05 治理决策
     const transaction = assertAndGetTransaction(options, 'PremiumService.unlockPremium')
 
@@ -176,6 +176,7 @@ class PremiumService {
     const unlockTime = BeijingTimeHelper.createBeijingTime()
     const idempotency_key = `premium_unlock_${user_id}_${BeijingTimeHelper.generateIdTimestamp()}`
 
+    // eslint-disable-next-line no-restricted-syntax -- 已传递 transaction
     const consumeResult = await AssetService.changeBalance(
       {
         user_id,
@@ -261,7 +262,7 @@ class PremiumService {
    * @param {number} user_id - 用户ID
    * @returns {Object} 状态查询结果
    */
-  static async getPremiumStatus (user_id) {
+  static async getPremiumStatus(user_id) {
     try {
       // 查询解锁状态
       const premiumStatus = await UserPremiumStatus.findOne({

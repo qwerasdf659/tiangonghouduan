@@ -1,0 +1,590 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>用户反馈管理 - 管理后台</title>
+
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+  <link href="/admin/css/common.css" rel="stylesheet">
+</head>
+<body class="bg-light">
+  <!-- 顶部导航 -->
+  <nav class="navbar navbar-dark bg-primary">
+    <div class="container-fluid">
+      <a href="/admin/dashboard.html" class="navbar-brand">
+        <i class="bi bi-arrow-left me-2"></i>💬 用户反馈管理
+      </a>
+      <div>
+        <span class="text-light me-3" id="welcomeText">欢迎，管理员</span>
+        <button class="btn btn-outline-light btn-sm" id="logoutBtn">退出登录</button>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container-fluid mt-4">
+    <!-- 统计卡片 -->
+    <div class="row g-3 mb-3">
+      <div class="col-md-3">
+        <div class="card">
+          <div class="card-body text-center">
+            <h6 class="text-muted">总反馈数</h6>
+            <h3 class="text-primary" id="totalFeedbacks">-</h3>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="card border-warning">
+          <div class="card-body text-center">
+            <h6 class="text-muted">待处理</h6>
+            <h3 class="text-warning" id="pendingFeedbacks">-</h3>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="card border-info">
+          <div class="card-body text-center">
+            <h6 class="text-muted">处理中</h6>
+            <h3 class="text-info" id="processingFeedbacks">-</h3>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="card border-success">
+          <div class="card-body text-center">
+            <h6 class="text-muted">已解决</h6>
+            <h3 class="text-success" id="resolvedFeedbacks">-</h3>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 筛选区域 -->
+    <div class="card mb-3">
+      <div class="card-body">
+        <div class="row g-3">
+          <div class="col-md-3">
+            <label class="form-label">处理状态</label>
+            <select class="form-select" id="statusFilter">
+              <option value="">全部状态</option>
+              <option value="pending">待处理</option>
+              <option value="processing">处理中</option>
+              <option value="resolved">已解决</option>
+              <option value="closed">已关闭</option>
+            </select>
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">反馈类型</label>
+            <select class="form-select" id="typeFilter">
+              <option value="">全部类型</option>
+              <option value="bug">Bug报告</option>
+              <option value="suggestion">功能建议</option>
+              <option value="complaint">投诉</option>
+              <option value="question">咨询</option>
+              <option value="other">其他</option>
+            </select>
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">用户ID</label>
+            <input type="number" class="form-control" id="userIdSearch" placeholder="输入用户ID">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">&nbsp;</label>
+            <button class="btn btn-primary w-100" id="searchBtn">
+              <i class="bi bi-search"></i> 查询
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 反馈列表 -->
+    <div class="card">
+      <div class="card-body">
+        <div class="table-responsive">
+          <table class="table table-hover align-middle">
+            <thead class="table-light">
+              <tr>
+                <th style="width: 60px;">ID</th>
+                <th>用户</th>
+                <th>类型</th>
+                <th>反馈内容</th>
+                <th>状态</th>
+                <th>提交时间</th>
+                <th style="width: 200px;">操作</th>
+              </tr>
+            </thead>
+            <tbody id="feedbacksTableBody">
+              <tr>
+                <td colspan="7" class="text-center py-5">
+                  <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">加载中...</span>
+                  </div>
+                  <p class="mt-2 text-muted">正在加载数据...</p>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- 分页 -->
+        <nav aria-label="分页" class="mt-3">
+          <ul class="pagination justify-content-end" id="pagination"></ul>
+        </nav>
+      </div>
+    </div>
+  </div>
+
+  <!-- 反馈详情模态框 -->
+  <div class="modal fade" id="feedbackDetailModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">
+            <i class="bi bi-chat-square-text"></i> 反馈详情
+          </h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label text-muted">反馈ID</label>
+              <p id="detailId" class="fw-bold">-</p>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label text-muted">用户ID</label>
+              <p id="detailUserId" class="fw-bold">-</p>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label text-muted">反馈类型</label>
+              <p id="detailType">-</p>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label text-muted">当前状态</label>
+              <p id="detailStatus">-</p>
+            </div>
+            <div class="col-12">
+              <label class="form-label text-muted">反馈内容</label>
+              <div class="border rounded p-3 bg-light" id="detailContent">-</div>
+            </div>
+            <div class="col-12" id="imagesSection" style="display: none;">
+              <label class="form-label text-muted">附件图片</label>
+              <div id="detailImages" class="d-flex flex-wrap gap-2"></div>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label text-muted">提交时间</label>
+              <p id="detailCreatedAt">-</p>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label text-muted">更新时间</label>
+              <p id="detailUpdatedAt">-</p>
+            </div>
+            <div class="col-12" id="replySection" style="display: none;">
+              <label class="form-label text-muted">管理员回复</label>
+              <div class="border rounded p-3 bg-info bg-opacity-10" id="detailReply">-</div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 回复反馈模态框 -->
+  <div class="modal fade" id="replyModal" tabindex="-1">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">
+            <i class="bi bi-reply"></i> 回复反馈
+          </h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <input type="hidden" id="replyFeedbackId">
+          <div class="mb-3">
+            <label class="form-label">回复内容 <span class="text-danger">*</span></label>
+            <textarea class="form-control" id="replyContent" rows="5" placeholder="请输入回复内容" required></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+          <button type="button" class="btn btn-primary" id="submitReplyBtn">
+            <i class="bi bi-send"></i> 发送回复
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 更新状态模态框 -->
+  <div class="modal fade" id="updateStatusModal" tabindex="-1">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">
+            <i class="bi bi-arrow-repeat"></i> 更新状态
+          </h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <input type="hidden" id="updateFeedbackId">
+          <div class="mb-3">
+            <label class="form-label">新状态 <span class="text-danger">*</span></label>
+            <select class="form-select" id="newStatus" required>
+              <option value="">请选择</option>
+              <option value="processing">处理中</option>
+              <option value="resolved">已解决</option>
+              <option value="closed">已关闭</option>
+            </select>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+          <button type="button" class="btn btn-primary" id="submitStatusBtn">
+            <i class="bi bi-check-lg"></i> 确认更新
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 加载遮罩层 -->
+  <div class="loading-overlay" id="loadingOverlay" style="display:none;">
+    <div class="spinner-border text-light" style="width: 3rem; height: 3rem;" role="status">
+      <span class="visually-hidden">处理中...</span>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="/admin/js/admin-common.js"></script>
+
+  <script>
+    // 全局变量
+    let currentPage = 1;
+    const pageSize = 20;
+
+    // 页面加载
+    document.addEventListener('DOMContentLoaded', function() {
+      checkAuth();
+      loadFeedbacks();
+      bindEvents();
+    });
+
+    // 权限检查
+    function checkAuth() {
+      const token = getToken();
+      if (!token) {
+        window.location.href = '/admin/login.html';
+        return false;
+      }
+      checkAdminPermission();
+      return true;
+    }
+
+    // 绑定事件
+    function bindEvents() {
+      document.getElementById('logoutBtn').addEventListener('click', logout);
+      document.getElementById('searchBtn').addEventListener('click', handleSearch);
+      document.getElementById('submitReplyBtn').addEventListener('click', handleReply);
+      document.getElementById('submitStatusBtn').addEventListener('click', handleUpdateStatus);
+    }
+
+    // 处理搜索
+    function handleSearch() {
+      currentPage = 1;
+      loadFeedbacks();
+    }
+
+    // 加载反馈列表
+    async function loadFeedbacks() {
+      try {
+        showLoading(true);
+        
+        const status = document.getElementById('statusFilter').value;
+        const type = document.getElementById('typeFilter').value;
+        const userId = document.getElementById('userIdSearch').value.trim();
+        
+        const params = new URLSearchParams({
+          page: currentPage,
+          page_size: pageSize
+        });
+        
+        if (status) params.append('status', status);
+        if (type) params.append('type', type);
+        if (userId) params.append('user_id', userId);
+        
+        const response = await apiRequest(`/api/v4/console/system/feedbacks?${params}`);
+        
+        if (response && response.success) {
+          const feedbacks = response.data.feedbacks || response.data.list || [];
+          renderFeedbacks(feedbacks);
+          renderPagination(response.data.pagination);
+          updateStats(feedbacks);
+        } else {
+          showError(response?.message || '加载失败');
+        }
+      } catch (error) {
+        console.error('加载反馈列表失败', error);
+        showError('加载失败，请稍后重试');
+      } finally {
+        showLoading(false);
+      }
+    }
+
+    // 渲染反馈列表
+    function renderFeedbacks(feedbacks) {
+      const tbody = document.getElementById('feedbacksTableBody');
+      
+      if (!feedbacks || feedbacks.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-4">暂无数据</td></tr>';
+        return;
+      }
+      
+      tbody.innerHTML = feedbacks.map(item => {
+        const statusBadge = getStatusBadge(item.status);
+        const typeBadge = getTypeBadge(item.type || item.feedback_type);
+        const id = item.feedback_id || item.id;
+        
+        return `
+          <tr>
+            <td>${id}</td>
+            <td>ID: ${item.user_id}</td>
+            <td>${typeBadge}</td>
+            <td>
+              <div style="max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                ${escapeHtml(item.content || '')}
+              </div>
+            </td>
+            <td>${statusBadge}</td>
+            <td>${formatDate(item.created_at)}</td>
+            <td>
+              <button class="btn btn-sm btn-outline-info" onclick="viewFeedback(${id})">
+                <i class="bi bi-eye"></i> 详情
+              </button>
+              <button class="btn btn-sm btn-outline-primary" onclick="openReplyModal(${id})">
+                <i class="bi bi-reply"></i> 回复
+              </button>
+              <button class="btn btn-sm btn-outline-warning" onclick="openStatusModal(${id})">
+                <i class="bi bi-arrow-repeat"></i> 状态
+              </button>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    // 更新统计数据
+    function updateStats(feedbacks) {
+      const stats = {
+        total: feedbacks.length,
+        pending: feedbacks.filter(f => f.status === 'pending').length,
+        processing: feedbacks.filter(f => f.status === 'processing').length,
+        resolved: feedbacks.filter(f => f.status === 'resolved').length
+      };
+      
+      document.getElementById('totalFeedbacks').textContent = stats.total;
+      document.getElementById('pendingFeedbacks').textContent = stats.pending;
+      document.getElementById('processingFeedbacks').textContent = stats.processing;
+      document.getElementById('resolvedFeedbacks').textContent = stats.resolved;
+    }
+
+    // 查看反馈详情
+    async function viewFeedback(id) {
+      try {
+        showLoading(true);
+        const response = await apiRequest(`/api/v4/console/system/feedbacks/${id}`);
+        
+        if (response && response.success) {
+          const item = response.data.feedback || response.data;
+          
+          document.getElementById('detailId').textContent = item.feedback_id || item.id;
+          document.getElementById('detailUserId').textContent = item.user_id;
+          document.getElementById('detailType').innerHTML = getTypeBadge(item.type || item.feedback_type);
+          document.getElementById('detailStatus').innerHTML = getStatusBadge(item.status);
+          document.getElementById('detailContent').textContent = item.content || '-';
+          document.getElementById('detailCreatedAt').textContent = formatDate(item.created_at);
+          document.getElementById('detailUpdatedAt').textContent = formatDate(item.updated_at);
+          
+          // 处理图片
+          const imagesSection = document.getElementById('imagesSection');
+          const imagesContainer = document.getElementById('detailImages');
+          if (item.images && item.images.length > 0) {
+            imagesSection.style.display = 'block';
+            imagesContainer.innerHTML = item.images.map(img => 
+              `<img src="${img}" class="img-thumbnail" style="max-width: 150px; cursor: pointer;" onclick="window.open('${img}', '_blank')">`
+            ).join('');
+          } else {
+            imagesSection.style.display = 'none';
+          }
+          
+          // 处理回复
+          const replySection = document.getElementById('replySection');
+          if (item.admin_reply) {
+            replySection.style.display = 'block';
+            document.getElementById('detailReply').textContent = item.admin_reply;
+          } else {
+            replySection.style.display = 'none';
+          }
+          
+          new bootstrap.Modal(document.getElementById('feedbackDetailModal')).show();
+        } else {
+          showError(response?.message || '获取详情失败');
+        }
+      } catch (error) {
+        console.error('获取反馈详情失败', error);
+        showError('获取失败，请稍后重试');
+      } finally {
+        showLoading(false);
+      }
+    }
+
+    // 打开回复模态框
+    function openReplyModal(id) {
+      document.getElementById('replyFeedbackId').value = id;
+      document.getElementById('replyContent').value = '';
+      new bootstrap.Modal(document.getElementById('replyModal')).show();
+    }
+
+    // 提交回复
+    async function handleReply() {
+      const id = document.getElementById('replyFeedbackId').value;
+      const content = document.getElementById('replyContent').value.trim();
+      
+      if (!content) {
+        showError('请输入回复内容');
+        return;
+      }
+      
+      try {
+        showLoading(true);
+        const response = await apiRequest(`/api/v4/console/system/feedbacks/${id}/reply`, {
+          method: 'POST',
+          body: JSON.stringify({ reply: content })
+        });
+        
+        if (response && response.success) {
+          showSuccess('回复成功');
+          bootstrap.Modal.getInstance(document.getElementById('replyModal')).hide();
+          loadFeedbacks();
+        } else {
+          showError(response?.message || '回复失败');
+        }
+      } catch (error) {
+        console.error('回复反馈失败', error);
+        showError('回复失败，请稍后重试');
+      } finally {
+        showLoading(false);
+      }
+    }
+
+    // 打开状态更新模态框
+    function openStatusModal(id) {
+      document.getElementById('updateFeedbackId').value = id;
+      document.getElementById('newStatus').value = '';
+      new bootstrap.Modal(document.getElementById('updateStatusModal')).show();
+    }
+
+    // 更新状态
+    async function handleUpdateStatus() {
+      const id = document.getElementById('updateFeedbackId').value;
+      const status = document.getElementById('newStatus').value;
+      
+      if (!status) {
+        showError('请选择新状态');
+        return;
+      }
+      
+      try {
+        showLoading(true);
+        const response = await apiRequest(`/api/v4/console/system/feedbacks/${id}/status`, {
+          method: 'PUT',
+          body: JSON.stringify({ status })
+        });
+        
+        if (response && response.success) {
+          showSuccess('状态更新成功');
+          bootstrap.Modal.getInstance(document.getElementById('updateStatusModal')).hide();
+          loadFeedbacks();
+        } else {
+          showError(response?.message || '更新失败');
+        }
+      } catch (error) {
+        console.error('更新状态失败', error);
+        showError('更新失败，请稍后重试');
+      } finally {
+        showLoading(false);
+      }
+    }
+
+    // 渲染分页
+    function renderPagination(pagination) {
+      const paginationEl = document.getElementById('pagination');
+      if (!pagination || pagination.total_pages <= 1) {
+        paginationEl.innerHTML = '';
+        return;
+      }
+      
+      let html = '';
+      for (let i = 1; i <= pagination.total_pages; i++) {
+        html += `
+          <li class="page-item ${i === currentPage ? 'active' : ''}">
+            <a class="page-link" href="#" onclick="changePage(${i}); return false;">${i}</a>
+          </li>
+        `;
+      }
+      paginationEl.innerHTML = html;
+    }
+
+    function changePage(page) {
+      currentPage = page;
+      loadFeedbacks();
+    }
+
+    // 工具函数
+    function getStatusBadge(status) {
+      const map = {
+        'pending': '<span class="badge bg-warning">待处理</span>',
+        'processing': '<span class="badge bg-info">处理中</span>',
+        'resolved': '<span class="badge bg-success">已解决</span>',
+        'closed': '<span class="badge bg-secondary">已关闭</span>'
+      };
+      return map[status] || `<span class="badge bg-secondary">${status}</span>`;
+    }
+
+    function getTypeBadge(type) {
+      const map = {
+        'bug': '<span class="badge bg-danger">Bug报告</span>',
+        'suggestion': '<span class="badge bg-primary">功能建议</span>',
+        'complaint': '<span class="badge bg-warning">投诉</span>',
+        'question': '<span class="badge bg-info">咨询</span>',
+        'other': '<span class="badge bg-secondary">其他</span>'
+      };
+      return map[type] || `<span class="badge bg-secondary">${type}</span>`;
+    }
+
+    function escapeHtml(text) {
+      if (!text) return '';
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    function showLoading(show) {
+      document.getElementById('loadingOverlay').style.display = show ? 'flex' : 'none';
+    }
+
+    function showSuccess(message) {
+      alert(message);
+    }
+
+    function showError(message) {
+      alert(message);
+    }
+  </script>
+</body>
+</html>
+

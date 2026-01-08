@@ -50,7 +50,7 @@ class ManagementStrategy {
    * const strategy = new ManagementStrategy()
    * // 创建实例后，可以使用forceWin、forceLose、adjustProbability等方法
    */
-  constructor () {
+  constructor() {
     this.logger = require('../../../utils/logger').logger
 
     // 🔄 内存缓存系统（5分钟TTL）
@@ -102,7 +102,7 @@ class ManagementStrategy {
    * const result = await strategy.forceWin(10001, 20001, 30001, '测试补偿')
    * // 返回：{ success: true, setting_id: 'setting_...', result: 'force_win', prize_id: 30001, user_id: 20001, admin_id: 10001, reason: '测试补偿', timestamp: '2025-11-08 12:00:00' }
    */
-  async forceWin (adminId, targetUserId, prizeId, reason = '管理员操作', expiresAt = null) {
+  async forceWin(adminId, targetUserId, prizeId, reason = '管理员操作', expiresAt = null) {
     try {
       // 🛡️ 验证管理员权限
       const adminValidation = await this.validateAdminPermission(adminId)
@@ -207,7 +207,7 @@ class ManagementStrategy {
    * const result = await strategy.forceLose(10001, 20001, 5, '防刷保护')
    * // 返回：{ success: true, setting_id: 'setting_...', result: 'force_lose', user_id: 20001, admin_id: 10001, count: 5, remaining: 5, reason: '防刷保护', timestamp: '2025-11-08 12:00:00' }
    */
-  async forceLose (adminId, targetUserId, count = 1, reason = '管理员操作', expiresAt = null) {
+  async forceLose(adminId, targetUserId, count = 1, reason = '管理员操作', expiresAt = null) {
     try {
       // 🛡️ 验证管理员权限
       const adminValidation = await this.validateAdminPermission(adminId)
@@ -307,7 +307,7 @@ class ManagementStrategy {
    * const result = await strategy.adjustProbability(10001, 20001, 2.0, '用户挽留')
    * // 返回：{ success: true, setting_id: 'setting_...', result: 'probability_adjust', user_id: 20001, admin_id: 10001, multiplier: 2.0, reason: '用户挽留', timestamp: '2025-11-08 12:00:00' }
    */
-  async adjustProbability (
+  async adjustProbability(
     adminId,
     targetUserId,
     multiplier,
@@ -424,7 +424,7 @@ class ManagementStrategy {
    * }, 'VIP用户体验优化')
    * // 返回：{ success: true, setting_id: 'setting_...', result: 'user_queue', user_id: 20001, admin_id: 10001, queue_config: {...}, reason: 'VIP用户体验优化', timestamp: '2025-11-08 12:00:00' }
    */
-  async setUserQueue (adminId, targetUserId, queueConfig, reason = '管理员操作', expiresAt = null) {
+  async setUserQueue(adminId, targetUserId, queueConfig, reason = '管理员操作', expiresAt = null) {
     try {
       // 🛡️ 验证管理员权限
       const adminValidation = await this.validateAdminPermission(adminId)
@@ -526,7 +526,7 @@ class ManagementStrategy {
    * const status = await strategy.getUserManagementStatus(20001)
    * // 返回：{ force_win: {...}, force_lose: null, probability_adjust: {...}, user_queue: null }
    */
-  async getUserManagementStatus (userId) {
+  async getUserManagementStatus(userId) {
     try {
       const status = {
         force_win: null,
@@ -548,6 +548,7 @@ class ManagementStrategy {
         }
 
         // 💾 查询数据库
+        // eslint-disable-next-line no-await-in-loop -- 配置项需要逐个查询和缓存
         const setting = await LotteryManagementSetting.findOne({
           where: {
             user_id: userId,
@@ -611,7 +612,7 @@ class ManagementStrategy {
    * const result2 = await strategy.clearUserSettings(10001, 20001, 'force_win')
    * // 返回：{ success: true, cleared_count: 1, timestamp: '2025-11-08 12:00:00' }
    */
-  async clearUserSettings (adminId, targetUserId, settingType = null) {
+  async clearUserSettings(adminId, targetUserId, settingType = null) {
     try {
       // 🛡️ 验证管理员权限
       const adminValidation = await this.validateAdminPermission(adminId)
@@ -691,7 +692,7 @@ class ManagementStrategy {
    * const result = await strategy.cleanupExpiredSettings()
    * // 返回：{ cleaned_count: 15, timestamp: '2025-11-08 12:00:00' }
    */
-  async cleanupExpiredSettings () {
+  async cleanupExpiredSettings() {
     try {
       // 💾 查询并更新过期设置
       const [updatedCount] = await LotteryManagementSetting.update(
@@ -734,7 +735,7 @@ class ManagementStrategy {
    * @private
    * @returns {void} 无返回值，启动定时器定期清理内存缓存
    */
-  startCacheCleanup () {
+  startCacheCleanup() {
     setInterval(() => {
       const now = Date.now()
       let cleanedCount = 0
@@ -789,7 +790,7 @@ class ManagementStrategy {
    *   logger.info('管理员验证失败', result.reason)
    * }
    */
-  async validateAdminInfo (adminInfo) {
+  async validateAdminInfo(adminInfo) {
     try {
       if (!adminInfo || !adminInfo.user_id) {
         return { valid: false, reason: 'ADMIN_INFO_MISSING' }
@@ -855,7 +856,7 @@ class ManagementStrategy {
    * const result2 = await strategy.validateAdminPermission(10001, { resource: 'lottery', action: 'manage' })
    * // 返回：{ valid: true, admin: {...}, roles: [...], adminLevel: 1 } 或 { valid: false, reason: 'PERMISSION_DENIED' }
    */
-  async validateAdminPermission (adminId, requiredPermission = null) {
+  async validateAdminPermission(adminId, requiredPermission = null) {
     try {
       // 🛡️ 获取用户角色信息
       const userRoles = await getUserRoles(adminId)
@@ -919,7 +920,7 @@ class ManagementStrategy {
    *   logger.info('用户不是管理员')
    * }
    */
-  async checkAdminPermission (adminId) {
+  async checkAdminPermission(adminId) {
     try {
       // 🛡️ 使用UUID角色系统进行权限验证
       const userRoles = await getUserRoles(adminId)
@@ -968,7 +969,7 @@ class ManagementStrategy {
    * const result = await strategy.getOperationLogs(10001, { page: 1, limit: 20 })
    * // 返回：{ logs: [], total: 0, page: 1, limit: 20 }
    */
-  async getOperationLogs (adminId, filters = {}) {
+  async getOperationLogs(adminId, filters = {}) {
     try {
       // 验证管理员权限
       const isAdmin = await this.checkAdminPermission(adminId)
@@ -1026,7 +1027,7 @@ class ManagementStrategy {
    * ])
    * // 返回：{ success: [{...}, {...}], failed: [], total: 2, success_count: 2, failed_count: 0 }
    */
-  async batchForceWin (adminId, operations) {
+  async batchForceWin(adminId, operations) {
     try {
       // 🛡️ 验证管理员权限（只验证一次）
       const adminValidation = await this.validateAdminPermission(adminId)
@@ -1045,6 +1046,7 @@ class ManagementStrategy {
       // 批量执行强制中奖操作
       for (const operation of operations) {
         try {
+          // eslint-disable-next-line no-await-in-loop -- 批量强制中奖需要逐个执行，确保错误隔离
           const result = await this.forceWin(
             adminId,
             operation.user_id,
@@ -1115,7 +1117,7 @@ class ManagementStrategy {
    * ])
    * // 返回：{ success: [{...}, {...}], failed: [], total: 2, success_count: 2, failed_count: 0 }
    */
-  async batchForceLose (adminId, operations) {
+  async batchForceLose(adminId, operations) {
     try {
       // 🛡️ 验证管理员权限（只验证一次）
       const adminValidation = await this.validateAdminPermission(adminId)
@@ -1134,6 +1136,7 @@ class ManagementStrategy {
       // 批量执行强制不中奖操作
       for (const operation of operations) {
         try {
+          // eslint-disable-next-line no-await-in-loop -- 批量强制不中奖需要逐个执行，确保错误隔离
           const result = await this.forceLose(
             adminId,
             operation.user_id,
@@ -1167,6 +1170,116 @@ class ManagementStrategy {
   }
 
   /**
+   * 获取管理策略状态 - V4.1新增方法
+   *
+   * 业务场景：获取管理策略的当前运行状态，用于系统监控和状态展示
+   *
+   * 返回内容：
+   * - 策略名称和版本
+   * - 缓存状态（大小、TTL配置）
+   * - 活跃设置统计（各类型数量）
+   * - 运行时间信息
+   *
+   * @returns {Promise<Object>} 管理策略状态对象
+   * @returns {string} return.strategy_name - 策略名称
+   * @returns {string} return.version - 策略版本
+   * @returns {string} return.status - 策略状态（active/inactive）
+   * @returns {Object} return.cache_info - 缓存信息
+   * @returns {number} return.cache_info.size - 缓存条目数
+   * @returns {number} return.cache_info.ttl_ms - 缓存TTL（毫秒）
+   * @returns {Object} return.active_settings - 活跃设置统计
+   * @returns {number} return.active_settings.force_win - 强制中奖设置数
+   * @returns {number} return.active_settings.force_lose - 强制不中奖设置数
+   * @returns {number} return.active_settings.probability_adjust - 概率调整设置数
+   * @returns {number} return.active_settings.user_queue - 用户队列设置数
+   * @returns {number} return.active_settings.total - 总活跃设置数
+   * @returns {string} return.timestamp - 状态获取时间戳（北京时间GMT+8格式）
+   *
+   * @example
+   * const strategy = new ManagementStrategy()
+   * const status = await strategy.getStatus()
+   * // 返回：{
+   * //   strategy_name: 'ManagementStrategy',
+   * //   version: '4.1',
+   * //   status: 'active',
+   * //   cache_info: { size: 15, ttl_ms: 300000 },
+   * //   active_settings: { force_win: 3, force_lose: 5, probability_adjust: 2, user_queue: 1, total: 11 },
+   * //   timestamp: '2025-11-08 12:00:00'
+   * // }
+   */
+  async getStatus() {
+    try {
+      // 统计各类型活跃设置数量
+      const settingTypes = ['force_win', 'force_lose', 'probability_adjust', 'user_queue']
+      const activeSettings = {
+        force_win: 0,
+        force_lose: 0,
+        probability_adjust: 0,
+        user_queue: 0,
+        total: 0
+      }
+
+      // 从数据库统计各类型活跃设置
+      for (const settingType of settingTypes) {
+        try {
+          // eslint-disable-next-line no-await-in-loop -- 统计各类型需要逐个查询
+          const count = await LotteryManagementSetting.count({
+            where: {
+              setting_type: settingType,
+              status: 'active',
+              [Op.or]: [{ expires_at: null }, { expires_at: { [Op.gt]: new Date() } }]
+            }
+          })
+          activeSettings[settingType] = count
+          activeSettings.total += count
+        } catch (countError) {
+          this.logger.warn(`统计${settingType}设置数量失败`, { error: countError.message })
+        }
+      }
+
+      const status = {
+        strategy_name: 'ManagementStrategy',
+        version: '4.1',
+        status: 'active',
+        cache_info: {
+          size: this.cache.size,
+          ttl_ms: this.cacheTTL
+        },
+        active_settings: activeSettings,
+        timestamp: BeijingTimeHelper.now()
+      }
+
+      this.logger.debug('获取管理策略状态成功', {
+        cache_size: status.cache_info.size,
+        active_settings_total: status.active_settings.total
+      })
+
+      return status
+    } catch (error) {
+      this.logError('获取管理策略状态失败', { error: error.message })
+      // 返回基础状态信息（即使部分统计失败）
+      return {
+        strategy_name: 'ManagementStrategy',
+        version: '4.1',
+        status: 'error',
+        cache_info: {
+          size: this.cache ? this.cache.size : 0,
+          ttl_ms: this.cacheTTL || 300000
+        },
+        active_settings: {
+          force_win: 0,
+          force_lose: 0,
+          probability_adjust: 0,
+          user_queue: 0,
+          total: 0
+        },
+        error: error.message,
+        timestamp: BeijingTimeHelper.now()
+      }
+    }
+  }
+
+  /**
    * 日志错误记录
    * @private
    *
@@ -1174,7 +1287,7 @@ class ManagementStrategy {
    * @param {Object} data - 附加数据（用于排障定位）
    * @returns {void} 无返回值
    */
-  logError (message, data) {
+  logError(message, data) {
     this.logger.error(message, { ...data, timestamp: BeijingTimeHelper.now() })
   }
 }

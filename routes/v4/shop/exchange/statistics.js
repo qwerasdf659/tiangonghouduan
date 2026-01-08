@@ -1,7 +1,7 @@
 /**
- * 兑换市场模块 - 统计数据
+ * B2C材料兑换模块 - 统计数据
  *
- * @route /api/v4/exchange_market
+ * @route /api/v4/shop/exchange
  * @description 管理员查询兑换市场统计数据
  *
  * API列表：
@@ -22,7 +22,7 @@ const { handleServiceError } = require('../../../../middleware/validation')
 const logger = require('../../../../utils/logger').logger
 
 /**
- * @route GET /api/v4/exchange_market/statistics
+ * @route GET /api/v4/shop/exchange/statistics
  * @desc 获取兑换市场统计数据（管理员操作）
  * @access Private (仅管理员)
  *

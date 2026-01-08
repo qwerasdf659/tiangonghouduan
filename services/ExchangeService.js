@@ -513,6 +513,7 @@ class ExchangeService {
      * 扣减材料资产（使用统一账本AssetService）
      * business_type: exchange_debit（兑换市场材料扣减）
      */
+    // eslint-disable-next-line no-restricted-syntax
     const materialResult = await AssetService.changeBalance(
       {
         user_id,
@@ -569,12 +570,21 @@ class ExchangeService {
       `[兑换市场] 材料扣减成功：${totalPayAmount}个${item.cost_asset_code}，剩余余额通过统一账本管理`
     )
 
+    /*
+     * 🔴 P0治理：提取扣减流水ID用于对账（2026-01-09）
+     * - materialResult.transaction_record 包含资产流水记录
+     * - transaction_record.transaction_id 是流水主键
+     * - 写入 exchange_records.debit_transaction_id 用于订单-流水1:1对账
+     */
+    const debit_transaction_id = materialResult.transaction_record?.transaction_id || null
+
     // 4. 生成订单号
     const order_no = this._generateOrderNo()
 
     /*
-     * 5. 创建兑换订单（✅ 包含 idempotency_key 和材料支付字段）
+     * 5. 创建兑换订单（✅ 包含 idempotency_key、材料支付字段、debit_transaction_id）
      * 🔴 P1-1-5: 捕获唯一约束冲突（并发场景）
+     * 🔴 P0治理（2026-01-09）：记录 debit_transaction_id 用于订单-流水对账
      */
     let record
     try {
@@ -586,6 +596,7 @@ class ExchangeService {
           order_no,
           idempotency_key, // ✅ 记录 idempotency_key 用于幂等性（业界标准形态）
           business_id, // ✅ 业务唯一键（事务边界治理 - 2026-01-05）
+          debit_transaction_id, // ✅ 关联扣减流水ID（P0治理 - 2026-01-09）
           user_id,
           item_id,
           item_snapshot: {
@@ -822,6 +833,155 @@ class ExchangeService {
     const timestamp = Date.now()
     const random = Math.random().toString(36).substr(2, 6).toUpperCase()
     return `EM${timestamp}${random}`
+  }
+
+  /**
+   * 管理员获取全量订单列表（Admin Only）
+   *
+   * @description
+   * 管理员查看所有兑换订单，支持状态筛选、分页、排序。
+   * 返回的字段包含敏感信息（如管理员备注、成本价等），仅供后台使用。
+   *
+   * 业务场景：
+   * - 管理后台订单管理页面
+   * - 订单状态筛选和批量处理
+   * - 订单详情查看
+   *
+   * @param {Object} options - 查询选项
+   * @param {string} [options.status] - 订单状态筛选（pending/completed/shipped/cancelled）
+   * @param {number} [options.user_id] - 用户ID筛选（可选）
+   * @param {number} [options.item_id] - 商品ID筛选（可选）
+   * @param {string} [options.order_no] - 订单号模糊搜索（可选）
+   * @param {number} [options.page=1] - 页码
+   * @param {number} [options.page_size=20] - 每页数量
+   * @param {string} [options.sort_by='created_at'] - 排序字段
+   * @param {string} [options.sort_order='DESC'] - 排序方向
+   * @returns {Promise<Object>} 订单列表和分页信息
+   *
+   * @example
+   * // 获取所有待处理订单
+   * const result = await ExchangeService.getAdminOrders({ status: 'pending', page: 1 });
+   */
+  static async getAdminOrders(options = {}) {
+    const {
+      status = null,
+      user_id = null,
+      item_id = null,
+      order_no = null,
+      page = 1,
+      page_size = 20,
+      sort_by = 'created_at',
+      sort_order = 'DESC'
+    } = options
+
+    try {
+      logger.info('[兑换市场] 管理员查询全量订单列表', {
+        status,
+        user_id,
+        item_id,
+        order_no,
+        page,
+        page_size
+      })
+
+      // 构建查询条件
+      const where = {}
+      if (status) {
+        where.status = status
+      }
+      if (user_id) {
+        where.user_id = user_id
+      }
+      if (item_id) {
+        where.item_id = item_id
+      }
+      if (order_no) {
+        // 订单号模糊搜索
+        where.order_no = {
+          [Op.like]: `%${order_no}%`
+        }
+      }
+
+      // 分页参数
+      const offset = (page - 1) * page_size
+      const limit = page_size
+
+      // 查询订单列表（使用管理员视图，包含敏感字段）
+      const { count, rows } = await ExchangeRecord.findAndCountAll({
+        where,
+        attributes: EXCHANGE_MARKET_ATTRIBUTES.adminMarketOrderView, // ✅ 使用管理员视图
+        limit,
+        offset,
+        order: [[sort_by, sort_order]]
+      })
+
+      logger.info(
+        `[兑换市场] 管理员查询订单成功：找到${count}个订单，返回第${page}页（${rows.length}个）`
+      )
+
+      return {
+        success: true,
+        orders: rows,
+        pagination: {
+          total: count,
+          page,
+          page_size,
+          total_pages: Math.ceil(count / page_size)
+        },
+        filters: {
+          status,
+          user_id,
+          item_id,
+          order_no
+        },
+        timestamp: BeijingTimeHelper.now()
+      }
+    } catch (error) {
+      logger.error('[兑换市场] 管理员查询订单列表失败:', error.message)
+      throw new Error(`查询订单列表失败: ${error.message}`)
+    }
+  }
+
+  /**
+   * 管理员获取订单详情（Admin Only）
+   *
+   * @description
+   * 管理员查看订单详情，返回所有字段（包含敏感信息）。
+   * 与用户端 getOrderDetail 不同，此方法不验证 user_id，返回完整信息。
+   *
+   * @param {string} order_no - 订单号
+   * @returns {Promise<Object>} 订单详情
+   */
+  static async getAdminOrderDetail(order_no) {
+    try {
+      logger.info('[兑换市场] 管理员查询订单详情', { order_no })
+
+      const order = await ExchangeRecord.findOne({
+        where: { order_no },
+        attributes: EXCHANGE_MARKET_ATTRIBUTES.adminMarketOrderView // ✅ 使用管理员视图
+      })
+
+      if (!order) {
+        const notFoundError = new Error('订单不存在')
+        notFoundError.statusCode = 404
+        notFoundError.errorCode = 'ORDER_NOT_FOUND'
+        throw notFoundError
+      }
+
+      logger.info('[兑换市场] 管理员获取订单详情成功', {
+        order_no,
+        status: order.status
+      })
+
+      return {
+        success: true,
+        order,
+        timestamp: BeijingTimeHelper.now()
+      }
+    } catch (error) {
+      logger.error(`[兑换市场] 管理员查询订单详情失败(order_no:${order_no}):`, error.message)
+      throw error
+    }
   }
 
   /**

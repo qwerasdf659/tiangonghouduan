@@ -3,6 +3,7 @@
  * 🛡️ 测试UUID角色系统的认证中间件功能
  * 创建时间：2025年01月21日
  * 更新时间：2025年01月28日
+ * 🔴 P0-1修复（2026-01-08）：移除硬编码 user_id=31，从 global.testData 动态获取
  */
 
 const { authenticateToken, generateTokens, requireAdmin } = require('../../middleware/auth.js')
@@ -12,15 +13,24 @@ describe('auth 中间件测试 - UUID角色系统', () => {
   let validUser, adminUser, validToken, _adminToken
 
   beforeAll(async () => {
-    // 真实的测试用户数据（基于UUID角色系统）
+    // 🔴 P0-1修复：从 global.testData 获取动态测试用户ID
+    const testUserId = global.testData?.testUser?.user_id
+    if (!testUserId) {
+      console.warn('⚠️ [auth.test.js] global.testData.testUser.user_id 未初始化，测试可能失败')
+    }
+
+    /*
+     * 真实的测试用户数据（基于UUID角色系统）
+     * 🔴 P0-1修复：使用动态 user_id
+     */
     validUser = {
-      user_id: 31, // 正确的user_id
+      user_id: testUserId, // 🔴 P0-1修复：动态获取，不再硬编码
       mobile: '13612227930',
       status: 'active'
     }
 
     adminUser = {
-      user_id: 31, // 正确的user_id（同一用户既是普通用户也是管理员）
+      user_id: testUserId, // 🔴 P0-1修复：动态获取，不再硬编码
       mobile: '13612227930',
       status: 'active',
       role_level: 100 // 管理员权限级别

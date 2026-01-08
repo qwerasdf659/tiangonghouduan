@@ -179,7 +179,8 @@ describe('核销系统修复验证测试', () => {
       }
 
       const successCount = responses.filter(r => r.body.success === true).length
-      const conflictOrOtherCount = responses.filter(
+      // 统计冲突或其他失败（用于调试，不影响断言）
+      const _conflictOrOtherCount = responses.filter(
         r => r.status === 409 || r.body.success === false
       ).length
 

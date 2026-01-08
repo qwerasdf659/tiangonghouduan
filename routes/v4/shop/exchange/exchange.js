@@ -1,7 +1,7 @@
 /**
- * 兑换市场模块 - 兑换操作
+ * B2C材料兑换模块 - 兑换操作
  *
- * @route /api/v4/exchange_market
+ * @route /api/v4/shop/exchange
  * @description 用户兑换商品操作
  *
  * API列表：
@@ -34,7 +34,7 @@ const IdempotencyService = require('../../../../services/IdempotencyService')
 const TransactionManager = require('../../../../utils/TransactionManager')
 
 /**
- * @route POST /api/v4/exchange_market/exchange
+ * @route POST /api/v4/shop/exchange/exchange
  * @desc 兑换商品（V4.5.0 材料资产支付）
  * @access Private (需要登录)
  *
@@ -104,7 +104,7 @@ router.post('/exchange', authenticateToken, async (req, res) => {
      * 统一使用 IdempotencyService 进行请求级幂等控制
      */
     const idempotencyResult = await IdempotencyService.getOrCreateRequest(idempotency_key, {
-      api_path: '/api/v4/exchange_market/exchange',
+      api_path: '/api/v4/shop/exchange/exchange',
       http_method: 'POST',
       request_params: { item_id: itemId, quantity: exchangeQuantity },
       user_id
@@ -129,7 +129,7 @@ router.post('/exchange', authenticateToken, async (req, res) => {
      * 使用 TransactionManager 统一事务边界（符合治理决策）
      * 服务层内部使用此幂等键生成派生子事务幂等键
      */
-    const result = await TransactionManager.execute(async (transaction) => {
+    const result = await TransactionManager.execute(async transaction => {
       return await ExchangeService.exchangeItem(user_id, itemId, exchangeQuantity, {
         idempotency_key,
         transaction

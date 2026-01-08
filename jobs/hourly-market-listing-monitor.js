@@ -1,5 +1,7 @@
 'use strict'
 
+/* eslint-disable no-await-in-loop -- 监控任务需要逐个检查异常记录，错误隔离 */
+
 /**
  * 市场挂牌异常监控定时任务
  *

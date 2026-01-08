@@ -78,7 +78,7 @@ class ChatRateLimitService {
    * @static
    * @returns {void} 无返回值，启动三个 setInterval 定期清理内存中的时间戳记录
    */
-  static initCleanup () {
+  static initCleanup() {
     // 清理用户消息时间戳
     setInterval(() => {
       const now = Date.now()
@@ -181,7 +181,7 @@ class ChatRateLimitService {
    *   return res.apiError('发送消息过于频繁', 'RATE_LIMIT_EXCEEDED', result, 429)
    * }
    */
-  static checkMessageRateLimit (userId, role_level = 0) {
+  static checkMessageRateLimit(userId, role_level = 0) {
     const now = Date.now()
 
     // 根据角色等级读取频率限制配置
@@ -262,7 +262,7 @@ class ChatRateLimitService {
    *   return res.apiError(`创建会话过于频繁，请${result.remainingTime}秒后再试`, 'RATE_LIMIT_EXCEEDED', result, 429)
    * }
    */
-  static checkCreateSessionRateLimit (userId) {
+  static checkCreateSessionRateLimit(userId) {
     const now = Date.now()
 
     // 从配置文件读取限制参数
@@ -321,7 +321,7 @@ class ChatRateLimitService {
    *
    * @static
    */
-  static async pushMessageWithRetry (
+  static async pushMessageWithRetry(
     ChatWebSocketService,
     sessionAdminId,
     messageData,
@@ -357,6 +357,7 @@ class ChatRateLimitService {
           // 还有重试机会，等待后重试（指数退避：1秒、2秒、3秒）
           const delaySeconds = attempt
           logger.info(`⏰ ${delaySeconds}秒后进行第${attempt + 1}次重试...`)
+          // eslint-disable-next-line no-await-in-loop -- WebSocket重试需要串行等待
           await new Promise(resolve => {
             setTimeout(() => {
               resolve()
@@ -388,7 +389,7 @@ class ChatRateLimitService {
    *
    * @static
    */
-  static getStats () {
+  static getStats() {
     return {
       userMessageCount: ChatRateLimitService.userMessageTimestamps.size,
       adminMessageCount: ChatRateLimitService.adminMessageTimestamps.size,
@@ -413,7 +414,7 @@ class ChatRateLimitService {
    * @static
    * @returns {void} 无返回值，按 type 清理内存中的限流时间戳记录
    */
-  static resetUserLimit (userId, type = 'all') {
+  static resetUserLimit(userId, type = 'all') {
     if (type === 'message' || type === 'all') {
       ChatRateLimitService.userMessageTimestamps.delete(userId)
       ChatRateLimitService.adminMessageTimestamps.delete(userId)

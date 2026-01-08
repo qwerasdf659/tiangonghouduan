@@ -254,6 +254,116 @@ function normalizeTargetTypes(targetTypes) {
   return { normalized, mapping }
 }
 
+/**
+ * 启动时校验数据库 target_type 一致性
+ *
+ * @description 【P0-5 修复】防止 target_type 漂移
+ * 在应用启动时校验数据库 admin_operation_logs.target_type 字段
+ * 是否存在未在常量中定义的值（可能的数据漂移）
+ *
+ * @param {Object} sequelize - Sequelize 实例
+ * @returns {Promise<{valid: boolean, unknown: string[], stats: Object}>} 校验结果
+ *
+ * @example
+ * // 在 app.js 启动时调用
+ * const { validateTargetTypeConsistency } = require('./constants/AuditTargetTypes')
+ * const result = await validateTargetTypeConsistency(sequelize)
+ * if (!result.valid) {
+ *   console.error('target_type 存在未知值：', result.unknown)
+ * }
+ */
+async function validateTargetTypeConsistency(sequelize) {
+  const logger = require('../utils/logger').logger
+
+  try {
+    logger.info('[启动校验] 开始校验审计日志 target_type 一致性...')
+
+    // 1. 查询数据库中所有不同的 target_type 值
+    const [results] = await sequelize.query(`
+      SELECT target_type, COUNT(*) as count
+      FROM admin_operation_logs
+      WHERE target_type IS NOT NULL
+      GROUP BY target_type
+      ORDER BY count DESC
+    `)
+
+    if (results.length === 0) {
+      logger.info('[启动校验] admin_operation_logs 表为空，跳过 target_type 校验')
+      return { valid: true, unknown: [], stats: {}, skipped: true }
+    }
+
+    // 2. 检查每个 target_type 是否在有效集合中
+    const unknown = []
+    const stats = {
+      total_types: results.length,
+      total_records: 0,
+      valid_records: 0,
+      unknown_records: 0,
+      distribution: {}
+    }
+
+    results.forEach(row => {
+      const targetType = row.target_type
+      const count = parseInt(row.count, 10)
+      stats.total_records += count
+      stats.distribution[targetType] = count
+
+      if (!isValidTargetType(targetType)) {
+        unknown.push({
+          value: targetType,
+          count,
+          normalized: normalizeTargetType(targetType),
+          is_normalizable: isValidTargetType(normalizeTargetType(targetType))
+        })
+        stats.unknown_records += count
+      } else {
+        stats.valid_records += count
+      }
+    })
+
+    // 3. 生成校验结果
+    if (unknown.length > 0) {
+      logger.warn('[启动校验] ⚠️ target_type 一致性校验发现未知值', {
+        unknown_count: unknown.length,
+        unknown_records: stats.unknown_records,
+        unknown_values: unknown.map(u => ({
+          value: u.value,
+          count: u.count,
+          suggestion: u.is_normalizable
+            ? `可规范化为 ${u.normalized}`
+            : '需要添加到 AUDIT_TARGET_TYPES'
+        }))
+      })
+
+      // 如果所有未知值都可以规范化，则只是警告
+      const allNormalizable = unknown.every(u => u.is_normalizable)
+      if (allNormalizable) {
+        logger.info('[启动校验] 所有未知值都可通过 normalizeTargetType() 规范化，不阻断启动')
+        return { valid: true, unknown, stats, warning: true }
+      }
+
+      // 存在无法规范化的值，校验失败
+      logger.error('[启动校验] ❌ 存在无法规范化的 target_type 值，请检查数据或添加到常量定义')
+      return { valid: false, unknown, stats }
+    }
+
+    logger.info('[启动校验] ✅ target_type 一致性校验通过', {
+      total_types: stats.total_types,
+      total_records: stats.total_records
+    })
+
+    return { valid: true, unknown: [], stats }
+  } catch (error) {
+    logger.error('[启动校验] target_type 校验出错', {
+      error: error.message,
+      stack: error.stack
+    })
+
+    // 校验出错不阻断启动，但记录错误
+    return { valid: true, unknown: [], stats: {}, error: error.message }
+  }
+}
+
 module.exports = {
   // 常量
   AUDIT_TARGET_TYPES,
@@ -265,5 +375,8 @@ module.exports = {
   isValidTargetType,
   getTargetTypeDisplayName,
   getLegacyMappings,
-  normalizeTargetTypes
+  normalizeTargetTypes,
+
+  // 启动校验函数（P0-5 实施）
+  validateTargetTypeConsistency
 }

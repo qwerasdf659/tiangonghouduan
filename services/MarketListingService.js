@@ -829,6 +829,7 @@ class MarketListingService {
 
     // ========== 7. 冻结卖家资产 ==========
     const freezeIdempotencyKey = `listing_freeze_${idempotency_key}`
+    // eslint-disable-next-line no-restricted-syntax -- 已传递 transaction
     const freezeResult = await AssetService.freeze(
       {
         user_id: seller_user_id,
@@ -974,6 +975,7 @@ class MarketListingService {
     let unfreezeResult = null
     if (listing.seller_offer_frozen && listing.offer_asset_code && listing.offer_amount > 0) {
       const unfreezeIdempotencyKey = `listing_unfreeze_${listing.listing_id}_withdraw`
+      // eslint-disable-next-line no-restricted-syntax -- 已传递 transaction
       unfreezeResult = await AssetService.unfreeze(
         {
           user_id: seller_user_id,
@@ -1138,6 +1140,7 @@ class MarketListingService {
       listing.offer_amount > 0
     ) {
       const unfreezeIdempotencyKey = `listing_admin_withdraw_${listing_id}_${Date.now()}`
+      // eslint-disable-next-line no-restricted-syntax -- 已传递 transaction
       unfreezeResult = await AssetService.unfreeze(
         {
           user_id: listing.seller_user_id,

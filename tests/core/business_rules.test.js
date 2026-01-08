@@ -64,7 +64,7 @@ async function getUserPoints(tester, user_id) {
  * - assets: 可叠加资产（材料、碎片等）
  * - items: 不可叠加物品（优惠券、实物商品等）
  */
-async function getUserBackpack(tester, user_id) {
+async function getUserBackpack(tester, _user_id) {
   const response = await tester.make_authenticated_request(
     'GET',
     '/api/v4/backpack',

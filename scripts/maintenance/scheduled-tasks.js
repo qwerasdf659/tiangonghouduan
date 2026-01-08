@@ -52,6 +52,8 @@ const HourlyCleanupUnboundImages = require('../../jobs/hourly-cleanup-unbound-im
 const HourlyExpireFungibleAssetListings = require('../../jobs/hourly-expire-fungible-asset-listings')
 // 2026-01-08新增：C2C材料交易 - 市场挂牌异常监控
 const HourlyMarketListingMonitor = require('../../jobs/hourly-market-listing-monitor')
+// 2026-01-09新增：P0-2 孤儿冻结检测与清理（每天凌晨2点）
+const DailyOrphanFrozenCheck = require('../../jobs/daily-orphan-frozen-check')
 
 /**
  * 定时任务管理类
@@ -117,6 +119,9 @@ class ScheduledTasks {
 
     // 任务18: 每小时市场挂牌异常监控（2026-01-08新增 - C2C材料交易 Phase 2）
     this.scheduleHourlyMarketListingMonitor()
+
+    // 任务19: 每天凌晨2点孤儿冻结检测与清理（2026-01-09新增 - P0-2修复）
+    this.scheduleDailyOrphanFrozenCheck()
 
     logger.info('所有定时任务已初始化完成')
   }
@@ -1531,6 +1536,129 @@ class ScheduledTasks {
       return report
     } catch (error) {
       logger.error('[手动触发] 市场挂牌监控失败', { error: error.message })
+      throw error
+    }
+  }
+
+  /**
+   * 定时任务19: 每天凌晨2点孤儿冻结检测与清理
+   * Cron表达式: 0 2 * * * (每天凌晨2点)
+   *
+   * 业务场景（P0-2 修复 2026-01-09）：
+   * - 检测孤儿冻结（frozen_amount > 实际活跃挂牌冻结总额）
+   * - 自动清理孤儿冻结资产（解冻到可用余额）
+   * - 发送告警通知给管理员
+   * - 记录完整审计日志
+   *
+   * 决策记录：
+   * - 固定每天凌晨2点执行（已拍板）
+   * - 自动解冻机制已确认符合业务合规要求
+   * - 使用 OrphanFrozenCleanupService 作为唯一入口
+   * - 分布式锁已在 Job 层实现
+   *
+   * @returns {void}
+   */
+  static scheduleDailyOrphanFrozenCheck() {
+    cron.schedule('0 2 * * *', async () => {
+      const lockKey = 'lock:daily_orphan_frozen_check'
+      const lockValue = `${process.pid}_${Date.now()}`
+      let redisClient = null
+
+      try {
+        // 获取 Redis 客户端
+        const { getRawClient } = require('../../utils/UnifiedRedisClient')
+        redisClient = getRawClient()
+
+        // 尝试获取分布式锁（30分钟过期，防止任务执行过长）
+        const acquired = await redisClient.set(lockKey, lockValue, 'EX', 1800, 'NX')
+
+        if (!acquired) {
+          logger.info('[定时任务] 其他实例正在执行孤儿冻结检测，跳过')
+          return
+        }
+
+        logger.info('[定时任务] 获取分布式锁成功，开始执行孤儿冻结检测...', {
+          lock_key: lockKey,
+          lock_value: lockValue
+        })
+
+        // 调用 Job 类执行孤儿冻结检测与清理
+        const report = await DailyOrphanFrozenCheck.execute({
+          dryRun: false, // 正式执行，非演练模式
+          sendNotification: true // 发送通知给管理员
+        })
+
+        if (report.detection.orphan_count > 0) {
+          logger.warn(
+            `[定时任务] 孤儿冻结检测完成：发现 ${report.detection.orphan_count} 条孤儿冻结`,
+            {
+              total_orphan_amount: report.detection.total_orphan_amount,
+              cleaned_count: report.cleanup?.cleaned_count || 0,
+              failed_count: report.cleanup?.failed_count || 0,
+              duration_ms: report.duration_ms
+            }
+          )
+        } else {
+          logger.info('[定时任务] 孤儿冻结检测完成：系统状态良好，无孤儿冻结')
+        }
+
+        // 释放锁
+        await redisClient.del(lockKey)
+        logger.info('[定时任务] 分布式锁已释放', { lock_key: lockKey })
+      } catch (error) {
+        logger.error('[定时任务] 孤儿冻结检测失败', { error: error.message })
+
+        // 确保释放锁
+        if (redisClient) {
+          try {
+            await redisClient.del(lockKey)
+          } catch (unlockError) {
+            logger.error('[定时任务] 释放分布式锁失败', { error: unlockError.message })
+          }
+        }
+      }
+    })
+
+    logger.info('✅ 定时任务已设置: 孤儿冻结检测与清理（每天凌晨2点执行，支持分布式锁）')
+  }
+
+  /**
+   * 手动触发孤儿冻结检测与清理（用于测试）
+   *
+   * 业务场景：手动执行孤儿冻结检测，用于开发调试和即时检查
+   *
+   * @param {Object} options - 执行选项
+   * @param {boolean} [options.dryRun=true] - 是否为演练模式（默认true，仅检测不清理）
+   * @param {boolean} [options.sendNotification=false] - 是否发送通知（默认false）
+   * @returns {Promise<Object>} 检测报告对象
+   *
+   * @example
+   * const ScheduledTasks = require('./scripts/maintenance/scheduled-tasks')
+   * // 演练模式（仅检测）
+   * const report = await ScheduledTasks.manualOrphanFrozenCheck({ dryRun: true })
+   * console.log('孤儿冻结数量:', report.detection.orphan_count)
+   *
+   * // 正式执行（检测并清理）
+   * const report = await ScheduledTasks.manualOrphanFrozenCheck({ dryRun: false })
+   * console.log('清理数量:', report.cleanup?.cleaned_count)
+   */
+  static async manualOrphanFrozenCheck(options = {}) {
+    const { dryRun = true, sendNotification = false } = options
+
+    try {
+      logger.info('[手动触发] 开始执行孤儿冻结检测...', { dryRun, sendNotification })
+      const report = await DailyOrphanFrozenCheck.execute({ dryRun, sendNotification })
+
+      logger.info('[手动触发] 孤儿冻结检测完成', {
+        orphan_count: report.detection.orphan_count,
+        total_orphan_amount: report.detection.total_orphan_amount,
+        cleaned_count: report.cleanup?.cleaned_count || 0,
+        duration_ms: report.duration_ms
+      })
+
+      return report
+    } catch (error) {
+      logger.error('[手动触发] 孤儿冻结检测失败', { error: error.message })
       throw error
     }
   }

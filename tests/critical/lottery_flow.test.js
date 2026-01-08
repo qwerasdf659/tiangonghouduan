@@ -24,8 +24,10 @@
  *
  * 测试数据：
  * - 使用真实数据库 restaurant_points_dev
- * - 测试账号：13612227930 (user_id: 31)
+ * - 测试账号：13612227930（user_id 从 global.testData 动态获取）
  * - 统一测试数据：tests/helpers/test-data.js
+ *
+ * 🔴 P0-1修复（2026-01-08）：移除硬编码 user_id，从 global.testData 动态获取
  */
 
 const request = require('supertest')

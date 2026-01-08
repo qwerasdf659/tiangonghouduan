@@ -108,9 +108,9 @@
  * // 示例2：查看引擎健康状态
  * const health = engine.getEngineHealth();
  * logger.info(`运行时长: ${health.uptime_hours}小时`);
- * logger.info(`总执行次数: ${health.metrics.totalExecutions}`);
- * logger.info(`成功率: ${health.metrics.successRate}%`);
- * logger.info(`平均执行时间: ${health.metrics.averageExecutionTime}ms`);
+ * logger.info(`总执行次数: ${health.metrics.total_executions}`);
+ * logger.info(`成功率: ${health.metrics.success_rate}%`);
+ * logger.info(`平均执行时间: ${health.metrics.average_execution_time}ms`);
  * ```
  *
  * @version 4.0.0
@@ -174,14 +174,14 @@ class UnifiedLotteryEngine {
     this.strategies = new Map()
     this.initializeStrategies()
 
-    // 性能指标
+    // 性能指标（统一使用 snake_case 命名）
     this.metrics = {
-      totalExecutions: 0,
-      successfulExecutions: 0,
-      averageExecutionTime: 0,
-      executionTimes: [],
-      strategiesUsed: {},
-      lastResetTime: BeijingTimeHelper.now()
+      total_executions: 0,
+      successful_executions: 0,
+      average_execution_time: 0,
+      execution_times: [],
+      strategies_used: {},
+      last_reset_time: BeijingTimeHelper.now()
     }
 
     // 启动时间戳
@@ -293,6 +293,7 @@ class UnifiedLotteryEngine {
 
         try {
           // 策略验证
+          // eslint-disable-next-line no-await-in-loop -- 策略按优先级串行执行
           const isValid = await this.validateStrategy(strategy, executionContext)
           if (!isValid) {
             this.logDebug(`策略验证失败: ${strategyName}`)
@@ -300,6 +301,7 @@ class UnifiedLotteryEngine {
           }
 
           // 执行策略（传递transaction参数）
+          // eslint-disable-next-line no-await-in-loop -- 策略按优先级串行执行
           const strategyResult = await this.executeWithTimeout(
             strategy,
             executionContext,
@@ -525,27 +527,27 @@ class UnifiedLotteryEngine {
   updateMetrics(startTime, success, strategyUsed) {
     const executionTime = Math.max(BeijingTimeHelper.timestamp() - startTime, 1) // 最小1ms
 
-    this.metrics.totalExecutions++
+    this.metrics.total_executions++
     if (success) {
-      this.metrics.successfulExecutions++
+      this.metrics.successful_executions++
     }
 
     // 更新执行时间统计
-    this.metrics.executionTimes.push(executionTime)
-    if (this.metrics.executionTimes.length > 100) {
-      this.metrics.executionTimes = this.metrics.executionTimes.slice(-100)
+    this.metrics.execution_times.push(executionTime)
+    if (this.metrics.execution_times.length > 100) {
+      this.metrics.execution_times = this.metrics.execution_times.slice(-100)
     }
 
     // 计算平均执行时间
-    this.metrics.averageExecutionTime = Math.round(
-      this.metrics.executionTimes.reduce((sum, time) => sum + time, 0) /
-        this.metrics.executionTimes.length
+    this.metrics.average_execution_time = Math.round(
+      this.metrics.execution_times.reduce((sum, time) => sum + time, 0) /
+        this.metrics.execution_times.length
     )
 
     // 更新策略使用统计
     if (strategyUsed) {
-      this.metrics.strategiesUsed[strategyUsed] =
-        (this.metrics.strategiesUsed[strategyUsed] || 0) + 1
+      this.metrics.strategies_used[strategyUsed] =
+        (this.metrics.strategies_used[strategyUsed] || 0) + 1
     }
   }
 
@@ -617,21 +619,30 @@ class UnifiedLotteryEngine {
   /**
    * 获取性能指标
    *
-   * @returns {Object} 引擎性能指标数据
+   * @returns {Object} 引擎性能指标数据（统一使用 snake_case 命名）
+   * @returns {number} return.total_executions - 总执行次数
+   * @returns {number} return.successful_executions - 成功执行次数
+   * @returns {number} return.average_execution_time - 平均执行时间（毫秒）
+   * @returns {Object} return.strategies_used - 策略使用统计
+   * @returns {string} return.last_reset_time - 上次重置时间
+   * @returns {number} return.uptime - 运行时间（毫秒）
+   * @returns {string} return.uptime_formatted - 格式化的运行时间
+   * @returns {number} return.success_rate - 成功率（百分比）
+   * @returns {string} return.engine_status - 引擎状态
    */
   getMetrics() {
     const uptime = BeijingTimeHelper.timestamp() - this.startTime
-    const successRate =
-      this.metrics.totalExecutions > 0
-        ? (this.metrics.successfulExecutions / this.metrics.totalExecutions) * 100
+    const success_rate =
+      this.metrics.total_executions > 0
+        ? (this.metrics.successful_executions / this.metrics.total_executions) * 100
         : 0
 
     return {
       ...this.metrics,
       uptime,
-      uptimeFormatted: this.formatUptime(uptime),
-      successRate: Math.round(successRate * 100) / 100,
-      engineStatus: this.config.maintenanceMode ? 'maintenance' : 'active'
+      uptime_formatted: this.formatUptime(uptime),
+      success_rate: Math.round(success_rate * 100) / 100,
+      engine_status: this.config.maintenanceMode ? 'maintenance' : 'active'
     }
   }
 
@@ -696,9 +707,9 @@ class UnifiedLotteryEngine {
         status: 'healthy',
         message: '引擎运行正常',
         strategies,
-        enabledStrategies: enabledStrategies.length,
-        totalExecutions: this.metrics.totalExecutions,
-        successRate: this.getMetrics().successRate,
+        enabled_strategies: enabledStrategies.length,
+        total_executions: this.metrics.total_executions,
+        success_rate: this.getMetrics().success_rate,
         uptime: this.formatUptime(BeijingTimeHelper.timestamp() - this.startTime),
         timestamp: this.getBeijingTimestamp(),
         version: this.version
@@ -1293,6 +1304,7 @@ class UnifiedLotteryEngine {
       )
 
       // 步骤1：统一扣除折扣后的总积分（在事务中执行）
+      // eslint-disable-next-line no-restricted-syntax -- 已传递 transaction（见下方 options 参数）
       await AssetService.changeBalance(
         {
           user_id,
@@ -1365,6 +1377,7 @@ class UnifiedLotteryEngine {
          * - 让底层的保底机制、积分扣除等都在统一事务中
          * - 任何环节失败，都能回滚所有操作，保证数据一致性
          */
+        // eslint-disable-next-line no-await-in-loop -- 多连抽需要在事务内串行执行
         const drawResult = await this.executeLottery(context, transaction)
 
         if (drawResult.success) {

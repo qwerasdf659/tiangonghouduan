@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>审计日志 - 管理后台</title>
+
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+  <link href="/admin/css/common.css" rel="stylesheet">
+</head>
+<body class="bg-light">
+  <!-- 顶部导航 -->
+  <nav class="navbar navbar-dark bg-primary">
+    <div class="container-fluid">
+      <a href="/admin/dashboard.html" class="navbar-brand">
+        <i class="bi bi-arrow-left me-2"></i>📋 审计日志
+      </a>
+      <div>
+        <span class="text-light me-3" id="welcomeText">欢迎，管理员</span>
+        <button class="btn btn-outline-light btn-sm" id="logoutBtn">退出登录</button>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container-fluid mt-4">
+    <!-- 统计卡片 -->
+    <div class="row g-3 mb-3">
+      <div class="col-md-3">
+        <div class="card">
+          <div class="card-body text-center">
+            <h6 class="text-muted">今日操作</h6>
+            <h3 class="text-primary" id="todayLogs">-</h3>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="card border-info">
+          <div class="card-body text-center">
+            <h6 class="text-muted">本周操作</h6>
+            <h3 class="text-info" id="weekLogs">-</h3>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="card border-success">
+          <div class="card-body text-center">
+            <h6 class="text-muted">成功操作</h6>
+            <h3 class="text-success" id="successLogs">-</h3>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="card border-danger">
+          <div class="card-body text-center">
+            <h6 class="text-muted">失败操作</h6>
+            <h3 class="text-danger" id="failedLogs">-</h3>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 筛选区域 -->
+    <div class="card mb-3">
+      <div class="card-body">
+        <div class="row g-3">
+          <div class="col-md-2">
+            <label class="form-label">操作类型</label>
+            <select class="form-select" id="operationTypeFilter">
+              <option value="">全部类型</option>
+              <option value="USER_CREATE">用户创建</option>
+              <option value="USER_UPDATE">用户更新</option>
+              <option value="USER_DELETE">用户删除</option>
+              <option value="POINTS_ADJUST">积分调整</option>
+              <option value="PRIZE_CONFIG">奖品配置</option>
+              <option value="ORDER_UPDATE">订单更新</option>
+              <option value="SYSTEM_CONFIG">系统配置</option>
+              <option value="LOGIN">登录操作</option>
+            </select>
+          </div>
+          <div class="col-md-2">
+            <label class="form-label">目标类型</label>
+            <select class="form-select" id="targetTypeFilter">
+              <option value="">全部目标</option>
+              <option value="user">用户</option>
+              <option value="prize">奖品</option>
+              <option value="order">订单</option>
+              <option value="system">系统</option>
+              <option value="points">积分</option>
+            </select>
+          </div>
+          <div class="col-md-2">
+            <label class="form-label">操作员ID</label>
+            <input type="number" class="form-control" id="operatorIdFilter" placeholder="操作员ID">
+          </div>
+          <div class="col-md-2">
+            <label class="form-label">开始日期</label>
+            <input type="date" class="form-control" id="startDateFilter">
+          </div>
+          <div class="col-md-2">
+            <label class="form-label">结束日期</label>
+            <input type="date" class="form-control" id="endDateFilter">
+          </div>
+          <div class="col-md-2">
+            <label class="form-label">&nbsp;</label>
+            <button class="btn btn-primary w-100" id="searchBtn">
+              <i class="bi bi-search"></i> 查询
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 日志列表 -->
+    <div class="card">
+      <div class="card-body">
+        <div class="table-responsive">
+          <table class="table table-hover align-middle table-sm">
+            <thead class="table-light">
+              <tr>
+                <th style="width: 60px;">ID</th>
+                <th>操作类型</th>
+                <th>目标</th>
+                <th>操作描述</th>
+                <th>操作员</th>
+                <th>IP地址</th>
+                <th>结果</th>
+                <th>操作时间</th>
+                <th style="width: 80px;">操作</th>
+              </tr>
+            </thead>
+            <tbody id="logsTableBody">
+              <tr>
+                <td colspan="9" class="text-center py-5">
+                  <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">加载中...</span>
+                  </div>
+                  <p class="mt-2 text-muted">正在加载数据...</p>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- 分页 -->
+        <nav aria-label="分页" class="mt-3">
+          <ul class="pagination justify-content-end" id="pagination"></ul>
+        </nav>
+      </div>
+    </div>
+  </div>
+
+  <!-- 日志详情模态框 -->
+  <div class="modal fade" id="logDetailModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">
+            <i class="bi bi-file-text"></i> 审计日志详情
+          </h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label text-muted">日志ID</label>
+              <p id="detailLogId" class="fw-bold">-</p>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label text-muted">操作时间</label>
+              <p id="detailCreatedAt" class="fw-bold">-</p>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label text-muted">操作类型</label>
+              <p id="detailOperationType">-</p>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label text-muted">操作结果</label>
+              <p id="detailResult">-</p>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label text-muted">目标类型</label>
+              <p id="detailTargetType">-</p>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label text-muted">目标ID</label>
+              <p id="detailTargetId">-</p>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label text-muted">操作员ID</label>
+              <p id="detailOperatorId">-</p>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label text-muted">IP地址</label>
+              <p id="detailIpAddress">-</p>
+            </div>
+            <div class="col-12">
+              <label class="form-label text-muted">操作描述</label>
+              <div class="border rounded p-3 bg-light" id="detailDescription">-</div>
+            </div>
+            <div class="col-12">
+              <label class="form-label text-muted">变更详情</label>
+              <pre class="border rounded p-3 bg-dark text-light" id="detailChanges" style="max-height: 300px; overflow: auto;">-</pre>
+            </div>
+            <div class="col-12" id="errorSection" style="display: none;">
+              <label class="form-label text-muted">错误信息</label>
+              <div class="border rounded p-3 bg-danger bg-opacity-10 text-danger" id="detailErrorMessage">-</div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 加载遮罩层 -->
+  <div class="loading-overlay" id="loadingOverlay" style="display:none;">
+    <div class="spinner-border text-light" style="width: 3rem; height: 3rem;" role="status">
+      <span class="visually-hidden">处理中...</span>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="/admin/js/admin-common.js"></script>
+
+  <script>
+    // 全局变量
+    let currentPage = 1;
+    const pageSize = 30;
+
+    // 页面加载
+    document.addEventListener('DOMContentLoaded', function() {
+      checkAuth();
+      initDateFilters();
+      loadAuditLogs();
+      loadStatistics();
+      bindEvents();
+    });
+
+    // 权限检查
+    function checkAuth() {
+      const token = getToken();
+      if (!token) {
+        window.location.href = '/admin/login.html';
+        return false;
+      }
+      checkAdminPermission();
+      return true;
+    }
+
+    // 初始化日期筛选器
+    function initDateFilters() {
+      const today = new Date();
+      const weekAgo = new Date(today);
+      weekAgo.setDate(today.getDate() - 7);
+      
+      document.getElementById('endDateFilter').value = today.toISOString().split('T')[0];
+      document.getElementById('startDateFilter').value = weekAgo.toISOString().split('T')[0];
+    }
+
+    // 绑定事件
+    function bindEvents() {
+      document.getElementById('logoutBtn').addEventListener('click', logout);
+      document.getElementById('searchBtn').addEventListener('click', handleSearch);
+    }
+
+    // 处理搜索
+    function handleSearch() {
+      currentPage = 1;
+      loadAuditLogs();
+    }
+
+    // 加载审计日志列表
+    async function loadAuditLogs() {
+      try {
+        showLoading(true);
+        
+        const operationType = document.getElementById('operationTypeFilter').value;
+        const targetType = document.getElementById('targetTypeFilter').value;
+        const operatorId = document.getElementById('operatorIdFilter').value.trim();
+        const startDate = document.getElementById('startDateFilter').value;
+        const endDate = document.getElementById('endDateFilter').value;
+        
+        const params = new URLSearchParams({
+          page: currentPage,
+          page_size: pageSize
+        });
+        
+        if (operationType) params.append('operation_type', operationType);
+        if (targetType) params.append('target_type', targetType);
+        if (operatorId) params.append('operator_id', operatorId);
+        if (startDate) params.append('start_date', startDate);
+        if (endDate) params.append('end_date', endDate);
+        
+        const response = await apiRequest(`/api/v4/console/system/audit-logs?${params}`);
+        
+        if (response && response.success) {
+          renderLogs(response.data.logs || response.data.list || []);
+          renderPagination(response.data.pagination);
+        } else {
+          showError(response?.message || '加载失败');
+        }
+      } catch (error) {
+        console.error('加载审计日志失败', error);
+        showError('加载失败，请稍后重试');
+      } finally {
+        showLoading(false);
+      }
+    }
+
+    // 加载统计数据
+    async function loadStatistics() {
+      try {
+        const response = await apiRequest('/api/v4/console/system/audit-logs/statistics');
+        
+        if (response && response.success) {
+          const stats = response.data.statistics || response.data;
+          document.getElementById('todayLogs').textContent = stats.today_count || 0;
+          document.getElementById('weekLogs').textContent = stats.week_count || 0;
+          document.getElementById('successLogs').textContent = stats.success_count || 0;
+          document.getElementById('failedLogs').textContent = stats.failed_count || 0;
+        }
+      } catch (error) {
+        console.error('加载统计数据失败', error);
+      }
+    }
+
+    // 渲染日志列表
+    function renderLogs(logs) {
+      const tbody = document.getElementById('logsTableBody');
+      
+      if (!logs || logs.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="9" class="text-center text-muted py-4">暂无数据</td></tr>';
+        return;
+      }
+      
+      tbody.innerHTML = logs.map(log => {
+        const id = log.log_id || log.id;
+        const operationBadge = getOperationTypeBadge(log.operation_type);
+        const resultBadge = getResultBadge(log.result || log.status);
+        
+        return `
+          <tr>
+            <td><small>${id}</small></td>
+            <td>${operationBadge}</td>
+            <td>
+              <small class="text-muted">${log.target_type || '-'}</small>
+              ${log.target_id ? `<br><code>${log.target_id}</code>` : ''}
+            </td>
+            <td>
+              <div style="max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                <small>${escapeHtml(log.description || log.action_description || '-')}</small>
+              </div>
+            </td>
+            <td><small>ID: ${log.operator_id || '-'}</small></td>
+            <td><small class="text-muted">${log.ip_address || '-'}</small></td>
+            <td>${resultBadge}</td>
+            <td><small>${formatDate(log.created_at)}</small></td>
+            <td>
+              <button class="btn btn-sm btn-outline-info" onclick="viewLogDetail(${id})">
+                <i class="bi bi-eye"></i>
+              </button>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    // 查看日志详情
+    async function viewLogDetail(id) {
+      try {
+        showLoading(true);
+        const response = await apiRequest(`/api/v4/console/system/audit-logs/${id}`);
+        
+        if (response && response.success) {
+          const log = response.data.log || response.data;
+          
+          document.getElementById('detailLogId').textContent = log.log_id || log.id;
+          document.getElementById('detailCreatedAt').textContent = formatDate(log.created_at);
+          document.getElementById('detailOperationType').innerHTML = getOperationTypeBadge(log.operation_type);
+          document.getElementById('detailResult').innerHTML = getResultBadge(log.result || log.status);
+          document.getElementById('detailTargetType').textContent = log.target_type || '-';
+          document.getElementById('detailTargetId').textContent = log.target_id || '-';
+          document.getElementById('detailOperatorId').textContent = log.operator_id || '-';
+          document.getElementById('detailIpAddress').textContent = log.ip_address || '-';
+          document.getElementById('detailDescription').textContent = log.description || log.action_description || '-';
+          
+          // 变更详情
+          const changes = log.changes || log.before_data || log.after_data;
+          if (changes) {
+            document.getElementById('detailChanges').textContent = JSON.stringify(changes, null, 2);
+          } else {
+            document.getElementById('detailChanges').textContent = '无变更记录';
+          }
+          
+          // 错误信息
+          const errorSection = document.getElementById('errorSection');
+          if (log.error_message) {
+            errorSection.style.display = 'block';
+            document.getElementById('detailErrorMessage').textContent = log.error_message;
+          } else {
+            errorSection.style.display = 'none';
+          }
+          
+          new bootstrap.Modal(document.getElementById('logDetailModal')).show();
+        } else {
+          showError(response?.message || '获取详情失败');
+        }
+      } catch (error) {
+        console.error('获取日志详情失败', error);
+        showError('获取失败，请稍后重试');
+      } finally {
+        showLoading(false);
+      }
+    }
+
+    // 渲染分页
+    function renderPagination(pagination) {
+      const paginationEl = document.getElementById('pagination');
+      if (!pagination || pagination.total_pages <= 1) {
+        paginationEl.innerHTML = '';
+        return;
+      }
+      
+      let html = '';
+      const maxPages = Math.min(pagination.total_pages, 10);
+      for (let i = 1; i <= maxPages; i++) {
+        html += `
+          <li class="page-item ${i === currentPage ? 'active' : ''}">
+            <a class="page-link" href="#" onclick="changePage(${i}); return false;">${i}</a>
+          </li>
+        `;
+      }
+      if (pagination.total_pages > 10) {
+        html += '<li class="page-item disabled"><span class="page-link">...</span></li>';
+      }
+      paginationEl.innerHTML = html;
+    }
+
+    function changePage(page) {
+      currentPage = page;
+      loadAuditLogs();
+    }
+
+    // 工具函数
+    function getOperationTypeBadge(type) {
+      const typeMap = {
+        'USER_CREATE': '<span class="badge bg-success">用户创建</span>',
+        'USER_UPDATE': '<span class="badge bg-info">用户更新</span>',
+        'USER_DELETE': '<span class="badge bg-danger">用户删除</span>',
+        'POINTS_ADJUST': '<span class="badge bg-warning">积分调整</span>',
+        'PRIZE_CONFIG': '<span class="badge bg-primary">奖品配置</span>',
+        'ORDER_UPDATE': '<span class="badge bg-info">订单更新</span>',
+        'SYSTEM_CONFIG': '<span class="badge bg-dark">系统配置</span>',
+        'LOGIN': '<span class="badge bg-secondary">登录操作</span>'
+      };
+      return typeMap[type] || `<span class="badge bg-secondary">${type || '-'}</span>`;
+    }
+
+    function getResultBadge(result) {
+      const resultMap = {
+        'success': '<span class="badge bg-success">成功</span>',
+        'SUCCESS': '<span class="badge bg-success">成功</span>',
+        'failed': '<span class="badge bg-danger">失败</span>',
+        'FAILED': '<span class="badge bg-danger">失败</span>',
+        'error': '<span class="badge bg-danger">错误</span>',
+        'ERROR': '<span class="badge bg-danger">错误</span>'
+      };
+      return resultMap[result] || `<span class="badge bg-secondary">${result || '-'}</span>`;
+    }
+
+    function escapeHtml(text) {
+      if (!text) return '';
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    function showLoading(show) {
+      document.getElementById('loadingOverlay').style.display = show ? 'flex' : 'none';
+    }
+
+    function showSuccess(message) {
+      alert(message);
+    }
+
+    function showError(message) {
+      alert(message);
+    }
+  </script>
+</body>
+</html>
+

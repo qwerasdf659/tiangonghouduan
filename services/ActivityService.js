@@ -60,7 +60,7 @@ class ActivityService {
    * @returns {Promise<Object>} 包含可参与活动列表和总数的对象
    * @throws {Error} 数据库查询失败等
    */
-  static async getAvailableActivitiesForUser (userId) {
+  static async getAvailableActivitiesForUser(userId) {
     try {
       // 1. 获取所有进行中的活动
       const now = BeijingTimeHelper.createBeijingTime()
@@ -99,15 +99,15 @@ class ActivityService {
         )
 
         if (validation.valid) {
-          // 获取用户今日抽奖次数
-          const todayStart = BeijingTimeHelper.getDayStart(now)
+          // 获取用户今日抽奖次数（使用北京时间的今日开始时间）
+          const todayStartTime = BeijingTimeHelper.todayStart()
           // eslint-disable-next-line no-await-in-loop
           const todayDrawCount = await models.LotteryDraw.count({
             where: {
               user_id: userId,
               campaign_id: activity.campaign_id,
               created_at: {
-                [Op.gte]: todayStart
+                [Op.gte]: todayStartTime
               }
             }
           })
@@ -148,7 +148,7 @@ class ActivityService {
    * @returns {Promise<Object>} 包含资格检查结果的对象
    * @throws {Error} 活动不存在等
    */
-  static async checkEligibility (userId, activityIdOrCode) {
+  static async checkEligibility(userId, activityIdOrCode) {
     try {
       // 查找活动（支持ID或代码）
       const activity = await models.LotteryCampaign.findOne({
@@ -193,7 +193,7 @@ class ActivityService {
    * @returns {Promise<Object>} 包含更新后活动信息的对象
    * @throws {Error} 活动不存在等
    */
-  static async configureConditions (campaignCode, participationConditions, conditionErrorMessages) {
+  static async configureConditions(campaignCode, participationConditions, conditionErrorMessages) {
     try {
       // 查找活动
       const activity = await models.LotteryCampaign.findOne({

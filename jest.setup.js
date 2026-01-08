@@ -6,6 +6,11 @@
  * - .env 是唯一配置真相源，测试环境也必须从 .env 加载
  * - 禁止在此硬编码数据库密码等敏感信息
  * - 测试必须连接真实数据库和Redis（不允许禁用）
+ *
+ * 🔴 P0-1修复（2026-01-08）：
+ * - 添加 initRealTestData() 调用，从数据库动态加载测试数据
+ * - 测试数据存储到 global.testData，供所有测试文件使用
+ * - 解决硬编码 user_id=31, campaign_id=2 的问题
  */
 
 // 🔧 2026-01-09：统一从 .env 加载配置（单一真相源）
@@ -38,6 +43,64 @@ console.log = (...args) => {
   }
   originalConsoleLog.apply(console, args)
 }
+
+/**
+ * 🔴 P0-1修复：全局测试数据初始化
+ *
+ * 在所有测试开始前，从数据库加载真实测试数据：
+ * - testUser: 通过 mobile='13612227930' 查询用户真实 user_id
+ * - testCampaign: 查询 status='active' 的活跃活动
+ *
+ * 测试文件可以通过 global.testData 获取这些数据
+ */
+global.beforeAll(async () => {
+  try {
+    const { initRealTestData } = require('./tests/helpers/test-setup')
+    const testData = await initRealTestData('13612227930')
+
+    // 将测试数据存储到 global 供所有测试使用
+    global.testData = {
+      // 测试用户（从数据库动态获取）
+      testUser: {
+        user_id: testData.testUser.user_id,
+        mobile: testData.testUser.mobile
+      },
+      // 管理员用户（同一用户）
+      adminUser: {
+        user_id: testData.adminUser.user_id,
+        mobile: testData.adminUser.mobile
+      },
+      // 测试活动（从数据库动态获取活跃活动）
+      testCampaign: {
+        campaign_id: testData.testCampaign.campaign_id,
+        campaign_name: testData.testCampaign.campaignName
+      },
+      // 标记初始化完成
+      _initialized: true
+    }
+
+    // 验证关键数据
+    if (!global.testData.testUser.user_id) {
+      console.warn('⚠️ [Jest Setup] 测试用户未找到，某些测试可能失败')
+    }
+    if (!global.testData.testCampaign.campaign_id) {
+      console.warn('⚠️ [Jest Setup] 活跃活动未找到，抽奖相关测试可能失败')
+    }
+
+    console.log(
+      `✅ [Jest Setup] 测试数据初始化完成: user_id=${global.testData.testUser.user_id}, campaign_id=${global.testData.testCampaign.campaign_id}`
+    )
+  } catch (error) {
+    console.error('❌ [Jest Setup] 测试数据初始化失败:', error.message)
+    // 设置空数据，允许测试继续（某些测试可能不需要这些数据）
+    global.testData = {
+      testUser: { user_id: null, mobile: '13612227930' },
+      adminUser: { user_id: null, mobile: '13612227930' },
+      testCampaign: { campaign_id: null, campaign_name: null },
+      _initialized: false
+    }
+  }
+})
 
 // 全局清理函数
 global.afterAll(async () => {

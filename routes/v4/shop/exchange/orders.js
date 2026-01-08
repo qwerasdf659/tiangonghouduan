@@ -1,7 +1,7 @@
 /**
- * 兑换市场模块 - 订单查询/管理
+ * B2C材料兑换模块 - 订单查询/管理
  *
- * @route /api/v4/exchange_market
+ * @route /api/v4/shop/exchange
  * @description 用户订单查询和管理员订单管理
  *
  * API列表：
@@ -25,7 +25,7 @@ const DataSanitizer = require('../../../../services/DataSanitizer')
 const logger = require('../../../../utils/logger').logger
 
 /**
- * @route GET /api/v4/exchange_market/orders
+ * @route GET /api/v4/shop/exchange/orders
  * @desc 获取用户订单列表
  * @access Private (需要登录)
  *
@@ -102,7 +102,7 @@ router.get('/orders', authenticateToken, async (req, res) => {
 })
 
 /**
- * @route GET /api/v4/exchange_market/orders/:order_no
+ * @route GET /api/v4/shop/exchange/orders/:order_no
  * @desc 获取订单详情
  * @access Private (需要登录，只能查看自己的订单）
  *
@@ -154,7 +154,7 @@ router.get('/orders/:order_no', authenticateToken, async (req, res) => {
 })
 
 /**
- * @route POST /api/v4/exchange_market/orders/:order_no/status
+ * @route POST /api/v4/shop/exchange/orders/:order_no/status
  * @desc 更新订单状态（管理员操作）
  * @access Private (仅管理员)
  *

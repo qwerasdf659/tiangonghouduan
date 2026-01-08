@@ -161,7 +161,7 @@ class AssetConversionService {
    *   is_duplicate: false // 是否为重复请求
    * }
    */
-  static async convertMaterial (user_id, from_asset_code, to_asset_code, from_amount, options = {}) {
+  static async convertMaterial(user_id, from_asset_code, to_asset_code, from_amount, options = {}) {
     // 强制要求事务边界 - 2026-01-05 治理决策
     const transaction = assertAndGetTransaction(options, 'AssetConversionService.convertMaterial')
 
@@ -315,6 +315,7 @@ class AssetConversionService {
      * 步骤1：扣减源材料（使用统一账本AssetService）
      * business_type: material_convert_debit
      */
+    // eslint-disable-next-line no-restricted-syntax -- 已传递 transaction
     const from_result = await AssetService.changeBalance(
       {
         user_id,
@@ -339,6 +340,7 @@ class AssetConversionService {
      * 步骤2：增加目标资产（使用统一账本AssetService）
      * business_type: material_convert_credit
      */
+    // eslint-disable-next-line no-restricted-syntax -- 已传递 transaction
     const to_result = await AssetService.changeBalance(
       {
         user_id,
@@ -410,7 +412,7 @@ class AssetConversionService {
    * )
    * ```
    */
-  static async convertRedShardToDiamond (user_id, red_shard_amount, options = {}) {
+  static async convertRedShardToDiamond(user_id, red_shard_amount, options = {}) {
     if (!options.idempotency_key) {
       throw new Error('idempotency_key不能为空（幂等性控制必需）')
     }
@@ -443,7 +445,7 @@ class AssetConversionService {
    * @param {Date} options.as_of_time - 查询生效时间点（可选，默认当前时间）
    * @returns {Promise<Array<Object>>} 规则列表（含 rule_id/from_asset_code/to_asset_code/from_amount/to_amount/effective_at/is_enabled）
    */
-  static async getConversionRules (options = {}) {
+  static async getConversionRules(options = {}) {
     const { transaction, as_of_time } = options
     const asOfTime = as_of_time || new Date()
 

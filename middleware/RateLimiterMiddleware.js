@@ -1,3 +1,5 @@
+/* eslint-disable no-await-in-loop -- 限流统计需要串行扫描Redis keys */
+
 const logger = require('../utils/logger').logger
 
 /**
@@ -34,7 +36,7 @@ class RateLimiterMiddleware {
    *
    * @returns {void} 无返回值
    */
-  constructor () {
+  constructor() {
     // 使用统一的Redis客户端
     this.redisClient = getRedisClient()
 
@@ -91,7 +93,7 @@ class RateLimiterMiddleware {
    * @param {Object|string} options 限流配置或预设名称
    * @returns {Function} Express中间件函数
    */
-  createLimiter (options = {}) {
+  createLimiter(options = {}) {
     // 如果传入字符串，使用预设配置
     if (typeof options === 'string') {
       const presetName = options
@@ -243,7 +245,7 @@ class RateLimiterMiddleware {
    * @param {Object} config 限流配置
    * @returns {string|null} 限流key
    */
-  _generateKey (req, config) {
+  _generateKey(req, config) {
     const { keyPrefix, keyGenerator } = config
 
     // 自定义key生成函数
@@ -279,7 +281,7 @@ class RateLimiterMiddleware {
    * @param {string} key Redis key
    * @returns {Promise<number|null>} 最早请求的时间戳
    */
-  async _getOldestRequestTime (key) {
+  async _getOldestRequestTime(key) {
     try {
       const client = await this.redisClient.ensureConnection()
       const result = await client.zrange(key, 0, 0, 'WITHSCORES')
@@ -307,7 +309,7 @@ class RateLimiterMiddleware {
    * @param {string} pattern 匹配模式（如 'rate_limit:*'）
    * @returns {Promise<Array<string>>} 匹配的keys数组
    */
-  async _scanKeys (client, pattern) {
+  async _scanKeys(client, pattern) {
     const keys = new Set() // 使用Set自动去重
     let cursor = '0'
 
@@ -340,7 +342,7 @@ class RateLimiterMiddleware {
    * @param {string} keyPattern key模式（如 'rate_limit:lottery:*'）
    * @returns {Promise<Object>} 统计信息
    */
-  async getStats (keyPattern = 'rate_limit:*') {
+  async getStats(keyPattern = 'rate_limit:*') {
     try {
       const client = await this.redisClient.ensureConnection()
 
@@ -380,7 +382,7 @@ class RateLimiterMiddleware {
    * @param {string} key 限流key
    * @returns {Promise<boolean>} 是否成功
    */
-  async resetLimit (key) {
+  async resetLimit(key) {
     try {
       await this.redisClient.del(key)
       logger.info(`[RateLimiter] 已重置限流: ${key}`)
@@ -396,7 +398,7 @@ class RateLimiterMiddleware {
    * @param {string} keyPattern key模式
    * @returns {Promise<number>} 清理的key数量
    */
-  async clearAll (keyPattern = 'rate_limit:*') {
+  async clearAll(keyPattern = 'rate_limit:*') {
     try {
       const client = await this.redisClient.ensureConnection()
 
@@ -426,7 +428,7 @@ class RateLimiterMiddleware {
    *
    * @returns {Promise<void>} 无返回值，用于应用退出时释放资源
    */
-  async cleanup () {
+  async cleanup() {
     try {
       logger.info('[RateLimiter] 正在清理资源...')
       // Redis客户端由UnifiedRedisClient统一管理，这里不需要关闭
@@ -444,7 +446,7 @@ let rateLimiterInstance = null
  * 获取限流器单例实例
  * @returns {RateLimiterMiddleware} 限流器实例
  */
-function getRateLimiter () {
+function getRateLimiter() {
   if (!rateLimiterInstance) {
     rateLimiterInstance = new RateLimiterMiddleware()
   }

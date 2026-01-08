@@ -53,7 +53,7 @@ describe('🎯 活动条件API集成测试', () => {
         return
       }
 
-      authToken = loginResponse.body.data.token
+      authToken = loginResponse.body.data.access_token
 
       // 获取活跃的抽奖活动
       testCampaign = await LotteryCampaign.findOne({

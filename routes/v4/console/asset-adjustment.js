@@ -268,6 +268,7 @@ router.post(
       try {
         const AuditLogService = req.app.locals.services.getService('auditLog')
 
+        // eslint-disable-next-line no-await-in-loop -- 批量调整需要逐笔事务处理，确保单笔失败不影响其他
         const result = await TransactionManager.execute(
           async transaction => {
             const changeResult = await AssetService.changeBalance(
