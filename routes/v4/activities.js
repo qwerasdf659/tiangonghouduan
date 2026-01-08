@@ -31,6 +31,63 @@ const { authenticateToken, requireAdmin } = require('../../middleware/auth')
 const ActivityService = require('../../services/ActivityService')
 
 /**
+ * @route GET /api/v4/activities
+ * @desc 获取所有活动列表（管理员视角，不限制状态和时间）
+ * @access Private（仅管理员）
+ *
+ * @query {string} [status] - 筛选活动状态（可选）
+ * @query {number} [limit] - 限制返回数量（可选）
+ *
+ * @returns {Object} 活动列表
+ * @returns {boolean} return.success - 请求是否成功
+ * @returns {string} return.code - 业务状态码
+ * @returns {string} return.message - 提示消息
+ * @returns {Object} return.data - 业务数据
+ * @returns {Array} return.data.activities - 活动列表
+ * @returns {number} return.data.total - 活动总数
+ */
+router.get('/', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const { status, limit } = req.query
+
+    logger.info('获取所有活动列表', {
+      status,
+      limit,
+      admin_id: req.user.user_id,
+      request_id: req.id
+    })
+
+    const activities = await ActivityService.getAllActivities({ status, limit })
+
+    logger.info('获取所有活动列表成功', {
+      total: activities.length,
+      admin_id: req.user.user_id,
+      request_id: req.id
+    })
+
+    return res.apiSuccess(
+      { activities, total: activities.length },
+      '获取所有活动列表成功',
+      'ACTIVITIES_LIST_SUCCESS'
+    )
+  } catch (error) {
+    logger.error('获取所有活动列表失败', {
+      error: error.message,
+      stack: error.stack,
+      admin_id: req.user?.user_id,
+      request_id: req.id
+    })
+
+    return res.apiError(
+      '获取所有活动列表失败',
+      'ACTIVITIES_LIST_ERROR',
+      { error: error.message },
+      500
+    )
+  }
+})
+
+/**
  * @route GET /api/v4/activities/available
  * @desc 获取活动列表（管理员查看）
  * @access Private（仅管理员 - 文档0.2决策）
@@ -227,8 +284,6 @@ router.post('/:idOrCode/participate', authenticateToken, requireAdmin, async (re
 router.get('/:idOrCode/conditions', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const { idOrCode } = req.params
-    const models = require('../../models')
-    const { Op } = require('sequelize')
 
     logger.info('管理员获取活动条件配置', {
       admin_id: req.user.user_id,
@@ -236,41 +291,21 @@ router.get('/:idOrCode/conditions', authenticateToken, requireAdmin, async (req,
       request_id: req.id
     })
 
-    // 查找活动
-    const activity = await models.LotteryCampaign.findOne({
-      where: {
-        [Op.or]: [{ campaign_id: idOrCode }, { campaign_code: idOrCode }]
-      },
-      attributes: [
-        'campaign_id',
-        'campaign_name',
-        'campaign_code',
-        'participation_conditions',
-        'condition_error_messages'
-      ]
-    })
+    // 通过 Service 层查询活动条件（符合路由层规范）
+    const conditionConfig = await ActivityService.getConditionConfig(idOrCode)
 
-    if (!activity) {
+    return res.apiSuccess(conditionConfig, '获取活动条件配置成功', 'CONDITIONS_GET_SUCCESS')
+  } catch (error) {
+    // 处理 Service 层抛出的业务错误
+    if (error.code === 'ACTIVITY_NOT_FOUND') {
       return res.apiError(
         '活动不存在',
         'ACTIVITY_NOT_FOUND',
-        { activity_id_or_code: idOrCode },
+        { activity_id_or_code: req.params.idOrCode },
         404
       )
     }
 
-    return res.apiSuccess(
-      {
-        campaign_id: activity.campaign_id,
-        campaign_name: activity.campaign_name,
-        campaign_code: activity.campaign_code,
-        participation_conditions: activity.participation_conditions,
-        condition_error_messages: activity.condition_error_messages
-      },
-      '获取活动条件配置成功',
-      'CONDITIONS_GET_SUCCESS'
-    )
-  } catch (error) {
     logger.error('获取活动条件配置失败', {
       error: error.message,
       admin_id: req.user?.user_id,

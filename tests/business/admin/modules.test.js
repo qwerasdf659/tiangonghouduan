@@ -48,12 +48,12 @@ describe('GET /api/v4/console/ - 管理员模块信息API', () => {
    * 验证返回的模块数量（当前应为18个实际挂载的模块）
    * 2026-01-08：新增 assets 和 images 模块
    */
-  test('应该返回20个已实现的模块', async () => {
+  test('应该返回21个已实现的模块', async () => {
     const response = await request(app).get('/api/v4/console/')
     const { modules } = response.body.data
 
     const moduleCount = Object.keys(modules).length
-    expect(moduleCount).toBe(20) // 实际挂载的路由数量（2026-01-09：新增activities活动条件管理模块）
+    expect(moduleCount).toBe(21) // 实际挂载的路由数量（2026-01-09：新增1个模块）
 
     // 验证必需的模块是否存在（原有8个）
     expect(modules).toHaveProperty('auth')

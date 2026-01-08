@@ -26,9 +26,10 @@ const router = express.Router()
 const { authenticateToken } = require('../../../middleware/auth')
 const { validatePositiveInteger, handleServiceError } = require('../../../middleware/validation')
 const logger = require('../../../utils/logger').logger
-const { MarketListing } = require('../../../models')
 // 业界标准幂等架构 - 统一入口幂等服务
 const IdempotencyService = require('../../../services/IdempotencyService')
+// 市场挂牌服务 - 通过 Service 层访问数据库（符合路由层规范）
+const MarketListingService = require('../../../services/MarketListingService')
 const TransactionManager = require('../../../utils/TransactionManager')
 
 /**
@@ -113,18 +114,19 @@ router.post(
       // 获取 TradeOrderService
       const TradeOrderService = req.app.locals.services.getService('tradeOrder')
 
-      // 查询挂牌信息
-      const listing = await MarketListing.findOne({
-        where: {
-          listing_id,
-          status: 'on_sale'
-        }
-      })
+      // 查询挂牌信息（通过 Service 层访问，符合路由层规范）
+      const listing = await MarketListingService.getListingById(listing_id)
 
       if (!listing) {
         // 标记幂等请求失败，允许重试
-        await IdempotencyService.markAsFailed(idempotency_key, '挂牌不存在或已下架')
-        return res.apiError('挂牌不存在或已下架', 'NOT_FOUND', null, 404)
+        await IdempotencyService.markAsFailed(idempotency_key, '挂牌不存在')
+        return res.apiError('挂牌不存在', 'NOT_FOUND', null, 404)
+      }
+
+      // 检查挂牌状态是否为在售
+      if (listing.status !== 'on_sale') {
+        await IdempotencyService.markAsFailed(idempotency_key, '挂牌已下架或已售出')
+        return res.apiError('挂牌已下架或已售出', 'NOT_AVAILABLE', null, 400)
       }
 
       // 不能购买自己的商品

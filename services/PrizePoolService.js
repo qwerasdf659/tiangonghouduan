@@ -148,12 +148,7 @@ class PrizePoolService {
                 prizeData.budget_cost_points ??
                 0
             ) || 0,
-          // 双账户模型：虚拟奖品扩展字段（可选）
-          virtual_amount:
-            prizeData.virtual_amount !== undefined && prizeData.virtual_amount !== null
-              ? parseInt(prizeData.virtual_amount) || 0
-              : null,
-          category: prizeData.category || null,
+          // 注意：virtual_amount 和 category 字段数据库不存在，已移除
           stock_quantity: parseInt(prizeData.quantity), // 前端字段映射：quantity → stock_quantity
           win_probability: prizeData.win_probability || prizeData.probability || 0, // 中奖概率（前端兼容）
           prize_description: prizeData.description || '', // 前端字段映射：description → prize_description
@@ -282,8 +277,7 @@ class PrizePoolService {
           'prize_type',
           'prize_value',
           'prize_value_points',
-          'virtual_amount',
-          'category',
+          // 注意：virtual_amount 和 category 字段数据库不存在，已移除
           'stock_quantity',
           'win_probability',
           'prize_description',
@@ -310,7 +304,7 @@ class PrizePoolService {
       }, 0)
       const usedQuantity = prizes.reduce((sum, prize) => sum + (prize.total_win_count || 0), 0)
 
-      // 4. 格式化奖品数据
+      // 4. 格式化奖品数据（virtual_amount 和 category 已移除）
       const formattedPrizes = prizes.map(prize => ({
         prize_id: prize.prize_id,
         campaign_id: prize.campaign_id,
@@ -318,8 +312,6 @@ class PrizePoolService {
         prize_type: prize.prize_type,
         prize_value: prize.prize_value,
         prize_value_points: prize.prize_value_points,
-        virtual_amount: prize.virtual_amount,
-        category: prize.category,
         stock_quantity: prize.stock_quantity,
         remaining_quantity: Math.max(0, (prize.stock_quantity || 0) - (prize.total_win_count || 0)),
         win_probability: prize.win_probability,
@@ -406,8 +398,7 @@ class PrizePoolService {
           'prize_type',
           'prize_value',
           'prize_value_points',
-          'virtual_amount',
-          'category',
+          // 注意：virtual_amount 和 category 字段数据库不存在，已移除
           'stock_quantity',
           'total_win_count',
           'daily_win_count',
@@ -441,7 +432,7 @@ class PrizePoolService {
         }, 0)
       }
 
-      // 4. 格式化奖品数据
+      // 4. 格式化奖品数据（virtual_amount 和 category 已移除）
       const formattedPrizes = prizes.map(prize => ({
         prize_id: prize.prize_id,
         campaign_id: prize.campaign_id,
@@ -451,8 +442,6 @@ class PrizePoolService {
         prize_type: prize.prize_type,
         prize_value: prize.prize_value,
         prize_value_points: prize.prize_value_points,
-        virtual_amount: prize.virtual_amount,
-        category: prize.category,
         stock_quantity: prize.stock_quantity,
         remaining_quantity: Math.max(0, (prize.stock_quantity || 0) - (prize.total_win_count || 0)),
         total_win_count: prize.total_win_count || 0,
@@ -522,8 +511,7 @@ class PrizePoolService {
       prize_type: prize.prize_type,
       prize_value: prize.prize_value,
       prize_value_points: prize.prize_value_points,
-      virtual_amount: prize.virtual_amount,
-      category: prize.category,
+      // 注意：virtual_amount 和 category 字段数据库不存在，已移除
       stock_quantity: prize.stock_quantity,
       win_probability: prize.win_probability,
       probability: prize.probability,
@@ -540,9 +528,7 @@ class PrizePoolService {
       prize_value_points: 'prize_value_points',
       value_points: 'prize_value_points',
       budget_cost_points: 'prize_value_points',
-      // 双账户模型：虚拟奖品扩展字段
-      virtual_amount: 'virtual_amount',
-      category: 'category',
+      // 注意：virtual_amount 和 category 字段数据库不存在，已移除
       quantity: 'stock_quantity',
       probability: 'win_probability', // 前端probability映射到数据库win_probability
       win_probability: 'win_probability',
@@ -639,14 +625,15 @@ class PrizePoolService {
       }
     }
 
-    // 5. 记录审计日志（奖品配置修改）
+    /*
+     * 5. 记录审计日志（奖品配置修改）
+     * 注意：virtual_amount 和 category 字段数据库不存在，已移除
+     */
     const afterData = {
       prize_name: prize.prize_name,
       prize_type: prize.prize_type,
       prize_value: prize.prize_value,
       prize_value_points: prize.prize_value_points,
-      virtual_amount: prize.virtual_amount,
-      category: prize.category,
       stock_quantity: prize.stock_quantity,
       win_probability: prize.win_probability,
       probability: prize.probability,
@@ -702,8 +689,7 @@ class PrizePoolService {
       prize_type: updatedPrize.prize_type,
       prize_value: updatedPrize.prize_value,
       prize_value_points: updatedPrize.prize_value_points,
-      virtual_amount: updatedPrize.virtual_amount,
-      category: updatedPrize.category,
+      // 注意：virtual_amount 和 category 字段数据库不存在，已移除
       stock_quantity: updatedPrize.stock_quantity,
       remaining_quantity: Math.max(
         0,

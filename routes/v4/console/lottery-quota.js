@@ -337,6 +337,40 @@ router.post('/users/:user_id/bonus', authenticateToken, requireAdmin, async (req
 })
 
 /**
+ * 获取配额统计数据
+ * GET /api/v4/console/lottery-quota/statistics
+ *
+ * Query参数：
+ * - campaign_id: 活动ID（可选，不传则返回全局统计）
+ *
+ * 返回：配额规则和使用情况的汇总统计
+ */
+router.get('/statistics', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const { campaign_id } = req.query
+
+    const statistics = await LotteryQuotaService.getStatistics({
+      campaign_id: campaign_id ? parseInt(campaign_id) : null
+    })
+
+    logger.info('获取配额统计数据', {
+      admin_id: req.user.user_id,
+      campaign_id: campaign_id || 'global'
+    })
+
+    return res.apiSuccess(statistics, '获取配额统计数据成功')
+  } catch (error) {
+    logger.error('获取配额统计数据失败:', error)
+    return res.apiError(
+      `获取配额统计数据失败：${error.message}`,
+      'GET_STATISTICS_FAILED',
+      null,
+      500
+    )
+  }
+})
+
+/**
  * 验证用户配额是否充足（预检查，不扣减）
  * GET /api/v4/console/lottery-quota/users/:user_id/check
  *

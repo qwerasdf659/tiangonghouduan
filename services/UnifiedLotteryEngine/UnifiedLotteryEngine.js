@@ -1305,7 +1305,7 @@ class UnifiedLotteryEngine {
 
       // 步骤1：统一扣除折扣后的总积分（在事务中执行）
       // eslint-disable-next-line no-restricted-syntax -- 已传递 transaction（见下方 options 参数）
-      await AssetService.changeBalance(
+      const assetChangeResult = await AssetService.changeBalance(
         {
           user_id,
           asset_code: 'POINTS',
@@ -1328,13 +1328,24 @@ class UnifiedLotteryEngine {
         { transaction }
       )
 
+      /*
+       * 🔥 事务边界治理：获取资产流水ID用于对账
+       * 修复日期：2026-01-09
+       * 问题：连抽场景下skip_points_deduction=true导致策略内部不会扣积分
+       *       但asset_transaction_id未传递给context，导致LotteryDraw创建失败（NOT NULL约束）
+       * 解决：在统一扣积分时获取transaction_id，传递给每次抽奖的context
+       */
+      const unifiedAssetTransactionId =
+        assetChangeResult?.transaction_record?.transaction_id || null
+
       this.logInfo('连抽积分统一扣除成功', {
         user_id,
         draw_count,
         requiredPoints,
         pricing,
         lotterySessionId,
-        consumeIdempotencyKey
+        consumeIdempotencyKey,
+        asset_transaction_id: unifiedAssetTransactionId
       })
 
       const results = []
@@ -1365,6 +1376,12 @@ class UnifiedLotteryEngine {
           lottery_session_id: lotterySessionId, // 方案B：传递抽奖会话ID
           idempotency_key: drawIdempotencyKey, // 方案B：派生幂等键
           request_idempotency_key: requestIdempotencyKey, // 请求级幂等键
+          /*
+           * 🔥 事务边界治理：传递统一扣款的资产流水ID（修复 2026-01-09）
+           * 业务规则：连抽场景下积分已在外层统一扣除，需将流水ID传递给策略
+           *          用于写入 lottery_draws.asset_transaction_id（NOT NULL字段）
+           */
+          asset_transaction_id: unifiedAssetTransactionId,
           user_status: {
             available_points: userAccount.available_points - requiredPoints // 显示扣除后的余额
           }

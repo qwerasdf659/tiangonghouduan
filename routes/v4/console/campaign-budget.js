@@ -30,6 +30,72 @@ const {
 } = require('./shared/middleware')
 // 决策7：写操作通过 Service 层处理（包含缓存失效）
 const AdminLotteryService = require('../../../services/AdminLotteryService')
+// 路由层规范：通过 Service 层访问数据库（2026-01-09）
+const ActivityService = require('../../../services/ActivityService')
+const UserService = require('../../../services/UserService')
+const AssetService = require('../../../services/AssetService')
+
+/**
+ * GET /batch-status - 批量获取多个活动的预算状态
+ *
+ * @description 一次性查询多个活动的预算状态，避免前端逐个请求
+ * @route GET /api/v4/console/campaign-budget/batch-status
+ * @access Private (需要管理员权限)
+ *
+ * @query {string} campaign_ids - 活动ID列表（逗号分隔，如：1,2,3）
+ * @query {number} limit - 限制返回数量（默认20，最大50）
+ *
+ * @returns {Object} 多个活动的预算状态列表
+ */
+router.get(
+  '/batch-status',
+  adminAuthMiddleware,
+  asyncHandler(async (req, res) => {
+    const { campaign_ids, limit = 20 } = req.query
+
+    try {
+      // 解析 campaign_ids（支持逗号分隔或单独指定）
+      let targetIds = []
+      if (campaign_ids) {
+        targetIds = campaign_ids
+          .split(',')
+          .map(id => parseInt(id.trim()))
+          .filter(id => !isNaN(id))
+      }
+
+      // 通过 Service 层获取批量预算状态（符合路由层规范）
+      const { campaigns: results, summary } = await ActivityService.getBatchBudgetStatus({
+        campaign_ids: targetIds,
+        limit: parseInt(limit) || 20
+      })
+
+      if (results.length === 0) {
+        return res.apiSuccess({ campaigns: [], total_count: 0 }, '未找到匹配的活动')
+      }
+
+      sharedComponents.logger.info('批量获取活动预算状态成功', {
+        campaign_count: results.length,
+        operated_by: req.user?.id
+      })
+
+      return res.apiSuccess(
+        {
+          campaigns: results,
+          summary,
+          total_count: results.length
+        },
+        '批量获取活动预算状态成功'
+      )
+    } catch (error) {
+      sharedComponents.logger.error('批量获取活动预算状态失败', { error: error.message })
+      return res.apiInternalError(
+        '批量获取活动预算状态失败',
+        error.message,
+        'BATCH_BUDGET_STATUS_ERROR'
+      )
+    }
+  })
+)
 
 /**
  * GET /campaigns/:campaign_id - 获取活动预算配置
@@ -51,41 +117,26 @@ router.get(
         return res.apiError('无效的活动ID', 'INVALID_CAMPAIGN_ID')
       }
 
-      const { LotteryCampaign, LotteryPrize } = require('../../../models')
+      // 通过 Service 层获取活动预算配置（符合路由层规范）
+      const campaignConfig = await ActivityService.getCampaignBudgetConfig(parseInt(campaign_id))
 
-      // 获取活动信息
-      const campaign = await LotteryCampaign.findByPk(parseInt(campaign_id), {
-        attributes: [
-          'campaign_id',
-          'campaign_code',
-          'name',
-          'budget_mode',
-          'pool_budget_total',
-          'pool_budget_remaining',
-          'allowed_campaign_ids',
-          'status',
-          'created_at',
-          'updated_at'
-        ]
-      })
-
-      if (!campaign) {
-        return res.apiError('活动不存在', 'CAMPAIGN_NOT_FOUND', { campaign_id })
-      }
-
-      // 获取奖品配置统计
-      const prizeConfig = await LotteryPrize.validateCampaignBudgetConfig(parseInt(campaign_id))
+      // 通过 Service 层获取奖品配置（符合路由层规范）
+      const prizeConfig = await ActivityService.getPrizeConfig(parseInt(campaign_id))
 
       sharedComponents.logger.info('获取活动预算配置成功', {
         campaign_id,
-        budget_mode: campaign.budget_mode,
+        budget_mode: campaignConfig.budget_mode,
         operated_by: req.user?.id
       })
 
       return res.apiSuccess(
         {
-          campaign: campaign.toJSON(),
-          prize_config: prizeConfig
+          campaign: {
+            ...campaignConfig,
+            pool_budget_total: campaignConfig.pool_budget.total,
+            pool_budget_remaining: campaignConfig.pool_budget.remaining
+          },
+          prize_config: prizeConfig.analysis
         },
         '活动预算配置获取成功'
       )
@@ -190,36 +241,8 @@ router.post(
         return res.apiError('无效的活动ID', 'INVALID_CAMPAIGN_ID')
       }
 
-      const { LotteryPrize, LotteryCampaign } = require('../../../models')
-
-      // 验证活动存在
-      const campaign = await LotteryCampaign.findByPk(parseInt(campaign_id))
-      if (!campaign) {
-        return res.apiError('活动不存在', 'CAMPAIGN_NOT_FOUND', { campaign_id })
-      }
-
-      // 验证空奖约束
-      const emptyPrizeResult = await LotteryPrize.validateEmptyPrizeConstraint(
-        parseInt(campaign_id)
-      )
-
-      // 获取完整的预算配置验证结果
-      const budgetConfigResult = await LotteryPrize.validateCampaignBudgetConfig(
-        parseInt(campaign_id)
-      )
-
-      const validationResult = {
-        campaign_id: parseInt(campaign_id),
-        campaign_name: campaign.name,
-        budget_mode: campaign.budget_mode,
-        empty_prize_constraint: {
-          valid: emptyPrizeResult.valid,
-          error: emptyPrizeResult.error || null,
-          empty_prizes: emptyPrizeResult.emptyPrizes || []
-        },
-        prize_config: budgetConfigResult,
-        overall_valid: emptyPrizeResult.valid && budgetConfigResult.valid
-      }
+      // 通过 Service 层验证奖品配置（符合路由层规范）
+      const validationResult = await ActivityService.validatePrizeConfig(parseInt(campaign_id))
 
       sharedComponents.logger.info('活动奖品配置验证完成', {
         campaign_id,
@@ -259,50 +282,22 @@ router.get(
     try {
       const validUserId = validators.validateUserId(user_id)
 
-      const { Account, AccountAssetBalance, User } = require('../../../models')
-
-      // 验证用户存在
-      const user = await User.findByPk(validUserId, {
-        attributes: ['user_id', 'nickname', 'mobile']
-      })
-
-      if (!user) {
-        return res.apiError('用户不存在', 'USER_NOT_FOUND', { user_id: validUserId })
+      // 通过 Service 层验证用户存在（符合路由层规范）
+      let user
+      try {
+        user = await UserService.getUserById(validUserId)
+      } catch (error) {
+        if (error.message === '用户不存在') {
+          return res.apiError('用户不存在', 'USER_NOT_FOUND', { user_id: validUserId })
+        }
+        throw error
       }
 
-      // 获取用户账户
-      const account = await Account.findOne({
-        where: { user_id: validUserId, account_type: 'user' }
-      })
+      // 通过 Service 层获取用户所有余额（符合路由层规范）
+      const allBalances = await AssetService.getAllBalances({ user_id: validUserId })
 
-      if (!account) {
-        // 用户没有账户，返回空余额
-        return res.apiSuccess(
-          {
-            user: user.toJSON(),
-            budget_balances: [],
-            total_budget_points: 0
-          },
-          '用户预算积分查询成功'
-        )
-      }
-
-      // 查询用户所有 BUDGET_POINTS 余额（按 campaign_id 分组）
-      const budgetBalances = await AccountAssetBalance.findAll({
-        where: {
-          account_id: account.account_id,
-          asset_code: 'BUDGET_POINTS'
-        },
-        attributes: [
-          'balance_id',
-          'campaign_id',
-          'available_amount',
-          'frozen_amount',
-          'created_at',
-          'updated_at'
-        ],
-        order: [['campaign_id', 'ASC']]
-      })
+      // 过滤出 BUDGET_POINTS 余额
+      const budgetBalances = allBalances.filter(b => b.asset_code === 'BUDGET_POINTS')
 
       // 计算总预算积分
       const totalBudgetPoints = budgetBalances.reduce(
@@ -319,7 +314,11 @@ router.get(
 
       return res.apiSuccess(
         {
-          user: user.toJSON(),
+          user: {
+            user_id: user.user_id,
+            nickname: user.nickname,
+            mobile: user.mobile
+          },
           budget_balances: budgetBalances.map(b => ({
             balance_id: b.balance_id,
             campaign_id: b.campaign_id,
@@ -425,68 +424,23 @@ router.get(
         return res.apiError('无效的活动ID', 'INVALID_CAMPAIGN_ID')
       }
 
-      const { LotteryCampaign, LotteryDraw, sequelize } = require('../../../models')
-      const { Op } = require('sequelize')
-
-      // 获取活动
-      const campaign = await LotteryCampaign.findByPk(parseInt(campaign_id), {
-        attributes: [
-          'campaign_id',
-          'name',
-          'budget_mode',
-          'pool_budget_total',
-          'pool_budget_remaining',
-          'status'
-        ]
-      })
-
-      if (!campaign) {
-        return res.apiError('活动不存在', 'CAMPAIGN_NOT_FOUND', { campaign_id })
-      }
-
-      // 统计预算使用情况（从抽奖记录汇总）
-      const budgetStats = await LotteryDraw.findAll({
-        where: {
-          campaign_id: parseInt(campaign_id),
-          prize_value_points: { [Op.gt]: 0 }
-        },
-        attributes: [
-          [sequelize.fn('COUNT', sequelize.col('draw_id')), 'draw_count'],
-          [sequelize.fn('SUM', sequelize.col('prize_value_points')), 'total_budget_consumed']
-        ],
-        raw: true
-      })
-
-      const stats = budgetStats[0] || { draw_count: 0, total_budget_consumed: 0 }
+      // 通过 Service 层获取预算消耗统计（符合路由层规范）
+      const statsResult = await ActivityService.getBudgetConsumptionStats(parseInt(campaign_id))
 
       const result = {
-        campaign_id: campaign.campaign_id,
-        campaign_name: campaign.name,
-        budget_mode: campaign.budget_mode,
-        pool_budget: {
-          total: Number(campaign.pool_budget_total) || 0,
-          remaining: Number(campaign.pool_budget_remaining) || 0,
-          used:
-            (Number(campaign.pool_budget_total) || 0) -
-            (Number(campaign.pool_budget_remaining) || 0),
-          usage_rate:
-            campaign.pool_budget_total > 0
-              ? (
-                  (((campaign.pool_budget_total || 0) - (campaign.pool_budget_remaining || 0)) /
-                    campaign.pool_budget_total) *
-                  100
-                ).toFixed(2) + '%'
-              : 'N/A'
-        },
+        campaign_id: statsResult.campaign.campaign_id,
+        campaign_name: statsResult.campaign.campaign_name,
+        budget_mode: statsResult.campaign.budget_mode,
+        pool_budget: statsResult.budget,
         statistics: {
-          winning_draws: parseInt(stats.draw_count) || 0,
-          total_budget_consumed: parseInt(stats.total_budget_consumed) || 0
+          winning_draws: statsResult.consumption.total_draws,
+          total_budget_consumed: statsResult.consumption.total_consumed
         }
       }
 
       sharedComponents.logger.info('活动预算状态查询成功', {
         campaign_id,
-        budget_mode: campaign.budget_mode,
+        budget_mode: result.budget_mode,
         operated_by: req.user?.id
       })
 

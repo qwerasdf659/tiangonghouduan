@@ -30,6 +30,7 @@ const assetsRoutes = require('./assets') // 🆕 后台运营资产中心（2026
 const imagesRoutes = require('./images') // 🆕 通用图片上传（2026-01-08 图片存储架构）
 const orphanFrozenRoutes = require('./orphan-frozen') // 🆕 孤儿冻结清理（P0-2 2026-01-09）
 const merchantPointsRoutes = require('./merchant-points') // 🆕 商家积分审核管理（P1 2026-01-09）
+const userHierarchyRoutes = require('./user-hierarchy') // 🆕 用户层级管理（业务员/门店管理 2026-01-09）
 
 // 挂载子模块路由
 router.use('/auth', authRoutes)
@@ -51,6 +52,7 @@ router.use('/assets', assetsRoutes) // 🆕 后台运营资产中心路由（202
 router.use('/images', imagesRoutes) // 🆕 通用图片上传路由（2026-01-08 图片存储架构）
 router.use('/orphan-frozen', orphanFrozenRoutes) // 🆕 孤儿冻结清理路由（P0-2 2026-01-09）
 router.use('/merchant-points', merchantPointsRoutes) // 🆕 商家积分审核管理路由（P1 2026-01-09）
+router.use('/user-hierarchy', userHierarchyRoutes) // 🆕 用户层级管理路由（业务员/门店管理 2026-01-09）
 
 /**
  * GET / - Admin API根路径信息
@@ -239,6 +241,18 @@ router.get('/', (req, res) => {
           '/merchant-points/stats/pending'
         ],
         note: '商家积分申请审核管理，基于统一审核引擎（ContentAuditEngine），审核通过后自动发放积分'
+      },
+      user_hierarchy: {
+        description: '用户层级管理（业务员/门店管理 2026-01-09）',
+        endpoints: [
+          '/user-hierarchy',
+          '/user-hierarchy/roles',
+          '/user-hierarchy/:user_id/subordinates',
+          '/user-hierarchy/:user_id/stats',
+          '/user-hierarchy/:user_id/deactivate',
+          '/user-hierarchy/:user_id/activate'
+        ],
+        note: '区域负责人→业务经理→业务员三级层级管理，门店分配，权限激活/停用，替代独立的门店管理功能'
       }
       // ⚠️ campaign_permissions模块暂未实现，待实现后再添加到此列表
     },

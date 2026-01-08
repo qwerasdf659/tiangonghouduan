@@ -19,7 +19,7 @@ const router = express.Router()
 const { authenticateToken, requireAdmin } = require('../../../../middleware/auth')
 const { handleServiceError } = require('../../../../middleware/validation')
 const logger = require('../../../../utils/logger').logger
-const BeijingTimeHelper = require('../../../../utils/timeHelper')
+// 时间格式化已移至 ConsumptionService 层处理，此处不再直接引用 BeijingTimeHelper
 
 /**
  * @route GET /api/v4/shop/consumption/me
@@ -153,64 +153,38 @@ router.delete('/:record_id', authenticateToken, async (req, res) => {
     }
 
     const recordId = parseInt(record_id)
+    const isAdmin = req.user.role_level >= 100
+    const roleLevel = req.user.role_level || 0
 
-    // 查询记录：必须是用户自己的记录且未删除
-    const record = await ConsumptionService.getRecordById(recordId)
-
-    if (!record) {
-      return res.apiError('消费记录不存在或已被删除', 'NOT_FOUND', null, 404)
-    }
-
-    // 权限验证：只能删除自己的记录
-    if (record.user_id !== userId) {
-      return res.apiError('您无权删除此消费记录', 'FORBIDDEN', null, 403)
-    }
-
-    // 🔒 安全修复：普通用户只能删除pending状态的记录，管理员可删除任何状态
-    if (req.user.role_level < 100 && record.status !== 'pending') {
-      return res.apiError(
-        `仅允许删除待审核状态的消费记录，当前状态：${record.status}。已审核的记录请联系管理员处理`,
-        'FORBIDDEN',
-        null,
-        403
-      )
-    }
-
-    // 检查是否已经被删除
-    if (record.is_deleted === 1) {
-      return res.apiError('该消费记录已经被删除，无需重复操作', 'BAD_REQUEST', null, 400)
-    }
-
-    // 执行软删除：标记为已删除
-    const deletedAt = BeijingTimeHelper.createDatabaseTime()
-
-    await record.update({
-      is_deleted: 1,
-      deleted_at: deletedAt
+    /**
+     * 调用 Service 层执行软删除
+     * - 路由层不直接操作 models，所有写操作收口到 Service 层
+     * - Service 层负责权限验证、状态检查、数据更新
+     */
+    const result = await ConsumptionService.softDeleteRecord(recordId, userId, {
+      isAdmin,
+      roleLevel
     })
 
-    logger.info('软删除消费记录成功', {
-      record_id: recordId,
-      user_id: userId,
-      deleted_at: BeijingTimeHelper.formatForAPI(deletedAt)
-    })
-
-    return res.apiSuccess(
-      {
-        record_id: recordId,
-        is_deleted: 1,
-        deleted_at: BeijingTimeHelper.formatForAPI(deletedAt),
-        record_type: 'consumption',
-        note: '消费记录已删除，将不再显示在列表中'
-      },
-      '消费记录已删除'
-    )
+    return res.apiSuccess(result, '消费记录已删除')
   } catch (error) {
     logger.error('软删除消费记录失败', {
       error: error.message,
       record_id: req.params.record_id,
       user_id: req.user?.user_id
     })
+
+    // 业务错误处理（来自 Service 层的业务错误）
+    if (error.message.includes('不存在')) {
+      return res.apiError(error.message, 'NOT_FOUND', null, 404)
+    }
+    if (error.message.includes('无权') || error.message.includes('仅允许删除')) {
+      return res.apiError(error.message, 'FORBIDDEN', null, 403)
+    }
+    if (error.message.includes('已经被删除')) {
+      return res.apiError(error.message, 'BAD_REQUEST', null, 400)
+    }
+
     return handleServiceError(error, res, '删除消费记录失败')
   }
 })
@@ -242,35 +216,18 @@ router.post('/:record_id/restore', authenticateToken, requireAdmin, async (req, 
 
     const recordId = parseInt(record_id)
 
-    // 查询已删除的记录（包含已删除的记录）
-    const record = await ConsumptionService.getRecordById(recordId, { includeDeleted: true })
-
-    if (!record) {
-      return res.apiError('消费记录不存在', 'NOT_FOUND', null, 404)
-    }
-
-    // 检查是否已经被删除
-    if (record.is_deleted === 0) {
-      return res.apiError('该消费记录未被删除，无需恢复', 'BAD_REQUEST', null, 400)
-    }
-
-    // 恢复记录：清除软删除标记
-    await record.update({
-      is_deleted: 0,
-      deleted_at: null
-    })
-
-    logger.info('管理员恢复消费记录成功', {
-      record_id: recordId,
-      admin_id: adminId,
-      original_user_id: record.user_id
-    })
+    /**
+     * 调用 Service 层执行恢复
+     * - 路由层不直接操作 models，所有写操作收口到 Service 层
+     * - Service 层负责验证、数据更新
+     */
+    const result = await ConsumptionService.restoreRecord(recordId, adminId)
 
     return res.apiSuccess(
       {
-        record_id: recordId,
-        is_deleted: 0,
-        user_id: record.user_id,
+        record_id: result.record_id,
+        is_deleted: result.is_deleted,
+        user_id: result.user_id,
         note: '消费记录已恢复，用户端将重新显示该记录'
       },
       '消费记录已恢复'

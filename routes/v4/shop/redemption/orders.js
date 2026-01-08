@@ -56,45 +56,16 @@ router.post('/orders', authenticateToken, async (req, res) => {
       user_id: userId
     })
 
-    // 关键安全校验：所有权或管理员权限检查（防越权）
-    const { ItemInstance } = req.app.locals.models
-    const item = await ItemInstance.findByPk(item_instance_id)
-
-    if (!item) {
-      logger.error('物品实例不存在', { item_instance_id })
-      return res.apiError('物品实例不存在', 'NOT_FOUND', null, 404)
-    }
-
-    // 检查物品所有权
-    if (item.owner_user_id !== userId) {
-      // 如果不是所有者，检查是否为管理员
-      const { getUserRoles } = require('../../../../middleware/auth')
-      const userRoles = await getUserRoles(userId)
-
-      if (!userRoles.isAdmin) {
-        logger.warn('非所有者且非管理员尝试生成核销码（防越权）', {
-          user_id: userId,
-          item_instance_id,
-          actual_owner: item.owner_user_id
-        })
-        return res.apiError('无权操作该物品，仅所有者或管理员可生成核销码', 'FORBIDDEN', null, 403)
-      }
-
-      logger.info('管理员生成核销码', {
-        admin_user_id: userId,
-        item_instance_id,
-        actual_owner: item.owner_user_id
-      })
-    }
-
-    /*
-     * 调用RedemptionService生成订单（传入创建者ID用于服务层兜底）
-     * 使用 TransactionManager 统一事务边界（符合治理决策）
+    /**
+     * 调用 RedemptionService 生成订单
+     * - 传入 creator_user_id 用于服务层权限校验（所有权/管理员判定）
+     * - 使用 TransactionManager 统一事务边界（符合治理决策）
+     * - 路由层不直接操作 models，所有验证逻辑收口到 Service 层
      */
     const RedemptionService = req.app.locals.services.getService('redemptionOrder')
-    const result = await TransactionManager.execute(async (transaction) => {
+    const result = await TransactionManager.execute(async transaction => {
       return await RedemptionService.createOrder(item_instance_id, {
-        creator_user_id: userId, // 传入创建者ID，供服务层兜底校验
+        creator_user_id: userId, // 传入创建者ID，供服务层权限校验
         transaction
       })
     })
@@ -125,12 +96,16 @@ router.post('/orders', authenticateToken, async (req, res) => {
       user_id: req.user?.user_id
     })
 
-    // 业务错误处理
+    // 业务错误处理（服务层返回的业务错误）
     if (error.message.includes('物品实例不存在')) {
       return res.apiError(error.message, 'NOT_FOUND', null, 404)
     }
 
-    if (error.message.includes('不可用')) {
+    if (error.message.includes('权限不足')) {
+      return res.apiError(error.message, 'FORBIDDEN', null, 403)
+    }
+
+    if (error.message.includes('不可用') || error.message.includes('已有待核销订单')) {
       return res.apiError(error.message, 'CONFLICT', null, 409)
     }
 
@@ -167,7 +142,7 @@ router.post('/orders/:order_id/cancel', authenticateToken, async (req, res) => {
 
     // 使用 TransactionManager 统一事务边界（符合治理决策）
     const RedemptionService = req.app.locals.services.getService('redemptionOrder')
-    const order = await TransactionManager.execute(async (transaction) => {
+    const order = await TransactionManager.execute(async transaction => {
       return await RedemptionService.cancelOrder(order_id, { transaction })
     })
 

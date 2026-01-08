@@ -41,17 +41,95 @@ const TTL_DAYS = 7 // 幂等记录保留天数
 const PROCESSING_TIMEOUT_SECONDS = 60 // processing 状态超时阈值（秒）
 
 /**
+ * 业务操作 canonical 映射表（全量覆盖所有写接口）
+ *
+ * 【已拍板决策 2026-01-09】：显式 operation，禁止依赖 URL 推导
+ * - 幂等语义从 URL 解耦，使用稳定的 canonical_operation 作为幂等作用域
+ * - 所有写接口必须在此映射表中显式定义
+ * - 未定义的路径使用原路径（保持严格，避免误放行）
+ *
+ * 命名规范：{DOMAIN}_{RESOURCE}_{ACTION}
+ * 例如：SHOP_EXCHANGE_CREATE_ORDER = 商城域 + 兑换资源 + 创建订单动作
+ */
+const CANONICAL_OPERATION_MAP = {
+  /* B2C 兑换下单 - 旧路径（待删除，但仍保留映射用于回放历史记录） */
+  '/api/v4/exchange_market/exchange': 'SHOP_EXCHANGE_CREATE_ORDER',
+  /* B2C 兑换下单 - 新路径（当前规范） */
+  '/api/v4/shop/exchange/exchange': 'SHOP_EXCHANGE_CREATE_ORDER',
+
+  // ===== 材料转换 =====
+  '/api/v4/assets/convert': 'SHOP_ASSET_CONVERT',
+  '/api/v4/shop/assets/convert': 'SHOP_ASSET_CONVERT',
+
+  // ===== 抽奖 =====
+  '/api/v4/lottery/draw': 'LOTTERY_DRAW',
+
+  // ===== C2C 市场交易 =====
+  '/api/v4/market/listings': 'MARKET_CREATE_LISTING',
+  '/api/v4/market/listings/:id/purchase': 'MARKET_PURCHASE_LISTING',
+  '/api/v4/market/listings/:id/cancel': 'MARKET_CANCEL_LISTING',
+
+  // ===== 核销系统 =====
+  '/api/v4/shop/redemption/orders': 'REDEMPTION_CREATE_ORDER',
+  '/api/v4/shop/redemption/fulfill': 'REDEMPTION_FULFILL',
+
+  // ===== 消费记录 =====
+  '/api/v4/shop/consumption/submit': 'CONSUMPTION_SUBMIT',
+
+  // ===== 管理员操作 =====
+  '/api/v4/console/asset-adjustment/adjust': 'ADMIN_ASSET_ADJUST',
+  '/api/v4/console/marketplace/force-withdraw': 'ADMIN_FORCE_WITHDRAW'
+
+  // 未来新增写接口在此添加映射（必须显式定义）
+}
+
+/**
  * 入口幂等服务类
  * 职责：管理API请求的幂等性，实现"重试返回首次结果"
  */
 class IdempotencyService {
+  /**
+   * 获取 API 路径的 canonical operation
+   *
+   * 【已拍板决策 2026-01-09】：显式 operation，禁止依赖 URL 推导
+   * - 所有写接口必须在 CANONICAL_OPERATION_MAP 中显式定义
+   * - 未定义的路径使用原路径（保持严格，避免误放行）
+   * - 规范化路径后再查找映射（处理动态参数如 :id）
+   *
+   * @param {string} api_path - API路径（原始路径）
+   * @returns {string} canonical operation 或原路径
+   */
+  static getCanonicalOperation(api_path) {
+    if (!api_path) return api_path
+
+    // 先尝试直接匹配
+    let canonical = CANONICAL_OPERATION_MAP[api_path]
+
+    // 如果未找到，规范化路径后再查找（处理动态ID）
+    if (!canonical) {
+      const normalized_path = this.normalizePath(api_path)
+      canonical = CANONICAL_OPERATION_MAP[normalized_path]
+    }
+
+    if (!canonical) {
+      /* 未定义的路径，记录告警（便于发现遗漏），仅对写操作记录 */
+      logger.warn('未定义 canonical operation 的写接口', {
+        api_path,
+        normalized_path: this.normalizePath(api_path),
+        hint: '如果这是新增写接口，需要在 CANONICAL_OPERATION_MAP 中显式定义'
+      })
+    }
+
+    return canonical || api_path
+  }
+
   /**
    * 过滤请求体，剔除非业务语义字段
    *
    * @param {Object} body - 原始请求体
    * @returns {Object} 过滤后的请求体
    */
-  static filterBodyForFingerprint (body) {
+  static filterBodyForFingerprint(body) {
     if (!body || typeof body !== 'object') {
       return {}
     }
@@ -82,7 +160,7 @@ class IdempotencyService {
    * @param {string} path - 原始API路径
    * @returns {string} 规范化后的路径
    */
-  static normalizePath (path) {
+  static normalizePath(path) {
     if (!path) return ''
 
     /*
@@ -101,7 +179,7 @@ class IdempotencyService {
    * @param {*} obj - 需要排序的对象
    * @returns {*} 排序后的对象
    */
-  static deepSortObject (obj) {
+  static deepSortObject(obj) {
     if (obj === null || obj === undefined) {
       return obj
     }
@@ -124,7 +202,13 @@ class IdempotencyService {
 
   /**
    * 生成请求指纹（用于检测参数冲突）
-   * 【业界标准形态】包含 user_id, method, path, query, body
+   *
+   * 【已拍板决策 2026-01-09】
+   * - 使用 canonical operation 替代 api_path
+   * - 强制不兼容策略：不做旧算法兼容，简洁优先
+   * - 旧路径记录在迁移前会自然过期（TTL=7天）或手动清理
+   *
+   * 指纹包含：user_id, method, operation(canonical), query, body
    *
    * @param {Object} context - 请求上下文
    * @param {number} context.user_id - 用户ID
@@ -134,20 +218,20 @@ class IdempotencyService {
    * @param {Object} context.body - 请求体
    * @returns {string} SHA-256哈希值
    */
-  static generateRequestFingerprint (context) {
+  static generateRequestFingerprint(context) {
     const { user_id, http_method, api_path, query, body } = context
 
     // 过滤请求体
     const body_filtered = this.filterBodyForFingerprint(body)
 
-    // 规范化路径
-    const normalized_path = this.normalizePath(api_path)
+    /* 使用 canonical operation 替代原始路径，同一业务操作的不同路径版本会生成相同的指纹 */
+    const canonical_operation = this.getCanonicalOperation(api_path)
 
     // 构建规范化的 canonical 对象
     const canonical = {
       user_id,
       method: http_method,
-      path: normalized_path,
+      operation: canonical_operation, // ✅ 稳定的业务操作标识（替代 path）
       query: query || {},
       body: body_filtered
     }
@@ -166,7 +250,7 @@ class IdempotencyService {
    * @returns {string} SHA-256哈希值
    * @deprecated 使用 generateRequestFingerprint 替代
    */
-  static generateRequestHash (params) {
+  static generateRequestHash(params) {
     // 兼容旧调用方式，仅对 body 进行哈希
     const sortedParams = JSON.stringify(params, Object.keys(params || {}).sort())
     return crypto.createHash('sha256').update(sortedParams).digest('hex')
@@ -190,7 +274,7 @@ class IdempotencyService {
    * @param {number} request_data.user_id - 用户ID
    * @returns {Promise<Object>} { is_new, request, should_process, response }
    */
-  static async getOrCreateRequest (idempotency_key, request_data) {
+  static async getOrCreateRequest(idempotency_key, request_data) {
     // 延迟加载模型，避免循环依赖
     const { ApiIdempotencyRequest } = require('../models')
 
@@ -216,8 +300,32 @@ class IdempotencyService {
       })
 
       if (existingRequest) {
-        // 检查参数是否一致（防止幂等键冲突）
+        // ✅ 获取当前和已存在记录的 canonical operation
+        const existing_canonical = this.getCanonicalOperation(existingRequest.api_path)
+        const current_canonical = this.getCanonicalOperation(api_path)
+
+        // 检查是否为同类操作（通过 canonical operation）
+        if (existing_canonical !== current_canonical) {
+          // 不同操作，严格 409
+          await transaction.rollback()
+          const error = new Error(
+            '幂等键冲突：该幂等键已用于不同的操作。' +
+              '已有操作：' +
+              existing_canonical +
+              '，当前操作：' +
+              current_canonical
+          )
+          error.statusCode = 409
+          error.errorCode = 'IDEMPOTENCY_KEY_CONFLICT_DIFFERENT_OPERATION'
+          throw error
+        }
+
+        // 同类操作，检查参数是否一致
         if (existingRequest.request_hash !== request_hash) {
+          /*
+           * 参数不一致（可能是路径变更导致的指纹变化）
+           * 【已拍板决策 2026-01-09】：强制不兼容，不做双算比对
+           */
           await transaction.rollback()
           const error = new Error(
             '幂等键冲突：相同的 idempotency_key 但参数不同。' +
@@ -228,14 +336,29 @@ class IdempotencyService {
           throw error
         }
 
+        // 如果路径不同但 canonical 相同，记录跨路径重试日志
+        if (existingRequest.api_path !== api_path) {
+          logger.info('🔄 检测到同类操作跨路径重试', {
+            idempotency_key,
+            old_path: existingRequest.api_path,
+            new_path: api_path,
+            canonical_operation: current_canonical,
+            decision: '不写回，只回放结果' // ✅ 已拍板决策
+          })
+        }
+
         // 参数一致，检查处理状态
         if (existingRequest.status === 'completed') {
-          // 已完成，返回快照结果
+          /*
+           * 已完成，返回快照结果
+           * 【已拍板决策】：不写回更新旧记录，保留审计真实性
+           */
           await transaction.commit()
           logger.info('🔄 入口幂等拦截：请求已完成，返回首次结果', {
             idempotency_key,
             user_id,
-            api_path
+            api_path,
+            original_path: existingRequest.api_path
           })
           return {
             is_new: false,
@@ -327,7 +450,7 @@ class IdempotencyService {
    * @param {Object} response_data - 响应数据
    * @returns {Promise<void>} 无返回值
    */
-  static async markAsCompleted (idempotency_key, business_event_id, response_data) {
+  static async markAsCompleted(idempotency_key, business_event_id, response_data) {
     const { ApiIdempotencyRequest } = require('../models')
 
     await ApiIdempotencyRequest.update(
@@ -357,7 +480,7 @@ class IdempotencyService {
    * @param {string} error_message - 错误信息
    * @returns {Promise<void>} 无返回值
    */
-  static async markAsFailed (idempotency_key, error_message) {
+  static async markAsFailed(idempotency_key, error_message) {
     const { ApiIdempotencyRequest } = require('../models')
 
     await ApiIdempotencyRequest.update(
@@ -383,7 +506,7 @@ class IdempotencyService {
    *
    * @returns {Promise<Object>} { updated_count }
    */
-  static async autoFailProcessingTimeout () {
+  static async autoFailProcessingTimeout() {
     const { ApiIdempotencyRequest } = require('../models')
     const { Op } = require('sequelize')
 
@@ -420,7 +543,7 @@ class IdempotencyService {
    *
    * @returns {Promise<Object>} { deleted_count }
    */
-  static async cleanupExpired () {
+  static async cleanupExpired() {
     const { ApiIdempotencyRequest } = require('../models')
     const { Op } = require('sequelize')
 
@@ -448,7 +571,7 @@ class IdempotencyService {
    * @param {string} idempotency_key - 幂等键
    * @returns {Promise<Object|null>} 请求记录或null
    */
-  static async findByKey (idempotency_key) {
+  static async findByKey(idempotency_key) {
     const { ApiIdempotencyRequest } = require('../models')
 
     return await ApiIdempotencyRequest.findOne({
@@ -462,7 +585,7 @@ class IdempotencyService {
    * @param {string} business_event_id - 业务事件ID
    * @returns {Promise<Object|null>} 请求记录或null
    */
-  static async findByBusinessEventId (business_event_id) {
+  static async findByBusinessEventId(business_event_id) {
     const { ApiIdempotencyRequest } = require('../models')
 
     return await ApiIdempotencyRequest.findOne({

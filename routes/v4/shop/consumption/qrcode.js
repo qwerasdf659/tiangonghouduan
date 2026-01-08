@@ -23,6 +23,8 @@ const { authenticateToken, requireAdmin } = require('../../../../middleware/auth
 const { handleServiceError } = require('../../../../middleware/validation')
 const QRCodeValidator = require('../../../../utils/QRCodeValidator')
 const logger = require('../../../../utils/logger').logger
+// 用户服务 - 通过 Service 层访问数据库（符合路由层规范）
+const UserService = require('../../../../services/UserService')
 
 /**
  * @route GET /api/v4/shop/consumption/qrcode/:user_id
@@ -75,14 +77,15 @@ router.get('/qrcode/:user_id', authenticateToken, async (req, res) => {
 
     logger.info('生成用户二维码（UUID版本）', { user_id: userId })
 
-    // 查询用户获取UUID
-    const { User } = require('../../../../models')
-    const user = await User.findByPk(userId, {
-      attributes: ['user_id', 'user_uuid']
-    })
-
-    if (!user) {
-      return res.apiError('用户不存在', 'NOT_FOUND', null, 404)
+    // 查询用户获取UUID（通过 Service 层访问，符合路由层规范）
+    let user
+    try {
+      user = await UserService.getUserById(userId)
+    } catch (error) {
+      if (error.code === 'USER_NOT_FOUND') {
+        return res.apiError('用户不存在', 'NOT_FOUND', null, 404)
+      }
+      throw error
     }
 
     // 使用UUID生成二维码

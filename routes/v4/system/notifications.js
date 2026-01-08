@@ -6,7 +6,7 @@ const logger = require('../../../utils/logger').logger
  * @description 通知功能API - 基于SystemAnnouncement实现
  * @module routes/v4/notifications
  * @requires express
- * @requires ../models - SystemAnnouncement模型
+ * @requires ServiceManager - 通过 req.app.locals.services 获取通知服务
  * @requires ../middleware/auth - 身份认证中间件
  *
  * 设计说明：

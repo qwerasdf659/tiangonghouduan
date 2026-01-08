@@ -13,31 +13,84 @@
  *
  * 执行频率：每小时执行一次
  *
- * 监控规则（可配置）：
+ * 监控规则（从DB system_settings读取，支持运营动态调整）：
  * - 价格异常：单价低于市场均价的10%或高于市场均价的300%
  * - 超长挂牌：on_sale状态超过7天未成交
  * - 冻结异常：用户冻结总额与其挂牌资产数量不匹配
  *
  * 创建时间：2026-01-08
+ * 修改时间：2026-01-09（D2：配置迁移到DB）
  */
 
 const { MarketListing, AccountAssetBalance, Account, sequelize } = require('../models')
 const { Op } = sequelize.Sequelize
 const NotificationService = require('../services/NotificationService')
+const AdminSystemService = require('../services/AdminSystemService')
 const logger = require('../utils/logger').logger
 
 /**
- * 监控配置
+ * 默认监控配置（作为DB配置缺失时的降级方案）
  */
-const MONITOR_CONFIG = {
+const DEFAULT_MONITOR_CONFIG = {
   /** 价格下限阈值（市场均价的百分比） */
   price_low_threshold: 0.1,
   /** 价格上限阈值（市场均价的倍数） */
   price_high_threshold: 3.0,
   /** 超长挂牌天数阈值 */
   long_listing_days: 7,
-  /** 单次检查的最大挂牌数量 */
+  /** 是否启用告警 */
+  alert_enabled: true,
+  /** 单次检查的最大挂牌数量（硬编码，不入DB） */
   max_check_count: 1000
+}
+
+/**
+ * 从DB加载监控配置
+ *
+ * @returns {Promise<Object>} 监控配置对象
+ */
+async function loadMonitorConfig() {
+  try {
+    const configs = await AdminSystemService.getSettingValues([
+      {
+        category: 'marketplace',
+        setting_key: 'monitor_price_low_threshold',
+        default_value: DEFAULT_MONITOR_CONFIG.price_low_threshold
+      },
+      {
+        category: 'marketplace',
+        setting_key: 'monitor_price_high_threshold',
+        default_value: DEFAULT_MONITOR_CONFIG.price_high_threshold
+      },
+      {
+        category: 'marketplace',
+        setting_key: 'monitor_long_listing_days',
+        default_value: DEFAULT_MONITOR_CONFIG.long_listing_days
+      },
+      {
+        category: 'marketplace',
+        setting_key: 'monitor_alert_enabled',
+        default_value: DEFAULT_MONITOR_CONFIG.alert_enabled
+      }
+    ])
+
+    return {
+      price_low_threshold:
+        parseFloat(configs.monitor_price_low_threshold) ||
+        DEFAULT_MONITOR_CONFIG.price_low_threshold,
+      price_high_threshold:
+        parseFloat(configs.monitor_price_high_threshold) ||
+        DEFAULT_MONITOR_CONFIG.price_high_threshold,
+      long_listing_days:
+        parseInt(configs.monitor_long_listing_days, 10) || DEFAULT_MONITOR_CONFIG.long_listing_days,
+      alert_enabled:
+        configs.monitor_alert_enabled === true || configs.monitor_alert_enabled === 'true',
+      max_check_count: DEFAULT_MONITOR_CONFIG.max_check_count
+    }
+  } catch (error) {
+    logger.warn('[市场监控] 加载DB配置失败，使用默认值', { error: error.message })
+    return DEFAULT_MONITOR_CONFIG
+  }
 }
 
 /**
@@ -55,23 +108,36 @@ class HourlyMarketListingMonitor {
       price_anomalies: [],
       long_listings: [],
       frozen_anomalies: [],
-      errors: []
+      errors: [],
+      config_source: 'unknown'
     }
 
     try {
       logger.info('[市场监控] 开始执行异常挂牌监控...')
 
+      /* 从DB加载监控配置 */
+      const config = await loadMonitorConfig()
+      report.config_source = 'database'
+      report.config_used = {
+        price_low_threshold: config.price_low_threshold,
+        price_high_threshold: config.price_high_threshold,
+        long_listing_days: config.long_listing_days,
+        alert_enabled: config.alert_enabled
+      }
+
+      logger.info('[市场监控] 已加载DB配置', report.config_used)
+
       // 1. 价格异常监控
-      await this.checkPriceAnomalies(report)
+      await this.checkPriceAnomalies(report, config)
 
       // 2. 超长挂牌监控
-      await this.checkLongListings(report)
+      await this.checkLongListings(report, config)
 
       // 3. 冻结余额异常监控
-      await this.checkFrozenAnomalies(report)
+      await this.checkFrozenAnomalies(report, config)
 
-      // 4. 发送监控报告（如有异常）
-      await this.sendAlertIfNeeded(report)
+      // 4. 发送监控报告（如有异常且告警已启用）
+      await this.sendAlertIfNeeded(report, config)
 
       report.completed_at = new Date().toISOString()
       report.success = true
@@ -95,9 +161,10 @@ class HourlyMarketListingMonitor {
    * 检查价格异常
    *
    * @param {Object} report - 监控报告对象
+   * @param {Object} config - 监控配置（从DB加载）
    * @returns {Promise<void>} 无返回值，结果直接写入report对象
    */
-  static async checkPriceAnomalies(report) {
+  static async checkPriceAnomalies(report, config) {
     try {
       logger.info('[市场监控] 检查价格异常...')
 
@@ -131,7 +198,7 @@ class HourlyMarketListingMonitor {
           listing_kind: 'fungible_asset',
           status: 'on_sale'
         },
-        limit: MONITOR_CONFIG.max_check_count
+        limit: config.max_check_count
       })
 
       for (const listing of activeListings) {
@@ -145,7 +212,7 @@ class HourlyMarketListingMonitor {
         const avgUnitPrice = avgData.avg_unit_price
 
         // 检查价格下限
-        if (unitPrice < avgUnitPrice * MONITOR_CONFIG.price_low_threshold) {
+        if (unitPrice < avgUnitPrice * config.price_low_threshold) {
           report.price_anomalies.push({
             listing_id: listing.listing_id,
             seller_user_id: listing.seller_user_id,
@@ -155,12 +222,12 @@ class HourlyMarketListingMonitor {
             unit_price: unitPrice,
             avg_unit_price: avgUnitPrice,
             anomaly_type: 'price_too_low',
-            description: `单价 ${unitPrice.toFixed(2)} 低于市场均价 ${avgUnitPrice.toFixed(2)} 的 ${(MONITOR_CONFIG.price_low_threshold * 100).toFixed(0)}%`
+            description: `单价 ${unitPrice.toFixed(2)} 低于市场均价 ${avgUnitPrice.toFixed(2)} 的 ${(config.price_low_threshold * 100).toFixed(0)}%`
           })
         }
 
         // 检查价格上限
-        if (unitPrice > avgUnitPrice * MONITOR_CONFIG.price_high_threshold) {
+        if (unitPrice > avgUnitPrice * config.price_high_threshold) {
           report.price_anomalies.push({
             listing_id: listing.listing_id,
             seller_user_id: listing.seller_user_id,
@@ -170,7 +237,7 @@ class HourlyMarketListingMonitor {
             unit_price: unitPrice,
             avg_unit_price: avgUnitPrice,
             anomaly_type: 'price_too_high',
-            description: `单价 ${unitPrice.toFixed(2)} 高于市场均价 ${avgUnitPrice.toFixed(2)} 的 ${(MONITOR_CONFIG.price_high_threshold * 100).toFixed(0)}%`
+            description: `单价 ${unitPrice.toFixed(2)} 高于市场均价 ${avgUnitPrice.toFixed(2)} 的 ${(config.price_high_threshold * 100).toFixed(0)}%`
           })
         }
       }
@@ -186,15 +253,14 @@ class HourlyMarketListingMonitor {
    * 检查超长挂牌
    *
    * @param {Object} report - 监控报告对象
+   * @param {Object} config - 监控配置（从DB加载）
    * @returns {Promise<void>} 无返回值，结果直接写入report对象
    */
-  static async checkLongListings(report) {
+  static async checkLongListings(report, config) {
     try {
       logger.info('[市场监控] 检查超长挂牌...')
 
-      const threshold = new Date(
-        Date.now() - MONITOR_CONFIG.long_listing_days * 24 * 60 * 60 * 1000
-      )
+      const threshold = new Date(Date.now() - config.long_listing_days * 24 * 60 * 60 * 1000)
 
       const longListings = await MarketListing.findAll({
         attributes: [
@@ -212,7 +278,7 @@ class HourlyMarketListingMonitor {
             [Op.lt]: threshold
           }
         },
-        limit: MONITOR_CONFIG.max_check_count
+        limit: config.max_check_count
       })
 
       for (const listing of longListings) {
@@ -229,7 +295,7 @@ class HourlyMarketListingMonitor {
           price_amount: listing.price_amount,
           created_at: listing.created_at,
           days_on_sale: daysOnSale,
-          description: `挂牌已上架 ${daysOnSale} 天，超过阈值 ${MONITOR_CONFIG.long_listing_days} 天`
+          description: `挂牌已上架 ${daysOnSale} 天，超过阈值 ${config.long_listing_days} 天`
         })
       }
 
@@ -248,9 +314,10 @@ class HourlyMarketListingMonitor {
    * 2. 冻结孤儿：用户有冻结余额但无对应活跃挂牌（资金被卡死风险）
    *
    * @param {Object} report - 监控报告对象
+   * @param {Object} _config - 监控配置（从DB加载，当前方法暂未使用）
    * @returns {Promise<void>} 无返回值，结果直接写入report对象
    */
-  static async checkFrozenAnomalies(report) {
+  static async checkFrozenAnomalies(report, _config) {
     try {
       logger.info('[市场监控] 检查冻结余额异常...')
 
@@ -403,14 +470,24 @@ class HourlyMarketListingMonitor {
    * 发送告警（如有异常）
    *
    * @param {Object} report - 监控报告对象
+   * @param {Object} config - 监控配置（从DB加载）
    * @returns {Promise<void>} 无返回值
    */
-  static async sendAlertIfNeeded(report) {
+  static async sendAlertIfNeeded(report, config) {
     const totalAnomalies =
       report.price_anomalies.length + report.long_listings.length + report.frozen_anomalies.length
 
     if (totalAnomalies === 0 && report.errors.length === 0) {
       logger.info('[市场监控] 无异常，不发送告警')
+      return
+    }
+
+    /* 检查告警开关是否启用 */
+    if (!config.alert_enabled) {
+      logger.info('[市场监控] 发现异常但告警已禁用，跳过发送', {
+        total_anomalies: totalAnomalies,
+        alert_enabled: config.alert_enabled
+      })
       return
     }
 

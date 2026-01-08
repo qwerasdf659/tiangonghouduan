@@ -41,7 +41,7 @@ class MaterialManagementService {
    * @param {Object|null} details - 附加信息（可选）
    * @returns {never} 直接抛错
    */
-  static _throw (status_code, error_code, message, details = null) {
+  static _throw(status_code, error_code, message, details = null) {
     const err = new Error(message)
     err.status_code = status_code
     err.error_code = error_code
@@ -60,7 +60,7 @@ class MaterialManagementService {
    * @param {number|string} [query.page_size=20] - 每页数量
    * @returns {Promise<Object>} 查询结果
    */
-  static async listConversionRules (query = {}) {
+  static async listConversionRules(query = {}) {
     const { from_asset_code, to_asset_code, is_enabled, page = 1, page_size = 20 } = query
 
     const where = {}
@@ -124,9 +124,12 @@ class MaterialManagementService {
    * @param {Object} options.transaction - Sequelize事务对象（必填）
    * @returns {Promise<Object>} 创建结果
    */
-  static async createConversionRule (payload, created_by, options = {}) {
+  static async createConversionRule(payload, created_by, options = {}) {
     // 强制要求事务边界 - 2026-01-05 治理决策
-    const transaction = assertAndGetTransaction(options, 'MaterialManagementService.createConversionRule')
+    const transaction = assertAndGetTransaction(
+      options,
+      'MaterialManagementService.createConversionRule'
+    )
 
     const {
       from_asset_code,
@@ -214,9 +217,12 @@ class MaterialManagementService {
    * @param {Object} options.transaction - Sequelize事务对象（必填）
    * @returns {Promise<Object>} 禁用结果
    */
-  static async disableConversionRule (rule_id, options = {}) {
+  static async disableConversionRule(rule_id, options = {}) {
     // 强制要求事务边界 - 2026-01-05 治理决策
-    const transaction = assertAndGetTransaction(options, 'MaterialManagementService.disableConversionRule')
+    const transaction = assertAndGetTransaction(
+      options,
+      'MaterialManagementService.disableConversionRule'
+    )
 
     const rule = await MaterialConversionRule.findByPk(rule_id, { transaction })
     if (!rule) {
@@ -238,7 +244,7 @@ class MaterialManagementService {
    * @param {string|boolean} [query.is_enabled] - 是否启用
    * @returns {Promise<Object>} 查询结果
    */
-  static async listAssetTypes (query = {}) {
+  static async listAssetTypes(query = {}) {
     const { group_code, is_enabled } = query
     const where = {}
     if (group_code) where.group_code = group_code
@@ -268,9 +274,12 @@ class MaterialManagementService {
    * @param {Object} options.transaction - Sequelize事务对象（必填）
    * @returns {Promise<Object>} 创建结果
    */
-  static async createAssetType (payload, options = {}) {
+  static async createAssetType(payload, options = {}) {
     // 强制要求事务边界 - 2026-01-05 治理决策
-    const transaction = assertAndGetTransaction(options, 'MaterialManagementService.createAssetType')
+    const transaction = assertAndGetTransaction(
+      options,
+      'MaterialManagementService.createAssetType'
+    )
 
     const {
       asset_code,
@@ -330,9 +339,12 @@ class MaterialManagementService {
    * @param {Object} options.transaction - Sequelize事务对象（必填）
    * @returns {Promise<Object>} 禁用结果
    */
-  static async disableAssetType (asset_code, options = {}) {
+  static async disableAssetType(asset_code, options = {}) {
     // 强制要求事务边界 - 2026-01-05 治理决策
-    const transaction = assertAndGetTransaction(options, 'MaterialManagementService.disableAssetType')
+    const transaction = assertAndGetTransaction(
+      options,
+      'MaterialManagementService.disableAssetType'
+    )
 
     const assetType = await MaterialAssetType.findOne({ where: { asset_code }, transaction })
     if (!assetType) {
@@ -344,6 +356,36 @@ class MaterialManagementService {
 
     await assetType.update({ is_enabled: false }, { transaction })
     return { asset_type: assetType.toJSON() }
+  }
+
+  /**
+   * 获取所有材料资产类型用于交易配置（管理后台）
+   *
+   * 业务场景：
+   * - 管理后台查看所有材料资产的交易配置
+   * - 包含黑名单检查和有效交易状态计算
+   *
+   * @returns {Promise<Array>} 资产类型配置列表
+   */
+  static async getAllAssetTypesForTradeConfig() {
+    const assets = await MaterialAssetType.findAll({
+      attributes: [
+        'asset_code',
+        'display_name',
+        'group_code',
+        'form',
+        'tier',
+        'is_tradable',
+        'is_enabled',
+        'sort_order'
+      ],
+      order: [
+        ['sort_order', 'ASC'],
+        ['asset_code', 'ASC']
+      ]
+    })
+
+    return assets.map(asset => asset.toJSON())
   }
 }
 

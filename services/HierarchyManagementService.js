@@ -558,6 +558,95 @@ class HierarchyManagementService {
       throw error
     }
   }
+
+  /**
+   * 📋 获取层级关系列表（分页查询）
+   *
+   * 业务场景：
+   * - 管理后台查看层级关系列表
+   * - 按条件筛选层级关系
+   *
+   * @param {Object} params - 查询参数
+   * @param {number} [params.superior_user_id] - 上级用户ID筛选
+   * @param {boolean} [params.is_active] - 是否激活
+   * @param {number} [params.role_level] - 角色级别筛选
+   * @param {number} [params.page=1] - 页码
+   * @param {number} [params.page_size=20] - 每页数量
+   * @returns {Promise<Object>} { count, rows }
+   */
+  static async getHierarchyList(params = {}) {
+    const { superior_user_id, is_active, role_level, page = 1, page_size = 20 } = params
+
+    const pageNum = parseInt(page, 10) || 1
+    const pageSize = parseInt(page_size, 10) || 20
+    const offset = (pageNum - 1) * pageSize
+
+    // 构建查询条件
+    const whereCondition = {}
+    if (superior_user_id !== undefined && superior_user_id !== null) {
+      whereCondition.superior_user_id = parseInt(superior_user_id, 10)
+    }
+    if (is_active !== undefined) {
+      whereCondition.is_active = is_active === true || is_active === 'true'
+    }
+
+    // 角色级别筛选条件
+    const roleCondition = {}
+    if (role_level) {
+      roleCondition.role_level = parseInt(role_level, 10)
+    }
+
+    const { count, rows } = await UserHierarchy.findAndCountAll({
+      where: whereCondition,
+      include: [
+        {
+          model: User,
+          as: 'user',
+          attributes: ['user_id', 'mobile', 'nickname', 'status'],
+          required: true
+        },
+        {
+          model: User,
+          as: 'superior',
+          attributes: ['user_id', 'mobile', 'nickname'],
+          required: false
+        },
+        {
+          model: Role,
+          as: 'role',
+          attributes: ['role_id', 'role_name', 'role_level'],
+          where: role_level ? roleCondition : undefined,
+          required: true
+        }
+      ],
+      order: [['created_at', 'DESC']],
+      limit: pageSize,
+      offset
+    })
+
+    return { count, rows }
+  }
+
+  /**
+   * 📋 获取可用角色列表（用于创建层级时选择角色）
+   *
+   * 业务场景：
+   * - 管理后台创建层级关系时选择角色
+   * - 只返回业务层级相关角色（业务员、业务经理、区域负责人）
+   *
+   * @returns {Promise<Array>} 角色列表
+   */
+  static async getHierarchyRoles() {
+    const roles = await Role.findAll({
+      where: {
+        role_level: { [Op.in]: [40, 60, 80] } // 业务员、业务经理、区域负责人
+      },
+      attributes: ['role_id', 'role_name', 'role_level', 'description'],
+      order: [['role_level', 'DESC']]
+    })
+
+    return roles
+  }
 }
 
 module.exports = HierarchyManagementService

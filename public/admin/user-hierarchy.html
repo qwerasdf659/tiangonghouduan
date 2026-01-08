@@ -1,0 +1,737 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>用户层级管理 - 管理后台</title>
+
+  <!-- Bootstrap 5 - UI框架 -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+
+  <!-- Bootstrap Icons - 图标库 -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+
+  <!-- 公共样式表 - 统一主题和响应式设计 -->
+  <link href="/admin/css/common.css" rel="stylesheet">
+
+  <style>
+    .hierarchy-card {
+      border-left: 4px solid #0d6efd;
+    }
+    .role-badge-80 { background-color: #6f42c1; } /* 区域负责人 - 紫色 */
+    .role-badge-60 { background-color: #fd7e14; } /* 业务经理 - 橙色 */
+    .role-badge-40 { background-color: #198754; } /* 业务员 - 绿色 */
+    .inactive-row { opacity: 0.6; }
+    .tree-level { padding-left: 20px; border-left: 2px dashed #dee2e6; }
+  </style>
+</head>
+<body class="bg-light">
+  <!-- 顶部导航 -->
+  <nav class="navbar navbar-dark bg-primary">
+    <div class="container-fluid">
+      <a href="/admin/dashboard.html" class="navbar-brand">
+        <i class="bi bi-arrow-left me-2"></i>管理后台 - 用户层级管理
+      </a>
+      <div>
+        <span class="text-light me-3" id="welcomeText">欢迎，管理员</span>
+        <button class="btn btn-outline-light btn-sm" id="logoutBtn">退出登录</button>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container-fluid mt-4">
+    <!-- 层级说明 -->
+    <div class="alert alert-info">
+      <i class="bi bi-info-circle me-2"></i>
+      <strong>层级结构：</strong>
+      <span class="badge role-badge-80 ms-2">区域负责人 (80)</span> →
+      <span class="badge role-badge-60 ms-2">业务经理 (60)</span> →
+      <span class="badge role-badge-40 ms-2">业务员 (40)</span> → 门店
+      <br>
+      <small class="text-muted mt-1 d-block">
+        用户层级管理用于管理业务人员的上下级关系。此功能整合了门店分配、业务员管理等能力。
+      </small>
+    </div>
+
+    <!-- 统计卡片 -->
+    <div class="row g-3 mb-4">
+      <div class="col-md-3">
+        <div class="card hierarchy-card">
+          <div class="card-body text-center">
+            <i class="bi bi-people-fill text-primary" style="font-size: 2rem;"></i>
+            <h4 class="mt-2 text-primary" id="totalCount">0</h4>
+            <small class="text-muted">总层级关系</small>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="card">
+          <div class="card-body text-center">
+            <i class="bi bi-person-check text-success" style="font-size: 2rem;"></i>
+            <h4 class="mt-2 text-success" id="activeCount">0</h4>
+            <small class="text-muted">激活中</small>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="card">
+          <div class="card-body text-center">
+            <i class="bi bi-person-x text-secondary" style="font-size: 2rem;"></i>
+            <h4 class="mt-2 text-secondary" id="inactiveCount">0</h4>
+            <small class="text-muted">已停用</small>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="card">
+          <div class="card-body text-center">
+            <i class="bi bi-shop text-info" style="font-size: 2rem;"></i>
+            <h4 class="mt-2 text-info" id="storeAssignCount">0</h4>
+            <small class="text-muted">已分配门店</small>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 操作区域 -->
+    <div class="card mb-3">
+      <div class="card-body">
+        <div class="row g-3 align-items-end">
+          <div class="col-md-2">
+            <label class="form-label">角色级别</label>
+            <select class="form-select" id="roleLevelFilter">
+              <option value="">全部级别</option>
+              <option value="80">区域负责人 (80)</option>
+              <option value="60">业务经理 (60)</option>
+              <option value="40">业务员 (40)</option>
+            </select>
+          </div>
+          <div class="col-md-2">
+            <label class="form-label">状态</label>
+            <select class="form-select" id="statusFilter">
+              <option value="">全部状态</option>
+              <option value="true">激活中</option>
+              <option value="false">已停用</option>
+            </select>
+          </div>
+          <div class="col-md-2">
+            <label class="form-label">上级用户ID</label>
+            <input type="number" class="form-control" id="superiorFilter" placeholder="输入上级ID">
+          </div>
+          <div class="col-md-2">
+            <button class="btn btn-primary w-100" id="refreshBtn">
+              <i class="bi bi-arrow-repeat"></i> 刷新
+            </button>
+          </div>
+          <div class="col-md-2">
+            <button class="btn btn-success w-100" id="createBtn">
+              <i class="bi bi-plus-lg"></i> 新建层级
+            </button>
+          </div>
+          <div class="col-md-2">
+            <button class="btn btn-outline-secondary w-100" id="exportBtn">
+              <i class="bi bi-download"></i> 导出
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 层级列表 -->
+    <div class="card">
+      <div class="card-header bg-white d-flex justify-content-between align-items-center">
+        <h5 class="mb-0"><i class="bi bi-diagram-3"></i> 用户层级列表</h5>
+        <span class="text-muted" id="listInfo">加载中...</span>
+      </div>
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-hover mb-0">
+            <thead class="table-light">
+              <tr>
+                <th>ID</th>
+                <th>用户</th>
+                <th>角色</th>
+                <th>上级</th>
+                <th>门店</th>
+                <th>状态</th>
+                <th>激活时间</th>
+                <th>操作</th>
+              </tr>
+            </thead>
+            <tbody id="hierarchyTableBody">
+              <tr>
+                <td colspan="8" class="text-center text-muted py-4">
+                  <i class="bi bi-hourglass-split"></i> 加载中...
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="card-footer bg-white">
+        <nav>
+          <ul class="pagination mb-0 justify-content-center" id="pagination"></ul>
+        </nav>
+      </div>
+    </div>
+  </div>
+
+  <!-- 新建/编辑层级模态框 -->
+  <div class="modal fade" id="hierarchyModal" tabindex="-1">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="modalTitle">新建层级关系</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <form id="hierarchyForm">
+            <div class="mb-3">
+              <label class="form-label">用户ID <span class="text-danger">*</span></label>
+              <input type="number" class="form-control" id="formUserId" required>
+              <small class="text-muted">输入要建立层级关系的用户ID</small>
+            </div>
+            <div class="mb-3">
+              <label class="form-label">角色 <span class="text-danger">*</span></label>
+              <select class="form-select" id="formRoleId" required>
+                <option value="">请选择角色</option>
+              </select>
+            </div>
+            <div class="mb-3">
+              <label class="form-label">上级用户ID</label>
+              <input type="number" class="form-control" id="formSuperiorId">
+              <small class="text-muted">区域负责人可不填上级；业务经理需填写区域负责人ID；业务员需填写业务经理ID</small>
+            </div>
+            <div class="mb-3">
+              <label class="form-label">关联门店ID</label>
+              <input type="number" class="form-control" id="formStoreId">
+              <small class="text-muted">仅业务员需要关联门店</small>
+            </div>
+          </form>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+          <button type="button" class="btn btn-primary" id="saveHierarchyBtn">保存</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 停用原因模态框 -->
+  <div class="modal fade" id="deactivateModal" tabindex="-1">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header bg-warning">
+          <h5 class="modal-title"><i class="bi bi-exclamation-triangle"></i> 停用用户权限</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <p>您正在停用用户 <strong id="deactivateUserInfo"></strong> 的层级权限。</p>
+          <div class="mb-3">
+            <label class="form-label">停用原因 <span class="text-danger">*</span></label>
+            <textarea class="form-control" id="deactivateReason" rows="3" placeholder="请输入停用原因" required></textarea>
+          </div>
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" id="includeSubordinates">
+            <label class="form-check-label text-danger" for="includeSubordinates">
+              <strong>同时停用所有下级用户</strong>（谨慎选择，将级联停用该用户管理的所有下级）
+            </label>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+          <button type="button" class="btn btn-warning" id="confirmDeactivateBtn">确认停用</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 下级用户查看模态框 -->
+  <div class="modal fade" id="subordinatesModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title"><i class="bi bi-diagram-2"></i> 下级用户列表</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div id="subordinatesList">
+            <div class="text-center text-muted py-4">
+              <i class="bi bi-hourglass-split"></i> 加载中...
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bootstrap JS -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+  <!-- 公共脚本 - 统一的认证和API调用 -->
+  <script src="/admin/js/admin-common.js"></script>
+
+  <script>
+    // ================================
+    // 用户层级管理 - 前端逻辑
+    // ================================
+
+    // 状态变量
+    let currentPage = 1;
+    const pageSize = 20;
+    let rolesList = [];
+    let currentDeactivateUserId = null;
+
+    // 初始化
+    document.addEventListener('DOMContentLoaded', async function() {
+      // 检查登录状态
+      if (!checkAuth()) return;
+
+      // 加载角色列表
+      await loadRoles();
+
+      // 加载数据
+      await loadHierarchyList();
+
+      // 绑定事件
+      bindEvents();
+    });
+
+    /**
+     * 加载可用角色列表
+     */
+    async function loadRoles() {
+      try {
+        const response = await apiRequest('/api/v4/console/user-hierarchy/roles');
+        if (response.success) {
+          rolesList = response.data || [];
+
+          // 填充角色下拉框
+          const roleSelect = document.getElementById('formRoleId');
+          roleSelect.innerHTML = '<option value="">请选择角色</option>';
+          rolesList.forEach(role => {
+            roleSelect.innerHTML += `<option value="${role.role_id}">${role.role_name} (${role.level_name})</option>`;
+          });
+        }
+      } catch (error) {
+        console.error('加载角色列表失败:', error);
+      }
+    }
+
+    /**
+     * 加载层级列表
+     */
+    async function loadHierarchyList() {
+      try {
+        const params = new URLSearchParams({
+          page: currentPage,
+          page_size: pageSize
+        });
+
+        const roleLevel = document.getElementById('roleLevelFilter').value;
+        const status = document.getElementById('statusFilter').value;
+        const superiorId = document.getElementById('superiorFilter').value;
+
+        if (roleLevel) params.append('role_level', roleLevel);
+        if (status) params.append('is_active', status);
+        if (superiorId) params.append('superior_user_id', superiorId);
+
+        const response = await apiRequest(`/api/v4/console/user-hierarchy?${params}`);
+
+        if (response.success) {
+          renderHierarchyTable(response.data);
+          updateStatistics(response.data);
+        } else {
+          showToast('加载层级列表失败: ' + (response.message || '未知错误'), 'danger');
+        }
+      } catch (error) {
+        console.error('加载层级列表失败:', error);
+        showToast('加载层级列表失败', 'danger');
+      }
+    }
+
+    /**
+     * 渲染层级表格
+     */
+    function renderHierarchyTable(data) {
+      const tbody = document.getElementById('hierarchyTableBody');
+      const rows = data.rows || [];
+
+      if (rows.length === 0) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="8" class="text-center text-muted py-4">
+              <i class="bi bi-inbox"></i> 暂无数据
+            </td>
+          </tr>
+        `;
+        document.getElementById('listInfo').textContent = '共 0 条记录';
+        return;
+      }
+
+      tbody.innerHTML = rows.map(h => {
+        const roleLevel = h.role_level || 40;
+        const roleBadgeClass = `role-badge-${roleLevel}`;
+        const rowClass = h.is_active ? '' : 'inactive-row';
+
+        return `
+          <tr class="${rowClass}">
+            <td>${h.hierarchy_id}</td>
+            <td>
+              <div><strong>${h.user_nickname || '未设置'}</strong></div>
+              <small class="text-muted">${h.user_mobile || '-'} (ID: ${h.user_id})</small>
+            </td>
+            <td>
+              <span class="badge ${roleBadgeClass}">${h.role_name || '-'}</span>
+              <small class="d-block text-muted">级别: ${roleLevel}</small>
+            </td>
+            <td>
+              ${h.superior_user_id
+                ? `<div>${h.superior_nickname || '-'}</div><small class="text-muted">ID: ${h.superior_user_id}</small>`
+                : '<span class="text-muted">-（顶级）</span>'
+              }
+            </td>
+            <td>${h.store_id || '<span class="text-muted">-</span>'}</td>
+            <td>
+              ${h.is_active
+                ? '<span class="badge bg-success">激活中</span>'
+                : `<span class="badge bg-secondary">已停用</span><br><small class="text-muted">${h.deactivation_reason || ''}</small>`
+              }
+            </td>
+            <td><small>${formatDate(h.activated_at)}</small></td>
+            <td>
+              <div class="btn-group btn-group-sm">
+                <button class="btn btn-outline-primary" onclick="viewSubordinates(${h.user_id})" title="查看下级">
+                  <i class="bi bi-diagram-2"></i>
+                </button>
+                ${h.is_active
+                  ? `<button class="btn btn-outline-warning" onclick="openDeactivateModal(${h.user_id}, '${h.user_nickname || h.user_mobile}')" title="停用">
+                      <i class="bi bi-pause-circle"></i>
+                    </button>`
+                  : `<button class="btn btn-outline-success" onclick="activateUser(${h.user_id})" title="激活">
+                      <i class="bi bi-play-circle"></i>
+                    </button>`
+                }
+              </div>
+            </td>
+          </tr>
+        `;
+      }).join('');
+
+      // 更新列表信息和分页
+      document.getElementById('listInfo').textContent = `共 ${data.count} 条记录`;
+      renderPagination(data.pagination);
+    }
+
+    /**
+     * 更新统计信息
+     */
+    function updateStatistics(data) {
+      const rows = data.rows || [];
+      const activeRows = rows.filter(r => r.is_active);
+      const inactiveRows = rows.filter(r => !r.is_active);
+      const storeAssigned = rows.filter(r => r.store_id);
+
+      document.getElementById('totalCount').textContent = data.count || 0;
+      document.getElementById('activeCount').textContent = activeRows.length;
+      document.getElementById('inactiveCount').textContent = inactiveRows.length;
+      document.getElementById('storeAssignCount').textContent = storeAssigned.length;
+    }
+
+    /**
+     * 渲染分页
+     */
+    function renderPagination(pagination) {
+      const paginationEl = document.getElementById('pagination');
+      if (!pagination || pagination.total_pages <= 1) {
+        paginationEl.innerHTML = '';
+        return;
+      }
+
+      let html = '';
+      const { page, total_pages } = pagination;
+
+      // 上一页
+      html += `<li class="page-item ${page <= 1 ? 'disabled' : ''}">
+        <a class="page-link" href="#" onclick="goToPage(${page - 1})">上一页</a>
+      </li>`;
+
+      // 页码
+      for (let i = 1; i <= total_pages; i++) {
+        if (i === 1 || i === total_pages || (i >= page - 2 && i <= page + 2)) {
+          html += `<li class="page-item ${i === page ? 'active' : ''}">
+            <a class="page-link" href="#" onclick="goToPage(${i})">${i}</a>
+          </li>`;
+        } else if (i === page - 3 || i === page + 3) {
+          html += `<li class="page-item disabled"><span class="page-link">...</span></li>`;
+        }
+      }
+
+      // 下一页
+      html += `<li class="page-item ${page >= total_pages ? 'disabled' : ''}">
+        <a class="page-link" href="#" onclick="goToPage(${page + 1})">下一页</a>
+      </li>`;
+
+      paginationEl.innerHTML = html;
+    }
+
+    /**
+     * 跳转到指定页
+     */
+    function goToPage(page) {
+      if (page < 1) return;
+      currentPage = page;
+      loadHierarchyList();
+    }
+
+    /**
+     * 绑定事件
+     */
+    function bindEvents() {
+      // 刷新按钮
+      document.getElementById('refreshBtn').addEventListener('click', () => {
+        currentPage = 1;
+        loadHierarchyList();
+      });
+
+      // 筛选条件变化
+      ['roleLevelFilter', 'statusFilter'].forEach(id => {
+        document.getElementById(id).addEventListener('change', () => {
+          currentPage = 1;
+          loadHierarchyList();
+        });
+      });
+
+      // 上级ID输入回车
+      document.getElementById('superiorFilter').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+          currentPage = 1;
+          loadHierarchyList();
+        }
+      });
+
+      // 新建层级按钮
+      document.getElementById('createBtn').addEventListener('click', openCreateModal);
+
+      // 保存层级按钮
+      document.getElementById('saveHierarchyBtn').addEventListener('click', saveHierarchy);
+
+      // 确认停用按钮
+      document.getElementById('confirmDeactivateBtn').addEventListener('click', confirmDeactivate);
+
+      // 导出按钮
+      document.getElementById('exportBtn').addEventListener('click', exportData);
+
+      // 退出登录
+      document.getElementById('logoutBtn').addEventListener('click', logout);
+    }
+
+    /**
+     * 打开新建层级模态框
+     */
+    function openCreateModal() {
+      document.getElementById('modalTitle').textContent = '新建层级关系';
+      document.getElementById('hierarchyForm').reset();
+
+      const modal = new bootstrap.Modal(document.getElementById('hierarchyModal'));
+      modal.show();
+    }
+
+    /**
+     * 保存层级关系
+     */
+    async function saveHierarchy() {
+      const userId = document.getElementById('formUserId').value;
+      const roleId = document.getElementById('formRoleId').value;
+      const superiorId = document.getElementById('formSuperiorId').value;
+      const storeId = document.getElementById('formStoreId').value;
+
+      if (!userId || !roleId) {
+        showToast('请填写必填字段', 'warning');
+        return;
+      }
+
+      try {
+        const response = await apiRequest('/api/v4/console/user-hierarchy', {
+          method: 'POST',
+          body: JSON.stringify({
+            user_id: parseInt(userId),
+            role_id: parseInt(roleId),
+            superior_user_id: superiorId ? parseInt(superiorId) : null,
+            store_id: storeId ? parseInt(storeId) : null
+          })
+        });
+
+        if (response.success) {
+          showToast('创建层级关系成功', 'success');
+          bootstrap.Modal.getInstance(document.getElementById('hierarchyModal')).hide();
+          loadHierarchyList();
+        } else {
+          showToast('创建失败: ' + (response.message || '未知错误'), 'danger');
+        }
+      } catch (error) {
+        console.error('保存层级关系失败:', error);
+        showToast('保存失败', 'danger');
+      }
+    }
+
+    /**
+     * 查看下级用户
+     */
+    async function viewSubordinates(userId) {
+      const modal = new bootstrap.Modal(document.getElementById('subordinatesModal'));
+      modal.show();
+
+      document.getElementById('subordinatesList').innerHTML = `
+        <div class="text-center text-muted py-4">
+          <i class="bi bi-hourglass-split"></i> 加载中...
+        </div>
+      `;
+
+      try {
+        const response = await apiRequest(`/api/v4/console/user-hierarchy/${userId}/subordinates`);
+
+        if (response.success) {
+          const subordinates = response.data.subordinates || [];
+
+          if (subordinates.length === 0) {
+            document.getElementById('subordinatesList').innerHTML = `
+              <div class="text-center text-muted py-4">
+                <i class="bi bi-inbox"></i> 该用户暂无下级
+              </div>
+            `;
+            return;
+          }
+
+          let html = '<table class="table table-sm"><thead><tr><th>用户</th><th>角色</th><th>状态</th></tr></thead><tbody>';
+          subordinates.forEach(sub => {
+            const roleLevel = sub.role_level || 40;
+            const roleBadgeClass = `role-badge-${roleLevel}`;
+            html += `
+              <tr>
+                <td>${sub.user_nickname || '-'} <small class="text-muted">(${sub.user_mobile || '-'})</small></td>
+                <td><span class="badge ${roleBadgeClass}">${sub.role_name || '-'}</span></td>
+                <td>${sub.is_active ? '<span class="badge bg-success">激活</span>' : '<span class="badge bg-secondary">停用</span>'}</td>
+              </tr>
+            `;
+          });
+          html += '</tbody></table>';
+
+          document.getElementById('subordinatesList').innerHTML = html;
+        } else {
+          document.getElementById('subordinatesList').innerHTML = `
+            <div class="alert alert-danger">加载失败: ${response.message || '未知错误'}</div>
+          `;
+        }
+      } catch (error) {
+        console.error('查看下级失败:', error);
+        document.getElementById('subordinatesList').innerHTML = `
+          <div class="alert alert-danger">加载失败</div>
+        `;
+      }
+    }
+
+    /**
+     * 打开停用模态框
+     */
+    function openDeactivateModal(userId, userInfo) {
+      currentDeactivateUserId = userId;
+      document.getElementById('deactivateUserInfo').textContent = userInfo + ' (ID: ' + userId + ')';
+      document.getElementById('deactivateReason').value = '';
+      document.getElementById('includeSubordinates').checked = false;
+
+      const modal = new bootstrap.Modal(document.getElementById('deactivateModal'));
+      modal.show();
+    }
+
+    /**
+     * 确认停用
+     */
+    async function confirmDeactivate() {
+      const reason = document.getElementById('deactivateReason').value.trim();
+      const includeSubordinates = document.getElementById('includeSubordinates').checked;
+
+      if (!reason) {
+        showToast('请填写停用原因', 'warning');
+        return;
+      }
+
+      try {
+        const response = await apiRequest(`/api/v4/console/user-hierarchy/${currentDeactivateUserId}/deactivate`, {
+          method: 'POST',
+          body: JSON.stringify({
+            reason: reason,
+            include_subordinates: includeSubordinates
+          })
+        });
+
+        if (response.success) {
+          showToast(`成功停用 ${response.data.deactivated_count} 个用户的权限`, 'success');
+          bootstrap.Modal.getInstance(document.getElementById('deactivateModal')).hide();
+          loadHierarchyList();
+        } else {
+          showToast('停用失败: ' + (response.message || '未知错误'), 'danger');
+        }
+      } catch (error) {
+        console.error('停用失败:', error);
+        showToast('停用失败', 'danger');
+      }
+    }
+
+    /**
+     * 激活用户
+     */
+    async function activateUser(userId) {
+      if (!confirm('确定要激活该用户的层级权限吗？')) return;
+
+      try {
+        const response = await apiRequest(`/api/v4/console/user-hierarchy/${userId}/activate`, {
+          method: 'POST',
+          body: JSON.stringify({
+            include_subordinates: false
+          })
+        });
+
+        if (response.success) {
+          showToast('激活成功', 'success');
+          loadHierarchyList();
+        } else {
+          showToast('激活失败: ' + (response.message || '未知错误'), 'danger');
+        }
+      } catch (error) {
+        console.error('激活失败:', error);
+        showToast('激活失败', 'danger');
+      }
+    }
+
+    /**
+     * 导出数据
+     */
+    function exportData() {
+      showToast('导出功能开发中', 'info');
+    }
+
+    /**
+     * 格式化日期
+     */
+    function formatDate(dateStr) {
+      if (!dateStr) return '-';
+      const date = new Date(dateStr);
+      return date.toLocaleString('zh-CN');
+    }
+
+    /**
+     * 显示Toast提示
+     */
+    function showToast(message, type = 'info') {
+      // 简单的alert替代，可以替换为更好的Toast组件
+      if (type === 'danger' || type === 'warning') {
+        alert(message);
+      } else {
+        console.log(`[${type}] ${message}`);
+      }
+    }
+  </script>
+</body>
+</html>
+

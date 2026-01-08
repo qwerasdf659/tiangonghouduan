@@ -128,15 +128,17 @@ router.post('/submit', authenticateToken, async (req, res) => {
      * 调用服务层处理（传入幂等键）
      * 使用 TransactionManager 统一事务边界（符合治理决策）
      */
-    const result = await TransactionManager.execute(async (transaction) => {
-      return await ConsumptionService.merchantSubmitConsumption({
-        qr_code,
-        consumption_amount,
-        merchant_notes,
-        merchant_id: merchantId,
-        idempotency_key, // 业界标准形态：统一使用 idempotency_key
-        transaction
-      })
+    const result = await TransactionManager.execute(async transaction => {
+      return await ConsumptionService.merchantSubmitConsumption(
+        {
+          qr_code,
+          consumption_amount,
+          merchant_notes,
+          merchant_id: merchantId,
+          idempotency_key // 业界标准形态：统一使用 idempotency_key
+        },
+        { transaction } // ✅ 事务通过 options 参数传入，而非 data 对象
+      )
     })
 
     // 从服务层获取 record 和 is_duplicate 标志

@@ -1047,6 +1047,8 @@ class AssetService {
    * @param {Object} filters - 筛选条件
    * @param {string} filters.asset_code - 资产代码（可选）
    * @param {string} filters.business_type - 业务类型（可选）
+   * @param {Date|string} filters.start_date - 开始日期（可选）
+   * @param {Date|string} filters.end_date - 结束日期（可选）
    * @param {number} filters.page - 页码（默认1）
    * @param {number} filters.page_size - 每页数量（默认20）
    * @param {Object} options - 选项
@@ -1055,7 +1057,7 @@ class AssetService {
    */
   static async getTransactions(params, filters = {}, options = {}) {
     const { user_id, system_code } = params
-    const { asset_code, business_type, page = 1, page_size = 20 } = filters
+    const { asset_code, business_type, start_date, end_date, page = 1, page_size = 20 } = filters
     const { transaction } = options
 
     const account = await this.getOrCreateAccount({ user_id, system_code }, { transaction })
@@ -1068,6 +1070,18 @@ class AssetService {
 
     if (business_type) {
       where.business_type = business_type
+    }
+
+    // 支持日期范围筛选（管理员视角资产流水查询需要）
+    if (start_date || end_date) {
+      const { Op } = require('sequelize')
+      where.created_at = {}
+      if (start_date) {
+        where.created_at[Op.gte] = start_date instanceof Date ? start_date : new Date(start_date)
+      }
+      if (end_date) {
+        where.created_at[Op.lte] = end_date instanceof Date ? end_date : new Date(end_date)
+      }
     }
 
     const { count, rows } = await AssetTransaction.findAndCountAll({
@@ -1977,6 +1991,111 @@ class AssetService {
       page,
       limit,
       total_pages: Math.ceil(count / limit)
+    }
+  }
+
+  /**
+   * 获取用户物品实例列表（分页）
+   *
+   * 业务场景：
+   * - 后台运营查看用户物品列表
+   * - 客服查询用户物品
+   *
+   * @param {Object} params - 参数对象
+   * @param {number} params.user_id - 用户ID
+   * @param {Object} filters - 筛选条件
+   * @param {string} filters.item_type - 物品类型筛选（可选）
+   * @param {string} filters.status - 状态筛选（可选，默认查询 available/locked）
+   * @param {number} filters.page - 页码（默认1）
+   * @param {number} filters.page_size - 每页数量（默认20，最大100）
+   * @param {Object} options - 选项
+   * @param {Object} options.transaction - Sequelize事务对象（可选）
+   * @returns {Promise<Object>} 物品列表和分页信息
+   */
+  static async getUserItemInstances(params, filters = {}, options = {}) {
+    const { user_id } = params
+    const { item_type, status, page = 1, page_size = 20 } = filters
+    const { transaction } = options
+
+    const { ItemInstance } = require('../models')
+    const { Op } = require('sequelize')
+
+    // 构建查询条件
+    const where = { owner_user_id: user_id }
+
+    if (item_type) {
+      where.item_type = item_type
+    }
+
+    if (status) {
+      where.status = status
+    } else {
+      // 默认只查询 available 和 locked 状态
+      where.status = { [Op.in]: ['available', 'locked'] }
+    }
+
+    const { count, rows } = await ItemInstance.findAndCountAll({
+      where,
+      order: [['created_at', 'DESC']],
+      limit: page_size,
+      offset: (page - 1) * page_size,
+      transaction
+    })
+
+    return {
+      items: rows,
+      total: count,
+      page,
+      page_size,
+      total_pages: Math.ceil(count / page_size)
+    }
+  }
+
+  /**
+   * 获取物品实例详情（包含事件历史）
+   *
+   * 业务场景：
+   * - 后台运营查看物品详情
+   * - 客服查询物品完整轨迹
+   *
+   * @param {Object} params - 参数对象
+   * @param {number} params.user_id - 用户ID（权限验证）
+   * @param {number} params.item_instance_id - 物品实例ID
+   * @param {Object} options - 选项
+   * @param {number} options.event_limit - 事件历史数量限制（默认10）
+   * @param {Object} options.transaction - Sequelize事务对象（可选）
+   * @returns {Promise<Object>} 物品详情和事件历史
+   */
+  static async getItemInstanceDetail(params, options = {}) {
+    const { user_id, item_instance_id } = params
+    const { event_limit = 10, transaction } = options
+
+    const { ItemInstance, ItemInstanceEvent } = require('../models')
+
+    // 查询物品（只能查看自己的物品）
+    const item = await ItemInstance.findOne({
+      where: {
+        item_instance_id,
+        owner_user_id: user_id
+      },
+      transaction
+    })
+
+    if (!item) {
+      return null
+    }
+
+    // 查询物品事件历史
+    const events = await ItemInstanceEvent.findAll({
+      where: { item_instance_id },
+      order: [['created_at', 'DESC']],
+      limit: event_limit,
+      transaction
+    })
+
+    return {
+      item,
+      events
     }
   }
 }

@@ -22,6 +22,7 @@ const router = express.Router()
 
 // 导入子路由模块
 const portfolioRoutes = require('./portfolio')
+const transactionsRoutes = require('./transactions')
 
 /*
  * 挂载子路由
@@ -29,7 +30,9 @@ const portfolioRoutes = require('./portfolio')
  * GET /portfolio/items - 物品列表
  * GET /portfolio/items/:id - 物品详情
  * GET /item-events - 物品事件历史
+ * GET /transactions - 资产流水查询（管理员视角）
  */
 router.use('/', portfolioRoutes)
+router.use('/transactions', transactionsRoutes)
 
 module.exports = router

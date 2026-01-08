@@ -1302,6 +1302,347 @@ class AdminLotteryService {
       new_total: newTotal
     }
   }
+
+  /**
+   * 获取干预规则列表
+   *
+   * @description 分页查询lottery_management_settings表
+   * 字段映射（数据库 → 业务）：
+   * - status 字段存储状态：active/used/expired/cancelled
+   * - setting_data JSON 字段存储：prize_id, reason, count, remaining 等具体设置
+   * - user_id 关联 target_user（目标用户）
+   * - created_by 关联 admin（操作管理员）
+   *
+   * @param {Object} query - 查询条件
+   * @param {number} query.page - 页码，默认1
+   * @param {number} query.page_size - 每页数量，默认20
+   * @param {string} query.status - 状态筛选：active/used/expired/cancelled
+   * @param {string} query.user_search - 用户搜索（用户ID或手机号）
+   * @param {string} query.setting_type - 设置类型筛选
+   * @returns {Promise<Object>} 干预规则列表和分页信息
+   */
+  static async getInterventionList(query = {}) {
+    const { Op } = require('sequelize')
+    const { page = 1, page_size = 20, status, user_search, setting_type } = query
+
+    const where = {}
+
+    // 状态筛选 - 使用 status 字段（枚举：active/used/expired/cancelled）
+    if (status) {
+      const now = new Date()
+      switch (status) {
+        case 'active':
+          // 生效中：status='active' 且 未过期（expires_at为null或大于当前时间）
+          where.status = 'active'
+          where[Op.or] = [{ expires_at: null }, { expires_at: { [Op.gt]: now } }]
+          break
+        case 'used':
+          // 已使用
+          where.status = 'used'
+          break
+        case 'expired':
+          // 已过期：status='active' 但 expires_at 已过期
+          where.status = 'active'
+          where.expires_at = { [Op.lte]: now, [Op.ne]: null }
+          break
+        case 'cancelled':
+          // 已取消
+          where.status = 'cancelled'
+          break
+        default:
+          // 不筛选或直接使用传入的状态值
+          if (['active', 'used', 'expired', 'cancelled'].includes(status)) {
+            where.status = status
+          }
+      }
+    }
+
+    // 设置类型筛选
+    if (setting_type) {
+      where.setting_type = setting_type
+    }
+
+    // 用户搜索 - 关联 target_user（正确的关联别名）
+    let userWhere
+    if (user_search) {
+      if (/^\d+$/.test(user_search)) {
+        userWhere = {
+          [Op.or]: [
+            { user_id: parseInt(user_search) },
+            { mobile: { [Op.like]: `%${user_search}%` } }
+          ]
+        }
+      } else {
+        userWhere = { mobile: { [Op.like]: `%${user_search}%` } }
+      }
+    }
+
+    const offset = (parseInt(page) - 1) * parseInt(page_size)
+    const limit = parseInt(page_size)
+
+    const { count, rows } = await models.LotteryManagementSetting.findAndCountAll({
+      where,
+      include: [
+        {
+          model: models.User,
+          as: 'target_user', // 正确的关联别名（模型定义的 as）
+          attributes: ['user_id', 'nickname', 'mobile'],
+          where: userWhere,
+          required: !!userWhere
+        },
+        {
+          model: models.User,
+          as: 'admin', // 正确的关联别名（模型定义的 as）
+          attributes: ['user_id', 'nickname'],
+          required: false
+        }
+      ],
+      order: [['created_at', 'DESC']],
+      offset,
+      limit
+    })
+
+    return {
+      items: rows.map(item => AdminLotteryService._formatInterventionItem(item)),
+      pagination: {
+        page: parseInt(page),
+        page_size: parseInt(page_size),
+        total: count,
+        total_pages: Math.ceil(count / parseInt(page_size))
+      }
+    }
+  }
+
+  /**
+   * 获取单个干预规则详情
+   *
+   * @param {string} settingId - 设置ID（字符串格式：setting_时间戳_随机码）
+   * @returns {Promise<Object>} 干预规则详情
+   * @throws {Error} 规则不存在
+   */
+  static async getInterventionById(settingId) {
+    const setting = await models.LotteryManagementSetting.findByPk(settingId, {
+      include: [
+        {
+          model: models.User,
+          as: 'target_user', // 正确的关联别名
+          attributes: ['user_id', 'nickname', 'mobile', 'status']
+        },
+        {
+          model: models.User,
+          as: 'admin', // 正确的关联别名
+          attributes: ['user_id', 'nickname']
+        }
+      ]
+    })
+
+    if (!setting) {
+      const error = new Error('干预规则不存在')
+      error.code = 'INTERVENTION_NOT_FOUND'
+      error.statusCode = 404
+      throw error
+    }
+
+    return AdminLotteryService._formatInterventionDetail(setting)
+  }
+
+  /**
+   * 取消干预规则
+   *
+   * @param {string} settingId - 设置ID（字符串格式）
+   * @param {Object} options - 选项
+   * @param {string} options.reason - 取消原因
+   * @param {number} options.operated_by - 操作者ID
+   * @param {Object} options.transaction - Sequelize事务对象
+   * @returns {Promise<Object>} 更新后的干预规则
+   * @throws {Error} 规则不存在或已不可取消
+   *
+   * 字段映射说明：
+   * - status 字段：存储状态 active/used/expired/cancelled
+   * - 取消操作：将 status 改为 'cancelled'
+   */
+  static async cancelIntervention(settingId, options = {}) {
+    const { reason = '管理员手动取消', operated_by } = options
+    const transaction = assertAndGetTransaction(options, 'AdminLotteryService.cancelIntervention')
+
+    const setting = await models.LotteryManagementSetting.findByPk(settingId, { transaction })
+
+    if (!setting) {
+      const error = new Error('干预规则不存在')
+      error.code = 'INTERVENTION_NOT_FOUND'
+      error.statusCode = 404
+      throw error
+    }
+
+    // 使用正确的字段名 status（而非 is_active）
+    if (setting.status === 'cancelled') {
+      const error = new Error('该干预规则已被取消')
+      error.code = 'ALREADY_CANCELLED'
+      error.statusCode = 400
+      throw error
+    }
+
+    if (setting.status === 'used') {
+      const error = new Error('该干预规则已被使用，无法取消')
+      error.code = 'ALREADY_USED'
+      error.statusCode = 400
+      throw error
+    }
+
+    // 更新状态为 cancelled（使用模型现有字段）
+    await setting.update(
+      {
+        status: 'cancelled'
+      },
+      { transaction }
+    )
+
+    // 记录审计日志
+    await AuditLogService.log(
+      {
+        business_type: 'lottery_management',
+        action_type: 'cancel_intervention',
+        target_id: settingId,
+        target_type: 'lottery_management_setting',
+        operator_id: operated_by,
+        after_data: {
+          setting_id: settingId,
+          setting_type: setting.setting_type,
+          reason
+        }
+      },
+      { transaction }
+    )
+
+    logger.info('干预规则取消成功', {
+      setting_id: settingId,
+      setting_type: setting.setting_type,
+      reason,
+      operated_by
+    })
+
+    return {
+      setting_id: settingId,
+      status: 'cancelled',
+      cancel_reason: reason
+    }
+  }
+
+  /**
+   * 格式化干预规则列表项
+   *
+   * @private
+   * @param {Object} item - 数据库记录
+   * @returns {Object} 格式化后的项
+   *
+   * 字段映射说明：
+   * - setting_data.prize_id: 强制中奖时的奖品ID
+   * - setting_data.reason: 操作原因
+   * - setting_data.count/remaining: 强制不中奖次数
+   * - target_user: 目标用户信息（关联别名）
+   * - admin: 操作管理员信息（关联别名）
+   */
+  static _formatInterventionItem(item) {
+    const now = new Date()
+    const settingData = item.setting_data || {}
+
+    // 计算实际状态（基于 status 字段和 expires_at）
+    let displayStatus = item.status
+    if (item.status === 'active' && item.expires_at && new Date(item.expires_at) <= now) {
+      displayStatus = 'expired' // 业务层显示已过期
+    }
+
+    return {
+      setting_id: item.setting_id,
+      user_id: item.user_id,
+      // 使用正确的关联别名 target_user
+      user_info: item.target_user
+        ? {
+            nickname: item.target_user.nickname,
+            mobile: item.target_user.mobile
+          }
+        : null,
+      setting_type: item.setting_type,
+      // prize_id 存储在 setting_data JSON 中
+      prize_id: settingData.prize_id || null,
+      // 奖品信息需要另外查询（暂不关联，从 setting_data 获取）
+      prize_info: settingData.prize_id
+        ? {
+            prize_id: settingData.prize_id,
+            prize_name: settingData.prize_name || null // 部分记录可能已存储奖品名
+          }
+        : null,
+      // reason 存储在 setting_data JSON 中
+      reason: settingData.reason || null,
+      // 状态字段
+      status: displayStatus,
+      expires_at: item.expires_at,
+      created_at: item.created_at,
+      // 操作管理员信息
+      operator: item.admin
+        ? {
+            user_id: item.admin.user_id,
+            nickname: item.admin.nickname
+          }
+        : null
+    }
+  }
+
+  /**
+   * 格式化干预规则详情
+   *
+   * @private
+   * @param {Object} setting - 数据库记录
+   * @returns {Object} 格式化后的详情
+   *
+   * 字段映射说明：
+   * - setting_data JSON 中存储具体设置参数（prize_id, reason, count 等）
+   * - target_user: 目标用户信息（关联别名）
+   * - admin: 操作管理员信息（关联别名）
+   */
+  static _formatInterventionDetail(setting) {
+    const now = new Date()
+    const settingData = setting.setting_data || {}
+
+    // 计算实际状态
+    let displayStatus = setting.status
+    if (setting.status === 'active' && setting.expires_at && new Date(setting.expires_at) <= now) {
+      displayStatus = 'expired'
+    }
+
+    return {
+      setting_id: setting.setting_id,
+      // 目标用户信息（使用正确的关联别名 target_user）
+      user: setting.target_user
+        ? {
+            user_id: setting.target_user.user_id,
+            nickname: setting.target_user.nickname,
+            mobile: setting.target_user.mobile,
+            status: setting.target_user.status
+          }
+        : null,
+      setting_type: setting.setting_type,
+      // 设置详情（从 setting_data JSON 提取）
+      setting_data: settingData,
+      // 奖品信息（从 setting_data 获取）
+      prize_id: settingData.prize_id || null,
+      prize_name: settingData.prize_name || null,
+      // reason 存储在 setting_data 中
+      reason: settingData.reason || null,
+      // 状态字段
+      status: displayStatus,
+      expires_at: setting.expires_at,
+      // 操作管理员信息（使用正确的关联别名 admin）
+      operator: setting.admin
+        ? {
+            user_id: setting.admin.user_id,
+            nickname: setting.admin.nickname
+          }
+        : null,
+      created_at: setting.created_at,
+      updated_at: setting.updated_at
+    }
+  }
 }
 
 module.exports = AdminLotteryService

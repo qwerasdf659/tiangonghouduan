@@ -239,7 +239,8 @@ class ConsumptionRecord extends Model {
    * @returns {Object} API响应对象
    */
   toAPIResponse() {
-    return {
+    // 基础响应数据
+    const response = {
       id: parseInt(this.record_id), // 通用id字段（数据脱敏）
       record_id: parseInt(this.record_id), // 保留业务字段（确保返回数字类型）
       user_id: this.user_id,
@@ -259,6 +260,25 @@ class ConsumptionRecord extends Model {
       age: this.getAge(),
       review_duration: this.getReviewDuration()
     }
+
+    // 关联的用户信息（消费用户）- 通过include查询时可用
+    if (this.user) {
+      response.user_mobile = this.user.mobile || null
+      response.user_nickname = this.user.nickname || null
+    }
+
+    // 关联的商家信息
+    if (this.merchant) {
+      response.merchant_mobile = this.merchant.mobile || null
+      response.merchant_nickname = this.merchant.nickname || null
+    }
+
+    // 关联的审核员信息
+    if (this.reviewer) {
+      response.reviewer_nickname = this.reviewer.nickname || null
+    }
+
+    return response
   }
 
   /**

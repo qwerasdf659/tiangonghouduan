@@ -23,6 +23,8 @@ const express = require('express')
 const router = express.Router()
 const { authenticateToken, requireAdmin } = require('../../../middleware/auth')
 const TransactionManager = require('../../../utils/TransactionManager')
+// 材料管理服务 - 通过 Service 层访问数据库（符合路由层规范）
+const MaterialManagementService = require('../../../services/MaterialManagementService')
 
 const logger = require('../../../utils/logger').logger
 
@@ -854,26 +856,8 @@ router.get('/tradable-assets', authenticateToken, requireAdmin, async (req, res)
       getBlacklistReason
     } = require('../../../constants/TradableAssetTypes')
 
-    // 获取 MaterialAssetType 模型
-    const { MaterialAssetType } = require('../../../models')
-
-    // 查询所有材料类资产
-    const assets = await MaterialAssetType.findAll({
-      attributes: [
-        'asset_code',
-        'display_name',
-        'group_code',
-        'form',
-        'tier',
-        'is_tradable',
-        'is_enabled',
-        'sort_order'
-      ],
-      order: [
-        ['sort_order', 'ASC'],
-        ['asset_code', 'ASC']
-      ]
-    })
+    // 通过 Service 层查询材料资产类型（符合路由层规范）
+    const assets = await MaterialManagementService.getAllAssetTypesForTradeConfig()
 
     // 构建响应数据，添加黑名单检查结果
     const assetConfigs = assets.map(asset => {

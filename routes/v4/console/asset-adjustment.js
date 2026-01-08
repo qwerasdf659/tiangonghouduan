@@ -35,6 +35,8 @@ const express = require('express')
 const router = express.Router()
 const { authenticateToken, requireAdmin } = require('../../../middleware/auth')
 const TransactionManager = require('../../../utils/TransactionManager')
+const MaterialManagementService = require('../../../services/MaterialManagementService')
+const UserService = require('../../../services/UserService')
 
 /**
  * 错误处理包装器
@@ -351,6 +353,73 @@ router.post(
 )
 
 /**
+ * GET /api/v4/console/asset-adjustment/asset-types
+ *
+ * @description 获取所有可调整的资产类型（管理员视角）
+ * @returns {Array} asset_types - 资产类型列表
+ * @access Admin
+ *
+ * 设计说明：
+ * - 暴露DB已存在能力：material_asset_types + 内置资产类型（POINTS/DIAMOND/BUDGET_POINTS）
+ * - 只读接口，不创造新业务能力
+ */
+router.get(
+  '/asset-types',
+  authenticateToken,
+  requireAdmin,
+  asyncHandler(async (req, res) => {
+    // 1. 内置资产类型（系统核心资产）
+    const builtInTypes = [
+      {
+        asset_code: 'POINTS',
+        name: '积分',
+        display_name: '积分',
+        category: 'builtin',
+        is_enabled: true
+      },
+      {
+        asset_code: 'DIAMOND',
+        name: '钻石',
+        display_name: '钻石',
+        category: 'builtin',
+        is_enabled: true
+      },
+      {
+        asset_code: 'BUDGET_POINTS',
+        name: '预算积分',
+        display_name: '预算积分',
+        category: 'builtin',
+        is_enabled: true
+      }
+    ]
+
+    // 2. 通过 Service 层获取材料资产类型（符合路由层规范）
+    const { asset_types: materialTypes } = await MaterialManagementService.listAssetTypes({
+      is_enabled: true
+    })
+
+    const materialAssetTypes = materialTypes.map(m => ({
+      asset_code: m.asset_code,
+      name: m.display_name,
+      display_name: m.display_name,
+      category: 'material',
+      group_code: m.group_code,
+      form: m.form,
+      tier: m.tier,
+      is_enabled: m.is_enabled
+    }))
+
+    // 3. 合并返回
+    const allAssetTypes = [...builtInTypes, ...materialAssetTypes]
+
+    return res.apiSuccess({
+      asset_types: allAssetTypes,
+      total: allAssetTypes.length
+    })
+  })
+)
+
+/**
  * GET /api/v4/console/asset-adjustment/user/:user_id/balances
  *
  * @description 查询用户所有资产余额（管理员视角）
@@ -364,12 +433,28 @@ router.get(
   asyncHandler(async (req, res) => {
     const { user_id } = req.params
 
-    const AssetService = req.app.locals.services.getService('asset')
+    // 1. 通过 Service 层获取用户基本信息（符合路由层规范）
+    let user
+    try {
+      user = await UserService.getUserById(Number(user_id))
+    } catch (error) {
+      if (error.message === '用户不存在') {
+        return res.apiError('用户不存在', 'USER_NOT_FOUND', null, 404)
+      }
+      throw error
+    }
 
+    // 2. 获取资产余额
+    const AssetService = req.app.locals.services.getService('asset')
     const balances = await AssetService.getAllBalances({ user_id: Number(user_id) })
 
     return res.apiSuccess({
-      user_id: Number(user_id),
+      user: {
+        user_id: user.user_id,
+        nickname: user.nickname,
+        mobile: user.mobile,
+        status: user.status
+      },
       balances: balances.map(b => ({
         asset_code: b.asset_code,
         available_amount: Number(b.available_amount),

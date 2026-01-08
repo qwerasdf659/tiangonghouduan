@@ -27,6 +27,7 @@
 const { MarketListing, sequelize, Op } = require('../models')
 const AssetService = require('../services/AssetService')
 const NotificationService = require('../services/NotificationService')
+const AdminSystemService = require('../services/AdminSystemService')
 const logger = require('../utils/logger')
 
 /**
@@ -37,9 +38,28 @@ const logger = require('../utils/logger')
  */
 class HourlyExpireFungibleAssetListings {
   /**
-   * 挂牌有效期（天）
+   * 默认挂牌有效期（天）- 作为DB配置缺失时的降级方案
    */
-  static LISTING_EXPIRY_DAYS = 3
+  static DEFAULT_EXPIRY_DAYS = 3
+
+  /**
+   * 从DB获取挂牌有效期配置
+   *
+   * @returns {Promise<number>} 挂牌有效期（天）
+   */
+  static async getExpiryDays() {
+    try {
+      const value = await AdminSystemService.getSettingValue(
+        'marketplace',
+        'listing_expiry_days',
+        this.DEFAULT_EXPIRY_DAYS
+      )
+      return parseInt(value, 10) || this.DEFAULT_EXPIRY_DAYS
+    } catch (error) {
+      logger.warn('获取listing_expiry_days配置失败，使用默认值', { error: error.message })
+      return this.DEFAULT_EXPIRY_DAYS
+    }
+  }
 
   /**
    * 执行挂牌过期任务
@@ -51,14 +71,19 @@ class HourlyExpireFungibleAssetListings {
     logger.info('开始执行可叠加资产挂牌过期任务')
 
     try {
+      /* 从DB加载过期天数配置 */
+      const expiryDays = await this.getExpiryDays()
+      logger.info(`使用挂牌有效期配置: ${expiryDays}天（来源: DB system_settings）`)
+
       // 扫描并处理超时挂牌
-      const result = await this._expireTimeoutListings()
+      const result = await this._expireTimeoutListings(expiryDays)
 
       const duration_ms = Date.now() - start_time
 
       const report = {
         timestamp: new Date().toISOString(),
         duration_ms,
+        expiry_days: expiryDays,
         expired_count: result.expired_count,
         failed_count: result.failed_count,
         total_unfrozen_amount: result.total_unfrozen_amount,
@@ -82,11 +107,12 @@ class HourlyExpireFungibleAssetListings {
    * 过期超时的挂牌
    *
    * @private
+   * @param {number} expiryDays - 过期天数（从DB配置读取）
    * @returns {Promise<Object>} 过期结果
    */
-  static async _expireTimeoutListings() {
-    // 计算过期时间阈值（3天前）
-    const expiryThreshold = new Date(Date.now() - this.LISTING_EXPIRY_DAYS * 24 * 60 * 60 * 1000)
+  static async _expireTimeoutListings(expiryDays) {
+    // 计算过期时间阈值（expiryDays天前）
+    const expiryThreshold = new Date(Date.now() - expiryDays * 24 * 60 * 60 * 1000)
 
     // 查询超时的可叠加资产挂牌（不加锁，批量查询）
     const timeoutListings = await MarketListing.findAll({

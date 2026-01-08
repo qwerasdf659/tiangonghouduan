@@ -204,7 +204,15 @@ class ConsumptionService {
     )
 
     logger.info('📊 开始处理商家消费记录提交（使用事务保护）...')
-    logger.info('📋 提交数据:', JSON.stringify(data, null, 2))
+    // 安全记录提交数据（排除不可序列化的对象如 transaction）
+    const safeLogData = {
+      qr_code: data.qr_code?.substring(0, 30) + '...',
+      consumption_amount: data.consumption_amount,
+      merchant_id: data.merchant_id,
+      merchant_notes: data.merchant_notes,
+      idempotency_key: data.idempotency_key
+    }
+    logger.info('📋 提交数据:', safeLogData)
 
     // 步骤1：验证必填参数
     if (!data.qr_code) {
@@ -364,46 +372,11 @@ class ConsumptionService {
       throw new Error(`不能审核：${canReview.reasons.join('；')}`)
     }
 
-    // 3. 更新消费记录状态（2026-01-09 添加业务结果态字段）
-    await record.update(
-      {
-        status: 'approved',
-        reviewed_by: reviewData.reviewer_id,
-        reviewed_at: BeijingTimeHelper.createDatabaseTime(),
-        admin_notes: reviewData.admin_notes || null,
-        final_status: 'approved', // 业务最终状态
-        settled_at: BeijingTimeHelper.createDatabaseTime(), // 结算时间
-        updated_at: BeijingTimeHelper.createDatabaseTime()
-      },
-      { transaction }
-    )
-
-    // 4. 更新审核记录表并获取review_id（2026-01-09 审计日志指向规则）
-    const reviewRecord = await ContentReviewRecord.findOne({
-      where: {
-        auditable_type: 'consumption',
-        auditable_id: recordId
-      },
-      transaction
-    })
-
-    if (!reviewRecord) {
-      throw new Error(`审核记录不存在: consumption_id=${recordId}`)
-    }
-
-    await reviewRecord.update(
-      {
-        audit_status: 'approved',
-        auditor_id: reviewData.reviewer_id,
-        audit_reason: reviewData.admin_notes || '审核通过',
-        audited_at: BeijingTimeHelper.createDatabaseTime(),
-        updated_at: BeijingTimeHelper.createDatabaseTime()
-      },
-      { transaction }
-    )
-
     /*
-     * 5. ✅ 方案C：审核通过时直接发放积分（使用 AssetService）
+     * 3. ✅ 先发放积分（满足数据库约束 chk_approved_has_reward）
+     * 数据库约束要求：status 为 approved 时必须有 reward_transaction_id
+     * 因此先发放积分获取 transaction_id，再更新消费记录状态
+     *
      * 幂等键命名规则：<business_type>:<action>:<entity_id>
      */
     // eslint-disable-next-line no-restricted-syntax -- 已传递 transaction
@@ -430,7 +403,58 @@ class ConsumptionService {
     )
 
     /*
-     * ========== 双账户模型：预算分配逻辑 ==========
+     * 获取积分流水ID，用于满足数据库约束
+     * AssetService.changeBalance 返回格式：{account, balance, transaction_record, is_duplicate}
+     */
+    const rewardTransactionId = pointsResult.transaction_record?.transaction_id || null
+
+    if (!rewardTransactionId) {
+      throw new Error('积分发放成功但未获取到流水ID，无法完成审核')
+    }
+
+    logger.info(`🔗 获取积分流水ID: ${rewardTransactionId}`)
+
+    // 4. 更新消费记录状态（包含 reward_transaction_id 以满足约束）
+    await record.update(
+      {
+        status: 'approved',
+        reviewed_by: reviewData.reviewer_id,
+        reviewed_at: BeijingTimeHelper.createDatabaseTime(),
+        admin_notes: reviewData.admin_notes || null,
+        reward_transaction_id: rewardTransactionId, // ✅ 满足 chk_approved_has_reward 约束
+        final_status: 'approved', // 业务最终状态
+        settled_at: BeijingTimeHelper.createDatabaseTime(), // 结算时间
+        updated_at: BeijingTimeHelper.createDatabaseTime()
+      },
+      { transaction }
+    )
+
+    // 5. 更新审核记录表并获取review_id（2026-01-09 审计日志指向规则）
+    const reviewRecord = await ContentReviewRecord.findOne({
+      where: {
+        auditable_type: 'consumption',
+        auditable_id: recordId
+      },
+      transaction
+    })
+
+    if (!reviewRecord) {
+      throw new Error(`审核记录不存在: consumption_id=${recordId}`)
+    }
+
+    await reviewRecord.update(
+      {
+        audit_status: 'approved',
+        auditor_id: reviewData.reviewer_id,
+        audit_reason: reviewData.admin_notes || '审核通过',
+        audited_at: BeijingTimeHelper.createDatabaseTime(),
+        updated_at: BeijingTimeHelper.createDatabaseTime()
+      },
+      { transaction }
+    )
+
+    /*
+     * ========== 6. 双账户模型：预算分配逻辑 ==========
      * 业务规则：
      * - 平台抽成10%用于奖品预算
      * - 抽成的80%作为预算积分
@@ -1215,6 +1239,113 @@ class ConsumptionService {
 
     logger.info('[配置] 预算系数读取成功', { ratio })
     return ratio
+  }
+
+  /**
+   * 软删除消费记录（Soft Delete Consumption Record）
+   *
+   * @description 标记消费记录为已删除，不物理删除数据
+   * @param {number} recordId - 消费记录ID
+   * @param {number} userId - 操作用户ID（用于权限验证）
+   * @param {Object} options - 选项
+   * @param {boolean} options.isAdmin - 是否为管理员操作
+   * @param {number} options.roleLevel - 用户角色级别（用于权限判断）
+   * @returns {Promise<Object>} 删除结果
+   * @throws {Error} 记录不存在、无权限、已删除、状态不允许等
+   */
+  static async softDeleteRecord(recordId, userId, options = {}) {
+    const { isAdmin = false, roleLevel = 0 } = options
+
+    logger.info('软删除消费记录', { record_id: recordId, user_id: userId, is_admin: isAdmin })
+
+    // 查询记录
+    const record = await ConsumptionRecord.findByPk(recordId)
+
+    if (!record) {
+      throw new Error('消费记录不存在')
+    }
+
+    // 权限检查：仅记录所有者或管理员可删除
+    if (!isAdmin && record.user_id !== userId) {
+      throw new Error('无权删除此消费记录')
+    }
+
+    // 状态检查：普通用户只能删除 pending 状态的记录，管理员可删除任何状态
+    if (roleLevel < 100 && record.status !== 'pending') {
+      throw new Error(
+        `仅允许删除待审核状态的消费记录，当前状态：${record.status}。已审核的记录请联系管理员处理`
+      )
+    }
+
+    // 检查是否已删除
+    if (record.is_deleted === 1) {
+      throw new Error('该消费记录已经被删除，无需重复操作')
+    }
+
+    // 执行软删除
+    const deletedAt = BeijingTimeHelper.createDatabaseTime()
+    await record.update({
+      is_deleted: 1,
+      deleted_at: deletedAt
+    })
+
+    logger.info('软删除消费记录成功', {
+      record_id: recordId,
+      user_id: userId,
+      deleted_at: BeijingTimeHelper.formatForAPI(deletedAt)
+    })
+
+    return {
+      record_id: recordId,
+      is_deleted: 1,
+      deleted_at: BeijingTimeHelper.formatForAPI(deletedAt),
+      record_type: 'consumption',
+      note: '消费记录已删除，将不再显示在列表中'
+    }
+  }
+
+  /**
+   * 恢复已删除的消费记录（Restore Deleted Consumption Record）
+   *
+   * @description 管理员恢复已软删除的消费记录
+   * @param {number} recordId - 消费记录ID
+   * @param {number} adminId - 管理员用户ID
+   * @returns {Promise<Object>} 恢复结果
+   * @throws {Error} 记录不存在、未删除等
+   */
+  static async restoreRecord(recordId, adminId) {
+    logger.info('管理员恢复消费记录', { record_id: recordId, admin_id: adminId })
+
+    // 查询记录（包含已删除的）
+    const record = await this.getRecordById(recordId, { includeDeleted: true })
+
+    if (!record) {
+      throw new Error('消费记录不存在')
+    }
+
+    // 检查是否已删除
+    if (record.is_deleted === 0) {
+      throw new Error('该消费记录未被删除，无需恢复')
+    }
+
+    // 恢复记录
+    await record.update({
+      is_deleted: 0,
+      deleted_at: null
+    })
+
+    logger.info('管理员恢复消费记录成功', {
+      record_id: recordId,
+      admin_id: adminId,
+      original_user_id: record.user_id
+    })
+
+    return {
+      record_id: recordId,
+      is_deleted: 0,
+      user_id: record.user_id,
+      note: '消费记录已恢复，用户端将重新显示该记录'
+    }
   }
 }
 

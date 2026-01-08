@@ -27,7 +27,6 @@ const router = express.Router()
 const { authenticateToken } = require('../../../middleware/auth')
 const { handleServiceError } = require('../../../middleware/validation')
 const logger = require('../../../utils/logger').logger
-const { MarketListing } = require('../../../models')
 // 业界标准幂等架构 - 统一入口幂等服务
 const IdempotencyService = require('../../../services/IdempotencyService')
 // 事务边界治理 - 统一事务管理器
@@ -137,20 +136,18 @@ router.post('/list', authenticateToken, async (req, res) => {
       return res.apiSuccess(duplicateResponse, '上架成功（幂等回放）')
     }
 
-    // 检查上架数量限制
-    const onSaleCount = await MarketListing.count({
-      where: {
-        seller_user_id: userId,
-        status: 'on_sale'
-      }
-    })
+    // 检查上架数量限制（通过 Service 层访问，符合路由层规范）
+    const listingCountInfo = await MarketListingService.getUserActiveListingCount(userId)
 
-    if (onSaleCount >= 10) {
+    if (listingCountInfo.remaining_count <= 0) {
       await IdempotencyService.markAsFailed(idempotency_key, '上架数量已达上限')
       return res.apiError(
-        '上架数量已达上限（10件）',
+        `上架数量已达上限（${listingCountInfo.max_count}件）`,
         'LIMIT_EXCEEDED',
-        { current: onSaleCount, limit: 10 },
+        {
+          current: listingCountInfo.active_count,
+          limit: listingCountInfo.max_count
+        },
         400
       )
     }
@@ -169,7 +166,8 @@ router.post('/list', authenticateToken, async (req, res) => {
           { transaction }
         )
 
-        // 构建响应数据
+        // 构建响应数据（使用从 listingCountInfo 获取的上架数量）
+        const currentCount = listingCountInfo.active_count
         return {
           listing: {
             listing_id: listing.listing_id,
@@ -178,9 +176,9 @@ router.post('/list', authenticateToken, async (req, res) => {
             is_duplicate
           },
           listing_status: {
-            current: onSaleCount + 1,
-            limit: 10,
-            remaining: 10 - onSaleCount - 1
+            current: currentCount + 1,
+            limit: listingCountInfo.max_count,
+            remaining: listingCountInfo.max_count - currentCount - 1
           },
           _listing_id: listing.listing_id, // 内部使用，记录幂等
           _is_duplicate: is_duplicate // 内部标记
@@ -209,7 +207,7 @@ router.post('/list', authenticateToken, async (req, res) => {
       listing_id: responseData._listing_id,
       idempotency_key,
       price_amount: priceAmountValue,
-      current_listings: onSaleCount + 1,
+      current_listings: responseData.listing_status.current,
       is_duplicate: responseData._is_duplicate
     })
 

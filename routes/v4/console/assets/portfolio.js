@@ -22,13 +22,16 @@
  *
  * 权限要求：admin（可写）或 ops（只读）角色
  *
+ * 架构规范：
+ * - 路由层通过 req.app.locals.services.getService() 获取服务
+ * - 路由层禁止直接 require models（所有数据库操作通过 Service 层）
+ *
  * 创建时间：2025-12-28
- * 更新时间：2026-01-07（架构重构 - 迁移到 console 域）
+ * 更新时间：2026-01-09（路由层规范治理 - 移除直接require models）
  */
 
 const express = require('express')
 const router = express.Router()
-const AssetService = require('../../../../services/AssetService')
 const { authenticateToken, requireRole } = require('../../../../middleware/auth')
 const logger = require('../../../../utils/logger')
 
@@ -79,6 +82,8 @@ router.get('/portfolio', authenticateToken, requireRole(['admin', 'ops']), async
 
     logger.info('📦 获取用户资产总览', { user_id, include_items })
 
+    // 通过 ServiceManager 获取 AssetService（路由层规范）
+    const AssetService = req.app.locals.services.getService('asset')
     const portfolio = await AssetService.getAssetPortfolio({ user_id }, { include_items })
 
     return res.apiSuccess(portfolio, '获取资产总览成功')
@@ -116,37 +121,13 @@ router.get(
       const item_type = req.query.item_type || null
       const status = req.query.status || null
 
-      const { ItemInstance } = require('../../../../models')
-      const { Op } = require('sequelize')
+      // 通过 ServiceManager 获取 AssetService（路由层规范）
+      const AssetService = req.app.locals.services.getService('asset')
 
-      // 构建查询条件
-      const where = { owner_user_id: user_id }
-
-      if (item_type) {
-        where.item_type = item_type
-      }
-
-      if (status) {
-        where.status = status
-      } else {
-        // 默认只查询 available 和 locked 状态
-        where.status = { [Op.in]: ['available', 'locked'] }
-      }
-
-      const { count, rows } = await ItemInstance.findAndCountAll({
-        where,
-        order: [['created_at', 'DESC']],
-        limit: page_size,
-        offset: (page - 1) * page_size
-      })
-
-      const result = {
-        items: rows,
-        total: count,
-        page,
-        page_size,
-        total_pages: Math.ceil(count / page_size)
-      }
+      const result = await AssetService.getUserItemInstances(
+        { user_id },
+        { item_type, status, page, page_size }
+      )
 
       return res.apiSuccess(result, '获取物品列表成功')
     } catch (error) {
@@ -178,30 +159,16 @@ router.get(
         return res.apiError('无效的物品ID', 400)
       }
 
-      const { ItemInstance, ItemInstanceEvent } = require('../../../../models')
+      // 通过 ServiceManager 获取 AssetService（路由层规范）
+      const AssetService = req.app.locals.services.getService('asset')
 
-      // 查询物品（只能查看自己的物品）
-      const item = await ItemInstance.findOne({
-        where: {
-          item_instance_id,
-          owner_user_id: user_id
-        }
-      })
+      const result = await AssetService.getItemInstanceDetail(
+        { user_id, item_instance_id },
+        { event_limit: 10 }
+      )
 
-      if (!item) {
+      if (!result) {
         return res.apiError('物品不存在或无权访问', 404)
-      }
-
-      // 查询物品事件历史
-      const events = await ItemInstanceEvent.findAll({
-        where: { item_instance_id },
-        order: [['created_at', 'DESC']],
-        limit: 10
-      })
-
-      const result = {
-        item,
-        events
       }
 
       return res.apiSuccess(result, '获取物品详情成功')
@@ -251,6 +218,9 @@ router.get('/item-events', authenticateToken, requireRole(['admin', 'ops']), asy
     const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 20))
 
     logger.info('📜 获取物品事件历史', { user_id, item_instance_id, event_types, page, limit })
+
+    // 通过 ServiceManager 获取 AssetService（路由层规范）
+    const AssetService = req.app.locals.services.getService('asset')
 
     const result = await AssetService.getItemEvents({
       user_id,

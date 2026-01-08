@@ -120,11 +120,11 @@
                 <tr>
                   <th style="width: 80px">ID</th>
                   <th>用户</th>
-                  <th>金额</th>
-                  <th>积分</th>
-                  <th>时间</th>
+                  <th>消费金额</th>
+                  <th>奖励积分</th>
+                  <th>提交时间</th>
                   <th>状态</th>
-                  <th>凭证</th>
+                  <th>方式</th>
                   <th style="width: 200px">操作</th>
                 </tr>
               </thead>
@@ -149,25 +149,6 @@
               </li>
             </ul>
           </nav>
-        </div>
-      </div>
-    </div>
-
-    <!-- 凭证查看模态框 -->
-    <div class="modal fade" id="voucherModal" tabindex="-1">
-      <div class="modal-dialog modal-lg modal-dialog-centered">
-        <div class="modal-content">
-          <div class="modal-header">
-            <h5 class="modal-title"><i class="bi bi-image"></i> 消费凭证</h5>
-            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-          </div>
-          <div class="modal-body text-center">
-            <img id="voucherImage" class="voucher-img" alt="消费凭证" />
-            <div class="mt-3" id="voucherInfo"></div>
-          </div>
-          <div class="modal-footer">
-            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
-          </div>
         </div>
       </div>
     </div>
@@ -270,14 +251,6 @@
             const action = reviewBtn.dataset.action
             reviewRecord(recordId, action)
           }
-
-          // 查看凭证按钮
-          const voucherBtn = e.target.closest('.view-voucher-btn')
-          if (voucherBtn) {
-            const url = voucherBtn.dataset.url
-            const recordId = parseInt(voucherBtn.dataset.recordId)
-            viewVoucher(url, recordId)
-          }
         })
 
         // ✅ 事件委托：分页按钮（动态生成的元素）
@@ -340,6 +313,7 @@
 
       /**
        * 渲染记录列表
+       * @description 以后端API返回的字段为权威标准
        * @param {Object} data - API返回的数据
        */
       function renderRecords(data) {
@@ -363,26 +337,20 @@
           .map(
             record => `
         <tr>
-          <td>${record.record_id || record.id}</td>
+          <td>${record.record_id}</td>
           <td>
-            <div>${maskPhone(record.mobile || record.user_mobile || '-')}</div>
-            <small class="text-muted">${record.nickname || record.user_nickname || '-'}</small>
+            <div>${record.user_mobile || '-'}</div>
+            <small class="text-muted">${record.user_nickname || '-'}</small>
           </td>
-          <td class="fw-bold">¥${(record.amount || 0).toFixed(2)}</td>
-          <td class="text-primary">${record.points_awarded || 0}</td>
+          <td class="fw-bold">¥${parseFloat(record.consumption_amount || 0).toFixed(2)}</td>
+          <td class="text-primary">${record.points_to_award || 0}</td>
           <td>
-            <div>${formatDate(record.created_at)}</div>
-            <small class="text-muted">${formatRelativeTime(record.created_at)}</small>
+            <div>${formatApiDate(record.created_at)}</div>
+            <small class="text-muted">${record.age || '-'}</small>
           </td>
           <td>${renderStatusBadge(record.status)}</td>
           <td>
-            ${
-              record.voucher_url
-                ? `<button class="btn btn-sm btn-outline-primary view-voucher-btn" data-url="${record.voucher_url}" data-record-id="${record.record_id || record.id}">
-                <i class="bi bi-image"></i> 查看
-              </button>`
-                : '<span class="text-muted">无凭证</span>'
-            }
+            <small class="text-muted">商家扫码</small>
           </td>
           <td class="table-actions">
             ${renderActions(record)}
@@ -396,6 +364,22 @@
         const pagination = data.pagination || {}
         const total = pagination.total || records.length
         renderPagination(total, currentPage)
+      }
+
+      /**
+       * 格式化后端API返回的日期对象
+       * @description 后端返回格式：{ iso, beijing, timestamp, relative }
+       * @param {Object|string} dateValue - 日期值
+       * @returns {string} 格式化后的日期字符串
+       */
+      function formatApiDate(dateValue) {
+        if (!dateValue) return '-'
+        // 后端返回对象格式 { iso, beijing, timestamp, relative }
+        if (typeof dateValue === 'object' && dateValue.beijing) {
+          return dateValue.beijing
+        }
+        // 兼容字符串格式
+        return formatDate(dateValue)
       }
 
       /**
@@ -416,28 +400,39 @@
 
       /**
        * 渲染操作按钮
+       * @description 以后端API字段为权威标准
        * @param {Object} record - 记录对象
        * @returns {string} HTML字符串
        */
       function renderActions(record) {
         if (record.status === 'pending') {
           return `
-          <button class="btn btn-sm btn-success me-1 review-btn" data-record-id="${record.record_id || record.id}" data-action="approve">
+          <button class="btn btn-sm btn-success me-1 review-btn" data-record-id="${record.record_id}" data-action="approve">
             <i class="bi bi-check-lg"></i> 通过
           </button>
-          <button class="btn btn-sm btn-danger review-btn" data-record-id="${record.record_id || record.id}" data-action="reject">
+          <button class="btn btn-sm btn-danger review-btn" data-record-id="${record.record_id}" data-action="reject">
             <i class="bi bi-x-lg"></i> 拒绝
           </button>
         `
         } else {
-          const reviewInfo = record.reviewed_at
-            ? `<div><small class="text-muted">审核时间：${formatDate(record.reviewed_at)}</small></div>`
+          // 后端返回 reviewed_at 格式：{ iso, beijing, timestamp, relative }
+          const reviewTime = record.reviewed_at
+            ? (typeof record.reviewed_at === 'object' ? record.reviewed_at.beijing : formatDate(record.reviewed_at))
+            : null
+          const reviewInfo = reviewTime
+            ? `<div><small class="text-muted">审核时间：${reviewTime}</small></div>`
             : ''
-          const remark = record.admin_remark
-            ? `<div><small class="text-muted">备注：${record.admin_remark}</small></div>`
+          // 后端字段名：admin_notes（不是admin_remark）
+          const remark = record.admin_notes
+            ? `<div><small class="text-muted">备注：${record.admin_notes}</small></div>`
+            : ''
+          // 审核员昵称
+          const reviewer = record.reviewer_nickname
+            ? `<div><small class="text-muted">审核员：${record.reviewer_nickname}</small></div>`
             : ''
           return `
           <small class="text-muted">已审核</small>
+          ${reviewer}
           ${reviewInfo}
           ${remark}
         `
@@ -547,18 +542,6 @@
         document.getElementById('searchInput').value = ''
         currentPage = 1
         loadRecords()
-      }
-
-      /**
-       * 查看凭证
-       * @param {string} url - 凭证图片URL
-       * @param {number} recordId - 记录ID
-       */
-      function viewVoucher(url, recordId) {
-        document.getElementById('voucherImage').src = url
-        document.getElementById('voucherInfo').innerHTML =
-          `<small class="text-muted">记录ID: ${recordId}</small>`
-        new bootstrap.Modal(document.getElementById('voucherModal')).show()
       }
 
       /**
