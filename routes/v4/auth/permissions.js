@@ -1,14 +1,30 @@
 /**
  * V4权限管理路由 - 基于UUID角色系统
  * 🛡️ 权限管理：移除is_admin依赖，使用UUID角色系统
+ *
+ * 顶层路径：/api/v4/permissions（2026-01-08 从 /api/v4/auth 拆分）
+ * 内部目录：routes/v4/auth/permissions.js
+ *
+ * 职责：
+ * - 权限检查（check）
+ * - 权限缓存失效（cache/invalidate）
+ * - 获取当前用户权限（me）
+ * - 管理员列表（admins）
+ * - 权限统计（statistics）
+ *
  * 创建时间：2025年01月21日
- * 更新时间：2025年11月10日（方案2代码清理优化）
+ * 更新时间：2026年01月08日 - 拆分到独立域，路由重命名
  */
 
 const BeijingTimeHelper = require('../../../utils/timeHelper')
 const express = require('express')
 const router = express.Router()
-const { authenticateToken, getUserRoles } = require('../../../middleware/auth')
+// 🔧 2026-01-08：顶部统一引入 invalidateUserPermissions，避免重复 require
+const {
+  authenticateToken,
+  getUserRoles,
+  invalidateUserPermissions
+} = require('../../../middleware/auth')
 const permission_module = require('../../../modules/UserPermissionModule')
 const permissionAuditLogger = require('../../../utils/PermissionAuditLogger') // 🔒 P1修复：审计日志系统
 const logger = require('../../../utils/logger').logger
@@ -174,54 +190,95 @@ router.get('/admins', authenticateToken, async (req, res) => {
 })
 
 /**
- * 🔄 P2修复：权限缓存强制刷新API
- * POST /api/v4/permissions/refresh
+ * 🔄 权限缓存失效API（2026-01-08 重命名：/refresh → /cache/invalidate）
+ * POST /api/v4/permissions/cache/invalidate
+ *
  * @description 手动清除指定用户的权限缓存，用于权限配置更新后强制刷新
+ *
+ * 权限边界规则（2026-01-08 已拍板）：
+ * - ✅ admin（role_level >= 100）：可以失效任意用户的权限缓存
+ * - ✅ ops/user：仅可失效自己的权限缓存（self）
+ * - ❌ ops/user 失效他人缓存：返回 403
  */
-router.post('/refresh', authenticateToken, async (req, res) => {
+router.post('/cache/invalidate', authenticateToken, async (req, res) => {
   try {
     const { user_id } = req.body
     const request_user_id = req.user.user_id
 
-    // 🛡️ 权限检查：只允许管理员或用户本人刷新权限缓存
+    // 参数验证
+    if (!user_id) {
+      return res.apiError('user_id 参数必填', 'INVALID_PARAMETER', {}, 400)
+    }
+
+    // 🛡️ 权限检查（2026-01-08 已拍板）：只允许 admin 或用户本人失效缓存
     const request_user_roles = await getUserRoles(request_user_id)
     const is_self = parseInt(user_id) === request_user_id
 
+    /*
+     * 权限边界规则：
+     * ✅ 允许：admin 对任意用户、用户对自己
+     * ❌ 禁止：ops/user 对他人
+     */
     if (!is_self && !request_user_roles.isAdmin) {
-      return res.apiError('只能刷新自己的权限缓存或需要管理员权限', 'FORBIDDEN', {}, 403)
+      logger.warn('❌ [Permissions] 权限缓存失效被拒绝', {
+        target_user_id: user_id,
+        operator_id: request_user_id,
+        is_admin: request_user_roles.isAdmin,
+        role_level: request_user_roles.role_level,
+        ip: req.ip
+      })
+      return res.apiError(
+        '只能失效自己的权限缓存或需要管理员权限',
+        'FORBIDDEN',
+        {
+          hint: 'ops 角色仅可失效自己的缓存（self），失效他人缓存需要 admin 权限'
+        },
+        403
+      )
     }
 
-    // 验证目标用户是否存在
-    const target_user_roles = await getUserRoles(user_id)
-    if (!target_user_roles.exists) {
-      return res.apiError('用户不存在', 'USER_NOT_FOUND', {}, 404)
+    // 验证目标用户是否存在（通过 ServiceManager 获取 UserService）
+    const UserService = req.app.locals.services.getService('user')
+    try {
+      await UserService.getUserWithValidation(user_id, { checkStatus: false })
+    } catch (error) {
+      if (error.code === 'USER_NOT_FOUND') {
+        return res.apiError('用户不存在', 'USER_NOT_FOUND', {}, 404)
+      }
+      throw error
     }
 
-    // 🔄 清除权限缓存
-    const { invalidateUserPermissions } = require('../../middleware/auth')
+    // 🔄 清除权限缓存（使用顶部已引入的 invalidateUserPermissions，不再重复 require）
     await invalidateUserPermissions(user_id, 'manual_refresh', request_user_id)
 
     // 🔒 记录审计日志
     await permissionAuditLogger.logPermissionChange({
       user_id,
       operator_id: request_user_id,
-      change_type: 'cache_refresh',
+      change_type: 'cache_invalidate',
       old_role: null,
       new_role: null,
-      reason: 'manual_cache_refresh'
+      reason: 'manual_cache_invalidate'
+    })
+
+    logger.info('✅ [Permissions] 权限缓存已失效', {
+      target_user_id: user_id,
+      operator_id: request_user_id,
+      cache_types: ['memory', 'redis'],
+      request_id: req.id
     })
 
     const response_data = {
-      user_id,
+      user_id: parseInt(user_id),
       cache_cleared: true,
-      refreshed_by: request_user_id,
-      refreshed_at: BeijingTimeHelper.now()
+      invalidated_by: request_user_id,
+      invalidated_at: BeijingTimeHelper.now()
     }
 
-    return res.apiSuccess(response_data, '权限缓存已刷新')
+    return res.apiSuccess(response_data, '权限缓存已失效')
   } catch (error) {
-    logger.error('❌ 刷新权限缓存失败:', error)
-    return res.apiInternalError('刷新权限缓存失败', error.message)
+    logger.error('❌ 失效权限缓存失败:', error)
+    return res.apiInternalError('失效权限缓存失败', error.message)
   }
 })
 

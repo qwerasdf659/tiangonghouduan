@@ -4,17 +4,19 @@
  * @description 统一处理图片上传、存储、查询、删除等业务逻辑
  *              核心职责：协调 SealosStorageService 和 image_resources 模型
  *
- * @architecture 架构决策（2026-01-07）
+ * @architecture 架构决策（2026-01-08 最终拍板）
  *   - 存储后端：Sealos 对象存储（S3 兼容）
- *   - 访问策略：全部 public-read
+ *   - 访问策略：全部 public-read，不使用 CDN
  *   - 数据库存储：仅存对象 key（如 prizes/xxx.jpg），不存完整 URL
- *   - URL 生成：API 层动态拼接 CDN 域名
- *   - 缩略图策略：URL 参数化（前端请求时带 size 参数）
+ *   - URL 生成：API 层动态拼接 Sealos 公网端点
+ *   - 缩略图策略：预生成 3 档尺寸（150/300/600px），上传时生成并存储
+ *   - 删除策略：Web 管理端删除时立即物理删除（数据库 + 对象存储）
  *
- * @version 1.0.0
+ * @version 2.0.0
  * @date 2026-01-08
  */
 
+const crypto = require('crypto')
 const SealosStorageService = require('./sealosStorage')
 const { getImageUrl, getThumbnailUrl } = require('../utils/ImageUrlHelper')
 
@@ -48,6 +50,13 @@ class ImageService {
   /**
    * 上传图片到 Sealos 并创建 image_resources 记录
    *
+   * @description
+   *   架构决策（2026-01-08 最终拍板）：
+   *   - 预生成 3 档缩略图（150/300/600px，cover-center）
+   *   - 原图和缩略图均上传到 Sealos
+   *   - 数据库存储 file_path（原图 key）和 thumbnail_paths（缩略图 key JSON）
+   *   - 不使用 CDN，直连 Sealos 公网端点
+   *
    * @param {Object} options - 上传选项
    * @param {Buffer} options.fileBuffer - 文件内容（Buffer）
    * @param {string} options.originalName - 原始文件名
@@ -63,11 +72,11 @@ class ImageService {
    *
    * @returns {Promise<Object>} 上传结果
    * @returns {number} result.image_id - 图片资源 ID
-   * @returns {string} result.object_key - 对象存储 key
-   * @returns {string} result.cdn_url - CDN 完整访问 URL
-   * @returns {Object} result.thumbnails - 缩略图 URL 对象
+   * @returns {string} result.object_key - 原图对象存储 key
+   * @returns {string} result.public_url - 原图公网访问 URL
+   * @returns {Object} result.thumbnails - 缩略图 URL 对象（small/medium/large）
    *
-   * @throws {Error} 文件验证失败或上传失败时抛出错误
+   * @throws {Error} 文件验证失败、尺寸超限或上传失败时抛出错误
    */
   static async uploadImage(options) {
     const {
@@ -84,10 +93,13 @@ class ImageService {
       transaction
     } = options
 
-    // 1. 文件验证
+    // 1. 文件基础验证（MIME 类型、文件大小）
     ImageService._validateFile(mimeType, fileSize)
 
-    // 2. 确定存储文件夹
+    // 2. 图片尺寸验证（最大边不超过 4096px）
+    await ImageService._validateImageDimensions(fileBuffer)
+
+    // 3. 确定存储文件夹
     const folder = BUSINESS_TYPE_FOLDER_MAP[businessType]
     if (!folder) {
       throw new Error(
@@ -95,52 +107,62 @@ class ImageService {
       )
     }
 
-    // 3. 确定资源分类（category）- 如未传入则使用默认映射
+    // 4. 确定资源分类（category）- 如未传入则使用默认映射
     const resolvedCategory = category || folder
 
-    // 4. 上传到 Sealos 对象存储
+    /**
+     * 5. 上传到 Sealos 对象存储（含预生成缩略图）
+     *    返回 { original_key, thumbnail_keys: { small, medium, large } }
+     */
     const storageService = new SealosStorageService()
-    const objectKey = await storageService.uploadImage(fileBuffer, originalName, folder)
+    const { original_key: originalKey, thumbnail_keys: thumbnailKeys } =
+      await storageService.uploadImageWithThumbnails(fileBuffer, originalName, folder)
 
-    // 5. 创建 image_resources 记录（字段与真实表结构一致）
+    // 6. 生成 upload_id 用于垃圾回收追踪（24小时未绑定清理）
+    const uploadId = `upload_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`
+
+    // 7. 创建 image_resources 记录（字段与真实表结构一致）
     const { ImageResources } = require('../models')
     const imageRecord = await ImageResources.create(
       {
-        file_path: objectKey, // 核心：仅存对象 key
-        original_filename: originalName, // 🔴 修复：original_name → original_filename
+        file_path: originalKey, // 存储原图 object key
+        thumbnail_paths: thumbnailKeys, // 存储缩略图 object keys（JSON）
+        original_filename: originalName,
         file_size: fileSize,
         mime_type: mimeType,
         business_type: businessType,
-        category: resolvedCategory, // 🔴 修复：新增必填字段
-        context_id: contextId, // 🔴 修复：business_id → context_id
-        user_id: userId, // 🔴 修复：uploader_id → user_id
+        category: resolvedCategory,
+        context_id: contextId,
+        user_id: userId,
         source_module: sourceModule,
         ip_address: ipAddress,
+        upload_id: uploadId, // 用于垃圾回收追踪
         status: 'active'
       },
       { transaction }
     )
 
-    // 6. 生成 CDN URL 和缩略图 URL
-    const cdnUrl = getImageUrl(objectKey)
+    // 8. 生成公网访问 URL（不使用 CDN）
+    const publicUrl = getImageUrl(originalKey)
     const thumbnails = {
-      small: getThumbnailUrl(objectKey, 'small'),
-      medium: getThumbnailUrl(objectKey, 'medium'),
-      large: getThumbnailUrl(objectKey, 'large')
+      small: getImageUrl(thumbnailKeys.small),
+      medium: getImageUrl(thumbnailKeys.medium),
+      large: getImageUrl(thumbnailKeys.large)
     }
 
-    console.log('✅ ImageService: 图片上传成功', {
+    console.log('✅ ImageService: 图片上传成功（含预生成缩略图）', {
       image_id: imageRecord.image_id,
-      object_key: objectKey,
+      object_key: originalKey,
+      thumbnail_keys: thumbnailKeys,
       business_type: businessType,
       category: resolvedCategory,
-      user_id: userId
+      upload_id: uploadId
     })
 
     return {
       image_id: imageRecord.image_id,
-      object_key: objectKey,
-      cdn_url: cdnUrl,
+      object_key: originalKey,
+      public_url: publicUrl, // 🔴 重命名：cdn_url → public_url（架构决策：不使用 CDN）
       thumbnails,
       file_size: fileSize,
       mime_type: mimeType,
@@ -204,7 +226,13 @@ class ImageService {
   }
 
   /**
-   * 软删除图片（标记为 deleted 状态）
+   * 物理删除图片（从 Sealos 和数据库中删除）
+   *
+   * @description
+   *   架构决策（2026-01-08 最终拍板）：
+   *   - Web 管理端删除时立即物理删除
+   *   - 同时删除原图和所有缩略图
+   *   - 从数据库物理删除记录（非软删除）
    *
    * @param {number} imageId - 图片资源 ID
    * @param {Object} [transaction] - Sequelize 事务
@@ -212,13 +240,36 @@ class ImageService {
    */
   static async deleteImage(imageId, transaction = null) {
     const { ImageResources } = require('../models')
-    const [affectedCount] = await ImageResources.update(
-      { status: 'deleted' },
-      { where: { image_id: imageId }, transaction }
-    )
+    const imageRecord = await ImageResources.findByPk(imageId)
+
+    if (!imageRecord) {
+      console.warn(`⚠️ ImageService: 尝试删除不存在的图片 image_id=${imageId}`)
+      return false
+    }
+
+    // 1. 物理删除 Sealos 对象（原图 + 缩略图）
+    const storageService = new SealosStorageService()
+    try {
+      await storageService.deleteImageWithThumbnails(
+        imageRecord.file_path,
+        imageRecord.thumbnail_paths
+      )
+      console.log(`✅ ImageService: Sealos 对象已物理删除 image_id=${imageId}`)
+    } catch (error) {
+      console.error(
+        `❌ ImageService: Sealos 对象删除失败 image_id=${imageId}, error=${error.message}`
+      )
+      // 即使对象存储删除失败，也尝试删除数据库记录，避免数据不一致
+    }
+
+    // 2. 物理删除数据库记录（非软删除）
+    const affectedCount = await ImageResources.destroy({
+      where: { image_id: imageId },
+      transaction
+    })
 
     if (affectedCount > 0) {
-      console.log(`✅ ImageService: 图片已软删除 image_id=${imageId}`)
+      console.log(`✅ ImageService: 数据库记录已物理删除 image_id=${imageId}`)
     }
 
     return affectedCount > 0
@@ -243,7 +294,7 @@ class ImageService {
   }
 
   /**
-   * 验证文件是否符合上传要求
+   * 验证文件是否符合上传要求（MIME 类型、文件大小）
    *
    * @private
    * @param {string} mimeType - MIME 类型
@@ -266,7 +317,163 @@ class ImageService {
   }
 
   /**
+   * 验证图片尺寸是否符合要求（最大边不超过 4096px）
+   *
+   * @private
+   * @param {Buffer} fileBuffer - 文件内容（Buffer）
+   * @returns {Promise<void>} 验证通过返回 void，否则抛出错误
+   * @throws {Error} 图片尺寸超限时抛出错误
+   */
+  static async _validateImageDimensions(fileBuffer) {
+    const sharp = require('sharp')
+
+    try {
+      const metadata = await sharp(fileBuffer).metadata()
+      const maxDimension = Math.max(metadata.width || 0, metadata.height || 0)
+      const MAX_DIMENSION = 4096 // 架构决策：最大边不超过 4096px
+
+      if (maxDimension > MAX_DIMENSION) {
+        throw new Error(
+          `图片尺寸过大：${metadata.width}×${metadata.height}px，最大边不能超过 ${MAX_DIMENSION}px`
+        )
+      }
+    } catch (error) {
+      if (error.message.includes('图片尺寸过大')) {
+        throw error
+      }
+      // sharp 解析失败可能是文件损坏或格式不支持
+      throw new Error(`图片文件无法解析：${error.message}`)
+    }
+  }
+
+  /**
+   * 清理未绑定的孤立图片（context_id=0 超过指定小时数）
+   *
+   * @description
+   *   架构决策（2026-01-08 最终拍板）：
+   *   - context_id=0 表示图片已上传但未绑定到任何业务实体
+   *   - 超过 24 小时未绑定的图片视为孤立资源，应自动清理
+   *   - 同时删除 Sealos 对象存储中的文件和数据库记录
+   *   - 定时任务每小时执行一次
+   *
+   * @param {number} [hours=24] - 未绑定超过多少小时才清理
+   * @returns {Promise<Object>} 清理结果
+   * @returns {number} result.cleaned_count - 清理的图片数量
+   * @returns {number} result.failed_count - 清理失败的数量
+   * @returns {Array} result.details - 清理详情
+   * @returns {string} result.timestamp - 清理时间
+   */
+  static async cleanupUnboundImages(hours = 24) {
+    const { ImageResources } = require('../models')
+    const { Op } = require('sequelize')
+    const BeijingTimeHelper = require('../utils/timeHelper')
+    const storageService = new SealosStorageService()
+
+    const startTime = Date.now()
+
+    // 计算清理阈值时间（当前时间 - hours 小时）
+    const threshold = new Date(Date.now() - hours * 60 * 60 * 1000)
+
+    console.log(
+      `🔍 ImageService: 开始清理未绑定图片（context_id=0 且 created_at < ${threshold.toISOString()}）`
+    )
+
+    try {
+      // 1. 查询符合条件的孤立图片
+      const unboundImages = await ImageResources.findAll({
+        where: {
+          context_id: 0, // 未绑定
+          status: 'active',
+          created_at: {
+            [Op.lt]: threshold // 超过指定小时数
+          }
+        },
+        order: [['created_at', 'ASC']]
+      })
+
+      console.log(`📊 ImageService: 发现 ${unboundImages.length} 个待清理的未绑定图片`)
+
+      if (unboundImages.length === 0) {
+        return {
+          cleaned_count: 0,
+          failed_count: 0,
+          details: [],
+          timestamp: BeijingTimeHelper.apiTimestamp()
+        }
+      }
+
+      // 2. 逐个清理（删除 Sealos 对象 + 数据库记录）
+      let cleanedCount = 0
+      let failedCount = 0
+      const details = []
+
+      for (const image of unboundImages) {
+        try {
+          // 删除 Sealos 对象（原图 + 缩略图）
+          await storageService.deleteImageWithThumbnails(image.file_path, image.thumbnail_paths)
+
+          // 物理删除数据库记录
+          await ImageResources.destroy({
+            where: { image_id: image.image_id }
+          })
+
+          cleanedCount++
+          details.push({
+            image_id: image.image_id,
+            file_path: image.file_path,
+            created_at: image.created_at,
+            success: true
+          })
+
+          console.log(
+            `🗑️ ImageService: 已清理 image_id=${image.image_id}, file_path=${image.file_path}`
+          )
+        } catch (error) {
+          failedCount++
+          details.push({
+            image_id: image.image_id,
+            file_path: image.file_path,
+            success: false,
+            error: error.message
+          })
+
+          console.error(
+            `❌ ImageService: 清理失败 image_id=${image.image_id}, error=${error.message}`
+          )
+        }
+      }
+
+      const duration = Date.now() - startTime
+      const result = {
+        cleaned_count: cleanedCount,
+        failed_count: failedCount,
+        total_found: unboundImages.length,
+        details,
+        timestamp: BeijingTimeHelper.apiTimestamp(),
+        duration_ms: duration
+      }
+
+      console.log('✅ ImageService: 未绑定图片清理完成', {
+        cleaned: cleanedCount,
+        failed: failedCount,
+        duration: `${duration}ms`
+      })
+
+      return result
+    } catch (error) {
+      console.error('❌ ImageService: 未绑定图片清理执行异常', { error: error.message })
+      throw error
+    }
+  }
+
+  /**
    * 格式化图片响应数据
+   *
+   * @description
+   *   架构决策（2026-01-08）：
+   *   - 优先使用预生成的缩略图 key（存储在 thumbnail_paths 字段）
+   *   - 如无预生成缩略图，则使用 getThumbnailUrl 动态构造（兼容旧数据）
+   *   - 不使用 CDN，直连 Sealos 公网端点
    *
    * @private
    * @param {Object} imageRecord - ImageResources 模型实例
@@ -274,22 +481,37 @@ class ImageService {
    */
   static _formatImageResponse(imageRecord) {
     const objectKey = imageRecord.file_path
+    const storedThumbnails = imageRecord.thumbnail_paths // JSON 字段
+
+    // 生成缩略图 URL：优先使用预生成 key，否则动态构造
+    let thumbnails
+    if (storedThumbnails && Object.keys(storedThumbnails).length > 0) {
+      // 使用预生成的缩略图 key
+      thumbnails = {
+        small: getImageUrl(storedThumbnails.small),
+        medium: getImageUrl(storedThumbnails.medium),
+        large: getImageUrl(storedThumbnails.large)
+      }
+    } else {
+      // 兼容旧数据：动态构造缩略图 URL
+      thumbnails = {
+        small: getThumbnailUrl(objectKey, 'small'),
+        medium: getThumbnailUrl(objectKey, 'medium'),
+        large: getThumbnailUrl(objectKey, 'large')
+      }
+    }
 
     return {
       image_id: imageRecord.image_id,
       object_key: objectKey,
-      cdn_url: getImageUrl(objectKey),
-      thumbnails: {
-        small: getThumbnailUrl(objectKey, 'small'),
-        medium: getThumbnailUrl(objectKey, 'medium'),
-        large: getThumbnailUrl(objectKey, 'large')
-      },
-      original_filename: imageRecord.original_filename, // 🔴 修复字段名
+      public_url: getImageUrl(objectKey), // 🔴 重命名：cdn_url → public_url
+      thumbnails,
+      original_filename: imageRecord.original_filename,
       file_size: imageRecord.file_size,
       mime_type: imageRecord.mime_type,
       business_type: imageRecord.business_type,
       category: imageRecord.category,
-      context_id: imageRecord.context_id, // 🔴 修复字段名
+      context_id: imageRecord.context_id,
       status: imageRecord.status,
       created_at: imageRecord.created_at
     }

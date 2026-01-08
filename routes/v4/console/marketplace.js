@@ -22,6 +22,7 @@
 const express = require('express')
 const router = express.Router()
 const { authenticateToken, requireAdmin } = require('../../../middleware/auth')
+const TransactionManager = require('../../../utils/TransactionManager')
 
 const logger = require('../../../utils/logger').logger
 
@@ -109,6 +110,10 @@ router.get('/listing-stats', authenticateToken, requireAdmin, async (req, res) =
  *
  * V4.5.0 材料资产支付版本
  *
+ * 🎯 2026-01-08 图片存储架构核查修复：
+ * - 使用 TransactionManager 包装事务
+ * - 创建商品后自动绑定图片 context_id（避免被24h定时清理误删）
+ *
  * @body {string} item_name - 商品名称（必填，最长100字符）
  * @body {string} item_description - 商品描述（可选，最长500字符）
  * @body {string} cost_asset_code - 材料资产代码（必填，如 'red_shard'）
@@ -117,34 +122,39 @@ router.get('/listing-stats', authenticateToken, requireAdmin, async (req, res) =
  * @body {number} stock - 初始库存（必填，>=0）
  * @body {number} sort_order - 排序号（必填，默认100）
  * @body {string} status - 商品状态（必填：active/inactive）
+ * @body {number} primary_image_id - 主图片ID（可选，关联 image_resources.image_id）
  */
 router.post('/exchange_market/items', authenticateToken, requireAdmin, async (req, res) => {
-  try {
-    const {
-      item_name,
-      item_description = '',
-      cost_asset_code,
-      cost_amount,
-      cost_price,
-      stock,
-      sort_order = 100,
-      status = 'active'
-    } = req.body
+  const {
+    item_name,
+    item_description = '',
+    cost_asset_code,
+    cost_amount,
+    cost_price,
+    stock,
+    sort_order = 100,
+    status = 'active',
+    // 🎯 2026-01-08 图片存储架构：主图片ID（关联 image_resources.image_id）
+    primary_image_id
+  } = req.body
 
-    const admin_id = req.user.user_id
+  const admin_id = req.user.user_id
 
-    logger.info('管理员创建兑换商品（材料资产支付）', {
-      admin_id,
-      item_name,
-      cost_asset_code,
-      cost_amount,
-      stock
-    })
+  logger.info('管理员创建兑换商品（材料资产支付）', {
+    admin_id,
+    item_name,
+    cost_asset_code,
+    cost_amount,
+    stock,
+    primary_image_id
+  })
 
-    // 🎯 P2-C架构重构：通过 ServiceManager 获取 ExchangeService
-    const ExchangeService = req.app.locals.services.getService('exchangeMarket')
+  // 🎯 P2-C架构重构：通过 ServiceManager 获取 ExchangeService
+  const ExchangeService = req.app.locals.services.getService('exchangeMarket')
 
-    // 🎯 调用服务层方法创建商品（V4.5.0 材料资产支付）
+  // 🎯 2026-01-08 图片存储架构修复：使用 TransactionManager 包装事务
+  const transactionResult = await TransactionManager.executeTransaction(async transaction => {
+    // 调用服务层方法创建商品（V4.5.0 材料资产支付 + 图片存储架构）
     const result = await ExchangeService.createExchangeItem(
       {
         item_name,
@@ -154,39 +164,48 @@ router.post('/exchange_market/items', authenticateToken, requireAdmin, async (re
         cost_price,
         stock,
         sort_order,
-        status
+        status,
+        primary_image_id
       },
-      admin_id
+      admin_id,
+      { transaction }
     )
 
-    logger.info('兑换商品创建成功（材料资产支付）', {
-      admin_id,
-      item_id: result.item.id,
-      item_name: result.item.item_name,
-      cost_asset_code: result.item.cost_asset_code,
-      cost_amount: result.item.cost_amount
-    })
+    return result
+  })
 
-    return res.apiSuccess(result, '商品创建成功')
-  } catch (error) {
+  if (!transactionResult.success) {
+    const errorMessage = transactionResult.error?.message || '创建商品失败'
     logger.error('创建兑换商品失败', {
-      error: error.message,
-      stack: error.stack,
-      admin_id: req.user?.user_id
+      error: errorMessage,
+      admin_id
     })
 
     // 业务错误直接返回错误消息
     if (
-      error.message.includes('不能为空') ||
-      error.message.includes('最长') ||
-      error.message.includes('无效') ||
-      error.message.includes('必须')
+      errorMessage.includes('不能为空') ||
+      errorMessage.includes('最长') ||
+      errorMessage.includes('无效') ||
+      errorMessage.includes('必须')
     ) {
-      return res.apiError(error.message, 'BAD_REQUEST', null, 400)
+      return res.apiError(errorMessage, 'BAD_REQUEST', null, 400)
     }
 
-    return res.apiError(error.message || '创建商品失败', 'INTERNAL_ERROR', null, 500)
+    return res.apiError(errorMessage, 'INTERNAL_ERROR', null, 500)
   }
+
+  const result = transactionResult.data
+
+  logger.info('兑换商品创建成功（材料资产支付）', {
+    admin_id,
+    item_id: result.item?.item_id,
+    item_name: result.item?.item_name,
+    cost_asset_code: result.item?.cost_asset_code,
+    cost_amount: result.item?.cost_amount,
+    bound_image: result.bound_image
+  })
+
+  return res.apiSuccess(result, '商品创建成功')
 })
 
 /**
@@ -194,6 +213,10 @@ router.post('/exchange_market/items', authenticateToken, requireAdmin, async (re
  * PUT /api/v4/console/marketplace/exchange_market/items/:item_id
  *
  * V4.5.0 材料资产支付版本
+ *
+ * 🎯 2026-01-08 图片存储架构核查修复：
+ * - 使用 TransactionManager 包装事务
+ * - 更换图片时删除旧图片 + 绑定新图片 context_id
  *
  * @param {number} item_id - 商品ID
  */
@@ -208,7 +231,9 @@ router.put('/exchange_market/items/:item_id', authenticateToken, requireAdmin, a
       cost_price,
       stock,
       sort_order,
-      status
+      status,
+      // 🎯 2026-01-08 图片存储架构：主图片ID（关联 image_resources.image_id）
+      primary_image_id
     } = req.body
 
     const admin_id = req.user.user_id
@@ -217,6 +242,7 @@ router.put('/exchange_market/items/:item_id', authenticateToken, requireAdmin, a
       admin_id,
       item_id,
       cost_asset_code,
+      primary_image_id,
       cost_amount
     })
 
@@ -229,24 +255,38 @@ router.put('/exchange_market/items/:item_id', authenticateToken, requireAdmin, a
     // 🎯 P2-C架构重构：通过 ServiceManager 获取 ExchangeService
     const ExchangeService = req.app.locals.services.getService('exchangeMarket')
 
-    // 🎯 调用服务层方法更新商品（V4.5.0 材料资产支付）
-    const result = await ExchangeService.updateExchangeItem(itemId, {
-      item_name,
-      item_description,
-      cost_asset_code,
-      cost_amount,
-      cost_price,
-      stock,
-      sort_order,
-      status
-    })
+    // 🎯 2026-01-08：使用事务包装更新操作（含图片处理）
+    const result = await TransactionManager.execute(
+      async transaction => {
+        return await ExchangeService.updateExchangeItem(
+          itemId,
+          {
+            item_name,
+            item_description,
+            cost_asset_code,
+            cost_amount,
+            cost_price,
+            stock,
+            sort_order,
+            status,
+            primary_image_id
+          },
+          { transaction }
+        )
+      },
+      {
+        description: `更新兑换商品 item_id=${itemId}`,
+        maxRetries: 1
+      }
+    )
 
     logger.info('兑换商品更新成功（材料资产支付）', {
       admin_id,
       item_id: itemId,
       item_name: result.item.item_name,
       cost_asset_code: result.item.cost_asset_code,
-      cost_amount: result.item.cost_amount
+      cost_amount: result.item.cost_amount,
+      image_changes: result.image_changes
     })
 
     return res.apiSuccess(result, '商品更新成功')
@@ -280,6 +320,10 @@ router.put('/exchange_market/items/:item_id', authenticateToken, requireAdmin, a
  * 删除兑换商品（管理员操作）
  * DELETE /api/v4/console/marketplace/exchange_market/items/:item_id
  *
+ * 🎯 2026-01-08 图片存储架构核查修复：
+ * - 使用 TransactionManager 包装事务
+ * - 删除商品时联动删除关联图片（DB + 对象存储）
+ *
  * @param {number} item_id - 商品ID
  */
 router.delete(
@@ -305,14 +349,23 @@ router.delete(
       // 🎯 P2-C架构重构：通过 ServiceManager 获取 ExchangeService
       const ExchangeService = req.app.locals.services.getService('exchangeMarket')
 
-      // 🎯 调用服务层方法删除商品
-      const result = await ExchangeService.deleteExchangeItem(itemId)
+      // 🎯 2026-01-08：使用事务包装删除操作（含图片删除）
+      const result = await TransactionManager.execute(
+        async transaction => {
+          return await ExchangeService.deleteExchangeItem(itemId, { transaction })
+        },
+        {
+          description: `删除兑换商品 item_id=${itemId}`,
+          maxRetries: 1
+        }
+      )
 
       logger.info('兑换商品删除操作完成', {
         admin_id,
         item_id: itemId,
         action: result.action,
-        message: result.message
+        message: result.message,
+        deleted_image_id: result.deleted_image_id
       })
 
       // 根据操作结果返回不同响应
@@ -340,6 +393,131 @@ router.delete(
       }
 
       return res.apiError(error.message || '删除商品失败', 'INTERNAL_ERROR', null, 500)
+    }
+  }
+)
+
+/**
+ * 客服强制撤回挂牌（管理员操作）
+ * POST /api/v4/console/marketplace/listings/:listing_id/force-withdraw
+ *
+ * 业务场景：
+ * - 客服人员可强制撤回任意用户的挂牌
+ * - 必须提供撤回原因用于审计追踪
+ * - 撤回操作会记录到管理员操作日志
+ *
+ * @param {number} listing_id - 挂牌ID
+ * @body {string} withdraw_reason - 撤回原因（必填，审计需要）
+ *
+ * @returns {Object} 撤回结果
+ * @returns {Object} data.listing - 更新后的挂牌信息
+ * @returns {Object} data.unfreeze_result - 解冻结果（如适用）
+ * @returns {Object} data.audit_log - 审计日志记录
+ *
+ * @security JWT + Admin权限
+ *
+ * @created 2026-01-08（C2C材料交易 Phase 2）
+ */
+router.post(
+  '/listings/:listing_id/force-withdraw',
+  authenticateToken,
+  requireAdmin,
+  async (req, res) => {
+    try {
+      const { listing_id } = req.params
+      const { withdraw_reason } = req.body
+      const admin_id = req.user.user_id
+      const ip_address = req.ip || req.connection.remoteAddress
+      const user_agent = req.get('User-Agent') || 'unknown'
+
+      logger.info('客服强制撤回挂牌请求', {
+        admin_id,
+        listing_id,
+        withdraw_reason,
+        ip_address
+      })
+
+      // 参数验证：listing_id
+      const listingId = parseInt(listing_id)
+      if (isNaN(listingId) || listingId <= 0) {
+        return res.apiError('无效的挂牌ID', 'BAD_REQUEST', null, 400)
+      }
+
+      // 参数验证：withdraw_reason
+      if (!withdraw_reason || withdraw_reason.trim().length === 0) {
+        return res.apiError(
+          '撤回原因是必填项（审计追踪需要）',
+          'MISSING_WITHDRAW_REASON',
+          null,
+          400
+        )
+      }
+
+      // 🎯 P2-C架构重构：通过 ServiceManager 获取 MarketListingService
+      const MarketListingService = require('../../../services/MarketListingService')
+
+      const result = await TransactionManager.executeTransaction(
+        async transaction => {
+          return await MarketListingService.adminForceWithdrawListing(
+            {
+              listing_id: listingId,
+              admin_id,
+              withdraw_reason: withdraw_reason.trim(),
+              ip_address,
+              user_agent
+            },
+            { transaction }
+          )
+        },
+        {
+          description: `客服强制撤回挂牌 - listing_id: ${listingId}`,
+          maxRetries: 1
+        }
+      )
+
+      logger.info('客服强制撤回挂牌成功', {
+        admin_id,
+        listing_id: listingId,
+        seller_user_id: result.listing?.seller_user_id,
+        listing_kind: result.listing?.listing_kind
+      })
+
+      return res.apiSuccess(
+        {
+          listing: result.listing,
+          unfreeze_result: result.unfreeze_result,
+          audit_log_id: result.audit_log?.log_id || null
+        },
+        '挂牌已强制撤回'
+      )
+    } catch (error) {
+      logger.error('客服强制撤回挂牌失败', {
+        error: error.message,
+        code: error.code,
+        stack: error.stack,
+        admin_id: req.user?.user_id,
+        listing_id: req.params.listing_id
+      })
+
+      // 业务错误处理
+      if (error.code === 'LISTING_NOT_FOUND') {
+        return res.apiError(error.message, 'NOT_FOUND', null, 404)
+      }
+
+      if (error.code === 'INVALID_LISTING_STATUS') {
+        return res.apiError(
+          error.message,
+          'INVALID_LISTING_STATUS',
+          { current_status: error.details?.current_status },
+          400
+        )
+      }
+
+      if (error.code === 'MISSING_WITHDRAW_REASON') {
+        return res.apiError(error.message, 'MISSING_WITHDRAW_REASON', null, 400)
+      }
+
+      return res.apiError(error.message || '强制撤回失败', 'INTERNAL_ERROR', null, 500)
     }
   }
 )

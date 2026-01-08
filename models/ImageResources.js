@@ -178,23 +178,44 @@ module.exports = sequelize => {
 
   /**
    * 安全输出方法（支持对象 key 转 URL）
-   * 🎯 架构决策（2026-01-08 拍板）：file_path 存储对象 key，通过 ImageUrlHelper 生成 URL
-   * @returns {Object} 安全的图片资源对象（包含 CDN URL，不含敏感路径）
+   *
+   * 🎯 架构决策（2026-01-08 拍板）：
+   * - file_path 存储原图对象 key
+   * - thumbnail_paths 存储预生成缩略图对象 key（JSON）
+   * - 优先使用 thumbnail_paths 中的预生成缩略图 key
+   * - 如无预生成缩略图，则根据原图 key 推断缩略图路径
+   *
+   * @returns {Object} 安全的图片资源对象（包含公网 URL，不含敏感路径）
    */
   ImageResources.prototype.toSafeJSON = function () {
     const values = this.get({ plain: true })
     const { getImageUrl, getThumbnailUrl } = require('../utils/ImageUrlHelper')
 
+    // 生成缩略图 URL：优先使用预生成的 thumbnail_paths
+    let thumbnails
+    const storedThumbnails = values.thumbnail_paths
+    if (storedThumbnails && Object.keys(storedThumbnails).length > 0) {
+      // 使用预生成的缩略图 key（数据库存储的真实 key）
+      thumbnails = {
+        small: storedThumbnails.small ? getImageUrl(storedThumbnails.small) : null,
+        medium: storedThumbnails.medium ? getImageUrl(storedThumbnails.medium) : null,
+        large: storedThumbnails.large ? getImageUrl(storedThumbnails.large) : null
+      }
+    } else {
+      // 兼容旧数据：根据原图 key 推断缩略图路径
+      thumbnails = {
+        small: getThumbnailUrl(values.file_path, 'small'),
+        medium: getThumbnailUrl(values.file_path, 'medium'),
+        large: getThumbnailUrl(values.file_path, 'large')
+      }
+    }
+
     return {
       ...values,
       // 提供安全的访问URL（使用 ImageUrlHelper 生成）
       imageUrl: getImageUrl(values.file_path),
-      // 提供缩略图URLs（使用 URL 参数化）
-      thumbnails: {
-        small: getThumbnailUrl(values.file_path, 'small'),
-        medium: getThumbnailUrl(values.file_path, 'medium'),
-        large: getThumbnailUrl(values.file_path, 'large')
-      },
+      // 提供缩略图URLs（优先使用预生成缩略图）
+      thumbnails,
       // 移除服务器文件路径敏感信息
       file_path: undefined,
       thumbnail_paths: undefined
@@ -202,33 +223,41 @@ module.exports = sequelize => {
   }
 
   /**
-   * 获取 URL 参数化缩略图 URL
+   * 获取缩略图 URL（兼容方法）
    *
    * 🎯 架构决策（2026-01-08 拍板）：
-   * - 废弃本地缩略图生成（ThumbnailService）
-   * - 使用 URL 参数化缩略图（CDN/存储服务支持的 ?width=x&height=y）
-   * - 本方法现在返回 URL 参数化的缩略图 URL，不再生成本地文件
+   * - 缩略图在上传时由 ImageService + SealosStorageService 预生成
+   * - 预生成 3 档缩略图（150/300/600px，cover-center）
+   * - 缩略图 key 存储在 thumbnail_paths 字段（JSON）
    *
-   * @deprecated 不再生成本地缩略图，改用 toSafeJSON().thumbnails
+   * @deprecated 请使用 toSafeJSON().thumbnails 获取缩略图 URL
    * @returns {Object} 缩略图 URL 对象 { small, medium, large }
    */
   ImageResources.prototype.generateThumbnails = function () {
-    const { getThumbnailUrl } = require('../utils/ImageUrlHelper')
+    const { getImageUrl, getThumbnailUrl } = require('../utils/ImageUrlHelper')
 
     if (!this.file_path) {
       console.warn('⚠️ generateThumbnails 已废弃：请使用 toSafeJSON().thumbnails')
       return null
     }
 
-    // 返回 URL 参数化缩略图（不生成本地文件）
-    const thumbnails = {
+    console.warn('⚠️ generateThumbnails 已废弃：请使用 toSafeJSON().thumbnails')
+
+    // 优先使用预生成的缩略图 key
+    if (this.thumbnail_paths && Object.keys(this.thumbnail_paths).length > 0) {
+      return {
+        small: this.thumbnail_paths.small ? getImageUrl(this.thumbnail_paths.small) : null,
+        medium: this.thumbnail_paths.medium ? getImageUrl(this.thumbnail_paths.medium) : null,
+        large: this.thumbnail_paths.large ? getImageUrl(this.thumbnail_paths.large) : null
+      }
+    }
+
+    // 兼容旧数据：根据原图 key 推断缩略图路径
+    return {
       small: getThumbnailUrl(this.file_path, 'small'),
       medium: getThumbnailUrl(this.file_path, 'medium'),
       large: getThumbnailUrl(this.file_path, 'large')
     }
-
-    console.warn('⚠️ generateThumbnails 已废弃：返回 URL 参数化缩略图，不再生成本地文件')
-    return thumbnails
   }
 
   // 检查是否有缩略图

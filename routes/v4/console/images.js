@@ -4,22 +4,33 @@
  * @description 提供统一的图片上传接口，支持多种业务类型
  *              所有模块（奖品、商品、Banner）统一使用此接口上传图片
  *
- * @architecture 架构决策（2026-01-07）
+ * @architecture 架构决策（2026-01-08 最终拍板）
  *   - 存储后端：Sealos 对象存储（S3 兼容）
- *   - 返回格式：image_id + object_key + cdn_url + thumbnails
+ *   - 访问策略：不使用 CDN，直连 Sealos 公网端点
+ *   - 缩略图策略：预生成 3 档尺寸（150/300/600px，cover-center）
+ *   - 返回格式：image_id + object_key + public_url + thumbnails
+ *   - 删除策略：Web 管理端删除时立即物理删除
  *   - 调用方式：先上传图片获取 image_id，再创建业务记录时关联
  *
  * @route /api/v4/console/images
- * @version 1.0.0
+ * @version 2.0.0
  * @date 2026-01-08
  */
 
 const express = require('express')
 const router = express.Router()
 const multer = require('multer')
-const ImageService = require('../../../services/ImageService')
+const serviceManager = require('../../../services')
 const { authenticateToken, requireAdmin } = require('../../../middleware/auth')
 const { asyncHandler } = require('./shared/middleware')
+
+/**
+ * 获取 ImageService 实例
+ * 通过 ServiceManager 统一获取，遵循项目规范
+ *
+ * @returns {Object} ImageService 静态类
+ */
+const getImageService = () => serviceManager.getService('image')
 
 /**
  * Multer 配置：内存存储模式
@@ -47,9 +58,15 @@ const upload = multer({
  *
  * @description 通用图片上传接口
  *
+ * @architecture 架构决策（2026-01-08）：
+ *   - 预生成 3 档缩略图（150/300/600px，cover-center）
+ *   - 文件验证：5MB 限制、最大边 4096px、jpeg/png/gif/webp
+ *   - 数据库存储 object key，不存完整 URL
+ *
  * @header Authorization - Bearer {token} 管理员认证
- * @body {file} image - 图片文件（必填）
+ * @body {file} image - 图片文件（必填，5MB 限制）
  * @body {string} business_type - 业务类型：lottery|exchange|trade|uploads（必填）
+ * @body {string} [category] - 资源分类（可选，如 prizes/products/banners）
  * @body {number} [business_id] - 关联的业务 ID（可选，后续可通过 API 绑定）
  *
  * @response {Object} 200 - 上传成功
@@ -59,20 +76,20 @@ const upload = multer({
  *   "message": "图片上传成功",
  *   "data": {
  *     "image_id": 123,
- *     "object_key": "prizes/1704672000000_abc123.jpg",
- *     "cdn_url": "https://cdn.example.com/bucket/prizes/1704672000000_abc123.jpg",
+ *     "object_key": "prizes/20260108_abc123.jpg",
+ *     "public_url": "https://objectstorageapi.xxx/bucket/prizes/20260108_abc123.jpg",
  *     "thumbnails": {
- *       "small": "...?w=100&h=100",
- *       "medium": "...?w=300&h=300",
- *       "large": "...?w=800&h=800"
+ *       "small": "https://objectstorageapi.xxx/bucket/prizes/thumbnails/small/20260108_abc123.jpg",
+ *       "medium": "https://objectstorageapi.xxx/bucket/prizes/thumbnails/medium/20260108_abc123.jpg",
+ *       "large": "https://objectstorageapi.xxx/bucket/prizes/thumbnails/large/20260108_abc123.jpg"
  *     },
  *     "file_size": 102400,
  *     "mime_type": "image/jpeg",
- *     "original_name": "prize.jpg"
+ *     "original_filename": "prize.jpg"
  *   }
  * }
  *
- * @response {Object} 400 - 参数错误或文件验证失败
+ * @response {Object} 400 - 参数错误、文件验证失败或图片尺寸超限
  * @response {Object} 401 - 未授权
  * @response {Object} 500 - 服务器错误
  */
@@ -104,7 +121,7 @@ router.post(
     }
 
     /* 3. 调用 ImageService 上传 - 字段对齐使用与 image_resources 表一致的字段名 */
-    const uploadResult = await ImageService.uploadImage({
+    const uploadResult = await getImageService().uploadImage({
       fileBuffer: req.file.buffer,
       originalName: req.file.originalname,
       mimeType: req.file.mimetype,
@@ -143,7 +160,7 @@ router.get(
       return res.apiError('无效的图片 ID', 'INVALID_IMAGE_ID', null, 400)
     }
 
-    const image = await ImageService.getImageById(imageId)
+    const image = await getImageService().getImageById(imageId)
     if (!image) {
       return res.apiError('图片不存在', 'IMAGE_NOT_FOUND', null, 404)
     }
@@ -175,7 +192,10 @@ router.get(
       return res.apiError('缺少必填参数：business_type 和 context_id', 'MISSING_PARAMS', null, 400)
     }
 
-    const images = await ImageService.getImagesByBusiness(businessType, parseInt(contextId, 10))
+    const images = await getImageService().getImagesByBusiness(
+      businessType,
+      parseInt(contextId, 10)
+    )
 
     return res.apiSuccess(
       {
@@ -215,7 +235,7 @@ router.patch(
       return res.apiError('缺少必填参数：context_id', 'MISSING_PARAM', null, 400)
     }
 
-    const success = await ImageService.updateImageContextId(imageId, parseInt(contextId, 10))
+    const success = await getImageService().updateImageContextId(imageId, parseInt(contextId, 10))
 
     if (!success) {
       return res.apiError('图片不存在或更新失败', 'UPDATE_FAILED', null, 404)
@@ -228,12 +248,18 @@ router.patch(
 /**
  * DELETE /api/v4/console/images/:image_id
  *
- * @description 软删除图片（标记为 deleted 状态）
+ * @description 物理删除图片（从数据库和 Sealos 对象存储中删除）
+ *
+ * @architecture 架构决策（2026-01-08）：
+ *   - Web 管理端删除时立即物理删除（非软删除）
+ *   - 同时删除原图和所有预生成缩略图
+ *   - 数据库记录物理删除，不保留历史
  *
  * @header Authorization - Bearer {token} 管理员认证
  * @param {number} image_id - 图片资源 ID
  *
  * @response {Object} 200 - 删除成功
+ * @response {Object} 404 - 图片不存在
  */
 router.delete(
   '/:image_id',
@@ -245,7 +271,7 @@ router.delete(
       return res.apiError('无效的图片 ID', 'INVALID_IMAGE_ID', null, 400)
     }
 
-    const success = await ImageService.deleteImage(imageId)
+    const success = await getImageService().deleteImage(imageId)
 
     if (!success) {
       return res.apiError('图片不存在或删除失败', 'DELETE_FAILED', null, 404)

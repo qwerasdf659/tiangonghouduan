@@ -76,7 +76,7 @@ router.get('/verify', authenticateToken, verifyRateLimiter, async (req, res) => 
       nickname: user.nickname,
       status: user.status,
       roles: userRoles.roles,
-      role_level: userRoles.maxLevel,
+      role_level: userRoles.role_level,
       is_admin: userRoles.isAdmin,
       created_at: BeijingTimeHelper.formatToISO(user.created_at),
       last_login: BeijingTimeHelper.formatToISO(user.last_login),

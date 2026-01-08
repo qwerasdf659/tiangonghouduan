@@ -38,7 +38,7 @@ const IdempotencyService = require('../../../../services/IdempotencyService')
 
 /**
  * 材料转换接口（显式转换）
- * POST /api/v4/assets/convert
+ * POST /api/v4/shop/assets/convert
  *
  * 业务场景：
  * - 用户主动将碎红水晶分解为钻石
@@ -173,7 +173,7 @@ router.post('/convert', authenticateToken, async (req, res) => {
      * 统一使用 IdempotencyService 进行请求级幂等控制
      */
     const idempotencyResult = await IdempotencyService.getOrCreateRequest(idempotency_key, {
-      api_path: '/api/v4/assets/convert',
+      api_path: '/api/v4/shop/assets/convert',
       http_method: 'POST',
       request_params: { from_asset_code, to_asset_code, from_amount: parsedAmount },
       user_id
@@ -210,7 +210,7 @@ router.post('/convert', authenticateToken, async (req, res) => {
             title: '碎红水晶分解为钻石',
             meta: {
               source: 'api',
-              endpoint: '/api/v4/assets/convert',
+              endpoint: '/api/v4/shop/assets/convert',
               request_time: new Date().toISOString()
             },
             transaction

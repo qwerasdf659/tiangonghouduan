@@ -549,7 +549,7 @@ class AssetService {
         { transaction }
       )
 
-      // 创建冻结流水记录（delta_amount为负数表示从available扣减）
+      // 创建冻结流水记录（delta_amount为负数表示从available扣减，frozen_amount_change为正数表示冻结增加）
       const transaction_record = await AssetTransaction.create(
         {
           account_id: account.account_id,
@@ -557,6 +557,7 @@ class AssetService {
           delta_amount: -amount, // 负数表示从available扣减
           balance_before: available_before,
           balance_after: available_after,
+          frozen_amount_change: amount, // 正数表示冻结余额增加
           business_type,
           lottery_session_id: null, // 冻结操作不关联抽奖会话
           idempotency_key,
@@ -723,7 +724,7 @@ class AssetService {
         { transaction }
       )
 
-      // 创建解冻流水记录（delta_amount为正数表示增加到available）
+      // 创建解冻流水记录（delta_amount为正数表示增加到available，frozen_amount_change为负数表示冻结减少）
       const transaction_record = await AssetTransaction.create(
         {
           account_id: account.account_id,
@@ -731,6 +732,7 @@ class AssetService {
           delta_amount: amount, // 正数表示增加到available
           balance_before: available_before,
           balance_after: available_after,
+          frozen_amount_change: -amount, // 负数表示冻结余额减少
           business_type,
           lottery_session_id: null, // 解冻操作不关联抽奖会话
           idempotency_key,
@@ -896,7 +898,7 @@ class AssetService {
         { transaction }
       )
 
-      // 创建结算流水记录（delta_amount为0，因为available不变）
+      // 创建结算流水记录（delta_amount为0因为available不变，frozen_amount_change为负数表示冻结结算扣减）
       const transaction_record = await AssetTransaction.create(
         {
           account_id: account.account_id,
@@ -904,6 +906,7 @@ class AssetService {
           delta_amount: 0, // available不变
           balance_before: available_before,
           balance_after: available_after,
+          frozen_amount_change: -amount, // 负数表示冻结余额结算扣减
           business_type,
           lottery_session_id: null, // 结算操作不关联抽奖会话
           idempotency_key,

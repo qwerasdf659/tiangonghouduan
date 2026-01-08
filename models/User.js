@@ -155,21 +155,14 @@ module.exports = sequelize => {
      * 直接关联已移除，避免 Sequelize 尝试查询不存在的 user_id 列
      */
 
-    // 🔥 用户的交易记录（作为发送方）
-    if (models.TradeRecord) {
-      User.hasMany(models.TradeRecord, {
-        foreignKey: 'from_user_id',
-        as: 'sentTrades',
-        comment: '用户发送的交易记录'
-      })
-
-      // 🔥 用户的交易记录（作为接收方）
-      User.hasMany(models.TradeRecord, {
-        foreignKey: 'to_user_id',
-        as: 'receivedTrades',
-        comment: '用户接收的交易记录'
-      })
-    }
+    /**
+     * ❌ TradeRecord 关联已删除（2026-01-08 交易流水收敛决策执行完成）
+     * - 删除原因：TradeRecord 模型和表已完全删除
+     * - 替代关联路径：
+     *   - C2C交易：User → TradeOrder (buyer_user_id / seller_user_id)
+     *   - 资产变动：User → Account → AssetTransaction
+     *   - 物品事件：User → ItemInstance → ItemInstanceEvent
+     */
 
     // 🔥 用户的抽奖记录（LotteryRecord已合并到LotteryDraw）
     if (models.LotteryDraw) {

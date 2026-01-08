@@ -21,6 +21,12 @@
  * - 未提供事务时直接报错（使用 assertAndGetTransaction）
  * - 服务层禁止自建事务，由入口层统一使用 TransactionManager.execute()
  *
+ * 审计整合方案（2026-01-08）：
+ * - 决策5：抽奖管理是关键操作，审计失败阻断业务
+ * - 决策6：幂等键由业务主键派生（setting_id），禁止自动生成
+ * - 决策7：审计日志在同一事务内
+ * - 决策10：target_id 指向 LotteryManagementSetting.setting_id
+ *
  * 依赖服务：
  * - UserService：用户验证
  * - PrizePoolService：奖品验证
@@ -28,7 +34,7 @@
  * - AuditLogService：审计日志记录
  *
  * 创建时间：2025年12月09日
- * 最后更新：2026年01月05日（事务边界治理改造）
+ * 最后更新：2026年01月08日（审计整合决策5/6/7/10实现）
  */
 
 const BeijingTimeHelper = require('../utils/timeHelper')
@@ -127,7 +133,7 @@ class AdminLotteryService {
     }
 
     // 🎯 获取ManagementStrategy（通过sharedComponents）
-    const { sharedComponents } = require('../routes/v4/admin/shared/middleware')
+    const { sharedComponents } = require('../routes/v4/console/shared/middleware')
     const managementStrategy = sharedComponents.managementStrategy
 
     // 🎯 调用管理策略设置强制中奖
@@ -137,7 +143,13 @@ class AdminLotteryService {
       throw new Error(result.error || '强制中奖设置失败')
     }
 
-    // 📝 记录审计日志
+    /*
+     * 【决策5/6/7/10】记录审计日志
+     * - 决策5：关键操作，失败阻断业务
+     * - 决策6：幂等键由 setting_id 派生（格式：lottery_force_win_{setting_id}）
+     * - 决策7：同一事务内
+     * - 决策10：target_id 指向 LotteryManagementSetting.setting_id
+     */
     await AuditLogService.logAdminOperation(
       {
         admin_id: adminId,
@@ -152,8 +164,10 @@ class AdminLotteryService {
           reason,
           expires_at: expiresAt
         },
+        idempotency_key: `lottery_force_win_${result.setting_id}`, // 决策6：业务主键派生
         ip_address: null, // 路由层会填充
-        user_agent: null // 路由层会填充
+        user_agent: null, // 路由层会填充
+        is_critical_operation: true // 决策5：关键操作
       },
       { transaction }
     )
@@ -224,7 +238,7 @@ class AdminLotteryService {
     }
 
     // 🎯 获取ManagementStrategy
-    const { sharedComponents } = require('../routes/v4/admin/shared/middleware')
+    const { sharedComponents } = require('../routes/v4/console/shared/middleware')
     const managementStrategy = sharedComponents.managementStrategy
 
     // 🎯 调用管理策略设置强制不中奖
@@ -234,7 +248,13 @@ class AdminLotteryService {
       throw new Error(result.error || '强制不中奖设置失败')
     }
 
-    // 📝 记录审计日志
+    /*
+     * 【决策5/6/7/10】记录审计日志
+     * - 决策5：关键操作，失败阻断业务
+     * - 决策6：幂等键由 setting_id 派生
+     * - 决策7：同一事务内
+     * - 决策10：target_id 指向 LotteryManagementSetting.setting_id
+     */
     await AuditLogService.logAdminOperation(
       {
         admin_id: adminId,
@@ -249,8 +269,10 @@ class AdminLotteryService {
           reason,
           expires_at: expiresAt
         },
+        idempotency_key: `lottery_force_lose_${result.setting_id}`, // 决策6
         ip_address: null,
-        user_agent: null
+        user_agent: null,
+        is_critical_operation: true // 决策5
       },
       { transaction }
     )
@@ -358,7 +380,13 @@ class AdminLotteryService {
       { transaction }
     )
 
-    // 📝 记录审计日志
+    /*
+     * 【决策5/6/7/10】记录审计日志
+     * - 决策5：关键操作，失败阻断业务
+     * - 决策6：幂等键由 setting_id 派生
+     * - 决策7：同一事务内
+     * - 决策10：target_id 指向 LotteryManagementSetting.setting_id
+     */
     await AuditLogService.logAdminOperation(
       {
         admin_id: adminId,
@@ -372,8 +400,10 @@ class AdminLotteryService {
           setting_data: settingData,
           expires_at: expiresAt
         },
+        idempotency_key: `lottery_probability_adjust_${setting.setting_id}`, // 决策6
         ip_address: null,
-        user_agent: null
+        user_agent: null,
+        is_critical_operation: true // 决策5
       },
       { transaction }
     )
@@ -493,7 +523,7 @@ class AdminLotteryService {
     }
 
     // 🎯 获取ManagementStrategy
-    const { sharedComponents } = require('../routes/v4/admin/shared/middleware')
+    const { sharedComponents } = require('../routes/v4/console/shared/middleware')
     const managementStrategy = sharedComponents.managementStrategy
 
     // 🎯 调用管理策略设置用户队列
@@ -509,7 +539,13 @@ class AdminLotteryService {
       throw new Error(result.error || '用户队列设置失败')
     }
 
-    // 📝 记录审计日志
+    /*
+     * 【决策5/6/7/10】记录审计日志
+     * - 决策5：关键操作，失败阻断业务
+     * - 决策6：幂等键由 setting_id 派生
+     * - 决策7：同一事务内
+     * - 决策10：target_id 指向 LotteryManagementSetting.setting_id
+     */
     await AuditLogService.logAdminOperation(
       {
         admin_id: adminId,
@@ -523,8 +559,10 @@ class AdminLotteryService {
           reason,
           expires_at: expiresAt
         },
+        idempotency_key: `lottery_user_queue_${result.setting_id}`, // 决策6
         ip_address: null,
-        user_agent: null
+        user_agent: null,
+        is_critical_operation: true // 决策5
       },
       { transaction }
     )
@@ -597,7 +635,7 @@ class AdminLotteryService {
       }
 
       // 🎯 获取ManagementStrategy
-      const { sharedComponents } = require('../routes/v4/admin/shared/middleware')
+      const { sharedComponents } = require('../routes/v4/console/shared/middleware')
       const managementStrategy = sharedComponents.managementStrategy
 
       // 🎯 获取用户管理状态
@@ -696,7 +734,7 @@ class AdminLotteryService {
     }
 
     // 🎯 获取ManagementStrategy
-    const { sharedComponents } = require('../routes/v4/admin/shared/middleware')
+    const { sharedComponents } = require('../routes/v4/console/shared/middleware')
     const managementStrategy = sharedComponents.managementStrategy
 
     // 🎯 调用管理策略清除用户设置
@@ -706,13 +744,46 @@ class AdminLotteryService {
       throw new Error(result.error || '清除用户设置失败')
     }
 
-    // 📝 记录审计日志
+    /*
+     * 【决策5/6/7/9/10】创建业务记录并记录审计日志
+     * - 决策5：关键操作，失败阻断业务
+     * - 决策6：幂等键由业务主键派生，禁止兜底
+     * - 决策7：同一事务内
+     * - 决策9：无天然业务主键的操作新增业务记录表
+     * - 决策10：target_id 永远指向业务记录主键（record_id）
+     */
+
+    // 【决策9】创建清除设置记录（为审计日志提供业务主键）
+    const { LotteryClearSettingRecord } = models
+    const idempotencyKey = LotteryClearSettingRecord.generateIdempotencyKey(
+      userId,
+      settingType || 'all',
+      adminId
+    )
+
+    const clearRecord = await LotteryClearSettingRecord.create(
+      {
+        user_id: userId,
+        admin_id: adminId,
+        setting_type: settingType || 'all',
+        cleared_count: result.cleared_count,
+        reason,
+        idempotency_key: idempotencyKey,
+        metadata: {
+          user_mobile: user.mobile,
+          cleared_at: BeijingTimeHelper.now()
+        }
+      },
+      { transaction }
+    )
+
+    // 【决策10】使用 record_id 作为 target_id
     await AuditLogService.logAdminOperation(
       {
         admin_id: adminId,
         operation_type: 'lottery_clear_settings',
-        operation_target: 'lottery_management_setting',
-        target_id: null, // 清除操作没有单一目标ID
+        operation_target: 'lottery_clear_setting_record',
+        target_id: clearRecord.record_id, // 决策10：指向业务记录主键
         operation_details: {
           user_id: userId,
           user_mobile: user.mobile,
@@ -720,8 +791,10 @@ class AdminLotteryService {
           cleared_count: result.cleared_count,
           reason
         },
+        idempotency_key: `audit_${idempotencyKey}`, // 审计幂等键派生自业务幂等键
         ip_address: null,
-        user_agent: null
+        user_agent: null,
+        is_critical_operation: true // 决策5
       },
       { transaction }
     )

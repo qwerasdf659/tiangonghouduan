@@ -19,7 +19,14 @@
  * - 所有调整操作记录审计日志
  * - 支持幂等性控制（idempotency_key）
  *
+ * 审计整合方案（2026-01-08）：
+ * - 决策5：资产调整是关键操作，审计失败阻断业务
+ * - 决策6：幂等键由业务主键派生（禁止自动生成）
+ * - 决策7：审计日志在同一事务内
+ * - 决策10：target_id 指向 AssetTransaction.transaction_id
+ *
  * 创建时间：2025-12-30
+ * 更新时间：2026-01-08（审计整合决策5/6/7/10实现）
  */
 
 'use strict'
@@ -27,7 +34,6 @@
 const express = require('express')
 const router = express.Router()
 const { authenticateToken, requireAdmin } = require('../../../middleware/auth')
-const { v4: uuidv4 } = require('uuid')
 const TransactionManager = require('../../../utils/TransactionManager')
 
 /**
@@ -81,26 +87,39 @@ router.post(
       return res.apiError('调整预算积分必须提供 campaign_id', 'BAD_REQUEST', null, 400)
     }
 
-    // 生成幂等键
-    const finalIdempotencyKey =
-      idempotency_key ||
-      `admin_adjust_${admin_id}_${user_id}_${asset_code}_${Date.now()}_${uuidv4().slice(0, 8)}`
+    /*
+     * 【决策6】幂等键必须由前端提供或由业务数据派生
+     * 禁止使用 Date.now() 自动生成（无法实现幂等性）
+     * 格式：admin_adjust_{admin_id}_{user_id}_{asset_code}_{前端timestamp}
+     */
+    if (!idempotency_key || idempotency_key.trim() === '') {
+      return res.apiError(
+        'idempotency_key 是必填参数（关键操作禁止自动生成幂等键，请由前端提供唯一业务标识）',
+        'BAD_REQUEST',
+        { hint: '推荐格式：admin_adjust_{admin_id}_{user_id}_{asset_code}_{timestamp}' },
+        400
+      )
+    }
 
     // 通过 ServiceManager 获取 AssetService
     const AssetService = req.app.locals.services.getService('asset')
     const AuditLogService = req.app.locals.services.getService('auditLog')
 
     try {
-      // 执行资产调整（使用 TransactionManager 确保事务边界）
+      /*
+       * 【决策7】审计日志与业务操作在同一事务内
+       * 【决策5】资产调整是关键操作，审计失败阻断业务
+       */
       const result = await TransactionManager.execute(
         async transaction => {
-          return await AssetService.changeBalance(
+          // 1. 执行资产调整
+          const changeResult = await AssetService.changeBalance(
             {
               user_id,
               asset_code,
               delta_amount: Number(amount),
               business_type: 'admin_adjustment',
-              idempotency_key: finalIdempotencyKey,
+              idempotency_key,
               campaign_id: campaign_id || null,
               meta: {
                 admin_id,
@@ -110,33 +129,45 @@ router.post(
             },
             { transaction }
           )
+
+          // 重复请求直接返回，不再记录审计日志
+          if (changeResult.is_duplicate) {
+            return changeResult
+          }
+
+          /*
+           * 【决策5/10】记录审计日志（关键操作，失败阻断业务流程）
+           * target_id 指向 AssetTransaction.transaction_id（决策10）
+           * 审计日志与业务在同一事务内（决策7）
+           */
+          await AuditLogService.logOperation({
+            operator_id: admin_id,
+            operation_type: 'asset_adjustment',
+            target_type: 'AssetTransaction',
+            target_id: changeResult.transaction_record?.transaction_id,
+            action: Number(amount) > 0 ? 'increase' : 'decrease',
+            before_data: {
+              user_id,
+              asset_code,
+              balance: changeResult.transaction_record?.balance_before
+            },
+            after_data: {
+              user_id,
+              asset_code,
+              balance: changeResult.transaction_record?.balance_after,
+              delta_amount: Number(amount)
+            },
+            reason,
+            idempotency_key,
+            ip_address: req.ip,
+            is_critical_operation: true, // 关键操作标记
+            transaction // 同一事务
+          })
+
+          return changeResult
         },
         { description: `管理员资产调整: user_id=${user_id}, asset_code=${asset_code}` }
       )
-
-      // 记录审计日志
-      try {
-        await AuditLogService.log({
-          operator_id: admin_id,
-          operation_type: 'asset_adjustment',
-          target_type: 'user_asset',
-          target_id: user_id,
-          before_data: {
-            asset_code,
-            balance_before: result.transaction_record?.balance_before
-          },
-          after_data: {
-            asset_code,
-            balance_after: result.transaction_record?.balance_after,
-            delta_amount: amount
-          },
-          reason,
-          ip_address: req.ip
-        })
-      } catch (auditError) {
-        // 审计日志失败不影响业务
-        console.error('[管理员资产调整] 审计日志记录失败:', auditError.message)
-      }
 
       // 检查是否是重复请求
       if (result.is_duplicate) {
@@ -147,7 +178,7 @@ router.post(
           asset_code,
           amount,
           balance_after: result.balance ? Number(result.balance.available_amount) : null,
-          idempotency_key: finalIdempotencyKey
+          idempotency_key
         })
       }
 
@@ -159,7 +190,7 @@ router.post(
         balance_before: result.transaction_record?.balance_before,
         balance_after: result.transaction_record?.balance_after,
         transaction_id: result.transaction_record?.transaction_id,
-        idempotency_key: finalIdempotencyKey
+        idempotency_key
       })
     } catch (error) {
       // 余额不足等业务错误
@@ -197,11 +228,27 @@ router.post(
       return res.apiError('单次批量调整不能超过100条', 'BAD_REQUEST', null, 400)
     }
 
+    /*
+     * 【决策6】幂等键必须由业务主键派生，禁止兜底
+     * 批量调整必须提供 batch_timestamp（由前端在发起请求时生成的唯一标识）
+     * 格式：batch_adjust_{admin_id}_{user_id}_{asset_code}_{batch_timestamp}_{index}
+     */
+    const { batch_timestamp } = req.body
+    if (!batch_timestamp || batch_timestamp.trim() === '') {
+      return res.apiError(
+        'batch_timestamp 是必填参数（关键操作禁止自动生成幂等键，请由前端提供批次唯一标识）',
+        'BAD_REQUEST',
+        { hint: '推荐格式：毫秒级时间戳，如 1736412345678' },
+        400
+      )
+    }
+
     const AssetService = req.app.locals.services.getService('asset')
     const results = []
     const errors = []
 
-    for (const adj of adjustments) {
+    for (let index = 0; index < adjustments.length; index++) {
+      const adj = adjustments[index]
       const { user_id, asset_code, amount, campaign_id } = adj
 
       if (!user_id || !asset_code || !amount) {
@@ -209,12 +256,21 @@ router.post(
         continue
       }
 
-      const idempotencyKey = `batch_adjust_${admin_id}_${user_id}_${asset_code}_${Date.now()}_${uuidv4().slice(0, 8)}`
+      /*
+       * 【决策6】批量调整的幂等键：由业务主键派生，禁止兜底
+       * 每项调整可单独提供 idempotency_key，否则使用 batch_timestamp + index 派生
+       * 格式：batch_adjust_{admin_id}_{user_id}_{asset_code}_{batch_timestamp}_{index}
+       */
+      const idempotencyKey =
+        adj.idempotency_key ||
+        `batch_adjust_${admin_id}_${user_id}_${asset_code}_${batch_timestamp}_${index}`
 
       try {
+        const AuditLogService = req.app.locals.services.getService('auditLog')
+
         const result = await TransactionManager.execute(
           async transaction => {
-            return await AssetService.changeBalance(
+            const changeResult = await AssetService.changeBalance(
               {
                 user_id,
                 asset_code,
@@ -230,6 +286,36 @@ router.post(
               },
               { transaction }
             )
+
+            // 重复请求不再记录审计日志
+            if (!changeResult.is_duplicate) {
+              // 【决策5/7/10】审计日志在事务内，关键操作
+              await AuditLogService.logOperation({
+                operator_id: admin_id,
+                operation_type: 'asset_adjustment',
+                target_type: 'AssetTransaction',
+                target_id: changeResult.transaction_record?.transaction_id,
+                action: Number(amount) > 0 ? 'increase' : 'decrease',
+                before_data: {
+                  user_id,
+                  asset_code,
+                  balance: changeResult.transaction_record?.balance_before
+                },
+                after_data: {
+                  user_id,
+                  asset_code,
+                  balance: changeResult.transaction_record?.balance_after,
+                  delta_amount: Number(amount)
+                },
+                reason: batch_reason,
+                idempotency_key: idempotencyKey,
+                ip_address: req.ip,
+                is_critical_operation: true,
+                transaction
+              })
+            }
+
+            return changeResult
           },
           { description: `批量资产调整: user_id=${user_id}, asset_code=${asset_code}` }
         )
@@ -239,7 +325,8 @@ router.post(
           asset_code,
           amount,
           success: true,
-          balance_after: result.transaction_record?.balance_after
+          balance_after: result.transaction_record?.balance_after,
+          is_duplicate: result.is_duplicate || false
         })
       } catch (error) {
         errors.push({

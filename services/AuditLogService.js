@@ -11,7 +11,9 @@ const logger = require('../utils/logger').logger
  * 3. 库存操作审计（物品使用、转让、核销）
  * 4. 审核操作审计（消费审核、兑换审核）
  * 5. 商品配置审计（商品创建、修改、删除）
- * 6. 数据变更对比（自动生成前后数据对比）
+ * 6. 资产调整审计（V4.5.0新增 - 管理员资产调整）
+ * 7. 抽奖管理审计（V4.5.0新增 - 强制中奖、概率调整等）
+ * 8. 数据变更对比（自动生成前后数据对比）
  *
  * 设计原则：
  * - **服务层适配**：不依赖req对象，适用于服务层调用
@@ -19,11 +21,13 @@ const logger = require('../utils/logger').logger
  * - **异步记录**：审计日志记录失败不影响业务操作
  * - **完整记录**：记录操作前后的完整数据、变更字段、操作原因
  * - **安全信息**：记录IP地址、用户代理等安全信息（如果有）
+ * - **统一枚举**：操作类型来源于 constants/AuditOperationTypes.js（单一真相源）
  *
  * 与auditLog中间件的关系：
  * - auditLog中间件：面向路由层，依赖req对象（适用于HTTP请求）
  * - AuditLogService：面向服务层，不依赖req对象（适用于内部调用）
  * - 两者底层都使用AdminOperationLog模型
+ * - 中间件层建议调用本服务的方法，而非直接操作模型
  *
  * 使用示例：
  * ```javascript
@@ -50,24 +54,33 @@ const logger = require('../utils/logger').logger
  *   transaction
  * });
  *
- * // 示例3：记录兑换审核操作
- * await AuditLogService.logExchangeAudit({
- *   operator_id: auditorId,
- *   exchange_id: exchangeId,
- *   action: 'approve',
- *   before_status: 'pending',
- *   after_status: 'approved',
- *   reason: '审核通过',
+ * // 示例3：记录资产调整操作（V4.5.0新增）
+ * await AuditLogService.logAssetAdjustment({
+ *   operator_id: adminId,
+ *   user_id: targetUserId,
+ *   asset_code: 'POINTS',
+ *   delta_amount: 100,
+ *   balance_before: 500,
+ *   balance_after: 600,
+ *   reason: '客服补偿',
+ *   idempotency_key: 'admin_adjust_xxx',
  *   transaction
  * });
  * ```
  *
  * 创建时间：2025年12月09日
- * 使用模型：Claude Sonnet 4.5
+ * 最后更新：2026年01月08日（V4.5.0 审计统一入口整合）
  */
 
 const { AdminOperationLog } = require('../models')
 const BeijingTimeHelper = require('../utils/timeHelper')
+
+// 引用统一枚举定义（单一真相源 - 2026-01-08 整合）
+const {
+  OPERATION_TYPES,
+  isValidOperationType,
+  isCriticalOperation
+} = require('../constants/AuditOperationTypes')
 
 /**
  * 审计日志服务类
@@ -78,6 +91,10 @@ class AuditLogService {
   /**
    * 记录通用操作审计日志（核心方法）
    *
+   * 根据《审计统一入口整合方案》决策5和决策6：
+   * - 关键操作（is_critical_operation=true）审计失败时必须阻断业务流程
+   * - 关键操作必须提供 idempotency_key，禁止自动生成兜底
+   *
    * @param {Object} params - 审计日志参数
    * @param {number} params.operator_id - 操作员ID（必填）
    * @param {string} params.operation_type - 操作类型（必填，如'points_adjust'）
@@ -87,72 +104,89 @@ class AuditLogService {
    * @param {Object} params.before_data - 操作前数据（可选）
    * @param {Object} params.after_data - 操作后数据（可选）
    * @param {string} params.reason - 操作原因（可选）
-   * @param {string} params.idempotency_key - 业务关联ID（可选）
+   * @param {string} params.idempotency_key - 业务关联ID（关键操作必填）
    * @param {string} params.ip_address - IP地址（可选）
    * @param {string} params.user_agent - 用户代理（可选）
    * @param {Object} params.transaction - 事务对象（可选）
+   * @param {boolean} params.is_critical_operation - 是否关键操作（决策5：关键操作失败时阻断业务流程）
    * @returns {Promise<AdminOperationLog|null>} 审计日志记录
+   * @throws {Error} 关键操作审计失败时抛出错误（阻断业务流程）
    */
   static async logOperation(params) {
-    try {
-      const {
-        operator_id,
-        operation_type,
-        target_type,
-        target_id,
-        action,
-        before_data = null,
-        after_data = null,
-        reason = null,
-        idempotency_key = null,
-        ip_address = null,
-        user_agent = null,
-        transaction = null
-      } = params
+    const {
+      operator_id,
+      operation_type,
+      target_type,
+      target_id,
+      action,
+      before_data = null,
+      after_data = null,
+      reason = null,
+      idempotency_key = null,
+      ip_address = null,
+      user_agent = null,
+      transaction = null,
+      is_critical_operation = false // 决策5：是否关键操作
+    } = params
 
+    // 判断是否为关键操作（显式标记 或 操作类型属于关键操作集合）
+    const isCritical = is_critical_operation || isCriticalOperation(operation_type)
+
+    try {
       // 1. 验证必填参数
       if (!operator_id || !operation_type || !target_type || !target_id || !action) {
-        logger.warn('[审计日志] 缺少必填参数，跳过记录')
+        const missingFields = {
+          operator_id: !!operator_id,
+          operation_type: !!operation_type,
+          target_type: !!target_type,
+          target_id: !!target_id,
+          action: !!action
+        }
+
+        // 决策5：关键操作缺少参数时抛出错误
+        if (isCritical) {
+          const error = new Error(
+            `[审计日志] 关键操作缺少必填参数: ${JSON.stringify(missingFields)}`
+          )
+          error.code = 'AUDIT_MISSING_PARAMS'
+          throw error
+        }
+
+        logger.warn('[审计日志] 缺少必填参数，跳过记录', missingFields)
         return null
       }
 
-      // 2. 验证操作类型
-      const validOperationTypes = [
-        'points_adjust',
-        'exchange_audit',
-        'product_update',
-        'product_create',
-        'product_delete',
-        'user_status_change',
-        'prize_config',
-        'prize_create',
-        'prize_delete',
-        'prize_stock_adjust', // 奖品库存调整
-        'campaign_config',
-        'role_assign',
-        'role_change', // 角色变更
-        'system_config',
-        'session_assign',
-        'inventory_operation', // 库存操作
-        'inventory_transfer', // 物品转让
-        'consumption_audit', // 消费审核
-        // 抽奖管理操作类型（V4.5.0新增）
-        'lottery_force_win', // 强制中奖
-        'lottery_force_lose', // 强制不中奖
-        'lottery_probability_adjust', // 概率调整
-        'lottery_user_queue', // 用户队列
-        'lottery_clear_settings' // 清除设置
-      ]
+      // 2. 验证操作类型（使用统一枚举定义 - constants/AuditOperationTypes.js）
+      if (!isValidOperationType(operation_type)) {
+        const errorMsg =
+          `[审计日志] 无效的操作类型: ${operation_type}，` +
+          '请检查 constants/AuditOperationTypes.js 中的定义'
 
-      if (!validOperationTypes.includes(operation_type)) {
-        logger.warn(`[审计日志] 无效的操作类型: ${operation_type}`)
+        // 决策5：关键操作类型无效时抛出错误
+        if (isCritical) {
+          const error = new Error(errorMsg)
+          error.code = 'AUDIT_INVALID_TYPE'
+          throw error
+        }
+
+        logger.warn(errorMsg)
         return null
       }
 
-      // 3. 计算变更字段
+      // 3. 决策6：关键操作强制要求 idempotency_key，禁止兜底
+      if (isCritical && !idempotency_key) {
+        const error = new Error(
+          `[审计日志] 关键操作 ${operation_type} 必须提供 idempotency_key（业务主键派生），` +
+            '禁止使用 Date.now() 或 UUID 兜底生成'
+        )
+        error.code = 'AUDIT_MISSING_IDEMPOTENCY_KEY'
+        throw error
+      }
+
+      // 4. 计算变更字段
       const changedFields = AdminOperationLog.compareObjects(before_data, after_data)
 
-      // 4. 创建审计日志
+      // 5. 创建审计日志
       const auditLog = await AdminOperationLog.create(
         {
           operator_id,
@@ -173,13 +207,26 @@ class AuditLogService {
       )
 
       logger.info(
-        `[审计日志] 记录成功: log_id=${auditLog.log_id}, 操作员=${operator_id}, 类型=${operation_type}, 动作=${action}`
+        `[审计日志] 记录成功: log_id=${auditLog.log_id}, 操作员=${operator_id}, ` +
+          `类型=${operation_type}, 动作=${action}, 关键操作=${isCritical}`
       )
 
       return auditLog
     } catch (error) {
-      // 审计日志记录失败不影响业务操作，只记录错误
-      logger.error(`[审计日志] 记录失败: ${error.message}`)
+      // 决策5：关键操作审计失败时必须抛出错误，阻断业务流程
+      if (isCritical) {
+        logger.error(`[审计日志] 关键操作审计失败，阻断业务流程: ${error.message}`, {
+          operation_type,
+          operator_id,
+          target_type,
+          target_id,
+          error_code: error.code || 'AUDIT_CRITICAL_FAILED'
+        })
+        throw error
+      }
+
+      // 非关键操作：审计日志记录失败不影响业务操作，只记录错误
+      logger.error(`[审计日志] 记录失败（非关键操作，不阻断）: ${error.message}`)
       logger.error(error.stack)
       return null
     }
@@ -190,17 +237,24 @@ class AuditLogService {
    *
    * 用于抽奖管理模块的审计日志记录，自动映射参数到logOperation格式
    *
+   * V4.5.1 更新（2026-01-08 审计统一入口整合）：
+   * - 【决策6】关键操作必须由调用方提供 idempotency_key，禁止自动生成兜底
+   * - 【决策5】关键操作审计失败时阻断业务流程
+   *
    * @param {Object} params - 参数
    * @param {number} params.admin_id - 管理员ID
    * @param {string} params.operation_type - 操作类型
    * @param {string} params.operation_target - 操作目标
    * @param {number} params.target_id - 目标ID
    * @param {Object} params.operation_details - 操作详情
+   * @param {string} params.idempotency_key - 幂等键（关键操作必填，禁止兜底生成）
    * @param {string} params.ip_address - IP地址
    * @param {string} params.user_agent - 用户代理
+   * @param {boolean} params.is_critical_operation - 是否关键操作（覆盖默认判断）
    * @param {Object} options - 选项
    * @param {Object} options.transaction - 事务对象
    * @returns {Promise<AdminOperationLog|null>} 审计日志记录
+   * @throws {Error} 关键操作审计失败时抛出错误
    */
   static async logAdminOperation(params, options = {}) {
     const {
@@ -209,10 +263,16 @@ class AuditLogService {
       operation_target,
       target_id,
       operation_details = {},
+      idempotency_key = null,
       ip_address = null,
-      user_agent = null
+      user_agent = null,
+      is_critical_operation = null // 允许覆盖默认判断
     } = params
     const { transaction = null } = options
+
+    // 判断是否关键操作（显式指定 > 枚举判断）
+    const isCritical =
+      is_critical_operation !== null ? is_critical_operation : isCriticalOperation(operation_type)
 
     // 映射到logOperation的参数格式
     return this.logOperation({
@@ -224,10 +284,11 @@ class AuditLogService {
       before_data: null,
       after_data: operation_details,
       reason: operation_details.reason || null,
-      idempotency_key: null,
+      idempotency_key, // 直接传递，logOperation 会检查关键操作是否缺少
       ip_address,
       user_agent,
-      transaction
+      transaction,
+      is_critical_operation: isCritical
     })
   }
 
@@ -237,6 +298,7 @@ class AuditLogService {
    * @param {Object} params - 参数
    * @param {number} params.operator_id - 操作员ID
    * @param {number} params.user_id - 用户ID
+   * @param {number} params.transaction_id - 资产交易记录ID（作为审计 target_id，决策10）
    * @param {number} params.before_points - 操作前积分
    * @param {number} params.after_points - 操作后积分
    * @param {number} params.points_amount - 积分数量
@@ -249,6 +311,7 @@ class AuditLogService {
     const {
       operator_id,
       user_id,
+      transaction_id, // 决策10：target_id 永远指向业务记录主键
       before_points,
       after_points,
       points_amount,
@@ -260,16 +323,18 @@ class AuditLogService {
     return this.logOperation({
       operator_id,
       operation_type: 'points_adjust',
-      target_type: 'AccountAssetBalance', // 更新到统一资产架构
-      target_id: user_id,
+      target_type: 'AssetTransaction', // 决策10：指向资产交易记录
+      target_id: transaction_id, // 决策10：使用业务记录主键
       action: 'add',
       before_data: {
+        user_id,
         available_points: before_points
       },
       after_data: {
+        user_id,
         available_points: after_points
       },
-      reason: reason || `增加积分${points_amount}分`,
+      reason: reason || `增加积分${points_amount}分（用户${user_id}）`,
       idempotency_key,
       transaction
     })
@@ -281,6 +346,7 @@ class AuditLogService {
    * @param {Object} params - 参数
    * @param {number} params.operator_id - 操作员ID
    * @param {number} params.user_id - 用户ID
+   * @param {number} params.transaction_id - 资产交易记录ID（作为审计 target_id，决策10）
    * @param {number} params.before_points - 操作前积分
    * @param {number} params.after_points - 操作后积分
    * @param {number} params.points_amount - 积分数量
@@ -293,6 +359,7 @@ class AuditLogService {
     const {
       operator_id,
       user_id,
+      transaction_id, // 决策10：target_id 永远指向业务记录主键
       before_points,
       after_points,
       points_amount,
@@ -304,16 +371,18 @@ class AuditLogService {
     return this.logOperation({
       operator_id,
       operation_type: 'points_adjust',
-      target_type: 'AccountAssetBalance', // 更新到统一资产架构
-      target_id: user_id,
+      target_type: 'AssetTransaction', // 决策10：指向资产交易记录
+      target_id: transaction_id, // 决策10：使用业务记录主键
       action: 'consume',
       before_data: {
+        user_id,
         available_points: before_points
       },
       after_data: {
+        user_id,
         available_points: after_points
       },
-      reason: reason || `消费积分${points_amount}分`,
+      reason: reason || `消费积分${points_amount}分（用户${user_id}）`,
       idempotency_key,
       transaction
     })
@@ -611,6 +680,77 @@ class AuditLogService {
       before_data,
       after_data,
       reason,
+      transaction
+    })
+  }
+
+  /**
+   * 记录资产调整操作（V4.5.0新增）
+   *
+   * @description 用于管理员资产调整路由的审计日志记录
+   * @see routes/v4/console/asset-adjustment.js
+   *
+   * @param {Object} params - 参数
+   * @param {number} params.operator_id - 操作员ID（管理员）
+   * @param {number} params.user_id - 目标用户ID
+   * @param {string} params.asset_code - 资产代码（POINTS/BUDGET_POINTS/DIAMOND等）
+   * @param {number} params.delta_amount - 调整数量（正数=增加，负数=扣减）
+   * @param {number} params.balance_before - 调整前余额
+   * @param {number} params.balance_after - 调整后余额
+   * @param {string} params.reason - 操作原因
+   * @param {string} params.idempotency_key - 幂等键（关键操作必填）
+   * @param {string} params.ip_address - IP地址（可选）
+   * @param {Object} params.transaction - 事务对象（可选）
+   * @returns {Promise<AdminOperationLog|null>} 审计日志记录（失败返回null，不阻塞业务流程）
+   *
+   * @example
+   * await AuditLogService.logAssetAdjustment({
+   *   operator_id: adminId,
+   *   user_id: 12345,
+   *   asset_code: 'POINTS',
+   *   delta_amount: 100,
+   *   balance_before: 500,
+   *   balance_after: 600,
+   *   reason: '客服补偿',
+   *   idempotency_key: 'admin_adjust_xxx',
+   *   ip_address: '192.168.1.1',
+   *   transaction
+   * });
+   */
+  static async logAssetAdjustment(params) {
+    const {
+      operator_id,
+      user_id,
+      asset_code,
+      delta_amount,
+      balance_before,
+      balance_after,
+      reason,
+      idempotency_key,
+      ip_address = null,
+      transaction
+    } = params
+
+    return this.logOperation({
+      operator_id,
+      operation_type: OPERATION_TYPES.ASSET_ADJUSTMENT, // 使用统一枚举常量
+      target_type: 'AccountAssetBalance',
+      target_id: user_id,
+      action: delta_amount > 0 ? 'add' : 'deduct',
+      before_data: {
+        asset_code,
+        balance: balance_before
+      },
+      after_data: {
+        asset_code,
+        balance: balance_after,
+        delta_amount
+      },
+      reason:
+        reason ||
+        `管理员${delta_amount > 0 ? '增加' : '扣减'}${asset_code} ${Math.abs(delta_amount)}`,
+      idempotency_key,
+      ip_address,
       transaction
     })
   }

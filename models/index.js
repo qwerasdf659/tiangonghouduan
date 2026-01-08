@@ -111,11 +111,16 @@ models.ItemInstanceEvent = require('./ItemInstanceEvent')(sequelize, DataTypes)
  *    - 事件类型：mint/lock/unlock/transfer/use/expire/destroy
  */
 
-models.TradeRecord = require('./TradeRecord')(sequelize, DataTypes)
-/*
- * ✅ TradeRecord：交易记录
- *    - 用途：记录用户的各类交易行为（兑换、购买等）
- *    - 表名：trade_records，主键：record_id
+/**
+ * ❌ TradeRecord：已删除（2026-01-08 交易流水收敛决策执行完成）
+ *    - 删除原因：职责混乱，与 AssetTransaction、TradeOrder 功能重叠
+ *    - 替代方案：
+ *      - 资产变动 → AssetTransaction（asset_transactions 表）
+ *      - C2C交易 → TradeOrder（trade_orders 表）
+ *      - 物品事件 → ItemInstanceEvent（item_instance_events 表）
+ *    - 数据库：trade_records 表已于 2026-01-08 删除（迁移 20260108210000）
+ *    - 模型文件：models/TradeRecord.js 已删除
+ *    - 文档：详见 docs/交易流水收敛方案-AssetTransaction-TradeOrder-TradeRecord-2026-01-08.md
  */
 
 // 🔴 管理和客服系统
@@ -289,6 +294,36 @@ models.RoleChangeLog = require('./RoleChangeLog')(sequelize, DataTypes)
  *    - 特点：操作类型、目标用户、操作人、影响数量、操作原因、IP地址
  *    - 表名：role_change_logs，主键：log_id
  *    - 业务场景：停用业务员权限→批量停用业务经理及下属→权限变更审计
+ */
+
+// 🔴 审计业务记录表（2026-01-08 决策9实现 - 为无天然业务主键的操作提供审计锚点）
+models.UserStatusChangeRecord = require('./UserStatusChangeRecord')(sequelize, DataTypes)
+/*
+ * ✅ UserStatusChangeRecord：用户状态变更记录
+ *    - 用途：为 user_status_change 审计日志提供业务主键（record_id → target_id）
+ *    - 特点：幂等键派生（决策6）、事务内创建（决策7）、关键操作阻断（决策5）
+ *    - 表名：user_status_change_records，主键：record_id
+ *    - 业务场景：管理员封禁/解封用户→创建变更记录→记录审计日志→可追溯
+ */
+
+models.UserRoleChangeRecord = require('./UserRoleChangeRecord')(sequelize, DataTypes)
+/*
+ * ✅ UserRoleChangeRecord：用户角色变更记录
+ *    - 用途：为 role_change 审计日志提供业务主键（record_id → target_id）
+ *    - 特点：幂等键派生（决策6）、事务内创建（决策7）、关键操作阻断（决策5）
+ *    - 表名：user_role_change_records，主键：record_id
+ *    - 业务场景：管理员变更用户角色→创建变更记录→记录审计日志→可追溯
+ *    - 注意：与 RoleChangeLog 区别 - 本模型专用于审计主键生成，不记录角色权限本身的变更
+ */
+
+models.LotteryClearSettingRecord = require('./LotteryClearSettingRecord')(sequelize, DataTypes)
+/*
+ * ✅ LotteryClearSettingRecord：抽奖清除设置记录
+ *    - 用途：为 lottery_clear_settings 审计日志提供业务主键（record_id → target_id）
+ *    - 特点：幂等键派生（决策6）、事务内创建（决策7）、关键操作阻断（决策5）
+ *    - 表名：lottery_clear_setting_records，主键：record_id
+ *    - 业务场景：管理员清除用户抽奖设置→创建清除记录→记录审计日志→可追溯
+ *    - 解决问题：原 target_id: null 导致关键操作被阻断
  */
 
 // 🔴 商家审核系统（2025年12月29日新增 - 资产域标准架构）

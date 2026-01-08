@@ -570,6 +570,19 @@ try {
 
   /*
    * ========================================
+   * 1.1 /permissions - 权限管理域（2026-01-08 从 auth 域拆分）
+   * ========================================
+   * 📌 拆分原因：解决 POST /api/v4/auth/refresh 路由冲突
+   * - token.js 的 Token 刷新 和 permissions.js 的权限缓存失效 都注册了 /refresh
+   * - Express 路由匹配规则：先注册先匹配，导致权限缓存失效接口不可达
+   * 📌 新路径：POST /api/v4/permissions/cache/invalidate
+   * 📌 详见文档：docs/路由冲突修复方案-POST-auth-refresh-2026-01-08.md
+   */
+  app.use('/api/v4/permissions', require('./routes/v4/auth/permissions'))
+  appLogger.info('✅ permissions域加载成功', { route: '/api/v4/permissions' })
+
+  /*
+   * ========================================
    * 2. /console - 后台控制台域（从 admin 迁移）
    * ========================================
    */
@@ -685,18 +698,24 @@ app.use('*', (req, res) => {
         'GET /health',
         'GET /api/v4',
         'GET /api/v4/docs',
+        // 认证域
         'POST /api/v4/auth/login',
-        'POST /api/v4/auth/register',
+        'POST /api/v4/auth/quick-login',
         'POST /api/v4/auth/logout',
         'GET /api/v4/auth/verify',
+        'POST /api/v4/auth/refresh', // Token刷新
+        // 权限域（2026-01-08 从 auth 域拆分）
+        'GET /api/v4/permissions/me', // 获取当前用户权限
+        'POST /api/v4/permissions/check', // 检查权限
+        'POST /api/v4/permissions/cache/invalidate', // 权限缓存失效（✅ 新路径）
+        'GET /api/v4/permissions/admins', // 管理员列表
+        'GET /api/v4/permissions/statistics', // 权限统计
+        'POST /api/v4/permissions/batch-check', // 批量权限检查
+        // 抽奖域
         'POST /api/v4/lottery/draw',
         'GET /api/v4/lottery/strategies',
-        'GET /api/v4/console/system/dashboard',
-        'GET /api/v4/permissions/user/:userId',
-        'POST /api/v4/permissions/check',
-        'POST /api/v4/permissions/promote',
-        'POST /api/v4/permissions/create-admin',
-        'GET /api/v4/permissions/me'
+        // 控制台域
+        'GET /api/v4/console/system/dashboard'
       ]
     },
     timestamp: BeijingTimeHelper.apiTimestamp(), // 🕐 北京时间API时间戳
@@ -811,6 +830,32 @@ async function initializeApp() {
     appLogger.error('SystemSettings 启动预检失败', { error: error.message })
     // 确保进程退出
     process.exit(1)
+  }
+
+  // 步骤3：审计操作类型 ENUM 一致性校验（审计整合方案 V4.5.0 决策）
+  try {
+    const { validateDbEnumConsistency } = require('./constants/AuditOperationTypes')
+    const { sequelize } = app.locals.models // 从已注入的 models 获取 sequelize
+    const enumResult = await validateDbEnumConsistency(sequelize)
+
+    if (!enumResult.valid) {
+      appLogger.error('❌ 审计操作类型 ENUM 一致性校验失败', {
+        missing: enumResult.missing,
+        extra: enumResult.extra,
+        solution: '请执行数据库迁移: npx sequelize-cli db:migrate'
+      })
+      // ENUM 不一致会导致审计日志写入失败，强制退出
+      process.exit(1)
+    }
+
+    if (enumResult.skipped) {
+      appLogger.warn('⚠️ 审计操作类型 ENUM 校验跳过（表或列不存在）')
+    } else {
+      appLogger.info('✅ 审计操作类型 ENUM 一致性校验通过')
+    }
+  } catch (error) {
+    appLogger.warn('审计 ENUM 校验出错（非致命）', { error: error.message })
+    // 校验函数内部已记录详细错误，不阻断启动
   }
 }
 

@@ -151,25 +151,52 @@ router.put('/users/:user_id/role', async (req, res) => {
 /**
  * 🛡️ 更新用户状态
  * PUT /api/v4/console/user_management/users/:user_id/status
+ *
+ * 安全检查：
+ * - 禁止管理员修改自己的状态（自我保护机制）
+ * - 使用 TransactionManager 统一管理事务边界
  */
 router.put('/users/:user_id/status', async (req, res) => {
   try {
     const { user_id } = req.params
     const { status, reason = '' } = req.body
+    const operatorId = req.user.user_id
 
     if (!status || !['active', 'inactive', 'banned'].includes(status)) {
       return res.apiError('无效的用户状态', 'INVALID_STATUS', null, 400)
     }
 
+    /*
+     * 🛡️ 自我保护检查（在事务之前检查，确保错误消息正确）
+     * - 管理员不能修改自己的账号状态
+     * - 防止误操作导致自己被锁定
+     */
+    if (parseInt(user_id) === operatorId) {
+      return res.apiError(
+        `禁止修改自己的账号状态（用户ID: ${user_id}, 操作者ID: ${operatorId}）`,
+        'CANNOT_MODIFY_SELF',
+        { user_id: parseInt(user_id), operator_id: operatorId },
+        403
+      )
+    }
+
     // 通过 ServiceManager 获取 UserRoleService
     const UserRoleService = req.app.locals.services.getService('userRole')
 
-    // 调用 Service 层方法（Service 层负责权限验证、缓存清除）
-    const result = await UserRoleService.updateUserStatus(user_id, status, req.user.user_id, {
-      reason
-    })
+    // 使用 TransactionManager 统一管理事务（2026-01-08 事务边界治理）
+    const result = await TransactionManager.execute(
+      async transaction => {
+        return await UserRoleService.updateUserStatus(user_id, status, operatorId, {
+          reason,
+          ip_address: req.ip,
+          user_agent: req.headers['user-agent'],
+          transaction
+        })
+      },
+      { description: 'updateUserStatus' }
+    )
 
-    logger.info(`✅ 用户状态更新成功: ${user_id} -> ${status} (操作者: ${req.user.user_id})`)
+    logger.info(`✅ 用户状态更新成功: ${user_id} -> ${status} (操作者: ${operatorId})`)
 
     return res.apiSuccess(result, '用户状态更新成功')
   } catch (error) {

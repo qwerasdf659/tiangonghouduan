@@ -347,10 +347,10 @@ class TradeOrderService {
       { transaction }
     )
 
-    // 3.6 冻结买家资产
+    // 3.6 冻结买家资产（幂等键派生规则：${root_idempotency_key}:freeze_buyer）
     const freezeResult = await AssetService.freeze(
       {
-        idempotency_key, // 使用同一幂等键
+        idempotency_key: `${idempotency_key}:freeze_buyer`, // 派生幂等键（文档规范：统一以根幂等键派生）
         business_type: 'order_freeze_buyer', // 通过 business_type 区分冻结分录
         user_id: buyer_id,
         asset_code: listing.price_asset_code,
@@ -640,6 +640,33 @@ class TradeOrderService {
       await BusinessCacheHelper.invalidateMarketListings('listing_sold')
     } catch (cacheError) {
       logger.warn('[交易市场] 缓存失效失败（非致命）:', cacheError.message)
+    }
+
+    // 6. 发送通知给买家和卖家
+    const NotificationService = require('./NotificationService')
+    try {
+      // 通知卖家：挂牌已售出
+      await NotificationService.notifyListingSold(order.seller_user_id, {
+        listing_id: order.listing_id,
+        offer_asset_code: listing.offer_asset_code || listing.offer_item_instance_id?.toString(),
+        offer_amount: Number(listing.offer_amount) || 1,
+        price_amount: Number(order.gross_amount),
+        net_amount: Number(order.net_amount)
+      })
+    } catch (notifyError) {
+      logger.warn('[TradeOrderService] 发送卖家售出通知失败（非致命）:', notifyError.message)
+    }
+
+    try {
+      // 通知买家：购买成功
+      await NotificationService.notifyPurchaseCompleted(order.buyer_user_id, {
+        order_id: order.order_id,
+        offer_asset_code: listing.offer_asset_code || listing.offer_item_instance_id?.toString(),
+        offer_amount: Number(listing.offer_amount) || 1,
+        price_amount: Number(order.gross_amount)
+      })
+    } catch (notifyError) {
+      logger.warn('[TradeOrderService] 发送买家购买成功通知失败（非致命）:', notifyError.message)
     }
 
     logger.info(`[TradeOrderService] 订单完成: ${order_id}`, {

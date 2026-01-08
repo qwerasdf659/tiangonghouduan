@@ -29,7 +29,8 @@ module.exports = sequelize => {
       image: {
         type: DataTypes.STRING(500),
         allowNull: true,
-        comment: '商品图片URL'
+        comment:
+          '【已废弃】旧商品图片URL字段（2026-01-08图片存储架构已迁移到primary_image_id关联image_resources表）'
       },
       primary_image_id: {
         type: DataTypes.INTEGER,
@@ -181,7 +182,8 @@ module.exports = sequelize => {
         type: DataTypes.STRING(500),
         allowNull: true,
         defaultValue: null,
-        comment: '臻选空间专属图片URL（NULL表示使用image，用于实现不同包装展示）'
+        comment:
+          '【已废弃】臻选空间专属图片URL（2026-01-08图片存储架构已迁移，新业务请使用primary_image_id关联image_resources表）'
       }
     },
     {

@@ -45,14 +45,15 @@ describe('GET /api/v4/console/ - 管理员模块信息API', () => {
 
   /**
    * 测试3：模块数量验证
-   * 验证返回的模块数量（当前应为16个实际挂载的模块）
+   * 验证返回的模块数量（当前应为18个实际挂载的模块）
+   * 2026-01-08：新增 assets 和 images 模块
    */
-  test('应该返回16个已实现的模块', async () => {
+  test('应该返回18个已实现的模块', async () => {
     const response = await request(app).get('/api/v4/console/')
     const { modules } = response.body.data
 
     const moduleCount = Object.keys(modules).length
-    expect(moduleCount).toBe(16) // 实际挂载的路由数量
+    expect(moduleCount).toBe(18) // 实际挂载的路由数量（含2026-01-08新增的assets和images）
 
     // 验证必需的模块是否存在（原有8个）
     expect(modules).toHaveProperty('auth')
@@ -71,6 +72,10 @@ describe('GET /api/v4/console/ - 管理员模块信息API', () => {
     expect(modules).toHaveProperty('diamond')
     expect(modules).toHaveProperty('popup_banners')
     expect(modules).toHaveProperty('lottery_quota')
+
+    // 验证新增的模块（2026-01-08）
+    expect(modules).toHaveProperty('assets')
+    expect(modules).toHaveProperty('images')
   })
 
   /**

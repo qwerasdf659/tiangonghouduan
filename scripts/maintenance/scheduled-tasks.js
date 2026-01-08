@@ -16,9 +16,12 @@
  * 10. 商家审核超时告警（每小时）- 2025-12-29新增（资产域标准架构）
  * 11. 交易市场超时解锁（每小时）- 2025-12-29新增（资产域标准架构）
  * 12. 业务记录关联对账（每小时第5分钟）- 2026-01-05新增（事务边界治理）
+ * 13. 未绑定图片清理（每小时第30分钟）- 2026-01-08新增（图片存储架构）
+ * 14. 可叠加资产挂牌过期（每小时第15分钟）- 2026-01-08新增（C2C材料交易）
+ * 15. 市场挂牌异常监控（每小时第45分钟）- 2026-01-08新增（C2C材料交易 Phase 2）
  *
  * 创建时间：2025-10-10
- * 更新时间：2026-01-05（新增事务边界治理对账任务）
+ * 更新时间：2026-01-08（新增C2C材料交易市场挂牌监控任务）
  */
 
 const cron = require('node-cron')
@@ -43,6 +46,12 @@ const DailyAssetReconciliation = require('../../jobs/daily-asset-reconciliation'
 
 // 2025-12-29新增：资产域标准架构定时任务
 const HourlyUnlockTimeoutTradeOrders = require('../../jobs/hourly-unlock-timeout-trade-orders')
+// 2026-01-08新增：图片存储架构 - 未绑定图片清理
+const HourlyCleanupUnboundImages = require('../../jobs/hourly-cleanup-unbound-images')
+// 2026-01-08新增：C2C材料交易 - 可叠加资产挂牌自动过期
+const HourlyExpireFungibleAssetListings = require('../../jobs/hourly-expire-fungible-asset-listings')
+// 2026-01-08新增：C2C材料交易 - 市场挂牌异常监控
+const HourlyMarketListingMonitor = require('../../jobs/hourly-market-listing-monitor')
 
 /**
  * 定时任务管理类
@@ -99,6 +108,15 @@ class ScheduledTasks {
 
     // 任务15: 每小时执行业务记录关联对账（2026-01-05新增 - 事务边界治理）
     this.scheduleHourlyBusinessRecordReconciliation()
+
+    // 任务16: 每小时清理未绑定图片（2026-01-08新增 - 图片存储架构）
+    this.scheduleHourlyCleanupUnboundImages()
+
+    // 任务17: 每小时过期超时的可叠加资产挂牌（2026-01-08新增 - C2C材料交易）
+    this.scheduleHourlyExpireFungibleAssetListings()
+
+    // 任务18: 每小时市场挂牌异常监控（2026-01-08新增 - C2C材料交易 Phase 2）
+    this.scheduleHourlyMarketListingMonitor()
 
     logger.info('所有定时任务已初始化完成')
   }
@@ -1214,6 +1232,305 @@ class ScheduledTasks {
       return report
     } catch (error) {
       logger.error('[手动触发] 业务记录关联对账失败', { error: error.message })
+      throw error
+    }
+  }
+
+  /**
+   * 定时任务16: 每小时清理未绑定图片（context_id=0 超过24小时）
+   * Cron表达式: 30 * * * * (每小时第30分钟)
+   *
+   * 业务场景（图片存储架构 2026-01-08）：
+   * - context_id=0 表示图片已上传但未绑定到任何业务实体（如奖品、商品）
+   * - 超过 24 小时未绑定视为孤立资源（上传后未使用或用户放弃操作）
+   * - 自动清理孤立图片，释放 Sealos 对象存储空间和数据库记录
+   *
+   * 清理策略：
+   * - 物理删除 Sealos 对象存储中的原图和所有缩略图
+   * - 物理删除 image_resources 数据库记录
+   * - 记录清理详情供审计追踪
+   *
+   * @returns {void}
+   */
+  static scheduleHourlyCleanupUnboundImages() {
+    cron.schedule('30 * * * *', async () => {
+      const lockKey = 'lock:cleanup_unbound_images'
+      const lockValue = `${process.pid}_${Date.now()}`
+      let redisClient = null
+
+      try {
+        // 获取 Redis 客户端
+        const { getRawClient } = require('../../utils/UnifiedRedisClient')
+        redisClient = getRawClient()
+
+        // 尝试获取分布式锁（10分钟过期）
+        const acquired = await redisClient.set(lockKey, lockValue, 'EX', 600, 'NX')
+
+        if (!acquired) {
+          logger.info('[定时任务] 其他实例正在执行未绑定图片清理，跳过')
+          return
+        }
+
+        logger.info('[定时任务] 获取分布式锁成功，开始执行未绑定图片清理...', {
+          lock_key: lockKey,
+          lock_value: lockValue
+        })
+
+        // 调用 Job 类执行清理
+        const report = await HourlyCleanupUnboundImages.execute(24)
+
+        if (report.cleaned_count > 0) {
+          logger.warn(`[定时任务] 未绑定图片清理完成：清理 ${report.cleaned_count} 个图片`)
+        } else {
+          logger.info('[定时任务] 未绑定图片清理完成：无需清理')
+        }
+
+        // 释放锁
+        await redisClient.del(lockKey)
+        logger.info('[定时任务] 分布式锁已释放', { lock_key: lockKey })
+      } catch (error) {
+        logger.error('[定时任务] 未绑定图片清理失败', { error: error.message })
+
+        // 确保释放锁
+        if (redisClient) {
+          try {
+            await redisClient.del(lockKey)
+          } catch (unlockError) {
+            logger.error('[定时任务] 释放分布式锁失败', { error: unlockError.message })
+          }
+        }
+      }
+    })
+
+    logger.info('✅ 定时任务已设置: 未绑定图片清理（每小时第30分钟执行，支持分布式锁）')
+  }
+
+  /**
+   * 手动触发未绑定图片清理（用于测试）
+   *
+   * 业务场景：手动执行未绑定图片清理，用于开发调试和即时清理
+   *
+   * @param {number} [hours=24] - 未绑定超过多少小时才清理
+   * @returns {Promise<Object>} 清理报告对象
+   *
+   * @example
+   * const ScheduledTasks = require('./scripts/maintenance/scheduled-tasks')
+   * const report = await ScheduledTasks.manualCleanupUnboundImages(24)
+   * console.log('清理数量:', report.cleaned_count)
+   */
+  static async manualCleanupUnboundImages(hours = 24) {
+    try {
+      logger.info('[手动触发] 开始执行未绑定图片清理...', { hours_threshold: hours })
+      const report = await HourlyCleanupUnboundImages.execute(hours)
+
+      logger.info('[手动触发] 未绑定图片清理完成', {
+        cleaned_count: report.cleaned_count,
+        failed_count: report.failed_count,
+        duration_ms: report.duration_ms
+      })
+
+      return report
+    } catch (error) {
+      logger.error('[手动触发] 未绑定图片清理失败', { error: error.message })
+      throw error
+    }
+  }
+
+  /**
+   * 定时任务17: 每小时过期超时的可叠加资产挂牌
+   * Cron表达式: 15 * * * * (每小时第15分钟)
+   *
+   * 业务场景（C2C材料交易 2026-01-08）：
+   * - status='on_sale' 且 created_at > 3天的可叠加资产挂牌
+   * - 自动撤回挂牌并解冻卖家资产
+   * - 发送过期通知给卖家
+   *
+   * @returns {void}
+   */
+  static scheduleHourlyExpireFungibleAssetListings() {
+    cron.schedule('15 * * * *', async () => {
+      const lockKey = 'lock:expire_fungible_asset_listings'
+      const lockValue = `${process.pid}_${Date.now()}`
+      let redisClient = null
+
+      try {
+        // 获取 Redis 客户端
+        const { getRawClient } = require('../../utils/UnifiedRedisClient')
+        redisClient = getRawClient()
+
+        // 尝试获取分布式锁（10分钟过期）
+        const acquired = await redisClient.set(lockKey, lockValue, 'EX', 600, 'NX')
+
+        if (!acquired) {
+          logger.info('[定时任务] 其他实例正在执行可叠加资产挂牌过期，跳过')
+          return
+        }
+
+        logger.info('[定时任务] 获取分布式锁成功，开始执行可叠加资产挂牌过期...', {
+          lock_key: lockKey,
+          lock_value: lockValue
+        })
+
+        // 调用 Job 类执行过期处理
+        const report = await HourlyExpireFungibleAssetListings.execute()
+
+        if (report.expired_count > 0) {
+          logger.warn(`[定时任务] 可叠加资产挂牌过期完成：过期 ${report.expired_count} 个挂牌`)
+        } else {
+          logger.info('[定时任务] 可叠加资产挂牌过期完成：无需过期')
+        }
+
+        // 释放锁
+        await redisClient.del(lockKey)
+        logger.info('[定时任务] 分布式锁已释放', { lock_key: lockKey })
+      } catch (error) {
+        logger.error('[定时任务] 可叠加资产挂牌过期失败', { error: error.message })
+
+        // 确保释放锁
+        if (redisClient) {
+          try {
+            await redisClient.del(lockKey)
+          } catch (unlockError) {
+            logger.error('[定时任务] 释放分布式锁失败', { error: unlockError.message })
+          }
+        }
+      }
+    })
+
+    logger.info('✅ 定时任务已设置: 可叠加资产挂牌过期（每小时第15分钟执行，支持分布式锁）')
+  }
+
+  /**
+   * 手动触发可叠加资产挂牌过期（用于测试）
+   *
+   * 业务场景：手动执行挂牌过期处理，用于开发调试和即时清理
+   *
+   * @returns {Promise<Object>} 过期报告对象
+   *
+   * @example
+   * const ScheduledTasks = require('./scripts/maintenance/scheduled-tasks')
+   * const report = await ScheduledTasks.manualExpireFungibleAssetListings()
+   * console.log('过期数量:', report.expired_count)
+   */
+  static async manualExpireFungibleAssetListings() {
+    try {
+      logger.info('[手动触发] 开始执行可叠加资产挂牌过期...')
+      const report = await HourlyExpireFungibleAssetListings.execute()
+
+      logger.info('[手动触发] 可叠加资产挂牌过期完成', {
+        expired_count: report.expired_count,
+        failed_count: report.failed_count,
+        total_unfrozen_amount: report.total_unfrozen_amount,
+        duration_ms: report.duration_ms
+      })
+
+      return report
+    } catch (error) {
+      logger.error('[手动触发] 可叠加资产挂牌过期失败', { error: error.message })
+      throw error
+    }
+  }
+
+  /**
+   * 定时任务18: 每小时市场挂牌异常监控
+   * Cron表达式: 45 * * * * (每小时第45分钟)
+   *
+   * 业务场景（C2C材料交易 Phase 2 2026-01-08）：
+   * - 监控价格异常挂牌（单价过高或过低）
+   * - 监控超长时间挂牌（超过7天仍未成交）
+   * - 监控冻结余额异常（冻结总额与挂牌不匹配）
+   * - 发送监控告警给管理员
+   *
+   * @returns {void}
+   */
+  static scheduleHourlyMarketListingMonitor() {
+    cron.schedule('45 * * * *', async () => {
+      const lockKey = 'lock:market_listing_monitor'
+      const lockValue = `${process.pid}_${Date.now()}`
+      let redisClient = null
+
+      try {
+        // 获取 Redis 客户端
+        const { getRawClient } = require('../../utils/UnifiedRedisClient')
+        redisClient = getRawClient()
+
+        // 尝试获取分布式锁（10分钟过期）
+        const acquired = await redisClient.set(lockKey, lockValue, 'EX', 600, 'NX')
+
+        if (!acquired) {
+          logger.info('[定时任务] 其他实例正在执行市场挂牌监控，跳过')
+          return
+        }
+
+        logger.info('[定时任务] 获取分布式锁成功，开始执行市场挂牌监控...', {
+          lock_key: lockKey,
+          lock_value: lockValue
+        })
+
+        // 调用 Job 类执行监控
+        const report = await HourlyMarketListingMonitor.execute()
+
+        const totalAnomalies =
+          report.price_anomalies.length +
+          report.long_listings.length +
+          report.frozen_anomalies.length
+
+        if (totalAnomalies > 0) {
+          logger.warn(`[定时任务] 市场挂牌监控完成：发现 ${totalAnomalies} 条异常`, {
+            price_anomalies: report.price_anomalies.length,
+            long_listings: report.long_listings.length,
+            frozen_anomalies: report.frozen_anomalies.length
+          })
+        } else {
+          logger.info('[定时任务] 市场挂牌监控完成：无异常')
+        }
+
+        // 释放锁
+        await redisClient.del(lockKey)
+        logger.info('[定时任务] 分布式锁已释放', { lock_key: lockKey })
+      } catch (error) {
+        logger.error('[定时任务] 市场挂牌监控失败', { error: error.message })
+
+        // 确保释放锁
+        if (redisClient) {
+          try {
+            await redisClient.del(lockKey)
+          } catch (unlockError) {
+            logger.error('[定时任务] 释放分布式锁失败', { error: unlockError.message })
+          }
+        }
+      }
+    })
+
+    logger.info('✅ 定时任务已设置: 市场挂牌异常监控（每小时第45分钟执行，支持分布式锁）')
+  }
+
+  /**
+   * 手动触发市场挂牌异常监控（用于测试）
+   *
+   * 业务场景：手动执行市场监控，用于开发调试和即时检查
+   *
+   * @returns {Promise<Object>} 监控报告对象
+   *
+   * @example
+   * const ScheduledTasks = require('./scripts/maintenance/scheduled-tasks')
+   * const report = await ScheduledTasks.manualMarketListingMonitor()
+   * console.log('价格异常数量:', report.price_anomalies.length)
+   */
+  static async manualMarketListingMonitor() {
+    try {
+      logger.info('[手动触发] 开始执行市场挂牌异常监控...')
+      const report = await HourlyMarketListingMonitor.execute()
+
+      logger.info('[手动触发] 市场挂牌监控完成', {
+        price_anomalies: report.price_anomalies.length,
+        long_listings: report.long_listings.length,
+        frozen_anomalies: report.frozen_anomalies.length
+      })
+
+      return report
+    } catch (error) {
+      logger.error('[手动触发] 市场挂牌监控失败', { error: error.message })
       throw error
     }
   }

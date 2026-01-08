@@ -345,17 +345,18 @@ describe('认证和权限系统API测试（V4架构）', () => {
 
   /**
    * V4权限管理API - 路径说明：
-   * - 权限API挂载在 /api/v4/auth/ 下（不是独立的 /api/v4/permissions/）
-   * - /api/v4/auth/check - 权限检查
-   * - /api/v4/auth/admins - 获取管理员列表
-   * - /api/v4/auth/me - 获取当前用户权限（替代 /permissions/user/:id）
-   * 更新时间：2025-12-22
+   * - 权限API独立挂载在 /api/v4/permissions/（2026-01-08 从 auth 域拆分）
+   * - /api/v4/permissions/check - 权限检查
+   * - /api/v4/permissions/admins - 获取管理员列表
+   * - /api/v4/permissions/me - 获取当前用户权限
+   * - /api/v4/permissions/cache/invalidate - 权限缓存失效
+   * 更新时间：2026-01-08
    */
   describe('V4权限管理API', () => {
-    test('检查用户权限 - POST /api/v4/auth/check', async () => {
+    test('检查用户权限 - POST /api/v4/permissions/check', async () => {
       const response = await tester.make_authenticated_request(
         'POST',
-        '/api/v4/auth/check',
+        '/api/v4/permissions/check',
         {
           resource: 'lottery',
           action: 'read'
@@ -379,16 +380,16 @@ describe('认证和权限系统API测试（V4架构）', () => {
       }
     })
 
-    test('获取当前用户权限信息 - GET /api/v4/auth/me', async () => {
+    test('获取当前用户权限信息 - GET /api/v4/permissions/me', async () => {
       /**
        * 🔒 安全说明：
        * - /api/v4/permissions/user/:user_id 已删除（违反"用户端禁止/:id参数"规范）
-       * - 改为使用 /api/v4/auth/me 查询当前用户自己的权限
+       * - 改为使用 /api/v4/permissions/me 查询当前用户自己的权限
        * - 管理员查询他人权限请使用 /api/v4/console/users/:id/permissions
        */
       const response = await tester.make_authenticated_request(
         'GET',
-        '/api/v4/auth/me',
+        '/api/v4/permissions/me',
         null,
         'regular'
       )
@@ -408,10 +409,10 @@ describe('认证和权限系统API测试（V4架构）', () => {
       }
     })
 
-    test('获取管理员列表 - GET /api/v4/auth/admins', async () => {
+    test('获取管理员列表 - GET /api/v4/permissions/admins', async () => {
       const response = await tester.make_authenticated_request(
         'GET',
-        '/api/v4/auth/admins',
+        '/api/v4/permissions/admins',
         null,
         'admin'
       )
@@ -423,6 +424,94 @@ describe('认证和权限系统API测试（V4架构）', () => {
         expect(Array.isArray(response.data.data.admins)).toBe(true)
 
         console.log('✅ 获取管理员列表成功, 总数:', response.data.data.total_count)
+      }
+    })
+
+    /**
+     * 权限缓存失效测试 - POST /api/v4/permissions/cache/invalidate
+     * 2026-01-08 新增：从 POST /api/v4/auth/refresh 迁移而来
+     *
+     * 权限边界规则：
+     * - admin 可以失效任意用户的缓存
+     * - ops/user 只能失效自己的缓存
+     */
+    test('权限缓存失效 - 管理员失效自己的缓存', async () => {
+      const response = await tester.make_authenticated_request(
+        'POST',
+        '/api/v4/permissions/cache/invalidate',
+        { user_id: TEST_DATA.users.adminUser.user_id },
+        'admin'
+      )
+
+      expect([200, 401]).toContain(response.status)
+      if (response.status === 200) {
+        expect(response.data.data).toHaveProperty('cache_cleared', true)
+        expect(response.data.data).toHaveProperty('user_id')
+        expect(response.data.data).toHaveProperty('invalidated_by')
+        expect(response.data.data).toHaveProperty('invalidated_at')
+
+        console.log('✅ 管理员权限缓存失效成功:', {
+          user_id: response.data.data.user_id,
+          invalidated_by: response.data.data.invalidated_by
+        })
+      }
+    })
+
+    test('权限缓存失效 - 普通用户失效自己的缓存', async () => {
+      const response = await tester.make_authenticated_request(
+        'POST',
+        '/api/v4/permissions/cache/invalidate',
+        { user_id: TEST_DATA.users.testUser.user_id },
+        'regular'
+      )
+
+      expect([200, 401]).toContain(response.status)
+      if (response.status === 200) {
+        expect(response.data.data).toHaveProperty('cache_cleared', true)
+
+        console.log('✅ 普通用户权限缓存失效成功（自己的缓存）')
+      }
+    })
+
+    test('权限缓存失效 - 普通用户失效他人缓存应被拒绝', async () => {
+      /**
+       * 注意：由于测试账号 13612227930 既是用户也是管理员（user_id=31）
+       * 这里测试普通用户尝试失效一个不存在的用户ID
+       * 如果要测试真正的403场景，需要创建两个不同的测试用户
+       */
+      const response = await tester.make_authenticated_request(
+        'POST',
+        '/api/v4/permissions/cache/invalidate',
+        { user_id: 99999 }, // 尝试失效其他用户（不存在的ID会返回404或403）
+        'regular'
+      )
+
+      // 期望返回 401（未认证）、403（禁止）或 404（用户不存在）
+      expect([401, 403, 404]).toContain(response.status)
+      if (response.status === 403) {
+        expect(response.data).toHaveProperty('success', false)
+        expect(response.data).toHaveProperty('code', 'FORBIDDEN')
+        console.log('✅ 普通用户失效他人缓存被正确拒绝（403 Forbidden）')
+      } else if (response.status === 404) {
+        expect(response.data).toHaveProperty('success', false)
+        console.log('✅ 尝试失效不存在用户缓存被正确拒绝（404 Not Found）')
+      }
+    })
+
+    test('权限缓存失效 - 缺少 user_id 参数', async () => {
+      const response = await tester.make_authenticated_request(
+        'POST',
+        '/api/v4/permissions/cache/invalidate',
+        {},
+        'admin'
+      )
+
+      expect([400, 401]).toContain(response.status)
+      if (response.status === 400) {
+        expect(response.data).toHaveProperty('success', false)
+        expect(response.data).toHaveProperty('code', 'INVALID_PARAMETER')
+
+        console.log('✅ 缺少 user_id 参数被正确拒绝（400 Bad Request）')
       }
     })
   })

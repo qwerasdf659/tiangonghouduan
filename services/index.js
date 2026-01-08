@@ -11,7 +11,7 @@ const logger = require('../utils/logger').logger
 
 // V4 核心服务
 const { UnifiedLotteryEngine } = require('./UnifiedLotteryEngine/UnifiedLotteryEngine')
-const { ThumbnailService } = require('./ThumbnailService') // 🎯 导入类
+// 🔴 ThumbnailService 已废弃（2026-01-08）：改用预生成缩略图 + SealosStorageService.uploadImageWithThumbnails()
 
 /*
  * V4 领域服务
@@ -38,6 +38,7 @@ const AdminLotteryService = require('./AdminLotteryService') // 管理后台抽�
 const AdminCustomerServiceService = require('./AdminCustomerServiceService') // 管理后台客服管理服务
 const MaterialManagementService = require('./MaterialManagementService') // 材料系统运营管理服务（V4.5.0）
 const PopupBannerService = require('./PopupBannerService') // 弹窗Banner管理服务（2025-12-22）
+const ImageService = require('./ImageService') // 通用图片上传服务（2026-01-08 图片存储架构）
 
 // V4 架构重构新增服务（2025-12-10）
 const LotteryPresetService = require('./LotteryPresetService') // 抽奖预设管理服务
@@ -193,8 +194,11 @@ class ServiceManager {
       // ✅ 注册V4统一抽奖引擎（移除旧版LotteryDrawService）
       this._services.set('unifiedLotteryEngine', new UnifiedLotteryEngine(this.models))
 
-      // ✅ 注册缩略图服务
-      this._services.set('thumbnail', new ThumbnailService(this.models))
+      /*
+       * 🔴 ThumbnailService 已废弃（2026-01-08）：
+       * 改用预生成缩略图 + SealosStorageService.uploadImageWithThumbnails()
+       * 不再注册 thumbnail 服务，避免运行时触碰本地 uploads/ 目录
+       */
 
       /*
        * 注册领域服务（Domain Services）
@@ -222,6 +226,7 @@ class ServiceManager {
       this._services.set('adminCustomerService', AdminCustomerServiceService) // 管理后台客服管理服务
       this._services.set('materialManagement', MaterialManagementService) // 材料系统运营管理服务（管理员）
       this._services.set('popupBanner', PopupBannerService) // 弹窗Banner管理服务（2025-12-22）
+      this._services.set('image', ImageService) // 通用图片上传服务（2026-01-08 图片存储架构）
 
       // ✅ 注册架构重构新增服务（P0优先级 - 2025-12-10）
       this._services.set('lotteryPreset', LotteryPresetService) // 抽奖预设管理服务

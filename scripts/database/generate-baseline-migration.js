@@ -47,7 +47,7 @@ const _tableNameMap = {
   'LotteryDraw.js': 'lottery_draws',
   'LotteryPreset.js': 'lottery_presets',
   'Product.js': 'products',
-  'TradeRecord.js': 'trade_records',
+  // ❌ TradeRecord.js 已删除（2026-01-08 交易流水收敛决策）- trade_records 表已废弃
   // 🗑️ UserInventory.js 已删除 - 迁移至 ItemInstance - 2025年12月21日
   'ItemInstance.js': 'item_instances', // 替代 UserInventory
   'CustomerServiceSession.js': 'customer_service_sessions',

@@ -46,7 +46,7 @@ class AssetTransaction extends Model {
    * @param {Object} models - Sequelize所有模型的集合对象
    * @returns {void} 无返回值，仅定义关联关系
    */
-  static associate (models) {
+  static associate(models) {
     // 多对一：流水归属于账户（Account 体系）
     AssetTransaction.belongsTo(models.Account, {
       foreignKey: 'account_id',
@@ -65,7 +65,7 @@ class AssetTransaction extends Model {
    * @param {number} data.balance_after - 变动后余额
    * @returns {Object} 验证结果对象 {is_valid: boolean, errors: Array<string>}
    */
-  static validateTransaction (data) {
+  static validateTransaction(data) {
     const errors = []
 
     /**
@@ -91,6 +91,9 @@ class AssetTransaction extends Model {
    * 用于标准化业务场景分类
    */
   static BUSINESS_TYPES = {
+    // 开账相关（Opening Balance - 历史余额补录）
+    OPENING_BALANCE: 'opening_balance', // 开账流水（历史余额补录）
+
     // 抽奖相关（Lottery - 抽奖业务）
     LOTTERY_CONSUME: 'lottery_consume', // 抽奖消耗积分
     LOTTERY_REWARD: 'lottery_reward', // 抽奖奖励发放
@@ -100,6 +103,18 @@ class AssetTransaction extends Model {
     MARKET_PURCHASE_BUYER_DEBIT: 'market_purchase_buyer_debit', // 市场购买买家扣减
     MARKET_PURCHASE_SELLER_CREDIT: 'market_purchase_seller_credit', // 市场购买卖家入账
     MARKET_PURCHASE_PLATFORM_FEE_CREDIT: 'market_purchase_platform_fee_credit', // 市场购买平台手续费
+
+    // 冻结相关（Freeze/Unfreeze/Settle - 资产冻结管理）
+    ORDER_FREEZE_BUYER: 'order_freeze_buyer', // 订单冻结（买家DIAMOND）
+    ORDER_UNFREEZE_BUYER: 'order_unfreeze_buyer', // 订单取消解冻（买家DIAMOND）
+    ORDER_TIMEOUT_UNFREEZE: 'order_timeout_unfreeze', // 订单超时自动解冻（买家DIAMOND）
+    ORDER_SETTLE_BUYER_DEBIT: 'order_settle_buyer_debit', // 订单结算买家扣减（从冻结扣减）
+    ORDER_SETTLE_SELLER_CREDIT: 'order_settle_seller_credit', // 订单结算卖家入账
+    ORDER_SETTLE_PLATFORM_FEE_CREDIT: 'order_settle_platform_fee_credit', // 订单结算平台手续费入账
+    LISTING_FREEZE_SELLER: 'listing_freeze_seller', // 挂牌冻结（卖家标的资产）
+    LISTING_UNFREEZE_SELLER: 'listing_unfreeze_seller', // 挂牌解冻（卖家标的资产）
+    LISTING_SETTLE_SELLER_OFFER_DEBIT: 'listing_settle_seller_offer_debit', // 挂牌成交卖家标的扣减
+    LISTING_TRANSFER_BUYER_OFFER_CREDIT: 'listing_transfer_buyer_offer_credit', // 挂牌成交买家收到标的
 
     // 兑换市场相关（Exchange Market - 材料资产扣减）
     EXCHANGE_DEBIT: 'exchange_debit', // 兑换扣减
@@ -194,6 +209,15 @@ module.exports = sequelize => {
           '幂等键（每条流水唯一）：抽奖格式 {request_key}:consume/{request_key}:reward，其他格式 {type}_{account}_{ts}_{random}'
       },
 
+      // 冻结余额变动（Frozen Amount Change - 冻结/解冻/结算操作记录）
+      frozen_amount_change: {
+        type: DataTypes.BIGINT,
+        allowNull: false,
+        defaultValue: 0,
+        comment:
+          '冻结余额变动（正数=增加冻结，负数=减少冻结，0=仅影响可用余额）：freeze正数, unfreeze负数, settleFromFrozen负数'
+      },
+
       // 扩展信息（Meta - JSON格式存储业务扩展信息）
       meta: {
         type: DataTypes.JSON,
@@ -239,6 +263,12 @@ module.exports = sequelize => {
           fields: ['asset_code', 'created_at'],
           name: 'idx_asset_code_time',
           comment: '索引：资产代码 + 创建时间（用于按资产类型统计分析）'
+        },
+        // 冻结变动索引（用于冻结余额对账查询）
+        {
+          fields: ['account_id', 'asset_code', 'frozen_amount_change'],
+          name: 'idx_frozen_change',
+          comment: '索引：账户ID + 资产代码 + 冻结变动（用于冻结余额对账查询）'
         }
       ]
     }

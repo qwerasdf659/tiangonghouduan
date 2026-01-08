@@ -121,6 +121,63 @@ class SealosStorageService {
   }
 
   /**
+   * 🎯 P1-2：内部上传方法，支持内网失败自动回退公网重试
+   *
+   * @param {Object} uploadParams - S3 上传参数
+   * @param {string} context - 日志上下文（如 'original' / 'thumbnail_small'）
+   * @returns {Promise<void>} 上传成功或抛出异常
+   * @private
+   */
+  async _uploadWithFallback(uploadParams, context = 'file') {
+    const isUsingInternalEndpoint =
+      process.env.SEALOS_INTERNAL_ENDPOINT &&
+      this.config.uploadEndpoint === process.env.SEALOS_INTERNAL_ENDPOINT
+
+    try {
+      // 优先使用当前 S3 客户端（内网优先）
+      await this.s3.upload(uploadParams).promise()
+    } catch (primaryError) {
+      // 内网上传失败，自动回退公网重试
+      if (isUsingInternalEndpoint && this.config.publicEndpoint) {
+        logger.warn(`⚠️ ${context} 内网上传失败，自动回退公网重试`, {
+          objectKey: uploadParams.Key,
+          primaryError: primaryError.message
+        })
+
+        try {
+          // 创建公网端点的 S3 客户端
+          const publicS3 = new AWS.S3({
+            endpoint: this.config.publicEndpoint,
+            accessKeyId: this.config.accessKeyId,
+            secretAccessKey: this.config.secretAccessKey,
+            region: this.config.region,
+            s3ForcePathStyle: true,
+            signatureVersion: 'v4'
+          })
+
+          // 使用公网端点重试上传
+          await publicS3.upload(uploadParams).promise()
+
+          logger.info(`✅ ${context} 公网回退上传成功`, {
+            objectKey: uploadParams.Key,
+            usedEndpoint: 'public_fallback'
+          })
+          return // 成功返回
+        } catch (fallbackError) {
+          logger.error(`❌ ${context} 公网回退上传也失败`, {
+            objectKey: uploadParams.Key,
+            fallbackError: fallbackError.message
+          })
+          throw new Error(`上传失败（内网+公网均失败）: ${fallbackError.message}`)
+        }
+      }
+
+      // 非内网场景或没有配置公网端点，直接抛出错误
+      throw primaryError
+    }
+  }
+
+  /**
    * 🔴 上传图片文件（返回对象 key，非完整 URL）
    *
    * 🎯 架构决策（2026-01-08 拍板）：
@@ -128,40 +185,50 @@ class SealosStorageService {
    * - 非完整 URL（不存 https://...）
    * - 支持 CDN 域名切换、公有/私有策略演进
    *
+   * 🎯 P1-2 架构优化（2026-01-09）：
+   * - 内网优先上传，失败自动回退公网重试
+   * - 避免 Sealos 集群内网不可达时服务中断
+   *
    * @param {Buffer} fileBuffer - 文件缓冲区
    * @param {string} originalName - 原始文件名
    * @param {string} folder - 存储文件夹 (默认: photos)
    * @returns {Promise<string>} 对象 key（如 prizes/20260108_abc123.jpg）
    */
   async uploadImage(fileBuffer, originalName, folder = 'photos') {
+    // 生成唯一文件名（对象 key）
+    const timestamp = BeijingTimeHelper.timestamp()
+    const hash = crypto.randomBytes(8).toString('hex')
+    const ext = path.extname(originalName) || '.jpg'
+    const objectKey = `${folder}/${timestamp}_${hash}${ext}`
+
+    // 检测文件类型
+    const contentType = this.getContentType(ext)
+
+    // 上传参数
+    const uploadParams = {
+      Bucket: this.config.bucket,
+      Key: objectKey,
+      Body: fileBuffer,
+      ContentType: contentType,
+      ACL: 'public-read', // 设置为公共可读（全部展示型素材）
+      CacheControl: 'max-age=31536000' // 缓存1年
+    }
+
+    // 🎯 P1-2：内网优先上传，失败自动回退公网重试
+    const isUsingInternalEndpoint =
+      process.env.SEALOS_INTERNAL_ENDPOINT &&
+      this.config.uploadEndpoint === process.env.SEALOS_INTERNAL_ENDPOINT
+
     try {
-      // 生成唯一文件名（对象 key）
-      const timestamp = BeijingTimeHelper.timestamp()
-      const hash = crypto.randomBytes(8).toString('hex')
-      const ext = path.extname(originalName) || '.jpg'
-      const objectKey = `${folder}/${timestamp}_${hash}${ext}`
-
-      // 检测文件类型
-      const contentType = this.getContentType(ext)
-
-      // 上传参数
-      const uploadParams = {
-        Bucket: this.config.bucket,
-        Key: objectKey,
-        Body: fileBuffer,
-        ContentType: contentType,
-        ACL: 'public-read', // 设置为公共可读（全部展示型素材）
-        CacheControl: 'max-age=31536000' // 缓存1年
-      }
-
       logger.info(`📤 开始上传文件: ${objectKey}`, {
         folder,
         contentType,
         size: fileBuffer.length,
-        endpoint: this.config.uploadEndpoint
+        endpoint: this.config.uploadEndpoint,
+        isInternalEndpoint: isUsingInternalEndpoint
       })
 
-      // 执行上传
+      // 执行上传（使用当前 S3 客户端，优先内网）
       await this.s3.upload(uploadParams).promise()
 
       // 生成公网访问 URL（仅用于日志和调试）
@@ -169,14 +236,58 @@ class SealosStorageService {
 
       logger.info('✅ 文件上传成功', {
         objectKey,
-        publicUrl
+        publicUrl,
+        usedEndpoint: 'internal'
       })
 
       // 🔴 返回对象 key（非完整 URL）- 已拍板确认
       return objectKey
-    } catch (error) {
-      logger.error('❌ Sealos文件上传失败:', error)
-      throw new Error(`文件上传失败: ${error.message}`)
+    } catch (primaryError) {
+      // 🎯 P1-2：内网上传失败，自动回退公网重试
+      if (isUsingInternalEndpoint && this.config.publicEndpoint) {
+        logger.warn('⚠️ 内网上传失败，自动回退公网重试', {
+          objectKey,
+          internalEndpoint: this.config.uploadEndpoint,
+          publicEndpoint: this.config.publicEndpoint,
+          primaryError: primaryError.message
+        })
+
+        try {
+          // 创建公网端点的 S3 客户端
+          const publicS3 = new AWS.S3({
+            endpoint: this.config.publicEndpoint,
+            accessKeyId: this.config.accessKeyId,
+            secretAccessKey: this.config.secretAccessKey,
+            region: this.config.region,
+            s3ForcePathStyle: true,
+            signatureVersion: 'v4'
+          })
+
+          // 使用公网端点重试上传
+          await publicS3.upload(uploadParams).promise()
+
+          const publicUrl = this.getPublicUrl(objectKey)
+
+          logger.info('✅ 公网回退上传成功', {
+            objectKey,
+            publicUrl,
+            usedEndpoint: 'public_fallback'
+          })
+
+          return objectKey
+        } catch (fallbackError) {
+          logger.error('❌ 公网回退上传也失败:', {
+            objectKey,
+            primaryError: primaryError.message,
+            fallbackError: fallbackError.message
+          })
+          throw new Error(`文件上传失败（内网+公网均失败）: ${fallbackError.message}`)
+        }
+      }
+
+      // 非内网场景或没有配置公网端点，直接抛出错误
+      logger.error('❌ Sealos文件上传失败:', primaryError)
+      throw new Error(`文件上传失败: ${primaryError.message}`)
     }
   }
 
@@ -278,6 +389,47 @@ class SealosStorageService {
   }
 
   /**
+   * 🔴 删除对象（别名，用于与文档保持一致）
+   * @param {string} objectKey - 对象 key
+   * @returns {Promise<boolean>} 删除结果
+   */
+  async deleteObject(objectKey) {
+    return this.deleteFile(objectKey)
+  }
+
+  /**
+   * 🔴 删除图片及其缩略图（立即物理删除 - 2026-01-09 用户拍板）
+   *
+   * @param {string} originalKey - 原图对象 key
+   * @param {Object} thumbnailKeys - 缩略图对象 key { small, medium, large }
+   * @returns {Promise<boolean>} 删除结果
+   */
+  async deleteImageWithThumbnails(originalKey, thumbnailKeys = null) {
+    try {
+      // 1. 删除原图
+      await this.deleteObject(originalKey)
+      logger.info(`🗑️ 原图删除成功: ${originalKey}`)
+
+      // 2. 删除缩略图（如果提供）- 使用 Promise.all 并行删除
+      if (thumbnailKeys) {
+        await Promise.all(
+          Object.entries(thumbnailKeys)
+            .filter(([_sizeName, thumbnailKey]) => thumbnailKey)
+            .map(async ([sizeName, thumbnailKey]) => {
+              await this.deleteObject(thumbnailKey)
+              logger.info(`🗑️ ${sizeName} 缩略图删除成功: ${thumbnailKey}`)
+            })
+        )
+      }
+
+      return true
+    } catch (error) {
+      logger.error('❌ 图片删除失败（含缩略图）:', error)
+      return false
+    }
+  }
+
+  /**
    * 🔴 获取文件临时访问URL
    * @param {string} fileKey - 文件Key
    * @param {number} expiresIn - 过期时间（秒，默认1小时）
@@ -373,6 +525,138 @@ class SealosStorageService {
     } catch (error) {
       logger.error('❌ 列出文件失败:', error)
       throw error
+    }
+  }
+
+  /**
+   * 🔴 上传图片并预生成缩略图（方案B - 2026-01-08 拍板确认）
+   *
+   * 🎯 架构决策（2026-01-08 用户拍板）：
+   * - 预生成 3 档缩略图：small(150x150)/medium(300x300)/large(600x600)
+   * - 裁剪规则：fit=cover（保持宽高比裁剪）、position=center（居中裁剪）
+   * - 输出格式：统一 JPEG(quality=80)，透明背景图保留 PNG
+   * - 目录结构：{folder}/thumbnails/{size}/xxx.jpg
+   *
+   * @param {Buffer} fileBuffer - 文件内容
+   * @param {string} originalName - 原始文件名
+   * @param {string} folder - 存储文件夹（默认 photos）
+   * @returns {Promise<Object>} 上传结果
+   * @returns {string} result.original_key - 原图对象 key
+   * @returns {Object} result.thumbnail_keys - 缩略图对象 key { small, medium, large }
+   */
+  async uploadImageWithThumbnails(fileBuffer, originalName, folder = 'photos') {
+    const sharp = require('sharp')
+    const path = require('path')
+
+    try {
+      // 1. 检测原始图片格式是否为透明背景（PNG/WebP with alpha）
+      const metadata = await sharp(fileBuffer).metadata()
+      const hasAlpha = metadata.hasAlpha
+      const outputFormat = hasAlpha ? 'png' : 'jpeg'
+      const ext = hasAlpha ? '.png' : '.jpg'
+
+      logger.info('📸 开始上传图片并生成缩略图', {
+        folder,
+        originalName,
+        format: outputFormat,
+        hasAlpha,
+        width: metadata.width,
+        height: metadata.height
+      })
+
+      // 2. 处理原图（统一格式优化）
+      let processedBuffer = fileBuffer
+      if (outputFormat === 'jpeg') {
+        processedBuffer = await sharp(fileBuffer).jpeg({ quality: 80 }).toBuffer()
+      } else {
+        processedBuffer = await sharp(fileBuffer).png({ compressionLevel: 8 }).toBuffer()
+      }
+
+      /**
+       * 3. 上传原图（使用带重试的上传方法）
+       * path.basename 提取文件名基础部分（不含扩展名）- 用于日志记录
+       * 🎯 P1-2：使用 _uploadWithFallback 支持内网失败自动回退公网
+       */
+      const _baseFilename = path.basename(originalName, path.extname(originalName))
+      const timestamp = BeijingTimeHelper.timestamp()
+      const hash = crypto.randomBytes(8).toString('hex')
+      const originalKey = `${folder}/${timestamp}_${hash}${ext}`
+
+      await this._uploadWithFallback(
+        {
+          Bucket: this.config.bucket,
+          Key: originalKey,
+          Body: processedBuffer,
+          ContentType: outputFormat === 'jpeg' ? 'image/jpeg' : 'image/png',
+          ACL: 'public-read',
+          CacheControl: 'max-age=31536000'
+        },
+        'original'
+      )
+
+      logger.info('✅ 原图上传成功', { originalKey })
+
+      // 4. 生成并上传 3 档缩略图（已拍板规格）
+      const sizes = {
+        small: { width: 150, height: 150 },
+        medium: { width: 300, height: 300 },
+        large: { width: 600, height: 600 }
+      }
+
+      // 🔧 使用 Promise.all 并行生成并上传缩略图（避免 await-in-loop 警告）
+      const thumbnailEntries = await Promise.all(
+        Object.entries(sizes).map(async ([sizeName, dimensions]) => {
+          // 内存生成缩略图（fit=cover + center）
+          const thumbnailSharp = sharp(fileBuffer).resize(dimensions.width, dimensions.height, {
+            fit: 'cover', // 保持宽高比裁剪
+            position: 'center' // 居中裁剪
+          })
+
+          // 根据原图格式选择输出格式
+          const thumbnailBuffer =
+            outputFormat === 'jpeg'
+              ? await thumbnailSharp.jpeg({ quality: 80 }).toBuffer()
+              : await thumbnailSharp.png({ compressionLevel: 8 }).toBuffer()
+
+          /*
+           * 上传到 Sealos（目录结构：{folder}/thumbnails/{size}/xxx.jpg）
+           * 🎯 P1-2：使用 _uploadWithFallback 支持内网失败自动回退公网
+           */
+          const thumbnailFilename = `${timestamp}_${hash}${ext}`
+          const thumbnailKey = `${folder}/thumbnails/${sizeName}/${thumbnailFilename}`
+
+          await this._uploadWithFallback(
+            {
+              Bucket: this.config.bucket,
+              Key: thumbnailKey,
+              Body: thumbnailBuffer,
+              ContentType: outputFormat === 'jpeg' ? 'image/jpeg' : 'image/png',
+              ACL: 'public-read',
+              CacheControl: 'max-age=31536000'
+            },
+            `thumbnail_${sizeName}`
+          )
+
+          logger.info(`✅ ${sizeName} 缩略图上传成功`, { thumbnailKey })
+          return [sizeName, thumbnailKey]
+        })
+      )
+
+      // 将数组转换为对象
+      const thumbnailKeys = Object.fromEntries(thumbnailEntries)
+
+      logger.info('🎉 图片及缩略图全部上传成功', {
+        originalKey,
+        thumbnailKeys
+      })
+
+      return {
+        original_key: originalKey,
+        thumbnail_keys: thumbnailKeys
+      }
+    } catch (error) {
+      logger.error('❌ 图片上传失败（含缩略图）:', error)
+      throw new Error(`图片上传失败: ${error.message}`)
     }
   }
 

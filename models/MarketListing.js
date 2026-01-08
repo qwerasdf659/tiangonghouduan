@@ -35,7 +35,8 @@
  * - locked（已锁定）→ sold（已售出）：成交完成
  * - locked（已锁定）→ on_sale（在售中）：超时解锁
  * - on_sale（在售中）→ withdrawn（已撤回）：卖家撤回
- * - sold/withdrawn 为终态，不可逆转
+ * - on_sale/locked（在售中/已锁定）→ admin_withdrawn（管理员强制撤回）：客服强制撤回
+ * - sold/withdrawn/admin_withdrawn 为终态，不可逆转
  *
  * 数据库表名：market_listings
  * 主键：listing_id（BIGINT，自增）
@@ -164,11 +165,11 @@ module.exports = sequelize => {
 
       // 状态管理
       status: {
-        type: DataTypes.ENUM('on_sale', 'locked', 'sold', 'withdrawn'),
+        type: DataTypes.ENUM('on_sale', 'locked', 'sold', 'withdrawn', 'admin_withdrawn'),
         allowNull: false,
         defaultValue: 'on_sale',
         comment:
-          '挂牌状态（Status）：on_sale-在售中（可被购买或撤回）| locked-已锁定（订单处理中，不可购买或撤回）| sold-已售出（终态，成交完成）| withdrawn-已撤回（终态，卖家主动下架）；业务规则：on_sale → locked → sold/withdrawn，locked 超时自动回滚为 on_sale'
+          '挂牌状态（Status）：on_sale-在售中 | locked-已锁定 | sold-已售出 | withdrawn-已撤回 | admin_withdrawn-管理员强制撤回；业务规则：on_sale → locked → sold/withdrawn/admin_withdrawn，locked 超时自动回滚为 on_sale'
       }
     },
     {

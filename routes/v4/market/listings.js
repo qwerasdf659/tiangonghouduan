@@ -37,7 +37,11 @@ const MarketListingService = require('../../../services/MarketListingService')
  *
  * @query {number} page - 页码（默认1）
  * @query {number} limit - 每页数量（默认20）
- * @query {string} category - 分类筛选（可选）
+ * @query {string} category - 分类筛选（可选，兼容旧参数）
+ * @query {string} listing_kind - 挂牌类型筛选（item_instance / fungible_asset，可选）
+ * @query {string} asset_code - 资产代码筛选（如 red_shard，仅对 fungible_asset 有效）
+ * @query {number} min_price - 最低价格筛选（可选）
+ * @query {number} max_price - 最高价格筛选（可选）
  * @query {string} sort - 排序方式（newest/price_asc/price_desc，默认newest）
  *
  * @returns {Object} 市场商品列表和分页信息
@@ -48,23 +52,39 @@ const MarketListingService = require('../../../services/MarketListingService')
  * - TTL: 20秒（交易市场变化频繁需快速反映）
  * - 缓存命中率目标：>80%
  *
- * 业务场景：用户浏览交易市场中其他用户上架的商品
+ * 业务场景：用户浏览交易市场中其他用户上架的商品（物品和材料）
  */
 router.get('/listings', authenticateToken, async (req, res) => {
   try {
-    const { page = 1, limit = 20, category, sort = 'newest' } = req.query
+    const {
+      page = 1,
+      limit = 20,
+      category,
+      listing_kind,
+      asset_code,
+      min_price,
+      max_price,
+      sort = 'newest'
+    } = req.query
 
     // 决策7：通过 Service 层获取市场列表（带缓存）
     const result = await MarketListingService.getMarketListings({
       page: parseInt(page, 10),
       page_size: parseInt(limit, 10),
       category,
+      listing_kind,
+      asset_code,
+      min_price: min_price ? parseInt(min_price, 10) : undefined,
+      max_price: max_price ? parseInt(max_price, 10) : undefined,
       sort
     })
 
     logger.info('获取交易市场挂牌列表成功', {
       user_id: req.user.user_id,
-      category,
+      listing_kind,
+      asset_code,
+      min_price,
+      max_price,
       sort,
       total: result.pagination.total,
       returned: result.products.length

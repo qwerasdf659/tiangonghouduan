@@ -38,18 +38,24 @@
  * - 商品配置审计（谁修改了商品配置）
  * - 用户状态变更审计（谁冻结/解冻了用户）
  * - 奖品配置审计（谁修改了奖品配置）
+ * - 抽奖管理审计（强制中奖、概率调整等 - V4.5.0新增）
  *
  * 设计模式：
  * - 不可修改：审计日志只能创建，不能修改或删除
  * - 完整记录：记录操作前后的完整数据
  * - 多维索引：支持按操作员、操作类型、目标对象等多维度查询
  *
+ * ENUM来源：
+ * - 统一枚举定义文件：constants/AuditOperationTypes.js
+ * - 确保模型、服务、迁移文件引用同一来源
+ *
  * 创建时间：2025-10-12
- * 最后更新：2025-10-12（添加与AuditRecord的详细区分说明）
+ * 最后更新：2026-01-08（V4.5.0 审计统一入口整合 - 使用统一枚举定义）
  */
 
 const { DataTypes } = require('sequelize')
 const BeijingTimeHelper = require('../utils/timeHelper')
+const { DB_ENUM_VALUES, getOperationTypeDescription } = require('../constants/AuditOperationTypes')
 
 module.exports = sequelize => {
   const AdminOperationLog = sequelize.define(
@@ -76,30 +82,11 @@ module.exports = sequelize => {
         onDelete: 'RESTRICT' // 不允许删除有审计日志的用户
       },
 
-      // 操作类型
+      // 操作类型（来源：constants/AuditOperationTypes.js 统一枚举定义）
       operation_type: {
-        type: DataTypes.ENUM(
-          'points_adjust', // 积分调整（手动增加/减少积分）
-          'exchange_audit', // 兑换审核（审核通过/拒绝）
-          'product_update', // 商品修改（修改商品配置）
-          'product_create', // 商品创建
-          'product_delete', // 商品删除
-          'user_status_change', // 用户状态变更（冻结/解冻）
-          'prize_config', // 奖品配置（修改奖品配置）
-          'prize_create', // 奖品创建
-          'prize_delete', // 奖品删除
-          'prize_stock_adjust', // 奖品库存调整（补充库存）
-          'campaign_config', // 活动配置（修改活动配置）
-          'role_assign', // 角色分配（给用户分配角色）
-          'role_change', // 角色变更（修改用户角色）
-          'system_config', // 系统配置修改
-          'session_assign', // 客服会话分配（分配/取消/转移）
-          'inventory_operation', // 库存操作（使用/核销/上架/下架）
-          'inventory_transfer', // 物品转让（用户间物品转让）
-          'consumption_audit' // 消费审核（审核通过/拒绝）
-        ),
+        type: DataTypes.ENUM(...DB_ENUM_VALUES),
         allowNull: false,
-        comment: '操作类型'
+        comment: '操作类型（V4.5.0统一枚举定义 - 详见 constants/AuditOperationTypes.js）'
       },
 
       // 目标对象信息
@@ -237,30 +224,15 @@ module.exports = sequelize => {
 
   /**
    * 获取操作类型描述
+   *
+   * @description 使用统一枚举定义获取操作类型的中文描述
    * @returns {string} 操作类型的中文描述（积分调整/兑换审核/商品修改等）
+   *
+   * 来源：constants/AuditOperationTypes.js - OPERATION_TYPE_DESCRIPTIONS
    */
   AdminOperationLog.prototype.getOperationTypeDescription = function () {
-    const typeMap = {
-      points_adjust: '积分调整',
-      exchange_audit: '兑换审核',
-      product_update: '商品修改',
-      product_create: '商品创建',
-      product_delete: '商品删除',
-      user_status_change: '用户状态变更',
-      prize_config: '奖品配置',
-      prize_create: '奖品创建',
-      prize_delete: '奖品删除',
-      prize_stock_adjust: '奖品库存调整',
-      campaign_config: '活动配置',
-      role_assign: '角色分配',
-      role_change: '角色变更',
-      system_config: '系统配置',
-      session_assign: '客服会话分配',
-      inventory_operation: '库存操作',
-      inventory_transfer: '物品转让',
-      consumption_audit: '消费审核'
-    }
-    return typeMap[this.operation_type] || '未知操作'
+    // 使用统一枚举定义的描述映射（单一真相源）
+    return getOperationTypeDescription(this.operation_type)
   }
 
   /**
@@ -327,16 +299,34 @@ module.exports = sequelize => {
 
   /**
    * 类方法：比较两个对象并生成changed_fields
-   * @param {Object} beforeObj - 变更前的对象数据
-   * @param {Object} afterObj - 变更后的对象数据
+   *
+   * 空值安全：支持 beforeObj/afterObj 为 null/undefined 的场景
+   *
+   * @param {Object|null} beforeObj - 变更前的对象数据（可为null）
+   * @param {Object|null} afterObj - 变更后的对象数据（可为null）
    * @param {Array<string>|null} fieldList - 需要比较的字段列表，null则比较所有字段
    * @returns {Array<Object>} 变更字段数组 [{field, old_value, new_value}, ...]
    */
   AdminOperationLog.compareObjects = function (beforeObj, afterObj, fieldList = null) {
     const changedFields = []
 
-    // 如果指定了字段列表，只比较这些字段；否则比较所有字段
-    const fieldsToCompare = fieldList || Object.keys(afterObj)
+    // P0修复：空值安全保护 - 当两个对象都为空时返回空数组
+    if (!beforeObj && !afterObj) {
+      return changedFields
+    }
+
+    // 确定要比较的字段列表（优先级：显式指定 > afterObj的字段 > beforeObj的字段）
+    let fieldsToCompare
+    if (fieldList) {
+      fieldsToCompare = fieldList
+    } else if (afterObj && typeof afterObj === 'object') {
+      fieldsToCompare = Object.keys(afterObj)
+    } else if (beforeObj && typeof beforeObj === 'object') {
+      fieldsToCompare = Object.keys(beforeObj)
+    } else {
+      // 两个都不是有效对象，返回空数组
+      return changedFields
+    }
 
     fieldsToCompare.forEach(field => {
       const oldValue = beforeObj ? beforeObj[field] : null

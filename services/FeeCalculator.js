@@ -7,21 +7,23 @@ const _logger = require('../utils/logger').logger
  * 业务场景：
  * - 计算物品转让的手续费（基于 ItemInstance.meta.value 字段）
  * - 支持按商品价值分档计费
- * - 集成到TradeRecord交易记录系统
+ * - 集成到TradeOrder交易订单系统（C2C市场）
  *
  * 数据库关联：
  * - ItemInstance.meta.value（商品价值）- 用于计费分档
  * - MarketListing.price_amount（用户定价）- 买家支付金额
- * - TradeRecord.fee_points_amount（手续费）- 平台收取
- * - TradeRecord.net_points_amount（卖家实收）- price_amount - fee
+ * - TradeOrder.fee_amount（手续费）- 平台收取
+ * - TradeOrder.net_amount（卖家实收）- gross_amount - fee_amount
  *
  * 使用示例：
  * const feeInfo = FeeCalculator.calculateItemFee(item.meta.value, listing.price_amount);
- * // 返回：{ fee: 30, rate: 0.05, netAmount: 570, tier: '中价值档' }
+ * // 返回：{ fee: 30, rate: 0.05, net_amount: 570, tier: '中价值档' }
+ *
+ * 变更记录：
+ * - 2026-01-08: 移除 createTradeRecord 方法（TradeRecord 已废弃，统一使用 TradeOrder）
  */
 
 const FEE_RULES = require('../config/fee_rules')
-const BeijingTimeHelper = require('../utils/timeHelper') // 北京时间工具类
 
 /**
  * 手续费计算器服务类
@@ -195,55 +197,6 @@ class FeeCalculator {
     if (!tier) return '未知档位'
 
     return `${(tier.rate * 100).toFixed(0)}%（${tier.label}）- ${tier.description}`
-  }
-
-  /**
-   * 集成到TradeRecord创建流程（Integration with TradeRecord）
-   *
-   * 业务场景：
-   * - 物品转让时创建交易记录
-   * - 自动计算手续费并记录到数据库
-   *
-   * @param {Object} item - ItemInstance物品对象
-   * @param {number} buyerId - 买家用户ID
-   * @param {number} sellerId - 卖家用户ID
-   * @param {Object} transaction - Sequelize事务对象
-   * @returns {Promise<Object>} TradeRecord创建结果
-   *
-   * @example
-   * const tradeRecord = await FeeCalculator.createTradeRecord(item, buyerId, sellerId, transaction);
-   */
-  static async createTradeRecord(item, buyerId, sellerId, transaction) {
-    const { TradeRecord } = require('../models')
-
-    // 计算手续费（Calculate Fee - 基于商品价值和售价）
-    const feeInfo = this.calculateItemFee(item.value, item.selling_points)
-
-    // 创建交易记录（Create Trade Record）
-    const tradeRecord = await TradeRecord.create(
-      {
-        trade_code: `tf_${BeijingTimeHelper.generateIdTimestamp()}_${Math.random().toString(36).substr(2, 8)}`,
-        trade_type: 'inventory_transfer', // 交易类型：物品转让
-        from_user_id: sellerId, // 卖家用户ID
-        to_user_id: buyerId, // 买家用户ID
-        points_amount: item.selling_points, // 交易金额（买家支付）
-        fee_points_amount: feeInfo.fee, // 手续费（平台收取）
-        net_points_amount: feeInfo.net_amount, // 卖家实收（售价-手续费）
-        status: 'completed', // 交易状态：已完成
-        item_id: item.inventory_id, // 物品ID
-        name: item.name, // 物品名称
-        transfer_note: `市场购买，手续费${feeInfo.fee}积分（${feeInfo.tier}）`,
-        trade_reason: `物品转让 - ${item.name}`,
-        trade_time: BeijingTimeHelper.createBeijingTime(),
-        processed_time: BeijingTimeHelper.createBeijingTime()
-      },
-      { transaction }
-    )
-
-    return {
-      trade_record: tradeRecord,
-      fee_info: feeInfo
-    }
   }
 }
 

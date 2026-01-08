@@ -851,11 +851,17 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
       // 2. 生成唯一的抽奖ID（用于幂等性控制）
       const draw_id = `draw_${BeijingTimeHelper.generateIdTimestamp()}_${user_id}_${Math.random().toString(36).substr(2, 6)}`
 
-      // 使用 idempotency_key 进行幂等控制（业界标准形态）
-      const idempotencyKey =
-        context.idempotency_key ||
-        context.lottery_session_id ||
-        `lottery_draw_${user_id}_${campaignId}_${Date.now()}`
+      /*
+       * 【决策6】使用 idempotency_key 进行幂等控制（业界标准形态）
+       * - 强制要求调用方提供 idempotency_key 或 lottery_session_id
+       * - 禁止使用 Date.now() 自动生成，确保幂等键可追溯
+       */
+      const idempotencyKey = context.idempotency_key || context.lottery_session_id
+      if (!idempotencyKey) {
+        throw new Error(
+          '缺少必需的 idempotency_key 或 lottery_session_id，无法执行抽奖（决策6：幂等键必须由业务派生）'
+        )
+      }
 
       // 3. 获取九八折券奖品信息（使用悲观锁防止超卖）
       const guaranteePrize = await models.LotteryPrize.findOne({
@@ -1738,7 +1744,15 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
           deductCampaignId = String(allowedCampaignIds[0])
         }
 
-        // 使用 AssetService 扣减用户 BUDGET_POINTS
+        /*
+         * 【决策6】使用 AssetService 扣减用户 BUDGET_POINTS
+         * - 幂等键必须由调用方传入，不允许回退生成
+         */
+        if (!idempotency_key) {
+          throw new Error(
+            '缺少必需的 idempotency_key，无法执行预算扣减（决策6：幂等键必须由业务派生）'
+          )
+        }
         await AssetService.changeBalance(
           {
             user_id: userId,
@@ -1746,8 +1760,7 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
             delta_amount: -amount, // 扣减为负数
             campaign_id: deductCampaignId, // 🔥 BUDGET_POINTS 必须指定 campaign_id
             business_type: 'lottery_budget_deduct',
-            idempotency_key:
-              idempotency_key || `budget_deduct_${campaignId}_${userId}_${Date.now()}`,
+            idempotency_key, // 决策6：使用调用方传入的业务派生幂等键
             meta: {
               campaign_id: campaignId,
               prize_id,
@@ -2155,32 +2168,33 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
       `draw_${BeijingTimeHelper.generateIdTimestamp()}_${user_id}_${Math.random().toString(36).substr(2, 6)}`
 
     /*
-     * 业界标准形态：使用 idempotency_key 进行幂等控制
-     * 优先使用 context.idempotency_key，回退到 lottery_session_id，最后使用传统格式
+     * 【决策6】业界标准形态：使用 idempotency_key 进行幂等控制
+     * - 强制要求调用方提供 idempotency_key 或 lottery_session_id
+     * - 禁止使用 Date.now() 自动生成，确保幂等键可追溯
      */
-    const idempotencyKey =
-      context.idempotency_key ||
-      context.lottery_session_id ||
-      `lottery_draw_${user_id}_${campaign_id}_${Date.now()}`
+    const idempotencyKey = context.idempotency_key || context.lottery_session_id
+    if (!idempotencyKey) {
+      throw new Error(
+        '缺少必需的 idempotency_key 或 lottery_session_id，无法记录抽奖历史（决策6：幂等键必须由业务派生）'
+      )
+    }
 
     // 幂等检查：防止重复提交创建多条抽奖记录
-    if (idempotencyKey) {
-      const existingDraw = await LotteryDraw.findOne({
-        where: { idempotency_key: idempotencyKey },
-        transaction: transaction || undefined
-      })
+    const existingDraw = await LotteryDraw.findOne({
+      where: { idempotency_key: idempotencyKey },
+      transaction: transaction || undefined
+    })
 
-      if (existingDraw) {
-        this.logInfo('抽奖记录已存在（幂等）', {
-          idempotency_key: idempotencyKey,
-          draw_id: existingDraw.draw_id,
-          user_id,
-          campaign_id,
-          lottery_session_id: context.lottery_session_id
-        })
-        // 返回已有记录（幂等）
-        return existingDraw
-      }
+    if (existingDraw) {
+      this.logInfo('抽奖记录已存在（幂等）', {
+        idempotency_key: idempotencyKey,
+        draw_id: existingDraw.draw_id,
+        user_id,
+        campaign_id,
+        lottery_session_id: context.lottery_session_id
+      })
+      // 返回已有记录（幂等）
+      return existingDraw
     }
 
     /*

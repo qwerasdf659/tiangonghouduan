@@ -34,7 +34,7 @@ class SystemSettings extends Model {
    * @param {Object} models - 所有模型的引用
    * @returns {void}
    */
-  static associate (models) {
+  static associate(models) {
     // 关联到更新管理员（记录最后由哪个管理员修改）
     SystemSettings.belongsTo(models.User, {
       foreignKey: 'updated_by',
@@ -51,20 +51,20 @@ class SystemSettings extends Model {
    * const setting = await SystemSettings.findOne({ where: { setting_key: 'system_name' }})
    * console.log(setting.getParsedValue()) // "餐厅抽奖系统"
    */
-  getParsedValue () {
+  getParsedValue() {
     const { setting_value, value_type } = this
 
     try {
       switch (value_type) {
-      case 'number':
-        return Number(setting_value)
-      case 'boolean':
-        return setting_value === 'true' || setting_value === '1'
-      case 'json':
-        return JSON.parse(setting_value)
-      case 'string':
-      default:
-        return setting_value
+        case 'number':
+          return Number(setting_value)
+        case 'boolean':
+          return setting_value === 'true' || setting_value === '1'
+        case 'json':
+          return JSON.parse(setting_value)
+        case 'string':
+        default:
+          return setting_value
       }
     } catch (error) {
       console.error(`解析配置值失败 [${this.setting_key}]:`, error.message)
@@ -82,7 +82,7 @@ class SystemSettings extends Model {
    * setting.setValue(5)
    * await setting.save()
    */
-  setValue (value) {
+  setValue(value) {
     if (typeof value === 'object') {
       this.setting_value = JSON.stringify(value)
       this.value_type = 'json'
@@ -117,10 +117,10 @@ module.exports = sequelize => {
 
       // 配置分类：区分不同模块的配置（仅运营配置，技术配置在代码中管理）
       category: {
-        type: DataTypes.ENUM('basic', 'points', 'notification', 'security'),
+        type: DataTypes.ENUM('basic', 'points', 'notification', 'security', 'marketplace'),
         allowNull: false,
         comment:
-          '配置分类：basic-基础设置，points-积分设置，notification-通知设置，security-安全设置（注：抽奖算法配置在config/business.config.js中管理）'
+          '配置分类：basic-基础设置，points-积分设置，notification-通知设置，security-安全设置，marketplace-市场设置（注：抽奖算法配置在config/business.config.js中管理）'
       },
 
       // 配置键名：具体的配置项标识

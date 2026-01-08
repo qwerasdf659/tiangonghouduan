@@ -48,7 +48,8 @@ module.exports = sequelize => {
       image_url: {
         type: DataTypes.STRING(500),
         allowNull: true,
-        comment: '商品图片URL（废弃字段，保留兼容过渡）'
+        comment:
+          '【已废弃】旧商品图片URL字段（2026-01-08图片存储架构已迁移到primary_image_id关联image_resources表，此字段仅保留向后兼容）'
       },
       primary_image_id: {
         type: DataTypes.INTEGER,

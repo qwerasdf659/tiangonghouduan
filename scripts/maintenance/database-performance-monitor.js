@@ -12,7 +12,7 @@
  * 3. 登录性能监控（通过日志分析）
  *
  * 创建时间：2025-11-09（基于文档建议）
- * 更新时间：2025-11-09
+ * 更新时间：2026-01-08（架构重构：改为依赖注入模式，解决循环依赖问题）
  *
  * 参考文档：docs/数据库性能问题排查和优化方案.md
  *
@@ -20,10 +20,20 @@
  * - 这是预防性监控，不是紧急优化
  * - 只在发现实际性能问题时才触发优化
  * - 当前系统运行稳定，无需立即优化
+ *
+ * 架构规范（2026-01-08）：
+ * - 采用依赖注入模式，避免循环依赖
+ * - sequelize 实例由 app.js/bootstrap 注入，而非直接 require
+ * - 独立脚本场景下可通过 init() 方法延迟初始化
  */
 
-const { sequelize } = require('../../config/database')
 const logger = require('../../utils/logger')
+
+/**
+ * 🏭 模块级 sequelize 引用（延迟初始化，避免循环依赖）
+ * @type {import('sequelize').Sequelize|null}
+ */
+let _sequelize = null
 
 /**
  * 数据库性能监控类
@@ -38,6 +48,10 @@ class DatabasePerformanceMonitor {
    * 创建数据库性能监控实例
    *
    * 初始化监控配置和慢查询统计数据
+   *
+   * 架构规范（2026-01-08）：
+   * - 构造函数不再直接 require sequelize
+   * - 通过 init() 或 setSequelize() 注入依赖
    */
   constructor() {
     // 监控配置（基于文档建议的阈值）
@@ -59,6 +73,59 @@ class DatabasePerformanceMonitor {
       count: 0, // 总次数
       lastResetTime: Date.now() // 上次重置时间
     }
+
+    // 是否已初始化（注入 sequelize）
+    this._initialized = false
+  }
+
+  /**
+   * 🔧 注入 sequelize 实例（依赖注入模式）
+   *
+   * 使用场景：
+   * - app.js 启动时调用：monitor.setSequelize(sequelize)
+   * - 独立脚本场景：await monitor.init()
+   *
+   * @param {import('sequelize').Sequelize} sequelizeInstance - Sequelize 实例
+   * @returns {DatabasePerformanceMonitor} this（链式调用）
+   */
+  setSequelize(sequelizeInstance) {
+    _sequelize = sequelizeInstance
+    this._initialized = true
+    logger.info('[性能监控] Sequelize 实例已注入')
+    return this
+  }
+
+  /**
+   * 🚀 延迟初始化（独立脚本场景使用）
+   *
+   * 业务场景：
+   * - 当监控模块作为独立脚本运行时，延迟加载 config/database
+   * - 避免在 require 阶段触发循环依赖
+   *
+   * @returns {Promise<DatabasePerformanceMonitor>} this（链式调用）
+   */
+  async init() {
+    if (this._initialized && _sequelize) {
+      return this
+    }
+
+    try {
+      // 延迟加载：仅在实际需要时 require config/database
+      const { sequelize } = require('../../config/database')
+      this.setSequelize(sequelize)
+      return this
+    } catch (error) {
+      logger.error('[性能监控] 初始化失败，无法加载数据库配置:', error.message)
+      throw error
+    }
+  }
+
+  /**
+   * 🔍 获取当前 sequelize 实例
+   * @returns {import('sequelize').Sequelize|null}
+   */
+  getSequelize() {
+    return _sequelize
   }
 
   /**
@@ -85,18 +152,18 @@ class DatabasePerformanceMonitor {
    */
   async checkConnectionCount() {
     try {
-      // 检查sequelize对象是否已初始化
-      if (!sequelize || !sequelize.query) {
+      // 检查sequelize对象是否已初始化（使用注入的实例）
+      if (!_sequelize || !_sequelize.query) {
         logger.warn('[性能监控] Sequelize对象未初始化，跳过连接数检查')
         return {
           status: 'skipped',
-          message: 'Sequelize未初始化',
+          message: 'Sequelize未初始化，请先调用 init() 或 setSequelize()',
           timestamp: new Date().toISOString()
         }
       }
 
-      // 查询MySQL连接数
-      const [results] = await sequelize.query('SHOW STATUS LIKE "Threads_connected"')
+      // 查询MySQL连接数（使用注入的 _sequelize）
+      const [results] = await _sequelize.query('SHOW STATUS LIKE "Threads_connected"')
       const currentConnections = parseInt(results[0].Value)
 
       // 连接池最大连接数（从配置读取）
@@ -353,12 +420,22 @@ const monitor = new DatabasePerformanceMonitor()
  * - 定期输出监控报告
  *
  * ⚠️ 注意：
- * - 需要在应用启动时调用startScheduledMonitoring()
- * - 或在scheduled-tasks.js中集成
+ * - 需要在应用启动时调用 startScheduledMonitoring(sequelize)
+ * - sequelize 实例由调用方（app.js）注入
  *
+ * 架构规范（2026-01-08）：
+ * - 函数接收 sequelize 参数，不再内部 require
+ * - 确保不产生循环依赖
+ *
+ * @param {import('sequelize').Sequelize} sequelizeInstance - Sequelize 实例（由 app.js 注入）
  * @returns {void} 无返回值
  */
-function startScheduledMonitoring() {
+function startScheduledMonitoring(sequelizeInstance) {
+  // 注入 sequelize 实例
+  if (sequelizeInstance) {
+    monitor.setSequelize(sequelizeInstance)
+  }
+
   logger.info('[性能监控] 启动数据库性能定时监控（间隔5分钟）')
 
   setInterval(async () => {
@@ -386,6 +463,10 @@ function startScheduledMonitoring() {
  * - 手动检查性能
  * - 生成性能报告
  *
+ * 架构规范（2026-01-08）：
+ * - 独立脚本场景下，自动延迟初始化 sequelize
+ * - app.js 已注入 sequelize 时，直接复用
+ *
  * @returns {Promise<string>} 格式化的监控报告
  *
  * @example
@@ -394,6 +475,11 @@ function startScheduledMonitoring() {
  * console.log(report)
  */
 async function manualCheck() {
+  // 独立脚本场景：延迟初始化（避免循环依赖）
+  if (!monitor._initialized) {
+    await monitor.init()
+  }
+
   const results = await monitor.performFullCheck()
   const report = monitor.generateReport(results)
   console.log(report)

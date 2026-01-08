@@ -2,40 +2,34 @@
  * 测试环境配置和工具函数
  * V4版本 - 移除Mock数据，使用真实数据库
  * 创建时间：2025年01月21日
- * 🔴 更新：统一使用生产数据库，移除内存数据库配置，清除所有Mock数据
+ * 🔴 更新（2026-01-09）：统一从 .env 加载配置，作为单一真相源
  */
 
-// 🔧 测试环境变量配置
-// ✅ 强制方案1：不加载dotenv，纯手动设置（docs/Devbox单环境统一配置方案新.md）
+// 🔧 2026-01-09：统一从 .env 加载配置（单一真相源）
+// 注意：jest.setup.js 已经加载了 dotenv，此处仅作为备用保障
+if (!process.env.DB_HOST) {
+  require('dotenv').config()
+}
+
 const BeijingTimeHelper = require('../../utils/timeHelper')
 
-// 🔧 修复：设置必需的环境变量
+// 🔧 设置测试环境标识
 process.env.NODE_ENV = 'test'
+
+// 🔧 仅设置非敏感的测试专用配置（.env 中未配置时的兜底）
 process.env.JWT_SECRET = process.env.JWT_SECRET || 'test-jwt-secret-key-for-development-only'
 // 决策25：全环境强制PII_HASH_SECRET（测试环境使用固定测试密钥）
 process.env.PII_HASH_SECRET = process.env.PII_HASH_SECRET || 'test-pii-hash-secret-key-32chars!'
 // ✅ 测试环境关闭限流（避免 429 干扰业务断言）
 process.env.DISABLE_RATE_LIMITER = 'true'
 
-// 🔴 统一数据库配置 - 使用唯一真实数据库 restaurant_points_dev
-if (!process.env.DB_HOST) {
-  console.log('🔧 设置测试环境数据库配置...')
-  process.env.DB_HOST = process.env.DB_HOST || 'dbconn.sealosbja.site'
-  // 🔴 统一数据库：测试/开发/生产全部连接唯一真实库 restaurant_points_dev
-  process.env.DB_PORT = process.env.DB_PORT || '42569'
-  process.env.DB_USER = process.env.DB_USER || 'root'
-  process.env.DB_PASSWORD = process.env.DB_PASSWORD || 'mc6r9cgb'
-  process.env.DB_NAME = process.env.DB_NAME || 'restaurant_points_dev'
-}
-
 // 🔧 设置测试超时时间（仅在jest环境中）
 if (typeof jest !== 'undefined') {
   jest.setTimeout(30000)
 }
 
-// ✅ Redis配置：必须连接（不允许禁用，方案A：只用REDIS_URL）
-process.env.REDIS_URL = 'redis://localhost:6379'
-// ❌ 移除DISABLE_REDIS设置（Redis为必需依赖，不允许禁用）
+// ✅ Redis配置：优先使用 .env 中的配置
+process.env.REDIS_URL = process.env.REDIS_URL || 'redis://localhost:6379'
 
 /**
  * 测试断言工具

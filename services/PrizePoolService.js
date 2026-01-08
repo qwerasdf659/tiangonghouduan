@@ -169,9 +169,36 @@ class PrizePoolService {
       )
 
       createdPrizes.push(prize)
+
+      // 🎯 2026-01-08 图片存储架构修复：绑定图片 context_id（避免被24h定时清理误删）
+      if (prizeData.image_id) {
+        try {
+          const ImageService = require('./ImageService')
+          // eslint-disable-next-line no-await-in-loop -- 需要在事务中顺序绑定图片
+          await ImageService.updateImageContextId(prizeData.image_id, prize.prize_id, transaction)
+          logger.info('[奖品池] 奖品图片绑定成功', {
+            prize_id: prize.prize_id,
+            image_id: prizeData.image_id
+          })
+        } catch (bindError) {
+          // 绑定失败记录警告但不阻塞创建
+          logger.warn('[奖品池] 奖品图片绑定失败（非致命）', {
+            prize_id: prize.prize_id,
+            image_id: prizeData.image_id,
+            error: bindError.message
+          })
+        }
+      }
     }
 
-    // 5. 记录审计日志（批量添加奖品）
+    /*
+     * 5. 记录审计日志（批量添加奖品）
+     * 【决策5/6/7】：
+     * - 决策5：prize_create 是关键操作，失败阻断业务
+     * - 决策6：幂等键由 campaign_id + 奖品IDs 派生，确保同一批奖品不会重复记录
+     * - 决策7：同一事务内
+     */
+    const prizeIdsStr = createdPrizes.map(p => p.prize_id).join('_')
     await AuditLogService.logOperation({
       operator_id: created_by || 1, // 操作员ID（如果没有传入，使用系统用户1）
       operation_type: 'prize_create', // 操作类型：奖品创建
@@ -186,7 +213,8 @@ class PrizePoolService {
         prize_ids: createdPrizes.map(p => p.prize_id)
       },
       reason: `批量添加${createdPrizes.length}个奖品到活动${campaign_id}`,
-      idempotency_key: `prize_batch_create_${campaign_id}_${Date.now()}`, // 业务关联ID（唯一标识）
+      idempotency_key: `prize_batch_create_${campaign_id}_prizes_${prizeIdsStr}`, // 决策6：业务主键派生
+      is_critical_operation: true, // 决策5：关键操作
       transaction // 事务对象
     })
 
@@ -464,6 +492,10 @@ class PrizePoolService {
    * - 强制要求外部事务传入（options.transaction）
    * - 未提供事务时直接报错，由入口层统一管理事务
    *
+   * 🎯 2026-01-08 图片存储架构：
+   * - 更换图片时删除旧图片（如有）
+   * - 更新新图片的 context_id 绑定到 prize_id
+   *
    * @param {number} prize_id - 奖品ID
    * @param {Object} updateData - 更新数据
    * @param {Object} options - 选项
@@ -484,7 +516,7 @@ class PrizePoolService {
       throw new Error('奖品不存在')
     }
 
-    // 保存更新前的数据（用于审计日志）
+    // 保存更新前的数据（用于审计日志和图片处理）
     const beforeData = {
       prize_name: prize.prize_name,
       prize_type: prize.prize_type,
@@ -495,7 +527,8 @@ class PrizePoolService {
       stock_quantity: prize.stock_quantity,
       win_probability: prize.win_probability,
       probability: prize.probability,
-      status: prize.status
+      status: prize.status,
+      image_id: prize.image_id // 记录旧的图片ID
     }
 
     // 2. 字段映射（前端字段 → 数据库字段）
@@ -545,8 +578,66 @@ class PrizePoolService {
       }
     }
 
+    // 🎯 2026-01-08 图片存储架构：处理图片更换逻辑
+    const oldImageId = beforeData.image_id
+    const newImageId = filteredUpdateData.image_id
+    const isImageChanging = filteredUpdateData.image_id !== undefined && newImageId !== oldImageId
+
     // 4. 更新奖品
     await prize.update(filteredUpdateData, { transaction })
+
+    // 5. 处理图片绑定和旧图片删除（2026-01-08 P0修复）
+    if (isImageChanging) {
+      const ImageService = require('./ImageService')
+
+      // 5a. 绑定新图片的 context_id 到 prize_id（如有新图片）
+      if (newImageId) {
+        try {
+          const bindSuccess = await ImageService.updateImageContextId(
+            newImageId,
+            prize_id,
+            transaction
+          )
+          if (bindSuccess) {
+            logger.info('[图片存储] 新图片已绑定到奖品', {
+              prize_id,
+              new_image_id: newImageId
+            })
+          } else {
+            logger.warn('[图片存储] 新图片绑定失败（图片可能不存在）', {
+              prize_id,
+              new_image_id: newImageId
+            })
+          }
+        } catch (bindError) {
+          logger.warn('[图片存储] 新图片绑定异常（非致命）', {
+            error: bindError.message,
+            prize_id,
+            new_image_id: newImageId
+          })
+        }
+      }
+
+      // 5b. 删除旧图片（如有）
+      if (oldImageId) {
+        try {
+          const deleted = await ImageService.deleteImage(oldImageId, transaction)
+          if (deleted) {
+            logger.info('[图片存储] 奖品旧图片已物理删除', {
+              prize_id,
+              old_image_id: oldImageId
+            })
+          }
+        } catch (imageError) {
+          // 图片删除失败不阻塞主流程，记录警告日志
+          logger.warn('[图片存储] 删除奖品旧图片异常（非致命）', {
+            error: imageError.message,
+            prize_id,
+            old_image_id: oldImageId
+          })
+        }
+      }
+    }
 
     // 5. 记录审计日志（奖品配置修改）
     const afterData = {
@@ -571,6 +662,13 @@ class PrizePoolService {
       operationDetail += ` (库存: ${beforeData.stock_quantity} → ${afterData.stock_quantity})`
     }
 
+    /*
+     * 【决策5/6/7】记录审计日志（奖品配置更新）：
+     * - 决策5：prize_config 是关键操作，失败阻断业务
+     * - 决策6：幂等键由 prize_id + 更新后的数据版本号派生
+     * - 决策7：同一事务内
+     */
+    const updateVersion = prize.updated_at ? new Date(prize.updated_at).getTime() : Date.now()
     await AuditLogService.logOperation({
       operator_id: updated_by || 1, // 操作员ID（如果没有传入，使用系统用户1）
       operation_type: 'prize_config', // 操作类型：奖品配置
@@ -580,7 +678,8 @@ class PrizePoolService {
       before_data: beforeData,
       after_data: afterData,
       reason: operationDetail,
-      idempotency_key: `prize_update_${prize_id}_${Date.now()}`, // 业务关联ID（唯一标识）
+      idempotency_key: `prize_config_${prize_id}_v${updateVersion}`, // 决策6：业务主键派生
+      is_critical_operation: true, // 决策5：关键操作
       transaction // 事务对象
     })
 
@@ -696,7 +795,13 @@ class PrizePoolService {
       await prize.update({ status: 'active' }, { transaction })
     }
 
-    // 5. 记录审计日志（奖品库存调整）
+    /*
+     * 5. 记录审计日志（奖品库存调整）
+     * 【决策5/6/7】：
+     * - 决策5：prize_stock_adjust 是关键操作，失败阻断业务
+     * - 决策6：幂等键由 prize_id + 新库存量派生，确保同一调整结果不会重复记录
+     * - 决策7：同一事务内
+     */
     await AuditLogService.logOperation({
       operator_id: operated_by || 1, // 操作员ID（如果没有传入，使用系统用户1）
       operation_type: 'prize_stock_adjust', // 操作类型：奖品库存调整
@@ -710,7 +815,8 @@ class PrizePoolService {
         stock_quantity: newQuantity
       },
       reason: `奖品库存调整: ${oldQuantity} → ${newQuantity}（补充${quantity}）`,
-      idempotency_key: `stock_adjust_${prize_id}_${Date.now()}`, // 业务关联ID（唯一标识）
+      idempotency_key: `stock_adjust_${prize_id}_from${oldQuantity}_to${newQuantity}`, // 决策6：业务主键派生
+      is_critical_operation: true, // 决策5：关键操作
       transaction // 事务对象
     })
 
@@ -754,6 +860,10 @@ class PrizePoolService {
    * - 强制要求外部事务传入（options.transaction）
    * - 未提供事务时直接报错，由入口层统一管理事务
    *
+   * 🎯 2026-01-08 图片存储架构：
+   * - 删除奖品时联动删除关联的图片（Sealos对象存储 + DB记录）
+   * - 确保"删 DB + 删对象存储"闭环
+   *
    * @param {number} prize_id - 奖品ID
    * @param {Object} options - 选项
    * @param {Object} options.transaction - 事务对象（必填）
@@ -781,7 +891,13 @@ class PrizePoolService {
       throw new Error(`该奖品已被中奖${totalWins}次，不能删除。建议改为停用状态。`)
     }
 
-    // 3. 记录审计日志（奖品删除）
+    /*
+     * 3. 记录审计日志（奖品删除）
+     * 【决策5/6/7】：
+     * - 决策5：prize_delete 是关键操作，失败阻断业务
+     * - 决策6：幂等键由 prize_id 派生（删除是幂等的，同一ID只能删除一次）
+     * - 决策7：同一事务内
+     */
     await AuditLogService.logOperation({
       operator_id: deleted_by || 1, // 操作员ID（如果没有传入，使用系统用户1）
       operation_type: 'prize_delete', // 操作类型：奖品删除
@@ -793,16 +909,19 @@ class PrizePoolService {
         prize_type: prize.prize_type,
         stock_quantity: prize.stock_quantity,
         win_probability: prize.win_probability,
-        status: prize.status
+        status: prize.status,
+        image_id: prize.image_id // 记录关联的图片ID
       },
       after_data: null, // 删除操作后数据为空
       reason: `删除奖品：${prize.prize_name}（ID: ${prize_id}）`,
-      idempotency_key: `prize_delete_${prize_id}_${Date.now()}`, // 业务关联ID（唯一标识）
+      idempotency_key: `prize_delete_${prize_id}`, // 决策6：业务主键派生（删除操作天然幂等）
+      is_critical_operation: true, // 决策5：关键操作
       transaction // 事务对象
     })
 
-    // 4. 保存关联的活动ID（删除前，用于缓存失效）
+    // 4. 保存关联的活动ID和图片ID（删除前，用于缓存失效和图片清理）
     const campaignIdForCache = prize.campaign_id
+    const imageIdToDelete = prize.image_id
 
     // 5. 删除奖品
     await prize.destroy({ transaction })
@@ -810,10 +929,37 @@ class PrizePoolService {
     logger.info('奖品删除成功', {
       prize_id,
       prize_name: prize.prize_name,
+      image_id: imageIdToDelete,
       deleted_by
     })
 
-    // 6. 缓存失效：奖品删除后立即失效活动配置缓存
+    // 6. 联动删除关联图片（2026-01-08 图片存储架构 P0修复）
+    if (imageIdToDelete) {
+      try {
+        const ImageService = require('./ImageService')
+        const deleted = await ImageService.deleteImage(imageIdToDelete, transaction)
+        if (deleted) {
+          logger.info('[图片存储] 奖品关联图片已物理删除', {
+            prize_id,
+            image_id: imageIdToDelete
+          })
+        } else {
+          logger.warn('[图片存储] 奖品关联图片删除失败或不存在', {
+            prize_id,
+            image_id: imageIdToDelete
+          })
+        }
+      } catch (imageError) {
+        // 图片删除失败不阻塞主流程，记录警告日志
+        logger.warn('[图片存储] 删除奖品图片异常（非致命）', {
+          error: imageError.message,
+          prize_id,
+          image_id: imageIdToDelete
+        })
+      }
+    }
+
+    // 7. 缓存失效：奖品删除后立即失效活动配置缓存
     try {
       await BusinessCacheHelper.invalidateLotteryCampaign(campaignIdForCache, 'prize_deleted')
       logger.info('[缓存] 活动配置缓存已失效（奖品删除）', {
@@ -830,7 +976,8 @@ class PrizePoolService {
     }
 
     return {
-      prize_id
+      prize_id,
+      deleted_image_id: imageIdToDelete || null
     }
   }
 

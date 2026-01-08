@@ -7,20 +7,23 @@
  * 职责：
  * - 用户登录/登出/注册
  * - Token验证/刷新
- * - 权限检查（仅自己的权限）
  *
  * 模块拆分说明：
  * - login.js: 登录功能（login, quick-login, decrypt-phone）
  * - token.js: Token管理（verify, refresh, logout）
  * - profile.js: 用户信息查询（profile）
- * - permissions.js: 权限相关
+ *
+ * 📌 2026-01-08 重要变更：
+ * - permissions.js 已独立挂载到 /api/v4/permissions（解决路由冲突）
+ * - 原因：token.js 和 permissions.js 都有 POST /refresh，导致权限缓存接口不可达
+ * - 详见文档：docs/路由冲突修复方案-POST-auth-refresh-2026-01-08.md
  *
  * 📌 遵循规范：
- * - 用户端禁止/:id参数（查询他人权限已迁移到/admin域）
+ * - 用户端禁止/:id参数
  * - 仅保留/me端点（当前用户自查）
  *
  * 创建时间：2025年01月21日
- * 更新时间：2025年12月22日 - 拆分大文件
+ * 更新时间：2026年01月08日 - 权限路由拆分到独立域
  */
 
 const express = require('express')
@@ -30,12 +33,18 @@ const router = express.Router()
 const loginRoutes = require('./login')
 const tokenRoutes = require('./token')
 const profileRoutes = require('./profile')
-const permissionRoutes = require('./permissions')
+/*
+ * 🔧 2026-01-08：permissionRoutes 已独立挂载到 /api/v4/permissions，此处不再引入
+ * const permissionRoutes = require('./permissions')
+ */
 
 // 挂载路由
 router.use('/', loginRoutes) // POST /login, /quick-login, /decrypt-phone
 router.use('/', tokenRoutes) // GET /verify, POST /refresh, /logout
 router.use('/', profileRoutes) // GET /profile
-router.use('/', permissionRoutes) // 权限相关
+/*
+ * 🔧 2026-01-08：权限路由已独立挂载到 /api/v4/permissions（解决路由冲突）
+ * router.use('/', permissionRoutes)
+ */
 
 module.exports = router

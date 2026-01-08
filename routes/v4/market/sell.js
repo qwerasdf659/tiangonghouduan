@@ -5,12 +5,12 @@
  * @description 用户上架商品到交易市场
  *
  * API列表：
- * - POST /list - 上架商品到交易市场
- * - POST /fungible-assets/list - 挂牌可叠加资产到市场（暂未实现）
+ * - POST /list - 上架物品实例到交易市场
+ * - POST /fungible-assets/list - 挂牌可叠加资产到市场（C2C材料交易）
  *
  * 业务场景：
- * - 用户将库存物品上架到交易市场出售
- * - 上架限制：最多同时上架10件商品
+ * - 用户将库存物品/可叠加资产上架到交易市场出售
+ * - 上架限制：材料和物品共享，最多同时上架10件
  * - 使用 Idempotency-Key（Header）进行幂等控制
  *
  * 幂等性保证（业界标准形态 - 破坏性重构 2026-01-02）：
@@ -19,6 +19,7 @@
  *
  * 创建时间：2025年12月22日
  * 更新时间：2026年01月02日 - 业界标准形态破坏性重构
+ * 更新时间：2026年01月08日 - 实现可叠加资产挂牌功能（C2C材料交易）
  */
 
 const express = require('express')
@@ -244,22 +245,224 @@ router.post('/list', authenticateToken, async (req, res) => {
 
 /**
  * @route POST /api/v4/market/fungible-assets/list
- * @desc 挂牌可叠加资产到市场
+ * @desc 挂牌可叠加资产到市场（C2C材料交易）
  * @access Private (需要登录)
  *
- * 🔴 业务场景：用户将可叠加资产挂牌到市场出售
- * 暂未实现：此功能需要 AssetService 的冻结功能支持
+ * @header {string} Idempotency-Key - 幂等键（必填，不接受body参数）
+ * @body {string} offer_asset_code - 挂卖资产代码（如 red_shard，必填）
+ * @body {number} offer_amount - 挂卖数量（正整数，必填）
+ * @body {number} price_amount - 定价金额（DIAMOND，必填，大于0）
+ *
+ * @returns {Object} 挂牌结果
+ * @returns {Object} data.listing - 挂牌信息
+ * @returns {number} data.listing.listing_id - 挂牌ID
+ * @returns {string} data.listing.offer_asset_code - 挂卖资产代码
+ * @returns {number} data.listing.offer_amount - 挂卖数量
+ * @returns {number} data.listing.price_amount - 定价金额
+ * @returns {boolean} data.listing.is_duplicate - 是否为幂等回放请求
+ * @returns {Object} data.listing_status - 上架状态
+ * @returns {Object} data.balance_after - 冻结后余额信息
+ *
+ * 业务场景：用户将可叠加资产（如材料）挂牌到C2C市场出售
+ * 挂牌限制：材料和物品共享，最多同时上架10件
+ * 幂等性控制：通过 Header Idempotency-Key 防止重复挂牌
  */
 router.post('/fungible-assets/list', authenticateToken, async (req, res) => {
-  // 暂时返回功能重构中的提示
-  return res.apiError(
-    '可叠加资产挂牌功能正在重构中，敬请期待',
-    'FEATURE_REBUILDING',
-    {
-      suggestion: '请使用 /api/v4/exchange_market 进行资产兑换'
-    },
-    503
-  )
+  // 【业界标准形态】强制从 Header 获取幂等键
+  const idempotency_key = req.headers['idempotency-key']
+
+  // 缺失幂等键直接返回 400
+  if (!idempotency_key) {
+    return res.apiError(
+      '缺少必需的幂等键：请在 Header 中提供 Idempotency-Key。' +
+        '重试时必须复用同一幂等键以防止重复挂牌。',
+      'MISSING_IDEMPOTENCY_KEY',
+      {
+        required_header: 'Idempotency-Key',
+        example: 'Idempotency-Key: fungible_list_<timestamp>_<random>'
+      },
+      400
+    )
+  }
+
+  try {
+    const userId = req.user.user_id
+    const { offer_asset_code, offer_amount, price_amount } = req.body
+
+    // 参数验证
+    if (!offer_asset_code) {
+      return res.apiError(
+        '缺少必要参数：offer_asset_code（挂卖资产代码）',
+        'BAD_REQUEST',
+        { required: ['offer_asset_code', 'offer_amount', 'price_amount'] },
+        400
+      )
+    }
+
+    if (!offer_amount || offer_amount === undefined) {
+      return res.apiError(
+        '缺少必要参数：offer_amount（挂卖数量）',
+        'BAD_REQUEST',
+        { required: ['offer_asset_code', 'offer_amount', 'price_amount'] },
+        400
+      )
+    }
+
+    if (!price_amount || price_amount === undefined) {
+      return res.apiError(
+        '缺少必要参数：price_amount（定价金额）',
+        'BAD_REQUEST',
+        { required: ['offer_asset_code', 'offer_amount', 'price_amount'] },
+        400
+      )
+    }
+
+    const offerAmountValue = parseInt(offer_amount, 10)
+    const priceAmountValue = parseInt(price_amount, 10)
+
+    if (isNaN(offerAmountValue) || offerAmountValue <= 0 || !Number.isInteger(offerAmountValue)) {
+      return res.apiError('挂卖数量必须是大于0的正整数', 'BAD_REQUEST', null, 400)
+    }
+
+    if (isNaN(priceAmountValue) || priceAmountValue <= 0) {
+      return res.apiError('定价金额必须是大于0的整数（DIAMOND）', 'BAD_REQUEST', null, 400)
+    }
+
+    /*
+     * 【入口幂等检查】防止同一次请求被重复提交
+     */
+    const idempotencyResult = await IdempotencyService.getOrCreateRequest(idempotency_key, {
+      api_path: '/api/v4/market/fungible-assets/list',
+      http_method: 'POST',
+      request_params: {
+        offer_asset_code,
+        offer_amount: offerAmountValue,
+        price_amount: priceAmountValue
+      },
+      user_id: userId
+    })
+
+    // 如果已完成，直接返回首次结果
+    if (!idempotencyResult.should_process) {
+      logger.info('🔄 入口幂等拦截：重复请求，返回首次结果', {
+        idempotency_key,
+        user_id: userId,
+        offer_asset_code
+      })
+      const duplicateResponse = {
+        ...idempotencyResult.response,
+        is_duplicate: true
+      }
+      return res.apiSuccess(duplicateResponse, '挂牌成功（幂等回放）')
+    }
+
+    // 使用事务执行挂牌操作
+    const responseData = await TransactionManager.execute(
+      async transaction => {
+        const { listing, freeze_result, is_duplicate } =
+          await MarketListingService.createFungibleAssetListing(
+            {
+              idempotency_key,
+              seller_user_id: userId,
+              offer_asset_code,
+              offer_amount: offerAmountValue,
+              price_amount: priceAmountValue,
+              price_asset_code: 'DIAMOND'
+            },
+            { transaction }
+          )
+
+        // 获取用户当前挂牌状态
+        const listingStatus = await MarketListingService.getUserActiveListingCount(userId, {
+          transaction
+        })
+
+        // 构建响应数据
+        return {
+          listing: {
+            listing_id: listing.listing_id,
+            listing_kind: 'fungible_asset',
+            offer_asset_code: listing.offer_asset_code,
+            offer_amount: Number(listing.offer_amount),
+            price_amount: Number(listing.price_amount),
+            price_asset_code: listing.price_asset_code,
+            status: listing.status,
+            is_duplicate
+          },
+          listing_status: {
+            current: listingStatus.active_count,
+            limit: listingStatus.max_count,
+            remaining: listingStatus.remaining_count
+          },
+          balance_after: freeze_result?.balance
+            ? {
+                available_amount: Number(freeze_result.balance.available_amount),
+                frozen_amount: Number(freeze_result.balance.frozen_amount)
+              }
+            : null,
+          _listing_id: listing.listing_id,
+          _is_duplicate: is_duplicate
+        }
+      },
+      { description: 'market_list_fungible_asset' }
+    )
+
+    // 记录幂等完成状态
+    if (!responseData._is_duplicate) {
+      await IdempotencyService.markAsCompleted(idempotency_key, responseData._listing_id, {
+        listing: responseData.listing,
+        listing_status: responseData.listing_status,
+        balance_after: responseData.balance_after
+      })
+    }
+
+    logger.info('可叠加资产挂牌成功', {
+      user_id: userId,
+      listing_id: responseData._listing_id,
+      offer_asset_code,
+      offer_amount: offerAmountValue,
+      price_amount: priceAmountValue,
+      idempotency_key,
+      is_duplicate: responseData._is_duplicate
+    })
+
+    return res.apiSuccess(
+      {
+        listing: responseData.listing,
+        listing_status: responseData.listing_status,
+        balance_after: responseData.balance_after
+      },
+      '挂牌成功'
+    )
+  } catch (error) {
+    // 标记幂等请求失败
+    await IdempotencyService.markAsFailed(idempotency_key, error.message).catch(markError => {
+      logger.error('标记幂等请求失败状态时出错:', markError)
+    })
+
+    // 处理特定错误码
+    if (error.code === 'LISTING_LIMIT_EXCEEDED') {
+      return res.apiError(error.message, error.code, error.details, 400)
+    }
+    if (error.code === 'INSUFFICIENT_BALANCE') {
+      return res.apiError(error.message, error.code, error.details, 400)
+    }
+    if (error.code === 'INVALID_ASSET_TYPE') {
+      return res.apiError(error.message, error.code, null, 400)
+    }
+    if (error.statusCode === 409) {
+      return res.apiError(error.message, error.code || 'IDEMPOTENCY_ERROR', error.details, 409)
+    }
+
+    logger.error('可叠加资产挂牌失败', {
+      error: error.message,
+      user_id: req.user?.user_id,
+      idempotency_key,
+      offer_asset_code: req.body?.offer_asset_code
+    })
+
+    return handleServiceError(error, res, '挂牌失败')
+  }
 })
 
 module.exports = router

@@ -38,7 +38,7 @@ class NotificationService {
    * @param {Object} options.data - 附加数据
    * @returns {Promise<Object>} 通知结果
    */
-  static async send (user_id, options) {
+  static async send(user_id, options) {
     const { type, title, content, data = {} } = options
 
     try {
@@ -102,7 +102,7 @@ class NotificationService {
    * @param {Object} options.metadata - 附加元数据
    * @returns {Promise<Object>} 消息发送结果
    */
-  static async sendToChat (user_id, options) {
+  static async sendToChat(user_id, options) {
     const { title, content, notification_type, metadata = {} } = options
 
     // 导入必要的模型和服务
@@ -185,7 +185,7 @@ class NotificationService {
    * @param {number} user_id - 用户ID
    * @returns {Promise<Object>} 客服聊天会话对象
    */
-  static async getOrCreateCustomerServiceSession (user_id) {
+  static async getOrCreateCustomerServiceSession(user_id) {
     const { CustomerServiceSession } = require('../models')
 
     // 1. 查找用户的活跃会话（waiting/assigned/active状态）
@@ -224,7 +224,7 @@ class NotificationService {
    * @param {Object} options.data - 附加数据
    * @returns {Promise<Object>} 通知结果
    */
-  static async sendToAdmins (options) {
+  static async sendToAdmins(options) {
     const { type, title, content, data = {} } = options
 
     try {
@@ -287,7 +287,7 @@ class NotificationService {
    * @param {Object} exchangeData - 兑换数据
    * @returns {Promise<Object>} 通知发送结果
    */
-  static async notifyExchangePending (user_id, exchangeData) {
+  static async notifyExchangePending(user_id, exchangeData) {
     return await this.send(user_id, {
       type: 'exchange_pending',
       title: '兑换申请已提交',
@@ -307,7 +307,7 @@ class NotificationService {
    * @param {Object} exchangeData - 兑换数据
    * @returns {Promise<Object>} 通知发送结果
    */
-  static async notifyNewExchangeAudit (exchangeData) {
+  static async notifyNewExchangeAudit(exchangeData) {
     return await this.sendToAdmins({
       type: 'new_exchange_audit',
       title: '新的兑换订单待审核',
@@ -329,7 +329,7 @@ class NotificationService {
    * @param {Object} exchangeData - 兑换数据
    * @returns {Promise<Object>} 通知发送结果
    */
-  static async notifyExchangeApproved (user_id, exchangeData) {
+  static async notifyExchangeApproved(user_id, exchangeData) {
     return await this.send(user_id, {
       type: 'exchange_approved',
       title: '兑换审核通过',
@@ -349,7 +349,7 @@ class NotificationService {
    * @param {Object} exchangeData - 兑换数据
    * @returns {Promise<Object>} 通知发送结果
    */
-  static async notifyExchangeRejected (user_id, exchangeData) {
+  static async notifyExchangeRejected(user_id, exchangeData) {
     return await this.send(user_id, {
       type: 'exchange_rejected',
       title: '兑换审核未通过',
@@ -369,7 +369,7 @@ class NotificationService {
    * @param {Object} alertData - 告警数据
    * @returns {Promise<Object>} 通知发送结果
    */
-  static async notifyTimeoutAlert (alertData) {
+  static async notifyTimeoutAlert(alertData) {
     return await this.sendToAdmins({
       type: 'pending_orders_alert',
       title: '待审核订单超时告警',
@@ -397,7 +397,7 @@ class NotificationService {
    *   is_first_unlock: false
    * })
    */
-  static async notifyPremiumUnlockSuccess (user_id, unlockData) {
+  static async notifyPremiumUnlockSuccess(user_id, unlockData) {
     const { unlock_cost, remaining_points, expires_at, validity_hours, is_first_unlock } =
       unlockData
 
@@ -429,7 +429,7 @@ class NotificationService {
    *   remaining_minutes: 45
    * })
    */
-  static async notifyPremiumExpiringSoon (user_id, reminderData) {
+  static async notifyPremiumExpiringSoon(user_id, reminderData) {
     const { expires_at, remaining_hours, remaining_minutes } = reminderData
 
     return await this.send(user_id, {
@@ -458,7 +458,7 @@ class NotificationService {
    *   total_unlock_count: 2
    * })
    */
-  static async notifyPremiumExpired (user_id, expiryData) {
+  static async notifyPremiumExpired(user_id, expiryData) {
     const { expired_at, total_unlock_count } = expiryData
 
     return await this.send(user_id, {
@@ -484,7 +484,7 @@ class NotificationService {
    * @param {Object} _options - 选项（预留参数）
    * @returns {Promise<Object>} 通知发送结果
    */
-  static async sendAuditApprovedNotification (user_id, auditData, _options = {}) {
+  static async sendAuditApprovedNotification(user_id, auditData, _options = {}) {
     const { type } = auditData
 
     const notificationMap = {
@@ -528,7 +528,7 @@ class NotificationService {
    * @param {Object} _options - 选项（预留参数）
    * @returns {Promise<Object>} 通知发送结果
    */
-  static async sendAuditRejectedNotification (user_id, auditData, _options = {}) {
+  static async sendAuditRejectedNotification(user_id, auditData, _options = {}) {
     const { type, reason } = auditData
 
     const notificationMap = {
@@ -570,7 +570,7 @@ class NotificationService {
    * @param {string} lotteryData.draw_id - 抽奖记录ID
    * @returns {Promise<Object>} 通知结果
    */
-  static async notifyLotteryWin (user_id, lotteryData) {
+  static async notifyLotteryWin(user_id, lotteryData) {
     const { prize_name, prize_type, prize_value, draw_id } = lotteryData
 
     // 根据奖品类型定制消息
@@ -609,7 +609,7 @@ class NotificationService {
    * @param {number} pointsData.balance_after - 变动后余额
    * @returns {Promise<Object>} 通知结果
    */
-  static async notifyPointsChange (user_id, pointsData) {
+  static async notifyPointsChange(user_id, pointsData) {
     const { change_type, points_amount, reason, balance_after } = pointsData
 
     const isEarn = change_type === 'earn'
@@ -636,7 +636,7 @@ class NotificationService {
    * @param {string} productData.product_category - 商品类别
    * @returns {Promise<Object>} 通知结果
    */
-  static async notifyNewProduct (user_id, productData) {
+  static async notifyNewProduct(user_id, productData) {
     const { product_name, exchange_points, product_category } = productData
 
     if (user_id) {
@@ -668,7 +668,7 @@ class NotificationService {
    * @param {string} announcementData.announcement_type - 公告类型
    * @returns {Promise<Object>} 通知结果
    */
-  static async notifyAnnouncement (user_id, announcementData) {
+  static async notifyAnnouncement(user_id, announcementData) {
     const { title, content, announcement_type } = announcementData
 
     if (user_id) {
@@ -706,7 +706,7 @@ class NotificationService {
    * @param {string} securityData.ip_address - IP地址
    * @returns {Promise<Object>} 通知结果
    */
-  static async notifySecurityEvent (user_id, securityData) {
+  static async notifySecurityEvent(user_id, securityData) {
     const { description, ip_address } = securityData
 
     return await this.send(user_id, {
@@ -714,6 +714,149 @@ class NotificationService {
       title: '🔐 账户安全提醒',
       content: `${description}${ip_address ? `（IP: ${ip_address}）` : ''}。如非本人操作，请及时联系客服。`,
       data: securityData
+    })
+  }
+
+  // ==================== C2C 材料交易通知 ====================
+
+  /**
+   * 挂牌创建成功通知（卖家）
+   *
+   * @param {number} user_id - 卖家用户ID
+   * @param {Object} listingData - 挂牌数据
+   * @param {number} listingData.listing_id - 挂牌ID
+   * @param {string} listingData.offer_asset_code - 挂卖资产代码
+   * @param {number} listingData.offer_amount - 挂卖数量
+   * @param {number} listingData.price_amount - 定价金额
+   * @returns {Promise<Object>} 通知结果
+   */
+  static async notifyListingCreated(user_id, listingData) {
+    const { listing_id, offer_asset_code, offer_amount, price_amount } = listingData
+
+    return await this.send(user_id, {
+      type: 'listing_created',
+      title: '📦 挂牌成功',
+      content: `您的 ${offer_amount} 个 ${offer_asset_code} 已成功上架，标价 ${price_amount} DIAMOND。资产已冻结，等待买家购买。`,
+      data: {
+        listing_id,
+        offer_asset_code,
+        offer_amount,
+        price_amount,
+        action: 'listing_created'
+      }
+    })
+  }
+
+  /**
+   * 挂牌售出通知（卖家）
+   *
+   * @param {number} user_id - 卖家用户ID
+   * @param {Object} saleData - 销售数据
+   * @param {number} saleData.listing_id - 挂牌ID
+   * @param {string} saleData.offer_asset_code - 售出资产代码
+   * @param {number} saleData.offer_amount - 售出数量
+   * @param {number} saleData.price_amount - 成交金额
+   * @param {number} saleData.net_amount - 实际到账（扣除手续费）
+   * @param {number} saleData.buyer_user_id - 买家用户ID
+   * @returns {Promise<Object>} 通知结果
+   */
+  static async notifyListingSold(user_id, saleData) {
+    const { listing_id, offer_asset_code, offer_amount, price_amount, net_amount } = saleData
+
+    return await this.send(user_id, {
+      type: 'listing_sold',
+      title: '💰 售出成功',
+      content: `恭喜！您的 ${offer_amount} 个 ${offer_asset_code} 已售出，成交价 ${price_amount} DIAMOND，实际到账 ${net_amount} DIAMOND（扣除5%手续费）。`,
+      data: {
+        listing_id,
+        offer_asset_code,
+        offer_amount,
+        price_amount,
+        net_amount,
+        action: 'listing_sold'
+      }
+    })
+  }
+
+  /**
+   * 购买成功通知（买家）
+   *
+   * @param {number} user_id - 买家用户ID
+   * @param {Object} purchaseData - 购买数据
+   * @param {number} purchaseData.order_id - 订单ID
+   * @param {string} purchaseData.offer_asset_code - 购买的资产代码
+   * @param {number} purchaseData.offer_amount - 购买数量
+   * @param {number} purchaseData.price_amount - 支付金额
+   * @returns {Promise<Object>} 通知结果
+   */
+  static async notifyPurchaseCompleted(user_id, purchaseData) {
+    const { order_id, offer_asset_code, offer_amount, price_amount } = purchaseData
+
+    return await this.send(user_id, {
+      type: 'purchase_completed',
+      title: '🎉 购买成功',
+      content: `您已成功购买 ${offer_amount} 个 ${offer_asset_code}，支付 ${price_amount} DIAMOND。资产已到账，请在背包中查看。`,
+      data: {
+        order_id,
+        offer_asset_code,
+        offer_amount,
+        price_amount,
+        action: 'purchase_completed'
+      }
+    })
+  }
+
+  /**
+   * 挂牌撤回通知（卖家）
+   *
+   * @param {number} user_id - 卖家用户ID
+   * @param {Object} withdrawData - 撤回数据
+   * @param {number} withdrawData.listing_id - 挂牌ID
+   * @param {string} withdrawData.offer_asset_code - 撤回资产代码
+   * @param {number} withdrawData.offer_amount - 撤回数量
+   * @param {string} [withdrawData.reason='用户主动撤回'] - 撤回原因
+   * @returns {Promise<Object>} 通知结果
+   */
+  static async notifyListingWithdrawn(user_id, withdrawData) {
+    const { listing_id, offer_asset_code, offer_amount, reason = '用户主动撤回' } = withdrawData
+
+    return await this.send(user_id, {
+      type: 'listing_withdrawn',
+      title: '📤 挂牌已撤回',
+      content: `您的 ${offer_amount} 个 ${offer_asset_code} 挂牌已撤回（${reason}）。资产已解冻至您的可用余额。`,
+      data: {
+        listing_id,
+        offer_asset_code,
+        offer_amount,
+        reason,
+        action: 'listing_withdrawn'
+      }
+    })
+  }
+
+  /**
+   * 挂牌过期通知（卖家）
+   *
+   * @param {number} user_id - 卖家用户ID
+   * @param {Object} expireData - 过期数据
+   * @param {number} expireData.listing_id - 挂牌ID
+   * @param {string} expireData.offer_asset_code - 过期资产代码
+   * @param {number} expireData.offer_amount - 过期数量
+   * @returns {Promise<Object>} 通知结果
+   */
+  static async notifyListingExpired(user_id, expireData) {
+    const { listing_id, offer_asset_code, offer_amount } = expireData
+
+    return await this.send(user_id, {
+      type: 'listing_expired',
+      title: '⏰ 挂牌已过期',
+      content: `您的 ${offer_amount} 个 ${offer_asset_code} 挂牌已超时（3天），系统已自动撤回并解冻资产。如需继续出售，请重新上架。`,
+      data: {
+        listing_id,
+        offer_asset_code,
+        offer_amount,
+        action: 'listing_expired'
+      }
     })
   }
 }

@@ -884,8 +884,11 @@ class ExchangeService {
   /**
    * 创建兑换商品（管理员操作）
    *
-   * 创建兑换商品（管理员操作）
    * V4.5.0 材料资产支付版本
+   *
+   * 🎯 2026-01-08 图片存储架构核查修复：
+   * - 使用事务包装创建操作
+   * - 创建商品后立即绑定图片 context_id（避免被24h定时清理误删）
    *
    * @param {Object} itemData - 商品数据
    * @param {string} itemData.item_name - 商品名称
@@ -896,55 +899,63 @@ class ExchangeService {
    * @param {number} itemData.stock - 初始库存
    * @param {number} [itemData.sort_order=100] - 排序号
    * @param {string} [itemData.status='active'] - 商品状态
+   * @param {number} [itemData.primary_image_id] - 主图片ID（关联 image_resources.image_id）
    * @param {number} created_by - 创建者ID
+   * @param {Object} options - 选项
+   * @param {Transaction} options.transaction - 外部事务对象（必填）
    * @returns {Promise<Object>} 创建结果
    */
-  static async createExchangeItem(itemData, created_by) {
-    try {
-      logger.info('[兑换市场] 管理员创建商品', {
-        item_name: itemData.item_name,
-        created_by
-      })
+  static async createExchangeItem(itemData, created_by, options = {}) {
+    // 强制要求事务边界 - 2026-01-08 图片存储架构治理
+    const transaction = assertAndGetTransaction(options, 'ExchangeService.createExchangeItem')
 
-      // 参数验证
-      if (!itemData.item_name || itemData.item_name.trim().length === 0) {
-        throw new Error('商品名称不能为空')
-      }
+    logger.info('[兑换市场] 管理员创建商品', {
+      item_name: itemData.item_name,
+      created_by
+    })
 
-      if (itemData.item_name.length > 100) {
-        throw new Error('商品名称最长100字符')
-      }
+    // 参数验证
+    if (!itemData.item_name || itemData.item_name.trim().length === 0) {
+      throw new Error('商品名称不能为空')
+    }
 
-      if (itemData.item_description && itemData.item_description.length > 500) {
-        throw new Error('商品描述最长500字符')
-      }
+    if (itemData.item_name.length > 100) {
+      throw new Error('商品名称最长100字符')
+    }
 
-      // V4.5.0：材料资产支付必填校验
-      if (!itemData.cost_asset_code) {
-        throw new Error('材料资产代码（cost_asset_code）不能为空')
-      }
+    if (itemData.item_description && itemData.item_description.length > 500) {
+      throw new Error('商品描述最长500字符')
+    }
 
-      if (!itemData.cost_amount || itemData.cost_amount <= 0) {
-        throw new Error('材料成本数量（cost_amount）必须大于0')
-      }
+    // V4.5.0：材料资产支付必填校验
+    if (!itemData.cost_asset_code) {
+      throw new Error('材料资产代码（cost_asset_code）不能为空')
+    }
 
-      if (itemData.cost_price === undefined || itemData.cost_price < 0) {
-        throw new Error('成本价必须大于等于0')
-      }
+    if (!itemData.cost_amount || itemData.cost_amount <= 0) {
+      throw new Error('材料成本数量（cost_amount）必须大于0')
+    }
 
-      if (itemData.stock === undefined || itemData.stock < 0) {
-        throw new Error('库存必须大于等于0')
-      }
+    if (itemData.cost_price === undefined || itemData.cost_price < 0) {
+      throw new Error('成本价必须大于等于0')
+    }
 
-      const validStatuses = ['active', 'inactive']
-      if (itemData.status && !validStatuses.includes(itemData.status)) {
-        throw new Error(`无效的status参数，允许值：${validStatuses.join(', ')}`)
-      }
+    if (itemData.stock === undefined || itemData.stock < 0) {
+      throw new Error('库存必须大于等于0')
+    }
 
-      // 创建商品（V4.5.0材料资产支付）
-      const item = await ExchangeItem.create({
+    const validStatuses = ['active', 'inactive']
+    if (itemData.status && !validStatuses.includes(itemData.status)) {
+      throw new Error(`无效的status参数，允许值：${validStatuses.join(', ')}`)
+    }
+
+    // 创建商品（V4.5.0材料资产支付 + 2026-01-08 图片存储架构）
+    const item = await ExchangeItem.create(
+      {
         item_name: itemData.item_name.trim(),
         item_description: itemData.item_description ? itemData.item_description.trim() : '',
+        // 🎯 2026-01-08 图片存储架构：主图片ID（关联 image_resources.image_id）
+        primary_image_id: itemData.primary_image_id || null,
         cost_asset_code: itemData.cost_asset_code,
         cost_amount: parseInt(itemData.cost_amount) || 0,
         cost_price: parseFloat(itemData.cost_price),
@@ -953,137 +964,234 @@ class ExchangeService {
         status: itemData.status || 'active',
         created_at: BeijingTimeHelper.createDatabaseTime(),
         updated_at: BeijingTimeHelper.createDatabaseTime()
-      })
+      },
+      { transaction }
+    )
 
-      logger.info(`[兑换市场] 商品创建成功，item_id: ${item.item_id}`)
+    logger.info(`[兑换市场] 商品创建成功，item_id: ${item.item_id}`)
 
-      // 决策4+22：商品创建后失效列表缓存
+    // 🎯 2026-01-08 图片存储架构修复：绑定图片 context_id（避免被24h定时清理误删）
+    let bound_image = false
+    if (itemData.primary_image_id) {
       try {
-        const { BusinessCacheHelper } = require('../utils/BusinessCacheHelper')
-        await BusinessCacheHelper.invalidateExchangeItems('item_created')
-      } catch (cacheError) {
-        logger.warn('[兑换市场] 缓存失效失败（非致命）:', cacheError.message)
+        const ImageService = require('./ImageService')
+        await ImageService.updateImageContextId(
+          itemData.primary_image_id,
+          item.item_id,
+          transaction
+        )
+        bound_image = true
+        logger.info('[兑换市场] 商品图片绑定成功', {
+          item_id: item.item_id,
+          image_id: itemData.primary_image_id
+        })
+      } catch (bindError) {
+        // 绑定失败记录警告但不阻塞创建
+        logger.warn('[兑换市场] 商品图片绑定失败（非致命）', {
+          item_id: item.item_id,
+          image_id: itemData.primary_image_id,
+          error: bindError.message
+        })
       }
+    }
 
-      return {
-        success: true,
-        item: item.toJSON(),
-        timestamp: BeijingTimeHelper.now()
-      }
-    } catch (error) {
-      logger.error('[兑换市场] 创建商品失败:', error.message)
-      throw error
+    // 决策4+22：商品创建后失效列表缓存
+    try {
+      const { BusinessCacheHelper } = require('../utils/BusinessCacheHelper')
+      await BusinessCacheHelper.invalidateExchangeItems('item_created')
+    } catch (cacheError) {
+      logger.warn('[兑换市场] 缓存失效失败（非致命）:', cacheError.message)
+    }
+
+    return {
+      success: true,
+      item: item.toJSON(),
+      bound_image,
+      timestamp: BeijingTimeHelper.now()
     }
   }
 
   /**
    * 更新兑换商品（管理员操作）
    *
+   * 🎯 2026-01-08 图片存储架构核查修复：
+   * - 更换图片时删除旧图片（DB + 对象存储）
+   * - 新图片绑定 context_id（避免被24h定时清理误删）
+   * - 符合"删除业务记录时统一删 DB + 删对象存储"规范
+   *
    * @param {number} item_id - 商品ID
    * @param {Object} updateData - 更新数据
+   * @param {Object} options - 选项
+   * @param {Transaction} options.transaction - 外部事务对象（必填，用于图片操作原子性）
    * @returns {Promise<Object>} 更新结果
    */
-  static async updateExchangeItem(item_id, updateData) {
+  static async updateExchangeItem(item_id, updateData, options = {}) {
+    // 强制要求事务边界 - 2026-01-08 图片存储架构治理
+    const transaction = assertAndGetTransaction(options, 'ExchangeService.updateExchangeItem')
+
+    logger.info('[兑换市场] 管理员更新商品', { item_id })
+
+    // 查询商品
+    const item = await ExchangeItem.findByPk(item_id, { transaction })
+    if (!item) {
+      throw new Error('商品不存在')
+    }
+
+    // 保存旧图片ID用于后续处理
+    const old_image_id = item.primary_image_id
+
+    // 构建更新数据
+    const finalUpdateData = { updated_at: BeijingTimeHelper.createDatabaseTime() }
+
+    if (updateData.item_name !== undefined) {
+      if (updateData.item_name.trim().length === 0) {
+        throw new Error('商品名称不能为空')
+      }
+      if (updateData.item_name.length > 100) {
+        throw new Error('商品名称最长100字符')
+      }
+      finalUpdateData.item_name = updateData.item_name.trim()
+    }
+
+    if (updateData.item_description !== undefined) {
+      if (updateData.item_description.length > 500) {
+        throw new Error('商品描述最长500字符')
+      }
+      finalUpdateData.item_description = updateData.item_description.trim()
+    }
+
+    // V4.5.0：材料资产支付字段更新
+    if (updateData.cost_asset_code !== undefined) {
+      if (!updateData.cost_asset_code) {
+        throw new Error('材料资产代码不能为空')
+      }
+      finalUpdateData.cost_asset_code = updateData.cost_asset_code
+    }
+
+    if (updateData.cost_amount !== undefined) {
+      if (updateData.cost_amount <= 0) {
+        throw new Error('材料成本数量必须大于0')
+      }
+      finalUpdateData.cost_amount = parseInt(updateData.cost_amount)
+    }
+
+    if (updateData.cost_price !== undefined) {
+      if (updateData.cost_price < 0) {
+        throw new Error('成本价必须大于等于0')
+      }
+      finalUpdateData.cost_price = parseFloat(updateData.cost_price)
+    }
+
+    if (updateData.stock !== undefined) {
+      if (updateData.stock < 0) {
+        throw new Error('库存必须大于等于0')
+      }
+      finalUpdateData.stock = parseInt(updateData.stock)
+    }
+
+    if (updateData.sort_order !== undefined) {
+      finalUpdateData.sort_order = parseInt(updateData.sort_order)
+    }
+
+    if (updateData.status !== undefined) {
+      const validStatuses = ['active', 'inactive']
+      if (!validStatuses.includes(updateData.status)) {
+        throw new Error(`无效的status参数，允许值：${validStatuses.join(', ')}`)
+      }
+      finalUpdateData.status = updateData.status
+    }
+
+    // 🎯 2026-01-08 图片存储架构修复：处理图片更换
+    let deleted_old_image = false
+    let bound_new_image = false
+    const new_image_id = updateData.primary_image_id
+
+    if (updateData.primary_image_id !== undefined) {
+      // 允许设置为 null（清除图片）或正整数（关联新图片）
+      finalUpdateData.primary_image_id = updateData.primary_image_id || null
+
+      const ImageService = require('./ImageService')
+
+      // 如果更换了图片（新旧不同），删除旧图片
+      if (old_image_id && old_image_id !== new_image_id) {
+        try {
+          await ImageService.deleteImage(old_image_id, transaction)
+          deleted_old_image = true
+          logger.info('[兑换市场] 商品旧图片删除成功', {
+            item_id,
+            old_image_id
+          })
+        } catch (imageError) {
+          // 旧图片删除失败不阻塞更新，但记录警告
+          logger.warn('[兑换市场] 商品旧图片删除失败（非致命）', {
+            item_id,
+            old_image_id,
+            error: imageError.message
+          })
+        }
+      }
+
+      // 如果设置了新图片，绑定 context_id（避免被24h定时清理误删）
+      if (new_image_id) {
+        try {
+          await ImageService.updateImageContextId(new_image_id, item_id, transaction)
+          bound_new_image = true
+          logger.info('[兑换市场] 商品新图片绑定成功', {
+            item_id,
+            new_image_id
+          })
+        } catch (bindError) {
+          // 绑定失败记录警告但不阻塞更新
+          logger.warn('[兑换市场] 商品新图片绑定失败（非致命）', {
+            item_id,
+            new_image_id,
+            error: bindError.message
+          })
+        }
+      }
+    }
+
+    // 更新商品
+    await item.update(finalUpdateData, { transaction })
+
+    logger.info(`[兑换市场] 商品更新成功，item_id: ${item_id}`, {
+      deleted_old_image,
+      bound_new_image,
+      old_image_id,
+      new_image_id
+    })
+
+    // 决策4+22：商品更新后失效列表缓存
     try {
-      logger.info('[兑换市场] 管理员更新商品', { item_id })
+      const { BusinessCacheHelper } = require('../utils/BusinessCacheHelper')
+      await BusinessCacheHelper.invalidateExchangeItems('item_updated')
+    } catch (cacheError) {
+      logger.warn('[兑换市场] 缓存失效失败（非致命）:', cacheError.message)
+    }
 
-      // 查询商品
-      const item = await ExchangeItem.findByPk(item_id)
-      if (!item) {
-        throw new Error('商品不存在')
-      }
-
-      // 构建更新数据
-      const finalUpdateData = { updated_at: BeijingTimeHelper.createDatabaseTime() }
-
-      if (updateData.item_name !== undefined) {
-        if (updateData.item_name.trim().length === 0) {
-          throw new Error('商品名称不能为空')
-        }
-        if (updateData.item_name.length > 100) {
-          throw new Error('商品名称最长100字符')
-        }
-        finalUpdateData.item_name = updateData.item_name.trim()
-      }
-
-      if (updateData.item_description !== undefined) {
-        if (updateData.item_description.length > 500) {
-          throw new Error('商品描述最长500字符')
-        }
-        finalUpdateData.item_description = updateData.item_description.trim()
-      }
-
-      // V4.5.0：材料资产支付字段更新
-      if (updateData.cost_asset_code !== undefined) {
-        if (!updateData.cost_asset_code) {
-          throw new Error('材料资产代码不能为空')
-        }
-        finalUpdateData.cost_asset_code = updateData.cost_asset_code
-      }
-
-      if (updateData.cost_amount !== undefined) {
-        if (updateData.cost_amount <= 0) {
-          throw new Error('材料成本数量必须大于0')
-        }
-        finalUpdateData.cost_amount = parseInt(updateData.cost_amount)
-      }
-
-      if (updateData.cost_price !== undefined) {
-        if (updateData.cost_price < 0) {
-          throw new Error('成本价必须大于等于0')
-        }
-        finalUpdateData.cost_price = parseFloat(updateData.cost_price)
-      }
-
-      if (updateData.stock !== undefined) {
-        if (updateData.stock < 0) {
-          throw new Error('库存必须大于等于0')
-        }
-        finalUpdateData.stock = parseInt(updateData.stock)
-      }
-
-      if (updateData.sort_order !== undefined) {
-        finalUpdateData.sort_order = parseInt(updateData.sort_order)
-      }
-
-      if (updateData.status !== undefined) {
-        const validStatuses = ['active', 'inactive']
-        if (!validStatuses.includes(updateData.status)) {
-          throw new Error(`无效的status参数，允许值：${validStatuses.join(', ')}`)
-        }
-        finalUpdateData.status = updateData.status
-      }
-
-      // 更新商品
-      await item.update(finalUpdateData)
-
-      logger.info(`[兑换市场] 商品更新成功，item_id: ${item_id}`)
-
-      // 决策4+22：商品更新后失效列表缓存
-      try {
-        const { BusinessCacheHelper } = require('../utils/BusinessCacheHelper')
-        await BusinessCacheHelper.invalidateExchangeItems('item_updated')
-      } catch (cacheError) {
-        logger.warn('[兑换市场] 缓存失效失败（非致命）:', cacheError.message)
-      }
-
-      return {
-        success: true,
-        item: item.toJSON(),
-        timestamp: BeijingTimeHelper.now()
-      }
-    } catch (error) {
-      logger.error(`[兑换市场] 更新商品失败(item_id:${item_id}):`, error.message)
-      throw error
+    return {
+      success: true,
+      item: item.toJSON(),
+      image_changes: {
+        deleted_old_image,
+        bound_new_image,
+        old_image_id,
+        new_image_id
+      },
+      timestamp: BeijingTimeHelper.now()
     }
   }
 
   /**
    * 删除兑换商品（管理员操作）
    *
+   * 🎯 2026-01-08 图片存储架构核查修复：
+   * - 删除商品时联动删除关联图片（DB + 对象存储）
+   * - 符合"删除业务记录时统一删 DB + 删对象存储"规范
+   *
    * @param {number} item_id - 商品ID
    * @param {Object} options - 选项
-   * @param {Transaction} options.transaction - 外部事务对象（可选）
+   * @param {Transaction} options.transaction - 外部事务对象（必填）
    * @returns {Promise<Object>} 删除结果
    */
   static async deleteExchangeItem(item_id, options = {}) {
@@ -1098,6 +1206,9 @@ class ExchangeService {
       throw new Error('商品不存在')
     }
 
+    // 保存关联图片ID用于后续删除
+    const associated_image_id = item.primary_image_id
+
     // 检查是否有相关订单
     const orderCount = await ExchangeRecord.count({
       where: { item_id },
@@ -1105,7 +1216,7 @@ class ExchangeService {
     })
 
     if (orderCount > 0) {
-      // 如果有订单，只能下架不能删除
+      // 如果有订单，只能下架不能删除（图片保留不删除）
       await item.update(
         {
           status: 'inactive',
@@ -1133,10 +1244,32 @@ class ExchangeService {
       }
     }
 
+    // 🎯 2026-01-08 图片存储架构修复：商品删除时联动删除关联图片
+    if (associated_image_id) {
+      try {
+        const ImageService = require('./ImageService')
+        const deleteResult = await ImageService.deleteImage(associated_image_id, transaction)
+        logger.info('[兑换市场] 商品关联图片删除成功', {
+          item_id,
+          image_id: associated_image_id,
+          delete_result: deleteResult.success
+        })
+      } catch (imageError) {
+        // 图片删除失败不阻塞商品删除，但记录警告
+        logger.warn('[兑换市场] 商品关联图片删除失败（非致命）', {
+          item_id,
+          image_id: associated_image_id,
+          error: imageError.message
+        })
+      }
+    }
+
     // 删除商品
     await item.destroy({ transaction })
 
-    logger.info(`[兑换市场] 商品删除成功，item_id: ${item_id}`)
+    logger.info(`[兑换市场] 商品删除成功，item_id: ${item_id}`, {
+      deleted_image_id: associated_image_id
+    })
 
     // 决策4+22：商品删除后失效列表缓存
     try {
@@ -1150,6 +1283,7 @@ class ExchangeService {
       success: true,
       action: 'deleted',
       message: '商品删除成功',
+      deleted_image_id: associated_image_id,
       timestamp: BeijingTimeHelper.now()
     }
   }

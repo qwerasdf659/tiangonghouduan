@@ -18,6 +18,10 @@ const { Op } = require('sequelize')
 const BeijingTimeHelper = require('../utils/timeHelper')
 const SealosStorageService = require('./sealosStorage')
 const { getImageUrl } = require('../utils/ImageUrlHelper')
+const sharp = require('sharp')
+
+// 🎯 2026-01-08 图片存储架构核查：统一尺寸限制常量（与 ImageService 保持一致）
+const MAX_IMAGE_DIMENSION = 4096 // 最大图片尺寸（宽或高）
 
 /**
  * 弹窗Banner服务类
@@ -301,12 +305,31 @@ class PopupBannerService {
    * - 返回对象 key（如 popup-banners/xxx.jpg）存入数据库
    * - 同时返回完整 URL 供前端预览使用
    *
+   * 🎯 2026-01-08 图片存储架构核查修复：
+   * - 添加图片尺寸校验（最大4096px，与 ImageService 保持一致）
+   *
    * @param {Buffer} fileBuffer - 文件缓冲区
    * @param {string} originalName - 原始文件名
-   * @returns {Promise<{objectKey: string, publicUrl: string}>} 对象 key 和公网 URL
+   * @returns {Promise<{objectKey: string, publicUrl: string, dimensions: {width: number, height: number}}>} 对象 key、公网 URL 和尺寸信息
    */
   static async uploadBannerImage(fileBuffer, originalName) {
     try {
+      // 🎯 2026-01-08 图片存储架构核查：添加尺寸校验（与 ImageService 保持一致）
+      const metadata = await sharp(fileBuffer).metadata()
+      const { width, height } = metadata
+
+      if (width > MAX_IMAGE_DIMENSION || height > MAX_IMAGE_DIMENSION) {
+        throw new Error(
+          `图片尺寸超出限制，宽高不能超过${MAX_IMAGE_DIMENSION}px（当前：${width}x${height}）`
+        )
+      }
+
+      logger.info('弹窗图片尺寸校验通过', {
+        original_name: originalName,
+        width,
+        height
+      })
+
       const storageService = new SealosStorageService()
 
       // uploadImage 现在返回对象 key（非完整 URL）
@@ -318,13 +341,16 @@ class PopupBannerService {
       logger.info('上传弹窗图片成功', {
         original_name: originalName,
         object_key: objectKey,
-        public_url: publicUrl
+        public_url: publicUrl,
+        width,
+        height
       })
 
       // 返回对象 key（存入数据库）和 URL（供前端预览）
       return {
         objectKey,
-        publicUrl
+        publicUrl,
+        dimensions: { width, height }
       }
     } catch (error) {
       logger.error('上传弹窗图片失败', { error: error.message, original_name: originalName })
@@ -410,7 +436,11 @@ class PopupBannerService {
   }
 
   /**
-   * 删除弹窗Banner
+   * 删除弹窗Banner（同步删除 Sealos 对象）
+   *
+   * 🎯 2026-01-09 用户拍板：删除即物理删除对象
+   * - 删除数据库记录
+   * - 同步删除 Sealos 上的图片对象
    *
    * @param {number} bannerId - 弹窗ID
    * @returns {Promise<boolean>} 是否成功
@@ -420,8 +450,43 @@ class PopupBannerService {
       const banner = await PopupBanner.findByPk(bannerId)
       if (!banner) return false
 
-      // 可选：删除Sealos上的图片文件（暂不实现，保留图片历史）
+      // 🎯 2026-01-09：同步删除 Sealos 上的图片对象（立即物理删除）
+      if (banner.image_url) {
+        /*
+         * 判断是对象 key 还是完整 URL
+         * 对象 key 格式：popup-banners/xxx.jpg（不以 http 开头）
+         * 完整 URL 格式：https://xxx.com/xxx.jpg（以 http 开头，历史数据或外部链接）
+         */
+        const isObjectKey = !banner.image_url.startsWith('http')
 
+        if (isObjectKey) {
+          try {
+            const storageService = new SealosStorageService()
+            await storageService.deleteObject(banner.image_url)
+            logger.info('删除弹窗Banner图片成功（Sealos）', {
+              banner_id: bannerId,
+              object_key: banner.image_url
+            })
+          } catch (storageError) {
+            /*
+             * 对象存储删除失败不阻塞数据库删除（降级处理）
+             * 可能原因：对象已不存在、网络问题等
+             */
+            logger.warn('删除弹窗Banner图片失败（非致命，继续删除数据库记录）', {
+              banner_id: bannerId,
+              object_key: banner.image_url,
+              error: storageError.message
+            })
+          }
+        } else {
+          logger.info('跳过图片删除（历史完整URL或外部链接）', {
+            banner_id: bannerId,
+            image_url: banner.image_url.substring(0, 50) + '...'
+          })
+        }
+      }
+
+      // 删除数据库记录
       await banner.destroy()
 
       logger.info('删除弹窗Banner成功', { banner_id: bannerId })

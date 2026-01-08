@@ -32,7 +32,7 @@
  * ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
  */
 
-const { User, Role, UserRole } = require('../models')
+const { User, Role, UserRole, UserRoleChangeRecord, UserStatusChangeRecord } = require('../models')
 const { assertAndGetTransaction } = require('../utils/transactionHelpers')
 const BeijingTimeHelper = require('../utils/timeHelper')
 const logger = require('../utils/logger')
@@ -50,7 +50,7 @@ class UserRoleService {
    * @param {number} user_id - 用户ID
    * @returns {Promise<Object>} 用户信息和权限数据，包含user_id、mobile、nickname、roles数组、is_admin、highest_role_level等字段
    */
-  static async getUserWithRoles (user_id) {
+  static async getUserWithRoles(user_id) {
     const user = await User.findByPk(user_id, {
       include: [
         {
@@ -99,7 +99,7 @@ class UserRoleService {
    * @param {string} action - 操作类型
    * @returns {Promise<boolean>} 是否拥有指定资源的操作权限
    */
-  static async checkUserPermission (user_id, resource, action = 'read') {
+  static async checkUserPermission(user_id, resource, action = 'read') {
     const user = await User.findByPk(user_id)
     if (!user) {
       return false
@@ -113,7 +113,7 @@ class UserRoleService {
    * @param {Array} userIds - 用户ID数组
    * @returns {Promise<Array>} 用户角色信息数组，每项包含user_id、mobile、nickname、roles、highest_role_level字段
    */
-  static async getBatchUsersWithRoles (userIds) {
+  static async getBatchUsersWithRoles(userIds) {
     const users = await User.findAll({
       where: { user_id: userIds },
       include: [
@@ -140,7 +140,7 @@ class UserRoleService {
    * 📊 获取角色统计信息
    * @returns {Promise<Array>} 角色统计信息数组，每项包含role_name、role_level、user_count、description字段
    */
-  static async getRoleStatistics () {
+  static async getRoleStatistics() {
     const roles = await Role.findAll({
       where: { is_active: true },
       include: [
@@ -169,6 +169,12 @@ class UserRoleService {
    * - 未提供事务时直接报错，由入口层统一管理事务
    * - 缓存失效、WebSocket断开等副作用应在事务提交后由调用方处理
    *
+   * 审计统一入口整合（2026-01-08 决策5/6/9/10）：
+   * - 【决策9】创建 UserRoleChangeRecord 记录，主键作为审计日志 target_id
+   * - 【决策6】idempotency_key 从 UserRoleChangeRecord.record_id 派生
+   * - 【决策5】审计日志失败时阻断业务流程（关键操作）
+   * - 【决策10】target_id 指向 UserRoleChangeRecord.record_id
+   *
    * @param {number} user_id - 用户ID
    * @param {string} role_name - 新角色名称
    * @param {number} operator_id - 操作者ID
@@ -178,8 +184,9 @@ class UserRoleService {
    * @param {string} options.ip_address - IP地址（可选）
    * @param {string} options.user_agent - 用户代理（可选）
    * @returns {Promise<Object>} 更新结果（包含 post_commit_actions 供调用方处理副作用）
+   * @throws {Error} 业务操作或审计日志失败时抛出错误（关键操作）
    */
-  static async updateUserRole (user_id, role_name, operator_id, options = {}) {
+  static async updateUserRole(user_id, role_name, operator_id, options = {}) {
     // 强制要求事务边界 - 2026-01-05 治理决策
     const transaction = assertAndGetTransaction(options, 'UserRoleService.updateUserRole')
     const { reason, ip_address, user_agent } = options
@@ -218,9 +225,32 @@ class UserRoleService {
       throw new Error('角色不存在')
     }
 
-    // 保存旧角色信息（用于审计日志）
+    // 保存旧角色信息
     const oldRoles = targetUserRoles.roles.map(r => r.role_name).join(', ') || '无角色'
     const oldRoleLevel = targetMaxLevel
+
+    /*
+     * 【决策9】创建业务记录（为审计日志提供业务主键）
+     * 幂等键由业务主键派生（决策6），格式参考 UserRoleChangeRecord.generateIdempotencyKey
+     */
+    const idempotencyKey = UserRoleChangeRecord.generateIdempotencyKey(
+      user_id,
+      role_name,
+      operator_id
+    )
+
+    const changeRecord = await UserRoleChangeRecord.create(
+      {
+        user_id,
+        operator_id,
+        old_role: oldRoles,
+        new_role: role_name,
+        reason: reason || `角色变更: ${oldRoles} → ${role_name}`,
+        idempotency_key: idempotencyKey,
+        metadata: { ip_address, user_agent }
+      },
+      { transaction }
+    )
 
     // 移除用户现有角色
     await UserRole.destroy({ where: { user_id }, transaction })
@@ -237,12 +267,15 @@ class UserRoleService {
       { transaction }
     )
 
-    // 记录审计日志（权限变更属于高敏感操作）
+    /*
+     * 【决策5/10】记录审计日志（关键操作，失败时阻断业务流程）
+     * target_id 指向 UserRoleChangeRecord.record_id（决策10）
+     */
     await AuditLogService.logOperation({
       operator_id,
       operation_type: 'role_change',
-      target_type: 'User',
-      target_id: user_id,
+      target_type: 'UserRoleChangeRecord',
+      target_id: changeRecord.record_id, // 决策10：指向业务记录主键
       action: 'update',
       before_data: {
         roles: oldRoles,
@@ -253,13 +286,19 @@ class UserRoleService {
         role_level: targetRole.role_level
       },
       reason: reason || `角色变更: ${oldRoles} → ${role_name}`,
-      idempotency_key: `role_change_${user_id}_${Date.now()}`,
+      idempotency_key: `audit_${idempotencyKey}`, // 从业务记录派生（决策6）
       ip_address,
       user_agent,
-      transaction
+      transaction,
+      is_critical_operation: true // 决策5：关键操作
     })
 
-    logger.info('用户角色更新成功', { user_id, new_role: role_name, operator_id })
+    logger.info('用户角色更新成功', {
+      user_id,
+      new_role: role_name,
+      operator_id,
+      record_id: changeRecord.record_id
+    })
 
     // 返回结果（包含 post_commit_actions 供调用方在事务提交后处理副作用）
     return {
@@ -270,6 +309,7 @@ class UserRoleService {
       old_role_level: oldRoleLevel,
       operator_id,
       reason,
+      record_id: changeRecord.record_id, // 业务记录ID
       // 事务提交后由调用方处理的副作用
       post_commit_actions: {
         invalidate_cache: true,
@@ -281,18 +321,35 @@ class UserRoleService {
   /**
    * 📝 更新用户状态（管理后台专用）
    *
+   * 事务边界治理（2026-01-08 审计统一入口整合）：
+   * - 强制要求外部事务传入（options.transaction）
+   * - 未提供事务时直接报错，由入口层统一管理事务
+   * - 缓存失效、WebSocket断开等副作用应在事务提交后由调用方处理
+   *
+   * 审计统一入口整合（2026-01-08 决策5/6/9/10）：
+   * - 【决策9】创建 UserStatusChangeRecord 记录，主键作为审计日志 target_id
+   * - 【决策6】idempotency_key 从 UserStatusChangeRecord.record_id 派生
+   * - 【决策5】审计日志失败时阻断业务流程（关键操作）
+   * - 【决策10】target_id 指向 UserStatusChangeRecord.record_id
+   *
    * @param {number} user_id - 用户ID
-   * @param {string} status - 状态（active/inactive/banned）
+   * @param {string} status - 状态（active/inactive/banned/pending）
    * @param {number} operator_id - 操作者ID
    * @param {Object} options - 选项参数
-   * @returns {Promise<Object>} 更新结果
+   * @param {Object} options.transaction - Sequelize事务对象（必填）
+   * @param {string} options.reason - 操作原因（可选）
+   * @param {string} options.ip_address - IP地址（可选）
+   * @param {string} options.user_agent - 用户代理（可选）
+   * @returns {Promise<Object>} 更新结果（包含 post_commit_actions 供调用方处理副作用）
+   * @throws {Error} 业务操作或审计日志失败时抛出错误（关键操作）
    */
-  static async updateUserStatus (user_id, status, operator_id, options = {}) {
-    const { reason = '' } = options
-    const { invalidateUserPermissions } = require('../middleware/auth')
+  static async updateUserStatus(user_id, status, operator_id, options = {}) {
+    // 强制要求事务边界 - 2026-01-08 审计统一入口整合
+    const transaction = assertAndGetTransaction(options, 'UserRoleService.updateUserStatus')
+    const { reason = '', ip_address, user_agent } = options
 
     // 验证状态值
-    if (!['active', 'inactive', 'banned'].includes(status)) {
+    if (!['active', 'inactive', 'banned', 'pending'].includes(status)) {
       throw new Error('无效的用户状态')
     }
 
@@ -302,55 +359,80 @@ class UserRoleService {
     }
 
     // 查找用户
-    const user = await User.findByPk(user_id)
+    const user = await User.findByPk(user_id, { transaction })
     if (!user) {
       throw new Error('用户不存在')
     }
 
     const oldStatus = user.status
 
+    /*
+     * 【决策9】创建业务记录（为审计日志提供业务主键）
+     * 幂等键由业务主键派生（决策6），格式参考 UserStatusChangeRecord.generateIdempotencyKey
+     */
+    const idempotencyKey = UserStatusChangeRecord.generateIdempotencyKey(
+      user_id,
+      status,
+      operator_id
+    )
+
+    const changeRecord = await UserStatusChangeRecord.create(
+      {
+        user_id,
+        operator_id,
+        old_status: oldStatus,
+        new_status: status,
+        reason: reason || `状态变更: ${oldStatus} → ${status}`,
+        idempotency_key: idempotencyKey,
+        metadata: { ip_address, user_agent }
+      },
+      { transaction }
+    )
+
     // 更新用户状态
-    await user.update({ status })
+    await user.update({ status }, { transaction })
 
-    // 自动清除用户权限缓存
-    await invalidateUserPermissions(user_id, `status_change_${oldStatus}_to_${status}`, operator_id)
-    logger.info('权限缓存已清除', { user_id, reason: `状态变更 ${oldStatus} → ${status}` })
-
-    // P1安全修复：如果用户被禁用/停用，强制断开所有WebSocket连接
-    if (status === 'inactive' || status === 'banned') {
-      try {
-        const ChatWebSocketService = require('./ChatWebSocketService')
-        // 断开普通用户连接
-        ChatWebSocketService.disconnectUser(user_id, 'user')
-        // 断开管理员连接（如果有）
-        ChatWebSocketService.disconnectUser(user_id, 'admin')
-        logger.info('用户被禁用，已断开所有WebSocket连接', {
-          user_id,
-          old_status: oldStatus,
-          new_status: status,
-          reason: '账号状态变更'
-        })
-      } catch (wsError) {
-        logger.warn('断开WebSocket连接失败（非致命错误）', {
-          user_id,
-          error: wsError.message
-        })
-      }
-    }
+    /*
+     * 【决策5/10】记录审计日志（关键操作，失败时阻断业务流程）
+     * target_id 指向 UserStatusChangeRecord.record_id（决策10）
+     */
+    await AuditLogService.logOperation({
+      operator_id,
+      operation_type: 'user_status_change',
+      target_type: 'UserStatusChangeRecord',
+      target_id: changeRecord.record_id, // 决策10：指向业务记录主键
+      action: 'update',
+      before_data: { status: oldStatus },
+      after_data: { status },
+      reason: reason || `状态变更: ${oldStatus} → ${status}`,
+      idempotency_key: `audit_${idempotencyKey}`, // 从业务记录派生（决策6）
+      ip_address,
+      user_agent,
+      transaction,
+      is_critical_operation: true // 决策5：关键操作
+    })
 
     logger.info('用户状态更新成功', {
       user_id,
       old_status: oldStatus,
       new_status: status,
-      operator_id
+      operator_id,
+      record_id: changeRecord.record_id
     })
 
+    // 返回结果（包含 post_commit_actions 供调用方在事务提交后处理副作用）
     return {
       user_id,
       old_status: oldStatus,
       new_status: status,
       operator_id,
-      reason
+      reason,
+      record_id: changeRecord.record_id, // 业务记录ID
+      // 事务提交后由调用方处理的副作用
+      post_commit_actions: {
+        invalidate_cache: true,
+        disconnect_ws: status === 'inactive' || status === 'banned' // 禁用/封禁需断开WebSocket
+      }
     }
   }
 
@@ -360,7 +442,7 @@ class UserRoleService {
    * @param {Object} filters - 过滤条件
    * @returns {Promise<Object>} 用户列表和分页信息
    */
-  static async getUserList (filters = {}) {
+  static async getUserList(filters = {}) {
     const { Op } = require('sequelize')
     const { page = 1, limit = 20, search, role_filter } = filters
 
@@ -447,7 +529,7 @@ class UserRoleService {
    * @param {number} user_id - 用户ID
    * @returns {Promise<Object>} 用户详情
    */
-  static async getUserDetail (user_id) {
+  static async getUserDetail(user_id) {
     // 查询用户信息（包含角色信息）
     const user = await User.findOne({
       where: { user_id },
@@ -503,7 +585,7 @@ class UserRoleService {
    *
    * @returns {Promise<Object>} 角色列表
    */
-  static async getRoleList () {
+  static async getRoleList() {
     // 查询所有激活的角色
     const roles = await Role.findAll({
       where: { is_active: true },

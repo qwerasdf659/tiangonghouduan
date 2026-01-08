@@ -51,7 +51,7 @@ class HourlyUnlockTimeoutTradeOrders {
    *
    * @returns {Promise<Object>} 执行报告
    */
-  static async execute () {
+  static async execute() {
     const start_time = Date.now()
     logger.info('开始执行交易市场超时解锁任务（JSON多级锁定版本）')
 
@@ -94,7 +94,7 @@ class HourlyUnlockTimeoutTradeOrders {
    * @private
    * @returns {Promise<Object>} 释放结果
    */
-  static async _releaseTimeoutLockedItems () {
+  static async _releaseTimeoutLockedItems() {
     const transaction = await sequelize.transaction()
 
     try {
@@ -150,9 +150,15 @@ class HourlyUnlockTimeoutTradeOrders {
             { transaction }
           )
 
-          // 记录解锁事件
+          /**
+           * 记录解锁事件（统一入口：ItemInstanceEvent.recordEvent）
+           *
+           * 幂等键规则（确定性派生）：
+           * - 格式：timeout_release:item_{item_instance_id}:lock_{lock_id}
+           * - 确保同一个超时解锁操作重试时返回幂等结果
+           */
           // eslint-disable-next-line no-await-in-loop
-          await ItemInstanceEvent.create(
+          await ItemInstanceEvent.recordEvent(
             {
               item_instance_id: item.item_instance_id,
               event_type: 'unlock',
@@ -163,7 +169,7 @@ class HourlyUnlockTimeoutTradeOrders {
               owner_before: item.owner_user_id,
               owner_after: item.owner_user_id,
               business_type: 'trade_timeout_release',
-              idempotency_key: `timeout_${lock.lock_id}_${Date.now()}`,
+              idempotency_key: `timeout_release:item_${item.item_instance_id}:lock_${lock.lock_id}`,
               meta: {
                 lock_type: lock.lock_type,
                 lock_id: lock.lock_id,
@@ -212,7 +218,7 @@ class HourlyUnlockTimeoutTradeOrders {
    * @private
    * @returns {Promise<Object>} 取消结果
    */
-  static async _cancelTimeoutOrders () {
+  static async _cancelTimeoutOrders() {
     const transaction = await sequelize.transaction()
 
     try {
@@ -242,7 +248,12 @@ class HourlyUnlockTimeoutTradeOrders {
 
       for (const order of frozen_orders) {
         try {
-          // 解冻买家资产
+          /**
+           * 解冻买家资产（幂等键派生规则：${root_idempotency_key}:timeout_unfreeze）
+           *
+           * 使用 order.idempotency_key 作为根幂等键（与订单创建时一致），
+           * 便于通过根幂等键串联订单的所有关联流水记录。
+           */
           // eslint-disable-next-line no-await-in-loop
           await AssetService.unfreeze(
             {
@@ -250,7 +261,7 @@ class HourlyUnlockTimeoutTradeOrders {
               asset_code: order.asset_code,
               amount: order.gross_amount,
               business_type: 'order_timeout_unfreeze',
-              idempotency_key: `${order.business_id}:timeout_unfreeze`,
+              idempotency_key: `${order.idempotency_key}:timeout_unfreeze`,
               meta: {
                 order_id: order.order_id,
                 unfreeze_reason: '订单超时自动取消'
