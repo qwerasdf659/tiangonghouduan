@@ -27,7 +27,7 @@ router.post('/create', authenticateToken, requireAdmin, async (req, res) => {
     const { user_id, presets } = req.body
 
     // 🎯 通过 ServiceManager 获取 LotteryPresetService
-    const LotteryPresetService = req.app.locals.services.getService('lotteryPreset')
+    const LotteryPresetService = req.app.locals.services.getService('lottery_preset')
 
     // 🎯 调用服务层方法（Service层会进行所有验证和业务逻辑处理）
     const createdPresets = await LotteryPresetService.createPresets(adminId, user_id, presets)
@@ -127,7 +127,7 @@ router.get('/list', authenticateToken, requireAdmin, async (req, res) => {
     const adminId = req.user.user_id
 
     // 🎯 通过 ServiceManager 获取 LotteryPresetService
-    const LotteryPresetService = req.app.locals.services.getService('lotteryPreset')
+    const LotteryPresetService = req.app.locals.services.getService('lottery_preset')
 
     // 🎯 调用服务层方法（将查询参数传递给Service层）
     const result = await LotteryPresetService.listPresetsWithPagination(req.query)
@@ -202,7 +202,7 @@ router.get('/stats', authenticateToken, requireAdmin, async (req, res) => {
     const adminId = req.user.user_id
 
     // 🎯 通过 ServiceManager 获取 LotteryPresetService
-    const LotteryPresetService = req.app.locals.services.getService('lotteryPreset')
+    const LotteryPresetService = req.app.locals.services.getService('lottery_preset')
 
     // 🎯 调用服务层方法
     const stats = await LotteryPresetService.getPresetStats()

@@ -10,15 +10,22 @@
  *
  * 🔴 P0-1修复（2026-01-08）：移除硬编码 user_id=31，从 global.testData 动态获取
  *
+ * P1-9 J2-RepoWide 改造说明：
+ * - BasicGuaranteeStrategy 通过 ServiceManager 获取（snake_case: basic_guarantee_strategy）
+ * - ManagementStrategy 通过 ServiceManager 获取（snake_case: management_strategy）
+ * - 模型直接引用用于测试数据准备（服务测试场景合理）
+ *
  * @date 2025-01-21 (重构)
  */
 
 /* eslint-disable no-console */
 
-const BasicGuaranteeStrategy = require('../../../../services/UnifiedLotteryEngine/strategies/BasicGuaranteeStrategy')
-const ManagementStrategy = require('../../../../services/UnifiedLotteryEngine/strategies/ManagementStrategy')
 const models = require('../../../../models')
 const { User } = models
+
+// 🔴 P1-9 J2-RepoWide：通过 global.getTestService 获取服务（snake_case key）
+let BasicGuaranteeStrategy
+let ManagementStrategy
 
 describe('V4统一策略测试套件 - 重构版', () => {
   let basic_guarantee_strategy
@@ -34,6 +41,22 @@ describe('V4统一策略测试套件 - 重构版', () => {
   beforeAll(async () => {
     console.log('🔍 初始化V4策略测试环境...')
 
+    /*
+     * 🔴 P1-9：通过 ServiceManager 获取策略服务
+     *
+     * ServiceManager 注册方式（见 services/index.js）：
+     * - basic_guarantee_strategy: 注册为类（BasicGuaranteeStrategy），需要 new 实例化
+     * - management_strategy: 注册为实例（new ManagementStrategy()），直接使用
+     */
+    const BasicGuaranteeStrategyClass = global.getTestService('basic_guarantee_strategy')
+    BasicGuaranteeStrategy = new BasicGuaranteeStrategyClass() // 类需要实例化
+    basic_guarantee_strategy = BasicGuaranteeStrategy
+
+    ManagementStrategy = global.getTestService('management_strategy') // 已是实例
+    management_strategy = ManagementStrategy
+
+    console.log('✅ 策略服务通过 ServiceManager 获取成功（P1-9）')
+
     // 🔴 P0-1修复：优先使用 global.testData 中的用户ID
     const testUserId = global.testData?.testUser?.user_id
     if (testUserId) {
@@ -48,10 +71,6 @@ describe('V4统一策略测试套件 - 重构版', () => {
     if (!test_user) {
       throw new Error(`测试用户 ${TEST_USER_CONFIG.mobile} 不存在`)
     }
-
-    // 初始化策略实例
-    basic_guarantee_strategy = new BasicGuaranteeStrategy()
-    management_strategy = new ManagementStrategy()
 
     console.log('✅ V4策略测试环境初始化完成')
   })
@@ -86,7 +105,7 @@ describe('V4统一策略测试套件 - 重构版', () => {
         campaign_id: 1
       }
 
-      const validation_result = await basic_guarantee_strategy.validate(test_context)
+      const validation_result = await basic_guarantee_strategy.validateStrategy(test_context)
       expect(typeof validation_result).toBe('boolean')
 
       console.log(`✅ 基础保底策略验证结果: ${validation_result}`)
@@ -241,7 +260,7 @@ describe('V4统一策略测试套件 - 重构版', () => {
       }
 
       // 测试基础策略验证
-      const normal_validation = await basic_guarantee_strategy.validate(normal_context)
+      const normal_validation = await basic_guarantee_strategy.validateStrategy(normal_context)
       expect(typeof normal_validation).toBe('boolean')
 
       // 测试管理策略权限验证（管理员类型请求）
@@ -267,7 +286,7 @@ describe('V4统一策略测试套件 - 重构版', () => {
         campaign_id: 1
       }
 
-      const validation_result = await basic_guarantee_strategy.validate(invalid_context)
+      const validation_result = await basic_guarantee_strategy.validateStrategy(invalid_context)
       expect(validation_result).toBe(false)
 
       console.log('✅ 无效用户ID处理验证通过')
@@ -289,10 +308,10 @@ describe('V4统一策略测试套件 - 重构版', () => {
     })
 
     test('应该正确处理空上下文', async () => {
-      const validation_result = await basic_guarantee_strategy.validate(null)
+      const validation_result = await basic_guarantee_strategy.validateStrategy(null)
       expect(validation_result).toBe(false)
 
-      const validation_result2 = await basic_guarantee_strategy.validate({})
+      const validation_result2 = await basic_guarantee_strategy.validateStrategy({})
       expect(validation_result2).toBe(false)
 
       console.log('✅ 空上下文处理验证通过')

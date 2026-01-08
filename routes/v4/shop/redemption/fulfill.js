@@ -84,8 +84,8 @@ router.post('/fulfill', authenticateToken, async (req, res) => {
      * 调用RedemptionService核销订单
      * 使用 TransactionManager 统一事务边界（符合治理决策）
      */
-    const RedemptionService = req.app.locals.services.getService('redemptionOrder')
-    const order = await TransactionManager.execute(async (transaction) => {
+    const RedemptionService = req.app.locals.services.getService('redemption_order')
+    const order = await TransactionManager.execute(async transaction => {
       return await RedemptionService.fulfillOrder(
         redeem_code.trim().toUpperCase(),
         redeemerUserId,
@@ -129,11 +129,11 @@ router.post('/fulfill', authenticateToken, async (req, res) => {
         },
         item_instance: order.item_instance
           ? {
-            item_instance_id: order.item_instance.item_instance_id,
-            item_type: order.item_instance.item_type,
-            item_name: order.item_instance.item_name,
-            status: order.item_instance.status
-          }
+              item_instance_id: order.item_instance.item_instance_id,
+              item_type: order.item_instance.item_type,
+              item_name: order.item_instance.item_name,
+              status: order.item_instance.status
+            }
           : null,
         redeemer: {
           user_id: redeemerUserId,

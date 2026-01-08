@@ -62,7 +62,7 @@ router.post('/orders', authenticateToken, async (req, res) => {
      * - 使用 TransactionManager 统一事务边界（符合治理决策）
      * - 路由层不直接操作 models，所有验证逻辑收口到 Service 层
      */
-    const RedemptionService = req.app.locals.services.getService('redemptionOrder')
+    const RedemptionService = req.app.locals.services.getService('redemption_order')
     const result = await TransactionManager.execute(async transaction => {
       return await RedemptionService.createOrder(item_instance_id, {
         creator_user_id: userId, // 传入创建者ID，供服务层权限校验
@@ -141,7 +141,7 @@ router.post('/orders/:order_id/cancel', authenticateToken, async (req, res) => {
     })
 
     // 使用 TransactionManager 统一事务边界（符合治理决策）
-    const RedemptionService = req.app.locals.services.getService('redemptionOrder')
+    const RedemptionService = req.app.locals.services.getService('redemption_order')
     const order = await TransactionManager.execute(async transaction => {
       return await RedemptionService.cancelOrder(order_id, { transaction })
     })

@@ -22,8 +22,34 @@
  */
 
 const { sequelize, RedemptionOrder, ItemInstance } = require('../../models')
-const RedemptionService = require('../../services/RedemptionService')
 const logger = require('../../utils/logger').logger
+
+/*
+ * P1-9：RedemptionService 通过 ServiceManager 获取
+ * 服务键：'redemption_order'（snake_case）
+ * 注意：在 execute() 方法开始时动态获取服务
+ */
+let RedemptionService = null
+
+/**
+ * P1-9：初始化 ServiceManager 并获取 RedemptionService
+ * @returns {Promise<Object>} RedemptionService 实例
+ */
+async function initializeRedemptionService() {
+  if (RedemptionService) return RedemptionService
+  try {
+    const serviceManager = require('../../services/index')
+    if (!serviceManager._initialized) {
+      await serviceManager.initialize()
+    }
+    RedemptionService = serviceManager.getService('redemption_order')
+    logger.info('RedemptionService 加载成功（P1-9 ServiceManager）')
+    return RedemptionService
+  } catch (error) {
+    logger.error('RedemptionService 加载失败', { error: error.message })
+    throw error
+  }
+}
 
 /**
  * 重新生成核销码工具类
@@ -41,6 +67,9 @@ class RegenerateRedemptionCodeTool {
    * @returns {Promise<Object>} 重新生成结果
    */
   static async execute(item_instance_id, reason, operator_user_id = null) {
+    // P1-9：初始化 RedemptionService
+    await initializeRedemptionService()
+
     logger.info('开始重新生成核销码', {
       item_instance_id,
       reason,

@@ -23,8 +23,10 @@ const express = require('express')
 const router = express.Router()
 const { authenticateToken, requireAdmin } = require('../../../middleware/auth')
 const TransactionManager = require('../../../utils/TransactionManager')
-// 材料管理服务 - 通过 Service 层访问数据库（符合路由层规范）
-const MaterialManagementService = require('../../../services/MaterialManagementService')
+/*
+ * P1-9：服务通过 ServiceManager 获取（B1-Injected + E2-Strict snake_case）
+ * const MaterialManagementService = require('../../../services/MaterialManagementService')
+ */
 
 const logger = require('../../../utils/logger').logger
 
@@ -62,7 +64,7 @@ router.get('/listing-stats', authenticateToken, requireAdmin, async (req, res) =
      *
      * @see docs/配置管理三层分离与校验统一方案.md
      */
-    const AdminSystemService = req.app.locals.services.getService('adminSystem')
+    const AdminSystemService = req.app.locals.services.getService('admin_system')
     const maxListings = await AdminSystemService.getSettingValue(
       'marketplace',
       'max_active_listings',
@@ -77,7 +79,7 @@ router.get('/listing-stats', authenticateToken, requireAdmin, async (req, res) =
     })
 
     // 🎯 P2-C架构重构：通过 ServiceManager 获取 ExchangeService
-    const ExchangeService = req.app.locals.services.getService('exchangeMarket')
+    const ExchangeService = req.app.locals.services.getService('exchange_market')
 
     // 🎯 调用服务层方法获取用户上架统计
     const result = await ExchangeService.getUserListingStats({
@@ -152,7 +154,7 @@ router.post('/exchange_market/items', authenticateToken, requireAdmin, async (re
   })
 
   // 🎯 P2-C架构重构：通过 ServiceManager 获取 ExchangeService
-  const ExchangeService = req.app.locals.services.getService('exchangeMarket')
+  const ExchangeService = req.app.locals.services.getService('exchange_market')
 
   // 🎯 2026-01-08 图片存储架构修复：使用 TransactionManager 包装事务
   const transactionResult = await TransactionManager.executeTransaction(async transaction => {
@@ -255,7 +257,7 @@ router.put('/exchange_market/items/:item_id', authenticateToken, requireAdmin, a
     }
 
     // 🎯 P2-C架构重构：通过 ServiceManager 获取 ExchangeService
-    const ExchangeService = req.app.locals.services.getService('exchangeMarket')
+    const ExchangeService = req.app.locals.services.getService('exchange_market')
 
     // 🎯 2026-01-08：使用事务包装更新操作（含图片处理）
     const result = await TransactionManager.execute(
@@ -349,7 +351,7 @@ router.delete(
       }
 
       // 🎯 P2-C架构重构：通过 ServiceManager 获取 ExchangeService
-      const ExchangeService = req.app.locals.services.getService('exchangeMarket')
+      const ExchangeService = req.app.locals.services.getService('exchange_market')
 
       // 🎯 2026-01-08：使用事务包装删除操作（含图片删除）
       const result = await TransactionManager.execute(
@@ -449,8 +451,8 @@ router.get('/trade_orders', authenticateToken, requireAdmin, async (req, res) =>
       page_size
     })
 
-    // 导入 TradeOrderService
-    const TradeOrderService = require('../../../services/TradeOrderService')
+    // P1-9：通过 ServiceManager 获取 TradeOrderService（snake_case key）
+    const TradeOrderService = req.app.locals.services.getService('trade_order')
 
     // 调用服务层方法获取订单列表
     const result = await TradeOrderService.getAdminOrders({
@@ -512,8 +514,8 @@ router.get('/trade_orders/:order_id', authenticateToken, requireAdmin, async (re
       return res.apiError('无效的订单ID', 'BAD_REQUEST', null, 400)
     }
 
-    // 导入 TradeOrderService
-    const TradeOrderService = require('../../../services/TradeOrderService')
+    // P1-9：通过 ServiceManager 获取 TradeOrderService（snake_case key）
+    const TradeOrderService = req.app.locals.services.getService('trade_order')
 
     // 调用服务层方法获取订单详情
     const order = await TradeOrderService.getOrderDetail(orderId)
@@ -604,8 +606,8 @@ router.post(
         )
       }
 
-      // 🎯 P2-C架构重构：通过 ServiceManager 获取 MarketListingService
-      const MarketListingService = require('../../../services/MarketListingService')
+      // 🎯 P1-9：通过 ServiceManager 获取 MarketListingService（snake_case key）
+      const MarketListingService = req.app.locals.services.getService('market_listing')
 
       const result = await TransactionManager.executeTransaction(
         async transaction => {
@@ -724,7 +726,7 @@ router.get('/exchange_market/orders', authenticateToken, requireAdmin, async (re
     })
 
     // 🎯 通过 ServiceManager 获取 ExchangeService
-    const ExchangeService = req.app.locals.services.getService('exchangeMarket')
+    const ExchangeService = req.app.locals.services.getService('exchange_market')
 
     // 调用服务层方法获取订单列表
     const result = await ExchangeService.getAdminOrders({
@@ -785,7 +787,7 @@ router.get(
       })
 
       // 🎯 通过 ServiceManager 获取 ExchangeService
-      const ExchangeService = req.app.locals.services.getService('exchangeMarket')
+      const ExchangeService = req.app.locals.services.getService('exchange_market')
 
       // 调用服务层方法获取订单详情
       const result = await ExchangeService.getAdminOrderDetail(order_no)
@@ -848,6 +850,9 @@ router.get('/tradable-assets', authenticateToken, requireAdmin, async (req, res)
     const admin_id = req.user.user_id
 
     logger.info('管理员查看C2C可交易资产配置', { admin_id })
+
+    // P1-9：通过 ServiceManager 获取服务（snake_case key）
+    const MaterialManagementService = req.app.locals.services.getService('material_management')
 
     // 导入黑名单相关常量和函数
     const {

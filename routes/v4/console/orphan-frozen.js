@@ -62,7 +62,7 @@ router.get(
     const { user_id, asset_code } = req.query
 
     // 通过 ServiceManager 获取服务
-    const OrphanFrozenCleanupService = req.app.locals.services.getService('orphanFrozenCleanup')
+    const OrphanFrozenCleanupService = req.app.locals.services.getService('orphan_frozen_cleanup')
 
     const options = {}
     if (user_id) options.user_id = Number(user_id)
@@ -91,7 +91,7 @@ router.get(
   authenticateToken,
   requireAdmin,
   asyncHandler(async (req, res) => {
-    const OrphanFrozenCleanupService = req.app.locals.services.getService('orphanFrozenCleanup')
+    const OrphanFrozenCleanupService = req.app.locals.services.getService('orphan_frozen_cleanup')
 
     const stats = await OrphanFrozenCleanupService.getOrphanFrozenStats()
 
@@ -156,7 +156,7 @@ router.post(
     }
 
     // 通过 ServiceManager 获取服务
-    const OrphanFrozenCleanupService = req.app.locals.services.getService('orphanFrozenCleanup')
+    const OrphanFrozenCleanupService = req.app.locals.services.getService('orphan_frozen_cleanup')
 
     const result = await OrphanFrozenCleanupService.cleanupOrphanFrozen({
       dry_run,

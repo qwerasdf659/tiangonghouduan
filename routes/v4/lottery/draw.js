@@ -32,11 +32,13 @@ const logger = require('../../../utils/logger').logger
 const { authenticateToken } = require('../../../middleware/auth')
 const dataAccessControl = require('../../../middleware/dataAccessControl')
 const { handleServiceError } = require('../../../middleware/validation')
-const DataSanitizer = require('../../../services/DataSanitizer')
+/*
+ * P1-9：服务通过 ServiceManager 获取（B1-Injected + E2-Strict snake_case）
+ * const DataSanitizer = require('../../../services/DataSanitizer')
+ * const IdempotencyService = require('../../../services/IdempotencyService')
+ */
 const LotteryDrawFormatter = require('../../../utils/formatters/LotteryDrawFormatter')
 const { requestDeduplication, lotteryRateLimiter } = require('./middleware')
-// 业界标准幂等架构 - 统一入口幂等服务
-const IdempotencyService = require('../../../services/IdempotencyService')
 // 事务边界治理（2026-01-05 决策）- 统一事务管理器
 const TransactionManager = require('../../../utils/TransactionManager')
 
@@ -69,6 +71,10 @@ router.post(
   lotteryRateLimiter,
   dataAccessControl,
   async (req, res) => {
+    // P1-9：通过 ServiceManager 获取服务（snake_case key）
+    const IdempotencyService = req.app.locals.services.getService('idempotency')
+    const DataSanitizer = req.app.locals.services.getService('data_sanitizer')
+
     // 【业界标准形态】强制从 Header 获取幂等键，不接受 body，不服务端生成
     const idempotency_key = req.headers['idempotency-key']
 
@@ -128,25 +134,20 @@ router.post(
        */
 
       // ✅ 通过Service获取并验证活动（不再直连models）
-      const lottery_engine = req.app.locals.services.getService('unifiedLotteryEngine')
+      const lottery_engine = req.app.locals.services.getService('unified_lottery_engine')
       const campaign = await lottery_engine.getCampaignByCode(campaign_code, {
         checkStatus: true // 只获取active状态的活动
       })
 
       // 使用 TransactionManager 统一管理事务边界
       const drawResult = await TransactionManager.execute(
-        async (transaction) => {
+        async transaction => {
           // 传递幂等键和事务到抽奖引擎
-          return await lottery_engine.execute_draw(
-            user_id,
-            campaign.campaign_id,
-            draw_count,
-            {
-              idempotency_key, // 请求级幂等键，用于派生事务级幂等键
-              request_source: 'api_v4_lottery_draw', // 请求来源标识
-              transaction // 🔒 关键：传递事务对象
-            }
-          )
+          return await lottery_engine.execute_draw(user_id, campaign.campaign_id, draw_count, {
+            idempotency_key, // 请求级幂等键，用于派生事务级幂等键
+            request_source: 'api_v4_lottery_draw', // 请求来源标识
+            transaction // 🔒 关键：传递事务对象
+          })
         },
         {
           timeout: 30000,

@@ -8,7 +8,33 @@
  */
 
 require('dotenv').config()
-const sealosStorage = require('../services/sealosStorage')
+
+/*
+ * P1-9：sealosStorage 通过 ServiceManager 获取
+ * 服务键：'sealos_storage'（snake_case）
+ * 注意：在 cleanupOrphanFiles() 函数开始时动态获取服务
+ */
+let sealosStorage = null
+
+/**
+ * P1-9：初始化 ServiceManager 并获取 SealosStorageService
+ * @returns {Promise<Object>} SealosStorageService 实例
+ */
+async function initializeSealosStorage() {
+  if (sealosStorage) return sealosStorage
+  try {
+    const serviceManager = require('../../services/index')
+    if (!serviceManager._initialized) {
+      await serviceManager.initialize()
+    }
+    sealosStorage = serviceManager.getService('sealos_storage')
+    console.log('✅ SealosStorageService 加载成功（P1-9 ServiceManager）')
+    return sealosStorage
+  } catch (error) {
+    console.error('❌ SealosStorageService 加载失败:', error.message)
+    throw error
+  }
+}
 
 /**
  * 需要清理的文件列表（从数据库迁移日志中提取）
@@ -33,6 +59,9 @@ const ORPHAN_FILES = [
  */
 async function cleanupOrphanFiles() {
   console.log('🧹 Sealos对象存储孤儿文件清理\n')
+
+  // P1-9：初始化 SealosStorageService
+  await initializeSealosStorage()
 
   if (ORPHAN_FILES.length === 0) {
     console.log('⚠️ 警告: 孤儿文件列表为空')

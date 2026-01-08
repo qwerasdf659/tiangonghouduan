@@ -42,7 +42,7 @@ router.get('/orders/:order_id', authenticateToken, async (req, res) => {
       user_id: req.user.user_id
     })
 
-    const RedemptionService = req.app.locals.services.getService('redemptionOrder')
+    const RedemptionService = req.app.locals.services.getService('redemption_order')
     const order = await RedemptionService.getOrderDetail(order_id, {
       include_item: true,
       include_redeemer: true
@@ -102,7 +102,7 @@ router.get(
         user_id: req.user.user_id
       })
 
-      const RedemptionService = req.app.locals.services.getService('redemptionOrder')
+      const RedemptionService = req.app.locals.services.getService('redemption_order')
       const order = await RedemptionService.getOrderByItem(itemInstanceId)
 
       if (!order) {

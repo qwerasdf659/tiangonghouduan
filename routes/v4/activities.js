@@ -28,7 +28,10 @@ const express = require('express')
 const router = express.Router()
 const logger = require('../../utils/logger').logger
 const { authenticateToken, requireAdmin } = require('../../middleware/auth')
-const ActivityService = require('../../services/ActivityService')
+/*
+ * P1-9：服务通过 ServiceManager 获取（B1-Injected + E2-Strict snake_case）
+ * const ActivityService = require('../../services/ActivityService')
+ */
 
 /**
  * @route GET /api/v4/activities
@@ -57,6 +60,8 @@ router.get('/', authenticateToken, requireAdmin, async (req, res) => {
       request_id: req.id
     })
 
+    // P1-9：通过 ServiceManager 获取 ActivityService（snake_case key）
+    const ActivityService = req.app.locals.services.getService('activity')
     const activities = await ActivityService.getAllActivities({ status, limit })
 
     logger.info('获取所有活动列表成功', {
@@ -109,6 +114,8 @@ router.get('/available', authenticateToken, requireAdmin, async (req, res) => {
       request_id: req.id
     })
 
+    // P1-9：通过 ServiceManager 获取 ActivityService（snake_case key）
+    const ActivityService = req.app.locals.services.getService('activity')
     // 调用 ActivityService 获取可参与的活动
     const result = await ActivityService.getAvailableActivitiesForUser(user_id)
 
@@ -160,6 +167,8 @@ router.get('/:idOrCode/check-eligibility', authenticateToken, requireAdmin, asyn
       request_id: req.id
     })
 
+    // P1-9：通过 ServiceManager 获取 ActivityService（snake_case key）
+    const ActivityService = req.app.locals.services.getService('activity')
     // 调用 ActivityService 检查资格
     const result = await ActivityService.checkEligibility(user_id, idOrCode)
 
@@ -225,6 +234,8 @@ router.post('/:idOrCode/participate', authenticateToken, requireAdmin, async (re
       request_id: req.id
     })
 
+    // P1-9：通过 ServiceManager 获取 ActivityService（snake_case key）
+    const ActivityService = req.app.locals.services.getService('activity')
     // 调用 ActivityService 检查资格
     const eligibility = await ActivityService.checkEligibility(user_id, idOrCode)
 
@@ -291,6 +302,8 @@ router.get('/:idOrCode/conditions', authenticateToken, requireAdmin, async (req,
       request_id: req.id
     })
 
+    // P1-9：通过 ServiceManager 获取 ActivityService（snake_case key）
+    const ActivityService = req.app.locals.services.getService('activity')
     // 通过 Service 层查询活动条件（符合路由层规范）
     const conditionConfig = await ActivityService.getConditionConfig(idOrCode)
 
@@ -358,6 +371,8 @@ router.post('/:code/configure-conditions', authenticateToken, requireAdmin, asyn
       request_id: req.id
     })
 
+    // P1-9：通过 ServiceManager 获取 ActivityService（snake_case key）
+    const ActivityService = req.app.locals.services.getService('activity')
     // 调用 ActivityService 配置条件
     const result = await ActivityService.configureConditions(
       code,

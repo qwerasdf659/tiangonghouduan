@@ -27,8 +27,11 @@ const router = express.Router()
 const { authenticateToken } = require('../../../middleware/auth')
 const { validatePositiveInteger, handleServiceError } = require('../../../middleware/validation')
 const logger = require('../../../utils/logger').logger
-// 决策7：路由层不直连 models，通过 Service 层操作
-const MarketListingService = require('../../../services/MarketListingService')
+/*
+ * 决策7：路由层不直连 models，通过 Service 层操作
+ * P1-9：服务通过 ServiceManager 获取（B1-Injected + E2-Strict snake_case）
+ * const MarketListingService = require('../../../services/MarketListingService')
+ */
 
 /**
  * @route GET /api/v4/market/listings
@@ -56,6 +59,9 @@ const MarketListingService = require('../../../services/MarketListingService')
  */
 router.get('/listings', authenticateToken, async (req, res) => {
   try {
+    // P1-9：通过 ServiceManager 获取服务（snake_case key）
+    const MarketListingService = req.app.locals.services.getService('market_listing')
+
     const {
       page = 1,
       limit = 20,
@@ -142,6 +148,9 @@ router.get(
   validatePositiveInteger('listing_id', 'params'),
   async (req, res) => {
     try {
+      // P1-9：通过 ServiceManager 获取服务（snake_case key）
+      const MarketListingService = req.app.locals.services.getService('market_listing')
+
       const listingId = req.validated.listing_id
 
       // 决策7：通过 Service 层获取挂牌详情
@@ -200,6 +209,9 @@ router.get(
  */
 router.get('/listing-status', authenticateToken, async (req, res) => {
   try {
+    // P1-9：通过 ServiceManager 获取服务（snake_case key）
+    const MarketListingService = req.app.locals.services.getService('market_listing')
+
     const userId = req.user.user_id
 
     // 决策7：通过 Service 层获取用户上架列表

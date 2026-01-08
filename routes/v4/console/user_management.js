@@ -30,7 +30,7 @@ router.get('/users', async (req, res) => {
     const { page = 1, limit = 20, search, role_filter } = req.query
 
     // 通过 ServiceManager 获取 UserRoleService
-    const UserRoleService = req.app.locals.services.getService('userRole')
+    const UserRoleService = req.app.locals.services.getService('user_role')
 
     // 调用 Service 层方法
     const result = await UserRoleService.getUserList({
@@ -57,7 +57,7 @@ router.get('/users/:user_id', async (req, res) => {
     const { user_id } = req.params
 
     // 通过 ServiceManager 获取 UserRoleService
-    const UserRoleService = req.app.locals.services.getService('userRole')
+    const UserRoleService = req.app.locals.services.getService('user_role')
 
     // 调用 Service 层方法
     const result = await UserRoleService.getUserDetail(user_id)
@@ -89,7 +89,7 @@ router.put('/users/:user_id/role', async (req, res) => {
     }
 
     // 通过 ServiceManager 获取 UserRoleService
-    const UserRoleService = req.app.locals.services.getService('userRole')
+    const UserRoleService = req.app.locals.services.getService('user_role')
 
     // 使用 TransactionManager 统一管理事务（2026-01-05 事务边界治理）
     const result = await TransactionManager.execute(
@@ -115,7 +115,8 @@ router.put('/users/:user_id/role', async (req, res) => {
 
       if (result.post_commit_actions.disconnect_ws) {
         try {
-          const ChatWebSocketService = require('../../../services/ChatWebSocketService')
+          // P1-9：通过 ServiceManager 获取 ChatWebSocketService（snake_case key）
+          const ChatWebSocketService = req.app.locals.services.getService('chat_web_socket')
           ChatWebSocketService.disconnectUser(user_id, 'user')
           ChatWebSocketService.disconnectUser(user_id, 'admin')
           logger.info(`✅ WebSocket连接已断开: user_id=${user_id}`)
@@ -181,7 +182,7 @@ router.put('/users/:user_id/status', async (req, res) => {
     }
 
     // 通过 ServiceManager 获取 UserRoleService
-    const UserRoleService = req.app.locals.services.getService('userRole')
+    const UserRoleService = req.app.locals.services.getService('user_role')
 
     // 使用 TransactionManager 统一管理事务（2026-01-08 事务边界治理）
     const result = await TransactionManager.execute(
@@ -221,7 +222,7 @@ router.put('/users/:user_id/status', async (req, res) => {
 router.get('/roles', async (req, res) => {
   try {
     // 通过 ServiceManager 获取 UserRoleService
-    const UserRoleService = req.app.locals.services.getService('userRole')
+    const UserRoleService = req.app.locals.services.getService('user_role')
 
     // 调用 Service 层方法
     const result = await UserRoleService.getRoleList()

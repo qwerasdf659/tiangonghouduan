@@ -25,19 +25,22 @@
  */
 
 const cron = require('node-cron')
-// 服务重命名（2025-10-12）：AuditManagementService → ExchangeService
-const ExchangeService = require('../../services/ExchangeService')
-const ManagementStrategy = require('../../services/UnifiedLotteryEngine/strategies/ManagementStrategy')
-const AdminLotteryService = require('../../services/AdminLotteryService')
+/*
+ * P1-9：服务通过 ServiceManager 获取（snake_case key）
+ * 移除直接 require 服务文件，改为在 initializeServices() 中通过 ServiceManager 获取
+ * 以下服务统一通过 ServiceManager 获取：
+ * - exchange_market (ExchangeService)
+ * - admin_lottery (AdminLotteryService)
+ * - notification (NotificationService)
+ * - trade_order (TradeOrderService)
+ * - management_strategy (ManagementStrategy)
+ */
 const logger = require('../../utils/logger')
 const { UserPremiumStatus, sequelize } = require('../../models')
 const { Op } = sequelize.Sequelize
-const NotificationService = require('../../services/NotificationService')
 const BeijingTimeHelper = require('../../utils/timeHelper')
 // 2025-11-09新增：数据库性能监控
 const { monitor: databaseMonitor } = require('./database-performance-monitor')
-// 2025-12-15新增：交易订单服务（Phase 2）
-const TradeOrderService = require('../../services/TradeOrderService')
 // 2025-12-17新增：每日资产对账任务（Phase 1）
 const DailyAssetReconciliation = require('../../jobs/daily-asset-reconciliation')
 // 🔴 移除 RedemptionService 直接引用（2025-12-17 P1-2）
@@ -62,12 +65,81 @@ const DailyOrphanFrozenCheck = require('../../jobs/daily-orphan-frozen-check')
  * @description 负责管理所有定时任务的调度和执行
  */
 class ScheduledTasks {
+  /*
+   * P1-9：服务实例（通过 ServiceManager 获取，使用 snake_case key）
+   * 在 initializeServices() 中初始化，供定时任务使用
+   * snake_case 服务键：
+   * - exchange_market → ExchangeService
+   * - admin_lottery → AdminLotteryService
+   * - notification → NotificationService
+   * - trade_order → TradeOrderService
+   * - management_strategy → ManagementStrategy
+   */
+  static ExchangeService = null
+  static AdminLotteryService = null
+  static NotificationService = null
+  static TradeOrderService = null
+  static ManagementStrategy = null
+  static _servicesInitialized = false
+
+  /**
+   * P1-9：初始化服务依赖（通过 ServiceManager 获取）
+   *
+   * @description 在定时任务执行前初始化所需的服务
+   * @returns {Promise<void>} 初始化完成后返回
+   */
+  static async initializeServices() {
+    if (this._servicesInitialized) {
+      return
+    }
+
+    try {
+      const serviceManager = require('../../services/index')
+
+      if (!serviceManager._initialized) {
+        await serviceManager.initialize()
+      }
+
+      /*
+       * P1-9：使用 snake_case 服务键获取服务
+       * exchange_market, admin_lottery, notification, trade_order, management_strategy
+       */
+      this.ExchangeService = serviceManager.getService('exchange_market')
+      this.AdminLotteryService = serviceManager.getService('admin_lottery')
+      this.NotificationService = serviceManager.getService('notification')
+      this.TradeOrderService = serviceManager.getService('trade_order')
+      this.ManagementStrategy = serviceManager.getService('management_strategy')
+
+      this._servicesInitialized = true
+      logger.info('[ScheduledTasks] 服务依赖初始化完成（P1-9 snake_case key）', {
+        services: [
+          'exchange_market',
+          'admin_lottery',
+          'notification',
+          'trade_order',
+          'management_strategy'
+        ]
+      })
+    } catch (error) {
+      logger.error('[ScheduledTasks] 服务依赖初始化失败:', error.message)
+      throw error
+    }
+  }
+
   /**
    * 初始化所有定时任务
    * @returns {void}
    */
   static initialize() {
     logger.info('开始初始化定时任务...')
+
+    /*
+     * P1-9：在定时任务初始化前先初始化服务依赖
+     * 使用异步初始化，避免阻塞主线程
+     */
+    this.initializeServices().catch(error => {
+      logger.error('[ScheduledTasks] 服务初始化失败:', error.message)
+    })
 
     // 任务1: 每小时检查超时订单（24小时）
     this.scheduleTimeoutCheck()
@@ -134,8 +206,11 @@ class ScheduledTasks {
   static scheduleTimeoutCheck() {
     cron.schedule('0 * * * *', async () => {
       try {
+        // P1-9：确保服务已初始化
+        await ScheduledTasks.initializeServices()
+
         logger.info('[定时任务] 开始执行24小时超时订单检查...')
-        const result = await ExchangeService.checkTimeoutAndAlert(24)
+        const result = await ScheduledTasks.ExchangeService.checkTimeoutAndAlert(24)
 
         if (result.hasTimeout) {
           logger.warn(`[定时任务] 发现${result.count}个超时订单（24小时）`)
@@ -158,12 +233,15 @@ class ScheduledTasks {
   static scheduleUrgentTimeoutCheck() {
     cron.schedule('0 9,18 * * *', async () => {
       try {
+        // P1-9：确保服务已初始化
+        await ScheduledTasks.initializeServices()
+
         logger.info('[定时任务] 开始执行72小时紧急超时订单检查...')
-        const result = await ExchangeService.checkTimeoutAndAlert(72)
+        const result = await ScheduledTasks.ExchangeService.checkTimeoutAndAlert(72)
 
         if (result.hasTimeout) {
           logger.error(`[定时任务] 🚨 发现${result.count}个紧急超时订单（72小时）`)
-          // 扩展点：如需发送紧急通知（钉钉/企业微信），可在此处集成NotificationService
+          // 扩展点：如需发送紧急通知（钉钉/企业微信），可在此处集成 ScheduledTasks.NotificationService
         } else {
           logger.info('[定时任务] 72小时超时订单检查完成，无超时订单')
         }
@@ -195,8 +273,11 @@ class ScheduledTasks {
           total_errors: results.errors.length
         })
 
+        // P1-9：确保服务已初始化
+        await ScheduledTasks.initializeServices()
+
         // 获取待审核订单统计
-        const statistics = await ExchangeService.getPendingOrdersStatistics()
+        const statistics = await ScheduledTasks.ExchangeService.getPendingOrdersStatistics()
 
         logger.info('[定时任务] 待审核订单统计', {
           total: statistics.total,
@@ -236,7 +317,10 @@ class ScheduledTasks {
   static async manualTimeoutCheck() {
     logger.info('[手动触发] 执行24小时超时订单检查...')
     try {
-      const result = await ExchangeService.checkTimeoutAndAlert(24)
+      // P1-9：确保服务已初始化
+      await ScheduledTasks.initializeServices()
+
+      const result = await ScheduledTasks.ExchangeService.checkTimeoutAndAlert(24)
       logger.info('[手动触发] 检查完成', { result })
       return result
     } catch (error) {
@@ -252,7 +336,10 @@ class ScheduledTasks {
   static async manualUrgentTimeoutCheck() {
     logger.info('[手动触发] 执行72小时紧急超时订单检查...')
     try {
-      const result = await ExchangeService.checkTimeoutAndAlert(72)
+      // P1-9：确保服务已初始化
+      await ScheduledTasks.initializeServices()
+
+      const result = await ScheduledTasks.ExchangeService.checkTimeoutAndAlert(72)
       logger.info('[手动触发] 检查完成', { result })
       return result
     } catch (error) {
@@ -279,10 +366,13 @@ class ScheduledTasks {
   static scheduleLotteryManagementCleanup() {
     cron.schedule('0 * * * *', async () => {
       try {
+        // P1-9：确保服务已初始化
+        await ScheduledTasks.initializeServices()
+
         logger.info('[定时任务] 开始清理过期的抽奖管理设置...')
 
-        // 创建ManagementStrategy实例并执行清理
-        const managementStrategy = new ManagementStrategy()
+        // P1-9：通过 ServiceManager 获取 ManagementStrategy 服务
+        const managementStrategy = ScheduledTasks.ManagementStrategy
         const result = await managementStrategy.cleanupExpiredSettings()
 
         if (result.cleaned_count > 0) {
@@ -317,7 +407,11 @@ class ScheduledTasks {
   static async manualLotteryManagementCleanup() {
     logger.info('[手动触发] 执行抽奖管理设置清理...')
     try {
-      const managementStrategy = new ManagementStrategy()
+      // P1-9：确保服务已初始化
+      await ScheduledTasks.initializeServices()
+
+      // P1-9：通过 ServiceManager 获取 ManagementStrategy 服务
+      const managementStrategy = ScheduledTasks.ManagementStrategy
       const result = await managementStrategy.cleanupExpiredSettings()
       logger.info('[手动触发] 清理完成', { result })
       return result
@@ -348,6 +442,9 @@ class ScheduledTasks {
   static schedulePremiumExpiryReminder() {
     cron.schedule('0 * * * *', async () => {
       try {
+        // P1-9：确保服务已初始化
+        await ScheduledTasks.initializeServices()
+
         logger.info('[定时任务] 开始检查即将过期的高级空间...')
 
         const now = new Date()
@@ -377,7 +474,8 @@ class ScheduledTasks {
               const remainingHours = Math.ceil(remainingMs / (1000 * 60 * 60))
               const remainingMinutes = Math.ceil(remainingMs / (1000 * 60))
 
-              await NotificationService.notifyPremiumExpiringSoon(status.user_id, {
+              // P1-9：通过 ServiceManager 获取 NotificationService
+              await ScheduledTasks.NotificationService.notifyPremiumExpiringSoon(status.user_id, {
                 expires_at: BeijingTimeHelper.formatForAPI(status.expires_at).iso,
                 remaining_hours: remainingHours,
                 remaining_minutes: remainingMinutes
@@ -458,11 +556,15 @@ class ScheduledTasks {
             attributes: ['user_id', 'expires_at', 'total_unlock_count']
           })
 
+          // P1-9：确保服务已初始化（用于发送通知）
+          await ScheduledTasks.initializeServices()
+
           // 发送过期通知
           let notifiedCount = 0
           for (const expired of expiredUsers) {
             try {
-              await NotificationService.notifyPremiumExpired(expired.user_id, {
+              // P1-9：通过 ServiceManager 获取 NotificationService
+              await ScheduledTasks.NotificationService.notifyPremiumExpired(expired.user_id, {
                 expired_at: BeijingTimeHelper.formatForAPI(expired.expires_at).iso,
                 total_unlock_count: expired.total_unlock_count
               })
@@ -598,10 +700,13 @@ class ScheduledTasks {
   static scheduleLotteryPrizesDailyReset() {
     cron.schedule('0 0 * * *', async () => {
       try {
+        // P1-9：确保服务已初始化
+        await ScheduledTasks.initializeServices()
+
         logger.info('[定时任务] 开始重置抽奖奖品每日中奖次数...')
 
-        // 调用AdminLotteryService的方法
-        const result = await AdminLotteryService.resetDailyWinCounts()
+        // P1-9：通过 ServiceManager 获取 AdminLotteryService
+        const result = await ScheduledTasks.AdminLotteryService.resetDailyWinCounts()
 
         logger.info('[定时任务] 抽奖奖品每日中奖次数重置完成', {
           updated_count: result.updated_count,
@@ -642,10 +747,13 @@ class ScheduledTasks {
   static scheduleLotteryCampaignStatusSync() {
     cron.schedule('0 * * * *', async () => {
       try {
+        // P1-9：确保服务已初始化
+        await ScheduledTasks.initializeServices()
+
         logger.info('[定时任务] 开始同步抽奖活动状态...')
 
-        // 调用AdminLotteryService的方法
-        const result = await AdminLotteryService.syncCampaignStatus()
+        // P1-9：通过 ServiceManager 获取 AdminLotteryService
+        const result = await ScheduledTasks.AdminLotteryService.syncCampaignStatus()
 
         if (result.started > 0 || result.ended > 0) {
           logger.info('[定时任务] 抽奖活动状态同步完成', {
@@ -684,7 +792,11 @@ class ScheduledTasks {
   static async manualLotteryPrizesDailyReset() {
     logger.info('[手动触发] 执行抽奖奖品每日中奖次数重置...')
     try {
-      const result = await AdminLotteryService.resetDailyWinCounts()
+      // P1-9：确保服务已初始化
+      await ScheduledTasks.initializeServices()
+
+      // P1-9：通过 ServiceManager 获取 AdminLotteryService
+      const result = await ScheduledTasks.AdminLotteryService.resetDailyWinCounts()
       logger.info('[手动触发] 重置完成', { result })
       return result
     } catch (error) {
@@ -714,7 +826,11 @@ class ScheduledTasks {
   static async manualLotteryCampaignStatusSync() {
     logger.info('[手动触发] 执行抽奖活动状态同步...')
     try {
-      const result = await AdminLotteryService.syncCampaignStatus()
+      // P1-9：确保服务已初始化
+      await ScheduledTasks.initializeServices()
+
+      // P1-9：通过 ServiceManager 获取 AdminLotteryService
+      const result = await ScheduledTasks.AdminLotteryService.syncCampaignStatus()
       logger.info('[手动触发] 同步完成', { result })
       return result
     } catch (error) {
@@ -763,9 +879,17 @@ class ScheduledTasks {
    * - 取消订单并解冻买家资产
    * - 回滚挂牌状态为 on_sale
    *
+   * P1-9 改造说明：
+   * - 模型访问通过顶层 require 的 models 对象获取（符合 D2-Max 规范）
+   * - TradeOrderService 通过 ServiceManager 获取（snake_case key: trade_order）
+   *
    * @returns {Promise<Object>} 结果对象 {unlocked_count, failed_count, details}
    */
   static async checkAndUnlockTimeoutListings() {
+    // P1-9：确保服务已初始化
+    await ScheduledTasks.initializeServices()
+
+    // P1-9：通过顶层 models 导入获取模型（符合 D2-Max）
     const { MarketListing, TradeOrder } = require('../../models')
 
     try {
@@ -835,7 +959,8 @@ class ScheduledTasks {
           // 有关联订单，取消订单并解冻资产
           const business_id = `timeout_unlock_${order.order_id}_${Date.now()}`
 
-          await TradeOrderService.cancelOrder({
+          // P1-9：通过 ServiceManager 获取 TradeOrderService
+          await ScheduledTasks.TradeOrderService.cancelOrder({
             order_id: order.order_id,
             business_id,
             cancel_reason: '订单超时自动取消（锁定超过15分钟）'

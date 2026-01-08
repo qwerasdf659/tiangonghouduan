@@ -20,8 +20,11 @@
 const express = require('express')
 const router = express.Router()
 const { authenticateToken, requireAdmin } = require('../../../middleware/auth')
-const ContentAuditEngine = require('../../../services/ContentAuditEngine')
-const MerchantPointsService = require('../../../services/MerchantPointsService')
+/*
+ * P1-9：服务通过 ServiceManager 获取（B1-Injected + E2-Strict snake_case）
+ * const ContentAuditEngine = require('../../../services/ContentAuditEngine')
+ * const MerchantPointsService = require('../../../services/MerchantPointsService')
+ */
 const TransactionManager = require('../../../utils/TransactionManager')
 const { logger } = require('../../../utils/logger')
 
@@ -45,6 +48,9 @@ router.use(requireAdmin)
  */
 router.get('/', async (req, res) => {
   try {
+    // P1-9：通过 ServiceManager 获取服务（snake_case key）
+    const MerchantPointsService = req.app.locals.services.getService('merchant_points')
+
     const { status, user_id, page = 1, page_size = 10 } = req.query
 
     const filters = {}
@@ -78,6 +84,9 @@ router.get('/', async (req, res) => {
  */
 router.get('/:audit_id', async (req, res) => {
   try {
+    // P1-9：通过 ServiceManager 获取服务（snake_case key）
+    const MerchantPointsService = req.app.locals.services.getService('merchant_points')
+
     const { audit_id } = req.params
 
     const application = await MerchantPointsService.getApplicationById(parseInt(audit_id, 10))
@@ -104,6 +113,9 @@ router.get('/:audit_id', async (req, res) => {
  */
 router.post('/:audit_id/approve', async (req, res) => {
   try {
+    // P1-9：通过 ServiceManager 获取服务（snake_case key）
+    const ContentAuditEngine = req.app.locals.services.getService('content_audit')
+
     const { audit_id } = req.params
     const { reason = '' } = req.body
     const auditorId = req.user.user_id
@@ -154,6 +166,9 @@ router.post('/:audit_id/approve', async (req, res) => {
  */
 router.post('/:audit_id/reject', async (req, res) => {
   try {
+    // P1-9：通过 ServiceManager 获取服务（snake_case key）
+    const ContentAuditEngine = req.app.locals.services.getService('content_audit')
+
     const { audit_id } = req.params
     const { reason } = req.body
     const auditorId = req.user.user_id
@@ -208,6 +223,9 @@ router.post('/:audit_id/reject', async (req, res) => {
  */
 router.get('/stats/pending', async (req, res) => {
   try {
+    // P1-9：通过 ServiceManager 获取服务（snake_case key）
+    const MerchantPointsService = req.app.locals.services.getService('merchant_points')
+
     const result = await MerchantPointsService.getApplications(
       { status: 'pending' },
       1,

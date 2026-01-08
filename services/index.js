@@ -5,8 +5,13 @@ const logger = require('../utils/logger').logger
  * 管理系统中所有服务的生命周期
  *
  * @description 基于V4架构，移除向后兼容代码
- * @version 4.0.0
- * @date 2025-09-25
+ * @version 4.1.0
+ * @date 2026-01-09
+ *
+ * P1-9 重构说明（2026-01-09）：
+ * - 所有 service key 统一使用 snake_case 命名（E2-Strict）
+ * - 不再兼容 camelCase key，旧 key 调用会抛出错误并提供迁移提示
+ * - 补充注册 DataSanitizer 和 LotteryQuotaService
  */
 
 // V4 核心服务
@@ -69,11 +74,75 @@ const OrphanFrozenCleanupService = require('./OrphanFrozenCleanupService') // �
 // P1 商家积分审核服务（2026-01-09 统一审批流）
 const MerchantPointsService = require('./MerchantPointsService') // 商家积分申请审核服务
 
+// P1-9 新增注册的服务（2026-01-09）
+const DataSanitizer = require('./DataSanitizer') // 统一数据脱敏服务
+const LotteryQuotaService = require('./lottery/LotteryQuotaService') // 抽奖配额服务
+const PerformanceMonitor = require('./UnifiedLotteryEngine/utils/PerformanceMonitor') // 性能监控服务
+const SealosStorageService = require('./sealosStorage') // Sealos 对象存储服务
+const ManagementStrategy = require('./UnifiedLotteryEngine/strategies/ManagementStrategy') // 管理策略服务
+const BasicGuaranteeStrategy = require('./UnifiedLotteryEngine/strategies/BasicGuaranteeStrategy') // 基础保底策略服务
+
 // V4 模块化服务
 const { lottery_service_container } = require('./lottery')
 
 // 数据库模型
 const models = require('../models')
+
+/**
+ * camelCase → snake_case 迁移映射表（P1-9 E2-Strict）
+ * 用于在调用旧 key 时提供迁移提示
+ *
+ * @type {Object<string, string>}
+ */
+const KEY_MIGRATION_MAP = {
+  // 核心服务
+  unifiedLotteryEngine: 'unified_lottery_engine',
+  lotteryContainer: 'lottery_container',
+
+  // 领域服务
+  exchangeMarket: 'exchange_market',
+  contentAudit: 'content_audit',
+  customerServiceSession: 'customer_service_session',
+  hierarchyManagement: 'hierarchy_management',
+  userRole: 'user_role',
+  chatWebSocket: 'chat_web_socket',
+  chatRateLimit: 'chat_rate_limit',
+  prizePool: 'prize_pool',
+
+  // 管理后台服务
+  adminSystem: 'admin_system',
+  adminLottery: 'admin_lottery',
+  adminCustomerService: 'admin_customer_service',
+  materialManagement: 'material_management',
+  popupBanner: 'popup_banner',
+  lotteryPreset: 'lottery_preset',
+  auditLog: 'audit_log',
+  lotteryManagement: 'lottery_management',
+
+  // 材料系统服务
+  assetConversion: 'asset_conversion',
+
+  // 背包双轨服务
+  redemptionOrder: 'redemption_order',
+
+  // 交易市场服务
+  tradeOrder: 'trade_order',
+  marketListing: 'market_listing',
+
+  // 清理服务
+  orphanFrozenCleanup: 'orphan_frozen_cleanup',
+
+  // 商家积分服务
+  merchantPoints: 'merchant_points',
+
+  // 新增服务
+  dataSanitizer: 'data_sanitizer',
+  lotteryQuota: 'lottery_quota',
+  sealosStorage: 'sealos_storage',
+  managementStrategy: 'management_strategy',
+  performanceMonitor: 'performance_monitor',
+  basicGuaranteeStrategy: 'basic_guarantee_strategy'
+}
 
 /**
  * 服务管理器 - V4统一版本
@@ -85,10 +154,9 @@ const models = require('../models')
  * - 提供服务健康检查和监控功能
  *
  * 管理的服务：
- * - unifiedLotteryEngine：V4统一抽奖引擎
- * - thumbnail：缩略图服务
- * - lotteryContainer：抽奖服务容器（包含user_service、history_service）
- * - 未来扩展：userInventory（用户库存服务）等
+ * - unified_lottery_engine：V4统一抽奖引擎
+ * - lottery_container：抽奖服务容器（包含user_service、history_service）
+ * - 未来扩展：user_inventory（用户库存服务）等
  *
  * 核心功能：
  * - initialize()：初始化所有服务
@@ -106,19 +174,16 @@ const models = require('../models')
  *
  * 使用方式：
  * ```javascript
+ * // 推荐方式（B1-Injected）：通过 req.app.locals.services 获取
+ * router.post('/create', authenticateToken, async (req, res) => {
+ *   const services = req.app.locals.services
+ *   const MarketListingService = services.getService('market_listing')
+ *   // ...
+ * })
+ *
+ * // 备选方式：直接引用 serviceManager（仅用于非路由场景）
  * const serviceManager = require('./services')
- *
- * // 初始化所有服务
- * await serviceManager.initialize()
- *
- * // 获取统一抽奖引擎
- * const lotteryEngine = serviceManager.getService('unifiedLotteryEngine')
- *
- * // 检查服务健康状态
- * const healthStatus = await serviceManager.getHealthStatus()
- *
- * // 优雅关闭所有服务
- * await serviceManager.shutdown()
+ * const lotteryEngine = serviceManager.getService('unified_lottery_engine')
  * ```
  *
  * 技术特性：
@@ -142,9 +207,10 @@ const models = require('../models')
  * - V4版本移除了所有向后兼容代码
  * - 移除了旧版LotteryDrawService（替换为UnifiedLotteryEngine）
  * - 采用模块化设计（lottery服务独立容器）
+ * - P1-9（2026-01-09）：统一 snake_case key，不兼容 camelCase
  *
  * 创建时间：2025年09月25日
- * 最后更新：2025年10月30日
+ * 最后更新：2026年01月09日（P1-9 E2-Strict snake_case）
  *
  * @class ServiceManager
  */
@@ -177,10 +243,10 @@ class ServiceManager {
    * - 确保服务按正确顺序初始化
    * - 防止重复初始化
    *
-   * 初始化的服务：
-   * - unifiedLotteryEngine：V4统一抽奖引擎
-   * - thumbnail：缩略图服务
-   * - lotteryContainer：抽奖服务容器
+   * 初始化的服务（P1-9 E2-Strict：使用 snake_case key）：
+   * - unified_lottery_engine：V4统一抽奖引擎
+   * - lottery_container：抽奖服务容器
+   * - 所有领域服务和管理服务
    *
    * @async
    * @returns {Promise<void>} 初始化完成后resolve，失败则抛出错误
@@ -192,77 +258,85 @@ class ServiceManager {
     }
 
     try {
-      logger.info('🚀 初始化V4服务管理器...')
+      logger.info('🚀 初始化V4服务管理器（P1-9 snake_case key）...')
 
-      // ✅ 注册V4统一抽奖引擎（移除旧版LotteryDrawService）
-      this._services.set('unifiedLotteryEngine', new UnifiedLotteryEngine(this.models))
+      // ========== 核心服务（使用 snake_case key） ==========
 
-      /*
-       * 🔴 ThumbnailService 已废弃（2026-01-08）：
-       * 改用预生成缩略图 + SealosStorageService.uploadImageWithThumbnails()
-       * 不再注册 thumbnail 服务，避免运行时触碰本地 uploads/ 目录
-       */
+      // V4统一抽奖引擎（实例化服务）
+      this._services.set('unified_lottery_engine', new UnifiedLotteryEngine(this.models))
 
-      /*
-       * 注册领域服务（Domain Services）
-       * 积分操作已统一迁移到 AssetService
-       */
-      this._services.set('exchangeMarket', ExchangeService)
-      this._services.set('contentAudit', ContentAuditEngine)
+      // 模块化抽奖服务容器
+      this._services.set('lottery_container', lottery_service_container)
+
+      // ========== 领域服务（静态类，使用 snake_case key） ==========
+
+      this._services.set('exchange_market', ExchangeService)
+      this._services.set('content_audit', ContentAuditEngine)
       this._services.set('announcement', AnnouncementService)
       this._services.set('notification', NotificationService)
       this._services.set('consumption', ConsumptionService)
-      this._services.set('customerServiceSession', CustomerServiceSessionService)
-      this._services.set('hierarchyManagement', HierarchyManagementService)
-      this._services.set('userRole', UserRoleService)
-      this._services.set('chatWebSocket', ChatWebSocketService) // ChatWebSocketService is already an instance
-      this._services.set('user', UserService) // 用户服务
-      this._services.set('chatRateLimit', ChatRateLimitService) // 聊天频率限制服务（P2-F架构重构 2025-12-11）
+      this._services.set('customer_service_session', CustomerServiceSessionService)
+      this._services.set('hierarchy_management', HierarchyManagementService)
+      this._services.set('user_role', UserRoleService)
+      this._services.set('chat_web_socket', ChatWebSocketService)
+      this._services.set('user', UserService)
+      this._services.set('chat_rate_limit', ChatRateLimitService)
 
-      // ✅ 注册管理服务（Admin Services）
-      this._services.set('prizePool', PrizePoolService) // 奖品池服务
-      this._services.set('premium', PremiumService) // 高级空间服务
-      this._services.set('feedback', FeedbackService) // 反馈管理服务
-      this._services.set('adminSystem', AdminSystemService) // 管理后台系统服务（已合并SystemSettingsService）
-      // this._services.set('adminMarketplace', AdminMarketplaceService) // 管理后台市场管理服务 - 已合并到ExchangeService
-      this._services.set('adminLottery', AdminLotteryService) // 管理后台抽奖管理服务
-      this._services.set('adminCustomerService', AdminCustomerServiceService) // 管理后台客服管理服务
-      this._services.set('materialManagement', MaterialManagementService) // 材料系统运营管理服务（管理员）
-      this._services.set('popupBanner', PopupBannerService) // 弹窗Banner管理服务（2025-12-22）
-      this._services.set('image', ImageService) // 通用图片上传服务（2026-01-08 图片存储架构）
+      // ========== 管理后台服务（使用 snake_case key） ==========
 
-      // ✅ 注册架构重构新增服务（P0优先级 - 2025-12-10）
-      this._services.set('lotteryPreset', LotteryPresetService) // 抽奖预设管理服务
-      this._services.set('activity', ActivityService) // 活动管理服务
-      this._services.set('auditLog', AuditLogService) // 审计日志服务（P1优先级 - 2025-12-10）
-      this._services.set('lotteryManagement', AdminLotteryService) // 抽奖管理服务（文档要求的别名）
+      this._services.set('prize_pool', PrizePoolService)
+      this._services.set('premium', PremiumService)
+      this._services.set('feedback', FeedbackService)
+      this._services.set('admin_system', AdminSystemService)
+      this._services.set('admin_lottery', AdminLotteryService)
+      this._services.set('admin_customer_service', AdminCustomerServiceService)
+      this._services.set('material_management', MaterialManagementService)
+      this._services.set('popup_banner', PopupBannerService)
+      this._services.set('image', ImageService)
 
-      // ✅ 注册P2-C架构重构服务（2025-12-11）
-      this._services.set('reporting', ReportingService) // 统一报表服务（合并AdminAnalyticsService、StatisticsService、UserDashboardService）
+      // ========== 架构重构服务（使用 snake_case key） ==========
 
-      // 注册V4.5.0材料系统服务（2025-12-15）
-      this._services.set('asset', AssetService) // 统一资产服务（余额/冻结/流水/幂等）
-      this._services.set('assetConversion', AssetConversionService) // 资产转换服务（材料转钻石）
+      this._services.set('lottery_preset', LotteryPresetService)
+      this._services.set('activity', ActivityService)
+      this._services.set('audit_log', AuditLogService)
+      this._services.set('lottery_management', AdminLotteryService) // 抽奖管理服务（别名）
+      this._services.set('reporting', ReportingService)
 
-      // 注册V4.6.0业界标准幂等架构服务（2025-12-26 方案B）
-      this._services.set('idempotency', IdempotencyService) // 入口幂等服务（重试返回首次结果）
+      // ========== 材料系统服务（使用 snake_case key） ==========
 
-      // 注册V4.2背包双轨架构服务（Phase 1 - 核销码系统）
-      this._services.set('redemptionOrder', RedemptionService) // 兑换订单服务（12位Base32核销码 + SHA-256哈希）
-      this._services.set('backpack', BackpackService) // 背包双轨查询服务（assets[] + items[]）
+      this._services.set('asset', AssetService)
+      this._services.set('asset_conversion', AssetConversionService)
 
-      // 注册V4.2交易市场服务（2025-12-21 暴力重构）
-      this._services.set('tradeOrder', TradeOrderService) // 交易订单服务（市场交易核心）
-      this._services.set('marketListing', MarketListingService) // 市场挂牌服务（决策5B/0C：统一收口）
+      // ========== 幂等架构服务（使用 snake_case key） ==========
 
-      // 注册 P0-2 孤儿冻结清理服务（2026-01-09）
-      this._services.set('orphanFrozenCleanup', OrphanFrozenCleanupService) // 孤儿冻结清理唯一入口
+      this._services.set('idempotency', IdempotencyService)
 
-      // 注册 P1 商家积分审核服务（2026-01-09 统一审批流）
-      this._services.set('merchantPoints', MerchantPointsService) // 商家积分申请审核服务
+      // ========== 背包双轨服务（使用 snake_case key） ==========
 
-      // 注册模块化抽奖服务容器
-      this._services.set('lotteryContainer', lottery_service_container)
+      this._services.set('redemption_order', RedemptionService)
+      this._services.set('backpack', BackpackService)
+
+      // ========== 交易市场服务（使用 snake_case key） ==========
+
+      this._services.set('trade_order', TradeOrderService)
+      this._services.set('market_listing', MarketListingService)
+
+      // ========== 清理服务（使用 snake_case key） ==========
+
+      this._services.set('orphan_frozen_cleanup', OrphanFrozenCleanupService)
+
+      // ========== 商家积分服务（使用 snake_case key） ==========
+
+      this._services.set('merchant_points', MerchantPointsService)
+
+      // ========== P1-9 新增服务（2026-01-09） ==========
+
+      this._services.set('data_sanitizer', DataSanitizer)
+      this._services.set('lottery_quota', LotteryQuotaService)
+      this._services.set('performance_monitor', new PerformanceMonitor()) // 性能监控服务（实例化）
+      this._services.set('sealos_storage', SealosStorageService) // Sealos 对象存储服务（静态类，需 new 实例化）
+      this._services.set('management_strategy', new ManagementStrategy()) // 管理策略服务（实例化）
+      this._services.set('basic_guarantee_strategy', BasicGuaranteeStrategy) // 基础保底策略服务（静态类）
 
       /*
        * 🎯 初始化阶段依赖注入（P2优先级 - 2025-12-10）
@@ -277,13 +351,14 @@ class ServiceManager {
       if (typeof AdminLotteryService.initialize === 'function') {
         AdminLotteryService.initialize(this)
       }
-      // AdminMarketplaceService已合并到ExchangeService，不再需要初始化
 
       logger.info('✅ Service依赖注入完成')
 
       this._initialized = true
-      logger.info('✅ V4服务管理器初始化完成')
-      logger.info(`📊 已注册服务: ${Array.from(this._services.keys()).join(', ')}`)
+      logger.info('✅ V4服务管理器初始化完成（P1-9 snake_case key）')
+      logger.info(
+        `📊 已注册服务（共${this._services.size}个）: ${Array.from(this._services.keys()).join(', ')}`
+      )
     } catch (error) {
       logger.error('❌ 服务管理器初始化失败:', error)
       throw error
@@ -291,9 +366,27 @@ class ServiceManager {
   }
 
   /**
-   * 获取服务实例
-   * @param {string} serviceName - 服务名称
+   * 获取服务实例（P1-9 E2-Strict：强制 snake_case）
+   *
+   * 业务场景：
+   * - 路由层通过 req.app.locals.services.getService() 获取服务
+   * - 非路由场景直接引用 serviceManager.getService() 获取服务
+   *
+   * 错误处理（E2-Strict）：
+   * - 如果使用 camelCase key，会抛出错误并提供迁移提示
+   * - 错误信息包含正确的 snake_case key 和可用服务列表
+   *
+   * @param {string} serviceName - 服务名称（必须使用 snake_case）
    * @returns {Object} 服务实例
+   * @throws {Error} 当服务不存在或使用旧 key 时抛出错误
+   *
+   * @example
+   * // ✅ 正确：使用 snake_case key
+   * const MarketListingService = services.getService('market_listing')
+   *
+   * // ❌ 错误：使用 camelCase key（会抛出错误并提供迁移提示）
+   * const MarketListingService = services.getService('marketListing')
+   * // Error: Service 'marketListing' not found. Did you mean 'market_listing'?
    */
   getService(serviceName) {
     if (!this._initialized) {
@@ -302,8 +395,18 @@ class ServiceManager {
 
     const service = this._services.get(serviceName)
     if (!service) {
+      // P1-9 E2-Strict：检查是否是 camelCase key，提供迁移提示
+      const suggestedKey = KEY_MIGRATION_MAP[serviceName]
+      if (suggestedKey) {
+        throw new Error(
+          `Service '${serviceName}' not found. ` +
+            `Did you mean '${suggestedKey}'? (P1-9 snake_case key migration required)\n` +
+            `迁移提示：请将 getService('${serviceName}') 改为 getService('${suggestedKey}')`
+        )
+      }
+
       const availableServices = Array.from(this._services.keys()).join(', ')
-      throw new Error(`服务 "${serviceName}" 不存在。可用服务: ${availableServices}`)
+      throw new Error(`服务 "${serviceName}" 不存在。\n` + `可用服务: ${availableServices}`)
     }
 
     return service
@@ -424,7 +527,10 @@ const serviceManager = new ServiceManager()
 
 /**
  * 初始化服务并返回服务容器
- * @param {Object} _models - 数据库模型
+ *
+ * 用于 app.js 中注入到 app.locals.services
+ *
+ * @param {Object} _models - 数据库模型（未使用，保留接口兼容）
  * @returns {Object} 服务容器
  */
 function initializeServices(_models) {

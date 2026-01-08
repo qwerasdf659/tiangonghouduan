@@ -11,6 +11,11 @@
  * - 添加 initRealTestData() 调用，从数据库动态加载测试数据
  * - 测试数据存储到 global.testData，供所有测试文件使用
  * - 解决硬编码 user_id=31, campaign_id=2 的问题
+ *
+ * 🔴 P1-9 集成（2026-01-09）：
+ * - 初始化 ServiceManager（J2-RepoWide：全仓统一）
+ * - 提供 global.getTestService() 方法供测试使用
+ * - 确保测试使用与业务代码相同的服务获取方式
  */
 
 // 🔧 2026-01-09：统一从 .env 加载配置（单一真相源）
@@ -45,16 +50,44 @@ console.log = (...args) => {
 }
 
 /**
- * 🔴 P0-1修复：全局测试数据初始化
+ * 🔴 P1-9 集成：初始化 ServiceManager
  *
- * 在所有测试开始前，从数据库加载真实测试数据：
- * - testUser: 通过 mobile='13612227930' 查询用户真实 user_id
- * - testCampaign: 查询 status='active' 的活跃活动
+ * 在所有测试开始前，初始化 ServiceManager：
+ * - 确保测试使用与业务代码相同的服务获取方式（J2-RepoWide）
+ * - 提供 global.getTestService() 方法供测试使用
+ * - 使用 snake_case key（E2-Strict）
+ */
+const {
+  initializeTestServiceManager,
+  getTestService,
+  getTestServiceManager,
+  createMockAppServices,
+  cleanupTestServiceManager
+} = require('./tests/helpers/UnifiedTestManager')
+
+// 🔴 P1-9：将服务获取方法挂载到 global，供所有测试文件使用
+global.getTestService = getTestService
+global.getTestServiceManager = getTestServiceManager
+global.createMockAppServices = createMockAppServices
+
+/**
+ * 🔴 P0-1修复 + P1-9集成：全局测试数据和服务初始化
  *
- * 测试文件可以通过 global.testData 获取这些数据
+ * 在所有测试开始前：
+ * 1. 初始化 ServiceManager（P1-9）
+ * 2. 从数据库加载真实测试数据（P0-1）
+ *
+ * 测试文件可以通过以下方式获取：
+ * - global.testData：测试用户和活动数据
+ * - global.getTestService('xxx')：通过 ServiceManager 获取服务
  */
 global.beforeAll(async () => {
   try {
+    // 🔴 P1-9：先初始化 ServiceManager
+    await initializeTestServiceManager()
+    console.log('✅ [Jest Setup] ServiceManager 初始化完成')
+
+    // 🔴 P0-1：加载真实测试数据
     const { initRealTestData } = require('./tests/helpers/test-setup')
     const testData = await initRealTestData('13612227930')
 
@@ -91,7 +124,7 @@ global.beforeAll(async () => {
       `✅ [Jest Setup] 测试数据初始化完成: user_id=${global.testData.testUser.user_id}, campaign_id=${global.testData.testCampaign.campaign_id}`
     )
   } catch (error) {
-    console.error('❌ [Jest Setup] 测试数据初始化失败:', error.message)
+    console.error('❌ [Jest Setup] 初始化失败:', error.message)
     // 设置空数据，允许测试继续（某些测试可能不需要这些数据）
     global.testData = {
       testUser: { user_id: null, mobile: '13612227930' },
@@ -104,6 +137,30 @@ global.beforeAll(async () => {
 
 // 全局清理函数
 global.afterAll(async () => {
+  // 🔴 P1-9：清理 ServiceManager
+  try {
+    await cleanupTestServiceManager()
+    console.log('🔌 [Jest Cleanup] ServiceManager 已关闭')
+  } catch (error) {
+    console.log('⚠️ [Jest Cleanup] ServiceManager 清理时出现警告（可忽略）:', error.message)
+  }
+
+  // 清理 Redis 连接，避免 Jest 卡死
+  try {
+    const { getRedisClient, isRedisHealthy } = require('./utils/UnifiedRedisClient')
+    // 只有在 Redis 健康时才尝试断开
+    if (await isRedisHealthy()) {
+      const client = await getRedisClient()
+      if (client && typeof client.disconnect === 'function') {
+        await client.disconnect()
+        console.log('🔌 [Jest Cleanup] Redis 客户端已断开')
+      }
+    }
+  } catch (error) {
+    // 忽略 Redis 清理错误，不影响测试结果
+    console.log('⚠️ [Jest Cleanup] Redis 清理时出现警告（可忽略）:', error.message)
+  }
+
   // 清理数据库连接
   if (global.sequelize) {
     await global.sequelize.close()

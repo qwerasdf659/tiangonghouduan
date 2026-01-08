@@ -292,81 +292,8 @@
   <!-- ✅ 引入通用工具库 -->
   <script src="/admin/js/admin-common.js"></script>
   
-  <script>
-    /**
-     * 显示用户信息
-     */
-    document.addEventListener('DOMContentLoaded', function() {
-      const userInfo = getCurrentUser();
-      if (userInfo && userInfo.nickname) {
-        document.getElementById('welcomeText').textContent = `欢迎，${userInfo.nickname}`;
-      }
-      
-      // 退出登录按钮
-      document.getElementById('logoutBtn').addEventListener('click', logout);
-    });
-    
-    /**
-     * 加载仪表盘数据
-     * 使用现有管理API：/api/v4/console/system/dashboard
-     * 
-     * 后端数据结构（V4统一抽奖引擎）：
-     * {
-     *   overview: { total_users, active_users, total_lotteries, win_rate },
-     *   today: { new_users, lottery_draws, wins, win_rate, points_consumed },
-     *   customer_service: { today_sessions, today_messages },
-     *   system: { uptime, memory_usage, cpu_usage, timestamp }
-     * }
-     */
-    async function loadDashboardData() {
-      try {
-        const response = await apiRequest('/api/v4/console/system/dashboard');
-        
-        if (response && response.success && response.data) {
-          const data = response.data;
-          
-          // 适配后端V4数据结构 - 总用户数据
-          if (data.overview) {
-            document.getElementById('totalUsers').textContent = formatNumber(data.overview.total_users || 0);
-          }
-          
-          // 适配后端V4数据结构 - 今日数据
-          if (data.today) {
-            document.getElementById('todayNewUsers').textContent = data.today.new_users || 0;
-            document.getElementById('todayDraws').textContent = formatNumber(data.today.lottery_draws || 0);
-            document.getElementById('todayWins').textContent = formatNumber(data.today.wins || 0);
-            document.getElementById('winRate').textContent = (data.today.win_rate || 0) + '%';
-            document.getElementById('points').textContent = formatNumber(data.today.points_consumed || 0);
-          }
-          
-          // 适配后端V4数据结构 - 客服会话数据
-          if (data.customer_service) {
-            document.getElementById('sessions').textContent = formatNumber(data.customer_service.today_sessions || 0);
-            document.getElementById('messages').textContent = formatNumber(data.customer_service.today_messages || 0);
-          }
-          
-          console.log('✅ 仪表盘数据加载成功', {
-            total_users: data.overview?.total_users,
-            today_new_users: data.today?.new_users,
-            today_draws: data.today?.lottery_draws,
-            today_wins: data.today?.wins,
-            win_rate: data.today?.win_rate
-          });
-        } else {
-          console.warn('⚠️ 仪表盘API返回数据格式异常:', response);
-        }
-      } catch (error) {
-        console.error('❌ 加载仪表盘数据失败:', error);
-        handleApiError(error, '加载仪表盘数据');
-      }
-    }
-    
-    // 页面初始化
-    if (getToken() && checkAdminPermission()) {
-      loadDashboardData();
-      setInterval(loadDashboardData, 60000); // 每分钟刷新
-    }
-  </script>
+  <!-- ✅ 页面专属逻辑 -->
+  <script src="/admin/js/pages/dashboard.js"></script>
 </body>
 </html>
 

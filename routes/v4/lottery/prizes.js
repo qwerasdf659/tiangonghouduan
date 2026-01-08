@@ -16,7 +16,10 @@ const logger = require('../../../utils/logger').logger
 const { authenticateToken } = require('../../../middleware/auth')
 const dataAccessControl = require('../../../middleware/dataAccessControl')
 const { handleServiceError } = require('../../../middleware/validation')
-const DataSanitizer = require('../../../services/DataSanitizer')
+/*
+ * P1-9：服务通过 ServiceManager 获取（B1-Injected + E2-Strict snake_case）
+ * const DataSanitizer = require('../../../services/DataSanitizer')
+ */
 
 /**
  * @route GET /api/v4/lottery/prizes/:campaignCode
@@ -33,6 +36,9 @@ const DataSanitizer = require('../../../services/DataSanitizer')
  */
 router.get('/prizes/:campaignCode', authenticateToken, dataAccessControl, async (req, res) => {
   try {
+    // P1-9：通过 ServiceManager 获取服务（snake_case key）
+    const DataSanitizer = req.app.locals.services.getService('data_sanitizer')
+
     const campaign_code = req.params.campaignCode
 
     // 🔥 参数校验增强
@@ -54,7 +60,7 @@ router.get('/prizes/:campaignCode', authenticateToken, dataAccessControl, async 
     }
 
     // ✅ 通过Service获取活动和奖品列表（不再直连models）
-    const lottery_engine = req.app.locals.services.getService('unifiedLotteryEngine')
+    const lottery_engine = req.app.locals.services.getService('unified_lottery_engine')
     const { campaign: _campaign, prizes: fullPrizes } =
       await lottery_engine.getCampaignWithPrizes(campaign_code)
 
@@ -108,7 +114,7 @@ router.get('/config/:campaignCode', authenticateToken, dataAccessControl, async 
     }
 
     // ✅ 通过Service获取活动配置（不再直连models）
-    const lottery_engine = req.app.locals.services.getService('unifiedLotteryEngine')
+    const lottery_engine = req.app.locals.services.getService('unified_lottery_engine')
     const campaign = await lottery_engine.getCampaignByCode(campaign_code)
 
     // 使用campaign.campaign_id获取完整配置（内部仍用ID）
@@ -116,7 +122,8 @@ router.get('/config/:campaignCode', authenticateToken, dataAccessControl, async 
 
     // 🔴 从 DB 读取单抽价格并动态计算连抽定价（配置管理三层分离方案）
     const businessConfig = require('../../../config/business.config')
-    const AdminSystemService = require('../../../services/AdminSystemService')
+    // P1-9：通过 ServiceManager 获取服务（snake_case key）
+    const AdminSystemService = req.app.locals.services.getService('admin_system')
 
     // 读取单抽价格（严格模式：配置缺失直接报错）
     const singleDrawCost = await AdminSystemService.getSettingValue(

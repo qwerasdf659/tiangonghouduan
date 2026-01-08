@@ -20,7 +20,10 @@
 const express = require('express')
 const router = express.Router()
 const { authenticateToken } = require('../../middleware/auth')
-const MerchantPointsService = require('../../services/MerchantPointsService')
+/*
+ * P1-9：服务通过 ServiceManager 获取
+ * const MerchantPointsService = require('../../services/MerchantPointsService')
+ */
 const TransactionManager = require('../../utils/TransactionManager')
 const { logger } = require('../../utils/logger')
 
@@ -55,6 +58,8 @@ router.post('/', async (req, res) => {
       return res.apiError('单次申请积分不能超过100000', 'POINTS_AMOUNT_TOO_LARGE', null, 400)
     }
 
+    // P1-9：通过 ServiceManager 获取 MerchantPointsService（snake_case key）
+    const MerchantPointsService = req.app.locals.services.getService('merchant_points')
     // 使用 TransactionManager 统一管理事务
     const result = await TransactionManager.execute(
       async transaction => {
@@ -107,6 +112,8 @@ router.get('/', async (req, res) => {
       filters.status = status
     }
 
+    // P1-9：通过 ServiceManager 获取 MerchantPointsService（snake_case key）
+    const MerchantPointsService = req.app.locals.services.getService('merchant_points')
     const result = await MerchantPointsService.getApplications(
       filters,
       parseInt(page, 10),
@@ -130,6 +137,8 @@ router.get('/stats', async (req, res) => {
   try {
     const userId = req.user.user_id
 
+    // P1-9：通过 ServiceManager 获取 MerchantPointsService（snake_case key）
+    const MerchantPointsService = req.app.locals.services.getService('merchant_points')
     const stats = await MerchantPointsService.getUserApplicationStats(userId)
 
     return res.apiSuccess(stats, '获取申请统计成功')
@@ -152,6 +161,8 @@ router.get('/:audit_id', async (req, res) => {
     const { audit_id } = req.params
     const userId = req.user.user_id
 
+    // P1-9：通过 ServiceManager 获取 MerchantPointsService（snake_case key）
+    const MerchantPointsService = req.app.locals.services.getService('merchant_points')
     const application = await MerchantPointsService.getApplicationById(parseInt(audit_id, 10))
 
     if (!application) {

@@ -5,6 +5,10 @@
  * 1. P1-1：材料转换风控校验按 group_code 限定
  * 2. P1-2：交易下单幂等冲突校验强制 DIAMOND-only
  * 3. P1-3：asset_transactions.user_id 重复外键清理（已通过迁移验证）
+ *
+ * P1-9 J2-RepoWide 改造：
+ * - 通过 ServiceManager 统一获取服务
+ * - 服务 key 使用 snake_case（E2-Strict）
  */
 
 const MaterialConversionValidator = require('../utils/materialConversionValidator')
@@ -16,6 +20,8 @@ describe('P1 修复验证测试', () => {
   let testDataCreated = false
 
   beforeAll(async () => {
+    // 🔴 P1-9: ServiceManager 已在 jest.setup.js 中初始化
+
     // 准备测试材料数据（使用 upsert 确保数据存在）
     const testMaterials = [
       {
@@ -160,9 +166,10 @@ describe('P1 修复验证测试', () => {
       /*
        * 这个测试需要实际的 TradeOrderService 和数据库数据
        * 由于测试环境限制，这里只做基本验证
+       *
+       * P1-9 J2-RepoWide：通过 ServiceManager 获取服务
        */
-
-      const TradeOrderService = require('../services/TradeOrderService')
+      const TradeOrderService = global.getTestService('trade_order')
 
       // 验证服务类存在且有 createOrder 方法
       expect(TradeOrderService).toBeDefined()

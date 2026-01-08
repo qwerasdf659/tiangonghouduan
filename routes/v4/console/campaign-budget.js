@@ -28,12 +28,22 @@ const {
   asyncHandler,
   validators
 } = require('./shared/middleware')
-// 决策7：写操作通过 Service 层处理（包含缓存失效）
-const AdminLotteryService = require('../../../services/AdminLotteryService')
-// 路由层规范：通过 Service 层访问数据库（2026-01-09）
-const ActivityService = require('../../../services/ActivityService')
-const UserService = require('../../../services/UserService')
-const AssetService = require('../../../services/AssetService')
+// P1-9：服务通过 ServiceManager 获取（B1-Injected + E2-Strict snake_case）
+
+/**
+ * P1-9：获取服务的辅助函数
+ *
+ * @param {Object} req - Express 请求对象
+ * @returns {Object} 服务实例集合
+ */
+function getServices(req) {
+  return {
+    AdminLotteryService: req.app.locals.services.getService('admin_lottery'),
+    ActivityService: req.app.locals.services.getService('activity'),
+    UserService: req.app.locals.services.getService('user'),
+    AssetService: req.app.locals.services.getService('asset')
+  }
+}
 
 /**
  * GET /batch-status - 批量获取多个活动的预算状态
@@ -62,6 +72,9 @@ router.get(
           .map(id => parseInt(id.trim()))
           .filter(id => !isNaN(id))
       }
+
+      // P1-9：通过 ServiceManager 获取服务
+      const { ActivityService } = getServices(req)
 
       // 通过 Service 层获取批量预算状态（符合路由层规范）
       const { campaigns: results, summary } = await ActivityService.getBatchBudgetStatus({
@@ -117,6 +130,9 @@ router.get(
         return res.apiError('无效的活动ID', 'INVALID_CAMPAIGN_ID')
       }
 
+      // P1-9：通过 ServiceManager 获取服务
+      const { ActivityService } = getServices(req)
+
       // 通过 Service 层获取活动预算配置（符合路由层规范）
       const campaignConfig = await ActivityService.getCampaignBudgetConfig(parseInt(campaign_id))
 
@@ -167,6 +183,9 @@ router.put(
   asyncHandler(async (req, res) => {
     const { campaign_id } = req.params
     const { budget_mode, pool_budget_total, allowed_campaign_ids } = req.body
+
+    // P1-9：通过 ServiceManager 获取服务
+    const { AdminLotteryService } = getServices(req)
 
     try {
       if (!campaign_id || isNaN(parseInt(campaign_id))) {
@@ -241,6 +260,9 @@ router.post(
         return res.apiError('无效的活动ID', 'INVALID_CAMPAIGN_ID')
       }
 
+      // 通过 ServiceManager 获取服务（P1-9 snake_case key）
+      const ActivityService = req.app.locals.services.getService('activity')
+
       // 通过 Service 层验证奖品配置（符合路由层规范）
       const validationResult = await ActivityService.validatePrizeConfig(parseInt(campaign_id))
 
@@ -281,6 +303,10 @@ router.get(
 
     try {
       const validUserId = validators.validateUserId(user_id)
+
+      // 通过 ServiceManager 获取服务（P1-9 snake_case key）
+      const UserService = req.app.locals.services.getService('user')
+      const AssetService = req.app.locals.services.getService('asset')
 
       // 通过 Service 层验证用户存在（符合路由层规范）
       let user
@@ -368,6 +394,9 @@ router.post(
         return res.apiError('必须提供补充原因', 'MISSING_REASON')
       }
 
+      // 通过 ServiceManager 获取服务（P1-9 snake_case key）
+      const AdminLotteryService = req.app.locals.services.getService('admin_lottery')
+
       // 决策7：通过 Service 层补充预算（包含缓存失效）
       const result = await AdminLotteryService.supplementCampaignBudget(
         parseInt(campaign_id),
@@ -423,6 +452,9 @@ router.get(
       if (!campaign_id || isNaN(parseInt(campaign_id))) {
         return res.apiError('无效的活动ID', 'INVALID_CAMPAIGN_ID')
       }
+
+      // 通过 ServiceManager 获取服务（P1-9 snake_case key）
+      const ActivityService = req.app.locals.services.getService('activity')
 
       // 通过 Service 层获取预算消耗统计（符合路由层规范）
       const statsResult = await ActivityService.getBudgetConsumptionStats(parseInt(campaign_id))

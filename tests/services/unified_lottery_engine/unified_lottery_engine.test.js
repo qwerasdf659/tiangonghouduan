@@ -11,15 +11,22 @@
  *
  * 🔴 P0-1修复（2026-01-08）：移除硬编码 user_id=31，从 global.testData 动态获取
  *
+ * P1-9 J2-RepoWide 改造说明：
+ * - UnifiedLotteryEngine 通过 ServiceManager 获取（snake_case: unified_lottery_engine）
+ * - 模型直接引用用于测试数据准备（服务测试场景合理）
+ *
  * @date 2025-01-21 (重构)
  */
 
-const {
-  UnifiedLotteryEngine
-} = require('../../../services/UnifiedLotteryEngine/UnifiedLotteryEngine')
 const BeijingTimeHelper = require('../../../utils/timeHelper')
 const models = require('../../../models')
 const { User, LotteryCampaign } = models
+
+/*
+ * 🔴 P1-9：通过 ServiceManager 获取服务（替代直接 require）
+ * 注意：getTestService 返回的是已实例化的引擎
+ */
+let UnifiedLotteryEngine
 
 describe('V4统一抽奖引擎主引擎测试 - 重构版', () => {
   let engine
@@ -58,6 +65,9 @@ describe('V4统一抽奖引擎主引擎测试 - 重构版', () => {
   }
 
   beforeAll(async () => {
+    // 🔴 P1-9：通过 ServiceManager 获取服务实例（snake_case key）
+    UnifiedLotteryEngine = global.getTestService('unified_lottery_engine')
+
     console.log('🔍 初始化V4真实业务测试环境...')
 
     try {
@@ -101,8 +111,8 @@ describe('V4统一抽奖引擎主引擎测试 - 重构版', () => {
         console.warn('⚠️ 未找到活跃的抽奖活动，将跳过部分测试')
       }
 
-      // 初始化统一引擎
-      engine = new UnifiedLotteryEngine()
+      // 初始化统一引擎（P1-9：已通过 ServiceManager 获取实例）
+      engine = UnifiedLotteryEngine
 
       console.log('✅ V4测试环境初始化完成')
       console.log(`📊 测试用户: ${real_test_user.user_id} (${real_test_user.mobile})`)

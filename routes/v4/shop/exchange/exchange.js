@@ -29,9 +29,8 @@ const router = express.Router()
 const { authenticateToken } = require('../../../../middleware/auth')
 const { handleServiceError } = require('../../../../middleware/validation')
 const logger = require('../../../../utils/logger').logger
-// 业界标准幂等架构 - 统一入口幂等服务
-const IdempotencyService = require('../../../../services/IdempotencyService')
 const TransactionManager = require('../../../../utils/TransactionManager')
+// P1-9：服务通过 ServiceManager 获取（B1-Injected + E2-Strict snake_case）
 
 /**
  * @route POST /api/v4/shop/exchange/exchange
@@ -51,6 +50,10 @@ const TransactionManager = require('../../../../utils/TransactionManager')
  * 幂等性控制（业界标准形态）：统一通过 Header Idempotency-Key 防止重复下单
  */
 router.post('/exchange', authenticateToken, async (req, res) => {
+  // P1-9：通过 ServiceManager 获取服务（B1-Injected + E2-Strict snake_case）
+  const IdempotencyService = req.app.locals.services.getService('idempotency')
+  const ExchangeService = req.app.locals.services.getService('exchange_market')
+
   // 【业界标准形态】强制从 Header 获取幂等键，不接受 body
   const idempotency_key = req.headers['idempotency-key']
 
@@ -70,9 +73,6 @@ router.post('/exchange', authenticateToken, async (req, res) => {
   }
 
   try {
-    // 🔄 通过 ServiceManager 获取 ExchangeService（符合TR-005规范）
-    const ExchangeService = req.app.locals.services.getService('exchangeMarket')
-
     const { item_id, quantity = 1 } = req.body
     const user_id = req.user.user_id
 

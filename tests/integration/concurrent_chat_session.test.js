@@ -9,12 +9,18 @@
  *
  * 依赖的数据库索引：
  * - UNIQUE INDEX idx_user_active_session ON customer_service_sessions(user_id, is_active_session)
+ *
+ * P1-9 J2-RepoWide 改造说明：
+ * - ChatRateLimitService 通过 ServiceManager 获取（snake_case: chat_rate_limit）
+ * - sequelize/CustomerServiceSession 直接引用用于测试数据准备/清理（集成测试场景合理）
  */
 
 const request = require('supertest')
 const app = require('../../app')
 const { sequelize, CustomerServiceSession } = require('../../models')
-const ChatRateLimitService = require('../../services/ChatRateLimitService')
+
+// 🔴 P1-9：通过 ServiceManager 获取服务（替代直接 require）
+let ChatRateLimitService
 
 // 测试账号（需要是真实存在的用户）
 let TEST_USER_ID = null // 动态获取登录用户的user_id
@@ -25,6 +31,8 @@ describe('创建聊天会话API并发测试（方案A：唯一索引+重试）',
 
   // 测试前准备：登录获取token
   beforeAll(async () => {
+    // 🔴 P1-9：通过 ServiceManager 获取服务实例（snake_case key）
+    ChatRateLimitService = global.getTestService('chat_rate_limit')
     console.log('\n===== 测试前准备 =====')
 
     try {

@@ -1,8 +1,14 @@
 /**
  * AnnouncementService 单元测试
+ *
+ * 更新时间：2026-01-09（P1-9 ServiceManager 集成）
+ *
+ * P1-9 重构说明：
+ * - 服务通过 global.getTestService() 获取（J2-RepoWide）
+ * - 使用 snake_case service key（E2-Strict）
+ * - 本测试使用 mock，但仍通过 ServiceManager 获取服务保持一致性
  */
 
-const AnnouncementService = require('../../services/AnnouncementService')
 const { SystemAnnouncement } = require('../../models')
 const BeijingTimeHelper = require('../../utils/timeHelper')
 
@@ -10,7 +16,15 @@ const BeijingTimeHelper = require('../../utils/timeHelper')
 jest.mock('../../models')
 jest.mock('../../utils/timeHelper')
 
+// 🔴 P1-9：通过 ServiceManager 获取服务（替代直接 require）
+let AnnouncementService
+
 describe('AnnouncementService', () => {
+  beforeAll(() => {
+    // 🔴 P1-9：通过 ServiceManager 获取服务实例（snake_case key）
+    AnnouncementService = global.getTestService('announcement')
+  })
+
   beforeEach(() => {
     jest.clearAllMocks()
   })

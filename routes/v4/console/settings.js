@@ -36,7 +36,7 @@ router.get(
       const { category } = req.params
 
       // 获取管理后台系统服务（P2-C架构重构：已合并SystemSettingsService）
-      const AdminSystemService = req.app.locals.services.getService('adminSystem')
+      const AdminSystemService = req.app.locals.services.getService('admin_system')
 
       // 调用服务层方法（服务层负责验证和数据查询）
       const result = await AdminSystemService.getSettingsByCategory(category)
@@ -87,7 +87,7 @@ router.put(
       const { settings: settingsToUpdate } = req.body
 
       // 获取管理后台系统服务（P2-C架构重构：已合并SystemSettingsService）
-      const AdminSystemService = req.app.locals.services.getService('adminSystem')
+      const AdminSystemService = req.app.locals.services.getService('admin_system')
 
       /*
        * 使用 TransactionManager 统一管理事务（2026-01-05 事务边界治理）
@@ -143,7 +143,7 @@ router.get(
   asyncHandler(async (req, res) => {
     try {
       // 获取管理后台系统服务（P2-C架构重构）
-      const AdminSystemService = req.app.locals.services.getService('adminSystem')
+      const AdminSystemService = req.app.locals.services.getService('admin_system')
 
       // 调用服务层方法
       const summary = await AdminSystemService.getSettingsSummary()
@@ -186,7 +186,7 @@ router.post(
       }
 
       // 获取管理后台系统服务（P2-C架构重构）
-      const AdminSystemService = req.app.locals.services.getService('adminSystem')
+      const AdminSystemService = req.app.locals.services.getService('admin_system')
 
       // 调用服务层方法（服务层负责Redis操作）
       const result = await AdminSystemService.clearCache(pattern)

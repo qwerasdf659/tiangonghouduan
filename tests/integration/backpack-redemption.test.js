@@ -8,12 +8,18 @@
  *
  * 创建时间：2025-12-17
  * 使用模型：Claude Sonnet 4.5
+ *
+ * P1-9 J2-RepoWide 改造：
+ * - 通过 ServiceManager 统一获取服务
+ * - 服务 key 使用 snake_case（E2-Strict）
  */
 
 const { sequelize, ItemInstance, User, RedemptionOrder } = require('../../models')
-const RedemptionService = require('../../services/RedemptionService')
-const BackpackService = require('../../services/BackpackService')
 const TransactionManager = require('../../utils/TransactionManager')
+
+// 🔴 P1-9 J2-RepoWide：通过 global.getTestService 获取服务（snake_case key）
+let RedemptionService
+let BackpackService
 
 // 测试数据库配置
 jest.setTimeout(30000)
@@ -26,7 +32,11 @@ describe('背包与兑换集成测试', () => {
   // 测试前准备
   beforeAll(async () => {
     try {
-      // 连接测试数据库
+      // 🔴 P1-9：通过 ServiceManager 获取服务实例
+      RedemptionService = global.getTestService('redemption_order')
+      BackpackService = global.getTestService('backpack')
+
+      // 连接测试数据库（由全局 jest.setup.js 处理，此处仅验证）
       await sequelize.authenticate()
     } catch (error) {
       console.warn('⚠️ 数据库连接失败，跳过测试:', error.message)

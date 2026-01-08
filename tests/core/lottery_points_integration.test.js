@@ -5,6 +5,11 @@
  * 1. 积分消费记录完整性（通过AssetService查询）
  * 2. 积分奖励记录完整性
  * 3. 资产流水记录正确性
+ *
+ * P1-9 J2-RepoWide 改造说明：
+ * - AssetService 通过 ServiceManager 获取（snake_case: asset）
+ * - BasicGuaranteeStrategy 通过 ServiceManager 获取（snake_case: basic_guarantee_strategy）
+ * - 模型直接引用用于测试数据准备/验证（核心测试场景合理）
  */
 
 const {
@@ -14,8 +19,10 @@ const {
   Account,
   AccountAssetBalance
 } = require('../../models')
-const AssetService = require('../../services/AssetService')
-const BasicGuaranteeStrategy = require('../../services/UnifiedLotteryEngine/strategies/BasicGuaranteeStrategy')
+
+// 🔴 P1-9：通过 ServiceManager 获取服务（替代直接 require）
+let AssetService
+let BasicGuaranteeStrategy
 
 describe('抽奖积分集成测试 - V4.5', () => {
   const testUserId = 31 // 测试账号：13612227930
@@ -33,6 +40,9 @@ describe('抽奖积分集成测试 - V4.5', () => {
   }
 
   beforeAll(async () => {
+    // 🔴 P1-9：通过 ServiceManager 获取服务实例（snake_case key）
+    AssetService = global.getTestService('asset')
+    BasicGuaranteeStrategy = global.getTestService('basic_guarantee_strategy')
     // 获取初始状态（使用新资产系统）
     initialBalance = await getPointsBalance(testUserId)
     initialUser = await User.findByPk(testUserId)

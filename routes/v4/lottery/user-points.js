@@ -127,7 +127,7 @@ router.get('/statistics/:user_id', authenticateToken, async (req, res) => {
      * 📡 调用统一抽奖引擎的统计服务（核心业务逻辑在Service层）
      * 服务层方法：UnifiedLotteryEngine.get_user_statistics(user_id)
      */
-    const lottery_engine = req.app.locals.services.getService('unifiedLotteryEngine')
+    const lottery_engine = req.app.locals.services.getService('unified_lottery_engine')
     const statistics = await lottery_engine.get_user_statistics(user_id)
 
     /*

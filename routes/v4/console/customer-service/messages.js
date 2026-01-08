@@ -32,7 +32,7 @@ router.use(authenticateToken, requireAdmin)
 router.get('/:session_id/messages', async (req, res) => {
   try {
     // 通过 ServiceManager 获取 AdminCustomerServiceService
-    const AdminCustomerServiceService = req.app.locals.services.getService('adminCustomerService')
+    const AdminCustomerServiceService = req.app.locals.services.getService('admin_customer_service')
 
     const session_id = parseInt(req.params.session_id)
     const options = {
@@ -98,7 +98,7 @@ router.post('/:session_id/send', async (req, res) => {
     }
 
     // 通过 ServiceManager 获取 AdminCustomerServiceService
-    const AdminCustomerServiceService = req.app.locals.services.getService('adminCustomerService')
+    const AdminCustomerServiceService = req.app.locals.services.getService('admin_customer_service')
 
     // 调用服务层方法
     const result = await AdminCustomerServiceService.sendMessage(session_id, data)
@@ -142,7 +142,7 @@ router.post('/:session_id/mark-read', async (req, res) => {
     const admin_id = req.user.user_id
 
     // 通过 ServiceManager 获取 AdminCustomerServiceService
-    const AdminCustomerServiceService = req.app.locals.services.getService('adminCustomerService')
+    const AdminCustomerServiceService = req.app.locals.services.getService('admin_customer_service')
 
     // 调用服务层方法
     const result = await AdminCustomerServiceService.markSessionAsRead(session_id, admin_id)

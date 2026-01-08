@@ -33,8 +33,7 @@ const { authenticateToken } = require('../../../../middleware/auth')
 const { handleServiceError } = require('../../../../middleware/validation')
 const logger = require('../../../../utils/logger').logger
 const TransactionManager = require('../../../../utils/TransactionManager')
-// 业界标准幂等架构 - 统一入口幂等服务
-const IdempotencyService = require('../../../../services/IdempotencyService')
+// P1-9：服务通过 ServiceManager 获取（B1-Injected + E2-Strict snake_case）
 
 /**
  * 材料转换接口（显式转换）
@@ -77,6 +76,10 @@ const IdempotencyService = require('../../../../services/IdempotencyService')
  * 幂等性控制（业界标准形态）：统一通过 Header Idempotency-Key 防止重复转换
  */
 router.post('/convert', authenticateToken, async (req, res) => {
+  // P1-9：通过 ServiceManager 获取服务（B1-Injected + E2-Strict snake_case）
+  const IdempotencyService = req.app.locals.services.getService('idempotency')
+  const AssetConversionService = req.app.locals.services.getService('asset_conversion')
+
   // 【业界标准形态】强制从 Header 获取幂等键，不接受 body
   const idempotency_key = req.headers['idempotency-key']
 
@@ -95,9 +98,6 @@ router.post('/convert', authenticateToken, async (req, res) => {
   }
 
   try {
-    // 通过 ServiceManager 获取 AssetConversionService（符合TR-005规范）
-    const AssetConversionService = req.app.locals.services.getService('assetConversion')
-
     const { from_asset_code, to_asset_code, from_amount } = req.body
     const user_id = req.user.user_id
 

@@ -30,7 +30,7 @@ router.use(authenticateToken, requireAdmin)
 router.get('/', async (req, res) => {
   try {
     // 通过 ServiceManager 获取 AdminCustomerServiceService
-    const AdminCustomerServiceService = req.app.locals.services.getService('adminCustomerService')
+    const AdminCustomerServiceService = req.app.locals.services.getService('admin_customer_service')
 
     const options = {
       page: req.query.page,
@@ -62,7 +62,7 @@ router.get('/', async (req, res) => {
 router.get('/stats', async (req, res) => {
   try {
     // 通过 ServiceManager 获取 AdminCustomerServiceService
-    const AdminCustomerServiceService = req.app.locals.services.getService('adminCustomerService')
+    const AdminCustomerServiceService = req.app.locals.services.getService('admin_customer_service')
 
     const admin_id = req.query.admin_id ? parseInt(req.query.admin_id) : undefined
 

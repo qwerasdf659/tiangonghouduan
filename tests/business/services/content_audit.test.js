@@ -10,18 +10,27 @@
  *
  * 创建时间：2025-10-11
  * 重命名时间：2025-10-12
+ *
+ * P1-9 J2-RepoWide 改造说明：
+ * - ContentAuditEngine 通过 ServiceManager 获取（snake_case: content_audit）
+ * - 模型直接引用用于测试数据准备/验证（业务测试场景合理）
  */
 
-const ContentAuditEngine = require('../../../services/ContentAuditEngine')
 const { ContentReviewRecord, User, sequelize } = require('../../../models')
 const BeijingTimeHelper = require('../../../utils/timeHelper')
 const { TEST_DATA } = require('../../helpers/test-data')
 const TransactionManager = require('../../../utils/TransactionManager')
 
+// 🔴 P1-9：通过 ServiceManager 获取服务（替代直接 require）
+let ContentAuditEngine
+
 describe('ContentAuditEngine - 内容审核引擎测试', () => {
   let testUser, testContentReviewRecord
 
   beforeAll(async () => {
+    // 🔴 P1-9：通过 ServiceManager 获取服务实例（snake_case key）
+    ContentAuditEngine = global.getTestService('content_audit')
+
     // 创建测试用户（审核员） - 使用统一测试数据
     testUser = await User.findOne({
       where: { mobile: TEST_DATA.users.testUser.mobile }

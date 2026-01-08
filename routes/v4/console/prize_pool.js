@@ -55,7 +55,7 @@ router.post(
       }
 
       // 通过 ServiceManager 获取 PrizePoolService
-      const PrizePoolService = req.app.locals.services.getService('prizePool')
+      const PrizePoolService = req.app.locals.services.getService('prize_pool')
 
       // 使用 TransactionManager 统一管理事务（2026-01-05 事务边界治理）
       const result = await TransactionManager.execute(
@@ -122,7 +122,7 @@ router.get(
       if (status) filters.status = status
 
       // 通过 ServiceManager 获取 PrizePoolService
-      const PrizePoolService = req.app.locals.services.getService('prizePool')
+      const PrizePoolService = req.app.locals.services.getService('prize_pool')
 
       // 调用 Service 层方法
       const result = await PrizePoolService.getAllPrizes(filters)
@@ -157,7 +157,7 @@ router.get(
       }
 
       // 通过 ServiceManager 获取 PrizePoolService
-      const PrizePoolService = req.app.locals.services.getService('prizePool')
+      const PrizePoolService = req.app.locals.services.getService('prize_pool')
 
       // 调用 Service 层方法
       const prizePoolInfo = await PrizePoolService.getPrizesByCampaign(campaign_code)
@@ -198,7 +198,7 @@ router.put(
       }
 
       // 通过 ServiceManager 获取 PrizePoolService
-      const PrizePoolService = req.app.locals.services.getService('prizePool')
+      const PrizePoolService = req.app.locals.services.getService('prize_pool')
 
       // 使用 TransactionManager 统一管理事务（2026-01-05 事务边界治理）
       const result = await TransactionManager.execute(
@@ -261,7 +261,7 @@ router.post(
       }
 
       // 通过 ServiceManager 获取 PrizePoolService
-      const PrizePoolService = req.app.locals.services.getService('prizePool')
+      const PrizePoolService = req.app.locals.services.getService('prize_pool')
 
       // 使用 TransactionManager 统一管理事务（2026-01-05 事务边界治理）
       const result = await TransactionManager.execute(
@@ -309,7 +309,7 @@ router.delete(
       const prizeId = parseInt(req.params.prize_id)
 
       // 通过 ServiceManager 获取 PrizePoolService
-      const PrizePoolService = req.app.locals.services.getService('prizePool')
+      const PrizePoolService = req.app.locals.services.getService('prize_pool')
 
       // 使用 TransactionManager 统一管理事务（2026-01-05 事务边界治理）
       const result = await TransactionManager.execute(

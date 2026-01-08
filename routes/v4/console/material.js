@@ -48,7 +48,7 @@ router.get('/conversion-rules', authenticateToken, requireAdmin, async (req, res
     const { from_asset_code, to_asset_code, is_enabled, page = 1, page_size = 20 } = req.query
 
     // ✅ 路由层不直连 models：通过 ServiceManager 获取运营管理服务
-    const MaterialManagementService = req.app.locals.services.getService('materialManagement')
+    const MaterialManagementService = req.app.locals.services.getService('material_management')
     const result = await MaterialManagementService.listConversionRules({
       from_asset_code,
       to_asset_code,
@@ -136,7 +136,7 @@ router.post('/conversion-rules', authenticateToken, requireAdmin, async (req, re
     }
 
     // ✅ 路由层只做参数校验，业务逻辑/风控校验由 Service 统一处理
-    const MaterialManagementService = req.app.locals.services.getService('materialManagement')
+    const MaterialManagementService = req.app.locals.services.getService('material_management')
 
     // 使用 TransactionManager 统一管理事务（2026-01-05 事务边界治理）
     const result = await TransactionManager.execute(
@@ -186,7 +186,7 @@ router.put(
   async (req, res) => {
     try {
       const { rule_id } = req.params
-      const MaterialManagementService = req.app.locals.services.getService('materialManagement')
+      const MaterialManagementService = req.app.locals.services.getService('material_management')
 
       // 使用 TransactionManager 统一管理事务（2026-01-05 事务边界治理）
       const result = await TransactionManager.execute(
@@ -221,7 +221,7 @@ router.put(
 router.get('/asset-types', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const { group_code, is_enabled } = req.query
-    const MaterialManagementService = req.app.locals.services.getService('materialManagement')
+    const MaterialManagementService = req.app.locals.services.getService('material_management')
     const result = await MaterialManagementService.listAssetTypes({ group_code, is_enabled })
     return res.apiSuccess(result, '查询材料资产类型成功')
   } catch (error) {
@@ -277,7 +277,7 @@ router.post('/asset-types', authenticateToken, requireAdmin, async (req, res) =>
       return res.apiError('form 必须为 shard 或 crystal', 'INVALID_FORM', null, 400)
     }
 
-    const MaterialManagementService = req.app.locals.services.getService('materialManagement')
+    const MaterialManagementService = req.app.locals.services.getService('material_management')
 
     // 使用 TransactionManager 统一管理事务（2026-01-05 事务边界治理）
     const result = await TransactionManager.execute(
@@ -324,7 +324,7 @@ router.put(
   async (req, res) => {
     try {
       const { asset_code } = req.params
-      const MaterialManagementService = req.app.locals.services.getService('materialManagement')
+      const MaterialManagementService = req.app.locals.services.getService('material_management')
 
       // 使用 TransactionManager 统一管理事务（2026-01-05 事务边界治理）
       const result = await TransactionManager.execute(

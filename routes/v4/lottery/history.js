@@ -52,7 +52,7 @@ router.get('/history/:user_id', authenticateToken, async (req, res) => {
     }
 
     // 获取抽奖历史
-    const lottery_engine = req.app.locals.services.getService('unifiedLotteryEngine')
+    const lottery_engine = req.app.locals.services.getService('unified_lottery_engine')
     const history = await lottery_engine.get_user_history(user_id, {
       page: finalPage,
       limit: finalLimit
@@ -88,7 +88,7 @@ router.get('/campaigns', authenticateToken, async (req, res) => {
     const { status = 'active' } = req.query
 
     // 获取活动列表
-    const lottery_engine = req.app.locals.services.getService('unifiedLotteryEngine')
+    const lottery_engine = req.app.locals.services.getService('unified_lottery_engine')
     const campaigns = await lottery_engine.get_campaigns({
       status,
       user_id: req.user.user_id

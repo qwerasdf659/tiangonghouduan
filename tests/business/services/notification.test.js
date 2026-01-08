@@ -2,16 +2,27 @@
  * NotificationService 测试套件
  * 测试统一通知服务（客服聊天系统集成）
  * 创建时间：2025-10-11 北京时间
+ * 更新时间：2026-01-09（P1-9 ServiceManager 集成）
+ *
+ * P1-9 重构说明：
+ * - NotificationService 通过 global.getTestService() 获取（J2-RepoWide）
+ * - 使用 snake_case service key（E2-Strict）
+ * - 模型直接引用用于测试数据准备/验证
  */
 
-const NotificationService = require('../../../services/NotificationService')
 const { CustomerServiceSession, ChatMessage, User } = require('../../../models')
 const { TEST_DATA } = require('../../helpers/test-data')
+
+// 🔴 P1-9：通过 ServiceManager 获取服务（替代直接 require）
+let NotificationService
 
 describe('NotificationService - 统一通知服务', () => {
   let testUser
 
   beforeAll(async () => {
+    // 🔴 P1-9：通过 ServiceManager 获取服务实例（snake_case key）
+    NotificationService = global.getTestService('notification')
+
     // 创建测试用户 - 使用统一测试数据
     testUser = await User.findOne({
       where: { mobile: TEST_DATA.users.testUser.mobile }

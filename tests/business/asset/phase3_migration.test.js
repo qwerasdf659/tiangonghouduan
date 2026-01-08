@@ -7,19 +7,30 @@
  * 3. 统一409幂等冲突语义（参数不同返回409）
  *
  * 创建时间：2025-12-15
+ * 更新时间：2026-01-09（P1-9 ServiceManager 集成）
  * Phase 3实施
+ *
+ * P1-9 重构说明：
+ * - 服务通过 global.getTestService() 获取（J2-RepoWide）
+ * - 使用 snake_case service key（E2-Strict）
+ * - 模型直接引用用于测试数据准备/清理
  */
 
 const { User, AssetTransaction, sequelize: _sequelize } = require('../../../models')
 const { Op } = require('sequelize')
-const AssetService = require('../../../services/AssetService')
-const AssetConversionService = require('../../../services/AssetConversionService')
 const TransactionManager = require('../../../utils/TransactionManager')
+
+// 🔴 P1-9：通过 ServiceManager 获取服务（替代直接 require）
+let AssetService
+let AssetConversionService
 
 describe('Phase 3迁移测试：统一账本域', () => {
   let testUser
 
   beforeAll(async () => {
+    // 🔴 P1-9：通过 ServiceManager 获取服务实例（snake_case key）
+    AssetService = global.getTestService('asset')
+    AssetConversionService = global.getTestService('asset_conversion')
     // 查找或创建测试用户
     const [user, created] = await User.findOrCreate({
       where: { mobile: '13600000003' },

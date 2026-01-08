@@ -45,7 +45,7 @@ router.post(
       }
 
       // 通过 ServiceManager 获取 AdminLotteryService
-      const AdminLotteryService = req.app.locals.services.getService('adminLottery')
+      const AdminLotteryService = req.app.locals.services.getService('admin_lottery')
 
       // 使用 TransactionManager 统一管理事务（2026-01-05 事务边界治理）
       const result = await TransactionManager.execute(
@@ -106,7 +106,7 @@ router.post(
       }
 
       // 通过 ServiceManager 获取 AdminLotteryService
-      const AdminLotteryService = req.app.locals.services.getService('adminLottery')
+      const AdminLotteryService = req.app.locals.services.getService('admin_lottery')
 
       // 使用 TransactionManager 统一管理事务（2026-01-05 事务边界治理）
       const result = await TransactionManager.execute(

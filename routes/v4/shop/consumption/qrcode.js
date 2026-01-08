@@ -23,8 +23,10 @@ const { authenticateToken, requireAdmin } = require('../../../../middleware/auth
 const { handleServiceError } = require('../../../../middleware/validation')
 const QRCodeValidator = require('../../../../utils/QRCodeValidator')
 const logger = require('../../../../utils/logger').logger
-// 用户服务 - 通过 Service 层访问数据库（符合路由层规范）
-const UserService = require('../../../../services/UserService')
+/*
+ * P1-9：UserService 通过 ServiceManager 获取（snake_case key）
+ * 在路由处理函数内通过 req.app.locals.services.getService('user') 获取
+ */
 
 /**
  * @route GET /api/v4/shop/consumption/qrcode/:user_id
@@ -77,7 +79,11 @@ router.get('/qrcode/:user_id', authenticateToken, async (req, res) => {
 
     logger.info('生成用户二维码（UUID版本）', { user_id: userId })
 
-    // 查询用户获取UUID（通过 Service 层访问，符合路由层规范）
+    /*
+     * 查询用户获取UUID（通过 Service 层访问，符合路由层规范）
+     * P1-9：通过 ServiceManager 获取 UserService（snake_case key）
+     */
+    const UserService = req.app.locals.services.getService('user')
     let user
     try {
       user = await UserService.getUserById(userId)

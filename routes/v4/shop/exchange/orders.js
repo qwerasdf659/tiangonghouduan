@@ -21,7 +21,10 @@ const express = require('express')
 const router = express.Router()
 const { authenticateToken, requireAdmin, getUserRoles } = require('../../../../middleware/auth')
 const { handleServiceError } = require('../../../../middleware/validation')
-const DataSanitizer = require('../../../../services/DataSanitizer')
+/*
+ * P1-9：DataSanitizer 通过 ServiceManager 获取（snake_case key）
+ * 在路由处理函数内通过 req.app.locals.services.getService('data_sanitizer') 获取
+ */
 const logger = require('../../../../utils/logger').logger
 
 /**
@@ -40,7 +43,7 @@ const logger = require('../../../../utils/logger').logger
 router.get('/orders', authenticateToken, async (req, res) => {
   try {
     // 🔄 通过 ServiceManager 获取 ExchangeService（符合TR-005规范）
-    const ExchangeService = req.app.locals.services.getService('exchangeMarket')
+    const ExchangeService = req.app.locals.services.getService('exchange_market')
 
     const { status, page = 1, page_size = 20 } = req.query
     const user_id = req.user.user_id
@@ -75,7 +78,11 @@ router.get('/orders', authenticateToken, async (req, res) => {
     const userRoles = await getUserRoles(user_id)
     const dataLevel = userRoles.isAdmin ? 'full' : 'public'
 
-    // 数据脱敏
+    /*
+     * 数据脱敏
+     * P1-9：通过 ServiceManager 获取 DataSanitizer（snake_case key）
+     */
+    const DataSanitizer = req.app.locals.services.getService('data_sanitizer')
     const sanitizedOrders = DataSanitizer.sanitizeExchangeMarketOrders(result.orders, dataLevel)
 
     logger.info('查询订单列表成功', {
@@ -114,7 +121,7 @@ router.get('/orders', authenticateToken, async (req, res) => {
 router.get('/orders/:order_no', authenticateToken, async (req, res) => {
   try {
     // 🔄 通过 ServiceManager 获取 ExchangeService（符合TR-005规范）
-    const ExchangeService = req.app.locals.services.getService('exchangeMarket')
+    const ExchangeService = req.app.locals.services.getService('exchange_market')
 
     const { order_no } = req.params
     const user_id = req.user.user_id
@@ -133,7 +140,11 @@ router.get('/orders/:order_no', authenticateToken, async (req, res) => {
     const userRoles = await getUserRoles(user_id)
     const dataLevel = userRoles.isAdmin ? 'full' : 'public'
 
-    // 数据脱敏
+    /*
+     * 数据脱敏
+     * P1-9：通过 ServiceManager 获取 DataSanitizer（snake_case key）
+     */
+    const DataSanitizer = req.app.locals.services.getService('data_sanitizer')
     const sanitizedOrder = DataSanitizer.sanitizeExchangeMarketOrder(result.order, dataLevel)
 
     logger.info('查询订单详情成功', {
@@ -167,7 +178,7 @@ router.get('/orders/:order_no', authenticateToken, async (req, res) => {
 router.post('/orders/:order_no/status', authenticateToken, requireAdmin, async (req, res) => {
   try {
     // 🔄 通过 ServiceManager 获取 ExchangeService（符合TR-005规范）
-    const ExchangeService = req.app.locals.services.getService('exchangeMarket')
+    const ExchangeService = req.app.locals.services.getService('exchange_market')
 
     const { order_no } = req.params
     const { status, remark = '' } = req.body

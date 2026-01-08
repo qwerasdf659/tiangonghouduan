@@ -14,6 +14,11 @@
  *
  * 使用 Claude Sonnet 4.5 模型创建
  * 创建时间：2025年12月3日
+ *
+ * P1-9 J2-RepoWide 改造说明：
+ * - FeeCalculator 是纯函数工具类，无状态依赖
+ * - 直接 require 是合理的单元测试方式
+ * - 保留直接引用（符合单元测试场景）
  */
 
 const FeeCalculator = require('../../services/FeeCalculator')

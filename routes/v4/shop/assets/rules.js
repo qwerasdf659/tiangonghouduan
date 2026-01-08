@@ -54,7 +54,7 @@ router.get('/conversion-rules', authenticateToken, async (req, res) => {
     logger.info('获取材料转换规则（从数据库）', { user_id })
 
     // 通过 ServiceManager 获取 AssetConversionService（符合TR-005规范）
-    const AssetConversionService = req.app.locals.services.getService('assetConversion')
+    const AssetConversionService = req.app.locals.services.getService('asset_conversion')
     const dbRules = await AssetConversionService.getConversionRules()
 
     logger.info('获取转换规则成功（从数据库）', {

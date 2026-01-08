@@ -26,9 +26,8 @@ const { authenticateToken } = require('../../../../middleware/auth')
 const { handleServiceError } = require('../../../../middleware/validation')
 const logger = require('../../../../utils/logger').logger
 const BeijingTimeHelper = require('../../../../utils/timeHelper')
-// 业界标准幂等架构 - 统一入口幂等服务
-const IdempotencyService = require('../../../../services/IdempotencyService')
 const TransactionManager = require('../../../../utils/TransactionManager')
+// P1-9：服务通过 ServiceManager 获取（B1-Injected + E2-Strict snake_case）
 
 /**
  * @route POST /api/v4/shop/consumption/submit
@@ -54,6 +53,10 @@ const TransactionManager = require('../../../../utils/TransactionManager')
  * 幂等性控制（业界标准形态）：统一通过 Header Idempotency-Key 防止重复提交
  */
 router.post('/submit', authenticateToken, async (req, res) => {
+  // P1-9：通过 ServiceManager 获取服务（B1-Injected + E2-Strict snake_case）
+  const IdempotencyService = req.app.locals.services.getService('idempotency')
+  const ConsumptionService = req.app.locals.services.getService('consumption')
+
   // 【业界标准形态】强制从 Header 获取幂等键，不接受 body，不服务端生成
   const idempotency_key = req.headers['idempotency-key']
 
@@ -72,9 +75,6 @@ router.post('/submit', authenticateToken, async (req, res) => {
   }
 
   try {
-    // 🔄 通过 ServiceManager 获取 ConsumptionService（符合TR-005规范）
-    const ConsumptionService = req.app.locals.services.getService('consumption')
-
     const { qr_code, consumption_amount, merchant_notes } = req.body
     const merchantId = req.user.user_id
 

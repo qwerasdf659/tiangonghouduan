@@ -24,8 +24,17 @@
 const express = require('express')
 const router = express.Router()
 const { authenticateToken, requireAdmin } = require('../../../middleware/auth')
-const LotteryQuotaService = require('../../../services/lottery/LotteryQuotaService')
 const logger = require('../../../utils/logger').logger
+// P1-9：服务通过 ServiceManager 获取（B1-Injected + E2-Strict snake_case）
+
+/**
+ * P1-9：获取 LotteryQuotaService 的辅助函数
+ * @param {Object} req - Express 请求对象
+ * @returns {Object} LotteryQuotaService
+ */
+function getLotteryQuotaService(req) {
+  return req.app.locals.services.getService('lottery_quota')
+}
 
 /**
  * 格式化配额规则数据用于API响应
@@ -61,7 +70,7 @@ router.get('/rules', authenticateToken, requireAdmin, async (req, res) => {
     const { rule_type, campaign_id, is_active, page = 1, page_size = 20 } = req.query
 
     // 通过 Service 层查询规则列表（2025-12-31 重构：移除直接 Model 操作）
-    const { rules, pagination } = await LotteryQuotaService.getRulesList({
+    const { rules, pagination } = await getLotteryQuotaService(req).getRulesList({
       rule_type,
       campaign_id,
       is_active,
@@ -145,7 +154,7 @@ router.post('/rules', authenticateToken, requireAdmin, async (req, res) => {
     }
 
     // 通过 Service 层创建规则（2025-12-31 重构：移除直接 Model 操作）
-    const rule = await LotteryQuotaService.createRule({
+    const rule = await getLotteryQuotaService(req).createRule({
       rule_type,
       campaign_id,
       role_uuid,
@@ -187,7 +196,7 @@ router.put('/rules/:rule_id/disable', authenticateToken, requireAdmin, async (re
     const { rule_id } = req.params
 
     // 通过 Service 层禁用规则（2025-12-31 重构：移除直接 Model 操作）
-    const rule = await LotteryQuotaService.disableRule({
+    const rule = await getLotteryQuotaService(req).disableRule({
       rule_id,
       updated_by: req.user.user_id
     })
@@ -226,13 +235,13 @@ router.get('/users/:user_id/status', authenticateToken, requireAdmin, async (req
       return res.apiError('缺少必填参数 campaign_id', 'MISSING_CAMPAIGN_ID', null, 400)
     }
 
-    const status = await LotteryQuotaService.getOrInitQuotaStatus({
+    const status = await getLotteryQuotaService(req).getOrInitQuotaStatus({
       user_id: parseInt(user_id),
       campaign_id: parseInt(campaign_id)
     })
 
     // 获取命中的规则信息（limit_value 在 status 中已有，此处仅需 matched_rule）
-    const { matched_rule } = await LotteryQuotaService.getEffectiveDailyLimit({
+    const { matched_rule } = await getLotteryQuotaService(req).getEffectiveDailyLimit({
       user_id: parseInt(user_id),
       campaign_id: parseInt(campaign_id)
     })
@@ -309,7 +318,7 @@ router.post('/users/:user_id/bonus', authenticateToken, requireAdmin, async (req
       return res.apiError('必须提供补偿原因', 'MISSING_REASON', null, 400)
     }
 
-    const result = await LotteryQuotaService.addBonusDrawCount(
+    const result = await getLotteryQuotaService(req).addBonusDrawCount(
       {
         user_id: parseInt(user_id),
         campaign_id: parseInt(campaign_id),
@@ -349,7 +358,7 @@ router.get('/statistics', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const { campaign_id } = req.query
 
-    const statistics = await LotteryQuotaService.getStatistics({
+    const statistics = await getLotteryQuotaService(req).getStatistics({
       campaign_id: campaign_id ? parseInt(campaign_id) : null
     })
 
@@ -389,7 +398,7 @@ router.get('/users/:user_id/check', authenticateToken, requireAdmin, async (req,
       return res.apiError('缺少必填参数 campaign_id', 'MISSING_CAMPAIGN_ID', null, 400)
     }
 
-    const result = await LotteryQuotaService.checkQuotaSufficient({
+    const result = await getLotteryQuotaService(req).checkQuotaSufficient({
       user_id: parseInt(user_id),
       campaign_id: parseInt(campaign_id),
       draw_count: parseInt(draw_count)

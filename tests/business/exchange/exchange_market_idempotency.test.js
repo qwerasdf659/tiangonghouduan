@@ -25,6 +25,11 @@
  * 更新时间：2025年12月18日 - 重构为材料资产支付
  * 符合规范：docs/架构重构待办清单.md - P1-1
  * 使用模型：Claude Sonnet 4.5
+ *
+ * P1-9 J2-RepoWide 改造说明：
+ * - ExchangeService 通过 ServiceManager 获取（snake_case: exchange_market）
+ * - AssetService 通过 ServiceManager 获取（snake_case: asset）
+ * - 模型直接引用用于测试数据准备/验证（业务测试场景合理）
  */
 
 const request = require('supertest')
@@ -35,12 +40,14 @@ const {
   Account,
   AccountAssetBalance
 } = require('../../../models')
-const ExchangeService = require('../../../services/ExchangeService')
-const AssetService = require('../../../services/AssetService')
 const BeijingTimeHelper = require('../../../utils/timeHelper')
 const { generateStandaloneIdempotencyKey } = require('../../../utils/IdempotencyHelper')
 // 事务边界治理 - 统一事务管理器
 const TransactionManager = require('../../../utils/TransactionManager')
+
+// 🔴 P1-9：通过 ServiceManager 获取服务（替代直接 require）
+let ExchangeService
+let AssetService
 
 describe('兑换市场幂等性测试 (Exchange Market Idempotency - V4.5.0 材料资产支付)', () => {
   let app
@@ -50,12 +57,17 @@ describe('兑换市场幂等性测试 (Exchange Market Idempotency - V4.5.0 材�
 
   /**
    * 测试前置准备
-   * 1. 初始化app和数据库连接
-   * 2. 创建测试用户
-   * 3. 创建测试商品（材料资产支付）
-   * 4. 初始化测试用户的材料资产账户
+   * 1. 初始化 ServiceManager 并获取服务（P1-9）
+   * 2. 初始化app和数据库连接
+   * 3. 创建测试用户
+   * 4. 创建测试商品（材料资产支付）
+   * 5. 初始化测试用户的材料资产账户
    */
   beforeAll(async () => {
+    // 🔴 P1-9：通过 ServiceManager 获取服务实例（snake_case key）
+    ExchangeService = global.getTestService('exchange_market')
+    AssetService = global.getTestService('asset')
+
     // 初始化Express应用
     app = require('../../../app')
 
@@ -169,14 +181,17 @@ describe('兑换市场幂等性测试 (Exchange Market Idempotency - V4.5.0 材�
       // 事务边界治理：使用 TransactionManager 包裹 AssetService 调用
       await TransactionManager.execute(
         async transaction => {
-          await AssetService.changeBalance({
-            user_id: testUser.user_id,
-            asset_code: 'red_shard',
-            delta_amount: 1000 - currentBalance,
-            business_type: 'test_recharge',
-            idempotency_key: generateStandaloneIdempotencyKey('test_recharge', testUser.user_id),
-            meta: { description: '测试充值' }
-          }, { transaction })
+          await AssetService.changeBalance(
+            {
+              user_id: testUser.user_id,
+              asset_code: 'red_shard',
+              delta_amount: 1000 - currentBalance,
+              business_type: 'test_recharge',
+              idempotency_key: generateStandaloneIdempotencyKey('test_recharge', testUser.user_id),
+              meta: { description: '测试充值' }
+            },
+            { transaction }
+          )
         },
         { description: 'test_recharge_asset' }
       )

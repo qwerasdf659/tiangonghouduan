@@ -14,9 +14,35 @@
 
 'use strict'
 
-const AssetService = require('../services/AssetService')
 const { Account, AccountAssetBalance, AssetTransaction, User } = require('../models')
 const { sequelize } = require('../config/database')
+
+/*
+ * P1-9：AssetService 通过 ServiceManager 获取
+ * 服务键：'asset'（snake_case）
+ * 注意：在测试开始时通过 ServiceManager 初始化获取
+ */
+let AssetService = null
+
+/**
+ * P1-9：初始化 ServiceManager 并获取 AssetService
+ * @returns {Promise<Object>} AssetService 实例
+ */
+async function initializeAssetService() {
+  if (AssetService) return AssetService
+  try {
+    const serviceManager = require('../services/index')
+    if (!serviceManager._initialized) {
+      await serviceManager.initialize()
+    }
+    AssetService = serviceManager.getService('asset')
+    console.log('  ✅ AssetService 加载成功（P1-9 ServiceManager）')
+    return AssetService
+  } catch (error) {
+    console.log(`  ❌ AssetService 加载失败: ${error.message}`)
+    throw error
+  }
+}
 
 // 测试结果统计
 const testResults = {
@@ -354,6 +380,9 @@ async function runTests() {
   console.log('='.repeat(60))
 
   try {
+    // P1-9：初始化 AssetService
+    await initializeAssetService()
+
     await testAccountCreation()
     await testBalanceOperations()
     await testFreezeUnfreeze()

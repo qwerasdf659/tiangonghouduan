@@ -16,7 +16,10 @@ const router = express.Router()
 const logger = require('../../../utils/logger').logger
 const { authenticateToken, getUserRoles } = require('../../../middleware/auth')
 const { handleServiceError } = require('../../../middleware/validation')
-const DataSanitizer = require('../../../services/DataSanitizer')
+/*
+ * P1-9：DataSanitizer 通过 ServiceManager 获取（snake_case key）
+ * 在路由处理函数内通过 req.app.locals.services.getService('data_sanitizer') 获取
+ */
 
 /**
  * @route POST /api/v4/system/feedback
@@ -57,7 +60,11 @@ router.post('/feedback', authenticateToken, async (req, res) => {
       device_info: userInfo.device
     })
 
-    // 返回脱敏后的数据
+    /*
+     * 返回脱敏后的数据
+     * P1-9：通过 ServiceManager 获取 DataSanitizer（snake_case key）
+     */
+    const DataSanitizer = req.app.locals.services.getService('data_sanitizer')
     const sanitizedFeedback = DataSanitizer.sanitizeFeedbacks([feedback], 'public')[0]
 
     return res.apiSuccess(
@@ -124,7 +131,11 @@ router.get('/feedback/my', authenticateToken, async (req, res) => {
       offset: valid_offset
     })
 
-    // 数据脱敏处理
+    /*
+     * 数据脱敏处理
+     * P1-9：通过 ServiceManager 获取 DataSanitizer（snake_case key）
+     */
+    const DataSanitizer = req.app.locals.services.getService('data_sanitizer')
     const sanitized_data = DataSanitizer.sanitizeFeedbacks(result.feedbacks, 'public')
 
     return res.apiSuccess(
@@ -196,19 +207,19 @@ router.get('/feedback/:id', authenticateToken, async (req, res) => {
       // 用户信息
       user_info: feedback.user
         ? {
-          user_id: feedback.user.user_id,
-          mobile: userRoles.isAdmin ? feedback.user.mobile : '****',
-          nickname: feedback.user.nickname || '匿名用户'
-        }
+            user_id: feedback.user.user_id,
+            mobile: userRoles.isAdmin ? feedback.user.mobile : '****',
+            nickname: feedback.user.nickname || '匿名用户'
+          }
         : null,
 
       // 处理信息（✅ 使用正确的字段名reply_content）
       reply_content: feedback.reply_content,
       admin_info: feedback.admin
         ? {
-          admin_id: feedback.admin.user_id,
-          admin_name: feedback.admin.nickname || '管理员'
-        }
+            admin_id: feedback.admin.user_id,
+            admin_name: feedback.admin.nickname || '管理员'
+          }
         : null,
 
       // 时间信息（✅ 仅使用存在的字段）
@@ -220,7 +231,11 @@ router.get('/feedback/:id', authenticateToken, async (req, res) => {
       internal_notes: userRoles.isAdmin ? feedback.internal_notes : undefined
     }
 
-    // 数据脱敏处理
+    /*
+     * 数据脱敏处理
+     * P1-9：通过 ServiceManager 获取 DataSanitizer（snake_case key）
+     */
+    const DataSanitizer = req.app.locals.services.getService('data_sanitizer')
     const sanitizedDetail = DataSanitizer.sanitizeFeedbacks(
       [feedbackDetail],
       userRoles.isAdmin ? 'full' : 'public'

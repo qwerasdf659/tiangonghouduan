@@ -15,7 +15,32 @@
 'use strict'
 
 const { sequelize, Account, AccountAssetBalance, AssetTransaction } = require('../models')
-const AssetService = require('../services/AssetService')
+
+/*
+ * P1-9：AssetService 通过 ServiceManager 获取
+ * 服务键：'asset'（snake_case）
+ * 改造：在 verifyAssetService 函数中通过 ServiceManager 动态获取
+ */
+let AssetService = null
+
+/**
+ * P1-9：初始化 ServiceManager 并获取 AssetService
+ * @returns {Promise<Object>} AssetService 实例
+ */
+async function initializeAssetService() {
+  try {
+    const serviceManager = require('../services/index')
+    if (!serviceManager._initialized) {
+      await serviceManager.initialize()
+    }
+    AssetService = serviceManager.getService('asset')
+    console.log('  ✅ AssetService 加载成功（P1-9 ServiceManager）')
+    return AssetService
+  } catch (error) {
+    console.log(`  ❌ AssetService 加载失败: ${error.message}`)
+    throw error
+  }
+}
 
 // 验证结果统计
 const verificationResults = {
@@ -174,6 +199,9 @@ async function verifyAssetServiceAPI() {
   console.log('\n📋 验证5: AssetService API')
 
   try {
+    // P1-9：通过 ServiceManager 获取 AssetService
+    await initializeAssetService()
+
     // 检查必需的方法
     const requiredMethods = [
       'changeBalance',

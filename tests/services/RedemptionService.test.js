@@ -9,7 +9,13 @@
  * - 并发核销冲突场景
  *
  * 创建时间：2025-12-17
+ * 更新时间：2026-01-09（P1-9 ServiceManager 集成）
  * 使用模型：Claude Sonnet 4.5
+ *
+ * P1-9 重构说明：
+ * - 服务通过 global.getTestService() 获取（J2-RepoWide）
+ * - 使用 snake_case service key（E2-Strict）
+ * - 模型仍直接 require（测试需要直接数据库操作）
  */
 
 const {
@@ -19,9 +25,11 @@ const {
   ItemInstanceEvent,
   User
 } = require('../../models')
-const RedemptionService = require('../../services/RedemptionService')
 const RedemptionCodeGenerator = require('../../utils/RedemptionCodeGenerator')
 const TransactionManager = require('../../utils/TransactionManager')
+
+// 🔴 P1-9：通过 ServiceManager 获取服务（替代直接 require）
+let RedemptionService
 
 // 测试数据库配置
 jest.setTimeout(30000)
@@ -34,6 +42,9 @@ describe('RedemptionService - 兑换订单服务', () => {
   beforeAll(async () => {
     // 连接测试数据库
     await sequelize.authenticate()
+
+    // 🔴 P1-9：通过 ServiceManager 获取服务实例（snake_case key）
+    RedemptionService = global.getTestService('redemption_order')
   })
 
   // 每个测试前创建测试数据

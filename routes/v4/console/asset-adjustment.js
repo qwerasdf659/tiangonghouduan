@@ -35,8 +35,11 @@ const express = require('express')
 const router = express.Router()
 const { authenticateToken, requireAdmin } = require('../../../middleware/auth')
 const TransactionManager = require('../../../utils/TransactionManager')
-const MaterialManagementService = require('../../../services/MaterialManagementService')
-const UserService = require('../../../services/UserService')
+/*
+ * P1-9：服务通过 ServiceManager 获取（B1-Injected + E2-Strict snake_case）
+ * const MaterialManagementService = require('../../../services/MaterialManagementService')
+ * const UserService = require('../../../services/UserService')
+ */
 
 /**
  * 错误处理包装器
@@ -105,7 +108,7 @@ router.post(
 
     // 通过 ServiceManager 获取 AssetService
     const AssetService = req.app.locals.services.getService('asset')
-    const AuditLogService = req.app.locals.services.getService('auditLog')
+    const AuditLogService = req.app.locals.services.getService('audit_log')
 
     try {
       /*
@@ -268,7 +271,7 @@ router.post(
         `batch_adjust_${admin_id}_${user_id}_${asset_code}_${batch_timestamp}_${index}`
 
       try {
-        const AuditLogService = req.app.locals.services.getService('auditLog')
+        const AuditLogService = req.app.locals.services.getService('audit_log')
 
         // eslint-disable-next-line no-await-in-loop -- 批量调整需要逐笔事务处理，确保单笔失败不影响其他
         const result = await TransactionManager.execute(
@@ -368,6 +371,9 @@ router.get(
   authenticateToken,
   requireAdmin,
   asyncHandler(async (req, res) => {
+    // P1-9：通过 ServiceManager 获取服务（snake_case key）
+    const MaterialManagementService = req.app.locals.services.getService('material_management')
+
     // 1. 内置资产类型（系统核心资产）
     const builtInTypes = [
       {
@@ -432,6 +438,9 @@ router.get(
   requireAdmin,
   asyncHandler(async (req, res) => {
     const { user_id } = req.params
+
+    // P1-9：通过 ServiceManager 获取服务（snake_case key）
+    const UserService = req.app.locals.services.getService('user')
 
     // 1. 通过 Service 层获取用户基本信息（符合路由层规范）
     let user

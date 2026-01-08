@@ -26,11 +26,8 @@ const router = express.Router()
 const { authenticateToken } = require('../../../middleware/auth')
 const { validatePositiveInteger, handleServiceError } = require('../../../middleware/validation')
 const logger = require('../../../utils/logger').logger
-// 业界标准幂等架构 - 统一入口幂等服务
-const IdempotencyService = require('../../../services/IdempotencyService')
-// 市场挂牌服务 - 通过 Service 层访问数据库（符合路由层规范）
-const MarketListingService = require('../../../services/MarketListingService')
 const TransactionManager = require('../../../utils/TransactionManager')
+// P1-9：服务通过 ServiceManager 获取（B1-Injected + E2-Strict snake_case）
 
 /**
  * @route POST /api/v4/market/listings/:listing_id/purchase
@@ -64,6 +61,11 @@ router.post(
   authenticateToken,
   validatePositiveInteger('listing_id', 'params'),
   async (req, res) => {
+    // P1-9：通过 ServiceManager 获取服务（B1-Injected + E2-Strict snake_case）
+    const IdempotencyService = req.app.locals.services.getService('idempotency')
+    const MarketListingService = req.app.locals.services.getService('market_listing')
+    const TradeOrderService = req.app.locals.services.getService('trade_order')
+
     // 【业界标准形态】强制从 Header 获取幂等键，不接受 body
     const idempotency_key = req.headers['idempotency-key']
 
@@ -110,9 +112,6 @@ router.post(
         }
         return res.apiSuccess(duplicateResponse, '购买成功（幂等回放）')
       }
-
-      // 获取 TradeOrderService
-      const TradeOrderService = req.app.locals.services.getService('tradeOrder')
 
       // 查询挂牌信息（通过 Service 层访问，符合路由层规范）
       const listing = await MarketListingService.getListingById(listing_id)

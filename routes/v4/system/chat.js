@@ -24,7 +24,10 @@ const logger = require('../../../utils/logger').logger
 const { authenticateToken } = require('../../../middleware/auth')
 const { handleServiceError } = require('../../../middleware/validation')
 const BeijingTimeHelper = require('../../../utils/timeHelper')
-const ChatRateLimitService = require('../../../services/ChatRateLimitService')
+/*
+ * P1-9：服务通过 ServiceManager 获取
+ * const ChatRateLimitService = require('../../../services/ChatRateLimitService')
+ */
 const TransactionManager = require('../../../utils/TransactionManager')
 
 /**
@@ -46,6 +49,8 @@ const TransactionManager = require('../../../utils/TransactionManager')
 router.post('/chat/sessions', authenticateToken, async (req, res) => {
   const userId = req.user.user_id
 
+  // P1-9：通过 ServiceManager 获取 ChatRateLimitService（snake_case key）
+  const ChatRateLimitService = req.app.locals.services.getService('chat_rate_limit')
   // 频率限制检查（防止恶意重复创建）
   const rateLimitCheck = ChatRateLimitService.checkCreateSessionRateLimit(userId)
   if (!rateLimitCheck.allowed) {
@@ -65,7 +70,9 @@ router.post('/chat/sessions', authenticateToken, async (req, res) => {
   }
 
   // 通过 ServiceManager 获取服务（符合TR-005规范）
-  const CustomerServiceSessionService = req.app.locals.services.getService('customerServiceSession')
+  const CustomerServiceSessionService = req.app.locals.services.getService(
+    'customer_service_session'
+  )
 
   try {
     // 获取请求体中的来源参数（可选）
@@ -110,8 +117,9 @@ router.get('/chat/sessions', authenticateToken, async (req, res) => {
     const { page = 1, limit = 10 } = req.query
 
     // 通过 ServiceManager 获取服务（符合TR-005规范）
-    const CustomerServiceSessionService =
-      req.app.locals.services.getService('customerServiceSession')
+    const CustomerServiceSessionService = req.app.locals.services.getService(
+      'customer_service_session'
+    )
 
     // 使用 CustomerServiceSessionService 获取会话列表
     const result = await CustomerServiceSessionService.getSessionList({
@@ -164,8 +172,9 @@ router.get('/chat/sessions/:session_id/messages', authenticateToken, async (req,
     const finalLimit = Math.min(parseInt(limit), 100)
 
     // 通过 ServiceManager 获取服务（符合TR-005规范）
-    const CustomerServiceSessionService =
-      req.app.locals.services.getService('customerServiceSession')
+    const CustomerServiceSessionService = req.app.locals.services.getService(
+      'customer_service_session'
+    )
 
     // 使用 CustomerServiceSessionService 获取会话消息
     const result = await CustomerServiceSessionService.getSessionMessages(session_id, {
@@ -216,6 +225,8 @@ router.post('/chat/sessions/:session_id/messages', authenticateToken, async (req
     // 频率限制检查（Rate Limit Check）
     const userId = req.user.user_id
     const role_level = req.user.role_level || 0 // 获取用户角色等级
+    // P1-9：通过 ServiceManager 获取 ChatRateLimitService（snake_case key）
+    const ChatRateLimitService = req.app.locals.services.getService('chat_rate_limit')
     const rateLimitCheck = ChatRateLimitService.checkMessageRateLimit(userId, role_level)
 
     if (!rateLimitCheck.allowed) {
@@ -267,17 +278,22 @@ router.post('/chat/sessions/:session_id/messages', authenticateToken, async (req
     }
 
     // 通过 ServiceManager 获取服务（符合TR-005规范）
-    const CustomerServiceSessionService =
-      req.app.locals.services.getService('customerServiceSession')
-    const ChatWebSocketService = req.app.locals.services.getService('chatWebSocket')
+    const CustomerServiceSessionService = req.app.locals.services.getService(
+      'customer_service_session'
+    )
+    const ChatWebSocketService = req.app.locals.services.getService('chat_web_socket')
 
     // 使用 TransactionManager 统一事务边界（符合治理决策）
-    const message = await TransactionManager.execute(async (transaction) => {
-      return await CustomerServiceSessionService.sendUserMessage(session_id, {
-        user_id: userId,
-        content: sanitized_content,
-        message_type
-      }, { transaction })
+    const message = await TransactionManager.execute(async transaction => {
+      return await CustomerServiceSessionService.sendUserMessage(
+        session_id,
+        {
+          user_id: userId,
+          content: sanitized_content,
+          message_type
+        },
+        { transaction }
+      )
     })
 
     // 通过WebSocket实时推送消息给客服（带自动重试机制）

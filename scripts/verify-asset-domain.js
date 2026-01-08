@@ -290,6 +290,25 @@ async function verifyDatabaseLayer() {
 }
 
 /**
+ * P1-9：初始化 ServiceManager 并获取 AssetService
+ * @returns {Promise<Object>} AssetService 实例
+ */
+async function initializeAssetService() {
+  try {
+    const serviceManager = require('../services/index')
+    if (!serviceManager._initialized) {
+      await serviceManager.initialize()
+    }
+    const AssetService = serviceManager.getService('asset')
+    console.log('  ✅ AssetService 加载成功（P1-9 ServiceManager）')
+    return AssetService
+  } catch (error) {
+    console.log(`  ❌ AssetService 加载失败: ${error.message}`)
+    throw error
+  }
+}
+
+/**
  * 验证服务层
  */
 async function verifyServiceLayer() {
@@ -299,7 +318,8 @@ async function verifyServiceLayer() {
 
   // 检查 AssetService 方法
   try {
-    const AssetService = require('../services/AssetService')
+    // P1-9：通过 ServiceManager 获取 AssetService
+    const AssetService = await initializeAssetService()
 
     console.log('【检查1】AssetService 核心方法')
 

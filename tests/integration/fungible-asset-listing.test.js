@@ -9,12 +9,18 @@
  * - 余额冻结/解冻
  *
  * 创建时间：2026-01-08
+ *
+ * P1-9 J2-RepoWide 改造：
+ * - 通过 ServiceManager 统一获取服务
+ * - 服务 key 使用 snake_case（E2-Strict）
  */
 
 const { sequelize, MarketListing, User, MaterialAssetType } = require('../../models')
-const MarketListingService = require('../../services/MarketListingService')
-const AssetService = require('../../services/AssetService')
 const TransactionManager = require('../../utils/TransactionManager')
+
+// 🔴 P1-9 J2-RepoWide：通过 global.getTestService 获取服务（snake_case key）
+let MarketListingService
+let AssetService
 
 // 测试数据库配置
 jest.setTimeout(30000)
@@ -28,7 +34,11 @@ describe('C2C 材料交易功能集成测试', () => {
   // 测试前准备
   beforeAll(async () => {
     try {
-      // 连接测试数据库
+      // 🔴 P1-9：通过 ServiceManager 获取服务实例
+      MarketListingService = global.getTestService('market_listing')
+      AssetService = global.getTestService('asset')
+
+      // 连接测试数据库（由全局 jest.setup.js 处理，此处仅验证）
       await sequelize.authenticate()
       console.log('✅ 数据库连接成功')
 

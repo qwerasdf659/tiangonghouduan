@@ -75,8 +75,16 @@ async function verifyLotteryLedger() {
     // 6. 执行抽奖验证
     console.log('\n🎰 执行抽奖验证...')
 
-    // 动态引入抽奖引擎（导出的是单例实例）
-    const engine = require('../../services/UnifiedLotteryEngine/UnifiedLotteryEngine')
+    /*
+     * P1-9：UnifiedLotteryEngine 通过 ServiceManager 获取
+     * 服务键：'unified_lottery_engine'（snake_case）
+     */
+    const serviceManager = require('../../services/index')
+    if (!serviceManager._initialized) {
+      await serviceManager.initialize()
+    }
+    const engine = serviceManager.getService('unified_lottery_engine')
+    console.log('✅ UnifiedLotteryEngine 加载成功（P1-9 ServiceManager）')
 
     const testIdempotencyKey = `verify_ledger_${Date.now()}`
 

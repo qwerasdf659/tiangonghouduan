@@ -97,8 +97,11 @@ router.get('/business-config', optionalAuth, dataAccessControl, async (req, res)
     // 读取代码层固定配置
     const businessConfig = require('../../../config/business.config')
 
-    // 🔴 从 DB 读取运营可调参数（严格模式：配置缺失直接报错）
-    const AdminSystemService = require('../../../services/AdminSystemService')
+    /*
+     * 🔴 从 DB 读取运营可调参数（严格模式：配置缺失直接报错）
+     * P1-9：通过 ServiceManager 获取服务（snake_case key）
+     */
+    const AdminSystemService = req.app.locals.services.getService('admin_system')
 
     // 读取单抽价格和每日上限（严格模式）
     const [singleDrawCost, dailyLimit] = await Promise.all([

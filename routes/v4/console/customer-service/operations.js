@@ -45,7 +45,7 @@ router.post('/:session_id/transfer', async (req, res) => {
     }
 
     // 通过 ServiceManager 获取 AdminCustomerServiceService
-    const AdminCustomerServiceService = req.app.locals.services.getService('adminCustomerService')
+    const AdminCustomerServiceService = req.app.locals.services.getService('admin_customer_service')
 
     // 调用服务层方法
     const result = await AdminCustomerServiceService.transferSession(
@@ -90,7 +90,7 @@ router.post('/:session_id/close', async (req, res) => {
     }
 
     // 通过 ServiceManager 获取 AdminCustomerServiceService
-    const AdminCustomerServiceService = req.app.locals.services.getService('adminCustomerService')
+    const AdminCustomerServiceService = req.app.locals.services.getService('admin_customer_service')
 
     // 调用服务层方法
     const result = await AdminCustomerServiceService.closeSession(session_id, data)

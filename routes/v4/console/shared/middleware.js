@@ -12,19 +12,90 @@
  * - 数据库操作必须收口到 Service 层，路由层禁止直连 models
  */
 
-const {
-  UnifiedLotteryEngine
-} = require('../../../../services/UnifiedLotteryEngine/UnifiedLotteryEngine')
-const ManagementStrategy = require('../../../../services/UnifiedLotteryEngine/strategies/ManagementStrategy')
-const PerformanceMonitor = require('../../../../services/UnifiedLotteryEngine/utils/PerformanceMonitor')
+/*
+ * P1-9：使用懒加载模式获取服务实例，避免顶部直接 require 服务
+ * 抽奖引擎相关类 - 通过 ServiceManager 或懒加载获取
+ */
 const { requireAdmin, authenticateToken } = require('../../../../middleware/auth')
+const logger = require('../../../../utils/logger').logger
 
-// 初始化共享组件
+// 共享组件 - 延迟初始化（首次访问时初始化）
+let _sharedComponents = null
+
+/**
+ * 获取共享组件（懒加载模式）
+ * @param {Object} serviceManager - 服务管理器实例（可选）
+ * @returns {Object} 共享组件
+ */
+function getSharedComponents(serviceManager = null) {
+  if (_sharedComponents) {
+    return _sharedComponents
+  }
+
+  // P1-9：通过 ServiceManager 获取服务（如果可用）
+  if (serviceManager) {
+    try {
+      _sharedComponents = {
+        lotteryEngine: serviceManager.getService('unified_lottery_engine'),
+        performanceMonitor: serviceManager.getService('performance_monitor'),
+        logger
+      }
+      return _sharedComponents
+    } catch (error) {
+      logger.warn('通过 ServiceManager 获取服务失败，使用直接实例化:', error.message)
+    }
+  }
+
+  // 降级方案：直接 require 并实例化
+  const {
+    UnifiedLotteryEngine
+  } = require('../../../../services/UnifiedLotteryEngine/UnifiedLotteryEngine')
+  const ManagementStrategy = require('../../../../services/UnifiedLotteryEngine/strategies/ManagementStrategy')
+  const PerformanceMonitor = require('../../../../services/UnifiedLotteryEngine/utils/PerformanceMonitor')
+
+  _sharedComponents = {
+    lotteryEngine: new UnifiedLotteryEngine(),
+    managementStrategy: new ManagementStrategy(),
+    performanceMonitor: new PerformanceMonitor(),
+    logger
+  }
+  return _sharedComponents
+}
+
+/**
+ * 兼容旧代码：提供 sharedComponents 别名
+ * 通过 getter 实现懒加载，首次访问时初始化组件
+ * @type {Object}
+ */
 const sharedComponents = {
-  lotteryEngine: new UnifiedLotteryEngine(),
-  managementStrategy: new ManagementStrategy(),
-  performanceMonitor: new PerformanceMonitor(),
-  logger: require('../../../../utils/logger').logger
+  /**
+   * 获取抽奖引擎实例
+   * @returns {Object} 抽奖引擎实例
+   */
+  get lotteryEngine() {
+    return getSharedComponents().lotteryEngine
+  },
+  /**
+   * 获取管理策略实例
+   * @returns {Object} 管理策略实例
+   */
+  get managementStrategy() {
+    return getSharedComponents().managementStrategy
+  },
+  /**
+   * 获取性能监控器实例
+   * @returns {Object} 性能监控器实例
+   */
+  get performanceMonitor() {
+    return getSharedComponents().performanceMonitor
+  },
+  /**
+   * 获取日志记录器
+   * @returns {Object} 日志记录器
+   */
+  get logger() {
+    return logger
+  }
 }
 
 /**

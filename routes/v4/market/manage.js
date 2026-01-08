@@ -24,8 +24,7 @@ const { validatePositiveInteger, handleServiceError } = require('../../../middle
 const logger = require('../../../utils/logger').logger
 // 事务边界治理 - 统一事务管理器
 const TransactionManager = require('../../../utils/TransactionManager')
-// 决策5B/0C：市场挂牌统一收口到Service层
-const MarketListingService = require('../../../services/MarketListingService')
+// P1-9：服务通过 ServiceManager 获取（B1-Injected + E2-Strict snake_case）
 
 /**
  * @route POST /api/v4/market/listings/:listing_id/withdraw
@@ -47,6 +46,9 @@ router.post(
   authenticateToken,
   validatePositiveInteger('listing_id', 'params'),
   async (req, res) => {
+    // P1-9：通过 ServiceManager 获取服务（B1-Injected + E2-Strict snake_case）
+    const MarketListingService = req.app.locals.services.getService('market_listing')
+
     try {
       const listingId = req.validated.listing_id
       const sellerId = req.user.user_id
@@ -128,6 +130,9 @@ router.post(
   authenticateToken,
   validatePositiveInteger('listing_id', 'params'),
   async (req, res) => {
+    // P1-9：通过 ServiceManager 获取服务（B1-Injected + E2-Strict snake_case）
+    const MarketListingService = req.app.locals.services.getService('market_listing')
+
     try {
       const listingId = req.validated.listing_id
       const sellerId = req.user.user_id

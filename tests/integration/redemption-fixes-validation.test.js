@@ -12,6 +12,11 @@
  * - P1-7: 定时任务分布式锁
  *
  * 创建时间：2025-12-17
+ *
+ * P1-9 J2-RepoWide 改造说明：
+ * - 本文件是集成测试，通过 HTTP API 测试业务功能
+ * - 模型直接引用仅用于测试数据准备和验证（集成测试场景合理）
+ * - 不涉及直接服务调用，符合规范
  */
 
 const request = require('supertest')
@@ -362,8 +367,11 @@ describe('核销系统修复验证测试', () => {
         { where: { order_id: createdOrder.order_id } }
       )
 
-      // 调用过期清理方法
-      const RedemptionService = require('../../services/RedemptionService')
+      /*
+       * 调用过期清理方法
+       * 🔴 P1-9：通过 ServiceManager 获取服务（替代直接 require）
+       */
+      const RedemptionService = global.getTestService('redemption_order')
       const expiredCount = await RedemptionService.expireOrders()
 
       expect(expiredCount).toBeGreaterThanOrEqual(0)

@@ -8,12 +8,23 @@
  * - 边界情况（空背包、大量数据）
  *
  * 创建时间：2025-12-17
+ * 更新时间：2026-01-09（P1-9 ServiceManager 集成）
  * 使用模型：Claude Sonnet 4.5
+ *
+ * P1-9 重构说明：
+ * - 服务通过 global.getTestService() 获取（J2-RepoWide）
+ * - 使用 snake_case service key（E2-Strict）
+ * - 模型仍直接 require（测试需要直接数据库操作）
  */
 
 const { sequelize, ItemInstance, User } = require('../../models')
-const BackpackService = require('../../services/BackpackService')
-const AssetService = require('../../services/AssetService')
+
+/*
+ * 🔴 P1-9：通过 ServiceManager 获取服务（替代直接 require）
+ * 注意：在 beforeAll 中获取服务，确保 ServiceManager 已初始化
+ */
+let BackpackService
+let AssetService
 
 // 测试数据库配置
 jest.setTimeout(30000)
@@ -25,6 +36,10 @@ describe('BackpackService - 背包服务', () => {
   beforeAll(async () => {
     // 连接测试数据库
     await sequelize.authenticate()
+
+    // 🔴 P1-9：通过 ServiceManager 获取服务实例（snake_case key）
+    BackpackService = global.getTestService('backpack')
+    AssetService = global.getTestService('asset')
   })
 
   // 每个测试前创建测试数据

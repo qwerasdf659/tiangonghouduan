@@ -2,11 +2,19 @@
  * P1 修复简化验证测试
  *
  * 验证 P1 修复的核心逻辑（不依赖复杂的测试数据）
+ *
+ * P1-9 J2-RepoWide 改造：
+ * - 通过 ServiceManager 统一获取服务
+ * - 服务 key 使用 snake_case（E2-Strict）
  */
 
 const { sequelize } = require('../models')
 
+// 🔴 P1-9 J2-RepoWide：通过 global.getTestService 获取服务（snake_case key）
+
 describe('P1 修复简化验证', () => {
+  // 🔴 P1-9：ServiceManager 在 jest.setup.js 中已全局初始化
+
   describe('P1-1：材料转换风控校验按 group_code 限定', () => {
     test('MaterialConversionValidator 应该有 validate 方法', () => {
       const MaterialConversionValidator = require('../utils/materialConversionValidator')
@@ -26,7 +34,8 @@ describe('P1 修复简化验证', () => {
 
   describe('P1-2：交易下单幂等冲突校验强制 DIAMOND-only', () => {
     test('TradeOrderService.createOrder 应该存在', () => {
-      const TradeOrderService = require('../services/TradeOrderService')
+      // 🔴 P1-9 J2-RepoWide：通过 global.getTestService 获取服务
+      const TradeOrderService = global.getTestService('trade_order')
       expect(TradeOrderService).toBeDefined()
       expect(typeof TradeOrderService.createOrder).toBe('function')
       console.log('✅ P1-2：TradeOrderService.createOrder 方法存在')

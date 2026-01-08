@@ -24,13 +24,22 @@
 const express = require('express')
 const router = express.Router()
 const { authenticateToken, requireAdmin } = require('../../../middleware/auth')
-const HierarchyManagementService = require('../../../services/HierarchyManagementService')
 const TransactionManager = require('../../../utils/TransactionManager')
 const { logger } = require('../../../utils/logger')
+// P1-9：服务通过 ServiceManager 获取（B1-Injected + E2-Strict snake_case）
 
 // 所有路由都需要管理员权限
 router.use(authenticateToken)
 router.use(requireAdmin)
+
+/**
+ * P1-9：通过中间件注入 HierarchyManagementService
+ * 所有路由都可以通过 req.hierarchyService 访问服务
+ */
+router.use((req, res, next) => {
+  req.hierarchyService = req.app.locals.services.getService('hierarchy_management')
+  next()
+})
 
 /**
  * 获取用户层级列表
@@ -52,7 +61,7 @@ router.get('/', async (req, res) => {
     const pageSize = parseInt(page_size, 10) || 20
 
     // 通过 Service 层查询层级列表（符合路由层规范）
-    const { count, rows } = await HierarchyManagementService.getHierarchyList({
+    const { count, rows } = await req.hierarchyService.getHierarchyList({
       superior_user_id,
       is_active: is_active !== undefined ? is_active === 'true' : undefined,
       role_level,
@@ -110,7 +119,7 @@ router.get('/:user_id/subordinates', async (req, res) => {
     const { user_id } = req.params
     const { include_inactive = 'false' } = req.query
 
-    const subordinates = await HierarchyManagementService.getAllSubordinates(
+    const subordinates = await req.hierarchyService.getAllSubordinates(
       parseInt(user_id, 10),
       include_inactive === 'true'
     )
@@ -154,7 +163,7 @@ router.get('/:user_id/stats', async (req, res) => {
   try {
     const { user_id } = req.params
 
-    const stats = await HierarchyManagementService.getHierarchyStats(parseInt(user_id, 10))
+    const stats = await req.hierarchyService.getHierarchyStats(parseInt(user_id, 10))
 
     return res.apiSuccess(stats, '获取层级统计信息成功')
   } catch (error) {
@@ -186,7 +195,7 @@ router.post('/', async (req, res) => {
       return res.apiError('角色ID不能为空', 'MISSING_ROLE_ID', null, 400)
     }
 
-    const result = await HierarchyManagementService.createHierarchy(
+    const result = await req.hierarchyService.createHierarchy(
       parseInt(user_id, 10),
       superior_user_id ? parseInt(superior_user_id, 10) : null,
       parseInt(role_id, 10),
@@ -232,7 +241,7 @@ router.post('/:user_id/deactivate', async (req, res) => {
 
     const result = await TransactionManager.execute(
       async transaction => {
-        return await HierarchyManagementService.batchDeactivatePermissions(
+        return await req.hierarchyService.batchDeactivatePermissions(
           parseInt(user_id, 10),
           operator_user_id,
           reason,
@@ -267,7 +276,7 @@ router.post('/:user_id/activate', async (req, res) => {
 
     const result = await TransactionManager.execute(
       async transaction => {
-        return await HierarchyManagementService.batchActivatePermissions(
+        return await req.hierarchyService.batchActivatePermissions(
           parseInt(user_id, 10),
           operator_user_id,
           include_subordinates === true || include_subordinates === 'true',
@@ -293,7 +302,7 @@ router.post('/:user_id/activate', async (req, res) => {
 router.get('/roles', async (req, res) => {
   try {
     // 通过 Service 层查询角色列表（符合路由层规范）
-    const roles = await HierarchyManagementService.getHierarchyRoles()
+    const roles = await req.hierarchyService.getHierarchyRoles()
 
     return res.apiSuccess(
       roles.map(r => ({

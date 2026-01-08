@@ -7,9 +7,35 @@
 
 require('dotenv').config()
 const { Sequelize } = require('sequelize')
-const sealosStorage = require('../services/sealosStorage')
 // 🔴 复用主 sequelize 实例（单一配置源）
 const { sequelize } = require('../../config/database')
+
+/*
+ * P1-9：sealosStorage 通过 ServiceManager 获取
+ * 服务键：'sealos_storage'（snake_case）
+ * 注意：在 listSealosFiles() 等函数调用时动态获取服务
+ */
+let sealosStorage = null
+
+/**
+ * P1-9：初始化 ServiceManager 并获取 SealosStorageService
+ * @returns {Promise<Object>} SealosStorageService 实例
+ */
+async function initializeSealosStorage() {
+  if (sealosStorage) return sealosStorage
+  try {
+    const serviceManager = require('../../services/index')
+    if (!serviceManager._initialized) {
+      await serviceManager.initialize()
+    }
+    sealosStorage = serviceManager.getService('sealos_storage')
+    console.log('✅ SealosStorageService 加载成功（P1-9 ServiceManager）')
+    return sealosStorage
+  } catch (error) {
+    console.error('❌ SealosStorageService 加载失败:', error.message)
+    throw error
+  }
+}
 
 /**
  * 获取数据库中所有有效的图片文件路径
@@ -50,6 +76,9 @@ async function identifyOrphanFiles() {
   console.log('🔍 开始识别Sealos对象存储孤儿文件...\n')
 
   try {
+    // P1-9：初始化 SealosStorageService
+    await initializeSealosStorage()
+
     // 1. 连接数据库
     await sequelize.authenticate()
     console.log('✅ 数据库连接成功\n')

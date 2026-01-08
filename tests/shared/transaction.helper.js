@@ -39,7 +39,7 @@ class TransactionTestSuite {
    *   }
    * )
    */
-  static async testTransactionCommit (transactionOperation, verifyFunction) {
+  static async testTransactionCommit(transactionOperation, verifyFunction) {
     const transaction = await sequelize.transaction()
 
     try {
@@ -87,7 +87,7 @@ class TransactionTestSuite {
    *   }
    * )
    */
-  static async testTransactionRollback (
+  static async testTransactionRollback(
     transactionOperation,
     verifyRollback,
     getOriginalValue = null
@@ -134,7 +134,7 @@ class TransactionTestSuite {
    * @param {Function} verifyIsolation - 验证隔离的函数
    * @returns {Promise<void>} 无返回值
    */
-  static async testTransactionIsolation (transaction1, transaction2, verifyIsolation) {
+  static async testTransactionIsolation(transaction1, transaction2, verifyIsolation) {
     const t1 = await sequelize.transaction()
     const t2 = await sequelize.transaction()
 
@@ -184,7 +184,7 @@ class TransactionTestSuite {
    *   // 验证所有表的变更
    * })
    */
-  static async testMultiTableTransaction (operations, verifyAllChanges) {
+  static async testMultiTableTransaction(operations, verifyAllChanges) {
     const transaction = await sequelize.transaction()
 
     try {
@@ -230,7 +230,7 @@ class TransactionTestSuite {
    * @param {number} timeoutMs - 超时时间(毫秒)
    * @returns {Promise<void>} 无返回值
    */
-  static async testTransactionTimeout (longRunningOperation, timeoutMs = 5000) {
+  static async testTransactionTimeout(longRunningOperation, timeoutMs = 5000) {
     const transaction = await sequelize.transaction()
     let timeoutOccurred = false
 
@@ -271,7 +271,7 @@ class TransactionHelpers {
    *
    * @returns {Promise<Transaction>} Sequelize事务实例
    */
-  static async createTestTransaction () {
+  static async createTestTransaction() {
     return await sequelize.transaction()
   }
 
@@ -281,7 +281,7 @@ class TransactionHelpers {
    * @param {Transaction} transaction - 事务实例
    * @returns {Promise<void>} 无返回值
    */
-  static async safeRollback (transaction) {
+  static async safeRollback(transaction) {
     if (transaction && !transaction.finished) {
       try {
         await transaction.rollback()
@@ -298,7 +298,7 @@ class TransactionHelpers {
    * @param {Transaction} transaction - 事务实例
    * @returns {Object} 事务状态
    */
-  static getTransactionStatus (transaction) {
+  static getTransactionStatus(transaction) {
     return {
       finished: transaction.finished,
       committed: transaction.finished && !transaction.options.rollback,
@@ -317,7 +317,7 @@ class TransactionHelpers {
    * @param {Object} record2Id - 第二条记录ID
    * @returns {Promise<boolean>} 是否发生死锁
    */
-  static async simulateDeadlock (t1, t2, Model1, Model2, record1Id, record2Id) {
+  static async simulateDeadlock(t1, t2, Model1, Model2, record1Id, record2Id) {
     let deadlockOccurred = false
 
     try {

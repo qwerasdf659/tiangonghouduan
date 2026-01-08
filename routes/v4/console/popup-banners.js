@@ -62,7 +62,7 @@ router.get(
       const offset = (parseInt(page) - 1) * parseInt(limit)
 
       // 获取弹窗服务
-      const PopupBannerService = req.app.locals.services.getService('popupBanner')
+      const PopupBannerService = req.app.locals.services.getService('popup_banner')
 
       // 调用服务层方法查询弹窗列表
       const { banners, total } = await PopupBannerService.getAdminBannerList({
@@ -103,7 +103,7 @@ router.get(
   adminAuthMiddleware,
   asyncHandler(async (req, res) => {
     try {
-      const PopupBannerService = req.app.locals.services.getService('popupBanner')
+      const PopupBannerService = req.app.locals.services.getService('popup_banner')
       const statistics = await PopupBannerService.getStatistics()
 
       return res.apiSuccess({ statistics }, '获取弹窗统计成功')
@@ -128,7 +128,7 @@ router.get(
     try {
       const { id } = req.params
 
-      const PopupBannerService = req.app.locals.services.getService('popupBanner')
+      const PopupBannerService = req.app.locals.services.getService('popup_banner')
       const banner = await PopupBannerService.getBannerById(parseInt(id))
 
       if (!banner) {
@@ -187,7 +187,7 @@ router.post(
         return res.apiError('请上传弹窗图片', 'IMAGE_REQUIRED', null, 400)
       }
 
-      const PopupBannerService = req.app.locals.services.getService('popupBanner')
+      const PopupBannerService = req.app.locals.services.getService('popup_banner')
 
       // 上传图片到Sealos（返回对象 key 和公网 URL）
       const { objectKey } = await PopupBannerService.uploadBannerImage(
@@ -242,7 +242,7 @@ router.put(
       const { id } = req.params
       const updateData = { ...req.body }
 
-      const PopupBannerService = req.app.locals.services.getService('popupBanner')
+      const PopupBannerService = req.app.locals.services.getService('popup_banner')
 
       // 如果上传了新图片，先上传到Sealos
       if (req.file) {
@@ -288,7 +288,7 @@ router.delete(
     try {
       const { id } = req.params
 
-      const PopupBannerService = req.app.locals.services.getService('popupBanner')
+      const PopupBannerService = req.app.locals.services.getService('popup_banner')
       const deleted = await PopupBannerService.deleteBanner(parseInt(id))
 
       if (!deleted) {
@@ -322,7 +322,7 @@ router.patch(
     try {
       const { id } = req.params
 
-      const PopupBannerService = req.app.locals.services.getService('popupBanner')
+      const PopupBannerService = req.app.locals.services.getService('popup_banner')
       const banner = await PopupBannerService.toggleBannerActive(parseInt(id))
 
       if (!banner) {
@@ -369,7 +369,7 @@ router.patch(
         return res.apiError('排序列表不能为空', 'INVALID_PARAMETERS', null, 400)
       }
 
-      const PopupBannerService = req.app.locals.services.getService('popupBanner')
+      const PopupBannerService = req.app.locals.services.getService('popup_banner')
       const updatedCount = await PopupBannerService.updateDisplayOrder(order_list)
 
       sharedComponents.logger.info('管理员更新弹窗排序', {

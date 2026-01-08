@@ -96,7 +96,7 @@ router.get(
       const maxLimit = Math.min(Math.max(parseInt(limit) || 10, 1), 10)
 
       // 获取弹窗服务
-      const PopupBannerService = req.app.locals.services.getService('popupBanner')
+      const PopupBannerService = req.app.locals.services.getService('popup_banner')
 
       // 根据状态调用不同的服务方法
       let banners

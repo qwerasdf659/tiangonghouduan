@@ -76,10 +76,13 @@ class AdminLotteryService {
    * AdminLotteryService.initialize(serviceManager)
    */
   static initialize(serviceManager) {
-    // 🎯 直接从_services Map获取，避免触发初始化检查
+    /*
+     * 🎯 直接从_services Map获取，避免触发初始化检查
+     * P1-9：使用 snake_case 服务键
+     */
     this._dependencies.user = serviceManager._services.get('user')
-    this._dependencies.prizePool = serviceManager._services.get('prizePool')
-    logger.info('AdminLotteryService依赖注入完成')
+    this._dependencies.prizePool = serviceManager._services.get('prize_pool')
+    logger.info('AdminLotteryService依赖注入完成（P1-9 snake_case key）')
   }
 
   /**

@@ -30,7 +30,7 @@ router.get(
   asyncHandler(async (req, res) => {
     try {
       // 获取系统监控服务
-      const AdminSystemService = req.app.locals.services.getService('adminSystem')
+      const AdminSystemService = req.app.locals.services.getService('admin_system')
 
       // 调用服务层方法获取系统状态
       const statusInfo = await AdminSystemService.getSystemStatus(
@@ -59,7 +59,7 @@ router.get(
   asyncHandler(async (req, res) => {
     try {
       // 获取系统监控服务
-      const AdminSystemService = req.app.locals.services.getService('adminSystem')
+      const AdminSystemService = req.app.locals.services.getService('admin_system')
 
       // 调用服务层方法获取仪表板数据
       const dashboardData = await AdminSystemService.getDashboardData(
@@ -88,7 +88,7 @@ router.get(
   asyncHandler(async (req, res) => {
     try {
       // 获取系统监控服务
-      const AdminSystemService = req.app.locals.services.getService('adminSystem')
+      const AdminSystemService = req.app.locals.services.getService('admin_system')
 
       // 调用服务层方法获取管理策略状态
       const result = await AdminSystemService.getManagementStatus(

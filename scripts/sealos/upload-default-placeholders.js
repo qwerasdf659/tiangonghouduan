@@ -19,14 +19,42 @@
  *   # 检查占位图是否存在（不上传）
  *   node scripts/sealos/upload-default-placeholders.js --check-only
  *
- * @version 1.0.0
- * @date 2026-01-08
+ * P1-9：已改造为通过 ServiceManager 获取服务（snake_case key）
+ * 服务键：'sealos_storage'
+ *
+ * @version 1.1.0
+ * @date 2026-01-09
  */
 
 require('dotenv').config()
 
 const sharp = require('sharp')
-const SealosStorageService = require('../../services/sealosStorage')
+
+/*
+ * P1-9：SealosStorageService 通过 ServiceManager 获取
+ * 服务键：'sealos_storage'（snake_case）
+ * 注意：该脚本需要在 main() 中异步获取服务
+ */
+let SealosStorageService = null
+
+/**
+ * P1-9：初始化 ServiceManager 并获取 SealosStorageService
+ * @returns {Promise<Object>} SealosStorageService 实例
+ */
+async function initializeSealosService() {
+  try {
+    const serviceManager = require('../../services/index')
+    if (!serviceManager._initialized) {
+      await serviceManager.initialize()
+    }
+    SealosStorageService = serviceManager.getService('sealos_storage')
+    console.log('✅ SealosStorageService 加载成功（P1-9 ServiceManager）')
+    return SealosStorageService
+  } catch (error) {
+    console.error('❌ SealosStorageService 加载失败:', error.message)
+    throw error
+  }
+}
 
 /**
  * 默认占位图配置
@@ -224,8 +252,8 @@ async function main() {
     process.exit(1)
   }
 
-  // 初始化 Sealos 存储服务
-  const storageService = new SealosStorageService()
+  // P1-9：通过 ServiceManager 获取 Sealos 存储服务
+  const storageService = await initializeSealosService()
 
   console.log(`\nSealos 配置：`)
   console.log(`  Endpoint: ${process.env.SEALOS_ENDPOINT}`)

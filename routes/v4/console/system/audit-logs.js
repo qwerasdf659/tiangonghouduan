@@ -17,7 +17,10 @@
 const express = require('express')
 const router = express.Router()
 const { authenticateToken, requireAdmin } = require('../../../../middleware/auth')
-const AuditLogService = require('../../../../services/AuditLogService')
+/*
+ * P1-9：服务通过 ServiceManager 获取（B1-Injected + E2-Strict snake_case）
+ * const AuditLogService = require('../../../../services/AuditLogService')
+ */
 const logger = require('../../../../utils/logger').logger
 
 /**
@@ -43,6 +46,9 @@ const logger = require('../../../../utils/logger').logger
  */
 router.get('/', authenticateToken, requireAdmin, async (req, res) => {
   try {
+    // P1-9：通过 ServiceManager 获取服务（snake_case key）
+    const AuditLogService = req.app.locals.services.getService('audit_log')
+
     const {
       operator_id,
       operation_type,
@@ -113,6 +119,9 @@ router.get('/', authenticateToken, requireAdmin, async (req, res) => {
  */
 router.get('/:log_id', authenticateToken, requireAdmin, async (req, res) => {
   try {
+    // P1-9：通过 ServiceManager 获取服务（snake_case key）
+    const AuditLogService = req.app.locals.services.getService('audit_log')
+
     const { log_id } = req.params
     const admin_id = req.user.user_id
 
@@ -176,6 +185,9 @@ router.get('/:log_id', authenticateToken, requireAdmin, async (req, res) => {
  */
 router.get('/stats/summary', authenticateToken, requireAdmin, async (req, res) => {
   try {
+    // P1-9：通过 ServiceManager 获取服务（snake_case key）
+    const AuditLogService = req.app.locals.services.getService('audit_log')
+
     const { operator_id, start_date, end_date } = req.query
     const admin_id = req.user.user_id
 

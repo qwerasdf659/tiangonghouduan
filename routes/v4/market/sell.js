@@ -27,12 +27,9 @@ const router = express.Router()
 const { authenticateToken } = require('../../../middleware/auth')
 const { handleServiceError } = require('../../../middleware/validation')
 const logger = require('../../../utils/logger').logger
-// 业界标准幂等架构 - 统一入口幂等服务
-const IdempotencyService = require('../../../services/IdempotencyService')
 // 事务边界治理 - 统一事务管理器
 const TransactionManager = require('../../../utils/TransactionManager')
-// 决策5B/0C：市场挂牌统一收口到Service层
-const MarketListingService = require('../../../services/MarketListingService')
+// P1-9：服务通过 ServiceManager 获取（B1-Injected + E2-Strict snake_case）
 
 /**
  * @route POST /api/v4/market/list
@@ -60,6 +57,10 @@ const MarketListingService = require('../../../services/MarketListingService')
  * 幂等性控制（业界标准形态）：统一通过 Header Idempotency-Key 防止重复上架
  */
 router.post('/list', authenticateToken, async (req, res) => {
+  // P1-9：通过 ServiceManager 获取服务（B1-Injected + E2-Strict snake_case）
+  const IdempotencyService = req.app.locals.services.getService('idempotency')
+  const MarketListingService = req.app.locals.services.getService('market_listing')
+
   // 【业界标准形态】强制从 Header 获取幂等键，不接受 body
   const idempotency_key = req.headers['idempotency-key']
 
@@ -266,6 +267,10 @@ router.post('/list', authenticateToken, async (req, res) => {
  * 幂等性控制：通过 Header Idempotency-Key 防止重复挂牌
  */
 router.post('/fungible-assets/list', authenticateToken, async (req, res) => {
+  // P1-9：通过 ServiceManager 获取服务（B1-Injected + E2-Strict snake_case）
+  const IdempotencyService = req.app.locals.services.getService('idempotency')
+  const MarketListingService = req.app.locals.services.getService('market_listing')
+
   // 【业界标准形态】强制从 Header 获取幂等键
   const idempotency_key = req.headers['idempotency-key']
 

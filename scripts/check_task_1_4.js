@@ -1,9 +1,37 @@
 /**
  * 任务 1.4 完整性检查脚本
  * 检查管理员认证路由重构是否完整
+ *
+ * P1-9：已改造为通过 ServiceManager 获取服务（snake_case key）
  */
 
 const { User, UserRole, Role } = require('../models')
+
+/*
+ * P1-9：UserService 通过 ServiceManager 获取
+ * 服务键：'user'（snake_case）
+ */
+let UserService = null
+
+/**
+ * P1-9：初始化 ServiceManager 并获取 UserService
+ * @returns {Promise<Object>} UserService 实例
+ */
+async function initializeUserService() {
+  if (UserService) return UserService
+  try {
+    const serviceManager = require('../services/index')
+    if (!serviceManager._initialized) {
+      await serviceManager.initialize()
+    }
+    UserService = serviceManager.getService('user')
+    console.log('  ✅ UserService 加载成功（P1-9 ServiceManager）')
+    return UserService
+  } catch (error) {
+    console.log(`  ❌ UserService 加载失败: ${error.message}`)
+    throw error
+  }
+}
 
 async function checkTask14() {
   console.log('===================================================================')
@@ -74,7 +102,8 @@ async function checkTask14() {
 
     // 检查 4: UserService 方法完整性
     console.log('\n✓ 检查 4: UserService 方法完整性')
-    const UserService = require('../services/UserService')
+    // P1-9：通过 ServiceManager 获取 UserService
+    await initializeUserService()
     const requiredMethods = [
       'adminLogin',
       'getUserWithValidation',

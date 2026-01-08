@@ -156,8 +156,106 @@ class UnifiedScriptManager {
       }
     }
 
+    /*
+     * P1-9：ServiceManager 集成
+     * 提供脚本上下文中的服务获取能力
+     */
+    this.serviceManager = null
+    this._serviceManagerInitialized = false
+
     UnifiedScriptManager.instance = this
     console.log('[UnifiedScriptManager] 初始化完成')
+  }
+
+  /**
+   * P1-9：初始化 ServiceManager（脚本上下文专用）
+   *
+   * @description
+   * 为脚本提供在非 Express 上下文中使用 ServiceManager 的能力。
+   * 脚本应通过此方法初始化 ServiceManager，然后使用 getService() 获取服务。
+   *
+   * @example
+   * const scriptManager = getUnifiedScriptManager()
+   * await scriptManager.initializeServiceManager()
+   * const userService = scriptManager.getService('user')
+   *
+   * @returns {Promise<void>} 初始化完成后返回
+   * @throws {Error} 如果 ServiceManager 初始化失败
+   */
+  async initializeServiceManager() {
+    if (this._serviceManagerInitialized) {
+      console.log('[UnifiedScriptManager] ServiceManager 已初始化，跳过')
+      return
+    }
+
+    try {
+      console.log('[UnifiedScriptManager] 正在初始化 ServiceManager...')
+      const serviceManager = require('../services/index')
+
+      if (!serviceManager._initialized) {
+        await serviceManager.initialize()
+      }
+
+      this.serviceManager = serviceManager
+      this._serviceManagerInitialized = true
+      console.log('[UnifiedScriptManager] ServiceManager 初始化完成（P1-9 snake_case key）')
+    } catch (error) {
+      console.error('[UnifiedScriptManager] ServiceManager 初始化失败:', error.message)
+      throw error
+    }
+  }
+
+  /**
+   * P1-9：获取服务（脚本上下文专用）
+   *
+   * @description
+   * 通过 ServiceManager 获取服务实例。
+   * 使用 snake_case 服务键，符合 P1-9 规范。
+   *
+   * @example
+   * const userService = scriptManager.getService('user')
+   * const prizePoolService = scriptManager.getService('prize_pool')
+   * const adminLotteryService = scriptManager.getService('admin_lottery')
+   *
+   * @param {string} serviceName - 服务名称（snake_case 格式）
+   * @returns {Object} 服务实例
+   * @throws {Error} 如果 ServiceManager 未初始化或服务不存在
+   */
+  getService(serviceName) {
+    if (!this._serviceManagerInitialized) {
+      throw new Error(
+        '[UnifiedScriptManager] ServiceManager 未初始化，请先调用 initializeServiceManager()'
+      )
+    }
+
+    return this.serviceManager.getService(serviceName)
+  }
+
+  /**
+   * P1-9：检查服务是否已注册
+   *
+   * @param {string} serviceName - 服务名称（snake_case 格式）
+   * @returns {boolean} 服务是否已注册
+   */
+  hasService(serviceName) {
+    if (!this._serviceManagerInitialized) {
+      return false
+    }
+
+    return this.serviceManager.hasService(serviceName)
+  }
+
+  /**
+   * P1-9：获取所有已注册的服务列表
+   *
+   * @returns {Array<string>} 服务名称列表（snake_case 格式）
+   */
+  getServiceList() {
+    if (!this._serviceManagerInitialized) {
+      return []
+    }
+
+    return this.serviceManager.getServiceList()
   }
 
   /**

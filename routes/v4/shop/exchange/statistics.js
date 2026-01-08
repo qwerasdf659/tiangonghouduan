@@ -34,7 +34,7 @@ const logger = require('../../../../utils/logger').logger
 router.get('/statistics', authenticateToken, requireAdmin, async (req, res) => {
   try {
     // 🔄 通过 ServiceManager 获取 ExchangeService（符合TR-005规范）
-    const ExchangeService = req.app.locals.services.getService('exchangeMarket')
+    const ExchangeService = req.app.locals.services.getService('exchange_market')
 
     const admin_id = req.user.user_id
 

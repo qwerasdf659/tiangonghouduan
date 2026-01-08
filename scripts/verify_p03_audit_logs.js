@@ -15,10 +15,34 @@
 const path = require('path')
 require('dotenv').config({ path: path.join(process.cwd(), '.env') })
 
-const { sequelize } = require('../models')
-const PrizePoolService = require('../services/PrizePoolService')
-const AuditLogService = require('../services/AuditLogService')
-const { AdminOperationLog } = require('../models')
+const { sequelize, AdminOperationLog } = require('../models')
+
+/*
+ * P1-9：PrizePoolService 和 AuditLogService 通过 ServiceManager 获取
+ * 服务键：'prize_pool'、'audit_log'（snake_case）
+ * 注意：在 verifyAuditLogs() 函数开始时动态获取服务
+ */
+let PrizePoolService = null
+let AuditLogService = null
+
+/**
+ * P1-9：初始化 ServiceManager 并获取服务
+ * @returns {Promise<Object>} 返回服务对象
+ */
+async function initializeServices() {
+  try {
+    const serviceManager = require('../services/index')
+    if (!serviceManager._initialized) {
+      await serviceManager.initialize()
+    }
+    PrizePoolService = serviceManager.getService('prize_pool')
+    AuditLogService = serviceManager.getService('audit_log')
+    console.log('✅ PrizePoolService、AuditLogService 加载成功（P1-9 ServiceManager）')
+  } catch (error) {
+    console.error('❌ 服务加载失败:', error.message)
+    throw error
+  }
+}
 
 /**
  * 验证审计日志功能
@@ -29,6 +53,9 @@ async function verifyAuditLogs() {
   console.log('==========================================\n')
 
   try {
+    // P1-9：初始化服务
+    await initializeServices()
+
     // 1. 验证数据库支持 prize_stock_adjust 操作类型
     console.log('【步骤1】验证数据库支持 prize_stock_adjust 操作类型...')
     const [results] = await sequelize.query(`

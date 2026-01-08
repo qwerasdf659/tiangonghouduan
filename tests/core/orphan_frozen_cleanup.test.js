@@ -8,7 +8,12 @@
  * - 验证干跑模式不修改数据
  *
  * 创建时间：2026-01-09
+ * 更新时间：2026-01-09（P1-9 ServiceManager 集成）
  * 版本：V4.5.0
+ *
+ * P1-9 重构说明：
+ * - 服务通过 global.getTestService() 获取（J2-RepoWide）
+ * - 使用 snake_case service key（E2-Strict）
  */
 
 'use strict'
@@ -17,10 +22,17 @@
 process.env.NODE_ENV = 'test'
 
 const { TestConfig } = require('../helpers/test-setup')
-const OrphanFrozenCleanupService = require('../../services/OrphanFrozenCleanupService')
 const { OPERATION_TYPES, isValidOperationType } = require('../../constants/AuditOperationTypes')
 
+// 🔴 P1-9：通过 ServiceManager 获取服务（替代直接 require）
+let OrphanFrozenCleanupService
+
 describe('P0-2: 孤儿冻结清理服务测试', () => {
+  // 🔴 P1-9：在测试前获取服务实例
+  beforeAll(() => {
+    OrphanFrozenCleanupService = global.getTestService('orphan_frozen_cleanup')
+  })
+
   describe('服务导出验证', () => {
     test('OrphanFrozenCleanupService 应该存在', () => {
       expect(OrphanFrozenCleanupService).toBeDefined()
