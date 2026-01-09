@@ -41,16 +41,18 @@ module.exports = {
   async approved(auditableId, auditRecord, transaction) {
     // 注意：第一个参数是 auditable_id（用户ID），audit_id 从 auditRecord 获取
     const auditId = auditRecord.audit_id
-    logger.info(`[商家积分审核回调] 审核通过回调触发: audit_id=${auditId}, auditable_id=${auditableId}`)
+    logger.info(
+      `[商家积分审核回调] 审核通过回调触发: audit_id=${auditId}, auditable_id=${auditableId}`
+    )
 
     try {
-      // 调用 MerchantPointsService 处理审核通过的业务逻辑
-      // 传递 audit_id（审核记录ID），而不是 auditable_id（用户ID）
-      await MerchantPointsService.processApprovedApplication(
-        auditId,
-        auditRecord.auditor_id,
-        { transaction }
-      )
+      /*
+       * 调用 MerchantPointsService 处理审核通过的业务逻辑
+       * 传递 audit_id（审核记录ID），而不是 auditable_id（用户ID）
+       */
+      await MerchantPointsService.processApprovedApplication(auditId, auditRecord.auditor_id, {
+        transaction
+      })
 
       return {
         success: true,
@@ -87,8 +89,10 @@ module.exports = {
     )
 
     try {
-      // 调用 MerchantPointsService 处理审核拒绝的业务逻辑
-      // 传递 audit_id（审核记录ID），而不是 auditable_id（用户ID）
+      /*
+       * 调用 MerchantPointsService 处理审核拒绝的业务逻辑
+       * 传递 audit_id（审核记录ID），而不是 auditable_id（用户ID）
+       */
       await MerchantPointsService.processRejectedApplication(
         auditId,
         auditRecord.auditor_id,

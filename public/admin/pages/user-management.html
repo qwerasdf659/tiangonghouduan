@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>用户管理中心 - 管理后台</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+  <link href="/admin/css/common.css" rel="stylesheet">
+  <style>
+    .tab-pane { padding-top: 1rem; }
+    .nav-link.active { font-weight: bold; }
+    .hierarchy-card { border-left: 4px solid #0d6efd; }
+    .review-card { border-left: 4px solid #ffc107; }
+    .role-badge-80 { background-color: #6f42c1; }
+    .role-badge-60 { background-color: #fd7e14; }
+    .role-badge-40 { background-color: #198754; }
+    .inactive-row { opacity: 0.6; }
+  </style>
+</head>
+<body class="bg-light">
+  <!-- 顶部导航 -->
+  <nav class="navbar navbar-dark bg-primary">
+    <div class="container-fluid">
+      <a href="/admin/dashboard.html" class="navbar-brand">
+        <i class="bi bi-arrow-left me-2"></i><i class="bi bi-people-fill"></i> 管理后台 - 用户管理中心
+      </a>
+      <div>
+        <span class="text-light me-3" id="welcomeText">欢迎，管理员</span>
+        <button class="btn btn-outline-light btn-sm" id="logoutBtn">退出登录</button>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container-fluid mt-4">
+    <div class="card">
+      <div class="card-header">
+        <ul class="nav nav-tabs card-header-tabs" id="userManagementTabs" role="tablist">
+          <li class="nav-item" role="presentation">
+            <button class="nav-link active" id="users-tab" data-bs-toggle="tab" data-bs-target="#users-pane" type="button" role="tab" aria-controls="users-pane" aria-selected="true">
+              <i class="bi bi-people"></i> 用户列表
+            </button>
+          </li>
+          <li class="nav-item" role="presentation">
+            <button class="nav-link" id="hierarchy-tab" data-bs-toggle="tab" data-bs-target="#hierarchy-pane" type="button" role="tab" aria-controls="hierarchy-pane" aria-selected="false">
+              <i class="bi bi-diagram-3"></i> 用户层级
+            </button>
+          </li>
+          <li class="nav-item" role="presentation">
+            <button class="nav-link" id="merchant-points-tab" data-bs-toggle="tab" data-bs-target="#merchant-points-pane" type="button" role="tab" aria-controls="merchant-points-pane" aria-selected="false">
+              <i class="bi bi-star"></i> 商家积分审核
+            </button>
+          </li>
+        </ul>
+      </div>
+      <div class="card-body">
+        <div class="tab-content" id="userManagementTabsContent">
+          <!-- 用户列表 Tab Pane -->
+          <div class="tab-pane fade show active" id="users-pane" role="tabpanel" aria-labelledby="users-tab">
+            <!-- 筛选器区域 -->
+            <div class="card mb-3">
+              <div class="card-body">
+                <div class="row g-3">
+                  <div class="col-md-3">
+                    <label class="form-label">用户类型</label>
+                    <select class="form-select" id="userTypeFilter">
+                      <option value="all">全部用户</option>
+                      <option value="normal">普通用户</option>
+                      <option value="vip">VIP用户</option>
+                      <option value="admin">管理员</option>
+                    </select>
+                  </div>
+                  <div class="col-md-3">
+                    <label class="form-label">账户状态</label>
+                    <select class="form-select" id="userStatusFilter">
+                      <option value="all">全部状态</option>
+                      <option value="active">正常</option>
+                      <option value="banned">已封禁</option>
+                    </select>
+                  </div>
+                  <div class="col-md-3">
+                    <label class="form-label">搜索</label>
+                    <input type="text" class="form-control" id="userSearchInput" placeholder="手机号、昵称、ID">
+                  </div>
+                  <div class="col-md-3">
+                    <label class="form-label">&nbsp;</label>
+                    <div>
+                      <button class="btn btn-primary" id="userSearchBtn">
+                        <i class="bi bi-search"></i> 搜索
+                      </button>
+                      <button class="btn btn-outline-secondary" id="userResetBtn">
+                        <i class="bi bi-arrow-clockwise"></i> 重置
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <!-- 统计信息 -->
+            <div class="row g-3 mb-3">
+              <div class="col-md-3">
+                <div class="card">
+                  <div class="card-body text-center">
+                    <h6 class="text-muted">总用户数</h6>
+                    <h3 class="text-primary" id="totalUsers">-</h3>
+                  </div>
+                </div>
+              </div>
+              <div class="col-md-3">
+                <div class="card">
+                  <div class="card-body text-center">
+                    <h6 class="text-muted">今日新增</h6>
+                    <h3 class="text-success" id="todayUsers">-</h3>
+                  </div>
+                </div>
+              </div>
+              <div class="col-md-3">
+                <div class="card">
+                  <div class="card-body text-center">
+                    <h6 class="text-muted">活跃用户</h6>
+                    <h3 class="text-info" id="activeUsers">-</h3>
+                  </div>
+                </div>
+              </div>
+              <div class="col-md-3">
+                <div class="card">
+                  <div class="card-body text-center">
+                    <h6 class="text-muted">VIP用户</h6>
+                    <h3 class="text-warning" id="vipUsers">-</h3>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <!-- 数据表格 -->
+            <div class="card">
+              <div class="card-body">
+                <div class="table-responsive">
+                  <table class="table table-hover align-middle">
+                    <thead class="table-light">
+                      <tr>
+                        <th style="width: 80px;">ID</th>
+                        <th>用户信息</th>
+                        <th>角色</th>
+                        <th>历史总积分</th>
+                        <th>注册时间</th>
+                        <th>最后登录</th>
+                        <th>状态</th>
+                        <th style="width: 200px;">操作</th>
+                      </tr>
+                    </thead>
+                    <tbody id="usersTableBody">
+                      <tr>
+                        <td colspan="8" class="text-center py-5">
+                          <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">加载中...</span>
+                          </div>
+                          <p class="mt-2 text-muted">正在加载数据...</p>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+                <nav aria-label="分页导航">
+                  <ul class="pagination justify-content-center mb-0" id="usersPagination"></ul>
+                </nav>
+              </div>
+            </div>
+          </div>
+
+          <!-- 用户层级 Tab Pane -->
+          <div class="tab-pane fade" id="hierarchy-pane" role="tabpanel" aria-labelledby="hierarchy-tab">
+            <!-- 层级说明 -->
+            <div class="alert alert-info">
+              <i class="bi bi-info-circle me-2"></i>
+              <strong>层级结构：</strong>
+              <span class="badge role-badge-80 ms-2">区域负责人 (80)</span> →
+              <span class="badge role-badge-60 ms-2">业务经理 (60)</span> →
+              <span class="badge role-badge-40 ms-2">业务员 (40)</span> → 门店
+            </div>
+
+            <!-- 统计卡片 -->
+            <div class="row g-3 mb-4">
+              <div class="col-md-3">
+                <div class="card hierarchy-card">
+                  <div class="card-body text-center">
+                    <i class="bi bi-people-fill text-primary" style="font-size: 2rem;"></i>
+                    <h4 class="mt-2 text-primary" id="hierarchyTotalCount">0</h4>
+                    <small class="text-muted">总层级关系</small>
+                  </div>
+                </div>
+              </div>
+              <div class="col-md-3">
+                <div class="card">
+                  <div class="card-body text-center">
+                    <i class="bi bi-person-check text-success" style="font-size: 2rem;"></i>
+                    <h4 class="mt-2 text-success" id="hierarchyActiveCount">0</h4>
+                    <small class="text-muted">激活中</small>
+                  </div>
+                </div>
+              </div>
+              <div class="col-md-3">
+                <div class="card">
+                  <div class="card-body text-center">
+                    <i class="bi bi-person-x text-secondary" style="font-size: 2rem;"></i>
+                    <h4 class="mt-2 text-secondary" id="hierarchyInactiveCount">0</h4>
+                    <small class="text-muted">已停用</small>
+                  </div>
+                </div>
+              </div>
+              <div class="col-md-3">
+                <div class="card">
+                  <div class="card-body text-center">
+                    <i class="bi bi-shop text-info" style="font-size: 2rem;"></i>
+                    <h4 class="mt-2 text-info" id="hierarchyStoreAssignCount">0</h4>
+                    <small class="text-muted">已分配门店</small>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 操作区域 -->
+            <div class="card mb-3">
+              <div class="card-body">
+                <div class="row g-3 align-items-end">
+                  <div class="col-md-2">
+                    <label class="form-label">角色级别</label>
+                    <select class="form-select" id="hierarchyRoleLevelFilter">
+                      <option value="">全部级别</option>
+                      <option value="80">区域负责人 (80)</option>
+                      <option value="60">业务经理 (60)</option>
+                      <option value="40">业务员 (40)</option>
+                    </select>
+                  </div>
+                  <div class="col-md-2">
+                    <label class="form-label">状态</label>
+                    <select class="form-select" id="hierarchyStatusFilter">
+                      <option value="">全部状态</option>
+                      <option value="true">激活中</option>
+                      <option value="false">已停用</option>
+                    </select>
+                  </div>
+                  <div class="col-md-2">
+                    <label class="form-label">上级用户ID</label>
+                    <input type="number" class="form-control" id="hierarchySuperiorFilter" placeholder="输入上级ID">
+                  </div>
+                  <div class="col-md-2">
+                    <button class="btn btn-primary w-100" id="hierarchyRefreshBtn">
+                      <i class="bi bi-arrow-repeat"></i> 刷新
+                    </button>
+                  </div>
+                  <div class="col-md-2">
+                    <button class="btn btn-success w-100" id="hierarchyCreateBtn">
+                      <i class="bi bi-plus-lg"></i> 新建层级
+                    </button>
+                  </div>
+                  <div class="col-md-2">
+                    <button class="btn btn-outline-secondary w-100" id="hierarchyExportBtn">
+                      <i class="bi bi-download"></i> 导出
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 层级列表 -->
+            <div class="card">
+              <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="bi bi-diagram-3"></i> 用户层级列表</h5>
+                <span class="text-muted" id="hierarchyListInfo">加载中...</span>
+              </div>
+              <div class="card-body p-0">
+                <div class="table-responsive">
+                  <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                      <tr>
+                        <th>ID</th>
+                        <th>用户</th>
+                        <th>角色</th>
+                        <th>上级</th>
+                        <th>门店</th>
+                        <th>状态</th>
+                        <th>激活时间</th>
+                        <th>操作</th>
+                      </tr>
+                    </thead>
+                    <tbody id="hierarchyTableBody">
+                      <tr>
+                        <td colspan="8" class="text-center text-muted py-4">
+                          <i class="bi bi-hourglass-split"></i> 加载中...
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+              <div class="card-footer bg-white">
+                <nav>
+                  <ul class="pagination mb-0 justify-content-center" id="hierarchyPagination"></ul>
+                </nav>
+              </div>
+            </div>
+          </div>
+
+          <!-- 商家积分审核 Tab Pane -->
+          <div class="tab-pane fade" id="merchant-points-pane" role="tabpanel" aria-labelledby="merchant-points-tab">
+            <!-- 审核统计 -->
+            <div class="row g-3 mb-4">
+              <div class="col-md-3">
+                <div class="card review-card">
+                  <div class="card-body text-center">
+                    <i class="bi bi-hourglass-split text-warning" style="font-size: 2rem;"></i>
+                    <h4 class="mt-2 text-warning" id="merchantPendingCount">0</h4>
+                    <small class="text-muted">待审核</small>
+                  </div>
+                </div>
+              </div>
+              <div class="col-md-3">
+                <div class="card">
+                  <div class="card-body text-center">
+                    <i class="bi bi-check-circle text-success" style="font-size: 2rem;"></i>
+                    <h4 class="mt-2 text-success" id="merchantApprovedCount">0</h4>
+                    <small class="text-muted">已通过</small>
+                  </div>
+                </div>
+              </div>
+              <div class="col-md-3">
+                <div class="card">
+                  <div class="card-body text-center">
+                    <i class="bi bi-x-circle text-danger" style="font-size: 2rem;"></i>
+                    <h4 class="mt-2 text-danger" id="merchantRejectedCount">0</h4>
+                    <small class="text-muted">已拒绝</small>
+                  </div>
+                </div>
+              </div>
+              <div class="col-md-3">
+                <div class="card">
+                  <div class="card-body text-center">
+                    <i class="bi bi-star-fill text-primary" style="font-size: 2rem;"></i>
+                    <h4 class="mt-2 text-primary" id="merchantTotalPoints">0</h4>
+                    <small class="text-muted">今日发放积分</small>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 操作区域 -->
+            <div class="card mb-3">
+              <div class="card-body">
+                <div class="row g-3 align-items-end">
+                  <div class="col-md-2">
+                    <label class="form-label">审核状态</label>
+                    <select class="form-select" id="merchantStatusFilter">
+                      <option value="">全部状态</option>
+                      <option value="pending" selected>待审核</option>
+                      <option value="approved">已通过</option>
+                      <option value="rejected">已拒绝</option>
+                    </select>
+                  </div>
+                  <div class="col-md-2">
+                    <label class="form-label">优先级</label>
+                    <select class="form-select" id="merchantPriorityFilter">
+                      <option value="">全部优先级</option>
+                      <option value="high">高</option>
+                      <option value="medium">中</option>
+                      <option value="low">低</option>
+                    </select>
+                  </div>
+                  <div class="col-md-2">
+                    <label class="form-label">时间范围</label>
+                    <select class="form-select" id="merchantTimeRangeFilter">
+                      <option value="">全部时间</option>
+                      <option value="today">今日</option>
+                      <option value="week">本周</option>
+                      <option value="month">本月</option>
+                    </select>
+                  </div>
+                  <div class="col-md-2">
+                    <button class="btn btn-primary w-100" id="merchantRefreshBtn">
+                      <i class="bi bi-arrow-repeat"></i> 刷新
+                    </button>
+                  </div>
+                  <div class="col-md-2">
+                    <button class="btn btn-success w-100" id="merchantBatchApproveBtn" disabled>
+                      <i class="bi bi-check-lg"></i> 批量通过
+                    </button>
+                  </div>
+                  <div class="col-md-2">
+                    <button class="btn btn-danger w-100" id="merchantBatchRejectBtn" disabled>
+                      <i class="bi bi-x-lg"></i> 批量拒绝
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 审核列表 -->
+            <div class="card">
+              <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="bi bi-list-check"></i> 积分发放申请</h5>
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" id="merchantSelectAll">
+                  <label class="form-check-label" for="merchantSelectAll">全选待审核</label>
+                </div>
+              </div>
+              <div class="card-body p-0">
+                <div class="table-responsive">
+                  <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                      <tr>
+                        <th width="40"><input type="checkbox" class="form-check-input" id="merchantHeaderCheckbox"></th>
+                        <th>申请ID</th>
+                        <th>申请人</th>
+                        <th>积分数量</th>
+                        <th>申请说明</th>
+                        <th>申请时间</th>
+                        <th>状态</th>
+                        <th>审核人</th>
+                        <th>操作</th>
+                      </tr>
+                    </thead>
+                    <tbody id="merchantReviewTableBody">
+                      <tr>
+                        <td colspan="10" class="text-center py-5 text-muted">
+                          <i class="bi bi-inbox" style="font-size: 3rem;"></i>
+                          <p class="mt-2">加载中...</p>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+              <div class="card-footer bg-white">
+                <nav>
+                  <ul class="pagination mb-0 justify-content-center" id="merchantPagination"></ul>
+                </nav>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 用户详情模态框 -->
+  <div class="modal fade" id="userDetailModal" tabindex="-1">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title"><i class="bi bi-person-circle"></i> 用户详情</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body" id="userDetailBody"></div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <!-- 角色管理模态框 -->
+  <div class="modal fade" id="roleModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title"><i class="bi bi-shield-check"></i> 角色管理</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label">选择角色</label>
+            <div id="rolesCheckboxes"></div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+          <button type="button" class="btn btn-primary" id="saveRolesBtn">保存</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 新建/编辑层级模态框 -->
+  <div class="modal fade" id="hierarchyModal" tabindex="-1">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="hierarchyModalTitle">新建层级关系</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <form id="hierarchyForm">
+            <div class="mb-3">
+              <label class="form-label">用户ID <span class="text-danger">*</span></label>
+              <input type="number" class="form-control" id="formUserId" required>
+              <small class="text-muted">输入要建立层级关系的用户ID</small>
+            </div>
+            <div class="mb-3">
+              <label class="form-label">角色 <span class="text-danger">*</span></label>
+              <select class="form-select" id="formRoleId" required>
+                <option value="">请选择角色</option>
+              </select>
+            </div>
+            <div class="mb-3">
+              <label class="form-label">上级用户ID</label>
+              <input type="number" class="form-control" id="formSuperiorId">
+              <small class="text-muted">区域负责人可不填上级</small>
+            </div>
+            <div class="mb-3">
+              <label class="form-label">关联门店ID</label>
+              <input type="number" class="form-control" id="formStoreId">
+              <small class="text-muted">仅业务员需要关联门店</small>
+            </div>
+          </form>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+          <button type="button" class="btn btn-primary" id="saveHierarchyBtn">保存</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 审核模态框 -->
+  <div class="modal fade" id="reviewModal" tabindex="-1">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title"><i class="bi bi-clipboard-check"></i> 审核积分申请</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <p><strong>申请ID：</strong><span id="modalApplyId">-</span></p>
+            <p><strong>申请人：</strong><span id="modalUser">-</span></p>
+            <p><strong>积分数量：</strong><span id="modalPoints" class="text-warning fw-bold">-</span></p>
+            <p><strong>申请说明：</strong><span id="modalRemark">-</span></p>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">审核意见</label>
+            <textarea class="form-control" id="reviewComment" rows="3" placeholder="请输入审核意见（可选）"></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+          <button type="button" class="btn btn-danger" id="rejectBtn">拒绝</button>
+          <button type="button" class="btn btn-success" id="approveBtn">通过</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast 提示组件 -->
+  <div class="position-fixed bottom-0 end-0 p-3" style="z-index: 11">
+    <div id="successToast" class="toast align-items-center text-white bg-success border-0" role="alert">
+      <div class="d-flex">
+        <div class="toast-body" id="successToastBody"></div>
+        <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+      </div>
+    </div>
+    <div id="errorToast" class="toast align-items-center text-white bg-danger border-0" role="alert">
+      <div class="d-flex">
+        <div class="toast-body" id="errorToastBody"></div>
+        <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 加载遮罩层 -->
+  <div class="loading-overlay" id="loadingOverlay" style="display:none;">
+    <div class="spinner-border text-light" style="width: 3rem; height: 3rem;" role="status">
+      <span class="visually-hidden">处理中...</span>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="/admin/js/admin-common.js"></script>
+  <script src="/admin/js/common/toast.js"></script>
+  <script src="/admin/js/pages/user-management.js"></script>
+</body>
+</html>
+

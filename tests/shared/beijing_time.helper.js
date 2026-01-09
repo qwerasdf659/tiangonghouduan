@@ -283,7 +283,45 @@ class BeijingTimeTestSuite {
   }
 }
 
+/**
+ * 简单时间工具测试（从 tests/core/time_helper.test.js 合并）
+ *
+ * 业务场景：快速验证 timeHelper 基本功能
+ * - 时间生成正确性
+ * - 中文格式化正确性
+ *
+ * 使用方式：
+ * ```javascript
+ * const { runSimpleTimeTests } = require('./shared/beijing_time.helper')
+ * await runSimpleTimeTests()
+ * ```
+ */
+async function runSimpleTimeTests() {
+  console.log('🕐 运行简单时间工具测试...')
+
+  // 测试1：北京时间生成
+  const now = BeijingTimeHelper.now()
+  if (!now || typeof now !== 'string') {
+    throw new Error('❌ 时间生成失败：返回值无效')
+  }
+  console.log(`✅ 北京时间生成正确: ${now}`)
+
+  // 测试2：中文格式化
+  const formatted = BeijingTimeHelper.formatChinese(new Date())
+  if (!formatted || typeof formatted !== 'string' || !formatted.includes('年')) {
+    throw new Error('❌ 中文格式化失败：格式不正确')
+  }
+  console.log(`✅ 中文格式化正确: ${formatted}`)
+
+  return {
+    success: true,
+    now,
+    formatted
+  }
+}
+
 // 导出测试工具
 module.exports = {
-  BeijingTimeTestSuite
+  BeijingTimeTestSuite,
+  runSimpleTimeTests
 }

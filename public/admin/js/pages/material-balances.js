@@ -60,7 +60,8 @@ async function loadAssetTypes() {
   try {
     const response = await apiRequest('/api/v4/console/asset-adjustment/asset-types')
     if (response && response.success) {
-      assetTypes = response.data || []
+      // 后端返回格式: { asset_types: [...], total }
+      assetTypes = response.data?.asset_types || []
       populateAssetSelect()
     }
   } catch (error) {

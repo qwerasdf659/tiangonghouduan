@@ -97,7 +97,7 @@
             </select>
           </div>
           <div class="col-md-3 d-flex align-items-end">
-            <button class="btn btn-outline-primary w-100" onclick="loadInterventions()">
+            <button class="btn btn-outline-primary w-100" id="searchFilterBtn">
               <i class="bi bi-search"></i> 搜索
             </button>
           </div>
@@ -168,7 +168,7 @@
                     <label class="form-label">搜索用户（手机号/昵称）<span class="text-danger">*</span></label>
                     <div class="input-group">
                       <input type="text" class="form-control" id="searchUserInput" placeholder="请输入手机号或昵称搜索">
-                      <button type="button" class="btn btn-outline-primary" onclick="searchUser()">
+                      <button type="button" class="btn btn-outline-primary" id="searchUserBtn">
                         <i class="bi bi-search"></i> 搜索
                       </button>
                     </div>
@@ -239,7 +239,7 @@
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
-          <button type="button" class="btn btn-primary" onclick="createIntervention()">
+          <button type="button" class="btn btn-primary" id="createInterventionBtn">
             <i class="bi bi-check-lg"></i> 创建规则
           </button>
         </div>

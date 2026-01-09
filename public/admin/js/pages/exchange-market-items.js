@@ -66,6 +66,33 @@ function bindEvents() {
   document.getElementById('searchBtn').addEventListener('click', handleSearch)
   document.getElementById('submitAddItemBtn').addEventListener('click', handleAddItem)
   document.getElementById('submitEditItemBtn').addEventListener('click', handleEditItem)
+
+  // 🔧 2026-01-09 CSP修复：使用事件委托替代内联onclick
+  document.getElementById('itemsTableBody').addEventListener('click', function (e) {
+    const target = e.target.closest('button')
+    if (!target) return
+
+    const itemId = target.dataset.itemId
+    if (!itemId) return
+
+    if (target.classList.contains('btn-edit-item')) {
+      editItem(parseInt(itemId))
+    } else if (target.classList.contains('btn-delete-item')) {
+      deleteItem(parseInt(itemId))
+    }
+  })
+
+  // 🔧 2026-01-09 CSP修复：分页事件委托
+  document.getElementById('pagination').addEventListener('click', function (e) {
+    e.preventDefault()
+    const target = e.target.closest('a[data-page]')
+    if (!target) return
+
+    const page = parseInt(target.dataset.page)
+    if (!isNaN(page)) {
+      changePage(page)
+    }
+  })
 }
 
 // ============================================
@@ -173,9 +200,11 @@ async function loadItems() {
     })
 
     if (currentFilters.status) params.append('status', currentFilters.status)
-    if (currentFilters.cost_asset_code) params.append('cost_asset_code', currentFilters.cost_asset_code)
+    if (currentFilters.cost_asset_code)
+      params.append('cost_asset_code', currentFilters.cost_asset_code)
 
-    const response = await fetch(`/api/v4/shop/exchange/items?${params}`, {
+    // 使用管理端接口（以后端为准）
+    const response = await fetch(`/api/v4/console/marketplace/exchange_market/items?${params}`, {
       headers: { Authorization: `Bearer ${token}` }
     })
 
@@ -198,7 +227,7 @@ async function loadItems() {
 
 /**
  * 渲染商品列表
- * 
+ *
  * DataSanitizer 返回的字段（以后端为准）：
  * - id: 商品ID（DataSanitizer 将 item_id 映射为 id）
  * - name: 商品名称
@@ -209,7 +238,7 @@ async function loadItems() {
  * - status: 状态
  * - sort_order: 排序号
  * - cost_price: 成本价（管理员可见）
- * - total_exchange_count: 已售数量（管理员可见）
+ * - sold_count: 已售数量（管理员可见）
  */
 function renderItems(items) {
   const tbody = document.getElementById('itemsTableBody')
@@ -235,8 +264,8 @@ function renderItems(items) {
         ? `<span class="badge bg-info">${getAssetDisplayName(item.cost_asset_code)}</span>`
         : '<span class="badge bg-secondary">未设置</span>'
 
-      // 已售数量：DataSanitizer返回 total_exchange_count（管理员可见）
-      const soldCount = item.total_exchange_count || item.sold_count || 0
+      // 已售数量：DataSanitizer返回 sold_count（管理员可见）
+      const soldCount = item.sold_count || 0
 
       return `
       <tr>
@@ -252,10 +281,10 @@ function renderItems(items) {
         <td>${statusBadge}</td>
         <td>${item.sort_order}</td>
         <td>
-          <button class="btn btn-sm btn-outline-primary" onclick="editItem(${itemId})">
+          <button class="btn btn-sm btn-outline-primary btn-edit-item" data-item-id="${itemId}">
             <i class="bi bi-pencil"></i> 编辑
           </button>
-          <button class="btn btn-sm btn-outline-danger" onclick="deleteItem(${itemId})">
+          <button class="btn btn-sm btn-outline-danger btn-delete-item" data-item-id="${itemId}">
             <i class="bi bi-trash"></i> 删除
           </button>
         </td>
@@ -267,15 +296,15 @@ function renderItems(items) {
 
 /**
  * 更新统计数据
- * 字段说明：total_exchange_count 是管理员可见的已售数量
+ * 字段说明：sold_count 是管理员可见的已售数量
  */
 function updateStats(items) {
   const stats = {
     total: items.length,
     active: items.filter(i => i.status === 'active').length,
     lowStock: items.filter(i => i.stock <= 10 && i.stock > 0).length,
-    // 兼容处理：优先使用 total_exchange_count，兼容 sold_count
-    totalSold: items.reduce((sum, i) => sum + (i.total_exchange_count || i.sold_count || 0), 0)
+    // 使用 sold_count 统计已售数量
+    totalSold: items.reduce((sum, i) => sum + (i.sold_count || 0), 0)
   }
 
   document.getElementById('totalItems').textContent = stats.total
@@ -286,6 +315,7 @@ function updateStats(items) {
 
 /**
  * 渲染分页
+ * 🔧 2026-01-09 CSP修复：使用 data-page 替代 onclick
  */
 function renderPagination(pagination) {
   const paginationEl = document.getElementById('pagination')
@@ -298,7 +328,7 @@ function renderPagination(pagination) {
   for (let i = 1; i <= pagination.total_pages; i++) {
     html += `
       <li class="page-item ${i === currentPage ? 'active' : ''}">
-        <a class="page-link" href="#" onclick="changePage(${i}); return false;">${i}</a>
+        <a class="page-link" href="#" data-page="${i}">${i}</a>
       </li>
     `
   }
@@ -384,7 +414,7 @@ async function handleAddItem() {
 
 /**
  * 编辑商品 - 加载商品详情
- * 
+ *
  * DataSanitizer 返回的字段：
  * - id: 商品ID（DataSanitizer 将 item_id 映射为 id）
  * - name, description, cost_asset_code, cost_amount, stock, status, sort_order
@@ -395,7 +425,9 @@ async function editItem(itemId) {
     showLoading(true)
     const token = getToken()
 
-    const response = await fetch(`/api/v4/shop/exchange/items/${itemId}`, {
+    // 使用管理端接口获取商品详情（以后端为准）
+    // 注意：管理端接口返回的是原始字段 item_id, name 等
+    const response = await fetch(`/api/v4/console/marketplace/exchange_market/items/${itemId}`, {
       headers: { Authorization: `Bearer ${token}` }
     })
 

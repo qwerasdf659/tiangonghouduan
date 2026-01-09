@@ -157,12 +157,12 @@ async function loadTransactions() {
     return
   }
 
+  // 参数名称与后端 /api/v4/console/assets/transactions 对齐
   params.append('user_id', userId)
-  if (businessId) params.append('business_id', businessId)
   if (assetCode) params.append('asset_code', assetCode)
-  if (txType) params.append('tx_type', txType)
-  if (startTime) params.append('start_time', startTime)
-  if (endTime) params.append('end_time', endTime)
+  if (txType) params.append('business_type', txType) // 后端参数名是 business_type
+  if (startTime) params.append('start_date', startTime) // 后端参数名是 start_date
+  if (endTime) params.append('end_date', endTime) // 后端参数名是 end_date
 
   params.append('page', currentPage)
   params.append('page_size', pageSize)
@@ -205,6 +205,19 @@ async function loadTransactions() {
 /**
  * 渲染交易流水列表
  * @param {Array} transactions - 交易记录列表
+ *
+ * 后端字段映射（/api/v4/console/assets/transactions）：
+ * - transaction_id: 流水ID
+ * - asset_code: 资产代码
+ * - asset_name: 资产名称
+ * - tx_type: 业务类型
+ * - amount: 变动金额（带符号，正数增加，负数减少）
+ * - balance_before: 变动前余额
+ * - balance_after: 变动后余额
+ * - reason: 原因
+ * - operator_name: 操作人
+ * - idempotency_key: 幂等键
+ * - created_at: 创建时间
  */
 function renderTransactions(transactions) {
   const tbody = document.getElementById('transactionsTableBody')
@@ -222,36 +235,40 @@ function renderTransactions(transactions) {
   }
 
   tbody.innerHTML = transactions
-    .map(
-      tx => `
+    .map(tx => {
+      // 根据 amount 正负判断增减
+      const isIncrease = tx.amount > 0
+      const displayAmount = Math.abs(tx.amount)
+      return `
     <tr>
-      <td><code>#${tx.tx_id}</code></td>
-      <td><code>${tx.user_id}</code></td>
+      <td><code>#${tx.transaction_id}</code></td>
       <td>
         <span class="badge bg-info">${tx.asset_code}</span>
+        <small class="text-muted">${tx.asset_name || ''}</small>
       </td>
       <td>
-        <span class="badge ${tx.tx_type === 'increase' ? 'bg-success' : 'bg-danger'}">
-          ${getTxTypeLabel(tx.tx_type)}
+        <span class="badge ${isIncrease ? 'bg-success' : 'bg-danger'}">
+          ${isIncrease ? '增加' : '减少'}
         </span>
       </td>
       <td>
-        <span class="${tx.tx_type === 'increase' ? 'tx-increase' : 'tx-decrease'}">
-          ${tx.tx_type === 'increase' ? '+' : '-'}${tx.amount}
+        <span class="${isIncrease ? 'tx-increase' : 'tx-decrease'}">
+          ${isIncrease ? '+' : '-'}${displayAmount}
         </span>
       </td>
       <td>${tx.balance_before}</td>
       <td>${tx.balance_after}</td>
       <td>
-        <span class="badge bg-secondary">${tx.business_type || '-'}</span>
+        <span class="badge bg-secondary">${tx.tx_type || '-'}</span>
       </td>
-      <td><small><code>${tx.business_id || '-'}</code></small></td>
+      <td><small>${tx.reason || '-'}</small></td>
+      <td><small class="text-muted">${tx.operator_name || '-'}</small></td>
       <td>
         <small>${formatDate(tx.created_at)}</small>
       </td>
     </tr>
   `
-    )
+    })
     .join('')
 }
 
@@ -264,8 +281,9 @@ function renderTransactions(transactions) {
  * @param {Array} transactions - 交易记录列表
  */
 function updateStatistics(transactions) {
-  const increaseCount = transactions.filter(tx => tx.tx_type === 'increase').length
-  const decreaseCount = transactions.filter(tx => tx.tx_type === 'decrease').length
+  // 根据金额正负判断增减
+  const increaseCount = transactions.filter(tx => tx.amount > 0).length
+  const decreaseCount = transactions.filter(tx => tx.amount < 0).length
 
   document.getElementById('totalTransactions').textContent = totalRecords
   document.getElementById('increaseCount').textContent = increaseCount

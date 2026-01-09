@@ -1334,29 +1334,29 @@ class AdminLotteryService {
     if (status) {
       const now = new Date()
       switch (status) {
-      case 'active':
-        // 生效中：status='active' 且 未过期（expires_at为null或大于当前时间）
-        where.status = 'active'
-        where[Op.or] = [{ expires_at: null }, { expires_at: { [Op.gt]: now } }]
-        break
-      case 'used':
-        // 已使用
-        where.status = 'used'
-        break
-      case 'expired':
-        // 已过期：status='active' 但 expires_at 已过期
-        where.status = 'active'
-        where.expires_at = { [Op.lte]: now, [Op.ne]: null }
-        break
-      case 'cancelled':
-        // 已取消
-        where.status = 'cancelled'
-        break
-      default:
-        // 不筛选或直接使用传入的状态值
-        if (['active', 'used', 'expired', 'cancelled'].includes(status)) {
-          where.status = status
-        }
+        case 'active':
+          // 生效中：status='active' 且 未过期（expires_at为null或大于当前时间）
+          where.status = 'active'
+          where[Op.or] = [{ expires_at: null }, { expires_at: { [Op.gt]: now } }]
+          break
+        case 'used':
+          // 已使用
+          where.status = 'used'
+          break
+        case 'expired':
+          // 已过期：status='active' 但 expires_at 已过期
+          where.status = 'active'
+          where.expires_at = { [Op.lte]: now, [Op.ne]: null }
+          break
+        case 'cancelled':
+          // 已取消
+          where.status = 'cancelled'
+          break
+        default:
+          // 不筛选或直接使用传入的状态值
+          if (['active', 'used', 'expired', 'cancelled'].includes(status)) {
+            where.status = status
+          }
       }
     }
 
@@ -1405,8 +1405,39 @@ class AdminLotteryService {
       limit
     })
 
+    /*
+     * 🎁 批量查询奖品名称（避免N+1查询）
+     * 收集所有需要查询的 prize_id
+     */
+    const prizeIds = new Set()
+    rows.forEach(item => {
+      const settingData =
+        typeof item.setting_data === 'string'
+          ? JSON.parse(item.setting_data)
+          : item.setting_data || {}
+      if (settingData.prize_id && !settingData.prize_name) {
+        prizeIds.add(settingData.prize_id)
+      }
+    })
+
+    // 批量查询奖品信息
+    const prizeMap = new Map()
+    if (prizeIds.size > 0) {
+      const prizes = await models.LotteryPrize.findAll({
+        where: { prize_id: { [Op.in]: Array.from(prizeIds) } },
+        attributes: ['prize_id', 'prize_name', 'prize_value']
+      })
+      prizes.forEach(prize => {
+        prizeMap.set(prize.prize_id, {
+          prize_id: prize.prize_id,
+          prize_name: prize.prize_name,
+          prize_value: prize.prize_value
+        })
+      })
+    }
+
     return {
-      items: rows.map(item => AdminLotteryService._formatInterventionItem(item)),
+      items: rows.map(item => AdminLotteryService._formatInterventionItem(item, prizeMap)),
       pagination: {
         page: parseInt(page),
         page_size: parseInt(page_size),
@@ -1536,6 +1567,7 @@ class AdminLotteryService {
    *
    * @private
    * @param {Object} item - 数据库记录
+   * @param {Map} prizeMap - 奖品ID到奖品信息的映射（可选，用于批量查询优化）
    * @returns {Object} 格式化后的项
    *
    * 字段映射说明：
@@ -1545,7 +1577,7 @@ class AdminLotteryService {
    * - target_user: 目标用户信息（关联别名）
    * - admin: 操作管理员信息（关联别名）
    */
-  static _formatInterventionItem(item) {
+  static _formatInterventionItem(item, prizeMap = new Map()) {
     const now = new Date()
     const settingData = item.setting_data || {}
 
@@ -1555,26 +1587,44 @@ class AdminLotteryService {
       displayStatus = 'expired' // 业务层显示已过期
     }
 
+    // 🎁 获取奖品信息（优先从 setting_data，其次从 prizeMap 查询）
+    let prizeInfo = null
+    if (settingData.prize_id) {
+      // 如果 setting_data 中已有 prize_name，直接使用
+      if (settingData.prize_name) {
+        prizeInfo = {
+          prize_id: settingData.prize_id,
+          prize_name: settingData.prize_name,
+          prize_value: settingData.prize_value || null
+        }
+      } else if (prizeMap.has(settingData.prize_id)) {
+        // 否则从 prizeMap 查询
+        prizeInfo = prizeMap.get(settingData.prize_id)
+      } else {
+        // 兜底：只有 prize_id
+        prizeInfo = {
+          prize_id: settingData.prize_id,
+          prize_name: null,
+          prize_value: null
+        }
+      }
+    }
+
     return {
       setting_id: item.setting_id,
       user_id: item.user_id,
       // 使用正确的关联别名 target_user
       user_info: item.target_user
         ? {
-          nickname: item.target_user.nickname,
-          mobile: item.target_user.mobile
-        }
+            nickname: item.target_user.nickname,
+            mobile: item.target_user.mobile
+          }
         : null,
       setting_type: item.setting_type,
       // prize_id 存储在 setting_data JSON 中
       prize_id: settingData.prize_id || null,
-      // 奖品信息需要另外查询（暂不关联，从 setting_data 获取）
-      prize_info: settingData.prize_id
-        ? {
-          prize_id: settingData.prize_id,
-          prize_name: settingData.prize_name || null // 部分记录可能已存储奖品名
-        }
-        : null,
+      // 奖品信息（从 setting_data 或 prizeMap 获取）
+      prize_info: prizeInfo,
       // reason 存储在 setting_data JSON 中
       reason: settingData.reason || null,
       // 状态字段
@@ -1584,9 +1634,9 @@ class AdminLotteryService {
       // 操作管理员信息
       operator: item.admin
         ? {
-          user_id: item.admin.user_id,
-          nickname: item.admin.nickname
-        }
+            user_id: item.admin.user_id,
+            nickname: item.admin.nickname
+          }
         : null
     }
   }
@@ -1618,11 +1668,11 @@ class AdminLotteryService {
       // 目标用户信息（使用正确的关联别名 target_user）
       user: setting.target_user
         ? {
-          user_id: setting.target_user.user_id,
-          nickname: setting.target_user.nickname,
-          mobile: setting.target_user.mobile,
-          status: setting.target_user.status
-        }
+            user_id: setting.target_user.user_id,
+            nickname: setting.target_user.nickname,
+            mobile: setting.target_user.mobile,
+            status: setting.target_user.status
+          }
         : null,
       setting_type: setting.setting_type,
       // 设置详情（从 setting_data JSON 提取）
@@ -1638,9 +1688,9 @@ class AdminLotteryService {
       // 操作管理员信息（使用正确的关联别名 admin）
       operator: setting.admin
         ? {
-          user_id: setting.admin.user_id,
-          nickname: setting.admin.nickname
-        }
+            user_id: setting.admin.user_id,
+            nickname: setting.admin.nickname
+          }
         : null,
       created_at: setting.created_at,
       updated_at: setting.updated_at

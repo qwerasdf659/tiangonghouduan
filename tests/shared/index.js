@@ -36,8 +36,11 @@ const { TransactionTestSuite, TransactionHelpers } = require('./transaction.help
 
 // ========== 项目架构特定工具 ==========
 
-// 北京时间测试工具（符合项目UTC+8标准）
-const { BeijingTimeTestSuite } = require('./beijing_time.helper')
+/**
+ * 北京时间测试工具（符合项目UTC+8标准）
+ * 包含 runSimpleTimeTests（从 tests/core/time_helper.test.js 合并）
+ */
+const { BeijingTimeTestSuite, runSimpleTimeTests } = require('./beijing_time.helper')
 
 // 幂等性测试工具（符合项目business_id标准）
 const { IdempotencyTestSuite } = require('./idempotency.helper')
@@ -58,6 +61,7 @@ module.exports = {
 
   // 项目架构特定工具
   BeijingTimeTestSuite,
+  runSimpleTimeTests, // 简单时间测试（从 tests/core/time_helper.test.js 合并）
   IdempotencyTestSuite,
   ServiceTestSuite
 }

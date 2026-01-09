@@ -69,7 +69,7 @@ class DataSanitizer {
    * const publicPrizes = DataSanitizer.sanitizePrizes(prizes, 'public')
    * // 返回：移除敏感字段，使用rarity替代win_probability
    */
-  static sanitizePrizes (prizes, dataLevel) {
+  static sanitizePrizes(prizes, dataLevel) {
     if (dataLevel === 'full') {
       // 管理员看完整数据，但需要转换DECIMAL字段为数字类型（修复前端TypeError）
       return DecimalConverter.convertPrizeData(Array.isArray(prizes) ? prizes : [prizes])
@@ -141,7 +141,7 @@ class DataSanitizer {
    * const publicInventory = DataSanitizer.sanitizeInventory(inventory, 'public')
    * // 返回：verification_code脱敏为'******'，移除verification_expires_at、source_id
    */
-  static sanitizeInventory (inventory, dataLevel) {
+  static sanitizeInventory(inventory, dataLevel) {
     if (dataLevel === 'full') {
       return inventory // 管理员看完整数据
     }
@@ -213,7 +213,7 @@ class DataSanitizer {
    * const publicUser = DataSanitizer.sanitizeUser(user, 'public')
    * // 返回：移除敏感字段，只返回基础信息
    */
-  static sanitizeUser (user, dataLevel) {
+  static sanitizeUser(user, dataLevel) {
     if (dataLevel === 'full') {
       return user // 管理员看完整数据
     }
@@ -258,7 +258,7 @@ class DataSanitizer {
    * const publicPoints = DataSanitizer.sanitizePoints(pointsData, 'public')
    * // 返回：移除敏感字段，只返回基础积分信息
    */
-  static sanitizePoints (pointsData, dataLevel) {
+  static sanitizePoints(pointsData, dataLevel) {
     if (dataLevel === 'full') {
       return pointsData
     }
@@ -299,7 +299,7 @@ class DataSanitizer {
    * const publicStats = DataSanitizer.sanitizeAdminStats(stats, 'public')
    * // 返回：模糊化的基础统计，移除敏感运营数据
    */
-  static sanitizeAdminStats (stats, dataLevel) {
+  static sanitizeAdminStats(stats, dataLevel) {
     if (dataLevel === 'full') {
       return stats // 只有管理员能看到完整统计
     }
@@ -343,7 +343,7 @@ class DataSanitizer {
    * const publicUpload = DataSanitizer.sanitizeUpload(uploadData, 'public')
    * // 返回：移除敏感字段，只返回基础上传信息
    */
-  static sanitizeUpload (uploadData, dataLevel) {
+  static sanitizeUpload(uploadData, dataLevel) {
     if (dataLevel === 'full') {
       return uploadData
     }
@@ -416,7 +416,7 @@ class DataSanitizer {
    * // 普通用户查看脱敏数据
    * const publicSessions = DataSanitizer.sanitizeChatSessions(sessions, 'public')
    */
-  static sanitizeChatSessions (sessions, dataLevel) {
+  static sanitizeChatSessions(sessions, dataLevel) {
     // 管理员权限：返回完整数据（不脱敏）
     if (dataLevel === 'full') {
       return sessions
@@ -467,7 +467,7 @@ class DataSanitizer {
    * const adminAnnouncements = DataSanitizer.sanitizeAnnouncements(announcements, 'full')
    * const publicAnnouncements = DataSanitizer.sanitizeAnnouncements(announcements, 'public')
    */
-  static sanitizeAnnouncements (announcements, dataLevel) {
+  static sanitizeAnnouncements(announcements, dataLevel) {
     if (dataLevel === 'full') {
       return announcements // 管理员看完整数据
     }
@@ -492,9 +492,9 @@ class DataSanitizer {
       view_count: announcement.view_count || 0, // 浏览次数（默认0,防止undefined显示问题）
       creator: announcement.creator
         ? {
-          user_id: announcement.creator.user_id, // 发布者用户ID（用于前端显示和数据追踪）
-          nickname: announcement.creator.nickname // 发布者昵称（用于前端友好显示）
-        }
+            user_id: announcement.creator.user_id, // 发布者用户ID（用于前端显示和数据追踪）
+            nickname: announcement.creator.nickname // 发布者昵称（用于前端友好显示）
+          }
         : null // creator为null时返回null,前端可统一处理为"系统管理员"
 
       /*
@@ -530,7 +530,7 @@ class DataSanitizer {
    * const adminRecords = DataSanitizer.sanitizePointsRecords(records, 'full')
    * const publicRecords = DataSanitizer.sanitizePointsRecords(records, 'public')
    */
-  static sanitizePointsRecords (records, dataLevel) {
+  static sanitizePointsRecords(records, dataLevel) {
     if (dataLevel === 'full') {
       return records // 管理员看完整数据
     }
@@ -581,7 +581,7 @@ class DataSanitizer {
    * const adminProducts = DataSanitizer.sanitizeExchangeProducts(products, 'full')
    * const publicProducts = DataSanitizer.sanitizeExchangeProducts(products, 'public')
    */
-  static sanitizeExchangeProducts (products, dataLevel) {
+  static sanitizeExchangeProducts(products, dataLevel) {
     if (dataLevel === 'full') {
       return products // 管理员看完整数据
     }
@@ -637,7 +637,7 @@ class DataSanitizer {
    * const adminProducts = DataSanitizer.sanitizeMarketProducts(products, 'full')
    * const publicProducts = DataSanitizer.sanitizeMarketProducts(products, 'public')
    */
-  static sanitizeMarketProducts (products, dataLevel) {
+  static sanitizeMarketProducts(products, dataLevel) {
     if (dataLevel === 'full') {
       return products // 管理员看完整数据
     }
@@ -693,7 +693,7 @@ class DataSanitizer {
    * const adminStats = DataSanitizer.sanitizeUserStatistics(statistics, 'full')
    * const publicStats = DataSanitizer.sanitizeUserStatistics(statistics, 'public')
    */
-  static sanitizeUserStatistics (statistics, dataLevel) {
+  static sanitizeUserStatistics(statistics, dataLevel) {
     if (dataLevel === 'full') {
       return statistics // 管理员看完整数据
     }
@@ -771,7 +771,7 @@ class DataSanitizer {
    * const adminFeedbacks = DataSanitizer.sanitizeFeedbacks(feedbacks, 'full')
    * const publicFeedbacks = DataSanitizer.sanitizeFeedbacks(feedbacks, 'public')
    */
-  static sanitizeFeedbacks (feedbacks, dataLevel) {
+  static sanitizeFeedbacks(feedbacks, dataLevel) {
     if (dataLevel === 'full') {
       return feedbacks // 管理员看完整数据（包含所有字段）
     }
@@ -789,11 +789,11 @@ class DataSanitizer {
       attachments: feedback.attachments, // ✅ 新增：附件URLs（JSON数组，用户自己上传的，可见）
       reply: feedback.reply_content
         ? {
-          // ✅ 回复信息（如果管理员已回复）
-          content: feedback.reply_content, // 回复内容（TEXT）
-          replied_at: feedback.replied_at, // 回复时间（DATETIME，北京时间）
-          admin_name: this.maskAdminName(feedback.admin?.nickname || '系统管理员') // 管理员名字脱敏（如"张**"）
-        }
+            // ✅ 回复信息（如果管理员已回复）
+            content: feedback.reply_content, // 回复内容（TEXT）
+            replied_at: feedback.replied_at, // 回复时间（DATETIME，北京时间）
+            admin_name: this.maskAdminName(feedback.admin?.nickname || '系统管理员') // 管理员名字脱敏（如"张**"）
+          }
         : null
       /*
        * ❌ 移除敏感字段（用户不可见，仅管理员可见）：
@@ -835,7 +835,7 @@ class DataSanitizer {
    * const adminRecords = DataSanitizer.sanitizeTransactionRecords(records, 'full')
    * const publicRecords = DataSanitizer.sanitizeTransactionRecords(records, 'public')
    */
-  static sanitizeTransactionRecords (records, dataLevel) {
+  static sanitizeTransactionRecords(records, dataLevel) {
     if (dataLevel === 'full') {
       return records // 管理员看完整数据
     }
@@ -874,7 +874,7 @@ class DataSanitizer {
    * const publicOverview = DataSanitizer.sanitizeSystemOverview(overview, 'public')
    * // 返回：{ error: 'Access denied', message: '权限不足，无法查看系统概览' }
    */
-  static sanitizeSystemOverview (overview, dataLevel) {
+  static sanitizeSystemOverview(overview, dataLevel) {
     if (dataLevel !== 'full') {
       // 普通用户无权查看系统概览
       return {
@@ -912,7 +912,7 @@ class DataSanitizer {
    * const publicStats = DataSanitizer.sanitizeAdminTodayStats(stats, 'public')
    * // 返回：{ error: 'Access denied', message: '权限不足，无法查看今日统计数据' }
    */
-  static sanitizeAdminTodayStats (stats, dataLevel) {
+  static sanitizeAdminTodayStats(stats, dataLevel) {
     if (dataLevel !== 'full') {
       // 非管理员无权查看今日统计
       return {
@@ -958,7 +958,7 @@ class DataSanitizer {
    * const publicMessage = DataSanitizer.sanitizeWebSocketMessage(message, 'public')
    * // 返回：移除敏感字段，只返回基础消息内容
    */
-  static sanitizeWebSocketMessage (message, dataLevel) {
+  static sanitizeWebSocketMessage(message, dataLevel) {
     if (dataLevel === 'full') {
       return message
     }
@@ -998,7 +998,7 @@ class DataSanitizer {
    * const sanitized = DataSanitizer.sanitizeLogs({ win_probability: 0.05, cost_points: 100 })
    * // 返回：脱敏后的JSON字符串
    */
-  static sanitizeLogs (logData) {
+  static sanitizeLogs(logData) {
     if (typeof logData !== 'string') {
       logData = JSON.stringify(logData)
     }
@@ -1030,7 +1030,7 @@ class DataSanitizer {
    * const icon = DataSanitizer.getPrizeIcon('points') // 返回：'🪙'
    * const icon = DataSanitizer.getPrizeIcon('physical') // 返回：'🎁'
    */
-  static getPrizeIcon (prizeType) {
+  static getPrizeIcon(prizeType) {
     const icons = {
       points: '🪙',
       physical: '🎁',
@@ -1059,7 +1059,7 @@ class DataSanitizer {
    * const rarity = DataSanitizer.calculateRarity('points') // 返回：'common'
    * const rarity = DataSanitizer.calculateRarity('special') // 返回：'legendary'
    */
-  static calculateRarity (prizeType) {
+  static calculateRarity(prizeType) {
     const rarity = {
       points: 'common',
       voucher: 'uncommon',
@@ -1087,7 +1087,7 @@ class DataSanitizer {
    * const display = DataSanitizer.getDisplayValue(500) // 返回：'中价值'
    * const display = DataSanitizer.getDisplayValue(50) // 返回：'基础价值'
    */
-  static getDisplayValue (value) {
+  static getDisplayValue(value) {
     if (typeof value === 'number') {
       if (value > 1000) return '高价值'
       if (value > 100) return '中价值'
@@ -1114,7 +1114,7 @@ class DataSanitizer {
    * const display = DataSanitizer.getSourceDisplay('lottery') // 返回：'抽奖获得'
    * const display = DataSanitizer.getSourceDisplay('exchange') // 返回：'兑换获得'
    */
-  static getSourceDisplay (method) {
+  static getSourceDisplay(method) {
     const displays = {
       lottery: '抽奖获得',
       exchange: '兑换获得',
@@ -1139,7 +1139,7 @@ class DataSanitizer {
    * const soon = DataSanitizer.checkExpiringSoon('2025-11-05') // 如果今天是2025-10-31，返回：true
    * const soon = DataSanitizer.checkExpiringSoon(null) // 返回：false
    */
-  static checkExpiringSoon (expiresAt) {
+  static checkExpiringSoon(expiresAt) {
     if (!expiresAt) return false
     const now = BeijingTimeHelper.createBeijingTime()
     const expiry = new Date(expiresAt)
@@ -1165,7 +1165,7 @@ class DataSanitizer {
    * const publicSource = DataSanitizer.getPublicSource('lottery_win') // 返回：'抽奖获得'
    * const publicSource = DataSanitizer.getPublicSource('exchange') // 返回：'商品兑换'
    */
-  static getPublicSource (source) {
+  static getPublicSource(source) {
     const publicSources = {
       lottery_win: '抽奖获得',
       exchange: '商品兑换',
@@ -1196,7 +1196,7 @@ class DataSanitizer {
    * const masked = DataSanitizer.maskUserName('张三丰') // 返回：'张*丰'
    * const masked = DataSanitizer.maskUserName(null) // 返回：'匿名用户'
    */
-  static maskUserName (user_name) {
+  static maskUserName(user_name) {
     if (!user_name) return '匿名用户'
     if (user_name.length <= 2) return user_name
     const first = user_name.charAt(0)
@@ -1223,7 +1223,7 @@ class DataSanitizer {
    * const masked = DataSanitizer.maskAdminName(null) // 返回：'客服'
    * const masked = DataSanitizer.maskAdminName('管理员A') // 返回：'客服A'
    */
-  static maskAdminName (adminName) {
+  static maskAdminName(adminName) {
     if (!adminName) return '客服'
     return '客服' + adminName.slice(-1)
   }
@@ -1235,13 +1235,13 @@ class DataSanitizer {
    *
    * 脱敏规则：
    * - 管理员（dataLevel='full'）：返回完整商品数据
-   * - 普通用户（dataLevel='public'）：移除cost_price（成本价）、total_exchange_count（销量统计）等敏感字段
+   * - 普通用户（dataLevel='public'）：移除cost_price（成本价）、sold_count（销量统计）等敏感字段
    *
    * @param {Array<Object>} items - 商品数据数组
    * @param {string} dataLevel - 数据级别：'full'（管理员）或'public'（普通用户）
    * @returns {Array<Object>} 脱敏后的商品数组
    */
-  static sanitizeExchangeMarketItems (items, dataLevel) {
+  static sanitizeExchangeMarketItems(items, dataLevel) {
     // V4.5.0: 材料资产支付 - 统一数据格式
     const sanitized = items.map(item => ({
       id: item.item_id || item.id,
@@ -1254,10 +1254,13 @@ class DataSanitizer {
       status: item.status,
       sort_order: item.sort_order,
       created_at: item.created_at,
-      // 管理员额外字段
+      /*
+       * 管理员额外字段
+       * 🔧 2026-01-09 修复：字段名匹配数据库模型（sold_count，不是 total_exchange_count）
+       */
       ...(dataLevel === 'full' && {
         cost_price: item.cost_price,
-        total_exchange_count: item.total_exchange_count
+        sold_count: item.sold_count
       })
     }))
 
@@ -1271,7 +1274,7 @@ class DataSanitizer {
    * @param {string} dataLevel - 数据级别：'full'（管理员）或'public'（普通用户）
    * @returns {Object} 脱敏后的商品数据
    */
-  static sanitizeExchangeMarketItem (item, dataLevel) {
+  static sanitizeExchangeMarketItem(item, dataLevel) {
     const items = this.sanitizeExchangeMarketItems([item], dataLevel)
     return items[0]
   }
@@ -1289,7 +1292,7 @@ class DataSanitizer {
    * @param {string} _dataLevel - 数据级别：'full'（管理员）或'public'（普通用户）（未使用，保留以保持接口一致性）
    * @returns {Array<Object>} 脱敏后的订单数组
    */
-  static sanitizeExchangeMarketOrders (orders, _dataLevel) {
+  static sanitizeExchangeMarketOrders(orders, _dataLevel) {
     // V4.5.0: 材料资产支付 - 统一数据格式
 
     // 普通用户数据脱敏（V4.5.0 材料资产支付）
@@ -1320,7 +1323,7 @@ class DataSanitizer {
    * @param {string} dataLevel - 数据级别：'full'（管理员）或'public'（普通用户）
    * @returns {Object} 脱敏后的订单数据
    */
-  static sanitizeExchangeMarketOrder (order, dataLevel) {
+  static sanitizeExchangeMarketOrder(order, dataLevel) {
     const orders = this.sanitizeExchangeMarketOrders([order], dataLevel)
     return orders[0]
   }

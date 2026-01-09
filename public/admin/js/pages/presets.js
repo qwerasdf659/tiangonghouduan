@@ -10,7 +10,7 @@
  * - Bootstrap 5（模态框、样式组件）
  */
 
-/* global apiRequest, getToken, getCurrentUser, logout, showLoading, checkAdminPermission, formatDate */
+/* global apiRequest, getToken, getCurrentUser, logout, checkAdminPermission, formatDate */
 /* global showSuccessToast, showErrorToast, showWarningToast, showInfoToast */
 /* global bootstrap */
 
@@ -29,9 +29,17 @@ document.addEventListener('DOMContentLoaded', function () {
     document.getElementById('welcomeText').textContent = `欢迎，${userInfo.nickname}`
   }
 
-  // 事件监听器
+  // 事件监听器 - 使用addEventListener替代内联onclick（CSP安全）
   document.getElementById('logoutBtn').addEventListener('click', logout)
   document.getElementById('prizeSelect').addEventListener('change', updatePrizePreview)
+
+  // 🔴 CSP修复：移除内联onclick，改用事件监听器
+  document.getElementById('searchFilterBtn').addEventListener('click', loadInterventions)
+  document.getElementById('searchUserBtn').addEventListener('click', searchUser)
+  document.getElementById('createInterventionBtn').addEventListener('click', createIntervention)
+
+  // 使用事件委托处理动态生成的按钮
+  document.getElementById('interventionTableBody').addEventListener('click', handleTableButtonClick)
 
   // Token和权限验证
   if (!getToken() || !checkAdminPermission()) {
@@ -42,6 +50,24 @@ document.addEventListener('DOMContentLoaded', function () {
   loadPrizes()
   loadInterventions()
 })
+
+/**
+ * 处理表格中动态按钮的点击事件（事件委托）
+ * @param {Event} e - 点击事件
+ */
+function handleTableButtonClick(e) {
+  const btn = e.target.closest('button')
+  if (!btn) return
+
+  const action = btn.dataset.action
+  const id = btn.dataset.id
+
+  if (action === 'view') {
+    viewIntervention(id)
+  } else if (action === 'cancel') {
+    cancelIntervention(id)
+  }
+}
 
 /**
  * 加载奖品列表
@@ -147,20 +173,22 @@ async function searchUser() {
     )
 
     if (response && response.success) {
-      const users = response.data?.list || response.data || []
+      // ✅ 直接使用后端返回的字段名 users（而不是做复杂映射）
+      const users = response.data?.users || []
 
       if (users.length === 0) {
         resultDiv.innerHTML = '<div class="alert alert-warning py-2 mb-0">未找到匹配的用户</div>'
         return
       }
 
+      // 🔴 CSP修复：使用data属性替代onclick
       resultDiv.innerHTML = `
         <div class="list-group">
           ${users
             .map(
               user => `
-            <a href="javascript:void(0)" class="list-group-item list-group-item-action" 
-               onclick="selectUser(${user.user_id}, '${user.nickname || ''}', '${user.mobile || ''}')">
+            <a href="javascript:void(0)" class="list-group-item list-group-item-action user-select-item" 
+               data-userid="${user.user_id}" data-nickname="${user.nickname || ''}" data-mobile="${user.mobile || ''}">
               <div class="d-flex justify-content-between align-items-center">
                 <div>
                   <strong>${user.nickname || '未设置昵称'}</strong>
@@ -174,6 +202,16 @@ async function searchUser() {
             .join('')}
         </div>
       `
+
+      // 添加用户选择事件监听器
+      resultDiv.querySelectorAll('.user-select-item').forEach(item => {
+        item.addEventListener('click', function () {
+          const userId = this.dataset.userid
+          const nickname = this.dataset.nickname
+          const mobile = this.dataset.mobile
+          selectUser(userId, nickname, mobile)
+        })
+      })
     }
   } catch (error) {
     console.error('搜索用户失败:', error)
@@ -242,29 +280,34 @@ async function loadInterventions() {
       // 字段映射对齐后端API返回格式：
       // setting_id, user_info.nickname, user_info.mobile, prize_info?.prize_name,
       // prize_info?.prize_value, expires_at, operator?.nickname
+      // 🔴 CSP修复：使用data属性替代onclick，配合事件委托处理
+      // ✅ 规则ID人性化显示：把机器ID翻译成人话
       tbody.innerHTML = interventions
         .map(
-          item => `
+          (item, index) => `
         <tr>
-          <td><code>${item.setting_id || ''}</code></td>
+          <td>
+            <span class="fw-semibold text-primary">${formatRuleId(item, index + (currentPage - 1) * pageSize)}</span>
+            <br><small class="text-muted" title="${item.setting_id}">${(item.setting_id || '').substring(0, 12)}...</small>
+          </td>
           <td>
             <strong>${item.user_info?.nickname || '未知'}</strong>
             <br><small class="text-muted">${item.user_info?.mobile || 'ID:' + item.user_id}</small>
           </td>
-          <td>${item.prize_info?.prize_name || item.setting_type || '概率调整'}</td>
-          <td class="text-success fw-bold">${item.prize_info ? '¥' + (item.prize_info.prize_value || 0).toFixed(2) : '-'}</td>
+          <td>${item.prize_info?.prize_name || getSettingTypeLabel(item.setting_type)}</td>
+          <td class="text-success fw-bold">${item.prize_info ? '¥' + parseFloat(item.prize_info.prize_value || 0).toFixed(2) : '-'}</td>
           <td>${getStatusBadge(item.status)}</td>
           <td><small>${formatDate(item.created_at)}</small></td>
           <td><small>${item.expires_at ? formatDate(item.expires_at) : '永不过期'}</small></td>
           <td>${item.operator?.nickname || '系统'}</td>
           <td>
-            <button class="btn btn-sm btn-outline-primary me-1" onclick="viewIntervention('${item.setting_id}')">
+            <button class="btn btn-sm btn-outline-primary me-1" data-action="view" data-id="${item.setting_id}">
               <i class="bi bi-eye"></i>
             </button>
             ${
               item.status === 'active'
                 ? `
-              <button class="btn btn-sm btn-outline-danger" onclick="cancelIntervention('${item.setting_id}')">
+              <button class="btn btn-sm btn-outline-danger" data-action="cancel" data-id="${item.setting_id}">
                 <i class="bi bi-x"></i>
               </button>
             `
@@ -319,16 +362,17 @@ function renderPagination(total) {
     return
   }
 
+  // 🔴 CSP修复：使用data-page属性替代onclick
   let html = ''
 
   if (currentPage > 1) {
-    html += `<li class="page-item"><a class="page-link" href="javascript:void(0)" onclick="goToPage(${currentPage - 1})">上一页</a></li>`
+    html += `<li class="page-item"><a class="page-link" href="javascript:void(0)" data-page="${currentPage - 1}">上一页</a></li>`
   }
 
   for (let i = 1; i <= totalPages; i++) {
     if (i === 1 || i === totalPages || (i >= currentPage - 2 && i <= currentPage + 2)) {
       html += `<li class="page-item ${i === currentPage ? 'active' : ''}">
-        <a class="page-link" href="javascript:void(0)" onclick="goToPage(${i})">${i}</a>
+        <a class="page-link" href="javascript:void(0)" data-page="${i}">${i}</a>
       </li>`
     } else if (i === currentPage - 3 || i === currentPage + 3) {
       html += `<li class="page-item disabled"><span class="page-link">...</span></li>`
@@ -336,10 +380,19 @@ function renderPagination(total) {
   }
 
   if (currentPage < totalPages) {
-    html += `<li class="page-item"><a class="page-link" href="javascript:void(0)" onclick="goToPage(${currentPage + 1})">下一页</a></li>`
+    html += `<li class="page-item"><a class="page-link" href="javascript:void(0)" data-page="${currentPage + 1}">下一页</a></li>`
   }
 
   pagination.innerHTML = html
+
+  // 添加事件监听器
+  pagination.querySelectorAll('[data-page]').forEach(link => {
+    link.addEventListener('click', function (e) {
+      e.preventDefault()
+      const page = parseInt(this.dataset.page)
+      if (page) goToPage(page)
+    })
+  })
 }
 
 /**
@@ -438,10 +491,15 @@ async function viewIntervention(id) {
       const item = response.data
 
       // 字段映射对齐后端API：setting_id, user.nickname, user.mobile, prize_name, reason, expires_at, operator
+      // ✅ 规则ID人性化显示
+      const friendlyId = `${getSettingTypeLabel(item.setting_type)} - ${item.user?.nickname || '用户' + item.user?.user_id}`
       document.getElementById('viewInterventionBody').innerHTML = `
         <div class="mb-3">
-          <label class="form-label text-muted">规则ID</label>
-          <div><code>${item.setting_id || ''}</code></div>
+          <label class="form-label text-muted">规则标识</label>
+          <div>
+            <span class="fw-bold text-primary">${friendlyId}</span>
+            <br><small class="text-muted">技术ID: ${item.setting_id || ''}</small>
+          </div>
         </div>
         <div class="mb-3">
           <label class="form-label text-muted">目标用户</label>
@@ -512,6 +570,33 @@ function getSettingTypeLabel(type) {
 }
 
 /**
+ * 生成人类可读的规则ID显示
+ * @param {Object} item - 干预规则数据
+ * @param {number} index - 列表中的序号（从0开始）
+ * @returns {string} 人类可读的规则标识
+ *
+ * @example
+ * // 输入: { setting_type: 'force_win', user_info: { nickname: '张三' }, created_at: '2026-01-09 10:55:11' }
+ * // 输出: '#1 强制中奖 - 张三'
+ */
+function formatRuleId(item, index) {
+  // 类型简称映射
+  const typeShort = {
+    force_win: '强制中奖',
+    force_lose: '禁止中奖',
+    probability_adjust: '概率调整',
+    user_queue: '队列设置',
+    blacklist: '黑名单'
+  }
+
+  const typeName = typeShort[item.setting_type] || '规则'
+  const userName = item.user_info?.nickname || '用户' + item.user_id
+
+  // 格式：#序号 类型 - 用户名
+  return `#${index + 1} ${typeName} - ${userName}`
+}
+
+/**
  * 取消干预规则
  * @param {string} id - 干预规则ID
  */
@@ -541,5 +626,16 @@ async function cancelIntervention(id) {
     showErrorToast('取消失败：' + error.message)
   } finally {
     showLoading(false)
+  }
+}
+
+/**
+ * 显示/隐藏加载状态
+ * @param {boolean} show - 是否显示加载状态
+ */
+function showLoading(show) {
+  const loadingOverlay = document.getElementById('loadingOverlay')
+  if (loadingOverlay) {
+    loadingOverlay.style.display = show ? 'flex' : 'none'
   }
 }

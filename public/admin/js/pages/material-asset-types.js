@@ -94,7 +94,8 @@ async function loadAssetTypes() {
     const response = await apiRequest('/api/v4/console/material/asset-types')
 
     if (response && response.success) {
-      currentAssetTypes = response.data || []
+      // 后端返回格式: { asset_types: [...] }
+      currentAssetTypes = response.data?.asset_types || []
       renderAssetTypes(currentAssetTypes)
       updateStatistics(currentAssetTypes)
     } else {

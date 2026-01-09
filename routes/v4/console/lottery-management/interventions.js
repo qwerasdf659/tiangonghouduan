@@ -84,8 +84,11 @@ router.get(
       // 通过 ServiceManager 获取 AdminLotteryService（路由层规范）
       const AdminLotteryService = req.app.locals.services.getService('admin_lottery')
 
-      // 调用 Service 层方法获取干预规则详情
-      const intervention = await AdminLotteryService.getInterventionById(parseInt(id))
+      /*
+       * 调用 Service 层方法获取干预规则详情
+       * 注意：setting_id 是字符串格式（如 setting_xxx），不需要 parseInt
+       */
+      const intervention = await AdminLotteryService.getInterventionById(id)
 
       return res.apiSuccess(intervention, '干预规则详情查询成功')
     } catch (error) {
@@ -120,10 +123,13 @@ router.post(
       // 通过 ServiceManager 获取 AdminLotteryService（路由层规范）
       const AdminLotteryService = req.app.locals.services.getService('admin_lottery')
 
-      // 使用 TransactionManager 统一管理事务（事务边界治理）
+      /*
+       * 使用 TransactionManager 统一管理事务（事务边界治理）
+       * 注意：setting_id 是字符串格式（如 setting_xxx），不需要 parseInt
+       */
       const result = await TransactionManager.execute(
         async transaction => {
-          return await AdminLotteryService.cancelIntervention(parseInt(id), {
+          return await AdminLotteryService.cancelIntervention(id, {
             reason,
             operated_by: req.user?.user_id,
             transaction

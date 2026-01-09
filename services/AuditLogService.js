@@ -1176,13 +1176,7 @@ class AuditLogService {
       }
 
       // 并行执行所有统计查询
-      const [
-        total,
-        todayCount,
-        weekCount,
-        byType,
-        byAction
-      ] = await Promise.all([
+      const [total, todayCount, weekCount, byType, byAction] = await Promise.all([
         // 总数（带日期范围）
         AdminOperationLog.count({ where: rangeWhere }),
 
@@ -1223,9 +1217,11 @@ class AuditLogService {
         })
       ])
 
-      // 从action统计中计算成功/失败（审计日志本身都是成功记录的操作）
-      // 按照审计日志的设计，所有记录都是成功的操作记录，失败操作不会被记录
-      // 这里将所有操作视为成功操作
+      /*
+       * 从action统计中计算成功/失败（审计日志本身都是成功记录的操作）
+       * 按照审计日志的设计，所有记录都是成功的操作记录，失败操作不会被记录
+       * 这里将所有操作视为成功操作
+       */
       const successCount = total
       const failedCount = 0
 
@@ -1234,8 +1230,8 @@ class AuditLogService {
         total,
         today_count: todayCount,
         week_count: weekCount,
-        success_count: successCount,  // 审计日志都是成功的操作记录
-        failed_count: failedCount,    // 失败操作不会被记录到审计日志
+        success_count: successCount, // 审计日志都是成功的操作记录
+        failed_count: failedCount, // 失败操作不会被记录到审计日志
 
         // 详细统计（图表或详细分析用）
         by_operation_type: byType.map(item => ({

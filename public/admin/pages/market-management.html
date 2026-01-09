@@ -1,0 +1,686 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>市场交易管理 - 管理后台</title>
+
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+  <link href="/admin/css/common.css" rel="stylesheet">
+
+  <style>
+    .nav-pills .nav-link {
+      border-radius: 0.5rem;
+      padding: 0.75rem 1.5rem;
+      font-weight: 500;
+      color: #495057;
+      background-color: #f8f9fa;
+      margin-right: 0.5rem;
+    }
+    .nav-pills .nav-link.active {
+      background-color: var(--bs-primary);
+      color: white;
+    }
+    .nav-pills .nav-link:hover:not(.active) {
+      background-color: #e9ecef;
+    }
+    .tab-pane {
+      padding-top: 1.5rem;
+    }
+    .loading-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0,0,0,0.5);
+      display: none;
+      justify-content: center;
+      align-items: center;
+      z-index: 9999;
+    }
+    .loading-overlay.show {
+      display: flex;
+    }
+    .item-image {
+      width: 50px;
+      height: 50px;
+      object-fit: cover;
+      border-radius: 0.25rem;
+    }
+    .stock-warning {
+      animation: pulse 1s infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+  </style>
+</head>
+<body class="bg-light">
+  <!-- 顶部导航 -->
+  <nav class="navbar navbar-dark bg-primary">
+    <div class="container-fluid">
+      <a href="/admin/dashboard.html" class="navbar-brand">
+        <i class="bi bi-arrow-left me-2"></i>🛒 市场交易管理
+      </a>
+      <div>
+        <span class="text-light me-3" id="welcomeText">欢迎，管理员</span>
+        <button class="btn btn-outline-light btn-sm" id="logoutBtn">退出登录</button>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container-fluid mt-4">
+    <!-- 功能模块选择 -->
+    <div class="card mb-4">
+      <div class="card-body">
+        <h5 class="card-title mb-3">
+          <i class="bi bi-grid-3x3-gap"></i> 选择功能模块
+        </h5>
+        <ul class="nav nav-pills" id="moduleTabs" role="tablist">
+          <li class="nav-item" role="presentation">
+            <button class="nav-link active" id="items-tab" data-bs-toggle="pill" data-bs-target="#items-panel" type="button">
+              <i class="bi bi-box-seam me-1"></i> 商品管理
+            </button>
+          </li>
+          <li class="nav-item" role="presentation">
+            <button class="nav-link" id="orders-tab" data-bs-toggle="pill" data-bs-target="#orders-panel" type="button">
+              <i class="bi bi-receipt me-1"></i> 兑换订单
+            </button>
+          </li>
+          <li class="nav-item" role="presentation">
+            <button class="nav-link" id="trade-tab" data-bs-toggle="pill" data-bs-target="#trade-panel" type="button">
+              <i class="bi bi-arrow-left-right me-1"></i> 交易订单
+            </button>
+          </li>
+          <li class="nav-item" role="presentation">
+            <button class="nav-link" id="stats-tab" data-bs-toggle="pill" data-bs-target="#stats-panel" type="button">
+              <i class="bi bi-bar-chart me-1"></i> 统计分析
+            </button>
+          </li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- 内容面板 -->
+    <div class="tab-content" id="moduleContent">
+      <!-- ==================== 商品管理面板 ==================== -->
+      <div class="tab-pane fade show active" id="items-panel" role="tabpanel">
+        <!-- 操作区域 -->
+        <div class="card mb-3">
+          <div class="card-body">
+            <div class="d-flex justify-content-between align-items-center">
+              <div>
+                <h5 class="mb-0"><i class="bi bi-box-seam"></i> 兑换商品管理</h5>
+                <small class="text-muted">管理用户可兑换的官方商品</small>
+              </div>
+              <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addItemModal">
+                <i class="bi bi-plus-lg"></i> 添加商品
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 统计信息 -->
+        <div class="row g-3 mb-3">
+          <div class="col-md-3">
+            <div class="card"><div class="card-body text-center">
+              <h6 class="text-muted">商品总数</h6>
+              <h3 class="text-primary" id="stat_items_total">-</h3>
+            </div></div>
+          </div>
+          <div class="col-md-3">
+            <div class="card border-success"><div class="card-body text-center">
+              <h6 class="text-muted">上架商品</h6>
+              <h3 class="text-success" id="stat_items_active">-</h3>
+            </div></div>
+          </div>
+          <div class="col-md-3">
+            <div class="card border-warning"><div class="card-body text-center">
+              <h6 class="text-muted">库存预警</h6>
+              <h3 class="text-warning" id="stat_items_lowStock">-</h3>
+            </div></div>
+          </div>
+          <div class="col-md-3">
+            <div class="card border-info"><div class="card-body text-center">
+              <h6 class="text-muted">总兑换次数</h6>
+              <h3 class="text-info" id="stat_items_exchanges">-</h3>
+            </div></div>
+          </div>
+        </div>
+
+        <!-- 筛选区域 -->
+        <div class="card mb-3">
+          <div class="card-body">
+            <form id="itemFilterForm" class="row g-3">
+              <div class="col-md-3">
+                <label class="form-label">状态筛选</label>
+                <select class="form-select" id="filterItemStatus">
+                  <option value="">全部状态</option>
+                  <option value="active">上架</option>
+                  <option value="inactive">下架</option>
+                </select>
+              </div>
+              <div class="col-md-3">
+                <label class="form-label">搜索商品</label>
+                <input type="text" class="form-control" id="filterItemKeyword" placeholder="商品名称">
+              </div>
+              <div class="col-md-3 d-flex align-items-end gap-2">
+                <button type="submit" class="btn btn-primary flex-fill">
+                  <i class="bi bi-search"></i> 查询
+                </button>
+                <button type="button" class="btn btn-secondary" id="resetItemFilterBtn">
+                  <i class="bi bi-arrow-counterclockwise"></i>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+
+        <!-- 商品表格 -->
+        <div class="card">
+          <div class="card-body">
+            <div class="table-responsive">
+              <table class="table table-hover align-middle">
+                <thead class="table-light">
+                  <tr>
+                    <th>ID</th>
+                    <th>商品信息</th>
+                    <th>兑换价格</th>
+                    <th>库存</th>
+                    <th>已兑换</th>
+                    <th>状态</th>
+                    <th>创建时间</th>
+                    <th style="width: 180px;">操作</th>
+                  </tr>
+                </thead>
+                <tbody id="itemsTableBody">
+                  <tr><td colspan="8" class="text-center py-5">
+                    <div class="spinner-border text-primary"></div>
+                    <p class="mt-2 text-muted">正在加载数据...</p>
+                  </td></tr>
+                </tbody>
+              </table>
+            </div>
+            <nav class="mt-3">
+              <ul class="pagination justify-content-end mb-0" id="itemsPagination"></ul>
+            </nav>
+          </div>
+        </div>
+      </div>
+
+      <!-- ==================== 兑换订单面板 ==================== -->
+      <div class="tab-pane fade" id="orders-panel" role="tabpanel">
+        <!-- 统计信息 -->
+        <div class="row g-3 mb-3">
+          <div class="col-md-3">
+            <div class="card"><div class="card-body text-center">
+              <h6 class="text-muted">订单总数</h6>
+              <h3 class="text-primary" id="stat_orders_total">-</h3>
+            </div></div>
+          </div>
+          <div class="col-md-3">
+            <div class="card border-warning"><div class="card-body text-center">
+              <h6 class="text-muted">待处理</h6>
+              <h3 class="text-warning" id="stat_orders_pending">-</h3>
+            </div></div>
+          </div>
+          <div class="col-md-3">
+            <div class="card border-success"><div class="card-body text-center">
+              <h6 class="text-muted">已发货</h6>
+              <h3 class="text-success" id="stat_orders_shipped">-</h3>
+            </div></div>
+          </div>
+          <div class="col-md-3">
+            <div class="card border-secondary"><div class="card-body text-center">
+              <h6 class="text-muted">已取消</h6>
+              <h3 class="text-secondary" id="stat_orders_cancelled">-</h3>
+            </div></div>
+          </div>
+        </div>
+
+        <!-- 筛选区域 -->
+        <div class="card mb-3">
+          <div class="card-body">
+            <form id="orderFilterForm" class="row g-3">
+              <div class="col-md-3">
+                <label class="form-label">订单状态</label>
+                <select class="form-select" id="filterOrderStatus">
+                  <option value="">全部状态</option>
+                  <option value="pending">待处理</option>
+                  <option value="completed">已完成</option>
+                  <option value="shipped">已发货</option>
+                  <option value="cancelled">已取消</option>
+                </select>
+              </div>
+              <div class="col-md-3">
+                <label class="form-label">搜索订单号</label>
+                <input type="text" class="form-control" id="filterOrderNo" placeholder="输入订单号">
+              </div>
+              <div class="col-md-3 d-flex align-items-end gap-2">
+                <button type="submit" class="btn btn-primary flex-fill">
+                  <i class="bi bi-search"></i> 查询
+                </button>
+                <button type="button" class="btn btn-secondary" id="resetOrderFilterBtn">
+                  <i class="bi bi-arrow-counterclockwise"></i>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+
+        <!-- 订单表格 -->
+        <div class="card">
+          <div class="card-body">
+            <div class="table-responsive">
+              <table class="table table-hover align-middle">
+                <thead class="table-light">
+                  <tr>
+                    <th>订单号</th>
+                    <th>用户</th>
+                    <th>商品信息</th>
+                    <th>数量</th>
+                    <th>支付方式</th>
+                    <th>支付金额</th>
+                    <th>状态</th>
+                    <th>兑换时间</th>
+                    <th style="width: 180px;">操作</th>
+                  </tr>
+                </thead>
+                <tbody id="ordersTableBody">
+                  <tr><td colspan="9" class="text-center py-5">
+                    <div class="spinner-border text-primary"></div>
+                    <p class="mt-2 text-muted">正在加载数据...</p>
+                  </td></tr>
+                </tbody>
+              </table>
+            </div>
+            <nav class="mt-3">
+              <ul class="pagination justify-content-end mb-0" id="ordersPagination"></ul>
+            </nav>
+          </div>
+        </div>
+      </div>
+
+      <!-- ==================== 交易订单面板 ==================== -->
+      <div class="tab-pane fade" id="trade-panel" role="tabpanel">
+        <!-- 统计信息 -->
+        <div class="row g-3 mb-3">
+          <div class="col-md-4">
+            <div class="card"><div class="card-body text-center">
+              <h6 class="text-muted">交易订单总数</h6>
+              <h3 class="text-primary" id="stat_trade_total">-</h3>
+            </div></div>
+          </div>
+          <div class="col-md-4">
+            <div class="card border-warning"><div class="card-body text-center">
+              <h6 class="text-muted">进行中</h6>
+              <h3 class="text-warning" id="stat_trade_pending">-</h3>
+            </div></div>
+          </div>
+          <div class="col-md-4">
+            <div class="card border-success"><div class="card-body text-center">
+              <h6 class="text-muted">已完成</h6>
+              <h3 class="text-success" id="stat_trade_completed">-</h3>
+            </div></div>
+          </div>
+        </div>
+
+        <!-- 筛选区域 -->
+        <div class="card mb-3">
+          <div class="card-body">
+            <form id="tradeFilterForm" class="row g-3">
+              <div class="col-md-2">
+                <label class="form-label">订单状态</label>
+                <select class="form-select" id="filterTradeStatus">
+                  <option value="">全部状态</option>
+                  <option value="pending">进行中</option>
+                  <option value="completed">已完成</option>
+                  <option value="cancelled">已取消</option>
+                </select>
+              </div>
+              <div class="col-md-2">
+                <label class="form-label">卖家ID</label>
+                <input type="number" class="form-control" id="filterTradeSellerId" placeholder="卖家ID">
+              </div>
+              <div class="col-md-2">
+                <label class="form-label">买家ID</label>
+                <input type="number" class="form-control" id="filterTradeBuyerId" placeholder="买家ID">
+              </div>
+              <div class="col-md-3">
+                <label class="form-label">订单号</label>
+                <input type="text" class="form-control" id="filterTradeOrderNo" placeholder="搜索订单号">
+              </div>
+              <div class="col-md-3 d-flex align-items-end gap-2">
+                <button type="submit" class="btn btn-primary flex-fill">
+                  <i class="bi bi-search"></i> 查询
+                </button>
+                <button type="button" class="btn btn-secondary" id="resetTradeFilterBtn">
+                  <i class="bi bi-arrow-counterclockwise"></i>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+
+        <!-- 交易表格 -->
+        <div class="card">
+          <div class="card-body">
+            <div class="table-responsive">
+              <table class="table table-hover align-middle">
+                <thead class="table-light">
+                  <tr>
+                    <th>订单号</th>
+                    <th>卖家</th>
+                    <th>买家</th>
+                    <th>商品</th>
+                    <th>价格</th>
+                    <th>状态</th>
+                    <th>创建时间</th>
+                    <th>操作</th>
+                  </tr>
+                </thead>
+                <tbody id="tradeOrdersTableBody">
+                  <tr><td colspan="8" class="text-center py-5">
+                    <div class="spinner-border text-primary"></div>
+                    <p class="mt-2 text-muted">正在加载数据...</p>
+                  </td></tr>
+                </tbody>
+              </table>
+            </div>
+            <nav class="mt-3">
+              <ul class="pagination justify-content-end mb-0" id="tradePagination"></ul>
+            </nav>
+          </div>
+        </div>
+      </div>
+
+      <!-- ==================== 统计分析面板 ==================== -->
+      <div class="tab-pane fade" id="stats-panel" role="tabpanel">
+        <div class="row g-4">
+          <div class="col-md-6">
+            <div class="card h-100">
+              <div class="card-header">
+                <h6 class="mb-0"><i class="bi bi-pie-chart"></i> 订单状态分布</h6>
+              </div>
+              <div class="card-body">
+                <div id="orderStatusChart" class="text-center py-5">
+                  <div class="spinner-border text-primary"></div>
+                  <p class="mt-2 text-muted">正在加载统计数据...</p>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div class="card h-100">
+              <div class="card-header">
+                <h6 class="mb-0"><i class="bi bi-graph-up"></i> 近7天兑换趋势</h6>
+              </div>
+              <div class="card-body">
+                <div id="exchangeTrendChart" class="text-center py-5">
+                  <div class="spinner-border text-primary"></div>
+                  <p class="mt-2 text-muted">正在加载统计数据...</p>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-12">
+            <div class="card">
+              <div class="card-header">
+                <h6 class="mb-0"><i class="bi bi-trophy"></i> 热门兑换商品 TOP 10</h6>
+              </div>
+              <div class="card-body">
+                <div class="table-responsive">
+                  <table class="table table-sm">
+                    <thead>
+                      <tr>
+                        <th>排名</th>
+                        <th>商品名称</th>
+                        <th>兑换次数</th>
+                        <th>兑换数量</th>
+                        <th>收入资产</th>
+                      </tr>
+                    </thead>
+                    <tbody id="topItemsTableBody">
+                      <tr><td colspan="5" class="text-center text-muted py-4">正在加载...</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 添加商品模态框 -->
+  <div class="modal fade" id="addItemModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title"><i class="bi bi-plus-circle"></i> 添加商品</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <form id="addItemForm">
+            <div class="row g-3">
+              <div class="col-md-6">
+                <label class="form-label">商品名称 <span class="text-danger">*</span></label>
+                <input type="text" class="form-control" id="itemName" required placeholder="输入商品名称">
+              </div>
+              <div class="col-md-6">
+                <label class="form-label">商品图片URL</label>
+                <input type="text" class="form-control" id="itemImage" placeholder="https://...">
+              </div>
+              <div class="col-md-12">
+                <label class="form-label">商品描述</label>
+                <textarea class="form-control" id="itemDescription" rows="2" placeholder="商品描述"></textarea>
+              </div>
+              <div class="col-md-4">
+                <label class="form-label">兑换价格 <span class="text-danger">*</span></label>
+                <input type="number" class="form-control" id="itemPrice" required min="1" placeholder="价格">
+              </div>
+              <div class="col-md-4">
+                <label class="form-label">支付方式 <span class="text-danger">*</span></label>
+                <select class="form-select" id="itemPriceUnit" required>
+                  <option value="points_virtual_value">虚拟价值</option>
+                  <option value="points_lottery">抽奖积分</option>
+                  <option value="coins">金币</option>
+                </select>
+              </div>
+              <div class="col-md-4">
+                <label class="form-label">库存数量 <span class="text-danger">*</span></label>
+                <input type="number" class="form-control" id="itemStock" required min="0" placeholder="库存">
+              </div>
+              <div class="col-md-6">
+                <label class="form-label">商品状态</label>
+                <select class="form-select" id="itemStatus">
+                  <option value="active">上架</option>
+                  <option value="inactive">下架</option>
+                </select>
+              </div>
+            </div>
+          </form>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+          <button type="button" class="btn btn-primary" id="submitAddItemBtn">
+            <i class="bi bi-check-lg"></i> 确认添加
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 编辑商品模态框 -->
+  <div class="modal fade" id="editItemModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title"><i class="bi bi-pencil"></i> 编辑商品</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <form id="editItemForm">
+            <input type="hidden" id="editItemId">
+            <div class="row g-3">
+              <div class="col-md-6">
+                <label class="form-label">商品名称 <span class="text-danger">*</span></label>
+                <input type="text" class="form-control" id="editItemName" required>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label">商品图片URL</label>
+                <input type="text" class="form-control" id="editItemImage">
+              </div>
+              <div class="col-md-12">
+                <label class="form-label">商品描述</label>
+                <textarea class="form-control" id="editItemDescription" rows="2"></textarea>
+              </div>
+              <div class="col-md-4">
+                <label class="form-label">兑换价格 <span class="text-danger">*</span></label>
+                <input type="number" class="form-control" id="editItemPrice" required min="1">
+              </div>
+              <div class="col-md-4">
+                <label class="form-label">支付方式</label>
+                <select class="form-select" id="editItemPriceUnit">
+                  <option value="points_virtual_value">虚拟价值</option>
+                  <option value="points_lottery">抽奖积分</option>
+                  <option value="coins">金币</option>
+                </select>
+              </div>
+              <div class="col-md-4">
+                <label class="form-label">库存数量 <span class="text-danger">*</span></label>
+                <input type="number" class="form-control" id="editItemStock" required min="0">
+              </div>
+              <div class="col-md-6">
+                <label class="form-label">商品状态</label>
+                <select class="form-select" id="editItemStatus">
+                  <option value="active">上架</option>
+                  <option value="inactive">下架</option>
+                </select>
+              </div>
+            </div>
+          </form>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+          <button type="button" class="btn btn-primary" id="submitEditItemBtn">
+            <i class="bi bi-check-lg"></i> 保存更新
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 订单详情模态框 -->
+  <div class="modal fade" id="orderDetailModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title"><i class="bi bi-receipt"></i> 订单详情</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="row g-3">
+            <div class="col-12">
+              <h6 class="border-bottom pb-2">订单信息</h6>
+              <table class="table table-sm">
+                <tr><td style="width:120px;" class="text-muted">订单号:</td><td id="detailOrderNo">-</td></tr>
+                <tr><td class="text-muted">订单状态:</td><td id="detailStatus">-</td></tr>
+                <tr><td class="text-muted">下单时间:</td><td id="detailExchangeTime">-</td></tr>
+              </table>
+            </div>
+            <div class="col-12">
+              <h6 class="border-bottom pb-2">用户信息</h6>
+              <table class="table table-sm">
+                <tr><td style="width:120px;" class="text-muted">用户ID:</td><td id="detailUserId">-</td></tr>
+              </table>
+            </div>
+            <div class="col-12">
+              <h6 class="border-bottom pb-2">商品信息</h6>
+              <table class="table table-sm">
+                <tr><td style="width:120px;" class="text-muted">商品名称:</td><td id="detailItemName">-</td></tr>
+                <tr><td class="text-muted">兑换数量:</td><td id="detailQuantity">-</td></tr>
+              </table>
+            </div>
+            <div class="col-12">
+              <h6 class="border-bottom pb-2">支付信息</h6>
+              <table class="table table-sm">
+                <tr><td style="width:120px;" class="text-muted">支付方式:</td><td id="detailPaymentType">-</td></tr>
+                <tr><td class="text-muted">支付数量:</td><td id="detailPayAmount">-</td></tr>
+              </table>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 更新订单状态模态框 -->
+  <div class="modal fade" id="updateStatusModal" tabindex="-1">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title"><i class="bi bi-arrow-repeat"></i> 更新订单状态</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <input type="hidden" id="updateOrderNo">
+          <div class="mb-3">
+            <label class="form-label">新状态 <span class="text-danger">*</span></label>
+            <select class="form-select" id="newStatus" required>
+              <option value="">请选择</option>
+              <option value="completed">已完成</option>
+              <option value="shipped">已发货</option>
+              <option value="cancelled">取消订单</option>
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">备注</label>
+            <textarea class="form-control" id="statusRemark" rows="3" placeholder="可选填写备注信息"></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+          <button type="button" class="btn btn-primary" id="submitUpdateStatusBtn">
+            <i class="bi bi-check-lg"></i> 确认更新
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast 提示 -->
+  <div class="position-fixed bottom-0 end-0 p-3" style="z-index: 11">
+    <div id="successToast" class="toast align-items-center text-white bg-success border-0" role="alert">
+      <div class="d-flex">
+        <div class="toast-body" id="successToastBody"></div>
+        <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+      </div>
+    </div>
+    <div id="errorToast" class="toast align-items-center text-white bg-danger border-0" role="alert">
+      <div class="d-flex">
+        <div class="toast-body" id="errorToastBody"></div>
+        <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 加载遮罩层 -->
+  <div class="loading-overlay" id="loadingOverlay">
+    <div class="spinner-border text-light" style="width: 3rem; height: 3rem;"></div>
+  </div>
+
+  <!-- Scripts -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="/admin/js/admin-common.js"></script>
+  <script src="/admin/js/pages/market-management.js"></script>
+</body>
+</html>
+

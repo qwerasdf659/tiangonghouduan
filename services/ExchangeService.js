@@ -105,7 +105,7 @@ const EXCHANGE_MARKET_ATTRIBUTES = {
   /**
    * 市场商品列表视图（Market Item List View）
    * 用户浏览商品列表时返回的字段
-   * 不包含敏感字段：cost_price（成本价）、total_exchange_count（总兑换次数）
+   * 不包含敏感字段：cost_price（成本价）、sold_count（已售数量）
    */
   marketItemView: [
     'item_id', // 商品ID（Item ID）
@@ -131,7 +131,7 @@ const EXCHANGE_MARKET_ATTRIBUTES = {
     'cost_asset_code', // 材料资产代码（Cost Asset Code）
     'cost_amount', // 材料成本数量（Cost Amount）
     'stock', // 库存（Stock）
-    'total_exchange_count', // 总兑换次数（Total Exchange Count - 展示商品热度）
+    'sold_count', // 已售数量（Sold Count - 展示商品热度）🔧 2026-01-09 修复：字段名匹配数据库模型
     'sort_order', // 排序（Sort Order）
     'status', // 状态（Status）
     'created_at', // 创建时间（Created At）
@@ -145,13 +145,13 @@ const EXCHANGE_MARKET_ATTRIBUTES = {
    */
   adminMarketItemView: [
     'item_id', // 商品ID（Item ID）
-    'item_name', // 商品名称（Item Name）
-    'item_description', // 商品描述（Item Description）
+    'name', // 商品名称（Name）🔧 2026-01-09 修复：字段名匹配数据库模型
+    'description', // 商品描述（Description）🔧 2026-01-09 修复：字段名匹配数据库模型
     'cost_asset_code', // 材料资产代码（Cost Asset Code）
     'cost_amount', // 材料成本数量（Cost Amount）
     'cost_price', // 成本价（Cost Price - 敏感信息，仅管理员可见）
     'stock', // 库存（Stock）
-    'total_exchange_count', // 总兑换次数（Total Exchange Count）
+    'sold_count', // 已售数量（Sold Count）🔧 2026-01-09 修复：字段名匹配数据库模型
     'sort_order', // 排序（Sort Order）
     'status', // 状态（Status）
     'created_at', // 创建时间（Created At）
@@ -1224,7 +1224,9 @@ class ExchangeService {
 
     // 🔧 2026-01-09 修复：兼容 item_description/description 两种字段名
     const itemDescription =
-      updateData.item_description !== undefined ? updateData.item_description : updateData.description
+      updateData.item_description !== undefined
+        ? updateData.item_description
+        : updateData.description
     if (itemDescription !== undefined) {
       if (itemDescription.length > 500) {
         throw new Error('商品描述最长500字符')
@@ -1679,6 +1681,122 @@ class ExchangeService {
         stack: error.stack
       })
       throw error
+    }
+  }
+
+  /**
+   * 管理后台获取兑换商品列表（Admin Only）
+   *
+   * 与 getMarketItems 的区别：
+   * - 支持查看所有状态的商品（包括 inactive）
+   * - 支持关键词搜索
+   * - 返回完整字段（包括管理字段）
+   *
+   * @param {Object} options - 查询选项
+   * @param {string} [options.status] - 商品状态（active/inactive，null表示全部）
+   * @param {string} [options.keyword] - 商品名称关键词
+   * @param {number} [options.page=1] - 页码
+   * @param {number} [options.page_size=20] - 每页数量
+   * @param {string} [options.sort_by='sort_order'] - 排序字段
+   * @param {string} [options.sort_order='ASC'] - 排序方向
+   * @returns {Promise<Object>} 商品列表和分页信息
+   *
+   * @created 2026-01-09（web管理平台功能完善）
+   */
+  static async getAdminMarketItems(options = {}) {
+    const {
+      status = null,
+      keyword = null,
+      page = 1,
+      page_size = 20,
+      sort_by = 'sort_order',
+      sort_order = 'ASC'
+    } = options
+
+    try {
+      logger.info('[兑换市场-管理] 查询商品列表', { status, keyword, page, page_size })
+
+      // 构建查询条件
+      const where = {}
+      if (status) {
+        where.status = status
+      }
+      if (keyword) {
+        where.item_name = { [Op.like]: `%${keyword}%` }
+      }
+
+      // 分页参数
+      const offset = (page - 1) * page_size
+      const limit = page_size
+
+      // 查询商品列表（包含所有字段）
+      const { count, rows } = await ExchangeItem.findAndCountAll({
+        where,
+        limit,
+        offset,
+        order: [[sort_by, sort_order]]
+      })
+
+      logger.info(`[兑换市场-管理] 找到${count}个商品，返回第${page}页（${rows.length}个）`)
+
+      return {
+        success: true,
+        items: rows,
+        pagination: {
+          total: count,
+          page,
+          page_size,
+          total_pages: Math.ceil(count / page_size)
+        },
+        timestamp: BeijingTimeHelper.now()
+      }
+    } catch (error) {
+      logger.error('[兑换市场-管理] 查询商品列表失败:', error.message)
+      throw new Error(`查询商品列表失败: ${error.message}`)
+    }
+  }
+
+  /**
+   * 获取兑换市场统计数据（Admin Only）
+   *
+   * @returns {Promise<Object>} 统计数据
+   * @returns {number} total_items - 商品总数
+   * @returns {number} active_items - 上架商品数
+   * @returns {number} low_stock_items - 库存预警商品数（库存<10）
+   * @returns {number} total_exchanges - 总兑换次数
+   *
+   * @created 2026-01-09（web管理平台功能完善）
+   */
+  static async getMarketItemStatistics() {
+    try {
+      logger.info('[兑换市场-管理] 查询统计数据')
+
+      // 并行查询统计数据
+      const [totalItems, activeItems, lowStockItems, totalExchanges] = await Promise.all([
+        // 商品总数
+        ExchangeItem.count(),
+        // 上架商品数
+        ExchangeItem.count({ where: { status: 'active' } }),
+        // 库存预警商品数（库存<10）
+        ExchangeItem.count({ where: { stock: { [Op.lt]: 10 } } }),
+        // 总兑换次数（已完成的订单数量）
+        ExchangeRecord.count({ where: { status: { [Op.ne]: 'cancelled' } } })
+      ])
+
+      const statistics = {
+        total_items: totalItems,
+        active_items: activeItems,
+        low_stock_items: lowStockItems,
+        total_exchanges: totalExchanges,
+        timestamp: BeijingTimeHelper.now()
+      }
+
+      logger.info('[兑换市场-管理] 统计数据查询成功', statistics)
+
+      return statistics
+    } catch (error) {
+      logger.error('[兑换市场-管理] 查询统计数据失败:', error.message)
+      throw new Error(`查询统计数据失败: ${error.message}`)
     }
   }
 }

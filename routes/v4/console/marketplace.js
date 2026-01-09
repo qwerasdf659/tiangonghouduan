@@ -109,6 +109,187 @@ router.get('/listing-stats', authenticateToken, requireAdmin, async (req, res) =
 })
 
 /**
+ * 管理员获取兑换商品列表（Admin Only）
+ * GET /api/v4/console/marketplace/exchange_market/items
+ *
+ * @description 管理员查看所有兑换商品列表，支持状态筛选、分页、排序
+ *
+ * 业务场景：
+ * - 管理后台商品管理页面
+ * - 支持按状态筛选（active/inactive）
+ * - 支持关键词搜索
+ *
+ * @query {string} status - 商品状态筛选（active/inactive/all，默认all）
+ * @query {string} keyword - 商品名称关键词搜索（可选）
+ * @query {number} page - 页码（默认1）
+ * @query {number} page_size - 每页数量（默认20）
+ * @query {string} sort_by - 排序字段（默认sort_order）
+ * @query {string} sort_order - 排序方向（ASC/DESC，默认ASC）
+ *
+ * @returns {Object} 商品列表和分页信息
+ *
+ * @security JWT + Admin权限
+ *
+ * @created 2026-01-09（web管理平台功能完善）
+ */
+router.get('/exchange_market/items', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const {
+      status = 'all',
+      keyword,
+      page = 1,
+      page_size = 20,
+      sort_by = 'sort_order',
+      sort_order = 'ASC'
+    } = req.query
+    const admin_id = req.user.user_id
+
+    logger.info('管理员查询兑换商品列表', {
+      admin_id,
+      status,
+      keyword,
+      page,
+      page_size
+    })
+
+    // 🎯 通过 ServiceManager 获取 ExchangeService
+    const ExchangeService = req.app.locals.services.getService('exchange_market')
+
+    // 调用服务层方法获取商品列表（管理后台查看所有状态）
+    const result = await ExchangeService.getAdminMarketItems({
+      status: status === 'all' ? null : status,
+      keyword,
+      page: parseInt(page),
+      page_size: parseInt(page_size),
+      sort_by,
+      sort_order
+    })
+
+    logger.info('管理员查询兑换商品成功', {
+      admin_id,
+      total: result.pagination.total,
+      page: result.pagination.page
+    })
+
+    return res.apiSuccess(result, '商品列表查询成功')
+  } catch (error) {
+    logger.error('管理员查询兑换商品失败', {
+      error: error.message,
+      stack: error.stack,
+      admin_id: req.user?.user_id
+    })
+
+    return res.apiError(error.message || '查询商品列表失败', 'INTERNAL_ERROR', null, 500)
+  }
+})
+
+/**
+ * 管理员获取兑换市场统计数据（Admin Only）
+ * GET /api/v4/console/marketplace/exchange_market/statistics
+ *
+ * @description 管理员查看兑换市场统计数据
+ *
+ * @returns {Object} 统计数据
+ * @returns {number} data.total_items - 商品总数
+ * @returns {number} data.active_items - 上架商品数
+ * @returns {number} data.low_stock_items - 库存预警商品数（库存<10）
+ * @returns {number} data.total_exchanges - 总兑换次数
+ *
+ * @security JWT + Admin权限
+ *
+ * @created 2026-01-09（web管理平台功能完善）
+ */
+router.get('/exchange_market/statistics', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const admin_id = req.user.user_id
+
+    logger.info('管理员查询兑换市场统计', { admin_id })
+
+    // 🎯 通过 ServiceManager 获取 ExchangeService
+    const ExchangeService = req.app.locals.services.getService('exchange_market')
+
+    // 调用服务层方法获取统计数据
+    const statistics = await ExchangeService.getMarketItemStatistics()
+
+    logger.info('管理员查询兑换市场统计成功', {
+      admin_id,
+      total_items: statistics.total_items,
+      active_items: statistics.active_items
+    })
+
+    return res.apiSuccess(statistics, '统计数据查询成功')
+  } catch (error) {
+    logger.error('管理员查询兑换市场统计失败', {
+      error: error.message,
+      stack: error.stack,
+      admin_id: req.user?.user_id
+    })
+
+    return res.apiError(error.message || '查询统计数据失败', 'INTERNAL_ERROR', null, 500)
+  }
+})
+
+/**
+ * 管理员获取单个兑换商品详情（Admin Only）
+ * GET /api/v4/console/marketplace/exchange_market/items/:item_id
+ *
+ * @description 管理员查看单个商品详情，返回完整字段
+ *
+ * @param {number} item_id - 商品ID
+ *
+ * @returns {Object} 商品详情
+ *
+ * @security JWT + Admin权限
+ *
+ * @created 2026-01-09（web管理平台功能完善）
+ */
+router.get('/exchange_market/items/:item_id', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const { item_id } = req.params
+    const admin_id = req.user.user_id
+
+    logger.info('管理员查询兑换商品详情', {
+      admin_id,
+      item_id
+    })
+
+    // 参数验证
+    const itemId = parseInt(item_id)
+    if (isNaN(itemId) || itemId <= 0) {
+      return res.apiError('无效的商品ID', 'BAD_REQUEST', null, 400)
+    }
+
+    // 🎯 通过 ServiceManager 获取 ExchangeService
+    const ExchangeService = req.app.locals.services.getService('exchange_market')
+
+    // 调用服务层方法获取商品详情
+    const result = await ExchangeService.getItemDetail(itemId)
+
+    logger.info('管理员查询兑换商品详情成功', {
+      admin_id,
+      item_id: itemId,
+      item_name: result.item?.name
+    })
+
+    return res.apiSuccess(result, '商品详情查询成功')
+  } catch (error) {
+    logger.error('管理员查询兑换商品详情失败', {
+      error: error.message,
+      stack: error.stack,
+      admin_id: req.user?.user_id,
+      item_id: req.params.item_id
+    })
+
+    // 业务错误处理
+    if (error.message === '商品不存在') {
+      return res.apiError(error.message, 'NOT_FOUND', null, 404)
+    }
+
+    return res.apiError(error.message || '查询商品详情失败', 'INTERNAL_ERROR', null, 500)
+  }
+})
+
+/**
  * 创建兑换商品（管理员操作）
  * POST /api/v4/console/marketplace/exchange_market/items
  *

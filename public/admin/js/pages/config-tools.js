@@ -3,8 +3,8 @@
  * @description 系统配置管理和运维工具
  * @author Admin
  * @created 2026-01-09
- * @updated 2026-01-09 修改API路径适配后端接口
- * 
+ * @updated 2026-01-09 修改API路径适配后端接口，移除内联事件处理器
+ *
  * 后端API路径（以后端为准）：
  * - GET /api/v4/console/settings - 获取所有设置概览
  * - GET /api/v4/console/settings/:category - 获取分类设置
@@ -18,7 +18,7 @@
 
 let currentSettingKey = null
 let currentCategory = null
-let settingsData = {}  // 按分类存储设置数据
+let settingsData = {} // 按分类存储设置数据
 
 // ============================================
 // 页面初始化
@@ -31,11 +31,8 @@ document.addEventListener('DOMContentLoaded', function () {
     document.getElementById('welcomeText').textContent = `欢迎，${userInfo.nickname}`
   }
 
-  // 事件监听器
-  document.getElementById('logoutBtn').addEventListener('click', logout)
-  document.getElementById('maintenanceSwitch').addEventListener('change', function () {
-    document.getElementById('maintenanceLabel').textContent = this.checked ? '开启' : '关闭'
-  })
+  // 绑定事件监听器（避免内联事件处理器，符合CSP策略）
+  bindEventListeners()
 
   // Token和权限验证
   if (!getToken() || !checkAdminPermission()) {
@@ -45,6 +42,43 @@ document.addEventListener('DOMContentLoaded', function () {
   // 加载配置列表
   loadConfigList()
 })
+
+/**
+ * 绑定所有事件监听器
+ */
+function bindEventListeners() {
+  // 退出登录
+  document.getElementById('logoutBtn').addEventListener('click', logout)
+
+  // 维护模式开关
+  document.getElementById('maintenanceSwitch').addEventListener('change', function () {
+    document.getElementById('maintenanceLabel').textContent = this.checked ? '开启' : '关闭'
+  })
+
+  // 快捷工具卡片
+  document.getElementById('toolCacheManagement').addEventListener('click', showCacheManagement)
+  document.getElementById('toolSystemConfig').addEventListener('click', showSystemConfig)
+  document.getElementById('toolFeatureFlags').addEventListener('click', showFeatureFlags)
+  document.getElementById('toolMaintenanceMode').addEventListener('click', showMaintenanceMode)
+
+  // 新增配置按钮
+  document.getElementById('btnAddConfig').addEventListener('click', showAddConfig)
+  document.getElementById('btnAddConfigSubmit').addEventListener('click', addConfig)
+
+  // 功能开关保存按钮
+  document.getElementById('btnSaveFeatureFlags').addEventListener('click', saveFeatureFlags)
+
+  // 维护模式保存按钮
+  document.getElementById('btnSaveMaintenanceMode').addEventListener('click', saveMaintenanceMode)
+
+  // 缓存清理按钮（使用事件委托）
+  document.querySelectorAll('.btn-clear-cache').forEach(btn => {
+    btn.addEventListener('click', function () {
+      const cacheType = this.dataset.cacheType
+      clearCache(cacheType)
+    })
+  })
+}
 
 // ============================================
 // 配置列表管理
@@ -64,7 +98,7 @@ async function loadConfigList() {
     if (response && response.success) {
       const summary = response.data || {}
       const categories = summary.categories || {}
-      
+
       if (Object.keys(categories).length === 0) {
         listContainer.innerHTML = `
           <div class="text-center py-4 text-muted">
@@ -86,14 +120,14 @@ async function loadConfigList() {
 
       listContainer.innerHTML = Object.entries(categories)
         .map(([category, count]) => {
-          const display = categoryDisplayNames[category] || { 
-            name: category, 
-            icon: 'bi-folder', 
-            color: 'secondary' 
+          const display = categoryDisplayNames[category] || {
+            name: category,
+            icon: 'bi-folder',
+            color: 'secondary'
           }
           return `
-            <a href="javascript:void(0)" class="list-group-item list-group-item-action" 
-               onclick="loadCategorySettings('${category}')">
+            <a href="javascript:void(0)" class="list-group-item list-group-item-action category-item" 
+               data-category="${category}">
               <div class="d-flex justify-content-between align-items-center">
                 <div>
                   <i class="bi ${display.icon} text-${display.color} me-2"></i>
@@ -105,6 +139,14 @@ async function loadConfigList() {
           `
         })
         .join('')
+
+      // 绑定分类点击事件
+      document.querySelectorAll('.category-item').forEach(item => {
+        item.addEventListener('click', function () {
+          const category = this.dataset.category
+          loadCategorySettings(category)
+        })
+      })
     } else {
       throw new Error(response?.message || '获取设置失败')
     }
@@ -127,7 +169,7 @@ async function loadCategorySettings(category) {
   currentCategory = category
   const detailContainer = document.getElementById('configDetail')
   const detailTitle = document.getElementById('detailTitle')
-  
+
   const categoryNames = {
     basic: '基础设置',
     points: '积分设置',
@@ -135,7 +177,7 @@ async function loadCategorySettings(category) {
     security: '安全设置',
     marketplace: '市场设置'
   }
-  
+
   detailTitle.innerHTML = `<i class="bi bi-list-check"></i> ${categoryNames[category] || category} 配置列表`
   detailContainer.innerHTML = `
     <div class="text-center py-4">
@@ -150,7 +192,7 @@ async function loadCategorySettings(category) {
     if (response && response.success) {
       const data = response.data || {}
       settingsData[category] = data.settings || []
-      
+
       if (settingsData[category].length === 0) {
         detailContainer.innerHTML = `
           <div class="text-center py-5 text-muted">
@@ -182,7 +224,7 @@ async function loadCategorySettings(category) {
  */
 function renderSettingsList(category, settings) {
   const detailContainer = document.getElementById('configDetail')
-  
+
   let html = `
     <form id="settingsForm">
       <div class="table-responsive">
@@ -197,11 +239,11 @@ function renderSettingsList(category, settings) {
           </thead>
           <tbody>
   `
-  
+
   settings.forEach(setting => {
     const isReadonly = setting.is_readonly
     const valueType = setting.value_type || 'string'
-    
+
     html += `
       <tr>
         <td>
@@ -209,35 +251,42 @@ function renderSettingsList(category, settings) {
           <br><small class="text-muted">${valueType}</small>
         </td>
         <td>
-          ${isReadonly 
-            ? `<span class="config-value">${formatSettingValue(setting.parsed_value || setting.setting_value)}</span>`
-            : renderSettingInput(setting)
+          ${
+            isReadonly
+              ? `<span class="config-value">${formatSettingValue(setting.parsed_value || setting.setting_value)}</span>`
+              : renderSettingInput(setting)
           }
         </td>
         <td><small class="text-muted">${setting.description || '-'}</small></td>
         <td>
-          ${isReadonly 
-            ? '<span class="badge bg-secondary">只读</span>' 
-            : '<span class="badge bg-success">可编辑</span>'
+          ${
+            isReadonly
+              ? '<span class="badge bg-secondary">只读</span>'
+              : '<span class="badge bg-success">可编辑</span>'
           }
         </td>
       </tr>
     `
   })
-  
+
   html += `
           </tbody>
         </table>
       </div>
       <div class="mt-3 d-flex justify-content-end">
-        <button type="button" class="btn btn-primary" onclick="saveSettings('${category}')">
+        <button type="button" class="btn btn-primary" id="btnSaveSettings">
           <i class="bi bi-save me-1"></i>保存更改
         </button>
       </div>
     </form>
   `
-  
+
   detailContainer.innerHTML = html
+
+  // 绑定保存按钮事件
+  document.getElementById('btnSaveSettings').addEventListener('click', function () {
+    saveSettings(category)
+  })
 }
 
 /**
@@ -247,7 +296,7 @@ function renderSettingInput(setting) {
   const key = setting.setting_key
   const value = setting.parsed_value !== undefined ? setting.parsed_value : setting.setting_value
   const valueType = setting.value_type || 'string'
-  
+
   switch (valueType) {
     case 'boolean':
       return `
@@ -292,11 +341,13 @@ function formatSettingValue(value) {
 async function saveSettings(category) {
   // 收集所有修改的配置项
   const settingsToUpdate = {}
+  let hasError = false
+
   document.querySelectorAll('.setting-input').forEach(input => {
     const key = input.dataset.key
     const type = input.dataset.type
     let value
-    
+
     if (type === 'boolean') {
       value = input.checked
     } else if (type === 'number') {
@@ -307,15 +358,18 @@ async function saveSettings(category) {
       } catch (e) {
         console.error(`JSON解析失败: ${key}`, e)
         showErrorToast(`配置项 ${key} 的JSON格式无效`)
+        hasError = true
         return
       }
     } else {
       value = input.value
     }
-    
+
     settingsToUpdate[key] = value
   })
-  
+
+  if (hasError) return
+
   if (Object.keys(settingsToUpdate).length === 0) {
     showErrorToast('没有可保存的配置项')
     return
@@ -406,7 +460,7 @@ async function addConfig() {
     }
 
     const settingsToUpdate = { [configKey]: value }
-    
+
     const response = await apiRequest(`/api/v4/console/settings/${currentCategory}`, {
       method: 'PUT',
       body: JSON.stringify({ settings: settingsToUpdate })
@@ -416,7 +470,7 @@ async function addConfig() {
       showSuccessToast('配置添加成功')
       bootstrap.Modal.getInstance(document.getElementById('addConfigModal')).hide()
       loadCategorySettings(currentCategory)
-      loadConfigList()  // 刷新左侧列表
+      loadConfigList() // 刷新左侧列表
     } else {
       throw new Error(response?.message || '添加失败')
     }
@@ -457,12 +511,12 @@ async function clearCache(type) {
       activity: 'activity:*',
       all: '*'
     }
-    
+
     const response = await apiRequest('/api/v4/console/cache/clear', {
       method: 'POST',
-      body: JSON.stringify({ 
+      body: JSON.stringify({
         pattern: patternMap[type] || type,
-        confirm: true  // 后端要求的确认参数
+        confirm: true // 后端要求的确认参数
       })
     })
 
@@ -516,7 +570,7 @@ async function showFeatureFlags() {
 
     if (response && response.success) {
       const settings = response.data?.settings || []
-      
+
       // 过滤出开关类型的配置（布尔类型）
       const flags = settings.filter(s => s.value_type === 'boolean')
 
@@ -620,15 +674,20 @@ async function showMaintenanceMode() {
 
     if (response && response.success) {
       const settings = response.data?.settings || []
-      
+
       // 查找维护模式相关配置
       const maintenanceEnabled = settings.find(s => s.setting_key === 'maintenance_mode')
       const maintenanceMessage = settings.find(s => s.setting_key === 'maintenance_message')
       const maintenanceEndTime = settings.find(s => s.setting_key === 'maintenance_end_time')
-      
-      document.getElementById('maintenanceSwitch').checked = maintenanceEnabled?.parsed_value || false
-      document.getElementById('maintenanceLabel').textContent = maintenanceEnabled?.parsed_value ? '开启' : '关闭'
-      document.getElementById('maintenanceMessage').value = maintenanceMessage?.parsed_value || '系统正在升级维护中，预计30分钟后恢复，给您带来不便敬请谅解。'
+
+      document.getElementById('maintenanceSwitch').checked =
+        maintenanceEnabled?.parsed_value || false
+      document.getElementById('maintenanceLabel').textContent = maintenanceEnabled?.parsed_value
+        ? '开启'
+        : '关闭'
+      document.getElementById('maintenanceMessage').value =
+        maintenanceMessage?.parsed_value ||
+        '系统正在升级维护中，预计30分钟后恢复，给您带来不便敬请谅解。'
 
       if (maintenanceEndTime?.parsed_value) {
         const endTime = new Date(maintenanceEndTime.parsed_value)
@@ -655,7 +714,7 @@ async function saveMaintenanceMode() {
       maintenance_mode: enabled,
       maintenance_message: message
     }
-    
+
     if (endTime) {
       settings.maintenance_end_time = new Date(endTime).toISOString()
     }

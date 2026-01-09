@@ -30,7 +30,7 @@
  */
 
 const BeijingTimeHelper = require('../../../utils/timeHelper')
-const { User, LotteryManagementSetting } = require('../../../models')
+const { User, LotteryManagementSetting, LotteryPrize } = require('../../../models')
 const { getUserRoles } = require('../../../middleware/auth')
 const { Op } = require('sequelize')
 
@@ -120,12 +120,17 @@ class ManagementStrategy {
         throw new Error('目标用户不存在或已停用')
       }
 
+      // 🎁 查询奖品信息（获取prize_name用于记录显示）
+      const prize = await LotteryPrize.findByPk(prizeId)
+      const prizeName = prize ? prize.prize_name : null
+
       // 💾 创建数据库记录
       const setting = await LotteryManagementSetting.create({
         user_id: targetUserId,
         setting_type: 'force_win',
         setting_data: {
           prize_id: prizeId,
+          prize_name: prizeName, // 保存奖品名称用于显示
           reason
         },
         expires_at: expiresAt,

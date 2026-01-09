@@ -68,7 +68,8 @@ async function loadAssetTypes() {
   try {
     const response = await apiRequest('/api/v4/console/material/asset-types')
     if (response && response.success) {
-      assetTypes = response.data || []
+      // 后端返回格式: { asset_types: [...] }
+      assetTypes = response.data?.asset_types || []
       populateAssetSelects()
     }
   } catch (error) {
@@ -112,7 +113,8 @@ async function loadRules() {
     const response = await apiRequest('/api/v4/console/material/conversion-rules')
 
     if (response && response.success) {
-      currentRules = response.data || []
+      // 后端返回格式: { rules: [...] }
+      currentRules = response.data?.rules || []
       renderRules(currentRules)
       updateStatistics(currentRules)
     } else {

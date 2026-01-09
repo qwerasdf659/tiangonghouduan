@@ -59,7 +59,7 @@
     <!-- 快捷工具 -->
     <div class="row g-3 mb-4">
       <div class="col-md-3">
-        <div class="card tool-card" onclick="showCacheManagement()">
+        <div class="card tool-card" id="toolCacheManagement">
           <div class="card-body text-center py-4">
             <i class="bi bi-database text-primary" style="font-size: 3rem;"></i>
             <h6 class="mt-3 mb-0">缓存管理</h6>
@@ -68,7 +68,7 @@
         </div>
       </div>
       <div class="col-md-3">
-        <div class="card tool-card" onclick="showSystemConfig()">
+        <div class="card tool-card" id="toolSystemConfig">
           <div class="card-body text-center py-4">
             <i class="bi bi-gear text-success" style="font-size: 3rem;"></i>
             <h6 class="mt-3 mb-0">系统配置</h6>
@@ -77,7 +77,7 @@
         </div>
       </div>
       <div class="col-md-3">
-        <div class="card tool-card" onclick="showFeatureFlags()">
+        <div class="card tool-card" id="toolFeatureFlags">
           <div class="card-body text-center py-4">
             <i class="bi bi-toggles text-warning" style="font-size: 3rem;"></i>
             <h6 class="mt-3 mb-0">功能开关</h6>
@@ -86,7 +86,7 @@
         </div>
       </div>
       <div class="col-md-3">
-        <div class="card tool-card" onclick="showMaintenanceMode()">
+        <div class="card tool-card" id="toolMaintenanceMode">
           <div class="card-body text-center py-4">
             <i class="bi bi-tools text-danger" style="font-size: 3rem;"></i>
             <h6 class="mt-3 mb-0">维护模式</h6>
@@ -102,7 +102,7 @@
         <div class="card">
           <div class="card-header bg-white d-flex justify-content-between align-items-center">
             <h6 class="mb-0"><i class="bi bi-list-ul"></i> 配置列表</h6>
-            <button class="btn btn-sm btn-primary" onclick="showAddConfig()">
+            <button class="btn btn-sm btn-primary" id="btnAddConfig">
               <i class="bi bi-plus"></i> 新增
             </button>
           </div>
@@ -149,28 +149,28 @@
                 <strong>用户缓存</strong>
                 <p class="text-muted mb-0 small">用户会话、权限信息</p>
               </div>
-              <button class="btn btn-outline-danger btn-sm" onclick="clearCache('user')">清理</button>
+              <button class="btn btn-outline-danger btn-sm btn-clear-cache" data-cache-type="user">清理</button>
             </div>
             <div class="list-group-item d-flex justify-content-between align-items-center">
               <div>
                 <strong>配置缓存</strong>
                 <p class="text-muted mb-0 small">系统配置项、开关状态</p>
               </div>
-              <button class="btn btn-outline-danger btn-sm" onclick="clearCache('config')">清理</button>
+              <button class="btn btn-outline-danger btn-sm btn-clear-cache" data-cache-type="config">清理</button>
             </div>
             <div class="list-group-item d-flex justify-content-between align-items-center">
               <div>
                 <strong>活动缓存</strong>
                 <p class="text-muted mb-0 small">抽奖活动、奖品信息</p>
               </div>
-              <button class="btn btn-outline-danger btn-sm" onclick="clearCache('activity')">清理</button>
+              <button class="btn btn-outline-danger btn-sm btn-clear-cache" data-cache-type="activity">清理</button>
             </div>
             <div class="list-group-item d-flex justify-content-between align-items-center">
               <div>
                 <strong>全部缓存</strong>
                 <p class="text-muted mb-0 small">清理所有Redis缓存</p>
               </div>
-              <button class="btn btn-danger btn-sm" onclick="clearCache('all')">全部清理</button>
+              <button class="btn btn-danger btn-sm btn-clear-cache" data-cache-type="all">全部清理</button>
             </div>
           </div>
         </div>
@@ -194,7 +194,7 @@
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
-          <button type="button" class="btn btn-primary" onclick="saveFeatureFlags()">保存更改</button>
+          <button type="button" class="btn btn-primary" id="btnSaveFeatureFlags">保存更改</button>
         </div>
       </div>
     </div>
@@ -232,7 +232,7 @@
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
-          <button type="button" class="btn btn-danger" onclick="saveMaintenanceMode()">保存设置</button>
+          <button type="button" class="btn btn-danger" id="btnSaveMaintenanceMode">保存设置</button>
         </div>
       </div>
     </div>
@@ -276,7 +276,7 @@
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
-          <button type="button" class="btn btn-primary" onclick="addConfig()">添加配置</button>
+          <button type="button" class="btn btn-primary" id="btnAddConfigSubmit">添加配置</button>
         </div>
       </div>
     </div>
@@ -297,4 +297,3 @@
   <script src="/admin/js/pages/config-tools.js"></script>
 </body>
 </html>
-
