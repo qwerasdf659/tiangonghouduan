@@ -67,14 +67,14 @@ const dbConfig = {
   logging:
     process.env.NODE_ENV === 'development'
       ? (sql, timing) => {
-          // 开发环境：记录所有查询和慢查询
-          console.log(sql)
-          if (timing) slowQueryLogger(sql, timing)
-        }
+        // 开发环境：记录所有查询和慢查询
+        console.log(sql)
+        if (timing) slowQueryLogger(sql, timing)
+      }
       : (sql, timing) => {
-          // 生产环境：只记录慢查询
-          if (timing) slowQueryLogger(sql, timing)
-        },
+        // 生产环境：只记录慢查询
+        if (timing) slowQueryLogger(sql, timing)
+      },
   benchmark: true, // ⚡ 启用查询时间记录（必需）
   pool: {
     max: 40, // ✅ 最大连接数 - 单实例场景合理，长期固定40（2025-12-30 已拍板）

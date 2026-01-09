@@ -532,33 +532,27 @@ class PopupBannerService {
    */
   static async getStatistics() {
     try {
-      const now = BeijingTimeHelper.createBeijingTime()
-
-      const [totalCount, activeCount, scheduledCount, expiredCount] = await Promise.all([
+      const [totalCount, activeCount, inactiveCount, homeCount, profileCount] = await Promise.all([
         // 总数
         PopupBanner.count(),
-        // 当前启用中
+        // 已启用
         PopupBanner.count({ where: { is_active: true } }),
-        // 待生效（未开始）
-        PopupBanner.count({
-          where: {
-            is_active: true,
-            start_time: { [Op.gt]: now }
-          }
-        }),
-        // 已过期
-        PopupBanner.count({
-          where: {
-            end_time: { [Op.lt]: now }
-          }
-        })
+        // 已禁用
+        PopupBanner.count({ where: { is_active: false } }),
+        // 首页弹窗
+        PopupBanner.count({ where: { position: 'home' } }),
+        // 个人中心弹窗
+        PopupBanner.count({ where: { position: 'profile' } })
       ])
 
       return {
         total: totalCount,
         active: activeCount,
-        scheduled: scheduledCount,
-        expired: expiredCount
+        inactive: inactiveCount,
+        by_position: {
+          home: homeCount,
+          profile: profileCount
+        }
       }
     } catch (error) {
       logger.error('获取弹窗统计信息失败', { error: error.message })

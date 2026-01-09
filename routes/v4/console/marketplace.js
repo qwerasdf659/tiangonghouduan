@@ -157,7 +157,7 @@ router.post('/exchange_market/items', authenticateToken, requireAdmin, async (re
   const ExchangeService = req.app.locals.services.getService('exchange_market')
 
   // 🎯 2026-01-08 图片存储架构修复：使用 TransactionManager 包装事务
-  const transactionResult = await TransactionManager.executeTransaction(async transaction => {
+  const transactionResult = await TransactionManager.execute(async transaction => {
     // 调用服务层方法创建商品（V4.5.0 材料资产支付 + 图片存储架构）
     const result = await ExchangeService.createExchangeItem(
       {
@@ -178,6 +178,10 @@ router.post('/exchange_market/items', authenticateToken, requireAdmin, async (re
     return result
   })
 
+  /*
+   * 🔧 2026-01-09 修复：ExchangeService.createExchangeItem 直接返回
+   * { success, item, bound_image, timestamp }，不需要检查 .data
+   */
   if (!transactionResult.success) {
     const errorMessage = transactionResult.error?.message || '创建商品失败'
     logger.error('创建兑换商品失败', {
@@ -198,18 +202,23 @@ router.post('/exchange_market/items', authenticateToken, requireAdmin, async (re
     return res.apiError(errorMessage, 'INTERNAL_ERROR', null, 500)
   }
 
-  const result = transactionResult.data
-
+  // 直接使用 transactionResult（已包含 item, bound_image, timestamp）
   logger.info('兑换商品创建成功（材料资产支付）', {
     admin_id,
-    item_id: result.item?.item_id,
-    item_name: result.item?.item_name,
-    cost_asset_code: result.item?.cost_asset_code,
-    cost_amount: result.item?.cost_amount,
-    bound_image: result.bound_image
+    item_id: transactionResult.item?.item_id,
+    item_name: transactionResult.item?.name,
+    cost_asset_code: transactionResult.item?.cost_asset_code,
+    cost_amount: transactionResult.item?.cost_amount,
+    bound_image: transactionResult.bound_image
   })
 
-  return res.apiSuccess(result, '商品创建成功')
+  return res.apiSuccess(
+    {
+      item: transactionResult.item,
+      bound_image: transactionResult.bound_image
+    },
+    '商品创建成功'
+  )
 })
 
 /**
@@ -609,7 +618,7 @@ router.post(
       // 🎯 P1-9：通过 ServiceManager 获取 MarketListingService（snake_case key）
       const MarketListingService = req.app.locals.services.getService('market_listing')
 
-      const result = await TransactionManager.executeTransaction(
+      const result = await TransactionManager.execute(
         async transaction => {
           return await MarketListingService.adminForceWithdrawListing(
             {

@@ -49,10 +49,10 @@
             <label class="form-label">公告类型</label>
             <select class="form-select" id="typeFilter">
               <option value="">全部类型</option>
+              <option value="system">系统公告</option>
               <option value="notice">通知</option>
               <option value="activity">活动</option>
-              <option value="update">更新</option>
-              <option value="warning">警告</option>
+              <option value="maintenance">维护</option>
             </select>
           </div>
           <div class="col-md-3">
@@ -80,8 +80,8 @@
                 <th>标题</th>
                 <th>类型</th>
                 <th>状态</th>
-                <th>排序</th>
-                <th>发布时间</th>
+                <th>优先级</th>
+                <th>创建时间</th>
                 <th>过期时间</th>
                 <th style="width: 200px;">操作</th>
               </tr>
@@ -128,9 +128,9 @@
               <label class="form-label">公告类型 <span class="text-danger">*</span></label>
               <select class="form-select" id="announcementType" required>
                 <option value="notice">通知</option>
+                <option value="system">系统公告</option>
                 <option value="activity">活动</option>
-                <option value="update">更新</option>
-                <option value="warning">警告</option>
+                <option value="maintenance">维护</option>
               </select>
             </div>
             <div class="col-md-6">
@@ -145,18 +145,19 @@
               <label class="form-label">公告内容 <span class="text-danger">*</span></label>
               <textarea class="form-control" id="announcementContent" rows="6" placeholder="请输入公告内容" required></textarea>
             </div>
-            <div class="col-md-4">
-              <label class="form-label">排序权重</label>
-              <input type="number" class="form-control" id="announcementSort" value="0" min="0">
-              <small class="text-muted">数字越大越靠前</small>
+            <div class="col-md-6">
+              <label class="form-label">优先级</label>
+              <select class="form-select" id="announcementPriority">
+                <option value="low">低</option>
+                <option value="medium" selected>中</option>
+                <option value="high">高</option>
+              </select>
+              <small class="text-muted">高优先级公告优先展示</small>
             </div>
-            <div class="col-md-4">
-              <label class="form-label">生效时间</label>
-              <input type="datetime-local" class="form-control" id="startTime">
-            </div>
-            <div class="col-md-4">
+            <div class="col-md-6">
               <label class="form-label">过期时间</label>
-              <input type="datetime-local" class="form-control" id="endTime">
+              <input type="datetime-local" class="form-control" id="expiresAt">
+              <small class="text-muted">留空表示永久有效</small>
             </div>
           </div>
         </div>

@@ -130,6 +130,46 @@ const ToastUtils = {
     const div = document.createElement('div')
     div.textContent = text
     return div.innerHTML
+  },
+
+  /**
+   * 显示成功提示
+   * @param {string} message - 消息内容
+   * @param {Object} options - 可选配置
+   * @returns {HTMLElement} Toast元素
+   */
+  success(message, options = {}) {
+    return this.show(message, 'success', options)
+  },
+
+  /**
+   * 显示错误提示
+   * @param {string} message - 消息内容
+   * @param {Object} options - 可选配置
+   * @returns {HTMLElement} Toast元素
+   */
+  error(message, options = {}) {
+    return this.show(message, 'error', options)
+  },
+
+  /**
+   * 显示警告提示
+   * @param {string} message - 消息内容
+   * @param {Object} options - 可选配置
+   * @returns {HTMLElement} Toast元素
+   */
+  warning(message, options = {}) {
+    return this.show(message, 'warning', options)
+  },
+
+  /**
+   * 显示信息提示
+   * @param {string} message - 消息内容
+   * @param {Object} options - 可选配置
+   * @returns {HTMLElement} Toast元素
+   */
+  info(message, options = {}) {
+    return this.show(message, 'info', options)
   }
 }
 

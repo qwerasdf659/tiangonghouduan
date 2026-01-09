@@ -139,8 +139,8 @@ class CustomerServiceSessionService {
       // 构建查询条件
       const where = {}
 
-      // 状态筛选
-      if (status) {
+      // 状态筛选 - 'all' 或空值表示不筛选
+      if (status && status !== 'all') {
         where.status = status
       }
 
@@ -163,11 +163,11 @@ class CustomerServiceSessionService {
           // 搜索条件
           where: search
             ? {
-                [Op.or]: [
-                  { nickname: { [Op.like]: `%${search}%` } },
-                  { mobile: { [Op.like]: `%${search}%` } }
-                ]
-              }
+              [Op.or]: [
+                { nickname: { [Op.like]: `%${search}%` } },
+                { mobile: { [Op.like]: `%${search}%` } }
+              ]
+            }
             : undefined,
           required: !!search
         },
@@ -208,16 +208,16 @@ class CustomerServiceSessionService {
         session_id: session.session_id,
         user: session.user
           ? {
-              user_id: session.user.user_id,
-              nickname: session.user.nickname,
-              mobile: session.user.mobile
-            }
+            user_id: session.user.user_id,
+            nickname: session.user.nickname,
+            mobile: session.user.mobile
+          }
           : null,
         admin: session.admin
           ? {
-              user_id: session.admin.user_id,
-              nickname: session.admin.nickname
-            }
+            user_id: session.admin.user_id,
+            nickname: session.admin.nickname
+          }
           : null,
         status: session.status,
         priority: session.priority,
@@ -441,16 +441,16 @@ class CustomerServiceSessionService {
           session_id: session.session_id,
           user: session.user
             ? {
-                user_id: session.user.user_id,
-                nickname: session.user.nickname,
-                mobile: session.user.mobile
-              }
+              user_id: session.user.user_id,
+              nickname: session.user.nickname,
+              mobile: session.user.mobile
+            }
             : null,
           admin: session.admin
             ? {
-                user_id: session.admin.user_id,
-                nickname: session.admin.nickname
-              }
+              user_id: session.admin.user_id,
+              nickname: session.admin.nickname
+            }
             : null,
           status: session.status,
           priority: session.priority,

@@ -88,7 +88,9 @@ async function loadStatistics() {
     const response = await apiRequest('/api/v4/console/system/audit-logs/statistics')
 
     if (response && response.success) {
-      const stats = response.data.statistics || response.data
+      // 后端直接返回统计数据在 response.data 中
+      // 字段：today_count, week_count, success_count, failed_count, total
+      const stats = response.data || {}
       document.getElementById('todayLogs').textContent = stats.today_count || 0
       document.getElementById('weekLogs').textContent = stats.week_count || 0
       document.getElementById('successLogs').textContent = stats.success_count || 0
@@ -96,6 +98,11 @@ async function loadStatistics() {
     }
   } catch (error) {
     console.error('加载统计数据失败', error)
+    // 失败时显示占位符
+    document.getElementById('todayLogs').textContent = '-'
+    document.getElementById('weekLogs').textContent = '-'
+    document.getElementById('successLogs').textContent = '-'
+    document.getElementById('failedLogs').textContent = '-'
   }
 }
 

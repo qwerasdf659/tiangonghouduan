@@ -1,6 +1,17 @@
 /**
  * 数据统计报表页面 - JavaScript逻辑
  * 从statistics.html提取，遵循前端工程化最佳实践
+ * 
+ * 2026-01-09 更新：适配后端 ReportingService.getChartsData() 返回的数据格式
+ * 后端数据结构：
+ *   - user_growth: [{date, count, cumulative}]
+ *   - user_types: {regular: {count, percentage}, admin: {count, percentage}, merchant: {count, percentage}, total}
+ *   - lottery_trend: [{date, count, high_tier_count, high_tier_rate}]
+ *   - consumption_trend: [{date, count, amount, avg_amount}]
+ *   - points_flow: [{date, earned, spent, balance_change}]
+ *   - top_prizes: [{prize_name, count, percentage}]
+ *   - active_hours: [{hour, hour_label, activity_count}]
+ *   - metadata: {days, start_date, end_date, query_time_ms, generated_at}
  */
 
 // ========== 页面初始化 ==========
@@ -26,12 +37,28 @@ document.addEventListener('DOMContentLoaded', function () {
   loadStatistics()
 })
 
+/**
+ * 将周期值转换为天数
+ */
+function periodToDays(period) {
+  switch (period) {
+    case 'today': return 1
+    case 'yesterday': return 1
+    case 'week': return 7
+    case 'month': return 30
+    default: return 7
+  }
+}
+
 async function loadStatistics() {
   showLoading()
 
   try {
     const period = document.getElementById('periodSelect').value
-    const params = new URLSearchParams({ period })
+    
+    // 后端API使用 days 参数
+    const days = periodToDays(period)
+    const params = new URLSearchParams({ days })
 
     if (period === 'custom') {
       const startDate = document.getElementById('startDate').value
@@ -47,7 +74,8 @@ async function loadStatistics() {
       params.append('end_date', endDate)
     }
 
-    const response = await apiRequest(`/api/v4/system/statistics/report?${params.toString()}`)
+    // 调用后端 /api/v4/system/statistics/charts API
+    const response = await apiRequest(`/api/v4/system/statistics/charts?${params.toString()}`)
 
     if (response && response.success) {
       renderStatistics(response.data)
@@ -62,121 +90,221 @@ async function loadStatistics() {
   }
 }
 
+/**
+ * 渲染统计数据 - 适配后端 getChartsData() 返回格式
+ */
 function renderStatistics(data) {
-  if (data.overview) {
-    document.getElementById('totalUsers').textContent = formatNumber(data.overview.total_users || 0)
-    document.getElementById('totalDraws').textContent = formatNumber(data.overview.total_draws || 0)
-    document.getElementById('winRate').textContent = `${(data.overview.win_rate || 0).toFixed(2)}%`
-    document.getElementById('totalRevenue').textContent =
-      `¥${(data.overview.total_revenue || 0).toFixed(2)}`
+  // ========== 1. 核心指标总览（从后端数据计算）==========
+  
+  // 总用户数：从 user_types.total 获取
+  const totalUsers = data.user_types?.total || 0
+  document.getElementById('totalUsers').textContent = formatNumber(totalUsers)
+  
+  // 总抽奖次数：从 lottery_trend 数组求和
+  const totalDraws = (data.lottery_trend || []).reduce((sum, item) => sum + (item.count || 0), 0)
+  document.getElementById('totalDraws').textContent = formatNumber(totalDraws)
+  
+  // 高档奖励率（原中奖率）：从 lottery_trend 计算
+  const totalHighTier = (data.lottery_trend || []).reduce((sum, item) => sum + (item.high_tier_count || 0), 0)
+  const highTierRate = totalDraws > 0 ? (totalHighTier / totalDraws * 100) : 0
+  document.getElementById('winRate').textContent = `${highTierRate.toFixed(2)}%`
+  
+  // 总消费金额：从 consumption_trend 数组求和
+  const totalRevenue = (data.consumption_trend || []).reduce((sum, item) => sum + parseFloat(item.amount || 0), 0)
+  document.getElementById('totalRevenue').textContent = `¥${totalRevenue.toFixed(2)}`
 
-    renderTrend('userTrend', data.overview.user_trend)
-    renderTrend('drawTrend', data.overview.draw_trend)
-    renderTrend('winRateTrend', data.overview.win_rate_trend)
-    renderTrend('revenueTrend', data.overview.revenue_trend)
+  // 计算趋势（基于最近和之前数据的对比）
+  const userTrend = calculateGrowthTrend(data.user_growth)
+  const drawTrend = calculateArrayTrend(data.lottery_trend, 'count')
+  const highTierTrend = calculateArrayTrend(data.lottery_trend, 'high_tier_rate')
+  const revenueTrend = calculateArrayTrend(data.consumption_trend, 'amount')
+
+  renderTrend('userTrend', userTrend)
+  renderTrend('drawTrend', drawTrend)
+  renderTrend('winRateTrend', highTierTrend)
+  renderTrend('revenueTrend', revenueTrend)
+
+  // ========== 2. 用户数据统计（从 user_types 和 user_growth 获取）==========
+  
+  // 新增用户：从 user_growth 最新一天的 count
+  const userGrowth = data.user_growth || []
+  const recentNewUsers = userGrowth.length > 0 ? userGrowth[userGrowth.length - 1].count : 0
+  const periodNewUsers = userGrowth.reduce((sum, item) => sum + (item.count || 0), 0)
+  document.getElementById('newUsers').textContent = formatNumber(periodNewUsers)
+  
+  // 活跃用户：从 active_hours 统计总活跃数
+  const activeCount = (data.active_hours || []).reduce((sum, item) => sum + (item.activity_count || 0), 0)
+  document.getElementById('activeUsers').textContent = formatNumber(activeCount)
+  
+  // 管理员用户数
+  const adminUsers = data.user_types?.admin?.count || 0
+  document.getElementById('vipUsers').textContent = formatNumber(adminUsers)
+  
+  // 普通用户数（作为"封禁用户"的替代，显示普通用户）
+  const regularUsers = data.user_types?.regular?.count || 0
+  document.getElementById('bannedUsers').textContent = formatNumber(regularUsers)
+
+  // ========== 3. 抽奖数据统计（从 lottery_trend 获取）==========
+  
+  document.getElementById('lotteryDraws').textContent = formatNumber(totalDraws)
+  document.getElementById('lotteryWins').textContent = formatNumber(totalHighTier)
+  document.getElementById('lotteryLosses').textContent = formatNumber(totalDraws - totalHighTier)
+  document.getElementById('avgWinRate').textContent = `${highTierRate.toFixed(2)}%`
+
+  // ========== 4. 消费数据统计（从 consumption_trend 获取）==========
+  
+  const consumptionTotal = totalRevenue
+  const consumptionCount = (data.consumption_trend || []).reduce((sum, item) => sum + (item.count || 0), 0)
+  
+  document.getElementById('consumptionTotal').textContent = `¥${consumptionTotal.toFixed(2)}`
+  document.getElementById('consumptionApproved').textContent = `¥${consumptionTotal.toFixed(2)}`
+  document.getElementById('consumptionPending').textContent = `¥0.00`
+  document.getElementById('consumptionRejected').textContent = `¥0.00`
+
+  // ========== 5. 积分数据统计（从 points_flow 获取）==========
+  
+  const pointsData = data.points_flow || []
+  const totalEarned = pointsData.reduce((sum, item) => sum + (item.earned || 0), 0)
+  const totalSpent = pointsData.reduce((sum, item) => sum + (item.spent || 0), 0)
+  const totalBalanceChange = pointsData.reduce((sum, item) => sum + (item.balance_change || 0), 0)
+  
+  document.getElementById('pointsIssued').textContent = formatNumber(totalEarned)
+  document.getElementById('pointsConsumed').textContent = formatNumber(totalSpent)
+  document.getElementById('pointsCurrent').textContent = formatNumber(totalBalanceChange)
+  document.getElementById('pointsAverage').textContent = totalUsers > 0 
+    ? formatNumber(Math.round(totalBalanceChange / totalUsers)) 
+    : '0'
+
+  // ========== 6. 奖品发放统计（从 top_prizes 获取）==========
+  
+  if (data.top_prizes && Array.isArray(data.top_prizes)) {
+    renderPrizeStats(data.top_prizes)
+  } else {
+    renderPrizeStats([])
   }
 
-  if (data.users) {
-    document.getElementById('newUsers').textContent = formatNumber(data.users.new_users || 0)
-    document.getElementById('activeUsers').textContent = formatNumber(data.users.active_users || 0)
-    document.getElementById('vipUsers').textContent = formatNumber(data.users.vip_users || 0)
-    document.getElementById('bannedUsers').textContent = formatNumber(data.users.banned_users || 0)
+  // ========== 7. 活跃时段统计（从 active_hours 获取，替代客服统计）==========
+  
+  if (data.active_hours && Array.isArray(data.active_hours)) {
+    renderActiveHoursStats(data.active_hours)
+  } else {
+    // 显示默认值
+    document.getElementById('totalSessions').textContent = '-'
+    document.getElementById('closedSessions').textContent = '-'
+    document.getElementById('avgResponseTime').textContent = '-'
+    document.getElementById('customerSatisfaction').textContent = '-'
   }
+}
 
-  if (data.lottery) {
-    document.getElementById('lotteryDraws').textContent = formatNumber(
-      data.lottery.total_draws || 0
-    )
-    document.getElementById('lotteryWins').textContent = formatNumber(data.lottery.wins || 0)
-    document.getElementById('lotteryLosses').textContent = formatNumber(data.lottery.losses || 0)
-    document.getElementById('avgWinRate').textContent =
-      `${(data.lottery.avg_win_rate || 0).toFixed(2)}%`
-  }
+/**
+ * 计算用户增长趋势
+ */
+function calculateGrowthTrend(userGrowth) {
+  if (!userGrowth || userGrowth.length < 2) return 0
+  
+  const midPoint = Math.floor(userGrowth.length / 2)
+  const recentSum = userGrowth.slice(midPoint).reduce((sum, item) => sum + (item.count || 0), 0)
+  const previousSum = userGrowth.slice(0, midPoint).reduce((sum, item) => sum + (item.count || 0), 0)
+  
+  if (previousSum === 0) return recentSum > 0 ? 100 : 0
+  return ((recentSum - previousSum) / previousSum * 100)
+}
 
-  if (data.consumption) {
-    document.getElementById('consumptionTotal').textContent =
-      `¥${(data.consumption.total || 0).toFixed(2)}`
-    document.getElementById('consumptionApproved').textContent =
-      `¥${(data.consumption.approved || 0).toFixed(2)}`
-    document.getElementById('consumptionPending').textContent =
-      `¥${(data.consumption.pending || 0).toFixed(2)}`
-    document.getElementById('consumptionRejected').textContent =
-      `¥${(data.consumption.rejected || 0).toFixed(2)}`
-  }
-
-  if (data.points) {
-    document.getElementById('pointsIssued').textContent = formatNumber(data.points.issued || 0)
-    document.getElementById('pointsConsumed').textContent = formatNumber(data.points.consumed || 0)
-    document.getElementById('pointsCurrent').textContent = formatNumber(data.points.current || 0)
-    document.getElementById('pointsAverage').textContent = formatNumber(data.points.average || 0)
-  }
-
-  if (data.prizes && Array.isArray(data.prizes)) {
-    renderPrizeStats(data.prizes)
-  }
-
-  if (data.customer_service) {
-    document.getElementById('totalSessions').textContent = formatNumber(
-      data.customer_service.total_sessions || 0
-    )
-    document.getElementById('closedSessions').textContent = formatNumber(
-      data.customer_service.closed_sessions || 0
-    )
-    document.getElementById('avgResponseTime').textContent =
-      `${data.customer_service.avg_response_time || 0}分钟`
-    document.getElementById('customerSatisfaction').textContent =
-      `${(data.customer_service.satisfaction || 0).toFixed(1)}分`
-  }
+/**
+ * 计算数组数据的趋势
+ */
+function calculateArrayTrend(dataArray, field) {
+  if (!dataArray || dataArray.length < 2) return 0
+  
+  const midPoint = Math.floor(dataArray.length / 2)
+  const recentSum = dataArray.slice(midPoint).reduce((sum, item) => sum + parseFloat(item[field] || 0), 0)
+  const previousSum = dataArray.slice(0, midPoint).reduce((sum, item) => sum + parseFloat(item[field] || 0), 0)
+  
+  if (previousSum === 0) return recentSum > 0 ? 100 : 0
+  return ((recentSum - previousSum) / previousSum * 100)
 }
 
 function renderTrend(elementId, trend) {
   const element = document.getElementById(elementId)
-  if (!element || trend === undefined) return
+  if (!element || trend === undefined || isNaN(trend)) return
 
   const isPositive = trend >= 0
   element.className = isPositive ? 'trend-up me-2' : 'trend-down me-2'
   element.innerHTML = `<i class="bi bi-arrow-${isPositive ? 'up' : 'down'}"></i> ${isPositive ? '+' : ''}${trend.toFixed(1)}%`
 }
 
+/**
+ * 渲染奖品统计 - 适配后端 top_prizes 格式
+ * 后端格式: [{prize_name, count, percentage}]
+ */
 function renderPrizeStats(prizes) {
   const tbody = document.getElementById('prizeStatsTable')
 
-  if (prizes.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="6" class="text-center py-4"><i class="bi bi-inbox text-muted" style="font-size: 2rem;"></i><p class="mt-2 text-muted">暂无数据</p></td></tr>`
+  if (!prizes || prizes.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="6" class="text-center py-4"><i class="bi bi-inbox text-muted" style="font-size: 2rem;"></i><p class="mt-2 text-muted">暂无奖品数据</p></td></tr>`
     return
   }
 
   tbody.innerHTML = prizes
     .map(prize => {
-      const claimRate = prize.issued > 0 ? (prize.claimed / prize.issued) * 100 : 0
+      const percentage = parseFloat(prize.percentage || 0)
       return `
       <tr>
-        <td>${prize.prize_name}</td>
-        <td>${getPrizeTypeLabel(prize.prize_type)}</td>
-        <td>${formatNumber(prize.issued || 0)}</td>
-        <td>${formatNumber(prize.claimed || 0)}</td>
+        <td>${escapeHtml(prize.prize_name || '未知奖品')}</td>
+        <td><span class="badge bg-primary">抽奖</span></td>
+        <td>${formatNumber(prize.count || 0)}</td>
+        <td>${formatNumber(prize.count || 0)}</td>
         <td>
           <div class="d-flex align-items-center">
             <div class="progress flex-fill me-2" style="height: 20px;">
-              <div class="progress-bar ${getProgressColor(claimRate)}" style="width: ${claimRate}%" role="progressbar">${claimRate.toFixed(1)}%</div>
+              <div class="progress-bar ${getProgressColor(percentage)}" style="width: ${Math.min(percentage, 100)}%" role="progressbar">${percentage.toFixed(1)}%</div>
             </div>
           </div>
         </td>
-        <td class="text-primary fw-bold">¥${((prize.prize_value || 0) * (prize.issued || 0)).toFixed(2)}</td>
+        <td class="text-muted">-</td>
       </tr>
     `
     })
     .join('')
 }
 
-function getPrizeTypeLabel(type) {
-  const labels = {
-    physical: '<span class="badge bg-primary">实物</span>',
-    virtual: '<span class="badge bg-info">虚拟</span>',
-    points: '<span class="badge bg-success">积分</span>',
-    coupon: '<span class="badge bg-warning text-dark">优惠券</span>'
+/**
+ * 渲染活跃时段统计 - 替代原客服统计
+ * 后端格式: [{hour, hour_label, activity_count}]
+ */
+function renderActiveHoursStats(activeHours) {
+  if (!activeHours || activeHours.length === 0) {
+    document.getElementById('totalSessions').textContent = '0'
+    document.getElementById('closedSessions').textContent = '0'
+    document.getElementById('avgResponseTime').textContent = '-'
+    document.getElementById('customerSatisfaction').textContent = '-'
+    return
   }
-  return labels[type] || '<span class="badge bg-secondary">未知</span>'
+  
+  // 总活跃次数
+  const totalActivity = activeHours.reduce((sum, item) => sum + (item.activity_count || 0), 0)
+  
+  // 找出最活跃的时段
+  const sortedHours = [...activeHours].sort((a, b) => (b.activity_count || 0) - (a.activity_count || 0))
+  const peakHour = sortedHours[0]
+  
+  // 计算活跃时段数（有活动的小时数）
+  const activeHourCount = activeHours.filter(h => h.activity_count > 0).length
+  
+  document.getElementById('totalSessions').textContent = formatNumber(totalActivity)
+  document.getElementById('closedSessions').textContent = formatNumber(activeHourCount)
+  document.getElementById('avgResponseTime').textContent = peakHour ? peakHour.hour_label : '-'
+  document.getElementById('customerSatisfaction').textContent = `${((activeHourCount / 24) * 100).toFixed(0)}%`
+}
+
+/**
+ * HTML转义
+ */
+function escapeHtml(text) {
+  if (!text) return ''
+  const div = document.createElement('div')
+  div.textContent = text
+  return div.innerHTML
 }
 
 function getProgressColor(percentage) {
@@ -191,7 +319,8 @@ async function exportToExcel() {
 
   try {
     const period = document.getElementById('periodSelect').value
-    const params = new URLSearchParams({ period, format: 'excel' })
+    const days = periodToDays(period)
+    const params = new URLSearchParams({ days, format: 'excel' })
 
     if (period === 'custom') {
       params.append('start_date', document.getElementById('startDate').value)
@@ -230,7 +359,8 @@ async function exportToPDF() {
 
   try {
     const period = document.getElementById('periodSelect').value
-    const params = new URLSearchParams({ period, format: 'pdf' })
+    const days = periodToDays(period)
+    const params = new URLSearchParams({ days, format: 'pdf' })
 
     if (period === 'custom') {
       params.append('start_date', document.getElementById('startDate').value)

@@ -10,13 +10,15 @@ let currentPage = 1
 const pageSize = 20
 let currentFilters = {
   status: '',
-  payment_type: '',
   order_no: ''
 }
 
 // 页面加载
 document.addEventListener('DOMContentLoaded', function () {
-  checkAuth()
+  // 使用 admin-common.js 中的 checkAdminPermission() 进行权限验证
+  if (!checkAdminPermission()) {
+    return
+  }
   loadOrders()
   bindEvents()
 })
@@ -32,7 +34,6 @@ function bindEvents() {
 function handleSearch() {
   currentFilters = {
     status: document.getElementById('statusFilter').value,
-    payment_type: document.getElementById('paymentTypeFilter').value,
     order_no: document.getElementById('orderNoSearch').value.trim()
   }
   currentPage = 1
@@ -78,6 +79,7 @@ async function loadOrders() {
 
 /**
  * 渲染订单列表
+ * ✅ 直接使用后端返回的字段：pay_asset_code, pay_amount
  */
 function renderOrders(orders) {
   const tbody = document.getElementById('ordersTableBody')
@@ -90,10 +92,10 @@ function renderOrders(orders) {
   tbody.innerHTML = orders
     .map(order => {
       const statusBadge = getStatusBadge(order.status)
-      const paymentTypeText = getPaymentTypeText(order.payment_type)
-
-      // 只显示虚拟价值（唯一支付方式）
-      const paymentAmount = `<span class="badge bg-info">${order.virtual_value_paid} 虚拟</span>`
+      // 直接使用后端字段 pay_asset_code 获取资产类型文本
+      const paymentTypeText = getAssetTypeText(order.pay_asset_code)
+      // 直接使用后端字段 pay_amount 显示支付数量
+      const paymentAmount = `<span class="badge bg-info">${order.pay_amount || 0} ${getAssetUnit(order.pay_asset_code)}</span>`
 
       return `
       <tr>
@@ -107,7 +109,7 @@ function renderOrders(orders) {
         <td>${paymentTypeText}</td>
         <td>${paymentAmount}</td>
         <td>${statusBadge}</td>
-        <td>${formatDate(order.exchange_time)}</td>
+        <td>${formatDate(order.exchange_time || order.created_at)}</td>
         <td>
           <button class="btn btn-sm btn-outline-info" onclick="viewOrderDetail('${order.order_no}')">
             <i class="bi bi-eye"></i> 详情
@@ -147,7 +149,7 @@ function updateStats(orders) {
 
 /**
  * 查看订单详情
- * ✅ 对齐后端：使用管理员专用接口获取订单详情
+ * ✅ 直接使用后端返回的字段：pay_asset_code, pay_amount, total_cost, admin_remark
  */
 async function viewOrderDetail(orderNo) {
   try {
@@ -165,22 +167,19 @@ async function viewOrderDetail(orderNo) {
 
       document.getElementById('detailOrderNo').textContent = order.order_no
       document.getElementById('detailStatus').innerHTML = getStatusBadge(order.status)
-      document.getElementById('detailExchangeTime').textContent = formatDate(order.exchange_time)
-      document.getElementById('detailShippedAt').textContent = formatDate(order.shipped_at) || '-'
+      document.getElementById('detailExchangeTime').textContent = formatDate(order.exchange_time || order.created_at)
+      document.getElementById('detailShippedAt').textContent = order.shipped_at ? formatDate(order.shipped_at) : '-'
       document.getElementById('detailUserId').textContent = order.user_id
       document.getElementById('detailItemName').textContent = order.item_snapshot?.name || '-'
-      document.getElementById('detailItemDesc').textContent =
-        order.item_snapshot?.description || '-'
+      document.getElementById('detailItemDesc').textContent = order.item_snapshot?.description || '-'
       document.getElementById('detailQuantity').textContent = order.quantity
-      document.getElementById('detailPaymentType').textContent = getPaymentTypeText(
-        order.payment_type
-      )
-      document.getElementById('detailVirtualPaid').textContent = order.virtual_value_paid || 0
-      document.getElementById('detailPointsPaid').textContent = order.points_paid || 0
+      // 直接使用后端字段
+      document.getElementById('detailPaymentType').textContent = getAssetTypeText(order.pay_asset_code)
+      document.getElementById('detailVirtualPaid').textContent = `${order.pay_amount || 0} ${getAssetUnit(order.pay_asset_code)}`
       document.getElementById('detailCost').textContent = order.total_cost || '-'
       document.getElementById('detailRemark').textContent = order.admin_remark || '-'
 
-      // 始终显示虚拟价值行，隐藏积分支付行（只支持virtual）
+      // 显示支付信息行
       document.getElementById('detailVirtualRow').style.display = 'table-row'
       document.getElementById('detailPointsRow').style.display = 'none'
 
@@ -294,11 +293,54 @@ function getStatusBadge(status) {
 }
 
 /**
- * 获取支付方式文本
+ * 根据后端返回的 pay_asset_code 获取资产类型显示文本
+ * ✅ 直接使用后端字段 pay_asset_code
  */
-function getPaymentTypeText(type) {
-  // 统一返回"虚拟价值"，因为只支持virtual支付方式
-  return '虚拟价值'
+function getAssetTypeText(assetCode) {
+  const assetMap = {
+    // 积分类型
+    'points_virtual_value': '虚拟价值',
+    'points_lottery': '抽奖积分',
+    'points_consumption': '消费积分',
+    'coins': '金币',
+    // 材料类型（碎片等）
+    'red_shard': '红色碎片',
+    'blue_shard': '蓝色碎片',
+    'green_shard': '绿色碎片',
+    'gold_shard': '金色碎片',
+    'purple_shard': '紫色碎片',
+    'shard': '碎片',
+    // 其他材料
+    'crystal': '水晶',
+    'gem': '宝石',
+    'ticket': '兑换券'
+  }
+  return assetMap[assetCode] || assetCode || '未知'
+}
+
+/**
+ * 根据后端返回的 pay_asset_code 获取资产单位
+ * ✅ 直接使用后端字段 pay_asset_code
+ */
+function getAssetUnit(assetCode) {
+  const unitMap = {
+    // 积分类型
+    'points_virtual_value': '虚拟值',
+    'points_lottery': '积分',
+    'points_consumption': '积分',
+    'coins': '金币',
+    // 材料类型
+    'red_shard': '个',
+    'blue_shard': '个',
+    'green_shard': '个',
+    'gold_shard': '个',
+    'purple_shard': '个',
+    'shard': '个',
+    'crystal': '个',
+    'gem': '个',
+    'ticket': '张'
+  }
+  return unitMap[assetCode] || '个'
 }
 
 /**

@@ -904,11 +904,11 @@ class ConsumptionService {
           required: false,
           where: search
             ? {
-                [Op.or]: [
-                  { mobile: { [Op.like]: `%${search}%` } },
-                  { nickname: { [Op.like]: `%${search}%` } }
-                ]
-              }
+              [Op.or]: [
+                { mobile: { [Op.like]: `%${search}%` } },
+                { nickname: { [Op.like]: `%${search}%` } }
+              ]
+            }
             : undefined
         },
         {

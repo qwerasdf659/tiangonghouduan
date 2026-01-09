@@ -172,7 +172,122 @@ router.get(
 /**
  * GET /api/v4/console/images
  *
- * @description 根据业务类型和上下文 ID 获取图片列表
+ * @description 分页获取图片列表（管理后台用）
+ *              支持按业务类型和状态筛选，返回统计信息
+ *
+ * @header Authorization - Bearer {token} 管理员认证
+ * @query {number} [page=1] - 页码
+ * @query {number} [page_size=24] - 每页数量
+ * @query {string} [business_type] - 业务类型筛选：lottery|exchange|trade|uploads
+ * @query {string} [status] - 状态筛选：active|archived|deleted|orphan（orphan表示context_id=0的孤儿图片）
+ *
+ * @response {Object} 200 - 图片列表和统计
+ */
+router.get(
+  '/',
+  authenticateToken,
+  requireAdmin,
+  asyncHandler(async (req, res) => {
+    const { ImageResources } = require('../../../models')
+    const { Op, fn, col } = require('sequelize')
+    const { getImageUrl } = require('../../../utils/ImageUrlHelper')
+
+    // 解析分页参数
+    const page = parseInt(req.query.page, 10) || 1
+    const pageSize = Math.min(parseInt(req.query.page_size, 10) || 24, 100)
+    const offset = (page - 1) * pageSize
+
+    // 构建查询条件
+    const where = {}
+    const { business_type: businessType, status } = req.query
+
+    if (businessType) {
+      where.business_type = businessType
+    }
+
+    // 状态筛选：orphan 表示 context_id=0 的孤儿图片
+    if (status === 'orphan') {
+      where.context_id = 0
+      where.status = 'active'
+    } else if (status) {
+      where.status = status
+    }
+
+    // 查询图片列表
+    const { count, rows } = await ImageResources.findAndCountAll({
+      where,
+      limit: pageSize,
+      offset,
+      order: [['created_at', 'DESC']]
+    })
+
+    // 格式化图片数据（直接使用后端字段名）
+    const images = rows.map(img => ({
+      image_id: img.image_id,
+      url: getImageUrl(img.file_path),
+      original_filename: img.original_filename,
+      file_size: img.file_size,
+      mime_type: img.mime_type,
+      business_type: img.business_type,
+      category: img.category,
+      context_id: img.context_id,
+      status: img.context_id === 0 ? 'orphan' : img.status,
+      created_at: img.created_at
+    }))
+
+    // 计算统计数据
+    const [statsResult] = await ImageResources.findAll({
+      attributes: [
+        [fn('COUNT', col('image_id')), 'total'],
+        [fn('SUM', col('file_size')), 'total_size']
+      ],
+      where: { status: 'active' },
+      raw: true
+    })
+
+    // 本周上传数
+    const oneWeekAgo = new Date()
+    oneWeekAgo.setDate(oneWeekAgo.getDate() - 7)
+    const weeklyCount = await ImageResources.count({
+      where: {
+        status: 'active',
+        created_at: { [Op.gte]: oneWeekAgo }
+      }
+    })
+
+    // 孤儿图片数（context_id=0）
+    const orphanCount = await ImageResources.count({
+      where: {
+        status: 'active',
+        context_id: 0
+      }
+    })
+
+    return res.apiSuccess(
+      {
+        images,
+        statistics: {
+          total: parseInt(statsResult?.total || 0),
+          total_size: parseInt(statsResult?.total_size || 0),
+          weekly_uploads: weeklyCount,
+          orphan_count: orphanCount
+        },
+        pagination: {
+          current_page: page,
+          page_size: pageSize,
+          total_count: count,
+          total_pages: Math.ceil(count / pageSize)
+        }
+      },
+      '获取图片列表成功'
+    )
+  })
+)
+
+/**
+ * GET /api/v4/console/images/by-business
+ *
+ * @description 根据业务类型和上下文 ID 获取关联图片（原 GET / 的功能）
  *
  * @header Authorization - Bearer {token} 管理员认证
  * @query {string} business_type - 业务类型：lottery|exchange|trade|uploads
@@ -181,11 +296,10 @@ router.get(
  * @response {Object} 200 - 图片列表
  */
 router.get(
-  '/',
+  '/by-business',
   authenticateToken,
   requireAdmin,
   asyncHandler(async (req, res) => {
-    // 🔴 修复：使用 context_id（与表结构一致）
     const { business_type: businessType, context_id: contextId } = req.query
 
     if (!businessType || !contextId) {

@@ -12,6 +12,7 @@ let currentUserId = null
 let currentPage = 1
 const pageSize = 20
 let assetTypes = []
+let campaigns = [] // 活动列表（用于BUDGET_POINTS选择）
 
 // ============================================================
 // 页面初始化
@@ -28,6 +29,8 @@ document.addEventListener('DOMContentLoaded', function () {
   document.getElementById('searchForm').addEventListener('submit', handleSearch)
   document.getElementById('submitAdjustBtn').addEventListener('click', submitAdjustAsset)
   document.getElementById('assetTypeFilter').addEventListener('change', loadAdjustmentRecords)
+  // 资产类型选择变化时，显示/隐藏活动选择框
+  document.getElementById('assetType').addEventListener('change', onAssetTypeChange)
 
   // Token和权限验证
   if (!getToken() || !checkAdminPermission()) {
@@ -36,6 +39,9 @@ document.addEventListener('DOMContentLoaded', function () {
 
   // 加载资产类型
   loadAssetTypes()
+
+  // 加载活动列表（用于预算积分调整）
+  loadCampaigns()
 })
 
 // ============================================================
@@ -69,6 +75,52 @@ async function loadAssetTypes() {
     }
   } catch (error) {
     console.error('加载资产类型失败:', error)
+  }
+}
+
+/**
+ * 加载活动列表
+ * @description 用于预算积分调整时选择活动
+ * @returns {Promise<void>}
+ */
+async function loadCampaigns() {
+  try {
+    // 使用活动预算批量状态接口获取活动列表
+    const response = await apiRequest('/api/v4/console/campaign-budget/batch-status?limit=50')
+    if (response && response.success) {
+      campaigns = response.data.campaigns || []
+
+      const select = document.getElementById('campaignId')
+      select.innerHTML = '<option value="">请选择活动</option>'
+
+      campaigns.forEach(campaign => {
+        const option = document.createElement('option')
+        option.value = campaign.campaign_id
+        option.textContent = `${campaign.campaign_name || campaign.name || '活动' + campaign.campaign_id} (ID: ${campaign.campaign_id})`
+        select.appendChild(option)
+      })
+    }
+  } catch (error) {
+    console.error('加载活动列表失败:', error)
+  }
+}
+
+/**
+ * 资产类型切换事件处理
+ * @description 当选择预算积分时显示活动选择框
+ */
+function onAssetTypeChange() {
+  const assetType = document.getElementById('assetType').value
+  const campaignGroup = document.getElementById('campaignIdGroup')
+  const campaignSelect = document.getElementById('campaignId')
+
+  if (assetType === 'BUDGET_POINTS') {
+    campaignGroup.style.display = 'block'
+    campaignSelect.setAttribute('required', 'required')
+  } else {
+    campaignGroup.style.display = 'none'
+    campaignSelect.removeAttribute('required')
+    campaignSelect.value = ''
   }
 }
 
@@ -391,13 +443,28 @@ async function submitAdjustAsset() {
     return
   }
 
+  const assetCode = document.getElementById('assetType').value
+  const adjustType = document.getElementById('adjustType').value
+  const amount = parseInt(document.getElementById('adjustAmount').value)
+
+  // 构建请求数据
   const data = {
     user_id: currentUserId,
-    asset_code: document.getElementById('assetType').value,
-    adjust_type: document.getElementById('adjustType').value,
-    amount: parseInt(document.getElementById('adjustAmount').value),
+    asset_code: assetCode,
+    // 后端使用amount字段，正数=增加，负数=扣减
+    amount: adjustType === 'decrease' ? -Math.abs(amount) : Math.abs(amount),
     reason: document.getElementById('adjustReason').value.trim(),
-    idempotency_key: `asset_adjust_${currentUserId}_${Date.now()}`
+    idempotency_key: `asset_adjust_${currentUserId}_${assetCode}_${Date.now()}`
+  }
+
+  // 预算积分必须提供campaign_id
+  if (assetCode === 'BUDGET_POINTS') {
+    const campaignId = document.getElementById('campaignId').value
+    if (!campaignId) {
+      showErrorToast('调整预算积分必须选择活动')
+      return
+    }
+    data.campaign_id = parseInt(campaignId)
   }
 
   try {
@@ -414,6 +481,8 @@ async function submitAdjustAsset() {
       showSuccessToast('资产调整成功')
       bootstrap.Modal.getInstance(document.getElementById('adjustAssetModal')).hide()
       form.reset()
+      // 重置活动选择框显示状态
+      document.getElementById('campaignIdGroup').style.display = 'none'
       loadUserAssets(currentUserId)
     } else {
       showErrorToast(response?.message || '调整失败')

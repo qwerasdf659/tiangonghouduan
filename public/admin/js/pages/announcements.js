@@ -91,6 +91,7 @@ async function loadAnnouncements() {
 
 /**
  * 渲染公告列表
+ * 直接使用后端字段：id, title, content, type, priority, is_active, created_at, expires_at
  */
 function renderAnnouncements(announcements) {
   const tbody = document.getElementById('announcementsTableBody')
@@ -102,26 +103,30 @@ function renderAnnouncements(announcements) {
 
   tbody.innerHTML = announcements
     .map(item => {
-      const statusBadge = getStatusBadge(item.status)
-      const typeBadge = getTypeBadge(item.type || item.announcement_type)
+      const announcementId = item.announcement_id || item.id
+      const statusBadge = getStatusBadge(item.is_active)
+      const typeBadge = getTypeBadge(item.type)
+      const priorityBadge = getPriorityBadge(item.priority)
+      const createdAt = formatDateSafe(item.created_at)
+      const expiresAt = item.expires_at ? formatDateSafe(item.expires_at) : '<span class="text-muted">永久</span>'
 
       return `
       <tr>
-        <td>${item.announcement_id || item.id}</td>
+        <td>${announcementId}</td>
         <td>
           <div class="fw-bold">${escapeHtml(item.title)}</div>
           <small class="text-muted">${escapeHtml((item.content || '').substring(0, 50))}...</small>
         </td>
         <td>${typeBadge}</td>
         <td>${statusBadge}</td>
-        <td>${item.sort_order || 0}</td>
-        <td>${formatDate(item.start_time || item.created_at)}</td>
-        <td>${item.end_time ? formatDate(item.end_time) : '<span class="text-muted">永久</span>'}</td>
+        <td>${priorityBadge}</td>
+        <td>${createdAt}</td>
+        <td>${expiresAt}</td>
         <td>
-          <button class="btn btn-sm btn-outline-primary" onclick="editAnnouncement(${item.announcement_id || item.id})">
+          <button class="btn btn-sm btn-outline-primary" onclick="editAnnouncement(${announcementId})">
             <i class="bi bi-pencil"></i> 编辑
           </button>
-          <button class="btn btn-sm btn-outline-danger" onclick="deleteAnnouncement(${item.announcement_id || item.id})">
+          <button class="btn btn-sm btn-outline-danger" onclick="deleteAnnouncement(${announcementId})">
             <i class="bi bi-trash"></i> 删除
           </button>
         </td>
@@ -140,16 +145,15 @@ function openAddModal() {
   document.getElementById('announcementId').value = ''
   document.getElementById('announcementTitle').value = ''
   document.getElementById('announcementType').value = 'notice'
-  document.getElementById('announcementStatus').value = 'draft'
+  document.getElementById('announcementStatus').value = 'active'
   document.getElementById('announcementContent').value = ''
-  document.getElementById('announcementSort').value = '0'
-  document.getElementById('startTime').value = ''
-  document.getElementById('endTime').value = ''
+  document.getElementById('announcementPriority').value = 'medium'
+  document.getElementById('expiresAt').value = ''
   announcementModal.show()
 }
 
 /**
- * 编辑公告
+ * 编辑公告 - 直接使用后端字段
  */
 async function editAnnouncement(id) {
   try {
@@ -162,17 +166,16 @@ async function editAnnouncement(id) {
       document.getElementById('modalTitle').innerHTML = '<i class="bi bi-pencil"></i> 编辑公告'
       document.getElementById('announcementId').value = id
       document.getElementById('announcementTitle').value = item.title || ''
-      document.getElementById('announcementType').value =
-        item.type || item.announcement_type || 'notice'
-      document.getElementById('announcementStatus').value = item.status || 'draft'
+      document.getElementById('announcementType').value = item.type || 'notice'
+      document.getElementById('announcementStatus').value = item.is_active ? 'active' : 'inactive'
       document.getElementById('announcementContent').value = item.content || ''
-      document.getElementById('announcementSort').value = item.sort_order || 0
+      document.getElementById('announcementPriority').value = item.priority || 'medium'
 
-      if (item.start_time) {
-        document.getElementById('startTime').value = formatDateTimeLocal(item.start_time)
-      }
-      if (item.end_time) {
-        document.getElementById('endTime').value = formatDateTimeLocal(item.end_time)
+      // 过期时间
+      if (item.expires_at) {
+        document.getElementById('expiresAt').value = formatDateTimeLocal(item.expires_at)
+      } else {
+        document.getElementById('expiresAt').value = ''
       }
 
       announcementModal.show()
@@ -188,16 +191,15 @@ async function editAnnouncement(id) {
 }
 
 /**
- * 提交表单
+ * 提交表单 - 直接使用后端字段
  */
 async function handleSubmit() {
   const title = document.getElementById('announcementTitle').value.trim()
   const type = document.getElementById('announcementType').value
   const status = document.getElementById('announcementStatus').value
   const content = document.getElementById('announcementContent').value.trim()
-  const sortOrder = parseInt(document.getElementById('announcementSort').value) || 0
-  const startTime = document.getElementById('startTime').value
-  const endTime = document.getElementById('endTime').value
+  const priority = document.getElementById('announcementPriority').value
+  const expiresAt = document.getElementById('expiresAt').value
 
   if (!title) {
     showError('请输入公告标题')
@@ -211,14 +213,14 @@ async function handleSubmit() {
   try {
     showLoading(true)
 
+    // 直接使用后端字段
     const payload = {
       title,
-      type,
-      status,
       content,
-      sort_order: sortOrder,
-      start_time: startTime || null,
-      end_time: endTime || null
+      type,
+      priority,
+      is_active: status === 'active',
+      expires_at: expiresAt || null
     }
 
     let response
@@ -308,29 +310,98 @@ function changePage(page) {
 
 // ========== 工具函数 ==========
 
-function getStatusBadge(status) {
-  const map = {
-    active: '<span class="badge bg-success">已发布</span>',
-    inactive: '<span class="badge bg-secondary">已下线</span>',
-    draft: '<span class="badge bg-warning">草稿</span>'
+/**
+ * 状态徽章 - 直接使用后端 is_active 布尔值
+ */
+function getStatusBadge(isActive) {
+  if (isActive === true) {
+    return '<span class="badge bg-success">已发布</span>'
   }
-  return map[status] || `<span class="badge bg-secondary">${status}</span>`
+  return '<span class="badge bg-secondary">已下线</span>'
 }
 
+/**
+ * 类型徽章 - 直接使用后端 type 字段
+ * 后端类型: system, activity, maintenance, notice
+ */
 function getTypeBadge(type) {
   const map = {
-    notice: '<span class="badge bg-info">通知</span>',
+    system: '<span class="badge bg-primary">系统</span>',
     activity: '<span class="badge bg-success">活动</span>',
-    update: '<span class="badge bg-primary">更新</span>',
-    warning: '<span class="badge bg-danger">警告</span>'
+    maintenance: '<span class="badge bg-warning">维护</span>',
+    notice: '<span class="badge bg-info">通知</span>'
   }
-  return map[type] || `<span class="badge bg-secondary">${type}</span>`
+  return map[type] || `<span class="badge bg-secondary">${type || '-'}</span>`
+}
+
+/**
+ * 优先级徽章 - 直接使用后端 priority 字段
+ * 后端优先级: high, medium, low
+ */
+function getPriorityBadge(priority) {
+  const map = {
+    high: '<span class="badge bg-danger">高</span>',
+    medium: '<span class="badge bg-warning">中</span>',
+    low: '<span class="badge bg-secondary">低</span>'
+  }
+  return map[priority] || `<span class="badge bg-secondary">${priority || '-'}</span>`
+}
+
+/**
+ * 安全的日期格式化函数
+ * 处理后端返回的中文格式日期（如 "2026年1月9日星期五 08:25:48"）
+ * @param {string} dateStr - 日期字符串
+ * @returns {string} 格式化后的日期显示
+ */
+function formatDateSafe(dateStr) {
+  if (!dateStr) return '-'
+  
+  // 如果已经是中文格式（包含"年"），直接返回（去掉星期几）
+  if (typeof dateStr === 'string' && dateStr.includes('年')) {
+    // 移除星期几的信息，使显示更简洁
+    return dateStr.replace(/星期[一二三四五六日]/, '').trim()
+  }
+  
+  // 尝试标准日期解析
+  try {
+    const date = new Date(dateStr)
+    if (isNaN(date.getTime())) {
+      return dateStr // 解析失败，返回原始字符串
+    }
+    return date.toLocaleString('zh-CN', {
+      timeZone: 'Asia/Shanghai',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit'
+    })
+  } catch (e) {
+    return dateStr
+  }
 }
 
 function formatDateTimeLocal(dateStr) {
   if (!dateStr) return ''
-  const date = new Date(dateStr)
-  return date.toISOString().slice(0, 16)
+  
+  // 处理中文格式日期
+  if (typeof dateStr === 'string' && dateStr.includes('年')) {
+    // 解析中文日期格式：2026年1月9日星期五 08:25:48
+    const match = dateStr.match(/(\d{4})年(\d{1,2})月(\d{1,2})日.*?(\d{1,2}):(\d{1,2})/)
+    if (match) {
+      const [, year, month, day, hour, minute] = match
+      return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}T${hour.padStart(2, '0')}:${minute.padStart(2, '0')}`
+    }
+    return ''
+  }
+  
+  try {
+    const date = new Date(dateStr)
+    if (isNaN(date.getTime())) return ''
+    return date.toISOString().slice(0, 16)
+  } catch (e) {
+    return ''
+  }
 }
 
 function escapeHtml(text) {

@@ -33,6 +33,48 @@ router.use(authenticateToken)
 router.use(requireAdmin)
 
 /**
+ * 获取商家积分申请完整统计
+ * @route GET /api/v4/console/merchant-points/stats/pending
+ *
+ * ⚠️ 重要：此路由必须在 /:audit_id 之前定义，否则会被 /:audit_id 匹配
+ *
+ * @returns {Object} 完整统计信息（待审核、已通过、已拒绝、今日发放积分）
+ */
+router.get('/stats/pending', async (req, res) => {
+  try {
+    // P1-9：通过 ServiceManager 获取服务（snake_case key）
+    const MerchantPointsService = req.app.locals.services.getService('merchant_points')
+
+    // 并行获取各状态统计
+    const [pendingResult, approvedResult, rejectedResult] = await Promise.all([
+      MerchantPointsService.getApplications({ status: 'pending' }, 1, 1),
+      MerchantPointsService.getApplications({ status: 'approved' }, 1, 1000), // 获取足够多来计算积分
+      MerchantPointsService.getApplications({ status: 'rejected' }, 1, 1)
+    ])
+
+    // 计算今日发放的积分总额
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    const todayPoints = approvedResult.rows
+      .filter(r => new Date(r.audited_at) >= today)
+      .reduce((sum, r) => sum + (r.points_amount || 0), 0)
+
+    return res.apiSuccess(
+      {
+        pending_count: pendingResult.count,
+        approved_count: approvedResult.count,
+        rejected_count: rejectedResult.count,
+        today_points: todayPoints
+      },
+      '获取统计成功'
+    )
+  } catch (error) {
+    logger.error('❌ 获取统计失败:', error.message)
+    return res.apiError('获取统计失败', 'GET_STATS_FAILED', null, 500)
+  }
+})
+
+/**
  * 获取商家积分申请列表
  * @route GET /api/v4/console/merchant-points
  *
@@ -126,11 +168,14 @@ router.post('/:audit_id/approve', async (req, res) => {
         /*
          * 调用 ContentAuditEngine 进行审核通过操作
          * 审核引擎会触发 MerchantPointsAuditCallback.approved() 回调
+         * 参数顺序：(auditId, auditorId, reason, options)
          */
-        return await ContentAuditEngine.approve(parseInt(audit_id, 10), auditorId, {
-          reason,
-          transaction
-        })
+        return await ContentAuditEngine.approve(
+          parseInt(audit_id, 10),
+          auditorId,
+          reason || null, // 第三个参数：审核原因
+          { transaction } // 第四个参数：选项对象
+        )
       },
       {
         name: `approve_merchant_points_${audit_id}`
@@ -184,11 +229,14 @@ router.post('/:audit_id/reject', async (req, res) => {
         /*
          * 调用 ContentAuditEngine 进行审核拒绝操作
          * 审核引擎会触发 MerchantPointsAuditCallback.rejected() 回调
+         * 参数顺序：(auditId, auditorId, reason, options)
          */
-        return await ContentAuditEngine.reject(parseInt(audit_id, 10), auditorId, {
-          reason: reason.trim(),
-          transaction
-        })
+        return await ContentAuditEngine.reject(
+          parseInt(audit_id, 10),
+          auditorId,
+          reason.trim(), // 第三个参数：拒绝原因
+          { transaction } // 第四个参数：选项对象
+        )
       },
       {
         name: `reject_merchant_points_${audit_id}`
@@ -212,35 +260,6 @@ router.post('/:audit_id/reject', async (req, res) => {
     }
 
     return res.apiError('商家积分申请审核拒绝失败', 'REJECT_FAILED', null, 500)
-  }
-})
-
-/**
- * 获取待审核申请统计
- * @route GET /api/v4/console/merchant-points/stats/pending
- *
- * @returns {Object} 待审核统计信息
- */
-router.get('/stats/pending', async (req, res) => {
-  try {
-    // P1-9：通过 ServiceManager 获取服务（snake_case key）
-    const MerchantPointsService = req.app.locals.services.getService('merchant_points')
-
-    const result = await MerchantPointsService.getApplications(
-      { status: 'pending' },
-      1,
-      1 // 只需要 count
-    )
-
-    return res.apiSuccess(
-      {
-        pending_count: result.count
-      },
-      '获取待审核统计成功'
-    )
-  } catch (error) {
-    logger.error('❌ 获取待审核统计失败:', error.message)
-    return res.apiError('获取待审核统计失败', 'GET_STATS_FAILED', null, 500)
   }
 })
 

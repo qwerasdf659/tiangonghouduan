@@ -399,9 +399,9 @@ router.post('/fungible-assets/list', authenticateToken, async (req, res) => {
           },
           balance_after: freeze_result?.balance
             ? {
-                available_amount: Number(freeze_result.balance.available_amount),
-                frozen_amount: Number(freeze_result.balance.frozen_amount)
-              }
+              available_amount: Number(freeze_result.balance.available_amount),
+              frozen_amount: Number(freeze_result.balance.frozen_amount)
+            }
             : null,
           _listing_id: listing.listing_id,
           _is_duplicate: is_duplicate

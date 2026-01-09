@@ -21,6 +21,18 @@
     .frozen-card {
       border-left: 4px solid #17a2b8;
     }
+    .user-card {
+      border-left: 4px solid #ffc107;
+    }
+    .value-card {
+      border-left: 4px solid #28a745;
+    }
+    .table th {
+      white-space: nowrap;
+    }
+    .badge-asset {
+      font-size: 0.75rem;
+    }
   </style>
 </head>
 <body class="bg-light">
@@ -38,14 +50,23 @@
   </nav>
 
   <div class="container-fluid mt-4">
-    <!-- 统计概览 -->
+    <!-- 功能说明 -->
+    <div class="alert alert-info mb-4">
+      <i class="bi bi-info-circle me-2"></i>
+      <strong>孤儿冻结说明：</strong>
+      当用户账户的冻结金额（frozen_amount）大于其活跃挂牌的冻结总额时，多出的部分称为"孤儿冻结"。
+      清理操作会将孤儿冻结金额解冻到用户的可用余额。
+    </div>
+
+    <!-- 统计概览 - 适配后端stats API字段 -->
+    <!-- 后端字段: total_orphan_count, total_orphan_amount, affected_user_count -->
     <div class="row g-3 mb-4">
       <div class="col-md-3">
         <div class="card orphan-card">
           <div class="card-body text-center">
             <i class="bi bi-exclamation-triangle text-danger" style="font-size: 2rem;"></i>
             <h4 class="mt-2 text-danger" id="orphanCount">0</h4>
-            <small class="text-muted">孤儿数据</small>
+            <small class="text-muted">孤儿冻结数</small>
           </div>
         </div>
       </div>
@@ -54,72 +75,55 @@
           <div class="card-body text-center">
             <i class="bi bi-snow2 text-info" style="font-size: 2rem;"></i>
             <h4 class="mt-2 text-info" id="frozenCount">0</h4>
-            <small class="text-muted">冻结数据</small>
+            <small class="text-muted">孤儿冻结总额</small>
           </div>
         </div>
       </div>
       <div class="col-md-3">
-        <div class="card">
+        <div class="card user-card">
           <div class="card-body text-center">
-            <i class="bi bi-clock-history text-warning" style="font-size: 2rem;"></i>
+            <i class="bi bi-people text-warning" style="font-size: 2rem;"></i>
             <h4 class="mt-2 text-warning" id="expiredCount">0</h4>
-            <small class="text-muted">过期冻结</small>
+            <small class="text-muted">影响用户数</small>
           </div>
         </div>
       </div>
       <div class="col-md-3">
-        <div class="card">
+        <div class="card value-card">
           <div class="card-body text-center">
             <i class="bi bi-cash-coin text-success" style="font-size: 2rem;"></i>
-            <h4 class="mt-2 text-success" id="totalValue">¥0</h4>
+            <h4 class="mt-2 text-success" id="totalValue">¥0.00</h4>
             <small class="text-muted">涉及金额</small>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- 操作区域 -->
+    <!-- 操作区域 - 简化筛选器，只保留后端支持的 -->
     <div class="card mb-3">
       <div class="card-body">
         <div class="row g-3 align-items-end">
-          <div class="col-md-2">
-            <label class="form-label">数据类型</label>
-            <select class="form-select" id="dataTypeFilter">
-              <option value="">全部类型</option>
-              <option value="orphan">孤儿数据</option>
-              <option value="frozen">冻结数据</option>
-              <option value="expired">过期冻结</option>
-            </select>
-          </div>
-          <div class="col-md-2">
-            <label class="form-label">资产类型</label>
+          <div class="col-md-3">
+            <label class="form-label">资产类型 (asset_code)</label>
             <select class="form-select" id="assetTypeFilter">
               <option value="">全部资产</option>
-              <option value="points">积分</option>
-              <option value="diamond">钻石</option>
-              <option value="material">材料</option>
+              <option value="points">积分 (points)</option>
+              <option value="diamond">钻石 (diamond)</option>
+              <option value="gold_coin">金币 (gold_coin)</option>
+              <option value="silver_coin">银币 (silver_coin)</option>
             </select>
           </div>
-          <div class="col-md-2">
-            <label class="form-label">时间范围</label>
-            <select class="form-select" id="timeRangeFilter">
-              <option value="">全部时间</option>
-              <option value="7">最近7天</option>
-              <option value="30">最近30天</option>
-              <option value="90">最近90天</option>
-            </select>
-          </div>
-          <div class="col-md-2">
+          <div class="col-md-3">
             <button class="btn btn-primary w-100" id="refreshBtn">
               <i class="bi bi-arrow-repeat"></i> 刷新
             </button>
           </div>
-          <div class="col-md-2">
+          <div class="col-md-3">
             <button class="btn btn-warning w-100" id="scanBtn">
               <i class="bi bi-search"></i> 扫描孤儿
             </button>
           </div>
-          <div class="col-md-2">
+          <div class="col-md-3">
             <button class="btn btn-danger w-100" id="batchCleanBtn" disabled>
               <i class="bi bi-trash"></i> 批量清理
             </button>
@@ -131,7 +135,7 @@
     <!-- 数据列表 -->
     <div class="card">
       <div class="card-header bg-white d-flex justify-content-between align-items-center">
-        <h5 class="mb-0"><i class="bi bi-list-ul"></i> 孤儿/冻结数据列表</h5>
+        <h5 class="mb-0"><i class="bi bi-list-ul"></i> 孤儿冻结数据列表</h5>
         <div class="form-check">
           <input class="form-check-input" type="checkbox" id="selectAll">
           <label class="form-check-label" for="selectAll">全选</label>
@@ -143,12 +147,12 @@
             <thead class="table-light">
               <tr>
                 <th width="40"><input type="checkbox" class="form-check-input" id="headerCheckbox"></th>
-                <th>ID</th>
+                <th>#</th>
                 <th>类型</th>
                 <th>资产类型</th>
-                <th>金额/数量</th>
+                <th>孤儿冻结额</th>
                 <th>用户</th>
-                <th>来源</th>
+                <th>描述</th>
                 <th>创建时间</th>
                 <th>过期时间</th>
                 <th>状态</th>
@@ -170,6 +174,41 @@
         <nav id="paginationNav"></nav>
       </div>
     </div>
+
+    <!-- 后端字段说明 -->
+    <div class="card mt-4">
+      <div class="card-header bg-light">
+        <i class="bi bi-code-square"></i> 后端API字段说明
+      </div>
+      <div class="card-body">
+        <h6>检测API (GET /api/v4/console/orphan-frozen/detect)</h6>
+        <ul class="small text-muted mb-3">
+          <li><code>total</code> - 孤儿冻结记录数</li>
+          <li><code>total_amount</code> - 孤儿冻结总金额</li>
+          <li><code>orphan_list[]</code> - 孤儿冻结列表</li>
+        </ul>
+        
+        <h6>孤儿冻结项字段 (orphan_list item)</h6>
+        <ul class="small text-muted mb-3">
+          <li><code>user_id</code> - 用户ID</li>
+          <li><code>account_id</code> - 账户ID</li>
+          <li><code>asset_code</code> - 资产代码</li>
+          <li><code>frozen_amount</code> - 账户总冻结金额</li>
+          <li><code>listed_amount</code> - 活跃挂牌冻结金额</li>
+          <li><code>orphan_amount</code> - 孤儿冻结金额 (frozen_amount - listed_amount)</li>
+          <li><code>available_amount</code> - 可用余额</li>
+          <li><code>description</code> - 描述信息</li>
+        </ul>
+
+        <h6>统计API (GET /api/v4/console/orphan-frozen/stats)</h6>
+        <ul class="small text-muted mb-0">
+          <li><code>total_orphan_count</code> - 孤儿冻结总数</li>
+          <li><code>total_orphan_amount</code> - 孤儿冻结总金额</li>
+          <li><code>affected_user_count</code> - 影响用户数</li>
+          <li><code>by_asset[]</code> - 按资产类型分组统计</li>
+        </ul>
+      </div>
+    </div>
   </div>
 
   <!-- 清理确认模态框 -->
@@ -177,25 +216,26 @@
     <div class="modal-dialog">
       <div class="modal-content">
         <div class="modal-header">
-          <h5 class="modal-title text-danger"><i class="bi bi-exclamation-triangle"></i> 确认清理</h5>
+          <h5 class="modal-title text-danger"><i class="bi bi-exclamation-triangle"></i> 确认清理孤儿冻结</h5>
           <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
         </div>
         <div class="modal-body">
-          <div class="alert alert-danger">
-            <i class="bi bi-exclamation-triangle-fill"></i> 此操作不可恢复！
+          <div class="alert alert-warning">
+            <i class="bi bi-info-circle-fill"></i> 
+            清理操作会将孤儿冻结金额解冻到用户的可用余额，此操作会记录审计日志。
           </div>
-          <p>您即将清理以下数据：</p>
+          <p>您即将清理以下孤儿冻结数据：</p>
           <ul id="cleanSummaryList">
             <!-- 动态生成 -->
           </ul>
           <div class="mb-3">
             <label class="form-label">清理原因 <span class="text-danger">*</span></label>
-            <textarea class="form-control" id="cleanReason" rows="2" required placeholder="请输入清理原因"></textarea>
+            <textarea class="form-control" id="cleanReason" rows="2" required placeholder="请输入清理原因（必填）"></textarea>
           </div>
           <div class="form-check">
             <input class="form-check-input" type="checkbox" id="confirmClean" required>
             <label class="form-check-label" for="confirmClean">
-              我已了解此操作的风险，确认执行清理
+              我已了解清理操作的影响，确认执行
             </label>
           </div>
         </div>
@@ -225,4 +265,3 @@
   <script src="/admin/js/pages/orphan-frozen.js"></script>
 </body>
 </html>
-

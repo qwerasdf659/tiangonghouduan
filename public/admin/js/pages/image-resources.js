@@ -115,10 +115,11 @@ async function uploadImages() {
 
     for (const file of selectedFiles) {
       const formData = new FormData()
-      formData.append('file', file)
-      formData.append('type', imageType)
+      formData.append('image', file) // 后端字段名是 image
+      formData.append('business_type', imageType) // 后端字段名是 business_type
 
-      const response = await fetch('/api/v4/console/system/images/upload', {
+      // 修正API路径：/api/v4/console/images/upload（移除 system 子路径）
+      const response = await fetch('/api/v4/console/images/upload', {
         method: 'POST',
         headers: { Authorization: `Bearer ${getToken()}` },
         body: formData
@@ -151,11 +152,13 @@ async function loadImageData() {
     const imageType = document.getElementById('imageTypeFilter').value
     const status = document.getElementById('statusFilter').value
 
+    // 修正API路径和参数名：使用后端字段名 business_type
     const params = new URLSearchParams({ page: currentPage, page_size: pageSize })
-    if (imageType) params.append('type', imageType)
+    if (imageType) params.append('business_type', imageType)
     if (status) params.append('status', status)
 
-    const response = await apiRequest(`/api/v4/console/system/images?${params.toString()}`)
+    // 修正API路径：/api/v4/console/images（移除 system 子路径）
+    const response = await apiRequest(`/api/v4/console/images?${params.toString()}`)
 
     if (response && response.success) {
       const { images, statistics, pagination } = response.data
@@ -201,6 +204,8 @@ function renderImages(images) {
     return
   }
 
+  // 适配后端字段名：original_filename（不是 file_name）
+  // 使用 data-image-id 属性替代内联 onclick，避免CSP错误
   container.innerHTML = images
     .map(image => {
       const statusBadge =
@@ -210,17 +215,17 @@ function renderImages(images) {
 
       return `
       <div class="col-md-2 col-sm-4 col-6">
-        <div class="card image-card" onclick="showImageDetail(${image.image_id})">
+        <div class="card image-card" data-image-id="${image.image_id}" style="cursor: pointer;">
           <div class="position-relative">
             ${
               image.url
-                ? `<img src="${image.url}" class="image-preview" alt="${image.file_name}" onerror="this.parentNode.innerHTML='<div class=\\'image-placeholder\\'><i class=\\'bi bi-image text-muted\\' style=\\'font-size: 2rem;\\'></i></div>'">`
+                ? `<img src="${image.url}" class="image-preview" alt="${image.original_filename || ''}">`
                 : '<div class="image-placeholder"><i class="bi bi-image text-muted" style="font-size: 2rem;"></i></div>'
             }
             ${statusBadge}
           </div>
           <div class="card-body p-2">
-            <small class="text-truncate d-block">${image.file_name || '-'}</small>
+            <small class="text-truncate d-block">${image.original_filename || '-'}</small>
             <small class="text-muted">${formatFileSize(image.file_size)}</small>
           </div>
         </div>
@@ -228,26 +233,49 @@ function renderImages(images) {
     `
     })
     .join('')
+
+  // 使用事件委托绑定点击事件，避免CSP内联脚本限制
+  container.querySelectorAll('.image-card[data-image-id]').forEach(card => {
+    card.addEventListener('click', function () {
+      const imageId = parseInt(this.dataset.imageId, 10)
+      if (imageId) {
+        showImageDetail(imageId)
+      }
+    })
+  })
+
+  // 处理图片加载错误
+  container.querySelectorAll('.image-preview').forEach(img => {
+    img.addEventListener('error', function () {
+      this.parentNode.innerHTML =
+        '<div class="image-placeholder"><i class="bi bi-image text-muted" style="font-size: 2rem;"></i></div>'
+    })
+  })
 }
 
 async function showImageDetail(imageId) {
   currentImageId = imageId
 
   try {
-    const response = await apiRequest(`/api/v4/console/system/images/${imageId}`)
+    // 修正API路径：/api/v4/console/images/:id（移除 system 子路径）
+    const response = await apiRequest(`/api/v4/console/images/${imageId}`)
 
     if (response && response.success) {
-      const image = response.data.image || response.data
+      const image = response.data
 
-      document.getElementById('detailImagePreview').src = image.url || ''
-      document.getElementById('detailFileName').textContent = image.file_name || '-'
+      // 适配后端字段名：public_url, original_filename, context_id
+      document.getElementById('detailImagePreview').src = image.public_url || ''
+      document.getElementById('detailFileName').textContent = image.original_filename || '-'
       document.getElementById('detailFileType').textContent = image.mime_type || '-'
       document.getElementById('detailFileSize').textContent = formatFileSize(image.file_size)
       document.getElementById('detailUploadTime').textContent = formatDate(image.created_at)
+      // 根据 context_id 判断是否为孤儿图片
       document.getElementById('detailUsageStatus').textContent =
-        image.status === 'orphan' ? '孤儿图片' : '使用中'
-      document.getElementById('detailRelatedEntity').textContent = image.related_entity || '-'
-      document.getElementById('detailImageUrl').value = image.url || ''
+        image.context_id === 0 ? '孤儿图片（未绑定）' : '使用中'
+      // 显示关联信息：business_type + context_id
+      document.getElementById('detailRelatedEntity').textContent =
+        image.context_id > 0 ? `${image.business_type}:${image.context_id}` : '-'
+      document.getElementById('detailImageUrl').value = image.public_url || ''
 
       new bootstrap.Modal(document.getElementById('imageDetailModal')).show()
     }
@@ -272,7 +300,8 @@ async function deleteCurrentImage() {
   }
 
   try {
-    const response = await apiRequest(`/api/v4/console/system/images/${currentImageId}`, {
+    // 修正API路径：/api/v4/console/images/:id（移除 system 子路径）
+    const response = await apiRequest(`/api/v4/console/images/${currentImageId}`, {
       method: 'DELETE'
     })
 

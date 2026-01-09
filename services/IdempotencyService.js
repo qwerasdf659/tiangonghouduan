@@ -52,13 +52,10 @@ const PROCESSING_TIMEOUT_SECONDS = 60 // processing 状态超时阈值（秒）
  * 例如：SHOP_EXCHANGE_CREATE_ORDER = 商城域 + 兑换资源 + 创建订单动作
  */
 const CANONICAL_OPERATION_MAP = {
-  /* B2C 兑换下单 - 旧路径（待删除，但仍保留映射用于回放历史记录） */
-  '/api/v4/exchange_market/exchange': 'SHOP_EXCHANGE_CREATE_ORDER',
-  /* B2C 兑换下单 - 新路径（当前规范） */
+  // ===== B2C 兑换下单 =====
   '/api/v4/shop/exchange/exchange': 'SHOP_EXCHANGE_CREATE_ORDER',
 
   // ===== 材料转换 =====
-  '/api/v4/assets/convert': 'SHOP_ASSET_CONVERT',
   '/api/v4/shop/assets/convert': 'SHOP_ASSET_CONVERT',
 
   // ===== 抽奖 =====

@@ -69,14 +69,30 @@ function bindEventListeners() {
   // 刷新数据
   document.getElementById('refreshBtn').addEventListener('click', refreshAll)
 
-  // 提交配额调整
-  document.getElementById('submitAdjustBtn').addEventListener('click', submitAdjustQuota)
+  // 提交配额规则创建
+  document.getElementById('submitAdjustBtn').addEventListener('click', submitCreateRule)
 
   // 活动筛选变更
   document.getElementById('activitySelect').addEventListener('change', refreshAll)
 
   // 时间周期变更
   document.getElementById('periodSelect').addEventListener('change', loadQuotaData)
+
+  // 规则类型变更 - 控制活动选择框显示/隐藏
+  const ruleTypeSelect = document.getElementById('ruleType')
+  if (ruleTypeSelect) {
+    ruleTypeSelect.addEventListener('change', function() {
+      const campaignContainer = document.getElementById('campaignSelectContainer')
+      const modalActivitySelect = document.getElementById('modalActivitySelect')
+      if (this.value === 'campaign') {
+        campaignContainer.style.display = 'block'
+        modalActivitySelect.setAttribute('required', 'required')
+      } else {
+        campaignContainer.style.display = 'none'
+        modalActivitySelect.removeAttribute('required')
+      }
+    })
+  }
 }
 
 // ==================== 数据加载函数 ====================
@@ -87,11 +103,12 @@ function bindEventListeners() {
  */
 async function loadStatistics() {
   try {
-    const activityId = document.getElementById('activitySelect').value
+    // 直接使用后端字段名 campaign_id
+    const campaignId = document.getElementById('activitySelect').value
     const params = new URLSearchParams()
 
-    if (activityId) {
-      params.append('campaign_id', activityId)
+    if (campaignId) {
+      params.append('campaign_id', campaignId)
     }
 
     const url = params.toString()
@@ -101,14 +118,15 @@ async function loadStatistics() {
     const response = await apiRequest(url)
 
     if (response && response.success) {
+      // 直接使用后端返回的字段名
       const { rules, quotas } = response.data
 
-      // 更新规则统计卡片
+      // 更新规则统计卡片（使用后端字段）
       document.getElementById('totalQuota').textContent = rules?.total || 0
       document.getElementById('usedQuota').textContent = quotas?.today_used || 0
       document.getElementById('remainingQuota').textContent = quotas?.today_remaining || 0
 
-      // 计算使用率
+      // 计算使用率（使用后端字段 today_limit）
       const totalLimit = quotas?.today_limit || 0
       const usedCount = quotas?.today_used || 0
       const usageRate = totalLimit > 0 ? Math.round((usedCount / totalLimit) * 100) + '%' : '0%'
@@ -143,8 +161,9 @@ async function loadActivities() {
 
       activities.forEach(activity => {
         const option = document.createElement('option')
-        option.value = activity.activity_id
-        option.textContent = activity.name
+        // 直接使用后端字段名 campaign_id（以后端为准）
+        option.value = activity.campaign_id
+        option.textContent = activity.name || activity.campaign_name
         select.appendChild(option.cloneNode(true))
         modalSelect.appendChild(option)
       })
@@ -163,7 +182,8 @@ async function loadQuotaData() {
   const tbody = document.getElementById('quotaTableBody')
 
   try {
-    const activityId = document.getElementById('activitySelect').value
+    // 直接使用后端字段名 campaign_id
+    const campaignId = document.getElementById('activitySelect').value
     const period = document.getElementById('periodSelect').value
 
     const params = new URLSearchParams({
@@ -172,8 +192,9 @@ async function loadQuotaData() {
       period: period
     })
 
-    if (activityId) {
-      params.append('activity_id', activityId)
+    // 使用后端字段名 campaign_id（而不是 activity_id）
+    if (campaignId) {
+      params.append('campaign_id', campaignId)
     }
 
     const response = await apiRequest(`/api/v4/console/lottery-quota/rules?${params.toString()}`)
@@ -210,6 +231,17 @@ async function loadQuotaData() {
 
 /**
  * 渲染配额规则表格
+ * 直接使用后端返回的字段名（以后端为准）
+ * 
+ * 后端返回字段：
+ * - rule_id: 规则ID（字符串）
+ * - scope_type: 规则类型（global/campaign/role/user）
+ * - scope_id: 作用范围ID
+ * - limit_value: 每日上限
+ * - priority: 优先级
+ * - status: 状态（active/inactive）
+ * - effective_from/effective_to: 生效时间范围
+ * 
  * @param {Array} rules - 配额规则数组
  */
 function renderQuotaTable(rules) {
@@ -218,7 +250,7 @@ function renderQuotaTable(rules) {
   if (!rules || rules.length === 0) {
     tbody.innerHTML = `
       <tr>
-        <td colspan="10" class="text-center py-5 text-muted">
+        <td colspan="8" class="text-center py-5 text-muted">
           <i class="bi bi-inbox" style="font-size: 3rem;"></i>
           <p class="mt-2">暂无配额规则</p>
         </td>
@@ -229,24 +261,47 @@ function renderQuotaTable(rules) {
 
   tbody.innerHTML = rules
     .map(rule => {
+      // 直接使用后端字段 status
       const statusBadge =
         rule.status === 'active'
           ? '<span class="badge bg-success">有效</span>'
           : '<span class="badge bg-secondary">已禁用</span>'
 
+      // 直接使用后端字段 scope_type
+      const scopeTypeText = getQuotaTypeText(rule.scope_type)
+      
+      // 直接使用后端字段 scope_type 和 scope_id
+      let scopeText = '-'
+      if (rule.scope_type === 'global') {
+        scopeText = '全局'
+      } else if (rule.scope_type === 'campaign') {
+        scopeText = `活动ID: ${rule.scope_id}`
+      } else if (rule.scope_type === 'role') {
+        scopeText = `角色: ${rule.scope_id}`
+      } else if (rule.scope_type === 'user') {
+        scopeText = `用户ID: ${rule.scope_id}`
+      }
+
+      // 直接使用后端字段 effective_from 和 effective_to
+      let effectiveText = '永久有效'
+      if (rule.effective_from || rule.effective_to) {
+        const from = rule.effective_from ? formatDate(rule.effective_from) : '开始'
+        const to = rule.effective_to ? formatDate(rule.effective_to) : '永久'
+        effectiveText = `${from} ~ ${to}`
+      }
+
+      // 直接使用后端字段 rule_id, limit_value, priority
       return `
       <tr>
         <td>${rule.rule_id}</td>
-        <td>${rule.campaign_name || rule.campaign_id || '-'}</td>
-        <td>${rule.scope_id || '-'}</td>
-        <td>${getQuotaTypeText(rule.scope_type)}</td>
-        <td>${rule.limit_value}</td>
-        <td>${rule.priority || '-'}</td>
-        <td>-</td>
-        <td>${formatDate(rule.effective_to) || '永久'}</td>
+        <td><span class="badge bg-primary">${scopeTypeText}</span></td>
+        <td>${scopeText}</td>
+        <td><strong>${rule.limit_value}</strong> 次/天</td>
+        <td>${rule.priority ?? '-'}</td>
+        <td><small>${effectiveText}</small></td>
         <td>${statusBadge}</td>
         <td>
-          <button class="btn btn-sm btn-outline-danger" onclick="disableRule(${rule.rule_id})" ${rule.status === 'inactive' ? 'disabled' : ''}>
+          <button class="btn btn-sm btn-outline-danger" onclick="disableRule('${rule.rule_id}')" ${rule.status === 'inactive' ? 'disabled' : ''} title="禁用规则">
             <i class="bi bi-x-circle"></i>
           </button>
         </td>
@@ -329,7 +384,9 @@ function goToPage(page) {
 
 /**
  * 禁用配额规则
- * @param {number} ruleId - 规则ID
+ * 直接使用后端字段 rule_id（后端返回的是字符串类型）
+ * 
+ * @param {string|number} ruleId - 规则ID（后端返回字符串，但也兼容数字）
  */
 async function disableRule(ruleId) {
   if (!confirm('确定要禁用此规则吗？')) {
@@ -337,6 +394,7 @@ async function disableRule(ruleId) {
   }
 
   try {
+    // 直接使用后端API路径，rule_id 作为路径参数
     const response = await apiRequest(`/api/v4/console/lottery-quota/rules/${ruleId}/disable`, {
       method: 'PUT'
     })
@@ -344,6 +402,7 @@ async function disableRule(ruleId) {
     if (response && response.success) {
       showSuccessToast('规则已禁用')
       loadQuotaData()
+      loadStatistics()  // 同时刷新统计数据
     } else {
       showErrorToast(response?.message || '禁用失败')
     }
@@ -356,8 +415,14 @@ async function disableRule(ruleId) {
 /**
  * 提交配额规则创建
  * POST /api/v4/console/lottery-quota/rules
+ * 
+ * 后端API参数（以后端为准，直接使用后端字段名）：
+ * - rule_type: 规则类型（global/campaign/role/user）
+ * - campaign_id: 活动ID（campaign类型必填，使用后端字段名）
+ * - limit_value: 每日抽奖次数上限
+ * - reason: 创建原因（可选）
  */
-async function submitAdjustQuota() {
+async function submitCreateRule() {
   const form = document.getElementById('adjustQuotaForm')
 
   if (!form.checkValidity()) {
@@ -365,18 +430,41 @@ async function submitAdjustQuota() {
     return
   }
 
-  const ruleType = document.getElementById('adjustType')?.value || 'campaign'
+  // 直接使用后端字段名 rule_type
+  const ruleType = document.getElementById('ruleType')?.value
+  if (!ruleType) {
+    showErrorToast('请选择规则类型')
+    return
+  }
+
+  // 直接使用后端字段名 limit_value
+  const limitValue = parseInt(document.getElementById('limitValue')?.value)
+  if (!limitValue || limitValue <= 0) {
+    showErrorToast('请输入有效的每日上限次数')
+    return
+  }
+
+  // 构建请求数据（直接使用后端字段名，无复杂映射）
   const data = {
-    rule_type: ruleType,
-    campaign_id: parseInt(document.getElementById('modalActivitySelect').value) || null,
-    limit_value: parseInt(document.getElementById('adjustAmount').value),
-    reason: document.getElementById('adjustReason').value.trim()
+    rule_type: ruleType,       // 后端字段
+    limit_value: limitValue,   // 后端字段
+    reason: document.getElementById('adjustReason')?.value?.trim() || null
+  }
+
+  // 如果是活动规则，添加 campaign_id（后端字段名）
+  if (ruleType === 'campaign') {
+    const campaignId = document.getElementById('modalActivitySelect')?.value
+    if (!campaignId) {
+      showErrorToast('活动规则必须选择一个活动')
+      return
+    }
+    data.campaign_id = parseInt(campaignId)  // 后端字段名
   }
 
   try {
     const submitBtn = document.getElementById('submitAdjustBtn')
     submitBtn.disabled = true
-    submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>提交中...'
+    submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>创建中...'
 
     const response = await apiRequest('/api/v4/console/lottery-quota/rules', {
       method: 'POST',
@@ -387,7 +475,10 @@ async function submitAdjustQuota() {
       showSuccessToast('配额规则创建成功')
       bootstrap.Modal.getInstance(document.getElementById('adjustQuotaModal')).hide()
       form.reset()
-      loadQuotaData()
+      // 重置活动选择容器的显示状态
+      document.getElementById('campaignSelectContainer').style.display = 'none'
+      // 刷新统计和列表
+      await refreshAll()
     } else {
       showErrorToast(response?.message || '创建失败')
     }
@@ -397,7 +488,7 @@ async function submitAdjustQuota() {
   } finally {
     const submitBtn = document.getElementById('submitAdjustBtn')
     submitBtn.disabled = false
-    submitBtn.innerHTML = '确认创建'
+    submitBtn.innerHTML = '创建规则'
   }
 }
 

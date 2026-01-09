@@ -106,6 +106,62 @@ router.get('/', authenticateToken, requireAdmin, async (req, res) => {
 })
 
 /**
+ * 管理员获取审计日志统计
+ * GET /api/v4/console/system/audit-logs/statistics
+ *
+ * @description 管理员获取审计日志统计信息（今日、本周、成功、失败等）
+ *
+ * @query {number} operator_id - 操作员ID筛选（可选）
+ * @query {string} start_date - 开始日期（可选）
+ * @query {string} end_date - 结束日期（可选）
+ *
+ * @returns {Object} 审计日志统计信息
+ *
+ * @security JWT + Admin权限
+ *
+ * @note 此路由必须在 /:log_id 之前定义，否则 "statistics" 会被当作 log_id 解析
+ */
+router.get('/statistics', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    // P1-9：通过 ServiceManager 获取服务（snake_case key）
+    const AuditLogService = req.app.locals.services.getService('audit_log')
+
+    const { operator_id, start_date, end_date } = req.query
+    const admin_id = req.user.user_id
+
+    logger.info('管理员查询审计日志统计', {
+      admin_id,
+      operator_id,
+      start_date,
+      end_date
+    })
+
+    // 调用服务层方法获取统计信息
+    const statistics = await AuditLogService.getAuditStatisticsEnhanced({
+      operator_id: operator_id ? parseInt(operator_id) : null,
+      start_date,
+      end_date
+    })
+
+    logger.info('管理员获取审计日志统计成功', {
+      admin_id,
+      total: statistics.total,
+      today_count: statistics.today_count
+    })
+
+    return res.apiSuccess(statistics, '审计日志统计查询成功')
+  } catch (error) {
+    logger.error('管理员查询审计日志统计失败', {
+      error: error.message,
+      stack: error.stack,
+      admin_id: req.user?.user_id
+    })
+
+    return res.apiError(error.message || '查询审计日志统计失败', 'INTERNAL_ERROR', null, 500)
+  }
+})
+
+/**
  * 管理员获取审计日志详情
  * GET /api/v4/console/system/audit-logs/:log_id
  *
@@ -166,65 +222,6 @@ router.get('/:log_id', authenticateToken, requireAdmin, async (req, res) => {
     }
 
     return res.apiError(error.message || '查询审计日志详情失败', 'INTERNAL_ERROR', null, 500)
-  }
-})
-
-/**
- * 管理员获取审计日志统计
- * GET /api/v4/console/system/audit-logs/statistics
- *
- * @description 管理员获取审计日志统计信息
- *
- * @query {number} operator_id - 操作员ID筛选（可选）
- * @query {string} start_date - 开始日期（可选）
- * @query {string} end_date - 结束日期（可选）
- *
- * @returns {Object} 审计日志统计信息
- *
- * @security JWT + Admin权限
- */
-router.get('/stats/summary', authenticateToken, requireAdmin, async (req, res) => {
-  try {
-    // P1-9：通过 ServiceManager 获取服务（snake_case key）
-    const AuditLogService = req.app.locals.services.getService('audit_log')
-
-    const { operator_id, start_date, end_date } = req.query
-    const admin_id = req.user.user_id
-
-    logger.info('管理员查询审计日志统计', {
-      admin_id,
-      operator_id,
-      start_date,
-      end_date
-    })
-
-    // 调用服务层方法获取统计信息
-    const statistics = await AuditLogService.getAuditStatistics({
-      operator_id: operator_id ? parseInt(operator_id) : null,
-      start_date,
-      end_date
-    })
-
-    logger.info('管理员获取审计日志统计成功', {
-      admin_id,
-      total: statistics.total
-    })
-
-    return res.apiSuccess(
-      {
-        success: true,
-        statistics
-      },
-      '审计日志统计查询成功'
-    )
-  } catch (error) {
-    logger.error('管理员查询审计日志统计失败', {
-      error: error.message,
-      stack: error.stack,
-      admin_id: req.user?.user_id
-    })
-
-    return res.apiError(error.message || '查询审计日志统计失败', 'INTERNAL_ERROR', null, 500)
   }
 })
 

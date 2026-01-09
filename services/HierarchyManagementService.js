@@ -61,26 +61,48 @@ class HierarchyManagementService {
    */
   static async createHierarchy(user_id, superior_user_id, role_id, store_id = null) {
     try {
-      // 1. 验证用户和角色存在
+      // 1. 验证用户存在
       const user = await User.findByPk(user_id)
       if (!user) {
-        throw new Error(`用户不存在: user_id=${user_id}`)
-      }
-
-      const role = await Role.findByPk(role_id)
-      if (!role) {
-        throw new Error(`角色不存在: role_id=${role_id}`)
-      }
-
-      // 2. 验证上级用户存在（如果有上级）
-      if (superior_user_id) {
-        const superior = await User.findByPk(superior_user_id)
-        if (!superior) {
-          throw new Error(`上级用户不存在: superior_user_id=${superior_user_id}`)
+        return {
+          success: false,
+          message: `用户不存在: user_id=${user_id}，请输入有效的用户ID`
         }
       }
 
-      // 3. 创建层级关系记录（简化版：不计算 hierarchy_path 和 hierarchy_level）
+      // 2. 验证角色存在
+      const role = await Role.findByPk(role_id)
+      if (!role) {
+        return {
+          success: false,
+          message: `角色不存在: role_id=${role_id}`
+        }
+      }
+
+      // 3. 验证上级用户存在（如果有上级）
+      if (superior_user_id) {
+        const superior = await User.findByPk(superior_user_id)
+        if (!superior) {
+          return {
+            success: false,
+            message: `上级用户不存在: superior_user_id=${superior_user_id}，请输入有效的上级用户ID`
+          }
+        }
+      }
+
+      // 4. 检查是否已存在相同的层级关系（避免重复创建）
+      const existingHierarchy = await UserHierarchy.findOne({
+        where: { user_id, role_id }
+      })
+      if (existingHierarchy) {
+        return {
+          success: false,
+          hierarchy: existingHierarchy,
+          message: `用户 ${user_id} 已存在该角色(${role.role_name})的层级关系，不能重复创建`
+        }
+      }
+
+      // 5. 创建层级关系记录（简化版：不计算 hierarchy_path 和 hierarchy_level）
       const hierarchy = await UserHierarchy.create({
         user_id,
         superior_user_id,
@@ -94,7 +116,7 @@ class HierarchyManagementService {
         `✅ 创建层级关系成功: 用户${user_id} → 上级${superior_user_id}, 角色级别${role.role_level}`
       )
 
-      // 4. 🔄 清除新用户的权限缓存（确保权限立即生效）
+      // 6. 🔄 清除新用户的权限缓存（确保权限立即生效）
       await PermissionManager.invalidateUser(user_id, 'hierarchy_create')
       logger.info(`✅ 已清除用户${user_id}的权限缓存`)
 

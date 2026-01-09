@@ -1069,21 +1069,25 @@ class ExchangeService {
     // 强制要求事务边界 - 2026-01-08 图片存储架构治理
     const transaction = assertAndGetTransaction(options, 'ExchangeService.createExchangeItem')
 
+    // 🔧 2026-01-09 修复：兼容 item_name/name 和 item_description/description 两种字段名
+    const itemName = itemData.item_name || itemData.name || ''
+    const itemDescription = itemData.item_description || itemData.description || ''
+
     logger.info('[兑换市场] 管理员创建商品', {
-      item_name: itemData.item_name,
+      item_name: itemName,
       created_by
     })
 
     // 参数验证
-    if (!itemData.item_name || itemData.item_name.trim().length === 0) {
+    if (!itemName || itemName.trim().length === 0) {
       throw new Error('商品名称不能为空')
     }
 
-    if (itemData.item_name.length > 100) {
+    if (itemName.length > 100) {
       throw new Error('商品名称最长100字符')
     }
 
-    if (itemData.item_description && itemData.item_description.length > 500) {
+    if (itemDescription && itemDescription.length > 500) {
       throw new Error('商品描述最长500字符')
     }
 
@@ -1109,11 +1113,14 @@ class ExchangeService {
       throw new Error(`无效的status参数，允许值：${validStatuses.join(', ')}`)
     }
 
-    // 创建商品（V4.5.0材料资产支付 + 2026-01-08 图片存储架构）
+    /*
+     * 创建商品（V4.5.0材料资产支付 + 2026-01-08 图片存储架构）
+     * 🔧 2026-01-09 修复：字段名匹配数据库模型（name/description，兼容API传入的item_name/item_description）
+     */
     const item = await ExchangeItem.create(
       {
-        item_name: itemData.item_name.trim(),
-        item_description: itemData.item_description ? itemData.item_description.trim() : '',
+        name: itemName.trim(),
+        description: itemDescription.trim(),
         // 🎯 2026-01-08 图片存储架构：主图片ID（关联 image_resources.image_id）
         primary_image_id: itemData.primary_image_id || null,
         cost_asset_code: itemData.cost_asset_code,
@@ -1203,21 +1210,26 @@ class ExchangeService {
     // 构建更新数据
     const finalUpdateData = { updated_at: BeijingTimeHelper.createDatabaseTime() }
 
-    if (updateData.item_name !== undefined) {
-      if (updateData.item_name.trim().length === 0) {
+    // 🔧 2026-01-09 修复：兼容 item_name/name 两种字段名
+    const itemName = updateData.item_name !== undefined ? updateData.item_name : updateData.name
+    if (itemName !== undefined) {
+      if (itemName.trim().length === 0) {
         throw new Error('商品名称不能为空')
       }
-      if (updateData.item_name.length > 100) {
+      if (itemName.length > 100) {
         throw new Error('商品名称最长100字符')
       }
-      finalUpdateData.item_name = updateData.item_name.trim()
+      finalUpdateData.name = itemName.trim()
     }
 
-    if (updateData.item_description !== undefined) {
-      if (updateData.item_description.length > 500) {
+    // 🔧 2026-01-09 修复：兼容 item_description/description 两种字段名
+    const itemDescription =
+      updateData.item_description !== undefined ? updateData.item_description : updateData.description
+    if (itemDescription !== undefined) {
+      if (itemDescription.length > 500) {
         throw new Error('商品描述最长500字符')
       }
-      finalUpdateData.item_description = updateData.item_description.trim()
+      finalUpdateData.description = itemDescription.trim()
     }
 
     // V4.5.0：材料资产支付字段更新

@@ -1952,103 +1952,103 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
 
     // 根据奖品类型进行不同的发放逻辑
     switch (prize.prize_type) {
-      case 'points':
-        // 🔧 V4.3修复：使用AssetService替代PointsService（方案B幂等）
-        // eslint-disable-next-line no-restricted-syntax -- 已传递 transaction
-        await AssetService.changeBalance(
-          {
-            user_id,
-            asset_code: 'POINTS',
-            delta_amount: parseInt(prize.prize_value), // 增加积分为正数
-            idempotency_key: `${idempotencyKey}:points`, // 方案B：派生幂等键
-            lottery_session_id: lotterySessionId, // 方案B：关联抽奖会话
-            business_type: 'lottery_reward',
-            meta: {
-              source_type: 'system',
-              title: `抽奖奖励：${prize.prize_name}`,
-              description: `获得${prize.prize_value}积分奖励`
-            }
-          },
-          { transaction } // 🎯 传入事务对象，确保积分操作在同一事务中
-        )
-
-        this.logInfo('发放积分奖励（使用AssetService + 事务）', {
+    case 'points':
+      // 🔧 V4.3修复：使用AssetService替代PointsService（方案B幂等）
+      // eslint-disable-next-line no-restricted-syntax -- 已传递 transaction
+      await AssetService.changeBalance(
+        {
           user_id,
-          prizeId: prize.prize_id,
-          prizeName: prize.prize_name,
-          points: prize.prize_value,
-          idempotencyKey,
-          lotterySessionId,
-          inTransaction: !!transaction
-        })
-        break
+          asset_code: 'POINTS',
+          delta_amount: parseInt(prize.prize_value), // 增加积分为正数
+          idempotency_key: `${idempotencyKey}:points`, // 方案B：派生幂等键
+          lottery_session_id: lotterySessionId, // 方案B：关联抽奖会话
+          business_type: 'lottery_reward',
+          meta: {
+            source_type: 'system',
+            title: `抽奖奖励：${prize.prize_name}`,
+            description: `获得${prize.prize_value}积分奖励`
+          }
+        },
+        { transaction } // 🎯 传入事务对象，确保积分操作在同一事务中
+      )
 
-      case 'coupon':
-      case 'physical': {
-        /**
-         * 🔥 统一资产域架构：优惠券/实物奖品通过 AssetService.mintItem() 发放
-         *
-         * 业务场景：
-         * - 抽奖中奖后，将优惠券/实物奖品写入 item_instances 表
-         * - 自动记录物品铸造事件到 item_instance_events 表
-         * - 支持幂等性控制（通过 source_type + source_id）
-         */
-        await AssetService.mintItem(
-          {
-            user_id,
-            item_type: prize.prize_type === 'coupon' ? 'voucher' : 'product',
-            source_type: 'lottery',
-            source_id: `${idempotencyKey}:item`,
-            meta: {
-              name: prize.prize_name,
-              description: prize.prize_description || `抽奖获得：${prize.prize_name}`,
-              value: Math.round(parseFloat(prize.prize_value) || 0),
-              prize_id: prize.prize_id,
-              prize_type: prize.prize_type,
-              acquisition_method: 'lottery',
-              acquisition_cost: this.config.pointsCostPerDraw,
-              can_transfer: true,
-              can_use: true
-            }
-          },
-          { transaction }
-        )
+      this.logInfo('发放积分奖励（使用AssetService + 事务）', {
+        user_id,
+        prizeId: prize.prize_id,
+        prizeName: prize.prize_name,
+        points: prize.prize_value,
+        idempotencyKey,
+        lotterySessionId,
+        inTransaction: !!transaction
+      })
+      break
 
-        this.logInfo('发放物品到背包（通过 AssetService.mintItem）', {
+    case 'coupon':
+    case 'physical': {
+      /**
+       * 🔥 统一资产域架构：优惠券/实物奖品通过 AssetService.mintItem() 发放
+       *
+       * 业务场景：
+       * - 抽奖中奖后，将优惠券/实物奖品写入 item_instances 表
+       * - 自动记录物品铸造事件到 item_instance_events 表
+       * - 支持幂等性控制（通过 source_type + source_id）
+       */
+      await AssetService.mintItem(
+        {
           user_id,
-          prizeId: prize.prize_id,
-          prizeName: prize.prize_name,
-          prizeType: prize.prize_type,
-          idempotencyKey,
-          inTransaction: !!transaction
-        })
-        break
-      }
-
-      case 'virtual': {
-        /**
-         * 🔥 背包双轨架构：虚拟资产发放到 AssetService（可叠加资产轨）
-         *
-         * 业务场景：
-         * - 抽奖中奖后，虚拟资产（材料/碎片）通过 AssetService 发放
-         * - 自动累加到用户资产余额
-         * - 支持幂等性控制
-         */
-        /*
-         * 虚拟奖品通过材料系统发放（见下方 material_asset_code 逻辑）
-         * 如果没有配置 material_asset_code，则记录警告
-         */
-        if (!prize.material_asset_code) {
-          this.logWarn('虚拟奖品未配置 material_asset_code，跳过发放', {
+          item_type: prize.prize_type === 'coupon' ? 'voucher' : 'product',
+          source_type: 'lottery',
+          source_id: `${idempotencyKey}:item`,
+          meta: {
+            name: prize.prize_name,
+            description: prize.prize_description || `抽奖获得：${prize.prize_name}`,
+            value: Math.round(parseFloat(prize.prize_value) || 0),
             prize_id: prize.prize_id,
-            prize_name: prize.prize_name
-          })
-        }
-        break
-      }
+            prize_type: prize.prize_type,
+            acquisition_method: 'lottery',
+            acquisition_cost: this.config.pointsCostPerDraw,
+            can_transfer: true,
+            can_use: true
+          }
+        },
+        { transaction }
+      )
 
-      default:
-        this.logError('未知奖品类型', { prizeType: prize.prize_type })
+      this.logInfo('发放物品到背包（通过 AssetService.mintItem）', {
+        user_id,
+        prizeId: prize.prize_id,
+        prizeName: prize.prize_name,
+        prizeType: prize.prize_type,
+        idempotencyKey,
+        inTransaction: !!transaction
+      })
+      break
+    }
+
+    case 'virtual': {
+      /**
+       * 🔥 背包双轨架构：虚拟资产发放到 AssetService（可叠加资产轨）
+       *
+       * 业务场景：
+       * - 抽奖中奖后，虚拟资产（材料/碎片）通过 AssetService 发放
+       * - 自动累加到用户资产余额
+       * - 支持幂等性控制
+       */
+      /*
+       * 虚拟奖品通过材料系统发放（见下方 material_asset_code 逻辑）
+       * 如果没有配置 material_asset_code，则记录警告
+       */
+      if (!prize.material_asset_code) {
+        this.logWarn('虚拟奖品未配置 material_asset_code，跳过发放', {
+          prize_id: prize.prize_id,
+          prize_name: prize.prize_name
+        })
+      }
+      break
+    }
+
+    default:
+      this.logError('未知奖品类型', { prizeType: prize.prize_type })
     }
 
     /**

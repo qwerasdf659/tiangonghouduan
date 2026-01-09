@@ -129,11 +129,11 @@ router.post('/fulfill', authenticateToken, async (req, res) => {
         },
         item_instance: order.item_instance
           ? {
-              item_instance_id: order.item_instance.item_instance_id,
-              item_type: order.item_instance.item_type,
-              item_name: order.item_instance.item_name,
-              status: order.item_instance.status
-            }
+            item_instance_id: order.item_instance.item_instance_id,
+            item_type: order.item_instance.item_type,
+            item_name: order.item_instance.item_name,
+            status: order.item_instance.status
+          }
           : null,
         redeemer: {
           user_id: redeemerUserId,

@@ -170,9 +170,9 @@ router.post(
           withdrawn_at: new Date().toISOString(),
           balance_after: result.unfreeze_result?.balance
             ? {
-                available_amount: Number(result.unfreeze_result.balance.available_amount),
-                frozen_amount: Number(result.unfreeze_result.balance.frozen_amount)
-              }
+              available_amount: Number(result.unfreeze_result.balance.available_amount),
+              frozen_amount: Number(result.unfreeze_result.balance.frozen_amount)
+            }
             : null
         },
         '撤回成功。资产已解冻至您的可用余额。'

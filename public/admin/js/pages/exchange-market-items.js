@@ -3,6 +3,19 @@
  * @description 管理用户可兑换的官方商品
  * @author Admin
  * @created 2026-01-09
+ * @updated 2026-01-09 适配后端V4.5.0材料资产支付字段
+ *
+ * 后端字段对照（以后端为准）：
+ * - item_id: 商品ID
+ * - name: 商品名称
+ * - description: 商品描述
+ * - cost_asset_code: 支付资产类型（如 red_shard）
+ * - cost_amount: 消耗数量
+ * - cost_price: 成本价
+ * - stock: 库存
+ * - sold_count: 已售数量
+ * - sort_order: 排序号
+ * - status: 状态（active/inactive）
  */
 
 // ============================================
@@ -13,9 +26,10 @@ let currentPage = 1
 const pageSize = 20
 let currentFilters = {
   status: '',
-  price_type: '',
+  cost_asset_code: '',
   sort_by: 'sort_order'
 }
+let assetTypes = [] // 缓存材料资产类型列表
 
 // ============================================
 // 页面初始化
@@ -23,6 +37,7 @@ let currentFilters = {
 
 document.addEventListener('DOMContentLoaded', function () {
   checkAuth()
+  loadAssetTypes() // 加载材料资产类型
   loadItems()
   bindEvents()
 })
@@ -54,6 +69,78 @@ function bindEvents() {
 }
 
 // ============================================
+// 材料资产类型加载
+// ============================================
+
+/**
+ * 加载材料资产类型列表
+ */
+async function loadAssetTypes() {
+  try {
+    const token = getToken()
+    const response = await fetch('/api/v4/console/material/asset-types?is_enabled=true', {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+
+    const data = await response.json()
+
+    if (data.success && data.data && data.data.asset_types) {
+      assetTypes = data.data.asset_types
+      populateAssetTypeSelects()
+    } else {
+      console.warn('加载材料资产类型失败', data.message)
+      // 使用默认选项
+      assetTypes = [
+        { asset_code: 'red_shard', display_name: '碎红水晶' },
+        { asset_code: 'red_crystal', display_name: '完整红水晶' }
+      ]
+      populateAssetTypeSelects()
+    }
+  } catch (error) {
+    console.error('加载材料资产类型失败', error)
+    // 使用默认选项
+    assetTypes = [
+      { asset_code: 'red_shard', display_name: '碎红水晶' },
+      { asset_code: 'red_crystal', display_name: '完整红水晶' }
+    ]
+    populateAssetTypeSelects()
+  }
+}
+
+/**
+ * 填充资产类型选择器
+ */
+function populateAssetTypeSelects() {
+  const selects = ['addAssetCodeSelect', 'editAssetCodeSelect', 'assetCodeFilter']
+
+  selects.forEach(selectId => {
+    const select = document.getElementById(selectId)
+    if (!select) return
+
+    // 保留第一个选项（默认提示）
+    const firstOption = select.options[0]
+    select.innerHTML = ''
+    select.appendChild(firstOption)
+
+    // 添加资产类型选项
+    assetTypes.forEach(asset => {
+      const option = document.createElement('option')
+      option.value = asset.asset_code
+      option.textContent = `${asset.display_name} (${asset.asset_code})`
+      select.appendChild(option)
+    })
+  })
+}
+
+/**
+ * 获取资产类型显示名称
+ */
+function getAssetDisplayName(assetCode) {
+  const asset = assetTypes.find(a => a.asset_code === assetCode)
+  return asset ? asset.display_name : assetCode
+}
+
+// ============================================
 // 商品列表
 // ============================================
 
@@ -63,7 +150,7 @@ function bindEvents() {
 function handleSearch() {
   currentFilters = {
     status: document.getElementById('statusFilter').value,
-    price_type: document.getElementById('priceTypeFilter').value,
+    cost_asset_code: document.getElementById('assetCodeFilter').value,
     sort_by: document.getElementById('sortByFilter').value
   }
   currentPage = 1
@@ -86,7 +173,7 @@ async function loadItems() {
     })
 
     if (currentFilters.status) params.append('status', currentFilters.status)
-    if (currentFilters.price_type) params.append('price_type', currentFilters.price_type)
+    if (currentFilters.cost_asset_code) params.append('cost_asset_code', currentFilters.cost_asset_code)
 
     const response = await fetch(`/api/v4/shop/exchange/items?${params}`, {
       headers: { Authorization: `Bearer ${token}` }
@@ -111,6 +198,18 @@ async function loadItems() {
 
 /**
  * 渲染商品列表
+ * 
+ * DataSanitizer 返回的字段（以后端为准）：
+ * - id: 商品ID（DataSanitizer 将 item_id 映射为 id）
+ * - name: 商品名称
+ * - description: 商品描述
+ * - cost_asset_code: 支付资产类型
+ * - cost_amount: 消耗数量
+ * - stock: 库存
+ * - status: 状态
+ * - sort_order: 排序号
+ * - cost_price: 成本价（管理员可见）
+ * - total_exchange_count: 已售数量（管理员可见）
  */
 function renderItems(items) {
   const tbody = document.getElementById('itemsTableBody')
@@ -122,6 +221,8 @@ function renderItems(items) {
 
   tbody.innerHTML = items
     .map(item => {
+      // 兼容处理：优先使用 id，兼容 item_id
+      const itemId = item.id || item.item_id
       const stockClass =
         item.stock === 0 ? 'stock-warning' : item.stock <= 10 ? 'stock-low' : 'stock-ok'
       const statusBadge =
@@ -129,27 +230,32 @@ function renderItems(items) {
           ? '<span class="badge bg-success">上架</span>'
           : '<span class="badge bg-secondary">下架</span>'
 
-      // 只显示虚拟价值（唯一支付方式）
-      const priceDisplay = `<span class="badge bg-info">${item.virtual_value_price} 虚拟价值</span>`
+      // 显示支付资产信息
+      const assetDisplay = item.cost_asset_code
+        ? `<span class="badge bg-info">${getAssetDisplayName(item.cost_asset_code)}</span>`
+        : '<span class="badge bg-secondary">未设置</span>'
+
+      // 已售数量：DataSanitizer返回 total_exchange_count（管理员可见）
+      const soldCount = item.total_exchange_count || item.sold_count || 0
 
       return `
       <tr>
-        <td>${item.id}</td>
+        <td>${itemId}</td>
         <td>
           <div><strong>${escapeHtml(item.name)}</strong></div>
           <small class="text-muted">${escapeHtml(item.description || '')}</small>
         </td>
-        <td>${getPriceTypeText(item.price_type)}</td>
-        <td>${priceDisplay}</td>
+        <td>${assetDisplay}</td>
+        <td><span class="badge bg-warning text-dark">${item.cost_amount || 0}</span></td>
         <td><span class="${stockClass}">${item.stock}</span></td>
-        <td>${item.total_exchange_count || 0}</td>
+        <td>${soldCount}</td>
         <td>${statusBadge}</td>
         <td>${item.sort_order}</td>
         <td>
-          <button class="btn btn-sm btn-outline-primary" onclick="editItem(${item.id})">
+          <button class="btn btn-sm btn-outline-primary" onclick="editItem(${itemId})">
             <i class="bi bi-pencil"></i> 编辑
           </button>
-          <button class="btn btn-sm btn-outline-danger" onclick="deleteItem(${item.id})">
+          <button class="btn btn-sm btn-outline-danger" onclick="deleteItem(${itemId})">
             <i class="bi bi-trash"></i> 删除
           </button>
         </td>
@@ -161,19 +267,21 @@ function renderItems(items) {
 
 /**
  * 更新统计数据
+ * 字段说明：total_exchange_count 是管理员可见的已售数量
  */
 function updateStats(items) {
   const stats = {
     total: items.length,
     active: items.filter(i => i.status === 'active').length,
     lowStock: items.filter(i => i.stock <= 10 && i.stock > 0).length,
-    totalExchanges: items.reduce((sum, i) => sum + (i.total_exchange_count || 0), 0)
+    // 兼容处理：优先使用 total_exchange_count，兼容 sold_count
+    totalSold: items.reduce((sum, i) => sum + (i.total_exchange_count || i.sold_count || 0), 0)
   }
 
   document.getElementById('totalItems').textContent = stats.total
   document.getElementById('activeItems').textContent = stats.active
   document.getElementById('lowStockItems').textContent = stats.lowStock
-  document.getElementById('totalExchanges').textContent = stats.totalExchanges
+  document.getElementById('totalExchanges').textContent = stats.totalSold
 }
 
 /**
@@ -211,6 +319,7 @@ function changePage(page) {
 
 /**
  * 添加商品
+ * 发送后端期望的字段：item_name, item_description, cost_asset_code, cost_amount, cost_price, stock, sort_order, status
  */
 async function handleAddItem() {
   try {
@@ -222,14 +331,28 @@ async function handleAddItem() {
 
     showLoading(true)
     const formData = new FormData(form)
-    const data = Object.fromEntries(formData.entries())
 
-    // 类型转换
-    data.virtual_value_price = parseFloat(data.virtual_value_price) || 0
-    data.points_price = parseInt(data.points_price) || 0
-    data.cost_price = parseFloat(data.cost_price) || 0
-    data.stock = parseInt(data.stock) || 0
-    data.sort_order = parseInt(data.sort_order) || 100
+    // 构建后端期望的请求体（使用后端字段名）
+    const requestData = {
+      item_name: formData.get('item_name'),
+      item_description: formData.get('item_description') || '',
+      cost_asset_code: formData.get('cost_asset_code'),
+      cost_amount: parseInt(formData.get('cost_amount')) || 0,
+      cost_price: parseFloat(formData.get('cost_price')) || 0,
+      stock: parseInt(formData.get('stock')) || 0,
+      sort_order: parseInt(formData.get('sort_order')) || 100,
+      status: formData.get('status') || 'active'
+    }
+
+    // 验证必填字段
+    if (!requestData.cost_asset_code) {
+      showError('请选择支付资产类型')
+      return
+    }
+    if (requestData.cost_amount <= 0) {
+      showError('材料消耗数量必须大于0')
+      return
+    }
 
     const token = getToken()
     const response = await fetch('/api/v4/console/marketplace/exchange_market/items', {
@@ -238,7 +361,7 @@ async function handleAddItem() {
         Authorization: `Bearer ${token}`,
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify(data)
+      body: JSON.stringify(requestData)
     })
 
     const result = await response.json()
@@ -260,7 +383,12 @@ async function handleAddItem() {
 }
 
 /**
- * 编辑商品
+ * 编辑商品 - 加载商品详情
+ * 
+ * DataSanitizer 返回的字段：
+ * - id: 商品ID（DataSanitizer 将 item_id 映射为 id）
+ * - name, description, cost_asset_code, cost_amount, stock, status, sort_order
+ * - cost_price: 成本价（管理员可见）
  */
 async function editItem(itemId) {
   try {
@@ -276,16 +404,22 @@ async function editItem(itemId) {
     if (data.success) {
       const item = data.data.item
 
-      document.getElementById('editItemId').value = item.id
-      document.getElementById('editItemName').value = item.name
+      // 填充表单（兼容 id 和 item_id）
+      document.getElementById('editItemId').value = item.id || item.item_id
+      document.getElementById('editItemName').value = item.name || ''
       document.getElementById('editItemDescription').value = item.description || ''
-      document.getElementById('editPriceType').value = item.price_type
-      document.getElementById('editVirtualPrice').value = item.virtual_value_price || 0
-      document.getElementById('editPointsPrice').value = item.points_price || 0
+      document.getElementById('editAssetCodeSelect').value = item.cost_asset_code || ''
+      document.getElementById('editCostAmount').value = item.cost_amount || 0
       document.getElementById('editCostPrice').value = item.cost_price || 0
-      document.getElementById('editStock').value = item.stock
-      document.getElementById('editSortOrder').value = item.sort_order
-      document.getElementById('editStatus').value = item.status
+      document.getElementById('editStock').value = item.stock || 0
+      document.getElementById('editSortOrder').value = item.sort_order || 100
+      document.getElementById('editStatus').value = item.status || 'active'
+
+      // display_points 是可选展示字段，后端可能没有
+      const displayPointsEl = document.getElementById('editDisplayPoints')
+      if (displayPointsEl) {
+        displayPointsEl.value = item.display_points || 0
+      }
 
       new bootstrap.Modal(document.getElementById('editItemModal')).show()
     } else {
@@ -301,6 +435,7 @@ async function editItem(itemId) {
 
 /**
  * 提交编辑
+ * 发送后端期望的字段：item_name, item_description, cost_asset_code, cost_amount, cost_price, stock, sort_order, status
  */
 async function handleEditItem() {
   try {
@@ -312,16 +447,29 @@ async function handleEditItem() {
 
     showLoading(true)
     const formData = new FormData(form)
-    const data = Object.fromEntries(formData.entries())
-    const itemId = data.item_id
-    delete data.item_id
+    const itemId = formData.get('item_id')
 
-    // 类型转换
-    data.virtual_value_price = parseFloat(data.virtual_value_price) || 0
-    data.points_price = parseInt(data.points_price) || 0
-    data.cost_price = parseFloat(data.cost_price) || 0
-    data.stock = parseInt(data.stock) || 0
-    data.sort_order = parseInt(data.sort_order) || 100
+    // 构建后端期望的请求体（使用后端字段名）
+    const requestData = {
+      item_name: formData.get('item_name'),
+      item_description: formData.get('item_description') || '',
+      cost_asset_code: formData.get('cost_asset_code'),
+      cost_amount: parseInt(formData.get('cost_amount')) || 0,
+      cost_price: parseFloat(formData.get('cost_price')) || 0,
+      stock: parseInt(formData.get('stock')) || 0,
+      sort_order: parseInt(formData.get('sort_order')) || 100,
+      status: formData.get('status') || 'active'
+    }
+
+    // 验证必填字段
+    if (!requestData.cost_asset_code) {
+      showError('请选择支付资产类型')
+      return
+    }
+    if (requestData.cost_amount <= 0) {
+      showError('材料消耗数量必须大于0')
+      return
+    }
 
     const token = getToken()
     const response = await fetch(`/api/v4/console/marketplace/exchange_market/items/${itemId}`, {
@@ -330,7 +478,7 @@ async function handleEditItem() {
         Authorization: `Bearer ${token}`,
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify(data)
+      body: JSON.stringify(requestData)
     })
 
     const result = await response.json()
@@ -386,13 +534,6 @@ async function deleteItem(itemId) {
 // ============================================
 // 工具函数
 // ============================================
-
-/**
- * 获取支付方式文本
- */
-function getPriceTypeText(type) {
-  return '虚拟价值'
-}
 
 /**
  * HTML转义

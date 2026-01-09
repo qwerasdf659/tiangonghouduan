@@ -365,6 +365,69 @@ class AnnouncementService {
       unread: unreadCount
     }
   }
+
+  /**
+   * 获取通知统计信息（前端通知中心专用）
+   * 返回格式符合前端期望：total, unread, today, week
+   * @param {Object} options - 查询选项
+   * @param {string} options.type - 通知类型过滤
+   * @returns {Promise<Object>} 统计数据 {total, unread, today, week}
+   */
+  static async getNotificationStatistics(options = {}) {
+    const { type = null } = options
+
+    // 构建基础条件
+    const baseWhere = { is_active: true }
+    if (type && type !== 'all') {
+      baseWhere.type = type
+    }
+
+    // 计算今日开始时间（北京时间）
+    const now = BeijingTimeHelper.createBeijingTime()
+    const todayStart = new Date(now)
+    todayStart.setHours(0, 0, 0, 0)
+
+    // 计算本周开始时间（周一）
+    const weekStart = new Date(now)
+    const dayOfWeek = weekStart.getDay()
+    const daysFromMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1 // 周日是0，需要减6天
+    weekStart.setDate(weekStart.getDate() - daysFromMonday)
+    weekStart.setHours(0, 0, 0, 0)
+
+    // 并行执行所有统计查询
+    const [totalCount, unreadCount, todayCount, weekCount] = await Promise.all([
+      // 总数
+      SystemAnnouncement.count({ where: baseWhere }),
+      // 未读数（view_count = 0）
+      SystemAnnouncement.count({
+        where: {
+          ...baseWhere,
+          view_count: 0
+        }
+      }),
+      // 今日通知数
+      SystemAnnouncement.count({
+        where: {
+          ...baseWhere,
+          created_at: { [Op.gte]: todayStart }
+        }
+      }),
+      // 本周通知数
+      SystemAnnouncement.count({
+        where: {
+          ...baseWhere,
+          created_at: { [Op.gte]: weekStart }
+        }
+      })
+    ])
+
+    return {
+      total: totalCount,
+      unread: unreadCount,
+      today: todayCount,
+      week: weekCount
+    }
+  }
 }
 
 module.exports = AnnouncementService

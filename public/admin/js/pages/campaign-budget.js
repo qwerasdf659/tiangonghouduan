@@ -3,7 +3,7 @@
  *
  * @file public/admin/js/pages/campaign-budget.js
  * @description 管理抽奖活动的预算分配和使用情况
- * @version 1.0.0
+ * @version 1.1.0
  * @date 2026-01-09
  *
  * 依赖模块：
@@ -13,7 +13,10 @@
  * API端点：
  * - GET  /api/v4/console/campaign-budget/batch-status        - 批量获取预算状态
  * - PUT  /api/v4/console/campaign-budget/campaigns/:id       - 设置活动预算
- * - GET  /api/v4/activities                                   - 获取活动列表
+ * - GET  /api/v4/console/activities                          - 获取活动列表
+ *
+ * 更新记录：
+ * - 2026-01-09: 修复字段映射，直接使用后端字段名（campaign_id, campaign_name, pool_budget等）
  */
 
 // ==================== 全局变量 ====================
@@ -76,21 +79,27 @@ function bindEventListeners() {
 // ==================== 数据加载函数 ====================
 
 /**
- * 加载活动列表
- * 使用 /api/v4/activities 端点
+ * 加载活动列表（用于设置预算的下拉选择）
+ * 复用 batch-status API 获取活动列表，避免调用不存在的端点
  */
 async function loadActivities() {
   try {
-    const response = await apiRequest('/api/v4/activities')
+    // 使用 batch-status API 获取活动列表（该API已返回所有活动信息）
+    const response = await apiRequest('/api/v4/console/campaign-budget/batch-status?limit=50')
 
     if (response && response.success) {
-      const activities = response.data.activities || response.data || []
+      // 后端返回格式：{ campaigns: [...], summary: {...} }
+      const campaigns = response.data.campaigns || []
       const select = document.getElementById('modalActivitySelect')
 
-      activities.forEach(activity => {
+      // 清空现有选项（保留第一个"请选择"选项）
+      select.innerHTML = '<option value="">请选择活动</option>'
+
+      campaigns.forEach(campaign => {
         const option = document.createElement('option')
-        option.value = activity.activity_id
-        option.textContent = activity.name
+        // 使用后端字段名：campaign_id, campaign_name
+        option.value = campaign.campaign_id
+        option.textContent = campaign.campaign_name
         select.appendChild(option)
       })
     }
@@ -102,6 +111,16 @@ async function loadActivities() {
 /**
  * 加载预算数据
  * 使用 /api/v4/console/campaign-budget/batch-status 端点
+ * 
+ * 后端返回格式：
+ * {
+ *   campaigns: [{
+ *     campaign_id, campaign_name, budget_mode, status,
+ *     pool_budget: { total, remaining, used, usage_rate },
+ *     statistics: { winning_draws, total_consumed }
+ *   }],
+ *   summary: { total_campaigns, total_budget, total_remaining, total_used }
+ * }
  */
 async function loadBudgetData() {
   showLoading(true)
@@ -120,9 +139,10 @@ async function loadBudgetData() {
     )
 
     if (response && response.success) {
+      // 直接使用后端返回的数据结构，不做字段映射
       const { campaigns, summary } = response.data
 
-      // 更新统计卡片
+      // 更新统计卡片 - 使用后端字段名
       document.getElementById('totalBudget').textContent =
         '¥' + (summary?.total_budget || 0).toFixed(2)
       document.getElementById('usedBudget').textContent =
@@ -131,31 +151,19 @@ async function loadBudgetData() {
         '¥' + (summary?.total_remaining || 0).toFixed(2)
       document.getElementById('activeCampaigns').textContent = summary?.total_campaigns || 0
 
-      // 转换数据格式以匹配渲染函数
-      const budgets = (campaigns || []).map(campaign => ({
-        activity_id: campaign.campaign_id,
-        activity_name: campaign.campaign_name,
-        budget_type: campaign.budget_mode || 'pool',
-        total_budget: campaign.pool_budget?.total || 0,
-        used_budget: campaign.pool_budget?.used || 0,
-        usage_rate: campaign.pool_budget?.usage_rate || '0%',
-        status: campaign.status || 'active',
-        valid_until: null
-      }))
-
-      // 前端筛选
-      let filteredBudgets = budgets
+      // 前端筛选（如果后端不支持筛选参数）
+      let filteredCampaigns = campaigns || []
       if (status) {
-        filteredBudgets = filteredBudgets.filter(b => b.status === status)
+        filteredCampaigns = filteredCampaigns.filter(c => c.status === status)
       }
       if (budgetType) {
-        filteredBudgets = filteredBudgets.filter(b => b.budget_type === budgetType)
+        filteredCampaigns = filteredCampaigns.filter(c => c.budget_mode === budgetType)
       }
 
       // 渲染表格
-      renderBudgetTable(filteredBudgets)
+      renderBudgetTable(filteredCampaigns)
 
-      // 分页
+      // 分页（当前后端不返回分页信息，所以隐藏分页）
       document.getElementById('paginationNav').innerHTML = ''
     } else {
       showErrorToast(response?.message || '加载失败')
@@ -179,12 +187,16 @@ async function loadBudgetData() {
 
 /**
  * 渲染预算表格
- * @param {Array} budgets - 预算数据数组
+ * 直接使用后端返回的字段名：
+ * - campaign_id, campaign_name, budget_mode, status
+ * - pool_budget.total, pool_budget.used, pool_budget.remaining, pool_budget.usage_rate
+ * 
+ * @param {Array} campaigns - 后端返回的活动数组
  */
-function renderBudgetTable(budgets) {
+function renderBudgetTable(campaigns) {
   const tbody = document.getElementById('budgetTableBody')
 
-  if (!budgets || budgets.length === 0) {
+  if (!campaigns || campaigns.length === 0) {
     tbody.innerHTML = `
       <tr>
         <td colspan="9" class="text-center py-5 text-muted">
@@ -196,27 +208,43 @@ function renderBudgetTable(budgets) {
     return
   }
 
-  tbody.innerHTML = budgets
-    .map(budget => {
-      const usageRate =
-        budget.total_budget > 0 ? ((budget.used_budget / budget.total_budget) * 100).toFixed(1) : 0
+  tbody.innerHTML = campaigns
+    .map(campaign => {
+      // 直接使用后端字段
+      const poolBudget = campaign.pool_budget || {}
+      const total = poolBudget.total || 0
+      const used = poolBudget.used || 0
+      const remaining = poolBudget.remaining || 0
+      
+      // 计算使用率
+      const usageRate = total > 0 ? ((used / total) * 100).toFixed(1) : 0
       const usageClass =
         usageRate >= 90 ? 'bg-danger' : usageRate >= 70 ? 'bg-warning' : 'bg-success'
 
+      // 状态徽章
       const statusBadge =
         {
           active: '<span class="badge bg-success">进行中</span>',
           pending: '<span class="badge bg-warning">待开始</span>',
-          ended: '<span class="badge bg-secondary">已结束</span>'
-        }[budget.status] || '<span class="badge bg-secondary">未知</span>'
+          ended: '<span class="badge bg-secondary">已结束</span>',
+          draft: '<span class="badge bg-info">草稿</span>'
+        }[campaign.status] || '<span class="badge bg-secondary">未知</span>'
+
+      // 预算模式显示
+      const budgetModeText = {
+        pool: '总预算',
+        user: '用户预算',
+        daily: '每日预算',
+        none: '无预算'
+      }[campaign.budget_mode] || campaign.budget_mode || '未设置'
 
       return `
       <tr>
-        <td>${budget.activity_id}</td>
-        <td>${budget.activity_name || '-'}</td>
-        <td>${budget.budget_type === 'daily' ? '每日预算' : '总预算'}</td>
-        <td>¥${(budget.total_budget || 0).toFixed(2)}</td>
-        <td>¥${(budget.used_budget || 0).toFixed(2)}</td>
+        <td>${campaign.campaign_id}</td>
+        <td>${campaign.campaign_name || '-'}</td>
+        <td>${budgetModeText}</td>
+        <td>¥${total.toFixed(2)}</td>
+        <td>¥${used.toFixed(2)}</td>
         <td>
           <div class="progress" style="height: 20px;">
             <div class="progress-bar ${usageClass}" role="progressbar" 
@@ -227,9 +255,9 @@ function renderBudgetTable(budgets) {
           </div>
         </td>
         <td>${statusBadge}</td>
-        <td>${formatDate(budget.valid_until) || '永久'}</td>
+        <td>${campaign.valid_until ? formatDate(campaign.valid_until) : '-'}</td>
         <td>
-          <button class="btn btn-sm btn-outline-primary" onclick="editBudget(${budget.budget_id})">
+          <button class="btn btn-sm btn-outline-primary" onclick="editBudget(${campaign.campaign_id})">
             <i class="bi bi-pencil"></i>
           </button>
         </td>
@@ -295,6 +323,10 @@ function goToPage(page) {
 /**
  * 提交预算设置
  * PUT /api/v4/console/campaign-budget/campaigns/:campaign_id
+ * 
+ * 请求体使用后端字段名：
+ * - budget_mode: 预算模式
+ * - pool_budget_total: 预算总额
  */
 async function submitBudget() {
   const form = document.getElementById('setBudgetForm')
@@ -305,6 +337,12 @@ async function submitBudget() {
   }
 
   const campaignId = parseInt(document.getElementById('modalActivitySelect').value)
+  if (!campaignId) {
+    showErrorToast('请选择活动')
+    return
+  }
+
+  // 使用后端期望的字段名
   const data = {
     budget_mode: document.getElementById('budgetType')?.value || 'pool',
     pool_budget_total: parseFloat(document.getElementById('budgetAmount').value)
@@ -340,10 +378,14 @@ async function submitBudget() {
 
 /**
  * 编辑预算
- * @param {number} budgetId - 预算ID
+ * @param {number} campaignId - 活动ID
  */
-function editBudget(budgetId) {
-  showInfoToast('编辑功能开发中...')
+function editBudget(campaignId) {
+  // 填充表单并打开模态框
+  document.getElementById('modalActivitySelect').value = campaignId
+  
+  const modal = new bootstrap.Modal(document.getElementById('setBudgetModal'))
+  modal.show()
 }
 
 // ==================== 工具函数 ====================

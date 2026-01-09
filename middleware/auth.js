@@ -774,9 +774,9 @@ const PermissionManager = {
     hitRate:
       cacheStats.totalQueries > 0
         ? (
-            ((cacheStats.memoryHits + cacheStats.redisHits) / cacheStats.totalQueries) *
+          ((cacheStats.memoryHits + cacheStats.redisHits) / cacheStats.totalQueries) *
             100
-          ).toFixed(1) + '%'
+        ).toFixed(1) + '%'
         : '0%',
     redisAvailable: !!redisClient
   }),

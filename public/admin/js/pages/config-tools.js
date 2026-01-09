@@ -3,14 +3,22 @@
  * @description 系统配置管理和运维工具
  * @author Admin
  * @created 2026-01-09
+ * @updated 2026-01-09 修改API路径适配后端接口
+ * 
+ * 后端API路径（以后端为准）：
+ * - GET /api/v4/console/settings - 获取所有设置概览
+ * - GET /api/v4/console/settings/:category - 获取分类设置
+ * - PUT /api/v4/console/settings/:category - 更新分类设置
+ * - POST /api/v4/console/cache/clear - 清除缓存
  */
 
 // ============================================
 // 全局变量
 // ============================================
 
-let currentConfigKey = null
-let configData = []
+let currentSettingKey = null
+let currentCategory = null
+let settingsData = {}  // 按分类存储设置数据
 
 // ============================================
 // 页面初始化
@@ -43,18 +51,21 @@ document.addEventListener('DOMContentLoaded', function () {
 // ============================================
 
 /**
- * 加载配置列表
+ * 加载配置列表 - 获取所有分类的设置
+ * 使用后端API: GET /api/v4/console/settings
  */
 async function loadConfigList() {
   const listContainer = document.getElementById('configList')
 
   try {
-    const response = await apiRequest('/api/v4/console/system/config')
+    // 调用后端实际提供的API
+    const response = await apiRequest('/api/v4/console/settings')
 
     if (response && response.success) {
-      configData = response.data || []
-
-      if (configData.length === 0) {
+      const summary = response.data || {}
+      const categories = summary.categories || {}
+      
+      if (Object.keys(categories).length === 0) {
         listContainer.innerHTML = `
           <div class="text-center py-4 text-muted">
             <i class="bi bi-inbox"></i>
@@ -64,119 +75,269 @@ async function loadConfigList() {
         return
       }
 
-      listContainer.innerHTML = configData
-        .map(
-          config => `
-        <a href="javascript:void(0)" class="list-group-item list-group-item-action" 
-           onclick="showConfigDetail('${config.config_key}')">
-          <div class="d-flex justify-content-between align-items-start">
-            <div>
-              <h6 class="mb-1">${config.config_key}</h6>
-              <small class="text-muted">${config.description || '无描述'}</small>
-            </div>
-            <span class="badge bg-secondary">${config.config_type || 'string'}</span>
-          </div>
-        </a>
-      `
-        )
+      // 构建分类列表，展示每个分类及其配置数量
+      const categoryDisplayNames = {
+        basic: { name: '基础设置', icon: 'bi-gear', color: 'primary' },
+        points: { name: '积分设置', icon: 'bi-coin', color: 'warning' },
+        notification: { name: '通知设置', icon: 'bi-bell', color: 'info' },
+        security: { name: '安全设置', icon: 'bi-shield-lock', color: 'danger' },
+        marketplace: { name: '市场设置', icon: 'bi-shop', color: 'success' }
+      }
+
+      listContainer.innerHTML = Object.entries(categories)
+        .map(([category, count]) => {
+          const display = categoryDisplayNames[category] || { 
+            name: category, 
+            icon: 'bi-folder', 
+            color: 'secondary' 
+          }
+          return `
+            <a href="javascript:void(0)" class="list-group-item list-group-item-action" 
+               onclick="loadCategorySettings('${category}')">
+              <div class="d-flex justify-content-between align-items-center">
+                <div>
+                  <i class="bi ${display.icon} text-${display.color} me-2"></i>
+                  <strong>${display.name}</strong>
+                </div>
+                <span class="badge bg-${display.color}">${count}项</span>
+              </div>
+            </a>
+          `
+        })
         .join('')
+    } else {
+      throw new Error(response?.message || '获取设置失败')
     }
   } catch (error) {
     console.error('加载配置列表失败:', error)
     listContainer.innerHTML = `
       <div class="text-center py-4 text-danger">
         <i class="bi bi-exclamation-triangle"></i>
-        <p class="mt-2 mb-0">加载失败</p>
+        <p class="mt-2 mb-0">加载失败: ${error.message}</p>
       </div>
     `
   }
 }
 
 /**
- * 显示配置详情
+ * 加载指定分类的设置
+ * 使用后端API: GET /api/v4/console/settings/:category
  */
-function showConfigDetail(configKey) {
-  currentConfigKey = configKey
-  const config = configData.find(c => c.config_key === configKey)
-
-  if (!config) {
-    showErrorToast('配置项不存在')
-    return
+async function loadCategorySettings(category) {
+  currentCategory = category
+  const detailContainer = document.getElementById('configDetail')
+  const detailTitle = document.getElementById('detailTitle')
+  
+  const categoryNames = {
+    basic: '基础设置',
+    points: '积分设置',
+    notification: '通知设置',
+    security: '安全设置',
+    marketplace: '市场设置'
   }
+  
+  detailTitle.innerHTML = `<i class="bi bi-list-check"></i> ${categoryNames[category] || category} 配置列表`
+  detailContainer.innerHTML = `
+    <div class="text-center py-4">
+      <div class="spinner-border" role="status"></div>
+      <p class="mt-2">加载中...</p>
+    </div>
+  `
 
-  document.getElementById('detailTitle').innerHTML =
-    `<i class="bi bi-pencil"></i> 编辑配置：${configKey}`
+  try {
+    const response = await apiRequest(`/api/v4/console/settings/${category}`)
 
-  document.getElementById('configDetail').innerHTML = `
-    <form id="editConfigForm">
-      <div class="mb-3">
-        <label class="form-label">配置键名</label>
-        <input type="text" class="form-control" value="${config.config_key}" readonly>
+    if (response && response.success) {
+      const data = response.data || {}
+      settingsData[category] = data.settings || []
+      
+      if (settingsData[category].length === 0) {
+        detailContainer.innerHTML = `
+          <div class="text-center py-5 text-muted">
+            <i class="bi bi-inbox" style="font-size: 3rem;"></i>
+            <p class="mt-3">该分类下暂无配置项</p>
+          </div>
+        `
+        return
+      }
+
+      // 渲染配置项列表
+      renderSettingsList(category, settingsData[category])
+    } else {
+      throw new Error(response?.message || '获取配置失败')
+    }
+  } catch (error) {
+    console.error('加载分类配置失败:', error)
+    detailContainer.innerHTML = `
+      <div class="text-center py-4 text-danger">
+        <i class="bi bi-exclamation-triangle"></i>
+        <p class="mt-2">加载失败: ${error.message}</p>
       </div>
-      <div class="mb-3">
-        <label class="form-label">配置值 <span class="text-danger">*</span></label>
-        <textarea class="form-control json-editor" id="editConfigValue" rows="6">${formatConfigValue(config.config_value)}</textarea>
+    `
+  }
+}
+
+/**
+ * 渲染配置项列表
+ */
+function renderSettingsList(category, settings) {
+  const detailContainer = document.getElementById('configDetail')
+  
+  let html = `
+    <form id="settingsForm">
+      <div class="table-responsive">
+        <table class="table table-hover">
+          <thead class="table-light">
+            <tr>
+              <th style="width: 30%;">配置键</th>
+              <th style="width: 35%;">配置值</th>
+              <th style="width: 20%;">说明</th>
+              <th style="width: 15%;">状态</th>
+            </tr>
+          </thead>
+          <tbody>
+  `
+  
+  settings.forEach(setting => {
+    const isReadonly = setting.is_readonly
+    const valueType = setting.value_type || 'string'
+    
+    html += `
+      <tr>
+        <td>
+          <code class="text-primary">${setting.setting_key}</code>
+          <br><small class="text-muted">${valueType}</small>
+        </td>
+        <td>
+          ${isReadonly 
+            ? `<span class="config-value">${formatSettingValue(setting.parsed_value || setting.setting_value)}</span>`
+            : renderSettingInput(setting)
+          }
+        </td>
+        <td><small class="text-muted">${setting.description || '-'}</small></td>
+        <td>
+          ${isReadonly 
+            ? '<span class="badge bg-secondary">只读</span>' 
+            : '<span class="badge bg-success">可编辑</span>'
+          }
+        </td>
+      </tr>
+    `
+  })
+  
+  html += `
+          </tbody>
+        </table>
       </div>
-      <div class="mb-3">
-        <label class="form-label">配置说明</label>
-        <input type="text" class="form-control" id="editConfigDescription" value="${config.description || ''}">
-      </div>
-      <div class="mb-3">
-        <label class="form-label">配置类型</label>
-        <select class="form-select" id="editConfigType">
-          <option value="string" ${config.config_type === 'string' ? 'selected' : ''}>字符串</option>
-          <option value="number" ${config.config_type === 'number' ? 'selected' : ''}>数字</option>
-          <option value="boolean" ${config.config_type === 'boolean' ? 'selected' : ''}>布尔值</option>
-          <option value="json" ${config.config_type === 'json' ? 'selected' : ''}>JSON对象</option>
-        </select>
-      </div>
-      <div class="d-flex gap-2">
-        <button type="button" class="btn btn-primary" onclick="saveConfig()">
-          <i class="bi bi-save"></i> 保存配置
-        </button>
-        <button type="button" class="btn btn-outline-danger" onclick="deleteConfig()">
-          <i class="bi bi-trash"></i> 删除配置
+      <div class="mt-3 d-flex justify-content-end">
+        <button type="button" class="btn btn-primary" onclick="saveSettings('${category}')">
+          <i class="bi bi-save me-1"></i>保存更改
         </button>
       </div>
     </form>
   `
+  
+  detailContainer.innerHTML = html
+}
+
+/**
+ * 渲染配置输入框
+ */
+function renderSettingInput(setting) {
+  const key = setting.setting_key
+  const value = setting.parsed_value !== undefined ? setting.parsed_value : setting.setting_value
+  const valueType = setting.value_type || 'string'
+  
+  switch (valueType) {
+    case 'boolean':
+      return `
+        <div class="form-check form-switch">
+          <input class="form-check-input setting-input" type="checkbox" 
+            data-key="${key}" data-type="boolean" ${value ? 'checked' : ''}>
+        </div>
+      `
+    case 'number':
+    case 'integer':
+      return `
+        <input type="number" class="form-control form-control-sm setting-input" 
+          data-key="${key}" data-type="number" value="${value || 0}">
+      `
+    case 'json':
+      return `
+        <textarea class="form-control form-control-sm setting-input json-editor" 
+          data-key="${key}" data-type="json" rows="3">${JSON.stringify(value, null, 2)}</textarea>
+      `
+    default:
+      return `
+        <input type="text" class="form-control form-control-sm setting-input" 
+          data-key="${key}" data-type="string" value="${value || ''}">
+      `
+  }
 }
 
 /**
  * 格式化配置值显示
  */
-function formatConfigValue(value) {
-  if (typeof value === 'object') {
-    return JSON.stringify(value, null, 2)
-  }
+function formatSettingValue(value) {
+  if (value === null || value === undefined) return '-'
+  if (typeof value === 'boolean') return value ? '是' : '否'
+  if (typeof value === 'object') return JSON.stringify(value, null, 2)
   return String(value)
 }
 
 /**
- * 保存配置
+ * 保存配置 - 批量更新分类设置
+ * 使用后端API: PUT /api/v4/console/settings/:category
  */
-async function saveConfig() {
-  if (!currentConfigKey) return
-
-  const configValue = document.getElementById('editConfigValue').value
-  const description = document.getElementById('editConfigDescription').value
-  const configType = document.getElementById('editConfigType').value
+async function saveSettings(category) {
+  // 收集所有修改的配置项
+  const settingsToUpdate = {}
+  document.querySelectorAll('.setting-input').forEach(input => {
+    const key = input.dataset.key
+    const type = input.dataset.type
+    let value
+    
+    if (type === 'boolean') {
+      value = input.checked
+    } else if (type === 'number') {
+      value = parseFloat(input.value)
+    } else if (type === 'json') {
+      try {
+        value = JSON.parse(input.value)
+      } catch (e) {
+        console.error(`JSON解析失败: ${key}`, e)
+        showErrorToast(`配置项 ${key} 的JSON格式无效`)
+        return
+      }
+    } else {
+      value = input.value
+    }
+    
+    settingsToUpdate[key] = value
+  })
+  
+  if (Object.keys(settingsToUpdate).length === 0) {
+    showErrorToast('没有可保存的配置项')
+    return
+  }
 
   showLoading(true)
 
   try {
-    const response = await apiRequest(`/api/v4/console/system/config/${currentConfigKey}`, {
+    const response = await apiRequest(`/api/v4/console/settings/${category}`, {
       method: 'PUT',
-      body: JSON.stringify({
-        config_value: configValue,
-        description: description,
-        config_type: configType
-      })
+      body: JSON.stringify({ settings: settingsToUpdate })
     })
 
     if (response && response.success) {
-      showSuccessToast('配置保存成功')
-      loadConfigList()
+      const result = response.data || {}
+      if (result.error_count > 0) {
+        showErrorToast(`部分配置更新失败: ${result.errors?.map(e => e.setting_key).join(', ')}`)
+      } else {
+        showSuccessToast(`${category}设置保存成功`)
+      }
+      // 重新加载配置列表
+      loadCategorySettings(category)
     } else {
       throw new Error(response?.message || '保存失败')
     }
@@ -189,41 +350,11 @@ async function saveConfig() {
 }
 
 /**
- * 删除配置
+ * 显示配置详情（兼容旧逻辑）
  */
-async function deleteConfig() {
-  if (!currentConfigKey) return
-
-  if (!confirm(`确定要删除配置项 "${currentConfigKey}" 吗？此操作不可恢复！`)) {
-    return
-  }
-
-  showLoading(true)
-
-  try {
-    const response = await apiRequest(`/api/v4/console/system/config/${currentConfigKey}`, {
-      method: 'DELETE'
-    })
-
-    if (response && response.success) {
-      showSuccessToast('配置删除成功')
-      currentConfigKey = null
-      document.getElementById('configDetail').innerHTML = `
-        <div class="text-center py-5 text-muted">
-          <i class="bi bi-hand-index" style="font-size: 3rem;"></i>
-          <p class="mt-3">请从左侧选择一个配置项</p>
-        </div>
-      `
-      loadConfigList()
-    } else {
-      throw new Error(response?.message || '删除失败')
-    }
-  } catch (error) {
-    console.error('删除配置失败:', error)
-    showErrorToast('删除失败：' + error.message)
-  } finally {
-    showLoading(false)
-  }
+function showConfigDetail(configKey) {
+  // 如果需要单独编辑某个配置项，可以实现此函数
+  console.log('查看配置详情:', configKey)
 }
 
 // ============================================
@@ -239,7 +370,7 @@ function showAddConfig() {
 }
 
 /**
- * 添加配置
+ * 添加配置 - 需要先选择分类
  */
 async function addConfig() {
   const configKey = document.getElementById('newConfigKey').value.trim()
@@ -252,23 +383,40 @@ async function addConfig() {
     return
   }
 
+  if (!currentCategory) {
+    showErrorToast('请先从左侧选择一个配置分类')
+    return
+  }
+
   showLoading(true)
 
   try {
-    const response = await apiRequest('/api/v4/console/system/config', {
-      method: 'POST',
-      body: JSON.stringify({
-        config_key: configKey,
-        config_value: configValue,
-        description: description,
-        config_type: configType
-      })
+    // 将新配置添加到当前分类
+    let value = configValue
+    if (configType === 'number') {
+      value = parseFloat(configValue)
+    } else if (configType === 'boolean') {
+      value = configValue.toLowerCase() === 'true'
+    } else if (configType === 'json') {
+      try {
+        value = JSON.parse(configValue)
+      } catch (e) {
+        throw new Error('JSON格式无效')
+      }
+    }
+
+    const settingsToUpdate = { [configKey]: value }
+    
+    const response = await apiRequest(`/api/v4/console/settings/${currentCategory}`, {
+      method: 'PUT',
+      body: JSON.stringify({ settings: settingsToUpdate })
     })
 
     if (response && response.success) {
       showSuccessToast('配置添加成功')
       bootstrap.Modal.getInstance(document.getElementById('addConfigModal')).hide()
-      loadConfigList()
+      loadCategorySettings(currentCategory)
+      loadConfigList()  // 刷新左侧列表
     } else {
       throw new Error(response?.message || '添加失败')
     }
@@ -292,7 +440,7 @@ function showCacheManagement() {
 }
 
 /**
- * 清理缓存
+ * 清理缓存 - 使用后端API: POST /api/v4/console/cache/clear
  */
 async function clearCache(type) {
   if (!confirm(`确定要清理 ${type === 'all' ? '全部' : type} 缓存吗？`)) {
@@ -302,13 +450,25 @@ async function clearCache(type) {
   showLoading(true)
 
   try {
-    const response = await apiRequest('/api/v4/console/system/cache/clear', {
+    // 根据类型构建缓存模式
+    const patternMap = {
+      user: 'user:*',
+      config: 'settings:*',
+      activity: 'activity:*',
+      all: '*'
+    }
+    
+    const response = await apiRequest('/api/v4/console/cache/clear', {
       method: 'POST',
-      body: JSON.stringify({ cache_type: type })
+      body: JSON.stringify({ 
+        pattern: patternMap[type] || type,
+        confirm: true  // 后端要求的确认参数
+      })
     })
 
     if (response && response.success) {
-      showSuccessToast('缓存清理成功')
+      const result = response.data || {}
+      showSuccessToast(`缓存清理成功，清理了 ${result.cleared_count || 0} 个缓存键`)
     } else {
       throw new Error(response?.message || '清理失败')
     }
@@ -325,10 +485,10 @@ async function clearCache(type) {
 // ============================================
 
 /**
- * 显示系统配置
+ * 显示系统配置 - 直接在当前页面加载基础设置
  */
 function showSystemConfig() {
-  window.location.href = '/admin/system-config.html'
+  loadCategorySettings('basic')
 }
 
 // ============================================
@@ -336,19 +496,29 @@ function showSystemConfig() {
 // ============================================
 
 /**
- * 显示功能开关
+ * 显示功能开关 - 从security分类获取功能开关设置
  */
 async function showFeatureFlags() {
   const modal = new bootstrap.Modal(document.getElementById('featureFlagsModal'))
   modal.show()
 
   const content = document.getElementById('featureFlagsContent')
+  content.innerHTML = `
+    <div class="text-center py-4">
+      <div class="spinner-border" role="status"></div>
+      <p class="mt-2">加载中...</p>
+    </div>
+  `
 
   try {
-    const response = await apiRequest('/api/v4/console/system/feature-flags')
+    // 功能开关通常存储在security分类中
+    const response = await apiRequest('/api/v4/console/settings/security')
 
     if (response && response.success) {
-      const flags = response.data || []
+      const settings = response.data?.settings || []
+      
+      // 过滤出开关类型的配置（布尔类型）
+      const flags = settings.filter(s => s.value_type === 'boolean')
 
       if (flags.length === 0) {
         content.innerHTML = `
@@ -374,12 +544,12 @@ async function showFeatureFlags() {
               .map(
                 flag => `
               <tr>
-                <td><code>${flag.flag_key}</code></td>
+                <td><code>${flag.setting_key}</code></td>
                 <td>${flag.description || '-'}</td>
                 <td>
                   <div class="form-check form-switch">
                     <input class="form-check-input feature-flag" type="checkbox" 
-                      data-key="${flag.flag_key}" ${flag.enabled ? 'checked' : ''}>
+                      data-key="${flag.setting_key}" ${flag.parsed_value ? 'checked' : ''}>
                   </div>
                 </td>
               </tr>
@@ -389,13 +559,15 @@ async function showFeatureFlags() {
           </tbody>
         </table>
       `
+    } else {
+      throw new Error(response?.message || '加载失败')
     }
   } catch (error) {
     console.error('加载功能开关失败:', error)
     content.innerHTML = `
       <div class="text-center py-4 text-danger">
         <i class="bi bi-exclamation-triangle"></i>
-        <p class="mt-2">加载失败</p>
+        <p class="mt-2">加载失败: ${error.message}</p>
       </div>
     `
   }
@@ -405,20 +577,17 @@ async function showFeatureFlags() {
  * 保存功能开关
  */
 async function saveFeatureFlags() {
-  const flags = []
+  const flags = {}
   document.querySelectorAll('.feature-flag').forEach(checkbox => {
-    flags.push({
-      flag_key: checkbox.dataset.key,
-      enabled: checkbox.checked
-    })
+    flags[checkbox.dataset.key] = checkbox.checked
   })
 
   showLoading(true)
 
   try {
-    const response = await apiRequest('/api/v4/console/system/feature-flags', {
+    const response = await apiRequest('/api/v4/console/settings/security', {
       method: 'PUT',
-      body: JSON.stringify({ flags })
+      body: JSON.stringify({ settings: flags })
     })
 
     if (response && response.success) {
@@ -440,25 +609,30 @@ async function saveFeatureFlags() {
 // ============================================
 
 /**
- * 显示维护模式
+ * 显示维护模式 - 从basic分类获取维护模式设置
  */
 async function showMaintenanceMode() {
   const modal = new bootstrap.Modal(document.getElementById('maintenanceModal'))
   modal.show()
 
   try {
-    const response = await apiRequest('/api/v4/console/system/maintenance')
+    const response = await apiRequest('/api/v4/console/settings/basic')
 
     if (response && response.success) {
-      const maintenance = response.data || {}
-      document.getElementById('maintenanceSwitch').checked = maintenance.enabled || false
-      document.getElementById('maintenanceLabel').textContent = maintenance.enabled
-        ? '开启'
-        : '关闭'
-      document.getElementById('maintenanceMessage').value = maintenance.message || ''
+      const settings = response.data?.settings || []
+      
+      // 查找维护模式相关配置
+      const maintenanceEnabled = settings.find(s => s.setting_key === 'maintenance_mode')
+      const maintenanceMessage = settings.find(s => s.setting_key === 'maintenance_message')
+      const maintenanceEndTime = settings.find(s => s.setting_key === 'maintenance_end_time')
+      
+      document.getElementById('maintenanceSwitch').checked = maintenanceEnabled?.parsed_value || false
+      document.getElementById('maintenanceLabel').textContent = maintenanceEnabled?.parsed_value ? '开启' : '关闭'
+      document.getElementById('maintenanceMessage').value = maintenanceMessage?.parsed_value || '系统正在升级维护中，预计30分钟后恢复，给您带来不便敬请谅解。'
 
-      if (maintenance.end_time) {
-        document.getElementById('maintenanceEndTime').value = maintenance.end_time.slice(0, 16)
+      if (maintenanceEndTime?.parsed_value) {
+        const endTime = new Date(maintenanceEndTime.parsed_value)
+        document.getElementById('maintenanceEndTime').value = endTime.toISOString().slice(0, 16)
       }
     }
   } catch (error) {
@@ -477,13 +651,18 @@ async function saveMaintenanceMode() {
   showLoading(true)
 
   try {
-    const response = await apiRequest('/api/v4/console/system/maintenance', {
+    const settings = {
+      maintenance_mode: enabled,
+      maintenance_message: message
+    }
+    
+    if (endTime) {
+      settings.maintenance_end_time = new Date(endTime).toISOString()
+    }
+
+    const response = await apiRequest('/api/v4/console/settings/basic', {
       method: 'PUT',
-      body: JSON.stringify({
-        enabled: enabled,
-        message: message,
-        end_time: endTime ? new Date(endTime).toISOString() : null
-      })
+      body: JSON.stringify({ settings })
     })
 
     if (response && response.success) {
@@ -509,4 +688,19 @@ async function saveMaintenanceMode() {
  */
 function showLoading(show) {
   document.getElementById('loadingOverlay').classList.toggle('show', show)
+}
+
+/**
+ * 显示成功提示
+ */
+function showSuccessToast(message) {
+  // 使用简单的alert，或者集成toast组件
+  alert('✅ ' + message)
+}
+
+/**
+ * 显示错误提示
+ */
+function showErrorToast(message) {
+  alert('❌ ' + message)
 }

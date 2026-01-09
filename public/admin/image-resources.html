@@ -114,21 +114,23 @@
         <div class="row g-3 align-items-end">
           <div class="col-md-3">
             <label class="form-label">图片类型</label>
+            <!-- 适配后端 business_type 字段：lottery/exchange/trade/uploads -->
             <select class="form-select" id="imageTypeFilter">
               <option value="">全部类型</option>
-              <option value="prize">奖品图片</option>
-              <option value="product">商品图片</option>
-              <option value="avatar">用户头像</option>
-              <option value="activity">活动图片</option>
-              <option value="other">其他</option>
+              <option value="lottery">抽奖奖品</option>
+              <option value="exchange">兑换商品</option>
+              <option value="trade">交易相关</option>
+              <option value="uploads">通用上传</option>
             </select>
           </div>
           <div class="col-md-3">
             <label class="form-label">状态</label>
+            <!-- 适配后端 status 字段：active/archived/deleted，orphan为特殊值表示context_id=0 -->
             <select class="form-select" id="statusFilter">
               <option value="">全部状态</option>
-              <option value="used">使用中</option>
+              <option value="active">使用中</option>
               <option value="orphan">孤儿图片</option>
+              <option value="archived">已归档</option>
             </select>
           </div>
           <div class="col-md-3">
@@ -192,11 +194,12 @@
 
           <div class="mt-3">
             <label class="form-label">图片类型</label>
+            <!-- 适配后端 business_type 字段：lottery/exchange/trade/uploads -->
             <select class="form-select" id="uploadImageType">
-              <option value="other">其他</option>
-              <option value="prize">奖品图片</option>
-              <option value="product">商品图片</option>
-              <option value="activity">活动图片</option>
+              <option value="uploads">通用上传</option>
+              <option value="lottery">抽奖奖品</option>
+              <option value="exchange">兑换商品</option>
+              <option value="trade">交易相关</option>
             </select>
           </div>
         </div>

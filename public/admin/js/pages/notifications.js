@@ -275,7 +275,7 @@ async function clearAll() {
   showLoading()
 
   try {
-    const response = await apiRequest('/api/v4/system/notifications/clear', { method: 'DELETE' })
+    const response = await apiRequest('/api/v4/system/notifications/clear', { method: 'POST' })
 
     if (response && response.success) {
       showSuccess('操作成功', '所有通知已清空')

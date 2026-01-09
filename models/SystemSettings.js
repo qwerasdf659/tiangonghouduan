@@ -56,15 +56,15 @@ class SystemSettings extends Model {
 
     try {
       switch (value_type) {
-        case 'number':
-          return Number(setting_value)
-        case 'boolean':
-          return setting_value === 'true' || setting_value === '1'
-        case 'json':
-          return JSON.parse(setting_value)
-        case 'string':
-        default:
-          return setting_value
+      case 'number':
+        return Number(setting_value)
+      case 'boolean':
+        return setting_value === 'true' || setting_value === '1'
+      case 'json':
+        return JSON.parse(setting_value)
+      case 'string':
+      default:
+        return setting_value
       }
     } catch (error) {
       console.error(`解析配置值失败 [${this.setting_key}]:`, error.message)

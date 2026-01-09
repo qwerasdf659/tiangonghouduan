@@ -121,10 +121,10 @@ module.exports = sequelize => {
 
     return role
       ? {
-          level: role.role_level,
-          permissions: role.permissions,
-          name: role.role_name
-        }
+        level: role.role_level,
+        permissions: role.permissions,
+        name: role.role_name
+      }
       : null
   }
 

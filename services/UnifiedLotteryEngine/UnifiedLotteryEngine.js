@@ -1404,12 +1404,12 @@ class UnifiedLotteryEngine {
             reward_tier: drawResult.data?.draw_result?.reward_tier || 'low',
             prize: drawResult.data?.draw_result?.prize_id
               ? {
-                  id: drawResult.data.draw_result.prize_id,
-                  name: drawResult.data.draw_result.prize_name,
-                  type: drawResult.data.draw_result.prize_type,
-                  value: drawResult.data.draw_result.prize_value,
-                  sort_order: drawResult.data.draw_result.sort_order // 🎯 方案3：传递sort_order给路由层
-                }
+                id: drawResult.data.draw_result.prize_id,
+                name: drawResult.data.draw_result.prize_name,
+                type: drawResult.data.draw_result.prize_type,
+                value: drawResult.data.draw_result.prize_value,
+                sort_order: drawResult.data.draw_result.sort_order // 🎯 方案3：传递sort_order给路由层
+              }
               : null,
             points_cost: drawResult.data?.draw_result?.points_cost || 0
           })
@@ -1599,12 +1599,12 @@ class UnifiedLotteryEngine {
           reward_tier: record.reward_tier,
           prize: record.prize
             ? {
-                id: record.prize.prize_id,
-                name: record.prize.prize_name,
-                type: record.prize.prize_type,
-                value: record.prize.prize_value,
-                image_id: record.prize.image_id
-              }
+              id: record.prize.prize_id,
+              name: record.prize.prize_name,
+              type: record.prize.prize_type,
+              value: record.prize.prize_value,
+              image_id: record.prize.image_id
+            }
             : null,
           points_cost: record.cost_points,
           probability: record.prize?.win_probability || 0, // 🎯 从关联的奖品中获取概率
@@ -2009,19 +2009,19 @@ class UnifiedLotteryEngine {
         }, {}), // 奖励档位分布（对象 - Object），如 { high: 15, mid: 18, low: 17 }
         last_high_tier_win: lastHighTierWin
           ? {
-              draw_id: lastHighTierWin.draw_id, // 抽奖记录ID
-              campaign_id: lastHighTierWin.campaign_id, // 抽奖活动ID
-              prize: lastHighTierWin.prize
-                ? {
-                    id: lastHighTierWin.prize.prize_id, // 奖品ID
-                    name: lastHighTierWin.prize.prize_name, // 奖品名称（如："100积分"）
-                    type: lastHighTierWin.prize.prize_type, // 奖品类型（如："points"）
-                    value: lastHighTierWin.prize.prize_value // 奖品价值（如：100）
-                  }
-                : null,
-              is_guarantee: lastHighTierWin.guarantee_triggered || false, // 是否保底获得
-              win_time: lastHighTierWin.created_at // 获得时间（北京时间 - Beijing Time）
-            }
+            draw_id: lastHighTierWin.draw_id, // 抽奖记录ID
+            campaign_id: lastHighTierWin.campaign_id, // 抽奖活动ID
+            prize: lastHighTierWin.prize
+              ? {
+                id: lastHighTierWin.prize.prize_id, // 奖品ID
+                name: lastHighTierWin.prize.prize_name, // 奖品名称（如："100积分"）
+                type: lastHighTierWin.prize.prize_type, // 奖品类型（如："points"）
+                value: lastHighTierWin.prize.prize_value // 奖品价值（如：100）
+              }
+              : null,
+            is_guarantee: lastHighTierWin.guarantee_triggered || false, // 是否保底获得
+            win_time: lastHighTierWin.created_at // 获得时间（北京时间 - Beijing Time）
+          }
           : null, // 最近一次高档奖励记录（如果没有则为null）
         timestamp: BeijingTimeHelper.formatForAPI(new Date()).iso // 响应时间戳（ISO 8601格式）
       }

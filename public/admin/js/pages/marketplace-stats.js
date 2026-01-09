@@ -96,32 +96,50 @@ function updateSummary(summary) {
 
 /**
  * 更新表格
+ * 
+ * 后端返回的stats字段格式：
+ * - user_id: 用户ID
+ * - mobile: 手机号
+ * - nickname: 昵称
+ * - status: 用户状态
+ * - listing_count: 上架数量
+ * - remaining_quota: 剩余配额
+ * - is_at_limit: 是否达到上限
  */
 function updateTable(stats) {
   const tbody = document.getElementById('statsTableBody')
 
-  if (stats.length === 0) {
+  if (!stats || stats.length === 0) {
     tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted">暂无数据</td></tr>'
     return
   }
 
+  // 获取最大上架限制（默认10）
+  const maxListings = 10
+
   tbody.innerHTML = stats
-    .map(
-      item => `
+    .map(item => {
+      // 计算百分比
+      const percentage = Math.min(100, Math.round((item.listing_count / maxListings) * 100))
+      // 确定上架状态
+      const listingStatus = item.is_at_limit ? 'at_limit' : 
+                           (item.listing_count >= maxListings * 0.8 ? 'near_limit' : 'normal')
+      
+      return `
     <tr>
       <td>${item.user_id}</td>
-      <td>${item.username || '-'}</td>
-      <td>${item.phone || '-'}</td>
+      <td>${item.nickname || '-'}</td>
+      <td>${item.mobile || '-'}</td>
       <td>
         <div>
-          <span class="badge ${getStatusBadgeClass(item.status)}">
-            ${item.active_listings} / ${item.limit}
+          <span class="badge ${getStatusBadgeClass(listingStatus)}">
+            ${item.listing_count} / ${maxListings}
           </span>
           <div class="progress mt-2" style="height: 8px;">
-            <div class="progress-bar ${getProgressClass(item.percentage)}" 
+            <div class="progress-bar ${getProgressClass(percentage)}" 
                  role="progressbar" 
-                 style="width: ${item.percentage}%"
-                 aria-valuenow="${item.percentage}" 
+                 style="width: ${percentage}%"
+                 aria-valuenow="${percentage}" 
                  aria-valuemin="0" 
                  aria-valuemax="100">
             </div>
@@ -129,25 +147,33 @@ function updateTable(stats) {
         </div>
       </td>
       <td>
-        <span class="${item.remaining === 0 ? 'text-danger fw-bold' : ''}">
-          ${item.remaining} 件
+        <span class="${item.remaining_quota === 0 ? 'text-danger fw-bold' : ''}">
+          ${item.remaining_quota} 件
         </span>
       </td>
       <td>
-        <span class="badge ${getStatusTagClass(item.status)}">
-          ${getStatusText(item.status)}
+        <span class="badge ${getStatusTagClass(listingStatus)}">
+          ${getStatusText(listingStatus)}
         </span>
       </td>
-      <td>${formatDate(item.registered_at)}</td>
+      <td>${getUserStatusBadge(item.status)}</td>
       <td>
-        <button class="btn btn-sm btn-outline-primary" onclick="viewUserListings(${item.user_id})">
+        <button class="btn btn-sm btn-outline-primary btn-view-listings" data-user-id="${item.user_id}">
           查看商品
         </button>
       </td>
     </tr>
   `
-    )
+    })
     .join('')
+
+  // 使用 addEventListener 绑定事件（避免 CSP 内联脚本警告）
+  tbody.querySelectorAll('.btn-view-listings').forEach(btn => {
+    btn.addEventListener('click', function() {
+      const userId = this.getAttribute('data-user-id')
+      viewUserListings(userId)
+    })
+  })
 }
 
 /**
@@ -167,7 +193,7 @@ function updatePagination(pagination) {
   // 上一页
   html += `
     <li class="page-item ${currentPage === 1 ? 'disabled' : ''}">
-      <a class="page-link" href="#" onclick="changePage(${currentPage - 1}); return false;">上一页</a>
+      <a class="page-link page-btn" href="#" data-page="${currentPage - 1}">上一页</a>
     </li>
   `
 
@@ -176,7 +202,7 @@ function updatePagination(pagination) {
     if (i === 1 || i === totalPages || (i >= currentPage - 2 && i <= currentPage + 2)) {
       html += `
         <li class="page-item ${i === currentPage ? 'active' : ''}">
-          <a class="page-link" href="#" onclick="changePage(${i}); return false;">${i}</a>
+          <a class="page-link page-btn" href="#" data-page="${i}">${i}</a>
         </li>
       `
     } else if (i === currentPage - 3 || i === currentPage + 3) {
@@ -187,11 +213,22 @@ function updatePagination(pagination) {
   // 下一页
   html += `
     <li class="page-item ${currentPage === totalPages ? 'disabled' : ''}">
-      <a class="page-link" href="#" onclick="changePage(${currentPage + 1}); return false;">下一页</a>
+      <a class="page-link page-btn" href="#" data-page="${currentPage + 1}">下一页</a>
     </li>
   `
 
   paginationEl.innerHTML = html
+
+  // 使用 addEventListener 绑定分页事件（避免 CSP 内联脚本警告）
+  paginationEl.querySelectorAll('.page-btn').forEach(btn => {
+    btn.addEventListener('click', function(e) {
+      e.preventDefault()
+      const page = parseInt(this.getAttribute('data-page'))
+      if (!isNaN(page) && page >= 1 && page <= totalPages) {
+        changePage(page)
+      }
+    })
+  })
 }
 
 // ============================================
@@ -310,6 +347,24 @@ function formatDate(dateStr) {
     hour: '2-digit',
     minute: '2-digit'
   })
+}
+
+/**
+ * 获取用户状态徽章
+ * 
+ * 后端返回的status字段是用户账户状态：
+ * - active: 正常
+ * - inactive: 禁用
+ * - suspended: 暂停
+ */
+function getUserStatusBadge(status) {
+  const statusMap = {
+    active: { text: '正常', class: 'bg-success' },
+    inactive: { text: '禁用', class: 'bg-danger' },
+    suspended: { text: '暂停', class: 'bg-warning' }
+  }
+  const config = statusMap[status] || { text: status || '未知', class: 'bg-secondary' }
+  return `<span class="badge ${config.class}">${config.text}</span>`
 }
 
 /**

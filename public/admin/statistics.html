@@ -131,7 +131,7 @@
           <div class="card-body">
             <div class="d-flex justify-content-between align-items-start mb-2">
               <div>
-                <h6 class="text-muted mb-0">中奖率</h6>
+                <h6 class="text-muted mb-0">高档奖励率</h6>
                 <h2 class="mt-2 mb-0" id="winRate">-</h2>
               </div>
               <div class="text-warning" style="font-size: 2rem;">
@@ -190,12 +190,12 @@
                   <td class="text-end fw-bold" id="activeUsers">-</td>
                 </tr>
                 <tr>
-                  <td>VIP用户</td>
+                  <td>管理员用户</td>
                   <td class="text-end fw-bold" id="vipUsers">-</td>
                 </tr>
                 <tr>
-                  <td>封禁用户</td>
-                  <td class="text-end fw-bold text-danger" id="bannedUsers">-</td>
+                  <td>普通用户</td>
+                  <td class="text-end fw-bold text-muted" id="bannedUsers">-</td>
                 </tr>
               </tbody>
             </table>
@@ -216,15 +216,15 @@
                   <td class="text-end fw-bold" id="lotteryDraws">-</td>
                 </tr>
                 <tr>
-                  <td>中奖次数</td>
+                  <td>高档奖励次数</td>
                   <td class="text-end fw-bold text-success" id="lotteryWins">-</td>
                 </tr>
                 <tr>
-                  <td>未中奖次数</td>
+                  <td>普通奖励次数</td>
                   <td class="text-end fw-bold text-muted" id="lotteryLosses">-</td>
                 </tr>
                 <tr>
-                  <td>平均中奖率</td>
+                  <td>高档奖励率</td>
                   <td class="text-end fw-bold text-warning" id="avgWinRate">-</td>
                 </tr>
               </tbody>
@@ -333,37 +333,37 @@
       </div>
     </div>
     
-    <!-- 客服工作统计 -->
+    <!-- 活跃时段统计 -->
     <div class="row g-3 mb-4">
       <div class="col-12">
         <div class="card">
           <div class="card-header bg-white">
-            <h6 class="mb-0"><i class="bi bi-headset"></i> 客服工作统计</h6>
+            <h6 class="mb-0"><i class="bi bi-clock-history"></i> 活跃时段统计</h6>
           </div>
           <div class="card-body">
             <div class="row">
               <div class="col-md-3">
                 <div class="text-center p-3">
                   <h4 class="text-primary mb-1" id="totalSessions">-</h4>
-                  <small class="text-muted">总会话数</small>
+                  <small class="text-muted">总活跃次数</small>
                 </div>
               </div>
               <div class="col-md-3">
                 <div class="text-center p-3">
                   <h4 class="text-success mb-1" id="closedSessions">-</h4>
-                  <small class="text-muted">已结束会话</small>
+                  <small class="text-muted">活跃时段数</small>
                 </div>
               </div>
               <div class="col-md-3">
                 <div class="text-center p-3">
                   <h4 class="text-warning mb-1" id="avgResponseTime">-</h4>
-                  <small class="text-muted">平均响应时间</small>
+                  <small class="text-muted">最活跃时段</small>
                 </div>
               </div>
               <div class="col-md-3">
                 <div class="text-center p-3">
                   <h4 class="text-info mb-1" id="customerSatisfaction">-</h4>
-                  <small class="text-muted">满意度</small>
+                  <small class="text-muted">活跃覆盖率</small>
                 </div>
               </div>
             </div>

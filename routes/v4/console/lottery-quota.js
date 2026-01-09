@@ -267,13 +267,13 @@ router.get('/users/:user_id/status', authenticateToken, requireAdmin, async (req
         last_draw_at: status.last_draw_at,
         matched_rule: matched_rule
           ? {
-              rule_id: matched_rule.rule_id,
-              rule_type: matched_rule.scope_type,
-              limit_value: matched_rule.limit_value,
-              priority: matched_rule.priority,
-              scope_type: matched_rule.scope_type,
-              scope_id: matched_rule.scope_id
-            }
+            rule_id: matched_rule.rule_id,
+            rule_type: matched_rule.scope_type,
+            limit_value: matched_rule.limit_value,
+            priority: matched_rule.priority,
+            scope_type: matched_rule.scope_type,
+            scope_id: matched_rule.scope_id
+          }
           : null
       },
       '查询用户配额状态成功'

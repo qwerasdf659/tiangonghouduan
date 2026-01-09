@@ -75,17 +75,27 @@
         display: flex;
         flex-direction: column;
         background: #fff;
+        overflow: hidden; /* 防止内容溢出 */
+        min-height: 0; /* 允许flex子项收缩 */
+      }
+      .chat-interface {
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
       }
       .chat-header {
         padding: 16px 20px;
         border-bottom: 1px solid #dee2e6;
         background: #fff;
+        flex-shrink: 0; /* 防止头部被压缩 */
       }
       .chat-messages {
         flex: 1;
         overflow-y: auto;
         padding: 20px;
         background: #f5f5f5;
+        min-height: 0; /* 关键：允许flex子项滚动 */
       }
       .message-item {
         margin-bottom: 16px;
@@ -121,6 +131,7 @@
         padding: 16px 20px;
         border-top: 1px solid #dee2e6;
         background: #fff;
+        flex-shrink: 0; /* 防止放大时被压缩 */
       }
       .quick-replies {
         display: flex;
@@ -188,7 +199,8 @@
         <!-- 聊天界面（隐藏） -->
         <div
           id="chatInterface"
-          style="display: none; height: 100%; display: flex; flex-direction: column"
+          class="chat-interface"
+          style="display: none"
         >
           <!-- 聊天头部 -->
           <div class="chat-header">

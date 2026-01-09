@@ -89,9 +89,12 @@
             </select>
           </div>
           <div class="col-md-2">
-            <label class="form-label">商家</label>
-            <select class="form-select" id="merchantFilter">
-              <option value="">全部商家</option>
+            <label class="form-label">优先级</label>
+            <select class="form-select" id="priorityFilter">
+              <option value="">全部优先级</option>
+              <option value="high">高</option>
+              <option value="medium">中</option>
+              <option value="low">低</option>
             </select>
           </div>
           <div class="col-md-2">
@@ -138,10 +141,9 @@
               <tr>
                 <th width="40"><input type="checkbox" class="form-check-input" id="headerCheckbox"></th>
                 <th>申请ID</th>
-                <th>商家名称</th>
-                <th>用户</th>
+                <th>申请人</th>
                 <th>积分数量</th>
-                <th>消费金额</th>
+                <th>申请说明</th>
                 <th>申请时间</th>
                 <th>状态</th>
                 <th>审核人</th>
@@ -176,11 +178,9 @@
         <div class="modal-body">
           <div class="mb-3">
             <p><strong>申请ID：</strong><span id="modalApplyId">-</span></p>
-            <p><strong>商家：</strong><span id="modalMerchant">-</span></p>
-            <p><strong>用户：</strong><span id="modalUser">-</span></p>
-            <p><strong>积分数量：</strong><span id="modalPoints">-</span></p>
-            <p><strong>消费金额：</strong><span id="modalAmount">-</span></p>
-            <p><strong>备注：</strong><span id="modalRemark">-</span></p>
+            <p><strong>申请人：</strong><span id="modalUser">-</span></p>
+            <p><strong>积分数量：</strong><span id="modalPoints" class="text-warning fw-bold">-</span></p>
+            <p><strong>申请说明：</strong><span id="modalRemark">-</span></p>
           </div>
           <div class="mb-3">
             <label class="form-label">审核意见</label>

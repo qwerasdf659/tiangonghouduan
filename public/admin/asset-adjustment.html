@@ -150,8 +150,17 @@
               <select class="form-select" id="assetType" required>
                 <option value="">请选择资产类型</option>
                 <option value="POINTS">积分</option>
+                <option value="BUDGET_POINTS">预算积分</option>
                 <option value="DIAMOND">钻石</option>
               </select>
+            </div>
+            <!-- 活动选择（仅预算积分时显示） -->
+            <div class="mb-3" id="campaignIdGroup" style="display: none;">
+              <label class="form-label">活动 <span class="text-danger">*</span></label>
+              <select class="form-select" id="campaignId">
+                <option value="">请选择活动</option>
+              </select>
+              <small class="text-muted">预算积分必须指定活动来源</small>
             </div>
             <div class="mb-3">
               <label class="form-label">调整类型 <span class="text-danger">*</span></label>

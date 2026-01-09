@@ -99,8 +99,10 @@
             <label class="form-label">预算类型</label>
             <select class="form-select" id="budgetTypeFilter">
               <option value="">全部类型</option>
+              <option value="pool">总预算</option>
+              <option value="user">用户预算</option>
               <option value="daily">每日预算</option>
-              <option value="total">总预算</option>
+              <option value="none">无预算</option>
             </select>
           </div>
           <div class="col-md-3">
@@ -172,10 +174,12 @@
               </select>
             </div>
             <div class="mb-3">
-              <label class="form-label">预算类型 <span class="text-danger">*</span></label>
+              <label class="form-label">预算模式 <span class="text-danger">*</span></label>
               <select class="form-select" id="budgetType" required>
-                <option value="total">总预算</option>
+                <option value="pool">总预算（活动池）</option>
+                <option value="user">用户预算</option>
                 <option value="daily">每日预算</option>
+                <option value="none">无预算限制</option>
               </select>
             </div>
             <div class="mb-3">

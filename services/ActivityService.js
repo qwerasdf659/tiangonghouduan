@@ -438,7 +438,7 @@ class ActivityService {
     const campaign = await models.LotteryCampaign.findByPk(parseInt(campaignId), {
       attributes: [
         'campaign_id',
-        'name',
+        'campaign_name',
         'campaign_code',
         'budget_mode',
         'pool_budget_total',
@@ -483,7 +483,7 @@ class ActivityService {
   static async getPrizeConfig(campaignId) {
     // 验证活动存在
     const campaign = await models.LotteryCampaign.findByPk(parseInt(campaignId), {
-      attributes: ['campaign_id', 'name', 'campaign_code', 'budget_mode']
+      attributes: ['campaign_id', 'campaign_name', 'campaign_code', 'budget_mode']
     })
 
     if (!campaign) {
@@ -498,17 +498,16 @@ class ActivityService {
       where: { campaign_id: parseInt(campaignId) },
       attributes: [
         'prize_id',
-        'name',
+        'prize_name',
         'prize_type',
-        'points_value',
-        'probability',
-        'total_quantity',
-        'remaining_quantity',
-        'is_active',
-        'tier'
+        'prize_value_points',
+        'win_probability',
+        'stock_quantity',
+        'status',
+        'sort_order'
       ],
       order: [
-        ['tier', 'ASC'],
+        ['sort_order', 'ASC'],
         ['prize_id', 'ASC']
       ]
     })
@@ -516,9 +515,9 @@ class ActivityService {
     // 分析奖品结构
     const analysis = {
       total_prizes: prizes.length,
-      has_empty_prize: prizes.some(p => p.prize_type === 'empty' || p.points_value === 0),
-      points_prizes_count: prizes.filter(p => p.points_value > 0).length,
-      total_probability: prizes.reduce((sum, p) => sum + Number(p.probability || 0), 0)
+      has_empty_prize: prizes.some(p => p.prize_type === 'empty' || p.prize_value_points === 0),
+      points_prizes_count: prizes.filter(p => p.prize_value_points > 0).length,
+      total_probability: prizes.reduce((sum, p) => sum + Number(p.win_probability || 0), 0)
     }
 
     return {
@@ -527,14 +526,13 @@ class ActivityService {
       budget_mode: campaign.budget_mode,
       prizes: prizes.map(p => ({
         prize_id: p.prize_id,
-        name: p.name,
+        prize_name: p.prize_name,
         prize_type: p.prize_type,
-        points_value: p.points_value,
-        probability: p.probability,
-        total_quantity: p.total_quantity,
-        remaining_quantity: p.remaining_quantity,
-        is_active: p.is_active,
-        tier: p.tier
+        prize_value_points: p.prize_value_points,
+        win_probability: p.win_probability,
+        stock_quantity: p.stock_quantity,
+        status: p.status,
+        sort_order: p.sort_order
       })),
       analysis
     }
@@ -559,7 +557,7 @@ class ActivityService {
     const campaign = await models.LotteryCampaign.findByPk(parseInt(campaignId), {
       attributes: [
         'campaign_id',
-        'name',
+        'campaign_name',
         'campaign_code',
         'budget_mode',
         'pool_budget_total',
@@ -659,7 +657,7 @@ class ActivityService {
   static async validatePrizeConfig(campaignId) {
     // 验证活动存在
     const campaign = await models.LotteryCampaign.findByPk(parseInt(campaignId), {
-      attributes: ['campaign_id', 'name', 'campaign_code', 'budget_mode']
+      attributes: ['campaign_id', 'campaign_name', 'campaign_code', 'budget_mode']
     })
 
     if (!campaign) {

@@ -52,6 +52,76 @@ router.get(
 )
 
 /**
+ * GET /feedbacks/stats - 获取反馈统计数据
+ *
+ * @description 获取反馈按状态分类的统计数据
+ * @route GET /api/v4/console/system/feedbacks/stats
+ * @access Private (需要管理员权限)
+ */
+router.get(
+  '/stats',
+  adminAuthMiddleware,
+  asyncHandler(async (req, res) => {
+    try {
+      const models = require('../../../../models')
+
+      // 并行查询各状态数量
+      const [total, pending, processing, replied, closed] = await Promise.all([
+        models.Feedback.count(),
+        models.Feedback.count({ where: { status: 'pending' } }),
+        models.Feedback.count({ where: { status: 'processing' } }),
+        models.Feedback.count({ where: { status: 'replied' } }),
+        models.Feedback.count({ where: { status: 'closed' } })
+      ])
+
+      return res.apiSuccess({
+        total,
+        pending,
+        processing,
+        replied,
+        closed,
+        resolved: replied + closed // 已解决 = 已回复 + 已关闭
+      }, '获取反馈统计成功')
+    } catch (error) {
+      sharedComponents.logger.error('获取反馈统计失败', { error: error.message })
+      return res.apiInternalError('获取反馈统计失败', error.message, 'FEEDBACK_STATS_ERROR')
+    }
+  })
+)
+
+/**
+ * GET /feedbacks/:id - 获取单个反馈详情
+ *
+ * @description 获取指定反馈的详细信息
+ * @route GET /api/v4/console/system/feedbacks/:id
+ * @access Private (需要管理员权限)
+ */
+router.get(
+  '/:id',
+  adminAuthMiddleware,
+  asyncHandler(async (req, res) => {
+    try {
+      const { id } = req.params
+
+      // 获取反馈服务
+      const FeedbackService = req.app.locals.services.getService('feedback')
+
+      // 调用服务层方法获取反馈详情
+      const feedback = await FeedbackService.getFeedbackById(id)
+
+      if (!feedback) {
+        return res.apiError('反馈不存在', 'FEEDBACK_NOT_FOUND', null, 404)
+      }
+
+      return res.apiSuccess({ feedback }, '获取反馈详情成功')
+    } catch (error) {
+      sharedComponents.logger.error('获取反馈详情失败', { error: error.message })
+      return res.apiInternalError('获取反馈详情失败', error.message, 'FEEDBACK_DETAIL_ERROR')
+    }
+  })
+)
+
+/**
  * POST /feedbacks/:id/reply - 回复用户反馈
  *
  * @description 管理员回复用户提交的反馈

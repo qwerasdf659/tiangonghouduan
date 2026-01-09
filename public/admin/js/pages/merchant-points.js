@@ -2,19 +2,35 @@
  * 商家积分审核页面逻辑
  * @file public/admin/js/pages/merchant-points.js
  * @description 审核商家提交的用户积分发放申请
- * @version 1.1.0
+ * @version 2.1.0
  * @date 2026-01-09
  *
- * 后端API端点（适配版）:
+ * 后端API端点:
  * - GET  /api/v4/console/merchant-points - 获取申请列表
  * - GET  /api/v4/console/merchant-points/:audit_id - 获取详情
  * - POST /api/v4/console/merchant-points/:audit_id/approve - 审核通过
  * - POST /api/v4/console/merchant-points/:audit_id/reject - 审核拒绝
  * - GET  /api/v4/console/merchant-points/stats/pending - 待审核统计
+ *
+ * 后端返回字段（以后端为准）:
+ * - audit_id: 审核记录ID
+ * - user_id: 申请用户ID
+ * - applicant: { user_id, nickname, mobile } - 申请人信息
+ * - points_amount: 申请积分数量
+ * - description: 申请描述
+ * - status: 审核状态 (pending/approved/rejected/cancelled)
+ * - priority: 优先级
+ * - auditor: { user_id, nickname, mobile } - 审核员信息
+ * - audit_reason: 审核意见/拒绝原因
+ * - submitted_at: 提交时间
+ * - audited_at: 审核时间
+ * - created_at: 创建时间
+ * 
+ * CSP兼容：使用事件委托代替内联事件处理器
  */
 
 // ================================
-// 商家积分审核 - 前端逻辑（适配后端API）
+// 商家积分审核 - 前端逻辑（直接使用后端字段名）
 // ================================
 
 // 全局变量
@@ -36,14 +52,35 @@ document.addEventListener('DOMContentLoaded', function () {
   // 事件监听器
   document.getElementById('logoutBtn').addEventListener('click', logout)
   document.getElementById('refreshBtn').addEventListener('click', loadData)
-  document.getElementById('statusFilter').addEventListener('change', loadData)
-  document.getElementById('timeRangeFilter').addEventListener('change', loadData)
+  document.getElementById('statusFilter').addEventListener('change', function() {
+    currentPage = 1
+    loadData()
+  })
+  document.getElementById('timeRangeFilter').addEventListener('change', function() {
+    currentPage = 1
+    loadData()
+  })
+  document.getElementById('priorityFilter').addEventListener('change', function() {
+    currentPage = 1
+    loadData()
+  })
 
   document.getElementById('headerCheckbox').addEventListener('change', toggleSelectAll)
   document.getElementById('batchApproveBtn').addEventListener('click', batchApprove)
   document.getElementById('batchRejectBtn').addEventListener('click', batchReject)
-  document.getElementById('approveBtn').addEventListener('click', () => reviewSingle('approve'))
-  document.getElementById('rejectBtn').addEventListener('click', () => reviewSingle('reject'))
+  document.getElementById('approveBtn').addEventListener('click', function() {
+    reviewSingle('approve')
+  })
+  document.getElementById('rejectBtn').addEventListener('click', function() {
+    reviewSingle('reject')
+  })
+
+  // 事件委托：处理表格内的点击事件（CSP兼容）
+  document.getElementById('reviewTableBody').addEventListener('click', handleTableClick)
+  document.getElementById('reviewTableBody').addEventListener('change', handleTableChange)
+  
+  // 事件委托：处理分页点击事件（CSP兼容）
+  document.getElementById('paginationNav').addEventListener('click', handlePaginationClick)
 
   // Token和权限验证
   if (!getToken() || !checkAdminPermission()) {
@@ -57,17 +94,68 @@ document.addEventListener('DOMContentLoaded', function () {
 })
 
 /**
+ * 处理表格内的点击事件（事件委托）
+ * @param {Event} event 
+ */
+function handleTableClick(event) {
+  const target = event.target.closest('button')
+  if (!target) return
+
+  const auditId = parseInt(target.dataset.auditId)
+  if (!auditId) return
+
+  if (target.classList.contains('btn-review')) {
+    showReviewModal(auditId)
+  } else if (target.classList.contains('btn-detail')) {
+    showDetail(auditId)
+  }
+}
+
+/**
+ * 处理表格内的change事件（事件委托）
+ * @param {Event} event 
+ */
+function handleTableChange(event) {
+  const target = event.target
+  if (!target.classList.contains('row-checkbox')) return
+
+  const auditId = parseInt(target.dataset.id)
+  if (!auditId) return
+
+  toggleRowSelection(auditId)
+}
+
+/**
+ * 处理分页点击事件（事件委托）
+ * @param {Event} event 
+ */
+function handlePaginationClick(event) {
+  event.preventDefault()
+  const target = event.target.closest('a')
+  if (!target) return
+  if (target.parentElement.classList.contains('disabled')) return
+
+  const page = parseInt(target.dataset.page)
+  if (page && page > 0) {
+    goToPage(page)
+  }
+}
+
+/**
  * 加载待审核统计
  */
 async function loadPendingStats() {
   try {
-    // 后端API: GET /api/v4/console/merchant-points/stats/pending
     const response = await apiRequest('/api/v4/console/merchant-points/stats/pending')
     if (response && response.success) {
+      // 更新所有统计卡片
       document.getElementById('pendingCount').textContent = response.data.pending_count || 0
+      document.getElementById('approvedCount').textContent = response.data.approved_count || 0
+      document.getElementById('rejectedCount').textContent = response.data.rejected_count || 0
+      document.getElementById('totalPoints').textContent = response.data.today_points || 0
     }
   } catch (error) {
-    console.error('加载待审核统计失败:', error)
+    console.error('加载统计失败:', error)
   }
 }
 
@@ -81,6 +169,7 @@ async function loadData() {
   try {
     const status = document.getElementById('statusFilter').value
     const timeRange = document.getElementById('timeRangeFilter').value
+    const priority = document.getElementById('priorityFilter').value
 
     const params = new URLSearchParams({
       page: currentPage,
@@ -89,18 +178,18 @@ async function loadData() {
 
     if (status) params.append('status', status)
     if (timeRange) params.append('time_range', timeRange)
+    if (priority) params.append('priority', priority)
 
-    // 后端API: GET /api/v4/console/merchant-points
     const response = await apiRequest(`/api/v4/console/merchant-points?${params.toString()}`)
 
     if (response && response.success) {
       const { rows, count, pagination } = response.data
 
-      // 更新统计（从列表数据计算）
-      updateStatisticsFromList(rows || [])
-
       // 渲染表格
       renderTable(rows || [])
+      
+      // 重新加载统计数据（从stats API获取准确统计）
+      loadPendingStats()
 
       // 渲染分页
       if (pagination) {
@@ -109,7 +198,7 @@ async function loadData() {
     } else {
       tbody.innerHTML = `
         <tr>
-          <td colspan="10" class="text-center py-5 text-muted">
+          <td colspan="9" class="text-center py-5 text-muted">
             <i class="bi bi-inbox" style="font-size: 3rem;"></i>
             <p class="mt-2">暂无数据</p>
           </td>
@@ -120,7 +209,7 @@ async function loadData() {
     console.error('加载数据失败:', error)
     tbody.innerHTML = `
       <tr>
-        <td colspan="10" class="text-center py-5 text-danger">
+        <td colspan="9" class="text-center py-5 text-danger">
           <i class="bi bi-exclamation-triangle" style="font-size: 2rem;"></i>
           <p class="mt-2">加载失败：${error.message}</p>
         </td>
@@ -136,12 +225,13 @@ async function loadData() {
  * @param {Array} rows - 申请列表
  */
 function updateStatisticsFromList(rows) {
+  // 使用后端字段名 status 和 points_amount
   const pending = rows.filter(r => r.status === 'pending').length
   const approved = rows.filter(r => r.status === 'approved').length
   const rejected = rows.filter(r => r.status === 'rejected').length
   const totalPoints = rows
     .filter(r => r.status === 'approved')
-    .reduce((sum, r) => sum + (r.points || 0), 0)
+    .reduce((sum, r) => sum + (r.points_amount || 0), 0)
 
   document.getElementById('approvedCount').textContent = approved
   document.getElementById('rejectedCount').textContent = rejected
@@ -158,7 +248,7 @@ function renderTable(applications) {
   if (!applications || applications.length === 0) {
     tbody.innerHTML = `
       <tr>
-        <td colspan="10" class="text-center py-5 text-muted">
+        <td colspan="9" class="text-center py-5 text-muted">
           <i class="bi bi-inbox" style="font-size: 3rem;"></i>
           <p class="mt-2">暂无申请记录</p>
         </td>
@@ -180,41 +270,52 @@ function renderTable(applications) {
       const isChecked = selectedItems.has(app.audit_id)
       const isPending = app.status === 'pending'
 
-      // 后端返回的字段名称可能不同，做兼容处理
-      const auditId = app.audit_id || app.application_id || app.id
-      const points = app.points || app.request_points || 0
-      const userName = app.user_nickname || app.user_name || app.user_mobile || '-'
-      const merchantName = app.merchant_name || '-'
-      const consumptionAmount = app.consumption_amount || app.amount || 0
-      const reviewerName = app.reviewer_name || app.auditor_name || '-'
+      // 直接使用后端字段名，不做复杂映射
+      const auditId = app.audit_id
+      const pointsAmount = app.points_amount || 0
+      
+      // 申请人信息：使用 applicant 对象
+      const applicantName = app.applicant 
+        ? (app.applicant.nickname || app.applicant.mobile || `用户${app.applicant.user_id}`)
+        : `用户${app.user_id}`
+      
+      // 审核员信息：使用 auditor 对象
+      const auditorName = app.auditor 
+        ? (app.auditor.nickname || app.auditor.mobile || `管理员${app.auditor.user_id}`)
+        : '-'
+      
+      // 申请描述
+      const description = app.description || '-'
+      
+      // 提交时间
+      const submittedAt = app.submitted_at || app.created_at
 
+      // 使用 data-* 属性代替内联事件（CSP兼容）
       return `
       <tr>
         <td>
           <input type="checkbox" class="form-check-input row-checkbox" 
                  data-id="${auditId}" 
                  ${isChecked ? 'checked' : ''}
-                 ${!isPending ? 'disabled' : ''}
-                 onchange="toggleRowSelection(${auditId})">
+                 ${!isPending ? 'disabled' : ''}>
         </td>
         <td>${auditId}</td>
-        <td>${merchantName}</td>
-        <td>${userName}</td>
-        <td class="text-warning"><strong>${points}</strong></td>
-        <td>¥${parseFloat(consumptionAmount).toFixed(2)}</td>
-        <td>${formatDate(app.created_at)}</td>
+        <td>${applicantName}</td>
+        <td class="text-warning"><strong>${pointsAmount}</strong></td>
+        <td title="${description}">${description.length > 20 ? description.substring(0, 20) + '...' : description}</td>
+        <td>${formatDate(submittedAt)}</td>
         <td>${statusBadge}</td>
-        <td>${reviewerName}</td>
+        <td>${auditorName}</td>
         <td>
           ${
             isPending
               ? `
-            <button class="btn btn-sm btn-outline-primary" onclick="showReviewModal(${auditId})">
+            <button class="btn btn-sm btn-outline-primary btn-review" data-audit-id="${auditId}">
               <i class="bi bi-clipboard-check"></i> 审核
             </button>
           `
               : `
-            <button class="btn btn-sm btn-outline-secondary" onclick="showDetail(${auditId})">
+            <button class="btn btn-sm btn-outline-secondary btn-detail" data-audit-id="${auditId}">
               <i class="bi bi-eye"></i> 详情
             </button>
           `
@@ -278,20 +379,26 @@ async function showReviewModal(auditId) {
   currentAuditId = auditId
 
   try {
-    // 后端API: GET /api/v4/console/merchant-points/:audit_id
     const response = await apiRequest(`/api/v4/console/merchant-points/${auditId}`)
 
     if (response && response.success) {
       const app = response.data
 
-      document.getElementById('modalApplyId').textContent = app.audit_id || app.id
-      document.getElementById('modalMerchant').textContent = app.merchant_name || '-'
-      document.getElementById('modalUser').textContent =
-        app.user_nickname || app.user_name || app.user_mobile || '-'
-      document.getElementById('modalPoints').textContent = app.points || app.request_points || 0
-      document.getElementById('modalAmount').textContent =
-        '¥' + parseFloat(app.consumption_amount || app.amount || 0).toFixed(2)
-      document.getElementById('modalRemark').textContent = app.remark || app.reason || '-'
+      // 直接使用后端字段名
+      document.getElementById('modalApplyId').textContent = app.audit_id
+      
+      // 申请人信息
+      const applicantName = app.applicant 
+        ? (app.applicant.nickname || app.applicant.mobile || `用户${app.applicant.user_id}`)
+        : `用户${app.user_id}`
+      document.getElementById('modalUser').textContent = applicantName
+      
+      // 积分数量
+      document.getElementById('modalPoints').textContent = app.points_amount || 0
+      
+      // 申请描述
+      document.getElementById('modalRemark').textContent = app.description || '-'
+      
       document.getElementById('reviewComment').value = ''
 
       new bootstrap.Modal(document.getElementById('reviewModal')).show()
@@ -322,7 +429,6 @@ async function reviewSingle(action) {
   showLoading(true)
 
   try {
-    // 后端API: POST /api/v4/console/merchant-points/:audit_id/approve 或 /reject
     const response = await apiRequest(
       `/api/v4/console/merchant-points/${currentAuditId}/${action}`,
       {
@@ -351,12 +457,11 @@ async function reviewSingle(action) {
 
 /**
  * 批量通过
- * 注意：后端不支持批量审核，这里改为逐个处理
  */
 async function batchApprove() {
   if (selectedItems.size === 0) return
 
-  if (!confirm(`确定要批量通过 ${selectedItems.size} 条申请吗？\n注意：将逐个处理每条申请`)) {
+  if (!confirm(`确定要批量通过 ${selectedItems.size} 条申请吗？`)) {
     return
   }
 
@@ -366,7 +471,6 @@ async function batchApprove() {
   let failCount = 0
 
   try {
-    // 逐个调用审核通过API
     for (const auditId of selectedItems) {
       try {
         const response = await apiRequest(`/api/v4/console/merchant-points/${auditId}/approve`, {
@@ -406,7 +510,6 @@ async function batchApprove() {
 
 /**
  * 批量拒绝
- * 注意：后端不支持批量审核，这里改为逐个处理
  */
 async function batchReject() {
   if (selectedItems.size === 0) return
@@ -423,7 +526,6 @@ async function batchReject() {
   let failCount = 0
 
   try {
-    // 逐个调用审核拒绝API
     for (const auditId of selectedItems) {
       try {
         const response = await apiRequest(`/api/v4/console/merchant-points/${auditId}/reject`, {
@@ -470,7 +572,7 @@ function showDetail(auditId) {
 }
 
 /**
- * 渲染分页
+ * 渲染分页（使用 data-* 属性代替内联事件，CSP兼容）
  * @param {Object} pagination - 分页信息
  */
 function renderPagination(pagination) {
@@ -484,7 +586,7 @@ function renderPagination(pagination) {
 
   html += `
     <li class="page-item ${currentPage === 1 ? 'disabled' : ''}">
-      <a class="page-link" href="#" onclick="goToPage(${currentPage - 1}); return false;">上一页</a>
+      <a class="page-link" href="#" data-page="${currentPage - 1}">上一页</a>
     </li>
   `
 
@@ -492,7 +594,7 @@ function renderPagination(pagination) {
     if (i === 1 || i === pagination.total_pages || (i >= currentPage - 2 && i <= currentPage + 2)) {
       html += `
         <li class="page-item ${i === currentPage ? 'active' : ''}">
-          <a class="page-link" href="#" onclick="goToPage(${i}); return false;">${i}</a>
+          <a class="page-link" href="#" data-page="${i}">${i}</a>
         </li>
       `
     } else if (i === currentPage - 3 || i === currentPage + 3) {
@@ -502,7 +604,7 @@ function renderPagination(pagination) {
 
   html += `
     <li class="page-item ${currentPage === pagination.total_pages ? 'disabled' : ''}">
-      <a class="page-link" href="#" onclick="goToPage(${currentPage + 1}); return false;">下一页</a>
+      <a class="page-link" href="#" data-page="${currentPage + 1}">下一页</a>
     </li>
   `
 

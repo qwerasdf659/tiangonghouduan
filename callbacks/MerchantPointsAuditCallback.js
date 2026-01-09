@@ -29,7 +29,7 @@ module.exports = {
    *
    * @description 商家积分申请审核通过后触发，发放积分给商家
    *
-   * @param {number} merchantPointsId - 审核记录ID（audit_id）
+   * @param {number} auditableId - 审核记录ID（audit_id）
    * @param {Object} auditRecord - 审核记录对象（ContentReviewRecord实例）
    * @param {number} auditRecord.audit_id - 审核记录ID
    * @param {number} auditRecord.auditor_id - 审核员ID
@@ -38,13 +38,16 @@ module.exports = {
    * @returns {Promise<{success: boolean, message: string}>} 回调处理结果
    * @throws {Error} 处理失败时抛出错误，触发事务回滚
    */
-  async approved(merchantPointsId, auditRecord, transaction) {
-    logger.info(`[商家积分审核回调] 审核通过回调触发: audit_id=${merchantPointsId}`)
+  async approved(auditableId, auditRecord, transaction) {
+    // 注意：第一个参数是 auditable_id（用户ID），audit_id 从 auditRecord 获取
+    const auditId = auditRecord.audit_id
+    logger.info(`[商家积分审核回调] 审核通过回调触发: audit_id=${auditId}, auditable_id=${auditableId}`)
 
     try {
       // 调用 MerchantPointsService 处理审核通过的业务逻辑
+      // 传递 audit_id（审核记录ID），而不是 auditable_id（用户ID）
       await MerchantPointsService.processApprovedApplication(
-        merchantPointsId,
+        auditId,
         auditRecord.auditor_id,
         { transaction }
       )
@@ -55,7 +58,7 @@ module.exports = {
       }
     } catch (error) {
       logger.error(
-        `[商家积分审核回调] 审核通过回调处理失败: audit_id=${merchantPointsId}, error=${error.message}`
+        `[商家积分审核回调] 审核通过回调处理失败: audit_id=${auditId}, error=${error.message}`
       )
       // 抛出错误，让上层事务回滚
       throw error
@@ -67,7 +70,7 @@ module.exports = {
    *
    * @description 商家积分申请审核拒绝后触发，记录拒绝原因
    *
-   * @param {number} merchantPointsId - 审核记录ID（audit_id）
+   * @param {number} auditableId - 审核记录ID（audit_id）
    * @param {Object} auditRecord - 审核记录对象（ContentReviewRecord实例）
    * @param {number} auditRecord.audit_id - 审核记录ID
    * @param {number} auditRecord.auditor_id - 审核员ID
@@ -76,15 +79,18 @@ module.exports = {
    * @returns {Promise<{success: boolean, message: string}>} 回调处理结果
    * @throws {Error} 处理失败时抛出错误，触发事务回滚
    */
-  async rejected(merchantPointsId, auditRecord, transaction) {
+  async rejected(auditableId, auditRecord, transaction) {
+    // 注意：第一个参数是 auditable_id（用户ID），audit_id 从 auditRecord 获取
+    const auditId = auditRecord.audit_id
     logger.info(
-      `[商家积分审核回调] 审核拒绝回调触发: audit_id=${merchantPointsId}, reason=${auditRecord?.audit_reason || '未提供原因'}`
+      `[商家积分审核回调] 审核拒绝回调触发: audit_id=${auditId}, auditable_id=${auditableId}, reason=${auditRecord?.audit_reason || '未提供原因'}`
     )
 
     try {
       // 调用 MerchantPointsService 处理审核拒绝的业务逻辑
+      // 传递 audit_id（审核记录ID），而不是 auditable_id（用户ID）
       await MerchantPointsService.processRejectedApplication(
-        merchantPointsId,
+        auditId,
         auditRecord.auditor_id,
         auditRecord.audit_reason || '未提供拒绝原因',
         { transaction }
@@ -96,7 +102,7 @@ module.exports = {
       }
     } catch (error) {
       logger.error(
-        `[商家积分审核回调] 审核拒绝回调处理失败: audit_id=${merchantPointsId}, error=${error.message}`
+        `[商家积分审核回调] 审核拒绝回调处理失败: audit_id=${auditId}, error=${error.message}`
       )
       // 抛出错误，让上层事务回滚
       throw error

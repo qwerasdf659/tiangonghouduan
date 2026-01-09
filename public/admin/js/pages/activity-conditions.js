@@ -11,6 +11,7 @@
 
 let conditionCounter = 0
 let currentActivityCode = null
+let currentActivityData = null  // 保存当前选中活动的完整数据
 
 // 条件类型配置
 const CONDITION_TYPES = {
@@ -62,6 +63,20 @@ document.addEventListener('DOMContentLoaded', function () {
   // 退出登录
   document.getElementById('logoutBtn').addEventListener('click', logout)
 
+  // 活动选择变更事件（解决CSP内联事件限制）
+  document.getElementById('activitySelect').addEventListener('change', loadActivityConditions)
+
+  // 添加条件按钮事件
+  document.getElementById('addConditionBtn').addEventListener('click', function() {
+    addCondition()
+  })
+
+  // 保存配置按钮事件
+  document.getElementById('saveConditionsBtn').addEventListener('click', saveConditions)
+
+  // 清空条件按钮事件
+  document.getElementById('clearAllConditionsBtn').addEventListener('click', clearAllConditions)
+
   // 加载活动列表
   loadActivities()
 })
@@ -71,12 +86,23 @@ document.addEventListener('DOMContentLoaded', function () {
 // ============================================
 
 /**
+ * 缓存活动列表数据（用于后续查找）
+ */
+let activitiesCache = []
+
+/**
  * 加载活动列表
+ * 调用后端API: GET /api/v4/lottery/campaigns
+ * 注意: 此API默认只返回status='active'的活动，管理后台需要查看所有状态
  */
 async function loadActivities() {
   try {
-    const response = await apiRequest('/api/v4/lottery/campaigns')
+    // 获取所有状态的活动（不传status参数让后端返回所有）
+    const response = await apiRequest('/api/v4/lottery/campaigns?status=')
     if (response && response.success && response.data) {
+      // 缓存活动数据
+      activitiesCache = response.data
+      
       const select = document.getElementById('activitySelect')
       select.innerHTML = '<option value="">-- 请选择活动 --</option>'
 
@@ -84,8 +110,13 @@ async function loadActivities() {
         const option = document.createElement('option')
         option.value = activity.campaign_code
         option.dataset.campaignId = activity.campaign_id
+        // 保存完整的活动数据到option
+        option.dataset.activityData = JSON.stringify(activity)
+        
         const statusText =
-          activity.status === 'active' ? '进行中' : activity.status === 'draft' ? '草稿' : '已结束'
+          activity.status === 'active' ? '进行中' : 
+          activity.status === 'draft' ? '草稿' : 
+          activity.status === 'paused' ? '已暂停' : '已结束'
         option.textContent = `${activity.campaign_name} (${statusText})`
         select.appendChild(option)
       })
@@ -98,28 +129,52 @@ async function loadActivities() {
 
 /**
  * 加载活动条件
+ * 修正：使用正确的后端API
+ * - 活动基本信息：从缓存中获取（已在loadActivities时加载）
+ * - 活动条件配置：调用 GET /api/v4/activities/:code/conditions
  */
 async function loadActivityConditions() {
-  const campaignCode = document.getElementById('activitySelect').value
+  const select = document.getElementById('activitySelect')
+  const campaignCode = select.value
   if (!campaignCode) {
     clearConditionsUI()
+    currentActivityData = null
     return
   }
 
   currentActivityCode = campaignCode
 
   try {
-    const response = await apiRequest(`/api/v4/lottery/campaigns/${campaignCode}`)
-    if (response && response.success && response.data) {
-      const activity = response.data
+    // 从缓存中获取活动基本信息
+    const selectedOption = select.options[select.selectedIndex]
+    let activityBasicInfo = null
+    
+    if (selectedOption.dataset.activityData) {
+      activityBasicInfo = JSON.parse(selectedOption.dataset.activityData)
+    } else {
+      // 如果没有缓存，从activitiesCache中查找
+      activityBasicInfo = activitiesCache.find(a => a.campaign_code === campaignCode)
+    }
+    
+    // 显示活动状态
+    if (activityBasicInfo) {
       const statusMap = { active: '进行中', draft: '草稿', paused: '已暂停', completed: '已结束' }
       document.getElementById('activityStatus').value =
-        statusMap[activity.status] || activity.status
+        statusMap[activityBasicInfo.status] || activityBasicInfo.status
+    }
 
+    // 调用正确的API获取活动条件配置
+    // 后端API: GET /api/v4/activities/:idOrCode/conditions
+    const response = await apiRequest(`/api/v4/activities/${campaignCode}/conditions`)
+    
+    if (response && response.success && response.data) {
+      const conditionData = response.data
+      currentActivityData = conditionData
+      
       clearConditionsUI()
 
-      const conditions = activity.participation_conditions || {}
-      const messages = activity.condition_error_messages || {}
+      const conditions = conditionData.participation_conditions || {}
+      const messages = conditionData.condition_error_messages || {}
 
       if (Object.keys(conditions).length > 0) {
         Object.entries(conditions).forEach(([type, rule]) => {
@@ -127,10 +182,20 @@ async function loadActivityConditions() {
         })
       }
       updatePreview()
+    } else {
+      // API返回成功但没有数据，说明没有配置条件
+      clearConditionsUI()
+      updatePreview()
     }
   } catch (error) {
     console.error('加载活动条件失败:', error)
-    alert('加载活动条件失败: ' + error.message)
+    // 如果是404错误，可能是活动没有配置条件，不需要报错
+    if (error.message && error.message.includes('404')) {
+      clearConditionsUI()
+      updatePreview()
+    } else {
+      alert('加载活动条件失败: ' + error.message)
+    }
   }
 }
 
@@ -140,6 +205,7 @@ async function loadActivityConditions() {
 
 /**
  * 添加条件
+ * 注意：使用addEventListener绑定事件，避免CSP内联脚本限制
  */
 function addCondition(presetType = '', presetOperator = '', presetValue = '', presetMessage = '') {
   conditionCounter++
@@ -152,11 +218,12 @@ function addCondition(presetType = '', presetOperator = '', presetValue = '', pr
   const defaultType = presetType || 'user_points'
   const defaultOperator = presetOperator || '>='
 
+  // 不使用内联事件处理器，改为使用data属性存储id
   conditionRow.innerHTML = `
     <div class="row g-2">
       <div class="col-md-3">
         <label class="form-label small">条件类型</label>
-        <select class="form-control form-control-sm" id="type-${id}" onchange="updateConditionUI(${id})">
+        <select class="form-control form-control-sm condition-type-select" id="type-${id}" data-condition-id="${id}">
           ${Object.entries(CONDITION_TYPES)
             .map(
               ([key, config]) => `
@@ -168,7 +235,7 @@ function addCondition(presetType = '', presetOperator = '', presetValue = '', pr
       </div>
       <div class="col-md-2">
         <label class="form-label small">运算符</label>
-        <select class="form-control form-control-sm" id="operator-${id}" onchange="updatePreview()"></select>
+        <select class="form-control form-control-sm condition-operator-select" id="operator-${id}" data-condition-id="${id}"></select>
       </div>
       <div class="col-md-2">
         <label class="form-label small">条件值</label>
@@ -176,13 +243,13 @@ function addCondition(presetType = '', presetOperator = '', presetValue = '', pr
       </div>
       <div class="col-md-4">
         <label class="form-label small">不满足时的提示语</label>
-        <input type="text" class="form-control form-control-sm" id="message-${id}"
+        <input type="text" class="form-control form-control-sm condition-message-input" id="message-${id}"
                placeholder="如：您的积分不足100分"
                value="${presetMessage || CONDITION_TYPES[defaultType].defaultMessage}"
-               onchange="updatePreview()">
+               data-condition-id="${id}">
       </div>
       <div class="col-md-1 d-flex align-items-end">
-        <button class="btn btn-sm btn-outline-danger w-100" onclick="removeCondition(${id})">
+        <button class="btn btn-sm btn-outline-danger w-100 condition-remove-btn" data-condition-id="${id}">
           <i class="bi bi-trash"></i>
         </button>
       </div>
@@ -190,12 +257,36 @@ function addCondition(presetType = '', presetOperator = '', presetValue = '', pr
   `
 
   container.appendChild(conditionRow)
+  
+  // 绑定事件监听器（避免CSP限制）
+  const typeSelect = document.getElementById(`type-${id}`)
+  const operatorSelect = document.getElementById(`operator-${id}`)
+  const messageInput = document.getElementById(`message-${id}`)
+  const removeBtn = conditionRow.querySelector('.condition-remove-btn')
+  
+  typeSelect.addEventListener('change', function() {
+    updateConditionUI(id)
+  })
+  
+  operatorSelect.addEventListener('change', function() {
+    updatePreview()
+  })
+  
+  messageInput.addEventListener('change', function() {
+    updatePreview()
+  })
+  
+  removeBtn.addEventListener('click', function() {
+    removeCondition(id)
+  })
+  
   updateConditionUI(id, presetOperator, presetValue)
   updatePreview()
 }
 
 /**
  * 更新条件UI
+ * 注意：使用addEventListener绑定事件，避免CSP内联脚本限制
  */
 function updateConditionUI(id, presetOperator = '', presetValue = '') {
   const typeSelect = document.getElementById(`type-${id}`)
@@ -214,16 +305,16 @@ function updateConditionUI(id, presetOperator = '', presetValue = '') {
   const valueContainer = document.getElementById(`value-container-${id}`)
   if (config.valueType === 'number') {
     valueContainer.innerHTML = `
-      <input type="number" class="form-control form-control-sm" id="value-${id}"
+      <input type="number" class="form-control form-control-sm condition-value-input" id="value-${id}"
              placeholder="${config.placeholder}"
              value="${presetValue || ''}"
-             onchange="updatePreview()">
+             data-condition-id="${id}">
     `
   } else if (config.valueType === 'select') {
     const isMultiple = operatorSelect.value === 'in'
     if (isMultiple) {
       valueContainer.innerHTML = `
-        <select class="form-control form-control-sm" id="value-${id}" multiple onchange="updatePreview()">
+        <select class="form-control form-control-sm condition-value-input" id="value-${id}" multiple data-condition-id="${id}">
           ${config.options
             .map(
               opt => `
@@ -235,7 +326,7 @@ function updateConditionUI(id, presetOperator = '', presetValue = '') {
       `
     } else {
       valueContainer.innerHTML = `
-        <select class="form-control form-control-sm" id="value-${id}" onchange="updatePreview()">
+        <select class="form-control form-control-sm condition-value-input" id="value-${id}" data-condition-id="${id}">
           ${config.options
             .map(
               opt => `
@@ -246,6 +337,14 @@ function updateConditionUI(id, presetOperator = '', presetValue = '') {
         </select>
       `
     }
+  }
+
+  // 绑定值输入框的change事件（避免CSP限制）
+  const valueInput = document.getElementById(`value-${id}`)
+  if (valueInput) {
+    valueInput.addEventListener('change', function() {
+      updatePreview()
+    })
   }
 
   const messageInput = document.getElementById(`message-${id}`)

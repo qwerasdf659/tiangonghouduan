@@ -57,14 +57,13 @@ router.get('/', authenticateToken, requireAdmin, async (req, res) => {
     // ✅ 使用 AnnouncementService 方法转换为通知格式
     const notifications = AnnouncementService.convertToNotificationFormat(announcements)
 
-    // ✅ 使用 AnnouncementService 获取未读数量
-    const unread_count = await AnnouncementService.getUnreadCount({ type })
+    // ✅ 获取统计数据（前端期望的格式）
+    const statistics = await AnnouncementService.getNotificationStatistics({ type })
 
     return res.apiSuccess(
       {
         notifications,
-        total: notifications.length,
-        unread: unread_count
+        statistics
       },
       '获取通知列表成功'
     )

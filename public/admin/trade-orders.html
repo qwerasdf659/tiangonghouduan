@@ -112,10 +112,10 @@
               <tr>
                 <th style="width: 80px;">订单ID</th>
                 <th>挂牌信息</th>
-                <th>买家</th>
-                <th>卖家</th>
-                <th>交易金额</th>
-                <th>手续费</th>
+                <th>买家ID</th>
+                <th>卖家ID</th>
+                <th>支付金额💎</th>
+                <th>手续费💎</th>
                 <th>状态</th>
                 <th>创建时间</th>
                 <th style="width: 120px;">操作</th>
@@ -207,22 +207,22 @@
               <p id="detailSellerId">-</p>
             </div>
 
-            <!-- 金额信息 -->
+            <!-- 金额信息（单位：DIAMOND钻石） -->
             <div class="col-12">
               <h6 class="border-bottom pb-2 text-primary">
-                <i class="bi bi-currency-exchange"></i> 金额信息
+                <i class="bi bi-currency-exchange"></i> 金额信息（💎钻石）
               </h6>
             </div>
             <div class="col-md-4">
-              <label class="form-label text-muted">交易金额</label>
+              <label class="form-label text-muted">买家支付总额</label>
               <p id="detailTotalPrice" class="fw-bold text-success">-</p>
             </div>
             <div class="col-md-4">
-              <label class="form-label text-muted">手续费</label>
+              <label class="form-label text-muted">平台手续费</label>
               <p id="detailFee" class="text-warning">-</p>
             </div>
             <div class="col-md-4">
-              <label class="form-label text-muted">卖家实收</label>
+              <label class="form-label text-muted">卖家实收金额</label>
               <p id="detailSellerReceive" class="text-info">-</p>
             </div>
           </div>

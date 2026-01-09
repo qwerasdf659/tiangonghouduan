@@ -48,7 +48,7 @@
         <div class="row">
           <div class="col-md-6">
             <label class="form-label">活动名称</label>
-            <select class="form-select" id="activitySelect" onchange="loadActivityConditions()">
+            <select class="form-select" id="activitySelect">
               <option value="">-- 请选择活动 --</option>
             </select>
           </div>
@@ -63,7 +63,7 @@
     <div class="card">
       <div class="card-header d-flex justify-content-between align-items-center">
         <h5 class="mb-0">参与条件配置</h5>
-        <button class="btn btn-sm btn-success" onclick="addCondition()">
+        <button class="btn btn-sm btn-success" id="addConditionBtn">
           <i class="bi bi-plus-circle"></i> 添加条件
         </button>
       </div>
@@ -76,10 +76,10 @@
         </div>
 
         <div class="mt-4 d-flex gap-2">
-          <button class="btn btn-primary" onclick="saveConditions()">
+          <button class="btn btn-primary" id="saveConditionsBtn">
             <i class="bi bi-save"></i> 保存配置
           </button>
-          <button class="btn btn-outline-danger" onclick="clearAllConditions()">
+          <button class="btn btn-outline-danger" id="clearAllConditionsBtn">
             <i class="bi bi-trash"></i> 清空所有条件
           </button>
         </div>

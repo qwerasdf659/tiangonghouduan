@@ -100,12 +100,11 @@
             </select>
           </div>
           <div class="col-md-3">
-            <label class="form-label">支付方式</label>
-            <select class="form-select" id="priceTypeFilter">
-              <option value="">全部方式</option>
-              <option value="virtual">虚拟奖品价值（唯一方式）</option>
+            <label class="form-label">支付资产类型</label>
+            <select class="form-select" id="assetCodeFilter">
+              <option value="">全部类型</option>
             </select>
-            <small class="text-muted">已简化为唯一支付方式</small>
+            <small class="text-muted">筛选特定材料资产支付</small>
           </div>
           <div class="col-md-3">
             <label class="form-label">排序方式</label>
@@ -134,10 +133,10 @@
               <tr>
                 <th style="width: 60px;">ID</th>
                 <th>商品信息</th>
-                <th>支付方式</th>
-                <th>价格</th>
+                <th>支付资产</th>
+                <th>消耗数量</th>
                 <th>库存</th>
-                <th>兑换次数</th>
+                <th>已售</th>
                 <th>状态</th>
                 <th>排序</th>
                 <th style="width: 200px;">操作</th>
@@ -182,30 +181,25 @@
                 <input type="text" class="form-control" name="item_name" required maxlength="100">
               </div>
               <div class="col-md-6">
-                <label class="form-label">支付方式 <span class="text-danger">*</span></label>
-                <select class="form-select" name="price_type" required id="priceTypeSelect" disabled>
-                  <option value="virtual" selected>虚拟奖品价值（唯一方式）</option>
+                <label class="form-label">支付资产类型 <span class="text-danger">*</span></label>
+                <select class="form-select" name="cost_asset_code" id="addAssetCodeSelect" required>
+                  <option value="">请选择材料资产...</option>
                 </select>
-                <small class="text-muted">
-                  已简化为唯一支付方式，保持业务逻辑清晰
-                </small>
+                <small class="text-muted">用户兑换时需要消耗的材料资产类型</small>
               </div>
               <div class="col-12">
                 <label class="form-label">商品描述</label>
                 <textarea class="form-control" name="item_description" rows="3" maxlength="500"></textarea>
               </div>
               <div class="col-md-6">
-                <label class="form-label">虚拟价值价格 <span class="text-danger">*</span> <span class="badge bg-success">实际扣除</span></label>
-                <input type="number" class="form-control" name="virtual_value_price" min="1" required>
-                <small class="text-success">✅ 用户兑换时从背包扣除的虚拟奖品价值（实际支付金额）</small>
+                <label class="form-label">材料消耗数量 <span class="text-danger">*</span> <span class="badge bg-success">实际扣除</span></label>
+                <input type="number" class="form-control" name="cost_amount" min="1" required>
+                <small class="text-success">✅ 用户兑换时从账户扣除的材料资产数量</small>
               </div>
               <div class="col-md-6">
-                <label class="form-label">积分价格 <span class="badge bg-secondary">仅展示</span></label>
-                <input type="number" class="form-control" name="points_price" min="0">
-                <small class="text-muted">
-                  📱 仅在前端显示"值多少积分"，不会扣除用户的显示积分<br>
-                  💡 建议设置为与虚拟价值相同，便于用户理解
-                </small>
+                <label class="form-label">展示积分 <span class="badge bg-secondary">仅展示</span></label>
+                <input type="number" class="form-control" name="display_points" min="0" value="0">
+                <small class="text-muted">📱 前端展示"值多少积分"，不实际扣除</small>
               </div>
               <div class="col-md-4">
                 <label class="form-label">成本价 <span class="text-danger">*</span></label>
@@ -260,25 +254,25 @@
                 <input type="text" class="form-control" name="item_name" id="editItemName" required maxlength="100">
               </div>
               <div class="col-md-6">
-                <label class="form-label">支付方式 <span class="text-danger">*</span></label>
-                <select class="form-select" name="price_type" id="editPriceType" required disabled>
-                  <option value="virtual" selected>虚拟奖品价值（唯一方式）</option>
+                <label class="form-label">支付资产类型 <span class="text-danger">*</span></label>
+                <select class="form-select" name="cost_asset_code" id="editAssetCodeSelect" required>
+                  <option value="">请选择材料资产...</option>
                 </select>
-                <small class="text-muted">统一支付方式，不可修改</small>
+                <small class="text-muted">用户兑换时需要消耗的材料资产类型</small>
               </div>
               <div class="col-12">
                 <label class="form-label">商品描述</label>
                 <textarea class="form-control" name="item_description" id="editItemDescription" rows="3"></textarea>
               </div>
               <div class="col-md-6">
-                <label class="form-label">虚拟价值价格 <span class="badge bg-success">实际扣除</span></label>
-                <input type="number" class="form-control" name="virtual_value_price" id="editVirtualPrice" min="1" required>
-                <small class="text-success">✅ 实际支付价格（从user_inventory扣除）</small>
+                <label class="form-label">材料消耗数量 <span class="badge bg-success">实际扣除</span></label>
+                <input type="number" class="form-control" name="cost_amount" id="editCostAmount" min="1" required>
+                <small class="text-success">✅ 实际扣除的材料资产数量</small>
               </div>
               <div class="col-md-6">
-                <label class="form-label">积分价格 <span class="badge bg-secondary">仅展示</span></label>
-                <input type="number" class="form-control" name="points_price" id="editPointsPrice" min="0">
-                <small class="text-muted">📱 前端展示用，不扣除显示积分</small>
+                <label class="form-label">展示积分 <span class="badge bg-secondary">仅展示</span></label>
+                <input type="number" class="form-control" name="display_points" id="editDisplayPoints" min="0">
+                <small class="text-muted">📱 前端展示用，不实际扣除</small>
               </div>
               <div class="col-md-4">
                 <label class="form-label">成本价</label>

@@ -2,6 +2,20 @@
  * C2C交易订单管理页面
  * @description 管理用户间的交易订单
  * @created 2026-01-09
+ * @updated 2026-01-09 修复前端与后端数据结构对齐问题
+ * 
+ * 后端字段说明（基于TradeOrder模型）:
+ * - order_id: 订单ID
+ * - listing_id: 挂牌ID
+ * - buyer_user_id: 买家用户ID
+ * - seller_user_id: 卖家用户ID
+ * - asset_code: 结算资产代码（默认DIAMOND）
+ * - gross_amount: 买家支付总额（DIAMOND单位）
+ * - fee_amount: 平台手续费
+ * - net_amount: 卖家实收金额
+ * - status: 订单状态（created/frozen/completed/cancelled/failed）
+ * - created_at: 创建时间
+ * - completed_at: 完成时间
  */
 
 // 全局变量
@@ -73,28 +87,32 @@ async function loadTradeOrders() {
     const response = await apiRequest(`/api/v4/console/marketplace/trade_orders?${params}`)
 
     if (response && response.success) {
-      const orders = response.data.orders || response.data.list || []
+      // 后端返回格式: { success, data: { orders, pagination, filters } }
+      const orders = response.data?.orders || []
+      const pagination = response.data?.pagination || {}
+      
       renderOrders(orders)
-      renderPagination(response.data.pagination)
-      updateStats(orders)
+      renderPagination(pagination)
+      updateStats(orders, pagination)
     } else {
       showError(response?.message || '加载失败')
+      renderEmptyState()
     }
   } catch (error) {
     console.error('加载交易订单失败', error)
     showError('加载失败，请重试')
+    renderEmptyState()
   } finally {
     showLoading(false)
   }
 }
 
 /**
- * 渲染订单列表
+ * 渲染空状态
  */
-function renderOrders(orders) {
+function renderEmptyState() {
   const tbody = document.getElementById('ordersTableBody')
-
-  if (!orders || orders.length === 0) {
+  if (tbody) {
     tbody.innerHTML = `
       <tr>
         <td colspan="10" class="text-center py-5 text-muted">
@@ -103,28 +121,85 @@ function renderOrders(orders) {
         </td>
       </tr>
     `
+  }
+  // 清空分页
+  const pagination = document.getElementById('pagination')
+  if (pagination) {
+    pagination.innerHTML = ''
+  }
+  // 重置统计
+  updateStatsWithValues(0, 0, 0, 0)
+}
+
+/**
+ * 更新统计数值
+ */
+function updateStatsWithValues(total, created, frozen, completed) {
+  const totalEl = document.getElementById('totalOrders')
+  const createdEl = document.getElementById('createdOrders')
+  const frozenEl = document.getElementById('frozenOrders')
+  const completedEl = document.getElementById('completedOrders')
+
+  if (totalEl) totalEl.textContent = total
+  if (createdEl) createdEl.textContent = created
+  if (frozenEl) frozenEl.textContent = frozen
+  if (completedEl) completedEl.textContent = completed
+}
+
+/**
+ * 渲染订单列表
+ * 
+ * 后端返回的订单字段（基于TradeOrder模型 + include listing）:
+ * - order_id: 订单ID
+ * - listing_id: 挂牌ID
+ * - buyer_user_id: 买家ID
+ * - seller_user_id: 卖家ID
+ * - gross_amount: 买家支付总额（DIAMOND，整数）
+ * - fee_amount: 平台手续费（DIAMOND，整数）
+ * - net_amount: 卖家实收金额（DIAMOND，整数）
+ * - asset_code: 结算资产代码（固定DIAMOND）
+ * - status: 订单状态 (created/frozen/completed/cancelled/failed)
+ * - created_at: 创建时间
+ * - completed_at: 完成时间
+ * - listing: 关联的挂牌信息（包含offerItem）
+ */
+function renderOrders(orders) {
+  const tbody = document.getElementById('ordersTableBody')
+
+  if (!orders || orders.length === 0) {
+    renderEmptyState()
     return
   }
 
   tbody.innerHTML = orders
     .map(order => {
       const statusBadge = getStatusBadge(order.status)
+      
+      // 从关联的listing获取资产信息
+      const listing = order.listing || {}
+      const assetCode = listing.asset_code || order.asset_code || 'DIAMOND'
+      
+      // 金额显示（后端使用gross_amount/fee_amount/net_amount字段，单位是整数DIAMOND）
+      const grossAmount = parseInt(order.gross_amount) || 0
+      const feeAmount = parseInt(order.fee_amount) || 0
 
       return `
       <tr>
-        <td>${order.order_id}</td>
-        <td>${order.listing_id || '-'}</td>
+        <td><span class="badge bg-light text-dark">#${order.order_id}</span></td>
         <td>
-          <span class="text-primary">${order.buyer_nickname || order.buyer_user_id}</span>
+          <small class="text-muted">挂牌#${order.listing_id || '-'}</small><br>
+          <span class="badge bg-secondary">${assetCode}</span>
         </td>
         <td>
-          <span class="text-success">${order.seller_nickname || order.seller_user_id}</span>
+          <span class="text-primary fw-bold">${order.buyer_user_id}</span>
         </td>
-        <td>${order.item_name || '-'}</td>
-        <td class="text-warning"><strong>¥${(order.price || 0).toFixed(2)}</strong></td>
+        <td>
+          <span class="text-success fw-bold">${order.seller_user_id}</span>
+        </td>
+        <td class="text-warning"><strong>💎${grossAmount}</strong></td>
+        <td class="text-muted">💎${feeAmount}</td>
         <td>${statusBadge}</td>
-        <td>${formatDate(order.created_at)}</td>
-        <td>${formatDate(order.completed_at) || '-'}</td>
+        <td><small>${formatDate(order.created_at)}</small></td>
         <td>
           <button class="btn btn-sm btn-outline-primary" onclick="viewOrderDetail(${order.order_id})">
             <i class="bi bi-eye"></i> 详情
@@ -138,40 +213,44 @@ function renderOrders(orders) {
 
 /**
  * 获取状态徽章
+ * 
+ * C2C订单状态（基于TradeOrder模型）:
+ * - created: 已创建/进行中
+ * - frozen: 已冻结（买家资产已冻结，等待结算）
+ * - completed: 已完成（终态）
+ * - cancelled: 已取消（终态）
+ * - failed: 失败（终态）
  */
 function getStatusBadge(status) {
   const badges = {
-    pending: '<span class="badge bg-warning">待支付</span>',
-    paid: '<span class="badge bg-info">已支付</span>',
+    created: '<span class="badge bg-warning">进行中</span>',
+    frozen: '<span class="badge bg-info">冻结中</span>',
     completed: '<span class="badge bg-success">已完成</span>',
     cancelled: '<span class="badge bg-secondary">已取消</span>',
-    refunded: '<span class="badge bg-danger">已退款</span>'
+    failed: '<span class="badge bg-danger">失败</span>'
   }
-  return badges[status] || `<span class="badge bg-secondary">${status}</span>`
+  return badges[status] || `<span class="badge bg-secondary">${status || '未知'}</span>`
 }
 
 /**
  * 更新统计信息
+ * 
+ * HTML中的统计卡片ID:
+ * - totalOrders: 订单总数
+ * - createdOrders: 进行中（状态=created）
+ * - frozenOrders: 冻结中（状态=frozen）
+ * - completedOrders: 已完成（状态=completed）
  */
-function updateStats(orders) {
-  if (!orders) return
+function updateStats(orders, pagination) {
+  // 使用分页信息中的总数
+  const total = pagination?.total || orders?.length || 0
+  
+  // 统计当前页面各状态数量（注：这只是当前页的统计，不是全量）
+  const createdCount = orders?.filter(o => o.status === 'created').length || 0
+  const frozenCount = orders?.filter(o => o.status === 'frozen').length || 0
+  const completedCount = orders?.filter(o => o.status === 'completed').length || 0
 
-  const total = orders.length
-  const completed = orders.filter(o => o.status === 'completed').length
-  const pending = orders.filter(o => o.status === 'pending').length
-  const totalAmount = orders
-    .filter(o => o.status === 'completed')
-    .reduce((sum, o) => sum + (o.price || 0), 0)
-
-  const totalEl = document.getElementById('totalOrders')
-  const completedEl = document.getElementById('completedOrders')
-  const pendingEl = document.getElementById('pendingOrders')
-  const amountEl = document.getElementById('totalAmount')
-
-  if (totalEl) totalEl.textContent = total
-  if (completedEl) completedEl.textContent = completed
-  if (pendingEl) pendingEl.textContent = pending
-  if (amountEl) amountEl.textContent = '¥' + totalAmount.toFixed(2)
+  updateStatsWithValues(total, createdCount, frozenCount, completedCount)
 }
 
 /**
@@ -184,7 +263,8 @@ async function viewOrderDetail(orderId) {
     const response = await apiRequest(`/api/v4/console/marketplace/trade_orders/${orderId}`)
 
     if (response && response.success) {
-      const order = response.data.order || response.data
+      // 后端返回格式: { success, data: { success, order } }
+      const order = response.data?.order || response.data
       renderOrderDetail(order)
       new bootstrap.Modal(document.getElementById('orderDetailModal')).show()
     } else {
@@ -200,96 +280,91 @@ async function viewOrderDetail(orderId) {
 
 /**
  * 渲染订单详情
+ * 
+ * 使用模态框中已有的元素ID:
+ * - detailOrderId, detailStatus, detailCreatedAt, detailCompletedAt
+ * - detailListingId, detailAssetCode
+ * - detailBuyerId, detailSellerId
+ * - detailTotalPrice, detailFee, detailSellerReceive
+ * 
+ * 后端字段映射:
+ * - gross_amount → 买家支付总额（显示在detailTotalPrice）
+ * - fee_amount → 平台手续费（显示在detailFee）
+ * - net_amount → 卖家实收金额（显示在detailSellerReceive）
  */
 function renderOrderDetail(order) {
-  const container = document.getElementById('orderDetailBody')
-
-  container.innerHTML = `
-    <div class="row">
-      <div class="col-md-6">
-        <h6 class="text-muted mb-3">订单信息</h6>
-        <table class="table table-sm">
-          <tr>
-            <td class="text-muted">订单ID</td>
-            <td>${order.order_id}</td>
-          </tr>
-          <tr>
-            <td class="text-muted">挂单ID</td>
-            <td>${order.listing_id || '-'}</td>
-          </tr>
-          <tr>
-            <td class="text-muted">商品名称</td>
-            <td>${order.item_name || '-'}</td>
-          </tr>
-          <tr>
-            <td class="text-muted">交易金额</td>
-            <td class="text-warning"><strong>¥${(order.price || 0).toFixed(2)}</strong></td>
-          </tr>
-          <tr>
-            <td class="text-muted">订单状态</td>
-            <td>${getStatusBadge(order.status)}</td>
-          </tr>
-          <tr>
-            <td class="text-muted">创建时间</td>
-            <td>${formatDate(order.created_at)}</td>
-          </tr>
-          <tr>
-            <td class="text-muted">完成时间</td>
-            <td>${formatDate(order.completed_at) || '-'}</td>
-          </tr>
-        </table>
-      </div>
-      <div class="col-md-6">
-        <h6 class="text-muted mb-3">交易双方</h6>
-        <table class="table table-sm">
-          <tr>
-            <td class="text-muted">买家ID</td>
-            <td>${order.buyer_user_id}</td>
-          </tr>
-          <tr>
-            <td class="text-muted">买家昵称</td>
-            <td>${order.buyer_nickname || '-'}</td>
-          </tr>
-          <tr>
-            <td class="text-muted">卖家ID</td>
-            <td>${order.seller_user_id}</td>
-          </tr>
-          <tr>
-            <td class="text-muted">卖家昵称</td>
-            <td>${order.seller_nickname || '-'}</td>
-          </tr>
-        </table>
-        ${
-          order.remark
-            ? `
-        <h6 class="text-muted mb-2 mt-3">订单备注</h6>
-        <p class="small">${order.remark}</p>
-        `
-            : ''
-        }
-      </div>
-    </div>
-  `
+  if (!order) return
+  
+  // 订单基本信息
+  const orderIdEl = document.getElementById('detailOrderId')
+  const statusEl = document.getElementById('detailStatus')
+  const createdAtEl = document.getElementById('detailCreatedAt')
+  const completedAtEl = document.getElementById('detailCompletedAt')
+  
+  if (orderIdEl) orderIdEl.textContent = `#${order.order_id}`
+  if (statusEl) statusEl.innerHTML = getStatusBadge(order.status)
+  if (createdAtEl) createdAtEl.textContent = formatDate(order.created_at)
+  if (completedAtEl) completedAtEl.textContent = order.completed_at ? formatDate(order.completed_at) : '-'
+  
+  // 挂牌信息
+  const listingIdEl = document.getElementById('detailListingId')
+  const assetCodeEl = document.getElementById('detailAssetCode')
+  
+  const listing = order.listing || {}
+  if (listingIdEl) listingIdEl.textContent = `#${order.listing_id || '-'}`
+  if (assetCodeEl) assetCodeEl.textContent = listing.asset_code || order.asset_code || 'DIAMOND'
+  
+  // 交易双方
+  const buyerIdEl = document.getElementById('detailBuyerId')
+  const sellerIdEl = document.getElementById('detailSellerId')
+  
+  if (buyerIdEl) buyerIdEl.textContent = order.buyer_user_id || '-'
+  if (sellerIdEl) sellerIdEl.textContent = order.seller_user_id || '-'
+  
+  // 金额信息（后端字段：gross_amount, fee_amount, net_amount，单位是整数DIAMOND）
+  const totalPriceEl = document.getElementById('detailTotalPrice')
+  const feeEl = document.getElementById('detailFee')
+  const sellerReceiveEl = document.getElementById('detailSellerReceive')
+  
+  const grossAmount = parseInt(order.gross_amount) || 0
+  const feeAmount = parseInt(order.fee_amount) || 0
+  const netAmount = parseInt(order.net_amount) || 0
+  
+  if (totalPriceEl) totalPriceEl.textContent = `💎${grossAmount}`
+  if (feeEl) feeEl.textContent = `💎${feeAmount}`
+  if (sellerReceiveEl) sellerReceiveEl.textContent = `💎${netAmount}`
 }
 
 /**
  * 渲染分页
+ * 
+ * HTML中分页容器ID: pagination (不是paginationNav)
+ * 后端分页格式: { total, page, page_size, total_pages }
  */
 function renderPagination(pagination) {
-  const nav = document.getElementById('paginationNav')
+  // 修复: 使用正确的元素ID 'pagination' 而不是 'paginationNav'
+  const nav = document.getElementById('pagination')
+  
+  if (!nav) {
+    console.warn('分页容器元素不存在')
+    return
+  }
+  
   if (!pagination || pagination.total_pages <= 1) {
     nav.innerHTML = ''
     return
   }
 
-  let html = '<ul class="pagination pagination-sm justify-content-center mb-0">'
+  let html = ''
 
+  // 上一页
   html += `
     <li class="page-item ${currentPage === 1 ? 'disabled' : ''}">
       <a class="page-link" href="#" onclick="goToPage(${currentPage - 1}); return false;">上一页</a>
     </li>
   `
 
+  // 页码
   for (let i = 1; i <= pagination.total_pages; i++) {
     if (i === 1 || i === pagination.total_pages || (i >= currentPage - 2 && i <= currentPage + 2)) {
       html += `
@@ -302,13 +377,13 @@ function renderPagination(pagination) {
     }
   }
 
+  // 下一页
   html += `
     <li class="page-item ${currentPage === pagination.total_pages ? 'disabled' : ''}">
       <a class="page-link" href="#" onclick="goToPage(${currentPage + 1}); return false;">下一页</a>
     </li>
   `
 
-  html += '</ul>'
   nav.innerHTML = html
 }
 
@@ -316,6 +391,7 @@ function renderPagination(pagination) {
  * 跳转到指定页
  */
 function goToPage(page) {
+  if (page < 1) return
   currentPage = page
   loadTradeOrders()
 }
@@ -326,7 +402,7 @@ function goToPage(page) {
 function showLoading(show) {
   const overlay = document.getElementById('loadingOverlay')
   if (overlay) {
-    overlay.classList.toggle('show', show)
+    overlay.style.display = show ? 'flex' : 'none'
   }
 }
 

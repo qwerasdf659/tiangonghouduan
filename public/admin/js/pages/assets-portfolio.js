@@ -55,26 +55,27 @@ async function loadAllData() {
 
 /**
  * 加载资产概览
- * ✅ 对齐后端：使用 /api/v4/console/asset-adjustment/asset-types 端点
- * 后端没有 /overview 端点，改为从 asset-types 构建概览数据
+ * ✅ 对齐后端：使用 /api/v4/console/assets/stats 端点获取统计数据
  * @returns {Promise<void>}
  */
 async function loadAssetOverview() {
   try {
-    const response = await apiRequest('/api/v4/console/asset-adjustment/asset-types')
+    const response = await apiRequest('/api/v4/console/assets/stats')
 
     if (response && response.success) {
-      const types = response.data.asset_types || response.data || []
-      // 从 asset-types 构建概览数据
-      const overview = types.map(t => ({
-        asset_code: t.asset_code,
-        name: t.name || t.display_name || t.asset_code,
-        category: t.category || 'builtin',
-        is_enabled: t.is_enabled !== false,
-        total_circulation: t.circulation || t.total_issued || 0,
-        holder_count: t.holder_count || 0
+      const stats = response.data.asset_stats || []
+      const summary = response.data.summary || {}
+      
+      // 从后端统计数据构建概览
+      const overview = stats.map(s => ({
+        asset_code: s.asset_code,
+        name: s.asset_code,
+        total_circulation: s.total_circulation || 0,
+        holder_count: s.holder_count || 0,
+        total_frozen: s.total_frozen || 0,
+        total_issued: s.total_issued || 0
       }))
-      renderAssetOverview(overview)
+      renderAssetOverview(overview, summary)
     }
   } catch (error) {
     console.error('加载资产概览失败:', error)
@@ -82,18 +83,40 @@ async function loadAssetOverview() {
 }
 
 /**
- * 加载资产类型详情
+ * 加载资产类型详情（带统计数据）
+ * ✅ 对齐后端：合并 asset-types 和 stats 数据
  * @returns {Promise<void>}
  */
 async function loadAssetTypes() {
   const tbody = document.getElementById('assetTypeTableBody')
 
   try {
-    const response = await apiRequest('/api/v4/console/asset-adjustment/asset-types')
+    // 并行获取资产类型和统计数据
+    const [typesResponse, statsResponse] = await Promise.all([
+      apiRequest('/api/v4/console/asset-adjustment/asset-types'),
+      apiRequest('/api/v4/console/assets/stats')
+    ])
 
-    if (response && response.success) {
-      const types = response.data.asset_types || response.data || []
-      renderAssetTypeTable(types)
+    if (typesResponse && typesResponse.success) {
+      const types = typesResponse.data.asset_types || typesResponse.data || []
+      const stats = statsResponse?.data?.asset_stats || []
+      
+      // 创建统计数据映射
+      const statsMap = new Map()
+      stats.forEach(s => statsMap.set(s.asset_code, s))
+      
+      // 合并类型和统计数据
+      const mergedTypes = types.map(t => ({
+        ...t,
+        total_issued: statsMap.get(t.asset_code)?.total_issued || 0,
+        circulation: statsMap.get(t.asset_code)?.total_circulation || 0,
+        frozen: statsMap.get(t.asset_code)?.total_frozen || 0,
+        destroyed: 0,
+        holder_count: statsMap.get(t.asset_code)?.holder_count || 0,
+        is_active: t.is_enabled !== false
+      }))
+      
+      renderAssetTypeTable(mergedTypes)
     } else {
       tbody.innerHTML = `
         <tr>
@@ -149,31 +172,41 @@ async function loadRecentTransactions() {
 /**
  * 渲染资产概览卡片
  * @param {Array} overview - 资产概览数据
+ * @param {Object} summary - 汇总数据
  */
-function renderAssetOverview(overview) {
+function renderAssetOverview(overview, summary = {}) {
   const container = document.getElementById('assetOverviewContainer')
 
-  // 默认资产类型
-  const defaultAssets = [
-    { asset_code: 'POINTS', name: '积分', icon: 'bi-star-fill', color: 'warning' },
-    { asset_code: 'DIAMOND', name: '钻石', icon: 'bi-gem', color: 'info' },
-    { asset_code: 'GOLD', name: '金币', icon: 'bi-coin', color: 'warning' },
-    { asset_code: 'MATERIAL', name: '材料', icon: 'bi-box-seam', color: 'success' }
-  ]
+  // 资产图标和颜色映射
+  const assetConfig = {
+    POINTS: { name: '积分', icon: 'bi-star-fill', color: 'warning' },
+    DIAMOND: { name: '钻石', icon: 'bi-gem', color: 'info' },
+    GOLD: { name: '金币', icon: 'bi-coin', color: 'warning' },
+    BUDGET_POINTS: { name: '预算积分', icon: 'bi-wallet2', color: 'success' }
+  }
 
-  container.innerHTML = defaultAssets
-    .map(asset => {
-      const data = overview.find(o => o.asset_code === asset.asset_code) || {}
-      return `
+  // 取前4个最常用的资产展示在概览卡片
+  const topAssets = overview.slice(0, 4)
+  
+  // 如果实际数据不足4个，补充默认显示
+  const displayAssets = ['POINTS', 'DIAMOND', 'BUDGET_POINTS', 'GOLD']
+    .map(code => {
+      const data = overview.find(o => o.asset_code === code) || { asset_code: code }
+      const config = assetConfig[code] || { name: code, icon: 'bi-box-seam', color: 'secondary' }
+      return { ...data, ...config }
+    })
+
+  container.innerHTML = displayAssets
+    .map(asset => `
       <div class="col-md-3">
         <div class="card asset-overview-card">
           <div class="card-body">
             <div class="d-flex justify-content-between align-items-center">
               <div>
                 <h6 class="text-muted mb-1">${asset.name}</h6>
-                <div class="asset-value text-${asset.color}">${formatNumber(data.total_circulation || 0)}</div>
+                <div class="asset-value text-${asset.color}">${formatNumber(asset.total_circulation || 0)}</div>
                 <small class="text-muted">
-                  持有用户: ${data.holder_count || 0}
+                  持有用户: ${asset.holder_count || 0}
                 </small>
               </div>
               <div>
@@ -183,8 +216,7 @@ function renderAssetOverview(overview) {
           </div>
         </div>
       </div>
-    `
-    })
+    `)
     .join('')
 }
 

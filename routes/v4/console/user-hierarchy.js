@@ -72,7 +72,7 @@ router.get('/', async (req, res) => {
     return res.apiSuccess(
       {
         rows: rows.map(h => ({
-          hierarchy_id: h.user_hierarchy_id,
+          hierarchy_id: h.hierarchy_id,
           user_id: h.user_id,
           user_mobile: h.user?.mobile,
           user_nickname: h.user?.nickname,
@@ -126,7 +126,7 @@ router.get('/:user_id/subordinates', async (req, res) => {
 
     // 格式化返回数据
     const formattedSubordinates = subordinates.map(sub => ({
-      hierarchy_id: sub.user_hierarchy_id,
+      hierarchy_id: sub.hierarchy_id,
       user_id: sub.user_id,
       user_mobile: sub.user?.mobile,
       user_nickname: sub.user?.nickname,

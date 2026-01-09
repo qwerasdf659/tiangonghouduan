@@ -66,22 +66,25 @@
         <div class="row g-3">
           <div class="col-md-3">
             <label class="form-label">处理状态</label>
+            <!-- 后端status枚举: pending, processing, replied, closed -->
             <select class="form-select" id="statusFilter">
               <option value="">全部状态</option>
               <option value="pending">待处理</option>
               <option value="processing">处理中</option>
-              <option value="resolved">已解决</option>
+              <option value="replied">已回复</option>
               <option value="closed">已关闭</option>
             </select>
           </div>
           <div class="col-md-3">
             <label class="form-label">反馈类型</label>
+            <!-- 后端category枚举: technical, feature, bug, complaint, suggestion, other -->
             <select class="form-select" id="typeFilter">
               <option value="">全部类型</option>
+              <option value="technical">技术问题</option>
+              <option value="feature">功能建议</option>
               <option value="bug">Bug报告</option>
-              <option value="suggestion">功能建议</option>
               <option value="complaint">投诉</option>
-              <option value="question">咨询</option>
+              <option value="suggestion">建议</option>
               <option value="other">其他</option>
             </select>
           </div>
@@ -234,10 +237,11 @@
           <input type="hidden" id="updateFeedbackId">
           <div class="mb-3">
             <label class="form-label">新状态 <span class="text-danger">*</span></label>
+            <!-- 后端status枚举: pending, processing, replied, closed -->
             <select class="form-select" id="newStatus" required>
               <option value="">请选择</option>
               <option value="processing">处理中</option>
-              <option value="resolved">已解决</option>
+              <option value="replied">已回复</option>
               <option value="closed">已关闭</option>
             </select>
           </div>

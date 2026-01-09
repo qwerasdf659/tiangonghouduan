@@ -234,7 +234,8 @@ async function loadStatistics() {
     const response = await apiRequest('/api/v4/console/popup-banners/statistics')
 
     if (response && response.success) {
-      const stats = response.data
+      // 后端返回 { statistics: {...} }，适配后端数据结构
+      const stats = response.data.statistics || response.data
       document.getElementById('statTotal').textContent = formatNumber(stats.total || 0)
       document.getElementById('statActive').textContent = formatNumber(stats.active || 0)
       document.getElementById('statInactive').textContent = formatNumber(stats.inactive || 0)
