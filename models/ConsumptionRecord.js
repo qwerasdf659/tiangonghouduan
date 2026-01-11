@@ -62,6 +62,13 @@ class ConsumptionRecord extends Model {
       comment: '关联审核员信息'
     })
 
+    // 多对一：门店信息（商家员工域权限体系升级 - 2026-01-12）
+    ConsumptionRecord.belongsTo(models.Store, {
+      foreignKey: 'store_id',
+      as: 'store',
+      comment: '关联门店信息（消费发生门店）'
+    })
+
     /*
      * 一对多：一个消费记录可以关联多个审核记录
      * 注意：审核记录存储在content_review_records表中
@@ -166,9 +173,9 @@ class ConsumptionRecord extends Model {
       errors.push('消费金额必须大于0')
     }
 
-    // 检查二维码格式
-    if (!this.qr_code || !this.qr_code.startsWith('QR_')) {
-      errors.push('二维码格式不正确')
+    // 检查二维码格式（支持 V1 永久码 QR_ 和 V2 动态码 QRV2_）
+    if (!this.qr_code || (!this.qr_code.startsWith('QR_') && !this.qr_code.startsWith('QRV2_'))) {
+      errors.push('二维码格式不正确，必须以 QR_ 或 QRV2_ 开头')
     }
 
     // 检查用户ID
@@ -245,12 +252,15 @@ class ConsumptionRecord extends Model {
       record_id: parseInt(this.record_id), // 保留业务字段（确保返回数字类型）
       user_id: this.user_id,
       merchant_id: this.merchant_id,
+      store_id: this.store_id, // 门店ID（商家员工域权限体系升级 - 2026-01-12）
       consumption_amount: parseFloat(this.consumption_amount),
       points_to_award: this.points_to_award,
       status: this.status,
       status_name: this.getStatusName(),
       status_color: this.getStatusColor(),
       qr_code: this.qr_code,
+      qr_code_version: this.qr_code_version,
+      is_legacy_v1: this.is_legacy_v1,
       merchant_notes: this.merchant_notes,
       admin_notes: this.admin_notes,
       reviewed_by: this.reviewed_by,
@@ -276,6 +286,12 @@ class ConsumptionRecord extends Model {
     // 关联的审核员信息
     if (this.reviewer) {
       response.reviewer_nickname = this.reviewer.nickname || null
+    }
+
+    // 关联的门店信息（商家员工域权限体系升级 - 2026-01-12）
+    if (this.store) {
+      response.store_name = this.store.store_name || null
+      response.store_code = this.store.store_code || null
     }
 
     return response
@@ -347,6 +363,22 @@ module.exports = sequelize => {
         onUpdate: 'CASCADE'
       },
 
+      /**
+       * 门店ID（商家员工域权限体系升级 - 2026-01-12）
+       * 用于多门店管理和门店级权限验证
+       */
+      store_id: {
+        type: DataTypes.INTEGER,
+        allowNull: true, // 初始允许 NULL（兼容历史数据）
+        comment: '门店ID（外键关联 stores 表，用于多门店管理和权限验证）',
+        references: {
+          model: 'stores',
+          key: 'store_id'
+        },
+        onDelete: 'RESTRICT', // 禁止删除有消费记录的门店
+        onUpdate: 'CASCADE'
+      },
+
       /*
        * ========================================
        * 消费和积分信息
@@ -393,13 +425,39 @@ module.exports = sequelize => {
        * ========================================
        */
       qr_code: {
-        type: DataTypes.STRING(150),
+        type: DataTypes.STRING(300),
         allowNull: false,
-        comment: '用户固定身份码（UUID版本，格式：QR_{user_uuid}_{signature}）',
+        comment: '用户动态二维码（v2格式: QRV2_{base64_payload}_{signature}，约200-250字符）',
         validate: {
           notEmpty: true,
-          len: [1, 150]
+          len: [1, 300]
         }
+      },
+
+      /**
+       * 二维码版本（v2 动态码升级 - 2026-01-12）
+       *
+       * v1: 永久码，存在重复使用风险，已废弃
+       * v2: 动态码，带 nonce 防重放 + 5分钟过期
+       */
+      qr_code_version: {
+        type: DataTypes.ENUM('v1', 'v2'),
+        allowNull: true,
+        defaultValue: null,
+        comment: '二维码版本（v1=永久码/已废弃，v2=动态码/防重放）'
+      },
+
+      /**
+       * v1 历史遗留标记（2026-01-12）
+       *
+       * 标记通过 v1 永久码提交的历史数据
+       * 便于后续审计和数据清理
+       */
+      is_legacy_v1: {
+        type: DataTypes.BOOLEAN,
+        allowNull: false,
+        defaultValue: false,
+        comment: '是否为 v1 历史遗留数据（v1 永久码重复使用风险记录）'
       },
 
       /*
@@ -601,6 +659,17 @@ module.exports = sequelize => {
           name: 'idx_reviewed',
           fields: ['reviewed_by', 'reviewed_at'],
           comment: '审核员工作量统计'
+        },
+        // 门店级索引（商家员工域权限体系升级 - 2026-01-12）
+        {
+          name: 'idx_consumption_store_status',
+          fields: ['store_id', 'status', 'created_at'],
+          comment: '门店级消费记录查询（store_id + 状态 + 时间）'
+        },
+        {
+          name: 'idx_consumption_store_merchant',
+          fields: ['store_id', 'merchant_id', 'created_at'],
+          comment: '门店+商家维度消费记录查询'
         }
       ],
 
@@ -695,6 +764,16 @@ module.exports = sequelize => {
             {
               association: 'reviewer',
               attributes: ['user_id', 'mobile', 'nickname', 'role']
+            }
+          ]
+        },
+
+        // 包含门店信息（商家员工域权限体系升级 - 2026-01-12）
+        withStore: {
+          include: [
+            {
+              association: 'store',
+              attributes: ['store_id', 'store_name', 'store_code', 'status']
             }
           ]
         },

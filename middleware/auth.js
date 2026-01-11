@@ -9,7 +9,7 @@ const logger = require('../utils/logger').logger
  */
 
 const jwt = require('jsonwebtoken')
-const { User, Role } = require('../models')
+const { User, Role, StoreStaff } = require('../models')
 const BeijingTimeHelper = require('../utils/timeHelper')
 
 // 尝试导入Redis客户端，如果失败则使用纯内存缓存
@@ -761,6 +761,205 @@ function requireRole(allowedRoles, _options = {}) {
 }
 
 /**
+ * 🏪 获取用户所属的所有在职门店
+ *
+ * @description 查询 store_staff 表获取用户所有 status='active' 的门店记录
+ *
+ * @param {number} user_id - 用户ID
+ * @returns {Promise<Array>} 门店列表，每个元素包含 {store_id, store_name, role_in_store}
+ *
+ * @example
+ * const stores = await getUserStores(123)
+ * // 返回：[{ store_id: 1, store_name: '测试门店', role_in_store: 'staff' }]
+ *
+ * @since 2026-01-12
+ * @see docs/商家员工域权限体系升级方案.md - AC2 组织边界隔离
+ */
+async function getUserStores(user_id) {
+  try {
+    const storeStaffRecords = await StoreStaff.findAll({
+      where: {
+        user_id,
+        status: 'active'
+      },
+      include: [
+        {
+          association: 'store',
+          attributes: ['store_id', 'store_name', 'store_code', 'status'],
+          required: true
+        }
+      ]
+    })
+
+    return storeStaffRecords.map(record => ({
+      store_id: record.store_id,
+      store_name: record.store?.store_name || null,
+      store_code: record.store?.store_code || null,
+      store_status: record.store?.status || null,
+      role_in_store: record.role_in_store,
+      joined_at: record.joined_at
+    }))
+  } catch (error) {
+    logger.error(`❌ [Auth] 获取用户门店列表失败: user_id=${user_id}`, error.message)
+    return []
+  }
+}
+
+/**
+ * 🏪 检查用户是否在指定门店在职
+ *
+ * @param {number} user_id - 用户ID
+ * @param {number} store_id - 门店ID
+ * @returns {Promise<boolean>} 是否在职
+ *
+ * @since 2026-01-12
+ */
+async function isUserActiveInStore(user_id, store_id) {
+  try {
+    const count = await StoreStaff.count({
+      where: {
+        user_id,
+        store_id,
+        status: 'active'
+      }
+    })
+    return count > 0
+  } catch (error) {
+    logger.error(
+      `❌ [Auth] 检查门店在职状态失败: user_id=${user_id}, store_id=${store_id}`,
+      error.message
+    )
+    return false
+  }
+}
+
+/**
+ * 🛡️ 商家权限检查中间件（支持门店范围隔离）
+ *
+ * @description 检查用户是否具有指定的商家域权限，并可选验证门店访问权限
+ *
+ * 设计决策（2026-01-12 商家员工域权限体系升级）：
+ * - 支持两种 scope：'global'（全局权限）和 'store'（门店范围权限）
+ * - scope='store' 时，要求请求中包含 store_id 参数，并验证用户在该门店在职
+ * - 超级管理员（role_level >= 100）跳过所有检查
+ *
+ * @param {string} capability - 需要的权限（如 'consumption:create'）
+ * @param {Object} options - 配置选项
+ * @param {string} options.scope - 权限范围：'global' | 'store'，默认 'global'
+ * @param {string} options.storeIdParam - store_id 参数来源：'body' | 'query' | 'params'，默认 'body'
+ * @returns {Function} 中间件函数
+ *
+ * @example
+ * // 全局权限检查（不验证门店）
+ * router.get('/list', authenticateToken, requireMerchantPermission('consumption:read'), handler)
+ *
+ * // 门店范围权限检查（验证用户是否在 request.body.store_id 对应门店在职）
+ * router.post('/submit', authenticateToken, requireMerchantPermission('consumption:create', { scope: 'store' }), handler)
+ *
+ * @since 2026-01-12
+ * @see docs/商家员工域权限体系升级方案.md - AC1 权限分层
+ */
+function requireMerchantPermission(capability, options = {}) {
+  const { scope = 'global', storeIdParam = 'body' } = options
+
+  return async (req, res, next) => {
+    try {
+      // 1. 验证是否已认证
+      if (!req.user) {
+        return res.status(401).json({
+          success: false,
+          error: 'UNAUTHENTICATED',
+          message: '未认证用户'
+        })
+      }
+
+      // 2. 超级管理员跳过所有检查
+      if (req.user.role_level >= 100) {
+        return next()
+      }
+
+      // 3. 检查具体权限
+      const [resource] = capability.split(':')
+      const hasPermission =
+        req.user.permissions.includes('*:*') ||
+        req.user.permissions.includes(`${resource}:*`) ||
+        req.user.permissions.includes(capability)
+
+      if (!hasPermission) {
+        logger.warn(
+          `🚫 [Auth] 商家权限不足: user_id=${req.user.user_id}, required=${capability}, user_permissions=[${req.user.permissions.join(',')}]`
+        )
+        return res.status(403).json({
+          success: false,
+          error: 'INSUFFICIENT_MERCHANT_PERMISSION',
+          message: `权限不足，需要 ${capability} 权限`,
+          data: {
+            required: capability,
+            user_permissions: req.user.permissions
+          }
+        })
+      }
+
+      // 4. 如果是门店范围权限，验证 store_id 访问权限
+      if (scope === 'store') {
+        // 获取 store_id
+        let storeId = null
+        if (storeIdParam === 'body') {
+          storeId = req.body?.store_id
+        } else if (storeIdParam === 'query') {
+          storeId = req.query?.store_id
+        } else if (storeIdParam === 'params') {
+          storeId = req.params?.store_id
+        }
+
+        // store_id 可选：如果没有提供，后续由 Service 层自动填充
+        if (storeId) {
+          const storeIdNum = parseInt(storeId, 10)
+          if (isNaN(storeIdNum) || storeIdNum <= 0) {
+            return res.status(400).json({
+              success: false,
+              error: 'INVALID_STORE_ID',
+              message: 'store_id 必须是有效的正整数'
+            })
+          }
+
+          // 验证用户是否在该门店在职
+          const isActive = await isUserActiveInStore(req.user.user_id, storeIdNum)
+          if (!isActive) {
+            logger.warn(
+              `🚫 [Auth] 门店访问被拒绝: user_id=${req.user.user_id}, store_id=${storeIdNum}`
+            )
+            return res.status(403).json({
+              success: false,
+              error: 'STORE_ACCESS_DENIED',
+              message: '您不是该门店的在职员工，无法执行此操作'
+            })
+          }
+
+          // 将验证过的 store_id 挂载到请求对象
+          // eslint-disable-next-line require-atomic-updates
+          req.verified_store_id = storeIdNum
+        }
+
+        // 获取用户所有在职门店（供 Service 层使用）
+        // eslint-disable-next-line require-atomic-updates
+        req.user_stores = await getUserStores(req.user.user_id)
+      }
+
+      // 5. 通过权限检查
+      next()
+    } catch (error) {
+      logger.error('❌ 商家权限检查失败:', error.message)
+      return res.status(500).json({
+        success: false,
+        error: 'MERCHANT_PERMISSION_CHECK_FAILED',
+        message: '商家权限验证失败'
+      })
+    }
+  }
+}
+
+/**
  * 🎯 权限管理工具
  */
 const PermissionManager = {
@@ -774,9 +973,9 @@ const PermissionManager = {
     hitRate:
       cacheStats.totalQueries > 0
         ? (
-          ((cacheStats.memoryHits + cacheStats.redisHits) / cacheStats.totalQueries) *
+            ((cacheStats.memoryHits + cacheStats.redisHits) / cacheStats.totalQueries) *
             100
-        ).toFixed(1) + '%'
+          ).toFixed(1) + '%'
         : '0%',
     redisAvailable: !!redisClient
   }),
@@ -799,6 +998,9 @@ module.exports = {
   requireAdmin,
   requireRole, // 🆕 角色检查中间件（支持多角色 + 读写权限区分）
   requirePermission,
+  requireMerchantPermission, // 🆕 商家权限检查中间件（支持门店范围隔离）
+  getUserStores, // 🆕 获取用户所属门店列表
+  isUserActiveInStore, // 🆕 检查用户是否在指定门店在职
   PermissionManager,
   invalidateUserPermissions
 }

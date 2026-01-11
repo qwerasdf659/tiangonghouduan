@@ -46,11 +46,23 @@ const premiumRoutes = require('./premium')
 // 资产管理路由（已拆分为子模块：convert.js, balance.js, transactions.js, rules.js）
 const assetsRoutes = require('./assets/index')
 
+// 员工管理路由（2026-01-12 商家员工域权限体系升级 AC3）
+const staffRoutes = require('./staff/index')
+
+// 商家审计日志路由（2026-01-12 商家员工域权限体系升级 AC4.3）
+const auditRoutes = require('./audit/index')
+
+// 风险告警管理路由（2026-01-12 商家员工域权限体系升级 AC5）
+const riskRoutes = require('./risk/index')
+
 // 挂载路由
 router.use('/exchange', exchangeRoutes) // B2C材料兑换（从 /api/v4/market 迁移）
 router.use('/redemption', redemptionRoutes)
 router.use('/consumption', consumptionRoutes)
 router.use('/premium', premiumRoutes)
 router.use('/assets', assetsRoutes) // 资产余额和流水查询（替代旧 /points 路由）
+router.use('/staff', staffRoutes) // 员工管理（入职/调店/禁用/启用）
+router.use('/audit', auditRoutes) // 商家审计日志查询
+router.use('/risk', riskRoutes) // 风险告警管理
 
 module.exports = router

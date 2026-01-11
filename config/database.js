@@ -23,7 +23,7 @@ const SLOW_QUERY_THRESHOLD = 1000 // 1秒阈值
  */
 let performanceMonitor = null
 try {
-  const { monitor } = require('../scripts/maintenance/database-performance-monitor')
+  const { monitor } = require('../scripts/maintenance/database_performance_monitor')
   performanceMonitor = monitor
 } catch (error) {
   // 如果监控模块加载失败，不影响数据库正常运行
@@ -67,14 +67,14 @@ const dbConfig = {
   logging:
     process.env.NODE_ENV === 'development'
       ? (sql, timing) => {
-        // 开发环境：记录所有查询和慢查询
-        console.log(sql)
-        if (timing) slowQueryLogger(sql, timing)
-      }
+          // 开发环境：记录所有查询和慢查询
+          console.log(sql)
+          if (timing) slowQueryLogger(sql, timing)
+        }
       : (sql, timing) => {
-        // 生产环境：只记录慢查询
-        if (timing) slowQueryLogger(sql, timing)
-      },
+          // 生产环境：只记录慢查询
+          if (timing) slowQueryLogger(sql, timing)
+        },
   benchmark: true, // ⚡ 启用查询时间记录（必需）
   pool: {
     max: 40, // ✅ 最大连接数 - 单实例场景合理，长期固定40（2025-12-30 已拍板）

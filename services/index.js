@@ -74,6 +74,9 @@ const OrphanFrozenCleanupService = require('./OrphanFrozenCleanupService') // �
 // P1 商家积分审核服务（2026-01-09 统一审批流）
 const MerchantPointsService = require('./MerchantPointsService') // 商家积分申请审核服务
 
+// 商家员工域权限体系升级服务（2026-01-12）
+const StaffManagementService = require('./StaffManagementService') // 员工管理服务
+
 // P1-9 新增注册的服务（2026-01-09）
 const DataSanitizer = require('./DataSanitizer') // 统一数据脱敏服务
 const LotteryQuotaService = require('./lottery/LotteryQuotaService') // 抽奖配额服务
@@ -141,7 +144,10 @@ const KEY_MIGRATION_MAP = {
   sealosStorage: 'sealos_storage',
   managementStrategy: 'management_strategy',
   performanceMonitor: 'performance_monitor',
-  basicGuaranteeStrategy: 'basic_guarantee_strategy'
+  basicGuaranteeStrategy: 'basic_guarantee_strategy',
+
+  // 商家员工域权限体系升级服务（2026-01-12）
+  staffManagement: 'staff_management'
 }
 
 /**
@@ -328,6 +334,10 @@ class ServiceManager {
       // ========== 商家积分服务（使用 snake_case key） ==========
 
       this._services.set('merchant_points', MerchantPointsService)
+
+      // ========== 商家员工域权限体系升级服务（2026-01-12） ==========
+
+      this._services.set('staff_management', StaffManagementService) // 员工管理服务
 
       // ========== P1-9 新增服务（2026-01-09） ==========
 

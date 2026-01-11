@@ -196,6 +196,24 @@ class ConsumptionService {
    * @param {Object} options.transaction - Sequelize事务对象（必填）
    * @returns {Object} 消费记录对象（Consumption Record Object）
    */
+  /**
+   * 商家提交消费记录
+   *
+   * @description 商家员工扫码后提交消费记录
+   * v2升级：user_uuid 由路由层验证后传入，不再在服务层重复验证二维码
+   *
+   * @param {Object} data - 消费数据
+   * @param {string} data.qr_code - v2动态二维码（用于记录原始数据）
+   * @param {string} data.user_uuid - 用户UUID（由路由层验证二维码后提取）
+   * @param {number} data.consumption_amount - 消费金额
+   * @param {number} data.merchant_id - 商家ID（提交者）
+   * @param {number} [data.store_id] - 门店ID（Phase 2 后为必填）
+   * @param {string} data.idempotency_key - 幂等键
+   * @param {string} [data.merchant_notes] - 商家备注
+   * @param {Object} options - 选项
+   * @param {Transaction} options.transaction - 数据库事务（必填）
+   * @returns {Promise<Object>} 消费记录或幂等重复结果
+   */
   static async merchantSubmitConsumption(data, options = {}) {
     // 强制要求事务边界 - 2026-01-05 治理决策
     const transaction = assertAndGetTransaction(
@@ -207,8 +225,10 @@ class ConsumptionService {
     // 安全记录提交数据（排除不可序列化的对象如 transaction）
     const safeLogData = {
       qr_code: data.qr_code?.substring(0, 30) + '...',
+      user_uuid: data.user_uuid ? data.user_uuid.substring(0, 8) + '...' : null,
       consumption_amount: data.consumption_amount,
       merchant_id: data.merchant_id,
+      store_id: data.store_id, // v2新增：门店ID
       merchant_notes: data.merchant_notes,
       idempotency_key: data.idempotency_key
     }
@@ -229,13 +249,24 @@ class ConsumptionService {
       throw new Error('缺少幂等键：idempotency_key 必须由调用方提供')
     }
 
-    // 步骤2：验证QR码签名（Step 2: Validate QR Code Signature - HMAC-SHA256，UUID版本）
-    const qrValidation = QRCodeValidator.validateQRCode(data.qr_code)
-    if (!qrValidation.valid) {
-      throw new Error(`二维码验证失败：${qrValidation.error}`)
+    /*
+     * 步骤2：获取 user_uuid
+     * v2升级：优先使用路由层验证后传入的 user_uuid
+     * 兼容模式：如果未传入 user_uuid，则在服务层验证二维码（Phase 2完成后移除）
+     */
+    let userUuid = data.user_uuid
+    if (!userUuid) {
+      // 兼容模式：服务层验证二维码（将在 Phase 2 完成后移除）
+      logger.warn('⚠️ user_uuid 未传入，使用服务层验证二维码（兼容模式，将在 Phase 2 后移除）')
+      const qrValidation = await QRCodeValidator.validateQRCode(data.qr_code)
+      if (!qrValidation.valid) {
+        const error = new Error(qrValidation.error || '二维码验证失败')
+        error.code = qrValidation.code || 'QRCODE_VALIDATION_FAILED'
+        error.statusCode = qrValidation.statusCode || 400
+        throw error
+      }
+      userUuid = qrValidation.user_uuid
     }
-
-    const userUuid = qrValidation.user_uuid
 
     // 步骤3：根据UUID查找用户（Step 3: Find User by UUID）
     const user = await User.findOne({
@@ -244,7 +275,10 @@ class ConsumptionService {
     }) // ✅ 在事务中查询
 
     if (!user) {
-      throw new Error(`用户不存在（UUID: ${userUuid}）`)
+      const error = new Error(`用户不存在（UUID: ${userUuid}）`)
+      error.code = 'USER_NOT_FOUND'
+      error.statusCode = 404
+      throw error
     }
 
     const userId = user.user_id // 获取内部user_id用于后续业务逻辑
@@ -285,16 +319,53 @@ class ConsumptionService {
     const randomSuffix = Math.random().toString(36).substr(2, 6)
     const business_id = `consumption_${data.merchant_id}_${Date.now()}_${randomSuffix}`
 
+    /*
+     * 步骤6.5：处理 store_id（商家员工域权限体系升级 - 2026-01-12）
+     * - 如果传入了 store_id，使用传入值
+     * - 否则查询商家关联的门店，如果只有一个则自动填充
+     * - 如果商家关联多个门店但未指定，记录警告（Phase 2 后可能改为强制要求）
+     */
+    let storeId = data.store_id
+    if (!storeId) {
+      // 查询商家关联的活跃门店
+      const { StoreStaff } = require('../models')
+      const merchantStores = await StoreStaff.findAll({
+        where: {
+          user_id: data.merchant_id,
+          status: 'active'
+        },
+        attributes: ['store_id'],
+        transaction
+      })
+
+      if (merchantStores.length === 1) {
+        // 仅关联一个门店，自动填充
+        storeId = merchantStores[0].store_id
+        logger.info(`✅ 自动填充 store_id: ${storeId}（商家仅关联一个门店）`)
+      } else if (merchantStores.length > 1) {
+        // 关联多个门店但未指定，记录警告（历史兼容，新提交应指定 store_id）
+        logger.warn(
+          `⚠️ 商家关联 ${merchantStores.length} 个门店但未指定 store_id，消费记录将缺少门店信息`
+        )
+      } else {
+        // 商家未关联任何门店，记录警告
+        logger.warn(`⚠️ 商家 ${data.merchant_id} 未关联任何门店，消费记录将缺少门店信息`)
+      }
+    }
+
     // 🔒 步骤7：创建消费记录（Step 7: Create Consumption Record - Within Transaction）
     const consumptionRecord = await ConsumptionRecord.create(
       {
         business_id, // ✅ 业务唯一键（事务边界治理 - 2026-01-05）
         user_id: userId,
         merchant_id: data.merchant_id,
+        store_id: storeId || null, // ✅ 门店ID（商家员工域权限体系升级 - 2026-01-12）
         consumption_amount: data.consumption_amount,
         points_to_award: pointsToAward,
         status: 'pending', // 待审核状态（Pending Status - Waiting for Admin Review）
         qr_code: data.qr_code,
+        qr_code_version: 'v2', // ✅ v2动态码（商家员工域权限体系升级 - 2026-01-12）
+        is_legacy_v1: false, // ✅ 非历史遗留数据
         idempotency_key, // ✅ 幂等键（业界标准形态）
         merchant_notes: data.merchant_notes || null,
         created_at: BeijingTimeHelper.createDatabaseTime(),
@@ -904,11 +975,11 @@ class ConsumptionService {
           required: false,
           where: search
             ? {
-              [Op.or]: [
-                { mobile: { [Op.like]: `%${search}%` } },
-                { nickname: { [Op.like]: `%${search}%` } }
-              ]
-            }
+                [Op.or]: [
+                  { mobile: { [Op.like]: `%${search}%` } },
+                  { nickname: { [Op.like]: `%${search}%` } }
+                ]
+              }
             : undefined
         },
         {
@@ -1163,20 +1234,51 @@ class ConsumptionService {
    * 2. 根据user_uuid查询用户基本信息（仅返回必要字段）
    * 3. 返回用户昵称、UUID和完整手机号码
    */
+  /**
+   * 根据二维码获取用户信息（预览模式 - 不消耗nonce）
+   *
+   * @description 验证v2动态二维码并获取用户信息
+   * v2版本：动态码 + nonce防重放 + 5分钟过期 + HMAC签名
+   *
+   * ✅ 预览模式：此方法不消耗nonce，允许多次调用获取用户信息
+   * 商家可多次扫码预览用户信息，只有 /submit 端点才消耗nonce
+   *
+   * 验证步骤：
+   * 1. 格式验证（V2前缀）
+   * 2. 签名验证（HMAC-SHA256）
+   * 3. 过期验证（exp > 当前时间）
+   * 4. ❌ 不消耗nonce（由 /submit 端点消耗）
+   *
+   * @param {string} qrCode - v2动态二维码字符串
+   * @returns {Promise<Object>} 用户信息 { user_id, user_uuid, nickname, mobile }
+   * @throws {Error} code=QRCODE_EXPIRED 二维码已过期
+   * @throws {Error} code=INVALID_QRCODE_FORMAT 二维码格式不支持
+   */
   static async getUserInfoByQRCode(qrCode) {
     try {
       logger.info(
-        '🔍 [ConsumptionService] 开始验证二维码（UUID版本）:',
+        '🔍 [ConsumptionService] 开始验证v2动态二维码（预览模式，不消耗nonce）:',
         qrCode.substring(0, 30) + '...'
       )
 
-      // 1. 验证二维码格式和签名（UUID版本）
-      const validation = QRCodeValidator.validateQRCode(qrCode)
+      /*
+       * 1. 验证v2动态二维码（格式 + 签名 + 过期时间）
+       * ✅ 使用 validateQRCodePreview 预览验证，不消耗nonce
+       * 这允许商家多次扫码预览用户信息，只有 /submit 才消耗nonce
+       */
+      const validation = QRCodeValidator.validateQRCodePreview(qrCode)
       if (!validation.valid) {
-        throw new Error(`二维码验证失败：${validation.error}`)
+        // 将验证失败的错误码传递上去（code/statusCode 来自 QRCodeValidator）
+        const error = new Error(validation.error || '二维码验证失败')
+        error.code = validation.code || 'QRCODE_VALIDATION_FAILED'
+        error.statusCode = validation.statusCode || 400
+        throw error
       }
 
-      logger.info('✅ [ConsumptionService] 二维码验证通过，用户UUID:', validation.user_uuid)
+      logger.info(
+        '✅ [ConsumptionService] v2动态二维码预览验证通过（未消耗nonce），用户UUID:',
+        validation.user_uuid
+      )
 
       // 2. 根据UUID查询用户信息（仅查询必要字段）
       const user = await User.findOne({
@@ -1188,7 +1290,10 @@ class ConsumptionService {
 
       // 3. 验证用户是否存在
       if (!user) {
-        throw new Error(`用户不存在（user_uuid: ${validation.user_uuid}）`)
+        const error = new Error(`用户不存在（user_uuid: ${validation.user_uuid}）`)
+        error.code = 'USER_NOT_FOUND'
+        error.statusCode = 404
+        throw error
       }
 
       logger.info(
@@ -1203,7 +1308,7 @@ class ConsumptionService {
         mobile: user.mobile // 返回完整手机号码
       }
     } catch (error) {
-      logger.error('❌ [ConsumptionService] 获取用户信息失败:', error.message)
+      logger.error('❌ [ConsumptionService] 获取用户信息失败:', error.message, { code: error.code })
       throw error
     }
   }
