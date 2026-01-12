@@ -173,9 +173,9 @@ class ConsumptionRecord extends Model {
       errors.push('消费金额必须大于0')
     }
 
-    // 检查二维码格式（支持 V1 永久码 QR_ 和 V2 动态码 QRV2_）
-    if (!this.qr_code || (!this.qr_code.startsWith('QR_') && !this.qr_code.startsWith('QRV2_'))) {
-      errors.push('二维码格式不正确，必须以 QR_ 或 QRV2_ 开头')
+    // 检查二维码格式（仅支持 V2 动态码，V1 已废弃）
+    if (!this.qr_code || !this.qr_code.startsWith('QRV2_')) {
+      errors.push('二维码格式不正确，必须以 QRV2_ 开头')
     }
 
     // 检查用户ID
@@ -259,8 +259,6 @@ class ConsumptionRecord extends Model {
       status_name: this.getStatusName(),
       status_color: this.getStatusColor(),
       qr_code: this.qr_code,
-      qr_code_version: this.qr_code_version,
-      is_legacy_v1: this.is_legacy_v1,
       merchant_notes: this.merchant_notes,
       admin_notes: this.admin_notes,
       reviewed_by: this.reviewed_by,
@@ -432,32 +430,6 @@ module.exports = sequelize => {
           notEmpty: true,
           len: [1, 300]
         }
-      },
-
-      /**
-       * 二维码版本（v2 动态码升级 - 2026-01-12）
-       *
-       * v1: 永久码，存在重复使用风险，已废弃
-       * v2: 动态码，带 nonce 防重放 + 5分钟过期
-       */
-      qr_code_version: {
-        type: DataTypes.ENUM('v1', 'v2'),
-        allowNull: true,
-        defaultValue: null,
-        comment: '二维码版本（v1=永久码/已废弃，v2=动态码/防重放）'
-      },
-
-      /**
-       * v1 历史遗留标记（2026-01-12）
-       *
-       * 标记通过 v1 永久码提交的历史数据
-       * 便于后续审计和数据清理
-       */
-      is_legacy_v1: {
-        type: DataTypes.BOOLEAN,
-        allowNull: false,
-        defaultValue: false,
-        comment: '是否为 v1 历史遗留数据（v1 永久码重复使用风险记录）'
       },
 
       /*

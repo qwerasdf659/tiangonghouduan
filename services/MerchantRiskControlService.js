@@ -602,14 +602,24 @@ class MerchantRiskControlService {
   /**
    * 更新告警状态（复核/忽略）
    *
+   * 事务边界（2026-01-12 TS2.2 治理）：
+   * - 支持外部事务传入（options.transaction）
+   * - 如果未提供事务，则在无事务环境下执行（单表操作，风险较低）
+   * - 建议调用方使用 TransactionManager.execute() 包裹，确保审计日志和业务操作的原子性
+   *
    * @param {number} alert_id - 告警ID
    * @param {Object} updateData - 更新数据
    * @param {string} updateData.status - 新状态 (reviewed/ignored)
    * @param {number} updateData.reviewer_id - 复核人ID
    * @param {string} [updateData.review_notes] - 复核备注
+   * @param {Object} [options={}] - 选项
+   * @param {Object} [options.transaction] - Sequelize事务对象（可选）
    * @returns {Promise<Object>} 更新后的告警记录
+   *
+   * @since 2026-01-12 支持事务边界（TS2.2）
    */
-  static async updateAlertStatus(alert_id, updateData) {
+  static async updateAlertStatus(alert_id, updateData, options = {}) {
+    const { transaction } = options
     const models = MerchantRiskControlService._getModels()
     const { RiskAlert } = models
 
@@ -618,17 +628,24 @@ class MerchantRiskControlService {
     }
 
     try {
-      const alert = await RiskAlert.findByPk(alert_id)
+      const alert = await RiskAlert.findByPk(alert_id, {
+        transaction,
+        lock: transaction ? transaction.LOCK.UPDATE : undefined
+      })
+
       if (!alert) {
         throw new Error(`告警记录不存在 (ID: ${alert_id})`)
       }
 
-      await alert.update({
-        status: updateData.status,
-        reviewed_by: updateData.reviewer_id,
-        review_notes: updateData.review_notes || null,
-        reviewed_at: BeijingTimeHelper.createDatabaseTime()
-      })
+      await alert.update(
+        {
+          status: updateData.status,
+          reviewed_by: updateData.reviewer_id,
+          review_notes: updateData.review_notes || null,
+          reviewed_at: BeijingTimeHelper.createDatabaseTime()
+        },
+        { transaction }
+      )
 
       logger.info('📝 风控告警状态已更新', {
         alert_id,

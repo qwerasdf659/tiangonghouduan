@@ -31,6 +31,8 @@ const imagesRoutes = require('./images') // 🆕 通用图片上传（2026-01-08
 const orphanFrozenRoutes = require('./orphan-frozen') // 🆕 孤儿冻结清理（P0-2 2026-01-09）
 const merchantPointsRoutes = require('./merchant-points') // 🆕 商家积分审核管理（P1 2026-01-09）
 const userHierarchyRoutes = require('./user-hierarchy') // 🆕 用户层级管理（业务员/门店管理 2026-01-09）
+const consumptionRoutes = require('./consumption') // 🆕 消费记录审核管理（2026-01-12 商家员工域权限体系升级 AC1.4）
+const storesRoutes = require('./stores') // 🆕 门店管理（2026-01-12 P1 门店数据维护入口）
 
 // 挂载子模块路由
 router.use('/auth', authRoutes)
@@ -53,6 +55,8 @@ router.use('/images', imagesRoutes) // 🆕 通用图片上传路由（2026-01-0
 router.use('/orphan-frozen', orphanFrozenRoutes) // 🆕 孤儿冻结清理路由（P0-2 2026-01-09）
 router.use('/merchant-points', merchantPointsRoutes) // 🆕 商家积分审核管理路由（P1 2026-01-09）
 router.use('/user-hierarchy', userHierarchyRoutes) // 🆕 用户层级管理路由（业务员/门店管理 2026-01-09）
+router.use('/consumption', consumptionRoutes) // 🆕 消费记录审核管理路由（2026-01-12 商家员工域权限体系升级 AC1.4）
+router.use('/stores', storesRoutes) // 🆕 门店管理路由（2026-01-12 P1 门店数据维护入口）
 
 /**
  * GET / - Admin API根路径信息
@@ -253,6 +257,28 @@ router.get('/', (req, res) => {
           '/user-hierarchy/:user_id/activate'
         ],
         note: '区域负责人→业务经理→业务员三级层级管理，门店分配，权限激活/停用，替代独立的门店管理功能'
+      },
+      consumption: {
+        description: '消费记录审核管理（2026-01-12 商家员工域权限体系升级）',
+        endpoints: [
+          '/consumption/pending',
+          '/consumption/records',
+          '/consumption/approve/:record_id',
+          '/consumption/reject/:record_id'
+        ],
+        note: '仅限 admin（role_level >= 100）访问，不开放 ops/区域经理；商家员工使用 /api/v4/shop/* 提交消费记录'
+      },
+      stores: {
+        description: '门店管理（2026-01-12 P1 门店数据维护入口）',
+        endpoints: [
+          '/stores',
+          '/stores/stats',
+          '/stores/regions',
+          '/stores/:store_id',
+          '/stores/:store_id/activate',
+          '/stores/:store_id/deactivate'
+        ],
+        note: '平台管理员门店 CRUD 操作，包括创建/编辑/删除/激活/停用门店；仅限 admin（role_level >= 100）访问'
       }
       // ⚠️ campaign_permissions模块暂未实现，待实现后再添加到此列表
     },

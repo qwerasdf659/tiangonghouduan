@@ -181,7 +181,6 @@ router.post(
       logger.info('商家提交消费记录', {
         merchant_id: merchantId,
         store_id: resolved_store_id,
-        qr_code_version: 'v2',
         user_uuid: qr_validation.user_uuid.substring(0, 8) + '...',
         consumption_amount,
         idempotency_key
@@ -222,7 +221,6 @@ router.post(
             consumption_amount: parseFloat(consumption_amount),
             extra_data: {
               block_code: riskCheckResult.blockCode,
-              qr_code_version: 'v2',
               idempotency_key
             }
           })
@@ -344,7 +342,6 @@ router.post(
             idempotency_key,
             extra_data: {
               points_to_award: record.points_to_award,
-              qr_code_version: 'v2',
               risk_alerts: riskCheckResult.hasAlerts ? riskCheckResult.alerts.map(a => a.type) : []
             }
           })

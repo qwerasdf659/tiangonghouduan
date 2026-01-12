@@ -19,9 +19,11 @@
  * 13. 未绑定图片清理（每小时第30分钟）- 2026-01-08新增（图片存储架构）
  * 14. 可叠加资产挂牌过期（每小时第15分钟）- 2026-01-08新增（C2C材料交易）
  * 15. 市场挂牌异常监控（每小时第45分钟）- 2026-01-08新增（C2C材料交易 Phase 2）
+ * 16. 孤儿冻结检测与清理（每天凌晨2点）- 2026-01-09新增（P0-2修复）
+ * 17. 商家审计日志180天清理（每天凌晨3点）- 2026-01-12新增（AC4.4 商家员工域权限体系升级）
  *
  * 创建时间：2025-10-10
- * 更新时间：2026-01-08（新增C2C材料交易市场挂牌监控任务）
+ * 更新时间：2026-01-12（新增商家审计日志180天清理任务 - AC4.4）
  */
 
 const cron = require('node-cron')
@@ -194,6 +196,9 @@ class ScheduledTasks {
 
     // 任务19: 每天凌晨2点孤儿冻结检测与清理（2026-01-09新增 - P0-2修复）
     this.scheduleDailyOrphanFrozenCheck()
+
+    // 任务20: 每天凌晨3点清理超过180天的商家操作日志（2026-01-12新增 - AC4.4 商家员工域权限体系升级）
+    this.scheduleDailyMerchantAuditLogCleanup()
 
     logger.info('所有定时任务已初始化完成')
   }
@@ -1784,6 +1789,190 @@ class ScheduledTasks {
       return report
     } catch (error) {
       logger.error('[手动触发] 孤儿冻结检测失败', { error: error.message })
+      throw error
+    }
+  }
+
+  /**
+   * 定时任务20: 每天凌晨3点清理超过180天的商家操作日志
+   * Cron表达式: 0 3 * * * (每天凌晨3点)
+   *
+   * 业务场景（商家员工域权限体系升级 AC4.4 2026-01-12）：
+   * - 商家操作日志（merchant_operation_logs）保留期限为180天
+   * - 超过保留期限的日志自动删除，释放数据库空间
+   * - 确保审计日志不会无限增长
+   *
+   * 清理策略：
+   * - 删除 created_at < (当前时间 - 180天) 的记录
+   * - 利用 created_at 索引高效查询
+   * - 分批删除，避免长事务锁表
+   * - 记录清理日志供运维追踪
+   *
+   * @returns {void}
+   *
+   * @since 2026-01-12
+   * @see docs/商家员工域权限体系升级方案.md - AC4.4 审计日志保留策略
+   */
+  static scheduleDailyMerchantAuditLogCleanup() {
+    cron.schedule('0 3 * * *', async () => {
+      const lockKey = 'lock:merchant_audit_log_cleanup'
+      const lockValue = `${process.pid}_${Date.now()}`
+      let redisClient = null
+
+      try {
+        // 获取 Redis 客户端
+        const { getRawClient } = require('../../utils/UnifiedRedisClient')
+        redisClient = getRawClient()
+
+        // 尝试获取分布式锁（10分钟过期）
+        const acquired = await redisClient.set(lockKey, lockValue, 'EX', 600, 'NX')
+
+        if (!acquired) {
+          logger.info('[定时任务] 其他实例正在执行商家审计日志清理，跳过')
+          return
+        }
+
+        logger.info('[定时任务] 获取分布式锁成功，开始执行商家审计日志180天清理...', {
+          lock_key: lockKey,
+          lock_value: lockValue
+        })
+
+        // 执行清理
+        const report = await ScheduledTasks.cleanupMerchantAuditLogs(180)
+
+        if (report.deleted_count > 0) {
+          logger.warn(
+            `[定时任务] 商家审计日志清理完成：删除 ${report.deleted_count} 条超过180天的记录`,
+            {
+              deleted_count: report.deleted_count,
+              cutoff_date: report.cutoff_date,
+              duration_ms: report.duration_ms
+            }
+          )
+        } else {
+          logger.info('[定时任务] 商家审计日志清理完成：无需清理')
+        }
+
+        // 释放锁
+        await redisClient.del(lockKey)
+        logger.info('[定时任务] 分布式锁已释放', { lock_key: lockKey })
+      } catch (error) {
+        logger.error('[定时任务] 商家审计日志清理失败', { error: error.message })
+
+        // 确保释放锁
+        if (redisClient) {
+          try {
+            await redisClient.del(lockKey)
+          } catch (unlockError) {
+            logger.error('[定时任务] 释放分布式锁失败', { error: unlockError.message })
+          }
+        }
+      }
+    })
+
+    logger.info('✅ 定时任务已设置: 商家审计日志180天清理（每天凌晨3点执行，支持分布式锁）')
+  }
+
+  /**
+   * 清理超过指定天数的商家操作日志
+   *
+   * @param {number} retentionDays - 保留天数（默认180天）
+   * @returns {Promise<Object>} 清理报告
+   * @returns {number} return.deleted_count - 删除的记录数
+   * @returns {string} return.cutoff_date - 截止日期（北京时间）
+   * @returns {number} return.duration_ms - 执行耗时（毫秒）
+   *
+   * @example
+   * const report = await ScheduledTasks.cleanupMerchantAuditLogs(180)
+   * console.log(`删除了 ${report.deleted_count} 条记录`)
+   */
+  static async cleanupMerchantAuditLogs(retentionDays = 180) {
+    const startTime = Date.now()
+    const { MerchantOperationLog } = require('../../models')
+
+    // 计算截止日期（180天前）
+    const cutoffDate = new Date()
+    cutoffDate.setDate(cutoffDate.getDate() - retentionDays)
+
+    logger.info('[商家审计日志清理] 开始执行...', {
+      retention_days: retentionDays,
+      cutoff_date: BeijingTimeHelper.formatForAPI(cutoffDate).iso
+    })
+
+    try {
+      // 分批删除，每批最多10000条，避免长事务
+      const batchSize = 10000
+      let totalDeleted = 0
+      let hasMore = true
+
+      while (hasMore) {
+        // 使用 destroy 删除满足条件的记录
+        const deletedCount = await MerchantOperationLog.destroy({
+          where: {
+            created_at: {
+              [Op.lt]: cutoffDate
+            }
+          },
+          limit: batchSize
+        })
+
+        totalDeleted += deletedCount
+
+        // 如果删除数量小于批次大小，说明没有更多记录了
+        if (deletedCount < batchSize) {
+          hasMore = false
+        } else {
+          // 等待一小段时间，避免对数据库造成过大压力
+          await new Promise(resolve => setTimeout(resolve, 100))
+        }
+
+        logger.info('[商家审计日志清理] 批次完成', {
+          batch_deleted: deletedCount,
+          total_deleted: totalDeleted
+        })
+      }
+
+      const duration = Date.now() - startTime
+
+      return {
+        deleted_count: totalDeleted,
+        cutoff_date: BeijingTimeHelper.formatForAPI(cutoffDate).iso,
+        duration_ms: duration,
+        status: 'SUCCESS'
+      }
+    } catch (error) {
+      logger.error('[商家审计日志清理] 执行失败', { error: error.message })
+      throw error
+    }
+  }
+
+  /**
+   * 手动触发商家审计日志清理（用于测试）
+   *
+   * 业务场景：手动执行商家审计日志清理，用于开发调试和即时清理
+   *
+   * @param {number} [retentionDays=180] - 保留天数
+   * @returns {Promise<Object>} 清理报告对象
+   *
+   * @example
+   * const ScheduledTasks = require('./scripts/maintenance/scheduled-tasks')
+   * const report = await ScheduledTasks.manualMerchantAuditLogCleanup(180)
+   * console.log('删除数量:', report.deleted_count)
+   */
+  static async manualMerchantAuditLogCleanup(retentionDays = 180) {
+    try {
+      logger.info('[手动触发] 开始执行商家审计日志清理...', { retention_days: retentionDays })
+      const report = await ScheduledTasks.cleanupMerchantAuditLogs(retentionDays)
+
+      logger.info('[手动触发] 商家审计日志清理完成', {
+        deleted_count: report.deleted_count,
+        cutoff_date: report.cutoff_date,
+        duration_ms: report.duration_ms
+      })
+
+      return report
+    } catch (error) {
+      logger.error('[手动触发] 商家审计日志清理失败', { error: error.message })
       throw error
     }
   }

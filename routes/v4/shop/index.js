@@ -1,5 +1,5 @@
 /**
- * shop域 - 积分商城业务域聚合
+ * shop域 - 积分商城业务域聚合（商家员工专用）
  *
  * 顶层路径：/api/v4/shop
  * 内部目录：routes/v4/shop/
@@ -7,9 +7,18 @@
  * 职责：
  * - B2C材料兑换（官方商城兑换商品）
  * - 核销系统（兑换码核销）
- * - 消费记录
+ * - 消费记录（商家员工录入）
  * - 会员权益
  * - 资产管理
+ * - 员工管理（店长功能）
+ * - 商家审计日志
+ * - 风险告警管理
+ *
+ * 📌 域边界隔离（2026-01-12 商家员工域权限体系升级 AC1.4）：
+ * - 此域仅限 merchant_staff/merchant_manager 角色访问
+ * - 必须在 store_staff 表中有 active 记录
+ * - 平台内部角色（admin/ops/regional_manager 等）应使用 /api/v4/console/*
+ * - 超级管理员（role_level >= 100）可兜底访问，但不建议日常使用
  *
  * 📌 遵循规范：
  * - 统一使用/shop作为顶层路径
@@ -17,16 +26,20 @@
  * - 用户端禁止/:id参数（使用/me端点）
  * - /assets 子路径用于资产余额和流水查询（替代旧 /points 路由）
  *
- * 📌 重构记录（2025-12-30）：
- * - 移除 /points 子路由（已迁移到 /assets）
- * - 积分操作统一使用 AssetService
+ * 📌 重构记录：
+ * - 2025-12-30：移除 /points 子路由（已迁移到 /assets）
+ * - 2026-01-12：增加商家域准入中间件（AC1.4）
  *
  * 创建时间：2025年01月21日
+ * 更新时间：2026年01月12日
  * 适用区域：中国（北京时间 Asia/Shanghai）
  */
 
 const express = require('express')
 const router = express.Router()
+
+// 认证中间件
+const { authenticateToken, requireMerchantDomainAccess } = require('../../../middleware/auth')
 
 /*
  * B2C材料兑换路由（已拆分为子模块：items.js, exchange.js, orders.js, statistics.js）
@@ -55,11 +68,29 @@ const auditRoutes = require('./audit/index')
 // 风险告警管理路由（2026-01-12 商家员工域权限体系升级 AC5）
 const riskRoutes = require('./risk/index')
 
-// 挂载路由
+/*
+ * =================================================================
+ * 🛡️ 商家域准入中间件（AC1.4 域边界隔离）
+ *
+ * 说明：
+ * - 此中间件应用于整个 /api/v4/shop/* 域
+ * - 验证用户是否为商家员工角色（merchant_staff/merchant_manager）
+ * - 验证用户是否在 store_staff 表中有 active 记录
+ * - 超级管理员（role_level >= 100）可跳过检查
+ *
+ * 被拦截的情况：
+ * - 未认证用户 → 401 UNAUTHENTICATED
+ * - 非商家角色（如 ops/regional_manager）→ 403 MERCHANT_DOMAIN_ACCESS_DENIED
+ * - 无活跃门店绑定 → 403 NO_STORE_BINDING
+ * =================================================================
+ */
+router.use(authenticateToken, requireMerchantDomainAccess())
+
+// 挂载子路由
 router.use('/exchange', exchangeRoutes) // B2C材料兑换（从 /api/v4/market 迁移）
-router.use('/redemption', redemptionRoutes)
-router.use('/consumption', consumptionRoutes)
-router.use('/premium', premiumRoutes)
+router.use('/redemption', redemptionRoutes) // 核销系统
+router.use('/consumption', consumptionRoutes) // 消费记录
+router.use('/premium', premiumRoutes) // 会员权益
 router.use('/assets', assetsRoutes) // 资产余额和流水查询（替代旧 /points 路由）
 router.use('/staff', staffRoutes) // 员工管理（入职/调店/禁用/启用）
 router.use('/audit', auditRoutes) // 商家审计日志查询

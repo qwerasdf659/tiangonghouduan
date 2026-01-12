@@ -432,11 +432,9 @@ async function authenticateToken(req, res, next) {
     const token = authHeader && authHeader.split(' ')[1]
 
     if (!token) {
-      return res.status(401).json({
-        success: false,
-        error: 'MISSING_TOKEN',
-        message: '缺少认证Token'
-      })
+      return res.apiUnauthorized
+        ? res.apiUnauthorized('缺少认证Token', 'MISSING_TOKEN')
+        : res.status(401).json({ success: false, code: 'MISSING_TOKEN', message: '缺少认证Token' })
     }
 
     // 验证Token
@@ -449,11 +447,11 @@ async function authenticateToken(req, res, next) {
     })
 
     if (!user) {
-      return res.status(401).json({
-        success: false,
-        error: 'USER_NOT_FOUND',
-        message: '用户不存在或已被禁用'
-      })
+      return res.apiUnauthorized
+        ? res.apiUnauthorized('用户不存在或已被禁用', 'USER_NOT_FOUND')
+        : res
+            .status(401)
+            .json({ success: false, code: 'USER_NOT_FOUND', message: '用户不存在或已被禁用' })
     }
 
     // 🛡️ 获取用户角色信息
@@ -485,24 +483,18 @@ async function authenticateToken(req, res, next) {
     next()
   } catch (error) {
     if (error.name === 'JsonWebTokenError') {
-      return res.status(401).json({
-        success: false,
-        error: 'INVALID_TOKEN',
-        message: '无效的Token'
-      })
+      return res.apiUnauthorized
+        ? res.apiUnauthorized('无效的Token', 'INVALID_TOKEN')
+        : res.status(401).json({ success: false, code: 'INVALID_TOKEN', message: '无效的Token' })
     } else if (error.name === 'TokenExpiredError') {
-      return res.status(401).json({
-        success: false,
-        error: 'TOKEN_EXPIRED',
-        message: 'Token已过期'
-      })
+      return res.apiUnauthorized
+        ? res.apiUnauthorized('Token已过期', 'TOKEN_EXPIRED')
+        : res.status(401).json({ success: false, code: 'TOKEN_EXPIRED', message: 'Token已过期' })
     } else {
       logger.error('❌ Token认证失败:', error.message)
-      return res.status(401).json({
-        success: false,
-        error: 'AUTH_FAILED',
-        message: '认证失败'
-      })
+      return res.apiUnauthorized
+        ? res.apiUnauthorized('认证失败', 'AUTH_FAILED')
+        : res.status(401).json({ success: false, code: 'AUTH_FAILED', message: '认证失败' })
     }
   }
 }
@@ -517,29 +509,27 @@ async function authenticateToken(req, res, next) {
 async function requireAdmin(req, res, next) {
   try {
     if (!req.user) {
-      return res.status(401).json({
-        success: false,
-        error: 'UNAUTHENTICATED',
-        message: '未认证用户'
-      })
+      return res.apiUnauthorized
+        ? res.apiUnauthorized('未认证用户', 'UNAUTHENTICATED')
+        : res.status(401).json({ success: false, code: 'UNAUTHENTICATED', message: '未认证用户' })
     }
 
     if (req.user.role_level < 100) {
-      return res.status(403).json({
-        success: false,
-        error: 'INSUFFICIENT_PERMISSION',
-        message: '需要管理员权限'
-      })
+      return res.apiForbidden
+        ? res.apiForbidden('需要管理员权限', 'INSUFFICIENT_PERMISSION')
+        : res
+            .status(403)
+            .json({ success: false, code: 'INSUFFICIENT_PERMISSION', message: '需要管理员权限' })
     }
 
     next()
   } catch (error) {
     logger.error('❌ 管理员权限验证失败:', error.message)
-    return res.status(500).json({
-      success: false,
-      error: 'PERMISSION_CHECK_FAILED',
-      message: '权限验证失败'
-    })
+    return res.apiError
+      ? res.apiError('权限验证失败', 'PERMISSION_CHECK_FAILED', null, 500)
+      : res
+          .status(500)
+          .json({ success: false, code: 'PERMISSION_CHECK_FAILED', message: '权限验证失败' })
   }
 }
 
@@ -619,11 +609,9 @@ function requirePermission(requiredPermission) {
   return async (req, res, next) => {
     try {
       if (!req.user) {
-        return res.status(401).json({
-          success: false,
-          error: 'UNAUTHENTICATED',
-          message: '未认证用户'
-        })
+        return res.apiUnauthorized
+          ? res.apiUnauthorized('未认证用户', 'UNAUTHENTICATED')
+          : res.status(401).json({ success: false, code: 'UNAUTHENTICATED', message: '未认证用户' })
       }
 
       // 超级管理员拥有所有权限
@@ -643,22 +631,24 @@ function requirePermission(requiredPermission) {
         return next()
       }
 
-      return res.status(403).json({
-        success: false,
-        error: 'INSUFFICIENT_PERMISSION',
-        message: '权限不足',
-        data: {
-          required: requiredPermission,
-          user_permissions: req.user.permissions
-        }
-      })
+      return res.apiForbidden
+        ? res.apiForbidden('权限不足', 'INSUFFICIENT_PERMISSION', {
+            required: requiredPermission,
+            user_permissions: req.user.permissions
+          })
+        : res.status(403).json({
+            success: false,
+            code: 'INSUFFICIENT_PERMISSION',
+            message: '权限不足',
+            data: { required: requiredPermission, user_permissions: req.user.permissions }
+          })
     } catch (error) {
       logger.error('❌ 权限检查失败:', error.message)
-      return res.status(500).json({
-        success: false,
-        error: 'PERMISSION_CHECK_FAILED',
-        message: '权限验证失败'
-      })
+      return res.apiError
+        ? res.apiError('权限验证失败', 'PERMISSION_CHECK_FAILED', null, 500)
+        : res
+            .status(500)
+            .json({ success: false, code: 'PERMISSION_CHECK_FAILED', message: '权限验证失败' })
     }
   }
 }
@@ -695,11 +685,9 @@ function requireRole(allowedRoles, _options = {}) {
     try {
       // 1. 验证是否已认证
       if (!req.user) {
-        return res.status(401).json({
-          success: false,
-          error: 'UNAUTHENTICATED',
-          message: '未认证用户'
-        })
+        return res.apiUnauthorized
+          ? res.apiUnauthorized('未认证用户', 'UNAUTHENTICATED')
+          : res.status(401).json({ success: false, code: 'UNAUTHENTICATED', message: '未认证用户' })
       }
 
       // 2. 获取用户角色名称列表
@@ -725,11 +713,16 @@ function requireRole(allowedRoles, _options = {}) {
         logger.warn(
           `🚫 [Auth] 角色权限不足: user_id=${req.user.user_id}, 需要角色=[${roles.join(',')}], 用户角色=[${userRoleNames.join(',')}]`
         )
-        return res.status(403).json({
-          success: false,
-          error: 'INSUFFICIENT_ROLE',
-          message: '角色权限不足，需要 ' + roles.join(' 或 ') + ' 角色'
-        })
+        return res.apiForbidden
+          ? res.apiForbidden(
+              '角色权限不足，需要 ' + roles.join(' 或 ') + ' 角色',
+              'INSUFFICIENT_ROLE'
+            )
+          : res.status(403).json({
+              success: false,
+              code: 'INSUFFICIENT_ROLE',
+              message: '角色权限不足，需要 ' + roles.join(' 或 ') + ' 角色'
+            })
       }
 
       // 4. 检查 ops 角色的读写权限（ops 只能读，不能写）
@@ -740,22 +733,27 @@ function requireRole(allowedRoles, _options = {}) {
         logger.warn(
           `🚫 [Auth] ops角色不能执行写操作: user_id=${req.user.user_id}, method=${req.method}, path=${req.path}`
         )
-        return res.status(403).json({
-          success: false,
-          error: 'OPS_READ_ONLY',
-          message: 'ops 角色仅可读，不能执行写操作（POST/PUT/PATCH/DELETE）'
-        })
+        return res.apiForbidden
+          ? res.apiForbidden(
+              'ops 角色仅可读，不能执行写操作（POST/PUT/PATCH/DELETE）',
+              'OPS_READ_ONLY'
+            )
+          : res.status(403).json({
+              success: false,
+              code: 'OPS_READ_ONLY',
+              message: 'ops 角色仅可读，不能执行写操作（POST/PUT/PATCH/DELETE）'
+            })
       }
 
       // 5. 通过权限检查
       next()
     } catch (error) {
       logger.error('❌ 角色权限检查失败:', error.message)
-      return res.status(500).json({
-        success: false,
-        error: 'ROLE_CHECK_FAILED',
-        message: '角色权限验证失败'
-      })
+      return res.apiError
+        ? res.apiError('角色权限验证失败', 'ROLE_CHECK_FAILED', null, 500)
+        : res
+            .status(500)
+            .json({ success: false, code: 'ROLE_CHECK_FAILED', message: '角色权限验证失败' })
     }
   }
 }
@@ -834,6 +832,138 @@ async function isUserActiveInStore(user_id, store_id) {
 }
 
 /**
+ * 🏪 商家域准入中间件（2026-01-12 商家员工域权限体系升级 AC1.4）
+ *
+ * @description 强制隔离商家域入口：仅允许商家员工/店长访问 /api/v4/shop/*
+ *
+ * 业务规则：
+ * 1. 超级管理员（role_level >= 100）可直接访问（兜底能力，但不建议日常使用）
+ * 2. 非管理员用户必须满足以下所有条件：
+ *    - 角色名称为 merchant_staff 或 merchant_manager
+ *    - 在 store_staff 表中至少有一个 status='active' 的记录
+ * 3. 平台内部角色（ops/regional_manager/business_manager/sales_staff）禁止访问商家域
+ *
+ * 安全意义：
+ * - 防止平台内部角色误用商家域接口
+ * - 确保商家域操作只能由真正的门店员工执行
+ * - 为后续门店级别隔离打下基础
+ *
+ * @returns {Function} Express 中间件函数
+ *
+ * @example
+ * // 在 routes/v4/shop/index.js 入口使用
+ * router.use(authenticateToken, requireMerchantDomainAccess())
+ *
+ * @since 2026-01-12
+ * @see docs/商家员工域权限体系升级方案.md - AC1.4 域边界强制隔离
+ */
+function requireMerchantDomainAccess() {
+  // 允许访问商家域的角色名称列表
+  const ALLOWED_MERCHANT_ROLES = ['merchant_staff', 'merchant_manager']
+
+  return async (req, res, next) => {
+    try {
+      // 1. 验证是否已认证
+      if (!req.user) {
+        return res.apiUnauthorized
+          ? res.apiUnauthorized('未认证用户', 'UNAUTHENTICATED')
+          : res.status(401).json({
+              success: false,
+              code: 'UNAUTHENTICATED',
+              message: '未认证用户'
+            })
+      }
+
+      const userRoleLevel = req.user.role_level || 0
+      const userRoleNames = req.user.roles?.map(r => r.role_name) || []
+      const userId = req.user.user_id
+
+      // 2. 超级管理员跳过所有检查（兜底能力）
+      if (userRoleLevel >= 100) {
+        logger.info(
+          `🛡️ [MerchantDomain] 管理员访问商家域: user_id=${userId}, role_level=${userRoleLevel}`
+        )
+        return next()
+      }
+
+      // 3. 检查是否为商家域角色
+      const isMerchantRole = ALLOWED_MERCHANT_ROLES.some(role => userRoleNames.includes(role))
+
+      if (!isMerchantRole) {
+        logger.warn(
+          `🚫 [MerchantDomain] 非商家角色被拒绝: user_id=${userId}, roles=[${userRoleNames.join(',')}]`
+        )
+        return res.apiForbidden
+          ? res.apiForbidden(
+              '此接口仅限商家员工使用，平台内部角色请使用 /api/v4/console/* 接口',
+              'MERCHANT_DOMAIN_ACCESS_DENIED',
+              {
+                user_roles: userRoleNames,
+                allowed_roles: ALLOWED_MERCHANT_ROLES,
+                suggestion: '请联系管理员分配商家员工角色，或使用 /api/v4/console/* 接口'
+              }
+            )
+          : res.status(403).json({
+              success: false,
+              code: 'MERCHANT_DOMAIN_ACCESS_DENIED',
+              message: '此接口仅限商家员工使用，平台内部角色请使用 /api/v4/console/* 接口',
+              data: {
+                user_roles: userRoleNames,
+                allowed_roles: ALLOWED_MERCHANT_ROLES
+              }
+            })
+      }
+
+      // 4. 检查是否在 store_staff 表中有活跃记录
+      const userStores = await getUserStores(userId)
+
+      if (!userStores || userStores.length === 0) {
+        logger.warn(`🚫 [MerchantDomain] 无门店绑定被拒绝: user_id=${userId}`)
+        return res.apiForbidden
+          ? res.apiForbidden('您尚未绑定任何门店，无法访问商家域接口', 'NO_STORE_BINDING', {
+              suggestion: '请联系店长或管理员添加您的门店绑定'
+            })
+          : res.status(403).json({
+              success: false,
+              code: 'NO_STORE_BINDING',
+              message: '您尚未绑定任何门店，无法访问商家域接口',
+              data: {
+                suggestion: '请联系店长或管理员添加您的门店绑定'
+              }
+            })
+      }
+
+      // 5. 将用户门店信息挂载到请求对象（供后续中间件和路由使用）
+      // eslint-disable-next-line require-atomic-updates
+      req.user_stores = userStores
+
+      // 如果用户只绑定了一个门店，自动设置当前门店（简化后续操作）
+      if (userStores.length === 1) {
+        // eslint-disable-next-line require-atomic-updates
+        req.current_store_id = userStores[0].store_id
+        // eslint-disable-next-line require-atomic-updates
+        req.current_store = userStores[0]
+      }
+
+      logger.info(
+        `✅ [MerchantDomain] 商家域准入通过: user_id=${userId}, stores=[${userStores.map(s => s.store_id).join(',')}]`
+      )
+
+      next()
+    } catch (error) {
+      logger.error('❌ [MerchantDomain] 商家域准入检查失败:', error.message)
+      return res.apiError
+        ? res.apiError('商家域准入检查失败', 'MERCHANT_DOMAIN_CHECK_FAILED', null, 500)
+        : res.status(500).json({
+            success: false,
+            code: 'MERCHANT_DOMAIN_CHECK_FAILED',
+            message: '商家域准入检查失败'
+          })
+    }
+  }
+}
+
+/**
  * 🛡️ 商家权限检查中间件（支持门店范围隔离）
  *
  * @description 检查用户是否具有指定的商家域权限，并可选验证门店访问权限
@@ -866,11 +996,9 @@ function requireMerchantPermission(capability, options = {}) {
     try {
       // 1. 验证是否已认证
       if (!req.user) {
-        return res.status(401).json({
-          success: false,
-          error: 'UNAUTHENTICATED',
-          message: '未认证用户'
-        })
+        return res.apiUnauthorized
+          ? res.apiUnauthorized('未认证用户', 'UNAUTHENTICATED')
+          : res.status(401).json({ success: false, code: 'UNAUTHENTICATED', message: '未认证用户' })
       }
 
       // 2. 超级管理员跳过所有检查
@@ -889,15 +1017,21 @@ function requireMerchantPermission(capability, options = {}) {
         logger.warn(
           `🚫 [Auth] 商家权限不足: user_id=${req.user.user_id}, required=${capability}, user_permissions=[${req.user.permissions.join(',')}]`
         )
-        return res.status(403).json({
-          success: false,
-          error: 'INSUFFICIENT_MERCHANT_PERMISSION',
-          message: `权限不足，需要 ${capability} 权限`,
-          data: {
-            required: capability,
-            user_permissions: req.user.permissions
-          }
-        })
+        return res.apiForbidden
+          ? res.apiForbidden(
+              `权限不足，需要 ${capability} 权限`,
+              'INSUFFICIENT_MERCHANT_PERMISSION',
+              {
+                required: capability,
+                user_permissions: req.user.permissions
+              }
+            )
+          : res.status(403).json({
+              success: false,
+              code: 'INSUFFICIENT_MERCHANT_PERMISSION',
+              message: `权限不足，需要 ${capability} 权限`,
+              data: { required: capability, user_permissions: req.user.permissions }
+            })
       }
 
       // 4. 如果是门店范围权限，验证 store_id 访问权限
@@ -916,11 +1050,13 @@ function requireMerchantPermission(capability, options = {}) {
         if (storeId) {
           const storeIdNum = parseInt(storeId, 10)
           if (isNaN(storeIdNum) || storeIdNum <= 0) {
-            return res.status(400).json({
-              success: false,
-              error: 'INVALID_STORE_ID',
-              message: 'store_id 必须是有效的正整数'
-            })
+            return res.apiError
+              ? res.apiError('store_id 必须是有效的正整数', 'INVALID_STORE_ID', null, 400)
+              : res.status(400).json({
+                  success: false,
+                  code: 'INVALID_STORE_ID',
+                  message: 'store_id 必须是有效的正整数'
+                })
           }
 
           // 验证用户是否在该门店在职
@@ -929,11 +1065,13 @@ function requireMerchantPermission(capability, options = {}) {
             logger.warn(
               `🚫 [Auth] 门店访问被拒绝: user_id=${req.user.user_id}, store_id=${storeIdNum}`
             )
-            return res.status(403).json({
-              success: false,
-              error: 'STORE_ACCESS_DENIED',
-              message: '您不是该门店的在职员工，无法执行此操作'
-            })
+            return res.apiForbidden
+              ? res.apiForbidden('您不是该门店的在职员工，无法执行此操作', 'STORE_ACCESS_DENIED')
+              : res.status(403).json({
+                  success: false,
+                  code: 'STORE_ACCESS_DENIED',
+                  message: '您不是该门店的在职员工，无法执行此操作'
+                })
           }
 
           // 将验证过的 store_id 挂载到请求对象
@@ -950,11 +1088,13 @@ function requireMerchantPermission(capability, options = {}) {
       next()
     } catch (error) {
       logger.error('❌ 商家权限检查失败:', error.message)
-      return res.status(500).json({
-        success: false,
-        error: 'MERCHANT_PERMISSION_CHECK_FAILED',
-        message: '商家权限验证失败'
-      })
+      return res.apiError
+        ? res.apiError('商家权限验证失败', 'MERCHANT_PERMISSION_CHECK_FAILED', null, 500)
+        : res.status(500).json({
+            success: false,
+            code: 'MERCHANT_PERMISSION_CHECK_FAILED',
+            message: '商家权限验证失败'
+          })
     }
   }
 }
@@ -998,6 +1138,7 @@ module.exports = {
   requireAdmin,
   requireRole, // 🆕 角色检查中间件（支持多角色 + 读写权限区分）
   requirePermission,
+  requireMerchantDomainAccess, // 🆕 商家域准入中间件（AC1.4 域边界隔离）
   requireMerchantPermission, // 🆕 商家权限检查中间件（支持门店范围隔离）
   getUserStores, // 🆕 获取用户所属门店列表
   isUserActiveInStore, // 🆕 检查用户是否在指定门店在职

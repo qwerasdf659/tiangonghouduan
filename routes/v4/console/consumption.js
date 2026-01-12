@@ -1,12 +1,17 @@
 /**
- * 消费记录管理模块 - 管理员审核
+ * 消费记录管理模块 - 管理员审核（Console 域）
  *
- * @route /api/v4/shop/consumption
- * @description 管理员审核消费记录（通过/拒绝）
+ * @route /api/v4/console/consumption
+ * @description 平台管理员审核消费记录（通过/拒绝）
+ *
+ * 📌 域边界说明（2026-01-12 商家员工域权限体系升级 AC1.4）：
+ * - 此模块属于 console 域，仅限 admin（role_level >= 100）访问
+ * - 商家员工（merchant_staff/merchant_manager）使用 /api/v4/shop/* 提交和查询消费
+ * - 审核权限只开放给 admin，不开放 ops/区域经理（已确认）
  *
  * API列表：
  * - GET /pending - 管理员查询待审核的消费记录
- * - GET /admin/records - 管理员查询所有消费记录（支持筛选、搜索、统计）
+ * - GET /records - 管理员查询所有消费记录（支持筛选、搜索、统计）
  * - POST /approve/:record_id - 管理员审核通过消费记录
  * - POST /reject/:record_id - 管理员审核拒绝消费记录
  *
@@ -14,25 +19,30 @@
  * - 审核通过后自动奖励积分（1元=1分）
  * - 审核拒绝需要填写原因（5-500字符）
  *
- * 创建时间：2025年12月22日
- * 从consumption.js拆分而来
+ * 创建时间：2026年01月12日
+ * 迁移说明：从 routes/v4/shop/consumption/review.js 迁移至 console 域
  */
 
 const express = require('express')
 const router = express.Router()
-const { authenticateToken, requireAdmin } = require('../../../../middleware/auth')
-const { handleServiceError } = require('../../../../middleware/validation')
-const logger = require('../../../../utils/logger').logger
-const BeijingTimeHelper = require('../../../../utils/timeHelper')
-const TransactionManager = require('../../../../utils/TransactionManager')
+const { authenticateToken, requireAdmin } = require('../../../middleware/auth')
+const { handleServiceError } = require('../../../middleware/validation')
+const logger = require('../../../utils/logger').logger
+const BeijingTimeHelper = require('../../../utils/timeHelper')
+const TransactionManager = require('../../../utils/TransactionManager')
 
 /**
- * @route GET /api/v4/shop/consumption/pending
+ * @route GET /api/v4/console/consumption/pending
  * @desc 管理员查询待审核的消费记录
- * @access Private (管理员)
+ * @access Private (管理员，role_level >= 100)
  *
  * @query {number} page - 页码（默认1）
  * @query {number} page_size - 每页数量（默认20，最大100）
+ *
+ * @returns {Object} {
+ *   records: Array - 待审核记录列表
+ *   pagination: Object - 分页信息
+ * }
  */
 router.get('/pending', authenticateToken, requireAdmin, async (req, res) => {
   try {
@@ -65,14 +75,15 @@ router.get('/pending', authenticateToken, requireAdmin, async (req, res) => {
 })
 
 /**
- * @route GET /api/v4/shop/consumption/admin/records
+ * @route GET /api/v4/console/consumption/records
  * @desc 管理员查询所有消费记录（支持筛选、搜索、统计）
- * @access Private (管理员)
+ * @access Private (管理员，role_level >= 100)
  *
  * @query {number} page - 页码（默认1）
  * @query {number} page_size - 每页数量（默认20，最大100）
  * @query {string} status - 状态筛选（pending/approved/rejected/all，默认all）
  * @query {string} search - 搜索关键词（手机号、用户昵称）
+ * @query {number} store_id - 门店ID筛选（可选）
  *
  * @returns {Object} {
  *   records: Array - 消费记录列表
@@ -80,19 +91,20 @@ router.get('/pending', authenticateToken, requireAdmin, async (req, res) => {
  *   statistics: Object - 统计数据（待审核、今日审核、通过、拒绝）
  * }
  */
-router.get('/admin/records', authenticateToken, requireAdmin, async (req, res) => {
+router.get('/records', authenticateToken, requireAdmin, async (req, res) => {
   try {
     // 🔄 通过 ServiceManager 获取 ConsumptionService（符合TR-005规范）
     const ConsumptionService = req.app.locals.services.getService('consumption')
 
-    const { page = 1, page_size = 20, status = 'all', search = '' } = req.query
+    const { page = 1, page_size = 20, status = 'all', search = '', store_id } = req.query
 
     logger.info('管理员查询消费记录', {
       admin_id: req.user.user_id,
       page,
       page_size,
       status,
-      search
+      search,
+      store_id
     })
 
     // 调用服务层查询
@@ -100,7 +112,8 @@ router.get('/admin/records', authenticateToken, requireAdmin, async (req, res) =
       page: parseInt(page),
       page_size: parseInt(page_size),
       status,
-      search
+      search,
+      store_id: store_id ? parseInt(store_id) : undefined
     })
 
     return res.apiSuccess(result, '查询成功')
@@ -111,9 +124,9 @@ router.get('/admin/records', authenticateToken, requireAdmin, async (req, res) =
 })
 
 /**
- * @route POST /api/v4/shop/consumption/approve/:record_id
+ * @route POST /api/v4/console/consumption/approve/:record_id
  * @desc 管理员审核通过消费记录
- * @access Private (管理员)
+ * @access Private (管理员，role_level >= 100)
  *
  * @param {number} record_id - 消费记录ID
  * @body {string} admin_notes - 审核备注（可选）
@@ -126,7 +139,7 @@ router.get('/admin/records', authenticateToken, requireAdmin, async (req, res) =
  * @returns {string} data.reviewed_at - 审核时间（北京时间）
  *
  * @example
- * POST /api/v4/shop/consumption/approve/123
+ * POST /api/v4/console/consumption/approve/123
  * {
  *   "admin_notes": "核实无误，审核通过"
  * }
@@ -146,7 +159,7 @@ router.post('/approve/:record_id', authenticateToken, requireAdmin, async (req, 
     })
 
     // 使用 TransactionManager 统一事务边界（符合治理决策）
-    const result = await TransactionManager.execute(async (transaction) => {
+    const result = await TransactionManager.execute(async transaction => {
       return await ConsumptionService.approveConsumption(parseInt(record_id), {
         reviewer_id: reviewerId,
         admin_notes,
@@ -181,9 +194,9 @@ router.post('/approve/:record_id', authenticateToken, requireAdmin, async (req, 
 })
 
 /**
- * @route POST /api/v4/shop/consumption/reject/:record_id
+ * @route POST /api/v4/console/consumption/reject/:record_id
  * @desc 管理员审核拒绝消费记录
- * @access Private (管理员)
+ * @access Private (管理员，role_level >= 100)
  *
  * @param {number} record_id - 消费记录ID
  * @body {string} admin_notes - 拒绝原因（必填，5-500字符）
@@ -195,7 +208,7 @@ router.post('/approve/:record_id', authenticateToken, requireAdmin, async (req, 
  * @returns {string} data.reviewed_at - 审核时间（北京时间）
  *
  * @example
- * POST /api/v4/shop/consumption/reject/123
+ * POST /api/v4/console/consumption/reject/123
  * {
  *   "admin_notes": "消费金额与实际不符"
  * }
@@ -225,7 +238,7 @@ router.post('/reject/:record_id', authenticateToken, requireAdmin, async (req, r
     })
 
     // 使用 TransactionManager 统一事务边界（符合治理决策）
-    const result = await TransactionManager.execute(async (transaction) => {
+    const result = await TransactionManager.execute(async transaction => {
       return await ConsumptionService.rejectConsumption(parseInt(record_id), {
         reviewer_id: reviewerId,
         admin_notes,

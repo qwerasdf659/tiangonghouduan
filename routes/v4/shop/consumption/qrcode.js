@@ -269,7 +269,6 @@ router.get(
           user_agent: req.headers['user-agent'],
           result: 'success',
           extra_data: {
-            qr_code_version: 'v2',
             user_uuid: userInfo.user_uuid
           }
         })

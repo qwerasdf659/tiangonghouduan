@@ -364,8 +364,6 @@ class ConsumptionService {
         points_to_award: pointsToAward,
         status: 'pending', // 待审核状态（Pending Status - Waiting for Admin Review）
         qr_code: data.qr_code,
-        qr_code_version: 'v2', // ✅ v2动态码（商家员工域权限体系升级 - 2026-01-12）
-        is_legacy_v1: false, // ✅ 非历史遗留数据
         idempotency_key, // ✅ 幂等键（业界标准形态）
         merchant_notes: data.merchant_notes || null,
         created_at: BeijingTimeHelper.createDatabaseTime(),
@@ -1350,21 +1348,33 @@ class ConsumptionService {
    * 软删除消费记录（Soft Delete Consumption Record）
    *
    * @description 标记消费记录为已删除，不物理删除数据
+   *
+   * 事务边界（2026-01-12 TS2.2 治理）：
+   * - 支持外部事务传入（options.transaction）
+   * - 如果未提供事务，则在无事务环境下执行（单表操作，风险较低）
+   * - 建议调用方使用 TransactionManager.execute() 包裹，确保审计日志和业务操作的原子性
+   *
    * @param {number} recordId - 消费记录ID
    * @param {number} userId - 操作用户ID（用于权限验证）
    * @param {Object} options - 选项
-   * @param {boolean} options.isAdmin - 是否为管理员操作
-   * @param {number} options.roleLevel - 用户角色级别（用于权限判断）
+   * @param {boolean} [options.isAdmin=false] - 是否为管理员操作
+   * @param {number} [options.roleLevel=0] - 用户角色级别（用于权限判断）
+   * @param {Object} [options.transaction] - Sequelize事务对象（可选）
    * @returns {Promise<Object>} 删除结果
    * @throws {Error} 记录不存在、无权限、已删除、状态不允许等
+   *
+   * @since 2026-01-12 支持事务边界（TS2.2）
    */
   static async softDeleteRecord(recordId, userId, options = {}) {
-    const { isAdmin = false, roleLevel = 0 } = options
+    const { isAdmin = false, roleLevel = 0, transaction } = options
 
     logger.info('软删除消费记录', { record_id: recordId, user_id: userId, is_admin: isAdmin })
 
-    // 查询记录
-    const record = await ConsumptionRecord.findByPk(recordId)
+    // 查询记录（支持事务锁定）
+    const record = await ConsumptionRecord.findByPk(recordId, {
+      transaction,
+      lock: transaction ? transaction.LOCK.UPDATE : undefined
+    })
 
     if (!record) {
       throw new Error('消费记录不存在')
@@ -1389,10 +1399,13 @@ class ConsumptionService {
 
     // 执行软删除
     const deletedAt = BeijingTimeHelper.createDatabaseTime()
-    await record.update({
-      is_deleted: 1,
-      deleted_at: deletedAt
-    })
+    await record.update(
+      {
+        is_deleted: 1,
+        deleted_at: deletedAt
+      },
+      { transaction }
+    )
 
     logger.info('软删除消费记录成功', {
       record_id: recordId,
@@ -1413,31 +1426,51 @@ class ConsumptionService {
    * 恢复已删除的消费记录（Restore Deleted Consumption Record）
    *
    * @description 管理员恢复已软删除的消费记录
+   *
+   * 事务边界（2026-01-12 TS2.2 治理）：
+   * - 支持外部事务传入（options.transaction）
+   * - 如果未提供事务，则在无事务环境下执行（单表操作，风险较低）
+   * - 建议调用方使用 TransactionManager.execute() 包裹，确保审计日志和业务操作的原子性
+   *
    * @param {number} recordId - 消费记录ID
    * @param {number} adminId - 管理员用户ID
+   * @param {Object} [options={}] - 选项
+   * @param {Object} [options.transaction] - Sequelize事务对象（可选）
    * @returns {Promise<Object>} 恢复结果
    * @throws {Error} 记录不存在、未删除等
+   *
+   * @since 2026-01-12 支持事务边界（TS2.2）
    */
-  static async restoreRecord(recordId, adminId) {
+  static async restoreRecord(recordId, adminId, options = {}) {
+    const { transaction } = options
+
     logger.info('管理员恢复消费记录', { record_id: recordId, admin_id: adminId })
 
-    // 查询记录（包含已删除的）
-    const record = await this.getRecordById(recordId, { includeDeleted: true })
+    // 查询记录（包含已删除的，支持事务锁定）
+    const record = await ConsumptionRecord.findByPk(recordId, {
+      where: { is_deleted: 1 }, // 明确查询已删除的记录
+      transaction,
+      lock: transaction ? transaction.LOCK.UPDATE : undefined,
+      paranoid: false // 查询已删除的记录
+    })
 
     if (!record) {
+      // 如果通过 paranoid 没查到，尝试常规查询判断是否存在但未删除
+      const existingRecord = await ConsumptionRecord.findByPk(recordId, { transaction })
+      if (existingRecord) {
+        throw new Error('该消费记录未被删除，无需恢复')
+      }
       throw new Error('消费记录不存在')
     }
 
-    // 检查是否已删除
-    if (record.is_deleted === 0) {
-      throw new Error('该消费记录未被删除，无需恢复')
-    }
-
     // 恢复记录
-    await record.update({
-      is_deleted: 0,
-      deleted_at: null
-    })
+    await record.update(
+      {
+        is_deleted: 0,
+        deleted_at: null
+      },
+      { transaction }
+    )
 
     logger.info('管理员恢复消费记录成功', {
       record_id: recordId,
