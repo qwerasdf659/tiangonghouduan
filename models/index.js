@@ -278,13 +278,24 @@ models.MerchantOperationLog = require('./MerchantOperationLog')(sequelize, DataT
  */
 
 // 🔴 层级化角色权限管理系统（2025年11月07日新增）
+models.AdministrativeRegion = require('./AdministrativeRegion')(sequelize, DataTypes)
+/*
+ * ✅ AdministrativeRegion：行政区划字典（2026-01-12 新增）
+ *    - 用途：标准化的省市区街道行政区划数据字典，支持四级级联选择
+ *    - 特点：GB/T 2260标准代码、层级结构（省→市→区县→街道）、拼音搜索
+ *    - 表名：administrative_regions，主键：region_code
+ *    - 业务场景：门店管理时的省市区街道级联选择、按区域维度统计
+ *    - 数据来源：GitHub modood/Administrative-divisions-of-China
+ */
+
 models.Store = require('./Store')(sequelize, DataTypes)
 /*
- * ✅ Store：门店信息管理
+ * ✅ Store：门店信息管理（2026-01-12 升级：新增省市区街道字段）
  *    - 用途：记录合作商家门店信息，用于业务员分派和消费记录关联
- *    - 特点：门店名称、编号、地址、联系人、所属区域、分配业务员
+ *    - 特点：门店名称、编号、地址、联系人、省市区街道级联、分配业务员
  *    - 表名：stores，主键：store_id
  *    - 业务场景：区域负责人创建门店→分配业务经理→业务员负责门店消费记录录入
+ *    - 更新：2026-01-12 删除 region 字段，新增 8 个行政区划字段（code + name 冗余设计）
  */
 
 models.UserHierarchy = require('./UserHierarchy')(sequelize, DataTypes)

@@ -9,22 +9,25 @@
  * - 门店列表查询（支持分页、筛选）
  * - 门店详情查询
  * - 门店状态管理（激活/停用）
+ * - 省市区街道级联选择（四级行政区划）
  *
  * 技术特性：
  * - 静态方法设计（符合项目规范）
  * - 事务支持（通过 options.transaction）
  * - 完整的数据验证
  * - 北京时间统一处理
+ * - 行政区划代码校验和自动填充名称
  *
  * @since 2026-01-12
- * @see docs/商家员工域权限体系升级方案.md - P1 门店数据维护入口
+ * @updated 2026-01-12 新增省市区街道字段支持（8个）
+ * @see docs/省市区级联选择功能设计方案.md
  */
 
 'use strict'
 
 const { Op } = require('sequelize')
 const { sequelize } = require('../models')
-const { Store, User, StoreStaff } = require('../models')
+const { Store, User, StoreStaff, AdministrativeRegion } = require('../models')
 const BeijingTimeHelper = require('../utils/timeHelper')
 const logger = require('../utils/logger').logger
 
@@ -46,10 +49,13 @@ class StoreService {
    * @param {Object} storeData - 门店数据
    * @param {string} storeData.store_name - 门店名称（必填）
    * @param {string} [storeData.store_code] - 门店编号（可选，系统自动生成）
-   * @param {string} [storeData.store_address] - 门店地址
+   * @param {string} [storeData.store_address] - 门店详细地址
    * @param {string} [storeData.contact_name] - 联系人姓名
    * @param {string} [storeData.contact_mobile] - 联系电话
-   * @param {string} [storeData.region] - 所属区域
+   * @param {string} storeData.province_code - 省级区划代码（必填）
+   * @param {string} storeData.city_code - 市级区划代码（必填）
+   * @param {string} storeData.district_code - 区县级区划代码（必填）
+   * @param {string} storeData.street_code - 街道级区划代码（必填）
    * @param {string} [storeData.status='pending'] - 门店状态（active/inactive/pending）
    * @param {number} [storeData.assigned_to] - 分配给哪个业务员
    * @param {number} [storeData.merchant_id] - 商户ID
@@ -58,23 +64,31 @@ class StoreService {
    * @param {number} options.operator_id - 操作者ID（必填）
    * @param {Transaction} [options.transaction] - 事务对象
    * @returns {Promise<Object>} 创建结果
-   * @throws {Error} 当门店名称为空或门店编号重复时
+   * @throws {Error} 当门店名称为空、门店编号重复或区划代码无效时
    */
   static async createStore(storeData, options = {}) {
     const { operator_id, transaction } = options
 
-    // 1. 数据验证
+    // 1. 数据验证 - 门店名称
     if (!storeData.store_name || storeData.store_name.trim() === '') {
       throw new Error('门店名称不能为空')
     }
 
-    // 2. 生成门店编号（如未提供）
+    // 2. 数据验证 - 行政区划（必填校验）
+    const regionValidation = await StoreService.validateAndFillRegionNames(storeData, {
+      transaction
+    })
+    if (!regionValidation.valid) {
+      throw new Error(`行政区划校验失败: ${regionValidation.errors.join(', ')}`)
+    }
+
+    // 3. 生成门店编号（如未提供）
     let storeCode = storeData.store_code
     if (!storeCode) {
       storeCode = await StoreService.generateStoreCode()
     }
 
-    // 3. 检查门店编号是否重复
+    // 4. 检查门店编号是否重复
     const existingStore = await Store.findOne({
       where: { store_code: storeCode },
       transaction
@@ -84,7 +98,7 @@ class StoreService {
       throw new Error(`门店编号 ${storeCode} 已存在`)
     }
 
-    // 4. 验证关联用户（如有）
+    // 5. 验证关联用户（如有）
     if (storeData.assigned_to) {
       const assignedUser = await User.findByPk(storeData.assigned_to, { transaction })
       if (!assignedUser) {
@@ -99,7 +113,7 @@ class StoreService {
       }
     }
 
-    // 5. 创建门店
+    // 6. 创建门店（使用校验后自动填充的名称）
     const store = await Store.create(
       {
         store_name: storeData.store_name.trim(),
@@ -107,7 +121,15 @@ class StoreService {
         store_address: storeData.store_address || null,
         contact_name: storeData.contact_name || null,
         contact_mobile: storeData.contact_mobile || null,
-        region: storeData.region || null,
+        // 行政区划字段（code + name）
+        province_code: regionValidation.names.province_code,
+        province_name: regionValidation.names.province_name,
+        city_code: regionValidation.names.city_code,
+        city_name: regionValidation.names.city_name,
+        district_code: regionValidation.names.district_code,
+        district_name: regionValidation.names.district_name,
+        street_code: regionValidation.names.street_code,
+        street_name: regionValidation.names.street_name,
         status: storeData.status || 'pending',
         assigned_to: storeData.assigned_to || null,
         merchant_id: storeData.merchant_id || null,
@@ -122,6 +144,7 @@ class StoreService {
       store_id: store.store_id,
       store_name: store.store_name,
       store_code: store.store_code,
+      region: `${store.province_name}${store.city_name}${store.district_name}${store.street_name}`,
       operator_id
     })
 
@@ -144,8 +167,11 @@ class StoreService {
    * @param {number} [queryParams.page=1] - 页码
    * @param {number} [queryParams.page_size=20] - 每页数量
    * @param {string} [queryParams.status] - 状态筛选（active/inactive/pending）
-   * @param {string} [queryParams.region] - 区域筛选
-   * @param {string} [queryParams.keyword] - 关键词搜索（门店名称/编号/联系人）
+   * @param {string} [queryParams.province_code] - 省级区划代码筛选
+   * @param {string} [queryParams.city_code] - 市级区划代码筛选
+   * @param {string} [queryParams.district_code] - 区县级区划代码筛选
+   * @param {string} [queryParams.street_code] - 街道级区划代码筛选
+   * @param {string} [queryParams.keyword] - 关键词搜索（门店名称/编号/联系人/地址）
    * @param {number} [queryParams.assigned_to] - 业务员筛选
    * @param {number} [queryParams.merchant_id] - 商户筛选
    * @param {Object} [options] - 选项
@@ -156,7 +182,10 @@ class StoreService {
       page = 1,
       page_size = 20,
       status,
-      region,
+      province_code,
+      city_code,
+      district_code,
+      street_code,
       keyword,
       assigned_to,
       merchant_id
@@ -171,8 +200,18 @@ class StoreService {
       where.status = status
     }
 
-    if (region) {
-      where.region = region
+    // 行政区划筛选（支持按省/市/区县/街道级别筛选）
+    if (province_code) {
+      where.province_code = province_code
+    }
+    if (city_code) {
+      where.city_code = city_code
+    }
+    if (district_code) {
+      where.district_code = district_code
+    }
+    if (street_code) {
+      where.street_code = street_code
     }
 
     if (assigned_to) {
@@ -187,7 +226,12 @@ class StoreService {
       where[Op.or] = [
         { store_name: { [Op.like]: `%${keyword}%` } },
         { store_code: { [Op.like]: `%${keyword}%` } },
-        { contact_name: { [Op.like]: `%${keyword}%` } }
+        { contact_name: { [Op.like]: `%${keyword}%` } },
+        { store_address: { [Op.like]: `%${keyword}%` } },
+        { province_name: { [Op.like]: `%${keyword}%` } },
+        { city_name: { [Op.like]: `%${keyword}%` } },
+        { district_name: { [Op.like]: `%${keyword}%` } },
+        { street_name: { [Op.like]: `%${keyword}%` } }
       ]
     }
 
@@ -323,7 +367,31 @@ class StoreService {
       }
     }
 
-    // 3. 验证关联用户（如有更新）
+    // 3. 行政区划校验（如有更新任一区划字段）
+    const regionFieldsToUpdate = ['province_code', 'city_code', 'district_code', 'street_code']
+    const hasRegionUpdate = regionFieldsToUpdate.some(field => updateData[field] !== undefined)
+
+    let regionNames = null
+    if (hasRegionUpdate) {
+      // 合并现有值和更新值
+      const regionCodes = {
+        province_code: updateData.province_code || store.province_code,
+        city_code: updateData.city_code || store.city_code,
+        district_code: updateData.district_code || store.district_code,
+        street_code: updateData.street_code || store.street_code
+      }
+
+      const regionValidation = await StoreService.validateAndFillRegionNames(regionCodes, {
+        transaction
+      })
+      if (!regionValidation.valid) {
+        throw new Error(`行政区划校验失败: ${regionValidation.errors.join(', ')}`)
+      }
+
+      regionNames = regionValidation.names
+    }
+
+    // 4. 验证关联用户（如有更新）
     if (updateData.assigned_to) {
       const assignedUser = await User.findByPk(updateData.assigned_to, { transaction })
       if (!assignedUser) {
@@ -338,14 +406,13 @@ class StoreService {
       }
     }
 
-    // 4. 构建更新字段
+    // 5. 构建更新字段
     const allowedFields = [
       'store_name',
       'store_code',
       'store_address',
       'contact_name',
       'contact_mobile',
-      'region',
       'status',
       'assigned_to',
       'merchant_id',
@@ -359,9 +426,21 @@ class StoreService {
       }
     })
 
+    // 更新行政区划字段（如有变更）
+    if (regionNames) {
+      updateFields.province_code = regionNames.province_code
+      updateFields.province_name = regionNames.province_name
+      updateFields.city_code = regionNames.city_code
+      updateFields.city_name = regionNames.city_name
+      updateFields.district_code = regionNames.district_code
+      updateFields.district_name = regionNames.district_name
+      updateFields.street_code = regionNames.street_code
+      updateFields.street_name = regionNames.street_name
+    }
+
     updateFields.updated_at = BeijingTimeHelper.createDatabaseTime()
 
-    // 5. 执行更新
+    // 6. 执行更新
     await store.update(updateFields, { transaction })
 
     logger.info('✅ 门店更新成功', {
@@ -370,7 +449,7 @@ class StoreService {
       operator_id
     })
 
-    // 6. 返回更新后的门店信息
+    // 7. 返回更新后的门店信息
     const updatedStore = await StoreService.getStoreById(store_id, { transaction })
 
     return {
@@ -461,6 +540,134 @@ class StoreService {
 
   /*
    * =================================================================
+   * 行政区划辅助方法
+   * =================================================================
+   */
+
+  /**
+   * 校验行政区划代码并自动填充名称
+   *
+   * @param {Object} codes - 区划代码对象
+   * @param {string} codes.province_code - 省级代码（必填）
+   * @param {string} codes.city_code - 市级代码（必填）
+   * @param {string} codes.district_code - 区县级代码（必填）
+   * @param {string} codes.street_code - 街道级代码（必填）
+   * @param {Object} [options] - 选项
+   * @returns {Promise<Object>} 校验结果 { valid: boolean, errors: string[], names: Object }
+   */
+  static async validateAndFillRegionNames(codes, options = {}) {
+    const { transaction } = options
+    const errors = []
+
+    // 必填字段检查
+    const requiredFields = [
+      { field: 'province_code', level: 1, name: '省级' },
+      { field: 'city_code', level: 2, name: '市级' },
+      { field: 'district_code', level: 3, name: '区县级' },
+      { field: 'street_code', level: 4, name: '街道级' }
+    ]
+
+    const validations = []
+    for (const { field, level, name } of requiredFields) {
+      if (!codes[field]) {
+        errors.push(`${name}区划代码不能为空`)
+      } else {
+        validations.push({ field, code: codes[field], level, name })
+      }
+    }
+
+    if (errors.length > 0) {
+      return { valid: false, errors, names: null }
+    }
+
+    // 并行查询所有区划
+    try {
+      const codeList = validations.map(v => v.code)
+      const regions = await AdministrativeRegion.findAll({
+        where: {
+          region_code: { [Op.in]: codeList },
+          status: 'active'
+        },
+        attributes: ['region_code', 'region_name', 'level', 'parent_code'],
+        transaction
+      })
+
+      const regionMap = new Map()
+      regions.forEach(r => {
+        regionMap.set(r.region_code, r)
+      })
+
+      // 校验每个代码是否存在且层级正确
+      const results = []
+      for (const v of validations) {
+        const region = regionMap.get(v.code)
+        if (!region) {
+          errors.push(`无效的${v.name}区划代码: ${v.code}`)
+        } else if (region.level !== v.level) {
+          errors.push(
+            `${v.name}区划代码 ${v.code} 层级不正确（期望层级 ${v.level}，实际层级 ${region.level}）`
+          )
+        } else {
+          results.push({ ...v, region })
+        }
+      }
+
+      if (errors.length > 0) {
+        return { valid: false, errors, names: null }
+      }
+
+      // 校验层级关系（省→市→区县→街道）
+      const provinceResult = results.find(r => r.field === 'province_code')
+      const cityResult = results.find(r => r.field === 'city_code')
+      const districtResult = results.find(r => r.field === 'district_code')
+      const streetResult = results.find(r => r.field === 'street_code')
+
+      // 校验市级的父级是省级
+      if (cityResult.region.parent_code !== provinceResult.code) {
+        errors.push(
+          `市级区划"${cityResult.region.region_name}"不属于省级区划"${provinceResult.region.region_name}"`
+        )
+      }
+
+      // 校验区县级的父级是市级
+      if (districtResult.region.parent_code !== cityResult.code) {
+        errors.push(
+          `区县级区划"${districtResult.region.region_name}"不属于市级区划"${cityResult.region.region_name}"`
+        )
+      }
+
+      // 校验街道级的父级是区县级
+      if (streetResult.region.parent_code !== districtResult.code) {
+        errors.push(
+          `街道级区划"${streetResult.region.region_name}"不属于区县级区划"${districtResult.region.region_name}"`
+        )
+      }
+
+      if (errors.length > 0) {
+        return { valid: false, errors, names: null }
+      }
+
+      // 返回有效的名称信息
+      const names = {
+        province_code: codes.province_code,
+        province_name: provinceResult.region.region_name,
+        city_code: codes.city_code,
+        city_name: cityResult.region.region_name,
+        district_code: codes.district_code,
+        district_name: districtResult.region.region_name,
+        street_code: codes.street_code,
+        street_name: streetResult.region.region_name
+      }
+
+      return { valid: true, errors: [], names }
+    } catch (error) {
+      logger.error('行政区划校验失败', { codes, error: error.message })
+      throw error
+    }
+  }
+
+  /*
+   * =================================================================
    * 辅助方法
    * =================================================================
    */
@@ -509,7 +716,31 @@ class StoreService {
       store_address: store.store_address,
       contact_name: store.contact_name,
       contact_mobile: store.contact_mobile,
-      region: store.region,
+      // 行政区划信息
+      province_code: store.province_code,
+      province_name: store.province_name,
+      city_code: store.city_code,
+      city_name: store.city_name,
+      district_code: store.district_code,
+      district_name: store.district_name,
+      street_code: store.street_code,
+      street_name: store.street_name,
+      // 完整地区显示名称
+      full_region_name: [
+        store.province_name,
+        store.city_name,
+        store.district_name,
+        store.street_name
+      ]
+        .filter(Boolean)
+        .join(' '),
+      // 级联选择器回显用的代码数组
+      region_codes: [
+        store.province_code,
+        store.city_code,
+        store.district_code,
+        store.street_code
+      ].filter(Boolean),
       status: store.status,
       status_name: StoreService.getStatusName(store.status),
       assigned_to: store.assigned_to,
@@ -556,21 +787,6 @@ class StoreService {
   }
 
   /**
-   * 获取所有可用区域列表
-   *
-   * @returns {Promise<Array<string>>} 区域列表
-   */
-  static async getRegions() {
-    const regions = await Store.findAll({
-      attributes: [[sequelize.fn('DISTINCT', sequelize.col('region')), 'region']],
-      where: { region: { [Op.ne]: null } },
-      order: [['region', 'ASC']]
-    })
-
-    return regions.map(r => r.region).filter(Boolean)
-  }
-
-  /**
    * 统计门店数据
    *
    * @returns {Promise<Object>} 统计结果
@@ -595,6 +811,34 @@ class StoreService {
     })
 
     return result
+  }
+
+  /**
+   * 按区域统计门店数量
+   *
+   * @param {string} [level='province'] - 统计级别（province/city/district/street）
+   * @returns {Promise<Array>} 区域统计结果
+   */
+  static async getStoreStatsByRegion(level = 'province') {
+    const codeField = `${level}_code`
+    const nameField = `${level}_name`
+
+    const stats = await Store.findAll({
+      attributes: [
+        codeField,
+        nameField,
+        [sequelize.fn('COUNT', sequelize.col('store_id')), 'count']
+      ],
+      where: { status: 'active' },
+      group: [codeField, nameField],
+      order: [[sequelize.fn('COUNT', sequelize.col('store_id')), 'DESC']]
+    })
+
+    return stats.map(stat => ({
+      code: stat.get(codeField),
+      name: stat.get(nameField),
+      count: parseInt(stat.get('count'), 10)
+    }))
   }
 }
 

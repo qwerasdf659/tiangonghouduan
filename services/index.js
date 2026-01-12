@@ -77,6 +77,7 @@ const MerchantPointsService = require('./MerchantPointsService') // 商家积分
 // 商家员工域权限体系升级服务（2026-01-12）
 const StaffManagementService = require('./StaffManagementService') // 员工管理服务
 const StoreService = require('./StoreService') // 门店管理服务（P1 门店数据维护入口）
+const RegionService = require('./RegionService') // 行政区划服务（省市区级联选择）
 
 // P1-9 新增注册的服务（2026-01-09）
 const DataSanitizer = require('./DataSanitizer') // 统一数据脱敏服务
@@ -341,6 +342,7 @@ class ServiceManager {
 
       this._services.set('staff_management', StaffManagementService) // 员工管理服务
       this._services.set('store', StoreService) // 门店管理服务（P1 门店数据维护入口）
+      this._services.set('RegionService', new RegionService(this.models)) // 行政区划服务（省市区级联选择，需实例化）
 
       // ========== P1-9 新增服务（2026-01-09） ==========
 
