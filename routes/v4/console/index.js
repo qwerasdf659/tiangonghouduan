@@ -34,6 +34,9 @@ const userHierarchyRoutes = require('./user-hierarchy') // 🆕 用户层级管�
 const consumptionRoutes = require('./consumption') // 🆕 消费记录审核管理（2026-01-12 商家员工域权限体系升级 AC1.4）
 const storesRoutes = require('./stores') // 🆕 门店管理（2026-01-12 P1 门店数据维护入口）
 const regionsRoutes = require('./regions') // 🆕 行政区划管理（2026-01-12 省市区级联选择）
+const staffRoutes = require('./staff') // 🆕 员工管理（2026-01-12 商家员工域权限体系升级 Phase 3）
+const auditLogsRoutes = require('./audit-logs') // 🆕 商家操作审计日志（2026-01-12 商家员工域权限体系升级 AC4.3）
+const riskAlertsRoutes = require('./risk-alerts') // 🆕 风控告警管理（2026-01-12 商家员工域权限体系升级 AC5）
 
 // 挂载子模块路由
 router.use('/auth', authRoutes)
@@ -59,6 +62,9 @@ router.use('/user-hierarchy', userHierarchyRoutes) // 🆕 用户层级管理路
 router.use('/consumption', consumptionRoutes) // 🆕 消费记录审核管理路由（2026-01-12 商家员工域权限体系升级 AC1.4）
 router.use('/stores', storesRoutes) // 🆕 门店管理路由（2026-01-12 P1 门店数据维护入口）
 router.use('/regions', regionsRoutes) // 🆕 行政区划管理路由（2026-01-12 省市区级联选择）
+router.use('/staff', staffRoutes) // 🆕 员工管理路由（2026-01-12 商家员工域权限体系升级 Phase 3）
+router.use('/audit-logs', auditLogsRoutes) // 🆕 商家操作审计日志路由（2026-01-12 商家员工域权限体系升级 AC4.3）
+router.use('/risk-alerts', riskAlertsRoutes) // 🆕 风控告警管理路由（2026-01-12 商家员工域权限体系升级 AC5）
 
 /**
  * GET / - Admin API根路径信息
@@ -292,6 +298,45 @@ router.get('/', (req, res) => {
           '/regions/validate'
         ],
         note: '省市区街道四级行政区划查询，用于门店管理时的级联选择器；仅限 admin 访问'
+      },
+      staff: {
+        description: '员工管理（2026-01-12 商家员工域权限体系升级）',
+        endpoints: [
+          '/staff',
+          '/staff/stats',
+          '/staff/:store_staff_id',
+          '/staff/by-user/:user_id',
+          '/staff/transfer',
+          '/staff/:store_staff_id/role',
+          '/staff/disable/:user_id',
+          '/staff/enable'
+        ],
+        note: '商家员工管理：员工入职/调店/离职/禁用/角色变更；仅限 admin（role_level >= 100）访问'
+      },
+      audit_logs: {
+        description: '商家操作审计日志（2026-01-12 商家员工域权限体系升级 AC4.3）',
+        endpoints: [
+          '/audit-logs',
+          '/audit-logs/:merchant_log_id',
+          '/audit-logs/stats/store/:store_id',
+          '/audit-logs/stats/operator/:operator_id',
+          '/audit-logs/cleanup',
+          '/audit-logs/operation-types'
+        ],
+        note: '商家域审计日志查询、统计、清理（保留180天）；仅限 admin（role_level >= 100）访问'
+      },
+      risk_alerts: {
+        description: '风控告警管理（2026-01-12 商家员工域权限体系升级 AC5）',
+        endpoints: [
+          '/risk-alerts',
+          '/risk-alerts/pending',
+          '/risk-alerts/:alert_id',
+          '/risk-alerts/:alert_id/review',
+          '/risk-alerts/stats/summary',
+          '/risk-alerts/stats/store/:store_id',
+          '/risk-alerts/types'
+        ],
+        note: '风控告警查询、复核、统计；支持频次阻断、金额告警、关联告警；仅限 admin 访问'
       }
       // ⚠️ campaign_permissions模块暂未实现，待实现后再添加到此列表
     },

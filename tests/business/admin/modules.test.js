@@ -53,7 +53,7 @@ describe('GET /api/v4/console/ - 管理员模块信息API', () => {
     const { modules } = response.body.data
 
     const moduleCount = Object.keys(modules).length
-    expect(moduleCount).toBe(21) // 实际挂载的路由数量（2026-01-09：新增1个模块）
+    expect(moduleCount).toBe(27) // 实际挂载的路由数量（2026-01-12：商家员工域权限体系升级新增6个模块）
 
     // 验证必需的模块是否存在（原有8个）
     expect(modules).toHaveProperty('auth')

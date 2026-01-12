@@ -25,6 +25,7 @@ const { authenticateToken, requireMerchantPermission } = require('../../../../mi
 const { handleServiceError } = require('../../../../middleware/validation')
 const logger = require('../../../../utils/logger').logger
 const MerchantRiskControlService = require('../../../../services/MerchantRiskControlService')
+const TransactionManager = require('../../../../utils/TransactionManager')
 const { RiskAlert, User, Store, ConsumptionRecord } = require('../../../../models')
 const { Op } = require('sequelize')
 const BeijingTimeHelper = require('../../../../utils/timeHelper')
@@ -257,11 +258,21 @@ router.post(
         }
       }
 
-      const result = await MerchantRiskControlService.updateAlertStatus(alertId, {
-        status: 'reviewed',
-        reviewer_id: req.user.user_id,
-        review_notes
-      })
+      // 使用 TransactionManager 统一事务边界（TS2.2）
+      const result = await TransactionManager.execute(
+        async transaction => {
+          return await MerchantRiskControlService.updateAlertStatus(
+            alertId,
+            {
+              status: 'reviewed',
+              reviewer_id: req.user.user_id,
+              review_notes
+            },
+            { transaction }
+          )
+        },
+        { description: `复核告警 ${alertId}` }
+      )
 
       logger.info('✅ 风险告警已复核', {
         alert_id: alertId,
@@ -312,11 +323,21 @@ router.post(
         }
       }
 
-      const result = await MerchantRiskControlService.updateAlertStatus(alertId, {
-        status: 'ignored',
-        reviewer_id: req.user.user_id,
-        review_notes
-      })
+      // 使用 TransactionManager 统一事务边界（TS2.2）
+      const result = await TransactionManager.execute(
+        async transaction => {
+          return await MerchantRiskControlService.updateAlertStatus(
+            alertId,
+            {
+              status: 'ignored',
+              reviewer_id: req.user.user_id,
+              review_notes
+            },
+            { transaction }
+          )
+        },
+        { description: `忽略告警 ${alertId}` }
+      )
 
       logger.info('✅ 风险告警已忽略', {
         alert_id: alertId,

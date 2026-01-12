@@ -144,8 +144,12 @@ class MerchantDataManager {
           store_address: '【请填写】门店地址（如：北京市朝阳区XX路XX号）',
           contact_name: '【请填写】联系人姓名',
           contact_mobile: '【请填写】联系人手机号',
-          region: '【可选】所属区域（如：朝阳区）',
-          merchant_mobile: '【请填写】门店负责人手机号（需已注册）'
+          province_code: '【必填】省级行政区划代码（如：11 表示北京市）',
+          city_code: '【必填】市级行政区划代码（如：1101 表示北京市）',
+          district_code: '【必填】区县级行政区划代码（如：110105 表示朝阳区）',
+          street_code: '【必填】街道级行政区划代码（如：110105001 表示建外街道）',
+          merchant_mobile: '【请填写】门店负责人手机号（需已注册）',
+          _行政区划说明: '行政区划代码可通过 /api/v4/console/regions 接口查询'
         }
       ],
       staff_bindings: [
@@ -224,6 +228,42 @@ class MerchantDataManager {
             continue
           }
 
+          // 验证行政区划代码必填
+          const requiredRegionFields = [
+            'province_code',
+            'city_code',
+            'district_code',
+            'street_code'
+          ]
+          const missingFields = requiredRegionFields.filter(field => !storeData[field])
+          if (missingFields.length > 0) {
+            console.error(`   ❌ 缺少必填的行政区划代码: ${missingFields.join(', ')}`)
+            continue
+          }
+
+          // 查询行政区划名称（从字典表获取）
+          const [regionNames] = await sequelize.query(
+            `
+            SELECT region_code, region_name FROM administrative_regions
+            WHERE region_code IN (:province_code, :city_code, :district_code, :street_code)
+          `,
+            {
+              replacements: {
+                province_code: storeData.province_code,
+                city_code: storeData.city_code,
+                district_code: storeData.district_code,
+                street_code: storeData.street_code
+              },
+              transaction
+            }
+          )
+
+          const regionMap = new Map(regionNames.map(r => [r.region_code, r.region_name]))
+          const province_name = regionMap.get(storeData.province_code) || ''
+          const city_name = regionMap.get(storeData.city_code) || ''
+          const district_name = regionMap.get(storeData.district_code) || ''
+          const street_name = regionMap.get(storeData.street_code) || ''
+
           // 创建门店
           await Store.create(
             {
@@ -232,7 +272,14 @@ class MerchantDataManager {
               store_address: storeData.store_address,
               contact_name: storeData.contact_name,
               contact_mobile: storeData.contact_mobile,
-              region: storeData.region || null,
+              province_code: storeData.province_code,
+              province_name: province_name,
+              city_code: storeData.city_code,
+              city_name: city_name,
+              district_code: storeData.district_code,
+              district_name: district_name,
+              street_code: storeData.street_code,
+              street_name: street_name,
               merchant_id: merchantId,
               status: 'active'
             },
@@ -404,6 +451,36 @@ class MerchantDataManager {
         }
       }
 
+      // 验证行政区划代码必填
+      const requiredRegionFields = ['province_code', 'city_code', 'district_code', 'street_code']
+      const missingFields = requiredRegionFields.filter(field => !storeData[field])
+      if (missingFields.length > 0) {
+        throw new Error(`缺少必填的行政区划代码: ${missingFields.join(', ')}`)
+      }
+
+      // 查询行政区划名称（从字典表获取）
+      const [regionNames] = await sequelize.query(
+        `
+        SELECT region_code, region_name FROM administrative_regions
+        WHERE region_code IN (:province_code, :city_code, :district_code, :street_code)
+      `,
+        {
+          replacements: {
+            province_code: storeData.province_code,
+            city_code: storeData.city_code,
+            district_code: storeData.district_code,
+            street_code: storeData.street_code
+          },
+          transaction
+        }
+      )
+
+      const regionMap = new Map(regionNames.map(r => [r.region_code, r.region_name]))
+      const province_name = regionMap.get(storeData.province_code) || ''
+      const city_name = regionMap.get(storeData.city_code) || ''
+      const district_name = regionMap.get(storeData.district_code) || ''
+      const street_name = regionMap.get(storeData.street_code) || ''
+
       // 创建门店
       const store = await Store.create(
         {
@@ -412,7 +489,14 @@ class MerchantDataManager {
           store_address: storeData.store_address,
           contact_name: storeData.contact_name,
           contact_mobile: storeData.contact_mobile,
-          region: storeData.region,
+          province_code: storeData.province_code,
+          province_name: province_name,
+          city_code: storeData.city_code,
+          city_name: city_name,
+          district_code: storeData.district_code,
+          district_name: district_name,
+          street_code: storeData.street_code,
+          street_name: street_name,
           merchant_id: merchantId,
           status: 'active'
         },

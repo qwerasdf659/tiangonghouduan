@@ -10,7 +10,7 @@
  * - 审核通过后自动奖励积分（通过AssetService）
  *
  * 业务流程：
- * 1. 用户出示固定身份码（QR_{user_id}_{signature}）
+ * 1. 用户出示V2动态身份码（QRV2_{base64_payload}_{signature}，5分钟有效）
  * 2. 商家扫码录入消费金额和备注
  * 3. 系统创建消费记录（状态：pending）
  * 4. 管理员审核（通过content_review_records表）

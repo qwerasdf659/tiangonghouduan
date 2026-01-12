@@ -11,9 +11,9 @@
  * 3. 商家提交消费记录 POST /api/v4/shop/consumption/submit
  * 4. 用户查询消费记录 GET /api/v4/shop/consumption/user/:user_id
  * 5. 查询消费记录详情 GET /api/v4/shop/consumption/detail/:record_id
- * 6. 管理员查询待审核记录 GET /api/v4/shop/consumption/pending
- * 7. 管理员审核通过 POST /api/v4/shop/consumption/approve/:record_id
- * 8. 管理员审核拒绝 POST /api/v4/shop/consumption/reject/:record_id
+ * 6. 管理员查询待审核记录 GET /api/v4/console/consumption/pending
+ * 7. 管理员审核通过 POST /api/v4/console/consumption/approve/:record_id
+ * 8. 管理员审核拒绝 POST /api/v4/console/consumption/reject/:record_id
  *
  * 测试账号：13612227930 (既是普通用户也是管理员)
  * 数据库：restaurant_points_dev
@@ -408,12 +408,17 @@ describe('消费记录API测试套件', () => {
    * ================================
    */
   describe('管理员审核功能', () => {
-    test('GET /api/v4/shop/consumption/pending - 查询待审核消费记录', async () => {
+    test('GET /api/v4/console/consumption/pending - 查询待审核消费记录', async () => {
       console.log('\n👔 测试：管理员查询待审核记录')
 
+      /*
+       * 注意：待审核记录在 console 域而非 shop 域
+       * shop 域用于商家员工提交消费记录
+       * console 域用于管理员审核消费记录
+       */
       const response = await tester.make_authenticated_request(
         'GET',
-        '/api/v4/shop/consumption/pending',
+        '/api/v4/console/consumption/pending',
         { page: 1, page_size: 10 },
         'regular' // 测试账号既是用户也是管理员
       )
@@ -429,7 +434,7 @@ describe('消费记录API测试套件', () => {
       console.log(`✅ 查询成功，待审核记录: ${response.data.data.records.length} 条`)
     })
 
-    test('POST /api/v4/shop/consumption/approve/:record_id - 管理员审核通过', async () => {
+    test('POST /api/v4/console/consumption/approve/:record_id - 管理员审核通过', async () => {
       if (!test_record_id) {
         console.log('⚠️ 跳过：test_record_id未设置（前置测试未成功）')
         return
@@ -439,7 +444,7 @@ describe('消费记录API测试套件', () => {
 
       const response = await tester.make_authenticated_request(
         'POST',
-        `/api/v4/shop/consumption/approve/${test_record_id}`,
+        `/api/v4/console/consumption/approve/${test_record_id}`,
         { admin_notes: '测试审核通过，金额核实无误' },
         'regular' // 测试账号既是用户也是管理员
       )
@@ -457,7 +462,7 @@ describe('消费记录API测试套件', () => {
       console.log(`💰 新余额: ${response.data.data.new_balance}`)
     })
 
-    test('POST /api/v4/shop/consumption/approve/:record_id - 重复审核应该失败', async () => {
+    test('POST /api/v4/console/consumption/approve/:record_id - 重复审核应该失败', async () => {
       if (!test_record_id) {
         console.log('⚠️ 跳过：test_record_id未设置（前置测试未成功）')
         return
@@ -467,7 +472,7 @@ describe('消费记录API测试套件', () => {
 
       const response = await tester.make_authenticated_request(
         'POST',
-        `/api/v4/shop/consumption/approve/${test_record_id}`,
+        `/api/v4/console/consumption/approve/${test_record_id}`,
         { admin_notes: '重复审核测试' },
         'regular'
       )
@@ -519,7 +524,7 @@ describe('消费记录API测试套件', () => {
       }
     })
 
-    test('POST /api/v4/shop/consumption/reject/:record_id - 管理员审核拒绝', async () => {
+    test('POST /api/v4/console/consumption/reject/:record_id - 管理员审核拒绝', async () => {
       if (!reject_record_id) {
         console.log('⚠️ 跳过拒绝测试（无可用记录）')
         return
@@ -529,7 +534,7 @@ describe('消费记录API测试套件', () => {
 
       const response = await tester.make_authenticated_request(
         'POST',
-        `/api/v4/shop/consumption/reject/${reject_record_id}`,
+        `/api/v4/console/consumption/reject/${reject_record_id}`,
         { admin_notes: '测试审核拒绝：消费金额与实际不符' },
         'regular'
       )
@@ -548,7 +553,7 @@ describe('消费记录API测试套件', () => {
       }
     })
 
-    test('POST /api/v4/shop/consumption/reject/:record_id - 拒绝原因必填验证', async () => {
+    test('POST /api/v4/console/consumption/reject/:record_id - 拒绝原因必填验证', async () => {
       console.log('\n❌ 测试：拒绝原因必填验证')
 
       // 创建临时记录ID用于测试（使用不存在的ID）
@@ -556,7 +561,7 @@ describe('消费记录API测试套件', () => {
 
       const response = await tester.make_authenticated_request(
         'POST',
-        `/api/v4/shop/consumption/reject/${temp_record_id}`,
+        `/api/v4/console/consumption/reject/${temp_record_id}`,
         { admin_notes: '' }, // 空原因
         'regular'
       )

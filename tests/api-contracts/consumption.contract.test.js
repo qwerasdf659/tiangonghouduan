@@ -34,10 +34,15 @@ describe('消费记录API契约测试', () => {
     }
   })
 
-  describe('GET /api/v4/shop/consumption/admin/records', () => {
+  describe('GET /api/v4/console/consumption/records', () => {
+    /**
+     * 管理员消费记录查询API
+     * 域：控制台域（/console），而非商家域（/shop）
+     * 注意：管理员相关操作统一在console域
+     */
     it('应该返回标准的响应结构', async () => {
       const response = await request(app)
-        .get('/api/v4/shop/consumption/admin/records?page=1&page_size=20&status=all')
+        .get('/api/v4/console/consumption/records?page=1&page_size=20&status=all')
         .set('Authorization', `Bearer ${adminToken}`)
         .expect(200)
 
@@ -61,7 +66,7 @@ describe('消费记录API契约测试', () => {
 
     it('应该返回正确的分页结构', async () => {
       const response = await request(app)
-        .get('/api/v4/shop/consumption/admin/records?page=1&page_size=10')
+        .get('/api/v4/console/consumption/records?page=1&page_size=10')
         .set('Authorization', `Bearer ${adminToken}`)
         .expect(200)
 
@@ -83,7 +88,7 @@ describe('消费记录API契约测试', () => {
 
     it('应该返回正确的统计数据结构', async () => {
       const response = await request(app)
-        .get('/api/v4/shop/consumption/admin/records')
+        .get('/api/v4/console/consumption/records')
         .set('Authorization', `Bearer ${adminToken}`)
         .expect(200)
 
@@ -104,7 +109,7 @@ describe('消费记录API契约测试', () => {
 
     it('应该返回正确的记录结构', async () => {
       const response = await request(app)
-        .get('/api/v4/shop/consumption/admin/records?page=1&page_size=1')
+        .get('/api/v4/console/consumption/records?page=1&page_size=1')
         .set('Authorization', `Bearer ${adminToken}`)
         .expect(200)
 
@@ -136,7 +141,7 @@ describe('消费记录API契约测试', () => {
     it('应该正确处理状态筛选参数', async () => {
       // 测试pending状态
       const pendingResponse = await request(app)
-        .get('/api/v4/shop/consumption/admin/records?status=pending')
+        .get('/api/v4/console/consumption/records?status=pending')
         .set('Authorization', `Bearer ${adminToken}`)
         .expect(200)
 
@@ -147,7 +152,7 @@ describe('消费记录API契约测试', () => {
 
       // 测试all状态
       const allResponse = await request(app)
-        .get('/api/v4/shop/consumption/admin/records?status=all')
+        .get('/api/v4/console/consumption/records?status=all')
         .set('Authorization', `Bearer ${adminToken}`)
         .expect(200)
 
@@ -163,7 +168,7 @@ describe('消费记录API契约测试', () => {
 
     it('应该正确处理搜索参数', async () => {
       const response = await request(app)
-        .get('/api/v4/shop/consumption/admin/records?search=136')
+        .get('/api/v4/console/consumption/records?search=136')
         .set('Authorization', `Bearer ${adminToken}`)
         .expect(200)
 
@@ -178,14 +183,14 @@ describe('消费记录API契约测试', () => {
     })
 
     it('应该拒绝无权限的访问', async () => {
-      // 不带Token访问
-      await request(app).get('/api/v4/shop/consumption/admin/records').expect(401)
+      // 不带Token访问 - 管理员端点需要认证
+      await request(app).get('/api/v4/console/consumption/records').expect(401)
     })
 
     it('应该正确处理页码参数', async () => {
       // 测试第2页
       const response = await request(app)
-        .get('/api/v4/shop/consumption/admin/records?page=2&page_size=5')
+        .get('/api/v4/console/consumption/records?page=2&page_size=5')
         .set('Authorization', `Bearer ${adminToken}`)
         .expect(200)
 
@@ -197,7 +202,7 @@ describe('消费记录API契约测试', () => {
     it('应该限制最大页面大小', async () => {
       // 请求超过最大限制的页面大小
       const response = await request(app)
-        .get('/api/v4/shop/consumption/admin/records?page_size=200')
+        .get('/api/v4/console/consumption/records?page_size=200')
         .set('Authorization', `Bearer ${adminToken}`)
         .expect(200)
 
@@ -207,7 +212,7 @@ describe('消费记录API契约测试', () => {
 
     it('应该处理无效的状态参数', async () => {
       const response = await request(app)
-        .get('/api/v4/shop/consumption/admin/records?status=invalid_status')
+        .get('/api/v4/console/consumption/records?status=invalid_status')
         .set('Authorization', `Bearer ${adminToken}`)
         .expect(200)
 
@@ -216,15 +221,16 @@ describe('消费记录API契约测试', () => {
     })
   })
 
-  describe('POST /api/v4/shop/consumption/approve/:record_id', () => {
+  describe('POST /api/v4/console/consumption/approve/:record_id', () => {
     it('应该拒绝无权限的访问', async () => {
-      await request(app).post('/api/v4/shop/consumption/approve/1').expect(401)
+      // 注意：管理员审核功能在 console 域而非 shop 域
+      await request(app).post('/api/v4/console/consumption/approve/1').expect(401)
     })
 
     it('应该要求admin_notes参数（可选）', async () => {
       // 注意：这个测试可能会实际修改数据，建议使用测试数据库
       const response = await request(app)
-        .post('/api/v4/shop/consumption/approve/999999')
+        .post('/api/v4/console/consumption/approve/999999')
         .set('Authorization', `Bearer ${adminToken}`)
         .send({
           admin_notes: '测试审核备注'
@@ -237,14 +243,15 @@ describe('消费记录API契约测试', () => {
     })
   })
 
-  describe('POST /api/v4/shop/consumption/reject/:record_id', () => {
+  describe('POST /api/v4/console/consumption/reject/:record_id', () => {
     it('应该拒绝无权限的访问', async () => {
-      await request(app).post('/api/v4/shop/consumption/reject/1').expect(401)
+      // 注意：管理员审核功能在 console 域而非 shop 域
+      await request(app).post('/api/v4/console/consumption/reject/1').expect(401)
     })
 
     it('应该要求admin_notes参数（拒绝时建议填写）', async () => {
       const response = await request(app)
-        .post('/api/v4/shop/consumption/reject/999999')
+        .post('/api/v4/console/consumption/reject/999999')
         .set('Authorization', `Bearer ${adminToken}`)
         .send({
           admin_notes: '消费金额与实际不符'

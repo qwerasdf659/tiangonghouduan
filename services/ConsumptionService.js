@@ -188,7 +188,7 @@ class ConsumptionService {
    * - ✅ 完整的错误处理和日志记录（便于问题排查）
    *
    * @param {Object} data - 消费记录数据
-   * @param {string} data.qr_code - 用户二维码字符串（必填，格式: "QR_{user_id}_{signature}"）
+   * @param {string} data.qr_code - 用户V2动态二维码字符串（必填，格式: "QRV2_{base64_payload}_{signature}"）
    * @param {number} data.merchant_id - 商家ID（必填，Merchant ID - Required）
    * @param {number} data.consumption_amount - 消费金额，单位元（必填，>0，Consumption Amount in Yuan - Required）
    * @param {string} [data.merchant_notes] - 商家备注（可选，Merchant Notes - Optional）
@@ -1223,7 +1223,7 @@ class ConsumptionService {
    * 根据二维码获取用户信息（UUID版本）
    * 业务场景：管理员扫码后快速获取用户基本信息（昵称、手机号码）
    *
-   * @param {string} qrCode - 用户二维码（格式：QR_{user_uuid}_{signature}）
+   * @param {string} qrCode - 用户V2动态二维码（格式：QRV2_{base64_payload}_{signature}）
    * @returns {Object} 用户信息（user_id, user_uuid, nickname, mobile）
    * @throws {Error} 二维码验证失败或用户不存在
    *

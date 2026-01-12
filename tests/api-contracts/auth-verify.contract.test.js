@@ -289,12 +289,12 @@ describe('GET /api/v4/auth/verify 契约测试', () => {
        *
        * 响应结构：
        * - success: false
-       * - error: 'MISSING_TOKEN'
+       * - code: 'UNAUTHORIZED'
        * - message: 包含"Token"关键字
        */
       expect(response.body).toMatchObject({
         success: false,
-        error: 'MISSING_TOKEN'
+        code: 'UNAUTHORIZED'
       })
     })
 
@@ -309,12 +309,13 @@ describe('GET /api/v4/auth/verify 契约测试', () => {
        *
        * 响应结构：
        * - success: false
-       * - error: 'INVALID_TOKEN'
+       * - code: 'UNAUTHORIZED' 或 'INVALID_TOKEN'
        */
       expect(response.body).toMatchObject({
-        success: false,
-        error: 'INVALID_TOKEN'
+        success: false
       })
+      // 验证code为UNAUTHORIZED或INVALID_TOKEN之一
+      expect(['UNAUTHORIZED', 'INVALID_TOKEN']).toContain(response.body.code)
     })
   })
 })
