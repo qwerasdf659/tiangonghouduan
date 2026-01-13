@@ -13,7 +13,8 @@
  * - TransactionManager 根据 error.code 判断是否重试
  *
  * 创建时间：2026-01-09（P0-3 实施）
- * 版本：V4.5.0
+ * 更新时间：2026-01-13（架构决策4 - 添加消费域错误码）
+ * 版本：V4.6.0
  */
 
 'use strict'
@@ -40,6 +41,7 @@ const NON_RETRYABLE_ERROR_CODES = Object.freeze([
   'NOT_OWNER', // 非所有者
   'OWNERSHIP_REQUIRED', // 需要所有权
   'UNAUTHORIZED', // 未授权
+  'PERMISSION_STORE_MISMATCH', // 门店权限不匹配
 
   // ========== 参数相关（400）==========
   'INVALID_PARAMS', // 参数错误
@@ -66,14 +68,35 @@ const NON_RETRYABLE_ERROR_CODES = Object.freeze([
   'INVALID_ASSET_TYPE', // 无效资产类型
   'LISTING_LIMIT_EXCEEDED', // 挂牌数量超限
 
+  // ========== 消费域错误码（CONSUMPTION_*）2026-01-13 ==========
+  'CONSUMPTION_MISSING_USER_UUID', // 缺少用户UUID（必须由路由层传入）
+  'CONSUMPTION_MISSING_IDEMPOTENCY_KEY', // 缺少幂等键
+  'CONSUMPTION_USER_NOT_FOUND', // 消费用户不存在
+  'CONSUMPTION_INVALID_AMOUNT', // 消费金额无效
+  'CONSUMPTION_AMOUNT_EXCEEDED', // 消费金额超过上限
+  'CONSUMPTION_DUPLICATE_SUBMISSION', // 重复提交消费记录
+
+  // ========== 二维码域错误码（QRCODE_*）==========
+  'QRCODE_INVALID_FORMAT', // 二维码格式无效
+  'QRCODE_EXPIRED', // 二维码已过期
+  'QRCODE_REPLAY_DETECTED', // 二维码重放攻击检测
+  'QRCODE_SIGNATURE_INVALID', // 二维码签名无效
+
   // ========== 幂等相关（409）==========
   'DUPLICATE_REQUEST', // 重复请求
   'CONFLICT', // 资源冲突
   'IDEMPOTENCY_CONFLICT', // 幂等键冲突
+  'IDEMPOTENCY_KEY_CONFLICT', // 幂等键冲突（别名）
+  'IDEMPOTENCY_REQUEST_IN_PROGRESS', // 幂等请求处理中
 
   // ========== 事务边界相关（500 但不可重试）==========
   'TRANSACTION_REQUIRED', // 需要事务
-  'TRANSACTION_FINISHED' // 事务已完成
+  'TRANSACTION_FINISHED', // 事务已完成
+
+  // ========== 通用错误码（用于隐藏内部细节）==========
+  'INTERNAL_ERROR', // 服务器内部错误
+  'DATABASE_ERROR', // 数据库错误
+  'SERVICE_UNAVAILABLE' // 服务不可用
 ])
 
 /**
@@ -299,8 +322,29 @@ function getRetryStrategy(error) {
   }
 }
 
+/**
+ * 消费域错误码常量（架构决策4 - 2026-01-13）
+ *
+ * 用于 BusinessError 业务异常类的 code 参数
+ * 便于在代码中引用：ErrorCodes.CONSUMPTION_USER_NOT_FOUND
+ */
+const CONSUMPTION_MISSING_USER_UUID = 'CONSUMPTION_MISSING_USER_UUID'
+const CONSUMPTION_MISSING_IDEMPOTENCY_KEY = 'CONSUMPTION_MISSING_IDEMPOTENCY_KEY'
+const CONSUMPTION_USER_NOT_FOUND = 'CONSUMPTION_USER_NOT_FOUND'
+const CONSUMPTION_INVALID_AMOUNT = 'CONSUMPTION_INVALID_AMOUNT'
+const CONSUMPTION_AMOUNT_EXCEEDED = 'CONSUMPTION_AMOUNT_EXCEEDED'
+const CONSUMPTION_DUPLICATE_SUBMISSION = 'CONSUMPTION_DUPLICATE_SUBMISSION'
+
+/**
+ * 二维码域错误码常量
+ */
+const QRCODE_INVALID_FORMAT = 'QRCODE_INVALID_FORMAT'
+const QRCODE_EXPIRED = 'QRCODE_EXPIRED'
+const QRCODE_REPLAY_DETECTED = 'QRCODE_REPLAY_DETECTED'
+const QRCODE_SIGNATURE_INVALID = 'QRCODE_SIGNATURE_INVALID'
+
 module.exports = {
-  // 错误码常量
+  // 错误码数组（用于 TransactionManager 分类）
   NON_RETRYABLE_ERROR_CODES,
   RETRYABLE_ERROR_CODES,
   BUSINESS_ERROR_KEYWORDS,
@@ -311,5 +355,19 @@ module.exports = {
   isRetryableError,
   isBusinessErrorByMessage,
   isRetryableErrorByMessage,
-  getRetryStrategy
+  getRetryStrategy,
+
+  // ========== 消费域错误码常量（架构决策4）==========
+  CONSUMPTION_MISSING_USER_UUID,
+  CONSUMPTION_MISSING_IDEMPOTENCY_KEY,
+  CONSUMPTION_USER_NOT_FOUND,
+  CONSUMPTION_INVALID_AMOUNT,
+  CONSUMPTION_AMOUNT_EXCEEDED,
+  CONSUMPTION_DUPLICATE_SUBMISSION,
+
+  // ========== 二维码域错误码常量 ==========
+  QRCODE_INVALID_FORMAT,
+  QRCODE_EXPIRED,
+  QRCODE_REPLAY_DETECTED,
+  QRCODE_SIGNATURE_INVALID
 }

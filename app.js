@@ -84,16 +84,16 @@ app.use(
   helmet({
     contentSecurityPolicy: {
       directives: {
-        defaultSrc: ['\'self\''],
-        styleSrc: ['\'self\'', '\'unsafe-inline\'', 'https://cdn.jsdelivr.net', 'https://unpkg.com'],
-        scriptSrc: ['\'self\'', '\'unsafe-inline\'', 'https://unpkg.com', 'https://cdn.jsdelivr.net'],
-        imgSrc: ['\'self\'', 'data:', 'https:'],
-        baseUri: ['\'self\''],
-        fontSrc: ['\'self\'', 'https:', 'data:'],
-        formAction: ['\'self\''],
-        frameAncestors: ['\'self\''],
-        objectSrc: ['\'none\''],
-        scriptSrcAttr: ['\'none\''],
+        defaultSrc: ["'self'"],
+        styleSrc: ["'self'", "'unsafe-inline'", 'https://cdn.jsdelivr.net', 'https://unpkg.com'],
+        scriptSrc: ["'self'", "'unsafe-inline'", 'https://unpkg.com', 'https://cdn.jsdelivr.net'],
+        imgSrc: ["'self'", 'data:', 'https:'],
+        baseUri: ["'self'"],
+        fontSrc: ["'self'", 'https:', 'data:'],
+        formAction: ["'self'"],
+        frameAncestors: ["'self'"],
+        objectSrc: ["'none'"],
+        scriptSrcAttr: ["'none'"],
         upgradeInsecureRequests: []
       }
     }
@@ -749,34 +749,60 @@ app.use('*', (req, res) => {
  * app.use(apiStandardManager.createStandardizationMiddleware())
  */
 
-// 🔧 全局错误处理
+/**
+ * 🔧 全局错误处理
+ *
+ * 架构决策4（2026-01-13）：
+ * - BusinessError：使用业务错误码，details 仅日志记录，不返回给客户端
+ * - Sequelize 错误：隐藏内部细节，返回通用 DATABASE_ERROR
+ * - 其他错误：开发环境返回详细信息，生产环境隐藏
+ */
 app.use((error, req, res, _next) => {
+  const requestId = getRequestId(req)
+
+  // 🔐 记录完整错误信息到日志（包含 request_id 用于追踪）
   appLogger.error('全局错误处理', {
     error: error.message,
+    code: error.code,
+    statusCode: error.statusCode,
     stack: error.stack,
     url: req.url,
     method: req.method,
-    request_id: getRequestId(req)
+    request_id: requestId,
+    // 架构决策5：details 仅记录到日志，不返回给客户端
+    details: error.details || null
   })
 
-  // Sequelize错误处理
-  if (error.name === 'SequelizeError') {
+  // 🎯 BusinessError 处理（架构决策4）
+  if (error.name === 'BusinessError') {
+    const resp = ApiResponse.error(
+      error.message,
+      error.code,
+      null, // 架构决策4：details 不暴露给客户端
+      error.statusCode || 400
+    )
+    resp.request_id = requestId
+    return ApiResponse.send(res, resp)
+  }
+
+  // Sequelize错误处理（隐藏内部细节）
+  if (error.name === 'SequelizeError' || error.name?.startsWith('Sequelize')) {
     const resp = ApiResponse.error('数据库操作失败', 'DATABASE_ERROR', null, 500)
-    resp.request_id = getRequestId(req)
+    resp.request_id = requestId
     return ApiResponse.send(res, resp)
   }
 
   // JWT错误处理
   if (error.name === 'JsonWebTokenError') {
     const resp = ApiResponse.error('Token无效', 'INVALID_TOKEN', null, 401)
-    resp.request_id = getRequestId(req)
+    resp.request_id = requestId
     return ApiResponse.send(res, resp)
   }
 
   // 验证错误处理
   if (error.name === 'ValidationError') {
     const resp = ApiResponse.error(error.message, 'VALIDATION_ERROR', null, 400)
-    resp.request_id = getRequestId(req)
+    resp.request_id = requestId
     return ApiResponse.send(res, resp)
   }
 
@@ -787,7 +813,7 @@ app.use((error, req, res, _next) => {
     null,
     500
   )
-  resp.request_id = getRequestId(req)
+  resp.request_id = requestId
   return ApiResponse.send(res, resp)
 })
 

@@ -34,7 +34,7 @@ const express = require('express')
 const router = express.Router()
 const { authenticateToken, requireMerchantPermission } = require('../../../../middleware/auth')
 const { handleServiceError } = require('../../../../middleware/validation')
-const logger = require('../../../../utils/logger').logger
+const { logger, sanitize } = require('../../../../utils/logger')
 const BeijingTimeHelper = require('../../../../utils/timeHelper')
 const TransactionManager = require('../../../../utils/TransactionManager')
 const QRCodeValidator = require('../../../../utils/QRCodeValidator')
@@ -178,12 +178,13 @@ router.post(
         }
       }
 
+      // 架构决策5：使用统一脱敏函数记录日志
       logger.info('商家提交消费记录', {
         merchant_id: merchantId,
         store_id: resolved_store_id,
-        user_uuid: qr_validation.user_uuid.substring(0, 8) + '...',
+        user_uuid: sanitize.user_uuid(qr_validation.user_uuid), // 脱敏：仅前8位
         consumption_amount,
-        idempotency_key
+        idempotency_key: sanitize.idempotency_key(idempotency_key) // 脱敏：截断到50字符
       })
 
       /*
@@ -249,18 +250,23 @@ router.post(
       /*
        * 【入口幂等检查】防止同一次请求被重复提交
        * 统一使用 IdempotencyService 进行请求级幂等控制
+       *
+       * 架构决策5脱敏：qr_code 完全不落日志，仅记录 user_uuid 前8位
        */
       const idempotencyResult = await IdempotencyService.getOrCreateRequest(idempotency_key, {
         api_path: '/api/v4/shop/consumption/submit',
         http_method: 'POST',
-        request_params: { qr_code: qr_code.substring(0, 20), consumption_amount },
+        request_params: {
+          user_uuid_prefix: sanitize.user_uuid(qr_validation.user_uuid), // 脱敏：仅前8位
+          consumption_amount
+        },
         user_id: merchantId
       })
 
       // 如果已完成，直接返回首次结果（幂等性要求）+ is_duplicate 标记
       if (!idempotencyResult.should_process) {
         logger.info('🔄 入口幂等拦截：重复请求，返回首次结果', {
-          idempotency_key,
+          idempotency_key: sanitize.idempotency_key(idempotency_key),
           merchant_id: merchantId
         })
         const duplicateResponse = {
@@ -320,7 +326,7 @@ router.post(
       logger.info('✅ 消费记录创建成功', {
         record_id: record.record_id,
         user_id: record.user_id,
-        idempotency_key,
+        idempotency_key: sanitize.idempotency_key(idempotency_key),
         is_duplicate: isDuplicate
       })
 
@@ -365,7 +371,7 @@ router.post(
       // 处理幂等键冲突错误（409状态码）
       if (error.statusCode === 409) {
         logger.warn('幂等性错误:', {
-          idempotency_key,
+          idempotency_key: sanitize.idempotency_key(idempotency_key),
           error_code: error.errorCode,
           message: error.message
         })
@@ -374,7 +380,7 @@ router.post(
 
       logger.error('提交消费记录失败', {
         error: error.message,
-        idempotency_key
+        idempotency_key: sanitize.idempotency_key(idempotency_key)
       })
       return handleServiceError(error, res, '提交消费记录失败')
     }

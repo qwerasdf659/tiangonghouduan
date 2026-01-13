@@ -1,4 +1,5 @@
 const logger = require('../utils/logger').logger
+const BusinessError = require('../utils/BusinessError')
 
 /**
  * 餐厅积分抽奖系统 V4.0 - 消费记录服务
@@ -234,38 +235,64 @@ class ConsumptionService {
     }
     logger.info('📋 提交数据:', safeLogData)
 
-    // 步骤1：验证必填参数
+    /*
+     * 步骤1：契约校验 - 服务层合约（Business Contract）
+     *
+     * 架构决策2（2026-01-13）：分层参数校验
+     * - 路由层：格式校验（正则、类型）、安全校验（签名、nonce）、边界校验（白名单）
+     * - 服务层：合约校验（必传字段）、业务校验（金额范围、状态机）
+     *
+     * 此处仅做合约校验（必传字段断言），格式校验已由路由层完成
+     */
     if (!data.qr_code) {
-      throw new Error('二维码不能为空')
+      throw new BusinessError('二维码不能为空', 'MISSING_REQUIRED_PARAM', 400)
     }
     if (!data.consumption_amount || data.consumption_amount <= 0) {
-      throw new Error('消费金额必须大于0')
+      throw new BusinessError('消费金额必须大于0', 'CONSUMPTION_INVALID_AMOUNT', 400, {
+        received_amount: data.consumption_amount
+      })
+    }
+    // 金额上限校验（业务规则：单笔消费不超过99999.99元）
+    if (data.consumption_amount > 99999.99) {
+      throw new BusinessError(
+        '消费金额超过上限（99999.99元）',
+        'CONSUMPTION_AMOUNT_EXCEEDED',
+        400,
+        { received_amount: data.consumption_amount, max_amount: 99999.99 }
+      )
     }
     if (!data.merchant_id) {
-      throw new Error('商家ID不能为空')
+      throw new BusinessError('商家ID不能为空', 'MISSING_REQUIRED_PARAM', 400)
     }
     // 【业界标准形态】幂等键必须由路由层传入，不再服务端生成
     if (!data.idempotency_key) {
-      throw new Error('缺少幂等键：idempotency_key 必须由调用方提供')
+      throw new BusinessError(
+        '缺少幂等键：idempotency_key 必须由调用方提供',
+        'CONSUMPTION_MISSING_IDEMPOTENCY_KEY',
+        400
+      )
     }
 
     /*
-     * 步骤2：获取 user_uuid
-     * v2升级：优先使用路由层验证后传入的 user_uuid
-     * 兼容模式：如果未传入 user_uuid，则在服务层验证二维码（Phase 2完成后移除）
+     * 步骤2：契约断言 - user_uuid 必须由路由层验证后传入
+     *
+     * 架构决策1（2026-01-13）：删除服务层兼容分支
+     * - 二维码验证单一入口：路由层（边界层）
+     * - 服务层不再验证二维码，user_uuid 为必传参数
+     * - 如果缺少 user_uuid，直接抛出 BusinessError（CONSUMPTION_MISSING_USER_UUID）
+     *
+     * 调用方职责：
+     * - 路由层必须先通过 QRCodeValidator.validateQRCode() 验证二维码
+     * - 验证成功后提取 user_uuid 传入服务层
      */
-    let userUuid = data.user_uuid
+    const userUuid = data.user_uuid
     if (!userUuid) {
-      // 兼容模式：服务层验证二维码（将在 Phase 2 完成后移除）
-      logger.warn('⚠️ user_uuid 未传入，使用服务层验证二维码（兼容模式，将在 Phase 2 后移除）')
-      const qrValidation = await QRCodeValidator.validateQRCode(data.qr_code)
-      if (!qrValidation.valid) {
-        const error = new Error(qrValidation.error || '二维码验证失败')
-        error.code = qrValidation.code || 'QRCODE_VALIDATION_FAILED'
-        error.statusCode = qrValidation.statusCode || 400
-        throw error
-      }
-      userUuid = qrValidation.user_uuid
+      throw new BusinessError(
+        'user_uuid 必须由路由层验证二维码后传入（服务层契约）',
+        'CONSUMPTION_MISSING_USER_UUID',
+        400,
+        { received_data_keys: Object.keys(data) } // 仅记录到日志，不返回给客户端
+      )
     }
 
     // 步骤3：根据UUID查找用户（Step 3: Find User by UUID）
@@ -275,10 +302,12 @@ class ConsumptionService {
     }) // ✅ 在事务中查询
 
     if (!user) {
-      const error = new Error(`用户不存在（UUID: ${userUuid}）`)
-      error.code = 'USER_NOT_FOUND'
-      error.statusCode = 404
-      throw error
+      throw new BusinessError(
+        '用户不存在',
+        'CONSUMPTION_USER_NOT_FOUND',
+        404,
+        { user_uuid: userUuid.substring(0, 8) + '...' } // 脱敏后记录到日志
+      )
     }
 
     const userId = user.user_id // 获取内部user_id用于后续业务逻辑

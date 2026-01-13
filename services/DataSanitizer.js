@@ -14,6 +14,34 @@ const DecimalConverter = require('../utils/formatters/DecimalConverter') // 🔧
  * - 移除敏感商业信息（概率、成本、限制等）
  * - 过滤敏感字段（role、permissions、admin_flags等）
  *
+ * 🏛️ DataSanitizer 架构原则（2026-01-13 确立）：
+ *
+ * 1. 禁止字段兼容逻辑（fail-fast）
+ *    - 禁止使用 `xxx.id || xxx.{table}_id` 等 fallback 逻辑
+ *    - 直接使用数据库真实字段名
+ *    - 字段缺失时立即报错（fail-fast）
+ *
+ * 2. 唯一真相源原则
+ *    - 数据库表结构是字段名的唯一权威定义
+ *    - 不做"可能存在的字段"的防御性兼容
+ *    - 字段变更必须通过数据库迁移 + 代码同步修改
+ *
+ * 3. 明确输入契约
+ *    - 每个脱敏方法必须在注释中声明处理哪个表
+ *    - 方法命名必须体现表名（如 sanitizeExchangeMarketItems 对应 exchange_items 表）
+ *    - 输入数据必须符合表结构，否则报错
+ *
+ * 4. 快速失败原则
+ *    - 访问不存在的字段时，让 JavaScript 返回 undefined
+ *    - 如果业务逻辑依赖该字段，会在后续处理中报错
+ *    - 不做"可能有、可能没有"的容错处理
+ *
+ * 5. 图片字段策略（2026-01-13 确立）
+ *    - 强制使用 primary_image_id 关联 image_resources 表
+ *    - 禁止使用废弃的 image/image_url 字段
+ *    - DataSanitizer 输出层不再返回 image/image_url
+ *    - 前端必须通过 primary_image_id 获取图片资源
+ *
  * 🔒 安全设计说明（重要）：
  * 1. 字段名保护：所有主键统一映射为通用'id'字段，防止数据库结构暴露
  * 2. 商业信息保护：移除概率、成本、限制等核心商业数据
@@ -33,7 +61,7 @@ const DecimalConverter = require('../utils/formatters/DecimalConverter') // 🔧
  * - 逆向工程难度：70/100
  *
  * 创建时间：2025年10月31日
- * 最后更新：2025年10月31日
+ * 最后更新：2026年01月13日（架构原则确立 + 兼容字段清理）
  */
 class DataSanitizer {
   /**
@@ -443,6 +471,8 @@ class DataSanitizer {
   /**
    * 系统公告数据脱敏 - 新增前端需求
    *
+   * 🗄️ 数据库表：system_announcements（主键：announcement_id）
+   *
    * 业务场景：系统公告列表API响应时调用，防止用户通过抓包获取管理员ID、内部备注等敏感信息
    *
    * 脱敏规则：
@@ -451,10 +481,14 @@ class DataSanitizer {
    *   target_groups（目标群体）等敏感字段
    * - 只返回业务必需的公告信息：ID、标题、内容、类型、优先级、创建时间、过期时间、是否激活
    *
-   * @param {Array<Object>} announcements - 公告数据数组，包含id、title、content、admin_id等字段
+   * 输入契约：
+   * - 输入数据必须来自 system_announcements 表的 Sequelize 查询结果
+   * - 必须包含 announcement_id 字段（数据库主键）
+   *
+   * @param {Array<Object>} announcements - 公告数据数组（来自 system_announcements 表）
    * @param {string} dataLevel - 数据级别：'full'（管理员完整数据）或'public'（普通用户脱敏数据）
-   * @returns {Array<Object>} 脱敏后的公告数组
-   * @returns {number} return[].id - 公告ID
+   * @returns {Array<Object>} 脱敏后的公告数组（id 字段映射自 announcement_id）
+   * @returns {number} return[].id - 公告ID（通用id字段，映射自 announcement_id）
    * @returns {string} return[].title - 公告标题
    * @returns {string} return[].content - 公告内容
    * @returns {string} return[].type - 公告类型
@@ -474,7 +508,7 @@ class DataSanitizer {
 
     return announcements.map(announcement => ({
       // 🔴 基础字段（7个 - Basic Fields）
-      id: announcement.id || announcement.announcement_id, // 兼容主键字段名（announcement_id是数据库主键）
+      id: announcement.announcement_id, // 数据库主键（唯一真相源）
       title: announcement.title,
       content: announcement.content,
       type: announcement.type,
@@ -544,65 +578,6 @@ class DataSanitizer {
       description: record.description,
       created_at: record.created_at
       // ❌ 移除敏感字段：reference_id, admin_notes, cost_analysis
-    }))
-  }
-
-  /**
-   * 商品兑换数据脱敏 - 新增前端需求
-   *
-   * 业务场景：商品兑换列表API响应时调用，防止用户通过抓包获取具体库存数、创建者、更新者等敏感信息
-   *
-   * 脱敏规则：
-   * - 管理员（dataLevel='full'）：返回完整商品数据
-   * - 普通用户（dataLevel='public'）：移除stock（具体库存数）、created_by（创建者）、
-   *   updated_by（更新者）等敏感字段
-   * - 使用stock_status（库存状态：in_stock/low_stock/out_of_stock）替代stock（具体库存数）
-   * - 兼容product_id和id字段，兼容image和image_url字段
-   *
-   * @param {Array<Object>} products - 商品数据数组，包含product_id、name、stock、created_by等字段
-   * @param {string} dataLevel - 数据级别：'full'（管理员完整数据）或'public'（普通用户脱敏数据）
-   * @returns {Array<Object>} 脱敏后的商品数组
-   * @returns {number} return[].id - 商品ID（product_id或id，兼容两种字段）
-   * @returns {string} return[].name - 商品名称
-   * @returns {string} return[].description - 商品描述
-   * @returns {string} return[].image - 商品图片URL（image或image_url，兼容两种字段）
-   * @returns {number} return[].exchange_points - 兑换所需积分
-   * @returns {string} return[].stock_status - 库存状态（in_stock/low_stock/out_of_stock），替代stock
-   * @returns {string} return[].category - 商品分类
-   * @returns {string} return[].space - 商品空间（lucky/premium/both）
-   * @returns {boolean} return[].is_available - 是否可用（status为active且stock>0）
-   * @returns {boolean} return[].is_hot - 是否热门
-   * @returns {boolean} return[].is_new - 是否新品
-   * @returns {boolean} return[].is_limited - 是否限量
-   * @returns {number} return[].sort_order - 排序顺序
-   * @returns {string} return[].created_at - 创建时间
-   *
-   * @example
-   * const adminProducts = DataSanitizer.sanitizeExchangeProducts(products, 'full')
-   * const publicProducts = DataSanitizer.sanitizeExchangeProducts(products, 'public')
-   */
-  static sanitizeExchangeProducts(products, dataLevel) {
-    if (dataLevel === 'full') {
-      return products // 管理员看完整数据
-    }
-
-    return products.map(product => ({
-      id: product.product_id || product.id, // 兼容product_id和id字段
-      name: product.name,
-      description: product.description,
-      image: product.image || product.image_url, // 兼容image和image_url字段
-      exchange_points: product.exchange_points, // 保持原字段名
-      stock_status:
-        product.stock > 0 ? (product.stock > 10 ? 'in_stock' : 'low_stock') : 'out_of_stock', // 标准化库存状态
-      category: product.category,
-      space: product.space, // lucky/premium/both
-      is_available: product.status === 'active' && product.stock > 0, // 计算是否可用
-      is_hot: product.is_hot || false,
-      is_new: product.is_new || false,
-      is_limited: product.is_limited || false,
-      sort_order: product.sort_order || 0,
-      created_at: product.created_at
-      // ❌ 移除敏感字段：stock（具体库存数）、created_by、updated_by
     }))
   }
 
@@ -1231,38 +1206,87 @@ class DataSanitizer {
   /**
    * 兑换市场商品列表数据脱敏
    *
+   * 🗄️ 数据库表：exchange_items（主键：item_id）
+   *
    * 业务场景：兑换市场商品列表API响应时调用，防止泄露商业敏感信息
    *
    * 脱敏规则：
    * - 管理员（dataLevel='full'）：返回完整商品数据
    * - 普通用户（dataLevel='public'）：移除cost_price（成本价）、sold_count（销量统计）等敏感字段
    *
-   * @param {Array<Object>} items - 商品数据数组
+   * 输入契约：
+   * - 输入数据必须来自 exchange_items 表的 Sequelize 查询结果
+   * - 必须包含 item_id 字段（数据库主键）
+   * - 🔧 2026-01-13 图片字段策略：需要 include primaryImage（ImageResources 关联）
+   *
+   * 输出字段（2026-01-13 图片字段策略 - 统一规范）：
+   * - primary_image_id: 主图片ID（关联 image_resources 表）
+   * - primary_image: 图片对象 { image_id, url, width, height, mime }，缺失时为 null
+   * - ❌ 移除字段：image, image_url（已废弃）
+   *
+   * @param {Array<Object>} items - 商品数据数组（来自 exchange_items 表，需 include primaryImage）
    * @param {string} dataLevel - 数据级别：'full'（管理员）或'public'（普通用户）
-   * @returns {Array<Object>} 脱敏后的商品数组
+   * @returns {Array<Object>} 脱敏后的商品数组（id 字段映射自 item_id）
    */
   static sanitizeExchangeMarketItems(items, dataLevel) {
-    // V4.5.0: 材料资产支付 - 统一数据格式
-    const sanitized = items.map(item => ({
-      id: item.item_id || item.id,
-      name: item.name,
-      description: item.description,
-      // V4.5.0: 材料资产支付字段
-      cost_asset_code: item.cost_asset_code,
-      cost_amount: item.cost_amount,
-      stock: item.stock,
-      status: item.status,
-      sort_order: item.sort_order,
-      created_at: item.created_at,
-      /*
-       * 管理员额外字段
-       * 🔧 2026-01-09 修复：字段名匹配数据库模型（sold_count，不是 total_exchange_count）
-       */
-      ...(dataLevel === 'full' && {
-        cost_price: item.cost_price,
-        sold_count: item.sold_count
-      })
-    }))
+    /*
+     * V4.5.0: 材料资产支付 - 统一数据格式
+     * 🔧 2026-01-13 图片字段策略：添加 primary_image_id 和 primary_image 对象
+     */
+    const sanitized = items.map(item => {
+      // 处理图片数据（通过 include 获取的 primaryImage 关联）
+      const primaryImageData = item.primaryImage
+      let primaryImage = null
+
+      if (primaryImageData) {
+        /*
+         * 使用 ImageResources 模型的 toSafeJSON 方法获取安全的公开 URL
+         * 📌 2026-01-13：image_resources 表无 width/height 字段，不输出这些字段
+         */
+        if (typeof primaryImageData.toSafeJSON === 'function') {
+          const safeImage = primaryImageData.toSafeJSON()
+          primaryImage = {
+            image_id: safeImage.image_id,
+            url: safeImage.url, // 公开永久 URL（无签名）
+            mime: safeImage.mime_type,
+            // 列表视图使用缩略图 URL
+            thumbnail_url: safeImage.thumbnails?.small || safeImage.url
+          }
+        } else {
+          // 降级处理：如果没有 toSafeJSON 方法（不应该发生）
+          primaryImage = {
+            image_id: primaryImageData.image_id,
+            url: null, // 无法生成 URL
+            mime: primaryImageData.mime_type,
+            thumbnail_url: null
+          }
+        }
+      }
+
+      return {
+        id: item.item_id, // 数据库主键（唯一真相源）
+        name: item.name,
+        description: item.description,
+        // V4.5.0: 材料资产支付字段
+        cost_asset_code: item.cost_asset_code,
+        cost_amount: item.cost_amount,
+        stock: item.stock,
+        status: item.status,
+        sort_order: item.sort_order,
+        created_at: item.created_at,
+        // 🔧 2026-01-13 图片字段策略（统一规范）
+        primary_image_id: item.primary_image_id || null, // 主图片ID
+        primary_image: primaryImage, // 图片对象（缺失时为 null）
+        /*
+         * 管理员额外字段
+         * 🔧 2026-01-09 修复：字段名匹配数据库模型（sold_count，不是 total_exchange_count）
+         */
+        ...(dataLevel === 'full' && {
+          cost_price: item.cost_price,
+          sold_count: item.sold_count
+        })
+      }
+    })
 
     return sanitized
   }
@@ -1282,22 +1306,28 @@ class DataSanitizer {
   /**
    * 兑换市场订单列表数据脱敏
    *
+   * 🗄️ 数据库表：exchange_records（主键：record_id）
+   *
    * 业务场景：用户查询兑换订单列表时调用，保护订单敏感信息
    *
    * 脱敏规则：
    * - 管理员（dataLevel='full'）：返回完整订单数据
    * - 普通用户（dataLevel='public'）：移除total_cost（成本金额）等敏感字段
    *
-   * @param {Array<Object>} orders - 订单数据数组
+   * 输入契约：
+   * - 输入数据必须来自 exchange_records 表的 Sequelize 查询结果
+   * - 必须包含 record_id 字段（数据库主键）
+   *
+   * @param {Array<Object>} orders - 订单数据数组（来自 exchange_records 表）
    * @param {string} _dataLevel - 数据级别：'full'（管理员）或'public'（普通用户）（未使用，保留以保持接口一致性）
-   * @returns {Array<Object>} 脱敏后的订单数组
+   * @returns {Array<Object>} 脱敏后的订单数组（id 字段映射自 record_id）
    */
   static sanitizeExchangeMarketOrders(orders, _dataLevel) {
     // V4.5.0: 材料资产支付 - 统一数据格式
 
     // 普通用户数据脱敏（V4.5.0 材料资产支付）
     const sanitized = orders.map(order => ({
-      id: order.record_id || order.id,
+      id: order.record_id, // 数据库主键（唯一真相源）
       order_no: order.order_no,
       item_snapshot: {
         name: order.item_snapshot?.item_name || order.item_snapshot?.name,

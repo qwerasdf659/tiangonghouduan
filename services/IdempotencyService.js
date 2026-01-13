@@ -41,43 +41,293 @@ const TTL_DAYS = 7 // 幂等记录保留天数
 const PROCESSING_TIMEOUT_SECONDS = 60 // processing 状态超时阈值（秒）
 
 /**
+ * 敏感字段列表 - 禁止存储到 response_snapshot
+ * 【决策细则9】response_snapshot 安全策略
+ */
+const SENSITIVE_FIELDS = [
+  'token',
+  'password',
+  'secret',
+  'access_key',
+  'private_key',
+  'id_card',
+  'bank_card',
+  'phone',
+  'mobile',
+  'jwt',
+  'refresh_token',
+  'session_key',
+  'openid',
+  'unionid'
+]
+
+/**
+ * response_snapshot 大小限制（字节）
+ * 【决策6】response_snapshot 存储策略
+ * - 软限制 32KB：超过记录告警但仍存储
+ * - 硬限制 64KB：超过只存关键字段 + 截断标记
+ */
+const SNAPSHOT_SOFT_LIMIT = 32768 // 32KB
+const SNAPSHOT_HARD_LIMIT = 65536 // 64KB
+
+/**
  * 业务操作 canonical 映射表（全量覆盖所有写接口）
  *
  * 【已拍板决策 2026-01-09】：显式 operation，禁止依赖 URL 推导
+ * 【已拍板决策 2026-01-13】：决策4-B 严格模式 - 未映射直接拒绝启动/拒绝请求
+ *
  * - 幂等语义从 URL 解耦，使用稳定的 canonical_operation 作为幂等作用域
  * - 所有写接口必须在此映射表中显式定义
- * - 未定义的路径使用原路径（保持严格，避免误放行）
+ * - 未定义的路径直接返回 500 错误（严格模式）
  *
- * 命名规范：{DOMAIN}_{RESOURCE}_{ACTION}
- * 例如：SHOP_EXCHANGE_CREATE_ORDER = 商城域 + 兑换资源 + 创建订单动作
+ * 命名规范：{MODULE}_{ACTION}_{OBJECT}
+ * 例如：SHOP_EXCHANGE_CREATE_ORDER = 商城模块 + 兑换动作 + 订单对象
  */
 const CANONICAL_OPERATION_MAP = {
+  /*
+   * ===============================================================
+   * 核心业务写接口 - 需要严格幂等保护
+   * 注意：路径参数统一使用 :id 占位符，normalizePath 会自动转换
+   * ===============================================================
+   */
+
+  // ===== 抽奖系统 =====
+  '/api/v4/lottery/draw': 'LOTTERY_DRAW', // 抽奖
+  '/api/v4/lottery/create': 'LOTTERY_PRESET_CREATE', // 创建抽奖预设
+
   // ===== B2C 兑换下单 =====
-  '/api/v4/shop/exchange/exchange': 'SHOP_EXCHANGE_CREATE_ORDER',
+  '/api/v4/shop/exchange': 'SHOP_EXCHANGE_CREATE_ORDER', // 兑换商品（实际路径）
+  '/api/v4/shop/exchange/exchange': 'SHOP_EXCHANGE_CREATE_ORDER', // 兑换商品（兼容路径）
+  '/api/v4/shop/orders/:id/status': 'SHOP_EXCHANGE_UPDATE_STATUS', // 更新订单状态
 
   // ===== 材料转换 =====
-  '/api/v4/shop/assets/convert': 'SHOP_ASSET_CONVERT',
+  '/api/v4/shop/convert': 'SHOP_ASSET_CONVERT', // 资产转换（实际路径）
+  '/api/v4/shop/assets/convert': 'SHOP_ASSET_CONVERT', // 资产转换（兼容路径）
 
-  // ===== 抽奖 =====
-  '/api/v4/lottery/draw': 'LOTTERY_DRAW',
+  // ===== C2C 市场交易 - 物品 =====
+  '/api/v4/market/list': 'MARKET_CREATE_LISTING', // 物品上架
+  '/api/v4/market/listings/:id/purchase': 'MARKET_PURCHASE_LISTING', // 购买物品
+  '/api/v4/market/listings/:id/withdraw': 'MARKET_CANCEL_LISTING', // 撤回物品
 
-  // ===== C2C 市场交易 =====
-  '/api/v4/market/listings': 'MARKET_CREATE_LISTING',
-  '/api/v4/market/listings/:id/purchase': 'MARKET_PURCHASE_LISTING',
-  '/api/v4/market/listings/:id/cancel': 'MARKET_CANCEL_LISTING',
+  // ===== C2C 市场交易 - 可叠加资产（材料） =====
+  '/api/v4/market/fungible-assets/list': 'MARKET_CREATE_FUNGIBLE_LISTING', // 材料上架
+  '/api/v4/market/fungible-assets/:id/purchase': 'MARKET_PURCHASE_FUNGIBLE', // 购买材料
+  '/api/v4/market/fungible-assets/:id/withdraw': 'MARKET_CANCEL_FUNGIBLE_LISTING', // 材料撤回
 
   // ===== 核销系统 =====
-  '/api/v4/shop/redemption/orders': 'REDEMPTION_CREATE_ORDER',
-  '/api/v4/shop/redemption/fulfill': 'REDEMPTION_FULFILL',
+  '/api/v4/shop/orders': 'REDEMPTION_CREATE_ORDER', // 创建核销订单（实际路径）
+  '/api/v4/shop/redemption/orders': 'REDEMPTION_CREATE_ORDER', // 创建核销订单（兼容路径）
+  '/api/v4/shop/fulfill': 'REDEMPTION_FULFILL', // 执行核销（实际路径）
+  '/api/v4/shop/redemption/fulfill': 'REDEMPTION_FULFILL', // 执行核销（兼容路径）
+  '/api/v4/shop/orders/:id/cancel': 'REDEMPTION_CANCEL_ORDER', // 取消核销订单
 
   // ===== 消费记录 =====
-  '/api/v4/shop/consumption/submit': 'CONSUMPTION_SUBMIT',
+  '/api/v4/shop/submit': 'CONSUMPTION_SUBMIT', // 提交消费记录（实际路径）
+  '/api/v4/shop/consumption/submit': 'CONSUMPTION_SUBMIT', // 提交消费记录（兼容路径）
+  '/api/v4/shop/:id': 'CONSUMPTION_DELETE', // 删除消费记录（实际路径）
+  '/api/v4/shop/consumption/:id': 'CONSUMPTION_DELETE', // 删除消费记录（兼容路径）
+  '/api/v4/shop/:id/restore': 'CONSUMPTION_RESTORE', // 恢复消费记录（实际路径）
+  '/api/v4/shop/consumption/:id/restore': 'CONSUMPTION_RESTORE', // 恢复消费记录（兼容路径）
 
-  // ===== 管理员操作 =====
-  '/api/v4/console/asset-adjustment/adjust': 'ADMIN_ASSET_ADJUST',
-  '/api/v4/console/marketplace/force-withdraw': 'ADMIN_FORCE_WITHDRAW'
+  // ===== 会员解锁 =====
+  '/api/v4/shop/unlock': 'PREMIUM_UNLOCK', // 解锁高级会员
 
-  // 未来新增写接口在此添加映射（必须显式定义）
+  // ===== 商户积分 =====
+  '/api/v4/merchant-points/': 'MERCHANT_POINTS_CREATE', // 商户积分申请（带尾斜杠）
+  '/api/v4/merchant-points': 'MERCHANT_POINTS_CREATE', // 商户积分申请
+
+  /*
+   * ===============================================================
+   * 认证系统 - 无状态操作，无需幂等重放但需要映射
+   * ===============================================================
+   */
+  '/api/v4/auth/login': 'AUTH_LOGIN', // 用户登录
+  '/api/v4/auth/decrypt-phone': 'AUTH_DECRYPT_PHONE', // 解密手机号
+  '/api/v4/auth/quick-login': 'AUTH_QUICK_LOGIN', // 快速登录
+  '/api/v4/auth/refresh': 'AUTH_TOKEN_REFRESH', // 刷新 Token
+  '/api/v4/auth/logout': 'AUTH_LOGOUT', // 登出
+
+  /*
+   * ===== 权限检查 =====
+   * 注意：权限路由在 app.js 中独立挂载到 /api/v4/permissions，
+   * 但路由文件 routes/v4/auth/permissions.js 中定义的路径是相对路径
+   */
+  '/api/v4/permissions/check': 'PERM_CHECK', // 权限检查
+  '/api/v4/permissions/cache/invalidate': 'PERM_CACHE_INVALIDATE', // 权限缓存失效
+  '/api/v4/permissions/batch-check': 'PERM_BATCH_CHECK', // 批量权限检查
+  // 兼容可能的 auth 前缀路径（验证脚本扫描结果）
+  '/api/v4/auth/check': 'PERM_CHECK', // 权限检查（auth前缀兼容）
+  '/api/v4/auth/cache/invalidate': 'PERM_CACHE_INVALIDATE', // 权限缓存失效（auth前缀兼容）
+  '/api/v4/auth/batch-check': 'PERM_BATCH_CHECK', // 批量权限检查（auth前缀兼容）
+
+  /*
+   * ===============================================================
+   * 系统功能 - 用户交互写操作
+   * ===============================================================
+   */
+  '/api/v4/system/feedback': 'SYSTEM_FEEDBACK_SUBMIT', // 提交反馈
+  '/api/v4/system/chat/sessions': 'CHAT_SESSION_CREATE', // 创建聊天会话
+  '/api/v4/system/chat/sessions/:id/messages': 'CHAT_MESSAGE_SEND', // 发送聊天消息
+  '/api/v4/system/:id/read': 'NOTIFICATION_MARK_READ', // 标记通知已读
+  '/api/v4/system/read-all': 'NOTIFICATION_READ_ALL', // 全部已读
+  '/api/v4/system/clear': 'NOTIFICATION_CLEAR', // 清空通知
+  '/api/v4/system/send': 'NOTIFICATION_SEND', // 发送通知
+
+  // ===== 活动参与 =====
+  '/api/v4/activities/:id/participate': 'ACTIVITY_PARTICIPATE', // 参与活动
+  '/api/v4/activities/:id/configure-conditions': 'ACTIVITY_CONFIG_CONDITIONS', // 配置活动条件
+
+  // ===== 员工管理（商家端）=====
+  '/api/v4/shop/add': 'SHOP_STAFF_CREATE', // 创建员工（实际路径）
+  '/api/v4/shop/staff/add': 'SHOP_STAFF_CREATE', // 创建员工（兼容路径）
+  '/api/v4/shop/transfer': 'SHOP_STAFF_TRANSFER', // 转移员工（实际路径）
+  '/api/v4/shop/staff/transfer': 'SHOP_STAFF_TRANSFER', // 转移员工（兼容路径）
+  '/api/v4/shop/disable': 'SHOP_STAFF_DISABLE', // 停用员工（实际路径）
+  '/api/v4/shop/staff/disable': 'SHOP_STAFF_DISABLE', // 停用员工（兼容路径）
+  '/api/v4/shop/enable': 'SHOP_STAFF_ENABLE', // 激活员工（实际路径）
+  '/api/v4/shop/staff/enable': 'SHOP_STAFF_ENABLE', // 激活员工（兼容路径）
+
+  // ===== 风险管理（商家端）=====
+  '/api/v4/shop/alerts/:id/review': 'SHOP_RISK_REVIEW', // 风险审核（实际路径）
+  '/api/v4/shop/risk/alerts/:id/review': 'SHOP_RISK_REVIEW', // 风险审核（兼容路径）
+  '/api/v4/shop/alerts/:id/ignore': 'SHOP_RISK_IGNORE', // 忽略风险（实际路径）
+  '/api/v4/shop/risk/alerts/:id/ignore': 'SHOP_RISK_IGNORE', // 忽略风险（兼容路径）
+
+  /*
+   * ===============================================================
+   * 管理后台写操作
+   * ===============================================================
+   */
+
+  // ===== 管理员登录 =====
+  '/api/v4/console/login': 'ADMIN_AUTH_LOGIN', // 管理员登录
+
+  // ===== 资产调整 =====
+  '/api/v4/console/adjust': 'ADMIN_ASSET_ADJUST', // 资产调整
+  '/api/v4/console/batch-adjust': 'ADMIN_ASSET_BATCH_ADJUST', // 批量调整
+
+  // ===== 审计日志 =====
+  '/api/v4/console/cleanup': 'ADMIN_AUDIT_LOG_CLEANUP', // 清理审计日志
+
+  // ===== 活动预算 =====
+  '/api/v4/console/campaigns/:id': 'ADMIN_CAMPAIGN_UPDATE', // 更新活动
+  '/api/v4/console/campaigns/:id/validate': 'ADMIN_CAMPAIGN_VALIDATE', // 验证活动
+  '/api/v4/console/campaigns/:id/pool/add': 'ADMIN_CAMPAIGN_POOL_ADD', // 添加预算池
+
+  // ===== 系统配置 =====
+  '/api/v4/console/config': 'ADMIN_CONFIG_UPDATE', // 更新系统配置
+  '/api/v4/console/test/simulate': 'ADMIN_CONFIG_TEST', // 测试配置
+
+  // ===== 消费审批 =====
+  '/api/v4/console/approve/:id': 'ADMIN_CONSUMPTION_APPROVE', // 审批消费
+  '/api/v4/console/reject/:id': 'ADMIN_CONSUMPTION_REJECT', // 拒绝消费
+
+  // ===== 客服管理 =====
+  '/api/v4/console/:id/send': 'ADMIN_CS_MESSAGE_SEND', // 发送客服消息（实际路径）
+  '/api/v4/console/customer-service/:id/send': 'ADMIN_CS_MESSAGE_SEND', // 发送客服消息（兼容路径）
+  '/api/v4/console/:id/mark-read': 'ADMIN_CS_MESSAGE_READ', // 标记已读（实际路径）
+  '/api/v4/console/customer-service/:id/mark-read': 'ADMIN_CS_MESSAGE_READ', // 标记已读（兼容路径）
+  '/api/v4/console/:id/transfer': 'ADMIN_CS_TRANSFER', // 转接会话（实际路径）
+  '/api/v4/console/customer-service/:id/transfer': 'ADMIN_CS_TRANSFER', // 转接会话（兼容路径）
+  '/api/v4/console/:id/close': 'ADMIN_CS_CLOSE', // 关闭会话（实际路径）
+  '/api/v4/console/customer-service/:id/close': 'ADMIN_CS_CLOSE', // 关闭会话（兼容路径）
+
+  // ===== 图片管理 =====
+  '/api/v4/console/upload': 'ADMIN_IMAGE_UPLOAD', // 上传图片
+  '/api/v4/console/:id/bind': 'ADMIN_IMAGE_BIND', // 绑定图片
+
+  // ===== 抽奖干预 =====
+  '/api/v4/console/probability-adjust': 'ADMIN_LOTTERY_PROB_ADJUST', // 概率调整（实际路径）
+  '/api/v4/console/lottery-management/probability-adjust': 'ADMIN_LOTTERY_PROB_ADJUST', // 概率调整（兼容路径）
+  '/api/v4/console/user-specific-queue': 'ADMIN_LOTTERY_USER_QUEUE', // 用户特定队列（实际路径）
+  '/api/v4/console/force-win': 'ADMIN_LOTTERY_FORCE_WIN', // 强制中奖（实际路径）
+  '/api/v4/console/force-lose': 'ADMIN_LOTTERY_FORCE_LOSE', // 强制不中（实际路径）
+  '/api/v4/console/interventions/:id/cancel': 'ADMIN_LOTTERY_INTERVENTION_CANCEL', // 取消干预（实际路径）
+  '/api/v4/console/clear-user-settings/:id': 'ADMIN_LOTTERY_CLEAR_USER', // 清除用户设置（实际路径）
+  '/api/v4/console/lottery-management/user-specific-queue': 'ADMIN_LOTTERY_USER_QUEUE', // 用户队列
+  '/api/v4/console/lottery-management/force-win': 'ADMIN_LOTTERY_FORCE_WIN', // 强制中奖
+  '/api/v4/console/lottery-management/force-lose': 'ADMIN_LOTTERY_FORCE_LOSE', // 强制不中
+  '/api/v4/console/lottery-management/interventions/:id/cancel':
+    'ADMIN_LOTTERY_INTERVENTION_CANCEL', // 取消干预
+  '/api/v4/console/lottery-management/clear-user-settings/:id': 'ADMIN_LOTTERY_CLEAR_USER', // 清除用户设置
+
+  // ===== 孤儿冻结清理 =====
+  '/api/v4/console/order': 'ADMIN_ORPHAN_CLEANUP', // 孤儿清理
+
+  // ===== 奖池管理 =====
+  '/api/v4/console/prize/:id': 'ADMIN_PRIZE_UPDATE', // 更新奖品
+  '/api/v4/console/prize/:id/add-stock': 'ADMIN_PRIZE_ADD_STOCK', // 增加库存
+
+  // ===== 抽奖配额管理 =====
+  '/api/v4/console/rules': 'ADMIN_LOTTERY_QUOTA_CREATE', // 创建配额规则
+  '/api/v4/console/rules/:id/disable': 'ADMIN_LOTTERY_QUOTA_DISABLE', // 禁用配额规则
+  '/api/v4/console/users/:id/bonus': 'ADMIN_LOTTERY_QUOTA_BONUS', // 赠送抽奖次数
+  '/api/v4/console/users/:id/role': 'ADMIN_USER_ROLE_UPDATE', // 更新用户角色
+  '/api/v4/console/users/:id/status': 'ADMIN_USER_STATUS_UPDATE', // 更新用户状态
+
+  // ===== 材料管理 =====
+  '/api/v4/console/conversion-rules': 'ADMIN_MATERIAL_RULE_CREATE', // 创建转换规则
+  '/api/v4/console/conversion-rules/:id/disable': 'ADMIN_MATERIAL_RULE_DISABLE', // 禁用转换规则
+  '/api/v4/console/asset-types': 'ADMIN_MATERIAL_TYPE_CREATE', // 创建资产类型
+  '/api/v4/console/asset-types/:id/disable': 'ADMIN_MATERIAL_TYPE_DISABLE', // 禁用资产类型
+
+  // ===== 设置管理 =====
+  '/api/v4/console/settings/:id': 'ADMIN_SETTINGS_UPDATE', // 更新设置
+  '/api/v4/console/cache/clear': 'ADMIN_CACHE_CLEAR', // 清除缓存
+
+  // ===== 市场管理 =====
+  '/api/v4/console/exchange_market/items': 'ADMIN_EXCHANGE_ITEM_CREATE', // 创建兑换商品
+  '/api/v4/console/exchange_market/items/:id': 'ADMIN_EXCHANGE_ITEM_UPDATE', // 更新兑换商品
+  '/api/v4/console/listings/:id/force-withdraw': 'ADMIN_FORCE_WITHDRAW', // 强制下架
+
+  // ===== 用户层级 =====
+  '/api/v4/console/:id/deactivate': 'ADMIN_USER_HIERARCHY_DEACTIVATE', // 停用层级
+  '/api/v4/console/:id/activate': 'ADMIN_USER_HIERARCHY_ACTIVATE', // 激活层级
+
+  // ===== 员工管理（总后台）=====
+  '/api/v4/console/transfer': 'ADMIN_STAFF_TRANSFER', // 员工转移
+  '/api/v4/console/disable/:id': 'ADMIN_STAFF_DISABLE', // 禁用员工
+  '/api/v4/console/enable': 'ADMIN_STAFF_ENABLE', // 启用员工
+  '/api/v4/console/:id/role': 'ADMIN_STAFF_UPDATE_ROLE', // 更新员工角色
+  '/api/v4/console/:id': 'ADMIN_RESOURCE_UPDATE', // 通用资源更新
+
+  // ===== 门店管理 =====
+  '/api/v4/console/batch-import': 'ADMIN_STORE_BATCH_IMPORT', // 批量导入门店
+  '/api/v4/console/:id/toggle': 'ADMIN_RESOURCE_TOGGLE', // 切换资源状态
+
+  // ===== 商户积分审核 =====
+  '/api/v4/console/:id/approve': 'ADMIN_MERCHANT_APPROVE', // 审批商户积分
+  '/api/v4/console/:id/reject': 'ADMIN_MERCHANT_REJECT', // 拒绝商户积分
+
+  // ===== 风险告警 =====
+  '/api/v4/console/:id/review': 'ADMIN_RISK_ALERT_REVIEW', // 审核风险告警
+
+  // ===== 基础创建操作（路由根路径的 POST）=====
+  '/api/v4/console/': 'ADMIN_RESOURCE_CREATE', // 管理后台资源创建（popup-banners/staff/stores/announcements/user-hierarchy）
+
+  // ===== 公告与反馈管理 =====
+  '/api/v4/console/system/': 'ADMIN_SYSTEM_CREATE', // 创建系统资源
+  '/api/v4/console/system/:id': 'ADMIN_SYSTEM_UPDATE', // 更新系统资源
+  '/api/v4/console/:id/reply': 'ADMIN_FEEDBACK_REPLY', // 回复反馈（实际路径）
+  '/api/v4/console/system/:id/reply': 'ADMIN_FEEDBACK_REPLY', // 回复反馈（兼容路径）
+  '/api/v4/console/:id/status': 'ADMIN_FEEDBACK_STATUS', // 更新反馈状态（实际路径）
+  '/api/v4/console/system/:id/status': 'ADMIN_FEEDBACK_STATUS', // 更新反馈状态（兼容路径）
+
+  // ===== 区域管理 =====
+  '/api/v4/console/validate': 'ADMIN_REGION_VALIDATE', // 验证区域
+
+  // ===== 批量操作 =====
+  '/api/v4/console/batch-add': 'ADMIN_BATCH_ADD', // 批量添加
+
+  /*
+   * ===============================================================
+   * 调试控制接口（仅开发环境）
+   * ===============================================================
+   */
+  '/api/v4/debug-control/log-level': 'DEBUG_LOG_LEVEL', // 日志级别调整
+  '/api/v4/debug-control/user-debug': 'DEBUG_USER_DEBUG', // 用户调试
+  '/api/v4/debug-control/session-debug': 'DEBUG_SESSION', // 会话调试
+  '/api/v4/debug-control/clear-debug': 'DEBUG_CLEAR' // 清除调试
 }
 
 /**
@@ -89,12 +339,15 @@ class IdempotencyService {
    * 获取 API 路径的 canonical operation
    *
    * 【已拍板决策 2026-01-09】：显式 operation，禁止依赖 URL 推导
+   * 【已拍板决策 2026-01-13】：决策4-B 严格模式 - 未映射直接拒绝
+   *
    * - 所有写接口必须在 CANONICAL_OPERATION_MAP 中显式定义
-   * - 未定义的路径使用原路径（保持严格，避免误放行）
+   * - 未定义的路径直接返回 500 错误（严格模式）
    * - 规范化路径后再查找映射（处理动态参数如 :id）
    *
    * @param {string} api_path - API路径（原始路径）
-   * @returns {string} canonical operation 或原路径
+   * @returns {string} canonical operation
+   * @throws {Error} 未映射的路径抛出 500 错误
    */
   static getCanonicalOperation(api_path) {
     if (!api_path) return api_path
@@ -108,16 +361,27 @@ class IdempotencyService {
       canonical = CANONICAL_OPERATION_MAP[normalized_path]
     }
 
+    // 【决策4-B】严格模式：未映射直接拒绝
     if (!canonical) {
-      /* 未定义的路径，记录告警（便于发现遗漏），仅对写操作记录 */
-      logger.warn('未定义 canonical operation 的写接口', {
+      const errorMessage =
+        '严重错误：写接口 ' +
+        api_path +
+        ' 未在 CANONICAL_OPERATION_MAP 中定义。' +
+        '请在 services/IdempotencyService.js 中添加映射后重启服务。'
+      const error = new Error(errorMessage)
+      error.statusCode = 500
+      error.code = 'CANONICAL_OPERATION_NOT_MAPPED'
+
+      logger.error('CANONICAL_OPERATION_NOT_MAPPED', {
         api_path,
         normalized_path: this.normalizePath(api_path),
-        hint: '如果这是新增写接口，需要在 CANONICAL_OPERATION_MAP 中显式定义'
+        action: '请在 CANONICAL_OPERATION_MAP 中添加映射'
       })
+
+      throw error
     }
 
-    return canonical || api_path
+    return canonical
   }
 
   /**
@@ -241,16 +505,79 @@ class IdempotencyService {
   }
 
   /**
-   * 生成请求参数哈希（兼容旧接口，内部调用 generateRequestFingerprint）
+   * 脱敏响应数据 - 过滤敏感字段
+   * 【决策细则9】response_snapshot 安全策略 - 禁止存储敏感信息
    *
-   * @param {Object} params - 请求参数
-   * @returns {string} SHA-256哈希值
-   * @deprecated 使用 generateRequestFingerprint 替代
+   * @param {Object} data - 原始响应数据
+   * @returns {Object} 脱敏后的响应数据
    */
-  static generateRequestHash(params) {
-    // 兼容旧调用方式，仅对 body 进行哈希
-    const sortedParams = JSON.stringify(params, Object.keys(params || {}).sort())
-    return crypto.createHash('sha256').update(sortedParams).digest('hex')
+  static sanitizeResponse(data) {
+    if (!data || typeof data !== 'object') return data
+
+    // 深度拷贝避免修改原始对象
+    const sanitized = JSON.parse(JSON.stringify(data))
+
+    // 递归脱敏
+    const sanitizeObject = obj => {
+      if (!obj || typeof obj !== 'object') return
+
+      for (const key of Object.keys(obj)) {
+        // 检查字段名是否在敏感列表中（不区分大小写）
+        const lowerKey = key.toLowerCase()
+        if (SENSITIVE_FIELDS.some(field => lowerKey.includes(field))) {
+          obj[key] = '[REDACTED]'
+        } else if (typeof obj[key] === 'object' && obj[key] !== null) {
+          sanitizeObject(obj[key])
+        }
+      }
+    }
+
+    sanitizeObject(sanitized)
+    return sanitized
+  }
+
+  /**
+   * 检查并处理 response_snapshot 大小
+   * 【决策6】response_snapshot 存储策略 - 大小限制
+   *
+   * @param {Object} responseData - 响应数据
+   * @param {string} idempotency_key - 幂等键（用于日志）
+   * @param {string} business_event_id - 业务事件ID（用于截断时保留）
+   * @returns {Object} 处理后的响应快照
+   */
+  static prepareResponseSnapshot(responseData, idempotency_key, business_event_id) {
+    // 先脱敏
+    const sanitized = this.sanitizeResponse(responseData)
+    const snapshot = JSON.stringify(sanitized)
+    const size = Buffer.byteLength(snapshot, 'utf8')
+
+    // 硬限制 64KB：截断只保留关键字段
+    if (size > SNAPSHOT_HARD_LIMIT) {
+      logger.warn('response_snapshot 超过 64KB，仅存关键字段', {
+        idempotency_key,
+        original_size: size,
+        business_event_id
+      })
+
+      return {
+        _truncated: true,
+        _original_size: size,
+        success: sanitized.success,
+        code: sanitized.code,
+        message: sanitized.message,
+        business_event_id: sanitized.business_event_id || business_event_id
+      }
+    }
+
+    // 软限制 32KB：记录告警但仍完整存储
+    if (size > SNAPSHOT_SOFT_LIMIT) {
+      logger.warn('response_snapshot 超过 32KB', {
+        idempotency_key,
+        size
+      })
+    }
+
+    return sanitized
   }
 
   /**
@@ -441,6 +768,7 @@ class IdempotencyService {
 
   /**
    * 标记请求为完成状态（保存结果快照）
+   * 【决策6】response_snapshot 合规存储 - 脱敏 + 大小限制
    *
    * @param {string} idempotency_key - 幂等键
    * @param {string} business_event_id - 业务事件ID（如 lottery_session_id）
@@ -450,11 +778,18 @@ class IdempotencyService {
   static async markAsCompleted(idempotency_key, business_event_id, response_data) {
     const { ApiIdempotencyRequest } = require('../models')
 
+    // 【决策6】使用脱敏和大小检查处理 response_snapshot
+    const response_snapshot = this.prepareResponseSnapshot(
+      response_data,
+      idempotency_key,
+      business_event_id
+    )
+
     await ApiIdempotencyRequest.update(
       {
         status: 'completed',
         business_event_id: business_event_id || null,
-        response_snapshot: response_data,
+        response_snapshot,
         response_code: response_data?.code || 'SUCCESS',
         completed_at: new Date()
       },
@@ -466,7 +801,8 @@ class IdempotencyService {
     logger.info('✅ 入口幂等：请求标记为完成', {
       idempotency_key,
       business_event_id,
-      response_code: response_data?.code || 'SUCCESS'
+      response_code: response_data?.code || 'SUCCESS',
+      snapshot_truncated: response_snapshot?._truncated || false
     })
   }
 
@@ -592,3 +928,6 @@ class IdempotencyService {
 }
 
 module.exports = IdempotencyService
+
+// 导出 CANONICAL_OPERATION_MAP 供验证脚本使用
+module.exports.CANONICAL_OPERATION_MAP = CANONICAL_OPERATION_MAP

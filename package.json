@@ -115,7 +115,8 @@
     "sealos:setup": "bash scripts/sealos/setup_sealos.sh",
     "check:cache": "node scripts/check-cache-config.js",
     "check:env": "node -e \"require('./config/environment').validateConfig()\"",
-    "check:config": "npm run check:cache && npm run check:env"
+    "check:config": "npm run check:cache && npm run check:env",
+    "cleanup:idempotency": "node scripts/maintenance/cleanup_expired_idempotency.js"
   },
   "dependencies": {
     "aws-sdk": "^2.1691.0",

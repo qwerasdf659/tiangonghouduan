@@ -113,7 +113,92 @@ if (process.env.NODE_ENV !== 'production') {
   )
 }
 
-// 🔐 敏感信息脱敏
+// 🔐 敏感信息脱敏（架构决策5：结构化日志 + 强制脱敏）
+/**
+ * 🚫 绝不允许落日志（黑名单）
+ *
+ * 这些字段包含敏感信息，必须完全从日志中移除，标记为 [REDACTED]
+ * 2026-01-13 执行策略拍板：严格脱敏
+ *
+ * @constant {string[]}
+ */
+const BLACKLIST_FIELDS = [
+  'authorization', // HTTP 认证头
+  'Authorization', // HTTP 认证头（大写）
+  'token', // 各类 token
+  'password', // 密码
+  'secret', // 密钥
+  'qr_code', // ✅ 完整二维码绝不落日志（可能被重放）
+  'nonce', // ✅ 一次性随机数绝不落日志
+  'signature', // ✅ 签名信息绝不落日志
+  'payment_info', // 支付信息
+  'card_number', // 银行卡号
+  'cvv', // 卡验证码
+  'private_key', // 私钥
+  'api_key' // API 密钥
+]
+
+/**
+ * 脱敏手机号：保留前3后4，中间4位打码
+ * @param {string|null} mobile - 手机号
+ * @returns {string|null} 脱敏后的手机号（示例：13612227930 → 136****7930）
+ */
+function sanitizeMobile(mobile) {
+  return mobile ? mobile.replace(/(\d{3})\d{4}(\d{4})/, '$1****$2') : null
+}
+
+/**
+ * 脱敏用户UUID：仅保留前8位
+ * @param {string|null} uuid - 用户UUID
+ * @returns {string|null} 脱敏后的UUID（示例：abc12345-xxxx → abc12345...）
+ */
+function sanitizeUserUuid(uuid) {
+  return uuid ? uuid.substring(0, 8) + '...' : null
+}
+
+/**
+ * IP地址：保留完整（便于风控，非敏感信息）
+ * @param {string|null} ip - IP地址
+ * @returns {string|null} 原始IP地址
+ */
+function sanitizeIp(ip) {
+  return ip
+}
+
+/**
+ * 脱敏商家备注：截断到100字符
+ * @param {string|null} notes - 商家备注
+ * @returns {string|null} 截断后的备注
+ */
+function sanitizeMerchantNotes(notes) {
+  return notes ? notes.substring(0, 100) : null
+}
+
+/**
+ * 脱敏幂等键：截断到50字符
+ * @param {string|null} key - 幂等键
+ * @returns {string|null} 截断后的幂等键
+ */
+function sanitizeIdempotencyKey(key) {
+  return key ? key.substring(0, 50) : null
+}
+
+/**
+ * ⚠️ 允许部分脱敏落日志（灰名单规则）
+ *
+ * 这些字段可以记录，但需要脱敏处理
+ * 每个规则函数接受原始值，返回脱敏后的值
+ *
+ * @constant {Object.<string, function>}
+ */
+const SANITIZE_RULES = {
+  mobile: sanitizeMobile,
+  user_uuid: sanitizeUserUuid,
+  ip: sanitizeIp,
+  merchant_notes: sanitizeMerchantNotes,
+  idempotency_key: sanitizeIdempotencyKey
+}
+
 /**
  * 敏感信息脱敏（Sanitize）
  *
@@ -121,13 +206,19 @@ if (process.env.NODE_ENV !== 'production') {
  * - 日志中可能包含 password/token 等敏感字段，必须脱敏后再输出
  * - 该函数会对对象进行深拷贝并递归脱敏
  *
+ * 架构决策5（2026-01-13）：
+ * - 黑名单字段：完全移除，替换为 [REDACTED]
+ * - 灰名单字段：按规则脱敏处理
+ *
  * @param {Object|null} data - 待脱敏的对象（可为空）
  * @returns {Object|null} 脱敏后的对象（若入参为空则原样返回）
  */
-function sanitize (data) {
+function sanitize(data) {
   if (!data) return data
 
-  const sensitive = ['password', 'token', 'secret', 'key', 'authorization']
+  // 处理字符串类型直接返回
+  if (typeof data !== 'object') return data
+
   const sanitized = JSON.parse(JSON.stringify(data))
 
   /**
@@ -136,13 +227,27 @@ function sanitize (data) {
    * @param {Object|null} obj - 待处理对象
    * @returns {void} 无返回值，直接修改 obj
    */
-  function maskValue (obj) {
+  function maskValue(obj) {
     if (typeof obj !== 'object' || obj === null) return
 
     for (const key in obj) {
-      if (sensitive.some(word => key.toLowerCase().includes(word))) {
-        obj[key] = '***MASKED***'
+      // 黑名单字段：完全移除
+      if (BLACKLIST_FIELDS.includes(key)) {
+        obj[key] = '[REDACTED]'
+        continue
+      }
+
+      // 灰名单字段：按规则脱敏
+      if (key === 'mobile' && SANITIZE_RULES.mobile) {
+        obj[key] = SANITIZE_RULES.mobile(obj[key])
+      } else if (key === 'user_uuid' && SANITIZE_RULES.user_uuid) {
+        obj[key] = SANITIZE_RULES.user_uuid(obj[key])
+      } else if (key === 'merchant_notes' && SANITIZE_RULES.merchant_notes) {
+        obj[key] = SANITIZE_RULES.merchant_notes(obj[key])
+      } else if (key === 'idempotency_key' && SANITIZE_RULES.idempotency_key) {
+        obj[key] = SANITIZE_RULES.idempotency_key(obj[key])
       } else if (typeof obj[key] === 'object') {
+        // 递归处理嵌套对象
         maskValue(obj[key])
       }
     }
@@ -151,6 +256,39 @@ function sanitize (data) {
   maskValue(sanitized)
   return sanitized
 }
+
+/**
+ * 对象脱敏快捷函数
+ *
+ * @param {Object} obj - 待脱敏对象
+ * @returns {Object} 脱敏后的对象
+ */
+sanitize.object = obj => sanitize(obj)
+
+/**
+ * 手机号脱敏快捷函数
+ */
+sanitize.mobile = SANITIZE_RULES.mobile
+
+/**
+ * user_uuid 脱敏快捷函数
+ */
+sanitize.user_uuid = SANITIZE_RULES.user_uuid
+
+/**
+ * 商家备注脱敏快捷函数
+ */
+sanitize.merchant_notes = SANITIZE_RULES.merchant_notes
+
+/**
+ * 幂等键脱敏快捷函数
+ */
+sanitize.idempotency_key = SANITIZE_RULES.idempotency_key
+
+/**
+ * IP地址脱敏快捷函数
+ */
+sanitize.ip = SANITIZE_RULES.ip
 
 // 🎯 智能日志记录器（支持按用户/会话调试）
 /**
@@ -169,7 +307,7 @@ class SmartLogger {
    * @param {Object} meta - 附加信息（会被脱敏后输出）
    * @returns {void} 无返回值
    */
-  log (level, message, meta = {}) {
+  log(level, message, meta = {}) {
     const { userId, sessionId, requestId } = meta
 
     // 🔍 检查是否需要为此用户/会话记录详细日志
@@ -195,7 +333,7 @@ class SmartLogger {
    * @param {Object} meta - 附加信息
    * @returns {void} 无返回值
    */
-  error (message, meta = {}) {
+  error(message, meta = {}) {
     this.log('error', message, { ...meta, stack: new Error().stack })
   }
 
@@ -206,7 +344,7 @@ class SmartLogger {
    * @param {Object} meta - 附加信息
    * @returns {void} 无返回值
    */
-  warn (message, meta = {}) {
+  warn(message, meta = {}) {
     this.log('warn', message, meta)
   }
 
@@ -217,7 +355,7 @@ class SmartLogger {
    * @param {Object} meta - 附加信息
    * @returns {void} 无返回值
    */
-  info (message, meta = {}) {
+  info(message, meta = {}) {
     this.log('info', message, meta)
   }
 
@@ -228,7 +366,7 @@ class SmartLogger {
    * @param {Object} meta - 附加信息
    * @returns {void} 无返回值
    */
-  debug (message, meta = {}) {
+  debug(message, meta = {}) {
     this.log('debug', message, meta)
   }
 
@@ -239,7 +377,7 @@ class SmartLogger {
    * @param {Object} meta - 附加信息
    * @returns {void} 无返回值
    */
-  trace (message, meta = {}) {
+  trace(message, meta = {}) {
     this.log('trace', message, meta)
   }
 
@@ -250,7 +388,7 @@ class SmartLogger {
    * @param {number} durationMinutes - 开启时长（分钟，默认30）
    * @returns {void} 无返回值
    */
-  enableDebugForUser (userId, durationMinutes = 30) {
+  enableDebugForUser(userId, durationMinutes = 30) {
     debugUsers.add(userId)
     this.info('为用户开启调试模式', { userId, duration: `${durationMinutes}分钟` })
 
@@ -271,7 +409,7 @@ class SmartLogger {
    * @param {number} durationMinutes - 开启时长（分钟，默认30）
    * @returns {void} 无返回值
    */
-  enableDebugForSession (sessionId, durationMinutes = 30) {
+  enableDebugForSession(sessionId, durationMinutes = 30) {
     debugSessions.add(sessionId)
     this.info('为会话开启调试模式', { sessionId, duration: `${durationMinutes}分钟` })
 
@@ -293,7 +431,7 @@ class SmartLogger {
    * @param {string} level - 日志级别（error/warn/info/debug/trace）
    * @returns {boolean} 是否设置成功
    */
-  setLogLevel (level) {
+  setLogLevel(level) {
     if (!Object.prototype.hasOwnProperty.call(LOG_LEVELS, level)) {
       this.error('无效的日志级别', { level, validLevels: Object.keys(LOG_LEVELS) })
       return false
@@ -310,7 +448,7 @@ class SmartLogger {
    *
    * @returns {Object} 当前配置（currentLevel/debugUsers/debugSessions/availableLevels）
    */
-  getConfig () {
+  getConfig() {
     return {
       currentLevel: CURRENT_LOG_LEVEL,
       debugUsers: Array.from(debugUsers),
@@ -324,7 +462,7 @@ class SmartLogger {
    *
    * @returns {void} 无返回值
    */
-  clearAllDebugSessions () {
+  clearAllDebugSessions() {
     const count = debugUsers.size + debugSessions.size
     debugUsers.clear()
     debugSessions.clear()
@@ -343,5 +481,10 @@ module.exports = {
   warn: (msg, meta) => smartLogger.warn(msg, meta),
   info: (msg, meta) => smartLogger.info(msg, meta),
   debug: (msg, meta) => smartLogger.debug(msg, meta),
-  trace: (msg, meta) => smartLogger.trace(msg, meta)
+  trace: (msg, meta) => smartLogger.trace(msg, meta),
+
+  // 脱敏工具导出（架构决策5：供外部模块使用）
+  sanitize,
+  BLACKLIST_FIELDS,
+  SANITIZE_RULES
 }

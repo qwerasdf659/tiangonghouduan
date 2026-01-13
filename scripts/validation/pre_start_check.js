@@ -2,11 +2,19 @@
  * 项目启动前自动验证脚本
  * 在PM2/Nodemon启动前执行所有检查
  *
+ * 检查项：
+ * 1. 路由文件完整性
+ * 2. 环境变量
+ * 3. 必需文件
+ * 4. 数据库连接
+ * 5. 幂等服务 Canonical Operation 映射（决策4-B 严格模式）
+ *
  * @author Restaurant Points System
  * @date 2025-11-23
+ * @updated 2026-01-13 - 添加 Canonical Operation 验证
  */
 
-const RouteValidator = require('./route-validator')
+const RouteValidator = require('./route_validator')
 const path = require('path')
 const fs = require('fs')
 
@@ -61,6 +69,19 @@ async function preStartCheck() {
       name: '数据库连接',
       passed: dbResult.valid,
       errors: dbResult.errors
+    })
+  }
+
+  // 5. Canonical Operation 映射检查（决策4-B 严格模式）
+  if (process.env.CHECK_CANONICAL !== 'false') {
+    console.log('\n5️⃣  幂等服务 Canonical Operation 检查')
+    console.log('-'.repeat(60))
+    const canonicalResult = await checkCanonicalOperations()
+    checks.push({
+      name: 'Canonical Operation 映射',
+      passed: canonicalResult.valid,
+      errors: canonicalResult.errors,
+      warnings: canonicalResult.warnings
     })
   }
 
@@ -198,6 +219,42 @@ async function checkDatabaseConnection() {
     return {
       valid: false,
       errors: [{ message: `数据库连接失败: ${error.message}` }]
+    }
+  }
+}
+
+/**
+ * 检查 Canonical Operation 映射完整性
+ * 【决策4-B】严格模式：启动时验证，运行时双保险
+ * @returns {Promise<Object>} 检查结果
+ */
+async function checkCanonicalOperations() {
+  try {
+    const { verifyCanonicalOperations } = require('./verify_idempotency_canonical')
+    const result = await verifyCanonicalOperations()
+
+    if (result.valid) {
+      console.log('  ✅ Canonical Operation 映射验证通过')
+      if (result.stats) {
+        console.log(`     已定义 ${result.stats.mapped_operations} 个映射`)
+      }
+    } else {
+      console.log('  ❌ Canonical Operation 映射验证失败')
+    }
+
+    if (result.warnings && result.warnings.length > 0) {
+      result.warnings.forEach(warning => {
+        console.log(`  ⚠️  ${warning}`)
+      })
+    }
+
+    return result
+  } catch (error) {
+    console.log(`  ❌ Canonical Operation 检查异常: ${error.message}`)
+    return {
+      valid: false,
+      errors: [{ message: `Canonical Operation 检查异常: ${error.message}` }],
+      warnings: []
     }
   }
 }

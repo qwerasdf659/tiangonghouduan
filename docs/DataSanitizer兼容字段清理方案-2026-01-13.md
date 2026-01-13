@@ -935,7 +935,8 @@ curl -H "Authorization: Bearer YOUR_TOKEN" \
 **强制要求**：
 
 - ✅ **必须返回** `primary_image_id`（资源主键，用于治理：清理孤儿图、权限、统计、替换图片不改业务表结构）
-- ✅ **必须返回** `primary_image`（轻量对象，至少含 `url`，可选 `width/height/mime`）
+- ✅ **必须返回** `primary_image`（轻量对象，含 `image_id`、`url`、`mime`、`thumbnail_url`）
+- ⚠️ **注意**：`image_resources` 表无 `width`/`height` 字段，故不返回（2026-01-13 实际验证）
 - ❌ **不再返回** `image` / `image_url`
 
 ### 2️⃣ 列表 vs 详情的返回结构
@@ -1018,8 +1019,8 @@ const items = await ExchangeItem.findAll({
   include: [
     {
       model: ImageResources,
-      as: 'primaryImage', // 假设 ExchangeItem 已定义 belongsTo(ImageResources, { as: 'primaryImage', foreignKey: 'primary_image_id' })
-      attributes: ['image_id', 'url', 'width', 'height', 'mime'],
+      as: 'primaryImage', // ExchangeItem.belongsTo(ImageResources, { as: 'primaryImage', foreignKey: 'primary_image_id' })
+      attributes: ['image_id', 'file_path', 'mime_type', 'thumbnail_paths'], // 📌 实际字段（无 width/height）
       required: false // LEFT JOIN，允许图片不存在
     }
   ],
@@ -1090,7 +1091,7 @@ static async sanitizeExchangeMarketItemsWithImages(items) {
   // 2. 批量查询图片（一次 SQL）
   const images = await ImageResources.findAll({
     where: { image_id: { [Op.in]: imageIds } },
-    attributes: ['image_id', 'url', 'width', 'height', 'mime']
+    attributes: ['image_id', 'file_path', 'mime_type', 'thumbnail_paths'] // 📌 实际字段（无 width/height）
   })
 
   // 3. 建立 Map
@@ -1160,7 +1161,12 @@ static async sanitizeExchangeMarketItemsWithImages(items) {
 
 ### 决策2：`primary_image` 字段集合 ✅ 已拍板
 
-**拍板决策**：**固定返回** `primary_image = { image_id, url, width, height, mime }`
+**拍板决策**：**固定返回** `primary_image = { image_id, url, mime, thumbnail_url }`
+
+**更新说明**（2026-01-13 实际验证）：
+
+- `image_resources` 表实际无 `width`/`height` 字段，故 `primary_image` 对象不含这两个字段
+- 新增 `thumbnail_url` 字段，用于列表视图显示缩略图
 
 **理由**：
 
@@ -1170,8 +1176,8 @@ static async sanitizeExchangeMarketItemsWithImages(items) {
 
 **执行要求**：
 
-- `primary_image` 对象必须包含且仅包含这 5 个字段
-- 所有字段类型固定：`image_id`(number)、`url`(string)、`width`(number)、`height`(number)、`mime`(string)
+- `primary_image` 对象必须包含这 4 个字段（基于实际数据库结构）
+- 所有字段类型固定：`image_id`(number)、`url`(string)、`mime`(string)、`thumbnail_url`(string|null)
 
 ---
 
@@ -1316,7 +1322,7 @@ return items.map(item => ({
 ### 强制要求（不做兼容、不考虑前端）
 
 1. ✅ **只返回 `id`**，不再返回 `item_id`
-2. ✅ **`primary_image` 固定 5 个字段**：`image_id, url, width, height, mime`
+2. ✅ **`primary_image` 固定 4 个字段**：`image_id, url, mime, thumbnail_url`（📌 实际数据库无 width/height）
 3. ✅ **图片缺失时 `primary_image` 返回 `null`**，不返回默认占位图
 4. ✅ **URL 为公开永久 CDN URL**，不做签名
 5. ✅ **列表返回缩略图 URL**，详情同样结构

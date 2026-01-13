@@ -61,7 +61,7 @@ const { BusinessCacheHelper } = require('../utils/BusinessCacheHelper')
  * 使用模型：Claude Sonnet 4.5
  */
 
-const { ExchangeItem, ExchangeRecord, sequelize } = require('../models')
+const { ExchangeItem, ExchangeRecord, ImageResources, sequelize } = require('../models')
 const { Op } = require('sequelize')
 const BeijingTimeHelper = require('../utils/timeHelper')
 const { assertAndGetTransaction } = require('../utils/transactionHelpers')
@@ -106,6 +106,8 @@ const EXCHANGE_MARKET_ATTRIBUTES = {
    * 市场商品列表视图（Market Item List View）
    * 用户浏览商品列表时返回的字段
    * 不包含敏感字段：cost_price（成本价）、sold_count（已售数量）
+   *
+   * 🔧 2026-01-13 图片字段策略：添加 primary_image_id，通过 include 关联获取图片详情
    */
   marketItemView: [
     'item_id', // 商品ID（Item ID）
@@ -116,6 +118,7 @@ const EXCHANGE_MARKET_ATTRIBUTES = {
     'stock', // 库存（Stock）
     'sort_order', // 排序（Sort Order）
     'status', // 状态：active/inactive（Status）
+    'primary_image_id', // 主图片ID（关联 image_resources 表）- 2026-01-13 图片字段策略
     'created_at' // 创建时间（Created At）
   ],
 
@@ -123,6 +126,8 @@ const EXCHANGE_MARKET_ATTRIBUTES = {
    * 商品详情视图（Market Item Detail View）
    * 用户查看商品详情时返回的字段
    * 包含商品的完整信息（除敏感字段外）
+   *
+   * 🔧 2026-01-13 图片字段策略：添加 primary_image_id，通过 include 关联获取图片详情
    */
   marketItemDetailView: [
     'item_id', // 商品ID（Item ID）
@@ -134,6 +139,7 @@ const EXCHANGE_MARKET_ATTRIBUTES = {
     'sold_count', // 已售数量（Sold Count - 展示商品热度）🔧 2026-01-09 修复：字段名匹配数据库模型
     'sort_order', // 排序（Sort Order）
     'status', // 状态（Status）
+    'primary_image_id', // 主图片ID（关联 image_resources 表）- 2026-01-13 图片字段策略
     'created_at', // 创建时间（Created At）
     'updated_at' // 更新时间（Updated At）
   ],
@@ -142,6 +148,8 @@ const EXCHANGE_MARKET_ATTRIBUTES = {
    * 管理员商品视图（Admin Market Item View）
    * 管理员查看商品时返回的字段
    * 包含所有字段，用于后台管理和数据分析
+   *
+   * 🔧 2026-01-13 图片字段策略：添加 primary_image_id，通过 include 关联获取图片详情
    */
   adminMarketItemView: [
     'item_id', // 商品ID（Item ID）
@@ -154,6 +162,7 @@ const EXCHANGE_MARKET_ATTRIBUTES = {
     'sold_count', // 已售数量（Sold Count）🔧 2026-01-09 修复：字段名匹配数据库模型
     'sort_order', // 排序（Sort Order）
     'status', // 状态（Status）
+    'primary_image_id', // 主图片ID（关联 image_resources 表）- 2026-01-13 图片字段策略
     'created_at', // 创建时间（Created At）
     'updated_at' // 更新时间（Updated At）
   ],
@@ -266,10 +275,21 @@ class ExchangeService {
       const offset = (page - 1) * page_size
       const limit = page_size
 
-      // 查询商品列表
+      /*
+       * 查询商品列表（2026-01-13 图片字段策略：include ImageResources）
+       * 📌 字段选择基于实际数据库表结构：image_resources 无 width/height 字段
+       */
       const { count, rows } = await ExchangeItem.findAndCountAll({
         where,
         attributes: EXCHANGE_MARKET_ATTRIBUTES.marketItemView, // ✅ 使用统一视图常量
+        include: [
+          {
+            model: ImageResources,
+            as: 'primaryImage', // ✅ 匹配模型关联定义的别名
+            attributes: ['image_id', 'file_path', 'mime_type', 'thumbnail_paths'],
+            required: false // 左连接，允许商品没有主图片
+          }
+        ],
         limit,
         offset,
         order: [[sort_by, sort_order]]
@@ -307,9 +327,21 @@ class ExchangeService {
    */
   static async getItemDetail(item_id) {
     try {
+      /*
+       * 2026-01-13 图片字段策略：include ImageResources 获取主图片详情
+       * 📌 字段选择基于实际数据库表结构：image_resources 无 width/height 字段
+       */
       const item = await ExchangeItem.findOne({
         where: { item_id },
-        attributes: EXCHANGE_MARKET_ATTRIBUTES.marketItemDetailView // ✅ 使用统一视图常量
+        attributes: EXCHANGE_MARKET_ATTRIBUTES.marketItemDetailView, // ✅ 使用统一视图常量
+        include: [
+          {
+            model: ImageResources,
+            as: 'primaryImage', // ✅ 匹配模型关联定义的别名
+            attributes: ['image_id', 'file_path', 'mime_type', 'thumbnail_paths'],
+            required: false // 左连接，允许商品没有主图片
+          }
+        ]
       })
 
       if (!item) {
