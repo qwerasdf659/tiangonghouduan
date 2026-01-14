@@ -1039,6 +1039,102 @@ class AssetService {
   }
 
   /**
+   * 获取用户所有 BUDGET_POINTS 可用余额总和（跨所有活动）
+   *
+   * 业务场景：抽奖策略需要判断用户总预算积分是否充足
+   * 方案1决策：BasicGuaranteeStrategy 统一通过 AssetService 访问资产数据
+   *
+   * @param {Object} params - 参数对象
+   * @param {number} params.user_id - 用户ID
+   * @param {Object} options - 选项
+   * @param {Object} options.transaction - Sequelize事务对象（可选）
+   * @returns {Promise<number>} BUDGET_POINTS 可用余额总和
+   */
+  static async getTotalBudgetPoints(params, options = {}) {
+    const { user_id } = params
+    const { transaction } = options
+
+    if (!user_id) {
+      throw new Error('getTotalBudgetPoints: user_id 参数必填')
+    }
+
+    // 获取用户账户
+    const account = await Account.findOne({
+      where: { user_id, account_type: 'user' },
+      transaction
+    })
+
+    if (!account) {
+      // 账户不存在时返回 0（符合决策G：0正常态）
+      return 0
+    }
+
+    // 汇总所有 BUDGET_POINTS 可用余额
+    const result = await AccountAssetBalance.sum('available_amount', {
+      where: {
+        account_id: account.account_id,
+        asset_code: 'BUDGET_POINTS'
+      },
+      transaction
+    })
+
+    return Number(result) || 0
+  }
+
+  /**
+   * 获取用户指定活动ID列表的 BUDGET_POINTS 可用余额总和
+   *
+   * 业务场景：抽奖策略按活动优先级扣减预算积分时，需要查询特定活动的余额
+   * 方案1决策：BasicGuaranteeStrategy 统一通过 AssetService 访问资产数据
+   *
+   * @param {Object} params - 参数对象
+   * @param {number} params.user_id - 用户ID
+   * @param {Array<string|number>} params.campaign_ids - 允许的活动ID列表
+   * @param {Object} options - 选项
+   * @param {Object} options.transaction - Sequelize事务对象（可选）
+   * @returns {Promise<number>} BUDGET_POINTS 可用余额总和
+   */
+  static async getBudgetPointsByCampaigns(params, options = {}) {
+    const { user_id, campaign_ids } = params
+    const { transaction } = options
+    const { Op } = require('sequelize')
+
+    if (!user_id) {
+      throw new Error('getBudgetPointsByCampaigns: user_id 参数必填')
+    }
+
+    if (!campaign_ids || !Array.isArray(campaign_ids) || campaign_ids.length === 0) {
+      return 0
+    }
+
+    // 获取用户账户
+    const account = await Account.findOne({
+      where: { user_id, account_type: 'user' },
+      transaction
+    })
+
+    if (!account) {
+      // 账户不存在时返回 0（符合决策G：0正常态）
+      return 0
+    }
+
+    // 将 campaign_ids 转为字符串数组（campaign_id 在表中为字符串类型）
+    const campaignIdStrings = campaign_ids.map(id => String(id))
+
+    // 汇总指定活动的 BUDGET_POINTS 可用余额
+    const result = await AccountAssetBalance.sum('available_amount', {
+      where: {
+        account_id: account.account_id,
+        asset_code: 'BUDGET_POINTS',
+        campaign_id: { [Op.in]: campaignIdStrings }
+      },
+      transaction
+    })
+
+    return Number(result) || 0
+  }
+
+  /**
    * 获取资产流水记录
    *
    * @param {Object} params - 参数对象

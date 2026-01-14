@@ -101,7 +101,7 @@ class TestAccountManager {
    *
    * @constructor
    */
-  constructor () {
+  constructor() {
     if (TestAccountManager.instance) {
       return TestAccountManager.instance
     }
@@ -114,7 +114,7 @@ class TestAccountManager {
         verification_code: '123456',
         role_name: 'admin',
         role_level: 100,
-        // is_admin字段已迁移到UUID角色系统
+        // 权限由 role_name + role_level 定义（UUID角色系统）
         available_points: 393580,
         description: '主要测试账号 - 超级管理员身份',
         created_by: 'USER_SPECIFICATION',
@@ -140,7 +140,7 @@ class TestAccountManager {
         user_id: 31,
         role_name: 'admin',
         role_level: 100,
-        // is_admin字段已迁移到UUID角色系统
+        // 权限由 role_name + role_level 定义（UUID角色系统）
         min_points: 1000,
         status: 'active'
       }),
@@ -183,7 +183,7 @@ class TestAccountManager {
    * console.log(config.user_id) // 31
    * console.log(config.test_privileges.unlimited_lottery) // true
    */
-  getTestAccountConfig () {
+  getTestAccountConfig() {
     return this.IMMUTABLE_TEST_CONFIG.MAIN_TEST_ACCOUNT
   }
 
@@ -218,7 +218,7 @@ class TestAccountManager {
    * await manager.validateTestAccount({ mobile: '13612227930', user_id: 31 })
    * // ✅ 测试账号验证通过: 13612227930
    */
-  async validateTestAccount (account) {
+  async validateTestAccount(account) {
     const required = this.IMMUTABLE_TEST_CONFIG.VALIDATION_REQUIREMENTS
     const forbidden = this.IMMUTABLE_TEST_CONFIG.FORBIDDEN_ACCOUNTS
 
@@ -274,7 +274,7 @@ class TestAccountManager {
    * console.log(config.testAccount.mobile) // '13612227930'
    * console.log(config.metadata.protection_level) // 'MAXIMUM'
    */
-  async createProtectedTestRequestConfig () {
+  async createProtectedTestRequestConfig() {
     const testAccount = this.getTestAccountConfig()
     await this.validateTestAccount(testAccount)
 
@@ -307,7 +307,7 @@ class TestAccountManager {
    * @param {string} privilegeType - 权限类型：'unlimited_lottery', 'bypass_daily_limit', 'bypass_points_limit'
    * @returns {boolean} 是否具有指定权限
    */
-  hasTestPrivilege (userId, privilegeType) {
+  hasTestPrivilege(userId, privilegeType) {
     const testAccount = this.IMMUTABLE_TEST_CONFIG.MAIN_TEST_ACCOUNT
 
     // 检查是否为主测试账号
@@ -327,7 +327,7 @@ class TestAccountManager {
    * @param {number|string} userId - 用户ID
    * @returns {boolean} 是否为测试账号
    */
-  isTestAccount (userId) {
+  isTestAccount(userId) {
     const testAccount = this.IMMUTABLE_TEST_CONFIG.MAIN_TEST_ACCOUNT
     return parseInt(userId) === testAccount.user_id
   }
@@ -337,7 +337,7 @@ class TestAccountManager {
    * @param {number|string} userId - 用户ID
    * @returns {Object|null} 测试权限配置，非测试账号返回null
    */
-  getTestPrivileges (userId) {
+  getTestPrivileges(userId) {
     if (this.isTestAccount(userId)) {
       return this.IMMUTABLE_TEST_CONFIG.MAIN_TEST_ACCOUNT.test_privileges
     }
@@ -350,7 +350,7 @@ class TestAccountManager {
    * @param {Object} _accountConfig - 新测试账号配置（预留参数）
    * @returns {boolean} 当前固定返回false（功能预留中）
    */
-  addTestAccount (_accountConfig) {
+  addTestAccount(_accountConfig) {
     // 预留接口，用于未来扩展多测试账号
     console.warn('🔮 多测试账号功能预留中，当前仅支持主测试账号13612227930')
     return false
@@ -379,7 +379,7 @@ class TestAccountManager {
    * console.log(report.main_account.user_id) // 31
    * console.log(report.protection_status.immutable_config) // true
    */
-  generateConfigReport () {
+  generateConfigReport() {
     const config = this.IMMUTABLE_TEST_CONFIG
     return {
       timestamp: BeijingTimeHelper.nowLocale(),

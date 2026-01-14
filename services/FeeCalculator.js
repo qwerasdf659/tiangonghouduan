@@ -6,22 +6,36 @@ const _logger = require('../utils/logger').logger
  *
  * 业务场景：
  * - 计算物品转让的手续费（基于 ItemInstance.meta.value 字段）
- * - 支持按商品价值分档计费
+ * - 支持按商品价值分档计费（DIAMOND）
+ * - 支持单一费率模式（red_shard 等非 DIAMOND 币种）
  * - 集成到TradeOrder交易订单系统（C2C市场）
  *
+ * 多币种扩展（2026-01-14）：
+ * - DIAMOND：保持分档逻辑（基于 itemValue 分档 + ceil + 最低费 1）
+ * - red_shard：单一费率 5%，最低手续费 1（从 system_settings 读取）
+ * - 其他币种：根据 system_settings 配置的费率和最低费计算
+ *
  * 数据库关联：
- * - ItemInstance.meta.value（商品价值）- 用于计费分档
+ * - ItemInstance.meta.value（商品价值）- 用于 DIAMOND 计费分档
  * - MarketListing.price_amount（用户定价）- 买家支付金额
+ * - MarketListing.price_asset_code（结算币种）- 决定计费模式
  * - TradeOrder.fee_amount（手续费）- 平台收取
  * - TradeOrder.net_amount（卖家实收）- gross_amount - fee_amount
+ * - system_settings（fee_rate_*, fee_min_*）- 多币种费率配置
  *
  * 使用示例：
+ * // DIAMOND（分档模式）
  * const feeInfo = FeeCalculator.calculateItemFee(item.meta.value, listing.price_amount);
  * // 返回：{ fee: 30, rate: 0.05, net_amount: 570, tier: '中价值档' }
+ *
+ * // red_shard（单一费率模式）
+ * const feeInfo = await FeeCalculator.calculateFeeByAsset('red_shard', null, 1000);
+ * // 返回：{ fee: 50, rate: 0.05, net_amount: 950, calculation_mode: 'flat' }
  *
  */
 
 const FEE_RULES = require('../config/fee_rules')
+const AdminSystemService = require('./AdminSystemService')
 
 /**
  * 手续费计算器服务类
@@ -195,6 +209,161 @@ class FeeCalculator {
     if (!tier) return '未知档位'
 
     return `${(tier.rate * 100).toFixed(0)}%（${tier.label}）- ${tier.description}`
+  }
+
+  /**
+   * 根据结算币种计算手续费（多币种扩展版）
+   *
+   * 业务规则（2026-01-14 拍板）：
+   * - DIAMOND：保持现状分档逻辑（基于 itemValue 分档 + ceil + 最低费 1）
+   * - red_shard：单一费率 5%，最低手续费 1（从 system_settings 读取）
+   * - 其他币种：根据 system_settings 中 fee_rate_{asset_code} 和 fee_min_{asset_code} 配置
+   *
+   * 配置项读取：
+   * - fee_rate_{asset_code}：费率（如 0.05 = 5%）
+   * - fee_min_{asset_code}：最低手续费（如 1）
+   *
+   * @param {string} asset_code - 结算币种代码（DIAMOND/red_shard 等）
+   * @param {number|null} itemValue - 商品价值（仅 DIAMOND 分档模式使用，其他币种可传 null）
+   * @param {number} sellingPrice - 用户定价（买家支付金额）
+   * @returns {Promise<Object>} 手续费计算结果
+   *   - fee: 手续费金额（已取整）
+   *   - rate: 费率（如 0.05 表示 5%）
+   *   - net_amount: 卖家实收金额（sellingPrice - fee）
+   *   - calculation_mode: 计费模式（'tiered'-分档模式 / 'flat'-单一费率模式）
+   *   - tier: 档位名称（仅分档模式有值）
+   *   - tier_description: 档位说明（仅分档模式有值）
+   *   - asset_code: 结算币种代码
+   *
+   * @example
+   * // DIAMOND 分档模式（基于商品价值分档）
+   * const fee = await FeeCalculator.calculateFeeByAsset('DIAMOND', 500, 600);
+   * // 返回：{ fee: 30, rate: 0.05, net_amount: 570, calculation_mode: 'tiered', tier: '中价值档' }
+   *
+   * // red_shard 单一费率模式（5%，最低 1）
+   * const fee = await FeeCalculator.calculateFeeByAsset('red_shard', null, 1000);
+   * // 返回：{ fee: 50, rate: 0.05, net_amount: 950, calculation_mode: 'flat' }
+   *
+   * @throws {Error} 不支持的结算币种（未在白名单且未配置费率）
+   *
+   * @see docs/交易市场多币种扩展功能-待办清单-2026-01-14.md
+   */
+  static async calculateFeeByAsset(asset_code, itemValue, sellingPrice) {
+    /*
+     * DIAMOND 特殊处理：保持现状分档逻辑
+     * 设计原因：DIAMOND 已有完善的分档费率体系，基于 itemValue 判断档位
+     */
+    if (asset_code === 'DIAMOND') {
+      // 如果未传入 itemValue，使用 sellingPrice 作为价值参考
+      const valueForTier = itemValue !== null && itemValue !== undefined ? itemValue : sellingPrice
+
+      const tierResult = this.calculateItemFee(valueForTier, sellingPrice)
+
+      return {
+        fee: tierResult.fee,
+        rate: tierResult.rate,
+        net_amount: tierResult.net_amount,
+        calculation_mode: 'tiered', // 分档模式
+        tier: tierResult.tier,
+        tier_description: tierResult.tier_description,
+        asset_code: 'DIAMOND'
+      }
+    }
+
+    /*
+     * 非 DIAMOND 币种：使用单一费率模式
+     * 从 system_settings 读取配置：
+     * - fee_rate_{asset_code}：费率
+     * - fee_min_{asset_code}：最低手续费
+     */
+
+    // 读取费率配置（默认 5%）
+    const feeRate = await AdminSystemService.getSettingValue(
+      'marketplace',
+      `fee_rate_${asset_code}`,
+      0.05 // 默认 5%
+    )
+
+    // 读取最低手续费配置（默认 1）
+    const feeMin = await AdminSystemService.getSettingValue(
+      'marketplace',
+      `fee_min_${asset_code}`,
+      1 // 默认最低 1
+    )
+
+    /*
+     * 计算手续费（单一费率模式）
+     * 公式：fee = floor(sellingPrice * feeRate)
+     * 注意：使用 floor 向下取整（与 DIAMOND 的 ceil 不同，对用户更友好）
+     * 保底：fee 不低于 feeMin
+     */
+    let fee = Math.floor(sellingPrice * feeRate)
+
+    // 应用最低手续费
+    if (fee < feeMin) {
+      fee = feeMin
+    }
+
+    // 计算卖家实收
+    const netAmount = sellingPrice - fee
+
+    return {
+      fee, // 手续费金额
+      rate: feeRate, // 费率
+      net_amount: netAmount, // 卖家实收
+      calculation_mode: 'flat', // 单一费率模式
+      tier: null, // 非分档模式无档位
+      tier_description: `${(feeRate * 100).toFixed(0)}% 单一费率`, // 费率说明
+      asset_code // 结算币种
+    }
+  }
+
+  /**
+   * 获取指定币种的费率信息（用于前端展示）
+   *
+   * @param {string} asset_code - 结算币种代码
+   * @returns {Promise<Object>} 费率信息
+   *   - rate: 费率（如 0.05）
+   *   - min_fee: 最低手续费
+   *   - calculation_mode: 计费模式
+   *
+   * @example
+   * const rateInfo = await FeeCalculator.getFeeRateByAsset('red_shard');
+   * // 返回：{ rate: 0.05, min_fee: 1, calculation_mode: 'flat' }
+   */
+  static async getFeeRateByAsset(asset_code) {
+    if (asset_code === 'DIAMOND') {
+      // DIAMOND 使用分档模式，返回基础费率区间
+      return {
+        rate: null, // 分档模式无单一费率
+        rate_range: FEE_RULES.tiers.map(t => ({
+          max_value: t.max_value,
+          rate: t.rate,
+          label: t.label
+        })),
+        min_fee: FEE_RULES.min_fee,
+        calculation_mode: 'tiered'
+      }
+    }
+
+    // 读取配置
+    const rate = await AdminSystemService.getSettingValue(
+      'marketplace',
+      `fee_rate_${asset_code}`,
+      0.05
+    )
+    const minFee = await AdminSystemService.getSettingValue(
+      'marketplace',
+      `fee_min_${asset_code}`,
+      1
+    )
+
+    return {
+      rate,
+      rate_range: null,
+      min_fee: minFee,
+      calculation_mode: 'flat'
+    }
   }
 }
 

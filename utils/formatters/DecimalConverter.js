@@ -17,8 +17,9 @@
  * - prize_value (DECIMAL(10,2)) - 奖品价值
  * - probability (DECIMAL(6,4)) - 概率
  * - win_probability (DECIMAL(8,6)) - 中奖概率
- * - points_balance (DECIMAL(10,2)) - 积分余额
  * - amount (DECIMAL(10,2)) - 金额
+ * - available_amount (DECIMAL(10,2)) - 可用余额（新资产账本）
+ * - frozen_amount (DECIMAL(10,2)) - 冻结余额（新资产账本）
  *
  * 创建时间：2025年11月23日
  * 创建原因：修复前端TypeError错误，确保数字类型字段返回真正的数字
@@ -35,7 +36,7 @@ class DecimalConverter {
    * DecimalConverter.toNumber(null)      // 返回: 0
    * DecimalConverter.toNumber(undefined) // 返回: 0
    */
-  static toNumber (value, defaultValue = 0) {
+  static toNumber(value, defaultValue = 0) {
     if (value === null || value === undefined || value === '') {
       return defaultValue
     }
@@ -55,7 +56,7 @@ class DecimalConverter {
    * DecimalConverter.convertFields(prize, ['prize_value'])
    * // 返回: { prize_value: 100.5, name: "奖品" }
    */
-  static convertFields (obj, fields) {
+  static convertFields(obj, fields) {
     if (!obj || typeof obj !== 'object') {
       return obj
     }
@@ -83,7 +84,7 @@ class DecimalConverter {
    * ]
    * DecimalConverter.convertArray(prizes, ['prize_value'])
    */
-  static convertArray (array, fields) {
+  static convertArray(array, fields) {
     if (!Array.isArray(array)) {
       return array
     }
@@ -101,7 +102,7 @@ class DecimalConverter {
    * DecimalConverter.convertPrizeData(prize)
    * // 返回: { prize_value: 100.5, probability: 0.1 }
    */
-  static convertPrizeData (data) {
+  static convertPrizeData(data) {
     const prizeFields = [
       'prize_value', // 奖品价值
       'win_probability', // 中奖概率
@@ -116,25 +117,51 @@ class DecimalConverter {
   }
 
   /**
-   * 转换用户数据 - 专用方法
+   * 转换用户积分账户数据 - 专用方法
+   * 处理 points_account 嵌套结构中的 DECIMAL 字段转数字
+   *
    * @param {Object|Array} data - 用户数据（单个对象或数组）
    * @returns {Object|Array} 转换后的用户数据
    *
    * @example
-   * const user = { points_balance: "1500.00" }
+   * const user = { points_account: { available_points: "1500.00", frozen_points: "0.00" } }
    * DecimalConverter.convertUserData(user)
-   * // 返回: { points_balance: 1500 }
+   * // 返回: { points_account: { available_points: 1500, frozen_points: 0, total_points: 1500 } }
    */
-  static convertUserData (data) {
-    const userFields = [
-      'points_balance' // 积分余额
+  static convertUserData(data) {
+    const pointsAccountFields = [
+      'available_points', // 可用积分
+      'frozen_points', // 冻结积分
+      'total_points' // 总积分
     ]
 
     if (Array.isArray(data)) {
-      return this.convertArray(data, userFields)
+      return data.map(item => this._convertPointsAccount(item, pointsAccountFields))
     } else {
-      return this.convertFields(data, userFields)
+      return this._convertPointsAccount(data, pointsAccountFields)
     }
+  }
+
+  /**
+   * 内部方法：转换 points_account 嵌套结构的数字字段
+   * @param {Object} item - 包含 points_account 的对象
+   * @param {Array<string>} fields - 需要转换的字段名数组
+   * @returns {Object} 转换后的对象
+   * @private
+   */
+  static _convertPointsAccount(item, fields) {
+    if (!item) return item
+
+    const result = { ...item }
+    if (result.points_account && typeof result.points_account === 'object') {
+      result.points_account = { ...result.points_account }
+      fields.forEach(field => {
+        if (result.points_account[field] !== undefined) {
+          result.points_account[field] = this.toNumber(result.points_account[field])
+        }
+      })
+    }
+    return result
   }
 
   /**
@@ -142,7 +169,7 @@ class DecimalConverter {
    * @param {Object|Array} data - 交易记录数据
    * @returns {Object|Array} 转换后的交易记录数据
    */
-  static convertTransactionData (data) {
+  static convertTransactionData(data) {
     const transactionFields = [
       'amount', // 金额
       'points_before', // 交易前积分
@@ -162,7 +189,7 @@ class DecimalConverter {
    * @param {Object|Array} data - 商品数据
    * @returns {Object|Array} 转换后的商品数据
    */
-  static convertProductData (data) {
+  static convertProductData(data) {
     const productFields = [
       'price', // 价格
       'original_price', // 原价
@@ -188,25 +215,25 @@ class DecimalConverter {
    * DecimalConverter.convert(userData, 'user')
    * DecimalConverter.convert(customData, 'custom', ['field1', 'field2'])
    */
-  static convert (data, dataType = 'prize', customFields = []) {
+  static convert(data, dataType = 'prize', customFields = []) {
     switch (dataType) {
-    case 'prize':
-      return this.convertPrizeData(data)
-    case 'user':
-      return this.convertUserData(data)
-    case 'transaction':
-      return this.convertTransactionData(data)
-    case 'product':
-      return this.convertProductData(data)
-    case 'custom':
-      if (Array.isArray(data)) {
-        return this.convertArray(data, customFields)
-      } else {
-        return this.convertFields(data, customFields)
-      }
-    default:
-      console.warn(`未知数据类型: ${dataType}，返回原始数据`)
-      return data
+      case 'prize':
+        return this.convertPrizeData(data)
+      case 'user':
+        return this.convertUserData(data)
+      case 'transaction':
+        return this.convertTransactionData(data)
+      case 'product':
+        return this.convertProductData(data)
+      case 'custom':
+        if (Array.isArray(data)) {
+          return this.convertArray(data, customFields)
+        } else {
+          return this.convertFields(data, customFields)
+        }
+      default:
+        console.warn(`未知数据类型: ${dataType}，返回原始数据`)
+        return data
     }
   }
 }

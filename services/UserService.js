@@ -596,48 +596,68 @@ class UserService {
         throw error
       }
 
-      // 步骤3：检查积分账户（如果需要）- 使用 AssetService 统一账户体系
+      /**
+       * 步骤3：获取积分账户（如果需要）
+       * V4.6决策G：首次查询积分就自动创建账户
+       * - 使用 getOrCreateAccount + getOrCreateBalance 自动创建
+       * - 账户不存在时返回 available_points: 0（0正常态）
+       * - 账户冻结时抛出 403 错误（决策H）
+       */
       let pointsAccount = null
       if (checkPointsAccount) {
         const AssetService = require('./AssetService')
         try {
-          // 使用 AssetService 获取用户账户和积分余额
+          // 获取或创建用户资产账户（决策G：自动创建）
           const account = await AssetService.getOrCreateAccount(
             { user_id: userId },
             { transaction }
           )
+
+          // 获取或创建 POINTS 余额记录（决策G：自动创建）
           const balance = await AssetService.getOrCreateBalance(account.account_id, 'POINTS', {
             transaction
           })
+
+          // 决策H：账户冻结时返回 403
+          if (account.status !== 'active') {
+            const error = new Error('积分账户已被冻结，请联系客服')
+            error.code = 'ACCOUNT_FROZEN'
+            error.statusCode = 403
+            error.data = {
+              user_id: userId,
+              account_status: account.status,
+              message: '您的积分账户已被冻结，如有疑问请联系客服'
+            }
+            throw error
+          }
 
           pointsAccount = {
             account_id: account.account_id,
             user_id: userId,
             available_points: Number(balance.available_amount) || 0,
-            total_earned: Number(balance.total_earned) || 0,
-            total_consumed: Number(balance.total_consumed) || 0,
+            frozen_points: Number(balance.frozen_amount) || 0,
+            total_points:
+              (Number(balance.available_amount) || 0) + (Number(balance.frozen_amount) || 0),
             is_active: account.status === 'active'
           }
-
-          if (account.status !== 'active') {
-            const error = new Error('积分账户已被冻结')
-            error.code = 'ACCOUNT_FROZEN'
-            error.statusCode = 403
-            error.data = { user_id: userId }
-            throw error
-          }
         } catch (accountError) {
+          // 业务错误（ACCOUNT_FROZEN 等）直接向上抛出
           if (accountError.code) {
             throw accountError
           }
-          const error = new Error('该用户尚未开通积分账户')
-          error.code = 'POINTS_ACCOUNT_NOT_FOUND'
-          error.statusCode = 404
-          error.data = {
+          // 其他错误（数据库异常）记录日志，返回默认 0 值结构（决策G：0正常态）
+          logger.warn('获取积分账户时发生异常，使用默认值', {
             user_id: userId,
-            suggestion: '用户需要先进行消费或参与活动才会开通积分账户'
+            error: accountError.message
+          })
+          pointsAccount = {
+            account_id: null,
+            user_id: userId,
+            available_points: 0,
+            frozen_points: 0,
+            total_points: 0,
+            is_active: true
           }
-          throw error
         }
       }
 

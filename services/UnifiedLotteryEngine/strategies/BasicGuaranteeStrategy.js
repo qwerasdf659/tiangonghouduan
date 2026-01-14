@@ -1501,6 +1501,8 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
   /**
    * 获取用户所有 BUDGET_POINTS 总和（无 campaign_id 限制）
    *
+   * 方案1决策：统一通过 AssetService 访问资产数据
+   *
    * @param {number} userId - 用户ID
    * @param {Object} options - 选项
    * @param {Object|null} options.transaction - 事务对象
@@ -1508,29 +1510,12 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
    */
   async getUserTotalBudgetPoints(userId, options = {}) {
     const { transaction } = options
-    const { Account, AccountAssetBalance } = require('../../../models')
+    const AssetService = require('../../AssetService')
 
     try {
-      // 查询用户账户
-      const account = await Account.findOne({
-        where: { user_id: userId, account_type: 'user' },
-        transaction
-      })
-
-      if (!account) {
-        return 0
-      }
-
-      // 汇总所有 BUDGET_POINTS 余额
-      const result = await AccountAssetBalance.sum('available_amount', {
-        where: {
-          account_id: account.account_id,
-          asset_code: 'BUDGET_POINTS'
-        },
-        transaction
-      })
-
-      return Number(result) || 0
+      // 通过 AssetService 统一获取 BUDGET_POINTS 总和
+      const total = await AssetService.getTotalBudgetPoints({ user_id: userId }, { transaction })
+      return total
     } catch (error) {
       this.logError('获取用户 BUDGET_POINTS 总和失败', { userId, error: error.message })
       return 0
@@ -1540,6 +1525,8 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
   /**
    * 获取用户指定 campaign_id 的 BUDGET_POINTS 总和
    *
+   * 方案1决策：统一通过 AssetService 访问资产数据
+   *
    * @param {number} userId - 用户ID
    * @param {Array<string|number>} campaignIds - 允许的 campaign_id 列表
    * @param {Object} options - 选项
@@ -1548,34 +1535,15 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
    */
   async getUserBudgetPointsByCampaigns(userId, campaignIds, options = {}) {
     const { transaction } = options
-    const { Account, AccountAssetBalance } = require('../../../models')
-    const { Op } = require('sequelize')
+    const AssetService = require('../../AssetService')
 
     try {
-      // 查询用户账户
-      const account = await Account.findOne({
-        where: { user_id: userId, account_type: 'user' },
-        transaction
-      })
-
-      if (!account) {
-        return 0
-      }
-
-      // 将 campaignIds 转为字符串数组（campaign_id 在表中为字符串类型）
-      const campaignIdStrings = campaignIds.map(id => String(id))
-
-      // 汇总指定 campaign_id 的 BUDGET_POINTS 余额
-      const result = await AccountAssetBalance.sum('available_amount', {
-        where: {
-          account_id: account.account_id,
-          asset_code: 'BUDGET_POINTS',
-          campaign_id: { [Op.in]: campaignIdStrings }
-        },
-        transaction
-      })
-
-      return Number(result) || 0
+      // 通过 AssetService 统一获取指定活动的 BUDGET_POINTS 总和
+      const total = await AssetService.getBudgetPointsByCampaigns(
+        { user_id: userId, campaign_ids: campaignIds },
+        { transaction }
+      )
+      return total
     } catch (error) {
       this.logError('获取用户指定活动 BUDGET_POINTS 失败', {
         userId,

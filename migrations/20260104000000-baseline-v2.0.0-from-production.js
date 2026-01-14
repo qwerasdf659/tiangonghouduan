@@ -66,6 +66,19 @@
 
 module.exports = {
   async up(queryInterface, Sequelize) {
+    // ==================== 幂等性检查（阶段2实现：2026-01-14）====================
+    // 如果核心表已存在，说明是现有环境，跳过 baseline
+    // 新环境：执行 baseline 创建所有表
+    // 现有环境：自动跳过，执行后续增量迁移即可
+    const [[usersCheck]] = await queryInterface.sequelize.query(
+      "SELECT COUNT(*) AS c FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = 'users'"
+    )
+    if (usersCheck.c > 0) {
+      console.log('✅ [Baseline V2.0.0] 核心表 users 已存在，跳过 baseline（现有环境）')
+      console.log('   此环境已包含历史迁移记录，无需重新创建表')
+      return
+    }
+
     const transaction = await queryInterface.sequelize.transaction()
 
     try {

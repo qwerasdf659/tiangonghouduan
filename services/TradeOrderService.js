@@ -28,9 +28,51 @@
 
 const { sequelize, TradeOrder, MarketListing, ItemInstance } = require('../models')
 const AssetService = require('./AssetService')
+const AdminSystemService = require('./AdminSystemService')
 const logger = require('../utils/logger')
 const { assertAndGetTransaction } = require('../utils/transactionHelpers')
 const { BusinessCacheHelper } = require('../utils/BusinessCacheHelper')
+
+/**
+ * 获取允许的结算币种白名单（多币种扩展 - 2026-01-14）
+ *
+ * 从 system_settings 读取 allowed_settlement_assets 配置
+ * 默认值：['DIAMOND', 'red_shard']
+ *
+ * @returns {Promise<string[]>} 允许的结算币种代码数组
+ */
+async function getAllowedSettlementAssets() {
+  const whitelist = await AdminSystemService.getSettingValue(
+    'marketplace',
+    'allowed_settlement_assets',
+    ['DIAMOND', 'red_shard'] // 默认值
+  )
+
+  // 如果是字符串（JSON格式），解析为数组
+  if (typeof whitelist === 'string') {
+    try {
+      return JSON.parse(whitelist)
+    } catch (e) {
+      logger.warn('[TradeOrderService] 解析 allowed_settlement_assets 失败，使用默认值', {
+        whitelist
+      })
+      return ['DIAMOND', 'red_shard']
+    }
+  }
+
+  return Array.isArray(whitelist) ? whitelist : ['DIAMOND', 'red_shard']
+}
+
+/**
+ * 校验结算币种是否在白名单中
+ *
+ * @param {string} asset_code - 结算币种代码
+ * @returns {Promise<boolean>} 是否允许
+ */
+async function isAssetCodeAllowed(asset_code) {
+  const whitelist = await getAllowedSettlementAssets()
+  return whitelist.includes(asset_code)
+}
 
 /**
  * 交易订单服务类
@@ -90,16 +132,18 @@ class TradeOrderService {
        * - listing_id
        * - buyer_user_id
        * - gross_amount（或 price_amount）
-       * - asset_code（强制 DIAMOND）
+       * - asset_code（白名单校验 - 2026-01-14 多币种扩展）
        *
        * 目的：防止同一 idempotency_key 被用于不同的业务参数
        */
 
-      // 强制校验已有订单的 asset_code 必须为 DIAMOND
-      if (existingOrder.asset_code !== 'DIAMOND') {
+      // 校验已有订单的 asset_code 是否在白名单中（多币种扩展 - 2026-01-14）
+      const existingAssetAllowed = await isAssetCodeAllowed(existingOrder.asset_code)
+      if (!existingAssetAllowed) {
+        const whitelist = await getAllowedSettlementAssets()
         const error = new Error(
           `幂等回放发现异常订单：订单 ${existingOrder.order_id} 的 asset_code=${existingOrder.asset_code}，` +
-            '不符合交易市场强制约束（只允许 DIAMOND）'
+            `不在允许的结算币种白名单中（当前白名单：${whitelist.join(', ')}）`
         )
         error.code = 'INVALID_ASSET_CODE'
         error.statusCode = 500 // 数据异常，服务端错误
@@ -107,7 +151,7 @@ class TradeOrderService {
           order_id: existingOrder.order_id,
           idempotency_key: existingOrder.idempotency_key,
           asset_code: existingOrder.asset_code,
-          expected: 'DIAMOND'
+          allowed: whitelist
         }
         throw error
       }
@@ -122,23 +166,25 @@ class TradeOrderService {
         throw new Error(`挂牌不存在: ${listing_id}`)
       }
 
-      // 强制校验当前挂牌的 price_asset_code 必须为 DIAMOND
-      if (tempListing.price_asset_code !== 'DIAMOND') {
+      // 校验当前挂牌的 price_asset_code 是否在白名单中（多币种扩展 - 2026-01-14）
+      const listingAssetAllowed = await isAssetCodeAllowed(tempListing.price_asset_code)
+      if (!listingAssetAllowed) {
+        const whitelist = await getAllowedSettlementAssets()
         const error = new Error(
-          `挂牌定价资产不合法: ${tempListing.price_asset_code}（交易市场只允许 DIAMOND）`
+          `挂牌定价资产不合法: ${tempListing.price_asset_code}（不在允许的结算币种白名单中）`
         )
         error.code = 'INVALID_ASSET_CODE'
         error.statusCode = 400
         error.details = {
           listing_id: tempListing.listing_id,
           price_asset_code: tempListing.price_asset_code,
-          expected: 'DIAMOND'
+          allowed: whitelist
         }
         throw error
       }
 
       const currentGrossAmount = tempListing.price_amount // gross_amount = price_amount
-      const currentAssetCode = tempListing.price_asset_code // 已强制校验为 DIAMOND
+      const currentAssetCode = tempListing.price_asset_code // 已通过白名单校验
 
       // 验证参数一致性（严格校验）
       const parameterMismatch = []
@@ -207,9 +253,13 @@ class TradeOrderService {
       throw new Error('不能购买自己的挂牌')
     }
 
-    // 交易市场结算币种只允许 DIAMOND
-    if (listing.price_asset_code !== 'DIAMOND') {
-      throw new Error(`挂牌定价资产不合法: ${listing.price_asset_code}（只允许 DIAMOND）`)
+    // 交易市场结算币种白名单校验（多币种扩展 - 2026-01-14）
+    const priceAssetAllowed = await isAssetCodeAllowed(listing.price_asset_code)
+    if (!priceAssetAllowed) {
+      const whitelist = await getAllowedSettlementAssets()
+      throw new Error(
+        `挂牌定价资产不合法: ${listing.price_asset_code}（不在允许的结算币种白名单中：${whitelist.join(', ')}）`
+      )
     }
 
     // 可叠加资产挂牌购买时必须校验卖家标的已冻结
@@ -262,24 +312,37 @@ class TradeOrderService {
 
     if (feeEnabled) {
       /*
-       * 统一 5% 手续费 + min_fee=1（计算由 FeeCalculator 读取配置）
+       * 多币种手续费计算（2026-01-14 扩展）
+       *
+       * 计费模式：
+       * - DIAMOND：分档模式（基于 itemValue 分档 + ceil + 最低费 1）
+       * - red_shard 等其他币种：单一费率模式（从 system_settings 读取费率和最低费）
+       *
+       * 价值锚点：
        * - item_instance：优先取 ItemInstance.meta.value 作为"价值锚点"
-       * - fungible_asset：用 price_amount 作为价值锚点（当前单档位等价）
+       * - fungible_asset：用 price_amount 作为价值锚点
        */
       const itemValue =
         listing.listing_kind === 'item_instance'
           ? listing.offerItem?.meta?.value || listing.price_amount
           : listing.price_amount
 
-      const feeInfo = FeeCalculator.calculateItemFee(itemValue, listing.price_amount)
+      // 使用多币种手续费计算方法（2026-01-14 多币种扩展）
+      const feeInfo = await FeeCalculator.calculateFeeByAsset(
+        listing.price_asset_code, // 结算币种
+        itemValue, // 价值锚点（DIAMOND 分档模式使用）
+        listing.price_amount // 用户定价
+      )
       feeAmount = feeInfo.fee
       feeRate = feeInfo.rate
 
-      logger.info('[TradeOrderService] 手续费计算完成', {
+      logger.info('[TradeOrderService] 手续费计算完成（多币种）', {
+        asset_code: listing.price_asset_code,
         item_value: itemValue,
         price_amount: listing.price_amount,
         fee_amount: feeAmount,
         fee_rate: feeRate,
+        calculation_mode: feeInfo.calculation_mode,
         tier: feeInfo.tier
       })
     } else {

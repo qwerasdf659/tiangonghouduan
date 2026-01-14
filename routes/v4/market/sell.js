@@ -38,7 +38,8 @@ const TransactionManager = require('../../../utils/TransactionManager')
  *
  * @header {string} Idempotency-Key - 幂等键（必填，不接受body参数）
  * @body {number} item_instance_id - 物品实例ID（必填）
- * @body {number} price_amount - 售价（DIAMOND，必填，大于0的整数）
+ * @body {number} price_amount - 售价（必填，大于0的整数）
+ * @body {string} [price_asset_code=DIAMOND] - 定价结算币种（可选，默认DIAMOND，支持：DIAMOND/red_shard）
  * @body {string} condition - 物品状态（可选，默认good）
  *
  * @returns {Object} 上架结果
@@ -55,6 +56,11 @@ const TransactionManager = require('../../../utils/TransactionManager')
  * 业务场景：用户将库存物品上架到交易市场出售
  * 上架限制：最多同时上架10件商品
  * 幂等性控制（业界标准形态）：统一通过 Header Idempotency-Key 防止重复上架
+ *
+ * 多币种扩展（2026-01-14）：
+ * - price_asset_code 参数支持选择结算币种
+ * - 白名单由 system_settings.allowed_settlement_assets 控制
+ * - 不同币种有不同的手续费计算逻辑
  */
 router.post('/list', authenticateToken, async (req, res) => {
   // P1-9：通过 ServiceManager 获取服务（B1-Injected + E2-Strict snake_case）
@@ -109,8 +115,16 @@ router.post('/list', authenticateToken, async (req, res) => {
     }
 
     if (isNaN(priceAmountValue) || priceAmountValue <= 0) {
-      return res.apiError('售价必须是大于0的整数（DIAMOND）', 'BAD_REQUEST', null, 400)
+      return res.apiError('售价必须是大于0的整数', 'BAD_REQUEST', null, 400)
     }
+
+    /*
+     * 多币种扩展（2026-01-14）：支持 price_asset_code 参数
+     * - 默认值：DIAMOND（保持向后兼容）
+     * - 支持值：DIAMOND、red_shard（由 system_settings.allowed_settlement_assets 控制）
+     * - 校验逻辑在 Service 层统一处理（白名单校验）
+     */
+    const priceAssetCode = req.body.price_asset_code || 'DIAMOND'
 
     /*
      * 【入口幂等检查】防止同一次请求被重复提交
@@ -119,7 +133,11 @@ router.post('/list', authenticateToken, async (req, res) => {
     const idempotencyResult = await IdempotencyService.getOrCreateRequest(idempotency_key, {
       api_path: '/api/v4/market/list',
       http_method: 'POST',
-      request_params: { item_instance_id: itemId, price_amount: priceAmountValue },
+      request_params: {
+        item_instance_id: itemId,
+        price_amount: priceAmountValue,
+        price_asset_code: priceAssetCode
+      },
       user_id: userId
     })
 
@@ -162,7 +180,7 @@ router.post('/list', authenticateToken, async (req, res) => {
             seller_user_id: userId,
             item_instance_id: itemId,
             price_amount: priceAmountValue,
-            price_asset_code: 'DIAMOND'
+            price_asset_code: priceAssetCode // 多币种扩展（2026-01-14）：使用请求参数
           },
           { transaction }
         )
@@ -222,6 +240,19 @@ router.post('/list', authenticateToken, async (req, res) => {
       logger.error('标记幂等请求失败状态时出错:', markError)
     })
 
+    // 数据库死锁错误处理（高并发场景）
+    const isDeadlock =
+      error.message?.includes('Deadlock') ||
+      error.message?.includes('deadlock') ||
+      error.parent?.code === 'ER_LOCK_DEADLOCK'
+    if (isDeadlock) {
+      logger.warn('数据库死锁（并发竞争），建议重试', {
+        idempotency_key,
+        user_id: req.user?.user_id
+      })
+      return res.apiError('服务繁忙，请稍后重试', 'CONCURRENT_CONFLICT', { retry_after: 1 }, 409)
+    }
+
     // 处理幂等键冲突错误（409状态码）
     if (error.statusCode === 409) {
       logger.warn('幂等性错误:', {
@@ -250,7 +281,8 @@ router.post('/list', authenticateToken, async (req, res) => {
  * @header {string} Idempotency-Key - 幂等键（必填，不接受body参数）
  * @body {string} offer_asset_code - 挂卖资产代码（如 red_shard，必填）
  * @body {number} offer_amount - 挂卖数量（正整数，必填）
- * @body {number} price_amount - 定价金额（DIAMOND，必填，大于0）
+ * @body {number} price_amount - 定价金额（必填，大于0）
+ * @body {string} [price_asset_code=DIAMOND] - 定价结算币种（可选，默认DIAMOND，支持：DIAMOND/red_shard）
  *
  * @returns {Object} 挂牌结果
  * @returns {Object} data.listing - 挂牌信息
@@ -258,11 +290,16 @@ router.post('/list', authenticateToken, async (req, res) => {
  * @returns {string} data.listing.offer_asset_code - 挂卖资产代码
  * @returns {number} data.listing.offer_amount - 挂卖数量
  * @returns {number} data.listing.price_amount - 定价金额
+ * @returns {string} data.listing.price_asset_code - 结算币种代码
  * @returns {boolean} data.listing.is_duplicate - 是否为幂等回放请求
  * @returns {Object} data.listing_status - 上架状态
  * @returns {Object} data.balance_after - 冻结后余额信息
  *
  * 业务场景：用户将可叠加资产（如材料）挂牌到C2C市场出售
+ *
+ * 多币种扩展（2026-01-14）：
+ * - price_asset_code 参数支持选择结算币种
+ * - 白名单由 system_settings.allowed_settlement_assets 控制
  * 挂牌限制：材料和物品共享，最多同时上架10件
  * 幂等性控制：通过 Header Idempotency-Key 防止重复挂牌
  */
@@ -328,8 +365,15 @@ router.post('/fungible-assets/list', authenticateToken, async (req, res) => {
     }
 
     if (isNaN(priceAmountValue) || priceAmountValue <= 0) {
-      return res.apiError('定价金额必须是大于0的整数（DIAMOND）', 'BAD_REQUEST', null, 400)
+      return res.apiError('定价金额必须是大于0的整数', 'BAD_REQUEST', null, 400)
     }
+
+    /*
+     * 多币种扩展（2026-01-14）：支持 price_asset_code 参数
+     * - 默认值：DIAMOND（保持向后兼容）
+     * - 支持值：DIAMOND、red_shard（由 system_settings.allowed_settlement_assets 控制）
+     */
+    const priceAssetCode = req.body.price_asset_code || 'DIAMOND'
 
     /*
      * 【入口幂等检查】防止同一次请求被重复提交
@@ -340,7 +384,8 @@ router.post('/fungible-assets/list', authenticateToken, async (req, res) => {
       request_params: {
         offer_asset_code,
         offer_amount: offerAmountValue,
-        price_amount: priceAmountValue
+        price_amount: priceAmountValue,
+        price_asset_code: priceAssetCode
       },
       user_id: userId
     })
@@ -370,7 +415,7 @@ router.post('/fungible-assets/list', authenticateToken, async (req, res) => {
               offer_asset_code,
               offer_amount: offerAmountValue,
               price_amount: priceAmountValue,
-              price_asset_code: 'DIAMOND'
+              price_asset_code: priceAssetCode // 多币种扩展（2026-01-14）：使用请求参数
             },
             { transaction }
           )
@@ -399,9 +444,9 @@ router.post('/fungible-assets/list', authenticateToken, async (req, res) => {
           },
           balance_after: freeze_result?.balance
             ? {
-              available_amount: Number(freeze_result.balance.available_amount),
-              frozen_amount: Number(freeze_result.balance.frozen_amount)
-            }
+                available_amount: Number(freeze_result.balance.available_amount),
+                frozen_amount: Number(freeze_result.balance.frozen_amount)
+              }
             : null,
           _listing_id: listing.listing_id,
           _is_duplicate: is_duplicate
@@ -442,6 +487,19 @@ router.post('/fungible-assets/list', authenticateToken, async (req, res) => {
     await IdempotencyService.markAsFailed(idempotency_key, error.message).catch(markError => {
       logger.error('标记幂等请求失败状态时出错:', markError)
     })
+
+    // 数据库死锁错误处理（高并发场景）
+    const isDeadlock =
+      error.message?.includes('Deadlock') ||
+      error.message?.includes('deadlock') ||
+      error.parent?.code === 'ER_LOCK_DEADLOCK'
+    if (isDeadlock) {
+      logger.warn('数据库死锁（并发竞争），建议重试', {
+        idempotency_key,
+        user_id: req.user?.user_id
+      })
+      return res.apiError('服务繁忙，请稍后重试', 'CONCURRENT_CONFLICT', { retry_after: 1 }, 409)
+    }
 
     // 处理特定错误码
     if (error.code === 'LISTING_LIMIT_EXCEEDED') {

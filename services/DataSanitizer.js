@@ -250,8 +250,8 @@ class DataSanitizer {
     }
 
     /**
-     * 🔥 V4.6统一（决策A2）：废弃 points_balance 字段，改用 points_account 结构
-     * - points_account 应由调用方通过 AssetService.getBalance() 获取后传入
+     * 积分账户结构：points_account
+     * - 由调用方通过 AssetService.getBalance() 获取后传入
      * - 如果 user 对象包含 points_account 属性，则直接使用
      * - 否则返回默认的 0 值结构（表示未初始化或无账户）
      */
@@ -715,14 +715,12 @@ class DataSanitizer {
 
       /*
        * 积分统计（用户应该看到自己的积分余额和交易记录）
-       * 🔥 V4.6统一（决策A2）：使用 points_account 结构替代 points_balance 字段
-       * - 优先使用 statistics.points_account（新结构）
-       * - 向后兼容：如果不存在，则从 statistics.points_balance 映射
+       * V4.6决策A2：统一使用 points_account 结构
        */
       points_account: statistics.points_account || {
-        available_points: statistics.points_balance || 0,
+        available_points: 0,
         frozen_points: 0,
-        total_points: statistics.points_balance || 0
+        total_points: 0
       },
       total_points_earned: statistics.total_points_earned,
       total_points_consumed: statistics.total_points_consumed, // 🔥 方案A修复：添加消耗积分

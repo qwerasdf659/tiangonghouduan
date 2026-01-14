@@ -1525,17 +1525,15 @@ class ReportingService {
         inventory_total: parseInt(inventoryStats[0]?.total_items || 0),
         inventory_available: parseInt(inventoryStats[0]?.available_items || 0),
 
-        // 积分统计 - 🔥 V4.6统一（决策A2）：使用 points_account 结构替代 points_balance
+        // 积分统计
         total_points_earned: parseInt(pointsStats[0]?.total_earned || 0),
         total_points_consumed: parseInt(pointsStats[0]?.total_consumed || 0),
-        // 🔥 V4.6统一：points_account 结构（废弃 points_balance 字段）
+        // 积分账户结构
         points_account: {
           available_points: pointsAccount?.available_points || 0,
           frozen_points: 0, // 统计场景暂无冻结概念
           total_points: pointsAccount?.available_points || 0
         },
-        // 向后兼容：保留 points_balance 作为内部传递字段（供 sanitizeUserStatistics 使用）
-        points_balance: pointsAccount?.available_points || 0,
         transaction_count: parseInt(pointsStats[0]?.total_transactions || 0),
 
         // 消费记录统计

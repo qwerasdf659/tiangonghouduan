@@ -32,7 +32,7 @@ describe('P1 修复简化验证', () => {
     })
   })
 
-  describe('P1-2：交易下单幂等冲突校验强制 DIAMOND-only', () => {
+  describe('P1-2：交易下单幂等冲突校验（多币种白名单模式）', () => {
     test('TradeOrderService.createOrder 应该存在', () => {
       // 🔴 P1-9 J2-RepoWide：通过 global.getTestService 获取服务
       const TradeOrderService = global.getTestService('trade_order')
@@ -41,15 +41,22 @@ describe('P1 修复简化验证', () => {
       console.log('✅ P1-2：TradeOrderService.createOrder 方法存在')
     })
 
-    test('TradeOrderService 代码应该包含 DIAMOND 强制校验', async () => {
+    test('TradeOrderService 代码应该包含多币种白名单校验（2026-01-14升级）', async () => {
       const fs = require('fs').promises
       const serviceCode = await fs.readFile('./services/TradeOrderService.js', 'utf8')
 
-      // 验证幂等回放路径有 DIAMOND 校验
-      expect(serviceCode).toMatch(/existingOrder\.asset_code.*!==.*'DIAMOND'/)
-      expect(serviceCode).toMatch(/price_asset_code.*!==.*'DIAMOND'/)
+      // 验证白名单函数存在
+      expect(serviceCode).toMatch(/isAssetCodeAllowed/)
+      expect(serviceCode).toMatch(/getAllowedSettlementAssets/)
 
-      console.log('✅ P1-2：TradeOrderService 代码包含 DIAMOND 强制校验')
+      // 验证幂等回放路径有资产白名单校验
+      expect(serviceCode).toMatch(/existingAssetAllowed.*=.*await isAssetCodeAllowed/)
+      // 验证参数一致性校验包含 asset_code
+      expect(serviceCode).toMatch(/existingOrder\.asset_code.*!==.*currentAssetCode/)
+
+      console.log(
+        '✅ P1-2：TradeOrderService 代码包含多币种白名单校验（支持 DIAMOND + red_shard 等）'
+      )
     })
   })
 

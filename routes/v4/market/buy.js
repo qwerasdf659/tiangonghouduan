@@ -207,6 +207,19 @@ router.post(
         logger.error('标记幂等请求失败状态时出错:', markError)
       })
 
+      // 数据库死锁错误处理（高并发场景）
+      const isDeadlock =
+        error.message?.includes('Deadlock') ||
+        error.message?.includes('deadlock') ||
+        error.parent?.code === 'ER_LOCK_DEADLOCK'
+      if (isDeadlock) {
+        logger.warn('数据库死锁（并发竞争），建议重试', {
+          idempotency_key,
+          buyer_id: req.user?.user_id
+        })
+        return res.apiError('服务繁忙，请稍后重试', 'CONCURRENT_CONFLICT', { retry_after: 1 }, 409)
+      }
+
       // 处理幂等键冲突错误（409状态码）
       if (error.statusCode === 409) {
         logger.warn('幂等性错误:', {

@@ -2,10 +2,10 @@
  * 抽奖记录数据格式化工具类
  * 负责抽奖记录的数据格式化、类型转换和显示逻辑
  *
- * V4.0语义更新（2026-01-01）：
- * - 删除 is_winner 相关逻辑（"中/没中"二分法已废弃）
- * - 新增 reward_tier 相关逻辑（奖励档位：low/mid/high）
- * - 统计方式从"中奖率"改为"档位分布"
+ * V4.0语义说明：
+ * - 使用 reward_tier 档位系统（low/mid/high）标识奖品价值等级
+ * - 每次抽奖100%获得奖品，通过档位区分奖品价值
+ * - 统计方式为档位分布统计
  */
 
 /**
@@ -26,9 +26,10 @@ const REWARD_TIER_CONFIG = {
  * - 提供 reward_tier 档位相关的辅助方法
  * - 根据 prize_value_points 推断奖励档位
  *
- * V4.0语义更新：
- * - 使用 reward_tier (low/mid/high) 替代原 is_winner
- * - 档位规则：low(<300) / mid(300-699) / high(>=700)
+ * 档位规则：
+ * - low：价值 < 300 积分（低档奖励）
+ * - mid：价值 300-699 积分（中档奖励）
+ * - high：价值 >= 700 积分（高档奖励）
  */
 class LotteryDrawFormatter {
   /**
@@ -36,7 +37,7 @@ class LotteryDrawFormatter {
    * @param {Object} lotteryDraw - 抽奖记录实例
    * @returns {Object} 格式化后的数据
    */
-  static formatToJSON (lotteryDraw) {
+  static formatToJSON(lotteryDraw) {
     const values = { ...lotteryDraw.get() }
 
     // 格式化时间显示
@@ -71,7 +72,7 @@ class LotteryDrawFormatter {
    * @param {Object} lotteryDraw - 抽奖记录实例
    * @returns {Object} 摘要格式数据
    */
-  static formatToSummary (lotteryDraw) {
+  static formatToSummary(lotteryDraw) {
     return {
       draw_id: lotteryDraw.draw_id,
       user_id: lotteryDraw.user_id,
@@ -97,7 +98,7 @@ class LotteryDrawFormatter {
    * @param {string} rewardTier - 奖励档位code
    * @returns {string} 档位显示文本
    */
-  static getRewardTierText (rewardTier) {
+  static getRewardTierText(rewardTier) {
     const config = REWARD_TIER_CONFIG[rewardTier]
     return config ? config.name : '未知档位'
   }
@@ -107,7 +108,7 @@ class LotteryDrawFormatter {
    * @param {string} rewardTier - 奖励档位code
    * @returns {string} 档位颜色值
    */
-  static getRewardTierColor (rewardTier) {
+  static getRewardTierColor(rewardTier) {
     const config = REWARD_TIER_CONFIG[rewardTier]
     return config ? config.color : '#999999'
   }
@@ -117,7 +118,7 @@ class LotteryDrawFormatter {
    * @param {number} prizeValuePoints - 奖品价值（积分）
    * @returns {string} 奖励档位code
    */
-  static inferRewardTier (prizeValuePoints) {
+  static inferRewardTier(prizeValuePoints) {
     if (prizeValuePoints == null || prizeValuePoints < 300) {
       return 'low'
     } else if (prizeValuePoints < 700) {
@@ -132,7 +133,7 @@ class LotteryDrawFormatter {
    * @param {string} prizeStatus - 奖品状态
    * @returns {string} 状态文本
    */
-  static getPrizeStatusText (prizeStatus) {
+  static getPrizeStatusText(prizeStatus) {
     const statuses = {
       pending: '待发放',
       awarded: '已发放',
@@ -149,7 +150,7 @@ class LotteryDrawFormatter {
    * @param {string} drawType - 抽奖类型
    * @returns {string} 类型文本
    */
-  static getDrawTypeText (drawType) {
+  static getDrawTypeText(drawType) {
     const drawTypeMap = {
       single: '单次抽奖',
       triple: '三连抽',
@@ -164,7 +165,7 @@ class LotteryDrawFormatter {
    * @param {string} prizeType - 奖品类型
    * @returns {string} 类型文本
    */
-  static getPrizeTypeText (prizeType) {
+  static getPrizeTypeText(prizeType) {
     const prizeTypeMap = {
       points: '积分奖励',
       product: '实物奖品',
@@ -182,7 +183,7 @@ class LotteryDrawFormatter {
    * @param {string} prizeStatus - 奖品状态
    * @returns {boolean} 是否已发放
    */
-  static isPrizeDelivered (prizeStatus) {
+  static isPrizeDelivered(prizeStatus) {
     return ['awarded', 'delivered', 'received'].includes(prizeStatus)
   }
 
@@ -192,7 +193,7 @@ class LotteryDrawFormatter {
    * @param {string} prizeStatus - 奖品状态
    * @returns {boolean} 是否可领取
    */
-  static isPrizeClaimableByTier (rewardTier, prizeStatus) {
+  static isPrizeClaimableByTier(rewardTier, prizeStatus) {
     // 只有高档奖励且已发放未领取时才可领取
     return rewardTier === 'high' && prizeStatus === 'awarded'
   }
@@ -202,7 +203,7 @@ class LotteryDrawFormatter {
    * @param {string|Object} field - 需要解析的字段
    * @returns {Object|string} 解析后的数据
    */
-  static parseJSONField (field) {
+  static parseJSONField(field) {
     if (!field) return field
 
     if (typeof field === 'string') {
@@ -222,7 +223,7 @@ class LotteryDrawFormatter {
    * @param {Object} stats - 原始统计数据
    * @returns {Object} 格式化后的统计数据
    */
-  static formatStats (stats) {
+  static formatStats(stats) {
     const totalDraws = stats.total_draws || 0
     return {
       total_draws: totalDraws,
@@ -248,7 +249,7 @@ class LotteryDrawFormatter {
    * @param {Object} analysisData - 原始分析数据
    * @returns {Object} 格式化后的分析数据
    */
-  static formatBatchAnalysis (analysisData) {
+  static formatBatchAnalysis(analysisData) {
     const totalDraws = analysisData.total_draws || 0
     return {
       total_draws: totalDraws,
@@ -270,7 +271,7 @@ class LotteryDrawFormatter {
    * @param {Object} options - 格式化选项
    * @returns {Array} 格式化后的记录数组
    */
-  static formatList (records, options = {}) {
+  static formatList(records, options = {}) {
     const { format = 'summary', includePrize = false } = options
 
     return records.map(record => {
