@@ -45,25 +45,29 @@ function getImageUrl(objectKey) {
     return null
   }
 
-  /**
-   * 🎯 架构决策（2026-01-08 拍板）：不兼容旧方案，只处理对象 key
-   * 以下警告仅用于发现数据问题，生产中应修复数据源
+  /*
+   * 🎯 架构决策（2026-01-08 拍板 + 2026-01-14 图片缩略图架构兼容残留核查报告强化）：
+   * - 不再兼容完整 URL 或本地路径
+   * - 发现非法格式直接抛出错误
+   * - 强制所有调用方修复数据源
    */
   if (objectKey.startsWith('http://') || objectKey.startsWith('https://')) {
-    console.warn(
-      `⚠️ ImageUrlHelper: 发现完整 URL，架构已拍板只存储对象 key。请检查数据: ${objectKey}`
+    throw new Error(
+      '❌ ImageUrlHelper.getImageUrl: 架构已拍板只存储对象 key，禁止传入完整 URL。' +
+        '请修复数据源: ' +
+        objectKey
     )
-    return objectKey // 兼容性返回，但应修复数据源
   }
 
   if (objectKey.startsWith('/')) {
-    console.warn(
-      `⚠️ ImageUrlHelper: 发现本地路径格式，架构已拍板只存储对象 key。请检查数据: ${objectKey}`
+    throw new Error(
+      '❌ ImageUrlHelper.getImageUrl: 架构已拍板只存储对象 key，禁止传入本地路径。' +
+        '请修复数据源: ' +
+        objectKey
     )
-    objectKey = objectKey.substring(1) // 尝试转换，但应修复数据源
   }
 
-  /**
+  /*
    * 🎯 架构决策（2026-01-08 拍板）：不使用 CDN，直连 Sealos 公网端点
    * 环境变量：SEALOS_ENDPOINT（公网端点）、SEALOS_BUCKET（存储桶名）
    */
@@ -241,11 +245,60 @@ function isValidObjectKey(objectKey) {
   return hasExtension && hasFolder
 }
 
+/**
+ * 获取占位图 URL（用于缩略图降级场景）
+ *
+ * @description
+ *   架构决策（2026-01-14 图片缩略图架构兼容残留核查报告）：
+ *   - 当图片缺失预生成缩略图时，根据业务类型返回对应的占位图
+ *   - 占位图 key 配置于 .env 文件中
+ *   - 优先级：业务类型占位图 > 通用占位图
+ *
+ * @param {string} businessType - 业务类型（prize/product/banner/avatar 等）
+ * @param {string} category - 业务分类（可选，用于更精细的占位图选择）
+ * @returns {string} 占位图完整 URL
+ *
+ * @example
+ * getPlaceholderImageUrl('prize') // 返回奖品占位图 URL
+ * getPlaceholderImageUrl('product', 'exchange') // 返回兑换商品占位图 URL
+ */
+function getPlaceholderImageUrl(businessType = 'default', category = null) {
+  // 从环境变量获取占位图 key 配置
+  const placeholderKeys = {
+    prize: process.env.DEFAULT_PRIZE_PLACEHOLDER_KEY || 'defaults/prize-placeholder.png',
+    product: process.env.DEFAULT_PRODUCT_PLACEHOLDER_KEY || 'defaults/product-placeholder.png',
+    banner: process.env.DEFAULT_BANNER_PLACEHOLDER_KEY || 'defaults/banner-placeholder.png',
+    avatar: process.env.DEFAULT_AVATAR_PLACEHOLDER_KEY || 'defaults/avatar-placeholder.png',
+    default: process.env.DEFAULT_PLACEHOLDER_KEY || 'defaults/placeholder.png'
+  }
+
+  // 优先使用业务类型对应的占位图
+  const selectedKey = placeholderKeys[businessType] || placeholderKeys.default
+
+  // 生成完整 URL
+  const url = getImageUrl(selectedKey)
+
+  // 如果 Sealos 配置缺失，返回本地静态资源路径作为最终降级
+  if (!url) {
+    console.warn(
+      '⚠️ ImageUrlHelper.getPlaceholderImageUrl: Sealos 配置缺失，使用本地静态资源降级。' +
+        'businessType: ' +
+        businessType +
+        ', category: ' +
+        category
+    )
+    return '/assets/images/' + businessType + '-placeholder.png'
+  }
+
+  return url
+}
+
 module.exports = {
   getImageUrl,
   getImageUrls,
   getDefaultImageUrl,
   getThumbnailUrl,
   transformImageFields,
-  isValidObjectKey
+  isValidObjectKey,
+  getPlaceholderImageUrl
 }

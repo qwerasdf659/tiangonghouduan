@@ -1,31 +1,40 @@
 /**
- * 餐厅积分抽奖系统 V4.5.0 - 材料转换规则查询API
- * 处理材料转换规则的查询功能
+ * 餐厅积分抽奖系统 V4.5.0 - 用户端材料转换规则查询API
+ * 处理用户端的材料转换规则查询功能
+ *
+ * 顶层路径：/api/v4/assets/conversion-rules
  *
  * 功能说明：
- * - 查询当前支持的材料转换规则
- * - 用于前端展示可用的转换选项
+ * - 查询当前支持的材料转换规则（用户端）
+ * - 用于前端（微信小程序）展示可用的转换选项
+ * - 不需要商家域权限，普通用户可访问
  *
- * 创建时间：2025年12月22日
+ * 与商家域接口的区别：
+ * - /api/v4/shop/assets/conversion-rules - 商家域（需要 requireMerchantDomainAccess）
+ * - /api/v4/assets/conversion-rules - 用户域（普通用户可访问）
+ *
+ * 创建时间：2026年01月14日
  * 使用 Claude Sonnet 4.5 模型
  */
 
+'use strict'
+
 const express = require('express')
 const router = express.Router()
-const { authenticateToken } = require('../../../../middleware/auth')
-const { handleServiceError } = require('../../../../middleware/validation')
-const logger = require('../../../../utils/logger').logger
+const { authenticateToken } = require('../../../middleware/auth')
+const { handleServiceError } = require('../../../middleware/validation')
+const logger = require('../../../utils/logger').logger
 
 /**
- * 获取材料转换规则接口（增强版）
+ * 获取材料转换规则接口（用户端）
  * GET /api/v4/assets/conversion-rules
  *
  * 业务场景：
  * - 查询当前支持的材料转换规则
- * - 用于前端展示可用的转换选项
- * - 返回完整的规则信息（含手续费、限制、展示信息）
+ * - 用于前端（微信小程序）展示可用的转换选项
+ * - 仅返回前端可见的规则（is_visible = true）
  *
- * 响应数据（增强版）：
+ * 响应数据：
  * {
  *   "success": true,
  *   "data": {
@@ -37,43 +46,30 @@ const logger = require('../../../../utils/logger').logger
  *         "from_amount": 1,
  *         "to_amount": 20,
  *         "conversion_rate": "1:20",
- *         "effective_at": "2025-12-15T00:00:00+08:00",
  *         "enabled": true,
- *         "limits": {
- *           "min_from_amount": 1,
- *           "max_from_amount": null
- *         },
- *         "fee": {
- *           "fee_rate": 0.05,
- *           "fee_min_amount": 10,
- *           "fee_asset_code": "DIAMOND"
- *         },
- *         "display": {
- *           "title": "红晶片分解",
- *           "description": "将红晶片分解为钻石",
- *           "display_icon": "/icons/red-shard.png",
- *           "risk_level": "low"
- *         }
+ *         "limits": { "min_from_amount": 1, "max_from_amount": null },
+ *         "fee": { "fee_rate": 0.05, "fee_min_amount": 10 },
+ *         "display": { "title": "红晶片分解", "description": "...", "risk_level": "low" }
  *       }
  *     ],
- *     "source": "database",
  *     "total_rules": 1
  *   },
- *   "message": "获取转换规则成功（从数据库）"
+ *   "message": "获取转换规则成功"
  * }
  */
 router.get('/conversion-rules', authenticateToken, async (req, res) => {
   try {
     const user_id = req.user.user_id
 
-    logger.info('获取材料转换规则（从数据库）', { user_id })
+    logger.info('用户端获取材料转换规则', { user_id })
 
     // 通过 ServiceManager 获取 AssetConversionService（符合TR-005规范）
     const AssetConversionService = req.app.locals.services.getService('asset_conversion')
+
     // 只返回前端可见的规则（is_visible = true）
     const dbRules = await AssetConversionService.getConversionRules({ visible_only: true })
 
-    logger.info('获取转换规则成功（从数据库）', {
+    logger.info('用户端获取转换规则成功', {
       user_id,
       rule_count: dbRules.length
     })
@@ -94,25 +90,25 @@ router.get('/conversion-rules', authenticateToken, async (req, res) => {
         effective_at: rule.effective_at,
         enabled: rule.is_enabled,
 
-        // 数量限制信息（新增）
+        // 数量限制信息
         limits: {
           min_from_amount: rule.min_from_amount || 1, // 默认最小1
           max_from_amount: rule.max_from_amount // null 表示无上限
         },
 
-        // 手续费信息（新增）
+        // 手续费信息
         fee: {
           fee_rate: parseFloat(rule.fee_rate) || 0, // 费率（小数，如 0.05 = 5%）
           fee_min_amount: rule.fee_min_amount || 0, // 最低手续费
-          fee_asset_code: rule.fee_asset_code || rule.to_asset_code // 手续费资产类型（默认与目标资产相同）
+          fee_asset_code: rule.fee_asset_code || rule.to_asset_code // 手续费资产类型
         },
 
-        // 展示信息（新增）
+        // 展示信息
         display: {
-          title: rule.title || autoDescription, // 规则标题（用于前端显示）
+          title: rule.title || autoDescription, // 规则标题
           description: rule.description || autoDescription, // 详细描述
           display_icon: rule.display_icon || null, // 图标 URL
-          risk_level: rule.risk_level || 'low' // 风险等级：low/medium/high
+          risk_level: rule.risk_level || 'low' // 风险等级
         }
       }
     })
@@ -120,13 +116,12 @@ router.get('/conversion-rules', authenticateToken, async (req, res) => {
     return res.apiSuccess(
       {
         rules,
-        source: 'database', // 标记数据来源
         total_rules: rules.length
       },
-      '获取转换规则成功（从数据库）'
+      '获取转换规则成功'
     )
   } catch (error) {
-    logger.error('获取转换规则失败（数据库查询）', {
+    logger.error('用户端获取转换规则失败', {
       error: error.message,
       stack: error.stack,
       user_id: req.user?.user_id

@@ -455,7 +455,6 @@ class MarketListingService {
    * @param {Object} params - 查询参数
    * @param {number} [params.page=1] - 页码
    * @param {number} [params.page_size=20] - 每页数量
-   * @param {string} [params.category] - 分类筛选（可选，兼容旧参数）
    * @param {string} [params.listing_kind] - 挂牌类型筛选（item_instance / fungible_asset，可选）
    * @param {string} [params.asset_code] - 资产代码筛选（如 red_shard，仅对 fungible_asset 有效）
    * @param {number} [params.min_price] - 最低价格筛选（可选）
@@ -471,7 +470,6 @@ class MarketListingService {
     const {
       page = 1,
       page_size = 20,
-      category,
       listing_kind,
       asset_code,
       min_price,
@@ -479,11 +477,10 @@ class MarketListingService {
       sort = 'newest'
     } = params
 
-    // 构建缓存参数（包含新的筛选参数）
+    // 构建缓存参数
     const cacheParams = {
       page,
       page_size,
-      category: category || 'all',
       listing_kind: listing_kind || 'all',
       asset_code: asset_code || 'all',
       min_price: min_price || 0,
@@ -512,12 +509,7 @@ class MarketListingService {
     // 构建查询条件 - 只查询上架中的商品
     const whereClause = { status: 'on_sale' }
 
-    // 兼容旧的 category 参数
-    if (category) {
-      whereClause.category = category
-    }
-
-    // 新增：按挂牌类型筛选（item_instance / fungible_asset）
+    // 按挂牌类型筛选（item_instance / fungible_asset）
     if (listing_kind && ['item_instance', 'fungible_asset'].includes(listing_kind)) {
       whereClause.listing_kind = listing_kind
     }
@@ -540,16 +532,16 @@ class MarketListingService {
     // 排序逻辑
     let orderClause
     switch (sort) {
-    case 'price_asc':
-      orderClause = [['price_amount', 'ASC']]
-      break
-    case 'price_desc':
-      orderClause = [['price_amount', 'DESC']]
-      break
-    case 'newest':
-    default:
-      orderClause = [['created_at', 'DESC']]
-      break
+      case 'price_asc':
+        orderClause = [['price_amount', 'ASC']]
+        break
+      case 'price_desc':
+        orderClause = [['price_amount', 'DESC']]
+        break
+      case 'newest':
+      default:
+        orderClause = [['created_at', 'DESC']]
+        break
     }
 
     // 分页查询

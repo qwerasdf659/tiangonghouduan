@@ -80,6 +80,19 @@ router.get('/conversion-rules', authenticateToken, requireAdmin, async (req, res
  * - effective_at: 生效时间（ISO8601格式，如 '2025-12-20T00:00:00.000+08:00'）
  * - is_enabled: 是否启用（默认 true）
  *
+ * Body参数（可选 - 2026-01-14 扩展字段）：
+ * - min_from_amount: 最小转换数量（默认1）
+ * - max_from_amount: 最大转换数量（null=无上限）
+ * - fee_rate: 手续费费率（如 0.05 = 5%，默认0）
+ * - fee_min_amount: 最低手续费（默认0）
+ * - fee_asset_code: 手续费资产类型（默认与目标资产相同）
+ * - title: 规则标题（前端展示）
+ * - description: 规则描述
+ * - display_icon: 展示图标URL
+ * - risk_level: 风险等级（low/medium/high，默认low）
+ * - is_visible: 是否前端可见（默认true）
+ * - rounding_mode: 舍入模式（floor/ceil/round，默认floor）
+ *
  * 硬约束：
  * - **版本化**：改比例必须新增规则（不得 UPDATE 覆盖历史）
  * - **风控校验**：保存时触发循环拦截和套利闭环检测
@@ -89,12 +102,25 @@ router.get('/conversion-rules', authenticateToken, requireAdmin, async (req, res
 router.post('/conversion-rules', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const {
+      // 必填字段
       from_asset_code,
       to_asset_code,
       from_amount,
       to_amount,
       effective_at,
-      is_enabled = true
+      is_enabled = true,
+      // 2026-01-14 扩展字段（可选）
+      min_from_amount,
+      max_from_amount,
+      fee_rate,
+      fee_min_amount,
+      fee_asset_code,
+      title,
+      description,
+      display_icon,
+      risk_level,
+      is_visible,
+      rounding_mode
     } = req.body
 
     // 参数验证
@@ -143,12 +169,25 @@ router.post('/conversion-rules', authenticateToken, requireAdmin, async (req, re
       async transaction => {
         return await MaterialManagementService.createConversionRule(
           {
+            // 必填字段
             from_asset_code,
             to_asset_code,
             from_amount: parseInt(from_amount),
             to_amount: parseInt(to_amount),
             effective_at: effectiveDate,
-            is_enabled: is_enabled === true || is_enabled === 'true'
+            is_enabled: is_enabled === true || is_enabled === 'true',
+            // 2026-01-14 扩展字段（可选，Service 层有默认值）
+            min_from_amount,
+            max_from_amount,
+            fee_rate,
+            fee_min_amount,
+            fee_asset_code,
+            title,
+            description,
+            display_icon,
+            risk_level,
+            is_visible,
+            rounding_mode
           },
           req.user.user_id,
           { transaction }

@@ -119,9 +119,10 @@ class AssetTransaction extends Model {
     // 兑换市场相关（Exchange Market - 材料资产扣减）
     EXCHANGE_DEBIT: 'exchange_debit', // 兑换扣减
 
-    // 材料转换相关（Material Conversion - 材料→DIAMOND）
+    // 材料转换相关（Material Conversion - 材料→DIAMOND + 手续费）
     MATERIAL_CONVERT_DEBIT: 'material_convert_debit', // 材料转换扣减
     MATERIAL_CONVERT_CREDIT: 'material_convert_credit', // 材料转换入账（DIAMOND）
+    MATERIAL_CONVERT_FEE: 'material_convert_fee', // 材料转换手续费入账（系统账户）
 
     // 管理员调整相关（Admin Adjustment）
     ADMIN_ADJUSTMENT: 'admin_adjustment' // 管理员调整资产

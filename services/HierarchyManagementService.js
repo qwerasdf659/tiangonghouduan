@@ -29,7 +29,7 @@ const logger = require('../utils/logger').logger
  * - 业务经理（role_level=60）可以管理业务员
  * - 业务员（role_level=40）无下级管理权限
  * - 权限停用会级联影响所有下级（需要明确传入参数）
- * - 所有操作记录到role_change_logs表
+ * - 所有操作通过 AuditLogService 记录到 audit_logs 表
  */
 
 const { User, Role, UserRole, UserHierarchy } = require('../models')

@@ -1,15 +1,17 @@
 /**
  * 餐厅积分抽奖系统 V4.5.0 - 材料转换API
- * 处理材料资产的显式转换功能（如碎红水晶分解为钻石）
+ * 处理材料资产的显式转换功能（规则驱动，支持任意材料转换）
  *
  * 功能说明：
- * - 材料转换（碎红水晶 → 钻石）
+ * - 规则驱动的材料转换（支持任意资产对）
+ * - 支持手续费机制（三方记账：用户扣减 + 用户入账 + 系统手续费入账）
  * - 支持强幂等性控制（防止重复转换）
  * - 完整的事务保护（扣减+入账原子操作）
- * - 转换规则验证（数量限制、启用状态）
+ * - 转换规则验证（数量限制、启用状态、生效时间）
  *
  * 业务规则（强制）：
- * - ✅ 本期只支持：red_shard → DIAMOND（1:20比例）
+ * - ✅ 规则驱动：转换规则配置在 material_conversion_rules 表中
+ * - ✅ 支持手续费：fee_rate / fee_min_amount 配置
  * - ✅ 必须传入幂等键（Header Idempotency-Key）
  * - ✅ 同一幂等键重复请求返回原结果（is_duplicate=true）
  * - ✅ 材料余额不足直接失败，不允许负余额
@@ -23,8 +25,14 @@
  * - 写操作使用 TransactionManager.execute() 统一管理事务
  * - IdempotencyService 在事务外执行（独立幂等检查）
  *
+ * 降维护成本方案（2026-01-13 升级）：
+ * - 移除硬编码的资产类型校验，改为数据库规则驱动
+ * - 支持手续费三方记账
+ * - 返回手续费信息给前端
+ *
  * 创建时间：2025年12月22日
  * 更新时间：2026年01月05日 - 事务边界治理改造
+ * 更新时间：2026年01月13日 - 规则驱动 + 手续费支持
  */
 
 const express = require('express')
@@ -36,18 +44,19 @@ const TransactionManager = require('../../../../utils/TransactionManager')
 // P1-9：服务通过 ServiceManager 获取（B1-Injected + E2-Strict snake_case）
 
 /**
- * 材料转换接口（显式转换）
+ * 材料转换接口（显式转换 - 规则驱动）
  * POST /api/v4/shop/assets/convert
  *
  * 业务场景：
- * - 用户主动将碎红水晶分解为钻石
+ * - 用户主动进行材料转换（如碎红水晶分解为钻石）
  * - 支持强幂等性，防止重复转换
- * - 本期只支持red_shard → DIAMOND转换
+ * - 规则驱动：支持任意在 material_conversion_rules 表中配置的转换规则
+ * - 支持手续费机制（三方记账）
  *
  * 请求参数：
  * @header {string} Idempotency-Key - 幂等键（必填，不接受body参数）
- * @body {string} from_asset_code - 源材料资产代码（当前只支持"red_shard"）
- * @body {string} to_asset_code - 目标资产代码（当前只支持"DIAMOND"）
+ * @body {string} from_asset_code - 源材料资产代码
+ * @body {string} to_asset_code - 目标资产代码
  * @body {number} from_amount - 转换数量（源材料数量，必须大于0）
  *
  * 响应数据：
@@ -58,11 +67,22 @@ const TransactionManager = require('../../../../utils/TransactionManager')
  *     "to_asset_code": "DIAMOND",
  *     "from_amount": 50,
  *     "to_amount": 1000,
+ *     "fee_amount": 0,
+ *     "fee_asset_code": "DIAMOND",
+ *     "net_to_amount": 1000,
  *     "from_tx_id": 123,
  *     "to_tx_id": 456,
+ *     "fee_tx_id": null,
  *     "from_balance": 100,
  *     "to_balance": 5000,
- *     "is_duplicate": false
+ *     "is_duplicate": false,
+ *     "conversion_info": {
+ *       "rule_id": 1,
+ *       "title": "红晶片分解",
+ *       "rate_description": "1碎红水晶 = 20钻石",
+ *       "fee_rate": 0,
+ *       "fee_description": "无手续费"
+ *     }
  *   },
  *   "message": "材料转换成功"
  * }
@@ -70,6 +90,8 @@ const TransactionManager = require('../../../../utils/TransactionManager')
  * 错误码：
  * - 400 MISSING_IDEMPOTENCY_KEY: 缺少幂等键
  * - 400 BAD_REQUEST: 缺少必填参数、转换规则不支持、数量不符合限制
+ * - 400 RULE_NOT_FOUND: 不支持的转换规则（未配置或已禁用）
+ * - 400 AMOUNT_OUT_OF_RANGE: 转换数量超出限制
  * - 403 INSUFFICIENT_BALANCE: 余额不足
  * - 500 INTERNAL_ERROR: 服务器内部错误
  *
@@ -141,32 +163,18 @@ router.post('/convert', authenticateToken, async (req, res) => {
       )
     }
 
-    // 4. 转换规则验证（本期只支持red_shard → DIAMOND）
-    if (from_asset_code !== 'red_shard') {
-      return res.apiError(
-        '不支持的源材料类型：当前只支持"red_shard"（碎红水晶）',
-        'BAD_REQUEST',
-        {
-          from_asset_code,
-          supported_types: ['red_shard'],
-          hint: '如需支持其他材料转换，请联系管理员'
-        },
-        400
-      )
-    }
-
-    if (to_asset_code !== 'DIAMOND') {
-      return res.apiError(
-        '不支持的目标资产类型：当前只支持"DIAMOND"（钻石）',
-        'BAD_REQUEST',
-        {
-          to_asset_code,
-          supported_types: ['DIAMOND'],
-          hint: '如需支持其他资产转换，请联系管理员'
-        },
-        400
-      )
-    }
+    /*
+     * 🔴 2026-01-13 规则驱动改造：移除硬编码的资产类型校验
+     *
+     * 改造前：硬编码校验 from_asset_code === 'red_shard' && to_asset_code === 'DIAMOND'
+     * 改造后：由 AssetConversionService.convertMaterial 内部查询 material_conversion_rules 表
+     *         如果规则不存在或未启用，服务层抛出 RULE_NOT_FOUND 异常
+     *
+     * 收益：
+     * - 运营可直接在数据库配置新规则，无需代码变更
+     * - 支持任意资产对的转换
+     * - 统一的规则管理入口
+     */
 
     /*
      * 【入口幂等检查】防止同一次请求被重复提交
@@ -220,22 +228,42 @@ router.post('/convert', authenticateToken, async (req, res) => {
       { description: 'convertMaterial' }
     )
 
-    // 构建响应数据
+    /*
+     * 构建响应数据（2026-01-13 增强：包含手续费信息）
+     *
+     * 字段说明：
+     * - to_amount: 用户实际获得的目标资产数量（已扣除手续费）
+     * - fee_amount: 扣除的手续费数量
+     * - fee_asset_code: 手续费资产类型
+     * - gross_to_amount: 转换产出原始数量（未扣除手续费）
+     * - conversion_info.fee_rate: 手续费费率
+     */
     const responseData = {
       from_asset_code: result.from_asset_code,
       to_asset_code: result.to_asset_code,
       from_amount: result.from_amount,
-      to_amount: result.to_amount,
+      to_amount: result.to_amount, // 实际入账数量（已扣手续费）
+      gross_to_amount: result.gross_to_amount || result.to_amount, // 原始产出数量
+      fee_amount: result.fee_amount || 0, // 手续费数量
+      fee_asset_code: result.fee_asset_code || result.to_asset_code, // 手续费资产类型
       from_tx_id: result.from_tx_id,
       to_tx_id: result.to_tx_id,
+      fee_tx_id: result.fee_tx_id || null, // 手续费交易ID（无手续费时为null）
       from_balance: result.from_balance,
       to_balance: result.to_balance,
       is_duplicate: false,
-      conversion_rate: 20, // 转换比例：1碎红水晶 = 20钻石
       conversion_info: {
-        rule_description: '碎红水晶分解为钻石',
-        rate_description: '1碎红水晶 = 20钻石',
-        display_icon: '💎'
+        rule_id: result.rule_id || null,
+        title: result.title || '材料转换',
+        rate_description:
+          result.rate_description ||
+          `1${from_asset_code} = ${result.conversion_rate || 1}${to_asset_code}`,
+        fee_rate: result.fee_rate || 0,
+        fee_description:
+          result.fee_amount > 0
+            ? `手续费: ${result.fee_amount} ${result.fee_asset_code}`
+            : '无手续费',
+        display_icon: result.display_icon || '💎'
       }
     }
 
@@ -300,19 +328,29 @@ router.post('/convert', authenticateToken, async (req, res) => {
       )
     }
 
-    // 转换规则错误（特殊处理）
-    if (
-      error.message &&
-      (error.message.includes('不支持的材料转换') || error.message.includes('转换规则'))
-    ) {
-      return res.apiError(
-        error.message,
-        'UNSUPPORTED_CONVERSION',
-        {
-          hint: '当前只支持碎红水晶转钻石，其他材料转换规则暂未开放'
-        },
-        400
-      )
+    // 转换规则错误（特殊处理 - 2026-01-13 规则驱动改造后细化错误类型）
+    if (error.message) {
+      // 规则不存在或未启用
+      if (error.message.includes('不支持的材料转换') || error.message.includes('转换规则不存在')) {
+        return res.apiError(
+          error.message,
+          'RULE_NOT_FOUND',
+          {
+            from_asset_code: req.body.from_asset_code,
+            to_asset_code: req.body.to_asset_code,
+            hint: '该转换规则未配置或已禁用，请检查资产代码或联系管理员'
+          },
+          400
+        )
+      }
+
+      // 数量超出限制
+      if (
+        error.message.includes('数量') &&
+        (error.message.includes('最小') || error.message.includes('最大'))
+      ) {
+        return res.apiError(error.message, 'AMOUNT_OUT_OF_RANGE', null, 400)
+      }
     }
 
     // 其他错误（通用处理）

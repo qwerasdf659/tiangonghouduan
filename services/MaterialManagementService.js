@@ -119,6 +119,17 @@ class MaterialManagementService {
    * @param {number|string} payload.to_amount - 目标资产数量
    * @param {string|Date} payload.effective_at - 生效时间（ISO8601字符串或Date）
    * @param {boolean|string} [payload.is_enabled=true] - 是否启用
+   * @param {number} [payload.min_from_amount=1] - 最小转换数量
+   * @param {number|null} [payload.max_from_amount=null] - 最大转换数量（null=无上限）
+   * @param {number} [payload.fee_rate=0] - 手续费费率（如 0.05 = 5%）
+   * @param {number} [payload.fee_min_amount=0] - 最低手续费
+   * @param {string|null} [payload.fee_asset_code=null] - 手续费资产类型（默认与目标资产相同）
+   * @param {string|null} [payload.title=null] - 规则标题（前端展示）
+   * @param {string|null} [payload.description=null] - 规则描述
+   * @param {string|null} [payload.display_icon=null] - 展示图标URL
+   * @param {string} [payload.risk_level='low'] - 风险等级（low/medium/high）
+   * @param {boolean} [payload.is_visible=true] - 是否前端可见
+   * @param {string} [payload.rounding_mode='floor'] - 舍入模式（floor/ceil/round）
    * @param {number} created_by - 创建人 user_id（管理员）
    * @param {Object} options - 选项
    * @param {Object} options.transaction - Sequelize事务对象（必填）
@@ -137,7 +148,19 @@ class MaterialManagementService {
       from_amount,
       to_amount,
       effective_at,
-      is_enabled = true
+      is_enabled = true,
+      // 2026-01-14 新增扩展字段（材料转换系统降维护成本方案）
+      min_from_amount = 1,
+      max_from_amount = null,
+      fee_rate = 0,
+      fee_min_amount = 0,
+      fee_asset_code = null,
+      title = null,
+      description = null,
+      display_icon = null,
+      risk_level = 'low',
+      is_visible = true,
+      rounding_mode = 'floor'
     } = payload || {}
 
     if (!from_asset_code || !to_asset_code) {
@@ -182,15 +205,39 @@ class MaterialManagementService {
       )
     }
 
+    // 验证 risk_level 枚举值
+    const validRiskLevels = ['low', 'medium', 'high']
+    const normalizedRiskLevel = validRiskLevels.includes(risk_level) ? risk_level : 'low'
+
+    // 验证 rounding_mode 枚举值
+    const validRoundingModes = ['floor', 'ceil', 'round']
+    const normalizedRoundingMode = validRoundingModes.includes(rounding_mode)
+      ? rounding_mode
+      : 'floor'
+
     const rule = await MaterialConversionRule.create(
       {
+        // 基础必填字段
         from_asset_code,
         to_asset_code,
         from_amount: parseInt(from_amount),
         to_amount: parseInt(to_amount),
         effective_at: effectiveDate,
         is_enabled: is_enabled === true || is_enabled === 'true',
-        created_by
+        created_by,
+
+        // 2026-01-14 扩展字段（材料转换系统降维护成本方案）
+        min_from_amount: parseInt(min_from_amount) || 1,
+        max_from_amount: max_from_amount !== null ? parseInt(max_from_amount) : null,
+        fee_rate: parseFloat(fee_rate) || 0,
+        fee_min_amount: parseInt(fee_min_amount) || 0,
+        fee_asset_code: fee_asset_code || null,
+        title: title || null,
+        description: description || null,
+        display_icon: display_icon || null,
+        risk_level: normalizedRiskLevel,
+        is_visible: is_visible === true || is_visible === 'true',
+        rounding_mode: normalizedRoundingMode
       },
       { transaction }
     )

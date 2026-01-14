@@ -56,10 +56,10 @@ module.exports = sequelize => {
       },
 
       /*
-       * 图片存储路径（Sealos对象存储 key 或完整 URL）
-       * 🎯 架构决策（2026-01-08 拍板）：
-       * - 新创建的 Banner 存储对象 key（如 popup-banners/xxx.jpg）
-       * - 历史数据可能是完整 URL，通过 ImageUrlHelper 兼容处理
+       * 图片存储路径（Sealos对象存储 key）
+       * 🎯 架构决策（2026-01-08 拍板 + 2026-01-14 图片缩略图架构兼容残留核查报告强化）：
+       * - 只允许存储对象 key（如 popup-banners/xxx.jpg）
+       * - 不再兼容完整 URL 或本地路径
        * - 前端显示时统一通过 ImageUrlHelper.getImageUrl() 生成完整 CDN URL
        */
       image_url: {
@@ -68,10 +68,25 @@ module.exports = sequelize => {
         validate: {
           notEmpty: {
             msg: '弹窗图片路径不能为空'
+          },
+          /**
+           * 强制校验 object key 格式（2026-01-14 图片缩略图架构兼容残留核查报告决策）
+           * @param {string} value - 图片路径值
+           * @returns {void}
+           * @throws {Error} 当值为完整 URL 或本地路径时抛出错误
+           */
+          isValidObjectKey(value) {
+            const { isValidObjectKey } = require('../utils/ImageUrlHelper')
+            if (!isValidObjectKey(value)) {
+              throw new Error(
+                '图片路径必须是对象存储 key 格式（如 popup-banners/xxx.jpg），' +
+                  '不允许完整 URL 或本地路径: ' +
+                  value
+              )
+            }
           }
-          // 🔴 移除 isUrl 校验：新架构存储对象 key，不是完整 URL
         },
-        comment: '图片存储路径（对象 key 或历史完整 URL）'
+        comment: '图片存储路径（仅对象 key，如 popup-banners/xxx.jpg）'
       },
 
       // 点击跳转链接（可选）

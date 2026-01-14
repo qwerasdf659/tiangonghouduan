@@ -45,12 +45,7 @@ module.exports = sequelize => {
         allowNull: true,
         comment: '商品描述'
       },
-      image_url: {
-        type: DataTypes.STRING(500),
-        allowNull: true,
-        comment:
-          '【已废弃】旧商品图片URL字段（2026-01-08图片存储架构已迁移到primary_image_id关联image_resources表，此字段仅保留向后兼容）'
-      },
+      // 商品主图片通过 image_resources 表统一管理
       primary_image_id: {
         type: DataTypes.INTEGER,
         allowNull: true,

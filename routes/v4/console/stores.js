@@ -24,7 +24,7 @@
  * - POST   /:store_id/activate   - 激活门店
  * - POST   /:store_id/deactivate - 停用门店
  *
- * 注意：区域列表接口已迁移至 /api/v4/console/regions
+ * 关联路由：区域列表查询 → /api/v4/console/regions
  *
  * @since 2026-01-12
  * @see docs/商家员工域权限体系升级方案.md - P1 门店数据维护入口
@@ -152,11 +152,6 @@ router.get('/stats', authenticateToken, requireAdmin, async (req, res) => {
     return handleServiceError(error, res, '获取门店统计')
   }
 })
-
-/*
- * 注意：区域列表已迁移至 /api/v4/console/regions 路由
- * 请使用 RegionService 获取标准化的省市区街道数据
- */
 
 /**
  * GET /:store_id - 获取门店详情

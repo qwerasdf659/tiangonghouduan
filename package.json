@@ -249,9 +249,8 @@
       "高性能API优化"
     ],
     "reference": "腾讯云API、阿里云API、网易云API、米哈游原神API设计规范",
-    "refactoredFrom": "V4统一引擎架构（/api/v4/unified-engine/*）",
-    "refactoredAt": "2025-11-11",
-    "reason": "隐藏内部技术架构，采用业务资源导向，符合行业标准",
+    "apiDesign": "RESTful资源导向（Resource-Oriented Design）",
+    "pathStyle": "扁平化（/api/v4/{resource}）",
     "techStack": [
       "Node.js 20+ + Express",
       "RESTful API设计",

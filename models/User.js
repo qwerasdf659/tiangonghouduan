@@ -148,20 +148,11 @@ module.exports = sequelize => {
       comment: '用户高级空间解锁状态（100积分解锁，24小时有效期）'
     })
 
-    /*
-     * ⚠️ 已废弃关联（2026-01-02）：
-     * 新架构中 AssetTransaction 通过 Account 间接关联 User：
-     * User → Account (user_id) → AssetTransaction (account_id)
-     * 直接关联已移除，避免 Sequelize 尝试查询不存在的 user_id 列
-     */
-
     /**
-     * ❌ TradeRecord 关联已删除（2026-01-08 交易流水收敛决策执行完成）
-     * - 删除原因：TradeRecord 模型和表已完全删除
-     * - 替代关联路径：
-     *   - C2C交易：User → TradeOrder (buyer_user_id / seller_user_id)
-     *   - 资产变动：User → Account → AssetTransaction
-     *   - 物品事件：User → ItemInstance → ItemInstanceEvent
+     * 当前关联路径：
+     * - C2C交易：User → TradeOrder (buyer_user_id / seller_user_id)
+     * - 资产变动：User → Account → AssetTransaction
+     * - 物品事件：User → ItemInstance → ItemInstanceEvent
      */
 
     // 🔥 用户的抽奖记录（LotteryRecord已合并到LotteryDraw）

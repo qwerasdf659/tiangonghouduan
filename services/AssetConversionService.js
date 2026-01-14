@@ -1,108 +1,86 @@
 /**
  * 餐厅积分抽奖系统 V4.5.0材料系统架构 - 资产转换服务（AssetConversionService）
- * 🔥 Phase 3已迁移：使用统一账本（AssetService）进行材料转换
  *
- * 业务场景：提供材料资产的显式转换功能，如碎红水晶分解为钻石
+ * 核心职责：基于统一账本（AssetService）进行材料资产转换
+ * 支持规则驱动 + 手续费三方记账
+ *
+ * 业务场景：提供材料资产的显式转换功能（规则驱动，支持任意资产对）
  *
  * 核心功能：
- * 1. 材料转钻石转换（碎红水晶 → 钻石，比例1:20）
- * 2. 完整的事务保护（扣减材料 + 增加钻石在同一事务中完成）
- * 3. 幂等性控制（防止重复转换）+ 409冲突保护（参数不同返回409）
- * 4. 规则验证（转换规则存在性、启用状态、数量限制）
- * 5. 完整的流水记录（统一账本双分录：material_convert_debit + material_convert_credit）
+ * 1. 规则驱动材料转换（支持任意在 material_conversion_rules 表配置的转换规则）
+ * 2. 手续费机制（三方记账：用户扣减 + 用户入账 + 系统手续费入账）
+ * 3. 完整的事务保护（扣减材料 + 增加目标资产 + 手续费入账在同一事务中完成）
+ * 4. 幂等性控制（防止重复转换）+ 409冲突保护（参数不同返回409）
+ * 5. 规则验证（转换规则存在性、启用状态、数量限制、手续费配置）
+ * 6. 完整的流水记录（统一账本双/三分录）
  *
  * 事务边界治理（2026-01-05 决策）：
  * - 所有写操作 **强制要求** 外部事务传入（options.transaction）
  * - 未提供事务时直接报错（使用 assertAndGetTransaction）
  * - 服务层禁止自建事务，由入口层统一使用 TransactionManager.execute()
  *
- * Phase 3改造要点：
- * - ✅ 使用AssetService.changeBalance()替代MaterialService + DiamondService
- * - ✅ 双分录模型：material_convert_debit（扣减）+ material_convert_credit（入账）
- * - ✅ 统一idempotency_key：两个分录使用同一个idempotency_key，通过business_type区分
- * - ✅ 409冲突检查：同一idempotency_key但参数不同时返回409 IDEMPOTENCY_KEY_CONFLICT
- * - ✅ 余额来源：统一从account_asset_balances读取，不再依赖旧余额表
+ * 降维护成本方案（2026-01-13 升级）：
+ * - ✅ 规则驱动：转换规则配置在 material_conversion_rules 表中
+ * - ✅ 移除硬编码：不再限制只能 red_shard → DIAMOND
+ * - ✅ 支持手续费：fee_rate / fee_min_amount 配置
+ * - ✅ 三方记账：用户扣减 + 用户入账 + 系统手续费入账
+ * - ✅ 数量限制：min_from_amount / max_from_amount 配置
+ * - ✅ 舍入控制：rounding_mode（floor/ceil/round）
+ * - ✅ 幂等优化：从"扫描"改为"点查"（getTransactionByIdempotencyKey）
  *
  * 业务流程：
  *
  * 1. **显式转换流程**（用户主动发起）
- *    - 用户选择碎红水晶数量 → convertMaterial()
- *    - 验证转换规则 → 验证材料余额
- *    - 统一账本双分录：扣减材料（debit）+ 增加钻石（credit）在同一事务中
+ *    - 用户选择源材料数量 → convertMaterial()
+ *    - 查询转换规则（material_conversion_rules）
+ *    - 验证规则启用状态、数量限制
+ *    - 计算产出数量和手续费
+ *    - 统一账本双/三分录：
+ *      - 扣减材料（debit）
+ *      - 增加目标资产（credit，已扣除手续费）
+ *      - 系统手续费入账（fee，如有配置）
  *    - 写入统一流水记录（asset_transactions表）→ 转换完成
  *
- * 2. **幂等性保护（Phase 3强化）**
+ * 2. **幂等性保护（Phase 4优化）**
  *    - 客户端必须传入idempotency_key（幂等键）
  *    - 同一idempotency_key只能转换一次
  *    - 重复请求（参数相同）：返回原结果（is_duplicate=true）
  *    - 重复请求（参数不同）：返回409冲突错误（IDEMPOTENCY_KEY_CONFLICT）
+ *    - 幂等检查改为点查（O(1)复杂度）
  *
  * 3. **错误处理**
- *    - 转换规则不存在/已禁用 → 拒绝转换
- *    - 材料余额不足 → 拒绝转换（统一账本验证）
- *    - 转换数量不符合限制 → 拒绝转换
- *    - 参数冲突 → 返回409错误
+ *    - 转换规则不存在/已禁用 → 拒绝转换（RULE_NOT_FOUND）
+ *    - 转换数量超出限制 → 拒绝转换（AMOUNT_OUT_OF_RANGE）
+ *    - 材料余额不足 → 拒绝转换（INSUFFICIENT_BALANCE）
+ *    - 参数冲突 → 返回409错误（IDEMPOTENCY_KEY_CONFLICT）
  *    - 任何异常自动回滚事务
  *
  * 设计原则：
+ * - **规则驱动**：转换规则来自数据库配置表，运营可调整无需代码变更
  * - **统一账本**：所有资产变动通过AssetService统一管理（Single Source of Truth）
- * - **事务原子性**：扣减和入账在同一事务中完成，要么全成功要么全失败
+ * - **三方记账**：用户扣减 + 用户入账 + 系统手续费入账
+ * - **事务原子性**：所有分录在同一事务中完成，要么全成功要么全失败
  * - **幂等性保证**：通过idempotency_key防止重复转换，参数不同返回409
- * - **规则配置化**：转换规则来自数据库配置表（material_conversion_rules），支持版本化（effective_at）
+ * - **规则配置化**：转换规则来自数据库配置表，支持版本化（effective_at）
  * - **完整审计**：每次转换都有完整的流水记录（asset_transactions）
  * - **不隐式触发**：只提供显式API，不在兑换等流程中自动转换
  *
  * 关键方法列表：
- * - convertMaterial() - 材料转换（核心方法，使用AssetService统一账本）
+ * - convertMaterial() - 材料转换（核心方法，支持手续费三方记账）
  * - convertRedShardToDiamond() - 碎红水晶转钻石（便捷方法）
+ * - getConversionRules() - 获取可用转换规则列表
  *
- * 数据模型关联（Phase 3最终态）：
+ * 数据模型关联（Phase 4最终态）：
+ * - MaterialConversionRule：转换规则配置表（规则真相源）
  * - AccountAssetBalance：统一资产余额表（管理所有资产余额）
  * - AssetTransaction：统一资产流水表（记录所有资产变动）
  *   - business_type: material_convert_debit（材料扣减分录）
- *   - business_type: material_convert_credit（钻石入账分录）
- *
- * 幂等性保证（Phase 3强化）：
- * - 通过idempotency_key（业务唯一标识）防止重复转换
- * - 同一idempotency_key的转换操作只会执行一次
- * - 参数一致：返回原结果（is_duplicate=true）
- * - 参数不一致：返回409冲突错误（IDEMPOTENCY_KEY_CONFLICT）
- *
- * 事务支持：
- * - 所有转换操作强制要求外部事务传入（options.transaction参数）
- * - 扣减材料和增加钻石必须在同一事务中
- * - 任何异常都会自动回滚事务，确保数据一致性
- *
- * 使用示例：
- * ```javascript
- * // 示例1：碎红水晶转钻石（显式转换）
- * const AssetConversionService = require('./services/AssetConversionService')
- * const result = await AssetConversionService.convertRedShardToDiamond(
- *   1, // user_id
- *   50, // red_shard_amount（50个碎红水晶）
- *   {
- *     transaction, // 必须传入事务
- *     idempotency_key: `convert_to_diamond_${Date.now()}` // 幂等键
- *   }
- * )
- * // 结果：扣减50个碎红水晶，增加1000个钻石（50 * 20 = 1000）
- *
- * // 示例2：通用材料转换
- * const result = await AssetConversionService.convertMaterial(
- *   1, // user_id
- *   'red_shard', // from_asset_code
- *   'DIAMOND', // to_asset_code
- *   20, // from_amount
- *   {
- *     transaction, // 必须传入事务
- *     idempotency_key: `material_convert_${Date.now()}`
- *   }
- * )
- * // 结果：扣减20个碎红水晶，增加400个钻石（20 * 20 = 400）
- * ```
+ *   - business_type: material_convert_credit（目标资产入账分录）
+ *   - business_type: material_convert_fee（手续费入账分录）
  *
  * 创建时间：2025-12-15
  * 最后更新：2026-01-05（事务边界治理改造）
+ * 最后更新：2026-01-13（规则驱动 + 手续费三方记账）
  * 使用模型：Claude Sonnet 4.5
  */
 
@@ -123,15 +101,22 @@ const { assertAndGetTransaction } = require('../utils/transactionHelpers')
  */
 class AssetConversionService {
   /**
-   * 材料转换（核心方法）
+   * 材料转换（核心方法 - 支持手续费三方记账）
    *
    * 事务边界治理（2026-01-05 决策）：
    * - 强制要求外部事务传入（options.transaction）
    * - 未提供事务时直接报错，由入口层统一管理事务
    *
+   * 降维护成本方案（2026-01-13 升级）：
+   * - 规则驱动：从数据库读取转换规则，支持任意资产对
+   * - 数量限制：min_from_amount / max_from_amount
+   * - 手续费机制：fee_rate / fee_min_amount / fee_asset_code
+   * - 舍入控制：rounding_mode（floor/ceil/round）
+   * - 幂等优化：使用点查替代扫描
+   *
    * 业务规则：
    * - 根据转换规则配置进行材料转换
-   * - 扣减源材料 + 增加目标资产在同一事务中完成
+   * - 扣减源材料 + 增加目标资产 + 系统手续费入账在同一事务中完成
    * - 支持幂等性控制，防止重复转换
    * - 验证转换规则、材料余额、数量限制
    *
@@ -153,12 +138,21 @@ class AssetConversionService {
    *   from_asset_code: 'red_shard',
    *   to_asset_code: 'DIAMOND',
    *   from_amount: 50,
-   *   to_amount: 1000,
-   *   from_tx_id: 123,  // 材料扣减流水ID
-   *   to_tx_id: 456,    // 钻石入账流水ID
-   *   from_balance: 100, // 转换后的材料余额
-   *   to_balance: 5000,  // 转换后的钻石余额
-   *   is_duplicate: false // 是否为重复请求
+   *   gross_to_amount: 1000,  // 原始产出（未扣手续费）
+   *   fee_amount: 50,         // 手续费
+   *   fee_asset_code: 'DIAMOND',
+   *   to_amount: 950,         // 实际入账（已扣手续费）
+   *   from_tx_id: 123,        // 材料扣减流水ID
+   *   to_tx_id: 456,          // 目标资产入账流水ID
+   *   fee_tx_id: 789,         // 手续费入账流水ID（无手续费时为null）
+   *   from_balance: 100,      // 转换后的材料余额
+   *   to_balance: 5000,       // 转换后的目标资产余额
+   *   is_duplicate: false,    // 是否为重复请求
+   *   rule_id: 1,             // 使用的规则ID
+   *   title: '红晶片分解',    // 规则标题
+   *   fee_rate: 0.05,         // 手续费费率
+   *   conversion_rate: 20,    // 转换比例
+   *   display_icon: '💎'      // 显示图标
    * }
    */
   static async convertMaterial(user_id, from_asset_code, to_asset_code, from_amount, options = {}) {
@@ -186,7 +180,7 @@ class AssetConversionService {
       throw new Error('idempotency_key不能为空（幂等性控制必需）')
     }
 
-    // 🔴 P1-3 修改：从 DB 读取转换规则（支持版本化查询）
+    // 🔴 从 DB 读取转换规则（支持版本化查询）
     const rule = await MaterialConversionRule.getEffectiveRule(
       from_asset_code,
       to_asset_code,
@@ -195,49 +189,68 @@ class AssetConversionService {
     )
 
     if (!rule) {
-      throw new Error(
-        `不支持的材料转换：${from_asset_code} → ${to_asset_code}（未找到生效的转换规则）`
+      const ruleNotFoundError = new Error(
+        `转换规则不存在：${from_asset_code} → ${to_asset_code}（未找到生效的转换规则）`
       )
+      ruleNotFoundError.errorCode = 'RULE_NOT_FOUND'
+      throw ruleNotFoundError
     }
 
     // 验证规则是否启用
     if (!rule.is_enabled) {
-      throw new Error(`材料转换规则已禁用：${from_asset_code} → ${to_asset_code}`)
+      const ruleDisabledError = new Error(`转换规则已禁用：${from_asset_code} → ${to_asset_code}`)
+      ruleDisabledError.errorCode = 'RULE_DISABLED'
+      throw ruleDisabledError
     }
 
-    // 计算转换后的目标资产数量（Calculate converted amount）
-    const to_amount = Math.floor((from_amount / rule.from_amount) * rule.to_amount)
+    // 🔴 2026-01-13 新增：数量限制验证
+    const minAmount = rule.min_from_amount || 1
+    const maxAmount = rule.max_from_amount // null 表示无上限
+
+    if (from_amount < minAmount) {
+      const minAmountError = new Error(
+        `转换数量低于最小限制：最小 ${minAmount}，当前 ${from_amount}`
+      )
+      minAmountError.errorCode = 'AMOUNT_BELOW_MINIMUM'
+      throw minAmountError
+    }
+
+    if (maxAmount && from_amount > maxAmount) {
+      const maxAmountError = new Error(
+        `转换数量超过最大限制：最大 ${maxAmount}，当前 ${from_amount}`
+      )
+      maxAmountError.errorCode = 'AMOUNT_ABOVE_MAXIMUM'
+      throw maxAmountError
+    }
+
+    // 🔴 2026-01-13 新增：计算转换产出和手续费
+    const conversionResult = this._calculateConversion(from_amount, rule)
+    const { gross_to_amount, fee_amount, net_to_amount, fee_asset_code } = conversionResult
 
     const idempotency_key = options.idempotency_key
-    const title = options.title || `材料转换：${from_asset_code} → ${to_asset_code}`
+    const title = options.title || rule.title || `材料转换：${from_asset_code} → ${to_asset_code}`
     const meta = {
       ...options.meta,
       from_asset_code,
       to_asset_code,
       from_amount,
-      to_amount,
+      gross_to_amount,
+      fee_amount,
+      fee_asset_code,
+      net_to_amount,
       rule_id: rule.rule_id, // 记录规则ID用于审计
       rule_effective_at: rule.effective_at, // 记录规则生效时间用于回放
       conversion_rate: rule.to_amount / rule.from_amount, // 转换比例
+      fee_rate: parseFloat(rule.fee_rate) || 0,
       rule_from_amount: rule.from_amount, // 规则源数量
       rule_to_amount: rule.to_amount // 规则目标数量
     }
 
-    // 🔴 Phase 3: 409幂等冲突检查 - 查询是否已存在转换记录
-    const existing_debit_tx = await AssetService.getTransactions(
-      { user_id },
-      {
-        asset_code: from_asset_code,
-        business_type: 'material_convert_debit',
-        page_size: 1000 // 获取足够多的记录用于查找
-      },
-      { transaction }
-    )
-
-    // 检查是否存在相同idempotency_key的记录（派生键格式：${idempotency_key}:debit）
+    // 🔴 2026-01-13 优化：幂等检查从"扫描"改为"点查"
     const debit_idempotency_key = `${idempotency_key}:debit`
-    const existing_record = existing_debit_tx.transactions.find(
-      tx => tx.idempotency_key === debit_idempotency_key
+    const existing_record = await AssetService.getTransactionByIdempotencyKey(
+      debit_idempotency_key,
+      { transaction }
     )
 
     if (existing_record) {
@@ -259,7 +272,6 @@ class AssetConversionService {
         )
         conflictError.statusCode = 409 // HTTP 409 Conflict
         conflictError.errorCode = 'IDEMPOTENCY_KEY_CONFLICT'
-
         throw conflictError
       }
 
@@ -269,20 +281,24 @@ class AssetConversionService {
         from_asset_code,
         to_asset_code,
         from_amount,
-        to_amount,
+        net_to_amount,
         idempotency_key
       })
 
-      // 查询对应的目标资产入账记录
-      const to_transactions_result = await AssetService.getTransactions(
-        { user_id },
-        {
-          asset_code: to_asset_code,
-          business_type: 'material_convert_credit',
-          page_size: 1
-        },
+      // 查询对应的目标资产入账记录和手续费记录
+      const credit_idempotency_key = `${idempotency_key}:credit`
+      const existing_credit = await AssetService.getTransactionByIdempotencyKey(
+        credit_idempotency_key,
         { transaction }
       )
+
+      let existing_fee = null
+      if (fee_amount > 0) {
+        const fee_idempotency_key = `${idempotency_key}:fee`
+        existing_fee = await AssetService.getTransactionByIdempotencyKey(fee_idempotency_key, {
+          transaction
+        })
+      }
 
       // 获取当前余额
       const from_balance_obj = await AssetService.getBalance(
@@ -299,15 +315,21 @@ class AssetConversionService {
         from_asset_code,
         to_asset_code,
         from_amount,
-        to_amount,
+        gross_to_amount,
+        fee_amount,
+        fee_asset_code,
+        to_amount: net_to_amount,
         from_tx_id: existing_record.transaction_id,
-        to_tx_id:
-          to_transactions_result.transactions.length > 0
-            ? to_transactions_result.transactions[0].transaction_id
-            : null,
+        to_tx_id: existing_credit?.transaction_id || null,
+        fee_tx_id: existing_fee?.transaction_id || null,
         from_balance: from_balance_obj.available_amount,
         to_balance: to_balance_obj.available_amount,
-        is_duplicate: true
+        is_duplicate: true,
+        rule_id: rule.rule_id,
+        title: rule.title || title,
+        fee_rate: parseFloat(rule.fee_rate) || 0,
+        conversion_rate: rule.to_amount / rule.from_amount,
+        display_icon: rule.display_icon || '💎'
       }
     }
 
@@ -315,7 +337,6 @@ class AssetConversionService {
      * 步骤1：扣减源材料（使用统一账本AssetService）
      * business_type: material_convert_debit
      */
-    // eslint-disable-next-line no-restricted-syntax -- 已传递 transaction
     const from_result = await AssetService.changeBalance(
       {
         user_id,
@@ -325,50 +346,77 @@ class AssetConversionService {
         business_type: 'material_convert_debit', // 业务类型：材料转换扣减
         meta: {
           ...meta,
-          to_asset_code,
-          to_amount,
-          conversion_rate: to_amount / from_amount,
+          step: 'debit',
           title: `${title}（扣减${from_asset_code}）`
         }
       },
-      {
-        transaction
-      }
+      { transaction }
     )
 
     /*
      * 步骤2：增加目标资产（使用统一账本AssetService）
      * business_type: material_convert_credit
+     * 注意：入账金额为 net_to_amount（已扣除手续费）
      */
-    // eslint-disable-next-line no-restricted-syntax -- 已传递 transaction
     const to_result = await AssetService.changeBalance(
       {
         user_id,
         asset_code: to_asset_code,
-        delta_amount: to_amount, // 正数表示增加
+        delta_amount: net_to_amount, // 正数表示增加（已扣除手续费）
         idempotency_key: `${idempotency_key}:credit`, // 幂等键：派生键（入账）
         business_type: 'material_convert_credit', // 业务类型：材料转换入账
         meta: {
           ...meta,
-          from_asset_code,
-          from_amount,
-          conversion_rate: to_amount / from_amount,
+          step: 'credit',
           title: `${title}（获得${to_asset_code}）`
         }
       },
-      {
-        transaction
-      }
+      { transaction }
     )
 
-    logger.info('✅ 材料转换成功（统一账本双分录）', {
+    /*
+     * 步骤3：系统手续费入账（如有配置）
+     * business_type: material_convert_fee
+     * 入账到 SYSTEM_PLATFORM_FEE 系统账户
+     */
+    let fee_result = null
+    if (fee_amount > 0) {
+      fee_result = await AssetService.changeBalance(
+        {
+          system_code: 'SYSTEM_PLATFORM_FEE', // 系统账户
+          asset_code: fee_asset_code,
+          delta_amount: fee_amount, // 正数表示增加
+          idempotency_key: `${idempotency_key}:fee`, // 幂等键：派生键（手续费）
+          business_type: 'material_convert_fee', // 业务类型：材料转换手续费
+          meta: {
+            ...meta,
+            step: 'fee',
+            title: `${title}（手续费入账）`,
+            payer_user_id: user_id // 记录支付手续费的用户
+          }
+        },
+        { transaction }
+      )
+
+      logger.info('✅ 材料转换手续费入账', {
+        user_id,
+        fee_amount,
+        fee_asset_code,
+        fee_tx_id: fee_result.transaction_record.transaction_id
+      })
+    }
+
+    logger.info('✅ 材料转换成功（统一账本三方记账）', {
       user_id,
       from_asset_code,
       to_asset_code,
       from_amount,
-      to_amount,
+      gross_to_amount,
+      fee_amount,
+      net_to_amount,
       from_tx_id: from_result.transaction_record.transaction_id,
       to_tx_id: to_result.transaction_record.transaction_id,
+      fee_tx_id: fee_result?.transaction_record.transaction_id || null,
       idempotency_key
     })
 
@@ -377,12 +425,78 @@ class AssetConversionService {
       from_asset_code,
       to_asset_code,
       from_amount,
-      to_amount,
+      gross_to_amount,
+      fee_amount,
+      fee_asset_code,
+      to_amount: net_to_amount,
       from_tx_id: from_result.transaction_record.transaction_id,
       to_tx_id: to_result.transaction_record.transaction_id,
+      fee_tx_id: fee_result?.transaction_record.transaction_id || null,
       from_balance: from_result.balance.available_amount,
       to_balance: to_result.balance.available_amount,
-      is_duplicate: false
+      is_duplicate: false,
+      rule_id: rule.rule_id,
+      title: rule.title || title,
+      fee_rate: parseFloat(rule.fee_rate) || 0,
+      conversion_rate: rule.to_amount / rule.from_amount,
+      display_icon: rule.display_icon || '💎',
+      rate_description: `1${from_asset_code} = ${rule.to_amount / rule.from_amount}${to_asset_code}`
+    }
+  }
+
+  /**
+   * 计算转换产出和手续费（内部方法）
+   *
+   * 计算逻辑：
+   * 1. gross_to_amount = (from_amount / rule.from_amount) * rule.to_amount（应用舍入模式）
+   * 2. fee_amount = max(gross_to_amount * fee_rate, fee_min_amount)
+   * 3. net_to_amount = gross_to_amount - fee_amount
+   *
+   * @param {number} from_amount - 源材料数量
+   * @param {Object} rule - 转换规则对象
+   * @returns {Object} 计算结果 { gross_to_amount, fee_amount, net_to_amount, fee_asset_code }
+   * @private
+   */
+  static _calculateConversion(from_amount, rule) {
+    // 1. 计算原始产出
+    const rawAmount = (from_amount / rule.from_amount) * rule.to_amount
+
+    // 2. 应用舍入模式
+    let gross_to_amount
+    const roundingMode = rule.rounding_mode || 'floor'
+    switch (roundingMode) {
+      case 'ceil':
+        gross_to_amount = Math.ceil(rawAmount)
+        break
+      case 'round':
+        gross_to_amount = Math.round(rawAmount)
+        break
+      case 'floor':
+      default:
+        gross_to_amount = Math.floor(rawAmount)
+    }
+
+    // 3. 计算手续费
+    const feeRate = parseFloat(rule.fee_rate) || 0
+    const feeMinAmount = parseInt(rule.fee_min_amount) || 0
+    let fee_amount = 0
+
+    if (feeRate > 0 || feeMinAmount > 0) {
+      const calculatedFee = Math.floor(gross_to_amount * feeRate)
+      fee_amount = Math.max(calculatedFee, feeMinAmount)
+    }
+
+    // 4. 计算净入账
+    const net_to_amount = gross_to_amount - fee_amount
+
+    // 5. 确定手续费资产类型（默认与目标资产相同）
+    const fee_asset_code = rule.fee_asset_code || rule.to_asset_code
+
+    return {
+      gross_to_amount,
+      fee_amount,
+      net_to_amount,
+      fee_asset_code
     }
   }
 
@@ -443,19 +557,28 @@ class AssetConversionService {
    * @param {Object} options - 选项
    * @param {Object} options.transaction - 事务（可选）
    * @param {Date} options.as_of_time - 查询生效时间点（可选，默认当前时间）
-   * @returns {Promise<Array<Object>>} 规则列表（含 rule_id/from_asset_code/to_asset_code/from_amount/to_amount/effective_at/is_enabled）
+   * @param {boolean} options.visible_only - 仅返回前端可见规则（可选，默认 false）
+   * @returns {Promise<Array<Object>>} 规则列表（增强版含完整字段信息）
    */
   static async getConversionRules(options = {}) {
-    const { transaction, as_of_time } = options
+    const { transaction, as_of_time, visible_only = false } = options
     const asOfTime = as_of_time || new Date()
 
+    // 构建查询条件
+    const whereCondition = {
+      is_enabled: true,
+      effective_at: {
+        [sequelize.Sequelize.Op.lte]: asOfTime
+      }
+    }
+
+    // 如果仅查询前端可见规则
+    if (visible_only) {
+      whereCondition.is_visible = true
+    }
+
     const rules = await MaterialConversionRule.findAll({
-      where: {
-        is_enabled: true,
-        effective_at: {
-          [sequelize.Sequelize.Op.lte]: asOfTime
-        }
-      },
+      where: whereCondition,
       order: [
         ['effective_at', 'DESC'],
         ['rule_id', 'DESC']

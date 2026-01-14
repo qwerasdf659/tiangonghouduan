@@ -840,9 +840,6 @@ class AdminLotteryService {
    * @example
    * // 定时任务调用
    * await AdminLotteryService.resetDailyWinCounts()
-   *
-   * 创建时间：2025年12月11日（从LotteryPrize.resetDailyWinCount迁移）
-   * 迁移原因：符合"Model层纯净度"架构原则（任务2.1）
    */
   static async resetDailyWinCounts() {
     try {
@@ -900,9 +897,6 @@ class AdminLotteryService {
    * // 定时任务调用
    * const result = await AdminLotteryService.syncCampaignStatus()
    * logger.info(`启动了${result.started}个活动，结束了${result.ended}个活动`)
-   *
-   * 创建时间：2025年12月11日（从LotteryCampaign.batchUpdateStatus迁移）
-   * 迁移原因：符合"Model层纯净度"架构原则（任务2.1）
    */
   static async syncCampaignStatus() {
     try {
@@ -1037,9 +1031,6 @@ class AdminLotteryService {
    *
    * // 获取活跃活动列表（不包含奖品）
    * const campaigns = await AdminLotteryService.getActiveCampaigns({ includePrizes: false })
-   *
-   * 创建时间：2025年12月11日（从LotteryCampaign.getActiveCampaigns迁移）
-   * 迁移原因：符合"Model层纯净度"架构原则（任务2.1）
    */
   static async getActiveCampaigns(options = {}) {
     try {

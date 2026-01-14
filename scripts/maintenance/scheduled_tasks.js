@@ -21,9 +21,10 @@
  * 15. 市场挂牌异常监控（每小时第45分钟）- 2026-01-08新增（C2C材料交易 Phase 2）
  * 16. 孤儿冻结检测与清理（每天凌晨2点）- 2026-01-09新增（P0-2修复）
  * 17. 商家审计日志180天清理（每天凌晨3点）- 2026-01-12新增（AC4.4 商家员工域权限体系升级）
+ * 18. 图片资源数据质量检查（每天凌晨4点）- 2026-01-14新增（图片缩略图架构兼容残留核查报告 Phase 1）
  *
  * 创建时间：2025-10-10
- * 更新时间：2026-01-12（新增商家审计日志180天清理任务 - AC4.4）
+ * 更新时间：2026-01-14（新增图片资源数据质量检查任务 - 缩略图架构兼容清理）
  */
 
 const cron = require('node-cron')
@@ -59,6 +60,8 @@ const HourlyExpireFungibleAssetListings = require('../../jobs/hourly-expire-fung
 const HourlyMarketListingMonitor = require('../../jobs/hourly-market-listing-monitor')
 // 2026-01-09新增：P0-2 孤儿冻结检测与清理（每天凌晨2点）
 const DailyOrphanFrozenCheck = require('../../jobs/daily-orphan-frozen-check')
+// 2026-01-14新增：图片资源数据质量门禁（图片缩略图架构兼容残留核查报告 Phase 1）
+const DailyImageResourceQualityCheck = require('../../jobs/daily-image-resource-quality-check')
 
 /**
  * 定时任务管理类
@@ -199,6 +202,9 @@ class ScheduledTasks {
 
     // 任务20: 每天凌晨3点清理超过180天的商家操作日志（2026-01-12新增 - AC4.4 商家员工域权限体系升级）
     this.scheduleDailyMerchantAuditLogCleanup()
+
+    // 任务21: 每天凌晨4点图片资源数据质量检查（2026-01-14新增 - 图片缩略图架构兼容残留核查报告 Phase 1）
+    this.scheduleDailyImageResourceQualityCheck()
 
     logger.info('所有定时任务已初始化完成')
   }
@@ -1973,6 +1979,114 @@ class ScheduledTasks {
       return report
     } catch (error) {
       logger.error('[手动触发] 商家审计日志清理失败', { error: error.message })
+      throw error
+    }
+  }
+
+  /**
+   * 定时任务21: 每天凌晨4点图片资源数据质量检查
+   * Cron表达式: 0 4 * * * (每天凌晨4点)
+   *
+   * 业务场景（图片缩略图架构兼容残留核查报告 Phase 1 2026-01-14）：
+   * - 检查 image_resources 表数据完整性
+   * - 发现缺失 thumbnail_paths 的记录
+   * - 发现 thumbnail_paths 不完整（缺少 small/medium/large）的记录
+   * - 发现 file_path 格式异常（http://、https://、/ 开头）的记录
+   * - 仅记录 ERROR 日志，不写数据库、不接告警系统
+   *
+   * @returns {void}
+   *
+   * @since 2026-01-14
+   * @see docs/图片缩略图架构兼容残留核查报告-2026-01-13.md - 7.2 执行方案
+   */
+  static scheduleDailyImageResourceQualityCheck() {
+    cron.schedule('0 4 * * *', async () => {
+      const lockKey = 'lock:image_resource_quality_check'
+      const lockValue = `${process.pid}_${Date.now()}`
+      let redisClient = null
+
+      try {
+        // 获取 Redis 客户端
+        const { getRawClient } = require('../../utils/UnifiedRedisClient')
+        redisClient = getRawClient()
+
+        // 尝试获取分布式锁（15分钟过期）
+        const acquired = await redisClient.set(lockKey, lockValue, 'EX', 900, 'NX')
+
+        if (!acquired) {
+          logger.info('[定时任务] 其他实例正在执行图片资源数据质量检查，跳过')
+          return
+        }
+
+        logger.info('[定时任务] 获取分布式锁成功，开始执行图片资源数据质量检查...', {
+          lock_key: lockKey,
+          lock_value: lockValue
+        })
+
+        // 调用 Job 类执行检查
+        const report = await DailyImageResourceQualityCheck.execute()
+
+        if (report.total_issues > 0) {
+          logger.warn(`[定时任务] 图片资源数据质量检查完成：发现 ${report.total_issues} 个问题`, {
+            total_checked: report.total_checked,
+            missing_thumbnails: report.missing_thumbnails_count,
+            incomplete_thumbnails: report.incomplete_thumbnails_count,
+            invalid_file_paths: report.invalid_file_path_count,
+            duration_ms: report.duration_ms
+          })
+        } else {
+          logger.info('[定时任务] 图片资源数据质量检查完成：数据质量良好')
+        }
+
+        // 释放锁
+        await redisClient.del(lockKey)
+        logger.info('[定时任务] 分布式锁已释放', { lock_key: lockKey })
+      } catch (error) {
+        logger.error('[定时任务] 图片资源数据质量检查失败', { error: error.message })
+
+        // 确保释放锁
+        if (redisClient) {
+          try {
+            await redisClient.del(lockKey)
+          } catch (unlockError) {
+            logger.error('[定时任务] 释放分布式锁失败', { error: unlockError.message })
+          }
+        }
+      }
+    })
+
+    logger.info('✅ 定时任务已设置: 图片资源数据质量检查（每天凌晨4点执行，支持分布式锁）')
+  }
+
+  /**
+   * 手动触发图片资源数据质量检查（用于测试）
+   *
+   * 业务场景：手动执行图片资源数据质量检查，用于开发调试和即时检查
+   *
+   * @returns {Promise<Object>} 检查报告对象
+   *
+   * @example
+   * const ScheduledTasks = require('./scripts/maintenance/scheduled-tasks')
+   * const report = await ScheduledTasks.manualImageResourceQualityCheck()
+   * console.log('问题数量:', report.total_issues)
+   */
+  static async manualImageResourceQualityCheck() {
+    try {
+      logger.info('[手动触发] 开始执行图片资源数据质量检查...')
+      const report = await DailyImageResourceQualityCheck.execute()
+
+      logger.info('[手动触发] 图片资源数据质量检查完成', {
+        total_checked: report.total_checked,
+        total_issues: report.total_issues,
+        missing_thumbnails: report.missing_thumbnails_count,
+        incomplete_thumbnails: report.incomplete_thumbnails_count,
+        invalid_file_paths: report.invalid_file_path_count,
+        duration_ms: report.duration_ms
+      })
+
+      return report
+    } catch (error) {
+      logger.error('[手动触发] 图片资源数据质量检查失败', { error: error.message })
       throw error
     }
   }

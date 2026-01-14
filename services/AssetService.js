@@ -1102,6 +1102,45 @@ class AssetService {
   }
 
   /**
+   * 通过幂等键点查交易记录
+   *
+   * 业务场景：
+   * - 材料转换服务的幂等性重放检查（从"扫描"优化为"点查"）
+   * - 任何需要根据 idempotency_key 快速查询是否已存在的场景
+   *
+   * 设计背景（来自 2026-01-13 材料转换系统降维护成本方案）：
+   * - 改造前：getTransactions 扫描 page_size=1000 条记录后内存遍历查找
+   * - 改造后：直接通过 idempotency_key 唯一索引点查（O(1) 复杂度）
+   *
+   * @param {string} idempotency_key - 幂等键（必填，精确匹配）
+   * @param {Object} options - 选项
+   * @param {Object} options.transaction - Sequelize事务对象（可选）
+   * @returns {Promise<Object|null>} 交易记录对象，不存在返回 null
+   */
+  static async getTransactionByIdempotencyKey(idempotency_key, options = {}) {
+    const { transaction } = options
+
+    if (!idempotency_key) {
+      throw new Error('idempotency_key是必填参数')
+    }
+
+    const transactionRecord = await AssetTransaction.findOne({
+      where: { idempotency_key },
+      transaction
+    })
+
+    if (transactionRecord) {
+      logger.debug('🔍 幂等键点查命中', {
+        idempotency_key,
+        transaction_id: transactionRecord.transaction_id,
+        business_type: transactionRecord.business_type
+      })
+    }
+
+    return transactionRecord
+  }
+
+  /**
    * 获取用户资产总览（统一资产域入口）
    *
    * 整合三个资产域：

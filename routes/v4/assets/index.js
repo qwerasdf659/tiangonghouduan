@@ -7,12 +7,14 @@
  * - 聚合资产相关路由
  * - 余额查询 (/balance, /balances)
  * - 流水查询 (/transactions)
+ * - 转换规则查询 (/conversion-rules) - 2026-01-14 新增
  *
  * 架构原则：
  * - 路由层不直连 models（通过 ServiceManager 获取服务）
  * - 路由层不开启事务（事务管理在 Service 层）
  *
  * 创建时间：2025-12-29
+ * 更新时间：2026-01-14（新增转换规则查询）
  */
 
 'use strict'
@@ -22,8 +24,10 @@ const router = express.Router()
 
 const balanceRoutes = require('./balance')
 const transactionsRoutes = require('./transactions')
+const conversionRulesRoutes = require('./conversion-rules')
 
 router.use('/', balanceRoutes)
 router.use('/', transactionsRoutes)
+router.use('/', conversionRulesRoutes) // GET /conversion-rules
 
 module.exports = router

@@ -1,12 +1,6 @@
 /**
- * 餐厅积分抽奖系统 - 简化图片资源管理模型
- * 移除过度设计的功能，保留核心业务需求
- *
- * 变更记录：
- * - 2026-01-08: 移除审核相关字段和方法（用户上传凭证审核业务已废弃）
- *   - 删除字段: review_status, reviewer_id, review_reason, reviewed_at, points_awarded
- *   - 删除方法: approve(), reject(), isPending()
- *   - 移除 user_upload_review 业务类型
+ * 餐厅积分抽奖系统 - 图片资源管理模型
+ * 核心业务：商品图片、用户头像、活动素材存储与管理
  */
 
 const BeijingTimeHelper = require('../utils/timeHelper')
@@ -101,11 +95,6 @@ module.exports = sequelize => {
         comment: '资源状态'
       },
 
-      /*
-       * 注意: 审核字段已于 2026-01-08 删除（用户上传凭证审核业务已废弃）
-       * 积分审核现在由 merchant_points_reviews 表单独管理
-       */
-
       // 来源模块标识
       source_module: {
         type: DataTypes.ENUM('system', 'lottery', 'exchange', 'admin'),
@@ -140,7 +129,6 @@ module.exports = sequelize => {
           name: 'idx_business_type_user',
           fields: ['business_type', 'user_id', 'created_at']
         },
-        /* 注意: idx_review_status_business 索引已于 2026-01-08 删除（审核字段已移除） */
         // 业务查询索引
         {
           name: 'idx_business_category',
@@ -173,7 +161,6 @@ module.exports = sequelize => {
       as: 'uploader',
       constraints: false
     })
-    /* 注意: reviewer 关联已于 2026-01-08 删除（审核字段已移除） */
   }
 
   /**
@@ -183,17 +170,25 @@ module.exports = sequelize => {
    * - file_path 存储原图对象 key
    * - thumbnail_paths 存储预生成缩略图对象 key（JSON）
    * - 优先使用 thumbnail_paths 中的预生成缩略图 key
-   * - 如无预生成缩略图，则根据原图 key 推断缩略图路径
+   *
+   * 🎯 架构决策（2026-01-14 图片缩略图架构兼容残留核查报告）：
+   * - 移除兼容旧数据的推断缩略图逻辑
+   * - 缺失 thumbnail_paths 时记录 ERROR 日志
+   * - 降级策略由 ENABLE_THUMBNAIL_FALLBACK 环境变量控制：
+   *   - true：使用原图作为缩略图（开发/测试环境）
+   *   - false（默认）：使用占位图（生产环境）
    *
    * @returns {Object} 安全的图片资源对象（包含公网 URL，不含敏感路径）
    */
   ImageResources.prototype.toSafeJSON = function () {
     const values = this.get({ plain: true })
-    const { getImageUrl, getThumbnailUrl } = require('../utils/ImageUrlHelper')
+    const { getImageUrl, getPlaceholderImageUrl } = require('../utils/ImageUrlHelper')
 
     // 生成缩略图 URL：优先使用预生成的 thumbnail_paths
-    let thumbnails
+    let thumbnails = null
     const storedThumbnails = values.thumbnail_paths
+    const enableFallback = process.env.ENABLE_THUMBNAIL_FALLBACK === 'true'
+
     if (storedThumbnails && Object.keys(storedThumbnails).length > 0) {
       // 使用预生成的缩略图 key（数据库存储的真实 key）
       thumbnails = {
@@ -202,11 +197,35 @@ module.exports = sequelize => {
         large: storedThumbnails.large ? getImageUrl(storedThumbnails.large) : null
       }
     } else {
-      // 兼容旧数据：根据原图 key 推断缩略图路径
-      thumbnails = {
-        small: getThumbnailUrl(values.file_path, 'small'),
-        medium: getThumbnailUrl(values.file_path, 'medium'),
-        large: getThumbnailUrl(values.file_path, 'large')
+      // 2026-01-14 决策：告警优先降级逻辑（移除兼容旧数据的推断缩略图逻辑）
+      console.error(
+        `❌ ImageResources.toSafeJSON: 图片 ${values.image_id} 缺少预生成缩略图。` +
+          `file_path: ${values.file_path}, business_type: ${values.business_type}, ` +
+          `category: ${values.category}, context_id: ${values.context_id}`
+      )
+
+      if (enableFallback) {
+        // 降级方案 A: 使用原图作为缩略图（如果 ENABLE_THUMBNAIL_FALLBACK 为 true）
+        const originalImageUrl = getImageUrl(values.file_path)
+        thumbnails = {
+          small: originalImageUrl,
+          medium: originalImageUrl,
+          large: originalImageUrl
+        }
+        console.warn(
+          `⚠️ ImageResources.toSafeJSON: 图片 ${values.image_id} 缩略图降级为原图 URL (ENABLE_THUMBNAIL_FALLBACK=true)`
+        )
+      } else {
+        // 降级方案 B: 使用占位图（生产环境默认）
+        const placeholderUrl = getPlaceholderImageUrl(values.business_type, values.category)
+        thumbnails = {
+          small: placeholderUrl,
+          medium: placeholderUrl,
+          large: placeholderUrl
+        }
+        console.warn(
+          `⚠️ ImageResources.toSafeJSON: 图片 ${values.image_id} 缩略图降级为占位图 URL (ENABLE_THUMBNAIL_FALLBACK=false)`
+        )
       }
     }
 
@@ -230,18 +249,21 @@ module.exports = sequelize => {
    * - 预生成 3 档缩略图（150/300/600px，cover-center）
    * - 缩略图 key 存储在 thumbnail_paths 字段（JSON）
    *
+   * 🎯 架构决策（2026-01-14 图片缩略图架构兼容残留核查报告）：
+   * - 移除兼容旧数据的推断缩略图逻辑
+   * - 缺失 thumbnail_paths 时记录 ERROR 日志并使用降级策略
+   *
    * @deprecated 请使用 toSafeJSON().thumbnails 获取缩略图 URL
    * @returns {Object} 缩略图 URL 对象 { small, medium, large }
    */
   ImageResources.prototype.generateThumbnails = function () {
-    const { getImageUrl, getThumbnailUrl } = require('../utils/ImageUrlHelper')
-
-    if (!this.file_path) {
-      console.warn('⚠️ generateThumbnails 已废弃：请使用 toSafeJSON().thumbnails')
-      return null
-    }
+    const { getImageUrl, getPlaceholderImageUrl } = require('../utils/ImageUrlHelper')
 
     console.warn('⚠️ generateThumbnails 已废弃：请使用 toSafeJSON().thumbnails')
+
+    if (!this.file_path) {
+      return null
+    }
 
     // 优先使用预生成的缩略图 key
     if (this.thumbnail_paths && Object.keys(this.thumbnail_paths).length > 0) {
@@ -252,11 +274,28 @@ module.exports = sequelize => {
       }
     }
 
-    // 兼容旧数据：根据原图 key 推断缩略图路径
-    return {
-      small: getThumbnailUrl(this.file_path, 'small'),
-      medium: getThumbnailUrl(this.file_path, 'medium'),
-      large: getThumbnailUrl(this.file_path, 'large')
+    // 2026-01-14 决策：告警优先降级逻辑（移除兼容旧数据的推断缩略图逻辑）
+    console.error(
+      `❌ ImageResources.generateThumbnails: 图片 ${this.image_id} 缺少预生成缩略图。` +
+        `file_path: ${this.file_path}, business_type: ${this.business_type}`
+    )
+
+    const enableFallback = process.env.ENABLE_THUMBNAIL_FALLBACK === 'true'
+
+    if (enableFallback) {
+      const originalImageUrl = getImageUrl(this.file_path)
+      return {
+        small: originalImageUrl,
+        medium: originalImageUrl,
+        large: originalImageUrl
+      }
+    } else {
+      const placeholderUrl = getPlaceholderImageUrl(this.business_type, this.category)
+      return {
+        small: placeholderUrl,
+        medium: placeholderUrl,
+        large: placeholderUrl
+      }
     }
   }
 
@@ -267,11 +306,6 @@ module.exports = sequelize => {
       (this.thumbnail_paths.small || this.thumbnail_paths.medium || this.thumbnail_paths.large)
     )
   }
-
-  /*
-   * 注意: 审核实例方法（approve, reject, isPending）已于 2026-01-08 删除
-   * 积分审核功能现在由 MerchantReviewService 提供
-   */
 
   /**
    * 按业务类型查询图片资源

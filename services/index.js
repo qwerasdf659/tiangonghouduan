@@ -16,7 +16,6 @@ const logger = require('../utils/logger').logger
 
 // V4 核心服务
 const { UnifiedLotteryEngine } = require('./UnifiedLotteryEngine/UnifiedLotteryEngine')
-// 🔴 ThumbnailService 已废弃（2026-01-08）：改用预生成缩略图 + SealosStorageService.uploadImageWithThumbnails()
 
 /*
  * V4 领域服务
@@ -94,67 +93,6 @@ const { lottery_service_container } = require('./lottery')
 const models = require('../models')
 
 /**
- * camelCase → snake_case 迁移映射表（P1-9 E2-Strict）
- * 用于在调用旧 key 时提供迁移提示
- *
- * @type {Object<string, string>}
- */
-const KEY_MIGRATION_MAP = {
-  // 核心服务
-  unifiedLotteryEngine: 'unified_lottery_engine',
-  lotteryContainer: 'lottery_container',
-
-  // 领域服务
-  exchangeMarket: 'exchange_market',
-  contentAudit: 'content_audit',
-  customerServiceSession: 'customer_service_session',
-  hierarchyManagement: 'hierarchy_management',
-  userRole: 'user_role',
-  chatWebSocket: 'chat_web_socket',
-  chatRateLimit: 'chat_rate_limit',
-  prizePool: 'prize_pool',
-
-  // 管理后台服务
-  adminSystem: 'admin_system',
-  adminLottery: 'admin_lottery',
-  adminCustomerService: 'admin_customer_service',
-  materialManagement: 'material_management',
-  popupBanner: 'popup_banner',
-  lotteryPreset: 'lottery_preset',
-  auditLog: 'audit_log',
-  lotteryManagement: 'lottery_management',
-
-  // 材料系统服务
-  assetConversion: 'asset_conversion',
-
-  // 背包双轨服务
-  redemptionOrder: 'redemption_order',
-
-  // 交易市场服务
-  tradeOrder: 'trade_order',
-  marketListing: 'market_listing',
-
-  // 清理服务
-  orphanFrozenCleanup: 'orphan_frozen_cleanup',
-
-  // 商家积分服务
-  merchantPoints: 'merchant_points',
-
-  // 新增服务
-  dataSanitizer: 'data_sanitizer',
-  lotteryQuota: 'lottery_quota',
-  sealosStorage: 'sealos_storage',
-  managementStrategy: 'management_strategy',
-  performanceMonitor: 'performance_monitor',
-  basicGuaranteeStrategy: 'basic_guarantee_strategy',
-
-  // 商家员工域权限体系升级服务（2026-01-12）
-  staffManagement: 'staff_management',
-  store: 'store',
-  region: 'region'
-}
-
-/**
  * 服务管理器 - V4统一版本
  *
  * 业务场景：
@@ -213,11 +151,9 @@ const KEY_MIGRATION_MAP = {
  * - 懒加载设计（需要时才初始化）
  * - 使用Map提升查找性能
  *
- * 架构升级说明：
- * - V4版本移除了所有向后兼容代码
- * - 移除了旧版LotteryDrawService（替换为UnifiedLotteryEngine）
- * - 采用模块化设计（lottery服务独立容器）
- * - P1-9（2026-01-09）：统一 snake_case key，不兼容 camelCase
+ * 架构说明：
+ * - 采用模块化设计，lottery服务独立容器
+ * - 统一 snake_case key
  *
  * 创建时间：2025年09月25日
  * 最后更新：2026年01月09日（P1-9 E2-Strict snake_case）
@@ -411,18 +347,9 @@ class ServiceManager {
 
     const service = this._services.get(serviceName)
     if (!service) {
-      // P1-9 E2-Strict：检查是否是 camelCase key，提供迁移提示
-      const suggestedKey = KEY_MIGRATION_MAP[serviceName]
-      if (suggestedKey) {
-        throw new Error(
-          `Service '${serviceName}' not found. ` +
-            `Did you mean '${suggestedKey}'? (P1-9 snake_case key migration required)\n` +
-            `迁移提示：请将 getService('${serviceName}') 改为 getService('${suggestedKey}')`
-        )
-      }
-
+      // V4.6 清理：移除 camelCase 兼容提示，直接返回服务不存在错误
       const availableServices = Array.from(this._services.keys()).join(', ')
-      throw new Error(`服务 "${serviceName}" 不存在。\n` + `可用服务: ${availableServices}`)
+      throw new Error(`服务 "${serviceName}" 不存在。\n可用服务: ${availableServices}`)
     }
 
     return service

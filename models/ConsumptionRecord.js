@@ -83,12 +83,10 @@ class ConsumptionRecord extends Model {
       comment: '关联的审核记录'
     })
 
-    /*
-     * ⚠️ 已废弃关联（2026-01-02）：
-     * 新架构中 AssetTransaction 不再有 reference_id 列
-     * 引用信息存储在 meta JSON 字段中：
+    /**
+     * AssetTransaction 关联说明：
+     * 引用信息存储在 AssetTransaction.meta JSON 字段中
      * meta: { reference_type: 'consumption', reference_id: record_id, ... }
-     * 通过 meta 字段查询替代直接关联
      */
   }
 
@@ -173,7 +171,7 @@ class ConsumptionRecord extends Model {
       errors.push('消费金额必须大于0')
     }
 
-    // 检查二维码格式（仅支持 V2 动态码，V1 已废弃）
+    // 检查二维码格式（V2 动态码）
     if (!this.qr_code || !this.qr_code.startsWith('QRV2_')) {
       errors.push('二维码格式不正确，必须以 QRV2_ 开头')
     }
@@ -750,10 +748,9 @@ module.exports = sequelize => {
           ]
         },
 
-        /*
-         * ⚠️ 已废弃 scope（2026-01-02）：
-         * points_transaction 关联已移除
-         * 新架构中通过 meta 字段查询 AssetTransaction
+        /**
+         * AssetTransaction 查询说明：
+         * 通过 AssetTransaction.meta 字段查询关联记录
          */
 
         // 完整信息（包含所有关联）

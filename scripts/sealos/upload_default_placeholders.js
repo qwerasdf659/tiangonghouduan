@@ -43,15 +43,13 @@ let SealosStorageService = null
  */
 async function initializeSealosService() {
   try {
-    const serviceManager = require('../../services/index')
-    if (!serviceManager._initialized) {
-      await serviceManager.initialize()
-    }
-    SealosStorageService = serviceManager.getService('sealos_storage')
-    console.log('✅ SealosStorageService 加载成功（P1-9 ServiceManager）')
+    // 直接实例化 SealosStorageService（避免 ServiceManager 封装问题）
+    const SealosStorageServiceClass = require('../../services/sealosStorage')
+    SealosStorageService = new SealosStorageServiceClass()
+    console.log('✅ SealosStorageService 直接初始化成功')
     return SealosStorageService
   } catch (error) {
-    console.error('❌ SealosStorageService 加载失败:', error.message)
+    console.error('❌ SealosStorageService 初始化失败:', error.message)
     throw error
   }
 }
@@ -158,9 +156,7 @@ async function uploadPlaceholder(storageService, type, config) {
     const buffer = await generatePlaceholder(config)
     console.log(`   ✅ 生成成功：${buffer.length} bytes`)
 
-    // 2. 上传到 Sealos（使用 uploadImage 方法，folder 设置为 defaults）
-    // 注意：uploadImage 会自动生成带时间戳的文件名，但我们需要固定文件名
-    // 因此直接使用 S3 SDK 上传
+    // 2. 上传到 Sealos（直接使用 S3 SDK 上传固定文件名）
     const objectKey = `defaults/${config.filename}`
     await storageService.s3
       .upload({
@@ -206,15 +202,21 @@ async function checkPlaceholder(storageService, type, config) {
   console.log(`\n🔍 检查: ${objectKey}`)
 
   try {
-    // 使用 fileExists 方法检查对象是否存在
-    const exists = await storageService.fileExists(objectKey)
-    if (exists) {
-      console.log(`   ✅ 存在`)
-    } else {
-      console.log(`   ⚠️ 不存在`)
-    }
-    return { type, filename: config.filename, objectKey, exists }
+    // 使用 S3 headObject 检查对象是否存在
+    await storageService.s3
+      .headObject({
+        Bucket: storageService.config.bucket,
+        Key: objectKey
+      })
+      .promise()
+
+    console.log(`   ✅ 存在`)
+    return { type, filename: config.filename, objectKey, exists: true }
   } catch (error) {
+    if (error.code === 'NotFound' || error.statusCode === 404) {
+      console.log(`   ⚠️ 不存在`)
+      return { type, filename: config.filename, objectKey, exists: false }
+    }
     console.log(`   ❓ 检查失败：${error.message}`)
     return { type, filename: config.filename, objectKey, exists: false, error: error.message }
   }

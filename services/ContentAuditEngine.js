@@ -41,8 +41,8 @@ const { assertAndGetTransaction } = require('../utils/transactionHelpers')
  * 设计模式：通用基础设施层，解耦审核逻辑与业务逻辑
  * 支持类型：exchange（兑换）、feedback（反馈）
  *
- * 变更记录：
- * - 2026-01-08: 移除 image 类型支持（用户上传凭证审核业务已废弃）
+ * 支持类型：
+ * - text: 文本内容审核（敏感词、违禁词检测）
  */
 class ContentAuditEngine {
   /**
@@ -65,10 +65,9 @@ class ContentAuditEngine {
      * 验证审核对象类型
      * 2026-01-09 扩展：添加 consumption 和 merchant_points 类型（功能重复检查报告决策）
      * - consumption: 消费审核（ConsumptionService）
-     * - merchant_points: 商家积分审核（原 MerchantReviewService，已迁移）
-     * - exchange: 兑换审核（ExchangeService）
-     * - feedback: 反馈审核（FeedbackService）
-     * 注意：image 类型已于 2026-01-08 移除（用户上传凭证审核业务已废弃）
+     * - merchant_points: 商家积分审核
+     * - exchange: 兑换审核
+     * - feedback: 反馈审核
      */
     const validTypes = ['exchange', 'feedback', 'consumption', 'merchant_points']
     if (!validTypes.includes(auditableType)) {
@@ -288,8 +287,7 @@ class ContentAuditEngine {
 
       /*
        * 动态加载对应的回调处理器
-       * 2026-01-09 扩展：添加 consumption 和 merchant_points 回调（功能重复检查报告决策）
-       * 注意：image 类型已于 2026-01-08 移除（用户上传凭证审核业务已废弃）
+       * 支持类型：exchange, feedback, consumption, merchant_points
        */
       const callbackMap = {
         exchange: '../callbacks/ExchangeAuditCallback',

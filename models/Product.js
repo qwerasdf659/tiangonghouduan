@@ -26,12 +26,7 @@ module.exports = sequelize => {
         allowNull: true,
         comment: '商品描述'
       },
-      image: {
-        type: DataTypes.STRING(500),
-        allowNull: true,
-        comment:
-          '【已废弃】旧商品图片URL字段（2026-01-08图片存储架构已迁移到primary_image_id关联image_resources表）'
-      },
+      // 商品主图片通过 image_resources 表统一管理
       primary_image_id: {
         type: DataTypes.INTEGER,
         allowNull: true,
@@ -177,14 +172,8 @@ module.exports = sequelize => {
         allowNull: true,
         defaultValue: null,
         comment: '臻选空间独立库存（NULL表示与幸运空间共享stock，用于实现独立库存管理）'
-      },
-      premium_image: {
-        type: DataTypes.STRING(500),
-        allowNull: true,
-        defaultValue: null,
-        comment:
-          '【已废弃】臻选空间专属图片URL（2026-01-08图片存储架构已迁移，新业务请使用primary_image_id关联image_resources表）'
       }
+      // 臻选空间与幸运空间共用 primary_image_id 关联的主图片
     },
     {
       tableName: 'products',
@@ -230,11 +219,15 @@ module.exports = sequelize => {
    * @returns {Object|null} 商品在该空间的展示信息，如果商品不在该空间则返回null
    *
    * 业务逻辑说明：
-   * - space='lucky': 只在幸运空间展示，使用原始字段（exchange_points, stock, image）
+   * - space='lucky': 只在幸运空间展示，使用原始字段（exchange_points, stock）
    * - space='premium': 只在臻选空间展示，使用原始字段
    * - space='both': 同时在两个空间展示，根据request_space返回对应配置
-   *   - 请求lucky空间：返回原始字段（exchange_points, stock, image）
+   *   - 请求lucky空间：返回原始字段（exchange_points, stock）
    *   - 请求premium空间：返回premium_*字段（如果有），否则使用原始字段
+   *
+   * 图片处理说明：
+   * - 图片通过 primary_image_id 关联 image_resources 表
+   * - 前端应通过关联的 ImageResources.toSafeJSON() 获取图片 URL
    */
   Product.prototype.getSpaceInfo = function (request_space) {
     // 检查商品是否在请求的空间可用
@@ -260,6 +253,7 @@ module.exports = sequelize => {
         expires_at: this.expires_at,
         original_price: this.original_price,
         discount: this.discount,
+        primary_image_id: this.primary_image_id, // 图片通过关联获取
         created_at: this.created_at,
         updated_at: this.updated_at
       })
@@ -275,12 +269,8 @@ module.exports = sequelize => {
             ? this.premium_exchange_points
             : this.exchange_points,
         stock: this.premium_stock !== null ? this.premium_stock : this.stock,
-        image: this.premium_image || this.image,
-        // 额外标记：是否使用了专属配置
-        using_premium_config:
-          this.premium_exchange_points !== null ||
-          this.premium_stock !== null ||
-          this.premium_image !== null
+        // 额外标记：是否使用了专属配置（仅检查积分和库存，图片统一使用 primary_image_id）
+        using_premium_config: this.premium_exchange_points !== null || this.premium_stock !== null
       }
     }
 
@@ -290,7 +280,6 @@ module.exports = sequelize => {
       space: this.space === 'both' ? request_space : this.space,
       exchange_points: this.exchange_points,
       stock: this.stock,
-      image: this.image,
       using_premium_config: false
     }
   }

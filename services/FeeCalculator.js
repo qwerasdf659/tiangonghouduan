@@ -19,8 +19,6 @@ const _logger = require('../utils/logger').logger
  * const feeInfo = FeeCalculator.calculateItemFee(item.meta.value, listing.price_amount);
  * // 返回：{ fee: 30, rate: 0.05, net_amount: 570, tier: '中价值档' }
  *
- * 变更记录：
- * - 2026-01-08: 移除 createTradeRecord 方法（TradeRecord 已废弃，统一使用 TradeOrder）
  */
 
 const FEE_RULES = require('../config/fee_rules')

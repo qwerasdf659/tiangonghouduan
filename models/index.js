@@ -111,18 +111,6 @@ models.ItemInstanceEvent = require('./ItemInstanceEvent')(sequelize, DataTypes)
  *    - 事件类型：mint/lock/unlock/transfer/use/expire/destroy
  */
 
-/**
- * ❌ TradeRecord：已删除（2026-01-08 交易流水收敛决策执行完成）
- *    - 删除原因：职责混乱，与 AssetTransaction、TradeOrder 功能重叠
- *    - 替代方案：
- *      - 资产变动 → AssetTransaction（asset_transactions 表）
- *      - C2C交易 → TradeOrder（trade_orders 表）
- *      - 物品事件 → ItemInstanceEvent（item_instance_events 表）
- *    - 数据库：trade_records 表已于 2026-01-08 删除（迁移 20260108210000）
- *    - 模型文件：models/TradeRecord.js 已删除
- *    - 文档：详见 docs/交易流水收敛方案-AssetTransaction-TradeOrder-TradeRecord-2026-01-08.md
- */
-
 // 🔴 管理和客服系统
 models.CustomerServiceSession = require('./CustomerServiceSession')(sequelize, DataTypes)
 /*
@@ -188,9 +176,11 @@ models.ExchangeRecord = require('./ExchangeRecord')(sequelize, DataTypes)
  */
 
 /*
- * 🔥 统一资产底座系统（2025年12月15日新增）
- *    ⚠️ UserAssetAccount 已废弃并删除（2025-12-31）
- *    新架构使用：Account + AccountAssetBalance + AssetTransaction
+ * 🔥 统一资产底座系统（V4.5.0 资产域标准架构）
+ *    当前架构：Account + AccountAssetBalance + AssetTransaction
+ *    - Account: 账户主体（用户账户 + 系统账户）
+ *    - AccountAssetBalance: 资产余额（支持冻结模型）
+ *    - AssetTransaction: 资产流水（业界标准幂等架构）
  */
 
 models.AssetTransaction = require('./AssetTransaction')(sequelize, DataTypes)
@@ -327,13 +317,6 @@ models.RiskAlert = require('./RiskAlert')(sequelize, DataTypes)
  *    - 业务场景：消费提交→风控检查→生成告警→管理员审核→处理结果
  */
 
-/*
- * ❌ RoleChangeLog：已废弃（2026-01-09 功能重复检查报告决策）
- *    - 原因：表中无数据（0行），改用 UserRoleChangeRecord + AdminOperationLog 组合
- *    - 迁移：20260109120000-drop-deprecated-audit-tables.js
- *    - 替代方案：UserRoleChangeRecord（业务事件主键）+ AdminOperationLog（审计真相源）
- */
-
 // 🔴 审计业务记录表（2026-01-08 决策9实现 - 为无天然业务主键的操作提供审计锚点）
 models.UserStatusChangeRecord = require('./UserStatusChangeRecord')(sequelize, DataTypes)
 /*
@@ -362,14 +345,6 @@ models.LotteryClearSettingRecord = require('./LotteryClearSettingRecord')(sequel
  *    - 表名：lottery_clear_setting_records，主键：record_id
  *    - 业务场景：管理员清除用户抽奖设置→创建清除记录→记录审计日志→可追溯
  *    - 解决问题：原 target_id: null 导致关键操作被阻断
- */
-
-/*
- * ❌ MerchantPointsReview：已废弃（2026-01-09 功能重复检查报告决策）
- *    - 原因：表中无数据（0行），已决策迁移到统一审批流（ContentReviewRecord）
- *    - 迁移：20260109120000-drop-deprecated-audit-tables.js
- *    - 替代方案：ContentReviewRecord（auditable_type='merchant_points'）
- *    - 业务逻辑：冻结-审核-结算链路保留，但状态管理统一走 ContentReviewRecord
  */
 
 models.WebSocketStartupLog = require('./WebSocketStartupLog')(sequelize, DataTypes)

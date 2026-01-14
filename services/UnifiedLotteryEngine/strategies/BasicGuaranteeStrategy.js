@@ -5,77 +5,20 @@ const LotteryDrawFormatter = require('../../../utils/formatters/LotteryDrawForma
  * 基础抽奖保底策略
  * 整合基础抽奖功能和保底机制的统一策略
  *
- * @description V4.1版本：直接根据奖品概率分配，移除基础中奖率限制
+ * @description V4.1版本：直接根据奖品概率分配
  * - 每次抽奖必定从奖品池中选择一个奖品（根据win_probability分配）
  * - 保底机制：每累计10次抽奖，第10次必中九八折券
- *
- * V4.0语义更新（2026-01-01）：
- * - 删除 is_winner 字段（"中/没中"二分法已废弃）
- * - 新增 reward_tier 字段（奖励档位：low/mid/high）
- * - 每次抽奖100%从奖品池选择一个奖品，只讨论"抽到了什么"
+ * - reward_tier: 奖励档位（low/mid/high）
+ * - 100%中奖：每次抽奖必定从奖品池选择一个奖品
  *
  * @version 4.1.1
- * @date 2026-01-01
- * @changes V4.1.1: 语义清理 - 删除is_winner，使用reward_tier
  */
 
 const BeijingTimeHelper = require('../../../utils/timeHelper')
 const LotteryStrategy = require('../core/LotteryStrategy')
-const { LotteryDraw, Account, AccountAssetBalance } = require('../../../models') // 🔧 V4.3修复：使用新的资产系统模型
-/**
- * 🎯 V4.5 配额控制：测试账号权限管理已迁移到 LotteryQuotaService（2025-12-23）
- *
- * 原导入（已废弃）：
- * const { hasTestPrivilege } = require('../../../utils/TestAccountManager')
- *
- * 新逻辑：
- * - 测试账号绕过抽奖次数限制的功能已迁移到 LotteryQuotaService
- * - 通过配额规则（user级别）实现测试账号的特殊配额
- * - 策略层不再直接检查测试账号权限
- */
-// 🔥 V4.3新增：统一资产服务（替代PointsService）
+const { LotteryDraw } = require('../../../models')
+// 统一资产服务：所有积分余额查询通过 AssetService.getBalance()
 const AssetService = require('../../AssetService')
-
-/**
- * 🔧 V4.3辅助函数：获取用户积分余额（兼容新资产系统）
- *
- * @param {number} user_id - 用户ID
- * @param {Object} options - 选项 {transaction, lock}
- * @returns {Promise<Object>} 积分余额对象 {available_points}
- */
-async function getUserPointsBalance(user_id, options = {}) {
-  const { transaction, lock } = options
-
-  // 查询用户账户
-  const account = await Account.findOne({
-    where: { user_id, account_type: 'user' },
-    transaction
-  })
-
-  if (!account) {
-    return null
-  }
-
-  // 查询 POINTS 资产余额
-  const pointsBalance = await AccountAssetBalance.findOne({
-    where: { account_id: account.account_id, asset_code: 'POINTS' },
-    transaction,
-    lock: lock ? transaction.LOCK.UPDATE : undefined
-  })
-
-  if (!pointsBalance) {
-    return {
-      available_points: 0,
-      account_id: account.account_id
-    }
-  }
-
-  return {
-    available_points: Number(pointsBalance.available_amount),
-    account_id: account.account_id,
-    balance_id: pointsBalance.balance_id
-  }
-}
 
 /**
  * 基础抽奖保底策略类
@@ -121,7 +64,7 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
   constructor(config = {}) {
     super('basic_guarantee', {
       enabled: true,
-      defaultProbability: 1.0, // 🎯 V4.1: 移除基础中奖率限制，直接根据奖品概率分配（原10%已废弃）
+      defaultProbability: 1.0, // 直接根据奖品概率分配
       maxDrawsPerDay: 10, // 每日最大抽奖次数
       pointsCostPerDraw: 100, // 每次抽奖消耗积分
 
@@ -170,32 +113,21 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
     const { user_id, campaign_id } = context
 
     try {
-      // 验证用户积分是否足够
-      const userAccount = await getUserPointsBalance(user_id) // 🔧 V4.3修复：使用新资产系统
-      if (!userAccount || userAccount.available_points < this.config.pointsCostPerDraw) {
+      /*
+       * 验证用户积分是否足够
+       * 🔥 V4.6统一：通过 AssetService.getBalance() 查询积分（决策F：读不加锁）
+       */
+      const balance = await AssetService.getBalance({ user_id, asset_code: 'POINTS' }, {})
+      if (balance.available_amount < this.config.pointsCostPerDraw) {
         this.logError('用户积分不足', {
           user_id,
-          currentPoints: userAccount?.available_points || 0,
+          currentPoints: balance.available_amount,
           requiredPoints: this.config.pointsCostPerDraw
         })
         return false
       }
 
-      /**
-       * 🎯 V4.5 配额控制：每日抽奖次数限制已迁移到 LotteryQuotaService（2025-12-23）
-       *
-       * 原逻辑（已废弃）：
-       * - 使用 LotteryDraw.count() 统计今日抽奖次数
-       * - 与 config.maxDrawsPerDay 硬编码值比较
-       *
-       * 新逻辑（引擎层统一处理）：
-       * - 由 UnifiedLotteryEngine.execute_draw() 调用 LotteryQuotaService.tryDeductQuota()
-       * - 原子扣减配额，避免并发窗口期问题
-       * - 支持四维度规则（全局/活动/角色/用户）
-       *
-       * 策略层不再检查每日次数，避免双重限制
-       */
-
+      // 每日抽奖次数限制由 LotteryQuotaService 在引擎层统一处理
       return true
     } catch (error) {
       this.logError('基础抽奖保底策略验证失败', { error: error.message, user_id, campaign_id })
@@ -383,13 +315,13 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
 
       try {
         /*
-         * 获取用户信息（包括积分余额）
-         * 🔧 V4.3修复：使用新资产系统获取用户积分
+         * 获取用户积分余额
+         * 🔥 V4.6统一：通过 AssetService.getBalance() 查询积分（决策F：读不加锁）
          */
-        const userAccount = await getUserPointsBalance(user_id, {
-          transaction: internalTransaction,
-          lock: true // 使用行级锁防止并发问题
-        })
+        const balance = await AssetService.getBalance(
+          { user_id, asset_code: 'POINTS' },
+          { transaction: internalTransaction }
+        )
 
         /*
          * 🎯 V4.1修改：移除基础中奖率判断，直接根据奖品概率分配
@@ -544,7 +476,7 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
             },
             probability: 1.0, // 移除基础中奖率后，中奖概率100%
             pointsCost: this.config.pointsCostPerDraw,
-            remainingPoints: userAccount.available_points - this.config.pointsCostPerDraw,
+            remainingPoints: balance.available_amount - this.config.pointsCostPerDraw,
             executionTime,
             executedStrategy: this.strategyName,
             guaranteeTriggered: false, // 标记为非保底中奖
@@ -605,7 +537,7 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
           prize: null,
           probability: 0,
           pointsCost: this.config.pointsCostPerDraw,
-          remainingPoints: userAccount.available_points - this.config.pointsCostPerDraw,
+          remainingPoints: balance.available_amount - this.config.pointsCostPerDraw,
           executionTime,
           executedStrategy: this.strategyName,
           guaranteeTriggered: false,
@@ -817,10 +749,11 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
     try {
       // 1. 检查用户积分（保底抽奖也需要积分）
       const pointsCost = this.config.pointsCostPerDraw
-      // 🔧 V4.3修复：使用新资产系统获取用户积分
-      const userAccount = await getUserPointsBalance(user_id, {
-        transaction: internalTransaction
-      })
+      // 🔥 V4.6统一：通过 AssetService.getBalance() 查询积分（决策F：读不加锁）
+      const guaranteeBalance = await AssetService.getBalance(
+        { user_id, asset_code: 'POINTS' },
+        { transaction: internalTransaction }
+      )
 
       /**
        * 🔥 修复：连抽场景跳过积分检查（外层已统一检查并扣除）
@@ -831,12 +764,12 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
        */
       if (!context.skip_points_deduction) {
         // 单抽场景 - 检查积分是否足够
-        if (!userAccount || userAccount.available_points < pointsCost) {
+        if (guaranteeBalance.available_amount < pointsCost) {
           if (!isExternalTransaction) {
             await internalTransaction.rollback()
           }
           throw new Error(
-            `保底抽奖积分不足：需要${pointsCost}积分，当前${userAccount?.available_points || 0}积分`
+            `保底抽奖积分不足：需要${pointsCost}积分，当前${guaranteeBalance.available_amount}积分`
           )
         }
       } else {
@@ -1011,7 +944,7 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
           sort_order: guaranteePrize.sort_order // 🎯 方案3：包含sort_order用于前端计算索引
         },
         pointsCost,
-        remainingPoints: userAccount.available_points - pointsCost,
+        remainingPoints: guaranteeBalance.available_amount - pointsCost,
         lotteryRecordId: lotteryRecord.id,
         message: `🎉 保底中奖！获得${guaranteePrize.prize_name}（消耗${pointsCost}积分）`
       }
@@ -1060,9 +993,9 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
       // 🔴 修复：详细的积分检查，优先使用context中的user_status
       let available_points = user_status?.available_points
       if (available_points === undefined) {
-        // 🔧 V4.3修复：使用新资产系统查询积分
-        const userAccount = await getUserPointsBalance(user_id)
-        available_points = userAccount?.available_points || 0
+        // 🔥 V4.6统一：通过 AssetService.getBalance() 查询积分（决策F：读不加锁）
+        const balance = await AssetService.getBalance({ user_id, asset_code: 'POINTS' }, {})
+        available_points = balance.available_amount || 0
       }
 
       if (available_points < this.config.pointsCostPerDraw) {
@@ -1077,23 +1010,7 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
         }
       }
 
-      /**
-       * 🎯 V4.5 配额控制：每日抽奖次数限制已迁移到 LotteryQuotaService（2025-12-23）
-       *
-       * 原逻辑（已废弃）：
-       * - 使用 LotteryDraw.count() 统计今日抽奖次数
-       * - 与 config.maxDrawsPerDay 硬编码值比较
-       * - 支持测试账号绕过限制
-       *
-       * 新逻辑（引擎层统一处理）：
-       * - 由 UnifiedLotteryEngine.execute_draw() 调用 LotteryQuotaService.tryDeductQuota()
-       * - 原子扣减配额，避免并发窗口期问题
-       * - 支持四维度规则（全局/活动/角色/用户）
-       * - 支持客服临时加次数（bonus_draw_count）
-       *
-       * 策略层不再检查每日次数，避免双重限制
-       */
-
+      // 每日抽奖次数限制由 LotteryQuotaService 在引擎层统一处理
       return {
         valid: true,
         reason: '验证通过'
@@ -1952,103 +1869,103 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
 
     // 根据奖品类型进行不同的发放逻辑
     switch (prize.prize_type) {
-    case 'points':
-      // 🔧 V4.3修复：使用AssetService替代PointsService（方案B幂等）
-      // eslint-disable-next-line no-restricted-syntax -- 已传递 transaction
-      await AssetService.changeBalance(
-        {
+      case 'points':
+        // 🔧 V4.3修复：使用AssetService替代PointsService（方案B幂等）
+        // eslint-disable-next-line no-restricted-syntax -- 已传递 transaction
+        await AssetService.changeBalance(
+          {
+            user_id,
+            asset_code: 'POINTS',
+            delta_amount: parseInt(prize.prize_value), // 增加积分为正数
+            idempotency_key: `${idempotencyKey}:points`, // 方案B：派生幂等键
+            lottery_session_id: lotterySessionId, // 方案B：关联抽奖会话
+            business_type: 'lottery_reward',
+            meta: {
+              source_type: 'system',
+              title: `抽奖奖励：${prize.prize_name}`,
+              description: `获得${prize.prize_value}积分奖励`
+            }
+          },
+          { transaction } // 🎯 传入事务对象，确保积分操作在同一事务中
+        )
+
+        this.logInfo('发放积分奖励（使用AssetService + 事务）', {
           user_id,
-          asset_code: 'POINTS',
-          delta_amount: parseInt(prize.prize_value), // 增加积分为正数
-          idempotency_key: `${idempotencyKey}:points`, // 方案B：派生幂等键
-          lottery_session_id: lotterySessionId, // 方案B：关联抽奖会话
-          business_type: 'lottery_reward',
-          meta: {
-            source_type: 'system',
-            title: `抽奖奖励：${prize.prize_name}`,
-            description: `获得${prize.prize_value}积分奖励`
-          }
-        },
-        { transaction } // 🎯 传入事务对象，确保积分操作在同一事务中
-      )
-
-      this.logInfo('发放积分奖励（使用AssetService + 事务）', {
-        user_id,
-        prizeId: prize.prize_id,
-        prizeName: prize.prize_name,
-        points: prize.prize_value,
-        idempotencyKey,
-        lotterySessionId,
-        inTransaction: !!transaction
-      })
-      break
-
-    case 'coupon':
-    case 'physical': {
-      /**
-       * 🔥 统一资产域架构：优惠券/实物奖品通过 AssetService.mintItem() 发放
-       *
-       * 业务场景：
-       * - 抽奖中奖后，将优惠券/实物奖品写入 item_instances 表
-       * - 自动记录物品铸造事件到 item_instance_events 表
-       * - 支持幂等性控制（通过 source_type + source_id）
-       */
-      await AssetService.mintItem(
-        {
-          user_id,
-          item_type: prize.prize_type === 'coupon' ? 'voucher' : 'product',
-          source_type: 'lottery',
-          source_id: `${idempotencyKey}:item`,
-          meta: {
-            name: prize.prize_name,
-            description: prize.prize_description || `抽奖获得：${prize.prize_name}`,
-            value: Math.round(parseFloat(prize.prize_value) || 0),
-            prize_id: prize.prize_id,
-            prize_type: prize.prize_type,
-            acquisition_method: 'lottery',
-            acquisition_cost: this.config.pointsCostPerDraw,
-            can_transfer: true,
-            can_use: true
-          }
-        },
-        { transaction }
-      )
-
-      this.logInfo('发放物品到背包（通过 AssetService.mintItem）', {
-        user_id,
-        prizeId: prize.prize_id,
-        prizeName: prize.prize_name,
-        prizeType: prize.prize_type,
-        idempotencyKey,
-        inTransaction: !!transaction
-      })
-      break
-    }
-
-    case 'virtual': {
-      /**
-       * 🔥 背包双轨架构：虚拟资产发放到 AssetService（可叠加资产轨）
-       *
-       * 业务场景：
-       * - 抽奖中奖后，虚拟资产（材料/碎片）通过 AssetService 发放
-       * - 自动累加到用户资产余额
-       * - 支持幂等性控制
-       */
-      /*
-       * 虚拟奖品通过材料系统发放（见下方 material_asset_code 逻辑）
-       * 如果没有配置 material_asset_code，则记录警告
-       */
-      if (!prize.material_asset_code) {
-        this.logWarn('虚拟奖品未配置 material_asset_code，跳过发放', {
-          prize_id: prize.prize_id,
-          prize_name: prize.prize_name
+          prizeId: prize.prize_id,
+          prizeName: prize.prize_name,
+          points: prize.prize_value,
+          idempotencyKey,
+          lotterySessionId,
+          inTransaction: !!transaction
         })
-      }
-      break
-    }
+        break
 
-    default:
-      this.logError('未知奖品类型', { prizeType: prize.prize_type })
+      case 'coupon':
+      case 'physical': {
+        /**
+         * 🔥 统一资产域架构：优惠券/实物奖品通过 AssetService.mintItem() 发放
+         *
+         * 业务场景：
+         * - 抽奖中奖后，将优惠券/实物奖品写入 item_instances 表
+         * - 自动记录物品铸造事件到 item_instance_events 表
+         * - 支持幂等性控制（通过 source_type + source_id）
+         */
+        await AssetService.mintItem(
+          {
+            user_id,
+            item_type: prize.prize_type === 'coupon' ? 'voucher' : 'product',
+            source_type: 'lottery',
+            source_id: `${idempotencyKey}:item`,
+            meta: {
+              name: prize.prize_name,
+              description: prize.prize_description || `抽奖获得：${prize.prize_name}`,
+              value: Math.round(parseFloat(prize.prize_value) || 0),
+              prize_id: prize.prize_id,
+              prize_type: prize.prize_type,
+              acquisition_method: 'lottery',
+              acquisition_cost: this.config.pointsCostPerDraw,
+              can_transfer: true,
+              can_use: true
+            }
+          },
+          { transaction }
+        )
+
+        this.logInfo('发放物品到背包（通过 AssetService.mintItem）', {
+          user_id,
+          prizeId: prize.prize_id,
+          prizeName: prize.prize_name,
+          prizeType: prize.prize_type,
+          idempotencyKey,
+          inTransaction: !!transaction
+        })
+        break
+      }
+
+      case 'virtual': {
+        /**
+         * 🔥 背包双轨架构：虚拟资产发放到 AssetService（可叠加资产轨）
+         *
+         * 业务场景：
+         * - 抽奖中奖后，虚拟资产（材料/碎片）通过 AssetService 发放
+         * - 自动累加到用户资产余额
+         * - 支持幂等性控制
+         */
+        /*
+         * 虚拟奖品通过材料系统发放（见下方 material_asset_code 逻辑）
+         * 如果没有配置 material_asset_code，则记录警告
+         */
+        if (!prize.material_asset_code) {
+          this.logWarn('虚拟奖品未配置 material_asset_code，跳过发放', {
+            prize_id: prize.prize_id,
+            prize_name: prize.prize_name
+          })
+        }
+        break
+      }
+
+      default:
+        this.logError('未知奖品类型', { prizeType: prize.prize_type })
     }
 
     /**
@@ -2320,10 +2237,11 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
       // ✅ 统一业务标准：使用snake_case参数解构
       const { user_id, campaign_id } = context
 
-      // 🔧 V4.3修复：使用新资产系统获取用户积分信息
-      const userAccount = await getUserPointsBalance(user_id, {
-        transaction // 🎯 在事务中查询
-      })
+      // 🔥 V4.6统一：通过 AssetService.getBalance() 查询积分（决策F：读不加锁）
+      const presetBalance = await AssetService.getBalance(
+        { user_id, asset_code: 'POINTS' },
+        { transaction }
+      )
 
       // ✅ 生成唯一的抽奖ID（用于幂等性控制）
       const draw_id = `draw_${BeijingTimeHelper.generateIdTimestamp()}_${user_id}_${Math.random().toString(36).substr(2, 6)}`
@@ -2407,7 +2325,7 @@ class BasicGuaranteeStrategy extends LotteryStrategy {
         // 🎯 显示为正常的随机概率，而不是1.0（用户无感知预设机制）
         probability: preset.prize.win_probability || 0.1,
         pointsCost: this.config.pointsCostPerDraw,
-        remainingPoints: userAccount.available_points - this.config.pointsCostPerDraw,
+        remainingPoints: presetBalance.available_amount - this.config.pointsCostPerDraw,
         executedStrategy: this.strategyName,
         timestamp: BeijingTimeHelper.now()
       }

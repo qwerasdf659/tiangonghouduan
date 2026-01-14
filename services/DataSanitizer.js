@@ -228,7 +228,10 @@ class DataSanitizer {
    * @returns {string} return.display_name - 显示名称（display_name或username）
    * @returns {boolean} return.can_lottery - 是否可以抽奖（默认true）
    * @returns {boolean} return.can_exchange - 是否可以兑换（默认true）
-   * @returns {number} return.balance - 积分余额（points_balance或0）
+   * @returns {Object} return.points_account - 积分账户信息（V4.6统一：采用points_account结构）
+   * @returns {number} return.points_account.available_points - 可用积分
+   * @returns {number} return.points_account.frozen_points - 冻结积分
+   * @returns {number} return.points_account.total_points - 总积分（可用+冻结）
    * @returns {string} return.avatar - 头像URL
    * @returns {string|null} return.member_since - 注册日期（YYYY-MM-DD格式，从created_at提取）
    *
@@ -246,12 +249,31 @@ class DataSanitizer {
       return user // 管理员看完整数据
     }
 
+    /**
+     * 🔥 V4.6统一（决策A2）：废弃 points_balance 字段，改用 points_account 结构
+     * - points_account 应由调用方通过 AssetService.getBalance() 获取后传入
+     * - 如果 user 对象包含 points_account 属性，则直接使用
+     * - 否则返回默认的 0 值结构（表示未初始化或无账户）
+     */
+    const pointsAccount = user.points_account || {
+      available_points: 0,
+      frozen_points: 0,
+      total_points: 0
+    }
+
     return {
       id: user.id,
       display_name: user.display_name || user.username,
       can_lottery: user.can_lottery !== false,
       can_exchange: user.can_exchange !== false,
-      balance: user.points_balance || 0,
+      // 🔥 V4.6统一（决策A2）：使用 points_account 结构替代 balance 字段
+      points_account: {
+        available_points: pointsAccount.available_points || 0,
+        frozen_points: pointsAccount.frozen_points || 0,
+        total_points:
+          pointsAccount.total_points ||
+          (pointsAccount.available_points || 0) + (pointsAccount.frozen_points || 0)
+      },
       avatar: user.avatar,
       member_since: user.created_at ? user.created_at.split('T')[0] : null
       // ❌ 移除敏感字段：role, permissions, admin_flags, detailed_stats
@@ -658,7 +680,10 @@ class DataSanitizer {
    * @returns {number} return.consumption_count - 消费记录数量
    * @returns {number} return.consumption_amount - 消费总金额
    * @returns {number} return.consumption_points - 消费获得积分
-   * @returns {number} return.month_points - 本月积分
+   * @returns {Object} return.points_account - 积分账户信息（V4.6统一：采用points_account结构）
+   * @returns {number} return.points_account.available_points - 可用积分
+   * @returns {number} return.points_account.frozen_points - 冻结积分
+   * @returns {number} return.points_account.total_points - 总积分
    * @returns {number} return.total_points_earned - 总获得积分
    * @returns {string} return.account_created - 账户创建时间
    * @returns {string} return.last_activity - 最后活动时间
@@ -688,8 +713,17 @@ class DataSanitizer {
       inventory_total: statistics.inventory_total, // 🔥 方案A修复：添加库存总数
       inventory_available: statistics.inventory_available, // 🔥 方案A修复：添加可用库存
 
-      // 积分统计（用户应该看到自己的积分余额和交易记录）
-      points_balance: statistics.points_balance, // 🔥 方案A修复：添加积分余额（P0风险2核心修复）
+      /*
+       * 积分统计（用户应该看到自己的积分余额和交易记录）
+       * 🔥 V4.6统一（决策A2）：使用 points_account 结构替代 points_balance 字段
+       * - 优先使用 statistics.points_account（新结构）
+       * - 向后兼容：如果不存在，则从 statistics.points_balance 映射
+       */
+      points_account: statistics.points_account || {
+        available_points: statistics.points_balance || 0,
+        frozen_points: 0,
+        total_points: statistics.points_balance || 0
+      },
       total_points_earned: statistics.total_points_earned,
       total_points_consumed: statistics.total_points_consumed, // 🔥 方案A修复：添加消耗积分
       transaction_count: statistics.transaction_count, // 🔥 方案A修复：添加交易次数
@@ -1219,10 +1253,9 @@ class DataSanitizer {
    * - 必须包含 item_id 字段（数据库主键）
    * - 🔧 2026-01-13 图片字段策略：需要 include primaryImage（ImageResources 关联）
    *
-   * 输出字段（2026-01-13 图片字段策略 - 统一规范）：
+   * 输出字段（统一规范）：
    * - primary_image_id: 主图片ID（关联 image_resources 表）
    * - primary_image: 图片对象 { image_id, url, width, height, mime }，缺失时为 null
-   * - ❌ 移除字段：image, image_url（已废弃）
    *
    * @param {Array<Object>} items - 商品数据数组（来自 exchange_items 表，需 include primaryImage）
    * @param {string} dataLevel - 数据级别：'full'（管理员）或'public'（普通用户）

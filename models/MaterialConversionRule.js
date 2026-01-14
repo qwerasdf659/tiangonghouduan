@@ -39,7 +39,7 @@ class MaterialConversionRule extends Model {
    * @param {Object} models - Sequelize所有模型的集合对象
    * @returns {void} 无返回值，仅定义关联关系
    */
-  static associate (models) {
+  static associate(models) {
     // 材料转换规则与创建人的关联（可选）
     MaterialConversionRule.belongsTo(models.User, {
       foreignKey: 'created_by',
@@ -47,6 +47,15 @@ class MaterialConversionRule extends Model {
       onDelete: 'SET NULL',
       onUpdate: 'CASCADE',
       comment: '关联创建人（用于审计）'
+    })
+
+    // 材料转换规则与更新人的关联（可选）
+    MaterialConversionRule.belongsTo(models.User, {
+      foreignKey: 'updated_by',
+      as: 'updater',
+      onDelete: 'SET NULL',
+      onUpdate: 'CASCADE',
+      comment: '关联更新人（用于审计）'
     })
 
     // 🔴 P1-1 新增：关联源材料类型（用于按 group_code 过滤规则）
@@ -79,7 +88,7 @@ class MaterialConversionRule extends Model {
    * @param {Object} options - Sequelize查询选项
    * @returns {Promise<MaterialConversionRule|null>} 生效的转换规则或null
    */
-  static async getEffectiveRule (from_asset_code, to_asset_code, asOf = new Date(), options = {}) {
+  static async getEffectiveRule(from_asset_code, to_asset_code, asOf = new Date(), options = {}) {
     return await MaterialConversionRule.findOne({
       where: {
         from_asset_code,
@@ -166,6 +175,104 @@ module.exports = sequelize => {
         type: DataTypes.INTEGER,
         allowNull: true,
         comment: '创建人（Created By - 操作记录）：记录规则创建者的 user_id，用于审计'
+      },
+
+      /*
+       * ============================================
+       * 扩展字段（2026-01-13 材料转换系统降维护成本方案）
+       * ============================================
+       */
+
+      // 批次约束字段（Batch Constraints）
+      min_from_amount: {
+        type: DataTypes.BIGINT,
+        allowNull: false,
+        defaultValue: 1,
+        comment: '最小转换数量（Min From Amount）：用户单次转换的最小源资产数量，用于保护性下限'
+      },
+
+      max_from_amount: {
+        type: DataTypes.BIGINT,
+        allowNull: true,
+        defaultValue: null,
+        comment: '最大转换数量（Max From Amount）：用户单次转换的最大源资产数量，NULL 表示无上限'
+      },
+
+      // 损耗建模字段（Loss Model - 手续费配置）
+      fee_rate: {
+        type: DataTypes.DECIMAL(5, 4),
+        allowNull: false,
+        defaultValue: 0.0,
+        comment: '手续费费率（Fee Rate）：如 0.05 = 5%，基于产出 to_amount 计算手续费'
+      },
+
+      fee_min_amount: {
+        type: DataTypes.BIGINT,
+        allowNull: false,
+        defaultValue: 0,
+        comment:
+          '最低手续费（Fee Min Amount）：手续费下限，计算结果低于此值时取此值，0 表示无最低限制'
+      },
+
+      fee_asset_code: {
+        type: DataTypes.STRING(50),
+        allowNull: true,
+        defaultValue: null,
+        comment:
+          '手续费资产类型（Fee Asset Code）：手续费收取的资产类型，NULL 时默认与 to_asset_code 相同'
+      },
+
+      // 前端展示字段（Frontend Display）
+      title: {
+        type: DataTypes.STRING(100),
+        allowNull: true,
+        defaultValue: null,
+        comment: '显示标题（Title）：前端展示的规则名称，如"红晶片分解"'
+      },
+
+      description: {
+        type: DataTypes.TEXT,
+        allowNull: true,
+        defaultValue: null,
+        comment: '描述文案（Description）：前端展示的规则说明文案'
+      },
+
+      display_icon: {
+        type: DataTypes.STRING(200),
+        allowNull: true,
+        defaultValue: null,
+        comment: '显示图标（Display Icon）：图标 URL 或 icon-name，用于前端渲染'
+      },
+
+      risk_level: {
+        type: DataTypes.ENUM('low', 'medium', 'high'),
+        allowNull: false,
+        defaultValue: 'low',
+        comment: '风险等级（Risk Level）：low-低风险/medium-中风险/high-高风险，用于前端提示'
+      },
+
+      is_visible: {
+        type: DataTypes.BOOLEAN,
+        allowNull: false,
+        defaultValue: true,
+        comment: '前端可见（Is Visible）：true-前端可见/false-隐藏规则（仅后端内部使用）'
+      },
+
+      // 舍入控制字段（Rounding Control）
+      rounding_mode: {
+        type: DataTypes.ENUM('floor', 'ceil', 'round'),
+        allowNull: false,
+        defaultValue: 'floor',
+        comment:
+          '舍入模式（Rounding Mode）：floor-向下取整（默认保守）/ceil-向上取整/round-四舍五入'
+      },
+
+      // 审计字段（Audit Fields）
+      updated_by: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+        defaultValue: null,
+        comment: '最后更新人（Updated By）：记录规则最后更新者的 user_id，用于审计'
       }
     },
     {

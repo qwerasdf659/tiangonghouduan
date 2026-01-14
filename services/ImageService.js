@@ -18,7 +18,8 @@
 
 const crypto = require('crypto')
 const SealosStorageService = require('./sealosStorage')
-const { getImageUrl, getThumbnailUrl } = require('../utils/ImageUrlHelper')
+const { getImageUrl, getThumbnailUrl, getPlaceholderImageUrl } = require('../utils/ImageUrlHelper')
+const _logger = require('../utils/logger').logger
 
 /**
  * 业务类型与文件夹映射
@@ -472,10 +473,14 @@ class ImageService {
    * 格式化图片响应数据
    *
    * @description
-   *   架构决策（2026-01-08）：
-   *   - 优先使用预生成的缩略图 key（存储在 thumbnail_paths 字段）
-   *   - 如无预生成缩略图，则使用 getThumbnailUrl 动态构造（兼容旧数据）
+   *   架构决策（2026-01-08 / 2026-01-13 清理兼容代码）：
+   *   - 使用预生成的缩略图 key（存储在 thumbnail_paths 字段）
    *   - 不使用 CDN，直连 Sealos 公网端点
+   *
+   *   架构决策（2026-01-14 图片缩略图架构兼容残留核查报告）：
+   *   - 移除兼容旧数据的推断缩略图逻辑
+   *   - 缺失 thumbnail_paths 时记录 ERROR 日志
+   *   - 降级策略由 ENABLE_THUMBNAIL_FALLBACK 环境变量控制
    *
    * @private
    * @param {Object} imageRecord - ImageResources 模型实例
@@ -484,29 +489,68 @@ class ImageService {
   static _formatImageResponse(imageRecord) {
     const objectKey = imageRecord.file_path
     const storedThumbnails = imageRecord.thumbnail_paths // JSON 字段
+    const enableFallback = process.env.ENABLE_THUMBNAIL_FALLBACK === 'true'
 
-    // 生成缩略图 URL：优先使用预生成 key，否则动态构造
-    let thumbnails
+    let thumbnails = null
     if (storedThumbnails && Object.keys(storedThumbnails).length > 0) {
       // 使用预生成的缩略图 key
       thumbnails = {
-        small: getImageUrl(storedThumbnails.small),
-        medium: getImageUrl(storedThumbnails.medium),
-        large: getImageUrl(storedThumbnails.large)
+        small: storedThumbnails.small ? getImageUrl(storedThumbnails.small) : null,
+        medium: storedThumbnails.medium ? getImageUrl(storedThumbnails.medium) : null,
+        large: storedThumbnails.large ? getImageUrl(storedThumbnails.large) : null
       }
     } else {
-      // 兼容旧数据：动态构造缩略图 URL
-      thumbnails = {
-        small: getThumbnailUrl(objectKey, 'small'),
-        medium: getThumbnailUrl(objectKey, 'medium'),
-        large: getThumbnailUrl(objectKey, 'large')
+      // 2026-01-14 决策：告警优先降级逻辑（移除兼容旧数据的推断缩略图逻辑）
+      console.error(
+        '❌ ImageService: 图片 ' +
+          imageRecord.image_id +
+          ' 缺少预生成缩略图。' +
+          'file_path: ' +
+          imageRecord.file_path +
+          ', business_type: ' +
+          imageRecord.business_type +
+          ', category: ' +
+          imageRecord.category +
+          ', context_id: ' +
+          imageRecord.context_id
+      )
+
+      if (enableFallback) {
+        // 降级方案 A: 使用原图作为缩略图（如果 ENABLE_THUMBNAIL_FALLBACK 为 true）
+        const originalImageUrl = getImageUrl(objectKey)
+        thumbnails = {
+          small: originalImageUrl,
+          medium: originalImageUrl,
+          large: originalImageUrl
+        }
+        console.warn(
+          '⚠️ ImageService: 图片 ' +
+            imageRecord.image_id +
+            ' 缩略图降级为原图 URL (ENABLE_THUMBNAIL_FALLBACK=true)'
+        )
+      } else {
+        // 降级方案 B: 使用占位图（生产环境默认）
+        const placeholderUrl = getPlaceholderImageUrl(
+          imageRecord.business_type,
+          imageRecord.category
+        )
+        thumbnails = {
+          small: placeholderUrl,
+          medium: placeholderUrl,
+          large: placeholderUrl
+        }
+        console.warn(
+          '⚠️ ImageService: 图片 ' +
+            imageRecord.image_id +
+            ' 缩略图降级为占位图 URL (ENABLE_THUMBNAIL_FALLBACK=false)'
+        )
       }
     }
 
     return {
       image_id: imageRecord.image_id,
       object_key: objectKey,
-      public_url: getImageUrl(objectKey), // 🔴 重命名：cdn_url → public_url
+      public_url: getImageUrl(objectKey),
       thumbnails,
       original_filename: imageRecord.original_filename,
       file_size: imageRecord.file_size,
