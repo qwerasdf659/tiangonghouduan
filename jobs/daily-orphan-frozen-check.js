@@ -49,8 +49,8 @@ class DailyOrphanFrozenCheck {
     logger.info('开始每日孤儿冻结检测任务', { dryRun })
 
     try {
-      // 获取孤儿冻结清理服务（通过 serviceManager 实例获取）
-      const orphanFrozenService = serviceManager.getService('orphanFrozenCleanup')
+      // 获取孤儿冻结清理服务（通过 serviceManager 实例获取，snake_case key）
+      const orphanFrozenService = serviceManager.getService('orphan_frozen_cleanup')
 
       if (!orphanFrozenService) {
         throw new Error('OrphanFrozenCleanupService 未注册到 ServiceManager')

@@ -39,10 +39,12 @@ const { assertAndGetTransaction } = require('../utils/transactionHelpers')
  * 内容审核引擎类
  * 业务职责：提供统一的审核流程管理和回调机制
  * 设计模式：通用基础设施层，解耦审核逻辑与业务逻辑
- * 支持类型：exchange（兑换）、feedback（反馈）
  *
- * 支持类型：
- * - text: 文本内容审核（敏感词、违禁词检测）
+ * 支持审核类型：
+ * - exchange: 兑换审核（物品兑换申请）
+ * - feedback: 反馈审核（用户反馈处理）
+ * - consumption: 消费审核（消费记录审核）
+ * - merchant_points: 商家积分审核
  */
 class ContentAuditEngine {
   /**

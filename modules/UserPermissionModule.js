@@ -318,7 +318,7 @@ class UserPermissionModule {
    * await permission_module.setUserRole(userId, true, operatorId);
    *
    * // ✅ 新方式（推荐）
-   * const UserRoleService = req.app.locals.services.getService('userRole');
+   * const UserRoleService = req.app.locals.services.getService('user_role');
    * await TransactionManager.execute(async (transaction) => {
    *   return await UserRoleService.updateUserRole(userId, 'admin', operatorId, { transaction });
    * });

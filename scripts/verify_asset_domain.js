@@ -190,17 +190,17 @@ async function verifyDatabaseLayer() {
     warn('检查 item_templates 表失败', err.message)
   }
 
-  // 5. 检查 item_template_aliases 表
-  console.log('\n【检查5】item_template_aliases 表状态')
+  // 5. 检查 item_template_aliases 表（2026-01-14 决策4：已废弃并删除）
+  console.log('\n【检查5】item_template_aliases 表状态（应已删除）')
   try {
     const exists = await tableExists('item_template_aliases')
-    if (exists) {
-      pass('item_template_aliases 表已创建')
+    if (!exists) {
+      pass('item_template_aliases 表已正确删除（2026-01-14 迁移双轨清理决策4）')
     } else {
-      fail('item_template_aliases 表不存在')
+      fail('item_template_aliases 表仍然存在，需要执行清理迁移')
     }
   } catch (err) {
-    fail('检查 item_template_aliases 表失败', err.message)
+    fail('检查 item_template_aliases 表状态失败', err.message)
   }
 
   // 6. 检查 locked 物品状态（使用 locks JSON 字段解析）
