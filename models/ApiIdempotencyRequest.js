@@ -41,7 +41,7 @@ class ApiIdempotencyRequest extends Model {
    * @param {Object} models - Sequelize所有模型的集合对象
    * @returns {void} 无返回值，仅定义关联关系
    */
-  static associate (models) {
+  static associate(models) {
     // 多对一：请求归属于用户
     ApiIdempotencyRequest.belongsTo(models.User, {
       foreignKey: 'user_id',
@@ -66,7 +66,7 @@ class ApiIdempotencyRequest extends Model {
    *
    * @returns {boolean} 是否已完成
    */
-  isCompleted () {
+  isCompleted() {
     return this.status === ApiIdempotencyRequest.STATUS.COMPLETED
   }
 
@@ -75,7 +75,7 @@ class ApiIdempotencyRequest extends Model {
    *
    * @returns {boolean} 是否处理中
    */
-  isProcessing () {
+  isProcessing() {
     return this.status === ApiIdempotencyRequest.STATUS.PROCESSING
   }
 
@@ -84,7 +84,7 @@ class ApiIdempotencyRequest extends Model {
    *
    * @returns {boolean} 是否失败
    */
-  isFailed () {
+  isFailed() {
     return this.status === ApiIdempotencyRequest.STATUS.FAILED
   }
 }

@@ -81,7 +81,7 @@ function bindEventListeners() {
   // 规则类型变更 - 控制活动选择框显示/隐藏
   const ruleTypeSelect = document.getElementById('ruleType')
   if (ruleTypeSelect) {
-    ruleTypeSelect.addEventListener('change', function() {
+    ruleTypeSelect.addEventListener('change', function () {
       const campaignContainer = document.getElementById('campaignSelectContainer')
       const modalActivitySelect = document.getElementById('modalActivitySelect')
       if (this.value === 'campaign') {
@@ -232,7 +232,7 @@ async function loadQuotaData() {
 /**
  * 渲染配额规则表格
  * 直接使用后端返回的字段名（以后端为准）
- * 
+ *
  * 后端返回字段：
  * - rule_id: 规则ID（字符串）
  * - scope_type: 规则类型（global/campaign/role/user）
@@ -241,7 +241,7 @@ async function loadQuotaData() {
  * - priority: 优先级
  * - status: 状态（active/inactive）
  * - effective_from/effective_to: 生效时间范围
- * 
+ *
  * @param {Array} rules - 配额规则数组
  */
 function renderQuotaTable(rules) {
@@ -269,7 +269,7 @@ function renderQuotaTable(rules) {
 
       // 直接使用后端字段 scope_type
       const scopeTypeText = getQuotaTypeText(rule.scope_type)
-      
+
       // 直接使用后端字段 scope_type 和 scope_id
       let scopeText = '-'
       if (rule.scope_type === 'global') {
@@ -385,7 +385,7 @@ function goToPage(page) {
 /**
  * 禁用配额规则
  * 直接使用后端字段 rule_id（后端返回的是字符串类型）
- * 
+ *
  * @param {string|number} ruleId - 规则ID（后端返回字符串，但也兼容数字）
  */
 async function disableRule(ruleId) {
@@ -402,7 +402,7 @@ async function disableRule(ruleId) {
     if (response && response.success) {
       showSuccessToast('规则已禁用')
       loadQuotaData()
-      loadStatistics()  // 同时刷新统计数据
+      loadStatistics() // 同时刷新统计数据
     } else {
       showErrorToast(response?.message || '禁用失败')
     }
@@ -415,7 +415,7 @@ async function disableRule(ruleId) {
 /**
  * 提交配额规则创建
  * POST /api/v4/console/lottery-quota/rules
- * 
+ *
  * 后端API参数（以后端为准，直接使用后端字段名）：
  * - rule_type: 规则类型（global/campaign/role/user）
  * - campaign_id: 活动ID（campaign类型必填，使用后端字段名）
@@ -446,8 +446,8 @@ async function submitCreateRule() {
 
   // 构建请求数据（直接使用后端字段名，无复杂映射）
   const data = {
-    rule_type: ruleType,       // 后端字段
-    limit_value: limitValue,   // 后端字段
+    rule_type: ruleType, // 后端字段
+    limit_value: limitValue, // 后端字段
     reason: document.getElementById('adjustReason')?.value?.trim() || null
   }
 
@@ -458,7 +458,7 @@ async function submitCreateRule() {
       showErrorToast('活动规则必须选择一个活动')
       return
     }
-    data.campaign_id = parseInt(campaignId)  // 后端字段名
+    data.campaign_id = parseInt(campaignId) // 后端字段名
   }
 
   try {

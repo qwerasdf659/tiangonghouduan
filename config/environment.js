@@ -80,7 +80,7 @@ const ENV_CONFIG = {
  *
  * @returns {Object} 当前环境配置对象
  */
-function getCurrentConfig () {
+function getCurrentConfig() {
   const config = ENV_CONFIG[NODE_ENV]
 
   if (!config) {
@@ -105,7 +105,7 @@ function getCurrentConfig () {
  *
  * 参考文档：docs/配置管理三层分离与校验统一方案.md
  */
-function validateConfig (failFast = true) {
+function validateConfig(failFast = true) {
   const { ConfigValidator } = require('./validator')
   const result = ConfigValidator.validate(NODE_ENV, failFast)
 
@@ -122,7 +122,7 @@ function validateConfig (failFast = true) {
  * @description 根据当前环境返回适当的express.static配置
  * @returns {Object} express.static配置对象
  */
-function getStaticCacheConfig () {
+function getStaticCacheConfig() {
   const config = getCurrentConfig()
   const staticConfig = config.cache.static
 
@@ -166,7 +166,7 @@ function getStaticCacheConfig () {
  * @description 在控制台输出当前环境的配置详情
  * @returns {void} 无返回值，仅输出信息到控制台
  */
-function printConfig () {
+function printConfig() {
   const config = getCurrentConfig()
 
   console.log('\n' + '='.repeat(50))

@@ -1,15 +1,15 @@
 /**
  * 孤儿冻结清理页面
- * 
+ *
  * @description 管理系统中的孤儿冻结数据（frozen_amount > 实际活跃挂牌冻结总额）
  * @created 2026-01-09
  * @updated 2026-01-09 - 适配后端API字段名，以后端为准；修复CSP内联事件问题
- * 
+ *
  * 后端API说明：
  * - GET /api/v4/console/orphan-frozen/detect - 检测孤儿冻结
  * - GET /api/v4/console/orphan-frozen/stats - 获取统计信息
  * - POST /api/v4/console/orphan-frozen/cleanup - 清理孤儿冻结
- * 
+ *
  * 后端返回字段（以此为准）：
  * - detect: { total, total_amount, orphan_list[] }
  * - orphan_list item: { user_id, account_id, asset_code, frozen_amount, listed_amount, orphan_amount, available_amount, description }
@@ -105,7 +105,7 @@ function setupEventDelegation() {
 
 /**
  * 加载数据
- * 
+ *
  * 调用后端API获取孤儿冻结数据和统计信息
  * 后端字段：
  * - /detect: { total, total_amount, orphan_list[] }
@@ -126,7 +126,9 @@ async function loadData() {
 
     // 并行获取检测结果和统计数据
     const [detectResponse, statsResponse] = await Promise.all([
-      apiRequest(`/api/v4/console/orphan-frozen/detect${detectParams.toString() ? '?' + detectParams.toString() : ''}`),
+      apiRequest(
+        `/api/v4/console/orphan-frozen/detect${detectParams.toString() ? '?' + detectParams.toString() : ''}`
+      ),
       apiRequest('/api/v4/console/orphan-frozen/stats')
     ])
 
@@ -142,13 +144,14 @@ async function loadData() {
 
       // 处理统计数据 - 使用后端字段名
       const stats = statsResponse?.data || {}
-      
+
       // 更新统计卡片 - 适配后端字段
       // 后端stats字段: total_orphan_count, total_orphan_amount, affected_user_count
       document.getElementById('orphanCount').textContent = stats.total_orphan_count || total
       document.getElementById('frozenCount').textContent = stats.total_orphan_amount || totalAmount
       document.getElementById('expiredCount').textContent = stats.affected_user_count || 0
-      document.getElementById('totalValue').textContent = '¥' + (stats.total_orphan_amount || totalAmount).toFixed(2)
+      document.getElementById('totalValue').textContent =
+        '¥' + (stats.total_orphan_amount || totalAmount).toFixed(2)
 
       // 直接使用后端返回的数据渲染表格，不做字段转换
       renderTable(orphanList)
@@ -193,10 +196,10 @@ async function loadData() {
 
 /**
  * 渲染表格
- * 
+ *
  * 直接使用后端返回的字段名，不做映射转换
  * 🔧 修复CSP问题：移除内联事件，使用data属性和事件委托
- * 
+ *
  * 后端orphan_list item字段：
  * - user_id: 用户ID
  * - account_id: 账户ID
@@ -206,7 +209,7 @@ async function loadData() {
  * - orphan_amount: 孤儿冻结金额
  * - available_amount: 可用余额
  * - description: 描述
- * 
+ *
  * @param {Array} orphanList - 后端返回的孤儿冻结列表
  */
 function renderTable(orphanList) {
@@ -238,10 +241,10 @@ function renderTable(orphanList) {
 
       // 资产类型显示名称映射
       const assetCodeNames = {
-        'points': '积分',
-        'diamond': '钻石',
-        'gold_coin': '金币',
-        'silver_coin': '银币'
+        points: '积分',
+        diamond: '钻石',
+        gold_coin: '金币',
+        silver_coin: '银币'
       }
       const assetName = assetCodeNames[item.asset_code] || item.asset_code
 
@@ -315,7 +318,7 @@ function toggleSelectAll() {
     const accountId = checkbox.dataset.accountId
     const assetCode = checkbox.dataset.assetCode
     const itemKey = `${accountId}_${assetCode}`
-    
+
     if (isChecked) {
       selectedItems.add(itemKey)
     } else {
@@ -335,7 +338,7 @@ function updateBatchButton() {
 
 /**
  * 扫描孤儿数据
- * 
+ *
  * 调用后端 /detect API 进行扫描
  * 后端返回: { total, total_amount, orphan_list }
  */
@@ -393,7 +396,7 @@ function showCleanConfirmModal() {
 
 /**
  * 执行清理
- * 
+ *
  * 调用后端 POST /cleanup API
  * 请求参数：{ dry_run, user_id, asset_code, reason, operator_name }
  * 后端返回：{ dry_run, detected, cleaned, failed, total_amount, details }
@@ -422,13 +425,13 @@ async function executeClean() {
       // 使用后端字段 cleaned
       const cleanedCount = response.data.cleaned || 0
       const failedCount = response.data.failed || 0
-      
+
       if (failedCount > 0) {
         showSuccessToast(`清理完成：成功 ${cleanedCount} 条，失败 ${failedCount} 条`)
       } else {
         showSuccessToast(`成功清理 ${cleanedCount} 条孤儿冻结数据`)
       }
-      
+
       bootstrap.Modal.getInstance(document.getElementById('cleanConfirmModal')).hide()
       selectedItems.clear()
       loadData()
@@ -445,14 +448,18 @@ async function executeClean() {
 
 /**
  * 清理单条记录
- * 
+ *
  * 按指定用户和资产类型清理
- * 
+ *
  * @param {number} userId - 用户ID
  * @param {string} assetCode - 资产代码
  */
 async function cleanSingleItem(userId, assetCode) {
-  if (!confirm(`确定要清理用户 #${userId} 的 ${assetCode} 孤儿冻结吗？\n\n此操作会将孤儿冻结金额解冻到可用余额。`)) {
+  if (
+    !confirm(
+      `确定要清理用户 #${userId} 的 ${assetCode} 孤儿冻结吗？\n\n此操作会将孤儿冻结金额解冻到可用余额。`
+    )
+  ) {
     return
   }
 
@@ -539,7 +546,7 @@ function goToPage(page) {
   if (page < 1) return
   const totalPages = Math.ceil(orphanDataCache.length / pageSize) || 1
   if (page > totalPages) return
-  
+
   currentPage = page
   // 重新渲染表格（使用缓存数据）
   renderTable(orphanDataCache)

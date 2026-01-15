@@ -118,7 +118,7 @@ module.exports = sequelize => {
          *
          * @returns {Object} 事件元数据对象
          */
-        get () {
+        get() {
           const value = this.getDataValue('meta')
           return value || {}
         }

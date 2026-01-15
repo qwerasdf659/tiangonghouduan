@@ -1,6 +1,6 @@
 /**
  * 配置工具API测试脚本
- * 
+ *
  * 测试后端提供的系统配置相关API
  */
 
@@ -25,13 +25,13 @@ function request(method, path, body = null, token = adminToken) {
       method: method,
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': token ? `Bearer ${token}` : ''
+        Authorization: token ? `Bearer ${token}` : ''
       }
     }
 
-    const req = http.request(options, (res) => {
+    const req = http.request(options, res => {
       let data = ''
-      res.on('data', chunk => data += chunk)
+      res.on('data', chunk => (data += chunk))
       res.on('end', () => {
         try {
           const jsonData = JSON.parse(data)
@@ -43,7 +43,7 @@ function request(method, path, body = null, token = adminToken) {
     })
 
     req.on('error', reject)
-    
+
     if (body) {
       req.write(JSON.stringify(body))
     }
@@ -57,12 +57,12 @@ function request(method, path, body = null, token = adminToken) {
 function logTest(name, result) {
   const status = result.status
   const success = status >= 200 && status < 300
-  const icon = success ? '✅' : (status === 401 ? '🔐' : '❌')
-  
+  const icon = success ? '✅' : status === 401 ? '🔐' : '❌'
+
   console.log(`\n${icon} ${name}`)
   console.log(`   状态: ${status}`)
   console.log(`   响应: ${JSON.stringify(result.data, null, 2).substring(0, 500)}`)
-  
+
   return { name, success, status, data: result.data }
 }
 
@@ -70,12 +70,12 @@ function logTest(name, result) {
  * 主测试函数
  */
 async function runTests() {
-  console.log('=' .repeat(60))
+  console.log('='.repeat(60))
   console.log('🔍 配置工具API测试')
-  console.log('=' .repeat(60))
-  
+  console.log('='.repeat(60))
+
   const results = []
-  
+
   // 1. 测试服务健康状态
   console.log('\n📋 1. 测试服务健康状态')
   try {
@@ -152,23 +152,23 @@ async function runTests() {
   }
 
   // 汇总
-  console.log('\n' + '=' .repeat(60))
+  console.log('\n' + '='.repeat(60))
   console.log('📊 测试汇总')
-  console.log('=' .repeat(60))
-  
+  console.log('='.repeat(60))
+
   const successCount = results.filter(r => r.success).length
   const authCount = results.filter(r => r.status === 401).length
   const failCount = results.filter(r => !r.success && r.status !== 401).length
-  
+
   console.log(`✅ 成功: ${successCount}`)
   console.log(`🔐 需要认证: ${authCount}`)
   console.log(`❌ 失败: ${failCount}`)
-  
+
   // 分析API可用性
-  console.log('\n' + '=' .repeat(60))
+  console.log('\n' + '='.repeat(60))
   console.log('🔧 API可用性分析')
-  console.log('=' .repeat(60))
-  
+  console.log('='.repeat(60))
+
   console.log(`
 前端请求的API路径（错误）:
 - /api/v4/console/system/config  ❌ 404 (不存在)
@@ -192,4 +192,3 @@ async function runTests() {
 
 // 执行测试
 runTests().catch(console.error)
-

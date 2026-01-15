@@ -59,7 +59,7 @@ class LotteryPresetService {
    * @returns {Promise<Array>} 创建的预设列表
    * @throws {Error} 参数错误、用户不存在、奖品不存在等
    */
-  static async createPresets (adminId, userId, presets) {
+  static async createPresets(adminId, userId, presets) {
     // ===== 第1步：基础参数验证 =====
     if (!adminId || !userId || !presets || !Array.isArray(presets) || presets.length === 0) {
       const error = new Error('参数错误：需要adminId、userId和presets数组')
@@ -145,7 +145,7 @@ class LotteryPresetService {
    * @returns {Promise<Object>} 包含用户信息、预设列表、统计数据的对象
    * @throws {Error} 用户不存在、无效状态参数等
    */
-  static async getUserPresets (adminId, userId, status = 'all') {
+  static async getUserPresets(adminId, userId, status = 'all') {
     // 🎯 参数验证：userId类型验证
     if (isNaN(userId) || userId <= 0) {
       const error = new Error('无效的用户ID，必须是正整数')
@@ -233,7 +233,7 @@ class LotteryPresetService {
    * @returns {Promise<Object>} 包含user_id和deleted_count的对象
    * @throws {Error} 用户不存在等
    */
-  static async clearUserPresets (adminId, userId) {
+  static async clearUserPresets(adminId, userId) {
     // 🎯 参数验证：userId类型验证
     if (isNaN(userId) || userId <= 0) {
       const error = new Error('无效的用户ID，必须是正整数')
@@ -280,7 +280,7 @@ class LotteryPresetService {
    * @returns {Promise<Object>} 包含list、pagination、filters的对象
    * @throws {Error} 参数验证失败等
    */
-  static async listPresetsWithPagination (filters = {}) {
+  static async listPresetsWithPagination(filters = {}) {
     const {
       status = 'all',
       user_id,
@@ -409,7 +409,7 @@ class LotteryPresetService {
    *
    * @returns {Promise<Object>} 包含各种统计数据的对象
    */
-  static async getPresetStats () {
+  static async getPresetStats() {
     // 🎯 性能优化：并行执行所有统计查询
     const [totalPresets, pendingPresets, usedPresets, totalUsers] = await Promise.all([
       models.LotteryPreset.count(),

@@ -139,10 +139,18 @@ module.exports = {
 
     console.log('验证结果:')
     console.log(`  lottery_draws.asset_transaction_id: ${verifyLottery.length > 0 ? '✅' : '❌'}`)
-    console.log(`  consumption_records.reward_transaction_id: ${verifyConsumption.length > 0 ? '✅' : '❌'}`)
-    console.log(`  exchange_records.debit_transaction_id: ${verifyExchange.length > 0 ? '✅' : '❌'}`)
+    console.log(
+      `  consumption_records.reward_transaction_id: ${verifyConsumption.length > 0 ? '✅' : '❌'}`
+    )
+    console.log(
+      `  exchange_records.debit_transaction_id: ${verifyExchange.length > 0 ? '✅' : '❌'}`
+    )
 
-    if (verifyLottery.length === 0 || verifyConsumption.length === 0 || verifyExchange.length === 0) {
+    if (
+      verifyLottery.length === 0 ||
+      verifyConsumption.length === 0 ||
+      verifyExchange.length === 0
+    ) {
       throw new Error('迁移验证失败：部分字段未正确创建')
     }
 
@@ -182,7 +190,10 @@ module.exports = {
         AND INDEX_NAME = 'idx_consumption_records_reward_tx_id'
     `)
     if (consumptionIdxExists.length > 0) {
-      await queryInterface.removeIndex('consumption_records', 'idx_consumption_records_reward_tx_id')
+      await queryInterface.removeIndex(
+        'consumption_records',
+        'idx_consumption_records_reward_tx_id'
+      )
     }
 
     const [consumptionColExists] = await queryInterface.sequelize.query(`

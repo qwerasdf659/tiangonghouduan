@@ -559,21 +559,56 @@ class BusinessCacheHelper {
   // ==================== 交易市场缓存专用方法 ====================
 
   /**
-   * 构建交易市场列表缓存 key（决策5适配）
+   * 构建交易市场列表缓存 key（决策5适配 + 2026-01-14 分类系统升级）
+   *
+   * @description category 参数已废弃，使用 listing_kind / item_category_code / asset_group_code / rarity_code 替代
    *
    * @param {Object} params - 查询参数
+   * @param {string} [params.listing_kind='all'] - 挂牌类型（item_instance/fungible_asset/all）
+   * @param {string} [params.asset_code='all'] - 资产代码
+   * @param {string} [params.item_category_code='all'] - 物品类目代码
+   * @param {string} [params.asset_group_code='all'] - 资产分组代码
+   * @param {string} [params.rarity_code='all'] - 稀有度代码
+   * @param {number} [params.min_price=0] - 最低价格
+   * @param {number} [params.max_price=0] - 最高价格
+   * @param {string} [params.sort='newest'] - 排序方式
+   * @param {number} [params.page=1] - 页码
+   * @param {number} [params.page_size=20] - 每页数量
    * @returns {string} 缓存 key
-   * @example 返回: 'app:v4:dev:api:market:listings:active:all:created_desc:1:20'
+   * @example 返回: 'app:v4:dev:api:market:listings:item_instance:all:electronics:all:rare:0:0:newest:1:20'
    */
   static buildMarketListingsKey(params = {}) {
     const {
-      status = 'active',
-      category = 'all',
-      sort = 'created_desc',
+      listing_kind = 'all',
+      asset_code = 'all',
+      item_category_code = 'all',
+      asset_group_code = 'all',
+      rarity_code = 'all',
+      min_price = 0,
+      max_price = 0,
+      sort = 'newest',
       page = 1,
       page_size = 20
     } = params
-    return `${KEY_PREFIX}${CACHE_PREFIX.MARKET}:listings:${status}:${category}:${sort}:${page}:${page_size}`
+
+    // 缓存 key 格式：按筛选维度组合（移除废弃的 category 参数）
+    const keyParts = [
+      KEY_PREFIX,
+      CACHE_PREFIX.MARKET,
+      'listings',
+      listing_kind,
+      asset_code,
+      item_category_code,
+      asset_group_code,
+      rarity_code,
+      min_price,
+      max_price,
+      sort,
+      page,
+      page_size
+    ]
+
+    return keyParts.join(':')
   }
 
   /**

@@ -117,18 +117,23 @@ async function check_lottery_consistency() {
     console.log('✅ 数据库连接成功')
 
     // 1. 检查是否有 lottery_session_id 为 NULL 的记录（分界线后）
-    const [null_session_records] = await sequelize.query(`
+    const [null_session_records] = await sequelize.query(
+      `
       SELECT draw_id, user_id, cost_points, created_at
       FROM lottery_draws
       WHERE created_at >= ?
         AND (lottery_session_id IS NULL OR lottery_session_id = '')
       LIMIT 20
-    `, { replacements: [CUTOFF_DATE] })
+    `,
+      { replacements: [CUTOFF_DATE] }
+    )
 
     if (null_session_records.length > 0) {
       console.log(`\n⚠️ 发现 ${null_session_records.length} 条缺失 lottery_session_id 的记录:`)
       null_session_records.forEach(r => {
-        console.log(`   - draw_id: ${r.draw_id}, user_id: ${r.user_id}, cost_points: ${r.cost_points}`)
+        console.log(
+          `   - draw_id: ${r.draw_id}, user_id: ${r.user_id}, cost_points: ${r.cost_points}`
+        )
       })
 
       await send_alert('LOTTERY_MISSING_SESSION_ID', {
@@ -140,7 +145,8 @@ async function check_lottery_consistency() {
     }
 
     // 2. 按 lottery_session_id 聚合检查金额一致性
-    const [inconsistent] = await sequelize.query(`
+    const [inconsistent] = await sequelize.query(
+      `
       SELECT
         ld.lottery_session_id,
         COUNT(*) as draw_count,
@@ -158,11 +164,14 @@ async function check_lottery_consistency() {
         AND ld.lottery_session_id != ''
       GROUP BY ld.lottery_session_id, atx.transaction_id, atx.delta_amount
       HAVING diff != 0 OR atx.transaction_id IS NULL
-    `, { replacements: [CUTOFF_DATE] })
+    `,
+      { replacements: [CUTOFF_DATE] }
+    )
 
     // 3. 检查孤立的流水（有流水但无对应 lottery_draws）
     // 排除测试数据：lottery_session_id 包含 test_ 的流水是测试产生的，不参与对账
-    const [orphan_transactions] = await sequelize.query(`
+    const [orphan_transactions] = await sequelize.query(
+      `
       SELECT
         atx.transaction_id,
         atx.lottery_session_id,
@@ -176,10 +185,13 @@ async function check_lottery_consistency() {
         AND atx.lottery_session_id NOT LIKE '%test_%'
         AND atx.idempotency_key NOT LIKE '%test_%'
       LIMIT 20
-    `, { replacements: [CUTOFF_DATE] })
+    `,
+      { replacements: [CUTOFF_DATE] }
+    )
 
     // 4. 汇总统计
-    const [stats] = await sequelize.query(`
+    const [stats] = await sequelize.query(
+      `
       SELECT
         COUNT(DISTINCT ld.lottery_session_id) as session_count,
         COUNT(*) as draw_count,
@@ -187,7 +199,9 @@ async function check_lottery_consistency() {
       FROM lottery_draws ld
       WHERE ld.created_at >= ?
         AND ld.lottery_session_id IS NOT NULL
-    `, { replacements: [CUTOFF_DATE] })
+    `,
+      { replacements: [CUTOFF_DATE] }
+    )
 
     console.log('\n📊 对账统计:')
     console.log(`   - 分界线后抽奖会话数: ${stats[0].session_count}`)
@@ -204,14 +218,18 @@ async function check_lottery_consistency() {
         console.log(`\n   金额不一致的会话 (${inconsistent.length}条):`)
         inconsistent.forEach(r => {
           console.log(`   - session_id: ${r.lottery_session_id}`)
-          console.log(`     draws合计: ${r.total_cost_in_draws}, 流水金额: ${r.transaction_amount || 'NULL'}, 差异: ${r.diff || 'N/A'}`)
+          console.log(
+            `     draws合计: ${r.total_cost_in_draws}, 流水金额: ${r.transaction_amount || 'NULL'}, 差异: ${r.diff || 'N/A'}`
+          )
         })
       }
 
       if (orphan_transactions.length > 0) {
         console.log(`\n   孤立的流水 (${orphan_transactions.length}条):`)
         orphan_transactions.forEach(r => {
-          console.log(`   - transaction_id: ${r.transaction_id}, session_id: ${r.lottery_session_id}`)
+          console.log(
+            `   - transaction_id: ${r.transaction_id}, session_id: ${r.lottery_session_id}`
+          )
         })
       }
 

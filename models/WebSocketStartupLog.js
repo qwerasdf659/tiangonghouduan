@@ -50,7 +50,7 @@ module.exports = sequelize => {
          *
          * @returns {string|null} 格式化后的时间字符串；无值返回 null
          */
-        get () {
+        get() {
           const rawValue = this.getDataValue('start_time')
           return rawValue ? BeijingTimeHelper.formatChinese(rawValue) : null
         }
@@ -86,7 +86,7 @@ module.exports = sequelize => {
          *
          * @returns {string|null} 格式化后的时间字符串；无值返回 null
          */
-        get () {
+        get() {
           const rawValue = this.getDataValue('stop_time')
           return rawValue ? BeijingTimeHelper.formatChinese(rawValue) : null
         }
@@ -127,7 +127,7 @@ module.exports = sequelize => {
          *
          * @returns {string|null} 格式化后的时间字符串；无值返回 null
          */
-        get () {
+        get() {
           const rawValue = this.getDataValue('created_at')
           return rawValue ? BeijingTimeHelper.formatChinese(rawValue) : null
         }
@@ -141,7 +141,7 @@ module.exports = sequelize => {
          *
          * @returns {string|null} 格式化后的时间字符串；无值返回 null
          */
-        get () {
+        get() {
           const rawValue = this.getDataValue('updated_at')
           return rawValue ? BeijingTimeHelper.formatChinese(rawValue) : null
         }

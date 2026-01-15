@@ -167,15 +167,23 @@ async function viewOrderDetail(orderNo) {
 
       document.getElementById('detailOrderNo').textContent = order.order_no
       document.getElementById('detailStatus').innerHTML = getStatusBadge(order.status)
-      document.getElementById('detailExchangeTime').textContent = formatDate(order.exchange_time || order.created_at)
-      document.getElementById('detailShippedAt').textContent = order.shipped_at ? formatDate(order.shipped_at) : '-'
+      document.getElementById('detailExchangeTime').textContent = formatDate(
+        order.exchange_time || order.created_at
+      )
+      document.getElementById('detailShippedAt').textContent = order.shipped_at
+        ? formatDate(order.shipped_at)
+        : '-'
       document.getElementById('detailUserId').textContent = order.user_id
       document.getElementById('detailItemName').textContent = order.item_snapshot?.name || '-'
-      document.getElementById('detailItemDesc').textContent = order.item_snapshot?.description || '-'
+      document.getElementById('detailItemDesc').textContent =
+        order.item_snapshot?.description || '-'
       document.getElementById('detailQuantity').textContent = order.quantity
       // 直接使用后端字段
-      document.getElementById('detailPaymentType').textContent = getAssetTypeText(order.pay_asset_code)
-      document.getElementById('detailVirtualPaid').textContent = `${order.pay_amount || 0} ${getAssetUnit(order.pay_asset_code)}`
+      document.getElementById('detailPaymentType').textContent = getAssetTypeText(
+        order.pay_asset_code
+      )
+      document.getElementById('detailVirtualPaid').textContent =
+        `${order.pay_amount || 0} ${getAssetUnit(order.pay_asset_code)}`
       document.getElementById('detailCost').textContent = order.total_cost || '-'
       document.getElementById('detailRemark').textContent = order.admin_remark || '-'
 
@@ -299,21 +307,21 @@ function getStatusBadge(status) {
 function getAssetTypeText(assetCode) {
   const assetMap = {
     // 积分类型
-    'points_virtual_value': '虚拟价值',
-    'points_lottery': '抽奖积分',
-    'points_consumption': '消费积分',
-    'coins': '金币',
+    points_virtual_value: '虚拟价值',
+    points_lottery: '抽奖积分',
+    points_consumption: '消费积分',
+    coins: '金币',
     // 材料类型（碎片等）
-    'red_shard': '红色碎片',
-    'blue_shard': '蓝色碎片',
-    'green_shard': '绿色碎片',
-    'gold_shard': '金色碎片',
-    'purple_shard': '紫色碎片',
-    'shard': '碎片',
+    red_shard: '红色碎片',
+    blue_shard: '蓝色碎片',
+    green_shard: '绿色碎片',
+    gold_shard: '金色碎片',
+    purple_shard: '紫色碎片',
+    shard: '碎片',
     // 其他材料
-    'crystal': '水晶',
-    'gem': '宝石',
-    'ticket': '兑换券'
+    crystal: '水晶',
+    gem: '宝石',
+    ticket: '兑换券'
   }
   return assetMap[assetCode] || assetCode || '未知'
 }
@@ -325,20 +333,20 @@ function getAssetTypeText(assetCode) {
 function getAssetUnit(assetCode) {
   const unitMap = {
     // 积分类型
-    'points_virtual_value': '虚拟值',
-    'points_lottery': '积分',
-    'points_consumption': '积分',
-    'coins': '金币',
+    points_virtual_value: '虚拟值',
+    points_lottery: '积分',
+    points_consumption: '积分',
+    coins: '金币',
     // 材料类型
-    'red_shard': '个',
-    'blue_shard': '个',
-    'green_shard': '个',
-    'gold_shard': '个',
-    'purple_shard': '个',
-    'shard': '个',
-    'crystal': '个',
-    'gem': '个',
-    'ticket': '张'
+    red_shard: '个',
+    blue_shard: '个',
+    green_shard: '个',
+    gold_shard: '个',
+    purple_shard: '个',
+    shard: '个',
+    crystal: '个',
+    gem: '个',
+    ticket: '张'
   }
   return unitMap[assetCode] || '个'
 }

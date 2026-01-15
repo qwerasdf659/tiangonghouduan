@@ -36,7 +36,7 @@ class ConfigValidator {
    * const result = ConfigValidator.validate('development', false)
    * console.log(result.errors)
    */
-  static validate (targetEnv = process.env.NODE_ENV || 'development', failFast = true) {
+  static validate(targetEnv = process.env.NODE_ENV || 'development', failFast = true) {
     const errors = []
     const warnings = []
 
@@ -162,7 +162,7 @@ class ConfigValidator {
               key,
               type: 'FORBIDDEN_VALUE',
               message: `生产环境禁止使用占位符/弱密钥: ${key}`,
-              fix: '生成强随机密钥替换当前值: node -e "console.log(require(\'crypto\').randomBytes(32).toString(\'hex\'))"'
+              fix: "生成强随机密钥替换当前值: node -e \"console.log(require('crypto').randomBytes(32).toString('hex'))\""
             })
           }
         }
@@ -230,7 +230,7 @@ class ConfigValidator {
    * const template = ConfigValidator.generateTemplate()
    * require('fs').writeFileSync('config.example', template)
    */
-  static generateTemplate () {
+  static generateTemplate() {
     let template = '# 餐厅积分抽奖系统 V4.0 - 环境变量配置模板\n'
     template += '# 🔴 重要：生产环境部署前必须修改所有 CHANGE_ME_* 占位符\n'
     template += `# 生成时间：${new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })}\n\n`
@@ -262,7 +262,7 @@ class ConfigValidator {
    * @param {Object} schema - Schema 定义
    * @returns {string} 修复建议
    */
-  static _generateFix (key, schema) {
+  static _generateFix(key, schema) {
     if (key.includes('SECRET') || key.includes('KEY') || key.includes('PASSWORD')) {
       const length = schema.minLength || 32
       return `生成密钥: node -e "console.log(require('crypto').randomBytes(${Math.ceil(length / 2)}).toString('hex'))"`
@@ -287,7 +287,7 @@ class ConfigValidator {
    * @param {Object} schema - Schema 定义
    * @returns {string} 示例值
    */
-  static _getExampleValue (key, schema) {
+  static _getExampleValue(key, schema) {
     // 默认值优先
     if (schema.default !== undefined && schema.default !== null) {
       return String(schema.default)

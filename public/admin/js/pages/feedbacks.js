@@ -12,7 +12,7 @@ const pageSize = 20
 document.addEventListener('DOMContentLoaded', function () {
   checkAuth()
   loadFeedbacks()
-  loadStats()  // 加载统计数据
+  loadStats() // 加载统计数据
   bindEvents()
 })
 
@@ -31,15 +31,15 @@ function bindEvents() {
   document.getElementById('searchBtn').addEventListener('click', handleSearch)
   document.getElementById('submitReplyBtn').addEventListener('click', handleReply)
   document.getElementById('submitStatusBtn').addEventListener('click', handleUpdateStatus)
-  
+
   // 使用事件委托处理表格按钮点击（避免CSP内联脚本限制）
-  document.getElementById('feedbacksTableBody').addEventListener('click', function(e) {
+  document.getElementById('feedbacksTableBody').addEventListener('click', function (e) {
     const btn = e.target.closest('button')
     if (!btn) return
-    
+
     const feedbackId = btn.dataset.id
     if (!feedbackId) return
-    
+
     if (btn.classList.contains('btn-view')) {
       viewFeedback(feedbackId)
     } else if (btn.classList.contains('btn-reply')) {
@@ -48,9 +48,9 @@ function bindEvents() {
       openStatusModal(feedbackId)
     }
   })
-  
+
   // 使用事件委托处理分页点击
-  document.getElementById('pagination').addEventListener('click', function(e) {
+  document.getElementById('pagination').addEventListener('click', function (e) {
     const link = e.target.closest('a')
     if (!link) return
     e.preventDefault()
@@ -69,17 +69,17 @@ async function loadFeedbacks() {
     showLoading(true)
 
     const status = document.getElementById('statusFilter').value
-    const category = document.getElementById('typeFilter').value  // 后端使用category字段
+    const category = document.getElementById('typeFilter').value // 后端使用category字段
     const userId = document.getElementById('userIdSearch').value.trim()
 
     // 后端使用limit/offset分页，转换参数
-    const params = new URLSearchParams({ 
-      limit: pageSize, 
-      offset: (currentPage - 1) * pageSize 
+    const params = new URLSearchParams({
+      limit: pageSize,
+      offset: (currentPage - 1) * pageSize
     })
 
     if (status) params.append('status', status)
-    if (category) params.append('category', category)  // 后端使用category字段
+    if (category) params.append('category', category) // 后端使用category字段
     if (userId) params.append('user_id', userId)
 
     const response = await apiRequest(`/api/v4/console/system/feedbacks?${params}`)
@@ -95,7 +95,7 @@ async function loadFeedbacks() {
         current_page: currentPage
       }
       renderPagination(pagination)
-      updateStats(response.data)  // 传递整个data对象用于统计
+      updateStats(response.data) // 传递整个data对象用于统计
     } else {
       showError(response?.message || '加载失败')
     }
@@ -122,9 +122,9 @@ function renderFeedbacks(feedbacks) {
       const categoryBadge = getCategoryBadge(item.category)
       const id = item.feedback_id || item.id
       // 后端关联查询返回user对象
-      const userDisplay = item.user ? 
-        `${item.user.nickname || '用户'} (ID: ${item.user_id})` : 
-        `ID: ${item.user_id}`
+      const userDisplay = item.user
+        ? `${item.user.nickname || '用户'} (ID: ${item.user_id})`
+        : `ID: ${item.user_id}`
 
       return `
       <tr>
@@ -195,9 +195,9 @@ async function viewFeedback(id) {
 
       document.getElementById('detailId').textContent = item.feedback_id || item.id
       // 后端关联查询返回user对象
-      const userDisplay = item.user ? 
-        `${item.user.nickname || '用户'} (ID: ${item.user_id})` : 
-        item.user_id
+      const userDisplay = item.user
+        ? `${item.user.nickname || '用户'} (ID: ${item.user_id})`
+        : item.user_id
       document.getElementById('detailUserId').textContent = userDisplay
       // 后端使用category字段（技术修正）
       document.getElementById('detailType').innerHTML = getCategoryBadge(item.category)

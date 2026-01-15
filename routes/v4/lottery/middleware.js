@@ -30,7 +30,7 @@ const requestCache = new Map()
  * @param {Function} next - 下一个中间件
  * @returns {void}
  */
-function requestDeduplication (req, res, next) {
+function requestDeduplication(req, res, next) {
   const { campaign_code, draw_count = 1 } = req.body
   const user_id = req.user?.user_id
 

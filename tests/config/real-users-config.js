@@ -63,7 +63,7 @@ const REAL_USER_CONFIG = {
  * 验证配置的测试用户是否在数据库中存在且符合要求
  * @returns {Promise<Object>} 验证结果对象，包含用户信息和错误列表
  */
-async function validateRealUsers () {
+async function validateRealUsers() {
   const { User } = require('../../models')
 
   console.log('🔍 验证指定的真实用户是否存在...')
@@ -160,7 +160,7 @@ async function validateRealUsers () {
  * @returns {Promise<{regularUsers: Array, adminUser: Object, config: Object}>} 测试用户信息
  * @throws {Error} 当用户验证失败时抛出错误
  */
-async function getRealTestUsers () {
+async function getRealTestUsers() {
   const validationResults = await validateRealUsers()
 
   if (validationResults.errors.length > 0) {
@@ -194,7 +194,7 @@ async function getRealTestUsers () {
  * @param {number} _campaignId - 活动ID（暂未使用）
  * @returns {Promise<void>} 无返回值的Promise
  */
-async function cleanupTestData (_userId, _campaignId) {
+async function cleanupTestData(_userId, _campaignId) {
   if (!REAL_USER_CONFIG.behavior.cleanupAfterTest) {
     console.log('⚠️ 已禁用测试后清理，跳过临时数据清理')
     return

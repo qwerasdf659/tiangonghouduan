@@ -43,7 +43,7 @@ class ModelConverter {
    *   fields: ['prize_id', 'prize_name', 'win_probability']
    * })
    */
-  static toPlainObject (model, options = {}) {
+  static toPlainObject(model, options = {}) {
     // 处理null/undefined
     if (!model) return null
 
@@ -102,7 +102,7 @@ class ModelConverter {
    *   removeInternalFields: true
    * })
    */
-  static bulkConvert (models, options = {}) {
+  static bulkConvert(models, options = {}) {
     if (!Array.isArray(models)) {
       throw new Error('bulkConvert需要数组参数')
     }
@@ -121,7 +121,7 @@ class ModelConverter {
    *   const plain = ModelConverter.toPlainObject(prize)
    * }
    */
-  static isSequelizeModel (obj) {
+  static isSequelizeModel(obj) {
     return obj && (obj.dataValues !== undefined || (obj.toJSON && typeof obj.toJSON === 'function'))
   }
 }

@@ -111,7 +111,7 @@ async function loadActivities() {
 /**
  * 加载预算数据
  * 使用 /api/v4/console/campaign-budget/batch-status 端点
- * 
+ *
  * 后端返回格式：
  * {
  *   campaigns: [{
@@ -190,7 +190,7 @@ async function loadBudgetData() {
  * 直接使用后端返回的字段名：
  * - campaign_id, campaign_name, budget_mode, status
  * - pool_budget.total, pool_budget.used, pool_budget.remaining, pool_budget.usage_rate
- * 
+ *
  * @param {Array} campaigns - 后端返回的活动数组
  */
 function renderBudgetTable(campaigns) {
@@ -215,7 +215,7 @@ function renderBudgetTable(campaigns) {
       const total = poolBudget.total || 0
       const used = poolBudget.used || 0
       const remaining = poolBudget.remaining || 0
-      
+
       // 计算使用率
       const usageRate = total > 0 ? ((used / total) * 100).toFixed(1) : 0
       const usageClass =
@@ -231,12 +231,15 @@ function renderBudgetTable(campaigns) {
         }[campaign.status] || '<span class="badge bg-secondary">未知</span>'
 
       // 预算模式显示
-      const budgetModeText = {
-        pool: '总预算',
-        user: '用户预算',
-        daily: '每日预算',
-        none: '无预算'
-      }[campaign.budget_mode] || campaign.budget_mode || '未设置'
+      const budgetModeText =
+        {
+          pool: '总预算',
+          user: '用户预算',
+          daily: '每日预算',
+          none: '无预算'
+        }[campaign.budget_mode] ||
+        campaign.budget_mode ||
+        '未设置'
 
       return `
       <tr>
@@ -323,7 +326,7 @@ function goToPage(page) {
 /**
  * 提交预算设置
  * PUT /api/v4/console/campaign-budget/campaigns/:campaign_id
- * 
+ *
  * 请求体使用后端字段名：
  * - budget_mode: 预算模式
  * - pool_budget_total: 预算总额
@@ -383,7 +386,7 @@ async function submitBudget() {
 function editBudget(campaignId) {
   // 填充表单并打开模态框
   document.getElementById('modalActivitySelect').value = campaignId
-  
+
   const modal = new bootstrap.Modal(document.getElementById('setBudgetModal'))
   modal.show()
 }

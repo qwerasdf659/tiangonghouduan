@@ -176,7 +176,7 @@ async function apiRequest(url, options = {}) {
     // 对于4xx业务错误（如400验证错误），返回结果而不是抛出异常
     // 这样前端可以正确显示后端返回的友好错误消息
     if (response.status >= 400 && response.status < 500) {
-      return result  // 返回包含 success: false 的结果
+      return result // 返回包含 success: false 的结果
     }
 
     if (!response.ok) {
@@ -201,12 +201,12 @@ async function apiRequest(url, options = {}) {
  */
 function formatDate(dateString) {
   if (!dateString) return '-'
-  
+
   // 如果已经是中文格式（包含"年"），直接返回（去掉星期几使显示更简洁）
   if (typeof dateString === 'string' && dateString.includes('年')) {
     return dateString.replace(/星期[一二三四五六日]/, '').trim()
   }
-  
+
   try {
     const date = new Date(dateString)
     if (isNaN(date.getTime())) {
@@ -236,12 +236,14 @@ function formatDate(dateString) {
  */
 function formatRelativeTime(dateString) {
   if (!dateString) return '-'
-  
+
   let past
-  
+
   // 处理中文格式日期（如 "2026年1月9日星期五 08:25:48"）
   if (typeof dateString === 'string' && dateString.includes('年')) {
-    const match = dateString.match(/(\d{4})年(\d{1,2})月(\d{1,2})日.*?(\d{1,2}):(\d{1,2}):?(\d{0,2})/)
+    const match = dateString.match(
+      /(\d{4})年(\d{1,2})月(\d{1,2})日.*?(\d{1,2}):(\d{1,2}):?(\d{0,2})/
+    )
     if (match) {
       const [, year, month, day, hour, minute, second] = match
       past = new Date(year, month - 1, day, hour, minute, second || 0)
@@ -251,11 +253,11 @@ function formatRelativeTime(dateString) {
   } else {
     past = new Date(dateString)
   }
-  
+
   if (isNaN(past.getTime())) {
     return dateString // 解析失败，返回原始字符串
   }
-  
+
   const now = new Date()
   const diffMs = now - past
 

@@ -42,15 +42,41 @@ class OrphanFrozenCleanupService {
    *
    * 查找所有 frozen_amount > 实际活跃挂牌冻结总额 的记录
    *
+   * 🔴 P0 决策（2026-01-15）：返回稳定 DTO 对象而非数组
+   * - Service 为权威契约，Job 适配 Service
+   * - DTO 包含检测结果汇总和明细列表
+   *
    * @param {Object} options - 选项
    * @param {number} options.user_id - 指定用户ID（可选，不传则检测所有）
    * @param {string} options.asset_code - 指定资产代码（可选）
-   * @returns {Promise<Array>} 孤儿冻结记录列表
+   * @param {number} options.limit - 最大返回条数（默认 1000）
+   * @returns {Promise<OrphanFrozenDetectDTO>} 稳定 DTO 对象
+   *
+   * @typedef {Object} OrphanFrozenDetectDTO
+   * @property {number} orphan_count - 孤儿冻结明细条数
+   * @property {number} total_orphan_amount - 孤儿冻结总额
+   * @property {Array<OrphanItem>} orphan_items - 孤儿冻结明细列表
+   * @property {number} checked_count - 本次检测的账户数
+   * @property {string} generated_at - DTO 生成时间（ISO8601 北京时间）
+   * @property {number} affected_user_count - 受影响用户数
+   * @property {Array<string>} affected_asset_codes - 受影响资产代码列表
+   * @property {boolean} items_truncated - 明细是否被截断
+   *
+   * @typedef {Object} OrphanItem
+   * @property {number} user_id - 用户 ID
+   * @property {number} account_id - 账户 ID
+   * @property {string} asset_code - 资产代码
+   * @property {number} frozen_amount - 当前冻结金额
+   * @property {number} listed_amount - 活跃挂牌金额
+   * @property {number} orphan_amount - 孤儿金额（= frozen - listed）
+   * @property {number} available_amount - 可用余额
+   * @property {string} description - 描述信息
    */
   static async detectOrphanFrozen(options = {}) {
-    const { user_id, asset_code } = options
+    const { user_id, asset_code, limit = 1000 } = options
+    const startTime = Date.now()
 
-    logger.info('[孤儿冻结检测] 开始检测...', { user_id, asset_code })
+    logger.info('[孤儿冻结检测] 开始检测...', { user_id, asset_code, limit })
 
     // 1. 构建查询条件
     const balanceWhere = {
@@ -83,9 +109,23 @@ class OrphanFrozenCleanupService {
       ]
     })
 
+    // 空结果返回空 DTO
     if (frozenBalances.length === 0) {
       logger.info('[孤儿冻结检测] 未发现有冻结余额的账户')
-      return []
+      return {
+        orphan_count: 0,
+        total_orphan_amount: 0,
+        orphan_items: [],
+        checked_count: 0,
+        generated_at: new Date().toISOString(),
+        affected_user_count: 0,
+        affected_asset_codes: [],
+        items_truncated: false,
+        _meta: {
+          query_options: { user_id, asset_code, limit },
+          execution_time_ms: Date.now() - startTime
+        }
+      }
     }
 
     /*
@@ -125,6 +165,8 @@ class OrphanFrozenCleanupService {
 
     // 5. 检测孤儿冻结
     const orphanFrozenList = []
+    const affectedUserIds = new Set()
+    const affectedAssetCodes = new Set()
 
     for (const balance of frozenBalances) {
       const userId = balance.account?.user_id
@@ -148,15 +190,44 @@ class OrphanFrozenCleanupService {
           available_amount: parseInt(balance.available_amount, 10),
           description: `冻结 ${frozenAmount}，活跃挂牌 ${listedAmount}，孤儿额 ${orphanAmount}`
         })
+
+        // 记录受影响的用户和资产
+        affectedUserIds.add(userId)
+        affectedAssetCodes.add(balance.asset_code)
       }
     }
 
-    logger.info(`[孤儿冻结检测] 检测完成，发现 ${orphanFrozenList.length} 条孤儿冻结`, {
-      total_checked: frozenBalances.length,
-      orphan_count: orphanFrozenList.length
+    // 6. 构建稳定 DTO 对象（P0 决策）
+    const dto = {
+      // 必填字段
+      orphan_count: orphanFrozenList.length,
+      total_orphan_amount: orphanFrozenList.reduce((sum, item) => sum + item.orphan_amount, 0),
+      orphan_items: orphanFrozenList.slice(0, limit),
+      checked_count: frozenBalances.length,
+      generated_at: new Date().toISOString(),
+
+      // 新增字段（风控/告警重要）
+      affected_user_count: affectedUserIds.size,
+      affected_asset_codes: Array.from(affectedAssetCodes),
+      items_truncated: orphanFrozenList.length > limit,
+
+      // 元数据
+      _meta: {
+        query_options: { user_id, asset_code, limit },
+        execution_time_ms: Date.now() - startTime
+      }
+    }
+
+    logger.info(`[孤儿冻结检测] 检测完成，发现 ${dto.orphan_count} 条孤儿冻结`, {
+      orphan_count: dto.orphan_count,
+      total_orphan_amount: dto.total_orphan_amount,
+      affected_user_count: dto.affected_user_count,
+      affected_asset_codes: dto.affected_asset_codes,
+      items_truncated: dto.items_truncated,
+      checked_count: dto.checked_count
     })
 
-    return orphanFrozenList
+    return dto
   }
 
   /**
@@ -164,14 +235,24 @@ class OrphanFrozenCleanupService {
    *
    * 🔴 P0-2唯一入口：所有孤儿冻结清理必须通过此方法
    * 🔴 P0-2分布式锁：使用 Redis 分布式锁防止多实例并发执行
+   * 🔴 P0 决策（2026-01-15）：统一返回契约字段
    *
    * @param {Object} options - 选项
-   * @param {boolean} options.dry_run - 干跑模式（仅检测不清理）
+   * @param {boolean} options.dry_run - 干跑模式（仅检测不清理，默认 true）
    * @param {number} options.user_id - 指定用户ID（可选）
    * @param {string} options.asset_code - 指定资产代码（可选）
-   * @param {number} options.operator_id - 操作者用户ID（必填）
-   * @param {string} options.reason - 清理原因（可选，默认"孤儿冻结自动清理"）
-   * @returns {Promise<Object>} 清理结果 { detected, cleaned, failed, details }
+   * @param {number} options.operator_id - 操作者用户ID（非 dry_run 时必填）
+   * @param {string} options.reason - 清理原因（可选，默认"孤儿冻结清理"）
+   * @param {number} options.limit - 最大清理条数（默认 100）
+   * @returns {Promise<OrphanFrozenCleanupDTO>} 清理结果 DTO
+   *
+   * @typedef {Object} OrphanFrozenCleanupDTO
+   * @property {number} cleaned_count - 成功清理条数
+   * @property {number} failed_count - 清理失败条数
+   * @property {number} total_unfrozen_amount - 总解冻金额
+   * @property {number} detected_count - 检测到的孤儿冻结总数
+   * @property {Array} details - 清理明细
+   * @property {boolean} dry_run - 是否为演练模式
    */
   static async cleanupOrphanFrozen(options = {}) {
     const {
@@ -179,7 +260,8 @@ class OrphanFrozenCleanupService {
       user_id,
       asset_code,
       operator_id,
-      reason = '孤儿冻结自动清理（产品决策：用户体验优先）'
+      reason = '孤儿冻结清理',
+      limit = 100
     } = options
 
     // 参数验证
@@ -192,7 +274,8 @@ class OrphanFrozenCleanupService {
       user_id,
       asset_code,
       operator_id,
-      reason
+      reason,
+      limit
     })
 
     // 🔴 P0-2：使用分布式锁防止并发执行
@@ -205,36 +288,38 @@ class OrphanFrozenCleanupService {
         async () => {
           logger.info('[孤儿冻结清理] 成功获取分布式锁，开始执行清理')
 
-          // 1. 检测孤儿冻结
-          const orphanList = await this.detectOrphanFrozen({ user_id, asset_code })
+          // 1. 检测孤儿冻结（返回 DTO）
+          const detectDto = await this.detectOrphanFrozen({ user_id, asset_code, limit })
 
+          // 2. 构建统一返回契约（P0 决策）
           const result = {
-            detected: orphanList.length,
-            cleaned: 0,
-            failed: 0,
-            total_amount: orphanList.reduce((sum, item) => sum + item.orphan_amount, 0),
+            cleaned_count: 0,
+            failed_count: 0,
+            total_unfrozen_amount: 0,
+            detected_count: detectDto.orphan_count,
             details: [],
             dry_run
           }
 
-          if (orphanList.length === 0) {
+          if (detectDto.orphan_count === 0) {
             logger.info('[孤儿冻结清理] 未发现孤儿冻结，无需清理')
             return result
           }
 
           if (dry_run) {
             logger.info(
-              `[孤儿冻结清理] 干跑模式：发现 ${orphanList.length} 条孤儿冻结，总额 ${result.total_amount}`
+              `[孤儿冻结清理] 干跑模式：发现 ${detectDto.orphan_count} 条孤儿冻结，总额 ${detectDto.total_orphan_amount}`
             )
-            result.details = orphanList
+            result.details = detectDto.orphan_items
+            result.total_unfrozen_amount = detectDto.total_orphan_amount
             return result
           }
 
-          // 2. 实际清理（事务保护）
+          // 3. 实际清理（事务保护）
           const transaction = await sequelize.transaction()
 
           try {
-            for (const orphan of orphanList) {
+            for (const orphan of detectDto.orphan_items) {
               const detail = {
                 user_id: orphan.user_id,
                 account_id: orphan.account_id,
@@ -244,7 +329,7 @@ class OrphanFrozenCleanupService {
               }
 
               try {
-                // 2.1 执行解冻操作
+                // 3.1 执行解冻操作
                 const idempotencyKey = `orphan_cleanup_service_${orphan.account_id}_${orphan.asset_code}_${Date.now()}`
 
                 // eslint-disable-next-line no-await-in-loop, no-restricted-syntax -- 事务内串行执行，已传递 transaction
@@ -268,7 +353,7 @@ class OrphanFrozenCleanupService {
                   { transaction }
                 )
 
-                // 2.2 记录审计日志（使用 logOperation 方法）
+                // 3.2 记录审计日志（使用 logOperation 方法）
                 // eslint-disable-next-line no-await-in-loop -- 批量清理需要逐条审计
                 await AuditLogService.logOperation({
                   operator_id: operator_id || 0, // 系统自动操作时使用 0
@@ -292,14 +377,15 @@ class OrphanFrozenCleanupService {
                 })
 
                 detail.status = 'success'
-                result.cleaned++
+                result.cleaned_count++
+                result.total_unfrozen_amount += orphan.orphan_amount
                 logger.info(
                   `[孤儿冻结清理] 清理成功：用户 ${orphan.user_id}, ${orphan.asset_code} 解冻 ${orphan.orphan_amount}`
                 )
               } catch (error) {
                 detail.status = 'failed'
                 detail.error = error.message
-                result.failed++
+                result.failed_count++
                 logger.error(
                   `[孤儿冻结清理] 清理失败：用户 ${orphan.user_id}, ${orphan.asset_code}`,
                   {
@@ -313,7 +399,9 @@ class OrphanFrozenCleanupService {
 
             await transaction.commit()
 
-            logger.info(`[孤儿冻结清理] 清理完成：成功 ${result.cleaned}，失败 ${result.failed}`)
+            logger.info(
+              `[孤儿冻结清理] 清理完成：成功 ${result.cleaned_count}，失败 ${result.failed_count}`
+            )
             return result
           } catch (error) {
             await transaction.rollback()
@@ -343,20 +431,18 @@ class OrphanFrozenCleanupService {
   /**
    * 获取孤儿冻结统计
    *
+   * 🔴 P0 适配（2026-01-15）：使用 DTO 返回结构
+   *
    * @returns {Promise<Object>} 统计信息
    */
   static async getOrphanFrozenStats() {
-    const orphanList = await this.detectOrphanFrozen()
+    // 调用检测方法（返回 DTO）
+    const detectDto = await this.detectOrphanFrozen()
 
     // 按资产类型分组统计
     const statsByAsset = {}
-    const totalUsers = new Set()
-    let totalAmount = 0
 
-    for (const orphan of orphanList) {
-      totalUsers.add(orphan.user_id)
-      totalAmount += orphan.orphan_amount
-
+    for (const orphan of detectDto.orphan_items) {
       if (!statsByAsset[orphan.asset_code]) {
         statsByAsset[orphan.asset_code] = {
           asset_code: orphan.asset_code,
@@ -380,11 +466,12 @@ class OrphanFrozenCleanupService {
     }))
 
     return {
-      total_orphan_count: orphanList.length,
-      total_orphan_amount: totalAmount,
-      affected_user_count: totalUsers.size,
+      total_orphan_count: detectDto.orphan_count,
+      total_orphan_amount: detectDto.total_orphan_amount,
+      affected_user_count: detectDto.affected_user_count,
+      affected_asset_codes: detectDto.affected_asset_codes,
       by_asset: assetStats,
-      checked_at: new Date().toISOString()
+      checked_at: detectDto.generated_at
     }
   }
 }

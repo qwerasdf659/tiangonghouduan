@@ -25,12 +25,15 @@ module.exports = {
     console.log(`分界线时间：${CUTOFF_DATE}`)
 
     // 步骤1：统计需要回填的记录
-    const [needBackfill] = await queryInterface.sequelize.query(`
+    const [needBackfill] = await queryInterface.sequelize.query(
+      `
       SELECT COUNT(*) as count
       FROM lottery_draws
       WHERE created_at >= ?
         AND (lottery_session_id IS NULL OR asset_transaction_id IS NULL)
-    `, { replacements: [CUTOFF_DATE] })
+    `,
+      { replacements: [CUTOFF_DATE] }
+    )
 
     const count = needBackfill[0].count
     console.log(`需要回填的记录数：${count}`)
@@ -44,7 +47,8 @@ module.exports = {
     // 关联策略：通过 idempotency_key 的时间戳部分匹配
     // 抽奖记录格式：verify_ledger_<timestamp>:reward_<n>
     // 流水记录格式：verify_ledger_<timestamp>:consume
-    const [drawsToBackfill] = await queryInterface.sequelize.query(`
+    const [drawsToBackfill] = await queryInterface.sequelize.query(
+      `
       SELECT
         ld.draw_id,
         ld.user_id,
@@ -54,7 +58,9 @@ module.exports = {
       FROM lottery_draws ld
       WHERE ld.created_at >= ?
         AND (ld.lottery_session_id IS NULL OR ld.asset_transaction_id IS NULL)
-    `, { replacements: [CUTOFF_DATE] })
+    `,
+      { replacements: [CUTOFF_DATE] }
+    )
 
     console.log(`找到 ${drawsToBackfill.length} 条待回填记录`)
 
@@ -74,7 +80,8 @@ module.exports = {
       const consumeIdempotencyKey = `verify_ledger_${timestamp}:consume`
 
       // 查找对应的扣款流水
-      const [txRecords] = await queryInterface.sequelize.query(`
+      const [txRecords] = await queryInterface.sequelize.query(
+        `
         SELECT
           transaction_id,
           lottery_session_id,
@@ -83,7 +90,9 @@ module.exports = {
         WHERE idempotency_key = ?
           AND business_type = 'lottery_consume'
         LIMIT 1
-      `, { replacements: [consumeIdempotencyKey] })
+      `,
+        { replacements: [consumeIdempotencyKey] }
+      )
 
       if (txRecords.length === 0) {
         console.warn(`⚠️ 未找到对应流水: ${consumeIdempotencyKey}`)
@@ -94,17 +103,22 @@ module.exports = {
       const tx = txRecords[0]
 
       // 更新 lottery_draws 记录
-      await queryInterface.sequelize.query(`
+      await queryInterface.sequelize.query(
+        `
         UPDATE lottery_draws
         SET
           lottery_session_id = ?,
           asset_transaction_id = ?
         WHERE draw_id = ?
-      `, {
-        replacements: [tx.lottery_session_id, tx.transaction_id, draw.draw_id]
-      })
+      `,
+        {
+          replacements: [tx.lottery_session_id, tx.transaction_id, draw.draw_id]
+        }
+      )
 
-      console.log(`✅ 回填成功: draw_id=${draw.draw_id} -> session=${tx.lottery_session_id}, tx=${tx.transaction_id}`)
+      console.log(
+        `✅ 回填成功: draw_id=${draw.draw_id} -> session=${tx.lottery_session_id}, tx=${tx.transaction_id}`
+      )
       successCount++
     }
 
@@ -113,14 +127,17 @@ module.exports = {
     console.log(`   - 失败: ${failCount}`)
 
     // 步骤3：验证回填结果
-    const [verifyResult] = await queryInterface.sequelize.query(`
+    const [verifyResult] = await queryInterface.sequelize.query(
+      `
       SELECT
         COUNT(*) as total,
         SUM(CASE WHEN lottery_session_id IS NOT NULL THEN 1 ELSE 0 END) as has_session,
         SUM(CASE WHEN asset_transaction_id IS NOT NULL THEN 1 ELSE 0 END) as has_tx
       FROM lottery_draws
       WHERE created_at >= ?
-    `, { replacements: [CUTOFF_DATE] })
+    `,
+      { replacements: [CUTOFF_DATE] }
+    )
 
     const stats = verifyResult[0]
     console.log(`\n📊 分界线后记录状态：`)
@@ -143,13 +160,16 @@ module.exports = {
     console.log('🔄 开始回滚：清除lottery_draws表的关联键')
 
     // 清除回填的关联键
-    await queryInterface.sequelize.query(`
+    await queryInterface.sequelize.query(
+      `
       UPDATE lottery_draws
       SET
         lottery_session_id = NULL,
         asset_transaction_id = NULL
       WHERE created_at >= ?
-    `, { replacements: [CUTOFF_DATE] })
+    `,
+      { replacements: [CUTOFF_DATE] }
+    )
 
     console.log('✅ 回滚完成：关联键已清除')
   }

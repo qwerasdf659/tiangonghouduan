@@ -42,6 +42,9 @@ const logger = require('../../../utils/logger').logger
  * @query {number} limit - 每页数量（默认20）
  * @query {string} listing_kind - 挂牌类型筛选（item_instance / fungible_asset，可选）
  * @query {string} asset_code - 资产代码筛选（如 red_shard，仅对 fungible_asset 有效）
+ * @query {string} item_category_code - 物品类目代码筛选（仅对 item_instance 有效）
+ * @query {string} asset_group_code - 资产分组代码筛选（仅对 fungible_asset 有效）
+ * @query {string} rarity_code - 稀有度代码筛选（仅对 item_instance 有效）
  * @query {number} min_price - 最低价格筛选（可选）
  * @query {number} max_price - 最高价格筛选（可选）
  * @query {string} sort - 排序方式（newest/price_asc/price_desc，默认newest）
@@ -57,21 +60,24 @@ const logger = require('../../../utils/logger').logger
  * 业务场景：用户浏览交易市场中其他用户上架的商品（物品和材料）
  *
  * 迁移说明（2026-01-14 决策1）：
- * - category 参数已废弃，请使用 listing_kind / asset_code 替代
+ * - category 参数已废弃，请使用 listing_kind / item_category_code / asset_group_code / rarity_code 替代
  * - 传入 category 参数将返回 400 错误
  */
 router.get('/listings', authenticateToken, async (req, res) => {
   try {
     /*
-     * 决策1（2026-01-13 迁移双轨清理）：
+     * 决策1（2026-01-14 迁移双轨清理）：
      * category 参数已废弃，直接返回 400 Bad Request
-     * 请使用 listing_kind / asset_code 替代
+     * 请使用 listing_kind / item_category_code / asset_group_code / rarity_code 替代
      */
     if (req.query.category) {
       return res.apiError(
-        'category 参数已废弃，请改用 listing_kind/asset_code',
+        'category 参数已废弃，请改用 listing_kind/item_category_code/asset_group_code/rarity_code',
         'DEPRECATED_PARAMETER',
-        { deprecated: 'category', use_instead: ['listing_kind', 'asset_code'] },
+        {
+          deprecated: 'category',
+          use_instead: ['listing_kind', 'item_category_code', 'asset_group_code', 'rarity_code']
+        },
         400
       )
     }
@@ -84,6 +90,9 @@ router.get('/listings', authenticateToken, async (req, res) => {
       limit = 20,
       listing_kind,
       asset_code,
+      item_category_code,
+      asset_group_code,
+      rarity_code,
       min_price,
       max_price,
       sort = 'newest'
@@ -95,6 +104,9 @@ router.get('/listings', authenticateToken, async (req, res) => {
       page_size: parseInt(limit, 10),
       listing_kind,
       asset_code,
+      item_category_code,
+      asset_group_code,
+      rarity_code,
       min_price: min_price ? parseInt(min_price, 10) : undefined,
       max_price: max_price ? parseInt(max_price, 10) : undefined,
       sort
@@ -104,6 +116,9 @@ router.get('/listings', authenticateToken, async (req, res) => {
       user_id: req.user.user_id,
       listing_kind,
       asset_code,
+      item_category_code,
+      asset_group_code,
+      rarity_code,
       min_price,
       max_price,
       sort,
@@ -131,6 +146,51 @@ router.get('/listings', authenticateToken, async (req, res) => {
     })
 
     return handleServiceError(error, res, '获取市场挂牌列表失败')
+  }
+})
+
+/**
+ * @route GET /api/v4/market/listings/facets
+ * @desc 获取市场筛选维度配置（类目、稀有度、资产分组、挂牌类型）
+ * @access Private (需要登录)
+ *
+ * @returns {Object} 筛选维度配置
+ * @returns {Array} data.categories - 物品类目列表
+ * @returns {Array} data.rarities - 稀有度列表
+ * @returns {Array} data.asset_groups - 资产分组列表
+ * @returns {Array} data.listing_kinds - 挂牌类型列表
+ *
+ * 业务场景：前端市场页面根据返回数据动态渲染筛选器
+ *
+ * 接口设计说明（2026-01-15 新增）：
+ * - 此接口返回所有可用的筛选维度，用于前端筛选器 UI 渲染
+ * - 仅返回已启用（is_enabled=true）且可交易（is_tradable=true）的选项
+ */
+router.get('/listings/facets', authenticateToken, async (req, res) => {
+  try {
+    // P1-9：通过 ServiceManager 获取服务（snake_case key）
+    const MarketListingService = req.app.locals.services.getService('market_listing')
+
+    // 获取筛选维度配置（仅返回已启用的选项）
+    const facets = await MarketListingService.getFilterFacets({
+      include_disabled: false
+    })
+
+    logger.info('获取市场筛选维度配置成功', {
+      user_id: req.user.user_id,
+      categories_count: facets.categories.length,
+      rarities_count: facets.rarities.length,
+      asset_groups_count: facets.asset_groups.length
+    })
+
+    return res.apiSuccess(facets, '获取筛选维度配置成功')
+  } catch (error) {
+    logger.error('获取市场筛选维度配置失败', {
+      error: error.message,
+      user_id: req.user?.user_id
+    })
+
+    return handleServiceError(error, res, '获取筛选维度配置失败')
   }
 })
 
@@ -175,19 +235,37 @@ router.get(
         return res.apiError('挂牌不存在', 'NOT_FOUND', null, 404)
       }
 
-      // 格式化返回数据（商品名称从 meta.name 或 item_type 获取）
+      // 格式化返回数据（优先使用快照字段，fallback 到关联查询）
       const listingDetail = {
         listing_id: listing.listing_id,
+        listing_kind: listing.listing_kind,
+        // 物品实例挂牌字段
         item_instance_id: listing.offer_item_instance_id,
-        item_name: listing.offerItem?.meta?.name || listing.offerItem?.item_type || '未知商品',
+        item_template_id: listing.offer_item_template_id || null,
+        item_name:
+          listing.offer_item_display_name ||
+          listing.offerItem?.meta?.name ||
+          listing.offerItem?.item_type ||
+          '未知商品',
         item_type: listing.offerItem?.item_type || 'unknown',
+        // 分类信息（快照字段）
+        item_category_code: listing.offer_item_category_code || null,
+        rarity_code: listing.offer_item_rarity || null,
+        rarity: listing.offer_item_rarity || listing.offerItem?.meta?.rarity || 'common',
+        // 可叠加资产挂牌字段
+        offer_asset_code: listing.offer_asset_code,
+        offer_amount: listing.offer_amount ? Number(listing.offer_amount) : null,
+        asset_group_code: listing.offer_asset_group_code || null,
+        asset_display_name: listing.offer_asset_display_name || null,
+        // 价格信息
         price_amount: listing.price_amount,
         price_asset_code: listing.price_asset_code || 'DIAMOND',
+        // 卖家和状态信息
         seller_user_id: listing.seller_user_id,
         status: listing.status,
         listed_at: listing.created_at,
+        // 详情描述
         description: listing.offerItem?.meta?.description || '',
-        rarity: listing.offerItem?.meta?.rarity || 'common',
         is_own: listing.seller_user_id === req.user.user_id
       }
 

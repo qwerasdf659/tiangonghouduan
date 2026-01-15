@@ -49,7 +49,7 @@ function displayUserInfo() {
  *   customer_service: { today_sessions, today_messages },
  *   system: { uptime, memory_usage, cpu_usage, timestamp }
  * }
- * 
+ *
  * 注意：V4.0语义更新，使用 high_tier_wins/high_tier_rate 替代 wins/win_rate
  */
 async function loadDashboardData() {
@@ -69,7 +69,10 @@ async function loadDashboardData() {
         updateElementText('todayNewUsers', data.today.new_users || 0)
         updateElementText('todayDraws', formatNumber(data.today.lottery_draws || 0))
         // V4.0语义更新：使用 high_tier_wins 替代 wins
-        updateElementText('todayWins', formatNumber(data.today.high_tier_wins || data.today.wins || 0))
+        updateElementText(
+          'todayWins',
+          formatNumber(data.today.high_tier_wins || data.today.wins || 0)
+        )
         // V4.0语义更新：使用 high_tier_rate 替代 win_rate
         updateElementText('winRate', (data.today.high_tier_rate || data.today.win_rate || 0) + '%')
         updateElementText('points', formatNumber(data.today.points_consumed || 0))

@@ -29,6 +29,16 @@ const logger = require('../../../utils/logger').logger
 const TransactionManager = require('../../../utils/TransactionManager')
 // P1-9：服务通过 ServiceManager 获取（B1-Injected + E2-Strict snake_case）
 
+/*
+ * 风控中间件（2026-01-14 多币种扩展新增）
+ * - 购买操作执行 fail-closed 策略：Redis 不可用时拒绝购买
+ * - 提供风控预检和上下文注入
+ */
+const {
+  getMarketRiskControlMiddleware
+} = require('../../../middleware/MarketRiskControlMiddleware')
+const marketRiskMiddleware = getMarketRiskControlMiddleware()
+
 /**
  * @route POST /api/v4/market/listings/:listing_id/purchase
  * @desc 购买市场商品
@@ -59,6 +69,7 @@ const TransactionManager = require('../../../utils/TransactionManager')
 router.post(
   '/listings/:listing_id/purchase',
   authenticateToken,
+  marketRiskMiddleware.createBuyRiskMiddleware(),
   validatePositiveInteger('listing_id', 'params'),
   async (req, res) => {
     // P1-9：通过 ServiceManager 获取服务（B1-Injected + E2-Strict snake_case）

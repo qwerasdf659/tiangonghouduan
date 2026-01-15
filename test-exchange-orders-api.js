@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 /**
  * 兑换市场订单API测试脚本
- * 
+ *
  * 测试后端API是否正常工作，验证数据库连接和业务逻辑
- * 
+ *
  * 使用方法：
  *   node test-exchange-orders-api.js
  */
@@ -20,7 +20,7 @@ const ADMIN_TOKEN = process.env.ADMIN_TOKEN || '' // 需要设置管理员token
 function makeRequest(method, path, data = null, token = null) {
   return new Promise((resolve, reject) => {
     const url = new URL(path, BASE_URL)
-    
+
     const options = {
       hostname: url.hostname,
       port: url.port || 3000,
@@ -30,14 +30,14 @@ function makeRequest(method, path, data = null, token = null) {
         'Content-Type': 'application/json'
       }
     }
-    
+
     if (token) {
       options.headers['Authorization'] = `Bearer ${token}`
     }
-    
-    const req = http.request(options, (res) => {
+
+    const req = http.request(options, res => {
       let body = ''
-      res.on('data', chunk => body += chunk)
+      res.on('data', chunk => (body += chunk))
       res.on('end', () => {
         try {
           const json = JSON.parse(body)
@@ -47,13 +47,13 @@ function makeRequest(method, path, data = null, token = null) {
         }
       })
     })
-    
+
     req.on('error', reject)
-    
+
     if (data) {
       req.write(JSON.stringify(data))
     }
-    
+
     req.end()
   })
 }
@@ -63,16 +63,16 @@ function makeRequest(method, path, data = null, token = null) {
  */
 async function adminLogin() {
   console.log('\n📌 1. 尝试管理员登录获取Token...')
-  
+
   // 尝试使用测试账号登录
   const loginData = {
-    mobile: '13800138000',  // 测试管理员账号
+    mobile: '13800138000', // 测试管理员账号
     password: 'admin123'
   }
-  
+
   try {
     const result = await makeRequest('POST', '/api/v4/auth/login', loginData)
-    
+
     if (result.status === 200 && result.data.success) {
       console.log('✅ 管理员登录成功')
       console.log('   用户信息:', result.data.data.user?.nickname || result.data.data.user?.user_id)
@@ -95,19 +95,24 @@ async function adminLogin() {
 async function testGetOrders(token) {
   console.log('\n📌 2. 测试获取兑换订单列表 API...')
   console.log('   GET /api/v4/console/marketplace/exchange_market/orders')
-  
+
   try {
-    const result = await makeRequest('GET', '/api/v4/console/marketplace/exchange_market/orders?page=1&page_size=10', null, token)
-    
+    const result = await makeRequest(
+      'GET',
+      '/api/v4/console/marketplace/exchange_market/orders?page=1&page_size=10',
+      null,
+      token
+    )
+
     console.log('   HTTP状态码:', result.status)
     console.log('   API响应:', JSON.stringify(result.data, null, 2).substring(0, 500))
-    
+
     if (result.status === 200 && result.data.success) {
       console.log('✅ 获取订单列表成功')
-      
+
       const orders = result.data.data?.orders || []
       console.log(`   订单数量: ${orders.length}`)
-      
+
       if (orders.length > 0) {
         console.log('\n📋 订单列表示例（第一条）:')
         const firstOrder = orders[0]
@@ -121,7 +126,7 @@ async function testGetOrders(token) {
         console.log('   - exchange_time:', firstOrder.exchange_time)
         console.log('   - created_at:', firstOrder.created_at)
       }
-      
+
       const pagination = result.data.data?.pagination
       if (pagination) {
         console.log('\n📊 分页信息:')
@@ -130,7 +135,7 @@ async function testGetOrders(token) {
         console.log('   - page_size:', pagination.page_size)
         console.log('   - total_pages:', pagination.total_pages)
       }
-      
+
       return orders
     } else {
       console.log('❌ 获取订单列表失败')
@@ -149,15 +154,20 @@ async function testGetOrders(token) {
 async function testGetOrderDetail(token, orderNo) {
   console.log('\n📌 3. 测试获取订单详情 API...')
   console.log(`   GET /api/v4/console/marketplace/exchange_market/orders/${orderNo}`)
-  
+
   try {
-    const result = await makeRequest('GET', `/api/v4/console/marketplace/exchange_market/orders/${orderNo}`, null, token)
-    
+    const result = await makeRequest(
+      'GET',
+      `/api/v4/console/marketplace/exchange_market/orders/${orderNo}`,
+      null,
+      token
+    )
+
     console.log('   HTTP状态码:', result.status)
-    
+
     if (result.status === 200 && result.data.success) {
       console.log('✅ 获取订单详情成功')
-      
+
       const order = result.data.data?.order
       if (order) {
         console.log('\n📋 订单详情:')
@@ -176,7 +186,7 @@ async function testGetOrderDetail(token, orderNo) {
         console.log('   - shipped_at:', order.shipped_at)
         console.log('   - created_at:', order.created_at)
       }
-      
+
       return order
     } else {
       console.log('❌ 获取订单详情失败')
@@ -195,12 +205,12 @@ async function testGetOrderDetail(token, orderNo) {
 async function testHealthCheck() {
   console.log('\n📌 0. 测试服务健康检查...')
   console.log('   GET /health')
-  
+
   try {
     const result = await makeRequest('GET', '/health')
-    
+
     console.log('   HTTP状态码:', result.status)
-    
+
     if (result.status === 200) {
       console.log('✅ 服务健康检查通过')
       console.log('   响应:', JSON.stringify(result.data, null, 2).substring(0, 300))
@@ -222,7 +232,7 @@ async function main() {
   console.log('='.repeat(60))
   console.log('🧪 兑换市场订单API测试')
   console.log('='.repeat(60))
-  
+
   // 0. 健康检查
   const isHealthy = await testHealthCheck()
   if (!isHealthy) {
@@ -230,7 +240,7 @@ async function main() {
     console.log('   启动命令: npm start 或 pm2 start ecosystem.config.js')
     process.exit(1)
   }
-  
+
   // 1. 获取管理员token
   const token = await adminLogin()
   if (!token) {
@@ -238,17 +248,17 @@ async function main() {
     console.log('   请设置环境变量: export ADMIN_TOKEN=your_token')
     process.exit(1)
   }
-  
+
   // 2. 测试获取订单列表
   const orders = await testGetOrders(token)
-  
+
   // 3. 如果有订单，测试获取详情
   if (orders.length > 0) {
     await testGetOrderDetail(token, orders[0].order_no)
   } else {
     console.log('\n⚠️  没有订单数据，跳过详情测试')
   }
-  
+
   console.log('\n' + '='.repeat(60))
   console.log('✅ 测试完成')
   console.log('='.repeat(60))
@@ -256,4 +266,3 @@ async function main() {
 
 // 运行测试
 main().catch(console.error)
-

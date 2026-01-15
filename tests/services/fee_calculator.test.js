@@ -216,4 +216,187 @@ describe('FeeCalculator - 手续费计算器测试', () => {
       expect(desc3).toContain('统一费率档')
     })
   })
+
+  /*
+   * ========================================
+   * 测试组8：多币种手续费计算测试（2026-01-14 新增）
+   * ========================================
+   *
+   * 业务决策（交易市场多币种扩展）：
+   * - DIAMOND：保持分档逻辑（基于 itemValue 分档 + ceil + 最低费 1）
+   * - red_shard：单一费率 5%，最低手续费 1（从 system_settings 读取）
+   * - 其他币种：根据 system_settings 配置的费率和最低费计算
+   */
+  describe('多币种手续费计算（calculateFeeByAsset）', () => {
+    /**
+     * DIAMOND 分档模式测试
+     * - 使用 calculateItemFee 的分档逻辑
+     * - calculation_mode 应为 'tiered'
+     */
+    test('DIAMOND 分档模式 - 高价值商品（itemValue=800, sellingPrice=750）', async () => {
+      const result = await FeeCalculator.calculateFeeByAsset('DIAMOND', 800, 750)
+
+      expect(result.asset_code).toBe('DIAMOND')
+      expect(result.calculation_mode).toBe('tiered')
+      expect(result.fee).toBe(38) // 750 * 0.05 = 37.5 → 向上取整 = 38
+      expect(result.rate).toBe(0.05) // 统一费率档 5%
+      expect(result.net_amount).toBe(712) // 750 - 38 = 712
+      expect(result.tier).toBe('统一费率档')
+    })
+
+    test('DIAMOND 分档模式 - 低价值商品（itemValue=100, sellingPrice=90）', async () => {
+      const result = await FeeCalculator.calculateFeeByAsset('DIAMOND', 100, 90)
+
+      expect(result.asset_code).toBe('DIAMOND')
+      expect(result.calculation_mode).toBe('tiered')
+      expect(result.fee).toBe(5) // 90 * 0.05 = 4.5 → 向上取整 = 5
+      expect(result.rate).toBe(0.05)
+      expect(result.net_amount).toBe(85) // 90 - 5 = 85
+    })
+
+    test('DIAMOND 分档模式 - itemValue 为 null 时使用 sellingPrice 作为价值参考', async () => {
+      const result = await FeeCalculator.calculateFeeByAsset('DIAMOND', null, 600)
+
+      expect(result.asset_code).toBe('DIAMOND')
+      expect(result.calculation_mode).toBe('tiered')
+      expect(result.fee).toBe(30) // 600 * 0.05 = 30
+      expect(result.net_amount).toBe(570) // 600 - 30 = 570
+    })
+
+    /**
+     * red_shard 单一费率模式测试
+     * - 使用 floor 向下取整（对用户更友好）
+     * - calculation_mode 应为 'flat'
+     * - 最低手续费 1
+     */
+    test('red_shard 单一费率模式 - 基础计算（sellingPrice=1000）', async () => {
+      const result = await FeeCalculator.calculateFeeByAsset('red_shard', null, 1000)
+
+      expect(result.asset_code).toBe('red_shard')
+      expect(result.calculation_mode).toBe('flat')
+      expect(result.fee).toBe(50) // 1000 * 0.05 = 50（floor 向下取整）
+      expect(result.rate).toBe(0.05) // 默认 5% 或从 system_settings 读取
+      expect(result.net_amount).toBe(950) // 1000 - 50 = 950
+      expect(result.tier).toBeNull() // 非分档模式无档位
+      expect(result.tier_description).toContain('单一费率')
+    })
+
+    test('red_shard 单一费率模式 - 小额交易（sellingPrice=15）', async () => {
+      const result = await FeeCalculator.calculateFeeByAsset('red_shard', null, 15)
+
+      expect(result.asset_code).toBe('red_shard')
+      expect(result.calculation_mode).toBe('flat')
+      // 15 * 0.05 = 0.75 → floor = 0 → 最低手续费 1
+      expect(result.fee).toBe(1)
+      expect(result.net_amount).toBe(14) // 15 - 1 = 14
+    })
+
+    test('red_shard 单一费率模式 - floor 取整验证（sellingPrice=199）', async () => {
+      const result = await FeeCalculator.calculateFeeByAsset('red_shard', null, 199)
+
+      expect(result.calculation_mode).toBe('flat')
+      // 199 * 0.05 = 9.95 → floor = 9
+      expect(result.fee).toBe(9)
+      expect(result.net_amount).toBe(190) // 199 - 9 = 190
+    })
+
+    /**
+     * DIAMOND vs red_shard 取整方式差异验证
+     *
+     * 业务决策（2026-01-14）：
+     * - DIAMOND：ceil 向上取整
+     * - red_shard：floor 向下取整（对用户更友好）
+     */
+    test('DIAMOND vs red_shard 取整方式差异验证', async () => {
+      // 相同售价 199
+      const diamondResult = await FeeCalculator.calculateFeeByAsset('DIAMOND', 199, 199)
+      const redShardResult = await FeeCalculator.calculateFeeByAsset('red_shard', null, 199)
+
+      // DIAMOND: 199 * 0.05 = 9.95 → ceil = 10
+      expect(diamondResult.fee).toBe(10)
+      expect(diamondResult.calculation_mode).toBe('tiered')
+
+      // red_shard: 199 * 0.05 = 9.95 → floor = 9
+      expect(redShardResult.fee).toBe(9)
+      expect(redShardResult.calculation_mode).toBe('flat')
+
+      // red_shard 对用户更友好（手续费少 1）
+      expect(redShardResult.fee).toBeLessThan(diamondResult.fee)
+    })
+
+    /**
+     * 最低手续费保底测试
+     *
+     * 业务决策：所有币种最低手续费为 1
+     */
+    test('最低手续费保底 - DIAMOND 极小额', async () => {
+      const result = await FeeCalculator.calculateFeeByAsset('DIAMOND', 5, 5)
+      expect(result.fee).toBeGreaterThanOrEqual(1) // 最低 1
+    })
+
+    test('最低手续费保底 - red_shard 极小额', async () => {
+      const result = await FeeCalculator.calculateFeeByAsset('red_shard', null, 5)
+      expect(result.fee).toBeGreaterThanOrEqual(1) // 最低 1
+    })
+
+    /**
+     * 返回结构完整性验证
+     */
+    test('返回结构完整性验证 - DIAMOND', async () => {
+      const result = await FeeCalculator.calculateFeeByAsset('DIAMOND', 500, 450)
+
+      expect(result).toHaveProperty('fee')
+      expect(result).toHaveProperty('rate')
+      expect(result).toHaveProperty('net_amount')
+      expect(result).toHaveProperty('calculation_mode')
+      expect(result).toHaveProperty('tier')
+      expect(result).toHaveProperty('tier_description')
+      expect(result).toHaveProperty('asset_code')
+
+      expect(typeof result.fee).toBe('number')
+      expect(typeof result.rate).toBe('number')
+      expect(typeof result.net_amount).toBe('number')
+    })
+
+    test('返回结构完整性验证 - red_shard', async () => {
+      const result = await FeeCalculator.calculateFeeByAsset('red_shard', null, 500)
+
+      expect(result).toHaveProperty('fee')
+      expect(result).toHaveProperty('rate')
+      expect(result).toHaveProperty('net_amount')
+      expect(result).toHaveProperty('calculation_mode')
+      expect(result).toHaveProperty('tier')
+      expect(result).toHaveProperty('tier_description')
+      expect(result).toHaveProperty('asset_code')
+
+      // red_shard 单一费率模式，tier 应为 null
+      expect(result.tier).toBeNull()
+    })
+  })
+
+  /*
+   * ========================================
+   * 测试组9：getFeeRateByAsset 辅助方法测试
+   * ========================================
+   */
+  describe('getFeeRateByAsset 辅助方法测试', () => {
+    test('DIAMOND 返回分档费率信息', async () => {
+      const rateInfo = await FeeCalculator.getFeeRateByAsset('DIAMOND')
+
+      expect(rateInfo.calculation_mode).toBe('tiered')
+      expect(rateInfo.rate).toBeNull() // 分档模式无单一费率
+      expect(rateInfo.rate_range).toBeDefined()
+      expect(Array.isArray(rateInfo.rate_range)).toBe(true)
+      expect(rateInfo.min_fee).toBe(1)
+    })
+
+    test('red_shard 返回单一费率信息', async () => {
+      const rateInfo = await FeeCalculator.getFeeRateByAsset('red_shard')
+
+      expect(rateInfo.calculation_mode).toBe('flat')
+      expect(rateInfo.rate).toBe(0.05) // 默认 5% 或从 DB 读取
+      expect(rateInfo.rate_range).toBeNull() // 单一费率无分档
+      expect(rateInfo.min_fee).toBe(1)
+    })
+  })
 })

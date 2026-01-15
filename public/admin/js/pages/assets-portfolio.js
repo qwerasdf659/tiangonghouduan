@@ -65,7 +65,7 @@ async function loadAssetOverview() {
     if (response && response.success) {
       const stats = response.data.asset_stats || []
       const summary = response.data.summary || {}
-      
+
       // 从后端统计数据构建概览
       const overview = stats.map(s => ({
         asset_code: s.asset_code,
@@ -100,11 +100,11 @@ async function loadAssetTypes() {
     if (typesResponse && typesResponse.success) {
       const types = typesResponse.data.asset_types || typesResponse.data || []
       const stats = statsResponse?.data?.asset_stats || []
-      
+
       // 创建统计数据映射
       const statsMap = new Map()
       stats.forEach(s => statsMap.set(s.asset_code, s))
-      
+
       // 合并类型和统计数据
       const mergedTypes = types.map(t => ({
         ...t,
@@ -115,7 +115,7 @@ async function loadAssetTypes() {
         holder_count: statsMap.get(t.asset_code)?.holder_count || 0,
         is_active: t.is_enabled !== false
       }))
-      
+
       renderAssetTypeTable(mergedTypes)
     } else {
       tbody.innerHTML = `
@@ -187,17 +187,17 @@ function renderAssetOverview(overview, summary = {}) {
 
   // 取前4个最常用的资产展示在概览卡片
   const topAssets = overview.slice(0, 4)
-  
+
   // 如果实际数据不足4个，补充默认显示
-  const displayAssets = ['POINTS', 'DIAMOND', 'BUDGET_POINTS', 'GOLD']
-    .map(code => {
-      const data = overview.find(o => o.asset_code === code) || { asset_code: code }
-      const config = assetConfig[code] || { name: code, icon: 'bi-box-seam', color: 'secondary' }
-      return { ...data, ...config }
-    })
+  const displayAssets = ['POINTS', 'DIAMOND', 'BUDGET_POINTS', 'GOLD'].map(code => {
+    const data = overview.find(o => o.asset_code === code) || { asset_code: code }
+    const config = assetConfig[code] || { name: code, icon: 'bi-box-seam', color: 'secondary' }
+    return { ...data, ...config }
+  })
 
   container.innerHTML = displayAssets
-    .map(asset => `
+    .map(
+      asset => `
       <div class="col-md-3">
         <div class="card asset-overview-card">
           <div class="card-body">
@@ -216,7 +216,8 @@ function renderAssetOverview(overview, summary = {}) {
           </div>
         </div>
       </div>
-    `)
+    `
+    )
     .join('')
 }
 

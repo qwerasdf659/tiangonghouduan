@@ -532,4 +532,278 @@ describe('C2C 材料交易功能集成测试', () => {
       console.log('✅ 挂牌数量查询测试通过:', listingCount)
     })
   })
+
+  // ==================== 多币种扩展测试（2026-01-14 新增） ====================
+
+  describe('多币种扩展功能测试', () => {
+    /**
+     * 测试场景：使用 red_shard 定价创建挂牌
+     *
+     * 业务决策（2026-01-14）：
+     * - 支持 red_shard 作为定价结算币种
+     * - 白名单校验：price_asset_code 必须在 allowed_listing_assets 中
+     */
+    test('支持 red_shard 定价创建挂牌', async () => {
+      if (skipTests) {
+        console.log('⏭️ 跳过测试')
+        return
+      }
+
+      // 1. 确保用户有足够的 red_shard 余额
+      const initialBalance = await AssetService.getBalance({
+        user_id: testUser.user_id,
+        asset_code: testAssetCode
+      })
+
+      if (initialBalance.available_amount < 5) {
+        console.warn(`⚠️ 用户 ${testAssetCode} 余额不足，跳过测试`)
+        return
+      }
+
+      // 2. 创建使用 red_shard 定价的挂牌
+      const idempotencyKey = `test_multi_currency_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+      const offerAmount = 3
+      const priceAmount = 50
+      const priceAssetCode = 'red_shard' // 使用 red_shard 定价
+
+      const result = await TransactionManager.execute(
+        async transaction => {
+          return await MarketListingService.createFungibleAssetListing(
+            {
+              idempotency_key: idempotencyKey,
+              seller_user_id: testUser.user_id,
+              offer_asset_code: testAssetCode,
+              offer_amount: offerAmount,
+              price_amount: priceAmount,
+              price_asset_code: priceAssetCode
+            },
+            { transaction }
+          )
+        },
+        { description: 'test_multi_currency_listing' }
+      )
+
+      createdListingIds.push(result.listing.listing_id)
+
+      // 3. 验证结果
+      expect(result.is_duplicate).toBe(false)
+      expect(result.listing).toBeDefined()
+      expect(result.listing.price_asset_code).toBe(priceAssetCode)
+      expect(Number(result.listing.price_amount)).toBe(priceAmount)
+      expect(result.listing.status).toBe('on_sale')
+
+      console.log('✅ red_shard 定价挂牌创建成功:', {
+        listing_id: result.listing.listing_id,
+        price_asset_code: result.listing.price_asset_code,
+        price_amount: result.listing.price_amount
+      })
+    })
+
+    /**
+     * 测试场景：定价币种白名单校验
+     *
+     * 业务决策（2026-01-14）：
+     * - 不在白名单中的币种应该被拒绝
+     */
+    test('拒绝非白名单定价币种', async () => {
+      if (skipTests) {
+        console.log('⏭️ 跳过测试')
+        return
+      }
+
+      // 1. 确保用户有足够的余额
+      const initialBalance = await AssetService.getBalance({
+        user_id: testUser.user_id,
+        asset_code: testAssetCode
+      })
+
+      if (initialBalance.available_amount < 5) {
+        console.warn(`⚠️ 用户 ${testAssetCode} 余额不足，跳过测试`)
+        return
+      }
+
+      // 2. 尝试使用非白名单币种创建挂牌
+      const idempotencyKey = `test_invalid_currency_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+
+      await expect(
+        TransactionManager.execute(
+          async transaction => {
+            return await MarketListingService.createFungibleAssetListing(
+              {
+                idempotency_key: idempotencyKey,
+                seller_user_id: testUser.user_id,
+                offer_asset_code: testAssetCode,
+                offer_amount: 3,
+                price_amount: 50,
+                price_asset_code: 'INVALID_CURRENCY' // 非白名单币种
+              },
+              { transaction }
+            )
+          },
+          { description: 'test_invalid_currency_listing' }
+        )
+      ).rejects.toThrow('不在允许的挂牌币种白名单中')
+
+      console.log('✅ 非白名单定价币种拒绝测试通过')
+    })
+
+    /**
+     * 测试场景：价格区间校验
+     *
+     * 业务决策（2026-01-14）：
+     * - red_shard 价格区间 [1, 1000000]
+     * - 超出范围应该被拒绝
+     */
+    test('价格区间校验 - 超出最大值被拒绝', async () => {
+      if (skipTests) {
+        console.log('⏭️ 跳过测试')
+        return
+      }
+
+      // 1. 确保用户有足够的余额
+      const initialBalance = await AssetService.getBalance({
+        user_id: testUser.user_id,
+        asset_code: testAssetCode
+      })
+
+      if (initialBalance.available_amount < 5) {
+        console.warn(`⚠️ 用户 ${testAssetCode} 余额不足，跳过测试`)
+        return
+      }
+
+      // 2. 尝试使用超过最大价格的金额
+      const idempotencyKey = `test_price_range_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+
+      await expect(
+        TransactionManager.execute(
+          async transaction => {
+            return await MarketListingService.createFungibleAssetListing(
+              {
+                idempotency_key: idempotencyKey,
+                seller_user_id: testUser.user_id,
+                offer_asset_code: testAssetCode,
+                offer_amount: 3,
+                price_amount: 2000000, // 超过 red_shard 最大价格 1000000
+                price_asset_code: 'red_shard'
+              },
+              { transaction }
+            )
+          },
+          { description: 'test_price_out_of_range' }
+        )
+      ).rejects.toThrow('超过最大价格')
+
+      console.log('✅ 价格区间校验（超出最大值）测试通过')
+    })
+
+    /**
+     * 测试场景：价格区间校验
+     *
+     * 业务决策（2026-01-14）：
+     * - 最小价格为 1
+     * - 低于最小价格应该被拒绝
+     */
+    test('价格区间校验 - 低于最小值被拒绝', async () => {
+      if (skipTests) {
+        console.log('⏭️ 跳过测试')
+        return
+      }
+
+      // 1. 确保用户有足够的余额
+      const initialBalance = await AssetService.getBalance({
+        user_id: testUser.user_id,
+        asset_code: testAssetCode
+      })
+
+      if (initialBalance.available_amount < 5) {
+        console.warn(`⚠️ 用户 ${testAssetCode} 余额不足，跳过测试`)
+        return
+      }
+
+      /*
+       * 2. 尝试使用低于最小价格的金额
+       * 🔴 注意：price_amount: 0 会被参数校验（>0）拦截，使用 0.5 测试价格区间校验
+       */
+      const idempotencyKey = `test_price_min_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+
+      await expect(
+        TransactionManager.execute(
+          async transaction => {
+            return await MarketListingService.createFungibleAssetListing(
+              {
+                idempotency_key: idempotencyKey,
+                seller_user_id: testUser.user_id,
+                offer_asset_code: testAssetCode,
+                offer_amount: 3,
+                price_amount: 0.5, // 低于最小价格 1（但大于 0 以通过参数校验）
+                price_asset_code: 'red_shard'
+              },
+              { transaction }
+            )
+          },
+          { description: 'test_price_below_min' }
+        )
+      ).rejects.toThrow('低于最小价格')
+
+      console.log('✅ 价格区间校验（低于最小值）测试通过')
+    })
+
+    /**
+     * 测试场景：多币种校验方法独立验证
+     *
+     * 业务决策（2026-01-14）：
+     * - validateListingAssetWhitelist：白名单校验
+     * - validatePriceRange：价格区间校验
+     */
+    test('多币种校验方法 - validateListingAssetWhitelist', async () => {
+      if (skipTests) {
+        console.log('⏭️ 跳过测试')
+        return
+      }
+
+      // 测试有效币种
+      const validResult = await MarketListingService.validateListingAssetWhitelist('DIAMOND')
+      expect(validResult.valid).toBe(true)
+      expect(validResult.whitelist).toContain('DIAMOND')
+
+      // 测试有效币种（red_shard）
+      const redShardResult = await MarketListingService.validateListingAssetWhitelist('red_shard')
+      expect(redShardResult.valid).toBe(true)
+      expect(redShardResult.whitelist).toContain('red_shard')
+
+      // 测试无效币种
+      const invalidResult = await MarketListingService.validateListingAssetWhitelist('INVALID')
+      expect(invalidResult.valid).toBe(false)
+      expect(invalidResult.message).toContain('不在允许的挂牌币种白名单中')
+
+      console.log('✅ validateListingAssetWhitelist 方法测试通过')
+    })
+
+    test('多币种校验方法 - validatePriceRange', async () => {
+      if (skipTests) {
+        console.log('⏭️ 跳过测试')
+        return
+      }
+
+      // 测试 DIAMOND 有效价格（无上限）
+      const diamondValidResult = await MarketListingService.validatePriceRange('DIAMOND', 1000000)
+      expect(diamondValidResult.valid).toBe(true)
+
+      // 测试 red_shard 有效价格
+      const redShardValidResult = await MarketListingService.validatePriceRange('red_shard', 500)
+      expect(redShardValidResult.valid).toBe(true)
+
+      // 测试 red_shard 超出最大价格
+      const redShardOverResult = await MarketListingService.validatePriceRange('red_shard', 2000000)
+      expect(redShardOverResult.valid).toBe(false)
+      expect(redShardOverResult.message).toContain('超过最大价格')
+
+      // 测试低于最小价格
+      const underMinResult = await MarketListingService.validatePriceRange('red_shard', 0)
+      expect(underMinResult.valid).toBe(false)
+      expect(underMinResult.message).toContain('低于最小价格')
+
+      console.log('✅ validatePriceRange 方法测试通过')
+    })
+  })
 })

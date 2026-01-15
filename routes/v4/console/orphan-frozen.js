@@ -51,15 +51,28 @@ function asyncHandler(fn) {
  * @description 检测孤儿冻结（仅检测，不清理）
  * @query {number} [user_id] - 指定用户ID（可选，不传则检测所有）
  * @query {string} [asset_code] - 指定资产代码（可选）
+ * @query {number} [limit=1000] - 最大返回条数（默认 1000）
  * @access Admin
- * @returns {Object} 孤儿冻结列表和统计
+ * @returns {Object} 孤儿冻结 DTO（包含统计汇总和明细列表）
+ *
+ * @example 返回结构
+ * {
+ *   orphan_count: 5,                    // 孤儿冻结明细条数
+ *   total_orphan_amount: 1000,          // 孤儿冻结总额
+ *   affected_user_count: 3,             // 受影响用户数
+ *   affected_asset_codes: ['POINTS'],   // 受影响资产代码列表
+ *   checked_count: 100,                 // 本次检测的账户数
+ *   items_truncated: false,             // 明细是否被截断
+ *   generated_at: '2026-01-15T...',     // DTO 生成时间
+ *   orphan_items: [...]                 // 孤儿冻结明细列表
+ * }
  */
 router.get(
   '/detect',
   authenticateToken,
   requireAdmin,
   asyncHandler(async (req, res) => {
-    const { user_id, asset_code } = req.query
+    const { user_id, asset_code, limit } = req.query
 
     // 通过 ServiceManager 获取服务
     const OrphanFrozenCleanupService = req.app.locals.services.getService('orphan_frozen_cleanup')
@@ -67,14 +80,23 @@ router.get(
     const options = {}
     if (user_id) options.user_id = Number(user_id)
     if (asset_code) options.asset_code = asset_code
+    if (limit) options.limit = Number(limit)
 
-    const orphanList = await OrphanFrozenCleanupService.detectOrphanFrozen(options)
+    // 🔴 P0 决策（2026-01-15）：detectOrphanFrozen 返回稳定 DTO 对象
+    const dto = await OrphanFrozenCleanupService.detectOrphanFrozen(options)
 
     return res.apiSuccess({
-      message: `检测完成，发现 ${orphanList.length} 条孤儿冻结`,
-      total: orphanList.length,
-      total_amount: orphanList.reduce((sum, item) => sum + item.orphan_amount, 0),
-      orphan_list: orphanList
+      message: `检测完成，发现 ${dto.orphan_count} 条孤儿冻结`,
+      // DTO 核心字段
+      orphan_count: dto.orphan_count,
+      total_orphan_amount: dto.total_orphan_amount,
+      affected_user_count: dto.affected_user_count,
+      affected_asset_codes: dto.affected_asset_codes,
+      checked_count: dto.checked_count,
+      items_truncated: dto.items_truncated,
+      generated_at: dto.generated_at,
+      // 明细列表
+      orphan_items: dto.orphan_items
     })
   })
 )
@@ -109,10 +131,21 @@ router.get(
  * @body {boolean} [dry_run=true] - 干跑模式（默认true，仅检测不清理）
  * @body {number} [user_id] - 指定用户ID（可选，不传则清理所有）
  * @body {string} [asset_code] - 指定资产代码（可选）
+ * @body {number} [limit=100] - 最大清理条数（默认 100）
  * @body {string} reason - 清理原因（🔴 P0-2 必填：实际清理时必须提供）
  * @body {string} operator_name - 操作人姓名（🔴 P0-2 必填：实际清理时必须提供）
  * @access SuperAdmin（role_level >= 100 且 is_super_admin = true）
- * @returns {Object} 清理结果报告
+ * @returns {Object} 清理结果 DTO
+ *
+ * @example 返回结构
+ * {
+ *   dry_run: true,                     // 是否为演练模式
+ *   detected_count: 5,                 // 检测到的孤儿冻结总数
+ *   cleaned_count: 5,                  // 成功清理条数
+ *   failed_count: 0,                   // 清理失败条数
+ *   total_unfrozen_amount: 1000,       // 总解冻金额
+ *   details: [...]                     // 清理明细
+ * }
  */
 router.post(
   '/cleanup',
@@ -121,7 +154,7 @@ router.post(
   asyncHandler(async (req, res) => {
     const admin_id = req.user.user_id
     const admin_role_level = req.user.role_level || 0
-    const { dry_run = true, user_id, asset_code, reason, operator_name } = req.body
+    const { dry_run = true, user_id, asset_code, limit, reason, operator_name } = req.body
 
     // 🔴 P0-2 决策：实际清理操作（dry_run=false）仅限超级管理员
     if (!dry_run) {
@@ -158,28 +191,33 @@ router.post(
     // 通过 ServiceManager 获取服务
     const OrphanFrozenCleanupService = req.app.locals.services.getService('orphan_frozen_cleanup')
 
+    // 🔴 P0 决策（2026-01-15）：cleanupOrphanFrozen 返回统一契约字段
     const result = await OrphanFrozenCleanupService.cleanupOrphanFrozen({
       dry_run,
       user_id: user_id ? Number(user_id) : undefined,
       asset_code,
+      limit: limit ? Number(limit) : 100,
       operator_id: admin_id,
       reason: reason
         ? `${reason.trim()}（操作人: ${operator_name || '未提供'}）`
         : `管理员手动清理孤儿冻结（admin_id=${admin_id}）`
     })
 
-    // 根据 dry_run 状态返回不同消息
+    /*
+     * 根据 dry_run 状态返回不同消息
+     * 🔴 适配新契约字段名：detected_count, cleaned_count, failed_count, total_unfrozen_amount
+     */
     const message = dry_run
-      ? `干跑模式：发现 ${result.detected} 条孤儿冻结，总额 ${result.total_amount}（未实际清理）`
-      : `清理完成：成功 ${result.cleaned} 条，失败 ${result.failed} 条`
+      ? `干跑模式：发现 ${result.detected_count} 条孤儿冻结，总额 ${result.total_unfrozen_amount}（未实际清理）`
+      : `清理完成：成功 ${result.cleaned_count} 条，失败 ${result.failed_count} 条`
 
     return res.apiSuccess({
       message,
       dry_run: result.dry_run,
-      detected: result.detected,
-      cleaned: result.cleaned,
-      failed: result.failed,
-      total_amount: result.total_amount,
+      detected_count: result.detected_count,
+      cleaned_count: result.cleaned_count,
+      failed_count: result.failed_count,
+      total_unfrozen_amount: result.total_unfrozen_amount,
       details: result.details
     })
   })

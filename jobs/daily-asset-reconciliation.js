@@ -52,7 +52,7 @@ class DailyAssetReconciliation {
    * @returns {Array<Object>} report.discrepancies - 差异详情
    * @returns {string} report.status - 状态: OK/WARNING/ERROR
    */
-  static async execute () {
+  static async execute() {
     const start_time = Date.now()
     logger.info('开始每日资产对账')
 
@@ -131,7 +131,7 @@ class DailyAssetReconciliation {
    * @returns {Promise<Object|null>} 差异详情或null（无差异）
    * @private
    */
-  static async _reconcileBalance (balance) {
+  static async _reconcileBalance(balance) {
     const { account_id, asset_code, available_amount, frozen_amount } = balance
 
     try {
@@ -221,7 +221,7 @@ class DailyAssetReconciliation {
    * @returns {string} 状态: OK/WARNING/ERROR
    * @private
    */
-  static _determineStatus (discrepancy_count, total_count) {
+  static _determineStatus(discrepancy_count, total_count) {
     if (discrepancy_count === 0) {
       return 'OK'
     }
@@ -248,7 +248,7 @@ class DailyAssetReconciliation {
    * @returns {void}
    * @private
    */
-  static _outputReport (report) {
+  static _outputReport(report) {
     console.log('\n' + '='.repeat(80))
     console.log('📊 每日资产对账报告')
     console.log('='.repeat(80))
@@ -299,7 +299,7 @@ class DailyAssetReconciliation {
    * @returns {string} Emoji
    * @private
    */
-  static _getStatusEmoji (status) {
+  static _getStatusEmoji(status) {
     const emojiMap = {
       OK: '✅',
       WARNING: '⚠️',
@@ -315,7 +315,7 @@ class DailyAssetReconciliation {
    * @returns {Promise<void>} - 返回 Promise，无返回值
    * @private
    */
-  static async _sendAlert (report) {
+  static async _sendAlert(report) {
     /**
      * 告警通知
      *
@@ -375,7 +375,7 @@ class DailyAssetReconciliation {
    * @param {Date} cutoffDate - 分界线时间（只检查该时间之后的记录）
    * @returns {Promise<Object>} 业务关联对账报告
    */
-  static async executeBusinessRecordReconciliation (cutoffDate = null) {
+  static async executeBusinessRecordReconciliation(cutoffDate = null) {
     const start_time = Date.now()
     const effectiveCutoff = cutoffDate || new Date('2026-01-02T20:24:20.000Z')
 
@@ -391,14 +391,13 @@ class DailyAssetReconciliation {
       }
 
       results.duration_ms = Date.now() - start_time
-      results.total_issues = (
+      results.total_issues =
         results.lottery_draws.missing_transaction_ids.length +
         results.lottery_draws.orphan_transaction_ids.length +
         results.consumption_records.missing_transaction_ids.length +
         results.consumption_records.orphan_transaction_ids.length +
         results.exchange_records.missing_transaction_ids.length +
         results.exchange_records.orphan_transaction_ids.length
-      )
       results.status = results.total_issues === 0 ? 'OK' : 'WARNING'
 
       this._outputBusinessRecordReport(results)
@@ -429,7 +428,7 @@ class DailyAssetReconciliation {
    * @returns {Promise<Object>} 对账结果
    * @private
    */
-  static async _reconcileLotteryDraws (cutoffDate) {
+  static async _reconcileLotteryDraws(cutoffDate) {
     // 查询分界线后所有抽奖记录
     const draws = await LotteryDraw.findAll({
       where: {
@@ -480,7 +479,7 @@ class DailyAssetReconciliation {
    * @returns {Promise<Object>} 对账结果
    * @private
    */
-  static async _reconcileConsumptionRecords (cutoffDate) {
+  static async _reconcileConsumptionRecords(cutoffDate) {
     // 查询分界线后所有已审核通过的消费记录
     const records = await ConsumptionRecord.unscoped().findAll({
       where: {
@@ -532,7 +531,7 @@ class DailyAssetReconciliation {
    * @returns {Promise<Object>} 对账结果
    * @private
    */
-  static async _reconcileExchangeRecords (cutoffDate) {
+  static async _reconcileExchangeRecords(cutoffDate) {
     // 查询分界线后所有兑换记录
     const records = await ExchangeRecord.findAll({
       where: {
@@ -582,7 +581,7 @@ class DailyAssetReconciliation {
    * @returns {void}
    * @private
    */
-  static _outputBusinessRecordReport (results) {
+  static _outputBusinessRecordReport(results) {
     console.log('\n' + '='.repeat(80))
     console.log('📊 业务记录关联对账报告（事务边界治理 P1-3）')
     console.log('='.repeat(80))
@@ -604,7 +603,9 @@ class DailyAssetReconciliation {
         console.log(`     - draw_id=${d.draw_id}, user=${d.user_id}, cost=${d.cost_points}`)
       })
       if (results.lottery_draws.missing_transaction_ids.length > 5) {
-        console.log(`     ... 等 ${results.lottery_draws.missing_transaction_ids.length - 5} 条更多`)
+        console.log(
+          `     ... 等 ${results.lottery_draws.missing_transaction_ids.length - 5} 条更多`
+        )
       }
     }
 
@@ -617,10 +618,14 @@ class DailyAssetReconciliation {
     if (results.consumption_records.missing_transaction_ids.length > 0) {
       console.log('   缺失详情:')
       results.consumption_records.missing_transaction_ids.slice(0, 5).forEach(r => {
-        console.log(`     - record_id=${r.record_id}, user=${r.user_id}, points=${r.points_to_award}`)
+        console.log(
+          `     - record_id=${r.record_id}, user=${r.user_id}, points=${r.points_to_award}`
+        )
       })
       if (results.consumption_records.missing_transaction_ids.length > 5) {
-        console.log(`     ... 等 ${results.consumption_records.missing_transaction_ids.length - 5} 条更多`)
+        console.log(
+          `     ... 等 ${results.consumption_records.missing_transaction_ids.length - 5} 条更多`
+        )
       }
     }
 
@@ -636,7 +641,9 @@ class DailyAssetReconciliation {
         console.log(`     - record_id=${r.record_id}, user=${r.user_id}, amount=${r.pay_amount}`)
       })
       if (results.exchange_records.missing_transaction_ids.length > 5) {
-        console.log(`     ... 等 ${results.exchange_records.missing_transaction_ids.length - 5} 条更多`)
+        console.log(
+          `     ... 等 ${results.exchange_records.missing_transaction_ids.length - 5} 条更多`
+        )
       }
     }
 
@@ -650,7 +657,7 @@ class DailyAssetReconciliation {
    * @returns {Promise<void>} 无返回值
    * @private
    */
-  static async _sendBusinessRecordAlert (results) {
+  static async _sendBusinessRecordAlert(results) {
     // 记录详细日志
     logger.error('发现业务记录关联问题（事务边界治理）', {
       total_issues: results.total_issues,
@@ -701,7 +708,7 @@ class DailyAssetReconciliation {
    *
    * @returns {Promise<Object>} 完整对账报告
    */
-  static async executeFullReconciliation () {
+  static async executeFullReconciliation() {
     logger.info('开始完整对账（余额 + 业务记录）')
 
     const balanceReport = await this.execute()
@@ -711,11 +718,12 @@ class DailyAssetReconciliation {
       timestamp: new Date().toISOString(),
       balance_reconciliation: balanceReport,
       business_record_reconciliation: businessReport,
-      overall_status: (balanceReport.status === 'OK' && businessReport.status === 'OK')
-        ? 'OK'
-        : (balanceReport.status === 'ERROR' || businessReport.status === 'ERROR')
-          ? 'ERROR'
-          : 'WARNING'
+      overall_status:
+        balanceReport.status === 'OK' && businessReport.status === 'OK'
+          ? 'OK'
+          : balanceReport.status === 'ERROR' || businessReport.status === 'ERROR'
+            ? 'ERROR'
+            : 'WARNING'
     }
 
     logger.info('完整对账完成', {
@@ -739,31 +747,31 @@ if (require.main === module) {
       let report
 
       switch (mode) {
-      case 'balance':
-        // 仅余额对账
-        console.log('执行模式: 余额对账')
-        report = await DailyAssetReconciliation.execute()
-        break
+        case 'balance':
+          // 仅余额对账
+          console.log('执行模式: 余额对账')
+          report = await DailyAssetReconciliation.execute()
+          break
 
-      case 'business':
-        // 仅业务记录关联对账
-        console.log('执行模式: 业务记录关联对账')
-        report = await DailyAssetReconciliation.executeBusinessRecordReconciliation()
-        break
+        case 'business':
+          // 仅业务记录关联对账
+          console.log('执行模式: 业务记录关联对账')
+          report = await DailyAssetReconciliation.executeBusinessRecordReconciliation()
+          break
 
-      case 'full':
-        // 完整对账（余额 + 业务记录）
-        console.log('执行模式: 完整对账（余额 + 业务记录）')
-        report = await DailyAssetReconciliation.executeFullReconciliation()
-        break
+        case 'full':
+          // 完整对账（余额 + 业务记录）
+          console.log('执行模式: 完整对账（余额 + 业务记录）')
+          report = await DailyAssetReconciliation.executeFullReconciliation()
+          break
 
-      default:
-        console.log('用法: node jobs/daily-asset-reconciliation.js [mode]')
-        console.log('  mode:')
-        console.log('    balance  - 余额对账（默认）')
-        console.log('    business - 业务记录关联对账')
-        console.log('    full     - 完整对账（余额 + 业务记录）')
-        process.exit(0)
+        default:
+          console.log('用法: node jobs/daily-asset-reconciliation.js [mode]')
+          console.log('  mode:')
+          console.log('    balance  - 余额对账（默认）')
+          console.log('    business - 业务记录关联对账')
+          console.log('    full     - 完整对账（余额 + 业务记录）')
+          process.exit(0)
       }
 
       const status = report.overall_status || report.status

@@ -1,6 +1,6 @@
 /**
  * 运营分析页面 - JavaScript逻辑
- * 
+ *
  * 适配后端接口（以后端为准）：
  * - /api/v4/console/analytics/stats/today - 今日统计
  * - /api/v4/console/analytics/decisions/analytics?days=N - 决策分析（含每日趋势）
@@ -173,28 +173,28 @@ async function loadTodayStats() {
       document.getElementById('activeUsers').textContent = formatNumber(
         data.user_stats?.active_users_today || 0
       )
-      document.getElementById('activeUsersGrowth').textContent = 
+      document.getElementById('activeUsersGrowth').textContent =
         `总用户: ${formatNumber(data.user_stats?.total_users || 0)}`
       document.getElementById('activeUsersGrowth').className = 'text-muted'
 
       document.getElementById('lotteryCount').textContent = formatNumber(
         data.lottery_stats?.draws_today || 0
       )
-      document.getElementById('lotteryCountGrowth').textContent = 
+      document.getElementById('lotteryCountGrowth').textContent =
         `高档奖励: ${data.lottery_stats?.high_tier_draws_today || 0}`
       document.getElementById('lotteryCountGrowth').className = 'text-muted'
 
       document.getElementById('pointsIssued').textContent = formatNumber(
         data.points_stats?.points_earned_today || 0
       )
-      document.getElementById('pointsIssuedGrowth').textContent = 
+      document.getElementById('pointsIssuedGrowth').textContent =
         `消耗: ${formatNumber(data.points_stats?.points_spent_today || 0)}`
       document.getElementById('pointsIssuedGrowth').className = 'text-muted'
 
       document.getElementById('exchangeOrders').textContent = formatNumber(
         data.inventory_stats?.used_items_today || 0
       )
-      document.getElementById('exchangeOrdersGrowth').textContent = 
+      document.getElementById('exchangeOrdersGrowth').textContent =
         `新增: ${data.inventory_stats?.new_items_today || 0}`
       document.getElementById('exchangeOrdersGrowth').className = 'text-muted'
     }
@@ -209,7 +209,7 @@ async function loadTodayStats() {
  */
 async function loadDecisionAnalytics() {
   const days = document.getElementById('timeRangeFilter').value
-  
+
   try {
     const response = await apiRequest(`/api/v4/console/analytics/decisions/analytics?days=${days}`)
 
@@ -253,11 +253,13 @@ async function loadLotteryTrends(days) {
     if (days >= 30) period = 'month'
     if (days >= 90) period = 'quarter'
 
-    const response = await apiRequest(`/api/v4/console/analytics/lottery/trends?period=${period}&granularity=daily`)
+    const response = await apiRequest(
+      `/api/v4/console/analytics/lottery/trends?period=${period}&granularity=daily`
+    )
 
     if (response && response.success) {
       const data = response.data
-      
+
       // 更新用户活跃趋势图
       if (data.user_activity && data.user_activity.length > 0) {
         const userDates = data.user_activity.map(item => item.period)

@@ -216,7 +216,7 @@ function renderSessions(sessions) {
       const userAvatar = session.user?.avatar_url || session.user_avatar || defaultAvatar
       const userId = session.user?.user_id || session.user_id
       const lastMessage = session.last_message?.content || session.last_message || '暂无消息'
-      
+
       return `
     <div class="session-item ${String(session.session_id) === String(currentSessionId) ? 'active' : ''}" 
          data-session-id="${session.session_id}" data-user-id="${userId}">
@@ -257,7 +257,7 @@ function getSessionStatusText(status) {
 
 async function openSession(sessionId) {
   if (String(sessionId) === String(currentSessionId)) return
-  currentSessionId = sessionId  // 保持原始类型（字符串）
+  currentSessionId = sessionId // 保持原始类型（字符串）
   showLoading()
 
   try {

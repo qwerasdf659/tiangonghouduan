@@ -54,7 +54,7 @@ class RedemptionCodeGenerator {
    * const code = RedemptionCodeGenerator.generate()
    * console.log(code) // '3K7J-2MQP-WXYZ'
    */
-  static generate () {
+  static generate() {
     let code = ''
 
     // 生成12个随机字符
@@ -83,7 +83,7 @@ class RedemptionCodeGenerator {
    * const hash = RedemptionCodeGenerator.hash('3K7J-2MQP-WXYZ')
    * console.log(hash) // 'a1b2c3d4...'（64位hex）
    */
-  static hash (code) {
+  static hash(code) {
     // 清理核销码：移除连字符并转大写
     const cleanCode = code.replace(/-/g, '').toUpperCase()
 
@@ -107,7 +107,7 @@ class RedemptionCodeGenerator {
    * RedemptionCodeGenerator.validate('3K7J2MQPWXYZ')   // false (缺少连字符)
    * RedemptionCodeGenerator.validate('3K7J-2MQP-WX0Z') // false (包含数字0)
    */
-  static validate (code) {
+  static validate(code) {
     // 正则表达式：4位-4位-4位，只允许Base32字符集
     const pattern = new RegExp(`^[${BASE32_CHARS}]{4}-[${BASE32_CHARS}]{4}-[${BASE32_CHARS}]{4}$`)
     return pattern.test(code)
@@ -130,7 +130,7 @@ class RedemptionCodeGenerator {
    *   return !existing // 返回true表示唯一
    * })
    */
-  static async generateUnique (checkUnique, maxRetries = 3) {
+  static async generateUnique(checkUnique, maxRetries = 3) {
     let attempts = 0
 
     // eslint-disable-next-line no-await-in-loop
@@ -159,7 +159,7 @@ class RedemptionCodeGenerator {
    * const codes = RedemptionCodeGenerator.generateBatch(10)
    * // ['3K7J-2MQP-WXYZ', '4N8K-3NRP-XYZW', ...]
    */
-  static generateBatch (count) {
+  static generateBatch(count) {
     const codes = []
     for (let i = 0; i < count; i++) {
       codes.push(this.generate())
@@ -178,7 +178,7 @@ class RedemptionCodeGenerator {
    * RedemptionCodeGenerator.format('3K7J2MQPWXYZ', true)  // '3K7J-2MQP-WXYZ'
    * RedemptionCodeGenerator.format('3K7J-2MQP-WXYZ', false) // '3K7J2MQPWXYZ'
    */
-  static format (code, withHyphen = true) {
+  static format(code, withHyphen = true) {
     const cleanCode = code.replace(/-/g, '').toUpperCase()
 
     if (!withHyphen) {

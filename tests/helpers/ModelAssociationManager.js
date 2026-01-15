@@ -35,7 +35,7 @@ const logger = winston.createLogger({
  * 负责检测、验证和修复模型关联关系
  */
 class ModelAssociationManager {
-  constructor () {
+  constructor() {
     this.initialized = false
     this.models = null
     this.associationMap = new Map()
@@ -49,7 +49,7 @@ class ModelAssociationManager {
   /**
    * 定义预期的模型关联关系
    */
-  defineExpectedAssociations () {
+  defineExpectedAssociations() {
     return {
       User: {
         hasMany: [
@@ -122,7 +122,7 @@ class ModelAssociationManager {
   /**
    * 🔍 运行完整的关联检查
    */
-  async runCompleteAssociationCheck () {
+  async runCompleteAssociationCheck() {
     logger.info('🔍 开始运行完整的模型关联检查...')
     const startTime = Date.now()
 
@@ -173,7 +173,7 @@ class ModelAssociationManager {
   /**
    * 📂 加载和分析模型
    */
-  async loadAndAnalyzeModels () {
+  async loadAndAnalyzeModels() {
     logger.info('📂 加载和分析模型结构...')
 
     try {
@@ -207,7 +207,7 @@ class ModelAssociationManager {
   /**
    * 🔍 提取模型关联关系
    */
-  extractModelAssociations (model) {
+  extractModelAssociations(model) {
     const associations = []
 
     // 通过检查模型的associations属性来提取关联
@@ -230,7 +230,7 @@ class ModelAssociationManager {
   /**
    * 📁 查找模型文件
    */
-  async findModelFile (modelName) {
+  async findModelFile(modelName) {
     const possiblePaths = [
       `models/${modelName}.js`,
       `models/${modelName.toLowerCase()}.js`,
@@ -256,7 +256,7 @@ class ModelAssociationManager {
   /**
    * ❌ 检查缺失的关联
    */
-  async checkMissingAssociations () {
+  async checkMissingAssociations() {
     logger.info('❌ 检查缺失的关联关系...')
 
     for (const [modelName, expectedAssoc] of Object.entries(this.expectedAssociations)) {
@@ -302,7 +302,7 @@ class ModelAssociationManager {
   /**
    * 🔍 检查特定类型的关联
    */
-  checkAssociationType (modelName, associationType, expectedAssocs, actualAssocs) {
+  checkAssociationType(modelName, associationType, expectedAssocs, actualAssocs) {
     for (const expected of expectedAssocs) {
       const found = actualAssocs.find(
         actual =>
@@ -327,7 +327,7 @@ class ModelAssociationManager {
   /**
    * 💥 检查错误的关联
    */
-  async checkBrokenAssociations () {
+  async checkBrokenAssociations() {
     logger.info('💥 检查错误的关联关系...')
 
     for (const [modelName, modelInfo] of this.associationMap) {
@@ -360,7 +360,7 @@ class ModelAssociationManager {
   /**
    * 🛠 生成修复建议
    */
-  async generateFixSuggestions () {
+  async generateFixSuggestions() {
     const suggestions = []
 
     // 为缺失的关联生成修复建议
@@ -398,41 +398,41 @@ class ModelAssociationManager {
   /**
    * 🔧 生成关联代码
    */
-  generateAssociationCode (missingAssoc) {
+  generateAssociationCode(missingAssoc) {
     const { modelName, associationType, targetModel, expectedConfig } = missingAssoc
 
     let code = `    // 🔥 关联到${targetModel}\n`
 
     switch (associationType) {
-    case 'hasMany':
-      code += `    ${modelName}.${associationType}(models.${targetModel}, {\n`
-      code += `      foreignKey: '${expectedConfig.foreignKey}',\n`
-      if (expectedConfig.sourceKey) {
-        code += `      sourceKey: '${expectedConfig.sourceKey}',\n`
-      }
-      code += `      as: '${expectedConfig.as}',\n`
-      code += `      comment: '${targetModel}关联关系'\n`
-      code += '    })\n'
-      break
+      case 'hasMany':
+        code += `    ${modelName}.${associationType}(models.${targetModel}, {\n`
+        code += `      foreignKey: '${expectedConfig.foreignKey}',\n`
+        if (expectedConfig.sourceKey) {
+          code += `      sourceKey: '${expectedConfig.sourceKey}',\n`
+        }
+        code += `      as: '${expectedConfig.as}',\n`
+        code += `      comment: '${targetModel}关联关系'\n`
+        code += '    })\n'
+        break
 
-    case 'hasOne':
-      code += `    ${modelName}.${associationType}(models.${targetModel}, {\n`
-      code += `      foreignKey: '${expectedConfig.foreignKey}',\n`
-      code += `      as: '${expectedConfig.as}',\n`
-      code += `      comment: '${targetModel}关联关系'\n`
-      code += '    })\n'
-      break
+      case 'hasOne':
+        code += `    ${modelName}.${associationType}(models.${targetModel}, {\n`
+        code += `      foreignKey: '${expectedConfig.foreignKey}',\n`
+        code += `      as: '${expectedConfig.as}',\n`
+        code += `      comment: '${targetModel}关联关系'\n`
+        code += '    })\n'
+        break
 
-    case 'belongsTo':
-      code += `    ${modelName}.${associationType}(models.${targetModel}, {\n`
-      code += `      foreignKey: '${expectedConfig.foreignKey}',\n`
-      if (expectedConfig.targetKey) {
-        code += `      targetKey: '${expectedConfig.targetKey}',\n`
-      }
-      code += `      as: '${expectedConfig.as}',\n`
-      code += `      comment: '${targetModel}关联关系'\n`
-      code += '    })\n'
-      break
+      case 'belongsTo':
+        code += `    ${modelName}.${associationType}(models.${targetModel}, {\n`
+        code += `      foreignKey: '${expectedConfig.foreignKey}',\n`
+        if (expectedConfig.targetKey) {
+          code += `      targetKey: '${expectedConfig.targetKey}',\n`
+        }
+        code += `      as: '${expectedConfig.as}',\n`
+        code += `      comment: '${targetModel}关联关系'\n`
+        code += '    })\n'
+        break
     }
 
     return code
@@ -441,7 +441,7 @@ class ModelAssociationManager {
   /**
    * 📊 生成关联报告
    */
-  async generateAssociationReport () {
+  async generateAssociationReport() {
     const report = {
       timestamp: BeijingTimeHelper.now(),
       summary: {
@@ -496,7 +496,7 @@ class ModelAssociationManager {
   /**
    * 📊 计算健康评分
    */
-  calculateHealthScore () {
+  calculateHealthScore() {
     const totalExpectedAssociations = Object.values(this.expectedAssociations).reduce(
       (sum, model) => sum + model.hasMany.length + model.hasOne.length + model.belongsTo.length,
       0
@@ -513,7 +513,7 @@ class ModelAssociationManager {
   /**
    * 🔧 自动修复关联关系
    */
-  async autoFixAssociations (suggestions) {
+  async autoFixAssociations(suggestions) {
     logger.info('🔧 开始自动修复关联关系...')
     let fixedCount = 0
 
@@ -539,7 +539,7 @@ class ModelAssociationManager {
   /**
    * 📝 添加关联到文件
    */
-  async addAssociationToFile (filePath, code) {
+  async addAssociationToFile(filePath, code) {
     try {
       const content = await fs.readFile(filePath, 'utf8')
 
@@ -565,7 +565,7 @@ class ModelAssociationManager {
   /**
    * 🧹 清理和优化
    */
-  async cleanup () {
+  async cleanup() {
     logger.info('🧹 执行模型关联管理器清理...')
 
     // 清理内存中的数据
@@ -579,7 +579,7 @@ class ModelAssociationManager {
   /**
    * 📊 获取关联统计
    */
-  getAssociationStats () {
+  getAssociationStats() {
     return {
       totalModels: this.associationMap.size,
       missingAssociations: this.missingAssociations.length,

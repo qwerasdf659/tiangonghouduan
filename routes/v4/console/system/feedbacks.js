@@ -74,14 +74,17 @@ router.get(
         models.Feedback.count({ where: { status: 'closed' } })
       ])
 
-      return res.apiSuccess({
-        total,
-        pending,
-        processing,
-        replied,
-        closed,
-        resolved: replied + closed // 已解决 = 已回复 + 已关闭
-      }, '获取反馈统计成功')
+      return res.apiSuccess(
+        {
+          total,
+          pending,
+          processing,
+          replied,
+          closed,
+          resolved: replied + closed // 已解决 = 已回复 + 已关闭
+        },
+        '获取反馈统计成功'
+      )
     } catch (error) {
       sharedComponents.logger.error('获取反馈统计失败', { error: error.message })
       return res.apiInternalError('获取反馈统计失败', error.message, 'FEEDBACK_STATS_ERROR')

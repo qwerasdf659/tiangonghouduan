@@ -195,6 +195,178 @@ const SYSTEM_SETTINGS_WHITELIST = {
     approvalRequired: false
   },
 
+  // ===== 多币种扩展配置（2026-01-14 新增）=====
+  'marketplace/allowed_listing_assets': {
+    type: 'json',
+    default: ['DIAMOND', 'red_shard'],
+    readonly: false,
+    description: '挂牌白名单：允许用于新挂牌定价的币种列表（用于"灰度下线"：禁新挂牌但存量可成交）',
+    changeRequiresRestart: false,
+    businessImpact: 'HIGH',
+    auditRequired: true,
+    approvalRequired: false
+  },
+
+  'marketplace/allowed_settlement_assets': {
+    type: 'json',
+    default: ['DIAMOND', 'red_shard'],
+    readonly: false,
+    description: '结算白名单：允许用于订单结算的币种列表（创建订单时校验）',
+    changeRequiresRestart: false,
+    businessImpact: 'HIGH',
+    auditRequired: true,
+    approvalRequired: false
+  },
+
+  // ----- 手续费率配置（按币种）-----
+  'marketplace/fee_rate_DIAMOND': {
+    type: 'number',
+    min: 0.01,
+    max: 0.3,
+    step: 0.01,
+    default: 0.05,
+    readonly: false,
+    description: 'DIAMOND币种交易手续费率（5% = 0.05）',
+    changeRequiresRestart: false,
+    businessImpact: 'CRITICAL',
+    auditRequired: true,
+    approvalRequired: false
+  },
+
+  'marketplace/fee_rate_red_shard': {
+    type: 'number',
+    min: 0.01,
+    max: 0.3,
+    step: 0.01,
+    default: 0.05,
+    readonly: false,
+    description: 'red_shard币种交易手续费率（5% = 0.05）',
+    changeRequiresRestart: false,
+    businessImpact: 'CRITICAL',
+    auditRequired: true,
+    approvalRequired: false
+  },
+
+  // ----- 最低手续费配置（按币种）-----
+  'marketplace/fee_min_DIAMOND': {
+    type: 'number',
+    min: 1,
+    max: 100,
+    default: 1,
+    readonly: false,
+    description: 'DIAMOND币种最低手续费（防止低价商品零手续费）',
+    changeRequiresRestart: false,
+    businessImpact: 'HIGH',
+    auditRequired: true,
+    approvalRequired: false
+  },
+
+  'marketplace/fee_min_red_shard': {
+    type: 'number',
+    min: 1,
+    max: 100,
+    default: 1,
+    readonly: false,
+    description: 'red_shard币种最低手续费（防止低价商品零手续费）',
+    changeRequiresRestart: false,
+    businessImpact: 'HIGH',
+    auditRequired: true,
+    approvalRequired: false
+  },
+
+  // ----- 价格区间配置（按币种）-----
+  'marketplace/min_price_DIAMOND': {
+    type: 'number',
+    min: 1,
+    max: 1000,
+    default: 1,
+    readonly: false,
+    description: 'DIAMOND币种挂牌最低价格',
+    changeRequiresRestart: false,
+    businessImpact: 'MEDIUM',
+    auditRequired: true,
+    approvalRequired: false
+  },
+
+  'marketplace/min_price_red_shard': {
+    type: 'number',
+    min: 1,
+    max: 1000,
+    default: 1,
+    readonly: false,
+    description: 'red_shard币种挂牌最低价格',
+    changeRequiresRestart: false,
+    businessImpact: 'MEDIUM',
+    auditRequired: true,
+    approvalRequired: false
+  },
+
+  'marketplace/max_price_red_shard': {
+    type: 'number',
+    min: 1000,
+    max: 10000000,
+    default: 1000000,
+    readonly: false,
+    description: 'red_shard币种挂牌最高价格（防止恶意定价）',
+    changeRequiresRestart: false,
+    businessImpact: 'MEDIUM',
+    auditRequired: true,
+    approvalRequired: false
+  },
+
+  // ----- 风控日限配置（按等级和币种）-----
+  'marketplace/daily_max_listings_normal': {
+    type: 'number',
+    min: 1,
+    max: 100,
+    default: 20,
+    readonly: false,
+    description: 'normal等级用户每日最大挂牌次数',
+    changeRequiresRestart: false,
+    businessImpact: 'HIGH',
+    auditRequired: true,
+    approvalRequired: false
+  },
+
+  'marketplace/daily_max_trades_normal': {
+    type: 'number',
+    min: 1,
+    max: 100,
+    default: 10,
+    readonly: false,
+    description: 'normal等级用户每日最大成交次数',
+    changeRequiresRestart: false,
+    businessImpact: 'HIGH',
+    auditRequired: true,
+    approvalRequired: false
+  },
+
+  'marketplace/daily_max_amount_normal_DIAMOND': {
+    type: 'number',
+    min: 1000,
+    max: 10000000,
+    default: 100000,
+    readonly: false,
+    description: 'normal等级用户每日DIAMOND最大交易金额',
+    changeRequiresRestart: false,
+    businessImpact: 'HIGH',
+    auditRequired: true,
+    approvalRequired: false
+  },
+
+  'marketplace/daily_max_amount_normal_red_shard': {
+    type: 'number',
+    min: 1000,
+    max: 10000000,
+    default: 50000,
+    readonly: false,
+    description: 'normal等级用户每日red_shard最大交易金额',
+    changeRequiresRestart: false,
+    businessImpact: 'HIGH',
+    auditRequired: true,
+    approvalRequired: false
+  },
+
   // ===== 安全设置（运营可调）=====
   'security/max_login_attempts': {
     type: 'number',
@@ -302,8 +474,8 @@ const FORBIDDEN_IN_DB = {
     'pool', // 连接池相关
     'timeout', // 超时配置（技术参数）
     'fee_strategy', // 手续费策略（结算参数）
-    'charge_target', // 收费对象（结算参数）
-    'fee_rate' // 手续费率（结算参数）
+    'charge_target' // 收费对象（结算参数）
+    // 注意：fee_rate 已移除，marketplace/fee_rate_* 配置允许运营调整（2026-01-14）
   ],
 
   exactMatch: [

@@ -59,13 +59,22 @@ class ItemInstance extends Model {
    * @param {Object} models - 所有模型的映射对象
    * @returns {void} 无返回值
    */
-  static associate (models) {
+  static associate(models) {
     // 物品实例属于某个用户（所有权真相）
     ItemInstance.belongsTo(models.User, {
       foreignKey: 'owner_user_id',
       as: 'owner',
       onDelete: 'RESTRICT',
       onUpdate: 'CASCADE'
+    })
+
+    // 物品实例关联物品模板（获取分类和稀有度信息）
+    ItemInstance.belongsTo(models.ItemTemplate, {
+      foreignKey: 'item_template_id',
+      as: 'itemTemplate',
+      onDelete: 'SET NULL',
+      onUpdate: 'CASCADE',
+      comment: '物品模板关联（获取类目/稀有度等快照信息）'
     })
   }
 
@@ -74,7 +83,7 @@ class ItemInstance extends Model {
    *
    * @returns {boolean} 是否可用 - true表示可用，false表示不可用
    */
-  isAvailable () {
+  isAvailable() {
     const locks = this.locks || []
     return this.status === 'available' && locks.length === 0
   }
@@ -84,7 +93,7 @@ class ItemInstance extends Model {
    *
    * @returns {boolean} 是否有锁定 - true表示有锁定
    */
-  isLocked () {
+  isLocked() {
     const locks = this.locks || []
     return locks.length > 0
   }
@@ -95,7 +104,7 @@ class ItemInstance extends Model {
    * @param {string} lockType - 锁类型（trade/redemption/security）
    * @returns {boolean} 是否有该类型锁
    */
-  hasLock (lockType) {
+  hasLock(lockType) {
     const locks = this.locks || []
     return locks.some(lock => lock.lock_type === lockType)
   }
@@ -105,7 +114,7 @@ class ItemInstance extends Model {
    *
    * @returns {Array<string>} 锁类型数组
    */
-  getLockTypes () {
+  getLockTypes() {
     const locks = this.locks || []
     return locks.map(lock => lock.lock_type)
   }
@@ -115,7 +124,7 @@ class ItemInstance extends Model {
    *
    * @returns {Object|null} 最高优先级锁对象，无锁返回null
    */
-  getHighestPriorityLock () {
+  getHighestPriorityLock() {
     const locks = this.locks || []
     if (locks.length === 0) return null
 
@@ -132,7 +141,7 @@ class ItemInstance extends Model {
    * @param {string} lockType - 锁类型
    * @returns {Object|null} 锁对象，不存在返回null
    */
-  getLock (lockType) {
+  getLock(lockType) {
     const locks = this.locks || []
     return locks.find(lock => lock.lock_type === lockType) || null
   }
@@ -143,7 +152,7 @@ class ItemInstance extends Model {
    * @param {string} lockId - 锁ID（订单ID）
    * @returns {Object|null} 锁对象，不存在返回null
    */
-  getLockById (lockId) {
+  getLockById(lockId) {
     const locks = this.locks || []
     return locks.find(lock => lock.lock_id === lockId) || null
   }
@@ -156,7 +165,7 @@ class ItemInstance extends Model {
    * @throws {Error} 当 security 锁的 lock_id 格式不正确时抛出错误
    * @returns {boolean} 验证通过返回 true
    */
-  static validateLockId (lockType, lockId) {
+  static validateLockId(lockType, lockId) {
     if (lockType === 'security') {
       // security 必须是业务单号格式：risk_case_xxx 或 appeal_xxx
       if (!lockId.match(/^(risk_case_|appeal_)\w+$/)) {
@@ -175,7 +184,7 @@ class ItemInstance extends Model {
    * @param {string} newLockType - 要添加的锁类型
    * @returns {Object} { canLock: boolean, reason: string, needOverride: boolean, existingLock: Object|null }
    */
-  canAddLock (newLockType) {
+  canAddLock(newLockType) {
     const locks = this.locks || []
 
     // 没有现有锁，可以添加
@@ -212,7 +221,7 @@ class ItemInstance extends Model {
    *
    * @returns {boolean} 是否有超时的锁
    */
-  hasTimeoutLock () {
+  hasTimeoutLock() {
     const locks = this.locks || []
     const now = new Date()
 
@@ -228,7 +237,7 @@ class ItemInstance extends Model {
    *
    * @returns {Array<Object>} 超时锁数组
    */
-  getTimeoutLocks () {
+  getTimeoutLocks() {
     const locks = this.locks || []
     const now = new Date()
 
@@ -251,7 +260,7 @@ class ItemInstance extends Model {
    * @param {string} options.reason - 锁定原因
    * @returns {Promise<Object>} 新创建的锁对象
    */
-  async lock (lockId, lockType, expiresAt, options = {}) {
+  async lock(lockId, lockType, expiresAt, options = {}) {
     const { transaction, reason = '' } = options
 
     // 验证锁类型
@@ -307,7 +316,7 @@ class ItemInstance extends Model {
    * @param {Sequelize.Transaction} options.transaction - 事务对象
    * @returns {Promise<boolean>} 解锁成功返回 true
    */
-  async unlock (lockId, lockType, options = {}) {
+  async unlock(lockId, lockType, options = {}) {
     const { transaction } = options
     const locks = this.locks || []
 
@@ -345,7 +354,7 @@ class ItemInstance extends Model {
    * @param {Sequelize.Transaction} options.transaction - 事务对象
    * @returns {Promise<void>} 无返回值
    */
-  async clearAllLocks (options = {}) {
+  async clearAllLocks(options = {}) {
     await this.update(
       {
         status: 'available',
@@ -363,7 +372,7 @@ class ItemInstance extends Model {
    * @param {Sequelize.Transaction} options.transaction - 事务对象
    * @returns {Promise<void>} 无返回值
    */
-  async transferOwnership (newOwnerId, options = {}) {
+  async transferOwnership(newOwnerId, options = {}) {
     await this.update(
       {
         owner_user_id: newOwnerId,
@@ -381,7 +390,7 @@ class ItemInstance extends Model {
    * @param {Sequelize.Transaction} options.transaction - 事务对象
    * @returns {Promise<void>} 无返回值
    */
-  async markAsUsed (options = {}) {
+  async markAsUsed(options = {}) {
     await this.update(
       {
         status: 'used',
@@ -398,7 +407,7 @@ class ItemInstance extends Model {
    * @param {Sequelize.Transaction} options.transaction - 事务对象
    * @returns {Promise<void>} 无返回值
    */
-  async markAsExpired (options = {}) {
+  async markAsExpired(options = {}) {
     await this.update(
       {
         status: 'expired',
@@ -415,7 +424,7 @@ class ItemInstance extends Model {
    * @param {Date} date - 日期对象
    * @returns {string} 北京时间格式字符串 (YYYY-MM-DDTHH:mm:ss.SSS+08:00)
    */
-  _formatBeijingTime (date) {
+  _formatBeijingTime(date) {
     // 获取北京时间（UTC+8）
     const beijingOffset = 8 * 60 * 60 * 1000
     const beijingDate = new Date(date.getTime() + beijingOffset)
@@ -484,7 +493,7 @@ module.exports = sequelize => {
          *
          * @returns {Object} 物品元数据对象
          */
-        get () {
+        get() {
           const value = this.getDataValue('meta')
           return value || {}
         }

@@ -125,7 +125,7 @@ module.exports = sequelize => {
            * @returns {void} 无返回值，验证失败时抛出错误
            * @throws {Error} 当过期时间早于或等于当前时间时抛出错误
            */
-          isAfterNow (value) {
+          isAfterNow(value) {
             if (value && new Date(value) <= BeijingTimeHelper.createBeijingTime()) {
               throw new Error('过期时间必须晚于当前时间')
             }
@@ -168,7 +168,7 @@ module.exports = sequelize => {
          * 获取北京时间格式的创建时间
          * @returns {string} 北京时间格式的日期字符串（YYYY年MM月DD日 HH:mm:ss）
          */
-        get () {
+        get() {
           return BeijingTimeHelper.formatChinese(this.getDataValue('created_at'))
         },
         comment: '创建时间'
@@ -181,7 +181,7 @@ module.exports = sequelize => {
          * 获取北京时间格式的更新时间
          * @returns {string} 北京时间格式的日期字符串（YYYY年MM月DD日 HH:mm:ss）
          */
-        get () {
+        get() {
           return BeijingTimeHelper.formatChinese(this.getDataValue('updated_at'))
         },
         comment: '更新时间'

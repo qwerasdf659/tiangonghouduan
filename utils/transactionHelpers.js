@@ -40,7 +40,7 @@ const TransactionContext = require('./TransactionContext')
  * @returns {void} 无返回值，验证失败时抛出错误
  * @throws {Error} 当事务不存在或已完成时抛出错误
  */
-function requireTransaction (transaction, methodName) {
+function requireTransaction(transaction, methodName) {
   if (!transaction) {
     const error = new Error(
       '[事务边界错误] ' +
@@ -82,7 +82,7 @@ function requireTransaction (transaction, methodName) {
  * @returns {Object|null} 事务对象 - 返回有效事务对象，不存在时返回 null
  * @throws {Error} 当 required=true 且不存在事务时抛出错误
  */
-function getEffectiveTransaction (options = {}, required = false) {
+function getEffectiveTransaction(options = {}, required = false) {
   // 优先使用显式传入的事务
   if (options.transaction) {
     return options.transaction
@@ -103,7 +103,7 @@ function getEffectiveTransaction (options = {}, required = false) {
  * @returns {Object} 事务对象 - 返回有效事务对象
  * @throws {Error} 当事务不存在或已完成时抛出错误
  */
-function assertAndGetTransaction (options = {}, methodName) {
+function assertAndGetTransaction(options = {}, methodName) {
   const transaction = getEffectiveTransaction(options, true)
   requireTransaction(transaction, methodName)
   return transaction

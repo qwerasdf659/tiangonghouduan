@@ -33,7 +33,16 @@
  * 更新时间：2026-01-08（添加可叠加资产挂牌支持）
  */
 
-const { MarketListing, ItemInstance, MaterialAssetType, sequelize } = require('../models')
+const {
+  MarketListing,
+  ItemInstance,
+  MaterialAssetType,
+  ItemTemplate,
+  AssetGroupDef,
+  User,
+  UserRiskProfile,
+  sequelize
+} = require('../models')
 const { Op } = sequelize.Sequelize
 const AssetService = require('./AssetService')
 const { BusinessCacheHelper } = require('../utils/BusinessCacheHelper')
@@ -51,6 +60,19 @@ const DEFAULT_LISTING_CONFIG = {
   max_active_listings: 10,
   /** 挂牌有效期（天），DB key: marketplace/listing_expiry_days */
   listing_expiry_days: 3
+}
+
+/**
+ * 多币种扩展 - 价格区间配置（2026-01-14 新增）
+ *
+ * 配置真相源：DB system_settings (marketplace/*)
+ * 用于校验不同币种的价格范围
+ */
+const DEFAULT_PRICE_RANGE_CONFIG = {
+  /** DIAMOND 价格区间（无限制） */
+  DIAMOND: { min: 1, max: null },
+  /** red_shard 价格区间 */
+  red_shard: { min: 1, max: 1000000 }
 }
 
 /**
@@ -131,6 +153,289 @@ class MarketListingService {
     _configCache.max_active_listings = { value: null, expires_at: 0 }
     _configCache.listing_expiry_days = { value: null, expires_at: 0 }
     logger.info('[MarketListingService] 配置缓存已清除')
+  }
+
+  // ================ 多币种扩展校验方法（2026-01-14 新增） ================
+
+  /**
+   * 校验定价币种是否在挂牌白名单中
+   *
+   * 业务决策（2026-01-14）：
+   * - 双白名单机制：allowed_listing_assets（挂牌）与 allowed_settlement_assets（结算）分离
+   * - 挂牌白名单控制新挂牌时可选的定价币种
+   * - 用于"灰度下线"场景：禁止新挂牌，但存量可继续成交
+   *
+   * @param {string} priceAssetCode - 定价币种代码
+   * @returns {Promise<Object>} 校验结果 {valid: boolean, whitelist: string[], message?: string}
+   */
+  static async validateListingAssetWhitelist(priceAssetCode) {
+    const AdminSystemService = require('./AdminSystemService')
+
+    // 从 DB 获取挂牌白名单（配置真相源）
+    const whitelist = await AdminSystemService.getSettingValue(
+      'marketplace',
+      'allowed_listing_assets',
+      ['DIAMOND', 'red_shard'] // 默认值
+    )
+
+    // 确保 whitelist 是数组
+    const whitelistArray = Array.isArray(whitelist) ? whitelist : JSON.parse(whitelist || '[]')
+
+    if (!whitelistArray.includes(priceAssetCode)) {
+      return {
+        valid: false,
+        whitelist: whitelistArray,
+        message: `定价币种 ${priceAssetCode} 不在允许的挂牌币种白名单中（当前白名单：${whitelistArray.join(', ')}）`
+      }
+    }
+
+    return {
+      valid: true,
+      whitelist: whitelistArray
+    }
+  }
+
+  /**
+   * 校验定价金额是否在币种允许的价格区间内
+   *
+   * 业务决策（2026-01-14）：
+   * - DIAMOND：无价格上限限制
+   * - red_shard：价格区间 [1, 1000000]，防止恶意定价
+   *
+   * @param {string} priceAssetCode - 定价币种代码
+   * @param {number} priceAmount - 定价金额
+   * @returns {Promise<Object>} 校验结果 {valid: boolean, min?: number, max?: number, message?: string}
+   */
+  static async validatePriceRange(priceAssetCode, priceAmount) {
+    const AdminSystemService = require('./AdminSystemService')
+
+    // 从 DB 获取价格区间配置
+    const minPrice = await AdminSystemService.getSettingValue(
+      'marketplace',
+      `min_price_${priceAssetCode}`,
+      DEFAULT_PRICE_RANGE_CONFIG[priceAssetCode]?.min || 1
+    )
+    const maxPrice = await AdminSystemService.getSettingValue(
+      'marketplace',
+      `max_price_${priceAssetCode}`,
+      DEFAULT_PRICE_RANGE_CONFIG[priceAssetCode]?.max || null
+    )
+
+    const numPrice = Number(priceAmount)
+
+    // 校验最小价格
+    if (numPrice < minPrice) {
+      return {
+        valid: false,
+        min: minPrice,
+        max: maxPrice,
+        message: `定价金额 ${numPrice} 低于最小价格 ${minPrice}（币种：${priceAssetCode}）`
+      }
+    }
+
+    // 校验最大价格（如果有限制）
+    if (maxPrice !== null && numPrice > maxPrice) {
+      return {
+        valid: false,
+        min: minPrice,
+        max: maxPrice,
+        message: `定价金额 ${numPrice} 超过最大价格 ${maxPrice}（币种：${priceAssetCode}）`
+      }
+    }
+
+    return {
+      valid: true,
+      min: minPrice,
+      max: maxPrice
+    }
+  }
+
+  /**
+   * 校验同一物品是否已有其他币种的活跃挂牌（同物单币校验）
+   *
+   * 业务决策（2026-01-14）：
+   * - 同一物品实例在同一时间只能用一种币种挂牌
+   * - 防止定价混乱和套利行为
+   * - 使用行锁（FOR UPDATE）防止并发插入
+   *
+   * @param {number} itemInstanceId - 物品实例ID（仅对 item_instance 类型有效）
+   * @param {string} priceAssetCode - 本次挂牌的定价币种
+   * @param {Object} options - 事务选项
+   * @param {Object} options.transaction - Sequelize事务对象（必填）
+   * @returns {Promise<Object>} 校验结果对象
+   */
+  static async validateSameItemSingleCurrency(itemInstanceId, priceAssetCode, options = {}) {
+    if (!itemInstanceId) {
+      // fungible_asset 类型不需要此校验
+      return { valid: true }
+    }
+
+    const transaction = options.transaction
+
+    // 使用行锁查询是否存在其他币种的活跃挂牌
+    const existingListing = await MarketListing.findOne({
+      where: {
+        offer_item_instance_id: itemInstanceId,
+        status: 'on_sale'
+      },
+      lock: transaction ? transaction.LOCK.UPDATE : undefined,
+      transaction
+    })
+
+    if (existingListing) {
+      // 检查是否为不同币种
+      if (existingListing.price_asset_code !== priceAssetCode) {
+        return {
+          valid: false,
+          existingListing: {
+            listing_id: existingListing.listing_id,
+            price_asset_code: existingListing.price_asset_code,
+            price_amount: existingListing.price_amount
+          },
+          message: `物品 ${itemInstanceId} 已存在其他币种的挂牌（listing_id: ${existingListing.listing_id}，币种: ${existingListing.price_asset_code}）`
+        }
+      }
+      // 如果是相同币种，说明物品已被挂牌（但不是"同物多币种"问题）
+      return {
+        valid: false,
+        existingListing: {
+          listing_id: existingListing.listing_id,
+          price_asset_code: existingListing.price_asset_code,
+          price_amount: existingListing.price_amount
+        },
+        message: `物品 ${itemInstanceId} 已存在活跃挂牌（listing_id: ${existingListing.listing_id}）`
+      }
+    }
+
+    return { valid: true }
+  }
+
+  // ================ 风控限额校验方法（2026-01-14 新增） ================
+
+  /**
+   * 校验用户风控限额（挂牌场景）
+   *
+   * 业务决策（2026-01-14）：
+   * - 日限统计维度：卖家+币种
+   * - 优先使用 user_risk_profiles 中的配置，fallback 到 system_settings
+   * - fail-closed 策略在中间件实现（此方法仅做数据库层校验）
+   *
+   * @param {Object} params - 校验参数
+   * @param {number} params.seller_user_id - 卖家用户ID
+   * @param {string} params.price_asset_code - 定价币种（用于日限统计）
+   * @param {Object} [options] - 事务选项
+   * @returns {Promise<Object>} 校验结果对象
+   */
+  static async validateRiskLimitsForListing(params, options = {}) {
+    const { seller_user_id, price_asset_code } = params
+
+    // 1. 检查用户是否被冻结
+    const frozenStatus = await UserRiskProfile.checkFrozenStatus(seller_user_id)
+    if (frozenStatus.is_frozen) {
+      return {
+        valid: false,
+        code: 'USER_FROZEN',
+        message: `账户已被冻结，禁止挂牌操作（原因：${frozenStatus.reason || '未知'}）`,
+        details: {
+          user_id: seller_user_id,
+          frozen_reason: frozenStatus.reason
+        }
+      }
+    }
+
+    // 2. 获取用户等级
+    const user = await User.findByPk(seller_user_id, {
+      attributes: ['user_id', 'user_level'],
+      transaction: options.transaction
+    })
+
+    if (!user) {
+      return {
+        valid: false,
+        code: 'USER_NOT_FOUND',
+        message: `用户不存在: ${seller_user_id}`
+      }
+    }
+
+    const userLevel = user.user_level || 'normal'
+
+    // 3. 获取用户风控阈值（优先从 user_risk_profiles，fallback 到 system_settings）
+    const thresholds = await UserRiskProfile.getAssetThresholds(
+      seller_user_id,
+      userLevel,
+      price_asset_code
+    )
+    const dailyMaxListings = thresholds.daily_max_listings || 20
+
+    /*
+     * 4. 统计今日该用户+该币种的挂牌次数（北京时间）
+     * 🔴 数据库使用 UTC 存储，业务逻辑使用北京时间（GMT+8）
+     * 北京时间今天 00:00:00 = UTC 昨天 16:00:00
+     */
+    const now = new Date()
+    const beijingOffset = 8 * 60 // 北京时间偏移量（分钟）
+    const utcOffset = now.getTimezoneOffset() // 当前时区偏移量（分钟）
+    const todayStartBeijing = new Date(now)
+    // 先转换为北京时间，设置为0点，再转回 UTC
+    todayStartBeijing.setMinutes(todayStartBeijing.getMinutes() + utcOffset + beijingOffset)
+    todayStartBeijing.setHours(0, 0, 0, 0)
+    // 转回 UTC 进行数据库查询
+    const todayStart = new Date(
+      todayStartBeijing.getTime() - (utcOffset + beijingOffset) * 60 * 1000
+    )
+
+    const todayListingsCount = await MarketListing.count({
+      where: {
+        seller_user_id,
+        price_asset_code,
+        created_at: {
+          [Op.gte]: todayStart
+        }
+      },
+      transaction: options.transaction
+    })
+
+    // 5. 校验日限
+    if (todayListingsCount >= dailyMaxListings) {
+      logger.warn('[MarketListingService] 用户达到日挂牌上限', {
+        user_id: seller_user_id,
+        price_asset_code,
+        today_count: todayListingsCount,
+        daily_max: dailyMaxListings,
+        user_level: userLevel
+      })
+
+      return {
+        valid: false,
+        code: 'DAILY_LISTING_LIMIT_EXCEEDED',
+        message: `今日挂牌次数已达上限（${todayListingsCount}/${dailyMaxListings}），请明天再试`,
+        details: {
+          user_id: seller_user_id,
+          price_asset_code,
+          today_count: todayListingsCount,
+          daily_max: dailyMaxListings,
+          user_level: userLevel,
+          threshold_source: thresholds.source
+        }
+      }
+    }
+
+    logger.debug('[MarketListingService] 风控校验通过', {
+      user_id: seller_user_id,
+      price_asset_code,
+      today_count: todayListingsCount,
+      daily_max: dailyMaxListings,
+      remaining: dailyMaxListings - todayListingsCount
+    })
+
+    return {
+      valid: true,
+      today_count: todayListingsCount,
+      daily_max: dailyMaxListings,
+      remaining: dailyMaxListings - todayListingsCount,
+      user_level: userLevel,
+      threshold_source: thresholds.source
+    }
   }
 
   /**
@@ -222,6 +527,68 @@ class MarketListingService {
     // 3. 强制要求事务边界
     const transaction = assertAndGetTransaction(options, 'MarketListingService.createListing')
 
+    // 3.1 多币种扩展：定价币种白名单校验（2026-01-14 新增）
+    const whitelistValidation =
+      await MarketListingService.validateListingAssetWhitelist(price_asset_code)
+    if (!whitelistValidation.valid) {
+      const error = new Error(whitelistValidation.message)
+      error.code = 'INVALID_PRICE_ASSET_CODE'
+      error.statusCode = 400
+      error.details = {
+        price_asset_code,
+        allowed_listing_assets: whitelistValidation.whitelist
+      }
+      throw error
+    }
+
+    // 3.2 多币种扩展：价格区间校验（2026-01-14 新增）
+    const priceRangeValidation = await MarketListingService.validatePriceRange(
+      price_asset_code,
+      price_amount
+    )
+    if (!priceRangeValidation.valid) {
+      const error = new Error(priceRangeValidation.message)
+      error.code = 'PRICE_OUT_OF_RANGE'
+      error.statusCode = 400
+      error.details = {
+        price_asset_code,
+        price_amount,
+        min_price: priceRangeValidation.min,
+        max_price: priceRangeValidation.max
+      }
+      throw error
+    }
+
+    // 3.3 多币种扩展：同物单币校验（2026-01-14 新增）
+    const sameItemValidation = await MarketListingService.validateSameItemSingleCurrency(
+      item_instance_id,
+      price_asset_code,
+      { transaction }
+    )
+    if (!sameItemValidation.valid) {
+      const error = new Error(sameItemValidation.message)
+      error.code = 'ITEM_ALREADY_LISTED'
+      error.statusCode = 409
+      error.details = {
+        item_instance_id,
+        existing_listing: sameItemValidation.existingListing
+      }
+      throw error
+    }
+
+    // 3.4 多币种扩展：风控限额校验（2026-01-14 新增）
+    const riskLimitValidation = await MarketListingService.validateRiskLimitsForListing(
+      { seller_user_id, price_asset_code },
+      { transaction }
+    )
+    if (!riskLimitValidation.valid) {
+      const error = new Error(riskLimitValidation.message)
+      error.code = riskLimitValidation.code
+      error.statusCode = riskLimitValidation.code === 'USER_FROZEN' ? 403 : 429
+      error.details = riskLimitValidation.details
+      throw error
+    }
+
     // 4. 查询并校验物品
     const item = await ItemInstance.findOne({
       where: { item_instance_id },
@@ -253,7 +620,35 @@ class MarketListingService {
     // 5. 锁定物品
     await item.update({ status: 'locked' }, { transaction })
 
-    // 6. 创建挂牌记录
+    // 6. 获取物品模板信息（用于快照字段填充）
+    let snapshotFields = {}
+    if (item.item_template_id) {
+      const template = await ItemTemplate.findOne({
+        where: { item_template_id: item.item_template_id },
+        transaction
+      })
+      if (template) {
+        snapshotFields = {
+          offer_item_template_id: template.item_template_id,
+          offer_item_category_code: template.category_code,
+          offer_item_rarity: template.rarity_code,
+          offer_item_display_name: template.display_name
+        }
+        logger.debug('[MarketListingService] 快照字段已填充', {
+          item_instance_id,
+          template_id: template.item_template_id,
+          category: template.category_code,
+          rarity: template.rarity_code
+        })
+      }
+    } else if (item.meta?.name) {
+      // 无模板时从 meta 获取显示名称
+      snapshotFields = {
+        offer_item_display_name: item.meta.name
+      }
+    }
+
+    // 7. 创建挂牌记录（包含快照字段）
     const listing = await MarketListing.create(
       {
         listing_kind: 'item_instance',
@@ -263,7 +658,8 @@ class MarketListingService {
         price_asset_code,
         seller_offer_frozen: false,
         status: 'on_sale',
-        idempotency_key
+        idempotency_key,
+        ...snapshotFields
       },
       { transaction }
     )
@@ -457,6 +853,9 @@ class MarketListingService {
    * @param {number} [params.page_size=20] - 每页数量
    * @param {string} [params.listing_kind] - 挂牌类型筛选（item_instance / fungible_asset，可选）
    * @param {string} [params.asset_code] - 资产代码筛选（如 red_shard，仅对 fungible_asset 有效）
+   * @param {string} [params.item_category_code] - 物品类目代码筛选（仅对 item_instance 有效）
+   * @param {string} [params.asset_group_code] - 资产分组代码筛选（仅对 fungible_asset 有效）
+   * @param {string} [params.rarity_code] - 稀有度代码筛选（仅对 item_instance 有效）
    * @param {number} [params.min_price] - 最低价格筛选（可选）
    * @param {number} [params.max_price] - 最高价格筛选（可选）
    * @param {string} [params.sort='newest'] - 排序方式（newest/price_asc/price_desc）
@@ -472,17 +871,23 @@ class MarketListingService {
       page_size = 20,
       listing_kind,
       asset_code,
+      item_category_code,
+      asset_group_code,
+      rarity_code,
       min_price,
       max_price,
       sort = 'newest'
     } = params
 
-    // 构建缓存参数
+    // 构建缓存参数（包含新筛选维度）
     const cacheParams = {
       page,
       page_size,
       listing_kind: listing_kind || 'all',
       asset_code: asset_code || 'all',
+      item_category_code: item_category_code || 'all',
+      asset_group_code: asset_group_code || 'all',
+      rarity_code: rarity_code || 'all',
       min_price: min_price || 0,
       max_price: max_price || 0,
       sort
@@ -514,12 +919,27 @@ class MarketListingService {
       whereClause.listing_kind = listing_kind
     }
 
-    // 新增：按资产代码筛选（仅对 fungible_asset 有效）
+    // 按资产代码筛选（仅对 fungible_asset 有效）
     if (asset_code) {
       whereClause.offer_asset_code = asset_code
     }
 
-    // 新增：按价格区间筛选
+    // 按物品类目代码筛选（仅对 item_instance 有效，使用快照字段）
+    if (item_category_code) {
+      whereClause.offer_item_category_code = item_category_code
+    }
+
+    // 按资产分组代码筛选（仅对 fungible_asset 有效，使用快照字段）
+    if (asset_group_code) {
+      whereClause.offer_asset_group_code = asset_group_code
+    }
+
+    // 按稀有度代码筛选（仅对 item_instance 有效，使用快照字段）
+    if (rarity_code) {
+      whereClause.offer_item_rarity = rarity_code
+    }
+
+    // 按价格区间筛选
     if (min_price !== undefined && min_price > 0) {
       whereClause.price_amount = whereClause.price_amount || {}
       whereClause.price_amount[Op.gte] = Number(min_price)
@@ -574,22 +994,37 @@ class MarketListingService {
       }
 
       if (listing.listing_kind === 'fungible_asset') {
-        // 可叠加资产挂牌
+        // 可叠加资产挂牌（使用快照字段）
         return {
           ...baseData,
           offer_asset_code: listing.offer_asset_code,
           offer_amount: Number(listing.offer_amount),
-          item_name: `${listing.offer_amount} 个 ${listing.offer_asset_code}`,
-          item_type: 'fungible_asset'
+          // 优先使用快照字段，fallback 到原有逻辑
+          item_name:
+            listing.offer_asset_display_name ||
+            `${listing.offer_amount} 个 ${listing.offer_asset_code}`,
+          item_type: 'fungible_asset',
+          // 新增：分组信息（快照字段）
+          asset_group_code: listing.offer_asset_group_code || null
         }
       } else {
-        // 物品实例挂牌（兼容原有逻辑）
+        // 物品实例挂牌（优先使用快照字段）
         return {
           ...baseData,
           item_instance_id: listing.offer_item_instance_id,
-          item_name: listing.offerItem?.meta?.name || listing.offerItem?.item_type || '未知商品',
+          // 优先使用快照字段，fallback 到 offerItem 关联
+          item_name:
+            listing.offer_item_display_name ||
+            listing.offerItem?.meta?.name ||
+            listing.offerItem?.item_type ||
+            '未知商品',
           item_type: listing.offerItem?.item_type || 'unknown',
-          rarity: listing.offerItem?.meta?.rarity || 'common'
+          // 新增：分类信息（快照字段）
+          item_template_id: listing.offer_item_template_id || null,
+          item_category_code: listing.offer_item_category_code || null,
+          rarity_code: listing.offer_item_rarity || null,
+          // 兼容原有 rarity 字段（优先使用快照，fallback 到 meta）
+          rarity: listing.offer_item_rarity || listing.offerItem?.meta?.rarity || 'common'
         }
       }
     })
@@ -749,6 +1184,51 @@ class MarketListingService {
       throw error
     }
 
+    // ========== 4.1 多币种扩展：定价币种白名单校验（2026-01-14 新增） ==========
+    const whitelistValidation =
+      await MarketListingService.validateListingAssetWhitelist(price_asset_code)
+    if (!whitelistValidation.valid) {
+      const error = new Error(whitelistValidation.message)
+      error.code = 'INVALID_PRICE_ASSET_CODE'
+      error.statusCode = 400
+      error.details = {
+        price_asset_code,
+        allowed_listing_assets: whitelistValidation.whitelist
+      }
+      throw error
+    }
+
+    // ========== 4.2 多币种扩展：价格区间校验（2026-01-14 新增） ==========
+    const priceRangeValidation = await MarketListingService.validatePriceRange(
+      price_asset_code,
+      price_amount
+    )
+    if (!priceRangeValidation.valid) {
+      const error = new Error(priceRangeValidation.message)
+      error.code = 'PRICE_OUT_OF_RANGE'
+      error.statusCode = 400
+      error.details = {
+        price_asset_code,
+        price_amount,
+        min_price: priceRangeValidation.min,
+        max_price: priceRangeValidation.max
+      }
+      throw error
+    }
+
+    // ========== 4.3 多币种扩展：风控限额校验（2026-01-14 新增） ==========
+    const riskLimitValidation = await MarketListingService.validateRiskLimitsForListing(
+      { seller_user_id, price_asset_code },
+      { transaction }
+    )
+    if (!riskLimitValidation.valid) {
+      const error = new Error(riskLimitValidation.message)
+      error.code = riskLimitValidation.code
+      error.statusCode = riskLimitValidation.code === 'USER_FROZEN' ? 403 : 429
+      error.details = riskLimitValidation.details
+      throw error
+    }
+
     // ========== 5. 校验资产类型是否存在、启用且可交易 ==========
 
     /*
@@ -838,7 +1318,27 @@ class MarketListingService {
       { transaction }
     )
 
-    // ========== 8. 创建挂牌记录 ==========
+    // ========== 8. 获取资产分组信息（用于快照字段填充） ==========
+    const assetSnapshotFields = {
+      offer_asset_display_name: assetType.display_name
+    }
+
+    if (assetType.group_code) {
+      const assetGroup = await AssetGroupDef.findOne({
+        where: { group_code: assetType.group_code },
+        transaction
+      })
+      if (assetGroup) {
+        assetSnapshotFields.offer_asset_group_code = assetGroup.group_code
+        logger.debug('[MarketListingService] 资产分组快照已填充', {
+          asset_code: offer_asset_code,
+          group_code: assetGroup.group_code,
+          display_name: assetType.display_name
+        })
+      }
+    }
+
+    // ========== 9. 创建挂牌记录（包含快照字段） ==========
     const listing = await MarketListing.create(
       {
         listing_kind: 'fungible_asset',
@@ -849,7 +1349,8 @@ class MarketListingService {
         price_asset_code,
         seller_offer_frozen: true,
         status: 'on_sale',
-        idempotency_key
+        idempotency_key,
+        ...assetSnapshotFields
       },
       { transaction }
     )
@@ -1244,6 +1745,402 @@ class MarketListingService {
       listing,
       unfreeze_result: unfreezeResult,
       audit_log: auditLog
+    }
+  }
+
+  /*
+   * ============================================================================
+   * 筛选维度查询相关方法（2026-01-15 新增）
+   * ============================================================================
+   */
+
+  /**
+   * 获取市场筛选维度配置（facets）
+   *
+   * 业务场景：
+   * - 用户端市场页面需要展示可用的筛选选项（类目、稀有度、资产分组）
+   * - 前端根据返回数据动态渲染筛选器
+   *
+   * 返回数据：
+   * - categories[]：物品类目列表（仅已启用）
+   * - rarities[]：稀有度列表（仅已启用，按 tier 升序）
+   * - asset_groups[]：资产分组列表（仅已启用且可交易）
+   * - listing_kinds[]：挂牌类型列表
+   *
+   * @param {Object} options - 配置选项
+   * @param {boolean} options.include_disabled - 是否包含已禁用项（默认 false，仅管理端使用）
+   * @returns {Promise<Object>} 筛选维度配置
+   *
+   * @example
+   * const facets = await MarketListingService.getFilterFacets()
+   * // 返回：{ categories: [...], rarities: [...], asset_groups: [...], listing_kinds: [...] }
+   */
+  static async getFilterFacets(options = {}) {
+    const { include_disabled = false } = options
+
+    // 延迟加载字典模型（避免循环依赖）
+    const { CategoryDef, RarityDef, AssetGroupDef } = require('../models')
+
+    // ========== 1. 查询物品类目列表 ==========
+    const categoryWhere = include_disabled ? {} : { is_enabled: true }
+    const categories = await CategoryDef.findAll({
+      where: categoryWhere,
+      attributes: ['category_code', 'display_name', 'description', 'icon_url', 'sort_order'],
+      order: [
+        ['sort_order', 'ASC'],
+        ['category_code', 'ASC']
+      ],
+      raw: true
+    })
+
+    // ========== 2. 查询稀有度列表 ==========
+    const rarityWhere = include_disabled ? {} : { is_enabled: true }
+    const rarities = await RarityDef.findAll({
+      where: rarityWhere,
+      attributes: ['rarity_code', 'display_name', 'description', 'color_hex', 'tier', 'sort_order'],
+      order: [
+        ['tier', 'ASC'],
+        ['sort_order', 'ASC']
+      ],
+      raw: true
+    })
+
+    // ========== 3. 查询资产分组列表（仅可交易） ==========
+    const assetGroupWhere = include_disabled ? {} : { is_enabled: true, is_tradable: true }
+    const assetGroups = await AssetGroupDef.findAll({
+      where: assetGroupWhere,
+      attributes: [
+        'group_code',
+        'display_name',
+        'description',
+        'group_type',
+        'color_hex',
+        'sort_order'
+      ],
+      order: [
+        ['sort_order', 'ASC'],
+        ['group_code', 'ASC']
+      ],
+      raw: true
+    })
+
+    // ========== 4. 返回挂牌类型列表（静态定义） ==========
+    const listingKinds = [
+      {
+        listing_kind: 'item_instance',
+        display_name: '物品',
+        description: '不可叠加物品（NFT类），如奖品实例'
+      },
+      {
+        listing_kind: 'fungible_asset',
+        display_name: '材料',
+        description: '可叠加资产，如材料碎片'
+      }
+    ]
+
+    logger.debug('[MarketListingService] 获取筛选维度配置成功', {
+      categories_count: categories.length,
+      rarities_count: rarities.length,
+      asset_groups_count: assetGroups.length,
+      include_disabled
+    })
+
+    return {
+      categories,
+      rarities,
+      asset_groups: assetGroups,
+      listing_kinds: listingKinds
+    }
+  }
+
+  /*
+   * ============================================================================
+   * 止损能力相关方法（2026-01-15 P1 - 孤儿冻结止损）
+   * ============================================================================
+   */
+
+  /**
+   * 暂停指定资产的新挂单（止损措施）
+   *
+   * 业务场景：
+   * - 孤儿冻结检测任务发现 P0 级别异常时触发
+   * - 暂时禁止该资产的新挂牌，防止异常扩大化
+   * - 不影响已有挂牌，不改动余额
+   *
+   * 实现方式：
+   * - 在 system_settings 中设置 marketplace/paused_assets 标记
+   * - createListing 时检查该标记，若暂停则拒绝创建
+   * - 记录审计日志便于追溯
+   *
+   * @param {string} asset_code - 资产代码（如 'POINTS', 'red_shard'）
+   * @param {Object} options - 配置选项
+   * @param {string} options.reason - 暂停原因（必填）
+   * @param {number} [options.duration_hours=24] - 暂停时长（小时，默认24）
+   * @param {number} [options.operator_id] - 操作者ID（可选，系统任务时为空）
+   * @returns {Promise<Object>} 暂停结果
+   *
+   * @example
+   * await MarketListingService.pauseListingForAsset('red_shard', {
+   *   reason: '孤儿冻结异常止损',
+   *   duration_hours: 24
+   * })
+   */
+  static async pauseListingForAsset(asset_code, options = {}) {
+    const { reason, duration_hours = 24, operator_id } = options
+
+    if (!asset_code) {
+      throw new Error('资产代码（asset_code）不能为空')
+    }
+
+    if (!reason) {
+      throw new Error('暂停原因（reason）不能为空')
+    }
+
+    const { SystemSetting } = require('../models')
+
+    // 1. 获取当前已暂停的资产列表
+    const settingKey = 'marketplace/paused_assets'
+    let pausedAssets = {}
+
+    const existingSetting = await SystemSetting.findOne({
+      where: { setting_key: settingKey }
+    })
+
+    if (existingSetting && existingSetting.setting_value) {
+      try {
+        pausedAssets = JSON.parse(existingSetting.setting_value)
+      } catch {
+        logger.warn('[MarketListingService] 解析暂停资产配置失败，使用空对象')
+        pausedAssets = {}
+      }
+    }
+
+    // 2. 添加/更新暂停记录
+    const pauseInfo = {
+      paused_at: new Date().toISOString(),
+      expires_at: new Date(Date.now() + duration_hours * 60 * 60 * 1000).toISOString(),
+      reason,
+      operator_id: operator_id || 'SYSTEM_ORPHAN_FROZEN_CHECK',
+      duration_hours
+    }
+
+    pausedAssets[asset_code] = pauseInfo
+
+    // 3. 保存配置
+    if (existingSetting) {
+      await existingSetting.update({
+        setting_value: JSON.stringify(pausedAssets)
+      })
+    } else {
+      await SystemSetting.create({
+        setting_key: settingKey,
+        setting_value: JSON.stringify(pausedAssets),
+        setting_type: 'json',
+        category: 'marketplace',
+        description: '暂停挂牌的资产列表（止损用）',
+        is_public: false
+      })
+    }
+
+    // 4. 记录审计日志
+    const AuditLogService = require('./AuditLogService')
+    await AuditLogService.logOperation({
+      operator_id: operator_id || 0,
+      operation_type: 'system_config',
+      target_type: 'SystemSetting',
+      target_id: settingKey,
+      action: 'pause_asset_listing',
+      before_data: existingSetting
+        ? { paused_assets: JSON.parse(existingSetting.setting_value || '{}') }
+        : {},
+      after_data: { paused_assets: pausedAssets },
+      reason,
+      is_critical_operation: true
+    })
+
+    logger.warn(`[MarketListingService] 已暂停资产 ${asset_code} 的新挂单`, {
+      asset_code,
+      reason,
+      duration_hours,
+      expires_at: pauseInfo.expires_at
+    })
+
+    return {
+      asset_code,
+      paused: true,
+      pause_info: pauseInfo
+    }
+  }
+
+  /**
+   * 恢复指定资产的挂单功能
+   *
+   * @param {string} asset_code - 资产代码
+   * @param {Object} options - 配置选项
+   * @param {string} options.reason - 恢复原因
+   * @param {number} [options.operator_id] - 操作者ID
+   * @returns {Promise<Object>} 恢复结果
+   */
+  static async resumeListingForAsset(asset_code, options = {}) {
+    const { reason = '手动恢复', operator_id } = options
+
+    if (!asset_code) {
+      throw new Error('资产代码（asset_code）不能为空')
+    }
+
+    const { SystemSetting } = require('../models')
+
+    const settingKey = 'marketplace/paused_assets'
+    const existingSetting = await SystemSetting.findOne({
+      where: { setting_key: settingKey }
+    })
+
+    if (!existingSetting || !existingSetting.setting_value) {
+      logger.info(`[MarketListingService] 资产 ${asset_code} 未被暂停，无需恢复`)
+      return { asset_code, resumed: false, reason: 'not_paused' }
+    }
+
+    let pausedAssets = {}
+    try {
+      pausedAssets = JSON.parse(existingSetting.setting_value)
+    } catch {
+      pausedAssets = {}
+    }
+
+    if (!pausedAssets[asset_code]) {
+      logger.info(`[MarketListingService] 资产 ${asset_code} 未被暂停，无需恢复`)
+      return { asset_code, resumed: false, reason: 'not_paused' }
+    }
+
+    // 记录恢复前状态
+    const beforeData = { ...pausedAssets }
+
+    // 移除暂停记录
+    delete pausedAssets[asset_code]
+
+    await existingSetting.update({
+      setting_value: JSON.stringify(pausedAssets)
+    })
+
+    // 记录审计日志
+    const AuditLogService = require('./AuditLogService')
+    await AuditLogService.logOperation({
+      operator_id: operator_id || 0,
+      operation_type: 'system_config',
+      target_type: 'SystemSetting',
+      target_id: settingKey,
+      action: 'resume_asset_listing',
+      before_data: { paused_assets: beforeData },
+      after_data: { paused_assets: pausedAssets },
+      reason,
+      is_critical_operation: true
+    })
+
+    logger.info(`[MarketListingService] 已恢复资产 ${asset_code} 的挂单功能`, {
+      asset_code,
+      reason
+    })
+
+    return {
+      asset_code,
+      resumed: true,
+      reason
+    }
+  }
+
+  /**
+   * 检查资产是否被暂停挂单
+   *
+   * @param {string} asset_code - 资产代码
+   * @returns {Promise<Object>} 检查结果 { is_paused, pause_info }
+   */
+  static async isAssetListingPaused(asset_code) {
+    const { SystemSetting } = require('../models')
+
+    const settingKey = 'marketplace/paused_assets'
+    const existingSetting = await SystemSetting.findOne({
+      where: { setting_key: settingKey }
+    })
+
+    if (!existingSetting || !existingSetting.setting_value) {
+      return { is_paused: false, pause_info: null }
+    }
+
+    let pausedAssets = {}
+    try {
+      pausedAssets = JSON.parse(existingSetting.setting_value)
+    } catch {
+      return { is_paused: false, pause_info: null }
+    }
+
+    const pauseInfo = pausedAssets[asset_code]
+
+    if (!pauseInfo) {
+      return { is_paused: false, pause_info: null }
+    }
+
+    // 检查是否已过期
+    if (pauseInfo.expires_at && new Date(pauseInfo.expires_at) < new Date()) {
+      // 自动清理过期记录
+      delete pausedAssets[asset_code]
+      await existingSetting.update({
+        setting_value: JSON.stringify(pausedAssets)
+      })
+      logger.info(`[MarketListingService] 资产 ${asset_code} 暂停已过期，自动恢复`)
+      return { is_paused: false, pause_info: null, expired: true }
+    }
+
+    return {
+      is_paused: true,
+      pause_info: pauseInfo
+    }
+  }
+
+  /**
+   * 获取所有暂停的资产列表
+   *
+   * @returns {Promise<Object>} 暂停资产列表
+   */
+  static async getPausedAssets() {
+    const { SystemSetting } = require('../models')
+
+    const settingKey = 'marketplace/paused_assets'
+    const existingSetting = await SystemSetting.findOne({
+      where: { setting_key: settingKey }
+    })
+
+    if (!existingSetting || !existingSetting.setting_value) {
+      return { paused_assets: {}, count: 0 }
+    }
+
+    let pausedAssets = {}
+    try {
+      pausedAssets = JSON.parse(existingSetting.setting_value)
+    } catch {
+      pausedAssets = {}
+    }
+
+    // 清理已过期的暂停记录
+    const now = new Date()
+    let hasExpired = false
+    for (const [assetCode, info] of Object.entries(pausedAssets)) {
+      if (info.expires_at && new Date(info.expires_at) < now) {
+        delete pausedAssets[assetCode]
+        hasExpired = true
+        logger.info(`[MarketListingService] 资产 ${assetCode} 暂停已过期，自动清理`)
+      }
+    }
+
+    // 如果有过期记录，更新数据库
+    if (hasExpired) {
+      await existingSetting.update({
+        setting_value: JSON.stringify(pausedAssets)
+      })
+    }
+
+    return {
+      paused_assets: pausedAssets,
+      count: Object.keys(pausedAssets).length
     }
   }
 }

@@ -47,6 +47,17 @@ models.UserPremiumStatus = require('./UserPremiumStatus')(sequelize, DataTypes)
  *    - 双重条件：history_total_points ≥ 100000（历史门槛） AND available_points ≥ 100（支付能力）
  */
 
+// 🔴 多币种风控配置模型（2026-01-14 新增）
+models.UserRiskProfile = require('./UserRiskProfile')(sequelize, DataTypes)
+/*
+ * ✅ UserRiskProfile：用户风控配置（多币种交易风控）
+ *    - 用途：存储用户等级默认配置和个人自定义风控配置（日限次、日限额）
+ *    - 特点：JSON可扩展的thresholds字段、支持账户冻结、优先级链（用户>等级>默认）
+ *    - 表名：user_risk_profiles，主键：risk_profile_id，外键：user_id
+ *    - 业务场景：多币种交易风控、用户等级阈值管理、账户冻结
+ *    - 配置类型：level（等级默认配置）、user（用户个人配置）
+ */
+
 // 🔴 抽奖系统核心模型
 models.LotteryCampaign = require('./LotteryCampaign')(sequelize, DataTypes)
 models.LotteryPrize = require('./LotteryPrize')(sequelize, DataTypes)
@@ -88,6 +99,39 @@ models.Product = require('./Product')(sequelize, DataTypes)
  *    - 用途：管理可兑换的商品信息（实物、虚拟商品、服务等）
  *    - 特点：商品名称、价格、库存、状态、描述
  *    - 表名：products，主键：product_id
+ */
+
+// 🔴 物品分类字典表（ItemTemplate 的依赖）
+models.CategoryDef = require('./CategoryDef')(sequelize, DataTypes)
+/*
+ * ✅ CategoryDef：物品类目字典
+ *    - 用途：定义商品/物品的分类（如电子产品、餐饮美食、优惠券等）
+ *    - 特点：标准化分类，支持前端筛选和分类展示
+ *    - 表名：category_defs，主键：category_code（字符串主键）
+ */
+
+models.RarityDef = require('./RarityDef')(sequelize, DataTypes)
+/*
+ * ✅ RarityDef：物品稀有度字典
+ *    - 用途：定义物品稀有度等级（如普通、稀有、史诗、传说等）
+ *    - 特点：标准化稀有度定义，支持前端展示和筛选
+ *    - 表名：rarity_defs，主键：rarity_code（字符串主键）
+ */
+
+models.AssetGroupDef = require('./AssetGroupDef')(sequelize, DataTypes)
+/*
+ * ✅ AssetGroupDef：资产组字典
+ *    - 用途：定义资产分组（如积分组、物品组、货币组等）
+ *    - 特点：标准化资产分组，支持市场和兑换业务
+ *    - 表名：asset_group_defs，主键：group_code（字符串主键）
+ */
+
+models.ItemTemplate = require('./ItemTemplate')(sequelize, DataTypes)
+/*
+ * ✅ ItemTemplate：物品模板定义（物品分类元数据）
+ *    - 用途：定义不可叠加物品的模板（名称、类目、稀有度、图片等）
+ *    - 特点：为 ItemInstance 提供模板定义，市场挂牌分类筛选
+ *    - 表名：item_templates，主键：item_template_id，唯一键：template_code
  */
 
 models.ItemInstance = require('./ItemInstance')(sequelize, DataTypes)

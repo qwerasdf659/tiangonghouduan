@@ -26,6 +26,16 @@ const logger = require('../../../utils/logger').logger
 const TransactionManager = require('../../../utils/TransactionManager')
 // P1-9：服务通过 ServiceManager 获取（B1-Injected + E2-Strict snake_case）
 
+/*
+ * 风控中间件（2026-01-14 多币种扩展新增）
+ * - 撤回操作不执行 fail-closed 策略：允许用户在任何情况下取回资产
+ * - 仅提供上下文注入，不阻断请求
+ */
+const {
+  getMarketRiskControlMiddleware
+} = require('../../../middleware/MarketRiskControlMiddleware')
+const marketRiskMiddleware = getMarketRiskControlMiddleware()
+
 /**
  * @route POST /api/v4/market/listings/:listing_id/withdraw
  * @desc 撤回市场挂牌
@@ -44,6 +54,7 @@ const TransactionManager = require('../../../utils/TransactionManager')
 router.post(
   '/listings/:listing_id/withdraw',
   authenticateToken,
+  marketRiskMiddleware.createWithdrawRiskMiddleware(),
   validatePositiveInteger('listing_id', 'params'),
   async (req, res) => {
     // P1-9：通过 ServiceManager 获取服务（B1-Injected + E2-Strict snake_case）
@@ -128,6 +139,7 @@ router.post(
 router.post(
   '/fungible-assets/:listing_id/withdraw',
   authenticateToken,
+  marketRiskMiddleware.createWithdrawRiskMiddleware(),
   validatePositiveInteger('listing_id', 'params'),
   async (req, res) => {
     // P1-9：通过 ServiceManager 获取服务（B1-Injected + E2-Strict snake_case）
@@ -170,9 +182,9 @@ router.post(
           withdrawn_at: new Date().toISOString(),
           balance_after: result.unfreeze_result?.balance
             ? {
-              available_amount: Number(result.unfreeze_result.balance.available_amount),
-              frozen_amount: Number(result.unfreeze_result.balance.frozen_amount)
-            }
+                available_amount: Number(result.unfreeze_result.balance.available_amount),
+                frozen_amount: Number(result.unfreeze_result.balance.frozen_amount)
+              }
             : null
         },
         '撤回成功。资产已解冻至您的可用余额。'

@@ -108,7 +108,9 @@ function renderAnnouncements(announcements) {
       const typeBadge = getTypeBadge(item.type)
       const priorityBadge = getPriorityBadge(item.priority)
       const createdAt = formatDateSafe(item.created_at)
-      const expiresAt = item.expires_at ? formatDateSafe(item.expires_at) : '<span class="text-muted">永久</span>'
+      const expiresAt = item.expires_at
+        ? formatDateSafe(item.expires_at)
+        : '<span class="text-muted">永久</span>'
 
       return `
       <tr>
@@ -355,13 +357,13 @@ function getPriorityBadge(priority) {
  */
 function formatDateSafe(dateStr) {
   if (!dateStr) return '-'
-  
+
   // 如果已经是中文格式（包含"年"），直接返回（去掉星期几）
   if (typeof dateStr === 'string' && dateStr.includes('年')) {
     // 移除星期几的信息，使显示更简洁
     return dateStr.replace(/星期[一二三四五六日]/, '').trim()
   }
-  
+
   // 尝试标准日期解析
   try {
     const date = new Date(dateStr)
@@ -383,7 +385,7 @@ function formatDateSafe(dateStr) {
 
 function formatDateTimeLocal(dateStr) {
   if (!dateStr) return ''
-  
+
   // 处理中文格式日期
   if (typeof dateStr === 'string' && dateStr.includes('年')) {
     // 解析中文日期格式：2026年1月9日星期五 08:25:48
@@ -394,7 +396,7 @@ function formatDateTimeLocal(dateStr) {
     }
     return ''
   }
-  
+
   try {
     const date = new Date(dateStr)
     if (isNaN(date.getTime())) return ''

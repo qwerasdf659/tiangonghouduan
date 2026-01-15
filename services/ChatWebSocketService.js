@@ -29,7 +29,7 @@ class ChatWebSocketService {
    * 构造函数 - 初始化连接管理和限制配置
    * @constructor
    */
-  constructor () {
+  constructor() {
     this.io = null
     this.connectedUsers = new Map() // 存储用户连接 {userId: socketId}
     this.connectedAdmins = new Map() // 存储客服连接 {adminId: socketId}
@@ -57,7 +57,7 @@ class ChatWebSocketService {
    * @param {Object} server - HTTP服务器实例
    * @returns {Promise<void>} 无返回值，初始化WebSocket服务并设置事件处理器
    */
-  async initialize (server) {
+  async initialize(server) {
     if (!server) {
       throw new Error('服务器实例不能为空')
     }
@@ -166,7 +166,7 @@ class ChatWebSocketService {
    * 设置事件处理器
    * @returns {void} 无返回值，设置WebSocket连接和消息事件处理器
    */
-  setupEventHandlers () {
+  setupEventHandlers() {
     this.io.on('connection', socket => {
       // 🔐 从JWT自动注册用户身份（P0安全修复 - 2025年12月18日）
       const userId = socket.user.user_id
@@ -273,7 +273,7 @@ class ChatWebSocketService {
    * @param {Object} message - 消息对象
    * @returns {Boolean} 是否推送成功
    */
-  pushMessageToUser (user_id, message) {
+  pushMessageToUser(user_id, message) {
     const socketId = this.connectedUsers.get(user_id)
     if (socketId) {
       try {
@@ -300,7 +300,7 @@ class ChatWebSocketService {
    * @param {Object} message - 消息对象
    * @returns {Boolean} 是否推送成功
    */
-  pushMessageToAdmin (admin_id, message) {
+  pushMessageToAdmin(admin_id, message) {
     const socketId = this.connectedAdmins.get(admin_id)
     if (socketId) {
       try {
@@ -326,7 +326,7 @@ class ChatWebSocketService {
    * @param {Object} message - 消息对象
    * @returns {Number} 成功推送的客服数量
    */
-  broadcastToAllAdmins (message) {
+  broadcastToAllAdmins(message) {
     let successCount = 0
 
     for (const [admin_id, socketId] of this.connectedAdmins.entries()) {
@@ -352,7 +352,7 @@ class ChatWebSocketService {
    * @param {Object} notification - 通知对象
    * @returns {Boolean} 是否推送成功
    */
-  pushNotificationToAdmin (admin_id, notification) {
+  pushNotificationToAdmin(admin_id, notification) {
     const socketId = this.connectedAdmins.get(admin_id)
     if (socketId) {
       try {
@@ -378,7 +378,7 @@ class ChatWebSocketService {
    * @param {Object} notification - 通知对象
    * @returns {Number} 成功推送的管理员数量
    */
-  broadcastNotificationToAllAdmins (notification) {
+  broadcastNotificationToAllAdmins(notification) {
     let successCount = 0
 
     for (const [admin_id, socketId] of this.connectedAdmins.entries()) {
@@ -425,7 +425,7 @@ class ChatWebSocketService {
    *   timestamp: "2025-11-08 20:30:00"  // 查询时间（北京时间）
    * }
    */
-  async getStatus () {
+  async getStatus() {
     try {
       const { WebSocketStartupLog } = require('../models')
       const currentLog = await WebSocketStartupLog.getCurrentRunning()
@@ -510,7 +510,7 @@ class ChatWebSocketService {
    * 获取在线用户列表
    * @returns {Array} 在线用户ID列表
    */
-  getOnlineUsers () {
+  getOnlineUsers() {
     return Array.from(this.connectedUsers.keys())
   }
 
@@ -518,7 +518,7 @@ class ChatWebSocketService {
    * 获取在线客服列表
    * @returns {Array} 在线客服ID列表
    */
-  getOnlineAdmins () {
+  getOnlineAdmins() {
     return Array.from(this.connectedAdmins.keys())
   }
 
@@ -527,7 +527,7 @@ class ChatWebSocketService {
    * @param {Number} user_id - 用户ID
    * @returns {Boolean} 是否在线
    */
-  isUserOnline (user_id) {
+  isUserOnline(user_id) {
     return this.connectedUsers.has(user_id)
   }
 
@@ -536,7 +536,7 @@ class ChatWebSocketService {
    * @param {Number} admin_id - 客服ID
    * @returns {Boolean} 是否在线
    */
-  isAdminOnline (admin_id) {
+  isAdminOnline(admin_id) {
     return this.connectedAdmins.has(admin_id)
   }
 
@@ -546,7 +546,7 @@ class ChatWebSocketService {
    * @param {String} user_type - 用户类型 'user' 或 'admin'
    * @returns {void} 无返回值，强制断开用户WebSocket连接
    */
-  disconnectUser (user_id, user_type = 'user') {
+  disconnectUser(user_id, user_type = 'user') {
     const map = user_type === 'user' ? this.connectedUsers : this.connectedAdmins
     const socketId = map.get(user_id)
 
@@ -570,7 +570,7 @@ class ChatWebSocketService {
    * 流程：记录停止事件 → 断开所有连接 → 关闭Socket.IO → 清理资源
    * 用途：服务维护、部署更新、异常处理、审计追踪
    */
-  async shutdown (reason = '正常停止') {
+  async shutdown(reason = '正常停止') {
     wsLogger.info('WebSocket服务正在停止...', { reason })
 
     try {
@@ -627,7 +627,7 @@ class ChatWebSocketService {
    * - 用户刷新页面会看到最新状态（系统消息）
    * - 离线用户上线后可查看系统消息
    */
-  notifySessionClosed (session_id, user_id, admin_id, closeData) {
+  notifySessionClosed(session_id, user_id, admin_id, closeData) {
     const result = {
       notified_user: false,
       notified_admin: false,
@@ -709,7 +709,7 @@ class ChatWebSocketService {
    * 获取服务器IP地址（2025年11月08日新增）
    * @returns {String} 服务器IP地址
    */
-  getServerIP () {
+  getServerIP() {
     try {
       const os = require('os')
       const interfaces = os.networkInterfaces()
@@ -730,7 +730,7 @@ class ChatWebSocketService {
    * 获取单例实例（静态方法）
    * @returns {ChatWebSocketService} WebSocket服务实例
    */
-  static getInstance () {
+  static getInstance() {
     return chatWebSocketServiceInstance
   }
 }

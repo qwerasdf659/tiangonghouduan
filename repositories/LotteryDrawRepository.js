@@ -20,7 +20,7 @@ class LotteryDrawRepository {
    * @param {Object} models - 模型集合（包含 LotteryDraw/LotteryPrize/User/sequelize）
    * @returns {void} 无返回值
    */
-  constructor (models) {
+  constructor(models) {
     this.LotteryDraw = models.LotteryDraw
     this.LotteryPrize = models.LotteryPrize
     this.User = models.User
@@ -33,7 +33,7 @@ class LotteryDrawRepository {
    * @param {Object} options - 查询选项
    * @returns {Array} 抽奖记录数组
    */
-  async getUserRecords (userId, options = {}) {
+  async getUserRecords(userId, options = {}) {
     const {
       drawType = null,
       prizeType = null,
@@ -89,7 +89,7 @@ class LotteryDrawRepository {
    * @param {Object} options - 查询选项
    * @returns {Object} {count, rows}
    */
-  async getUserRecordsWithCount (userId, options = {}) {
+  async getUserRecordsWithCount(userId, options = {}) {
     const {
       drawType = null,
       prizeType = null,
@@ -144,7 +144,7 @@ class LotteryDrawRepository {
    * @param {Number} userId - 用户ID
    * @returns {Object} 统计数据
    */
-  async getUserLotteryStats (userId) {
+  async getUserLotteryStats(userId) {
     const [stats] = await this.sequelize.query(
       `
       SELECT
@@ -170,7 +170,7 @@ class LotteryDrawRepository {
    * @param {Object} conditions - 分析条件
    * @returns {Object} 分析结果
    */
-  async batchAnalyze (conditions = {}) {
+  async batchAnalyze(conditions = {}) {
     const baseWhere = { ...conditions }
 
     const [totalDraws, highTierDraws, prizeStats] = await Promise.all([
@@ -212,7 +212,7 @@ class LotteryDrawRepository {
    * @param {Object} options - 查询选项
    * @returns {Object} {count, rows}
    */
-  async getLotteryHistory (options = {}) {
+  async getLotteryHistory(options = {}) {
     const {
       userId = null,
       campaignId = null,
@@ -268,7 +268,7 @@ class LotteryDrawRepository {
    * 获取今日抽奖统计（V4.0语义更新）
    * @returns {Object} 今日统计数据
    */
-  async getTodayStats () {
+  async getTodayStats() {
     const todayStart = BeijingTimeHelper.createBeijingTime()
     todayStart.setHours(0, 0, 0, 0)
 
@@ -308,7 +308,7 @@ class LotteryDrawRepository {
    * @param {Object} options - 查询选项
    * @returns {Array} 日期统计数组
    */
-  async getDailyStats (options = {}) {
+  async getDailyStats(options = {}) {
     const { startDate = null, endDate = null, campaignId = null } = options
 
     const where = {}
@@ -328,7 +328,7 @@ class LotteryDrawRepository {
         [
           this.sequelize.fn(
             'SUM',
-            this.sequelize.literal('CASE WHEN reward_tier = \'high\' THEN 1 ELSE 0 END')
+            this.sequelize.literal("CASE WHEN reward_tier = 'high' THEN 1 ELSE 0 END")
           ),
           'total_high_tier_wins'
         ]
@@ -346,7 +346,7 @@ class LotteryDrawRepository {
    * @param {Object} conditions - 附加条件
    * @returns {Array} 最近的抽奖记录
    */
-  async getRecentDraws (limit = 10, conditions = {}) {
+  async getRecentDraws(limit = 10, conditions = {}) {
     return await this.LotteryDraw.findAll({
       where: conditions,
       include: [
@@ -372,7 +372,7 @@ class LotteryDrawRepository {
    * @param {Number} minutes - 分钟数，默认30分钟内
    * @returns {Number} 在线用户数
    */
-  async getActiveUsersCount (minutes = 30) {
+  async getActiveUsersCount(minutes = 30) {
     const cutoffTime = new Date(Date.now() - minutes * 60 * 1000)
 
     return await this.LotteryDraw.count({
@@ -392,7 +392,7 @@ class LotteryDrawRepository {
    * @param {Object} options - 查询选项
    * @returns {Array} 抽奖记录数组
    */
-  async findByUserIds (userIds, options = {}) {
+  async findByUserIds(userIds, options = {}) {
     // V4.0语义更新：使用 rewardTier 替代 isWinner
     const { rewardTier = null, startDate = null, endDate = null, limit = null } = options
 
@@ -427,7 +427,7 @@ class LotteryDrawRepository {
    * @param {Object} options - 查询选项
    * @returns {Array} 抽奖记录数组
    */
-  async findByBatchId (batchId, options = {}) {
+  async findByBatchId(batchId, options = {}) {
     const { includePrize = false } = options
 
     const queryOptions = {
@@ -454,7 +454,7 @@ class LotteryDrawRepository {
    * @param {Object} transaction - 事务对象
    * @returns {Number} 删除的记录数
    */
-  async deleteRecords (conditions, transaction = null) {
+  async deleteRecords(conditions, transaction = null) {
     const options = { where: conditions }
     if (transaction) options.transaction = transaction
 
@@ -468,7 +468,7 @@ class LotteryDrawRepository {
    * @param {Object} transaction - 事务对象
    * @returns {Array} [更新数量, 更新的记录]
    */
-  async updateRecords (conditions, updateData, transaction = null) {
+  async updateRecords(conditions, updateData, transaction = null) {
     const options = { where: conditions }
     if (transaction) options.transaction = transaction
 

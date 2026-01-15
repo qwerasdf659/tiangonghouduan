@@ -111,7 +111,7 @@ module.exports = {
     if (count > 0) {
       console.warn(
         `⚠️ 警告：存在${count}条包含lottery_session_id的抽奖记录。` +
-        '回滚后这些记录的lottery_session_id信息将丢失。'
+          '回滚后这些记录的lottery_session_id信息将丢失。'
       )
     }
 

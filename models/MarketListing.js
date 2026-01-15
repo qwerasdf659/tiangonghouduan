@@ -109,6 +109,58 @@ module.exports = sequelize => {
         }
       },
 
+      /*
+       * === 快照字段（物品实例相关）- 2026-01-15 新增 ===
+       * 物品模板ID（快照）
+       */
+      offer_item_template_id: {
+        type: DataTypes.BIGINT,
+        allowNull: true,
+        comment:
+          '挂牌物品模板ID（快照 → item_templates.item_template_id）：仅 listing_kind=item_instance 时有值，挂牌时从物品实例关联的模板复制'
+      },
+
+      // 物品类目代码（快照）
+      offer_item_category_code: {
+        type: DataTypes.STRING(50),
+        allowNull: true,
+        comment:
+          '挂牌物品类目代码（快照 → category_defs.category_code）：用于前端筛选，挂牌时从物品模板复制'
+      },
+
+      // 物品稀有度（快照）
+      offer_item_rarity: {
+        type: DataTypes.STRING(50),
+        allowNull: true,
+        comment:
+          '挂牌物品稀有度（快照 → rarity_defs.rarity_code）：用于前端筛选，挂牌时从物品模板复制'
+      },
+
+      // 物品显示名称（快照）
+      offer_item_display_name: {
+        type: DataTypes.STRING(200),
+        allowNull: true,
+        comment: '挂牌物品显示名称（快照）：便于搜索和展示，挂牌时从物品模板复制'
+      },
+
+      /*
+       * === 快照字段（可叠加资产相关）- 2026-01-15 新增 ===
+       * 资产分组代码（快照）
+       */
+      offer_asset_group_code: {
+        type: DataTypes.STRING(50),
+        allowNull: true,
+        comment:
+          '挂牌资产分组代码（快照 → asset_group_defs.group_code）：仅 listing_kind=fungible_asset 时有值，用于前端筛选'
+      },
+
+      // 资产显示名称（快照）
+      offer_asset_display_name: {
+        type: DataTypes.STRING(100),
+        allowNull: true,
+        comment: '挂牌资产显示名称（快照）：便于搜索和展示，挂牌时从 material_asset_types 复制'
+      },
+
       // 标的资产（Offer）- 可叠加资产
       offer_asset_code: {
         type: DataTypes.STRING(50),
@@ -238,6 +290,47 @@ module.exports = sequelize => {
       as: 'offerItem',
       comment: '标的物品实例关联（Offer Item Association）- 关联挂牌的物品实例（物品所有权真相）'
     })
+
+    // === 2026-01-15 新增：快照字段关联 ===
+
+    // 物品模板关联（快照来源）
+    if (models.ItemTemplate) {
+      MarketListing.belongsTo(models.ItemTemplate, {
+        foreignKey: 'offer_item_template_id',
+        as: 'offerItemTemplate',
+        comment: '物品模板关联（快照来源）- 关联挂牌物品的模板定义'
+      })
+    }
+
+    // 物品类目关联（筛选维度）
+    if (models.CategoryDef) {
+      MarketListing.belongsTo(models.CategoryDef, {
+        foreignKey: 'offer_item_category_code',
+        targetKey: 'category_code',
+        as: 'offerCategory',
+        comment: '物品类目关联（筛选维度）- 关联挂牌物品的类目'
+      })
+    }
+
+    // 物品稀有度关联（筛选维度）
+    if (models.RarityDef) {
+      MarketListing.belongsTo(models.RarityDef, {
+        foreignKey: 'offer_item_rarity',
+        targetKey: 'rarity_code',
+        as: 'offerRarity',
+        comment: '物品稀有度关联（筛选维度）- 关联挂牌物品的稀有度'
+      })
+    }
+
+    // 资产分组关联（筛选维度）
+    if (models.AssetGroupDef) {
+      MarketListing.belongsTo(models.AssetGroupDef, {
+        foreignKey: 'offer_asset_group_code',
+        targetKey: 'group_code',
+        as: 'offerAssetGroup',
+        comment: '资产分组关联（筛选维度）- 关联挂牌资产的分组'
+      })
+    }
 
     // 锁定订单
     MarketListing.belongsTo(models.TradeOrder, {

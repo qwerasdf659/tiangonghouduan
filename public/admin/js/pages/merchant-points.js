@@ -25,7 +25,7 @@
  * - submitted_at: 提交时间
  * - audited_at: 审核时间
  * - created_at: 创建时间
- * 
+ *
  * CSP兼容：使用事件委托代替内联事件处理器
  */
 
@@ -52,15 +52,15 @@ document.addEventListener('DOMContentLoaded', function () {
   // 事件监听器
   document.getElementById('logoutBtn').addEventListener('click', logout)
   document.getElementById('refreshBtn').addEventListener('click', loadData)
-  document.getElementById('statusFilter').addEventListener('change', function() {
+  document.getElementById('statusFilter').addEventListener('change', function () {
     currentPage = 1
     loadData()
   })
-  document.getElementById('timeRangeFilter').addEventListener('change', function() {
+  document.getElementById('timeRangeFilter').addEventListener('change', function () {
     currentPage = 1
     loadData()
   })
-  document.getElementById('priorityFilter').addEventListener('change', function() {
+  document.getElementById('priorityFilter').addEventListener('change', function () {
     currentPage = 1
     loadData()
   })
@@ -68,17 +68,17 @@ document.addEventListener('DOMContentLoaded', function () {
   document.getElementById('headerCheckbox').addEventListener('change', toggleSelectAll)
   document.getElementById('batchApproveBtn').addEventListener('click', batchApprove)
   document.getElementById('batchRejectBtn').addEventListener('click', batchReject)
-  document.getElementById('approveBtn').addEventListener('click', function() {
+  document.getElementById('approveBtn').addEventListener('click', function () {
     reviewSingle('approve')
   })
-  document.getElementById('rejectBtn').addEventListener('click', function() {
+  document.getElementById('rejectBtn').addEventListener('click', function () {
     reviewSingle('reject')
   })
 
   // 事件委托：处理表格内的点击事件（CSP兼容）
   document.getElementById('reviewTableBody').addEventListener('click', handleTableClick)
   document.getElementById('reviewTableBody').addEventListener('change', handleTableChange)
-  
+
   // 事件委托：处理分页点击事件（CSP兼容）
   document.getElementById('paginationNav').addEventListener('click', handlePaginationClick)
 
@@ -95,7 +95,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
 /**
  * 处理表格内的点击事件（事件委托）
- * @param {Event} event 
+ * @param {Event} event
  */
 function handleTableClick(event) {
   const target = event.target.closest('button')
@@ -113,7 +113,7 @@ function handleTableClick(event) {
 
 /**
  * 处理表格内的change事件（事件委托）
- * @param {Event} event 
+ * @param {Event} event
  */
 function handleTableChange(event) {
   const target = event.target
@@ -127,7 +127,7 @@ function handleTableChange(event) {
 
 /**
  * 处理分页点击事件（事件委托）
- * @param {Event} event 
+ * @param {Event} event
  */
 function handlePaginationClick(event) {
   event.preventDefault()
@@ -187,7 +187,7 @@ async function loadData() {
 
       // 渲染表格
       renderTable(rows || [])
-      
+
       // 重新加载统计数据（从stats API获取准确统计）
       loadPendingStats()
 
@@ -273,20 +273,20 @@ function renderTable(applications) {
       // 直接使用后端字段名，不做复杂映射
       const auditId = app.audit_id
       const pointsAmount = app.points_amount || 0
-      
+
       // 申请人信息：使用 applicant 对象
-      const applicantName = app.applicant 
-        ? (app.applicant.nickname || app.applicant.mobile || `用户${app.applicant.user_id}`)
+      const applicantName = app.applicant
+        ? app.applicant.nickname || app.applicant.mobile || `用户${app.applicant.user_id}`
         : `用户${app.user_id}`
-      
+
       // 审核员信息：使用 auditor 对象
-      const auditorName = app.auditor 
-        ? (app.auditor.nickname || app.auditor.mobile || `管理员${app.auditor.user_id}`)
+      const auditorName = app.auditor
+        ? app.auditor.nickname || app.auditor.mobile || `管理员${app.auditor.user_id}`
         : '-'
-      
+
       // 申请描述
       const description = app.description || '-'
-      
+
       // 提交时间
       const submittedAt = app.submitted_at || app.created_at
 
@@ -386,19 +386,19 @@ async function showReviewModal(auditId) {
 
       // 直接使用后端字段名
       document.getElementById('modalApplyId').textContent = app.audit_id
-      
+
       // 申请人信息
-      const applicantName = app.applicant 
-        ? (app.applicant.nickname || app.applicant.mobile || `用户${app.applicant.user_id}`)
+      const applicantName = app.applicant
+        ? app.applicant.nickname || app.applicant.mobile || `用户${app.applicant.user_id}`
         : `用户${app.user_id}`
       document.getElementById('modalUser').textContent = applicantName
-      
+
       // 积分数量
       document.getElementById('modalPoints').textContent = app.points_amount || 0
-      
+
       // 申请描述
       document.getElementById('modalRemark').textContent = app.description || '-'
-      
+
       document.getElementById('reviewComment').value = ''
 
       new bootstrap.Modal(document.getElementById('reviewModal')).show()

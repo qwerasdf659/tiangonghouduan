@@ -78,7 +78,9 @@ module.exports = {
         `)
 
         if (invalidRecords[0].count > 0) {
-          console.log(`⚠️ 发现 ${invalidRecords[0].count} 条 approved 记录缺失 reward_transaction_id`)
+          console.log(
+            `⚠️ 发现 ${invalidRecords[0].count} 条 approved 记录缺失 reward_transaction_id`
+          )
           console.log('⚠️ 跳过 CHECK 约束，请先回填数据')
         } else {
           // 添加 CHECK 约束

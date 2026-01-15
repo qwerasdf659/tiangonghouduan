@@ -100,7 +100,8 @@ async function check_consumption_consistency() {
 
     // 1. 检查 approved 状态但缺失奖励流水的记录
     // 幂等键格式：consumption_reward:approve:{record_id}
-    const [missing_rewards] = await sequelize.query(`
+    const [missing_rewards] = await sequelize.query(
+      `
       SELECT
         cr.record_id,
         cr.user_id,
@@ -118,10 +119,13 @@ async function check_consumption_consistency() {
         AND cr.created_at >= ?
         AND atx.transaction_id IS NULL
       LIMIT 50
-    `, { replacements: [CUTOFF_DATE] })
+    `,
+      { replacements: [CUTOFF_DATE] }
+    )
 
     // 2. 检查奖励金额不一致的记录
-    const [amount_mismatch] = await sequelize.query(`
+    const [amount_mismatch] = await sequelize.query(
+      `
       SELECT
         cr.record_id,
         cr.user_id,
@@ -136,11 +140,14 @@ async function check_consumption_consistency() {
         AND cr.created_at >= ?
         AND cr.points_to_award != atx.delta_amount
       LIMIT 50
-    `, { replacements: [CUTOFF_DATE] })
+    `,
+      { replacements: [CUTOFF_DATE] }
+    )
 
     // 3. 检查孤立的奖励流水（有流水但无对应消费记录）
     // 排除测试数据：idempotency_key 包含 test_ 的流水是测试产生的，不参与对账
-    const [orphan_rewards] = await sequelize.query(`
+    const [orphan_rewards] = await sequelize.query(
+      `
       SELECT
         atx.transaction_id,
         atx.idempotency_key,
@@ -154,10 +161,13 @@ async function check_consumption_consistency() {
         AND cr.record_id IS NULL
         AND atx.idempotency_key NOT LIKE '%test_%'
       LIMIT 20
-    `, { replacements: [CUTOFF_DATE] })
+    `,
+      { replacements: [CUTOFF_DATE] }
+    )
 
     // 4. 汇总统计
-    const [stats] = await sequelize.query(`
+    const [stats] = await sequelize.query(
+      `
       SELECT
         COUNT(*) as total_consumption,
         SUM(CASE WHEN status = 'approved' THEN 1 ELSE 0 END) as approved_count,
@@ -166,7 +176,9 @@ async function check_consumption_consistency() {
         SUM(CASE WHEN status = 'approved' THEN points_to_award ELSE 0 END) as total_points_awarded
       FROM consumption_records
       WHERE created_at >= ?
-    `, { replacements: [CUTOFF_DATE] })
+    `,
+      { replacements: [CUTOFF_DATE] }
+    )
 
     console.log('\n📊 对账统计:')
     console.log(`   - 分界线后消费记录总数: ${stats[0].total_consumption}`)
@@ -176,7 +188,8 @@ async function check_consumption_consistency() {
     console.log(`   - 应发放积分总额: ${stats[0].total_points_awarded}`)
 
     // 5. 处理结果
-    const has_errors = missing_rewards.length > 0 || amount_mismatch.length > 0 || orphan_rewards.length > 0
+    const has_errors =
+      missing_rewards.length > 0 || amount_mismatch.length > 0 || orphan_rewards.length > 0
 
     if (has_errors) {
       console.log('\n❌ 发现数据不一致:')
@@ -184,7 +197,9 @@ async function check_consumption_consistency() {
       if (missing_rewards.length > 0) {
         console.log(`\n   缺失奖励流水的 approved 记录 (${missing_rewards.length}条):`)
         missing_rewards.slice(0, 10).forEach(r => {
-          console.log(`   - record_id: ${r.record_id}, user_id: ${r.user_id}, points_to_award: ${r.points_to_award}`)
+          console.log(
+            `   - record_id: ${r.record_id}, user_id: ${r.user_id}, points_to_award: ${r.points_to_award}`
+          )
         })
         if (missing_rewards.length > 10) {
           console.log(`   ... 还有 ${missing_rewards.length - 10} 条`)
@@ -194,7 +209,9 @@ async function check_consumption_consistency() {
       if (amount_mismatch.length > 0) {
         console.log(`\n   奖励金额不一致 (${amount_mismatch.length}条):`)
         amount_mismatch.slice(0, 10).forEach(r => {
-          console.log(`   - record_id: ${r.record_id}, 期望: ${r.expected_points}, 实际: ${r.actual_points}, 差异: ${r.diff}`)
+          console.log(
+            `   - record_id: ${r.record_id}, 期望: ${r.expected_points}, 实际: ${r.actual_points}, 差异: ${r.diff}`
+          )
         })
       }
 

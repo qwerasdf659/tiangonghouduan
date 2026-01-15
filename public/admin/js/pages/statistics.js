@@ -1,7 +1,7 @@
 /**
  * 数据统计报表页面 - JavaScript逻辑
  * 从statistics.html提取，遵循前端工程化最佳实践
- * 
+ *
  * 2026-01-09 更新：适配后端 ReportingService.getChartsData() 返回的数据格式
  * 后端数据结构：
  *   - user_growth: [{date, count, cumulative}]
@@ -42,11 +42,16 @@ document.addEventListener('DOMContentLoaded', function () {
  */
 function periodToDays(period) {
   switch (period) {
-    case 'today': return 1
-    case 'yesterday': return 1
-    case 'week': return 7
-    case 'month': return 30
-    default: return 7
+    case 'today':
+      return 1
+    case 'yesterday':
+      return 1
+    case 'week':
+      return 7
+    case 'month':
+      return 30
+    default:
+      return 7
   }
 }
 
@@ -55,7 +60,7 @@ async function loadStatistics() {
 
   try {
     const period = document.getElementById('periodSelect').value
-    
+
     // 后端API使用 days 参数
     const days = periodToDays(period)
     const params = new URLSearchParams({ days })
@@ -95,22 +100,28 @@ async function loadStatistics() {
  */
 function renderStatistics(data) {
   // ========== 1. 核心指标总览（从后端数据计算）==========
-  
+
   // 总用户数：从 user_types.total 获取
   const totalUsers = data.user_types?.total || 0
   document.getElementById('totalUsers').textContent = formatNumber(totalUsers)
-  
+
   // 总抽奖次数：从 lottery_trend 数组求和
   const totalDraws = (data.lottery_trend || []).reduce((sum, item) => sum + (item.count || 0), 0)
   document.getElementById('totalDraws').textContent = formatNumber(totalDraws)
-  
+
   // 高档奖励率（原中奖率）：从 lottery_trend 计算
-  const totalHighTier = (data.lottery_trend || []).reduce((sum, item) => sum + (item.high_tier_count || 0), 0)
-  const highTierRate = totalDraws > 0 ? (totalHighTier / totalDraws * 100) : 0
+  const totalHighTier = (data.lottery_trend || []).reduce(
+    (sum, item) => sum + (item.high_tier_count || 0),
+    0
+  )
+  const highTierRate = totalDraws > 0 ? (totalHighTier / totalDraws) * 100 : 0
   document.getElementById('winRate').textContent = `${highTierRate.toFixed(2)}%`
-  
+
   // 总消费金额：从 consumption_trend 数组求和
-  const totalRevenue = (data.consumption_trend || []).reduce((sum, item) => sum + parseFloat(item.amount || 0), 0)
+  const totalRevenue = (data.consumption_trend || []).reduce(
+    (sum, item) => sum + parseFloat(item.amount || 0),
+    0
+  )
   document.getElementById('totalRevenue').textContent = `¥${totalRevenue.toFixed(2)}`
 
   // 计算趋势（基于最近和之前数据的对比）
@@ -125,58 +136,63 @@ function renderStatistics(data) {
   renderTrend('revenueTrend', revenueTrend)
 
   // ========== 2. 用户数据统计（从 user_types 和 user_growth 获取）==========
-  
+
   // 新增用户：从 user_growth 最新一天的 count
   const userGrowth = data.user_growth || []
   const recentNewUsers = userGrowth.length > 0 ? userGrowth[userGrowth.length - 1].count : 0
   const periodNewUsers = userGrowth.reduce((sum, item) => sum + (item.count || 0), 0)
   document.getElementById('newUsers').textContent = formatNumber(periodNewUsers)
-  
+
   // 活跃用户：从 active_hours 统计总活跃数
-  const activeCount = (data.active_hours || []).reduce((sum, item) => sum + (item.activity_count || 0), 0)
+  const activeCount = (data.active_hours || []).reduce(
+    (sum, item) => sum + (item.activity_count || 0),
+    0
+  )
   document.getElementById('activeUsers').textContent = formatNumber(activeCount)
-  
+
   // 管理员用户数
   const adminUsers = data.user_types?.admin?.count || 0
   document.getElementById('vipUsers').textContent = formatNumber(adminUsers)
-  
+
   // 普通用户数（作为"封禁用户"的替代，显示普通用户）
   const regularUsers = data.user_types?.regular?.count || 0
   document.getElementById('bannedUsers').textContent = formatNumber(regularUsers)
 
   // ========== 3. 抽奖数据统计（从 lottery_trend 获取）==========
-  
+
   document.getElementById('lotteryDraws').textContent = formatNumber(totalDraws)
   document.getElementById('lotteryWins').textContent = formatNumber(totalHighTier)
   document.getElementById('lotteryLosses').textContent = formatNumber(totalDraws - totalHighTier)
   document.getElementById('avgWinRate').textContent = `${highTierRate.toFixed(2)}%`
 
   // ========== 4. 消费数据统计（从 consumption_trend 获取）==========
-  
+
   const consumptionTotal = totalRevenue
-  const consumptionCount = (data.consumption_trend || []).reduce((sum, item) => sum + (item.count || 0), 0)
-  
+  const consumptionCount = (data.consumption_trend || []).reduce(
+    (sum, item) => sum + (item.count || 0),
+    0
+  )
+
   document.getElementById('consumptionTotal').textContent = `¥${consumptionTotal.toFixed(2)}`
   document.getElementById('consumptionApproved').textContent = `¥${consumptionTotal.toFixed(2)}`
   document.getElementById('consumptionPending').textContent = `¥0.00`
   document.getElementById('consumptionRejected').textContent = `¥0.00`
 
   // ========== 5. 积分数据统计（从 points_flow 获取）==========
-  
+
   const pointsData = data.points_flow || []
   const totalEarned = pointsData.reduce((sum, item) => sum + (item.earned || 0), 0)
   const totalSpent = pointsData.reduce((sum, item) => sum + (item.spent || 0), 0)
   const totalBalanceChange = pointsData.reduce((sum, item) => sum + (item.balance_change || 0), 0)
-  
+
   document.getElementById('pointsIssued').textContent = formatNumber(totalEarned)
   document.getElementById('pointsConsumed').textContent = formatNumber(totalSpent)
   document.getElementById('pointsCurrent').textContent = formatNumber(totalBalanceChange)
-  document.getElementById('pointsAverage').textContent = totalUsers > 0 
-    ? formatNumber(Math.round(totalBalanceChange / totalUsers)) 
-    : '0'
+  document.getElementById('pointsAverage').textContent =
+    totalUsers > 0 ? formatNumber(Math.round(totalBalanceChange / totalUsers)) : '0'
 
   // ========== 6. 奖品发放统计（从 top_prizes 获取）==========
-  
+
   if (data.top_prizes && Array.isArray(data.top_prizes)) {
     renderPrizeStats(data.top_prizes)
   } else {
@@ -184,7 +200,7 @@ function renderStatistics(data) {
   }
 
   // ========== 7. 活跃时段统计（从 active_hours 获取，替代客服统计）==========
-  
+
   if (data.active_hours && Array.isArray(data.active_hours)) {
     renderActiveHoursStats(data.active_hours)
   } else {
@@ -201,13 +217,15 @@ function renderStatistics(data) {
  */
 function calculateGrowthTrend(userGrowth) {
   if (!userGrowth || userGrowth.length < 2) return 0
-  
+
   const midPoint = Math.floor(userGrowth.length / 2)
   const recentSum = userGrowth.slice(midPoint).reduce((sum, item) => sum + (item.count || 0), 0)
-  const previousSum = userGrowth.slice(0, midPoint).reduce((sum, item) => sum + (item.count || 0), 0)
-  
+  const previousSum = userGrowth
+    .slice(0, midPoint)
+    .reduce((sum, item) => sum + (item.count || 0), 0)
+
   if (previousSum === 0) return recentSum > 0 ? 100 : 0
-  return ((recentSum - previousSum) / previousSum * 100)
+  return ((recentSum - previousSum) / previousSum) * 100
 }
 
 /**
@@ -215,13 +233,17 @@ function calculateGrowthTrend(userGrowth) {
  */
 function calculateArrayTrend(dataArray, field) {
   if (!dataArray || dataArray.length < 2) return 0
-  
+
   const midPoint = Math.floor(dataArray.length / 2)
-  const recentSum = dataArray.slice(midPoint).reduce((sum, item) => sum + parseFloat(item[field] || 0), 0)
-  const previousSum = dataArray.slice(0, midPoint).reduce((sum, item) => sum + parseFloat(item[field] || 0), 0)
-  
+  const recentSum = dataArray
+    .slice(midPoint)
+    .reduce((sum, item) => sum + parseFloat(item[field] || 0), 0)
+  const previousSum = dataArray
+    .slice(0, midPoint)
+    .reduce((sum, item) => sum + parseFloat(item[field] || 0), 0)
+
   if (previousSum === 0) return recentSum > 0 ? 100 : 0
-  return ((recentSum - previousSum) / previousSum * 100)
+  return ((recentSum - previousSum) / previousSum) * 100
 }
 
 function renderTrend(elementId, trend) {
@@ -280,21 +302,24 @@ function renderActiveHoursStats(activeHours) {
     document.getElementById('customerSatisfaction').textContent = '-'
     return
   }
-  
+
   // 总活跃次数
   const totalActivity = activeHours.reduce((sum, item) => sum + (item.activity_count || 0), 0)
-  
+
   // 找出最活跃的时段
-  const sortedHours = [...activeHours].sort((a, b) => (b.activity_count || 0) - (a.activity_count || 0))
+  const sortedHours = [...activeHours].sort(
+    (a, b) => (b.activity_count || 0) - (a.activity_count || 0)
+  )
   const peakHour = sortedHours[0]
-  
+
   // 计算活跃时段数（有活动的小时数）
   const activeHourCount = activeHours.filter(h => h.activity_count > 0).length
-  
+
   document.getElementById('totalSessions').textContent = formatNumber(totalActivity)
   document.getElementById('closedSessions').textContent = formatNumber(activeHourCount)
   document.getElementById('avgResponseTime').textContent = peakHour ? peakHour.hour_label : '-'
-  document.getElementById('customerSatisfaction').textContent = `${((activeHourCount / 24) * 100).toFixed(0)}%`
+  document.getElementById('customerSatisfaction').textContent =
+    `${((activeHourCount / 24) * 100).toFixed(0)}%`
 }
 
 /**

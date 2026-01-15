@@ -96,7 +96,7 @@ function updateSummary(summary) {
 
 /**
  * 更新表格
- * 
+ *
  * 后端返回的stats字段格式：
  * - user_id: 用户ID
  * - mobile: 手机号
@@ -122,9 +122,12 @@ function updateTable(stats) {
       // 计算百分比
       const percentage = Math.min(100, Math.round((item.listing_count / maxListings) * 100))
       // 确定上架状态
-      const listingStatus = item.is_at_limit ? 'at_limit' : 
-                           (item.listing_count >= maxListings * 0.8 ? 'near_limit' : 'normal')
-      
+      const listingStatus = item.is_at_limit
+        ? 'at_limit'
+        : item.listing_count >= maxListings * 0.8
+          ? 'near_limit'
+          : 'normal'
+
       return `
     <tr>
       <td>${item.user_id}</td>
@@ -169,7 +172,7 @@ function updateTable(stats) {
 
   // 使用 addEventListener 绑定事件（避免 CSP 内联脚本警告）
   tbody.querySelectorAll('.btn-view-listings').forEach(btn => {
-    btn.addEventListener('click', function() {
+    btn.addEventListener('click', function () {
       const userId = this.getAttribute('data-user-id')
       viewUserListings(userId)
     })
@@ -221,7 +224,7 @@ function updatePagination(pagination) {
 
   // 使用 addEventListener 绑定分页事件（避免 CSP 内联脚本警告）
   paginationEl.querySelectorAll('.page-btn').forEach(btn => {
-    btn.addEventListener('click', function(e) {
+    btn.addEventListener('click', function (e) {
       e.preventDefault()
       const page = parseInt(this.getAttribute('data-page'))
       if (!isNaN(page) && page >= 1 && page <= totalPages) {
@@ -351,7 +354,7 @@ function formatDate(dateStr) {
 
 /**
  * 获取用户状态徽章
- * 
+ *
  * 后端返回的status字段是用户账户状态：
  * - active: 正常
  * - inactive: 禁用

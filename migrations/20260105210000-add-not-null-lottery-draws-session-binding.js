@@ -24,28 +24,34 @@ module.exports = {
     console.log('📝 开始迁移：为lottery_draws表的关联键添加NOT NULL约束')
 
     // 步骤1：验证分界线后的记录都已有关联键
-    const [nullRecords] = await queryInterface.sequelize.query(`
+    const [nullRecords] = await queryInterface.sequelize.query(
+      `
       SELECT COUNT(*) as count
       FROM lottery_draws
       WHERE created_at >= ?
         AND (lottery_session_id IS NULL OR asset_transaction_id IS NULL)
-    `, { replacements: [CUTOFF_DATE] })
+    `,
+      { replacements: [CUTOFF_DATE] }
+    )
 
     if (nullRecords[0].count > 0) {
       throw new Error(
         `发现 ${nullRecords[0].count} 条分界线后的记录缺失关联键。` +
-        '请先执行回填迁移 20260105200000-backfill-lottery-draws-session-binding.js'
+          '请先执行回填迁移 20260105200000-backfill-lottery-draws-session-binding.js'
       )
     }
 
     console.log('✅ 验证通过：所有分界线后记录都有关联键')
 
     // 步骤2：检查分界线前是否有记录（历史数据）
-    const [oldRecords] = await queryInterface.sequelize.query(`
+    const [oldRecords] = await queryInterface.sequelize.query(
+      `
       SELECT COUNT(*) as count
       FROM lottery_draws
       WHERE created_at < ?
-    `, { replacements: [CUTOFF_DATE] })
+    `,
+      { replacements: [CUTOFF_DATE] }
+    )
 
     const hasOldRecords = oldRecords[0].count > 0
 
@@ -103,7 +109,9 @@ module.exports = {
 
     console.log('\n📊 字段状态：')
     columns.forEach(col => {
-      console.log(`   - ${col.COLUMN_NAME}: nullable=${col.IS_NULLABLE}, comment=${col.COLUMN_COMMENT}`)
+      console.log(
+        `   - ${col.COLUMN_NAME}: nullable=${col.IS_NULLABLE}, comment=${col.COLUMN_COMMENT}`
+      )
     })
 
     console.log('✅ 迁移完成')

@@ -71,8 +71,8 @@ describe('P0-2: 孤儿冻结清理服务测试', () => {
 
       // 验证返回结果中 dry_run 为 true
       expect(result.dry_run).toBe(true)
-      // 干跑模式不会执行实际清理
-      expect(result.cleaned).toBe(0)
+      // 干跑模式不会执行实际清理（P0 DTO 契约：cleaned_count）
+      expect(result.cleaned_count).toBe(0)
     })
 
     test('cleanupOrphanFrozen 干跑模式不应该有失败记录', async () => {
@@ -82,37 +82,63 @@ describe('P0-2: 孤儿冻结清理服务测试', () => {
       })
 
       expect(result.dry_run).toBe(true)
-      expect(result.failed).toBe(0)
+      // P0 DTO 契约：failed_count
+      expect(result.failed_count).toBe(0)
     })
   })
 
   describe('检测逻辑验证', () => {
-    test('detectOrphanFrozen 返回数组', async () => {
-      const orphanList = await OrphanFrozenCleanupService.detectOrphanFrozen()
+    /**
+     * P0 DTO 契约（2026-01-15）：
+     * detectOrphanFrozen 返回稳定 DTO 对象，包含：
+     * - orphan_count: 孤儿冻结数量
+     * - total_orphan_amount: 孤儿冻结总额
+     * - orphan_items: 孤儿冻结详情数组
+     * - checked_count: 检测账户数
+     * - generated_at: 生成时间
+     * - affected_user_count: 受影响用户数
+     * - affected_asset_codes: 受影响资产代码
+     * - items_truncated: 是否截断
+     */
+    test('detectOrphanFrozen 返回 DTO 对象', async () => {
+      const dto = await OrphanFrozenCleanupService.detectOrphanFrozen()
 
-      expect(Array.isArray(orphanList)).toBe(true)
+      // 验证 DTO 结构
+      expect(dto).toBeDefined()
+      expect(typeof dto.orphan_count).toBe('number')
+      expect(typeof dto.total_orphan_amount).toBe('number')
+      expect(Array.isArray(dto.orphan_items)).toBe(true)
+      expect(typeof dto.checked_count).toBe('number')
+      expect(dto.generated_at).toBeDefined()
+      expect(typeof dto.affected_user_count).toBe('number')
+      expect(Array.isArray(dto.affected_asset_codes)).toBe(true)
+      expect(typeof dto.items_truncated).toBe('boolean')
     })
 
     test('detectOrphanFrozen 支持按用户ID过滤', async () => {
-      const orphanList = await OrphanFrozenCleanupService.detectOrphanFrozen({
+      const dto = await OrphanFrozenCleanupService.detectOrphanFrozen({
         user_id: TestConfig.realData.testUser.user_id || 1
       })
 
-      expect(Array.isArray(orphanList)).toBe(true)
+      // 验证返回 DTO 对象
+      expect(dto).toBeDefined()
+      expect(Array.isArray(dto.orphan_items)).toBe(true)
       // 如果有结果，所有结果应该属于该用户
-      orphanList.forEach(orphan => {
+      dto.orphan_items.forEach(orphan => {
         expect(orphan.user_id).toBe(TestConfig.realData.testUser.user_id || 1)
       })
     })
 
     test('detectOrphanFrozen 支持按资产代码过滤', async () => {
-      const orphanList = await OrphanFrozenCleanupService.detectOrphanFrozen({
+      const dto = await OrphanFrozenCleanupService.detectOrphanFrozen({
         asset_code: 'DIAMOND'
       })
 
-      expect(Array.isArray(orphanList)).toBe(true)
+      // 验证返回 DTO 对象
+      expect(dto).toBeDefined()
+      expect(Array.isArray(dto.orphan_items)).toBe(true)
       // 如果有结果，所有结果应该是该资产类型
-      orphanList.forEach(orphan => {
+      dto.orphan_items.forEach(orphan => {
         expect(orphan.asset_code).toBe('DIAMOND')
       })
     })

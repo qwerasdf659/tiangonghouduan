@@ -116,7 +116,7 @@ class LotteryUserService {
    * logger.info('用户昵称:', userInfo.nickname)
    * logger.info('是否管理员:', userInfo.is_admin)
    */
-  async getUserInfo (user_id) {
+  async getUserInfo(user_id) {
     try {
       const user = await User.findByPk(user_id)
       if (!user) {
@@ -158,7 +158,7 @@ class LotteryUserService {
    *   logger.info('用户是管理员，允许访问管理功能')
    * }
    */
-  async isAdmin (user_id) {
+  async isAdmin(user_id) {
     try {
       const userRoles = await getUserRoles(user_id)
       return userRoles.isAdmin
@@ -184,7 +184,7 @@ class LotteryUserService {
    *   logger.info('用户可以管理抽奖活动')
    * }
    */
-  async hasPermission (user_id, resource, action = 'read') {
+  async hasPermission(user_id, resource, action = 'read') {
     try {
       const user = await User.findByPk(user_id)
       if (!user) return false
@@ -223,7 +223,7 @@ class LotteryUserService {
    * const stats = await userService.getUserStats(10001)
    * logger.info('用户高档奖励率:', stats.stats.high_tier_rate)
    */
-  async getUserStats (user_id) {
+  async getUserStats(user_id) {
     try {
       const user = await User.findByPk(user_id)
       if (!user) {
@@ -277,7 +277,7 @@ class LotteryUserService {
    *   logger.info('用户无法参与抽奖，原因:', permission.reason)
    * }
    */
-  async validateLotteryPermission (user_id) {
+  async validateLotteryPermission(user_id) {
     try {
       const user = await User.findByPk(user_id)
       if (!user) {
@@ -322,7 +322,7 @@ class LotteryUserService {
    * // 抽奖成功，重置失败次数
    * await userService.updateConsecutiveFailCount(10001, false)
    */
-  async updateConsecutiveFailCount (user_id, increment = true) {
+  async updateConsecutiveFailCount(user_id, increment = true) {
     try {
       const user = await User.findByPk(user_id)
       if (!user) {
@@ -358,7 +358,7 @@ class LotteryUserService {
    * const newTotal = await userService.updateHistoryTotalPoints(10001, 100)
    * logger.info('新的历史总积分:', newTotal)
    */
-  async updateHistoryTotalPoints (user_id, points) {
+  async updateHistoryTotalPoints(user_id, points) {
     try {
       const user = await User.findByPk(user_id)
       if (!user) {

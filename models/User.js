@@ -84,6 +84,14 @@ module.exports = sequelize => {
         type: DataTypes.INTEGER,
         defaultValue: 0,
         comment: '登录次数统计'
+      },
+
+      // 🔥 用户等级（多币种风控扩展 - 2026-01-14）
+      user_level: {
+        type: DataTypes.ENUM('normal', 'vip', 'merchant'),
+        allowNull: false,
+        defaultValue: 'normal',
+        comment: '用户等级（normal-普通用户，vip-VIP用户，merchant-商户）'
       }
     },
     {

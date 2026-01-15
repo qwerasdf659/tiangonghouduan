@@ -27,7 +27,7 @@ class ConcurrencyControlMiddleware {
    *
    * @returns {void} 无返回值
    */
-  constructor () {
+  constructor() {
     this.lockManager = new UnifiedDistributedLock()
     this.activeRequests = new Map()
 
@@ -46,7 +46,7 @@ class ConcurrencyControlMiddleware {
    * @param {number} maxConcurrent 最大并发数，默认5
    * @returns {Function} Express中间件函数
    */
-  limitUserConcurrency (maxConcurrent = 5) {
+  limitUserConcurrency(maxConcurrent = 5) {
     return async (req, res, next) => {
       const user_id = req.user?.user_id
 
@@ -100,7 +100,7 @@ class ConcurrencyControlMiddleware {
    * @param {Object} options 锁配置选项
    * @returns {Function} Express中间件函数
    */
-  distributedLock (keyGenerator, options = {}) {
+  distributedLock(keyGenerator, options = {}) {
     const {
       ttl = 30000, // 锁过期时间，默认30秒
       maxRetries = 3, // 最大重试次数
@@ -198,7 +198,7 @@ class ConcurrencyControlMiddleware {
    * @param {number} maxConcurrent 最大并发数
    * @returns {Function} Express中间件函数
    */
-  limitIPConcurrency (maxConcurrent = 10) {
+  limitIPConcurrency(maxConcurrent = 10) {
     return async (req, res, next) => {
       const clientIP = req.ip || req.connection.remoteAddress
       const ipKey = `ip_concurrency:${clientIP}`
@@ -242,7 +242,7 @@ class ConcurrencyControlMiddleware {
    * 获取并发统计信息
    * @returns {Object} 并发统计数据
    */
-  getStats () {
+  getStats() {
     const userConcurrency = []
     const ipConcurrency = []
 
@@ -273,7 +273,7 @@ class ConcurrencyControlMiddleware {
    *
    * @returns {Promise<void>} 无返回值，用于应用退出时释放锁管理器资源
    */
-  async cleanup () {
+  async cleanup() {
     try {
       logger.info('[ConcurrencyControl] 正在清理资源...')
 

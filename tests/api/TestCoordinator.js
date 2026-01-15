@@ -28,7 +28,7 @@ class TestCoordinator extends BaseTestManager {
    * 创建测试协调器实例
    * @param {string} baseUrl - API基础URL
    */
-  constructor (baseUrl = 'http://localhost:3000') {
+  constructor(baseUrl = 'http://localhost:3000') {
     super(baseUrl)
     console.log('[TestCoordinator] 测试协调器初始化完成')
   }
@@ -38,7 +38,7 @@ class TestCoordinator extends BaseTestManager {
    * @param {number} timeout - 超时时间（毫秒）
    * @returns {Promise<boolean>} 是否就绪
    */
-  async waitForV4Engine (timeout = 30000) {
+  async waitForV4Engine(timeout = 30000) {
     console.log('⏰ 等待V4统一引擎启动就绪...')
     const start_time = Date.now()
     const check_interval = 1000 // 每秒检查一次
