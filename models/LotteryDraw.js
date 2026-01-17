@@ -45,6 +45,16 @@ class LotteryDraw extends Model {
       as: 'prize',
       comment: '获得的奖品'
     })
+
+    // 🔴 统一抽奖架构新增关联（2026-01-18）
+    // 一对一：每次抽奖有一个决策快照
+    LotteryDraw.hasOne(models.LotteryDrawDecision, {
+      foreignKey: 'draw_id',
+      sourceKey: 'draw_id',
+      as: 'decision',
+      onDelete: 'CASCADE',
+      comment: '抽奖决策快照（审计用）'
+    })
   }
 
   /**

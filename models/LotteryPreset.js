@@ -203,6 +203,117 @@ module.exports = (sequelize, DataTypes) => {
         comment: '创建预设的管理员ID'
       },
 
+      // 🔴 统一抽奖架构新增字段（2026-01-18 - DR-16二次审批流程）
+
+      /**
+       * campaign_id - 关联的抽奖活动ID（2026-01-18新增）
+       *
+       * 业务含义：预设关联到具体的抽奖活动，支持活动级别的预设管理
+       *
+       * 业务规则：
+       * - 可选字段（允许为空，向后兼容旧预设）
+       * - 新预设建议关联活动（便于按活动管理预设）
+       * - 外键约束：引用lottery_campaigns.campaign_id
+       *
+       * 示例：campaign_id = 1（关联到活动1的预设）
+       */
+      campaign_id: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+        references: {
+          model: 'lottery_campaigns',
+          key: 'campaign_id'
+        },
+        comment: '关联的抽奖活动ID（可选，用于按活动管理预设）'
+      },
+
+      /**
+       * approval_status - 预设审批状态（2026-01-18新增 - DR-16）
+       *
+       * 业务含义：大额预设需要二次审批，此字段记录审批流程状态
+       *
+       * 状态枚举：
+       * - pending_approval：等待审批（预设创建后的默认状态）
+       * - approved：已批准（上级管理员批准，可以执行）
+       * - rejected：已拒绝（上级管理员拒绝，不执行）
+       *
+       * 业务规则：
+       * - 小额预设可直接approved（无需审批流程）
+       * - 大额预设必须经过审批（pending_approval → approved/rejected）
+       * - 只有approved状态的预设才会在抽奖时使用
+       *
+       * 示例：approval_status = 'approved'（预设已批准，可执行）
+       */
+      approval_status: {
+        type: DataTypes.ENUM('pending_approval', 'approved', 'rejected'),
+        allowNull: false,
+        defaultValue: 'approved',
+        comment: '审批状态：pending_approval=等待审批，approved=已批准，rejected=已拒绝'
+      },
+
+      /**
+       * advance_mode - 系统垫付模式（2026-01-18新增 - DR-04）
+       *
+       * 业务含义：当库存或预算不足时，系统如何处理预设发放
+       *
+       * 模式枚举：
+       * - system_advance：系统垫付（库存/预算不足时系统先垫付，产生欠账）
+       * - user_confirm：用户确认（提示用户库存/预算不足，用户决定是否继续）
+       * - reject：直接拒绝（库存/预算不足时拒绝预设发放）
+       *
+       * 业务规则：
+       * - 默认system_advance（预设发放不可驳回的核心设计）
+       * - 垫付产生的欠账记录在preset_inventory_debt和preset_budget_debt表
+       * - 垫付有上限控制（preset_debt_limits表配置）
+       *
+       * 示例：advance_mode = 'system_advance'（系统垫付模式）
+       */
+      advance_mode: {
+        type: DataTypes.ENUM('system_advance', 'user_confirm', 'reject'),
+        allowNull: false,
+        defaultValue: 'system_advance',
+        comment: '系统垫付模式：system_advance=系统垫付，user_confirm=用户确认，reject=直接拒绝'
+      },
+
+      /**
+       * approved_by - 审批人ID（2026-01-18新增 - DR-16）
+       *
+       * 业务含义：记录哪个上级管理员批准/拒绝了此预设
+       *
+       * 业务规则：
+       * - 可选字段（小额预设无需审批时为null）
+       * - 大额预设审批后必填
+       * - 用于审计追溯
+       *
+       * 示例：approved_by = 2（管理员user_id=2批准了此预设）
+       */
+      approved_by: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+        references: {
+          model: 'users',
+          key: 'user_id'
+        },
+        comment: '审批人ID（上级管理员user_id）'
+      },
+
+      /**
+       * approved_at - 审批时间（2026-01-18新增 - DR-16）
+       *
+       * 业务含义：记录预设被批准/拒绝的时间
+       *
+       * 业务规则：
+       * - 可选字段（小额预设无需审批时为null）
+       * - 大额预设审批后自动填入当前时间
+       *
+       * 示例：approved_at = "2026-01-18 15:30:00"
+       */
+      approved_at: {
+        type: DataTypes.DATE,
+        allowNull: true,
+        comment: '审批时间'
+      },
+
       /**
        * created_at - 预设创建时间（北京时间）
        *
@@ -273,10 +384,54 @@ module.exports = (sequelize, DataTypes) => {
       as: 'prize'
     })
 
-    // 关联管理员表
+    // 关联管理员表（创建人）
     LotteryPreset.belongsTo(models.User, {
       foreignKey: 'created_by',
       as: 'admin'
+    })
+
+    // 🔴 统一抽奖架构新增关联（2026-01-18）
+
+    // 关联抽奖活动
+    LotteryPreset.belongsTo(models.LotteryCampaign, {
+      foreignKey: 'campaign_id',
+      as: 'campaign',
+      onDelete: 'SET NULL',
+      comment: '关联的抽奖活动'
+    })
+
+    // 关联审批人（上级管理员）
+    LotteryPreset.belongsTo(models.User, {
+      foreignKey: 'approved_by',
+      as: 'approver',
+      comment: '审批人（上级管理员）'
+    })
+
+    // 一对多：预设产生的库存欠账
+    LotteryPreset.hasMany(models.PresetInventoryDebt, {
+      foreignKey: 'preset_id',
+      sourceKey: 'preset_id',
+      as: 'inventoryDebts',
+      onDelete: 'SET NULL',
+      comment: '预设产生的库存欠账'
+    })
+
+    // 一对多：预设产生的预算欠账
+    LotteryPreset.hasMany(models.PresetBudgetDebt, {
+      foreignKey: 'preset_id',
+      sourceKey: 'preset_id',
+      as: 'budgetDebts',
+      onDelete: 'SET NULL',
+      comment: '预设产生的预算欠账'
+    })
+
+    // 一对多：预设关联的决策快照
+    LotteryPreset.hasMany(models.LotteryDrawDecision, {
+      foreignKey: 'preset_id',
+      sourceKey: 'preset_id',
+      as: 'decisions',
+      onDelete: 'SET NULL',
+      comment: '预设关联的决策快照'
     })
   }
 

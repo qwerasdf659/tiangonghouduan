@@ -39,6 +39,64 @@ class LotteryCampaign extends Model {
       comment: '抽奖记录'
     })
 
+    // 🔴 统一抽奖架构新增关联（2026-01-18）
+
+    // 一对多：一个活动有多个档位规则
+    LotteryCampaign.hasMany(models.LotteryTierRule, {
+      foreignKey: 'campaign_id',
+      as: 'tierRules',
+      onDelete: 'CASCADE',
+      comment: '档位规则（tier_first选奖方法使用）'
+    })
+
+    // 一对多：一个活动有多个用户配额记录
+    LotteryCampaign.hasMany(models.LotteryCampaignUserQuota, {
+      foreignKey: 'campaign_id',
+      as: 'userQuotas',
+      onDelete: 'CASCADE',
+      comment: '用户配额（pool_quota预算模式使用）'
+    })
+
+    // 一对多：一个活动有多个配额赠送记录
+    LotteryCampaign.hasMany(models.LotteryCampaignQuotaGrant, {
+      foreignKey: 'campaign_id',
+      as: 'quotaGrants',
+      onDelete: 'CASCADE',
+      comment: '配额赠送记录'
+    })
+
+    // 一对多：一个活动有多个库存欠账记录
+    LotteryCampaign.hasMany(models.PresetInventoryDebt, {
+      foreignKey: 'campaign_id',
+      as: 'inventoryDebts',
+      onDelete: 'RESTRICT',
+      comment: '库存欠账（禁止删除有欠账的活动）'
+    })
+
+    // 一对多：一个活动有多个预算欠账记录
+    LotteryCampaign.hasMany(models.PresetBudgetDebt, {
+      foreignKey: 'campaign_id',
+      as: 'budgetDebts',
+      onDelete: 'RESTRICT',
+      comment: '预算欠账（禁止删除有欠账的活动）'
+    })
+
+    // 一对一：一个活动有一个欠账上限配置
+    LotteryCampaign.hasOne(models.PresetDebtLimit, {
+      foreignKey: 'campaign_id',
+      as: 'debtLimit',
+      onDelete: 'CASCADE',
+      comment: '欠账上限配置'
+    })
+
+    // 多对一：档位降级保底奖品
+    LotteryCampaign.belongsTo(models.LotteryPrize, {
+      foreignKey: 'tier_fallback_prize_id',
+      as: 'tierFallbackPrize',
+      onDelete: 'SET NULL',
+      comment: '档位降级保底奖品（必须是prize_value_points=0的空奖）'
+    })
+
     /*
      * 🔥 LotteryRecord已合并到LotteryDraw，使用draws关联即可
      * 注意：新合并模型中lottery_id字段对应campaign_id关联
@@ -674,6 +732,66 @@ module.exports = sequelize => {
         allowNull: false,
         defaultValue: 'user',
         comment: '预算模式：user=用户预算账户扣减，pool=活动池预算扣减，none=不限制预算（测试用）'
+      },
+
+      // ======================== 统一抽奖架构新字段 ========================
+
+      /**
+       * 选奖方法
+       * @type {string}
+       * @业务含义 控制如何从奖品池中选择奖品
+       * @枚举值
+       * - normalize：归一化方法（传统概率归一化）
+       * - fallback：保底方法（概率穷尽时使用保底奖品）
+       * - tier_first：先选档位法（推荐，先选档位再选奖品）
+       */
+      pick_method: {
+        type: DataTypes.ENUM('normalize', 'fallback', 'tier_first'),
+        allowNull: false,
+        defaultValue: 'tier_first',
+        comment: '选奖方法：normalize=归一化, fallback=保底, tier_first=先选档位（推荐）'
+      },
+
+      /**
+       * 档位保底奖品ID
+       * @type {number}
+       * @业务含义 当所有档位都无可用奖品时，发放此保底奖品
+       * @关联 lottery_prizes.prize_id
+       * @注意 此奖品应配置为prize_value_points=0的空奖
+       */
+      tier_fallback_prize_id: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+        defaultValue: null,
+        comment: '档位保底奖品ID（所有档位无货时发放，外键关联lottery_prizes.prize_id）'
+      },
+
+      /**
+       * 档位权重比例因子
+       * @type {number}
+       * @业务含义 整数权重制的比例因子，所有档位权重之和必须等于此值
+       * @默认值 1,000,000（百万分之一精度）
+       * @设计原理 避免浮点精度问题，使用整数权重进行概率计算
+       */
+      tier_weight_scale: {
+        type: DataTypes.INTEGER.UNSIGNED,
+        allowNull: false,
+        defaultValue: 1000000,
+        comment: '档位权重比例因子（默认1000000，所有档位权重之和必须等于此值）'
+      },
+
+      /**
+       * 分层解析器版本
+       * @type {string}
+       * @业务含义 指定使用哪个版本的用户分层配置
+       * @关联 config/segment_rules.js 中的配置版本
+       * @用途 根据用户特征（VIP等级、新用户等）匹配不同的档位概率规则
+       */
+      segment_resolver_version: {
+        type: DataTypes.STRING(32),
+        allowNull: false,
+        defaultValue: 'v1',
+        comment: '分层解析器配置版本号（如v1/v2），匹配config/segment_rules.js中的配置'
       },
       /**
        * 活动池总预算

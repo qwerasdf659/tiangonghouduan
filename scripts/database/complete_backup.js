@@ -46,6 +46,15 @@ function getBeijingDateStr() {
   return `${year}-${month}-${day}_${hour}-${minute}-${second}`
 }
 
+function getBeijingDateForFile() {
+  const now = new Date()
+  const beijing = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Shanghai' }))
+  const year = beijing.getFullYear()
+  const month = String(beijing.getMonth() + 1).padStart(2, '0')
+  const day = String(beijing.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
 // 颜色输出
 const colors = {
   reset: '\x1b[0m',
@@ -303,9 +312,12 @@ SET SQL_MODE = 'NO_AUTO_VALUE_ON_ZERO';
     sqlContent += `SET FOREIGN_KEY_CHECKS = 1;\n\n`
     sqlContent += `-- 备份完成于 ${beijingTime}\n`
 
+    // 获取当前北京日期用于文件名
+    const beijingDateForFile = getBeijingDateForFile()
+    
     // 保存备份文件
-    const jsonFileName = `complete_backup_2026-01-13_${dateStr}.json`
-    const sqlFileName = `complete_backup_2026-01-13_${dateStr}.sql`
+    const jsonFileName = `complete_backup_${beijingDateForFile}_${dateStr}.json`
+    const sqlFileName = `complete_backup_${beijingDateForFile}_${dateStr}.sql`
 
     const jsonPath = path.join(outputDir, jsonFileName)
     const sqlPath = path.join(outputDir, sqlFileName)
@@ -332,7 +344,7 @@ ${sqlFileName}: ${sqlMD5}
 
     const summaryContent = `# 数据库备份摘要报告
 ## 备份信息
-- 备份日期（北京时间）: 2026-01-13
+- 备份日期（北京时间）: ${beijingDateForFile}
 - 备份时间: ${beijingTime}
 - 数据库: ${dbName}
 - 主机: ${dbHost}:${dbPort}
@@ -367,7 +379,7 @@ ${tableNames
     fs.writeFileSync(path.join(outputDir, 'BACKUP_SUMMARY.txt'), summaryContent)
 
     // 生成README
-    const readmeContent = `# 数据库备份 - 2026年01月13日（北京时间）
+    const readmeContent = `# 数据库备份 - ${beijingDateForFile}（北京时间）
 
 ## 备份内容
 - 完整的表结构（CREATE TABLE语句）
@@ -458,8 +470,11 @@ md5sum ${sqlFileName}
 async function main() {
   const args = process.argv.slice(2)
 
+  // 获取当前北京日期用于目录名
+  const beijingDateDir = getBeijingDateForFile()
+  
   // 解析输出目录
-  let outputDir = path.join(process.cwd(), 'backups/backup_2026-01-13_complete')
+  let outputDir = path.join(process.cwd(), `backups/backup_${beijingDateDir}_complete`)
   const outputArg = args.find(arg => arg.startsWith('--output-dir='))
   if (outputArg) {
     outputDir = outputArg.split('=')[1]

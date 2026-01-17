@@ -474,6 +474,52 @@ module.exports = sequelize => {
         defaultValue: 0,
         comment: '奖品价值积分（统一价值单位）'
       },
+
+      // ======================== 统一抽奖架构新字段 ========================
+
+      /**
+       * 奖品所属档位
+       * @type {string}
+       * @业务含义 用于tier_first选奖法，先选档位再选奖品
+       * @枚举值 high-高档位, mid-中档位, low-低档位
+       * @设计原理 固定三档位制，简化业务逻辑，避免动态档位带来的复杂性
+       */
+      reward_tier: {
+        type: DataTypes.ENUM('high', 'mid', 'low'),
+        allowNull: false,
+        defaultValue: 'low',
+        comment: '奖品所属档位：high=高档位, mid=中档位, low=低档位（tier_first选奖法使用）'
+      },
+
+      /**
+       * 中奖权重（整数权重制）
+       * @type {number}
+       * @业务含义 同档位内的奖品权重，用于计算选中概率
+       * @设计原理 使用整数权重避免浮点精度问题
+       * @计算公式 选中概率 = 该奖品权重 / 同档位所有可用奖品权重之和
+       * @注意 权重为0表示不参与抽奖
+       */
+      win_weight: {
+        type: DataTypes.INTEGER.UNSIGNED,
+        allowNull: false,
+        defaultValue: 0,
+        comment: '中奖权重（整数，同档位内权重之和用于概率计算，0表示不参与抽奖）'
+      },
+
+      /**
+       * 是否为保底奖品
+       * @type {boolean}
+       * @业务含义 标记此奖品是否为保底奖品
+       * @规则 prize_value_points=0的奖品应标记为true
+       * @用途 当所有档位都无可用奖品时，发放保底奖品
+       */
+      is_fallback: {
+        type: DataTypes.BOOLEAN,
+        allowNull: false,
+        defaultValue: false,
+        comment: '是否为保底奖品（prize_value_points=0的奖品应标记为true）'
+      },
+
       /**
        * 材料资产代码（用于材料类型奖品）
        * 关联 material_asset_types 表的 asset_code 字段

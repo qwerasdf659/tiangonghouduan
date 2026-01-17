@@ -64,6 +64,70 @@ models.LotteryPrize = require('./LotteryPrize')(sequelize, DataTypes)
 models.LotteryDraw = require('./LotteryDraw')(sequelize, DataTypes)
 models.LotteryPreset = require('./LotteryPreset')(sequelize, DataTypes)
 
+// 🔴 统一抽奖架构新增模型（2026-01-18 - Pipeline架构升级）
+models.LotteryTierRule = require('./LotteryTierRule')(sequelize, DataTypes)
+/*
+ * ✅ LotteryTierRule：抽奖档位规则表（整数权重制）
+ *    - 用途：定义各分层用户的档位概率（支持tier_first选奖方法）
+ *    - 特点：campaign_id + segment_key + tier_name 唯一约束，整数权重（SCALE=1,000,000）
+ *    - 表名：lottery_tier_rules，主键：tier_rule_id
+ *    - 业务场景：新用户高档位高概率、VIP用户专属档位配置
+ */
+
+models.LotteryDrawDecision = require('./LotteryDrawDecision')(sequelize, DataTypes)
+/*
+ * ✅ LotteryDrawDecision：抽奖决策快照表（审计核心）
+ *    - 用途：记录每次抽奖的完整决策路径，支持问题排查和审计
+ *    - 特点：1:1 关联 lottery_draws，记录pipeline_type、segment_key、selected_tier、随机数等
+ *    - 表名：lottery_draw_decisions，主键：decision_id，唯一约束：draw_id
+ *    - 业务场景：抽奖结果复现、概率公平性审计、系统垫付追踪
+ */
+
+models.LotteryCampaignUserQuota = require('./LotteryCampaignUserQuota')(sequelize, DataTypes)
+/*
+ * ✅ LotteryCampaignUserQuota：活动用户配额表（pool_quota模式）
+ *    - 用途：管理用户在pool_quota预算模式下的抽奖次数配额
+ *    - 特点：remaining_quota（剩余次数）、total_granted（累计获得）、total_used（累计使用）
+ *    - 表名：lottery_campaign_user_quota，主键：quota_id，唯一约束：campaign_id + user_id
+ *    - 业务场景：用户消费获得配额→使用配额抽奖→配额耗尽无法抽奖
+ */
+
+models.LotteryCampaignQuotaGrant = require('./LotteryCampaignQuotaGrant')(sequelize, DataTypes)
+/*
+ * ✅ LotteryCampaignQuotaGrant：配额赠送记录表（流水审计）
+ *    - 用途：记录配额的来源和流向，支持配额审计
+ *    - 特点：grant_type区分来源（admin_grant/spending/activity/refund）
+ *    - 表名：lottery_campaign_quota_grants，主键：grant_id
+ *    - 业务场景：管理员赠送配额→消费自动发放配额→活动奖励配额
+ */
+
+models.PresetInventoryDebt = require('./PresetInventoryDebt')(sequelize, DataTypes)
+/*
+ * ✅ PresetInventoryDebt：预设库存欠账表（系统垫付）
+ *    - 用途：记录预设强制发放时因库存不足产生的欠账
+ *    - 特点：debt_quantity（欠账数量）、repaid_quantity（已偿还）、debt_status状态流转
+ *    - 表名：preset_inventory_debt，主键：debt_id
+ *    - 业务场景：预设发放库存不足→系统垫付→运营补货偿还
+ */
+
+models.PresetBudgetDebt = require('./PresetBudgetDebt')(sequelize, DataTypes)
+/*
+ * ✅ PresetBudgetDebt：预设预算欠账表（系统垫付）
+ *    - 用途：记录预设强制发放时因预算不足产生的欠账
+ *    - 特点：budget_source区分来源（user/pool）、debt_amount（欠账金额）
+ *    - 表名：preset_budget_debt，主键：debt_id
+ *    - 业务场景：预设发放预算不足→系统垫付→运营充值偿还
+ */
+
+models.PresetDebtLimit = require('./PresetDebtLimit')(sequelize, DataTypes)
+/*
+ * ✅ PresetDebtLimit：预设欠账上限配置表（风控）
+ *    - 用途：配置活动的最大可容忍欠账额度，防止无限制垫付
+ *    - 特点：max_inventory_debt（库存欠账上限）、max_budget_debt（预算欠账上限）、alert_threshold_percent
+ *    - 表名：preset_debt_limits，主键：limit_id，唯一约束：campaign_id
+ *    - 业务场景：配置欠账上限→接近上限告警→超限拒绝预设发放
+ */
+
 models.LotteryManagementSetting = require('./LotteryManagementSetting')(sequelize, DataTypes)
 /*
  * ✅ LotteryManagementSetting：抽奖管理设置（管理员抽奖干预）
