@@ -27,9 +27,17 @@
  */
 
 const BaseStage = require('./BaseStage')
-const { LotteryPrize } = require('../../../../models')
-const { Op } = require('sequelize')
-const BeijingTimeHelper = require('../../../../utils/timeHelper')
+
+/*
+ * 注：以下导入预留用于未来扩展功能（当前版本暂未使用）
+ * - LotteryPrize: 用于直接查询奖品（当前通过 context.campaign.prizes 获取）
+ * - Op: Sequelize 操作符（当前条件过滤在 JavaScript 层面完成）
+ * - BeijingTimeHelper: 时间处理工具（当前阶段不涉及时间计算）
+ *
+ * const { LotteryPrize } = require('../../../../models')
+ * const { Op } = require('sequelize')
+ * const BeijingTimeHelper = require('../../../../utils/timeHelper')
+ */
 
 /**
  * 档位定义（降级顺序）
@@ -115,9 +123,9 @@ class BuildPrizePoolStage extends BaseStage {
       // 7. 构建返回数据
       const result = {
         available_prizes: filtered_prizes,
-        prizes_by_tier: prizes_by_tier,
-        available_tiers: available_tiers,
-        has_valuable_prizes: has_valuable_prizes,
+        prizes_by_tier,
+        available_tiers,
+        has_valuable_prizes,
         total_available: filtered_prizes.length,
         tier_counts: {
           high: prizes_by_tier.high.length,
@@ -285,4 +293,3 @@ class BuildPrizePoolStage extends BaseStage {
 }
 
 module.exports = BuildPrizePoolStage
-

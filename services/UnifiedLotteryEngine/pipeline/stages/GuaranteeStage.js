@@ -31,7 +31,8 @@
 
 const BaseStage = require('./BaseStage')
 const { LotteryDraw, LotteryPrize } = require('../../../../models')
-const { Op } = require('sequelize')
+/* eslint-disable-next-line spaced-comment -- Op 操作符预留用于复杂查询条件（当前版本使用简单条件） */
+// const { Op } = require('sequelize')
 
 /**
  * 默认保底阈值（抽奖次数）
@@ -103,7 +104,8 @@ class GuaranteeStage extends BaseStage {
 
       if (!is_guarantee_draw) {
         // 未触发保底，返回正常结果
-        const remaining_to_guarantee = guarantee_threshold - (next_draw_number % guarantee_threshold)
+        const remaining_to_guarantee =
+          guarantee_threshold - (next_draw_number % guarantee_threshold)
 
         this.log('info', '未触发保底机制', {
           user_id,
@@ -115,19 +117,15 @@ class GuaranteeStage extends BaseStage {
 
         return this.success({
           guarantee_triggered: false,
-          user_draw_count: user_draw_count,
-          next_draw_number: next_draw_number,
-          guarantee_threshold: guarantee_threshold,
-          remaining_to_guarantee: remaining_to_guarantee
+          user_draw_count,
+          next_draw_number,
+          guarantee_threshold,
+          remaining_to_guarantee
         })
       }
 
       // 3. 触发保底，获取保底奖品
-      const guarantee_prize = await this._getGuaranteePrize(
-        campaign_id,
-        prizes,
-        guarantee_prize_id
-      )
+      const guarantee_prize = await this._getGuaranteePrize(campaign_id, prizes, guarantee_prize_id)
 
       if (!guarantee_prize) {
         // 没有配置保底奖品，降级为使用当前抽中的奖品
@@ -140,9 +138,9 @@ class GuaranteeStage extends BaseStage {
         return this.success({
           guarantee_triggered: false,
           reason: '未配置保底奖品',
-          user_draw_count: user_draw_count,
-          next_draw_number: next_draw_number,
-          guarantee_threshold: guarantee_threshold
+          user_draw_count,
+          next_draw_number,
+          guarantee_threshold
         })
       }
 
@@ -157,10 +155,10 @@ class GuaranteeStage extends BaseStage {
 
       return this.success({
         guarantee_triggered: true,
-        guarantee_prize: guarantee_prize,
-        user_draw_count: user_draw_count,
-        next_draw_number: next_draw_number,
-        guarantee_threshold: guarantee_threshold,
+        guarantee_prize,
+        user_draw_count,
+        next_draw_number,
+        guarantee_threshold,
         remaining_to_guarantee: 0,
         guarantee_reason: `累计抽奖${next_draw_number}次，触发保底机制`
       })
@@ -250,10 +248,11 @@ class GuaranteeStage extends BaseStage {
     }
 
     // 2. 自动选择高档奖品
-    const high_tier_prizes = prizes.filter(p =>
-      p.reward_tier === 'high' &&
-      p.status === 'active' &&
-      (p.stock_quantity === null || p.stock_quantity > 0)
+    const high_tier_prizes = prizes.filter(
+      p =>
+        p.reward_tier === 'high' &&
+        p.status === 'active' &&
+        (p.stock_quantity === null || p.stock_quantity > 0)
     )
 
     if (high_tier_prizes.length > 0) {
@@ -263,10 +262,11 @@ class GuaranteeStage extends BaseStage {
     }
 
     // 3. 降级到中档奖品
-    const mid_tier_prizes = prizes.filter(p =>
-      p.reward_tier === 'mid' &&
-      p.status === 'active' &&
-      (p.stock_quantity === null || p.stock_quantity > 0)
+    const mid_tier_prizes = prizes.filter(
+      p =>
+        p.reward_tier === 'mid' &&
+        p.status === 'active' &&
+        (p.stock_quantity === null || p.stock_quantity > 0)
     )
 
     if (mid_tier_prizes.length > 0) {
@@ -280,4 +280,3 @@ class GuaranteeStage extends BaseStage {
 }
 
 module.exports = GuaranteeStage
-

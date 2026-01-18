@@ -781,6 +781,59 @@ class StaffManagementService {
 
     return { total, managers, staff }
   }
+
+  /**
+   * 获取用户在指定门店的角色
+   *
+   * @description 检查用户在门店的角色（staff/manager）和在职状态
+   *
+   * @param {number} user_id - 用户ID
+   * @param {number} store_id - 门店ID
+   * @returns {Promise<Object|null>} 员工角色信息，如果用户不在该门店则返回null
+   *
+   * @since 2026-01-18 路由层合规性治理：封装门店角色查询
+   */
+  static async getUserStoreRole(user_id, store_id) {
+    const staffRecord = await StoreStaff.findOne({
+      where: {
+        user_id,
+        store_id,
+        status: 'active'
+      },
+      attributes: ['store_staff_id', 'role_in_store', 'joined_at']
+    })
+
+    if (!staffRecord) {
+      return null
+    }
+
+    return {
+      store_staff_id: staffRecord.store_staff_id,
+      role_in_store: staffRecord.role_in_store,
+      is_manager: staffRecord.role_in_store === 'manager',
+      joined_at: BeijingTimeHelper.formatForAPI(staffRecord.joined_at)
+    }
+  }
+
+  /**
+   * 检查用户是否为门店店长
+   *
+   * @param {number} user_id - 用户ID
+   * @param {number} store_id - 门店ID
+   * @param {number} [role_level] - 系统角色级别（可选，>=40 视为店长）
+   * @returns {Promise<boolean>} 是否为店长
+   *
+   * @since 2026-01-18 路由层合规性治理
+   */
+  static async isStoreManager(user_id, store_id, role_level = 0) {
+    // 系统管理员或高级角色直接视为店长
+    if (role_level >= 40) {
+      return true
+    }
+
+    const roleInfo = await StaffManagementService.getUserStoreRole(user_id, store_id)
+    return roleInfo?.is_manager || false
+  }
 }
 
 module.exports = StaffManagementService

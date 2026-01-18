@@ -155,30 +155,39 @@ class LotteryTierRule extends Model {
     }
 
     const rules = await Promise.all([
-      this.create({
-        campaign_id: campaignId,
-        segment_key: segmentKey,
-        tier_name: 'high',
-        tier_weight: weights.high,
-        status: 'active',
-        created_by
-      }, { transaction }),
-      this.create({
-        campaign_id: campaignId,
-        segment_key: segmentKey,
-        tier_name: 'mid',
-        tier_weight: weights.mid,
-        status: 'active',
-        created_by
-      }, { transaction }),
-      this.create({
-        campaign_id: campaignId,
-        segment_key: segmentKey,
-        tier_name: 'low',
-        tier_weight: weights.low,
-        status: 'active',
-        created_by
-      }, { transaction })
+      this.create(
+        {
+          campaign_id: campaignId,
+          segment_key: segmentKey,
+          tier_name: 'high',
+          tier_weight: weights.high,
+          status: 'active',
+          created_by
+        },
+        { transaction }
+      ),
+      this.create(
+        {
+          campaign_id: campaignId,
+          segment_key: segmentKey,
+          tier_name: 'mid',
+          tier_weight: weights.mid,
+          status: 'active',
+          created_by
+        },
+        { transaction }
+      ),
+      this.create(
+        {
+          campaign_id: campaignId,
+          segment_key: segmentKey,
+          tier_name: 'low',
+          tier_weight: weights.low,
+          status: 'active',
+          created_by
+        },
+        { transaction }
+      )
     ])
 
     return rules

@@ -32,7 +32,15 @@ const { handleServiceError } = require('../../../../middleware/validation')
 const logger = require('../../../../utils/logger').logger
 const TransactionManager = require('../../../../utils/TransactionManager')
 const StaffManagementService = require('../../../../services/StaffManagementService')
-const { MerchantOperationLog } = require('../../../../models')
+
+/**
+ * 获取商家操作审计日志服务（通过 ServiceManager 统一入口）
+ * @param {Object} req - Express 请求对象
+ * @returns {Object} MerchantOperationLogService 实例
+ */
+function getMerchantOperationLogService(req) {
+  return req.app.locals.services.getService('merchant_operation_log')
+}
 
 /**
  * @route GET /api/v4/shop/staff/list
@@ -136,17 +144,15 @@ router.post(
         )
       })
 
-      // 记录审计日志
+      // 记录审计日志（通过 ServiceManager 获取服务）
       try {
-        await MerchantOperationLog.createLog({
+        const MerchantOperationLogService = getMerchantOperationLogService(req)
+        await MerchantOperationLogService.createLogFromRequest(req, {
           operator_id,
           store_id: parseInt(store_id, 10),
           operation_type: 'staff_add',
           action: 'create',
           target_user_id: parseInt(user_id, 10),
-          request_id: req.id,
-          ip_address: req.ip,
-          user_agent: req.headers['user-agent'],
           result: 'success',
           extra_data: { role_in_store, notes, staff_record_id: result.id }
         })
@@ -212,17 +218,15 @@ router.post(
         )
       })
 
-      // 记录审计日志
+      // 记录审计日志（通过 ServiceManager 获取服务）
       try {
-        await MerchantOperationLog.createLog({
+        const MerchantOperationLogService = getMerchantOperationLogService(req)
+        await MerchantOperationLogService.createLogFromRequest(req, {
           operator_id,
           store_id: parseInt(to_store_id, 10),
           operation_type: 'staff_transfer',
           action: 'update',
           target_user_id: parseInt(user_id, 10),
-          request_id: req.id,
-          ip_address: req.ip,
-          user_agent: req.headers['user-agent'],
           result: 'success',
           extra_data: {
             from_store_id: parseInt(from_store_id, 10),
@@ -282,17 +286,15 @@ router.post(
         )
       })
 
-      // 记录审计日志（store_id 为 null 表示跨门店操作）
+      // 记录审计日志（store_id 为 null 表示跨门店操作，通过 ServiceManager 获取服务）
       try {
-        await MerchantOperationLog.createLog({
+        const MerchantOperationLogService = getMerchantOperationLogService(req)
+        await MerchantOperationLogService.createLogFromRequest(req, {
           operator_id,
           store_id: null, // 禁用涉及多门店，设为 null
           operation_type: 'staff_disable',
           action: 'update',
           target_user_id: parseInt(user_id, 10),
-          request_id: req.id,
-          ip_address: req.ip,
-          user_agent: req.headers['user-agent'],
           result: 'success',
           extra_data: { reason, affected_stores: result.affected_stores }
         })
@@ -349,17 +351,15 @@ router.post(
         )
       })
 
-      // 记录审计日志
+      // 记录审计日志（通过 ServiceManager 获取服务）
       try {
-        await MerchantOperationLog.createLog({
+        const MerchantOperationLogService = getMerchantOperationLogService(req)
+        await MerchantOperationLogService.createLogFromRequest(req, {
           operator_id,
           store_id: parseInt(store_id, 10),
           operation_type: 'staff_enable',
           action: 'update',
           target_user_id: parseInt(user_id, 10),
-          request_id: req.id,
-          ip_address: req.ip,
-          user_agent: req.headers['user-agent'],
           result: 'success',
           extra_data: { notes }
         })

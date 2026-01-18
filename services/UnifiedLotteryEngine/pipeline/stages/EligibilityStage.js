@@ -26,10 +26,7 @@
  */
 
 const BaseStage = require('./BaseStage')
-const {
-  LotteryCampaignUserQuota,
-  LotteryDraw
-} = require('../../../../models')
+const { LotteryCampaignUserQuota, LotteryDraw } = require('../../../../models')
 const { Op } = require('sequelize')
 const BeijingTimeHelper = require('../../../../utils/timeHelper')
 
@@ -77,11 +74,7 @@ class EligibilityStage extends BaseStage {
       // 1. 检查用户是否被禁止抽奖（黑名单检查）
       const ban_check = await this._checkUserBan(user_id, campaign_id)
       if (!ban_check.is_eligible) {
-        return this.failure(
-          ban_check.reason,
-          'USER_BANNED',
-          { user_id, campaign_id }
-        )
+        return this.failure(ban_check.reason, 'USER_BANNED', { user_id, campaign_id })
       }
 
       // 2. 获取用户的活动配额
@@ -101,9 +94,8 @@ class EligibilityStage extends BaseStage {
       const is_eligible = remaining_draws > 0 && quota_check.is_eligible
 
       if (!is_eligible) {
-        const reason = remaining_draws <= 0
-          ? `今日抽奖次数已达上限（${max_daily_draws}次）`
-          : quota_check.reason
+        const reason =
+          remaining_draws <= 0 ? `今日抽奖次数已达上限（${max_daily_draws}次）` : quota_check.reason
 
         this.log('info', '用户不满足抽奖资格', {
           user_id,
@@ -114,22 +106,20 @@ class EligibilityStage extends BaseStage {
           remaining_draws
         })
 
-        return this.failure(
-          reason,
-          'ELIGIBILITY_CHECK_FAILED',
-          {
-            user_id,
-            campaign_id,
-            daily_draws,
-            max_daily_draws,
-            remaining_draws,
-            quota_info: user_quota ? {
-              granted_quota: user_quota.granted_quota,
-              used_quota: user_quota.used_quota,
-              remaining_quota: user_quota.granted_quota - user_quota.used_quota
-            } : null
-          }
-        )
+        return this.failure(reason, 'ELIGIBILITY_CHECK_FAILED', {
+          user_id,
+          campaign_id,
+          daily_draws,
+          max_daily_draws,
+          remaining_draws,
+          quota_info: user_quota
+            ? {
+                granted_quota: user_quota.granted_quota,
+                used_quota: user_quota.used_quota,
+                remaining_quota: user_quota.granted_quota - user_quota.used_quota
+              }
+            : null
+        })
       }
 
       // 构建返回数据
@@ -137,11 +127,9 @@ class EligibilityStage extends BaseStage {
         is_eligible: true,
         user_quota: user_quota ? user_quota.toJSON() : null,
         daily_draws_count: daily_draws,
-        remaining_draws: remaining_draws,
-        max_daily_draws: max_daily_draws,
-        quota_remaining: user_quota
-          ? user_quota.granted_quota - user_quota.used_quota
-          : null
+        remaining_draws,
+        max_daily_draws,
+        quota_remaining: user_quota ? user_quota.granted_quota - user_quota.used_quota : null
       }
 
       this.log('info', '抽奖资格检查通过', {
@@ -302,4 +290,3 @@ class EligibilityStage extends BaseStage {
 }
 
 module.exports = EligibilityStage
-

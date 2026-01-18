@@ -37,6 +37,7 @@ const regionsRoutes = require('./regions') // 🆕 行政区划管理（2026-01-
 const staffRoutes = require('./staff') // 🆕 员工管理（2026-01-12 商家员工域权限体系升级 Phase 3）
 const auditLogsRoutes = require('./audit-logs') // 🆕 商家操作审计日志（2026-01-12 商家员工域权限体系升级 AC4.3）
 const riskAlertsRoutes = require('./risk-alerts') // 🆕 风控告警管理（2026-01-12 商家员工域权限体系升级 AC5）
+const debtManagementRoutes = require('./debt-management') // 🆕 欠账管理（2026-01-18 统一抽奖架构）
 
 // 挂载子模块路由
 router.use('/auth', authRoutes)
@@ -65,6 +66,7 @@ router.use('/regions', regionsRoutes) // 🆕 行政区划管理路由（2026-01
 router.use('/staff', staffRoutes) // 🆕 员工管理路由（2026-01-12 商家员工域权限体系升级 Phase 3）
 router.use('/audit-logs', auditLogsRoutes) // 🆕 商家操作审计日志路由（2026-01-12 商家员工域权限体系升级 AC4.3）
 router.use('/risk-alerts', riskAlertsRoutes) // 🆕 风控告警管理路由（2026-01-12 商家员工域权限体系升级 AC5）
+router.use('/debt-management', debtManagementRoutes) // 🆕 欠账管理路由（2026-01-18 统一抽奖架构）
 
 /**
  * GET / - Admin API根路径信息
@@ -337,6 +339,22 @@ router.get('/', (req, res) => {
           '/risk-alerts/types'
         ],
         note: '风控告警查询、复核、统计；支持频次阻断、金额告警、关联告警；仅限 admin 访问'
+      },
+      debt_management: {
+        description: '欠账管理（2026-01-18 统一抽奖架构）',
+        endpoints: [
+          '/debt-management/dashboard',
+          '/debt-management/by-campaign',
+          '/debt-management/by-prize',
+          '/debt-management/by-creator',
+          '/debt-management/trend',
+          '/debt-management/pending',
+          '/debt-management/clear',
+          '/debt-management/limits',
+          '/debt-management/limits/:campaign_id',
+          '/debt-management/limits/:campaign_id/alert-check'
+        ],
+        note: '预设欠账看板、清偿管理、上限配置；支持按活动/奖品/责任人统计；仅限 admin 访问'
       }
       // ⚠️ campaign_permissions模块暂未实现，待实现后再添加到此列表
     },

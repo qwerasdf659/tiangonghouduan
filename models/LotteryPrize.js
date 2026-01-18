@@ -353,6 +353,178 @@ class LotteryPrize extends Model {
       prizes_by_tier: prizesByValue
     }
   }
+
+  /**
+   * 校验活动奖品权重配置（纯严格校验，不自动补差）
+   *
+   * 业务规则（用户拍板决定）：
+   * - 同档位（reward_tier）内所有激活奖品的 win_weight 之和必须严格等于 1,000,000
+   * - 不等于 1,000,000 则拒绝保存/上线
+   * - 不做任何自动补差或归一化处理
+   *
+   * @param {number} campaignId - 活动ID
+   * @param {Object} options - 查询选项
+   * @param {Object} [options.transaction] - 数据库事务
+   * @returns {Promise<Object>} 校验结果
+   */
+  static async validatePrizeWeights(campaignId, options = {}) {
+    const { transaction } = options
+    const WEIGHT_SCALE = 1000000
+
+    if (!campaignId) {
+      return {
+        valid: false,
+        error: '活动ID不能为空',
+        tier_results: {}
+      }
+    }
+
+    // 查询活动所有激活奖品（按档位分组）
+    const allPrizes = await this.findAll({
+      where: {
+        campaign_id: campaignId,
+        status: 'active'
+      },
+      attributes: ['prize_id', 'prize_name', 'reward_tier', 'win_weight'],
+      order: [
+        ['reward_tier', 'ASC'],
+        ['prize_id', 'ASC']
+      ],
+      transaction
+    })
+
+    if (allPrizes.length === 0) {
+      return {
+        valid: false,
+        error: `活动 ${campaignId} 没有配置任何激活状态的奖品`,
+        tier_results: {}
+      }
+    }
+
+    // 按 reward_tier 分组
+    const prizesByTier = {
+      high: [],
+      mid: [],
+      low: []
+    }
+
+    for (const prize of allPrizes) {
+      const tier = prize.reward_tier || 'low'
+      if (prizesByTier[tier]) {
+        prizesByTier[tier].push({
+          prize_id: prize.prize_id,
+          prize_name: prize.prize_name,
+          win_weight: prize.win_weight || 0
+        })
+      }
+    }
+
+    // 严格校验每个档位的权重之和
+    const tierResults = {}
+    const errors = []
+
+    for (const [tier, prizes] of Object.entries(prizesByTier)) {
+      const totalWeight = prizes.reduce((sum, p) => sum + p.win_weight, 0)
+      const isValid = totalWeight === WEIGHT_SCALE
+
+      tierResults[tier] = {
+        valid: isValid,
+        prize_count: prizes.length,
+        total_weight: totalWeight,
+        expected_weight: WEIGHT_SCALE,
+        difference: totalWeight - WEIGHT_SCALE,
+        prizes: prizes.map(p => ({
+          prize_id: p.prize_id,
+          prize_name: p.prize_name,
+          win_weight: p.win_weight,
+          probability: ((p.win_weight / WEIGHT_SCALE) * 100).toFixed(4) + '%'
+        }))
+      }
+
+      // 只有档位有奖品时才校验权重
+      if (prizes.length > 0 && !isValid) {
+        if (totalWeight < WEIGHT_SCALE) {
+          errors.push(
+            `档位 ${tier}（${prizes.length}个奖品）权重之和 ${totalWeight} 不足，缺口 ${WEIGHT_SCALE - totalWeight}`
+          )
+        } else {
+          errors.push(
+            `档位 ${tier}（${prizes.length}个奖品）权重之和 ${totalWeight} 超出，超额 ${totalWeight - WEIGHT_SCALE}`
+          )
+        }
+      }
+    }
+
+    // 汇总结果
+    const allTiersValid = errors.length === 0
+    const hasAtLeastOneTierWithPrizes = Object.values(prizesByTier).some(
+      prizes => prizes.length > 0
+    )
+
+    return {
+      valid: allTiersValid && hasAtLeastOneTierWithPrizes,
+      error: errors.length > 0 ? errors.join('；') : null,
+      campaign_id: campaignId,
+      weight_scale: WEIGHT_SCALE,
+      tier_results: tierResults,
+      message: allTiersValid
+        ? `活动 ${campaignId} 所有档位权重配置正确（SCALE=${WEIGHT_SCALE}）`
+        : `活动 ${campaignId} 权重配置校验失败：配置不正确，禁止上线`
+    }
+  }
+
+  /**
+   * 活动上线前完整校验（纯严格模式）
+   *
+   * 业务规则（用户拍板决定）：
+   * - 配置不正确就禁止上线活动
+   * - 包括：档位权重校验 + 奖品权重校验 + 空奖配置校验
+   *
+   * @param {number} campaignId - 活动ID
+   * @param {Object} options - 查询选项
+   * @returns {Promise<Object>} 完整校验结果
+   */
+  static async validateForLaunch(campaignId, options = {}) {
+    const { transaction } = options
+
+    // 1. 校验奖品权重配置
+    const prizeWeightResult = await this.validatePrizeWeights(campaignId, { transaction })
+
+    // 2. 校验空奖配置
+    const emptyPrizeResult = await this.validateEmptyPrizeConstraint(campaignId, { transaction })
+
+    // 3. 校验预算配置
+    const budgetConfigResult = await this.validateCampaignBudgetConfig(campaignId, { transaction })
+
+    // 汇总所有错误
+    const errors = []
+    if (!prizeWeightResult.valid && prizeWeightResult.error) {
+      errors.push(`奖品权重：${prizeWeightResult.error}`)
+    }
+    if (!emptyPrizeResult.valid && emptyPrizeResult.error) {
+      errors.push(`空奖配置：${emptyPrizeResult.error}`)
+    }
+    if (!budgetConfigResult.valid && budgetConfigResult.error) {
+      errors.push(`预算配置：${budgetConfigResult.error}`)
+    }
+
+    const allValid = prizeWeightResult.valid && emptyPrizeResult.valid && budgetConfigResult.valid
+
+    return {
+      valid: allValid,
+      can_launch: allValid,
+      error: errors.length > 0 ? errors.join('；') : null,
+      campaign_id: campaignId,
+      validation_details: {
+        prize_weights: prizeWeightResult,
+        empty_prize: emptyPrizeResult,
+        budget_config: budgetConfigResult
+      },
+      message: allValid
+        ? `活动 ${campaignId} 配置校验通过，可以上线`
+        : `活动 ${campaignId} 配置校验失败，禁止上线：${errors.join('；')}`
+    }
+  }
 }
 
 module.exports = sequelize => {
@@ -518,6 +690,20 @@ module.exports = sequelize => {
         allowNull: false,
         defaultValue: false,
         comment: '是否为保底奖品（prize_value_points=0的奖品应标记为true）'
+      },
+
+      /**
+       * 是否VIP专属奖品
+       * @type {boolean}
+       * @业务含义 标记此奖品是否仅VIP用户可抽
+       * @规则 VIP用户可以抽到此奖品，普通用户不参与此奖品的抽奖
+       * @用途 用于分层策略，VIP用户享有独占奖品池
+       */
+      reserved_for_vip: {
+        type: DataTypes.BOOLEAN,
+        allowNull: false,
+        defaultValue: false,
+        comment: '是否VIP专属奖品（仅VIP用户可抽）'
       },
 
       /**

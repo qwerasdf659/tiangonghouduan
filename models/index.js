@@ -105,26 +105,26 @@ models.PresetInventoryDebt = require('./PresetInventoryDebt')(sequelize, DataTyp
 /*
  * ✅ PresetInventoryDebt：预设库存欠账表（系统垫付）
  *    - 用途：记录预设强制发放时因库存不足产生的欠账
- *    - 特点：debt_quantity（欠账数量）、repaid_quantity（已偿还）、debt_status状态流转
+ *    - 特点：debt_quantity（欠账数量）、cleared_quantity（已清偿）、status状态流转（pending/cleared/written_off）
  *    - 表名：preset_inventory_debt，主键：debt_id
- *    - 业务场景：预设发放库存不足→系统垫付→运营补货偿还
+ *    - 业务场景：预设发放库存不足→系统垫付→运营补货清偿
  */
 
 models.PresetBudgetDebt = require('./PresetBudgetDebt')(sequelize, DataTypes)
 /*
  * ✅ PresetBudgetDebt：预设预算欠账表（系统垫付）
  *    - 用途：记录预设强制发放时因预算不足产生的欠账
- *    - 特点：budget_source区分来源（user/pool）、debt_amount（欠账金额）
+ *    - 特点：debt_source区分来源（user_budget/pool_budget/pool_quota）、debt_amount（欠账金额）、cleared_amount（已清偿）
  *    - 表名：preset_budget_debt，主键：debt_id
- *    - 业务场景：预设发放预算不足→系统垫付→运营充值偿还
+ *    - 业务场景：预设发放预算不足→系统垫付→运营充值清偿
  */
 
 models.PresetDebtLimit = require('./PresetDebtLimit')(sequelize, DataTypes)
 /*
  * ✅ PresetDebtLimit：预设欠账上限配置表（风控）
- *    - 用途：配置活动的最大可容忍欠账额度，防止无限制垫付
- *    - 特点：max_inventory_debt（库存欠账上限）、max_budget_debt（预算欠账上限）、alert_threshold_percent
- *    - 表名：preset_debt_limits，主键：limit_id，唯一约束：campaign_id
+ *    - 用途：配置各级别（global/campaign/prize）的最大可容忍欠账额度，防止无限制垫付
+ *    - 特点：limit_level（限制级别）、inventory_debt_limit（库存欠账上限）、budget_debt_limit（预算欠账上限）
+ *    - 表名：preset_debt_limits，主键：limit_id，唯一约束：limit_level + reference_id
  *    - 业务场景：配置欠账上限→接近上限告警→超限拒绝预设发放
  */
 

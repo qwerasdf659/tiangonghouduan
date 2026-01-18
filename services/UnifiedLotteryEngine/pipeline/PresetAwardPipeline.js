@@ -26,12 +26,13 @@
  */
 
 const PipelineRunner = require('./PipelineRunner')
-const LoadCampaignStage = require('./stages/LoadCampaignStage')
-// 以下 Stage 将在后续实现
-// const LoadPresetStage = require('./stages/LoadPresetStage')
-// const PresetBudgetStage = require('./stages/PresetBudgetStage')
-// const DecisionSnapshotStage = require('./stages/DecisionSnapshotStage')
-// const PresetSettleStage = require('./stages/PresetSettleStage')
+const {
+  LoadCampaignStage,
+  LoadPresetStage,
+  PresetBudgetStage,
+  /* DecisionSnapshotStage 预留用于审计快照（当前预设流程集成在 PresetSettleStage） */
+  PresetSettleStage
+} = require('./stages')
 
 /**
  * 预设发放管线
@@ -52,24 +53,26 @@ class PresetAwardPipeline extends PipelineRunner {
   /**
    * 初始化 Stage
    *
+   * 执行顺序严格按照架构文档定义（预设发放流程）
+   *
+   * @returns {void}
    * @private
    */
   _initializeStages() {
-    // 1. 加载活动配置
+    // 1. 加载活动配置 - 加载活动基本信息
     this.addStage(new LoadCampaignStage())
 
-    // TODO: 后续添加其他 Stage
-    // 2. 加载预设配置
-    // this.addStage(new LoadPresetStage())
+    // 2. 加载预设配置 - 加载预设记录和关联奖品
+    this.addStage(new LoadPresetStage())
 
-    // 3. 处理预设预算（支持欠账）
-    // this.addStage(new PresetBudgetStage())
+    // 3. 处理预设预算（支持欠账）- 检查/扣减预算，支持欠账模式
+    this.addStage(new PresetBudgetStage())
 
-    // 4. 记录决策快照
-    // this.addStage(new DecisionSnapshotStage())
-
-    // 5. 预设结算（强制变体）
-    // this.addStage(new PresetSettleStage())
+    /*
+     * 4. 预设结算（强制变体）- 扣库存、发奖品、记录欠账
+     * 注意：PresetSettleStage 内部会创建决策记录
+     */
+    this.addStage(new PresetSettleStage())
   }
 
   /**
@@ -98,4 +101,3 @@ class PresetAwardPipeline extends PipelineRunner {
 }
 
 module.exports = PresetAwardPipeline
-

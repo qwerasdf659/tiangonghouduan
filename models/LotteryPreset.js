@@ -315,6 +315,41 @@ module.exports = (sequelize, DataTypes) => {
       },
 
       /**
+       * rejection_reason - 拒绝原因（2026-01-18新增 - DR-16）
+       *
+       * 业务含义：记录审批拒绝的原因（用于审计和运营沟通）
+       *
+       * 业务规则：
+       * - 可选字段（仅rejected状态需要填写）
+       * - 审批拒绝时必填（说明拒绝理由）
+       * - 用于运营沟通和后续调整
+       *
+       * 示例：rejection_reason = "奖品价值过高，需要更高级别审批"
+       */
+      rejection_reason: {
+        type: DataTypes.STRING(500),
+        allowNull: true,
+        comment: '审批拒绝原因（rejected状态时填写）'
+      },
+
+      /**
+       * reason - 预设原因（2026-01-18新增）
+       *
+       * 业务含义：记录创建预设的业务原因（用于审计和运营追溯）
+       *
+       * 业务规则：
+       * - 可选字段（建议填写，便于后续审计）
+       * - 运营人员填写预设创建原因
+       *
+       * 示例：reason = "VIP用户生日福利"
+       */
+      reason: {
+        type: DataTypes.STRING(500),
+        allowNull: true,
+        comment: '预设创建原因（运营人员填写）'
+      },
+
+      /**
        * created_at - 预设创建时间（北京时间）
        *
        * 业务含义：记录预设创建的时间（用于审计和统计）

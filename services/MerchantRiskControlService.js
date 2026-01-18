@@ -668,6 +668,641 @@ class MerchantRiskControlService {
   static getRiskConfig() {
     return { ...RISK_CONFIG }
   }
+
+  /**
+   * 获取告警详情（包含关联信息）
+   *
+   * @param {number} alertId - 告警ID
+   * @returns {Promise<Object|null>} 告警详情（包含关联的用户、门店、消费记录信息）
+   *
+   * @since 2026-01-18 路由层合规性治理：移除路由直接访问模型
+   */
+  static async getAlertDetail(alertId) {
+    const models = MerchantRiskControlService._getModels()
+    const { RiskAlert, User, Store, ConsumptionRecord } = models
+
+    if (!RiskAlert) {
+      throw new Error('RiskAlert 模型不存在')
+    }
+
+    try {
+      const alert = await RiskAlert.findByPk(alertId, {
+        include: [
+          {
+            model: User,
+            as: 'operator',
+            attributes: ['user_id', 'nickname', 'mobile']
+          },
+          {
+            model: Store,
+            as: 'store',
+            attributes: ['store_id', 'store_name']
+          },
+          {
+            model: User,
+            as: 'targetUser',
+            attributes: ['user_id', 'nickname', 'mobile']
+          },
+          {
+            model: User,
+            as: 'reviewer',
+            attributes: ['user_id', 'nickname']
+          },
+          {
+            model: ConsumptionRecord,
+            as: 'relatedRecord',
+            attributes: ['record_id', 'consumption_amount', 'status', 'created_at']
+          }
+        ]
+      })
+
+      if (!alert) {
+        return null
+      }
+
+      // 格式化返回数据
+      const result = {
+        ...(alert.toAPIResponse ? alert.toAPIResponse() : alert.toJSON()),
+        operator: alert.operator
+          ? {
+              user_id: alert.operator.user_id,
+              nickname: alert.operator.nickname,
+              mobile: alert.operator.mobile
+            }
+          : null,
+        store: alert.store
+          ? {
+              store_id: alert.store.store_id,
+              store_name: alert.store.store_name
+            }
+          : null,
+        target_user: alert.targetUser
+          ? {
+              user_id: alert.targetUser.user_id,
+              nickname: alert.targetUser.nickname,
+              mobile: alert.targetUser.mobile
+            }
+          : null,
+        reviewer: alert.reviewer
+          ? {
+              user_id: alert.reviewer.user_id,
+              nickname: alert.reviewer.nickname
+            }
+          : null,
+        related_record: alert.relatedRecord
+          ? {
+              record_id: alert.relatedRecord.record_id,
+              consumption_amount: parseFloat(alert.relatedRecord.consumption_amount),
+              status: alert.relatedRecord.status,
+              created_at: BeijingTimeHelper.formatForAPI(alert.relatedRecord.created_at)
+            }
+          : null
+      }
+
+      return result
+    } catch (error) {
+      logger.error('❌ 获取告警详情失败', { alertId, error: error.message })
+      throw error
+    }
+  }
+
+  /**
+   * 获取风控告警统计概览
+   *
+   * @param {Object} filters - 筛选条件
+   * @param {number} [filters.store_id] - 门店ID（可选）
+   * @returns {Promise<Object>} 统计数据（按状态、类型、严重程度分组）
+   *
+   * @since 2026-01-18 路由层合规性治理：移除路由直接访问模型
+   */
+  static async getAlertStats(filters = {}) {
+    const models = MerchantRiskControlService._getModels()
+    const { RiskAlert } = models
+
+    if (!RiskAlert) {
+      throw new Error('RiskAlert 模型不存在')
+    }
+
+    try {
+      // 构建查询条件
+      const where = {}
+      if (filters.store_id) where.store_id = filters.store_id
+
+      // 按状态统计
+      const statusStats = await RiskAlert.findAll({
+        where,
+        attributes: [
+          'status',
+          [RiskAlert.sequelize.fn('COUNT', RiskAlert.sequelize.col('alert_id')), 'count']
+        ],
+        group: ['status'],
+        raw: true
+      })
+
+      // 按类型统计
+      const typeStats = await RiskAlert.findAll({
+        where,
+        attributes: [
+          'alert_type',
+          [RiskAlert.sequelize.fn('COUNT', RiskAlert.sequelize.col('alert_id')), 'count']
+        ],
+        group: ['alert_type'],
+        raw: true
+      })
+
+      // 按严重程度统计
+      const severityStats = await RiskAlert.findAll({
+        where,
+        attributes: [
+          'severity',
+          [RiskAlert.sequelize.fn('COUNT', RiskAlert.sequelize.col('alert_id')), 'count']
+        ],
+        group: ['severity'],
+        raw: true
+      })
+
+      // 今日新增
+      const todayStart = BeijingTimeHelper.getTodayStart()
+      const todayCount = await RiskAlert.count({
+        where: {
+          ...where,
+          created_at: { [Op.gte]: todayStart }
+        }
+      })
+
+      return {
+        by_status: statusStats.reduce((acc, item) => {
+          acc[item.status] = parseInt(item.count, 10)
+          return acc
+        }, {}),
+        by_type: typeStats.reduce((acc, item) => {
+          acc[item.alert_type] = parseInt(item.count, 10)
+          return acc
+        }, {}),
+        by_severity: severityStats.reduce((acc, item) => {
+          acc[item.severity] = parseInt(item.count, 10)
+          return acc
+        }, {}),
+        today_count: todayCount,
+        risk_config: MerchantRiskControlService.getRiskConfig(),
+        store_id: filters.store_id || null
+      }
+    } catch (error) {
+      logger.error('❌ 获取风控统计失败', { filters, error: error.message })
+      throw error
+    }
+  }
+
+  /**
+   * 检查告警是否存在
+   *
+   * @param {number} alertId - 告警ID
+   * @returns {Promise<Object|null>} 告警记录（仅基本字段）
+   *
+   * @since 2026-01-18 路由层合规性治理：支持路由层权限检查
+   */
+  static async getAlertBasic(alertId) {
+    const models = MerchantRiskControlService._getModels()
+    const { RiskAlert } = models
+
+    if (!RiskAlert) {
+      throw new Error('RiskAlert 模型不存在')
+    }
+
+    return await RiskAlert.findByPk(alertId, {
+      attributes: ['alert_id', 'store_id', 'status']
+    })
+  }
+
+  /**
+   * 查询风控告警列表（带关联信息，用于管理后台）
+   *
+   * @param {Object} filters - 筛选条件
+   * @param {Object} pagination - 分页参数
+   * @returns {Promise<Object>} 告警列表及分页信息
+   *
+   * @since 2026-01-18 路由层合规性治理：支持 console/risk-alerts.js
+   */
+  static async queryRiskAlertsWithDetails(filters = {}, pagination = {}) {
+    const models = MerchantRiskControlService._getModels()
+    const { RiskAlert, User, Store } = models
+
+    if (!RiskAlert) {
+      throw new Error('RiskAlert 模型不存在')
+    }
+
+    const page = Math.max(1, parseInt(pagination.page, 10) || 1)
+    const pageSize = Math.min(100, Math.max(1, parseInt(pagination.page_size, 10) || 20))
+    const offset = (page - 1) * pageSize
+
+    // 构建查询条件
+    const where = {}
+    if (filters.alert_type) where.alert_type = filters.alert_type
+    if (filters.severity) where.severity = filters.severity
+    if (filters.status) where.status = filters.status
+    if (filters.store_id) where.store_id = parseInt(filters.store_id, 10)
+    if (filters.operator_id) where.operator_id = parseInt(filters.operator_id, 10)
+    if (filters.target_user_id) where.target_user_id = parseInt(filters.target_user_id, 10)
+    if (filters.is_blocked !== undefined) {
+      where.is_blocked = filters.is_blocked === 'true' || filters.is_blocked === true
+    }
+
+    // 时间范围筛选
+    if (filters.start_time || filters.end_time) {
+      where.created_at = {}
+      if (filters.start_time) {
+        where.created_at[Op.gte] = BeijingTimeHelper.parseBeijingTime(filters.start_time)
+      }
+      if (filters.end_time) {
+        where.created_at[Op.lte] = BeijingTimeHelper.parseBeijingTime(filters.end_time)
+      }
+    }
+
+    try {
+      const { count, rows } = await RiskAlert.findAndCountAll({
+        where,
+        include: [
+          {
+            model: User,
+            as: 'operator',
+            attributes: ['user_id', 'nickname', 'mobile']
+          },
+          {
+            model: Store,
+            as: 'store',
+            attributes: ['store_id', 'store_name']
+          },
+          {
+            model: User,
+            as: 'targetUser',
+            attributes: ['user_id', 'nickname', 'mobile']
+          },
+          {
+            model: User,
+            as: 'reviewer',
+            attributes: ['user_id', 'nickname']
+          }
+        ],
+        order: [
+          ['severity', 'DESC'],
+          ['created_at', 'DESC']
+        ],
+        limit: pageSize,
+        offset
+      })
+
+      const items = rows.map(alert => ({
+        alert_id: alert.alert_id,
+        alert_type: alert.alert_type,
+        alert_type_name: RiskAlert.ALERT_TYPE_DESCRIPTIONS?.[alert.alert_type] || alert.alert_type,
+        severity: alert.severity,
+        rule_name: alert.rule_name,
+        rule_threshold: alert.rule_threshold,
+        actual_value: alert.actual_value,
+        alert_message: alert.alert_message,
+        is_blocked: alert.is_blocked,
+        status: alert.status,
+        review_notes: alert.review_notes,
+        reviewed_at: alert.reviewed_at ? BeijingTimeHelper.formatForAPI(alert.reviewed_at) : null,
+        created_at: BeijingTimeHelper.formatForAPI(alert.created_at),
+        operator_info: alert.operator
+          ? {
+              user_id: alert.operator.user_id,
+              nickname: alert.operator.nickname,
+              mobile: alert.operator.mobile
+            }
+          : null,
+        store_info: alert.store
+          ? {
+              store_id: alert.store.store_id,
+              store_name: alert.store.store_name
+            }
+          : null,
+        target_user_info: alert.targetUser
+          ? {
+              user_id: alert.targetUser.user_id,
+              nickname: alert.targetUser.nickname,
+              mobile: alert.targetUser.mobile
+            }
+          : null,
+        reviewer_info: alert.reviewer
+          ? {
+              user_id: alert.reviewer.user_id,
+              nickname: alert.reviewer.nickname
+            }
+          : null
+      }))
+
+      return {
+        items,
+        pagination: {
+          page,
+          page_size: pageSize,
+          total: count,
+          total_pages: Math.ceil(count / pageSize)
+        }
+      }
+    } catch (error) {
+      logger.error('❌ 查询风控告警列表失败', { error: error.message, filters })
+      throw error
+    }
+  }
+
+  /**
+   * 查询待处理风控告警
+   *
+   * @param {Object} filters - 筛选条件
+   * @param {Object} pagination - 分页参数
+   * @returns {Promise<Object>} 待处理告警列表
+   *
+   * @since 2026-01-18 路由层合规性治理
+   */
+  static async getPendingAlerts(filters = {}, pagination = {}) {
+    const models = MerchantRiskControlService._getModels()
+    const { RiskAlert } = models
+
+    if (!RiskAlert) {
+      throw new Error('RiskAlert 模型不存在')
+    }
+
+    return await RiskAlert.getPendingAlerts(filters, {
+      page: parseInt(pagination.page, 10) || 1,
+      page_size: parseInt(pagination.page_size, 10) || 20
+    })
+  }
+
+  /**
+   * 复核风控告警（带事务）
+   *
+   * @param {number} alertId - 告警ID
+   * @param {Object} params - 复核参数
+   * @param {number} params.reviewed_by - 复核人ID
+   * @param {string} params.status - 新状态（reviewed/ignored）
+   * @param {string} [params.review_notes] - 复核备注
+   * @returns {Promise<Object>} 复核后的告警信息
+   *
+   * @since 2026-01-18 路由层合规性治理：事务收口到服务层
+   */
+  static async reviewAlert(alertId, params) {
+    const models = MerchantRiskControlService._getModels()
+    const { RiskAlert, sequelize } = models
+
+    if (!RiskAlert) {
+      throw new Error('RiskAlert 模型不存在')
+    }
+
+    const { reviewed_by, status, review_notes } = params
+
+    // 使用事务确保原子性
+    const transaction = await sequelize.transaction()
+
+    try {
+      const alert = await RiskAlert.reviewAlert(
+        alertId,
+        { reviewed_by, status, review_notes },
+        { transaction }
+      )
+
+      await transaction.commit()
+
+      logger.info('📝 风控告警已复核', {
+        alert_id: alertId,
+        reviewed_by,
+        status,
+        review_notes
+      })
+
+      return {
+        alert_id: alert.alert_id,
+        status: alert.status,
+        reviewed_by: alert.reviewed_by,
+        review_notes: alert.review_notes,
+        reviewed_at: BeijingTimeHelper.formatForAPI(alert.reviewed_at)
+      }
+    } catch (error) {
+      await transaction.rollback()
+      logger.error('❌ 复核风控告警失败', { alertId, error: error.message })
+      throw error
+    }
+  }
+
+  /**
+   * 获取风控告警统计摘要
+   *
+   * @param {Object} filters - 筛选条件（时间范围）
+   * @returns {Promise<Object>} 统计摘要数据
+   *
+   * @since 2026-01-18 路由层合规性治理
+   */
+  static async getStatsSummary(filters = {}) {
+    const models = MerchantRiskControlService._getModels()
+    const { RiskAlert } = models
+
+    if (!RiskAlert) {
+      throw new Error('RiskAlert 模型不存在')
+    }
+
+    const { start_time, end_time } = filters
+
+    // 构建时间条件
+    const timeCondition = {}
+    if (start_time) {
+      timeCondition[Op.gte] = BeijingTimeHelper.parseBeijingTime(start_time)
+    }
+    if (end_time) {
+      timeCondition[Op.lte] = BeijingTimeHelper.parseBeijingTime(end_time)
+    }
+
+    const where = {}
+    if (Object.keys(timeCondition).length > 0) {
+      where.created_at = timeCondition
+    }
+
+    try {
+      // 总数统计
+      const totalCount = await RiskAlert.count({ where })
+      const pendingCount = await RiskAlert.count({ where: { ...where, status: 'pending' } })
+      const reviewedCount = await RiskAlert.count({ where: { ...where, status: 'reviewed' } })
+      const ignoredCount = await RiskAlert.count({ where: { ...where, status: 'ignored' } })
+      const blockedCount = await RiskAlert.count({ where: { ...where, is_blocked: true } })
+
+      // 按告警类型统计
+      const byType = await RiskAlert.findAll({
+        attributes: ['alert_type', [RiskAlert.sequelize.fn('COUNT', '*'), 'count']],
+        where,
+        group: ['alert_type'],
+        raw: true
+      })
+
+      const typeStats = {}
+      byType.forEach(item => {
+        typeStats[item.alert_type] = parseInt(item.count, 10)
+      })
+
+      // 按严重程度统计
+      const bySeverity = await RiskAlert.findAll({
+        attributes: ['severity', [RiskAlert.sequelize.fn('COUNT', '*'), 'count']],
+        where,
+        group: ['severity'],
+        raw: true
+      })
+
+      const severityStats = {}
+      bySeverity.forEach(item => {
+        severityStats[item.severity] = parseInt(item.count, 10)
+      })
+
+      // 今日新增
+      const todayStart = BeijingTimeHelper.getTodayRange().start
+      const todayCount = await RiskAlert.count({
+        where: {
+          created_at: { [Op.gte]: todayStart }
+        }
+      })
+
+      return {
+        total: totalCount,
+        by_status: {
+          pending: pendingCount,
+          reviewed: reviewedCount,
+          ignored: ignoredCount
+        },
+        blocked_count: blockedCount,
+        by_type: typeStats,
+        by_severity: severityStats,
+        today_count: todayCount,
+        time_range: {
+          start_time: start_time || null,
+          end_time: end_time || null
+        }
+      }
+    } catch (error) {
+      logger.error('❌ 获取风控告警统计摘要失败', { error: error.message })
+      throw error
+    }
+  }
+
+  /**
+   * 获取门店风控告警统计
+   *
+   * @param {number} storeId - 门店ID
+   * @param {Object} filters - 筛选条件（时间范围）
+   * @returns {Promise<Object>} 门店统计数据
+   *
+   * @since 2026-01-18 路由层合规性治理
+   */
+  static async getStoreStats(storeId, filters = {}) {
+    const models = MerchantRiskControlService._getModels()
+    const { RiskAlert } = models
+
+    if (!RiskAlert) {
+      throw new Error('RiskAlert 模型不存在')
+    }
+
+    const { start_time, end_time } = filters
+
+    // 构建时间条件
+    const timeCondition = {}
+    if (start_time) {
+      timeCondition[Op.gte] = BeijingTimeHelper.parseBeijingTime(start_time)
+    }
+    if (end_time) {
+      timeCondition[Op.lte] = BeijingTimeHelper.parseBeijingTime(end_time)
+    }
+
+    const where = { store_id: parseInt(storeId, 10) }
+    if (Object.keys(timeCondition).length > 0) {
+      where.created_at = timeCondition
+    }
+
+    try {
+      const totalCount = await RiskAlert.count({ where })
+      const pendingCount = await RiskAlert.count({ where: { ...where, status: 'pending' } })
+      const blockedCount = await RiskAlert.count({ where: { ...where, is_blocked: true } })
+
+      // 按告警类型统计
+      const byType = await RiskAlert.findAll({
+        attributes: ['alert_type', [RiskAlert.sequelize.fn('COUNT', '*'), 'count']],
+        where,
+        group: ['alert_type'],
+        raw: true
+      })
+
+      const typeStats = {}
+      byType.forEach(item => {
+        typeStats[item.alert_type] = parseInt(item.count, 10)
+      })
+
+      // 按操作员统计 TOP 5
+      const topOperators = await RiskAlert.findAll({
+        attributes: ['operator_id', [RiskAlert.sequelize.fn('COUNT', '*'), 'count']],
+        where,
+        group: ['operator_id'],
+        order: [[RiskAlert.sequelize.literal('count'), 'DESC']],
+        limit: 5,
+        raw: true
+      })
+
+      return {
+        store_id: parseInt(storeId, 10),
+        total: totalCount,
+        pending: pendingCount,
+        blocked: blockedCount,
+        by_type: typeStats,
+        top_operators: topOperators.map(item => ({
+          operator_id: item.operator_id,
+          alert_count: parseInt(item.count, 10)
+        })),
+        time_range: {
+          start_time: start_time || null,
+          end_time: end_time || null
+        }
+      }
+    } catch (error) {
+      logger.error('❌ 获取门店风控统计失败', { storeId, error: error.message })
+      throw error
+    }
+  }
+
+  /**
+   * 获取告警类型列表
+   *
+   * @returns {Promise<Object>} 告警类型、严重程度、状态列表
+   *
+   * @since 2026-01-18 路由层合规性治理
+   */
+  static async getAlertTypesList() {
+    const models = MerchantRiskControlService._getModels()
+    const { RiskAlert } = models
+
+    if (!RiskAlert) {
+      throw new Error('RiskAlert 模型不存在')
+    }
+
+    const alertTypes = Object.entries(RiskAlert.ALERT_TYPES || {}).map(([key, value]) => ({
+      code: value,
+      name: RiskAlert.ALERT_TYPE_DESCRIPTIONS?.[value] || value,
+      key
+    }))
+
+    const severityLevels = Object.entries(RiskAlert.SEVERITY_LEVELS || {}).map(([key, value]) => ({
+      code: value,
+      name: key.toLowerCase(),
+      key
+    }))
+
+    const alertStatus = Object.entries(RiskAlert.ALERT_STATUS || {}).map(([key, value]) => ({
+      code: value,
+      name: key.toLowerCase(),
+      key
+    }))
+
+    return {
+      alert_types: alertTypes,
+      severity_levels: severityLevels,
+      alert_status: alertStatus
+    }
+  }
 }
 
 // 导出服务类和枚举常量

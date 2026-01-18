@@ -80,7 +80,7 @@ class BudgetContextStage extends BaseStage {
       const budget_provider = BudgetProviderFactory.create(budget_mode, {
         user_id,
         campaign_id,
-        campaign: campaign,
+        campaign,
         transaction: context.transaction || null
       })
 
@@ -108,11 +108,11 @@ class BudgetContextStage extends BaseStage {
 
       // 5. 构建返回数据
       const result = {
-        budget_provider: budget_provider,
-        budget_mode: budget_mode,
-        budget_before: budget_before,
-        min_prize_cost: min_prize_cost,
-        budget_sufficient: budget_sufficient,
+        budget_provider,
+        budget_mode,
+        budget_before,
+        min_prize_cost,
+        budget_sufficient,
         can_win_valuable_prize: budget_sufficient && min_prize_cost > 0
       }
 
@@ -166,13 +166,10 @@ class BudgetContextStage extends BaseStage {
     }
 
     // 找出最小成本
-    const min_cost = Math.min(
-      ...valuable_prizes.map(p => p.prize_value_points || 0)
-    )
+    const min_cost = Math.min(...valuable_prizes.map(p => p.prize_value_points || 0))
 
     return min_cost
   }
 }
 
 module.exports = BudgetContextStage
-

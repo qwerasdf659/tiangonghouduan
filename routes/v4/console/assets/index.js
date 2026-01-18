@@ -22,7 +22,6 @@
 const express = require('express')
 const router = express.Router()
 const { authenticateToken, requireAdmin } = require('../../../../middleware/auth')
-const { sequelize } = require('../../../../models')
 const logger = require('../../../../utils/logger')
 
 // 导入子路由模块
@@ -35,48 +34,16 @@ const transactionsRoutes = require('./transactions')
  * @description 查询系统所有资产的统计数据，用于运营资产中心仪表盘
  * @access Admin
  * @returns {Object} 各资产类型的流通量、持有用户数、冻结量等统计
+ *
+ * @since 2026-01-18 路由层合规性治理：移除直接 sequelize 访问，使用 AssetService.getSystemStats()
  */
 router.get('/stats', authenticateToken, requireAdmin, async (req, res) => {
   try {
-    logger.info('📊 获取系统级资产统计')
+    // 通过 ServiceManager 获取 AssetService
+    const AssetService = req.app.locals.services.getService('asset')
+    const result = await AssetService.getSystemStats()
 
-    // 从 account_asset_balances 表聚合统计
-    const [stats] = await sequelize.query(`
-      SELECT 
-        asset_code,
-        COUNT(DISTINCT account_id) as holder_count,
-        SUM(available_amount) as total_circulation,
-        SUM(frozen_amount) as total_frozen,
-        SUM(available_amount + frozen_amount) as total_issued
-      FROM account_asset_balances
-      WHERE available_amount > 0 OR frozen_amount > 0
-      GROUP BY asset_code
-      ORDER BY asset_code
-    `)
-
-    // 转换为前端需要的格式
-    const assetStats = stats.map(stat => ({
-      asset_code: stat.asset_code,
-      holder_count: parseInt(stat.holder_count) || 0,
-      total_circulation: parseFloat(stat.total_circulation) || 0,
-      total_frozen: parseFloat(stat.total_frozen) || 0,
-      total_issued: parseFloat(stat.total_issued) || 0,
-      destroyed: 0 // 暂无销毁数据
-    }))
-
-    // 汇总数据
-    const summary = {
-      total_asset_types: assetStats.length,
-      total_holders: assetStats.reduce((sum, s) => sum + s.holder_count, 0),
-      total_circulation: assetStats.reduce((sum, s) => sum + s.total_circulation, 0),
-      total_frozen: assetStats.reduce((sum, s) => sum + s.total_frozen, 0)
-    }
-
-    return res.apiSuccess({
-      asset_stats: assetStats,
-      summary,
-      retrieved_at: new Date().toISOString()
-    })
+    return res.apiSuccess(result)
   } catch (error) {
     logger.error('❌ 获取系统资产统计失败', { error: error.message, stack: error.stack })
     return res.apiError(error.message || '获取资产统计失败', 'STATS_ERROR', null, 500)

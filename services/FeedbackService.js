@@ -376,6 +376,51 @@ class FeedbackService {
       throw error
     }
   }
+
+  /**
+   * 获取反馈统计数据
+   *
+   * @description 按状态分类统计反馈数量
+   * @returns {Promise<Object>} 统计数据
+   *
+   * @since 2026-01-18 路由层合规性治理：支持管理后台统计查询
+   */
+  static async getStats() {
+    const models = FeedbackService._getModels()
+
+    try {
+      // 并行查询各状态数量
+      const [total, pending, processing, replied, closed] = await Promise.all([
+        models.Feedback.count(),
+        models.Feedback.count({ where: { status: 'pending' } }),
+        models.Feedback.count({ where: { status: 'processing' } }),
+        models.Feedback.count({ where: { status: 'replied' } }),
+        models.Feedback.count({ where: { status: 'closed' } })
+      ])
+
+      return {
+        total,
+        pending,
+        processing,
+        replied,
+        closed,
+        resolved: replied + closed // 已解决 = 已回复 + 已关闭
+      }
+    } catch (error) {
+      logger.error('获取反馈统计失败', { error: error.message })
+      throw error
+    }
+  }
+
+  /**
+   * 延迟加载 models，避免循环依赖
+   *
+   * @private
+   * @returns {Object} 模型集合
+   */
+  static _getModels() {
+    return require('../models')
+  }
 }
 
 module.exports = FeedbackService

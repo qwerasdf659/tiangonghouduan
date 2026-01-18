@@ -28,6 +28,7 @@ const {
   asyncHandler,
   validators
 } = require('./shared/middleware')
+const TransactionManager = require('../../../utils/TransactionManager')
 // P1-9：服务通过 ServiceManager 获取（B1-Injected + E2-Strict snake_case）
 
 /**
@@ -173,6 +174,8 @@ router.get(
  * @body {string} budget_mode - 预算模式（user/pool/none）
  * @body {number} pool_budget_total - 活动池总预算（budget_mode=pool时使用）
  * @body {Array<string|number>} allowed_campaign_ids - 允许使用的预算来源活动ID列表
+ * @body {boolean} preset_debt_enabled - 预设是否允许欠账（true/false）
+ * @body {string} preset_budget_policy - 预设预算扣减策略（follow_campaign/pool_first/user_first）
  *
  * 缓存策略（决策3/7）：
  * - 更新成功后在 Service 层精准失效活动配置缓存
@@ -182,7 +185,13 @@ router.put(
   adminAuthMiddleware,
   asyncHandler(async (req, res) => {
     const { campaign_id } = req.params
-    const { budget_mode, pool_budget_total, allowed_campaign_ids } = req.body
+    const {
+      budget_mode,
+      pool_budget_total,
+      allowed_campaign_ids,
+      preset_debt_enabled,
+      preset_budget_policy
+    } = req.body
 
     // P1-9：通过 ServiceManager 获取服务
     const { AdminLotteryService } = getServices(req)
@@ -192,11 +201,27 @@ router.put(
         return res.apiError('无效的活动ID', 'INVALID_CAMPAIGN_ID')
       }
 
-      // 决策7：通过 Service 层更新活动预算（包含缓存失效）
-      const result = await AdminLotteryService.updateCampaignBudget(
-        parseInt(campaign_id),
-        { budget_mode, pool_budget_total, allowed_campaign_ids },
-        { operated_by: req.user?.id }
+      /*
+       * ✅ 事务边界治理：通过 TransactionManager.execute() 统一创建事务
+       * - 路由层不直连 models
+       * - 写操作收口到 Service（AdminLotteryService），并显式传入 transaction
+       */
+      const result = await TransactionManager.execute(
+        async transaction => {
+          // 决策7：通过 Service 层更新活动预算（包含缓存失效）
+          return await AdminLotteryService.updateCampaignBudget(
+            parseInt(campaign_id),
+            {
+              budget_mode,
+              pool_budget_total,
+              allowed_campaign_ids,
+              preset_debt_enabled,
+              preset_budget_policy
+            },
+            { operated_by: req.user?.id, transaction }
+          )
+        },
+        { description: `console_update_campaign_budget: campaign_id=${campaign_id}` }
       )
 
       sharedComponents.logger.info('活动预算配置更新成功', {
@@ -205,8 +230,8 @@ router.put(
         operated_by: req.user?.id
       })
 
-      // 重新加载活动获取最新数据
-      const campaign = await result.campaign
+      // Service 层已在同一事务内 reload，直接使用最新数据
+      const campaign = result.campaign
 
       return res.apiSuccess(
         {
@@ -216,7 +241,9 @@ router.put(
             budget_mode: campaign.budget_mode,
             pool_budget_total: campaign.pool_budget_total,
             pool_budget_remaining: campaign.pool_budget_remaining,
-            allowed_campaign_ids: campaign.allowed_campaign_ids
+            allowed_campaign_ids: campaign.allowed_campaign_ids,
+            preset_debt_enabled: campaign.preset_debt_enabled,
+            preset_budget_policy: campaign.preset_budget_policy
           }
         },
         '活动预算配置更新成功'
@@ -284,6 +311,69 @@ router.post(
         error.message,
         'PRIZE_CONFIG_VALIDATE_ERROR'
       )
+    }
+  })
+)
+
+/**
+ * POST /campaigns/:campaign_id/validate-for-launch - 活动上线前完整校验（纯严格模式）
+ *
+ * @description 活动上线前的完整配置校验，不通过则禁止上线
+ *
+ * 校验内容（用户拍板决定 - 纯严格校验，不自动补差）：
+ * 1. 档位权重校验：同活动+同segment_key下，high+mid+low 权重之和必须 = 1,000,000
+ * 2. 奖品权重校验：同档位（reward_tier）内，所有奖品 win_weight 之和必须 = 1,000,000
+ * 3. 空奖配置校验：必须有 prize_value_points=0 的保底奖品
+ * 4. 基础配置校验：必须有激活状态的奖品
+ *
+ * 业务规则：配置不正确就禁止上线活动
+ *
+ * @route POST /api/v4/console/campaign-budget/campaigns/:campaign_id/validate-for-launch
+ * @access Private (需要管理员权限)
+ * @param {number} campaign_id - 活动ID
+ * @returns {Object} 完整校验结果，包含 can_launch 字段
+ */
+router.post(
+  '/campaigns/:campaign_id/validate-for-launch',
+  adminAuthMiddleware,
+  asyncHandler(async (req, res) => {
+    const { campaign_id } = req.params
+
+    try {
+      if (!campaign_id || isNaN(parseInt(campaign_id))) {
+        return res.apiError('无效的活动ID', 'INVALID_CAMPAIGN_ID')
+      }
+
+      // 通过 ServiceManager 获取服务（P1-9 snake_case key）
+      const ActivityService = req.app.locals.services.getService('activity')
+
+      // 调用活动上线前完整校验（纯严格模式）
+      const validationResult = await ActivityService.validateForLaunch(parseInt(campaign_id))
+
+      sharedComponents.logger.info('活动上线前完整校验完成', {
+        campaign_id,
+        can_launch: validationResult.can_launch,
+        errors_count: validationResult.errors?.length || 0,
+        operated_by: req.user?.id
+      })
+
+      if (validationResult.can_launch) {
+        return res.apiSuccess(validationResult, '活动配置校验通过，可以上线')
+      } else {
+        // 校验不通过，返回详细错误信息，HTTP 状态码仍为 200（业务级错误）
+        return res.apiSuccess(validationResult, '活动配置校验未通过，禁止上线')
+      }
+    } catch (error) {
+      sharedComponents.logger.error('活动上线前校验失败', {
+        campaign_id,
+        error: error.message
+      })
+
+      if (error.code === 'CAMPAIGN_NOT_FOUND') {
+        return res.apiError('活动不存在', error.code, null, 404)
+      }
+
+      return res.apiInternalError('活动上线前校验失败', error.message, 'VALIDATE_FOR_LAUNCH_ERROR')
     }
   })
 )
@@ -397,11 +487,19 @@ router.post(
       // 通过 ServiceManager 获取服务（P1-9 snake_case key）
       const AdminLotteryService = req.app.locals.services.getService('admin_lottery')
 
-      // 决策7：通过 Service 层补充预算（包含缓存失效）
-      const result = await AdminLotteryService.supplementCampaignBudget(
-        parseInt(campaign_id),
-        amount,
-        { operated_by: req.user?.id }
+      /*
+       * ✅ 事务边界治理：通过 TransactionManager.execute() 统一创建事务
+       * - 补充池预算属于写操作，必须显式传入 transaction
+       */
+      const result = await TransactionManager.execute(
+        async transaction => {
+          // 决策7：通过 Service 层补充预算（包含缓存失效）
+          return await AdminLotteryService.supplementCampaignBudget(parseInt(campaign_id), amount, {
+            operated_by: req.user?.id,
+            transaction
+          })
+        },
+        { description: `console_supplement_campaign_budget: campaign_id=${campaign_id}` }
       )
 
       sharedComponents.logger.info('活动池预算补充成功', {

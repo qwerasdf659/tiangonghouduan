@@ -40,4 +40,3 @@ module.exports = {
   // 配额初始化模式常量
   QUOTA_INIT_MODES: PoolQuotaBudgetProvider.QUOTA_INIT_MODES
 }
-

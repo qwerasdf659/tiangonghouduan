@@ -57,34 +57,19 @@ router.get(
  * @description 获取反馈按状态分类的统计数据
  * @route GET /api/v4/console/system/feedbacks/stats
  * @access Private (需要管理员权限)
+ *
+ * @since 2026-01-18 路由层合规性治理：移除直接模型访问，使用 FeedbackService.getStats()
  */
 router.get(
   '/stats',
   adminAuthMiddleware,
   asyncHandler(async (req, res) => {
     try {
-      const models = require('../../../../models')
+      // 通过 ServiceManager 获取 FeedbackService
+      const FeedbackService = req.app.locals.services.getService('feedback')
+      const stats = await FeedbackService.getStats()
 
-      // 并行查询各状态数量
-      const [total, pending, processing, replied, closed] = await Promise.all([
-        models.Feedback.count(),
-        models.Feedback.count({ where: { status: 'pending' } }),
-        models.Feedback.count({ where: { status: 'processing' } }),
-        models.Feedback.count({ where: { status: 'replied' } }),
-        models.Feedback.count({ where: { status: 'closed' } })
-      ])
-
-      return res.apiSuccess(
-        {
-          total,
-          pending,
-          processing,
-          replied,
-          closed,
-          resolved: replied + closed // 已解决 = 已回复 + 已关闭
-        },
-        '获取反馈统计成功'
-      )
+      return res.apiSuccess(stats, '获取反馈统计成功')
     } catch (error) {
       sharedComponents.logger.error('获取反馈统计失败', { error: error.message })
       return res.apiInternalError('获取反馈统计失败', error.message, 'FEEDBACK_STATS_ERROR')

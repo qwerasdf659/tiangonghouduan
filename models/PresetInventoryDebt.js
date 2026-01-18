@@ -4,13 +4,17 @@
  *
  * 业务职责：
  * - 记录预设发放时因库存不足产生的欠账
- * - 管理系统垫付的库存偿还
+ * - 管理系统垫付的库存清偿
  * - 支持库存补货后的债务清偿
  *
  * 核心规则（DR-02）：
  * - 预设发放不可驳回，即使库存不足也要先发放
- * - 产生的欠账需要运营人员在后台补货偿还
+ * - 产生的欠账需要运营人员在后台补货清偿
  * - 欠账存在期间不影响活动状态
+ *
+ * 命名规范：
+ * - 统一使用 cleared_* 系列命名（清偿相关字段）
+ * - 状态枚举：pending（待清偿）、cleared（已清偿）、written_off（已核销）
  */
 
 'use strict'
@@ -61,6 +65,22 @@ class PresetInventoryDebt extends Model {
       onDelete: 'SET NULL',
       comment: '产生欠账的预设'
     })
+
+    // 多对一：收到预设奖品的用户
+    PresetInventoryDebt.belongsTo(models.User, {
+      foreignKey: 'user_id',
+      as: 'user',
+      onDelete: 'SET NULL',
+      comment: '收到预设奖品的用户'
+    })
+
+    // 多对一：清偿操作人
+    PresetInventoryDebt.belongsTo(models.User, {
+      foreignKey: 'cleared_by_user_id',
+      as: 'clearedByUser',
+      onDelete: 'SET NULL',
+      comment: '清偿操作人'
+    })
   }
 
   /**
@@ -69,20 +89,27 @@ class PresetInventoryDebt extends Model {
    */
   getStatusName() {
     const statusNames = {
-      pending: '待偿还',
-      repaying: '偿还中',
-      repaid: '已偿还',
-      cancelled: '已取消'
+      pending: '待清偿',
+      cleared: '已清偿',
+      written_off: '已核销'
     }
-    return statusNames[this.debt_status] || '未知状态'
+    return statusNames[this.status] || '未知状态'
   }
 
   /**
-   * 检查是否可以偿还
-   * @returns {boolean} 是否可偿还
+   * 检查是否可以清偿
+   * @returns {boolean} 是否可清偿
    */
-  canRepay() {
-    return this.debt_status === 'pending' || this.debt_status === 'repaying'
+  canClear() {
+    return this.status === 'pending'
+  }
+
+  /**
+   * 检查是否可以核销
+   * @returns {boolean} 是否可核销
+   */
+  canWriteOff() {
+    return this.status === 'pending'
   }
 
   /**
@@ -90,42 +117,74 @@ class PresetInventoryDebt extends Model {
    * @returns {number} 剩余欠账数量
    */
   getRemainingDebt() {
-    return this.debt_quantity - this.repaid_quantity
+    return this.debt_quantity - this.cleared_quantity
   }
 
   /**
-   * 偿还欠账
-   * @param {number} quantity - 偿还数量
-   * @param {number} repaidBy - 偿还人ID
-   * @param {Object} options - 事务选项
-   * @returns {Promise<boolean>} 是否完全偿还
+   * 清偿欠账
+   * @param {number} quantity - 清偿数量
+   * @param {Object} options - 清偿选项
+   * @param {number} options.clearedByUserId - 清偿操作人ID
+   * @param {string} options.clearedByMethod - 清偿方式：restock（补货触发）、manual（手动清偿）、auto（自动清偿）
+   * @param {string} options.clearedNotes - 清偿备注
+   * @param {Object} options.transaction - 事务对象
+   * @returns {Promise<boolean>} 是否完全清偿
    */
-  async repay(quantity, repaidBy, options = {}) {
-    const { transaction } = options
+  async clearDebt(quantity, options = {}) {
+    const { clearedByUserId, clearedByMethod = 'manual', clearedNotes, transaction } = options
     const remaining = this.getRemainingDebt()
 
     if (quantity <= 0) {
-      throw new Error('偿还数量必须大于0')
+      throw new Error('清偿数量必须大于0')
     }
 
     if (quantity > remaining) {
-      throw new Error(`偿还数量(${quantity})超过剩余欠账(${remaining})`)
+      throw new Error(`清偿数量(${quantity})超过剩余欠账(${remaining})`)
     }
 
-    const newRepaidQuantity = this.repaid_quantity + quantity
-    const isFullyRepaid = newRepaidQuantity >= this.debt_quantity
+    const newClearedQuantity = this.cleared_quantity + quantity
+    const isFullyCleared = newClearedQuantity >= this.debt_quantity
 
     await this.update(
       {
-        repaid_quantity: newRepaidQuantity,
-        debt_status: isFullyRepaid ? 'repaid' : 'repaying',
-        repaid_at: isFullyRepaid ? new Date() : null,
-        repaid_by: repaidBy
+        cleared_quantity: newClearedQuantity,
+        status: isFullyCleared ? 'cleared' : 'pending',
+        cleared_at: isFullyCleared ? new Date() : null,
+        cleared_by_user_id: clearedByUserId,
+        cleared_by_method: clearedByMethod,
+        cleared_notes: clearedNotes
       },
       { transaction }
     )
 
-    return isFullyRepaid
+    return isFullyCleared
+  }
+
+  /**
+   * 核销欠账（决定不再追讨）
+   * @param {Object} options - 核销选项
+   * @param {number} options.clearedByUserId - 核销操作人ID
+   * @param {string} options.clearedNotes - 核销备注
+   * @param {Object} options.transaction - 事务对象
+   * @returns {Promise<void>} 无返回值
+   */
+  async writeOff(options = {}) {
+    const { clearedByUserId, clearedNotes, transaction } = options
+
+    if (!this.canWriteOff()) {
+      throw new Error(`当前状态(${this.status})不允许核销`)
+    }
+
+    await this.update(
+      {
+        status: 'written_off',
+        cleared_at: new Date(),
+        cleared_by_user_id: clearedByUserId,
+        cleared_by_method: 'auto',
+        cleared_notes: clearedNotes || '核销处理'
+      },
+      { transaction }
+    )
   }
 
   /**
@@ -137,14 +196,17 @@ class PresetInventoryDebt extends Model {
       debt_id: this.debt_id,
       campaign_id: this.campaign_id,
       prize_id: this.prize_id,
+      user_id: this.user_id,
       debt_quantity: this.debt_quantity,
-      repaid_quantity: this.repaid_quantity,
+      cleared_quantity: this.cleared_quantity,
       remaining_quantity: this.getRemainingDebt(),
-      debt_status: this.debt_status,
+      status: this.status,
       status_name: this.getStatusName(),
-      can_repay: this.canRepay(),
+      can_clear: this.canClear(),
+      can_write_off: this.canWriteOff(),
+      cleared_by_method: this.cleared_by_method,
       created_at: this.created_at,
-      repaid_at: this.repaid_at
+      cleared_at: this.cleared_at
     }
   }
 
@@ -156,19 +218,17 @@ class PresetInventoryDebt extends Model {
    */
   static async getDebtStatsByCampaign(campaignId, options = {}) {
     const { transaction } = options
-    const { Op, fn, col } = require('sequelize')
+    const { fn, col } = require('sequelize')
 
     const result = await this.findOne({
       attributes: [
         [fn('COUNT', col('debt_id')), 'total_debts'],
         [fn('SUM', col('debt_quantity')), 'total_debt_quantity'],
-        [fn('SUM', col('repaid_quantity')), 'total_repaid_quantity']
+        [fn('SUM', col('cleared_quantity')), 'total_cleared_quantity']
       ],
       where: {
         campaign_id: campaignId,
-        debt_status: {
-          [Op.in]: ['pending', 'repaying']
-        }
+        status: 'pending'
       },
       raw: true,
       transaction
@@ -177,26 +237,22 @@ class PresetInventoryDebt extends Model {
     return {
       total_debts: parseInt(result.total_debts) || 0,
       total_debt_quantity: parseInt(result.total_debt_quantity) || 0,
-      total_repaid_quantity: parseInt(result.total_repaid_quantity) || 0,
+      total_cleared_quantity: parseInt(result.total_cleared_quantity) || 0,
       remaining_debt_quantity:
-        (parseInt(result.total_debt_quantity) || 0) -
-        (parseInt(result.total_repaid_quantity) || 0)
+        (parseInt(result.total_debt_quantity) || 0) - (parseInt(result.total_cleared_quantity) || 0)
     }
   }
 
   /**
-   * 查询未偿还的欠账列表
+   * 查询待清偿的欠账列表
    * @param {Object} options - 查询选项
-   * @returns {Promise<Array>} 未偿还欠账列表
+   * @returns {Promise<Array>} 待清偿欠账列表
    */
   static async findPendingDebts(options = {}) {
     const { campaignId, prizeId, limit = 100, transaction } = options
-    const { Op } = require('sequelize')
 
     const where = {
-      debt_status: {
-        [Op.in]: ['pending', 'repaying']
-      }
+      status: 'pending'
     }
 
     if (campaignId) {
@@ -223,20 +279,18 @@ class PresetInventoryDebt extends Model {
    */
   static async getDebtsByPrize(campaignId, options = {}) {
     const { transaction } = options
-    const { Op, fn, col } = require('sequelize')
+    const { fn, col } = require('sequelize')
 
     return this.findAll({
       attributes: [
         'prize_id',
         [fn('SUM', col('debt_quantity')), 'total_debt'],
-        [fn('SUM', col('repaid_quantity')), 'total_repaid'],
+        [fn('SUM', col('cleared_quantity')), 'total_cleared'],
         [fn('COUNT', col('debt_id')), 'debt_count']
       ],
       where: {
         campaign_id: campaignId,
-        debt_status: {
-          [Op.in]: ['pending', 'repaying']
-        }
+        status: 'pending'
       },
       group: ['prize_id'],
       transaction
@@ -263,12 +317,21 @@ module.exports = sequelize => {
       },
 
       /**
-       * 活动ID
+       * 关联的预设ID
        */
-      campaign_id: {
-        type: DataTypes.INTEGER,
+      preset_id: {
+        type: DataTypes.STRING(50),
         allowNull: false,
-        comment: '活动ID（外键关联lottery_campaigns.campaign_id）'
+        comment: '关联的预设ID（外键关联lottery_presets.preset_id）'
+      },
+
+      /**
+       * 关联的抽奖记录ID
+       */
+      draw_id: {
+        type: DataTypes.STRING(50),
+        allowNull: false,
+        comment: '关联的抽奖记录ID（外键关联lottery_draws.draw_id）'
       },
 
       /**
@@ -277,73 +340,97 @@ module.exports = sequelize => {
       prize_id: {
         type: DataTypes.INTEGER,
         allowNull: false,
-        comment: '奖品ID（外键关联lottery_prizes.prize_id）'
+        comment: '欠账奖品ID（外键关联lottery_prizes.prize_id）'
+      },
+
+      /**
+       * 用户ID（收到预设奖品的用户）
+       */
+      user_id: {
+        type: DataTypes.INTEGER,
+        allowNull: false,
+        comment: '用户ID（收到预设奖品的用户）'
+      },
+
+      /**
+       * 活动ID
+       */
+      campaign_id: {
+        type: DataTypes.INTEGER,
+        allowNull: false,
+        comment: '活动ID'
       },
 
       /**
        * 欠账数量
        */
       debt_quantity: {
-        type: DataTypes.INTEGER,
+        type: DataTypes.INTEGER.UNSIGNED,
         allowNull: false,
         defaultValue: 1,
-        comment: '欠账数量（系统垫付的库存数量）'
-      },
-
-      /**
-       * 已偿还数量
-       */
-      repaid_quantity: {
-        type: DataTypes.INTEGER,
-        allowNull: false,
-        defaultValue: 0,
-        comment: '已偿还数量'
+        comment: '欠账数量（库存垫付数量）'
       },
 
       /**
        * 欠账状态
+       * - pending: 待清偿
+       * - cleared: 已清偿
+       * - written_off: 已核销
        */
-      debt_status: {
-        type: DataTypes.ENUM('pending', 'repaying', 'repaid', 'cancelled'),
+      status: {
+        type: DataTypes.ENUM('pending', 'cleared', 'written_off'),
         allowNull: false,
         defaultValue: 'pending',
-        comment: '欠账状态：pending=待偿还, repaying=偿还中, repaid=已偿还, cancelled=已取消'
+        comment: '欠账状态：pending-待清偿, cleared-已清偿, written_off-已核销'
       },
 
       /**
-       * 产生欠账的预设ID
+       * 已清偿数量
        */
-      preset_id: {
-        type: DataTypes.STRING(50),
-        allowNull: true,
-        comment: '产生欠账的预设ID（外键关联lottery_presets.preset_id）'
+      cleared_quantity: {
+        type: DataTypes.INTEGER.UNSIGNED,
+        allowNull: false,
+        defaultValue: 0,
+        comment: '已清偿数量'
       },
 
       /**
-       * 产生欠账的抽奖记录ID
+       * 清偿时间
        */
-      draw_id: {
-        type: DataTypes.STRING(50),
-        allowNull: true,
-        comment: '产生欠账的抽奖记录ID（外键关联lottery_draws.draw_id）'
-      },
-
-      /**
-       * 偿还人ID
-       */
-      repaid_by: {
-        type: DataTypes.INTEGER,
-        allowNull: true,
-        comment: '偿还人ID（管理员user_id）'
-      },
-
-      /**
-       * 偿还时间
-       */
-      repaid_at: {
+      cleared_at: {
         type: DataTypes.DATE,
         allowNull: true,
-        comment: '完全偿还时间'
+        comment: '清偿时间'
+      },
+
+      /**
+       * 清偿方式
+       * - restock: 补货触发
+       * - manual: 手动清偿
+       * - auto: 自动核销
+       */
+      cleared_by_method: {
+        type: DataTypes.ENUM('restock', 'manual', 'auto'),
+        allowNull: true,
+        comment: '清偿方式：restock-补货触发, manual-手动清偿, auto-自动核销'
+      },
+
+      /**
+       * 清偿操作人ID
+       */
+      cleared_by_user_id: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+        comment: '清偿操作人ID'
+      },
+
+      /**
+       * 清偿备注
+       */
+      cleared_notes: {
+        type: DataTypes.TEXT,
+        allowNull: true,
+        comment: '清偿备注'
       },
 
       /**
@@ -353,7 +440,7 @@ module.exports = sequelize => {
         type: DataTypes.DATE,
         allowNull: false,
         defaultValue: DataTypes.NOW,
-        comment: '欠账产生时间'
+        comment: '创建时间'
       },
 
       /**
@@ -363,7 +450,7 @@ module.exports = sequelize => {
         type: DataTypes.DATE,
         allowNull: false,
         defaultValue: DataTypes.NOW,
-        comment: '最后更新时间'
+        comment: '更新时间'
       }
     },
     {
@@ -374,27 +461,27 @@ module.exports = sequelize => {
       createdAt: 'created_at',
       updatedAt: 'updated_at',
       underscored: true,
-      comment: '预设库存欠账表 - 记录预设发放产生的库存欠账',
+      comment: '预设库存欠账表 - 记录预设发放时库存不足的系统垫付',
       indexes: [
-        // 查询索引：按活动和状态查询
-        {
-          fields: ['campaign_id', 'debt_status'],
-          name: 'idx_inv_debt_campaign_status'
-        },
-        // 查询索引：按奖品和状态查询
-        {
-          fields: ['prize_id', 'debt_status'],
-          name: 'idx_inv_debt_prize_status'
-        },
-        // 查询索引：按预设查询
+        // 预设ID索引
         {
           fields: ['preset_id'],
           name: 'idx_inv_debt_preset'
         },
-        // 查询索引：按创建时间查询
+        // 奖品+状态联合索引
         {
-          fields: ['created_at'],
-          name: 'idx_inv_debt_created'
+          fields: ['prize_id', 'status'],
+          name: 'idx_inv_debt_prize_status'
+        },
+        // 活动+状态联合索引
+        {
+          fields: ['campaign_id', 'status'],
+          name: 'idx_inv_debt_campaign_status'
+        },
+        // 状态+创建时间索引（用于查询待处理欠账）
+        {
+          fields: ['status', 'created_at'],
+          name: 'idx_inv_debt_status_created'
         }
       ]
     }

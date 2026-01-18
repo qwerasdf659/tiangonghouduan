@@ -27,7 +27,8 @@
  */
 
 const BaseStage = require('./BaseStage')
-const SegmentResolver = require('../../../../config/segment_rules')
+const { SegmentResolver } = require('../../../../config/segment_rules')
+const { User } = require('../../../../models')
 
 /**
  * 权重缩放比例（整数权重系统）
@@ -114,12 +115,12 @@ class TierPickStage extends BaseStage {
 
       // 5. 构建返回数据
       const result = {
-        selected_tier: selected_tier,
-        original_tier: original_tier,
+        selected_tier,
+        original_tier,
         tier_downgrade_path: downgrade_path,
-        random_value: random_value,
-        tier_weights: tier_weights,
-        user_segment: user_segment,
+        random_value,
+        tier_weights,
+        user_segment,
         weight_scale: WEIGHT_SCALE
       }
 
@@ -130,7 +131,7 @@ class TierPickStage extends BaseStage {
         original_tier,
         selected_tier,
         downgrade_count: downgrade_path.length - 1,
-        random_value: (random_value / WEIGHT_SCALE * 100).toFixed(4) + '%'
+        random_value: ((random_value / WEIGHT_SCALE) * 100).toFixed(4) + '%'
       })
 
       return this.success(result)
@@ -147,6 +148,11 @@ class TierPickStage extends BaseStage {
   /**
    * 解析用户分群
    *
+   * 根据架构设计方案 DR-15 和 DR-17：
+   * - segment_key 是代码级策略，存储在 config/segment_rules.js
+   * - 通过 campaign.segment_resolver_version 指定使用哪个版本
+   * - 需要查询用户信息（created_at, history_total_points 等）来匹配规则
+   *
    * @param {number} user_id - 用户ID
    * @param {Object} campaign - 活动配置
    * @returns {Promise<string>} 用户分群标识
@@ -154,8 +160,37 @@ class TierPickStage extends BaseStage {
    */
   async _resolveUserSegment(user_id, campaign) {
     try {
-      const resolver_version = campaign.segment_resolver_version || 'v1.0.0'
-      const segment = await SegmentResolver.resolve(user_id, resolver_version)
+      // 获取分层规则版本（默认使用 'default' 版本）
+      const resolver_version = campaign.segment_resolver_version || 'default'
+
+      // 验证版本是否有效
+      if (!SegmentResolver.isValidVersion(resolver_version)) {
+        this.log('warn', '无效的分层规则版本，使用默认版本', {
+          user_id,
+          requested_version: resolver_version
+        })
+        return 'default'
+      }
+
+      // 查询用户信息用于分群规则匹配
+      const user = await User.findByPk(user_id, {
+        attributes: ['user_id', 'created_at', 'last_active_at']
+      })
+
+      if (!user) {
+        this.log('warn', '用户不存在，使用默认分群', { user_id })
+        return 'default'
+      }
+
+      // 调用 SegmentResolver.resolveSegment(version, user) 解析分群
+      const segment = SegmentResolver.resolveSegment(resolver_version, user.toJSON())
+
+      this.log('info', '用户分群解析成功', {
+        user_id,
+        resolver_version,
+        segment_key: segment
+      })
+
       return segment || 'default'
     } catch (error) {
       this.log('warn', '解析用户分群失败，使用默认分群', {
@@ -171,16 +206,16 @@ class TierPickStage extends BaseStage {
    *
    * @param {string} segment - 用户分群
    * @param {Array} tier_rules - 档位规则列表
-   * @param {Object} campaign - 活动配置
+   * @param {Object} _campaign - 活动配置（预留用于扩展权重计算）
    * @returns {Object} 档位权重 { high: weight, mid: weight, low: weight, fallback: weight }
    * @private
    */
-  _getTierWeights(segment, tier_rules, campaign) {
+  _getTierWeights(segment, tier_rules, _campaign) {
     // 默认权重配置（已拍板0.10.2）
     const default_weights = {
-      high: 50000,     // 5%
-      mid: 150000,     // 15%
-      low: 300000,     // 30%
+      high: 50000, // 5%
+      mid: 150000, // 15%
+      low: 300000, // 30%
       fallback: 500000 // 50%
     }
 
@@ -198,8 +233,8 @@ class TierPickStage extends BaseStage {
     // 构建权重映射
     const weights = { ...default_weights }
     for (const rule of segment_rules) {
-      if (rule.tier_name && typeof rule.weight === 'number') {
-        weights[rule.tier_name] = rule.weight
+      if (rule.tier_name && typeof rule.tier_weight === 'number') {
+        weights[rule.tier_name] = rule.tier_weight
       }
     }
 
@@ -250,11 +285,11 @@ class TierPickStage extends BaseStage {
    *
    * @param {string} original_tier - 原始抽中的档位
    * @param {Object} prizes_by_tier - 按档位分组的奖品
-   * @param {Array} available_tiers - 可用档位列表
+   * @param {Array} _available_tiers - 可用档位列表（预留用于优化降级逻辑）
    * @returns {Object} { selected_tier: string, downgrade_path: string[] }
    * @private
    */
-  _applyDowngrade(original_tier, prizes_by_tier, available_tiers) {
+  _applyDowngrade(original_tier, prizes_by_tier, _available_tiers) {
     const downgrade_path = [original_tier]
     let current_tier = original_tier
 
@@ -299,10 +334,9 @@ class TierPickStage extends BaseStage {
 
     return {
       selected_tier: current_tier,
-      downgrade_path: downgrade_path
+      downgrade_path
     }
   }
 }
 
 module.exports = TierPickStage
-

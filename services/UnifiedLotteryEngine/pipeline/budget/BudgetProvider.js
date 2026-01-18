@@ -24,10 +24,10 @@ const { logger } = require('../../../../utils/logger')
  * 预算模式常量
  */
 const BUDGET_MODES = {
-  USER: 'user',       // 用户预算模式：从用户 BUDGET_POINTS 扣减
-  POOL: 'pool',       // 活动池模式：从活动 pool_budget_remaining 扣减
+  USER: 'user', // 用户预算模式：从用户 BUDGET_POINTS 扣减
+  POOL: 'pool', // 活动池模式：从活动 pool_budget_remaining 扣减
   POOL_QUOTA: 'pool_quota', // 池+配额模式：先扣配额，配额用完扣池
-  NONE: 'none'        // 无预算限制
+  NONE: 'none' // 无预算限制
 }
 
 /**
@@ -51,11 +51,11 @@ class BudgetProvider {
    * @param {Object} params - 查询参数
    * @param {number} params.user_id - 用户ID
    * @param {number} params.campaign_id - 活动ID
-   * @param {Object} options - 额外选项
+   * @param {Object} _options - 额外选项（子类实现时使用）
    * @returns {Promise<Object>} 预算信息 { available: number, details: Object }
    * @abstract
    */
-  async getAvailableBudget(params, options = {}) {
+  async getAvailableBudget(params, _options = {}) {
     throw new Error('BudgetProvider.getAvailableBudget() must be implemented')
   }
 
@@ -91,12 +91,12 @@ class BudgetProvider {
    * @param {number} params.amount - 扣减金额
    * @param {string} params.reason - 扣减原因
    * @param {string} params.reference_id - 关联ID（如 draw_id）
-   * @param {Object} options - 额外选项
-   * @param {Object} options.transaction - 数据库事务
+   * @param {Object} _options - 额外选项（子类实现时使用）
+   * @param {Object} _options.transaction - 数据库事务
    * @returns {Promise<Object>} 扣减结果 { success: boolean, deducted: number, remaining: number }
    * @abstract
    */
-  async deductBudget(params, options = {}) {
+  async deductBudget(params, _options = {}) {
     throw new Error('BudgetProvider.deductBudget() must be implemented')
   }
 
@@ -108,12 +108,12 @@ class BudgetProvider {
    * @param {number} params.campaign_id - 活动ID
    * @param {number} params.amount - 回滚金额
    * @param {string} params.original_reference_id - 原扣减的关联ID
-   * @param {Object} options - 额外选项
-   * @param {Object} options.transaction - 数据库事务
+   * @param {Object} _options - 额外选项（子类实现时使用）
+   * @param {Object} _options.transaction - 数据库事务
    * @returns {Promise<Object>} 回滚结果 { success: boolean, refunded: number }
    * @abstract
    */
-  async rollbackBudget(params, options = {}) {
+  async rollbackBudget(params, _options = {}) {
     throw new Error('BudgetProvider.rollbackBudget() must be implemented')
   }
 
@@ -164,6 +164,7 @@ class BudgetProvider {
    * @param {string} level - 日志级别
    * @param {string} message - 日志消息
    * @param {Object} data - 附加数据
+   * @returns {void}
    * @protected
    */
   _log(level, message, data = {}) {
@@ -196,4 +197,3 @@ class BudgetProvider {
 BudgetProvider.MODES = BUDGET_MODES
 
 module.exports = BudgetProvider
-

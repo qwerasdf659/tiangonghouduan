@@ -444,6 +444,9 @@ class ActivityService {
         'pool_budget_total',
         'pool_budget_remaining',
         'allowed_campaign_ids',
+        // ======================== 预设欠账控制字段（统一架构 V1.6） ========================
+        'preset_debt_enabled',
+        'preset_budget_policy',
         'status'
       ]
     })
@@ -466,6 +469,13 @@ class ActivityService {
         used:
           (Number(campaign.pool_budget_total) || 0) - (Number(campaign.pool_budget_remaining) || 0)
       },
+      /*
+       * 预设欠账控制字段（统一架构真源字段）
+       * - preset_debt_enabled：是否允许欠账（预设发放资源不足时是否允许欠账）
+       * - preset_budget_policy：预设预算扣减策略（follow_campaign/pool_first/user_first）
+       */
+      preset_debt_enabled: !!campaign.preset_debt_enabled,
+      preset_budget_policy: campaign.preset_budget_policy,
       allowed_campaign_ids: campaign.allowed_campaign_ids || [],
       status: campaign.status
     }
@@ -688,6 +698,148 @@ class ActivityService {
       },
       prize_config: budgetConfigResult,
       overall_valid: emptyPrizeResult.valid && budgetConfigResult.valid
+    }
+  }
+
+  /**
+   * 活动上线前完整校验（纯严格模式 - 用户拍板决定）
+   *
+   * 业务规则：
+   * - 配置不正确就禁止上线活动
+   * - 不做任何自动补差或归一化处理
+   * - 校验内容：
+   *   1. 档位权重校验：同活动+同segment_key下，high+mid+low 权重之和必须 = 1,000,000
+   *   2. 奖品权重校验：同档位（reward_tier）内，所有奖品 win_weight 之和必须 = 1,000,000
+   *   3. 空奖配置校验：必须有 prize_value_points=0 的保底奖品
+   *   4. 基础配置校验：必须有激活状态的奖品
+   *
+   * @param {number} campaignId - 活动ID
+   * @param {Object} options - 查询选项
+   * @param {Object} [options.transaction] - 数据库事务
+   * @returns {Promise<Object>} 完整校验结果
+   * @throws {Error} 活动不存在
+   */
+  static async validateForLaunch(campaignId, options = {}) {
+    const { transaction } = options
+    const parsedCampaignId = parseInt(campaignId)
+
+    // 验证活动存在
+    const campaign = await models.LotteryCampaign.findByPk(parsedCampaignId, {
+      attributes: [
+        'campaign_id',
+        'campaign_name',
+        'campaign_code',
+        'budget_mode',
+        'status',
+        'pick_method'
+      ],
+      transaction
+    })
+
+    if (!campaign) {
+      const error = new Error('活动不存在')
+      error.code = 'CAMPAIGN_NOT_FOUND'
+      error.statusCode = 404
+      throw error
+    }
+
+    const errors = []
+    const validationDetails = {}
+
+    // 1. 校验档位权重（如果使用 tier_first 选奖法）
+    if (campaign.pick_method === 'tier_first') {
+      // 获取所有该活动的 segment_key
+      const segmentKeys = await models.LotteryTierRule.findAll({
+        where: { campaign_id: parsedCampaignId, status: 'active' },
+        attributes: [
+          [models.sequelize.fn('DISTINCT', models.sequelize.col('segment_key')), 'segment_key']
+        ],
+        raw: true,
+        transaction
+      })
+
+      const tierWeightResults = {}
+      for (const { segment_key } of segmentKeys) {
+        // eslint-disable-next-line no-await-in-loop
+        const tierResult = await models.LotteryTierRule.validateTierWeights(
+          parsedCampaignId,
+          segment_key,
+          { transaction }
+        )
+        tierWeightResults[segment_key] = tierResult
+
+        if (!tierResult.valid) {
+          errors.push(`档位权重[${segment_key}]：${tierResult.error}`)
+        }
+      }
+
+      // 如果没有配置任何档位规则，也是错误
+      if (segmentKeys.length === 0) {
+        errors.push('档位权重：活动未配置任何档位规则（tier_first 选奖法必须配置）')
+      }
+
+      validationDetails.tier_weights = {
+        valid: errors.filter(e => e.startsWith('档位权重')).length === 0,
+        segment_results: tierWeightResults
+      }
+    } else {
+      // 非 tier_first 模式，跳过档位权重校验
+      validationDetails.tier_weights = {
+        valid: true,
+        skipped: true,
+        reason: `活动使用 ${campaign.pick_method || 'normalize'} 选奖法，不需要档位权重校验`
+      }
+    }
+
+    // 2. 校验奖品权重（所有活动都需要）
+    const prizeWeightResult = await models.LotteryPrize.validatePrizeWeights(parsedCampaignId, {
+      transaction
+    })
+    validationDetails.prize_weights = prizeWeightResult
+
+    if (!prizeWeightResult.valid && prizeWeightResult.error) {
+      errors.push(`奖品权重：${prizeWeightResult.error}`)
+    }
+
+    // 3. 校验空奖配置
+    const emptyPrizeResult = await models.LotteryPrize.validateEmptyPrizeConstraint(
+      parsedCampaignId,
+      { transaction }
+    )
+    validationDetails.empty_prize = emptyPrizeResult
+
+    if (!emptyPrizeResult.valid && emptyPrizeResult.error) {
+      errors.push(`空奖配置：${emptyPrizeResult.error}`)
+    }
+
+    // 4. 校验预算配置
+    const budgetConfigResult = await models.LotteryPrize.validateCampaignBudgetConfig(
+      parsedCampaignId,
+      { transaction }
+    )
+    validationDetails.budget_config = budgetConfigResult
+
+    if (!budgetConfigResult.valid && budgetConfigResult.error) {
+      errors.push(`预算配置：${budgetConfigResult.error}`)
+    }
+
+    // 汇总结果
+    const allValid = errors.length === 0
+
+    return {
+      valid: allValid,
+      can_launch: allValid,
+      campaign_id: parsedCampaignId,
+      campaign_name: campaign.campaign_name,
+      campaign_code: campaign.campaign_code,
+      pick_method: campaign.pick_method,
+      current_status: campaign.status,
+      error: errors.length > 0 ? errors.join('；') : null,
+      errors,
+      validation_details: validationDetails,
+      message: allValid
+        ? `活动 ${campaign.campaign_name} 配置校验通过，可以上线`
+        : `活动 ${campaign.campaign_name} 配置校验失败，禁止上线`
     }
   }
 }

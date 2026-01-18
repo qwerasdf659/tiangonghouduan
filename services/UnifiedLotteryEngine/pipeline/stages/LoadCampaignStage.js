@@ -21,12 +21,9 @@
  */
 
 const BaseStage = require('./BaseStage')
-const {
-  LotteryCampaign,
-  LotteryPrize,
-  LotteryTierRule
-} = require('../../../../models')
-const { Op } = require('sequelize')
+const { LotteryCampaign, LotteryPrize, LotteryTierRule } = require('../../../../models')
+/* eslint-disable-next-line spaced-comment -- Op 操作符预留用于复杂查询条件（当前版本使用默认查询） */
+// const { Op } = require('sequelize')
 
 /**
  * 加载活动配置 Stage
@@ -59,11 +56,7 @@ class LoadCampaignStage extends BaseStage {
       const campaign = await this._loadCampaign(campaign_id)
 
       if (!campaign) {
-        throw this.createError(
-          `活动不存在: ${campaign_id}`,
-          'CAMPAIGN_NOT_FOUND',
-          true
-        )
+        throw this.createError(`活动不存在: ${campaign_id}`, 'CAMPAIGN_NOT_FOUND', true)
       }
 
       // 2. 验证活动状态
@@ -122,36 +115,25 @@ class LoadCampaignStage extends BaseStage {
    * 验证活动状态
    *
    * @param {Object} campaign - 活动配置
+   * @returns {void}
    * @throws {Error} 活动状态无效时抛出错误
    * @private
    */
   _validateCampaignStatus(campaign) {
     // 检查活动状态
     if (campaign.status !== 'active') {
-      throw this.createError(
-        `活动状态无效: ${campaign.status}`,
-        'CAMPAIGN_INACTIVE',
-        true
-      )
+      throw this.createError(`活动状态无效: ${campaign.status}`, 'CAMPAIGN_INACTIVE', true)
     }
 
     // 检查活动时间
     const now = new Date()
 
     if (campaign.start_time && new Date(campaign.start_time) > now) {
-      throw this.createError(
-        '活动尚未开始',
-        'CAMPAIGN_NOT_STARTED',
-        true
-      )
+      throw this.createError('活动尚未开始', 'CAMPAIGN_NOT_STARTED', true)
     }
 
     if (campaign.end_time && new Date(campaign.end_time) < now) {
-      throw this.createError(
-        '活动已结束',
-        'CAMPAIGN_ENDED',
-        true
-      )
+      throw this.createError('活动已结束', 'CAMPAIGN_ENDED', true)
     }
   }
 
@@ -165,7 +147,7 @@ class LoadCampaignStage extends BaseStage {
   async _loadPrizes(campaign_id) {
     return await LotteryPrize.findAll({
       where: {
-        campaign_id: campaign_id,
+        campaign_id,
         status: 'active'
       },
       order: [
@@ -186,7 +168,7 @@ class LoadCampaignStage extends BaseStage {
   async _loadTierRules(campaign_id) {
     return await LotteryTierRule.findAll({
       where: {
-        campaign_id: campaign_id,
+        campaign_id,
         status: 'active'
       },
       order: [
@@ -212,9 +194,7 @@ class LoadCampaignStage extends BaseStage {
   _getFallbackPrize(prizes, campaign) {
     // 1. 检查活动是否配置了指定的兜底奖品
     if (campaign.tier_fallback_prize_id) {
-      const specified_fallback = prizes.find(
-        p => p.prize_id === campaign.tier_fallback_prize_id
-      )
+      const specified_fallback = prizes.find(p => p.prize_id === campaign.tier_fallback_prize_id)
       if (specified_fallback) {
         return specified_fallback
       }
@@ -245,4 +225,3 @@ class LoadCampaignStage extends BaseStage {
 }
 
 module.exports = LoadCampaignStage
-

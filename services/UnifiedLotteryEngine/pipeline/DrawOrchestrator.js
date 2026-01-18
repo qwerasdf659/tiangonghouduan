@@ -169,7 +169,7 @@ class DrawOrchestrator {
       if (preset) {
         return {
           pipeline_type: PIPELINE_TYPES.PRESET,
-          preset: preset,
+          preset,
           reason: 'preset_hit'
         }
       }
@@ -181,7 +181,7 @@ class DrawOrchestrator {
       if (override) {
         return {
           pipeline_type: PIPELINE_TYPES.OVERRIDE,
-          override: override,
+          override,
           reason: 'override_hit'
         }
       }
@@ -206,8 +206,8 @@ class DrawOrchestrator {
     try {
       const preset = await LotteryPreset.findOne({
         where: {
-          user_id: user_id,
-          campaign_id: campaign_id,
+          user_id,
+          campaign_id,
           status: 'pending',
           approval_status: 'approved'
         },
@@ -246,8 +246,8 @@ class DrawOrchestrator {
     try {
       const override = await LotteryManagementSetting.findOne({
         where: {
-          user_id: user_id,
-          campaign_id: campaign_id,
+          user_id,
+          campaign_id,
           setting_type: ['force_win', 'force_lose'],
           status: 'active'
         }
@@ -279,6 +279,7 @@ class DrawOrchestrator {
    * @param {string} level - 日志级别
    * @param {string} message - 日志消息
    * @param {Object} data - 附加数据
+   * @returns {void}
    * @private
    */
   _log(level, message, data = {}) {
@@ -312,4 +313,3 @@ class DrawOrchestrator {
 DrawOrchestrator.PIPELINE_TYPES = PIPELINE_TYPES
 
 module.exports = DrawOrchestrator
-

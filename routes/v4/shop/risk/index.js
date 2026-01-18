@@ -24,11 +24,15 @@ const router = express.Router()
 const { authenticateToken, requireMerchantPermission } = require('../../../../middleware/auth')
 const { handleServiceError } = require('../../../../middleware/validation')
 const logger = require('../../../../utils/logger').logger
-const MerchantRiskControlService = require('../../../../services/MerchantRiskControlService')
 const TransactionManager = require('../../../../utils/TransactionManager')
-const { RiskAlert, User, Store, ConsumptionRecord } = require('../../../../models')
-const { Op } = require('sequelize')
 const BeijingTimeHelper = require('../../../../utils/timeHelper')
+
+/*
+ * 路由层合规性治理（2026-01-18）：
+ * - 移除直接 require models
+ * - 通过 ServiceManager 统一获取服务
+ * - 所有数据库操作收口到 MerchantRiskControlService
+ */
 
 /**
  * @route GET /api/v4/shop/risk/alerts
@@ -102,6 +106,8 @@ router.get(
         filters.end_date = endDateTime
       }
 
+      // 通过 ServiceManager 获取服务（路由层合规性治理 2026-01-18）
+      const MerchantRiskControlService = req.app.locals.services.getService('merchant_risk_control')
       const result = await MerchantRiskControlService.queryRiskAlerts(filters, {
         page: parseInt(page, 10),
         page_size: parseInt(page_size, 10)
@@ -133,35 +139,9 @@ router.get(
         return res.apiError('无效的告警ID', 'BAD_REQUEST', null, 400)
       }
 
-      const alert = await RiskAlert.findByPk(alertId, {
-        include: [
-          {
-            model: User,
-            as: 'operator',
-            attributes: ['user_id', 'nickname', 'mobile']
-          },
-          {
-            model: Store,
-            as: 'store',
-            attributes: ['store_id', 'store_name']
-          },
-          {
-            model: User,
-            as: 'targetUser',
-            attributes: ['user_id', 'nickname', 'mobile']
-          },
-          {
-            model: User,
-            as: 'reviewer',
-            attributes: ['user_id', 'nickname']
-          },
-          {
-            model: ConsumptionRecord,
-            as: 'relatedRecord',
-            attributes: ['record_id', 'consumption_amount', 'status', 'created_at']
-          }
-        ]
-      })
+      // 通过 ServiceManager 获取服务（路由层合规性治理 2026-01-18）
+      const MerchantRiskControlService = req.app.locals.services.getService('merchant_risk_control')
+      const alert = await MerchantRiskControlService.getAlertDetail(alertId)
 
       if (!alert) {
         return res.apiError('告警不存在', 'NOT_FOUND', null, 404)
@@ -176,45 +156,7 @@ router.get(
         }
       }
 
-      const result = {
-        ...(alert.toAPIResponse ? alert.toAPIResponse() : alert.toJSON()),
-        operator: alert.operator
-          ? {
-              user_id: alert.operator.user_id,
-              nickname: alert.operator.nickname,
-              mobile: alert.operator.mobile
-            }
-          : null,
-        store: alert.store
-          ? {
-              store_id: alert.store.store_id,
-              store_name: alert.store.store_name
-            }
-          : null,
-        target_user: alert.targetUser
-          ? {
-              user_id: alert.targetUser.user_id,
-              nickname: alert.targetUser.nickname,
-              mobile: alert.targetUser.mobile
-            }
-          : null,
-        reviewer: alert.reviewer
-          ? {
-              user_id: alert.reviewer.user_id,
-              nickname: alert.reviewer.nickname
-            }
-          : null,
-        related_record: alert.relatedRecord
-          ? {
-              record_id: alert.relatedRecord.record_id,
-              consumption_amount: parseFloat(alert.relatedRecord.consumption_amount),
-              status: alert.relatedRecord.status,
-              created_at: BeijingTimeHelper.formatForAPI(alert.relatedRecord.created_at)
-            }
-          : null
-      }
-
-      return res.apiSuccess(result, '告警详情获取成功')
+      return res.apiSuccess(alert, '告警详情获取成功')
     } catch (error) {
       logger.error('获取告警详情失败', { error: error.message })
       return handleServiceError(error, res, '获取告警详情失败')
@@ -243,8 +185,11 @@ router.post(
         return res.apiError('无效的告警ID', 'BAD_REQUEST', null, 400)
       }
 
+      // 通过 ServiceManager 获取服务（路由层合规性治理 2026-01-18）
+      const MerchantRiskControlService = req.app.locals.services.getService('merchant_risk_control')
+
       // 验证告警存在且用户有权限
-      const alert = await RiskAlert.findByPk(alertId)
+      const alert = await MerchantRiskControlService.getAlertBasic(alertId)
       if (!alert) {
         return res.apiError('告警不存在', 'NOT_FOUND', null, 404)
       }
@@ -308,8 +253,11 @@ router.post(
         return res.apiError('无效的告警ID', 'BAD_REQUEST', null, 400)
       }
 
+      // 通过 ServiceManager 获取服务（路由层合规性治理 2026-01-18）
+      const MerchantRiskControlService = req.app.locals.services.getService('merchant_risk_control')
+
       // 验证告警存在且用户有权限
-      const alert = await RiskAlert.findByPk(alertId)
+      const alert = await MerchantRiskControlService.getAlertBasic(alertId)
       if (!alert) {
         return res.apiError('告警不存在', 'NOT_FOUND', null, 404)
       }
@@ -376,75 +324,13 @@ router.get(
         }
       }
 
-      // 构建查询条件
-      const where = {}
-      if (resolved_store_id) where.store_id = resolved_store_id
-
-      // 按状态统计
-      const statusStats = await RiskAlert.findAll({
-        where,
-        attributes: [
-          'status',
-          [RiskAlert.sequelize.fn('COUNT', RiskAlert.sequelize.col('alert_id')), 'count']
-        ],
-        group: ['status'],
-        raw: true
+      // 通过 ServiceManager 获取服务（路由层合规性治理 2026-01-18）
+      const MerchantRiskControlService = req.app.locals.services.getService('merchant_risk_control')
+      const stats = await MerchantRiskControlService.getAlertStats({
+        store_id: resolved_store_id
       })
 
-      // 按类型统计
-      const typeStats = await RiskAlert.findAll({
-        where,
-        attributes: [
-          'alert_type',
-          [RiskAlert.sequelize.fn('COUNT', RiskAlert.sequelize.col('alert_id')), 'count']
-        ],
-        group: ['alert_type'],
-        raw: true
-      })
-
-      // 按严重程度统计
-      const severityStats = await RiskAlert.findAll({
-        where,
-        attributes: [
-          'severity',
-          [RiskAlert.sequelize.fn('COUNT', RiskAlert.sequelize.col('alert_id')), 'count']
-        ],
-        group: ['severity'],
-        raw: true
-      })
-
-      // 今日新增
-      const todayStart = BeijingTimeHelper.getTodayStart()
-      const todayCount = await RiskAlert.count({
-        where: {
-          ...where,
-          created_at: { [Op.gte]: todayStart }
-        }
-      })
-
-      // 获取风控配置
-      const riskConfig = MerchantRiskControlService.getRiskConfig()
-
-      return res.apiSuccess(
-        {
-          by_status: statusStats.reduce((acc, item) => {
-            acc[item.status] = parseInt(item.count, 10)
-            return acc
-          }, {}),
-          by_type: typeStats.reduce((acc, item) => {
-            acc[item.alert_type] = parseInt(item.count, 10)
-            return acc
-          }, {}),
-          by_severity: severityStats.reduce((acc, item) => {
-            acc[item.severity] = parseInt(item.count, 10)
-            return acc
-          }, {}),
-          today_count: todayCount,
-          risk_config: riskConfig,
-          store_id: resolved_store_id
-        },
-        '风控统计获取成功'
-      )
+      return res.apiSuccess(stats, '风控统计获取成功')
     } catch (error) {
       logger.error('获取风控统计失败', { error: error.message })
       return handleServiceError(error, res, '获取风控统计失败')

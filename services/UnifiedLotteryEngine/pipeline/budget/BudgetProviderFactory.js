@@ -103,7 +103,7 @@ class BudgetProviderFactory {
 
     this._log('debug', '创建 BudgetProvider', {
       campaign_id: campaign.campaign_id,
-      budget_mode: budget_mode,
+      budget_mode,
       provider_type: provider.constructor.name
     })
 
@@ -138,6 +138,7 @@ class BudgetProviderFactory {
    * 清除缓存
    *
    * @param {number} campaign_id - 活动ID（可选，不传则清除所有）
+   * @returns {void}
    */
   clearCache(campaign_id = null) {
     if (campaign_id) {
@@ -159,6 +160,7 @@ class BudgetProviderFactory {
    * @param {string} level - 日志级别
    * @param {string} message - 日志消息
    * @param {Object} data - 附加数据
+   * @returns {void}
    * @private
    */
   _log(level, message, data = {}) {
@@ -175,20 +177,39 @@ class BudgetProviderFactory {
 
 /**
  * 无预算限制提供者（空实现）
+ *
+ * 用于 budget_mode='none' 的活动，不做任何预算检查和扣减
  */
 class NoBudgetProvider extends BudgetProvider {
+  /**
+   * 创建无预算提供者实例
+   */
   constructor() {
     super(BudgetProvider.MODES.NONE)
   }
 
-  async getAvailableBudget(params, options = {}) {
+  /**
+   * 获取可用预算（始终返回无限）
+   *
+   * @param {Object} _params - 查询参数（忽略）
+   * @param {Object} _options - 额外选项（忽略）
+   * @returns {Promise<Object>} 预算信息
+   */
+  async getAvailableBudget(_params, _options = {}) {
     return {
       available: Infinity,
       details: { mode: 'none', unlimited: true }
     }
   }
 
-  async checkBudget(params, options = {}) {
+  /**
+   * 检查预算（始终足够）
+   *
+   * @param {Object} params - 检查参数
+   * @param {Object} _options - 额外选项（忽略）
+   * @returns {Promise<Object>} 检查结果
+   */
+  async checkBudget(params, _options = {}) {
     return {
       sufficient: true,
       available: Infinity,
@@ -198,7 +219,14 @@ class NoBudgetProvider extends BudgetProvider {
     }
   }
 
-  async deductBudget(params, options = {}) {
+  /**
+   * 扣减预算（无实际扣减）
+   *
+   * @param {Object} params - 扣减参数
+   * @param {Object} _options - 额外选项（忽略）
+   * @returns {Promise<Object>} 扣减结果
+   */
+  async deductBudget(params, _options = {}) {
     return {
       success: true,
       deducted: params.amount,
@@ -207,7 +235,14 @@ class NoBudgetProvider extends BudgetProvider {
     }
   }
 
-  async rollbackBudget(params, options = {}) {
+  /**
+   * 回滚预算（无实际回滚）
+   *
+   * @param {Object} params - 回滚参数
+   * @param {Object} _options - 额外选项（忽略）
+   * @returns {Promise<Object>} 回滚结果
+   */
+  async rollbackBudget(params, _options = {}) {
     return {
       success: true,
       refunded: params.amount,
@@ -224,4 +259,3 @@ module.exports = {
   NoBudgetProvider,
   factory
 }
-

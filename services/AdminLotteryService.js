@@ -1085,15 +1085,28 @@ class AdminLotteryService {
   /**
    * 更新活动预算配置
    *
-   * @description 更新活动的预算模式和相关配置，更新后精准失效缓存（决策3/7）
+   * @description
+   * 更新活动的预算与预设预算策略配置（统一抽奖架构字段真源在 lottery_campaigns 表）。
+   *
+   * 本方法承载“管理后台配置入口”的写操作收口：
+   * - budget_mode / pool_budget_total / allowed_campaign_ids（预算模式与池预算）
+   * - preset_debt_enabled / preset_budget_policy（预设欠账控制：是否允许欠账 + 扣减策略）
+   *
+   * ✅ 事务边界治理：
+   * - 本方法 **必须** 在 TransactionManager.execute() 内部调用（或显式传入 options.transaction）
+   * - 确保同一请求内的写操作具备原子性与一致性
+   *
+   * 更新后精准失效活动配置缓存（决策3/7）
    * @param {number} campaign_id - 活动ID
    * @param {Object} updateData - 更新数据
    * @param {string} [updateData.budget_mode] - 预算模式（user/pool/none）
    * @param {number} [updateData.pool_budget_total] - 活动池总预算
    * @param {Array} [updateData.allowed_campaign_ids] - 允许使用的预算来源活动ID列表
+   * @param {boolean} [updateData.preset_debt_enabled] - 预设是否允许欠账（TRUE-允许欠账发放，FALSE-资源不足直接失败）
+   * @param {string} [updateData.preset_budget_policy] - 预设预算扣减策略（follow_campaign/pool_first/user_first）
    * @param {Object} [options] - 选项
    * @param {number} [options.operated_by] - 操作者ID（管理员）
-   * @param {Object} [options.transaction] - Sequelize事务对象（可选）
+   * @param {Object} options.transaction - Sequelize事务对象（必填，事务边界治理）
    * @returns {Promise<Object>} 更新结果 {campaign, updated_fields}
    *
    * 缓存策略（决策3/7）：
@@ -1101,7 +1114,8 @@ class AdminLotteryService {
    * - 缓存失效失败不阻塞主流程（记录WARN日志）
    */
   static async updateCampaignBudget(campaign_id, updateData, options = {}) {
-    const { operated_by, transaction } = options
+    const { operated_by } = options
+    const transaction = assertAndGetTransaction(options, 'AdminLotteryService.updateCampaignBudget')
     const { LotteryCampaign } = models
 
     // 验证 budget_mode
@@ -1111,6 +1125,35 @@ class AdminLotteryService {
       error.code = 'INVALID_BUDGET_MODE'
       error.statusCode = 400
       throw error
+    }
+
+    // 验证 preset_budget_policy（预设预算扣减策略）
+    if (updateData.preset_budget_policy !== undefined) {
+      const validPresetBudgetPolicies = ['follow_campaign', 'pool_first', 'user_first']
+
+      if (
+        typeof updateData.preset_budget_policy !== 'string' ||
+        !validPresetBudgetPolicies.includes(updateData.preset_budget_policy)
+      ) {
+        const error = new Error(
+          `无效的预设预算扣减策略：${updateData.preset_budget_policy}（允许值：${validPresetBudgetPolicies.join(
+            '/'
+          )}）`
+        )
+        error.code = 'INVALID_PRESET_BUDGET_POLICY'
+        error.statusCode = 400
+        throw error
+      }
+    }
+
+    // 验证 preset_debt_enabled（预设是否允许欠账）
+    if (updateData.preset_debt_enabled !== undefined) {
+      if (typeof updateData.preset_debt_enabled !== 'boolean') {
+        const error = new Error('preset_debt_enabled 必须是 boolean（true/false）')
+        error.code = 'INVALID_PRESET_DEBT_ENABLED'
+        error.statusCode = 400
+        throw error
+      }
     }
 
     // 获取活动
@@ -1124,7 +1167,13 @@ class AdminLotteryService {
 
     // 构建更新数据
     const fieldsToUpdate = {}
-    const { budget_mode, pool_budget_total, allowed_campaign_ids } = updateData
+    const {
+      budget_mode,
+      pool_budget_total,
+      allowed_campaign_ids,
+      preset_debt_enabled,
+      preset_budget_policy
+    } = updateData
 
     if (budget_mode) {
       fieldsToUpdate.budget_mode = budget_mode
@@ -1163,6 +1212,14 @@ class AdminLotteryService {
       fieldsToUpdate.allowed_campaign_ids = allowed_campaign_ids
     }
 
+    // 预设欠账控制字段（统一架构真源字段）
+    if (preset_debt_enabled !== undefined) {
+      fieldsToUpdate.preset_debt_enabled = preset_debt_enabled
+    }
+    if (preset_budget_policy !== undefined) {
+      fieldsToUpdate.preset_budget_policy = preset_budget_policy
+    }
+
     if (Object.keys(fieldsToUpdate).length === 0) {
       const error = new Error('未提供任何更新字段')
       error.code = 'NO_UPDATE_DATA'
@@ -1172,6 +1229,7 @@ class AdminLotteryService {
 
     // 执行更新
     await campaign.update(fieldsToUpdate, { transaction })
+    const reloadedCampaign = await campaign.reload({ transaction })
 
     // ========== 决策3/7：活动配置更新后精准失效缓存 ==========
     try {
@@ -1198,7 +1256,7 @@ class AdminLotteryService {
     })
 
     return {
-      campaign: campaign.reload({ transaction }),
+      campaign: reloadedCampaign,
       updated_fields: Object.keys(fieldsToUpdate)
     }
   }
@@ -1219,7 +1277,11 @@ class AdminLotteryService {
    * - 缓存失效失败不阻塞主流程（记录WARN日志）
    */
   static async supplementCampaignBudget(campaign_id, amount, options = {}) {
-    const { operated_by, transaction } = options
+    const { operated_by } = options
+    const transaction = assertAndGetTransaction(
+      options,
+      'AdminLotteryService.supplementCampaignBudget'
+    )
     const { LotteryCampaign } = models
 
     // 验证金额

@@ -18,13 +18,17 @@
  */
 
 const BudgetProvider = require('./BudgetProvider')
-const { LotteryCampaign, LotteryCampaignUserQuota, LotteryCampaignQuotaGrant } = require('../../../../models')
+const {
+  LotteryCampaign,
+  LotteryCampaignUserQuota,
+  LotteryCampaignQuotaGrant
+} = require('../../../../models')
 
 /**
  * 配额初始化模式
  */
 const QUOTA_INIT_MODES = {
-  ON_DEMAND: 'on_demand',       // 按需初始化：用户首次参与时创建配额
+  ON_DEMAND: 'on_demand', // 按需初始化：用户首次参与时创建配额
   PRE_ALLOCATED: 'pre_allocated' // 预分配：提前为用户分配配额
 }
 
@@ -89,8 +93,8 @@ class PoolQuotaBudgetProvider extends BudgetProvider {
       return {
         available: total_available,
         details: {
-          quota_remaining: quota_remaining,
-          pool_remaining: pool_remaining,
+          quota_remaining,
+          pool_remaining,
           quota_total: quota ? parseFloat(quota.quota_total || 0) : 0,
           quota_used: quota ? parseFloat(quota.quota_used || 0) : 0,
           quota_status: quota ? quota.status : 'not_initialized'
@@ -295,8 +299,12 @@ class PoolQuotaBudgetProvider extends BudgetProvider {
       if (original_details) {
         // 1. 回滚到配额
         if (original_details.from_quota > 0 && quota) {
-          quota.quota_used = Math.max(0, parseFloat(quota.quota_used || 0) - original_details.from_quota)
-          quota.quota_remaining = parseFloat(quota.quota_remaining || 0) + original_details.from_quota
+          quota.quota_used = Math.max(
+            0,
+            parseFloat(quota.quota_used || 0) - original_details.from_quota
+          )
+          quota.quota_remaining =
+            parseFloat(quota.quota_remaining || 0) + original_details.from_quota
 
           // 恢复状态
           if (quota.status === 'exhausted' && quota.quota_remaining > 0) {
@@ -309,7 +317,8 @@ class PoolQuotaBudgetProvider extends BudgetProvider {
 
         // 2. 回滚到活动池
         if (original_details.from_pool > 0) {
-          campaign.pool_budget_remaining = parseFloat(campaign.pool_budget_remaining || 0) + original_details.from_pool
+          campaign.pool_budget_remaining =
+            parseFloat(campaign.pool_budget_remaining || 0) + original_details.from_pool
           refund_details.to_pool = original_details.from_pool
           await campaign.save({ transaction })
         }
@@ -376,28 +385,36 @@ class PoolQuotaBudgetProvider extends BudgetProvider {
     if (!quota && this.quota_init_mode === QUOTA_INIT_MODES.ON_DEMAND) {
       // 获取活动的默认配额
       const campaign = await LotteryCampaign.findByPk(campaign_id, { transaction })
-      const default_quota = campaign ? parseFloat(campaign.default_quota || this.default_quota) : this.default_quota
+      const default_quota = campaign
+        ? parseFloat(campaign.default_quota || this.default_quota)
+        : this.default_quota
 
       if (default_quota > 0) {
-        quota = await LotteryCampaignUserQuota.create({
-          user_id: user_id,
-          campaign_id: campaign_id,
-          quota_total: default_quota,
-          quota_used: 0,
-          quota_remaining: default_quota,
-          status: 'active'
-        }, { transaction })
+        quota = await LotteryCampaignUserQuota.create(
+          {
+            user_id,
+            campaign_id,
+            quota_total: default_quota,
+            quota_used: 0,
+            quota_remaining: default_quota,
+            status: 'active'
+          },
+          { transaction }
+        )
 
         // 记录配额发放
-        await LotteryCampaignQuotaGrant.create({
-          quota_id: quota.quota_id,
-          user_id: user_id,
-          campaign_id: campaign_id,
-          grant_amount: default_quota,
-          grant_source: 'initial',
-          grant_reason: '首次参与自动初始化配额',
-          balance_after: default_quota
-        }, { transaction })
+        await LotteryCampaignQuotaGrant.create(
+          {
+            quota_id: quota.quota_id,
+            user_id,
+            campaign_id,
+            grant_amount: default_quota,
+            grant_source: 'initial',
+            grant_reason: '首次参与自动初始化配额',
+            balance_after: default_quota
+          },
+          { transaction }
+        )
 
         this._log('info', '创建用户配额', {
           user_id,
@@ -435,14 +452,17 @@ class PoolQuotaBudgetProvider extends BudgetProvider {
       })
 
       if (!quota) {
-        quota = await LotteryCampaignUserQuota.create({
-          user_id: user_id,
-          campaign_id: campaign_id,
-          quota_total: amount,
-          quota_used: 0,
-          quota_remaining: amount,
-          status: 'active'
-        }, { transaction })
+        quota = await LotteryCampaignUserQuota.create(
+          {
+            user_id,
+            campaign_id,
+            quota_total: amount,
+            quota_used: 0,
+            quota_remaining: amount,
+            status: 'active'
+          },
+          { transaction }
+        )
       } else {
         // 增加配额
         quota.quota_total = parseFloat(quota.quota_total || 0) + amount
@@ -457,16 +477,19 @@ class PoolQuotaBudgetProvider extends BudgetProvider {
       }
 
       // 记录配额发放
-      await LotteryCampaignQuotaGrant.create({
-        quota_id: quota.quota_id,
-        user_id: user_id,
-        campaign_id: campaign_id,
-        grant_amount: amount,
-        grant_source: source,
-        grant_reason: reason,
-        granted_by: granted_by,
-        balance_after: quota.quota_remaining
-      }, { transaction })
+      await LotteryCampaignQuotaGrant.create(
+        {
+          quota_id: quota.quota_id,
+          user_id,
+          campaign_id,
+          grant_amount: amount,
+          grant_source: source,
+          grant_reason: reason,
+          granted_by,
+          balance_after: quota.quota_remaining
+        },
+        { transaction }
+      )
 
       this._log('info', '分配用户配额', {
         user_id,
@@ -499,4 +522,3 @@ class PoolQuotaBudgetProvider extends BudgetProvider {
 PoolQuotaBudgetProvider.QUOTA_INIT_MODES = QUOTA_INIT_MODES
 
 module.exports = PoolQuotaBudgetProvider
-

@@ -978,65 +978,65 @@ class UnifiedScriptManager {
 
     for (const problem of problems) {
       switch (problem.component) {
-      case 'strategy':
-        if (problem.strategyName === 'ManagementStrategy') {
+        case 'strategy':
+          if (problem.strategyName === 'ManagementStrategy') {
+            solutions.push({
+              component: problem.component,
+              strategyName: problem.strategyName,
+              priority: 'critical',
+              actions: [
+                '创建ManagementStrategy专项测试套件',
+                '补充管理员权限验证测试',
+                '添加概率调整功能测试',
+                '增加预设奖品队列测试',
+                '完善错误处理测试'
+              ],
+              estimatedImprovement: '+60%',
+              estimatedTime: '2-3小时'
+            })
+          } else {
+            solutions.push({
+              component: problem.component,
+              strategyName: problem.strategyName,
+              priority: 'high',
+              actions: [
+                `扩展${problem.strategyName}测试用例`,
+                '增加边界条件测试',
+                '补充异常场景测试'
+              ],
+              estimatedImprovement: `+${Math.round(problem.gap * 0.7)}%`,
+              estimatedTime: '1-2小时'
+            })
+          }
+          break
+
+        case 'coreComponent':
+          if (problem.componentName === 'DecisionCore') {
+            solutions.push({
+              component: problem.component,
+              componentName: problem.componentName,
+              priority: 'critical',
+              actions: [
+                '创建DecisionCore完整测试套件',
+                '测试决策链执行逻辑',
+                '验证策略选择算法',
+                '测试性能监控功能'
+              ],
+              estimatedImprovement: '+65%',
+              estimatedTime: '3-4小时'
+            })
+          }
+          break
+
+        case 'overall':
           solutions.push({
             component: problem.component,
-            strategyName: problem.strategyName,
-            priority: 'critical',
-            actions: [
-              '创建ManagementStrategy专项测试套件',
-              '补充管理员权限验证测试',
-              '添加概率调整功能测试',
-              '增加预设奖品队列测试',
-              '完善错误处理测试'
-            ],
-            estimatedImprovement: '+60%',
-            estimatedTime: '2-3小时'
-          })
-        } else {
-          solutions.push({
-            component: problem.component,
-            strategyName: problem.strategyName,
             priority: 'high',
-            actions: [
-              `扩展${problem.strategyName}测试用例`,
-              '增加边界条件测试',
-              '补充异常场景测试'
-            ],
-            estimatedImprovement: `+${Math.round(problem.gap * 0.7)}%`,
-            estimatedTime: '1-2小时'
+            actions: ['执行系统性测试用例补充', '增强集成测试覆盖', '完善端到端测试场景'],
+            estimatedImprovement: `+${Math.round(problem.gap * 0.8)}%`,
+            estimatedTime: '4-6小时'
           })
-        }
-        break
-
-      case 'coreComponent':
-        if (problem.componentName === 'DecisionCore') {
-          solutions.push({
-            component: problem.component,
-            componentName: problem.componentName,
-            priority: 'critical',
-            actions: [
-              '创建DecisionCore完整测试套件',
-              '测试决策链执行逻辑',
-              '验证策略选择算法',
-              '测试性能监控功能'
-            ],
-            estimatedImprovement: '+65%',
-            estimatedTime: '3-4小时'
-          })
-        }
-        break
-
-      case 'overall':
-        solutions.push({
-          component: problem.component,
-          priority: 'high',
-          actions: ['执行系统性测试用例补充', '增强集成测试覆盖', '完善端到端测试场景'],
-          estimatedImprovement: `+${Math.round(problem.gap * 0.8)}%`,
-          estimatedTime: '4-6小时'
-        })
-        break
+          break
       }
     }
 

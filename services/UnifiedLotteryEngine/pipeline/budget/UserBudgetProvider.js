@@ -70,15 +70,15 @@ class UserBudgetProvider extends BudgetProvider {
       this._log('debug', '获取用户预算余额', {
         user_id,
         campaign_id,
-        balance: balance
+        balance
       })
 
       return {
         available: balance || 0,
         details: {
           asset_code: 'BUDGET_POINTS',
-          user_id: user_id,
-          campaign_id: campaign_id
+          user_id,
+          campaign_id
         }
       }
     } catch (error) {
@@ -133,9 +133,9 @@ class UserBudgetProvider extends BudgetProvider {
       const deduct_result = await AssetService.deductAsset(user_id, 'BUDGET_POINTS', amount, {
         reason: reason || '抽奖预算扣减',
         reference_type: 'lottery_draw',
-        reference_id: reference_id,
-        campaign_id: campaign_id,
-        transaction: transaction
+        reference_id,
+        campaign_id,
+        transaction
       })
 
       // 获取扣减后余额
@@ -146,7 +146,7 @@ class UserBudgetProvider extends BudgetProvider {
         campaign_id,
         deducted: amount,
         remaining: new_balance,
-        reference_id: reference_id
+        reference_id
       })
 
       return {
@@ -188,8 +188,8 @@ class UserBudgetProvider extends BudgetProvider {
         reason: '抽奖预算回滚',
         reference_type: 'lottery_draw_rollback',
         reference_id: original_reference_id,
-        campaign_id: campaign_id,
-        transaction: transaction
+        campaign_id,
+        transaction
       })
 
       // 获取回滚后余额
@@ -199,14 +199,14 @@ class UserBudgetProvider extends BudgetProvider {
         user_id,
         campaign_id,
         refunded: amount,
-        new_balance: new_balance,
-        original_reference_id: original_reference_id
+        new_balance,
+        original_reference_id
       })
 
       return {
         success: true,
         refunded: amount,
-        new_balance: new_balance,
+        new_balance,
         transaction_id: refund_result.transaction_id
       }
     } catch (error) {
@@ -222,4 +222,3 @@ class UserBudgetProvider extends BudgetProvider {
 }
 
 module.exports = UserBudgetProvider
-

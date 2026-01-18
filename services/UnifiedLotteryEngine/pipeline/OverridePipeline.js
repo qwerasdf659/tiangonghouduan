@@ -30,12 +30,7 @@
  */
 
 const PipelineRunner = require('./PipelineRunner')
-const LoadCampaignStage = require('./stages/LoadCampaignStage')
-// 以下 Stage 将在后续实现
-// const LoadOverrideStage = require('./stages/LoadOverrideStage')
-// const OverrideExecuteStage = require('./stages/OverrideExecuteStage')
-// const DecisionSnapshotStage = require('./stages/DecisionSnapshotStage')
-// const OverrideSettleStage = require('./stages/OverrideSettleStage')
+const { LoadCampaignStage, LoadOverrideStage, OverrideSettleStage } = require('./stages')
 
 /**
  * 管理干预管线
@@ -56,24 +51,23 @@ class OverridePipeline extends PipelineRunner {
   /**
    * 初始化 Stage
    *
+   * 执行顺序严格按照架构文档定义（管理干预流程）
+   *
+   * @returns {void}
    * @private
    */
   _initializeStages() {
-    // 1. 加载活动配置
+    // 1. 加载活动配置 - 加载活动基本信息
     this.addStage(new LoadCampaignStage())
 
-    // TODO: 后续添加其他 Stage
-    // 2. 加载干预配置
-    // this.addStage(new LoadOverrideStage())
+    // 2. 加载干预配置 - 验证干预类型和权限
+    this.addStage(new LoadOverrideStage())
 
-    // 3. 执行干预逻辑
-    // this.addStage(new OverrideExecuteStage())
-
-    // 4. 记录决策快照
-    // this.addStage(new DecisionSnapshotStage())
-
-    // 5. 干预结算
-    // this.addStage(new OverrideSettleStage())
+    /*
+     * 3. 干预结算 - 执行干预逻辑、发奖品、记录决策
+     * 注意：OverrideSettleStage 内部会创建决策记录
+     */
+    this.addStage(new OverrideSettleStage())
   }
 
   /**
@@ -102,4 +96,3 @@ class OverridePipeline extends PipelineRunner {
 }
 
 module.exports = OverridePipeline
-

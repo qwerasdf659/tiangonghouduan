@@ -46,8 +46,10 @@ class LotteryDraw extends Model {
       comment: '获得的奖品'
     })
 
-    // 🔴 统一抽奖架构新增关联（2026-01-18）
-    // 一对一：每次抽奖有一个决策快照
+    /*
+     * 🔴 统一抽奖架构新增关联（2026-01-18）
+     * 一对一：每次抽奖有一个决策快照
+     */
     LotteryDraw.hasOne(models.LotteryDrawDecision, {
       foreignKey: 'draw_id',
       sourceKey: 'draw_id',
@@ -383,6 +385,137 @@ module.exports = sequelize => {
         type: DataTypes.JSON,
         allowNull: true,
         comment: '抽奖结果元数据'
+      },
+
+      // ========== 统一抽奖架构字段（2026-01-18） ==========
+
+      /**
+       * 管线类型
+       * @业务含义 标识本次抽奖走的是哪条管线
+       * @枚举值
+       * - normal：正常抽奖管线
+       * - preset：预设发放管线
+       * - override：管理干预管线
+       */
+      pipeline_type: {
+        type: DataTypes.ENUM('normal', 'preset', 'override'),
+        allowNull: false,
+        defaultValue: 'normal',
+        comment: '管线类型：normal-正常抽奖, preset-预设发放, override-管理干预'
+      },
+
+      /**
+       * 选奖方法
+       * @业务含义 记录本次抽奖使用的选奖方法
+       */
+      pick_method: {
+        type: DataTypes.STRING(32),
+        allowNull: true,
+        comment: '选奖方法：normalize/fallback/tier_first'
+      },
+
+      /**
+       * 原始命中档位
+       * @业务含义 tier_first模式下，随机抽中的初始档位
+       */
+      original_tier: {
+        type: DataTypes.ENUM('high', 'mid', 'low'),
+        allowNull: true,
+        comment: '原始命中档位（tier_first模式下抽中的档位）'
+      },
+
+      /**
+       * 最终发放档位
+       * @业务含义 经过降级处理后的最终发放档位，可能是fallback
+       */
+      final_tier: {
+        type: DataTypes.ENUM('high', 'mid', 'low', 'fallback'),
+        allowNull: true,
+        comment: '最终发放档位（降级后的档位，可能是fallback）'
+      },
+
+      /**
+       * 降级次数
+       * @业务含义 从原始档位降级的次数，0表示未降级
+       */
+      downgrade_count: {
+        type: DataTypes.INTEGER,
+        allowNull: false,
+        defaultValue: 0,
+        comment: '降级次数（0=未降级，便于快速统计）'
+      },
+
+      /**
+       * 是否触发fallback兜底
+       * @业务含义 所有档位都无可用奖品时触发fallback
+       */
+      fallback_triggered: {
+        type: DataTypes.BOOLEAN,
+        allowNull: false,
+        defaultValue: false,
+        comment: '是否触发fallback兜底'
+      },
+
+      /**
+       * 是否为预设发放
+       * @业务含义 标识本次抽奖是否来自预设
+       */
+      is_preset: {
+        type: DataTypes.BOOLEAN,
+        allowNull: false,
+        defaultValue: false,
+        comment: '是否为预设发放'
+      },
+
+      /**
+       * 关联预设ID
+       * @业务含义 预设发放时关联的预设记录
+       */
+      preset_id: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+        comment: '关联预设ID（lottery_presets.preset_id）'
+      },
+
+      /**
+       * 关联库存欠账ID
+       * @业务含义 预设发放产生库存欠账时的关联ID
+       */
+      inventory_debt_id: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+        comment: '关联库存欠账ID（preset_inventory_debt.debt_id）'
+      },
+
+      /**
+       * 关联预算欠账ID
+       * @业务含义 预设发放产生预算欠账时的关联ID
+       */
+      budget_debt_id: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+        comment: '关联预算欠账ID（preset_budget_debt.debt_id）'
+      },
+
+      /**
+       * 是否产生了欠账
+       * @业务含义 便于快速筛选有欠账的抽奖记录
+       */
+      has_debt: {
+        type: DataTypes.BOOLEAN,
+        allowNull: false,
+        defaultValue: false,
+        comment: '是否产生了欠账（便于快速筛选）'
+      },
+
+      /**
+       * 关联决策快照ID
+       * @业务含义 关联lottery_draw_decisions表，用于审计追溯
+       */
+      decision_id: {
+        type: DataTypes.BIGINT,
+        allowNull: true,
+        comment: '关联决策快照ID（lottery_draw_decisions.decision_id）'
       },
 
       // ========== 双账户模型预算审计字段 ==========

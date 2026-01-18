@@ -559,6 +559,85 @@ class MerchantOperationLogService {
   }
 
   /**
+   * 导出审计日志数据（用于 CSV 导出）
+   *
+   * @description 获取审计日志数据用于导出，支持大数据量（最多 50000 条）
+   *
+   * @param {Object} filters - 筛选条件
+   * @param {number} [filters.store_id] - 门店ID
+   * @param {Date} [filters.start_time] - 开始时间
+   * @param {Date} [filters.end_time] - 结束时间
+   * @param {string} [filters.operation_type] - 操作类型
+   * @param {string} [filters.result] - 操作结果
+   * @param {number} [filters.limit=10000] - 最大导出条数
+   * @returns {Promise<Array>} 审计日志列表
+   *
+   * @since 2026-01-18 路由层合规性治理：支持 CSV 导出功能
+   */
+  static async exportLogs(filters = {}) {
+    const { MerchantOperationLog, User, Store } = getModels()
+
+    const { store_id, start_time, end_time, operation_type, result, limit = 10000 } = filters
+
+    // 构建查询条件
+    const where = {}
+    if (store_id) where.store_id = store_id
+    if (operation_type) where.operation_type = operation_type
+    if (result) where.result = result
+
+    // 时间范围筛选
+    if (start_time || end_time) {
+      where.created_at = {}
+      if (start_time) {
+        where.created_at[Op.gte] = start_time
+      }
+      if (end_time) {
+        where.created_at[Op.lte] = end_time
+      }
+    }
+
+    // 限制导出条数
+    const exportLimit = Math.min(Math.max(parseInt(limit) || 10000, 100), 50000)
+
+    try {
+      const logs = await MerchantOperationLog.findAll({
+        where,
+        include: [
+          {
+            model: User,
+            as: 'operator',
+            attributes: ['user_id', 'nickname']
+          },
+          {
+            model: Store,
+            as: 'store',
+            attributes: ['store_id', 'store_name']
+          }
+        ],
+        order: [['created_at', 'DESC']],
+        limit: exportLimit,
+        raw: false
+      })
+
+      logger.info('审计日志导出数据获取完成', {
+        store_id,
+        start_time: start_time ? BeijingTimeHelper.formatForAPI(start_time) : null,
+        end_time: end_time ? BeijingTimeHelper.formatForAPI(end_time) : null,
+        exported_count: logs.length
+      })
+
+      return logs
+    } catch (error) {
+      logger.error('获取导出审计日志数据失败', {
+        error: error.message,
+        filters,
+        stack: error.stack
+      })
+      throw error
+    }
+  }
+
+  /**
    * 清理过期的审计日志
    *
    * @description 删除超过保留期的审计日志（默认 180 天）

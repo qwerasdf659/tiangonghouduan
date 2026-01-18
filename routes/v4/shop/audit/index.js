@@ -23,9 +23,14 @@ const router = express.Router()
 const { authenticateToken, requireMerchantPermission } = require('../../../../middleware/auth')
 const { handleServiceError } = require('../../../../middleware/validation')
 const logger = require('../../../../utils/logger').logger
-const { MerchantOperationLog, User, Store } = require('../../../../models')
-const { Op } = require('sequelize')
 const BeijingTimeHelper = require('../../../../utils/timeHelper')
+
+/*
+ * 路由层合规性治理（2026-01-18）：
+ * - 移除直接 require models
+ * - 通过 ServiceManager 统一获取服务
+ * - 所有数据库操作收口到 MerchantOperationLogService
+ */
 
 /**
  * @route GET /api/v4/shop/audit/logs
@@ -86,89 +91,46 @@ router.get(
         }
       }
 
-      // 构建查询条件
-      const where = {}
-      if (resolved_store_id) where.store_id = resolved_store_id
-      if (operator_id) where.operator_id = parseInt(operator_id, 10)
-      if (operation_type) where.operation_type = operation_type
-      if (result) where.result = result
+      // 通过 ServiceManager 获取服务（路由层合规性治理 2026-01-18）
+      const MerchantOperationLogService =
+        req.app.locals.services.getService('merchant_operation_log')
 
-      // 日期范围
-      if (start_date || end_date) {
-        where.created_at = {}
-        if (start_date) {
-          where.created_at[Op.gte] = BeijingTimeHelper.parseFromDateString(start_date)
-        }
-        if (end_date) {
-          const endDateTime = BeijingTimeHelper.parseFromDateString(end_date)
-          endDateTime.setHours(23, 59, 59, 999)
-          where.created_at[Op.lte] = endDateTime
-        }
+      // 构建服务层筛选条件
+      const filters = {
+        page: parseInt(page, 10),
+        page_size: parseInt(page_size, 10)
+      }
+      if (resolved_store_id) filters.store_id = resolved_store_id
+      if (operator_id) filters.operator_id = parseInt(operator_id, 10)
+      if (operation_type) filters.operation_type = operation_type
+      if (result) filters.result = result
+
+      // 日期范围转换为服务层期望的格式
+      if (start_date) {
+        const startDateTime = BeijingTimeHelper.parseFromDateString(start_date)
+        filters.start_time = BeijingTimeHelper.formatForAPI(startDateTime)?.iso
+      }
+      if (end_date) {
+        const endDateTime = BeijingTimeHelper.parseFromDateString(end_date)
+        endDateTime.setHours(23, 59, 59, 999)
+        filters.end_time = BeijingTimeHelper.formatForAPI(endDateTime)?.iso
       }
 
-      // 分页参数
-      const pageNum = Math.max(1, parseInt(page, 10))
-      const pageSize = Math.min(100, Math.max(1, parseInt(page_size, 10)))
-      const offset = (pageNum - 1) * pageSize
+      // 调用服务层查询
+      const result_data = await MerchantOperationLogService.queryLogs(filters)
 
-      // 查询日志
-      const { count, rows } = await MerchantOperationLog.findAndCountAll({
-        where,
-        include: [
-          {
-            model: User,
-            as: 'operator',
-            attributes: ['user_id', 'nickname', 'mobile']
-          },
-          {
-            model: Store,
-            as: 'store',
-            attributes: ['store_id', 'store_name']
-          },
-          {
-            model: User,
-            as: 'targetUser',
-            attributes: ['user_id', 'nickname', 'mobile']
-          }
-        ],
-        order: [['created_at', 'DESC']],
-        limit: pageSize,
-        offset
-      })
-
-      const logs = rows.map(log => ({
-        ...log.toAPIResponse(),
-        operator: log.operator
-          ? {
-              user_id: log.operator.user_id,
-              nickname: log.operator.nickname,
-              mobile: log.operator.mobile
-            }
-          : null,
-        store: log.store
-          ? {
-              store_id: log.store.store_id,
-              store_name: log.store.store_name
-            }
-          : null,
-        target_user: log.targetUser
-          ? {
-              user_id: log.targetUser.user_id,
-              nickname: log.targetUser.nickname,
-              mobile: log.targetUser.mobile
-            }
-          : null
+      // 转换响应格式以保持 API 兼容性
+      const logs = result_data.items.map(log => ({
+        ...log,
+        operator: log.operator_info,
+        store: log.store_info,
+        target_user: log.target_user_info
       }))
 
       return res.apiSuccess(
         {
           logs,
-          pagination: {
-            total: count,
-            page: pageNum,
-            page_size: pageSize,
-            total_pages: Math.ceil(count / pageSize)
-          }
+          pagination: result_data.pagination
         },
         '商家操作日志获取成功'
       )
@@ -197,25 +159,10 @@ router.get(
         return res.apiError('无效的日志ID', 'BAD_REQUEST', null, 400)
       }
 
-      const log = await MerchantOperationLog.findByPk(logId, {
-        include: [
-          {
-            model: User,
-            as: 'operator',
-            attributes: ['user_id', 'nickname', 'mobile']
-          },
-          {
-            model: Store,
-            as: 'store',
-            attributes: ['store_id', 'store_name']
-          },
-          {
-            model: User,
-            as: 'targetUser',
-            attributes: ['user_id', 'nickname', 'mobile']
-          }
-        ]
-      })
+      // 通过 ServiceManager 获取服务（路由层合规性治理 2026-01-18）
+      const MerchantOperationLogService =
+        req.app.locals.services.getService('merchant_operation_log')
+      const log = await MerchantOperationLogService.getLogDetail(logId)
 
       if (!log) {
         return res.apiError('日志不存在', 'NOT_FOUND', null, 404)
@@ -230,29 +177,12 @@ router.get(
         }
       }
 
+      // 转换响应格式以保持 API 兼容性
       const result = {
-        ...log.toAPIResponse(),
-        operator: log.operator
-          ? {
-              user_id: log.operator.user_id,
-              nickname: log.operator.nickname,
-              mobile: log.operator.mobile
-            }
-          : null,
-        store: log.store
-          ? {
-              store_id: log.store.store_id,
-              store_name: log.store.store_name
-            }
-          : null,
-        target_user: log.targetUser
-          ? {
-              user_id: log.targetUser.user_id,
-              nickname: log.targetUser.nickname,
-              mobile: log.targetUser.mobile
-            }
-          : null,
-        extra_data: log.extra_data
+        ...log,
+        operator: log.operator_info,
+        store: log.store_info,
+        target_user: log.target_user_info
       }
 
       return res.apiSuccess(result, '日志详情获取成功')
@@ -343,16 +273,9 @@ router.get(
         }
       }
 
-      // 3. 构建查询条件
-      const where = {
-        created_at: {
-          [Op.gte]: startDateTime,
-          [Op.lte]: endDateTime
-        }
-      }
-      if (resolved_store_id) where.store_id = resolved_store_id
-      if (operation_type) where.operation_type = operation_type
-      if (result) where.result = result
+      // 3. 通过 ServiceManager 获取服务（路由层合规性治理 2026-01-18）
+      const MerchantOperationLogService =
+        req.app.locals.services.getService('merchant_operation_log')
 
       // 4. 限制导出条数
       const exportLimit = Math.min(Math.max(parseInt(limit) || 10000, 100), 50000)
@@ -365,24 +288,14 @@ router.get(
         export_limit: exportLimit
       })
 
-      // 5. 查询数据
-      const logs = await MerchantOperationLog.findAll({
-        where,
-        include: [
-          {
-            model: User,
-            as: 'operator',
-            attributes: ['user_id', 'nickname']
-          },
-          {
-            model: Store,
-            as: 'store',
-            attributes: ['store_id', 'store_name']
-          }
-        ],
-        order: [['created_at', 'DESC']],
-        limit: exportLimit,
-        raw: false
+      // 5. 通过服务层获取数据
+      const logs = await MerchantOperationLogService.exportLogs({
+        store_id: resolved_store_id,
+        start_time: startDateTime,
+        end_time: endDateTime,
+        operation_type,
+        result,
+        limit: exportLimit
       })
 
       // 6. 设置响应头（CSV流式输出）

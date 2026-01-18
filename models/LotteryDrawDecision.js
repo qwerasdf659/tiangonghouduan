@@ -106,9 +106,11 @@ class LotteryDrawDecision extends Model {
    * @returns {boolean} 是否触发垫付
    */
   hasSystemAdvance() {
-    return this.system_advance_triggered ||
-           this.inventory_debt_created > 0 ||
-           this.budget_debt_created > 0
+    return (
+      this.system_advance_triggered ||
+      this.inventory_debt_created > 0 ||
+      this.budget_debt_created > 0
+    )
   }
 
   /**
@@ -248,7 +250,79 @@ module.exports = sequelize => {
       },
 
       /**
-       * 选中的档位
+       * 分层规则版本
+       * 记录解析时使用的分层规则版本，便于审计
+       */
+      segment_version: {
+        type: DataTypes.STRING(32),
+        allowNull: true,
+        comment: '分层规则版本（如v1/v2，对应config/segment_rules.js）'
+      },
+
+      /**
+       * 匹配的规则ID
+       * 记录最终匹配的档位规则ID，便于审计追溯
+       */
+      matched_rule_id: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+        comment: '匹配的档位规则ID（lottery_tier_rules.tier_rule_id）'
+      },
+
+      /**
+       * 匹配原因
+       * 简要说明为什么命中此规则/档位
+       */
+      match_reason: {
+        type: DataTypes.STRING(255),
+        allowNull: true,
+        comment: '匹配原因说明（如："new_user分层命中high档位"）'
+      },
+
+      /**
+       * 原始命中档位
+       * 档位抽选时最初命中的档位（降级前）
+       */
+      original_tier: {
+        type: DataTypes.ENUM('high', 'mid', 'low'),
+        allowNull: true,
+        comment: '原始命中档位（降级前）'
+      },
+
+      /**
+       * 最终发放档位
+       * 降级后的最终档位（可能是fallback）
+       */
+      final_tier: {
+        type: DataTypes.ENUM('high', 'mid', 'low', 'fallback'),
+        allowNull: true,
+        comment: '最终发放档位（降级后）'
+      },
+
+      /**
+       * 降级次数
+       * 记录经历了多少次降级（0=未降级）
+       */
+      downgrade_count: {
+        type: DataTypes.INTEGER,
+        allowNull: false,
+        defaultValue: 0,
+        comment: '降级次数（0=未降级，便于统计分析）'
+      },
+
+      /**
+       * 是否触发fallback兜底
+       * 当所有档位都无可用奖品时触发
+       */
+      fallback_triggered: {
+        type: DataTypes.BOOLEAN,
+        allowNull: false,
+        defaultValue: false,
+        comment: '是否触发了fallback兜底'
+      },
+
+      /**
+       * 选中的档位（兼容旧字段）
        */
       selected_tier: {
         type: DataTypes.ENUM('high', 'mid', 'low', 'fallback'),

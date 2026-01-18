@@ -84,37 +84,24 @@ class PrizePickStage extends BaseStage {
       const tier_prizes = prizes_by_tier[selected_tier] || []
 
       if (tier_prizes.length === 0) {
-        throw this.createError(
-          `选中档位 ${selected_tier} 没有可用奖品`,
-          'NO_PRIZES_IN_TIER',
-          true
-        )
+        throw this.createError(`选中档位 ${selected_tier} 没有可用奖品`, 'NO_PRIZES_IN_TIER', true)
       }
 
       // 执行奖品抽取
-      const {
-        selected_prize,
-        random_value,
-        total_weight,
-        hit_range
-      } = this._pickPrize(tier_prizes)
+      const { selected_prize, random_value, total_weight, hit_range } = this._pickPrize(tier_prizes)
 
       if (!selected_prize) {
-        throw this.createError(
-          '奖品抽取失败：无法选中奖品',
-          'PRIZE_PICK_FAILED',
-          true
-        )
+        throw this.createError('奖品抽取失败：无法选中奖品', 'PRIZE_PICK_FAILED', true)
       }
 
       // 构建返回数据
       const result = {
-        selected_prize: selected_prize,
+        selected_prize,
         prize_random_value: random_value,
         tier_total_weight: total_weight,
         prize_hit_range: hit_range,
         tier_prize_count: tier_prizes.length,
-        selected_tier: selected_tier
+        selected_tier
       }
 
       this.log('info', '奖品抽取完成', {
@@ -124,10 +111,9 @@ class PrizePickStage extends BaseStage {
         prize_id: selected_prize.prize_id,
         prize_name: selected_prize.prize_name,
         prize_value_points: selected_prize.prize_value_points,
-        random_value_percent: total_weight > 0
-          ? (random_value / total_weight * 100).toFixed(4) + '%'
-          : '0%',
-        hit_range: hit_range
+        random_value_percent:
+          total_weight > 0 ? ((random_value / total_weight) * 100).toFixed(4) + '%' : '0%',
+        hit_range
       })
 
       return this.success(result)
@@ -205,13 +191,12 @@ class PrizePickStage extends BaseStage {
     }
 
     return {
-      selected_prize: selected_prize,
-      random_value: random_value,
-      total_weight: total_weight,
-      hit_range: hit_range
+      selected_prize,
+      random_value,
+      total_weight,
+      hit_range
     }
   }
 }
 
 module.exports = PrizePickStage
-

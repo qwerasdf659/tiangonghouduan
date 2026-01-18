@@ -164,7 +164,10 @@ class LotteryCampaignUserQuota extends Model {
 
     for (const userId of userIds) {
       try {
+        // 顺序执行以正确捕获单个用户的失败
+        // eslint-disable-next-line no-await-in-loop
         const quota = await this.getOrCreate(campaignId, userId, { transaction })
+        // eslint-disable-next-line no-await-in-loop
         await quota.addQuota(amount, { transaction })
         successCount++
       } catch (error) {

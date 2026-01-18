@@ -77,6 +77,9 @@ const MerchantPointsService = require('./MerchantPointsService') // 商家积分
 const StaffManagementService = require('./StaffManagementService') // 员工管理服务
 const StoreService = require('./StoreService') // 门店管理服务（P1 门店数据维护入口）
 const RegionService = require('./RegionService') // 行政区划服务（省市区级联选择）
+const MerchantOperationLogService = require('./MerchantOperationLogService') // 商家操作审计日志服务
+const MerchantRiskControlService = require('./MerchantRiskControlService') // 商家风控服务
+const DebtManagementService = require('./DebtManagementService') // 欠账管理服务（2026-01-18 路由层合规性治理）
 
 // P1-9 新增注册的服务（2026-01-09）
 const DataSanitizer = require('./DataSanitizer') // 统一数据脱敏服务
@@ -280,6 +283,9 @@ class ServiceManager {
       this._services.set('staff_management', StaffManagementService) // 员工管理服务
       this._services.set('store', StoreService) // 门店管理服务（P1 门店数据维护入口）
       this._services.set('region', new RegionService(this.models)) // 行政区划服务（省市区级联选择，需实例化）
+      this._services.set('merchant_operation_log', MerchantOperationLogService) // 商家操作审计日志服务
+      this._services.set('merchant_risk_control', MerchantRiskControlService) // 商家风控服务
+      this._services.set('debt_management', DebtManagementService) // 欠账管理服务（2026-01-18 路由层合规性治理）
 
       // ========== P1-9 新增服务（2026-01-09） ==========
 

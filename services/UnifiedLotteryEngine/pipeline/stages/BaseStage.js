@@ -46,11 +46,11 @@ class BaseStage {
   /**
    * 执行 Stage（子类必须实现）
    *
-   * @param {Object} context - 执行上下文
+   * @param {Object} _context - 执行上下文（子类实现时使用）
    * @returns {Promise<Object>} Stage 执行结果
    * @abstract
    */
-  async execute(context) {
+  async execute(_context) {
     throw new Error(`Stage ${this.stage_name} must implement execute(context) method`)
   }
 
@@ -78,7 +78,7 @@ class BaseStage {
 
     return {
       valid: errors.length === 0,
-      errors: errors
+      errors
     }
   }
 
@@ -93,7 +93,7 @@ class BaseStage {
     return {
       success: true,
       stage: this.stage_name,
-      data: data,
+      data,
       should_skip_remaining: options.should_skip_remaining || false,
       skip_reason: options.skip_reason || null,
       timestamp: new Date().toISOString()
@@ -113,9 +113,9 @@ class BaseStage {
       success: false,
       stage: this.stage_name,
       error: {
-        message: message,
-        code: code,
-        details: details
+        message,
+        code,
+        details
       },
       timestamp: new Date().toISOString()
     }
@@ -143,6 +143,7 @@ class BaseStage {
    * @param {string} level - 日志级别
    * @param {string} message - 日志消息
    * @param {Object} data - 附加数据
+   * @returns {void}
    */
   log(level, message, data = {}) {
     if (!this.options.enable_logging) return
@@ -193,6 +194,7 @@ class BaseStage {
    * @param {Object} context - 执行上下文
    * @param {string} key - 数据键
    * @param {*} value - 数据值
+   * @returns {void}
    */
   setContextData(context, key, value) {
     if (!context) return
@@ -219,4 +221,3 @@ class BaseStage {
 }
 
 module.exports = BaseStage
-

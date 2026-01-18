@@ -562,6 +562,112 @@ class ImageService {
       created_at: imageRecord.created_at
     }
   }
+
+  /**
+   * 分页获取图片列表（管理后台用）
+   *
+   * @param {Object} filters - 筛选条件
+   * @param {string} [filters.business_type] - 业务类型筛选
+   * @param {string} [filters.status] - 状态筛选（active/archived/deleted/orphan）
+   * @param {Object} pagination - 分页参数
+   * @param {number} [pagination.page=1] - 页码
+   * @param {number} [pagination.page_size=24] - 每页数量
+   * @returns {Promise<Object>} 图片列表和统计信息
+   *
+   * @since 2026-01-18 路由层合规性治理：支持管理后台列表查询
+   */
+  static async getImageList(filters = {}, pagination = {}) {
+    const { ImageResources } = require('../models')
+    const { Op, fn, col } = require('sequelize')
+
+    // 分页参数
+    const page = Math.max(1, parseInt(pagination.page, 10) || 1)
+    const pageSize = Math.min(Math.max(1, parseInt(pagination.page_size, 10) || 24), 100)
+    const offset = (page - 1) * pageSize
+
+    // 构建查询条件
+    const where = {}
+    const { business_type: businessType, status } = filters
+
+    if (businessType) {
+      where.business_type = businessType
+    }
+
+    // 状态筛选：orphan 表示 context_id=0 的孤儿图片
+    if (status === 'orphan') {
+      where.context_id = 0
+      where.status = 'active'
+    } else if (status) {
+      where.status = status
+    }
+
+    // 查询图片列表
+    const { count, rows } = await ImageResources.findAndCountAll({
+      where,
+      limit: pageSize,
+      offset,
+      order: [['created_at', 'DESC']]
+    })
+
+    // 格式化图片数据
+    const images = rows.map(img => ({
+      image_id: img.image_id,
+      url: getImageUrl(img.file_path),
+      original_filename: img.original_filename,
+      file_size: img.file_size,
+      mime_type: img.mime_type,
+      business_type: img.business_type,
+      category: img.category,
+      context_id: img.context_id,
+      status: img.context_id === 0 ? 'orphan' : img.status,
+      created_at: img.created_at
+    }))
+
+    // 计算统计数据
+    const [statsResult] = await ImageResources.findAll({
+      attributes: [
+        [fn('COUNT', col('image_id')), 'total'],
+        [fn('SUM', col('file_size')), 'total_size']
+      ],
+      where: { status: 'active' },
+      raw: true
+    })
+
+    // 本周上传数
+    const oneWeekAgo = new Date()
+    oneWeekAgo.setDate(oneWeekAgo.getDate() - 7)
+
+    const weekCount = await ImageResources.count({
+      where: {
+        created_at: { [Op.gte]: oneWeekAgo }
+      }
+    })
+
+    // 孤儿图片数（context_id=0）
+    const orphanCount = await ImageResources.count({
+      where: {
+        context_id: 0,
+        status: 'active'
+      }
+    })
+
+    return {
+      images,
+      pagination: {
+        page,
+        page_size: pageSize,
+        total: count,
+        total_pages: Math.ceil(count / pageSize)
+      },
+      stats: {
+        total: parseInt(statsResult?.total, 10) || 0,
+        total_size_mb:
+          Math.round(((parseInt(statsResult?.total_size, 10) || 0) / 1024 / 1024) * 100) / 100,
+        week_count: weekCount,
+        orphan_count: orphanCount
+      }
+    }
+  }
 }
 
 module.exports = ImageService

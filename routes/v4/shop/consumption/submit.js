@@ -38,13 +38,14 @@ const { logger, sanitize } = require('../../../../utils/logger')
 const BeijingTimeHelper = require('../../../../utils/timeHelper')
 const TransactionManager = require('../../../../utils/TransactionManager')
 const QRCodeValidator = require('../../../../utils/QRCodeValidator')
-// P1-9：服务通过 ServiceManager 获取（B1-Injected + E2-Strict snake_case）
 
-// 商家域审计日志（AC4.2）
-const { MerchantOperationLog } = require('../../../../models')
-
-// 商家域风控服务（AC5：频次阻断 + 金额/关联告警）
-const MerchantRiskControlService = require('../../../../services/MerchantRiskControlService')
+/*
+ * 路由层合规性治理（2026-01-18）：
+ * - 移除直接 require models
+ * - 通过 ServiceManager 统一获取服务（B1-Injected + E2-Strict snake_case）
+ * - 商家域审计日志（AC4.2）通过 MerchantOperationLogService 访问
+ * - 商家域风控服务（AC5）通过 MerchantRiskControlService 访问
+ */
 
 /**
  * @route POST /api/v4/shop/consumption/submit
@@ -191,7 +192,9 @@ router.post(
        * 🛡️ 【AC5 风控检查】执行频次阻断 + 金额/关联告警
        * - 频次超限（10次/60秒）→ 阻断提交返回 429
        * - 金额/关联异常 → 仅告警，不阻断
+       * - 通过 ServiceManager 获取服务（路由层合规性治理 2026-01-18）
        */
+      const MerchantRiskControlService = req.app.locals.services.getService('merchant_risk_control')
       const riskCheckResult = await MerchantRiskControlService.performFullRiskCheck({
         operator_id: merchantId,
         store_id: resolved_store_id,
@@ -207,9 +210,11 @@ router.post(
           block_code: riskCheckResult.blockCode
         })
 
-        // 记录被阻断的审计日志
+        // 记录被阻断的审计日志（通过 ServiceManager 获取服务）
         try {
-          await MerchantOperationLog.createLog({
+          const MerchantOperationLogService =
+            req.app.locals.services.getService('merchant_operation_log')
+          await MerchantOperationLogService.createLog({
             operator_id: merchantId,
             store_id: resolved_store_id,
             operation_type: 'submit_consumption',
@@ -330,10 +335,12 @@ router.post(
         is_duplicate: isDuplicate
       })
 
-      // 【AC4.2】记录商家域审计日志（提交消费记录）
+      // 【AC4.2】记录商家域审计日志（提交消费记录，通过 ServiceManager 获取服务）
       if (!isDuplicate) {
         try {
-          await MerchantOperationLog.createLog({
+          const MerchantOperationLogService =
+            req.app.locals.services.getService('merchant_operation_log')
+          await MerchantOperationLogService.createLog({
             operator_id: merchantId,
             store_id: resolved_store_id,
             operation_type: 'submit_consumption',

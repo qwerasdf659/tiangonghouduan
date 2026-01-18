@@ -95,15 +95,8 @@ class LotteryCampaignQuotaGrant extends Model {
   static async createGrant(grantData, options = {}) {
     const { transaction } = options
 
-    const {
-      campaign_id,
-      user_id,
-      grant_type,
-      grant_amount,
-      reason,
-      granted_by,
-      related_order_id
-    } = grantData
+    const { campaign_id, user_id, grant_type, grant_amount, reason, granted_by, related_order_id } =
+      grantData
 
     if (!campaign_id || !user_id || !grant_type || !grant_amount) {
       throw new Error('缺少必要的赠送参数')
@@ -270,7 +263,8 @@ module.exports = sequelize => {
       grant_type: {
         type: DataTypes.ENUM('admin_grant', 'spending', 'activity', 'refund'),
         allowNull: false,
-        comment: '赠送类型：admin_grant=管理员赠送, spending=消费赠送, activity=活动奖励, refund=配额退还'
+        comment:
+          '赠送类型：admin_grant=管理员赠送, spending=消费赠送, activity=活动奖励, refund=配额退还'
       },
 
       /**

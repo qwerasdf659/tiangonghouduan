@@ -69,7 +69,8 @@ class DailyImageResourceQualityCheck {
       const invalidFilePathRecords = []
 
       while (hasMore) {
-        // 查询已绑定且激活的图片资源
+        // 查询已绑定且激活的图片资源（分页查询必须顺序执行）
+        // eslint-disable-next-line no-await-in-loop
         const batch = await ImageResources.findAll({
           where: {
             status: 'active',

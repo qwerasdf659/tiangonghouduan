@@ -51,7 +51,7 @@ class PipelineRunner {
    */
   addStage(stage) {
     if (!stage || typeof stage.execute !== 'function') {
-      throw new Error(`Invalid stage: must implement execute(context) method`)
+      throw new Error('Invalid stage: must implement execute(context) method')
     }
     this.stages.push(stage)
     return this
@@ -75,14 +75,14 @@ class PipelineRunner {
     const pipeline_context = {
       ...context,
       pipeline_name: this.pipeline_name,
-      execution_id: execution_id,
+      execution_id,
       stage_results: {},
       stage_timings: {},
       errors: [],
       started_at: new Date().toISOString()
     }
 
-    this._log('info', `开始执行管线`, {
+    this._log('info', '开始执行管线', {
       execution_id,
       user_id: context.user_id,
       campaign_id: context.campaign_id,
@@ -90,7 +90,8 @@ class PipelineRunner {
     })
 
     try {
-      // 按顺序执行每个 Stage
+      // 按顺序执行每个 Stage（管线设计要求顺序执行，每个 Stage 依赖上一个的结果）
+      // eslint-disable-next-line no-await-in-loop
       for (const stage of this.stages) {
         const stage_name = stage.constructor.name
         const stage_start = Date.now()
@@ -98,7 +99,8 @@ class PipelineRunner {
         this._log('debug', `执行 Stage: ${stage_name}`, { execution_id })
 
         try {
-          // 执行 Stage
+          // 执行 Stage（管线设计要求顺序执行）
+          // eslint-disable-next-line no-await-in-loop
           const stage_result = await stage.execute(pipeline_context)
 
           // 记录 Stage 结果
@@ -143,7 +145,7 @@ class PipelineRunner {
       pipeline_context.completed_at = new Date().toISOString()
       pipeline_context.total_duration_ms = total_duration
 
-      this._log('info', `管线执行完成`, {
+      this._log('info', '管线执行完成', {
         execution_id,
         total_duration_ms: total_duration,
         stage_count: this.stages.length,
@@ -152,7 +154,7 @@ class PipelineRunner {
 
       return {
         success: pipeline_context.errors.length === 0,
-        execution_id: execution_id,
+        execution_id,
         pipeline_name: this.pipeline_name,
         context: pipeline_context,
         duration_ms: total_duration
@@ -160,7 +162,7 @@ class PipelineRunner {
     } catch (error) {
       const total_duration = Date.now() - start_time
 
-      this._log('error', `管线执行失败`, {
+      this._log('error', '管线执行失败', {
         execution_id,
         error: error.message,
         total_duration_ms: total_duration
@@ -168,7 +170,7 @@ class PipelineRunner {
 
       return {
         success: false,
-        execution_id: execution_id,
+        execution_id,
         pipeline_name: this.pipeline_name,
         error: error.message,
         context: pipeline_context,
@@ -216,6 +218,7 @@ class PipelineRunner {
    * @param {string} level - 日志级别
    * @param {string} message - 日志消息
    * @param {Object} data - 附加数据
+   * @returns {void}
    * @private
    */
   _log(level, message, data = {}) {
@@ -249,4 +252,3 @@ class PipelineRunner {
 }
 
 module.exports = PipelineRunner
-

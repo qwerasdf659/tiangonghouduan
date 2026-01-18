@@ -122,8 +122,9 @@ async function main() {
       })
     }
 
-    // 插入订单
+    // 插入订单（测试数据脚本，顺序插入）
     for (const order of ordersToCreate) {
+      // eslint-disable-next-line no-await-in-loop
       await sequelize.query(
         `
         INSERT INTO exchange_records 

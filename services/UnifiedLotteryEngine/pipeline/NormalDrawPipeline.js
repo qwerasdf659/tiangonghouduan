@@ -26,16 +26,17 @@
  */
 
 const PipelineRunner = require('./PipelineRunner')
-const LoadCampaignStage = require('./stages/LoadCampaignStage')
-// 以下 Stage 将在后续实现
-// const EligibilityStage = require('./stages/EligibilityStage')
-// const BudgetContextStage = require('./stages/BudgetContextStage')
-// const BuildPrizePoolStage = require('./stages/BuildPrizePoolStage')
-// const GuaranteeStage = require('./stages/GuaranteeStage')
-// const TierPickStage = require('./stages/TierPickStage')
-// const PrizePickStage = require('./stages/PrizePickStage')
-// const DecisionSnapshotStage = require('./stages/DecisionSnapshotStage')
-// const SettleStage = require('./stages/SettleStage')
+const {
+  LoadCampaignStage,
+  EligibilityStage,
+  BudgetContextStage,
+  BuildPrizePoolStage,
+  GuaranteeStage,
+  TierPickStage,
+  PrizePickStage,
+  DecisionSnapshotStage,
+  SettleStage
+} = require('./stages')
 
 /**
  * 普通抽奖管线
@@ -56,36 +57,38 @@ class NormalDrawPipeline extends PipelineRunner {
   /**
    * 初始化 Stage
    *
+   * 执行顺序严格按照架构文档定义
+   *
+   * @returns {void}
    * @private
    */
   _initializeStages() {
-    // 1. 加载活动配置
+    // 1. 加载活动配置 - 加载活动、奖品、档位规则
     this.addStage(new LoadCampaignStage())
 
-    // TODO: 后续添加其他 Stage
-    // 2. 检查用户资格
-    // this.addStage(new EligibilityStage())
+    // 2. 检查用户资格 - 验证用户是否有权参与
+    this.addStage(new EligibilityStage())
 
-    // 3. 初始化预算上下文
-    // this.addStage(new BudgetContextStage())
+    // 3. 初始化预算上下文 - 根据预算模式创建 BudgetProvider
+    this.addStage(new BudgetContextStage())
 
-    // 4. 构建可用奖品池
-    // this.addStage(new BuildPrizePoolStage())
+    // 4. 构建可用奖品池 - 过滤有库存且有效的奖品
+    this.addStage(new BuildPrizePoolStage())
 
-    // 5. 检查保底机制
-    // this.addStage(new GuaranteeStage())
+    // 5. 检查保底机制 - 判断是否触发保底
+    this.addStage(new GuaranteeStage())
 
-    // 6. 选择档位（tier_first模式）
-    // this.addStage(new TierPickStage())
+    // 6. 选择档位（tier_first模式）- 根据权重选择奖品档位
+    this.addStage(new TierPickStage())
 
-    // 7. 选择奖品
-    // this.addStage(new PrizePickStage())
+    // 7. 选择奖品 - 在选中档位内选择具体奖品
+    this.addStage(new PrizePickStage())
 
-    // 8. 记录决策快照
-    // this.addStage(new DecisionSnapshotStage())
+    // 8. 记录决策快照 - 生成完整的决策审计数据
+    this.addStage(new DecisionSnapshotStage())
 
-    // 9. 结算（唯一写操作点）
-    // this.addStage(new SettleStage())
+    // 9. 结算（唯一写操作点）- 扣库存、扣预算、发奖品、记录
+    this.addStage(new SettleStage())
   }
 
   /**
@@ -108,4 +111,3 @@ class NormalDrawPipeline extends PipelineRunner {
 }
 
 module.exports = NormalDrawPipeline
-

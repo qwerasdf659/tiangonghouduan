@@ -68,9 +68,9 @@ class PoolBudgetProvider extends BudgetProvider {
       // 计算可用预算
       let available = 0
       const details = {
-        campaign_id: campaign_id,
-        user_id: user_id,
-        is_whitelist: is_whitelist
+        campaign_id,
+        user_id,
+        is_whitelist
       }
 
       if (is_whitelist && this.use_reserved_pool) {
@@ -83,9 +83,13 @@ class PoolBudgetProvider extends BudgetProvider {
         details.public_pool = public_pool
         details.pool_type = 'reserved+public'
       } else {
-        // 普通用户：只能使用公共池
-        // 如果没有分离公共池/预留池，使用 pool_budget_remaining
-        const public_pool = parseFloat(campaign.public_pool_remaining || campaign.pool_budget_remaining || 0)
+        /*
+         * 普通用户：只能使用公共池
+         * 如果没有分离公共池/预留池，使用 pool_budget_remaining
+         */
+        const public_pool = parseFloat(
+          campaign.public_pool_remaining || campaign.pool_budget_remaining || 0
+        )
         available = public_pool
 
         details.public_pool = public_pool
@@ -100,8 +104,8 @@ class PoolBudgetProvider extends BudgetProvider {
       })
 
       return {
-        available: available,
-        details: details
+        available,
+        details
       }
     } catch (error) {
       this._log('error', '获取活动池预算失败', {
@@ -190,7 +194,9 @@ class PoolBudgetProvider extends BudgetProvider {
 
       // 从公共池扣减剩余金额
       if (remaining_amount > 0) {
-        const public_pool = parseFloat(campaign.public_pool_remaining || campaign.pool_budget_remaining || 0)
+        const public_pool = parseFloat(
+          campaign.public_pool_remaining || campaign.pool_budget_remaining || 0
+        )
 
         if (public_pool >= remaining_amount) {
           if (campaign.public_pool_remaining !== undefined) {
@@ -210,8 +216,9 @@ class PoolBudgetProvider extends BudgetProvider {
       await campaign.save({ transaction })
 
       // 计算剩余预算
-      const new_remaining = parseFloat(campaign.public_pool_remaining || campaign.pool_budget_remaining || 0) +
-                           parseFloat(campaign.reserved_pool_remaining || 0)
+      const new_remaining =
+        parseFloat(campaign.public_pool_remaining || campaign.pool_budget_remaining || 0) +
+        parseFloat(campaign.reserved_pool_remaining || 0)
 
       this._log('info', '活动池预算扣减成功', {
         user_id,
@@ -277,8 +284,9 @@ class PoolBudgetProvider extends BudgetProvider {
       await campaign.save({ transaction })
 
       // 计算新余额
-      const new_remaining = parseFloat(campaign.public_pool_remaining || campaign.pool_budget_remaining || 0) +
-                           parseFloat(campaign.reserved_pool_remaining || 0)
+      const new_remaining =
+        parseFloat(campaign.public_pool_remaining || campaign.pool_budget_remaining || 0) +
+        parseFloat(campaign.reserved_pool_remaining || 0)
 
       this._log('info', '活动池预算回滚成功', {
         campaign_id,
@@ -304,4 +312,3 @@ class PoolBudgetProvider extends BudgetProvider {
 }
 
 module.exports = PoolBudgetProvider
-

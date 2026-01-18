@@ -3,13 +3,12 @@
  * 创建时间：2026年01月18日 北京时间
  *
  * 业务职责：
- * - 配置活动的最大可容忍欠账额度
+ * - 配置各级别的最大可容忍欠账额度
  * - 控制系统垫付的风险边界
  * - 防止无限制的欠账积累
  *
  * 核心规则（DR-03）：
- * - 每个活动可配置库存欠账上限
- * - 每个活动可配置预算欠账上限
+ * - 支持三级配置：global（全局）、campaign（活动）、prize（奖品）
  * - 超过上限时预设发放将失败
  * - 默认值允许一定的风险容忍度
  */
@@ -29,13 +28,34 @@ class PresetDebtLimit extends Model {
    * @returns {void}
    */
   static associate(models) {
-    // 一对一：配置属于某个活动
-    PresetDebtLimit.belongsTo(models.LotteryCampaign, {
-      foreignKey: 'campaign_id',
-      as: 'campaign',
-      onDelete: 'CASCADE',
-      comment: '所属活动'
+    // 多对一：创建人
+    PresetDebtLimit.belongsTo(models.User, {
+      foreignKey: 'created_by',
+      as: 'creator',
+      onDelete: 'SET NULL',
+      comment: '创建人'
     })
+
+    // 多对一：更新人
+    PresetDebtLimit.belongsTo(models.User, {
+      foreignKey: 'updated_by',
+      as: 'updater',
+      onDelete: 'SET NULL',
+      comment: '更新人'
+    })
+  }
+
+  /**
+   * 获取限制级别显示名称
+   * @returns {string} 级别中文名称
+   */
+  getLimitLevelName() {
+    const levelNames = {
+      global: '全局',
+      campaign: '活动',
+      prize: '奖品'
+    }
+    return levelNames[this.limit_level] || '未知级别'
   }
 
   /**
@@ -46,17 +66,17 @@ class PresetDebtLimit extends Model {
    */
   checkInventoryDebtLimit(currentDebt, additionalDebt = 1) {
     const totalDebt = currentDebt + additionalDebt
-    const isExceeded = totalDebt > this.max_inventory_debt
+    const isExceeded = totalDebt > this.inventory_debt_limit
 
     return {
       is_exceeded: isExceeded,
       current_debt: currentDebt,
       additional_debt: additionalDebt,
       total_after_add: totalDebt,
-      max_allowed: this.max_inventory_debt,
-      remaining: Math.max(0, this.max_inventory_debt - currentDebt),
+      max_allowed: this.inventory_debt_limit,
+      remaining: Math.max(0, this.inventory_debt_limit - currentDebt),
       message: isExceeded
-        ? `库存欠账将超限：${totalDebt} > ${this.max_inventory_debt}`
+        ? `库存欠账将超限：${totalDebt} > ${this.inventory_debt_limit}`
         : '库存欠账在允许范围内'
     }
   }
@@ -69,17 +89,17 @@ class PresetDebtLimit extends Model {
    */
   checkBudgetDebtLimit(currentDebt, additionalDebt) {
     const totalDebt = currentDebt + additionalDebt
-    const isExceeded = totalDebt > this.max_budget_debt
+    const isExceeded = totalDebt > this.budget_debt_limit
 
     return {
       is_exceeded: isExceeded,
       current_debt: currentDebt,
       additional_debt: additionalDebt,
       total_after_add: totalDebt,
-      max_allowed: this.max_budget_debt,
-      remaining: Math.max(0, this.max_budget_debt - currentDebt),
+      max_allowed: this.budget_debt_limit,
+      remaining: Math.max(0, this.budget_debt_limit - currentDebt),
       message: isExceeded
-        ? `预算欠账将超限：${totalDebt} > ${this.max_budget_debt}`
+        ? `预算欠账将超限：${totalDebt} > ${this.budget_debt_limit}`
         : '预算欠账在允许范围内'
     }
   }
@@ -91,129 +111,180 @@ class PresetDebtLimit extends Model {
   toSummary() {
     return {
       limit_id: this.limit_id,
-      campaign_id: this.campaign_id,
-      max_inventory_debt: this.max_inventory_debt,
-      max_budget_debt: this.max_budget_debt,
-      alert_threshold_percent: this.alert_threshold_percent,
+      limit_level: this.limit_level,
+      limit_level_name: this.getLimitLevelName(),
+      reference_id: this.reference_id,
+      inventory_debt_limit: this.inventory_debt_limit,
+      budget_debt_limit: this.budget_debt_limit,
       status: this.status,
+      description: this.description,
       created_at: this.created_at,
       updated_at: this.updated_at
     }
   }
 
   /**
-   * 获取或创建活动的欠账上限配置
-   * @param {number} campaignId - 活动ID
+   * 获取或创建全局欠账上限配置
    * @param {Object} options - 查询选项
-   * @returns {Promise<PresetDebtLimit>} 欠账上限配置
+   * @returns {Promise<PresetDebtLimit>} 全局欠账上限配置
    */
-  static async getOrCreateForCampaign(campaignId, options = {}) {
+  static async getOrCreateGlobal(options = {}) {
     const { transaction, defaults = {} } = options
 
     const [limit, created] = await this.findOrCreate({
-      where: { campaign_id: campaignId },
+      where: { limit_level: 'global', reference_id: null },
       defaults: {
-        campaign_id: campaignId,
-        max_inventory_debt: defaults.max_inventory_debt || 100,
-        max_budget_debt: defaults.max_budget_debt || 100000,
-        alert_threshold_percent: defaults.alert_threshold_percent || 80,
+        limit_level: 'global',
+        reference_id: null,
+        inventory_debt_limit: defaults.inventory_debt_limit || 1000,
+        budget_debt_limit: defaults.budget_debt_limit || 1000000,
         status: 'active',
+        description: '全局欠账上限配置',
         ...defaults
       },
       transaction
     })
 
     if (created) {
-      console.log(`[PresetDebtLimit] 为活动 ${campaignId} 创建默认欠账上限配置`)
+      console.log('[PresetDebtLimit] 创建全局欠账上限配置')
     }
 
     return limit
   }
 
   /**
-   * 检查活动的欠账是否接近上限（用于告警）
+   * 获取或创建活动欠账上限配置
    * @param {number} campaignId - 活动ID
+   * @param {Object} options - 查询选项
+   * @returns {Promise<PresetDebtLimit>} 活动欠账上限配置
+   */
+  static async getOrCreateForCampaign(campaignId, options = {}) {
+    const { transaction, defaults = {} } = options
+
+    const [limit, created] = await this.findOrCreate({
+      where: { limit_level: 'campaign', reference_id: campaignId },
+      defaults: {
+        limit_level: 'campaign',
+        reference_id: campaignId,
+        inventory_debt_limit: defaults.inventory_debt_limit || 100,
+        budget_debt_limit: defaults.budget_debt_limit || 100000,
+        status: 'active',
+        description: `活动 ${campaignId} 欠账上限配置`,
+        ...defaults
+      },
+      transaction
+    })
+
+    if (created) {
+      console.log(`[PresetDebtLimit] 为活动 ${campaignId} 创建欠账上限配置`)
+    }
+
+    return limit
+  }
+
+  /**
+   * 获取或创建奖品欠账上限配置
+   * @param {number} prizeId - 奖品ID
+   * @param {Object} options - 查询选项
+   * @returns {Promise<PresetDebtLimit>} 奖品欠账上限配置
+   */
+  static async getOrCreateForPrize(prizeId, options = {}) {
+    const { transaction, defaults = {} } = options
+
+    const [limit, created] = await this.findOrCreate({
+      where: { limit_level: 'prize', reference_id: prizeId },
+      defaults: {
+        limit_level: 'prize',
+        reference_id: prizeId,
+        inventory_debt_limit: defaults.inventory_debt_limit || 50,
+        budget_debt_limit: defaults.budget_debt_limit || 50000,
+        status: 'active',
+        description: `奖品 ${prizeId} 欠账上限配置`,
+        ...defaults
+      },
+      transaction
+    })
+
+    if (created) {
+      console.log(`[PresetDebtLimit] 为奖品 ${prizeId} 创建欠账上限配置`)
+    }
+
+    return limit
+  }
+
+  /**
+   * 获取有效的欠账上限配置（按优先级：prize > campaign > global）
+   * @param {Object} context - 上下文 {campaignId, prizeId}
+   * @param {Object} options - 查询选项
+   * @returns {Promise<PresetDebtLimit>} 有效的欠账上限配置
+   */
+  static async getEffectiveLimit(context, options = {}) {
+    const { campaignId, prizeId } = context
+    const { transaction } = options
+
+    // 按优先级查找：prize > campaign > global
+    const levels = []
+    if (prizeId) {
+      levels.push({ limit_level: 'prize', reference_id: prizeId })
+    }
+    if (campaignId) {
+      levels.push({ limit_level: 'campaign', reference_id: campaignId })
+    }
+    levels.push({ limit_level: 'global', reference_id: null })
+
+    for (const condition of levels) {
+      // eslint-disable-next-line no-await-in-loop -- 按优先级顺序查找，找到第一个即返回，无法并行化
+      const limit = await this.findOne({
+        where: { ...condition, status: 'active' },
+        transaction
+      })
+      if (limit) {
+        return limit
+      }
+    }
+
+    // 如果没有任何配置，创建全局默认配置
+    return this.getOrCreateGlobal({ transaction })
+  }
+
+  /**
+   * 检查欠账是否接近上限（用于告警）
+   * @param {Object} context - 上下文 {campaignId, prizeId}
    * @param {Object} currentDebts - 当前欠账统计 {inventory: number, budget: number}
    * @param {Object} options - 查询选项
    * @returns {Promise<Object>} 告警检查结果
    */
-  static async checkAlertThreshold(campaignId, currentDebts, options = {}) {
+  static async checkAlertThreshold(context, currentDebts, options = {}) {
     const { transaction } = options
 
-    const limit = await this.findOne({
-      where: { campaign_id: campaignId, status: 'active' },
-      transaction
-    })
+    const limit = await this.getEffectiveLimit(context, { transaction })
+    const alertThreshold = 0.8 // 80% 告警阈值
 
-    if (!limit) {
-      return {
-        needs_alert: false,
-        message: '未找到欠账上限配置'
-      }
-    }
+    const inventoryUsage = currentDebts.inventory / limit.inventory_debt_limit
+    const budgetUsage = currentDebts.budget / limit.budget_debt_limit
 
-    const inventoryPercent = (currentDebts.inventory / limit.max_inventory_debt) * 100
-    const budgetPercent = (currentDebts.budget / limit.max_budget_debt) * 100
-
-    const alerts = []
-
-    if (inventoryPercent >= limit.alert_threshold_percent) {
-      alerts.push({
-        type: 'inventory',
-        current: currentDebts.inventory,
-        max: limit.max_inventory_debt,
-        percent: inventoryPercent.toFixed(2),
-        message: `库存欠账已达${inventoryPercent.toFixed(2)}%`
-      })
-    }
-
-    if (budgetPercent >= limit.alert_threshold_percent) {
-      alerts.push({
-        type: 'budget',
-        current: currentDebts.budget,
-        max: limit.max_budget_debt,
-        percent: budgetPercent.toFixed(2),
-        message: `预算欠账已达${budgetPercent.toFixed(2)}%`
-      })
-    }
+    const needsInventoryAlert = inventoryUsage >= alertThreshold
+    const needsBudgetAlert = budgetUsage >= alertThreshold
 
     return {
-      needs_alert: alerts.length > 0,
-      alerts,
-      threshold_percent: limit.alert_threshold_percent
+      needs_alert: needsInventoryAlert || needsBudgetAlert,
+      limit_config: limit.toSummary(),
+      inventory: {
+        current: currentDebts.inventory,
+        limit: limit.inventory_debt_limit,
+        usage_percent: Math.round(inventoryUsage * 100),
+        needs_alert: needsInventoryAlert,
+        remaining: limit.inventory_debt_limit - currentDebts.inventory
+      },
+      budget: {
+        current: currentDebts.budget,
+        limit: limit.budget_debt_limit,
+        usage_percent: Math.round(budgetUsage * 100),
+        needs_alert: needsBudgetAlert,
+        remaining: limit.budget_debt_limit - currentDebts.budget
+      },
+      alert_threshold_percent: Math.round(alertThreshold * 100)
     }
-  }
-
-  /**
-   * 批量检查所有活动的欠账告警状态
-   * @param {Object} options - 查询选项
-   * @returns {Promise<Array>} 需要告警的活动列表
-   */
-  static async checkAllCampaignAlerts(options = {}) {
-    const { transaction } = options
-
-    // 获取所有启用的欠账上限配置
-    const limits = await this.findAll({
-      where: { status: 'active' },
-      transaction
-    })
-
-    const alertCampaigns = []
-
-    for (const limit of limits) {
-      /*
-       * 这里需要结合其他服务获取当前欠账数据
-       * 此处仅返回配置信息，实际告警检查需要在服务层完成
-       */
-      alertCampaigns.push({
-        campaign_id: limit.campaign_id,
-        max_inventory_debt: limit.max_inventory_debt,
-        max_budget_debt: limit.max_budget_debt,
-        alert_threshold_percent: limit.alert_threshold_percent
-      })
-    }
-
-    return alertCampaigns
   }
 }
 
@@ -236,53 +307,65 @@ module.exports = sequelize => {
       },
 
       /**
-       * 活动ID（唯一）
+       * 限制级别
+       * - global: 全局配置
+       * - campaign: 活动级配置
+       * - prize: 奖品级配置
        */
-      campaign_id: {
-        type: DataTypes.INTEGER,
+      limit_level: {
+        type: DataTypes.ENUM('global', 'campaign', 'prize'),
         allowNull: false,
-        unique: true,
-        comment: '活动ID（外键关联lottery_campaigns.campaign_id，唯一约束）'
+        comment: '限制级别：global-全局, campaign-活动, prize-奖品'
       },
 
       /**
-       * 最大库存欠账数量
+       * 关联ID（根据level不同含义不同）
        */
-      max_inventory_debt: {
+      reference_id: {
         type: DataTypes.INTEGER,
+        allowNull: true,
+        comment: '关联ID：campaign级别为campaign_id，prize级别为prize_id，global级别为null'
+      },
+
+      /**
+       * 库存欠账上限
+       */
+      inventory_debt_limit: {
+        type: DataTypes.INTEGER.UNSIGNED,
         allowNull: false,
         defaultValue: 100,
-        comment: '最大库存欠账数量（超过此值预设发放将失败）'
+        comment: '库存欠账上限数量'
       },
 
       /**
-       * 最大预算欠账金额
+       * 预算欠账上限
        */
-      max_budget_debt: {
-        type: DataTypes.INTEGER,
+      budget_debt_limit: {
+        type: DataTypes.INTEGER.UNSIGNED,
         allowNull: false,
         defaultValue: 100000,
-        comment: '最大预算欠账金额（超过此值预设发放将失败）'
+        comment: '预算欠账上限金额（整数分值）'
       },
 
       /**
-       * 告警阈值百分比
-       */
-      alert_threshold_percent: {
-        type: DataTypes.INTEGER,
-        allowNull: false,
-        defaultValue: 80,
-        comment: '告警阈值百分比（欠账达到此百分比时触发告警）'
-      },
-
-      /**
-       * 配置状态
+       * 状态
+       * - active: 启用
+       * - inactive: 停用
        */
       status: {
         type: DataTypes.ENUM('active', 'inactive'),
         allowNull: false,
         defaultValue: 'active',
-        comment: '配置状态：active=启用, inactive=停用'
+        comment: '配置状态：active-启用, inactive-停用'
+      },
+
+      /**
+       * 配置说明
+       */
+      description: {
+        type: DataTypes.TEXT,
+        allowNull: true,
+        comment: '配置说明'
       },
 
       /**
@@ -291,7 +374,7 @@ module.exports = sequelize => {
       created_by: {
         type: DataTypes.INTEGER,
         allowNull: true,
-        comment: '创建人ID（管理员user_id）'
+        comment: '创建人ID'
       },
 
       /**
@@ -300,7 +383,7 @@ module.exports = sequelize => {
       updated_by: {
         type: DataTypes.INTEGER,
         allowNull: true,
-        comment: '更新人ID（管理员user_id）'
+        comment: '更新人ID'
       },
 
       /**
@@ -331,18 +414,18 @@ module.exports = sequelize => {
       createdAt: 'created_at',
       updatedAt: 'updated_at',
       underscored: true,
-      comment: '预设欠账上限配置表 - 配置活动的最大可容忍欠账额度',
+      comment: '欠账上限配置表 - 配置各级别的欠账上限，防止系统风险',
       indexes: [
-        // 唯一索引：一个活动只能有一个欠账上限配置
+        // 唯一索引：限制级别+关联ID
         {
-          fields: ['campaign_id'],
-          unique: true,
-          name: 'uk_debt_limits_campaign'
+          fields: ['limit_level', 'reference_id'],
+          name: 'uk_debt_limit_level_ref',
+          unique: true
         },
-        // 查询索引：按状态查询
+        // 状态索引
         {
           fields: ['status'],
-          name: 'idx_debt_limits_status'
+          name: 'idx_debt_limit_status'
         }
       ]
     }

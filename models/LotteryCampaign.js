@@ -81,13 +81,13 @@ class LotteryCampaign extends Model {
       comment: '预算欠账（禁止删除有欠账的活动）'
     })
 
-    // 一对一：一个活动有一个欠账上限配置
-    LotteryCampaign.hasOne(models.PresetDebtLimit, {
-      foreignKey: 'campaign_id',
-      as: 'debtLimit',
-      onDelete: 'CASCADE',
-      comment: '欠账上限配置'
-    })
+    /*
+     * 注意：PresetDebtLimit 使用多态设计（limit_level + reference_id）
+     * 不直接通过 campaign_id 关联，而是通过:
+     *   - limit_level = 'campaign'
+     *   - reference_id = campaign_id
+     * 获取活动的欠账上限配置请使用: PresetDebtLimit.getOrCreateForCampaign(campaign_id)
+     */
 
     // 多对一：档位降级保底奖品
     LotteryCampaign.belongsTo(models.LotteryPrize, {
@@ -793,6 +793,164 @@ module.exports = sequelize => {
         defaultValue: 'v1',
         comment: '分层解析器配置版本号（如v1/v2），匹配config/segment_rules.js中的配置'
       },
+
+      // ======================== 预设欠账控制字段（统一架构V1.6） ========================
+
+      /**
+       * 兜底奖品ID
+       * @type {number}
+       * @业务含义 pick_method=fallback时使用，允许null表示自动选择prize_value_points=0的奖品
+       */
+      fallback_prize_id: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+        defaultValue: null,
+        comment:
+          '兜底奖品ID（pick_method=fallback时使用，null表示自动选择prize_value_points=0的奖品）'
+      },
+
+      /**
+       * 预设是否允许欠账
+       * @type {boolean}
+       * @业务含义 核心开关：TRUE-允许欠账发放，FALSE-资源不足直接失败
+       */
+      preset_debt_enabled: {
+        type: DataTypes.BOOLEAN,
+        allowNull: false,
+        defaultValue: false,
+        comment: '预设是否允许欠账（核心开关）：TRUE-允许欠账发放，FALSE-资源不足直接失败'
+      },
+
+      /**
+       * 预设预算扣减策略
+       * @type {string}
+       * @业务含义 控制预设发放时预算扣减的优先级
+       * @枚举值
+       * - follow_campaign：遵循budget_mode（默认，推荐）
+       * - pool_first：先扣pool后扣user
+       * - user_first：先扣user后扣pool
+       */
+      preset_budget_policy: {
+        type: DataTypes.ENUM('follow_campaign', 'pool_first', 'user_first'),
+        allowNull: false,
+        defaultValue: 'follow_campaign',
+        comment:
+          '预设预算扣减策略：follow_campaign-遵循budget_mode(默认), pool_first-先pool后user, user_first-先user后pool'
+      },
+
+      // ======================== 配额管理字段（pool+quota模式） ========================
+
+      /**
+       * 默认用户配额
+       * @type {number}
+       * @业务含义 pool+quota模式下，按需初始化时分配给新用户的默认配额
+       */
+      default_quota: {
+        type: DataTypes.DECIMAL(12, 2),
+        allowNull: false,
+        defaultValue: 0,
+        comment: '默认用户配额（pool+quota模式按需初始化时使用）',
+        /**
+         * 获取默认配额值
+         * @returns {number} 配额值
+         */
+        get() {
+          const value = this.getDataValue('default_quota')
+          return value ? parseFloat(value) : 0
+        }
+      },
+
+      /**
+       * 配额初始化模式
+       * @type {string}
+       * @业务含义 控制用户配额何时创建
+       * @枚举值
+       * - on_demand：按需初始化（用户首次参与时创建配额）
+       * - pre_allocated：预分配（管理员批量导入配额）
+       */
+      quota_init_mode: {
+        type: DataTypes.ENUM('on_demand', 'pre_allocated'),
+        allowNull: false,
+        defaultValue: 'on_demand',
+        comment: '配额初始化模式：on_demand-按需初始化(默认), pre_allocated-预分配'
+      },
+
+      // ======================== 预留池机制字段 ========================
+
+      /**
+       * 公共池剩余预算
+       * @type {number}
+       * @业务含义 普通用户可用的预算池（预留池模式时使用）
+       */
+      public_pool_remaining: {
+        type: DataTypes.DECIMAL(12, 2),
+        allowNull: true,
+        defaultValue: null,
+        comment: '公共池剩余预算（普通用户可用，预留池模式时使用）',
+        /**
+         * 获取公共池剩余预算
+         * @returns {number|null} 剩余预算值或null
+         */
+        get() {
+          const value = this.getDataValue('public_pool_remaining')
+          return value !== null ? parseFloat(value) : null
+        }
+      },
+
+      /**
+       * 预留池剩余预算
+       * @type {number}
+       * @业务含义 白名单/VIP专用的预算池（预留池模式时使用）
+       */
+      reserved_pool_remaining: {
+        type: DataTypes.DECIMAL(12, 2),
+        allowNull: true,
+        defaultValue: null,
+        comment: '预留池剩余预算（白名单专用，预留池模式时使用）',
+        /**
+         * 获取预留池剩余预算
+         * @returns {number|null} 剩余预算值或null
+         */
+        get() {
+          const value = this.getDataValue('reserved_pool_remaining')
+          return value !== null ? parseFloat(value) : null
+        }
+      },
+
+      // ======================== 活动级欠账上限 ========================
+
+      /**
+       * 活动预算欠账上限
+       * @type {number}
+       * @业务含义 该活动允许的最大预算欠账金额，0表示不限制（强烈不推荐）
+       */
+      max_budget_debt: {
+        type: DataTypes.DECIMAL(12, 2),
+        allowNull: false,
+        defaultValue: 0,
+        comment: '该活动预算欠账上限（0=不限制，强烈不推荐）',
+        /**
+         * 获取活动预算欠账上限
+         * @returns {number} 欠账上限值
+         */
+        get() {
+          const value = this.getDataValue('max_budget_debt')
+          return value ? parseFloat(value) : 0
+        }
+      },
+
+      /**
+       * 活动库存欠账数量上限
+       * @type {number}
+       * @业务含义 该活动允许的最大库存欠账数量，0表示不限制（强烈不推荐）
+       */
+      max_inventory_debt_qty: {
+        type: DataTypes.INTEGER,
+        allowNull: false,
+        defaultValue: 0,
+        comment: '该活动库存欠账总数量上限（0=不限制，强烈不推荐）'
+      },
+
       /**
        * 活动池总预算
        * @type {number}

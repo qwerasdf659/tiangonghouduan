@@ -26,11 +26,12 @@ const { handleServiceError } = require('../../../../middleware/validation')
 const QRCodeValidator = require('../../../../utils/QRCodeValidator')
 const logger = require('../../../../utils/logger').logger
 
-// 商家域审计日志（AC4.2）
-const { MerchantOperationLog } = require('../../../../models')
 /*
- * P1-9：UserService 通过 ServiceManager 获取（snake_case key）
- * 在路由处理函数内通过 req.app.locals.services.getService('user') 获取
+ * 路由层合规性治理（2026-01-18）：
+ * - 移除直接 require models
+ * - 通过 ServiceManager 统一获取服务（B1-Injected + E2-Strict snake_case）
+ * - UserService 通过 req.app.locals.services.getService('user') 获取
+ * - 商家域审计日志（AC4.2）通过 MerchantOperationLogService 访问
  */
 
 /**
@@ -256,9 +257,11 @@ router.get(
         merchant_id: req.user.user_id
       })
 
-      // 【AC4.2】记录商家域审计日志（扫码获取用户信息）
+      // 【AC4.2】记录商家域审计日志（扫码获取用户信息，通过 ServiceManager 获取服务）
       try {
-        await MerchantOperationLog.createLog({
+        const MerchantOperationLogService =
+          req.app.locals.services.getService('merchant_operation_log')
+        await MerchantOperationLogService.createLog({
           operator_id: req.user.user_id,
           store_id: resolved_store_id,
           operation_type: 'scan_user',

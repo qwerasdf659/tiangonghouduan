@@ -11,8 +11,10 @@
  * API列表：
  * - GET /list - 商家员工查询消费记录（店员查自己，店长查全店）
  * - GET /detail/:record_id - 商家员工查询记录详情（权限验证）
+ * - GET /stats - 商家员工查询消费统计
  *
  * @since 2026-01-12
+ * @updated 2026-01-18 路由层合规性治理：移除直接模型访问，使用 Service 层
  * @see docs/商家员工域权限体系升级方案.md - AC4 商家侧消费记录查询
  */
 
@@ -27,6 +29,17 @@ const {
 } = require('../../../../middleware/auth')
 const { handleServiceError } = require('../../../../middleware/validation')
 const logger = require('../../../../utils/logger').logger
+
+/**
+ * 通过 ServiceManager 获取服务实例
+ *
+ * @param {Object} req - Express 请求对象
+ * @param {string} serviceName - 服务名称（snake_case）
+ * @returns {Object} 服务实例
+ */
+const getService = (req, serviceName) => {
+  return req.app.locals.services.getService(serviceName)
+}
 
 /**
  * @route GET /api/v4/shop/consumption/merchant/list
@@ -56,7 +69,8 @@ router.get(
   requireMerchantPermission('consumption:read'),
   async (req, res) => {
     try {
-      const { ConsumptionRecord, Store, User } = require('../../../../models')
+      const ConsumptionService = getService(req, 'consumption')
+      const StaffManagementService = getService(req, 'staff_management')
 
       const userId = req.user.user_id
       const roleLevel = req.user.role_level || 0
@@ -69,7 +83,7 @@ router.get(
         return res.apiError('门店ID不能为空', 'MISSING_STORE_ID', null, 400)
       }
 
-      const storeId = parseInt(store_id)
+      const storeId = parseInt(store_id, 10)
       if (isNaN(storeId)) {
         return res.apiError('门店ID格式不正确', 'INVALID_STORE_ID', null, 400)
       }
@@ -81,93 +95,29 @@ router.get(
         return res.apiForbidden('STORE_ACCESS_DENIED', '您没有该门店的访问权限')
       }
 
-      // 4. 获取用户在该门店的角色
-      const { StoreStaff } = require('../../../../models')
-      const staffRecord = await StoreStaff.findOne({
-        where: {
-          user_id: userId,
-          store_id: storeId,
-          status: 'active'
-        },
-        attributes: ['role_in_store']
-      })
-
-      const isManager = staffRecord?.role_in_store === 'manager' || roleLevel >= 40
-
-      // 5. 分页参数
-      const finalPage = Math.max(parseInt(page) || 1, 1)
-      const finalPageSize = Math.min(Math.max(parseInt(page_size) || 20, 1), 50)
-      const offset = (finalPage - 1) * finalPageSize
-
-      // 6. 构建查询条件
-      const whereClause = {
-        store_id: storeId,
-        is_deleted: 0
-      }
-
-      // 店员只能查自己录入的
-      if (!isManager) {
-        whereClause.merchant_id = userId
-      }
-
-      // 状态筛选
-      if (status && ['pending', 'approved', 'rejected', 'expired'].includes(status)) {
-        whereClause.status = status
-      }
+      // 4. 获取用户在该门店的角色（通过服务层）
+      const isManager = await StaffManagementService.isStoreManager(userId, storeId, roleLevel)
 
       logger.info('商家员工查询消费记录', {
         user_id: userId,
         store_id: storeId,
         is_manager: isManager,
         status,
-        page: finalPage,
-        page_size: finalPageSize
+        page,
+        page_size
       })
 
-      // 7. 执行查询
-      const { count, rows } = await ConsumptionRecord.findAndCountAll({
-        where: whereClause,
-        include: [
-          {
-            model: User,
-            as: 'user',
-            attributes: ['user_id', 'nickname', 'mobile']
-          },
-          {
-            model: User,
-            as: 'merchant',
-            attributes: ['user_id', 'nickname', 'mobile']
-          },
-          {
-            model: Store,
-            as: 'store',
-            attributes: ['store_id', 'store_name', 'store_code']
-          }
-        ],
-        order: [['created_at', 'DESC']],
-        limit: finalPageSize,
-        offset
+      // 5. 调用服务层查询
+      const result = await ConsumptionService.getMerchantRecords({
+        user_id: userId,
+        store_id: storeId,
+        is_manager: isManager,
+        status,
+        page: parseInt(page, 10),
+        page_size: parseInt(page_size, 10)
       })
 
-      // 8. 格式化响应数据
-      const records = rows.map(record => record.toAPIResponse())
-
-      return res.apiSuccess(
-        {
-          records,
-          pagination: {
-            current_page: finalPage,
-            page_size: finalPageSize,
-            total_count: count,
-            total_pages: Math.ceil(count / finalPageSize)
-          },
-          query_scope: isManager ? 'store' : 'self',
-          query_note: isManager
-            ? '店长模式：显示本店全部消费记录'
-            : '店员模式：仅显示您录入的消费记录'
-        },
-        '查询成功'
-      )
+      return res.apiSuccess(result, '查询成功')
     } catch (error) {
       logger.error('商家侧消费记录查询失败', {
         error: error.message,
@@ -196,43 +146,21 @@ router.get(
   requireMerchantPermission('consumption:read'),
   async (req, res) => {
     try {
-      const { ConsumptionRecord, Store, User } = require('../../../../models')
+      const ConsumptionService = getService(req, 'consumption')
+      const StaffManagementService = getService(req, 'staff_management')
 
       const userId = req.user.user_id
       const roleLevel = req.user.role_level || 0
       const { record_id } = req.params
 
       // 1. 参数验证
-      const recordId = parseInt(record_id)
+      const recordId = parseInt(record_id, 10)
       if (isNaN(recordId)) {
         return res.apiError('无效的记录ID', 'INVALID_RECORD_ID', null, 400)
       }
 
-      // 2. 查询记录
-      const record = await ConsumptionRecord.findByPk(recordId, {
-        include: [
-          {
-            model: User,
-            as: 'user',
-            attributes: ['user_id', 'nickname', 'mobile']
-          },
-          {
-            model: User,
-            as: 'merchant',
-            attributes: ['user_id', 'nickname', 'mobile']
-          },
-          {
-            model: User,
-            as: 'reviewer',
-            attributes: ['user_id', 'nickname']
-          },
-          {
-            model: Store,
-            as: 'store',
-            attributes: ['store_id', 'store_name', 'store_code']
-          }
-        ]
-      })
+      // 2. 调用服务层查询记录详情
+      const record = await ConsumptionService.getMerchantRecordDetail(recordId)
 
       if (!record) {
         return res.apiError('消费记录不存在', 'RECORD_NOT_FOUND', null, 404)
@@ -247,18 +175,8 @@ router.get(
         return res.apiForbidden('STORE_ACCESS_DENIED', '您没有该记录所属门店的访问权限')
       }
 
-      // 获取用户在门店的角色
-      const { StoreStaff } = require('../../../../models')
-      const staffRecord = await StoreStaff.findOne({
-        where: {
-          user_id: userId,
-          store_id: storeId,
-          status: 'active'
-        },
-        attributes: ['role_in_store']
-      })
-
-      const isManager = staffRecord?.role_in_store === 'manager' || roleLevel >= 40
+      // 获取用户在门店的角色（通过服务层）
+      const isManager = await StaffManagementService.isStoreManager(userId, storeId, roleLevel)
 
       // 店员只能查看自己录入的记录
       if (!isManager && record.merchant_id !== userId) {
@@ -303,8 +221,8 @@ router.get(
   requireMerchantPermission('consumption:read'),
   async (req, res) => {
     try {
-      const { ConsumptionRecord } = require('../../../../models')
-      const { sequelize } = require('../../../../config/database')
+      const ConsumptionService = getService(req, 'consumption')
+      const StaffManagementService = getService(req, 'staff_management')
 
       const userId = req.user.user_id
       const roleLevel = req.user.role_level || 0
@@ -315,7 +233,7 @@ router.get(
         return res.apiError('门店ID不能为空', 'MISSING_STORE_ID', null, 400)
       }
 
-      const storeId = parseInt(store_id)
+      const storeId = parseInt(store_id, 10)
       if (isNaN(storeId)) {
         return res.apiError('门店ID格式不正确', 'INVALID_STORE_ID', null, 400)
       }
@@ -326,84 +244,23 @@ router.get(
         return res.apiForbidden('STORE_ACCESS_DENIED', '您没有该门店的访问权限')
       }
 
-      // 3. 获取用户角色
-      const { StoreStaff } = require('../../../../models')
-      const staffRecord = await StoreStaff.findOne({
-        where: {
-          user_id: userId,
-          store_id: storeId,
-          status: 'active'
-        },
-        attributes: ['role_in_store']
-      })
-
-      const isManager = staffRecord?.role_in_store === 'manager' || roleLevel >= 40
-
-      // 4. 构建查询条件
-      const whereClause = {
-        store_id: storeId,
-        is_deleted: 0
-      }
-
-      // 店员只统计自己的
-      if (!isManager) {
-        whereClause.merchant_id = userId
-      }
-
-      // 5. 执行统计查询
-      const stats = await ConsumptionRecord.findAll({
-        where: whereClause,
-        attributes: [
-          'status',
-          [sequelize.fn('COUNT', sequelize.col('record_id')), 'count'],
-          [sequelize.fn('SUM', sequelize.col('consumption_amount')), 'total_amount'],
-          [sequelize.fn('SUM', sequelize.col('points_to_award')), 'total_points']
-        ],
-        group: ['status'],
-        raw: true
-      })
-
-      // 6. 格式化统计结果
-      const statusStats = {
-        pending: { count: 0, amount: 0, points: 0 },
-        approved: { count: 0, amount: 0, points: 0 },
-        rejected: { count: 0, amount: 0, points: 0 },
-        expired: { count: 0, amount: 0, points: 0 }
-      }
-
-      stats.forEach(stat => {
-        if (statusStats[stat.status]) {
-          statusStats[stat.status] = {
-            count: parseInt(stat.count) || 0,
-            amount: parseFloat(stat.total_amount) || 0,
-            points: parseInt(stat.total_points) || 0
-          }
-        }
-      })
-
-      // 计算总计
-      const total = {
-        count: Object.values(statusStats).reduce((sum, s) => sum + s.count, 0),
-        amount: Object.values(statusStats).reduce((sum, s) => sum + s.amount, 0),
-        approved_points: statusStats.approved.points
-      }
+      // 3. 获取用户角色（通过服务层）
+      const isManager = await StaffManagementService.isStoreManager(userId, storeId, roleLevel)
 
       logger.info('商家员工查询消费统计', {
         user_id: userId,
         store_id: storeId,
-        is_manager: isManager,
-        stats: total
+        is_manager: isManager
       })
 
-      return res.apiSuccess(
-        {
-          store_id: storeId,
-          stats_scope: isManager ? 'store' : 'self',
-          by_status: statusStats,
-          total
-        },
-        '查询成功'
-      )
+      // 4. 调用服务层查询统计
+      const stats = await ConsumptionService.getMerchantStats({
+        user_id: userId,
+        store_id: storeId,
+        is_manager: isManager
+      })
+
+      return res.apiSuccess(stats, '查询成功')
     } catch (error) {
       logger.error('商家侧消费统计查询失败', {
         error: error.message,

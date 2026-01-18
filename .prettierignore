@@ -1,0 +1,90 @@
+# ============================================================
+# Prettier 忽略配置 - 后端数据库项目专用
+# 创建时间：2026-01-18
+# 说明：与 .eslintrc.js 的 ignorePatterns 保持一致
+# ============================================================
+
+# 依赖目录
+node_modules/
+
+# 日志目录
+logs/
+
+# 配置文件（由 ESLint 规则管理）
+*.config.js
+commitlint.config.js
+ecosystem.config.js
+jest.config.js
+
+# IDE/工具配置目录
+.cursor/
+.claude/
+.vscode/
+.idea/
+
+# 数据库迁移文件（由 Sequelize-CLI 生成，格式固定）
+migrations/
+
+# 脚本工具（运维/诊断/工具脚本，不纳入主工程格式检查）
+scripts/
+
+# ============================================================
+# 【重要】前端静态资源 - 属于前端开发人员负责，后端不检查
+# ============================================================
+public/
+
+# ============================================================
+# 【重要】备份数据/报告 - 历史数据归档，不需要格式化
+# ============================================================
+backups/
+
+# 上传文件目录
+uploads/
+
+# 测试覆盖率报告
+coverage/
+
+# 根目录临时测试脚本（与 ESLint 一致）
+test-*.js
+test_*.js
+
+# 小程序示例代码
+miniprogram-examples/
+
+# 微信相关配置
+wxqd/
+
+# 文档目录（markdown 格式可能有特殊要求）
+docs/
+
+# 数据备份和导出文件
+data/
+*.sql
+*.json.backup
+dump.rdb
+
+# 备份文件
+*.backup
+*.backup.*
+
+# Python 脚本（不属于 Node.js 后端代码）
+*.py
+
+# Shell 脚本（不属于 JS 代码）
+*.sh
+
+# 回调配置
+callbacks/
+
+# 配置示例文件
+config.example
+
+# package-lock.json（npm 自动生成）
+package-lock.json
+
+
+
+
+
+
+
