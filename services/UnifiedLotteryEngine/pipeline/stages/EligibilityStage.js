@@ -20,15 +20,20 @@
  * - 快速失败，资格不满足时立即返回
  * - 提供详细的不满足原因
  *
+ * 🔄 2026-01-19 架构迁移说明：
+ * - 配额检查已迁移到 LotteryQuotaService（单一真相源）
+ * - 不再直接查询 LotteryDraw.count，而是使用 LotteryQuotaService.checkQuotaSufficient
+ * - 支持四维度配额控制：全局/活动/角色/用户
+ *
  * @module services/UnifiedLotteryEngine/pipeline/stages/EligibilityStage
  * @author 统一抽奖架构重构
  * @since 2026-01-18
+ * @updated 2026-01-19 - 集成 LotteryQuotaService 作为配额真相源
  */
 
 const BaseStage = require('./BaseStage')
-const { LotteryCampaignUserQuota, LotteryDraw } = require('../../../../models')
-const { Op } = require('sequelize')
-const BeijingTimeHelper = require('../../../../utils/timeHelper')
+const { LotteryCampaignUserQuota } = require('../../../../models')
+const LotteryQuotaService = require('../../../lottery/LotteryQuotaService')
 
 /**
  * 抽奖资格检查 Stage
@@ -54,9 +59,9 @@ class EligibilityStage extends BaseStage {
    * @returns {Promise<Object>} Stage 执行结果
    */
   async execute(context) {
-    const { user_id, campaign_id } = context
+    const { user_id, campaign_id, draw_count = 1 } = context
 
-    this.log('info', '开始检查抽奖资格', { user_id, campaign_id })
+    this.log('info', '开始检查抽奖资格', { user_id, campaign_id, draw_count })
 
     try {
       // 获取活动配置（从 LoadCampaignStage 的结果中）
@@ -77,42 +82,59 @@ class EligibilityStage extends BaseStage {
         return this.failure(ban_check.reason, 'USER_BANNED', { user_id, campaign_id })
       }
 
-      // 2. 获取用户的活动配额
+      // 2. 获取用户的活动配额（可选，用于特殊配额控制）
       const user_quota = await this._getUserQuota(user_id, campaign_id)
 
-      // 3. 检查今日已抽奖次数
-      const daily_draws = await this._getDailyDrawsCount(user_id, campaign_id)
+      /*
+       * 3. 使用 LotteryQuotaService 检查配额（单一真相源）
+       *
+       * 🔄 2026-01-19 架构迁移：
+       * - 不再直接查询 LotteryDraw.count
+       * - 使用 LotteryQuotaService.checkQuotaSufficient 作为配额真相源
+       * - 支持四维度配额控制：全局/活动/角色/用户
+       * - 支持连抽场景的配额检查
+       */
+      const quota_check = await LotteryQuotaService.checkQuotaSufficient({
+        user_id,
+        campaign_id,
+        draw_count
+      })
 
-      // 4. 计算剩余抽奖次数
-      const max_daily_draws = campaign.max_daily_draws || 10 // 默认每日最多10次
-      const remaining_draws = Math.max(0, max_daily_draws - daily_draws)
+      // 4. 检查活动级别的配额限制（特殊配额，与 LotteryQuotaService 配额并行）
+      const campaign_quota_check = this._checkCampaignQuotaLimit(user_quota, campaign)
 
-      // 5. 检查配额限制
-      const quota_check = this._checkQuotaLimit(user_quota, campaign)
-
-      // 6. 综合判断资格
-      const is_eligible = remaining_draws > 0 && quota_check.is_eligible
+      // 5. 综合判断资格：配额充足 + 活动配额限制通过
+      const is_eligible = quota_check.sufficient && campaign_quota_check.is_eligible
 
       if (!is_eligible) {
-        const reason =
-          remaining_draws <= 0 ? `今日抽奖次数已达上限（${max_daily_draws}次）` : quota_check.reason
+        const reason = !quota_check.sufficient ? quota_check.message : campaign_quota_check.reason
 
         this.log('info', '用户不满足抽奖资格', {
           user_id,
           campaign_id,
+          draw_count,
           reason,
-          daily_draws,
-          max_daily_draws,
-          remaining_draws
+          quota_sufficient: quota_check.sufficient,
+          quota_remaining: quota_check.remaining,
+          quota_limit: quota_check.limit
         })
 
         return this.failure(reason, 'ELIGIBILITY_CHECK_FAILED', {
           user_id,
           campaign_id,
-          daily_draws,
-          max_daily_draws,
-          remaining_draws,
-          quota_info: user_quota
+          draw_count,
+          daily_draws: quota_check.used,
+          max_daily_draws: quota_check.limit,
+          remaining_draws: quota_check.remaining,
+          quota_info: {
+            sufficient: quota_check.sufficient,
+            remaining: quota_check.remaining,
+            limit: quota_check.limit,
+            used: quota_check.used,
+            bonus: quota_check.bonus,
+            requested: quota_check.requested
+          },
+          campaign_quota: user_quota
             ? {
                 granted_quota: user_quota.granted_quota,
                 used_quota: user_quota.used_quota,
@@ -126,17 +148,26 @@ class EligibilityStage extends BaseStage {
       const result = {
         is_eligible: true,
         user_quota: user_quota ? user_quota.toJSON() : null,
-        daily_draws_count: daily_draws,
-        remaining_draws,
-        max_daily_draws,
-        quota_remaining: user_quota ? user_quota.granted_quota - user_quota.used_quota : null
+        daily_draws_count: quota_check.used,
+        remaining_draws: quota_check.remaining,
+        max_daily_draws: quota_check.limit,
+        quota_remaining: quota_check.remaining,
+        quota_info: {
+          sufficient: quota_check.sufficient,
+          remaining: quota_check.remaining,
+          limit: quota_check.limit,
+          used: quota_check.used,
+          bonus: quota_check.bonus,
+          matched_rule_id: quota_check.matched_rule_id
+        }
       }
 
       this.log('info', '抽奖资格检查通过', {
         user_id,
         campaign_id,
-        daily_draws,
-        remaining_draws
+        draw_count,
+        daily_draws: quota_check.used,
+        remaining_draws: quota_check.remaining
       })
 
       return this.success(result)
@@ -144,6 +175,7 @@ class EligibilityStage extends BaseStage {
       this.log('error', '抽奖资格检查失败', {
         user_id,
         campaign_id,
+        draw_count,
         error: error.message
       })
       throw error
@@ -214,51 +246,33 @@ class EligibilityStage extends BaseStage {
     }
   }
 
-  /**
-   * 获取用户今日抽奖次数
+  /*
+   * _getDailyDrawsCount 方法已废弃
    *
-   * @param {number} user_id - 用户ID
-   * @param {number} campaign_id - 活动ID
-   * @returns {Promise<number>} 今日已抽奖次数
-   * @private
+   * 🔄 2026-01-19 架构迁移说明：
+   * - 今日抽奖次数的查询已迁移到 LotteryQuotaService
+   * - LotteryQuotaService.checkQuotaSufficient() 返回的 used 字段即为已用次数
+   * - 使用 LotteryQuotaService 可以支持四维度配额控制和原子扣减
+   *
+   * @deprecated 此方法已移除，使用 LotteryQuotaService.checkQuotaSufficient() 替代
+   * @see LotteryQuotaService.checkQuotaSufficient()
    */
-  async _getDailyDrawsCount(user_id, campaign_id) {
-    try {
-      // 获取今日北京时间的开始和结束
-      const today_start = BeijingTimeHelper.getTodayStart()
-      const today_end = BeijingTimeHelper.getTodayEnd()
-
-      const count = await LotteryDraw.count({
-        where: {
-          user_id,
-          campaign_id,
-          created_at: {
-            [Op.gte]: today_start,
-            [Op.lt]: today_end
-          }
-        }
-      })
-
-      return count
-    } catch (error) {
-      this.log('warn', '获取今日抽奖次数失败', {
-        user_id,
-        campaign_id,
-        error: error.message
-      })
-      return 0
-    }
-  }
 
   /**
-   * 检查配额限制
+   * 检查活动级别的配额限制（特殊配额，与 LotteryQuotaService 配额并行）
    *
-   * @param {Object|null} user_quota - 用户配额记录
+   * 🔄 2026-01-19 说明：
+   * - 此方法检查 lottery_campaign_user_quota 表中的特殊配额
+   * - 与 LotteryQuotaService 的每日配额是两套独立的配额系统
+   * - LotteryQuotaService：每日限制，自动初始化，按规则优先级
+   * - lottery_campaign_user_quota：活动专属配额，需手动分配
+   *
+   * @param {Object|null} user_quota - 用户配额记录（lottery_campaign_user_quota）
    * @param {Object} campaign - 活动配置
    * @returns {Object} 检查结果 { is_eligible, reason }
    * @private
    */
-  _checkQuotaLimit(user_quota, campaign) {
+  _checkCampaignQuotaLimit(user_quota, campaign) {
     // 如果活动没有配额限制，直接通过
     if (!campaign.quota_enabled) {
       return { is_eligible: true, reason: null }

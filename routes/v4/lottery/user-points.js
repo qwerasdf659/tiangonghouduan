@@ -148,17 +148,27 @@ router.get('/statistics/:user_id', authenticateToken, async (req, res) => {
  *
  * @returns {Object} 系统健康状态
  */
+/**
+ * V4.6 抽奖系统健康检查（Pipeline 架构）
+ *
+ * 2026-01-19 Phase 5 迁移：
+ * - 更新为 Pipeline 管线名称
+ * - 保留 ManagementStrategy 用于管理 API
+ */
 router.get('/health', (req, res) => {
   try {
     return res.apiSuccess(
       {
         status: 'healthy',
-        service: 'V4.0统一抽奖引擎',
-        version: '4.0.0',
-        strategies: ['basic_guarantee', 'management'],
+        service: 'V4.6统一抽奖引擎',
+        version: '4.6.0',
+        architecture: 'pipeline',
+        pipelines: ['NormalDrawPipeline'], // Phase 5：统一管线
+        decision_sources: ['normal', 'preset', 'override'], // 决策来源类型
+        management_strategy: 'ManagementStrategy',
         timestamp: BeijingTimeHelper.apiTimestamp()
       },
-      'V4.0抽奖系统运行正常'
+      'V4.6抽奖系统运行正常（Phase 5 统一管线架构）'
     )
   } catch (error) {
     logger.error('抽奖系统健康检查失败:', error)

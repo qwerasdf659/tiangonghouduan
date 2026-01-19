@@ -27,42 +27,32 @@ module.exports = {
   // ====================================
   lottery: {
     /**
-     * 连抽折扣配置
+     * 抽奖系统配置（代码层固定规则）
      *
-     * @description 定义不同抽奖类型的抽奖次数和折扣率
-     * @业务规则
-     * - 单抽/3连抽/5连抽：无折扣（discount=1.0）
-     * - 10连抽：九折优惠（discount=0.9）
+     * @description 抽奖系统的固定业务规则配置
      *
-     * @重要说明
+     * @重要说明 - 定价配置迁移说明（2026-01-19）
+     * - draw_types（连抽折扣配置）已迁移到 lottery_campaign_pricing_config 表
      * - 单抽价格（lottery_cost_points）从 DB system_settings 读取
-     * - 连抽总价 = 单抽价格 × count × discount
-     * - 价格相关字段（total_cost/per_draw）由业务层动态计算
+     * - 连抽折扣由 PricingStage 从 lottery_campaign_pricing_config 表动态读取
+     * - 定价配置通过管理后台 API 进行管理（版本化、可回滚）
      *
-     * @see AdminSystemService.getSettingValue('points', 'lottery_cost_points')
+     * @see PricingStage._getDrawPricing() - 定价计算核心逻辑
+     * @see routes/v4/console/lottery-management/pricing-config.js - 定价配置管理API
+     * @see lottery_campaign_pricing_config 表 - 活动级定价配置存储
+     *
+     * @deprecated draw_types 字段已移除
+     * @migration Phase 3: 定价真相收敛到 lottery_campaign_pricing_config 表
      */
-    draw_types: {
-      single: {
-        count: 1, // 抽奖次数
-        discount: 1.0, // 折扣率（1.0=无折扣）
-        label: '单抽' // 前端显示名称
-      },
-      triple: {
-        count: 3, // 抽奖次数
-        discount: 1.0, // 无折扣
-        label: '3连抽' // 前端显示名称
-      },
-      five: {
-        count: 5, // 抽奖次数
-        discount: 1.0, // 无折扣
-        label: '5连抽' // 前端显示名称
-      },
-      ten: {
-        count: 10, // 抽奖次数
-        discount: 0.9, // 九折优惠
-        label: '10连抽(九折)' // 前端显示名称
-      }
-    },
+
+    /**
+     * 最大抽奖次数（动态范围上限）
+     *
+     * @description 单次抽奖最大允许的抽奖次数
+     * @业务规则 最大支持 20 连抽
+     * @note 具体可选档位由 lottery_campaign_pricing_config 表中的 draw_buttons 配置
+     */
+    max_draw_count: 20,
 
     /**
      * 每日重置时间（固定规则）

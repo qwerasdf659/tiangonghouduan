@@ -101,6 +101,15 @@ models.LotteryCampaignQuotaGrant = require('./LotteryCampaignQuotaGrant')(sequel
  *    - 业务场景：管理员赠送配额→消费自动发放配额→活动奖励配额
  */
 
+models.LotteryCampaignPricingConfig = require('./LotteryCampaignPricingConfig').initModel(sequelize)
+/*
+ * ✅ LotteryCampaignPricingConfig：活动级定价配置表（版本化管理）
+ *    - 用途：PricingStage的唯一定价真值来源，支持连抽定价配置
+ *    - 特点：版本化管理（可回滚/可定时生效/多版本）、运营可动态调整 discount
+ *    - 表名：lottery_campaign_pricing_config，主键：config_id，唯一约束：campaign_id + version
+ *    - 业务场景：单抽/多连抽定价→折扣动态调整→AB测试→限时活动
+ */
+
 models.PresetInventoryDebt = require('./PresetInventoryDebt')(sequelize, DataTypes)
 /*
  * ✅ PresetInventoryDebt：预设库存欠账表（系统垫付）

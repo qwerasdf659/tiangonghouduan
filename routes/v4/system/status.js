@@ -109,10 +109,25 @@ router.get('/business-config', optionalAuth, dataAccessControl, async (req, res)
       AdminSystemService.getSettingValue('points', 'daily_lottery_limit', null, { strict: true })
     ])
 
-    // 动态计算连抽定价（基于 DB 读取的单抽价格）
-    const drawTypes = businessConfig.lottery.draw_types
+    /*
+     * 动态计算连抽定价（基于 DB 读取的单抽价格）
+     *
+     * 🔄 2026-01-19 架构迁移说明：
+     * - 定价配置已从 business.config.lottery.draw_types 迁移到 lottery_campaign_pricing_config 表
+     * - 此处返回系统级默认配置（不依赖特定活动）
+     * - 活动级定价配置应通过 /api/v4/lottery/config/:campaignCode 获取
+     *
+     * @see PricingStage._getDrawPricing() - 活动级定价计算
+     * @see routes/v4/console/lottery-management/pricing-config.js - 定价配置管理
+     */
+    const defaultDiscounts = {
+      single: { count: 1, discount: 1.0, label: '单抽' },
+      triple: { count: 3, discount: 1.0, label: '3连抽' },
+      five: { count: 5, discount: 1.0, label: '5连抽' },
+      ten: { count: 10, discount: 0.9, label: '10连抽(九折)' }
+    }
     const drawPricing = {}
-    for (const [type, config] of Object.entries(drawTypes)) {
+    for (const [type, config] of Object.entries(defaultDiscounts)) {
       drawPricing[type] = {
         count: config.count,
         discount: config.discount,

@@ -62,6 +62,8 @@ const HourlyMarketListingMonitor = require('../../jobs/hourly-market-listing-mon
 const DailyOrphanFrozenCheck = require('../../jobs/daily-orphan-frozen-check')
 // 2026-01-14新增：图片资源数据质量门禁（图片缩略图架构兼容残留核查报告 Phase 1）
 const DailyImageResourceQualityCheck = require('../../jobs/daily-image-resource-quality-check')
+// 2026-01-19新增：定价配置定时生效（Phase 3 统一抽奖架构）
+const HourlyPricingConfigScheduler = require('../../jobs/hourly-pricing-config-scheduler')
 
 /**
  * 定时任务管理类
@@ -205,6 +207,9 @@ class ScheduledTasks {
 
     // 任务21: 每天凌晨4点图片资源数据质量检查（2026-01-14新增 - 图片缩略图架构兼容残留核查报告 Phase 1）
     this.scheduleDailyImageResourceQualityCheck()
+
+    // 任务22: 每小时第10分钟检查定价配置定时生效（2026-01-19新增 - Phase 3 统一抽奖架构）
+    this.scheduleHourlyPricingConfigActivation()
 
     logger.info('所有定时任务已初始化完成')
   }
@@ -2087,6 +2092,109 @@ class ScheduledTasks {
       return report
     } catch (error) {
       logger.error('[手动触发] 图片资源数据质量检查失败', { error: error.message })
+      throw error
+    }
+  }
+
+  /**
+   * 定时任务22: 每小时第10分钟检查定价配置定时生效
+   * Cron表达式: 10 * * * * (每小时第10分钟)
+   *
+   * 业务场景（Phase 3 统一抽奖架构 2026-01-19）：
+   * - 检查所有 scheduled 状态的定价配置
+   * - 如果 effective_at <= 当前时间，自动激活该版本
+   * - 同活动有多个待生效版本时，仅激活最新版本
+   *
+   * @returns {void}
+   *
+   * @since 2026-01-19
+   * @see docs/抽奖模块Strategy到Pipeline迁移方案新.md - Phase 3.3
+   */
+  static scheduleHourlyPricingConfigActivation() {
+    cron.schedule('10 * * * *', async () => {
+      const lockKey = 'lock:pricing_config_activation'
+      const lockValue = `${process.pid}_${Date.now()}`
+      let redisClient = null
+
+      try {
+        // 获取 Redis 客户端
+        const { getRawClient } = require('../../utils/UnifiedRedisClient')
+        redisClient = getRawClient()
+
+        // 尝试获取分布式锁（5分钟过期）
+        const acquired = await redisClient.set(lockKey, lockValue, 'EX', 300, 'NX')
+
+        if (!acquired) {
+          logger.info('[定时任务] 其他实例正在执行定价配置定时生效检查，跳过')
+          return
+        }
+
+        logger.info('[定时任务] 获取分布式锁成功，开始执行定价配置定时生效检查...', {
+          lock_key: lockKey,
+          lock_value: lockValue
+        })
+
+        // 调用 Job 类执行
+        const result = await HourlyPricingConfigScheduler.execute()
+
+        if (result.activated > 0) {
+          logger.info('[定时任务] 定价配置定时生效检查完成', {
+            processed: result.processed,
+            activated: result.activated,
+            failed: result.failed,
+            skipped: result.skipped
+          })
+        } else {
+          logger.debug('[定时任务] 定价配置定时生效检查完成，无需激活的配置')
+        }
+      } catch (error) {
+        logger.error('[定时任务] 定价配置定时生效检查失败', {
+          error: error.message,
+          stack: error.stack
+        })
+      } finally {
+        // 释放分布式锁
+        if (redisClient) {
+          try {
+            await redisClient.del(lockKey)
+          } catch (unlockError) {
+            logger.error('[定时任务] 释放分布式锁失败', { error: unlockError.message })
+          }
+        }
+      }
+    })
+
+    logger.info('✅ 定时任务已设置: 定价配置定时生效检查（每小时第10分钟执行，支持分布式锁）')
+  }
+
+  /**
+   * 手动触发定价配置定时生效检查（用于测试）
+   *
+   * 业务场景：手动执行定价配置定时生效检查，用于开发调试和即时检查
+   *
+   * @returns {Promise<Object>} 执行结果
+   *
+   * @example
+   * const ScheduledTasks = require('./scripts/maintenance/scheduled-tasks')
+   * const result = await ScheduledTasks.manualPricingConfigActivation()
+   * console.log('激活数量:', result.activated)
+   */
+  static async manualPricingConfigActivation() {
+    try {
+      logger.info('[手动触发] 开始执行定价配置定时生效检查...')
+      const result = await HourlyPricingConfigScheduler.execute()
+
+      logger.info('[手动触发] 定价配置定时生效检查完成', {
+        processed: result.processed,
+        activated: result.activated,
+        failed: result.failed,
+        skipped: result.skipped,
+        duration_ms: result.duration_ms
+      })
+
+      return result
+    } catch (error) {
+      logger.error('[手动触发] 定价配置定时生效检查失败', { error: error.message })
       throw error
     }
   }

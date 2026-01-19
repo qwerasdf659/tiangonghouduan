@@ -4,12 +4,13 @@
  * SettleStage - 结算阶段 Stage（唯一写入点）
  *
  * 职责：
- * 1. 创建抽奖记录（lottery_draws）
- * 2. 记录决策快照（lottery_draw_decisions）
- * 3. 扣减奖品库存
- * 4. 扣减用户预算（通过 BudgetProvider）
- * 5. 发放奖品到用户背包
- * 6. 更新用户配额（如果有）
+ * 1. 扣减用户积分（从 PricingStage 获取 draw_cost）
+ * 2. 创建抽奖记录（lottery_draws）
+ * 3. 记录决策快照（lottery_draw_decisions）
+ * 4. 扣减奖品库存
+ * 5. 扣减用户预算（通过 BudgetProvider）
+ * 6. 发放奖品到用户背包
+ * 7. 更新用户配额（如果有）
  *
  * 输出到上下文：
  * - draw_record: 创建的抽奖记录
@@ -22,9 +23,15 @@
  * - 幂等性控制：通过 idempotency_key 防止重复执行
  * - 失败时事务回滚，保证数据一致性
  *
+ * ⚠️ 关键约束（Phase 2 增强 - 2026-01-18）：
+ * - **禁止硬编码默认值**：draw_cost 必须从 PricingStage 获取
+ * - **幂等键派生规则**：:consume（积分扣减）/ :reward_N（奖品发放）
+ * - **连抽场景**：支持 skip_points_deduction 跳过积分扣减
+ *
  * @module services/UnifiedLotteryEngine/pipeline/stages/SettleStage
  * @author 统一抽奖架构重构
  * @since 2026-01-18
+ * @updated 2026-01-19 - Phase 2 增强（积分扣减、派生幂等键）
  */
 
 const BaseStage = require('./BaseStage')
@@ -65,12 +72,22 @@ class SettleStage extends BaseStage {
    * @param {string} context.lottery_session_id - 抽奖会话ID
    * @param {Object} context.transaction - 外部事务（可选）
    * @param {Object} context.stage_results - 前置Stage的执行结果
+   * @param {boolean} context.skip_points_deduction - 是否跳过积分扣减（连抽子请求）
+   * @param {number} context.current_draw_index - 连抽时当前抽奖索引（用于派生幂等键）
+   * @param {number} context.draw_count - 抽奖次数（1=单抽，>1=连抽）
    * @returns {Promise<Object>} Stage 执行结果
    */
   async execute(context) {
-    const { user_id, campaign_id, idempotency_key, lottery_session_id } = context
+    const {
+      user_id,
+      campaign_id,
+      idempotency_key,
+      lottery_session_id,
+      draw_count = 1, // 🆕 支持连抽次数
+      batch_id = null // 🆕 Phase 2：连抽批次ID（由外层生成）
+    } = context
 
-    this.log('info', '开始结算阶段', { user_id, campaign_id, idempotency_key })
+    this.log('info', '开始结算阶段', { user_id, campaign_id, idempotency_key, draw_count })
 
     // 幂等性检查
     const existing_draw = await this._checkIdempotency(idempotency_key)
@@ -101,6 +118,20 @@ class SettleStage extends BaseStage {
 
     const { decision_snapshot, final_prize, final_tier, guarantee_triggered } = decision_data
 
+    /*
+     * ========== 🆕 Phase 2 增强：获取定价信息 ==========
+     * 🔴 禁止硬编码默认值，draw_cost 必须从 PricingStage 获取
+     */
+    const pricing_data = this.getContextData(context, 'PricingStage.data')
+    if (!pricing_data || pricing_data.draw_cost === undefined) {
+      throw this.createError(
+        'PricingStage 未提供 draw_cost，请确保 PricingStage 已执行',
+        'MISSING_PRICING_DATA',
+        true
+      )
+    }
+    const draw_cost = pricing_data.draw_cost
+
     // 获取预算上下文
     const budget_data = this.getContextData(context, 'BudgetContextStage.data') || {}
     const budget_provider = context.stage_data?.budget_provider
@@ -113,10 +144,60 @@ class SettleStage extends BaseStage {
       // 1. 生成唯一的抽奖ID
       const draw_id = this._generateDrawId(user_id)
 
+      /*
+       * ========== 🆕 Phase 2 增强：扣减用户积分 ==========
+       * 🔴 连抽场景：检查是否跳过积分扣减（由外层统一处理）
+       */
+      const skip_points_deduction = context.skip_points_deduction === true
+      let points_deducted = 0
+
+      if (draw_cost > 0 && !skip_points_deduction) {
+        /*
+         * 🔴 幂等键派生规则（与旧链路一致）：idempotency_key + ':consume'
+         * 确保重复请求时不会重复扣减积分
+         */
+        const consume_idempotency_key = `${idempotency_key}:consume`
+
+        // eslint-disable-next-line no-restricted-syntax -- transaction 已正确传递
+        await AssetService.changeBalance(
+          {
+            user_id,
+            asset_code: 'POINTS',
+            delta_amount: -draw_cost,
+            idempotency_key: consume_idempotency_key, // 🔴 派生幂等键
+            lottery_session_id,
+            business_type: 'lottery_consume', // 🔴 与旧链路一致
+            meta: {
+              source_type: 'system',
+              title: '抽奖消耗',
+              description: `抽奖消耗 ${draw_cost} 积分`,
+              draw_count,
+              discount_applied: pricing_data.saved_points || 0
+            }
+          },
+          { transaction }
+        )
+
+        points_deducted = draw_cost
+
+        this.log('info', '用户积分扣减成功', {
+          user_id,
+          draw_cost,
+          idempotency_key: consume_idempotency_key,
+          skip_points_deduction
+        })
+      } else if (skip_points_deduction) {
+        this.log('info', '跳过积分扣减（连抽子请求）', {
+          user_id,
+          draw_cost,
+          reason: 'skip_points_deduction=true'
+        })
+      }
+
       // 2. 扣减奖品库存
       await this._deductPrizeStock(final_prize, transaction)
 
-      // 3. 扣减用户预算
+      // 3. 扣减用户预算（如果有 BudgetProvider）
       let budget_deducted = 0
       if (budget_provider && final_prize.prize_value_points > 0) {
         budget_deducted = await this._deductBudget(
@@ -132,14 +213,20 @@ class SettleStage extends BaseStage {
         )
       }
 
-      // 4. 发放奖品到用户背包
+      /*
+       * ========== 🆕 Phase 2 增强：使用派生幂等键发奖 ==========
+       * 🔴 幂等键派生规则：idempotency_key + ':reward_' + index
+       */
+      const reward_index = context.current_draw_index || 0
+      const reward_idempotency_key = `${idempotency_key}:reward_${reward_index}`
+
       await this._distributePrize(user_id, final_prize, {
-        idempotency_key,
+        idempotency_key: reward_idempotency_key, // 🔴 使用派生幂等键
         lottery_session_id,
         transaction
       })
 
-      // 5. 创建抽奖记录
+      // 5. 创建抽奖记录（使用真实的 draw_cost）
       const draw_record = await this._createDrawRecord({
         draw_id,
         user_id,
@@ -151,6 +238,10 @@ class SettleStage extends BaseStage {
         lottery_session_id,
         budget_data,
         budget_deducted,
+        points_deducted, // 🆕 传递积分扣减信息
+        draw_cost, // 🆕 传递抽奖成本
+        draw_count, // 🆕 传递抽奖次数
+        batch_id, // 🆕 Phase 2：连抽批次ID
         transaction
       })
 
@@ -185,7 +276,11 @@ class SettleStage extends BaseStage {
           reward_tier: final_tier,
           guarantee_triggered,
           budget_deducted,
-          budget_after: budget_data.budget_before - budget_deducted
+          budget_after: budget_data.budget_before - budget_deducted,
+          // 🆕 增加积分扣减信息
+          draw_cost,
+          points_deducted,
+          skip_points_deduction
         }
       }
 
@@ -195,7 +290,9 @@ class SettleStage extends BaseStage {
         draw_id,
         prize_id: final_prize.prize_id,
         prize_name: final_prize.prize_name,
-        budget_deducted
+        budget_deducted,
+        draw_cost, // 🆕 增加日志
+        points_deducted // 🆕 增加日志
       })
 
       return this.success(result)
@@ -333,6 +430,7 @@ class SettleStage extends BaseStage {
       switch (prize.prize_type) {
         case 'points':
           // 积分奖品：增加用户积分
+          // eslint-disable-next-line no-restricted-syntax -- transaction 已正确传递
           await AssetService.changeBalance(
             {
               user_id,
@@ -376,6 +474,7 @@ class SettleStage extends BaseStage {
         case 'virtual':
           // 虚拟资产：写入材料余额
           if (prize.material_asset_code && prize.material_amount) {
+            // eslint-disable-next-line no-restricted-syntax -- transaction 已正确传递
             await AssetService.changeBalance(
               {
                 user_id,
@@ -419,6 +518,21 @@ class SettleStage extends BaseStage {
    * 创建抽奖记录
    *
    * @param {Object} params - 参数
+   * @param {string} params.draw_id - 抽奖ID
+   * @param {number} params.user_id - 用户ID
+   * @param {number} params.campaign_id - 活动ID
+   * @param {Object} params.final_prize - 中奖奖品
+   * @param {string} params.final_tier - 最终档位
+   * @param {boolean} params.guarantee_triggered - 是否触发保底
+   * @param {string} params.idempotency_key - 幂等键
+   * @param {string} params.lottery_session_id - 抽奖会话ID
+   * @param {Object} params.budget_data - 预算数据
+   * @param {number} params.budget_deducted - 预算扣减金额
+   * @param {number} params.points_deducted - 积分扣减金额（🆕 Phase 2）
+   * @param {number} params.draw_cost - 抽奖成本（🆕 Phase 2，从 PricingStage 获取）
+   * @param {number} params.draw_count - 抽奖次数（🆕 Phase 2，1=单抽，>1=连抽）
+   * @param {string} params.batch_id - 批次ID（🆕 Phase 2，连抽批次标识）
+   * @param {Object} params.transaction - 事务对象
    * @returns {Promise<Object>} 抽奖记录
    * @private
    */
@@ -434,11 +548,22 @@ class SettleStage extends BaseStage {
       lottery_session_id,
       budget_data,
       budget_deducted,
+      points_deducted = 0, // 🆕 Phase 2：积分扣减金额
+      draw_cost = 0, // 🆕 Phase 2：抽奖成本（禁止硬编码）
+      draw_count = 1, // 🆕 Phase 2：抽奖次数
+      batch_id = null, // 🆕 Phase 2：连抽批次ID
       transaction
     } = params
 
     // 生成业务唯一键
     const business_id = `lottery_draw_${user_id}_${lottery_session_id || 'no_session'}_${draw_id}`
+
+    /*
+     * 🆕 Phase 2 增强：
+     * - draw_type：根据 draw_count 动态确定（single/multi）
+     * - cost_points：使用真实的 draw_cost（从 PricingStage 获取），禁止硬编码
+     */
+    const draw_type = draw_count > 1 ? 'multi' : 'single'
 
     return await LotteryDraw.create(
       {
@@ -449,17 +574,19 @@ class SettleStage extends BaseStage {
         user_id,
         lottery_id: campaign_id,
         campaign_id,
-        draw_type: 'single',
+        draw_type, // 🆕 动态确定（single/multi）
+        batch_id, // 🆕 Phase 2：连抽批次ID（null 表示单抽）
         prize_id: final_prize.prize_id,
         prize_name: final_prize.prize_name,
         prize_type: final_prize.prize_type,
         prize_value: final_prize.prize_value,
-        cost_points: 100, // 默认抽奖消耗积分
+        cost_points: draw_cost, // 🆕 使用真实的 draw_cost（禁止硬编码 100）
         reward_tier: final_tier,
         guarantee_triggered,
         prize_value_points: final_prize.prize_value_points || 0,
         budget_points_before: budget_data.budget_before || null,
         budget_points_after: (budget_data.budget_before || 0) - budget_deducted,
+        points_deducted, // 🆕 记录实际积分扣减金额
         created_at: BeijingTimeHelper.createBeijingTime()
       },
       { transaction }

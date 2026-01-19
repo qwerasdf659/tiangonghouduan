@@ -337,6 +337,7 @@ class AssetConversionService {
      * 步骤1：扣减源材料（使用统一账本AssetService）
      * business_type: material_convert_debit
      */
+    // eslint-disable-next-line no-restricted-syntax -- transaction 已正确传递
     const from_result = await AssetService.changeBalance(
       {
         user_id,
@@ -358,6 +359,7 @@ class AssetConversionService {
      * business_type: material_convert_credit
      * 注意：入账金额为 net_to_amount（已扣除手续费）
      */
+    // eslint-disable-next-line no-restricted-syntax -- transaction 已正确传递
     const to_result = await AssetService.changeBalance(
       {
         user_id,
@@ -381,6 +383,7 @@ class AssetConversionService {
      */
     let fee_result = null
     if (fee_amount > 0) {
+      // eslint-disable-next-line no-restricted-syntax -- transaction 已正确传递
       fee_result = await AssetService.changeBalance(
         {
           system_code: 'SYSTEM_PLATFORM_FEE', // 系统账户

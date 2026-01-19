@@ -120,9 +120,15 @@ router.get('/config/:campaignCode', authenticateToken, dataAccessControl, async 
     // 使用campaign.campaign_id获取完整配置（内部仍用ID）
     const fullConfig = await lottery_engine.get_campaign_config(campaign.campaign_id)
 
-    // 🔴 从 DB 读取单抽价格并动态计算连抽定价（配置管理三层分离方案）
-    const businessConfig = require('../../../config/business.config')
-    // P1-9：通过 ServiceManager 获取服务（snake_case key）
+    /*
+     * 🔴 从 lottery_campaign_pricing_config 表读取定价配置
+     *
+     * 配置来源优先级（Phase 3 已拍板 2026-01-19）：
+     * 1. lottery_campaign_pricing_config 表（活动级版本化配置，优先）
+     * 2. campaign.prize_distribution_config.draw_pricing（降级兼容）
+     * 3. 系统默认配置（最终兜底）
+     */
+    const { LotteryCampaignPricingConfig } = require('../../../models')
     const AdminSystemService = req.app.locals.services.getService('admin_system')
 
     // 读取单抽价格（严格模式：配置缺失直接报错）
@@ -133,22 +139,72 @@ router.get('/config/:campaignCode', authenticateToken, dataAccessControl, async 
       { strict: true }
     )
 
-    // 动态计算默认连抽定价（基于 DB 读取的单抽价格）
-    const drawTypes = businessConfig.lottery.draw_types
-    const defaultPricing = {}
-    for (const [type, config] of Object.entries(drawTypes)) {
-      defaultPricing[type] = {
-        count: config.count,
-        discount: config.discount,
-        label: config.label,
-        per_draw: Math.floor(singleDrawCost * config.discount),
-        total_cost: Math.floor(singleDrawCost * config.count * config.discount)
+    // 尝试从 pricing_config 表读取配置
+    let drawPricing = null
+    let isConfigMissing = true
+
+    try {
+      const pricingConfig = await LotteryCampaignPricingConfig.getActivePricingConfig(
+        campaign.campaign_id
+      )
+      if (pricingConfig && pricingConfig.pricing_config) {
+        // 从新表获取配置
+        const discountTiers = pricingConfig.pricing_config.discount_tiers || []
+        if (discountTiers.length > 0) {
+          drawPricing = {}
+          discountTiers.forEach(tier => {
+            if (tier.enabled !== false) {
+              const key =
+                tier.count === 1
+                  ? 'single'
+                  : tier.count === 3
+                    ? 'triple'
+                    : tier.count === 5
+                      ? 'five'
+                      : tier.count === 10
+                        ? 'ten'
+                        : `x${tier.count}`
+              drawPricing[key] = {
+                count: tier.count,
+                discount: tier.discount || 1.0,
+                label: tier.label || `${tier.count}连抽`,
+                per_draw: Math.floor(singleDrawCost * (tier.discount || 1.0)),
+                total_cost: Math.floor(singleDrawCost * tier.count * (tier.discount || 1.0))
+              }
+            }
+          })
+          isConfigMissing = false
+        }
       }
+    } catch (err) {
+      logger.warn(`[CONFIG_WARN] 读取活动 ${campaign_code} 定价配置失败: ${err.message}`)
     }
 
-    // 检查活动是否有自定义定价配置
-    const isConfigMissing = !campaign.prize_distribution_config?.draw_pricing
-    const drawPricing = campaign.prize_distribution_config?.draw_pricing || defaultPricing
+    // 降级：使用活动JSON配置
+    if (!drawPricing && campaign.prize_distribution_config?.draw_pricing) {
+      drawPricing = campaign.prize_distribution_config.draw_pricing
+      isConfigMissing = false
+    }
+
+    // 最终兜底：使用系统默认配置
+    if (!drawPricing) {
+      const defaultDiscounts = {
+        single: { count: 1, discount: 1.0, label: '单抽' },
+        triple: { count: 3, discount: 1.0, label: '3连抽' },
+        five: { count: 5, discount: 1.0, label: '5连抽' },
+        ten: { count: 10, discount: 0.9, label: '10连抽(九折)' }
+      }
+      drawPricing = {}
+      for (const [type, config] of Object.entries(defaultDiscounts)) {
+        drawPricing[type] = {
+          count: config.count,
+          discount: config.discount,
+          label: config.label,
+          per_draw: Math.floor(singleDrawCost * config.discount),
+          total_cost: Math.floor(singleDrawCost * config.count * config.discount)
+        }
+      }
+    }
 
     // 如果配置缺失，记录告警日志
     if (isConfigMissing) {

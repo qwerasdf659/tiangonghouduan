@@ -50,11 +50,19 @@ function getSharedComponents(serviceManager = null) {
   const {
     UnifiedLotteryEngine
   } = require('../../../../services/UnifiedLotteryEngine/UnifiedLotteryEngine')
+  const DrawOrchestrator = require('../../../../services/UnifiedLotteryEngine/pipeline/DrawOrchestrator')
   const ManagementStrategy = require('../../../../services/UnifiedLotteryEngine/strategies/ManagementStrategy')
   const PerformanceMonitor = require('../../../../services/UnifiedLotteryEngine/utils/PerformanceMonitor')
 
   _sharedComponents = {
     lotteryEngine: new UnifiedLotteryEngine(),
+    /**
+     * V4.6 管线编排器（2026-01-19 Phase 5 迁移）
+     *
+     * drawOrchestrator: 抽奖执行入口（替代原 basic_guarantee_strategy）
+     * managementStrategy: 管理操作 API（forceWin/forceLose 等）- 继续保留
+     */
+    drawOrchestrator: new DrawOrchestrator(),
     managementStrategy: new ManagementStrategy(),
     performanceMonitor: new PerformanceMonitor(),
     logger
@@ -76,7 +84,20 @@ const sharedComponents = {
     return getSharedComponents().lotteryEngine
   },
   /**
-   * 获取管理策略实例
+   * V4.6 管线编排器（2026-01-19 Phase 5 迁移）
+   *
+   * 获取管线编排器实例（抽奖执行入口）
+   *
+   * @returns {Object} 管线编排器实例
+   */
+  get drawOrchestrator() {
+    return getSharedComponents().drawOrchestrator
+  },
+  /**
+   * 获取管理策略实例（管理操作 API）
+   *
+   * 用途：forceWin/forceLose/getUserStatus/clearUserSettings 等管理操作
+   *
    * @returns {Object} 管理策略实例
    */
   get managementStrategy() {

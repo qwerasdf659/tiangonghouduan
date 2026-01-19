@@ -1,64 +1,75 @@
 /**
- * 餐厅积分抽奖系统 V4.0统一引擎架构 - 统一抽奖引擎（UnifiedLotteryEngine）
+ * 餐厅积分抽奖系统 V4.6 统一引擎架构 - 统一抽奖引擎（UnifiedLotteryEngine）
  *
- * 业务场景：提供统一的抽奖服务入口，整合所有抽奖决策逻辑，支持多种抽奖策略和业务规则
+ * 业务场景：提供统一的抽奖服务入口，整合所有抽奖决策逻辑，使用 Pipeline 管线架构
+ *
+ * ⚠️ V4.6 架构重构说明（2026-01-19 Phase 5 迁移）：
+ * - **策略模式已废弃**：原 BasicGuaranteeStrategy 已移除
+ * - **管线架构替代**：使用 DrawOrchestrator 编排 Pipeline 管线
+ * - **ManagementStrategy 保留**：仅用于管理 API（非抽奖执行）
  *
  * 核心功能：
- * 1. 抽奖策略管理（基础保底策略、管理预设策略）
- * 2. 抽奖执行入口（executeLottery统一入口，策略链执行）
- * 3. 性能监控（执行时间、成功率、策略使用统计）
+ * 1. 管线编排管理（DrawOrchestrator 编排 3 种管线）
+ * 2. 抽奖执行入口（executeLottery → DrawOrchestrator.execute）
+ * 3. 性能监控（执行时间、成功率、管线使用统计）
  * 4. 缓存管理（奖品配置缓存、用户抽奖次数缓存）
  * 5. 日志追踪（完整的执行日志、错误追踪、审计记录）
  *
- * 业务流程：
+ * V4.6 业务流程（Phase 5 统一管线架构 - 2026-01-19）：
  *
- * 1. **普通用户抽奖流程**（basic_guarantee策略）
- *    - 用户发起抽奖 → executeLottery()统一入口
+ * ⚠️ Phase 5 架构变更：原 3 条管线已合并为 1 条统一管线（NormalDrawPipeline）
+ * - 决策来源判断由 LoadDecisionSourceStage 在管线内统一处理
+ * - 预设/覆盖/普通 三种模式通过 decision_source 字段区分
+ *
+ * 1. **统一抽奖流程**（NormalDrawPipeline + LoadDecisionSourceStage）
+ *    - 用户发起抽奖 → executeLottery() → DrawOrchestrator.execute()
  *    - 检查抽奖资格（积分余额、每日次数限制、活动有效性）
- *    - 执行basic_guarantee策略 → 概率计算、保底机制触发
+ *    - LoadDecisionSourceStage 检查决策来源（preset > override > normal）
+ *    - 执行统一管线 → 概率计算、保底机制触发
  *    - 从奖品池选择奖品 → 100%中奖（只是奖品价值不同）
  *    - 创建抽奖记录、扣除积分、创建用户库存
  *
- * 2. **管理员预设抽奖流程**（management策略）
- *    - 管理员创建预设中奖记录 → 指定用户、奖品、原因
- *    - 用户发起抽奖 → executeLottery()检查是否有预设记录
- *    - 执行management策略 → 优先返回预设奖品
- *    - 消耗预设记录 → 创建抽奖记录、扣除积分、创建用户库存
+ * 2. **决策来源优先级**
+ *    - preset（预设奖品）：管理员预设的中奖记录，最高优先级
+ *    - override（管理干预）：管理员临时干预，次高优先级
+ *    - normal（正常抽奖）：默认流程，按权重选择奖品
  *
- * 3. **策略链执行流程**
- *    - Step 1: getExecutionChain()获取策略执行链 → ['management', 'basic_guarantee']
- *    - Step 2: 按顺序执行策略，management策略优先
- *    - Step 3: 策略验证（validateStrategy）→ 策略启用状态检查
- *    - Step 4: 策略执行（executeWithTimeout）→ 超时保护（默认30秒）
- *    - Step 5: 结果标准化（normalizeStrategyResult）→ 统一返回格式
+ * 3. **管线执行流程**
+ *    - Step 1: DrawOrchestrator.execute() 接收抽奖上下文
+ *    - Step 2: 统一执行 NormalDrawPipeline（内含决策来源判断）
+ *    - Step 3: 管线内部执行各 Stage（决策来源 → 验证 → 选奖 → 结算 → 记录）
+ *    - Step 4: 结果标准化并返回
  *
  * 设计原则：
- * - **策略模式应用**：支持多种抽奖策略（基础保底、管理预设），策略可扩展
- * - **责任链模式**：策略按优先级顺序执行，先执行management再执行basic_guarantee
+ * - **管线模式应用**：使用 Pipeline + Stage 架构，替代原策略模式
+ * - **编排器模式**：DrawOrchestrator 统一编排所有管线
  * - **事务安全保障**：支持外部事务传入，确保抽奖、扣分、创建库存的原子性
- * - **性能监控完善**：记录每次执行的时间、成功率、策略使用情况
- * - **超时保护机制**：默认30秒超时，防止策略执行过长阻塞服务
+ * - **性能监控完善**：记录每次执行的时间、成功率、管线使用情况
+ * - **超时保护机制**：默认30秒超时，防止管线执行过长阻塞服务
  * - **缓存优化性能**：奖品配置、用户抽奖次数使用缓存，减少数据库查询
  * - **日志完整追踪**：详细的执行日志（INFO/DEBUG/ERROR三级），便于问题排查
  *
- * V4架构特点：
- * - **只保留2种策略**：BasicGuaranteeStrategy（基础+保底合并）+ ManagementStrategy（管理预设）
+ * V4.6 Phase 5 架构特点：
+ * - **1 条统一管线**：NormalDrawPipeline（整合原 3 条管线功能）
+ * - **决策来源 Stage**：LoadDecisionSourceStage 统一判断 preset/override/normal
  * - **100%中奖机制**：每次抽奖必定从奖品池选择一个奖品（不存在"不中奖"逻辑）
- * - **保底机制集成**：保底逻辑整合在BasicGuaranteeStrategy中，不再单独策略
- * - **统一事务管理**：所有策略执行支持外部事务，确保数据一致性
+ * - **保底机制集成**：保底逻辑整合在 GuaranteeStage 中
+ * - **统一事务管理**：所有管线执行支持外部事务，确保数据一致性
+ * - **ManagementStrategy 保留**：仅用于管理 API（如强制中奖、查询历史）
  *
  * 关键方法列表：
- * - executeLottery() - 统一抽奖执行入口（支持外部事务）
- * - initializeStrategies() - 初始化V4两种策略（basic_guarantee、management）
- * - getExecutionChain() - 获取策略执行链（根据上下文决定执行顺序）
- * - executeWithTimeout() - 带超时保护的策略执行（默认30秒）
- * - normalizeStrategyResult() - 标准化策略返回结果（统一数据格式）
- * - updateMetrics() - 更新性能指标（执行时间、成功率、策略使用统计）
+ * - executeLottery() - 统一抽奖执行入口（委托给 DrawOrchestrator）
+ * - getHealthStatus() - 获取引擎健康状态（Pipeline 模式）
+ * - healthCheck() - 健康检查（Pipeline 状态）
+ * - getMetrics() - 获取性能指标
+ * - updateMetrics() - 更新性能指标（执行时间、成功率、管线使用统计）
  * - getEngineHealth() - 获取引擎健康状态（运行时长、成功率、平均执行时间）
  *
- * 组件依赖：
- * - BasicGuaranteeStrategy：基础抽奖+保底机制策略（核心策略）
- * - ManagementStrategy：管理预设策略（特殊场景）
+ * 组件依赖（Phase 5 统一架构）：
+ * - DrawOrchestrator：管线编排器（核心执行入口）
+ * - NormalDrawPipeline：统一抽奖管线（整合 preset/override/normal）
+ * - LoadDecisionSourceStage：决策来源判断 Stage
+ * - ManagementStrategy：管理操作策略（仅用于管理 API）
  * - PerformanceMonitor：性能监控组件（执行时间、慢查询告警）
  * - CacheManager：缓存管理组件（奖品配置、用户次数）
  * - Logger：日志组件（INFO/DEBUG/ERROR三级日志）
@@ -72,7 +83,7 @@
  *
  * 性能指标：
  * - 平均执行时间：< 500ms（不含数据库写入）
- * - 策略执行超时：30秒（可配置）
+ * - 管线执行超时：30秒（可配置）
  * - 缓存命中率：> 80%（奖品配置缓存）
  * - 成功率：> 99%（排除用户资格不足）
  *
@@ -124,10 +135,17 @@
  */
 
 const BeijingTimeHelper = require('../../utils/timeHelper')
-const BasicGuaranteeStrategy = require('./strategies/BasicGuaranteeStrategy')
-const ManagementStrategy = require('./strategies/ManagementStrategy')
 const PerformanceMonitor = require('./utils/PerformanceMonitor')
 const CacheManager = require('./utils/CacheManager')
+
+/**
+ * V4.6 管线编排器（2026-01-19 Phase 5 迁移）
+ *
+ * 替代原 Strategy 模式，统一使用 Pipeline 架构
+ *
+ * @see docs/抽奖模块Strategy到Pipeline迁移方案新.md
+ */
+const DrawOrchestrator = require('./pipeline/DrawOrchestrator')
 
 /**
  * 业务缓存助手（2026-01-03 Redis L2 缓存方案）
@@ -170,9 +188,19 @@ class UnifiedLotteryEngine {
     this.cacheManager = new CacheManager()
     this.logger = require('../../utils/logger').logger
 
-    // 策略管理
-    this.strategies = new Map()
-    this.initializeStrategies()
+    /**
+     * V4.6 管线编排器（2026-01-19 Phase 5 迁移）
+     *
+     * 替代原 Strategy 模式：
+     * - 旧链路：strategies → executeLottery → 策略链执行
+     * - 新链路：drawOrchestrator → Pipeline(Stages) → 统一结算
+     *
+     * @type {DrawOrchestrator}
+     */
+    this.drawOrchestrator = new DrawOrchestrator({
+      enable_preset: true,
+      enable_override: true
+    })
 
     // 性能指标（统一使用 snake_case 命名）
     this.metrics = {
@@ -180,185 +208,76 @@ class UnifiedLotteryEngine {
       successful_executions: 0,
       average_execution_time: 0,
       execution_times: [],
-      strategies_used: {},
+      pipelines_used: {}, // 🔄 从 strategies_used 改为 pipelines_used
       last_reset_time: BeijingTimeHelper.now()
     }
 
     // 启动时间戳
     this.startTime = BeijingTimeHelper.timestamp()
 
-    this.logInfo('V4统一抽奖引擎初始化完成', {
+    this.logInfo('V4.6统一抽奖引擎初始化完成（Pipeline 模式）', {
       version: this.version,
-      strategiesCount: this.strategies.size,
+      orchestrator_status: this.drawOrchestrator.getStatus(),
       enableMetrics: this.config.enableMetrics
     })
   }
 
   /**
-   * 初始化V4两种策略
-   *
-   * @returns {void} 无返回值
-   */
-  initializeStrategies() {
-    try {
-      // 基础抽奖保底策略（合并了基础抽奖和保底机制）
-      const basicGuaranteeStrategy = new BasicGuaranteeStrategy()
-      this.strategies.set('basic_guarantee', basicGuaranteeStrategy)
-
-      // 管理策略
-      const managementStrategy = new ManagementStrategy()
-      this.strategies.set('management', managementStrategy)
-
-      this.logInfo('V4抽奖策略初始化完成', {
-        strategies: ['basic_guarantee', 'management']
-      })
-    } catch (error) {
-      this.logError('策略初始化失败', { error: error.message })
-      throw error
-    }
-  }
-
-  /**
    * 统一抽奖执行入口
-   * @param {Object} context 抽奖上下文
-   * @param {Transaction} transaction 外部事务对象（可选，用于连抽统一事务保护）
-   * @returns {Object} 抽奖结果
+   *
+   * V4.6 重构（2026-01-19 Phase 5 迁移）：
+   * - 旧实现：Strategy 链式执行
+   * - 新实现：DrawOrchestrator 编排 Pipeline 执行
+   *
+   * @param {Object} context - 抽奖上下文
+   * @param {number} context.user_id - 用户ID
+   * @param {number} context.campaign_id - 活动ID
+   * @param {string} context.idempotency_key - 幂等键
+   * @param {Object} context.user_status - 用户状态（可选）
+   * @param {Transaction} transaction - 外部事务对象（可选，用于连抽统一事务保护）
+   * @returns {Promise<Object>} 抽奖结果
    */
   async executeLottery(context, transaction = null) {
     const startTime = BeijingTimeHelper.timestamp()
     const executionId = this.generateExecutionId()
 
     try {
-      this.logInfo('开始执行抽奖', {
+      this.logInfo('开始执行抽奖（Pipeline 模式）', {
         executionId,
-        user_id: context?.user_id || context?.user_id,
-        campaignId: context?.campaign_id || context?.campaignId,
+        user_id: context?.user_id,
+        campaign_id: context?.campaign_id,
         hasExternalTransaction: !!transaction
       })
 
-      // 直接使用传入的上下文，添加执行信息
-      const executionContext = {
+      // 构建 Pipeline 上下文
+      const pipelineContext = {
         execution_id: executionId,
         timestamp: this.getBeijingTimestamp(),
         engine_version: this.version,
+        transaction, // 传递外部事务
         ...context
       }
 
-      // 🎯 V4.1新增：检查用户是否有管理设置（强制中奖、强制不中奖、概率调整、用户队列）
-      const managementStrategy = this.strategies.get('management')
-      if (managementStrategy && managementStrategy.instance) {
-        try {
-          const managementStatus = await managementStrategy.instance.getUserManagementStatus(
-            context.user_id
-          )
+      /**
+       * V4.6 核心改动：使用 DrawOrchestrator 替代 Strategy 链
+       *
+       * DrawOrchestrator 职责：
+       * 1. 根据上下文选择管线（Preset > Override > Normal）
+       * 2. 执行管线（各 Stage 顺序执行）
+       * 3. 返回统一的结果格式
+       */
+      const orchestratorResult = await this.drawOrchestrator.execute(pipelineContext)
 
-          // 将管理设置注入到上下文中，供策略使用
-          if (
-            managementStatus.force_win ||
-            managementStatus.force_lose ||
-            managementStatus.probability_adjust ||
-            managementStatus.user_queue
-          ) {
-            executionContext.managementSettings = managementStatus
-
-            this.logInfo('检测到用户管理设置', {
-              user_id: context.user_id,
-              hasForceWin: !!managementStatus.force_win,
-              hasForceLose: !!managementStatus.force_lose,
-              hasProbabilityAdjust: !!managementStatus.probability_adjust,
-              hasUserQueue: !!managementStatus.user_queue
-            })
-          }
-        } catch (error) {
-          this.logError('获取用户管理设置失败', {
-            user_id: context.user_id,
-            error: error.message
-          })
-          // 即使获取失败也继续执行，不影响正常抽奖流程
-        }
-      }
-
-      // 获取策略执行链
-      const strategyChain = this.getExecutionChain(executionContext)
-
-      // 执行策略链
-      let finalResult = null
-      for (const strategyName of strategyChain) {
-        const strategy = this.strategies.get(strategyName)
-
-        if (!strategy || !strategy.enabled) {
-          this.logDebug(`跳过未启用的策略: ${strategyName}`)
-          continue
-        }
-
-        try {
-          // 策略验证
-          // eslint-disable-next-line no-await-in-loop -- 策略按优先级串行执行
-          const isValid = await this.validateStrategy(strategy, executionContext)
-          if (!isValid) {
-            this.logDebug(`策略验证失败: ${strategyName}`)
-            continue
-          }
-
-          // 执行策略（传递transaction参数）
-          // eslint-disable-next-line no-await-in-loop -- 策略按优先级串行执行
-          const strategyResult = await this.executeWithTimeout(
-            strategy,
-            executionContext,
-            transaction
-          )
-
-          if (strategyResult.success) {
-            this.logInfo(`策略执行成功: ${strategyName}`, {
-              executionId,
-              strategy: strategyName
-            })
-
-            // 标准化策略结果
-            finalResult = this.normalizeStrategyResult(strategyResult, strategyName)
-            finalResult.strategy_used = strategyName
-            finalResult.execution_id = executionId
-            finalResult.engine_version = this.version
-            finalResult.timestamp = this.getBeijingTimestamp()
-
-            // 管理策略特殊处理：检查是否需要继续执行
-            if (strategyName === 'management' && strategyResult.shouldContinue) {
-              this.logDebug('管理策略指示继续执行其他策略')
-              continue
-            }
-
-            break
-          } else {
-            this.logDebug(`策略执行失败: ${strategyName}`, {
-              error: strategyResult.error || strategyResult.message
-            })
-          }
-        } catch (error) {
-          this.logError(`策略执行异常: ${strategyName}`, {
-            error: error.message,
-            executionId
-          })
-          continue
-        }
-      }
-
-      // 检查是否有成功的结果
-      if (!finalResult) {
-        const executionTime = BeijingTimeHelper.timestamp() - startTime
-        this.updateMetrics(startTime, false, null)
-        return this.createEngineError('所有策略执行失败', {
-          availableStrategies: strategyChain,
-          executionTime
-        })
-      }
+      // 格式化结果为标准抽奖返回格式
+      const finalResult = this._formatOrchestratorResult(orchestratorResult, executionId)
 
       // 更新性能指标
-      this.updateMetrics(startTime, true, finalResult.strategy_used)
+      this.updateMetrics(startTime, finalResult.success, orchestratorResult.pipeline_type)
 
-      this.logInfo('抽奖执行完成', {
+      this.logInfo('抽奖执行完成（Pipeline 模式）', {
         executionId,
         success: finalResult.success,
-        strategy: finalResult.strategy_used,
+        pipeline_type: orchestratorResult.pipeline_type,
         executionTime: BeijingTimeHelper.timestamp() - startTime
       })
 
@@ -378,19 +297,70 @@ class UnifiedLotteryEngine {
   }
 
   /**
-   * 获取策略执行链
+   * 格式化 DrawOrchestrator 返回结果为标准抽奖格式
    *
-   * @param {Object} context - 抽奖上下文
-   * @returns {Array<string>} 策略名称数组
+   * 将 Pipeline 执行结果转换为与旧 Strategy 模式兼容的返回格式
+   *
+   * @param {Object} orchestratorResult - DrawOrchestrator.execute 返回结果
+   * @param {string} executionId - 执行ID
+   * @returns {Object} 标准化的抽奖结果
+   * @private
    */
-  getExecutionChain(context) {
-    // 管理员操作优先使用管理策略
-    if (context.operationType === 'admin_preset' || context.operation_type === 'admin_preset') {
-      return ['management']
+  _formatOrchestratorResult(orchestratorResult, executionId) {
+    // 失败情况处理
+    if (!orchestratorResult.success) {
+      return {
+        success: false,
+        message: orchestratorResult.error || '抽奖执行失败',
+        code: orchestratorResult.context?.errors?.[0]?.code || 'DRAW_FAILED',
+        execution_id: executionId,
+        engine_version: this.version,
+        timestamp: this.getBeijingTimestamp()
+      }
     }
 
-    // 默认策略链：基础抽奖保底策略（合并了保底和基础抽奖功能）
-    return ['basic_guarantee']
+    // 获取 SettleStage 的结算数据
+    const settleData = orchestratorResult.context?.stage_results?.SettleStage?.data
+    if (!settleData) {
+      return {
+        success: false,
+        message: 'SettleStage 未返回数据',
+        code: 'SETTLE_MISSING',
+        execution_id: executionId,
+        engine_version: this.version,
+        timestamp: this.getBeijingTimestamp()
+      }
+    }
+
+    // 构建标准返回格式（兼容原 Strategy 模式返回结构）
+    const drawRecord = settleData.draw_record || {}
+    const settleResult = settleData.settle_result || {}
+
+    return {
+      success: true,
+      message: '抽奖成功',
+      data: {
+        draw_result: {
+          draw_id: drawRecord.draw_id,
+          prize_id: drawRecord.prize_id,
+          prize_name: drawRecord.prize_name,
+          prize_type: drawRecord.prize_type,
+          prize_value: drawRecord.prize_value,
+          reward_tier: drawRecord.reward_tier,
+          guarantee_triggered: drawRecord.guarantee_triggered || false,
+          points_cost: settleResult.draw_cost || 100,
+          sort_order: drawRecord.sort_order
+        }
+      },
+      // 元数据
+      pipeline_type: orchestratorResult.pipeline_type,
+      selection_reason: orchestratorResult.selection_reason,
+      execution_id: executionId,
+      engine_version: this.version,
+      timestamp: this.getBeijingTimestamp(),
+      // 🔄 兼容旧 Strategy 模式的字段映射
+      strategy_used: `pipeline_${orchestratorResult.pipeline_type}`
+    }
   }
 
   /**
@@ -552,71 +522,6 @@ class UnifiedLotteryEngine {
   }
 
   /**
-   * 获取策略运行状态
-   *
-   * @param {string} strategyType - 策略类型
-   * @returns {Object|null} 策略状态信息，不存在时返回null
-   */
-  getStrategyStatus(strategyType) {
-    const strategy = this.strategies.get(strategyType)
-    if (!strategy) {
-      return null
-    }
-
-    let config = {}
-
-    // 尝试获取策略配置
-    if (typeof strategy.getConfig === 'function') {
-      config = strategy.getConfig()
-    } else {
-      // 降级方案：从策略对象直接读取
-      config = {
-        name: strategy.strategyName || strategyType,
-        enabled: strategy.enabled !== false,
-        config: strategy.config || {},
-        metrics: strategy.metrics || {}
-      }
-    }
-
-    return {
-      strategyType,
-      status: strategy.enabled !== false ? 'enabled' : 'disabled',
-      config,
-      lastChecked: BeijingTimeHelper.now()
-    }
-  }
-
-  /**
-   * 更新策略配置
-   *
-   * @param {string} strategyType - 策略类型
-   * @param {Object} newConfig - 新配置对象
-   * @returns {boolean} 更新是否成功
-   */
-  updateStrategyConfig(strategyType, newConfig) {
-    const strategy = this.strategies.get(strategyType)
-    if (!strategy) {
-      return false
-    }
-
-    try {
-      if (typeof strategy.updateConfig === 'function') {
-        return strategy.updateConfig(newConfig)
-      } else {
-        // 简单的配置更新
-        Object.assign(strategy.config || {}, newConfig)
-        return true
-      }
-    } catch (error) {
-      this.logError('策略配置更新失败', {
-        strategy: strategyType,
-        error: error.message
-      })
-      return false
-    }
-  }
-
-  /**
    * 获取性能指标
    *
    * @returns {Object} 引擎性能指标数据（统一使用 snake_case 命名）
@@ -673,16 +578,20 @@ class UnifiedLotteryEngine {
    */
   getHealthStatus() {
     try {
-      const enabledStrategies = Array.from(this.strategies.entries()).filter(
-        ([_, strategy]) => strategy.enabled !== false
-      )
+      /**
+       * V4.6 健康状态检查（2026-01-19 Phase 5 迁移）
+       *
+       * 替代原 Strategy 检查，使用 DrawOrchestrator 状态
+       */
+      const orchestratorStatus = this.drawOrchestrator?.getStatus?.() || {}
+      const pipelineTypes = orchestratorStatus.pipeline_types || []
 
-      if (enabledStrategies.length === 0) {
+      if (pipelineTypes.length === 0 && !this.drawOrchestrator) {
         return {
           status: 'unhealthy',
-          message: '没有可用的抽奖策略',
-          strategies: [],
-          enabledStrategies: 0,
+          message: 'V4.6: 管线编排器未初始化',
+          pipelines: [],
+          draw_orchestrator_ready: false,
           timestamp: this.getBeijingTimestamp(),
           version: this.version
         }
@@ -697,17 +606,20 @@ class UnifiedLotteryEngine {
         }
       }
 
-      // 构建策略状态列表
-      const strategies = enabledStrategies.map(([name, strategy]) => ({
+      // V4.6: 构建管线状态列表
+      const pipelines = pipelineTypes.map(name => ({
         name,
-        status: strategy.enabled !== false ? 'enabled' : 'disabled'
+        status: 'enabled'
       }))
 
       return {
         status: 'healthy',
-        message: '引擎运行正常',
-        strategies,
-        enabled_strategies: enabledStrategies.length,
+        message: 'V4.6引擎运行正常（Pipeline 模式）',
+        pipelines,
+        draw_orchestrator_ready: true,
+        enabled_pipelines: pipelineTypes.length,
+        // 兼容旧字段
+        enabled_strategies: pipelineTypes.length,
         total_executions: this.metrics.total_executions,
         success_rate: this.getMetrics().success_rate,
         uptime: this.formatUptime(BeijingTimeHelper.timestamp() - this.startTime),
@@ -731,17 +643,31 @@ class UnifiedLotteryEngine {
    *
    * @returns {Promise<Object>} 健康检查结果
    */
+  /**
+   * V4.6 健康检查方法（Pipeline 架构）
+   *
+   * 2026-01-19 Phase 5 迁移重构：
+   * - 移除原 this.strategies 遍历
+   * - 使用 DrawOrchestrator 状态
+   *
+   * @returns {Object} 健康检查结果
+   */
   async healthCheck() {
     const startTime = BeijingTimeHelper.timestamp()
 
     try {
-      const strategies = {}
+      /**
+       * V4.6: 使用 Pipeline 状态替代原 Strategy 状态
+       */
+      const orchestratorStatus = this.drawOrchestrator?.getStatus?.() || {}
+      const pipelineTypes = orchestratorStatus.pipeline_types || []
 
-      // 检查每个策略的健康状态
-      for (const [name, strategy] of this.strategies.entries()) {
-        strategies[name] = {
-          enabled: strategy.enabled !== false,
-          healthy: true // 假设策略健康，实际项目中可以添加更详细的检查
+      // 构建管线状态信息
+      const pipelines = {}
+      for (const pipelineName of pipelineTypes) {
+        pipelines[pipelineName] = {
+          enabled: true,
+          healthy: true
         }
       }
 
@@ -752,7 +678,8 @@ class UnifiedLotteryEngine {
         version: this.version,
         checkTime,
         timestamp: this.getBeijingTimestamp(),
-        strategies,
+        pipelines, // V4.6: 使用 pipelines 替代 strategies
+        draw_orchestrator_ready: !!this.drawOrchestrator,
         metrics: this.getMetrics()
       }
     } catch (error) {
@@ -762,16 +689,6 @@ class UnifiedLotteryEngine {
         timestamp: this.getBeijingTimestamp()
       }
     }
-  }
-
-  /**
-   * 获取策略实例
-   *
-   * @param {string} strategyType - 策略类型
-   * @returns {Object|null} 策略实例，不存在时返回null
-   */
-  getStrategy(strategyType) {
-    return this.strategies.get(strategyType) || null
   }
 
   /**
@@ -973,9 +890,15 @@ class UnifiedLotteryEngine {
         throw new Error('活动不存在')
       }
 
-      // 🎯 整合保底规则配置（从BasicGuaranteeStrategy获取）
-      const basicGuaranteeStrategy = this.strategies.get('basic_guarantee')
-      const guaranteeRule = basicGuaranteeStrategy?.config?.guaranteeRule || null
+      /**
+       * V4.6 Phase 5：保底规则现在由 Pipeline 架构内部处理
+       *
+       * 原方式：从 BasicGuaranteeStrategy.config.guaranteeRule 获取
+       * 新方式：Pipeline 内部的 NormalDrawPipeline 处理保底逻辑
+       *
+       * @deprecated 此字段仅用于向后兼容，实际保底逻辑在 Pipeline 中
+       */
+      const guaranteeRule = null // V4.6: Pipeline 内部处理保底规则
 
       this.logInfo('获取活动配置', {
         campaign_id,
@@ -1060,11 +983,24 @@ class UnifiedLotteryEngine {
       { strict: true } // 🔴 严格模式：配置缺失直接报错
     )
 
-    // 步骤4：从代码配置获取折扣信息
-    const businessConfig = require('../../config/business.config')
-    const drawTypes = businessConfig.lottery.draw_types
-    const drawTypeConfig = drawTypes[drawKey] || {
-      count: draw_count,
+    /*
+     * 步骤4：获取折扣配置
+     *
+     * 🔄 2026-01-19 架构迁移说明：
+     * - 折扣配置已从 business.config.lottery.draw_types 迁移到 lottery_campaign_pricing_config 表
+     * - 此方法现在使用默认折扣规则（与 PricingStage 保持一致）
+     * - 完整的定价计算由 PricingStage 执行（Pipeline 模式）
+     *
+     * @deprecated 此方法将在后续版本中被 PricingStage 完全替代
+     * @see PricingStage._getDrawPricing() - 新的定价计算核心逻辑
+     */
+    const defaultDiscounts = {
+      1: { discount: 1.0, label: '单抽' },
+      3: { discount: 1.0, label: '3连抽' },
+      5: { discount: 1.0, label: '5连抽' },
+      10: { discount: 0.9, label: '10连抽(九折)' }
+    }
+    const drawTypeConfig = defaultDiscounts[draw_count] || {
       discount: 1.0,
       label: `${draw_count}连抽`
     }
@@ -1350,6 +1286,19 @@ class UnifiedLotteryEngine {
 
       const results = []
 
+      /*
+       * 🆕 Phase 2 增强：连抽批次ID生成
+       *
+       * 业务价值：
+       * - 将同一次连抽的多条记录关联在一起
+       * - 便于后续统计分析和审计追踪
+       * - batch_id 格式：batch_{user_id}_{timestamp}_{random}
+       */
+      const batch_id =
+        draw_count > 1
+          ? `batch_${user_id}_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`
+          : null // 单抽不需要 batch_id
+
       // 步骤2：执行多次抽奖（不再重复扣除积分）
       for (let i = 0; i < draw_count; i++) {
         /**
@@ -1372,6 +1321,8 @@ class UnifiedLotteryEngine {
           campaign_id,
           draw_number: i + 1,
           total_draws: draw_count,
+          draw_count, // 🆕 Phase 2：传递抽奖次数
+          batch_id, // 🆕 Phase 2：连抽批次ID（null 表示单抽）
           skip_points_deduction: true, // 🎯 关键标识：告诉策略不要再扣除积分
           lottery_session_id: lotterySessionId, // 方案B：传递抽奖会话ID
           idempotency_key: drawIdempotencyKey, // 方案B：派生幂等键

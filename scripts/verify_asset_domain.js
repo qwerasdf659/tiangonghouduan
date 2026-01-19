@@ -549,33 +549,41 @@ async function verifyBusinessLayer() {
   const fs = require('fs')
   const path = require('path')
 
-  // 检查抽奖策略是否使用 AssetService.mintItem
-  console.log('【检查1】抽奖策略改造状态')
+  /**
+   * V4.6 Phase 5 迁移：检查 Pipeline 管线是否使用 AssetService
+   *
+   * 原 BasicGuaranteeStrategy 已移除，改为检查 SettleStage.js
+   */
+  console.log('【检查1】抽奖管线改造状态（V4.6 Pipeline 架构）')
   try {
-    const strategyPath = path.join(
-      __dirname,
-      '..',
-      'services',
-      'UnifiedLotteryEngine',
-      'strategies',
-      'BasicGuaranteeStrategy.js'
-    )
+    const settleStages = [
+      path.join(__dirname, '..', 'services', 'UnifiedLotteryEngine', 'pipeline', 'stages', 'SettleStage.js'),
+      path.join(__dirname, '..', 'services', 'UnifiedLotteryEngine', 'pipeline', 'stages', 'PresetSettleStage.js'),
+      path.join(__dirname, '..', 'services', 'UnifiedLotteryEngine', 'pipeline', 'stages', 'OverrideSettleStage.js')
+    ]
 
-    if (fs.existsSync(strategyPath)) {
-      const content = fs.readFileSync(strategyPath, 'utf-8')
+    let pipelineCheckPassed = false
+    for (const stagePath of settleStages) {
+      if (fs.existsSync(stagePath)) {
+        const content = fs.readFileSync(stagePath, 'utf-8')
+        const stageName = path.basename(stagePath)
 
-      if (content.includes('AssetService.mintItem') || content.includes('assetService.mintItem')) {
-        pass('抽奖策略已使用 AssetService.mintItem()')
-      } else if (content.includes('ItemInstance.create')) {
-        fail('抽奖策略仍直接使用 ItemInstance.create()')
-      } else {
-        warn('抽奖策略未发现 mintItem 或 ItemInstance.create 调用')
+        if (content.includes('AssetService.changeBalance') || content.includes('AssetService.mintItem')) {
+          pass(`${stageName} 已使用 AssetService`)
+          pipelineCheckPassed = true
+        } else if (content.includes('ItemInstance.create')) {
+          fail(`${stageName} 仍直接使用 ItemInstance.create()`)
+        } else {
+          warn(`${stageName} 未发现 AssetService 调用`)
+        }
       }
-    } else {
-      warn('BasicGuaranteeStrategy.js 文件不存在')
+    }
+
+    if (pipelineCheckPassed) {
+      pass('V4.6 Pipeline 管线已正确使用 AssetService')
     }
   } catch (err) {
-    fail('检查抽奖策略改造状态失败', err.message)
+    fail('检查抽奖管线改造状态失败', err.message)
   }
 
   // 检查交易服务是否使用 AssetService.transferItem

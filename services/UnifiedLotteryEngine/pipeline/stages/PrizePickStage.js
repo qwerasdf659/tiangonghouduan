@@ -56,6 +56,124 @@ class PrizePickStage extends BaseStage {
     this.log('info', '开始奖品抽取', { user_id, campaign_id })
 
     try {
+      /*
+       * 🎯 Phase 1 新增：根据 decision_source 判断是否跳过正常抽取
+       * preset/override/guarantee 模式使用预定奖品
+       */
+      const decision_data = this.getContextData(context, 'LoadDecisionSourceStage.data')
+      const decision_source = decision_data?.decision_source || 'normal'
+
+      // preset 模式：直接使用预设奖品
+      if (decision_source === 'preset' && decision_data?.preset) {
+        const preset = decision_data.preset
+        const preset_stage_data = this.getContextData(context, 'LoadPresetStage.data')
+        const preset_prize = preset_stage_data?.preset_prize || preset
+
+        this.log('info', '预设模式：使用预设奖品', {
+          user_id,
+          decision_source,
+          prize_id: preset_prize.prize_id || preset.prize_id,
+          prize_name: preset_prize.prize_name || '预设奖品'
+        })
+
+        return this.success({
+          selected_prize: preset_prize,
+          prize_random_value: 0,
+          tier_total_weight: 0,
+          prize_hit_range: [0, 0],
+          tier_prize_count: 1,
+          selected_tier: preset_prize.reward_tier || 'high',
+          decision_source,
+          skipped: true,
+          skip_reason: 'preset_mode'
+        })
+      }
+
+      // override 模式：根据干预配置选择奖品
+      if (decision_source === 'override' && decision_data?.override) {
+        const override = decision_data.override
+        const override_type = override.setting_type || override.override_type
+        const override_stage_data = this.getContextData(context, 'LoadOverrideStage.data')
+
+        if (override_type === 'force_win' && override_stage_data?.override_prize) {
+          const override_prize = override_stage_data.override_prize
+          this.log('info', '干预模式（强制中奖）：使用指定奖品', {
+            user_id,
+            decision_source,
+            prize_id: override_prize.prize_id,
+            prize_name: override_prize.prize_name
+          })
+
+          return this.success({
+            selected_prize: override_prize,
+            prize_random_value: 0,
+            tier_total_weight: 0,
+            prize_hit_range: [0, 0],
+            tier_prize_count: 1,
+            selected_tier: override_prize.reward_tier || 'high',
+            decision_source,
+            skipped: true,
+            skip_reason: 'override_force_win'
+          })
+        }
+
+        // force_lose 模式：使用 fallback 奖品
+        if (override_type === 'force_lose') {
+          const campaign_data = this.getContextData(context, 'LoadCampaignStage.data')
+          const fallback_prize = campaign_data?.fallback_prize
+
+          if (fallback_prize) {
+            this.log('info', '干预模式（强制不中）：使用兜底奖品', {
+              user_id,
+              decision_source,
+              prize_id: fallback_prize.prize_id,
+              prize_name: fallback_prize.prize_name
+            })
+
+            return this.success({
+              selected_prize: fallback_prize,
+              prize_random_value: 0,
+              tier_total_weight: 0,
+              prize_hit_range: [0, 0],
+              tier_prize_count: 1,
+              selected_tier: 'fallback',
+              decision_source,
+              skipped: true,
+              skip_reason: 'override_force_lose'
+            })
+          }
+        }
+      }
+
+      // guarantee 模式：使用保底奖品
+      if (decision_source === 'guarantee' && decision_data?.guarantee_triggered) {
+        const guarantee_data = this.getContextData(context, 'GuaranteeStage.data')
+        const guarantee_prize = guarantee_data?.guarantee_prize
+
+        if (guarantee_prize) {
+          this.log('info', '保底模式：使用保底奖品', {
+            user_id,
+            decision_source,
+            prize_id: guarantee_prize.prize_id,
+            prize_name: guarantee_prize.prize_name
+          })
+
+          return this.success({
+            selected_prize: guarantee_prize,
+            prize_random_value: 0,
+            tier_total_weight: 0,
+            prize_hit_range: [0, 0],
+            tier_prize_count: 1,
+            selected_tier: guarantee_prize.reward_tier || 'high',
+            decision_source,
+            skipped: true,
+            skip_reason: 'guarantee_mode'
+          })
+        }
+      }
+
+      // normal 模式：继续正常的奖品抽取流程
+
       // 获取奖品池信息（从 BuildPrizePoolStage 的结果中）
       const prize_pool_data = this.getContextData(context, 'BuildPrizePoolStage.data')
       if (!prize_pool_data) {

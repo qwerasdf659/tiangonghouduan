@@ -302,26 +302,31 @@ class ServiceTestSuite {
    * @returns {Promise<Object>} 测试结果
    * @throws {Error} 如果验证失败
    */
+  /**
+   * V4.6 测试 UnifiedLotteryEngine（Pipeline 架构）
+   *
+   * 2026-01-19 Phase 5 迁移重构：
+   * - 移除原 initializeStrategies、getExecutionChain 方法检查
+   * - 使用 drawOrchestrator 替代 strategies
+   *
+   * @param {Object} UnifiedLotteryEngine - UnifiedLotteryEngine 实例
+   * @returns {Promise<Object>} 测试结果
+   */
   static async testUnifiedLotteryEngine(UnifiedLotteryEngine) {
-    console.log('🎲 测试UnifiedLotteryEngine...')
+    console.log('🎲 测试UnifiedLotteryEngine（V4.6 Pipeline 架构）...')
 
-    // 验证核心方法
-    const requiredMethods = [
-      'executeLottery',
-      'initializeStrategies',
-      'getExecutionChain',
-      'getEngineHealth'
-    ]
+    // V4.6: 验证核心方法（Pipeline 架构）
+    const requiredMethods = ['executeLottery', 'getEngineHealth', 'getHealthStatus', 'healthCheck']
 
     await ServiceTestSuite.testServiceHealth(UnifiedLotteryEngine, requiredMethods)
 
-    // 验证策略初始化
-    const strategies = UnifiedLotteryEngine.strategies
-    if (!strategies || Object.keys(strategies).length === 0) {
-      throw new Error('❌ 策略未初始化')
+    // V4.6: 验证 DrawOrchestrator 初始化
+    const drawOrchestrator = UnifiedLotteryEngine.drawOrchestrator
+    if (!drawOrchestrator) {
+      throw new Error('❌ DrawOrchestrator 未初始化')
     }
 
-    console.log(`✅ 策略加载成功: ${Object.keys(strategies).length}个策略`)
+    console.log('✅ DrawOrchestrator 已就绪')
 
     // 验证健康状态
     const health = UnifiedLotteryEngine.getEngineHealth()
@@ -329,12 +334,16 @@ class ServiceTestSuite {
       throw new Error('❌ 无法获取引擎健康状态')
     }
 
-    console.log('✅ UnifiedLotteryEngine验证通过')
+    console.log('✅ UnifiedLotteryEngine 验证通过（V4.6 Pipeline 模式）')
+
+    // V4.6: 获取管线状态
+    const orchestratorStatus = drawOrchestrator?.getStatus?.() || {}
+    const pipelineTypes = orchestratorStatus.pipeline_types || []
 
     return {
       success: true,
-      strategyCount: Object.keys(strategies).length,
-      strategies: Object.keys(strategies),
+      pipelineCount: pipelineTypes.length,
+      pipelines: pipelineTypes,
       health
     }
   }

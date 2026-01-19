@@ -70,6 +70,78 @@ class TierPickStage extends BaseStage {
     this.log('info', '开始档位抽取', { user_id, campaign_id })
 
     try {
+      /*
+       * 🎯 Phase 1 新增：根据 decision_source 判断是否跳过正常抽取
+       * preset/override 模式不需要执行正常的档位抽取逻辑
+       */
+      const decision_data = this.getContextData(context, 'LoadDecisionSourceStage.data')
+      const decision_source = decision_data?.decision_source || 'normal'
+
+      // preset 模式：使用预设奖品，跳过档位抽取
+      if (decision_source === 'preset' && decision_data?.preset) {
+        const preset = decision_data.preset
+        const preset_tier = preset.reward_tier || 'high'
+        this.log('info', '预设模式：跳过档位抽取，使用预设档位', {
+          user_id,
+          decision_source,
+          preset_tier
+        })
+        return this.success({
+          selected_tier: preset_tier,
+          original_tier: preset_tier,
+          tier_downgrade_path: [],
+          random_value: 0,
+          tier_weights: {},
+          decision_source,
+          skipped: true,
+          skip_reason: 'preset_mode'
+        })
+      }
+
+      // override 模式：根据干预类型决定档位
+      if (decision_source === 'override' && decision_data?.override) {
+        const override = decision_data.override
+        const override_type = override.setting_type || override.override_type
+        // force_win 使用 high 档位，force_lose 使用 fallback 档位
+        const override_tier = override_type === 'force_win' ? 'high' : 'fallback'
+        this.log('info', '干预模式：跳过档位抽取，使用干预档位', {
+          user_id,
+          decision_source,
+          override_type,
+          override_tier
+        })
+        return this.success({
+          selected_tier: override_tier,
+          original_tier: override_tier,
+          tier_downgrade_path: [],
+          random_value: 0,
+          tier_weights: {},
+          decision_source,
+          skipped: true,
+          skip_reason: 'override_mode'
+        })
+      }
+
+      // guarantee 模式：使用高档位
+      if (decision_source === 'guarantee') {
+        this.log('info', '保底模式：强制使用高档位', {
+          user_id,
+          decision_source
+        })
+        return this.success({
+          selected_tier: 'high',
+          original_tier: 'high',
+          tier_downgrade_path: [],
+          random_value: 0,
+          tier_weights: {},
+          decision_source,
+          skipped: true,
+          skip_reason: 'guarantee_mode'
+        })
+      }
+
+      // normal 模式：继续正常的档位抽取流程
+
       // 获取活动配置（从 LoadCampaignStage 的结果中）
       const campaign_data = this.getContextData(context, 'LoadCampaignStage.data')
       if (!campaign_data || !campaign_data.campaign) {

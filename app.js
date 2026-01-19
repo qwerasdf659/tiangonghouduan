@@ -352,19 +352,28 @@ app.get('/api/v4', (req, res) => {
   return res.apiSuccess(
     {
       version: '4.0.0',
-      name: '餐厅积分抽奖系统 V4统一引擎',
-      architecture: 'unified-lottery-engine',
-      description: 'V4统一抽奖引擎架构 - 2种策略统一管理',
+      name: '餐厅积分抽奖系统 V4.6统一引擎',
+      architecture: 'unified-lottery-pipeline',
+      description: 'V4.6统一抽奖引擎架构 - Pipeline 模式统一管理',
       engine: {
         name: 'UnifiedLotteryEngine',
-        version: '4.0.0',
-        strategies: [
-          'BasicGuaranteeStrategy - 基础抽奖保底策略, ManagementStrategy - 管理策略',
-          'ManagementStrategy - 管理抽奖策略'
-        ],
+        version: '4.6.0',
+        /**
+         * V4.6 管线架构（2026-01-19 Phase 5 迁移）
+         *
+         * 替代原 Strategy 模式
+         * 统一使用 Pipeline 架构
+         */
+        /**
+         * V4.6 Phase 5：原 3 条管线已合并为 1 条统一管线
+         * 决策来源由 LoadDecisionSourceStage 在管线内判断
+         */
+        pipelines: ['NormalDrawPipeline - 统一抽奖管线（Phase 5 合并）'],
+        decision_sources: ['normal', 'preset', 'override'], // 决策来源类型
         core: {
-          UnifiedLotteryEngine: '统一抽奖引擎 - 集成式设计',
-          LotteryStrategy: '策略基类'
+          UnifiedLotteryEngine: '统一抽奖引擎 - Pipeline 设计',
+          DrawOrchestrator: '管线编排器',
+          LoadDecisionSourceStage: '决策来源判断 Stage'
         }
       },
       endpoints: {
@@ -385,21 +394,23 @@ app.get('/api/v4/docs', (req, res) => {
     {
       title: '餐厅积分抽奖系统 V4.0 统一引擎API文档',
       version: '4.0.0',
-      architecture: 'unified-lottery-engine',
-      description: 'V4统一抽奖引擎架构，通过统一引擎管理2种抽奖策略',
+      architecture: 'unified-lottery-engine-v4.6-pipeline',
+      description: 'V4.6统一抽奖引擎架构，使用 Pipeline 管线模式替代 Strategy 策略模式',
       last_updated: BeijingTimeHelper.apiTimestamp(),
       unified_engine: {
-        description: 'V4统一抽奖引擎提供完整的抽奖执行和管理功能',
+        description: 'V4.6统一抽奖引擎通过 DrawOrchestrator 编排 Pipeline 管线执行抽奖',
         endpoints: {
-          'POST /api/v4/lottery/draw': '执行抽奖',
-          'GET /api/v4/lottery/strategies': '获取策略列表',
+          'POST /api/v4/lottery/draw': '执行抽奖（Pipeline模式）',
+          'GET /api/v4/lottery/strategies': '获取管线列表',
           'GET /api/v4/lottery/metrics': '获取引擎指标',
           'POST /api/v4/lottery/validate': '验证抽奖条件'
         },
-        strategies: [
-          'BasicGuaranteeStrategy - 基础抽奖保底策略',
-          'ManagementStrategy - 管理抽奖策略'
-        ]
+        /**
+         * V4.6 Phase 5：统一管线架构
+         */
+        pipelines: ['NormalDrawPipeline - 统一抽奖管线'],
+        decision_sources: ['normal', 'preset', 'override'],
+        orchestrator: 'DrawOrchestrator - 管线编排器'
       },
       admin_system: {
         description: 'V4管理系统提供引擎配置、监控和维护功能',

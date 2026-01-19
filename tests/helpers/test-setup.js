@@ -102,11 +102,24 @@ class TestAssertions {
         incorrect: ['completed', 'finished', 'done'], // 技术术语
         message: '奖品状态应使用业务术语 "distributed"（已分发）'
       },
-      // 策略名称
+      /**
+       * V4.6 Phase 5：Pipeline 架构替代 Strategy 模式
+       *
+       * 正确名称：Pipeline 管线名称
+       * 遗留名称：Strategy 类名（仍可用于遗留测试）
+       *
+       * @deprecated Strategy 模式将在 Phase 6-7 完全移除
+       */
+      /**
+       * Phase 5 统一管线架构（2026-01-19）
+       * - 原 3 条管线已合并为 1 条统一管线（NormalDrawPipeline）
+       */
       strategy_names: {
-        correct: ['BasicGuaranteeStrategy', 'ManagementStrategy'],
-        incorrect: ['basic', 'guarantee', 'management'],
-        message: '策略名称应使用完整类名，不应降低测试标准'
+        correct: ['NormalDrawPipeline', 'ManagementStrategy'], // Phase 5: 统一管线
+        decision_sources: ['normal', 'preset', 'override'], // 决策来源类型
+        legacy: ['BasicGuaranteeStrategy', 'ManagementStrategy'],
+        incorrect: ['basic', 'guarantee', 'management', 'pipeline'],
+        message: 'V4.6 Phase 5: 应使用统一管线 NormalDrawPipeline 或 ManagementStrategy'
       }
     }
 
@@ -303,12 +316,25 @@ const TestConfig = {
     _initialized: false
   },
 
-  // V4抽奖策略配置验证
+  /**
+   * V4.6 Phase 5 抽奖架构配置验证（2026-01-19）
+   *
+   * Phase 5 统一管线迁移：
+   * - 原 3 条管线已合并为 1 条统一管线（NormalDrawPipeline）
+   * - 决策来源由 LoadDecisionSourceStage 在管线内判断
+   * - ManagementStrategy 仍用于管理 API
+   *
+   * @deprecated strategyValidation 将在 Phase 6-7 重命名为 pipelineValidation
+   */
   strategyValidation: {
-    // 实际存在的策略类（V4架构）
-    correct: ['BasicGuaranteeStrategy', 'ManagementStrategy'],
-    // 期待的策略数量
-    expectedCount: 2
+    // V4.6 Phase 5 统一管线（新架构）
+    pipelines: ['NormalDrawPipeline'], // Phase 5：统一管线
+    expectedPipelineCount: 1, // Phase 5：1 条统一管线
+    decisionSources: ['normal', 'preset', 'override'], // 决策来源类型
+    // 遗留 Strategy 类（仅用于遗留测试）
+    legacyStrategies: ['BasicGuaranteeStrategy', 'ManagementStrategy'],
+    // 向后兼容：引擎中 strategies.size 应为 0（已废弃）
+    expectedCount: 0
   }
 }
 

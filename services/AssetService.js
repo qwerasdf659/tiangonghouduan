@@ -1041,8 +1041,8 @@ class AssetService {
   /**
    * 获取用户所有 BUDGET_POINTS 可用余额总和（跨所有活动）
    *
-   * 业务场景：抽奖策略需要判断用户总预算积分是否充足
-   * 方案1决策：BasicGuaranteeStrategy 统一通过 AssetService 访问资产数据
+   * 业务场景：抽奖管线需要判断用户总预算积分是否充足
+   * 方案1决策：V4.6 Pipeline 统一通过 AssetService 访问资产数据
    *
    * @param {Object} params - 参数对象
    * @param {number} params.user_id - 用户ID
@@ -1084,8 +1084,8 @@ class AssetService {
   /**
    * 获取用户指定活动ID列表的 BUDGET_POINTS 可用余额总和
    *
-   * 业务场景：抽奖策略按活动优先级扣减预算积分时，需要查询特定活动的余额
-   * 方案1决策：BasicGuaranteeStrategy 统一通过 AssetService 访问资产数据
+   * 业务场景：抽奖管线按活动优先级扣减预算积分时，需要查询特定活动的余额
+   * 方案1决策：V4.6 Pipeline 统一通过 AssetService 访问资产数据
    *
    * @param {Object} params - 参数对象
    * @param {number} params.user_id - 用户ID

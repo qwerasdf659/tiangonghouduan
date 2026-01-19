@@ -149,10 +149,16 @@ class UnifiedScriptManager {
         utils: 'services/UnifiedLotteryEngine/utils/**/*.js'
       },
 
-      // 关键策略权重
-      strategyWeights: {
-        'BasicGuaranteeStrategy.js': 0.7, // 基础抽奖+保底策略
-        'ManagementStrategy.js': 0.3 // 管理策略
+      /**
+       * V4.6 Phase 5 迁移：Pipeline 管线权重
+       *
+       * 原 BasicGuaranteeStrategy 已移除，改为管线权重
+       */
+      pipelineWeights: {
+        'SettleStage.js': 0.4, // 结算管线
+        'PresetSettleStage.js': 0.2, // 预设结算管线
+        'OverrideSettleStage.js': 0.2, // 覆盖结算管线
+        'ManagementStrategy.js': 0.2 // 管理策略（仅用于管理 API）
       }
     }
 
@@ -811,11 +817,39 @@ class UnifiedScriptManager {
         }
       }
 
-      // 解析策略覆盖率
-      if (line.includes('BasicGuaranteeStrategy.js')) {
+      /**
+       * V4.6 Phase 5 迁移：解析 Pipeline 管线覆盖率
+       *
+       * 原 BasicGuaranteeStrategy 已移除，改为解析管线 Stage
+       */
+      if (line.includes('SettleStage.js')) {
         const match = line.match(/(\d+\.?\d*)/g)
         if (match && match.length >= 4) {
-          coverageData.strategies.BasicGuaranteeStrategy = {
+          coverageData.strategies.SettleStage = {
+            statements: parseFloat(match[0]),
+            branches: parseFloat(match[1]),
+            functions: parseFloat(match[2]),
+            lines: parseFloat(match[3])
+          }
+        }
+      }
+
+      if (line.includes('PresetSettleStage.js')) {
+        const match = line.match(/(\d+\.?\d*)/g)
+        if (match && match.length >= 4) {
+          coverageData.strategies.PresetSettleStage = {
+            statements: parseFloat(match[0]),
+            branches: parseFloat(match[1]),
+            functions: parseFloat(match[2]),
+            lines: parseFloat(match[3])
+          }
+        }
+      }
+
+      if (line.includes('OverrideSettleStage.js')) {
+        const match = line.match(/(\d+\.?\d*)/g)
+        if (match && match.length >= 4) {
+          coverageData.strategies.OverrideSettleStage = {
             statements: parseFloat(match[0]),
             branches: parseFloat(match[1]),
             functions: parseFloat(match[2]),

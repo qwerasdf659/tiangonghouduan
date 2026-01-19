@@ -1,16 +1,20 @@
 /**
- * 抽奖积分集成测试 - V4.5
+ * 抽奖积分集成测试 - V4.6 Pipeline 架构版
  *
- * 验证BasicGuaranteeStrategy使用AssetService后的数据完整性：
- * 1. 积分消费记录完整性（通过AssetService查询）
+ * V4.6 Phase 6 更新说明（2026-01-19）：
+ * - 使用 UnifiedLotteryEngine 执行抽奖（Pipeline 架构）
+ * - 移除对 BasicGuaranteeStrategy 的直接依赖
+ * - 通过 DrawOrchestrator 编排抽奖流程
+ *
+ * 验证抽奖积分消费和奖励的数据完整性：
+ * 1. 积分消费记录完整性（通过 AssetService 查询）
  * 2. 积分奖励记录完整性
  * 3. 资产流水记录正确性
  *
- * P1-9 J2-RepoWide 改造说明：
- * - AssetService 通过 ServiceManager 获取（snake_case: asset）
- * - BasicGuaranteeStrategy 通过 ServiceManager 获取（snake_case: basic_guarantee_strategy）
- * - 模型直接引用用于测试数据准备/验证（核心测试场景合理）
+ * @date 2026-01-19 (V4.6 Phase 6 重构)
  */
+
+/* eslint-disable no-console */
 
 const {
   User,
@@ -20,19 +24,20 @@ const {
   AccountAssetBalance
 } = require('../../models')
 
-// 🔴 P1-9：通过 ServiceManager 获取服务（替代直接 require）
+/**
+ * V4.6: 通过 ServiceManager 获取服务
+ */
 let AssetService
-let BasicGuaranteeStrategy
+let UnifiedLotteryEngine
 
-describe('抽奖积分集成测试 - V4.5', () => {
-  const testUserId = 31 // 测试账号：13612227930
+describe('抽奖积分集成测试 - V4.6 Pipeline 架构', () => {
+  let testUserId
   const campaignId = 2 // 使用实际存在的活动ID
-
   let initialBalance = null
   let initialUser = null
 
   /**
-   * 辅助函数：获取用户POINTS余额（使用新资产系统）
+   * 辅助函数：获取用户 POINTS 余额（使用资产系统）
    */
   async function getPointsBalance(userId) {
     const result = await AssetService.getBalance({ user_id: userId, asset_code: 'POINTS' })
@@ -40,25 +45,47 @@ describe('抽奖积分集成测试 - V4.5', () => {
   }
 
   beforeAll(async () => {
-    // 🔴 P1-9：通过 ServiceManager 获取服务实例（snake_case key）
-    AssetService = global.getTestService('asset')
-    BasicGuaranteeStrategy = global.getTestService('basic_guarantee_strategy')
-    // 获取初始状态（使用新资产系统）
-    initialBalance = await getPointsBalance(testUserId)
-    initialUser = await User.findByPk(testUserId)
+    console.log('🔍 初始化抽奖积分集成测试环境（V4.6 Pipeline 架构）...')
 
-    if (!initialUser) {
+    // 通过 ServiceManager 获取服务
+    AssetService = global.getTestService('asset')
+
+    /**
+     * V4.6: 使用 UnifiedLotteryEngine 替代 BasicGuaranteeStrategy
+     * 引擎内部通过 DrawOrchestrator 编排 Pipeline 执行抽奖
+     */
+    const {
+      UnifiedLotteryEngine: Engine
+    } = require('../../services/UnifiedLotteryEngine/UnifiedLotteryEngine')
+    UnifiedLotteryEngine = new Engine()
+
+    // 获取测试用户ID
+    testUserId = global.testData?.testUser?.user_id
+    if (!testUserId) {
+      // 备用：通过手机号查询
+      const user = await User.findOne({ where: { mobile: '13612227930' } })
+      testUserId = user?.user_id
+    }
+
+    if (!testUserId) {
       throw new Error('测试用户不存在')
     }
 
-    console.log('\n📊 测试开始前的数据状态（V4.5资产系统）：')
+    // 获取初始状态
+    initialBalance = await getPointsBalance(testUserId)
+    initialUser = await User.findByPk(testUserId)
+
+    console.log('📊 测试开始前的数据状态：')
     console.log({
+      user_id: testUserId,
       available_points: initialBalance,
-      history_total_points: initialUser.history_total_points
+      history_total_points: initialUser?.history_total_points
     })
+
+    console.log('✅ 抽奖积分集成测试环境初始化完成')
   })
 
-  describe('抽奖消费积分测试', () => {
+  describe('抽奖消费积分测试（Pipeline 架构）', () => {
     test('应该创建完整的积分消费记录', async () => {
       const beforeBalance = await getPointsBalance(testUserId)
 
@@ -68,35 +95,35 @@ describe('抽奖积分集成测试 - V4.5', () => {
         return
       }
 
-      // 执行一次抽奖
-      const strategy = new BasicGuaranteeStrategy()
-
+      /**
+       * V4.6: 使用 UnifiedLotteryEngine.executeLottery()
+       * 内部通过 DrawOrchestrator.execute() 编排 Pipeline
+       */
       try {
-        const result = await strategy.execute({
+        const result = await UnifiedLotteryEngine.executeLottery({
           user_id: testUserId,
           campaign_id: campaignId
         })
 
-        console.log('\n🎲 抽奖结果：', {
+        console.log('\n🎲 抽奖结果（Pipeline 架构）：', {
           success: result.success,
-          // V4.0语义更新：使用 reward_tier 替代 is_winner
-          reward_tier: result.reward_tier,
-          prize: result.prize?.prize_name
+          prize_id: result.prize_id,
+          execution_time: result.execution_time
         })
 
-        // 如果策略执行失败（无可用奖品、幂等性等问题），跳过验证
+        // 如果执行失败，跳过验证
         if (!result.success) {
-          console.log('\n⚠️ 跳过测试：策略执行未成功（可能无可用奖品或配置问题）')
+          console.log(`\n⚠️ 跳过测试：Pipeline 执行未成功 - ${result.message || result.error}`)
           return
         }
 
-        // 验证积分账户更新（使用新资产系统）
+        // 验证积分账户更新
         const afterBalance = await getPointsBalance(testUserId)
 
         // 1. 验证余额减少
         expect(afterBalance).toBe(beforeBalance - 100)
 
-        // 2. 验证资产流水记录存在（使用AssetTransaction）
+        // 2. 验证资产流水记录存在
         const consumeRecords = await AssetTransaction.findAll({
           where: {
             user_id: testUserId,
@@ -111,7 +138,7 @@ describe('抽奖积分集成测试 - V4.5', () => {
         const consumeRecord = consumeRecords[0]
 
         // 3. 验证流水记录详情
-        expect(Number(consumeRecord.delta_amount)).toBe(-100) // 扣减为负数
+        expect(Number(consumeRecord.delta_amount)).toBe(-100)
         expect(consumeRecord.asset_code).toBe('POINTS')
 
         console.log('\n✅ 积分消费记录验证通过：')
@@ -131,7 +158,7 @@ describe('抽奖积分集成测试 - V4.5', () => {
     })
   })
 
-  describe('抽奖奖励积分测试', () => {
+  describe('抽奖奖励积分测试（Pipeline 架构）', () => {
     test('应该创建完整的积分奖励记录', async () => {
       // 获取积分奖品
       const pointsPrize = await LotteryPrize.findOne({
@@ -149,31 +176,27 @@ describe('抽奖积分集成测试 - V4.5', () => {
 
       const beforeBalance = await getPointsBalance(testUserId)
 
-      // 检查余额是否足够尝试多次抽奖
       if (beforeBalance < 2000) {
         console.log('\n⚠️ 跳过测试：用户积分不足尝试抽中奖励（需要至少2000积分）')
         return
       }
 
-      // 尝试多次抽奖直到中奖积分奖励
-      const strategy = new BasicGuaranteeStrategy()
       let rewardResult = null
       let attempts = 0
       const maxAttempts = 20
 
-      console.log('\n🎲 尝试抽中积分奖励...')
+      console.log('\n🎲 尝试抽中积分奖励（Pipeline 架构）...')
 
       while (attempts < maxAttempts && !rewardResult) {
         try {
-          const result = await strategy.execute({
+          const result = await UnifiedLotteryEngine.executeLottery({
             user_id: testUserId,
             campaign_id: campaignId
           })
 
           attempts++
 
-          // V4.0语义更新：使用 reward_tier 替代 is_winner（每次抽奖必得奖品）
-          if (result.reward_tier && result.prize?.prize_type === 'points') {
+          if (result.success && result.prize?.prize_type === 'points') {
             rewardResult = result
             console.log(
               `\n🎉 第${attempts}次抽奖中奖！奖励：${result.prize.prize_name} (${result.prize.prize_value}积分)`
@@ -210,8 +233,7 @@ describe('抽奖积分集成测试 - V4.5', () => {
       expect(rewardRecords.length).toBe(1)
       const rewardRecord = rewardRecords[0]
 
-      // 验证流水记录详情
-      expect(Number(rewardRecord.delta_amount)).toBe(prizeValue) // 奖励为正数
+      expect(Number(rewardRecord.delta_amount)).toBe(prizeValue)
       expect(rewardRecord.asset_code).toBe('POINTS')
 
       console.log('\n✅ 积分奖励记录验证通过：')
@@ -220,15 +242,13 @@ describe('抽奖积分集成测试 - V4.5', () => {
         delta_amount: rewardRecord.delta_amount,
         prize_value: prizeValue
       })
-    }, 120000) // 增加超时时间到120秒
+    }, 120000)
   })
 
   describe('数据一致性验证', () => {
     test('资产余额应该正确反映交易记录', async () => {
-      // 获取当前余额
       const currentBalance = await getPointsBalance(testUserId)
 
-      // 获取账户信息
       const account = await Account.findOne({
         where: { user_id: testUserId, account_type: 'user' }
       })
@@ -247,7 +267,6 @@ describe('抽奖积分集成测试 - V4.5', () => {
         return
       }
 
-      // 验证AssetService返回的余额与数据库一致
       expect(currentBalance).toBe(Number(assetBalance.available_amount))
 
       console.log('\n✅ 余额一致性验证通过：')
@@ -259,7 +278,6 @@ describe('抽奖积分集成测试 - V4.5', () => {
   })
 
   afterAll(async () => {
-    // 显示最终状态
     const finalBalance = await getPointsBalance(testUserId)
     const finalUser = await User.findByPk(testUserId)
 

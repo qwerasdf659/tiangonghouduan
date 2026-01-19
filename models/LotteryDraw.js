@@ -285,9 +285,9 @@ module.exports = sequelize => {
 
       // 抽奖行为
       draw_type: {
-        type: DataTypes.ENUM('single', 'triple', 'five', 'ten'),
+        type: DataTypes.ENUM('single', 'triple', 'five', 'ten', 'multi'),
         allowNull: true,
-        comment: '抽奖类型'
+        comment: '抽奖类型：single=单抽，triple=3连，five=5连，ten=10连，multi=其他连抽'
       },
       draw_sequence: {
         type: DataTypes.INTEGER,

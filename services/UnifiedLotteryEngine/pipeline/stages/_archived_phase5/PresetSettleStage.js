@@ -356,6 +356,7 @@ class PresetSettleStage extends BaseStage {
 
     switch (prize.prize_type) {
       case 'points':
+        // eslint-disable-next-line no-restricted-syntax -- transaction 已正确传递
         await AssetService.changeBalance(
           {
             user_id,
@@ -396,6 +397,7 @@ class PresetSettleStage extends BaseStage {
 
       case 'virtual':
         if (prize.material_asset_code && prize.material_amount) {
+          // eslint-disable-next-line no-restricted-syntax -- transaction 已正确传递
           await AssetService.changeBalance(
             {
               user_id,
