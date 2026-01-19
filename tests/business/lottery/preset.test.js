@@ -7,8 +7,8 @@
  * **优先级**: P1 (核心业务功能)
  *
  * **测试覆盖**:
- * 1. GET /api/v4/lottery-preset/stats - 获取预设统计
- * 2. POST /api/v4/lottery-preset/create - 创建抽奖预设
+ * 1. GET /api/v4/lottery/preset/stats - 获取预设统计
+ * 2. POST /api/v4/lottery/preset/create - 创建抽奖预设
  * 3. GET /api/v4/lottery/preset/user/:user_id - 获取用户预设
  * 4. DELETE /api/v4/lottery/preset/user/:user_id - 清理用户预设
  *
@@ -59,7 +59,7 @@ describe('抽奖预设系统API测试（V4架构）', () => {
   })
 
   // ========== 获取预设统计API测试 ==========
-  describe('GET /api/v4/lottery-preset/stats - 获取预设统计', () => {
+  describe('GET /api/v4/lottery/preset/stats - 获取预设统计', () => {
     test('✅ 应该返回正确的预设统计数据结构', async () => {
       const response = await tester.make_authenticated_request(
         'GET',
@@ -192,7 +192,7 @@ describe('抽奖预设系统API测试（V4架构）', () => {
   })
 
   // ========== 创建抽奖预设API测试 ==========
-  describe('POST /api/v4/lottery-preset/create - 创建抽奖预设', () => {
+  describe('POST /api/v4/lottery/preset/create - 创建抽奖预设', () => {
     let created_preset_ids = []
 
     afterEach(async () => {

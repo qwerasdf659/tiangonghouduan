@@ -139,7 +139,8 @@ class ChatWebSocketService {
 
         wsLogger.info('WebSocket握手鉴权成功', {
           user_id: decoded.user_id,
-          role: decoded.role || decoded.is_admin,
+          role: decoded.role,
+          role_level: decoded.role_level,
           socket_id: socket.id
         })
 
@@ -168,9 +169,12 @@ class ChatWebSocketService {
    */
   setupEventHandlers() {
     this.io.on('connection', socket => {
-      // 🔐 从JWT自动注册用户身份（P0安全修复 - 2025年12月18日）
+      /**
+       * 🔐 从JWT自动注册用户身份（P0安全修复 - 2025年12月18日）
+       * 🔄 2026-01-19：统一使用 role_level >= 100 判断管理员（删除 is_admin 兼容）
+       */
       const userId = socket.user.user_id
-      const isAdmin = socket.user.role === 'admin' || socket.user.is_admin === true
+      const isAdmin = socket.user.role_level >= 100
 
       if (isAdmin) {
         this.connectedAdmins.set(userId, socket.id)

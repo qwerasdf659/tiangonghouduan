@@ -35,7 +35,7 @@ router.get('/announcements', optionalAuth, dataAccessControl, async (req, res) =
     const AnnouncementService = req.app.locals.services.getService('announcement')
 
     const { type = null, priority = null, limit = 10, offset = 0 } = req.query
-    const dataLevel = req.isAdmin ? 'full' : 'public'
+    const dataLevel = req.role_level >= 100 ? 'full' : 'public'
 
     // ✅ 使用 AnnouncementService 统一查询逻辑
     const announcements = await AnnouncementService.getAnnouncements({
@@ -84,7 +84,7 @@ router.get('/announcements/home', optionalAuth, dataAccessControl, async (req, r
     // 🔄 通过 ServiceManager 获取 AnnouncementService（符合TR-005规范）
     const AnnouncementService = req.app.locals.services.getService('announcement')
 
-    const dataLevel = req.isAdmin ? 'full' : 'public'
+    const dataLevel = req.role_level >= 100 ? 'full' : 'public'
 
     // ✅ 使用 AnnouncementService 统一查询逻辑（不直接操作models）
     const announcements = await AnnouncementService.getAnnouncements({

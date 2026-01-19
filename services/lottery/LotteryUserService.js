@@ -23,7 +23,7 @@ const logger = require('../../utils/logger').logger
  * - 基于UUID角色系统进行权限验证
  * - 使用`getUserRoles`中间件函数获取用户角色信息
  * - 支持灵活的角色和权限验证，适应不同业务场景
- * - `is_admin`字段：基于角色系统的管理员标识（计算值）
+ * - 管理员判断：role_level >= 100
  *
  * 集成模型：
  * - User：用户模型，存储用户基本信息、状态、连续失败次数、历史总积分
@@ -42,13 +42,8 @@ const logger = require('../../utils/logger').logger
  * // 获取用户信息
  * const userInfo = await userService.getUserInfo(10001)
  * logger.info('用户昵称:', userInfo.nickname)
- * logger.info('是否管理员:', userInfo.is_admin)
- *
- * // 验证用户是否为管理员
- * const isAdmin = await userService.isAdmin(10001)
- * if (isAdmin) {
- *   logger.info('用户是管理员，允许访问管理功能')
- * }
+ * logger.info('用户角色级别:', userInfo.role_level)
+ * logger.info('是否管理员:', userInfo.role_level >= 100)
  *
  * // 验证抽奖权限
  * const permission = await userService.validateLotteryPermission(10001)
@@ -102,7 +97,7 @@ class LotteryUserService {
    * @returns {string} return.mobile - 手机号
    * @returns {string} return.nickname - 昵称
    * @returns {string} return.status - 用户状态（active/inactive）
-   * @returns {boolean} return.is_admin - 是否为管理员（基于角色计算）
+   * @returns {number} return.role_level - 角色级别（>= 100 为管理员）
    * @returns {Array} return.roles - 用户角色列表
    * @returns {number} return.consecutive_fail_count - 连续失败次数
    * @returns {number} return.history_total_points - 历史总积分
@@ -114,7 +109,7 @@ class LotteryUserService {
    * @example
    * const userInfo = await userService.getUserInfo(10001)
    * logger.info('用户昵称:', userInfo.nickname)
-   * logger.info('是否管理员:', userInfo.is_admin)
+   * logger.info('是否管理员:', userInfo.role_level >= 100)
    */
   async getUserInfo(user_id) {
     try {
@@ -131,7 +126,7 @@ class LotteryUserService {
         mobile: user.mobile,
         nickname: user.nickname,
         status: user.status,
-        is_admin: userRoles.isAdmin, // 🛡️ 基于角色计算
+        role_level: userRoles.role_level, // 🛡️ 基于角色级别判断权限（>= 100 为管理员）
         roles: userRoles.roles,
         consecutive_fail_count: user.consecutive_fail_count,
         history_total_points: user.history_total_points,
@@ -141,30 +136,6 @@ class LotteryUserService {
     } catch (error) {
       logger.error('获取用户信息失败:', error)
       throw error
-    }
-  }
-
-  /**
-   * 🛡️ 检查用户是否为管理员 - 使用UUID角色系统
-   *
-   * 业务场景：验证用户是否具有管理员权限，用于管理功能访问控制
-   *
-   * @param {number} user_id - 用户ID（users表主键）
-   * @returns {Promise<boolean>} 是否为管理员
-   *
-   * @example
-   * const isAdmin = await userService.isAdmin(10001)
-   * if (isAdmin) {
-   *   logger.info('用户是管理员，允许访问管理功能')
-   * }
-   */
-  async isAdmin(user_id) {
-    try {
-      const userRoles = await getUserRoles(user_id)
-      return userRoles.isAdmin
-    } catch (error) {
-      logger.error('检查管理员权限失败:', error)
-      return false
     }
   }
 
@@ -206,7 +177,7 @@ class LotteryUserService {
    * @returns {number} return.user_id - 用户ID
    * @returns {string} return.mobile - 手机号
    * @returns {string} return.nickname - 昵称
-   * @returns {boolean} return.is_admin - 是否为管理员
+   * @returns {number} return.role_level - 角色级别（>= 100 为管理员）
    * @returns {number} return.consecutive_fail_count - 连续失败次数
    * @returns {number} return.history_total_points - 历史总积分
    * @returns {number} return.login_count - 登录次数
@@ -237,7 +208,7 @@ class LotteryUserService {
         user_id: user.user_id,
         mobile: user.mobile,
         nickname: user.nickname,
-        is_admin: userRoles.isAdmin, // 🛡️ 基于角色计算
+        role_level: userRoles.role_level, // 🛡️ 基于角色级别判断权限（>= 100 为管理员）
         consecutive_fail_count: user.consecutive_fail_count || 0,
         history_total_points: user.history_total_points || 0,
         login_count: user.login_count || 0,
@@ -266,7 +237,7 @@ class LotteryUserService {
    * @returns {boolean} return.valid - 是否有效
    * @returns {string} [return.reason] - 无效原因（USER_NOT_FOUND/USER_INACTIVE/VALIDATION_ERROR）
    * @returns {number} [return.user_id] - 用户ID
-   * @returns {boolean} [return.is_admin] - 是否为管理员
+   * @returns {number} [return.role_level] - 角色级别（>= 100 为管理员）
    * @returns {boolean} [return.can_participate] - 是否可以参与抽奖
    *
    * @example
@@ -294,7 +265,7 @@ class LotteryUserService {
       return {
         valid: true,
         user_id,
-        is_admin: userRoles.isAdmin,
+        role_level: userRoles.role_level, // 角色级别（>= 100 为管理员）
         can_participate: true
       }
     } catch (error) {

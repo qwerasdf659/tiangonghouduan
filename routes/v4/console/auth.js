@@ -71,8 +71,8 @@ router.get('/profile', authenticateToken, async (req, res) => {
   // 获取用户角色信息
   const userRoles = await getUserRoles(user.user_id)
 
-  // 验证管理员权限
-  if (!userRoles.isAdmin) {
+  // 验证管理员权限（role_level >= 100）
+  if (userRoles.role_level < 100) {
     return res.apiError('用户不具备管理员权限', 'INSUFFICIENT_PERMISSION', null, 403)
   }
 

@@ -74,9 +74,9 @@ router.get('/orders', authenticateToken, async (req, res) => {
       page_size: finalPageSize
     })
 
-    // 获取用户权限
+    // 获取用户权限（role_level >= 100 为管理员）
     const userRoles = await getUserRoles(user_id)
-    const dataLevel = userRoles.isAdmin ? 'full' : 'public'
+    const dataLevel = userRoles.role_level >= 100 ? 'full' : 'public'
 
     /*
      * 数据脱敏
@@ -136,9 +136,9 @@ router.get('/orders/:order_no', authenticateToken, async (req, res) => {
     // 调用服务层
     const result = await ExchangeService.getOrderDetail(user_id, order_no)
 
-    // 获取用户权限
+    // 获取用户权限（role_level >= 100 为管理员）
     const userRoles = await getUserRoles(user_id)
-    const dataLevel = userRoles.isAdmin ? 'full' : 'public'
+    const dataLevel = userRoles.role_level >= 100 ? 'full' : 'public'
 
     /*
      * 数据脱敏

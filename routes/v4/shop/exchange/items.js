@@ -100,9 +100,9 @@ router.get('/items', authenticateToken, async (req, res) => {
       sort_order: sort_order.toUpperCase()
     })
 
-    // 获取用户权限
+    // 获取用户权限（role_level >= 100 为管理员）
     const userRoles = await getUserRoles(req.user.user_id)
-    const dataLevel = userRoles.isAdmin ? 'full' : 'public'
+    const dataLevel = userRoles.role_level >= 100 ? 'full' : 'public'
 
     /*
      * 数据脱敏
@@ -163,9 +163,9 @@ router.get('/items/:item_id', authenticateToken, async (req, res) => {
     // 调用服务层
     const result = await ExchangeService.getItemDetail(itemId)
 
-    // 获取用户权限
+    // 获取用户权限（role_level >= 100 为管理员）
     const userRoles = await getUserRoles(user_id)
-    const dataLevel = userRoles.isAdmin ? 'full' : 'public'
+    const dataLevel = userRoles.role_level >= 100 ? 'full' : 'public'
 
     /*
      * 数据脱敏

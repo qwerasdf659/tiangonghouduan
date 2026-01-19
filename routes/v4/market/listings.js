@@ -58,30 +58,9 @@ const logger = require('../../../utils/logger').logger
  * - 缓存命中率目标：>80%
  *
  * 业务场景：用户浏览交易市场中其他用户上架的商品（物品和材料）
- *
- * 迁移说明（2026-01-14 决策1）：
- * - category 参数已废弃，请使用 listing_kind / item_category_code / asset_group_code / rarity_code 替代
- * - 传入 category 参数将返回 400 错误
  */
 router.get('/listings', authenticateToken, async (req, res) => {
   try {
-    /*
-     * 决策1（2026-01-14 迁移双轨清理）：
-     * category 参数已废弃，直接返回 400 Bad Request
-     * 请使用 listing_kind / item_category_code / asset_group_code / rarity_code 替代
-     */
-    if (req.query.category) {
-      return res.apiError(
-        'category 参数已废弃，请改用 listing_kind/item_category_code/asset_group_code/rarity_code',
-        'DEPRECATED_PARAMETER',
-        {
-          deprecated: 'category',
-          use_instead: ['listing_kind', 'item_category_code', 'asset_group_code', 'rarity_code']
-        },
-        400
-      )
-    }
-
     // P1-9：通过 ServiceManager 获取服务（snake_case key）
     const MarketListingService = req.app.locals.services.getService('market_listing')
 

@@ -1,7 +1,7 @@
 /**
  * 餐厅积分抽奖系统 V4.0 - 模型统一导出（V15.0 UUID角色系统版）
  * 清理了无效的模型引用，只保留实际存在的模型
- * V15.0更新：集成UUID角色系统，移除is_admin字段依赖
+ * V15.0更新：集成UUID角色系统（role_level >= 100 为管理员）
  */
 
 const { Sequelize, DataTypes } = require('sequelize')
@@ -15,7 +15,7 @@ models.User = require('./User')(sequelize, DataTypes)
 /*
  * ✅ User：用户基本信息（核心主键：user_id，唯一标识：mobile）
  *    - 包含：基本资料、积分累计、保底机制、状态管理
- *    - 权限管理：通过UUID角色系统（roles表关联），不使用is_admin字段
+ *    - 权限管理：通过UUID角色系统（roles表关联，role_level >= 100 为管理员）
  */
 
 // V15.0新增：UUID角色系统模型

@@ -76,8 +76,7 @@ router.get('/verify', authenticateToken, verifyRateLimiter, async (req, res) => 
       nickname: user.nickname,
       status: user.status,
       roles: userRoles.roles,
-      role_level: userRoles.role_level,
-      is_admin: userRoles.isAdmin,
+      role_level: userRoles.role_level, // 角色级别（>= 100 为管理员）
       created_at: BeijingTimeHelper.formatToISO(user.created_at),
       last_login: BeijingTimeHelper.formatToISO(user.last_login),
       login_count: user.login_count,
@@ -164,7 +163,7 @@ router.post('/refresh', async (req, res) => {
     user: {
       user_id: user.user_id,
       mobile: user.mobile,
-      is_admin: userRoles.isAdmin,
+      role_level: userRoles.role_level, // 角色级别（>= 100 为管理员）
       roles: userRoles.roles,
       status: user.status
     },

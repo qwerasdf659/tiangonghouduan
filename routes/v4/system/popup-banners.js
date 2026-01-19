@@ -86,9 +86,10 @@ router.get(
       /*
        * 权限控制：非管理员只能请求 active 状态
        * req.user 可能不存在（未登录用户）
+       * role_level >= 100 为管理员
        */
-      const isAdmin = req.user?.is_admin || req.user?.role_level >= 100
-      if (!isAdmin && status !== 'active') {
+      const hasAdminAccess = (req.role_level || 0) >= 100
+      if (!hasAdminAccess && status !== 'active') {
         return res.apiForbidden('权限不足：只能查询 active 状态弹窗')
       }
 
@@ -119,7 +120,7 @@ router.get(
         status,
         position,
         count: banners.length,
-        is_admin: isAdmin,
+        has_admin_access: hasAdminAccess,
         ip: req.ip
       })
 

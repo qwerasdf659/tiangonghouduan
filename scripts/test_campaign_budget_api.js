@@ -74,7 +74,8 @@ async function adminLogin() {
     const secret = 'restaurant_points_jwt_secret_key_development_only_32_chars'
 
     // 使用数据库中存在的管理员用户ID
-    adminToken = jwt.sign({ user_id: 31, role: 'admin', is_admin: true }, secret, {
+    // 🔄 2026-01-19：移除is_admin，使用role_level（统一JWT架构）
+    adminToken = jwt.sign({ user_id: 31, role: 'admin', role_level: 200 }, secret, {
       expiresIn: '1h'
     })
 

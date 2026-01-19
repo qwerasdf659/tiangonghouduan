@@ -5,7 +5,7 @@
  * @description 用户兑换商品操作
  *
  * API列表：
- * - POST /exchange - 兑换商品（V4.5.0 材料资产支付）
+ * - POST / - 兑换商品（V4.5.0 材料资产支付，路由挂载到 /api/v4/shop/exchange）
  *
  * 业务场景：
  * - 用户使用材料资产兑换商品
@@ -20,8 +20,13 @@
  * - 统一只接受 Header Idempotency-Key
  * - 缺失幂等键直接返回 400
  *
+ * 路径双轨清理（2026-01-19）：
+ * - 原路径：/api/v4/shop/exchange/exchange（已废弃删除）
+ * - canonical 路径：/api/v4/shop/exchange（当前使用）
+ * - 路由定义已从 /exchange 改为 /（根路径）
+ *
  * 创建时间：2025年12月22日
- * 更新时间：2026年01月02日 - 业界标准形态破坏性重构
+ * 更新时间：2026年01月19日 - 路径双轨清理
  */
 
 const express = require('express')
@@ -33,7 +38,7 @@ const TransactionManager = require('../../../../utils/TransactionManager')
 // P1-9：服务通过 ServiceManager 获取（B1-Injected + E2-Strict snake_case）
 
 /**
- * @route POST /api/v4/shop/exchange/exchange
+ * @route POST /api/v4/shop/exchange
  * @desc 兑换商品（V4.5.0 材料资产支付）
  * @access Private (需要登录)
  *
@@ -48,8 +53,12 @@ const TransactionManager = require('../../../../utils/TransactionManager')
  *
  * 业务场景：用户使用材料资产兑换商品
  * 幂等性控制（业界标准形态）：统一通过 Header Idempotency-Key 防止重复下单
+ *
+ * 【路径双轨清理 2026-01-19】：
+ * - 原路径：/api/v4/shop/exchange/exchange（已废弃）
+ * - canonical 路径：/api/v4/shop/exchange（当前使用）
  */
-router.post('/exchange', authenticateToken, async (req, res) => {
+router.post('/', authenticateToken, async (req, res) => {
   // P1-9：通过 ServiceManager 获取服务（B1-Injected + E2-Strict snake_case）
   const IdempotencyService = req.app.locals.services.getService('idempotency')
   const ExchangeService = req.app.locals.services.getService('exchange_market')
@@ -102,9 +111,10 @@ router.post('/exchange', authenticateToken, async (req, res) => {
     /*
      * 【入口幂等检查】防止同一次请求被重复提交
      * 统一使用 IdempotencyService 进行请求级幂等控制
+     * 【路径双轨清理 2026-01-19】：使用 canonical 路径 /api/v4/shop/exchange
      */
     const idempotencyResult = await IdempotencyService.getOrCreateRequest(idempotency_key, {
-      api_path: '/api/v4/shop/exchange/exchange',
+      api_path: '/api/v4/shop/exchange',
       http_method: 'POST',
       request_params: { item_id: itemId, quantity: exchangeQuantity },
       user_id

@@ -38,7 +38,7 @@
 
 const logger = require('../utils/logger').logger
 const { LotteryCampaignPricingConfig, LotteryCampaign } = require('../models')
-const BusinessCacheHelper = require('../utils/BusinessCacheHelper')
+const { BusinessCacheHelper } = require('../utils/BusinessCacheHelper')
 
 /**
  * 活动定价配置管理服务类
@@ -668,11 +668,9 @@ class LotteryCampaignPricingConfigService {
       }
     }
 
-    let activated = 0
-    let failed = 0
-
-    for (const [campaign_id, config] of campaign_config_map) {
-      try {
+    // 并行激活所有配置（每个活动最新版本）
+    const activation_promises = Array.from(campaign_config_map.entries()).map(
+      async ([campaign_id, config]) => {
         // 激活版本
         await LotteryCampaignPricingConfig.activateVersion(
           campaign_id,
@@ -690,17 +688,30 @@ class LotteryCampaignPricingConfigService {
           effective_at: config.effective_at
         })
 
+        return { campaign_id, config }
+      }
+    )
+
+    // 使用 Promise.allSettled 并行执行，独立处理每个结果
+    const activation_results = await Promise.allSettled(activation_promises)
+
+    // 统计激活结果
+    let activated = 0
+    let failed = 0
+    activation_results.forEach((result, index) => {
+      if (result.status === 'fulfilled') {
         activated++
-      } catch (error) {
+      } else {
+        const [campaign_id, config] = Array.from(campaign_config_map.entries())[index]
         logger.error('定时生效配置激活失败', {
           campaign_id,
           version: config.version,
           config_id: config.config_id,
-          error: error.message
+          error: result.reason?.message || String(result.reason)
         })
         failed++
       }
-    }
+    })
 
     // 归档其他同活动的 scheduled 版本（被跳过的旧版本）
     const skipped_configs = scheduled_configs.filter(
@@ -709,21 +720,27 @@ class LotteryCampaignPricingConfigService {
         campaign_config_map.get(c.campaign_id).config_id !== c.config_id
     )
 
-    for (const config of skipped_configs) {
-      try {
-        await config.update({ status: 'archived' })
-        logger.info('跳过的定时版本已归档', {
-          campaign_id: config.campaign_id,
-          version: config.version,
-          reason: '同活动有更新版本已激活'
-        })
-      } catch (error) {
+    // 并行归档跳过的版本
+    const archive_promises = skipped_configs.map(async config => {
+      await config.update({ status: 'archived' })
+      logger.info('跳过的定时版本已归档', {
+        campaign_id: config.campaign_id,
+        version: config.version,
+        reason: '同活动有更新版本已激活'
+      })
+      return config
+    })
+
+    const archive_results = await Promise.allSettled(archive_promises)
+    archive_results.forEach((result, index) => {
+      if (result.status === 'rejected') {
+        const config = skipped_configs[index]
         logger.warn('归档跳过版本失败', {
           config_id: config.config_id,
-          error: error.message
+          error: result.reason?.message || String(result.reason)
         })
       }
-    }
+    })
 
     return {
       processed: scheduled_configs.length,

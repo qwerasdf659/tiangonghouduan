@@ -19,7 +19,7 @@ const { authenticateToken, requireAdmin } = require('../../../middleware/auth')
 
 /**
  * 为用户创建抽奖预设队列
- * POST /api/v4/lottery-preset/create
+ * POST /api/v4/lottery/preset/create
  */
 router.post('/create', authenticateToken, requireAdmin, async (req, res) => {
   try {
@@ -97,10 +97,10 @@ router.post('/create', authenticateToken, requireAdmin, async (req, res) => {
 
 /**
  * 获取所有预设列表（管理员视角）
- * GET /api/v4/lottery-preset/list
+ * GET /api/v4/lottery/preset/list
  *
  * @description 获取所有用户的预设列表，支持筛选和分页（管理员查看所有预设记录）
- * @route GET /api/v4/lottery-preset/list
+ * @route GET /api/v4/lottery/preset/list
  * @access Private（需要JWT认证 + 管理员权限）
  *
  * 业务场景：
@@ -178,10 +178,10 @@ router.get('/list', authenticateToken, requireAdmin, async (req, res) => {
 
 /**
  * 获取预设统计信息
- * GET /api/v4/lottery-preset/stats
+ * GET /api/v4/lottery/preset/stats
  *
  * @description 获取系统级预设统计数据（管理员监控运营效果）
- * @route GET /api/v4/lottery-preset/stats
+ * @route GET /api/v4/lottery/preset/stats
  * @access Private（需要JWT认证 + 管理员权限）
  *
  * 业务场景：

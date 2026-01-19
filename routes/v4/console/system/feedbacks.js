@@ -21,7 +21,7 @@ const { sharedComponents, adminAuthMiddleware, asyncHandler } = require('../shar
  * GET /feedbacks - 获取所有用户反馈
  *
  * @description 获取用户反馈列表，支持分页和过滤
- * @route GET /api/v4/console/feedbacks
+ * @route GET /api/v4/console/system/feedbacks
  * @access Private (需要管理员权限)
  */
 router.get(
@@ -113,7 +113,7 @@ router.get(
  * POST /feedbacks/:id/reply - 回复用户反馈
  *
  * @description 管理员回复用户提交的反馈
- * @route POST /api/v4/console/feedbacks/:id/reply
+ * @route POST /api/v4/console/system/feedbacks/:id/reply
  * @access Private (需要管理员权限)
  */
 router.post(
@@ -171,7 +171,7 @@ router.post(
  * PUT /feedbacks/:id/status - 更新反馈状态
  *
  * @description 更新反馈的处理状态
- * @route PUT /api/v4/console/feedbacks/:id/status
+ * @route PUT /api/v4/console/system/feedbacks/:id/status
  * @access Private (需要管理员权限)
  */
 router.put(

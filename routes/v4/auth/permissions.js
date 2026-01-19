@@ -13,7 +13,7 @@
  * - 权限统计（statistics）
  *
  * 创建时间：2025年01月21日
- * 更新时间：2026年01月08日 - 拆分到独立域，路由重命名
+ * 更新时间：2026年01-19日 - 改用 UserRoleService（删除 UserPermissionModule）
  */
 
 const BeijingTimeHelper = require('../../../utils/timeHelper')
@@ -25,7 +25,6 @@ const {
   getUserRoles,
   invalidateUserPermissions
 } = require('../../../middleware/auth')
-const permission_module = require('../../../modules/UserPermissionModule')
 const permissionAuditLogger = require('../../../utils/PermissionAuditLogger') // 🔒 P1修复：审计日志系统
 const logger = require('../../../utils/logger').logger
 
@@ -88,19 +87,22 @@ router.get('/me', authenticateToken, async (req, res) => {
   try {
     const user_id = req.user.user_id
 
-    // 获取用户完整权限信息
-    const permissions = await permission_module.getUserPermissions(parseInt(user_id))
+    // 通过 ServiceManager 获取 UserRoleService
+    const UserRoleService = req.app.locals.services.getService('user_role')
 
-    // 构建响应数据
+    // 获取用户完整权限信息
+    const permissions = await UserRoleService.getUserPermissions(parseInt(user_id))
+
+    // 构建响应数据（role_level >= 100 为管理员）
+    const hasAdminAccess = permissions.role_level >= 100
     const response_data = {
       user_id: parseInt(user_id),
       roles: permissions.roles,
-      is_admin: permissions.is_admin,
-      role_level: permissions.role_level,
+      role_level: permissions.role_level, // 角色级别（>= 100 为管理员）
       permissions,
-      can_manage_lottery: permissions.is_admin,
-      can_view_admin_panel: permissions.is_admin,
-      can_modify_user_permissions: permissions.is_admin
+      can_manage_lottery: hasAdminAccess,
+      can_view_admin_panel: hasAdminAccess,
+      can_modify_user_permissions: hasAdminAccess
     }
 
     return res.apiSuccess(response_data, '当前用户权限信息获取成功')
@@ -121,11 +123,14 @@ router.post('/check', authenticateToken, validatePermissionParams, async (req, r
     const { resource, action = 'read' } = req.body
     const user_id = req.user.user_id
 
+    // 通过 ServiceManager 获取 UserRoleService
+    const UserRoleService = req.app.locals.services.getService('user_role')
+
     // 🛡️ 获取用户角色信息
     const user_roles = await getUserRoles(user_id)
 
     // 🛡️ 检查权限
-    const has_permission = await permission_module.checkUserPermission(user_id, resource, action)
+    const has_permission = await UserRoleService.checkUserPermission(user_id, resource, action)
 
     // 🔒 P1修复：记录权限检查审计日志
     await permissionAuditLogger.logPermissionCheck({
@@ -133,8 +138,7 @@ router.post('/check', authenticateToken, validatePermissionParams, async (req, r
       resource,
       action,
       has_permission,
-      is_admin: user_roles.isAdmin,
-      role_level: user_roles.role_level,
+      role_level: user_roles.role_level, // 角色级别（>= 100 为管理员）
       ip_address: req.ip,
       user_agent: req.get('user-agent')
     })
@@ -144,8 +148,7 @@ router.post('/check', authenticateToken, validatePermissionParams, async (req, r
       resource,
       action,
       has_permission,
-      is_admin: user_roles.isAdmin,
-      role_level: user_roles.role_level, // 🔄 统一命名：使用role_level
+      role_level: user_roles.role_level, // 角色级别（>= 100 为管理员）
       checked_at: BeijingTimeHelper.now()
     }
 
@@ -164,20 +167,23 @@ router.get('/admins', authenticateToken, async (req, res) => {
   try {
     const request_user_id = req.user.user_id
 
-    // 🛡️ 检查管理员权限
+    // 🛡️ 检查管理员权限（role_level >= 100）
     const request_user_roles = await getUserRoles(request_user_id)
-    if (!request_user_roles.isAdmin) {
+    if (request_user_roles.role_level < 100) {
       return res.apiError('需要管理员权限', 'ADMIN_REQUIRED', {}, 403)
     }
 
+    // 通过 ServiceManager 获取 UserRoleService
+    const UserRoleService = req.app.locals.services.getService('user_role')
+
     // 🛡️ 获取所有管理员
-    const admins = await permission_module.getAllAdmins()
+    const admins = await UserRoleService.getAllAdmins()
 
     const response_data = {
       total_count: admins.length,
       admins: admins.map(admin => ({
         ...admin,
-        is_admin: admin.is_admin
+        role_level: admin.role_level // 角色级别（>= 100 为管理员）
       })),
       retrieved_at: BeijingTimeHelper.now()
     }
@@ -216,14 +222,13 @@ router.post('/cache/invalidate', authenticateToken, async (req, res) => {
 
     /*
      * 权限边界规则：
-     * ✅ 允许：admin 对任意用户、用户对自己
+     * ✅ 允许：admin（role_level >= 100）对任意用户、用户对自己
      * ❌ 禁止：ops/user 对他人
      */
-    if (!is_self && !request_user_roles.isAdmin) {
+    if (!is_self && request_user_roles.role_level < 100) {
       logger.warn('❌ [Permissions] 权限缓存失效被拒绝', {
         target_user_id: user_id,
         operator_id: request_user_id,
-        is_admin: request_user_roles.isAdmin,
         role_level: request_user_roles.role_level,
         ip: req.ip
       })
@@ -305,8 +310,11 @@ router.post('/batch-check', authenticateToken, async (req, res) => {
       }
     }
 
+    // 通过 ServiceManager 获取 UserRoleService
+    const UserRoleService = req.app.locals.services.getService('user_role')
+
     // 🛡️ 批量检查权限
-    const result = await permission_module.batchCheckUserPermissions(user_id, permissions)
+    const result = await UserRoleService.batchCheckUserPermissions(user_id, permissions)
 
     // 🔒 记录审计日志（批量检查）
     await permissionAuditLogger.logPermissionCheck({
@@ -334,18 +342,21 @@ router.get('/statistics', authenticateToken, async (req, res) => {
   try {
     const request_user_id = req.user.user_id
 
-    // 🛡️ 检查管理员权限
+    // 🛡️ 检查管理员权限（role_level >= 100）
     const request_user_roles = await getUserRoles(request_user_id)
-    if (!request_user_roles.isAdmin) {
+    if (request_user_roles.role_level < 100) {
       return res.apiError('需要管理员权限', 'ADMIN_REQUIRED', {}, 403)
     }
 
+    // 通过 ServiceManager 获取 UserRoleService
+    const UserRoleService = req.app.locals.services.getService('user_role')
+
     // 🛡️ 获取权限统计
-    const statistics = await permission_module.getPermissionStatistics()
+    const statistics = await UserRoleService.getPermissionStatistics()
 
     const response_data = {
       ...statistics,
-      is_admin: request_user_roles.isAdmin,
+      role_level: request_user_roles.role_level, // 角色级别（>= 100 为管理员）
       retrieved_by: request_user_id
     }
 

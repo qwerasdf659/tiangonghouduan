@@ -298,7 +298,7 @@ class BackpackService {
    * @param {number} item_instance_id - 物品实例ID
    * @param {Object} [options] - 选项
    * @param {number} [options.viewer_user_id] - 查看者用户ID（用于权限检查）
-   * @param {boolean} [options.is_admin] - 是否管理员（管理员可以查看任意物品）
+   * @param {boolean} [options.has_admin_access] - 是否具有管理员访问权限（role_level >= 100）
    * @param {Object} [options.transaction] - Sequelize事务对象
    * @returns {Promise<Object|null>} 物品详情对象，不存在返回 null
    *
@@ -319,13 +319,13 @@ class BackpackService {
    * @throws {Error} FORBIDDEN - 无权查看此物品
    */
   static async getItemDetail(item_instance_id, options = {}) {
-    const { viewer_user_id, is_admin = false, transaction = null } = options
+    const { viewer_user_id, has_admin_access = false, transaction = null } = options
 
     try {
       logger.info('获取物品详情', {
         item_instance_id,
         viewer_user_id,
-        is_admin
+        has_admin_access
       })
 
       // 1. 查询物品实例
@@ -340,7 +340,7 @@ class BackpackService {
       }
 
       // 2. 权限检查：普通用户只能查看自己的物品
-      if (!is_admin && viewer_user_id && item.owner_user_id !== viewer_user_id) {
+      if (!has_admin_access && viewer_user_id && item.owner_user_id !== viewer_user_id) {
         const error = new Error('无权查看此物品')
         error.code = 'FORBIDDEN'
         throw error

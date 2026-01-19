@@ -41,14 +41,15 @@ router.get('/points/:user_id', authenticateToken, pointsRateLimiter, async (req,
       return res.apiError('user_id参数无效，必须为正整数', 'INVALID_USER_ID', {}, 400)
     }
 
-    // 🛡️ 权限检查：只能查看自己的积分，除非是超级管理员
+    // 🛡️ 权限检查：只能查看自己的积分，除非是超级管理员（role_level >= 100）
     const currentUserRoles = await getUserRoles(req.user.user_id)
-    if (req.user.user_id !== user_id && !currentUserRoles.isAdmin) {
+    const hasAdminAccess = currentUserRoles.role_level >= 100
+    if (req.user.user_id !== user_id && !hasAdminAccess) {
       return res.apiError('无权查看其他用户的积分信息', 'ACCESS_DENIED', {}, 403)
     }
 
     // ✅ 审计日志：记录管理员查询他人积分的操作（安全审计和合规性要求）
-    if (currentUserRoles.isAdmin && req.user.user_id !== user_id) {
+    if (hasAdminAccess && req.user.user_id !== user_id) {
       logger.warn('[Audit] 管理员查询他人积分', {
         operator_id: req.user.user_id, // 操作者（管理员）
         operator_mobile: req.user.mobile, // 操作者手机号
@@ -115,11 +116,11 @@ router.get('/statistics/:user_id', authenticateToken, async (req, res) => {
     /*
      * 🛡️ 权限检查（Access Control - 严格权限验证）：
      * 业务规则1：普通用户只能查看自己的统计（user_id必须匹配JWT token中的用户ID）
-     * 业务规则2：超级管理员admin可以查看任何用户的统计（用于后台管理和数据分析）
+     * 业务规则2：超级管理员admin（role_level >= 100）可以查看任何用户的统计（用于后台管理和数据分析）
      * 安全保障：防止用户A查看用户B的统计数据，保护用户隐私
      */
     const currentUserRoles = await getUserRoles(req.user.user_id)
-    if (req.user.user_id !== user_id && !currentUserRoles.isAdmin) {
+    if (req.user.user_id !== user_id && currentUserRoles.role_level < 100) {
       return res.apiError('无权查看其他用户的统计信息', 'ACCESS_DENIED', {}, 403)
     }
 

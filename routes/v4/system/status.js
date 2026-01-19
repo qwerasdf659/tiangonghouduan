@@ -31,7 +31,7 @@ const BeijingTimeHelper = require('../../../utils/timeHelper')
  */
 router.get('/status', optionalAuth, dataAccessControl, async (req, res) => {
   try {
-    const dataLevel = req.isAdmin ? 'full' : 'public'
+    const dataLevel = req.role_level >= 100 ? 'full' : 'public'
 
     // 系统基本状态
     const systemStatus = {
@@ -137,8 +137,8 @@ router.get('/business-config', optionalAuth, dataAccessControl, async (req, res)
       }
     }
 
-    // 根据用户角色返回不同级别的配置
-    const dataLevel = req.isAdmin ? 'full' : 'public'
+    // 根据用户角色返回不同级别的配置（role_level >= 100 为管理员）
+    const dataLevel = req.role_level >= 100 ? 'full' : 'public'
 
     // 公开配置（所有用户可见）
     const publicConfig = {

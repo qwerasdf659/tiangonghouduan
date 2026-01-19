@@ -256,7 +256,6 @@ async function getUserRoles(user_id, forceRefresh = false) {
 
     if (!user || !user.roles) {
       const emptyResult = {
-        isAdmin: false,
         role_level: 0, // 🔄 统一命名：使用role_level（snake_case标准）
         roles: [],
         permissions: []
@@ -285,8 +284,7 @@ async function getUserRoles(user_id, forceRefresh = false) {
     })
 
     const result = {
-      isAdmin: maxRoleLevel >= 100, // 🛡️ 基于角色级别计算管理员权限
-      role_level: maxRoleLevel, // 🔄 统一命名：使用role_level替代roleLevel（snake_case标准）
+      role_level: maxRoleLevel, // 🔄 统一命名：使用role_level（snake_case标准），管理员判断使用 role_level >= 100
       roles: user.roles.map(role => ({
         role_uuid: role.role_uuid,
         role_name: role.role_name,
@@ -302,7 +300,6 @@ async function getUserRoles(user_id, forceRefresh = false) {
   } catch (error) {
     logger.error('❌ 获取用户角色失败:', error.message)
     return {
-      isAdmin: false,
       role_level: 0, // 🔄 统一命名：使用role_level（snake_case标准）
       roles: [],
       permissions: []
@@ -360,8 +357,7 @@ async function generateTokens(user) {
         mobile: user.mobile,
         nickname: user.nickname,
         status: user.status,
-        role_level: userRoles.role_level, // 🔄 统一命名：使用role_level
-        is_admin: userRoles.isAdmin,
+        role_level: userRoles.role_level, // 🔄 统一使用 role_level，管理员判断: role_level >= 100
         user_role: userRole,
         roles: userRoles.roles
       }
@@ -474,11 +470,11 @@ async function authenticateToken(req, res, next) {
     req.user = userInfo
 
     /*
-     * 🛡️ 设置管理员标识（基于角色级别 >= 100）
-     * 用于路由层快速判断管理员权限
+     * 🛡️ 设置角色级别（用于路由层权限判断）
+     * 管理员判断：req.role_level >= 100
      */
     // eslint-disable-next-line require-atomic-updates
-    req.isAdmin = userRoles.isAdmin
+    req.role_level = userRoles.role_level
 
     next()
   } catch (error) {
@@ -583,9 +579,9 @@ async function optionalAuth(req, res, next) {
       // eslint-disable-next-line require-atomic-updates
       req.user = userInfo
 
-      // 🛡️ 设置管理员标识（基于角色级别 >= 100）
+      // 🛡️ 设置角色级别（管理员判断：req.role_level >= 100）
       // eslint-disable-next-line require-atomic-updates
-      req.isAdmin = userRoles.isAdmin
+      req.role_level = userRoles.role_level
 
       next()
     } catch (tokenError) {

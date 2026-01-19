@@ -50,10 +50,10 @@ router.get('/user/statistics/:user_id', authenticateToken, dataAccessControl, as
     }
 
     const currentUserId = req.user.user_id
-    const isAdmin = req.isAdmin
+    const hasAdminAccess = req.role_level >= 100
 
-    // 权限检查：只能查看自己的统计或管理员查看任何用户
-    if (user_id !== currentUserId && !isAdmin) {
+    // 权限检查：只能查看自己的统计或管理员（role_level >= 100）查看任何用户
+    if (user_id !== currentUserId && !hasAdminAccess) {
       return res.apiError('无权限查看其他用户统计', 'FORBIDDEN', null, 403)
     }
 
@@ -61,7 +61,7 @@ router.get('/user/statistics/:user_id', authenticateToken, dataAccessControl, as
     const ReportingService = req.app.locals.services.getService('reporting')
 
     // ✅ 使用 ReportingService 获取用户统计数据
-    const statistics = await ReportingService.getUserStatistics(user_id, isAdmin)
+    const statistics = await ReportingService.getUserStatistics(user_id, hasAdminAccess)
 
     return res.apiSuccess(
       {
@@ -77,7 +77,7 @@ router.get('/user/statistics/:user_id', authenticateToken, dataAccessControl, as
       error_stack: error.stack,
       user_id: req.params.user_id,
       current_user_id: req.user?.user_id,
-      is_admin: req.isAdmin,
+      role_level: req.role_level,
       timestamp: BeijingTimeHelper.now()
     })
 
@@ -97,7 +97,7 @@ router.get('/user/statistics/:user_id', authenticateToken, dataAccessControl, as
  */
 router.get('/admin/overview', authenticateToken, dataAccessControl, async (req, res) => {
   try {
-    if (!req.isAdmin) {
+    if (req.role_level < 100) {
       return res.apiError('需要管理员权限', 'FORBIDDEN', null, 403)
     }
 

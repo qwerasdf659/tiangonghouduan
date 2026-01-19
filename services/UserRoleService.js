@@ -1,10 +1,18 @@
 /**
  * 用户角色服务 - 统一用户权限操作接口
  * 创建时间：2025年01月21日
- * 最后更新：2026年01月05日（事务边界治理改造）
+ * 最后更新：2026年01月19日（合并 UserPermissionModule 功能）
  *
  * 🎯 目的：简化用户权限操作，而不合并User和Role模型
  * 🛡️ 优势：保持模型分离的同时提供便捷的业务接口
+ *
+ * 📋 2026-01-19 合并 UserPermissionModule 功能：
+ * - getUserPermissions() - 获取用户权限信息
+ * - getAllAdmins() - 获取所有管理员列表
+ * - batchCheckUserPermissions() - 批量检查权限
+ * - getPermissionStatistics() - 权限统计信息
+ * - validateOperation() - 验证操作权限
+ * - getAdminInfo() - 获取管理员信息
  *
  * 事务边界治理（2026-01-05 决策）：
  * - 所有写操作 **强制要求** 外部事务传入（options.transaction）
@@ -48,7 +56,7 @@ class UserRoleService {
   /**
    * 🔍 获取用户完整信息（包含角色权限）
    * @param {number} user_id - 用户ID
-   * @returns {Promise<Object>} 用户信息和权限数据，包含user_id、mobile、nickname、roles数组、is_admin、highest_role_level等字段
+   * @returns {Promise<Object>} 用户信息和权限数据，包含user_id、mobile、nickname、roles数组、highest_role_level等字段
    */
   static async getUserWithRoles(user_id) {
     const user = await User.findByPk(user_id, {
@@ -86,8 +94,7 @@ class UserRoleService {
           permissions: role.permissions
         })) || [],
 
-      // 便捷权限检查
-      is_admin: await user.isAdmin(),
+      // 便捷权限检查：管理员判断使用 highest_role_level >= 100
       highest_role_level: Math.max(...(user.roles?.map(r => r.role_level) || [0]))
     }
   }
@@ -604,6 +611,373 @@ class UserRoleService {
         description: role.description
       }))
     }
+  }
+
+  // ==================== 从 UserPermissionModule 迁移的方法 ====================
+
+  /**
+   * 🛡️ 获取用户权限信息（基于UUID角色系统）
+   *
+   * 从 UserPermissionModule 迁移（2026-01-19）
+   *
+   * @param {number} user_id - 用户ID
+   * @returns {Promise<Object>} 用户权限信息
+   */
+  static async getUserPermissions(user_id) {
+    try {
+      const user = await User.findOne({
+        where: { user_id, status: 'active' },
+        include: [
+          {
+            model: Role,
+            as: 'roles',
+            through: {
+              where: { is_active: true }
+            },
+            attributes: ['role_id', 'role_uuid', 'role_name', 'role_level', 'permissions']
+          }
+        ]
+      })
+
+      if (!user) {
+        return {
+          exists: false,
+          role_level: 0,
+          permissions: [],
+          roles: []
+        }
+      }
+
+      // 计算用户最高权限级别
+      const maxRoleLevel =
+        user.roles.length > 0 ? Math.max(...user.roles.map(role => role.role_level)) : 0
+
+      // 合并所有角色权限
+      const allPermissions = new Set()
+      user.roles.forEach(role => {
+        if (role.permissions) {
+          Object.entries(role.permissions).forEach(([resource, actions]) => {
+            if (Array.isArray(actions)) {
+              actions.forEach(action => {
+                allPermissions.add(`${resource}:${action}`)
+              })
+            }
+          })
+        }
+      })
+
+      return {
+        exists: true,
+        user_id: user.user_id,
+        mobile: user.mobile,
+        nickname: user.nickname,
+        status: user.status,
+        role_level: maxRoleLevel, // 🛡️ 管理员判断：role_level >= 100
+        permissions: Array.from(allPermissions),
+        roles: user.roles.map(role => ({
+          role_uuid: role.role_uuid,
+          role_name: role.role_name,
+          role_level: role.role_level
+        }))
+      }
+    } catch (error) {
+      logger.error('获取用户权限失败', { user_id, error: error.message })
+      return {
+        exists: false,
+        role_level: 0,
+        permissions: [],
+        roles: []
+      }
+    }
+  }
+
+  /**
+   * 🛡️ 获取所有管理员用户
+   *
+   * 从 UserPermissionModule 迁移（2026-01-19）
+   *
+   * 安全优化：
+   * - ✅ 手机号脱敏处理（格式：138****8000）
+   * - ✅ role_level从数据库动态读取
+   * - ✅ 按创建时间降序排序
+   *
+   * @returns {Promise<Array>} 管理员用户列表
+   */
+  static async getAllAdmins() {
+    try {
+      const adminUsers = await User.findAll({
+        where: { status: 'active' },
+        include: [
+          {
+            model: Role,
+            as: 'roles',
+            where: { role_name: 'admin', is_active: true },
+            through: { where: { is_active: true } },
+            attributes: ['role_name', 'role_level', 'role_uuid']
+          }
+        ],
+        attributes: ['user_id', 'mobile', 'nickname', 'status', 'created_at', 'last_login'],
+        order: [
+          ['created_at', 'DESC'],
+          ['user_id', 'ASC']
+        ]
+      })
+
+      return adminUsers.map(user => ({
+        user_id: user.user_id,
+        mobile: UserRoleService._maskMobile(user.mobile), // 手机号脱敏
+        nickname: user.nickname,
+        status: user.status,
+        role_level: user.roles[0]?.role_level || 100, // 管理员 role_level >= 100
+        roles: user.roles.map(r => ({
+          role_name: r.role_name,
+          role_level: r.role_level,
+          role_uuid: r.role_uuid
+        })),
+        created_at: user.created_at,
+        last_login: user.last_login
+      }))
+    } catch (error) {
+      logger.error('获取管理员列表失败', { error: error.message })
+      throw error
+    }
+  }
+
+  /**
+   * 🔄 批量检查用户权限
+   *
+   * 从 UserPermissionModule 迁移（2026-01-19）
+   *
+   * @param {number} user_id - 用户ID
+   * @param {Array} permissions - 权限数组 [{ resource, action }]
+   * @returns {Promise<Object>} 权限检查结果
+   */
+  static async batchCheckUserPermissions(user_id, permissions) {
+    try {
+      if (!Array.isArray(permissions) || permissions.length === 0) {
+        throw new Error('permissions必须为非空数组')
+      }
+
+      // 获取用户权限信息（只查询一次）
+      const userPermissions = await UserRoleService.getUserPermissions(user_id)
+
+      // 批量检查所有权限
+      const results = await Promise.all(
+        permissions.map(async ({ resource, action = 'read' }) => {
+          const has_permission = await UserRoleService.checkUserPermission(
+            user_id,
+            resource,
+            action
+          )
+          return {
+            resource,
+            action,
+            has_permission
+          }
+        })
+      )
+
+      return {
+        user_id,
+        role_level: userPermissions.role_level, // 管理员判断：role_level >= 100
+        permissions: results,
+        checked_at: BeijingTimeHelper.now()
+      }
+    } catch (error) {
+      logger.error('批量检查用户权限失败', { user_id, error: error.message })
+      throw error
+    }
+  }
+
+  /**
+   * 🛡️ 验证操作权限（统一权限验证入口）
+   *
+   * 从 UserPermissionModule 迁移（2026-01-19）
+   *
+   * @param {number} operator_id - 操作者ID
+   * @param {string} required_level - 必需权限级别 (user|admin)
+   * @param {string} resource - 资源名称
+   * @param {string} action - 操作类型
+   * @returns {Promise<Object>} 验证结果
+   */
+  static async validateOperation(
+    operator_id,
+    required_level = 'user',
+    resource = null,
+    action = 'read'
+  ) {
+    try {
+      const operatorPermissions = await UserRoleService.getUserPermissions(operator_id)
+
+      if (!operatorPermissions.exists) {
+        return { valid: false, reason: 'USER_NOT_FOUND' }
+      }
+
+      // 检查管理员权限要求（role_level >= 100）
+      if (required_level === 'admin' && operatorPermissions.role_level < 100) {
+        return { valid: false, reason: 'ADMIN_REQUIRED' }
+      }
+
+      // 如果指定了具体资源权限，进行检查
+      if (resource) {
+        const hasPermission = await UserRoleService.checkUserPermission(
+          operator_id,
+          resource,
+          action
+        )
+        if (!hasPermission) {
+          return { valid: false, reason: 'PERMISSION_DENIED' }
+        }
+      }
+
+      return {
+        valid: true,
+        role_level: operatorPermissions.role_level, // 管理员判断：role_level >= 100
+        permissions: operatorPermissions.permissions
+      }
+    } catch (error) {
+      logger.error('验证操作权限失败', { operator_id, error: error.message })
+      return { valid: false, reason: 'VALIDATION_ERROR' }
+    }
+  }
+
+  /**
+   * 🛡️ 获取管理员信息（基于角色系统）
+   *
+   * 从 UserPermissionModule 迁移（2026-01-19）
+   *
+   * @param {number} admin_id - 管理员ID
+   * @returns {Promise<Object>} 管理员信息
+   */
+  static async getAdminInfo(admin_id) {
+    try {
+      const userPermissions = await UserRoleService.getUserPermissions(admin_id)
+
+      if (!userPermissions.exists) {
+        return { valid: false, reason: 'ADMIN_NOT_FOUND' }
+      }
+
+      if (userPermissions.role_level < 100) {
+        return { valid: false, reason: 'NOT_ADMIN' }
+      }
+
+      return {
+        valid: true,
+        admin_id: userPermissions.user_id,
+        mobile: userPermissions.mobile,
+        nickname: userPermissions.nickname,
+        role_level: userPermissions.role_level, // 管理员 role_level >= 100
+        roles: userPermissions.roles
+      }
+    } catch (error) {
+      logger.error('获取管理员信息失败', { admin_id, error: error.message })
+      return { valid: false, reason: 'SYSTEM_ERROR' }
+    }
+  }
+
+  /**
+   * 🛡️ 获取权限统计信息
+   *
+   * 从 UserPermissionModule 迁移（2026-01-19）
+   *
+   * 功能说明：
+   * - 统计系统总用户数、管理员数量、普通用户数量
+   * - 统计各角色的用户分布
+   * - 记录查询耗时，便于性能监控
+   *
+   * @returns {Promise<Object>} 权限统计
+   */
+  static async getPermissionStatistics() {
+    const startTime = Date.now()
+
+    try {
+      logger.info('开始查询权限统计')
+
+      // 第1步：统计各角色用户数量
+      const userStats = await User.count({
+        where: { status: 'active' },
+        include: [
+          {
+            model: Role,
+            as: 'roles',
+            through: { where: { is_active: true } },
+            attributes: []
+          }
+        ],
+        group: ['roles.role_name'],
+        raw: true
+      })
+
+      // 第2步：获取总用户数
+      const totalUsers = await User.count({ where: { status: 'active' } })
+
+      // 第3步：获取管理员数量
+      const adminCount = await User.count({
+        where: { status: 'active' },
+        include: [
+          {
+            model: Role,
+            as: 'roles',
+            where: { role_name: 'admin', is_active: true },
+            through: { where: { is_active: true } }
+          }
+        ]
+      })
+
+      // 转换GROUP BY结果为对象格式
+      const roleDistribution = {}
+      if (Array.isArray(userStats)) {
+        userStats.forEach(stat => {
+          const roleName = stat.role_name
+          if (roleName) {
+            roleDistribution[roleName] = parseInt(stat.count) || 0
+          }
+        })
+      }
+
+      const queryTime = Date.now() - startTime
+      logger.info('权限统计查询完成', { queryTime, totalUsers, adminCount })
+
+      // 性能告警
+      if (queryTime > 500) {
+        logger.warn('权限统计查询耗时较长', { queryTime, totalUsers })
+      }
+
+      const roleSum = Object.values(roleDistribution).reduce((sum, count) => sum + count, 0)
+
+      return {
+        total_users: totalUsers,
+        admin_count: adminCount,
+        user_count: totalUsers - adminCount,
+        role_distribution: roleDistribution,
+        query_time_ms: queryTime,
+        timestamp: BeijingTimeHelper.now(),
+        meta: {
+          has_admins: adminCount > 0,
+          role_count: Object.keys(roleDistribution).length,
+          data_consistent: roleSum === totalUsers,
+          query_time_warning: queryTime > 500
+        }
+      }
+    } catch (error) {
+      logger.error('获取权限统计失败', { error: error.message })
+      throw error
+    }
+  }
+
+  /**
+   * 🔒 手机号脱敏处理（私有静态方法）
+   *
+   * 从 UserPermissionModule 迁移（2026-01-19）
+   *
+   * @param {string} mobile - 原始11位手机号
+   * @returns {string} 脱敏后的手机号（格式：138****8000）
+   */
+  static _maskMobile(mobile) {
+    if (!mobile || mobile.length !== 11) {
+      return mobile
+    }
+    return mobile.slice(0, 3) + '****' + mobile.slice(-4)
   }
 }
 

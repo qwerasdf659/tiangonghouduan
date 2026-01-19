@@ -171,12 +171,9 @@ module.exports = sequelize => {
    * - thumbnail_paths 存储预生成缩略图对象 key（JSON）
    * - 优先使用 thumbnail_paths 中的预生成缩略图 key
    *
-   * 🎯 架构决策（2026-01-14 图片缩略图架构兼容残留核查报告）：
-   * - 移除兼容旧数据的推断缩略图逻辑
-   * - 缺失 thumbnail_paths 时记录 ERROR 日志
-   * - 降级策略由 ENABLE_THUMBNAIL_FALLBACK 环境变量控制：
-   *   - true：使用原图作为缩略图（开发/测试环境）
-   *   - false（默认）：使用占位图（生产环境）
+   * 🎯 架构决策（2026-01-19 缩略图降级兼容清理）：
+   * - 已移除 ENABLE_THUMBNAIL_FALLBACK 环境变量控制
+   * - 缺失 thumbnail_paths 时：记录 ERROR 日志 + 返回占位图 URL（生产安全兜底）
    *
    * @returns {Object} 安全的图片资源对象（包含公网 URL，不含敏感路径）
    */
@@ -187,45 +184,28 @@ module.exports = sequelize => {
     // 生成缩略图 URL：优先使用预生成的 thumbnail_paths
     let thumbnails = null
     const storedThumbnails = values.thumbnail_paths
-    const enableFallback = process.env.ENABLE_THUMBNAIL_FALLBACK === 'true'
 
     if (storedThumbnails && Object.keys(storedThumbnails).length > 0) {
-      // 使用预生成的缩略图 key（数据库存储的真实 key）
+      // 使用预生成的缩略图 key（正常路径）
       thumbnails = {
         small: storedThumbnails.small ? getImageUrl(storedThumbnails.small) : null,
         medium: storedThumbnails.medium ? getImageUrl(storedThumbnails.medium) : null,
         large: storedThumbnails.large ? getImageUrl(storedThumbnails.large) : null
       }
     } else {
-      // 2026-01-14 决策：告警优先降级逻辑（移除兼容旧数据的推断缩略图逻辑）
+      // 缩略图缺失时：记录 ERROR 日志 + 返回占位图（生产安全兜底）
       console.error(
         `❌ ImageResources.toSafeJSON: 图片 ${values.image_id} 缺少预生成缩略图。` +
           `file_path: ${values.file_path}, business_type: ${values.business_type}, ` +
           `category: ${values.category}, context_id: ${values.context_id}`
       )
 
-      if (enableFallback) {
-        // 降级方案 A: 使用原图作为缩略图（如果 ENABLE_THUMBNAIL_FALLBACK 为 true）
-        const originalImageUrl = getImageUrl(values.file_path)
-        thumbnails = {
-          small: originalImageUrl,
-          medium: originalImageUrl,
-          large: originalImageUrl
-        }
-        console.warn(
-          `⚠️ ImageResources.toSafeJSON: 图片 ${values.image_id} 缩略图降级为原图 URL (ENABLE_THUMBNAIL_FALLBACK=true)`
-        )
-      } else {
-        // 降级方案 B: 使用占位图（生产环境默认）
-        const placeholderUrl = getPlaceholderImageUrl(values.business_type, values.category)
-        thumbnails = {
-          small: placeholderUrl,
-          medium: placeholderUrl,
-          large: placeholderUrl
-        }
-        console.warn(
-          `⚠️ ImageResources.toSafeJSON: 图片 ${values.image_id} 缩略图降级为占位图 URL (ENABLE_THUMBNAIL_FALLBACK=false)`
-        )
+      // 使用占位图作为降级方案（生产安全兜底）
+      const placeholderUrl = getPlaceholderImageUrl(values.business_type, values.category)
+      thumbnails = {
+        small: placeholderUrl,
+        medium: placeholderUrl,
+        large: placeholderUrl
       }
     }
 
@@ -238,64 +218,6 @@ module.exports = sequelize => {
       // 移除服务器文件路径敏感信息
       file_path: undefined,
       thumbnail_paths: undefined
-    }
-  }
-
-  /**
-   * 获取缩略图 URL（兼容方法）
-   *
-   * 🎯 架构决策（2026-01-08 拍板）：
-   * - 缩略图在上传时由 ImageService + SealosStorageService 预生成
-   * - 预生成 3 档缩略图（150/300/600px，cover-center）
-   * - 缩略图 key 存储在 thumbnail_paths 字段（JSON）
-   *
-   * 🎯 架构决策（2026-01-14 图片缩略图架构兼容残留核查报告）：
-   * - 移除兼容旧数据的推断缩略图逻辑
-   * - 缺失 thumbnail_paths 时记录 ERROR 日志并使用降级策略
-   *
-   * @deprecated 请使用 toSafeJSON().thumbnails 获取缩略图 URL
-   * @returns {Object} 缩略图 URL 对象 { small, medium, large }
-   */
-  ImageResources.prototype.generateThumbnails = function () {
-    const { getImageUrl, getPlaceholderImageUrl } = require('../utils/ImageUrlHelper')
-
-    console.warn('⚠️ generateThumbnails 已废弃：请使用 toSafeJSON().thumbnails')
-
-    if (!this.file_path) {
-      return null
-    }
-
-    // 优先使用预生成的缩略图 key
-    if (this.thumbnail_paths && Object.keys(this.thumbnail_paths).length > 0) {
-      return {
-        small: this.thumbnail_paths.small ? getImageUrl(this.thumbnail_paths.small) : null,
-        medium: this.thumbnail_paths.medium ? getImageUrl(this.thumbnail_paths.medium) : null,
-        large: this.thumbnail_paths.large ? getImageUrl(this.thumbnail_paths.large) : null
-      }
-    }
-
-    // 2026-01-14 决策：告警优先降级逻辑（移除兼容旧数据的推断缩略图逻辑）
-    console.error(
-      `❌ ImageResources.generateThumbnails: 图片 ${this.image_id} 缺少预生成缩略图。` +
-        `file_path: ${this.file_path}, business_type: ${this.business_type}`
-    )
-
-    const enableFallback = process.env.ENABLE_THUMBNAIL_FALLBACK === 'true'
-
-    if (enableFallback) {
-      const originalImageUrl = getImageUrl(this.file_path)
-      return {
-        small: originalImageUrl,
-        medium: originalImageUrl,
-        large: originalImageUrl
-      }
-    } else {
-      const placeholderUrl = getPlaceholderImageUrl(this.business_type, this.category)
-      return {
-        small: placeholderUrl,
-        medium: placeholderUrl,
-        large: placeholderUrl
-      }
     }
   }
 

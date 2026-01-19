@@ -1097,7 +1097,7 @@ class ConsumptionService {
    * @description 先进行轻量查询验证权限，再获取完整详情
    * @param {number} recordId - 消费记录ID
    * @param {number} viewerId - 查看者用户ID
-   * @param {boolean} isAdmin - 是否为管理员（role_level >= 100）
+   * @param {boolean} has_admin_access - 是否具有管理员访问权限（role_level >= 100）
    * @param {Object} options - 查询选项
    * @param {boolean} options.include_review_records - 是否包含审核记录
    * @param {boolean} options.include_points_transaction - 是否包含积分交易记录
@@ -1114,7 +1114,12 @@ class ConsumptionService {
    * - 权限通过后再查询完整数据（包含关联查询，响应~200ms）
    * - 无权限查询节省约75%时间和80%数据库资源
    */
-  static async getConsumptionDetailWithAuth(recordId, viewerId, isAdmin = false, options = {}) {
+  static async getConsumptionDetailWithAuth(
+    recordId,
+    viewerId,
+    has_admin_access = false,
+    options = {}
+  ) {
     try {
       /*
        * ✅ 步骤1：轻量查询验证权限（仅查询3个字段，响应<50ms）
@@ -1136,7 +1141,7 @@ class ConsumptionService {
        * 权限检查：用户本人、商家、管理员(role_level >= 100)可查询
        */
       const hasAccess =
-        viewerId === basicRecord.user_id || viewerId === basicRecord.merchant_id || isAdmin
+        viewerId === basicRecord.user_id || viewerId === basicRecord.merchant_id || has_admin_access
 
       if (!hasAccess) {
         const error = new Error('无权访问此消费记录')
@@ -1386,8 +1391,8 @@ class ConsumptionService {
    * @param {number} recordId - 消费记录ID
    * @param {number} userId - 操作用户ID（用于权限验证）
    * @param {Object} options - 选项
-   * @param {boolean} [options.isAdmin=false] - 是否为管理员操作
-   * @param {number} [options.roleLevel=0] - 用户角色级别（用于权限判断）
+   * @param {boolean} [options.has_admin_access=false] - 是否具有管理员访问权限（role_level >= 100）
+   * @param {number} [options.role_level=0] - 用户角色级别（用于权限判断）
    * @param {Object} [options.transaction] - Sequelize事务对象（可选）
    * @returns {Promise<Object>} 删除结果
    * @throws {Error} 记录不存在、无权限、已删除、状态不允许等
@@ -1395,9 +1400,9 @@ class ConsumptionService {
    * @since 2026-01-12 支持事务边界（TS2.2）
    */
   static async softDeleteRecord(recordId, userId, options = {}) {
-    const { isAdmin = false, roleLevel = 0, transaction } = options
+    const { has_admin_access = false, role_level = 0, transaction } = options
 
-    logger.info('软删除消费记录', { record_id: recordId, user_id: userId, is_admin: isAdmin })
+    logger.info('软删除消费记录', { record_id: recordId, user_id: userId, has_admin_access })
 
     // 查询记录（支持事务锁定）
     const record = await ConsumptionRecord.findByPk(recordId, {
@@ -1410,12 +1415,12 @@ class ConsumptionService {
     }
 
     // 权限检查：仅记录所有者或管理员可删除
-    if (!isAdmin && record.user_id !== userId) {
+    if (!has_admin_access && record.user_id !== userId) {
       throw new Error('无权删除此消费记录')
     }
 
     // 状态检查：普通用户只能删除 pending 状态的记录，管理员可删除任何状态
-    if (roleLevel < 100 && record.status !== 'pending') {
+    if (role_level < 100 && record.status !== 'pending') {
       throw new Error(
         `仅允许删除待审核状态的消费记录，当前状态：${record.status}。已审核的记录请联系管理员处理`
       )

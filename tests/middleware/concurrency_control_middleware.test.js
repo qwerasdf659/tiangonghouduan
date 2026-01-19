@@ -9,11 +9,14 @@ const ConcurrencyControlMiddleware = require('../../middleware/ConcurrencyContro
 
 describe('ConcurrencyControlMiddleware 中间件测试 - 真实业务逻辑', () => {
   let middleware
-  // 🔴 P0-1修复：testUser 改为函数内部获取，确保 global.testData 已初始化
+  /*
+   * 🔴 P0-1修复：testUser 改为函数内部获取，确保 global.testData 已初始化
+   * 🔴 is_admin字段已移除，使用 role_level 判断管理员权限
+   */
   const getTestUser = () => ({
     user_id: global.testData?.testUser?.user_id, // 🔴 P0-1修复：动态获取
     mobile: '13612227930',
-    is_admin: false
+    role_level: global.testData?.testUser?.role_level || 0 // role_level >= 100 为管理员
   })
   // 兼容现有测试代码的静态引用
   let testUser

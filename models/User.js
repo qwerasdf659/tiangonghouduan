@@ -1,7 +1,6 @@
 /**
  * 用户信息管理模型 - V4.0 统一架构版本
  * 🛡️ 完全基于UUID角色系统的用户权限管理
- * 🗑️ 移除is_admin字段依赖，使用roles表关联
  *
  * 🔧 V4.0 UUID角色系统优化内容：
  * ⭐⭐⭐⭐⭐ 核心字段（5个）：
@@ -11,7 +10,7 @@
  * - history_total_points: 臻选空间解锁，必需，高优先级
  * - nickname: 用户昵称，可选，中优先级
  *
- * 🛡️ 权限管理：通过UUID角色系统实现，替代is_admin字段
+ * 🛡️ 权限管理：通过UUID角色系统实现（role_level >= 100 为管理员）
  */
 
 const { DataTypes } = require('sequelize')
@@ -222,7 +221,7 @@ module.exports = sequelize => {
     }
   }
 
-  // 🛡️ UUID角色系统方法 - 替代原有的is_admin检查
+  // 🛡️ UUID角色系统方法 - 检查用户是否拥有指定角色
   User.prototype.hasRole = async function (roleName) {
     const userRoles = await this.getRoles({
       where: { is_active: true },
@@ -265,10 +264,6 @@ module.exports = sequelize => {
     }
 
     return false
-  }
-
-  User.prototype.isAdmin = async function () {
-    return await this.hasRole('admin')
   }
 
   User.prototype.canAccess = async function (resource) {

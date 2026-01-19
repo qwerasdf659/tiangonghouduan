@@ -116,12 +116,12 @@ async function validateRealUsers() {
       validationResults.errors.push(`管理员用户不存在: ${REAL_USER_CONFIG.byMobile.adminUser}`)
     }
 
-    // 验证管理员权限 - 使用角色系统
+    // 验证管理员权限 - 使用 role_level 判断（role_level >= 100 为管理员）
     if (validationResults.adminUser) {
       const { getUserRoles } = require('../../middleware/auth')
       try {
         const userRoles = await getUserRoles(validationResults.adminUser.user_id)
-        if (!userRoles.isAdmin) {
+        if (userRoles.role_level < 100) {
           validationResults.errors.push(
             `指定的管理员用户无管理员权限: ${REAL_USER_CONFIG.byMobile.adminUser}`
           )

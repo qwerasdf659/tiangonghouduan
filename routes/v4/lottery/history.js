@@ -45,9 +45,9 @@ router.get('/history/:user_id', authenticateToken, async (req, res) => {
     const finalPage = Math.max(parseInt(page) || 1, 1) // 确保page>=1
     const finalLimit = Math.min(Math.max(parseInt(limit) || 20, 1), 50) // 确保1<=limit<=50
 
-    // 🛡️ 权限检查：只能查看自己的抽奖历史，除非是超级管理员
+    // 🛡️ 权限检查：只能查看自己的抽奖历史，除非是超级管理员（role_level >= 100）
     const currentUserRoles = await getUserRoles(req.user.user_id)
-    if (req.user.user_id !== user_id && !currentUserRoles.isAdmin) {
+    if (req.user.user_id !== user_id && currentUserRoles.role_level < 100) {
       return res.apiError('无权查看其他用户的抽奖历史', 'ACCESS_DENIED', {}, 403)
     }
 

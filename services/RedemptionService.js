@@ -123,7 +123,7 @@ class RedemptionService {
         const userRoles = await getUserRoles(creator_user_id)
 
         // 管理员判定：role_level >= 100
-        if (!userRoles.isAdmin) {
+        if (userRoles.role_level < 100) {
           logger.error('服务层兜底：非所有者且非管理员尝试生成核销码', {
             creator_user_id,
             item_instance_id,

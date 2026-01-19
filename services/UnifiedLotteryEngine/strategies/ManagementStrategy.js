@@ -770,7 +770,7 @@ class ManagementStrategy {
    * 验证流程：
    * 1. 检查adminInfo对象和user_id字段是否存在
    * 2. 获取用户角色信息（getUserRoles）
-   * 3. 验证是否为管理员（isAdmin）
+   * 3. 验证是否为管理员（role_level >= 100）
    * 4. 验证用户状态（必须为active）
    *
    * @param {Object} adminInfo - 管理员信息对象
@@ -784,7 +784,7 @@ class ManagementStrategy {
    *   - 'VALIDATION_ERROR': 验证过程发生错误
    * @returns {Object} return.admin - 管理员用户对象（当valid为true时）
    * @returns {Array} return.roles - 用户角色数组（当valid为true时）
-   * @returns {boolean} return.isAdmin - 是否为管理员（当valid为true时）
+   * @returns {number} return.role_level - 角色级别（当valid为true时）
    *
    * @example
    * const strategy = new ManagementStrategy()
@@ -804,7 +804,8 @@ class ManagementStrategy {
       // 🛡️ 获取用户角色信息
       const userRoles = await getUserRoles(adminInfo.user_id)
 
-      if (!userRoles.isAdmin) {
+      // 管理员判断：role_level >= 100
+      if (userRoles.role_level < 100) {
         return { valid: false, reason: 'NOT_ADMIN' }
       }
 
@@ -818,7 +819,7 @@ class ManagementStrategy {
         valid: true,
         admin,
         roles: userRoles.roles,
-        isAdmin: userRoles.isAdmin
+        role_level: userRoles.role_level
       }
     } catch (error) {
       this.logError('验证管理员信息失败', { adminInfo, error: error.message })
@@ -866,7 +867,8 @@ class ManagementStrategy {
       // 🛡️ 获取用户角色信息
       const userRoles = await getUserRoles(adminId)
 
-      if (!userRoles.isAdmin) {
+      // 管理员判断：role_level >= 100
+      if (userRoles.role_level < 100) {
         return { valid: false, reason: 'NOT_ADMIN' }
       }
 
@@ -906,20 +908,20 @@ class ManagementStrategy {
    *
    * 验证流程：
    * 1. 获取用户角色信息（getUserRoles）
-   * 2. 验证是否为管理员（isAdmin）
+   * 2. 验证是否为管理员（role_level >= 100）
    * 3. 验证用户状态（必须为active）
    *
    * 注意：此方法不进行特定权限检查，只检查基础管理员身份
    *
    * @param {number} adminId - 管理员用户ID
    * @returns {Promise<boolean>} 是否为管理员
-   * @returns {boolean} true - 用户是管理员且状态为active
+   * @returns {boolean} true - 用户是管理员（role_level >= 100）且状态为active
    * @returns {boolean} false - 用户不是管理员、状态不是active或验证过程发生错误
    *
    * @example
    * const strategy = new ManagementStrategy()
-   * const isAdmin = await strategy.checkAdminPermission(10001)
-   * if (isAdmin) {
+   * const hasAdminAccess = await strategy.checkAdminPermission(10001)
+   * if (hasAdminAccess) {
    *   logger.info('用户是管理员')
    * } else {
    *   logger.info('用户不是管理员')
@@ -930,7 +932,8 @@ class ManagementStrategy {
       // 🛡️ 使用UUID角色系统进行权限验证
       const userRoles = await getUserRoles(adminId)
 
-      if (!userRoles.isAdmin) {
+      // 管理员判断：role_level >= 100
+      if (userRoles.role_level < 100) {
         return false
       }
 
@@ -977,8 +980,8 @@ class ManagementStrategy {
   async getOperationLogs(adminId, filters = {}) {
     try {
       // 验证管理员权限
-      const isAdmin = await this.checkAdminPermission(adminId)
-      if (!isAdmin) {
+      const hasAdminAccess = await this.checkAdminPermission(adminId)
+      if (!hasAdminAccess) {
         throw new Error('管理员权限验证失败')
       }
 

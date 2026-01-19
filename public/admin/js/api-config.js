@@ -25,11 +25,11 @@ const API_ENDPOINTS = {
 
   // ===== 预设管理API =====
   PRESET: {
-    LIST: '/api/v4/lottery-preset/list', // 获取所有预设列表（管理员）
-    CREATE: '/api/v4/lottery-preset/create', // 创建预设
-    USER_LIST: '/api/v4/lottery-preset/user/:user_id', // 获取用户预设
-    DELETE: '/api/v4/lottery-preset/user/:user_id', // 删除用户预设
-    STATS: '/api/v4/lottery-preset/stats' // 获取统计信息
+    LIST: '/api/v4/lottery/preset/list', // 获取所有预设列表（管理员）
+    CREATE: '/api/v4/lottery/preset/create', // 创建预设
+    USER_LIST: '/api/v4/lottery/preset/user/:user_id', // 获取用户预设
+    DELETE: '/api/v4/lottery/preset/user/:user_id', // 删除用户预设
+    STATS: '/api/v4/lottery/preset/stats' // 获取统计信息
   },
 
   // ===== 奖品池管理API =====

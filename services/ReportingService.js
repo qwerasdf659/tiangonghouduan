@@ -1382,12 +1382,12 @@ class ReportingService {
    * 获取用户统计数据
    *
    * @param {number} user_id - 用户ID
-   * @param {boolean} isAdmin - 是否管理员（决定数据脱敏级别）
+   * @param {boolean} has_admin_access - 是否具有管理员访问权限（决定数据脱敏级别，role_level >= 100）
    * @returns {Promise<Object>} 用户统计数据
    */
-  static async getUserStatistics(user_id, isAdmin = false) {
+  static async getUserStatistics(user_id, has_admin_access = false) {
     try {
-      const dataLevel = isAdmin ? 'full' : 'public'
+      const dataLevel = has_admin_access ? 'full' : 'public'
 
       // 并行查询各种统计数据
       const [userInfo, lotteryStats, inventoryStats, pointsStats, pointsAccount, consumptionStats] =

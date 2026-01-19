@@ -49,27 +49,69 @@ async function initializeService() {
 }
 
 /**
- * 路由文件到 API 前缀的映射表
- * 基于 app.js 中的路由挂载点
+ * 路由文件到完整 API 路径的精确映射表
+ * 基于 app.js 和各模块 index.js 中的实际路由挂载点
+ *
+ * 📌 重要：必须按照精确度从高到低排序（更长的路径优先匹配）
+ * 📌 2026-01-19：修复路径解析问题，确保子模块挂载路径正确
  */
-const ROUTE_FILE_PREFIX_MAP = {
-  'routes/v4/auth': '/api/v4/auth',
-  'routes/v4/auth/permissions.js': '/api/v4/permissions', // 权限独立挂载
-  'routes/v4/console': '/api/v4/console',
-  'routes/v4/lottery': '/api/v4/lottery',
-  'routes/v4/market': '/api/v4/market',
-  'routes/v4/shop': '/api/v4/shop',
-  'routes/v4/system': '/api/v4/system',
-  'routes/v4/user': '/api/v4/user',
-  'routes/v4/assets': '/api/v4/assets',
-  'routes/v4/backpack': '/api/v4/backpack',
-  'routes/v4/merchant-points.js': '/api/v4/merchant-points',
-  'routes/v4/activities.js': '/api/v4/activities',
-  'routes/v4/debug-control.js': '/api/v4/debug-control'
-}
+const ROUTE_FILE_PREFIX_MAP = [
+  // ===== 精确匹配（最长路径优先）=====
+
+  // auth 域 - permissions 独立挂载（必须在 auth 之前）
+  { pattern: 'routes/v4/auth/permissions.js', prefix: '/api/v4/permissions' },
+
+  // console 域 - 子模块挂载（必须在 console 之前）
+  { pattern: 'routes/v4/console/customer-service/messages.js', prefix: '/api/v4/console/customer-service/sessions' },
+  { pattern: 'routes/v4/console/customer-service/operations.js', prefix: '/api/v4/console/customer-service/sessions' },
+  { pattern: 'routes/v4/console/customer-service/sessions.js', prefix: '/api/v4/console/customer-service/sessions' },
+  { pattern: 'routes/v4/console/customer-service', prefix: '/api/v4/console/customer-service' },
+  { pattern: 'routes/v4/console/lottery-management/adjustment.js', prefix: '/api/v4/console/lottery-management' },
+  { pattern: 'routes/v4/console/lottery-management/force-control.js', prefix: '/api/v4/console/lottery-management' },
+  { pattern: 'routes/v4/console/lottery-management/interventions.js', prefix: '/api/v4/console/lottery-management' },
+  { pattern: 'routes/v4/console/lottery-management/pricing-config.js', prefix: '/api/v4/console/lottery-management' },
+  { pattern: 'routes/v4/console/lottery-management/user-status.js', prefix: '/api/v4/console/lottery-management' },
+  { pattern: 'routes/v4/console/lottery-management', prefix: '/api/v4/console/lottery-management' },
+  { pattern: 'routes/v4/console/campaign-budget.js', prefix: '/api/v4/console/campaign-budget' },
+  { pattern: 'routes/v4/console/debt-management.js', prefix: '/api/v4/console/debt-management' },
+
+  // shop 域 - 子模块挂载
+  { pattern: 'routes/v4/shop/exchange/exchange.js', prefix: '/api/v4/shop/exchange' },
+  { pattern: 'routes/v4/shop/exchange', prefix: '/api/v4/shop/exchange' },
+  { pattern: 'routes/v4/shop/consumption', prefix: '/api/v4/shop/consumption' },
+  { pattern: 'routes/v4/shop/redemption', prefix: '/api/v4/shop/redemption' },
+  { pattern: 'routes/v4/shop/staff', prefix: '/api/v4/shop/staff' },
+  { pattern: 'routes/v4/shop/risk', prefix: '/api/v4/shop/risk' },
+  { pattern: 'routes/v4/shop/assets', prefix: '/api/v4/shop/assets' },
+  { pattern: 'routes/v4/shop/stock', prefix: '/api/v4/shop/stock' },
+
+  // console 域 - 独立子模块挂载（2026-01-19 路径双轨清理新增）
+  { pattern: 'routes/v4/console/popup-banners.js', prefix: '/api/v4/console/popup-banners' },
+  { pattern: 'routes/v4/console/staff.js', prefix: '/api/v4/console/staff' },
+  { pattern: 'routes/v4/console/stores.js', prefix: '/api/v4/console/stores' },
+  { pattern: 'routes/v4/console/user-hierarchy.js', prefix: '/api/v4/console/user-hierarchy' },
+  { pattern: 'routes/v4/console/system/announcements.js', prefix: '/api/v4/console/system/announcements' },
+  { pattern: 'routes/v4/console/system/feedbacks.js', prefix: '/api/v4/console/system/feedbacks' },
+
+  // ===== 通用域匹配（较短路径）=====
+  { pattern: 'routes/v4/auth', prefix: '/api/v4/auth' },
+  { pattern: 'routes/v4/console', prefix: '/api/v4/console' },
+  { pattern: 'routes/v4/lottery', prefix: '/api/v4/lottery' },
+  { pattern: 'routes/v4/market', prefix: '/api/v4/market' },
+  { pattern: 'routes/v4/shop', prefix: '/api/v4/shop' },
+  { pattern: 'routes/v4/system', prefix: '/api/v4/system' },
+  { pattern: 'routes/v4/user', prefix: '/api/v4/user' },
+  { pattern: 'routes/v4/assets', prefix: '/api/v4/assets' },
+  { pattern: 'routes/v4/backpack', prefix: '/api/v4/backpack' },
+  { pattern: 'routes/v4/merchant-points.js', prefix: '/api/v4/merchant-points' },
+  { pattern: 'routes/v4/activities.js', prefix: '/api/v4/activities' },
+  { pattern: 'routes/v4/debug-control.js', prefix: '/api/v4/debug-control' }
+]
 
 /**
  * 根据路由文件路径获取 API 前缀
+ * 使用有序数组确保精确匹配优先
+ *
  * @param {string} file_path - 路由文件路径
  * @returns {string} API 前缀
  */
@@ -77,8 +119,8 @@ function getApiPrefix(file_path) {
   // 标准化路径分隔符
   const normalized_path = file_path.replace(/\\/g, '/')
 
-  // 尝试精确匹配
-  for (const [pattern, prefix] of Object.entries(ROUTE_FILE_PREFIX_MAP)) {
+  // 按顺序尝试匹配（数组已按精确度排序）
+  for (const { pattern, prefix } of ROUTE_FILE_PREFIX_MAP) {
     if (normalized_path.includes(pattern)) {
       return prefix
     }
@@ -133,15 +175,25 @@ function scanWriteRoutes() {
             let match
             while ((match = pattern.exec(content)) !== null) {
               const route_path = match[1]
-              // 构建完整 API 路径
-              const full_api_path = route_path.startsWith('/')
-                ? `${api_prefix}${route_path}`
-                : `${api_prefix}/${route_path}`
+
+              // 构建完整 API 路径（正确处理根路径 '/'）
+              let full_api_path
+              if (route_path === '/') {
+                // 根路径直接使用 api_prefix
+                full_api_path = api_prefix
+              } else if (route_path.startsWith('/')) {
+                full_api_path = `${api_prefix}${route_path}`
+              } else {
+                full_api_path = `${api_prefix}/${route_path}`
+              }
+
+              // 清理多余斜杠，但保留路径末尾的单个斜杠（如果原本就有）
+              full_api_path = full_api_path.replace(/\/+/g, '/').replace(/\/$/, '')
 
               write_routes.push({
                 file: relative_path,
                 route_path: route_path,
-                full_api_path: full_api_path.replace(/\/+/g, '/') // 清理多余斜杠
+                full_api_path: full_api_path
               })
             }
           }
@@ -283,10 +335,10 @@ function runValidation() {
   console.log('\n--- 测试 Canonical Operation 映射一致性 ---')
 
   const test_cases = [
-    // 商城兑换操作 - 测试单一路径映射
+    // 商城兑换操作 - 测试单一路径映射（canonical 路径）
     {
       name: '商城兑换操作',
-      paths: ['/api/v4/shop/exchange/exchange'],
+      paths: ['/api/v4/shop/exchange'],
       expected_canonical: 'SHOP_EXCHANGE_CREATE_ORDER'
     },
     // 资产转换操作
@@ -378,14 +430,14 @@ function runValidation() {
       context_1: {
         user_id: 1001,
         http_method: 'POST',
-        api_path: '/api/v4/shop/exchange/exchange',
+        api_path: '/api/v4/shop/exchange',
         query: {},
         body: { item_id: 100, quantity: 1 }
       },
       context_2: {
         user_id: 1001,
         http_method: 'POST',
-        api_path: '/api/v4/shop/exchange/exchange',
+        api_path: '/api/v4/shop/exchange',
         query: {},
         body: { item_id: 100, quantity: 1 }
       },

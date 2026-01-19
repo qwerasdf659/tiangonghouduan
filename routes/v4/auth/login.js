@@ -142,7 +142,7 @@ router.post('/login', async (req, res) => {
       user_id: user.user_id,
       mobile: user.mobile,
       nickname: user.nickname,
-      is_admin: userRoles.isAdmin,
+      role_level: userRoles.role_level, // 角色级别（>= 100 为管理员）
       roles: userRoles.roles,
       status: user.status,
       last_login: user.last_login,
@@ -341,7 +341,7 @@ router.post('/quick-login', async (req, res) => {
       user_id: user.user_id,
       mobile: user.mobile,
       nickname: user.nickname,
-      is_admin: userRoles.isAdmin,
+      role_level: userRoles.role_level, // 角色级别（>= 100 为管理员）
       roles: userRoles.roles,
       status: user.status,
       created_at: user.created_at,

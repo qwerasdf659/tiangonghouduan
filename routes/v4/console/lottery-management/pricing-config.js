@@ -41,7 +41,6 @@
 
 const express = require('express')
 const router = express.Router()
-const logger = require('../../../../utils/logger').logger
 const { adminAuthMiddleware, asyncHandler } = require('../shared/middleware')
 
 /**
@@ -176,8 +175,10 @@ router.post(
  * - 将其他版本状态设为 archived
  * - 触发活动缓存失效
  */
-router.put('/campaigns/:campaign_id/pricing/:version/activate', async (req, res) => {
-  try {
+router.put(
+  '/campaigns/:campaign_id/pricing/:version/activate',
+  adminAuthMiddleware,
+  asyncHandler(async (req, res) => {
     const { campaign_id, version } = req.params
     const updated_by = req.user?.user_id
 
@@ -195,17 +196,8 @@ router.put('/campaigns/:campaign_id/pricing/:version/activate', async (req, res)
     )
 
     return res.apiSuccess(result, `版本 ${version} 已激活`)
-  } catch (error) {
-    logger.error('[PricingConfig] 激活版本失败:', { error: error.message, stack: error.stack })
-
-    // 处理 Service 抛出的业务错误
-    if (error.code) {
-      return res.apiError(error.message, error.code, error.details || null, error.statusCode || 500)
-    }
-
-    return res.apiError('激活版本失败', 'ACTIVATE_VERSION_ERROR', { error: error.message }, 500)
-  }
-})
+  })
+)
 
 /**
  * PUT /campaigns/:campaign_id/pricing/:version/archive
@@ -215,8 +207,10 @@ router.put('/campaigns/:campaign_id/pricing/:version/activate', async (req, res)
  * - 将指定版本状态设为 archived
  * - 不影响其他版本
  */
-router.put('/campaigns/:campaign_id/pricing/:version/archive', async (req, res) => {
-  try {
+router.put(
+  '/campaigns/:campaign_id/pricing/:version/archive',
+  adminAuthMiddleware,
+  asyncHandler(async (req, res) => {
     const { campaign_id, version } = req.params
     const updated_by = req.user?.user_id
 
@@ -234,17 +228,8 @@ router.put('/campaigns/:campaign_id/pricing/:version/archive', async (req, res) 
     )
 
     return res.apiSuccess(result, `版本 ${version} 已归档`)
-  } catch (error) {
-    logger.error('[PricingConfig] 归档版本失败:', { error: error.message, stack: error.stack })
-
-    // 处理 Service 抛出的业务错误
-    if (error.code) {
-      return res.apiError(error.message, error.code, error.details || null, error.statusCode || 500)
-    }
-
-    return res.apiError('归档版本失败', 'ARCHIVE_VERSION_ERROR', { error: error.message }, 500)
-  }
-})
+  })
+)
 
 /**
  * POST /campaigns/:campaign_id/pricing/rollback
@@ -265,8 +250,10 @@ router.put('/campaigns/:campaign_id/pricing/:version/archive', async (req, res) 
  * - 回滚操作会创建新资源（新版本），符合 POST 语义
  * - 保持版本号单调递增的不可变性
  */
-router.post('/campaigns/:campaign_id/pricing/rollback', async (req, res) => {
-  try {
+router.post(
+  '/campaigns/:campaign_id/pricing/rollback',
+  adminAuthMiddleware,
+  asyncHandler(async (req, res) => {
     const { campaign_id } = req.params
     const { target_version, rollback_reason = '' } = req.body
     const updated_by = req.user?.user_id
@@ -291,17 +278,8 @@ router.post('/campaigns/:campaign_id/pricing/rollback', async (req, res) => {
     )
 
     return res.apiSuccess(result, `已回滚到版本 ${target_version}，新版本号: ${result.new_version}`)
-  } catch (error) {
-    logger.error('[PricingConfig] 回滚版本失败:', { error: error.message, stack: error.stack })
-
-    // 处理 Service 抛出的业务错误
-    if (error.code) {
-      return res.apiError(error.message, error.code, error.details || null, error.statusCode || 500)
-    }
-
-    return res.apiError('回滚版本失败', 'ROLLBACK_VERSION_ERROR', { error: error.message }, 500)
-  }
-})
+  })
+)
 
 /**
  * PUT /campaigns/:campaign_id/pricing/:version/schedule
@@ -317,8 +295,10 @@ router.post('/campaigns/:campaign_id/pricing/rollback', async (req, res) => {
  * - 设置 effective_at 生效时间
  * - 定时任务会在到达生效时间后自动激活
  */
-router.put('/campaigns/:campaign_id/pricing/:version/schedule', async (req, res) => {
-  try {
+router.put(
+  '/campaigns/:campaign_id/pricing/:version/schedule',
+  adminAuthMiddleware,
+  asyncHandler(async (req, res) => {
     const { campaign_id, version } = req.params
     const { effective_at } = req.body
     const updated_by = req.user?.user_id
@@ -343,17 +323,8 @@ router.put('/campaigns/:campaign_id/pricing/:version/schedule', async (req, res)
     )
 
     return res.apiSuccess(result, `版本 ${version} 已设置定时生效`)
-  } catch (error) {
-    logger.error('[PricingConfig] 设置定时生效失败:', { error: error.message, stack: error.stack })
-
-    // 处理 Service 抛出的业务错误
-    if (error.code) {
-      return res.apiError(error.message, error.code, error.details || null, error.statusCode || 500)
-    }
-
-    return res.apiError('设置定时生效失败', 'SCHEDULE_VERSION_ERROR', { error: error.message }, 500)
-  }
-})
+  })
+)
 
 /**
  * DELETE /campaigns/:campaign_id/pricing/:version/schedule
@@ -363,8 +334,10 @@ router.put('/campaigns/:campaign_id/pricing/:version/schedule', async (req, res)
  * - 将 scheduled 状态的版本恢复为 draft 状态
  * - 清空 effective_at 时间
  */
-router.delete('/campaigns/:campaign_id/pricing/:version/schedule', async (req, res) => {
-  try {
+router.delete(
+  '/campaigns/:campaign_id/pricing/:version/schedule',
+  adminAuthMiddleware,
+  asyncHandler(async (req, res) => {
     const { campaign_id, version } = req.params
     const updated_by = req.user?.user_id
 
@@ -382,16 +355,7 @@ router.delete('/campaigns/:campaign_id/pricing/:version/schedule', async (req, r
     )
 
     return res.apiSuccess(result, `版本 ${version} 已取消定时生效`)
-  } catch (error) {
-    logger.error('[PricingConfig] 取消定时生效失败:', { error: error.message, stack: error.stack })
-
-    // 处理 Service 抛出的业务错误
-    if (error.code) {
-      return res.apiError(error.message, error.code, error.details || null, error.statusCode || 500)
-    }
-
-    return res.apiError('取消定时生效失败', 'CANCEL_SCHEDULE_ERROR', { error: error.message }, 500)
-  }
-})
+  })
+)
 
 module.exports = router

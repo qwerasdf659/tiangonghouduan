@@ -484,7 +484,7 @@ describe('🎯 Pipeline架构完整业务流程测试', () => {
       console.log('   - Strategy -> Pipeline 迁移已完成')
       console.log('   - 定价配置已迁移到 lottery_campaign_pricing_config 表')
       console.log('   - EligibilityStage 已集成 LotteryQuotaService')
-      console.log('   - BasicGuaranteeStrategy 已归档到 _archived_phase5/')
+      console.log('   - BasicGuaranteeStrategy 已删除（不再需要）')
       console.log('='.repeat(70))
 
       expect(true).toBe(true)

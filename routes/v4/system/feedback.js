@@ -188,10 +188,11 @@ router.get('/feedback/:id', authenticateToken, async (req, res) => {
       return res.apiError('反馈不存在', 'NOT_FOUND', null, 404)
     }
 
-    // 权限验证：用户只能查看自己的反馈，管理员可以查看所有反馈
+    // 权限验证：用户只能查看自己的反馈，管理员（role_level >= 100）可以查看所有反馈
     const userRoles = await getUserRoles(user_id)
+    const hasAdminAccess = userRoles.role_level >= 100
 
-    if (!userRoles.isAdmin && feedback.user_id !== user_id) {
+    if (!hasAdminAccess && feedback.user_id !== user_id) {
       return res.apiError('无权限查看此反馈', 'FORBIDDEN', null, 403)
     }
 
@@ -208,7 +209,7 @@ router.get('/feedback/:id', authenticateToken, async (req, res) => {
       user_info: feedback.user
         ? {
             user_id: feedback.user.user_id,
-            mobile: userRoles.isAdmin ? feedback.user.mobile : '****',
+            mobile: hasAdminAccess ? feedback.user.mobile : '****',
             nickname: feedback.user.nickname || '匿名用户'
           }
         : null,
@@ -228,7 +229,7 @@ router.get('/feedback/:id', authenticateToken, async (req, res) => {
 
       // 处理进度（✅ 直接读取数据库字段）
       estimated_response_time: feedback.estimated_response_time,
-      internal_notes: userRoles.isAdmin ? feedback.internal_notes : undefined
+      internal_notes: hasAdminAccess ? feedback.internal_notes : undefined
     }
 
     /*
@@ -238,7 +239,7 @@ router.get('/feedback/:id', authenticateToken, async (req, res) => {
     const DataSanitizer = req.app.locals.services.getService('data_sanitizer')
     const sanitizedDetail = DataSanitizer.sanitizeFeedbacks(
       [feedbackDetail],
-      userRoles.isAdmin ? 'full' : 'public'
+      hasAdminAccess ? 'full' : 'public'
     )[0]
 
     return res.apiSuccess(sanitizedDetail, '获取反馈详情成功')

@@ -477,10 +477,9 @@ class ImageService {
    *   - 使用预生成的缩略图 key（存储在 thumbnail_paths 字段）
    *   - 不使用 CDN，直连 Sealos 公网端点
    *
-   *   架构决策（2026-01-14 图片缩略图架构兼容残留核查报告）：
-   *   - 移除兼容旧数据的推断缩略图逻辑
-   *   - 缺失 thumbnail_paths 时记录 ERROR 日志
-   *   - 降级策略由 ENABLE_THUMBNAIL_FALLBACK 环境变量控制
+   *   架构决策（2026-01-19 缩略图降级兼容清理）：
+   *   - 已移除 ENABLE_THUMBNAIL_FALLBACK 环境变量控制
+   *   - 缺失 thumbnail_paths 时：记录 ERROR 日志 + 返回占位图 URL（生产安全兜底）
    *
    * @private
    * @param {Object} imageRecord - ImageResources 模型实例
@@ -489,18 +488,17 @@ class ImageService {
   static _formatImageResponse(imageRecord) {
     const objectKey = imageRecord.file_path
     const storedThumbnails = imageRecord.thumbnail_paths // JSON 字段
-    const enableFallback = process.env.ENABLE_THUMBNAIL_FALLBACK === 'true'
 
     let thumbnails = null
     if (storedThumbnails && Object.keys(storedThumbnails).length > 0) {
-      // 使用预生成的缩略图 key
+      // 使用预生成的缩略图 key（正常路径）
       thumbnails = {
         small: storedThumbnails.small ? getImageUrl(storedThumbnails.small) : null,
         medium: storedThumbnails.medium ? getImageUrl(storedThumbnails.medium) : null,
         large: storedThumbnails.large ? getImageUrl(storedThumbnails.large) : null
       }
     } else {
-      // 2026-01-14 决策：告警优先降级逻辑（移除兼容旧数据的推断缩略图逻辑）
+      // 缩略图缺失时：记录 ERROR 日志 + 返回占位图（生产安全兜底）
       console.error(
         '❌ ImageService: 图片 ' +
           imageRecord.image_id +
@@ -515,35 +513,12 @@ class ImageService {
           imageRecord.context_id
       )
 
-      if (enableFallback) {
-        // 降级方案 A: 使用原图作为缩略图（如果 ENABLE_THUMBNAIL_FALLBACK 为 true）
-        const originalImageUrl = getImageUrl(objectKey)
-        thumbnails = {
-          small: originalImageUrl,
-          medium: originalImageUrl,
-          large: originalImageUrl
-        }
-        console.warn(
-          '⚠️ ImageService: 图片 ' +
-            imageRecord.image_id +
-            ' 缩略图降级为原图 URL (ENABLE_THUMBNAIL_FALLBACK=true)'
-        )
-      } else {
-        // 降级方案 B: 使用占位图（生产环境默认）
-        const placeholderUrl = getPlaceholderImageUrl(
-          imageRecord.business_type,
-          imageRecord.category
-        )
-        thumbnails = {
-          small: placeholderUrl,
-          medium: placeholderUrl,
-          large: placeholderUrl
-        }
-        console.warn(
-          '⚠️ ImageService: 图片 ' +
-            imageRecord.image_id +
-            ' 缩略图降级为占位图 URL (ENABLE_THUMBNAIL_FALLBACK=false)'
-        )
+      // 使用占位图作为降级方案（生产安全兜底）
+      const placeholderUrl = getPlaceholderImageUrl(imageRecord.business_type, imageRecord.category)
+      thumbnails = {
+        small: placeholderUrl,
+        medium: placeholderUrl,
+        large: placeholderUrl
       }
     }
 

@@ -75,6 +75,7 @@ const SNAPSHOT_HARD_LIMIT = 65536 // 64KB
  *
  * 【已拍板决策 2026-01-09】：显式 operation，禁止依赖 URL 推导
  * 【已拍板决策 2026-01-13】：决策4-B 严格模式 - 未映射直接拒绝启动/拒绝请求
+ * 【已拍板决策 2026-01-19】：路径双轨清理 - 删除所有 deprecated 路径，只保留 canonical 路径
  *
  * - 幂等语义从 URL 解耦，使用稳定的 canonical_operation 作为幂等作用域
  * - 所有写接口必须在此映射表中显式定义
@@ -93,16 +94,14 @@ const CANONICAL_OPERATION_MAP = {
 
   // ===== 抽奖系统 =====
   '/api/v4/lottery/draw': 'LOTTERY_DRAW', // 抽奖
-  '/api/v4/lottery/create': 'LOTTERY_PRESET_CREATE', // 创建抽奖预设
+  '/api/v4/lottery/preset/create': 'LOTTERY_PRESET_CREATE', // 创建抽奖预设（修复：lottery/preset 子路由挂载）
 
   // ===== B2C 兑换下单 =====
-  '/api/v4/shop/exchange': 'SHOP_EXCHANGE_CREATE_ORDER', // 兑换商品（实际路径）
-  '/api/v4/shop/exchange/exchange': 'SHOP_EXCHANGE_CREATE_ORDER', // 兑换商品（兼容路径）
-  '/api/v4/shop/orders/:id/status': 'SHOP_EXCHANGE_UPDATE_STATUS', // 更新订单状态
+  '/api/v4/shop/exchange': 'SHOP_EXCHANGE_CREATE_ORDER', // 兑换商品（canonical 路径）
+  '/api/v4/shop/exchange/orders/:id/status': 'SHOP_EXCHANGE_UPDATE_STATUS', // 更新订单状态
 
   // ===== 材料转换 =====
-  '/api/v4/shop/convert': 'SHOP_ASSET_CONVERT', // 资产转换（实际路径）
-  '/api/v4/shop/assets/convert': 'SHOP_ASSET_CONVERT', // 资产转换（兼容路径）
+  '/api/v4/shop/assets/convert': 'SHOP_ASSET_CONVERT', // 资产转换（canonical 路径）
 
   // ===== C2C 市场交易 - 物品 =====
   '/api/v4/market/list': 'MARKET_CREATE_LISTING', // 物品上架
@@ -115,26 +114,20 @@ const CANONICAL_OPERATION_MAP = {
   '/api/v4/market/fungible-assets/:id/withdraw': 'MARKET_CANCEL_FUNGIBLE_LISTING', // 材料撤回
 
   // ===== 核销系统 =====
-  '/api/v4/shop/orders': 'REDEMPTION_CREATE_ORDER', // 创建核销订单（实际路径）
-  '/api/v4/shop/redemption/orders': 'REDEMPTION_CREATE_ORDER', // 创建核销订单（兼容路径）
-  '/api/v4/shop/fulfill': 'REDEMPTION_FULFILL', // 执行核销（实际路径）
-  '/api/v4/shop/redemption/fulfill': 'REDEMPTION_FULFILL', // 执行核销（兼容路径）
-  '/api/v4/shop/orders/:id/cancel': 'REDEMPTION_CANCEL_ORDER', // 取消核销订单
+  '/api/v4/shop/redemption/orders': 'REDEMPTION_CREATE_ORDER', // 创建核销订单（canonical 路径）
+  '/api/v4/shop/redemption/fulfill': 'REDEMPTION_FULFILL', // 执行核销（canonical 路径）
+  '/api/v4/shop/redemption/orders/:id/cancel': 'REDEMPTION_CANCEL_ORDER', // 取消核销订单
 
   // ===== 消费记录 =====
-  '/api/v4/shop/submit': 'CONSUMPTION_SUBMIT', // 提交消费记录（实际路径）
-  '/api/v4/shop/consumption/submit': 'CONSUMPTION_SUBMIT', // 提交消费记录（兼容路径）
-  '/api/v4/shop/:id': 'CONSUMPTION_DELETE', // 删除消费记录（实际路径）
-  '/api/v4/shop/consumption/:id': 'CONSUMPTION_DELETE', // 删除消费记录（兼容路径）
-  '/api/v4/shop/:id/restore': 'CONSUMPTION_RESTORE', // 恢复消费记录（实际路径）
-  '/api/v4/shop/consumption/:id/restore': 'CONSUMPTION_RESTORE', // 恢复消费记录（兼容路径）
+  '/api/v4/shop/consumption/submit': 'CONSUMPTION_SUBMIT', // 提交消费记录（canonical 路径）
+  '/api/v4/shop/consumption/:id': 'CONSUMPTION_DELETE', // 删除消费记录（canonical 路径）
+  '/api/v4/shop/consumption/:id/restore': 'CONSUMPTION_RESTORE', // 恢复消费记录（canonical 路径）
 
   // ===== 会员解锁 =====
-  '/api/v4/shop/unlock': 'PREMIUM_UNLOCK', // 解锁高级会员
+  '/api/v4/shop/premium/unlock': 'PREMIUM_UNLOCK', // 解锁高级会员（修复：shop/premium 子路由挂载）
 
   // ===== 商户积分 =====
-  '/api/v4/merchant-points/': 'MERCHANT_POINTS_CREATE', // 商户积分申请（带尾斜杠）
-  '/api/v4/merchant-points': 'MERCHANT_POINTS_CREATE', // 商户积分申请
+  '/api/v4/merchant-points': 'MERCHANT_POINTS_CREATE', // 商户积分申请（canonical 路径，去尾斜杠）
 
   /*
    * ===============================================================
@@ -152,13 +145,12 @@ const CANONICAL_OPERATION_MAP = {
    * 注意：权限路由在 app.js 中独立挂载到 /api/v4/permissions，
    * 但路由文件 routes/v4/auth/permissions.js 中定义的路径是相对路径
    */
-  '/api/v4/permissions/check': 'PERM_CHECK', // 权限检查
-  '/api/v4/permissions/cache/invalidate': 'PERM_CACHE_INVALIDATE', // 权限缓存失效
-  '/api/v4/permissions/batch-check': 'PERM_BATCH_CHECK', // 批量权限检查
-  // 兼容可能的 auth 前缀路径（验证脚本扫描结果）
-  '/api/v4/auth/check': 'PERM_CHECK', // 权限检查（auth前缀兼容）
-  '/api/v4/auth/cache/invalidate': 'PERM_CACHE_INVALIDATE', // 权限缓存失效（auth前缀兼容）
-  '/api/v4/auth/batch-check': 'PERM_BATCH_CHECK', // 批量权限检查（auth前缀兼容）
+  '/api/v4/permissions/check': 'PERM_CHECK', // 权限检查（canonical 路径）
+  '/api/v4/permissions/cache/invalidate': 'PERM_CACHE_INVALIDATE', // 权限缓存失效（canonical 路径）
+  '/api/v4/permissions/batch-check': 'PERM_BATCH_CHECK', // 批量权限检查（canonical 路径）
+  '/api/v4/auth/permissions/check': 'AUTH_PERM_CHECK', // 权限检查（auth 子路由挂载）
+  '/api/v4/auth/permissions/cache/invalidate': 'AUTH_PERM_CACHE_INVALIDATE', // 权限缓存失效（auth 子路由挂载）
+  '/api/v4/auth/permissions/batch-check': 'AUTH_PERM_BATCH_CHECK', // 批量权限检查（auth 子路由挂载）
 
   /*
    * ===============================================================
@@ -168,30 +160,24 @@ const CANONICAL_OPERATION_MAP = {
   '/api/v4/system/feedback': 'SYSTEM_FEEDBACK_SUBMIT', // 提交反馈
   '/api/v4/system/chat/sessions': 'CHAT_SESSION_CREATE', // 创建聊天会话
   '/api/v4/system/chat/sessions/:id/messages': 'CHAT_MESSAGE_SEND', // 发送聊天消息
-  '/api/v4/system/:id/read': 'NOTIFICATION_MARK_READ', // 标记通知已读
-  '/api/v4/system/read-all': 'NOTIFICATION_READ_ALL', // 全部已读
-  '/api/v4/system/clear': 'NOTIFICATION_CLEAR', // 清空通知
-  '/api/v4/system/send': 'NOTIFICATION_SEND', // 发送通知
+  '/api/v4/system/notifications/:id/read': 'NOTIFICATION_MARK_READ', // 标记通知已读（修复：system/:id/read → system/notifications/:id/read）
+  '/api/v4/system/notifications/read-all': 'NOTIFICATION_READ_ALL', // 全部已读（修复：system/read-all → system/notifications/read-all）
+  '/api/v4/system/notifications/clear': 'NOTIFICATION_CLEAR', // 清空通知（修复：system/clear → system/notifications/clear）
+  '/api/v4/system/notifications/send': 'NOTIFICATION_SEND', // 发送通知（修复：system/send → system/notifications/send）
 
   // ===== 活动参与 =====
   '/api/v4/activities/:id/participate': 'ACTIVITY_PARTICIPATE', // 参与活动
   '/api/v4/activities/:id/configure-conditions': 'ACTIVITY_CONFIG_CONDITIONS', // 配置活动条件
 
   // ===== 员工管理（商家端）=====
-  '/api/v4/shop/add': 'SHOP_STAFF_CREATE', // 创建员工（实际路径）
-  '/api/v4/shop/staff/add': 'SHOP_STAFF_CREATE', // 创建员工（兼容路径）
-  '/api/v4/shop/transfer': 'SHOP_STAFF_TRANSFER', // 转移员工（实际路径）
-  '/api/v4/shop/staff/transfer': 'SHOP_STAFF_TRANSFER', // 转移员工（兼容路径）
-  '/api/v4/shop/disable': 'SHOP_STAFF_DISABLE', // 停用员工（实际路径）
-  '/api/v4/shop/staff/disable': 'SHOP_STAFF_DISABLE', // 停用员工（兼容路径）
-  '/api/v4/shop/enable': 'SHOP_STAFF_ENABLE', // 激活员工（实际路径）
-  '/api/v4/shop/staff/enable': 'SHOP_STAFF_ENABLE', // 激活员工（兼容路径）
+  '/api/v4/shop/staff/add': 'SHOP_STAFF_CREATE', // 创建员工（canonical 路径）
+  '/api/v4/shop/staff/transfer': 'SHOP_STAFF_TRANSFER', // 转移员工（canonical 路径）
+  '/api/v4/shop/staff/disable': 'SHOP_STAFF_DISABLE', // 停用员工（canonical 路径）
+  '/api/v4/shop/staff/enable': 'SHOP_STAFF_ENABLE', // 激活员工（canonical 路径）
 
   // ===== 风险管理（商家端）=====
-  '/api/v4/shop/alerts/:id/review': 'SHOP_RISK_REVIEW', // 风险审核（实际路径）
-  '/api/v4/shop/risk/alerts/:id/review': 'SHOP_RISK_REVIEW', // 风险审核（兼容路径）
-  '/api/v4/shop/alerts/:id/ignore': 'SHOP_RISK_IGNORE', // 忽略风险（实际路径）
-  '/api/v4/shop/risk/alerts/:id/ignore': 'SHOP_RISK_IGNORE', // 忽略风险（兼容路径）
+  '/api/v4/shop/risk/alerts/:id/review': 'SHOP_RISK_REVIEW', // 风险审核（canonical 路径）
+  '/api/v4/shop/risk/alerts/:id/ignore': 'SHOP_RISK_IGNORE', // 忽略风险（canonical 路径）
 
   /*
    * ===============================================================
@@ -200,124 +186,151 @@ const CANONICAL_OPERATION_MAP = {
    */
 
   // ===== 管理员登录 =====
-  '/api/v4/console/login': 'ADMIN_AUTH_LOGIN', // 管理员登录
+  '/api/v4/console/auth/login': 'ADMIN_AUTH_LOGIN', // 管理员登录（修复：console/login → console/auth/login）
 
   // ===== 资产调整 =====
-  '/api/v4/console/adjust': 'ADMIN_ASSET_ADJUST', // 资产调整
-  '/api/v4/console/batch-adjust': 'ADMIN_ASSET_BATCH_ADJUST', // 批量调整
+  '/api/v4/console/asset-adjustment/adjust': 'ADMIN_ASSET_ADJUST', // 资产调整（修复：console/adjust → console/asset-adjustment/adjust）
+  '/api/v4/console/asset-adjustment/batch-adjust': 'ADMIN_ASSET_BATCH_ADJUST', // 批量调整（修复：console/batch-adjust → console/asset-adjustment/batch-adjust）
 
   // ===== 审计日志 =====
-  '/api/v4/console/cleanup': 'ADMIN_AUDIT_LOG_CLEANUP', // 清理审计日志
+  '/api/v4/console/audit-logs/cleanup': 'ADMIN_AUDIT_LOG_CLEANUP', // 清理审计日志（修复：console/cleanup → console/audit-logs/cleanup）
 
   // ===== 活动预算 =====
-  '/api/v4/console/campaigns/:id': 'ADMIN_CAMPAIGN_UPDATE', // 更新活动
-  '/api/v4/console/campaigns/:id/validate': 'ADMIN_CAMPAIGN_VALIDATE', // 验证活动
-  '/api/v4/console/campaigns/:id/pool/add': 'ADMIN_CAMPAIGN_POOL_ADD', // 添加预算池
+  '/api/v4/console/campaign-budget/campaigns/:id': 'ADMIN_CAMPAIGN_UPDATE', // 更新活动
+  '/api/v4/console/campaign-budget/campaigns/:id/validate': 'ADMIN_CAMPAIGN_VALIDATE', // 验证活动
+  '/api/v4/console/campaign-budget/campaigns/:id/pool/add': 'ADMIN_CAMPAIGN_POOL_ADD', // 添加预算池
 
   // ===== 系统配置 =====
-  '/api/v4/console/config': 'ADMIN_CONFIG_UPDATE', // 更新系统配置
-  '/api/v4/console/test/simulate': 'ADMIN_CONFIG_TEST', // 测试配置
+  '/api/v4/console/config/config': 'ADMIN_CONFIG_UPDATE', // 更新系统配置（修复：console/config → console/config/config）
+  '/api/v4/console/config/test/simulate': 'ADMIN_CONFIG_TEST', // 测试配置（修复：console/test/simulate → console/config/test/simulate）
 
   // ===== 消费审批 =====
-  '/api/v4/console/approve/:id': 'ADMIN_CONSUMPTION_APPROVE', // 审批消费
-  '/api/v4/console/reject/:id': 'ADMIN_CONSUMPTION_REJECT', // 拒绝消费
+  '/api/v4/console/consumption/approve/:id': 'ADMIN_CONSUMPTION_APPROVE', // 审批消费（修复：console/approve/:id → console/consumption/approve/:id）
+  '/api/v4/console/consumption/reject/:id': 'ADMIN_CONSUMPTION_REJECT', // 拒绝消费（修复：console/reject/:id → console/consumption/reject/:id）
 
   // ===== 客服管理 =====
-  '/api/v4/console/:id/send': 'ADMIN_CS_MESSAGE_SEND', // 发送客服消息（实际路径）
-  '/api/v4/console/customer-service/:id/send': 'ADMIN_CS_MESSAGE_SEND', // 发送客服消息（兼容路径）
-  '/api/v4/console/:id/mark-read': 'ADMIN_CS_MESSAGE_READ', // 标记已读（实际路径）
-  '/api/v4/console/customer-service/:id/mark-read': 'ADMIN_CS_MESSAGE_READ', // 标记已读（兼容路径）
-  '/api/v4/console/:id/transfer': 'ADMIN_CS_TRANSFER', // 转接会话（实际路径）
-  '/api/v4/console/customer-service/:id/transfer': 'ADMIN_CS_TRANSFER', // 转接会话（兼容路径）
-  '/api/v4/console/:id/close': 'ADMIN_CS_CLOSE', // 关闭会话（实际路径）
-  '/api/v4/console/customer-service/:id/close': 'ADMIN_CS_CLOSE', // 关闭会话（兼容路径）
+  '/api/v4/console/customer-service/sessions/:id/send': 'ADMIN_CS_MESSAGE_SEND', // 发送客服消息（canonical 路径）
+  '/api/v4/console/customer-service/sessions/:id/mark-read': 'ADMIN_CS_MESSAGE_READ', // 标记已读（canonical 路径）
+  '/api/v4/console/customer-service/sessions/:id/transfer': 'ADMIN_CS_TRANSFER', // 转接会话（canonical 路径）
+  '/api/v4/console/customer-service/sessions/:id/close': 'ADMIN_CS_CLOSE', // 关闭会话（canonical 路径）
 
   // ===== 图片管理 =====
-  '/api/v4/console/upload': 'ADMIN_IMAGE_UPLOAD', // 上传图片
-  '/api/v4/console/:id/bind': 'ADMIN_IMAGE_BIND', // 绑定图片
+  '/api/v4/console/images/upload': 'ADMIN_IMAGE_UPLOAD', // 上传图片
+  '/api/v4/console/images/:id/bind': 'ADMIN_IMAGE_BIND', // 绑定图片
+  '/api/v4/console/images/:id': 'ADMIN_IMAGE_DELETE', // 删除图片（新增 DELETE 方法映射）
+
+  // ===== 资产组合管理 =====
+  '/api/v4/console/assets/portfolio/items/': 'ADMIN_ASSET_ITEM_CREATE', // 创建资产组合项（尾斜杠）
+  '/api/v4/console/assets/portfolio/items/:id': 'ADMIN_ASSET_ITEM_UPDATE', // 更新或删除资产组合项（PUT/DELETE）
 
   // ===== 抽奖干预 =====
-  '/api/v4/console/probability-adjust': 'ADMIN_LOTTERY_PROB_ADJUST', // 概率调整（实际路径）
-  '/api/v4/console/lottery-management/probability-adjust': 'ADMIN_LOTTERY_PROB_ADJUST', // 概率调整（兼容路径）
-  '/api/v4/console/user-specific-queue': 'ADMIN_LOTTERY_USER_QUEUE', // 用户特定队列（实际路径）
-  '/api/v4/console/force-win': 'ADMIN_LOTTERY_FORCE_WIN', // 强制中奖（实际路径）
-  '/api/v4/console/force-lose': 'ADMIN_LOTTERY_FORCE_LOSE', // 强制不中（实际路径）
-  '/api/v4/console/interventions/:id/cancel': 'ADMIN_LOTTERY_INTERVENTION_CANCEL', // 取消干预（实际路径）
-  '/api/v4/console/clear-user-settings/:id': 'ADMIN_LOTTERY_CLEAR_USER', // 清除用户设置（实际路径）
-  '/api/v4/console/lottery-management/user-specific-queue': 'ADMIN_LOTTERY_USER_QUEUE', // 用户队列
-  '/api/v4/console/lottery-management/force-win': 'ADMIN_LOTTERY_FORCE_WIN', // 强制中奖
-  '/api/v4/console/lottery-management/force-lose': 'ADMIN_LOTTERY_FORCE_LOSE', // 强制不中
+  '/api/v4/console/lottery-management/probability-adjust': 'ADMIN_LOTTERY_PROB_ADJUST', // 概率调整（canonical 路径）
+  '/api/v4/console/lottery-management/user-specific-queue': 'ADMIN_LOTTERY_USER_QUEUE', // 用户队列（canonical 路径）
+  '/api/v4/console/lottery-management/force-win': 'ADMIN_LOTTERY_FORCE_WIN', // 强制中奖（canonical 路径）
+  '/api/v4/console/lottery-management/force-lose': 'ADMIN_LOTTERY_FORCE_LOSE', // 强制不中（canonical 路径）
   '/api/v4/console/lottery-management/interventions/:id/cancel':
-    'ADMIN_LOTTERY_INTERVENTION_CANCEL', // 取消干预
-  '/api/v4/console/lottery-management/clear-user-settings/:id': 'ADMIN_LOTTERY_CLEAR_USER', // 清除用户设置
+    'ADMIN_LOTTERY_INTERVENTION_CANCEL', // 取消干预（canonical 路径）
+  '/api/v4/console/lottery-management/clear-user-settings/:id': 'ADMIN_LOTTERY_CLEAR_USER', // 清除用户设置（DELETE）
+  '/api/v4/console/lottery-management/user-settings/:id': 'ADMIN_LOTTERY_USER_SETTINGS_DELETE', // 删除用户抽奖设置（DELETE 方法）
 
   // ===== 孤儿冻结清理 =====
-  '/api/v4/console/order': 'ADMIN_ORPHAN_CLEANUP', // 孤儿清理
+  '/api/v4/console/orphan-frozen/cleanup': 'ADMIN_ORPHAN_CLEANUP', // 孤儿清理（修复：console/order → console/orphan-frozen/cleanup）
 
   // ===== 奖池管理 =====
-  '/api/v4/console/prize/:id': 'ADMIN_PRIZE_UPDATE', // 更新奖品
-  '/api/v4/console/prize/:id/add-stock': 'ADMIN_PRIZE_ADD_STOCK', // 增加库存
+  '/api/v4/console/prize-pool/:id': 'ADMIN_PRIZE_POOL_UPDATE', // 添加奖品到奖池（POST :campaign_id）
+  '/api/v4/console/prize-pool/prize/:id': 'ADMIN_PRIZE_UPDATE', // 更新奖品（PUT）或删除奖品（DELETE）
+  '/api/v4/console/prize-pool/prize/:id/add-stock': 'ADMIN_PRIZE_ADD_STOCK', // 增加库存
+  '/api/v4/console/prize-pool/batch-add': 'ADMIN_PRIZE_BATCH_ADD', // 批量添加奖品
 
   // ===== 抽奖配额管理 =====
-  '/api/v4/console/rules': 'ADMIN_LOTTERY_QUOTA_CREATE', // 创建配额规则
-  '/api/v4/console/rules/:id/disable': 'ADMIN_LOTTERY_QUOTA_DISABLE', // 禁用配额规则
-  '/api/v4/console/users/:id/bonus': 'ADMIN_LOTTERY_QUOTA_BONUS', // 赠送抽奖次数
-  '/api/v4/console/users/:id/role': 'ADMIN_USER_ROLE_UPDATE', // 更新用户角色
-  '/api/v4/console/users/:id/status': 'ADMIN_USER_STATUS_UPDATE', // 更新用户状态
+  '/api/v4/console/lottery-quota/rules/': 'ADMIN_LOTTERY_QUOTA_CREATE', // 创建配额规则（修复：尾斜杠）
+  '/api/v4/console/lottery-quota/rules/:id': 'ADMIN_LOTTERY_QUOTA_UPDATE', // 更新配额规则（PUT）
+  '/api/v4/console/lottery-quota/rules/:id/disable': 'ADMIN_LOTTERY_QUOTA_DISABLE', // 禁用配额规则
+  '/api/v4/console/lottery-quota/users/:id/bonus': 'ADMIN_LOTTERY_QUOTA_BONUS', // 赠送抽奖次数
+
+  // ===== 用户管理 =====
+  '/api/v4/console/user-management/points/adjust': 'ADMIN_USER_POINTS_ADJUST', // 调整用户积分
+  '/api/v4/console/user-management/users/:id/role': 'ADMIN_USER_ROLE_UPDATE', // 更新用户角色
+  '/api/v4/console/user-management/users/:id/status': 'ADMIN_USER_STATUS_UPDATE', // 更新用户状态
 
   // ===== 材料管理 =====
-  '/api/v4/console/conversion-rules': 'ADMIN_MATERIAL_RULE_CREATE', // 创建转换规则
-  '/api/v4/console/conversion-rules/:id/disable': 'ADMIN_MATERIAL_RULE_DISABLE', // 禁用转换规则
-  '/api/v4/console/asset-types': 'ADMIN_MATERIAL_TYPE_CREATE', // 创建资产类型
-  '/api/v4/console/asset-types/:id/disable': 'ADMIN_MATERIAL_TYPE_DISABLE', // 禁用资产类型
+  '/api/v4/console/material/conversion-rules/': 'ADMIN_MATERIAL_RULE_CREATE', // 创建转换规则（修复：尾斜杠）
+  '/api/v4/console/material/conversion-rules/:id': 'ADMIN_MATERIAL_RULE_UPDATE', // 更新或删除转换规则（PUT/DELETE）
+  '/api/v4/console/material/conversion-rules/:id/disable': 'ADMIN_MATERIAL_RULE_DISABLE', // 禁用转换规则
+  '/api/v4/console/material/asset-types/': 'ADMIN_MATERIAL_TYPE_CREATE', // 创建资产类型（修复：尾斜杠）
+  '/api/v4/console/material/asset-types/:id': 'ADMIN_MATERIAL_TYPE_UPDATE', // 更新或删除资产类型（PUT/DELETE）
+  '/api/v4/console/material/asset-types/:id/disable': 'ADMIN_MATERIAL_TYPE_DISABLE', // 禁用资产类型
+  '/api/v4/console/material/users/:id/adjust': 'ADMIN_MATERIAL_USER_ADJUST', // 调整用户材料余额
 
   // ===== 设置管理 =====
   '/api/v4/console/settings/:id': 'ADMIN_SETTINGS_UPDATE', // 更新设置
   '/api/v4/console/cache/clear': 'ADMIN_CACHE_CLEAR', // 清除缓存
 
   // ===== 市场管理 =====
-  '/api/v4/console/exchange_market/items': 'ADMIN_EXCHANGE_ITEM_CREATE', // 创建兑换商品
-  '/api/v4/console/exchange_market/items/:id': 'ADMIN_EXCHANGE_ITEM_UPDATE', // 更新兑换商品
-  '/api/v4/console/listings/:id/force-withdraw': 'ADMIN_FORCE_WITHDRAW', // 强制下架
+  '/api/v4/console/marketplace/exchange_market/items': 'ADMIN_EXCHANGE_ITEM_CREATE', // 创建兑换商品（修复：添加 marketplace 前缀）
+  '/api/v4/console/marketplace/exchange_market/items/:id': 'ADMIN_EXCHANGE_ITEM_UPDATE', // 更新兑换商品（修复：添加 marketplace 前缀）或删除（DELETE）
+  '/api/v4/console/marketplace/listings/:id/force-withdraw': 'ADMIN_FORCE_WITHDRAW', // 强制下架
 
   // ===== 用户层级 =====
-  '/api/v4/console/:id/deactivate': 'ADMIN_USER_HIERARCHY_DEACTIVATE', // 停用层级
-  '/api/v4/console/:id/activate': 'ADMIN_USER_HIERARCHY_ACTIVATE', // 激活层级
+  '/api/v4/console/user-hierarchy/': 'ADMIN_USER_HIERARCHY_CREATE', // 创建用户层级关系（修复：尾斜杠）
+  '/api/v4/console/user-hierarchy/:id/deactivate': 'ADMIN_USER_HIERARCHY_DEACTIVATE', // 停用层级
+  '/api/v4/console/user-hierarchy/:id/activate': 'ADMIN_USER_HIERARCHY_ACTIVATE', // 激活层级
 
   // ===== 员工管理（总后台）=====
-  '/api/v4/console/transfer': 'ADMIN_STAFF_TRANSFER', // 员工转移
-  '/api/v4/console/disable/:id': 'ADMIN_STAFF_DISABLE', // 禁用员工
-  '/api/v4/console/enable': 'ADMIN_STAFF_ENABLE', // 启用员工
-  '/api/v4/console/:id/role': 'ADMIN_STAFF_UPDATE_ROLE', // 更新员工角色
-  '/api/v4/console/:id': 'ADMIN_RESOURCE_UPDATE', // 通用资源更新
+  '/api/v4/console/staff/': 'ADMIN_STAFF_CREATE', // 员工入职（修复：尾斜杠）
+  '/api/v4/console/staff/transfer': 'ADMIN_STAFF_TRANSFER', // 员工转移
+  '/api/v4/console/staff/disable/:id': 'ADMIN_STAFF_DISABLE', // 禁用员工
+  '/api/v4/console/staff/enable': 'ADMIN_STAFF_ENABLE', // 启用员工
+  '/api/v4/console/staff/:id/role': 'ADMIN_STAFF_UPDATE_ROLE', // 更新员工角色
+  '/api/v4/console/staff/:id': 'ADMIN_STAFF_DELETE', // 删除员工（DELETE 方法，修改 operation 名称）
 
   // ===== 门店管理 =====
-  '/api/v4/console/batch-import': 'ADMIN_STORE_BATCH_IMPORT', // 批量导入门店
-  '/api/v4/console/:id/toggle': 'ADMIN_RESOURCE_TOGGLE', // 切换资源状态
+  '/api/v4/console/stores/': 'ADMIN_STORE_CREATE', // 创建门店（修复：尾斜杠）
+  '/api/v4/console/stores/batch-import': 'ADMIN_STORE_BATCH_IMPORT', // 批量导入门店
+  '/api/v4/console/stores/:id': 'ADMIN_STORE_UPDATE', // 更新门店信息（PUT）或删除门店（DELETE）
+  '/api/v4/console/stores/:id/activate': 'ADMIN_STORE_ACTIVATE', // 激活门店
+  '/api/v4/console/stores/:id/deactivate': 'ADMIN_STORE_DEACTIVATE', // 停用门店
 
   // ===== 商户积分审核 =====
-  '/api/v4/console/:id/approve': 'ADMIN_MERCHANT_APPROVE', // 审批商户积分
-  '/api/v4/console/:id/reject': 'ADMIN_MERCHANT_REJECT', // 拒绝商户积分
+  '/api/v4/console/merchant-points/:id/approve': 'ADMIN_MERCHANT_APPROVE', // 审批商户积分（修复：console/:id/approve → console/merchant-points/:id/approve）
+  '/api/v4/console/merchant-points/:id/reject': 'ADMIN_MERCHANT_REJECT', // 拒绝商户积分（修复：console/:id/reject → console/merchant-points/:id/reject）
 
   // ===== 风险告警 =====
-  '/api/v4/console/:id/review': 'ADMIN_RISK_ALERT_REVIEW', // 审核风险告警
-
-  // ===== 基础创建操作（路由根路径的 POST）=====
-  '/api/v4/console/': 'ADMIN_RESOURCE_CREATE', // 管理后台资源创建（popup-banners/staff/stores/announcements/user-hierarchy）
+  '/api/v4/console/risk-alerts/:id/review': 'ADMIN_RISK_ALERT_REVIEW', // 审核风险告警（修复：risk/alerts → risk-alerts）
 
   // ===== 公告与反馈管理 =====
-  '/api/v4/console/system/': 'ADMIN_SYSTEM_CREATE', // 创建系统资源
-  '/api/v4/console/system/:id': 'ADMIN_SYSTEM_UPDATE', // 更新系统资源
-  '/api/v4/console/:id/reply': 'ADMIN_FEEDBACK_REPLY', // 回复反馈（实际路径）
-  '/api/v4/console/system/:id/reply': 'ADMIN_FEEDBACK_REPLY', // 回复反馈（兼容路径）
-  '/api/v4/console/:id/status': 'ADMIN_FEEDBACK_STATUS', // 更新反馈状态（实际路径）
-  '/api/v4/console/system/:id/status': 'ADMIN_FEEDBACK_STATUS', // 更新反馈状态（兼容路径）
+  '/api/v4/console/system/announcements/': 'ADMIN_ANNOUNCEMENT_CREATE', // 创建公告（修复：尾斜杠）
+  '/api/v4/console/system/announcements/:id': 'ADMIN_ANNOUNCEMENT_UPDATE', // 更新公告（PUT）或删除公告（DELETE）
+  '/api/v4/console/system/feedbacks/:id/reply': 'ADMIN_FEEDBACK_REPLY', // 回复反馈
+  '/api/v4/console/system/feedbacks/:id/status': 'ADMIN_FEEDBACK_STATUS', // 更新反馈状态
 
   // ===== 区域管理 =====
-  '/api/v4/console/validate': 'ADMIN_REGION_VALIDATE', // 验证区域
+  '/api/v4/console/regions/validate': 'ADMIN_REGION_VALIDATE', // 验证区域（修复：console/validate → console/regions/validate）
 
-  // ===== 批量操作 =====
-  '/api/v4/console/batch-add': 'ADMIN_BATCH_ADD', // 批量添加
+  // ===== 弹窗 Banner 管理 =====
+  '/api/v4/console/popup-banners/': 'ADMIN_POPUP_BANNER_CREATE', // 创建弹窗 Banner（修复：尾斜杠）
+  '/api/v4/console/popup-banners/:id': 'ADMIN_POPUP_BANNER_UPDATE', // 更新弹窗 Banner（PUT）或删除（DELETE）
+  '/api/v4/console/popup-banners/:id/toggle': 'ADMIN_POPUP_BANNER_TOGGLE', // 切换弹窗 Banner 状态（新增）
+  '/api/v4/console/popup-banners/order': 'ADMIN_POPUP_BANNER_ORDER', // 调整弹窗 Banner 排序（新增）
+
+  // ===== 欠账管理（2026-01-19 路径双轨清理新增）=====
+  '/api/v4/console/debt-management/clear': 'ADMIN_DEBT_CLEAR', // 清偿欠账
+  '/api/v4/console/debt-management/limits/:id': 'ADMIN_DEBT_LIMITS_UPDATE', // 更新欠账上限
+
+  // ===== 活动预算验证（2026-01-19 路径双轨清理新增）=====
+  '/api/v4/console/campaign-budget/campaigns/:id/validate-for-launch':
+    'ADMIN_CAMPAIGN_VALIDATE_FOR_LAUNCH', // 活动上线前校验
+
+  // ===== 活动定价配置管理（2026-01-19 路径双轨清理新增）=====
+  '/api/v4/console/lottery-management/campaigns/:id/pricing': 'ADMIN_PRICING_CONFIG_CREATE', // 创建定价配置
+  '/api/v4/console/lottery-management/campaigns/:id/pricing/:id/activate':
+    'ADMIN_PRICING_CONFIG_ACTIVATE', // 激活定价配置
+  '/api/v4/console/lottery-management/campaigns/:id/pricing/:id/archive':
+    'ADMIN_PRICING_CONFIG_ARCHIVE', // 归档定价配置
+  '/api/v4/console/lottery-management/campaigns/:id/pricing/rollback':
+    'ADMIN_PRICING_CONFIG_ROLLBACK', // 回滚定价配置
+  '/api/v4/console/lottery-management/campaigns/:id/pricing/:id/schedule':
+    'ADMIN_PRICING_CONFIG_SCHEDULE', // 定价配置预约（PUT/DELETE）
 
   /*
    * ===============================================================

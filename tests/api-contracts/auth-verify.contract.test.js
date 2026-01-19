@@ -9,7 +9,7 @@
  * 契约规范（2026-01-08 拍板）：
  * - 权限级别字段统一使用 role_level（snake_case）
  * - 不再使用 maxLevel、roleLevel 等变体
- * - is_admin 由 role_level >= 100 计算得出
+ * - 移除 is_admin 字段，统一使用 role_level >= 100 判断管理员
  *
  * 创建时间：2026-01-08
  */
@@ -81,8 +81,9 @@ describe('GET /api/v4/auth/verify 契约测试', () => {
        * - status: 用户状态（字符串：active/inactive/banned）
        * - roles: 用户角色列表（数组）
        * - role_level: 用户最高权限级别（数字，>=100为管理员）
-       * - is_admin: 是否管理员（布尔值，role_level >= 100）
        * - valid/token_valid: Token有效标识（布尔值）
+       *
+       * 注意：is_admin 字段已移除，使用 role_level >= 100 判断管理员
        */
       expect(data).toMatchObject({
         user_id: expect.any(Number),
@@ -90,7 +91,6 @@ describe('GET /api/v4/auth/verify 契约测试', () => {
         status: expect.any(String),
         roles: expect.any(Array),
         role_level: expect.any(Number), // 🔒 关键：必须是 role_level，不是 maxLevel
-        is_admin: expect.any(Boolean),
         valid: expect.any(Boolean)
       })
 
@@ -130,7 +130,7 @@ describe('GET /api/v4/auth/verify 契约测试', () => {
       expect(typeof data.role_level).toBe('number')
     })
 
-    it('is_admin 应与 role_level 一致', async () => {
+    it('role_level >= 100 表示管理员权限', async () => {
       if (!userToken) {
         console.warn('⚠️ 跳过测试：Token未获取')
         return
@@ -146,12 +146,15 @@ describe('GET /api/v4/auth/verify 契约测试', () => {
       /**
        * 🔒 管理员判定规则契约
        *
-       * 规则：is_admin = (role_level >= 100)
-       * - role_level >= 100: is_admin = true
-       * - role_level < 100: is_admin = false
+       * 规则：role_level >= 100 表示管理员
+       * - role_level >= 100: 管理员权限
+       * - role_level < 100: 普通用户权限
+       *
+       * 注意：is_admin 字段已移除，前端应使用 role_level 判断
        */
-      const expectedIsAdmin = data.role_level >= 100
-      expect(data.is_admin).toBe(expectedIsAdmin)
+      expect(typeof data.role_level).toBe('number')
+      // 测试账号 13612227930 是管理员，role_level 应 >= 100
+      expect(data.role_level).toBeGreaterThanOrEqual(100)
     })
 
     it('roles 数组元素应包含角色基本信息', async () => {

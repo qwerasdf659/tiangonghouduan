@@ -153,8 +153,8 @@ router.delete('/:record_id', authenticateToken, async (req, res) => {
     }
 
     const recordId = parseInt(record_id)
-    const isAdmin = req.user.role_level >= 100
-    const roleLevel = req.user.role_level || 0
+    const has_admin_access = req.user.role_level >= 100
+    const role_level = req.user.role_level || 0
 
     /**
      * 调用 Service 层执行软删除
@@ -162,8 +162,8 @@ router.delete('/:record_id', authenticateToken, async (req, res) => {
      * - Service 层负责权限验证、状态检查、数据更新
      */
     const result = await ConsumptionService.softDeleteRecord(recordId, userId, {
-      isAdmin,
-      roleLevel
+      has_admin_access,
+      role_level
     })
 
     return res.apiSuccess(result, '消费记录已删除')

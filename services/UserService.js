@@ -505,11 +505,11 @@ class UserService {
         throw error
       }
 
-      // 步骤4: 管理员权限检查
+      // 步骤4: 管理员权限检查（role_level >= 100 为管理员）
       const { getUserRoles } = require('../middleware/auth')
       const userRoles = await getUserRoles(user.user_id)
 
-      if (!userRoles.isAdmin) {
+      if (userRoles.role_level < 100) {
         logger.warn('用户不具备管理员权限', {
           user_id: user.user_id,
           role_level: userRoles.role_level,

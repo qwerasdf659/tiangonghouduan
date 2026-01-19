@@ -185,7 +185,7 @@ describe('认证和权限系统API测试（V4架构）', () => {
         expect(user).toHaveProperty('mobile')
         expect(user).toHaveProperty('nickname')
         expect(user).toHaveProperty('status')
-        expect(user).toHaveProperty('is_admin')
+        expect(user).toHaveProperty('role_level') // 使用 role_level 替代 is_admin
         expect(user).toHaveProperty('roles')
         expect(user).toHaveProperty('consecutive_fail_count')
         expect(user).toHaveProperty('history_total_points')
@@ -199,14 +199,14 @@ describe('认证和权限系统API测试（V4架构）', () => {
         // 验证手机号格式（完整显示，符合业务需求）
         expect(user.mobile).toMatch(/^1[3-9]\d{9}$/)
 
-        // 验证角色信息
+        // 验证角色信息：使用 role_level 判断管理员（role_level >= 100）
         expect(Array.isArray(user.roles)).toBe(true)
-        expect(typeof user.is_admin).toBe('boolean')
+        expect(typeof user.role_level).toBe('number')
 
         console.log('✅ 获取用户信息成功:', {
           user_id: user.user_id,
           mobile: user.mobile,
-          is_admin: user.is_admin
+          role_level: user.role_level // role_level >= 100 为管理员
         })
       }
     })
@@ -300,7 +300,7 @@ describe('认证和权限系统API测试（V4架构）', () => {
         expect(refresh_response.data.data).toHaveProperty('user')
         expect(refresh_response.data.data.user).toHaveProperty('user_id')
         expect(refresh_response.data.data.user).toHaveProperty('mobile')
-        expect(refresh_response.data.data.user).toHaveProperty('is_admin')
+        expect(refresh_response.data.data.user).toHaveProperty('role_level') // 使用 role_level 替代 is_admin
         expect(refresh_response.data.data.user).toHaveProperty('roles')
         expect(refresh_response.data.data).toHaveProperty('expires_in')
         expect(refresh_response.data.data).toHaveProperty('timestamp')
@@ -367,8 +367,7 @@ describe('认证和权限系统API测试（V4架构）', () => {
         expect(response.data.data).toHaveProperty('has_permission')
         expect(response.data.data).toHaveProperty('resource')
         expect(response.data.data).toHaveProperty('action')
-        expect(response.data.data).toHaveProperty('is_admin')
-        expect(response.data.data).toHaveProperty('role_level')
+        expect(response.data.data).toHaveProperty('role_level') // 使用 role_level 替代 is_admin
 
         console.log('✅ 权限检查成功:', {
           resource: response.data.data.resource,
@@ -395,13 +394,11 @@ describe('认证和权限系统API测试（V4架构）', () => {
       expect([200, 401, 403]).toContain(response.status)
       if (response.status === 200) {
         expect(response.data.data).toHaveProperty('roles')
-        expect(response.data.data).toHaveProperty('is_admin')
-        expect(response.data.data).toHaveProperty('role_level')
+        expect(response.data.data).toHaveProperty('role_level') // 使用 role_level 替代 is_admin
         expect(response.data.data).toHaveProperty('permissions')
 
         console.log('✅ 获取当前用户权限成功:', {
-          is_admin: response.data.data.is_admin,
-          role_level: response.data.data.role_level,
+          role_level: response.data.data.role_level, // role_level >= 100 为管理员
           roles_count: response.data.data.roles?.length || 0
         })
       }
