@@ -90,7 +90,7 @@ async function handleLogin(e) {
     if (result.success && result.data && result.data.access_token) {
       const user = result.data.user
 
-      // 权限检查（基于user.roles数组或is_admin字段）
+      // 权限检查（基于user.role_level或roles数组）
       const hasAdminAccess = checkAdminAccess(user)
 
       if (hasAdminAccess) {
@@ -118,32 +118,26 @@ async function handleLogin(e) {
 
 /**
  * 检查用户是否有管理员权限
+ * 🔄 2026-01-19：移除is_admin字段检查，统一使用 role_level >= 100 判断管理员
  * @param {Object} user - 用户信息对象
  * @returns {boolean} 是否有管理员权限
  */
 function checkAdminAccess(user) {
   if (!user) return false
 
-  // 检查is_admin字段
-  if (user.is_admin === true) return true
+  // 优先检查role_level字段（role_level >= 100 为管理员）
+  if (user.role_level >= 100) return true
 
-  // 检查roles数组
+  // 兼容：检查roles数组中的role_level
   if (user.roles && Array.isArray(user.roles)) {
     return user.roles.some(role => {
       // 支持对象形式的role
       if (typeof role === 'object') {
-        return role.role_name === 'admin' || role.role_level >= 100
-      }
-      // 支持字符串形式的role
-      if (typeof role === 'string') {
-        return role === 'admin'
+        return role.role_level >= 100
       }
       return false
     })
   }
-
-  // 检查role_level字段
-  if (user.role_level && user.role_level >= 100) return true
 
   return false
 }

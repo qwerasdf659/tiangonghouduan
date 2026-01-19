@@ -4,6 +4,7 @@ const logger = require('../utils/logger').logger
  * 统一数据访问控制中间件 - V4.0 统一架构版本
  * 用于所有需要数据脱敏的API路由
  * 🛡️ 基于UUID角色系统的数据访问控制
+ * 🔄 2026-01-19：移除is_admin，统一使用 role_level >= 100 判断管理员
  *
  * 使用方式：
  * router.get('/api/endpoint', authenticateToken, dataAccessControl, handler)
@@ -15,18 +16,18 @@ const dataAccessControl = (req, res, next) => {
     if (!req.user) {
       req.dataLevel = 'public'
       req.roleBasedAdmin = false
-      req.isAdmin = false // 未认证用户不是管理员
+      req.role_level = 0 // 未认证用户角色等级为0
       logger.info('[DataAccess] Anonymous user accessing with level: public')
       return next()
     }
 
-    // 🛡️ 基于UUID角色系统判断用户数据访问级别
+    // 🛡️ 基于UUID角色系统判断用户数据访问级别（role_level >= 100 为管理员）
     const isSuperAdmin = req.user.role_level >= 100
 
     // 设置数据访问级别标识
     req.dataLevel = isSuperAdmin ? 'full' : 'public'
     req.roleBasedAdmin = isSuperAdmin
-    // req.isAdmin 由 auth.js 中间件设置，此处仅用于未认证用户的情况
+    // role_level 由 auth.js 中间件设置，此处仅用于未认证用户的情况
 
     // 记录访问日志（脱敏处理）
     logger.info(`[DataAccess] User ${req.user.user_id} accessing with level: ${req.dataLevel}`)

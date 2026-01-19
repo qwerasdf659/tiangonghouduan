@@ -284,6 +284,11 @@ describe('RateLimiterMiddleware 中间件测试 - 请求频率限制', () => {
   })
 
   describe('🔐 抽奖限流预设配置测试', () => {
+    // 🔴 修复：测试前清理 lottery 预设的限流数据
+    beforeEach(async () => {
+      await rateLimiter.clearAll('rate_limit:lottery:*')
+    })
+
     test('✅ 抽奖限流预设应该正确工作', async () => {
       // 使用抽奖预设配置
       const limiter = rateLimiter.createLimiter('lottery')

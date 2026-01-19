@@ -374,6 +374,18 @@ class IdempotencyService {
       canonical = CANONICAL_OPERATION_MAP[normalized_path]
     }
 
+    // 如果仍未找到，尝试添加尾斜杠匹配（针对POST创建类请求，如 /popup-banners -> /popup-banners/）
+    if (!canonical) {
+      const path_with_trailing_slash = api_path.endsWith('/') ? api_path : api_path + '/'
+      canonical = CANONICAL_OPERATION_MAP[path_with_trailing_slash]
+    }
+
+    // 如果仍未找到，尝试移除尾斜杠匹配（兼容性处理）
+    if (!canonical) {
+      const path_without_trailing_slash = api_path.endsWith('/') ? api_path.slice(0, -1) : api_path
+      canonical = CANONICAL_OPERATION_MAP[path_without_trailing_slash]
+    }
+
     // 【决策4-B】严格模式：未映射直接拒绝
     if (!canonical) {
       const errorMessage =
@@ -429,21 +441,44 @@ class IdempotencyService {
   }
 
   /**
-   * 规范化API路径，去掉资源ID
+   * 规范化API路径，去掉资源ID和业务标识符
    *
    * @param {string} path - 原始API路径
    * @returns {string} 规范化后的路径
+   *
+   * @description
+   * 处理四种情况：
+   * 1. 纯数字 ID：/listings/123/purchase → /listings/:id/purchase
+   * 2. UUID 格式：/items/550e8400-e29b-41d4-a716-446655440000 → /items/:uuid
+   * 3. snake_case 业务标识符：/asset-types/red_shard/disable → /asset-types/:id/disable
+   *    （如 asset_code、activity_code 等业务代码，包含下划线的标识符）
+   * 4. 路由参数占位符：/:idOrCode/participate → /:id/participate
+   *    （将 :xxx 格式统一为 :id，以匹配 CANONICAL_OPERATION_MAP 中的映射）
+   *
+   * @example
+   * normalizePath('/api/v4/console/material/asset-types/red_shard/disable')
+   * // 返回: '/api/v4/console/material/asset-types/:id/disable'
    */
   static normalizePath(path) {
     if (!path) return ''
 
-    /*
-     * 将路径中的纯数字/UUID替换为占位符
-     * 例如: /api/v4/market/listings/123/purchase -> /api/v4/market/listings/:id/purchase
-     */
-    return path
-      .replace(/\/\d+/g, '/:id')
-      .replace(/\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi, '/:uuid')
+    return (
+      path
+        /*
+         * 规范化顺序很重要：
+         * 1. 将纯数字替换为 :id（最常见情况）
+         * 2. 将 UUID 替换为 :uuid（特殊格式）
+         * 3. 将 snake_case 标识符替换为 :id（如 red_shard, blue_crystal 等业务代码）
+         *    - 只匹配包含下划线的标识符，避免误匹配 kebab-case 路由段
+         *    - 正则匹配格式: 小写字母_小写字母[更多字符]
+         * 4. 将所有路由参数占位符（如 :idOrCode, :order_id）统一替换为 :id
+         *    但保留已经是 :id 或 :uuid 的情况
+         */
+        .replace(/\/\d+/g, '/:id')
+        .replace(/\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi, '/:uuid')
+        .replace(/\/([a-z]+_[a-z][a-z0-9_]*)(?=\/|$)/gi, '/:id')
+        .replace(/:(?!id\b|uuid\b)[a-zA-Z_][a-zA-Z0-9_]*/g, ':id')
+    )
   }
 
   /**

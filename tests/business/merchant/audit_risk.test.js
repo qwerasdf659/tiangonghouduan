@@ -279,11 +279,20 @@ describe('商家审计日志和风控告警API测试', () => {
         expect(response.data.success).toBe(true)
 
         const stats = response.data.data
-        expect(stats).toHaveProperty('today')
-        expect(stats).toHaveProperty('pending_count')
+        // 🔴 修复：实际 API 返回 today_count 而非 today，返回 by_status 而非 pending_count
+        expect(stats).toHaveProperty('today_count')
+        expect(stats).toHaveProperty('by_status')
+        expect(stats).toHaveProperty('by_severity')
+        expect(stats).toHaveProperty('by_type')
+        expect(stats).toHaveProperty('risk_config')
 
-        console.log(`✅ 今日告警数: ${stats.today}`)
-        console.log(`✅ 待处理告警: ${stats.pending_count}`)
+        // 计算待处理数量（从 by_status 中获取 pending 数量，如果不存在则为 0）
+        const pendingCount = stats.by_status?.pending || 0
+
+        console.log(`✅ 今日告警数: ${stats.today_count}`)
+        console.log(`✅ 待处理告警: ${pendingCount}`)
+        console.log(`✅ 按严重程度统计:`, JSON.stringify(stats.by_severity))
+        console.log(`✅ 按状态统计:`, JSON.stringify(stats.by_status))
       } else if (response.status === 404) {
         console.log('⚠️ 统计接口可能未实现')
       }

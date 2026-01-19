@@ -67,6 +67,100 @@ describe('C2C 材料交易功能集成测试', () => {
       }
 
       console.log(`✅ 测试资产类型: ${testAssetCode}`)
+
+      const { Op } = require('sequelize')
+
+      /*
+       * 🔴 P0-2 修复：清理之前测试运行留下的 on_sale 挂牌（避免孤儿冻结）
+       * 这些挂牌可能是之前测试运行异常中断导致的，资产处于冻结状态
+       * 必须通过正确的撤回方法来解冻资产
+       */
+      const orphanListings = await MarketListing.findAll({
+        where: {
+          seller_user_id: testUser.user_id,
+          status: 'on_sale',
+          offer_asset_code: testAssetCode,
+          listing_kind: 'fungible_asset'
+        }
+      })
+
+      if (orphanListings.length > 0) {
+        console.log(`🧹 发现 ${orphanListings.length} 条之前测试遗留的 on_sale 挂牌，开始清理...`)
+        for (const listing of orphanListings) {
+          try {
+            await TransactionManager.execute(
+              async transaction => {
+                await MarketListingService.withdrawFungibleAssetListing(
+                  {
+                    listing_id: listing.listing_id,
+                    seller_user_id: listing.seller_user_id,
+                    withdraw_reason: 'beforeAll cleanup'
+                  },
+                  { transaction }
+                )
+              },
+              { description: `cleanup_orphan_${listing.listing_id}` }
+            )
+            console.log(`  ✅ 撤回挂牌: ${listing.listing_id}`)
+          } catch (error) {
+            console.warn(`  ⚠️ 撤回失败: ${listing.listing_id} (${error.message})`)
+          }
+        }
+      }
+
+      /*
+       * 🔴 重置每日挂牌计数器（测试环境专用）
+       * 每日挂牌次数通过统计 market_listings 表中今天创建的记录计算
+       * 测试环境需要重置计数器，避免因达到日限而导致测试失败
+       *
+       * 重置策略：
+       * 1. 删除该测试用户今天创建的、已完成业务流程的挂牌记录
+       *    - withdrawn（已撤回）：资产已解冻，可安全删除
+       *    - sold（已售出）：资产已转移，可安全删除
+       *    - admin_withdrawn（管理员撤回）：资产已解冻，可安全删除
+       * 2. on_sale 状态的挂牌不删除（需要通过正常业务流程撤回）
+       *
+       * 北京时间今天 00:00:00 = UTC 昨天 16:00:00
+       */
+      const now = new Date()
+      const beijingOffset = 8 * 60 // 北京时间偏移量（分钟）
+      const utcOffset = now.getTimezoneOffset() // 当前时区偏移量（分钟）
+      const todayStartBeijing = new Date(now)
+      // 先转换为北京时间，设置为0点，再转回 UTC
+      todayStartBeijing.setMinutes(todayStartBeijing.getMinutes() + utcOffset + beijingOffset)
+      todayStartBeijing.setHours(0, 0, 0, 0)
+      // 转回 UTC 进行数据库查询
+      const todayStart = new Date(
+        todayStartBeijing.getTime() - (utcOffset + beijingOffset) * 60 * 1000
+      )
+
+      // 删除已完成业务流程的挂牌记录（不影响资产余额）
+      const deletedCount = await MarketListing.destroy({
+        where: {
+          seller_user_id: testUser.user_id,
+          status: {
+            [Op.in]: ['withdrawn', 'sold', 'admin_withdrawn']
+          },
+          created_at: {
+            [Op.gte]: todayStart
+          }
+        }
+      })
+
+      if (deletedCount > 0) {
+        console.log(`🔄 已重置每日挂牌计数器：删除 ${deletedCount} 条已完成的挂牌记录`)
+      }
+
+      // 统计当前今日挂牌次数
+      const currentTodayCount = await MarketListing.count({
+        where: {
+          seller_user_id: testUser.user_id,
+          created_at: {
+            [Op.gte]: todayStart
+          }
+        }
+      })
+      console.log(`📊 当前今日挂牌次数: ${currentTodayCount}/20`)
     } catch (error) {
       console.warn('⚠️ 数据库连接失败，跳过测试:', error.message)
       skipTests = true
@@ -307,8 +401,20 @@ describe('C2C 材料交易功能集成测试', () => {
         return
       }
 
-      // 使用一个非常大的数量
+      // 🔴 修复：先查询实际余额，使用比实际余额更大的数量来触发错误
+      const currentBalance = await AssetService.getBalance({
+        user_id: testUser.user_id,
+        asset_code: testAssetCode
+      })
+
+      // 使用比当前可用余额更大的数量（确保触发余额不足错误）
+      const insufficientAmount = BigInt(currentBalance.available_amount || 0) + BigInt(1000000)
+
       const idempotencyKey = `test_insufficient_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+
+      console.log(
+        `🔍 测试余额不足场景: 当前余额=${currentBalance.available_amount}, 请求数量=${insufficientAmount.toString()}`
+      )
 
       await expect(
         TransactionManager.execute(
@@ -318,7 +424,7 @@ describe('C2C 材料交易功能集成测试', () => {
                 idempotency_key: idempotencyKey,
                 seller_user_id: testUser.user_id,
                 offer_asset_code: testAssetCode,
-                offer_amount: 999999999, // 非常大的数量
+                offer_amount: Number(insufficientAmount), // 比实际余额多100万
                 price_amount: 100
               },
               { transaction }
@@ -409,11 +515,12 @@ describe('C2C 材料交易功能集成测试', () => {
         asset_code: testAssetCode
       })
 
-      expect(balanceAfterWithdraw.available_amount).toBe(
-        balanceAfterCreate.available_amount + offerAmount
+      // 🔴 修复：显式转换为数值类型（Decimal/String → Number），避免字符串拼接
+      expect(Number(balanceAfterWithdraw.available_amount)).toBe(
+        Number(balanceAfterCreate.available_amount) + offerAmount
       )
-      expect(balanceAfterWithdraw.frozen_amount).toBe(
-        balanceAfterCreate.frozen_amount - offerAmount
+      expect(Number(balanceAfterWithdraw.frozen_amount)).toBe(
+        Number(balanceAfterCreate.frozen_amount) - offerAmount
       )
 
       console.log('✅ 撤回挂牌成功:', {

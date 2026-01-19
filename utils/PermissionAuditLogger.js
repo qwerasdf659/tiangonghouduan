@@ -60,15 +60,16 @@ class PermissionAuditLogger {
    * @param {string} data.resource - 资源名称
    * @param {string} data.action - 操作类型
    * @param {boolean} data.has_permission - 是否有权限
-   * @param {boolean} data.is_admin - 是否管理员
-   * @param {number} data.role_level - 角色级别
+   * @param {number} data.role_level - 角色级别（>= 100 为管理员）
    * @param {string} data.ip_address - IP地址
    * @param {string} data.user_agent - 用户代理
    * @param {number} data.batch_count - 批量检查数量（可选）
    * @returns {Promise<void>}
    *
    * 日志格式（JSON Lines格式，每行一个JSON对象）：
-   * {"action":"PERMISSION_CHECK","user_id":123,"resource":"lottery","action_type":"participate","has_permission":true,"is_admin":false,"role_level":0,"ip_address":"127.0.0.1","user_agent":"Mozilla/5.0...","timestamp":"2025-11-10T18:30:00.000+08:00"}
+   * {"action":"PERMISSION_CHECK","user_id":123,"resource":"lottery","action_type":"participate","has_permission":true,"role_level":0,"ip_address":"127.0.0.1","user_agent":"Mozilla/5.0...","timestamp":"2025-11-10T18:30:00.000+08:00"}
+   *
+   * 注意：is_admin 字段已移除，使用 role_level >= 100 判断管理员权限
    */
   async logPermissionCheck(data) {
     try {
@@ -78,8 +79,7 @@ class PermissionAuditLogger {
         resource: data.resource, // 资源名称（如lottery、inventory）
         action_type: data.action, // 操作类型（如read、participate）
         has_permission: data.has_permission, // 权限检查结果
-        is_admin: data.is_admin || false, // 是否管理员
-        role_level: data.role_level || 0, // 角色级别
+        role_level: data.role_level || 0, // 角色级别（>= 100 为管理员）
         ip_address: data.ip_address || 'unknown', // 来源IP地址
         user_agent: data.user_agent || 'unknown', // 用户代理字符串
         timestamp: BeijingTimeHelper.now() // 北京时间时间戳

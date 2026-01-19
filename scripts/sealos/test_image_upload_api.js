@@ -49,7 +49,7 @@ async function loginAndGetToken() {
       console.log(`✅ 登录成功`)
       console.log(`   用户 ID: ${user.user_id}`)
       console.log(`   用户名: ${user.nickname}`)
-      console.log(`   是否管理员: ${user.is_admin}`)
+      console.log(`   是否管理员: ${user.role_level >= 100 ? '是' : '否'}`) // role_level >= 100 为管理员
       return token
     } else {
       throw new Error(`登录失败: ${response.data.message}`)

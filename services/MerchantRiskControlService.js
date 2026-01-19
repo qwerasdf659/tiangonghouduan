@@ -228,7 +228,7 @@ class MerchantRiskControlService {
       }
 
       // 2. 日累计金额告警
-      const todayStart = BeijingTimeHelper.getTodayStart()
+      const todayStart = BeijingTimeHelper.todayStart()
       const dailyTotal =
         (await ConsumptionRecord.sum('consumption_amount', {
           where: {
@@ -822,7 +822,7 @@ class MerchantRiskControlService {
       })
 
       // 今日新增
-      const todayStart = BeijingTimeHelper.getTodayStart()
+      const todayStart = BeijingTimeHelper.todayStart()
       const todayCount = await RiskAlert.count({
         where: {
           ...where,
@@ -1153,7 +1153,7 @@ class MerchantRiskControlService {
       })
 
       // 今日新增
-      const todayStart = BeijingTimeHelper.getTodayRange().start
+      const todayStart = BeijingTimeHelper.todayStart()
       const todayCount = await RiskAlert.count({
         where: {
           created_at: { [Op.gte]: todayStart }

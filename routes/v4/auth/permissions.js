@@ -93,16 +93,15 @@ router.get('/me', authenticateToken, async (req, res) => {
     // 获取用户完整权限信息
     const permissions = await UserRoleService.getUserPermissions(parseInt(user_id))
 
-    // 构建响应数据（role_level >= 100 为管理员）
-    const hasAdminAccess = permissions.role_level >= 100
+    /**
+     * 🔄 2026-01-19：移除便捷权限字段，前端统一用 role_level >= 100 判断管理员
+     * 已移除字段：can_manage_lottery, can_view_admin_panel, can_modify_user_permissions
+     */
     const response_data = {
       user_id: parseInt(user_id),
       roles: permissions.roles,
-      role_level: permissions.role_level, // 角色级别（>= 100 为管理员）
-      permissions,
-      can_manage_lottery: hasAdminAccess,
-      can_view_admin_panel: hasAdminAccess,
-      can_modify_user_permissions: hasAdminAccess
+      role_level: permissions.role_level, // 角色级别（>= 100 为管理员，前端自行判断）
+      permissions
     }
 
     return res.apiSuccess(response_data, '当前用户权限信息获取成功')

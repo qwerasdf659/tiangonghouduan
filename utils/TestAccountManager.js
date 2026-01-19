@@ -1,8 +1,8 @@
 /**
  * 测试账号管理器 - V4.0 统一架构版本
- * 🛡️ 使用UUID角色系统替代is_admin字段
+ * 🛡️ 使用UUID角色系统和role_level统一权限判断（role_level >= 100为管理员）
  * 创建时间：2025年01月21日
- * 更新时间：2025年01月28日
+ * 更新时间：2026年01月19日 - 移除is_admin字段
  */
 
 const BeijingTimeHelper = require('./timeHelper')
@@ -54,7 +54,7 @@ const BeijingTimeHelper = require('./timeHelper')
  * - 数据源验证：DATABASE_VERIFIED标记确保数据真实性
  *
  * 架构迁移说明：
- * - V4版本使用UUID角色系统替代is_admin字段
+ * - V4版本使用UUID角色系统和role_level统一权限判断（role_level >= 100为管理员）
  * - 支持未来扩展多测试账号（addTestAccount预留接口）
  *
  * 使用方式：
@@ -295,7 +295,7 @@ class TestAccountManager {
     console.log('🛡️ 创建受保护测试配置:')
     console.log(`   📱 手机号: ${protectedConfig.testAccount.mobile}`)
     console.log(`   👤 用户ID: ${protectedConfig.testAccount.user_id}`)
-    console.log(`   👨‍💼 管理员: ${protectedConfig.testAccount.is_admin ? '是' : '否'}`)
+    console.log(`   👨‍💼 管理员: ${protectedConfig.testAccount.role_level >= 100 ? '是' : '否'}`)
     console.log(`   💰 积分: ${protectedConfig.testAccount.available_points}`)
 
     return protectedConfig
@@ -387,7 +387,7 @@ class TestAccountManager {
       main_account: {
         mobile: config.MAIN_TEST_ACCOUNT.mobile,
         user_id: config.MAIN_TEST_ACCOUNT.user_id,
-        is_admin: config.MAIN_TEST_ACCOUNT.is_admin,
+        role_level: config.MAIN_TEST_ACCOUNT.role_level, // role_level >= 100 为管理员
         // 🎯 V4新增：测试权限报告
         test_privileges: config.MAIN_TEST_ACCOUNT.test_privileges
       },

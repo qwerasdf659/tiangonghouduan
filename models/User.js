@@ -221,35 +221,35 @@ module.exports = sequelize => {
     }
   }
 
-  // 🛡️ UUID角色系统方法 - 检查用户是否拥有指定角色
+  /**
+   * 🛡️ UUID角色系统方法 - 检查用户是否拥有指定角色
+   * 🔧 2026-01-19 修复：移除错误的 include，getRoles() 已返回 Role 实例
+   * @param {string} roleName - 角色名称
+   * @returns {Promise<boolean>} 是否拥有指定角色
+   */
   User.prototype.hasRole = async function (roleName) {
-    const userRoles = await this.getRoles({
-      where: { is_active: true },
-      include: [
-        {
-          model: sequelize.models.Role,
-          where: { role_name: roleName, is_active: true }
-        }
-      ]
+    const roles = await this.getRoles({
+      where: { role_name: roleName, is_active: true },
+      through: { where: { is_active: true } }
     })
-    return userRoles.length > 0
+    return roles.length > 0
   }
 
+  /**
+   * 🛡️ UUID角色系统方法 - 检查用户是否拥有指定资源的权限
+   * 🔧 2026-01-19 修复：移除错误的 include，getRoles() 已返回 Role 实例
+   * @param {string} resource - 资源名称（如 lottery、user 等）
+   * @param {string} [action='read'] - 操作类型（read、write、delete 等）
+   * @returns {Promise<boolean>} 是否拥有权限
+   */
   User.prototype.hasPermission = async function (resource, action = 'read') {
-    const userRoles = await this.getRoles({
+    const roles = await this.getRoles({
       where: { is_active: true },
-      include: [
-        {
-          model: sequelize.models.Role,
-          where: { is_active: true }
-        }
-      ]
+      through: { where: { is_active: true } }
     })
 
-    for (const userRole of userRoles) {
-      const role = userRole.Role
-
-      // 超级管理员拥有所有权限
+    for (const role of roles) {
+      // 超级管理员拥有所有权限（role_level >= 100）
       if (role.role_level >= 100) return true
 
       // 检查具体权限
