@@ -40,10 +40,17 @@ const {
   LotteryDrawDecision,
   LotteryPrize: _LotteryPrize,
   LotteryCampaignUserQuota: _LotteryCampaignUserQuota,
+  LotteryHourlyMetrics, // Phase P2：监控指标埋点
   sequelize
 } = require('../../../../models')
 const BeijingTimeHelper = require('../../../../utils/timeHelper')
 const AssetService = require('../../../AssetService')
+
+/*
+ * ========== Phase 9-16 增强：体验状态管理器 ==========
+ * 用于更新用户抽奖体验计数器（Pity/AntiEmpty/AntiHigh）
+ */
+const { ExperienceStateManager, GlobalStateManager } = require('../../strategy/state')
 
 // eslint-disable-next-line no-unused-vars -- _LotteryPrize, _LotteryCampaignUserQuota: 预留用于未来扩展功能
 const _preReserved = { _LotteryPrize, _LotteryCampaignUserQuota }
@@ -256,6 +263,36 @@ class SettleStage extends BaseStage {
 
       // 7. 更新用户配额（如果有）
       await this._updateUserQuota(user_id, campaign_id, transaction)
+
+      /*
+       * ========== Phase 9-16 增强：更新用户体验状态 ==========
+       * 用于 Pity 系统、Anti-Empty Streak、Anti-High Streak、Luck Debt 机制
+       *
+       * 规则：
+       * - 空奖（empty tier）：增加空奖连击计数
+       * - 非空奖：重置空奖连击，增加对应档位计数
+       * - 全局状态：记录跨活动的抽奖统计
+       */
+      await this._updateExperienceState({
+        user_id,
+        campaign_id,
+        final_tier,
+        final_prize,
+        transaction
+      })
+
+      /*
+       * ========== Phase P2 增强：记录监控指标 ==========
+       * 按小时聚合监控数据，用于活动健康度监控和策略效果评估
+       */
+      await this._recordHourlyMetrics({
+        campaign_id,
+        draw_tier: final_tier,
+        prize_value: final_prize.prize_value_points || 0,
+        budget_tier: budget_data?.budget_tier || null,
+        mechanisms: decision_snapshot.experience_smoothing || {},
+        transaction
+      })
 
       // 提交事务（如果是内部创建的事务）
       if (!use_external_transaction) {
@@ -660,6 +697,157 @@ class SettleStage extends BaseStage {
       // 配额更新失败不应该阻断结算
       this.log('warn', '用户配额更新失败（非致命）', {
         user_id,
+        campaign_id,
+        error: error.message
+      })
+    }
+  }
+
+  /**
+   * 更新用户体验状态（Phase 9-16 增强）
+   *
+   * 用于 Pity 系统、Anti-Empty Streak、Anti-High Streak、Luck Debt 机制
+   *
+   * @param {Object} params - 参数
+   * @param {number} params.user_id - 用户ID
+   * @param {number} params.campaign_id - 活动ID
+   * @param {string} params.final_tier - 最终奖品档位
+   * @param {Object} params.final_prize - 中奖奖品对象
+   * @param {Object} params.transaction - 事务对象
+   * @returns {Promise<void>} 无返回值
+   * @private
+   */
+  async _updateExperienceState(params) {
+    const { user_id, campaign_id, final_tier, final_prize, transaction } = params
+
+    try {
+      /*
+       * 1. 更新活动级体验状态（用于 Pity / Anti-Empty / Anti-High）
+       */
+      const experience_manager = new ExperienceStateManager()
+      const is_empty =
+        final_tier === 'empty' || final_tier === 'fallback' || final_prize.prize_value_points === 0
+
+      await experience_manager.updateState(
+        {
+          user_id,
+          campaign_id,
+          draw_tier: final_tier, // 传递实际档位而非 is_high 布尔值
+          is_empty
+        },
+        { transaction }
+      )
+
+      this.log('debug', '活动体验状态已更新', {
+        user_id,
+        campaign_id,
+        draw_tier: final_tier,
+        is_empty
+      })
+
+      /*
+       * 2. 更新全局状态（用于 Luck Debt 机制）
+       */
+      const global_manager = new GlobalStateManager()
+
+      // 检查是否是该活动的首次抽奖（用于增加 participated_campaigns 计数）
+      const is_first_draw = await global_manager.isFirstParticipation(
+        { user_id, campaign_id },
+        { transaction }
+      )
+
+      await global_manager.updateState(
+        {
+          user_id,
+          campaign_id,
+          draw_tier: final_tier,
+          is_first_draw_in_campaign: is_first_draw
+        },
+        { transaction }
+      )
+
+      this.log('debug', '全局体验状态已更新', {
+        user_id,
+        campaign_id,
+        draw_tier: final_tier,
+        is_first_draw
+      })
+    } catch (error) {
+      /*
+       * 体验状态更新失败不应该阻断结算
+       * 记录错误日志，但继续执行
+       */
+      this.log('warn', '体验状态更新失败（非致命）', {
+        user_id,
+        campaign_id,
+        error: error.message
+      })
+    }
+  }
+
+  /**
+   * 记录监控指标（Phase P2 增强）
+   *
+   * 按小时聚合抽奖监控数据，用于：
+   * 1. 活动健康度监控（空奖率、高价值率）
+   * 2. 策略效果评估（Pity/AntiEmpty/AntiHigh 触发率）
+   * 3. 预算分布分析（B0-B3 用户分布）
+   *
+   * @param {Object} params - 参数
+   * @param {number} params.campaign_id - 活动ID
+   * @param {string} params.draw_tier - 抽奖档位（high/mid/low/fallback/empty）
+   * @param {number} params.prize_value - 奖品价值（积分）
+   * @param {string} params.budget_tier - 预算分层（B0/B1/B2/B3）
+   * @param {Object} params.mechanisms - 触发的体验机制
+   * @param {Object} params.transaction - 事务对象
+   * @returns {Promise<void>} 无返回值
+   * @private
+   */
+  async _recordHourlyMetrics(params) {
+    const { campaign_id, draw_tier, prize_value, budget_tier, mechanisms, transaction } = params
+
+    try {
+      // 获取或创建当前小时的指标记录
+      const metrics = await LotteryHourlyMetrics.findOrCreateMetrics(campaign_id, new Date(), {
+        transaction
+      })
+
+      // 解析机制触发情况
+      const mechanism_flags = {
+        pity_triggered:
+          mechanisms?.smoothing_applied &&
+          mechanisms?.applied_mechanisms?.some(m => m.type === 'pity'),
+        anti_empty_triggered: mechanisms?.anti_empty_result?.forced === true,
+        anti_high_triggered: mechanisms?.anti_high_result?.tier_capped === true,
+        luck_debt_triggered: mechanisms?.luck_debt_result?.debt_level !== 'none',
+        guarantee_triggered: false, // 保底由其他逻辑处理
+        tier_downgraded: mechanisms?.tier_downgraded === true
+      }
+
+      // 记录本次抽奖
+      await metrics.recordDraw(
+        {
+          tier: draw_tier,
+          prize_value, // 奖品价值（积分）
+          budget_tier, // 预算分层（B0/B1/B2/B3）
+          mechanisms: mechanism_flags
+        },
+        { transaction }
+      )
+
+      this.log('debug', '监控指标已记录', {
+        campaign_id,
+        draw_tier,
+        prize_value,
+        budget_tier,
+        mechanisms: mechanism_flags
+      })
+    } catch (error) {
+      /*
+       * 监控指标记录失败不应该阻断结算
+       * 记录错误日志，但继续执行
+       */
+      this.log('warn', '监控指标记录失败（非致命）', {
         campaign_id,
         error: error.message
       })

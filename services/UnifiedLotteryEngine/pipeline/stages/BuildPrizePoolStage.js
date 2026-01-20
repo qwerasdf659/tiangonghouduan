@@ -8,22 +8,30 @@
  * 2. 根据库存过滤奖品（排除缺货奖品）
  * 3. 根据每日中奖上限过滤奖品
  * 4. 按档位分组奖品（high/mid/low/fallback）
- * 5. 确保至少有一个空奖可用
+ * 5. 根据 Budget Tier 限制可参与的档位
+ * 6. 确保至少有一个空奖可用
  *
  * 输出到上下文：
  * - available_prizes: 可用奖品列表
  * - prizes_by_tier: 按档位分组的奖品 { high: [], mid: [], low: [], fallback: [] }
- * - available_tiers: 可用的档位列表
+ * - available_tiers: 可用的档位列表（受 Budget Tier 限制）
+ * - allowed_tiers: 预算分层允许的档位（来自 BudgetContextStage）
  * - has_valuable_prizes: 是否有有价值的奖品可用
+ *
+ * 策略引擎集成（2026-01-20）：
+ * - 从 BudgetContextStage 获取 budget_tier 和 allowed_tiers
+ * - 根据 budget_tier 过滤可参与的档位
+ * - 为后续的 TierPickStage 准备分层权重信息
  *
  * 设计原则：
  * - 读操作Stage，不执行任何写操作
- * - 预算不足时自动降级到空奖
+ * - 预算不足时自动降级到空奖（B0 只能抽 fallback）
  * - 保证每次抽奖都能选出一个奖品（100%中奖）
  *
  * @module services/UnifiedLotteryEngine/pipeline/stages/BuildPrizePoolStage
  * @author 统一抽奖架构重构
  * @since 2026-01-18
+ * @updated 2026-01-20 集成预算分层限制
  */
 
 const BaseStage = require('./BaseStage')
@@ -61,6 +69,8 @@ class BuildPrizePoolStage extends BaseStage {
   /**
    * 执行奖品池构建
    *
+   * 集成预算分层限制：根据 budget_tier 限制可参与的档位
+   *
    * @param {Object} context - 执行上下文
    * @param {number} context.user_id - 用户ID
    * @param {number} context.campaign_id - 活动ID
@@ -73,7 +83,7 @@ class BuildPrizePoolStage extends BaseStage {
     this.log('info', '开始构建奖品池', { user_id, campaign_id })
 
     try {
-      // 获取活动配置和奖品列表（从 LoadCampaignStage 的结果中）
+      /* 获取活动配置和奖品列表（从 LoadCampaignStage 的结果中） */
       const campaign_data = this.getContextData(context, 'LoadCampaignStage.data')
       if (!campaign_data) {
         throw this.createError(
@@ -86,53 +96,71 @@ class BuildPrizePoolStage extends BaseStage {
       const prizes = campaign_data.prizes || []
       const fallback_prize = campaign_data.fallback_prize
 
-      // 获取预算上下文（从 BudgetContextStage 的结果中）
+      /* 获取预算上下文（从 BudgetContextStage 的结果中） */
       const budget_data = this.getContextData(context, 'BudgetContextStage.data')
       const budget_before = budget_data?.budget_before || 0
       const budget_mode = budget_data?.budget_mode || 'none'
+
+      /* 获取预算分层信息（新增：策略引擎集成） */
+      const budget_tier = budget_data?.budget_tier || 'B0'
+      const allowed_tiers = budget_data?.available_tiers || ['fallback']
+      const pressure_tier = budget_data?.pressure_tier || 'P1'
+      const effective_budget = budget_data?.effective_budget || 0
 
       this.log('info', '奖品池构建参数', {
         campaign_id,
         total_prizes: prizes.length,
         budget_before,
-        budget_mode
+        effective_budget,
+        budget_mode,
+        budget_tier,
+        pressure_tier,
+        allowed_tiers
       })
 
-      // 1. 根据库存和每日上限过滤奖品
+      /* 1. 根据库存和每日上限过滤奖品 */
       let filtered_prizes = await this._filterByAvailability(prizes)
 
-      // 2. 根据预算过滤奖品（如果启用了预算限制）
+      /* 2. 根据预算过滤奖品（如果启用了预算限制） */
       if (budget_mode !== 'none') {
         filtered_prizes = this._filterByBudget(filtered_prizes, budget_before)
       }
 
-      // 3. 按档位分组
+      /* 3. 按档位分组 */
       const prizes_by_tier = this._groupByTier(filtered_prizes)
 
-      // 4. 确保有兜底奖品
+      /* 4. 确保有兜底奖品 */
       if (prizes_by_tier.fallback.length === 0 && fallback_prize) {
         prizes_by_tier.fallback.push(fallback_prize)
       }
 
-      // 5. 计算可用档位
-      const available_tiers = this._getAvailableTiers(prizes_by_tier)
+      /* 5. 根据 budget_tier 限制可参与的档位（新增） */
+      const filtered_prizes_by_tier = this._filterByAllowedTiers(prizes_by_tier, allowed_tiers)
 
-      // 6. 判断是否有有价值的奖品
-      const has_valuable_prizes = this._hasValuablePrizes(prizes_by_tier)
+      /* 6. 计算可用档位（在 allowed_tiers 限制后） */
+      const available_tiers = this._getAvailableTiers(filtered_prizes_by_tier)
 
-      // 7. 构建返回数据
+      /* 7. 判断是否有有价值的奖品 */
+      const has_valuable_prizes = this._hasValuablePrizes(filtered_prizes_by_tier)
+
+      /* 8. 构建返回数据 */
       const result = {
         available_prizes: filtered_prizes,
-        prizes_by_tier,
+        prizes_by_tier: filtered_prizes_by_tier,
         available_tiers,
+        allowed_tiers,
         has_valuable_prizes,
         total_available: filtered_prizes.length,
         tier_counts: {
-          high: prizes_by_tier.high.length,
-          mid: prizes_by_tier.mid.length,
-          low: prizes_by_tier.low.length,
-          fallback: prizes_by_tier.fallback.length
-        }
+          high: filtered_prizes_by_tier.high.length,
+          mid: filtered_prizes_by_tier.mid.length,
+          low: filtered_prizes_by_tier.low.length,
+          fallback: filtered_prizes_by_tier.fallback.length
+        },
+        /* 策略引擎分层信息（传递给后续 Stage） */
+        budget_tier,
+        pressure_tier,
+        effective_budget
       }
 
       this.log('info', '奖品池构建完成', {
@@ -140,6 +168,9 @@ class BuildPrizePoolStage extends BaseStage {
         user_id,
         total_available: filtered_prizes.length,
         available_tiers,
+        allowed_tiers,
+        budget_tier,
+        pressure_tier,
         tier_counts: result.tier_counts,
         has_valuable_prizes
       })
@@ -276,12 +307,12 @@ class BuildPrizePoolStage extends BaseStage {
    * @private
    */
   _hasValuablePrizes(prizes_by_tier) {
-    // 有价值的档位：high、mid、low
+    /* 有价值的档位：high、mid、low */
     const valuable_tiers = ['high', 'mid', 'low']
 
     for (const tier of valuable_tiers) {
       const tier_prizes = prizes_by_tier[tier] || []
-      // 检查是否有 prize_value_points > 0 的奖品
+      /* 检查是否有 prize_value_points > 0 的奖品 */
       const has_valuable = tier_prizes.some(p => (p.prize_value_points || 0) > 0)
       if (has_valuable) {
         return true
@@ -289,6 +320,53 @@ class BuildPrizePoolStage extends BaseStage {
     }
 
     return false
+  }
+
+  /**
+   * 根据预算分层允许的档位过滤奖品
+   *
+   * 业务规则（Budget Tier 限制）：
+   * - B0（无预算）：只允许 fallback
+   * - B1（低预算）：允许 low + fallback
+   * - B2（中预算）：允许 mid + low + fallback
+   * - B3（高预算）：允许 high + mid + low + fallback
+   *
+   * @param {Object} prizes_by_tier - 原始按档位分组的奖品
+   * @param {Array<string>} allowed_tiers - 预算分层允许的档位列表
+   * @returns {Object} 过滤后的按档位分组奖品
+   * @private
+   */
+  _filterByAllowedTiers(prizes_by_tier, allowed_tiers) {
+    const filtered = {
+      high: [],
+      mid: [],
+      low: [],
+      fallback: []
+    }
+
+    /* 遍历每个档位，只保留 allowed_tiers 中允许的 */
+    for (const tier of TIER_ORDER) {
+      if (allowed_tiers.includes(tier)) {
+        filtered[tier] = prizes_by_tier[tier] || []
+      } else {
+        /* 不允许的档位置空，但记录日志 */
+        if (prizes_by_tier[tier] && prizes_by_tier[tier].length > 0) {
+          this.log('debug', '档位因预算限制被排除', {
+            tier,
+            excluded_count: prizes_by_tier[tier].length,
+            allowed_tiers
+          })
+        }
+        filtered[tier] = []
+      }
+    }
+
+    /* fallback 始终保留（确保 100% 中奖） */
+    if (filtered.fallback.length === 0 && prizes_by_tier.fallback) {
+      filtered.fallback = prizes_by_tier.fallback
+    }
+
+    return filtered
   }
 }
 

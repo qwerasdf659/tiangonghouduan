@@ -5,28 +5,41 @@
  *
  * 职责：
  * 1. 根据活动的 budget_mode 初始化对应的 BudgetProvider
- * 2. 查询用户当前预算余额
- * 3. 检查预算是否足够支付最低价值奖品
- * 4. 将 budget_provider 和预算信息注入上下文
+ * 2. 调用 StrategyEngine 计算预算分层（Budget Tier B0-B3）
+ * 3. 调用 StrategyEngine 计算活动压力分层（Pressure Tier P0-P2）
+ * 4. 查询用户当前预算余额（EffectiveBudget）
+ * 5. 检查预算是否足够支付最低价值奖品
+ * 6. 将 budget_provider 和预算分层信息注入上下文
  *
  * 输出到上下文：
  * - budget_provider: BudgetProvider 实例
  * - budget_before: 抽奖前预算余额
+ * - effective_budget: 有效预算（统一计算口径）
+ * - budget_tier: 预算分层（B0/B1/B2/B3）
+ * - pressure_tier: 活动压力分层（P0/P1/P2）
+ * - available_tiers: 该预算分层可参与的档位列表
  * - min_prize_cost: 最低奖品成本
  * - budget_sufficient: 预算是否充足
  *
+ * 策略引擎集成（2026-01-20）：
+ * - 集成 StrategyEngine.computeBudgetContext()
+ * - 支持 BxPx 矩阵预算分层控制
+ * - 为后续 BuildPrizePoolStage 和 TierPickStage 提供分层信息
+ *
  * 设计原则：
  * - 读操作Stage，不执行任何写操作
- * - 预算不足时仍然继续（降级到空奖），不直接失败
- * - 支持三种预算模式：user、pool、pool_quota
+ * - 预算不足时仍然继续（降级到空奖 B0），不直接失败
+ * - 支持三种预算模式：user、pool、hybrid、none
  *
  * @module services/UnifiedLotteryEngine/pipeline/stages/BudgetContextStage
  * @author 统一抽奖架构重构
  * @since 2026-01-18
+ * @updated 2026-01-20 集成 StrategyEngine
  */
 
 const BaseStage = require('./BaseStage')
 const BudgetProviderFactory = require('../budget/BudgetProviderFactory')
+const StrategyEngine = require('../../strategy/StrategyEngine')
 
 /**
  * 预算上下文初始化 Stage
@@ -40,10 +53,15 @@ class BudgetContextStage extends BaseStage {
       is_writer: false,
       required: true
     })
+
+    /* 初始化策略引擎实例 */
+    this.strategyEngine = new StrategyEngine()
   }
 
   /**
    * 执行预算上下文初始化
+   *
+   * 集成 StrategyEngine 计算预算分层和压力分层
    *
    * @param {Object} context - 执行上下文
    * @param {number} context.user_id - 用户ID
@@ -57,7 +75,7 @@ class BudgetContextStage extends BaseStage {
     this.log('info', '开始初始化预算上下文', { user_id, campaign_id })
 
     try {
-      // 获取活动配置（从 LoadCampaignStage 的结果中）
+      /* 获取活动配置（从 LoadCampaignStage 的结果中） */
       const campaign_data = this.getContextData(context, 'LoadCampaignStage.data')
       if (!campaign_data || !campaign_data.campaign) {
         throw this.createError(
@@ -76,7 +94,7 @@ class BudgetContextStage extends BaseStage {
         budget_mode
       })
 
-      // 1. 创建 BudgetProvider 实例
+      /* 1. 创建 BudgetProvider 实例 */
       const budget_provider = BudgetProviderFactory.create(budget_mode, {
         user_id,
         campaign_id,
@@ -84,46 +102,78 @@ class BudgetContextStage extends BaseStage {
         transaction: context.transaction || null
       })
 
-      // 2. 查询当前预算余额
+      /* 2. 调用 StrategyEngine 计算预算上下文（包含分层信息） */
+      const strategy_context = await this.strategyEngine.computeBudgetContext({
+        user_id,
+        campaign,
+        prizes,
+        transaction: context.transaction || null
+      })
+
+      /* 3. 同时获取传统预算余额（兼容现有逻辑） */
       let budget_before = 0
       if (budget_mode !== 'none') {
         try {
           budget_before = await budget_provider.getBalance()
         } catch (error) {
-          this.log('warn', '获取预算余额失败，使用默认值0', {
+          this.log('warn', '获取预算余额失败，使用 EffectiveBudget', {
             user_id,
             campaign_id,
             budget_mode,
             error: error.message
           })
-          budget_before = 0
+          budget_before = strategy_context.effective_budget || 0
         }
       }
 
-      // 3. 计算最低奖品成本
+      /* 4. 计算最低奖品成本 */
       const min_prize_cost = this._calculateMinPrizeCost(prizes)
 
-      // 4. 判断预算是否充足（能否抽中非空奖）
+      /* 5. 判断预算是否充足（能否抽中非空奖） */
       const budget_sufficient = budget_mode === 'none' || budget_before >= min_prize_cost
 
-      // 5. 构建返回数据
+      /* 6. 构建返回数据（整合策略引擎结果） */
       const result = {
+        /* 基础预算信息 */
         budget_provider,
         budget_mode,
         budget_before,
         min_prize_cost,
         budget_sufficient,
-        can_win_valuable_prize: budget_sufficient && min_prize_cost > 0
+        can_win_valuable_prize: budget_sufficient && min_prize_cost > 0,
+
+        /* 策略引擎计算的分层信息（新增） */
+        effective_budget: strategy_context.effective_budget,
+        budget_tier: strategy_context.budget_tier,
+        available_tiers: strategy_context.available_tiers,
+        budget_sufficiency: strategy_context.budget_sufficiency,
+
+        /* 活动压力分层（新增） */
+        pressure_index: strategy_context.pressure_index,
+        pressure_tier: strategy_context.pressure_tier,
+        time_progress: strategy_context.time_progress,
+        virtual_consumption: strategy_context.virtual_consumption,
+        weight_adjustment: strategy_context.weight_adjustment,
+
+        /* 钱包可用性（新增） */
+        wallet_available: strategy_context.wallet_available
       }
 
-      // 将 budget_provider 存储到上下文中，供后续 Stage 使用
+      /* 将关键数据存储到上下文中，供后续 Stage 使用 */
       this.setContextData(context, 'budget_provider', budget_provider)
+      this.setContextData(context, 'budget_tier', strategy_context.budget_tier)
+      this.setContextData(context, 'pressure_tier', strategy_context.pressure_tier)
+      this.setContextData(context, 'available_tiers', strategy_context.available_tiers)
+      this.setContextData(context, 'effective_budget', strategy_context.effective_budget)
 
       this.log('info', '预算上下文初始化完成', {
         user_id,
         campaign_id,
         budget_mode,
         budget_before,
+        effective_budget: strategy_context.effective_budget,
+        budget_tier: strategy_context.budget_tier,
+        pressure_tier: strategy_context.pressure_tier,
         min_prize_cost,
         budget_sufficient
       })

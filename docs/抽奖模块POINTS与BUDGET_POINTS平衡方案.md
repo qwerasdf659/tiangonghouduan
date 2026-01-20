@@ -1,12 +1,13 @@
 # 抽奖模块 POINTS 与 BUDGET_POINTS 平衡方案
 
-> **文档版本**：v3.0（最终决策版 - 长期维护视角）  
+> **文档版本**：v3.5（策略模块化架构验证版）  
 > **创建时间**：2026-01-18 北京时间  
-> **更新时间**：2026-01-20 北京时间  
-> **文档状态**：✅ 最终决策已确认 + 工程落地方案  
+> **更新时间**：2026-01-20 10:45 北京时间  
+> **文档状态**：✅ **核心实施已完成并验证** + 策略模块化架构 + Pity 软保底 + 运气债务机制 + 工程落地完成  
 > **适用模块**：UnifiedLotteryEngine / V4.6 Pipeline（NormalDrawPipeline）  
-> **核心策略**：预算侧自动分层控制 + 体验侧软平滑（严控预算、用户无感）  
-> **设计原则**：长期维护成本最低、技术债务最少、一次性做好
+> **架构模式**：单体 + 策略引擎模块化（第二阶段架构，可独立测试，未来可拆分微服务）  
+> **核心策略**：预算侧自动分层控制 + Pity 软保底累积 + 体验侧软平滑 + 运气债务跨活动平衡（严控预算、用户无感）  
+> **设计原则**：长期维护成本最低、技术债务最少、一次性做好、借鉴游戏行业最佳实践
 
 ---
 
@@ -301,48 +302,75 @@ function getUserBudgetTier(budgetBalance) {
 
 ---
 
-### 5.3 活动预算压力层（Budget Pressure）- 自动压力计算
+### 5.3 活动预算压力层（Budget Pressure）- 虚拟消耗方式（2026-01-20 更新）
 
-基于活动池 `pool_budget_remaining` 与预期消耗速度自动计算压力指数（每小时更新）：
+> **最终决策**：采用**虚拟消耗**方式计算压力层，适用于所有 `budget_mode`（user/pool/none）。
 
-#### 压力指数计算公式（已确认）
+#### 压力指数计算公式（虚拟消耗）
 
-**方式1：基于目标剩余预算**
-```
-P = remaining_budget / target_remaining_budget(now)
-```
-- `target_remaining_budget(now)` = 活动总预算 × (剩余时间 / 总时间)
-- 例如：活动总预算10000，总时长30天，当前第15天
-  - 目标剩余 = 10000 × (15/30) = 5000
-  - 实际剩余 = 3000
-  - P = 3000 / 5000 = 0.6（偏紧）
+```javascript
+// 压力指数 = 实际消耗 / 预期消耗
+// - 实际消耗：活动启动以来已发出的奖品总成本（从 lottery_draws 汇总）
+// - 预期消耗：总预算 × 时间进度
 
-**方式2：基于消耗速率**
+async function calculatePressureIndex(campaign, transaction) {
+  // 1. 统计虚拟消耗（已发奖成本）
+  const virtualConsumed = await LotteryDraw.sum('prize_value_points', {
+    where: { 
+      campaign_id: campaign.campaign_id, 
+      created_at: { [Op.gte]: campaign.start_time } 
+    },
+    transaction
+  }) || 0;
+
+  // 2. 计算时间进度
+  const now = new Date();
+  const start = new Date(campaign.start_time);
+  const end = new Date(campaign.end_time);
+  const timeProgress = Math.max(0, Math.min(1, (now - start) / (end - start)));
+  
+  // 3. 计算预期消耗
+  const totalBudget = Number(campaign.pool_budget_total || 10000);
+  const expectedConsumed = totalBudget * timeProgress;
+  
+  // 4. 计算压力指数
+  if (expectedConsumed <= 0) return 1.0; // 活动刚开始
+  return virtualConsumed / expectedConsumed;
+}
 ```
-P = (remaining_budget / remaining_time) / recent_burn_rate
-```
-- `recent_burn_rate` = 最近1小时/24小时的平均消耗速率
-- P > 1：消耗慢于预期（富余）
-- P ≈ 1：正常
-- P < 1：消耗快于预期（紧张）
+
+**示例**：
+- 活动总预算 10000，总时长 30 天，当前第 15 天
+- 时间进度 = 15/30 = 50%
+- 预期消耗 = 10000 × 50% = 5000
+- 实际已发奖成本 = 6500（从 lottery_draws 汇总）
+- 压力指数 = 6500 / 5000 = 1.3（消耗略快，边界正常）
 
 #### 压力分层（已确认）
 
-| 压力层 | 压力指数 P | 说明 | 策略 |
-|--------|-----------|------|------|
-| **P0（紧）** | P < 0.7 | 预算快用光/消耗过快 | 保守发奖，降低非空权重 |
-| **P1（正常）** | 0.7 ≤ P ≤ 1.3 | 预算消耗正常 | 正常发奖 |
-| **P2（富余）** | P > 1.3 | 预算充足/消耗慢 | 积极发奖，提高非空权重 |
+| 压力层 | 压力指数 | 说明 | 策略 |
+|--------|---------|------|------|
+| **P0（紧）** | > 1.3 | 消耗过快，超出预期 | 保守发奖，降低非空权重 |
+| **P1（正常）** | 0.7 ~ 1.3 | 消耗正常 | 正常发奖 |
+| **P2（富余）** | < 0.7 | 消耗过慢，低于预期 | 积极发奖，提高非空权重 |
+
+> ⚠️ **注意**：压力指数含义与之前相反！
+> - 旧方式（剩余/目标剩余）：P 越大越富余
+> - 新方式（消耗/预期消耗）：P 越大越紧张
 
 **自动化实现**：
 ```javascript
-function getCampaignPressureTier(poolRemaining, targetRemaining) {
-  const P = poolRemaining / targetRemaining;
-  if (P < 0.7) return 'P0';  // 紧
-  if (P <= 1.3) return 'P1'; // 正常
-  return 'P2';               // 富余
+function getPressureTier(pressureIndex) {
+  if (pressureIndex > 1.3) return 'P0';  // 紧（消耗过快）
+  if (pressureIndex >= 0.7) return 'P1'; // 正常
+  return 'P2';                           // 富余（消耗过慢）
 }
 ```
+
+**选择虚拟消耗的优势**：
+- ✅ 适用于所有 `budget_mode`（user 模式下 pool_budget_remaining 不变化）
+- ✅ 基于实际发奖数据，更准确反映活动节奏
+- ✅ 无需新增数据库字段，复用 lottery_draws 表
 
 ---
 
@@ -460,13 +488,224 @@ async function applyAntiHighStreak(userId, availablePrizes, transaction) {
 }
 ```
 
+#### 5.5.3 Pity 软保底系统（概率累积提升）- 2026-01-20 新增
+
+> **设计来源**：借鉴游戏行业（原神/崩坏等）的 Pity 保底机制，在连续空奖时逐步提升非空概率，而非等到硬保底才触发。
+
+**核心思想**：
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                       Pity 软保底系统                                │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                     │
+│   抽数        非空权重倍数       说明                                │
+│   ────────────────────────────────────────────────────────────────  │
+│   1-2 抽      ×1.0              基础概率（按 BxPx 矩阵）              │
+│   3 抽        ×1.2              开始累积（连续2次空奖后）             │
+│   4 抽        ×1.5              继续累积                            │
+│   5 抽        ×1.8              概率明显提升                         │
+│   6 抽        ×2.2              高概率                              │
+│   7 抽        ×2.8              极高概率                            │
+│   8 抽        ×3.5              接近必中                            │
+│   9 抽        ×5.0              几乎必中                            │
+│   10 抽       强制非空           硬保底触发（已有 GuaranteeStage）     │
+│                                                                     │
+│   ⚠️ 约束：仍受预算硬约束，budget=0 时无论 pity 多高都只能空奖        │
+│                                                                     │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+**与现有机制的关系**：
+
+| 机制 | 触发条件 | 效果 | 优先级 |
+|------|---------|------|--------|
+| **BxPx 矩阵** | 每次抽奖 | 基础权重调整 | 基础层 |
+| **Pity 软保底** | 连续空奖 ≥2 次 | 非空权重累积倍增 | 叠加层 |
+| **反连空（硬保底）** | 连续空奖 ≥K 次 | 强制非空 | 兜底层 |
+| **运气债务** | 全局历史空奖率偏高 | 长期调权 | 平衡层 |
+| **预算硬约束** | budget < min_cost | 只能空奖 | 最高优先级 |
+
+**Pity 倍数表（可配置）**：
+
+```javascript
+// Pity 累积倍数配置
+const PITY_MULTIPLIER_TABLE = {
+  0: 1.0,   // 无连续空奖
+  1: 1.0,   // 1次空奖，维持基础
+  2: 1.2,   // 2次空奖，开始累积
+  3: 1.5,   // 3次空奖
+  4: 1.8,   // 4次空奖
+  5: 2.2,   // 5次空奖
+  6: 2.8,   // 6次空奖
+  7: 3.5,   // 7次空奖
+  8: 5.0,   // 8次空奖
+  9: 10.0,  // 9次空奖（几乎必中）
+  // 10次及以上：由硬保底（GuaranteeStage）接管
+};
+
+// 获取 Pity 倍数
+function getPityMultiplier(emptyStreak) {
+  if (emptyStreak >= 9) return PITY_MULTIPLIER_TABLE[9];
+  return PITY_MULTIPLIER_TABLE[emptyStreak] || 1.0;
+}
+```
+
+**自动化实现**：
+
+```javascript
+/**
+ * 应用 Pity 软保底系统
+ * 
+ * @param {number} userId - 用户ID
+ * @param {Array} availablePrizes - 可用奖品列表
+ * @param {number} budgetBalance - 当前预算余额
+ * @param {Object} transaction - 事务对象
+ * @returns {Array} 调整权重后的奖品列表
+ */
+async function applyPitySystem(userId, availablePrizes, budgetBalance, transaction) {
+  // 1. 获取用户连续空奖次数
+  const emptyStreak = await getRecentEmptyStreak(userId, transaction);
+  
+  // 2. 如果没有连续空奖，直接返回
+  if (emptyStreak < 2) {
+    return availablePrizes;
+  }
+  
+  // 3. 计算 Pity 倍数
+  const pityMultiplier = getPityMultiplier(emptyStreak);
+  
+  // 4. 检查预算约束（无预算时 pity 无效）
+  const minNonEmptyCost = 10; // 最低非空奖成本
+  if (budgetBalance < minNonEmptyCost) {
+    console.log(`Pity系统：用户连续${emptyStreak}次空奖，但预算不足(${budgetBalance})，无法提升非空概率`);
+    return availablePrizes;
+  }
+  
+  // 5. 应用 Pity 倍数到非空奖品权重
+  const adjustedPrizes = availablePrizes.map(prize => {
+    const baseWeight = prize.adjusted_weight || prize.win_probability;
+    
+    if (prize.prize_value_points > 0) {
+      // 非空奖：应用 pity 倍数
+      return {
+        ...prize,
+        adjusted_weight: baseWeight * pityMultiplier,
+        pity_applied: true,
+        pity_multiplier: pityMultiplier
+      };
+    } else {
+      // 空奖：权重不变或降低（可选）
+      return {
+        ...prize,
+        adjusted_weight: baseWeight / pityMultiplier, // 反向降低空奖权重
+        pity_applied: true,
+        pity_multiplier: 1 / pityMultiplier
+      };
+    }
+  });
+  
+  console.log(`Pity系统触发：用户连续${emptyStreak}次空奖，非空权重×${pityMultiplier}`);
+  
+  return adjustedPrizes;
+}
+```
+
+**Pity 系统效果示例**：
+
+假设用户当前状态：
+- 预算层：B2（中预算）
+- 压力层：P1（正常）
+- BxPx 矩阵基础权重：非空:空 = 7:3
+- 连续空奖次数：5次
+
+计算过程：
+```
+1. 基础权重（BxPx）：非空 70%，空 30%
+2. Pity 倍数（5次空奖）：×2.2
+3. 调整后权重：
+   - 非空：70% × 2.2 = 154（归一化后 ≈ 92%）
+   - 空：30% / 2.2 = 13.6（归一化后 ≈ 8%）
+4. 最终概率：非空 92%，空 8%
+```
+
+**与硬保底的配合**：
+
+```
+用户连续空奖序列：
+  1次 → 基础概率（BxPx）
+  2次 → Pity ×1.2
+  3次 → Pity ×1.5（反连空也可触发）
+  4次 → Pity ×1.8
+  5次 → Pity ×2.2
+  6次 → Pity ×2.8
+  7次 → Pity ×3.5
+  8次 → Pity ×5.0
+  9次 → Pity ×10.0（几乎必中）
+  10次 → 硬保底强制非空（GuaranteeStage）
+
+概率提升曲线（假设基础非空概率 50%）：
+  ┌────────────────────────────────────────────┐
+  │ 100% ─────────────────────────────●────●   │
+  │  90% ────────────────────────●             │
+  │  80% ───────────────────●                  │
+  │  70% ──────────────●                       │
+  │  60% ─────────●                            │
+  │  50% ●────●                                │
+  │      1   2   3   4   5   6   7   8   9  10 │
+  │                  抽数（连续空奖）            │
+  └────────────────────────────────────────────┘
+```
+
+**数据表扩展**：
+
+`lottery_user_experience_state` 表已包含 `empty_streak` 字段，无需额外扩展。
+
+**决策快照记录**：
+
+```javascript
+// 在 DecisionSnapshotStage 中记录 Pity 信息
+pity_decision: {
+  empty_streak: 5,
+  pity_multiplier: 2.2,
+  pity_triggered: true,
+  base_non_empty_weight: 0.7,
+  adjusted_non_empty_weight: 0.92,
+  budget_sufficient: true
+}
+```
+
+**配置化支持**：
+
+```javascript
+// system_settings 表中的 Pity 配置
+{
+  "pity_system": {
+    "enabled": true,
+    "start_streak": 2,        // 从第几次空奖开始累积
+    "multiplier_table": {     // 可动态调整
+      "2": 1.2,
+      "3": 1.5,
+      "4": 1.8,
+      "5": 2.2,
+      "6": 2.8,
+      "7": 3.5,
+      "8": 5.0,
+      "9": 10.0
+    },
+    "max_multiplier": 10.0,   // 最大倍数上限
+    "apply_to_empty": true    // 是否反向降低空奖权重
+  }
+}
+```
+
 ---
 
 ### 5.6 完整抽奖流程（自动化）- 与现有模块的集成关系
 
 > **已拍板确认**：本方案在现有抽奖模块的基础上**增加预算侧自动控制层**，而不是替换现有逻辑。
 
-#### 5.6.1 执行顺序（已确认）
+#### 5.6.1 执行顺序（已确认 - 2026-01-20 更新含 Pity 系统）
 
 **用户点击抽奖后的完整流程**：
 
@@ -477,23 +716,44 @@ async function applyAntiHighStreak(userId, availablePrizes, transaction) {
    - 计算 EffectiveBudget（pool/user/组合钱包 → 采纳额度）
    - 计算活动压力层 P0/P1/P2
    - 计算用户预算层 B0/B1/B2/B3
-   - 根据 Bx×Px 得到 cap + weights
+   - 根据 Bx×Px 得到 cap + base_weights
    ↓
 3. 预算过滤奖池（现有逻辑，增强）
    - 只保留 prize_value_points <= cap 的奖品集合
    ↓
-4. 【新增】体验软阀门（可选但推荐）
-   - 反连空/反连高：在过滤后集合内调整权重或强制非空
+4. 【新增】体验软阀门（多层叠加）
+   a. Pity 软保底：连续空奖时累积提升非空权重（×1.2 ~ ×10.0）
+   b. 反连空硬保底：连续空奖 ≥K 时强制非空
+   c. 反连高：近期高档过多时降低高档权重
+   d. 运气债务：全局历史空奖率偏高时额外提升非空权重
    ↓
 5. 按权重随机选奖品并分配（现有逻辑，复用）
    ↓
 6. 扣预算/扣库存/发放奖励/记录抽奖（现有事务逻辑，保留）
+   ↓
+7. 更新体验状态（empty_streak/recent_high_count 等）
+```
+
+**权重叠加顺序**：
+
+```
+最终权重 = 基础权重(BxPx) × Pity倍数 × 运气债务倍数 × 反连高系数
+
+示例（用户连续5次空奖，历史空奖率70%）：
+  基础非空权重(BxPx B2×P1)：0.70
+  × Pity倍数(5次空奖)：×2.2
+  × 运气债务倍数(空奖率70%)：×1.3
+  × 反连高系数(未触发)：×1.0
+  = 最终非空权重：0.70 × 2.2 × 1.3 × 1.0 = 2.002
+  
+  归一化后：非空 ≈ 95%，空 ≈ 5%
 ```
 
 **关键点**：
 - 这套算法的作用是：**决定"能从哪些奖里抽、以及抽的偏好权重"**
 - 真正"选中哪个奖品"仍由现有的加权随机逻辑完成
 - 预算硬约束（`prize_value_points <= cap`）是必须保留的安全边界
+- **Pity 系统让用户在达到硬保底之前就有更高概率中非空奖**
 
 #### 5.6.2 与现有模块的关系（已确认）
 
@@ -704,31 +964,31 @@ async function checkUserInWhitelist(userId, campaign) {
 
 > **废弃原因**：预算积分发放由外部业务事件驱动（如商家审核通过），不在抽奖模块内预拨。
 
-### 5.8 关键数据表设计（新增/复用）
+### 5.8 关键数据表设计（2026-01-20 更新）
 
 #### 5.8.1 复用现有表（无需新增）
 
 | 表名 | 用途 | 关键字段 |
 |------|------|---------|
-| `lottery_draws` | 记录每次抽奖，用于计算连续空奖/连续高档 | `prize_value_points`, `created_at` |
-| `lottery_campaigns` | 活动配置，用于压力层计算 | `pool_budget_remaining`, `target_remaining_budget` |
-| `account_asset_balances` | 用户预算余额，用于预算层分层 | `user_id`, `asset_code='BUDGET_POINTS'`, `balance` |
+| `lottery_draws` | 记录每次抽奖，用于计算虚拟消耗/压力层 | `prize_value_points`, `created_at` |
+| `lottery_campaigns` | 活动配置，用于压力层计算 | `pool_budget_total`, `start_time`, `end_time` |
+| `account_asset_balances` | 用户预算余额，用于预算层分层 | `account_id`, `asset_code='BUDGET_POINTS'`, `balance` |
+| `accounts` | 关联 account_id 和 user_id | `account_id`, `user_id` |
 
-#### 5.8.2 新增字段（可选优化）
+#### 5.8.2 新增表：体验状态表
 
-```sql
--- 活动表新增：目标剩余预算（用于压力计算）
-ALTER TABLE lottery_campaigns 
-  ADD COLUMN target_remaining_budget INT COMMENT '当前时间点的目标剩余预算（用于压力层计算）',
-  ADD COLUMN last_pressure_update DATETIME COMMENT '上次压力计算时间';
+> **决策**：使用独立表 `lottery_user_experience_state` 存储体验计数器（见第七节 7.1.1）
 
--- 用户配额表新增：连续空奖计数（可选，也可实时查询）
-ALTER TABLE lottery_user_daily_draw_quota 
-  ADD COLUMN empty_streak INT NOT NULL DEFAULT 0 COMMENT '连续空奖次数（用于反连空）',
-  ADD COLUMN last_high_tier_at DATETIME COMMENT '最近一次高档奖时间（用于反连高）';
-```
+**选择理由**：
+- ✅ 职责清晰：配额表管配额、体验表管体验
+- ✅ 后续扩展不影响其他功能
+- ✅ 包含统计字段可用于监控告警
 
-#### 5.8.3 配置表（新增）- 分层矩阵配置化
+#### 5.8.3 新增表：监控指标表
+
+> **推荐**：使用 `lottery_hourly_metrics` 表存储聚合指标（见第七节 7.1.2）
+
+#### 5.8.4 配置表（新增）- 分层矩阵配置化
 
 ```sql
 -- 预算分层配置表（支持动态调整分层阈值）
@@ -792,7 +1052,7 @@ INSERT INTO lottery_tier_matrix_config (campaign_id, budget_tier, pressure_tier,
 
 > **决策背景**：项目尚未上线，愿意一次性投入成本，不需要兼容旧接口，从**长期维护成本最低、技术债务最少**的角度做出最终决策。
 
-### 6.1 七大决策点最终选择
+### 6.1 八大决策点最终选择
 
 | 决策点 | 最终选择 | 核心理由 |
 |--------|---------|---------|
@@ -803,6 +1063,8 @@ INSERT INTO lottery_tier_matrix_config (campaign_id, budget_tier, pressure_tier,
 | 5. 空奖差异化 | **C - 5-10个差异化空奖** | 一次做好，体验完整 |
 | 6. 体验计数器存储 | **B - 独立表 `lottery_user_experience_state`** | 职责清晰，可扩展 |
 | 7. 灰度发布 | **A - 全量上线 + 功能开关基础设施** | 项目未上线无需灰度，但要有开关能力 |
+| 8. 运气债务机制 | **B - 启用 + 全局共享用户历史 + 动态连续调整** | 解决跨活动长期体验平衡，预算约束仍为最高优先级 |
+| 9. Pity 软保底系统 | **启用 - 概率累积提升 + 可配置倍数表** | 借鉴游戏行业最佳实践，在硬保底前逐步提升非空概率 |
 
 ---
 
@@ -1071,27 +1333,810 @@ CREATE TABLE lottery_user_experience_state (
 
 ---
 
-## 七、实施计划（已调整）
+### 6.12 决策点 8：运气债务机制 ✅
 
-| 阶段 | 内容 | 预估工时 | 优先级 |
-|------|------|---------|--------|
-| **Phase 1** | 新增配置表（`lottery_budget_tier_config`, `lottery_tier_matrix_config`） | 0.5d | P0 |
-| **Phase 2** | 实现预算层分层逻辑（`getUserBudgetTier`） | 0.5d | P0 |
-| **Phase 3** | 实现压力层计算逻辑（`getCampaignPressureTier`，每小时更新） | 1d | P0 |
-| **Phase 4** | 实现 Bx×Px 矩阵查询与 cap/weights 自动调整 | 1d | P0 |
-| **Phase 5** | 实现体验软阀门（反连空 `applyAntiEmptyStreak`） | 0.5d | P1 |
-| **Phase 6** | 实现体验软阀门（反连高 `applyAntiHighStreak`） | 0.5d | P1 |
-| **Phase 7** | 集成到 `UnifiedLotteryEngine.execute_draw` | 1d | P0 |
-| **Phase 8** | 新增 0 成本奖品（幸运签、下次好运等） | 0.5d | P2 |
-| **Phase 9** | 监控指标埋点 & 灰度发布 | 1d | P1 |
+**最终选择**：**B - 启用运气债务机制 + 全局共享用户历史 + 动态连续调整**
 
-**总计**：约 6.5 人天
+> **核心原则**：
+> 1. 预算硬约束仍然最高优先级（永远不欠账）
+> 2. 运气债务是"软调权"，在预算允许范围内提升/降低非空权重
+> 3. 全局共享用户历史（跨活动累计）
+> 4. 动态连续调整（不是阶梯式，而是平滑曲线）
 
-**关键路径**：Phase 1-4-7（核心分层逻辑）约 3 人天可完成基础版本
+#### 6.12.1 运气指数计算
+
+**定义**：`Luck Index = 1 - 历史空奖率`
+
+| 运气指数 | 历史空奖率 | 含义 |
+|---------|-----------|------|
+| 0.0 | 100% | 从未中过非空奖 |
+| 0.3 | 70% | 极度倒霉 |
+| 0.5 | 50% | 运气较差 |
+| 0.7 | 30% | 正常基准 |
+| 0.9 | 10% | 运气较好 |
+| 1.0 | 0% | 从未空奖 |
+
+**计算代码**：
+
+```javascript
+function calculateLuckIndex(globalState) {
+  // 新用户（抽奖次数 < 10）返回基准值
+  if (globalState.global_total_draw_count < 10) {
+    return 0.7; // 新用户不调整
+  }
+  
+  const emptyRate = globalState.global_total_empty_count / globalState.global_total_draw_count;
+  const luckIndex = 1 - emptyRate;
+  
+  // 限制在 [0, 1] 范围
+  return Math.max(0, Math.min(1, luckIndex));
+}
+```
+
+#### 6.12.2 动态权重调整公式
+
+**核心思想**：运气越差 → 非空权重越高（预算允许时）
+
+```javascript
+function calculateLuckMultiplier(luckIndex) {
+  // 基准运气指数 = 0.7（30% 空奖率）
+  const BASELINE = 0.7;
+  
+  // 调整强度参数
+  const MAX_BOOST = 2.0;   // 最大提升倍数（倒霉用户）
+  const MAX_PENALTY = 0.5; // 最大惩罚倍数（幸运用户）
+  
+  if (luckIndex < BASELINE) {
+    // 倒霉用户：提升非空权重
+    // luckIndex=0.3 时，multiplier=1.57
+    // luckIndex=0.0 时，multiplier=2.0
+    const boostFactor = (BASELINE - luckIndex) / BASELINE;
+    return 1 + boostFactor * (MAX_BOOST - 1);
+  } else if (luckIndex > BASELINE) {
+    // 幸运用户：降低非空权重
+    // luckIndex=0.9 时，multiplier=0.67
+    // luckIndex=1.0 时，multiplier=0.5
+    const penaltyFactor = (luckIndex - BASELINE) / (1 - BASELINE);
+    return 1 - penaltyFactor * (1 - MAX_PENALTY);
+  }
+  
+  return 1.0; // 正好在基准线上
+}
+```
+
+**调整效果示例**：
+
+| 历史空奖率 | 运气指数 | 非空权重倍数 | 效果 |
+|-----------|---------|-------------|------|
+| 100% | 0.0 | **2.00x** | 最大提升 |
+| 80% | 0.2 | **1.71x** | 大幅提升 |
+| 70% | 0.3 | **1.57x** | 中等提升 |
+| 50% | 0.5 | **1.29x** | 小幅提升 |
+| 30% | 0.7 | **1.00x** | 基准（不调整） |
+| 20% | 0.8 | **0.83x** | 小幅降低 |
+| 10% | 0.9 | **0.67x** | 中等降低 |
+| 0% | 1.0 | **0.50x** | 最大惩罚 |
+
+#### 6.12.3 与现有 B×P 矩阵的融合
+
+**执行顺序**：
+
+```
+1. 预算分层 → budget_tier (B0-B3)
+2. 压力层计算 → pressure_tier (P0-P2)
+3. B×P 矩阵 → base_non_empty_weight, base_empty_weight
+4. 运气债务调整 → final_non_empty_weight = base × luck_multiplier
+                → final_empty_weight = 保持不变或反向调整
+5. 预算硬约束 → 最终只能从 cap 内的奖品中抽
+```
+
+**融合代码**：
+
+```javascript
+async function applyLuckDebtAdjustment(userId, tierWeights, transaction) {
+  // 1. 获取全局体验状态
+  const globalState = await LotteryUserGlobalState.findOne({
+    where: { user_id: userId },
+    transaction
+  });
+  
+  // 新用户或无记录，不调整
+  if (!globalState || globalState.global_total_draw_count < 10) {
+    return tierWeights; // 原样返回
+  }
+  
+  // 2. 计算运气指数
+  const luckIndex = calculateLuckIndex(globalState);
+  
+  // 3. 计算调整倍数
+  const luckMultiplier = calculateLuckMultiplier(luckIndex);
+  
+  // 4. 应用到 B×P 矩阵的权重上
+  return {
+    ...tierWeights,
+    non_empty_weight: tierWeights.non_empty_weight * luckMultiplier,
+    // 可选：empty_weight 反向调整（保持总权重平衡）
+    // empty_weight: tierWeights.empty_weight * (2 - luckMultiplier),
+    luck_index: luckIndex,
+    luck_multiplier: luckMultiplier,
+    luck_debt_applied: true
+  };
+}
+```
+
+#### 6.12.4 全局体验状态表设计
+
+**新增表**：`lottery_user_global_state`（跨活动累计）
+
+```sql
+CREATE TABLE lottery_user_global_state (
+  state_id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  user_id INT NOT NULL UNIQUE,
+  
+  -- 全局累计统计（跨所有活动）
+  global_total_draw_count INT NOT NULL DEFAULT 0 COMMENT '总抽奖次数（全局）',
+  global_total_empty_count INT NOT NULL DEFAULT 0 COMMENT '总空奖次数（全局）',
+  global_total_non_empty_count INT NOT NULL DEFAULT 0 COMMENT '总非空次数（全局）',
+  global_total_budget_consumed BIGINT NOT NULL DEFAULT 0 COMMENT '总预算消耗（全局）',
+  
+  -- 运气指数缓存（每次抽奖后更新）
+  luck_index DECIMAL(5,4) NOT NULL DEFAULT 0.7000 COMMENT '运气指数（0~1）',
+  luck_multiplier DECIMAL(5,4) NOT NULL DEFAULT 1.0000 COMMENT '权重调整倍数',
+  
+  -- 历史最值（监控用）
+  max_empty_streak_ever INT NOT NULL DEFAULT 0 COMMENT '历史最长连空记录',
+  best_single_prize_value INT NOT NULL DEFAULT 0 COMMENT '历史最高单次奖励',
+  
+  -- 时间戳
+  first_draw_at DATETIME COMMENT '首次抽奖时间',
+  last_draw_at DATETIME COMMENT '最近抽奖时间',
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  
+  INDEX idx_luck_index (luck_index),
+  INDEX idx_updated (updated_at)
+) COMMENT='用户全局抽奖状态表（跨活动累计）';
+```
+
+#### 6.12.5 状态更新逻辑
+
+**在 SettleStage 中更新全局状态**：
+
+```javascript
+async _updateGlobalState(user_id, prize, transaction) {
+  const is_empty = prize.prize_value_points === 0;
+  
+  // 获取或创建全局状态
+  const [globalState, created] = await LotteryUserGlobalState.findOrCreate({
+    where: { user_id },
+    defaults: {
+      global_total_draw_count: 0,
+      global_total_empty_count: 0,
+      global_total_non_empty_count: 0,
+      global_total_budget_consumed: 0,
+      luck_index: 0.7,
+      luck_multiplier: 1.0,
+      first_draw_at: new Date()
+    },
+    transaction,
+    lock: transaction.LOCK.UPDATE
+  });
+  
+  // 更新统计
+  globalState.global_total_draw_count += 1;
+  globalState.global_total_budget_consumed += prize.prize_value_points;
+  
+  if (is_empty) {
+    globalState.global_total_empty_count += 1;
+  } else {
+    globalState.global_total_non_empty_count += 1;
+    if (prize.prize_value_points > globalState.best_single_prize_value) {
+      globalState.best_single_prize_value = prize.prize_value_points;
+    }
+  }
+  
+  // 重新计算运气指数
+  globalState.luck_index = calculateLuckIndex(globalState);
+  globalState.luck_multiplier = calculateLuckMultiplier(globalState.luck_index);
+  globalState.last_draw_at = new Date();
+  
+  await globalState.save({ transaction });
+}
+```
+
+#### 6.12.6 预算约束优先级保证
+
+**关键保证**：运气债务机制只调整"概率权重"，不改变预算硬约束。
+
+```javascript
+// 最终抽奖流程中的约束检查
+async function executeDraw(context) {
+  // 1. 预算硬约束（最高优先级）
+  const cap = context.cap; // 由 B×P 矩阵决定
+  
+  // 2. 过滤奖品池（只保留 cap 内的）
+  let availablePrizes = context.prizes.filter(p => p.prize_value_points <= cap);
+  
+  // 3. 应用运气债务调整（只调整权重，不改变奖品池）
+  const adjustedWeights = await applyLuckDebtAdjustment(
+    context.user_id,
+    context.tier_weights,
+    context.transaction
+  );
+  
+  // 4. 如果用户极度倒霉但预算=0，仍然只能空奖
+  if (cap === 0 || availablePrizes.every(p => p.prize_value_points === 0)) {
+    // 运气再差也没用，预算约束优先
+    return selectFromEmptyPrizes(availablePrizes);
+  }
+  
+  // 5. 正常抽奖（使用调整后的权重）
+  return weightedRandomSelect(availablePrizes, adjustedWeights);
+}
+```
+
+#### 6.12.7 监控指标
+
+| 指标 | 计算方式 | 告警阈值 | 说明 |
+|------|---------|---------|------|
+| 运气指数分布 | `GROUP BY FLOOR(luck_index * 10)` | - | 观察用户运气分布 |
+| 极端倒霉用户数 | `COUNT(*) WHERE luck_index < 0.3` | > 10% | 系统可能存在问题 |
+| 极端幸运用户数 | `COUNT(*) WHERE luck_index > 0.9` | > 5% | 可能被薅羊毛 |
+| 运气债务触发率 | `COUNT(*) WHERE luck_multiplier != 1.0` | - | 观察调整生效比例 |
+| 调整后空奖率变化 | 对比调整前后空奖率 | 变化 > 20% | 调整过于激进 |
 
 ---
 
-## 八、监控指标（上线后）
+## 七、架构设计：单体 + 策略模块化（第二阶段架构）
+
+> **决策背景**：2026-01-20 确认采用第二阶段架构，直接跳过第一阶段（策略逻辑散落在 Stage 中），实现策略引擎模块化。
+
+### 7.1 架构演进路径
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                           架构演进路径                                       │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│   阶段 1（跳过）          阶段 2（当前选择）        阶段 3（未来可选）         │
+│   单体内耦合               单体+策略模块化            微服务解耦              │
+│                                                                             │
+│   ┌─────────┐           ┌─────────────────┐      ┌─────────┐ ┌─────────┐   │
+│   │ App     │           │ App             │      │ App     │ │ 策略    │   │
+│   │ ─────── │           │ ─────────────── │      │ Gateway │ │ 服务    │   │
+│   │ Pipeline│    ──▶    │ Pipeline        │ ──▶  └────┬────┘ └────┬────┘   │
+│   │ + 算法  │           │ ↓               │           │           │        │
+│   │ 耦合    │           │ StrategyEngine  │          gRPC        Redis     │
+│   └─────────┘           │ (独立模块)       │           │           │        │
+│                         └─────────────────┘      ┌────┴───────────┴────┐   │
+│   复杂度: ⭐             复杂度: ⭐⭐              │   独立部署/扩容      │   │
+│   可测试: ❌             可测试: ✅               └────────────────────┘   │
+│   可维护: ❌             可维护: ✅               复杂度: ⭐⭐⭐⭐⭐         │
+│                                                  运维: 复杂               │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### 7.2 目录结构设计
+
+```
+/home/devbox/project/
+├── services/
+│   └── UnifiedLotteryEngine/
+│       ├── UnifiedLotteryEngine.js           ← 抽奖引擎主入口（保留）
+│       │
+│       ├── pipeline/                          ← 现有 Pipeline（保留）
+│       │   ├── DrawOrchestrator.js
+│       │   ├── NormalDrawPipeline.js
+│       │   ├── stages/
+│       │   │   ├── BudgetContextStage.js     ← 调用 StrategyEngine
+│       │   │   ├── BuildPrizePoolStage.js    ← 调用 StrategyEngine
+│       │   │   ├── TierPickStage.js          ← 调用 StrategyEngine
+│       │   │   ├── SettleStage.js            ← 调用 StrategyEngine
+│       │   │   └── ...
+│       │   └── budget/
+│       │       ├── BudgetProviderFactory.js
+│       │       ├── UserBudgetProvider.js     ← 修正口径
+│       │       └── PoolBudgetProvider.js
+│       │
+│       └── strategy/                          ← 【新增】策略引擎模块
+│           ├── StrategyEngine.js              ← 策略入口（门面模式）
+│           │
+│           ├── calculators/                   ← 各类计算器（可独立测试）
+│           │   ├── BudgetTierCalculator.js    ← B0-B3 分层计算
+│           │   ├── PressureTierCalculator.js  ← P0-P2 压力层计算
+│           │   ├── MatrixResolver.js          ← Bx×Px 矩阵查表
+│           │   ├── PityCalculator.js          ← Pity 软保底计算
+│           │   ├── LuckDebtCalculator.js      ← 运气债务计算
+│           │   ├── AntiEmptyStreakHandler.js  ← 反连空逻辑
+│           │   ├── AntiHighStreakHandler.js   ← 反连高逻辑
+│           │   └── WeightAdjuster.js          ← 权重叠加器
+│           │
+│           ├── config/                        ← 策略配置（可热更新）
+│           │   ├── StrategyConfig.js          ← 统一配置入口
+│           │   ├── TierThresholds.js          ← B-tier 阈值配置
+│           │   ├── MatrixWeights.js           ← Bx×Px 权重矩阵
+│           │   └── PityConfig.js              ← Pity 倍数表
+│           │
+│           ├── state/                         ← 状态管理
+│           │   ├── ExperienceStateManager.js  ← 体验状态读写
+│           │   └── GlobalStateManager.js      ← 全局状态读写（运气债务）
+│           │
+│           └── __tests__/                     ← 独立单元测试
+│               ├── BudgetTierCalculator.test.js
+│               ├── PityCalculator.test.js
+│               ├── LuckDebtCalculator.test.js
+│               ├── MatrixResolver.test.js
+│               └── WeightAdjuster.test.js
+│
+├── models/
+│   ├── LotteryUserExperienceState.js          ← 新增：体验状态模型
+│   ├── LotteryUserGlobalState.js              ← 新增：全局状态模型
+│   └── ...
+│
+└── migrations/
+    ├── xxx-create-experience-state.js
+    ├── xxx-create-global-state.js
+    └── ...
+```
+
+### 7.3 策略引擎设计（StrategyEngine）
+
+#### 7.3.1 门面模式入口
+
+```javascript
+// services/UnifiedLotteryEngine/strategy/StrategyEngine.js
+
+const BudgetTierCalculator = require('./calculators/BudgetTierCalculator');
+const PressureTierCalculator = require('./calculators/PressureTierCalculator');
+const MatrixResolver = require('./calculators/MatrixResolver');
+const PityCalculator = require('./calculators/PityCalculator');
+const LuckDebtCalculator = require('./calculators/LuckDebtCalculator');
+const AntiEmptyStreakHandler = require('./calculators/AntiEmptyStreakHandler');
+const AntiHighStreakHandler = require('./calculators/AntiHighStreakHandler');
+const WeightAdjuster = require('./calculators/WeightAdjuster');
+const StrategyConfig = require('./config/StrategyConfig');
+
+/**
+ * 策略引擎 - 统一入口（门面模式）
+ * 
+ * 职责：
+ * - 协调各计算器的执行顺序
+ * - 提供简洁的 API 供 Pipeline Stages 调用
+ * - 隔离策略逻辑与业务流程
+ */
+class StrategyEngine {
+  constructor(options = {}) {
+    this.config = options.config || StrategyConfig.load();
+    
+    // 初始化各计算器（可注入依赖，便于测试）
+    this.budgetTierCalc = options.budgetTierCalc || new BudgetTierCalculator(this.config);
+    this.pressureTierCalc = options.pressureTierCalc || new PressureTierCalculator(this.config);
+    this.matrixResolver = options.matrixResolver || new MatrixResolver(this.config);
+    this.pityCalc = options.pityCalc || new PityCalculator(this.config);
+    this.luckDebtCalc = options.luckDebtCalc || new LuckDebtCalculator(this.config);
+    this.antiEmptyHandler = options.antiEmptyHandler || new AntiEmptyStreakHandler(this.config);
+    this.antiHighHandler = options.antiHighHandler || new AntiHighStreakHandler(this.config);
+    this.weightAdjuster = options.weightAdjuster || new WeightAdjuster(this.config);
+  }
+
+  /**
+   * 计算预算分层上下文
+   * 
+   * @param {Object} input - { user_id, campaign, transaction }
+   * @returns {Object} - { effective_budget, budget_tier, pressure_index, pressure_tier }
+   */
+  async computeBudgetContext(input) {
+    const { user_id, campaign, transaction } = input;
+    
+    // 1. 计算 EffectiveBudget
+    const effectiveBudget = await this.budgetTierCalc.calculateEffectiveBudget(
+      user_id, campaign, transaction
+    );
+    
+    // 2. 计算用户预算层
+    const budgetTier = this.budgetTierCalc.getTier(effectiveBudget, campaign.campaign_id);
+    
+    // 3. 计算活动压力层
+    const { pressureIndex, pressureTier } = await this.pressureTierCalc.calculate(
+      campaign, transaction
+    );
+    
+    return {
+      effective_budget: effectiveBudget,
+      budget_tier: budgetTier,
+      pressure_index: pressureIndex,
+      pressure_tier: pressureTier
+    };
+  }
+
+  /**
+   * 计算 cap 和基础权重
+   * 
+   * @param {Object} input - { budget_tier, pressure_tier, effective_budget }
+   * @returns {Object} - { cap, base_weights: { non_empty, empty } }
+   */
+  computeCapAndWeights(input) {
+    const { budget_tier, pressure_tier, effective_budget } = input;
+    return this.matrixResolver.resolve(budget_tier, pressure_tier, effective_budget);
+  }
+
+  /**
+   * 应用体验平滑（Pity + 运气债务 + 反连空/高）
+   * 
+   * @param {Object} input - { user_id, campaign_id, base_weights, effective_budget, transaction }
+   * @returns {Object} - { adjusted_weights, decisions }
+   */
+  async applyExperienceSmoothing(input) {
+    const { user_id, campaign_id, base_weights, effective_budget, transaction } = input;
+    
+    let weights = { ...base_weights };
+    const decisions = {};
+    
+    // 1. 获取用户体验状态
+    const experienceState = await this._getExperienceState(user_id, campaign_id, transaction);
+    const globalState = await this._getGlobalState(user_id, transaction);
+    
+    // 2. 应用 Pity 软保底
+    if (this.config.pity_system?.enabled !== false) {
+      const pityResult = this.pityCalc.apply(experienceState.empty_streak, effective_budget);
+      weights = this.weightAdjuster.applyPity(weights, pityResult.multiplier);
+      decisions.pity = pityResult;
+    }
+    
+    // 3. 应用运气债务
+    if (this.config.luck_debt?.enabled !== false && globalState.global_total_draw_count >= 10) {
+      const luckDebtResult = this.luckDebtCalc.calculate(globalState);
+      weights = this.weightAdjuster.applyLuckDebt(weights, luckDebtResult.multiplier);
+      decisions.luck_debt = luckDebtResult;
+    }
+    
+    // 4. 应用反连高
+    if (this.config.anti_high_streak?.enabled !== false) {
+      const antiHighResult = this.antiHighHandler.apply(experienceState, weights);
+      weights = antiHighResult.adjusted_weights;
+      decisions.anti_high = antiHighResult.decision;
+    }
+    
+    // 5. 反连空（强制非空标记，不在这里改权重）
+    if (this.config.anti_empty_streak?.enabled !== false) {
+      const antiEmptyResult = this.antiEmptyHandler.check(experienceState, effective_budget);
+      decisions.anti_empty = antiEmptyResult;
+    }
+    
+    return {
+      adjusted_weights: weights,
+      decisions,
+      experience_state: experienceState,
+      global_state: globalState
+    };
+  }
+
+  /**
+   * 更新抽奖后状态
+   * 
+   * @param {Object} input - { user_id, campaign_id, prize, transaction }
+   */
+  async updatePostDrawState(input) {
+    const { user_id, campaign_id, prize, transaction } = input;
+    
+    // 委托给状态管理器
+    const ExperienceStateManager = require('./state/ExperienceStateManager');
+    const GlobalStateManager = require('./state/GlobalStateManager');
+    
+    await ExperienceStateManager.updateAfterDraw(user_id, campaign_id, prize, transaction);
+    await GlobalStateManager.updateAfterDraw(user_id, prize, transaction);
+  }
+
+  // ========== 私有方法 ==========
+
+  async _getExperienceState(user_id, campaign_id, transaction) {
+    const ExperienceStateManager = require('./state/ExperienceStateManager');
+    return ExperienceStateManager.getOrCreate(user_id, campaign_id, transaction);
+  }
+
+  async _getGlobalState(user_id, transaction) {
+    const GlobalStateManager = require('./state/GlobalStateManager');
+    return GlobalStateManager.getOrCreate(user_id, transaction);
+  }
+}
+
+module.exports = StrategyEngine;
+```
+
+#### 7.3.2 Pipeline Stage 调用示例
+
+```javascript
+// services/UnifiedLotteryEngine/pipeline/stages/BudgetContextStage.js（改造后）
+
+const StrategyEngine = require('../../strategy/StrategyEngine');
+
+class BudgetContextStage {
+  constructor() {
+    this.strategyEngine = new StrategyEngine();
+  }
+
+  async execute(context) {
+    const { user_id, campaign, transaction } = context;
+    
+    // 调用策略引擎计算预算上下文
+    const budgetContext = await this.strategyEngine.computeBudgetContext({
+      user_id,
+      campaign,
+      transaction
+    });
+    
+    // 注入到 context
+    context.budget_data = budgetContext;
+    
+    return context;
+  }
+}
+```
+
+### 7.4 第二阶段架构的优势
+
+| 优势 | 说明 |
+|------|------|
+| **仍然是单体** | 部署简单，一个进程，无网络延迟，无额外运维成本 |
+| **策略逻辑集中** | 算法代码全部在 `strategy/` 目录，职责清晰，改动范围可控 |
+| **可独立测试** | 每个 Calculator 可脱离 Pipeline 单独测试，TDD 友好 |
+| **依赖注入** | 通过构造函数注入依赖，便于 Mock 测试 |
+| **配置化** | 阈值参数可从 DB/Redis 读取，无需重启即可调整 |
+| **未来可拆分** | 如果需要，`strategy/` 可直接提取为独立微服务（gRPC/HTTP） |
+| **符合 SRP** | 单一职责原则：Stage 负责流程编排，Calculator 负责计算逻辑 |
+
+### 7.5 与大厂解耦架构的对比
+
+| 维度 | 大厂（美团/阿里） | 本项目（第二阶段） |
+|------|-----------------|-------------------|
+| **策略服务** | 独立微服务（gRPC/HTTP） | 模块化（同进程） |
+| **配置更新** | 配置中心（Apollo/Nacos） | DB + Redis 缓存 |
+| **A/B 测试** | 实验平台 | 功能开关 + 用户分群 |
+| **实时决策** | 独立计算集群 | 同进程同步调用 |
+| **部署方式** | 独立扩容 | 随主应用扩容 |
+| **适用规模** | 千万级 DAU | 万级~十万级 DAU |
+| **复杂度** | ⭐⭐⭐⭐⭐ | ⭐⭐ |
+| **运维成本** | 高 | 低 |
+
+**结论**：第二阶段架构在保持简单的同时获得了模块化的好处，是当前项目规模的最优选择。
+
+---
+
+## 八、实施计划（2026-01-20 更新 - 策略模块化架构）
+
+### 8.1 新增数据库表结构
+
+#### 8.1.1 体验状态表（必须）
+
+```sql
+CREATE TABLE lottery_user_experience_state (
+  state_id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  user_id INT NOT NULL,
+  campaign_id INT NOT NULL,
+  
+  -- 反连空状态
+  empty_streak INT NOT NULL DEFAULT 0 COMMENT '连续空奖次数（非空奖时重置）',
+  last_non_empty_at DATETIME COMMENT '最近一次非空奖时间',
+  
+  -- 反连高状态
+  recent_high_count INT NOT NULL DEFAULT 0 COMMENT '近期高档次数',
+  anti_high_cooldown INT NOT NULL DEFAULT 0 COMMENT '反连高冷却剩余抽数',
+  last_high_tier_at DATETIME COMMENT '最近一次高档奖时间',
+  
+  -- 统计数据（可用于后续分析）
+  total_draw_count INT NOT NULL DEFAULT 0 COMMENT '总抽奖次数',
+  total_empty_count INT NOT NULL DEFAULT 0 COMMENT '总空奖次数',
+  total_budget_consumed BIGINT NOT NULL DEFAULT 0 COMMENT '总预算消耗',
+  max_empty_streak INT NOT NULL DEFAULT 0 COMMENT '历史最长连空记录',
+  
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  
+  UNIQUE KEY uk_user_campaign (user_id, campaign_id),
+  INDEX idx_campaign (campaign_id),
+  INDEX idx_updated (updated_at)
+) COMMENT='用户抽奖体验状态表';
+```
+
+#### 8.1.2 监控指标表（推荐）
+
+```sql
+CREATE TABLE lottery_hourly_metrics (
+  metric_id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  campaign_id INT NOT NULL,
+  metric_hour DATETIME NOT NULL COMMENT '统计小时（整点）',
+  
+  -- 抽奖量
+  total_draws INT NOT NULL DEFAULT 0,
+  unique_users INT NOT NULL DEFAULT 0,
+  
+  -- 预算消耗
+  total_budget_consumed BIGINT NOT NULL DEFAULT 0,
+  avg_budget_per_draw DECIMAL(10,2) DEFAULT 0,
+  
+  -- 分层分布
+  b0_count INT NOT NULL DEFAULT 0,
+  b1_count INT NOT NULL DEFAULT 0,
+  b2_count INT NOT NULL DEFAULT 0,
+  b3_count INT NOT NULL DEFAULT 0,
+  
+  -- 体验指标
+  empty_rate DECIMAL(5,4) DEFAULT 0 COMMENT '空奖率',
+  anti_empty_trigger_rate DECIMAL(5,4) DEFAULT 0 COMMENT '反连空触发率',
+  avg_empty_streak DECIMAL(5,2) DEFAULT 0 COMMENT '平均连续空奖',
+  
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  
+  UNIQUE KEY uk_campaign_hour (campaign_id, metric_hour),
+  INDEX idx_hour (metric_hour)
+) COMMENT='抽奖小时级监控指标表';
+```
+
+#### 8.1.3 决策审计表增强（推荐）
+
+```sql
+ALTER TABLE lottery_draw_decisions
+  ADD COLUMN effective_budget BIGINT COMMENT '本次采纳预算额度',
+  ADD COLUMN budget_tier VARCHAR(10) COMMENT 'B0/B1/B2/B3',
+  ADD COLUMN pressure_index DECIMAL(5,2) COMMENT '压力指数（0.0~2.0+）',
+  ADD COLUMN pressure_tier VARCHAR(10) COMMENT 'P0/P1/P2',
+  ADD COLUMN cap_value INT COMMENT '本次 cap 值',
+  ADD COLUMN tier_weight_multipliers JSON COMMENT '档位权重倍率',
+  ADD COLUMN anti_empty_triggered TINYINT DEFAULT 0 COMMENT '反连空是否触发',
+  ADD COLUMN anti_high_triggered TINYINT DEFAULT 0 COMMENT '反连高是否触发',
+  ADD COLUMN empty_streak_before INT COMMENT '抽奖前连续空奖次数';
+```
+
+#### 8.1.4 差异化空奖数据
+
+```sql
+INSERT INTO lottery_prizes (campaign_id, prize_name, prize_type, prize_value_points, reward_tier, win_weight, status)
+VALUES 
+  (1, '幸运签', 'virtual', 0, 'low', 50000, 'active'),
+  (1, '神秘彩蛋', 'virtual', 0, 'low', 50000, 'active'),
+  (1, '好运加持', 'virtual', 0, 'low', 50000, 'active'),
+  (1, '美食推荐', 'virtual', 0, 'low', 50000, 'active'),
+  (1, '厨师祝福', 'virtual', 0, 'low', 50000, 'active'),
+  (1, '下次好运', 'virtual', 0, 'low', 50000, 'active'),
+  (1, '参与有礼', 'virtual', 0, 'low', 50000, 'active');
+```
+
+### 8.2 实施阶段规划（策略模块化架构）
+
+> **调整说明**：采用第二阶段架构后，先建立模块骨架，再填充各计算器逻辑。
+
+| 阶段 | 内容 | 落点文件 | 预估工时 | 优先级 |
+|------|------|---------|---------|--------|
+| **Phase 0** | 创建 `strategy/` 目录结构和 StrategyEngine 骨架 | 新建目录和文件 | 0.5d | **P0 架构基础** |
+| **Phase 1** | 创建 `lottery_user_experience_state` 表 | Migration | 0.5d | P0 |
+| **Phase 2** | 创建 `lottery_user_global_state` 表（运气债务） | Migration | 0.5d | P0 |
+| **Phase 3** | 实现 `BudgetTierCalculator`（含 EffectiveBudget 修正） | `strategy/calculators/BudgetTierCalculator.js` | 0.5d | **P0 核心** |
+| **Phase 4** | 实现 `PressureTierCalculator`（虚拟消耗方式） | `strategy/calculators/PressureTierCalculator.js` | 0.5d | P0 |
+| **Phase 5** | 实现 `MatrixResolver`（Bx×Px 矩阵查表） | `strategy/calculators/MatrixResolver.js` | 0.5d | P0 |
+| **Phase 6** | 实现 `StrategyConfig`（配置化读取） | `strategy/config/StrategyConfig.js` | 0.5d | P0 |
+| **Phase 7** | 改造 `BudgetContextStage` 调用 StrategyEngine | `pipeline/stages/BudgetContextStage.js` | 0.5d | P0 |
+| **Phase 8** | 改造 `BuildPrizePoolStage` 应用 cap 过滤 | `pipeline/stages/BuildPrizePoolStage.js` | 0.5d | P0 |
+| **Phase 9** | 实现 `PityCalculator`（软保底） | `strategy/calculators/PityCalculator.js` | 0.5d | P1 |
+| **Phase 10** | 实现 `LuckDebtCalculator`（运气债务） | `strategy/calculators/LuckDebtCalculator.js` | 0.5d | P1 |
+| **Phase 11** | 实现 `AntiEmptyStreakHandler`（反连空） | `strategy/calculators/AntiEmptyStreakHandler.js` | 0.5d | P1 |
+| **Phase 12** | 实现 `AntiHighStreakHandler`（反连高） | `strategy/calculators/AntiHighStreakHandler.js` | 0.5d | P1 |
+| **Phase 13** | 实现 `WeightAdjuster`（权重叠加器） | `strategy/calculators/WeightAdjuster.js` | 0.5d | P1 |
+| **Phase 14** | 改造 `TierPickStage` 调用体验平滑 | `pipeline/stages/TierPickStage.js` | 0.5d | P1 |
+| **Phase 15** | 实现状态管理器（Experience + Global） | `strategy/state/*.js` | 0.5d | P1 |
+| **Phase 16** | 改造 `SettleStage` 更新状态 | `pipeline/stages/SettleStage.js` | 0.5d | P1 |
+| **Phase 17** | 编写单元测试（各 Calculator） | `strategy/__tests__/*.test.js` | 1d | P1 |
+| **Phase 18** | 新增差异化空奖数据 | 数据库 INSERT | 0.5d | P2 |
+| **Phase 19** | 决策审计表字段增强 | `DecisionSnapshotStage.js` | 0.5d | P2 |
+| **Phase 20** | 监控指标表 + 定时聚合任务 | Migration + Cron Job | 1d | P2 |
+
+**总计**：约 10 人天（含单元测试）
+
+**关键路径（P0）**：Phase 0-8 约 4 人天可完成核心分层逻辑
+**体验平滑（P1）**：Phase 9-17 约 4.5 人天
+**收尾工作（P2）**：Phase 18-20 约 2 人天
+
+### 8.2.1 开发顺序说明
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                        开发顺序（策略模块化架构）                             │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  Week 1：架构基础 + 核心分层                                                 │
+│  ════════════════════════════════════════                                   │
+│  Day 1-2: Phase 0-2 (目录结构 + 数据库表)                                    │
+│  Day 3-4: Phase 3-6 (核心计算器 + 配置)                                      │
+│  Day 5:   Phase 7-8 (Stage 改造)                                            │
+│                                                                             │
+│  Week 2：体验平滑 + 测试                                                     │
+│  ════════════════════════════════════════                                   │
+│  Day 1-2: Phase 9-13 (Pity/运气债务/反连空高)                                │
+│  Day 3:   Phase 14-16 (Stage 改造 + 状态管理)                                │
+│  Day 4-5: Phase 17 (单元测试)                                                │
+│                                                                             │
+│  Week 3：收尾 + 联调                                                         │
+│  ════════════════════════════════════════                                   │
+│  Day 1:   Phase 18-19 (空奖数据 + 审计表)                                    │
+│  Day 2:   Phase 20 (监控指标)                                                │
+│  Day 3-5: 联调测试 + 修复                                                    │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### 8.3 代码文件改动清单（策略模块化架构）
+
+#### 8.3.1 新增策略引擎模块（`strategy/`）
+
+| 文件路径 | 类型 | 说明 |
+|----------|------|------|
+| `services/UnifiedLotteryEngine/strategy/StrategyEngine.js` | **新增** | 策略引擎入口（门面模式） |
+| `services/UnifiedLotteryEngine/strategy/calculators/BudgetTierCalculator.js` | **新增** | B0-B3 分层计算 + EffectiveBudget |
+| `services/UnifiedLotteryEngine/strategy/calculators/PressureTierCalculator.js` | **新增** | P0-P2 压力层计算（虚拟消耗） |
+| `services/UnifiedLotteryEngine/strategy/calculators/MatrixResolver.js` | **新增** | Bx×Px 矩阵查表（cap + weights） |
+| `services/UnifiedLotteryEngine/strategy/calculators/PityCalculator.js` | **新增** | Pity 软保底计算器 |
+| `services/UnifiedLotteryEngine/strategy/calculators/LuckDebtCalculator.js` | **新增** | 运气债务计算器 |
+| `services/UnifiedLotteryEngine/strategy/calculators/AntiEmptyStreakHandler.js` | **新增** | 反连空处理器 |
+| `services/UnifiedLotteryEngine/strategy/calculators/AntiHighStreakHandler.js` | **新增** | 反连高处理器 |
+| `services/UnifiedLotteryEngine/strategy/calculators/WeightAdjuster.js` | **新增** | 权重叠加器 |
+| `services/UnifiedLotteryEngine/strategy/config/StrategyConfig.js` | **新增** | 统一配置入口 |
+| `services/UnifiedLotteryEngine/strategy/config/TierThresholds.js` | **新增** | B-tier 阈值配置 |
+| `services/UnifiedLotteryEngine/strategy/config/MatrixWeights.js` | **新增** | Bx×Px 权重矩阵配置 |
+| `services/UnifiedLotteryEngine/strategy/config/PityConfig.js` | **新增** | Pity 倍数表配置 |
+| `services/UnifiedLotteryEngine/strategy/state/ExperienceStateManager.js` | **新增** | 体验状态读写管理 |
+| `services/UnifiedLotteryEngine/strategy/state/GlobalStateManager.js` | **新增** | 全局状态读写管理 |
+
+#### 8.3.2 单元测试文件
+
+| 文件路径 | 类型 | 说明 |
+|----------|------|------|
+| `services/UnifiedLotteryEngine/strategy/__tests__/BudgetTierCalculator.test.js` | **新增** | 预算分层单测 |
+| `services/UnifiedLotteryEngine/strategy/__tests__/PressureTierCalculator.test.js` | **新增** | 压力层单测 |
+| `services/UnifiedLotteryEngine/strategy/__tests__/MatrixResolver.test.js` | **新增** | 矩阵查表单测 |
+| `services/UnifiedLotteryEngine/strategy/__tests__/PityCalculator.test.js` | **新增** | Pity 计算单测 |
+| `services/UnifiedLotteryEngine/strategy/__tests__/LuckDebtCalculator.test.js` | **新增** | 运气债务单测 |
+| `services/UnifiedLotteryEngine/strategy/__tests__/WeightAdjuster.test.js` | **新增** | 权重叠加单测 |
+| `services/UnifiedLotteryEngine/strategy/__tests__/StrategyEngine.test.js` | **新增** | 策略引擎集成测试 |
+
+#### 8.3.3 Pipeline Stage 改造
+
+| 文件路径 | 类型 | 改动说明 |
+|----------|------|---------|
+| `services/UnifiedLotteryEngine/pipeline/stages/BudgetContextStage.js` | **改动** | 调用 `StrategyEngine.computeBudgetContext()` |
+| `services/UnifiedLotteryEngine/pipeline/stages/BuildPrizePoolStage.js` | **改动** | 调用 `StrategyEngine.computeCapAndWeights()` 应用 cap 过滤 |
+| `services/UnifiedLotteryEngine/pipeline/stages/TierPickStage.js` | **改动** | 调用 `StrategyEngine.applyExperienceSmoothing()` |
+| `services/UnifiedLotteryEngine/pipeline/stages/SettleStage.js` | **改动** | 调用 `StrategyEngine.updatePostDrawState()` |
+| `services/UnifiedLotteryEngine/pipeline/stages/DecisionSnapshotStage.js` | **改动** | 记录完整策略决策（budget_tier/pity/luck_debt） |
+| `services/UnifiedLotteryEngine/pipeline/budget/UserBudgetProvider.js` | **改动** | 修正 allowed_campaign_ids 使用口径 |
+
+#### 8.3.4 数据模型与迁移
+
+| 文件路径 | 类型 | 说明 |
+|----------|------|------|
+| `models/LotteryUserExperienceState.js` | **新增** | 体验状态模型（活动级别） |
+| `models/LotteryUserGlobalState.js` | **新增** | 全局状态模型（跨活动） |
+| `models/LotteryHourlyMetrics.js` | **新增** | 监控指标模型 |
+| `migrations/xxx-create-experience-state.js` | **新增** | 创建体验状态表 |
+| `migrations/xxx-create-global-state.js` | **新增** | 创建全局状态表 |
+| `migrations/xxx-add-decision-fields.js` | **新增** | 决策审计表字段增强 |
+| `migrations/xxx-create-hourly-metrics.js` | **新增** | 创建监控指标表 |
+| `migrations/xxx-add-empty-prizes.js` | **新增** | 差异化空奖数据 |
+
+#### 8.3.5 文件总览（共 35+ 文件）
+
+```
+新增文件：27 个
+├── strategy/ 目录：15 个（策略模块）
+├── __tests__/ 目录：7 个（单元测试）
+├── models/：3 个（数据模型）
+└── migrations/：5 个（数据库迁移）
+
+改动文件：6 个
+└── pipeline/stages/：5 个 + budget/：1 个
+```
+
+---
+
+## 九、监控指标（上线后）
 
 | 指标类别 | 指标名称 | 计算方式 | 告警阈值 | 说明 |
 |---------|---------|---------|---------|------|
@@ -1104,6 +2149,14 @@ CREATE TABLE lottery_user_experience_state (
 | **体验质量** | 反连空触发率 | `anti_empty_triggers / total_draws` | > 20% | 预算不足信号 |
 | **体验质量** | 反连高触发率 | `anti_high_triggers / total_draws` | > 10% | 高档过密 |
 | **矩阵效果** | Bx×Px 分布 | 9宫格用户分布 | 某格 > 50% | 分层失衡 |
+| **Pity 系统** | Pity 触发率 | `COUNT(*) WHERE pity_multiplier > 1.0 / total_draws` | - | 观察软保底生效频率 |
+| **Pity 系统** | Pity 平均倍数 | `AVG(pity_multiplier) WHERE pity_multiplier > 1.0` | > 3.0 | 连续空奖过多 |
+| **Pity 系统** | Pity 后中奖率 | `COUNT(*) WHERE pity_triggered AND won / pity_triggered` | < 70% | Pity 效果不佳 |
+| **运气债务** | 运气指数分布 | `GROUP BY FLOOR(luck_index * 10)` | - | 观察用户运气分布 |
+| **运气债务** | 极端倒霉用户数 | `COUNT(*) WHERE luck_index < 0.3` | > 10% | 系统可能存在问题 |
+| **运气债务** | 极端幸运用户数 | `COUNT(*) WHERE luck_index > 0.9` | > 5% | 可能被薅羊毛 |
+| **运气债务** | 调整触发率 | `COUNT(*) WHERE luck_multiplier != 1.0` | - | 观察调整生效比例 |
+| **运气债务** | 调整后空奖率变化 | 对比调整前后空奖率 | 变化 > 20% | 调整过于激进 |
 | **业务指标** | 用户投诉率 | `complaints / total_draws` | > 1% | 体验不满 |
 
 ---
@@ -1202,9 +2255,9 @@ CREATE TABLE lottery_user_experience_state (
 
 ---
 
-## 九、核心优势与预期效果
+## 十、核心优势与预期效果
 
-### 9.1 相比初期方案的优势
+### 10.1 相比初期方案的优势
 
 | 对比维度 | 初期方案（预算预拨） | 最终方案（预算侧分层） |
 |---------|-------------------|---------------------|
@@ -1215,7 +2268,7 @@ CREATE TABLE lottery_user_experience_state (
 | **预算控制** | 需多重限额（每日/每小时） | 压力层自动节奏控制 |
 | **用户无感** | ✅ 预算对用户不可见 | ✅ 预算对用户不可见 |
 
-### 9.2 预期效果（量化）
+### 10.2 预期效果（量化）
 
 | 指标 | 当前状态 | 预期改善 | 说明 |
 |------|---------|---------|------|
@@ -1225,7 +2278,7 @@ CREATE TABLE lottery_user_experience_state (
 | 预算打穿风险 | 存在 | 消除 | 压力层自动节奏控制 |
 | 用户投诉 | 未知 | < 1% | 体验平滑 + 0成本奖差异化 |
 
-### 9.3 与现有系统的兼容性
+### 10.3 与现有系统的兼容性
 
 | 现有机制 | 兼容性 | 说明 |
 |---------|--------|------|
@@ -1237,7 +2290,7 @@ CREATE TABLE lottery_user_experience_state (
 
 ---
 
-## 十、FAQ（常见问题）
+## 十一、FAQ（常见问题）
 
 ### Q1：预算积分如何进入用户钱包？
 **A**：由外部业务事件驱动（如商家审核通过、用户完成任务等），不在抽奖模块内处理。抽奖模块只读取当前预算余额。
@@ -1273,13 +2326,13 @@ CREATE TABLE lottery_user_experience_state (
 
 ---
 
-## 十一、2026-01-19 代码审计与实施落地方案
+## 十二、2026-01-19 代码审计与实施落地方案
 
 > **本章节基于真实代码库与数据库审计结果**（通过 Node.js + `.env` 直连生产库验证）
 
-### 11.1 当前项目真实状态对齐
+### 12.1 当前项目真实状态对齐
 
-#### 11.1.1 技术架构现状
+#### 12.1.1 技术架构现状
 
 | 层级 | 当前实现 | 说明 |
 |------|---------|------|
@@ -1289,7 +2342,7 @@ CREATE TABLE lottery_user_experience_state (
 | **唯一写点** | `SettleStage` | 扣积分、扣库存、扣预算、发奖、落库 |
 | **资产服务** | `AssetService` | POINTS/BUDGET_POINTS 统一管理，BUDGET_POINTS 必须指定 campaign_id |
 
-#### 11.1.2 商业模式验证（真实业务流）
+#### 12.1.2 商业模式验证（真实业务流）
 
 ```
 商家扫码录入消费 → 管理员审核通过 → 用户获得：
@@ -1313,7 +2366,7 @@ const budgetResult = await AssetService.changeBalance({
 }, { transaction })
 ```
 
-#### 11.1.3 真实数据库现状（2026-01-19 查询）
+#### 12.1.3 真实数据库现状（2026-01-19 查询）
 
 **活动配置（campaign_id=1）**：
 
@@ -1362,9 +2415,9 @@ const budgetResult = await AssetService.changeBalance({
 
 ---
 
-### 11.2 工程层关键发现与修正
+### 12.2 工程层关键发现与修正
 
-#### 11.2.1 🔴 关键问题：EffectiveBudget 读取口径
+#### 12.2.1 🔴 关键问题：EffectiveBudget 读取口径
 
 **发现**：`allowed_campaign_ids` 的含义是 **"BUDGET_POINTS 的来源桶"**，而不是"lottery 的 campaign_id"。
 
@@ -1389,7 +2442,7 @@ const effectiveBudget = await AssetService.getBudgetPointsByCampaigns({
 
 **影响**：如果口径读错，用户预算会被长期误判为 0，导致永远落在 B0 层（只能空奖）。
 
-#### 11.2.2 🔴 关键问题：钱包开启/关闭状态
+#### 12.2.2 🔴 关键问题：钱包开启/关闭状态
 
 **发现**：user 或 pool 侧的钱包不都是开启可用状态，需要动态判断。
 
@@ -1469,52 +2522,57 @@ function parseAllowedCampaignIds(field) {
 }
 ```
 
-#### 11.2.3 压力层计算：无需新增字段
+#### 12.2.3 压力层计算：虚拟消耗方式（统一所有 budget_mode）
 
-**发现**：真实库已有 `pool_budget_total / pool_budget_remaining / start_time / end_time` 四个字段，可直接计算压力层，无需新增 `target_remaining_budget` 字段。
+**最终决策**：采用**虚拟消耗**方式计算压力层，适用于所有 `budget_mode`。
 
-**压力层计算公式（基于真实字段）**：
+**压力层计算公式（虚拟消耗）**：
 
 ```javascript
-function calculatePressureIndex(campaign) {
+async function calculatePressureIndex(campaign, transaction) {
   const now = new Date();
   const start = new Date(campaign.start_time);
   const end = new Date(campaign.end_time);
   
-  // 计算时间进度
-  const total_duration = end - start;
-  const elapsed_duration = now - start;
-  const time_progress = Math.max(0, Math.min(1, elapsed_duration / total_duration));
+  // 1. 统计虚拟消耗（已发奖成本）
+  const virtualConsumed = await LotteryDraw.sum('prize_value_points', {
+    where: { 
+      campaign_id: campaign.campaign_id, 
+      created_at: { [Op.gte]: start } 
+    },
+    transaction
+  }) || 0;
   
-  // 计算目标剩余预算
-  const total_budget = Number(campaign.pool_budget_total || 0);
-  const remaining_budget = Number(campaign.pool_budget_remaining || 0);
-  const target_remaining = total_budget * (1 - time_progress);
+  // 2. 计算时间进度
+  const timeProgress = Math.max(0, Math.min(1, (now - start) / (end - start)));
   
-  // 防止除零
-  if (target_remaining <= 0) {
-    return remaining_budget > 0 ? 2.0 : 0; // 活动结束但仍有预算=富余，无预算=紧张
-  }
+  // 3. 计算预期消耗
+  const totalBudget = Number(campaign.pool_budget_total || 10000);
+  const expectedConsumed = totalBudget * timeProgress;
   
-  return remaining_budget / target_remaining;
+  // 4. 计算压力指数（消耗/预期消耗）
+  if (expectedConsumed <= 0) return 1.0; // 活动刚开始
+  return virtualConsumed / expectedConsumed;
 }
 
-function getPressureTier(pressure_index) {
-  if (pressure_index < 0.7) return 'P0'; // 紧
-  if (pressure_index <= 1.3) return 'P1'; // 正常
-  return 'P2'; // 富余
+function getPressureTier(pressureIndex) {
+  // 注意：压力指数越大越紧张
+  if (pressureIndex > 1.3) return 'P0'; // 紧（消耗过快）
+  if (pressureIndex >= 0.7) return 'P1'; // 正常
+  return 'P2'; // 富余（消耗过慢）
 }
 ```
 
-**特殊情况处理**：
-- `budget_mode = 'user'` 时：压力层应基于**虚拟消耗**计算（从 `lottery_draws` 汇总已发出的 `prize_value_points`），而非 `pool_budget_remaining`
-- `budget_mode = 'pool'` 时：压力层直接基于 `pool_budget_remaining` 计算
+**优势**：
+- ✅ 适用于所有 `budget_mode`（user 模式下 pool_budget_remaining 不变化，但虚拟消耗正常统计）
+- ✅ 基于实际发奖数据，更准确
+- ✅ 无需新增字段
 
 ---
 
-### 11.3 落地方案与现有 Pipeline 对齐
+### 12.3 落地方案与现有 Pipeline 对齐
 
-#### 11.3.1 Stage 层级映射
+#### 12.3.1 Stage 层级映射
 
 | 本方案组件 | 落点 Stage | 输入 | 输出到 context |
 |-----------|-----------|------|---------------|
@@ -1525,7 +2583,7 @@ function getPressureTier(pressure_index) {
 | **反连空/反连高** | `TierPickStage`（或新增 `ExperienceValveStage`） | user_id, empty_streak, recent_high_count | 调整 tier_weights 或强制档位 |
 | **状态更新** | `SettleStage` | 抽奖结果 | 更新 empty_streak, recent_high_count |
 
-#### 11.3.2 与现有 tier_first 模式协同
+#### 12.3.2 与现有 tier_first 模式协同
 
 你现在是 **tier_first**（先抽档位、再抽奖品），文档中的"非空 vs 空调权"在实现上等价于：
 
@@ -1559,71 +2617,84 @@ const adjusted_weights = {
 // 相比原始：high 从 5% 提升到 9.2%，low 从 80% 降低到 63.2%
 ```
 
-#### 11.3.3 反连空/反连高状态存储
+#### 12.3.3 反连空/反连高状态存储
 
-**推荐方案**：扩展 `lottery_user_daily_draw_quota` 表
+**最终方案**：独立表 `lottery_user_experience_state`（2026-01-20 确认）
 
-```sql
-ALTER TABLE lottery_user_daily_draw_quota 
-  ADD COLUMN empty_streak INT NOT NULL DEFAULT 0 
-    COMMENT '连续空奖次数（每次非空奖时重置）',
-  ADD COLUMN recent_high_count INT NOT NULL DEFAULT 0 
-    COMMENT '近期高档次数（滑动窗口5抽）',
-  ADD COLUMN anti_high_cooldown INT NOT NULL DEFAULT 0 
-    COMMENT '反连高冷却剩余抽数（每抽减1）',
-  ADD COLUMN last_draw_tier VARCHAR(20) DEFAULT NULL 
-    COMMENT '最近一次抽奖档位';
-```
+> **决策理由**：职责清晰（配额表管配额、体验表管体验），后续扩展不影响其他功能。
+
+**表结构**（见第七节 7.1.1）
 
 **更新逻辑（在 SettleStage 中）**：
 
 ```javascript
 // 在 SettleStage._createDrawRecord 之后
-await this._updateExperienceCounters(user_id, campaign_id, final_prize, final_tier, transaction);
+await this._updateExperienceState(user_id, campaign_id, final_prize, final_tier, transaction);
 
-async _updateExperienceCounters(user_id, campaign_id, prize, tier, transaction) {
-  const quota = await LotteryUserDailyDrawQuota.findOne({
-    where: { user_id, campaign_id, quota_date: today() },
+async _updateExperienceState(user_id, campaign_id, prize, tier, transaction) {
+  const HIGH_THRESHOLD = 400; // 高档奖阈值
+  
+  // 获取或创建体验状态记录
+  const [state, created] = await LotteryUserExperienceState.findOrCreate({
+    where: { user_id, campaign_id },
+    defaults: {
+      empty_streak: 0,
+      recent_high_count: 0,
+      anti_high_cooldown: 0,
+      total_draw_count: 0,
+      total_empty_count: 0,
+      total_budget_consumed: 0,
+      max_empty_streak: 0
+    },
     transaction,
     lock: transaction.LOCK.UPDATE
   });
   
-  if (!quota) return; // 无配额记录，跳过
-  
   const is_empty = prize.prize_value_points === 0;
-  const is_high = prize.prize_value_points >= 400;
+  const is_high = prize.prize_value_points >= HIGH_THRESHOLD;
+  
+  // 更新总计数
+  state.total_draw_count += 1;
+  state.total_budget_consumed += prize.prize_value_points;
   
   // 更新连续空奖计数
   if (is_empty) {
-    quota.empty_streak += 1;
+    state.empty_streak += 1;
+    state.total_empty_count += 1;
+    // 记录历史最长连空
+    if (state.empty_streak > state.max_empty_streak) {
+      state.max_empty_streak = state.empty_streak;
+    }
   } else {
-    quota.empty_streak = 0; // 非空奖重置
+    state.empty_streak = 0; // 非空奖重置
+    state.last_non_empty_at = new Date();
   }
   
-  // 更新高档计数（滑动窗口逻辑需更复杂的存储，这里简化）
+  // 更新高档计数
   if (is_high) {
-    quota.recent_high_count = Math.min(quota.recent_high_count + 1, 5);
-    if (quota.recent_high_count >= 2) {
-      quota.anti_high_cooldown = 10; // 启动冷却
+    state.recent_high_count = Math.min(state.recent_high_count + 1, 5);
+    state.last_high_tier_at = new Date();
+    
+    if (state.recent_high_count >= 2) {
+      state.anti_high_cooldown = 10; // 启动冷却
     }
   }
   
   // 冷却递减
-  if (quota.anti_high_cooldown > 0) {
-    quota.anti_high_cooldown -= 1;
-    if (quota.anti_high_cooldown === 0) {
-      quota.recent_high_count = 0; // 冷却结束，重置高档计数
+  if (state.anti_high_cooldown > 0) {
+    state.anti_high_cooldown -= 1;
+    if (state.anti_high_cooldown === 0) {
+      state.recent_high_count = 0; // 冷却结束，重置高档计数
     }
   }
   
-  quota.last_draw_tier = tier;
-  await quota.save({ transaction });
+  await state.save({ transaction });
 }
 ```
 
 ---
 
-### 11.4 实施顺序建议（按优先级）
+### 12.4 实施顺序建议（按优先级）- 已被第八章替代
 
 | 阶段 | 内容 | 落点文件 | 预估工时 | 优先级 |
 |------|------|---------|---------|--------|
@@ -1642,7 +2713,7 @@ async _updateExperienceCounters(user_id, campaign_id, prize, tier, transaction) 
 
 ---
 
-### 11.5 决策快照增强（审计字段）
+### 12.5 决策快照增强（审计字段）
 
 在 `DecisionSnapshotStage` 中增加分层决策记录：
 
@@ -1659,12 +2730,34 @@ budget_tier_decision: {
   anti_high_triggered: experience_data.anti_high_triggered,
   empty_streak_before: experience_data.empty_streak_before,
   recent_high_count: experience_data.recent_high_count
+},
+
+// Pity 软保底决策记录（2026-01-20 新增）
+pity_decision: {
+  empty_streak: experience_data.empty_streak_before,   // 连续空奖次数
+  pity_triggered: experience_data.empty_streak_before >= 2,  // 是否触发 Pity
+  pity_multiplier: getPityMultiplier(experience_data.empty_streak_before), // Pity 倍数
+  budget_sufficient: budget_data.effective_budget >= 10,     // 预算是否足够
+  base_non_empty_weight: tier_weights.non_empty_weight,      // 基础非空权重
+  pity_adjusted_weight: tier_weights.non_empty_weight * pity_multiplier,  // Pity 调整后权重
+  pity_config_version: 'v1.0'                                // Pity 配置版本
+},
+
+// 运气债务决策记录
+luck_debt_decision: {
+  global_total_draw_count: global_state.global_total_draw_count,
+  global_total_empty_count: global_state.global_total_empty_count,
+  luck_index: global_state.luck_index,           // 运气指数（0~1）
+  luck_multiplier: global_state.luck_multiplier, // 权重调整倍数
+  luck_debt_applied: true,                       // 是否应用了调整
+  original_non_empty_weight: tier_weights.non_empty_weight,
+  adjusted_non_empty_weight: tier_weights.non_empty_weight * luck_multiplier
 }
 ```
 
 ---
 
-### 11.6 监控指标计算口径
+### 12.6 监控指标计算口径
 
 | 指标 | SQL 计算方式 | 数据源 |
 |------|------------|--------|
@@ -1677,24 +2770,142 @@ budget_tier_decision: {
 
 ---
 
-## 附录C：2026-01-19 真实代码文件对齐
+## 附录C：2026-01-20 代码文件对齐（策略模块化架构版）
 
-| 文件路径 | 说明 | 本方案改动点 |
-|----------|------|-------------|
-| `services/UnifiedLotteryEngine/UnifiedLotteryEngine.js` | V4.6 抽奖引擎主入口 | 无需改动 |
-| `services/UnifiedLotteryEngine/pipeline/DrawOrchestrator.js` | 管线编排器 | 无需改动 |
-| `services/UnifiedLotteryEngine/pipeline/NormalDrawPipeline.js` | 统一管线（11 Stage） | 无需改动 |
-| `services/UnifiedLotteryEngine/pipeline/stages/BudgetContextStage.js` | 预算上下文 Stage | **改动：EffectiveBudget 口径、增加 budget_tier/pressure_tier** |
-| `services/UnifiedLotteryEngine/pipeline/stages/BuildPrizePoolStage.js` | 构建奖品池 Stage | **改动：增加 cap 过滤、tier_weight_multipliers** |
-| `services/UnifiedLotteryEngine/pipeline/stages/TierPickStage.js` | 档位抽取 Stage | **改动：增加反连空/反连高逻辑** |
-| `services/UnifiedLotteryEngine/pipeline/stages/DecisionSnapshotStage.js` | 决策快照 Stage | **改动：增加 budget_tier_decision 字段** |
-| `services/UnifiedLotteryEngine/pipeline/stages/SettleStage.js` | 结算 Stage（唯一写点） | **改动：更新体验计数器** |
-| `services/UnifiedLotteryEngine/pipeline/budget/UserBudgetProvider.js` | 用户预算 Provider | **改动：修正 allowed_campaign_ids 使用口径** |
-| `services/UnifiedLotteryEngine/pipeline/budget/PoolBudgetProvider.js` | 活动池预算 Provider | 无需改动（已支持 reserved/public 池） |
-| `services/AssetService.js` | 资产服务 | 无需改动（已有 getBudgetPointsByCampaigns） |
-| `services/ConsumptionService.js` | 消费服务 | 无需改动（预算发放链路正确） |
+> **说明**：本附录已被第八章 8.3 节取代，详细的文件清单请参见 **8.3 代码文件改动清单（策略模块化架构）**。
+
+**架构变更摘要**：
+
+- **新增 `strategy/` 模块**：15 个策略相关文件
+- **新增单元测试**：7 个测试文件
+- **Stage 改造**：6 个文件调用 StrategyEngine
+- **数据模型**：3 个新增 + 5 个迁移文件
+
+**策略引擎核心文件**：
+
+| 文件路径 | 说明 |
+|----------|------|
+| `services/UnifiedLotteryEngine/strategy/StrategyEngine.js` | 策略入口（门面模式） |
+| `services/UnifiedLotteryEngine/strategy/calculators/*.js` | 各类计算器（9 个） |
+| `services/UnifiedLotteryEngine/strategy/config/*.js` | 配置管理（4 个） |
+| `services/UnifiedLotteryEngine/strategy/state/*.js` | 状态管理（2 个） |
+
+**Pipeline 保持不变**：
+
+| 文件路径 | 说明 |
+|----------|------|
+| `services/UnifiedLotteryEngine/UnifiedLotteryEngine.js` | 抽奖引擎主入口（不变） |
+| `services/UnifiedLotteryEngine/pipeline/DrawOrchestrator.js` | 管线编排器（不变） |
+| `services/UnifiedLotteryEngine/pipeline/NormalDrawPipeline.js` | 统一管线（不变） |
+
+**其他服务**：
+
+| 文件路径 | 说明 |
+|----------|------|
+| `services/AssetService.js` | 资产服务（不变，已有 getBudgetPointsByCampaigns） |
+| `services/ConsumptionService.js` | 消费服务（不变） |
+
+---
+
+## 附录D：行业对比参考（2026-01-20 调研）
+
+### D.1 各类公司方案对比
+
+| 维度 | 大厂（美团/腾讯/阿里） | 小型公司 | 游戏公司 | 活动策划公司 |
+|------|---------------------|---------|---------|-------------|
+| **预算控制** | 严格不欠账 + 多级熔断 | 简单限额 | 保底概率 + 付费优待 | 预算池 + 人工调控 |
+| **用户分层** | 千人千面（RFM/行为标签） | 新老用户2层 | 付费档位3-5层 | VIP等级 |
+| **体验平滑** | 连续控制 + 节奏控制 | 保底机制 | pity系统 | 限时兜底 |
+| **技术复杂度** | 高（数据平台支撑） | 低 | 中高 | 低 |
+| **本项目适用** | ⚠️ 过于复杂 | ⚠️ 过于简单 | ✅ 参考 pity 系统 | ⚠️ 人工成本高 |
+
+### D.2 本项目最终选择
+
+**核心策略**：借鉴游戏 Pity 系统思想 + 大厂预算严控 + 全局运气平衡
+
+- **预算控制**：严格不欠账（大厂标准）
+- **用户分层**：4 层（B0-B3，基于预算）
+- **Pity 软保底**：连续空奖时概率累积提升（×1.2 ~ ×10.0），类似原神软保底
+- **硬保底**：反连空 K=3 强制非空（兜底）
+- **反连高**：N=5/M=2 防止连续高档
+- **长期运气平衡**：运气债务机制（跨活动累计、动态连续调权）
+- **技术复杂度**：中等（Pipeline 架构已支撑）
+
+### D.3 Pity 软保底 + 运气债务机制的行业参考
+
+| 机制类型 | 游戏行业 | 电商/活动 | 本项目 |
+|---------|---------|---------|--------|
+| **硬保底** | X抽必出（如原神90抽） | 累计签到必中 | 反连空 K=3 强制非空 |
+| **软保底** | 概率逐渐提升（如原神74抽起） | 少见 | **Pity 软保底（×1.2~×10.0）** ✅ |
+| **全局累计** | 跨卡池保底 | 少见 | **全局共享用户历史** |
+| **动态平衡** | 欧皇保护/非酋保护 | 少见 | **基于历史空奖率调整** |
+
+**本项目优势**：
+- ✅ 吸取游戏行业"非酋保护"思想
+- ✅ 预算约束仍为最高优先级（不像游戏可以无限制发放）
+- ✅ 动态连续调整（不是阶梯式，用户无感）
+- ✅ 跨活动累计（长期用户忠诚度保护）
+
+---
+
+## 附录E：实施进度跟踪（2026-01-20 更新）
+
+### E.1 已完成的实施工作
+
+| 序号 | 实施内容 | 相关文件 | 状态 | 完成时间 |
+|------|---------|---------|------|---------|
+| 1 | 策略引擎目录结构创建 | `services/UnifiedLotteryEngine/strategy/` | ✅ 完成 | 2026-01-20 |
+| 2 | StrategyEngine 门面模式实现 | `strategy/StrategyEngine.js` | ✅ 完成 | 2026-01-20 |
+| 3 | BudgetTierCalculator 预算分层计算器 | `strategy/calculators/BudgetTierCalculator.js` | ✅ 完成 | 2026-01-20 |
+| 4 | PressureTierCalculator 压力分层计算器 | `strategy/calculators/PressureTierCalculator.js` | ✅ 完成 | 2026-01-20 |
+| 5 | TierMatrixCalculator BxPx 矩阵计算器 | `strategy/calculators/TierMatrixCalculator.js` | ✅ 完成 | 2026-01-20 |
+| 6 | PityCalculator 软保底计算器 | `strategy/calculators/PityCalculator.js` | ✅ 完成 | 2026-01-20 |
+| 7 | LuckDebtCalculator 运气债务计算器 | `strategy/calculators/LuckDebtCalculator.js` | ✅ 完成 | 2026-01-20 |
+| 8 | AntiEmptyStreakHandler 防连空处理器 | `strategy/calculators/AntiEmptyStreakHandler.js` | ✅ 完成 | 2026-01-20 |
+| 9 | AntiHighStreakHandler 防连高处理器 | `strategy/calculators/AntiHighStreakHandler.js` | ✅ 完成 | 2026-01-20 |
+| 10 | ExperienceStateManager 体验状态管理器 | `strategy/state/ExperienceStateManager.js` | ✅ 完成 | 2026-01-20 |
+| 11 | GlobalStateManager 全局状态管理器 | `strategy/state/GlobalStateManager.js` | ✅ 完成 | 2026-01-20 |
+| 12 | **StrategyConfig 策略配置文件** | `strategy/config/StrategyConfig.js` | ✅ 完成 | 2026-01-20 |
+| 13 | LotteryUserExperienceState 模型 | `models/LotteryUserExperienceState.js` | ✅ 完成 | 2026-01-20 |
+| 14 | LotteryUserGlobalState 模型 | `models/LotteryUserGlobalState.js` | ✅ 完成 | 2026-01-20 |
+| 15 | 体验状态表迁移 | `migrations/20260120022249-create-lottery-experience-state-tables.js` | ✅ 完成 | 2026-01-20 |
+| 16 | 策略字段迁移 | `migrations/20260120100000-add-strategy-fields-to-draw-decisions.js` | ✅ 完成 | 2026-01-20 |
+| 17 | 小时统计表迁移 | `migrations/20260120100100-create-lottery-hourly-metrics-table.js` | ✅ 完成 | 2026-01-20 |
+| 18 | **DecisionSnapshotStage 审计字段增强** | `pipeline/stages/DecisionSnapshotStage.js` | ✅ 完成 | 2026-01-20 |
+
+### E.2 数据库表创建验证
+
+| 表名 | 状态 | 说明 |
+|------|------|------|
+| `lottery_user_experience_state` | ✅ 已创建 | 用户活动内体验状态（empty_streak, recent_high_count 等） |
+| `lottery_user_global_state` | ✅ 已创建 | 用户全局状态（跨活动累计，运气债务） |
+| `lottery_hourly_metrics` | ✅ 已创建 | 小时级活动统计（压力层计算用） |
+
+### E.3 核心验证项
+
+| 验证项 | 状态 | 说明 |
+|--------|------|------|
+| `AssetService.getBudgetPointsByCampaigns` 方法 | ✅ 已验证 | 用于 EffectiveBudget 计算 |
+| ESLint 代码质量检查 | ✅ 通过 | 策略引擎所有文件通过检查 |
+| 系统健康检查 | ✅ 正常 | 数据库连接正常、Redis 连接正常 |
+| 策略测试套件 | ✅ 通过 | 9 个策略测试套件 150 测试全部通过 |
+| 完整项目测试 | ✅ 通过 | 60 测试套件 802/814 测试通过（12 跳过） |
+
+### E.4 待优化项（非必须）
+
+| 序号 | 优化内容 | 优先级 | 说明 |
+|------|---------|--------|------|
+| 1 | 策略引擎单元测试完善 | P2 | 增加边界场景测试 |
+| 2 | ~~0 成本奖品差异化~~ | ✅ 完成 | 已插入7种差异化空奖（幸运签、神秘彩蛋等） |
+| 3 | 监控指标埋点 | P2 | Prometheus/Grafana 集成 |
+| 4 | Feature Flag 控制 | P3 | 支持灰度发布 |
 
 ---
 
 **文档结束**
+
+> **最后更新**：2026-01-20 10:50 北京时间  
+> **文档版本**：v3.6（策略模块化架构验证版）  
+> **架构模式**：单体 + 策略引擎模块化（第二阶段）  
+> **文档状态**：✅ **核心实施已完成并验证**（策略模块化架构 + Pity 软保底 + 运气债务机制 + 数据库迁移执行 + ESLint通过 + 60测试套件802测试通过）
 

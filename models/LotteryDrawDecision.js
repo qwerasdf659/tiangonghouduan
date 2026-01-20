@@ -463,6 +463,89 @@ module.exports = sequelize => {
         type: DataTypes.INTEGER,
         allowNull: true,
         comment: '决策处理耗时（毫秒）'
+      },
+
+      // ============== 策略引擎审计字段 ==============
+
+      /**
+       * 有效预算（统一计算口径）
+       */
+      effective_budget: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+        comment: '有效预算（统一计算口径，来自 StrategyEngine.computeBudgetContext）'
+      },
+
+      /**
+       * 预算分层（B0/B1/B2/B3）
+       */
+      budget_tier: {
+        type: DataTypes.STRING(10),
+        allowNull: true,
+        comment: '预算分层（B0/B1/B2/B3，来自 BudgetTierCalculator）'
+      },
+
+      /**
+       * 活动压力分层（P0/P1/P2）
+       */
+      pressure_tier: {
+        type: DataTypes.STRING(10),
+        allowNull: true,
+        comment: '活动压力分层（P0/P1/P2，来自 PressureTierCalculator）'
+      },
+
+      /**
+       * 预算上限值
+       */
+      cap_value: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+        comment: '预算上限值（该 BxPx 组合允许的最大奖品积分价值）'
+      },
+
+      /**
+       * Pity 系统决策信息
+       */
+      pity_decision: {
+        type: DataTypes.JSON,
+        allowNull: true,
+        comment: 'Pity 系统决策信息（包含 empty_streak, boost_multiplier, triggered）'
+      },
+
+      /**
+       * 运气债务决策信息
+       */
+      luck_debt_decision: {
+        type: DataTypes.JSON,
+        allowNull: true,
+        comment: '运气债务决策信息（包含 debt_level, multiplier, historical_empty_rate）'
+      },
+
+      /**
+       * 体验平滑机制应用记录
+       */
+      experience_smoothing: {
+        type: DataTypes.JSON,
+        allowNull: true,
+        comment: '体验平滑机制应用记录（包含 Pity/AntiEmpty/AntiHigh 应用结果）'
+      },
+
+      /**
+       * BxPx 矩阵权重调整信息
+       */
+      weight_adjustment: {
+        type: DataTypes.JSON,
+        allowNull: true,
+        comment: 'BxPx 矩阵权重调整信息（包含 base_weights, adjusted_weights, multiplier）'
+      },
+
+      /**
+       * 可用档位列表
+       */
+      available_tiers: {
+        type: DataTypes.JSON,
+        allowNull: true,
+        comment: '可用档位列表（基于预算和库存过滤后的档位）'
       }
     },
     {

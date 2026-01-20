@@ -8,6 +8,7 @@
  * 2. 构建完整的决策快照数据
  * 3. 准备写入 lottery_draw_decisions 表的数据
  * 4. 生成可追溯的审计记录
+ * 5. 记录策略引擎决策数据（BxPx矩阵、体验平滑、运气债务）
  *
  * 输出到上下文：
  * - decision_snapshot: 完整的决策快照对象
@@ -19,10 +20,12 @@
  * - 读操作Stage，只做数据汇总
  * - 快照数据用于后续的 SettleStage 写入
  * - 确保所有决策过程可追溯
+ * - 策略决策数据完整记录，支持运营分析
  *
  * @module services/UnifiedLotteryEngine/pipeline/stages/DecisionSnapshotStage
  * @author 统一抽奖架构重构
  * @since 2026-01-18
+ * @updated 2026-01-20 - 增加策略引擎决策审计字段
  */
 
 const BaseStage = require('./BaseStage')
@@ -66,6 +69,9 @@ class DecisionSnapshotStage extends BaseStage {
       const prize_pick_data = this.getContextData(context, 'PrizePickStage.data') || {}
       const guarantee_data = this.getContextData(context, 'GuaranteeStage.data') || {}
 
+      // 收集策略引擎相关的决策数据
+      const strategy_data = this.getContextData(context, 'TierPickStage.strategy_data') || {}
+
       // 2. 确定最终奖品（保底覆盖逻辑）
       const guarantee_triggered = guarantee_data.guarantee_triggered === true
       const final_prize = guarantee_triggered
@@ -85,13 +91,14 @@ class DecisionSnapshotStage extends BaseStage {
         ? 'high' // 保底强制为高档
         : tier_pick_data.selected_tier
 
-      // 4. 构建决策因素列表
+      // 4. 构建决策因素列表（包含策略引擎数据）
       const decision_factors = this._buildDecisionFactors({
         eligibility_data,
         budget_data,
         tier_pick_data,
         prize_pick_data,
-        guarantee_data
+        guarantee_data,
+        strategy_data
       })
 
       // 5. 构建完整的决策快照
@@ -121,12 +128,23 @@ class DecisionSnapshotStage extends BaseStage {
           quota_remaining: eligibility_data.quota_remaining
         },
 
-        // 预算状态快照
+        // 预算状态快照（增强版：包含 EffectiveBudget 和 BxPx 信息）
         budget_snapshot: {
           budget_mode: budget_data.budget_mode,
           budget_before: budget_data.budget_before,
           min_prize_cost: budget_data.min_prize_cost,
-          budget_sufficient: budget_data.budget_sufficient
+          budget_sufficient: budget_data.budget_sufficient,
+          // 策略引擎增强字段 - EffectiveBudget 计算
+          effective_budget: budget_data.effective_budget,
+          wallet_available: budget_data.wallet_available,
+          // BxPx 分层信息
+          budget_tier: budget_data.budget_tier,
+          pressure_tier: budget_data.pressure_tier,
+          pressure_index: budget_data.pressure_index,
+          // BxPx 矩阵输出
+          cap_multiplier: budget_data.cap_multiplier,
+          calculated_cap: budget_data.calculated_cap,
+          empty_weight_multiplier: budget_data.empty_weight_multiplier
         },
 
         // 奖品池状态快照
@@ -137,7 +155,7 @@ class DecisionSnapshotStage extends BaseStage {
           has_valuable_prizes: prize_pool_data.has_valuable_prizes
         },
 
-        // 档位抽取决策
+        // 档位抽取决策（增强版：包含体验平滑和权重调整信息）
         tier_decision: {
           user_segment: tier_pick_data.user_segment,
           tier_weights: tier_pick_data.tier_weights,
@@ -145,7 +163,51 @@ class DecisionSnapshotStage extends BaseStage {
           weight_scale: tier_pick_data.weight_scale,
           original_tier: tier_pick_data.original_tier,
           selected_tier: tier_pick_data.selected_tier,
-          downgrade_path: tier_pick_data.tier_downgrade_path
+          downgrade_path: tier_pick_data.tier_downgrade_path,
+          // 策略引擎增强字段 - 权重调整详情
+          base_weights: strategy_data.base_weights,
+          adjusted_weights: strategy_data.adjusted_weights,
+          weight_adjustments: strategy_data.weight_adjustments || {}
+        },
+
+        // 策略引擎决策快照（新增）
+        strategy_snapshot: {
+          // 体验状态输入
+          experience_state: {
+            empty_streak: strategy_data.experience_state?.empty_streak,
+            recent_high_count: strategy_data.experience_state?.recent_high_count,
+            total_draw_count: strategy_data.experience_state?.total_draw_count,
+            total_empty_count: strategy_data.experience_state?.total_empty_count,
+            pity_trigger_count: strategy_data.experience_state?.pity_trigger_count
+          },
+
+          // Pity 系统状态
+          pity_system: {
+            enabled: strategy_data.pity_enabled,
+            soft_triggered: strategy_data.pity_soft_triggered,
+            hard_triggered: strategy_data.pity_hard_triggered,
+            boost_percentage: strategy_data.pity_boost_percentage
+          },
+
+          // Luck Debt 运气债务状态
+          luck_debt: {
+            enabled: strategy_data.luck_debt_enabled,
+            global_draw_count: strategy_data.global_draw_count,
+            historical_empty_rate: strategy_data.historical_empty_rate,
+            debt_level: strategy_data.luck_debt_level,
+            debt_multiplier: strategy_data.luck_debt_multiplier
+          },
+
+          // Anti-Streak 机制状态
+          anti_streak: {
+            anti_empty_triggered: strategy_data.anti_empty_triggered,
+            anti_high_triggered: strategy_data.anti_high_triggered,
+            forced_tier: strategy_data.forced_tier,
+            capped_max_tier: strategy_data.capped_max_tier
+          },
+
+          // 总体权重调整因子
+          total_weight_adjustment: strategy_data.total_weight_adjustment || 1.0
         },
 
         // 奖品抽取决策
@@ -227,7 +289,8 @@ class DecisionSnapshotStage extends BaseStage {
       tier_pick_data,
       // prize_pick_data 预留用于详细奖品选择因素分析（当前版本简化处理）
       prize_pick_data: _prize_pick_data, // eslint-disable-line no-unused-vars
-      guarantee_data
+      guarantee_data,
+      strategy_data = {}
     } = data
 
     // 资格相关因素
@@ -252,6 +315,37 @@ class DecisionSnapshotStage extends BaseStage {
       })
     }
 
+    // BxPx 分层因素（策略引擎增强）
+    if (budget_data.budget_tier) {
+      factors.push({
+        type: 'strategy',
+        factor: 'budget_tier',
+        value: budget_data.budget_tier,
+        impact:
+          budget_data.budget_tier === 'B3'
+            ? 'positive'
+            : budget_data.budget_tier === 'B0'
+              ? 'negative'
+              : 'neutral',
+        description: `预算分层: ${budget_data.budget_tier} (EffectiveBudget: ${budget_data.effective_budget})`
+      })
+    }
+
+    if (budget_data.pressure_tier) {
+      factors.push({
+        type: 'strategy',
+        factor: 'pressure_tier',
+        value: budget_data.pressure_tier,
+        impact:
+          budget_data.pressure_tier === 'P0'
+            ? 'positive'
+            : budget_data.pressure_tier === 'P2'
+              ? 'negative'
+              : 'neutral',
+        description: `活动压力: ${budget_data.pressure_tier} (压力指数: ${(budget_data.pressure_index * 100).toFixed(1)}%)`
+      })
+    }
+
     // 分群因素
     if (tier_pick_data.user_segment) {
       factors.push({
@@ -271,6 +365,60 @@ class DecisionSnapshotStage extends BaseStage {
         value: tier_pick_data.tier_downgrade_path,
         impact: 'neutral',
         description: `档位降级: ${tier_pick_data.tier_downgrade_path.join(' → ')}`
+      })
+    }
+
+    // Pity 系统因素（策略引擎增强）
+    if (strategy_data.pity_soft_triggered) {
+      factors.push({
+        type: 'strategy',
+        factor: 'pity_soft_guarantee',
+        value: strategy_data.pity_boost_percentage,
+        impact: 'positive',
+        description: `Pity 软保底触发: 非空奖概率提升 ${strategy_data.pity_boost_percentage}%`
+      })
+    }
+
+    if (strategy_data.pity_hard_triggered) {
+      factors.push({
+        type: 'strategy',
+        factor: 'pity_hard_guarantee',
+        value: true,
+        impact: 'positive',
+        description: 'Pity 硬保底触发: 强制发放非空奖品'
+      })
+    }
+
+    // Luck Debt 运气债务因素（策略引擎增强）
+    if (strategy_data.luck_debt_level && strategy_data.luck_debt_level !== 'none') {
+      factors.push({
+        type: 'strategy',
+        factor: 'luck_debt',
+        value: strategy_data.luck_debt_multiplier,
+        impact: 'positive',
+        description: `运气债务补偿 (${strategy_data.luck_debt_level}): 权重乘数 ${strategy_data.luck_debt_multiplier}`
+      })
+    }
+
+    // Anti-Empty 因素（策略引擎增强）
+    if (strategy_data.anti_empty_triggered) {
+      factors.push({
+        type: 'strategy',
+        factor: 'anti_empty_streak',
+        value: strategy_data.experience_state?.empty_streak,
+        impact: 'positive',
+        description: `防连续空奖触发: 连续${strategy_data.experience_state?.empty_streak}次空奖后强制非空`
+      })
+    }
+
+    // Anti-High 因素（策略引擎增强）
+    if (strategy_data.anti_high_triggered) {
+      factors.push({
+        type: 'strategy',
+        factor: 'anti_high_streak',
+        value: strategy_data.experience_state?.recent_high_count,
+        impact: 'negative',
+        description: `防连续高价值触发: 近期高价值${strategy_data.experience_state?.recent_high_count}次，档位上限 ${strategy_data.capped_max_tier}`
       })
     }
 

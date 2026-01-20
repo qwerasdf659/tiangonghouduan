@@ -512,6 +512,53 @@ models.RedemptionOrder = require('./RedemptionOrder')(sequelize, DataTypes)
  *    - 业务场景：生成核销码→核销验证→过期清理
  */
 
+// 🔴 V4.6 抽奖策略引擎模型（2026-01-20 - 预算侧自动分层控制）
+models.LotteryUserExperienceState = require('./LotteryUserExperienceState')(sequelize, DataTypes)
+/*
+ * ✅ LotteryUserExperienceState：用户活动级抽奖体验状态
+ *    - 用途：追踪用户在特定活动中的抽奖体验状态（Pity/AntiStreak）
+ *    - 特点：empty_streak（连续空奖次数）、recent_high_count（近期高价值次数）
+ *    - 表名：lottery_user_experience_state，主键：state_id，唯一约束：user_id + campaign_id
+ *    - 业务场景：Pity保底触发→AntiEmpty防空连→AntiHigh防高价值集中
+ */
+
+models.LotteryUserGlobalState = require('./LotteryUserGlobalState')(sequelize, DataTypes)
+/*
+ * ✅ LotteryUserGlobalState：用户全局抽奖统计（运气债务）
+ *    - 用途：追踪用户跨活动的全局抽奖历史统计（LuckDebt运气债务机制）
+ *    - 特点：historical_empty_rate（历史空奖率）、luck_debt_multiplier（补偿乘数）
+ *    - 表名：lottery_user_global_state，主键：global_state_id，唯一约束：user_id
+ *    - 业务场景：历史空奖率 > 期望值 → 累积运气债务 → 补偿提高非空奖概率
+ */
+
+models.LotteryHourlyMetrics = require('./LotteryHourlyMetrics')(sequelize, DataTypes)
+/*
+ * ✅ LotteryHourlyMetrics：抽奖监控指标表（按小时聚合）
+ *    - 用途：存储按小时聚合的抽奖监控指标，用于监控活动健康度和策略效果
+ *    - 特点：档位分布统计、BxPx分层分布、体验机制触发统计、预计算率指标
+ *    - 表名：lottery_hourly_metrics，主键：metric_id，唯一约束：campaign_id + hour_bucket
+ *    - 业务场景：实时监控空奖率/高价值率、Pity/AntiEmpty触发率、异常检测预警
+ */
+
+models.LotteryStrategyConfig = require('./LotteryStrategyConfig')(sequelize, DataTypes)
+/*
+ * ✅ LotteryStrategyConfig：抽奖策略全局配置表（Phase 3+ 动态配置）
+ *    - 用途：存储策略引擎的全局配置参数，支持运行时动态调整
+ *    - 特点：配置分组管理、优先级机制、定时生效、JSON值类型
+ *    - 表名：lottery_strategy_config，主键：strategy_config_id
+ *    - 配置分组：budget_tier/pressure_tier/pity/luck_debt/anti_empty/anti_high
+ *    - 业务场景：运营调参、A/B测试、活动期间特殊配置
+ */
+
+models.LotteryTierMatrixConfig = require('./LotteryTierMatrixConfig')(sequelize, DataTypes)
+/*
+ * ✅ LotteryTierMatrixConfig：BxPx矩阵配置表（Phase 3+ 动态配置）
+ *    - 用途：存储 Budget Tier × Pressure Tier 组合的乘数配置
+ *    - 特点：12种组合（4个Budget Tier × 3个Pressure Tier）、cap乘数、空奖权重乘数
+ *    - 表名：lottery_tier_matrix_config，主键：matrix_config_id
+ *    - 业务场景：根据用户预算和活动压力动态调整奖品分布
+ */
+
 // 🔴 设置模型关联关系
 Object.keys(models).forEach(modelName => {
   if (models[modelName].associate) {

@@ -5,16 +5,25 @@
  *
  * 职责：
  * 1. 根据用户分群（segment）获取对应的档位权重配置
- * 2. 使用整数权重系统（SCALE = 1,000,000）进行档位抽取
- * 3. 实现固定降级路径：high → mid → low → fallback
- * 4. 当选中档位无可用奖品时自动降级
+ * 2. 应用 BxPx 矩阵权重调整（根据 budget_tier 和 pressure_tier）
+ * 3. 使用整数权重系统（SCALE = 1,000,000）进行档位抽取
+ * 4. 实现固定降级路径：high → mid → low → fallback
+ * 5. 当选中档位无可用奖品时自动降级
  *
  * 输出到上下文：
  * - selected_tier: 最终选中的档位
  * - original_tier: 原始抽中的档位（降级前）
  * - tier_downgrade_path: 降级路径（如 ['high', 'mid', 'low']）
  * - random_value: 抽取时使用的随机数
- * - tier_weights: 使用的档位权重配置
+ * - tier_weights: 基础档位权重配置
+ * - adjusted_weights: BxPx 矩阵调整后的权重
+ * - budget_tier: 预算分层（来自 BudgetContextStage）
+ * - pressure_tier: 压力分层（来自 BudgetContextStage）
+ *
+ * 策略引擎集成（2026-01-20）：
+ * - 从 BuildPrizePoolStage 获取 budget_tier 和 pressure_tier
+ * - 调用 StrategyEngine.computeWeightAdjustment() 获取权重调整
+ * - 应用 BxPx 矩阵调整 fallback 档位权重
  *
  * 设计原则：
  * - 档位优先：先抽档位，再在档位内抽奖品
@@ -24,11 +33,13 @@
  * @module services/UnifiedLotteryEngine/pipeline/stages/TierPickStage
  * @author 统一抽奖架构重构
  * @since 2026-01-18
+ * @updated 2026-01-20 集成 BxPx 矩阵权重调整
  */
 
 const BaseStage = require('./BaseStage')
 const { SegmentResolver } = require('../../../../config/segment_rules')
-const { User } = require('../../../../models')
+const { User, LotteryUserExperienceState } = require('../../../../models')
+const StrategyEngine = require('../../strategy/StrategyEngine')
 
 /**
  * 权重缩放比例（整数权重系统）
@@ -53,6 +64,9 @@ class TierPickStage extends BaseStage {
       is_writer: false,
       required: true
     })
+
+    /* 初始化策略引擎实例 */
+    this.strategyEngine = new StrategyEngine()
   }
 
   /**
@@ -155,7 +169,7 @@ class TierPickStage extends BaseStage {
       const campaign = campaign_data.campaign
       const tier_rules = campaign_data.tier_rules || []
 
-      // 获取奖品池信息（从 BuildPrizePoolStage 的结果中）
+      /* 获取奖品池信息（从 BuildPrizePoolStage 的结果中） */
       const prize_pool_data = this.getContextData(context, 'BuildPrizePoolStage.data')
       if (!prize_pool_data) {
         throw this.createError(
@@ -168,42 +182,127 @@ class TierPickStage extends BaseStage {
       const prizes_by_tier = prize_pool_data.prizes_by_tier
       const available_tiers = prize_pool_data.available_tiers
 
-      // 1. 解析用户分群
+      /* 获取预算分层信息（来自 BudgetContextStage，经由 BuildPrizePoolStage 传递） */
+      const budget_tier = prize_pool_data.budget_tier || 'B1'
+      const pressure_tier = prize_pool_data.pressure_tier || 'P1'
+      const effective_budget = prize_pool_data.effective_budget || 0
+
+      /* 1. 解析用户分群 */
       const user_segment = await this._resolveUserSegment(user_id, campaign)
 
-      // 2. 获取分群对应的档位权重
-      const tier_weights = this._getTierWeights(user_segment, tier_rules, campaign)
+      /* 2. 获取分群对应的基础档位权重 */
+      const base_tier_weights = this._getTierWeights(user_segment, tier_rules, campaign)
 
-      // 3. 执行档位抽取
+      /* 3. 应用 BxPx 矩阵权重调整（策略引擎集成） */
+      const weight_adjustment = this.strategyEngine.computeWeightAdjustment({
+        budget_tier,
+        pressure_tier,
+        base_tier_weights
+      })
+      const adjusted_weights = weight_adjustment.adjusted_weights
+
+      this.log('info', 'BxPx 矩阵权重调整', {
+        user_id,
+        budget_tier,
+        pressure_tier,
+        base_fallback_weight: base_tier_weights.fallback,
+        adjusted_fallback_weight: adjusted_weights.fallback,
+        empty_weight_multiplier: weight_adjustment.empty_weight_multiplier
+      })
+
+      /* 4. 执行档位抽取（使用调整后的权重） */
       const random_value = Math.random() * WEIGHT_SCALE
-      const original_tier = this._pickTier(tier_weights, random_value)
+      const original_tier = this._pickTier(adjusted_weights, random_value)
 
-      // 4. 检查选中档位是否有可用奖品，必要时降级
+      /* 5. 检查选中档位是否有可用奖品，必要时降级 */
       const { selected_tier, downgrade_path } = this._applyDowngrade(
         original_tier,
         prizes_by_tier,
         available_tiers
       )
 
-      // 5. 构建返回数据
+      /* 6. 应用体验平滑机制（Pity / AntiEmpty / AntiHigh） */
+      let experience_state = null
+      let smoothing_result = null
+      let final_tier = selected_tier
+
+      try {
+        // 获取用户活动级体验状态
+        experience_state = await LotteryUserExperienceState.findOne({
+          where: { user_id, campaign_id }
+        })
+
+        if (experience_state) {
+          // 调用策略引擎应用体验平滑
+          smoothing_result = await this.strategyEngine.applyExperienceSmoothing({
+            user_id,
+            campaign_id,
+            selected_tier,
+            tier_weights: adjusted_weights,
+            experience_state: experience_state.toJSON(),
+            available_tiers,
+            effective_budget,
+            prizes_by_tier
+          })
+
+          // 如果体验平滑改变了档位，更新 final_tier
+          if (smoothing_result.smoothing_applied) {
+            final_tier = smoothing_result.final_tier
+            this.log('info', '体验平滑已应用', {
+              user_id,
+              campaign_id,
+              original_selected_tier: selected_tier,
+              smoothed_tier: final_tier,
+              applied_mechanisms: smoothing_result.applied_mechanisms.map(m => m.type)
+            })
+          }
+        }
+      } catch (smoothing_error) {
+        // 体验平滑失败不应阻断抽奖，记录警告继续执行
+        this.log('warn', '体验平滑处理失败（非致命）', {
+          user_id,
+          campaign_id,
+          error: smoothing_error.message
+        })
+      }
+
+      /* 7. 构建返回数据 */
       const result = {
-        selected_tier,
+        selected_tier: final_tier,
         original_tier,
         tier_downgrade_path: downgrade_path,
         random_value,
-        tier_weights,
+        tier_weights: base_tier_weights,
+        adjusted_weights,
         user_segment,
-        weight_scale: WEIGHT_SCALE
+        weight_scale: WEIGHT_SCALE,
+        /* 策略引擎分层信息 */
+        budget_tier,
+        pressure_tier,
+        effective_budget,
+        empty_weight_multiplier: weight_adjustment.empty_weight_multiplier,
+        /* 体验平滑信息 */
+        experience_smoothing: smoothing_result
+          ? {
+              applied: smoothing_result.smoothing_applied,
+              original_selected_tier: selected_tier,
+              final_tier,
+              mechanisms: smoothing_result.applied_mechanisms || []
+            }
+          : { applied: false, original_selected_tier: selected_tier, final_tier, mechanisms: [] }
       }
 
       this.log('info', '档位抽取完成', {
         user_id,
         campaign_id,
         user_segment,
+        budget_tier,
+        pressure_tier,
         original_tier,
-        selected_tier,
+        selected_tier: final_tier,
         downgrade_count: downgrade_path.length - 1,
-        random_value: ((random_value / WEIGHT_SCALE) * 100).toFixed(4) + '%'
+        random_value: ((random_value / WEIGHT_SCALE) * 100).toFixed(4) + '%',
+        smoothing_applied: smoothing_result?.smoothing_applied || false
       })
 
       return this.success(result)
