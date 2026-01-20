@@ -312,6 +312,12 @@ const TestConfig = {
       campaignName: null // 测试活动名称，动态获取
     },
 
+    // 🔴 P0-2新增：测试门店信息 - 通过 initRealTestData() 动态获取活跃门店
+    testStore: {
+      store_id: null, // 🔴 P0-2修复：移除硬编码，通过 initRealTestData() 动态获取
+      store_name: null // 测试门店名称，动态获取
+    },
+
     // 🔴 P0-1新增：标记测试数据是否已初始化
     _initialized: false
   },
@@ -361,7 +367,7 @@ async function initRealTestData(mobile = '13612227930') {
 
   try {
     // 延迟加载 models，避免循环依赖
-    const { User, LotteryCampaign } = require('../../models')
+    const { User, LotteryCampaign, Store } = require('../../models')
 
     // 1. 查询测试用户
     const user = await User.findOne({
@@ -398,6 +404,24 @@ async function initRealTestData(mobile = '13612227930') {
       )
     }
 
+    // 3. 🔴 P0-2新增：查询活跃的测试门店
+    const store = await Store.findOne({
+      where: { status: 'active' },
+      order: [['store_id', 'ASC']], // 取第一个活跃门店
+      attributes: ['store_id', 'store_name', 'status']
+    })
+
+    if (!store) {
+      console.warn('⚠️ initRealTestData: 未找到活跃的测试门店')
+      // 不抛错，允许测试继续（某些测试可能不需要门店）
+    } else {
+      TestConfig.realData.testStore.store_id = store.store_id
+      TestConfig.realData.testStore.store_name = store.store_name
+      console.log(
+        `✅ initRealTestData: 测试门店 store_id=${store.store_id}, name=${store.store_name}`
+      )
+    }
+
     TestConfig.realData._initialized = true
     return TestConfig.realData
   } catch (error) {
@@ -430,6 +454,18 @@ async function getRealTestCampaignId() {
     await initRealTestData()
   }
   return TestConfig.realData.testCampaign.campaign_id
+}
+
+/**
+ * 🔴 P0-2新增：获取真实测试门店ID
+ *
+ * @returns {Promise<number|null>} 门店ID
+ */
+async function getRealTestStoreId() {
+  if (!TestConfig.realData._initialized) {
+    await initRealTestData()
+  }
+  return TestConfig.realData.testStore.store_id
 }
 
 /**
@@ -510,5 +546,7 @@ module.exports = {
   // 🔴 P0-1修复：导出测试数据初始化函数
   initRealTestData,
   getRealTestUserId,
-  getRealTestCampaignId
+  getRealTestCampaignId,
+  // 🔴 P0-2新增：导出获取测试门店ID函数
+  getRealTestStoreId
 }

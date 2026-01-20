@@ -209,10 +209,10 @@ describe('🎰 抽奖接口 sort_order 字段测试（V4架构 - 方案3验证�
     })
   })
 
-  describe('GET /api/v4/lottery/prizes/:campaignCode - 奖品列表sort_order验证', () => {
+  describe('GET /api/v4/lottery/campaigns/:code/prizes - 奖品列表sort_order验证', () => {
     test('✅ 奖品列表应该返回 sort_order 字段', async () => {
       const response = await request(app)
-        .get('/api/v4/lottery/prizes/BASIC_LOTTERY')
+        .get('/api/v4/lottery/campaigns/BASIC_LOTTERY/prizes')
         .set('Authorization', `Bearer ${testUserToken}`)
 
       // 跳过测试如果API不可用或返回权限错误

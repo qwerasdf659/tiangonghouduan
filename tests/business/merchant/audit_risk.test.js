@@ -26,6 +26,7 @@ const { TEST_DATA } = require('../../helpers/test-data')
 describe('商家审计日志和风控告警API测试', () => {
   let tester
   const test_account = TEST_DATA.users.adminUser
+  let test_store_id = null // 🔴 P0-2修复：从 global.testData 动态获取
 
   beforeAll(async () => {
     console.log('🚀 商家审计日志和风控告警API测试启动')
@@ -43,6 +44,16 @@ describe('商家审计日志和风控告警API测试', () => {
     } catch (error) {
       console.warn('⚠️ V4引擎可能未启动，继续测试:', error.message)
     }
+
+    // 🔴 P0-2修复：从 global.testData 动态获取门店ID
+    test_store_id = global.testData?.testStore?.store_id
+    if (!test_store_id) {
+      console.warn('⚠️ 测试门店未找到，使用第一个可用门店')
+      const { Store } = require('../../../models')
+      const store = await Store.findOne({ where: { status: 'active' } })
+      test_store_id = store?.store_id
+    }
+    console.log(`📍 测试门店ID: ${test_store_id}`)
 
     // 获取认证token
     try {
@@ -129,10 +140,10 @@ describe('商家审计日志和风控告警API测试', () => {
     test('GET /api/v4/shop/audit/logs - 按门店筛选', async () => {
       console.log('\n📋 测试：按门店筛选审计日志')
 
-      // 使用测试门店ID=1
+      // 🔴 P0-2修复：使用动态获取的门店ID
       const response = await tester.make_authenticated_request(
         'GET',
-        '/api/v4/shop/audit/logs?store_id=1&page=1',
+        `/api/v4/shop/audit/logs?store_id=${test_store_id}&page=1`,
         null,
         'admin'
       )
@@ -145,14 +156,14 @@ describe('商家审计日志和风控告警API测试', () => {
         const logs = response.data.data.logs
         if (logs && logs.length > 0) {
           logs.forEach(log => {
-            // 如果有store_id字段，应该等于1
+            // 🔴 P0-2修复：使用动态获取的门店ID进行断言
             if (log.store_id !== null) {
-              expect(log.store_id).toBe(1)
+              expect(log.store_id).toBe(test_store_id)
             }
           })
-          console.log(`✅ 门店1的审计日志: ${logs.length} 条`)
+          console.log(`✅ 门店${test_store_id}的审计日志: ${logs.length} 条`)
         } else {
-          console.log('⚠️ 门店1暂无审计日志')
+          console.log(`⚠️ 门店${test_store_id}暂无审计日志`)
         }
       }
     })

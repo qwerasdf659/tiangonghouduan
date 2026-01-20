@@ -108,7 +108,7 @@ router.post(
  * @query campaign_id - 可选，筛选指定活动
  * @query status - 可选，筛选状态
  *
- * 🔴 注意：必须在 /:campaign_code 之前定义，否则会被参数化路由捕获
+ * 🔴 注意：必须在 /:code 之前定义，否则会被参数化路由捕获
  */
 router.get(
   '/list',
@@ -136,21 +136,23 @@ router.get(
 )
 
 /**
- * GET /:campaign_code - 获取指定活动的奖品池
+ * GET /:code - 获取指定活动的奖品池
  *
  * @description 获取指定活动的所有奖品信息
- * @route GET /api/v4/console/prize-pool/:campaign_code
+ * @route GET /api/v4/console/prize-pool/:code
  * @access Private (需要管理员权限)
  *
- * 🎯 V4.2: 使用campaign_code标识符（方案2实施）
- * 🔒 P0修复：修正模型名称和字段映射
+ * API路径参数设计规范 V2.2（2026-01-20）：
+ * - 奖品池（按活动查询）是配置实体，使用业务码（:code）作为标识符
+ * - 业务码格式：snake_case（如 spring_festival）
  */
 router.get(
-  '/:campaign_code',
+  '/:code',
   adminAuthMiddleware,
   asyncHandler(async (req, res) => {
     try {
-      const { campaign_code } = req.params
+      // 配置实体使用 :code 占位符，内部变量保持业务语义
+      const campaign_code = req.params.code
 
       if (!campaign_code) {
         return res.apiError('缺少活动代码', 'MISSING_CAMPAIGN_CODE')
@@ -166,7 +168,7 @@ router.get(
     } catch (error) {
       if (error.message.includes('活动不存在')) {
         return res.apiError(error.message, 'CAMPAIGN_NOT_FOUND', {
-          campaign_code: req.params.campaign_code
+          campaign_code: req.params.code
         })
       }
 
@@ -177,23 +179,26 @@ router.get(
 )
 
 /**
- * PUT /prize/:prize_id - 更新奖品信息
+ * PUT /prize/:id - 更新奖品信息
  *
  * @description 更新指定奖品的信息
- * @route PUT /api/v4/console/prize-pool/prize/:prize_id
+ * @route PUT /api/v4/console/prize-pool/prize/:id
  * @access Private (需要管理员权限)
+ *
+ * API路径参数设计规范 V2.2（2026-01-20）：
+ * - 奖品配置实例是事务实体，使用数字ID（:id）作为标识符
  *
  * 🔒 P0修复：修正模型名称和字段映射
  */
 router.put(
-  '/prize/:prize_id',
+  '/prize/:id',
   adminAuthMiddleware,
   asyncHandler(async (req, res) => {
-    const { prize_id } = req.params
+    const prize_id = parseInt(req.params.id, 10)
     const updateData = req.body
 
     try {
-      if (!prize_id || isNaN(parseInt(prize_id))) {
+      if (!prize_id || isNaN(prize_id) || prize_id <= 0) {
         return res.apiError('无效的奖品ID', 'INVALID_PRIZE_ID')
       }
 
@@ -242,18 +247,21 @@ router.put(
 )
 
 /**
- * POST /prize/:prize_id/add-stock - 补充库存（原路径保持兼容）
+ * POST /prize/:id/add-stock - 补充库存
  *
  * @description 为指定奖品补充库存数量
- * @route POST /api/v4/console/prize-pool/prize/:prize_id/add-stock
+ * @route POST /api/v4/console/prize-pool/prize/:id/add-stock
  * @access Private (需要管理员权限)
+ *
+ * API路径参数设计规范 V2.2（2026-01-20）：
+ * - 奖品配置实例是事务实体，使用数字ID（:id）作为标识符
  */
 router.post(
-  '/prize/:prize_id/add-stock',
+  '/prize/:id/add-stock',
   adminAuthMiddleware,
   asyncHandler(async (req, res) => {
     try {
-      const prizeId = parseInt(req.params.prize_id)
+      const prizeId = parseInt(req.params.id, 10)
       const { quantity } = req.body
 
       if (!quantity || quantity <= 0) {
@@ -295,18 +303,21 @@ router.post(
 )
 
 /**
- * DELETE /prize/:prize_id - 删除奖品（原路径保持兼容）
+ * DELETE /prize/:id - 删除奖品
  *
  * @description 删除指定的奖品（仅当无中奖记录时）
- * @route DELETE /api/v4/console/prize-pool/prize/:prize_id
+ * @route DELETE /api/v4/console/prize-pool/prize/:id
  * @access Private (需要管理员权限)
+ *
+ * API路径参数设计规范 V2.2（2026-01-20）：
+ * - 奖品配置实例是事务实体，使用数字ID（:id）作为标识符
  */
 router.delete(
-  '/prize/:prize_id',
+  '/prize/:id',
   adminAuthMiddleware,
   asyncHandler(async (req, res) => {
     try {
-      const prizeId = parseInt(req.params.prize_id)
+      const prizeId = parseInt(req.params.id, 10)
 
       // 通过 ServiceManager 获取 PrizePoolService
       const PrizePoolService = req.app.locals.services.getService('prize_pool')

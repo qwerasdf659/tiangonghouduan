@@ -33,6 +33,7 @@ describe('消费记录API测试套件', () => {
   // 测试数据
   let test_qr_code = null
   let test_record_id = null
+  let test_store_id = null // 🔴 P0-2修复：从 global.testData 动态获取
 
   beforeAll(async () => {
     console.log('🚀 消费记录API测试套件启动')
@@ -50,6 +51,16 @@ describe('消费记录API测试套件', () => {
     } catch (error) {
       console.warn('⚠️ V4引擎可能未启动，继续测试:', error.message)
     }
+
+    // 🔴 P0-2修复：从 global.testData 动态获取门店ID
+    test_store_id = global.testData?.testStore?.store_id
+    if (!test_store_id) {
+      console.warn('⚠️ 测试门店未找到，使用第一个可用门店')
+      const { Store } = require('../../../models')
+      const store = await Store.findOne({ where: { status: 'active' } })
+      test_store_id = store?.store_id
+    }
+    console.log(`📍 测试门店ID: ${test_store_id}`)
 
     // 登录获取token（既是用户也是管理员）
     try {
@@ -125,10 +136,13 @@ describe('消费记录API测试套件', () => {
     test('GET /api/v4/shop/consumption/user-info - 验证二维码并获取用户信息', async () => {
       console.log('\n✅ 测试：验证二维码并获取用户信息（管理员功能）')
 
-      // 管理员（role_level >= 100）跳过门店检查
+      /*
+       * 管理员（role_level >= 100）跳过门店检查
+       * 🔴 P0-2修复：使用动态获取的门店ID
+       */
       const response = await tester.make_authenticated_request(
         'GET',
-        `/api/v4/shop/consumption/user-info?qr_code=${test_qr_code}&store_id=1`,
+        `/api/v4/shop/consumption/user-info?qr_code=${test_qr_code}&store_id=${test_store_id}`,
         null,
         'admin' // 需要管理员权限（role_level >= 100 跳过门店校验）
       )

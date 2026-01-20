@@ -8,3 +8,4 @@ backups/
 logs/
 scripts/toolkit/
 **/*.md
+public/admin/

@@ -25,7 +25,7 @@ const express = require('express')
 const router = express.Router()
 
 // 🔄 抽奖核心功能路由（已拆分为子模块）
-const prizesRoutes = require('./prizes') // 奖品和配置
+const campaignsRoutes = require('./campaigns') // 活动（奖品和配置）- V2.2 重构
 const drawRoutes = require('./draw') // 抽奖执行
 const historyRoutes = require('./history') // 抽奖历史和活动
 const userPointsRoutes = require('./user-points') // 用户积分和统计
@@ -33,8 +33,18 @@ const userPointsRoutes = require('./user-points') // 用户积分和统计
 // 抽奖预设管理路由（创建预设、查询列表等，不含/user/:id）
 const lotteryPresetRoutes = require('./lottery-preset')
 
-// 挂载奖品和配置路由
-router.use('/', prizesRoutes)
+/*
+ * 挂载活动路由（2026-01-20 V2.2 路由重构）
+ *
+ * 重构说明：
+ * - /prizes/:campaignCode → /campaigns/:code/prizes
+ * - /config/:campaignCode → /campaigns/:code/config
+ *
+ * 设计原则：
+ * - 活动（campaign）是配置实体，使用业务码（:code）作为标识符
+ * - RESTful 层级结构：活动 → 奖品/配置
+ */
+router.use('/campaigns', campaignsRoutes)
 
 // 挂载抽奖执行路由
 router.use('/', drawRoutes)

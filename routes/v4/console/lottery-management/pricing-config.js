@@ -5,8 +5,8 @@
  *
  * @description 管理员管理活动定价配置（CRUD + 版本管理 + 回滚 + 定时生效）
  * @module routes/v4/console/lottery-management/pricing-config
- * @version 1.2.0
- * @date 2026-01-19
+ * @version 1.3.0
+ * @date 2026-01-20
  *
  * 业务场景：
  * - 查询活动定价配置（当前版本 + 历史版本）
@@ -20,15 +20,19 @@
  * - lottery_campaign_pricing_config 表为唯一真相源
  * - 活动 JSON 字段仅作创建活动时的默认模板
  *
- * API 端点：
- * - GET    /campaigns/:campaign_id/pricing          - 获取活动当前定价配置
- * - GET    /campaigns/:campaign_id/pricing/versions - 获取所有版本
- * - POST   /campaigns/:campaign_id/pricing          - 创建新版本
- * - PUT    /campaigns/:campaign_id/pricing/:version/activate - 激活指定版本
- * - PUT    /campaigns/:campaign_id/pricing/:version/archive  - 归档指定版本
- * - POST   /campaigns/:campaign_id/pricing/rollback - 回滚到指定版本（Phase 3.3）
- * - PUT    /campaigns/:campaign_id/pricing/:version/schedule - 设置定时生效（Phase 3.3）
- * - DELETE /campaigns/:campaign_id/pricing/:version/schedule - 取消定时生效（Phase 3.3）
+ * API 端点（符合 API路径参数设计规范.md）：
+ * - GET    /campaigns/:code/pricing                  - 获取活动当前定价配置
+ * - GET    /campaigns/:code/pricing/versions         - 获取所有版本
+ * - POST   /campaigns/:code/pricing                  - 创建新版本
+ * - PUT    /campaigns/:code/pricing/:version/activate - 激活指定版本
+ * - PUT    /campaigns/:code/pricing/:version/archive  - 归档指定版本
+ * - POST   /campaigns/:code/pricing/rollback          - 回滚到指定版本（Phase 3.3）
+ * - PUT    /campaigns/:code/pricing/:version/schedule - 设置定时生效（Phase 3.3）
+ * - DELETE /campaigns/:code/pricing/:version/schedule - 取消定时生效（Phase 3.3）
+ *
+ * 路由参数说明：
+ * - :code    - 活动业务码（配置实体标识，如 default_campaign）
+ * - :version - 版本号（数字）
  *
  * 权限要求：
  * - 需要管理员权限（通过 adminAuthMiddleware 中间件验证）
@@ -37,11 +41,13 @@
  * - 路由不直接访问 models，写操作收口到 Service
  * - 通过 ServiceManager 获取 Service
  * - 统一使用 res.apiSuccess / res.apiError
+ * - 符合 API路径参数设计规范：campaigns 使用 :code（配置实体）
  */
 
 const express = require('express')
 const router = express.Router()
 const { adminAuthMiddleware, asyncHandler } = require('../shared/middleware')
+const { validateBusinessCode, validateNumericId } = require('../../../../middleware/validation')
 
 /**
  * 通过 ServiceManager 获取定价配置服务实例
@@ -55,12 +61,39 @@ function getPricingConfigService(req) {
 }
 
 /**
- * GET /campaigns/:campaign_id/pricing
+ * 通过活动业务码获取活动ID
+ *
+ * @description 根据 campaign_code 查询活动信息，返回 campaign_id
+ * @param {Object} req - Express 请求对象（包含验证后的参数）
+ * @returns {Promise<Object>} 活动信息对象
+ * @throws {Error} 活动不存在时抛出错误
+ */
+async function getCampaignByCode(req) {
+  const lottery_engine = req.app.locals.services.getService('unified_lottery_engine')
+  const code = req.validated?.code || req.params.code
+  const campaign = await lottery_engine.getCampaignByCode(code)
+
+  if (!campaign) {
+    const error = new Error(`活动不存在: ${code}`)
+    error.statusCode = 404
+    error.errorCode = 'CAMPAIGN_NOT_FOUND'
+    throw error
+  }
+
+  return campaign
+}
+
+/**
+ * GET /campaigns/:code/pricing
  * 获取活动当前生效的定价配置
+ *
+ * 路由参数：
+ * - :code - 活动业务码（如 default_campaign）
  *
  * 响应字段说明：
  * - config_id: 配置唯一ID
  * - campaign_id: 关联活动ID
+ * - campaign_code: 活动业务码
  * - version: 版本号
  * - pricing_config: 定价配置 JSON（包含 draw_buttons 数组）
  * - status: 配置状态（draft/active/scheduled/archived）
@@ -70,53 +103,70 @@ function getPricingConfigService(req) {
  * - created_at: 创建时间
  */
 router.get(
-  '/campaigns/:campaign_id/pricing',
+  '/campaigns/:code/pricing',
   adminAuthMiddleware,
+  validateBusinessCode('code'), // 验证活动业务码
   asyncHandler(async (req, res) => {
-    const { campaign_id } = req.params
+    // 通过业务码获取活动信息
+    const campaign = await getCampaignByCode(req)
     const PricingConfigService = getPricingConfigService(req)
 
-    // 调用 Service 获取活跃配置
-    const pricing_config = await PricingConfigService.getActivePricingConfig(campaign_id)
+    // 调用 Service 获取活跃配置（使用 campaign_id）
+    const pricing_config = await PricingConfigService.getActivePricingConfig(campaign.campaign_id)
 
     if (!pricing_config) {
       return res.apiError(
         '该活动暂无定价配置，请先创建',
         'PRICING_CONFIG_NOT_FOUND',
-        { campaign_id: parseInt(campaign_id, 10) },
+        { campaign_code: campaign.campaign_code, campaign_id: campaign.campaign_id },
         404
       )
     }
 
-    return res.apiSuccess(pricing_config, '获取定价配置成功')
+    // 在响应中附加 campaign_code 信息
+    const responseData = {
+      ...(pricing_config.toJSON ? pricing_config.toJSON() : pricing_config),
+      campaign_code: campaign.campaign_code
+    }
+
+    return res.apiSuccess(responseData, '获取定价配置成功')
   })
 )
 
 /**
- * GET /campaigns/:campaign_id/pricing/versions
+ * GET /campaigns/:code/pricing/versions
  * 获取活动所有版本的定价配置
  *
+ * 路由参数：
+ * - :code - 活动业务码
+ *
  * 响应说明：
+ * - campaign_code: 活动业务码
  * - versions: 版本列表（按版本号降序）
  * - total: 版本总数
  */
 router.get(
-  '/campaigns/:campaign_id/pricing/versions',
+  '/campaigns/:code/pricing/versions',
   adminAuthMiddleware,
+  validateBusinessCode('code'), // 验证活动业务码
   asyncHandler(async (req, res) => {
-    const { campaign_id } = req.params
+    // 通过业务码获取活动信息
+    const campaign = await getCampaignByCode(req)
     const PricingConfigService = getPricingConfigService(req)
 
-    // 调用 Service 获取所有版本
-    const result = await PricingConfigService.getAllVersions(campaign_id)
+    // 调用 Service 获取所有版本（使用 campaign_id）
+    const result = await PricingConfigService.getAllVersions(campaign.campaign_id)
 
-    return res.apiSuccess(result, '获取版本列表成功')
+    return res.apiSuccess({ campaign_code: campaign.campaign_code, ...result }, '获取版本列表成功')
   })
 )
 
 /**
- * POST /campaigns/:campaign_id/pricing
+ * POST /campaigns/:code/pricing
  * 创建新版本定价配置
+ *
+ * 路由参数：
+ * - :code - 活动业务码
  *
  * 请求体：
  * {
@@ -136,10 +186,12 @@ router.get(
  * - 版本号自动递增
  */
 router.post(
-  '/campaigns/:campaign_id/pricing',
+  '/campaigns/:code/pricing',
   adminAuthMiddleware,
+  validateBusinessCode('code'), // 验证活动业务码
   asyncHandler(async (req, res) => {
-    const { campaign_id } = req.params
+    // 通过业务码获取活动信息
+    const campaign = await getCampaignByCode(req)
     const { pricing_config, activate_immediately = false } = req.body
     const created_by = req.user?.user_id
 
@@ -154,21 +206,31 @@ router.post(
 
     const PricingConfigService = getPricingConfigService(req)
 
-    // 调用 Service 创建新版本
+    // 调用 Service 创建新版本（使用 campaign_id）
     const result = await PricingConfigService.createNewVersion(
-      campaign_id,
+      campaign.campaign_id,
       pricing_config,
       created_by,
       { activate_immediately }
     )
 
-    return res.apiSuccess(result, `创建新版本成功${activate_immediately ? '并已激活' : ''}`)
+    // 附加 campaign_code 信息
+    const responseData = {
+      ...(result.toJSON ? result.toJSON() : result),
+      campaign_code: campaign.campaign_code
+    }
+
+    return res.apiSuccess(responseData, `创建新版本成功${activate_immediately ? '并已激活' : ''}`)
   })
 )
 
 /**
- * PUT /campaigns/:campaign_id/pricing/:version/activate
+ * PUT /campaigns/:code/pricing/:version/activate
  * 激活指定版本的定价配置
+ *
+ * 路由参数：
+ * - :code    - 活动业务码
+ * - :version - 版本号（数字）
  *
  * 业务逻辑：
  * - 将指定版本状态设为 active
@@ -176,10 +238,14 @@ router.post(
  * - 触发活动缓存失效
  */
 router.put(
-  '/campaigns/:campaign_id/pricing/:version/activate',
+  '/campaigns/:code/pricing/:version/activate',
   adminAuthMiddleware,
+  validateBusinessCode('code'), // 验证活动业务码
+  validateNumericId('version'), // 验证版本号
   asyncHandler(async (req, res) => {
-    const { campaign_id, version } = req.params
+    // 通过业务码获取活动信息
+    const campaign = await getCampaignByCode(req)
+    const version = req.validated.version
     const updated_by = req.user?.user_id
 
     if (!updated_by) {
@@ -188,10 +254,10 @@ router.put(
 
     const PricingConfigService = getPricingConfigService(req)
 
-    // 调用 Service 激活版本
+    // 调用 Service 激活版本（使用 campaign_id）
     const result = await PricingConfigService.activateVersion(
-      campaign_id,
-      parseInt(version, 10),
+      campaign.campaign_id,
+      version,
       updated_by
     )
 
@@ -200,18 +266,26 @@ router.put(
 )
 
 /**
- * PUT /campaigns/:campaign_id/pricing/:version/archive
+ * PUT /campaigns/:code/pricing/:version/archive
  * 归档指定版本的定价配置
+ *
+ * 路由参数：
+ * - :code    - 活动业务码
+ * - :version - 版本号（数字）
  *
  * 业务逻辑：
  * - 将指定版本状态设为 archived
  * - 不影响其他版本
  */
 router.put(
-  '/campaigns/:campaign_id/pricing/:version/archive',
+  '/campaigns/:code/pricing/:version/archive',
   adminAuthMiddleware,
+  validateBusinessCode('code'), // 验证活动业务码
+  validateNumericId('version'), // 验证版本号
   asyncHandler(async (req, res) => {
-    const { campaign_id, version } = req.params
+    // 通过业务码获取活动信息
+    const campaign = await getCampaignByCode(req)
+    const version = req.validated.version
     const updated_by = req.user?.user_id
 
     if (!updated_by) {
@@ -220,10 +294,10 @@ router.put(
 
     const PricingConfigService = getPricingConfigService(req)
 
-    // 调用 Service 归档版本
+    // 调用 Service 归档版本（使用 campaign_id）
     const result = await PricingConfigService.archiveVersion(
-      campaign_id,
-      parseInt(version, 10),
+      campaign.campaign_id,
+      version,
       updated_by
     )
 
@@ -232,8 +306,11 @@ router.put(
 )
 
 /**
- * POST /campaigns/:campaign_id/pricing/rollback
+ * POST /campaigns/:code/pricing/rollback
  * 回滚到指定版本的定价配置
+ *
+ * 路由参数：
+ * - :code - 活动业务码
  *
  * 请求体：
  * {
@@ -251,10 +328,12 @@ router.put(
  * - 保持版本号单调递增的不可变性
  */
 router.post(
-  '/campaigns/:campaign_id/pricing/rollback',
+  '/campaigns/:code/pricing/rollback',
   adminAuthMiddleware,
+  validateBusinessCode('code'), // 验证活动业务码
   asyncHandler(async (req, res) => {
-    const { campaign_id } = req.params
+    // 通过业务码获取活动信息
+    const campaign = await getCampaignByCode(req)
     const { target_version, rollback_reason = '' } = req.body
     const updated_by = req.user?.user_id
 
@@ -269,9 +348,9 @@ router.post(
 
     const PricingConfigService = getPricingConfigService(req)
 
-    // 调用 Service 执行回滚
+    // 调用 Service 执行回滚（使用 campaign_id）
     const result = await PricingConfigService.rollbackToVersion(
-      campaign_id,
+      campaign.campaign_id,
       parseInt(target_version, 10),
       updated_by,
       rollback_reason
@@ -282,8 +361,12 @@ router.post(
 )
 
 /**
- * PUT /campaigns/:campaign_id/pricing/:version/schedule
+ * PUT /campaigns/:code/pricing/:version/schedule
  * 设置版本定时生效
+ *
+ * 路由参数：
+ * - :code    - 活动业务码
+ * - :version - 版本号（数字）
  *
  * 请求体：
  * {
@@ -296,10 +379,14 @@ router.post(
  * - 定时任务会在到达生效时间后自动激活
  */
 router.put(
-  '/campaigns/:campaign_id/pricing/:version/schedule',
+  '/campaigns/:code/pricing/:version/schedule',
   adminAuthMiddleware,
+  validateBusinessCode('code'), // 验证活动业务码
+  validateNumericId('version'), // 验证版本号
   asyncHandler(async (req, res) => {
-    const { campaign_id, version } = req.params
+    // 通过业务码获取活动信息
+    const campaign = await getCampaignByCode(req)
+    const version = req.validated.version
     const { effective_at } = req.body
     const updated_by = req.user?.user_id
 
@@ -314,10 +401,10 @@ router.put(
 
     const PricingConfigService = getPricingConfigService(req)
 
-    // 调用 Service 设置定时生效
+    // 调用 Service 设置定时生效（使用 campaign_id）
     const result = await PricingConfigService.scheduleActivation(
-      campaign_id,
-      parseInt(version, 10),
+      campaign.campaign_id,
+      version,
       effective_at,
       updated_by
     )
@@ -327,18 +414,26 @@ router.put(
 )
 
 /**
- * DELETE /campaigns/:campaign_id/pricing/:version/schedule
+ * DELETE /campaigns/:code/pricing/:version/schedule
  * 取消定时生效
+ *
+ * 路由参数：
+ * - :code    - 活动业务码
+ * - :version - 版本号（数字）
  *
  * 业务逻辑：
  * - 将 scheduled 状态的版本恢复为 draft 状态
  * - 清空 effective_at 时间
  */
 router.delete(
-  '/campaigns/:campaign_id/pricing/:version/schedule',
+  '/campaigns/:code/pricing/:version/schedule',
   adminAuthMiddleware,
+  validateBusinessCode('code'), // 验证活动业务码
+  validateNumericId('version'), // 验证版本号
   asyncHandler(async (req, res) => {
-    const { campaign_id, version } = req.params
+    // 通过业务码获取活动信息
+    const campaign = await getCampaignByCode(req)
+    const version = req.validated.version
     const updated_by = req.user?.user_id
 
     if (!updated_by) {
@@ -347,10 +442,10 @@ router.delete(
 
     const PricingConfigService = getPricingConfigService(req)
 
-    // 调用 Service 取消定时生效
+    // 调用 Service 取消定时生效（使用 campaign_id）
     const result = await PricingConfigService.cancelScheduledActivation(
-      campaign_id,
-      parseInt(version, 10),
+      campaign.campaign_id,
+      version,
       updated_by
     )
 

@@ -6,9 +6,12 @@
  *
  * API列表：
  * - GET /me - 用户查询自己的消费记录
- * - GET /detail/:record_id - 查询消费记录详情
- * - DELETE /:record_id - 软删除消费记录
- * - POST /:record_id/restore - 管理员恢复已删除记录
+ * - GET /detail/:id - 查询消费记录详情
+ * - DELETE /:id - 软删除消费记录
+ * - POST /:id/restore - 管理员恢复已删除记录
+ *
+ * API路径参数设计规范 V2.2（2026-01-20）：
+ * - 消费记录是事务实体，使用数字ID（:id）作为标识符
  *
  * 创建时间：2025年12月22日
  * 从consumption.js拆分而来
@@ -69,11 +72,14 @@ router.get('/me', authenticateToken, async (req, res) => {
 })
 
 /**
- * @route GET /api/v4/shop/consumption/detail/:record_id
+ * @route GET /api/v4/shop/consumption/detail/:id
  * @desc 查询消费记录详情
  * @access Private (相关用户或管理员)
  *
- * @param {number} record_id - 消费记录ID
+ * API路径参数设计规范 V2.2（2026-01-20）：
+ * - 消费记录是事务实体，使用数字ID（:id）作为标识符
+ *
+ * @param {number} id - 消费记录ID
  *
  * ⭐ P0优化：权限验证前置
  * - 先轻量查询验证权限（仅查询user_id、merchant_id、is_deleted字段）
@@ -83,13 +89,12 @@ router.get('/me', authenticateToken, async (req, res) => {
  * - 业务错误返回友好提示（如"消费记录不存在"）
  * - 系统错误返回通用消息（不暴露技术栈信息）
  */
-router.get('/detail/:record_id', authenticateToken, async (req, res) => {
+router.get('/detail/:id', authenticateToken, async (req, res) => {
   try {
     // 🔄 通过 ServiceManager 获取 ConsumptionService（符合TR-005规范）
     const ConsumptionService = req.app.locals.services.getService('consumption')
 
-    const { record_id } = req.params
-    const recordId = parseInt(record_id)
+    const recordId = parseInt(req.params.id, 10)
 
     logger.info('查询消费记录详情', { record_id: recordId })
 
@@ -126,11 +131,14 @@ router.get('/detail/:record_id', authenticateToken, async (req, res) => {
 })
 
 /**
- * @route DELETE /api/v4/shop/consumption/:record_id
+ * @route DELETE /api/v4/shop/consumption/:id
  * @desc 软删除消费记录（用户端隐藏记录，管理员可恢复）
  * @access Private (用户自己的记录)
  *
- * @param {number} record_id - 消费记录ID（路径参数）
+ * API路径参数设计规范 V2.2（2026-01-20）：
+ * - 消费记录是事务实体，使用数字ID（:id）作为标识符
+ *
+ * @param {number} id - 消费记录ID（路径参数）
  *
  * 业务规则：
  * - 只能删除自己的消费记录（通过JWT token验证user_id）
@@ -139,20 +147,18 @@ router.get('/detail/:record_id', authenticateToken, async (req, res) => {
  * - 前端查询时自动过滤已删除记录（WHERE is_deleted=0）
  * - 用户删除后无法自己恢复，只有管理员可以在后台恢复
  */
-router.delete('/:record_id', authenticateToken, async (req, res) => {
+router.delete('/:id', authenticateToken, async (req, res) => {
   try {
     // 🔄 通过 ServiceManager 获取 ConsumptionService（符合TR-005规范）
     const ConsumptionService = req.app.locals.services.getService('consumption')
 
     const userId = req.user.user_id
-    const { record_id } = req.params
+    const recordId = parseInt(req.params.id, 10)
 
-    // 参数验证：检查record_id是否为有效的正整数
-    if (!record_id || isNaN(parseInt(record_id))) {
+    // 参数验证：检查 id 是否为有效的正整数
+    if (isNaN(recordId) || recordId <= 0) {
       return res.apiError('无效的记录ID，必须是正整数', 'BAD_REQUEST', null, 400)
     }
-
-    const recordId = parseInt(record_id)
     const has_admin_access = req.user.role_level >= 100
     const role_level = req.user.role_level || 0
 
@@ -190,31 +196,32 @@ router.delete('/:record_id', authenticateToken, async (req, res) => {
 })
 
 /**
- * @route POST /api/v4/shop/consumption/:record_id/restore
+ * @route POST /api/v4/shop/consumption/:id/restore
  * @desc 管理员恢复已删除的消费记录（管理员专用）
  * @access Private (仅管理员)
  *
- * @param {number} record_id - 消费记录ID（路径参数）
+ * API路径参数设计规范 V2.2（2026-01-20）：
+ * - 消费记录是事务实体，使用数字ID（:id）作为标识符
+ *
+ * @param {number} id - 消费记录ID（路径参数）
  *
  * 业务规则：
  * - 仅管理员可以恢复已删除的记录
  * - 恢复后用户端将重新显示该记录
  * - 恢复操作会清空deleted_at时间戳
  */
-router.post('/:record_id/restore', authenticateToken, requireAdmin, async (req, res) => {
+router.post('/:id/restore', authenticateToken, requireAdmin, async (req, res) => {
   try {
     // 🔄 通过 ServiceManager 获取 ConsumptionService（符合TR-005规范）
     const ConsumptionService = req.app.locals.services.getService('consumption')
 
-    const { record_id } = req.params
+    const recordId = parseInt(req.params.id, 10)
     const adminId = req.user.user_id
 
     // 参数验证
-    if (!record_id || isNaN(parseInt(record_id))) {
+    if (isNaN(recordId) || recordId <= 0) {
       return res.apiError('无效的记录ID', 'BAD_REQUEST', null, 400)
     }
-
-    const recordId = parseInt(record_id)
 
     /**
      * 调用 Service 层执行恢复

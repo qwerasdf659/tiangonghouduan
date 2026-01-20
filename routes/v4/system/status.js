@@ -115,7 +115,7 @@ router.get('/business-config', optionalAuth, dataAccessControl, async (req, res)
      * 🔄 2026-01-19 架构迁移说明：
      * - 定价配置已从 business.config.lottery.draw_types 迁移到 lottery_campaign_pricing_config 表
      * - 此处返回系统级默认配置（不依赖特定活动）
-     * - 活动级定价配置应通过 /api/v4/lottery/config/:campaignCode 获取
+     * - 活动级定价配置应通过 /api/v4/lottery/campaigns/:code/config 获取
      *
      * @see PricingStage._getDrawPricing() - 活动级定价计算
      * @see routes/v4/console/lottery-management/pricing-config.js - 定价配置管理

@@ -225,11 +225,11 @@ async function runTest() {
     // 7. 检查API可用性
     console.log('\n📋 7. API端点可用性')
     console.log(`
-后端实际提供的API:
-✅ GET  /api/v4/console/settings          - 获取设置概览
-✅ GET  /api/v4/console/settings/:category - 获取分类设置
-✅ PUT  /api/v4/console/settings/:category - 更新分类设置
-✅ POST /api/v4/console/cache/clear        - 清除缓存
+后端实际提供的API（2026-01-20 V2.2 路由重构）:
+✅ GET  /api/v4/console/settings       - 获取设置概览
+✅ GET  /api/v4/console/settings/:code - 获取分类设置
+✅ PUT  /api/v4/console/settings/:code - 更新分类设置
+✅ POST /api/v4/console/cache/clear    - 清除缓存
 
 前端已修改为使用正确的API路径。
 请刷新管理后台页面验证数据显示。

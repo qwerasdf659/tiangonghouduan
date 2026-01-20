@@ -25,7 +25,7 @@ const operationsRoutes = require('./operations')
 
 // 挂载子模块路由
 router.use('/sessions', sessionsRoutes) // 包含 /sessions 和 /sessions/stats
-router.use('/sessions', messagesRoutes) // 包含 /sessions/:session_id/messages, /send, /mark-read
-router.use('/sessions', operationsRoutes) // 包含 /sessions/:session_id/transfer, /close
+router.use('/sessions', messagesRoutes) // 包含 /sessions/:id/messages, /send, /mark-read（事务实体使用 :id）
+router.use('/sessions', operationsRoutes) // 包含 /sessions/:id/transfer, /close（事务实体使用 :id）
 
 module.exports = router

@@ -108,6 +108,11 @@ global.beforeAll(async () => {
         campaign_id: testData.testCampaign.campaign_id,
         campaign_name: testData.testCampaign.campaignName
       },
+      // 🔴 P0-2新增：测试门店（从数据库动态获取活跃门店）
+      testStore: {
+        store_id: testData.testStore?.store_id || null,
+        store_name: testData.testStore?.store_name || null
+      },
       // 标记初始化完成
       _initialized: true
     }
@@ -119,9 +124,12 @@ global.beforeAll(async () => {
     if (!global.testData.testCampaign.campaign_id) {
       console.warn('⚠️ [Jest Setup] 活跃活动未找到，抽奖相关测试可能失败')
     }
+    if (!global.testData.testStore.store_id) {
+      console.warn('⚠️ [Jest Setup] 活跃门店未找到，门店相关测试可能失败')
+    }
 
     console.log(
-      `✅ [Jest Setup] 测试数据初始化完成: user_id=${global.testData.testUser.user_id}, campaign_id=${global.testData.testCampaign.campaign_id}`
+      `✅ [Jest Setup] 测试数据初始化完成: user_id=${global.testData.testUser.user_id}, campaign_id=${global.testData.testCampaign.campaign_id}, store_id=${global.testData.testStore.store_id}`
     )
   } catch (error) {
     console.error('❌ [Jest Setup] 初始化失败:', error.message)
@@ -130,6 +138,7 @@ global.beforeAll(async () => {
       testUser: { user_id: null, mobile: '13612227930' },
       adminUser: { user_id: null, mobile: '13612227930' },
       testCampaign: { campaign_id: null, campaign_name: null },
+      testStore: { store_id: null, store_name: null },
       _initialized: false
     }
   }

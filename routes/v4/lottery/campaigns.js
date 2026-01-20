@@ -1,13 +1,22 @@
 /**
- * 餐厅积分抽奖系统 V4.0 - 奖品和配置API路由
+ * 餐厅积分抽奖系统 V4.0 - 抽奖活动路由模块
+ *
+ * 路由前缀：/api/v4/lottery/campaigns
  *
  * 功能：
- * - 获取抽奖奖品列表（已脱敏）
- * - 获取抽奖配置
+ * - 获取活动的奖品列表（已脱敏）
+ * - 获取活动的抽奖配置
  *
- * 路由前缀：/api/v4/lottery
+ * API路径参数设计规范（V2.2）：
+ * - 活动（campaign）是配置实体，使用业务码（:code）作为标识符
+ * - 业务码格式：snake_case（如 spring_festival）
  *
- * 创建时间：2025年12月22日
+ * 路由重构（2026-01-20）：
+ * - /prizes/:campaignCode → /campaigns/:code/prizes
+ * - /config/:campaignCode → /campaigns/:code/config
+ *
+ * 创建时间：2026年01月20日
+ * 适用区域：中国（北京时间 Asia/Shanghai）
  */
 
 const express = require('express')
@@ -16,50 +25,67 @@ const logger = require('../../../utils/logger').logger
 const { authenticateToken } = require('../../../middleware/auth')
 const dataAccessControl = require('../../../middleware/dataAccessControl')
 const { handleServiceError } = require('../../../middleware/validation')
-/*
- * P1-9：服务通过 ServiceManager 获取（B1-Injected + E2-Strict snake_case）
- * const DataSanitizer = require('../../../services/DataSanitizer')
- */
 
 /**
- * @route GET /api/v4/lottery/prizes/:campaignCode
- * @desc 获取抽奖奖品列表 - 已应用数据脱敏
+ * 验证活动代码（业务码）格式
+ *
+ * @description 配置实体使用业务码作为标识符
+ * 业务码格式规范：
+ * - 字母开头，可包含字母、数字、下划线
+ * - 长度限制：1-100 字符
+ *
+ * @param {string} code - 活动代码
+ * @returns {Object} 验证结果对象，包含 valid 布尔值和可选的 error 对象
+ */
+function validateCampaignCode(code) {
+  if (!code || typeof code !== 'string') {
+    return { valid: false, error: { message: '缺少活动代码参数', code: 'MISSING_CAMPAIGN_CODE' } }
+  }
+
+  if (code.length > 100) {
+    return { valid: false, error: { message: '活动代码过长', code: 'INVALID_CAMPAIGN_CODE' } }
+  }
+
+  if (!/^[A-Za-z][A-Za-z0-9_]*$/.test(code)) {
+    return {
+      valid: false,
+      error: {
+        message: '活动代码格式不正确，只允许字母开头、包含字母、数字和下划线',
+        code: 'INVALID_CAMPAIGN_CODE'
+      }
+    }
+  }
+
+  return { valid: true }
+}
+
+/**
+ * @route GET /api/v4/lottery/campaigns/:code/prizes
+ * @desc 获取活动的奖品列表 - 已应用数据脱敏
  * @access Private
  *
- * @param {string} campaignCode - 活动代码
+ * @param {string} code - 活动代码（配置实体业务码）
  *
  * @returns {Object} 奖品列表（已脱敏，隐藏概率和库存）
  *
  * 安全措施：
- * - 使用campaign_code标识符（防止ID遍历攻击）
+ * - 使用 campaign_code 业务码标识符（配置实体标准）
  * - 数据脱敏处理（隐藏概率、库存等敏感信息）
  */
-router.get('/prizes/:campaignCode', authenticateToken, dataAccessControl, async (req, res) => {
+router.get('/:code/prizes', authenticateToken, dataAccessControl, async (req, res) => {
   try {
     // P1-9：通过 ServiceManager 获取服务（snake_case key）
     const DataSanitizer = req.app.locals.services.getService('data_sanitizer')
 
-    const campaign_code = req.params.campaignCode
+    const campaign_code = req.params.code
 
-    // 🔥 参数校验增强
-    if (!campaign_code || typeof campaign_code !== 'string') {
-      return res.apiError('缺少活动代码参数', 'MISSING_CAMPAIGN_CODE', {}, 400)
+    // 参数校验（配置实体业务码）
+    const validation = validateCampaignCode(campaign_code)
+    if (!validation.valid) {
+      return res.apiError(validation.error.message, validation.error.code, { campaign_code }, 400)
     }
 
-    if (campaign_code.length > 100) {
-      return res.apiError('活动代码过长', 'INVALID_CAMPAIGN_CODE', { max_length: 100 }, 400)
-    }
-
-    if (!/^[a-z0-9_]+$/i.test(campaign_code)) {
-      return res.apiError(
-        '活动代码格式不正确，只允许字母、数字和下划线',
-        'INVALID_CAMPAIGN_CODE',
-        { campaign_code },
-        400
-      )
-    }
-
-    // ✅ 通过Service获取活动和奖品列表（不再直连models）
+    // 通过 Service 获取活动和奖品列表（不再直连 models）
     const lottery_engine = req.app.locals.services.getService('unified_lottery_engine')
     const { campaign: _campaign, prizes: fullPrizes } =
       await lottery_engine.getCampaignWithPrizes(campaign_code)
@@ -79,11 +105,11 @@ router.get('/prizes/:campaignCode', authenticateToken, dataAccessControl, async 
 })
 
 /**
- * @route GET /api/v4/lottery/config/:campaignCode
- * @desc 获取抽奖配置 - 已应用数据脱敏
+ * @route GET /api/v4/lottery/campaigns/:code/config
+ * @desc 获取活动的抽奖配置 - 已应用数据脱敏
  * @access Private
  *
- * @param {string} campaignCode - 活动代码
+ * @param {string} code - 活动代码（配置实体业务码）
  *
  * @returns {Object} 抽奖配置信息
  *
@@ -91,37 +117,25 @@ router.get('/prizes/:campaignCode', authenticateToken, dataAccessControl, async 
  * - 普通用户仅返回脱敏后的公开配置
  * - 管理员返回完整配置（含警告信息）
  */
-router.get('/config/:campaignCode', authenticateToken, dataAccessControl, async (req, res) => {
+router.get('/:code/config', authenticateToken, dataAccessControl, async (req, res) => {
   try {
-    const campaign_code = req.params.campaignCode
+    const campaign_code = req.params.code
 
-    // 🔥 P1级修复：参数校验增强
-    if (!campaign_code || typeof campaign_code !== 'string') {
-      return res.apiError('缺少活动代码参数', 'MISSING_CAMPAIGN_CODE', {}, 400)
+    // 参数校验（配置实体业务码）
+    const validation = validateCampaignCode(campaign_code)
+    if (!validation.valid) {
+      return res.apiError(validation.error.message, validation.error.code, { campaign_code }, 400)
     }
 
-    if (campaign_code.length > 100) {
-      return res.apiError('活动代码过长', 'INVALID_CAMPAIGN_CODE', { max_length: 100 }, 400)
-    }
-
-    if (!/^[a-z0-9_]+$/i.test(campaign_code)) {
-      return res.apiError(
-        '活动代码格式不正确，只允许字母、数字和下划线',
-        'INVALID_CAMPAIGN_CODE',
-        { campaign_code },
-        400
-      )
-    }
-
-    // ✅ 通过Service获取活动配置（不再直连models）
+    // 通过 Service 获取活动配置（不再直连 models）
     const lottery_engine = req.app.locals.services.getService('unified_lottery_engine')
     const campaign = await lottery_engine.getCampaignByCode(campaign_code)
 
-    // 使用campaign.campaign_id获取完整配置（内部仍用ID）
+    // 使用 campaign.campaign_id 获取完整配置（内部仍用 ID）
     const fullConfig = await lottery_engine.get_campaign_config(campaign.campaign_id)
 
     /*
-     * 🔴 从 lottery_campaign_pricing_config 表读取定价配置
+     * 从 lottery_campaign_pricing_config 表读取定价配置
      *
      * 配置来源优先级（Phase 3 已拍板 2026-01-19）：
      * 1. lottery_campaign_pricing_config 表（活动级版本化配置，优先）
@@ -180,7 +194,7 @@ router.get('/config/:campaignCode', authenticateToken, dataAccessControl, async 
       logger.warn(`[CONFIG_WARN] 读取活动 ${campaign_code} 定价配置失败: ${err.message}`)
     }
 
-    // 降级：使用活动JSON配置
+    // 降级：使用活动 JSON 配置
     if (!drawPricing && campaign.prize_distribution_config?.draw_pricing) {
       drawPricing = campaign.prize_distribution_config.draw_pricing
       isConfigMissing = false
@@ -212,11 +226,11 @@ router.get('/config/:campaignCode', authenticateToken, dataAccessControl, async 
     }
 
     if (req.dataLevel === 'full') {
-      // 管理员获取完整配置（返回campaign_code而不是campaign_id）
+      // 管理员获取完整配置（返回 campaign_code 而不是 campaign_id）
       const adminConfig = {
         ...fullConfig,
         campaign_code: campaign.campaign_code,
-        draw_pricing: drawPricing // ✅ 添加定价配置（含降级保护）
+        draw_pricing: drawPricing
       }
 
       // 如果配置缺失，在响应中添加警告信息（仅管理员可见）
@@ -241,9 +255,7 @@ router.get('/config/:campaignCode', authenticateToken, dataAccessControl, async 
         guarantee_info: {
           exists: !!fullConfig.guarantee_rule,
           description: '连续抽奖有惊喜哦~'
-          // ❌ 不返回：triggerCount, guaranteePrizeId, counterResetAfterTrigger
         },
-        // ✅ 连抽定价信息（动态计算，确保100%业务连续性）
         draw_pricing: drawPricing
       }
 

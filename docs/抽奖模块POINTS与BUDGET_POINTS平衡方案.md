@@ -1,11 +1,12 @@
 # 抽奖模块 POINTS 与 BUDGET_POINTS 平衡方案
 
-> **文档版本**：v2.0（已拍板决策版）  
+> **文档版本**：v3.0（最终决策版 - 长期维护视角）  
 > **创建时间**：2026-01-18 北京时间  
-> **更新时间**：2026-01-18 北京时间  
-> **文档状态**：✅ 已确认方案  
-> **适用模块**：UnifiedLotteryEngine / BasicGuaranteeStrategy  
-> **核心策略**：预算侧自动分层控制 + 体验侧软平滑（严控预算、用户无感）
+> **更新时间**：2026-01-20 北京时间  
+> **文档状态**：✅ 最终决策已确认 + 工程落地方案  
+> **适用模块**：UnifiedLotteryEngine / V4.6 Pipeline（NormalDrawPipeline）  
+> **核心策略**：预算侧自动分层控制 + 体验侧软平滑（严控预算、用户无感）  
+> **设计原则**：长期维护成本最低、技术债务最少、一次性做好
 
 ---
 
@@ -203,26 +204,41 @@ VALUES
   - 例：用户在 `allowed_campaign_ids`（如 `CONSUMPTION_DEFAULT`）下的 `BUDGET_POINTS` 余额
   - 可扩展：多钱包组合（多个 campaign_id / asset_code / business wallet 组合）
 
-#### 5.2A.2 “采纳预算额度”（EffectiveBudget）的统一计算口径
+#### 5.2A.2 "采纳预算额度"（EffectiveBudget）的统一计算口径
 
 定义：**EffectiveBudget = 本次抽奖可被消耗的预算上限**（抽奖引擎唯一需要的预算输入）。
 
-它由三步组成：
+它由四步组成：
 
 1) **选择预算线路（line selection）**：由活动配置决定（与现有 `budget_mode` 对齐）
 
 - `budget_mode = 'user'`：只采纳 user 线路
 - `budget_mode = 'pool'`：只采纳 pool 线路
+- `budget_mode = 'pool_quota'`：quota + pool 组合
+- `budget_mode = 'none'`：无预算限制（EffectiveBudget = Infinity）
 - `budget_mode = 'hybrid'`（如未来需要）：采纳两者交集约束（见下）
 
-2) **聚合预算钱包（wallet aggregation）**：把“单钱包/组合钱包”聚合成一个数
+2) **检查钱包开启状态（wallet availability）**：判断目标钱包是否可用
+
+> ⚠️ **关键点**：user 或 pool 侧的钱包不都是开启可用的状态，有时候是开启有时候是关闭的。
+
+| 钱包类型 | 开启条件 | 关闭/不可用时处理 |
+|---------|---------|------------------|
+| **user 钱包** | `allowed_campaign_ids` 已配置且数组非空 | EffectiveBudget = 0（降级到 B0） |
+| **pool 公共池** | `pool_budget_remaining > 0` 或 `public_pool_remaining > 0` | EffectiveBudget = 0 |
+| **pool 预留池** | `reserved_pool_remaining > 0` 且用户在白名单 | 非白名单用户只能用公共池 |
+| **quota 配额** | 用户有配额记录且 `quota_remaining > 0` | 回退到 pool 兜底 |
+
+3) **聚合预算钱包（wallet aggregation）**：把"单钱包/组合钱包"聚合成一个数
 
 - user 线路聚合（示例）：
   - `user_budget_total = SUM(balance of BUDGET_POINTS where campaign_id in allowed_campaign_ids)`
+  - ⚠️ `allowed_campaign_ids` 是 **"预算来源桶"**（如 `CONSUMPTION_DEFAULT`），不是 lottery 的 campaign_id
 - pool 线路聚合（示例）：
-  - `pool_budget_total = SUM(pool wallets) 或 直接取 pool_budget_remaining`
+  - `pool_budget_total = public_pool_remaining + (is_whitelist ? reserved_pool_remaining : 0)`
+  - 或简化为 `pool_budget_remaining`（未区分公共/预留池时）
 
-3) **得到最终 EffectiveBudget（final adoption）**：结合线路选择与安全约束
+4) **得到最终 EffectiveBudget（final adoption）**：结合线路选择与安全约束
 
 推荐的统一公式（足够覆盖大多数配置）：
 
@@ -237,11 +253,13 @@ EffectiveBudget =
 
 其中 `BudgetLineTotal` 的取值规则：
 
-- **user 模式**：`BudgetLineTotal = user_budget_total`
-- **pool 模式**：`BudgetLineTotal = pool_budget_total`
+- **none 模式**：`BudgetLineTotal = Infinity`（不做预算限制）
+- **user 模式**：`BudgetLineTotal = user_budget_total`（按 allowed_campaign_ids 聚合）
+- **pool 模式**：`BudgetLineTotal = pool_budget_total`（考虑 reserved/public 池）
+- **pool_quota 模式**：`BudgetLineTotal = user_quota_remaining + pool_budget_total`
 - **hybrid 模式（可选扩展）**：
   - **保守型（推荐）**：`BudgetLineTotal = min(user_budget_total, pool_budget_total)`
-    - 含义：两边都必须“允许”，才能发放更高成本奖（双重约束，最稳）
+    - 含义：两边都必须"允许"，才能发放更高成本奖（双重约束，最稳）
   - **叠加型（谨慎）**：`BudgetLineTotal = user_budget_total + pool_budget_total`
     - 含义：两边都可贡献预算（更激进，需更强的风控与节奏控制）
 
@@ -593,38 +611,90 @@ async function executeLotteryWithAutoTier(userId, campaignId, transaction) {
   return selectedPrize;
 }
 
-// ========== 辅助函数：EffectiveBudget 计算 ==========
+// ========== 辅助函数：EffectiveBudget 计算（含钱包开启状态检查） ==========
 async function calculateEffectiveBudget(userId, campaign, transaction) {
-  const budgetMode = campaign.budget_mode;
+  const budgetMode = campaign.budget_mode || 'none';
   
+  // 1. 无预算限制模式
+  if (budgetMode === 'none') {
+    return Infinity; // 不做预算约束
+  }
+  
+  // 2. user 模式：从用户预算钱包聚合（按 allowed_campaign_ids）
   if (budgetMode === 'user') {
-    // user 模式：从用户预算钱包聚合
-    const allowedCampaigns = campaign.allowed_campaign_ids || ['CONSUMPTION_DEFAULT'];
-    const userBudget = await AssetService.getBalanceSum(
-      userId,
-      'BUDGET_POINTS',
-      allowedCampaigns,
-      transaction
+    // ⚠️ 检查钱包开启状态：allowed_campaign_ids 是否已配置
+    const allowedCampaigns = parseAllowedCampaignIds(campaign.allowed_campaign_ids);
+    
+    if (!allowedCampaigns || allowedCampaigns.length === 0) {
+      console.warn('user 模式但 allowed_campaign_ids 未配置，降级为 0');
+      return 0; // 钱包未开启，降级到 B0
+    }
+    
+    // 调用 AssetService 聚合用户在指定桶内的 BUDGET_POINTS 余额
+    const userBudget = await AssetService.getBudgetPointsByCampaigns(
+      { user_id: userId, campaign_ids: allowedCampaigns },
+      { transaction }
     );
     return userBudget;
+  }
+  
+  // 3. pool 模式：从活动池（考虑 reserved/public 池）
+  if (budgetMode === 'pool') {
+    const publicPool = Number(campaign.public_pool_remaining || campaign.pool_budget_remaining || 0);
+    const reservedPool = Number(campaign.reserved_pool_remaining || 0);
     
-  } else if (budgetMode === 'pool') {
-    // pool 模式：从活动池
-    return Number(campaign.pool_budget_remaining);
+    // ⚠️ 检查用户是否在白名单（可访问预留池）
+    const isWhitelist = await checkUserInWhitelist(userId, campaign);
     
-  } else if (budgetMode === 'hybrid') {
-    // hybrid 模式：取两者最小值（保守）
-    const userBudget = await AssetService.getBalanceSum(
-      userId,
-      'BUDGET_POINTS',
-      campaign.allowed_campaign_ids,
-      transaction
-    );
-    const poolBudget = Number(campaign.pool_budget_remaining);
+    if (isWhitelist && reservedPool > 0) {
+      return reservedPool + publicPool; // 白名单用户可用预留池+公共池
+    }
+    
+    return publicPool; // 普通用户只能用公共池
+  }
+  
+  // 4. pool_quota 模式：quota + pool 组合
+  if (budgetMode === 'pool_quota') {
+    const quotaRemaining = await getUserQuotaRemaining(userId, campaign, transaction);
+    const poolRemaining = Number(campaign.pool_budget_remaining || 0);
+    return quotaRemaining + poolRemaining;
+  }
+  
+  // 5. hybrid 模式：取两者最小值（保守）
+  if (budgetMode === 'hybrid') {
+    const allowedCampaigns = parseAllowedCampaignIds(campaign.allowed_campaign_ids);
+    const userBudget = allowedCampaigns.length > 0
+      ? await AssetService.getBudgetPointsByCampaigns(
+          { user_id: userId, campaign_ids: allowedCampaigns },
+          { transaction }
+        )
+      : 0;
+    const poolBudget = Number(campaign.pool_budget_remaining || 0);
     return Math.min(userBudget, poolBudget);
   }
   
-  throw new Error(`未知的 budget_mode: ${budgetMode}`);
+  console.warn(`未知的 budget_mode: ${budgetMode}，降级为 0`);
+  return 0; // 安全降级
+}
+
+// ========== 辅助函数：解析 allowed_campaign_ids ==========
+function parseAllowedCampaignIds(field) {
+  if (!field) return [];
+  if (Array.isArray(field)) return field;
+  try {
+    const parsed = JSON.parse(field);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+// ========== 辅助函数：检查用户是否在白名单 ==========
+async function checkUserInWhitelist(userId, campaign) {
+  // 白名单逻辑可以是：VIP用户、特定标签用户等
+  // 这里简化为检查配置
+  const whitelistUserIds = campaign.whitelist_user_ids || [];
+  return whitelistUserIds.includes(userId);
 }
 ```
 
@@ -849,18 +919,28 @@ P = remaining_budget / target_remaining_budget(now)
 
 ---
 
-## 附录A：相关代码文件
+## 附录A：相关代码文件（V4.6 Pipeline 架构）
 
 | 文件路径 | 说明 |
 |----------|------|
-| `services/UnifiedLotteryEngine/UnifiedLotteryEngine.js` | 抽奖引擎主入口 |
-| `services/UnifiedLotteryEngine/strategies/BasicGuaranteeStrategy.js` | 基础抽奖策略 |
+| `services/UnifiedLotteryEngine/UnifiedLotteryEngine.js` | 抽奖引擎主入口（V4.6） |
+| `services/UnifiedLotteryEngine/pipeline/DrawOrchestrator.js` | 管线编排器 |
+| `services/UnifiedLotteryEngine/pipeline/NormalDrawPipeline.js` | 统一抽奖管线（11 Stage 串联） |
+| `services/UnifiedLotteryEngine/pipeline/stages/BudgetContextStage.js` | 预算上下文 Stage |
+| `services/UnifiedLotteryEngine/pipeline/stages/BuildPrizePoolStage.js` | 构建奖品池 Stage |
+| `services/UnifiedLotteryEngine/pipeline/stages/TierPickStage.js` | 档位抽取 Stage |
+| `services/UnifiedLotteryEngine/pipeline/stages/PrizePickStage.js` | 奖品抽取 Stage |
+| `services/UnifiedLotteryEngine/pipeline/stages/SettleStage.js` | 结算 Stage（唯一写点） |
+| `services/UnifiedLotteryEngine/pipeline/budget/BudgetProviderFactory.js` | 预算 Provider 工厂 |
+| `services/UnifiedLotteryEngine/pipeline/budget/UserBudgetProvider.js` | 用户预算 Provider |
+| `services/UnifiedLotteryEngine/pipeline/budget/PoolBudgetProvider.js` | 活动池预算 Provider |
 | `services/AssetService.js` | 资产服务（POINTS/BUDGET_POINTS） |
+| `services/ConsumptionService.js` | 消费服务（预算发放来源） |
 | `models/LotteryCampaign.js` | 活动模型（含 pool_budget_remaining） |
-| `models/LotteryPrize.js` | 奖品模型（含 prize_value_points） |
+| `models/LotteryPrize.js` | 奖品模型（含 prize_value_points, reward_tier, win_weight） |
 | `routes/v4/lottery/draw.js` | 抽奖API路由 |
 
-## 附录B：当前数据库真实数据快照
+## 附录B：当前数据库真实数据快照（2026-01-19 更新）
 
 ```json
 {
@@ -868,22 +948,68 @@ P = remaining_budget / target_remaining_budget(now)
     {
       "campaign_id": 1,
       "campaign_code": "BASIC_LOTTERY",
+      "status": "active",
       "budget_mode": "user",
+      "pool_budget_total": "10000",
       "pool_budget_remaining": "10000",
-      "allowed_campaign_ids": ["CONSUMPTION_DEFAULT"]
+      "allowed_campaign_ids": ["CONSUMPTION_DEFAULT"],
+      "pick_method": "tier_first",
+      "tier_weight_scale": 1000000,
+      "segment_resolver_version": "v1",
+      "start_time": "2025-08-19 00:00:00",
+      "end_time": "2026-12-28 23:59:59",
+      "cost_per_draw": "100.00"
     }
   ],
-  "lottery_prizes_summary": {
-    "non_empty_active": 8,
-    "empty_active": 1,
-    "active_prob_sum": "1.000000"
+  "lottery_prizes_by_tier": {
+    "high": [
+      { "prize_id": 1, "prize_name": "八八折", "prize_value_points": 100, "win_weight": 1000 },
+      { "prize_id": 5, "prize_name": "2000积分券", "prize_value_points": 150, "win_weight": 10000 },
+      { "prize_id": 6, "prize_name": "500积分券", "prize_value_points": 400, "win_weight": 180000 },
+      { "prize_id": 9, "prize_name": "九八折券", "prize_value_points": 100, "win_weight": 1000 }
+    ],
+    "mid": [
+      { "prize_id": 2, "prize_name": "100积分", "prize_value_points": 80, "win_weight": 300000 },
+      { "prize_id": 3, "prize_name": "甜品1份", "prize_value_points": 60, "win_weight": 200000 },
+      { "prize_id": 7, "prize_name": "精品首饰", "prize_value_points": 10, "win_weight": 10000 },
+      { "prize_id": 8, "prize_name": "生腌拼盘", "prize_value_points": 10, "win_weight": 1000 }
+    ],
+    "low_fallback": [
+      { "prize_id": 4, "prize_name": "青菜1份", "prize_value_points": 0, "win_weight": 300000 }
+    ]
   },
-  "lottery_draws_30d": {
+  "lottery_tier_rules": [
+    { "segment_key": "default", "high": 50000, "mid": 150000, "low": 800000 },
+    { "segment_key": "new_user", "high": 100000, "mid": 200000, "low": 700000 },
+    { "segment_key": "vip_user", "high": 80000, "mid": 220000, "low": 700000 }
+  ],
+  "budget_points_distribution": {
+    "total_users_with_budget": 1,
+    "total_budget_balance": 580,
+    "by_campaign_id": {
+      "CONSUMPTION_DEFAULT": { "users": 1, "sum_budget": 80 },
+      "1": { "users": 1, "sum_budget": 500 }
+    },
+    "tier_distribution": {
+      "B0": 0,
+      "B1": 1,
+      "B2": 0,
+      "B3": 0
+    }
+  },
+  "lottery_draws_recent": {
     "total_draws": 2,
-    "reward_tier_mix": { "low": 2 }
+    "all_tier": "low",
+    "all_prize_value_points": 0
   }
 }
 ```
+
+**数据解读**：
+- 当前唯一活跃用户在 `CONSUMPTION_DEFAULT` 桶有 80 预算积分，落在 **B1 层**
+- 但该用户在 campaign_id='1' 桶有 500 预算积分（测试数据，非正常业务产生）
+- ⚠️ 如果 EffectiveBudget 只读 `allowed_campaign_ids=['CONSUMPTION_DEFAULT']`，则实际可用 = 80（B1）
+- ⚠️ 如果误读全部 BUDGET_POINTS，则会得到 580（B3），这会导致过度发奖
 
 ---
 
@@ -955,6 +1081,429 @@ P = remaining_budget / target_remaining_budget(now)
 - 配置开关：`system_settings` 中增加 `enable_budget_tier_control` 开关
 - 关闭后回退到原有逻辑（按 `win_probability` 直接抽奖）
 - 分层配置表保留，可随时重新启用
+
+---
+
+## 十一、2026-01-19 代码审计与实施落地方案
+
+> **本章节基于真实代码库与数据库审计结果**（通过 Node.js + `.env` 直连生产库验证）
+
+### 11.1 当前项目真实状态对齐
+
+#### 11.1.1 技术架构现状
+
+| 层级 | 当前实现 | 说明 |
+|------|---------|------|
+| **抽奖主链路** | V4.6 Pipeline（`NormalDrawPipeline`） | 已完成 Strategy → Pipeline 迁移 |
+| **Stage 串联** | 11 个 Stage 串行执行 | LoadCampaign → Eligibility → LoadDecisionSource → BudgetContext → Pricing → BuildPrizePool → Guarantee → TierPick → PrizePick → DecisionSnapshot → Settle |
+| **预算 Provider** | `BudgetProviderFactory` 工厂模式 | 支持 user/pool/pool_quota/none 四种模式 |
+| **唯一写点** | `SettleStage` | 扣积分、扣库存、扣预算、发奖、落库 |
+| **资产服务** | `AssetService` | POINTS/BUDGET_POINTS 统一管理，BUDGET_POINTS 必须指定 campaign_id |
+
+#### 11.1.2 商业模式验证（真实业务流）
+
+```
+商家扫码录入消费 → 管理员审核通过 → 用户获得：
+  ├─ POINTS（可见、可消耗抽奖门票）：1元 = 1积分
+  └─ BUDGET_POINTS（不可见、平台控制发奖成本）：按 budget_ratio 系数计算
+                    ↓
+              campaign_id = 'CONSUMPTION_DEFAULT'（预算来源桶标识）
+```
+
+**关键代码确认**（`services/ConsumptionService.js:584-601`）：
+
+```javascript
+const budgetResult = await AssetService.changeBalance({
+  user_id: record.user_id,
+  asset_code: 'BUDGET_POINTS',
+  delta_amount: budgetPointsToAllocate,
+  business_type: 'consumption_budget_allocation',
+  idempotency_key: `consumption_budget:approve:${recordId}`,
+  campaign_id: 'CONSUMPTION_DEFAULT', // 🔥 预算来源桶标识
+  meta: { ... }
+}, { transaction })
+```
+
+#### 11.1.3 真实数据库现状（2026-01-19 查询）
+
+**活动配置（campaign_id=1）**：
+
+| 字段 | 值 | 说明 |
+|------|-----|------|
+| campaign_code | BASIC_LOTTERY | |
+| budget_mode | **user** | 从用户 BUDGET_POINTS 扣预算 |
+| allowed_campaign_ids | `["CONSUMPTION_DEFAULT"]` | **预算来源桶**（非 lottery campaign_id） |
+| pool_budget_total | 10000 | 活动总预算（pool 模式备用） |
+| pool_budget_remaining | 10000 | 活动剩余预算（pool 模式备用） |
+| pick_method | tier_first | 先抽档位、再抽奖品 |
+| tier_weight_scale | 1000000 | 整数权重系统（100万 = 100%） |
+| start_time | 2025-08-19 | |
+| end_time | 2026-12-28 | |
+
+**用户预算分布（按 BUDGET_POINTS 真实余额）**：
+
+| 统计维度 | 值 | 说明 |
+|---------|-----|------|
+| 总用户数 | 1 | 开发环境数据较少 |
+| 总预算余额 | 580 | 跨所有 campaign_id 汇总 |
+| CONSUMPTION_DEFAULT 桶余额 | 80 | 当前唯一活跃用户落在 B1 层 |
+| 其他桶余额（campaign_id='1'） | 500 | 测试数据，非正常业务产生 |
+
+**奖品池配置（真实 reward_tier + win_weight）**：
+
+| prize_id | prize_name | reward_tier | prize_value_points | win_weight | 说明 |
+|----------|------------|-------------|-------------------|------------|------|
+| 1 | 八八折 | **high** | 100 | 1,000 | 未启用（weight 极低） |
+| 2 | 100积分 | **mid** | 80 | 300,000 | 非空奖 |
+| 3 | 甜品1份 | **mid** | 60 | 200,000 | 非空奖 |
+| 4 | 青菜1份 | **low** | 0 | 300,000 | **唯一空奖（fallback 档位）** |
+| 5 | 2000积分券 | **high** | 150 | 10,000 | 非空奖 |
+| 6 | 500积分券 | **high** | 400 | 180,000 | 最高成本奖 |
+| 7 | 精品首饰 | **mid** | 10 | 10,000 | 最低成本非空奖 |
+| 8 | 生腌拼盘 | **mid** | 10 | 1,000 | 未启用（weight 极低） |
+| 9 | 九八折券 | **high** | 100 | 1,000 | 保底专用 |
+
+**档位规则（lottery_tier_rules）**：
+
+| segment_key | high | mid | low | 说明 |
+|-------------|------|-----|-----|------|
+| default | 50,000 (5%) | 150,000 (15%) | 800,000 (80%) | 默认分群 |
+| new_user | 100,000 (10%) | 200,000 (20%) | 700,000 (70%) | 新用户优待 |
+| vip_user | 80,000 (8%) | 220,000 (22%) | 700,000 (70%) | VIP用户优待 |
+
+---
+
+### 11.2 工程层关键发现与修正
+
+#### 11.2.1 🔴 关键问题：EffectiveBudget 读取口径
+
+**发现**：`allowed_campaign_ids` 的含义是 **"BUDGET_POINTS 的来源桶"**，而不是"lottery 的 campaign_id"。
+
+**当前代码风险**（`UserBudgetProvider.js:52-65`）：
+
+```javascript
+// ❌ 当前实现可能误读：把 lottery campaign_id 当作 allowed 检查
+if (this.allowed_campaign_ids && !this.allowed_campaign_ids.includes(campaign_id)) {
+  return { available: 0, ... } // 会错误返回 0
+}
+```
+
+**正确口径**（需修正）：
+
+```javascript
+// ✅ 正确实现：按 allowed_campaign_ids 聚合用户 BUDGET_POINTS 余额
+const effectiveBudget = await AssetService.getBudgetPointsByCampaigns({
+  user_id,
+  campaign_ids: campaign.allowed_campaign_ids || ['CONSUMPTION_DEFAULT']
+}, { transaction })
+```
+
+**影响**：如果口径读错，用户预算会被长期误判为 0，导致永远落在 B0 层（只能空奖）。
+
+#### 11.2.2 🔴 关键问题：钱包开启/关闭状态
+
+**发现**：user 或 pool 侧的钱包不都是开启可用状态，需要动态判断。
+
+**钱包状态场景**：
+
+| 场景 | budget_mode | 钱包状态 | EffectiveBudget 计算 |
+|------|-------------|---------|---------------------|
+| 1 | `user` | user 钱包开启 | 按 allowed_campaign_ids 聚合用户 BUDGET_POINTS |
+| 2 | `user` | user 钱包关闭/未创建 | EffectiveBudget = 0（降级到 B0） |
+| 3 | `pool` | pool 钱包开启 | 直接取 pool_budget_remaining |
+| 4 | `pool` | pool 钱包关闭（reserved/public 区分） | 需判断用户是否在白名单，选择对应池子 |
+| 5 | `pool_quota` | quota 开启 | 先扣 quota，quota 用完再扣 pool |
+| 6 | `none` | 无预算限制 | EffectiveBudget = Infinity（不限制） |
+
+**判断逻辑建议**（伪代码）：
+
+```javascript
+async function calculateEffectiveBudget(user_id, campaign, transaction) {
+  const budget_mode = campaign.budget_mode || 'none';
+  
+  // 1. 无预算限制模式
+  if (budget_mode === 'none') {
+    return Infinity; // 不做预算约束
+  }
+  
+  // 2. user 模式：按 allowed_campaign_ids 聚合
+  if (budget_mode === 'user') {
+    const allowed = parseAllowedCampaignIds(campaign.allowed_campaign_ids);
+    
+    // 检查 allowed 是否为空（钱包未配置/关闭）
+    if (!allowed || allowed.length === 0) {
+      logger.warn('user 模式但 allowed_campaign_ids 未配置，降级为 0');
+      return 0;
+    }
+    
+    return await AssetService.getBudgetPointsByCampaigns({
+      user_id,
+      campaign_ids: allowed
+    }, { transaction });
+  }
+  
+  // 3. pool 模式：从活动池读取
+  if (budget_mode === 'pool') {
+    // 检查 pool 是否开启（remaining 字段存在且 > 0）
+    const pool_remaining = Number(campaign.pool_budget_remaining || 0);
+    const reserved_remaining = Number(campaign.reserved_pool_remaining || 0);
+    const public_remaining = Number(campaign.public_pool_remaining || pool_remaining);
+    
+    // 如果有预留池且用户在白名单，可用预留池+公共池
+    const is_whitelist = await checkUserInWhitelist(user_id, campaign);
+    if (is_whitelist && reserved_remaining > 0) {
+      return reserved_remaining + public_remaining;
+    }
+    
+    return public_remaining;
+  }
+  
+  // 4. pool_quota 模式：quota + pool 组合
+  if (budget_mode === 'pool_quota') {
+    const quota = await getUserQuotaRemaining(user_id, campaign, transaction);
+    const pool = Number(campaign.pool_budget_remaining || 0);
+    return quota + pool;
+  }
+  
+  return 0; // 未知模式，安全降级
+}
+
+// 辅助函数：解析 allowed_campaign_ids（支持 JSON 字符串或数组）
+function parseAllowedCampaignIds(field) {
+  if (!field) return [];
+  if (Array.isArray(field)) return field;
+  try {
+    return JSON.parse(field);
+  } catch {
+    return [];
+  }
+}
+```
+
+#### 11.2.3 压力层计算：无需新增字段
+
+**发现**：真实库已有 `pool_budget_total / pool_budget_remaining / start_time / end_time` 四个字段，可直接计算压力层，无需新增 `target_remaining_budget` 字段。
+
+**压力层计算公式（基于真实字段）**：
+
+```javascript
+function calculatePressureIndex(campaign) {
+  const now = new Date();
+  const start = new Date(campaign.start_time);
+  const end = new Date(campaign.end_time);
+  
+  // 计算时间进度
+  const total_duration = end - start;
+  const elapsed_duration = now - start;
+  const time_progress = Math.max(0, Math.min(1, elapsed_duration / total_duration));
+  
+  // 计算目标剩余预算
+  const total_budget = Number(campaign.pool_budget_total || 0);
+  const remaining_budget = Number(campaign.pool_budget_remaining || 0);
+  const target_remaining = total_budget * (1 - time_progress);
+  
+  // 防止除零
+  if (target_remaining <= 0) {
+    return remaining_budget > 0 ? 2.0 : 0; // 活动结束但仍有预算=富余，无预算=紧张
+  }
+  
+  return remaining_budget / target_remaining;
+}
+
+function getPressureTier(pressure_index) {
+  if (pressure_index < 0.7) return 'P0'; // 紧
+  if (pressure_index <= 1.3) return 'P1'; // 正常
+  return 'P2'; // 富余
+}
+```
+
+**特殊情况处理**：
+- `budget_mode = 'user'` 时：压力层应基于**虚拟消耗**计算（从 `lottery_draws` 汇总已发出的 `prize_value_points`），而非 `pool_budget_remaining`
+- `budget_mode = 'pool'` 时：压力层直接基于 `pool_budget_remaining` 计算
+
+---
+
+### 11.3 落地方案与现有 Pipeline 对齐
+
+#### 11.3.1 Stage 层级映射
+
+| 本方案组件 | 落点 Stage | 输入 | 输出到 context |
+|-----------|-----------|------|---------------|
+| **EffectiveBudget 计算** | `BudgetContextStage` | campaign.budget_mode, allowed_campaign_ids | `effective_budget`, `budget_tier` |
+| **压力层计算** | `BudgetContextStage`（或新增 `PressureStage`） | campaign.pool_budget_total/remaining, start_time, end_time | `pressure_tier`, `pressure_index` |
+| **cap + weights 矩阵** | `BuildPrizePoolStage` | budget_tier, pressure_tier | `cap`, `tier_weight_multipliers` |
+| **预算过滤奖池** | `BuildPrizePoolStage` | prizes, cap | `available_prizes`（增强过滤） |
+| **反连空/反连高** | `TierPickStage`（或新增 `ExperienceValveStage`） | user_id, empty_streak, recent_high_count | 调整 tier_weights 或强制档位 |
+| **状态更新** | `SettleStage` | 抽奖结果 | 更新 empty_streak, recent_high_count |
+
+#### 11.3.2 与现有 tier_first 模式协同
+
+你现在是 **tier_first**（先抽档位、再抽奖品），文档中的"非空 vs 空调权"在实现上等价于：
+
+1. **把 fallback 档位当作"空奖集合"**（`reward_tier = 'low'` 且 `prize_value_points = 0`）
+2. **把 high/mid/low 当作"非空集合"**（`prize_value_points > 0` 的奖品）
+3. **在 TierPickStage 里，对档位权重做倍率**：
+   - `fallback_weight × empty_multiplier`
+   - `(high/mid/low) × non_empty_multiplier`
+
+**示例（B2×P1 = 非空:空 = 7:3）**：
+
+```javascript
+// 原始档位权重（default 分群）
+const original_weights = {
+  high: 50000,   // 5%
+  mid: 150000,   // 15%
+  low: 800000    // 80%（当前只有空奖，视为 fallback）
+};
+
+// 应用 B2×P1 倍率（非空:空 = 7:3）
+const non_empty_multiplier = 7;
+const empty_multiplier = 3;
+
+const adjusted_weights = {
+  high: 50000 * non_empty_multiplier,   // 350000
+  mid: 150000 * non_empty_multiplier,   // 1050000
+  low: 800000 * empty_multiplier        // 2400000
+};
+
+// 归一化后：high=9.2%, mid=27.6%, low=63.2%
+// 相比原始：high 从 5% 提升到 9.2%，low 从 80% 降低到 63.2%
+```
+
+#### 11.3.3 反连空/反连高状态存储
+
+**推荐方案**：扩展 `lottery_user_daily_draw_quota` 表
+
+```sql
+ALTER TABLE lottery_user_daily_draw_quota 
+  ADD COLUMN empty_streak INT NOT NULL DEFAULT 0 
+    COMMENT '连续空奖次数（每次非空奖时重置）',
+  ADD COLUMN recent_high_count INT NOT NULL DEFAULT 0 
+    COMMENT '近期高档次数（滑动窗口5抽）',
+  ADD COLUMN anti_high_cooldown INT NOT NULL DEFAULT 0 
+    COMMENT '反连高冷却剩余抽数（每抽减1）',
+  ADD COLUMN last_draw_tier VARCHAR(20) DEFAULT NULL 
+    COMMENT '最近一次抽奖档位';
+```
+
+**更新逻辑（在 SettleStage 中）**：
+
+```javascript
+// 在 SettleStage._createDrawRecord 之后
+await this._updateExperienceCounters(user_id, campaign_id, final_prize, final_tier, transaction);
+
+async _updateExperienceCounters(user_id, campaign_id, prize, tier, transaction) {
+  const quota = await LotteryUserDailyDrawQuota.findOne({
+    where: { user_id, campaign_id, quota_date: today() },
+    transaction,
+    lock: transaction.LOCK.UPDATE
+  });
+  
+  if (!quota) return; // 无配额记录，跳过
+  
+  const is_empty = prize.prize_value_points === 0;
+  const is_high = prize.prize_value_points >= 400;
+  
+  // 更新连续空奖计数
+  if (is_empty) {
+    quota.empty_streak += 1;
+  } else {
+    quota.empty_streak = 0; // 非空奖重置
+  }
+  
+  // 更新高档计数（滑动窗口逻辑需更复杂的存储，这里简化）
+  if (is_high) {
+    quota.recent_high_count = Math.min(quota.recent_high_count + 1, 5);
+    if (quota.recent_high_count >= 2) {
+      quota.anti_high_cooldown = 10; // 启动冷却
+    }
+  }
+  
+  // 冷却递减
+  if (quota.anti_high_cooldown > 0) {
+    quota.anti_high_cooldown -= 1;
+    if (quota.anti_high_cooldown === 0) {
+      quota.recent_high_count = 0; // 冷却结束，重置高档计数
+    }
+  }
+  
+  quota.last_draw_tier = tier;
+  await quota.save({ transaction });
+}
+```
+
+---
+
+### 11.4 实施顺序建议（按优先级）
+
+| 阶段 | 内容 | 落点文件 | 预估工时 | 优先级 |
+|------|------|---------|---------|--------|
+| **P0-1** | 修正 EffectiveBudget 读取口径（按 allowed_campaign_ids 聚合） | `BudgetContextStage.js`, `UserBudgetProvider.js` | 0.5d | **必须最先做** |
+| **P0-2** | 实现 Budget Tier 分层（B0-B3） | `BudgetContextStage.js` | 0.5d | P0 |
+| **P0-3** | 实现 cap 机制（矩阵查表 + 奖池过滤增强） | `BuildPrizePoolStage.js` | 0.5d | P0 |
+| **P1-1** | 实现反连空（K=3，强制非空档位） | `TierPickStage.js` 或新增 Stage | 0.5d | P1 |
+| **P1-2** | 实现压力层（P0-P2，基于真实字段计算） | `BudgetContextStage.js` | 0.5d | P1 |
+| **P1-3** | 启用 B×P 矩阵（完整调权） | `BuildPrizePoolStage.js`, `TierPickStage.js` | 0.5d | P1 |
+| **P1-4** | 扩展配额表存储体验计数器 | Migration + `SettleStage.js` | 0.5d | P1 |
+| **P2-1** | 实现反连高（N=5,M=2,T=10） | `TierPickStage.js` | 0.5d | P2 |
+| **P2-2** | 扩充 0 成本奖品差异化 | 数据库 INSERT | 0.5d | P2 |
+| **P2-3** | 监控指标埋点 + DecisionSnapshot 增强 | `DecisionSnapshotStage.js` | 1d | P2 |
+
+**关键路径**：P0-1 → P0-2 → P0-3（约 1.5d 可完成核心预算分层）
+
+---
+
+### 11.5 决策快照增强（审计字段）
+
+在 `DecisionSnapshotStage` 中增加分层决策记录：
+
+```javascript
+// decision_snapshot 新增字段
+budget_tier_decision: {
+  effective_budget: budget_data.effective_budget,
+  budget_tier: budget_data.budget_tier,          // B0/B1/B2/B3
+  pressure_index: budget_data.pressure_index,    // 0.0 ~ 2.0+
+  pressure_tier: budget_data.pressure_tier,      // P0/P1/P2
+  cap_value: prize_pool_data.cap,                // 本次 cap 值
+  tier_weight_multipliers: prize_pool_data.tier_weight_multipliers, // {non_empty: 7, empty: 3}
+  anti_empty_triggered: experience_data.anti_empty_triggered,
+  anti_high_triggered: experience_data.anti_high_triggered,
+  empty_streak_before: experience_data.empty_streak_before,
+  recent_high_count: experience_data.recent_high_count
+}
+```
+
+---
+
+### 11.6 监控指标计算口径
+
+| 指标 | SQL 计算方式 | 数据源 |
+|------|------------|--------|
+| B0 用户占比 | `COUNT(CASE WHEN effective_budget < 10 THEN 1 END) / COUNT(*)` | `lottery_draw_decisions.budget_tier_decision` |
+| 空奖占比 | `COUNT(CASE WHEN prize_value_points = 0 THEN 1 END) / COUNT(*)` | `lottery_draws.prize_value_points` |
+| 平均连续空奖 | `AVG(max_empty_streak)` | `lottery_user_daily_draw_quota.empty_streak` 或从 draws 计算 |
+| 反连空触发率 | `COUNT(CASE WHEN anti_empty_triggered THEN 1 END) / COUNT(*)` | `lottery_draw_decisions.budget_tier_decision` |
+| 压力层分布 | `GROUP BY pressure_tier` | `lottery_draw_decisions` |
+| 矩阵格子分布 | `GROUP BY budget_tier, pressure_tier` | `lottery_draw_decisions` |
+
+---
+
+## 附录C：2026-01-19 真实代码文件对齐
+
+| 文件路径 | 说明 | 本方案改动点 |
+|----------|------|-------------|
+| `services/UnifiedLotteryEngine/UnifiedLotteryEngine.js` | V4.6 抽奖引擎主入口 | 无需改动 |
+| `services/UnifiedLotteryEngine/pipeline/DrawOrchestrator.js` | 管线编排器 | 无需改动 |
+| `services/UnifiedLotteryEngine/pipeline/NormalDrawPipeline.js` | 统一管线（11 Stage） | 无需改动 |
+| `services/UnifiedLotteryEngine/pipeline/stages/BudgetContextStage.js` | 预算上下文 Stage | **改动：EffectiveBudget 口径、增加 budget_tier/pressure_tier** |
+| `services/UnifiedLotteryEngine/pipeline/stages/BuildPrizePoolStage.js` | 构建奖品池 Stage | **改动：增加 cap 过滤、tier_weight_multipliers** |
+| `services/UnifiedLotteryEngine/pipeline/stages/TierPickStage.js` | 档位抽取 Stage | **改动：增加反连空/反连高逻辑** |
+| `services/UnifiedLotteryEngine/pipeline/stages/DecisionSnapshotStage.js` | 决策快照 Stage | **改动：增加 budget_tier_decision 字段** |
+| `services/UnifiedLotteryEngine/pipeline/stages/SettleStage.js` | 结算 Stage（唯一写点） | **改动：更新体验计数器** |
+| `services/UnifiedLotteryEngine/pipeline/budget/UserBudgetProvider.js` | 用户预算 Provider | **改动：修正 allowed_campaign_ids 使用口径** |
+| `services/UnifiedLotteryEngine/pipeline/budget/PoolBudgetProvider.js` | 活动池预算 Provider | 无需改动（已支持 reserved/public 池） |
+| `services/AssetService.js` | 资产服务 | 无需改动（已有 getBudgetPointsByCampaigns） |
+| `services/ConsumptionService.js` | 消费服务 | 无需改动（预算发放链路正确） |
 
 ---
 

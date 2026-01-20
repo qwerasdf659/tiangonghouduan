@@ -24,18 +24,22 @@ const TransactionManager = require('../../../../utils/TransactionManager')
 router.use(authenticateToken, requireAdmin)
 
 /**
- * POST /:session_id/transfer - 转接会话
+ * POST /:id/transfer - 转接会话
+ *
+ * API路径参数设计规范 V2.2（2026-01-20）：
+ * - 会话是事务实体，使用数字ID（:id）作为标识符
  *
  * @description 将会话转接给其他客服
- * @route POST /api/v4/console/customer-service/sessions/:session_id/transfer
+ * @route POST /api/v4/console/customer-service/sessions/:id/transfer
+ * @param {number} id - 会话ID（事务实体）
  * @access Admin
  */
-router.post('/:session_id/transfer', async (req, res) => {
+router.post('/:id/transfer', async (req, res) => {
   try {
-    const session_id = parseInt(req.params.session_id)
+    const sessionId = parseInt(req.params.id)
 
     // 参数验证：防止NaN导致的SQL错误
-    if (isNaN(session_id) || session_id <= 0) {
+    if (isNaN(sessionId) || sessionId <= 0) {
       return res.apiError('会话ID无效', 'BAD_REQUEST', null, 400)
     }
 
@@ -46,10 +50,10 @@ router.post('/:session_id/transfer', async (req, res) => {
       return res.apiError('目标客服ID不能为空', 'BAD_REQUEST', null, 400)
     }
 
-    const current_admin_id = req.user.user_id
-    const target_id = parseInt(target_admin_id)
+    const currentAdminId = req.user.user_id
+    const targetId = parseInt(target_admin_id)
 
-    if (current_admin_id === target_id) {
+    if (currentAdminId === targetId) {
       return res.apiError('不能转接给自己', 'BAD_REQUEST', null, 400)
     }
 
@@ -62,9 +66,9 @@ router.post('/:session_id/transfer', async (req, res) => {
     const result = await TransactionManager.execute(
       async transaction => {
         return await CustomerServiceSessionService.transferSession(
-          session_id,
-          current_admin_id,
-          target_id,
+          sessionId,
+          currentAdminId,
+          targetId,
           { transaction }
         )
       },
@@ -90,18 +94,22 @@ router.post('/:session_id/transfer', async (req, res) => {
 })
 
 /**
- * POST /:session_id/close - 关闭会话
+ * POST /:id/close - 关闭会话
+ *
+ * API路径参数设计规范 V2.2（2026-01-20）：
+ * - 会话是事务实体，使用数字ID（:id）作为标识符
  *
  * @description 关闭客服会话
- * @route POST /api/v4/console/customer-service/sessions/:session_id/close
+ * @route POST /api/v4/console/customer-service/sessions/:id/close
+ * @param {number} id - 会话ID（事务实体）
  * @access Admin
  */
-router.post('/:session_id/close', async (req, res) => {
+router.post('/:id/close', async (req, res) => {
   try {
-    const session_id = parseInt(req.params.session_id)
+    const sessionId = parseInt(req.params.id)
 
     // 参数验证：防止NaN导致的SQL错误
-    if (isNaN(session_id) || session_id <= 0) {
+    if (isNaN(sessionId) || sessionId <= 0) {
       return res.apiError('会话ID无效', 'BAD_REQUEST', null, 400)
     }
 
@@ -120,7 +128,7 @@ router.post('/:session_id/close', async (req, res) => {
     // 使用 TransactionManager.execute 包裹事务
     const result = await TransactionManager.execute(
       async transaction => {
-        return await CustomerServiceSessionService.closeSession(session_id, data, { transaction })
+        return await CustomerServiceSessionService.closeSession(sessionId, data, { transaction })
       },
       { description: 'closeSession' }
     )

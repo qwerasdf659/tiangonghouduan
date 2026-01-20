@@ -18,7 +18,7 @@ const TransactionManager = require('../../../utils/TransactionManager')
 const { sharedComponents, adminAuthMiddleware, asyncHandler } = require('./shared/middleware')
 
 /**
- * GET /settings/:category - 获取指定分类的所有设置
+ * GET /settings/:code - 获取指定分类的所有设置
  *
  * @description 获取某个分类下的所有配置项（如基础设置、抽奖设置等）
  * @route GET /api/v4/console/settings/basic
@@ -27,13 +27,18 @@ const { sharedComponents, adminAuthMiddleware, asyncHandler } = require('./share
  * @route GET /api/v4/console/settings/notification
  * @route GET /api/v4/console/settings/security
  * @access Private (需要管理员权限)
+ *
+ * API路径参数设计规范 V2.2（2026-01-20）：
+ * - 系统设置是配置实体，使用业务码（:code）作为标识符
+ * - 业务码格式：lowercase（如 basic, lottery, points）
  */
 router.get(
-  '/settings/:category',
+  '/settings/:code',
   adminAuthMiddleware,
   asyncHandler(async (req, res) => {
     try {
-      const { category } = req.params
+      // 配置实体使用 :code 占位符，内部变量保持业务语义
+      const category = req.params.code
 
       // 获取管理后台系统服务（P2-C架构重构：已合并SystemSettingsService）
       const AdminSystemService = req.app.locals.services.getService('admin_system')
@@ -51,7 +56,7 @@ router.get(
     } catch (error) {
       sharedComponents.logger.error('获取系统设置失败', {
         error: error.message,
-        category: req.params.category
+        category: req.params.code
       })
 
       // 处理业务错误
@@ -65,7 +70,7 @@ router.get(
 )
 
 /**
- * PUT /settings/:category - 批量更新指定分类的设置
+ * PUT /settings/:code - 批量更新指定分类的设置
  *
  * @description 批量更新某个分类下的配置项
  * @route PUT /api/v4/console/settings/basic
@@ -75,15 +80,20 @@ router.get(
  * @route PUT /api/v4/console/settings/security
  * @access Private (需要管理员权限)
  *
+ * API路径参数设计规范 V2.2（2026-01-20）：
+ * - 系统设置是配置实体，使用业务码（:code）作为标识符
+ * - 业务码格式：lowercase（如 basic, lottery, points）
+ *
  * @body {Object} settings - 要更新的配置项键值对
  * @body.example { "system_name": "新系统名称", "customer_phone": "400-123-4567" }
  */
 router.put(
-  '/settings/:category',
+  '/settings/:code',
   adminAuthMiddleware,
   asyncHandler(async (req, res) => {
     try {
-      const { category } = req.params
+      // 配置实体使用 :code 占位符，内部变量保持业务语义
+      const category = req.params.code
       const { settings: settingsToUpdate } = req.body
 
       // 获取管理后台系统服务（P2-C架构重构：已合并SystemSettingsService）
@@ -114,7 +124,7 @@ router.put(
     } catch (error) {
       sharedComponents.logger.error('更新系统设置失败', {
         error: error.message,
-        category: req.params.category
+        category: req.params.code
       })
 
       // 处理业务错误

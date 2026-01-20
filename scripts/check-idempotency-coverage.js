@@ -93,19 +93,22 @@ function getActualWriteRoutes() {
     { method: 'POST', path: '/api/v4/console/lottery-management/interventions/:id/cancel', file: 'console/lottery-management/interventions.js' },
     { method: 'DELETE', path: '/api/v4/console/lottery-management/user-settings/:id', file: 'console/lottery-management/user-status.js' },
     
-    // ===== 控制台管理 - 定价配置 =====
-    { method: 'POST', path: '/api/v4/console/lottery-management/campaigns/:id/pricing', file: 'console/lottery-management/pricing-config.js' },
-    { method: 'PUT', path: '/api/v4/console/lottery-management/campaigns/:id/pricing/:version/activate', file: 'console/lottery-management/pricing-config.js' },
-    { method: 'PUT', path: '/api/v4/console/lottery-management/campaigns/:id/pricing/:version/archive', file: 'console/lottery-management/pricing-config.js' },
-    { method: 'POST', path: '/api/v4/console/lottery-management/campaigns/:id/pricing/rollback', file: 'console/lottery-management/pricing-config.js' },
-    { method: 'PUT', path: '/api/v4/console/lottery-management/campaigns/:id/pricing/:version/schedule', file: 'console/lottery-management/pricing-config.js' },
-    { method: 'DELETE', path: '/api/v4/console/lottery-management/campaigns/:id/pricing/:version/schedule', file: 'console/lottery-management/pricing-config.js' },
+    // ===== 控制台管理 - 定价配置（2026-01-20 V2.2 路由重构）=====
+    // :code 表示活动业务码（配置实体），:id 表示版本号（事务实体）
+    { method: 'POST', path: '/api/v4/console/lottery-management/campaigns/:code/pricing', file: 'console/lottery-management/pricing-config.js' },
+    { method: 'PUT', path: '/api/v4/console/lottery-management/campaigns/:code/pricing/:id/activate', file: 'console/lottery-management/pricing-config.js' },
+    { method: 'PUT', path: '/api/v4/console/lottery-management/campaigns/:code/pricing/:id/archive', file: 'console/lottery-management/pricing-config.js' },
+    { method: 'POST', path: '/api/v4/console/lottery-management/campaigns/:code/pricing/rollback', file: 'console/lottery-management/pricing-config.js' },
+    { method: 'PUT', path: '/api/v4/console/lottery-management/campaigns/:code/pricing/:id/schedule', file: 'console/lottery-management/pricing-config.js' },
+    { method: 'DELETE', path: '/api/v4/console/lottery-management/campaigns/:code/pricing/:id/schedule', file: 'console/lottery-management/pricing-config.js' },
     
-    // ===== 控制台管理 - 材料 =====
-    { method: 'PUT', path: '/api/v4/console/material/asset-types/:id/disable', file: 'console/material.js' },
+    // ===== 控制台管理 - 材料（2026-01-20 V2.2 路由重构）=====
+    // :code 表示资产类型业务码（配置实体）
+    { method: 'PUT', path: '/api/v4/console/material/asset-types/:code/disable', file: 'console/material.js' },
     
-    // ===== 控制台管理 - 设置 =====
-    { method: 'PUT', path: '/api/v4/console/settings/:category', file: 'console/settings.js' },
+    // ===== 控制台管理 - 设置（2026-01-20 V2.2 路由重构）=====
+    // :code 表示设置分类码（配置实体）
+    { method: 'PUT', path: '/api/v4/console/settings/:code', file: 'console/settings.js' },
     { method: 'POST', path: '/api/v4/console/cache/clear', file: 'console/settings.js' },
     
     // ===== 控制台管理 - 弹窗Banner =====
@@ -154,10 +157,11 @@ function getActualWriteRoutes() {
     // ===== 控制台管理 - 用户管理 =====
     { method: 'POST', path: '/api/v4/console/user-management/points/adjust', file: 'console/user_management.js' },
     
-    // ===== 控制台管理 - 材料系统 =====
+    // ===== 控制台管理 - 材料系统（2026-01-20 V2.2 路由重构）=====
+    // asset-types 使用 :code（配置实体），conversion-rules 使用 :id（事务实体）
     { method: 'POST', path: '/api/v4/console/material/asset-types/', file: 'console/material.js' },
-    { method: 'PUT', path: '/api/v4/console/material/asset-types/:id', file: 'console/material.js' },
-    { method: 'DELETE', path: '/api/v4/console/material/asset-types/:id', file: 'console/material.js' },
+    { method: 'PUT', path: '/api/v4/console/material/asset-types/:code', file: 'console/material.js' },
+    { method: 'DELETE', path: '/api/v4/console/material/asset-types/:code', file: 'console/material.js' },
     { method: 'POST', path: '/api/v4/console/material/conversion-rules/', file: 'console/material.js' },
     { method: 'PUT', path: '/api/v4/console/material/conversion-rules/:id', file: 'console/material.js' },
     { method: 'DELETE', path: '/api/v4/console/material/conversion-rules/:id', file: 'console/material.js' },

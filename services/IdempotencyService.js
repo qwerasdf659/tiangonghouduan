@@ -94,7 +94,21 @@ const CANONICAL_OPERATION_MAP = {
 
   // ===== 抽奖系统 =====
   '/api/v4/lottery/draw': 'LOTTERY_DRAW', // 抽奖
-  '/api/v4/lottery/preset/create': 'LOTTERY_PRESET_CREATE', // 创建抽奖预设（修复：lottery/preset 子路由挂载）
+  '/api/v4/lottery/preset/create': 'LOTTERY_PRESET_CREATE', // 创建抽奖预设
+
+  /*
+   * ===== 抽奖活动配置查询（2026-01-20 V2.2 路由重构）=====
+   *
+   * 重构说明：
+   * - /prizes/:campaignCode → /campaigns/:code/prizes
+   * - /config/:campaignCode → /campaigns/:code/config
+   *
+   * 设计原则：
+   * - 活动（campaign）是配置实体，使用业务码（:code）作为标识符
+   * - RESTful 层级结构：活动 → 奖品/配置
+   */
+  '/api/v4/lottery/campaigns/:code/prizes': 'CAMPAIGN_PRIZES', // 获取活动奖品列表
+  '/api/v4/lottery/campaigns/:code/config': 'CAMPAIGN_CONFIG', // 获取活动抽奖配置
 
   // ===== B2C 兑换下单 =====
   '/api/v4/shop/exchange': 'SHOP_EXCHANGE_CREATE_ORDER', // 兑换商品（canonical 路径）
@@ -199,6 +213,7 @@ const CANONICAL_OPERATION_MAP = {
   '/api/v4/console/campaign-budget/campaigns/:id': 'ADMIN_CAMPAIGN_UPDATE', // 更新活动
   '/api/v4/console/campaign-budget/campaigns/:id/validate': 'ADMIN_CAMPAIGN_VALIDATE', // 验证活动
   '/api/v4/console/campaign-budget/campaigns/:id/pool/add': 'ADMIN_CAMPAIGN_POOL_ADD', // 添加预算池
+  '/api/v4/console/campaign-budget/campaigns/:id/budget-status': 'ADMIN_CAMPAIGN_BUDGET_STATUS', // 获取预算状态
 
   // ===== 系统配置 =====
   '/api/v4/console/config/config': 'ADMIN_CONFIG_UPDATE', // 更新系统配置（修复：console/config → console/config/config）
@@ -236,9 +251,13 @@ const CANONICAL_OPERATION_MAP = {
   // ===== 孤儿冻结清理 =====
   '/api/v4/console/orphan-frozen/cleanup': 'ADMIN_ORPHAN_CLEANUP', // 孤儿清理（修复：console/order → console/orphan-frozen/cleanup）
 
-  // ===== 奖池管理 =====
-  '/api/v4/console/prize-pool/:id': 'ADMIN_PRIZE_POOL_UPDATE', // 添加奖品到奖池（POST :campaign_id）
-  '/api/v4/console/prize-pool/prize/:id': 'ADMIN_PRIZE_UPDATE', // 更新奖品（PUT）或删除奖品（DELETE）
+  /*
+   * ===== 奖池管理（2026-01-20 V2.2 路由重构）=====
+   * 奖品池（按活动查询）：配置实体，使用 :code
+   */
+  '/api/v4/console/prize-pool/:code': 'ADMIN_PRIZE_POOL_BY_CAMPAIGN', // 获取活动奖品池
+  // 奖品配置实例：事务实体，使用 :id
+  '/api/v4/console/prize-pool/prize/:id': 'ADMIN_PRIZE_UPDATE', // 更新奖品或删除奖品
   '/api/v4/console/prize-pool/prize/:id/add-stock': 'ADMIN_PRIZE_ADD_STOCK', // 增加库存
   '/api/v4/console/prize-pool/batch-add': 'ADMIN_PRIZE_BATCH_ADD', // 批量添加奖品
 
@@ -253,17 +272,24 @@ const CANONICAL_OPERATION_MAP = {
   '/api/v4/console/user-management/users/:id/role': 'ADMIN_USER_ROLE_UPDATE', // 更新用户角色
   '/api/v4/console/user-management/users/:id/status': 'ADMIN_USER_STATUS_UPDATE', // 更新用户状态
 
-  // ===== 材料管理 =====
-  '/api/v4/console/material/conversion-rules/': 'ADMIN_MATERIAL_RULE_CREATE', // 创建转换规则（修复：尾斜杠）
-  '/api/v4/console/material/conversion-rules/:id': 'ADMIN_MATERIAL_RULE_UPDATE', // 更新或删除转换规则（PUT/DELETE）
+  /*
+   * ===== 材料管理（2026-01-20 V2.2 路由重构）=====
+   * 转换规则：事务实体，使用 :id
+   */
+  '/api/v4/console/material/conversion-rules/': 'ADMIN_MATERIAL_RULE_CREATE', // 创建转换规则
+  '/api/v4/console/material/conversion-rules/:id': 'ADMIN_MATERIAL_RULE_UPDATE', // 更新或删除转换规则
   '/api/v4/console/material/conversion-rules/:id/disable': 'ADMIN_MATERIAL_RULE_DISABLE', // 禁用转换规则
-  '/api/v4/console/material/asset-types/': 'ADMIN_MATERIAL_TYPE_CREATE', // 创建资产类型（修复：尾斜杠）
-  '/api/v4/console/material/asset-types/:id': 'ADMIN_MATERIAL_TYPE_UPDATE', // 更新或删除资产类型（PUT/DELETE）
-  '/api/v4/console/material/asset-types/:id/disable': 'ADMIN_MATERIAL_TYPE_DISABLE', // 禁用资产类型
+  // 资产类型：配置实体，使用 :code
+  '/api/v4/console/material/asset-types/': 'ADMIN_MATERIAL_TYPE_CREATE', // 创建资产类型
+  '/api/v4/console/material/asset-types/:code': 'ADMIN_MATERIAL_TYPE_UPDATE', // 更新资产类型（配置实体用业务码）
+  '/api/v4/console/material/asset-types/:code/disable': 'ADMIN_MATERIAL_TYPE_DISABLE', // 禁用资产类型
   '/api/v4/console/material/users/:id/adjust': 'ADMIN_MATERIAL_USER_ADJUST', // 调整用户材料余额
 
-  // ===== 设置管理 =====
-  '/api/v4/console/settings/:id': 'ADMIN_SETTINGS_UPDATE', // 更新设置
+  /*
+   * ===== 设置管理（2026-01-20 V2.2 路由重构）=====
+   * 系统设置：配置实体，使用 :code
+   */
+  '/api/v4/console/settings/:code': 'ADMIN_SETTINGS_UPDATE', // 更新设置（配置实体用业务码）
   '/api/v4/console/cache/clear': 'ADMIN_CACHE_CLEAR', // 清除缓存
 
   // ===== 市场管理 =====
@@ -316,21 +342,28 @@ const CANONICAL_OPERATION_MAP = {
   // ===== 欠账管理（2026-01-19 路径双轨清理新增）=====
   '/api/v4/console/debt-management/clear': 'ADMIN_DEBT_CLEAR', // 清偿欠账
   '/api/v4/console/debt-management/limits/:id': 'ADMIN_DEBT_LIMITS_UPDATE', // 更新欠账上限
+  '/api/v4/console/debt-management/limits/:id/alert-check': 'ADMIN_DEBT_ALERT_CHECK', // 检查欠账告警状态
 
   // ===== 活动预算验证（2026-01-19 路径双轨清理新增）=====
   '/api/v4/console/campaign-budget/campaigns/:id/validate-for-launch':
     'ADMIN_CAMPAIGN_VALIDATE_FOR_LAUNCH', // 活动上线前校验
 
-  // ===== 活动定价配置管理（2026-01-19 路径双轨清理新增）=====
-  '/api/v4/console/lottery-management/campaigns/:id/pricing': 'ADMIN_PRICING_CONFIG_CREATE', // 创建定价配置
-  '/api/v4/console/lottery-management/campaigns/:id/pricing/:id/activate':
+  /*
+   * ===== 活动定价配置管理（2026-01-20 V2.2 路由重构）=====
+   *
+   * 设计原则：
+   * - 活动（campaign）是配置实体，使用 :code
+   * - 定价配置实例是事务实体，使用 :id
+   */
+  '/api/v4/console/lottery-management/campaigns/:code/pricing': 'ADMIN_PRICING_CONFIG_CREATE', // 创建定价配置
+  '/api/v4/console/lottery-management/campaigns/:code/pricing/:id/activate':
     'ADMIN_PRICING_CONFIG_ACTIVATE', // 激活定价配置
-  '/api/v4/console/lottery-management/campaigns/:id/pricing/:id/archive':
+  '/api/v4/console/lottery-management/campaigns/:code/pricing/:id/archive':
     'ADMIN_PRICING_CONFIG_ARCHIVE', // 归档定价配置
-  '/api/v4/console/lottery-management/campaigns/:id/pricing/rollback':
+  '/api/v4/console/lottery-management/campaigns/:code/pricing/rollback':
     'ADMIN_PRICING_CONFIG_ROLLBACK', // 回滚定价配置
-  '/api/v4/console/lottery-management/campaigns/:id/pricing/:id/schedule':
-    'ADMIN_PRICING_CONFIG_SCHEDULE', // 定价配置预约（PUT/DELETE）
+  '/api/v4/console/lottery-management/campaigns/:code/pricing/:id/schedule':
+    'ADMIN_PRICING_CONFIG_SCHEDULE', // 定价配置预约
 
   /*
    * ===============================================================
@@ -441,44 +474,90 @@ class IdempotencyService {
   }
 
   /**
-   * 规范化API路径，去掉资源ID和业务标识符
+   * 规范化API路径，将动态参数替换为标准占位符
    *
    * @param {string} path - 原始API路径
    * @returns {string} 规范化后的路径
    *
    * @description
-   * 处理四种情况：
-   * 1. 纯数字 ID：/listings/123/purchase → /listings/:id/purchase
-   * 2. UUID 格式：/items/550e8400-e29b-41d4-a716-446655440000 → /items/:uuid
-   * 3. snake_case 业务标识符：/asset-types/red_shard/disable → /asset-types/:id/disable
-   *    （如 asset_code、activity_code 等业务代码，包含下划线的标识符）
-   * 4. 路由参数占位符：/:idOrCode/participate → /:id/participate
-   *    （将 :xxx 格式统一为 :id，以匹配 CANONICAL_OPERATION_MAP 中的映射）
+   * API路径参数设计规范 V2.2（2026-01-20）
+   *
+   * 三种资源类型对应三种占位符：
+   * 1. 事务实体（数字ID）→ :id
+   *    - 高频创建、有状态、数量无限增长
+   *    - 如：订单、记录、规则实例
+   *
+   * 2. 配置实体（业务码）→ :code
+   *    - 低频变更、语义稳定、数量有限
+   *    - 如：活动、资产类型、设置分类
+   *    - 业务码格式：snake_case（如 red_shard）或 UPPER_SNAKE（如 DIAMOND）
+   *
+   * 3. 外部暴露实体（UUID）→ :uuid
+   *    - 需要隐藏内部ID、防枚举
+   *    - 如：用户分享链接
    *
    * @example
-   * normalizePath('/api/v4/console/material/asset-types/red_shard/disable')
-   * // 返回: '/api/v4/console/material/asset-types/:id/disable'
+   * normalizePath('/api/v4/market/listings/123')
+   * // 返回: '/api/v4/market/listings/:id'
+   *
+   * normalizePath('/api/v4/lottery/campaigns/spring_festival/prizes')
+   * // 返回: '/api/v4/lottery/campaigns/:code/prizes'
+   *
+   * normalizePath('/api/v4/user/profile/550e8400-e29b-41d4-a716-446655440000')
+   * // 返回: '/api/v4/user/profile/:uuid'
    */
   static normalizePath(path) {
     if (!path) return ''
 
-    return (
-      path
-        /*
-         * 规范化顺序很重要：
-         * 1. 将纯数字替换为 :id（最常见情况）
-         * 2. 将 UUID 替换为 :uuid（特殊格式）
-         * 3. 将 snake_case 标识符替换为 :id（如 red_shard, blue_crystal 等业务代码）
-         *    - 只匹配包含下划线的标识符，避免误匹配 kebab-case 路由段
-         *    - 正则匹配格式: 小写字母_小写字母[更多字符]
-         * 4. 将所有路由参数占位符（如 :idOrCode, :order_id）统一替换为 :id
-         *    但保留已经是 :id 或 :uuid 的情况
-         */
-        .replace(/\/\d+/g, '/:id')
-        .replace(/\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi, '/:uuid')
-        .replace(/\/([a-z]+_[a-z][a-z0-9_]*)(?=\/|$)/gi, '/:id')
-        .replace(/:(?!id\b|uuid\b)[a-zA-Z_][a-zA-Z0-9_]*/g, ':id')
+    let result = path
+
+    /*
+     * 规范化顺序很重要（优先级从高到低）：
+     *
+     * 1. UUID → :uuid（格式最明确，优先匹配）
+     * 2. 纯数字 → :id（事务实体）
+     * 3. 配置实体路径中的业务码 → :code
+     *    - 只对特定配置实体路径进行匹配，避免误匹配
+     *    - 匹配 snake_case 业务标识符（如 red_shard, spring_festival）
+     * 4. 其他路由参数占位符 → :id（默认）
+     *    - 保留已经是 :id, :code, :uuid 的情况
+     */
+
+    // Step 1: UUID → :uuid
+    result = result.replace(
+      /\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi,
+      '/:uuid'
     )
+
+    // Step 2: 纯数字 → :id
+    result = result.replace(/\/\d+/g, '/:id')
+
+    /*
+     * Step 3: 配置实体路径中的业务码 → :code
+     * 定义配置实体路径模式（参考 API路径参数设计规范.md 第4.2节）
+     */
+    const configEntityPatterns = [
+      /\/(asset-types)\/([A-Za-z][A-Za-z0-9_]*)(?=\/|$)/g, // 材料资产类型
+      /\/(categories)\/([A-Za-z][A-Za-z0-9_]*)(?=\/|$)/g, // 类目定义
+      /\/(rarities)\/([A-Za-z][A-Za-z0-9_]*)(?=\/|$)/g, // 稀有度定义
+      /\/(asset-groups)\/([A-Za-z][A-Za-z0-9_]*)(?=\/|$)/g, // 资产分组
+      /\/(roles)\/([A-Za-z][A-Za-z0-9_]*)(?=\/|$)/g, // 角色定义
+      /\/(campaigns)\/([A-Za-z][A-Za-z0-9_]*)(?=\/|$)/g, // 抽奖活动
+      /\/(prize-pool)\/(?!prize(?:\/|$)|batch-add(?:\/|$)|list(?:\/|$))([A-Za-z][A-Za-z0-9_]*)(?=\/|$)/g, // 奖品池（按活动，排除固定路径段）
+      /\/(settings)\/([A-Za-z][A-Za-z0-9_]*)(?=\/|$)/g // 系统设置
+    ]
+
+    configEntityPatterns.forEach(pattern => {
+      result = result.replace(pattern, '/$1/:code')
+    })
+
+    /*
+     * Step 4: 路由参数占位符统一化（保留 :id, :code, :uuid）
+     * 将其他形式的占位符（如 :campaignCode, :asset_code）转为 :id
+     */
+    result = result.replace(/:(?!id\b|code\b|uuid\b)[a-zA-Z_][a-zA-Z0-9_]*/g, ':id')
+
+    return result
   }
 
   /**

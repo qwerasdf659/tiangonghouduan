@@ -10,7 +10,7 @@
  *
  * API列表：
  * - GET /list - 商家员工查询消费记录（店员查自己，店长查全店）
- * - GET /detail/:record_id - 商家员工查询记录详情（权限验证）
+ * - GET /detail/:id - 商家员工查询记录详情（权限验证）
  * - GET /stats - 商家员工查询消费统计
  *
  * @since 2026-01-12
@@ -130,18 +130,21 @@ router.get(
 )
 
 /**
- * @route GET /api/v4/shop/consumption/merchant/detail/:record_id
+ * @route GET /api/v4/shop/consumption/merchant/detail/:id
  * @desc 商家员工查询消费记录详情（权限验证）
  * @access Private (merchant_staff / merchant_manager)
  *
- * @param {number} record_id - 消费记录ID
+ * API路径参数设计规范 V2.2（2026-01-20）：
+ * - 消费记录是事务实体，使用数字ID（:id）作为标识符
+ *
+ * @param {number} id - 消费记录ID
  *
  * 权限控制：
  * - 店员：只能查看自己录入的记录详情
  * - 店长：可以查看本店任意记录详情
  */
 router.get(
-  '/detail/:record_id',
+  '/detail/:id',
   authenticateToken,
   requireMerchantPermission('consumption:read'),
   async (req, res) => {
@@ -151,11 +154,10 @@ router.get(
 
       const userId = req.user.user_id
       const roleLevel = req.user.role_level || 0
-      const { record_id } = req.params
+      const recordId = parseInt(req.params.id, 10)
 
       // 1. 参数验证
-      const recordId = parseInt(record_id, 10)
-      if (isNaN(recordId)) {
+      if (isNaN(recordId) || recordId <= 0) {
         return res.apiError('无效的记录ID', 'INVALID_RECORD_ID', null, 400)
       }
 
@@ -195,7 +197,7 @@ router.get(
     } catch (error) {
       logger.error('商家侧消费记录详情查询失败', {
         error: error.message,
-        record_id: req.params.record_id,
+        record_id: req.params.id,
         user_id: req.user?.user_id
       })
       return handleServiceError(error, res, '查询消费记录失败')

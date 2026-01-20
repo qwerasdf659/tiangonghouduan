@@ -32,7 +32,7 @@ let UnifiedLotteryEngine
 
 describe('抽奖积分集成测试 - V4.6 Pipeline 架构', () => {
   let testUserId
-  const campaignId = 2 // 使用实际存在的活动ID
+  let campaignId // 🔴 P0-1修复：从 global.testData 动态获取，不再硬编码
   let initialBalance = null
   let initialUser = null
 
@@ -59,7 +59,7 @@ describe('抽奖积分集成测试 - V4.6 Pipeline 架构', () => {
     } = require('../../services/UnifiedLotteryEngine/UnifiedLotteryEngine')
     UnifiedLotteryEngine = new Engine()
 
-    // 获取测试用户ID
+    // 🔴 P0-1修复：从 global.testData 动态获取测试用户ID
     testUserId = global.testData?.testUser?.user_id
     if (!testUserId) {
       // 备用：通过手机号查询
@@ -69,6 +69,19 @@ describe('抽奖积分集成测试 - V4.6 Pipeline 架构', () => {
 
     if (!testUserId) {
       throw new Error('测试用户不存在')
+    }
+
+    // 🔴 P0-1修复：从 global.testData 动态获取活动ID，不再硬编码
+    campaignId = global.testData?.testCampaign?.campaign_id
+    if (!campaignId) {
+      // 备用：从数据库查询第一个活跃活动
+      const { LotteryCampaign } = require('../../models')
+      const campaign = await LotteryCampaign.findOne({ where: { status: 'active' } })
+      campaignId = campaign?.campaign_id
+    }
+
+    if (!campaignId) {
+      console.warn('⚠️ 测试活动不存在，抽奖相关测试将被跳过')
     }
 
     // 获取初始状态

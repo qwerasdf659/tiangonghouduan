@@ -43,7 +43,7 @@ const debtManagementRoutes = require('./debt-management') // 🆕 欠账管理�
 router.use('/auth', authRoutes)
 router.use('/system', systemRoutes)
 router.use('/config', configRoutes)
-router.use(settingsRoutes) // 🆕 系统设置路由（挂载到根路径，使/admin/settings/:category可直接访问）
+router.use(settingsRoutes) // 🆕 系统设置路由（挂载到根路径，使/admin/settings/:code可直接访问）
 router.use('/prize-pool', prizePoolRoutes)
 router.use('/user-management', userManagementRoutes)
 router.use('/lottery-management', lotteryManagementRoutes)
@@ -118,8 +118,8 @@ router.get('/', (req, res) => {
         description: '奖品池管理',
         endpoints: [
           '/prize-pool/batch-add',
-          '/prize-pool/:campaign_id',
-          '/prize-pool/prize/:prize_id'
+          '/prize-pool/:code', // 活动代码（配置实体）
+          '/prize-pool/prize/:id' // 奖品ID（事务实体）
         ]
       },
       user_management: {
@@ -192,7 +192,7 @@ router.get('/', (req, res) => {
         description: '抽奖配额管理（2025-12-23）',
         endpoints: [
           '/lottery-quota/rules',
-          '/lottery-quota/rules/:rule_id/disable',
+          '/lottery-quota/rules/:id/disable', // 规则ID（事务实体）
           '/lottery-quota/users/:user_id/status',
           '/lottery-quota/users/:user_id/bonus',
           '/lottery-quota/users/:user_id/check'
@@ -273,8 +273,8 @@ router.get('/', (req, res) => {
         endpoints: [
           '/consumption/pending',
           '/consumption/records',
-          '/consumption/approve/:record_id',
-          '/consumption/reject/:record_id'
+          '/consumption/approve/:id', // 记录ID（事务实体）
+          '/consumption/reject/:id' // 记录ID（事务实体）
         ],
         note: '仅限 admin（role_level >= 100）访问，不开放 ops/区域经理；商家员工使用 /api/v4/shop/* 提交消费记录'
       },

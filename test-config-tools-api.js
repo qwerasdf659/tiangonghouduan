@@ -176,9 +176,9 @@ async function runTests() {
 - /api/v4/console/system/feature-flags  ❌ 404 (不存在)
 - /api/v4/console/system/maintenance  ❌ 404 (不存在)
 
-后端实际提供的API路径（正确）:
-- /api/v4/console/settings  ✅ 获取所有设置概览
-- /api/v4/console/settings/:category  ✅ 获取/更新分类设置
+后端实际提供的API路径（2026-01-20 V2.2 路由重构）:
+- /api/v4/console/settings     ✅ 获取所有设置概览
+- /api/v4/console/settings/:code  ✅ 获取/更新分类设置
 - /api/v4/console/cache/clear  ✅ 清除缓存
 - /api/v4/console/system/status  ✅ 系统状态
 - /api/v4/console/system/dashboard  ✅ 仪表板数据

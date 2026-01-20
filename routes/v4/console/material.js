@@ -209,7 +209,10 @@ router.post('/conversion-rules', authenticateToken, requireAdmin, async (req, re
 
 /**
  * 禁用材料转换规则（管理员）
- * PUT /api/v4/console/material/conversion-rules/:rule_id/disable
+ * PUT /api/v4/console/material/conversion-rules/:id/disable
+ *
+ * API路径参数设计规范 V2.2（2026-01-20）：
+ * - 转换规则是事务实体（高频创建），使用数字ID（:id）作为标识符
  *
  * 硬约束：
  * - 禁止 UPDATE 覆盖 from_amount/to_amount/effective_at
@@ -218,34 +221,29 @@ router.post('/conversion-rules', authenticateToken, requireAdmin, async (req, re
  *
  * 返回：更新后的规则信息
  */
-router.put(
-  '/conversion-rules/:rule_id/disable',
-  authenticateToken,
-  requireAdmin,
-  async (req, res) => {
-    try {
-      const { rule_id } = req.params
-      const MaterialManagementService = req.app.locals.services.getService('material_management')
+router.put('/conversion-rules/:id/disable', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const rule_id = parseInt(req.params.id, 10)
+    const MaterialManagementService = req.app.locals.services.getService('material_management')
 
-      // 使用 TransactionManager 统一管理事务（2026-01-05 事务边界治理）
-      const result = await TransactionManager.execute(
-        async transaction => {
-          return await MaterialManagementService.disableConversionRule(rule_id, { transaction })
-        },
-        { description: 'disableConversionRule' }
-      )
+    // 使用 TransactionManager 统一管理事务（2026-01-05 事务边界治理）
+    const result = await TransactionManager.execute(
+      async transaction => {
+        return await MaterialManagementService.disableConversionRule(rule_id, { transaction })
+      },
+      { description: 'disableConversionRule' }
+    )
 
-      return res.apiSuccess(result, '禁用材料转换规则成功')
-    } catch (error) {
-      return res.apiError(
-        `禁用材料转换规则失败：${error.message}`,
-        error.error_code || 'disable_rule_failed',
-        error.details || null,
-        error.status_code || 500
-      )
-    }
+    return res.apiSuccess(result, '禁用材料转换规则成功')
+  } catch (error) {
+    return res.apiError(
+      `禁用材料转换规则失败：${error.message}`,
+      error.error_code || 'disable_rule_failed',
+      error.details || null,
+      error.status_code || 500
+    )
   }
-)
+})
 
 /**
  * 查询材料资产类型列表（管理员）
@@ -351,38 +349,124 @@ router.post('/asset-types', authenticateToken, requireAdmin, async (req, res) =>
 })
 
 /**
- * 禁用材料资产类型（管理员）
- * PUT /api/v4/console/material/asset-types/:asset_code/disable
+ * 更新材料资产类型（管理员）
+ * PUT /api/v4/console/material/asset-types/:code
+ *
+ * @description 配置实体使用业务码（:code）作为标识符
+ * @param {string} code - 资产类型代码（如 red_shard、DIAMOND）
+ *
+ * API路径参数设计规范 V2.2（2026-01-20）：
+ * - 配置实体使用 :code 占位符
+ * - 对应 CANONICAL_OPERATION_MAP: 'ADMIN_MATERIAL_TYPE_UPDATE'
+ *
+ * Body参数（可选，至少提供一个）：
+ * - display_name: 展示名称
+ * - group_code: 分组代码
+ * - form: 形态（shard/crystal）
+ * - tier: 层级
+ * - sort_order: 排序权重
+ * - visible_value_points: 显示价值积分
+ * - budget_value_points: 预算价值积分
+ * - is_enabled: 是否启用
+ * - is_tradable: 是否可交易
+ *
+ * 业务约束：
+ * - asset_code 不可更新（是配置实体的唯一标识符）
  *
  * 返回：更新后的材料资产类型信息
  */
-router.put(
-  '/asset-types/:asset_code/disable',
-  authenticateToken,
-  requireAdmin,
-  async (req, res) => {
-    try {
-      const { asset_code } = req.params
-      const MaterialManagementService = req.app.locals.services.getService('material_management')
+router.put('/asset-types/:code', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    // 配置实体使用业务码作为标识符
+    const asset_code = req.params.code
+    const {
+      display_name,
+      group_code,
+      form,
+      tier,
+      sort_order,
+      visible_value_points,
+      budget_value_points,
+      is_enabled,
+      is_tradable
+    } = req.body
 
-      // 使用 TransactionManager 统一管理事务（2026-01-05 事务边界治理）
-      const result = await TransactionManager.execute(
-        async transaction => {
-          return await MaterialManagementService.disableAssetType(asset_code, { transaction })
-        },
-        { description: 'disableAssetType' }
-      )
-
-      return res.apiSuccess(result, '禁用材料资产类型成功')
-    } catch (error) {
-      return res.apiError(
-        `禁用材料资产类型失败：${error.message}`,
-        error.error_code || 'disable_asset_type_failed',
-        error.details || null,
-        error.status_code || 500
-      )
+    // form 字段验证
+    if (form !== undefined && !['shard', 'crystal'].includes(form)) {
+      return res.apiError('form 必须为 shard 或 crystal', 'INVALID_FORM', null, 400)
     }
+
+    const MaterialManagementService = req.app.locals.services.getService('material_management')
+
+    // 使用 TransactionManager 统一管理事务（2026-01-05 事务边界治理）
+    const result = await TransactionManager.execute(
+      async transaction => {
+        return await MaterialManagementService.updateAssetType(
+          asset_code,
+          {
+            display_name,
+            group_code,
+            form,
+            tier,
+            sort_order,
+            visible_value_points,
+            budget_value_points,
+            is_enabled,
+            is_tradable
+          },
+          { transaction }
+        )
+      },
+      { description: 'updateAssetType' }
+    )
+
+    return res.apiSuccess(result, '更新材料资产类型成功')
+  } catch (error) {
+    return res.apiError(
+      `更新材料资产类型失败：${error.message}`,
+      error.error_code || 'update_asset_type_failed',
+      error.details || null,
+      error.status_code || 500
+    )
   }
-)
+})
+
+/**
+ * 禁用材料资产类型（管理员）
+ * PUT /api/v4/console/material/asset-types/:code/disable
+ *
+ * @description 配置实体使用业务码（:code）作为标识符
+ * @param {string} code - 资产类型代码（如 red_shard、DIAMOND）
+ *
+ * API路径参数设计规范 V2.2（2026-01-20）：
+ * - 配置实体使用 :code 占位符
+ * - 业务码格式：snake_case 或 UPPER_SNAKE
+ *
+ * 返回：更新后的材料资产类型信息
+ */
+router.put('/asset-types/:code/disable', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    // 配置实体使用业务码作为标识符
+    const asset_code = req.params.code
+    const MaterialManagementService = req.app.locals.services.getService('material_management')
+
+    // 使用 TransactionManager 统一管理事务（2026-01-05 事务边界治理）
+    const result = await TransactionManager.execute(
+      async transaction => {
+        return await MaterialManagementService.disableAssetType(asset_code, { transaction })
+      },
+      { description: 'disableAssetType' }
+    )
+
+    return res.apiSuccess(result, '禁用材料资产类型成功')
+  } catch (error) {
+    return res.apiError(
+      `禁用材料资产类型失败：${error.message}`,
+      error.error_code || 'disable_asset_type_failed',
+      error.details || null,
+      error.status_code || 500
+    )
+  }
+})
 
 module.exports = router

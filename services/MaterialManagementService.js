@@ -375,6 +375,98 @@ class MaterialManagementService {
   }
 
   /**
+   * 更新材料资产类型（管理员）
+   *
+   * 事务边界治理（2026-01-05 决策）：
+   * - 强制要求外部事务传入（options.transaction）
+   * - 未提供事务时直接报错，由入口层统一管理事务
+   *
+   * API路径参数设计规范 V2.2（2026-01-20）：
+   * - 配置实体使用业务码（:code）作为标识符
+   * - 对应 CANONICAL_OPERATION_MAP: 'ADMIN_MATERIAL_TYPE_UPDATE'
+   *
+   * 业务约束：
+   * - asset_code 不可更新（是配置实体的唯一标识符）
+   * - 可更新字段：display_name, group_code, form, tier, sort_order,
+   *               visible_value_points, budget_value_points, is_enabled, is_tradable
+   *
+   * @param {string} asset_code - 资产代码（配置实体业务码，不可更新）
+   * @param {Object} payload - 更新内容
+   * @param {string} [payload.display_name] - 展示名称
+   * @param {string} [payload.group_code] - 分组代码
+   * @param {string} [payload.form] - 形态（shard/crystal）
+   * @param {number} [payload.tier] - 层级
+   * @param {number} [payload.sort_order] - 排序权重
+   * @param {number|null} [payload.visible_value_points] - 显示价值积分
+   * @param {number|null} [payload.budget_value_points] - 预算价值积分
+   * @param {boolean} [payload.is_enabled] - 是否启用
+   * @param {boolean} [payload.is_tradable] - 是否可交易
+   * @param {Object} options - 选项
+   * @param {Object} options.transaction - Sequelize事务对象（必填）
+   * @returns {Promise<Object>} 更新结果
+   */
+  static async updateAssetType(asset_code, payload, options = {}) {
+    // 强制要求事务边界 - 2026-01-05 治理决策
+    const transaction = assertAndGetTransaction(
+      options,
+      'MaterialManagementService.updateAssetType'
+    )
+
+    // 查找资产类型
+    const assetType = await MaterialAssetType.findOne({ where: { asset_code }, transaction })
+    if (!assetType) {
+      this._throw(404, 'asset_type_not_found', `材料资产类型 ${asset_code} 不存在`)
+    }
+
+    // 构建更新字段（只允许更新指定字段）
+    const allowedFields = [
+      'display_name',
+      'group_code',
+      'form',
+      'tier',
+      'sort_order',
+      'visible_value_points',
+      'budget_value_points',
+      'is_enabled',
+      'is_tradable'
+    ]
+    const updateData = {}
+
+    for (const field of allowedFields) {
+      if (payload[field] !== undefined) {
+        // 特殊处理：form 字段需要验证枚举值
+        if (field === 'form') {
+          if (!['shard', 'crystal'].includes(payload.form)) {
+            this._throw(400, 'invalid_form', 'form 必须为 shard 或 crystal')
+          }
+          updateData.form = payload.form
+        } else if (
+          ['tier', 'sort_order', 'visible_value_points', 'budget_value_points'].includes(field)
+        ) {
+          // 特殊处理：数字字段
+          updateData[field] = payload[field] !== null ? parseInt(payload[field]) : null
+        } else if (['is_enabled', 'is_tradable'].includes(field)) {
+          // 特殊处理：布尔字段
+          updateData[field] = payload[field] === true || payload[field] === 'true'
+        } else {
+          // 其他字段直接赋值
+          updateData[field] = payload[field]
+        }
+      }
+    }
+
+    // 检查是否有可更新的字段
+    if (Object.keys(updateData).length === 0) {
+      this._throw(400, 'no_update_fields', '没有提供任何可更新的字段')
+    }
+
+    // 执行更新
+    await assetType.update(updateData, { transaction })
+
+    return { asset_type: assetType.toJSON() }
+  }
+
+  /**
    * 禁用材料资产类型（管理员）
    *
    * 事务边界治理（2026-01-05 决策）：

@@ -182,7 +182,10 @@ router.post('/rules', authenticateToken, requireAdmin, async (req, res) => {
 
 /**
  * 禁用配额规则
- * PUT /api/v4/console/lottery-quota/rules/:rule_id/disable
+ * PUT /api/v4/console/lottery-quota/rules/:id/disable
+ *
+ * API路径参数设计规范 V2.2（2026-01-20）：
+ * - 配额规则是事务实体（按需创建），使用数字ID（:id）作为标识符
  *
  * 硬约束：
  * - 禁止修改 limit_value 等核心字段
@@ -191,9 +194,9 @@ router.post('/rules', authenticateToken, requireAdmin, async (req, res) => {
  *
  * 返回：更新后的规则信息
  */
-router.put('/rules/:rule_id/disable', authenticateToken, requireAdmin, async (req, res) => {
+router.put('/rules/:id/disable', authenticateToken, requireAdmin, async (req, res) => {
   try {
-    const { rule_id } = req.params
+    const rule_id = parseInt(req.params.id, 10)
 
     // 通过 Service 层禁用规则（2025-12-31 重构：移除直接 Model 操作）
     const rule = await getLotteryQuotaService(req).disableRule({

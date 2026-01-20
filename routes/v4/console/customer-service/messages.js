@@ -26,21 +26,25 @@ const TransactionManager = require('../../../../utils/TransactionManager')
 router.use(authenticateToken, requireAdmin)
 
 /**
- * GET /:session_id/messages - 获取会话消息
+ * GET /:id/messages - 获取会话消息
+ *
+ * API路径参数设计规范 V2.2（2026-01-20）：
+ * - 会话是事务实体，使用数字ID（:id）作为标识符
  *
  * @description 获取指定会话的消息历史
- * @route GET /api/v4/console/customer-service/sessions/:session_id/messages
+ * @route GET /api/v4/console/customer-service/sessions/:id/messages
+ * @param {number} id - 会话ID（事务实体）
  * @access Admin
  */
-router.get('/:session_id/messages', async (req, res) => {
+router.get('/:id/messages', async (req, res) => {
   try {
     // 通过 ServiceManager 获取 AdminCustomerServiceService
     const AdminCustomerServiceService = req.app.locals.services.getService('admin_customer_service')
 
-    const session_id = parseInt(req.params.session_id)
+    const sessionId = parseInt(req.params.id)
 
     // 参数验证：防止NaN导致的SQL错误
-    if (isNaN(session_id) || session_id <= 0) {
+    if (isNaN(sessionId) || sessionId <= 0) {
       return res.apiError('会话ID无效', 'BAD_REQUEST', null, 400)
     }
 
@@ -50,7 +54,7 @@ router.get('/:session_id/messages', async (req, res) => {
     }
 
     // 调用服务层方法
-    const result = await AdminCustomerServiceService.getSessionMessages(session_id, options)
+    const result = await AdminCustomerServiceService.getSessionMessages(sessionId, options)
 
     return res.apiSuccess(result, '获取会话消息成功')
   } catch (error) {
@@ -66,18 +70,22 @@ router.get('/:session_id/messages', async (req, res) => {
 })
 
 /**
- * POST /:session_id/send - 发送消息
+ * POST /:id/send - 发送消息
+ *
+ * API路径参数设计规范 V2.2（2026-01-20）：
+ * - 会话是事务实体，使用数字ID（:id）作为标识符
  *
  * @description 管理员发送消息给用户
- * @route POST /api/v4/console/customer-service/sessions/:session_id/send
+ * @route POST /api/v4/console/customer-service/sessions/:id/send
+ * @param {number} id - 会话ID（事务实体）
  * @access Admin
  */
-router.post('/:session_id/send', async (req, res) => {
+router.post('/:id/send', async (req, res) => {
   try {
-    const session_id = parseInt(req.params.session_id)
+    const sessionId = parseInt(req.params.id)
 
     // 参数验证：防止NaN导致的SQL错误
-    if (isNaN(session_id) || session_id <= 0) {
+    if (isNaN(sessionId) || sessionId <= 0) {
       return res.apiError('会话ID无效', 'BAD_REQUEST', null, 400)
     }
 
@@ -120,7 +128,7 @@ router.post('/:session_id/send', async (req, res) => {
     // 使用 TransactionManager.execute 包裹事务
     const result = await TransactionManager.execute(
       async transaction => {
-        return await CustomerServiceSessionService.sendMessage(session_id, data, { transaction })
+        return await CustomerServiceSessionService.sendMessage(sessionId, data, { transaction })
       },
       { description: 'sendMessage' }
     )
@@ -152,28 +160,32 @@ router.post('/:session_id/send', async (req, res) => {
 })
 
 /**
- * POST /:session_id/mark-read - 标记消息已读
+ * POST /:id/mark-read - 标记消息已读
+ *
+ * API路径参数设计规范 V2.2（2026-01-20）：
+ * - 会话是事务实体，使用数字ID（:id）作为标识符
  *
  * @description 标记会话中用户发送的消息为已读
- * @route POST /api/v4/console/customer-service/sessions/:session_id/mark-read
+ * @route POST /api/v4/console/customer-service/sessions/:id/mark-read
+ * @param {number} id - 会话ID（事务实体）
  * @access Admin
  */
-router.post('/:session_id/mark-read', async (req, res) => {
+router.post('/:id/mark-read', async (req, res) => {
   try {
-    const session_id = parseInt(req.params.session_id)
+    const sessionId = parseInt(req.params.id)
 
     // 参数验证：防止NaN导致的SQL错误
-    if (isNaN(session_id) || session_id <= 0) {
+    if (isNaN(sessionId) || sessionId <= 0) {
       return res.apiError('会话ID无效', 'BAD_REQUEST', null, 400)
     }
 
-    const admin_id = req.user.user_id
+    const adminId = req.user.user_id
 
     // 通过 ServiceManager 获取 AdminCustomerServiceService
     const AdminCustomerServiceService = req.app.locals.services.getService('admin_customer_service')
 
     // 调用服务层方法
-    const result = await AdminCustomerServiceService.markSessionAsRead(session_id, admin_id)
+    const result = await AdminCustomerServiceService.markSessionAsRead(sessionId, adminId)
 
     return res.apiSuccess(result, '标记已读成功')
   } catch (error) {

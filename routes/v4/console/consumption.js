@@ -124,11 +124,14 @@ router.get('/records', authenticateToken, requireAdmin, async (req, res) => {
 })
 
 /**
- * @route POST /api/v4/console/consumption/approve/:record_id
+ * @route POST /api/v4/console/consumption/approve/:id
  * @desc 管理员审核通过消费记录
  * @access Private (管理员，role_level >= 100)
  *
- * @param {number} record_id - 消费记录ID
+ * API路径参数设计规范 V2.2（2026-01-20）：
+ * - 消费记录是事务实体，使用数字ID（:id）作为标识符
+ *
+ * @param {number} id - 消费记录ID
  * @body {string} admin_notes - 审核备注（可选）
  *
  * @returns {Object} 审核结果
@@ -144,12 +147,12 @@ router.get('/records', authenticateToken, requireAdmin, async (req, res) => {
  *   "admin_notes": "核实无误，审核通过"
  * }
  */
-router.post('/approve/:record_id', authenticateToken, requireAdmin, async (req, res) => {
+router.post('/approve/:id', authenticateToken, requireAdmin, async (req, res) => {
   try {
     // 🔄 通过 ServiceManager 获取 ConsumptionService（符合TR-005规范）
     const ConsumptionService = req.app.locals.services.getService('consumption')
 
-    const { record_id } = req.params
+    const record_id = parseInt(req.params.id, 10)
     const { admin_notes } = req.body
     const reviewerId = req.user.user_id
 
@@ -194,11 +197,14 @@ router.post('/approve/:record_id', authenticateToken, requireAdmin, async (req, 
 })
 
 /**
- * @route POST /api/v4/console/consumption/reject/:record_id
+ * @route POST /api/v4/console/consumption/reject/:id
  * @desc 管理员审核拒绝消费记录
  * @access Private (管理员，role_level >= 100)
  *
- * @param {number} record_id - 消费记录ID
+ * API路径参数设计规范 V2.2（2026-01-20）：
+ * - 消费记录是事务实体，使用数字ID（:id）作为标识符
+ *
+ * @param {number} id - 消费记录ID
  * @body {string} admin_notes - 拒绝原因（必填，5-500字符）
  *
  * @returns {Object} 审核结果
@@ -213,12 +219,12 @@ router.post('/approve/:record_id', authenticateToken, requireAdmin, async (req, 
  *   "admin_notes": "消费金额与实际不符"
  * }
  */
-router.post('/reject/:record_id', authenticateToken, requireAdmin, async (req, res) => {
+router.post('/reject/:id', authenticateToken, requireAdmin, async (req, res) => {
   try {
     // 🔄 通过 ServiceManager 获取 ConsumptionService（符合TR-005规范）
     const ConsumptionService = req.app.locals.services.getService('consumption')
 
-    const { record_id } = req.params
+    const record_id = parseInt(req.params.id, 10)
     const { admin_notes } = req.body
     const reviewerId = req.user.user_id
 

@@ -4,18 +4,20 @@
  * 功能：
  * - 创建聊天会话（POST /chat/sessions）
  * - 获取用户聊天会话列表（GET /chat/sessions）
- * - 获取聊天历史记录（GET /chat/sessions/:session_id/messages）
- * - 发送聊天消息（POST /chat/sessions/:session_id/messages）
+ * - 获取聊天历史记录（GET /chat/sessions/:id/messages）
+ * - 发送聊天消息（POST /chat/sessions/:id/messages）
  *
  * 路由前缀：/api/v4/system
  *
  * 规范遵循：
  * - API设计与契约标准规范 v2.0（2025-12-23）
+ * - API路径参数设计规范 V2.2（2026-01-20）：会话是事务实体，使用 :id
  * - RESTful资源嵌套（原则3：资源嵌套规范）
  * - 硬切断旧路径策略（不保留 /chat/create, /chat/send, /chat/history）
  *
  * 创建时间：2025年12月22日
  * 重构时间：2025年12月23日（符合API设计与契约标准规范）
+ * 更新时间：2026年01月20日（统一事务实体路由参数为 :id）
  */
 
 const express = require('express')
@@ -152,21 +154,24 @@ router.get('/chat/sessions', authenticateToken, async (req, res) => {
 })
 
 /**
- * @route GET /api/v4/system/chat/sessions/:session_id/messages
+ * @route GET /api/v4/system/chat/sessions/:id/messages
  * @desc 获取聊天历史记录
  * @access Private
  *
- * Canonical Path：GET /api/v4/system/chat/sessions/:session_id/messages
+ * API路径参数设计规范 V2.2（2026-01-20）：
+ * - 会话是事务实体，使用数字ID（:id）作为标识符
  *
- * @param {string} session_id - 会话ID
+ * Canonical Path：GET /api/v4/system/chat/sessions/:id/messages
+ *
+ * @param {number} id - 会话ID（事务实体）
  * @query {number} page - 页码（默认1）
  * @query {number} limit - 每页数量（默认50，最大100）
  *
  * @returns {Object} 消息列表和分页信息
  */
-router.get('/chat/sessions/:session_id/messages', authenticateToken, async (req, res) => {
+router.get('/chat/sessions/:id/messages', authenticateToken, async (req, res) => {
   try {
-    const { session_id } = req.params
+    const sessionId = req.params.id
     const { page = 1, limit = 50 } = req.query
     // 分页安全保护：最大100条记录
     const finalLimit = Math.min(parseInt(limit), 100)
@@ -177,7 +182,7 @@ router.get('/chat/sessions/:session_id/messages', authenticateToken, async (req,
     )
 
     // 使用 CustomerServiceSessionService 获取会话消息
-    const result = await CustomerServiceSessionService.getSessionMessages(session_id, {
+    const result = await CustomerServiceSessionService.getSessionMessages(sessionId, {
       user_id: req.user.user_id, // 权限验证：用户只能查看自己的会话
       page: parseInt(page),
       limit: finalLimit,
@@ -204,21 +209,24 @@ router.get('/chat/sessions/:session_id/messages', authenticateToken, async (req,
 })
 
 /**
- * @route POST /api/v4/system/chat/sessions/:session_id/messages
+ * @route POST /api/v4/system/chat/sessions/:id/messages
  * @desc 发送聊天消息
  * @access Private
  *
- * Canonical Path：POST /api/v4/system/chat/sessions/:session_id/messages
+ * API路径参数设计规范 V2.2（2026-01-20）：
+ * - 会话是事务实体，使用数字ID（:id）作为标识符
  *
- * @param {string} session_id - 会话ID
+ * Canonical Path：POST /api/v4/system/chat/sessions/:id/messages
+ *
+ * @param {number} id - 会话ID（事务实体）
  * @body {string} content - 消息内容（必需）
  * @body {string} message_type - 消息类型（默认text）
  *
  * @returns {Object} 发送的消息信息
  */
-router.post('/chat/sessions/:session_id/messages', authenticateToken, async (req, res) => {
+router.post('/chat/sessions/:id/messages', authenticateToken, async (req, res) => {
   try {
-    const { session_id } = req.params
+    const sessionId = req.params.id
     const { content, message_type = 'text' } = req.body
     const businessConfig = require('../../../config/business.config')
 
@@ -286,7 +294,7 @@ router.post('/chat/sessions/:session_id/messages', authenticateToken, async (req
     // 使用 TransactionManager 统一事务边界（符合治理决策）
     const message = await TransactionManager.execute(async transaction => {
       return await CustomerServiceSessionService.sendUserMessage(
-        session_id,
+        sessionId,
         {
           user_id: userId,
           content: sanitized_content,
