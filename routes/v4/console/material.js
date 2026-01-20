@@ -69,6 +69,36 @@ router.get('/conversion-rules', authenticateToken, requireAdmin, async (req, res
 })
 
 /**
+ * 获取单个材料转换规则详情（管理员）
+ * GET /api/v4/console/material/conversion-rules/:id
+ *
+ * API路径参数设计规范 V2.2（2026-01-20）：
+ * - 转换规则是事务实体（高频创建），使用数字ID（:id）作为标识符
+ *
+ * 返回：规则详情
+ */
+router.get('/conversion-rules/:id', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const rule_id = parseInt(req.params.id, 10)
+    if (isNaN(rule_id) || rule_id <= 0) {
+      return res.apiError('无效的规则ID', 'INVALID_RULE_ID', null, 400)
+    }
+
+    const MaterialManagementService = req.app.locals.services.getService('material_management')
+    const result = await MaterialManagementService.getConversionRuleById(rule_id)
+
+    return res.apiSuccess(result, '获取材料转换规则详情成功')
+  } catch (error) {
+    return res.apiError(
+      `获取材料转换规则详情失败：${error.message}`,
+      error.error_code || 'get_rule_failed',
+      error.details || null,
+      error.status_code || 500
+    )
+  }
+})
+
+/**
  * 创建材料转换规则（管理员）
  * POST /api/v4/console/material/conversion-rules
  *
@@ -265,6 +295,35 @@ router.get('/asset-types', authenticateToken, requireAdmin, async (req, res) => 
     return res.apiError(
       `查询材料资产类型失败：${error.message}`,
       error.error_code || 'query_asset_types_failed',
+      error.details || null,
+      error.status_code || 500
+    )
+  }
+})
+
+/**
+ * 获取单个材料资产类型详情（管理员）
+ * GET /api/v4/console/material/asset-types/:code
+ *
+ * @description 配置实体使用业务码（:code）作为标识符
+ * @param {string} code - 资产类型代码（如 red_shard、DIAMOND）
+ *
+ * API路径参数设计规范 V2.2（2026-01-20）：
+ * - 配置实体使用 :code 占位符
+ * - 业务码格式：snake_case 或 UPPER_SNAKE
+ *
+ * 返回：材料资产类型详情
+ */
+router.get('/asset-types/:code', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const asset_code = req.params.code
+    const MaterialManagementService = req.app.locals.services.getService('material_management')
+    const result = await MaterialManagementService.getAssetTypeByCode(asset_code)
+    return res.apiSuccess(result, '获取材料资产类型详情成功')
+  } catch (error) {
+    return res.apiError(
+      `获取材料资产类型详情失败：${error.message}`,
+      error.error_code || 'get_asset_type_failed',
       error.details || null,
       error.status_code || 500
     )

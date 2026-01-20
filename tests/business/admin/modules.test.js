@@ -45,15 +45,15 @@ describe('GET /api/v4/console/ - 管理员模块信息API', () => {
 
   /**
    * 测试3：模块数量验证
-   * 验证返回的模块数量（当前应为18个实际挂载的模块）
-   * 2026-01-08：新增 assets 和 images 模块
+   * 验证返回的模块数量
+   * 2026-01-21：API覆盖率补齐后新增多个模块（40个模块）
    */
-  test('应该返回21个已实现的模块', async () => {
+  test('应该返回40个已实现的模块', async () => {
     const response = await request(app).get('/api/v4/console/')
     const { modules } = response.body.data
 
     const moduleCount = Object.keys(modules).length
-    expect(moduleCount).toBe(28) // 实际挂载的路由数量（2026-01-18：统一抽奖引擎重构，新增1个模块）
+    expect(moduleCount).toBe(40) // 实际挂载的路由数量（2026-01-21：API覆盖率补齐完成）
 
     // 验证必需的模块是否存在（原有8个）
     expect(modules).toHaveProperty('auth')
@@ -76,6 +76,42 @@ describe('GET /api/v4/console/ - 管理员模块信息API', () => {
     // 验证新增的模块（2026-01-08）
     expect(modules).toHaveProperty('assets')
     expect(modules).toHaveProperty('images')
+
+    // 验证新增的模块（2026-01-09）
+    expect(modules).toHaveProperty('asset_adjustment')
+    expect(modules).toHaveProperty('campaign_budget')
+    expect(modules).toHaveProperty('orphan_frozen')
+    expect(modules).toHaveProperty('merchant_points')
+    expect(modules).toHaveProperty('user_hierarchy')
+
+    // 验证新增的模块（2026-01-12 商家员工域权限体系升级）
+    expect(modules).toHaveProperty('consumption')
+    expect(modules).toHaveProperty('stores')
+    expect(modules).toHaveProperty('regions')
+    expect(modules).toHaveProperty('staff')
+    expect(modules).toHaveProperty('audit_logs')
+    expect(modules).toHaveProperty('risk_alerts')
+
+    // 验证新增的模块（2026-01-18 统一抽奖架构）
+    expect(modules).toHaveProperty('debt_management')
+
+    // 验证新增的模块（2026-01-21 API覆盖率补齐 P0）
+    expect(modules).toHaveProperty('dictionaries')
+    expect(modules).toHaveProperty('lottery_configs')
+    expect(modules).toHaveProperty('item_templates')
+    expect(modules).toHaveProperty('risk_profiles')
+    expect(modules).toHaveProperty('lottery_tier_rules')
+    expect(modules).toHaveProperty('lottery_presets')
+
+    // 验证新增的模块（2026-01-21 API覆盖率补齐 P2 只读查询）
+    expect(modules).toHaveProperty('lottery_monitoring')
+    expect(modules).toHaveProperty('trade_orders')
+    expect(modules).toHaveProperty('user_premium')
+
+    // 验证新增的模块（2026-01-22 API覆盖率补齐 P1 只读查询）
+    expect(modules).toHaveProperty('admin_audit_logs')
+    expect(modules).toHaveProperty('business_records')
+    expect(modules).toHaveProperty('system_data')
   })
 
   /**

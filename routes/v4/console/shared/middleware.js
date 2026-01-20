@@ -16,7 +16,7 @@
  * P1-9：使用懒加载模式获取服务实例，避免顶部直接 require 服务
  * 抽奖引擎相关类 - 通过 ServiceManager 或懒加载获取
  */
-const { requireAdmin, authenticateToken } = require('../../../../middleware/auth')
+const { requireAdmin, requireRole, authenticateToken } = require('../../../../middleware/auth')
 const logger = require('../../../../utils/logger').logger
 
 // 共享组件 - 延迟初始化（首次访问时初始化）
@@ -140,9 +140,17 @@ async function getSimpleSystemStats(serviceManager) {
 }
 
 /**
- * 管理员权限验证中间件组合
+ * 管理员权限验证中间件组合（仅admin可访问）
+ * 用于写操作和敏感数据
  */
 const adminAuthMiddleware = [authenticateToken, requireAdmin]
+
+/**
+ * 管理员+运营权限验证中间件组合（admin和ops可访问，ops只读）
+ * 用于P1优先级只读API（符合docs/数据库表API覆盖率分析报告.md要求）
+ * ops角色只能执行GET请求，POST/PUT/DELETE会被requireRole中间件拦截
+ */
+const adminOpsAuthMiddleware = [authenticateToken, requireRole(['admin', 'ops'])]
 
 /**
  * 错误处理包装器
@@ -293,6 +301,7 @@ module.exports = {
   sharedComponents,
   getSimpleSystemStats,
   adminAuthMiddleware,
+  adminOpsAuthMiddleware, // 🆕 P1只读API中间件（admin+ops，ops只读）
   asyncHandler,
   validators
   /**

@@ -403,6 +403,187 @@ class LotteryPresetService {
   }
 
   /**
+   * 根据ID获取预设详情（带完整关联）
+   *
+   * @description 获取单个预设的详细信息，包括关联的奖品、用户、活动等
+   *
+   * @param {number} presetId - 预设ID
+   * @returns {Promise<Object|null>} 预设详情或null
+   */
+  static async getPresetById(presetId) {
+    if (!presetId) {
+      const error = new Error('参数错误：预设ID不能为空')
+      error.code = 'INVALID_PARAMETERS'
+      throw error
+    }
+
+    const preset = await models.LotteryPreset.findByPk(presetId, {
+      include: [
+        {
+          model: models.LotteryPrize,
+          as: 'prize',
+          attributes: ['prize_id', 'prize_name', 'prize_type', 'prize_value', 'prize_description']
+        },
+        {
+          model: models.User,
+          as: 'targetUser',
+          attributes: ['user_id', 'mobile', 'nickname']
+        },
+        {
+          model: models.User,
+          as: 'admin',
+          attributes: ['user_id', 'mobile', 'nickname']
+        },
+        {
+          model: models.User,
+          as: 'approver',
+          attributes: ['user_id', 'mobile', 'nickname']
+        },
+        {
+          model: models.LotteryCampaign,
+          as: 'campaign',
+          attributes: ['campaign_id', 'campaign_name', 'status']
+        }
+      ]
+    })
+
+    return preset
+  }
+
+  /**
+   * 更新预设信息
+   *
+   * @description 更新指定预设的信息（只能更新 pending 状态的预设）
+   *
+   * 业务规则：
+   * - 只能更新 pending 状态的预设
+   * - 已使用(used)或已过期(expired)的预设不能更新
+   * - 可更新字段：prize_id, queue_order, expires_at, reason
+   *
+   * @param {number} presetId - 预设ID
+   * @param {Object} updateData - 更新数据
+   * @param {number} updateData.prize_id - 新奖品ID（可选）
+   * @param {number} updateData.queue_order - 新队列顺序（可选）
+   * @param {Date} updateData.expires_at - 新过期时间（可选）
+   * @param {string} updateData.reason - 更新原因（可选）
+   * @param {Object} options - 选项
+   * @param {Object} options.transaction - 数据库事务
+   * @returns {Promise<Object>} 更新后的预设信息
+   * @throws {Error} 预设不存在或状态不允许更新
+   */
+  static async updatePreset(presetId, updateData, options = {}) {
+    const { transaction } = options
+
+    if (!presetId) {
+      const error = new Error('参数错误：预设ID不能为空')
+      error.code = 'INVALID_PARAMETERS'
+      throw error
+    }
+
+    const preset = await models.LotteryPreset.findByPk(presetId, { transaction })
+
+    if (!preset) {
+      const error = new Error('预设不存在')
+      error.code = 'PRESET_NOT_FOUND'
+      throw error
+    }
+
+    // 只能更新 pending 状态的预设
+    if (preset.status !== 'pending') {
+      const error = new Error('只能更新等待使用状态的预设')
+      error.code = 'INVALID_PRESET_STATUS'
+      throw error
+    }
+
+    // 允许更新的字段白名单
+    const allowedFields = ['prize_id', 'queue_order', 'expires_at', 'reason']
+    const filteredData = {}
+    for (const field of allowedFields) {
+      if (updateData[field] !== undefined) {
+        filteredData[field] = updateData[field]
+      }
+    }
+
+    // 如果更新 prize_id，验证奖品存在性
+    if (filteredData.prize_id) {
+      const prize = await models.LotteryPrize.findByPk(filteredData.prize_id, { transaction })
+      if (!prize) {
+        const error = new Error('奖品不存在')
+        error.code = 'PRIZE_NOT_FOUND'
+        throw error
+      }
+    }
+
+    await preset.update(filteredData, { transaction })
+
+    logger.info('[LotteryPresetService] 更新预设', {
+      preset_id: presetId,
+      user_id: preset.user_id,
+      updated_fields: Object.keys(filteredData)
+    })
+
+    // 重新查询完整信息
+    const updatedPreset = await this.getPresetById(presetId)
+
+    return updatedPreset
+  }
+
+  /**
+   * 删除单个预设
+   *
+   * @description 删除指定的预设记录（只能删除 pending 状态的预设）
+   *
+   * 业务规则：
+   * - 只能删除 pending 状态的预设
+   * - 已使用(used)或已过期(expired)的预设不能删除
+   *
+   * @param {number} presetId - 预设ID
+   * @param {Object} options - 选项
+   * @param {Object} options.transaction - 数据库事务
+   * @returns {Promise<Object>} 被删除的预设信息
+   * @throws {Error} 预设不存在或状态不允许删除
+   */
+  static async deletePreset(presetId, options = {}) {
+    const { transaction } = options
+
+    if (!presetId) {
+      const error = new Error('参数错误：预设ID不能为空')
+      error.code = 'INVALID_PARAMETERS'
+      throw error
+    }
+
+    const preset = await models.LotteryPreset.findByPk(presetId, { transaction })
+
+    if (!preset) {
+      const error = new Error('预设不存在')
+      error.code = 'PRESET_NOT_FOUND'
+      throw error
+    }
+
+    // 只能删除 pending 状态的预设
+    if (preset.status !== 'pending') {
+      const error = new Error('只能删除等待使用状态的预设')
+      error.code = 'INVALID_PRESET_STATUS'
+      throw error
+    }
+
+    await preset.destroy({ transaction })
+
+    logger.info('[LotteryPresetService] 删除预设', {
+      preset_id: presetId,
+      user_id: preset.user_id,
+      prize_id: preset.prize_id
+    })
+
+    return {
+      preset_id: presetId,
+      user_id: preset.user_id,
+      prize_id: preset.prize_id,
+      deleted_at: BeijingTimeHelper.apiTimestamp()
+    }
+  }
+
+  /**
    * 获取预设统计信息
    *
    * @description 获取系统级预设统计数据（管理员监控运营效果）

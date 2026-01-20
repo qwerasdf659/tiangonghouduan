@@ -284,6 +284,22 @@ class MaterialManagementService {
   }
 
   /**
+   * 获取单个材料转换规则详情
+   *
+   * @description 根据规则ID获取转换规则详情（用于管理后台查看单条记录）
+   * @param {number|string} rule_id - 规则ID
+   * @returns {Promise<Object>} 规则详情
+   * @throws {Error} 404 - 规则不存在
+   */
+  static async getConversionRuleById(rule_id) {
+    const rule = await MaterialConversionRule.findByPk(rule_id)
+    if (!rule) {
+      this._throw(404, 'rule_not_found', '规则不存在')
+    }
+    return { rule: rule.toJSON() }
+  }
+
+  /**
    * 查询材料资产类型列表（管理员）
    *
    * @param {Object} query - 查询参数
@@ -307,6 +323,33 @@ class MaterialManagementService {
     })
 
     return { asset_types: assetTypes.map(t => t.toJSON()) }
+  }
+
+  /**
+   * 获取单个材料资产类型详情（管理员）
+   *
+   * API路径参数设计规范 V2.2（2026-01-20）：
+   * - 配置实体使用业务码（:code）作为标识符
+   * - 对应路由：GET /api/v4/console/material/asset-types/:code
+   *
+   * @param {string} assetCode - 资产类型代码（如 red_shard、DIAMOND）
+   * @returns {Promise<Object>} 资产类型详情
+   * @throws {Error} 404 - 资产类型不存在
+   */
+  static async getAssetTypeByCode(assetCode) {
+    if (!assetCode) {
+      this._throw(400, 'missing_asset_code', '缺少必填参数：asset_code')
+    }
+
+    const assetType = await MaterialAssetType.findOne({
+      where: { asset_code: assetCode }
+    })
+
+    if (!assetType) {
+      this._throw(404, 'asset_type_not_found', `资产类型 ${assetCode} 不存在`)
+    }
+
+    return { asset_type: assetType.toJSON() }
   }
 
   /**

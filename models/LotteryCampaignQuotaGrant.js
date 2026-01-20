@@ -54,17 +54,18 @@ class LotteryCampaignQuotaGrant extends Model {
   }
 
   /**
-   * 获取赠送类型显示名称
-   * @returns {string} 赠送类型中文名称
+   * 获取赠送来源显示名称
+   * @returns {string} 赠送来源中文名称
    */
-  getGrantTypeName() {
-    const typeNames = {
+  getGrantSourceName() {
+    const sourceNames = {
       admin_grant: '管理员赠送',
       spending: '消费赠送',
       activity: '活动奖励',
-      refund: '配额退还'
+      refund: '配额退还',
+      system: '系统赠送'
     }
-    return typeNames[this.grant_type] || '未知类型'
+    return sourceNames[this.grant_source] || '未知来源'
   }
 
   /**
@@ -74,14 +75,16 @@ class LotteryCampaignQuotaGrant extends Model {
   toSummary() {
     return {
       grant_id: this.grant_id,
+      quota_id: this.quota_id,
       campaign_id: this.campaign_id,
       user_id: this.user_id,
-      grant_type: this.grant_type,
-      grant_type_name: this.getGrantTypeName(),
+      grant_source: this.grant_source,
+      grant_source_name: this.getGrantSourceName(),
       grant_amount: this.grant_amount,
-      reason: this.reason,
+      grant_reason: this.grant_reason,
       granted_by: this.granted_by,
-      related_order_id: this.related_order_id,
+      source_reference_id: this.source_reference_id,
+      balance_after: this.balance_after,
       created_at: this.created_at
     }
   }
@@ -95,10 +98,19 @@ class LotteryCampaignQuotaGrant extends Model {
   static async createGrant(grantData, options = {}) {
     const { transaction } = options
 
-    const { campaign_id, user_id, grant_type, grant_amount, reason, granted_by, related_order_id } =
-      grantData
+    const {
+      quota_id,
+      campaign_id,
+      user_id,
+      grant_source,
+      grant_amount,
+      grant_reason,
+      granted_by,
+      source_reference_id,
+      balance_after
+    } = grantData
 
-    if (!campaign_id || !user_id || !grant_type || !grant_amount) {
+    if (!user_id || !campaign_id || !grant_source || !grant_amount) {
       throw new Error('缺少必要的赠送参数')
     }
 
@@ -108,13 +120,15 @@ class LotteryCampaignQuotaGrant extends Model {
 
     const grant = await this.create(
       {
+        quota_id: quota_id || null,
         campaign_id,
         user_id,
-        grant_type,
+        grant_source,
         grant_amount,
-        reason: reason || null,
+        grant_reason: grant_reason || null,
         granted_by: granted_by || null,
-        related_order_id: related_order_id || null
+        source_reference_id: source_reference_id || null,
+        balance_after: balance_after || null
       },
       { transaction }
     )
@@ -145,23 +159,23 @@ class LotteryCampaignQuotaGrant extends Model {
   }
 
   /**
-   * 按赠送类型统计活动配额
+   * 按赠送来源统计活动配额
    * @param {number} campaignId - 活动ID
    * @param {Object} options - 查询选项
-   * @returns {Promise<Array>} 按类型分组的统计结果
+   * @returns {Promise<Array>} 按来源分组的统计结果
    */
-  static async getGrantStatsByType(campaignId, options = {}) {
+  static async getGrantStatsBySource(campaignId, options = {}) {
     const { transaction } = options
     const { fn, col } = require('sequelize')
 
     return this.findAll({
       attributes: [
-        'grant_type',
+        'grant_source',
         [fn('COUNT', col('grant_id')), 'grant_count'],
         [fn('SUM', col('grant_amount')), 'total_amount']
       ],
       where: { campaign_id: campaignId },
-      group: ['grant_type'],
+      group: ['grant_source'],
       transaction
     })
   }
@@ -240,12 +254,12 @@ module.exports = sequelize => {
       },
 
       /**
-       * 活动ID
+       * 配额ID - 外键关联 lottery_campaign_user_quota
        */
-      campaign_id: {
-        type: DataTypes.INTEGER,
-        allowNull: false,
-        comment: '活动ID（外键关联lottery_campaigns.campaign_id）'
+      quota_id: {
+        type: DataTypes.BIGINT,
+        allowNull: true,
+        comment: '关联的配额ID（外键关联lottery_campaign_user_quota.quota_id）'
       },
 
       /**
@@ -258,13 +272,12 @@ module.exports = sequelize => {
       },
 
       /**
-       * 赠送类型
+       * 活动ID
        */
-      grant_type: {
-        type: DataTypes.ENUM('admin_grant', 'spending', 'activity', 'refund'),
+      campaign_id: {
+        type: DataTypes.INTEGER,
         allowNull: false,
-        comment:
-          '赠送类型：admin_grant=管理员赠送, spending=消费赠送, activity=活动奖励, refund=配额退还'
+        comment: '活动ID（外键关联lottery_campaigns.campaign_id）'
       },
 
       /**
@@ -277,9 +290,28 @@ module.exports = sequelize => {
       },
 
       /**
+       * 赠送来源
+       */
+      grant_source: {
+        type: DataTypes.STRING(50),
+        allowNull: false,
+        comment:
+          '赠送来源：admin_grant=管理员赠送, spending=消费赠送, activity=活动奖励, refund=配额退还, system=系统赠送'
+      },
+
+      /**
+       * 来源引用ID
+       */
+      source_reference_id: {
+        type: DataTypes.STRING(100),
+        allowNull: true,
+        comment: '来源引用ID（如消费订单ID、活动奖励ID，用于追溯）'
+      },
+
+      /**
        * 赠送原因
        */
-      reason: {
+      grant_reason: {
         type: DataTypes.TEXT,
         allowNull: true,
         comment: '赠送原因说明'
@@ -295,12 +327,12 @@ module.exports = sequelize => {
       },
 
       /**
-       * 关联订单ID
+       * 操作后余额
        */
-      related_order_id: {
-        type: DataTypes.STRING(100),
+      balance_after: {
+        type: DataTypes.INTEGER,
         allowNull: true,
-        comment: '关联的订单ID（如消费订单ID，用于追溯）'
+        comment: '赠送操作后的配额余额'
       },
 
       /**
@@ -326,20 +358,25 @@ module.exports = sequelize => {
           fields: ['campaign_id', 'user_id', 'created_at'],
           name: 'idx_quota_grants_campaign_user_time'
         },
-        // 查询索引：按赠送类型查询
+        // 查询索引：按赠送来源查询
         {
-          fields: ['campaign_id', 'grant_type'],
-          name: 'idx_quota_grants_campaign_type'
+          fields: ['campaign_id', 'grant_source'],
+          name: 'idx_quota_grants_campaign_source'
         },
-        // 查询索引：按关联订单查询
+        // 查询索引：按来源引用ID查询
         {
-          fields: ['related_order_id'],
-          name: 'idx_quota_grants_order'
+          fields: ['source_reference_id'],
+          name: 'idx_quota_grants_source_ref'
         },
         // 查询索引：按赠送人查询
         {
           fields: ['granted_by', 'created_at'],
           name: 'idx_quota_grants_granter_time'
+        },
+        // 查询索引：按配额ID查询
+        {
+          fields: ['quota_id'],
+          name: 'idx_quota_grants_quota'
         }
       ]
     }

@@ -33,7 +33,7 @@
 
 const express = require('express')
 const router = express.Router()
-const { authenticateToken, requireAdmin } = require('../../../middleware/auth')
+const { authenticateToken, requireAdmin, requireRole } = require('../../../middleware/auth')
 const StaffManagementService = require('../../../services/StaffManagementService')
 const logger = require('../../../utils/logger').logger
 const TransactionManager = require('../../../utils/TransactionManager')
@@ -98,7 +98,7 @@ function handleServiceError(error, res, operation) {
  *
  * @access Admin only (role_level >= 100)
  */
-router.get('/', authenticateToken, requireAdmin, async (req, res) => {
+router.get('/', authenticateToken, requireRole(['admin', 'ops']), async (req, res) => {
   try {
     const { page = 1, page_size = 20, store_id, user_id, status, role_in_store } = req.query
 
@@ -130,7 +130,7 @@ router.get('/', authenticateToken, requireAdmin, async (req, res) => {
  *
  * @access Admin only (role_level >= 100)
  */
-router.get('/stats', authenticateToken, requireAdmin, async (req, res) => {
+router.get('/stats', authenticateToken, requireRole(['admin', 'ops']), async (req, res) => {
   try {
     const { store_id } = req.query
 
@@ -164,28 +164,33 @@ router.get('/stats', authenticateToken, requireAdmin, async (req, res) => {
  *
  * @access Admin only (role_level >= 100)
  */
-router.get('/by-user/:user_id', authenticateToken, requireAdmin, async (req, res) => {
-  try {
-    const { user_id } = req.params
+router.get(
+  '/by-user/:user_id',
+  authenticateToken,
+  requireRole(['admin', 'ops']),
+  async (req, res) => {
+    try {
+      const { user_id } = req.params
 
-    if (!user_id || isNaN(parseInt(user_id, 10))) {
-      return res.apiError('用户ID无效', 'INVALID_USER_ID', null, 400)
+      if (!user_id || isNaN(parseInt(user_id, 10))) {
+        return res.apiError('用户ID无效', 'INVALID_USER_ID', null, 400)
+      }
+
+      const stores = await StaffManagementService.getUserStores(parseInt(user_id, 10))
+
+      return res.apiSuccess(
+        {
+          user_id: parseInt(user_id, 10),
+          stores,
+          store_count: stores.length
+        },
+        '获取用户门店列表成功'
+      )
+    } catch (error) {
+      return handleServiceError(error, res, '获取用户门店列表')
     }
-
-    const stores = await StaffManagementService.getUserStores(parseInt(user_id, 10))
-
-    return res.apiSuccess(
-      {
-        user_id: parseInt(user_id, 10),
-        stores,
-        store_count: stores.length
-      },
-      '获取用户门店列表成功'
-    )
-  } catch (error) {
-    return handleServiceError(error, res, '获取用户门店列表')
   }
-})
+)
 
 /**
  * GET /:store_staff_id - 获取员工详情
@@ -194,25 +199,30 @@ router.get('/by-user/:user_id', authenticateToken, requireAdmin, async (req, res
  *
  * @access Admin only (role_level >= 100)
  */
-router.get('/:store_staff_id', authenticateToken, requireAdmin, async (req, res) => {
-  try {
-    const { store_staff_id } = req.params
+router.get(
+  '/:store_staff_id',
+  authenticateToken,
+  requireRole(['admin', 'ops']),
+  async (req, res) => {
+    try {
+      const { store_staff_id } = req.params
 
-    if (!store_staff_id || isNaN(parseInt(store_staff_id, 10))) {
-      return res.apiError('员工记录ID无效', 'INVALID_STORE_STAFF_ID', null, 400)
+      if (!store_staff_id || isNaN(parseInt(store_staff_id, 10))) {
+        return res.apiError('员工记录ID无效', 'INVALID_STORE_STAFF_ID', null, 400)
+      }
+
+      const staff = await StaffManagementService.getStaffDetail(parseInt(store_staff_id, 10))
+
+      if (!staff) {
+        return res.apiError('员工记录不存在', 'STAFF_NOT_FOUND', null, 404)
+      }
+
+      return res.apiSuccess(staff, '获取员工详情成功')
+    } catch (error) {
+      return handleServiceError(error, res, '获取员工详情')
     }
-
-    const staff = await StaffManagementService.getStaffDetail(parseInt(store_staff_id, 10))
-
-    if (!staff) {
-      return res.apiError('员工记录不存在', 'STAFF_NOT_FOUND', null, 404)
-    }
-
-    return res.apiSuccess(staff, '获取员工详情成功')
-  } catch (error) {
-    return handleServiceError(error, res, '获取员工详情')
   }
-})
+)
 
 /*
  * =================================================================

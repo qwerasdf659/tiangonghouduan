@@ -15,10 +15,10 @@
 const express = require('express')
 const router = express.Router()
 const logger = require('../../../../utils/logger').logger
-const { authenticateToken, requireAdmin } = require('../../../../middleware/auth')
+const { authenticateToken, requireRole } = require('../../../../middleware/auth')
 
 // 所有路由都需要管理员权限
-router.use(authenticateToken, requireAdmin)
+router.use(authenticateToken, requireRole(['admin', 'ops']))
 
 /**
  * GET /sessions - 获取会话列表

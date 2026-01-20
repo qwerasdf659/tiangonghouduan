@@ -3,6 +3,6 @@
 
 # 路由层规范检查（增量门禁，仅检查暂存区文件）
 # 注意：当前为警告模式，不阻止提交；启用严格模式：添加 --strict 参数
-node scripts/validation/check-route-layer-compliance.js --staged || echo "⚠️ 路由层规范检查发现问题，请查看上方输出"
+node scripts/validation/check_route_layer_compliance.js --staged || echo "⚠️ 路由层规范检查发现问题，请查看上方输出"
 
 npx lint-staged

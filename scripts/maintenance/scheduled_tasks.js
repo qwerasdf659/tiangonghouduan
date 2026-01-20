@@ -43,7 +43,7 @@ const { UserPremiumStatus, sequelize } = require('../../models')
 const { Op } = sequelize.Sequelize
 const BeijingTimeHelper = require('../../utils/timeHelper')
 // 2025-11-09新增：数据库性能监控
-const { monitor: databaseMonitor } = require('./database-performance-monitor')
+const { monitor: databaseMonitor } = require('./database_performance_monitor')
 // 2025-12-17新增：每日资产对账任务（Phase 1）
 const DailyAssetReconciliation = require('../../jobs/daily-asset-reconciliation')
 // 🔴 移除 RedemptionService 直接引用（2025-12-17 P1-2）

@@ -38,6 +38,18 @@ const staffRoutes = require('./staff') // 🆕 员工管理（2026-01-12 商家�
 const auditLogsRoutes = require('./audit-logs') // 🆕 商家操作审计日志（2026-01-12 商家员工域权限体系升级 AC4.3）
 const riskAlertsRoutes = require('./risk-alerts') // 🆕 风控告警管理（2026-01-12 商家员工域权限体系升级 AC5）
 const debtManagementRoutes = require('./debt-management') // 🆕 欠账管理（2026-01-18 统一抽奖架构）
+const dictionariesRoutes = require('./dictionaries') // 🆕 字典表管理（2026-01-21 API覆盖率补齐）
+const lotteryConfigsRoutes = require('./lottery-configs') // 🆕 抽奖配置管理（2026-01-21 API覆盖率补齐）
+const itemTemplatesRoutes = require('./item-templates') // 🆕 物品模板管理（2026-01-21 API覆盖率补齐）
+const riskProfilesRoutes = require('./risk-profiles') // 🆕 用户风控配置管理（2026-01-21 API覆盖率补齐）
+const lotteryTierRulesRoutes = require('./lottery-tier-rules') // 🆕 抽奖档位规则管理（2026-01-21 API覆盖率补齐）
+const lotteryPresetsRoutes = require('./lottery-presets') // 🆕 抽奖预设管理（2026-01-21 API覆盖率补齐）
+const lotteryMonitoringRoutes = require('./lottery-monitoring') // 🆕 抽奖监控数据查询（2026-01-21 P2 API覆盖率补齐）
+const tradeOrdersRoutes = require('./trade-orders') // 🆕 交易订单查询（2026-01-21 P2 API覆盖率补齐）
+const userPremiumRoutes = require('./user-premium') // 🆕 用户高级空间状态查询（2026-01-21 P2 API覆盖率补齐）
+const adminAuditLogsRoutes = require('./admin-audit-logs') // 🆕 管理员操作审计日志（2026-01-22 P1 API覆盖率补齐）
+const businessRecordsRoutes = require('./business-records') // 🆕 业务记录查询（2026-01-22 P1 API覆盖率补齐）
+const systemDataRoutes = require('./system-data') // 🆕 系统数据查询（2026-01-22 P1 API覆盖率补齐）
 
 // 挂载子模块路由
 router.use('/auth', authRoutes)
@@ -67,6 +79,18 @@ router.use('/staff', staffRoutes) // 🆕 员工管理路由（2026-01-12 商家
 router.use('/audit-logs', auditLogsRoutes) // 🆕 商家操作审计日志路由（2026-01-12 商家员工域权限体系升级 AC4.3）
 router.use('/risk-alerts', riskAlertsRoutes) // 🆕 风控告警管理路由（2026-01-12 商家员工域权限体系升级 AC5）
 router.use('/debt-management', debtManagementRoutes) // 🆕 欠账管理路由（2026-01-18 统一抽奖架构）
+router.use('/dictionaries', dictionariesRoutes) // 🆕 字典表管理路由（2026-01-21 API覆盖率补齐）
+router.use('/lottery-configs', lotteryConfigsRoutes) // 🆕 抽奖配置管理路由（2026-01-21 API覆盖率补齐）
+router.use('/item-templates', itemTemplatesRoutes) // 🆕 物品模板管理路由（2026-01-21 API覆盖率补齐）
+router.use('/risk-profiles', riskProfilesRoutes) // 🆕 用户风控配置管理路由（2026-01-21 API覆盖率补齐）
+router.use('/lottery-tier-rules', lotteryTierRulesRoutes) // 🆕 抽奖档位规则管理路由（2026-01-21 API覆盖率补齐）
+router.use('/lottery-presets', lotteryPresetsRoutes) // 🆕 抽奖预设管理路由（2026-01-21 API覆盖率补齐）
+router.use('/lottery-monitoring', lotteryMonitoringRoutes) // 🆕 抽奖监控数据查询路由（2026-01-21 P2 API覆盖率补齐）
+router.use('/trade-orders', tradeOrdersRoutes) // 🆕 交易订单查询路由（2026-01-21 P2 API覆盖率补齐）
+router.use('/user-premium', userPremiumRoutes) // 🆕 用户高级空间状态查询路由（2026-01-21 P2 API覆盖率补齐）
+router.use('/admin-audit-logs', adminAuditLogsRoutes) // 🆕 管理员操作审计日志路由（2026-01-22 P1 API覆盖率补齐）
+router.use('/business-records', businessRecordsRoutes) // 🆕 业务记录查询路由（2026-01-22 P1 API覆盖率补齐）
+router.use('/system-data', systemDataRoutes) // 🆕 系统数据查询路由（2026-01-22 P1 API覆盖率补齐）
 
 /**
  * GET / - Admin API根路径信息
@@ -355,6 +379,143 @@ router.get('/', (req, res) => {
           '/debt-management/limits/:campaign_id/alert-check'
         ],
         note: '预设欠账看板、清偿管理、上限配置；支持按活动/奖品/责任人统计；仅限 admin 访问'
+      },
+      dictionaries: {
+        description: '字典表管理（2026-01-21 API覆盖率补齐）',
+        endpoints: [
+          '/dictionaries/categories',
+          '/dictionaries/categories/:code',
+          '/dictionaries/rarities',
+          '/dictionaries/rarities/:code',
+          '/dictionaries/asset-groups',
+          '/dictionaries/asset-groups/:code'
+        ],
+        note: '配置/字典表（category_defs, rarity_defs, asset_group_defs）CRUD管理；仅限 admin 访问'
+      },
+      lottery_configs: {
+        description: '抽奖配置管理（2026-01-21 API覆盖率补齐）',
+        endpoints: [
+          '/lottery-configs/strategy',
+          '/lottery-configs/strategy/:id',
+          '/lottery-configs/matrix',
+          '/lottery-configs/matrix/:id',
+          '/lottery-configs/matrix/full'
+        ],
+        note: '抽奖策略配置（lottery_strategy_config）和BxPx矩阵配置（lottery_tier_matrix_config）CRUD管理；仅限 admin 访问'
+      },
+      item_templates: {
+        description: '物品模板管理（2026-01-21 API覆盖率补齐）',
+        endpoints: [
+          '/item-templates',
+          '/item-templates/types',
+          '/item-templates/:id',
+          '/item-templates/batch/status'
+        ],
+        note: '物品模板（item_templates）CRUD管理，包括类型查询和批量状态更新；仅限 admin 访问'
+      },
+      risk_profiles: {
+        description: '用户风控配置管理（2026-01-21 API覆盖率补齐）',
+        endpoints: [
+          '/risk-profiles',
+          '/risk-profiles/level/:risk_level',
+          '/risk-profiles/:id',
+          '/risk-profiles/user/:user_id',
+          '/risk-profiles/user/:user_id/freeze',
+          '/risk-profiles/user/:user_id/unfreeze'
+        ],
+        note: '用户风控配置（user_risk_profiles）CRUD管理，包括冻结/解冻用户；仅限 admin 访问'
+      },
+      lottery_tier_rules: {
+        description: '抽奖档位规则管理（2026-01-21 API覆盖率补齐）',
+        endpoints: [
+          '/lottery-tier-rules',
+          '/lottery-tier-rules/:id',
+          '/lottery-tier-rules/validate-weights'
+        ],
+        note: '抽奖档位规则（lottery_tier_rules）CRUD管理，包括权重验证；仅限 admin 访问'
+      },
+      lottery_presets: {
+        description: '抽奖预设管理（2026-01-21 API覆盖率补齐）',
+        endpoints: [
+          '/lottery-presets',
+          '/lottery-presets/stats',
+          '/lottery-presets/user/:user_id',
+          '/lottery-presets/:id'
+        ],
+        note: '抽奖预设（lottery_presets）CRUD管理，为用户创建预设队列和统计；仅限 admin 访问'
+      },
+      lottery_monitoring: {
+        description: '抽奖监控数据查询（2026-01-21 P2 API覆盖率补齐）',
+        endpoints: [
+          '/lottery-monitoring/hourly-metrics',
+          '/lottery-monitoring/hourly-metrics/:id',
+          '/lottery-monitoring/hourly-metrics/summary/:campaign_id',
+          '/lottery-monitoring/user-experience-states',
+          '/lottery-monitoring/user-experience-states/:user_id/:campaign_id',
+          '/lottery-monitoring/user-global-states',
+          '/lottery-monitoring/user-global-states/:user_id',
+          '/lottery-monitoring/quota-grants',
+          '/lottery-monitoring/quota-grants/:id',
+          '/lottery-monitoring/user-quotas',
+          '/lottery-monitoring/user-quotas/:user_id/:campaign_id',
+          '/lottery-monitoring/user-quotas/stats/:campaign_id'
+        ],
+        note: '抽奖监控数据只读查询（lottery_hourly_metrics/lottery_user_experience_state/lottery_user_global_state/lottery_campaign_quota_grants/lottery_campaign_user_quota）；仅限 admin 访问'
+      },
+      trade_orders: {
+        description: '交易订单查询（2026-01-21 P2 API覆盖率补齐）',
+        endpoints: [
+          '/trade-orders',
+          '/trade-orders/stats',
+          '/trade-orders/user/:user_id/stats',
+          '/trade-orders/by-business-id/:business_id',
+          '/trade-orders/:id'
+        ],
+        note: '交易订单（trade_orders）只读查询，支持买家/卖家/状态筛选和统计汇总；仅限 admin 访问'
+      },
+      user_premium: {
+        description: '用户高级空间状态查询（2026-01-21 P2 API覆盖率补齐）',
+        endpoints: [
+          '/user-premium',
+          '/user-premium/stats',
+          '/user-premium/expiring',
+          '/user-premium/:user_id'
+        ],
+        note: '用户高级空间状态（user_premium_status）只读查询，支持有效期筛选和即将过期提醒；仅限 admin 访问'
+      },
+      admin_audit_logs: {
+        description: '管理员操作审计日志（2026-01-22 P1 API覆盖率补齐）',
+        endpoints: ['/admin-audit-logs'],
+        note: '管理员域审计日志（admin_operation_logs）只读查询；仅限 admin 访问'
+      },
+      business_records: {
+        description: '业务记录查询（2026-01-22 P1 API覆盖率补齐）',
+        endpoints: [
+          '/business-records/lottery-clear-settings',
+          '/business-records/redemption-orders',
+          '/business-records/content-reviews',
+          '/business-records/user-role-changes',
+          '/business-records/user-status-changes',
+          '/business-records/exchange-records',
+          '/business-records/chat-messages'
+        ],
+        note: '多个P1优先级业务数据表的只读查询（lottery_clear_setting_records/redemption_orders/content_review_records/user_role_change_records/user_status_change_records/exchange_records/chat_messages）；仅限 admin 访问'
+      },
+      system_data: {
+        description: '系统数据查询（2026-01-22 P1 API覆盖率补齐）',
+        endpoints: [
+          '/system-data/accounts',
+          '/system-data/accounts/:account_id',
+          '/system-data/user-roles',
+          '/system-data/market-listings',
+          '/system-data/market-listings/:listing_id',
+          '/system-data/market-listings/statistics/summary',
+          '/system-data/lottery-campaigns',
+          '/system-data/lottery-campaigns/:campaign_id',
+          '/system-data/lottery-daily-quotas',
+          '/system-data/lottery-daily-quotas/:quota_id'
+        ],
+        note: '系统级数据只读查询（accounts/user_roles/market_listings/lottery_campaigns/lottery_user_daily_draw_quota）；仅限 admin 访问'
       }
       // ⚠️ campaign_permissions模块暂未实现，待实现后再添加到此列表
     },

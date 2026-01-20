@@ -135,91 +135,70 @@ router.get('/:code/config', authenticateToken, dataAccessControl, async (req, re
     const fullConfig = await lottery_engine.get_campaign_config(campaign.campaign_id)
 
     /*
-     * 从 lottery_campaign_pricing_config 表读取定价配置
+     * 使用 LotteryPricingService 统一定价服务获取定价配置
      *
-     * 🔴 2026-01-21 技术债务修复（Phase 4）：
-     * - 定价配置唯一来源：lottery_campaign_pricing_config 表
-     * - 旧兼容字段 prize_distribution_config.draw_pricing 已清理（迁移 20260120193900）
-     * - 配置缺失时使用系统默认配置
+     * 🔴 2026-01-21 技术债务修复（完整实施）：
+     * - 定价配置唯一来源：LotteryPricingService（内部读取 lottery_campaign_pricing_config 表）
+     * - 消除代码重复：路由与 UnifiedLotteryEngine/PricingStage 共用同一服务
+     * - 字段名统一：使用 draw_buttons（非旧的 discount_tiers）
      *
      * @see services/lottery/LotteryPricingService.js - 统一定价服务
-     * @see docs/技术债务-getDrawPricing定价逻辑迁移方案.md
+     * @see docs/技术债务-getDrawPricing定价逻辑迁移方案.md 方案C
      */
-    const { LotteryCampaignPricingConfig } = require('../../../models')
-    const AdminSystemService = req.app.locals.services.getService('admin_system')
+    const LotteryPricingService = require('../../../services/lottery/LotteryPricingService')
 
-    // 读取单抽价格（严格模式：配置缺失直接报错）
-    const singleDrawCost = await AdminSystemService.getSettingValue(
-      'points',
-      'lottery_cost_points',
-      null,
-      { strict: true }
-    )
-
-    // 尝试从 pricing_config 表读取配置
-    let drawPricing = null
-    let isConfigMissing = true
+    // 使用统一定价服务获取所有启用档位的定价
+    const drawPricing = {}
+    let isConfigMissing = false
 
     try {
-      const pricingConfig = await LotteryCampaignPricingConfig.getActivePricingConfig(
-        campaign.campaign_id
-      )
-      if (pricingConfig && pricingConfig.pricing_config) {
-        // 从新表获取配置
-        const discountTiers = pricingConfig.pricing_config.discount_tiers || []
-        if (discountTiers.length > 0) {
-          drawPricing = {}
-          discountTiers.forEach(tier => {
-            if (tier.enabled !== false) {
-              const key =
-                tier.count === 1
-                  ? 'single'
-                  : tier.count === 3
-                    ? 'triple'
-                    : tier.count === 5
-                      ? 'five'
-                      : tier.count === 10
-                        ? 'ten'
-                        : `x${tier.count}`
-              drawPricing[key] = {
-                count: tier.count,
-                discount: tier.discount || 1.0,
-                label: tier.label || `${tier.count}连抽`,
-                per_draw: Math.floor(singleDrawCost * (tier.discount || 1.0)),
-                total_cost: Math.floor(singleDrawCost * tier.count * (tier.discount || 1.0))
-              }
-            }
-          })
-          isConfigMissing = false
-        }
+      const pricings = await LotteryPricingService.getAllDrawPricings(campaign.campaign_id)
+
+      if (pricings && pricings.length > 0) {
+        // 将数组格式转换为对象格式（兼容旧的 API 返回结构）
+        pricings.forEach(pricing => {
+          const key =
+            pricing.draw_count === 1
+              ? 'single'
+              : pricing.draw_count === 3
+                ? 'triple'
+                : pricing.draw_count === 5
+                  ? 'five'
+                  : pricing.draw_count === 10
+                    ? 'ten'
+                    : `x${pricing.draw_count}`
+          drawPricing[key] = {
+            count: pricing.draw_count,
+            discount: pricing.discount,
+            label: pricing.label,
+            per_draw: pricing.per_draw,
+            total_cost: pricing.total_cost,
+            original_cost: pricing.original_cost,
+            saved_points: pricing.saved_points
+          }
+        })
+      } else {
+        isConfigMissing = true
+        logger.warn(`[CONFIG_WARN] 活动 ${campaign_code} 定价服务返回空配置`)
       }
     } catch (err) {
-      logger.warn(`[CONFIG_WARN] 读取活动 ${campaign_code} 定价配置失败: ${err.message}`)
-    }
-
-    // 兜底：使用系统默认配置（lottery_campaign_pricing_config 表未配置时）
-    if (!drawPricing) {
-      const defaultDiscounts = {
-        single: { count: 1, discount: 1.0, label: '单抽' },
-        triple: { count: 3, discount: 1.0, label: '3连抽' },
-        five: { count: 5, discount: 1.0, label: '5连抽' },
-        ten: { count: 10, discount: 0.9, label: '10连抽(九折)' }
-      }
-      drawPricing = {}
-      for (const [type, config] of Object.entries(defaultDiscounts)) {
-        drawPricing[type] = {
-          count: config.count,
-          discount: config.discount,
-          label: config.label,
-          per_draw: Math.floor(singleDrawCost * config.discount),
-          total_cost: Math.floor(singleDrawCost * config.count * config.discount)
-        }
+      isConfigMissing = true
+      logger.error(`[CONFIG_ERROR] 读取活动 ${campaign_code} 定价配置失败`, {
+        error: err.message,
+        code: err.code,
+        campaign_id: campaign.campaign_id
+      })
+      // 配置缺失时抛出错误（严格模式）
+      if (err.code === 'MISSING_PRICING_CONFIG' || err.code === 'MISSING_BASE_COST_CONFIG') {
+        throw err
       }
     }
 
     // 如果配置缺失，记录告警日志
     if (isConfigMissing) {
-      logger.warn(`[CONFIG_WARN] 活动 ${campaign_code} 未配置自定义定价，使用 DB 默认配置`)
+      logger.warn(
+        `[CONFIG_WARN] 活动 ${campaign_code} 定价配置异常，请检查 lottery_campaign_pricing_config 表`
+      )
     }
 
     if (req.dataLevel === 'full') {

@@ -996,7 +996,7 @@ if (require.main === module) {
 
         // 初始化定时任务
         try {
-          const ScheduledTasks = require('./scripts/maintenance/scheduled-tasks')
+          const ScheduledTasks = require('./scripts/maintenance/scheduled_tasks')
           ScheduledTasks.initialize()
           appLogger.info('定时任务初始化完成')
         } catch (error) {

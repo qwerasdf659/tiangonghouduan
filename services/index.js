@@ -84,6 +84,16 @@ const MerchantOperationLogService = require('./MerchantOperationLogService') // 
 const MerchantRiskControlService = require('./MerchantRiskControlService') // 商家风控服务
 const DebtManagementService = require('./DebtManagementService') // 欠账管理服务（2026-01-18 路由层合规性治理）
 const LotteryCampaignPricingConfigService = require('./LotteryCampaignPricingConfigService') // 活动定价配置管理服务（2026-01-19 Phase 3）
+const DictionaryService = require('./DictionaryService') // 字典表管理服务（2026-01-21 API覆盖率补齐）
+const LotteryConfigService = require('./LotteryConfigService') // 抽奖配置管理服务（2026-01-21 API覆盖率补齐）
+const ItemTemplateService = require('./ItemTemplateService') // 物品模板管理服务（2026-01-21 API覆盖率补齐）
+const UserRiskProfileService = require('./UserRiskProfileService') // 用户风控配置管理服务（2026-01-21 API覆盖率补齐）
+const LotteryTierRuleService = require('./LotteryTierRuleService') // 抽奖档位规则管理服务（2026-01-21 API覆盖率补齐）
+
+// P2 API覆盖率补齐 - 监控查询服务（2026-01-21）
+const LotteryMonitoringService = require('./LotteryMonitoringService') // 抽奖监控数据查询服务
+const TradeOrderQueryService = require('./TradeOrderQueryService') // 交易订单查询服务
+const UserPremiumQueryService = require('./UserPremiumQueryService') // 用户高级空间状态查询服务
 
 // P1-9 新增注册的服务（2026-01-09）
 const DataSanitizer = require('./DataSanitizer') // 统一数据脱敏服务
@@ -315,6 +325,20 @@ class ServiceManager {
       // ========== Phase 4 定价服务（2026-01-21 技术债务修复） ==========
 
       this._services.set('lottery_pricing', LotteryPricingService) // 抽奖定价服务（getDrawPricing 统一）
+
+      // ========== API覆盖率补齐服务（2026-01-21） ==========
+
+      this._services.set('dictionary', new DictionaryService(this.models)) // 字典表管理服务（category_defs, rarity_defs, asset_group_defs）
+      this._services.set('lottery_config', new LotteryConfigService(this.models)) // 抽奖配置管理服务（lottery_strategy_config, lottery_tier_matrix_config）
+      this._services.set('item_template', new ItemTemplateService(this.models)) // 物品模板管理服务（item_templates）
+      this._services.set('user_risk_profile', new UserRiskProfileService(this.models)) // 用户风控配置管理服务（user_risk_profiles）
+      this._services.set('lottery_tier_rule', new LotteryTierRuleService(this.models)) // 抽奖档位规则管理服务（lottery_tier_rules）
+
+      // ========== P2 API覆盖率补齐 - 监控查询服务（2026-01-21） ==========
+
+      this._services.set('lottery_monitoring', new LotteryMonitoringService(this.models)) // 抽奖监控数据查询服务
+      this._services.set('trade_order_query', new TradeOrderQueryService(this.models)) // 交易订单查询服务
+      this._services.set('user_premium_query', new UserPremiumQueryService(this.models)) // 用户高级空间状态查询服务
 
       /**
        * V4.6 管线编排器（2026-01-19 Phase 5 迁移）

@@ -50,7 +50,7 @@ class LotteryCampaignUserQuota extends Model {
    * @returns {boolean} 是否有可用配额
    */
   hasAvailableQuota() {
-    return this.remaining_quota > 0
+    return this.quota_remaining > 0
   }
 
   /**
@@ -67,8 +67,8 @@ class LotteryCampaignUserQuota extends Model {
 
     await this.update(
       {
-        remaining_quota: this.remaining_quota - 1,
-        total_used: this.total_used + 1,
+        quota_remaining: this.quota_remaining - 1,
+        quota_used: this.quota_used + 1,
         last_used_at: new Date()
       },
       { transaction }
@@ -92,8 +92,8 @@ class LotteryCampaignUserQuota extends Model {
 
     await this.update(
       {
-        remaining_quota: this.remaining_quota + amount,
-        total_granted: this.total_granted + amount
+        quota_remaining: this.quota_remaining + amount,
+        quota_total: this.quota_total + amount
       },
       { transaction }
     )
@@ -108,9 +108,9 @@ class LotteryCampaignUserQuota extends Model {
       quota_id: this.quota_id,
       campaign_id: this.campaign_id,
       user_id: this.user_id,
-      remaining_quota: this.remaining_quota,
-      total_granted: this.total_granted,
-      total_used: this.total_used,
+      quota_remaining: this.quota_remaining,
+      quota_total: this.quota_total,
+      quota_used: this.quota_used,
       has_available: this.hasAvailableQuota(),
       last_used_at: this.last_used_at,
       created_at: this.created_at
@@ -135,9 +135,10 @@ class LotteryCampaignUserQuota extends Model {
       defaults: {
         campaign_id: campaignId,
         user_id: userId,
-        remaining_quota: initialQuota,
-        total_granted: initialQuota,
-        total_used: 0
+        quota_remaining: initialQuota,
+        quota_total: initialQuota,
+        quota_used: 0,
+        status: 'active'
       },
       transaction
     })
@@ -196,9 +197,9 @@ class LotteryCampaignUserQuota extends Model {
     const result = await this.findOne({
       attributes: [
         [fn('COUNT', col('quota_id')), 'total_users'],
-        [fn('SUM', col('total_granted')), 'total_granted'],
-        [fn('SUM', col('total_used')), 'total_used'],
-        [fn('SUM', col('remaining_quota')), 'total_remaining']
+        [fn('SUM', col('quota_total')), 'total_granted'],
+        [fn('SUM', col('quota_used')), 'total_used'],
+        [fn('SUM', col('quota_remaining')), 'total_remaining']
       ],
       where: { campaign_id: campaignId },
       raw: true,
@@ -209,7 +210,7 @@ class LotteryCampaignUserQuota extends Model {
     const usersWithQuota = await this.count({
       where: {
         campaign_id: campaignId,
-        remaining_quota: { [Op.gt]: 0 }
+        quota_remaining: { [Op.gt]: 0 }
       },
       transaction
     })
@@ -236,9 +237,9 @@ class LotteryCampaignUserQuota extends Model {
     return this.findAll({
       where: {
         campaign_id: campaignId,
-        remaining_quota: { [Op.gt]: 0 }
+        quota_remaining: { [Op.gt]: 0 }
       },
-      order: [['remaining_quota', 'DESC']],
+      order: [['quota_remaining', 'DESC']],
       limit,
       offset,
       transaction
@@ -283,9 +284,29 @@ module.exports = sequelize => {
       },
 
       /**
+       * 配额总量
+       */
+      quota_total: {
+        type: DataTypes.INTEGER,
+        allowNull: false,
+        defaultValue: 0,
+        comment: '配额总量'
+      },
+
+      /**
+       * 已使用配额
+       */
+      quota_used: {
+        type: DataTypes.INTEGER,
+        allowNull: false,
+        defaultValue: 0,
+        comment: '已使用配额'
+      },
+
+      /**
        * 剩余配额
        */
-      remaining_quota: {
+      quota_remaining: {
         type: DataTypes.INTEGER,
         allowNull: false,
         defaultValue: 0,
@@ -293,23 +314,22 @@ module.exports = sequelize => {
       },
 
       /**
-       * 累计获得配额
+       * 过期时间
        */
-      total_granted: {
-        type: DataTypes.INTEGER,
-        allowNull: false,
-        defaultValue: 0,
-        comment: '累计获得的配额总数'
+      expires_at: {
+        type: DataTypes.DATE,
+        allowNull: true,
+        comment: '配额过期时间'
       },
 
       /**
-       * 累计使用配额
+       * 状态
        */
-      total_used: {
-        type: DataTypes.INTEGER,
+      status: {
+        type: DataTypes.STRING(20),
         allowNull: false,
-        defaultValue: 0,
-        comment: '累计使用的配额总数'
+        defaultValue: 'active',
+        comment: '状态（active/expired/disabled）'
       },
 
       /**
@@ -359,12 +379,12 @@ module.exports = sequelize => {
         },
         // 查询索引：按用户查询所有活动配额
         {
-          fields: ['user_id', 'remaining_quota'],
+          fields: ['user_id', 'quota_remaining'],
           name: 'idx_user_quota_user_remaining'
         },
         // 查询索引：按活动查询有配额的用户
         {
-          fields: ['campaign_id', 'remaining_quota'],
+          fields: ['campaign_id', 'quota_remaining'],
           name: 'idx_user_quota_campaign_remaining'
         }
       ]

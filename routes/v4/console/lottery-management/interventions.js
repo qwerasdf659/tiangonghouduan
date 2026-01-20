@@ -20,7 +20,11 @@
 
 const express = require('express')
 const router = express.Router()
-const { adminAuthMiddleware, asyncHandler } = require('../shared/middleware')
+const {
+  adminAuthMiddleware,
+  adminOpsAuthMiddleware,
+  asyncHandler
+} = require('../shared/middleware')
 const TransactionManager = require('../../../../utils/TransactionManager')
 
 /**
@@ -38,7 +42,7 @@ const TransactionManager = require('../../../../utils/TransactionManager')
  */
 router.get(
   '/interventions',
-  adminAuthMiddleware,
+  adminOpsAuthMiddleware, // P1只读API：允许admin和ops角色访问
   asyncHandler(async (req, res) => {
     try {
       const { page = 1, page_size = 20, status, user_search, setting_type } = req.query
@@ -76,7 +80,7 @@ router.get(
  */
 router.get(
   '/interventions/:id',
-  adminAuthMiddleware,
+  adminOpsAuthMiddleware, // P1只读API：允许admin和ops角色访问
   asyncHandler(async (req, res) => {
     try {
       const { id } = req.params

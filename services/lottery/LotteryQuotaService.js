@@ -472,6 +472,41 @@ class LotteryQuotaService {
   }
 
   /**
+   * 获取单个配额规则详情
+   *
+   * API路径参数设计规范 V2.2（2026-01-20）：
+   * - 配额规则是事务实体（按需创建），使用数字ID（:id）作为标识符
+   * - 对应路由：GET /api/v4/console/lottery-quota/rules/:id
+   *
+   * @param {number} ruleId - 规则ID
+   * @returns {Promise<Object>} 规则详情
+   * @throws {Error} 404 - 规则不存在
+   */
+  static async getRuleById(ruleId) {
+    const { LotteryDrawQuotaRule } = require('../../models')
+
+    if (!ruleId || isNaN(parseInt(ruleId))) {
+      const error = new Error('缺少必填参数：rule_id')
+      error.code = 'MISSING_RULE_ID'
+      error.status = 400
+      throw error
+    }
+
+    const rule = await LotteryDrawQuotaRule.findByPk(parseInt(ruleId))
+
+    if (!rule) {
+      const error = new Error(`配额规则 ${ruleId} 不存在`)
+      error.code = 'RULE_NOT_FOUND'
+      error.status = 404
+      throw error
+    }
+
+    logger.info('获取配额规则详情', { rule_id: ruleId })
+
+    return rule
+  }
+
+  /**
    * 创建配额规则
    *
    * @param {Object} params - 规则参数

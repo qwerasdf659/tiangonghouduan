@@ -98,6 +98,39 @@ router.get('/rules', authenticateToken, requireAdmin, async (req, res) => {
 })
 
 /**
+ * 获取单个配额规则详情
+ * GET /api/v4/console/lottery-quota/rules/:id
+ *
+ * API路径参数设计规范 V2.2（2026-01-20）：
+ * - 配额规则是事务实体（按需创建），使用数字ID（:id）作为标识符
+ *
+ * 返回：规则详情（含优先级信息）
+ */
+router.get('/rules/:id', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const rule_id = parseInt(req.params.id, 10)
+
+    if (isNaN(rule_id) || rule_id <= 0) {
+      return res.apiError('无效的规则ID', 'INVALID_RULE_ID', null, 400)
+    }
+
+    const rule = await getLotteryQuotaService(req).getRuleById(rule_id)
+
+    logger.info('获取配额规则详情', {
+      admin_id: req.user.user_id,
+      rule_id
+    })
+
+    return res.apiSuccess(formatQuotaRuleForApi(rule), '获取配额规则详情成功')
+  } catch (error) {
+    logger.error('获取配额规则详情失败:', error)
+    const statusCode = error.status || 500
+    const errorCode = error.code || 'GET_RULE_FAILED'
+    return res.apiError(error.message, errorCode, null, statusCode)
+  }
+})
+
+/**
  * 创建配额规则
  * POST /api/v4/console/lottery-quota/rules
  *
