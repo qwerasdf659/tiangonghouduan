@@ -154,6 +154,12 @@ const DrawOrchestrator = require('./pipeline/DrawOrchestrator')
 const { BusinessCacheHelper } = require('../../utils/BusinessCacheHelper')
 
 /**
+ * 抽奖定价服务（2026-01-21 技术债务修复 - getDrawPricing 统一）
+ * @see docs/技术债务-getDrawPricing定价逻辑迁移方案.md
+ */
+const LotteryPricingService = require('../lottery/LotteryPricingService')
+
+/**
  * V4统一抽奖引擎核心类
  *
  * 职责：统一管理抽奖策略、执行流程、性能监控、缓存管理
@@ -928,105 +934,12 @@ class UnifiedLotteryEngine {
   }
 
   /**
-   * 🎯 新增方法：获取连抽定价配置
+   * 🔴 注意：getDrawPricing 方法已迁移至 LotteryPricingService
    *
-   * 根据抽奖次数从活动配置中获取对应的定价信息
-   *
-   * 业务规则：
-   * - 单抽：100积分，无折扣
-   * - 3连抽：300积分，无折扣
-   * - 5连抽：500积分，无折扣
-   * - 10连抽：900积分，九折优惠（节省100积分）
-   *
-   * 技术实现：
-   * - 从prize_distribution_config的draw_pricing字段读取配置
-   * - 如果配置缺失，使用系统默认值（100积分/次，无折扣）
-   *
-   * @param {number} draw_count - 抽奖次数（1/3/5/10）
-   * @param {Object} campaign - 活动配置对象（包含prize_distribution_config）
-   * @returns {Object} 定价配置 { total_cost, per_draw, discount, count, label }
-   *
-   * @example
-   * // 10连抽的定价配置
-   * getDrawPricing(10, campaign)
-   * // 返回：{ total_cost: 900, per_draw: 90, discount: 0.9, count: 10, label: '10连抽(九折)' }
+   * @deprecated 2026-01-21 技术债务修复
+   * @see services/lottery/LotteryPricingService.js - 统一定价服务
+   * @see docs/技术债务-getDrawPricing定价逻辑迁移方案.md - 方案C
    */
-  async getDrawPricing(draw_count, campaign) {
-    // 步骤1：从活动配置中读取定价配置（JSON字段）
-    const pricingConfig = campaign.prize_distribution_config?.draw_pricing || {}
-
-    // 步骤2：根据抽奖次数确定配置key
-    const drawKeys = {
-      1: 'single', // 单抽
-      3: 'triple', // 3连抽
-      5: 'five', // 5连抽
-      10: 'ten' // 10连抽（九折优惠）
-    }
-    const drawKey = drawKeys[draw_count] || 'single'
-
-    /**
-     * 步骤3：从数据库读取单抽积分消耗配置（严格模式 2025-12-30）
-     *
-     * 配置管理三层分离方案：
-     * - 严格模式读取：配置缺失直接报错，不使用默认值兜底
-     * - 单抽价格直接影响积分经济，静默兜底会造成规则漂移
-     *
-     * 读取优先级：
-     * 1. 活动配置 prize_distribution_config.draw_pricing（活动级覆盖）
-     * 2. 数据库 system_settings.lottery_cost_points（全局配置）
-     *
-     * @see docs/配置管理三层分离与校验统一方案.md
-     */
-    const AdminSystemService = require('../AdminSystemService')
-    const defaultPerDraw = await AdminSystemService.getSettingValue(
-      'points',
-      'lottery_cost_points',
-      null,
-      { strict: true } // 🔴 严格模式：配置缺失直接报错
-    )
-
-    /*
-     * 步骤4：获取折扣配置
-     *
-     * 架构说明（2026-01-19）：
-     * - 折扣配置存储在 lottery_campaign_pricing_config 表
-     * - 此方法使用默认折扣规则（与 PricingStage 保持一致）
-     * - 完整的定价计算由 PricingStage 执行（Pipeline 模式）
-     *
-     * @see PricingStage._getDrawPricing() - 定价计算核心逻辑
-     */
-    const defaultDiscounts = {
-      1: { discount: 1.0, label: '单抽' },
-      3: { discount: 1.0, label: '3连抽' },
-      5: { discount: 1.0, label: '5连抽' },
-      10: { discount: 0.9, label: '10连抽(九折)' }
-    }
-    const drawTypeConfig = defaultDiscounts[draw_count] || {
-      discount: 1.0,
-      label: `${draw_count}连抽`
-    }
-
-    // 步骤5：获取对应的定价配置，如果活动有自定义配置则使用活动配置
-    const pricing = pricingConfig[drawKey] || {
-      total_cost: Math.floor(draw_count * defaultPerDraw * drawTypeConfig.discount), // 使用DB配置 + 折扣
-      per_draw: Math.floor(defaultPerDraw * drawTypeConfig.discount), // 折后单价
-      discount: drawTypeConfig.discount, // 折扣率
-      count: draw_count, // 抽奖次数
-      label: drawTypeConfig.label // 显示名称
-    }
-
-    // 步骤6：记录日志（便于调试和问题排查）
-    this.logInfo('获取连抽定价配置', {
-      draw_count, // 请求的抽奖次数
-      drawKey, // 映射的配置key
-      pricing, // 最终的定价配置
-      default_per_draw: defaultPerDraw, // 数据库配置的单抽积分
-      discount: drawTypeConfig.discount, // 折扣率
-      is_custom: !!pricingConfig[drawKey] // 是否使用了自定义配置
-    })
-
-    return pricing
-  }
 
   /**
    * 执行抽奖（路由层调用接口）
@@ -1137,13 +1050,18 @@ class UnifiedLotteryEngine {
        * ❌ 原逻辑：const requiredPoints = draw_count * 100
        * 问题：硬编码定价，无法实现折扣机制
        *
-       * ✅ 新逻辑：从配置读取定价
+       * ✅ 新逻辑：通过 LotteryPricingService 统一获取定价
        * 优势：
        * - 10连抽可享受九折优惠（900积分，节省100积分）
        * - 修改定价只需改配置，无需改代码
        * - 支持灵活的折扣策略
+       * - 🔴 2026-01-21 技术债务修复：统一定价服务，消除重复逻辑
+       *
+       * @see docs/技术债务-getDrawPricing定价逻辑迁移方案.md 方案C
        */
-      const pricing = await this.getDrawPricing(draw_count, campaign) // 从DB配置读取定价
+      const pricing = await LotteryPricingService.getDrawPricing(draw_count, campaign.campaign_id, {
+        transaction
+      }) // 从 LotteryPricingService 统一获取定价
       const requiredPoints = pricing.total_cost // 使用配置的总价格
 
       // 记录详细的积分计算日志

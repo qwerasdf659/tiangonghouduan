@@ -41,6 +41,12 @@ const { LotteryCampaignPricingConfig, LotteryCampaign } = require('../models')
 const { BusinessCacheHelper } = require('../utils/BusinessCacheHelper')
 
 /**
+ * 定价服务 - 用于缓存失效（2026-01-21 技术债务修复）
+ * @see docs/技术债务-getDrawPricing定价逻辑迁移方案.md - 6.4 实现缓存功能
+ */
+const LotteryPricingService = require('./lottery/LotteryPricingService')
+
+/**
  * 活动定价配置管理服务类
  *
  * @class LotteryCampaignPricingConfigService
@@ -206,8 +212,15 @@ class LotteryCampaignPricingConfigService {
         { transaction }
       )
 
-      // 失效活动缓存
+      /**
+       * 🔴 失效缓存（2026-01-21 技术债务修复：同时失效活动缓存和定价缓存）
+       * @see docs/技术债务-getDrawPricing定价逻辑迁移方案.md - 6.4 缓存失效
+       */
       await BusinessCacheHelper.invalidateLotteryCampaign(campaign_id)
+      await LotteryPricingService.invalidateCache(
+        campaign_id,
+        'pricing_config_created_and_activated'
+      )
 
       logger.info('新版本已激活', {
         campaign_id,
@@ -259,8 +272,12 @@ class LotteryCampaignPricingConfigService {
       { transaction }
     )
 
-    // 失效活动缓存
+    /**
+     * 🔴 失效缓存（2026-01-21 技术债务修复：同时失效活动缓存和定价缓存）
+     * @see docs/技术债务-getDrawPricing定价逻辑迁移方案.md - 6.4 缓存失效
+     */
     await BusinessCacheHelper.invalidateLotteryCampaign(campaign_id)
+    await LotteryPricingService.invalidateCache(campaign_id, 'pricing_config_version_activated')
 
     logger.info('激活定价配置版本成功', {
       campaign_id,
@@ -438,8 +455,15 @@ class LotteryCampaignPricingConfigService {
       { transaction }
     )
 
-    // 7. 失效活动缓存
+    /**
+     * 🔴 7. 失效缓存（2026-01-21 技术债务修复：同时失效活动缓存和定价缓存）
+     * @see docs/技术债务-getDrawPricing定价逻辑迁移方案.md - 6.4 缓存失效
+     */
     await BusinessCacheHelper.invalidateLotteryCampaign(campaign_id)
+    await LotteryPricingService.invalidateCache(
+      campaign_id,
+      `pricing_config_rollback_from_v${target_version}`
+    )
 
     logger.info('定价配置回滚成功', {
       campaign_id,
@@ -678,8 +702,12 @@ class LotteryCampaignPricingConfigService {
           config.created_by // 使用创建者作为激活者
         )
 
-        // 失效缓存
+        /**
+         * 🔴 失效缓存（2026-01-21 技术债务修复：同时失效活动缓存和定价缓存）
+         * @see docs/技术债务-getDrawPricing定价逻辑迁移方案.md - 6.4 缓存失效
+         */
         await BusinessCacheHelper.invalidateLotteryCampaign(campaign_id)
+        await LotteryPricingService.invalidateCache(campaign_id, 'scheduled_activation')
 
         logger.info('定时生效配置已激活', {
           campaign_id,

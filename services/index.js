@@ -88,6 +88,7 @@ const LotteryCampaignPricingConfigService = require('./LotteryCampaignPricingCon
 // P1-9 新增注册的服务（2026-01-09）
 const DataSanitizer = require('./DataSanitizer') // 统一数据脱敏服务
 const LotteryQuotaService = require('./lottery/LotteryQuotaService') // 抽奖配额服务
+const LotteryPricingService = require('./lottery/LotteryPricingService') // 抽奖定价服务（2026-01-21 技术债务修复）
 const PerformanceMonitor = require('./UnifiedLotteryEngine/utils/PerformanceMonitor') // 性能监控服务
 const SealosStorageService = require('./sealosStorage') // Sealos 对象存储服务
 
@@ -310,6 +311,10 @@ class ServiceManager {
       // ========== Phase 3 定价配置管理服务（2026-01-19） ==========
 
       this._services.set('lottery_campaign_pricing_config', LotteryCampaignPricingConfigService) // 活动定价配置管理服务
+
+      // ========== Phase 4 定价服务（2026-01-21 技术债务修复） ==========
+
+      this._services.set('lottery_pricing', LotteryPricingService) // 抽奖定价服务（getDrawPricing 统一）
 
       /**
        * V4.6 管线编排器（2026-01-19 Phase 5 迁移）

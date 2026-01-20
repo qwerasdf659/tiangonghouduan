@@ -502,6 +502,64 @@ class BusinessCacheHelper {
     return await this.del(key, reason)
   }
 
+  // ==================== 定价配置缓存专用方法（2026-01-21 技术债务修复）====================
+
+  /**
+   * 构建定价配置缓存 key
+   *
+   * @description 用于缓存活动的定价配置（lottery_campaign_pricing_config 表）
+   * @param {number} campaign_id - 活动 ID
+   * @returns {string} 缓存 key
+   * @example 返回: 'app:v4:dev:api:lottery:pricing:1'
+   *
+   * @see docs/技术债务-getDrawPricing定价逻辑迁移方案.md - 问题3决策
+   */
+  static buildLotteryPricingKey(campaign_id) {
+    return `${KEY_PREFIX}${CACHE_PREFIX.LOTTERY}:pricing:${campaign_id}`
+  }
+
+  /**
+   * 获取定价配置缓存
+   *
+   * @description 获取活动的定价配置缓存（TTL=60秒）
+   * @param {number} campaign_id - 活动 ID
+   * @returns {Promise<Object|null>} 定价配置对象或 null
+   */
+  static async getLotteryPricing(campaign_id) {
+    const key = this.buildLotteryPricingKey(campaign_id)
+    return await this.get(key)
+  }
+
+  /**
+   * 写入定价配置缓存
+   *
+   * @description 缓存活动的定价配置（TTL=60秒，与活动配置一致）
+   * @param {number} campaign_id - 活动 ID
+   * @param {Object} pricing_config - 定价配置对象
+   * @returns {Promise<boolean>} 是否写入成功
+   */
+  static async setLotteryPricing(campaign_id, pricing_config) {
+    const key = this.buildLotteryPricingKey(campaign_id)
+    return await this.set(key, pricing_config, DEFAULT_TTL.LOTTERY)
+  }
+
+  /**
+   * 失效定价配置缓存
+   *
+   * @description 配置变更时调用，实现写后精准失效
+   * @param {number} campaign_id - 活动 ID
+   * @param {string} reason - 失效原因（用于日志记录）
+   * @returns {Promise<boolean>} 是否失效成功
+   *
+   * @example
+   * // 运营后台修改定价配置后
+   * await BusinessCacheHelper.invalidateLotteryPricing(1, 'pricing_config_updated')
+   */
+  static async invalidateLotteryPricing(campaign_id, reason = 'pricing_config_updated') {
+    const key = this.buildLotteryPricingKey(campaign_id)
+    return await this.del(key, reason)
+  }
+
   // ==================== 商品列表缓存专用方法 ====================
 
   /**

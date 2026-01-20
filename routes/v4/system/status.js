@@ -117,7 +117,10 @@ router.get('/business-config', optionalAuth, dataAccessControl, async (req, res)
      * - 此处返回系统级默认配置（不依赖特定活动）
      * - 活动级定价配置应通过 /api/v4/lottery/campaigns/:code/config 获取
      *
-     * @see PricingStage._getDrawPricing() - 活动级定价计算
+     * 🔴 2026-01-21 技术债务修复：
+     * - 活动级定价计算已迁移至 LotteryPricingService.getDrawPricing()
+     *
+     * @see services/lottery/LotteryPricingService.js - 统一定价服务
      * @see routes/v4/console/lottery-management/pricing-config.js - 定价配置管理
      */
     const defaultDiscounts = {

@@ -31,18 +31,21 @@ module.exports = {
      *
      * @description 抽奖系统的固定业务规则配置
      *
-     * @重要说明 - 定价配置迁移说明（2026-01-19）
+     * @重要说明 - 定价配置迁移说明（2026-01-19 → 2026-01-21 更新）
      * - draw_types（连抽折扣配置）已迁移到 lottery_campaign_pricing_config 表
      * - 单抽价格（lottery_cost_points）从 DB system_settings 读取
-     * - 连抽折扣由 PricingStage 从 lottery_campaign_pricing_config 表动态读取
+     * - 连抽折扣由 LotteryPricingService 从 lottery_campaign_pricing_config 表动态读取
      * - 定价配置通过管理后台 API 进行管理（版本化、可回滚）
      *
-     * @see PricingStage._getDrawPricing() - 定价计算核心逻辑
+     * 🔴 2026-01-21 技术债务修复：
+     * - 定价计算已统一迁移至 LotteryPricingService.getDrawPricing()
+     *
+     * @see services/lottery/LotteryPricingService.js - 统一定价服务（核心）
      * @see routes/v4/console/lottery-management/pricing-config.js - 定价配置管理API
      * @see lottery_campaign_pricing_config 表 - 活动级定价配置存储
      *
      * @deprecated draw_types 字段已移除
-     * @migration Phase 3: 定价真相收敛到 lottery_campaign_pricing_config 表
+     * @migration Phase 3 → Phase 4: 定价逻辑统一至 LotteryPricingService
      */
 
     /**

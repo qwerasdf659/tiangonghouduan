@@ -137,10 +137,13 @@ router.get('/:code/config', authenticateToken, dataAccessControl, async (req, re
     /*
      * 从 lottery_campaign_pricing_config 表读取定价配置
      *
-     * 配置来源优先级（Phase 3 已拍板 2026-01-19）：
-     * 1. lottery_campaign_pricing_config 表（活动级版本化配置，优先）
-     * 2. campaign.prize_distribution_config.draw_pricing（降级兼容）
-     * 3. 系统默认配置（最终兜底）
+     * 🔴 2026-01-21 技术债务修复（Phase 4）：
+     * - 定价配置唯一来源：lottery_campaign_pricing_config 表
+     * - 旧兼容字段 prize_distribution_config.draw_pricing 已清理（迁移 20260120193900）
+     * - 配置缺失时使用系统默认配置
+     *
+     * @see services/lottery/LotteryPricingService.js - 统一定价服务
+     * @see docs/技术债务-getDrawPricing定价逻辑迁移方案.md
      */
     const { LotteryCampaignPricingConfig } = require('../../../models')
     const AdminSystemService = req.app.locals.services.getService('admin_system')
@@ -194,13 +197,7 @@ router.get('/:code/config', authenticateToken, dataAccessControl, async (req, re
       logger.warn(`[CONFIG_WARN] 读取活动 ${campaign_code} 定价配置失败: ${err.message}`)
     }
 
-    // 降级：使用活动 JSON 配置
-    if (!drawPricing && campaign.prize_distribution_config?.draw_pricing) {
-      drawPricing = campaign.prize_distribution_config.draw_pricing
-      isConfigMissing = false
-    }
-
-    // 最终兜底：使用系统默认配置
+    // 兜底：使用系统默认配置（lottery_campaign_pricing_config 表未配置时）
     if (!drawPricing) {
       const defaultDiscounts = {
         single: { count: 1, discount: 1.0, label: '单抽' },
