@@ -211,7 +211,7 @@ const validators = {
    * 业务规则：
    * - 积分数量必须是有效整数（可以是正数或负数）
    * - 调整原因必须提供且不能为空字符串
-   * - 调整原因会记录到points_transactions表的transaction_title字段
+   * - 调整原因会记录到asset_transactions表的transaction_title字段
    *
    * @param {string|number} points - 积分数量（正数增加，负数扣减）
    * @param {string} reason - 调整原因（必填，会记录到交易记录）

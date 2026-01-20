@@ -599,7 +599,10 @@ class PopupBannerService {
    * 🎯 架构决策（2026-01-08 拍板）：
    * - 数据库存储对象 key（如 popup-banners/xxx.jpg）
    * - API 返回完整 CDN URL（如 https://cdn.example.com/bucket/popup-banners/xxx.jpg）
-   * - 兼容历史数据：如果已是完整 URL，则原样返回
+   *
+   * 2026-01-20 技术债务清理：
+   * - 已删除"完整URL兼容"逻辑（数据库验证无历史完整URL数据）
+   * - 统一架构：数据库只存对象key，API返回时拼接CDN域名
    *
    * @private
    * @param {Object} banner - banner 对象（plain JSON）
@@ -607,11 +610,6 @@ class PopupBannerService {
    */
   static _transformBannerImageUrl(banner) {
     if (!banner || !banner.image_url) {
-      return banner
-    }
-
-    // 如果已经是完整 URL（http/https 开头），原样返回（兼容历史数据）
-    if (banner.image_url.startsWith('http://') || banner.image_url.startsWith('https://')) {
       return banner
     }
 

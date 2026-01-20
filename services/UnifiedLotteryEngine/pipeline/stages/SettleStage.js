@@ -49,8 +49,13 @@ const AssetService = require('../../../AssetService')
 /*
  * ========== Phase 9-16 增强：体验状态管理器 ==========
  * 用于更新用户抽奖体验计数器（Pity/AntiEmpty/AntiHigh）
+ *
+ * 技术债务清理（2026-01-20）：
+ * - 原引用：../../strategy/state
+ * - 新引用：../../compute/state
+ * - 详见：docs/技术债务彻底清理重构方案-2026-01-20.md P1-New 项9-15
  */
-const { ExperienceStateManager, GlobalStateManager } = require('../../strategy/state')
+const { ExperienceStateManager, GlobalStateManager } = require('../../compute/state')
 
 // eslint-disable-next-line no-unused-vars -- _LotteryPrize, _LotteryCampaignUserQuota: 预留用于未来扩展功能
 const _preReserved = { _LotteryPrize, _LotteryCampaignUserQuota }

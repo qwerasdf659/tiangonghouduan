@@ -49,7 +49,7 @@ const marketRiskMiddleware = getMarketRiskControlMiddleware()
  * @header {string} Idempotency-Key - 幂等键（必填，不接受body参数）
  * @body {number} item_instance_id - 物品实例ID（必填）
  * @body {number} price_amount - 售价（必填，大于0的整数）
- * @body {string} [price_asset_code=DIAMOND] - 定价结算币种（可选，默认DIAMOND，支持：DIAMOND/red_shard）
+ * @body {string} price_asset_code - 定价结算币种（必填，支持：DIAMOND/red_shard）
  * @body {string} condition - 物品状态（可选，默认good）
  *
  * @returns {Object} 上架结果
@@ -133,12 +133,20 @@ router.post(
       }
 
       /*
-       * 多币种扩展（2026-01-14）：支持 price_asset_code 参数
-       * - 默认值：DIAMOND（保持向后兼容）
+       * 多币种扩展（2026-01-14）：price_asset_code 参数
+       * - 必填参数（2026-01-20 清理兼容代码：移除默认值）
        * - 支持值：DIAMOND、red_shard（由 system_settings.allowed_settlement_assets 控制）
        * - 校验逻辑在 Service 层统一处理（白名单校验）
        */
-      const priceAssetCode = req.body.price_asset_code || 'DIAMOND'
+      const priceAssetCode = req.body.price_asset_code
+      if (!priceAssetCode) {
+        return res.apiError(
+          'price_asset_code 是必填参数（如 DIAMOND、red_shard）',
+          'MISSING_REQUIRED_FIELD',
+          { field: 'price_asset_code', allowed_values: ['DIAMOND', 'red_shard'] },
+          400
+        )
+      }
 
       /*
        * 【入口幂等检查】防止同一次请求被重复提交
@@ -297,7 +305,7 @@ router.post(
  * @body {string} offer_asset_code - 挂卖资产代码（如 red_shard，必填）
  * @body {number} offer_amount - 挂卖数量（正整数，必填）
  * @body {number} price_amount - 定价金额（必填，大于0）
- * @body {string} [price_asset_code=DIAMOND] - 定价结算币种（可选，默认DIAMOND，支持：DIAMOND/red_shard）
+ * @body {string} price_asset_code - 定价结算币种（必填，支持：DIAMOND/red_shard）
  *
  * @returns {Object} 挂牌结果
  * @returns {Object} data.listing - 挂牌信息
@@ -388,11 +396,19 @@ router.post(
       }
 
       /*
-       * 多币种扩展（2026-01-14）：支持 price_asset_code 参数
-       * - 默认值：DIAMOND（保持向后兼容）
+       * 多币种扩展（2026-01-14）：price_asset_code 参数
+       * - 必填参数（2026-01-20 清理兼容代码：移除默认值）
        * - 支持值：DIAMOND、red_shard（由 system_settings.allowed_settlement_assets 控制）
        */
-      const priceAssetCode = req.body.price_asset_code || 'DIAMOND'
+      const priceAssetCode = req.body.price_asset_code
+      if (!priceAssetCode) {
+        return res.apiError(
+          'price_asset_code 是必填参数（如 DIAMOND、red_shard）',
+          'MISSING_REQUIRED_FIELD',
+          { field: 'price_asset_code', allowed_values: ['DIAMOND', 'red_shard'] },
+          400
+        )
+      }
 
       /*
        * 【入口幂等检查】防止同一次请求被重复提交

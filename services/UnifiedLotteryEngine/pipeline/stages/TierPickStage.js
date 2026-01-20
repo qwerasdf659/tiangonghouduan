@@ -20,9 +20,9 @@
  * - budget_tier: 预算分层（来自 BudgetContextStage）
  * - pressure_tier: 压力分层（来自 BudgetContextStage）
  *
- * 策略引擎集成（2026-01-20）：
+ * 计算引擎集成：
  * - 从 BuildPrizePoolStage 获取 budget_tier 和 pressure_tier
- * - 调用 StrategyEngine.computeWeightAdjustment() 获取权重调整
+ * - 调用 LotteryComputeEngine.computeWeightAdjustment() 获取权重调整
  * - 应用 BxPx 矩阵调整 fallback 档位权重
  *
  * 设计原则：
@@ -33,13 +33,14 @@
  * @module services/UnifiedLotteryEngine/pipeline/stages/TierPickStage
  * @author 统一抽奖架构重构
  * @since 2026-01-18
- * @updated 2026-01-20 集成 BxPx 矩阵权重调整
  */
 
 const BaseStage = require('./BaseStage')
 const { SegmentResolver } = require('../../../../config/segment_rules')
 const { User, LotteryUserExperienceState } = require('../../../../models')
-const StrategyEngine = require('../../strategy/StrategyEngine')
+
+/* 抽奖计算引擎 */
+const LotteryComputeEngine = require('../../compute/LotteryComputeEngine')
 
 /**
  * 权重缩放比例（整数权重系统）
@@ -65,8 +66,8 @@ class TierPickStage extends BaseStage {
       required: true
     })
 
-    /* 初始化策略引擎实例 */
-    this.strategyEngine = new StrategyEngine()
+    /* 初始化抽奖计算引擎实例 */
+    this.computeEngine = new LotteryComputeEngine()
   }
 
   /**
@@ -194,7 +195,7 @@ class TierPickStage extends BaseStage {
       const base_tier_weights = this._getTierWeights(user_segment, tier_rules, campaign)
 
       /* 3. 应用 BxPx 矩阵权重调整（策略引擎集成） */
-      const weight_adjustment = this.strategyEngine.computeWeightAdjustment({
+      const weight_adjustment = this.computeEngine.computeWeightAdjustment({
         budget_tier,
         pressure_tier,
         base_tier_weights
@@ -234,7 +235,7 @@ class TierPickStage extends BaseStage {
 
         if (experience_state) {
           // 调用策略引擎应用体验平滑
-          smoothing_result = await this.strategyEngine.applyExperienceSmoothing({
+          smoothing_result = await this.computeEngine.applyExperienceSmoothing({
             user_id,
             campaign_id,
             selected_tier,

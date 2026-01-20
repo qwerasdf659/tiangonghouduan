@@ -299,7 +299,7 @@ class UnifiedLotteryEngine {
   /**
    * 格式化 DrawOrchestrator 返回结果为标准抽奖格式
    *
-   * 将 Pipeline 执行结果转换为与旧 Strategy 模式兼容的返回格式
+   * 将 Pipeline 执行结果转换为统一的 API 返回格式
    *
    * @param {Object} orchestratorResult - DrawOrchestrator.execute 返回结果
    * @param {string} executionId - 执行ID
@@ -332,7 +332,7 @@ class UnifiedLotteryEngine {
       }
     }
 
-    // 构建标准返回格式（兼容原 Strategy 模式返回结构）
+    // 构建标准返回格式
     const drawRecord = settleData.draw_record || {}
     const settleResult = settleData.settle_result || {}
 
@@ -357,9 +357,12 @@ class UnifiedLotteryEngine {
       selection_reason: orchestratorResult.selection_reason,
       execution_id: executionId,
       engine_version: this.version,
-      timestamp: this.getBeijingTimestamp(),
-      // 🔄 兼容旧 Strategy 模式的字段映射
-      strategy_used: `pipeline_${orchestratorResult.pipeline_type}`
+      timestamp: this.getBeijingTimestamp()
+      /*
+       * 清理日期：2026-01-20（技术债务清理方案 - 清理项2）
+       * 已删除字段：strategy_used（兼容旧 Strategy 模式的字段映射）
+       * 详见：docs/技术债务彻底清理重构方案-2026-01-20.md 决策6
+       */
     }
   }
 
@@ -618,8 +621,10 @@ class UnifiedLotteryEngine {
         pipelines,
         draw_orchestrator_ready: true,
         enabled_pipelines: pipelineTypes.length,
-        // 兼容旧字段
-        enabled_strategies: pipelineTypes.length,
+        /*
+         * 2026-01-20 技术债务清理（P2全局注释审查）：
+         * 已删除 enabled_strategies 兼容字段，现已统一使用 enabled_pipelines
+         */
         total_executions: this.metrics.total_executions,
         success_rate: this.getMetrics().success_rate,
         uptime: this.formatUptime(BeijingTimeHelper.timestamp() - this.startTime),
@@ -893,10 +898,8 @@ class UnifiedLotteryEngine {
       /**
        * V4.6 Phase 5：保底规则现在由 Pipeline 架构内部处理
        *
-       * 原方式：从 BasicGuaranteeStrategy.config.guaranteeRule 获取
-       * 新方式：Pipeline 内部的 NormalDrawPipeline 处理保底逻辑
-       *
-       * @deprecated 此字段仅用于向后兼容，实际保底逻辑在 Pipeline 中
+       * 保底逻辑由 NormalDrawPipeline 内部的 GuaranteeStage 统一处理
+       * 此字段保留为 null，仅用于活动配置的返回结构完整性
        */
       const guaranteeRule = null // V4.6: Pipeline 内部处理保底规则
 
@@ -937,8 +940,7 @@ class UnifiedLotteryEngine {
    *
    * 技术实现：
    * - 从prize_distribution_config的draw_pricing字段读取配置
-   * - 如果配置缺失，降级为默认值（100积分/次，无折扣）
-   * - 确保向后兼容性
+   * - 如果配置缺失，使用系统默认值（100积分/次，无折扣）
    *
    * @param {number} draw_count - 抽奖次数（1/3/5/10）
    * @param {Object} campaign - 活动配置对象（包含prize_distribution_config）
@@ -986,13 +988,12 @@ class UnifiedLotteryEngine {
     /*
      * 步骤4：获取折扣配置
      *
-     * 🔄 2026-01-19 架构迁移说明：
-     * - 折扣配置已从 business.config.lottery.draw_types 迁移到 lottery_campaign_pricing_config 表
-     * - 此方法现在使用默认折扣规则（与 PricingStage 保持一致）
+     * 架构说明（2026-01-19）：
+     * - 折扣配置存储在 lottery_campaign_pricing_config 表
+     * - 此方法使用默认折扣规则（与 PricingStage 保持一致）
      * - 完整的定价计算由 PricingStage 执行（Pipeline 模式）
      *
-     * @deprecated 此方法将在后续版本中被 PricingStage 完全替代
-     * @see PricingStage._getDrawPricing() - 新的定价计算核心逻辑
+     * @see PricingStage._getDrawPricing() - 定价计算核心逻辑
      */
     const defaultDiscounts = {
       1: { discount: 1.0, label: '单抽' },
@@ -1032,10 +1033,10 @@ class UnifiedLotteryEngine {
    *
    * 🔒 事务边界治理（2026-01-05 决策）：
    * - 支持外部事务传入（options.transaction），由路由层统一开事务
-   * - 如果未传入外部事务，则自建事务（保持向后兼容）
+   * - 如果未传入外部事务，则内部创建事务
    * - 外部事务模式下，不在方法内 commit/rollback（由外部控制）
    *
-   * 幂等性机制（方案B - 业界标准）：
+   * 幂等性机制（业界标准）：
    * - 入口幂等：通过路由层 IdempotencyService 实现"重试返回首次结果"
    * - 流水幂等：通过派生 idempotency_key 保证每条流水唯一
    *
@@ -1062,9 +1063,9 @@ class UnifiedLotteryEngine {
     /*
      * 🔒 事务边界治理（2026-01-05 决策）
      *
-     * 改造说明：
+     * 事务策略：
      * - 支持外部事务传入（options.transaction），由路由层统一开事务
-     * - 如果未传入外部事务，则自建事务（保持向后兼容）
+     * - 如果未传入外部事务，则内部创建事务
      * - 外部事务模式下，不在方法内 commit/rollback（由外部控制）
      *
      * 业务价值：

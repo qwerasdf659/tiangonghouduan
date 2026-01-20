@@ -237,12 +237,17 @@ class BackpackService {
         transaction
       })
 
-      // 2. 格式化物品数据（包含核销码信息）
+      /*
+       * 2. 格式化物品数据（包含核销码信息）
+       * 2026-01-20 技术债务清理：
+       * - ItemInstance 模型没有 item_name 字段
+       * - 物品名称从 meta.name 获取（JSON 元数据字段）
+       */
       const formattedItems = instances.map(instance => {
         return {
           item_instance_id: instance.item_instance_id,
           item_type: instance.item_type || 'unknown',
-          item_name: instance.item_name,
+          name: instance.meta?.name || '未命名物品',
           status: instance.status,
           rarity: instance.meta?.rarity || 'common',
           description: instance.meta?.description || '',
@@ -306,7 +311,7 @@ class BackpackService {
    * {
    *   item_instance_id: 123,
    *   item_type: '优惠券',
-   *   item_name: '10元代金券',
+   *   name: '10元代金券',    // 2026-01-20 统一使用 name（从 meta.name 获取）
    *   status: 'available',
    *   rarity: 'common',
    *   description: '满100元可用',
@@ -357,11 +362,14 @@ class BackpackService {
         transaction
       })
 
-      // 4. 格式化返回数据
+      /*
+       * 4. 格式化返回数据
+       * 2026-01-20 技术债务清理：name 从 meta.name 获取
+       */
       const itemDetail = {
         item_instance_id: item.item_instance_id,
         item_type: item.item_type || 'unknown',
-        item_name: item.item_name,
+        name: item.meta?.name || '未命名物品',
         status: item.status,
         rarity: item.meta?.rarity || 'common',
         description: item.meta?.description || '',

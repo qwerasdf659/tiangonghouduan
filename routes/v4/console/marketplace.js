@@ -268,7 +268,7 @@ router.get('/exchange_market/items/:item_id', authenticateToken, requireAdmin, a
     logger.info('管理员查询兑换商品详情成功', {
       admin_id,
       item_id: itemId,
-      item_name: result.item?.name
+      name: result.item?.name
     })
 
     return res.apiSuccess(result, '商品详情查询成功')
@@ -299,8 +299,12 @@ router.get('/exchange_market/items/:item_id', authenticateToken, requireAdmin, a
  * - 使用 TransactionManager 包装事务
  * - 创建商品后自动绑定图片 context_id（避免被24h定时清理误删）
  *
- * @body {string} item_name - 商品名称（必填，最长100字符）
- * @body {string} item_description - 商品描述（可选，最长500字符）
+ * 2026-01-20 技术债务清理：
+ * - 字段名统一为 name/description（与数据库模型一致）
+ * - 已删除 item_name/item_description 兼容
+ *
+ * @body {string} name - 商品名称（必填，最长100字符）
+ * @body {string} description - 商品描述（可选，最长500字符）
  * @body {string} cost_asset_code - 材料资产代码（必填，如 'red_shard'）
  * @body {number} cost_amount - 材料资产数量（必填，>0）
  * @body {number} cost_price - 成本价（必填）
@@ -311,8 +315,8 @@ router.get('/exchange_market/items/:item_id', authenticateToken, requireAdmin, a
  */
 router.post('/exchange_market/items', authenticateToken, requireAdmin, async (req, res) => {
   const {
-    item_name,
-    item_description = '',
+    name,
+    description = '',
     cost_asset_code,
     cost_amount,
     cost_price,
@@ -327,7 +331,7 @@ router.post('/exchange_market/items', authenticateToken, requireAdmin, async (re
 
   logger.info('管理员创建兑换商品（材料资产支付）', {
     admin_id,
-    item_name,
+    name,
     cost_asset_code,
     cost_amount,
     stock,
@@ -342,8 +346,8 @@ router.post('/exchange_market/items', authenticateToken, requireAdmin, async (re
     // 调用服务层方法创建商品（V4.5.0 材料资产支付 + 图片存储架构）
     const result = await ExchangeService.createExchangeItem(
       {
-        item_name,
-        item_description,
+        name,
+        description,
         cost_asset_code,
         cost_amount,
         cost_price,
@@ -387,7 +391,7 @@ router.post('/exchange_market/items', authenticateToken, requireAdmin, async (re
   logger.info('兑换商品创建成功（材料资产支付）', {
     admin_id,
     item_id: transactionResult.item?.item_id,
-    item_name: transactionResult.item?.name,
+    name: transactionResult.item?.name,
     cost_asset_code: transactionResult.item?.cost_asset_code,
     cost_amount: transactionResult.item?.cost_amount,
     bound_image: transactionResult.bound_image
@@ -412,14 +416,17 @@ router.post('/exchange_market/items', authenticateToken, requireAdmin, async (re
  * - 使用 TransactionManager 包装事务
  * - 更换图片时删除旧图片 + 绑定新图片 context_id
  *
+ * 2026-01-20 技术债务清理：
+ * - 字段名统一为 name/description（与数据库模型一致）
+ *
  * @param {number} item_id - 商品ID
  */
 router.put('/exchange_market/items/:item_id', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const { item_id } = req.params
     const {
-      item_name,
-      item_description,
+      name,
+      description,
       cost_asset_code,
       cost_amount,
       cost_price,
@@ -455,8 +462,8 @@ router.put('/exchange_market/items/:item_id', authenticateToken, requireAdmin, a
         return await ExchangeService.updateExchangeItem(
           itemId,
           {
-            item_name,
-            item_description,
+            name,
+            description,
             cost_asset_code,
             cost_amount,
             cost_price,
@@ -477,7 +484,7 @@ router.put('/exchange_market/items/:item_id', authenticateToken, requireAdmin, a
     logger.info('兑换商品更新成功（材料资产支付）', {
       admin_id,
       item_id: itemId,
-      item_name: result.item.item_name,
+      name: result.item.name,
       cost_asset_code: result.item.cost_asset_code,
       cost_amount: result.item.cost_amount,
       image_changes: result.image_changes

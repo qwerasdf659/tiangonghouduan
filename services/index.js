@@ -10,8 +10,11 @@ const logger = require('../utils/logger').logger
  *
  * P1-9 重构说明（2026-01-09）：
  * - 所有 service key 统一使用 snake_case 命名（E2-Strict）
- * - 不再兼容 camelCase key，旧 key 调用会抛出错误并提供迁移提示
+ * - 不再兼容 camelCase key，旧 key 调用直接抛出 "服务不存在" 错误
  * - 补充注册 DataSanitizer 和 LotteryQuotaService
+ *
+ * 2026-01-20 技术债务清理（清理项8）：
+ * - 确认无 camelCase 兼容逻辑，getService() 直接返回错误，无迁移提示
  */
 
 // V4 核心服务
@@ -347,27 +350,18 @@ class ServiceManager {
   }
 
   /**
-   * 获取服务实例（P1-9 E2-Strict：强制 snake_case）
+   * 获取服务实例
    *
    * 业务场景：
    * - 路由层通过 req.app.locals.services.getService() 获取服务
    * - 非路由场景直接引用 serviceManager.getService() 获取服务
    *
-   * 错误处理（E2-Strict）：
-   * - 如果使用 camelCase key，会抛出错误并提供迁移提示
-   * - 错误信息包含正确的 snake_case key 和可用服务列表
-   *
-   * @param {string} serviceName - 服务名称（必须使用 snake_case）
+   * @param {string} serviceName - 服务名称（使用 snake_case 格式）
    * @returns {Object} 服务实例
-   * @throws {Error} 当服务不存在或使用旧 key 时抛出错误
+   * @throws {Error} 当服务不存在时抛出错误
    *
    * @example
-   * // ✅ 正确：使用 snake_case key
    * const MarketListingService = services.getService('market_listing')
-   *
-   * // ❌ 错误：使用 camelCase key（会抛出错误并提供迁移提示）
-   * const MarketListingService = services.getService('marketListing')
-   * // Error: Service 'marketListing' not found. Did you mean 'market_listing'?
    */
   getService(serviceName) {
     if (!this._initialized) {
@@ -376,7 +370,6 @@ class ServiceManager {
 
     const service = this._services.get(serviceName)
     if (!service) {
-      // V4.6 清理：移除 camelCase 兼容提示，直接返回服务不存在错误
       const availableServices = Array.from(this._services.keys()).join(', ')
       throw new Error(`服务 "${serviceName}" 不存在。\n可用服务: ${availableServices}`)
     }

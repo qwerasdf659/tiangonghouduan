@@ -252,7 +252,12 @@ class PerformanceMonitor {
   }
 
   /**
-   * 完成监控 - 兼容 finishMonitoring 和 endMonitoring 两种调用方式
+   * 完成监控并生成性能报告
+   *
+   * 2026-01-20 技术债务清理：
+   * - 已删除 endMonitoring 别名方法
+   * - 统一使用 finishMonitoring 作为唯一方法名
+   *
    * @param {string} monitorId - 监控ID
    * @param {Object} result - 操作结果
    * @returns {Object} 性能报告
@@ -319,18 +324,14 @@ class PerformanceMonitor {
     return report
   }
 
-  /**
-   * endMonitoring - 别名方法，兼容测试文件的调用
-   * @param {string} monitorId - 监控ID
-   * @param {Object} result - 操作结果
-   * @returns {Object} 性能报告
+  /*
+   * 2026-01-20 技术债务清理：
+   * - 已删除 endMonitoring() 别名方法
+   * - 统一使用 finishMonitoring() 作为唯一方法名
    */
-  endMonitoring(monitorId, result = {}) {
-    return this.finishMonitoring(monitorId, result)
-  }
 
   /**
-   * 分析性能报告 - 新增方法
+   * 分析性能报告
    * @param {Object} report - 性能报告
    * @returns {Object} 性能分析结果
    */

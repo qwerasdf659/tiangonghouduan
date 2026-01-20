@@ -476,7 +476,7 @@ class ExchangeService {
         order: {
           order_no: existingOrder.order_no,
           record_id: existingOrder.record_id,
-          item_name: existingOrder.item_snapshot?.item_name || '未知商品',
+          name: existingOrder.item_snapshot?.name || '未知商品',
           quantity: existingOrder.quantity,
           pay_asset_code: existingOrder.pay_asset_code,
           pay_amount: existingOrder.pay_amount,
@@ -556,7 +556,7 @@ class ExchangeService {
         meta: {
           idempotency_key, // 保留原幂等键用于追溯
           item_id,
-          item_name: item.name,
+          name: item.name,
           quantity,
           cost_amount: item.cost_amount,
           total_pay_amount: totalPayAmount
@@ -631,10 +631,14 @@ class ExchangeService {
           debit_transaction_id, // ✅ 关联扣减流水ID（P0治理 - 2026-01-09）
           user_id,
           item_id,
+          /*
+           * item_snapshot 字段：商品快照（2026-01-20 统一字段名）
+           * - 使用 name/description 与 ExchangeItem 模型一致
+           */
           item_snapshot: {
             item_id: item.item_id,
-            item_name: item.name,
-            item_description: item.description,
+            name: item.name,
+            description: item.description,
             cost_asset_code: item.cost_asset_code,
             cost_amount: item.cost_amount
           },
@@ -699,7 +703,7 @@ class ExchangeService {
       order: {
         order_no,
         record_id: record.record_id,
-        item_name: item.name,
+        name: item.name,
         quantity,
         pay_asset_code: item.cost_asset_code,
         pay_amount: totalPayAmount,
@@ -1083,8 +1087,8 @@ class ExchangeService {
    * - 创建商品后立即绑定图片 context_id（避免被24h定时清理误删）
    *
    * @param {Object} itemData - 商品数据
-   * @param {string} itemData.item_name - 商品名称
-   * @param {string} [itemData.item_description] - 商品描述
+   * @param {string} itemData.name - 商品名称
+   * @param {string} [itemData.description] - 商品描述
    * @param {string} itemData.cost_asset_code - 材料资产代码（如 'red_shard'）
    * @param {number} itemData.cost_amount - 材料资产数量（必填，>0）
    * @param {number} itemData.cost_price - 成本价
@@ -1101,25 +1105,29 @@ class ExchangeService {
     // 强制要求事务边界 - 2026-01-08 图片存储架构治理
     const transaction = assertAndGetTransaction(options, 'ExchangeService.createExchangeItem')
 
-    // 🔧 2026-01-09 修复：兼容 item_name/name 和 item_description/description 两种字段名
-    const itemName = itemData.item_name || itemData.name || ''
-    const itemDescription = itemData.item_description || itemData.description || ''
+    /*
+     * 2026-01-20 技术债务清理：
+     * - 已删除 item_name/item_description 兼容逻辑
+     * - 统一使用 name/description（与数据库模型一致）
+     * - API参数也已同步修改为 name/description
+     */
+    const { name = '', description = '' } = itemData
 
     logger.info('[兑换市场] 管理员创建商品', {
-      item_name: itemName,
+      name,
       created_by
     })
 
     // 参数验证
-    if (!itemName || itemName.trim().length === 0) {
+    if (!name || name.trim().length === 0) {
       throw new Error('商品名称不能为空')
     }
 
-    if (itemName.length > 100) {
+    if (name.length > 100) {
       throw new Error('商品名称最长100字符')
     }
 
-    if (itemDescription && itemDescription.length > 500) {
+    if (description && description.length > 500) {
       throw new Error('商品描述最长500字符')
     }
 
@@ -1147,12 +1155,12 @@ class ExchangeService {
 
     /*
      * 创建商品（V4.5.0材料资产支付 + 2026-01-08 图片存储架构）
-     * 🔧 2026-01-09 修复：字段名匹配数据库模型（name/description，兼容API传入的item_name/item_description）
+     * 2026-01-20 技术债务清理：统一使用 name/description 字段
      */
     const item = await ExchangeItem.create(
       {
-        name: itemName.trim(),
-        description: itemDescription.trim(),
+        name: name.trim(),
+        description: description.trim(),
         // 🎯 2026-01-08 图片存储架构：主图片ID（关联 image_resources.image_id）
         primary_image_id: itemData.primary_image_id || null,
         cost_asset_code: itemData.cost_asset_code,
@@ -1242,28 +1250,26 @@ class ExchangeService {
     // 构建更新数据
     const finalUpdateData = { updated_at: BeijingTimeHelper.createDatabaseTime() }
 
-    // 🔧 2026-01-09 修复：兼容 item_name/name 两种字段名
-    const itemName = updateData.item_name !== undefined ? updateData.item_name : updateData.name
-    if (itemName !== undefined) {
-      if (itemName.trim().length === 0) {
+    /*
+     * 2026-01-20 技术债务清理：
+     * - 已删除 item_name/item_description 兼容逻辑
+     * - 统一使用 name/description（与数据库模型一致）
+     */
+    if (updateData.name !== undefined) {
+      if (updateData.name.trim().length === 0) {
         throw new Error('商品名称不能为空')
       }
-      if (itemName.length > 100) {
+      if (updateData.name.length > 100) {
         throw new Error('商品名称最长100字符')
       }
-      finalUpdateData.name = itemName.trim()
+      finalUpdateData.name = updateData.name.trim()
     }
 
-    // 🔧 2026-01-09 修复：兼容 item_description/description 两种字段名
-    const itemDescription =
-      updateData.item_description !== undefined
-        ? updateData.item_description
-        : updateData.description
-    if (itemDescription !== undefined) {
-      if (itemDescription.length > 500) {
+    if (updateData.description !== undefined) {
+      if (updateData.description.length > 500) {
         throw new Error('商品描述最长500字符')
       }
-      finalUpdateData.description = itemDescription.trim()
+      finalUpdateData.description = updateData.description.trim()
     }
 
     // V4.5.0：材料资产支付字段更新
@@ -1754,7 +1760,7 @@ class ExchangeService {
         where.status = status
       }
       if (keyword) {
-        where.item_name = { [Op.like]: `%${keyword}%` }
+        where.name = { [Op.like]: `%${keyword}%` }
       }
 
       // 分页参数

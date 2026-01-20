@@ -49,7 +49,7 @@ const logger = require('../utils/logger').logger
  *   item_id: itemId,
  *   from_user_id: fromUserId,
  *   to_user_id: toUserId,
- *   item_name: '优惠券',
+ *   name: '优惠券',  // 2026-01-20 统一字段名
  *   reason: '赠送朋友',
  *   transaction
  * });
@@ -463,17 +463,19 @@ class AuditLogService {
   /**
    * 记录物品使用操作
    *
+   * 2026-01-20 技术债务清理：参数名统一为 name（与其他服务一致）
+   *
    * @param {Object} params - 参数
    * @param {number} params.operator_id - 操作员ID
    * @param {number} params.item_id - 物品ID
-   * @param {string} params.item_name - 物品名称
+   * @param {string} params.name - 物品名称
    * @param {string} params.reason - 操作原因
    * @param {string} params.idempotency_key - 业务ID
    * @param {Object} params.transaction - 事务对象
    * @returns {Promise<AdminOperationLog|null>} 审计日志记录（失败返回null，不阻塞业务流程）
    */
   static async logInventoryUse(params) {
-    const { operator_id, item_id, item_name, reason, idempotency_key, transaction } = params
+    const { operator_id, item_id, name, reason, idempotency_key, transaction } = params
 
     return this.logOperation({
       operator_id,
@@ -487,7 +489,7 @@ class AuditLogService {
       after_data: {
         status: 'used'
       },
-      reason: reason || `使用物品：${item_name}`,
+      reason: reason || `使用物品：${name}`,
       idempotency_key,
       transaction
     })
@@ -499,12 +501,14 @@ class AuditLogService {
    * ⚠️ 注意：此方法已更新为使用独立的 'inventory_transfer' 操作类型
    * 用于物品转让的审计日志记录，提供更清晰的审计追溯
    *
+   * 2026-01-20 技术债务清理：参数名统一为 name（与其他服务一致）
+   *
    * @param {Object} params - 参数
    * @param {number} params.operator_id - 操作员ID（转让方）
    * @param {number} params.item_id - 物品ID
    * @param {number} params.from_user_id - 转让方ID
    * @param {number} params.to_user_id - 接收方ID
-   * @param {string} params.item_name - 物品名称
+   * @param {string} params.name - 物品名称
    * @param {string} params.reason - 操作原因
    * @param {string} params.idempotency_key - 业务ID
    * @param {Object} params.transaction - 事务对象
@@ -516,7 +520,7 @@ class AuditLogService {
       item_id,
       from_user_id,
       to_user_id,
-      item_name,
+      name,
       reason,
       idempotency_key,
       transaction
@@ -534,7 +538,7 @@ class AuditLogService {
       after_data: {
         user_id: to_user_id
       },
-      reason: reason || `物品转让：${item_name}（${from_user_id} → ${to_user_id}）`,
+      reason: reason || `物品转让：${name}（${from_user_id} → ${to_user_id}）`,
       idempotency_key,
       transaction
     })
@@ -543,11 +547,13 @@ class AuditLogService {
   /**
    * 记录物品核销操作
    *
+   * 2026-01-20 技术债务清理：参数名统一为 name（与其他服务一致）
+   *
    * @param {Object} params - 参数
    * @param {number} params.operator_id - 操作员ID（商家）
    * @param {number} params.item_id - 物品ID
    * @param {number} params.user_id - 用户ID
-   * @param {string} params.item_name - 物品名称
+   * @param {string} params.name - 物品名称
    * @param {string} params.verification_code - 核销码
    * @param {string} params.reason - 操作原因
    * @param {string} params.idempotency_key - 业务ID
@@ -559,7 +565,7 @@ class AuditLogService {
       operator_id,
       item_id,
       user_id,
-      item_name,
+      name,
       verification_code,
       reason,
       idempotency_key,
@@ -580,7 +586,7 @@ class AuditLogService {
         status: 'used',
         verification_code: null
       },
-      reason: reason || `核销物品：${item_name}（用户${user_id}）`,
+      reason: reason || `核销物品：${name}（用户${user_id}）`,
       idempotency_key,
       transaction
     })

@@ -159,7 +159,7 @@ router.post(
               listing_id,
               item_instance_id: listing.offer_item_instance_id,
               price_amount: listing.price_amount,
-              price_asset_code: listing.price_asset_code || 'DIAMOND',
+              price_asset_code: listing.price_asset_code, // 2026-01-20：sell.js 已强制必填，无需默认值
               idempotency_key // 业界标准形态：统一使用 idempotency_key
             },
             { transaction }
@@ -183,7 +183,7 @@ router.post(
         order_id: orderResult.order_id,
         listing_id,
         seller_id: listing.seller_user_id,
-        asset_code: listing.price_asset_code || 'DIAMOND',
+        asset_code: listing.price_asset_code, // 2026-01-20：无需默认值
         gross_amount: listing.price_amount,
         fee_amount: completeResult.fee_amount || 0,
         net_amount: completeResult.net_amount || listing.price_amount,

@@ -268,12 +268,15 @@ describe('BackpackService - 背包服务', () => {
           expect(item).toHaveProperty('item_type')
           expect(item).toHaveProperty('status')
 
-          // item_name用于展示（可选）
-          if (item.item_name) {
-            expect(typeof item.item_name).toBe('string')
-          }
+          /*
+           * 2026-01-20 技术债务清理：
+           * - 字段名从 item_name 改为 name（与其他服务统一）
+           * - name 用于展示（必填，从 meta.name 获取）
+           */
+          expect(item).toHaveProperty('name')
+          expect(typeof item.name).toBe('string')
 
-          // description用于展示（可选）
+          // description 用于展示（可选）
           if (item.description) {
             expect(typeof item.description).toBe('string')
           }
@@ -418,6 +421,136 @@ describe('BackpackService - 背包服务', () => {
         for (const item of created_items) {
           await item.destroy()
         }
+      }
+    })
+  })
+
+  // ==================== 字段名称验证测试（2026-01-20 技术债务清理） ====================
+
+  describe('字段名称验证 - 2026-01-20 技术债务清理', () => {
+    /*
+     * 测试背景：
+     * - 2026-01-20 技术债务清理将 item_name 字段统一改为 name
+     * - 物品名称从 ItemInstance.meta.name 获取
+     * - 确保 API 返回正确的字段名
+     */
+
+    it('getUserBackpack 返回的物品应使用 name 字段而非 item_name', async () => {
+      // 创建带有 meta.name 的测试物品
+      const test_item = await ItemInstance.create({
+        owner_user_id: test_user.user_id,
+        item_type: 'voucher',
+        status: 'available',
+        meta: {
+          name: '测试优惠券-字段验证',
+          description: '用于验证字段名称的测试物品',
+          rarity: 'common'
+        }
+      })
+
+      try {
+        // 执行查询（通过 getUserBackpack 获取 items）
+        const result = await BackpackService.getUserBackpack(test_user.user_id, {
+          viewer_user_id: test_user.user_id
+        })
+
+        // 从 items 数组中找到刚创建的测试物品
+        const found_item = result.items.find(
+          i =>
+            i.item_instance_id === test_item.item_instance_id ||
+            String(i.item_instance_id) === String(test_item.item_instance_id)
+        )
+
+        expect(found_item).toBeDefined()
+
+        // ✅ 验证使用正确的字段名 name（而非旧的 item_name）
+        expect(found_item).toHaveProperty('name')
+        expect(found_item).not.toHaveProperty('item_name')
+        expect(found_item.name).toBe('测试优惠券-字段验证')
+
+        // ✅ 验证其他必要字段
+        expect(found_item).toHaveProperty('item_instance_id')
+        expect(found_item).toHaveProperty('item_type')
+        expect(found_item).toHaveProperty('status')
+        expect(found_item).toHaveProperty('rarity')
+        expect(found_item).toHaveProperty('description')
+      } finally {
+        // 清理测试数据
+        await test_item.destroy()
+      }
+    })
+
+    it('getItemDetail 返回的物品详情应使用 name 字段而非 item_name', async () => {
+      // 创建测试物品
+      const test_item = await ItemInstance.create({
+        owner_user_id: test_user.user_id,
+        item_type: 'product',
+        status: 'available',
+        meta: {
+          name: '详情测试物品',
+          description: '用于验证详情接口字段名称',
+          rarity: 'rare'
+        }
+      })
+
+      try {
+        // 执行查询
+        const item_detail = await BackpackService.getItemDetail(test_item.item_instance_id, {
+          viewer_user_id: test_user.user_id
+        })
+
+        expect(item_detail).toBeDefined()
+
+        // ✅ 验证使用正确的字段名 name（而非旧的 item_name）
+        expect(item_detail).toHaveProperty('name')
+        expect(item_detail).not.toHaveProperty('item_name')
+        expect(item_detail.name).toBe('详情测试物品')
+
+        // ✅ 验证其他字段
+        expect(item_detail).toHaveProperty('item_instance_id')
+        expect(item_detail).toHaveProperty('item_type')
+        expect(item_detail).toHaveProperty('status')
+        expect(item_detail).toHaveProperty('description')
+        expect(item_detail.description).toBe('用于验证详情接口字段名称')
+      } finally {
+        // 清理测试数据
+        await test_item.destroy()
+      }
+    })
+
+    it('默认名称应为"未命名物品"当 meta.name 不存在时', async () => {
+      // 创建没有 meta.name 的测试物品
+      const test_item = await ItemInstance.create({
+        owner_user_id: test_user.user_id,
+        item_type: 'unknown',
+        status: 'available',
+        meta: {
+          // 故意不设置 name 字段
+          description: '无名物品测试'
+        }
+      })
+
+      try {
+        // 执行查询（通过 getUserBackpack 获取 items）
+        const result = await BackpackService.getUserBackpack(test_user.user_id, {
+          viewer_user_id: test_user.user_id
+        })
+
+        // 从 items 数组中找到测试物品
+        const found_item = result.items.find(
+          i =>
+            i.item_instance_id === test_item.item_instance_id ||
+            String(i.item_instance_id) === String(test_item.item_instance_id)
+        )
+
+        expect(found_item).toBeDefined()
+
+        // ✅ 验证默认名称
+        expect(found_item).toHaveProperty('name')
+        expect(found_item.name).toBe('未命名物品')
+      } finally {
+        // 清理测试数据
+        await test_item.destroy()
       }
     })
   })

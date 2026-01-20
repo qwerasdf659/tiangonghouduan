@@ -13,7 +13,7 @@
  *
  * ⚠️ 双重条件AND关系（缺一不可）：
  * - 条件1: users.history_total_points ≥ 100000（历史累计10万积分门槛）
- * - 条件2: user_points_accounts.available_points ≥ 100（当前余额≥100积分）
+ * - 条件2: account_asset_balances 中用户积分余额 ≥ 100（当前余额≥100积分）
  *
  * 数据表：user_premium_status
  * 创建时间：2025-11-02

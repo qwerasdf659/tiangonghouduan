@@ -127,11 +127,15 @@ router.post('/fulfill', authenticateToken, async (req, res) => {
           fulfilled_at: order.fulfilled_at,
           redeemer_user_id: order.redeemer_user_id
         },
+        /*
+         * 物品实例信息
+         * 2026-01-20 技术债务清理：name 从 meta.name 获取
+         */
         item_instance: order.item_instance
           ? {
               item_instance_id: order.item_instance.item_instance_id,
               item_type: order.item_instance.item_type,
-              item_name: order.item_instance.item_name,
+              name: order.item_instance.meta?.name || '未命名物品',
               status: order.item_instance.status
             }
           : null,

@@ -15,10 +15,9 @@
  * - draw_count 范围：1-20，但必须在活动配置的启用按钮列表中
  * - 配置缺失时严格报错阻断，不允许兜底默认值
  *
- * 配置来源优先级（Phase 3 已拍板 2026-01-18）：
- * 1. lottery_campaign_pricing_config 表（活动级版本化配置，优先）
- * 2. campaign.prize_distribution_config.draw_pricing（活动JSON字段，降级兼容）
- * 3. 默认配置（最终兜底）
+ * 配置来源：
+ * - lottery_campaign_pricing_config 表（活动级版本化配置，唯一来源）
+ * - 配置缺失时严格报错阻断，不允许兜底默认值
  *
  * 输入依赖：
  * - LoadCampaignStage.data.campaign
@@ -168,14 +167,12 @@ class PricingStage extends BaseStage {
   /**
    * 获取抽奖定价配置
    *
-   * 复用旧链路 UnifiedLotteryEngine.getDrawPricing() 的语义
+   * 配置来源：
+   * - lottery_campaign_pricing_config 表（活动级版本化配置，唯一来源）
+   * - 数据库 system_settings.lottery_cost_points（单抽成本全局配置）
+   * - 配置缺失时严格报错阻断
    *
-   * 配置来源优先级（Phase 3 已拍板 2026-01-18）：
-   * 1. lottery_campaign_pricing_config 表（活动级版本化配置，优先）
-   * 2. 活动配置 prize_distribution_config.draw_pricing（活动级覆盖，降级）
-   * 3. 数据库 system_settings.lottery_cost_points（全局配置）
-   *
-   * 定价模式（已拍板 2026-01-18）：
+   * 定价模式：
    * - 运营配 discount，后端用 `单抽成本(DB) × count × discount` 动态计算
    *
    * @param {number} draw_count - 抽奖次数
@@ -211,8 +208,8 @@ class PricingStage extends BaseStage {
         })
       }
     } catch (error) {
-      // 新表查询失败，记录警告但不阻断，降级到旧逻辑
-      this.log('warn', 'pricing_config 表查询失败，降级到活动JSON配置', {
+      /* 新表查询失败时记录警告，后续会抛出 MISSING_PRICING_CONFIG_IN_TABLE 错误 */
+      this.log('warn', 'pricing_config 表查询失败', {
         campaign_id: campaign.campaign_id,
         error: error.message
       })
@@ -220,22 +217,16 @@ class PricingStage extends BaseStage {
 
     /*
      * ================================================================
-     * 步骤1.5：如果新表无配置，降级到活动JSON字段（兼容迁移过渡期）
+     * 步骤1.5：配置缺失时严格报错阻断
      * ================================================================
+     * 定价配置必须在 lottery_campaign_pricing_config 表中配置
      */
     if (pricing_source === 'default') {
-      const prize_distribution_config = campaign.prize_distribution_config || {}
-      const legacy_draw_pricing = prize_distribution_config.draw_pricing || {}
-
-      if (Object.keys(legacy_draw_pricing).length > 0) {
-        draw_pricing_config = legacy_draw_pricing
-        pricing_source = 'campaign_json'
-
-        this.log('info', '从活动 JSON 字段加载定价配置（降级模式）', {
-          campaign_id: campaign.campaign_id,
-          config_keys: Object.keys(legacy_draw_pricing)
-        })
-      }
+      throw this.createError(
+        `活动 ${campaign.campaign_id} 的定价配置缺失，请在 lottery_campaign_pricing_config 表中配置`,
+        'MISSING_PRICING_CONFIG_IN_TABLE',
+        true
+      )
     }
 
     // 步骤2：获取单抽积分消耗配置（严格模式：配置缺失直接报错）

@@ -994,13 +994,16 @@ class MarketListingService {
       }
 
       if (listing.listing_kind === 'fungible_asset') {
-        // 可叠加资产挂牌（使用快照字段）
+        /*
+         * 可叠加资产挂牌（使用快照字段）
+         * 2026-01-20 技术债务清理：统一使用 name 字段名
+         */
         return {
           ...baseData,
           offer_asset_code: listing.offer_asset_code,
           offer_amount: Number(listing.offer_amount),
           // 优先使用快照字段，fallback 到原有逻辑
-          item_name:
+          name:
             listing.offer_asset_display_name ||
             `${listing.offer_amount} 个 ${listing.offer_asset_code}`,
           item_type: 'fungible_asset',
@@ -1008,12 +1011,15 @@ class MarketListingService {
           asset_group_code: listing.offer_asset_group_code || null
         }
       } else {
-        // 物品实例挂牌（优先使用快照字段）
+        /*
+         * 物品实例挂牌（优先使用快照字段）
+         * 2026-01-20 技术债务清理：统一使用 name 字段名
+         */
         return {
           ...baseData,
           item_instance_id: listing.offer_item_instance_id,
           // 优先使用快照字段，fallback 到 offerItem 关联
-          item_name:
+          name:
             listing.offer_item_display_name ||
             listing.offerItem?.meta?.name ||
             listing.offerItem?.item_type ||

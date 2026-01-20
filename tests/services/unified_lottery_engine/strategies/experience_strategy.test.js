@@ -13,10 +13,16 @@
 
 /* eslint-disable no-console */
 
-const PityCalculator = require('../../../../services/UnifiedLotteryEngine/strategy/calculators/PityCalculator')
-const LuckDebtCalculator = require('../../../../services/UnifiedLotteryEngine/strategy/calculators/LuckDebtCalculator')
-const AntiEmptyStreakHandler = require('../../../../services/UnifiedLotteryEngine/strategy/calculators/AntiEmptyStreakHandler')
-const AntiHighStreakHandler = require('../../../../services/UnifiedLotteryEngine/strategy/calculators/AntiHighStreakHandler')
+/*
+ * 技术债务清理（2026-01-20）：
+ * - 原引用：strategy/calculators/...
+ * - 新引用：compute/calculators/...
+ * - 原因：strategy 目录重构为 compute 目录
+ */
+const PityCalculator = require('../../../../services/UnifiedLotteryEngine/compute/calculators/PityCalculator')
+const LuckDebtCalculator = require('../../../../services/UnifiedLotteryEngine/compute/calculators/LuckDebtCalculator')
+const AntiEmptyStreakHandler = require('../../../../services/UnifiedLotteryEngine/compute/calculators/AntiEmptyStreakHandler')
+const AntiHighStreakHandler = require('../../../../services/UnifiedLotteryEngine/compute/calculators/AntiHighStreakHandler')
 
 describe('体验策略模块测试套件', () => {
   // ============== PityCalculator 测试 ==============

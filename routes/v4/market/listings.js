@@ -183,7 +183,7 @@ router.get('/listings/facets', authenticateToken, async (req, res) => {
  * @returns {Object} 挂牌详情
  * @returns {number} data.listing_id - 挂牌ID
  * @returns {number} data.item_instance_id - 物品实例ID
- * @returns {string} data.item_name - 物品名称
+ * @returns {string} data.name - 物品名称（2026-01-20 统一字段名）
  * @returns {string} data.item_type - 物品类型
  * @returns {number} data.price_amount - 价格数量
  * @returns {string} data.price_asset_code - 价格资产类型（如DIAMOND）
@@ -214,14 +214,17 @@ router.get(
         return res.apiError('挂牌不存在', 'NOT_FOUND', null, 404)
       }
 
-      // 格式化返回数据（优先使用快照字段，fallback 到关联查询）
+      /*
+       * 格式化返回数据（优先使用快照字段，fallback 到关联查询）
+       * 2026-01-20 技术债务清理：统一使用 name 字段名
+       */
       const listingDetail = {
         listing_id: listing.listing_id,
         listing_kind: listing.listing_kind,
         // 物品实例挂牌字段
         item_instance_id: listing.offer_item_instance_id,
         item_template_id: listing.offer_item_template_id || null,
-        item_name:
+        name:
           listing.offer_item_display_name ||
           listing.offerItem?.meta?.name ||
           listing.offerItem?.item_type ||

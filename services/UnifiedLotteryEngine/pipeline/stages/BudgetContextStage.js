@@ -5,8 +5,8 @@
  *
  * 职责：
  * 1. 根据活动的 budget_mode 初始化对应的 BudgetProvider
- * 2. 调用 StrategyEngine 计算预算分层（Budget Tier B0-B3）
- * 3. 调用 StrategyEngine 计算活动压力分层（Pressure Tier P0-P2）
+ * 2. 调用 LotteryComputeEngine 计算预算分层（Budget Tier B0-B3）
+ * 3. 调用 LotteryComputeEngine 计算活动压力分层（Pressure Tier P0-P2）
  * 4. 查询用户当前预算余额（EffectiveBudget）
  * 5. 检查预算是否足够支付最低价值奖品
  * 6. 将 budget_provider 和预算分层信息注入上下文
@@ -21,8 +21,8 @@
  * - min_prize_cost: 最低奖品成本
  * - budget_sufficient: 预算是否充足
  *
- * 策略引擎集成（2026-01-20）：
- * - 集成 StrategyEngine.computeBudgetContext()
+ * 计算引擎集成（2026-01-20）：
+ * - 集成 LotteryComputeEngine.computeBudgetContext()
  * - 支持 BxPx 矩阵预算分层控制
  * - 为后续 BuildPrizePoolStage 和 TierPickStage 提供分层信息
  *
@@ -34,12 +34,14 @@
  * @module services/UnifiedLotteryEngine/pipeline/stages/BudgetContextStage
  * @author 统一抽奖架构重构
  * @since 2026-01-18
- * @updated 2026-01-20 集成 StrategyEngine
+ * @updated 2026-01-20 集成 LotteryComputeEngine
  */
 
 const BaseStage = require('./BaseStage')
 const BudgetProviderFactory = require('../budget/BudgetProviderFactory')
-const StrategyEngine = require('../../strategy/StrategyEngine')
+
+/* 抽奖计算引擎 */
+const LotteryComputeEngine = require('../../compute/LotteryComputeEngine')
 
 /**
  * 预算上下文初始化 Stage
@@ -54,14 +56,14 @@ class BudgetContextStage extends BaseStage {
       required: true
     })
 
-    /* 初始化策略引擎实例 */
-    this.strategyEngine = new StrategyEngine()
+    /* 初始化抽奖计算引擎实例 */
+    this.computeEngine = new LotteryComputeEngine()
   }
 
   /**
    * 执行预算上下文初始化
    *
-   * 集成 StrategyEngine 计算预算分层和压力分层
+   * 集成 LotteryComputeEngine 计算预算分层和压力分层
    *
    * @param {Object} context - 执行上下文
    * @param {number} context.user_id - 用户ID
@@ -102,29 +104,24 @@ class BudgetContextStage extends BaseStage {
         transaction: context.transaction || null
       })
 
-      /* 2. 调用 StrategyEngine 计算预算上下文（包含分层信息） */
-      const strategy_context = await this.strategyEngine.computeBudgetContext({
+      /* 2. 调用 LotteryComputeEngine 计算预算上下文（包含分层信息） */
+      const strategy_context = await this.computeEngine.computeBudgetContext({
         user_id,
         campaign,
         prizes,
         transaction: context.transaction || null
       })
 
-      /* 3. 同时获取传统预算余额（兼容现有逻辑） */
-      let budget_before = 0
-      if (budget_mode !== 'none') {
-        try {
-          budget_before = await budget_provider.getBalance()
-        } catch (error) {
-          this.log('warn', '获取预算余额失败，使用 EffectiveBudget', {
-            user_id,
-            campaign_id,
-            budget_mode,
-            error: error.message
-          })
-          budget_before = strategy_context.effective_budget || 0
-        }
-      }
+      /*
+       * 3. 获取预算余额（统一使用 LotteryComputeEngine 计算结果）
+       *
+       * 清理日期：2026-01-20（技术债务清理方案 - 清理项3）
+       * 清理原因：budget_provider.getBalance() 方法在 BudgetProvider 基类中不存在
+       *          代码每次都会进入 catch 块，属于 100% 死代码
+       * 清理方案：直接使用 strategy_context.effective_budget（已由 LotteryComputeEngine 计算）
+       * 详见：docs/技术债务彻底清理重构方案-2026-01-20.md 决策7
+       */
+      const budget_before = budget_mode === 'none' ? 0 : strategy_context.effective_budget || 0
 
       /* 4. 计算最低奖品成本 */
       const min_prize_cost = this._calculateMinPrizeCost(prizes)

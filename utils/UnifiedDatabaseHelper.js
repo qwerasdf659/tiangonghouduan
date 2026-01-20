@@ -150,12 +150,13 @@ class UnifiedDatabaseHelper {
       lottery_prizes: {
         primaryKey: 'prize_id',
         requiredFields: ['prize_name', 'stock', 'status']
-      },
-      user_points_accounts: {
-        primaryKey: 'account_id',
-        requiredFields: ['user_id', 'total_points', 'available_points'],
-        indexes: [{ columns: ['user_id'], unique: true }]
       }
+      /*
+       * 2026-01-20 技术债务清理（P2全局注释审查）：
+       * 已删除 user_points_accounts 配置 - 该表已废弃
+       * 用户积分现通过 account_asset_balances 表管理（asset_code='POINTS'）
+       * 详见：docs/技术债务彻底清理重构方案-2026-01-20.md
+       */
     }
 
     // 核心表列表（V4.3 更新：对齐新账本架构）
