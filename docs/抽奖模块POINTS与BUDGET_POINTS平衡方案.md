@@ -788,64 +788,245 @@ INSERT INTO lottery_tier_matrix_config (campaign_id, budget_tier, pressure_tier,
 
 ---
 
-## 六、已拍板决策点（✅ 已确认）
+## 六、最终决策汇总（✅ 2026-01-20 确认 - 长期维护视角）
 
-### 6.1 方案选择 ✅
+> **决策背景**：项目尚未上线，愿意一次性投入成本，不需要兼容旧接口，从**长期维护成本最低、技术债务最少**的角度做出最终决策。
 
-**最终选择**：**预算侧自动分层控制方案**（第五节）
+### 6.1 七大决策点最终选择
 
-**核心决策**：
-- ❌ 不采用"预算预拨"（方案1）- 预算发放由外部业务驱动
-- ❌ 不采用"动态定价"（方案2）- 不改变积分经济
-- ✅ 采用"预算侧自动分层 + 体验软阀门"
-  - 根据预算余额自动分层（B0/B1/B2/B3）
-  - 根据活动压力自动调节（P0/P1/P2）
-  - 预算允许时自动平滑体验（反连空/反连高）
-
----
-
-### 6.2 预算分层阈值 ✅
-
-| 预算层 | 分层条件 | 说明 |
-|--------|---------|------|
-| **B0** | `budget < 10` | 仅空奖 |
-| **B1** | `10 ≤ budget < 100` | 低档奖 |
-| **B2** | `100 ≤ budget < 400` | 中档奖 |
-| **B3** | `budget ≥ 400` | 高档奖 |
-
-**依据**：当前奖池 `prize_value_points` 分布（10/60/80/100/150/400）
+| 决策点 | 最终选择 | 核心理由 |
+|--------|---------|---------|
+| 1. EffectiveBudget 口径 | **A - 按 allowed_campaign_ids 多桶聚合** | 标准方案，无技术债务 |
+| 2. 压力层计算 | **B - 虚拟消耗（适用所有 budget_mode）** | 一次做好，user/pool 模式都适用 |
+| 3. B-tier 阈值推导 | **C - 混合（有配置用配置，无配置自动推导）** | 最灵活，运营可控+自动兜底 |
+| 4. 反连空选奖 | **A - 安全优先（只从 budget 允许的奖品中选）** | 安全刚需，不欠账 |
+| 5. 空奖差异化 | **C - 5-10个差异化空奖** | 一次做好，体验完整 |
+| 6. 体验计数器存储 | **B - 独立表 `lottery_user_experience_state`** | 职责清晰，可扩展 |
+| 7. 灰度发布 | **A - 全量上线 + 功能开关基础设施** | 项目未上线无需灰度，但要有开关能力 |
 
 ---
 
-### 6.3 压力层计算方式 ✅
+### 6.2 决策点 1：EffectiveBudget 读取口径 ✅
 
-**压力指数公式**：
+**最终选择**：**A - 按 allowed_campaign_ids 多桶聚合**
+
+**实现方式**：
+```javascript
+// 正确实现：按 allowed_campaign_ids 聚合用户 BUDGET_POINTS 余额
+const effectiveBudget = await AssetService.getBudgetPointsByCampaigns({
+  user_id,
+  campaign_ids: campaign.allowed_campaign_ids || ['CONSUMPTION_DEFAULT']
+}, { transaction });
 ```
-P = remaining_budget / target_remaining_budget(now)
+
+**选择理由**：
+- ✅ 标准方案，无技术债务
+- ✅ 支持多桶聚合，扩展性强
+- ✅ 与 AssetService 现有能力对齐
+
+---
+
+### 6.3 决策点 2：压力层计算方式 ✅
+
+**最终选择**：**B - 虚拟消耗（适用所有 budget_mode）**
+
+**实现方式**：
+```javascript
+// 统计活动启动以来的"已发奖成本"（虚拟消耗）
+async function calculatePressureIndex(campaign, transaction) {
+  const virtualConsumed = await LotteryDraw.sum('prize_value_points', {
+    where: { 
+      campaign_id: campaign.campaign_id, 
+      created_at: { [Op.gte]: campaign.start_time } 
+    },
+    transaction
+  });
+
+  const now = new Date();
+  const start = new Date(campaign.start_time);
+  const end = new Date(campaign.end_time);
+  
+  // 时间进度
+  const timeProgress = Math.max(0, Math.min(1, (now - start) / (end - start)));
+  
+  // 预期消耗 = 总预算 × 时间进度
+  const totalBudget = Number(campaign.pool_budget_total || 10000);
+  const expectedConsumed = totalBudget * timeProgress;
+  
+  // 压力指数 = 实际消耗 / 预期消耗
+  if (expectedConsumed <= 0) return 1.0; // 活动刚开始
+  return virtualConsumed / expectedConsumed;
+}
 ```
 
 **压力分层**：
-- **P0（紧）**：P < 0.7
-- **P1（正常）**：0.7 ≤ P ≤ 1.3
-- **P2（富余）**：P > 1.3
+- **P0（紧）**：压力指数 > 1.3（消耗过快）
+- **P1（正常）**：0.7 ≤ 压力指数 ≤ 1.3
+- **P2（富余）**：压力指数 < 0.7（消耗过慢）
 
-**更新频率**：每小时计算一次（缓存1小时）
-
----
-
-### 6.4 体验软阀门参数 ✅
-
-| 参数 | 确认值 | 说明 |
-|------|--------|------|
-| **反连空阈值 K** | 3 次 | 连续空奖3次后，预算允许时强制非空 |
-| **反连高窗口 N** | 5 抽 | 最近5抽内统计高档次数 |
-| **反连高阈值 M** | 2 次 | 5抽内2次高档则触发降权 |
-| **反连高降权倍数** | 0.5x | 高档权重降低50% |
-| **反连高持续时长 T** | 10 抽 | 降权持续10抽后恢复 |
+**选择理由**：
+- ✅ 一次做好，user/pool 模式都适用
+- ✅ 基于实际发奖数据，更准确
+- ✅ 无需依赖 pool_budget_remaining（user 模式下此字段无意义）
 
 ---
 
-### 6.5 Bx × Px 矩阵（cap + weights）✅
+### 6.4 决策点 3：B-tier 阈值推导 ✅
+
+**最终选择**：**C - 混合（有配置用配置，无配置自动推导）**
+
+**实现方式**：
+```javascript
+async function getBudgetTierThresholds(campaignId) {
+  // 1. 先查配置表
+  const config = await LotteryBudgetTierConfig.findAll({
+    where: { campaign_id: [campaignId, 0] }, // 活动级 > 全局默认
+    order: [['campaign_id', 'DESC']]
+  });
+  
+  if (config.length > 0) {
+    return config; // 有配置用配置
+  }
+  
+  // 2. 无配置时从奖池自动推导
+  const prizes = await LotteryPrize.findAll({
+    where: { 
+      campaign_id: campaignId, 
+      status: 'active', 
+      prize_value_points: { [Op.gt]: 0 } 
+    }
+  });
+  
+  const costs = prizes.map(p => p.prize_value_points).sort((a, b) => a - b);
+  const minCost = costs[0] || 10;
+  const medianCost = costs[Math.floor(costs.length / 2)] || 100;
+  const maxCost = costs[costs.length - 1] || 400;
+  
+  return [
+    { tier_name: 'B0', min_budget: 0, max_budget: minCost },
+    { tier_name: 'B1', min_budget: minCost, max_budget: medianCost },
+    { tier_name: 'B2', min_budget: medianCost, max_budget: maxCost },
+    { tier_name: 'B3', min_budget: maxCost, max_budget: null }
+  ];
+}
+```
+
+**选择理由**：
+- ✅ 运营可精确控制（有配置时）
+- ✅ 自动兜底（无配置时从奖池推导）
+- ✅ 奖品变化时自动适配
+
+---
+
+### 6.5 决策点 4：反连空选奖策略 ✅
+
+**最终选择**：**A - 安全优先（只从 budget 允许的奖品中选）**
+
+**规则**：
+- 连续空奖 K=3 次后触发
+- 强制从 `prize_value_points > 0 AND prize_value_points <= cap` 的奖品中选
+- 如果没有符合条件的非空奖，继续空奖（不欠账）
+
+**选择理由**：
+- ✅ 安全刚需，绝不欠账
+- ✅ 预算控制是硬约束
+
+---
+
+### 6.6 决策点 5：空奖差异化设计 ✅
+
+**最终选择**：**C - 5-10个差异化空奖**
+
+**空奖设计方案**：
+
+| 奖品名称 | 文案 | 视觉 | 概念 | prize_value_points |
+|---------|------|------|------|-------------------|
+| 幸运签 | "今日宜加餐，遇好事" | 签筒动画 | 趣味互动 | 0 |
+| 神秘彩蛋 | "彩蛋已收集，集满10个换惊喜" | 彩蛋图标 | 收集成就 | 0 |
+| 好运加持 | "下次抽奖运气+10%" | 光环特效 | 心理暗示 | 0 |
+| 美食推荐 | "今日推荐：招牌菜" | 菜品图片 | 引流点餐 | 0 |
+| 厨师祝福 | "主厨祝您用餐愉快" | 厨师卡通 | 品牌温度 | 0 |
+| 下次好运 | "运气正在积攒中..." | 进度条 | 保底暗示 | 0 |
+| 参与有礼 | "感谢参与，欢迎再来" | 礼物图标 | 通用兜底 | 0 |
+
+**选择理由**：
+- ✅ 一次做好，体验完整
+- ✅ 空奖也有"层次感"，不是都一样的"谢谢参与"
+- ✅ 可扩展（如彩蛋收集系统）
+
+---
+
+### 6.7 决策点 6：体验计数器存储 ✅
+
+**最终选择**：**B - 独立表 `lottery_user_experience_state`**
+
+**表设计**：
+```sql
+CREATE TABLE lottery_user_experience_state (
+  state_id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  user_id INT NOT NULL,
+  campaign_id INT NOT NULL,
+  
+  -- 反连空状态
+  empty_streak INT NOT NULL DEFAULT 0 COMMENT '连续空奖次数（非空奖时重置）',
+  last_non_empty_at DATETIME COMMENT '最近一次非空奖时间',
+  
+  -- 反连高状态
+  recent_high_count INT NOT NULL DEFAULT 0 COMMENT '近期高档次数',
+  anti_high_cooldown INT NOT NULL DEFAULT 0 COMMENT '反连高冷却剩余抽数',
+  last_high_tier_at DATETIME COMMENT '最近一次高档奖时间',
+  
+  -- 统计数据（可用于后续分析）
+  total_draw_count INT NOT NULL DEFAULT 0 COMMENT '总抽奖次数',
+  total_empty_count INT NOT NULL DEFAULT 0 COMMENT '总空奖次数',
+  total_budget_consumed BIGINT NOT NULL DEFAULT 0 COMMENT '总预算消耗',
+  max_empty_streak INT NOT NULL DEFAULT 0 COMMENT '历史最长连空记录',
+  
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  
+  UNIQUE KEY uk_user_campaign (user_id, campaign_id),
+  INDEX idx_campaign (campaign_id),
+  INDEX idx_updated (updated_at)
+) COMMENT='用户抽奖体验状态表';
+```
+
+**选择理由**：
+- ✅ 职责清晰（`lottery_user_daily_draw_quota` 是配额，本表是体验状态）
+- ✅ 后续扩展不影响其他功能
+- ✅ 附加统计字段（空奖率、最长连空）可用于监控告警
+
+---
+
+### 6.8 决策点 7：灰度发布策略 ✅
+
+**最终选择**：**A - 全量上线 + 功能开关基础设施**
+
+**开关配置**（`system_settings` 表）：
+```javascript
+{
+  setting_key: 'lottery_budget_tier_control',
+  setting_value: JSON.stringify({
+    enabled: true,
+    version: 'v1',
+    features: {
+      budget_tier: true,      // B0-B3 分层
+      pressure_tier: true,    // P0-P2 压力层
+      anti_empty_streak: true, // 反连空
+      anti_high_streak: true   // 反连高
+    }
+  })
+}
+```
+
+**选择理由**：
+- ✅ 项目未上线，无需灰度
+- ✅ 开关基础设施可复用（后续新功能都能用）
+- ✅ 上线后如有问题可一键关闭
+
+---
+
+### 6.9 Bx × Px 矩阵（cap + weights）✅
 
 #### cap 矩阵（预算上限倍数）
 
@@ -867,18 +1048,26 @@ P = remaining_budget / target_remaining_budget(now)
 
 ---
 
-### 6.6 池子耗尽时的兜底策略 ✅
+### 6.10 体验软阀门参数 ✅
 
-**最终选择**：**A - 继续允许抽，但只能抽空奖**
+| 参数 | 确认值 | 说明 |
+|------|--------|------|
+| **反连空阈值 K** | 3 次 | 连续空奖3次后，预算允许时强制非空 |
+| **反连高窗口 N** | 5 抽 | 最近5抽内统计高档次数 |
+| **反连高阈值 M** | 2 次 | 5抽内2次高档则触发降权 |
+| **反连高降权倍数** | 0.5x | 高档权重降低50% |
+| **反连高持续时长 T** | 10 抽 | 降权持续10抽后恢复 |
+
+---
+
+### 6.11 池子耗尽时的兜底策略 ✅
+
+**最终选择**：**继续允许抽，但只能抽空奖**
 
 **理由**：
 - 符合"严控预算、不欠账"原则
-- 用户体验由"0成本奖品差异化"（方案3）兜底
+- 用户体验由"7种差异化空奖"兜底
 - 配合外部预算补给机制（商家审核通过自动发放预算）
-
-**辅助措施**：
-- 扩充 0 成本奖品种类（幸运签、下次好运、神秘彩蛋等）
-- 前端提示"当前仅基础奖励"（不暴露预算概念）
 
 ---
 
