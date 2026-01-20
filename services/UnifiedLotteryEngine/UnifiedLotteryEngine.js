@@ -1174,7 +1174,7 @@ class UnifiedLotteryEngine {
             description:
               draw_count === 1
                 ? `单次抽奖消耗${requiredPoints}积分`
-                : `${draw_count}连抽消耗${requiredPoints}积分（${pricing.label}，原价${draw_count * 100}积分，节省${draw_count * 100 - requiredPoints}积分）`,
+                : `${draw_count}连抽消耗${requiredPoints}积分（${pricing.label}，原价${pricing.original_cost}积分，节省${pricing.saved_points}积分）`,
             request_idempotency_key: requestIdempotencyKey,
             campaign_id,
             draw_count
@@ -1356,9 +1356,9 @@ class UnifiedLotteryEngine {
         draw_count, // 抽奖次数
         prizes: results, // 抽奖结果数组
         total_points_cost: requiredPoints, // 实际消耗积分（折后价）
-        original_cost: draw_count * 100, // 原价（无折扣价格）
+        original_cost: pricing.original_cost, // 原价（无折扣价格）- 🔴 2026-01-21 修复：使用服务计算值
         discount: pricing.discount, // 折扣率（0.9=九折）
-        saved_points: draw_count * 100 - requiredPoints, // 节省积分（优惠金额）
+        saved_points: pricing.saved_points, // 节省积分（优惠金额）- 🔴 2026-01-21 修复：使用服务计算值
         remaining_balance: remainingPoints, // 剩余积分余额
         draw_type: pricing.label || `${draw_count}连抽` // 前端显示的抽奖类型名称
       }
