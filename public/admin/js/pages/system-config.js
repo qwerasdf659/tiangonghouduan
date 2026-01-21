@@ -95,8 +95,8 @@ const announcementsModule = {
       if (type) params.append('type', type)
       if (keyword) params.append('keyword', keyword)
 
-      // 正确的后端API路径：/api/v4/console/system/announcements
-      const response = await apiRequest(`/api/v4/console/system/announcements?${params.toString()}`)
+      // 使用API_ENDPOINTS集中管理
+      const response = await apiRequest(API_ENDPOINTS.ANNOUNCEMENT.LIST + '?' + params.toString())
 
       if (response && response.success) {
         // 后端返回字段：announcements (数组), total, limit, offset
@@ -251,10 +251,10 @@ const announcementsModule = {
 
     showLoading(true)
     try {
-      // 正确的后端API路径
+      // 使用API_ENDPOINTS集中管理
       const url = id
-        ? `/api/v4/console/system/announcements/${id}`
-        : '/api/v4/console/system/announcements'
+        ? API.buildURL(API_ENDPOINTS.ANNOUNCEMENT.UPDATE, { id })
+        : API_ENDPOINTS.ANNOUNCEMENT.CREATE
       const method = id ? 'PUT' : 'POST'
 
       // 后端字段：is_active (布尔值)，将前端status转换
@@ -291,8 +291,8 @@ const announcementsModule = {
 
     showLoading(true)
     try {
-      // 正确的后端API路径
-      const response = await apiRequest(`/api/v4/console/system/announcements/${id}`, {
+      // 使用API_ENDPOINTS集中管理
+      const response = await apiRequest(API.buildURL(API_ENDPOINTS.ANNOUNCEMENT.DELETE, { id }), {
         method: 'DELETE'
       })
 
@@ -375,8 +375,8 @@ const notificationsModule = {
       if (type && type !== 'all') params.append('type', type)
       if (status && status !== 'all') params.append('status', status)
 
-      // 正确的后端API路径
-      const response = await apiRequest(`/api/v4/system/notifications?${params.toString()}`)
+      // 使用API_ENDPOINTS集中管理
+      const response = await apiRequest(API_ENDPOINTS.NOTIFICATION.LIST + '?' + params.toString())
 
       if (response && response.success) {
         // 后端返回字段：notifications (不是 items), statistics (不是 stats)
@@ -447,8 +447,8 @@ const notificationsModule = {
 
   async markAsRead(id) {
     try {
-      // 正确的后端API路径
-      await apiRequest(`/api/v4/system/notifications/${id}/read`, { method: 'PUT' })
+      // 使用API_ENDPOINTS集中管理
+      await apiRequest(API.buildURL(API_ENDPOINTS.NOTIFICATION.READ, { id }), { method: 'PUT' })
       this.loadData()
     } catch (error) {
       console.error('标记已读失败:', error)

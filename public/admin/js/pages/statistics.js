@@ -282,7 +282,50 @@ function renderStatistics(data) {
     document.getElementById('avgResponseTime').textContent = '-'
     document.getElementById('customerSatisfaction').textContent = '-'
   }
+
+  // ========== 8. 渲染 ECharts 图表 ==========
+  renderTrendChart(data)
+  renderUserTypeChart(data.user_types)
 }
+
+/**
+ * 渲染趋势图
+ */
+function renderTrendChart(data) {
+  if (!trendChart) return
+
+  const userGrowth = data.user_growth || []
+  const lotteryTrend = data.lottery_trend || []
+  const consumptionTrend = data.consumption_trend || []
+
+  // 提取日期列表（优先使用 user_growth 的日期）
+  const dates = userGrowth.map(item => item.date)
+  const users = userGrowth.map(item => item.count || 0)
+
+  // 构建抽奖次数数组（按日期匹配）
+  const drawsMap = new Map(lotteryTrend.map(item => [item.date, item.count || 0]))
+  const draws = dates.map(date => drawsMap.get(date) || 0)
+
+  // 构建消费金额数组（按日期匹配）
+  const revenueMap = new Map(consumptionTrend.map(item => [item.date, parseFloat(item.amount) || 0]))
+  const revenue = dates.map(date => revenueMap.get(date) || 0)
+
+  trendChart.setOption(getTrendChartOption(dates, users, draws, revenue))
+}
+
+/**
+ * 渲染用户类型饼图
+ */
+function renderUserTypeChart(userTypes) {
+  if (!userTypeChart || !userTypes) return
+
+  const data = [
+    { value: userTypes.regular?.count || 0, name: '普通用户', itemStyle: { color: '#5470c6' } },
+    { value: userTypes.admin?.count || 0, name: '管理员', itemStyle: { color: '#91cc75' } },
+    { value: userTypes.merchant?.count || 0, name: '商户', itemStyle: { color: '#fac858' } }
+  ].filter(item => item.value > 0)
+
+  userTypeChart.setOption(getUserTypeChartOption(data))
 
 /**
  * 计算用户增长趋势
