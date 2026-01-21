@@ -578,6 +578,25 @@ models.FeatureFlag = require('./FeatureFlag')(sequelize, DataTypes)
  *    - 业务场景：新功能灰度发布、A/B测试、紧急降级开关
  */
 
+// 🔴 V4.7 系统字典表（中文化显示名称 - 2026-01-22）
+models.SystemDictionary = require('./SystemDictionary')(sequelize, DataTypes)
+/*
+ * ✅ SystemDictionary：系统字典表
+ *    - 用途：存储各类枚举的中文显示名称映射（中文化显示名称核心数据源）
+ *    - 特点：dict_type + dict_code 唯一约束、版本管理、Redis缓存配合
+ *    - 表名：system_dictionaries，主键：dict_id
+ *    - 业务场景：状态码转中文名称、前端颜色配置、运营动态修改
+ */
+
+models.SystemDictionaryHistory = require('./SystemDictionaryHistory')(sequelize, DataTypes)
+/*
+ * ✅ SystemDictionaryHistory：系统字典历史表
+ *    - 用途：记录字典修改历史，支持版本回滚和审计追溯
+ *    - 特点：记录修改前快照、修改人、修改原因
+ *    - 表名：system_dictionary_history，主键：history_id，外键：dict_id
+ *    - 业务场景：版本回滚、审计追溯、变更历史查询
+ */
+
 // 🔴 设置模型关联关系
 Object.keys(models).forEach(modelName => {
   if (models[modelName].associate) {

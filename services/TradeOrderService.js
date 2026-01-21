@@ -33,7 +33,7 @@
 
 const { Op, fn, col } = require('sequelize')
 const { sequelize, TradeOrder, MarketListing, ItemInstance, User } = require('../models')
-const { getDisplayName } = require('../constants/DisplayNames')
+const { attachDisplayNames, DICT_TYPES } = require('../utils/displayNameHelper')
 const AssetService = require('./AssetService')
 const AdminSystemService = require('./AdminSystemService')
 const logger = require('../utils/logger')
@@ -1038,24 +1038,25 @@ class TradeOrderService {
       offset
     })
 
-    // 添加中文显示名称
-    const ordersWithDisplayNames = rows.map(row => {
-      const order = row.get({ plain: true })
-      return {
-        ...order,
-        status_display: getDisplayName(order.status, 'status'),
-        // 如果有关联的挂牌，也添加挂牌状态中文名称
-        listing: order.listing
-          ? {
-              ...order.listing,
-              status_display: getDisplayName(order.listing.status, 'status')
-            }
-          : null
+    // 添加中文显示名称（2026-01-22 迁移到数据库字典表）
+    const ordersData = rows.map(row => row.get({ plain: true }))
+
+    // 为订单状态添加显示名称
+    await attachDisplayNames(ordersData, [
+      { field: 'status', dictType: DICT_TYPES.TRADE_ORDER_STATUS }
+    ])
+
+    // 为关联的挂牌添加状态显示名称
+    for (const order of ordersData) {
+      if (order.listing) {
+        await attachDisplayNames(order.listing, [
+          { field: 'status', dictType: DICT_TYPES.LISTING_STATUS }
+        ])
       }
-    })
+    }
 
     return {
-      orders: ordersWithDisplayNames,
+      orders: ordersData,
       pagination: {
         total_count: count,
         page,
@@ -1103,18 +1104,20 @@ class TradeOrderService {
 
     if (!order) return null
 
-    // 添加中文显示名称
+    // 添加中文显示名称（2026-01-22 迁移到数据库字典表）
     const orderData = order.get({ plain: true })
-    return {
-      ...orderData,
-      status_display: getDisplayName(orderData.status, 'status'),
-      listing: orderData.listing
-        ? {
-            ...orderData.listing,
-            status_display: getDisplayName(orderData.listing.status, 'status')
-          }
-        : null
+    await attachDisplayNames(orderData, [
+      { field: 'status', dictType: DICT_TYPES.TRADE_ORDER_STATUS }
+    ])
+
+    // 为关联的挂牌添加状态显示名称
+    if (orderData.listing) {
+      await attachDisplayNames(orderData.listing, [
+        { field: 'status', dictType: DICT_TYPES.LISTING_STATUS }
+      ])
     }
+
+    return orderData
   }
 
   /**
@@ -1155,18 +1158,20 @@ class TradeOrderService {
 
     if (!order) return null
 
-    // 添加中文显示名称
+    // 添加中文显示名称（2026-01-22 迁移到数据库字典表）
     const orderData = order.get({ plain: true })
-    return {
-      ...orderData,
-      status_display: getDisplayName(orderData.status, 'status'),
-      listing: orderData.listing
-        ? {
-            ...orderData.listing,
-            status_display: getDisplayName(orderData.listing.status, 'status')
-          }
-        : null
+    await attachDisplayNames(orderData, [
+      { field: 'status', dictType: DICT_TYPES.TRADE_ORDER_STATUS }
+    ])
+
+    // 为关联的挂牌添加状态显示名称
+    if (orderData.listing) {
+      await attachDisplayNames(orderData.listing, [
+        { field: 'status', dictType: DICT_TYPES.LISTING_STATUS }
+      ])
     }
+
+    return orderData
   }
 
   /**
@@ -1211,14 +1216,19 @@ class TradeOrderService {
       raw: true
     })
 
-    // 添加中文显示名称
-    const byStatusWithDisplayNames = statusStats.reduce((acc, item) => {
-      acc[item.status] = {
+    // 添加中文显示名称（2026-01-22 迁移到数据库字典表）
+    const byStatusWithDisplayNames = {}
+    for (const item of statusStats) {
+      // 为每个状态添加显示名称
+      const statusData = { status: item.status }
+      await attachDisplayNames(statusData, [
+        { field: 'status', dictType: DICT_TYPES.TRADE_ORDER_STATUS }
+      ])
+      byStatusWithDisplayNames[item.status] = {
         count: parseInt(item.count) || 0,
-        display_name: getDisplayName(item.status, 'status')
+        display_name: statusData.status_display
       }
-      return acc
-    }, {})
+    }
 
     return {
       period: { start_time, end_time },

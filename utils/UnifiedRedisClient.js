@@ -428,6 +428,23 @@ class UnifiedRedisClient {
   }
 
   /**
+   * 执行SCAN命令（迭代遍历键，生产安全）
+   *
+   * 与KEYS命令不同，SCAN使用游标分批迭代，不会阻塞Redis
+   *
+   * @param {string} cursor - 游标位置（首次传 '0'）
+   * @param {string} matchPattern - 'MATCH' 关键字
+   * @param {string} pattern - 匹配模式（如 'prefix:*'）
+   * @param {string} countKeyword - 'COUNT' 关键字
+   * @param {number} count - 每批返回的数量建议值
+   * @returns {Promise<[string, string[]]>} [nextCursor, matchedKeys]
+   */
+  async scan(cursor, matchPattern, pattern, countKeyword, count) {
+    const client = await this.ensureConnection()
+    return await client.scan(cursor, matchPattern, pattern, countKeyword, count)
+  }
+
+  /**
    * 关闭所有连接
    * @returns {Promise<void>} 所有连接关闭完成
    */

@@ -41,6 +41,9 @@ const notificationsRoutes = require('./notifications')
 // 弹窗Banner路由（2025-12-22 新增）
 const popupBannersRoutes = require('./popup-banners')
 
+// 系统字典路由（2026-01-22 新增 - 中文化显示名称系统）
+const dictionariesRoutes = require('./dictionaries')
+
 // 挂载公告路由
 router.use('/', announcementsRoutes)
 
@@ -64,5 +67,8 @@ router.use('/notifications', notificationsRoutes)
 
 // 挂载弹窗Banner路由（2025-12-22 新增）
 router.use('/', popupBannersRoutes)
+
+// 挂载系统字典路由（2026-01-22 新增 - 中文化显示名称系统）
+router.use('/dictionaries', dictionariesRoutes)
 
 module.exports = router

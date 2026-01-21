@@ -1,5 +1,6 @@
 const logger = require('../utils/logger').logger
 const BusinessError = require('../utils/BusinessError')
+const { attachDisplayNames } = require('../utils/displayNameHelper')
 
 /**
  * 餐厅积分抽奖系统 V4.0 - 消费记录服务
@@ -846,8 +847,22 @@ class ConsumptionService {
       // 计算统计信息
       const stats = await this.getUserConsumptionStats(userId)
 
+      // 格式化记录并附加中文显示名称
+      const formattedRecords = rows.map(r => r.toAPIResponse())
+
+      /*
+       * 附加中文显示名称（V4.7 中文化显示名称系统 - 2026-01-22）
+       * 使用 displayNameHelper 从系统字典获取显示名称：
+       * - status → consumption_status 字典类型
+       * - final_status → consumption_final_status 字典类型
+       */
+      const recordsWithDisplayNames = await attachDisplayNames(formattedRecords, [
+        { field: 'status', dictType: 'consumption_status' },
+        { field: 'final_status', dictType: 'consumption_final_status' }
+      ])
+
       return {
-        records: rows.map(r => r.toAPIResponse()),
+        records: recordsWithDisplayNames,
         pagination: {
           total: count,
           page,
@@ -951,8 +966,22 @@ class ConsumptionService {
         distinct: true // 去重保护，确保count准确
       })
 
+      // 格式化记录并附加中文显示名称
+      const formattedRecords = rows.map(r => r.toAPIResponse())
+
+      /*
+       * 附加中文显示名称（V4.7 中文化显示名称系统 - 2026-01-22）
+       * 使用 displayNameHelper 从系统字典获取显示名称：
+       * - status → consumption_status 字典类型
+       * - final_status → consumption_final_status 字典类型
+       */
+      const recordsWithDisplayNames = await attachDisplayNames(formattedRecords, [
+        { field: 'status', dictType: 'consumption_status' },
+        { field: 'final_status', dictType: 'consumption_final_status' }
+      ])
+
       return {
-        records: rows.map(r => r.toAPIResponse()),
+        records: recordsWithDisplayNames,
         pagination: {
           total: count,
           page,
@@ -1075,8 +1104,22 @@ class ConsumptionService {
       })
       stats.pending = pendingTotal
 
+      // 格式化记录并附加中文显示名称
+      const formattedRecords = rows.map(r => r.toAPIResponse())
+
+      /*
+       * 附加中文显示名称（V4.7 中文化显示名称系统 - 2026-01-22）
+       * 使用 displayNameHelper 从系统字典获取显示名称：
+       * - status → consumption_status 字典类型
+       * - final_status → consumption_final_status 字典类型
+       */
+      const recordsWithDisplayNames = await attachDisplayNames(formattedRecords, [
+        { field: 'status', dictType: 'consumption_status' },
+        { field: 'final_status', dictType: 'consumption_final_status' }
+      ])
+
       return {
-        records: rows.map(r => r.toAPIResponse()),
+        records: recordsWithDisplayNames,
         pagination: {
           total: count,
           page,
@@ -1212,7 +1255,21 @@ class ConsumptionService {
         throw new Error(`消费记录不存在或已被删除（ID: ${recordId}）`)
       }
 
-      return record.toAPIResponse()
+      // 格式化记录
+      const formattedRecord = record.toAPIResponse()
+
+      /*
+       * 附加中文显示名称（V4.7 中文化显示名称系统 - 2026-01-22）
+       * 使用 displayNameHelper 从系统字典获取显示名称：
+       * - status → consumption_status 字典类型
+       * - final_status → consumption_final_status 字典类型
+       */
+      const recordWithDisplayNames = await attachDisplayNames(formattedRecord, [
+        { field: 'status', dictType: 'consumption_status' },
+        { field: 'final_status', dictType: 'consumption_final_status' }
+      ])
+
+      return recordWithDisplayNames
     } catch (error) {
       logger.error('❌ 获取消费记录详情失败:', error.message)
       throw error
@@ -1588,10 +1645,21 @@ class ConsumptionService {
       })
 
       // 格式化响应数据
-      const records = rows.map(record => record.toAPIResponse())
+      const formattedRecords = rows.map(record => record.toAPIResponse())
+
+      /*
+       * 附加中文显示名称（V4.7 中文化显示名称系统 - 2026-01-22）
+       * 使用 displayNameHelper 从系统字典获取显示名称：
+       * - status → consumption_status 字典类型
+       * - final_status → consumption_final_status 字典类型
+       */
+      const recordsWithDisplayNames = await attachDisplayNames(formattedRecords, [
+        { field: 'status', dictType: 'consumption_status' },
+        { field: 'final_status', dictType: 'consumption_final_status' }
+      ])
 
       return {
-        records,
+        records: recordsWithDisplayNames,
         pagination: {
           current_page: finalPage,
           page_size: finalPageSize,
@@ -1649,7 +1717,25 @@ class ConsumptionService {
         ]
       })
 
-      return record
+      if (!record) {
+        return null
+      }
+
+      // 格式化记录并附加中文显示名称
+      const formattedRecord = record.toJSON()
+
+      /*
+       * 附加中文显示名称（V4.7 中文化显示名称系统 - 2026-01-22）
+       * 使用 displayNameHelper 从系统字典获取显示名称：
+       * - status → consumption_status 字典类型
+       * - final_status → consumption_final_status 字典类型
+       */
+      const recordWithDisplayNames = await attachDisplayNames(formattedRecord, [
+        { field: 'status', dictType: 'consumption_status' },
+        { field: 'final_status', dictType: 'consumption_final_status' }
+      ])
+
+      return recordWithDisplayNames
     } catch (error) {
       logger.error('商家侧消费记录详情查询失败', {
         error: error.message,

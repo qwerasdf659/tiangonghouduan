@@ -71,6 +71,12 @@ const models = require('../models')
 const logger = require('../utils/logger').logger
 
 /**
+ * 中文显示名称助手（2026-01-22 中文化显示名称系统）
+ * @see docs/中文化显示名称实施文档.md
+ */
+const displayNameHelper = require('../utils/displayNameHelper')
+
+/**
  * 反馈管理服务类
  */
 class FeedbackService {
@@ -142,8 +148,18 @@ class FeedbackService {
         total
       })
 
+      // 添加中文显示名称（状态、分类、优先级）
+      const feedbacksWithDisplayNames = await displayNameHelper.attachDisplayNames(
+        feedbacks.map(f => f.toJSON()),
+        [
+          { field: 'status', dictType: 'feedback_status' },
+          { field: 'category', dictType: 'feedback_category' },
+          { field: 'priority', dictType: 'priority' }
+        ]
+      )
+
       return {
-        feedbacks: feedbacks.map(f => f.toJSON()),
+        feedbacks: feedbacksWithDisplayNames,
         total,
         limit: parseInt(limit),
         offset: parseInt(offset)
@@ -323,7 +339,17 @@ class FeedbackService {
         user_id: feedback.user_id
       })
 
-      return feedback.toJSON()
+      // 添加中文显示名称（状态、分类、优先级）
+      const feedbackWithDisplayNames = await displayNameHelper.attachDisplayNames(
+        feedback.toJSON(),
+        [
+          { field: 'status', dictType: 'feedback_status' },
+          { field: 'category', dictType: 'feedback_category' },
+          { field: 'priority', dictType: 'priority' }
+        ]
+      )
+
+      return feedbackWithDisplayNames
     } catch (error) {
       logger.error('获取反馈详情失败', {
         error: error.message,

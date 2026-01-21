@@ -256,6 +256,7 @@ class ConsumptionRecord extends Model {
       status: this.status,
       status_name: this.getStatusName(),
       status_color: this.getStatusColor(),
+      final_status: this.final_status, // V4.7 业务最终状态（中文化显示名称系统 - 2026-01-22）
       qr_code: this.qr_code,
       merchant_notes: this.merchant_notes,
       admin_notes: this.admin_notes,

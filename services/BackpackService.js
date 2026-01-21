@@ -21,6 +21,7 @@
 
 const { ItemInstance, MaterialAssetType, sequelize } = require('../models')
 const AssetService = require('./AssetService')
+const { attachDisplayNames } = require('../utils/displayNameHelper')
 
 const logger = require('../utils/logger').logger
 
@@ -192,7 +193,15 @@ class BackpackService {
         }
       })
 
-      return formattedAssets
+      /*
+       * 4. 附加中文显示名称
+       * 使用 displayNameHelper 从系统字典获取 rarity 的中文显示名称
+       */
+      const assetsWithDisplayNames = await attachDisplayNames(formattedAssets, [
+        { field: 'rarity', dictType: 'rarity' }
+      ])
+
+      return assetsWithDisplayNames
     } catch (error) {
       logger.error('查询可叠加资产失败', {
         error: error.message,
@@ -278,7 +287,20 @@ class BackpackService {
         })
       }
 
-      return formattedItems
+      /*
+       * 4. 附加中文显示名称
+       * 使用 displayNameHelper 从系统字典获取以下字段的中文显示名称：
+       * - status → item_status 字典类型
+       * - item_type → item_type 字典类型
+       * - rarity → rarity 字典类型
+       */
+      const itemsWithDisplayNames = await attachDisplayNames(formattedItems, [
+        { field: 'status', dictType: 'item_status' },
+        { field: 'item_type', dictType: 'item_type' },
+        { field: 'rarity', dictType: 'rarity' }
+      ])
+
+      return itemsWithDisplayNames
     } catch (error) {
       logger.error('查询不可叠加物品失败', {
         error: error.message,
@@ -371,13 +393,26 @@ class BackpackService {
         has_redemption_code: !!redemptionOrder
       }
 
+      /*
+       * 5. 附加中文显示名称
+       * 使用 displayNameHelper 从系统字典获取以下字段的中文显示名称：
+       * - status → item_status 字典类型
+       * - item_type → item_type 字典类型
+       * - rarity → rarity 字典类型
+       */
+      const detailWithDisplayNames = await attachDisplayNames(itemDetail, [
+        { field: 'status', dictType: 'item_status' },
+        { field: 'item_type', dictType: 'item_type' },
+        { field: 'rarity', dictType: 'rarity' }
+      ])
+
       logger.info('获取物品详情成功', {
         item_instance_id,
         status: item.status,
-        has_redemption_code: itemDetail.has_redemption_code
+        has_redemption_code: detailWithDisplayNames.has_redemption_code
       })
 
-      return itemDetail
+      return detailWithDisplayNames
     } catch (error) {
       logger.error('获取物品详情失败', {
         error: error.message,

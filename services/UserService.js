@@ -29,6 +29,9 @@ const logger = require('../utils/logger')
 const { BusinessCacheHelper } = require('../utils/BusinessCacheHelper')
 const { assertAndGetTransaction } = require('../utils/transactionHelpers')
 
+// 引用中文显示名称辅助函数（V4.7 中文化显示名称系统 - 2026-01-22）
+const { attachDisplayNames, DICT_TYPES } = require('../utils/displayNameHelper')
+
 /**
  * 用户服务类
  */
@@ -360,6 +363,12 @@ class UserService {
             throw error
           }
 
+          // 添加中文显示名称（V4.7 中文化显示名称系统 - 2026-01-22）
+          await attachDisplayNames(cached, [
+            { field: 'status', dictType: DICT_TYPES.USER_STATUS },
+            { field: 'user_level', dictType: DICT_TYPES.USER_LEVEL }
+          ])
+
           // 返回缓存数据（普通对象）
           return cached
         }
@@ -421,7 +430,15 @@ class UserService {
        * 统一返回普通对象（与缓存命中时保持一致）
        * 避免路由层通过 Sequelize getter 访问属性时返回 undefined
        */
-      return user.get({ plain: true })
+      const userData = user.get({ plain: true })
+
+      // 添加中文显示名称（V4.7 中文化显示名称系统 - 2026-01-22）
+      await attachDisplayNames(userData, [
+        { field: 'status', dictType: DICT_TYPES.USER_STATUS },
+        { field: 'user_level', dictType: DICT_TYPES.USER_LEVEL }
+      ])
+
+      return userData
     } catch (error) {
       // 如果是业务错误，直接抛出
       if (error.code) {
@@ -666,8 +683,17 @@ class UserService {
         has_points_account: !!pointsAccount
       })
 
+      // 转换用户数据为普通对象（便于添加显示名称）
+      const userData = user.get ? user.get({ plain: true }) : user
+
+      // 添加中文显示名称（V4.7 中文化显示名称系统 - 2026-01-22）
+      await attachDisplayNames(userData, [
+        { field: 'status', dictType: DICT_TYPES.USER_STATUS },
+        { field: 'user_level', dictType: DICT_TYPES.USER_LEVEL }
+      ])
+
       return {
-        user,
+        user: userData,
         points_account: pointsAccount
       }
     } catch (error) {

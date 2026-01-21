@@ -946,6 +946,16 @@ async function initializeApp() {
   } catch (error) {
     appLogger.warn('target_type 校验出错（非致命）', { error: error.message })
   }
+
+  // 步骤5：DisplayNameService 初始化（中文显示名称系统 V4.7 - 2026-01-22）
+  try {
+    const DisplayNameService = require('./services/DisplayNameService')
+    await DisplayNameService.initialize()
+    appLogger.info('✅ DisplayNameService 中文显示名称服务初始化完成')
+  } catch (error) {
+    appLogger.error('DisplayNameService 初始化失败（非致命）', { error: error.message })
+    // 显示名称服务初始化失败不阻断启动，降级为使用内存缓存或直接数据库查询
+  }
 }
 
 /*

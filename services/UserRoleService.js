@@ -47,6 +47,12 @@ const logger = require('../utils/logger')
 const AuditLogService = require('./AuditLogService')
 
 /**
+ * 中文显示名称助手（2026-01-22 中文化显示名称系统）
+ * @see docs/中文化显示名称实施文档.md
+ */
+const displayNameHelper = require('../utils/displayNameHelper')
+
+/**
  * 用户角色服务类
  * 职责：管理用户角色和权限的分配、移除、检查等操作
  * 特点：简化用户权限操作，保持User和Role模型分离
@@ -548,8 +554,13 @@ class UserRoleService {
 
     logger.info('获取用户列表成功', { count, todayNewCount, activeCount, vipCount })
 
+    // 附加中文显示名称（2026-01-22 中文化显示名称系统）
+    const usersWithDisplayNames = await displayNameHelper.attachDisplayNames(processedUsers, [
+      { field: 'status', dictType: 'user_status' }
+    ])
+
     return {
-      users: processedUsers,
+      users: usersWithDisplayNames,
       pagination: {
         current_page: parseInt(page),
         per_page: parseInt(limit),
@@ -599,27 +610,35 @@ class UserRoleService {
 
     logger.info('获取用户详情成功', { user_id })
 
+    // 构建用户详情对象
+    const userDetail = {
+      user_id: user.user_id,
+      mobile: user.mobile,
+      nickname: user.nickname,
+      status: user.status,
+      history_total_points: user.history_total_points,
+      consecutive_fail_count: user.consecutive_fail_count,
+      role_level: max_role_level,
+      roles: user.roles.map(role => ({
+        role_uuid: role.role_uuid,
+        role_name: role.role_name,
+        role_level: role.role_level,
+        description: role.description,
+        assigned_at: role.UserRole?.assigned_at
+      })),
+      last_login: user.last_login,
+      login_count: user.login_count,
+      created_at: user.created_at,
+      updated_at: user.updated_at
+    }
+
+    // 附加中文显示名称（2026-01-22 中文化显示名称系统）
+    const userWithDisplayNames = await displayNameHelper.attachDisplayNames(userDetail, [
+      { field: 'status', dictType: 'user_status' }
+    ])
+
     return {
-      user: {
-        user_id: user.user_id,
-        mobile: user.mobile,
-        nickname: user.nickname,
-        status: user.status,
-        history_total_points: user.history_total_points,
-        consecutive_fail_count: user.consecutive_fail_count,
-        role_level: max_role_level,
-        roles: user.roles.map(role => ({
-          role_uuid: role.role_uuid,
-          role_name: role.role_name,
-          role_level: role.role_level,
-          description: role.description,
-          assigned_at: role.UserRole?.assigned_at
-        })),
-        last_login: user.last_login,
-        login_count: user.login_count,
-        created_at: user.created_at,
-        updated_at: user.updated_at
-      }
+      user: userWithDisplayNames
     }
   }
 

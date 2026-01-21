@@ -7,6 +7,12 @@ const logger = require('../utils/logger').logger
 const { BusinessCacheHelper } = require('../utils/BusinessCacheHelper')
 
 /**
+ * 中文显示名称助手（2026-01-22 中文化显示名称系统）
+ * @see docs/中文化显示名称实施文档.md
+ */
+const displayNameHelper = require('../utils/displayNameHelper')
+
+/**
  * 餐厅积分抽奖系统 V4.5.0 - 兑换市场服务（ExchangeService）
  * 材料资产支付兑换市场核心服务（V4.5.0统一版）
  *
@@ -297,9 +303,15 @@ class ExchangeService {
 
       logger.info(`[兑换市场] 找到${count}个商品，返回第${page}页（${rows.length}个）`)
 
+      // 添加中文显示名称（商品状态）
+      const itemsWithDisplayNames = await displayNameHelper.attachDisplayNames(
+        rows.map(item => item.toJSON()),
+        [{ field: 'status', dictType: 'product_status' }]
+      )
+
       const result = {
         success: true,
-        items: rows,
+        items: itemsWithDisplayNames,
         pagination: {
           total: count,
           page,
@@ -348,9 +360,14 @@ class ExchangeService {
         throw new Error('商品不存在')
       }
 
+      // 添加中文显示名称（商品状态）
+      const itemWithDisplayNames = await displayNameHelper.attachDisplayNames(item.toJSON(), [
+        { field: 'status', dictType: 'product_status' }
+      ])
+
       return {
         success: true,
-        item,
+        item: itemWithDisplayNames,
         timestamp: BeijingTimeHelper.now()
       }
     } catch (error) {
@@ -753,9 +770,15 @@ class ExchangeService {
 
       logger.info(`[兑换市场] 找到${count}个订单，返回第${page}页（${rows.length}个）`)
 
+      // 添加中文显示名称（订单状态）
+      const ordersWithDisplayNames = await displayNameHelper.attachDisplayNames(
+        rows.map(order => order.toJSON()),
+        [{ field: 'status', dictType: 'exchange_status' }]
+      )
+
       return {
         success: true,
-        orders: rows,
+        orders: ordersWithDisplayNames,
         pagination: {
           total: count,
           page,
@@ -788,9 +811,14 @@ class ExchangeService {
         throw new Error('订单不存在或无权访问')
       }
 
+      // 添加中文显示名称（订单状态）
+      const orderWithDisplayNames = await displayNameHelper.attachDisplayNames(order.toJSON(), [
+        { field: 'status', dictType: 'exchange_status' }
+      ])
+
       return {
         success: true,
-        order,
+        order: orderWithDisplayNames,
         timestamp: BeijingTimeHelper.now()
       }
     } catch (error) {
@@ -955,9 +983,15 @@ class ExchangeService {
         `[兑换市场] 管理员查询订单成功：找到${count}个订单，返回第${page}页（${rows.length}个）`
       )
 
+      // 添加中文显示名称（订单状态）
+      const ordersWithDisplayNames = await displayNameHelper.attachDisplayNames(
+        rows.map(order => order.toJSON()),
+        [{ field: 'status', dictType: 'exchange_status' }]
+      )
+
       return {
         success: true,
-        orders: rows,
+        orders: ordersWithDisplayNames,
         pagination: {
           total: count,
           page,
@@ -1009,9 +1043,14 @@ class ExchangeService {
         status: order.status
       })
 
+      // 添加中文显示名称（订单状态）
+      const orderWithDisplayNames = await displayNameHelper.attachDisplayNames(order.toJSON(), [
+        { field: 'status', dictType: 'exchange_status' }
+      ])
+
       return {
         success: true,
-        order,
+        order: orderWithDisplayNames,
         timestamp: BeijingTimeHelper.now()
       }
     } catch (error) {
@@ -1763,9 +1802,15 @@ class ExchangeService {
 
       logger.info(`[兑换市场-管理] 找到${count}个商品，返回第${page}页（${rows.length}个）`)
 
+      // 添加中文显示名称（商品状态）
+      const itemsWithDisplayNames = await displayNameHelper.attachDisplayNames(
+        rows.map(item => item.toJSON()),
+        [{ field: 'status', dictType: 'product_status' }]
+      )
+
       return {
         success: true,
-        items: rows,
+        items: itemsWithDisplayNames,
         pagination: {
           total: count,
           page,

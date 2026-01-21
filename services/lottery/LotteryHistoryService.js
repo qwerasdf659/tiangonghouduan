@@ -70,6 +70,9 @@ const models = require('../../models')
 const { Op } = require('sequelize')
 const BeijingTimeHelper = require('../../utils/timeHelper')
 
+// 引用中文显示名称辅助函数（V4.7 中文化显示名称系统 - 2026-01-22）
+const { attachDisplayNames, DICT_TYPES } = require('../../utils/displayNameHelper')
+
 /**
  * 抽奖历史服务类
  *
@@ -230,6 +233,22 @@ class LotteryHistoryService {
       // 处理返回数据
       const processed_records = rows.map(record => this.format_lottery_record(record))
 
+      // 添加中文显示名称（V4.7 中文化显示名称系统 - 2026-01-22）
+      await attachDisplayNames(processed_records, [
+        { field: 'prize_type', dictType: DICT_TYPES.PRIZE_TYPE },
+        { field: 'reward_tier', dictType: DICT_TYPES.REWARD_TIER }
+      ])
+
+      // 为嵌套的 campaign_info.status 添加显示名称
+      for (const record of processed_records) {
+        if (record.campaign_info && record.campaign_info.status) {
+          // eslint-disable-next-line no-await-in-loop -- 嵌套字段需要单独处理
+          await attachDisplayNames(record.campaign_info, [
+            { field: 'status', dictType: DICT_TYPES.CAMPAIGN_STATUS }
+          ])
+        }
+      }
+
       return {
         total_count: count,
         page: parseInt(page),
@@ -268,6 +287,12 @@ class LotteryHistoryService {
       }
 
       const processed_records = records.map(record => this.format_lottery_record(record))
+
+      // 添加中文显示名称（V4.7 中文化显示名称系统 - 2026-01-22）
+      await attachDisplayNames(processed_records, [
+        { field: 'prize_type', dictType: DICT_TYPES.PRIZE_TYPE },
+        { field: 'reward_tier', dictType: DICT_TYPES.REWARD_TIER }
+      ])
 
       return {
         batch_id,
@@ -341,6 +366,27 @@ class LotteryHistoryService {
         limit: 5
       })
 
+      // 格式化最近高档奖励记录
+      const formatted_recent_high_tier = recent_high_tier.map(record =>
+        this.format_lottery_record(record)
+      )
+
+      // 添加中文显示名称（V4.7 中文化显示名称系统 - 2026-01-22）
+      await attachDisplayNames(formatted_recent_high_tier, [
+        { field: 'prize_type', dictType: DICT_TYPES.PRIZE_TYPE },
+        { field: 'reward_tier', dictType: DICT_TYPES.REWARD_TIER }
+      ])
+
+      // 格式化档位分布统计并添加显示名称
+      const tier_distribution = tier_distribution_stats.map(stat => ({
+        reward_tier: stat.reward_tier,
+        count: parseInt(stat.getDataValue('count'))
+      }))
+
+      await attachDisplayNames(tier_distribution, [
+        { field: 'reward_tier', dictType: DICT_TYPES.REWARD_TIER }
+      ])
+
       // V4.0语义更新：返回档位分布统计（替代原中奖率）
       return {
         user_id,
@@ -349,11 +395,8 @@ class LotteryHistoryService {
         // V4.0：替代 winning_rate
         high_tier_rate:
           total_draws > 0 ? ((high_tier_draws / total_draws) * 100).toFixed(2) + '%' : '0%',
-        tier_distribution: tier_distribution_stats.map(stat => ({
-          reward_tier: stat.reward_tier,
-          count: parseInt(stat.getDataValue('count'))
-        })),
-        recent_high_tier: recent_high_tier.map(record => this.format_lottery_record(record)),
+        tier_distribution,
+        recent_high_tier: formatted_recent_high_tier,
         date_range,
         timestamp: BeijingTimeHelper.apiTimestamp()
       }

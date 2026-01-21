@@ -1,7 +1,7 @@
 const logger = require('../utils/logger').logger
 
-// 引用统一中文显示名称映射（2026-01-21 新增）
-const { getDisplayName } = require('../constants/DisplayNames')
+// 引用中文显示名称辅助函数（V4.7 中文化显示名称系统 - 2026-01-22）
+const { attachDisplayNames, DICT_TYPES } = require('../utils/displayNameHelper')
 
 /**
  * 餐厅积分抽奖系统 V4.0 - 统一审计日志服务（AuditLogService）
@@ -930,16 +930,14 @@ class AuditLogService {
         `[审计日志] 管理员查询成功：找到${count}条日志，返回第${page}页（${rows.length}条）`
       )
 
-      // 添加中文显示名称（2026-01-21 新增）
-      const logsWithDisplayNames = rows.map(log => {
-        const logData = log.toJSON ? log.toJSON() : log
-        return {
-          ...logData,
-          operation_type_display: getDisplayName(logData.operation_type, 'operation_type'),
-          target_type_display: getDisplayName(logData.target_type, 'target_type'),
-          result_display: getDisplayName(logData.result, 'status')
-        }
-      })
+      // 添加中文显示名称（V4.7 中文化显示名称系统 - 2026-01-22）
+      const logsWithDisplayNames = rows.map(log => (log.toJSON ? log.toJSON() : log))
+
+      // 批量附加显示名称和颜色
+      await attachDisplayNames(logsWithDisplayNames, [
+        { field: 'operation_type', dictType: DICT_TYPES.OPERATION_TYPE },
+        { field: 'target_type', dictType: DICT_TYPES.TARGET_TYPE }
+      ])
 
       return {
         success: true,

@@ -43,6 +43,9 @@ const AuditLogService = require('./AuditLogService')
 const { assertAndGetTransaction } = require('../utils/transactionHelpers')
 const { BusinessCacheHelper } = require('../utils/BusinessCacheHelper')
 
+// 引用中文显示名称辅助函数（V4.7 中文化显示名称系统 - 2026-01-22）
+const { attachDisplayNames, DICT_TYPES } = require('../utils/displayNameHelper')
+
 const logger = require('../utils/logger').logger
 
 /**
@@ -1490,8 +1493,19 @@ class AdminLotteryService {
       })
     }
 
+    // 格式化干预规则列表项
+    const formattedItems = rows.map(item =>
+      AdminLotteryService._formatInterventionItem(item, prizeMap)
+    )
+
+    // 添加中文显示名称（V4.7 中文化显示名称系统 - 2026-01-22）
+    await attachDisplayNames(formattedItems, [
+      { field: 'status', dictType: DICT_TYPES.MANAGEMENT_SETTING_STATUS },
+      { field: 'setting_type', dictType: DICT_TYPES.MANAGEMENT_SETTING_TYPE }
+    ])
+
     return {
-      items: rows.map(item => AdminLotteryService._formatInterventionItem(item, prizeMap)),
+      items: formattedItems,
       pagination: {
         page: parseInt(page),
         page_size: parseInt(page_size),
@@ -1531,7 +1545,14 @@ class AdminLotteryService {
       throw error
     }
 
-    return AdminLotteryService._formatInterventionDetail(setting)
+    // 格式化并添加中文显示名称（V4.7 中文化显示名称系统 - 2026-01-22）
+    const formattedSetting = AdminLotteryService._formatInterventionDetail(setting)
+    await attachDisplayNames(formattedSetting, [
+      { field: 'status', dictType: DICT_TYPES.MANAGEMENT_SETTING_STATUS },
+      { field: 'setting_type', dictType: DICT_TYPES.MANAGEMENT_SETTING_TYPE }
+    ])
+
+    return formattedSetting
   }
 
   /**
