@@ -26,7 +26,7 @@ const PAGE_CONFIGS = {
     subtitle: '配置系统中的材料类型（碎片/水晶）',
     icon: 'bi-gem',
     emoji: '💎',
-    apiEndpoint: '/api/v4/console/material/asset-types',
+    apiEndpoint: API_ENDPOINTS.MATERIAL.ASSET_TYPES,
     primaryKey: 'asset_code',
     pagination: false,
 
@@ -127,7 +127,7 @@ const PAGE_CONFIGS = {
         submitBtn: 'submitEditBtn',
         method: 'PUT',
         url: function (data) {
-          return `/api/v4/console/material/asset-types/${data._assetCode}`
+          return API.buildURL(API_ENDPOINTS.MATERIAL.ASSET_TYPE_DETAIL, { asset_code: data._assetCode })
         },
         successMessage: '更新成功',
         fields: [
@@ -163,7 +163,7 @@ const PAGE_CONFIGS = {
 
         try {
           const response = await apiRequest(
-            `/api/v4/console/material/asset-types/${row.asset_code}`,
+            API.buildURL(API_ENDPOINTS.MATERIAL.ASSET_TYPE_DETAIL, { asset_code: row.asset_code }),
             {
               method: 'PUT',
               body: JSON.stringify({ is_enabled: newStatus })
@@ -200,7 +200,8 @@ const PAGE_CONFIGS = {
     subtitle: '查询和管理用户的材料/资产余额',
     icon: 'bi-wallet2',
     emoji: '💰',
-    apiEndpoint: '/api/v4/console/asset-adjustment/balances',
+    apiEndpoint: API_ENDPOINTS.ASSET_ADJUSTMENT.USER_BALANCES,
+    apiPathParams: ['user_id'], // 标记需要路径参数
     primaryKey: 'user_id',
     pagination: false,
 
@@ -239,7 +240,7 @@ const PAGE_CONFIGS = {
         formId: 'adjustBalanceForm',
         submitBtn: 'submitAdjustBtn',
         method: 'POST',
-        url: '/api/v4/console/asset-adjustment/adjust',
+        url: API_ENDPOINTS.ASSET_ADJUSTMENT.ADJUST,
         successMessage: '调整成功',
         fields: [
           { id: 'adjustUserId', key: 'user_id', type: 'integer' },
@@ -270,7 +271,7 @@ const PAGE_CONFIGS = {
     subtitle: '查询材料/资产的交易记录',
     icon: 'bi-list-ul',
     emoji: '📋',
-    apiEndpoint: '/api/v4/console/material/transactions',
+    apiEndpoint: API_ENDPOINTS.MATERIAL.TRANSACTIONS,
     primaryKey: 'transaction_id',
     pagination: true,
     pageSize: 20,
@@ -364,7 +365,7 @@ const PAGE_CONFIGS = {
     subtitle: '查询和管理用户的钻石/积分账户',
     icon: 'bi-gem',
     emoji: '💎',
-    apiEndpoint: '/api/v4/console/diamond/accounts',
+    apiEndpoint: API_ENDPOINTS.DIAMOND_ACCOUNTS.ACCOUNTS,
     primaryKey: 'user_id',
     pagination: false,
 
@@ -413,12 +414,12 @@ const PAGE_CONFIGS = {
         formId: 'adjustBalanceForm',
         submitBtn: 'submitAdjustBtn',
         method: 'POST',
-        url: '/api/v4/console/diamond/adjust',
+        url: API_ENDPOINTS.ASSET_ADJUSTMENT.ADJUST,
         successMessage: '调整成功',
         fields: [
           { id: 'adjustUserId', key: 'user_id', type: 'integer' },
           { id: 'adjustAmount', key: 'amount', type: 'integer' },
-          { id: 'adjustType', key: 'type' },
+          { id: 'adjustAssetCode', key: 'asset_code', defaultValue: 'DIAMOND' },
           { id: 'adjustReason', key: 'reason' }
         ]
       }
@@ -438,7 +439,7 @@ const PAGE_CONFIGS = {
     subtitle: '管理用户可兑换的官方商品',
     icon: 'bi-shop',
     emoji: '🛒',
-    apiEndpoint: '/api/v4/console/marketplace/exchange_market/items',
+    apiEndpoint: API_ENDPOINTS.MARKETPLACE.EXCHANGE_ITEMS,
     primaryKey: 'item_id',
     pagination: true,
     pageSize: 20,
@@ -579,7 +580,7 @@ const PAGE_CONFIGS = {
         submitBtn: 'submitEditBtn',
         method: 'PUT',
         url: function (data) {
-          return `/api/v4/console/marketplace/exchange_market/items/${data._itemId}`
+          return API.buildURL(API_ENDPOINTS.MARKETPLACE.EXCHANGE_ITEM_DETAIL, { item_id: data._itemId })
         },
         successMessage: '更新成功',
         fields: [
@@ -610,7 +611,7 @@ const PAGE_CONFIGS = {
 
         try {
           const response = await apiRequest(
-            `/api/v4/console/marketplace/exchange_market/items/${row.item_id}`,
+            API.buildURL(API_ENDPOINTS.MARKETPLACE.EXCHANGE_ITEM_DETAIL, { item_id: row.item_id }),
             {
               method: 'PUT',
               body: JSON.stringify({ status: newStatus })
@@ -646,7 +647,7 @@ const PAGE_CONFIGS = {
     subtitle: '管理兑换市场的订单',
     icon: 'bi-receipt',
     emoji: '📦',
-    apiEndpoint: '/api/v4/console/marketplace/exchange_market/orders',
+    apiEndpoint: API_ENDPOINTS.MARKETPLACE.EXCHANGE_ORDERS,
     primaryKey: 'order_no',
     pagination: true,
     pageSize: 20,
@@ -751,7 +752,7 @@ const PAGE_CONFIGS = {
         submitBtn: 'submitUpdateStatusBtn',
         method: 'POST',
         url: function (data) {
-          return `/api/v4/shop/exchange/orders/${data._orderNo}/status`
+          return API.buildURL(API_ENDPOINTS.MARKETPLACE.EXCHANGE_ORDER_STATUS, { order_no: data._orderNo })
         },
         successMessage: '状态更新成功',
         fields: [
@@ -765,7 +766,7 @@ const PAGE_CONFIGS = {
       viewOrderDetail: async function (row) {
         try {
           const response = await apiRequest(
-            `/api/v4/console/marketplace/exchange_market/orders/${row.order_no}`
+            API.buildURL(API_ENDPOINTS.MARKETPLACE.EXCHANGE_ORDER_DETAIL, { order_no: row.order_no })
           )
           if (response?.success) {
             const order = response.data.order
@@ -806,7 +807,7 @@ const PAGE_CONFIGS = {
     subtitle: '管理用户间的交易订单',
     icon: 'bi-arrow-left-right',
     emoji: '🔄',
-    apiEndpoint: '/api/v4/console/marketplace/trade/orders',
+    apiEndpoint: API_ENDPOINTS.MARKETPLACE.TRADE_ORDERS,
     primaryKey: 'order_no',
     pagination: true,
     pageSize: 20,
@@ -889,7 +890,7 @@ const PAGE_CONFIGS = {
     subtitle: '管理系统公告和通知',
     icon: 'bi-megaphone',
     emoji: '📢',
-    apiEndpoint: '/api/v4/console/notifications/announcements',
+    apiEndpoint: API_ENDPOINTS.NOTIFICATION.ANNOUNCEMENTS,
     primaryKey: 'announcement_id',
     pagination: true,
     pageSize: 20,
@@ -1007,7 +1008,7 @@ const PAGE_CONFIGS = {
 
         try {
           const response = await apiRequest(
-            `/api/v4/console/notifications/announcements/${row.announcement_id}`,
+            API.buildURL(API_ENDPOINTS.ANNOUNCEMENT.DELETE, { id: row.announcement_id }),
             {
               method: 'DELETE'
             }

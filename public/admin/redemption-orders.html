@@ -243,10 +243,11 @@
       try {
         const response = await apiRequest(API_ENDPOINTS.STORE.LIST);
         if (response && response.success) {
-          stores = response.data.stores || response.data || [];
+          // 适配后端返回格式: { items: [...], total, page, ... }
+          stores = response.data.items || [];
           const select = document.getElementById('redeemStoreId');
           select.innerHTML = '<option value="">请选择门店</option>' +
-            stores.map(s => `<option value="${s.store_id}">${escapeHtml(s.name)}</option>`).join('');
+            stores.map(s => `<option value="${s.store_id}">${escapeHtml(s.store_name)}</option>`).join('');
         }
       } catch (error) {
         console.error('加载门店失败:', error);

@@ -136,7 +136,7 @@ async function loadRecords(silent = false) {
       params.append('search', search)
     }
 
-    const response = await apiRequest(`/api/v4/shop/consumption/admin/records?${params.toString()}`)
+    const response = await apiRequest(`${API_ENDPOINTS.CONSUMPTION.ADMIN_RECORDS}?${params.toString()}`)
 
     if (response && response.success) {
       renderRecords(response.data)
@@ -413,8 +413,8 @@ async function submitReview() {
   try {
     const endpoint =
       currentAction === 'approve'
-        ? `/api/v4/shop/consumption/approve/${currentRecordId}`
-        : `/api/v4/shop/consumption/reject/${currentRecordId}`
+        ? API.buildURL(API_ENDPOINTS.CONSUMPTION.APPROVE, { id: currentRecordId })
+        : API.buildURL(API_ENDPOINTS.CONSUMPTION.REJECT, { id: currentRecordId })
 
     const response = await apiRequest(endpoint, {
       method: 'POST',

@@ -112,8 +112,8 @@ async function loadStatistics() {
     }
 
     const url = params.toString()
-      ? `/api/v4/console/lottery-quota/statistics?${params.toString()}`
-      : '/api/v4/console/lottery-quota/statistics'
+      ? API_ENDPOINTS.LOTTERY_QUOTA.STATISTICS + '?' + params.toString()
+      : API_ENDPOINTS.LOTTERY_QUOTA.STATISTICS
 
     const response = await apiRequest(url)
 
@@ -152,7 +152,7 @@ async function refreshAll() {
  */
 async function loadActivities() {
   try {
-    const response = await apiRequest('/api/v4/activities')
+    const response = await apiRequest(API_ENDPOINTS.ACTIVITIES.LIST)
 
     if (response && response.success) {
       const activities = response.data.activities || response.data || []
@@ -197,7 +197,7 @@ async function loadQuotaData() {
       params.append('campaign_id', campaignId)
     }
 
-    const response = await apiRequest(`/api/v4/console/lottery-quota/rules?${params.toString()}`)
+    const response = await apiRequest(API_ENDPOINTS.LOTTERY_QUOTA.RULES + '?' + params.toString())
 
     if (response && response.success) {
       const { rules, pagination } = response.data
@@ -394,8 +394,8 @@ async function disableRule(ruleId) {
   }
 
   try {
-    // 直接使用后端API路径，rule_id 作为路径参数
-    const response = await apiRequest(`/api/v4/console/lottery-quota/rules/${ruleId}/disable`, {
+    // 使用API_ENDPOINTS集中管理
+    const response = await apiRequest(API.buildURL(API_ENDPOINTS.LOTTERY_QUOTA.DISABLE_RULE, { id: ruleId }), {
       method: 'PUT'
     })
 
@@ -466,7 +466,7 @@ async function submitCreateRule() {
     submitBtn.disabled = true
     submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>创建中...'
 
-    const response = await apiRequest('/api/v4/console/lottery-quota/rules', {
+    const response = await apiRequest(API_ENDPOINTS.LOTTERY_QUOTA.RULES, {
       method: 'POST',
       body: JSON.stringify(data)
     })

@@ -119,7 +119,7 @@ async function uploadImages() {
       formData.append('business_type', imageType) // 后端字段名是 business_type
 
       // 修正API路径：/api/v4/console/images/upload（移除 system 子路径）
-      const response = await fetch('/api/v4/console/images/upload', {
+      const response = await fetch(API_ENDPOINTS.IMAGE.UPLOAD, {
         method: 'POST',
         headers: { Authorization: `Bearer ${getToken()}` },
         body: formData
@@ -158,7 +158,7 @@ async function loadImageData() {
     if (status) params.append('status', status)
 
     // 修正API路径：/api/v4/console/images（移除 system 子路径）
-    const response = await apiRequest(`/api/v4/console/images?${params.toString()}`)
+    const response = await apiRequest(`${API_ENDPOINTS.IMAGE.LIST}?${params.toString()}`)
 
     if (response && response.success) {
       const { images, statistics, pagination } = response.data
@@ -258,7 +258,7 @@ async function showImageDetail(imageId) {
 
   try {
     // 修正API路径：/api/v4/console/images/:id（移除 system 子路径）
-    const response = await apiRequest(`/api/v4/console/images/${imageId}`)
+    const response = await apiRequest(API.buildURL(API_ENDPOINTS.IMAGE.DELETE, { id: imageId }))
 
     if (response && response.success) {
       const image = response.data
@@ -301,7 +301,7 @@ async function deleteCurrentImage() {
 
   try {
     // 修正API路径：/api/v4/console/images/:id（移除 system 子路径）
-    const response = await apiRequest(`/api/v4/console/images/${currentImageId}`, {
+    const response = await apiRequest(API.buildURL(API_ENDPOINTS.IMAGE.DELETE, { id: currentImageId }), {
       method: 'DELETE'
     })
 

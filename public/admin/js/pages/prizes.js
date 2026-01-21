@@ -94,7 +94,7 @@ async function loadPrizes() {
   showLoading()
 
   try {
-    const response = await apiRequest('/api/v4/console/prize-pool/list')
+    const response = await apiRequest(API_ENDPOINTS.PRIZE.LIST)
 
     if (response && response.success) {
       currentPrizes = response.data.prizes || response.data.list || []
@@ -276,7 +276,7 @@ async function submitAddPrize() {
       color: '#FF6B6B'
     }
 
-    const response = await apiRequest('/api/v4/console/prize-pool/batch-add', {
+    const response = await apiRequest(API_ENDPOINTS.PRIZE.BATCH_ADD, {
       method: 'POST',
       body: JSON.stringify({
         campaign_id: 1,
@@ -349,7 +349,7 @@ async function submitEditPrize() {
       description: document.getElementById('editPrizeDescription').value || ''
     }
 
-    const result = await apiRequest(`/api/v4/console/prize-pool/prize/${prizeId}`, {
+    const result = await apiRequest(API.buildURL(API_ENDPOINTS.PRIZE.UPDATE, { prize_id: prizeId }), {
       method: 'PUT',
       body: JSON.stringify(updateData)
     })
@@ -382,7 +382,7 @@ async function addStock(prizeId) {
   showLoading()
 
   try {
-    const response = await apiRequest(`/api/v4/console/prize-pool/prize/${prizeId}/add-stock`, {
+    const response = await apiRequest(API.buildURL(API_ENDPOINTS.PRIZE.ADD_STOCK, { prize_id: prizeId }), {
       method: 'POST',
       body: JSON.stringify({ quantity: parseInt(quantity) })
     })
@@ -412,7 +412,7 @@ async function deletePrize(prizeId) {
   showLoading()
 
   try {
-    const response = await apiRequest(`/api/v4/console/prize-pool/prize/${prizeId}`, {
+    const response = await apiRequest(API.buildURL(API_ENDPOINTS.PRIZE.DELETE, { prize_id: prizeId }), {
       method: 'DELETE'
     })
 

@@ -1459,8 +1459,8 @@ class AdminLotteryService {
     })
 
     /*
-     * 🎁 批量查询奖品名称（避免N+1查询）
-     * 收集所有需要查询的 prize_id
+     * 🎁 批量查询奖品信息（避免N+1查询）
+     * 收集所有需要查询的 prize_id（无论setting_data中是否有prize_name都要查询prize_value）
      */
     const prizeIds = new Set()
     rows.forEach(item => {
@@ -1468,7 +1468,8 @@ class AdminLotteryService {
         typeof item.setting_data === 'string'
           ? JSON.parse(item.setting_data)
           : item.setting_data || {}
-      if (settingData.prize_id && !settingData.prize_name) {
+      // 只要有prize_id就收集，确保能获取最新的prize_value
+      if (settingData.prize_id) {
         prizeIds.add(settingData.prize_id)
       }
     })
@@ -1640,19 +1641,24 @@ class AdminLotteryService {
       displayStatus = 'expired' // 业务层显示已过期
     }
 
-    // 🎁 获取奖品信息（优先从 setting_data，其次从 prizeMap 查询）
+    // 🎁 获取奖品信息（优先从 prizeMap 获取最新数据，确保prize_value准确）
     let prizeInfo = null
     if (settingData.prize_id) {
-      // 如果 setting_data 中已有 prize_name，直接使用
-      if (settingData.prize_name) {
+      // 优先从 prizeMap 获取奖品信息（包含最新的prize_value）
+      const dbPrize = prizeMap.get(settingData.prize_id)
+      if (dbPrize) {
+        prizeInfo = {
+          prize_id: settingData.prize_id,
+          prize_name: dbPrize.prize_name || settingData.prize_name,
+          prize_value: dbPrize.prize_value ?? null
+        }
+      } else if (settingData.prize_name) {
+        // prizeMap中没有时（奖品可能已删除），使用setting_data的数据
         prizeInfo = {
           prize_id: settingData.prize_id,
           prize_name: settingData.prize_name,
-          prize_value: settingData.prize_value || null
+          prize_value: settingData.prize_value ?? null
         }
-      } else if (prizeMap.has(settingData.prize_id)) {
-        // 否则从 prizeMap 查询
-        prizeInfo = prizeMap.get(settingData.prize_id)
       } else {
         // 兜底：只有 prize_id
         prizeInfo = {

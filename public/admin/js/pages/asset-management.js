@@ -142,7 +142,7 @@ async function loadAssetTypes() {
   showTableLoading(tbody, 9)
 
   try {
-    const response = await apiRequest('/api/v4/console/material/asset-types')
+    const response = await apiRequest(API_ENDPOINTS.MATERIAL.ASSET_TYPES)
 
     if (response?.success) {
       // 后端返回格式: { asset_types: [...] }
@@ -260,7 +260,7 @@ async function submitAddAssetType() {
   try {
     setButtonLoading('submitAddAssetTypeBtn', true)
 
-    const response = await apiRequest('/api/v4/console/material/asset-types', {
+    const response = await apiRequest(API_ENDPOINTS.MATERIAL.ASSET_TYPES, {
       method: 'POST',
       body: JSON.stringify(data)
     })
@@ -323,7 +323,7 @@ async function submitEditAssetType() {
   try {
     setButtonLoading('submitEditAssetTypeBtn', true)
 
-    const response = await apiRequest(`/api/v4/console/material/asset-types/${assetCode}`, {
+    const response = await apiRequest(API.buildURL(API_ENDPOINTS.MATERIAL.ASSET_TYPE_DETAIL, { asset_code: assetCode }), {
       method: 'PUT',
       body: JSON.stringify(data)
     })
@@ -352,7 +352,7 @@ async function toggleAssetTypeStatus(assetCode, currentStatus) {
   if (!confirm(`确定要${action}该资产类型吗？`)) return
 
   try {
-    const response = await apiRequest(`/api/v4/console/material/asset-types/${assetCode}`, {
+    const response = await apiRequest(API.buildURL(API_ENDPOINTS.MATERIAL.ASSET_TYPE_DETAIL, { asset_code: assetCode }), {
       method: 'PUT',
       body: JSON.stringify({ is_enabled: newStatus })
     })
@@ -389,11 +389,25 @@ async function handleBalanceSearch(e) {
   try {
     showLoading(true)
 
-    const params = new URLSearchParams()
-    if (userId) params.append('user_id', userId)
-    if (mobile) params.append('mobile', mobile)
+    // 如果只有手机号，先查询用户ID
+    let targetUserId = userId
+    if (!targetUserId && mobile) {
+      const userResponse = await apiRequest(`${API_ENDPOINTS.USER.LIST}?search=${mobile}`)
+      if (userResponse?.success && userResponse.data?.users?.length > 0) {
+        targetUserId = userResponse.data.users[0].user_id
+      } else {
+        showError('未找到该手机号对应的用户')
+        return
+      }
+    }
 
-    const response = await apiRequest(`/api/v4/console/asset-adjustment/balances?${params}`)
+    if (!targetUserId) {
+      showError('请输入用户ID或手机号')
+      return
+    }
+
+    // 使用正确的API路径：/api/v4/console/asset-adjustment/user/:user_id/balances
+    const response = await apiRequest(API.buildURL(API_ENDPOINTS.ASSET_ADJUSTMENT.USER_BALANCES, { user_id: targetUserId }))
 
     if (response?.success) {
       currentQueryUserId = response.data.user?.user_id
@@ -424,13 +438,14 @@ async function handleBalanceSearch(e) {
 
 /**
  * 渲染用户余额列表
+ * 后端字段: asset_code, available_amount, frozen_amount, total, campaign_id
  */
 function renderUserBalances() {
   const tbody = document.getElementById('balancesTableBody')
 
   if (userBalances.length === 0) {
     tbody.innerHTML =
-      '<tr><td colspan="6" class="text-center text-muted py-4">暂无资产余额</td></tr>'
+      '<tr><td colspan="5" class="text-center text-muted py-4">暂无资产余额</td></tr>'
     return
   }
 
@@ -439,10 +454,9 @@ function renderUserBalances() {
       balance => `
     <tr>
       <td><code>${balance.asset_code}</code></td>
-      <td><strong>${escapeHtml(balance.display_name || balance.asset_code)}</strong></td>
-      <td><span class="badge bg-info">${balance.group_code || '-'}</span></td>
-      <td class="text-success fw-bold fs-5">${balance.balance}</td>
-      <td class="text-primary">${balance.visible_value || '-'}</td>
+      <td class="text-success fw-bold fs-5">${balance.available_amount}</td>
+      <td class="text-warning">${balance.frozen_amount}</td>
+      <td class="text-primary fw-bold">${balance.total}</td>
       <td>
         <button class="btn btn-sm btn-success" data-action="adjust" data-code="${balance.asset_code}">
           <i class="bi bi-plus-slash-minus"></i> 调整
@@ -483,17 +497,31 @@ async function submitAdjustBalance() {
     return
   }
 
+  const userId = parseInt(document.getElementById('adjustUserId').value)
+  const assetCode = document.getElementById('adjustAssetCode').value
+  const amount = parseInt(document.getElementById('adjustAmount').value)
+  const reason = document.getElementById('adjustReason').value.trim()
+
+  // 获取当前管理员ID（从登录用户信息）
+  const currentUser = getCurrentUser()
+  const adminId = currentUser?.user_id || 0
+
+  // 生成幂等键：admin_adjust_{admin_id}_{user_id}_{asset_code}_{timestamp}
+  const timestamp = Date.now()
+  const idempotencyKey = `admin_adjust_${adminId}_${userId}_${assetCode}_${timestamp}`
+
   const data = {
-    user_id: parseInt(document.getElementById('adjustUserId').value),
-    asset_code: document.getElementById('adjustAssetCode').value,
-    amount: parseInt(document.getElementById('adjustAmount').value),
-    reason: document.getElementById('adjustReason').value.trim()
+    user_id: userId,
+    asset_code: assetCode,
+    amount: amount,
+    reason: reason,
+    idempotency_key: idempotencyKey
   }
 
   try {
     setButtonLoading('submitAdjustBalanceBtn', true)
 
-    const response = await apiRequest('/api/v4/console/asset-adjustment/adjust', {
+    const response = await apiRequest(API_ENDPOINTS.ASSET_ADJUSTMENT.ADJUST, {
       method: 'POST',
       body: JSON.stringify(data)
     })
@@ -553,8 +581,8 @@ async function loadTransactions() {
     if (startDate) params.append('start_date', startDate)
     if (endDate) params.append('end_date', endDate)
 
-    // 注意：流水记录API在 /api/v4/console/assets/transactions
-    const response = await apiRequest(`/api/v4/console/assets/transactions?${params}`)
+    // 使用API_ENDPOINTS集中管理
+    const response = await apiRequest(API_ENDPOINTS.ASSETS.TRANSACTIONS + '?' + params)
 
     if (response?.success) {
       // 后端返回格式: { transactions: [...], pagination: {...} }
@@ -731,17 +759,31 @@ async function handleDirectAdjustment(e) {
     return
   }
 
+  const userId = parseInt(document.getElementById('adjUserId').value)
+  const assetCode = document.getElementById('adjAssetCode').value
+  const amount = parseInt(document.getElementById('adjAmount').value)
+  const reason = document.getElementById('adjReason').value.trim()
+
+  // 获取当前管理员ID（从登录用户信息）
+  const currentUser = getCurrentUser()
+  const adminId = currentUser?.user_id || 0
+
+  // 生成幂等键：admin_adjust_{admin_id}_{user_id}_{asset_code}_{timestamp}
+  const timestamp = Date.now()
+  const idempotencyKey = `admin_adjust_${adminId}_${userId}_${assetCode}_${timestamp}`
+
   const data = {
-    user_id: parseInt(document.getElementById('adjUserId').value),
-    asset_code: document.getElementById('adjAssetCode').value,
-    amount: parseInt(document.getElementById('adjAmount').value),
-    reason: document.getElementById('adjReason').value.trim()
+    user_id: userId,
+    asset_code: assetCode,
+    amount: amount,
+    reason: reason,
+    idempotency_key: idempotencyKey
   }
 
   try {
     showLoading(true)
 
-    const response = await apiRequest('/api/v4/console/asset-adjustment/adjust', {
+    const response = await apiRequest(API_ENDPOINTS.ASSET_ADJUSTMENT.ADJUST, {
       method: 'POST',
       body: JSON.stringify(data)
     })

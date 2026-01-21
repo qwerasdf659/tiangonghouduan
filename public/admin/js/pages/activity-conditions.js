@@ -98,7 +98,7 @@ let activitiesCache = []
 async function loadActivities() {
   try {
     // 获取所有状态的活动（不传status参数让后端返回所有）
-    const response = await apiRequest('/api/v4/lottery/campaigns?status=')
+    const response = await apiRequest(`${API_ENDPOINTS.LOTTERY_CAMPAIGNS.LIST}?status=`)
     if (response && response.success && response.data) {
       // 缓存活动数据
       activitiesCache = response.data
@@ -169,7 +169,7 @@ async function loadActivityConditions() {
 
     // 调用正确的API获取活动条件配置
     // 后端API: GET /api/v4/activities/:idOrCode/conditions
-    const response = await apiRequest(`/api/v4/activities/${campaignCode}/conditions`)
+    const response = await apiRequest(API.buildURL(API_ENDPOINTS.LOTTERY_CAMPAIGNS.CONDITIONS, { code: campaignCode }))
 
     if (response && response.success && response.data) {
       const conditionData = response.data
@@ -476,7 +476,7 @@ async function saveConditions() {
 
   try {
     const response = await apiRequest(
-      `/api/v4/activities/${currentActivityCode}/configure-conditions`,
+      API.buildURL(API_ENDPOINTS.LOTTERY_CAMPAIGNS.CONFIGURE_CONDITIONS, { code: currentActivityCode }),
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

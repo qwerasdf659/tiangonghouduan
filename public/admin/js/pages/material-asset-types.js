@@ -91,7 +91,7 @@ async function loadAssetTypes() {
   `
 
   try {
-    const response = await apiRequest('/api/v4/console/material/asset-types')
+    const response = await apiRequest(API_ENDPOINTS.MATERIAL.ASSET_TYPES)
 
     if (response && response.success) {
       // 后端返回格式: { asset_types: [...] }
@@ -221,7 +221,7 @@ async function submitAddAssetType() {
     submitBtn.disabled = true
     submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>提交中...'
 
-    const response = await apiRequest('/api/v4/console/material/asset-types', {
+    const response = await apiRequest(API_ENDPOINTS.MATERIAL.ASSET_TYPES, {
       method: 'POST',
       body: JSON.stringify(data)
     })
@@ -293,7 +293,7 @@ async function submitEditAssetType() {
     submitBtn.disabled = true
     submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>保存中...'
 
-    const response = await apiRequest(`/api/v4/console/material/asset-types/${assetCode}`, {
+    const response = await apiRequest(API.buildURL(API_ENDPOINTS.MATERIAL.ASSET_TYPE_DETAIL, { asset_code: assetCode }), {
       method: 'PUT',
       body: JSON.stringify(data)
     })
@@ -327,7 +327,7 @@ async function toggleAssetTypeStatus(assetCode, currentStatus) {
   }
 
   try {
-    const response = await apiRequest(`/api/v4/console/material/asset-types/${assetCode}`, {
+    const response = await apiRequest(API.buildURL(API_ENDPOINTS.MATERIAL.ASSET_TYPE_DETAIL, { asset_code: assetCode }), {
       method: 'PUT',
       body: JSON.stringify({ is_enabled: newStatus })
     })

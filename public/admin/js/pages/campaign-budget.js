@@ -85,7 +85,7 @@ function bindEventListeners() {
 async function loadActivities() {
   try {
     // 使用 batch-status API 获取活动列表（该API已返回所有活动信息）
-    const response = await apiRequest('/api/v4/console/campaign-budget/batch-status?limit=50')
+    const response = await apiRequest(`${API_ENDPOINTS.CAMPAIGN_BUDGET.BATCH_STATUS}?limit=50`)
 
     if (response && response.success) {
       // 后端返回格式：{ campaigns: [...], summary: {...} }
@@ -135,7 +135,7 @@ async function loadBudgetData() {
     })
 
     const response = await apiRequest(
-      `/api/v4/console/campaign-budget/batch-status?${params.toString()}`
+      API_ENDPOINTS.CAMPAIGN_BUDGET.BATCH_STATUS + '?' + params.toString()
     )
 
     if (response && response.success) {
@@ -356,7 +356,7 @@ async function submitBudget() {
     submitBtn.disabled = true
     submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>提交中...'
 
-    const response = await apiRequest(`/api/v4/console/campaign-budget/campaigns/${campaignId}`, {
+    const response = await apiRequest(API.buildURL(API_ENDPOINTS.CAMPAIGN_BUDGET.CAMPAIGN, { campaign_id: campaignId }), {
       method: 'PUT',
       body: JSON.stringify(data)
     })

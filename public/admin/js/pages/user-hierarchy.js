@@ -38,7 +38,7 @@ document.addEventListener('DOMContentLoaded', async function () {
  */
 async function loadRoles() {
   try {
-    const response = await apiRequest('/api/v4/console/user-hierarchy/roles')
+    const response = await apiRequest(API_ENDPOINTS.USER_HIERARCHY.ROLES)
     if (response.success) {
       rolesList = response.data || []
 
@@ -72,7 +72,7 @@ async function loadHierarchyList() {
     if (status) params.append('is_active', status)
     if (superiorId) params.append('superior_user_id', superiorId)
 
-    const response = await apiRequest(`/api/v4/console/user-hierarchy?${params}`)
+    const response = await apiRequest(`${API_ENDPOINTS.USER_HIERARCHY.LIST}?${params}`)
 
     if (response.success) {
       renderHierarchyTable(response.data)
@@ -297,7 +297,7 @@ async function saveHierarchy() {
   }
 
   try {
-    const response = await apiRequest('/api/v4/console/user-hierarchy', {
+    const response = await apiRequest(API_ENDPOINTS.USER_HIERARCHY.CREATE, {
       method: 'POST',
       body: JSON.stringify({
         user_id: parseInt(userId),
@@ -335,7 +335,7 @@ async function viewSubordinates(userId) {
   `
 
   try {
-    const response = await apiRequest(`/api/v4/console/user-hierarchy/${userId}/subordinates`)
+    const response = await apiRequest(API.buildURL(API_ENDPOINTS.USER_HIERARCHY.SUBORDINATES, { user_id: userId }))
 
     if (response.success) {
       const subordinates = response.data.subordinates || []
@@ -407,7 +407,7 @@ async function confirmDeactivate() {
 
   try {
     const response = await apiRequest(
-      `/api/v4/console/user-hierarchy/${currentDeactivateUserId}/deactivate`,
+      API.buildURL(API_ENDPOINTS.USER_HIERARCHY.DEACTIVATE, { user_id: currentDeactivateUserId }),
       {
         method: 'POST',
         body: JSON.stringify({
@@ -438,7 +438,7 @@ async function activateUser(userId) {
   if (!confirm('确定要激活该用户的层级权限吗？')) return
 
   try {
-    const response = await apiRequest(`/api/v4/console/user-hierarchy/${userId}/activate`, {
+    const response = await apiRequest(API.buildURL(API_ENDPOINTS.USER_HIERARCHY.ACTIVATE, { user_id: userId }), {
       method: 'POST',
       body: JSON.stringify({
         include_subordinates: false

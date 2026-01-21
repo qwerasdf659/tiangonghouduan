@@ -58,7 +58,7 @@ document.addEventListener('DOMContentLoaded', function () {
  */
 async function loadAssetTypes() {
   try {
-    const response = await apiRequest('/api/v4/console/asset-adjustment/asset-types')
+    const response = await apiRequest(API_ENDPOINTS.ASSET_ADJUSTMENT.ASSET_TYPES)
     if (response && response.success) {
       // 后端返回格式: { asset_types: [...], total }
       assetTypes = response.data?.asset_types || []
@@ -108,7 +108,7 @@ async function handleSearch(e) {
     try {
       // ✅ 对齐后端：user-management返回用户列表，取第一个匹配用户
       const userResponse = await apiRequest(
-        `/api/v4/console/user-management/users?search=${mobile}`
+        `${API_ENDPOINTS.USER.LIST}?search=${mobile}`
       )
       if (userResponse && userResponse.success && userResponse.data) {
         const users = userResponse.data.users || userResponse.data
@@ -157,7 +157,7 @@ async function loadUserBalances(userId) {
   `
 
   try {
-    const response = await apiRequest(`/api/v4/console/asset-adjustment/user/${userId}/balances`)
+    const response = await apiRequest(API.buildURL(API_ENDPOINTS.ASSET_ADJUSTMENT.USER_BALANCES, { user_id: userId }))
 
     if (response && response.success) {
       const { user, balances } = response.data
@@ -282,7 +282,7 @@ async function submitAdjustBalance() {
     submitBtn.disabled = true
     submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>提交中...'
 
-    const response = await apiRequest(`/api/v4/console/asset-adjustment/adjust`, {
+    const response = await apiRequest(API_ENDPOINTS.ASSET_ADJUSTMENT.ADJUST, {
       method: 'POST',
       body: JSON.stringify(data)
     })

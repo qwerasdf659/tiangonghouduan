@@ -156,7 +156,7 @@ function displayUserInfo() {
  */
 async function loadDashboardData() {
   try {
-    const response = await apiRequest('/api/v4/console/system/dashboard')
+    const response = await apiRequest(API_ENDPOINTS.SYSTEM.DASHBOARD)
 
     if (response && response.success && response.data) {
       const data = response.data
@@ -226,7 +226,7 @@ async function loadDashboardData() {
  */
 async function loadTrendData() {
   try {
-    const response = await apiRequest('/api/v4/console/analytics/decisions/analytics?days=7')
+    const response = await apiRequest(`${API_ENDPOINTS.SYSTEM.DASHBOARD_TRENDS}?days=7`)
 
     if (response && response.success && response.data) {
       const dailyStats = response.data.trends?.daily_stats || []

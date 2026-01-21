@@ -74,7 +74,7 @@ async function handleLogin(e) {
 
   try {
     // 统一使用console auth认证端点
-    const response = await fetch('/api/v4/console/auth/login', {
+    const response = await fetch(API_ENDPOINTS.CONSOLE_AUTH.LOGIN, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({

@@ -92,8 +92,8 @@ async function loadConfigList() {
   const listContainer = document.getElementById('configList')
 
   try {
-    // 调用后端实际提供的API
-    const response = await apiRequest('/api/v4/console/settings')
+    // 使用API_ENDPOINTS集中管理
+    const response = await apiRequest(API_ENDPOINTS.SETTINGS.LIST)
 
     if (response && response.success) {
       const summary = response.data || {}
@@ -187,7 +187,7 @@ async function loadCategorySettings(category) {
   `
 
   try {
-    const response = await apiRequest(`/api/v4/console/settings/${category}`)
+    const response = await apiRequest(API.buildURL(API_ENDPOINTS.SETTINGS.CATEGORY, { category }))
 
     if (response && response.success) {
       const data = response.data || {}
@@ -378,7 +378,7 @@ async function saveSettings(category) {
   showLoading(true)
 
   try {
-    const response = await apiRequest(`/api/v4/console/settings/${category}`, {
+    const response = await apiRequest(API.buildURL(API_ENDPOINTS.SETTINGS.UPDATE, { category }), {
       method: 'PUT',
       body: JSON.stringify({ settings: settingsToUpdate })
     })
@@ -461,7 +461,7 @@ async function addConfig() {
 
     const settingsToUpdate = { [configKey]: value }
 
-    const response = await apiRequest(`/api/v4/console/settings/${currentCategory}`, {
+    const response = await apiRequest(API.buildURL(API_ENDPOINTS.SETTINGS.UPDATE, { category: currentCategory }), {
       method: 'PUT',
       body: JSON.stringify({ settings: settingsToUpdate })
     })
@@ -512,7 +512,7 @@ async function clearCache(type) {
       all: '*'
     }
 
-    const response = await apiRequest('/api/v4/console/cache/clear', {
+    const response = await apiRequest(API_ENDPOINTS.CACHE.CLEAR, {
       method: 'POST',
       body: JSON.stringify({
         pattern: patternMap[type] || type,
@@ -566,7 +566,7 @@ async function showFeatureFlags() {
 
   try {
     // 功能开关通常存储在security分类中
-    const response = await apiRequest('/api/v4/console/settings/security')
+    const response = await apiRequest(API_ENDPOINTS.SETTINGS.SECURITY)
 
     if (response && response.success) {
       const settings = response.data?.settings || []
@@ -639,7 +639,7 @@ async function saveFeatureFlags() {
   showLoading(true)
 
   try {
-    const response = await apiRequest('/api/v4/console/settings/security', {
+    const response = await apiRequest(API_ENDPOINTS.SETTINGS.SECURITY, {
       method: 'PUT',
       body: JSON.stringify({ settings: flags })
     })
@@ -670,7 +670,7 @@ async function showMaintenanceMode() {
   modal.show()
 
   try {
-    const response = await apiRequest('/api/v4/console/settings/basic')
+    const response = await apiRequest(API_ENDPOINTS.SETTINGS.BASIC)
 
     if (response && response.success) {
       const settings = response.data?.settings || []
@@ -719,7 +719,7 @@ async function saveMaintenanceMode() {
       settings.maintenance_end_time = new Date(endTime).toISOString()
     }
 
-    const response = await apiRequest('/api/v4/console/settings/basic', {
+    const response = await apiRequest(API_ENDPOINTS.SETTINGS.BASIC, {
       method: 'PUT',
       body: JSON.stringify({ settings })
     })

@@ -60,7 +60,7 @@ async function loadAllData() {
  */
 async function loadAssetOverview() {
   try {
-    const response = await apiRequest('/api/v4/console/assets/stats')
+    const response = await apiRequest(API_ENDPOINTS.ASSETS.STATS)
 
     if (response && response.success) {
       const stats = response.data.asset_stats || []
@@ -93,8 +93,8 @@ async function loadAssetTypes() {
   try {
     // 并行获取资产类型和统计数据
     const [typesResponse, statsResponse] = await Promise.all([
-      apiRequest('/api/v4/console/asset-adjustment/asset-types'),
-      apiRequest('/api/v4/console/assets/stats')
+      apiRequest(API_ENDPOINTS.ASSET_ADJUSTMENT.ASSET_TYPES),
+      apiRequest(API_ENDPOINTS.ASSETS.STATS)
     ])
 
     if (typesResponse && typesResponse.success) {

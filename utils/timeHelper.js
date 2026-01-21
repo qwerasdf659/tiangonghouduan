@@ -52,6 +52,15 @@ class BeijingTimeHelper {
   }
 
   /**
+   * 获取当前北京时间的 Date 对象
+   * 用于数据库操作（Sequelize 会自动处理时区）
+   * @returns {Date} 当前时间的 Date 对象
+   */
+  static nowDate() {
+    return new Date()
+  }
+
+  /**
    * 将UTC时间转换为北京时间字符串
    * @param {Date|string} date - 输入时间
    * @returns {string} 北京时间字符串

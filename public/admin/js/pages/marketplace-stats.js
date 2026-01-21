@@ -64,7 +64,7 @@ async function fetchStats() {
       filter: currentFilter
     })
 
-    const response = await fetch(`/api/v4/console/marketplace/listing-stats?${params}`, {
+    const response = await fetch(`${API_ENDPOINTS.MARKETPLACE_STATS.LISTING_STATS}?${params}`, {
       headers: {
         Authorization: `Bearer ${token}`
       }

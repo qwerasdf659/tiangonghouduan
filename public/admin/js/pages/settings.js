@@ -64,10 +64,10 @@ async function loadAllSettings() {
   try {
     // 并行加载所有分类的设置
     const [basicRes, pointsRes, notificationRes, securityRes] = await Promise.all([
-      apiRequest('/api/v4/console/settings/basic').catch(e => null),
-      apiRequest('/api/v4/console/settings/points').catch(e => null),
-      apiRequest('/api/v4/console/settings/notification').catch(e => null),
-      apiRequest('/api/v4/console/settings/security').catch(e => null)
+      apiRequest(API_ENDPOINTS.SETTINGS.BASIC).catch(e => null),
+      apiRequest(API_ENDPOINTS.SETTINGS.POINTS).catch(e => null),
+      apiRequest(API_ENDPOINTS.SETTINGS.NOTIFICATION).catch(e => null),
+      apiRequest(API_ENDPOINTS.SETTINGS.SECURITY).catch(e => null)
     ])
 
     // 加载基础设置
@@ -155,7 +155,7 @@ async function saveBasicSettings() {
       customer_email: document.getElementById('customerServiceEmail').value
     }
 
-    const response = await apiRequest('/api/v4/console/settings/basic', {
+    const response = await apiRequest(API_ENDPOINTS.SETTINGS.BASIC, {
       method: 'PUT',
       body: JSON.stringify({ settings })
     })
@@ -217,7 +217,7 @@ async function savePointsSettings() {
       budget_allocation_ratio: parseFloat(document.getElementById('budget_allocation_ratio').value)
     }
 
-    const response = await apiRequest('/api/v4/console/settings/points', {
+    const response = await apiRequest(API_ENDPOINTS.SETTINGS.POINTS, {
       method: 'PUT',
       body: JSON.stringify({ settings })
     })
@@ -248,7 +248,7 @@ async function saveNotificationSettings() {
       app_notification_enabled: document.getElementById('appNotificationEnabled')?.checked !== false
     }
 
-    const response = await apiRequest('/api/v4/console/settings/notification', {
+    const response = await apiRequest(API_ENDPOINTS.SETTINGS.NOTIFICATION, {
       method: 'PUT',
       body: JSON.stringify({ settings })
     })
@@ -280,7 +280,7 @@ async function saveSecuritySettings() {
       api_rate_limit: parseInt(document.getElementById('apiRateLimit')?.value || 100)
     }
 
-    const response = await apiRequest('/api/v4/console/settings/security', {
+    const response = await apiRequest(API_ENDPOINTS.SETTINGS.SECURITY, {
       method: 'PUT',
       body: JSON.stringify({ settings })
     })
@@ -320,7 +320,7 @@ async function clearCache(type) {
     else if (type === 'user') pattern = 'user_*'
     else if (type === 'prize') pattern = 'prize_*'
 
-    const response = await apiRequest('/api/v4/console/cache/clear', {
+    const response = await apiRequest(API_ENDPOINTS.CACHE.CLEAR, {
       method: 'POST',
       body: JSON.stringify({ pattern, confirm: true })
     })

@@ -92,7 +92,7 @@ const usersModule = {
       if (search) params.append('search', search)
 
       const response = await apiRequest(
-        `/api/v4/console/user-management/users?${params.toString()}`
+        API_ENDPOINTS.USER.LIST + '?' + params.toString()
       )
 
       if (response && response.success) {
@@ -230,10 +230,10 @@ const usersModule = {
     try {
       // 并行加载用户基本信息、高级状态、风控配置、抽奖状态
       const [userRes, premiumRes, riskRes, globalStateRes] = await Promise.allSettled([
-        apiRequest(`/api/v4/console/user-management/users/${userId}`),
-        apiRequest(`/api/v4/console/user-premium/${userId}`),
-        apiRequest(`/api/v4/console/risk-profiles/user/${userId}`),
-        apiRequest(`/api/v4/console/lottery-monitoring/user-global-states/${userId}`)
+        apiRequest(API.buildURL(API_ENDPOINTS.USER.DETAIL, { user_id: userId })),
+        apiRequest(API.buildURL(API_ENDPOINTS.USER_PREMIUM.DETAIL, { user_id: userId })),
+        apiRequest(API.buildURL(API_ENDPOINTS.RISK_PROFILES.USER, { user_id: userId })),
+        apiRequest(API.buildURL(API_ENDPOINTS.LOTTERY_MONITORING.USER_GLOBAL_DETAIL, { user_id: userId }))
       ])
 
       if (userRes.status === 'fulfilled' && userRes.value && userRes.value.success) {
@@ -355,7 +355,7 @@ const usersModule = {
     showLoading(true)
     try {
       const newStatus = currentStatus === 'banned' ? 'active' : 'banned'
-      const response = await apiRequest(`/api/v4/console/user-management/users/${userId}/status`, {
+      const response = await apiRequest(API.buildURL(API_ENDPOINTS.USER.UPDATE_STATUS, { user_id: userId }), {
         method: 'PUT',
         body: JSON.stringify({ status: newStatus })
       })
@@ -420,7 +420,7 @@ const hierarchyModule = {
       if (status) params.append('is_active', status)
       if (superiorId) params.append('superior_id', superiorId)
 
-      const response = await apiRequest(`/api/v4/console/user-hierarchy?${params.toString()}`)
+      const response = await apiRequest(API_ENDPOINTS.USER_HIERARCHY.LIST + '?' + params.toString())
 
       if (response && response.success) {
         this.hierarchies = response.data.items || []
@@ -557,7 +557,7 @@ const hierarchyModule = {
 
     showLoading(true)
     try {
-      const response = await apiRequest('/api/v4/console/user-hierarchy', {
+      const response = await apiRequest(API_ENDPOINTS.USER_HIERARCHY.CREATE, {
         method: 'POST',
         body: JSON.stringify({
           user_id: parseInt(userId),
@@ -587,7 +587,7 @@ const hierarchyModule = {
 
     showLoading(true)
     try {
-      const response = await apiRequest(`/api/v4/console/user-hierarchy/${id}/status`, {
+      const response = await apiRequest(API.buildURL(API_ENDPOINTS.USER_HIERARCHY.UPDATE_STATUS, { id }), {
         method: 'PUT',
         body: JSON.stringify({ is_active: !isActive })
       })
@@ -661,7 +661,7 @@ const merchantPointsModule = {
       if (priority) params.append('priority', priority)
       if (timeRange) params.append('time_range', timeRange)
 
-      const response = await apiRequest(`/api/v4/console/merchant-points?${params.toString()}`)
+      const response = await apiRequest(API_ENDPOINTS.MERCHANT_POINTS.LIST + '?' + params.toString())
 
       if (response && response.success) {
         this.reviews = response.data.items || []
@@ -806,7 +806,7 @@ const merchantPointsModule = {
     showLoading(true)
     try {
       const comment = document.getElementById('reviewComment').value
-      const response = await apiRequest(`/api/v4/console/merchant-points/${this.currentReviewId}`, {
+      const response = await apiRequest(API.buildURL(API_ENDPOINTS.MERCHANT_POINTS.DETAIL, { id: this.currentReviewId }), {
         method: 'PUT',
         body: JSON.stringify({ status, comment })
       })
@@ -849,7 +849,7 @@ const merchantPointsModule = {
 
     showLoading(true)
     try {
-      const response = await apiRequest('/api/v4/console/merchant-points/batch', {
+      const response = await apiRequest(API_ENDPOINTS.MERCHANT_POINTS.BATCH, {
         method: 'PUT',
         body: JSON.stringify({ ids: this.selectedIds, status })
       })

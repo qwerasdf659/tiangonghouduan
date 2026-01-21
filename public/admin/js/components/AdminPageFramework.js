@@ -9,7 +9,7 @@
  *   pageId: 'material-asset-types',
  *   title: '材料资产类型管理',
  *   icon: 'bi-gem',
- *   apiEndpoint: '/api/v4/console/material/asset-types',
+ *   apiEndpoint: API_ENDPOINTS.MATERIAL.ASSET_TYPES,
  *   stats: [...],
  *   filters: [...],
  *   columns: [...],

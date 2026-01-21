@@ -151,8 +151,8 @@ async function loadStatistics() {
       params.append('end_date', endDate)
     }
 
-    // 调用后端 /api/v4/system/statistics/charts API
-    const response = await apiRequest(`/api/v4/system/statistics/charts?${params.toString()}`)
+    // 调用后端统计图表API（使用 API_ENDPOINTS）
+    const response = await apiRequest(`${API_ENDPOINTS.SYSTEM.CHARTS}?${params.toString()}`)
 
     if (response && response.success) {
       renderStatistics(response.data)
@@ -467,7 +467,7 @@ async function exportToExcel() {
       params.append('end_date', document.getElementById('endDate').value)
     }
 
-    const response = await fetch(`/api/v4/system/statistics/export?${params.toString()}`, {
+    const response = await fetch(`${API_ENDPOINTS.SYSTEM.STATISTICS_EXPORT}?${params.toString()}`, {
       headers: { Authorization: `Bearer ${getToken()}` }
     })
 
@@ -507,7 +507,7 @@ async function exportToPDF() {
       params.append('end_date', document.getElementById('endDate').value)
     }
 
-    const response = await fetch(`/api/v4/system/statistics/export?${params.toString()}`, {
+    const response = await fetch(`${API_ENDPOINTS.SYSTEM.STATISTICS_EXPORT}?${params.toString()}`, {
       headers: { Authorization: `Bearer ${getToken()}` }
     })
 

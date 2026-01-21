@@ -229,7 +229,7 @@ async function loadAllData() {
  */
 async function loadTodayStats() {
   try {
-    const response = await apiRequest('/api/v4/console/analytics/stats/today')
+    const response = await apiRequest(API_ENDPOINTS.ANALYTICS.TODAY_STATS)
 
     if (response && response.success) {
       const data = response.data
@@ -276,7 +276,7 @@ async function loadDecisionAnalytics() {
   const days = document.getElementById('timeRangeFilter').value
 
   try {
-    const response = await apiRequest(`/api/v4/console/analytics/decisions/analytics?days=${days}`)
+    const response = await apiRequest(`${API_ENDPOINTS.ANALYTICS.DECISIONS}?days=${days}`)
 
     if (response && response.success) {
       const data = response.data
@@ -321,7 +321,7 @@ async function loadLotteryTrends(days) {
     if (days >= 90) period = 'quarter'
 
     const response = await apiRequest(
-      `/api/v4/console/analytics/lottery/trends?period=${period}&granularity=daily`
+      `${API_ENDPOINTS.ANALYTICS.LOTTERY_TRENDS}?period=${period}&granularity=daily`
     )
 
     if (response && response.success) {

@@ -246,14 +246,15 @@
       try {
         const response = await apiRequest(API_ENDPOINTS.STORE.LIST);
         if (response && response.success) {
-          stores = response.data.stores || response.data || [];
+          // 适配后端返回格式: { items: [...], total, page, ... }
+          stores = response.data.items || [];
           const options = '<option value="">全部门店</option>' +
-            stores.map(s => `<option value="${s.store_id}">${escapeHtml(s.name)}</option>`).join('');
+            stores.map(s => `<option value="${s.store_id}">${escapeHtml(s.store_name)}</option>`).join('');
           document.getElementById('storeFilter').innerHTML = options;
           document.getElementById('staffStoreId').innerHTML = '<option value="">请选择门店</option>' +
-            stores.map(s => `<option value="${s.store_id}">${escapeHtml(s.name)}</option>`).join('');
+            stores.map(s => `<option value="${s.store_id}">${escapeHtml(s.store_name)}</option>`).join('');
           document.getElementById('transferTargetStore').innerHTML = '<option value="">请选择目标门店</option>' +
-            stores.map(s => `<option value="${s.store_id}">${escapeHtml(s.name)}</option>`).join('');
+            stores.map(s => `<option value="${s.store_id}">${escapeHtml(s.store_name)}</option>`).join('');
         }
       } catch (error) {
         console.error('加载门店失败:', error);
@@ -270,7 +271,8 @@
 
         const params = new URLSearchParams();
         if (storeId) params.append('store_id', storeId);
-        if (role) params.append('role', role);
+        // 使用后端字段名 role_in_store
+        if (role) params.append('role_in_store', role);
         if (status) params.append('status', status);
         if (search) params.append('search', search);
 
@@ -300,13 +302,14 @@
         return;
       }
 
+      // 使用后端实际返回的字段名：user_nickname, role_in_store
       tbody.innerHTML = staff.map(s => `
         <tr>
           <td>
             <div class="d-flex align-items-center">
-              <div class="staff-avatar me-3">${getInitials(s.user_name || s.nickname || 'U')}</div>
+              <div class="staff-avatar me-3">${getInitials(s.user_nickname || 'U')}</div>
               <div>
-                <div class="fw-bold">${escapeHtml(s.user_name || s.nickname || '-')}</div>
+                <div class="fw-bold">${escapeHtml(s.user_nickname || '-')}</div>
                 <small class="text-muted">ID: ${s.user_id}</small>
               </div>
             </div>
@@ -315,11 +318,11 @@
             <i class="bi bi-shop text-primary"></i> ${escapeHtml(s.store_name || '-')}
           </td>
           <td>
-            <span class="badge ${s.role === 'manager' ? 'bg-warning' : 'bg-info'} role-badge">
-              ${s.role === 'manager' ? '👑 店长' : '👤 员工'}
+            <span class="badge ${s.role_in_store === 'manager' ? 'bg-warning' : 'bg-info'} role-badge">
+              ${s.role_in_store === 'manager' ? '👑 店长' : '👤 员工'}
             </span>
           </td>
-          <td>${formatDate(s.joined_at || s.created_at)}</td>
+          <td>${formatDate(s.joined_at)}</td>
           <td>
             <span class="badge ${s.status === 'active' ? 'bg-success' : 'bg-secondary'}">
               ${s.status === 'active' ? '在职' : '离职'}
@@ -327,13 +330,13 @@
           </td>
           <td>
             <div class="btn-group btn-group-sm">
-              <button class="btn btn-outline-warning" onclick="openTransferModal(${s.store_staff_id}, '${escapeHtml(s.user_name || s.nickname || '')}', '${escapeHtml(s.store_name || '')}')">
-                <i class="bi bi-arrow-left-right"></i> 调店
-              </button>
-              <button class="btn btn-outline-primary" onclick="changeRole(${s.store_staff_id}, '${s.role}')">
-                <i class="bi bi-person-gear"></i> ${s.role === 'manager' ? '降级' : '升级'}
-              </button>
               ${s.status === 'active' ? `
+                <button class="btn btn-outline-warning" onclick="openTransferModal(${s.user_id}, ${s.store_id}, '${escapeHtml(s.user_nickname || '')}', '${escapeHtml(s.store_name || '')}')">
+                  <i class="bi bi-arrow-left-right"></i> 调店
+                </button>
+                <button class="btn btn-outline-primary" onclick="changeRole(${s.store_staff_id}, '${s.role_in_store}')">
+                  <i class="bi bi-person-gear"></i> ${s.role_in_store === 'manager' ? '降级' : '升级'}
+                </button>
                 <button class="btn btn-outline-danger" onclick="disableStaff(${s.user_id})">
                   <i class="bi bi-person-x"></i> 离职
                 </button>
@@ -351,7 +354,8 @@
     function updateStats(stats) {
       document.getElementById('totalStaff').textContent = stats.total || staffList.length;
       document.getElementById('activeStaff').textContent = stats.active || staffList.filter(s => s.status === 'active').length;
-      document.getElementById('managerCount').textContent = stats.managers || staffList.filter(s => s.role === 'manager').length;
+      // 使用后端字段名 role_in_store
+      document.getElementById('managerCount').textContent = stats.managers || staffList.filter(s => s.role_in_store === 'manager').length;
       document.getElementById('storeCount').textContent = stats.stores || new Set(staffList.map(s => s.store_id)).size;
     }
 
@@ -376,12 +380,13 @@
 
       showLoading();
       try {
+        // 使用后端字段名 role_in_store
         const response = await apiRequest(API_ENDPOINTS.STAFF.CREATE, {
           method: 'POST',
           body: JSON.stringify({
             user_id: parseInt(userId),
             store_id: parseInt(storeId),
-            role: role
+            role_in_store: role
           })
         });
 
@@ -400,8 +405,10 @@
       }
     }
 
-    function openTransferModal(staffId, staffName, currentStore) {
-      document.getElementById('transferStaffId').value = staffId;
+    function openTransferModal(userId, fromStoreId, staffName, currentStore) {
+      // 保存 user_id 和 from_store_id 用于后端 transfer API
+      document.getElementById('transferStaffId').value = userId;
+      document.getElementById('transferStaffId').dataset.fromStoreId = fromStoreId;
       document.getElementById('transferStaffName').value = staffName;
       document.getElementById('transferCurrentStore').value = currentStore;
       document.getElementById('transferTargetStore').value = '';
@@ -409,7 +416,8 @@
     }
 
     async function submitTransfer() {
-      const staffId = document.getElementById('transferStaffId').value;
+      const userId = document.getElementById('transferStaffId').value;
+      const fromStoreId = document.getElementById('transferStaffId').dataset.fromStoreId;
       const targetStoreId = document.getElementById('transferTargetStore').value;
 
       if (!targetStoreId) {
@@ -419,11 +427,13 @@
 
       showLoading();
       try {
+        // 使用后端字段名: user_id, from_store_id, to_store_id
         const response = await apiRequest(API_ENDPOINTS.STAFF.TRANSFER, {
           method: 'POST',
           body: JSON.stringify({
-            store_staff_id: parseInt(staffId),
-            new_store_id: parseInt(targetStoreId)
+            user_id: parseInt(userId),
+            from_store_id: parseInt(fromStoreId),
+            to_store_id: parseInt(targetStoreId)
           })
         });
 
@@ -432,10 +442,13 @@
           alert('✅ 调店成功');
           loadStaff();
         } else {
-          showError('调店失败', response?.message || '操作失败');
+          // 显示后端返回的详细错误信息
+          const errorMsg = response?.message || '操作失败';
+          console.error('▶调店失败:', errorMsg);
+          showError('调店失败', errorMsg);
         }
       } catch (error) {
-        console.error('调店失败:', error);
+        console.error('▶调店失败:', error.message);
         showError('调店失败', error.message);
       } finally {
         hideLoading();
@@ -450,9 +463,10 @@
 
       showLoading();
       try {
+        // 使用后端字段名 role_in_store
         const response = await apiRequest(API.buildURL(API_ENDPOINTS.STAFF.ROLE, { store_staff_id: staffId }), {
           method: 'PUT',
-          body: JSON.stringify({ role: newRole })
+          body: JSON.stringify({ role_in_store: newRole })
         });
 
         if (response && response.success) {
@@ -516,9 +530,24 @@
       }
     }
 
-    function formatDate(dateStr) {
-      if (!dateStr) return '-';
-      return new Date(dateStr).toLocaleDateString('zh-CN');
+    function formatDate(dateValue) {
+      if (!dateValue) return '-';
+      // 后端返回的时间是对象格式: { iso, beijing, timestamp, relative }
+      if (typeof dateValue === 'object') {
+        // 优先使用 beijing 格式（北京时间）
+        if (dateValue.beijing) {
+          return dateValue.beijing.split(' ')[0]; // 只显示日期部分
+        }
+        // 如果有 iso 格式，使用 iso
+        if (dateValue.iso) {
+          return new Date(dateValue.iso).toLocaleDateString('zh-CN');
+        }
+      }
+      // 兼容字符串格式
+      if (typeof dateValue === 'string') {
+        return new Date(dateValue).toLocaleDateString('zh-CN');
+      }
+      return '-';
     }
 
     function escapeHtml(str) {

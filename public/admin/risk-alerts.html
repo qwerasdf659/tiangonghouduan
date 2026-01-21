@@ -103,6 +103,30 @@
       </div>
     </div>
 
+    <!-- ECharts 告警分布图 -->
+    <div class="row g-3 mb-4">
+      <div class="col-md-6">
+        <div class="card">
+          <div class="card-header bg-white">
+            <h6 class="mb-0"><i class="bi bi-pie-chart"></i> 告警级别分布</h6>
+          </div>
+          <div class="card-body">
+            <div id="levelDistChart" style="height: 280px;"></div>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-6">
+        <div class="card">
+          <div class="card-header bg-white">
+            <h6 class="mb-0"><i class="bi bi-bar-chart"></i> 告警类型分布</h6>
+          </div>
+          <div class="card-body">
+            <div id="typeDistChart" style="height: 280px;"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- 筛选栏 -->
     <div class="card mb-4">
       <div class="card-body">
@@ -112,18 +136,19 @@
             <select class="form-select" id="levelFilter">
               <option value="">全部级别</option>
               <option value="critical">🔴 严重</option>
-              <option value="warning">🟡 警告</option>
-              <option value="info">🔵 提示</option>
+              <option value="high">🔴 高危</option>
+              <option value="medium">🟡 中等</option>
+              <option value="low">🔵 低</option>
             </select>
           </div>
           <div class="col-md-2">
             <label class="form-label">告警类型</label>
             <select class="form-select" id="typeFilter">
               <option value="">全部类型</option>
-              <option value="fraud">欺诈检测</option>
-              <option value="abuse">滥用检测</option>
-              <option value="anomaly">异常行为</option>
-              <option value="limit">限额告警</option>
+              <option value="frequency_limit">频次限制</option>
+              <option value="amount_limit">金额告警</option>
+              <option value="duplicate_user">重复用户</option>
+              <option value="suspicious_pattern">可疑模式</option>
             </select>
           </div>
           <div class="col-md-2">
@@ -131,8 +156,7 @@
             <select class="form-select" id="statusFilter">
               <option value="">全部状态</option>
               <option value="pending">待处理</option>
-              <option value="processing">处理中</option>
-              <option value="resolved">已解决</option>
+              <option value="reviewed">已复核</option>
               <option value="ignored">已忽略</option>
             </select>
           </div>
@@ -214,26 +238,15 @@
             <div class="mb-3">
               <label class="form-label">处理状态</label>
               <select class="form-select" id="handleStatus">
-                <option value="processing">处理中</option>
-                <option value="resolved">已解决</option>
-                <option value="ignored">忽略</option>
+                <option value="reviewed">已复核</option>
+                <option value="ignored">已忽略</option>
               </select>
             </div>
             <div class="mb-3">
               <label class="form-label">处理说明</label>
               <textarea class="form-control" id="handleRemark" rows="3" placeholder="请填写处理说明..."></textarea>
             </div>
-            <div class="mb-3">
-              <label class="form-label">关联操作</label>
-              <div class="form-check">
-                <input class="form-check-input" type="checkbox" id="blockUser">
-                <label class="form-check-label" for="blockUser">封禁相关用户</label>
-              </div>
-              <div class="form-check">
-                <input class="form-check-input" type="checkbox" id="cancelPrize">
-                <label class="form-check-label" for="cancelPrize">撤销相关奖品</label>
-              </div>
-            </div>
+            <!-- 关联操作暂未支持，后端API不提供此功能 -->
           </form>
         </div>
         <div class="modal-footer">
@@ -251,11 +264,17 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <!-- ✅ ECharts - 图表库（本地引用，符合规范要求） -->
+  <script src="/admin/js/lib/echarts.min.js"></script>
   <script src="/admin/js/admin-common.js"></script>
   <script src="/admin/js/api-config.js"></script>
   <script>
     let alerts = [];
     let selectedAlert = null;
+    
+    // ECharts 图表实例
+    let levelDistChart = null;
+    let typeDistChart = null;
 
     document.addEventListener('DOMContentLoaded', function() {
       const userInfo = getCurrentUser();
@@ -264,22 +283,133 @@
       }
       document.getElementById('logoutBtn').addEventListener('click', logout);
       
+      // 初始化 ECharts 图表
+      initCharts();
+      
       loadAlerts();
       // 自动刷新
       setInterval(loadAlerts, 60000);
+      
+      // 窗口大小改变时重绘图表
+      window.addEventListener('resize', function() {
+        if (levelDistChart) levelDistChart.resize();
+        if (typeDistChart) typeDistChart.resize();
+      });
     });
+    
+    // 初始化 ECharts 图表
+    function initCharts() {
+      const levelContainer = document.getElementById('levelDistChart');
+      const typeContainer = document.getElementById('typeDistChart');
+      
+      if (levelContainer) {
+        levelDistChart = echarts.init(levelContainer);
+        levelDistChart.setOption(getLevelChartOption([]));
+      }
+      
+      if (typeContainer) {
+        typeDistChart = echarts.init(typeContainer);
+        typeDistChart.setOption(getTypeChartOption([]));
+      }
+    }
+    
+    // 告警级别分布图配置
+    function getLevelChartOption(data) {
+      return {
+        tooltip: { trigger: 'item', formatter: '{a} <br/>{b}: {c} ({d}%)' },
+        legend: { orient: 'vertical', left: 'left', top: 'center' },
+        series: [{
+          name: '告警级别',
+          type: 'pie',
+          radius: ['40%', '70%'],
+          avoidLabelOverlap: false,
+          itemStyle: { borderRadius: 10, borderColor: '#fff', borderWidth: 2 },
+          label: { show: false, position: 'center' },
+          emphasis: { label: { show: true, fontSize: 18, fontWeight: 'bold' } },
+          labelLine: { show: false },
+          data: data
+        }]
+      };
+    }
+    
+    // 告警类型分布图配置
+    function getTypeChartOption(types, counts) {
+      return {
+        tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+        grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },
+        xAxis: { type: 'category', data: types, axisLabel: { interval: 0, rotate: 0 } },
+        yAxis: { type: 'value', name: '告警数' },
+        series: [{
+          name: '告警数量',
+          type: 'bar',
+          data: counts,
+          itemStyle: {
+            color: function(params) {
+              const colors = ['#5470c6', '#91cc75', '#fac858', '#ee6666'];
+              return colors[params.dataIndex % colors.length];
+            },
+            borderRadius: [4, 4, 0, 0]
+          },
+          label: { show: true, position: 'top' }
+        }]
+      };
+    }
+    
+    // 更新图表数据（使用后端字段：severity, alert_type）
+    function updateCharts(alertsList) {
+      // 统计告警严重程度分布（后端使用 severity: critical/high/medium/low）
+      const severityStats = { critical: 0, high: 0, medium: 0, low: 0 };
+      // 统计告警类型分布（后端使用 alert_type: frequency_limit/amount_limit/duplicate_user/suspicious_pattern）
+      const alertTypeStats = { frequency_limit: 0, amount_limit: 0, duplicate_user: 0, suspicious_pattern: 0 };
+      
+      alertsList.forEach(alert => {
+        // 统计严重程度
+        if (severityStats.hasOwnProperty(alert.severity)) {
+          severityStats[alert.severity]++;
+        }
+        // 统计告警类型
+        if (alertTypeStats.hasOwnProperty(alert.alert_type)) {
+          alertTypeStats[alert.alert_type]++;
+        }
+      });
+      
+      // 更新级别分布饼图（合并 critical+high 为严重，medium 为警告，low 为提示）
+      if (levelDistChart) {
+        const levelData = [
+          { value: severityStats.critical + severityStats.high, name: '严重', itemStyle: { color: '#dc3545' } },
+          { value: severityStats.medium, name: '警告', itemStyle: { color: '#ffc107' } },
+          { value: severityStats.low, name: '提示', itemStyle: { color: '#0dcaf0' } }
+        ].filter(item => item.value > 0);
+        
+        levelDistChart.setOption(getLevelChartOption(levelData));
+      }
+      
+      // 更新类型分布柱状图（使用后端实际的 alert_type 值）
+      if (typeDistChart) {
+        const typeLabels = ['频次限制', '金额告警', '重复用户', '可疑模式'];
+        const typeCounts = [
+          alertTypeStats.frequency_limit, 
+          alertTypeStats.amount_limit, 
+          alertTypeStats.duplicate_user, 
+          alertTypeStats.suspicious_pattern
+        ];
+        
+        typeDistChart.setOption(getTypeChartOption(typeLabels, typeCounts));
+      }
+    }
 
     async function loadAlerts() {
       showLoading();
       try {
-        const level = document.getElementById('levelFilter').value;
-        const type = document.getElementById('typeFilter').value;
+        // 使用后端实际字段名：severity 代替 level，alert_type 代替 type
+        const severity = document.getElementById('levelFilter').value;
+        const alert_type = document.getElementById('typeFilter').value;
         const status = document.getElementById('statusFilter').value;
         const time = document.getElementById('timeFilter').value;
 
         const params = new URLSearchParams();
-        if (level) params.append('level', level);
-        if (type) params.append('type', type);
+        if (severity) params.append('severity', severity);
+        if (alert_type) params.append('alert_type', alert_type);
         if (status) params.append('status', status);
         if (time) params.append('time_range', time);
 
@@ -287,9 +417,15 @@
         const response = await apiRequest(url);
 
         if (response && response.success) {
-          alerts = response.data.alerts || response.data || [];
+          // 后端返回 data.items 而不是 data.alerts
+          alerts = response.data.items || response.data.alerts || [];
+          // 确保是数组
+          if (!Array.isArray(alerts)) {
+            alerts = [];
+          }
           renderAlerts(alerts);
-          updateStats(response.data.stats || {});
+          updateStats(response.data.stats || calculateStatsFromAlerts(alerts));
+          updateCharts(alerts);  // 更新 ECharts 图表
         } else {
           showError('加载失败', response?.message || '获取告警列表失败');
         }
@@ -299,6 +435,16 @@
       } finally {
         hideLoading();
       }
+    }
+    
+    // 从告警列表计算统计数据（后端字段：severity）
+    function calculateStatsFromAlerts(alertsList) {
+      return {
+        critical: alertsList.filter(a => a.severity === 'critical' || a.severity === 'high').length,
+        warning: alertsList.filter(a => a.severity === 'warning' || a.severity === 'medium').length,
+        info: alertsList.filter(a => a.severity === 'info' || a.severity === 'low').length,
+        resolved: alertsList.filter(a => a.status === 'reviewed').length
+      };
     }
 
     function renderAlerts(alerts) {
@@ -315,66 +461,95 @@
         return;
       }
 
+      // 使用后端实际字段名：severity, alert_type, alert_message, rule_name
       container.innerHTML = alerts.map(alert => `
-        <div class="alert-card ${alert.level} p-3 border-bottom cursor-pointer" onclick="selectAlert(${alert.alert_id})" style="cursor: pointer;">
+        <div class="alert-card ${mapSeverityToLevel(alert.severity)} p-3 border-bottom cursor-pointer" onclick="selectAlert(${alert.alert_id})" style="cursor: pointer;">
           <div class="d-flex align-items-start">
-            <div class="alert-icon ${alert.level} me-3">
-              <i class="bi bi-${getAlertIcon(alert.type)}"></i>
+            <div class="alert-icon ${mapSeverityToLevel(alert.severity)} me-3">
+              <i class="bi bi-${getAlertIcon(alert.alert_type)}"></i>
             </div>
             <div class="flex-grow-1">
               <div class="d-flex justify-content-between align-items-start mb-1">
-                <h6 class="mb-0">${escapeHtml(alert.title || getAlertTitle(alert.type))}</h6>
+                <h6 class="mb-0">${escapeHtml(alert.rule_name || alert.alert_type_name || getAlertTitle(alert.alert_type))}</h6>
                 <small class="text-muted">${formatTime(alert.created_at)}</small>
               </div>
-              <p class="text-muted mb-2 small">${escapeHtml(truncateText(alert.description || alert.message || '', 80))}</p>
+              <p class="text-muted mb-2 small">${escapeHtml(truncateText(alert.alert_message || '', 80))}</p>
               <div class="d-flex align-items-center">
-                <span class="badge ${getLevelBadgeClass(alert.level)} me-2">${getLevelLabel(alert.level)}</span>
+                <span class="badge ${getSeverityBadgeClass(alert.severity)} me-2">${getSeverityLabel(alert.severity)}</span>
                 <span class="badge ${getStatusBadgeClass(alert.status)}">${getStatusLabel(alert.status)}</span>
-                ${alert.user_id ? `<small class="text-muted ms-2">用户ID: ${alert.user_id}</small>` : ''}
+                ${alert.target_user_id ? `<small class="text-muted ms-2">用户ID: ${alert.target_user_id}</small>` : ''}
+                ${alert.is_blocked ? `<span class="badge bg-danger ms-2">已阻断</span>` : ''}
               </div>
             </div>
           </div>
         </div>
       `).join('');
     }
+    
+    // 将后端 severity 映射为前端 CSS class 使用的 level
+    function mapSeverityToLevel(severity) {
+      const map = { 'critical': 'critical', 'high': 'critical', 'medium': 'warning', 'warning': 'warning', 'low': 'info', 'info': 'info' };
+      return map[severity] || 'info';
+    }
 
     function updateStats(stats) {
-      document.getElementById('criticalCount').textContent = stats.critical || alerts.filter(a => a.level === 'critical').length;
-      document.getElementById('warningCount').textContent = stats.warning || alerts.filter(a => a.level === 'warning').length;
-      document.getElementById('infoCount').textContent = stats.info || alerts.filter(a => a.level === 'info').length;
-      document.getElementById('resolvedCount').textContent = stats.resolved || alerts.filter(a => a.status === 'resolved').length;
+      // 后端使用 severity 字段（critical/high/medium/low），统计分组
+      const criticalCount = stats.critical || stats.high || alerts.filter(a => a.severity === 'critical' || a.severity === 'high').length;
+      const warningCount = stats.warning || stats.medium || alerts.filter(a => a.severity === 'warning' || a.severity === 'medium').length;
+      const infoCount = stats.info || stats.low || alerts.filter(a => a.severity === 'info' || a.severity === 'low').length;
+      // 后端状态是 reviewed 而不是 resolved
+      const resolvedCount = stats.resolved || stats.reviewed || alerts.filter(a => a.status === 'reviewed').length;
+      
+      document.getElementById('criticalCount').textContent = criticalCount;
+      document.getElementById('warningCount').textContent = warningCount;
+      document.getElementById('infoCount').textContent = infoCount;
+      document.getElementById('resolvedCount').textContent = resolvedCount;
     }
 
     async function selectAlert(alertId) {
       selectedAlert = alerts.find(a => a.alert_id === alertId);
       if (!selectedAlert) return;
 
-      // 渲染详情
+      // 渲染详情（使用后端实际字段名）
       document.getElementById('alertDetail').innerHTML = `
         <div class="mb-3">
-          <span class="badge ${getLevelBadgeClass(selectedAlert.level)} mb-2">${getLevelLabel(selectedAlert.level)}</span>
-          <h5>${escapeHtml(selectedAlert.title || getAlertTitle(selectedAlert.type))}</h5>
+          <span class="badge ${getSeverityBadgeClass(selectedAlert.severity)} mb-2">${getSeverityLabel(selectedAlert.severity)}</span>
+          ${selectedAlert.is_blocked ? '<span class="badge bg-danger mb-2 ms-1">已阻断</span>' : ''}
+          <h5>${escapeHtml(selectedAlert.rule_name || selectedAlert.alert_type_name || getAlertTitle(selectedAlert.alert_type))}</h5>
         </div>
         <table class="table table-sm">
-          <tr><th style="width:30%">告警类型</th><td>${getTypeLabel(selectedAlert.type)}</td></tr>
+          <tr><th style="width:30%">告警类型</th><td>${getAlertTypeLabel(selectedAlert.alert_type)}</td></tr>
+          <tr><th>严重程度</th><td>${getSeverityLabel(selectedAlert.severity)}</td></tr>
           <tr><th>状态</th><td><span class="badge ${getStatusBadgeClass(selectedAlert.status)}">${getStatusLabel(selectedAlert.status)}</span></td></tr>
-          <tr><th>关联用户</th><td>${selectedAlert.user_id || '-'}</td></tr>
-          <tr><th>关联活动</th><td>${selectedAlert.campaign_id || '-'}</td></tr>
+          <tr><th>触发阈值</th><td>${selectedAlert.rule_threshold || '-'}</td></tr>
+          <tr><th>实际值</th><td>${selectedAlert.actual_value || '-'}</td></tr>
+          <tr><th>操作员ID</th><td>${selectedAlert.operator_id || '-'}</td></tr>
+          <tr><th>目标用户ID</th><td>${selectedAlert.target_user_id || '-'}</td></tr>
+          <tr><th>门店ID</th><td>${selectedAlert.store_id || '-'}</td></tr>
           <tr><th>触发时间</th><td>${formatDateTime(selectedAlert.created_at)}</td></tr>
+          ${selectedAlert.reviewed_at ? `<tr><th>复核时间</th><td>${formatDateTime(selectedAlert.reviewed_at)}</td></tr>` : ''}
         </table>
         <div class="mb-3">
           <h6>告警描述</h6>
-          <p class="text-muted small">${escapeHtml(selectedAlert.description || selectedAlert.message || '无详细描述')}</p>
+          <p class="text-muted small">${escapeHtml(selectedAlert.alert_message || '无详细描述')}</p>
         </div>
+        ${selectedAlert.review_notes ? `
         <div class="mb-3">
-          <h6>详细数据</h6>
-          <pre class="bg-light p-2 rounded small">${JSON.stringify(selectedAlert.details || {}, null, 2)}</pre>
+          <h6>复核备注</h6>
+          <p class="text-muted small">${escapeHtml(selectedAlert.review_notes)}</p>
         </div>
+        ` : ''}
+        <div class="mb-3">
+          <h6>操作员信息</h6>
+          <pre class="bg-light p-2 rounded small">${JSON.stringify(selectedAlert.operator_info || {}, null, 2)}</pre>
+        </div>
+        ${selectedAlert.status === 'pending' ? `
         <div class="d-grid gap-2">
           <button class="btn btn-primary" onclick="openHandleModal(${selectedAlert.alert_id})">
             <i class="bi bi-gear"></i> 处理告警
           </button>
         </div>
+        ` : ''}
       `;
 
       // 加载处理时间线
@@ -382,14 +557,16 @@
     }
 
     async function loadAlertTimeline(alertId) {
-      try {
-        const response = await apiRequest(API.buildURL(API_ENDPOINTS.RISK_ALERT.HISTORY, { alert_id: alertId }));
-        if (response && response.success) {
-          const history = response.data.history || response.data || [];
-          renderTimeline(history);
-        }
-      } catch (error) {
-        console.error('加载处理记录失败:', error);
+      // 后端暂未实现告警历史API，使用告警详情中的复核信息代替
+      if (selectedAlert && selectedAlert.reviewed_at) {
+        renderTimeline([{
+          created_at: selectedAlert.reviewed_at,
+          status: selectedAlert.status,
+          remark: selectedAlert.review_notes,
+          operator_name: selectedAlert.reviewer_info?.nickname || '管理员'
+        }]);
+      } else {
+        renderTimeline([]);
       }
     }
 
@@ -420,25 +597,22 @@
     async function submitHandle() {
       const alertId = document.getElementById('handleAlertId').value;
       const status = document.getElementById('handleStatus').value;
-      const remark = document.getElementById('handleRemark').value;
-      const blockUser = document.getElementById('blockUser').checked;
-      const cancelPrize = document.getElementById('cancelPrize').checked;
+      const reviewNotes = document.getElementById('handleRemark').value;
 
       showLoading();
       try {
-        const response = await apiRequest(API.buildURL(API_ENDPOINTS.RISK_ALERT.HANDLE, { alert_id: alertId }), {
+        // 使用后端正确的API路径：/api/v4/console/risk-alerts/:alert_id/review
+        const response = await apiRequest(API.buildURL(API_ENDPOINTS.RISK_ALERT.REVIEW, { alert_id: alertId }), {
           method: 'POST',
           body: JSON.stringify({
-            status: status,
-            remark: remark,
-            block_user: blockUser,
-            cancel_prize: cancelPrize
+            status: status,          // 后端期望：reviewed 或 ignored
+            review_notes: reviewNotes // 后端字段名是 review_notes 而不是 remark
           })
         });
 
         if (response && response.success) {
           bootstrap.Modal.getInstance(document.getElementById('handleAlertModal')).hide();
-          alert('✅ 处理成功');
+          alert(`✅ 告警已${status === 'reviewed' ? '复核' : '忽略'}`);
           loadAlerts();
           if (selectedAlert && selectedAlert.alert_id == alertId) {
             loadAlertTimeline(alertId);
@@ -477,61 +651,100 @@
       }
     }
 
-    // 辅助函数
-    function getAlertIcon(type) {
+    // 辅助函数（使用后端实际字段值）
+    
+    // 根据后端 alert_type 获取图标
+    function getAlertIcon(alertType) {
       const icons = {
+        frequency_limit: 'speedometer2',
+        amount_limit: 'cash-stack',
+        duplicate_user: 'people',
+        suspicious_pattern: 'shield-exclamation',
+        // 兼容旧字段
         fraud: 'shield-exclamation',
         abuse: 'person-x',
         anomaly: 'activity',
         limit: 'speedometer2'
       };
-      return icons[type] || 'exclamation-triangle';
+      return icons[alertType] || 'exclamation-triangle';
     }
 
-    function getAlertTitle(type) {
+    // 根据后端 alert_type 获取标题
+    function getAlertTitle(alertType) {
       const titles = {
+        frequency_limit: '频次限制告警',
+        amount_limit: '金额超限告警',
+        duplicate_user: '重复用户告警',
+        suspicious_pattern: '可疑模式告警',
+        // 兼容旧字段
         fraud: '欺诈检测告警',
         abuse: '滥用检测告警',
         anomaly: '异常行为告警',
         limit: '限额超标告警'
       };
-      return titles[type] || '风控告警';
+      return titles[alertType] || '风控告警';
     }
 
-    function getTypeLabel(type) {
+    // 根据后端 alert_type 获取类型标签
+    function getAlertTypeLabel(alertType) {
       const labels = {
+        frequency_limit: '⏱️ 频次限制',
+        amount_limit: '💰 金额告警',
+        duplicate_user: '👥 重复用户',
+        suspicious_pattern: '🔍 可疑模式',
+        // 兼容旧字段
         fraud: '🛡️ 欺诈检测',
         abuse: '👤 滥用检测',
         anomaly: '📊 异常行为',
         limit: '⚡ 限额告警'
       };
-      return labels[type] || type;
+      return labels[alertType] || alertType;
     }
 
-    function getLevelBadgeClass(level) {
+    // 后端 severity 字段的样式类
+    function getSeverityBadgeClass(severity) {
       const classes = {
         critical: 'bg-danger',
+        high: 'bg-danger',
+        medium: 'bg-warning text-dark',
         warning: 'bg-warning text-dark',
+        low: 'bg-info',
         info: 'bg-info'
       };
-      return classes[level] || 'bg-secondary';
+      return classes[severity] || 'bg-secondary';
     }
 
-    function getLevelLabel(level) {
+    // 后端 severity 字段的显示标签
+    function getSeverityLabel(severity) {
       const labels = {
         critical: '🔴 严重',
+        high: '🔴 高危',
+        medium: '🟡 中等',
         warning: '🟡 警告',
+        low: '🔵 低',
         info: '🔵 提示'
       };
-      return labels[level] || level;
+      return labels[severity] || severity;
+    }
+    
+    // 兼容旧的 getLevelBadgeClass 和 getLevelLabel
+    function getLevelBadgeClass(level) {
+      return getSeverityBadgeClass(level);
+    }
+    
+    function getLevelLabel(level) {
+      return getSeverityLabel(level);
     }
 
+    // 后端状态字段：pending/reviewed/ignored
     function getStatusBadgeClass(status) {
       const classes = {
         pending: 'bg-danger',
+        reviewed: 'bg-success',
+        ignored: 'bg-secondary',
+        // 兼容旧字段
         processing: 'bg-warning text-dark',
-        resolved: 'bg-success',
-        ignored: 'bg-secondary'
+        resolved: 'bg-success'
       };
       return classes[status] || 'bg-secondary';
     }
@@ -539,9 +752,11 @@
     function getStatusLabel(status) {
       const labels = {
         pending: '待处理',
+        reviewed: '已复核',
+        ignored: '已忽略',
+        // 兼容旧字段
         processing: '处理中',
-        resolved: '已解决',
-        ignored: '已忽略'
+        resolved: '已解决'
       };
       return labels[status] || status;
     }

@@ -680,7 +680,7 @@ class StaffManagementService {
         {
           model: Store,
           as: 'store',
-          attributes: ['store_id', 'store_name', 'store_code', 'status', 'address']
+          attributes: ['store_id', 'store_name', 'store_code', 'status', 'store_address']
         },
         {
           model: User,
@@ -713,7 +713,7 @@ class StaffManagementService {
         {
           model: Store,
           as: 'store',
-          attributes: ['store_id', 'store_name', 'store_code', 'status', 'address']
+          attributes: ['store_id', 'store_name', 'store_code', 'status', 'store_address']
         }
       ],
       order: [['joined_at', 'ASC']]

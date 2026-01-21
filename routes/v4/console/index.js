@@ -189,24 +189,15 @@ router.get('/', (req, res) => {
       },
       material: {
         description: '材料系统管理（V4.5.0）',
-        endpoints: [
-          '/material/asset-types',
-          '/material/conversion-rules',
-          '/material/users/:user_id/balance',
-          '/material/users/:user_id/adjust',
-          '/material/transactions'
-        ],
-        note: '材料资产类型管理、转换规则管理、用户余额查询/调整、材料流水查询'
+        endpoints: ['/material/asset-types', '/material/conversion-rules'],
+        note: '材料资产类型管理、转换规则管理（用户余额管理已迁移至 asset-adjustment 模块）'
       },
-      diamond: {
-        description: '钻石系统管理（V4.5.0）',
-        endpoints: [
-          '/diamond/users/:user_id/balance',
-          '/diamond/users/:user_id/adjust',
-          '/diamond/transactions'
-        ],
-        note: '用户钻石余额查询/调整、钻石流水查询'
-      },
+      /*
+       * 💡 diamond 模块已合并到 asset-adjustment 统一管理
+       * 钻石/材料余额查询: /asset-adjustment/user/:user_id/balances
+       * 资产调整: /asset-adjustment/adjust
+       * 资产流水: /assets/transactions
+       */
       popup_banners: {
         description: '弹窗Banner管理（2025-12-22）',
         endpoints: [

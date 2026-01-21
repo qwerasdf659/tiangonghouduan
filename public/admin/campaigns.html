@@ -106,9 +106,9 @@
             <label class="form-label">预算模式</label>
             <select class="form-select" id="budgetModeFilter">
               <option value="">全部模式</option>
-              <option value="user_budget">用户预算</option>
-              <option value="pool_budget">奖池预算</option>
-              <option value="hybrid">混合模式</option>
+              <option value="user">用户预算</option>
+              <option value="pool">奖池预算</option>
+              <option value="none">无限制</option>
             </select>
           </div>
           <div class="col-md-4">
@@ -116,7 +116,7 @@
             <input type="text" class="form-control" id="searchInput" placeholder="搜索活动名称...">
           </div>
           <div class="col-md-2 d-flex align-items-end">
-            <button class="btn btn-primary w-100" onclick="loadCampaigns()">
+            <button class="btn btn-primary w-100" id="searchBtn">
               <i class="bi bi-search"></i> 搜索
             </button>
           </div>
@@ -223,6 +223,7 @@
         document.getElementById('welcomeText').textContent = `欢迎，${userInfo.nickname}`;
       }
       document.getElementById('logoutBtn').addEventListener('click', logout);
+      document.getElementById('searchBtn').addEventListener('click', loadCampaigns);
       loadCampaigns();
     });
 
@@ -274,7 +275,7 @@
         <div class="col-md-6 col-lg-4 mb-4">
           <div class="card campaign-card h-100">
             <div class="card-header d-flex justify-content-between align-items-center">
-              <h6 class="mb-0">${escapeHtml(campaign.name || '未命名活动')}</h6>
+              <h6 class="mb-0">${escapeHtml(campaign.campaign_name || '未命名活动')}</h6>
               <span class="badge status-${campaign.status || 'ended'}">${getStatusText(campaign.status)}</span>
             </div>
             <div class="card-body">
@@ -296,17 +297,25 @@
               </div>
               <p class="mb-0">
                 <i class="bi bi-gift text-warning"></i> 
-                奖品数量: <strong>${campaign.prize_count || 0}</strong>
+                奖品数量: <strong>${campaign.prizes ? campaign.prizes.length : 0}</strong>
               </p>
             </div>
             <div class="card-footer bg-white">
-              <button class="btn btn-sm btn-outline-primary" onclick="viewCampaignDetail(${campaign.campaign_id})">
+              <button class="btn btn-sm btn-outline-primary btn-view-detail" data-campaign-id="${campaign.campaign_id}">
                 <i class="bi bi-eye"></i> 查看详情
               </button>
             </div>
           </div>
         </div>
       `).join('');
+
+      // 绑定查看详情按钮事件（避免CSP内联脚本限制）
+      container.querySelectorAll('.btn-view-detail').forEach(btn => {
+        btn.addEventListener('click', function() {
+          const campaignId = this.getAttribute('data-campaign-id');
+          viewCampaignDetail(parseInt(campaignId));
+        });
+      });
     }
 
     function updateStats(campaigns) {
@@ -314,12 +323,15 @@
       document.getElementById('activeCampaigns').textContent = 
         campaigns.filter(c => c.status === 'active').length;
       
-      const totalPrizes = campaigns.reduce((sum, c) => sum + (c.prize_count || 0), 0);
+      // 使用后端字段：通过prizes关联数组计算奖品数量
+      const totalPrizes = campaigns.reduce((sum, c) => sum + (c.prizes ? c.prizes.length : 0), 0);
       document.getElementById('totalPrizes').textContent = totalPrizes;
       
+      // 使用后端字段：pool_budget_total - pool_budget_remaining = 已使用预算
       const budgetUsed = campaigns.reduce((sum, c) => {
-        const used = (c.user_budget_used || 0) + (c.pool_budget_used || 0);
-        return sum + used;
+        const total = Number(c.pool_budget_total) || 0;
+        const remaining = Number(c.pool_budget_remaining) || 0;
+        return sum + (total - remaining);
       }, 0);
       document.getElementById('budgetUsed').textContent = budgetUsed.toLocaleString();
     }
@@ -345,40 +357,48 @@
     }
 
     function renderCampaignDetail(campaign) {
-      // 基本信息
+      // 计算预算使用情况
+      const poolTotal = Number(campaign.pool_budget_total) || 0;
+      const poolRemaining = Number(campaign.pool_budget_remaining) || 0;
+      const poolUsed = poolTotal - poolRemaining;
+
+      // 基本信息 - 使用后端字段campaign_name
       document.getElementById('basicInfo').innerHTML = `
         <table class="table table-sm">
           <tr><th style="width:40%">活动ID</th><td>${campaign.campaign_id}</td></tr>
-          <tr><th>活动名称</th><td>${escapeHtml(campaign.name || '-')}</td></tr>
+          <tr><th>活动名称</th><td>${escapeHtml(campaign.campaign_name || '-')}</td></tr>
+          <tr><th>活动代码</th><td>${escapeHtml(campaign.campaign_code || '-')}</td></tr>
+          <tr><th>活动类型</th><td>${campaign.campaign_type || '-'}</td></tr>
           <tr><th>活动状态</th><td><span class="badge status-${campaign.status}">${getStatusText(campaign.status)}</span></td></tr>
           <tr><th>开始时间</th><td>${formatDateTime(campaign.start_time)}</td></tr>
           <tr><th>结束时间</th><td>${formatDateTime(campaign.end_time)}</td></tr>
-          <tr><th>创建时间</th><td>${formatDateTime(campaign.created_at)}</td></tr>
+          <tr><th>创建时间</th><td>${formatDateTime(campaign.createdAt)}</td></tr>
         </table>
       `;
 
-      // 预算配置
+      // 预算配置 - 使用后端字段pool_budget_total/pool_budget_remaining
       document.getElementById('budgetInfo').innerHTML = `
         <table class="table table-sm">
           <tr><th style="width:40%">预算模式</th><td>${getBudgetModeText(campaign.budget_mode)}</td></tr>
-          <tr><th>预算来源</th><td>${campaign.budget_source || '-'}</td></tr>
-          <tr><th>用户预算</th><td>${(campaign.user_budget || 0).toLocaleString()}</td></tr>
-          <tr><th>用户预算已用</th><td>${(campaign.user_budget_used || 0).toLocaleString()}</td></tr>
-          <tr><th>奖池预算</th><td>${(campaign.pool_budget || 0).toLocaleString()}</td></tr>
-          <tr><th>奖池预算已用</th><td>${(campaign.pool_budget_used || 0).toLocaleString()}</td></tr>
+          <tr><th>奖池总预算</th><td>${poolTotal.toLocaleString()}</td></tr>
+          <tr><th>奖池剩余预算</th><td>${poolRemaining.toLocaleString()}</td></tr>
+          <tr><th>奖池已用预算</th><td>${poolUsed.toLocaleString()}</td></tr>
+          <tr><th>总参与人数</th><td>${(campaign.total_participants || 0).toLocaleString()}</td></tr>
+          <tr><th>总抽奖次数</th><td>${(campaign.total_draws || 0).toLocaleString()}</td></tr>
+          <tr><th>总中奖次数</th><td>${(campaign.total_prizes_awarded || 0).toLocaleString()}</td></tr>
         </table>
       `;
 
-      // 奖品列表
+      // 奖品列表 - 使用后端字段prize_name/win_probability/stock_quantity/total_win_count
       const prizes = campaign.prizes || [];
       document.getElementById('prizeList').innerHTML = prizes.length > 0 
         ? prizes.map(prize => `
             <tr>
-              <td>${escapeHtml(prize.name || '-')}</td>
-              <td><span class="badge bg-secondary">${prize.rarity || '-'}</span></td>
-              <td>${((prize.base_probability || 0) * 100).toFixed(2)}%</td>
-              <td>${prize.stock || 0}</td>
-              <td>${prize.issued || 0}</td>
+              <td>${escapeHtml(prize.prize_name || '-')}</td>
+              <td><span class="badge bg-secondary">${prize.reward_tier || prize.prize_type || '-'}</span></td>
+              <td>${((prize.win_probability || 0) * 100).toFixed(2)}%</td>
+              <td>${prize.stock_quantity || 0}</td>
+              <td>${prize.total_win_count || 0}</td>
             </tr>
           `).join('')
         : '<tr><td colspan="5" class="text-center text-muted">暂无奖品</td></tr>';
@@ -395,17 +415,20 @@
     }
 
     function getBudgetModeText(mode) {
+      // 使用后端数据库字段值：user/pool/none
       const modeMap = {
-        'user_budget': '用户预算',
-        'pool_budget': '奖池预算',
-        'hybrid': '混合模式'
+        'user': '用户预算',
+        'pool': '奖池预算',
+        'none': '无限制'
       };
       return modeMap[mode] || '未知';
     }
 
     function calculateBudgetProgress(campaign) {
-      const totalBudget = (campaign.user_budget || 0) + (campaign.pool_budget || 0);
-      const usedBudget = (campaign.user_budget_used || 0) + (campaign.pool_budget_used || 0);
+      // 使用后端字段：pool_budget_total 和 pool_budget_remaining
+      const totalBudget = Number(campaign.pool_budget_total) || 0;
+      const remainingBudget = Number(campaign.pool_budget_remaining) || 0;
+      const usedBudget = totalBudget - remainingBudget;
       if (totalBudget === 0) return 0;
       return Math.min(100, (usedBudget / totalBudget) * 100);
     }

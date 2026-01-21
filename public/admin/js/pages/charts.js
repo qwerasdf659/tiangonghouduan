@@ -202,7 +202,7 @@ async function loadAllCharts() {
 
   try {
     const days = document.getElementById('periodSelect').value
-    const response = await apiRequest(`/api/v4/system/statistics/charts?days=${days}`)
+    const response = await apiRequest(`${API_ENDPOINTS.SYSTEM.CHARTS}?days=${days}`)
 
     if (response && response.success) {
       const data = response.data

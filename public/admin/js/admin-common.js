@@ -149,8 +149,21 @@ async function apiRequest(url, options = {}) {
     }
   }
 
+  // 处理查询参数
+  let finalUrl = url
+  if (options.queryParams) {
+    const queryString = Object.entries(options.queryParams)
+      .filter(([_, value]) => value !== undefined && value !== '')
+      .map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(value)}`)
+      .join('&')
+    if (queryString) {
+      finalUrl = `${url}?${queryString}`
+    }
+    delete options.queryParams
+  }
+
   try {
-    const response = await fetch(url, { ...defaultOptions, ...options })
+    const response = await fetch(finalUrl, { ...defaultOptions, ...options })
 
     // 处理非JSON响应
     const contentType = response.headers.get('content-type')

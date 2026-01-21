@@ -792,7 +792,8 @@ class StoreService {
    * @returns {Promise<Object>} 统计结果
    */
   static async getStoreStats() {
-    const stats = await Store.findAll({
+    // 1. 门店状态统计
+    const storeStats = await Store.findAll({
       attributes: ['status', [sequelize.fn('COUNT', sequelize.col('store_id')), 'count']],
       group: ['status']
     })
@@ -801,14 +802,43 @@ class StoreService {
       total: 0,
       active: 0,
       inactive: 0,
-      pending: 0
+      pending: 0,
+      total_staff: 0,
+      cities: 0
     }
 
-    stats.forEach(stat => {
+    storeStats.forEach(stat => {
       const count = parseInt(stat.get('count'), 10)
       result[stat.status] = count
       result.total += count
     })
+
+    // 2. 员工总数统计（在职员工）
+    try {
+      const staffCount = await StoreStaff.count({
+        where: { status: 'active' }
+      })
+      result.total_staff = staffCount
+    } catch (error) {
+      logger.warn('获取员工统计失败', { error: error.message })
+      result.total_staff = 0
+    }
+
+    // 3. 覆盖城市数量统计（去重）
+    try {
+      const cityStats = await Store.findAll({
+        attributes: [[sequelize.fn('DISTINCT', sequelize.col('city_code')), 'city_code']],
+        where: {
+          city_code: { [Op.ne]: null },
+          status: 'active'
+        },
+        raw: true
+      })
+      result.cities = cityStats.length
+    } catch (error) {
+      logger.warn('获取城市统计失败', { error: error.message })
+      result.cities = 0
+    }
 
     return result
   }

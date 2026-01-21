@@ -76,7 +76,7 @@ function handleTableButtonClick(e) {
 async function loadPrizes() {
   try {
     // ✅ 对齐后端API：/api/v4/console/prize-pool/list 返回 { data: { prizes: [...], statistics: {...} } }
-    const response = await apiRequest('/api/v4/console/prize-pool/list')
+    const response = await apiRequest(API_ENDPOINTS.PRIZE.LIST)
 
     if (response && response.success) {
       // 正确提取奖品数组：response.data.prizes（后端返回的是对象，不是数组）
@@ -169,7 +169,7 @@ async function searchUser() {
   try {
     // ✅ 使用user-management端点搜索用户
     const response = await apiRequest(
-      `/api/v4/console/user-management/users?search=${encodeURIComponent(keyword)}&page_size=10`
+      `${API_ENDPOINTS.USER.LIST}?search=${encodeURIComponent(keyword)}&page_size=10`
     )
 
     if (response && response.success) {
@@ -255,7 +255,7 @@ async function loadInterventions() {
     if (prizeType) params.append('prize_type', prizeType)
 
     // ✅ 使用console管理端点 - 后端返回格式: { data: { interventions: [...], pagination: {...} } }
-    const response = await apiRequest(`/api/v4/console/lottery-management/interventions?${params}`)
+    const response = await apiRequest(`${API_ENDPOINTS.LOTTERY_INTERVENTION.LIST}?${params}`)
 
     if (response && response.success) {
       // 正确提取数据：后端返回 interventions 数组和 pagination 对象
@@ -440,7 +440,7 @@ async function createIntervention() {
       }
     }
 
-    const response = await apiRequest('/api/v4/console/lottery-management/force-win', {
+    const response = await apiRequest(API_ENDPOINTS.LOTTERY_INTERVENTION.FORCE_WIN, {
       method: 'POST',
       body: JSON.stringify({
         user_id: parseInt(targetUserId),
@@ -485,7 +485,7 @@ function resetForm() {
  */
 async function viewIntervention(id) {
   try {
-    const response = await apiRequest(`/api/v4/console/lottery-management/interventions/${id}`)
+    const response = await apiRequest(API.buildURL(API_ENDPOINTS.LOTTERY_INTERVENTION.DETAIL, { id }))
 
     if (response && response.success) {
       const item = response.data
@@ -609,7 +609,7 @@ async function cancelIntervention(id) {
 
   try {
     const response = await apiRequest(
-      `/api/v4/console/lottery-management/interventions/${id}/cancel`,
+      API.buildURL(API_ENDPOINTS.LOTTERY_INTERVENTION.CANCEL, { id: id }),
       {
         method: 'POST'
       }

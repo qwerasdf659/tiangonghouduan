@@ -82,7 +82,7 @@ async function loadFeedbacks() {
     if (category) params.append('category', category) // 后端使用category字段
     if (userId) params.append('user_id', userId)
 
-    const response = await apiRequest(`/api/v4/console/system/feedbacks?${params}`)
+    const response = await apiRequest(`${API_ENDPOINTS.FEEDBACK.LIST}?${params}`)
 
     if (response && response.success) {
       const feedbacks = response.data.feedbacks || response.data.list || []
@@ -159,7 +159,7 @@ function renderFeedbacks(feedbacks) {
 async function loadStats() {
   try {
     // 获取全部反馈数据（不分页）来统计
-    const response = await apiRequest('/api/v4/console/system/feedbacks?limit=1000&offset=0')
+    const response = await apiRequest(`${API_ENDPOINTS.FEEDBACK.LIST}?limit=1000&offset=0`)
     if (response && response.success) {
       const feedbacks = response.data.feedbacks || []
       const stats = {
@@ -188,7 +188,7 @@ function updateStats(data) {
 async function viewFeedback(id) {
   try {
     showLoading(true)
-    const response = await apiRequest(`/api/v4/console/system/feedbacks/${id}`)
+    const response = await apiRequest(API.buildURL(API_ENDPOINTS.FEEDBACK.DETAIL, { id }))
 
     if (response && response.success) {
       const item = response.data.feedback || response.data
@@ -261,7 +261,7 @@ async function handleReply() {
   try {
     showLoading(true)
     // 后端使用reply_content参数（技术修正）
-    const response = await apiRequest(`/api/v4/console/system/feedbacks/${id}/reply`, {
+    const response = await apiRequest(API.buildURL(API_ENDPOINTS.FEEDBACK.REPLY, { id }), {
       method: 'POST',
       body: JSON.stringify({ reply_content: content })
     })
@@ -298,7 +298,7 @@ async function handleUpdateStatus() {
 
   try {
     showLoading(true)
-    const response = await apiRequest(`/api/v4/console/system/feedbacks/${id}/status`, {
+    const response = await apiRequest(API.buildURL(API_ENDPOINTS.FEEDBACK.STATUS, { id }), {
       method: 'PUT',
       body: JSON.stringify({ status })
     })

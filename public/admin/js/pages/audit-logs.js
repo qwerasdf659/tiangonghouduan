@@ -67,7 +67,7 @@ async function loadAuditLogs() {
     if (startDate) params.append('start_date', startDate)
     if (endDate) params.append('end_date', endDate)
 
-    const response = await apiRequest(`/api/v4/console/system/audit-logs?${params}`)
+    const response = await apiRequest(`${API_ENDPOINTS.AUDIT_LOGS.LIST}?${params}`)
 
     if (response && response.success) {
       renderLogs(response.data.logs || response.data.list || [])
@@ -85,7 +85,7 @@ async function loadAuditLogs() {
 
 async function loadStatistics() {
   try {
-    const response = await apiRequest('/api/v4/console/system/audit-logs/statistics')
+    const response = await apiRequest(API_ENDPOINTS.AUDIT_LOGS.STATISTICS)
 
     if (response && response.success) {
       // 后端直接返回统计数据在 response.data 中
@@ -151,7 +151,7 @@ function renderLogs(logs) {
 async function viewLogDetail(id) {
   try {
     showLoading(true)
-    const response = await apiRequest(`/api/v4/console/system/audit-logs/${id}`)
+    const response = await apiRequest(API.buildURL(API_ENDPOINTS.AUDIT_LOGS.DETAIL, { id }))
 
     if (response && response.success) {
       const log = response.data.log || response.data

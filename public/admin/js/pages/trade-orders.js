@@ -84,7 +84,7 @@ async function loadTradeOrders() {
     if (sellerId) params.append('seller_user_id', sellerId)
     if (listingId) params.append('listing_id', listingId)
 
-    const response = await apiRequest(`/api/v4/console/marketplace/trade_orders?${params}`)
+    const response = await apiRequest(`${API_ENDPOINTS.TRADE_ORDERS.LIST}?${params}`)
 
     if (response && response.success) {
       // 后端返回格式: { success, data: { orders, pagination, filters } }
@@ -260,7 +260,7 @@ async function viewOrderDetail(orderId) {
   try {
     showLoading(true)
 
-    const response = await apiRequest(`/api/v4/console/marketplace/trade_orders/${orderId}`)
+    const response = await apiRequest(API.buildURL(API_ENDPOINTS.TRADE_ORDERS.DETAIL, { order_id: orderId }))
 
     if (response && response.success) {
       // 后端返回格式: { success, data: { success, order } }

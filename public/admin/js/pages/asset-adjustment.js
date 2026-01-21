@@ -54,7 +54,7 @@ document.addEventListener('DOMContentLoaded', function () {
  */
 async function loadAssetTypes() {
   try {
-    const response = await apiRequest('/api/v4/console/asset-adjustment/asset-types')
+    const response = await apiRequest(API_ENDPOINTS.ASSET_ADJUSTMENT.ASSET_TYPES)
     if (response && response.success) {
       assetTypes = response.data.asset_types || response.data || []
 
@@ -86,7 +86,7 @@ async function loadAssetTypes() {
 async function loadCampaigns() {
   try {
     // 使用活动预算批量状态接口获取活动列表
-    const response = await apiRequest('/api/v4/console/campaign-budget/batch-status?limit=50')
+    const response = await apiRequest(`${API_ENDPOINTS.CAMPAIGN_BUDGET.BATCH_STATUS}?limit=50`)
     if (response && response.success) {
       campaigns = response.data.campaigns || []
 
@@ -150,7 +150,7 @@ async function handleSearch(e) {
   if (mobile && !userId) {
     try {
       const userResponse = await apiRequest(
-        `/api/v4/console/user-management/users?search=${mobile}`
+        `${API_ENDPOINTS.USER.LIST}?search=${mobile}`
       )
       if (userResponse && userResponse.success && userResponse.data) {
         const users = userResponse.data.users || userResponse.data
@@ -185,7 +185,7 @@ async function loadUserAssets(userId) {
   showLoading(true)
 
   try {
-    const response = await apiRequest(`/api/v4/console/asset-adjustment/user/${userId}/balances`)
+    const response = await apiRequest(API.buildURL(API_ENDPOINTS.ASSET_ADJUSTMENT.USER_BALANCES, { user_id: userId }))
 
     if (response && response.success) {
       const { user, balances } = response.data
@@ -304,7 +304,7 @@ async function loadAdjustmentRecords() {
       params.append('asset_code', assetType)
     }
 
-    const response = await apiRequest(`/api/v4/console/assets/transactions?${params.toString()}`)
+    const response = await apiRequest(`${API_ENDPOINTS.ASSETS.TRANSACTIONS}?${params.toString()}`)
 
     if (response && response.success) {
       const { transactions, pagination } = response.data
@@ -472,7 +472,7 @@ async function submitAdjustAsset() {
     submitBtn.disabled = true
     submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>提交中...'
 
-    const response = await apiRequest('/api/v4/console/asset-adjustment/adjust', {
+    const response = await apiRequest(API_ENDPOINTS.ASSET_ADJUSTMENT.ADJUST, {
       method: 'POST',
       body: JSON.stringify(data)
     })

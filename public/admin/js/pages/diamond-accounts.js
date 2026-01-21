@@ -84,7 +84,7 @@ async function handleSearch(e) {
     try {
       // ✅ 对齐后端：user-management返回用户列表，取第一个匹配用户
       const userResponse = await apiRequest(
-        `/api/v4/console/user-management/users?search=${mobile}`
+        `${API_ENDPOINTS.USER.LIST}?search=${mobile}`
       )
       if (userResponse && userResponse.success && userResponse.data) {
         const users = userResponse.data.users || userResponse.data
@@ -123,7 +123,7 @@ async function loadUserDiamondAccount(userId) {
 
   try {
     // ✅ 改用统一资产调整端点查询用户资产余额（文档决策：钻石统一到资产中心）
-    const response = await apiRequest(`/api/v4/console/asset-adjustment/user/${userId}/balances`)
+    const response = await apiRequest(API.buildURL(API_ENDPOINTS.ASSET_ADJUSTMENT.USER_BALANCES, { user_id: userId }))
 
     if (response && response.success) {
       const { user, balances } = response.data
@@ -186,7 +186,7 @@ async function loadTransactions(userId) {
   try {
     // ✅ 钻石流水查询（使用统一资产流水端点，过滤asset_code=DIAMOND）
     params.append('asset_code', 'DIAMOND')
-    const response = await apiRequest(`/api/v4/console/assets/transactions?${params.toString()}`)
+    const response = await apiRequest(`${API_ENDPOINTS.ASSETS.TRANSACTIONS}?${params.toString()}`)
 
     if (response && response.success) {
       const { transactions, pagination } = response.data
@@ -391,7 +391,7 @@ async function submitAdjustBalance() {
       reason: data.reason,
       idempotency_key: `diamond_adjust_${currentUserId}_${Date.now()}` // 幂等键
     }
-    const response = await apiRequest('/api/v4/console/asset-adjustment/adjust', {
+    const response = await apiRequest(API_ENDPOINTS.ASSET_ADJUSTMENT.ADJUST, {
       method: 'POST',
       body: JSON.stringify(adjustData)
     })

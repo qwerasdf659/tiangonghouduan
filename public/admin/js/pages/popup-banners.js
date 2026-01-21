@@ -231,7 +231,7 @@ function handleLinkTypeChange() {
  */
 async function loadStatistics() {
   try {
-    const response = await apiRequest('/api/v4/console/popup-banners/statistics')
+    const response = await apiRequest(API_ENDPOINTS.POPUP_BANNER.STATS)
 
     if (response && response.success) {
       // 后端返回 { statistics: {...} }，适配后端数据结构
@@ -265,7 +265,7 @@ async function loadBanners() {
     if (status) params.append('is_active', status)
     if (keyword) params.append('keyword', keyword)
 
-    const response = await apiRequest(`/api/v4/console/popup-banners?${params.toString()}`)
+    const response = await apiRequest(`${API_ENDPOINTS.POPUP_BANNER.LIST}?${params.toString()}`)
 
     if (response && response.success) {
       const data = response.data
@@ -455,7 +455,7 @@ async function viewBanner(id) {
   showLoading()
 
   try {
-    const response = await apiRequest(`/api/v4/console/popup-banners/${id}`)
+    const response = await apiRequest(API.buildURL(API_ENDPOINTS.POPUP_BANNER.DETAIL, { id }))
 
     if (response && response.success) {
       currentBannerId = id
@@ -552,7 +552,7 @@ async function editBanner(id) {
   showLoading()
 
   try {
-    const response = await apiRequest(`/api/v4/console/popup-banners/${id}`)
+    const response = await apiRequest(API.buildURL(API_ENDPOINTS.POPUP_BANNER.DETAIL, { id }))
 
     if (response && response.success) {
       const banner = response.data
@@ -617,7 +617,7 @@ async function toggleBanner(id) {
   showLoading()
 
   try {
-    const response = await apiRequest(`/api/v4/console/popup-banners/${id}/toggle`, {
+    const response = await apiRequest(API.buildURL(API_ENDPOINTS.POPUP_BANNER.TOGGLE, { id }), {
       method: 'PATCH'
     })
 
@@ -654,7 +654,7 @@ async function confirmDelete() {
   showLoading()
 
   try {
-    const response = await apiRequest(`/api/v4/console/popup-banners/${currentBannerId}`, {
+    const response = await apiRequest(API.buildURL(API_ENDPOINTS.POPUP_BANNER.UPDATE, { id: currentBannerId }), {
       method: 'DELETE'
     })
 
@@ -725,8 +725,8 @@ async function saveBanner() {
     }
 
     const url = isEdit
-      ? `/api/v4/console/popup-banners/${bannerId}`
-      : '/api/v4/console/popup-banners'
+      ? API.buildURL(API_ENDPOINTS.POPUP_BANNER.UPDATE, { id: bannerId })
+      : API_ENDPOINTS.POPUP_BANNER.CREATE
     const method = isEdit ? 'PUT' : 'POST'
 
     const response = await fetch(url, {

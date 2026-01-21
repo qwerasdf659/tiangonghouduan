@@ -89,7 +89,7 @@ async function loadNotifications(silent = false) {
     if (type !== 'all') params.append('type', type)
     if (status !== 'all') params.append('status', status)
 
-    const response = await apiRequest(`/api/v4/system/notifications?${params.toString()}`)
+    const response = await apiRequest(`${API_ENDPOINTS.NOTIFICATION.LIST}?${params.toString()}`)
 
     if (response && response.success) {
       allNotifications = response.data.notifications || []
@@ -192,7 +192,7 @@ async function viewNotification(notificationId) {
   showLoading()
 
   try {
-    const response = await apiRequest(`/api/v4/system/notifications/${notificationId}`)
+    const response = await apiRequest(API.buildURL(API_ENDPOINTS.NOTIFICATION.READ, { id: notificationId }))
 
     if (response && response.success) {
       const notif = response.data.notification || response.data
@@ -241,7 +241,7 @@ function renderNotificationDetail(notif) {
 
 async function markAsRead(notificationId) {
   try {
-    await apiRequest(`/api/v4/system/notifications/${notificationId}/read`, { method: 'POST' })
+    await apiRequest(API.buildURL(API_ENDPOINTS.NOTIFICATION.READ, { id: notificationId }), { method: 'POST' })
   } catch (error) {
     console.error('标记已读失败:', error)
   }
@@ -253,7 +253,7 @@ async function markAllAsRead() {
   showLoading()
 
   try {
-    const response = await apiRequest('/api/v4/system/notifications/read-all', { method: 'POST' })
+    const response = await apiRequest(API_ENDPOINTS.NOTIFICATION.READ_ALL, { method: 'POST' })
 
     if (response && response.success) {
       showSuccess('操作成功', '所有通知已标记为已读')
@@ -275,7 +275,7 @@ async function clearAll() {
   showLoading()
 
   try {
-    const response = await apiRequest('/api/v4/system/notifications/clear', { method: 'POST' })
+    const response = await apiRequest(API_ENDPOINTS.NOTIFICATION.CLEAR, { method: 'POST' })
 
     if (response && response.success) {
       showSuccess('操作成功', '所有通知已清空')
@@ -306,7 +306,7 @@ async function sendNotification() {
   showLoading()
 
   try {
-    const response = await apiRequest('/api/v4/system/notifications/send', {
+    const response = await apiRequest(API_ENDPOINTS.NOTIFICATION.SEND, {
       method: 'POST',
       body: JSON.stringify({ type, title, content, target })
     })

@@ -367,8 +367,25 @@ class UnifiedPageLoader {
     `
 
     try {
-      const queryString = new URLSearchParams(params).toString()
-      const url = `${pageConfig.apiEndpoint}/${params.user_id || params.mobile}/balance?${queryString}`
+      // 如果只有手机号，需要先查询用户ID
+      let targetUserId = params.user_id
+      if (!targetUserId && params.mobile) {
+        const userResponse = await apiRequest(`${API_ENDPOINTS.USER.LIST}?search=${params.mobile}`)
+        if (userResponse?.success && userResponse.data?.users?.length > 0) {
+          targetUserId = userResponse.data.users[0].user_id
+        } else {
+          throw new Error('未找到该手机号对应的用户')
+        }
+      }
+
+      if (!targetUserId) {
+        throw new Error('请输入用户ID或手机号')
+      }
+
+      // 使用 API.buildURL 正确构造带路径参数的URL
+      const url = pageConfig.apiPathParams
+        ? API.buildURL(pageConfig.apiEndpoint, { user_id: targetUserId })
+        : `${pageConfig.apiEndpoint}?user_id=${targetUserId}`
       const response = await apiRequest(url)
 
       if (response && response.success) {
@@ -859,9 +876,9 @@ class UnifiedPageLoader {
     // 并行加载用户相关数据
     try {
       const [rolesRes, premiumRes, riskRes] = await Promise.allSettled([
-        apiRequest(`/api/v4/console/system-data/user-roles?user_id=${userId}`),
-        apiRequest(`/api/v4/console/user-premium/${userId}`),
-        apiRequest(`/api/v4/console/risk-profiles/user/${userId}`)
+        apiRequest(`${API_ENDPOINTS.SYSTEM_DATA.USER_ROLES}?user_id=${userId}`),
+        apiRequest(API.buildURL(API_ENDPOINTS.USER_PREMIUM.DETAIL, { user_id: userId })),
+        apiRequest(API.buildURL(API_ENDPOINTS.RISK_PROFILES.USER, { user_id: userId }))
       ])
 
       if (rolesRes.status === 'fulfilled' && rolesRes.value?.success) {

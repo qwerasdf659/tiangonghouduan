@@ -93,7 +93,8 @@ app.use(
         formAction: ["'self'"],
         frameAncestors: ["'self'"],
         objectSrc: ["'none'"],
-        scriptSrcAttr: ["'none'"],
+        // 允许内联事件处理器（onclick等），管理后台页面需要
+        scriptSrcAttr: ["'unsafe-inline'"],
         upgradeInsecureRequests: []
       }
     }

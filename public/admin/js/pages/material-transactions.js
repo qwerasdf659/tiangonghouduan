@@ -56,7 +56,7 @@ document.addEventListener('DOMContentLoaded', function () {
  */
 async function loadAssetTypes() {
   try {
-    const response = await apiRequest('/api/v4/console/asset-adjustment/asset-types')
+    const response = await apiRequest(API_ENDPOINTS.ASSET_ADJUSTMENT.ASSET_TYPES)
     if (response && response.success) {
       // 后端返回格式: { asset_types: [...], total: n }
       assetTypes = response.data.asset_types || response.data || []
@@ -168,7 +168,7 @@ async function loadTransactions() {
   params.append('page_size', pageSize)
 
   try {
-    const response = await apiRequest(`/api/v4/console/assets/transactions?${params.toString()}`)
+    const response = await apiRequest(`${API_ENDPOINTS.ASSETS.TRANSACTIONS}?${params.toString()}`)
 
     if (response && response.success) {
       const { transactions, pagination } = response.data

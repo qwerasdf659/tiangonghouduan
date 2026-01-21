@@ -56,7 +56,7 @@ async function loadOrders() {
 
     if (currentFilters.status) params.append('status', currentFilters.status)
 
-    const response = await fetch(`/api/v4/console/marketplace/exchange_market/orders?${params}`, {
+    const response = await fetch(`${API_ENDPOINTS.MARKETPLACE.EXCHANGE_ORDERS}?${params}`, {
       headers: { Authorization: `Bearer ${token}` }
     })
 
@@ -156,7 +156,7 @@ async function viewOrderDetail(orderNo) {
     showLoading(true)
     const token = getToken()
 
-    const response = await fetch(`/api/v4/console/marketplace/exchange_market/orders/${orderNo}`, {
+    const response = await fetch(API.buildURL(API_ENDPOINTS.MARKETPLACE.EXCHANGE_ORDER_DETAIL, { order_no: orderNo }), {
       headers: { Authorization: `Bearer ${token}` }
     })
 
@@ -230,7 +230,7 @@ async function handleUpdateStatus() {
     showLoading(true)
     const token = getToken()
 
-    const response = await fetch(`/api/v4/shop/exchange/orders/${orderNo}/status`, {
+    const response = await fetch(API.buildURL(API_ENDPOINTS.MARKETPLACE.EXCHANGE_ORDER_STATUS, { order_no: orderNo }), {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${token}`,

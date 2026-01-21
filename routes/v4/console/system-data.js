@@ -435,7 +435,7 @@ router.get(
       const { status, budget_mode, start_date, end_date } = req.query
       const pagination = buildPaginationOptions(req.query)
 
-      const { LotteryCampaign } = require('../../../models')
+      const { LotteryCampaign, LotteryPrize } = require('../../../models')
 
       // 构建查询条件
       const where = {}
@@ -449,6 +449,23 @@ router.get(
 
       const { count, rows } = await LotteryCampaign.findAndCountAll({
         where,
+        include: [
+          {
+            model: LotteryPrize,
+            as: 'prizes',
+            required: false,
+            attributes: [
+              'prize_id',
+              'prize_name',
+              'prize_type',
+              'reward_tier',
+              'win_probability',
+              'stock_quantity',
+              'total_win_count'
+            ]
+          }
+        ],
+        distinct: true, // 避免LEFT JOIN导致的count重复计算
         ...pagination
       })
 

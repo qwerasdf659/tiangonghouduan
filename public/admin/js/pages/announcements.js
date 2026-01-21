@@ -73,7 +73,7 @@ async function loadAnnouncements() {
     if (type) params.append('type', type)
     if (keyword) params.append('keyword', keyword)
 
-    const response = await apiRequest(`/api/v4/console/system/announcements?${params}`)
+    const response = await apiRequest(`${API_ENDPOINTS.ANNOUNCEMENT.LIST}?${params}`)
 
     if (response && response.success) {
       renderAnnouncements(response.data.announcements || response.data.list || [])
@@ -160,7 +160,7 @@ function openAddModal() {
 async function editAnnouncement(id) {
   try {
     showLoading(true)
-    const response = await apiRequest(`/api/v4/console/system/announcements/${id}`)
+    const response = await apiRequest(API.buildURL(API_ENDPOINTS.ANNOUNCEMENT.DETAIL, { id }))
 
     if (response && response.success) {
       const item = response.data.announcement || response.data
@@ -227,12 +227,12 @@ async function handleSubmit() {
 
     let response
     if (editingId) {
-      response = await apiRequest(`/api/v4/console/system/announcements/${editingId}`, {
+      response = await apiRequest(API.buildURL(API_ENDPOINTS.ANNOUNCEMENT.UPDATE, { id: editingId }), {
         method: 'PUT',
         body: JSON.stringify(payload)
       })
     } else {
-      response = await apiRequest('/api/v4/console/system/announcements', {
+      response = await apiRequest(API_ENDPOINTS.ANNOUNCEMENT.CREATE, {
         method: 'POST',
         body: JSON.stringify(payload)
       })
@@ -263,7 +263,7 @@ async function deleteAnnouncement(id) {
 
   try {
     showLoading(true)
-    const response = await apiRequest(`/api/v4/console/system/announcements/${id}`, {
+    const response = await apiRequest(API.buildURL(API_ENDPOINTS.ANNOUNCEMENT.DELETE, { id }), {
       method: 'DELETE'
     })
 

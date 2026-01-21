@@ -458,7 +458,7 @@ const notificationsModule = {
   async markAllAsRead() {
     showLoading(true)
     try {
-      const response = await apiRequest('/api/v4/system/notifications/read-all', { method: 'PUT' })
+      const response = await apiRequest(API_ENDPOINTS.NOTIFICATION.READ_ALL, { method: 'PUT' })
       if (response && response.success) {
         showSuccessToast('已全部标记为已读')
         this.loadData()
@@ -477,7 +477,7 @@ const notificationsModule = {
 
     showLoading(true)
     try {
-      const response = await apiRequest('/api/v4/system/notifications/clear', { method: 'DELETE' })
+      const response = await apiRequest(API_ENDPOINTS.NOTIFICATION.CLEAR, { method: 'DELETE' })
       if (response && response.success) {
         showSuccessToast('已清空所有通知')
         this.loadData()
@@ -509,8 +509,8 @@ const notificationsModule = {
 
     showLoading(true)
     try {
-      // 正确的后端API路径
-      const response = await apiRequest('/api/v4/system/notifications/send', {
+      // 使用API_ENDPOINTS集中管理
+      const response = await apiRequest(API_ENDPOINTS.NOTIFICATION.SEND, {
         method: 'POST',
         body: JSON.stringify({ type, title, content, target })
       })
@@ -603,8 +603,8 @@ const bannersModule = {
       if (status) params.append('is_active', status)
       if (keyword) params.append('keyword', keyword)
 
-      // 正确的后端API路径
-      const response = await apiRequest(`/api/v4/console/popup-banners?${params.toString()}`)
+      // 使用API_ENDPOINTS集中管理
+      const response = await apiRequest(API_ENDPOINTS.POPUP_BANNER.LIST + '?' + params.toString())
 
       if (response && response.success) {
         // 后端返回字段：banners, pagination
@@ -628,7 +628,7 @@ const bannersModule = {
 
   async loadStats() {
     try {
-      const response = await apiRequest('/api/v4/console/popup-banners/statistics')
+      const response = await apiRequest(API_ENDPOINTS.POPUP_BANNER.STATS)
       if (response && response.success && response.data) {
         this.renderStats(response.data)
       }
@@ -813,7 +813,7 @@ const bannersModule = {
         formData.append('image', this.selectedImage)
         formData.append('business_type', 'banner')
 
-        const uploadResponse = await fetch('/api/v4/console/images/upload', {
+        const uploadResponse = await fetch(API_ENDPOINTS.IMAGE.UPLOAD, {
           method: 'POST',
           headers: { Authorization: `Bearer ${getToken()}` },
           body: formData
@@ -827,7 +827,7 @@ const bannersModule = {
         imageUrl = uploadResult.data.public_url
       }
 
-      const url = id ? `/api/v4/console/popup-banners/${id}` : '/api/v4/console/popup-banners'
+      const url = id ? API.buildURL(API_ENDPOINTS.POPUP_BANNER.UPDATE, { id }) : API_ENDPOINTS.POPUP_BANNER.CREATE
       const method = id ? 'PUT' : 'POST'
 
       // 后端字段：display_order (不是 sort_order)
@@ -864,8 +864,8 @@ const bannersModule = {
   async toggleActive(id, isActive) {
     showLoading(true)
     try {
-      // 后端使用 PATCH /popup-banners/:id/toggle
-      const response = await apiRequest(`/api/v4/console/popup-banners/${id}/toggle`, {
+      // 使用API_ENDPOINTS集中管理
+      const response = await apiRequest(API.buildURL(API_ENDPOINTS.POPUP_BANNER.TOGGLE, { id }), {
         method: 'PATCH'
       })
 
@@ -887,7 +887,7 @@ const bannersModule = {
 
     showLoading(true)
     try {
-      const response = await apiRequest(`/api/v4/console/popup-banners/${id}`, { method: 'DELETE' })
+      const response = await apiRequest(API.buildURL(API_ENDPOINTS.POPUP_BANNER.DELETE, { id }), { method: 'DELETE' })
 
       if (response && response.success) {
         showSuccessToast('删除成功')
@@ -957,7 +957,7 @@ const imagesModule = {
       if (type) params.append('business_type', type)
       if (status) params.append('status', status)
 
-      const response = await apiRequest(`/api/v4/console/images?${params.toString()}`)
+      const response = await apiRequest(API_ENDPOINTS.IMAGE.LIST + '?' + params.toString())
 
       if (response && response.success) {
         // 后端返回字段：images (不是 items), statistics (不是 stats)
@@ -1119,7 +1119,7 @@ const imagesModule = {
         formData.append('image', file)
         formData.append('business_type', businessType)
 
-        const response = await fetch('/api/v4/console/images/upload', {
+        const response = await fetch(API_ENDPOINTS.IMAGE.UPLOAD, {
           method: 'POST',
           headers: { Authorization: `Bearer ${getToken()}` },
           body: formData

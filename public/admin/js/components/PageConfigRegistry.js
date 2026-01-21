@@ -78,7 +78,7 @@ const PageConfigRegistry = {
     subtitle: '配置系统中的材料类型（碎片/水晶）',
     icon: 'bi-gem',
     emoji: '💎',
-    apiEndpoint: '/api/v4/console/material/asset-types',
+    apiEndpoint: API_ENDPOINTS.MATERIAL.ASSET_TYPES,
     primaryKey: 'asset_code',
 
     stats: [
@@ -283,7 +283,7 @@ const PageConfigRegistry = {
         formId: 'editForm',
         submitBtn: 'submitEditBtn',
         method: 'PUT',
-        url: data => `/api/v4/console/material/asset-types/${data.asset_code}`,
+        url: data => API.buildURL(API_ENDPOINTS.MATERIAL.ASSET_TYPE_DETAIL, { asset_code: data.asset_code }),
         successMessage: '资产类型更新成功',
         fields: [
           {
@@ -352,7 +352,7 @@ const PageConfigRegistry = {
     subtitle: '查询和调整用户的材料资产余额',
     icon: 'bi-wallet2',
     emoji: '💰',
-    apiEndpoint: '/api/v4/console/material/users',
+    apiEndpoint: API_ENDPOINTS.MATERIAL.USERS,
     primaryKey: 'user_id',
     customLayout: 'user-search-first', // 特殊布局：先搜索用户
 
@@ -398,7 +398,7 @@ const PageConfigRegistry = {
         formId: 'adjustForm',
         submitBtn: 'submitAdjustBtn',
         method: 'POST',
-        url: data => `/api/v4/console/material/users/${data.user_id}/adjust`,
+        url: data => API.buildURL(API_ENDPOINTS.MATERIAL.USER_ADJUST, { user_id: data.user_id }),
         successMessage: '余额调整成功',
         fields: [
           {
@@ -452,7 +452,7 @@ const PageConfigRegistry = {
     subtitle: '查看材料资产的变动记录',
     icon: 'bi-list-ul',
     emoji: '📋',
-    apiEndpoint: '/api/v4/console/material/transactions',
+    apiEndpoint: API_ENDPOINTS.MATERIAL.TRANSACTIONS,
     primaryKey: 'transaction_id',
     pagination: true,
     pageSize: 20,
@@ -527,7 +527,7 @@ const PageConfigRegistry = {
     subtitle: '查询和管理用户钻石账户',
     icon: 'bi-diamond',
     emoji: '💠',
-    apiEndpoint: '/api/v4/console/diamond/users',
+    apiEndpoint: API_ENDPOINTS.DIAMOND_ACCOUNTS.USERS,
     primaryKey: 'user_id',
     customLayout: 'user-search-first',
 
@@ -574,7 +574,7 @@ const PageConfigRegistry = {
         formId: 'adjustForm',
         submitBtn: 'submitAdjustBtn',
         method: 'POST',
-        url: data => `/api/v4/console/diamond/users/${data.user_id}/adjust`,
+        url: data => API.buildURL(API_ENDPOINTS.DIAMOND_ACCOUNTS.USER_ADJUST, { user_id: data.user_id }),
         successMessage: '钻石调整成功',
         fields: [
           {
@@ -619,7 +619,7 @@ const PageConfigRegistry = {
     subtitle: '查看系统物品库存和资产统计',
     icon: 'bi-collection',
     emoji: '📦',
-    apiEndpoint: '/api/v4/console/assets/portfolio',
+    apiEndpoint: API_ENDPOINTS.ASSETS.PORTFOLIO,
     primaryKey: 'item_id',
     pagination: true,
     pageSize: 20,
@@ -681,7 +681,7 @@ const PageConfigRegistry = {
     subtitle: '管理兑换市场的商品配置',
     icon: 'bi-box-seam',
     emoji: '📦',
-    apiEndpoint: '/api/v4/console/marketplace/exchange-items',
+    apiEndpoint: API_ENDPOINTS.MARKETPLACE.EXCHANGE_ITEMS_SIMPLE,
     primaryKey: 'item_id',
     pagination: true,
 
@@ -778,7 +778,7 @@ const PageConfigRegistry = {
     subtitle: '管理用户的兑换订单',
     icon: 'bi-receipt',
     emoji: '📋',
-    apiEndpoint: '/api/v4/console/marketplace/exchange-orders',
+    apiEndpoint: API_ENDPOINTS.MARKETPLACE.EXCHANGE_ORDERS_SIMPLE,
     primaryKey: 'order_no',
     pagination: true,
     pageSize: 20,
@@ -854,7 +854,7 @@ const PageConfigRegistry = {
     subtitle: '查看兑换市场的数据统计',
     icon: 'bi-bar-chart',
     emoji: '📊',
-    apiEndpoint: '/api/v4/console/marketplace/exchange-stats',
+    apiEndpoint: API_ENDPOINTS.MARKETPLACE.EXCHANGE_STATS,
     customLayout: 'stats-dashboard',
 
     stats: [
@@ -897,7 +897,7 @@ const PageConfigRegistry = {
     subtitle: '管理用户之间的交易订单',
     icon: 'bi-arrow-left-right',
     emoji: '🔄',
-    apiEndpoint: '/api/v4/console/marketplace/trade-orders',
+    apiEndpoint: API_ENDPOINTS.MARKETPLACE.TRADE_ORDERS_SIMPLE,
     primaryKey: 'order_id',
     pagination: true,
     pageSize: 20,
@@ -956,7 +956,7 @@ const PageConfigRegistry = {
     subtitle: '查看市场挂牌和交易的综合统计',
     icon: 'bi-graph-up',
     emoji: '📈',
-    apiEndpoint: '/api/v4/console/marketplace/listing-stats',
+    apiEndpoint: API_ENDPOINTS.MARKETPLACE_STATS.LISTING_STATS,
     customLayout: 'stats-dashboard',
 
     stats: [
@@ -977,7 +977,7 @@ const PageConfigRegistry = {
     subtitle: '管理系统用户',
     icon: 'bi-people',
     emoji: '👥',
-    apiEndpoint: '/api/v4/console/user-management/users',
+    apiEndpoint: API_ENDPOINTS.USER.LIST,
     primaryKey: 'user_id',
     pagination: true,
     pageSize: 20,
@@ -1053,7 +1053,7 @@ const PageConfigRegistry = {
     subtitle: '管理业务员、门店等层级关系',
     icon: 'bi-diagram-3',
     emoji: '🏢',
-    apiEndpoint: '/api/v4/console/user-hierarchy',
+    apiEndpoint: API_ENDPOINTS.USER_HIERARCHY.LIST,
     primaryKey: 'user_id',
     pagination: true,
 
@@ -1147,7 +1147,7 @@ const PageConfigRegistry = {
     subtitle: '审核商户提交的积分申请',
     icon: 'bi-clipboard-check',
     emoji: '✅',
-    apiEndpoint: '/api/v4/console/merchant-points',
+    apiEndpoint: API_ENDPOINTS.MERCHANT_POINTS.LIST,
     primaryKey: 'audit_id',
     pagination: true,
 
@@ -1224,7 +1224,7 @@ const PageConfigRegistry = {
     subtitle: '管理系统公告',
     icon: 'bi-megaphone',
     emoji: '📢',
-    apiEndpoint: '/api/v4/console/system/announcements',
+    apiEndpoint: API_ENDPOINTS.ANNOUNCEMENT.LIST,
     primaryKey: 'announcement_id',
     pagination: true,
 
@@ -1318,7 +1318,7 @@ const PageConfigRegistry = {
     subtitle: '管理系统推送通知',
     icon: 'bi-bell',
     emoji: '🔔',
-    apiEndpoint: '/api/v4/console/system/notifications',
+    apiEndpoint: API_ENDPOINTS.SYSTEM.CONSOLE_NOTIFICATIONS,
     primaryKey: 'notification_id',
     pagination: true,
 
@@ -1390,7 +1390,7 @@ const PageConfigRegistry = {
     subtitle: '管理首页弹窗和横幅图片',
     icon: 'bi-image',
     emoji: '🖼️',
-    apiEndpoint: '/api/v4/console/popup-banners',
+    apiEndpoint: API_ENDPOINTS.POPUP_BANNER.LIST,
     primaryKey: 'banner_id',
 
     stats: [
@@ -1487,7 +1487,7 @@ const PageConfigRegistry = {
     subtitle: '管理系统上传的图片资源',
     icon: 'bi-images',
     emoji: '🖼️',
-    apiEndpoint: '/api/v4/console/images',
+    apiEndpoint: API_ENDPOINTS.IMAGE.LIST,
     primaryKey: 'image_id',
     pagination: true,
 

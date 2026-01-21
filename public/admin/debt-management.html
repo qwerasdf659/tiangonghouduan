@@ -334,7 +334,8 @@
     async function loadPendingDebts() {
       const response = await apiRequest(API_ENDPOINTS.DEBT.PENDING);
       if (response && response.success) {
-        pendingDebts = response.data.debts || response.data || [];
+        // 后端返回格式: { debt_type, items: [...], pagination: {...} }
+        pendingDebts = response.data.items || [];
         renderPendingList(pendingDebts);
       }
     }
@@ -342,39 +343,61 @@
     async function loadByCampaign() {
       const response = await apiRequest(API_ENDPOINTS.DEBT.BY_CAMPAIGN);
       if (response && response.success) {
-        renderByCampaignList(response.data.campaigns || response.data || []);
+        // 后端返回格式: { items: [...], pagination: {...} }
+        renderByCampaignList(response.data.items || []);
       }
     }
 
     async function loadByPrize() {
       const response = await apiRequest(API_ENDPOINTS.DEBT.BY_PRIZE);
       if (response && response.success) {
-        renderByPrizeList(response.data.prizes || response.data || []);
+        // 后端返回格式: { items: [...], pagination: {...} }
+        renderByPrizeList(response.data.items || []);
       }
     }
 
     async function loadLimits() {
       const response = await apiRequest(API_ENDPOINTS.DEBT.LIMITS);
       if (response && response.success) {
-        renderLimitsList(response.data.limits || response.data || []);
+        // 后端返回格式: { items: [...], pagination: {...} }
+        renderLimitsList(response.data.items || []);
       }
     }
 
     function updateDashboard(data) {
-      document.getElementById('pendingCount').textContent = data.pending_count || 0;
-      document.getElementById('pendingAmount').textContent = (data.pending_amount || 0).toLocaleString();
-      document.getElementById('clearedCount').textContent = data.cleared_count || 0;
-      const clearRate = data.total_count > 0 
-        ? ((data.cleared_count / data.total_count) * 100).toFixed(1) + '%'
+      // 后端返回格式: { inventory_debt: {...}, budget_debt: {...}, debt_limit_config_count }
+      const invDebt = data.inventory_debt || {};
+      const budDebt = data.budget_debt || {};
+      
+      // 待清偿总数 = 库存欠账待清偿数 + 预算欠账待清偿数
+      const pendingCount = (invDebt.pending_count || 0) + (budDebt.pending_count || 0);
+      document.getElementById('pendingCount').textContent = pendingCount;
+      
+      // 待清偿金额 = 预算欠账剩余金额 (库存欠账没有金额概念)
+      const pendingAmount = budDebt.remaining_amount || 0;
+      document.getElementById('pendingAmount').textContent = pendingAmount.toLocaleString();
+      
+      // 已清偿总数 = 库存欠账已核销数 + 预算欠账已核销数
+      const clearedCount = (invDebt.written_off_count || 0) + (budDebt.written_off_count || 0);
+      document.getElementById('clearedCount').textContent = clearedCount;
+      
+      // 总数 = 库存欠账总数 + 预算欠账总数
+      const totalCount = (invDebt.total_count || 0) + (budDebt.total_count || 0);
+      const clearRate = totalCount > 0 
+        ? ((clearedCount / totalCount) * 100).toFixed(1) + '%'
         : '0%';
       document.getElementById('clearRate').textContent = clearRate;
     }
 
     function updateCharts(data) {
-      // 来源分布饼图
-      const sourceData = data.by_source || [
-        { name: '库存欠账', value: data.inventory_debt || 0 },
-        { name: '预算欠账', value: data.budget_debt || 0 }
+      // 后端返回格式: { inventory_debt: {...}, budget_debt: { by_source: [...], ... } }
+      const invDebt = data.inventory_debt || {};
+      const budDebt = data.budget_debt || {};
+      
+      // 来源分布饼图 - 显示库存欠账数量 vs 预算欠账金额
+      const sourceData = [
+        { name: '库存欠账', value: invDebt.remaining_quantity || 0 },
+        { name: '预算欠账', value: budDebt.remaining_amount || 0 }
       ];
       
       sourceChart.setOption({
@@ -394,19 +417,19 @@
         }]
       });
 
-      // 活动柱状图
-      const campaignData = data.by_campaign || [];
+      // 活动柱状图 - 需要从by-campaign API获取数据，这里先设置空图表
+      // 实际数据由loadByCampaign加载后更新
       campaignChart.setOption({
         tooltip: { trigger: 'axis' },
         xAxis: {
           type: 'category',
-          data: campaignData.map(c => c.campaign_name || `活动${c.campaign_id}`),
+          data: [],
           axisLabel: { rotate: 30 }
         },
         yAxis: { type: 'value' },
         series: [{
           type: 'bar',
-          data: campaignData.map(c => c.debt_amount || 0),
+          data: [],
           itemStyle: { color: '#dc3545' }
         }]
       });
@@ -419,41 +442,89 @@
         return;
       }
 
-      tbody.innerHTML = debts.map(debt => `
-        <tr>
-          <td>${debt.debt_id}</td>
-          <td><span class="badge bg-${debt.debt_type === 'inventory' ? 'warning' : 'info'}">${debt.debt_type === 'inventory' ? '库存' : '预算'}</span></td>
-          <td>${escapeHtml(debt.campaign_name || '-')}</td>
-          <td>${escapeHtml(debt.prize_name || '-')}</td>
-          <td class="text-danger fw-bold">${debt.debt_quantity || 0}</td>
-          <td class="text-success">${debt.cleared_quantity || 0}</td>
-          <td>${escapeHtml(debt.creator_name || '-')}</td>
-          <td>${formatDateTime(debt.created_at)}</td>
-          <td>
-            <button class="btn btn-sm btn-success" onclick="openClearModal(${debt.debt_id}, '${debt.debt_type}', ${debt.debt_quantity - (debt.cleared_quantity || 0)})">
-              <i class="bi bi-check-circle"></i> 清偿
-            </button>
-          </td>
-        </tr>
-      `).join('');
+      // 后端返回格式 (库存欠账): 
+      // { debt_id, campaign_id, prize_id, debt_quantity, cleared_quantity, remaining_quantity, status, ... }
+      // 关联: campaign: { campaign_name }, prize: { prize_name, prize_type }
+      // 后端返回格式 (预算欠账):
+      // { debt_id, campaign_id, user_id, debt_amount, cleared_amount, remaining_amount, status, ... }
+      // 关联: campaign: { campaign_name }, user: { nickname, phone }
+      
+      tbody.innerHTML = debts.map(debt => {
+        // 判断是库存欠账还是预算欠账 (通过字段判断)
+        const isInventory = debt.debt_quantity !== undefined;
+        const debtType = isInventory ? 'inventory' : 'budget';
+        const quantity = isInventory ? debt.debt_quantity : debt.debt_amount;
+        const cleared = isInventory ? debt.cleared_quantity : debt.cleared_amount;
+        const remaining = isInventory ? debt.remaining_quantity : debt.remaining_amount;
+        
+        // 获取关联信息
+        const campaignName = debt.campaign?.campaign_name || '-';
+        const prizeName = isInventory ? (debt.prize?.prize_name || '-') : '-';
+        
+        return `
+          <tr>
+            <td>${debt.debt_id}</td>
+            <td><span class="badge bg-${isInventory ? 'warning' : 'info'}">${isInventory ? '库存' : '预算'}</span></td>
+            <td>${escapeHtml(campaignName)}</td>
+            <td>${escapeHtml(prizeName)}</td>
+            <td class="text-danger fw-bold">${quantity || 0}</td>
+            <td class="text-success">${cleared || 0}</td>
+            <td>${escapeHtml(debt.user?.nickname || '-')}</td>
+            <td>${formatDateTime(debt.created_at)}</td>
+            <td>
+              <button class="btn btn-sm btn-success" onclick="openClearModal(${debt.debt_id}, '${debtType}', ${remaining || 0})">
+                <i class="bi bi-check-circle"></i> 清偿
+              </button>
+            </td>
+          </tr>
+        `;
+      }).join('');
     }
 
     function renderByCampaignList(campaigns) {
       const tbody = document.getElementById('byCampaignList');
       if (campaigns.length === 0) {
         tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">暂无数据</td></tr>';
+        // 更新图表为空 - 需要完整配置
+        campaignChart.setOption({
+          tooltip: { trigger: 'axis' },
+          xAxis: {
+            type: 'category',
+            data: [],
+            axisLabel: { rotate: 30 }
+          },
+          yAxis: { type: 'value' },
+          series: [{
+            type: 'bar',
+            data: [],
+            itemStyle: { color: '#dc3545' }
+          }]
+        });
         return;
       }
 
+      // 后端返回格式: { campaign_id, campaign_name, inventory_debt: {...}, budget_debt: {...} }
       tbody.innerHTML = campaigns.map(c => {
-        const clearRate = c.debt_total > 0 ? ((c.cleared_total / c.debt_total) * 100).toFixed(1) : 0;
+        const invDebt = c.inventory_debt || {};
+        const budDebt = c.budget_debt || {};
+        
+        // 欠账记录数 = 库存欠账数 + 预算欠账数
+        const debtCount = (invDebt.count || 0) + (budDebt.count || 0);
+        // 欠账总量 = 库存欠账剩余量 + 预算欠账剩余额
+        const debtTotal = (invDebt.remaining_quantity || 0) + (budDebt.remaining_amount || 0);
+        // 已清偿量
+        const clearedTotal = (invDebt.cleared_quantity || 0) + (budDebt.cleared_amount || 0);
+        // 清偿率
+        const totalDebt = (invDebt.total_quantity || 0) + (budDebt.total_amount || 0);
+        const clearRate = totalDebt > 0 ? ((clearedTotal / totalDebt) * 100).toFixed(1) : 0;
+        
         return `
           <tr>
             <td>${c.campaign_id}</td>
             <td>${escapeHtml(c.campaign_name || '-')}</td>
-            <td>${c.debt_count || 0}</td>
-            <td class="text-danger">${c.debt_total || 0}</td>
-            <td class="text-success">${c.cleared_total || 0}</td>
+            <td>${debtCount}</td>
+            <td class="text-danger">${debtTotal}</td>
+            <td class="text-success">${clearedTotal}</td>
             <td>
               <div class="progress" style="height: 20px;">
                 <div class="progress-bar bg-success" style="width: ${clearRate}%">${clearRate}%</div>
@@ -462,6 +533,26 @@
           </tr>
         `;
       }).join('');
+
+      // 更新活动柱状图 - 需要完整配置
+      campaignChart.setOption({
+        tooltip: { trigger: 'axis' },
+        xAxis: {
+          type: 'category',
+          data: campaigns.map(c => c.campaign_name || `活动${c.campaign_id}`),
+          axisLabel: { rotate: 30 }
+        },
+        yAxis: { type: 'value' },
+        series: [{
+          type: 'bar',
+          data: campaigns.map(c => {
+            const invDebt = c.inventory_debt || {};
+            const budDebt = c.budget_debt || {};
+            return (invDebt.remaining_quantity || 0) + (budDebt.remaining_amount || 0);
+          }),
+          itemStyle: { color: '#dc3545' }
+        }]
+      });
     }
 
     function renderByPrizeList(prizes) {
@@ -471,15 +562,18 @@
         return;
       }
 
+      // 后端返回格式: { prize_id, prize_name, debt_count, total_quantity, cleared_quantity, remaining_quantity }
       tbody.innerHTML = prizes.map(p => {
-        const clearRate = p.debt_total > 0 ? ((p.cleared_total / p.debt_total) * 100).toFixed(1) : 0;
+        const clearRate = p.total_quantity > 0 
+          ? ((p.cleared_quantity / p.total_quantity) * 100).toFixed(1) 
+          : 0;
         return `
           <tr>
             <td>${p.prize_id}</td>
             <td>${escapeHtml(p.prize_name || '-')}</td>
             <td>${p.debt_count || 0}</td>
-            <td class="text-danger">${p.debt_total || 0}</td>
-            <td class="text-success">${p.cleared_total || 0}</td>
+            <td class="text-danger">${p.remaining_quantity || 0}</td>
+            <td class="text-success">${p.cleared_quantity || 0}</td>
             <td>
               <div class="progress" style="height: 20px;">
                 <div class="progress-bar bg-success" style="width: ${clearRate}%">${clearRate}%</div>
@@ -497,24 +591,33 @@
         return;
       }
 
+      // 后端返回格式: { limit_id, limit_level, limit_level_name, reference_id, 
+      //                inventory_debt_limit, budget_debt_limit, status, description }
       tbody.innerHTML = limits.map(l => {
-        const usage = l.max_debt > 0 ? ((l.current_debt / l.max_debt) * 100).toFixed(1) : 0;
-        const statusClass = usage >= 90 ? 'danger' : usage >= 70 ? 'warning' : 'success';
+        // 总上限 = 库存上限 + 预算上限
+        const maxDebt = (l.inventory_debt_limit || 0) + (l.budget_debt_limit || 0);
+        // 当前使用量需要从其他API获取，这里暂时显示上限配置
+        const usage = 0; // TODO: 需要获取当前欠账数据来计算
+        const statusClass = l.status === 'active' ? 'success' : 'secondary';
+        
         return `
           <tr>
             <td>${l.limit_id}</td>
-            <td><span class="badge bg-secondary">${l.level || 'global'}</span></td>
-            <td>${l.related_id || '-'}</td>
-            <td>${l.max_debt || 0}</td>
-            <td>${l.current_debt || 0}</td>
+            <td><span class="badge bg-secondary">${l.limit_level_name || l.limit_level || 'global'}</span></td>
+            <td>${l.reference_id || '-'}${l.campaign_name ? ` (${escapeHtml(l.campaign_name)})` : ''}</td>
+            <td>
+              <small class="text-muted">库存:</small> ${l.inventory_debt_limit || 0}<br>
+              <small class="text-muted">预算:</small> ${l.budget_debt_limit || 0}
+            </td>
+            <td>-</td>
             <td>
               <div class="progress" style="height: 20px;">
-                <div class="progress-bar bg-${statusClass}" style="width: ${usage}%">${usage}%</div>
+                <div class="progress-bar bg-info" style="width: 0%">-</div>
               </div>
             </td>
             <td>
-              <span class="badge bg-${usage >= 90 ? 'danger' : 'success'}">
-                ${usage >= 90 ? '⚠️ 接近上限' : '正常'}
+              <span class="badge bg-${statusClass}">
+                ${l.status === 'active' ? '启用' : '禁用'}
               </span>
             </td>
           </tr>
@@ -524,7 +627,9 @@
 
     function openClearModal(debtId, debtType, pendingQty) {
       document.getElementById('clearDebtId').value = debtId;
+      // 保存原始类型用于提交
       document.getElementById('clearDebtType').value = debtType === 'inventory' ? '库存欠账' : '预算欠账';
+      document.getElementById('clearDebtType').dataset.type = debtType;
       document.getElementById('clearPendingQty').value = pendingQty;
       document.getElementById('clearQuantity').value = '';
       document.getElementById('clearQuantity').max = pendingQty;
@@ -534,21 +639,25 @@
 
     async function submitClear() {
       const debtId = document.getElementById('clearDebtId').value;
-      const quantity = parseInt(document.getElementById('clearQuantity').value);
+      const debtTypeEl = document.getElementById('clearDebtType');
+      const debtType = debtTypeEl.dataset.type || (debtTypeEl.value === '库存欠账' ? 'inventory' : 'budget');
+      const amount = parseInt(document.getElementById('clearQuantity').value);
       const remark = document.getElementById('clearRemark').value;
 
-      if (!quantity || quantity <= 0) {
+      if (!amount || amount <= 0) {
         alert('请输入有效的清偿数量');
         return;
       }
 
       showLoading();
       try {
+        // 后端API期望: { debt_type, debt_id, amount, remark }
         const response = await apiRequest(API_ENDPOINTS.DEBT.CLEAR, {
           method: 'POST',
           body: JSON.stringify({
-            debt_id: debtId,
-            clear_quantity: quantity,
+            debt_type: debtType,
+            debt_id: parseInt(debtId),
+            amount: amount,
             remark: remark
           })
         });

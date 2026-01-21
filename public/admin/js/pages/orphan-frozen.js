@@ -127,9 +127,9 @@ async function loadData() {
     // 并行获取检测结果和统计数据
     const [detectResponse, statsResponse] = await Promise.all([
       apiRequest(
-        `/api/v4/console/orphan-frozen/detect${detectParams.toString() ? '?' + detectParams.toString() : ''}`
+        API_ENDPOINTS.ORPHAN_FROZEN.DETECT + (detectParams.toString() ? '?' + detectParams.toString() : '')
       ),
-      apiRequest('/api/v4/console/orphan-frozen/stats')
+      apiRequest(API_ENDPOINTS.ORPHAN_FROZEN.STATS)
     ])
 
     // 处理检测结果 - 使用后端字段名
@@ -346,7 +346,7 @@ async function scanOrphans() {
   showLoading(true)
 
   try {
-    const response = await apiRequest('/api/v4/console/orphan-frozen/detect', {
+    const response = await apiRequest(API_ENDPOINTS.ORPHAN_FROZEN.DETECT, {
       method: 'GET'
     })
 
@@ -412,7 +412,7 @@ async function executeClean() {
 
   try {
     // 调用后端清理API（清理全部检测到的孤儿冻结）
-    const response = await apiRequest('/api/v4/console/orphan-frozen/cleanup', {
+    const response = await apiRequest(API_ENDPOINTS.ORPHAN_FROZEN.CLEANUP, {
       method: 'POST',
       body: JSON.stringify({
         dry_run: false, // 实际清理
@@ -467,7 +467,7 @@ async function cleanSingleItem(userId, assetCode) {
 
   try {
     // 调用后端清理API，指定user_id和asset_code
-    const response = await apiRequest('/api/v4/console/orphan-frozen/cleanup', {
+    const response = await apiRequest(API_ENDPOINTS.ORPHAN_FROZEN.CLEANUP, {
       method: 'POST',
       body: JSON.stringify({
         dry_run: false,

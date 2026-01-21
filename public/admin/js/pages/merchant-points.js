@@ -146,7 +146,7 @@ function handlePaginationClick(event) {
  */
 async function loadPendingStats() {
   try {
-    const response = await apiRequest('/api/v4/console/merchant-points/stats/pending')
+    const response = await apiRequest(API_ENDPOINTS.MERCHANT_POINTS.STATS_PENDING)
     if (response && response.success) {
       // 更新所有统计卡片
       document.getElementById('pendingCount').textContent = response.data.pending_count || 0
@@ -180,7 +180,7 @@ async function loadData() {
     if (timeRange) params.append('time_range', timeRange)
     if (priority) params.append('priority', priority)
 
-    const response = await apiRequest(`/api/v4/console/merchant-points?${params.toString()}`)
+    const response = await apiRequest(API_ENDPOINTS.MERCHANT_POINTS.LIST + '?' + params.toString())
 
     if (response && response.success) {
       const { rows, count, pagination } = response.data
@@ -379,7 +379,7 @@ async function showReviewModal(auditId) {
   currentAuditId = auditId
 
   try {
-    const response = await apiRequest(`/api/v4/console/merchant-points/${auditId}`)
+    const response = await apiRequest(API.buildURL(API_ENDPOINTS.MERCHANT_POINTS.DETAIL, { id: auditId }))
 
     if (response && response.success) {
       const app = response.data
@@ -429,8 +429,11 @@ async function reviewSingle(action) {
   showLoading(true)
 
   try {
+    const endpoint = action === 'approve' 
+      ? API.buildURL(API_ENDPOINTS.MERCHANT_POINTS.APPROVE, { id: currentAuditId })
+      : API.buildURL(API_ENDPOINTS.MERCHANT_POINTS.REJECT, { id: currentAuditId })
     const response = await apiRequest(
-      `/api/v4/console/merchant-points/${currentAuditId}/${action}`,
+      endpoint,
       {
         method: 'POST',
         body: JSON.stringify({
@@ -473,7 +476,7 @@ async function batchApprove() {
   try {
     for (const auditId of selectedItems) {
       try {
-        const response = await apiRequest(`/api/v4/console/merchant-points/${auditId}/approve`, {
+        const response = await apiRequest(API.buildURL(API_ENDPOINTS.MERCHANT_POINTS.APPROVE, { id: auditId }), {
           method: 'POST',
           body: JSON.stringify({ reason: '批量审核通过' })
         })
@@ -528,7 +531,7 @@ async function batchReject() {
   try {
     for (const auditId of selectedItems) {
       try {
-        const response = await apiRequest(`/api/v4/console/merchant-points/${auditId}/reject`, {
+        const response = await apiRequest(API.buildURL(API_ENDPOINTS.MERCHANT_POINTS.REJECT, { id: auditId }), {
           method: 'POST',
           body: JSON.stringify({ reason: reason.trim() })
         })

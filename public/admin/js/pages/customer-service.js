@@ -130,7 +130,7 @@ async function loadSessionMessages(sessionId, silent = false) {
   if (!silent) showLoading()
   try {
     const response = await apiRequest(
-      `/api/v4/console/customer-service/sessions/${sessionId}/messages`
+      API.buildURL(API_ENDPOINTS.CUSTOMER_SERVICE.SESSION_MESSAGES, { session_id: sessionId })
     )
     if (response && response.success) {
       renderMessages(response.data.messages || [])
@@ -176,7 +176,7 @@ async function loadSessions(silent = false) {
     if (search) params.append('search', search)
 
     const response = await apiRequest(
-      `/api/v4/console/customer-service/sessions?${params.toString()}`
+      API_ENDPOINTS.CUSTOMER_SERVICE.SESSIONS + '?' + params.toString()
     )
 
     if (response && response.success) {
@@ -262,7 +262,7 @@ async function openSession(sessionId) {
 
   try {
     const response = await apiRequest(
-      `/api/v4/console/customer-service/sessions/${sessionId}/messages`
+      API.buildURL(API_ENDPOINTS.CUSTOMER_SERVICE.SESSION_MESSAGES, { session_id: sessionId })
     )
     if (response && response.success) {
       const session = response.data.session
@@ -340,7 +340,7 @@ async function sendMessage() {
 
   try {
     const response = await apiRequest(
-      `/api/v4/console/customer-service/sessions/${currentSessionId}/send`,
+      API.buildURL(API_ENDPOINTS.CUSTOMER_SERVICE.SEND_MESSAGE, { session_id: currentSessionId }),
       {
         method: 'POST',
         body: JSON.stringify({ content: content })
@@ -374,7 +374,7 @@ function insertQuickReply(text) {
 
 async function markAsRead(sessionId) {
   try {
-    await apiRequest(`/api/v4/console/customer-service/sessions/${sessionId}/mark-read`, {
+    await apiRequest(API.buildURL(API_ENDPOINTS.CUSTOMER_SERVICE.MARK_READ, { session_id: sessionId }), {
       method: 'POST'
     })
   } catch (error) {
@@ -400,7 +400,7 @@ async function viewUserInfo() {
       return
     }
 
-    const response = await apiRequest(`/api/v4/console/user-management/users/${userId}`)
+    const response = await apiRequest(API.buildURL(API_ENDPOINTS.USER.DETAIL, { user_id: userId }))
     if (response && response.success) {
       const user = response.data.user || response.data
       renderUserInfo(user)
@@ -434,7 +434,7 @@ function renderUserInfo(user) {
 
 async function loadAdminList() {
   try {
-    const response = await apiRequest('/api/v4/console/user-management/users?role_filter=admin')
+    const response = await apiRequest(API_ENDPOINTS.USER.LIST + '?role_filter=admin')
     if (response && response.success) {
       const admins = response.data.users || []
       const select = document.getElementById('transferTargetSelect')
@@ -474,7 +474,7 @@ async function submitTransfer() {
   showLoading()
   try {
     const response = await apiRequest(
-      `/api/v4/console/customer-service/sessions/${currentSessionId}/transfer`,
+      API.buildURL(API_ENDPOINTS.CUSTOMER_SERVICE.TRANSFER, { session_id: currentSessionId }),
       {
         method: 'POST',
         body: JSON.stringify({ target_admin_id: parseInt(targetId) })
@@ -509,7 +509,7 @@ async function closeSession() {
 
   try {
     const response = await apiRequest(
-      `/api/v4/console/customer-service/sessions/${currentSessionId}/close`,
+      API.buildURL(API_ENDPOINTS.CUSTOMER_SERVICE.CLOSE, { session_id: currentSessionId }),
       { method: 'POST', body: JSON.stringify({ close_reason: '问题已解决' }) }
     )
     if (response && response.success) {

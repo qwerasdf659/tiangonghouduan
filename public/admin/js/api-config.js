@@ -81,8 +81,19 @@ const API_ENDPOINTS = {
   // ===== 系统管理API =====
   SYSTEM: {
     DASHBOARD: '/api/v4/console/system/dashboard', // 系统仪表板
+    DASHBOARD_TRENDS: '/api/v4/console/analytics/decisions/analytics', // 仪表盘趋势数据
     HEALTH: '/health', // 健康检查
-    VERSION: '/api/v4' // 版本信息
+    VERSION: '/api/v4', // 版本信息
+    CHARTS: '/api/v4/system/statistics/charts', // 统计图表数据
+    STATISTICS_EXPORT: '/api/v4/system/statistics/export', // 统计导出
+    CONSOLE_NOTIFICATIONS: '/api/v4/console/system/notifications' // 控制台通知管理
+  },
+
+  // ===== 数据分析API =====
+  ANALYTICS: {
+    TODAY_STATS: '/api/v4/console/analytics/stats/today', // 今日统计
+    DECISIONS: '/api/v4/console/analytics/decisions/analytics', // 决策分析
+    LOTTERY_TRENDS: '/api/v4/console/analytics/lottery/trends' // 抽奖趋势
   },
 
   // ===== 抽奖活动管理API =====
@@ -240,7 +251,8 @@ const API_ENDPOINTS = {
     LOTTERY_DRAWS: '/api/v4/console/business-records/lottery-draws',
     ITEM_EVENTS: '/api/v4/console/business-records/item-events',
     ASSET_TRANSACTIONS: '/api/v4/console/business-records/asset-transactions',
-    EXCHANGE_RECORDS: '/api/v4/console/business-records/exchange-records'
+    EXCHANGE_RECORDS: '/api/v4/console/business-records/exchange-records',
+    EXCHANGE_STATS: '/api/v4/shop/exchange/statistics' // 兑换市场统计
   },
 
   // ===== 活动定价配置API =====
@@ -304,6 +316,11 @@ const API_ENDPOINTS = {
     UNLOCK: '/api/v4/console/user-premium/:user_id/unlock'
   },
 
+  // ===== 系统数据API =====
+  SYSTEM_DATA: {
+    USER_ROLES: '/api/v4/console/system-data/user-roles'
+  },
+
   // ===== 公告管理API =====
   ANNOUNCEMENT: {
     LIST: '/api/v4/console/system/announcements',
@@ -319,7 +336,8 @@ const API_ENDPOINTS = {
     READ: '/api/v4/system/notifications/:id/read',
     READ_ALL: '/api/v4/system/notifications/read-all',
     CLEAR: '/api/v4/system/notifications/clear',
-    SEND: '/api/v4/system/notifications/send'
+    SEND: '/api/v4/system/notifications/send',
+    ANNOUNCEMENTS: '/api/v4/console/notifications/announcements'
   },
 
   // ===== 弹窗Banner API =====
@@ -351,15 +369,21 @@ const API_ENDPOINTS = {
     CATEGORY: '/api/v4/console/settings/:category',
     UPDATE: '/api/v4/console/settings/:category',
     SECURITY: '/api/v4/console/settings/security',
-    BASIC: '/api/v4/console/settings/basic'
+    BASIC: '/api/v4/console/settings/basic',
+    POINTS: '/api/v4/console/settings/points',
+    NOTIFICATION: '/api/v4/console/settings/notification'
   },
 
   // ===== 用户层级API =====
   USER_HIERARCHY: {
     LIST: '/api/v4/console/user-hierarchy',
+    ROLES: '/api/v4/console/user-hierarchy/roles',
     DETAIL: '/api/v4/console/user-hierarchy/:id',
     CREATE: '/api/v4/console/user-hierarchy',
-    UPDATE_STATUS: '/api/v4/console/user-hierarchy/:id/status'
+    SUBORDINATES: '/api/v4/console/user-hierarchy/:user_id/subordinates',
+    UPDATE_STATUS: '/api/v4/console/user-hierarchy/:id/status',
+    DEACTIVATE: '/api/v4/console/user-hierarchy/:user_id/deactivate',
+    ACTIVATE: '/api/v4/console/user-hierarchy/:user_id/activate'
   },
 
   // ===== 商户积分API =====
@@ -368,7 +392,8 @@ const API_ENDPOINTS = {
     DETAIL: '/api/v4/console/merchant-points/:id',
     BATCH: '/api/v4/console/merchant-points/batch',
     APPROVE: '/api/v4/console/merchant-points/:id/approve',
-    REJECT: '/api/v4/console/merchant-points/:id/reject'
+    REJECT: '/api/v4/console/merchant-points/:id/reject',
+    STATS_PENDING: '/api/v4/console/merchant-points/stats/pending'
   },
 
   // ===== 抽奖配额API =====
@@ -388,6 +413,153 @@ const API_ENDPOINTS = {
   // ===== 概率调整API =====
   PROBABILITY: {
     ADJUST: '/api/v4/console/lottery-management/probability-adjust'
+  },
+
+  // ===== 资产管理API =====
+  ASSETS: {
+    STATS: '/api/v4/console/assets/stats',
+    TRANSACTIONS: '/api/v4/console/assets/transactions',
+    PORTFOLIO: '/api/v4/console/assets/portfolio'
+  },
+
+  // ===== 资产调整API =====
+  ASSET_ADJUSTMENT: {
+    ASSET_TYPES: '/api/v4/console/asset-adjustment/asset-types',
+    USER_BALANCES: '/api/v4/console/asset-adjustment/user/:user_id/balances',
+    ADJUST: '/api/v4/console/asset-adjustment/adjust'
+  },
+
+  // ===== 材料资产API =====
+  MATERIAL: {
+    ASSET_TYPES: '/api/v4/console/material/asset-types',
+    ASSET_TYPE_DETAIL: '/api/v4/console/material/asset-types/:asset_code',
+    CONVERSION_RULES: '/api/v4/console/material/conversion-rules',
+    CONVERSION_RULE_DETAIL: '/api/v4/console/material/conversion-rules/:rule_id',
+    USER_BALANCE: '/api/v4/console/material/users/:user_id/balance',
+    USER_ADJUST: '/api/v4/console/material/users/:user_id/adjust',
+    USERS: '/api/v4/console/material/users',
+    TRANSACTIONS: '/api/v4/console/material/transactions'
+  },
+
+  // ===== 客服会话API =====
+  CUSTOMER_SERVICE: {
+    SESSIONS: '/api/v4/console/customer-service/sessions',
+    SESSION_MESSAGES: '/api/v4/console/customer-service/sessions/:session_id/messages',
+    SEND_MESSAGE: '/api/v4/console/customer-service/sessions/:session_id/send',
+    MARK_READ: '/api/v4/console/customer-service/sessions/:session_id/mark-read',
+    TRANSFER: '/api/v4/console/customer-service/sessions/:session_id/transfer',
+    CLOSE: '/api/v4/console/customer-service/sessions/:session_id/close'
+  },
+
+  // ===== 活动预算API =====
+  CAMPAIGN_BUDGET: {
+    BATCH_STATUS: '/api/v4/console/campaign-budget/batch-status',
+    CAMPAIGN: '/api/v4/console/campaign-budget/campaigns/:campaign_id'
+  },
+
+  // ===== 市场管理API =====
+  MARKETPLACE: {
+    // 兑换市场商品
+    EXCHANGE_ITEMS: '/api/v4/console/marketplace/exchange_market/items',
+    EXCHANGE_ITEM_DETAIL: '/api/v4/console/marketplace/exchange_market/items/:item_id',
+    // 兑换市场订单
+    EXCHANGE_ORDERS: '/api/v4/console/marketplace/exchange_market/orders',
+    EXCHANGE_ORDER_DETAIL: '/api/v4/console/marketplace/exchange_market/orders/:order_no',
+    EXCHANGE_ORDER_STATUS: '/api/v4/shop/exchange/orders/:order_no/status',
+    // 交易订单
+    TRADE_ORDERS: '/api/v4/console/marketplace/trade/orders',
+    // 简化路径版本（兼容 PageConfigRegistry.js）
+    EXCHANGE_ITEMS_SIMPLE: '/api/v4/console/marketplace/exchange-items',
+    EXCHANGE_ORDERS_SIMPLE: '/api/v4/console/marketplace/exchange-orders',
+    EXCHANGE_STATS: '/api/v4/console/marketplace/exchange-stats',
+    TRADE_ORDERS_SIMPLE: '/api/v4/console/marketplace/trade-orders'
+  },
+
+  // ===== 孤儿冻结API =====
+  ORPHAN_FROZEN: {
+    DETECT: '/api/v4/console/orphan-frozen/detect',
+    STATS: '/api/v4/console/orphan-frozen/stats',
+    CLEANUP: '/api/v4/console/orphan-frozen/cleanup'
+  },
+
+  // ===== 抽奖干预管理API =====
+  LOTTERY_INTERVENTION: {
+    LIST: '/api/v4/console/lottery-management/interventions',
+    DETAIL: '/api/v4/console/lottery-management/interventions/:id',
+    CANCEL: '/api/v4/console/lottery-management/interventions/:id/cancel',
+    FORCE_WIN: '/api/v4/console/lottery-management/force-win'
+  },
+
+  // ===== 抽奖活动API =====
+  LOTTERY_CAMPAIGNS: {
+    LIST: '/api/v4/lottery/campaigns',
+    DETAIL: '/api/v4/lottery/campaigns/:campaign_code',
+    CONDITIONS: '/api/v4/activities/:code/conditions',
+    CONFIGURE_CONDITIONS: '/api/v4/activities/:code/configure-conditions'
+  },
+
+  // ===== 消费记录API（管理员审核 - console域） =====
+  CONSUMPTION: {
+    ADMIN_RECORDS: '/api/v4/console/consumption/records',
+    PENDING: '/api/v4/console/consumption/pending',
+    APPROVE: '/api/v4/console/consumption/approve/:id',
+    REJECT: '/api/v4/console/consumption/reject/:id'
+  },
+
+  // ===== 反馈管理API =====
+  FEEDBACK: {
+    LIST: '/api/v4/console/system/feedbacks',
+    DETAIL: '/api/v4/console/system/feedbacks/:id',
+    REPLY: '/api/v4/console/system/feedbacks/:id/reply',
+    STATUS: '/api/v4/console/system/feedbacks/:id/status'
+  },
+
+  // ===== 控制台认证API =====
+  CONSOLE_AUTH: {
+    LOGIN: '/api/v4/console/auth/login',
+    LOGOUT: '/api/v4/console/auth/logout'
+  },
+
+  // ===== 交易订单API =====
+  TRADE_ORDERS: {
+    LIST: '/api/v4/console/marketplace/trade_orders',
+    DETAIL: '/api/v4/console/marketplace/trade_orders/:order_id'
+  },
+
+  // ===== 市场统计API =====
+  MARKETPLACE_STATS: {
+    LISTING_STATS: '/api/v4/console/marketplace/listing-stats'
+  },
+
+  // ===== 审计日志API =====
+  AUDIT_LOGS: {
+    LIST: '/api/v4/console/system/audit-logs',
+    STATISTICS: '/api/v4/console/system/audit-logs/statistics',
+    DETAIL: '/api/v4/console/system/audit-logs/:id'
+  },
+
+  // ===== 设置管理API（扩展）=====
+  SETTINGS_EXT: {
+    GLOBAL: '/api/v4/console/settings/global',
+    LOTTERY: '/api/v4/console/settings/lottery',
+    SYSTEM: '/api/v4/console/settings/system',
+    PRIZE: '/api/v4/console/settings/prize'
+  },
+
+  // ===== 钻石账户API =====
+  DIAMOND_ACCOUNTS: {
+    LIST: '/api/v4/console/diamond-accounts',
+    DETAIL: '/api/v4/console/diamond-accounts/:user_id',
+    ADJUST: '/api/v4/console/diamond-accounts/adjust',
+    USER_BALANCE: '/api/v4/console/diamond/users/:user_id/balance',
+    USER_ADJUST: '/api/v4/console/diamond/users/:user_id/adjust',
+    USERS: '/api/v4/console/diamond/users',
+    ACCOUNTS: '/api/v4/console/diamond/accounts'
+  },
+
+  // ===== 用户层级扩展API =====
+  USER_HIERARCHY_EXT: {
+    ROLES: '/api/v4/console/user-hierarchy/roles'
   }
 }
 

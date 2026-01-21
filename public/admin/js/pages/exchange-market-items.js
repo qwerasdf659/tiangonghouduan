@@ -105,7 +105,7 @@ function bindEvents() {
 async function loadAssetTypes() {
   try {
     const token = getToken()
-    const response = await fetch('/api/v4/console/material/asset-types?is_enabled=true', {
+    const response = await fetch(`${API_ENDPOINTS.MATERIAL.ASSET_TYPES}?is_enabled=true`, {
       headers: { Authorization: `Bearer ${token}` }
     })
 
@@ -204,7 +204,7 @@ async function loadItems() {
       params.append('cost_asset_code', currentFilters.cost_asset_code)
 
     // 使用管理端接口（以后端为准）
-    const response = await fetch(`/api/v4/console/marketplace/exchange_market/items?${params}`, {
+    const response = await fetch(`${API_ENDPOINTS.MARKETPLACE.EXCHANGE_ITEMS}?${params}`, {
       headers: { Authorization: `Bearer ${token}` }
     })
 
@@ -385,7 +385,7 @@ async function handleAddItem() {
     }
 
     const token = getToken()
-    const response = await fetch('/api/v4/console/marketplace/exchange_market/items', {
+    const response = await fetch(API_ENDPOINTS.MARKETPLACE.EXCHANGE_ITEMS, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${token}`,
@@ -427,7 +427,7 @@ async function editItem(itemId) {
 
     // 使用管理端接口获取商品详情（以后端为准）
     // 注意：管理端接口返回的是原始字段 item_id, name 等
-    const response = await fetch(`/api/v4/console/marketplace/exchange_market/items/${itemId}`, {
+    const response = await fetch(API.buildURL(API_ENDPOINTS.MARKETPLACE.EXCHANGE_ITEM_DETAIL, { item_id: itemId }), {
       headers: { Authorization: `Bearer ${token}` }
     })
 
@@ -504,7 +504,7 @@ async function handleEditItem() {
     }
 
     const token = getToken()
-    const response = await fetch(`/api/v4/console/marketplace/exchange_market/items/${itemId}`, {
+    const response = await fetch(API.buildURL(API_ENDPOINTS.MARKETPLACE.EXCHANGE_ITEM_DETAIL, { item_id: itemId }), {
       method: 'PUT',
       headers: {
         Authorization: `Bearer ${token}`,
@@ -542,7 +542,7 @@ async function deleteItem(itemId) {
     showLoading(true)
     const token = getToken()
 
-    const response = await fetch(`/api/v4/console/marketplace/exchange_market/items/${itemId}`, {
+    const response = await fetch(API.buildURL(API_ENDPOINTS.MARKETPLACE.EXCHANGE_ITEM_DETAIL, { item_id: itemId }), {
       method: 'DELETE',
       headers: { Authorization: `Bearer ${token}` }
     })

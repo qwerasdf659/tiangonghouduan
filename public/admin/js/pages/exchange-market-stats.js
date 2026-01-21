@@ -75,7 +75,7 @@ async function loadStatistics() {
     showLoading(true)
     const token = getToken()
 
-    const response = await fetch('/api/v4/shop/exchange/statistics', {
+    const response = await fetch(API_ENDPOINTS.BUSINESS_RECORDS.EXCHANGE_STATS, {
       headers: { Authorization: `Bearer ${token}` }
     })
 

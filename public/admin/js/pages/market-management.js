@@ -150,7 +150,7 @@ async function loadItems() {
     if (status) params.append('status', status)
     if (keyword) params.append('keyword', keyword)
 
-    const response = await apiRequest(`/api/v4/console/marketplace/exchange_market/items?${params}`)
+    const response = await apiRequest(`${API_ENDPOINTS.MARKETPLACE.EXCHANGE_ITEMS}?${params}`)
 
     if (response?.success) {
       items = response.data.items || response.data || []
@@ -272,7 +272,7 @@ async function submitAddItem() {
   try {
     setButtonLoading('submitAddItemBtn', true)
 
-    const response = await apiRequest('/api/v4/console/marketplace/exchange_market/items', {
+    const response = await apiRequest(API_ENDPOINTS.MARKETPLACE.EXCHANGE_ITEMS, {
       method: 'POST',
       body: JSON.stringify(data)
     })
@@ -339,7 +339,7 @@ async function submitEditItem() {
     setButtonLoading('submitEditItemBtn', true)
 
     const response = await apiRequest(
-      `/api/v4/console/marketplace/exchange_market/items/${itemId}`,
+      API.buildURL(API_ENDPOINTS.MARKETPLACE.EXCHANGE_ITEM_DETAIL, { item_id: itemId }),
       {
         method: 'PUT',
         body: JSON.stringify(data)
@@ -368,7 +368,7 @@ async function toggleItemStatus(itemId, currentStatus) {
 
   try {
     const response = await apiRequest(
-      `/api/v4/console/marketplace/exchange_market/items/${itemId}`,
+      API.buildURL(API_ENDPOINTS.MARKETPLACE.EXCHANGE_ITEM_DETAIL, { item_id: itemId }),
       {
         method: 'PUT',
         body: JSON.stringify({ status: newStatus })
@@ -406,7 +406,7 @@ async function loadOrders() {
     if (orderNo) params.append('order_no', orderNo)
 
     const response = await apiRequest(
-      `/api/v4/console/marketplace/exchange_market/orders?${params}`
+      API_ENDPOINTS.MARKETPLACE.EXCHANGE_ORDERS + '?' + params
     )
 
     if (response?.success) {
@@ -505,7 +505,7 @@ async function viewOrderDetail(orderNo) {
     showLoading(true)
 
     const response = await apiRequest(
-      `/api/v4/console/marketplace/exchange_market/orders/${orderNo}`
+      API.buildURL(API_ENDPOINTS.MARKETPLACE.EXCHANGE_ORDER_DETAIL, { order_no: orderNo })
     )
 
     if (response?.success) {
@@ -545,7 +545,7 @@ async function submitUpdateStatus() {
   try {
     setButtonLoading('submitUpdateStatusBtn', true)
 
-    const response = await apiRequest(`/api/v4/shop/exchange/orders/${orderNo}/status`, {
+    const response = await apiRequest(API.buildURL(API_ENDPOINTS.MARKETPLACE.EXCHANGE_ORDER_STATUS, { order_no: orderNo }), {
       method: 'POST',
       body: JSON.stringify({ status: newStatus, remark })
     })
@@ -595,7 +595,7 @@ async function loadTradeOrders() {
     if (buyerId) params.append('buyer_id', buyerId)
     if (orderNo) params.append('order_no', orderNo)
 
-    const response = await apiRequest(`/api/v4/console/marketplace/trade/orders?${params}`)
+    const response = await apiRequest(API_ENDPOINTS.MARKETPLACE.TRADE_ORDERS + '?' + params)
 
     if (response?.success) {
       tradeOrders = response.data.orders || response.data || []
