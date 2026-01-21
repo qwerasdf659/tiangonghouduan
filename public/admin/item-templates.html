@@ -93,10 +93,12 @@
             <label class="form-label">物品类型</label>
             <select class="form-select" id="typeFilter">
               <option value="">全部类型</option>
-              <option value="coupon">优惠券</option>
+              <option value="voucher">优惠券</option>
+              <option value="coupon">代金券</option>
               <option value="points">积分</option>
               <option value="gift">礼品</option>
               <option value="virtual">虚拟物品</option>
+              <option value="material">材料</option>
             </select>
           </div>
           <div class="col-md-2">
@@ -163,10 +165,12 @@
               <div class="col-md-4">
                 <label class="form-label">物品类型</label>
                 <select class="form-select" id="templateType">
-                  <option value="coupon">优惠券</option>
+                  <option value="voucher">优惠券</option>
+                  <option value="coupon">代金券</option>
                   <option value="points">积分</option>
                   <option value="gift">礼品</option>
                   <option value="virtual">虚拟物品</option>
+                  <option value="material">材料</option>
                 </select>
               </div>
               <div class="col-md-4">
@@ -243,19 +247,21 @@
         const status = document.getElementById('statusFilter').value;
         const search = document.getElementById('searchInput').value;
 
+        // 构建查询参数（使用后端字段名）
         const params = new URLSearchParams();
-        if (type) params.append('type', type);
-        if (rarity) params.append('rarity', rarity);
-        if (status) params.append('status', status);
-        if (search) params.append('search', search);
+        if (type) params.append('item_type', type);  // 后端使用 item_type
+        if (rarity) params.append('rarity_code', rarity);  // 后端使用 rarity_code
+        if (status) params.append('is_enabled', status === 'active' ? 'true' : 'false');  // 后端使用 is_enabled
+        if (search) params.append('keyword', search);  // 后端使用 keyword
 
         const url = API_ENDPOINTS.ITEM_TEMPLATE.LIST + (params.toString() ? `?${params.toString()}` : '');
         const response = await apiRequest(url);
 
         if (response && response.success) {
-          templates = response.data.templates || response.data || [];
+          // 后端返回格式: { list: [...], pagination: {...} }
+          templates = response.data.list || [];
           renderTemplates(templates);
-          updateStats(response.data.stats || {});
+          updateStats(response.data.pagination || {});
         } else {
           showError('加载失败', response?.message || '获取物品模板失败');
         }
@@ -284,27 +290,28 @@
         return;
       }
 
+      // 使用后端字段名：item_template_id, display_name, template_code, item_type, rarity_code, is_enabled
       container.innerHTML = templates.map(t => `
         <div class="col-md-4 col-lg-3 mb-4">
           <div class="card template-card h-100">
             <div class="card-body text-center">
-              <div class="template-icon">${getTypeIcon(t.type)}</div>
-              <h6 class="card-title">${escapeHtml(t.name || t.template_name)}</h6>
-              <p class="text-muted small mb-2">${escapeHtml(t.code || t.template_code)}</p>
-              <span class="badge text-white rarity-${t.rarity || 'common'} rarity-badge mb-2">
-                ${getRarityLabel(t.rarity)}
+              <div class="template-icon">${getTypeIcon(t.item_type)}</div>
+              <h6 class="card-title">${escapeHtml(t.display_name)}</h6>
+              <p class="text-muted small mb-2">${escapeHtml(t.template_code)}</p>
+              <span class="badge text-white rarity-${t.rarity_code || 'common'} rarity-badge mb-2">
+                ${getRarityLabel(t.rarity_code, t.rarity)}
               </span>
               <p class="small text-muted mb-0">${escapeHtml(truncateText(t.description, 50))}</p>
             </div>
             <div class="card-footer bg-white d-flex justify-content-between align-items-center">
-              <span class="badge ${t.status === 'active' ? 'bg-success' : 'bg-secondary'}">
-                ${t.status === 'active' ? '启用' : '禁用'}
+              <span class="badge ${t.is_enabled ? 'bg-success' : 'bg-secondary'}">
+                ${t.is_enabled ? '启用' : '禁用'}
               </span>
               <div>
-                <button class="btn btn-sm btn-outline-primary me-1" onclick="editTemplate(${t.template_id || t.id})">
+                <button class="btn btn-sm btn-outline-primary me-1" onclick="editTemplate(${t.item_template_id})">
                   <i class="bi bi-pencil"></i>
                 </button>
-                <button class="btn btn-sm btn-outline-danger" onclick="deleteTemplate(${t.template_id || t.id})">
+                <button class="btn btn-sm btn-outline-danger" onclick="deleteTemplate(${t.item_template_id})">
                   <i class="bi bi-trash"></i>
                 </button>
               </div>
@@ -314,24 +321,36 @@
       `).join('');
     }
 
-    function updateStats(stats) {
-      document.getElementById('totalTemplates').textContent = stats.total || templates.length;
-      document.getElementById('totalTypes').textContent = stats.types || new Set(templates.map(t => t.type)).size;
-      document.getElementById('activeTemplates').textContent = stats.active || templates.filter(t => t.status === 'active').length;
-      document.getElementById('rarityCount').textContent = stats.rarity_count || '-';
+    function updateStats(pagination) {
+      // 使用后端分页数据和前端已加载的templates数组计算统计
+      document.getElementById('totalTemplates').textContent = pagination.total_count || templates.length;
+      document.getElementById('totalTypes').textContent = new Set(templates.map(t => t.item_type)).size;
+      document.getElementById('activeTemplates').textContent = templates.filter(t => t.is_enabled).length;
+      
+      // 稀有度分布统计
+      const raritySet = new Set(templates.map(t => t.rarity_code).filter(Boolean));
+      document.getElementById('rarityCount').textContent = raritySet.size || '-';
     }
 
-    function getTypeIcon(type) {
+    function getTypeIcon(itemType) {
+      // 使用后端 item_type 字段
       const icons = {
+        voucher: '🎫',
         coupon: '🎫',
         points: '💰',
         gift: '🎁',
-        virtual: '✨'
+        virtual: '✨',
+        material: '📦'
       };
-      return icons[type] || '📦';
+      return icons[itemType] || '📦';
     }
 
-    function getRarityLabel(rarity) {
+    function getRarityLabel(rarityCode, rarityObj) {
+      // 优先使用后端返回的 rarity 对象中的 display_name
+      if (rarityObj && rarityObj.display_name) {
+        return rarityObj.display_name;
+      }
+      // 回退到 rarity_code 映射
       const labels = {
         common: '普通',
         uncommon: '优良',
@@ -339,7 +358,7 @@
         epic: '史诗',
         legendary: '传说'
       };
-      return labels[rarity] || '普通';
+      return labels[rarityCode] || '普通';
     }
 
     function truncateText(text, maxLength) {
@@ -357,20 +376,22 @@
     async function editTemplate(templateId) {
       showLoading();
       try {
-        const response = await apiRequest(API.buildURL(API_ENDPOINTS.ITEM_TEMPLATE.DETAIL, { template_id: templateId }));
+        // 使用后端字段名 id
+        const response = await apiRequest(API.buildURL(API_ENDPOINTS.ITEM_TEMPLATE.DETAIL, { id: templateId }));
         if (response && response.success) {
           const t = response.data;
           document.getElementById('templateModalTitle').innerHTML = '<i class="bi bi-pencil"></i> 编辑物品模板';
-          document.getElementById('templateId').value = t.template_id || t.id;
-          document.getElementById('templateName').value = t.name || t.template_name || '';
-          document.getElementById('templateCode').value = t.code || t.template_code || '';
-          document.getElementById('templateType').value = t.type || 'coupon';
-          document.getElementById('templateRarity').value = t.rarity || 'common';
-          document.getElementById('templateStatus').value = t.status || 'active';
-          document.getElementById('templateIcon').value = t.icon_url || t.icon || '';
-          document.getElementById('templateValue').value = t.base_value || t.value || '';
+          // 使用后端字段名
+          document.getElementById('templateId').value = t.item_template_id;
+          document.getElementById('templateName').value = t.display_name || '';
+          document.getElementById('templateCode').value = t.template_code || '';
+          document.getElementById('templateType').value = t.item_type || 'voucher';
+          document.getElementById('templateRarity').value = t.rarity_code || 'common';
+          document.getElementById('templateStatus').value = t.is_enabled ? 'active' : 'inactive';
+          document.getElementById('templateIcon').value = t.image_url || '';
+          document.getElementById('templateValue').value = t.reference_price_points || '';
           document.getElementById('templateDescription').value = t.description || '';
-          document.getElementById('templateAttributes').value = t.attributes ? JSON.stringify(t.attributes, null, 2) : '';
+          document.getElementById('templateAttributes').value = t.meta ? JSON.stringify(t.meta, null, 2) : '';
           
           new bootstrap.Modal(document.getElementById('templateModal')).show();
         } else {
@@ -387,30 +408,32 @@
     async function submitTemplate() {
       const templateId = document.getElementById('templateId').value;
       
-      let attributes = {};
+      let meta = null;
       try {
         const attrStr = document.getElementById('templateAttributes').value;
         if (attrStr.trim()) {
-          attributes = JSON.parse(attrStr);
+          meta = JSON.parse(attrStr);
         }
       } catch (e) {
         alert('扩展属性JSON格式错误');
         return;
       }
 
+      // 使用后端字段名
+      const statusValue = document.getElementById('templateStatus').value;
       const data = {
-        name: document.getElementById('templateName').value,
-        code: document.getElementById('templateCode').value,
-        type: document.getElementById('templateType').value,
-        rarity: document.getElementById('templateRarity').value,
-        status: document.getElementById('templateStatus').value,
-        icon_url: document.getElementById('templateIcon').value,
-        base_value: parseFloat(document.getElementById('templateValue').value) || 0,
-        description: document.getElementById('templateDescription').value,
-        attributes: attributes
+        display_name: document.getElementById('templateName').value,
+        template_code: document.getElementById('templateCode').value,
+        item_type: document.getElementById('templateType').value,
+        rarity_code: document.getElementById('templateRarity').value,
+        is_enabled: statusValue === 'active',
+        image_url: document.getElementById('templateIcon').value || null,
+        reference_price_points: parseFloat(document.getElementById('templateValue').value) || 0,
+        description: document.getElementById('templateDescription').value || null,
+        meta: meta
       };
 
-      if (!data.name || !data.code) {
+      if (!data.display_name || !data.template_code) {
         alert('请填写模板名称和编码');
         return;
       }
@@ -418,7 +441,7 @@
       showLoading();
       try {
         const url = templateId
-          ? API.buildURL(API_ENDPOINTS.ITEM_TEMPLATE.UPDATE, { template_id: templateId })
+          ? API.buildURL(API_ENDPOINTS.ITEM_TEMPLATE.UPDATE, { id: templateId })
           : API_ENDPOINTS.ITEM_TEMPLATE.CREATE;
         const method = templateId ? 'PUT' : 'POST';
 
@@ -447,7 +470,8 @@
 
       showLoading();
       try {
-        const response = await apiRequest(API.buildURL(API_ENDPOINTS.ITEM_TEMPLATE.DELETE, { template_id: templateId }), {
+        // 使用后端字段名 id
+        const response = await apiRequest(API.buildURL(API_ENDPOINTS.ITEM_TEMPLATE.DELETE, { id: templateId }), {
           method: 'DELETE'
         });
 

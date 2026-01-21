@@ -8,18 +8,30 @@
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
   <link href="/admin/css/common.css" rel="stylesheet">
   <style>
-    .dict-type-card {
+    .dict-tab-btn {
       cursor: pointer;
       transition: all 0.3s ease;
-      border-left: 3px solid transparent;
+      border-left: 4px solid transparent;
     }
-    .dict-type-card:hover,
-    .dict-type-card.active {
+    .dict-tab-btn:hover,
+    .dict-tab-btn.active {
       border-left-color: #0d6efd;
-      background: #f8f9fa;
+      background: #e7f1ff;
     }
     .dict-item-row:hover {
       background: #f8f9fa;
+    }
+    .color-preview {
+      display: inline-block;
+      width: 20px;
+      height: 20px;
+      border-radius: 4px;
+      border: 1px solid #dee2e6;
+      vertical-align: middle;
+    }
+    .tier-badge {
+      font-weight: bold;
+      min-width: 24px;
     }
   </style>
 </head>
@@ -38,54 +50,108 @@
 
   <div class="container-fluid mt-4">
     <div class="row">
-      <!-- 左侧：字典类型列表 -->
-      <div class="col-md-4">
+      <!-- 左侧：字典类型选择 -->
+      <div class="col-md-3">
         <div class="card">
-          <div class="card-header bg-white d-flex justify-content-between align-items-center">
-            <h6 class="mb-0"><i class="bi bi-folder"></i> 字典类型</h6>
-            <button class="btn btn-sm btn-success" onclick="openTypeModal()">
-              <i class="bi bi-plus"></i> 新增
-            </button>
+          <div class="card-header bg-white">
+            <h6 class="mb-0"><i class="bi bi-book"></i> 字典类型</h6>
           </div>
-          <div class="card-body p-0" id="dictTypeList" style="max-height: 600px; overflow-y: auto;">
-            <!-- 动态生成 -->
+          <div class="card-body p-0">
+            <div class="dict-tab-btn p-3 border-bottom active" data-type="categories" onclick="switchDictType('categories')">
+              <div class="d-flex justify-content-between align-items-center">
+                <div>
+                  <h6 class="mb-1"><i class="bi bi-folder text-primary"></i> 物品类目</h6>
+                  <small class="text-muted">category_defs</small>
+                </div>
+                <span class="badge bg-primary" id="categoriesCount">-</span>
+              </div>
+            </div>
+            <div class="dict-tab-btn p-3 border-bottom" data-type="rarities" onclick="switchDictType('rarities')">
+              <div class="d-flex justify-content-between align-items-center">
+                <div>
+                  <h6 class="mb-1"><i class="bi bi-gem text-warning"></i> 稀有度</h6>
+                  <small class="text-muted">rarity_defs</small>
+                </div>
+                <span class="badge bg-warning text-dark" id="raritiesCount">-</span>
+              </div>
+            </div>
+            <div class="dict-tab-btn p-3" data-type="asset-groups" onclick="switchDictType('asset-groups')">
+              <div class="d-flex justify-content-between align-items-center">
+                <div>
+                  <h6 class="mb-1"><i class="bi bi-collection text-success"></i> 资产分组</h6>
+                  <small class="text-muted">asset_group_defs</small>
+                </div>
+                <span class="badge bg-success" id="assetGroupsCount">-</span>
+              </div>
+            </div>
           </div>
         </div>
       </div>
 
-      <!-- 右侧：字典项列表 -->
-      <div class="col-md-8">
+      <!-- 右侧：字典数据表格 -->
+      <div class="col-md-9">
         <div class="card">
           <div class="card-header bg-white d-flex justify-content-between align-items-center">
             <h6 class="mb-0">
-              <i class="bi bi-list-ul"></i> 字典项 
-              <span class="text-muted small" id="currentTypeName">- 请选择字典类型</span>
+              <i class="bi bi-list-ul"></i> 
+              <span id="currentDictTitle">物品类目列表</span>
             </h6>
-            <button class="btn btn-sm btn-success" id="addItemBtn" onclick="openItemModal()" disabled>
-              <i class="bi bi-plus"></i> 新增字典项
+            <button class="btn btn-sm btn-success" id="addBtn" onclick="openAddModal()">
+              <i class="bi bi-plus"></i> 新增
             </button>
           </div>
           <div class="card-body">
-            <div class="table-responsive">
+            <!-- 类目表格 -->
+            <div id="categoriesTable" class="table-responsive">
               <table class="table table-hover">
                 <thead>
                   <tr>
-                    <th style="width: 60px;">排序</th>
-                    <th>字典值</th>
+                    <th>类目代码</th>
                     <th>显示名称</th>
-                    <th>扩展信息</th>
+                    <th>图标</th>
+                    <th>排序</th>
                     <th>状态</th>
                     <th style="width: 120px;">操作</th>
                   </tr>
                 </thead>
-                <tbody id="dictItemList">
+                <tbody id="categoriesList"></tbody>
+              </table>
+            </div>
+
+            <!-- 稀有度表格 -->
+            <div id="raritiesTable" class="table-responsive" style="display: none;">
+              <table class="table table-hover">
+                <thead>
                   <tr>
-                    <td colspan="6" class="text-center text-muted py-4">
-                      <i class="bi bi-hand-index" style="font-size: 2rem;"></i>
-                      <p class="mt-2">请先选择左侧字典类型</p>
-                    </td>
+                    <th>稀有度代码</th>
+                    <th>显示名称</th>
+                    <th>等级</th>
+                    <th>颜色</th>
+                    <th>排序</th>
+                    <th>状态</th>
+                    <th style="width: 120px;">操作</th>
                   </tr>
-                </tbody>
+                </thead>
+                <tbody id="raritiesList"></tbody>
+              </table>
+            </div>
+
+            <!-- 资产分组表格 -->
+            <div id="assetGroupsTable" class="table-responsive" style="display: none;">
+              <table class="table table-hover">
+                <thead>
+                  <tr>
+                    <th>分组代码</th>
+                    <th>显示名称</th>
+                    <th>分组类型</th>
+                    <th>颜色</th>
+                    <th>可交易</th>
+                    <th>排序</th>
+                    <th>状态</th>
+                    <th style="width: 120px;">操作</th>
+                  </tr>
+                </thead>
+                <tbody id="assetGroupsList"></tbody>
               </table>
             </div>
           </div>
@@ -94,86 +160,182 @@
     </div>
   </div>
 
-  <!-- 字典类型模态框 -->
-  <div class="modal fade" id="typeModal" tabindex="-1">
+  <!-- 类目编辑模态框 -->
+  <div class="modal fade" id="categoryModal" tabindex="-1">
     <div class="modal-dialog">
       <div class="modal-content">
         <div class="modal-header">
-          <h5 class="modal-title" id="typeModalTitle"><i class="bi bi-folder-plus"></i> 新增字典类型</h5>
+          <h5 class="modal-title" id="categoryModalTitle"><i class="bi bi-folder-plus"></i> 新增类目</h5>
           <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
         </div>
         <div class="modal-body">
-          <form id="typeForm">
-            <input type="hidden" id="typeId">
+          <form id="categoryForm">
+            <input type="hidden" id="categoryEditCode">
             <div class="mb-3">
-              <label class="form-label">类型编码 <span class="text-danger">*</span></label>
-              <input type="text" class="form-control" id="typeCode" required placeholder="如：gender、status">
-              <small class="text-muted">唯一标识，创建后不可修改</small>
+              <label class="form-label">类目代码 <span class="text-danger">*</span></label>
+              <input type="text" class="form-control" id="categoryCode" required placeholder="如：consumable、equipment">
+              <small class="text-muted">小写字母开头，仅包含小写字母、数字和下划线</small>
             </div>
             <div class="mb-3">
-              <label class="form-label">类型名称 <span class="text-danger">*</span></label>
-              <input type="text" class="form-control" id="typeName" required placeholder="如：性别、状态">
+              <label class="form-label">显示名称 <span class="text-danger">*</span></label>
+              <input type="text" class="form-control" id="categoryDisplayName" required placeholder="如：消耗品、装备">
             </div>
             <div class="mb-3">
-              <label class="form-label">类型描述</label>
-              <textarea class="form-control" id="typeDescription" rows="2"></textarea>
+              <label class="form-label">描述</label>
+              <textarea class="form-control" id="categoryDescription" rows="2"></textarea>
             </div>
             <div class="mb-3">
-              <label class="form-label">状态</label>
-              <select class="form-select" id="typeStatus">
-                <option value="active">启用</option>
-                <option value="inactive">禁用</option>
-              </select>
+              <label class="form-label">图标URL</label>
+              <input type="text" class="form-control" id="categoryIconUrl" placeholder="https://...">
+            </div>
+            <div class="row">
+              <div class="col-md-6 mb-3">
+                <label class="form-label">排序</label>
+                <input type="number" class="form-control" id="categorySortOrder" value="0" min="0">
+              </div>
+              <div class="col-md-6 mb-3">
+                <label class="form-label">状态</label>
+                <select class="form-select" id="categoryIsEnabled">
+                  <option value="true">启用</option>
+                  <option value="false">禁用</option>
+                </select>
+              </div>
             </div>
           </form>
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
-          <button type="button" class="btn btn-primary" onclick="submitType()">保存</button>
+          <button type="button" class="btn btn-primary" onclick="submitCategory()">保存</button>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- 字典项模态框 -->
-  <div class="modal fade" id="itemModal" tabindex="-1">
+  <!-- 稀有度编辑模态框 -->
+  <div class="modal fade" id="rarityModal" tabindex="-1">
     <div class="modal-dialog">
       <div class="modal-content">
         <div class="modal-header">
-          <h5 class="modal-title" id="itemModalTitle"><i class="bi bi-plus-circle"></i> 新增字典项</h5>
+          <h5 class="modal-title" id="rarityModalTitle"><i class="bi bi-gem"></i> 新增稀有度</h5>
           <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
         </div>
         <div class="modal-body">
-          <form id="itemForm">
-            <input type="hidden" id="itemId">
+          <form id="rarityForm">
+            <input type="hidden" id="rarityEditCode">
             <div class="mb-3">
-              <label class="form-label">字典值 <span class="text-danger">*</span></label>
-              <input type="text" class="form-control" id="itemValue" required placeholder="存储值">
+              <label class="form-label">稀有度代码 <span class="text-danger">*</span></label>
+              <input type="text" class="form-control" id="rarityCode" required placeholder="如：common、rare、legendary">
             </div>
             <div class="mb-3">
               <label class="form-label">显示名称 <span class="text-danger">*</span></label>
-              <input type="text" class="form-control" id="itemLabel" required placeholder="显示文本">
+              <input type="text" class="form-control" id="rarityDisplayName" required placeholder="如：普通、稀有、传说">
             </div>
             <div class="mb-3">
-              <label class="form-label">排序</label>
-              <input type="number" class="form-control" id="itemSort" value="0" min="0">
+              <label class="form-label">描述</label>
+              <textarea class="form-control" id="rarityDescription" rows="2"></textarea>
             </div>
-            <div class="mb-3">
-              <label class="form-label">扩展信息 (JSON)</label>
-              <textarea class="form-control font-monospace" id="itemExtra" rows="2" placeholder='{"css": "badge-success"}'></textarea>
+            <div class="row">
+              <div class="col-md-6 mb-3">
+                <label class="form-label">等级 (tier)</label>
+                <input type="number" class="form-control" id="rarityTier" value="1" min="1">
+                <small class="text-muted">数值越大越稀有</small>
+              </div>
+              <div class="col-md-6 mb-3">
+                <label class="form-label">主题颜色</label>
+                <div class="input-group">
+                  <input type="color" class="form-control form-control-color" id="rarityColorPicker" value="#6c757d">
+                  <input type="text" class="form-control" id="rarityColorHex" placeholder="#RRGGBB">
+                </div>
+              </div>
             </div>
-            <div class="mb-3">
-              <label class="form-label">状态</label>
-              <select class="form-select" id="itemStatus">
-                <option value="active">启用</option>
-                <option value="inactive">禁用</option>
-              </select>
+            <div class="row">
+              <div class="col-md-6 mb-3">
+                <label class="form-label">排序</label>
+                <input type="number" class="form-control" id="raritySortOrder" value="0" min="0">
+              </div>
+              <div class="col-md-6 mb-3">
+                <label class="form-label">状态</label>
+                <select class="form-select" id="rarityIsEnabled">
+                  <option value="true">启用</option>
+                  <option value="false">禁用</option>
+                </select>
+              </div>
             </div>
           </form>
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
-          <button type="button" class="btn btn-primary" onclick="submitItem()">保存</button>
+          <button type="button" class="btn btn-primary" onclick="submitRarity()">保存</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 资产分组编辑模态框 -->
+  <div class="modal fade" id="assetGroupModal" tabindex="-1">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="assetGroupModalTitle"><i class="bi bi-collection"></i> 新增资产分组</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <form id="assetGroupForm">
+            <input type="hidden" id="assetGroupEditCode">
+            <div class="mb-3">
+              <label class="form-label">分组代码 <span class="text-danger">*</span></label>
+              <input type="text" class="form-control" id="assetGroupCode" required placeholder="如：material、currency">
+            </div>
+            <div class="mb-3">
+              <label class="form-label">显示名称 <span class="text-danger">*</span></label>
+              <input type="text" class="form-control" id="assetGroupDisplayName" required placeholder="如：材料、货币">
+            </div>
+            <div class="mb-3">
+              <label class="form-label">描述</label>
+              <textarea class="form-control" id="assetGroupDescription" rows="2"></textarea>
+            </div>
+            <div class="row">
+              <div class="col-md-6 mb-3">
+                <label class="form-label">分组类型</label>
+                <select class="form-select" id="assetGroupType">
+                  <option value="system">系统 (system)</option>
+                  <option value="material" selected>材料 (material)</option>
+                  <option value="custom">自定义 (custom)</option>
+                </select>
+              </div>
+              <div class="col-md-6 mb-3">
+                <label class="form-label">主题颜色</label>
+                <div class="input-group">
+                  <input type="color" class="form-control form-control-color" id="assetGroupColorPicker" value="#28a745">
+                  <input type="text" class="form-control" id="assetGroupColorHex" placeholder="#RRGGBB">
+                </div>
+              </div>
+            </div>
+            <div class="row">
+              <div class="col-md-4 mb-3">
+                <label class="form-label">排序</label>
+                <input type="number" class="form-control" id="assetGroupSortOrder" value="0" min="0">
+              </div>
+              <div class="col-md-4 mb-3">
+                <label class="form-label">可交易</label>
+                <select class="form-select" id="assetGroupIsTradable">
+                  <option value="true">是</option>
+                  <option value="false">否</option>
+                </select>
+              </div>
+              <div class="col-md-4 mb-3">
+                <label class="form-label">状态</label>
+                <select class="form-select" id="assetGroupIsEnabled">
+                  <option value="true">启用</option>
+                  <option value="false">禁用</option>
+                </select>
+              </div>
+            </div>
+          </form>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+          <button type="button" class="btn btn-primary" onclick="submitAssetGroup()">保存</button>
         </div>
       </div>
     </div>
@@ -189,9 +351,16 @@
   <script src="/admin/js/admin-common.js"></script>
   <script src="/admin/js/api-config.js"></script>
   <script>
-    let dictTypes = [];
-    let dictItems = [];
-    let currentTypeCode = null;
+    // 当前选中的字典类型
+    let currentDictType = 'categories';
+    
+    // 数据缓存
+    let categoriesData = [];
+    let raritiesData = [];
+    let assetGroupsData = [];
+    
+    // 防重复提交标志
+    let isSubmitting = false;
 
     document.addEventListener('DOMContentLoaded', function() {
       const userInfo = getCurrentUser();
@@ -200,309 +369,493 @@
       }
       document.getElementById('logoutBtn').addEventListener('click', logout);
       
-      loadDictTypes();
+      // 颜色选择器同步
+      document.getElementById('rarityColorPicker').addEventListener('input', function() {
+        document.getElementById('rarityColorHex').value = this.value;
+      });
+      document.getElementById('rarityColorHex').addEventListener('input', function() {
+        if (/^#[0-9A-Fa-f]{6}$/.test(this.value)) {
+          document.getElementById('rarityColorPicker').value = this.value;
+        }
+      });
+      document.getElementById('assetGroupColorPicker').addEventListener('input', function() {
+        document.getElementById('assetGroupColorHex').value = this.value;
+      });
+      document.getElementById('assetGroupColorHex').addEventListener('input', function() {
+        if (/^#[0-9A-Fa-f]{6}$/.test(this.value)) {
+          document.getElementById('assetGroupColorPicker').value = this.value;
+        }
+      });
+      
+      // 加载所有数据
+      loadAllData();
     });
 
-    async function loadDictTypes() {
+    // 加载所有字典数据
+    async function loadAllData() {
       showLoading();
       try {
-        const response = await apiRequest(API_ENDPOINTS.DICT.TYPES);
-        if (response && response.success) {
-          dictTypes = response.data.types || response.data || [];
-          renderDictTypes(dictTypes);
-        } else {
-          showError('加载失败', response?.message || '获取字典类型失败');
+        // 并行加载三种字典
+        const [catRes, rarRes, groupRes] = await Promise.all([
+          apiRequest(API_ENDPOINTS.DICT.CATEGORIES),
+          apiRequest(API_ENDPOINTS.DICT.RARITIES),
+          apiRequest(API_ENDPOINTS.DICT.ASSET_GROUPS)
+        ]);
+
+        if (catRes && catRes.success) {
+          categoriesData = catRes.data.items || [];
+          document.getElementById('categoriesCount').textContent = categoriesData.length;
         }
+        
+        if (rarRes && rarRes.success) {
+          raritiesData = rarRes.data.items || [];
+          document.getElementById('raritiesCount').textContent = raritiesData.length;
+        }
+        
+        if (groupRes && groupRes.success) {
+          assetGroupsData = groupRes.data.items || [];
+          document.getElementById('assetGroupsCount').textContent = assetGroupsData.length;
+        }
+
+        // 渲染当前选中的字典
+        renderCurrentDict();
       } catch (error) {
-        console.error('加载字典类型失败:', error);
+        console.error('加载字典数据失败:', error);
         showError('加载失败', error.message);
       } finally {
         hideLoading();
       }
     }
 
-    function renderDictTypes(types) {
-      const container = document.getElementById('dictTypeList');
-
-      if (!types || types.length === 0) {
-        container.innerHTML = `
-          <div class="text-center py-4 text-muted">
-            <i class="bi bi-folder" style="font-size: 2rem;"></i>
-            <p class="mt-2 mb-0">暂无字典类型</p>
-          </div>
-        `;
-        return;
-      }
-
-      container.innerHTML = types.map(type => `
-        <div class="dict-type-card p-3 border-bottom ${currentTypeCode === type.type_code ? 'active' : ''}" 
-             onclick="selectDictType('${type.type_code}', '${escapeHtml(type.type_name)}')">
-          <div class="d-flex justify-content-between align-items-center">
-            <div>
-              <h6 class="mb-1">${escapeHtml(type.type_name)}</h6>
-              <small class="text-muted">${escapeHtml(type.type_code)}</small>
-            </div>
-            <div>
-              <span class="badge ${type.status === 'active' ? 'bg-success' : 'bg-secondary'} me-1">
-                ${type.status === 'active' ? '启用' : '禁用'}
-              </span>
-              <button class="btn btn-sm btn-link text-primary p-0" onclick="event.stopPropagation(); editType('${type.type_code}')">
-                <i class="bi bi-pencil"></i>
-              </button>
-            </div>
-          </div>
-          ${type.description ? `<small class="text-muted d-block mt-1">${escapeHtml(type.description)}</small>` : ''}
-        </div>
-      `).join('');
-    }
-
-    async function selectDictType(typeCode, typeName) {
-      currentTypeCode = typeCode;
-      document.getElementById('currentTypeName').textContent = `- ${typeName}`;
-      document.getElementById('addItemBtn').disabled = false;
+    // 切换字典类型
+    function switchDictType(type) {
+      currentDictType = type;
       
       // 更新选中状态
-      document.querySelectorAll('.dict-type-card').forEach(card => {
-        card.classList.remove('active');
+      document.querySelectorAll('.dict-tab-btn').forEach(btn => {
+        btn.classList.remove('active');
+        if (btn.dataset.type === type) {
+          btn.classList.add('active');
+        }
       });
-      event.currentTarget?.classList?.add('active');
 
-      await loadDictItems(typeCode);
+      // 更新标题
+      const titles = {
+        'categories': '物品类目列表',
+        'rarities': '稀有度列表',
+        'asset-groups': '资产分组列表'
+      };
+      document.getElementById('currentDictTitle').textContent = titles[type];
+
+      // 切换表格显示
+      document.getElementById('categoriesTable').style.display = type === 'categories' ? 'block' : 'none';
+      document.getElementById('raritiesTable').style.display = type === 'rarities' ? 'block' : 'none';
+      document.getElementById('assetGroupsTable').style.display = type === 'asset-groups' ? 'block' : 'none';
+
+      renderCurrentDict();
     }
 
-    async function loadDictItems(typeCode) {
-      showLoading();
-      try {
-        const response = await apiRequest(API.buildURL(API_ENDPOINTS.DICT.ITEMS, { type_code: typeCode }));
-        if (response && response.success) {
-          dictItems = response.data.items || response.data || [];
-          renderDictItems(dictItems);
-        } else {
-          showError('加载失败', response?.message || '获取字典项失败');
-        }
-      } catch (error) {
-        console.error('加载字典项失败:', error);
-        showError('加载失败', error.message);
-      } finally {
-        hideLoading();
+    // 渲染当前字典
+    function renderCurrentDict() {
+      switch (currentDictType) {
+        case 'categories':
+          renderCategories();
+          break;
+        case 'rarities':
+          renderRarities();
+          break;
+        case 'asset-groups':
+          renderAssetGroups();
+          break;
       }
     }
 
-    function renderDictItems(items) {
-      const tbody = document.getElementById('dictItemList');
-
-      if (!items || items.length === 0) {
-        tbody.innerHTML = `
-          <tr>
-            <td colspan="6" class="text-center text-muted py-4">
-              <i class="bi bi-inbox" style="font-size: 2rem;"></i>
-              <p class="mt-2 mb-0">暂无字典项</p>
-            </td>
-          </tr>
-        `;
+    // 渲染类目列表
+    function renderCategories() {
+      const tbody = document.getElementById('categoriesList');
+      
+      if (categoriesData.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="6" class="text-center text-muted py-4">暂无数据</td></tr>`;
         return;
       }
 
-      tbody.innerHTML = items.map(item => `
+      tbody.innerHTML = categoriesData.map(item => `
         <tr class="dict-item-row">
+          <td><code>${escapeHtml(item.category_code)}</code></td>
+          <td>${escapeHtml(item.display_name)}</td>
+          <td>${item.icon_url ? `<img src="${escapeHtml(item.icon_url)}" alt="" style="width:24px;height:24px;">` : '-'}</td>
           <td><span class="badge bg-secondary">${item.sort_order || 0}</span></td>
-          <td><code>${escapeHtml(item.item_value || item.value)}</code></td>
-          <td>${escapeHtml(item.item_label || item.label)}</td>
+          <td><span class="badge ${item.is_enabled ? 'bg-success' : 'bg-secondary'}">${item.is_enabled ? '启用' : '禁用'}</span></td>
           <td>
-            ${item.extra_info || item.extra ? 
-              `<small class="text-muted font-monospace">${truncateText(JSON.stringify(item.extra_info || item.extra), 30)}</small>` : 
-              '-'}
-          </td>
-          <td>
-            <span class="badge ${item.status === 'active' ? 'bg-success' : 'bg-secondary'}">
-              ${item.status === 'active' ? '启用' : '禁用'}
-            </span>
-          </td>
-          <td>
-            <button class="btn btn-sm btn-outline-primary me-1" onclick="editItem(${item.item_id || item.id})">
-              <i class="bi bi-pencil"></i>
-            </button>
-            <button class="btn btn-sm btn-outline-danger" onclick="deleteItem(${item.item_id || item.id})">
-              <i class="bi bi-trash"></i>
-            </button>
+            <button class="btn btn-sm btn-outline-primary me-1" onclick="editCategory('${item.category_code}')"><i class="bi bi-pencil"></i></button>
+            <button class="btn btn-sm btn-outline-danger" onclick="deleteCategory('${item.category_code}')"><i class="bi bi-trash"></i></button>
           </td>
         </tr>
       `).join('');
     }
 
-    function openTypeModal() {
-      document.getElementById('typeModalTitle').innerHTML = '<i class="bi bi-folder-plus"></i> 新增字典类型';
-      document.getElementById('typeForm').reset();
-      document.getElementById('typeId').value = '';
-      document.getElementById('typeCode').disabled = false;
-      new bootstrap.Modal(document.getElementById('typeModal')).show();
-    }
-
-    async function editType(typeCode) {
-      const type = dictTypes.find(t => t.type_code === typeCode);
-      if (!type) return;
-
-      document.getElementById('typeModalTitle').innerHTML = '<i class="bi bi-pencil"></i> 编辑字典类型';
-      document.getElementById('typeId').value = type.type_id || type.id;
-      document.getElementById('typeCode').value = type.type_code;
-      document.getElementById('typeCode').disabled = true;
-      document.getElementById('typeName').value = type.type_name || '';
-      document.getElementById('typeDescription').value = type.description || '';
-      document.getElementById('typeStatus').value = type.status || 'active';
+    // 渲染稀有度列表
+    function renderRarities() {
+      const tbody = document.getElementById('raritiesList');
       
-      new bootstrap.Modal(document.getElementById('typeModal')).show();
-    }
-
-    async function submitType() {
-      const typeId = document.getElementById('typeId').value;
-      const data = {
-        type_code: document.getElementById('typeCode').value,
-        type_name: document.getElementById('typeName').value,
-        description: document.getElementById('typeDescription').value,
-        status: document.getElementById('typeStatus').value
-      };
-
-      if (!data.type_code || !data.type_name) {
-        alert('请填写类型编码和名称');
+      if (raritiesData.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="7" class="text-center text-muted py-4">暂无数据</td></tr>`;
         return;
       }
 
-      showLoading();
-      try {
-        const url = typeId
-          ? API.buildURL(API_ENDPOINTS.DICT.UPDATE_TYPE, { type_id: typeId })
-          : API_ENDPOINTS.DICT.CREATE_TYPE;
-        const method = typeId ? 'PUT' : 'POST';
-
-        const response = await apiRequest(url, {
-          method: method,
-          body: JSON.stringify(data)
-        });
-
-        if (response && response.success) {
-          bootstrap.Modal.getInstance(document.getElementById('typeModal')).hide();
-          alert(`✅ ${typeId ? '更新' : '创建'}成功`);
-          loadDictTypes();
-        } else {
-          showError('保存失败', response?.message || '操作失败');
-        }
-      } catch (error) {
-        console.error('保存字典类型失败:', error);
-        showError('保存失败', error.message);
-      } finally {
-        hideLoading();
-      }
+      tbody.innerHTML = raritiesData.map(item => `
+        <tr class="dict-item-row">
+          <td><code>${escapeHtml(item.rarity_code)}</code></td>
+          <td>${escapeHtml(item.display_name)}</td>
+          <td><span class="badge bg-info tier-badge">${item.tier || 1}</span></td>
+          <td>
+            ${item.color_hex ? 
+              `<span class="color-preview" style="background:${item.color_hex}"></span> <code>${item.color_hex}</code>` : 
+              '-'}
+          </td>
+          <td><span class="badge bg-secondary">${item.sort_order || 0}</span></td>
+          <td><span class="badge ${item.is_enabled ? 'bg-success' : 'bg-secondary'}">${item.is_enabled ? '启用' : '禁用'}</span></td>
+          <td>
+            <button class="btn btn-sm btn-outline-primary me-1" onclick="editRarity('${item.rarity_code}')"><i class="bi bi-pencil"></i></button>
+            <button class="btn btn-sm btn-outline-danger" onclick="deleteRarity('${item.rarity_code}')"><i class="bi bi-trash"></i></button>
+          </td>
+        </tr>
+      `).join('');
     }
 
-    function openItemModal() {
-      if (!currentTypeCode) {
-        alert('请先选择字典类型');
+    // 渲染资产分组列表
+    function renderAssetGroups() {
+      const tbody = document.getElementById('assetGroupsList');
+      
+      if (assetGroupsData.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="8" class="text-center text-muted py-4">暂无数据</td></tr>`;
         return;
       }
-      document.getElementById('itemModalTitle').innerHTML = '<i class="bi bi-plus-circle"></i> 新增字典项';
-      document.getElementById('itemForm').reset();
-      document.getElementById('itemId').value = '';
-      new bootstrap.Modal(document.getElementById('itemModal')).show();
+
+      const typeLabels = { system: '系统', material: '材料', custom: '自定义' };
+
+      tbody.innerHTML = assetGroupsData.map(item => `
+        <tr class="dict-item-row">
+          <td><code>${escapeHtml(item.group_code)}</code></td>
+          <td>${escapeHtml(item.display_name)}</td>
+          <td><span class="badge bg-info">${typeLabels[item.group_type] || item.group_type}</span></td>
+          <td>
+            ${item.color_hex ? 
+              `<span class="color-preview" style="background:${item.color_hex}"></span> <code>${item.color_hex}</code>` : 
+              '-'}
+          </td>
+          <td><span class="badge ${item.is_tradable ? 'bg-success' : 'bg-warning'}">${item.is_tradable ? '是' : '否'}</span></td>
+          <td><span class="badge bg-secondary">${item.sort_order || 0}</span></td>
+          <td><span class="badge ${item.is_enabled ? 'bg-success' : 'bg-secondary'}">${item.is_enabled ? '启用' : '禁用'}</span></td>
+          <td>
+            <button class="btn btn-sm btn-outline-primary me-1" onclick="editAssetGroup('${item.group_code}')"><i class="bi bi-pencil"></i></button>
+            <button class="btn btn-sm btn-outline-danger" onclick="deleteAssetGroup('${item.group_code}')"><i class="bi bi-trash"></i></button>
+          </td>
+        </tr>
+      `).join('');
     }
 
-    async function editItem(itemId) {
-      const item = dictItems.find(i => (i.item_id || i.id) === itemId);
+    // 打开新增模态框
+    function openAddModal() {
+      switch (currentDictType) {
+        case 'categories':
+          document.getElementById('categoryModalTitle').innerHTML = '<i class="bi bi-folder-plus"></i> 新增类目';
+          document.getElementById('categoryForm').reset();
+          document.getElementById('categoryEditCode').value = '';
+          document.getElementById('categoryCode').disabled = false;
+          new bootstrap.Modal(document.getElementById('categoryModal')).show();
+          break;
+        case 'rarities':
+          document.getElementById('rarityModalTitle').innerHTML = '<i class="bi bi-gem"></i> 新增稀有度';
+          document.getElementById('rarityForm').reset();
+          document.getElementById('rarityEditCode').value = '';
+          document.getElementById('rarityCode').disabled = false;
+          document.getElementById('rarityColorPicker').value = '#6c757d';
+          document.getElementById('rarityColorHex').value = '';
+          new bootstrap.Modal(document.getElementById('rarityModal')).show();
+          break;
+        case 'asset-groups':
+          document.getElementById('assetGroupModalTitle').innerHTML = '<i class="bi bi-collection"></i> 新增资产分组';
+          document.getElementById('assetGroupForm').reset();
+          document.getElementById('assetGroupEditCode').value = '';
+          document.getElementById('assetGroupCode').disabled = false;
+          document.getElementById('assetGroupColorPicker').value = '#28a745';
+          document.getElementById('assetGroupColorHex').value = '';
+          new bootstrap.Modal(document.getElementById('assetGroupModal')).show();
+          break;
+      }
+    }
+
+    // ===== 类目操作 =====
+    function editCategory(code) {
+      const item = categoriesData.find(c => c.category_code === code);
       if (!item) return;
 
-      document.getElementById('itemModalTitle').innerHTML = '<i class="bi bi-pencil"></i> 编辑字典项';
-      document.getElementById('itemId').value = item.item_id || item.id;
-      document.getElementById('itemValue').value = item.item_value || item.value || '';
-      document.getElementById('itemLabel').value = item.item_label || item.label || '';
-      document.getElementById('itemSort').value = item.sort_order || 0;
-      document.getElementById('itemExtra').value = item.extra_info || item.extra ? JSON.stringify(item.extra_info || item.extra, null, 2) : '';
-      document.getElementById('itemStatus').value = item.status || 'active';
+      document.getElementById('categoryModalTitle').innerHTML = '<i class="bi bi-pencil"></i> 编辑类目';
+      document.getElementById('categoryEditCode').value = item.category_code;
+      document.getElementById('categoryCode').value = item.category_code;
+      document.getElementById('categoryCode').disabled = true;
+      document.getElementById('categoryDisplayName').value = item.display_name || '';
+      document.getElementById('categoryDescription').value = item.description || '';
+      document.getElementById('categoryIconUrl').value = item.icon_url || '';
+      document.getElementById('categorySortOrder').value = item.sort_order || 0;
+      document.getElementById('categoryIsEnabled').value = item.is_enabled ? 'true' : 'false';
       
-      new bootstrap.Modal(document.getElementById('itemModal')).show();
+      new bootstrap.Modal(document.getElementById('categoryModal')).show();
     }
 
-    async function submitItem() {
-      const itemId = document.getElementById('itemId').value;
+    async function submitCategory() {
+      if (isSubmitting) return;
       
-      let extraInfo = null;
-      try {
-        const extraStr = document.getElementById('itemExtra').value;
-        if (extraStr.trim()) {
-          extraInfo = JSON.parse(extraStr);
-        }
-      } catch (e) {
-        alert('扩展信息JSON格式错误');
-        return;
-      }
-
+      const editCode = document.getElementById('categoryEditCode').value;
       const data = {
-        type_code: currentTypeCode,
-        item_value: document.getElementById('itemValue').value,
-        item_label: document.getElementById('itemLabel').value,
-        sort_order: parseInt(document.getElementById('itemSort').value) || 0,
-        extra_info: extraInfo,
-        status: document.getElementById('itemStatus').value
+        category_code: document.getElementById('categoryCode').value.trim(),
+        display_name: document.getElementById('categoryDisplayName').value.trim(),
+        description: document.getElementById('categoryDescription').value.trim() || null,
+        icon_url: document.getElementById('categoryIconUrl').value.trim() || null,
+        sort_order: parseInt(document.getElementById('categorySortOrder').value) || 0,
+        is_enabled: document.getElementById('categoryIsEnabled').value === 'true'
       };
 
-      if (!data.item_value || !data.item_label) {
-        alert('请填写字典值和显示名称');
+      if (!data.category_code || !data.display_name) {
+        alert('请填写类目代码和显示名称');
         return;
       }
 
+      // 自动转换为小写并验证代码格式
+      data.category_code = data.category_code.toLowerCase();
+      if (!/^[a-z][a-z0-9_]*$/.test(data.category_code)) {
+        alert('类目代码格式错误：必须以小写字母开头，仅包含小写字母、数字和下划线');
+        return;
+      }
+
+      isSubmitting = true;
       showLoading();
       try {
-        const url = itemId
-          ? API.buildURL(API_ENDPOINTS.DICT.UPDATE_ITEM, { item_id: itemId })
-          : API_ENDPOINTS.DICT.CREATE_ITEM;
-        const method = itemId ? 'PUT' : 'POST';
+        const url = editCode
+          ? API.buildURL(API_ENDPOINTS.DICT.UPDATE_CATEGORY, { code: editCode })
+          : API_ENDPOINTS.DICT.CREATE_CATEGORY;
+        const method = editCode ? 'PUT' : 'POST';
 
-        const response = await apiRequest(url, {
-          method: method,
-          body: JSON.stringify(data)
-        });
+        const response = await apiRequest(url, { method, body: JSON.stringify(data) });
 
         if (response && response.success) {
-          bootstrap.Modal.getInstance(document.getElementById('itemModal')).hide();
-          alert(`✅ ${itemId ? '更新' : '创建'}成功`);
-          loadDictItems(currentTypeCode);
+          bootstrap.Modal.getInstance(document.getElementById('categoryModal')).hide();
+          alert(`✅ ${editCode ? '更新' : '创建'}成功`);
+          loadAllData();
         } else {
           showError('保存失败', response?.message || '操作失败');
         }
       } catch (error) {
-        console.error('保存字典项失败:', error);
         showError('保存失败', error.message);
       } finally {
+        isSubmitting = false;
         hideLoading();
       }
     }
 
-    async function deleteItem(itemId) {
-      if (!confirm('确定要删除此字典项吗？')) return;
+    async function deleteCategory(code) {
+      if (!confirm(`确定要删除类目 "${code}" 吗？`)) return;
 
       showLoading();
       try {
-        const response = await apiRequest(API.buildURL(API_ENDPOINTS.DICT.DELETE_ITEM, { item_id: itemId }), {
-          method: 'DELETE'
-        });
-
+        const response = await apiRequest(API.buildURL(API_ENDPOINTS.DICT.DELETE_CATEGORY, { code }), { method: 'DELETE' });
         if (response && response.success) {
           alert('✅ 删除成功');
-          loadDictItems(currentTypeCode);
+          loadAllData();
         } else {
           showError('删除失败', response?.message || '操作失败');
         }
       } catch (error) {
-        console.error('删除字典项失败:', error);
         showError('删除失败', error.message);
       } finally {
         hideLoading();
       }
     }
 
-    function truncateText(text, maxLength) {
-      if (!text) return '';
-      return text.length > maxLength ? text.substring(0, maxLength) + '...' : text;
+    // ===== 稀有度操作 =====
+    function editRarity(code) {
+      const item = raritiesData.find(r => r.rarity_code === code);
+      if (!item) return;
+
+      document.getElementById('rarityModalTitle').innerHTML = '<i class="bi bi-pencil"></i> 编辑稀有度';
+      document.getElementById('rarityEditCode').value = item.rarity_code;
+      document.getElementById('rarityCode').value = item.rarity_code;
+      document.getElementById('rarityCode').disabled = true;
+      document.getElementById('rarityDisplayName').value = item.display_name || '';
+      document.getElementById('rarityDescription').value = item.description || '';
+      document.getElementById('rarityTier').value = item.tier || 1;
+      document.getElementById('rarityColorHex').value = item.color_hex || '';
+      document.getElementById('rarityColorPicker').value = item.color_hex || '#6c757d';
+      document.getElementById('raritySortOrder').value = item.sort_order || 0;
+      document.getElementById('rarityIsEnabled').value = item.is_enabled ? 'true' : 'false';
+      
+      new bootstrap.Modal(document.getElementById('rarityModal')).show();
     }
 
+    async function submitRarity() {
+      if (isSubmitting) return;
+      
+      const editCode = document.getElementById('rarityEditCode').value;
+      const data = {
+        rarity_code: document.getElementById('rarityCode').value.trim(),
+        display_name: document.getElementById('rarityDisplayName').value.trim(),
+        description: document.getElementById('rarityDescription').value.trim() || null,
+        tier: parseInt(document.getElementById('rarityTier').value) || 1,
+        color_hex: document.getElementById('rarityColorHex').value.trim() || null,
+        sort_order: parseInt(document.getElementById('raritySortOrder').value) || 0,
+        is_enabled: document.getElementById('rarityIsEnabled').value === 'true'
+      };
+
+      if (!data.rarity_code || !data.display_name) {
+        alert('请填写稀有度代码和显示名称');
+        return;
+      }
+
+      // 自动转换为小写并验证代码格式
+      data.rarity_code = data.rarity_code.toLowerCase();
+      if (!/^[a-z][a-z0-9_]*$/.test(data.rarity_code)) {
+        alert('稀有度代码格式错误：必须以小写字母开头，仅包含小写字母、数字和下划线');
+        return;
+      }
+
+      isSubmitting = true;
+      showLoading();
+      try {
+        const url = editCode
+          ? API.buildURL(API_ENDPOINTS.DICT.UPDATE_RARITY, { code: editCode })
+          : API_ENDPOINTS.DICT.CREATE_RARITY;
+        const method = editCode ? 'PUT' : 'POST';
+
+        const response = await apiRequest(url, { method, body: JSON.stringify(data) });
+
+        if (response && response.success) {
+          bootstrap.Modal.getInstance(document.getElementById('rarityModal')).hide();
+          alert(`✅ ${editCode ? '更新' : '创建'}成功`);
+          loadAllData();
+        } else {
+          showError('保存失败', response?.message || '操作失败');
+        }
+      } catch (error) {
+        showError('保存失败', error.message);
+      } finally {
+        isSubmitting = false;
+        hideLoading();
+      }
+    }
+
+    async function deleteRarity(code) {
+      if (!confirm(`确定要删除稀有度 "${code}" 吗？`)) return;
+
+      showLoading();
+      try {
+        const response = await apiRequest(API.buildURL(API_ENDPOINTS.DICT.DELETE_RARITY, { code }), { method: 'DELETE' });
+        if (response && response.success) {
+          alert('✅ 删除成功');
+          loadAllData();
+        } else {
+          showError('删除失败', response?.message || '操作失败');
+        }
+      } catch (error) {
+        showError('删除失败', error.message);
+      } finally {
+        hideLoading();
+      }
+    }
+
+    // ===== 资产分组操作 =====
+    function editAssetGroup(code) {
+      const item = assetGroupsData.find(g => g.group_code === code);
+      if (!item) return;
+
+      document.getElementById('assetGroupModalTitle').innerHTML = '<i class="bi bi-pencil"></i> 编辑资产分组';
+      document.getElementById('assetGroupEditCode').value = item.group_code;
+      document.getElementById('assetGroupCode').value = item.group_code;
+      document.getElementById('assetGroupCode').disabled = true;
+      document.getElementById('assetGroupDisplayName').value = item.display_name || '';
+      document.getElementById('assetGroupDescription').value = item.description || '';
+      document.getElementById('assetGroupType').value = item.group_type || 'material';
+      document.getElementById('assetGroupColorHex').value = item.color_hex || '';
+      document.getElementById('assetGroupColorPicker').value = item.color_hex || '#28a745';
+      document.getElementById('assetGroupSortOrder').value = item.sort_order || 0;
+      document.getElementById('assetGroupIsTradable').value = item.is_tradable ? 'true' : 'false';
+      document.getElementById('assetGroupIsEnabled').value = item.is_enabled ? 'true' : 'false';
+      
+      new bootstrap.Modal(document.getElementById('assetGroupModal')).show();
+    }
+
+    async function submitAssetGroup() {
+      if (isSubmitting) return;
+      
+      const editCode = document.getElementById('assetGroupEditCode').value;
+      const data = {
+        group_code: document.getElementById('assetGroupCode').value.trim(),
+        display_name: document.getElementById('assetGroupDisplayName').value.trim(),
+        description: document.getElementById('assetGroupDescription').value.trim() || null,
+        group_type: document.getElementById('assetGroupType').value,
+        color_hex: document.getElementById('assetGroupColorHex').value.trim() || null,
+        sort_order: parseInt(document.getElementById('assetGroupSortOrder').value) || 0,
+        is_tradable: document.getElementById('assetGroupIsTradable').value === 'true',
+        is_enabled: document.getElementById('assetGroupIsEnabled').value === 'true'
+      };
+
+      if (!data.group_code || !data.display_name) {
+        alert('请填写分组代码和显示名称');
+        return;
+      }
+
+      // 自动转换为小写并验证代码格式
+      data.group_code = data.group_code.toLowerCase();
+      if (!/^[a-z][a-z0-9_]*$/.test(data.group_code)) {
+        alert('分组代码格式错误：必须以小写字母开头，仅包含小写字母、数字和下划线');
+        return;
+      }
+
+      isSubmitting = true;
+      showLoading();
+      try {
+        const url = editCode
+          ? API.buildURL(API_ENDPOINTS.DICT.UPDATE_ASSET_GROUP, { code: editCode })
+          : API_ENDPOINTS.DICT.CREATE_ASSET_GROUP;
+        const method = editCode ? 'PUT' : 'POST';
+
+        const response = await apiRequest(url, { method, body: JSON.stringify(data) });
+
+        if (response && response.success) {
+          bootstrap.Modal.getInstance(document.getElementById('assetGroupModal')).hide();
+          alert(`✅ ${editCode ? '更新' : '创建'}成功`);
+          loadAllData();
+        } else {
+          showError('保存失败', response?.message || '操作失败');
+        }
+      } catch (error) {
+        showError('保存失败', error.message);
+      } finally {
+        isSubmitting = false;
+        hideLoading();
+      }
+    }
+
+    async function deleteAssetGroup(code) {
+      if (!confirm(`确定要删除资产分组 "${code}" 吗？`)) return;
+
+      showLoading();
+      try {
+        const response = await apiRequest(API.buildURL(API_ENDPOINTS.DICT.DELETE_ASSET_GROUP, { code }), { method: 'DELETE' });
+        if (response && response.success) {
+          alert('✅ 删除成功');
+          loadAllData();
+        } else {
+          showError('删除失败', response?.message || '操作失败');
+        }
+      } catch (error) {
+        showError('删除失败', error.message);
+      } finally {
+        hideLoading();
+      }
+    }
+
+    // ===== 工具函数 =====
     function escapeHtml(str) {
       if (!str) return '';
       const div = document.createElement('div');
@@ -524,4 +877,3 @@
   </script>
 </body>
 </html>
-

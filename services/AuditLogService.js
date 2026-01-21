@@ -463,8 +463,6 @@ class AuditLogService {
   /**
    * 记录物品使用操作
    *
-   * 2026-01-20 技术债务清理：参数名统一为 name（与其他服务一致）
-   *
    * @param {Object} params - 参数
    * @param {number} params.operator_id - 操作员ID
    * @param {number} params.item_id - 物品ID
@@ -500,8 +498,6 @@ class AuditLogService {
    *
    * ⚠️ 注意：此方法已更新为使用独立的 'inventory_transfer' 操作类型
    * 用于物品转让的审计日志记录，提供更清晰的审计追溯
-   *
-   * 2026-01-20 技术债务清理：参数名统一为 name（与其他服务一致）
    *
    * @param {Object} params - 参数
    * @param {number} params.operator_id - 操作员ID（转让方）
@@ -546,8 +542,6 @@ class AuditLogService {
 
   /**
    * 记录物品核销操作
-   *
-   * 2026-01-20 技术债务清理：参数名统一为 name（与其他服务一致）
    *
    * @param {Object} params - 参数
    * @param {number} params.operator_id - 操作员ID（商家）

@@ -5,6 +5,10 @@ require('dotenv').config()
 
 const { sequelize } = require('./config/database')
 
+/**
+ * 数据库探查函数 - 分析项目实际数据状态
+ * @returns {Promise<void>} 无返回值，结果输出到控制台
+ */
 async function analyzeDatabase() {
   try {
     console.log('🔗 连接数据库...')
@@ -22,7 +26,7 @@ async function analyzeDatabase() {
       WHERE table_schema = DATABASE()
       ORDER BY TABLE_ROWS DESC
     `)
-    
+
     console.log('表名 | 行数 | 大小(MB)')
     console.log('-'.repeat(60))
     tables.slice(0, 30).forEach(t => {
@@ -30,8 +34,15 @@ async function analyzeDatabase() {
     })
 
     // 2. 查询关键表的结构
-    const keyTables = ['users', 'lottery_campaigns', 'lottery_prizes', 'item_instances', 'market_listings', 'trade_orders']
-    
+    const keyTables = [
+      'users',
+      'lottery_campaigns',
+      'lottery_prizes',
+      'item_instances',
+      'market_listings',
+      'trade_orders'
+    ]
+
     for (const tableName of keyTables) {
       console.log(`\n📊 === ${tableName} 表结构 ===\n`)
       const [columns] = await sequelize.query(`
@@ -39,7 +50,10 @@ async function analyzeDatabase() {
         FROM information_schema.columns 
         WHERE table_schema = DATABASE() AND table_name = '${tableName}'
       `)
-      console.log(`${tableName} 字段:`, columns.map(c => c.COLUMN_NAME))
+      console.log(
+        `${tableName} 字段:`,
+        columns.map(c => c.COLUMN_NAME)
+      )
     }
 
     // 3. 查询活动数据
@@ -136,7 +150,10 @@ async function analyzeDatabase() {
       FROM system_settings
       ORDER BY category
     `)
-    console.log('系统设置:', settings.map(s => `${s.category}.${s.setting_key}`))
+    console.log(
+      '系统设置:',
+      settings.map(s => `${s.category}.${s.setting_key}`)
+    )
 
     // 15. 查看抽奖策略配置
     console.log('\n📊 === 抽奖策略配置 ===\n')
@@ -152,7 +169,7 @@ async function analyzeDatabase() {
     console.log('\n📊 === 门店和员工 ===\n')
     const [stores] = await sequelize.query(`SELECT * FROM stores`)
     console.log('门店:', JSON.stringify(stores, null, 2))
-    
+
     const [staff] = await sequelize.query(`SELECT * FROM store_staff`)
     console.log('员工:', JSON.stringify(staff, null, 2))
 
@@ -172,7 +189,6 @@ async function analyzeDatabase() {
     console.log('配额规则:', JSON.stringify(quotaRules, null, 2))
 
     console.log('\n✅ 数据库分析完成')
-
   } catch (error) {
     console.error('❌ 数据库分析失败:', error.message)
   } finally {

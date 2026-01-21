@@ -91,16 +91,25 @@ async function loadNotifications(silent = false) {
 
     const response = await apiRequest(`${API_ENDPOINTS.NOTIFICATION.LIST}?${params.toString()}`)
 
-    if (response && response.success) {
-      allNotifications = response.data.notifications || []
+    // 处理未登录或token失效的情况（apiRequest返回undefined）
+    if (!response) {
+      console.warn('通知数据加载失败: 未获取到响应（可能是未登录或token失效）')
+      setNotificationStatisticsError('需要登录')
+      return
+    }
+
+    if (response.success) {
+      allNotifications = response.data?.notifications || []
       renderNotifications(allNotifications)
       updateStatistics(response.data)
     } else if (!silent) {
       showError('加载失败', response?.message || '获取通知失败')
+      setNotificationStatisticsError(response?.message || '加载失败')
     }
   } catch (error) {
     console.error('加载通知失败:', error)
     if (!silent) showError('加载失败', error.message)
+    setNotificationStatisticsError('请求错误')
   } finally {
     if (!silent) hideLoading()
   }
@@ -172,20 +181,33 @@ function getNotificationTypeText(type) {
 }
 
 function updateStatistics(data) {
-  if (data.statistics) {
+  if (data?.statistics) {
     document.getElementById('totalNotifications').textContent = formatNumber(
-      data.statistics.total || 0
+      data.statistics.total ?? 0
     )
     document.getElementById('unreadNotifications').textContent = formatNumber(
-      data.statistics.unread || 0
+      data.statistics.unread ?? 0
     )
     document.getElementById('todayNotifications').textContent = formatNumber(
-      data.statistics.today || 0
+      data.statistics.today ?? 0
     )
     document.getElementById('weekNotifications').textContent = formatNumber(
-      data.statistics.week || 0
+      data.statistics.week ?? 0
     )
   }
+}
+
+/**
+ * 设置通知统计数据为错误状态
+ * @param {string} message - 错误信息
+ */
+function setNotificationStatisticsError(message) {
+  const errorText = `<span class="text-danger" title="${message}">-</span>`
+  const elements = ['totalNotifications', 'unreadNotifications', 'todayNotifications', 'weekNotifications']
+  elements.forEach(id => {
+    const el = document.getElementById(id)
+    if (el) el.innerHTML = errorText
+  })
 }
 
 async function viewNotification(notificationId) {

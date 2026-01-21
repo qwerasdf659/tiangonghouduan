@@ -266,7 +266,7 @@ router.get('/user-global-states', authenticateToken, requireAdmin, async (req, r
  * 路径参数：
  * - user_id: 用户ID
  *
- * 返回：用户全局状态详情
+ * 返回：用户全局状态详情（无记录时返回默认状态，不返回404）
  */
 router.get('/user-global-states/:user_id', authenticateToken, requireAdmin, async (req, res) => {
   try {
@@ -274,8 +274,19 @@ router.get('/user-global-states/:user_id', authenticateToken, requireAdmin, asyn
 
     const state = await getLotteryMonitoringService(req).getUserGlobalState(user_id)
 
+    // 用户没有全局状态记录是正常的（新用户/未参与抽奖），返回默认值而不是404
     if (!state) {
-      return res.apiError('用户全局状态不存在', 'STATE_NOT_FOUND', null, 404)
+      return res.apiSuccess(
+        {
+          user_id,
+          total_draws: 0,
+          total_wins: 0,
+          luck_debt: 0,
+          historical_empty_rate: null,
+          message: '用户尚无抽奖记录'
+        },
+        '获取用户全局状态成功'
+      )
     }
 
     return res.apiSuccess(state, '获取用户全局状态成功')
@@ -461,6 +472,55 @@ router.get('/user-quotas/stats/:campaign_id', authenticateToken, requireAdmin, a
   } catch (error) {
     logger.error('获取活动配额统计失败:', error)
     return res.apiError(`查询失败：${error.message}`, 'GET_QUOTA_STATS_FAILED', null, 500)
+  }
+})
+
+/*
+ * ==========================================
+ * 6. 综合监控统计 - 用于抽奖监控仪表盘
+ * ==========================================
+ */
+
+/**
+ * GET /stats - 获取抽奖监控综合统计数据
+ *
+ * 用于前端抽奖监控仪表盘展示（lottery-metrics.html）
+ *
+ * Query参数：
+ * - campaign_id: 活动ID（可选，不传则统计所有活动）
+ * - time_range: 时间范围（today/yesterday/week/month/custom，默认today）
+ * - start_date: 自定义开始日期（YYYY-MM-DD，当time_range=custom时使用）
+ * - end_date: 自定义结束日期（YYYY-MM-DD，当time_range=custom时使用）
+ *
+ * 返回：综合监控统计数据，包含：
+ * - summary: 核心指标汇总（抽奖次数、中奖次数、中奖率、奖品价值及趋势）
+ * - trend: 小时趋势数据
+ * - prize_distribution: 奖品分布
+ * - recent_draws: 最近抽奖记录
+ * - prize_stats: 奖品发放统计
+ */
+router.get('/stats', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const { campaign_id, time_range = 'today', start_date, end_date } = req.query
+
+    const stats = await getLotteryMonitoringService(req).getMonitoringStats({
+      campaign_id: campaign_id ? parseInt(campaign_id) : undefined,
+      time_range,
+      start_date,
+      end_date
+    })
+
+    logger.info('获取抽奖监控统计', {
+      admin_id: req.user.user_id,
+      campaign_id,
+      time_range,
+      total_draws: stats.summary.total_draws
+    })
+
+    return res.apiSuccess(stats, '获取抽奖监控统计成功')
+  } catch (error) {
+    logger.error('获取抽奖监控统计失败:', error)
+    return res.apiError(`查询失败：${error.message}`, 'GET_MONITORING_STATS_FAILED', null, 500)
   }
 })
 

@@ -246,18 +246,6 @@ class EligibilityStage extends BaseStage {
     }
   }
 
-  /*
-   * _getDailyDrawsCount 方法已废弃
-   *
-   * 🔄 2026-01-19 架构迁移说明：
-   * - 今日抽奖次数的查询已迁移到 LotteryQuotaService
-   * - LotteryQuotaService.checkQuotaSufficient() 返回的 used 字段即为已用次数
-   * - 使用 LotteryQuotaService 可以支持四维度配额控制和原子扣减
-   *
-   * @deprecated 此方法已移除，使用 LotteryQuotaService.checkQuotaSufficient() 替代
-   * @see LotteryQuotaService.checkQuotaSufficient()
-   */
-
   /**
    * 检查活动级别的配额限制（特殊配额，与 LotteryQuotaService 配额并行）
    *

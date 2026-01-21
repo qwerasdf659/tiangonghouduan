@@ -257,9 +257,8 @@ class LotteryStrategyStatsService {
 
     const total_draws = draws.length
     const unique_users = new Set(draws.map(d => d.user_id)).size
-    const empty_count = draws.filter(
-      d => d.prize_type === 'fallback' || d.prize_type === 'empty' || !d.prize_id
-    ).length
+    // empty_count 只统计真正空奖（empty 或 prize_id 为空），不包括正常保底（fallback）
+    const empty_count = draws.filter(d => d.prize_type === 'empty' || !d.prize_id).length
     const empty_rate = total_draws > 0 ? empty_count / total_draws : 0
 
     // 预算消耗计算（从decision表，字段为 budget_deducted）
@@ -301,6 +300,7 @@ class LotteryStrategyStatsService {
       }
     })
 
+    // empty_count 只统计真正空奖（empty 或 prize_id 为空），不包括正常保底（fallback）
     const empty_count = await LotteryDraw.count({
       where: {
         campaign_id,
@@ -308,7 +308,7 @@ class LotteryStrategyStatsService {
           [Op.gte]: range.start,
           [Op.lte]: range.end
         },
-        [Op.or]: [{ prize_type: 'fallback' }, { prize_type: 'empty' }, { prize_id: null }]
+        [Op.or]: [{ prize_type: 'empty' }, { prize_id: null }]
       }
     })
 
@@ -357,20 +357,29 @@ class LotteryStrategyStatsService {
   async _getHourlyFromDraws(campaign_id, start_time, end_time) {
     const LotteryDraw = this.models.LotteryDraw
 
-    // 使用SQL按小时分组聚合
+    /*
+     * 使用SQL按小时分组聚合
+     * 注意：fallback 和 empty 分开统计
+     * - fallback_tier_count：正常保底机制触发次数
+     * - empty_count：真正空奖次数（系统异常，需要运营关注）
+     */
     const hourly_data = await LotteryDraw.findAll({
       attributes: [
         [fn('DATE_FORMAT', col('created_at'), '%Y-%m-%d %H:00:00'), 'hour_bucket'],
         [fn('COUNT', col('draw_id')), 'total_draws'],
         [fn('COUNT', fn('DISTINCT', col('user_id'))), 'unique_users'],
+        // 保底奖品次数（正常保底机制）
+        [
+          fn('SUM', literal("CASE WHEN prize_type = 'fallback' THEN 1 ELSE 0 END")),
+          'fallback_tier_count'
+        ],
+        // 真正空奖次数（系统异常导致）
         [
           fn(
             'SUM',
-            literal(
-              "CASE WHEN prize_type IN ('fallback', 'empty') OR prize_id IS NULL THEN 1 ELSE 0 END"
-            )
+            literal("CASE WHEN prize_type = 'empty' OR prize_id IS NULL THEN 1 ELSE 0 END")
           ),
-          'fallback_tier_count'
+          'empty_count'
         ]
       ],
       where: {
@@ -385,13 +394,15 @@ class LotteryStrategyStatsService {
       raw: true
     })
 
-    // 计算空奖率
+    // 计算空奖率（使用真正空奖数 empty_count，而非保底数 fallback_tier_count）
     const result = hourly_data.map(row => ({
       hour_bucket: row.hour_bucket,
       total_draws: parseInt(row.total_draws) || 0,
       unique_users: parseInt(row.unique_users) || 0,
       fallback_tier_count: parseInt(row.fallback_tier_count) || 0,
-      empty_rate: row.total_draws > 0 ? row.fallback_tier_count / row.total_draws : 0
+      empty_count: parseInt(row.empty_count) || 0,
+      empty_rate:
+        row.total_draws > 0 ? (parseInt(row.empty_count) || 0) / parseInt(row.total_draws) : 0
     }))
 
     return {
@@ -430,6 +441,7 @@ class LotteryStrategyStatsService {
         total_draws: row.total_draws,
         unique_users: row.unique_users,
         fallback_tier_count: row.fallback_tier_count,
+        empty_count: row.empty_count || 0, // 真正空奖次数
         empty_rate: parseFloat(row.empty_rate) || 0,
         high_tier_count: row.high_tier_count,
         mid_tier_count: row.mid_tier_count,

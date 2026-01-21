@@ -221,27 +221,16 @@ function renderBalances(balances) {
     return
   }
 
+  // 后端返回字段: asset_code, available_amount, frozen_amount, total, campaign_id
   tbody.innerHTML = balances
     .map(
       balance => `
     <tr>
       <td><code>${balance.asset_code}</code></td>
-      <td><strong>${balance.display_name}</strong></td>
-      <td><span class="badge bg-info">${balance.group_code || '-'}</span></td>
-      <td>
-        <span class="badge ${balance.form === 'shard' ? 'bg-warning' : 'bg-primary'}">
-          ${getFormLabel(balance.form)}
-        </span>
-      </td>
-      <td>
-        <h5 class="mb-0 text-success">${balance.balance}</h5>
-      </td>
-      <td>
-        <span class="text-primary">${balance.visible_value_points || 0} 积分</span>
-      </td>
-      <td>
-        <small>${formatDate(balance.updated_at)}</small>
-      </td>
+      <td><h5 class="mb-0 text-success">${balance.available_amount}</h5></td>
+      <td><span class="text-warning">${balance.frozen_amount}</span></td>
+      <td><span class="text-primary fw-bold">${balance.total}</span></td>
+      <td><span class="text-muted">${balance.campaign_id || '-'}</span></td>
     </tr>
   `
     )
@@ -254,6 +243,7 @@ function renderBalances(balances) {
 
 /**
  * 提交调整余额
+ * 后端字段: user_id, asset_code, amount(带符号), reason, idempotency_key
  * @returns {Promise<void>}
  */
 async function submitAdjustBalance() {
@@ -268,13 +258,29 @@ async function submitAdjustBalance() {
     return
   }
 
+  // 获取当前管理员ID
+  const currentUser = getCurrentUser()
+  const adminId = currentUser?.user_id || 0
+
+  // 获取调整参数
+  const assetCode = document.getElementById('adjustAssetCode').value
+  const adjustType = document.getElementById('adjustType').value
+  const rawAmount = parseInt(document.getElementById('adjustAmount').value)
+  const reason = document.getElementById('adjustReason').value.trim()
+
+  // 后端期望: amount 正数=增加, 负数=减少
+  const amount = adjustType === 'decrease' ? -Math.abs(rawAmount) : Math.abs(rawAmount)
+
+  // 生成幂等键: admin_adjust_{admin_id}_{user_id}_{asset_code}_{timestamp}
+  const timestamp = Date.now()
+  const idempotencyKey = `admin_adjust_${adminId}_${currentUserId}_${assetCode}_${timestamp}`
+
   const data = {
     user_id: currentUserId,
-    asset_code: document.getElementById('adjustAssetCode').value,
-    adjust_type: document.getElementById('adjustType').value,
-    amount: parseInt(document.getElementById('adjustAmount').value),
-    reason: document.getElementById('adjustReason').value.trim(),
-    idempotency_key: `material_adjust_${currentUserId}_${Date.now()}`
+    asset_code: assetCode,
+    amount: amount,
+    reason: reason,
+    idempotency_key: idempotencyKey
   }
 
   try {

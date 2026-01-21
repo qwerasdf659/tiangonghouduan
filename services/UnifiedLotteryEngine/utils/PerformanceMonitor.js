@@ -254,10 +254,6 @@ class PerformanceMonitor {
   /**
    * 完成监控并生成性能报告
    *
-   * 2026-01-20 技术债务清理：
-   * - 已删除 endMonitoring 别名方法
-   * - 统一使用 finishMonitoring 作为唯一方法名
-   *
    * @param {string} monitorId - 监控ID
    * @param {Object} result - 操作结果
    * @returns {Object} 性能报告
@@ -323,12 +319,6 @@ class PerformanceMonitor {
 
     return report
   }
-
-  /*
-   * 2026-01-20 技术债务清理：
-   * - 已删除 endMonitoring() 别名方法
-   * - 统一使用 finishMonitoring() 作为唯一方法名
-   */
 
   /**
    * 分析性能报告

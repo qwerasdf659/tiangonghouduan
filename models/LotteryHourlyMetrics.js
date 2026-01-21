@@ -75,6 +75,7 @@ class LotteryHourlyMetrics extends Model {
         mid_tier_count: 0,
         low_tier_count: 0,
         fallback_tier_count: 0,
+        empty_count: 0,
         total_budget_consumed: 0,
         total_prize_value: 0,
         b0_tier_count: 0,
@@ -174,8 +175,11 @@ class LotteryHourlyMetrics extends Model {
         updates.low_tier_count = this.low_tier_count + 1
         break
       case 'fallback':
-      case 'empty':
         updates.fallback_tier_count = this.fallback_tier_count + 1
+        break
+      case 'empty':
+        // 真正空奖：系统异常导致，与正常 fallback 保底分开统计
+        updates.empty_count = (this.empty_count || 0) + 1
         break
     }
 
@@ -217,7 +221,10 @@ class LotteryHourlyMetrics extends Model {
 
     // 重新计算率指标
     const new_total = updates.total_draws
-    updates.empty_rate = new_total > 0 ? updates.fallback_tier_count / new_total : 0
+    // empty_rate 使用真正空奖数（empty_count），而非保底奖品数（fallback_tier_count）
+    const empty_count =
+      updates.empty_count !== undefined ? updates.empty_count : this.empty_count || 0
+    updates.empty_rate = new_total > 0 ? empty_count / new_total : 0
     updates.high_value_rate = new_total > 0 ? updates.high_tier_count / new_total : 0
     updates.avg_prize_value = new_total > 0 ? updates.total_prize_value / new_total : 0
 
@@ -233,13 +240,13 @@ class LotteryHourlyMetrics extends Model {
    */
   async recalculateRates(options = {}) {
     const total = this.total_draws || 1 // 避免除以零
-    const fallback_count = this.fallback_tier_count || 0
+    const empty_count = this.empty_count || 0 // 使用真正空奖数
     const high_count = this.high_tier_count || 0
     const prize_value = this.total_prize_value || 0
 
     await this.update(
       {
-        empty_rate: fallback_count / total,
+        empty_rate: empty_count / total, // empty_rate 基于真正空奖数，非保底数
         high_value_rate: high_count / total,
         avg_prize_value: prize_value / total
       },
@@ -367,7 +374,21 @@ function initModel(sequelize) {
         type: DataTypes.INTEGER,
         allowNull: false,
         defaultValue: 0,
-        comment: '空奖次数（fallback档位）'
+        comment: '保底奖品次数（fallback档位，正常保底机制）'
+      },
+
+      /**
+       * 真正空奖次数（系统异常导致的空奖）
+       *
+       * 与 fallback_tier_count 区分：
+       * - empty_count：系统异常或配置问题导致的空奖，需要运营关注
+       * - fallback_tier_count：正常保底机制触发，是预期行为
+       */
+      empty_count: {
+        type: DataTypes.INTEGER,
+        allowNull: false,
+        defaultValue: 0,
+        comment: '真正空奖次数（系统异常导致的空奖，与正常fallback保底分开统计）'
       },
 
       // ========== 预算相关统计 ==========

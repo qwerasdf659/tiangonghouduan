@@ -3,10 +3,6 @@
  *
  * 业务场景：提供统一的抽奖服务入口，整合所有抽奖决策逻辑，使用 Pipeline 管线架构
  *
- * ⚠️ V4.6 架构重构说明（2026-01-19 Phase 5 迁移）：
- * - **策略模式已废弃**：原 BasicGuaranteeStrategy 已移除
- * - **管线架构替代**：使用 DrawOrchestrator 编排 Pipeline 管线
- * - **ManagementStrategy 保留**：仅用于管理 API（非抽奖执行）
  *
  * 核心功能：
  * 1. 管线编排管理（DrawOrchestrator 编排 3 种管线）
@@ -15,7 +11,7 @@
  * 4. 缓存管理（奖品配置缓存、用户抽奖次数缓存）
  * 5. 日志追踪（完整的执行日志、错误追踪、审计记录）
  *
- * V4.6 业务流程（Phase 5 统一管线架构 - 2026-01-19）：
+ * V4.6 业务流程：
  *
  * ⚠️ Phase 5 架构变更：原 3 条管线已合并为 1 条统一管线（NormalDrawPipeline）
  * - 决策来源判断由 LoadDecisionSourceStage 在管线内统一处理
@@ -49,7 +45,7 @@
  * - **缓存优化性能**：奖品配置、用户抽奖次数使用缓存，减少数据库查询
  * - **日志完整追踪**：详细的执行日志（INFO/DEBUG/ERROR三级），便于问题排查
  *
- * V4.6 Phase 5 架构特点：
+ * V4.6 架构特点：
  * - **1 条统一管线**：NormalDrawPipeline（整合原 3 条管线功能）
  * - **决策来源 Stage**：LoadDecisionSourceStage 统一判断 preset/override/normal
  * - **100%中奖机制**：每次抽奖必定从奖品池选择一个奖品（不存在"不中奖"逻辑）
@@ -65,7 +61,7 @@
  * - updateMetrics() - 更新性能指标（执行时间、成功率、管线使用统计）
  * - getEngineHealth() - 获取引擎健康状态（运行时长、成功率、平均执行时间）
  *
- * 组件依赖（Phase 5 统一架构）：
+ * 组件依赖：
  * - DrawOrchestrator：管线编排器（核心执行入口）
  * - NormalDrawPipeline：统一抽奖管线（整合 preset/override/normal）
  * - LoadDecisionSourceStage：决策来源判断 Stage
@@ -139,11 +135,9 @@ const PerformanceMonitor = require('./utils/PerformanceMonitor')
 const CacheManager = require('./utils/CacheManager')
 
 /**
- * V4.6 管线编排器（2026-01-19 Phase 5 迁移）
+ * V4.6 管线编排器
  *
- * 替代原 Strategy 模式，统一使用 Pipeline 架构
- *
- * @see docs/抽奖模块Strategy到Pipeline迁移方案新.md
+ * 使用 Pipeline 架构编排抽奖流程
  */
 const DrawOrchestrator = require('./pipeline/DrawOrchestrator')
 
@@ -154,8 +148,7 @@ const DrawOrchestrator = require('./pipeline/DrawOrchestrator')
 const { BusinessCacheHelper } = require('../../utils/BusinessCacheHelper')
 
 /**
- * 抽奖定价服务（2026-01-21 技术债务修复 - getDrawPricing 统一）
- * @see docs/技术债务-getDrawPricing定价逻辑迁移方案.md
+ * 抽奖定价服务 - 统一定价计算入口
  */
 const LotteryPricingService = require('../lottery/LotteryPricingService')
 
@@ -195,11 +188,9 @@ class UnifiedLotteryEngine {
     this.logger = require('../../utils/logger').logger
 
     /**
-     * V4.6 管线编排器（2026-01-19 Phase 5 迁移）
+     * V4.6 管线编排器
      *
-     * 替代原 Strategy 模式：
-     * - 旧链路：strategies → executeLottery → 策略链执行
-     * - 新链路：drawOrchestrator → Pipeline(Stages) → 统一结算
+     * 执行流程：drawOrchestrator → Pipeline(Stages) → 统一结算
      *
      * @type {DrawOrchestrator}
      */
@@ -231,9 +222,7 @@ class UnifiedLotteryEngine {
   /**
    * 统一抽奖执行入口
    *
-   * V4.6 重构（2026-01-19 Phase 5 迁移）：
-   * - 旧实现：Strategy 链式执行
-   * - 新实现：DrawOrchestrator 编排 Pipeline 执行
+   * 使用 DrawOrchestrator 编排 Pipeline 执行抽奖流程
    *
    * @param {Object} context - 抽奖上下文
    * @param {number} context.user_id - 用户ID
@@ -364,11 +353,6 @@ class UnifiedLotteryEngine {
       execution_id: executionId,
       engine_version: this.version,
       timestamp: this.getBeijingTimestamp()
-      /*
-       * 清理日期：2026-01-20（技术债务清理方案 - 清理项2）
-       * 已删除字段：strategy_used（兼容旧 Strategy 模式的字段映射）
-       * 详见：docs/技术债务彻底清理重构方案-2026-01-20.md 决策6
-       */
     }
   }
 
@@ -587,11 +571,7 @@ class UnifiedLotteryEngine {
    */
   getHealthStatus() {
     try {
-      /**
-       * V4.6 健康状态检查（2026-01-19 Phase 5 迁移）
-       *
-       * 替代原 Strategy 检查，使用 DrawOrchestrator 状态
-       */
+      // 获取 DrawOrchestrator 状态
       const orchestratorStatus = this.drawOrchestrator?.getStatus?.() || {}
       const pipelineTypes = orchestratorStatus.pipeline_types || []
 
@@ -627,10 +607,6 @@ class UnifiedLotteryEngine {
         pipelines,
         draw_orchestrator_ready: true,
         enabled_pipelines: pipelineTypes.length,
-        /*
-         * 2026-01-20 技术债务清理（P2全局注释审查）：
-         * 已删除 enabled_strategies 兼容字段，现已统一使用 enabled_pipelines
-         */
         total_executions: this.metrics.total_executions,
         success_rate: this.getMetrics().success_rate,
         uptime: this.formatUptime(BeijingTimeHelper.timestamp() - this.startTime),
@@ -650,16 +626,7 @@ class UnifiedLotteryEngine {
   }
 
   /**
-   * 异步健康检查
-   *
-   * @returns {Promise<Object>} 健康检查结果
-   */
-  /**
    * V4.6 健康检查方法（Pipeline 架构）
-   *
-   * 2026-01-19 Phase 5 迁移重构：
-   * - 移除原 this.strategies 遍历
-   * - 使用 DrawOrchestrator 状态
    *
    * @returns {Object} 健康检查结果
    */
@@ -934,14 +901,6 @@ class UnifiedLotteryEngine {
   }
 
   /**
-   * 🔴 注意：getDrawPricing 方法已迁移至 LotteryPricingService
-   *
-   * @deprecated 2026-01-21 技术债务修复
-   * @see services/lottery/LotteryPricingService.js - 统一定价服务
-   * @see docs/技术债务-getDrawPricing定价逻辑迁移方案.md - 方案C
-   */
-
-  /**
    * 执行抽奖（路由层调用接口）
    *
    * 🔒 事务边界治理（2026-01-05 决策）：
@@ -1050,14 +1009,10 @@ class UnifiedLotteryEngine {
        * ❌ 原逻辑：const requiredPoints = draw_count * 100
        * 问题：硬编码定价，无法实现折扣机制
        *
-       * ✅ 新逻辑：通过 LotteryPricingService 统一获取定价
-       * 优势：
+       * 通过 LotteryPricingService 统一获取定价：
        * - 10连抽可享受九折优惠（900积分，节省100积分）
        * - 修改定价只需改配置，无需改代码
        * - 支持灵活的折扣策略
-       * - 🔴 2026-01-21 技术债务修复：统一定价服务，消除重复逻辑
-       *
-       * @see docs/技术债务-getDrawPricing定价逻辑迁移方案.md 方案C
        */
       const pricing = await LotteryPricingService.getDrawPricing(draw_count, campaign.campaign_id, {
         transaction

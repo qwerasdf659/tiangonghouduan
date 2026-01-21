@@ -142,9 +142,9 @@ const usersModule = {
         <td><code>${user.user_id}</code></td>
         <td>
           <div class="d-flex align-items-center">
-            <img src="${user.avatar_url || '/admin/images/default-avatar.png'}" 
+            <img src="${user.avatar_url || '/admin/images/default-avatar.svg'}" 
                  class="rounded-circle me-2" width="40" height="40" 
-                 onerror="this.src='/admin/images/default-avatar.png'">
+                 onerror="this.src='/admin/images/default-avatar.svg'">
             <div>
               <div class="fw-bold">${user.nickname || '未设置昵称'}</div>
               <small class="text-muted">${user.mobile || '-'}</small>
@@ -155,7 +155,10 @@ const usersModule = {
           ${user.role_level >= 100 ? '<span class="badge bg-danger">管理员</span>' : ''}
           ${user.role_level >= 50 && user.role_level < 100 ? '<span class="badge bg-warning">高级用户</span>' : ''}
           ${user.role_level < 50 ? '<span class="badge bg-secondary">普通用户</span>' : ''}
-          ${user.roles && user.roles.length > 0 ? user.roles.map(r => `<span class="badge bg-info ms-1">${r}</span>`).join('') : ''}
+          ${user.roles && user.roles.length > 0 ? user.roles.map(r => {
+            const roleName = typeof r === 'string' ? r : (r.role_name || '');
+            return roleName ? `<span class="badge bg-info ms-1">${roleName}</span>` : '';
+          }).join('') : ''}
         </td>
         <td><span class="badge bg-info">${user.history_total_points || 0}</span></td>
         <td><small>${this.formatDate(user.created_at)}</small></td>
@@ -276,18 +279,36 @@ const usersModule = {
           `
         }
 
-        // 渲染角色标签
+        // 渲染角色标签（兼容字符串数组或对象数组）
         const rolesHtml =
           user.roles && user.roles.length > 0
-            ? user.roles.map(r => `<span class="badge bg-info me-1">${r}</span>`).join('')
+            ? user.roles.map(r => {
+                // 后端可能返回字符串数组或对象数组
+                const roleName = typeof r === 'string' ? r : (r.role_name || r.name || '未知角色')
+                const roleColors = {
+                  'user': 'secondary',
+                  'vip': 'warning',
+                  'admin': 'primary',
+                  'super_admin': 'danger',
+                  'system_job': 'info'
+                }
+                const roleLabels = {
+                  'user': '普通用户',
+                  'vip': 'VIP用户',
+                  'admin': '管理员',
+                  'super_admin': '超级管理员',
+                  'system_job': '系统任务'
+                }
+                return `<span class="badge bg-${roleColors[roleName] || 'info'} me-1">${roleLabels[roleName] || roleName}</span>`
+              }).join('')
             : '<span class="text-muted">无角色</span>'
 
         document.getElementById('userDetailBody').innerHTML = `
           <div class="row">
             <div class="col-md-4 text-center">
-              <img src="${user.avatar_url || '/admin/images/default-avatar.png'}" 
+              <img src="${user.avatar_url || '/admin/images/default-avatar.svg'}" 
                    class="rounded-circle mb-3" width="100" height="100"
-                   onerror="this.src='/admin/images/default-avatar.png'">
+                   onerror="this.src='/admin/images/default-avatar.svg'">
               <h5>${user.nickname || '未设置昵称'}</h5>
               <p class="text-muted">${user.mobile || '-'}</p>
               <div class="mb-2">${rolesHtml}</div>
@@ -418,23 +439,35 @@ const hierarchyModule = {
 
       if (roleLevel) params.append('role_level', roleLevel)
       if (status) params.append('is_active', status)
-      if (superiorId) params.append('superior_id', superiorId)
+      if (superiorId) params.append('superior_user_id', superiorId) // 修复：使用后端字段名
 
+      console.log('📡 层级模块请求API:', API_ENDPOINTS.USER_HIERARCHY.LIST + '?' + params.toString())
       const response = await apiRequest(API_ENDPOINTS.USER_HIERARCHY.LIST + '?' + params.toString())
+      console.log('📥 层级模块响应:', response)
 
       if (response && response.success) {
-        this.hierarchies = response.data.items || []
-        this.renderStats(response.data.stats || {})
+        // 修复：后端返回rows而不是items
+        this.hierarchies = response.data.rows || []
+        // 修复：从rows数据动态计算统计
+        const stats = {
+          total: response.data.count || 0,
+          active: this.hierarchies.filter(h => h.is_active).length,
+          inactive: this.hierarchies.filter(h => !h.is_active).length,
+          store_assigned: this.hierarchies.filter(h => h.store_id).length
+        }
+        this.renderStats(stats)
         this.renderTable(this.hierarchies)
         this.renderPagination(response.data.pagination)
         document.getElementById('hierarchyListInfo').textContent =
-          `共 ${response.data.pagination?.total || this.hierarchies.length} 条`
+          `共 ${response.data.count || this.hierarchies.length} 条`
+        console.log('✅ 层级数据加载成功, 记录数:', this.hierarchies.length)
       } else {
+        console.error('❌ 层级API返回失败:', response)
         showErrorToast(response?.message || '加载层级数据失败')
         this.renderEmptyTable()
       }
     } catch (error) {
-      console.error('加载层级数据失败:', error)
+      console.error('❌ 加载层级数据异常:', error)
       showErrorToast(error.message || '网络错误')
       this.renderEmptyTable()
     } finally {
@@ -465,19 +498,20 @@ const hierarchyModule = {
       return
     }
 
+    // 修复：使用后端返回的字段名（hierarchy_id, user_nickname, role_name, role_level, superior_user_id等）
     tbody.innerHTML = items
       .map(
         item => `
       <tr class="${item.is_active ? '' : 'inactive-row'}">
-        <td>${item.id}</td>
+        <td>${item.hierarchy_id}</td>
         <td>
-          <strong>${item.user?.nickname || '用户' + item.user_id}</strong>
-          <br><small class="text-muted">ID: ${item.user_id}</small>
+          <strong>${item.user_nickname || '用户' + item.user_id}</strong>
+          <br><small class="text-muted">ID: ${item.user_id} | ${item.user_mobile || '-'}</small>
         </td>
         <td>
-          <span class="badge role-badge-${item.role?.role_level || ''}">${item.role?.role_name || '-'}</span>
+          <span class="badge role-badge-${item.role_level || ''}">${item.role_name || '-'}</span>
         </td>
-        <td>${item.superior_id ? `用户${item.superior_id}` : '-'}</td>
+        <td>${item.superior_user_id ? `${item.superior_nickname || '用户' + item.superior_user_id}` : '-'}</td>
         <td>${item.store_id ? `门店${item.store_id}` : '-'}</td>
         <td>
           <span class="badge ${item.is_active ? 'bg-success' : 'bg-secondary'}">
@@ -486,7 +520,7 @@ const hierarchyModule = {
         </td>
         <td><small>${this.formatDate(item.activated_at)}</small></td>
         <td>
-          <button class="btn btn-sm btn-outline-warning" onclick="hierarchyModule.toggleActive(${item.id}, ${item.is_active})">
+          <button class="btn btn-sm btn-outline-warning" onclick="hierarchyModule.toggleActive(${item.hierarchy_id}, ${item.is_active})">
             <i class="bi ${item.is_active ? 'bi-pause' : 'bi-play'}"></i>
           </button>
         </td>
@@ -557,12 +591,13 @@ const hierarchyModule = {
 
     showLoading(true)
     try {
+      // 修复：使用后端期望的字段名 superior_user_id
       const response = await apiRequest(API_ENDPOINTS.USER_HIERARCHY.CREATE, {
         method: 'POST',
         body: JSON.stringify({
           user_id: parseInt(userId),
           role_id: parseInt(roleId),
-          superior_id: superiorId ? parseInt(superiorId) : null,
+          superior_user_id: superiorId ? parseInt(superiorId) : null,
           store_id: storeId ? parseInt(storeId) : null
         })
       })
@@ -581,15 +616,31 @@ const hierarchyModule = {
     }
   },
 
-  async toggleActive(id, isActive) {
+  async toggleActive(hierarchyId, isActive) {
     const action = isActive ? '停用' : '激活'
     if (!confirm(`确定要${action}该层级关系吗？`)) return
 
+    // 修复：获取hierarchy对应的user_id，因为后端API使用user_id
+    const hierarchy = this.hierarchies.find(h => h.hierarchy_id === hierarchyId)
+    if (!hierarchy) {
+      showErrorToast('找不到该层级关系')
+      return
+    }
+
     showLoading(true)
     try {
-      const response = await apiRequest(API.buildURL(API_ENDPOINTS.USER_HIERARCHY.UPDATE_STATUS, { id }), {
-        method: 'PUT',
-        body: JSON.stringify({ is_active: !isActive })
+      // 修复：使用正确的后端API端点（DEACTIVATE或ACTIVATE）
+      const endpoint = isActive 
+        ? API.buildURL(API_ENDPOINTS.USER_HIERARCHY.DEACTIVATE, { user_id: hierarchy.user_id })
+        : API.buildURL(API_ENDPOINTS.USER_HIERARCHY.ACTIVATE, { user_id: hierarchy.user_id })
+      
+      const body = isActive 
+        ? { reason: '管理员停用', include_subordinates: false }
+        : { include_subordinates: false }
+
+      const response = await apiRequest(endpoint, {
+        method: 'POST',
+        body: JSON.stringify(body)
       })
 
       if (response && response.success) {
@@ -661,16 +712,25 @@ const merchantPointsModule = {
       if (priority) params.append('priority', priority)
       if (timeRange) params.append('time_range', timeRange)
 
-      const response = await apiRequest(API_ENDPOINTS.MERCHANT_POINTS.LIST + '?' + params.toString())
+      // 并行加载列表数据和统计数据
+      const [listResponse, statsResponse] = await Promise.all([
+        apiRequest(API_ENDPOINTS.MERCHANT_POINTS.LIST + '?' + params.toString()),
+        apiRequest(API_ENDPOINTS.MERCHANT_POINTS.STATS_PENDING)
+      ])
 
-      if (response && response.success) {
-        this.reviews = response.data.items || []
-        this.renderStats(response.data.stats || {})
+      if (listResponse && listResponse.success) {
+        // 修复：后端返回 rows 而不是 items
+        this.reviews = listResponse.data.rows || []
         this.renderTable(this.reviews)
-        this.renderPagination(response.data.pagination)
+        this.renderPagination(listResponse.data.pagination)
       } else {
-        showErrorToast(response?.message || '加载审核数据失败')
+        showErrorToast(listResponse?.message || '加载审核数据失败')
         this.renderEmptyTable()
+      }
+
+      // 渲染统计数据
+      if (statsResponse && statsResponse.success) {
+        this.renderStats(statsResponse.data)
       }
     } catch (error) {
       console.error('加载审核数据失败:', error)
@@ -682,9 +742,10 @@ const merchantPointsModule = {
   },
 
   renderStats(stats) {
-    document.getElementById('merchantPendingCount').textContent = stats.pending || 0
-    document.getElementById('merchantApprovedCount').textContent = stats.approved || 0
-    document.getElementById('merchantRejectedCount').textContent = stats.rejected || 0
+    // 修复：使用后端统计接口返回的字段名
+    document.getElementById('merchantPendingCount').textContent = stats.pending_count || 0
+    document.getElementById('merchantApprovedCount').textContent = stats.approved_count || 0
+    document.getElementById('merchantRejectedCount').textContent = stats.rejected_count || 0
     document.getElementById('merchantTotalPoints').textContent = stats.today_points || 0
   },
 
@@ -703,34 +764,35 @@ const merchantPointsModule = {
       return
     }
 
+    // 修复：使用后端返回的字段名
     tbody.innerHTML = items
       .map(
         item => `
       <tr>
         <td>
           <input type="checkbox" class="form-check-input review-checkbox" 
-                 value="${item.id}" ${item.status === 'pending' ? '' : 'disabled'}
+                 value="${item.audit_id}" ${item.status === 'pending' ? '' : 'disabled'}
                  onchange="merchantPointsModule.updateSelection()">
         </td>
-        <td><code>${item.id}</code></td>
+        <td><code>${item.audit_id}</code></td>
         <td>
           <strong>${item.applicant?.nickname || '用户' + item.user_id}</strong>
           <br><small class="text-muted">ID: ${item.user_id}</small>
         </td>
-        <td><span class="badge bg-warning text-dark fs-6">${item.points}</span></td>
-        <td><small>${item.remark || '-'}</small></td>
-        <td><small>${this.formatDate(item.created_at)}</small></td>
+        <td><span class="badge bg-warning text-dark fs-6">${item.points_amount}</span></td>
+        <td><small>${item.description || '-'}</small></td>
+        <td><small>${this.formatDate(item.submitted_at)}</small></td>
         <td>
           <span class="badge ${this.getStatusBadgeClass(item.status)}">
             ${this.getStatusText(item.status)}
           </span>
         </td>
-        <td><small>${item.reviewer?.nickname || '-'}</small></td>
+        <td><small>${item.auditor?.nickname || '-'}</small></td>
         <td>
           ${
             item.status === 'pending'
               ? `
-            <button class="btn btn-sm btn-outline-primary" onclick="merchantPointsModule.showReviewModal(${item.id})">
+            <button class="btn btn-sm btn-outline-primary" onclick="merchantPointsModule.showReviewModal('${item.audit_id}')">
               <i class="bi bi-check-square"></i> 审核
             </button>
           `
@@ -785,16 +847,17 @@ const merchantPointsModule = {
     this.loadData()
   },
 
-  showReviewModal(id) {
-    const item = this.reviews.find(r => r.id === id)
+  showReviewModal(auditId) {
+    // 修复：使用后端字段名 audit_id
+    const item = this.reviews.find(r => r.audit_id === auditId || r.audit_id === String(auditId))
     if (!item) return
 
-    this.currentReviewId = id
-    document.getElementById('modalApplyId').textContent = item.id
+    this.currentReviewId = auditId
+    document.getElementById('modalApplyId').textContent = item.audit_id
     document.getElementById('modalUser').textContent =
       item.applicant?.nickname || '用户' + item.user_id
-    document.getElementById('modalPoints').textContent = item.points
-    document.getElementById('modalRemark').textContent = item.remark || '-'
+    document.getElementById('modalPoints').textContent = item.points_amount
+    document.getElementById('modalRemark').textContent = item.description || '-'
     document.getElementById('reviewComment').value = ''
 
     new bootstrap.Modal(document.getElementById('reviewModal')).show()
@@ -806,9 +869,14 @@ const merchantPointsModule = {
     showLoading(true)
     try {
       const comment = document.getElementById('reviewComment').value
-      const response = await apiRequest(API.buildURL(API_ENDPOINTS.MERCHANT_POINTS.DETAIL, { id: this.currentReviewId }), {
-        method: 'PUT',
-        body: JSON.stringify({ status, comment })
+      // 修复：使用正确的后端API端点（approve 或 reject）
+      const endpoint = status === 'approved' 
+        ? API.buildURL(API_ENDPOINTS.MERCHANT_POINTS.APPROVE, { id: this.currentReviewId })
+        : API.buildURL(API_ENDPOINTS.MERCHANT_POINTS.REJECT, { id: this.currentReviewId })
+      
+      const response = await apiRequest(endpoint, {
+        method: 'POST',
+        body: JSON.stringify({ audit_reason: comment })
       })
 
       if (response && response.success) {
@@ -833,9 +901,8 @@ const merchantPointsModule = {
   },
 
   updateSelection() {
-    this.selectedIds = Array.from(document.querySelectorAll('.review-checkbox:checked')).map(cb =>
-      parseInt(cb.value)
-    )
+    // 修复：audit_id 可能是字符串，不要强制转为数字
+    this.selectedIds = Array.from(document.querySelectorAll('.review-checkbox:checked')).map(cb => cb.value)
     const hasSelection = this.selectedIds.length > 0
     document.getElementById('merchantBatchApproveBtn').disabled = !hasSelection
     document.getElementById('merchantBatchRejectBtn').disabled = !hasSelection
@@ -849,17 +916,37 @@ const merchantPointsModule = {
 
     showLoading(true)
     try {
-      const response = await apiRequest(API_ENDPOINTS.MERCHANT_POINTS.BATCH, {
-        method: 'PUT',
-        body: JSON.stringify({ ids: this.selectedIds, status })
-      })
-
-      if (response && response.success) {
-        showSuccessToast(`${action}成功`)
-        this.loadData()
-      } else {
-        showErrorToast(response?.message || '操作失败')
+      // 后端没有批量接口，循环调用单个审核接口
+      let successCount = 0
+      let failCount = 0
+      
+      for (const auditId of this.selectedIds) {
+        try {
+          const endpoint = status === 'approved' 
+            ? API.buildURL(API_ENDPOINTS.MERCHANT_POINTS.APPROVE, { id: auditId })
+            : API.buildURL(API_ENDPOINTS.MERCHANT_POINTS.REJECT, { id: auditId })
+          
+          const response = await apiRequest(endpoint, {
+            method: 'POST',
+            body: JSON.stringify({ audit_reason: action })
+          })
+          
+          if (response && response.success) {
+            successCount++
+          } else {
+            failCount++
+          }
+        } catch (e) {
+          failCount++
+        }
       }
+
+      if (successCount > 0) {
+        showSuccessToast(`${action}完成：成功 ${successCount} 条${failCount > 0 ? `，失败 ${failCount} 条` : ''}`)
+      } else {
+        showErrorToast(`${action}失败`)
+      }
+      this.loadData()
     } catch (error) {
       showErrorToast(error.message || '网络错误')
     } finally {

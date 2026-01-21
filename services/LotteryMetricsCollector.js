@@ -21,7 +21,8 @@
  * - total_draws：总抽奖次数
  * - unique_users：独立用户数（HyperLogLog）
  * - b0_count / b1_count / b2_count / b3_count：Budget Tier 分布
- * - empty_count：空奖次数（fallback 档位）
+ * - empty_count：真正空奖次数（系统异常导致，需运营关注）
+ * - fallback_tier_count：保底奖品次数（正常保底机制）
  * - high_tier_count / mid_tier_count / low_tier_count：奖品档位分布
  * - pity_triggered：Pity 保底触发次数
  * - anti_empty_triggered：反连空触发次数
@@ -81,13 +82,17 @@ const BUDGET_TIER_MAP = {
 
 /**
  * 奖品档位映射表（与抽奖引擎 reward_tier 一致）
+ *
+ * 注意：empty 与 fallback 分开统计
+ * - fallback：正常保底机制触发，预期行为
+ * - empty：系统异常或配置问题导致的空奖，需要运营关注
  */
 const TIER_MAP = {
   high: 'high_tier_count',
   mid: 'mid_tier_count',
   low: 'low_tier_count',
   fallback: 'fallback_tier_count',
-  empty: 'fallback_tier_count' // 兼容处理：empty 归入 fallback
+  empty: 'empty_count' // 真正空奖：与 fallback 保底分开统计
 }
 
 /**
@@ -354,16 +359,24 @@ class LotteryMetricsCollector {
         const tier_key = this._buildKey(campaign_id, TIER_MAP[selected_tier], hour_bucket)
         pipeline.incr(tier_key)
         pipeline.expire(tier_key, this.ttl_seconds)
+
+        /*
+         * 真正空奖（empty）运营预警日志
+         * empty 表示系统异常或配置问题导致的空奖，需要运营关注
+         * 与 fallback（正常保底机制）区分开
+         */
+        if (selected_tier === 'empty') {
+          this.logger.warn('[LotteryMetricsCollector] 检测到真正空奖（empty），请运营关注！', {
+            campaign_id,
+            user_id,
+            hour_bucket,
+            alert_type: 'EMPTY_PRIZE_DETECTED',
+            message: '系统出现空奖，可能是奖品配置问题或库存不足'
+          })
+        }
       }
 
-      // 5. 空奖计数（fallback 或 empty 档位）
-      if (selected_tier === 'fallback' || selected_tier === 'empty') {
-        const empty_key = this._buildKey(campaign_id, 'empty_count', hour_bucket)
-        pipeline.incr(empty_key)
-        pipeline.expire(empty_key, this.ttl_seconds)
-      }
-
-      // 6. 体验机制触发统计
+      // 5. 体验机制触发统计
       for (const [trigger_name, redis_field] of Object.entries(TRIGGER_MAP)) {
         if (triggers[trigger_name] === true) {
           const trigger_key = this._buildKey(campaign_id, redis_field, hour_bucket)

@@ -377,7 +377,9 @@
     function updateMetricCards(data) {
       document.getElementById('totalDraws').textContent = formatNumber(data.total_draws || 0);
       document.getElementById('totalWins').textContent = formatNumber(data.total_wins || 0);
-      document.getElementById('winRate').textContent = (data.win_rate || 0).toFixed(1) + '%';
+      // 后端返回字符串格式，直接使用或转换为数字
+      const winRate = parseFloat(data.win_rate) || 0;
+      document.getElementById('winRate').textContent = winRate.toFixed(1) + '%';
       document.getElementById('totalValue').textContent = '¥' + formatNumber(data.total_value || 0);
 
       updateTrend('drawsTrend', data.draws_trend);
@@ -392,11 +394,13 @@
         element.textContent = '-';
         return;
       }
-      const isUp = value >= 0;
+      // 后端返回字符串格式，转换为数字
+      const numValue = parseFloat(value) || 0;
+      const isUp = numValue >= 0;
       element.innerHTML = `
         <span class="${isUp ? 'trend-up' : 'trend-down'}">
           <i class="bi bi-arrow-${isUp ? 'up' : 'down'}"></i>
-          ${Math.abs(value).toFixed(1)}%
+          ${Math.abs(numValue).toFixed(1)}%
         </span>
         <span class="text-muted">较昨日</span>
       `;

@@ -160,26 +160,41 @@ async function loadImageData() {
     // 修正API路径：/api/v4/console/images（移除 system 子路径）
     const response = await apiRequest(`${API_ENDPOINTS.IMAGE.LIST}?${params.toString()}`)
 
-    if (response && response.success) {
-      const { images, statistics, pagination } = response.data
+    // 处理未登录或token失效的情况（apiRequest返回undefined）
+    if (!response) {
+      console.warn('图片数据加载失败: 未获取到响应（可能是未登录或token失效）')
+      setImageStatisticsError('需要登录')
+      container.innerHTML = `
+        <div class="col-12 text-center py-5 text-warning">
+          <i class="bi bi-lock" style="font-size: 2rem;"></i>
+          <p class="mt-2">需要登录才能查看</p>
+        </div>
+      `
+      return
+    }
 
-      document.getElementById('totalImages').textContent = statistics?.total || 0
-      document.getElementById('totalSize').textContent = formatFileSize(statistics?.total_size || 0)
-      document.getElementById('weeklyUploads').textContent = statistics?.weekly_uploads || 0
-      document.getElementById('orphanImages').textContent = statistics?.orphan_count || 0
+    if (response.success) {
+      const { images, statistics, pagination } = response.data || {}
+
+      document.getElementById('totalImages').textContent = statistics?.total ?? 0
+      document.getElementById('totalSize').textContent = formatFileSize(statistics?.total_size ?? 0)
+      document.getElementById('weeklyUploads').textContent = statistics?.weekly_uploads ?? 0
+      document.getElementById('orphanImages').textContent = statistics?.orphan_count ?? 0
 
       renderImages(images || [])
       if (pagination) renderPagination(pagination)
     } else {
+      setImageStatisticsError(response?.message || '加载失败')
       container.innerHTML = `
         <div class="col-12 text-center py-5 text-muted">
           <i class="bi bi-inbox" style="font-size: 3rem;"></i>
-          <p class="mt-2">暂无图片</p>
+          <p class="mt-2">${response?.message || '暂无图片'}</p>
         </div>
       `
     }
   } catch (error) {
     console.error('加载图片失败:', error)
+    setImageStatisticsError('请求错误')
     container.innerHTML = `
       <div class="col-12 text-center py-5 text-danger">
         <i class="bi bi-exclamation-triangle" style="font-size: 2rem;"></i>
@@ -189,6 +204,18 @@ async function loadImageData() {
   } finally {
     showLoading(false)
   }
+}
+
+/**
+ * 设置图片统计数据为错误状态
+ * @param {string} message - 错误信息
+ */
+function setImageStatisticsError(message) {
+  const errorText = `<span class="text-danger" title="${message}">-</span>`
+  document.getElementById('totalImages').innerHTML = errorText
+  document.getElementById('totalSize').innerHTML = errorText
+  document.getElementById('weeklyUploads').innerHTML = errorText
+  document.getElementById('orphanImages').innerHTML = errorText
 }
 
 function renderImages(images) {

@@ -1,33 +1,32 @@
 /**
- * P0-5: 审计日志 target_type 命名统一测试
+ * 审计日志 target_type 命名统一测试
  *
  * 文件路径：tests/core/audit_target_type_normalization.test.js
  *
  * 职责：
  * - 验证 AuditTargetTypes.js 的常量和工具函数
  * - 验证 PascalCase → snake_case 规范化逻辑
- * - 验证历史遗留名映射到新架构标准名
- * - 验证复数形式规范化为单数
  * - 验证未知 target_type 的处理逻辑
  *
+ * 重构记录：
+ * - 2026-01-21: 移除 TARGET_TYPE_LEGACY_MAPPING 相关测试（数据库已100%标准化）
+ *
  * 创建时间：2026-01-09
- * 版本：V4.5.0
+ * 版本：V4.6.0
  */
 
 'use strict'
 
 const {
   AUDIT_TARGET_TYPES,
-  TARGET_TYPE_LEGACY_MAPPING,
   VALID_TARGET_TYPES,
   normalizeTargetType,
   isValidTargetType,
   getTargetTypeDisplayName,
-  getLegacyMappings,
   normalizeTargetTypes
 } = require('../../constants/AuditTargetTypes')
 
-describe('P0-5: 审计日志 target_type 命名统一测试', () => {
+describe('审计日志 target_type 命名统一测试', () => {
   describe('常量定义验证', () => {
     test('AUDIT_TARGET_TYPES 应该是不可变对象', () => {
       expect(Object.isFrozen(AUDIT_TARGET_TYPES)).toBe(true)
@@ -51,10 +50,6 @@ describe('P0-5: 审计日志 target_type 命名统一测试', () => {
       // 市场交易
       expect(AUDIT_TARGET_TYPES.MARKET_LISTING).toBe('market_listing')
       expect(AUDIT_TARGET_TYPES.TRADE_ORDER).toBe('trade_order')
-    })
-
-    test('TARGET_TYPE_LEGACY_MAPPING 应该是不可变对象', () => {
-      expect(Object.isFrozen(TARGET_TYPE_LEGACY_MAPPING)).toBe(true)
     })
 
     test('VALID_TARGET_TYPES 应该是不可变数组', () => {
@@ -93,32 +88,6 @@ describe('P0-5: 审计日志 target_type 命名统一测试', () => {
 
       test('CustomerServiceSession → customer_service_session', () => {
         expect(normalizeTargetType('CustomerServiceSession')).toBe('customer_service_session')
-      })
-    })
-
-    describe('历史遗留名映射', () => {
-      test('UserPointsAccount → account_asset_balance（旧模型名）', () => {
-        expect(normalizeTargetType('UserPointsAccount')).toBe('account_asset_balance')
-      })
-
-      test('PointsTransaction → asset_transaction（旧模型名）', () => {
-        expect(normalizeTargetType('PointsTransaction')).toBe('asset_transaction')
-      })
-
-      test('UserInventory → item_instance（旧模型名）', () => {
-        expect(normalizeTargetType('UserInventory')).toBe('item_instance')
-      })
-    })
-
-    describe('复数形式修正', () => {
-      test('ExchangeRecords → exchange_record（复数→单数）', () => {
-        expect(normalizeTargetType('ExchangeRecords')).toBe('exchange_record')
-      })
-    })
-
-    describe('语义不清修正', () => {
-      test('LotteryManagement → lottery_management_setting', () => {
-        expect(normalizeTargetType('LotteryManagement')).toBe('lottery_management_setting')
       })
     })
 
@@ -174,12 +143,6 @@ describe('P0-5: 审计日志 target_type 命名统一测试', () => {
       expect(isValidTargetType('AssetTransaction')).toBe(false)
     })
 
-    test('历史遗留名返回 false（需要先规范化）', () => {
-      expect(isValidTargetType('UserPointsAccount')).toBe(false)
-      expect(isValidTargetType('PointsTransaction')).toBe(false)
-      expect(isValidTargetType('UserInventory')).toBe(false)
-    })
-
     test('未知类型返回 false', () => {
       expect(isValidTargetType('UnknownType')).toBe(false)
       expect(isValidTargetType('random_string')).toBe(false)
@@ -201,32 +164,16 @@ describe('P0-5: 审计日志 target_type 命名统一测试', () => {
     })
   })
 
-  describe('getLegacyMappings 验证', () => {
-    test('返回映射表副本', () => {
-      const mappings = getLegacyMappings()
-      expect(typeof mappings).toBe('object')
-      expect(mappings.User).toBe('user')
-      expect(mappings.UserPointsAccount).toBe('account_asset_balance')
-    })
-
-    test('返回的是副本，修改不影响原始数据', () => {
-      const mappings = getLegacyMappings()
-      mappings.NewKey = 'new_value'
-      expect(TARGET_TYPE_LEGACY_MAPPING.NewKey).toBeUndefined()
-    })
-  })
-
   describe('normalizeTargetTypes 批量规范化验证', () => {
     test('批量转换多个 target_type', () => {
-      const input = ['User', 'ItemInstance', 'user', 'UserPointsAccount']
+      const input = ['User', 'ItemInstance', 'user']
       const result = normalizeTargetTypes(input)
 
-      expect(result.normalized).toEqual(['user', 'item_instance', 'user', 'account_asset_balance'])
+      expect(result.normalized).toEqual(['user', 'item_instance', 'user'])
 
       expect(result.mapping).toEqual({
         User: 'user',
-        ItemInstance: 'item_instance',
-        UserPointsAccount: 'account_asset_balance'
+        ItemInstance: 'item_instance'
       })
     })
 
@@ -239,36 +186,26 @@ describe('P0-5: 审计日志 target_type 命名统一测试', () => {
     })
   })
 
-  describe('迁移数据完整性验证', () => {
-    test('所有历史遗留值都映射到有效的标准资源码', () => {
-      Object.entries(TARGET_TYPE_LEGACY_MAPPING).forEach(([_legacy, standard]) => {
-        expect(isValidTargetType(standard)).toBe(true)
-      })
-    })
-
-    test('映射覆盖真实数据库中发现的所有历史值', () => {
-      // 真实数据库验证结果中发现的 target_type 值
+  describe('数据完整性验证', () => {
+    test('数据库中实际使用的 target_type 值都是有效的标准码', () => {
+      // 2026-01-21 数据库验证结果中的所有 target_type 值（已全部是 snake_case）
       const dbTargetTypes = [
-        'UserPointsAccount',
-        'CustomerServiceSession',
-        'User',
-        'ConsumptionRecord',
-        'PointsTransaction',
         'lottery_management_setting',
+        'user',
+        'account_asset_balance',
         'lottery_clear_setting_record',
-        'UserRoleChangeRecord',
-        'UserStatusChangeRecord',
-        'AccountAssetBalance',
-        'ExchangeRecords',
-        'LotteryManagement',
-        'UserInventory'
+        'customer_service_session',
+        'user_role_change_record',
+        'user_status_change_record',
+        'consumption_record',
+        'asset_transaction',
+        'feature_flag',
+        'exchange_record',
+        'item_instance'
       ]
 
       dbTargetTypes.forEach(targetType => {
-        const normalized = normalizeTargetType(targetType)
-        // 规范化后要么是有效的标准码，要么就是已经是标准码（snake_case）
-        const isValid = isValidTargetType(normalized) || targetType === normalized
-        expect(isValid).toBe(true)
+        expect(isValidTargetType(targetType)).toBe(true)
       })
     })
   })

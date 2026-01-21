@@ -270,23 +270,14 @@ async function loadUsers(silent = false) {
 }
 
 /**
- * 从Dashboard API加载统计数据
+ * 【已废弃】从Dashboard API加载统计数据
+ * 统计数据现在直接从用户列表API的statistics字段获取
+ * @deprecated 使用updateStatistics代替
  */
 async function loadDashboardStatistics() {
-  try {
-    const response = await apiRequest(API_ENDPOINTS.SYSTEM.DASHBOARD)
-    if (response && response.success && response.data) {
-      const overview = response.data.overview || {}
-      const today = response.data.today || {}
-
-      document.getElementById('totalUsers').textContent = formatNumber(overview.total_users || 0)
-      document.getElementById('todayUsers').textContent = formatNumber(today.new_users || 0)
-      document.getElementById('activeUsers').textContent = formatNumber(overview.active_users || 0)
-      document.getElementById('vipUsers').textContent = formatNumber(overview.vip_users || 0)
-    }
-  } catch (error) {
-    console.error('加载仪表板统计失败:', error)
-  }
+  // 不再需要单独调用Dashboard API
+  // 统计数据由用户列表API响应中的statistics字段提供
+  console.log('[users.js] loadDashboardStatistics已废弃，统计数据由updateStatistics处理')
 }
 
 // ==================== 渲染函数 ====================
@@ -480,12 +471,28 @@ function renderPagination(total, current) {
 
 /**
  * 更新统计信息
- * @param {Object} data - API返回的数据
+ * 从用户列表API的statistics字段获取统计数据（后端核心权威）
+ * @param {Object} data - API返回的数据，包含statistics字段
  */
 function updateStatistics(data) {
-  if (data.pagination) {
-    document.getElementById('totalUsers').textContent = formatNumber(data.pagination.total || 0)
-  }
+  // 从后端返回的statistics字段获取统计数据
+  const statistics = data.statistics || {}
+  
+  // 总用户数：优先使用statistics，其次用pagination.total
+  const totalUsers = statistics.total_users ?? data.pagination?.total ?? 0
+  document.getElementById('totalUsers').textContent = formatNumber(totalUsers)
+  
+  // 今日新增用户
+  const todayNew = statistics.today_new ?? 0
+  document.getElementById('todayUsers').textContent = formatNumber(todayNew)
+  
+  // 活跃用户数
+  const activeUsers = statistics.active_users ?? 0
+  document.getElementById('activeUsers').textContent = formatNumber(activeUsers)
+  
+  // VIP用户数
+  const vipUsers = statistics.vip_users ?? 0
+  document.getElementById('vipUsers').textContent = formatNumber(vipUsers)
 }
 
 // ==================== 用户操作函数 ====================

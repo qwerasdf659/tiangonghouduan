@@ -112,15 +112,7 @@ class BudgetContextStage extends BaseStage {
         transaction: context.transaction || null
       })
 
-      /*
-       * 3. 获取预算余额（统一使用 LotteryComputeEngine 计算结果）
-       *
-       * 清理日期：2026-01-20（技术债务清理方案 - 清理项3）
-       * 清理原因：budget_provider.getBalance() 方法在 BudgetProvider 基类中不存在
-       *          代码每次都会进入 catch 块，属于 100% 死代码
-       * 清理方案：直接使用 strategy_context.effective_budget（已由 LotteryComputeEngine 计算）
-       * 详见：docs/技术债务彻底清理重构方案-2026-01-20.md 决策7
-       */
+      // 3. 获取预算余额（使用 LotteryComputeEngine 计算结果）
       const budget_before = budget_mode === 'none' ? 0 : strategy_context.effective_budget || 0
 
       /* 4. 计算最低奖品成本 */

@@ -52,14 +52,12 @@ const API_ENDPOINTS = {
   },
 
   // ===== 角色管理API =====
+  // 注意：后端只实现了角色列表查询，角色的创建/编辑/删除通过数据库管理
+  // 用户角色变更请使用 USER.UPDATE_ROLE API
   ROLE: {
-    LIST: '/api/v4/console/user-management/roles', // 获取角色列表
-    DETAIL: '/api/v4/console/user-management/roles/:role_id', // 角色详情
-    CREATE: '/api/v4/console/user-management/roles', // 创建角色
-    UPDATE: '/api/v4/console/user-management/roles/:role_id', // 更新角色
-    DELETE: '/api/v4/console/user-management/roles/:role_id', // 删除角色
-    ASSIGN: '/api/v4/console/user-management/roles/:role_id/assign', // 分配角色给用户
-    PERMISSIONS: '/api/v4/console/user-management/permissions' // 权限列表
+    LIST: '/api/v4/console/user-management/roles' // 获取角色列表（只读）
+    // 以下API后端未实现，已移除：
+    // DETAIL, CREATE, UPDATE, DELETE, ASSIGN, PERMISSIONS
   },
 
   // ===== 抽奖管理API =====
@@ -185,24 +183,28 @@ const API_ENDPOINTS = {
   },
 
   // ===== 字典管理API =====
+  // 后端提供三种具体的字典表管理：类目、稀有度、资产分组
   DICT: {
-    // 字典类型
-    TYPES: '/api/v4/console/dictionaries/types',
-    CREATE_TYPE: '/api/v4/console/dictionaries/types',
-    UPDATE_TYPE: '/api/v4/console/dictionaries/types/:type_id',
-    DELETE_TYPE: '/api/v4/console/dictionaries/types/:type_id',
-    // 字典项
-    ITEMS: '/api/v4/console/dictionaries/items',
-    CREATE_ITEM: '/api/v4/console/dictionaries/items',
-    UPDATE_ITEM: '/api/v4/console/dictionaries/items/:item_id',
-    DELETE_ITEM: '/api/v4/console/dictionaries/items/:item_id',
-    // 原有兼容
+    // 获取所有字典数据（用于下拉选项）
+    ALL: '/api/v4/console/dictionaries/all',
+    // 类目字典（category_defs）
     CATEGORIES: '/api/v4/console/dictionaries/categories',
-    CATEGORY_DETAIL: '/api/v4/console/dictionaries/categories/:id',
+    CATEGORY_DETAIL: '/api/v4/console/dictionaries/categories/:code',
+    CREATE_CATEGORY: '/api/v4/console/dictionaries/categories',
+    UPDATE_CATEGORY: '/api/v4/console/dictionaries/categories/:code',
+    DELETE_CATEGORY: '/api/v4/console/dictionaries/categories/:code',
+    // 稀有度字典（rarity_defs）
     RARITIES: '/api/v4/console/dictionaries/rarities',
-    RARITY_DETAIL: '/api/v4/console/dictionaries/rarities/:id',
+    RARITY_DETAIL: '/api/v4/console/dictionaries/rarities/:code',
+    CREATE_RARITY: '/api/v4/console/dictionaries/rarities',
+    UPDATE_RARITY: '/api/v4/console/dictionaries/rarities/:code',
+    DELETE_RARITY: '/api/v4/console/dictionaries/rarities/:code',
+    // 资产分组字典（asset_group_defs）
     ASSET_GROUPS: '/api/v4/console/dictionaries/asset-groups',
-    ASSET_GROUP_DETAIL: '/api/v4/console/dictionaries/asset-groups/:id'
+    ASSET_GROUP_DETAIL: '/api/v4/console/dictionaries/asset-groups/:code',
+    CREATE_ASSET_GROUP: '/api/v4/console/dictionaries/asset-groups',
+    UPDATE_ASSET_GROUP: '/api/v4/console/dictionaries/asset-groups/:code',
+    DELETE_ASSET_GROUP: '/api/v4/console/dictionaries/asset-groups/:code'
   },
 
   // ===== 物品模板API =====
@@ -236,11 +238,19 @@ const API_ENDPOINTS = {
   },
 
   // ===== 业务记录API =====
+  // 后端字段说明（以后端为准）：
+  // - order_id: UUID格式的订单ID
+  // - code_hash: 核销码的SHA-256哈希值（不存明文）
+  // - item_instance_id: 关联的物品实例ID
+  // - redeemer_user_id: 核销用户ID
+  // - status: 订单状态（pending/fulfilled/cancelled/expired）
+  // - expires_at: 过期时间
+  // - fulfilled_at: 核销时间
   BUSINESS_RECORDS: {
     // 核销订单
     REDEMPTION_ORDERS: '/api/v4/console/business-records/redemption-orders',
     LIST: '/api/v4/console/business-records/redemption-orders', // 别名
-    DETAIL: '/api/v4/console/business-records/redemption-orders/:order_id',
+    DETAIL: '/api/v4/console/business-records/redemption-orders/:order_id', // 使用 order_id（UUID）
     REDEEM: '/api/v4/console/business-records/redemption-orders/:order_id/redeem',
     CANCEL: '/api/v4/console/business-records/redemption-orders/:order_id/cancel',
     BATCH_EXPIRE: '/api/v4/console/business-records/redemption-orders/batch-expire',
@@ -371,7 +381,8 @@ const API_ENDPOINTS = {
     SECURITY: '/api/v4/console/settings/security',
     BASIC: '/api/v4/console/settings/basic',
     POINTS: '/api/v4/console/settings/points',
-    NOTIFICATION: '/api/v4/console/settings/notification'
+    NOTIFICATION: '/api/v4/console/settings/notification',
+    MARKETPLACE: '/api/v4/console/settings/marketplace'
   },
 
   // ===== 用户层级API =====
@@ -466,13 +477,13 @@ const API_ENDPOINTS = {
     EXCHANGE_ORDERS: '/api/v4/console/marketplace/exchange_market/orders',
     EXCHANGE_ORDER_DETAIL: '/api/v4/console/marketplace/exchange_market/orders/:order_no',
     EXCHANGE_ORDER_STATUS: '/api/v4/shop/exchange/orders/:order_no/status',
-    // 交易订单
-    TRADE_ORDERS: '/api/v4/console/marketplace/trade/orders',
+    // 交易订单（C2C市场交易订单 - 使用后端正确的路径）
+    TRADE_ORDERS: '/api/v4/console/marketplace/trade_orders',
     // 简化路径版本（兼容 PageConfigRegistry.js）
     EXCHANGE_ITEMS_SIMPLE: '/api/v4/console/marketplace/exchange-items',
     EXCHANGE_ORDERS_SIMPLE: '/api/v4/console/marketplace/exchange-orders',
     EXCHANGE_STATS: '/api/v4/console/marketplace/exchange-stats',
-    TRADE_ORDERS_SIMPLE: '/api/v4/console/marketplace/trade-orders'
+    TRADE_ORDERS_SIMPLE: '/api/v4/console/marketplace/trade_orders'
   },
 
   // ===== 孤儿冻结API =====

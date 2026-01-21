@@ -48,12 +48,12 @@ describe('GET /api/v4/console/ - 管理员模块信息API', () => {
    * 验证返回的模块数量
    * 2026-01-21：API覆盖率补齐后新增多个模块（40个模块）
    */
-  test('应该返回42个已实现的模块', async () => {
+  test('应该返回41个已实现的模块', async () => {
     const response = await request(app).get('/api/v4/console/')
     const { modules } = response.body.data
 
     const moduleCount = Object.keys(modules).length
-    expect(moduleCount).toBe(42) // 实际挂载的路由数量（2026-01-21：会话管理功能补齐+API覆盖率完成）
+    expect(moduleCount).toBe(41) // 实际挂载的路由数量（2026-01-21：技术债务清理后更新）
 
     // 验证必需的模块是否存在（原有8个）
     expect(modules).toHaveProperty('auth')
@@ -69,7 +69,7 @@ describe('GET /api/v4/console/ - 管理员模块信息API', () => {
     expect(modules).toHaveProperty('customer_service')
     expect(modules).toHaveProperty('marketplace')
     expect(modules).toHaveProperty('material')
-    expect(modules).toHaveProperty('diamond')
+    // diamond 模块已移除（功能并入 material 模块）
     expect(modules).toHaveProperty('popup_banners')
     expect(modules).toHaveProperty('lottery_quota')
 

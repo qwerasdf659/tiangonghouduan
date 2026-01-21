@@ -19,13 +19,7 @@
  * - **活动可覆盖**：活动级 base_cost 覆盖全局 lottery_cost_points
  * - **缓存优化**：60秒短缓存 + 写后精准失效
  *
- * 技术债务修复：
- * - 问题：UnifiedLotteryEngine.getDrawPricing() 使用旧 JSON 字段（已清空）
- * - 问题：PricingStage._getDrawPricing() 使用新表（数据源不一致）
- * - 解决：抽取此服务统一定价逻辑，两处调用均使用此服务
- *
- * @see docs/技术债务-getDrawPricing定价逻辑迁移方案.md
- * @author 技术债务清理 - Phase 4
+ * @author 统一抽奖架构
  * @since 2026-01-21
  */
 

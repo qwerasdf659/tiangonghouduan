@@ -994,10 +994,7 @@ class MarketListingService {
       }
 
       if (listing.listing_kind === 'fungible_asset') {
-        /*
-         * 可叠加资产挂牌（使用快照字段）
-         * 2026-01-20 技术债务清理：统一使用 name 字段名
-         */
+        // 可叠加资产挂牌（使用快照字段）
         return {
           ...baseData,
           offer_asset_code: listing.offer_asset_code,
@@ -1011,10 +1008,7 @@ class MarketListingService {
           asset_group_code: listing.offer_asset_group_code || null
         }
       } else {
-        /*
-         * 物品实例挂牌（优先使用快照字段）
-         * 2026-01-20 技术债务清理：统一使用 name 字段名
-         */
+        // 物品实例挂牌（优先使用快照字段）
         return {
           ...baseData,
           item_instance_id: listing.offer_item_instance_id,
@@ -1029,8 +1023,8 @@ class MarketListingService {
           item_template_id: listing.offer_item_template_id || null,
           item_category_code: listing.offer_item_category_code || null,
           rarity_code: listing.offer_item_rarity || null,
-          // 兼容原有 rarity 字段（优先使用快照，fallback 到 meta）
-          rarity: listing.offer_item_rarity || listing.offerItem?.meta?.rarity || 'common'
+          // 稀有度：使用快照字段
+          rarity: listing.offer_item_rarity || 'common'
         }
       }
     })

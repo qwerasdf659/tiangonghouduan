@@ -831,12 +831,7 @@ class LotteryComputeEngine {
    * @private
    */
   _getMatrixMultiplier(budget_tier, pressure_tier) {
-    /*
-     * 技术债务清理（2026-01-20）：
-     * - 原实现：使用 TIER_WEIGHT_MATRIX（简化视图）
-     * - 新实现：直接使用 TIER_MATRIX_CONFIG 获取 empty_weight_multiplier
-     * - 原因：TIER_WEIGHT_MATRIX 已删除，统一使用完整配置
-     */
+    // 使用 TIER_MATRIX_CONFIG 获取 empty_weight_multiplier
     const tier_config = TIER_MATRIX_CONFIG[budget_tier]
     if (!tier_config) {
       this._log('warn', '未知的 budget_tier，使用默认乘数', { budget_tier })
@@ -920,11 +915,6 @@ class LotteryComputeEngine {
    * @returns {Object} 状态信息
    */
   getStatus() {
-    /*
-     * 技术债务清理（2026-01-20）：
-     * - 原字段：matrix: TIER_WEIGHT_MATRIX（简化视图）
-     * - 新字段：matrix: TIER_MATRIX_CONFIG（完整配置）
-     */
     return {
       engine_name: 'LotteryComputeEngine',
       version: '2.0.0',

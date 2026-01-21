@@ -585,15 +585,16 @@ async function loadTradeOrders() {
       page_size: pageSize
     })
 
+    // 使用后端正确的字段名
     const status = document.getElementById('filterTradeStatus').value
     const sellerId = document.getElementById('filterTradeSellerId').value.trim()
     const buyerId = document.getElementById('filterTradeBuyerId').value.trim()
     const orderNo = document.getElementById('filterTradeOrderNo').value.trim()
 
     if (status) params.append('status', status)
-    if (sellerId) params.append('seller_id', sellerId)
-    if (buyerId) params.append('buyer_id', buyerId)
-    if (orderNo) params.append('order_no', orderNo)
+    if (sellerId) params.append('seller_user_id', sellerId)  // 后端使用 seller_user_id
+    if (buyerId) params.append('buyer_user_id', buyerId)      // 后端使用 buyer_user_id
+    if (orderNo) params.append('listing_id', orderNo)         // 后端支持 listing_id 筛选
 
     const response = await apiRequest(API_ENDPOINTS.MARKETPLACE.TRADE_ORDERS + '?' + params)
 
@@ -624,19 +625,20 @@ function renderTradeOrders() {
     return
   }
 
+  // 使用后端正确的字段名
   tbody.innerHTML = tradeOrders
     .map(
       order => `
     <tr>
-      <td><code>${order.order_no}</code></td>
-      <td>ID: ${order.seller_id}</td>
-      <td>ID: ${order.buyer_id}</td>
-      <td>${escapeHtml(order.item_name || '-')}</td>
-      <td class="text-primary fw-bold">${order.price}</td>
-      <td>${getStatusBadge(order.status)}</td>
+      <td><code>${order.order_id}</code></td>
+      <td>ID: ${order.seller_user_id}</td>
+      <td>ID: ${order.buyer_user_id}</td>
+      <td>${escapeHtml(order.listing?.offerItem?.item_name || order.asset_code || '-')}</td>
+      <td class="text-primary fw-bold">${order.gross_amount}</td>
+      <td>${getTradeOrderStatusBadge(order.status)}</td>
       <td>${formatDateTime(order.created_at)}</td>
       <td>
-        <button class="btn btn-sm btn-outline-info" data-action="detail" data-order="${order.order_no}">
+        <button class="btn btn-sm btn-outline-info" data-action="detail" data-order="${order.order_id}">
           <i class="bi bi-eye"></i>
         </button>
       </td>
@@ -646,13 +648,27 @@ function renderTradeOrders() {
     .join('')
 }
 
+// C2C交易订单状态徽章（使用后端的状态值）
+function getTradeOrderStatusBadge(status) {
+  const statusMap = {
+    created: { text: '已创建', class: 'bg-secondary' },
+    frozen: { text: '已冻结', class: 'bg-warning' },
+    completed: { text: '已完成', class: 'bg-success' },
+    cancelled: { text: '已取消', class: 'bg-danger' },
+    failed: { text: '失败', class: 'bg-dark' }
+  }
+  const info = statusMap[status] || { text: status || '未知', class: 'bg-secondary' }
+  return `<span class="badge ${info.class}">${info.text}</span>`
+}
+
 function updateTradeStats() {
   const total = tradeOrders.length
-  const pending = tradeOrders.filter(o => o.status === 'pending').length
+  // 使用后端正确的状态值：created/frozen 为进行中，completed 为已完成
+  const inProgress = tradeOrders.filter(o => o.status === 'created' || o.status === 'frozen').length
   const completed = tradeOrders.filter(o => o.status === 'completed').length
 
   document.getElementById('stat_trade_total').textContent = total
-  document.getElementById('stat_trade_pending').textContent = pending
+  document.getElementById('stat_trade_pending').textContent = inProgress
   document.getElementById('stat_trade_completed').textContent = completed
 }
 
@@ -661,13 +677,15 @@ function handleTradeAction(e) {
   if (!btn) return
 
   const action = btn.dataset.action
-  const orderNo = btn.dataset.order
+  const orderId = btn.dataset.order  // 使用 order_id
 
   if (action === 'detail') {
-    const order = tradeOrders.find(o => o.order_no === orderNo)
+    // 使用后端正确的字段名
+    const order = tradeOrders.find(o => String(o.order_id) === String(orderId))
     if (order) {
+      const itemName = order.listing?.offerItem?.item_name || order.asset_code || '-'
       alert(
-        `交易订单详情：\n订单号：${order.order_no}\n卖家ID：${order.seller_id}\n买家ID：${order.buyer_id}\n商品：${order.item_name}\n价格：${order.price}\n状态：${order.status}`
+        `交易订单详情：\n订单ID：${order.order_id}\n卖家ID：${order.seller_user_id}\n买家ID：${order.buyer_user_id}\n商品：${itemName}\n结算资产：${order.asset_code}\n买家支付：${order.gross_amount}\n卖家实收：${order.net_amount}\n手续费：${order.fee_amount}\n状态：${order.status}`
       )
     }
   }

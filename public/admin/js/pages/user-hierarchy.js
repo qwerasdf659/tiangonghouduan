@@ -72,17 +72,21 @@ async function loadHierarchyList() {
     if (status) params.append('is_active', status)
     if (superiorId) params.append('superior_user_id', superiorId)
 
+    console.log('📡 请求API:', `${API_ENDPOINTS.USER_HIERARCHY.LIST}?${params}`)
     const response = await apiRequest(`${API_ENDPOINTS.USER_HIERARCHY.LIST}?${params}`)
+    console.log('📥 API响应:', response)
 
-    if (response.success) {
+    if (response && response.success) {
+      console.log('✅ 数据加载成功, 记录数:', response.data?.count || 0)
       renderHierarchyTable(response.data)
       updateStatistics(response.data)
     } else {
-      showErrorToast('加载层级列表失败: ' + (response.message || '未知错误'))
+      console.error('❌ API返回失败:', response)
+      showErrorToast('加载层级列表失败: ' + (response?.message || '未知错误'))
     }
   } catch (error) {
-    console.error('加载层级列表失败:', error)
-    showErrorToast('加载层级列表失败')
+    console.error('❌ 加载层级列表异常:', error)
+    showErrorToast('加载层级列表失败: ' + error.message)
   }
 }
 

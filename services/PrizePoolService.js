@@ -519,20 +519,28 @@ class PrizePoolService {
       image_id: prize.image_id // 记录旧的图片ID
     }
 
-    // 2. 字段映射（前端字段 → 数据库字段）
+    /*
+     * 2. 字段映射（前端字段 → 数据库字段）
+     * 🔧 2026-01-21 修复：同时支持 description 和 prize_description 字段名
+     */
     const allowedFields = {
       name: 'prize_name',
+      prize_name: 'prize_name', // 🔧 支持直接使用数据库字段名
       type: 'prize_type',
+      prize_type: 'prize_type', // 🔧 支持直接使用数据库字段名
       value: 'prize_value',
+      prize_value: 'prize_value', // 🔧 支持直接使用数据库字段名
       // 双账户模型：内部预算成本（系统内部）
       prize_value_points: 'prize_value_points',
       value_points: 'prize_value_points',
       budget_cost_points: 'prize_value_points',
       // 注意：virtual_amount 和 category 字段数据库不存在，已移除
       quantity: 'stock_quantity',
+      stock_quantity: 'stock_quantity', // 🔧 支持直接使用数据库字段名
       probability: 'win_probability', // 前端probability映射到数据库win_probability
       win_probability: 'win_probability',
       description: 'prize_description',
+      prize_description: 'prize_description', // 🔧 支持直接使用数据库字段名
       image_id: 'image_id',
       angle: 'angle',
       color: 'color',

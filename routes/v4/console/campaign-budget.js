@@ -218,7 +218,7 @@ router.put(
               preset_debt_enabled,
               preset_budget_policy
             },
-            { operated_by: req.user?.id, transaction }
+            { operated_by: req.user?.user_id, transaction }
           )
         },
         { description: `console_update_campaign_budget: campaign_id=${campaign_id}` }
@@ -495,7 +495,7 @@ router.post(
         async transaction => {
           // 决策7：通过 Service 层补充预算（包含缓存失效）
           return await AdminLotteryService.supplementCampaignBudget(parseInt(campaign_id), amount, {
-            operated_by: req.user?.id,
+            operated_by: req.user?.user_id,
             transaction
           })
         },

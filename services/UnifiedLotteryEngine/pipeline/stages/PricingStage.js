@@ -9,12 +9,6 @@
  * 3. 验证用户积分是否足够支付
  * 4. 硬护栏1：draw_count 必须在活动配置的启用按钮列表中（由 LotteryPricingService 验证）
  *
- * ⚠️ 2026-01-21 技术债务修复：
- * - 原逻辑：内部实现 _getDrawPricing() 定价计算
- * - 新逻辑：调用 LotteryPricingService.getDrawPricing() 统一服务
- * - 消除重复：与 UnifiedLotteryEngine.execute_draw() 共用同一服务
- *
- * @see docs/技术债务-getDrawPricing定价逻辑迁移方案.md 方案C
  * @see services/lottery/LotteryPricingService.js - 统一定价服务
  *
  * 配置来源（由 LotteryPricingService 管理）：
@@ -44,14 +38,12 @@
  * @module services/UnifiedLotteryEngine/pipeline/stages/PricingStage
  * @author 统一抽奖架构重构
  * @since 2026-01-19
- * @updated 2026-01-21 - 技术债务修复：迁移至 LotteryPricingService
  */
 
 const BaseStage = require('./BaseStage')
 
 /**
- * 抽奖定价服务（2026-01-21 技术债务修复 - getDrawPricing 统一）
- * @see docs/技术债务-getDrawPricing定价逻辑迁移方案.md
+ * 抽奖定价服务 - 统一定价计算入口
  */
 const LotteryPricingService = require('../../../lottery/LotteryPricingService')
 
@@ -110,16 +102,7 @@ class PricingStage extends BaseStage {
       const budget_data = this.getContextData(context, 'BudgetContextStage.data') || {}
       const user_points = budget_data.budget_before || 0
 
-      /**
-       * 🎯 核心：调用 LotteryPricingService 统一定价服务
-       *
-       * 🔴 2026-01-21 技术债务修复：
-       * - 原逻辑：this._getDrawPricing(draw_count, campaign)
-       * - 新逻辑：LotteryPricingService.getDrawPricing(draw_count, campaign_id, options)
-       * - 消除重复：UnifiedLotteryEngine 和 PricingStage 共用同一服务
-       *
-       * @see docs/技术债务-getDrawPricing定价逻辑迁移方案.md 方案C
-       */
+      // 调用 LotteryPricingService 统一定价服务
       const transaction = context.transaction // 从上下文获取事务（如有）
       const pricing = await LotteryPricingService.getDrawPricing(draw_count, campaign.campaign_id, {
         transaction
@@ -137,7 +120,7 @@ class PricingStage extends BaseStage {
       }
 
       /**
-       * 构建返回数据（兼容旧链路 getDrawPricing() 输出格式）
+       * 构建返回数据
        *
        * LotteryPricingService 返回字段映射：
        * - total_cost → total_cost, draw_cost
@@ -198,19 +181,6 @@ class PricingStage extends BaseStage {
       throw error
     }
   }
-
-  /**
-   * 🔴 注意：以下旧方法已迁移至 LotteryPricingService
-   *
-   * @deprecated 2026-01-21 技术债务修复
-   * @see services/lottery/LotteryPricingService.js - 统一定价服务
-   * @see docs/技术债务-getDrawPricing定价逻辑迁移方案.md - 方案C
-   *
-   * 已删除的方法：
-   * - _getDrawPricing() → LotteryPricingService.getDrawPricing()
-   * - _loadDiscountConfig() → LotteryCampaignPricingConfig.getDrawButtonConfig()
-   * - _getEnabledDrawButtons() → LotteryCampaignPricingConfig.getEnabledDrawCounts()
-   */
 }
 
 module.exports = PricingStage

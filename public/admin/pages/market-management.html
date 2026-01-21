@@ -336,22 +336,24 @@
                 <label class="form-label">订单状态</label>
                 <select class="form-select" id="filterTradeStatus">
                   <option value="">全部状态</option>
-                  <option value="pending">进行中</option>
+                  <option value="created">已创建</option>
+                  <option value="frozen">已冻结</option>
                   <option value="completed">已完成</option>
                   <option value="cancelled">已取消</option>
+                  <option value="failed">失败</option>
                 </select>
               </div>
               <div class="col-md-2">
                 <label class="form-label">卖家ID</label>
-                <input type="number" class="form-control" id="filterTradeSellerId" placeholder="卖家ID">
+                <input type="number" class="form-control" id="filterTradeSellerId" placeholder="卖家用户ID">
               </div>
               <div class="col-md-2">
                 <label class="form-label">买家ID</label>
-                <input type="number" class="form-control" id="filterTradeBuyerId" placeholder="买家ID">
+                <input type="number" class="form-control" id="filterTradeBuyerId" placeholder="买家用户ID">
               </div>
               <div class="col-md-3">
-                <label class="form-label">订单号</label>
-                <input type="text" class="form-control" id="filterTradeOrderNo" placeholder="搜索订单号">
+                <label class="form-label">挂牌ID</label>
+                <input type="text" class="form-control" id="filterTradeOrderNo" placeholder="挂牌ID">
               </div>
               <div class="col-md-3 d-flex align-items-end gap-2">
                 <button type="submit" class="btn btn-primary flex-fill">

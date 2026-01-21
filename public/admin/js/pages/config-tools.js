@@ -243,12 +243,14 @@ function renderSettingsList(category, settings) {
   settings.forEach(setting => {
     const isReadonly = setting.is_readonly
     const valueType = setting.value_type || 'string'
+    // 使用后端返回的中文名称，如果没有则使用原始key
+    const displayName = setting.display_name || setting.setting_key
 
     html += `
       <tr>
         <td>
-          <code class="text-primary">${setting.setting_key}</code>
-          <br><small class="text-muted">${valueType}</small>
+          <strong class="text-primary">${displayName}</strong>
+          <br><small class="text-muted"><code>${setting.setting_key}</code> · ${valueType}</small>
         </td>
         <td>
           ${

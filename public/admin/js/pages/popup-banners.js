@@ -231,18 +231,84 @@ function handleLinkTypeChange() {
  */
 async function loadStatistics() {
   try {
+    console.log('📊 开始加载统计数据...')
     const response = await apiRequest(API_ENDPOINTS.POPUP_BANNER.STATS)
+    console.log('📊 统计API响应:', response)
 
-    if (response && response.success) {
+    // 处理未登录或token失效的情况（apiRequest返回undefined）
+    if (!response) {
+      console.warn('统计数据加载失败: 未获取到响应（可能是未登录或token失效）')
+      setStatisticsError('需要登录')
+      return
+    }
+
+    if (response.success) {
       // 后端返回 { statistics: {...} }，适配后端数据结构
-      const stats = response.data.statistics || response.data
-      document.getElementById('statTotal').textContent = formatNumber(stats.total || 0)
-      document.getElementById('statActive').textContent = formatNumber(stats.active || 0)
-      document.getElementById('statInactive').textContent = formatNumber(stats.inactive || 0)
-      document.getElementById('statHome').textContent = formatNumber(stats.by_position?.home || 0)
+      const stats = response.data?.statistics || response.data || {}
+      console.log('📊 解析的统计数据:', stats)
+      
+      // 更新统计卡片
+      const total = stats.total ?? 0
+      const active = stats.active ?? 0
+      const inactive = stats.inactive ?? 0
+      const home = stats.by_position?.home ?? 0
+      
+      console.log(`📊 统计值: total=${total}, active=${active}, inactive=${inactive}, home=${home}`)
+      
+      document.getElementById('statTotal').textContent = formatNumber(total)
+      document.getElementById('statActive').textContent = formatNumber(active)
+      document.getElementById('statInactive').textContent = formatNumber(inactive)
+      document.getElementById('statHome').textContent = formatNumber(home)
+      
+      console.log('✅ 统计数据更新完成')
+    } else {
+      console.warn('统计数据加载失败:', response.message)
+      setStatisticsError(response.message || '加载失败')
     }
   } catch (error) {
-    console.error('加载统计失败:', error)
+    console.error('❌ 加载统计失败:', error)
+    setStatisticsError('请求错误')
+  }
+}
+
+/**
+ * 设置统计数据为错误状态
+ * @param {string} message - 错误信息
+ */
+function setStatisticsError(message) {
+  const errorText = `<span class="text-danger" title="${message}">-</span>`
+  const elements = ['statTotal', 'statActive', 'statInactive', 'statHome']
+  elements.forEach(id => {
+    const el = document.getElementById(id)
+    if (el) el.innerHTML = errorText
+  })
+}
+
+/**
+ * 从列表数据更新统计（备用方案）
+ * 当统计API失败时，可以从列表数据计算统计
+ * @param {Array} banners - 弹窗列表
+ * @param {number} total - 总数
+ */
+function updateStatisticsFromList(banners, total) {
+  // 如果统计已经正确显示（不是"-"），则跳过
+  const statTotalEl = document.getElementById('statTotal')
+  const currentValue = statTotalEl?.textContent?.trim()
+  
+  // 只有当统计显示"-"时才从列表数据更新
+  if (currentValue === '-' || currentValue === '') {
+    console.log('📊 从列表数据更新统计（备用方案）')
+    
+    const activeCount = banners.filter(b => b.is_active === true).length
+    const inactiveCount = banners.filter(b => b.is_active === false).length
+    const homeCount = banners.filter(b => b.position === 'home').length
+    
+    document.getElementById('statTotal').textContent = formatNumber(total || banners.length)
+    document.getElementById('statActive').textContent = formatNumber(activeCount)
+    document.getElementById('statInactive').textContent = formatNumber(inactiveCount)
+    document.getElementById('statHome').textContent = formatNumber(homeCount)
+    
+    console.log(`📊 备用统计: total=${total}, active=${activeCount}, inactive=${inactiveCount}, home=${homeCount}`)
   }
 }
 
@@ -270,6 +336,10 @@ async function loadBanners() {
     if (response && response.success) {
       const data = response.data
       totalRecords = data.pagination.total
+      
+      // 从列表数据计算统计（作为备用方案）
+      updateStatisticsFromList(data.banners, data.pagination.total)
+      
       renderBanners(data.banners)
       renderPagination(data.pagination)
     } else {

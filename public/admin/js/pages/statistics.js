@@ -326,6 +326,7 @@ function renderUserTypeChart(userTypes) {
   ].filter(item => item.value > 0)
 
   userTypeChart.setOption(getUserTypeChartOption(data))
+}
 
 /**
  * 计算用户增长趋势

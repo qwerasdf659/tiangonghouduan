@@ -129,7 +129,7 @@ router.get('/expiring', authenticateToken, requireAdmin, async (req, res) => {
  * 路径参数：
  * - user_id: 用户ID
  *
- * 返回：用户高级空间状态详情
+ * 返回：用户高级空间状态详情（无记录时返回默认状态，不返回404）
  */
 router.get('/:user_id', authenticateToken, requireAdmin, async (req, res) => {
   try {
@@ -137,8 +137,18 @@ router.get('/:user_id', authenticateToken, requireAdmin, async (req, res) => {
 
     const status = await getUserPremiumQueryService(req).getUserPremiumStatus(user_id)
 
+    // 用户没有高级空间记录是正常状态，返回默认值而不是404
     if (!status) {
-      return res.apiError('用户高级空间状态不存在', 'STATUS_NOT_FOUND', null, 404)
+      return res.apiSuccess(
+        {
+          user_id,
+          is_unlocked: false,
+          unlock_method: null,
+          expire_time: null,
+          message: '用户尚未解锁高级空间'
+        },
+        '获取用户高级空间状态成功'
+      )
     }
 
     return res.apiSuccess(status, '获取用户高级空间状态成功')

@@ -981,18 +981,31 @@ const PageConfigRegistry = {
     primaryKey: 'user_id',
     pagination: true,
     pageSize: 20,
+    // 数据字段映射（后端返回 users 数组）
+    dataField: 'users',
 
+    // 统计数据配置（以后端返回字段为准）
+    // 后端返回格式: { users: [], pagination: {...}, statistics: { total_users, today_new, active_users, vip_users } }
     stats: [
-      { key: 'total', label: '用户总数', color: 'primary', field: 'pagination.total_count' },
-      { key: 'active', label: '活跃用户', color: 'success', field: 'stats.active' },
-      { key: 'new_today', label: '今日新增', color: 'info', field: 'stats.new_today' },
-      { key: 'vip', label: 'VIP用户', color: 'warning', field: 'stats.vip' }
+      { key: 'total', label: '总用户数', color: 'primary', field: 'statistics.total_users' },
+      { key: 'new_today', label: '今日新增', color: 'info', field: 'statistics.today_new' },
+      { key: 'active', label: '活跃用户', color: 'success', field: 'statistics.active_users' },
+      { key: 'vip', label: 'VIP用户', color: 'warning', field: 'statistics.vip_users' }
     ],
 
     filters: [
       {
-        key: 'status',
-        label: '状态',
+        key: 'user_type',
+        label: '用户类型',
+        type: 'select',
+        col: 2,
+        options: [
+          { value: '', label: '全部用户' }
+        ]
+      },
+      {
+        key: 'account_status',
+        label: '账户状态',
         type: 'select',
         col: 2,
         options: [
@@ -1001,30 +1014,62 @@ const PageConfigRegistry = {
           { value: 'banned', label: '封禁' }
         ]
       },
-      {
-        key: 'role',
-        label: '角色',
-        type: 'select',
-        col: 2,
-        options: [
-          { value: '', label: '全部角色' },
-          { value: 'user', label: '普通用户' },
-          { value: 'vip', label: 'VIP用户' },
-          { value: 'merchant', label: '商户' }
-        ]
-      },
-      { key: 'search', label: '搜索', type: 'text', placeholder: '用户ID/手机号/昵称', col: 4 }
+      { key: 'search', label: '搜索', type: 'text', placeholder: '手机号、昵称、ID', col: 4 }
     ],
 
     columns: [
-      { key: 'user_id', label: '用户ID' },
-      { key: 'nickname', label: '昵称' },
-      { key: 'mobile', label: '手机号' },
-      { key: 'role', label: '角色', type: 'badge' },
-      { key: 'points', label: '积分', type: 'currency', color: 'warning' },
-      { key: 'status', label: '状态', type: 'status' },
+      { key: 'user_id', label: 'ID' },
+      { 
+        key: 'user_info', 
+        label: '用户信息',
+        // 自定义渲染：显示昵称和手机号
+        render: (value, row) => {
+          const nickname = row.nickname || '未设置昵称'
+          const mobile = row.mobile || '-'
+          return `<div><strong>${nickname}</strong><br><small class="text-muted">${mobile}</small></div>`
+        }
+      },
+      { 
+        key: 'roles', 
+        label: '角色', 
+        type: 'badge',
+        // 渲染角色标签
+        render: (roles) => {
+          if (!roles || !Array.isArray(roles) || roles.length === 0) {
+            return '<span class="badge bg-secondary">普通用户</span>'
+          }
+          return roles.map(r => {
+            const roleLabels = {
+              'user': '普通用户',
+              'vip': 'VIP用户', 
+              'admin': '管理员',
+              'super_admin': '超级管理员',
+              'system_job': '系统定时任务'
+            }
+            const roleColors = {
+              'user': 'secondary',
+              'vip': 'warning',
+              'admin': 'primary',
+              'super_admin': 'danger',
+              'system_job': 'info'
+            }
+            return `<span class="badge bg-${roleColors[r] || 'secondary'}">${roleLabels[r] || r}</span>`
+          }).join(' ')
+        }
+      },
+      { key: 'history_total_points', label: '历史总积分', type: 'currency', color: 'warning' },
       { key: 'created_at', label: '注册时间', type: 'datetime' },
-      { key: 'last_login', label: '最后登录', type: 'datetime' }
+      { key: 'last_login', label: '最后登录', type: 'datetime' },
+      { 
+        key: 'status', 
+        label: '状态', 
+        type: 'status',
+        statusMap: {
+          'active': { class: 'success', label: '正常' },
+          'inactive': { class: 'secondary', label: '未激活' },
+          'banned': { class: 'danger', label: '封禁' }
+        }
+      }
     ],
 
     actions: [
@@ -1150,12 +1195,16 @@ const PageConfigRegistry = {
     apiEndpoint: API_ENDPOINTS.MERCHANT_POINTS.LIST,
     primaryKey: 'audit_id',
     pagination: true,
+    // 数据字段映射（后端返回 rows 数组）
+    dataField: 'rows',
+    // 统计接口（独立获取统计数据）
+    statsEndpoint: API_ENDPOINTS.MERCHANT_POINTS.STATS_PENDING,
 
     stats: [
-      { key: 'total', label: '申请总数', color: 'primary', field: 'pagination.total_count' },
-      { key: 'pending', label: '待审核', color: 'warning', field: 'stats.pending' },
-      { key: 'approved', label: '已通过', color: 'success', field: 'stats.approved' },
-      { key: 'rejected', label: '已拒绝', color: 'danger', field: 'stats.rejected' }
+      { key: 'total', label: '申请总数', color: 'primary', field: 'pagination.total' },
+      { key: 'pending', label: '待审核', color: 'warning', field: 'pending_count' },
+      { key: 'approved', label: '已通过', color: 'success', field: 'approved_count' },
+      { key: 'rejected', label: '已拒绝', color: 'danger', field: 'rejected_count' }
     ],
 
     filters: [
@@ -1171,15 +1220,16 @@ const PageConfigRegistry = {
           { value: 'rejected', label: '已拒绝' }
         ]
       },
-      { key: 'merchant_id', label: '商户ID', type: 'number', placeholder: '输入商户ID', col: 3 }
+      { key: 'user_id', label: '用户ID', type: 'number', placeholder: '输入用户ID', col: 3 }
     ],
 
     columns: [
       { key: 'audit_id', label: '审核ID', type: 'code' },
-      { key: 'merchant_id', label: '商户ID' },
-      { key: 'merchant_name', label: '商户名称' },
+      { key: 'user_id', label: '用户ID' },
+      { key: 'applicant', label: '申请人', render: (v) => v || '-' },
       { key: 'points_amount', label: '申请积分', type: 'currency', color: 'warning' },
-      { key: 'reason', label: '申请原因' },
+      { key: 'description', label: '申请原因' },
+      { key: 'priority', label: '优先级', type: 'badge', badgeMap: { high: 'danger', medium: 'warning', low: 'secondary' } },
       {
         key: 'status',
         label: '状态',
@@ -1190,7 +1240,7 @@ const PageConfigRegistry = {
           rejected: { class: 'danger', label: '已拒绝' }
         }
       },
-      { key: 'created_at', label: '申请时间', type: 'datetime' }
+      { key: 'submitted_at', label: '申请时间', type: 'datetime' }
     ],
 
     actions: [

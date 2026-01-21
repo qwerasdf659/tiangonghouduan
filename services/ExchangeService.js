@@ -57,7 +57,7 @@ const { BusinessCacheHelper } = require('../utils/BusinessCacheHelper')
  * - 订单号格式：EXC{timestamp}{random}
  *
  * 创建时间：2025年12月06日
- * 最后修改：2025年12月18日 - 暴力移除旧方案，统一为材料资产支付
+ * 最后修改：2026年01月21日
  * 使用模型：Claude Sonnet 4.5
  */
 
@@ -531,7 +531,7 @@ class ExchangeService {
       totalPayAmount
     })
 
-    // 3. 使用AssetService统一账本扣减材料资产（Phase 3迁移）
+    // 3. 使用AssetService统一账本扣减材料资产
     const AssetService = require('./AssetService')
 
     logger.info('[兑换市场] 开始扣减材料资产（统一账本）', {
@@ -1105,12 +1105,6 @@ class ExchangeService {
     // 强制要求事务边界 - 2026-01-08 图片存储架构治理
     const transaction = assertAndGetTransaction(options, 'ExchangeService.createExchangeItem')
 
-    /*
-     * 2026-01-20 技术债务清理：
-     * - 已删除 item_name/item_description 兼容逻辑
-     * - 统一使用 name/description（与数据库模型一致）
-     * - API参数也已同步修改为 name/description
-     */
     const { name = '', description = '' } = itemData
 
     logger.info('[兑换市场] 管理员创建商品', {
@@ -1153,10 +1147,7 @@ class ExchangeService {
       throw new Error(`无效的status参数，允许值：${validStatuses.join(', ')}`)
     }
 
-    /*
-     * 创建商品（V4.5.0材料资产支付 + 2026-01-08 图片存储架构）
-     * 2026-01-20 技术债务清理：统一使用 name/description 字段
-     */
+    // 创建商品（V4.5.0材料资产支付 + 图片存储架构）
     const item = await ExchangeItem.create(
       {
         name: name.trim(),
@@ -1250,11 +1241,6 @@ class ExchangeService {
     // 构建更新数据
     const finalUpdateData = { updated_at: BeijingTimeHelper.createDatabaseTime() }
 
-    /*
-     * 2026-01-20 技术债务清理：
-     * - 已删除 item_name/item_description 兼容逻辑
-     * - 统一使用 name/description（与数据库模型一致）
-     */
     if (updateData.name !== undefined) {
       if (updateData.name.trim().length === 0) {
         throw new Error('商品名称不能为空')

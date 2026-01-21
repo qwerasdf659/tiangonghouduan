@@ -113,6 +113,13 @@ async function loadPrizes() {
 
 /**
  * 渲染奖品列表
+ * 
+ * 🔧 2026-01-21 修复：适配后端返回的字段名
+ * - description → prize_description
+ * - current_stock → stock_quantity
+ * - initial_stock → stock_quantity
+ * - claimed_count → total_win_count
+ * - image_url → 根据image_id处理
  */
 function renderPrizes(prizes) {
   const tbody = document.getElementById('prizesTableBody')
@@ -142,14 +149,14 @@ function renderPrizes(prizes) {
                onerror="this.src='${defaultPrizeImage}'">
           <div>
             <div class="fw-bold">${prize.prize_name}</div>
-            <small class="text-muted">${prize.description || '暂无描述'}</small>
+            <small class="text-muted">${prize.prize_description || '暂无描述'}</small>
           </div>
         </div>
       </td>
       <td>${getPrizeTypeLabel(prize.prize_type)}</td>
       <td class="fw-bold text-primary">¥${(prize.prize_value || 0).toFixed(2)}</td>
-      <td>${renderStockBadge(prize.current_stock, prize.initial_stock)}</td>
-      <td class="text-info">${formatNumber(prize.claimed_count || 0)}</td>
+      <td>${renderStockBadge(prize.remaining_quantity, prize.stock_quantity)}</td>
+      <td class="text-info">${formatNumber(prize.total_win_count || 0)}</td>
       <td>${renderPrizeStatus(prize)}</td>
       <td>
         <div class="btn-group btn-group-sm">
@@ -185,13 +192,19 @@ function getPrizeTypeLabel(type) {
 
 /**
  * 渲染库存徽章
+ * 
+ * 🔧 2026-01-21 修复：参数改为 (remaining, total)
+ * - remaining: 剩余库存 (remaining_quantity)
+ * - total: 总库存 (stock_quantity)
  */
-function renderStockBadge(current, initial) {
+function renderStockBadge(remaining, total) {
+  const current = remaining || 0
+  const initial = total || 0
   const percentage = initial > 0 ? (current / initial) * 100 : 0
   let badgeClass = 'bg-success'
   let icon = 'check-circle'
 
-  if (percentage === 0) {
+  if (current === 0) {
     badgeClass = 'bg-danger'
     icon = 'x-circle'
   } else if (percentage < 20) {
@@ -208,11 +221,18 @@ function renderStockBadge(current, initial) {
 
 /**
  * 渲染奖品状态
+ * 
+ * 🔧 2026-01-21 修复：使用后端字段
+ * - remaining_quantity: 剩余库存
+ * - stock_quantity: 总库存
  */
 function renderPrizeStatus(prize) {
-  if (prize.current_stock === 0) {
+  const remaining = prize.remaining_quantity || 0
+  const total = prize.stock_quantity || 0
+  
+  if (remaining === 0) {
     return '<span class="badge bg-danger">已售罄</span>'
-  } else if (prize.current_stock < prize.initial_stock * 0.2) {
+  } else if (remaining < total * 0.2) {
     return '<span class="badge bg-warning text-dark">库存不足</span>'
   } else {
     return '<span class="badge bg-success">正常</span>'
@@ -221,19 +241,27 @@ function renderPrizeStatus(prize) {
 
 /**
  * 更新统计信息
+ * 
+ * 🔧 2026-01-21 修复：适配后端返回的统计字段
+ * 后端返回: { total, active, inactive, out_of_stock, total_stock, remaining_stock }
+ * 前端显示: 奖品总数, 库存充足, 库存不足, 已领取
  */
 function updateStatistics(data) {
   if (data.statistics) {
-    document.getElementById('totalPrizes').textContent = formatNumber(data.statistics.total || 0)
+    const stats = data.statistics
+    // 奖品总数
+    document.getElementById('totalPrizes').textContent = formatNumber(stats.total || 0)
+    // 库存充足 = 活跃的奖品数 - 无库存的
     document.getElementById('inStockPrizes').textContent = formatNumber(
-      data.statistics.in_stock || 0
+      (stats.active || 0) - (stats.out_of_stock || 0)
     )
+    // 库存不足 = 无库存的奖品数
     document.getElementById('lowStockPrizes').textContent = formatNumber(
-      data.statistics.low_stock || 0
+      stats.out_of_stock || 0
     )
-    document.getElementById('claimedPrizes').textContent = formatNumber(
-      data.statistics.claimed || 0
-    )
+    // 已领取 = 总库存 - 剩余库存
+    const claimed = (stats.total_stock || 0) - (stats.remaining_stock || 0)
+    document.getElementById('claimedPrizes').textContent = formatNumber(claimed)
   }
 }
 
@@ -303,6 +331,10 @@ async function submitAddPrize() {
 
 /**
  * 编辑奖品
+ * 
+ * 🔧 2026-01-21 修复：使用后端字段名
+ * - current_stock → stock_quantity
+ * - description → prize_description
  */
 function editPrize(prizeId) {
   const prize = currentPrizes.find(p => (p.prize_id || p.id) === prizeId)
@@ -315,11 +347,15 @@ function editPrize(prizeId) {
   document.getElementById('editPrizeName').value = prize.prize_name
   document.getElementById('editPrizeType').value = prize.prize_type
   document.getElementById('editPrizeValue').value = prize.prize_value
-  document.getElementById('editPrizeStock').value = prize.current_stock
-  document.getElementById('editPrizeDescription').value = prize.description || ''
+  document.getElementById('editPrizeStock').value = prize.stock_quantity || 0
+  document.getElementById('editPrizeDescription').value = prize.prize_description || ''
 
+  // 处理图片显示
   if (prize.image_url) {
     document.getElementById('editImagePreview').src = prize.image_url
+    document.getElementById('editImagePreviewContainer').style.display = 'block'
+  } else {
+    document.getElementById('editImagePreview').src = defaultPrizeImage
     document.getElementById('editImagePreviewContainer').style.display = 'block'
   }
 

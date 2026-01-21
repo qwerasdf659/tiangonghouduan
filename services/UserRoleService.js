@@ -517,7 +517,36 @@ class UserRoleService {
       }
     })
 
-    logger.info('获取用户列表成功', { count })
+    // 并行获取全局统计数据（不受分页影响）
+    const todayStart = new Date()
+    todayStart.setHours(0, 0, 0, 0)
+
+    const [todayNewCount, activeCount, vipCount] = await Promise.all([
+      // 今日新增用户数
+      User.count({
+        where: {
+          created_at: { [Op.gte]: todayStart }
+        }
+      }),
+      // 活跃用户数（状态为active）
+      User.count({
+        where: { status: 'active' }
+      }),
+      // VIP/管理员用户数（role_level > 100）
+      User.count({
+        include: [
+          {
+            model: Role,
+            as: 'roles',
+            where: { role_level: { [Op.gt]: 100 } },
+            through: { where: { is_active: true } },
+            required: true
+          }
+        ]
+      })
+    ])
+
+    logger.info('获取用户列表成功', { count, todayNewCount, activeCount, vipCount })
 
     return {
       users: processedUsers,
@@ -526,6 +555,13 @@ class UserRoleService {
         per_page: parseInt(limit),
         total: count,
         total_pages: Math.ceil(count / parseInt(limit))
+      },
+      // 全局统计数据（供前端统计卡片使用）
+      statistics: {
+        total_users: count,
+        today_new: todayNewCount,
+        active_users: activeCount,
+        vip_users: vipCount
       }
     }
   }

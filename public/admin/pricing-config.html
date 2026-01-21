@@ -87,22 +87,22 @@
       </div>
     </div>
 
-    <!-- 价格历史 -->
+    <!-- 配置版本历史 -->
     <div class="card mt-4">
       <div class="card-header bg-white">
-        <h6 class="mb-0"><i class="bi bi-clock-history"></i> 价格调整历史</h6>
+        <h6 class="mb-0"><i class="bi bi-clock-history"></i> 配置版本历史</h6>
       </div>
       <div class="card-body">
         <div class="table-responsive">
           <table class="table table-sm">
             <thead>
               <tr>
-                <th>调整时间</th>
-                <th>操作人</th>
-                <th>定价方案</th>
-                <th>原价格</th>
-                <th>新价格</th>
-                <th>原因</th>
+                <th>创建时间</th>
+                <th>创建人</th>
+                <th>版本号</th>
+                <th>配置内容</th>
+                <th>状态</th>
+                <th>操作</th>
               </tr>
             </thead>
             <tbody id="priceHistoryList">
@@ -116,73 +116,51 @@
     </div>
   </div>
 
-  <!-- 定价方案模态框 -->
+  <!-- 抽奖按钮配置模态框（适配后端 draw_buttons 结构） -->
   <div class="modal fade" id="priceModal" tabindex="-1">
     <div class="modal-dialog">
       <div class="modal-content">
         <div class="modal-header">
-          <h5 class="modal-title" id="priceModalTitle"><i class="bi bi-tag"></i> 添加定价方案</h5>
+          <h5 class="modal-title" id="priceModalTitle"><i class="bi bi-tag"></i> 添加抽奖按钮</h5>
           <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
         </div>
         <div class="modal-body">
           <form id="priceForm">
-            <input type="hidden" id="priceId">
+            <input type="hidden" id="buttonIndex" value="-1">
             <div class="mb-3">
-              <label class="form-label">方案名称 <span class="text-danger">*</span></label>
-              <input type="text" class="form-control" id="priceName" required placeholder="如：单次抽奖、5次套餐">
-            </div>
-            <div class="mb-3">
-              <label class="form-label">方案类型</label>
-              <select class="form-select" id="priceType">
-                <option value="single">单次</option>
-                <option value="package">套餐</option>
-                <option value="subscription">订阅</option>
-              </select>
+              <label class="form-label">按钮标签 <span class="text-danger">*</span></label>
+              <input type="text" class="form-control" id="buttonLabel" required placeholder="如：单抽、3连抽、10连抽(九折)">
             </div>
             <div class="row mb-3">
               <div class="col-md-6">
-                <label class="form-label">原价 (元)</label>
-                <input type="number" class="form-control" id="originalPrice" min="0" step="0.01">
+                <label class="form-label">抽奖次数 <span class="text-danger">*</span></label>
+                <input type="number" class="form-control" id="buttonCount" min="1" value="1" required>
               </div>
               <div class="col-md-6">
-                <label class="form-label">现价 (元) <span class="text-danger">*</span></label>
-                <input type="number" class="form-control" id="currentPrice" min="0" step="0.01" required>
+                <label class="form-label">折扣系数</label>
+                <input type="number" class="form-control" id="buttonDiscount" min="0" max="1" step="0.01" value="1.0" placeholder="1.0=无折扣, 0.9=九折">
+                <small class="text-muted">1.0=无折扣, 0.9=九折, 0.8=八折</small>
               </div>
-            </div>
-            <div class="mb-3">
-              <label class="form-label">抽奖次数</label>
-              <input type="number" class="form-control" id="drawCount" min="1" value="1">
             </div>
             <div class="row mb-3">
               <div class="col-md-6">
-                <label class="form-label">生效时间</label>
-                <input type="datetime-local" class="form-control" id="priceStartTime">
+                <label class="form-label">排序权重</label>
+                <input type="number" class="form-control" id="buttonSortOrder" min="0" value="1">
+                <small class="text-muted">数值越小排序越靠前</small>
               </div>
               <div class="col-md-6">
-                <label class="form-label">失效时间</label>
-                <input type="datetime-local" class="form-control" id="priceEndTime">
+                <label class="form-label">状态</label>
+                <select class="form-select" id="buttonEnabled">
+                  <option value="true">启用</option>
+                  <option value="false">禁用</option>
+                </select>
               </div>
-            </div>
-            <div class="mb-3">
-              <label class="form-label">排序权重</label>
-              <input type="number" class="form-control" id="priceSort" min="0" value="0">
-            </div>
-            <div class="mb-3">
-              <label class="form-label">状态</label>
-              <select class="form-select" id="priceStatus">
-                <option value="active">启用</option>
-                <option value="inactive">禁用</option>
-              </select>
-            </div>
-            <div class="mb-3">
-              <label class="form-label">备注</label>
-              <textarea class="form-control" id="priceRemark" rows="2"></textarea>
             </div>
           </form>
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
-          <button type="button" class="btn btn-primary" onclick="submitPrice()">保存</button>
+          <button type="button" class="btn btn-primary" onclick="submitDrawButton()">保存</button>
         </div>
       </div>
     </div>
@@ -199,7 +177,8 @@
   <script src="/admin/js/api-config.js"></script>
   <script>
     let campaigns = [];
-    let pricingPlans = [];
+    let currentPricingConfig = null;  // 后端返回的完整定价配置对象
+    let drawButtons = [];             // pricing_config.draw_buttons 抽奖按钮数组
     let currentCampaignCode = null;
 
     document.addEventListener('DOMContentLoaded', function() {
@@ -242,17 +221,33 @@
       showLoading();
       try {
         const response = await apiRequest(API.buildURL(API_ENDPOINTS.PRICING.GET_BY_CAMPAIGN, { code: campaignCode }));
-        if (response && response.success) {
-          pricingPlans = response.data.pricing_plans || response.data || [];
-          renderPricingPlans(pricingPlans);
+        if (response && response.success && response.data) {
+          // 后端返回格式：{ config_id, campaign_id, pricing_config: { draw_buttons: [...] }, status, ... }
+          currentPricingConfig = response.data;
+          // 从 pricing_config.draw_buttons 获取抽奖按钮数组
+          drawButtons = response.data.pricing_config?.draw_buttons || [];
+          console.log('[定价配置] 加载成功:', { 
+            config_id: currentPricingConfig.config_id,
+            version: currentPricingConfig.version,
+            status: currentPricingConfig.status,
+            draw_buttons_count: drawButtons.length 
+          });
+          renderPricingPlans(drawButtons);
           loadPriceHistory(campaignCode);
         } else {
-          pricingPlans = [];
-          renderPricingPlans([]);
+          // 可能是404（该活动暂无定价配置）或其他错误
+          console.log('[定价配置] 无配置或请求失败:', response?.message || '未知错误');
+          currentPricingConfig = null;
+          drawButtons = [];
+          renderNoPricingConfig(response?.message);
+          // 仍然加载版本历史（可能有归档版本）
+          loadPriceHistory(campaignCode);
         }
       } catch (error) {
         console.error('加载定价配置失败:', error);
-        renderPricingPlans([]);
+        currentPricingConfig = null;
+        drawButtons = [];
+        renderNoPricingConfig(error.message);
       } finally {
         hideLoading();
       }
@@ -272,10 +267,33 @@
       document.getElementById('campaignStatus').value = '';
     }
 
-    function renderPricingPlans(plans) {
+    // 渲染无配置状态（活动存在但无定价配置）
+    function renderNoPricingConfig(message) {
+      document.getElementById('pricingList').innerHTML = `
+        <div class="col-12">
+          <div class="card">
+            <div class="card-body text-center py-5">
+              <i class="bi bi-tag" style="font-size: 3rem; color: #ffc107;"></i>
+              <p class="mt-2 text-warning">${escapeHtml(message || '该活动暂无定价配置')}</p>
+              <p class="text-muted small">点击下方按钮创建首个定价配置版本</p>
+              <button class="btn btn-primary" onclick="openAddPriceModal()">
+                <i class="bi bi-plus"></i> 创建定价配置
+              </button>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    /**
+     * 渲染抽奖按钮列表
+     * 适配后端 draw_buttons 数据结构:
+     * { count: number, discount: number, label: string, enabled: boolean, sort_order: number }
+     */
+    function renderPricingPlans(buttons) {
       const container = document.getElementById('pricingList');
 
-      if (!plans || plans.length === 0) {
+      if (!buttons || !Array.isArray(buttons) || buttons.length === 0) {
         container.innerHTML = `
           <div class="col-12">
             <div class="card">
@@ -292,35 +310,39 @@
         return;
       }
 
-      container.innerHTML = plans.map(plan => {
-        const discount = plan.original_price && plan.current_price < plan.original_price 
-          ? Math.round((1 - plan.current_price / plan.original_price) * 100) 
-          : 0;
+      // 按 sort_order 排序
+      const sortedButtons = [...buttons].sort((a, b) => (a.sort_order || a.count) - (b.sort_order || b.count));
+
+      container.innerHTML = sortedButtons.map((btn, index) => {
+        // 计算折扣显示（discount < 1 表示有折扣）
+        const hasDiscount = btn.discount && btn.discount < 1;
+        const discountPercent = hasDiscount ? Math.round((1 - btn.discount) * 100) : 0;
 
         return `
           <div class="col-md-4 col-lg-3 mb-4">
             <div class="card pricing-card h-100 position-relative">
-              ${discount > 0 ? `<span class="discount-badge">-${discount}%</span>` : ''}
+              ${hasDiscount ? `<span class="discount-badge">-${discountPercent}%</span>` : ''}
               <div class="card-body text-center">
-                <h5 class="card-title">${escapeHtml(plan.name || plan.plan_name)}</h5>
-                <span class="badge ${getTypeBadgeClass(plan.type)}">${getTypeLabel(plan.type)}</span>
+                <h5 class="card-title">${escapeHtml(btn.label || btn.count + '连抽')}</h5>
+                <span class="badge ${getCountBadgeClass(btn.count)}">${getCountLabel(btn.count)}</span>
                 <div class="my-3">
-                  ${plan.original_price && plan.original_price > plan.current_price ? 
-                    `<del class="text-muted">¥${plan.original_price}</del>` : ''}
-                  <div class="price-tag">¥${plan.current_price || 0}</div>
-                  <div class="price-unit">${plan.draw_count || 1}次抽奖</div>
+                  ${hasDiscount ? 
+                    `<del class="text-muted">原价</del>` : ''}
+                  <div class="price-tag">${btn.count}次</div>
+                  <div class="price-unit">抽奖次数</div>
+                  ${hasDiscount ? `<div class="text-success small">享${Math.round(btn.discount * 100) / 10}折</div>` : ''}
                 </div>
-                <p class="text-muted small">${escapeHtml(plan.remark || '暂无描述')}</p>
+                <p class="text-muted small">排序: ${btn.sort_order || btn.count}</p>
               </div>
               <div class="card-footer bg-white d-flex justify-content-between">
-                <span class="badge ${plan.status === 'active' ? 'bg-success' : 'bg-secondary'}">
-                  ${plan.status === 'active' ? '启用' : '禁用'}
+                <span class="badge ${btn.enabled !== false ? 'bg-success' : 'bg-secondary'}">
+                  ${btn.enabled !== false ? '启用' : '禁用'}
                 </span>
                 <div>
-                  <button class="btn btn-sm btn-outline-primary me-1" onclick="editPrice(${plan.pricing_id || plan.id})">
+                  <button class="btn btn-sm btn-outline-primary me-1" onclick="editDrawButton(${index})">
                     <i class="bi bi-pencil"></i>
                   </button>
-                  <button class="btn btn-sm btn-outline-danger" onclick="deletePrice(${plan.pricing_id || plan.id})">
+                  <button class="btn btn-sm btn-outline-danger" onclick="deleteDrawButton(${index})">
                     <i class="bi bi-trash"></i>
                   </button>
                 </div>
@@ -331,37 +353,112 @@
       }).join('');
     }
 
+    // 根据抽奖次数返回样式类
+    function getCountBadgeClass(count) {
+      if (count === 1) return 'bg-info';
+      if (count <= 3) return 'bg-primary';
+      if (count <= 5) return 'bg-success';
+      return 'bg-warning text-dark';
+    }
+
+    // 根据抽奖次数返回标签
+    function getCountLabel(count) {
+      if (count === 1) return '单抽';
+      return count + '连抽';
+    }
+
+    // 加载配置版本历史
     async function loadPriceHistory(campaignCode) {
       try {
-        // 使用 API_ENDPOINTS.PRICING.GET_VERSIONS 获取历史版本
         const response = await apiRequest(API.buildURL(API_ENDPOINTS.PRICING.GET_VERSIONS, { code: campaignCode }));
         if (response && response.success) {
-          const history = response.data.history || response.data.versions || response.data || [];
-          renderPriceHistory(history);
+          const versions = response.data.versions || [];
+          renderVersionHistory(versions);
         }
       } catch (error) {
-        console.error('加载价格历史失败:', error);
+        console.error('加载版本历史失败:', error);
+        renderVersionHistory([]);
       }
     }
 
-    function renderPriceHistory(history) {
+    // 渲染版本历史（适配后端 versions 数据结构）
+    function renderVersionHistory(versions) {
       const tbody = document.getElementById('priceHistoryList');
       
-      if (!history || history.length === 0) {
+      if (!versions || versions.length === 0) {
         tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">暂无历史记录</td></tr>';
         return;
       }
 
-      tbody.innerHTML = history.slice(0, 10).map(h => `
-        <tr>
-          <td>${formatDateTime(h.created_at)}</td>
-          <td>${escapeHtml(h.operator_name || h.operator_id || '-')}</td>
-          <td>${escapeHtml(h.plan_name || '-')}</td>
-          <td>¥${h.old_price || '-'}</td>
-          <td>¥${h.new_price || '-'}</td>
-          <td>${escapeHtml(h.reason || '-')}</td>
-        </tr>
-      `).join('');
+      tbody.innerHTML = versions.slice(0, 10).map(v => {
+        const buttonsCount = v.pricing_config?.draw_buttons?.length || 0;
+        return `
+          <tr>
+            <td>${formatDateTime(v.created_at)}</td>
+            <td>${escapeHtml(v.created_by || '-')}</td>
+            <td>版本 ${v.version}</td>
+            <td>${buttonsCount}个按钮</td>
+            <td>
+              <span class="badge ${getVersionStatusBadge(v.status)}">${getVersionStatusLabel(v.status)}</span>
+            </td>
+            <td>
+              ${v.status !== 'active' ? 
+                `<button class="btn btn-sm btn-outline-success" onclick="activateVersion(${v.version})">
+                  <i class="bi bi-check-circle"></i> 激活
+                </button>` : 
+                '<span class="text-success">当前版本</span>'
+              }
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    // 版本状态样式
+    function getVersionStatusBadge(status) {
+      const badges = {
+        draft: 'bg-secondary',
+        active: 'bg-success',
+        scheduled: 'bg-warning text-dark',
+        archived: 'bg-light text-dark'
+      };
+      return badges[status] || 'bg-secondary';
+    }
+
+    // 版本状态标签
+    function getVersionStatusLabel(status) {
+      const labels = {
+        draft: '草稿',
+        active: '生效中',
+        scheduled: '定时生效',
+        archived: '已归档'
+      };
+      return labels[status] || status;
+    }
+
+    // 激活指定版本
+    async function activateVersion(version) {
+      if (!confirm(`确定要激活版本 ${version} 吗？这将使当前版本失效。`)) return;
+
+      showLoading();
+      try {
+        const response = await apiRequest(
+          API.buildURL(API_ENDPOINTS.PRICING.ACTIVATE, { code: currentCampaignCode, version: version }),
+          { method: 'PUT' }
+        );
+
+        if (response && response.success) {
+          alert(`✅ 版本 ${version} 已激活`);
+          loadPricingConfig();
+        } else {
+          showError('激活失败', response?.message || '操作失败');
+        }
+      } catch (error) {
+        console.error('激活版本失败:', error);
+        showError('激活失败', error.message);
+      } finally {
+        hideLoading();
+      }
     }
 
     function openAddPriceModal() {
@@ -369,68 +466,88 @@
         alert('请先选择活动');
         return;
       }
-      document.getElementById('priceModalTitle').innerHTML = '<i class="bi bi-tag"></i> 添加定价方案';
+      document.getElementById('priceModalTitle').innerHTML = '<i class="bi bi-tag"></i> 添加抽奖按钮';
       document.getElementById('priceForm').reset();
-      document.getElementById('priceId').value = '';
+      document.getElementById('buttonIndex').value = '-1';
+      document.getElementById('buttonCount').value = '1';
+      document.getElementById('buttonDiscount').value = '1.0';
+      document.getElementById('buttonSortOrder').value = '1';
+      document.getElementById('buttonEnabled').value = 'true';
       new bootstrap.Modal(document.getElementById('priceModal')).show();
     }
 
-    async function editPrice(priceId) {
-      const plan = pricingPlans.find(p => (p.pricing_id || p.id) === priceId);
-      if (!plan) return;
+    // 编辑抽奖按钮（使用数组索引）
+    function editDrawButton(index) {
+      const btn = drawButtons[index];
+      if (!btn) return;
 
-      document.getElementById('priceModalTitle').innerHTML = '<i class="bi bi-pencil"></i> 编辑定价方案';
-      document.getElementById('priceId').value = priceId;
-      document.getElementById('priceName').value = plan.name || plan.plan_name || '';
-      document.getElementById('priceType').value = plan.type || 'single';
-      document.getElementById('originalPrice').value = plan.original_price || '';
-      document.getElementById('currentPrice').value = plan.current_price || '';
-      document.getElementById('drawCount').value = plan.draw_count || 1;
-      document.getElementById('priceStartTime').value = plan.start_time ? formatDateTimeForInput(plan.start_time) : '';
-      document.getElementById('priceEndTime').value = plan.end_time ? formatDateTimeForInput(plan.end_time) : '';
-      document.getElementById('priceSort').value = plan.sort_order || 0;
-      document.getElementById('priceStatus').value = plan.status || 'active';
-      document.getElementById('priceRemark').value = plan.remark || '';
+      document.getElementById('priceModalTitle').innerHTML = '<i class="bi bi-pencil"></i> 编辑抽奖按钮';
+      document.getElementById('buttonIndex').value = index;
+      document.getElementById('buttonLabel').value = btn.label || '';
+      document.getElementById('buttonCount').value = btn.count || 1;
+      document.getElementById('buttonDiscount').value = btn.discount || 1.0;
+      document.getElementById('buttonSortOrder').value = btn.sort_order || btn.count || 1;
+      document.getElementById('buttonEnabled').value = btn.enabled !== false ? 'true' : 'false';
       
       new bootstrap.Modal(document.getElementById('priceModal')).show();
     }
 
-    async function submitPrice() {
-      const priceId = document.getElementById('priceId').value;
-      const data = {
-        name: document.getElementById('priceName').value,
-        type: document.getElementById('priceType').value,
-        original_price: parseFloat(document.getElementById('originalPrice').value) || null,
-        current_price: parseFloat(document.getElementById('currentPrice').value),
-        draw_count: parseInt(document.getElementById('drawCount').value) || 1,
-        start_time: document.getElementById('priceStartTime').value || null,
-        end_time: document.getElementById('priceEndTime').value || null,
-        sort_order: parseInt(document.getElementById('priceSort').value) || 0,
-        status: document.getElementById('priceStatus').value,
-        remark: document.getElementById('priceRemark').value
+    // 提交抽奖按钮配置（创建新版本）
+    async function submitDrawButton() {
+      const index = parseInt(document.getElementById('buttonIndex').value);
+      const newButton = {
+        label: document.getElementById('buttonLabel').value,
+        count: parseInt(document.getElementById('buttonCount').value) || 1,
+        discount: parseFloat(document.getElementById('buttonDiscount').value) || 1.0,
+        sort_order: parseInt(document.getElementById('buttonSortOrder').value) || 1,
+        enabled: document.getElementById('buttonEnabled').value === 'true'
       };
 
-      if (!data.name || !data.current_price) {
-        alert('请填写方案名称和现价');
+      if (!newButton.label) {
+        alert('请填写按钮标签');
         return;
       }
 
+      if (newButton.count < 1) {
+        alert('抽奖次数必须大于0');
+        return;
+      }
+
+      // 更新本地 draw_buttons 数组
+      let updatedButtons = [...drawButtons];
+      if (index >= 0 && index < updatedButtons.length) {
+        // 编辑现有按钮
+        updatedButtons[index] = newButton;
+      } else {
+        // 添加新按钮
+        updatedButtons.push(newButton);
+      }
+
+      // 调用后端API创建新版本（包含更新后的 draw_buttons）
       showLoading();
       try {
-        // 使用 API_ENDPOINTS.PRICING 配置
-        const url = priceId
-          ? API.buildURL(API_ENDPOINTS.PRICING.UPDATE, { id: priceId })
-          : API.buildURL(API_ENDPOINTS.PRICING.CREATE, { code: currentCampaignCode });
-        const method = priceId ? 'PUT' : 'POST';
+        const pricingConfig = {
+          draw_buttons: updatedButtons,
+          // 保留原有的其他配置（如 base_cost）
+          ...(currentPricingConfig?.pricing_config || {})
+        };
+        // 确保 draw_buttons 被正确覆盖
+        pricingConfig.draw_buttons = updatedButtons;
 
-        const response = await apiRequest(url, {
-          method: method,
-          body: JSON.stringify(data)
-        });
+        const response = await apiRequest(
+          API.buildURL(API_ENDPOINTS.PRICING.CREATE, { code: currentCampaignCode }),
+          {
+            method: 'POST',
+            body: JSON.stringify({
+              pricing_config: pricingConfig,
+              activate_immediately: true  // 立即激活新版本
+            })
+          }
+        );
 
         if (response && response.success) {
           bootstrap.Modal.getInstance(document.getElementById('priceModal')).hide();
-          alert(`✅ ${priceId ? '更新' : '创建'}成功`);
+          alert(`✅ ${index >= 0 ? '更新' : '添加'}成功，已创建新版本`);
           loadPricingConfig();
         } else {
           showError('保存失败', response?.message || '操作失败');
@@ -443,19 +560,33 @@
       }
     }
 
-    async function deletePrice(priceId) {
-      if (!confirm('确定要删除此定价方案吗？')) return;
+    // 删除抽奖按钮（创建新版本）
+    async function deleteDrawButton(index) {
+      if (!confirm('确定要删除此抽奖按钮吗？这将创建一个新的配置版本。')) return;
+
+      // 从数组中移除指定按钮
+      let updatedButtons = drawButtons.filter((_, i) => i !== index);
 
       showLoading();
       try {
-        // 使用 API_ENDPOINTS.PRICING 配置
+        const pricingConfig = {
+          ...(currentPricingConfig?.pricing_config || {}),
+          draw_buttons: updatedButtons
+        };
+
         const response = await apiRequest(
-          API.buildURL(API_ENDPOINTS.PRICING.DETAIL, { id: priceId }),
-          { method: 'DELETE' }
+          API.buildURL(API_ENDPOINTS.PRICING.CREATE, { code: currentCampaignCode }),
+          {
+            method: 'POST',
+            body: JSON.stringify({
+              pricing_config: pricingConfig,
+              activate_immediately: true
+            })
+          }
         );
 
         if (response && response.success) {
-          alert('✅ 删除成功');
+          alert('✅ 删除成功，已创建新版本');
           loadPricingConfig();
         } else {
           showError('删除失败', response?.message || '操作失败');
@@ -468,6 +599,10 @@
       }
     }
 
+    // 保留旧函数名作为兼容（调用新函数）
+    function editPrice(id) { console.warn('editPrice 已废弃，请使用 editDrawButton'); }
+    function deletePrice(id) { console.warn('deletePrice 已废弃，请使用 deleteDrawButton'); }
+
     function getStatusLabel(status) {
       const labels = {
         draft: '草稿',
@@ -476,24 +611,6 @@
         ended: '已结束'
       };
       return labels[status] || status;
-    }
-
-    function getTypeBadgeClass(type) {
-      const classes = {
-        single: 'bg-info',
-        package: 'bg-success',
-        subscription: 'bg-warning text-dark'
-      };
-      return classes[type] || 'bg-secondary';
-    }
-
-    function getTypeLabel(type) {
-      const labels = {
-        single: '单次',
-        package: '套餐',
-        subscription: '订阅'
-      };
-      return labels[type] || type;
     }
 
     function formatDateTime(dateStr) {

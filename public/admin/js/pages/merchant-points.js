@@ -145,17 +145,23 @@ function handlePaginationClick(event) {
  * 加载待审核统计
  */
 async function loadPendingStats() {
+  console.log('[商家积分] 开始加载统计数据...')
+  console.log('[商家积分] API端点:', API_ENDPOINTS.MERCHANT_POINTS.STATS_PENDING)
   try {
     const response = await apiRequest(API_ENDPOINTS.MERCHANT_POINTS.STATS_PENDING)
+    console.log('[商家积分] 统计接口返回:', response)
     if (response && response.success) {
       // 更新所有统计卡片
       document.getElementById('pendingCount').textContent = response.data.pending_count || 0
       document.getElementById('approvedCount').textContent = response.data.approved_count || 0
       document.getElementById('rejectedCount').textContent = response.data.rejected_count || 0
       document.getElementById('totalPoints').textContent = response.data.today_points || 0
+      console.log('[商家积分] 统计数据更新完成:', response.data)
+    } else {
+      console.error('[商家积分] 统计接口返回失败:', response)
     }
   } catch (error) {
-    console.error('加载统计失败:', error)
+    console.error('[商家积分] 加载统计失败:', error)
   }
 }
 
@@ -165,6 +171,8 @@ async function loadPendingStats() {
 async function loadData() {
   showLoading(true)
   const tbody = document.getElementById('reviewTableBody')
+  
+  console.log('[商家积分] 开始加载列表数据...')
 
   try {
     const status = document.getElementById('statusFilter').value
@@ -180,7 +188,10 @@ async function loadData() {
     if (timeRange) params.append('time_range', timeRange)
     if (priority) params.append('priority', priority)
 
-    const response = await apiRequest(API_ENDPOINTS.MERCHANT_POINTS.LIST + '?' + params.toString())
+    const url = API_ENDPOINTS.MERCHANT_POINTS.LIST + '?' + params.toString()
+    console.log('[商家积分] 请求URL:', url)
+    const response = await apiRequest(url)
+    console.log('[商家积分] 列表接口返回:', response)
 
     if (response && response.success) {
       const { rows, count, pagination } = response.data

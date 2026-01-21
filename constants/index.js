@@ -46,15 +46,13 @@ const {
   createC2CBlacklistError
 } = require('./TradableAssetTypes')
 
-// 审计日志 target_type 常量（P0-5 实施）
+// 审计日志 target_type 常量
 const {
   AUDIT_TARGET_TYPES,
-  TARGET_TYPE_LEGACY_MAPPING,
   VALID_TARGET_TYPES,
   normalizeTargetType,
   isValidTargetType,
   getTargetTypeDisplayName,
-  getLegacyMappings,
   normalizeTargetTypes
 } = require('./AuditTargetTypes')
 
@@ -86,14 +84,12 @@ module.exports = {
   validateC2CTradability,
   createC2CBlacklistError,
 
-  // 审计日志 target_type（P0-5 实施）
+  // 审计日志 target_type
   AUDIT_TARGET_TYPES,
-  TARGET_TYPE_LEGACY_MAPPING,
   VALID_TARGET_TYPES,
   normalizeTargetType,
   isValidTargetType,
   getTargetTypeDisplayName,
-  getLegacyMappings,
   normalizeTargetTypes,
 
   // 命名空间导出（便于按模块引用）

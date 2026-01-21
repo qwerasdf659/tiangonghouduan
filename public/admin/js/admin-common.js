@@ -43,7 +43,9 @@
  */
 function getToken() {
   const token = localStorage.getItem('admin_token')
+  console.log('[认证] getToken() - Token存在:', !!token, token ? `(长度: ${token.length})` : '')
   if (!token) {
+    console.warn('[认证] Token不存在，跳转到登录页')
     window.location.href = '/admin/login.html'
     return null
   }
@@ -84,18 +86,40 @@ function logout() {
  * @returns {boolean} 是否有管理员权限
  */
 function checkAdminPermission() {
+  console.log('[权限检查] 开始检查管理员权限...')
   const userStr = localStorage.getItem('admin_user')
+  console.log('[权限检查] admin_user存在:', !!userStr)
+  
   if (!userStr) {
+    console.warn('[权限检查] admin_user不存在，跳转到登录页')
     logout()
     return false
   }
 
   try {
     const user = JSON.parse(userStr)
+    console.log('[权限检查] 用户信息:', user)
+    console.log('[权限检查] 用户角色:', user.roles)
+    console.log('[权限检查] 用户role_level:', user.role_level)
 
-    // ✅ 权限检查：后端通过user_roles表关联查询，会在user对象中包含roles数组
-    const hasAdminAccess =
-      user.roles && user.roles.some(role => role.role_name === 'admin' || role.role_level >= 100)
+    // ✅ 权限检查：支持 role_level 直接在 user 对象上，也支持 roles 数组
+    let hasAdminAccess = false
+    
+    // 检查 user.role_level
+    if (user.role_level && user.role_level >= 100) {
+      hasAdminAccess = true
+      console.log('[权限检查] 通过 user.role_level 检查')
+    }
+    
+    // 检查 user.roles 数组
+    if (!hasAdminAccess && user.roles && Array.isArray(user.roles)) {
+      hasAdminAccess = user.roles.some(role => role.role_name === 'admin' || role.role_level >= 100)
+      if (hasAdminAccess) {
+        console.log('[权限检查] 通过 user.roles 数组检查')
+      }
+    }
+
+    console.log('[权限检查] 最终结果:', hasAdminAccess ? '有权限' : '无权限')
 
     if (!hasAdminAccess) {
       alert('您没有管理员权限，请联系系统管理员分配权限')
@@ -105,7 +129,7 @@ function checkAdminPermission() {
 
     return true
   } catch (error) {
-    console.error('权限检查失败:', error)
+    console.error('[权限检查] 解析用户信息失败:', error)
     logout()
     return false
   }
@@ -142,28 +166,38 @@ function getCurrentUserId() {
  * @returns {Promise<ApiResponse>} API响应对象
  */
 async function apiRequest(url, options = {}) {
-  const defaultOptions = {
-    headers: {
-      Authorization: `Bearer ${getToken()}`,
-      'Content-Type': 'application/json'
-    }
+  // 🔧 修复：正确合并headers，避免options.headers覆盖Authorization
+  const defaultHeaders = {
+    Authorization: `Bearer ${getToken()}`,
+    'Content-Type': 'application/json'
   }
+
+  // 合并headers：默认headers + 传入的headers
+  const mergedHeaders = {
+    ...defaultHeaders,
+    ...(options.headers || {})
+  }
+
+  // 构建最终options（不包含原始headers，使用合并后的headers）
+  const { headers: _, ...restOptions } = options
 
   // 处理查询参数
   let finalUrl = url
-  if (options.queryParams) {
-    const queryString = Object.entries(options.queryParams)
-      .filter(([_, value]) => value !== undefined && value !== '')
+  if (restOptions.queryParams) {
+    const queryString = Object.entries(restOptions.queryParams)
+      .filter(([_k, value]) => value !== undefined && value !== '')
       .map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(value)}`)
       .join('&')
     if (queryString) {
       finalUrl = `${url}?${queryString}`
     }
-    delete options.queryParams
+    delete restOptions.queryParams
   }
 
   try {
-    const response = await fetch(finalUrl, { ...defaultOptions, ...options })
+    console.log('[API请求] 发送请求:', finalUrl)
+    const response = await fetch(finalUrl, { ...restOptions, headers: mergedHeaders })
+    console.log('[API请求] 响应状态:', response.status, response.statusText)
 
     // 处理非JSON响应
     const contentType = response.headers.get('content-type')
@@ -173,9 +207,11 @@ async function apiRequest(url, options = {}) {
     } else {
       result = { success: false, message: await response.text() }
     }
+    console.log('[API请求] 响应数据:', result)
 
     // 详细的错误处理
     if (response.status === 401) {
+      console.error('[API请求] 401 未授权')
       alert('登录已过期或权限不足，请重新登录')
       logout()
       return

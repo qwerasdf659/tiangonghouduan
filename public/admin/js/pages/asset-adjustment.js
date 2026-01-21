@@ -221,7 +221,14 @@ async function loadUserAssets(userId) {
 
 /**
  * 渲染资产卡片
- * @param {Array} balances - 资产余额列表
+ * @param {Array} balances - 资产余额列表（后端字段：asset_code, available_amount, frozen_amount, total, campaign_id）
+ * 
+ * 以后端数据库为准，直接使用后端返回的字段名：
+ * - available_amount: 可用余额
+ * - frozen_amount: 冻结余额
+ * - total: 总余额
+ * - asset_code: 资产代码
+ * - campaign_id: 活动ID（BUDGET_POINTS专用）
  */
 function renderAssetCards(balances) {
   const container = document.getElementById('assetCardsContainer')
@@ -235,24 +242,89 @@ function renderAssetCards(balances) {
     return
   }
 
-  container.innerHTML = balances
+  // 聚合同类资产（BUDGET_POINTS可能有多条记录，合并显示总额）
+  const aggregatedBalances = aggregateBalances(balances)
+
+  container.innerHTML = aggregatedBalances
     .map(balance => {
       const iconClass = getAssetIcon(balance.asset_code)
       const cardClass = balance.asset_code.toLowerCase()
+      // 优先显示 total，其次 available_amount
+      const displayBalance = balance.total ?? balance.available_amount ?? 0
+      // 获取资产显示名称
+      const displayName = getAssetDisplayName(balance.asset_code)
 
       return `
       <div class="col-md-3">
         <div class="card asset-card ${cardClass}">
           <div class="card-body text-center">
             <i class="bi ${iconClass}" style="font-size: 2rem;"></i>
-            <h4 class="mt-2 mb-0">${balance.balance || 0}</h4>
-            <small class="text-muted">${balance.asset_name || balance.asset_code}</small>
+            <h4 class="mt-2 mb-0">${formatNumber(displayBalance)}</h4>
+            <small class="text-muted">${displayName}</small>
           </div>
         </div>
       </div>
     `
     })
     .join('')
+}
+
+/**
+ * 聚合同类资产余额
+ * @description 将相同asset_code的余额合并（如BUDGET_POINTS不同campaign_id的余额）
+ * @param {Array} balances - 原始余额列表
+ * @returns {Array} 聚合后的余额列表
+ */
+function aggregateBalances(balances) {
+  const balanceMap = new Map()
+
+  balances.forEach(balance => {
+    const key = balance.asset_code
+    if (balanceMap.has(key)) {
+      const existing = balanceMap.get(key)
+      existing.available_amount = (existing.available_amount || 0) + (balance.available_amount || 0)
+      existing.frozen_amount = (existing.frozen_amount || 0) + (balance.frozen_amount || 0)
+      existing.total = (existing.total || 0) + (balance.total || 0)
+      // 标记为聚合数据
+      existing._aggregated = true
+      existing._campaign_count = (existing._campaign_count || 1) + 1
+    } else {
+      balanceMap.set(key, { ...balance, _campaign_count: 1 })
+    }
+  })
+
+  return Array.from(balanceMap.values())
+}
+
+/**
+ * 获取资产显示名称
+ * @param {string} assetCode - 资产代码
+ * @returns {string} 显示名称
+ */
+function getAssetDisplayName(assetCode) {
+  // 从已加载的资产类型中查找
+  const assetType = assetTypes.find(t => t.asset_code === assetCode)
+  if (assetType) {
+    return assetType.display_name || assetType.name || assetCode
+  }
+  
+  // 内置资产类型映射
+  const builtInNames = {
+    POINTS: '积分',
+    DIAMOND: '钻石',
+    BUDGET_POINTS: '预算积分'
+  }
+  return builtInNames[assetCode] || assetCode
+}
+
+/**
+ * 格式化数字（添加千分位）
+ * @param {number} num - 数字
+ * @returns {string} 格式化后的字符串
+ */
+function formatNumber(num) {
+  if (num === null || num === undefined) return '0'
+  return Number(num).toLocaleString('zh-CN')
 }
 
 /**

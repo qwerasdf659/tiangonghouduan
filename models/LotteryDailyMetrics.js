@@ -77,6 +77,7 @@ class LotteryDailyMetrics extends Model {
         mid_tier_count: 0,
         low_tier_count: 0,
         fallback_tier_count: 0,
+        empty_count: 0,
         total_budget_consumed: 0,
         avg_budget_per_draw: 0,
         total_prize_value: 0,
@@ -177,6 +178,7 @@ class LotteryDailyMetrics extends Model {
       mid_tier_count: 0,
       low_tier_count: 0,
       fallback_tier_count: 0,
+      empty_count: 0, // 真正空奖次数（与 fallback 保底分开统计）
       total_budget_consumed: 0,
       total_prize_value: 0,
       b0_count: 0,
@@ -197,6 +199,7 @@ class LotteryDailyMetrics extends Model {
       aggregated.mid_tier_count += hourly.mid_tier_count || 0
       aggregated.low_tier_count += hourly.low_tier_count || 0
       aggregated.fallback_tier_count += hourly.fallback_tier_count || 0
+      aggregated.empty_count += hourly.empty_count || 0 // 真正空奖次数
       aggregated.total_budget_consumed += parseFloat(hourly.total_budget_consumed) || 0
       aggregated.total_prize_value += parseFloat(hourly.total_prize_value) || 0
       aggregated.b0_count += hourly.b0_tier_count || 0
@@ -212,7 +215,8 @@ class LotteryDailyMetrics extends Model {
     // 计算派生指标
     const total = aggregated.total_draws || 1
     aggregated.avg_budget_per_draw = aggregated.total_budget_consumed / total
-    aggregated.empty_rate = aggregated.fallback_tier_count / total
+    // empty_rate 使用真正空奖数（empty_count），而非保底奖品数（fallback_tier_count）
+    aggregated.empty_rate = aggregated.empty_count / total
     aggregated.high_value_rate = aggregated.high_tier_count / total
     aggregated.avg_prize_value = aggregated.total_prize_value / total
 
@@ -370,7 +374,21 @@ function initModel(sequelize) {
         type: DataTypes.INTEGER,
         allowNull: false,
         defaultValue: 0,
-        comment: '空奖次数（fallback档位）'
+        comment: '保底奖品次数（fallback档位，正常保底机制）'
+      },
+
+      /**
+       * 真正空奖次数（系统异常导致的空奖）
+       *
+       * 与 fallback_tier_count 区分：
+       * - empty_count：系统异常或配置问题导致的空奖，需要运营关注
+       * - fallback_tier_count：正常保底机制触发，是预期行为
+       */
+      empty_count: {
+        type: DataTypes.INTEGER,
+        allowNull: false,
+        defaultValue: 0,
+        comment: '真正空奖次数（系统异常导致的空奖，与正常fallback保底分开统计）'
       },
 
       // ========== 预算相关统计 ==========

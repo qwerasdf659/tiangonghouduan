@@ -41,8 +41,7 @@ const { LotteryCampaignPricingConfig, LotteryCampaign } = require('../models')
 const { BusinessCacheHelper } = require('../utils/BusinessCacheHelper')
 
 /**
- * 定价服务 - 用于缓存失效（2026-01-21 技术债务修复）
- * @see docs/技术债务-getDrawPricing定价逻辑迁移方案.md - 6.4 实现缓存功能
+ * 定价服务 - 用于缓存失效
  */
 const LotteryPricingService = require('./lottery/LotteryPricingService')
 
@@ -212,10 +211,7 @@ class LotteryCampaignPricingConfigService {
         { transaction }
       )
 
-      /**
-       * 🔴 失效缓存（2026-01-21 技术债务修复：同时失效活动缓存和定价缓存）
-       * @see docs/技术债务-getDrawPricing定价逻辑迁移方案.md - 6.4 缓存失效
-       */
+      // 失效缓存：活动缓存 + 定价缓存
       await BusinessCacheHelper.invalidateLotteryCampaign(campaign_id)
       await LotteryPricingService.invalidateCache(
         campaign_id,
@@ -272,10 +268,7 @@ class LotteryCampaignPricingConfigService {
       { transaction }
     )
 
-    /**
-     * 🔴 失效缓存（2026-01-21 技术债务修复：同时失效活动缓存和定价缓存）
-     * @see docs/技术债务-getDrawPricing定价逻辑迁移方案.md - 6.4 缓存失效
-     */
+    // 失效缓存：活动缓存 + 定价缓存
     await BusinessCacheHelper.invalidateLotteryCampaign(campaign_id)
     await LotteryPricingService.invalidateCache(campaign_id, 'pricing_config_version_activated')
 
@@ -455,10 +448,7 @@ class LotteryCampaignPricingConfigService {
       { transaction }
     )
 
-    /**
-     * 🔴 7. 失效缓存（2026-01-21 技术债务修复：同时失效活动缓存和定价缓存）
-     * @see docs/技术债务-getDrawPricing定价逻辑迁移方案.md - 6.4 缓存失效
-     */
+    // 7. 失效缓存：活动缓存 + 定价缓存
     await BusinessCacheHelper.invalidateLotteryCampaign(campaign_id)
     await LotteryPricingService.invalidateCache(
       campaign_id,
@@ -702,10 +692,7 @@ class LotteryCampaignPricingConfigService {
           config.created_by // 使用创建者作为激活者
         )
 
-        /**
-         * 🔴 失效缓存（2026-01-21 技术债务修复：同时失效活动缓存和定价缓存）
-         * @see docs/技术债务-getDrawPricing定价逻辑迁移方案.md - 6.4 缓存失效
-         */
+        // 失效缓存：活动缓存 + 定价缓存
         await BusinessCacheHelper.invalidateLotteryCampaign(campaign_id)
         await LotteryPricingService.invalidateCache(campaign_id, 'scheduled_activation')
 

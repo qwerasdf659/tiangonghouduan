@@ -237,12 +237,7 @@ class BackpackService {
         transaction
       })
 
-      /*
-       * 2. 格式化物品数据（包含核销码信息）
-       * 2026-01-20 技术债务清理：
-       * - ItemInstance 模型没有 item_name 字段
-       * - 物品名称从 meta.name 获取（JSON 元数据字段）
-       */
+      // 2. 格式化物品数据（物品名称从 meta.name 获取）
       const formattedItems = instances.map(instance => {
         return {
           item_instance_id: instance.item_instance_id,
@@ -362,10 +357,7 @@ class BackpackService {
         transaction
       })
 
-      /*
-       * 4. 格式化返回数据
-       * 2026-01-20 技术债务清理：name 从 meta.name 获取
-       */
+      // 4. 格式化返回数据（name 从 meta.name 获取）
       const itemDetail = {
         item_instance_id: item.item_instance_id,
         item_type: item.item_type || 'unknown',

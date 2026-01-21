@@ -426,10 +426,68 @@ class AdminSystemService {
    * @returns {number} return.count - 配置项数量
    * @returns {Array<Object>} return.settings - 配置项列表
    */
+  /**
+   * 配置键中文名称映射表
+   * @description 用于前端显示友好的中文名称
+   */
+  static SETTING_DISPLAY_NAMES = {
+    // ===== 基础设置 (basic) =====
+    system_name: '系统名称',
+    system_version: '系统版本',
+    customer_phone: '客服电话',
+    customer_email: '客服邮箱',
+    maintenance_mode: '维护模式',
+    maintenance_message: '维护公告',
+    maintenance_end_time: '维护结束时间',
+
+    // ===== 积分设置 (points) =====
+    sign_in_points: '签到积分',
+    lottery_cost_points: '抽奖消耗积分',
+    points_expire_days: '积分过期天数',
+    initial_points: '新用户初始积分',
+    budget_allocation_ratio: '预算分配比例',
+    daily_lottery_limit: '每日抽奖次数限制',
+    merchant_review_budget_ratio: '商户审核预算比例',
+    merchant_review_campaign_id: '商户审核活动ID',
+
+    // ===== 通知设置 (notification) =====
+    sms_enabled: '短信通知',
+    email_enabled: '邮件通知',
+    app_notification_enabled: 'APP推送通知',
+
+    // ===== 安全设置 (security) =====
+    max_login_attempts: '最大登录尝试次数',
+    lockout_duration: '锁定时长(分钟)',
+    password_min_length: '密码最小长度',
+    api_rate_limit: 'API请求限制(次/分钟)',
+
+    // ===== 市场设置 (marketplace) =====
+    max_active_listings: '最大同时上架数',
+    listing_expiry_days: '挂牌过期天数',
+    monitor_price_low_threshold: '价格下限阈值',
+    monitor_price_high_threshold: '价格上限阈值',
+    monitor_long_listing_days: '超长挂牌天数',
+    monitor_alert_enabled: '市场监控告警',
+    allowed_settlement_assets: '允许结算币种',
+    fee_rate_DIAMOND: '钻石手续费率',
+    fee_rate_red_shard: '红晶手续费率',
+    fee_min_DIAMOND: '钻石最低手续费',
+    fee_min_red_shard: '红晶最低手续费',
+    min_price_red_shard: '红晶最低价格',
+    max_price_red_shard: '红晶最高价格',
+    daily_max_listings_DIAMOND: '钻石每日最大上架数',
+    daily_max_listings_red_shard: '红晶每日最大上架数',
+    daily_max_trades_DIAMOND: '钻石每日最大交易数',
+    daily_max_trades_red_shard: '红晶每日最大交易数',
+    daily_max_amount_DIAMOND: '钻石每日最大交易额',
+    daily_max_amount_red_shard: '红晶每日最大交易额',
+    allowed_listing_assets: '允许上架资产类型'
+  }
+
   static async getSettingsByCategory(category) {
     try {
-      // 验证分类是否合法
-      const validCategories = ['basic', 'points', 'notification', 'security']
+      // 验证分类是否合法（2026-01-21 修复：与 updateSettings 保持一致，添加 marketplace 分类）
+      const validCategories = ['basic', 'points', 'notification', 'security', 'marketplace']
       if (!validCategories.includes(category)) {
         throw new Error(`无效的设置分类: ${category}。有效分类: ${validCategories.join(', ')}`)
       }
@@ -454,11 +512,13 @@ class AdminSystemService {
         order: [['setting_id', 'ASC']]
       })
 
-      // 转换配置项数据（自动解析value_type）
+      // 转换配置项数据（自动解析value_type，添加中文名称）
       const parsedSettings = settings.map(setting => {
         const data = setting.toJSON()
         // 使用模型的getParsedValue方法自动解析值
         data.parsed_value = setting.getParsedValue()
+        // 添加中文显示名称（2026-01-21 新增）
+        data.display_name = AdminSystemService.SETTING_DISPLAY_NAMES[data.setting_key] || data.setting_key
         return data
       })
 

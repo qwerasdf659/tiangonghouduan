@@ -1356,10 +1356,7 @@ class DataSanitizer {
   static sanitizeExchangeMarketOrders(orders, _dataLevel) {
     // V4.5.0: 材料资产支付 - 统一数据格式
 
-    /*
-     * 普通用户数据脱敏（V4.5.0 材料资产支付）
-     * 2026-01-20 技术债务清理：item_snapshot 统一使用 name/description
-     */
+    // 普通用户数据脱敏（V4.5.0 材料资产支付）
     const sanitized = orders.map(order => ({
       id: order.record_id, // 数据库主键（唯一真相源）
       order_no: order.order_no,

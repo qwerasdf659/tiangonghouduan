@@ -630,19 +630,48 @@ const bannersModule = {
     try {
       const response = await apiRequest(API_ENDPOINTS.POPUP_BANNER.STATS)
       if (response && response.success && response.data) {
-        this.renderStats(response.data)
+        // 后端返回格式：{ statistics: { total, active, inactive, by_position: { home, profile } } }
+        this.renderStats(response.data.statistics || response.data)
+      } else {
+        // API 调用失败，从列表数据计算统计
+        console.warn('弹窗统计API返回失败，从列表数据计算')
+        this.renderStatsFromList()
       }
     } catch (error) {
       console.error('加载弹窗统计失败:', error)
+      // API 调用异常，从列表数据计算统计
+      this.renderStatsFromList()
     }
   },
 
   renderStats(stats) {
-    document.getElementById('bannerStatTotal').textContent =
-      stats.total || this.banners.length || '-'
-    document.getElementById('bannerStatActive').textContent = stats.active || '-'
-    document.getElementById('bannerStatInactive').textContent = stats.inactive || '-'
-    document.getElementById('bannerStatHome').textContent = stats.home || '-'
+    // 防护：确保 stats 是有效对象
+    if (!stats || typeof stats !== 'object') {
+      console.warn('renderStats: 无效的统计数据，使用列表数据计算')
+      this.renderStatsFromList()
+      return
+    }
+    
+    // 使用 ?? 运算符确保 0 值正确显示（|| 会把 0 当作 falsy 值）
+    document.getElementById('bannerStatTotal').textContent = stats.total ?? 0
+    document.getElementById('bannerStatActive').textContent = stats.active ?? 0
+    document.getElementById('bannerStatInactive').textContent = stats.inactive ?? 0
+    // 后端返回 by_position.home，而非直接的 home 字段
+    document.getElementById('bannerStatHome').textContent = stats.by_position?.home ?? stats.home ?? 0
+  },
+
+  // 从列表数据计算统计（作为 API 失败时的后备方案）
+  renderStatsFromList() {
+    const banners = this.banners || []
+    const total = banners.length
+    const active = banners.filter(b => b.is_active === true).length
+    const inactive = total - active
+    const home = banners.filter(b => b.position === 'home').length
+    
+    document.getElementById('bannerStatTotal').textContent = total
+    document.getElementById('bannerStatActive').textContent = active
+    document.getElementById('bannerStatInactive').textContent = inactive
+    document.getElementById('bannerStatHome').textContent = home
   },
 
   renderGrid(items) {

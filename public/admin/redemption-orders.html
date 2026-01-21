@@ -275,11 +275,18 @@
         const response = await apiRequest(url);
 
         if (response && response.success) {
-          codes = response.data.records || response.data.codes || response.data || [];
+          // 适配后端返回格式：后端返回 orders 字段（以后端为准）
+          codes = response.data.orders || response.data.records || response.data.codes || [];
           totalPages = response.data.pagination?.total_pages || 1;
           renderCodeList(codes);
           renderPagination();
-          updateStats(response.data.stats || {});
+          // 统计数据需要从分页信息和当前数据计算
+          updateStats({
+            total: response.data.pagination?.total || codes.length,
+            pending: codes.filter(c => c.status === 'pending').length,
+            fulfilled: codes.filter(c => c.status === 'fulfilled').length,
+            expired: codes.filter(c => c.status === 'expired').length
+          });
         } else {
           showError('加载失败', response?.message || '获取核销码列表失败');
         }
@@ -299,34 +306,56 @@
         return;
       }
 
-      tbody.innerHTML = codes.map(c => `
+      // 适配后端字段名（以后端为准）：
+      // order_id - 订单ID（UUID）
+      // code_hash - 核销码哈希（显示前8位）
+      // item_instance - 关联的物品实例
+      // redeemer - 关联的核销用户
+      // redeemer_user_id - 核销用户ID
+      // status - 状态
+      // expires_at - 过期时间
+      // fulfilled_at - 核销时间
+      tbody.innerHTML = codes.map(c => {
+        // 获取物品信息（从关联的 item_instance）
+        const itemInfo = c.item_instance || {};
+        const itemMeta = itemInfo.meta || {};
+        const prizeName = itemMeta.prize_name || itemMeta.name || itemInfo.item_type || '-';
+        
+        // 获取核销人信息
+        const redeemer = c.redeemer || {};
+        const redeemerName = redeemer.nickname || redeemer.mobile || '-';
+        
+        // 显示核销码（显示哈希前8位，因为后端只存哈希）
+        const codeDisplay = c.code_hash ? c.code_hash.substring(0, 8) + '...' : '-';
+        
+        return `
         <tr class="status-${c.status}">
-          <td><input type="checkbox" class="code-checkbox" value="${c.code_id || c.id}"></td>
-          <td><code class="code-display p-1">${escapeHtml(c.redemption_code || c.code)}</code></td>
+          <td><input type="checkbox" class="code-checkbox" value="${c.order_id}"></td>
+          <td><code class="code-display p-1" title="${c.code_hash || ''}">${escapeHtml(codeDisplay)}</code></td>
           <td>
-            <small>${c.user_id || '-'}</small>
-            ${c.user_name ? `<br><small class="text-muted">${escapeHtml(c.user_name)}</small>` : ''}
+            <small>${c.redeemer_user_id || '-'}</small>
+            ${redeemerName !== '-' ? `<br><small class="text-muted">${escapeHtml(redeemerName)}</small>` : ''}
           </td>
-          <td>${escapeHtml(c.prize_name || '-')}</td>
-          <td>${escapeHtml(c.campaign_name || '-')}</td>
+          <td>${escapeHtml(prizeName)}</td>
+          <td>${escapeHtml(itemMeta.campaign_name || '-')}</td>
           <td><span class="badge ${getStatusBadgeClass(c.status)}">${getStatusLabel(c.status)}</span></td>
           <td><small>${formatDateTime(c.created_at)}</small></td>
-          <td><small>${formatDateTime(c.expire_at || c.valid_until)}</small></td>
+          <td><small>${formatDateTime(c.expires_at)}</small></td>
           <td>
-            <button class="btn btn-sm btn-outline-primary me-1" onclick="viewCodeDetail(${c.code_id || c.id})">
+            <button class="btn btn-sm btn-outline-primary me-1" onclick="viewCodeDetail('${c.order_id}')">
               <i class="bi bi-eye"></i>
             </button>
             ${c.status === 'pending' ? `
-              <button class="btn btn-sm btn-outline-success me-1" onclick="openRedeemModal(${c.code_id || c.id}, '${escapeHtml(c.redemption_code || c.code)}')">
+              <button class="btn btn-sm btn-outline-success me-1" onclick="openRedeemModal('${c.order_id}', '${escapeHtml(codeDisplay)}')">
                 <i class="bi bi-check-lg"></i>
               </button>
-              <button class="btn btn-sm btn-outline-danger" onclick="cancelCode(${c.code_id || c.id})">
+              <button class="btn btn-sm btn-outline-danger" onclick="cancelCode('${c.order_id}')">
                 <i class="bi bi-x-lg"></i>
               </button>
             ` : ''}
           </td>
         </tr>
-      `).join('');
+      `}).join('');
     }
 
     function renderPagination() {
@@ -357,14 +386,17 @@
     function updateStats(stats) {
       document.getElementById('totalCodes').textContent = stats.total || codes.length;
       document.getElementById('pendingCodes').textContent = stats.pending || codes.filter(c => c.status === 'pending').length;
-      document.getElementById('redeemedCodes').textContent = stats.redeemed || codes.filter(c => c.status === 'redeemed').length;
+      // 后端状态是 fulfilled（以后端为准），不是 redeemed
+      document.getElementById('redeemedCodes').textContent = stats.fulfilled || stats.redeemed || codes.filter(c => c.status === 'fulfilled').length;
       document.getElementById('expiredCodes').textContent = stats.expired || codes.filter(c => c.status === 'expired').length;
     }
 
     function getStatusBadgeClass(status) {
+      // 适配后端状态：fulfilled（以后端为准）
       const classes = {
         pending: 'bg-warning text-dark',
-        redeemed: 'bg-success',
+        fulfilled: 'bg-success',  // 后端使用 fulfilled
+        redeemed: 'bg-success',   // 兼容旧字段
         expired: 'bg-danger',
         cancelled: 'bg-secondary'
       };
@@ -372,38 +404,48 @@
     }
 
     function getStatusLabel(status) {
+      // 适配后端状态：fulfilled（以后端为准）
       const labels = {
         pending: '待核销',
-        redeemed: '已核销',
+        fulfilled: '已核销',  // 后端使用 fulfilled
+        redeemed: '已核销',   // 兼容旧字段
         expired: '已过期',
         cancelled: '已取消'
       };
       return labels[status] || status;
     }
 
-    async function viewCodeDetail(codeId) {
+    async function viewCodeDetail(orderId) {
       showLoading();
       try {
-        const response = await apiRequest(API.buildURL(API_ENDPOINTS.BUSINESS_RECORDS.DETAIL, { record_id: codeId }));
+        // 使用 order_id 作为路径参数（以后端为准）
+        const response = await apiRequest(API.buildURL(API_ENDPOINTS.BUSINESS_RECORDS.DETAIL, { order_id: orderId }));
         if (response && response.success) {
           const c = response.data;
+          // 适配后端字段名
+          const itemInfo = c.item_instance || {};
+          const itemMeta = itemInfo.meta || {};
+          const prizeName = itemMeta.prize_name || itemMeta.name || itemInfo.item_type || '-';
+          const redeemer = c.redeemer || {};
+          const codeDisplay = c.code_hash ? c.code_hash.substring(0, 8) + '...' : '-';
+          
           document.getElementById('codeDetailContent').innerHTML = `
             <div class="text-center mb-3">
-              <div class="code-display">${escapeHtml(c.redemption_code || c.code)}</div>
+              <div class="code-display" title="${c.code_hash || ''}">${escapeHtml(codeDisplay)}</div>
+              <small class="text-muted">订单ID: ${c.order_id}</small>
             </div>
             <table class="table table-sm">
               <tr><th style="width:35%">状态</th><td><span class="badge ${getStatusBadgeClass(c.status)}">${getStatusLabel(c.status)}</span></td></tr>
-              <tr><th>用户ID</th><td>${c.user_id || '-'}</td></tr>
-              <tr><th>奖品</th><td>${escapeHtml(c.prize_name || '-')}</td></tr>
-              <tr><th>活动</th><td>${escapeHtml(c.campaign_name || '-')}</td></tr>
+              <tr><th>核销用户ID</th><td>${c.redeemer_user_id || '-'}</td></tr>
+              <tr><th>核销用户</th><td>${escapeHtml(redeemer.nickname || redeemer.mobile || '-')}</td></tr>
+              <tr><th>物品类型</th><td>${escapeHtml(itemInfo.item_type || '-')}</td></tr>
+              <tr><th>奖品名称</th><td>${escapeHtml(prizeName)}</td></tr>
+              <tr><th>活动</th><td>${escapeHtml(itemMeta.campaign_name || '-')}</td></tr>
               <tr><th>创建时间</th><td>${formatDateTime(c.created_at)}</td></tr>
-              <tr><th>有效期至</th><td>${formatDateTime(c.expire_at || c.valid_until)}</td></tr>
-              ${c.status === 'redeemed' ? `
-                <tr><th>核销时间</th><td>${formatDateTime(c.redeemed_at)}</td></tr>
-                <tr><th>核销门店</th><td>${escapeHtml(c.store_name || '-')}</td></tr>
-                <tr><th>核销人</th><td>${c.redeemer_id || '-'}</td></tr>
+              <tr><th>有效期至</th><td>${formatDateTime(c.expires_at)}</td></tr>
+              ${c.status === 'fulfilled' ? `
+                <tr><th>核销时间</th><td>${formatDateTime(c.fulfilled_at)}</td></tr>
               ` : ''}
-              ${c.remark ? `<tr><th>备注</th><td>${escapeHtml(c.remark)}</td></tr>` : ''}
             </table>
           `;
           new bootstrap.Modal(document.getElementById('codeDetailModal')).show();
@@ -418,22 +460,23 @@
       }
     }
 
-    function openRedeemModal(codeId, code) {
-      document.getElementById('redeemCodeId').value = codeId;
-      document.getElementById('redeemCodeDisplay').textContent = code;
+    function openRedeemModal(orderId, codeDisplay) {
+      document.getElementById('redeemCodeId').value = orderId;
+      document.getElementById('redeemCodeDisplay').textContent = codeDisplay;
       document.getElementById('redeemStoreId').value = '';
       document.getElementById('redeemRemark').value = '';
       new bootstrap.Modal(document.getElementById('redeemModal')).show();
     }
 
     async function submitRedeem() {
-      const codeId = document.getElementById('redeemCodeId').value;
+      const orderId = document.getElementById('redeemCodeId').value;
       const storeId = document.getElementById('redeemStoreId').value;
       const remark = document.getElementById('redeemRemark').value;
 
       showLoading();
       try {
-        const response = await apiRequest(API.buildURL(API_ENDPOINTS.BUSINESS_RECORDS.REDEEM, { record_id: codeId }), {
+        // 使用 order_id 作为路径参数（以后端为准）
+        const response = await apiRequest(API.buildURL(API_ENDPOINTS.BUSINESS_RECORDS.REDEEM, { order_id: orderId }), {
           method: 'POST',
           body: JSON.stringify({
             store_id: storeId ? parseInt(storeId) : null,
@@ -456,12 +499,13 @@
       }
     }
 
-    async function cancelCode(codeId) {
+    async function cancelCode(orderId) {
       if (!confirm('确定要取消此核销码吗？')) return;
 
       showLoading();
       try {
-        const response = await apiRequest(API.buildURL(API_ENDPOINTS.BUSINESS_RECORDS.CANCEL, { record_id: codeId }), {
+        // 使用 order_id 作为路径参数（以后端为准）
+        const response = await apiRequest(API.buildURL(API_ENDPOINTS.BUSINESS_RECORDS.CANCEL, { order_id: orderId }), {
           method: 'POST'
         });
 
@@ -485,6 +529,7 @@
     }
 
     async function batchExpire() {
+      // 获取选中的 order_id（UUID 字符串）
       const selected = Array.from(document.querySelectorAll('.code-checkbox:checked')).map(cb => cb.value);
       if (selected.length === 0) {
         alert('请先选择要处理的核销码');
@@ -495,9 +540,10 @@
 
       showLoading();
       try {
+        // 使用 order_ids 而不是 code_ids（以后端为准）
         const response = await apiRequest(API_ENDPOINTS.BUSINESS_RECORDS.BATCH_EXPIRE, {
           method: 'POST',
-          body: JSON.stringify({ code_ids: selected.map(Number) })
+          body: JSON.stringify({ order_ids: selected })
         });
 
         if (response && response.success) {

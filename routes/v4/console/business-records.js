@@ -295,6 +295,194 @@ router.get(
   }
 )
 
+/**
+ * POST /api/v4/console/business-records/redemption-orders/:order_id/redeem
+ * @desc 管理员直接核销订单（通过order_id，无需核销码）
+ * @access Admin only (role_level >= 100)
+ *
+ * @body {number} [store_id] - 核销门店ID（可选）
+ * @body {string} [remark] - 备注（可选）
+ */
+router.post(
+  '/redemption-orders/:order_id/redeem',
+  authenticateToken,
+  requireRole(['admin', 'ops']),
+  async (req, res) => {
+    try {
+      const { order_id } = req.params
+      const { store_id, remark } = req.body
+      const adminUserId = req.user.user_id
+
+      const { RedemptionOrder, ItemInstance, User, sequelize } = require('../../../models')
+      const BeijingTimeHelper = require('../../../utils/timeHelper')
+
+      // 开启事务
+      const transaction = await sequelize.transaction()
+
+      try {
+        // 查找订单并锁定
+        const order = await RedemptionOrder.findByPk(order_id, {
+          include: [
+            { model: ItemInstance, as: 'item_instance' }
+          ],
+          lock: transaction.LOCK.UPDATE,
+          transaction
+        })
+
+        if (!order) {
+          await transaction.rollback()
+          return res.apiError('订单不存在', 'NOT_FOUND', null, 404)
+        }
+
+        // 检查订单状态
+        if (order.status === 'fulfilled') {
+          await transaction.rollback()
+          return res.apiError('订单已核销', 'ALREADY_FULFILLED', null, 409)
+        }
+
+        if (order.status === 'cancelled') {
+          await transaction.rollback()
+          return res.apiError('订单已取消', 'CANCELLED', null, 409)
+        }
+
+        if (order.status === 'expired') {
+          await transaction.rollback()
+          return res.apiError('订单已过期', 'EXPIRED', null, 400)
+        }
+
+        // 检查是否过期
+        if (order.expires_at && new Date(order.expires_at) < new Date()) {
+          // 更新状态为过期
+          await order.update({ status: 'expired' }, { transaction })
+          await transaction.commit()
+          return res.apiError('订单已过期', 'EXPIRED', null, 400)
+        }
+
+        // 执行核销
+        const fulfilledAt = BeijingTimeHelper.createDatabaseTime()
+        await order.update({
+          status: 'fulfilled',
+          redeemer_user_id: adminUserId,
+          fulfilled_at: fulfilledAt
+        }, { transaction })
+
+        // 更新物品实例状态
+        if (order.item_instance) {
+          await order.item_instance.update({
+            status: 'used'
+          }, { transaction })
+        }
+
+        await transaction.commit()
+
+        logger.info('管理员核销订单成功', {
+          order_id,
+          admin_id: adminUserId,
+          store_id,
+          remark
+        })
+
+        // 重新查询完整数据
+        const updatedOrder = await RedemptionOrder.findByPk(order_id, {
+          include: [
+            { model: User, as: 'redeemer', attributes: ['user_id', 'nickname', 'mobile'] },
+            { model: ItemInstance, as: 'item_instance' }
+          ]
+        })
+
+        return res.apiSuccess(updatedOrder, '核销成功')
+      } catch (error) {
+        await transaction.rollback()
+        throw error
+      }
+    } catch (error) {
+      return handleServiceError(error, res, '核销订单')
+    }
+  }
+)
+
+/**
+ * POST /api/v4/console/business-records/redemption-orders/:order_id/cancel
+ * @desc 管理员取消订单
+ * @access Admin only (role_level >= 100)
+ *
+ * @body {string} [reason] - 取消原因（可选）
+ */
+router.post(
+  '/redemption-orders/:order_id/cancel',
+  authenticateToken,
+  requireRole(['admin', 'ops']),
+  async (req, res) => {
+    try {
+      const { order_id } = req.params
+      const { reason } = req.body
+      const adminUserId = req.user.user_id
+
+      const { RedemptionOrder, ItemInstance, User, sequelize } = require('../../../models')
+
+      // 开启事务
+      const transaction = await sequelize.transaction()
+
+      try {
+        // 查找订单并锁定
+        const order = await RedemptionOrder.findByPk(order_id, {
+          include: [
+            { model: ItemInstance, as: 'item_instance' }
+          ],
+          lock: transaction.LOCK.UPDATE,
+          transaction
+        })
+
+        if (!order) {
+          await transaction.rollback()
+          return res.apiError('订单不存在', 'NOT_FOUND', null, 404)
+        }
+
+        // 检查订单状态
+        if (order.status !== 'pending') {
+          await transaction.rollback()
+          return res.apiError(`订单状态为 ${order.status}，无法取消`, 'INVALID_STATUS', null, 400)
+        }
+
+        // 执行取消
+        await order.update({
+          status: 'cancelled'
+        }, { transaction })
+
+        // 恢复物品实例状态（如果需要）
+        if (order.item_instance && order.item_instance.status === 'pending_redeem') {
+          await order.item_instance.update({
+            status: 'available'
+          }, { transaction })
+        }
+
+        await transaction.commit()
+
+        logger.info('管理员取消订单成功', {
+          order_id,
+          admin_id: adminUserId,
+          reason
+        })
+
+        // 重新查询完整数据
+        const updatedOrder = await RedemptionOrder.findByPk(order_id, {
+          include: [
+            { model: User, as: 'redeemer', attributes: ['user_id', 'nickname', 'mobile'] },
+            { model: ItemInstance, as: 'item_instance' }
+          ]
+        })
+
+        return res.apiSuccess(updatedOrder, '取消成功')
+      } catch (error) {
+        await transaction.rollback()
+        throw error
+      }
+    } catch (error) {
+      return handleServiceError(error, res, '取消订单')
+    }
+  }
+)
+
 /*
  * =================================================================
  * 内容审核记录查询接口

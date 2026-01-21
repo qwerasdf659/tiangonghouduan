@@ -301,10 +301,7 @@ class RedemptionService {
           operator_user_id: redeemer_user_id,
           business_type: 'redemption_use',
           idempotency_key: order.order_id,
-          /*
-           * meta 元数据（用于审计追溯）
-           * 2026-01-20 技术债务清理：统一使用 name 字段名
-           */
+          // meta 元数据（用于审计追溯）
           meta: {
             order_id: order.order_id,
             redeemer_user_id,

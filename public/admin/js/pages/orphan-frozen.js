@@ -3,17 +3,18 @@
  *
  * @description 管理系统中的孤儿冻结数据（frozen_amount > 实际活跃挂牌冻结总额）
  * @created 2026-01-09
- * @updated 2026-01-09 - 适配后端API字段名，以后端为准；修复CSP内联事件问题
+ * @updated 2026-01-21 - 🔴 修复字段名匹配：以后端数据库为准，不做映射转换
  *
  * 后端API说明：
  * - GET /api/v4/console/orphan-frozen/detect - 检测孤儿冻结
  * - GET /api/v4/console/orphan-frozen/stats - 获取统计信息
  * - POST /api/v4/console/orphan-frozen/cleanup - 清理孤儿冻结
  *
- * 后端返回字段（以此为准）：
- * - detect: { total, total_amount, orphan_list[] }
- * - orphan_list item: { user_id, account_id, asset_code, frozen_amount, listed_amount, orphan_amount, available_amount, description }
+ * 🔴 后端返回字段（以此为权威，前端直接使用）：
+ * - detect: { orphan_count, total_orphan_amount, orphan_items[], affected_user_count, ... }
+ * - orphan_items item: { user_id, account_id, asset_code, frozen_amount, listed_amount, orphan_amount, available_amount, description }
  * - stats: { total_orphan_count, total_orphan_amount, affected_user_count, by_asset[], checked_at }
+ * - cleanup: { dry_run, detected_count, cleaned_count, failed_count, total_unfrozen_amount, details[] }
  */
 
 'use strict'
@@ -107,8 +108,8 @@ function setupEventDelegation() {
  * 加载数据
  *
  * 调用后端API获取孤儿冻结数据和统计信息
- * 后端字段：
- * - /detect: { total, total_amount, orphan_list[] }
+ * 🔴 后端字段（以此为准）：
+ * - /detect: { orphan_count, total_orphan_amount, orphan_items[], affected_user_count, ... }
  * - /stats: { total_orphan_count, total_orphan_amount, affected_user_count, by_asset[] }
  */
 async function loadData() {
@@ -132,12 +133,12 @@ async function loadData() {
       apiRequest(API_ENDPOINTS.ORPHAN_FROZEN.STATS)
     ])
 
-    // 处理检测结果 - 使用后端字段名
+    // 处理检测结果 - 🔴 直接使用后端字段名，不做映射
     if (detectResponse && detectResponse.success) {
-      // 后端返回格式: { total, total_amount, orphan_list }
-      const orphanList = detectResponse.data.orphan_list || []
-      const total = detectResponse.data.total || 0
-      const totalAmount = detectResponse.data.total_amount || 0
+      // 🔴 后端返回格式: { orphan_count, total_orphan_amount, orphan_items }
+      const orphanList = detectResponse.data.orphan_items || []
+      const orphanCount = detectResponse.data.orphan_count || 0
+      const totalOrphanAmount = detectResponse.data.total_orphan_amount || 0
 
       // 缓存原始数据
       orphanDataCache = orphanList
@@ -145,13 +146,13 @@ async function loadData() {
       // 处理统计数据 - 使用后端字段名
       const stats = statsResponse?.data || {}
 
-      // 更新统计卡片 - 适配后端字段
+      // 更新统计卡片 - 🔴 使用后端正确字段
       // 后端stats字段: total_orphan_count, total_orphan_amount, affected_user_count
-      document.getElementById('orphanCount').textContent = stats.total_orphan_count || total
-      document.getElementById('frozenCount').textContent = stats.total_orphan_amount || totalAmount
+      document.getElementById('orphanCount').textContent = stats.total_orphan_count || orphanCount
+      document.getElementById('frozenCount').textContent = stats.total_orphan_amount || totalOrphanAmount
       document.getElementById('expiredCount').textContent = stats.affected_user_count || 0
       document.getElementById('totalValue').textContent =
-        '¥' + (stats.total_orphan_amount || totalAmount).toFixed(2)
+        '¥' + (stats.total_orphan_amount || totalOrphanAmount).toFixed(2)
 
       // 直接使用后端返回的数据渲染表格，不做字段转换
       renderTable(orphanList)
@@ -340,7 +341,7 @@ function updateBatchButton() {
  * 扫描孤儿数据
  *
  * 调用后端 /detect API 进行扫描
- * 后端返回: { total, total_amount, orphan_list }
+ * 🔴 后端返回: { orphan_count, total_orphan_amount, orphan_items }
  */
 async function scanOrphans() {
   showLoading(true)
@@ -351,8 +352,8 @@ async function scanOrphans() {
     })
 
     if (response && response.success) {
-      // 使用后端字段 total
-      const foundCount = response.data.total || 0
+      // 🔴 使用后端正确字段 orphan_count
+      const foundCount = response.data.orphan_count || 0
       showSuccessToast(`扫描完成，发现 ${foundCount} 条孤儿冻结数据`)
       loadData()
     } else {
@@ -399,7 +400,7 @@ function showCleanConfirmModal() {
  *
  * 调用后端 POST /cleanup API
  * 请求参数：{ dry_run, user_id, asset_code, reason, operator_name }
- * 后端返回：{ dry_run, detected, cleaned, failed, total_amount, details }
+ * 🔴 后端返回：{ dry_run, detected_count, cleaned_count, failed_count, total_unfrozen_amount, details }
  */
 async function executeClean() {
   const reason = document.getElementById('cleanReason').value.trim()
@@ -422,9 +423,9 @@ async function executeClean() {
     })
 
     if (response && response.success) {
-      // 使用后端字段 cleaned
-      const cleanedCount = response.data.cleaned || 0
-      const failedCount = response.data.failed || 0
+      // 🔴 使用后端正确字段 cleaned_count 和 failed_count
+      const cleanedCount = response.data.cleaned_count || 0
+      const failedCount = response.data.failed_count || 0
 
       if (failedCount > 0) {
         showSuccessToast(`清理完成：成功 ${cleanedCount} 条，失败 ${failedCount} 条`)
@@ -479,7 +480,8 @@ async function cleanSingleItem(userId, assetCode) {
     })
 
     if (response && response.success) {
-      const cleanedCount = response.data.cleaned || 0
+      // 🔴 使用后端正确字段 cleaned_count
+      const cleanedCount = response.data.cleaned_count || 0
       showSuccessToast(`清理成功：已解冻 ${cleanedCount} 条孤儿冻结`)
       loadData()
     } else {

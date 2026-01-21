@@ -61,7 +61,7 @@ router.post(
       const result = await TransactionManager.execute(
         async transaction => {
           return await PrizePoolService.batchAddPrizes(campaign_id, prizes, {
-            created_by: req.user?.id,
+            created_by: req.user?.user_id,
             transaction
           })
         },
@@ -205,11 +205,14 @@ router.put(
       // 通过 ServiceManager 获取 PrizePoolService
       const PrizePoolService = req.app.locals.services.getService('prize_pool')
 
-      // 使用 TransactionManager 统一管理事务（2026-01-05 事务边界治理）
+      /*
+       * 使用 TransactionManager 统一管理事务（2026-01-05 事务边界治理）
+       * 🔧 2026-01-21 修复：使用正确的字段名 user_id 而不是 id
+       */
       const result = await TransactionManager.execute(
         async transaction => {
           return await PrizePoolService.updatePrize(prize_id, updateData, {
-            updated_by: req.user?.id,
+            updated_by: req.user?.user_id,
             transaction
           })
         },
@@ -219,7 +222,7 @@ router.put(
       sharedComponents.logger.info('奖品信息更新成功', {
         prize_id,
         updated_fields: result.updated_fields,
-        updated_by: req.user?.id
+        updated_by: req.user?.user_id
       })
 
       return res.apiSuccess(result, '奖品信息更新成功')
@@ -275,7 +278,7 @@ router.post(
       const result = await TransactionManager.execute(
         async transaction => {
           return await PrizePoolService.addStock(prizeId, quantity, {
-            operated_by: req.user?.id,
+            operated_by: req.user?.user_id,
             transaction
           })
         },
@@ -326,7 +329,7 @@ router.delete(
       const result = await TransactionManager.execute(
         async transaction => {
           return await PrizePoolService.deletePrize(prizeId, {
-            deleted_by: req.user?.id,
+            deleted_by: req.user?.user_id,
             transaction
           })
         },

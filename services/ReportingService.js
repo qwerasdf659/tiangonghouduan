@@ -1016,59 +1016,46 @@ class ReportingService {
       const Role = models.Role
 
       // 查询各类型用户数量（通过角色关联）
-      const [user_role_users, admin_role_users, merchant_role_users, all_users] = await Promise.all(
-        [
-          // 普通用户：拥有user角色
-          models.User.count({
-            distinct: true,
-            include: [
-              {
-                model: Role,
-                as: 'roles',
-                where: { role_name: 'user', is_active: true },
-                through: { where: { is_active: true } },
-                required: true
-              }
-            ]
-          }),
+      const [admin_role_users, merchant_role_users, all_users] = await Promise.all([
+        // 管理员用户：拥有admin角色
+        models.User.count({
+          distinct: true,
+          include: [
+            {
+              model: Role,
+              as: 'roles',
+              where: { role_name: 'admin', is_active: true },
+              through: { where: { is_active: true } },
+              required: true
+            }
+          ]
+        }),
 
-          // 管理员用户：拥有admin角色
-          models.User.count({
-            distinct: true,
-            include: [
-              {
-                model: Role,
-                as: 'roles',
-                where: { role_name: 'admin', is_active: true },
-                through: { where: { is_active: true } },
-                required: true
-              }
-            ]
-          }),
+        // 商家用户：拥有merchant角色
+        models.User.count({
+          distinct: true,
+          include: [
+            {
+              model: Role,
+              as: 'roles',
+              where: { role_name: 'merchant', is_active: true },
+              through: { where: { is_active: true } },
+              required: true
+            }
+          ]
+        }),
 
-          // 商家用户：拥有merchant角色
-          models.User.count({
-            distinct: true,
-            include: [
-              {
-                model: Role,
-                as: 'roles',
-                where: { role_name: 'merchant', is_active: true },
-                through: { where: { is_active: true } },
-                required: true
-              }
-            ]
-          }),
+        // 总用户数
+        models.User.count()
+      ])
 
-          // 总用户数
-          models.User.count()
-        ]
-      )
+      // 普通用户 = 总用户 - 管理员 - 商家（未分配角色的用户计入普通用户）
+      const regular_users = all_users - admin_role_users - merchant_role_users
 
       const types_data = {
         regular: {
-          count: user_role_users,
-          percentage: all_users > 0 ? ((user_role_users / all_users) * 100).toFixed(2) : '0.00'
+          count: regular_users,
+          percentage: all_users > 0 ? ((regular_users / all_users) * 100).toFixed(2) : '0.00'
         },
         admin: {
           count: admin_role_users,
@@ -1082,7 +1069,7 @@ class ReportingService {
       }
 
       logger.info(
-        `用户类型分布: 普通${user_role_users}, 管理员${admin_role_users}, 商家${merchant_role_users}, 总用户${all_users}`
+        `用户类型分布: 普通${regular_users}, 管理员${admin_role_users}, 商家${merchant_role_users}, 总用户${all_users}`
       )
       return types_data
     } catch (error) {

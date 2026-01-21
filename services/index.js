@@ -4,17 +4,9 @@ const logger = require('../utils/logger').logger
  * 服务管理器 - V4统一版本
  * 管理系统中所有服务的生命周期
  *
- * @description 基于V4架构，移除向后兼容代码
+ * @description 基于V4架构，所有 service key 使用 snake_case 命名
  * @version 4.1.0
- * @date 2026-01-09
- *
- * P1-9 重构说明（2026-01-09）：
- * - 所有 service key 统一使用 snake_case 命名（E2-Strict）
- * - 不再兼容 camelCase key，旧 key 调用直接抛出 "服务不存在" 错误
- * - 补充注册 DataSanitizer 和 LotteryQuotaService
- *
- * 2026-01-20 技术债务清理（清理项8）：
- * - 确认无 camelCase 兼容逻辑，getService() 直接返回错误，无迁移提示
+ * @date 2026-01-21
  */
 
 // V4 核心服务
@@ -99,17 +91,15 @@ const UserPremiumQueryService = require('./UserPremiumQueryService') // 用户�
 // P1-9 新增注册的服务（2026-01-09）
 const DataSanitizer = require('./DataSanitizer') // 统一数据脱敏服务
 const LotteryQuotaService = require('./lottery/LotteryQuotaService') // 抽奖配额服务
-const LotteryPricingService = require('./lottery/LotteryPricingService') // 抽奖定价服务（2026-01-21 技术债务修复）
+const LotteryPricingService = require('./lottery/LotteryPricingService') // 抽奖定价服务
 const PerformanceMonitor = require('./UnifiedLotteryEngine/utils/PerformanceMonitor') // 性能监控服务
 const SealosStorageService = require('./sealosStorage') // Sealos 对象存储服务
 
 /**
- * V4.6 管线编排器（2026-01-19 Phase 5 迁移）
+ * V4.6 管线编排器
  *
- * 抽奖执行入口：统一使用 DrawOrchestrator 替代原 BasicGuaranteeStrategy
- * 管理操作保留：ManagementStrategy 仍用于 forceWin/forceLose 等管理 API
- *
- * @see docs/抽奖模块Strategy到Pipeline迁移方案新.md
+ * 抽奖执行入口：使用 DrawOrchestrator 编排 Pipeline 执行
+ * 管理操作：ManagementStrategy 用于 forceWin/forceLose 等管理 API
  */
 const DrawOrchestrator = require('./UnifiedLotteryEngine/pipeline/DrawOrchestrator')
 const ManagementStrategy = require('./UnifiedLotteryEngine/strategies/ManagementStrategy')
@@ -319,15 +309,12 @@ class ServiceManager {
       this._services.set('performance_monitor', new PerformanceMonitor()) // 性能监控服务（实例化）
       this._services.set('sealos_storage', SealosStorageService) // Sealos 对象存储服务（静态类，需 new 实例化）
 
-      // ========== Phase 3 定价配置管理服务（2026-01-19） ==========
+      // ========== 抽奖定价相关服务 ==========
 
       this._services.set('lottery_campaign_pricing_config', LotteryCampaignPricingConfigService) // 活动定价配置管理服务
+      this._services.set('lottery_pricing', LotteryPricingService) // 抽奖定价服务
 
-      // ========== Phase 4 定价服务（2026-01-21 技术债务修复） ==========
-
-      this._services.set('lottery_pricing', LotteryPricingService) // 抽奖定价服务（getDrawPricing 统一）
-
-      // ========== API覆盖率补齐服务（2026-01-21） ==========
+      // ========== API覆盖率补齐服务 ==========
 
       this._services.set('dictionary', new DictionaryService(this.models)) // 字典表管理服务（category_defs, rarity_defs, asset_group_defs）
       this._services.set('lottery_config', new LotteryConfigService(this.models)) // 抽奖配置管理服务（lottery_strategy_config, lottery_tier_matrix_config）
@@ -343,12 +330,10 @@ class ServiceManager {
       this._services.set('lottery_strategy_stats', new LotteryStrategyStatsService(this.models)) // 抽奖策略引擎监控仪表盘统计服务
 
       /**
-       * V4.6 管线编排器（2026-01-19 Phase 5 迁移）
+       * V4.6 管线编排器
        *
-       * draw_orchestrator: 抽奖执行入口（替代原 basic_guarantee_strategy）
-       * management_strategy: 管理操作 API（forceWin/forceLose 等）- 继续保留
-       *
-       * @see docs/抽奖模块Strategy到Pipeline迁移方案新.md
+       * draw_orchestrator: 抽奖执行入口（Pipeline 架构）
+       * management_strategy: 管理操作 API（forceWin/forceLose 等）
        */
       this._services.set('draw_orchestrator', new DrawOrchestrator())
       this._services.set('management_strategy', new ManagementStrategy())

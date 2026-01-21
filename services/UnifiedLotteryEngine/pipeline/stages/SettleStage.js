@@ -47,15 +47,7 @@ const BeijingTimeHelper = require('../../../../utils/timeHelper')
 const AssetService = require('../../../AssetService')
 const { getInstance: getLotteryMetricsCollector } = require('../../../LotteryMetricsCollector') // 🆕 实时Redis指标采集
 
-/*
- * ========== Phase 9-16 增强：体验状态管理器 ==========
- * 用于更新用户抽奖体验计数器（Pity/AntiEmpty/AntiHigh）
- *
- * 技术债务清理（2026-01-20）：
- * - 原引用：../../strategy/state
- * - 新引用：../../compute/state
- * - 详见：docs/技术债务彻底清理重构方案-2026-01-20.md P1-New 项9-15
- */
+// 体验状态管理器 - 用于更新用户抽奖体验计数器（Pity/AntiEmpty/AntiHigh）
 const { ExperienceStateManager, GlobalStateManager } = require('../../compute/state')
 
 // eslint-disable-next-line no-unused-vars -- _LotteryPrize, _LotteryCampaignUserQuota: 预留用于未来扩展功能
@@ -165,8 +157,8 @@ class SettleStage extends BaseStage {
       let points_deducted = 0
 
       if (draw_cost > 0 && !skip_points_deduction) {
-        /*
-         * 🔴 幂等键派生规则（与旧链路一致）：idempotency_key + ':consume'
+        /**
+         * 幂等键派生规则：idempotency_key + ':consume'
          * 确保重复请求时不会重复扣减积分
          */
         const consume_idempotency_key = `${idempotency_key}:consume`
@@ -177,9 +169,9 @@ class SettleStage extends BaseStage {
             user_id,
             asset_code: 'POINTS',
             delta_amount: -draw_cost,
-            idempotency_key: consume_idempotency_key, // 🔴 派生幂等键
+            idempotency_key: consume_idempotency_key, // 派生幂等键
             lottery_session_id,
-            business_type: 'lottery_consume', // 🔴 与旧链路一致
+            business_type: 'lottery_consume', // 业务类型：抽奖消耗
             meta: {
               source_type: 'system',
               title: '抽奖消耗',

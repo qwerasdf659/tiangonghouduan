@@ -44,6 +44,12 @@ class AdminPageFramework {
     this.pageSize = config.pageSize || 20
     this.currentPage = 1
 
+    // 数据字段配置（指定后端返回的数据数组所在字段名）
+    this.dataField = config.dataField || null
+    
+    // 独立统计接口配置（可选，如果配置了则单独调用统计接口）
+    this.statsEndpoint = config.statsEndpoint || null
+
     // 数据
     this.data = []
     this.statsData = {}
@@ -425,7 +431,17 @@ class AdminPageFramework {
       if (response && response.success) {
         this.data = this.extractData(response.data)
         this.renderTableData()
-        this.updateStats(response.data)
+        
+        // 调试日志：检查响应数据结构
+        console.log('[AdminPageFramework] response.data:', response.data)
+        console.log('[AdminPageFramework] statistics字段:', response.data?.statistics)
+        
+        // 如果配置了独立的统计接口，则单独加载统计数据
+        if (this.statsEndpoint) {
+          await this.loadStatsFromEndpoint()
+        } else {
+          this.updateStats(response.data)
+        }
 
         if (this.pagination && response.data.pagination) {
           this.renderPaginationControls(response.data.pagination)
@@ -447,12 +463,19 @@ class AdminPageFramework {
    * 从响应中提取数据数组
    */
   extractData(data) {
-    // 尝试多种常见的数据结构
+    // 1. 优先使用配置中指定的 dataField
+    if (this.dataField && data[this.dataField]) {
+      return data[this.dataField]
+    }
+    
+    // 2. 尝试多种常见的数据结构
     if (Array.isArray(data)) return data
     if (data.list) return data.list
     if (data.items) return data.items
     if (data.orders) return data.orders
     if (data.records) return data.records
+    if (data.users) return data.users  // 添加对 users 字段的支持
+    if (data.data) return Array.isArray(data.data) ? data.data : []
     return []
   }
 
@@ -640,6 +663,26 @@ class AdminPageFramework {
     this.filterValues = {}
     this.currentPage = 1
     this.loadData()
+  }
+
+  /**
+   * 从独立统计接口加载数据
+   */
+  async loadStatsFromEndpoint() {
+    if (!this.statsEndpoint) return
+    
+    try {
+      const response = await apiRequest(this.statsEndpoint)
+      
+      if (response && response.success) {
+        this.statsData = response.data
+        this.updateStats(response.data)
+      } else {
+        console.warn('加载统计数据失败:', response?.message)
+      }
+    } catch (error) {
+      console.error('加载统计接口失败:', error)
+    }
   }
 
   /**

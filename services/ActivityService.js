@@ -92,7 +92,6 @@ class ActivityService {
     // 格式化返回数据，统一字段名称
     return campaigns.map(campaign => ({
       campaign_id: campaign.campaign_id,
-      name: campaign.campaign_name, // 兼容前端期望的 name 字段
       campaign_name: campaign.campaign_name,
       campaign_code: campaign.campaign_code,
       description: campaign.description,

@@ -5,16 +5,18 @@
  *
  * 职责：
  * - 定义标准资源码集合（单数 snake_case）
- * - 建立历史遗留值映射表（PascalCase/旧模型名 → 标准码）
  * - 提供规范化和校验工具函数
  *
- * 设计原则（P0-5已拍板）：
+ * 设计原则：
  * - 资源码与代码重构/模型更名解耦
  * - 统一使用单数 snake_case 格式
  * - 保留原始值用于审计追溯
  *
+ * 重构记录：
+ * - 2026-01-21: 删除 TARGET_TYPE_LEGACY_MAPPING（数据库已100%标准化，无旧格式数据）
+ *
  * 创建时间：2026-01-09
- * 版本：V4.5.0
+ * 版本：V4.6.0
  */
 
 'use strict'
@@ -78,65 +80,6 @@ const AUDIT_TARGET_TYPES = Object.freeze({
 })
 
 /**
- * 历史遗留值映射表
- *
- * 映射规则：
- * - PascalCase → snake_case（如 AssetTransaction → asset_transaction）
- * - 历史遗留名 → 新架构标准名（如 UserPointsAccount → account_asset_balance）
- * - 复数形式 → 单数（如 ExchangeRecords → exchange_record）
- * - 语义不清 → 明确资源（如 LotteryManagement → lottery_management_setting）
- *
- * @constant {Object}
- */
-const TARGET_TYPE_LEGACY_MAPPING = Object.freeze({
-  // ========== 用户与权限（PascalCase → snake_case）==========
-  User: 'user',
-  UserRoleChangeRecord: 'user_role_change_record',
-  UserStatusChangeRecord: 'user_status_change_record',
-  CustomerServiceSession: 'customer_service_session',
-
-  // ========== 资产与账本（历史遗留名 → 新架构标准名）==========
-  UserPointsAccount: 'account_asset_balance', // 旧模型名 → 新架构
-  PointsTransaction: 'asset_transaction', // 旧模型名 → 新架构
-  AssetTransaction: 'asset_transaction',
-  AccountAssetBalance: 'account_asset_balance',
-  Account: 'account',
-
-  // ========== 物品与库存（PascalCase → snake_case）==========
-  ItemInstance: 'item_instance',
-  ItemInstanceEvent: 'item_instance_event',
-  UserInventory: 'item_instance', // 旧模型名 → 新架构
-  RedemptionOrder: 'redemption_order',
-
-  // ========== 商品与兑换（PascalCase → snake_case + 复数修正）==========
-  Product: 'product',
-  ExchangeItem: 'exchange_item',
-  ExchangeRecord: 'exchange_record',
-  ExchangeRecords: 'exchange_record', // 复数 → 单数
-
-  // ========== 消费与审核（PascalCase → snake_case）==========
-  ConsumptionRecord: 'consumption_record',
-  ContentReviewRecord: 'content_review_record',
-
-  // ========== 抽奖系统（PascalCase → snake_case + 语义明确）==========
-  LotteryCampaign: 'lottery_campaign',
-  LotteryPrize: 'lottery_prize',
-  LotteryDraw: 'lottery_draw',
-  LotteryManagement: 'lottery_management_setting', // 语义不清 → 明确
-  LotteryManagementSetting: 'lottery_management_setting',
-  LotteryClearSettingRecord: 'lottery_clear_setting_record',
-
-  // ========== 市场交易（PascalCase → snake_case）==========
-  MarketListing: 'market_listing',
-  TradeOrder: 'trade_order',
-
-  // ========== 系统配置（PascalCase → snake_case）==========
-  SystemSetting: 'system_setting',
-  PopupBanner: 'popup_banner',
-  FeatureFlag: 'feature_flag'
-})
-
-/**
  * 所有有效的 target_type 值（标准码集合）
  * @constant {string[]}
  */
@@ -146,8 +89,8 @@ const VALID_TARGET_TYPES = Object.freeze(Object.values(AUDIT_TARGET_TYPES))
  * 规范化 target_type 值
  *
  * 处理逻辑：
- * 1. 如果是历史遗留值，映射到标准码
- * 2. 如果已经是标准码，直接返回
+ * 1. 如果已经是标准码，直接返回
+ * 2. 尝试自动转换 PascalCase → snake_case
  * 3. 如果是未知值，返回原值（由调用方决定是否报错）
  *
  * @param {string} targetType - 原始 target_type 值
@@ -158,17 +101,12 @@ function normalizeTargetType(targetType) {
     return targetType
   }
 
-  // 1. 检查是否在历史遗留映射表中
-  if (TARGET_TYPE_LEGACY_MAPPING[targetType]) {
-    return TARGET_TYPE_LEGACY_MAPPING[targetType]
-  }
-
-  // 2. 检查是否已经是标准码
+  // 1. 检查是否已经是标准码
   if (VALID_TARGET_TYPES.includes(targetType)) {
     return targetType
   }
 
-  // 3. 尝试自动转换 PascalCase → snake_case（兜底逻辑）
+  // 2. 尝试自动转换 PascalCase → snake_case
   const autoConverted = targetType
     .replace(/([A-Z])/g, '_$1')
     .toLowerCase()
@@ -178,7 +116,7 @@ function normalizeTargetType(targetType) {
     return autoConverted
   }
 
-  // 4. 无法识别，返回原值
+  // 3. 无法识别，返回原值
   return targetType
 }
 
@@ -228,15 +166,6 @@ function getTargetTypeDisplayName(targetType) {
   }
 
   return displayNames[targetType] || targetType
-}
-
-/**
- * 获取历史遗留值的映射目标（用于迁移脚本）
- *
- * @returns {Object} 历史遗留值映射表（副本）
- */
-function getLegacyMappings() {
-  return { ...TARGET_TYPE_LEGACY_MAPPING }
 }
 
 /**
@@ -370,16 +299,14 @@ async function validateTargetTypeConsistency(sequelize) {
 module.exports = {
   // 常量
   AUDIT_TARGET_TYPES,
-  TARGET_TYPE_LEGACY_MAPPING,
   VALID_TARGET_TYPES,
 
   // 工具函数
   normalizeTargetType,
   isValidTargetType,
   getTargetTypeDisplayName,
-  getLegacyMappings,
   normalizeTargetTypes,
 
-  // 启动校验函数（P0-5 实施）
+  // 启动校验函数
   validateTargetTypeConsistency
 }

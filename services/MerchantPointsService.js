@@ -296,22 +296,30 @@ class MerchantPointsService {
       ]
     })
 
-    // 批量获取申请用户信息
-    const userIds = [...new Set(rows.map(r => r.auditable_id))]
+    /*
+     * 批量获取申请用户信息
+     * 注意：auditable_id 可能是字符串类型，需要转换为数字进行查询
+     */
+    const userIds = [
+      ...new Set(rows.map(r => parseInt(r.auditable_id, 10)).filter(id => !isNaN(id)))
+    ]
     const users = await User.findAll({
       where: { user_id: userIds },
       attributes: ['user_id', 'nickname', 'mobile']
     })
+    // 使用数字类型作为 Map 的键
     const userMap = new Map(users.map(u => [u.user_id, u]))
 
     // 组装返回数据
     const enrichedRows = rows.map(record => {
       const plainRecord = record.toJSON()
       const auditData = plainRecord.audit_data || {}
+      // 确保使用数字类型从 userMap 获取用户信息
+      const userId = parseInt(plainRecord.auditable_id, 10)
       return {
         audit_id: plainRecord.audit_id,
         user_id: plainRecord.auditable_id,
-        applicant: userMap.get(plainRecord.auditable_id) || null,
+        applicant: userMap.get(userId) || null,
         points_amount: auditData.points_amount,
         description: auditData.description,
         status: plainRecord.audit_status,
