@@ -52,6 +52,7 @@ const businessRecordsRoutes = require('./business-records') // 🆕 业务记录
 const systemDataRoutes = require('./system-data') // 🆕 系统数据查询（2026-01-22 P1 API覆盖率补齐）
 const featureFlagsRoutes = require('./feature-flags') // 🆕 功能开关管理（2026-01-21 Feature Flag 灰度发布）
 const lotteryStrategyStatsRoutes = require('./lottery-strategy-stats') // 🆕 抽奖策略统计（2026-01-22 策略引擎监控方案）
+const sessionsRoutes = require('./sessions') // 🆕 会话管理（2026-01-21 会话管理功能补齐）
 
 // 挂载子模块路由
 router.use('/auth', authRoutes)
@@ -95,6 +96,7 @@ router.use('/business-records', businessRecordsRoutes) // 🆕 业务记录查�
 router.use('/system-data', systemDataRoutes) // 🆕 系统数据查询路由（2026-01-22 P1 API覆盖率补齐）
 router.use('/feature-flags', featureFlagsRoutes) // 🆕 功能开关管理路由（2026-01-21 Feature Flag 灰度发布）
 router.use('/lottery-strategy-stats', lotteryStrategyStatsRoutes) // 🆕 抽奖策略统计路由（2026-01-22 策略引擎监控方案）
+router.use('/sessions', sessionsRoutes) // 🆕 会话管理路由（2026-01-21 会话管理功能补齐）
 
 /**
  * GET / - Admin API根路径信息
@@ -533,6 +535,18 @@ router.get('/', (req, res) => {
           '/feature-flags/batch-check'
         ],
         note: '功能开关CRUD、启用/禁用、白名单/黑名单管理、用户可用性检查；仅限 admin 访问'
+      },
+      sessions: {
+        description: '会话管理（2026-01-21 会话管理功能补齐）',
+        endpoints: [
+          '/sessions',
+          '/sessions/stats',
+          '/sessions/:user_session_id/deactivate',
+          '/sessions/deactivate-user',
+          '/sessions/cleanup',
+          '/sessions/online-users'
+        ],
+        note: '用户会话管理：会话列表、统计、强制登出、清理过期会话、在线用户监控；仅限 admin 访问'
       }
       // ⚠️ campaign_permissions模块暂未实现，待实现后再添加到此列表
     },

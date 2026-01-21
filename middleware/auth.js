@@ -308,11 +308,27 @@ async function getUserRoles(user_id, forceRefresh = false) {
 }
 
 /**
- * 🛡️ 生成JWT Token（基于UUID角色系统）
+ * 🛡️ 生成JWT Token（基于UUID角色系统，支持会话存储）
+ *
+ * @description 生成 access_token 和 refresh_token，支持关联会话存储
+ *
  * @param {Object} user - 用户对象
- * @returns {Promise<Object>} Token信息
+ * @param {Object} options - 可选配置
+ * @param {string} options.session_token - 会话令牌（关联 authentication_sessions 表的 session_token）
+ * @returns {Promise<Object>} Token信息（包含 access_token, refresh_token, session_token）
+ *
+ * @example
+ * // 无会话存储（兼容旧逻辑）
+ * const tokens = await generateTokens(user)
+ *
+ * // 有会话存储（2026-01-21 会话管理功能）
+ * const sessionToken = require('uuid').v4()
+ * const tokens = await generateTokens(user, { session_token: sessionToken })
+ *
+ * @since 2025-12-22（创建）
+ * @updated 2026-01-21（新增 session_token 支持，用于会话管理）
  */
-async function generateTokens(user) {
+async function generateTokens(user, options = {}) {
   try {
     // 获取用户角色信息
     const userRoles = await getUserRoles(user.user_id)
@@ -325,6 +341,11 @@ async function generateTokens(user) {
      * 🔐 JWT Payload（P1-2修复：移除is_admin字段）
      * 原因：管理员权限应实时从数据库查询，而非存储在Token中
      * 安全性：避免权限变更后Token未过期导致的权限漂移问题
+     *
+     * 🆕 2026-01-21：新增 session_token 字段，关联会话存储
+     * - session_token 用于关联 authentication_sessions 表
+     * - 敏感操作时验证会话有效性
+     * - 强制登出时可立即失效会话
      */
     const payload = {
       user_id: user.user_id,
@@ -335,6 +356,11 @@ async function generateTokens(user) {
       // P1-2修复：移除is_admin字段，权限实时查询而非存储在JWT中
       user_role: userRole, // 🔐 角色名称
       iat: Math.floor(BeijingTimeHelper.timestamp() / 1000)
+    }
+
+    // 🆕 2026-01-21：如果传入 session_token，则添加到 JWT Payload
+    if (options.session_token) {
+      payload.session_token = options.session_token
     }
 
     const access_token = jwt.sign(payload, process.env.JWT_SECRET, {
@@ -350,6 +376,7 @@ async function generateTokens(user) {
     return {
       access_token,
       refresh_token,
+      session_token: options.session_token || null, // 🆕 返回 session_token 供调用方使用
       expires_in: 24 * 60 * 60, // 24小时
       token_type: 'Bearer',
       user: {

@@ -10,7 +10,12 @@
  * - 路由层只负责：认证/鉴权、参数校验、调用Service、统一响应
  * - 使用统一响应 res.apiSuccess / res.apiError
  *
+ * 会话管理（2026-01-21 新增）：
+ * - 登出时失效对应的会话记录
+ * - 支持强制登出时立即失效
+ *
  * 创建时间：2025-12-22
+ * 更新时间：2026-01-21（新增登出时失效会话）
  */
 
 const express = require('express')
@@ -24,6 +29,7 @@ const {
 } = require('../../../middleware/auth')
 const BeijingTimeHelper = require('../../../utils/timeHelper')
 const { getRateLimiter } = require('../../../middleware/RateLimiterMiddleware')
+const { AuthenticationSession } = require('../../../models') // 🆕 会话模型
 
 // 创建Token验证接口专用限流器
 const rateLimiter = getRateLimiter()
@@ -185,6 +191,7 @@ router.post('/refresh', async (req, res) => {
  */
 router.post('/logout', authenticateToken, async (req, res) => {
   const user_id = req.user.user_id
+  const sessionToken = req.user?.session_token
 
   /**
    * 🔐 安全升级：清除refresh_token Cookie
@@ -196,6 +203,29 @@ router.post('/logout', authenticateToken, async (req, res) => {
     sameSite: 'strict',
     path: '/api/v4/auth'
   })
+
+  /**
+   * 🆕 2026-01-21 会话管理：失效当前会话
+   *
+   * 业务规则：
+   * - 登出时立即失效当前会话
+   * - 会话失效后，敏感操作验证将被拒绝
+   * - JWT Token 仍有效（7天），但会话已失效
+   */
+  if (sessionToken) {
+    try {
+      const session = await AuthenticationSession.findByToken(sessionToken)
+      if (session) {
+        await session.deactivate('用户主动退出登录')
+        logger.info(
+          `🔐 [Session] 会话已失效: user_id=${user_id}, session_token=${sessionToken.substring(0, 8)}...`
+        )
+      }
+    } catch (sessionError) {
+      // 会话失效失败不阻塞登出流程
+      logger.warn(`⚠️ [Session] 会话失效失败（非致命）: ${sessionError.message}`)
+    }
+  }
 
   // 清除用户权限缓存
   await invalidateUserPermissions(user_id, 'user_logout', user_id)

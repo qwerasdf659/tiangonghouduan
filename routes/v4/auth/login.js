@@ -10,15 +10,23 @@
  * - 路由层只负责：认证/鉴权、参数校验、调用Service、统一响应
  * - 登录操作通过 UserService 处理
  *
+ * 会话管理（2026-01-21 新增）：
+ * - 登录成功后创建 AuthenticationSession 记录
+ * - 会话有效期：2小时（独立于JWT，可续期）
+ * - session_token 存入 JWT Payload，用于敏感操作验证
+ *
  * 创建时间：2025-12-22
+ * 更新时间：2026-01-21（新增会话存储功能）
  */
 
 const express = require('express')
 const router = express.Router()
+const { v4: uuidv4 } = require('uuid') // 🆕 用于生成会话令牌
 const logger = require('../../../utils/logger').logger
 const { generateTokens, getUserRoles } = require('../../../middleware/auth')
 const BeijingTimeHelper = require('../../../utils/timeHelper')
 const TransactionManager = require('../../../utils/TransactionManager')
+const { AuthenticationSession } = require('../../../models') // 🆕 会话模型
 
 /**
  * 🛡️ 用户登录（支持自动注册）
@@ -116,8 +124,39 @@ router.post('/login', async (req, res) => {
   // 更新最后登录时间和登录次数
   await UserService.updateLoginStats(user.user_id)
 
-  // 生成Token
-  const tokens = await generateTokens(user)
+  /**
+   * 🆕 2026-01-21 会话管理功能：创建认证会话记录
+   *
+   * 业务规则：
+   * - 生成唯一的 session_token (UUID v4)
+   * - 会话有效期：2小时（独立于JWT 7天有效期）
+   * - 敏感操作时自动续期30分钟
+   * - 强制登出时立即失效会话
+   *
+   * @see docs/会话管理功能补齐方案.md
+   */
+  const sessionToken = uuidv4()
+  const userType = userRoles.role_level >= 100 ? 'admin' : 'user'
+  const loginIp = req.ip || req.headers['x-forwarded-for']?.split(',')[0]?.trim() || null
+
+  try {
+    await AuthenticationSession.createSession({
+      session_token: sessionToken,
+      user_type: userType,
+      user_id: user.user_id,
+      login_ip: loginIp,
+      expires_in_minutes: 120 // 2小时短期会话（可续期）
+    })
+    logger.info(
+      `🔐 [Session] 会话创建成功: user_id=${user.user_id}, session_token=${sessionToken.substring(0, 8)}...`
+    )
+  } catch (sessionError) {
+    // 会话创建失败不阻塞登录流程，但记录警告日志
+    logger.warn(`⚠️ [Session] 会话创建失败（非致命）: ${sessionError.message}`)
+  }
+
+  // 生成Token（传入 session_token 关联会话）
+  const tokens = await generateTokens(user, { session_token: sessionToken })
 
   /**
    * 🔐 Token安全升级：通过HttpOnly Cookie设置refresh_token
@@ -315,8 +354,33 @@ router.post('/quick-login', async (req, res) => {
     `✅ 用户 ${mobile} 更新登录统计：last_login=${user.last_login}, login_count=${user.login_count}`
   )
 
-  // 生成JWT Token
-  const tokens = await generateTokens(user)
+  /**
+   * 🆕 2026-01-21 会话管理功能：创建认证会话记录（快速登录）
+   *
+   * 与普通登录相同的会话管理逻辑
+   * @see docs/会话管理功能补齐方案.md
+   */
+  const sessionToken = uuidv4()
+  const userType = userRoles.role_level >= 100 ? 'admin' : 'user'
+  const loginIp = req.ip || req.headers['x-forwarded-for']?.split(',')[0]?.trim() || null
+
+  try {
+    await AuthenticationSession.createSession({
+      session_token: sessionToken,
+      user_type: userType,
+      user_id: user.user_id,
+      login_ip: loginIp,
+      expires_in_minutes: 120 // 2小时短期会话（可续期）
+    })
+    logger.info(
+      `🔐 [Session] 快速登录会话创建成功: user_id=${user.user_id}, session_token=${sessionToken.substring(0, 8)}...`
+    )
+  } catch (sessionError) {
+    logger.warn(`⚠️ [Session] 快速登录会话创建失败（非致命）: ${sessionError.message}`)
+  }
+
+  // 生成JWT Token（传入 session_token 关联会话）
+  const tokens = await generateTokens(user, { session_token: sessionToken })
 
   /**
    * 🔐 Token安全升级：通过HttpOnly Cookie设置refresh_token
