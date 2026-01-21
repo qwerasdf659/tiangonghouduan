@@ -353,23 +353,23 @@ class LotteryConfigService {
     const { transaction } = options
 
     try {
-      const results = []
-
-      for (const [config_key, config_value] of Object.entries(configs)) {
-        const config = await this.LotteryStrategyConfig.upsertConfig(
-          config_group,
-          config_key,
-          config_value,
-          {
-            updated_by: admin_id,
-            transaction
-          }
-        )
-        results.push({
+      /*
+       * 🚀 使用 Promise.all 并行执行所有配置更新操作
+       * 每个配置项有唯一的 config_key，操作不同的数据库行，可以安全并行
+       */
+      const configEntries = Object.entries(configs)
+      const updatePromises = configEntries.map(([config_key, config_value]) =>
+        this.LotteryStrategyConfig.upsertConfig(config_group, config_key, config_value, {
+          updated_by: admin_id,
+          transaction
+        }).then(config => ({
           config_key,
           strategy_config_id: config.strategy_config_id
-        })
-      }
+        }))
+      )
+
+      // 并行等待所有配置更新完成
+      const results = await Promise.all(updatePromises)
 
       logger.info(`管理员 ${admin_id} 批量更新配置分组 ${config_group} 成功`, {
         config_count: results.length

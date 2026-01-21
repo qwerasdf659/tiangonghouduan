@@ -73,7 +73,8 @@ const AUDIT_TARGET_TYPES = Object.freeze({
 
   // ========== 系统配置 ==========
   SYSTEM_SETTING: 'system_setting',
-  POPUP_BANNER: 'popup_banner'
+  POPUP_BANNER: 'popup_banner',
+  FEATURE_FLAG: 'feature_flag'
 })
 
 /**
@@ -131,7 +132,8 @@ const TARGET_TYPE_LEGACY_MAPPING = Object.freeze({
 
   // ========== 系统配置（PascalCase → snake_case）==========
   SystemSetting: 'system_setting',
-  PopupBanner: 'popup_banner'
+  PopupBanner: 'popup_banner',
+  FeatureFlag: 'feature_flag'
 })
 
 /**
@@ -221,7 +223,8 @@ function getTargetTypeDisplayName(targetType) {
     market_listing: '市场挂牌',
     trade_order: '交易订单',
     system_setting: '系统设置',
-    popup_banner: '弹窗广告'
+    popup_banner: '弹窗广告',
+    feature_flag: '功能开关'
   }
 
   return displayNames[targetType] || targetType

@@ -45,6 +45,7 @@ const {
 } = require('../../../../models')
 const BeijingTimeHelper = require('../../../../utils/timeHelper')
 const AssetService = require('../../../AssetService')
+const { getInstance: getLotteryMetricsCollector } = require('../../../LotteryMetricsCollector') // 🆕 实时Redis指标采集
 
 /*
  * ========== Phase 9-16 增强：体验状态管理器 ==========
@@ -304,6 +305,28 @@ class SettleStage extends BaseStage {
         await transaction.commit()
         this.log('info', '结算事务已提交', { user_id, campaign_id, draw_id })
       }
+
+      /*
+       * ========== Phase P2 增强：Redis 实时指标采集 ==========
+       * 事务提交成功后，异步记录到 Redis 实时层
+       * - 用途：实时仪表板查询（低延迟）
+       * - 特点：fire-and-forget，不阻塞主流程
+       * - 数据流：Redis 实时层 → 小时聚合任务 → MySQL lottery_hourly_metrics
+       */
+      this._recordRealtimeMetrics({
+        campaign_id,
+        user_id,
+        draw_tier: final_tier,
+        prize_value: final_prize.prize_value_points || 0,
+        budget_tier: budget_data?.budget_tier || null,
+        mechanisms: decision_snapshot.experience_smoothing || {}
+      }).catch(redis_error => {
+        // Redis 记录失败不影响主业务，仅记录日志
+        this.log('warn', 'Redis 实时指标记录失败（非致命）', {
+          campaign_id,
+          error: redis_error.message
+        })
+      })
 
       // 构建返回数据
       const result = {
@@ -857,6 +880,59 @@ class SettleStage extends BaseStage {
         error: error.message
       })
     }
+  }
+
+  /**
+   * 记录实时指标到 Redis（事务提交后调用）
+   *
+   * 用途：
+   * - 实时仪表板查询（低延迟读取）
+   * - Redis INCR 原子操作确保高并发数据准确性
+   * - 数据保留 25 小时（比小时聚合周期多 1 小时容错）
+   *
+   * @param {Object} params - 参数对象
+   * @param {number} params.campaign_id - 活动ID
+   * @param {number} params.user_id - 用户ID
+   * @param {string} params.draw_tier - 抽奖档位 (high/mid/low/fallback)
+   * @param {number} params.prize_value - 奖品价值（积分）
+   * @param {string} params.budget_tier - 预算分层 (B0/B1/B2/B3)
+   * @param {Object} params.mechanisms - 体验机制触发情况
+   * @returns {Promise<void>} 无返回值，异步完成
+   * @private
+   */
+  async _recordRealtimeMetrics(params) {
+    const { campaign_id, user_id, draw_tier, prize_value, budget_tier, mechanisms } = params
+
+    const metrics_collector = getLotteryMetricsCollector()
+
+    // 解析机制触发情况
+    const mechanism_flags = {
+      pity_triggered:
+        mechanisms?.smoothing_applied &&
+        mechanisms?.applied_mechanisms?.some(m => m.type === 'pity'),
+      anti_empty_triggered: mechanisms?.anti_empty_result?.forced === true,
+      anti_high_triggered: mechanisms?.anti_high_result?.tier_capped === true,
+      luck_debt_triggered: mechanisms?.luck_debt_result?.debt_level !== 'none'
+    }
+
+    /*
+     * 记录到 Redis
+     * 🔴 修正参数名：LotteryMetricsCollector 期望 selected_tier 和 triggers
+     */
+    await metrics_collector.recordDraw({
+      campaign_id,
+      user_id,
+      selected_tier: draw_tier, // 映射 draw_tier → selected_tier
+      prize_value,
+      budget_tier,
+      triggers: mechanism_flags // 映射 mechanisms → triggers
+    })
+
+    this.log('debug', 'Redis 实时指标已记录', {
+      campaign_id,
+      user_id,
+      selected_tier: draw_tier
+    })
   }
 }
 

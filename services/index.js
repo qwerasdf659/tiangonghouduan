@@ -92,6 +92,7 @@ const LotteryTierRuleService = require('./LotteryTierRuleService') // 抽奖档�
 
 // P2 API覆盖率补齐 - 监控查询服务（2026-01-21）
 const LotteryMonitoringService = require('./LotteryMonitoringService') // 抽奖监控数据查询服务
+const LotteryStrategyStatsService = require('./LotteryStrategyStatsService') // 抽奖策略引擎监控仪表盘统计服务
 const TradeOrderQueryService = require('./TradeOrderQueryService') // 交易订单查询服务
 const UserPremiumQueryService = require('./UserPremiumQueryService') // 用户高级空间状态查询服务
 
@@ -339,6 +340,7 @@ class ServiceManager {
       this._services.set('lottery_monitoring', new LotteryMonitoringService(this.models)) // 抽奖监控数据查询服务
       this._services.set('trade_order_query', new TradeOrderQueryService(this.models)) // 交易订单查询服务
       this._services.set('user_premium_query', new UserPremiumQueryService(this.models)) // 用户高级空间状态查询服务
+      this._services.set('lottery_strategy_stats', new LotteryStrategyStatsService(this.models)) // 抽奖策略引擎监控仪表盘统计服务
 
       /**
        * V4.6 管线编排器（2026-01-19 Phase 5 迁移）

@@ -28,7 +28,7 @@
 
 const express = require('express')
 const router = express.Router()
-const { authenticateToken, requireAdmin } = require('../../../middleware/auth')
+const { authenticateToken, requireRole } = require('../../../middleware/auth')
 const logger = require('../../../utils/logger').logger
 const { Op } = require('sequelize')
 
@@ -100,55 +100,60 @@ function buildPaginationOptions(query, defaultSortBy = 'created_at') {
  * @query {number} [page=1] - 页码
  * @query {number} [page_size=20] - 每页数量
  */
-router.get('/lottery-clear-settings', authenticateToken, requireAdmin, async (req, res) => {
-  try {
-    const { user_id, admin_id, setting_type, start_date, end_date } = req.query
-    const pagination = buildPaginationOptions(req.query)
+router.get(
+  '/lottery-clear-settings',
+  authenticateToken,
+  requireRole(['admin', 'ops']),
+  async (req, res) => {
+    try {
+      const { user_id, admin_id, setting_type, start_date, end_date } = req.query
+      const pagination = buildPaginationOptions(req.query)
 
-    const { LotteryClearSettingRecord, User } = require('../../../models')
+      const { LotteryClearSettingRecord, User } = require('../../../models')
 
-    // 构建查询条件
-    const where = {}
-    if (user_id) where.user_id = parseInt(user_id)
-    if (admin_id) where.admin_id = parseInt(admin_id)
-    if (setting_type) where.setting_type = setting_type
-    if (start_date || end_date) {
-      where.created_at = {}
-      if (start_date) where.created_at[Op.gte] = new Date(start_date)
-      if (end_date) where.created_at[Op.lte] = new Date(end_date + ' 23:59:59')
+      // 构建查询条件
+      const where = {}
+      if (user_id) where.user_id = parseInt(user_id)
+      if (admin_id) where.admin_id = parseInt(admin_id)
+      if (setting_type) where.setting_type = setting_type
+      if (start_date || end_date) {
+        where.created_at = {}
+        if (start_date) where.created_at[Op.gte] = new Date(start_date)
+        if (end_date) where.created_at[Op.lte] = new Date(end_date + ' 23:59:59')
+      }
+
+      const { count, rows } = await LotteryClearSettingRecord.findAndCountAll({
+        where,
+        include: [
+          { model: User, as: 'user', attributes: ['user_id', 'nickname', 'mobile'] },
+          { model: User, as: 'admin', attributes: ['user_id', 'nickname', 'mobile'] }
+        ],
+        ...pagination
+      })
+
+      logger.info('查询抽奖清除设置记录成功', {
+        admin_id: req.user.user_id,
+        total: count,
+        page: pagination.page
+      })
+
+      return res.apiSuccess(
+        {
+          records: rows,
+          pagination: {
+            total: count,
+            page: pagination.page,
+            page_size: pagination.page_size,
+            total_pages: Math.ceil(count / pagination.page_size)
+          }
+        },
+        '获取抽奖清除设置记录列表成功'
+      )
+    } catch (error) {
+      return handleServiceError(error, res, '查询抽奖清除设置记录')
     }
-
-    const { count, rows } = await LotteryClearSettingRecord.findAndCountAll({
-      where,
-      include: [
-        { model: User, as: 'user', attributes: ['user_id', 'nickname', 'mobile'] },
-        { model: User, as: 'admin', attributes: ['user_id', 'nickname', 'mobile'] }
-      ],
-      ...pagination
-    })
-
-    logger.info('查询抽奖清除设置记录成功', {
-      admin_id: req.user.user_id,
-      total: count,
-      page: pagination.page
-    })
-
-    return res.apiSuccess(
-      {
-        records: rows,
-        pagination: {
-          total: count,
-          page: pagination.page,
-          page_size: pagination.page_size,
-          total_pages: Math.ceil(count / pagination.page_size)
-        }
-      },
-      '获取抽奖清除设置记录列表成功'
-    )
-  } catch (error) {
-    return handleServiceError(error, res, '查询抽奖清除设置记录')
   }
-})
+)
 
 /**
  * GET /api/v4/console/business-records/lottery-clear-settings/:record_id
@@ -158,7 +163,7 @@ router.get('/lottery-clear-settings', authenticateToken, requireAdmin, async (re
 router.get(
   '/lottery-clear-settings/:record_id',
   authenticateToken,
-  requireAdmin,
+  requireRole(['admin', 'ops']),
   async (req, res) => {
     try {
       const { record_id } = req.params
@@ -200,85 +205,95 @@ router.get(
  * @query {number} [page=1] - 页码
  * @query {number} [page_size=20] - 每页数量
  */
-router.get('/redemption-orders', authenticateToken, requireAdmin, async (req, res) => {
-  try {
-    const { status, redeemer_user_id, start_date, end_date } = req.query
-    const pagination = buildPaginationOptions(req.query)
+router.get(
+  '/redemption-orders',
+  authenticateToken,
+  requireRole(['admin', 'ops']),
+  async (req, res) => {
+    try {
+      const { status, redeemer_user_id, start_date, end_date } = req.query
+      const pagination = buildPaginationOptions(req.query)
 
-    const { RedemptionOrder, User, ItemInstance } = require('../../../models')
+      const { RedemptionOrder, User, ItemInstance } = require('../../../models')
 
-    // 构建查询条件
-    const where = {}
-    if (status) where.status = status
-    if (redeemer_user_id) where.redeemer_user_id = parseInt(redeemer_user_id)
-    if (start_date || end_date) {
-      where.created_at = {}
-      if (start_date) where.created_at[Op.gte] = new Date(start_date)
-      if (end_date) where.created_at[Op.lte] = new Date(end_date + ' 23:59:59')
-    }
+      // 构建查询条件
+      const where = {}
+      if (status) where.status = status
+      if (redeemer_user_id) where.redeemer_user_id = parseInt(redeemer_user_id)
+      if (start_date || end_date) {
+        where.created_at = {}
+        if (start_date) where.created_at[Op.gte] = new Date(start_date)
+        if (end_date) where.created_at[Op.lte] = new Date(end_date + ' 23:59:59')
+      }
 
-    const { count, rows } = await RedemptionOrder.findAndCountAll({
-      where,
-      include: [
-        { model: User, as: 'redeemer', attributes: ['user_id', 'nickname', 'mobile'] },
+      const { count, rows } = await RedemptionOrder.findAndCountAll({
+        where,
+        include: [
+          { model: User, as: 'redeemer', attributes: ['user_id', 'nickname', 'mobile'] },
+          {
+            model: ItemInstance,
+            as: 'item_instance',
+            attributes: ['item_instance_id', 'item_type', 'meta']
+          }
+        ],
+        ...pagination
+      })
+
+      logger.info('查询核销订单列表成功', {
+        admin_id: req.user.user_id,
+        total: count,
+        page: pagination.page
+      })
+
+      return res.apiSuccess(
         {
-          model: ItemInstance,
-          as: 'item_instance',
-          attributes: ['item_instance_id', 'item_type', 'meta']
-        }
-      ],
-      ...pagination
-    })
-
-    logger.info('查询核销订单列表成功', {
-      admin_id: req.user.user_id,
-      total: count,
-      page: pagination.page
-    })
-
-    return res.apiSuccess(
-      {
-        orders: rows,
-        pagination: {
-          total: count,
-          page: pagination.page,
-          page_size: pagination.page_size,
-          total_pages: Math.ceil(count / pagination.page_size)
-        }
-      },
-      '获取核销订单列表成功'
-    )
-  } catch (error) {
-    return handleServiceError(error, res, '查询核销订单列表')
+          orders: rows,
+          pagination: {
+            total: count,
+            page: pagination.page,
+            page_size: pagination.page_size,
+            total_pages: Math.ceil(count / pagination.page_size)
+          }
+        },
+        '获取核销订单列表成功'
+      )
+    } catch (error) {
+      return handleServiceError(error, res, '查询核销订单列表')
+    }
   }
-})
+)
 
 /**
  * GET /api/v4/console/business-records/redemption-orders/:order_id
  * @desc 获取核销订单详情
  * @access Admin only (role_level >= 100)
  */
-router.get('/redemption-orders/:order_id', authenticateToken, requireAdmin, async (req, res) => {
-  try {
-    const { order_id } = req.params
-    const { RedemptionOrder, User, ItemInstance } = require('../../../models')
+router.get(
+  '/redemption-orders/:order_id',
+  authenticateToken,
+  requireRole(['admin', 'ops']),
+  async (req, res) => {
+    try {
+      const { order_id } = req.params
+      const { RedemptionOrder, User, ItemInstance } = require('../../../models')
 
-    const order = await RedemptionOrder.findByPk(order_id, {
-      include: [
-        { model: User, as: 'redeemer', attributes: ['user_id', 'nickname', 'mobile'] },
-        { model: ItemInstance, as: 'item_instance' }
-      ]
-    })
+      const order = await RedemptionOrder.findByPk(order_id, {
+        include: [
+          { model: User, as: 'redeemer', attributes: ['user_id', 'nickname', 'mobile'] },
+          { model: ItemInstance, as: 'item_instance' }
+        ]
+      })
 
-    if (!order) {
-      return res.apiError('订单不存在', 'NOT_FOUND', null, 404)
+      if (!order) {
+        return res.apiError('订单不存在', 'NOT_FOUND', null, 404)
+      }
+
+      return res.apiSuccess(order, '获取核销订单详情成功')
+    } catch (error) {
+      return handleServiceError(error, res, '获取核销订单详情')
     }
-
-    return res.apiSuccess(order, '获取核销订单详情成功')
-  } catch (error) {
-    return handleServiceError(error, res, '获取核销订单详情')
   }
-})
+)
 
 /*
  * =================================================================
@@ -300,77 +315,87 @@ router.get('/redemption-orders/:order_id', authenticateToken, requireAdmin, asyn
  * @query {number} [page=1] - 页码
  * @query {number} [page_size=20] - 每页数量
  */
-router.get('/content-reviews', authenticateToken, requireAdmin, async (req, res) => {
-  try {
-    const { auditable_type, audit_status, auditor_id, priority, start_date, end_date } = req.query
-    const pagination = buildPaginationOptions(req.query, 'submitted_at')
+router.get(
+  '/content-reviews',
+  authenticateToken,
+  requireRole(['admin', 'ops']),
+  async (req, res) => {
+    try {
+      const { auditable_type, audit_status, auditor_id, priority, start_date, end_date } = req.query
+      const pagination = buildPaginationOptions(req.query, 'submitted_at')
 
-    const { ContentReviewRecord, User } = require('../../../models')
+      const { ContentReviewRecord, User } = require('../../../models')
 
-    // 构建查询条件
-    const where = {}
-    if (auditable_type) where.auditable_type = auditable_type
-    if (audit_status) where.audit_status = audit_status
-    if (auditor_id) where.auditor_id = parseInt(auditor_id)
-    if (priority) where.priority = priority
-    if (start_date || end_date) {
-      where.submitted_at = {}
-      if (start_date) where.submitted_at[Op.gte] = new Date(start_date)
-      if (end_date) where.submitted_at[Op.lte] = new Date(end_date + ' 23:59:59')
+      // 构建查询条件
+      const where = {}
+      if (auditable_type) where.auditable_type = auditable_type
+      if (audit_status) where.audit_status = audit_status
+      if (auditor_id) where.auditor_id = parseInt(auditor_id)
+      if (priority) where.priority = priority
+      if (start_date || end_date) {
+        where.submitted_at = {}
+        if (start_date) where.submitted_at[Op.gte] = new Date(start_date)
+        if (end_date) where.submitted_at[Op.lte] = new Date(end_date + ' 23:59:59')
+      }
+
+      const { count, rows } = await ContentReviewRecord.findAndCountAll({
+        where,
+        include: [{ model: User, as: 'auditor', attributes: ['user_id', 'nickname', 'mobile'] }],
+        ...pagination
+      })
+
+      logger.info('查询内容审核记录成功', {
+        admin_id: req.user.user_id,
+        total: count,
+        page: pagination.page
+      })
+
+      return res.apiSuccess(
+        {
+          records: rows,
+          pagination: {
+            total: count,
+            page: pagination.page,
+            page_size: pagination.page_size,
+            total_pages: Math.ceil(count / pagination.page_size)
+          }
+        },
+        '获取内容审核记录列表成功'
+      )
+    } catch (error) {
+      return handleServiceError(error, res, '查询内容审核记录')
     }
-
-    const { count, rows } = await ContentReviewRecord.findAndCountAll({
-      where,
-      include: [{ model: User, as: 'auditor', attributes: ['user_id', 'nickname', 'mobile'] }],
-      ...pagination
-    })
-
-    logger.info('查询内容审核记录成功', {
-      admin_id: req.user.user_id,
-      total: count,
-      page: pagination.page
-    })
-
-    return res.apiSuccess(
-      {
-        records: rows,
-        pagination: {
-          total: count,
-          page: pagination.page,
-          page_size: pagination.page_size,
-          total_pages: Math.ceil(count / pagination.page_size)
-        }
-      },
-      '获取内容审核记录列表成功'
-    )
-  } catch (error) {
-    return handleServiceError(error, res, '查询内容审核记录')
   }
-})
+)
 
 /**
  * GET /api/v4/console/business-records/content-reviews/:audit_id
  * @desc 获取内容审核记录详情
  * @access Admin only (role_level >= 100)
  */
-router.get('/content-reviews/:audit_id', authenticateToken, requireAdmin, async (req, res) => {
-  try {
-    const { audit_id } = req.params
-    const { ContentReviewRecord, User } = require('../../../models')
+router.get(
+  '/content-reviews/:audit_id',
+  authenticateToken,
+  requireRole(['admin', 'ops']),
+  async (req, res) => {
+    try {
+      const { audit_id } = req.params
+      const { ContentReviewRecord, User } = require('../../../models')
 
-    const record = await ContentReviewRecord.findByPk(parseInt(audit_id), {
-      include: [{ model: User, as: 'auditor', attributes: ['user_id', 'nickname', 'mobile'] }]
-    })
+      const record = await ContentReviewRecord.findByPk(parseInt(audit_id), {
+        include: [{ model: User, as: 'auditor', attributes: ['user_id', 'nickname', 'mobile'] }]
+      })
 
-    if (!record) {
-      return res.apiError('审核记录不存在', 'NOT_FOUND', null, 404)
+      if (!record) {
+        return res.apiError('审核记录不存在', 'NOT_FOUND', null, 404)
+      }
+
+      return res.apiSuccess(record, '获取内容审核记录详情成功')
+    } catch (error) {
+      return handleServiceError(error, res, '获取内容审核记录详情')
     }
-
-    return res.apiSuccess(record, '获取内容审核记录详情成功')
-  } catch (error) {
-    return handleServiceError(error, res, '获取内容审核记录详情')
   }
-})
+)
 
 /*
  * =================================================================
@@ -392,83 +417,93 @@ router.get('/content-reviews/:audit_id', authenticateToken, requireAdmin, async 
  * @query {number} [page=1] - 页码
  * @query {number} [page_size=20] - 每页数量
  */
-router.get('/user-role-changes', authenticateToken, requireAdmin, async (req, res) => {
-  try {
-    const { user_id, operator_id, old_role, new_role, start_date, end_date } = req.query
-    const pagination = buildPaginationOptions(req.query)
+router.get(
+  '/user-role-changes',
+  authenticateToken,
+  requireRole(['admin', 'ops']),
+  async (req, res) => {
+    try {
+      const { user_id, operator_id, old_role, new_role, start_date, end_date } = req.query
+      const pagination = buildPaginationOptions(req.query)
 
-    const { UserRoleChangeRecord, User } = require('../../../models')
+      const { UserRoleChangeRecord, User } = require('../../../models')
 
-    // 构建查询条件
-    const where = {}
-    if (user_id) where.user_id = parseInt(user_id)
-    if (operator_id) where.operator_id = parseInt(operator_id)
-    if (old_role) where.old_role = old_role
-    if (new_role) where.new_role = new_role
-    if (start_date || end_date) {
-      where.created_at = {}
-      if (start_date) where.created_at[Op.gte] = new Date(start_date)
-      if (end_date) where.created_at[Op.lte] = new Date(end_date + ' 23:59:59')
+      // 构建查询条件
+      const where = {}
+      if (user_id) where.user_id = parseInt(user_id)
+      if (operator_id) where.operator_id = parseInt(operator_id)
+      if (old_role) where.old_role = old_role
+      if (new_role) where.new_role = new_role
+      if (start_date || end_date) {
+        where.created_at = {}
+        if (start_date) where.created_at[Op.gte] = new Date(start_date)
+        if (end_date) where.created_at[Op.lte] = new Date(end_date + ' 23:59:59')
+      }
+
+      const { count, rows } = await UserRoleChangeRecord.findAndCountAll({
+        where,
+        include: [
+          { model: User, as: 'user', attributes: ['user_id', 'nickname', 'mobile'] },
+          { model: User, as: 'operator', attributes: ['user_id', 'nickname', 'mobile'] }
+        ],
+        ...pagination
+      })
+
+      logger.info('查询用户角色变更记录成功', {
+        admin_id: req.user.user_id,
+        total: count,
+        page: pagination.page
+      })
+
+      return res.apiSuccess(
+        {
+          records: rows,
+          pagination: {
+            total: count,
+            page: pagination.page,
+            page_size: pagination.page_size,
+            total_pages: Math.ceil(count / pagination.page_size)
+          }
+        },
+        '获取用户角色变更记录列表成功'
+      )
+    } catch (error) {
+      return handleServiceError(error, res, '查询用户角色变更记录')
     }
-
-    const { count, rows } = await UserRoleChangeRecord.findAndCountAll({
-      where,
-      include: [
-        { model: User, as: 'user', attributes: ['user_id', 'nickname', 'mobile'] },
-        { model: User, as: 'operator', attributes: ['user_id', 'nickname', 'mobile'] }
-      ],
-      ...pagination
-    })
-
-    logger.info('查询用户角色变更记录成功', {
-      admin_id: req.user.user_id,
-      total: count,
-      page: pagination.page
-    })
-
-    return res.apiSuccess(
-      {
-        records: rows,
-        pagination: {
-          total: count,
-          page: pagination.page,
-          page_size: pagination.page_size,
-          total_pages: Math.ceil(count / pagination.page_size)
-        }
-      },
-      '获取用户角色变更记录列表成功'
-    )
-  } catch (error) {
-    return handleServiceError(error, res, '查询用户角色变更记录')
   }
-})
+)
 
 /**
  * GET /api/v4/console/business-records/user-role-changes/:record_id
  * @desc 获取用户角色变更记录详情
  * @access Admin only (role_level >= 100)
  */
-router.get('/user-role-changes/:record_id', authenticateToken, requireAdmin, async (req, res) => {
-  try {
-    const { record_id } = req.params
-    const { UserRoleChangeRecord, User } = require('../../../models')
+router.get(
+  '/user-role-changes/:record_id',
+  authenticateToken,
+  requireRole(['admin', 'ops']),
+  async (req, res) => {
+    try {
+      const { record_id } = req.params
+      const { UserRoleChangeRecord, User } = require('../../../models')
 
-    const record = await UserRoleChangeRecord.findByPk(parseInt(record_id), {
-      include: [
-        { model: User, as: 'user', attributes: ['user_id', 'nickname', 'mobile'] },
-        { model: User, as: 'operator', attributes: ['user_id', 'nickname', 'mobile'] }
-      ]
-    })
+      const record = await UserRoleChangeRecord.findByPk(parseInt(record_id), {
+        include: [
+          { model: User, as: 'user', attributes: ['user_id', 'nickname', 'mobile'] },
+          { model: User, as: 'operator', attributes: ['user_id', 'nickname', 'mobile'] }
+        ]
+      })
 
-    if (!record) {
-      return res.apiError('记录不存在', 'NOT_FOUND', null, 404)
+      if (!record) {
+        return res.apiError('记录不存在', 'NOT_FOUND', null, 404)
+      }
+
+      return res.apiSuccess(record, '获取用户角色变更记录详情成功')
+    } catch (error) {
+      return handleServiceError(error, res, '获取用户角色变更记录详情')
     }
-
-    return res.apiSuccess(record, '获取用户角色变更记录详情成功')
-  } catch (error) {
-    return handleServiceError(error, res, '获取用户角色变更记录详情')
   }
-})
+)
 
 /*
  * =================================================================
@@ -490,83 +525,93 @@ router.get('/user-role-changes/:record_id', authenticateToken, requireAdmin, asy
  * @query {number} [page=1] - 页码
  * @query {number} [page_size=20] - 每页数量
  */
-router.get('/user-status-changes', authenticateToken, requireAdmin, async (req, res) => {
-  try {
-    const { user_id, operator_id, old_status, new_status, start_date, end_date } = req.query
-    const pagination = buildPaginationOptions(req.query)
+router.get(
+  '/user-status-changes',
+  authenticateToken,
+  requireRole(['admin', 'ops']),
+  async (req, res) => {
+    try {
+      const { user_id, operator_id, old_status, new_status, start_date, end_date } = req.query
+      const pagination = buildPaginationOptions(req.query)
 
-    const { UserStatusChangeRecord, User } = require('../../../models')
+      const { UserStatusChangeRecord, User } = require('../../../models')
 
-    // 构建查询条件
-    const where = {}
-    if (user_id) where.user_id = parseInt(user_id)
-    if (operator_id) where.operator_id = parseInt(operator_id)
-    if (old_status) where.old_status = old_status
-    if (new_status) where.new_status = new_status
-    if (start_date || end_date) {
-      where.created_at = {}
-      if (start_date) where.created_at[Op.gte] = new Date(start_date)
-      if (end_date) where.created_at[Op.lte] = new Date(end_date + ' 23:59:59')
+      // 构建查询条件
+      const where = {}
+      if (user_id) where.user_id = parseInt(user_id)
+      if (operator_id) where.operator_id = parseInt(operator_id)
+      if (old_status) where.old_status = old_status
+      if (new_status) where.new_status = new_status
+      if (start_date || end_date) {
+        where.created_at = {}
+        if (start_date) where.created_at[Op.gte] = new Date(start_date)
+        if (end_date) where.created_at[Op.lte] = new Date(end_date + ' 23:59:59')
+      }
+
+      const { count, rows } = await UserStatusChangeRecord.findAndCountAll({
+        where,
+        include: [
+          { model: User, as: 'user', attributes: ['user_id', 'nickname', 'mobile'] },
+          { model: User, as: 'operator', attributes: ['user_id', 'nickname', 'mobile'] }
+        ],
+        ...pagination
+      })
+
+      logger.info('查询用户状态变更记录成功', {
+        admin_id: req.user.user_id,
+        total: count,
+        page: pagination.page
+      })
+
+      return res.apiSuccess(
+        {
+          records: rows,
+          pagination: {
+            total: count,
+            page: pagination.page,
+            page_size: pagination.page_size,
+            total_pages: Math.ceil(count / pagination.page_size)
+          }
+        },
+        '获取用户状态变更记录列表成功'
+      )
+    } catch (error) {
+      return handleServiceError(error, res, '查询用户状态变更记录')
     }
-
-    const { count, rows } = await UserStatusChangeRecord.findAndCountAll({
-      where,
-      include: [
-        { model: User, as: 'user', attributes: ['user_id', 'nickname', 'mobile'] },
-        { model: User, as: 'operator', attributes: ['user_id', 'nickname', 'mobile'] }
-      ],
-      ...pagination
-    })
-
-    logger.info('查询用户状态变更记录成功', {
-      admin_id: req.user.user_id,
-      total: count,
-      page: pagination.page
-    })
-
-    return res.apiSuccess(
-      {
-        records: rows,
-        pagination: {
-          total: count,
-          page: pagination.page,
-          page_size: pagination.page_size,
-          total_pages: Math.ceil(count / pagination.page_size)
-        }
-      },
-      '获取用户状态变更记录列表成功'
-    )
-  } catch (error) {
-    return handleServiceError(error, res, '查询用户状态变更记录')
   }
-})
+)
 
 /**
  * GET /api/v4/console/business-records/user-status-changes/:record_id
  * @desc 获取用户状态变更记录详情
  * @access Admin only (role_level >= 100)
  */
-router.get('/user-status-changes/:record_id', authenticateToken, requireAdmin, async (req, res) => {
-  try {
-    const { record_id } = req.params
-    const { UserStatusChangeRecord, User } = require('../../../models')
+router.get(
+  '/user-status-changes/:record_id',
+  authenticateToken,
+  requireRole(['admin', 'ops']),
+  async (req, res) => {
+    try {
+      const { record_id } = req.params
+      const { UserStatusChangeRecord, User } = require('../../../models')
 
-    const record = await UserStatusChangeRecord.findByPk(parseInt(record_id), {
-      include: [
-        { model: User, as: 'user', attributes: ['user_id', 'nickname', 'mobile'] },
-        { model: User, as: 'operator', attributes: ['user_id', 'nickname', 'mobile'] }
-      ]
-    })
+      const record = await UserStatusChangeRecord.findByPk(parseInt(record_id), {
+        include: [
+          { model: User, as: 'user', attributes: ['user_id', 'nickname', 'mobile'] },
+          { model: User, as: 'operator', attributes: ['user_id', 'nickname', 'mobile'] }
+        ]
+      })
 
-    if (!record) {
-      return res.apiError('记录不存在', 'NOT_FOUND', null, 404)
+      if (!record) {
+        return res.apiError('记录不存在', 'NOT_FOUND', null, 404)
+      }
+
+      return res.apiSuccess(record, '获取用户状态变更记录详情成功')
+    } catch (error) {
+      return handleServiceError(error, res, '获取用户状态变更记录详情')
     }
-
-    return res.apiSuccess(record, '获取用户状态变更记录详情成功')
-  } catch (error) {
-    return handleServiceError(error, res, '获取用户状态变更记录详情')
   }
-})
+)
 
 /*
  * =================================================================
@@ -588,87 +633,97 @@ router.get('/user-status-changes/:record_id', authenticateToken, requireAdmin, a
  * @query {number} [page=1] - 页码
  * @query {number} [page_size=20] - 每页数量
  */
-router.get('/exchange-records', authenticateToken, requireAdmin, async (req, res) => {
-  try {
-    const { user_id, item_id, status, order_no, start_date, end_date } = req.query
-    const pagination = buildPaginationOptions(req.query)
+router.get(
+  '/exchange-records',
+  authenticateToken,
+  requireRole(['admin', 'ops']),
+  async (req, res) => {
+    try {
+      const { user_id, item_id, status, order_no, start_date, end_date } = req.query
+      const pagination = buildPaginationOptions(req.query)
 
-    const { ExchangeRecord, User, ExchangeItem } = require('../../../models')
+      const { ExchangeRecord, User, ExchangeItem } = require('../../../models')
 
-    // 构建查询条件
-    const where = {}
-    if (user_id) where.user_id = parseInt(user_id)
-    if (item_id) where.item_id = parseInt(item_id)
-    if (status) where.status = status
-    if (order_no) where.order_no = { [Op.like]: `%${order_no}%` }
-    if (start_date || end_date) {
-      where.created_at = {}
-      if (start_date) where.created_at[Op.gte] = new Date(start_date)
-      if (end_date) where.created_at[Op.lte] = new Date(end_date + ' 23:59:59')
-    }
+      // 构建查询条件
+      const where = {}
+      if (user_id) where.user_id = parseInt(user_id)
+      if (item_id) where.item_id = parseInt(item_id)
+      if (status) where.status = status
+      if (order_no) where.order_no = { [Op.like]: `%${order_no}%` }
+      if (start_date || end_date) {
+        where.created_at = {}
+        if (start_date) where.created_at[Op.gte] = new Date(start_date)
+        if (end_date) where.created_at[Op.lte] = new Date(end_date + ' 23:59:59')
+      }
 
-    const { count, rows } = await ExchangeRecord.findAndCountAll({
-      where,
-      include: [
-        { model: User, as: 'user', attributes: ['user_id', 'nickname', 'mobile'] },
+      const { count, rows } = await ExchangeRecord.findAndCountAll({
+        where,
+        include: [
+          { model: User, as: 'user', attributes: ['user_id', 'nickname', 'mobile'] },
+          {
+            model: ExchangeItem,
+            as: 'item',
+            attributes: ['item_id', 'name', 'cost_asset_code', 'cost_amount']
+          }
+        ],
+        ...pagination
+      })
+
+      logger.info('查询B2C兑换记录成功', {
+        admin_id: req.user.user_id,
+        total: count,
+        page: pagination.page
+      })
+
+      return res.apiSuccess(
         {
-          model: ExchangeItem,
-          as: 'item',
-          attributes: ['item_id', 'name', 'cost_asset_code', 'cost_amount']
-        }
-      ],
-      ...pagination
-    })
-
-    logger.info('查询B2C兑换记录成功', {
-      admin_id: req.user.user_id,
-      total: count,
-      page: pagination.page
-    })
-
-    return res.apiSuccess(
-      {
-        records: rows,
-        pagination: {
-          total: count,
-          page: pagination.page,
-          page_size: pagination.page_size,
-          total_pages: Math.ceil(count / pagination.page_size)
-        }
-      },
-      '获取B2C兑换记录列表成功'
-    )
-  } catch (error) {
-    return handleServiceError(error, res, '查询B2C兑换记录')
+          records: rows,
+          pagination: {
+            total: count,
+            page: pagination.page,
+            page_size: pagination.page_size,
+            total_pages: Math.ceil(count / pagination.page_size)
+          }
+        },
+        '获取B2C兑换记录列表成功'
+      )
+    } catch (error) {
+      return handleServiceError(error, res, '查询B2C兑换记录')
+    }
   }
-})
+)
 
 /**
  * GET /api/v4/console/business-records/exchange-records/:record_id
  * @desc 获取B2C兑换记录详情
  * @access Admin only (role_level >= 100)
  */
-router.get('/exchange-records/:record_id', authenticateToken, requireAdmin, async (req, res) => {
-  try {
-    const { record_id } = req.params
-    const { ExchangeRecord, User, ExchangeItem } = require('../../../models')
+router.get(
+  '/exchange-records/:record_id',
+  authenticateToken,
+  requireRole(['admin', 'ops']),
+  async (req, res) => {
+    try {
+      const { record_id } = req.params
+      const { ExchangeRecord, User, ExchangeItem } = require('../../../models')
 
-    const record = await ExchangeRecord.findByPk(parseInt(record_id), {
-      include: [
-        { model: User, as: 'user', attributes: ['user_id', 'nickname', 'mobile'] },
-        { model: ExchangeItem, as: 'item' }
-      ]
-    })
+      const record = await ExchangeRecord.findByPk(parseInt(record_id), {
+        include: [
+          { model: User, as: 'user', attributes: ['user_id', 'nickname', 'mobile'] },
+          { model: ExchangeItem, as: 'item' }
+        ]
+      })
 
-    if (!record) {
-      return res.apiError('记录不存在', 'NOT_FOUND', null, 404)
+      if (!record) {
+        return res.apiError('记录不存在', 'NOT_FOUND', null, 404)
+      }
+
+      return res.apiSuccess(record, '获取B2C兑换记录详情成功')
+    } catch (error) {
+      return handleServiceError(error, res, '获取B2C兑换记录详情')
     }
-
-    return res.apiSuccess(record, '获取B2C兑换记录详情成功')
-  } catch (error) {
-    return handleServiceError(error, res, '获取B2C兑换记录详情')
   }
-})
+)
 
 /*
  * =================================================================
@@ -693,7 +748,7 @@ router.get('/exchange-records/:record_id', authenticateToken, requireAdmin, asyn
  * @query {number} [page=1] - 页码
  * @query {number} [page_size=20] - 每页数量
  */
-router.get('/chat-messages', authenticateToken, requireAdmin, async (req, res) => {
+router.get('/chat-messages', authenticateToken, requireRole(['admin', 'ops']), async (req, res) => {
   try {
     const {
       session_id,
@@ -772,43 +827,48 @@ router.get('/chat-messages', authenticateToken, requireAdmin, async (req, res) =
  * @desc 获取聊天消息详情
  * @access Admin only (role_level >= 100)
  */
-router.get('/chat-messages/:message_id', authenticateToken, requireAdmin, async (req, res) => {
-  try {
-    const { message_id } = req.params
-    const { ChatMessage, User, CustomerServiceSession } = require('../../../models')
+router.get(
+  '/chat-messages/:message_id',
+  authenticateToken,
+  requireRole(['admin', 'ops']),
+  async (req, res) => {
+    try {
+      const { message_id } = req.params
+      const { ChatMessage, User, CustomerServiceSession } = require('../../../models')
 
-    const message = await ChatMessage.findByPk(parseInt(message_id), {
-      include: [
-        {
-          model: User,
-          as: 'sender',
-          attributes: ['user_id', 'nickname', 'mobile'],
-          required: false
-        },
-        {
-          model: CustomerServiceSession,
-          as: 'session',
-          attributes: ['session_id', 'user_id', 'status', 'admin_id', 'created_at'],
-          required: false
-        },
-        {
-          model: ChatMessage,
-          as: 'replyTo',
-          attributes: ['message_id', 'content', 'sender_type', 'created_at'],
-          required: false
-        }
-      ]
-    })
+      const message = await ChatMessage.findByPk(parseInt(message_id), {
+        include: [
+          {
+            model: User,
+            as: 'sender',
+            attributes: ['user_id', 'nickname', 'mobile'],
+            required: false
+          },
+          {
+            model: CustomerServiceSession,
+            as: 'session',
+            attributes: ['session_id', 'user_id', 'status', 'admin_id', 'created_at'],
+            required: false
+          },
+          {
+            model: ChatMessage,
+            as: 'replyTo',
+            attributes: ['message_id', 'content', 'sender_type', 'created_at'],
+            required: false
+          }
+        ]
+      })
 
-    if (!message) {
-      return res.apiError('消息不存在', 'NOT_FOUND', null, 404)
+      if (!message) {
+        return res.apiError('消息不存在', 'NOT_FOUND', null, 404)
+      }
+
+      return res.apiSuccess(message, '获取聊天消息详情成功')
+    } catch (error) {
+      return handleServiceError(error, res, '获取聊天消息详情')
     }
-
-    return res.apiSuccess(message, '获取聊天消息详情成功')
-  } catch (error) {
-    return handleServiceError(error, res, '获取聊天消息详情')
   }
-})
+)
 
 /**
  * GET /api/v4/console/business-records/chat-messages/statistics/summary
@@ -821,7 +881,7 @@ router.get('/chat-messages/:message_id', authenticateToken, requireAdmin, async 
 router.get(
   '/chat-messages/statistics/summary',
   authenticateToken,
-  requireAdmin,
+  requireRole(['admin', 'ops']),
   async (req, res) => {
     try {
       const { start_date, end_date } = req.query

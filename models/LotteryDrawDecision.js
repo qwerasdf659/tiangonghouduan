@@ -273,7 +273,7 @@ module.exports = sequelize => {
        * 匹配原因
        * 简要说明为什么命中此规则/档位
        */
-      match_reason: {
+      matched_reason: {
         type: DataTypes.STRING(255),
         allowNull: true,
         comment: '匹配原因说明（如："new_user分层命中high档位"）'

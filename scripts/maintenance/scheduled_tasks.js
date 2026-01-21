@@ -64,6 +64,10 @@ const DailyOrphanFrozenCheck = require('../../jobs/daily-orphan-frozen-check')
 const DailyImageResourceQualityCheck = require('../../jobs/daily-image-resource-quality-check')
 // 2026-01-19新增：定价配置定时生效（Phase 3 统一抽奖架构）
 const HourlyPricingConfigScheduler = require('../../jobs/hourly-pricing-config-scheduler')
+// 2026-01-23新增：抽奖策略引擎监控 - 小时级指标聚合
+const HourlyLotteryMetricsAggregation = require('../../jobs/hourly-lottery-metrics-aggregation')
+// 2026-01-23新增：抽奖策略引擎监控 - 日报级指标聚合
+const DailyLotteryMetricsAggregation = require('../../jobs/daily-lottery-metrics-aggregation')
 
 /**
  * 定时任务管理类
@@ -210,6 +214,12 @@ class ScheduledTasks {
 
     // 任务22: 每小时第10分钟检查定价配置定时生效（2026-01-19新增 - Phase 3 统一抽奖架构）
     this.scheduleHourlyPricingConfigActivation()
+
+    // 任务23: 每小时整点执行抽奖指标小时聚合（2026-01-23新增 - 策略引擎监控方案）
+    this.scheduleHourlyLotteryMetricsAggregation()
+
+    // 任务24: 每天凌晨1点执行抽奖指标日报聚合（2026-01-23新增 - 策略引擎监控方案）
+    this.scheduleDailyLotteryMetricsAggregation()
 
     logger.info('所有定时任务已初始化完成')
   }
@@ -2195,6 +2205,180 @@ class ScheduledTasks {
       return result
     } catch (error) {
       logger.error('[手动触发] 定价配置定时生效检查失败', { error: error.message })
+      throw error
+    }
+  }
+
+  /**
+   * 定时任务23: 每小时整点执行抽奖指标小时聚合
+   * Cron表达式: 0 * * * * (每小时整点)
+   *
+   * 业务场景：
+   * - 将 Redis 中实时采集的抽奖指标聚合到 MySQL lottery_hourly_metrics 表
+   * - 清理已聚合的 Redis 数据，保持数据新鲜度
+   * - 支持分布式锁，避免多实例重复执行
+   *
+   * @returns {void}
+   *
+   * @since 2026-01-23
+   * @see docs/抽奖策略引擎监控方案.md
+   */
+  static scheduleHourlyLotteryMetricsAggregation() {
+    cron.schedule('0 * * * *', async () => {
+      const lockKey = 'lock:hourly_lottery_metrics_aggregation'
+      const lockValue = `${process.pid}_${Date.now()}`
+      let redisClient = null
+
+      try {
+        // 获取 Redis 客户端
+        const { getRawClient } = require('../../utils/UnifiedRedisClient')
+        redisClient = getRawClient()
+
+        // 尝试获取分布式锁（5分钟过期）
+        const acquired = await redisClient.set(lockKey, lockValue, 'EX', 300, 'NX')
+
+        if (!acquired) {
+          logger.info('[定时任务] 其他实例正在执行抽奖指标小时聚合，跳过')
+          return
+        }
+
+        logger.info('[定时任务] 获取分布式锁成功，开始执行抽奖指标小时聚合...', {
+          lock_key: lockKey,
+          lock_value: lockValue
+        })
+
+        // 调用 Job 类执行
+        const job = new HourlyLotteryMetricsAggregation()
+        await job.execute()
+
+        logger.info('[定时任务] 抽奖指标小时聚合完成')
+      } catch (error) {
+        logger.error('[定时任务] 抽奖指标小时聚合失败', {
+          error: error.message,
+          stack: error.stack
+        })
+      } finally {
+        // 释放分布式锁
+        if (redisClient) {
+          try {
+            await redisClient.del(lockKey)
+          } catch (unlockError) {
+            logger.error('[定时任务] 释放分布式锁失败', { error: unlockError.message })
+          }
+        }
+      }
+    })
+
+    logger.info('✅ 定时任务已设置: 抽奖指标小时聚合（每小时整点执行，支持分布式锁）')
+  }
+
+  /**
+   * 定时任务24: 每天凌晨1点执行抽奖指标日报聚合
+   * Cron表达式: 0 1 * * * (每天凌晨1点)
+   *
+   * 业务场景：
+   * - 将 lottery_hourly_metrics 的小时数据聚合到 lottery_daily_metrics 日报表
+   * - 用于长期历史分析和运营决策
+   * - 支持分布式锁，避免多实例重复执行
+   *
+   * @returns {void}
+   *
+   * @since 2026-01-23
+   * @see docs/抽奖策略引擎监控方案.md
+   */
+  static scheduleDailyLotteryMetricsAggregation() {
+    cron.schedule('0 1 * * *', async () => {
+      const lockKey = 'lock:daily_lottery_metrics_aggregation'
+      const lockValue = `${process.pid}_${Date.now()}`
+      let redisClient = null
+
+      try {
+        // 获取 Redis 客户端
+        const { getRawClient } = require('../../utils/UnifiedRedisClient')
+        redisClient = getRawClient()
+
+        // 尝试获取分布式锁（10分钟过期）
+        const acquired = await redisClient.set(lockKey, lockValue, 'EX', 600, 'NX')
+
+        if (!acquired) {
+          logger.info('[定时任务] 其他实例正在执行抽奖指标日报聚合，跳过')
+          return
+        }
+
+        logger.info('[定时任务] 获取分布式锁成功，开始执行抽奖指标日报聚合...', {
+          lock_key: lockKey,
+          lock_value: lockValue
+        })
+
+        // 调用 Job 类执行
+        const job = new DailyLotteryMetricsAggregation()
+        await job.execute()
+
+        logger.info('[定时任务] 抽奖指标日报聚合完成')
+      } catch (error) {
+        logger.error('[定时任务] 抽奖指标日报聚合失败', {
+          error: error.message,
+          stack: error.stack
+        })
+      } finally {
+        // 释放分布式锁
+        if (redisClient) {
+          try {
+            await redisClient.del(lockKey)
+          } catch (unlockError) {
+            logger.error('[定时任务] 释放分布式锁失败', { error: unlockError.message })
+          }
+        }
+      }
+    })
+
+    logger.info('✅ 定时任务已设置: 抽奖指标日报聚合（每天凌晨1点执行，支持分布式锁）')
+  }
+
+  /**
+   * 手动触发抽奖指标小时聚合（用于测试）
+   *
+   * 业务场景：手动执行抽奖指标小时聚合，用于开发调试和即时检查
+   *
+   * @param {string} [target_hour_bucket] - 可选，指定要聚合的小时桶 (YYYY-MM-DD-HH)
+   * @returns {Promise<void>} 执行完成
+   *
+   * @example
+   * const ScheduledTasks = require('./scripts/maintenance/scheduled-tasks')
+   * await ScheduledTasks.manualHourlyLotteryMetricsAggregation()
+   */
+  static async manualHourlyLotteryMetricsAggregation(target_hour_bucket = null) {
+    try {
+      logger.info('[手动触发] 开始执行抽奖指标小时聚合...')
+      const job = new HourlyLotteryMetricsAggregation()
+      await job.execute(target_hour_bucket)
+      logger.info('[手动触发] 抽奖指标小时聚合完成')
+    } catch (error) {
+      logger.error('[手动触发] 抽奖指标小时聚合失败', { error: error.message })
+      throw error
+    }
+  }
+
+  /**
+   * 手动触发抽奖指标日报聚合（用于测试）
+   *
+   * 业务场景：手动执行抽奖指标日报聚合，用于开发调试和即时检查
+   *
+   * @param {string} [target_date] - 可选，指定要聚合的日期 (YYYY-MM-DD)
+   * @returns {Promise<void>} 执行完成
+   *
+   * @example
+   * const ScheduledTasks = require('./scripts/maintenance/scheduled-tasks')
+   * await ScheduledTasks.manualDailyLotteryMetricsAggregation('2026-01-22')
+   */
+  static async manualDailyLotteryMetricsAggregation(target_date = null) {
+    try {
+      logger.info('[手动触发] 开始执行抽奖指标日报聚合...')
+      const job = new DailyLotteryMetricsAggregation()
+      await job.execute(target_date)
+      logger.info('[手动触发] 抽奖指标日报聚合完成')
+    } catch (error) {
+      logger.error('[手动触发] 抽奖指标日报聚合失败', { error: error.message })
       throw error
     }
   }

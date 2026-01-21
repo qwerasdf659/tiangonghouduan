@@ -108,6 +108,34 @@ class BeijingTimeHelper {
   }
 
   /**
+   * 格式化时间为指定格式（北京时间）
+   * 支持格式：YYYY-MM-DD, YYYY-MM-DD HH:mm:ss, YYYY-MM-DD HH:00:00 等
+   * @param {Date|string} date - 输入时间
+   * @param {string} formatStr - 格式字符串（默认 'YYYY-MM-DD HH:mm:ss'）
+   * @returns {string} 格式化后的时间字符串
+   */
+  static format(date = new Date(), formatStr = 'YYYY-MM-DD HH:mm:ss') {
+    const inputDate = new Date(date)
+    // 转换为北京时间
+    const beijingDate = new Date(inputDate.toLocaleString('en-US', { timeZone: 'Asia/Shanghai' }))
+
+    const year = beijingDate.getFullYear()
+    const month = String(beijingDate.getMonth() + 1).padStart(2, '0')
+    const day = String(beijingDate.getDate()).padStart(2, '0')
+    const hours = String(beijingDate.getHours()).padStart(2, '0')
+    const minutes = String(beijingDate.getMinutes()).padStart(2, '0')
+    const seconds = String(beijingDate.getSeconds()).padStart(2, '0')
+
+    return formatStr
+      .replace('YYYY', year)
+      .replace('MM', month)
+      .replace('DD', day)
+      .replace('HH', hours)
+      .replace('mm', minutes)
+      .replace('ss', seconds)
+  }
+
+  /**
    * 获取今日开始时间（北京时间）
    * @returns {Date} 今日00:00:00的Date对象
    */
@@ -127,6 +155,30 @@ class BeijingTimeHelper {
     const today = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Shanghai' }))
     today.setHours(23, 59, 59, 999)
     return today
+  }
+
+  /**
+   * 获取指定日期的开始时间（北京时间 00:00:00）
+   * @param {Date|string} date - 输入日期
+   * @returns {Date} 该日期 00:00:00 的 Date 对象
+   */
+  static startOfDay(date = new Date()) {
+    const inputDate = new Date(date)
+    const beijingDate = new Date(inputDate.toLocaleString('en-US', { timeZone: 'Asia/Shanghai' }))
+    beijingDate.setHours(0, 0, 0, 0)
+    return beijingDate
+  }
+
+  /**
+   * 获取指定日期的结束时间（北京时间 23:59:59.999）
+   * @param {Date|string} date - 输入日期
+   * @returns {Date} 该日期 23:59:59.999 的 Date 对象
+   */
+  static endOfDay(date = new Date()) {
+    const inputDate = new Date(date)
+    const beijingDate = new Date(inputDate.toLocaleString('en-US', { timeZone: 'Asia/Shanghai' }))
+    beijingDate.setHours(23, 59, 59, 999)
+    return beijingDate
   }
 
   /**

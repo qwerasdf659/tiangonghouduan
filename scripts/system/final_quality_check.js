@@ -160,7 +160,7 @@ class FinalQualityChecker {
 
     try {
       const dbCheck = await execAsync(
-        'node scripts/database/database-toolkit.js --action=check 2>&1'
+        'node scripts/database/database_toolkit.js --action=check 2>&1'
       )
 
       this.results.databaseHealth = {

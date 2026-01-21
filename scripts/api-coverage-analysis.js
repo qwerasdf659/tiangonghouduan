@@ -173,19 +173,124 @@ async function main() {
       searchPatterns
     )
     
-    // 判断是否有对外API（更严格的检测）
+    // 判断是否有对外API（v2.1 改进的检测逻辑）
+    // 策略1：路由文件直接引用表名/模型名
+    // 策略2：服务文件在 console 路由中被调用（通过 ServiceManager）
+    // 策略3：表名映射到特定的路由文件（如 popup_banners -> popup-banners.js）
     let hasExternalAPI = false
     let apiEndpoints = []
+    let matchedRouteFiles = []
     
+    // 策略1：直接引用检测
     for (const route of routeUsages) {
       const fullPath = path.join(projectRoot, route.file)
       const content = fs.readFileSync(fullPath, 'utf8')
-      // 检查是否有路由定义，并且是console路由
       const isConsoleRoute = route.file.includes('console') || route.file.includes('v4')
       const routeMatches = content.match(/router\.(get|post|put|delete|patch)\s*\(\s*['"`][^'"`]+['"`]/gi) || []
       if (routeMatches.length > 0 && isConsoleRoute) {
         hasExternalAPI = true
         apiEndpoints = routeMatches.slice(0, 5).map(m => m.replace(/router\./, '').trim())
+        matchedRouteFiles.push(route.file)
+      }
+    }
+    
+    // 策略2：通过 ServiceManager 间接引用检测
+    // 根据服务文件名推断对应的路由文件
+    if (!hasExternalAPI && serviceUsages.length > 0) {
+      const consoleRoutesDir = path.join(projectRoot, 'routes', 'v4', 'console')
+      
+      // 表名到路由文件的映射（常见模式）
+      const tableToRouteMap = {
+        'popup_banners': 'popup-banners.js',
+        'administrative_regions': 'regions.js',
+        'item_templates': 'item-templates.js',
+        'lottery_presets': 'lottery-presets.js',
+        'lottery_tier_rules': 'lottery-tier-rules.js',
+        'user_risk_profiles': 'risk-profiles.js',
+        'system_settings': 'settings.js',
+        'user_hierarchy': 'user-hierarchy.js',
+        'material_conversion_rules': 'material.js',
+        'material_asset_types': 'material.js',
+        'lottery_draw_quota_rules': 'lottery-quota.js',
+        'lottery_management_settings': 'lottery-management/interventions.js',
+        'preset_budget_debt': 'debt-management.js',
+        'preset_inventory_debt': 'debt-management.js',
+        'preset_debt_limits': 'debt-management.js',
+        'admin_operation_logs': 'admin-audit-logs.js',
+        'consumption_records': 'consumption.js',
+        'image_resources': 'images.js',
+        'trade_orders': 'trade-orders.js',
+        'user_premium_status': 'user-premium.js',
+        'store_staff': 'staff.js',
+        'customer_service_sessions': 'customer-service/sessions.js',
+        'lottery_user_experience_state': 'lottery-monitoring.js',
+        'lottery_user_global_state': 'lottery-monitoring.js',
+        'lottery_campaign_user_quota': 'lottery-monitoring.js',
+        'lottery_campaign_quota_grants': 'lottery-monitoring.js',
+        'item_instance_events': 'business-records.js',
+        'risk_alerts': 'risk-alerts.js',
+        'websocket_startup_logs': 'system-data.js',
+        'lottery_draw_decisions': 'business-records.js',
+        'api_idempotency_requests': 'system-data.js',
+        'authentication_sessions': 'system-data.js'
+      }
+      
+      // 检查映射的路由文件是否存在
+      const mappedRouteFile = tableToRouteMap[tableName]
+      if (mappedRouteFile) {
+        const routeFilePath = path.join(consoleRoutesDir, mappedRouteFile)
+        if (fs.existsSync(routeFilePath)) {
+          try {
+            const routeContent = fs.readFileSync(routeFilePath, 'utf8')
+            const routeMatches = routeContent.match(/router\.(get|post|put|delete|patch)\s*\(\s*['"`][^'"`]+['"`]/gi) || []
+            if (routeMatches.length > 0) {
+              hasExternalAPI = true
+              apiEndpoints = routeMatches.slice(0, 5).map(m => m.replace(/router\./, '').trim())
+              matchedRouteFiles.push(`routes/v4/console/${mappedRouteFile}`)
+            }
+          } catch (e) {
+            // 忽略读取错误
+          }
+        }
+      }
+      
+      // 策略3：通过服务文件名推断路由文件名（如 PopupBannerService -> popup-banners.js）
+      if (!hasExternalAPI) {
+        for (const serviceFile of serviceUsages.map(s => s.file)) {
+          // 从服务文件名提取关键词
+          const serviceName = path.basename(serviceFile, '.js')
+          // PopupBannerService -> popup-banner
+          const routeNameBase = serviceName
+            .replace(/Service$/i, '')
+            .replace(/([A-Z])/g, (m, p1, offset) => offset ? `-${p1.toLowerCase()}` : p1.toLowerCase())
+          
+          // 尝试多种路由文件名格式
+          const possibleRouteFiles = [
+            `${routeNameBase}.js`,
+            `${routeNameBase}s.js`,
+            `${routeNameBase.replace(/-/g, '_')}.js`
+          ]
+          
+          for (const routeFileName of possibleRouteFiles) {
+            const routeFilePath = path.join(consoleRoutesDir, routeFileName)
+            if (fs.existsSync(routeFilePath)) {
+              try {
+                const routeContent = fs.readFileSync(routeFilePath, 'utf8')
+                const routeMatches = routeContent.match(/router\.(get|post|put|delete|patch)\s*\(\s*['"`][^'"`]+['"`]/gi) || []
+                if (routeMatches.length > 0) {
+                  hasExternalAPI = true
+                  apiEndpoints = routeMatches.slice(0, 5).map(m => m.replace(/router\./, '').trim())
+                  matchedRouteFiles.push(`routes/v4/console/${routeFileName}`)
+                  break
+                }
+              } catch (e) {
+                // 忽略
+              }
+            }
+          }
+          
+          if (hasExternalAPI) break
+        }
       }
     }
     
@@ -197,8 +302,8 @@ async function main() {
       model_exists: modelExists,
       service_usage: serviceUsages.length > 0,
       service_files: [...new Set(serviceUsages.map(s => s.file))],
-      route_usage: routeUsages.length > 0,
-      route_files: [...new Set(routeUsages.map(r => r.file))],
+      route_usage: routeUsages.length > 0 || matchedRouteFiles.length > 0,
+      route_files: [...new Set([...routeUsages.map(r => r.file), ...matchedRouteFiles])],
       has_external_api: hasExternalAPI,
       api_endpoints: apiEndpoints,
       status: ''

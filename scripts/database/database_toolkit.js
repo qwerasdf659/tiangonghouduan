@@ -28,6 +28,9 @@
 
 'use strict'
 
+// 🔴 脚本独立运行时需要加载环境变量
+require('dotenv').config()
+
 const { sequelize } = require('../../models')
 const BeijingTimeHelper = require('../../utils/timeHelper')
 
@@ -136,7 +139,21 @@ async function checkDatabaseIntegrity() {
 
     for (const fk of foreignKeys) {
       try {
-        // 查询孤儿记录
+        /*
+         * 检查表是否有 is_deleted 字段（支持软删除的表）
+         * 如果有，则在孤儿记录检查中排除已软删除的记录
+         * 因为软删除的记录在业务上已经"不存在"，不应计入活跃孤儿数据
+         */
+        const [columns] = await sequelize.query(`
+          SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS 
+          WHERE TABLE_SCHEMA = DATABASE() 
+            AND TABLE_NAME = '${fk.TABLE_NAME}' 
+            AND COLUMN_NAME = 'is_deleted'
+        `)
+        const hasSoftDelete = columns.length > 0
+        const softDeleteCondition = hasSoftDelete ? `AND (is_deleted = 0 OR is_deleted IS NULL)` : ''
+
+        // 查询孤儿记录（排除软删除的记录）
         const [orphans] = await sequelize.query(`
           SELECT COUNT(*) as count
           FROM \`${fk.TABLE_NAME}\`
@@ -145,6 +162,7 @@ async function checkDatabaseIntegrity() {
             FROM \`${fk.REFERENCED_TABLE_NAME}\`
           )
           AND \`${fk.COLUMN_NAME}\` IS NOT NULL
+          ${softDeleteCondition}
         `)
 
         const orphanCount = orphans[0].count
@@ -164,6 +182,7 @@ async function checkDatabaseIntegrity() {
               FROM \`${fk.REFERENCED_TABLE_NAME}\`
             )
             AND \`${fk.COLUMN_NAME}\` IS NOT NULL
+            ${softDeleteCondition}
             GROUP BY \`${fk.COLUMN_NAME}\`
             LIMIT 5
           `)

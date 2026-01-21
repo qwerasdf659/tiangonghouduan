@@ -245,7 +245,7 @@ router.get('/matrix/:id', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const service = getLotteryConfigService(req)
     const { id } = req.params
-    const result = await service.getTierMatrixConfigById(parseInt(id))
+    const result = await service.getMatrixConfigById(parseInt(id))
 
     return res.apiSuccess(result, '获取矩阵配置详情成功')
   } catch (error) {
@@ -276,7 +276,7 @@ router.post('/matrix', authenticateToken, requireAdmin, async (req, res) => {
     const admin_id = req.user.user_id
 
     const result = await TransactionManager.execute(async transaction => {
-      return await service.createTierMatrixConfig(req.body, admin_id, { transaction })
+      return await service.createMatrixConfig(req.body, admin_id, { transaction })
     })
 
     return res.apiSuccess(result, '创建矩阵配置成功')
@@ -309,7 +309,7 @@ router.put('/matrix/:id', authenticateToken, requireAdmin, async (req, res) => {
     const admin_id = req.user.user_id
 
     const result = await TransactionManager.execute(async transaction => {
-      return await service.updateTierMatrixConfig(parseInt(id), req.body, admin_id, { transaction })
+      return await service.updateMatrixConfig(parseInt(id), req.body, admin_id, { transaction })
     })
 
     return res.apiSuccess(result, '更新矩阵配置成功')
@@ -334,7 +334,7 @@ router.delete('/matrix/:id', authenticateToken, requireAdmin, async (req, res) =
     const admin_id = req.user.user_id
 
     await TransactionManager.execute(async transaction => {
-      await service.deleteTierMatrixConfig(parseInt(id), admin_id, { transaction })
+      await service.deleteMatrixConfig(parseInt(id), admin_id, { transaction })
     })
 
     return res.apiSuccess(null, '删除矩阵配置成功')

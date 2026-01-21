@@ -50,6 +50,8 @@ const userPremiumRoutes = require('./user-premium') // 🆕 用户高级空间�
 const adminAuditLogsRoutes = require('./admin-audit-logs') // 🆕 管理员操作审计日志（2026-01-22 P1 API覆盖率补齐）
 const businessRecordsRoutes = require('./business-records') // 🆕 业务记录查询（2026-01-22 P1 API覆盖率补齐）
 const systemDataRoutes = require('./system-data') // 🆕 系统数据查询（2026-01-22 P1 API覆盖率补齐）
+const featureFlagsRoutes = require('./feature-flags') // 🆕 功能开关管理（2026-01-21 Feature Flag 灰度发布）
+const lotteryStrategyStatsRoutes = require('./lottery-strategy-stats') // 🆕 抽奖策略统计（2026-01-22 策略引擎监控方案）
 
 // 挂载子模块路由
 router.use('/auth', authRoutes)
@@ -91,6 +93,8 @@ router.use('/user-premium', userPremiumRoutes) // 🆕 用户高级空间状态�
 router.use('/admin-audit-logs', adminAuditLogsRoutes) // 🆕 管理员操作审计日志路由（2026-01-22 P1 API覆盖率补齐）
 router.use('/business-records', businessRecordsRoutes) // 🆕 业务记录查询路由（2026-01-22 P1 API覆盖率补齐）
 router.use('/system-data', systemDataRoutes) // 🆕 系统数据查询路由（2026-01-22 P1 API覆盖率补齐）
+router.use('/feature-flags', featureFlagsRoutes) // 🆕 功能开关管理路由（2026-01-21 Feature Flag 灰度发布）
+router.use('/lottery-strategy-stats', lotteryStrategyStatsRoutes) // 🆕 抽奖策略统计路由（2026-01-22 策略引擎监控方案）
 
 /**
  * GET / - Admin API根路径信息
@@ -516,6 +520,19 @@ router.get('/', (req, res) => {
           '/system-data/lottery-daily-quotas/:quota_id'
         ],
         note: '系统级数据只读查询（accounts/user_roles/market_listings/lottery_campaigns/lottery_user_daily_draw_quota）；仅限 admin 访问'
+      },
+      feature_flags: {
+        description: '功能开关管理（2026-01-21 Feature Flag 灰度发布）',
+        endpoints: [
+          '/feature-flags',
+          '/feature-flags/:flagKey',
+          '/feature-flags/:flagKey/toggle',
+          '/feature-flags/:flagKey/whitelist',
+          '/feature-flags/:flagKey/blacklist',
+          '/feature-flags/:flagKey/check/:userId',
+          '/feature-flags/batch-check'
+        ],
+        note: '功能开关CRUD、启用/禁用、白名单/黑名单管理、用户可用性检查；仅限 admin 访问'
       }
       // ⚠️ campaign_permissions模块暂未实现，待实现后再添加到此列表
     },

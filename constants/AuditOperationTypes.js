@@ -205,7 +205,36 @@ const OPERATION_TYPES = Object.freeze({
    * 消费审核（审核通过/拒绝）
    * @description 管理员审核用户的消费记录
    */
-  CONSUMPTION_AUDIT: 'consumption_audit'
+  CONSUMPTION_AUDIT: 'consumption_audit',
+
+  // ==================== 功能开关类（Feature Flag V4.6.0 新增）====================
+  /**
+   * 功能开关创建
+   * @description 管理员创建新的功能开关
+   * @example FeatureFlagService.createFlag()
+   */
+  FEATURE_FLAG_CREATE: 'feature_flag_create',
+
+  /**
+   * 功能开关更新
+   * @description 管理员更新功能开关配置
+   * @example FeatureFlagService.updateFlag()
+   */
+  FEATURE_FLAG_UPDATE: 'feature_flag_update',
+
+  /**
+   * 功能开关删除
+   * @description 管理员删除功能开关
+   * @example FeatureFlagService.deleteFlag()
+   */
+  FEATURE_FLAG_DELETE: 'feature_flag_delete',
+
+  /**
+   * 功能开关启用/禁用
+   * @description 管理员切换功能开关状态
+   * @example FeatureFlagService.toggleFlag()
+   */
+  FEATURE_FLAG_TOGGLE: 'feature_flag_toggle'
 })
 
 /**
@@ -278,7 +307,13 @@ const OPERATION_TYPE_DESCRIPTIONS = Object.freeze({
   [OPERATION_TYPES.SESSION_ASSIGN]: '客服会话分配',
 
   // 消费审核类
-  [OPERATION_TYPES.CONSUMPTION_AUDIT]: '消费审核'
+  [OPERATION_TYPES.CONSUMPTION_AUDIT]: '消费审核',
+
+  // 功能开关类（Feature Flag V4.6.0 新增）
+  [OPERATION_TYPES.FEATURE_FLAG_CREATE]: '功能开关创建',
+  [OPERATION_TYPES.FEATURE_FLAG_UPDATE]: '功能开关更新',
+  [OPERATION_TYPES.FEATURE_FLAG_DELETE]: '功能开关删除',
+  [OPERATION_TYPES.FEATURE_FLAG_TOGGLE]: '功能开关启用/禁用'
 })
 
 /**
@@ -323,7 +358,11 @@ const CRITICAL_OPERATIONS = Object.freeze(
     OPERATION_TYPES.LOTTERY_CLEAR_SETTINGS, // 清除设置 - 批量影响抽奖配置
 
     // ========== 市场交易关键操作（C2C Phase 2 新增）==========
-    OPERATION_TYPES.MARKET_LISTING_ADMIN_WITHDRAW // 市场挂牌强制撤回 - 影响卖家资产和交易
+    OPERATION_TYPES.MARKET_LISTING_ADMIN_WITHDRAW, // 市场挂牌强制撤回 - 影响卖家资产和交易
+
+    // ========== 功能开关关键操作（Feature Flag V4.6.0 新增）==========
+    OPERATION_TYPES.FEATURE_FLAG_DELETE, // 功能开关删除 - 不可恢复的破坏性操作
+    OPERATION_TYPES.FEATURE_FLAG_TOGGLE // 功能开关切换 - 影响系统功能可用性
   ])
 )
 

@@ -1061,6 +1061,192 @@ class LotteryComputeEngine {
       grayscale_decisions // 返回灰度判断详情，便于调试
     }
   }
+
+  // ==================== Feature Flag 服务集成（V4.6.0 灰度发布） ====================
+
+  /**
+   * 检查功能是否对特定用户启用（使用 FeatureFlagService 数据库配置）
+   *
+   * 与 checkFeatureWithGrayscale 的区别：
+   * - checkFeatureWithGrayscale：使用 StrategyConfig 的环境变量配置
+   * - checkFeatureWithFeatureFlag：使用 FeatureFlagService 的数据库配置
+   *
+   * 推荐使用场景：
+   * - 需要动态调整灰度配置而无需重启服务
+   * - 需要精细化的用户分群控制
+   * - 需要审计日志记录配置变更
+   *
+   * @param {string} feature - 特性名称（对应 flag_key）
+   * @param {number} user_id - 用户ID
+   * @param {Object} options - 额外选项
+   * @returns {Promise<Object>} 判定结果，包含 enabled、reason、strategy 字段
+   *
+   * @example
+   * // 检查 Pity 系统是否对用户启用
+   * const result = await engine.checkFeatureWithFeatureFlag('lottery_pity_system', userId)
+   * if (result.enabled) {
+   *   // 执行 Pity 逻辑
+   * }
+   */
+  async checkFeatureWithFeatureFlag(feature, user_id, options = {}) {
+    try {
+      // 延迟加载 FeatureFlagService（避免循环依赖）
+      const FeatureFlagService = require('../../FeatureFlagService')
+      return await FeatureFlagService.isEnabled(feature, user_id, options)
+    } catch (error) {
+      this._log('warn', 'Feature Flag 服务调用失败，降级到环境变量配置', {
+        feature,
+        user_id,
+        error: error.message
+      })
+      // 降级到环境变量配置
+      return this.checkFeatureWithGrayscale(feature, { user_id })
+    }
+  }
+
+  /**
+   * 使用 Feature Flag 服务应用体验平滑机制（V4.6.0 灰度发布集成）
+   *
+   * 与 applyExperienceSmoothingWithGrayscale 的区别：
+   * - applyExperienceSmoothingWithGrayscale：使用环境变量配置
+   * - applyExperienceSmoothingWithFeatureFlag：使用数据库配置（FeatureFlagService）
+   *
+   * @param {Object} params - 参数对象
+   * @param {number} params.user_id - 用户ID
+   * @param {number} params.campaign_id - 活动ID
+   * @param {string} params.selected_tier - 当前选择的档位
+   * @param {Object} params.tier_weights - 档位权重
+   * @param {Object} params.experience_state - 体验状态
+   * @returns {Promise<Object>} 平滑处理结果
+   */
+  async applyExperienceSmoothingWithFeatureFlag(params) {
+    const { user_id, campaign_id, selected_tier, tier_weights, experience_state } = params
+
+    this._log('debug', '开始应用体验平滑（Feature Flag）', {
+      user_id,
+      campaign_id,
+      selected_tier
+    })
+
+    let final_tier = selected_tier
+    let final_weights = { ...tier_weights }
+    const applied_mechanisms = []
+    const feature_flag_decisions = {}
+
+    // 1. Pity 系统（通过 FeatureFlagService 判断）
+    const pity_decision = await this.checkFeatureWithFeatureFlag('lottery_pity_system', user_id)
+    feature_flag_decisions.pity = pity_decision
+
+    if (pity_decision.enabled && experience_state) {
+      const pity_result = this._applyPitySystem({
+        empty_streak: experience_state.empty_streak || 0,
+        tier_weights: final_weights
+      })
+
+      if (pity_result.pity_triggered) {
+        final_weights = pity_result.adjusted_weights
+        applied_mechanisms.push({
+          type: 'pity',
+          empty_streak: experience_state.empty_streak,
+          boost_multiplier: pity_result.boost_multiplier,
+          feature_flag_reason: pity_decision.reason,
+          feature_flag_strategy: pity_decision.strategy
+        })
+      }
+    }
+
+    // 2. AntiEmpty（通过 FeatureFlagService 判断）
+    const anti_empty_decision = await this.checkFeatureWithFeatureFlag(
+      'lottery_anti_empty_streak',
+      user_id
+    )
+    feature_flag_decisions.anti_empty = anti_empty_decision
+
+    if (anti_empty_decision.enabled && experience_state) {
+      const anti_empty_result = this._applyAntiEmptyStreak({
+        empty_streak: experience_state.empty_streak || 0,
+        selected_tier: final_tier,
+        tier_weights: final_weights
+      })
+
+      if (anti_empty_result.forced_non_empty) {
+        final_tier = anti_empty_result.forced_tier
+        applied_mechanisms.push({
+          type: 'anti_empty',
+          empty_streak: experience_state.empty_streak,
+          forced_tier: final_tier,
+          feature_flag_reason: anti_empty_decision.reason
+        })
+      }
+    }
+
+    // 3. AntiHigh（通过 FeatureFlagService 判断）
+    const anti_high_decision = await this.checkFeatureWithFeatureFlag(
+      'lottery_anti_high_streak',
+      user_id
+    )
+    feature_flag_decisions.anti_high = anti_high_decision
+
+    if (anti_high_decision.enabled && experience_state) {
+      const anti_high_result = this._applyAntiHighStreak({
+        recent_high_count: experience_state.recent_high_count || 0,
+        selected_tier: final_tier,
+        tier_weights: final_weights
+      })
+
+      if (anti_high_result.tier_capped) {
+        final_tier = anti_high_result.capped_tier
+        applied_mechanisms.push({
+          type: 'anti_high',
+          recent_high_count: experience_state.recent_high_count,
+          capped_tier: final_tier,
+          feature_flag_reason: anti_high_decision.reason
+        })
+      }
+    }
+
+    return {
+      smoothing_applied: applied_mechanisms.length > 0,
+      final_tier,
+      final_weights,
+      applied_mechanisms,
+      feature_flag_decisions // 返回 Feature Flag 判断详情
+    }
+  }
+
+  /**
+   * 获取运气债务乘数（使用 Feature Flag 服务）
+   *
+   * @param {Object} params - 参数对象
+   * @param {number} params.user_id - 用户ID
+   * @param {Object} params.user_stats - 用户统计数据
+   * @returns {Promise<Object>} 包含 multiplier、enabled、reason 等字段的结果对象
+   */
+  async getLuckDebtMultiplierWithFeatureFlag(params) {
+    const { user_id, user_stats } = params
+
+    // 检查运气债务功能是否启用
+    const decision = await this.checkFeatureWithFeatureFlag('lottery_luck_debt', user_id)
+
+    if (!decision.enabled) {
+      return {
+        multiplier: 1.0,
+        enabled: false,
+        reason: decision.reason,
+        feature_flag_strategy: decision.strategy
+      }
+    }
+
+    // 调用实际的运气债务计算
+    const luckDebtResult = this._applyLuckDebt(user_stats)
+
+    return {
+      ...luckDebtResult,
+      enabled: true,
+      feature_flag_reason: decision.reason,
+      feature_flag_strategy: decision.strategy
+    }
+  }
 }
 
 /* 导出类和常量 */

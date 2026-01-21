@@ -373,7 +373,19 @@ const CANONICAL_OPERATION_MAP = {
   '/api/v4/debug-control/log-level': 'DEBUG_LOG_LEVEL', // 日志级别调整
   '/api/v4/debug-control/user-debug': 'DEBUG_USER_DEBUG', // 用户调试
   '/api/v4/debug-control/session-debug': 'DEBUG_SESSION', // 会话调试
-  '/api/v4/debug-control/clear-debug': 'DEBUG_CLEAR' // 清除调试
+  '/api/v4/debug-control/clear-debug': 'DEBUG_CLEAR', // 清除调试
+
+  /*
+   * ===============================================================
+   * 功能开关管理（2026-01-21 Feature Flag 灰度发布）
+   * flag_key 是配置实体业务码（如 lottery_pity_system），使用 :code
+   * ===============================================================
+   */
+  '/api/v4/console/feature-flags/': 'ADMIN_FEATURE_FLAG_CREATE', // 创建功能开关
+  '/api/v4/console/feature-flags/:code': 'ADMIN_FEATURE_FLAG_UPDATE', // 更新或删除功能开关（PUT/DELETE）
+  '/api/v4/console/feature-flags/:code/toggle': 'ADMIN_FEATURE_FLAG_TOGGLE', // 切换功能开关状态
+  '/api/v4/console/feature-flags/:code/whitelist': 'ADMIN_FEATURE_FLAG_WHITELIST', // 白名单管理（POST/DELETE）
+  '/api/v4/console/feature-flags/:code/blacklist': 'ADMIN_FEATURE_FLAG_BLACKLIST' // 黑名单管理（POST/DELETE）
 }
 
 /**
@@ -544,7 +556,8 @@ class IdempotencyService {
       /\/(roles)\/([A-Za-z][A-Za-z0-9_]*)(?=\/|$)/g, // 角色定义
       /\/(campaigns)\/([A-Za-z][A-Za-z0-9_]*)(?=\/|$)/g, // 抽奖活动
       /\/(prize-pool)\/(?!prize(?:\/|$)|batch-add(?:\/|$)|list(?:\/|$))([A-Za-z][A-Za-z0-9_]*)(?=\/|$)/g, // 奖品池（按活动，排除固定路径段）
-      /\/(settings)\/([A-Za-z][A-Za-z0-9_]*)(?=\/|$)/g // 系统设置
+      /\/(settings)\/([A-Za-z][A-Za-z0-9_]*)(?=\/|$)/g, // 系统设置
+      /\/(feature-flags)\/([A-Za-z][A-Za-z0-9_]*)(?=\/|$)/g // 功能开关（flag_key 是业务码）
     ]
 
     configEntityPatterns.forEach(pattern => {

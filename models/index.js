@@ -540,6 +540,15 @@ models.LotteryHourlyMetrics = require('./LotteryHourlyMetrics')(sequelize, DataT
  *    - 业务场景：实时监控空奖率/高价值率、Pity/AntiEmpty触发率、异常检测预警
  */
 
+models.LotteryDailyMetrics = require('./LotteryDailyMetrics')(sequelize, DataTypes)
+/*
+ * ✅ LotteryDailyMetrics：抽奖日报统计表（按日聚合）
+ *    - 用途：存储按日聚合的抽奖监控指标，用于长期历史分析和运营决策
+ *    - 特点：从小时级数据汇总、永久保留、支持跨活动对比分析
+ *    - 表名：lottery_daily_metrics，主键：daily_metric_id，唯一约束：campaign_id + metric_date
+ *    - 业务场景：日报生成、年度对比、运营决策、长期趋势分析
+ */
+
 models.LotteryStrategyConfig = require('./LotteryStrategyConfig')(sequelize, DataTypes)
 /*
  * ✅ LotteryStrategyConfig：抽奖策略全局配置表（Phase 3+ 动态配置）
@@ -557,6 +566,16 @@ models.LotteryTierMatrixConfig = require('./LotteryTierMatrixConfig')(sequelize,
  *    - 特点：12种组合（4个Budget Tier × 3个Pressure Tier）、cap乘数、空奖权重乘数
  *    - 表名：lottery_tier_matrix_config，主键：matrix_config_id
  *    - 业务场景：根据用户预算和活动压力动态调整奖品分布
+ */
+
+// 🔴 V4.6 功能开关系统（Feature Flag - 2026-01-21）
+models.FeatureFlag = require('./FeatureFlag')(sequelize, DataTypes)
+/*
+ * ✅ FeatureFlag：功能开关表
+ *    - 用途：全系统通用的功能开关和灰度发布控制
+ *    - 特点：百分比灰度、用户白名单/黑名单、时间窗口、用户分群
+ *    - 表名：feature_flags，主键：flag_id，唯一约束：flag_key
+ *    - 业务场景：新功能灰度发布、A/B测试、紧急降级开关
  */
 
 // 🔴 设置模型关联关系
