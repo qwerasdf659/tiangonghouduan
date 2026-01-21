@@ -11,7 +11,11 @@
  * - 严格遵循项目 snake_case 命名规范
  * - 使用 res.apiSuccess/res.apiError 统一响应格式
  *
- * @version 1.0.0
+ * 服务合并记录（2026-01-21）：
+ * - 原 TradeOrderQueryService 已合并到 TradeOrderService
+ * - 本路由现使用 TradeOrderService 的静态查询方法
+ *
+ * @version 1.1.0
  * @date 2026-01-21
  */
 
@@ -21,15 +25,7 @@ const express = require('express')
 const router = express.Router()
 const { authenticateToken, requireAdmin } = require('../../../middleware/auth')
 const logger = require('../../../utils/logger').logger
-
-/**
- * 获取 TradeOrderQueryService 的辅助函数
- * @param {Object} req - Express 请求对象
- * @returns {Object} TradeOrderQueryService 实例
- */
-function getTradeOrderQueryService(req) {
-  return req.app.locals.services.getService('trade_order_query')
-}
+const TradeOrderService = require('../../../services/TradeOrderService')
 
 /**
  * GET / - 查询交易订单列表
@@ -61,7 +57,7 @@ router.get('/', authenticateToken, requireAdmin, async (req, res) => {
       page_size = 20
     } = req.query
 
-    const result = await getTradeOrderQueryService(req).getOrders({
+    const result = await TradeOrderService.getOrders({
       buyer_user_id: buyer_user_id ? parseInt(buyer_user_id) : undefined,
       seller_user_id: seller_user_id ? parseInt(seller_user_id) : undefined,
       listing_id: listing_id ? parseInt(listing_id) : undefined,
@@ -101,7 +97,7 @@ router.get('/stats', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const { start_time, end_time, seller_user_id, buyer_user_id } = req.query
 
-    const stats = await getTradeOrderQueryService(req).getOrderStats({
+    const stats = await TradeOrderService.getOrderStats({
       start_time,
       end_time,
       seller_user_id: seller_user_id ? parseInt(seller_user_id) : undefined,
@@ -132,7 +128,7 @@ router.get('/user/:user_id/stats', authenticateToken, requireAdmin, async (req, 
   try {
     const user_id = parseInt(req.params.user_id)
 
-    const stats = await getTradeOrderQueryService(req).getUserTradeStats(user_id)
+    const stats = await TradeOrderService.getUserTradeStats(user_id)
 
     logger.info('获取用户交易统计', {
       admin_id: req.user.user_id,
@@ -158,7 +154,7 @@ router.get('/by-business-id/:business_id', authenticateToken, requireAdmin, asyn
   try {
     const { business_id } = req.params
 
-    const order = await getTradeOrderQueryService(req).getOrderByBusinessId(business_id)
+    const order = await TradeOrderService.getOrderByBusinessId(business_id)
 
     if (!order) {
       return res.apiError('订单不存在', 'ORDER_NOT_FOUND', null, 404)
@@ -183,7 +179,7 @@ router.get('/:id', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const order_id = parseInt(req.params.id)
 
-    const order = await getTradeOrderQueryService(req).getOrderById(order_id)
+    const order = await TradeOrderService.getOrderById(order_id)
 
     if (!order) {
       return res.apiError('订单不存在', 'ORDER_NOT_FOUND', null, 404)

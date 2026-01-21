@@ -1,5 +1,8 @@
 const logger = require('../utils/logger').logger
 
+// 引用统一中文显示名称映射（2026-01-21 新增）
+const { getDisplayName } = require('../constants/DisplayNames')
+
 /**
  * 餐厅积分抽奖系统 V4.0 - 统一审计日志服务（AuditLogService）
  *
@@ -927,9 +930,20 @@ class AuditLogService {
         `[审计日志] 管理员查询成功：找到${count}条日志，返回第${page}页（${rows.length}条）`
       )
 
+      // 添加中文显示名称（2026-01-21 新增）
+      const logsWithDisplayNames = rows.map(log => {
+        const logData = log.toJSON ? log.toJSON() : log
+        return {
+          ...logData,
+          operation_type_display: getDisplayName(logData.operation_type, 'operation_type'),
+          target_type_display: getDisplayName(logData.target_type, 'target_type'),
+          result_display: getDisplayName(logData.result, 'status')
+        }
+      })
+
       return {
         success: true,
-        logs: rows,
+        logs: logsWithDisplayNames,
         pagination: {
           total: count,
           page,

@@ -173,7 +173,8 @@ function renderOrders(orders) {
 
   tbody.innerHTML = orders
     .map(order => {
-      const statusBadge = getStatusBadge(order.status)
+      // 优先使用后端返回的中文名称字段
+      const statusBadge = getStatusBadge(order.status, order.status_display)
 
       // 从关联的listing获取资产信息
       const listing = order.listing || {}
@@ -220,16 +221,29 @@ function renderOrders(orders) {
  * - completed: 已完成（终态）
  * - cancelled: 已取消（终态）
  * - failed: 失败（终态）
+ *
+ * @param {string} status - 状态英文标识
+ * @param {string} displayName - 后端返回的中文显示名称（优先使用）
  */
-function getStatusBadge(status) {
-  const badges = {
-    created: '<span class="badge bg-warning">进行中</span>',
-    frozen: '<span class="badge bg-info">冻结中</span>',
-    completed: '<span class="badge bg-success">已完成</span>',
-    cancelled: '<span class="badge bg-secondary">已取消</span>',
-    failed: '<span class="badge bg-danger">失败</span>'
+function getStatusBadge(status, displayName) {
+  // 颜色映射
+  const colorMap = {
+    created: 'bg-warning',
+    frozen: 'bg-info',
+    completed: 'bg-success',
+    cancelled: 'bg-secondary',
+    failed: 'bg-danger',
+    pending: 'bg-warning',
+    processing: 'bg-info'
   }
-  return badges[status] || `<span class="badge bg-secondary">${status || '未知'}</span>`
+
+  const statusKey = (status || '').toLowerCase()
+  const badgeColor = colorMap[statusKey] || 'bg-secondary'
+  
+  // 优先使用后端返回的中文名称
+  const text = displayName || status || '未知'
+  
+  return `<span class="badge ${badgeColor}">${text}</span>`
 }
 
 /**
@@ -302,7 +316,8 @@ function renderOrderDetail(order) {
   const completedAtEl = document.getElementById('detailCompletedAt')
 
   if (orderIdEl) orderIdEl.textContent = `#${order.order_id}`
-  if (statusEl) statusEl.innerHTML = getStatusBadge(order.status)
+  // 优先使用后端返回的中文名称字段
+  if (statusEl) statusEl.innerHTML = getStatusBadge(order.status, order.status_display)
   if (createdAtEl) createdAtEl.textContent = formatDate(order.created_at)
   if (completedAtEl)
     completedAtEl.textContent = order.completed_at ? formatDate(order.completed_at) : '-'

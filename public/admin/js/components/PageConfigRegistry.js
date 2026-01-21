@@ -458,7 +458,7 @@ const PageConfigRegistry = {
     pageSize: 20,
 
     stats: [
-      { key: 'total', label: '流水总数', color: 'primary', field: 'pagination.total_count' },
+      { key: 'total', label: '流水总数', color: 'primary', field: 'pagination.total' },
       {
         key: 'increase',
         label: '增加记录',
@@ -686,7 +686,7 @@ const PageConfigRegistry = {
     pagination: true,
 
     stats: [
-      { key: 'total', label: '商品总数', color: 'primary', field: 'pagination.total_count' },
+      { key: 'total', label: '商品总数', color: 'primary', field: 'pagination.total' },
       {
         key: 'active',
         label: '上架中',
@@ -783,11 +783,16 @@ const PageConfigRegistry = {
     pagination: true,
     pageSize: 20,
 
+    // 数据字段映射（后端返回 orders 数组）
+    dataField: 'orders',
+    
+    // 统计数据配置（以后端返回字段为准）
+    // 后端返回格式: { orders: [], pagination: { total, page, page_size, total_pages }, ... }
     stats: [
-      { key: 'total', label: '订单总数', color: 'primary', field: 'pagination.total_count' },
-      { key: 'pending', label: '待处理', color: 'warning', field: 'stats.pending' },
-      { key: 'shipped', label: '已发货', color: 'success', field: 'stats.shipped' },
-      { key: 'cancelled', label: '已取消', color: 'secondary', field: 'stats.cancelled' }
+      { key: 'total', label: '订单总数', color: 'primary', field: 'pagination.total' },
+      { key: 'pending', label: '待处理', color: 'warning', compute: data => data.filter(d => d.status === 'pending').length },
+      { key: 'shipped', label: '已发货', color: 'success', compute: data => data.filter(d => d.status === 'shipped').length },
+      { key: 'cancelled', label: '已取消', color: 'secondary', compute: data => data.filter(d => d.status === 'cancelled').length }
     ],
 
     filters: [
@@ -901,12 +906,16 @@ const PageConfigRegistry = {
     primaryKey: 'order_id',
     pagination: true,
     pageSize: 20,
+    // 数据字段映射（后端返回 orders 数组）
+    dataField: 'orders',
 
+    // 统计数据配置（以后端返回字段为准）
+    // 后端返回格式: { orders: [], pagination: { total, page, page_size, total_pages }, ... }
     stats: [
-      { key: 'total', label: '交易总数', color: 'primary', field: 'pagination.total_count' },
-      { key: 'pending', label: '进行中', color: 'warning', field: 'stats.pending' },
-      { key: 'completed', label: '已完成', color: 'success', field: 'stats.completed' },
-      { key: 'disputed', label: '有争议', color: 'danger', field: 'stats.disputed' }
+      { key: 'total', label: '交易总数', color: 'primary', field: 'pagination.total' },
+      { key: 'pending', label: '进行中', color: 'warning', compute: data => data.filter(d => d.status === 'created' || d.status === 'frozen').length },
+      { key: 'completed', label: '已完成', color: 'success', compute: data => data.filter(d => d.status === 'completed').length },
+      { key: 'disputed', label: '已取消', color: 'danger', compute: data => data.filter(d => d.status === 'cancelled' || d.status === 'failed').length }
     ],
 
     filters: [
@@ -1101,12 +1110,16 @@ const PageConfigRegistry = {
     apiEndpoint: API_ENDPOINTS.USER_HIERARCHY.LIST,
     primaryKey: 'user_id',
     pagination: true,
+    // 数据字段映射（后端返回 rows 数组）
+    dataField: 'rows',
 
+    // 统计数据配置（以后端返回字段为准）
+    // 后端返回格式: { rows: [], count, pagination: { page, page_size, total_pages } }
     stats: [
-      { key: 'total', label: '层级用户总数', color: 'primary', field: 'pagination.total_count' },
-      { key: 'managers', label: '区域负责人', color: 'danger', field: 'stats.managers' },
-      { key: 'supervisors', label: '业务经理', color: 'warning', field: 'stats.supervisors' },
-      { key: 'agents', label: '业务员', color: 'info', field: 'stats.agents' }
+      { key: 'total', label: '层级用户总数', color: 'primary', field: 'count' },
+      { key: 'managers', label: '区域负责人', color: 'danger', compute: data => data.filter(d => d.role_level === 80).length },
+      { key: 'supervisors', label: '业务经理', color: 'warning', compute: data => data.filter(d => d.role_level === 60).length },
+      { key: 'agents', label: '业务员', color: 'info', compute: data => data.filter(d => d.role_level === 40).length }
     ],
 
     filters: [
@@ -1277,9 +1290,10 @@ const PageConfigRegistry = {
     apiEndpoint: API_ENDPOINTS.ANNOUNCEMENT.LIST,
     primaryKey: 'announcement_id',
     pagination: true,
+    dataField: 'announcements', // 后端返回 { announcements, total, limit, offset }
 
     stats: [
-      { key: 'total', label: '公告总数', color: 'primary', field: 'pagination.total_count' },
+      { key: 'total', label: '公告总数', color: 'primary', field: 'total' }, // 后端直接返回 total 字段
       {
         key: 'active',
         label: '生效中',
@@ -1373,9 +1387,9 @@ const PageConfigRegistry = {
     pagination: true,
 
     stats: [
-      { key: 'total', label: '通知总数', color: 'primary', field: 'pagination.total_count' },
-      { key: 'sent', label: '已发送', color: 'success', field: 'stats.sent' },
-      { key: 'pending', label: '待发送', color: 'warning', field: 'stats.pending' }
+      { key: 'total', label: '通知总数', color: 'primary', field: 'pagination.total' },
+      { key: 'sent', label: '已发送', color: 'success', compute: (data) => data.filter(d => d.status === 'sent').length },
+      { key: 'pending', label: '待发送', color: 'warning', compute: (data) => data.filter(d => d.status === 'pending').length }
     ],
 
     filters: [
@@ -1540,12 +1554,13 @@ const PageConfigRegistry = {
     apiEndpoint: API_ENDPOINTS.IMAGE.LIST,
     primaryKey: 'image_id',
     pagination: true,
+    dataField: 'images', // 后端返回 { images, statistics, pagination }
 
     stats: [
-      { key: 'total', label: '图片总数', color: 'primary', field: 'pagination.total_count' },
-      { key: 'lottery', label: '抽奖图片', color: 'info', field: 'stats.lottery' },
-      { key: 'exchange', label: '兑换图片', color: 'warning', field: 'stats.exchange' },
-      { key: 'trade', label: '交易图片', color: 'success', field: 'stats.trade' }
+      { key: 'total', label: '图片总数', color: 'primary', field: 'statistics.total' }, // 后端返回 statistics.total
+      { key: 'lottery', label: '抽奖图片', color: 'info', compute: (data) => data.filter(d => d.business_type === 'lottery').length },
+      { key: 'exchange', label: '兑换图片', color: 'warning', compute: (data) => data.filter(d => d.business_type === 'exchange').length },
+      { key: 'trade', label: '交易图片', color: 'success', compute: (data) => data.filter(d => d.business_type === 'trade').length }
     ],
 
     filters: [

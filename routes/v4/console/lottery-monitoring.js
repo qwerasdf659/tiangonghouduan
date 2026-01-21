@@ -27,12 +27,14 @@ const { authenticateToken, requireAdmin } = require('../../../middleware/auth')
 const logger = require('../../../utils/logger').logger
 
 /**
- * 获取 LotteryMonitoringService 的辅助函数
+ * 获取 LotteryAnalyticsService 的辅助函数
+ * （服务合并后由 LotteryAnalyticsService 提供监控数据查询功能）
+ *
  * @param {Object} req - Express 请求对象
- * @returns {Object} LotteryMonitoringService 实例
+ * @returns {Object} LotteryAnalyticsService 实例
  */
-function getLotteryMonitoringService(req) {
-  return req.app.locals.services.getService('lottery_monitoring')
+function getLotteryAnalyticsService(req) {
+  return req.app.locals.services.getService('lottery_analytics')
 }
 
 /*
@@ -57,7 +59,7 @@ router.get('/hourly-metrics', authenticateToken, requireAdmin, async (req, res) 
   try {
     const { campaign_id, start_time, end_time, page = 1, page_size = 24 } = req.query
 
-    const result = await getLotteryMonitoringService(req).getHourlyMetrics({
+    const result = await getLotteryAnalyticsService(req).getHourlyMetrics({
       campaign_id: campaign_id ? parseInt(campaign_id) : undefined,
       start_time,
       end_time,
@@ -90,7 +92,7 @@ router.get('/hourly-metrics/:id', authenticateToken, requireAdmin, async (req, r
   try {
     const metric_id = parseInt(req.params.id)
 
-    const metric = await getLotteryMonitoringService(req).getHourlyMetricById(metric_id)
+    const metric = await getLotteryAnalyticsService(req).getHourlyMetricById(metric_id)
 
     if (!metric) {
       return res.apiError('统计指标不存在', 'METRIC_NOT_FOUND', null, 404)
@@ -124,7 +126,7 @@ router.get(
       const campaign_id = parseInt(req.params.campaign_id)
       const { start_time, end_time } = req.query
 
-      const summary = await getLotteryMonitoringService(req).getHourlyMetricsSummary(
+      const summary = await getLotteryAnalyticsService(req).getHourlyMetricsSummary(
         campaign_id,
         start_time,
         end_time
@@ -160,7 +162,7 @@ router.get('/user-experience-states', authenticateToken, requireAdmin, async (re
   try {
     const { campaign_id, user_id, min_empty_streak, page = 1, page_size = 20 } = req.query
 
-    const result = await getLotteryMonitoringService(req).getUserExperienceStates({
+    const result = await getLotteryAnalyticsService(req).getUserExperienceStates({
       campaign_id: campaign_id ? parseInt(campaign_id) : undefined,
       user_id: user_id ? parseInt(user_id) : undefined,
       min_empty_streak: min_empty_streak !== undefined ? parseInt(min_empty_streak) : undefined,
@@ -200,7 +202,7 @@ router.get(
       const user_id = parseInt(req.params.user_id)
       const campaign_id = parseInt(req.params.campaign_id)
 
-      const state = await getLotteryMonitoringService(req).getUserExperienceState(
+      const state = await getLotteryAnalyticsService(req).getUserExperienceState(
         user_id,
         campaign_id
       )
@@ -239,7 +241,7 @@ router.get('/user-global-states', authenticateToken, requireAdmin, async (req, r
   try {
     const { user_id, luck_debt_level, min_draw_count, page = 1, page_size = 20 } = req.query
 
-    const result = await getLotteryMonitoringService(req).getUserGlobalStates({
+    const result = await getLotteryAnalyticsService(req).getUserGlobalStates({
       user_id: user_id ? parseInt(user_id) : undefined,
       luck_debt_level,
       min_draw_count: min_draw_count !== undefined ? parseInt(min_draw_count) : undefined,
@@ -272,7 +274,7 @@ router.get('/user-global-states/:user_id', authenticateToken, requireAdmin, asyn
   try {
     const user_id = parseInt(req.params.user_id)
 
-    const state = await getLotteryMonitoringService(req).getUserGlobalState(user_id)
+    const state = await getLotteryAnalyticsService(req).getUserGlobalState(user_id)
 
     // 用户没有全局状态记录是正常的（新用户/未参与抽奖），返回默认值而不是404
     if (!state) {
@@ -330,7 +332,7 @@ router.get('/quota-grants', authenticateToken, requireAdmin, async (req, res) =>
       page_size = 20
     } = req.query
 
-    const result = await getLotteryMonitoringService(req).getQuotaGrants({
+    const result = await getLotteryAnalyticsService(req).getQuotaGrants({
       campaign_id: campaign_id ? parseInt(campaign_id) : undefined,
       user_id: user_id ? parseInt(user_id) : undefined,
       granted_by: granted_by ? parseInt(granted_by) : undefined,
@@ -366,7 +368,7 @@ router.get('/quota-grants/:id', authenticateToken, requireAdmin, async (req, res
   try {
     const grant_id = parseInt(req.params.id)
 
-    const grant = await getLotteryMonitoringService(req).getQuotaGrantById(grant_id)
+    const grant = await getLotteryAnalyticsService(req).getQuotaGrantById(grant_id)
 
     if (!grant) {
       return res.apiError('赠送记录不存在', 'GRANT_NOT_FOUND', null, 404)
@@ -401,7 +403,7 @@ router.get('/user-quotas', authenticateToken, requireAdmin, async (req, res) => 
   try {
     const { campaign_id, user_id, has_remaining, page = 1, page_size = 20 } = req.query
 
-    const result = await getLotteryMonitoringService(req).getUserQuotas({
+    const result = await getLotteryAnalyticsService(req).getUserQuotas({
       campaign_id: campaign_id ? parseInt(campaign_id) : undefined,
       user_id: user_id ? parseInt(user_id) : undefined,
       has_remaining: has_remaining !== undefined ? has_remaining === 'true' : undefined,
@@ -440,7 +442,7 @@ router.get(
       const user_id = parseInt(req.params.user_id)
       const campaign_id = parseInt(req.params.campaign_id)
 
-      const quota = await getLotteryMonitoringService(req).getUserQuota(user_id, campaign_id)
+      const quota = await getLotteryAnalyticsService(req).getUserQuota(user_id, campaign_id)
 
       if (!quota) {
         return res.apiError('用户配额状态不存在', 'QUOTA_NOT_FOUND', null, 404)
@@ -466,7 +468,7 @@ router.get('/user-quotas/stats/:campaign_id', authenticateToken, requireAdmin, a
   try {
     const campaign_id = parseInt(req.params.campaign_id)
 
-    const stats = await getLotteryMonitoringService(req).getCampaignQuotaStats(campaign_id)
+    const stats = await getLotteryAnalyticsService(req).getCampaignQuotaStats(campaign_id)
 
     return res.apiSuccess(stats, '获取活动配额统计成功')
   } catch (error) {
@@ -503,7 +505,7 @@ router.get('/stats', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const { campaign_id, time_range = 'today', start_date, end_date } = req.query
 
-    const stats = await getLotteryMonitoringService(req).getMonitoringStats({
+    const stats = await getLotteryAnalyticsService(req).getMonitoringStats({
       campaign_id: campaign_id ? parseInt(campaign_id) : undefined,
       time_range,
       start_date,

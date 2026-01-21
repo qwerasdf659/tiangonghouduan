@@ -11,7 +11,11 @@
  * - 严格遵循项目 snake_case 命名规范
  * - 使用 res.apiSuccess/res.apiError 统一响应格式
  *
- * @version 1.0.0
+ * 服务合并记录（2026-01-21）：
+ * - 原使用 UserPremiumQueryService，现已合并到 PremiumService
+ * - 通过 ServiceManager 获取 'premium' 服务调用查询方法
+ *
+ * @version 1.1.0
  * @date 2026-01-21
  */
 
@@ -23,12 +27,14 @@ const { authenticateToken, requireAdmin } = require('../../../middleware/auth')
 const logger = require('../../../utils/logger').logger
 
 /**
- * 获取 UserPremiumQueryService 的辅助函数
+ * 获取 PremiumService 的辅助函数
+ * 服务合并后，高级空间相关的查询方法已合并到 PremiumService
+ *
  * @param {Object} req - Express 请求对象
- * @returns {Object} UserPremiumQueryService 实例
+ * @returns {Object} PremiumService 类（静态方法调用）
  */
-function getUserPremiumQueryService(req) {
-  return req.app.locals.services.getService('user_premium_query')
+function getPremiumService(req) {
+  return req.app.locals.services.getService('premium')
 }
 
 /**
@@ -48,7 +54,7 @@ router.get('/', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const { user_id, is_unlocked, unlock_method, is_valid, page = 1, page_size = 20 } = req.query
 
-    const result = await getUserPremiumQueryService(req).getPremiumStatuses({
+    const result = await getPremiumService(req).getPremiumStatuses({
       user_id: user_id ? parseInt(user_id) : undefined,
       is_unlocked: is_unlocked !== undefined ? is_unlocked === 'true' : undefined,
       unlock_method,
@@ -77,7 +83,7 @@ router.get('/', authenticateToken, requireAdmin, async (req, res) => {
  */
 router.get('/stats', authenticateToken, requireAdmin, async (req, res) => {
   try {
-    const stats = await getUserPremiumQueryService(req).getPremiumStats()
+    const stats = await getPremiumService(req).getPremiumStats()
 
     logger.info('获取高级空间状态统计', {
       admin_id: req.user.user_id
@@ -104,7 +110,7 @@ router.get('/expiring', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const { hours = 24, page = 1, page_size = 20 } = req.query
 
-    const result = await getUserPremiumQueryService(req).getExpiringUsers(
+    const result = await getPremiumService(req).getExpiringUsers(
       parseInt(hours),
       parseInt(page),
       parseInt(page_size)
@@ -135,7 +141,7 @@ router.get('/:user_id', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const user_id = parseInt(req.params.user_id)
 
-    const status = await getUserPremiumQueryService(req).getUserPremiumStatus(user_id)
+    const status = await getPremiumService(req).getUserPremiumStatusDetail(user_id)
 
     // 用户没有高级空间记录是正常状态，返回默认值而不是404
     if (!status) {

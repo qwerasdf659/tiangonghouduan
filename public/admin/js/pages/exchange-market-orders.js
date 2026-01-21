@@ -91,7 +91,8 @@ function renderOrders(orders) {
 
   tbody.innerHTML = orders
     .map(order => {
-      const statusBadge = getStatusBadge(order.status)
+      // 优先使用后端返回的中文名称
+      const statusBadge = getStatusBadge(order.status, order.status_display)
       // 直接使用后端字段 pay_asset_code 获取资产类型文本
       const paymentTypeText = getAssetTypeText(order.pay_asset_code)
       // 直接使用后端字段 pay_amount 显示支付数量
@@ -166,7 +167,8 @@ async function viewOrderDetail(orderNo) {
       const order = data.data.order
 
       document.getElementById('detailOrderNo').textContent = order.order_no
-      document.getElementById('detailStatus').innerHTML = getStatusBadge(order.status)
+      // 优先使用后端返回的中文名称
+      document.getElementById('detailStatus').innerHTML = getStatusBadge(order.status, order.status_display)
       document.getElementById('detailExchangeTime').textContent = formatDate(
         order.exchange_time || order.created_at
       )
@@ -290,14 +292,23 @@ function changePage(page) {
 /**
  * 获取状态标签HTML
  */
-function getStatusBadge(status) {
-  const map = {
-    pending: '<span class="badge bg-warning">待处理</span>',
-    completed: '<span class="badge bg-info">已完成</span>',
-    shipped: '<span class="badge bg-success">已发货</span>',
-    cancelled: '<span class="badge bg-secondary">已取消</span>'
+/**
+ * 获取状态徽章
+ * @param {string} status - 状态英文标识
+ * @param {string} displayName - 后端返回的中文显示名称（优先使用）
+ */
+function getStatusBadge(status, displayName) {
+  const colorMap = {
+    pending: 'bg-warning',
+    completed: 'bg-info',
+    shipped: 'bg-success',
+    cancelled: 'bg-secondary'
   }
-  return map[status] || `<span class="badge bg-secondary">${status}</span>`
+  const statusKey = (status || '').toLowerCase()
+  const badgeColor = colorMap[statusKey] || 'bg-secondary'
+  // 优先使用后端返回的中文名称
+  const text = displayName || status || '未知'
+  return `<span class="badge ${badgeColor}">${text}</span>`
 }
 
 /**

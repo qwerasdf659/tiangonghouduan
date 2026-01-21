@@ -117,15 +117,18 @@ function renderLogs(logs) {
   tbody.innerHTML = logs
     .map(log => {
       const id = log.log_id || log.id
-      const operationBadge = getOperationTypeBadge(log.operation_type)
-      const resultBadge = getResultBadge(log.result || log.status)
+      // 优先使用后端返回的中文名称字段
+      const operationBadge = getOperationTypeBadge(log.operation_type, log.operation_type_display)
+      const resultBadge = getResultBadge(log.result || log.status, log.result_display)
+      // 目标类型使用后端返回的中文名称
+      const targetTypeText = log.target_type_display || log.target_type || '-'
 
       return `
       <tr>
         <td><small>${id}</small></td>
         <td>${operationBadge}</td>
         <td>
-          <small class="text-muted">${log.target_type || '-'}</small>
+          <small class="text-muted">${targetTypeText}</small>
           ${log.target_id ? `<br><code>${log.target_id}</code>` : ''}
         </td>
         <td>
@@ -158,11 +161,12 @@ async function viewLogDetail(id) {
 
       document.getElementById('detailLogId').textContent = log.log_id || log.id
       document.getElementById('detailCreatedAt').textContent = formatDate(log.created_at)
+      // 优先使用后端返回的中文名称字段
       document.getElementById('detailOperationType').innerHTML = getOperationTypeBadge(
-        log.operation_type
+        log.operation_type, log.operation_type_display
       )
-      document.getElementById('detailResult').innerHTML = getResultBadge(log.result || log.status)
-      document.getElementById('detailTargetType').textContent = log.target_type || '-'
+      document.getElementById('detailResult').innerHTML = getResultBadge(log.result || log.status, log.result_display)
+      document.getElementById('detailTargetType').textContent = log.target_type_display || log.target_type || '-'
       document.getElementById('detailTargetId').textContent = log.target_id || '-'
       document.getElementById('detailOperatorId').textContent = log.operator_id || '-'
       document.getElementById('detailIpAddress').textContent = log.ip_address || '-'
@@ -221,30 +225,78 @@ function changePage(page) {
   loadAuditLogs()
 }
 
-function getOperationTypeBadge(type) {
-  const typeMap = {
-    USER_CREATE: '<span class="badge bg-success">用户创建</span>',
-    USER_UPDATE: '<span class="badge bg-info">用户更新</span>',
-    USER_DELETE: '<span class="badge bg-danger">用户删除</span>',
-    POINTS_ADJUST: '<span class="badge bg-warning">积分调整</span>',
-    PRIZE_CONFIG: '<span class="badge bg-primary">奖品配置</span>',
-    ORDER_UPDATE: '<span class="badge bg-info">订单更新</span>',
-    SYSTEM_CONFIG: '<span class="badge bg-dark">系统配置</span>',
-    LOGIN: '<span class="badge bg-secondary">登录操作</span>'
+/**
+ * 获取操作类型徽章
+ * @param {string} type - 操作类型英文标识
+ * @param {string} displayName - 后端返回的中文显示名称（优先使用）
+ */
+function getOperationTypeBadge(type, displayName) {
+  // 颜色映射（根据操作类型分类）
+  const colorMap = {
+    // 用户相关 - 绿色系
+    user_create: 'bg-success',
+    user_update: 'bg-info',
+    user_delete: 'bg-danger',
+    user_status_change: 'bg-warning',
+    user_ban: 'bg-danger',
+    user_unban: 'bg-success',
+    // 积分资产相关 - 黄色/橙色系
+    points_adjust: 'bg-warning',
+    asset_adjustment: 'bg-warning',
+    asset_orphan_cleanup: 'bg-secondary',
+    // 商品奖品相关 - 蓝色系
+    prize_config: 'bg-primary',
+    prize_create: 'bg-primary',
+    prize_update: 'bg-info',
+    product_create: 'bg-primary',
+    product_update: 'bg-info',
+    // 系统配置 - 深色
+    system_config: 'bg-dark',
+    system_update: 'bg-dark',
+    // 登录相关 - 灰色
+    session_login: 'bg-secondary',
+    login_success: 'bg-success',
+    login_failed: 'bg-danger',
+    // 审核相关
+    exchange_audit: 'bg-info',
+    consumption_audit: 'bg-info',
+    // 市场交易
+    market_listing_create: 'bg-primary',
+    market_trade_complete: 'bg-success'
   }
-  return typeMap[type] || `<span class="badge bg-secondary">${type || '-'}</span>`
+
+  const typeKey = (type || '').toLowerCase()
+  const badgeColor = colorMap[typeKey] || 'bg-secondary'
+  
+  // 优先使用后端返回的中文名称，否则使用原始类型
+  const text = displayName || type || '-'
+  
+  return `<span class="badge ${badgeColor}">${text}</span>`
 }
 
-function getResultBadge(result) {
-  const resultMap = {
-    success: '<span class="badge bg-success">成功</span>',
-    SUCCESS: '<span class="badge bg-success">成功</span>',
-    failed: '<span class="badge bg-danger">失败</span>',
-    FAILED: '<span class="badge bg-danger">失败</span>',
-    error: '<span class="badge bg-danger">错误</span>',
-    ERROR: '<span class="badge bg-danger">错误</span>'
+/**
+ * 获取结果徽章
+ * @param {string} result - 结果状态英文标识
+ * @param {string} displayName - 后端返回的中文显示名称（优先使用）
+ */
+function getResultBadge(result, displayName) {
+  // 颜色映射
+  const colorMap = {
+    success: 'bg-success',
+    completed: 'bg-success',
+    failed: 'bg-danger',
+    error: 'bg-danger',
+    pending: 'bg-warning',
+    processing: 'bg-info'
   }
-  return resultMap[result] || `<span class="badge bg-secondary">${result || '-'}</span>`
+
+  const resultKey = (result || '').toLowerCase()
+  const badgeColor = colorMap[resultKey] || 'bg-secondary'
+  
+  // 优先使用后端返回的中文名称，否则使用原始结果
+  const text = displayName || result || '-'
+  
+  return `<span class="badge ${badgeColor}">${text}</span>`
 }
 
 function escapeHtml(text) {

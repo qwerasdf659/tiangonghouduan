@@ -7,6 +7,7 @@
  * - 协调资产冻结/解冻/结算（调用 AssetService）
  * - 协调物品所有权变更（调用 ItemInstance）
  * - 提供强幂等性保证（idempotency_key）
+ * - 管理后台订单查询（合并自 TradeOrderQueryService）
  *
  * 业务流程：
  * 1. 创建订单（createOrder）：
@@ -22,11 +23,17 @@
  *    - 解锁挂牌（MarketListing.status = on_sale）
  *    - 更新订单状态（TradeOrder.status = cancelled）
  *
+ * 服务合并记录（2026-01-21）：
+ * - 合并 TradeOrderQueryService 的所有查询方法到本服务
+ * - 原因：减少服务数量，统一订单相关操作
+ *
  * 创建时间：2025-12-15（Phase 2）
- * 更新时间：2026-01-02 - 业界标准形态：统一使用 idempotency_key
+ * 更新时间：2026-01-21 - 合并 TradeOrderQueryService
  */
 
-const { sequelize, TradeOrder, MarketListing, ItemInstance } = require('../models')
+const { Op, fn, col } = require('sequelize')
+const { sequelize, TradeOrder, MarketListing, ItemInstance, User } = require('../models')
+const { getDisplayName } = require('../constants/DisplayNames')
 const AssetService = require('./AssetService')
 const AdminSystemService = require('./AdminSystemService')
 const logger = require('../utils/logger')
@@ -898,114 +905,6 @@ class TradeOrderService {
   }
 
   /**
-   * 管理员获取全量交易订单列表（Admin Only）
-   *
-   * @description 管理员查看所有交易订单，支持状态筛选、分页、排序
-   *
-   * 业务场景：
-   * - 管理后台订单管理页面
-   * - 订单状态筛选和查看
-   * - 交易纠纷处理
-   *
-   * @param {Object} options - 查询选项
-   * @param {string} [options.status] - 订单状态筛选（created/frozen/completed/cancelled）
-   * @param {number} [options.buyer_user_id] - 买家ID筛选（可选）
-   * @param {number} [options.seller_user_id] - 卖家ID筛选（可选）
-   * @param {number} [options.listing_id] - 挂牌ID筛选（可选）
-   * @param {number} [options.page=1] - 页码
-   * @param {number} [options.page_size=20] - 每页数量
-   * @param {string} [options.sort_by='created_at'] - 排序字段
-   * @param {string} [options.sort_order='DESC'] - 排序方向
-   * @returns {Promise<Object>} 订单列表和分页信息
-   *
-   * @example
-   * // 获取所有冻结中订单
-   * const result = await TradeOrderService.getAdminOrders({ status: 'frozen', page: 1 });
-   */
-  static async getAdminOrders(options = {}) {
-    const {
-      status = null,
-      buyer_user_id = null,
-      seller_user_id = null,
-      listing_id = null,
-      page = 1,
-      page_size = 20,
-      sort_by = 'created_at',
-      sort_order = 'DESC'
-    } = options
-
-    logger.info('[TradeOrderService] 管理员查询全量订单列表', {
-      status,
-      buyer_user_id,
-      seller_user_id,
-      listing_id,
-      page,
-      page_size
-    })
-
-    // 构建查询条件
-    const where = {}
-    if (status) {
-      where.status = status
-    }
-    if (buyer_user_id) {
-      where.buyer_user_id = buyer_user_id
-    }
-    if (seller_user_id) {
-      where.seller_user_id = seller_user_id
-    }
-    if (listing_id) {
-      where.listing_id = listing_id
-    }
-
-    // 分页参数
-    const offset = (page - 1) * page_size
-    const limit = page_size
-
-    // 查询订单列表
-    const { count, rows } = await TradeOrder.findAndCountAll({
-      where,
-      include: [
-        {
-          model: MarketListing,
-          as: 'listing',
-          include: [
-            {
-              model: ItemInstance,
-              as: 'offerItem',
-              required: false
-            }
-          ]
-        }
-      ],
-      limit,
-      offset,
-      order: [[sort_by, sort_order]]
-    })
-
-    logger.info(
-      `[TradeOrderService] 管理员查询订单成功：找到${count}个订单，返回第${page}页（${rows.length}个）`
-    )
-
-    return {
-      success: true,
-      orders: rows,
-      pagination: {
-        total: count,
-        page,
-        page_size,
-        total_pages: Math.ceil(count / page_size)
-      },
-      filters: {
-        status,
-        buyer_user_id,
-        seller_user_id,
-        listing_id
-      }
-    }
-  }
-
-  /**
    * 查询用户订单列表
    *
    * @param {Object} params - 查询参数
@@ -1052,6 +951,324 @@ class TradeOrderService {
       total: count,
       page,
       page_size
+    }
+  }
+
+  /*
+   * ==========================================
+   * 以下方法合并自 TradeOrderQueryService（2026-01-21）
+   * 管理后台专用的只读查询方法
+   * ==========================================
+   */
+
+  /**
+   * 查询交易订单列表（管理后台用，支持完整筛选条件）
+   *
+   * @param {Object} options - 查询参数
+   * @param {number} [options.buyer_user_id] - 买家用户ID
+   * @param {number} [options.seller_user_id] - 卖家用户ID
+   * @param {number} [options.listing_id] - 挂牌ID
+   * @param {string} [options.status] - 订单状态（created/frozen/completed/cancelled/failed）
+   * @param {string} [options.asset_code] - 结算资产代码
+   * @param {string} [options.start_time] - 开始时间（ISO8601格式，北京时间）
+   * @param {string} [options.end_time] - 结束时间（ISO8601格式，北京时间）
+   * @param {number} [options.page=1] - 页码
+   * @param {number} [options.page_size=20] - 每页数量
+   * @returns {Promise<Object>} 订单列表和分页信息
+   */
+  static async getOrders(options = {}) {
+    const {
+      buyer_user_id,
+      seller_user_id,
+      listing_id,
+      status,
+      asset_code,
+      start_time,
+      end_time,
+      page = 1,
+      page_size = 20
+    } = options
+
+    const where = {}
+
+    if (buyer_user_id) where.buyer_user_id = buyer_user_id
+    if (seller_user_id) where.seller_user_id = seller_user_id
+    if (listing_id) where.listing_id = listing_id
+    if (status) where.status = status
+    if (asset_code) where.asset_code = asset_code
+
+    // 时间范围过滤
+    if (start_time || end_time) {
+      where.created_at = {}
+      if (start_time) where.created_at[Op.gte] = new Date(start_time)
+      if (end_time) where.created_at[Op.lte] = new Date(end_time)
+    }
+
+    const offset = (page - 1) * page_size
+
+    const { count, rows } = await TradeOrder.findAndCountAll({
+      where,
+      include: [
+        {
+          model: User,
+          as: 'buyer',
+          attributes: ['user_id', 'nickname', 'mobile']
+        },
+        {
+          model: User,
+          as: 'seller',
+          attributes: ['user_id', 'nickname', 'mobile']
+        },
+        {
+          model: MarketListing,
+          as: 'listing',
+          attributes: [
+            'listing_id',
+            'listing_kind',
+            'offer_item_instance_id',
+            'offer_asset_code',
+            'offer_amount',
+            'price_amount',
+            'status'
+          ]
+        }
+      ],
+      order: [['created_at', 'DESC']],
+      limit: page_size,
+      offset
+    })
+
+    // 添加中文显示名称
+    const ordersWithDisplayNames = rows.map(row => {
+      const order = row.get({ plain: true })
+      return {
+        ...order,
+        status_display: getDisplayName(order.status, 'status'),
+        // 如果有关联的挂牌，也添加挂牌状态中文名称
+        listing: order.listing
+          ? {
+              ...order.listing,
+              status_display: getDisplayName(order.listing.status, 'status')
+            }
+          : null
+      }
+    })
+
+    return {
+      orders: ordersWithDisplayNames,
+      pagination: {
+        total_count: count,
+        page,
+        page_size,
+        total_pages: Math.ceil(count / page_size)
+      }
+    }
+  }
+
+  /**
+   * 获取单个交易订单详情（管理后台用，包含中文显示名称）
+   *
+   * @param {number} order_id - 订单ID
+   * @returns {Promise<Object|null>} 订单详情或null
+   */
+  static async getOrderById(order_id) {
+    const order = await TradeOrder.findByPk(order_id, {
+      include: [
+        {
+          model: User,
+          as: 'buyer',
+          attributes: ['user_id', 'nickname', 'mobile']
+        },
+        {
+          model: User,
+          as: 'seller',
+          attributes: ['user_id', 'nickname', 'mobile']
+        },
+        {
+          model: MarketListing,
+          as: 'listing',
+          attributes: [
+            'listing_id',
+            'listing_kind',
+            'offer_item_instance_id',
+            'offer_asset_code',
+            'offer_amount',
+            'price_amount',
+            'status',
+            'created_at'
+          ]
+        }
+      ]
+    })
+
+    if (!order) return null
+
+    // 添加中文显示名称
+    const orderData = order.get({ plain: true })
+    return {
+      ...orderData,
+      status_display: getDisplayName(orderData.status, 'status'),
+      listing: orderData.listing
+        ? {
+            ...orderData.listing,
+            status_display: getDisplayName(orderData.listing.status, 'status')
+          }
+        : null
+    }
+  }
+
+  /**
+   * 根据业务ID查询订单（管理后台用）
+   *
+   * @param {string} business_id - 业务唯一键
+   * @returns {Promise<Object|null>} 订单详情或null
+   */
+  static async getOrderByBusinessId(business_id) {
+    const order = await TradeOrder.findOne({
+      where: { business_id },
+      include: [
+        {
+          model: User,
+          as: 'buyer',
+          attributes: ['user_id', 'nickname', 'mobile']
+        },
+        {
+          model: User,
+          as: 'seller',
+          attributes: ['user_id', 'nickname', 'mobile']
+        },
+        {
+          model: MarketListing,
+          as: 'listing',
+          attributes: [
+            'listing_id',
+            'listing_kind',
+            'offer_item_instance_id',
+            'offer_asset_code',
+            'offer_amount',
+            'price_amount',
+            'status'
+          ]
+        }
+      ]
+    })
+
+    if (!order) return null
+
+    // 添加中文显示名称
+    const orderData = order.get({ plain: true })
+    return {
+      ...orderData,
+      status_display: getDisplayName(orderData.status, 'status'),
+      listing: orderData.listing
+        ? {
+            ...orderData.listing,
+            status_display: getDisplayName(orderData.listing.status, 'status')
+          }
+        : null
+    }
+  }
+
+  /**
+   * 获取交易订单统计汇总（管理后台用）
+   *
+   * @param {Object} options - 查询参数
+   * @param {string} [options.start_time] - 开始时间
+   * @param {string} [options.end_time] - 结束时间
+   * @param {number} [options.seller_user_id] - 卖家用户ID（可选）
+   * @param {number} [options.buyer_user_id] - 买家用户ID（可选）
+   * @returns {Promise<Object>} 统计汇总数据
+   */
+  static async getOrderStats(options = {}) {
+    const { start_time, end_time, seller_user_id, buyer_user_id } = options
+
+    const where = {}
+    if (seller_user_id) where.seller_user_id = seller_user_id
+    if (buyer_user_id) where.buyer_user_id = buyer_user_id
+    if (start_time || end_time) {
+      where.created_at = {}
+      if (start_time) where.created_at[Op.gte] = new Date(start_time)
+      if (end_time) where.created_at[Op.lte] = new Date(end_time)
+    }
+
+    // 按状态统计
+    const statusStats = await TradeOrder.findAll({
+      attributes: ['status', [fn('COUNT', col('order_id')), 'count']],
+      where,
+      group: ['status'],
+      raw: true
+    })
+
+    // 金额汇总统计
+    const amountStats = await TradeOrder.findOne({
+      attributes: [
+        [fn('COUNT', col('order_id')), 'total_orders'],
+        [fn('SUM', col('gross_amount')), 'total_gross_amount'],
+        [fn('SUM', col('fee_amount')), 'total_fee_amount'],
+        [fn('SUM', col('net_amount')), 'total_net_amount']
+      ],
+      where: { ...where, status: 'completed' },
+      raw: true
+    })
+
+    // 添加中文显示名称
+    const byStatusWithDisplayNames = statusStats.reduce((acc, item) => {
+      acc[item.status] = {
+        count: parseInt(item.count) || 0,
+        display_name: getDisplayName(item.status, 'status')
+      }
+      return acc
+    }, {})
+
+    return {
+      period: { start_time, end_time },
+      by_status: byStatusWithDisplayNames,
+      completed_summary: {
+        total_orders: parseInt(amountStats?.total_orders) || 0,
+        total_gross_amount: parseInt(amountStats?.total_gross_amount) || 0,
+        total_fee_amount: parseInt(amountStats?.total_fee_amount) || 0,
+        total_net_amount: parseInt(amountStats?.total_net_amount) || 0
+      }
+    }
+  }
+
+  /**
+   * 获取用户的交易历史统计（管理后台用）
+   *
+   * @param {number} user_id - 用户ID
+   * @returns {Promise<Object>} 用户交易统计
+   */
+  static async getUserTradeStats(user_id) {
+    // 作为买家的统计
+    const buyerStats = await TradeOrder.findOne({
+      attributes: [
+        [fn('COUNT', col('order_id')), 'total_orders'],
+        [fn('SUM', col('gross_amount')), 'total_spent']
+      ],
+      where: { buyer_user_id: user_id, status: 'completed' },
+      raw: true
+    })
+
+    // 作为卖家的统计
+    const sellerStats = await TradeOrder.findOne({
+      attributes: [
+        [fn('COUNT', col('order_id')), 'total_orders'],
+        [fn('SUM', col('net_amount')), 'total_earned']
+      ],
+      where: { seller_user_id: user_id, status: 'completed' },
+      raw: true
+    })
+
+    return {
+      user_id,
+      as_buyer: {
+        total_orders: parseInt(buyerStats?.total_orders) || 0,
+        total_spent: parseInt(buyerStats?.total_spent) || 0
+      },
+      as_seller: {
+        total_orders: parseInt(sellerStats?.total_orders) || 0,
+        total_earned: parseInt(sellerStats?.total_earned) || 0
+      }
     }
   }
 }

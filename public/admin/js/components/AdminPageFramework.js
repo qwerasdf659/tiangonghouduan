@@ -689,25 +689,39 @@ class AdminPageFramework {
    * 更新统计数据
    */
   updateStats(responseData) {
+    // 🔍 调试：打印传入的响应数据
+    console.log('[AdminPageFramework.updateStats] 开始更新统计数据')
+    console.log('[AdminPageFramework.updateStats] responseData:', responseData)
+    console.log('[AdminPageFramework.updateStats] this.stats配置:', this.stats)
+    
     this.stats.forEach(stat => {
       const el = document.getElementById(`stat_${stat.key}`)
-      if (!el) return
+      if (!el) {
+        console.warn(`[AdminPageFramework.updateStats] 找不到元素: stat_${stat.key}`)
+        return
+      }
 
       let value = '-'
 
       if (stat.compute) {
         // 使用计算函数
         value = stat.compute(this.data, responseData)
+        console.log(`[AdminPageFramework.updateStats] stat.key=${stat.key}, 使用compute函数, value=${value}`)
       } else if (stat.field) {
         // 从响应数据中直接取值
-        value = this.getNestedValue(responseData, stat.field) ?? '-'
+        const rawValue = this.getNestedValue(responseData, stat.field)
+        value = rawValue ?? '-'
+        console.log(`[AdminPageFramework.updateStats] stat.key=${stat.key}, field=${stat.field}, rawValue=${rawValue}, value=${value}`)
       } else {
         // 从数据数组中统计
         value = this.data.length
+        console.log(`[AdminPageFramework.updateStats] stat.key=${stat.key}, 使用data.length, value=${value}`)
       }
 
       el.textContent = value
     })
+    
+    console.log('[AdminPageFramework.updateStats] 统计数据更新完成')
   }
 
   /**

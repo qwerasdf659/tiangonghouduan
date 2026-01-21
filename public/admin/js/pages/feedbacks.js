@@ -117,7 +117,8 @@ function renderFeedbacks(feedbacks) {
 
   tbody.innerHTML = feedbacks
     .map(item => {
-      const statusBadge = getStatusBadge(item.status)
+      // 优先使用后端返回的中文名称
+      const statusBadge = getStatusBadge(item.status, item.status_display)
       // 后端使用category字段（技术修正）
       const categoryBadge = getCategoryBadge(item.category)
       const id = item.feedback_id || item.id
@@ -201,7 +202,8 @@ async function viewFeedback(id) {
       document.getElementById('detailUserId').textContent = userDisplay
       // 后端使用category字段（技术修正）
       document.getElementById('detailType').innerHTML = getCategoryBadge(item.category)
-      document.getElementById('detailStatus').innerHTML = getStatusBadge(item.status)
+      // 优先使用后端返回的中文名称
+      document.getElementById('detailStatus').innerHTML = getStatusBadge(item.status, item.status_display)
       document.getElementById('detailContent').textContent = item.content || '-'
       document.getElementById('detailCreatedAt').textContent = formatDate(item.created_at)
       document.getElementById('detailUpdatedAt').textContent = formatDate(item.updated_at)
@@ -341,15 +343,24 @@ function changePage(page) {
   loadFeedbacks()
 }
 
-function getStatusBadge(status) {
-  // 后端状态枚举: pending, processing, replied, closed（技术修正）
-  const map = {
-    pending: '<span class="badge bg-warning">待处理</span>',
-    processing: '<span class="badge bg-info">处理中</span>',
-    replied: '<span class="badge bg-success">已回复</span>',
-    closed: '<span class="badge bg-secondary">已关闭</span>'
+/**
+ * 获取状态徽章
+ * @param {string} status - 状态英文标识
+ * @param {string} displayName - 后端返回的中文显示名称（优先使用）
+ */
+function getStatusBadge(status, displayName) {
+  // 后端状态枚举: pending, processing, replied, closed
+  const colorMap = {
+    pending: 'bg-warning',
+    processing: 'bg-info',
+    replied: 'bg-success',
+    closed: 'bg-secondary'
   }
-  return map[status] || `<span class="badge bg-secondary">${status || '未知'}</span>`
+  const statusKey = (status || '').toLowerCase()
+  const badgeColor = colorMap[statusKey] || 'bg-secondary'
+  // 优先使用后端返回的中文名称
+  const text = displayName || status || '未知'
+  return `<span class="badge ${badgeColor}">${text}</span>`
 }
 
 // 后端使用category字段，枚举值: technical, feature, bug, complaint, suggestion, other（技术修正）

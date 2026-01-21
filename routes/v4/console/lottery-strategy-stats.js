@@ -36,13 +36,14 @@ const logger = require('../../../utils/logger').logger
 const BeijingTimeHelper = require('../../../utils/timeHelper')
 
 /**
- * 获取 LotteryStrategyStatsService 的辅助函数
+ * 获取 LotteryAnalyticsService 的辅助函数
+ * （服务合并后由 LotteryAnalyticsService 提供策略统计分析功能）
  *
  * @param {Object} req - Express 请求对象
- * @returns {Object} LotteryStrategyStatsService 实例
+ * @returns {Object} LotteryAnalyticsService 实例
  */
-function getLotteryStrategyStatsService(req) {
-  return req.app.locals.services.getService('lottery_strategy_stats')
+function getLotteryAnalyticsService(req) {
+  return req.app.locals.services.getService('lottery_analytics')
 }
 
 /**
@@ -133,7 +134,7 @@ router.get('/realtime/:campaign_id', authenticateToken, requireAdmin, async (req
     }
 
     // 🔴 修正：调用正确的服务方法 getRealtimeOverview（不是 getRealtimeStats）
-    const result = await getLotteryStrategyStatsService(req).getRealtimeOverview(campaign_id)
+    const result = await getLotteryAnalyticsService(req).getRealtimeOverview(campaign_id)
 
     logger.info('查询实时概览统计', {
       admin_id: req.user.user_id,
@@ -184,7 +185,7 @@ router.get('/hourly/:campaign_id', authenticateToken, requireAdmin, async (req, 
     const { start_time, end_time } = parseTimeRange(req.query)
 
     // 🔴 修正：调用正确的服务方法 getHourlyTrend 并使用 options 对象参数格式
-    const result = await getLotteryStrategyStatsService(req).getHourlyTrend(campaign_id, {
+    const result = await getLotteryAnalyticsService(req).getHourlyTrend(campaign_id, {
       start_time,
       end_time
     })
@@ -244,7 +245,7 @@ router.get('/daily/:campaign_id', authenticateToken, requireAdmin, async (req, r
     const { start_date, end_date } = parseDateRange(req.query)
 
     // 🔴 修正：调用正确的服务方法 getDailyTrend 并使用 options 对象参数格式
-    const result = await getLotteryStrategyStatsService(req).getDailyTrend(campaign_id, {
+    const result = await getLotteryAnalyticsService(req).getDailyTrend(campaign_id, {
       start_date,
       end_date
     })
@@ -316,7 +317,7 @@ router.get('/tier-distribution/:campaign_id', authenticateToken, requireAdmin, a
     const { start_time, end_time } = parseTimeRange(req.query)
 
     // 🔴 修正：使用 options 对象参数格式
-    const result = await getLotteryStrategyStatsService(req).getTierDistribution(campaign_id, {
+    const result = await getLotteryAnalyticsService(req).getTierDistribution(campaign_id, {
       start_time,
       end_time
     })
@@ -384,7 +385,7 @@ router.get(
       const { start_time, end_time } = parseTimeRange(req.query)
 
       // 🔴 修正：调用正确的服务方法 getExperienceTriggers（不是 getExperienceTriggerStats）并使用 options 对象参数格式
-      const result = await getLotteryStrategyStatsService(req).getExperienceTriggers(campaign_id, {
+      const result = await getLotteryAnalyticsService(req).getExperienceTriggers(campaign_id, {
         start_time,
         end_time
       })
@@ -448,7 +449,7 @@ router.get(
       const { start_time, end_time } = parseTimeRange(req.query)
 
       // 🔴 修正：调用正确的服务方法 getBudgetConsumption（不是 getBudgetConsumptionStats）并使用 options 对象参数格式
-      const result = await getLotteryStrategyStatsService(req).getBudgetConsumption(campaign_id, {
+      const result = await getLotteryAnalyticsService(req).getBudgetConsumption(campaign_id, {
         start_time,
         end_time
       })

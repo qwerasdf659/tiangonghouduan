@@ -484,6 +484,13 @@ class AdminSystemService {
     allowed_listing_assets: '允许上架资产类型'
   }
 
+  /**
+   * 按分类获取系统配置列表
+   *
+   * @param {string} category - 配置分类（basic/points/notification/security/marketplace）
+   * @returns {Promise<Object>} 返回该分类下所有配置的键值对
+   * @throws {Error} 当分类名称无效时抛出错误
+   */
   static async getSettingsByCategory(category) {
     try {
       // 验证分类是否合法（2026-01-21 修复：与 updateSettings 保持一致，添加 marketplace 分类）
@@ -518,7 +525,8 @@ class AdminSystemService {
         // 使用模型的getParsedValue方法自动解析值
         data.parsed_value = setting.getParsedValue()
         // 添加中文显示名称（2026-01-21 新增）
-        data.display_name = AdminSystemService.SETTING_DISPLAY_NAMES[data.setting_key] || data.setting_key
+        data.display_name =
+          AdminSystemService.SETTING_DISPLAY_NAMES[data.setting_key] || data.setting_key
         return data
       })
 

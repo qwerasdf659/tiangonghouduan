@@ -449,7 +449,7 @@ function renderOrders() {
       <td>${order.quantity}</td>
       <td>${getAssetText(order.pay_asset_code)}</td>
       <td><span class="badge bg-info">${order.pay_amount} ${getAssetUnit(order.pay_asset_code)}</span></td>
-      <td>${getStatusBadge(order.status)}</td>
+      <td>${getStatusBadge(order.status, order.status_display)}</td>
       <td>${formatDateTime(order.exchange_time || order.created_at)}</td>
       <td>
         <button class="btn btn-sm btn-outline-info" data-action="detail" data-order="${order.order_no}">
@@ -511,7 +511,7 @@ async function viewOrderDetail(orderNo) {
     if (response?.success) {
       const order = response.data.order
       document.getElementById('detailOrderNo').textContent = order.order_no
-      document.getElementById('detailStatus').innerHTML = getStatusBadge(order.status)
+      document.getElementById('detailStatus').innerHTML = getStatusBadge(order.status, order.status_display)
       document.getElementById('detailExchangeTime').textContent = formatDateTime(
         order.exchange_time || order.created_at
       )
@@ -635,7 +635,7 @@ function renderTradeOrders() {
       <td>ID: ${order.buyer_user_id}</td>
       <td>${escapeHtml(order.listing?.offerItem?.item_name || order.asset_code || '-')}</td>
       <td class="text-primary fw-bold">${order.gross_amount}</td>
-      <td>${getTradeOrderStatusBadge(order.status)}</td>
+      <td>${getTradeOrderStatusBadge(order.status, order.status_display)}</td>
       <td>${formatDateTime(order.created_at)}</td>
       <td>
         <button class="btn btn-sm btn-outline-info" data-action="detail" data-order="${order.order_id}">
@@ -648,17 +648,24 @@ function renderTradeOrders() {
     .join('')
 }
 
-// C2C交易订单状态徽章（使用后端的状态值）
-function getTradeOrderStatusBadge(status) {
-  const statusMap = {
-    created: { text: '已创建', class: 'bg-secondary' },
-    frozen: { text: '已冻结', class: 'bg-warning' },
-    completed: { text: '已完成', class: 'bg-success' },
-    cancelled: { text: '已取消', class: 'bg-danger' },
-    failed: { text: '失败', class: 'bg-dark' }
+/**
+ * C2C交易订单状态徽章
+ * @param {string} status - 状态英文标识
+ * @param {string} displayName - 后端返回的中文显示名称（优先使用）
+ */
+function getTradeOrderStatusBadge(status, displayName) {
+  const colorMap = {
+    created: 'bg-secondary',
+    frozen: 'bg-warning',
+    completed: 'bg-success',
+    cancelled: 'bg-danger',
+    failed: 'bg-dark'
   }
-  const info = statusMap[status] || { text: status || '未知', class: 'bg-secondary' }
-  return `<span class="badge ${info.class}">${info.text}</span>`
+  const statusKey = (status || '').toLowerCase()
+  const badgeColor = colorMap[statusKey] || 'bg-secondary'
+  // 优先使用后端返回的中文名称
+  const text = displayName || status || '未知'
+  return `<span class="badge ${badgeColor}">${text}</span>`
 }
 
 function updateTradeStats() {
@@ -787,14 +794,23 @@ function getAssetUnit(assetCode) {
   return map[assetCode] || '个'
 }
 
-function getStatusBadge(status) {
-  const map = {
-    pending: '<span class="badge bg-warning">待处理</span>',
-    completed: '<span class="badge bg-info">已完成</span>',
-    shipped: '<span class="badge bg-success">已发货</span>',
-    cancelled: '<span class="badge bg-secondary">已取消</span>'
+/**
+ * 兑换订单状态徽章
+ * @param {string} status - 状态英文标识
+ * @param {string} displayName - 后端返回的中文显示名称（优先使用）
+ */
+function getStatusBadge(status, displayName) {
+  const colorMap = {
+    pending: 'bg-warning',
+    completed: 'bg-info',
+    shipped: 'bg-success',
+    cancelled: 'bg-secondary'
   }
-  return map[status] || `<span class="badge bg-secondary">${status}</span>`
+  const statusKey = (status || '').toLowerCase()
+  const badgeColor = colorMap[statusKey] || 'bg-secondary'
+  // 优先使用后端返回的中文名称
+  const text = displayName || status || '未知'
+  return `<span class="badge ${badgeColor}">${text}</span>`
 }
 
 function showTableLoading(tbody, colspan) {

@@ -633,12 +633,16 @@ router.delete(
  * 管理员获取C2C交易订单列表（Admin Only）
  * GET /api/v4/console/marketplace/trade_orders
  *
- * @description 管理员查看所有C2C交易订单，支持状态筛选、分页、排序
+ * @description 管理员查看所有C2C交易订单，支持状态筛选、分页
  *
  * 业务场景：
  * - 管理后台C2C交易订单管理页面
  * - 订单状态筛选和查看
  * - 交易纠纷处理
+ *
+ * 服务合并记录（2026-01-22）：
+ * - 已使用 TradeOrderService.getOrders() 替代原 getAdminOrders()
+ * - 排序固定为 created_at DESC（降序）
  *
  * @query {string} status - 订单状态筛选（created/frozen/completed/cancelled）
  * @query {number} buyer_user_id - 买家ID筛选（可选）
@@ -646,14 +650,13 @@ router.delete(
  * @query {number} listing_id - 挂牌ID筛选（可选）
  * @query {number} page - 页码（默认1）
  * @query {number} page_size - 每页数量（默认20）
- * @query {string} sort_by - 排序字段（默认created_at）
- * @query {string} sort_order - 排序方向（默认DESC）
  *
  * @returns {Object} 订单列表和分页信息
  *
  * @security JWT + Admin权限
  *
  * @created 2026-01-09（web管理平台功能完善）
+ * @updated 2026-01-22（服务合并：使用 getOrders() 替代 getAdminOrders()）
  */
 router.get('/trade_orders', authenticateToken, requireAdmin, async (req, res) => {
   try {
@@ -663,9 +666,7 @@ router.get('/trade_orders', authenticateToken, requireAdmin, async (req, res) =>
       seller_user_id,
       listing_id,
       page = 1,
-      page_size = 20,
-      sort_by = 'created_at',
-      sort_order = 'DESC'
+      page_size = 20
     } = req.query
     const admin_id = req.user.user_id
 
@@ -682,21 +683,19 @@ router.get('/trade_orders', authenticateToken, requireAdmin, async (req, res) =>
     // P1-9：通过 ServiceManager 获取 TradeOrderService（snake_case key）
     const TradeOrderService = req.app.locals.services.getService('trade_order')
 
-    // 调用服务层方法获取订单列表
-    const result = await TradeOrderService.getAdminOrders({
+    // 调用服务层方法获取订单列表（2026-01-22 合并：使用 getOrders() 替代 getAdminOrders()）
+    const result = await TradeOrderService.getOrders({
       status,
-      buyer_user_id: buyer_user_id ? parseInt(buyer_user_id) : null,
-      seller_user_id: seller_user_id ? parseInt(seller_user_id) : null,
-      listing_id: listing_id ? parseInt(listing_id) : null,
+      buyer_user_id: buyer_user_id ? parseInt(buyer_user_id) : undefined,
+      seller_user_id: seller_user_id ? parseInt(seller_user_id) : undefined,
+      listing_id: listing_id ? parseInt(listing_id) : undefined,
       page: parseInt(page),
-      page_size: parseInt(page_size),
-      sort_by,
-      sort_order
+      page_size: parseInt(page_size)
     })
 
     logger.info('管理员查询C2C交易订单成功', {
       admin_id,
-      total: result.pagination.total,
+      total: result.pagination.total_count,
       page: result.pagination.page
     })
 

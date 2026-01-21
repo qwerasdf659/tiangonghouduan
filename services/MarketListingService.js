@@ -48,6 +48,7 @@ const AssetService = require('./AssetService')
 const { BusinessCacheHelper } = require('../utils/BusinessCacheHelper')
 const { assertAndGetTransaction } = require('../utils/transactionHelpers')
 const logger = require('../utils/logger').logger
+const { getDisplayName } = require('../constants/DisplayNames')
 
 /**
  * 挂牌限制配置默认值（兜底，优先从 DB system_settings 读取）
@@ -836,8 +837,17 @@ class MarketListingService {
       offset: (page - 1) * page_size
     })
 
+    // 添加中文显示名称
+    const listingsWithDisplayNames = rows.map(row => {
+      const listing = row.get ? row.get({ plain: true }) : row
+      return {
+        ...listing,
+        status_display: getDisplayName(listing.status, 'status')
+      }
+    })
+
     return {
-      listings: rows,
+      listings: listingsWithDisplayNames,
       total: count,
       page,
       page_size
@@ -990,6 +1000,7 @@ class MarketListingService {
         price_asset_code: listing.price_asset_code || 'DIAMOND',
         seller_user_id: listing.seller_user_id,
         status: listing.status,
+        status_display: getDisplayName(listing.status, 'status'), // 添加状态中文名称
         listed_at: listing.created_at
       }
 

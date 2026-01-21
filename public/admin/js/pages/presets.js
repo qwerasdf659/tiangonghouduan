@@ -296,7 +296,7 @@ async function loadInterventions() {
           </td>
           <td>${item.prize_info?.prize_name || getSettingTypeLabel(item.setting_type)}</td>
           <td class="text-success fw-bold">${item.prize_info ? '¥' + parseFloat(item.prize_info.prize_value || 0).toFixed(2) : '-'}</td>
-          <td>${getStatusBadge(item.status)}</td>
+          <td>${getStatusBadge(item.status, item.status_display)}</td>
           <td><small>${formatDate(item.created_at)}</small></td>
           <td><small>${item.expires_at ? formatDate(item.expires_at) : '永不过期'}</small></td>
           <td>${item.operator?.nickname || '系统'}</td>
@@ -339,14 +339,23 @@ async function loadInterventions() {
  * @param {string} status - 状态值
  * @returns {string} HTML标签
  */
-function getStatusBadge(status) {
-  const badges = {
-    active: '<span class="badge bg-success">待触发</span>',
-    used: '<span class="badge bg-secondary">已使用</span>',
-    expired: '<span class="badge bg-danger">已过期</span>',
-    cancelled: '<span class="badge bg-warning text-dark">已取消</span>'
+/**
+ * 获取状态徽章
+ * @param {string} status - 状态英文标识
+ * @param {string} displayName - 后端返回的中文显示名称（优先使用）
+ */
+function getStatusBadge(status, displayName) {
+  const colorMap = {
+    active: 'bg-success',
+    used: 'bg-secondary',
+    expired: 'bg-danger',
+    cancelled: 'bg-warning text-dark'
   }
-  return badges[status] || '<span class="badge bg-light text-dark">未知</span>'
+  const statusKey = (status || '').toLowerCase()
+  const badgeColor = colorMap[statusKey] || 'bg-light text-dark'
+  // 优先使用后端返回的中文名称
+  const text = displayName || status || '未知'
+  return `<span class="badge ${badgeColor}">${text}</span>`
 }
 
 /**
@@ -515,7 +524,7 @@ async function viewIntervention(id) {
         </div>
         <div class="mb-3">
           <label class="form-label text-muted">状态</label>
-          <div>${getStatusBadge(item.status)}</div>
+          <div>${getStatusBadge(item.status, item.status_display)}</div>
         </div>
         <div class="mb-3">
           <label class="form-label text-muted">干预原因</label>

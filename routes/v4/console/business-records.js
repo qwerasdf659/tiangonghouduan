@@ -322,9 +322,7 @@ router.post(
       try {
         // 查找订单并锁定
         const order = await RedemptionOrder.findByPk(order_id, {
-          include: [
-            { model: ItemInstance, as: 'item_instance' }
-          ],
+          include: [{ model: ItemInstance, as: 'item_instance' }],
           lock: transaction.LOCK.UPDATE,
           transaction
         })
@@ -360,17 +358,23 @@ router.post(
 
         // 执行核销
         const fulfilledAt = BeijingTimeHelper.createDatabaseTime()
-        await order.update({
-          status: 'fulfilled',
-          redeemer_user_id: adminUserId,
-          fulfilled_at: fulfilledAt
-        }, { transaction })
+        await order.update(
+          {
+            status: 'fulfilled',
+            redeemer_user_id: adminUserId,
+            fulfilled_at: fulfilledAt
+          },
+          { transaction }
+        )
 
         // 更新物品实例状态
         if (order.item_instance) {
-          await order.item_instance.update({
-            status: 'used'
-          }, { transaction })
+          await order.item_instance.update(
+            {
+              status: 'used'
+            },
+            { transaction }
+          )
         }
 
         await transaction.commit()
@@ -426,9 +430,7 @@ router.post(
       try {
         // 查找订单并锁定
         const order = await RedemptionOrder.findByPk(order_id, {
-          include: [
-            { model: ItemInstance, as: 'item_instance' }
-          ],
+          include: [{ model: ItemInstance, as: 'item_instance' }],
           lock: transaction.LOCK.UPDATE,
           transaction
         })
@@ -445,15 +447,21 @@ router.post(
         }
 
         // 执行取消
-        await order.update({
-          status: 'cancelled'
-        }, { transaction })
+        await order.update(
+          {
+            status: 'cancelled'
+          },
+          { transaction }
+        )
 
         // 恢复物品实例状态（如果需要）
         if (order.item_instance && order.item_instance.status === 'pending_redeem') {
-          await order.item_instance.update({
-            status: 'available'
-          }, { transaction })
+          await order.item_instance.update(
+            {
+              status: 'available'
+            },
+            { transaction }
+          )
         }
 
         await transaction.commit()

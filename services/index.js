@@ -83,10 +83,13 @@ const UserRiskProfileService = require('./UserRiskProfileService') // 用户风�
 const LotteryTierRuleService = require('./LotteryTierRuleService') // 抽奖档位规则管理服务（2026-01-21 API覆盖率补齐）
 
 // P2 API覆盖率补齐 - 监控查询服务（2026-01-21）
-const LotteryMonitoringService = require('./LotteryMonitoringService') // 抽奖监控数据查询服务
-const LotteryStrategyStatsService = require('./LotteryStrategyStatsService') // 抽奖策略引擎监控仪表盘统计服务
-const TradeOrderQueryService = require('./TradeOrderQueryService') // 交易订单查询服务
-const UserPremiumQueryService = require('./UserPremiumQueryService') // 用户高级空间状态查询服务
+const LotteryAnalyticsService = require('./LotteryAnalyticsService') // 抽奖分析服务（监控+统计）
+/*
+ * 服务合并记录（2026-01-21）：
+ * - LotteryMonitoringService + LotteryStrategyStatsService → LotteryAnalyticsService
+ * - TradeOrderQueryService 已合并到 TradeOrderService
+ * - UserPremiumQueryService 已合并到 PremiumService
+ */
 
 // P1-9 新增注册的服务（2026-01-09）
 const DataSanitizer = require('./DataSanitizer') // 统一数据脱敏服务
@@ -324,10 +327,13 @@ class ServiceManager {
 
       // ========== P2 API覆盖率补齐 - 监控查询服务（2026-01-21） ==========
 
-      this._services.set('lottery_monitoring', new LotteryMonitoringService(this.models)) // 抽奖监控数据查询服务
-      this._services.set('trade_order_query', new TradeOrderQueryService(this.models)) // 交易订单查询服务
-      this._services.set('user_premium_query', new UserPremiumQueryService(this.models)) // 用户高级空间状态查询服务
-      this._services.set('lottery_strategy_stats', new LotteryStrategyStatsService(this.models)) // 抽奖策略引擎监控仪表盘统计服务
+      this._services.set('lottery_analytics', new LotteryAnalyticsService(this.models)) // 抽奖分析服务（监控+统计合并）
+      /*
+       * 已合并的服务（2026-01-21）：
+       * - lottery_monitoring + lottery_strategy_stats → LotteryAnalyticsService
+       * - trade_order_query → TradeOrderService（静态方法直接调用，无需注册）
+       * - user_premium_query → PremiumService（静态方法直接调用，无需注册）
+       */
 
       /**
        * V4.6 管线编排器
