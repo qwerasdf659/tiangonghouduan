@@ -25,6 +25,7 @@
 const express = require('express')
 const router = express.Router()
 const { authenticateToken } = require('../../../middleware/auth')
+const { requireValidSession } = require('../../../middleware/sensitiveOperation') // 🔐 会话管理功能（2026-01-21）
 const { handleServiceError } = require('../../../middleware/validation')
 const logger = require('../../../utils/logger').logger
 // 事务边界治理 - 统一事务管理器
@@ -75,6 +76,7 @@ const marketRiskMiddleware = getMarketRiskControlMiddleware()
 router.post(
   '/list',
   authenticateToken,
+  requireValidSession, // 🔐 市场挂牌属于敏感操作，需验证会话（2026-01-21 会话管理功能）
   marketRiskMiddleware.createListingRiskMiddleware(),
   async (req, res) => {
     // P1-9：通过 ServiceManager 获取服务（B1-Injected + E2-Strict snake_case）
@@ -329,6 +331,7 @@ router.post(
 router.post(
   '/fungible-assets/list',
   authenticateToken,
+  requireValidSession, // 🔐 可叠加资产挂牌属于敏感操作，需验证会话（2026-01-21 会话管理功能）
   marketRiskMiddleware.createListingRiskMiddleware(),
   async (req, res) => {
     // P1-9：通过 ServiceManager 获取服务（B1-Injected + E2-Strict snake_case）

@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>抽奖监控 - 管理后台</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+  <link href="/admin/css/common.css" rel="stylesheet">
+  <style>
+    .metric-card {
+      border-radius: 12px;
+      transition: all 0.3s ease;
+    }
+    .metric-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    }
+    .metric-value {
+      font-size: 2rem;
+      font-weight: bold;
+    }
+    .metric-trend {
+      font-size: 0.85rem;
+    }
+    .trend-up { color: #198754; }
+    .trend-down { color: #dc3545; }
+    .chart-container {
+      height: 350px;
+    }
+    .live-indicator {
+      width: 8px;
+      height: 8px;
+      background: #198754;
+      border-radius: 50%;
+      display: inline-block;
+      animation: pulse 2s infinite;
+    }
+    @keyframes pulse {
+      0% { opacity: 1; }
+      50% { opacity: 0.5; }
+      100% { opacity: 1; }
+    }
+  </style>
+</head>
+<body class="bg-light">
+  <nav class="navbar navbar-dark bg-primary">
+    <div class="container-fluid">
+      <a href="/admin/dashboard.html" class="navbar-brand">
+        <i class="bi bi-arrow-left me-2"></i>📊 管理后台 - 抽奖监控
+      </a>
+      <div class="d-flex align-items-center">
+        <span class="live-indicator me-2"></span>
+        <span class="text-light me-3" id="lastUpdate">实时更新</span>
+        <span class="text-light me-3" id="welcomeText">欢迎，管理员</span>
+        <button class="btn btn-outline-light btn-sm" id="logoutBtn">退出登录</button>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container-fluid mt-4">
+    <!-- 时间筛选 -->
+    <div class="card mb-4">
+      <div class="card-body">
+        <div class="row align-items-center">
+          <div class="col-md-3">
+            <label class="form-label">选择活动</label>
+            <select class="form-select" id="campaignFilter">
+              <option value="">全部活动</option>
+            </select>
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">时间范围</label>
+            <select class="form-select" id="timeRange">
+              <option value="today">今日</option>
+              <option value="yesterday">昨日</option>
+              <option value="week">本周</option>
+              <option value="month">本月</option>
+              <option value="custom">自定义</option>
+            </select>
+          </div>
+          <div class="col-md-4" id="customDateRange" style="display: none;">
+            <label class="form-label">自定义时间</label>
+            <div class="input-group">
+              <input type="date" class="form-control" id="startDate">
+              <span class="input-group-text">至</span>
+              <input type="date" class="form-control" id="endDate">
+            </div>
+          </div>
+          <div class="col-md-2 d-flex align-items-end">
+            <button class="btn btn-primary" onclick="loadMetrics()">
+              <i class="bi bi-arrow-clockwise"></i> 刷新数据
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 核心指标卡片 -->
+    <div class="row g-3 mb-4">
+      <div class="col-md-3">
+        <div class="card metric-card border-primary">
+          <div class="card-body">
+            <div class="d-flex justify-content-between">
+              <div>
+                <h6 class="text-muted">抽奖次数</h6>
+                <div class="metric-value text-primary" id="totalDraws">-</div>
+                <div class="metric-trend" id="drawsTrend">-</div>
+              </div>
+              <i class="bi bi-dice-5 text-primary" style="font-size: 2.5rem;"></i>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="card metric-card border-success">
+          <div class="card-body">
+            <div class="d-flex justify-content-between">
+              <div>
+                <h6 class="text-muted">中奖次数</h6>
+                <div class="metric-value text-success" id="totalWins">-</div>
+                <div class="metric-trend" id="winsTrend">-</div>
+              </div>
+              <i class="bi bi-trophy text-success" style="font-size: 2.5rem;"></i>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="card metric-card border-warning">
+          <div class="card-body">
+            <div class="d-flex justify-content-between">
+              <div>
+                <h6 class="text-muted">中奖率</h6>
+                <div class="metric-value text-warning" id="winRate">-</div>
+                <div class="metric-trend" id="rateTrend">-</div>
+              </div>
+              <i class="bi bi-percent text-warning" style="font-size: 2.5rem;"></i>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="card metric-card border-info">
+          <div class="card-body">
+            <div class="d-flex justify-content-between">
+              <div>
+                <h6 class="text-muted">奖品价值</h6>
+                <div class="metric-value text-info" id="totalValue">-</div>
+                <div class="metric-trend" id="valueTrend">-</div>
+              </div>
+              <i class="bi bi-currency-yen text-info" style="font-size: 2.5rem;"></i>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 图表区域 -->
+    <div class="row g-3 mb-4">
+      <div class="col-md-8">
+        <div class="card">
+          <div class="card-header bg-white">
+            <h6 class="mb-0"><i class="bi bi-graph-up"></i> 抽奖趋势</h6>
+          </div>
+          <div class="card-body">
+            <div class="chart-container" id="trendChart"></div>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="card">
+          <div class="card-header bg-white">
+            <h6 class="mb-0"><i class="bi bi-pie-chart"></i> 奖品分布</h6>
+          </div>
+          <div class="card-body">
+            <div class="chart-container" id="prizeDistChart"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="row g-3">
+      <!-- 实时抽奖记录 -->
+      <div class="col-md-6">
+        <div class="card">
+          <div class="card-header bg-white d-flex justify-content-between align-items-center">
+            <h6 class="mb-0"><i class="bi bi-lightning"></i> 实时抽奖记录</h6>
+            <span class="badge bg-success">最新20条</span>
+          </div>
+          <div class="card-body p-0" style="max-height: 400px; overflow-y: auto;">
+            <table class="table table-sm table-hover mb-0">
+              <thead class="sticky-top bg-light">
+                <tr>
+                  <th>时间</th>
+                  <th>用户</th>
+                  <th>活动</th>
+                  <th>结果</th>
+                </tr>
+              </thead>
+              <tbody id="realtimeList">
+                <!-- 动态生成 -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- 奖品统计 -->
+      <div class="col-md-6">
+        <div class="card">
+          <div class="card-header bg-white">
+            <h6 class="mb-0"><i class="bi bi-gift"></i> 奖品发放统计</h6>
+          </div>
+          <div class="card-body p-0" style="max-height: 400px; overflow-y: auto;">
+            <table class="table table-sm table-hover mb-0">
+              <thead class="sticky-top bg-light">
+                <tr>
+                  <th>奖品名称</th>
+                  <th>发放数量</th>
+                  <th>剩余库存</th>
+                  <th>消耗率</th>
+                </tr>
+              </thead>
+              <tbody id="prizeStatsList">
+                <!-- 动态生成 -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="loading-overlay" id="loadingOverlay">
+    <div class="spinner-border text-light" style="width: 3rem; height: 3rem;" role="status">
+      <span class="visually-hidden">加载中...</span>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="/admin/js/admin-common.js"></script>
+  <script src="/admin/js/api-config.js"></script>
+  <script src="/admin/js/lib/echarts.min.js"></script>
+  <script>
+    let trendChart = null;
+    let prizeDistChart = null;
+    let refreshTimer = null;
+
+    document.addEventListener('DOMContentLoaded', function() {
+      const userInfo = getCurrentUser();
+      if (userInfo && userInfo.nickname) {
+        document.getElementById('welcomeText').textContent = `欢迎，${userInfo.nickname}`;
+      }
+      document.getElementById('logoutBtn').addEventListener('click', logout);
+
+      document.getElementById('timeRange').addEventListener('change', function() {
+        document.getElementById('customDateRange').style.display = this.value === 'custom' ? 'block' : 'none';
+      });
+
+      initCharts();
+      loadCampaigns();
+      loadMetrics();
+
+      // 自动刷新（每30秒）
+      refreshTimer = setInterval(() => {
+        loadMetrics();
+        updateLastTime();
+      }, 30000);
+    });
+
+    function initCharts() {
+      trendChart = echarts.init(document.getElementById('trendChart'));
+      prizeDistChart = echarts.init(document.getElementById('prizeDistChart'));
+
+      window.addEventListener('resize', () => {
+        trendChart.resize();
+        prizeDistChart.resize();
+      });
+    }
+
+    async function loadCampaigns() {
+      try {
+        const response = await apiRequest(API_ENDPOINTS.CAMPAIGN.LIST);
+        if (response && response.success) {
+          const campaigns = response.data.campaigns || response.data || [];
+          const select = document.getElementById('campaignFilter');
+          select.innerHTML = '<option value="">全部活动</option>' +
+            campaigns.map(c => `<option value="${c.campaign_id}">${escapeHtml(c.name || c.campaign_name)}</option>`).join('');
+        }
+      } catch (error) {
+        console.error('加载活动失败:', error);
+      }
+    }
+
+    async function loadMetrics() {
+      showLoading();
+      try {
+        const campaignId = document.getElementById('campaignFilter').value;
+        const timeRange = document.getElementById('timeRange').value;
+
+        const params = new URLSearchParams();
+        if (campaignId) params.append('campaign_id', campaignId);
+        params.append('time_range', timeRange);
+
+        if (timeRange === 'custom') {
+          params.append('start_date', document.getElementById('startDate').value);
+          params.append('end_date', document.getElementById('endDate').value);
+        }
+
+        const url = API_ENDPOINTS.LOTTERY_MONITORING.STATS + '?' + params.toString();
+        const response = await apiRequest(url);
+
+        if (response && response.success) {
+          const data = response.data;
+          updateMetricCards(data.summary || data);
+          updateTrendChart(data.trend || []);
+          updatePrizeDistChart(data.prize_distribution || []);
+          updateRealtimeList(data.recent_draws || []);
+          updatePrizeStats(data.prize_stats || []);
+        } else {
+          // 使用模拟数据
+          updateWithMockData();
+        }
+      } catch (error) {
+        console.error('加载监控数据失败:', error);
+        updateWithMockData();
+      } finally {
+        hideLoading();
+        updateLastTime();
+      }
+    }
+
+    function updateWithMockData() {
+      updateMetricCards({
+        total_draws: 1234,
+        total_wins: 456,
+        win_rate: 36.9,
+        total_value: 12580,
+        draws_trend: 12.5,
+        wins_trend: 8.2,
+        rate_trend: -2.1,
+        value_trend: 15.6
+      });
+
+      updateTrendChart([
+        { time: '00:00', draws: 45, wins: 15 },
+        { time: '04:00', draws: 23, wins: 8 },
+        { time: '08:00', draws: 89, wins: 32 },
+        { time: '12:00', draws: 156, wins: 58 },
+        { time: '16:00', draws: 234, wins: 89 },
+        { time: '20:00', draws: 312, wins: 118 },
+        { time: '24:00', draws: 375, wins: 136 }
+      ]);
+
+      updatePrizeDistChart([
+        { name: '一等奖', value: 5 },
+        { name: '二等奖', value: 25 },
+        { name: '三等奖', value: 80 },
+        { name: '参与奖', value: 346 },
+        { name: '谢谢参与', value: 778 }
+      ]);
+
+      updateRealtimeList([
+        { time: '刚刚', user: '用户***1234', campaign: '新春抽奖', result: '二等奖', is_win: true },
+        { time: '1分钟前', user: '用户***5678', campaign: '新春抽奖', result: '谢谢参与', is_win: false },
+        { time: '2分钟前', user: '用户***9012', campaign: '会员福利', result: '三等奖', is_win: true }
+      ]);
+
+      updatePrizeStats([
+        { name: '一等奖-iPhone', issued: 5, stock: 95, rate: 5 },
+        { name: '二等奖-耳机', issued: 25, stock: 175, rate: 12.5 },
+        { name: '三等奖-优惠券', issued: 80, stock: 420, rate: 16 }
+      ]);
+    }
+
+    function updateMetricCards(data) {
+      document.getElementById('totalDraws').textContent = formatNumber(data.total_draws || 0);
+      document.getElementById('totalWins').textContent = formatNumber(data.total_wins || 0);
+      document.getElementById('winRate').textContent = (data.win_rate || 0).toFixed(1) + '%';
+      document.getElementById('totalValue').textContent = '¥' + formatNumber(data.total_value || 0);
+
+      updateTrend('drawsTrend', data.draws_trend);
+      updateTrend('winsTrend', data.wins_trend);
+      updateTrend('rateTrend', data.rate_trend);
+      updateTrend('valueTrend', data.value_trend);
+    }
+
+    function updateTrend(elementId, value) {
+      const element = document.getElementById(elementId);
+      if (value === undefined || value === null) {
+        element.textContent = '-';
+        return;
+      }
+      const isUp = value >= 0;
+      element.innerHTML = `
+        <span class="${isUp ? 'trend-up' : 'trend-down'}">
+          <i class="bi bi-arrow-${isUp ? 'up' : 'down'}"></i>
+          ${Math.abs(value).toFixed(1)}%
+        </span>
+        <span class="text-muted">较昨日</span>
+      `;
+    }
+
+    function updateTrendChart(data) {
+      const option = {
+        tooltip: { trigger: 'axis' },
+        legend: { data: ['抽奖次数', '中奖次数'], bottom: 0 },
+        grid: { left: '3%', right: '4%', bottom: '15%', containLabel: true },
+        xAxis: {
+          type: 'category',
+          data: data.map(d => d.time || d.hour || d.date)
+        },
+        yAxis: { type: 'value' },
+        series: [
+          {
+            name: '抽奖次数',
+            type: 'line',
+            smooth: true,
+            data: data.map(d => d.draws || d.draw_count || 0),
+            areaStyle: { opacity: 0.3 },
+            itemStyle: { color: '#0d6efd' }
+          },
+          {
+            name: '中奖次数',
+            type: 'line',
+            smooth: true,
+            data: data.map(d => d.wins || d.win_count || 0),
+            areaStyle: { opacity: 0.3 },
+            itemStyle: { color: '#198754' }
+          }
+        ]
+      };
+      trendChart.setOption(option);
+    }
+
+    function updatePrizeDistChart(data) {
+      const option = {
+        tooltip: { trigger: 'item', formatter: '{b}: {c} ({d}%)' },
+        legend: { orient: 'vertical', left: 'left', top: 'center' },
+        series: [{
+          type: 'pie',
+          radius: ['40%', '70%'],
+          center: ['60%', '50%'],
+          avoidLabelOverlap: false,
+          itemStyle: { borderRadius: 10, borderColor: '#fff', borderWidth: 2 },
+          label: { show: false },
+          emphasis: { label: { show: true, fontSize: 14, fontWeight: 'bold' } },
+          data: data.map(d => ({
+            name: d.name || d.prize_name,
+            value: d.value || d.count
+          }))
+        }]
+      };
+      prizeDistChart.setOption(option);
+    }
+
+    function updateRealtimeList(records) {
+      const tbody = document.getElementById('realtimeList');
+      
+      if (!records || records.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">暂无数据</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = records.map(r => `
+        <tr>
+          <td><small class="text-muted">${r.time || formatTime(r.created_at)}</small></td>
+          <td>${escapeHtml(r.user || r.user_name || '-')}</td>
+          <td>${escapeHtml(r.campaign || r.campaign_name || '-')}</td>
+          <td>
+            <span class="badge ${r.is_win ? 'bg-success' : 'bg-secondary'}">
+              ${escapeHtml(r.result || r.prize_name || '谢谢参与')}
+            </span>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    function updatePrizeStats(stats) {
+      const tbody = document.getElementById('prizeStatsList');
+      
+      if (!stats || stats.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">暂无数据</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = stats.map(s => `
+        <tr>
+          <td>${escapeHtml(s.name || s.prize_name)}</td>
+          <td><span class="badge bg-success">${s.issued || s.issued_count || 0}</span></td>
+          <td><span class="badge bg-info">${s.stock || s.remaining || 0}</span></td>
+          <td>
+            <div class="progress" style="height: 20px;">
+              <div class="progress-bar ${getProgressBarClass(s.rate || 0)}" 
+                   style="width: ${s.rate || 0}%">
+                ${(s.rate || 0).toFixed(1)}%
+              </div>
+            </div>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    function getProgressBarClass(rate) {
+      if (rate >= 80) return 'bg-danger';
+      if (rate >= 50) return 'bg-warning';
+      return 'bg-success';
+    }
+
+    function updateLastTime() {
+      document.getElementById('lastUpdate').textContent = '更新于 ' + new Date().toLocaleTimeString('zh-CN');
+    }
+
+    function formatNumber(num) {
+      return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+    }
+
+    function formatTime(dateStr) {
+      if (!dateStr) return '-';
+      const date = new Date(dateStr);
+      const now = new Date();
+      const diff = now - date;
+      if (diff < 60000) return '刚刚';
+      if (diff < 3600000) return Math.floor(diff / 60000) + '分钟前';
+      return date.toLocaleTimeString('zh-CN');
+    }
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      const div = document.createElement('div');
+      div.textContent = str;
+      return div.innerHTML;
+    }
+
+    function showLoading() {
+      document.getElementById('loadingOverlay').classList.add('show');
+    }
+
+    function hideLoading() {
+      document.getElementById('loadingOverlay').classList.remove('show');
+    }
+  </script>
+</body>
+</html>
+

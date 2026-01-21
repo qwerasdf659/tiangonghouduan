@@ -310,6 +310,11 @@ const CANONICAL_OPERATION_MAP = {
   '/api/v4/console/staff/:id/role': 'ADMIN_STAFF_UPDATE_ROLE', // 更新员工角色
   '/api/v4/console/staff/:id': 'ADMIN_STAFF_DELETE', // 删除员工（DELETE 方法，修改 operation 名称）
 
+  // ===== 会话管理（2026-01-21 会话管理功能补齐）=====
+  '/api/v4/console/sessions/:id/deactivate': 'ADMIN_SESSION_DEACTIVATE', // 失效单个会话
+  '/api/v4/console/sessions/deactivate-user': 'ADMIN_SESSION_DEACTIVATE_USER', // 失效用户所有会话
+  '/api/v4/console/sessions/cleanup': 'ADMIN_SESSION_CLEANUP', // 清理过期会话
+
   // ===== 门店管理 =====
   '/api/v4/console/stores/': 'ADMIN_STORE_CREATE', // 创建门店（修复：尾斜杠）
   '/api/v4/console/stores/batch-import': 'ADMIN_STORE_BATCH_IMPORT', // 批量导入门店

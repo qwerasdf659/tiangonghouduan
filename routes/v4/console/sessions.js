@@ -190,7 +190,10 @@ router.get('/stats', authenticateToken, requireAdmin, async (req, res) => {
 router.get('/online-users', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const now = BeijingTimeHelper.createBeijingTime()
-    // 查询所有活跃且未过期的会话，按用户分组
+    /*
+     * 查询所有活跃且未过期的会话，按用户分组
+     * 查询活跃会话（不使用include避免模型scope问题）
+     */
     const activeSessions = await AuthenticationSession.findAll({
       where: {
         is_active: true,
@@ -198,30 +201,35 @@ router.get('/online-users', authenticateToken, requireAdmin, async (req, res) =>
           [Op.gt]: now
         }
       },
-      include: [
-        {
-          model: User,
-          as: 'user',
-          attributes: ['user_id', 'nickname', 'mobile', 'status'],
-          required: true
-        }
-      ],
       order: [['last_activity', 'DESC']]
     })
+
+    // 批量查询关联用户信息
+    const userIds = [...new Set(activeSessions.map(s => s.user_id).filter(Boolean))]
+    const users =
+      userIds.length > 0
+        ? await User.findAll({
+            where: { user_id: userIds },
+            attributes: ['user_id', 'nickname', 'mobile', 'status']
+          })
+        : []
+    const userMap = new Map(users.map(u => [u.user_id, u]))
+
     // 按用户聚合
     const userSessionMap = new Map()
     for (const session of activeSessions) {
       const userId = session.user_id
       const userType = session.user_type
+      const userInfo = userMap.get(userId)
       if (!userSessionMap.has(userId)) {
         userSessionMap.set(userId, {
           user_id: userId,
           user_type: userType,
-          nickname: session.user?.nickname || null,
-          mobile: session.user?.mobile
-            ? `${session.user.mobile.substring(0, 3)}****${session.user.mobile.substring(7)}`
+          nickname: userInfo?.nickname || null,
+          mobile: userInfo?.mobile
+            ? `${userInfo.mobile.substring(0, 3)}****${userInfo.mobile.substring(7)}`
             : null,
-          status: session.user?.status || null,
+          status: userInfo?.status || null,
           active_sessions: 0,
           last_activity: session.last_activity,
           login_ips: new Set()
@@ -277,35 +285,38 @@ router.get('/:id', authenticateToken, requireAdmin, async (req, res) => {
     if (isNaN(sessionId) || sessionId <= 0) {
       return res.apiError('无效的会话ID', 'INVALID_SESSION_ID', null, 400)
     }
+
+    // 查询会话（不使用include避免模型scope问题）
     const session = await AuthenticationSession.findOne({
-      where: { user_session_id: sessionId },
-      include: [
-        {
-          model: User,
-          as: 'user',
-          attributes: ['user_id', 'nickname', 'mobile', 'status', 'created_at', 'last_login']
-        }
-      ]
+      where: { user_session_id: sessionId }
     })
+
     if (!session) {
       return res.apiError('会话不存在', 'SESSION_NOT_FOUND', null, 404)
     }
+
+    // 单独查询用户信息
+    const userInfo = await User.findOne({
+      where: { user_id: session.user_id },
+      attributes: ['user_id', 'nickname', 'mobile', 'status', 'created_at', 'last_login']
+    })
+
     return res.apiSuccess(
       {
         user_session_id: session.user_session_id,
         session_token: `${session.session_token.substring(0, 8)}...`, // 脱敏显示
         user_type: session.user_type,
         user_id: session.user_id,
-        user_info: session.user
+        user_info: userInfo
           ? {
-              user_id: session.user.user_id,
-              nickname: session.user.nickname,
-              mobile: session.user.mobile
-                ? `${session.user.mobile.substring(0, 3)}****${session.user.mobile.substring(7)}`
+              user_id: userInfo.user_id,
+              nickname: userInfo.nickname,
+              mobile: userInfo.mobile
+                ? `${userInfo.mobile.substring(0, 3)}****${userInfo.mobile.substring(7)}`
                 : null,
-              status: session.user.status,
-              created_at: BeijingTimeHelper.formatToISO(session.user.created_at),
-              last_login: BeijingTimeHelper.formatToISO(session.user.last_login)
+              status: userInfo.status,
+              created_at: BeijingTimeHelper.formatToISO(userInfo.created_at),
+              last_login: BeijingTimeHelper.formatToISO(userInfo.last_login)
             }
           : null,
         login_ip: session.login_ip,

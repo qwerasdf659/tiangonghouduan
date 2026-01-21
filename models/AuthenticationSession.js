@@ -290,25 +290,20 @@ module.exports = sequelize => {
 
   // 关联关系
   AuthenticationSession.associate = function (models) {
-    // 普通用户会话
-    AuthenticationSession.belongsTo(models.User, {
-      foreignKey: 'user_id',
-      as: 'user',
-      constraints: false,
-      scope: {
-        user_type: 'user'
-      }
-    })
-
     /*
-     * V4.0简化权限：管理员会话也使用User模型
-     * 管理员信息通过UUID角色系统区分
+     * 关联用户表（统一关联，不区分user_type）
+     *
+     * 🔴 注意：不使用 scope 限制 user_type
+     *    - user_type 是 authentication_sessions 表的字段，不是 users 表的字段
+     *    - 如需按 user_type 区分，应在查询时手动添加条件
+     *
+     * V4.0简化权限：所有会话都关联到 users 表
+     * 管理员/用户身份通过 user_type 字段和 roles 表区分
      */
     AuthenticationSession.belongsTo(models.User, {
       foreignKey: 'user_id',
-      as: 'admin',
+      as: 'user',
       constraints: false
-      // 注意：管理员权限通过roles表关联检查，不使用scope限制
     })
   }
 

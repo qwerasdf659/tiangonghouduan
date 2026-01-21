@@ -1,0 +1,597 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>欠账管理 - 管理后台</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+  <link href="/admin/css/common.css" rel="stylesheet">
+  <style>
+    .debt-card {
+      border-left: 4px solid #dc3545;
+    }
+    .debt-card.cleared {
+      border-left-color: #28a745;
+    }
+    .amount-text {
+      font-size: 1.5rem;
+      font-weight: bold;
+    }
+    .chart-container {
+      height: 300px;
+    }
+  </style>
+</head>
+<body class="bg-light">
+  <nav class="navbar navbar-dark bg-primary">
+    <div class="container-fluid">
+      <a href="/admin/dashboard.html" class="navbar-brand">
+        <i class="bi bi-arrow-left me-2"></i>💰 管理后台 - 欠账管理
+      </a>
+      <div>
+        <span class="text-light me-3" id="welcomeText">欢迎，管理员</span>
+        <button class="btn btn-outline-light btn-sm" id="logoutBtn">退出登录</button>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container-fluid mt-4">
+    <!-- 仪表盘统计 -->
+    <div class="row g-3 mb-4">
+      <div class="col-md-3">
+        <div class="card stat-card">
+          <div class="card-body text-center">
+            <i class="bi bi-exclamation-triangle text-danger" style="font-size: 2rem;"></i>
+            <h6 class="text-muted mt-2">待清偿总数</h6>
+            <h2 id="pendingCount" class="text-danger mb-0">-</h2>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="card stat-card">
+          <div class="card-body text-center">
+            <i class="bi bi-currency-yen text-warning" style="font-size: 2rem;"></i>
+            <h6 class="text-muted mt-2">待清偿金额</h6>
+            <h2 id="pendingAmount" class="text-warning mb-0">-</h2>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="card stat-card">
+          <div class="card-body text-center">
+            <i class="bi bi-check-circle text-success" style="font-size: 2rem;"></i>
+            <h6 class="text-muted mt-2">已清偿总数</h6>
+            <h2 id="clearedCount" class="text-success mb-0">-</h2>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="card stat-card">
+          <div class="card-body text-center">
+            <i class="bi bi-percent text-info" style="font-size: 2rem;"></i>
+            <h6 class="text-muted mt-2">清偿率</h6>
+            <h2 id="clearRate" class="text-info mb-0">-</h2>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 图表区域 -->
+    <div class="row g-3 mb-4">
+      <div class="col-md-6">
+        <div class="card">
+          <div class="card-header">
+            <i class="bi bi-pie-chart"></i> 欠账来源分布
+          </div>
+          <div class="card-body">
+            <div id="sourceChart" class="chart-container"></div>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-6">
+        <div class="card">
+          <div class="card-header">
+            <i class="bi bi-bar-chart"></i> 按活动汇总
+          </div>
+          <div class="card-body">
+            <div id="campaignChart" class="chart-container"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 选项卡 -->
+    <ul class="nav nav-tabs mb-4" id="debtTabs" role="tablist">
+      <li class="nav-item" role="presentation">
+        <button class="nav-link active" id="pending-tab" data-bs-toggle="tab" data-bs-target="#pending" type="button">
+          <i class="bi bi-clock-history"></i> 待清偿列表
+        </button>
+      </li>
+      <li class="nav-item" role="presentation">
+        <button class="nav-link" id="by-campaign-tab" data-bs-toggle="tab" data-bs-target="#by-campaign" type="button">
+          <i class="bi bi-trophy"></i> 按活动汇总
+        </button>
+      </li>
+      <li class="nav-item" role="presentation">
+        <button class="nav-link" id="by-prize-tab" data-bs-toggle="tab" data-bs-target="#by-prize" type="button">
+          <i class="bi bi-gift"></i> 按奖品汇总
+        </button>
+      </li>
+      <li class="nav-item" role="presentation">
+        <button class="nav-link" id="limits-tab" data-bs-toggle="tab" data-bs-target="#limits" type="button">
+          <i class="bi bi-shield-exclamation"></i> 上限配置
+        </button>
+      </li>
+    </ul>
+
+    <div class="tab-content" id="debtTabContent">
+      <!-- 待清偿列表 -->
+      <div class="tab-pane fade show active" id="pending" role="tabpanel">
+        <div class="card">
+          <div class="card-body">
+            <div class="table-responsive">
+              <table class="table table-hover">
+                <thead>
+                  <tr>
+                    <th>ID</th>
+                    <th>类型</th>
+                    <th>活动</th>
+                    <th>奖品</th>
+                    <th>欠账数量</th>
+                    <th>已清偿</th>
+                    <th>责任人</th>
+                    <th>创建时间</th>
+                    <th>操作</th>
+                  </tr>
+                </thead>
+                <tbody id="pendingList">
+                  <!-- 动态生成 -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 按活动汇总 -->
+      <div class="tab-pane fade" id="by-campaign" role="tabpanel">
+        <div class="card">
+          <div class="card-body">
+            <div class="table-responsive">
+              <table class="table table-hover">
+                <thead>
+                  <tr>
+                    <th>活动ID</th>
+                    <th>活动名称</th>
+                    <th>欠账记录数</th>
+                    <th>欠账总量</th>
+                    <th>已清偿量</th>
+                    <th>清偿率</th>
+                  </tr>
+                </thead>
+                <tbody id="byCampaignList">
+                  <!-- 动态生成 -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 按奖品汇总 -->
+      <div class="tab-pane fade" id="by-prize" role="tabpanel">
+        <div class="card">
+          <div class="card-body">
+            <div class="table-responsive">
+              <table class="table table-hover">
+                <thead>
+                  <tr>
+                    <th>奖品ID</th>
+                    <th>奖品名称</th>
+                    <th>欠账记录数</th>
+                    <th>欠账总量</th>
+                    <th>已清偿量</th>
+                    <th>清偿率</th>
+                  </tr>
+                </thead>
+                <tbody id="byPrizeList">
+                  <!-- 动态生成 -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 上限配置 -->
+      <div class="tab-pane fade" id="limits" role="tabpanel">
+        <div class="card">
+          <div class="card-body">
+            <div class="table-responsive">
+              <table class="table table-hover">
+                <thead>
+                  <tr>
+                    <th>配置ID</th>
+                    <th>级别</th>
+                    <th>关联ID</th>
+                    <th>最大欠账量</th>
+                    <th>当前欠账量</th>
+                    <th>使用率</th>
+                    <th>状态</th>
+                  </tr>
+                </thead>
+                <tbody id="limitsList">
+                  <!-- 动态生成 -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 清偿模态框 -->
+  <div class="modal fade" id="clearModal" tabindex="-1">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title"><i class="bi bi-check-circle"></i> 清偿操作</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <form id="clearForm">
+            <input type="hidden" id="clearDebtId">
+            <div class="mb-3">
+              <label class="form-label">欠账类型</label>
+              <input type="text" class="form-control" id="clearDebtType" readonly>
+            </div>
+            <div class="mb-3">
+              <label class="form-label">待清偿数量</label>
+              <input type="text" class="form-control" id="clearPendingQty" readonly>
+            </div>
+            <div class="mb-3">
+              <label class="form-label">清偿数量</label>
+              <input type="number" class="form-control" id="clearQuantity" min="1" required>
+            </div>
+            <div class="mb-3">
+              <label class="form-label">备注</label>
+              <textarea class="form-control" id="clearRemark" rows="2"></textarea>
+            </div>
+          </form>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+          <button type="button" class="btn btn-success" onclick="submitClear()">确认清偿</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="loading-overlay" id="loadingOverlay">
+    <div class="spinner-border text-light" style="width: 3rem; height: 3rem;" role="status">
+      <span class="visually-hidden">加载中...</span>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="/admin/js/lib/echarts.min.js"></script>
+  <script src="/admin/js/admin-common.js"></script>
+  <script src="/admin/js/api-config.js"></script>
+  <script>
+    let dashboard = {};
+    let pendingDebts = [];
+    let sourceChart, campaignChart;
+
+    document.addEventListener('DOMContentLoaded', function() {
+      const userInfo = getCurrentUser();
+      if (userInfo && userInfo.nickname) {
+        document.getElementById('welcomeText').textContent = `欢迎，${userInfo.nickname}`;
+      }
+      document.getElementById('logoutBtn').addEventListener('click', logout);
+      
+      initCharts();
+      loadAllData();
+    });
+
+    function initCharts() {
+      sourceChart = echarts.init(document.getElementById('sourceChart'));
+      campaignChart = echarts.init(document.getElementById('campaignChart'));
+      window.addEventListener('resize', () => {
+        sourceChart.resize();
+        campaignChart.resize();
+      });
+    }
+
+    async function loadAllData() {
+      showLoading();
+      try {
+        await Promise.all([
+          loadDashboard(),
+          loadPendingDebts(),
+          loadByCampaign(),
+          loadByPrize(),
+          loadLimits()
+        ]);
+      } catch (error) {
+        console.error('加载数据失败:', error);
+        showError('加载失败', error.message);
+      } finally {
+        hideLoading();
+      }
+    }
+
+    async function loadDashboard() {
+      const response = await apiRequest(API_ENDPOINTS.DEBT.DASHBOARD);
+      if (response && response.success) {
+        dashboard = response.data;
+        updateDashboard(dashboard);
+        updateCharts(dashboard);
+      }
+    }
+
+    async function loadPendingDebts() {
+      const response = await apiRequest(API_ENDPOINTS.DEBT.PENDING);
+      if (response && response.success) {
+        pendingDebts = response.data.debts || response.data || [];
+        renderPendingList(pendingDebts);
+      }
+    }
+
+    async function loadByCampaign() {
+      const response = await apiRequest(API_ENDPOINTS.DEBT.BY_CAMPAIGN);
+      if (response && response.success) {
+        renderByCampaignList(response.data.campaigns || response.data || []);
+      }
+    }
+
+    async function loadByPrize() {
+      const response = await apiRequest(API_ENDPOINTS.DEBT.BY_PRIZE);
+      if (response && response.success) {
+        renderByPrizeList(response.data.prizes || response.data || []);
+      }
+    }
+
+    async function loadLimits() {
+      const response = await apiRequest(API_ENDPOINTS.DEBT.LIMITS);
+      if (response && response.success) {
+        renderLimitsList(response.data.limits || response.data || []);
+      }
+    }
+
+    function updateDashboard(data) {
+      document.getElementById('pendingCount').textContent = data.pending_count || 0;
+      document.getElementById('pendingAmount').textContent = (data.pending_amount || 0).toLocaleString();
+      document.getElementById('clearedCount').textContent = data.cleared_count || 0;
+      const clearRate = data.total_count > 0 
+        ? ((data.cleared_count / data.total_count) * 100).toFixed(1) + '%'
+        : '0%';
+      document.getElementById('clearRate').textContent = clearRate;
+    }
+
+    function updateCharts(data) {
+      // 来源分布饼图
+      const sourceData = data.by_source || [
+        { name: '库存欠账', value: data.inventory_debt || 0 },
+        { name: '预算欠账', value: data.budget_debt || 0 }
+      ];
+      
+      sourceChart.setOption({
+        tooltip: { trigger: 'item' },
+        legend: { bottom: '5%' },
+        series: [{
+          type: 'pie',
+          radius: ['40%', '70%'],
+          data: sourceData,
+          emphasis: {
+            itemStyle: {
+              shadowBlur: 10,
+              shadowOffsetX: 0,
+              shadowColor: 'rgba(0, 0, 0, 0.5)'
+            }
+          }
+        }]
+      });
+
+      // 活动柱状图
+      const campaignData = data.by_campaign || [];
+      campaignChart.setOption({
+        tooltip: { trigger: 'axis' },
+        xAxis: {
+          type: 'category',
+          data: campaignData.map(c => c.campaign_name || `活动${c.campaign_id}`),
+          axisLabel: { rotate: 30 }
+        },
+        yAxis: { type: 'value' },
+        series: [{
+          type: 'bar',
+          data: campaignData.map(c => c.debt_amount || 0),
+          itemStyle: { color: '#dc3545' }
+        }]
+      });
+    }
+
+    function renderPendingList(debts) {
+      const tbody = document.getElementById('pendingList');
+      if (debts.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="9" class="text-center text-muted">🎉 暂无待清偿欠账</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = debts.map(debt => `
+        <tr>
+          <td>${debt.debt_id}</td>
+          <td><span class="badge bg-${debt.debt_type === 'inventory' ? 'warning' : 'info'}">${debt.debt_type === 'inventory' ? '库存' : '预算'}</span></td>
+          <td>${escapeHtml(debt.campaign_name || '-')}</td>
+          <td>${escapeHtml(debt.prize_name || '-')}</td>
+          <td class="text-danger fw-bold">${debt.debt_quantity || 0}</td>
+          <td class="text-success">${debt.cleared_quantity || 0}</td>
+          <td>${escapeHtml(debt.creator_name || '-')}</td>
+          <td>${formatDateTime(debt.created_at)}</td>
+          <td>
+            <button class="btn btn-sm btn-success" onclick="openClearModal(${debt.debt_id}, '${debt.debt_type}', ${debt.debt_quantity - (debt.cleared_quantity || 0)})">
+              <i class="bi bi-check-circle"></i> 清偿
+            </button>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    function renderByCampaignList(campaigns) {
+      const tbody = document.getElementById('byCampaignList');
+      if (campaigns.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">暂无数据</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = campaigns.map(c => {
+        const clearRate = c.debt_total > 0 ? ((c.cleared_total / c.debt_total) * 100).toFixed(1) : 0;
+        return `
+          <tr>
+            <td>${c.campaign_id}</td>
+            <td>${escapeHtml(c.campaign_name || '-')}</td>
+            <td>${c.debt_count || 0}</td>
+            <td class="text-danger">${c.debt_total || 0}</td>
+            <td class="text-success">${c.cleared_total || 0}</td>
+            <td>
+              <div class="progress" style="height: 20px;">
+                <div class="progress-bar bg-success" style="width: ${clearRate}%">${clearRate}%</div>
+              </div>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function renderByPrizeList(prizes) {
+      const tbody = document.getElementById('byPrizeList');
+      if (prizes.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">暂无数据</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = prizes.map(p => {
+        const clearRate = p.debt_total > 0 ? ((p.cleared_total / p.debt_total) * 100).toFixed(1) : 0;
+        return `
+          <tr>
+            <td>${p.prize_id}</td>
+            <td>${escapeHtml(p.prize_name || '-')}</td>
+            <td>${p.debt_count || 0}</td>
+            <td class="text-danger">${p.debt_total || 0}</td>
+            <td class="text-success">${p.cleared_total || 0}</td>
+            <td>
+              <div class="progress" style="height: 20px;">
+                <div class="progress-bar bg-success" style="width: ${clearRate}%">${clearRate}%</div>
+              </div>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function renderLimitsList(limits) {
+      const tbody = document.getElementById('limitsList');
+      if (limits.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted">暂无上限配置</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = limits.map(l => {
+        const usage = l.max_debt > 0 ? ((l.current_debt / l.max_debt) * 100).toFixed(1) : 0;
+        const statusClass = usage >= 90 ? 'danger' : usage >= 70 ? 'warning' : 'success';
+        return `
+          <tr>
+            <td>${l.limit_id}</td>
+            <td><span class="badge bg-secondary">${l.level || 'global'}</span></td>
+            <td>${l.related_id || '-'}</td>
+            <td>${l.max_debt || 0}</td>
+            <td>${l.current_debt || 0}</td>
+            <td>
+              <div class="progress" style="height: 20px;">
+                <div class="progress-bar bg-${statusClass}" style="width: ${usage}%">${usage}%</div>
+              </div>
+            </td>
+            <td>
+              <span class="badge bg-${usage >= 90 ? 'danger' : 'success'}">
+                ${usage >= 90 ? '⚠️ 接近上限' : '正常'}
+              </span>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function openClearModal(debtId, debtType, pendingQty) {
+      document.getElementById('clearDebtId').value = debtId;
+      document.getElementById('clearDebtType').value = debtType === 'inventory' ? '库存欠账' : '预算欠账';
+      document.getElementById('clearPendingQty').value = pendingQty;
+      document.getElementById('clearQuantity').value = '';
+      document.getElementById('clearQuantity').max = pendingQty;
+      document.getElementById('clearRemark').value = '';
+      new bootstrap.Modal(document.getElementById('clearModal')).show();
+    }
+
+    async function submitClear() {
+      const debtId = document.getElementById('clearDebtId').value;
+      const quantity = parseInt(document.getElementById('clearQuantity').value);
+      const remark = document.getElementById('clearRemark').value;
+
+      if (!quantity || quantity <= 0) {
+        alert('请输入有效的清偿数量');
+        return;
+      }
+
+      showLoading();
+      try {
+        const response = await apiRequest(API_ENDPOINTS.DEBT.CLEAR, {
+          method: 'POST',
+          body: JSON.stringify({
+            debt_id: debtId,
+            clear_quantity: quantity,
+            remark: remark
+          })
+        });
+
+        if (response && response.success) {
+          bootstrap.Modal.getInstance(document.getElementById('clearModal')).hide();
+          alert('✅ 清偿成功');
+          loadAllData();
+        } else {
+          showError('清偿失败', response?.message || '操作失败');
+        }
+      } catch (error) {
+        console.error('清偿失败:', error);
+        showError('清偿失败', error.message);
+      } finally {
+        hideLoading();
+      }
+    }
+
+    function formatDateTime(dateStr) {
+      if (!dateStr) return '-';
+      return new Date(dateStr).toLocaleString('zh-CN');
+    }
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      const div = document.createElement('div');
+      div.textContent = str;
+      return div.innerHTML;
+    }
+
+    function showLoading() {
+      document.getElementById('loadingOverlay').classList.add('show');
+    }
+
+    function hideLoading() {
+      document.getElementById('loadingOverlay').classList.remove('show');
+    }
+
+    function showError(title, message) {
+      alert(`❌ ${title}\n${message}`);
+    }
+  </script>
+</body>
+</html>
+

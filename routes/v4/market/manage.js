@@ -20,6 +20,7 @@
 const express = require('express')
 const router = express.Router()
 const { authenticateToken } = require('../../../middleware/auth')
+const { requireValidSession } = require('../../../middleware/sensitiveOperation') // 🔐 会话管理功能（2026-01-21）
 const { validatePositiveInteger, handleServiceError } = require('../../../middleware/validation')
 const logger = require('../../../utils/logger').logger
 // 事务边界治理 - 统一事务管理器
@@ -54,6 +55,7 @@ const marketRiskMiddleware = getMarketRiskControlMiddleware()
 router.post(
   '/listings/:listing_id/withdraw',
   authenticateToken,
+  requireValidSession, // 🔐 市场撤回属于敏感操作，需验证会话（2026-01-21 会话管理功能）
   marketRiskMiddleware.createWithdrawRiskMiddleware(),
   validatePositiveInteger('listing_id', 'params'),
   async (req, res) => {
@@ -139,6 +141,7 @@ router.post(
 router.post(
   '/fungible-assets/:listing_id/withdraw',
   authenticateToken,
+  requireValidSession, // 🔐 可叠加资产撤回属于敏感操作，需验证会话（2026-01-21 会话管理功能）
   marketRiskMiddleware.createWithdrawRiskMiddleware(),
   validatePositiveInteger('listing_id', 'params'),
   async (req, res) => {

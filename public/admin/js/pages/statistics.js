@@ -14,6 +14,10 @@
  *   - metadata: {days, start_date, end_date, query_time_ms, generated_at}
  */
 
+// ========== ECharts 图表实例 ==========
+let trendChart = null
+let userTypeChart = null
+
 // ========== 页面初始化 ==========
 
 document.addEventListener('DOMContentLoaded', function () {
@@ -34,8 +38,76 @@ document.addEventListener('DOMContentLoaded', function () {
     if (!isCustom) loadStatistics()
   })
 
+  // 初始化 ECharts 图表
+  initCharts()
   loadStatistics()
+
+  // 窗口大小改变时重绘图表
+  window.addEventListener('resize', function () {
+    if (trendChart) trendChart.resize()
+    if (userTypeChart) userTypeChart.resize()
+  })
 })
+
+/**
+ * 初始化 ECharts 图表实例
+ */
+function initCharts() {
+  const trendContainer = document.getElementById('trendChart')
+  const userTypeContainer = document.getElementById('userTypeChart')
+
+  if (trendContainer) {
+    trendChart = echarts.init(trendContainer)
+    trendChart.setOption(getTrendChartOption([], [], [], []))
+  }
+
+  if (userTypeContainer) {
+    userTypeChart = echarts.init(userTypeContainer)
+    userTypeChart.setOption(getUserTypeChartOption([]))
+  }
+}
+
+/**
+ * 获取趋势图配置
+ */
+function getTrendChartOption(dates, users, draws, revenue) {
+  return {
+    tooltip: { trigger: 'axis', axisPointer: { type: 'cross' } },
+    legend: { data: ['新增用户', '抽奖次数', '消费金额'], bottom: 0 },
+    grid: { left: '3%', right: '4%', bottom: '15%', top: '10%', containLabel: true },
+    xAxis: { type: 'category', boundaryGap: false, data: dates },
+    yAxis: [
+      { type: 'value', name: '次数', position: 'left' },
+      { type: 'value', name: '金额(元)', position: 'right' }
+    ],
+    series: [
+      { name: '新增用户', type: 'line', data: users, smooth: true, itemStyle: { color: '#5470c6' }, areaStyle: { opacity: 0.3 } },
+      { name: '抽奖次数', type: 'line', data: draws, smooth: true, itemStyle: { color: '#91cc75' } },
+      { name: '消费金额', type: 'line', yAxisIndex: 1, data: revenue, smooth: true, itemStyle: { color: '#fac858' } }
+    ]
+  }
+}
+
+/**
+ * 获取用户类型饼图配置
+ */
+function getUserTypeChartOption(data) {
+  return {
+    tooltip: { trigger: 'item', formatter: '{a} <br/>{b}: {c} ({d}%)' },
+    legend: { orient: 'vertical', left: 'left', top: 'center' },
+    series: [{
+      name: '用户类型',
+      type: 'pie',
+      radius: ['40%', '70%'],
+      avoidLabelOverlap: false,
+      itemStyle: { borderRadius: 10, borderColor: '#fff', borderWidth: 2 },
+      label: { show: false, position: 'center' },
+      emphasis: { label: { show: true, fontSize: 16, fontWeight: 'bold' } },
+      labelLine: { show: false },
+      data: data
+    }]
+  }
+}
 
 /**
  * 将周期值转换为天数

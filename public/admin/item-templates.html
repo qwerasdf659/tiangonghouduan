@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>物品模板 - 管理后台</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+  <link href="/admin/css/common.css" rel="stylesheet">
+  <style>
+    .template-card {
+      transition: all 0.3s ease;
+      border-top: 3px solid #0d6efd;
+    }
+    .template-card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+    }
+    .template-icon {
+      font-size: 2.5rem;
+      margin-bottom: 10px;
+    }
+    .rarity-badge {
+      font-size: 0.7rem;
+      padding: 2px 6px;
+    }
+    .rarity-common { background: #6c757d; }
+    .rarity-uncommon { background: #198754; }
+    .rarity-rare { background: #0d6efd; }
+    .rarity-epic { background: #6f42c1; }
+    .rarity-legendary { background: #fd7e14; }
+  </style>
+</head>
+<body class="bg-light">
+  <nav class="navbar navbar-dark bg-primary">
+    <div class="container-fluid">
+      <a href="/admin/dashboard.html" class="navbar-brand">
+        <i class="bi bi-arrow-left me-2"></i>📦 管理后台 - 物品模板
+      </a>
+      <div>
+        <span class="text-light me-3" id="welcomeText">欢迎，管理员</span>
+        <button class="btn btn-outline-light btn-sm" id="logoutBtn">退出登录</button>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container-fluid mt-4">
+    <!-- 统计卡片 -->
+    <div class="row g-3 mb-4">
+      <div class="col-md-3">
+        <div class="card stat-card">
+          <div class="card-body text-center">
+            <i class="bi bi-box-seam text-primary" style="font-size: 2rem;"></i>
+            <h6 class="text-muted mt-2">模板总数</h6>
+            <h2 id="totalTemplates" class="text-primary mb-0">-</h2>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="card stat-card">
+          <div class="card-body text-center">
+            <i class="bi bi-tags text-success" style="font-size: 2rem;"></i>
+            <h6 class="text-muted mt-2">物品类型</h6>
+            <h2 id="totalTypes" class="text-success mb-0">-</h2>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="card stat-card">
+          <div class="card-body text-center">
+            <i class="bi bi-check-circle text-warning" style="font-size: 2rem;"></i>
+            <h6 class="text-muted mt-2">已启用</h6>
+            <h2 id="activeTemplates" class="text-warning mb-0">-</h2>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="card stat-card">
+          <div class="card-body text-center">
+            <i class="bi bi-star text-info" style="font-size: 2rem;"></i>
+            <h6 class="text-muted mt-2">稀有度分布</h6>
+            <h2 id="rarityCount" class="text-info mb-0">-</h2>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 筛选和操作栏 -->
+    <div class="card mb-4">
+      <div class="card-body">
+        <div class="row g-3 align-items-center">
+          <div class="col-md-2">
+            <label class="form-label">物品类型</label>
+            <select class="form-select" id="typeFilter">
+              <option value="">全部类型</option>
+              <option value="coupon">优惠券</option>
+              <option value="points">积分</option>
+              <option value="gift">礼品</option>
+              <option value="virtual">虚拟物品</option>
+            </select>
+          </div>
+          <div class="col-md-2">
+            <label class="form-label">稀有度</label>
+            <select class="form-select" id="rarityFilter">
+              <option value="">全部稀有度</option>
+              <option value="common">普通</option>
+              <option value="uncommon">优良</option>
+              <option value="rare">稀有</option>
+              <option value="epic">史诗</option>
+              <option value="legendary">传说</option>
+            </select>
+          </div>
+          <div class="col-md-2">
+            <label class="form-label">状态</label>
+            <select class="form-select" id="statusFilter">
+              <option value="">全部状态</option>
+              <option value="active">启用</option>
+              <option value="inactive">禁用</option>
+            </select>
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">搜索</label>
+            <input type="text" class="form-control" id="searchInput" placeholder="搜索模板名称...">
+          </div>
+          <div class="col-md-3 d-flex align-items-end">
+            <button class="btn btn-primary me-2" onclick="loadTemplates()">
+              <i class="bi bi-search"></i> 搜索
+            </button>
+            <button class="btn btn-success" onclick="openCreateModal()">
+              <i class="bi bi-plus-lg"></i> 新建模板
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 物品模板列表 -->
+    <div class="row" id="templateList">
+      <!-- 动态生成 -->
+    </div>
+  </div>
+
+  <!-- 模板表单模态框 -->
+  <div class="modal fade" id="templateModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="templateModalTitle"><i class="bi bi-plus-circle"></i> 新建物品模板</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <form id="templateForm">
+            <input type="hidden" id="templateId">
+            <div class="row g-3">
+              <div class="col-md-6">
+                <label class="form-label">模板名称 <span class="text-danger">*</span></label>
+                <input type="text" class="form-control" id="templateName" required>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label">模板编码 <span class="text-danger">*</span></label>
+                <input type="text" class="form-control" id="templateCode" required placeholder="唯一标识">
+              </div>
+              <div class="col-md-4">
+                <label class="form-label">物品类型</label>
+                <select class="form-select" id="templateType">
+                  <option value="coupon">优惠券</option>
+                  <option value="points">积分</option>
+                  <option value="gift">礼品</option>
+                  <option value="virtual">虚拟物品</option>
+                </select>
+              </div>
+              <div class="col-md-4">
+                <label class="form-label">稀有度</label>
+                <select class="form-select" id="templateRarity">
+                  <option value="common">普通</option>
+                  <option value="uncommon">优良</option>
+                  <option value="rare">稀有</option>
+                  <option value="epic">史诗</option>
+                  <option value="legendary">传说</option>
+                </select>
+              </div>
+              <div class="col-md-4">
+                <label class="form-label">状态</label>
+                <select class="form-select" id="templateStatus">
+                  <option value="active">启用</option>
+                  <option value="inactive">禁用</option>
+                </select>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label">图标URL</label>
+                <input type="text" class="form-control" id="templateIcon" placeholder="https://...">
+              </div>
+              <div class="col-md-6">
+                <label class="form-label">基础价值</label>
+                <input type="number" class="form-control" id="templateValue" min="0" step="0.01">
+              </div>
+              <div class="col-12">
+                <label class="form-label">模板描述</label>
+                <textarea class="form-control" id="templateDescription" rows="2"></textarea>
+              </div>
+              <div class="col-12">
+                <label class="form-label">扩展属性 (JSON格式)</label>
+                <textarea class="form-control font-monospace" id="templateAttributes" rows="3" placeholder='{"key": "value"}'></textarea>
+              </div>
+            </div>
+          </form>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+          <button type="button" class="btn btn-primary" onclick="submitTemplate()">保存</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="loading-overlay" id="loadingOverlay">
+    <div class="spinner-border text-light" style="width: 3rem; height: 3rem;" role="status">
+      <span class="visually-hidden">加载中...</span>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="/admin/js/admin-common.js"></script>
+  <script src="/admin/js/api-config.js"></script>
+  <script>
+    let templates = [];
+
+    document.addEventListener('DOMContentLoaded', function() {
+      const userInfo = getCurrentUser();
+      if (userInfo && userInfo.nickname) {
+        document.getElementById('welcomeText').textContent = `欢迎，${userInfo.nickname}`;
+      }
+      document.getElementById('logoutBtn').addEventListener('click', logout);
+      
+      loadTemplates();
+    });
+
+    async function loadTemplates() {
+      showLoading();
+      try {
+        const type = document.getElementById('typeFilter').value;
+        const rarity = document.getElementById('rarityFilter').value;
+        const status = document.getElementById('statusFilter').value;
+        const search = document.getElementById('searchInput').value;
+
+        const params = new URLSearchParams();
+        if (type) params.append('type', type);
+        if (rarity) params.append('rarity', rarity);
+        if (status) params.append('status', status);
+        if (search) params.append('search', search);
+
+        const url = API_ENDPOINTS.ITEM_TEMPLATE.LIST + (params.toString() ? `?${params.toString()}` : '');
+        const response = await apiRequest(url);
+
+        if (response && response.success) {
+          templates = response.data.templates || response.data || [];
+          renderTemplates(templates);
+          updateStats(response.data.stats || {});
+        } else {
+          showError('加载失败', response?.message || '获取物品模板失败');
+        }
+      } catch (error) {
+        console.error('加载物品模板失败:', error);
+        showError('加载失败', error.message);
+      } finally {
+        hideLoading();
+      }
+    }
+
+    function renderTemplates(templates) {
+      const container = document.getElementById('templateList');
+
+      if (!templates || templates.length === 0) {
+        container.innerHTML = `
+          <div class="col-12">
+            <div class="card">
+              <div class="card-body text-center py-5 text-muted">
+                <i class="bi bi-box" style="font-size: 3rem;"></i>
+                <p class="mt-2">暂无物品模板</p>
+              </div>
+            </div>
+          </div>
+        `;
+        return;
+      }
+
+      container.innerHTML = templates.map(t => `
+        <div class="col-md-4 col-lg-3 mb-4">
+          <div class="card template-card h-100">
+            <div class="card-body text-center">
+              <div class="template-icon">${getTypeIcon(t.type)}</div>
+              <h6 class="card-title">${escapeHtml(t.name || t.template_name)}</h6>
+              <p class="text-muted small mb-2">${escapeHtml(t.code || t.template_code)}</p>
+              <span class="badge text-white rarity-${t.rarity || 'common'} rarity-badge mb-2">
+                ${getRarityLabel(t.rarity)}
+              </span>
+              <p class="small text-muted mb-0">${escapeHtml(truncateText(t.description, 50))}</p>
+            </div>
+            <div class="card-footer bg-white d-flex justify-content-between align-items-center">
+              <span class="badge ${t.status === 'active' ? 'bg-success' : 'bg-secondary'}">
+                ${t.status === 'active' ? '启用' : '禁用'}
+              </span>
+              <div>
+                <button class="btn btn-sm btn-outline-primary me-1" onclick="editTemplate(${t.template_id || t.id})">
+                  <i class="bi bi-pencil"></i>
+                </button>
+                <button class="btn btn-sm btn-outline-danger" onclick="deleteTemplate(${t.template_id || t.id})">
+                  <i class="bi bi-trash"></i>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function updateStats(stats) {
+      document.getElementById('totalTemplates').textContent = stats.total || templates.length;
+      document.getElementById('totalTypes').textContent = stats.types || new Set(templates.map(t => t.type)).size;
+      document.getElementById('activeTemplates').textContent = stats.active || templates.filter(t => t.status === 'active').length;
+      document.getElementById('rarityCount').textContent = stats.rarity_count || '-';
+    }
+
+    function getTypeIcon(type) {
+      const icons = {
+        coupon: '🎫',
+        points: '💰',
+        gift: '🎁',
+        virtual: '✨'
+      };
+      return icons[type] || '📦';
+    }
+
+    function getRarityLabel(rarity) {
+      const labels = {
+        common: '普通',
+        uncommon: '优良',
+        rare: '稀有',
+        epic: '史诗',
+        legendary: '传说'
+      };
+      return labels[rarity] || '普通';
+    }
+
+    function truncateText(text, maxLength) {
+      if (!text) return '';
+      return text.length > maxLength ? text.substring(0, maxLength) + '...' : text;
+    }
+
+    function openCreateModal() {
+      document.getElementById('templateModalTitle').innerHTML = '<i class="bi bi-plus-circle"></i> 新建物品模板';
+      document.getElementById('templateForm').reset();
+      document.getElementById('templateId').value = '';
+      new bootstrap.Modal(document.getElementById('templateModal')).show();
+    }
+
+    async function editTemplate(templateId) {
+      showLoading();
+      try {
+        const response = await apiRequest(API.buildURL(API_ENDPOINTS.ITEM_TEMPLATE.DETAIL, { template_id: templateId }));
+        if (response && response.success) {
+          const t = response.data;
+          document.getElementById('templateModalTitle').innerHTML = '<i class="bi bi-pencil"></i> 编辑物品模板';
+          document.getElementById('templateId').value = t.template_id || t.id;
+          document.getElementById('templateName').value = t.name || t.template_name || '';
+          document.getElementById('templateCode').value = t.code || t.template_code || '';
+          document.getElementById('templateType').value = t.type || 'coupon';
+          document.getElementById('templateRarity').value = t.rarity || 'common';
+          document.getElementById('templateStatus').value = t.status || 'active';
+          document.getElementById('templateIcon').value = t.icon_url || t.icon || '';
+          document.getElementById('templateValue').value = t.base_value || t.value || '';
+          document.getElementById('templateDescription').value = t.description || '';
+          document.getElementById('templateAttributes').value = t.attributes ? JSON.stringify(t.attributes, null, 2) : '';
+          
+          new bootstrap.Modal(document.getElementById('templateModal')).show();
+        } else {
+          showError('加载失败', response?.message || '获取模板详情失败');
+        }
+      } catch (error) {
+        console.error('加载模板详情失败:', error);
+        showError('加载失败', error.message);
+      } finally {
+        hideLoading();
+      }
+    }
+
+    async function submitTemplate() {
+      const templateId = document.getElementById('templateId').value;
+      
+      let attributes = {};
+      try {
+        const attrStr = document.getElementById('templateAttributes').value;
+        if (attrStr.trim()) {
+          attributes = JSON.parse(attrStr);
+        }
+      } catch (e) {
+        alert('扩展属性JSON格式错误');
+        return;
+      }
+
+      const data = {
+        name: document.getElementById('templateName').value,
+        code: document.getElementById('templateCode').value,
+        type: document.getElementById('templateType').value,
+        rarity: document.getElementById('templateRarity').value,
+        status: document.getElementById('templateStatus').value,
+        icon_url: document.getElementById('templateIcon').value,
+        base_value: parseFloat(document.getElementById('templateValue').value) || 0,
+        description: document.getElementById('templateDescription').value,
+        attributes: attributes
+      };
+
+      if (!data.name || !data.code) {
+        alert('请填写模板名称和编码');
+        return;
+      }
+
+      showLoading();
+      try {
+        const url = templateId
+          ? API.buildURL(API_ENDPOINTS.ITEM_TEMPLATE.UPDATE, { template_id: templateId })
+          : API_ENDPOINTS.ITEM_TEMPLATE.CREATE;
+        const method = templateId ? 'PUT' : 'POST';
+
+        const response = await apiRequest(url, {
+          method: method,
+          body: JSON.stringify(data)
+        });
+
+        if (response && response.success) {
+          bootstrap.Modal.getInstance(document.getElementById('templateModal')).hide();
+          alert(`✅ ${templateId ? '更新' : '创建'}成功`);
+          loadTemplates();
+        } else {
+          showError('保存失败', response?.message || '操作失败');
+        }
+      } catch (error) {
+        console.error('保存模板失败:', error);
+        showError('保存失败', error.message);
+      } finally {
+        hideLoading();
+      }
+    }
+
+    async function deleteTemplate(templateId) {
+      if (!confirm('确定要删除此物品模板吗？此操作不可恢复！')) return;
+
+      showLoading();
+      try {
+        const response = await apiRequest(API.buildURL(API_ENDPOINTS.ITEM_TEMPLATE.DELETE, { template_id: templateId }), {
+          method: 'DELETE'
+        });
+
+        if (response && response.success) {
+          alert('✅ 删除成功');
+          loadTemplates();
+        } else {
+          showError('删除失败', response?.message || '操作失败');
+        }
+      } catch (error) {
+        console.error('删除模板失败:', error);
+        showError('删除失败', error.message);
+      } finally {
+        hideLoading();
+      }
+    }
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      const div = document.createElement('div');
+      div.textContent = str;
+      return div.innerHTML;
+    }
+
+    function showLoading() {
+      document.getElementById('loadingOverlay').classList.add('show');
+    }
+
+    function hideLoading() {
+      document.getElementById('loadingOverlay').classList.remove('show');
+    }
+
+    function showError(title, message) {
+      alert(`❌ ${title}\n${message}`);
+    }
+  </script>
+</body>
+</html>
+

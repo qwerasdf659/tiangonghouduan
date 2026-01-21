@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BxPx矩阵配置 - 管理后台</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+  <link href="/admin/css/common.css" rel="stylesheet">
+  <style>
+    .matrix-table th, .matrix-table td {
+      text-align: center;
+      vertical-align: middle;
+      min-width: 100px;
+    }
+    .matrix-cell {
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .matrix-cell:hover {
+      background: #e9ecef !important;
+    }
+    .matrix-cell.editable {
+      background: #f8f9fa;
+    }
+    .matrix-cell input {
+      width: 80px;
+      text-align: center;
+    }
+    .tier-badge {
+      display: inline-block;
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 0.85rem;
+      font-weight: 500;
+    }
+    .tier-B1 { background: #d4edda; color: #155724; }
+    .tier-B2 { background: #cce5ff; color: #004085; }
+    .tier-B3 { background: #fff3cd; color: #856404; }
+    .tier-B4 { background: #f8d7da; color: #721c24; }
+    .tier-P1 { background: #e2e3e5; color: #383d41; }
+    .tier-P2 { background: #d1ecf1; color: #0c5460; }
+    .tier-P3 { background: #d4edda; color: #155724; }
+    .tier-P4 { background: #cce5ff; color: #004085; }
+    .tier-P5 { background: #e2d5f1; color: #5a2d82; }
+  </style>
+</head>
+<body class="bg-light">
+  <nav class="navbar navbar-dark bg-primary">
+    <div class="container-fluid">
+      <a href="/admin/dashboard.html" class="navbar-brand">
+        <i class="bi bi-arrow-left me-2"></i>🎯 管理后台 - BxPx矩阵配置
+      </a>
+      <div>
+        <span class="text-light me-3" id="welcomeText">欢迎，管理员</span>
+        <button class="btn btn-outline-light btn-sm" id="logoutBtn">退出登录</button>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container-fluid mt-4">
+    <!-- 说明卡片 -->
+    <div class="card mb-4">
+      <div class="card-body">
+        <h6 class="card-title"><i class="bi bi-info-circle"></i> BxPx矩阵说明</h6>
+        <div class="row">
+          <div class="col-md-6">
+            <p class="mb-2"><strong>Bx（预算层级）：</strong></p>
+            <ul class="small mb-0">
+              <li><span class="tier-badge tier-B1">B1</span> 低预算用户（&lt;100元）</li>
+              <li><span class="tier-badge tier-B2">B2</span> 中预算用户（100-500元）</li>
+              <li><span class="tier-badge tier-B3">B3</span> 高预算用户（500-2000元）</li>
+              <li><span class="tier-badge tier-B4">B4</span> 超高预算用户（&gt;2000元）</li>
+            </ul>
+          </div>
+          <div class="col-md-6">
+            <p class="mb-2"><strong>Px（奖品层级）：</strong></p>
+            <ul class="small mb-0">
+              <li><span class="tier-badge tier-P1">P1</span> 普通奖品（价值&lt;10元）</li>
+              <li><span class="tier-badge tier-P2">P2</span> 优质奖品（10-50元）</li>
+              <li><span class="tier-badge tier-P3">P3</span> 稀有奖品（50-200元）</li>
+              <li><span class="tier-badge tier-P4">P4</span> 珍贵奖品（200-1000元）</li>
+              <li><span class="tier-badge tier-P5">P5</span> 传说奖品（&gt;1000元）</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 活动选择 -->
+    <div class="card mb-4">
+      <div class="card-body">
+        <div class="row align-items-center">
+          <div class="col-md-4">
+            <label class="form-label">选择活动</label>
+            <select class="form-select" id="campaignSelect" onchange="loadMatrixConfig()">
+              <option value="">请选择活动</option>
+            </select>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">配置类型</label>
+            <select class="form-select" id="configType" onchange="loadMatrixConfig()">
+              <option value="probability">中奖概率配置</option>
+              <option value="daily_limit">每日限制配置</option>
+              <option value="prize_pool">奖池权重配置</option>
+            </select>
+          </div>
+          <div class="col-md-4 d-flex align-items-end">
+            <button class="btn btn-primary me-2" onclick="loadMatrixConfig()">
+              <i class="bi bi-arrow-clockwise"></i> 刷新
+            </button>
+            <button class="btn btn-success" onclick="saveMatrixConfig()">
+              <i class="bi bi-save"></i> 保存配置
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 矩阵表格 -->
+    <div class="card">
+      <div class="card-header bg-white d-flex justify-content-between align-items-center">
+        <h6 class="mb-0"><i class="bi bi-grid-3x3"></i> 配置矩阵</h6>
+        <span class="badge bg-info" id="configTypeLabel">中奖概率配置</span>
+      </div>
+      <div class="card-body">
+        <div class="table-responsive">
+          <table class="table table-bordered matrix-table" id="matrixTable">
+            <thead class="table-light">
+              <tr>
+                <th class="bg-secondary text-white">Bx \ Px</th>
+                <th><span class="tier-badge tier-P1">P1</span></th>
+                <th><span class="tier-badge tier-P2">P2</span></th>
+                <th><span class="tier-badge tier-P3">P3</span></th>
+                <th><span class="tier-badge tier-P4">P4</span></th>
+                <th><span class="tier-badge tier-P5">P5</span></th>
+              </tr>
+            </thead>
+            <tbody id="matrixBody">
+              <!-- 动态生成 -->
+            </tbody>
+          </table>
+        </div>
+        <div class="mt-3 text-muted small">
+          <i class="bi bi-lightbulb"></i> 提示：点击单元格可编辑数值，编辑完成后点击"保存配置"按钮生效
+        </div>
+      </div>
+    </div>
+
+    <!-- 配置历史 -->
+    <div class="card mt-4">
+      <div class="card-header bg-white">
+        <h6 class="mb-0"><i class="bi bi-clock-history"></i> 配置历史</h6>
+      </div>
+      <div class="card-body">
+        <div class="table-responsive">
+          <table class="table table-sm">
+            <thead>
+              <tr>
+                <th>修改时间</th>
+                <th>修改人</th>
+                <th>配置类型</th>
+                <th>修改内容</th>
+                <th>操作</th>
+              </tr>
+            </thead>
+            <tbody id="historyList">
+              <tr>
+                <td colspan="5" class="text-center text-muted">暂无历史记录</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="loading-overlay" id="loadingOverlay">
+    <div class="spinner-border text-light" style="width: 3rem; height: 3rem;" role="status">
+      <span class="visually-hidden">加载中...</span>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="/admin/js/admin-common.js"></script>
+  <script src="/admin/js/api-config.js"></script>
+  <script>
+    const budgetTiers = ['B1', 'B2', 'B3', 'B4'];
+    const prizeTiers = ['P1', 'P2', 'P3', 'P4', 'P5'];
+    let matrixConfig = {};
+    let originalConfig = {};
+
+    document.addEventListener('DOMContentLoaded', function() {
+      const userInfo = getCurrentUser();
+      if (userInfo && userInfo.nickname) {
+        document.getElementById('welcomeText').textContent = `欢迎，${userInfo.nickname}`;
+      }
+      document.getElementById('logoutBtn').addEventListener('click', logout);
+      
+      loadCampaigns();
+      renderEmptyMatrix();
+    });
+
+    async function loadCampaigns() {
+      try {
+        const response = await apiRequest(API_ENDPOINTS.CAMPAIGN.LIST);
+        if (response && response.success) {
+          const campaigns = response.data.campaigns || response.data || [];
+          const select = document.getElementById('campaignSelect');
+          select.innerHTML = '<option value="">请选择活动</option>' +
+            campaigns.map(c => `<option value="${c.campaign_id}">${escapeHtml(c.name || c.campaign_name)}</option>`).join('');
+        }
+      } catch (error) {
+        console.error('加载活动列表失败:', error);
+      }
+    }
+
+    async function loadMatrixConfig() {
+      const campaignId = document.getElementById('campaignSelect').value;
+      const configType = document.getElementById('configType').value;
+
+      if (!campaignId) {
+        renderEmptyMatrix();
+        return;
+      }
+
+      document.getElementById('configTypeLabel').textContent = getConfigTypeLabel(configType);
+
+      showLoading();
+      try {
+        const url = API.buildURL(API_ENDPOINTS.MATRIX.GET, { campaign_id: campaignId }) + `?type=${configType}`;
+        const response = await apiRequest(url);
+
+        if (response && response.success) {
+          matrixConfig = response.data.matrix || response.data || {};
+          originalConfig = JSON.parse(JSON.stringify(matrixConfig));
+          renderMatrix(matrixConfig, configType);
+          loadConfigHistory(campaignId);
+        } else {
+          // 如果没有配置，使用默认值
+          matrixConfig = getDefaultMatrix(configType);
+          originalConfig = JSON.parse(JSON.stringify(matrixConfig));
+          renderMatrix(matrixConfig, configType);
+        }
+      } catch (error) {
+        console.error('加载矩阵配置失败:', error);
+        matrixConfig = getDefaultMatrix(configType);
+        renderMatrix(matrixConfig, document.getElementById('configType').value);
+      } finally {
+        hideLoading();
+      }
+    }
+
+    function getDefaultMatrix(configType) {
+      const matrix = {};
+      const defaultValues = {
+        probability: { B1: { P1: 50, P2: 30, P3: 15, P4: 4, P5: 1 }, B2: { P1: 40, P2: 35, P3: 18, P4: 5, P5: 2 }, B3: { P1: 30, P2: 35, P3: 22, P4: 10, P5: 3 }, B4: { P1: 20, P2: 30, P3: 28, P4: 15, P5: 7 } },
+        daily_limit: { B1: { P1: 10, P2: 5, P3: 2, P4: 1, P5: 0 }, B2: { P1: 15, P2: 8, P3: 3, P4: 1, P5: 1 }, B3: { P1: 20, P2: 10, P3: 5, P4: 2, P5: 1 }, B4: { P1: 30, P2: 15, P3: 8, P4: 3, P5: 2 } },
+        prize_pool: { B1: { P1: 100, P2: 50, P3: 20, P4: 5, P5: 1 }, B2: { P1: 80, P2: 60, P3: 30, P4: 10, P5: 2 }, B3: { P1: 60, P2: 60, P3: 40, P4: 15, P5: 5 }, B4: { P1: 40, P2: 50, P3: 50, P4: 25, P5: 10 } }
+      };
+      return defaultValues[configType] || defaultValues.probability;
+    }
+
+    function renderEmptyMatrix() {
+      const tbody = document.getElementById('matrixBody');
+      tbody.innerHTML = budgetTiers.map(bTier => `
+        <tr>
+          <th class="table-light"><span class="tier-badge tier-${bTier}">${bTier}</span></th>
+          ${prizeTiers.map(pTier => `
+            <td class="matrix-cell text-muted">-</td>
+          `).join('')}
+        </tr>
+      `).join('');
+    }
+
+    function renderMatrix(matrix, configType) {
+      const tbody = document.getElementById('matrixBody');
+      const unit = getConfigUnit(configType);
+
+      tbody.innerHTML = budgetTiers.map(bTier => `
+        <tr>
+          <th class="table-light"><span class="tier-badge tier-${bTier}">${bTier}</span></th>
+          ${prizeTiers.map(pTier => {
+            const value = matrix[bTier]?.[pTier] ?? 0;
+            return `
+              <td class="matrix-cell editable" onclick="editCell(this, '${bTier}', '${pTier}')">
+                <span class="cell-value">${value}${unit}</span>
+              </td>
+            `;
+          }).join('')}
+        </tr>
+      `).join('');
+    }
+
+    function editCell(cell, bTier, pTier) {
+      // 如果已经在编辑模式，忽略
+      if (cell.querySelector('input')) return;
+
+      const value = matrixConfig[bTier]?.[pTier] ?? 0;
+      const configType = document.getElementById('configType').value;
+      const unit = getConfigUnit(configType);
+
+      cell.innerHTML = `
+        <input type="number" class="form-control form-control-sm" value="${value}" min="0" 
+               onblur="saveCell(this, '${bTier}', '${pTier}')"
+               onkeypress="if(event.key==='Enter')this.blur()">
+      `;
+      cell.querySelector('input').focus();
+      cell.querySelector('input').select();
+    }
+
+    function saveCell(input, bTier, pTier) {
+      const value = parseFloat(input.value) || 0;
+      const configType = document.getElementById('configType').value;
+      const unit = getConfigUnit(configType);
+
+      // 更新配置
+      if (!matrixConfig[bTier]) matrixConfig[bTier] = {};
+      matrixConfig[bTier][pTier] = value;
+
+      // 更新显示
+      input.parentElement.innerHTML = `<span class="cell-value">${value}${unit}</span>`;
+    }
+
+    async function saveMatrixConfig() {
+      const campaignId = document.getElementById('campaignSelect').value;
+      const configType = document.getElementById('configType').value;
+
+      if (!campaignId) {
+        alert('请先选择活动');
+        return;
+      }
+
+      showLoading();
+      try {
+        const response = await apiRequest(API.buildURL(API_ENDPOINTS.MATRIX.UPDATE, { campaign_id: campaignId }), {
+          method: 'PUT',
+          body: JSON.stringify({
+            type: configType,
+            matrix: matrixConfig
+          })
+        });
+
+        if (response && response.success) {
+          originalConfig = JSON.parse(JSON.stringify(matrixConfig));
+          alert('✅ 配置保存成功');
+          loadConfigHistory(campaignId);
+        } else {
+          showError('保存失败', response?.message || '操作失败');
+        }
+      } catch (error) {
+        console.error('保存矩阵配置失败:', error);
+        showError('保存失败', error.message);
+      } finally {
+        hideLoading();
+      }
+    }
+
+    async function loadConfigHistory(campaignId) {
+      try {
+        const response = await apiRequest(API.buildURL(API_ENDPOINTS.MATRIX.HISTORY, { campaign_id: campaignId }));
+        if (response && response.success) {
+          const history = response.data.history || response.data || [];
+          renderHistory(history);
+        }
+      } catch (error) {
+        console.error('加载配置历史失败:', error);
+      }
+    }
+
+    function renderHistory(history) {
+      const tbody = document.getElementById('historyList');
+      
+      if (!history || history.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted">暂无历史记录</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = history.slice(0, 10).map(h => `
+        <tr>
+          <td>${formatDateTime(h.created_at)}</td>
+          <td>${escapeHtml(h.operator_name || h.operator_id || '-')}</td>
+          <td><span class="badge bg-info">${getConfigTypeLabel(h.config_type)}</span></td>
+          <td><small class="text-muted">${escapeHtml(truncateText(h.change_summary || JSON.stringify(h.changes), 50))}</small></td>
+          <td>
+            <button class="btn btn-sm btn-outline-primary" onclick="rollbackConfig(${h.history_id || h.id})">
+              <i class="bi bi-arrow-counterclockwise"></i> 回滚
+            </button>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    async function rollbackConfig(historyId) {
+      if (!confirm('确定要回滚到此版本的配置吗？')) return;
+
+      showLoading();
+      try {
+        const response = await apiRequest(API.buildURL(API_ENDPOINTS.MATRIX.ROLLBACK, { history_id: historyId }), {
+          method: 'POST'
+        });
+
+        if (response && response.success) {
+          alert('✅ 回滚成功');
+          loadMatrixConfig();
+        } else {
+          showError('回滚失败', response?.message || '操作失败');
+        }
+      } catch (error) {
+        console.error('回滚配置失败:', error);
+        showError('回滚失败', error.message);
+      } finally {
+        hideLoading();
+      }
+    }
+
+    function getConfigTypeLabel(type) {
+      const labels = {
+        probability: '中奖概率配置',
+        daily_limit: '每日限制配置',
+        prize_pool: '奖池权重配置'
+      };
+      return labels[type] || type;
+    }
+
+    function getConfigUnit(type) {
+      const units = {
+        probability: '%',
+        daily_limit: '次',
+        prize_pool: ''
+      };
+      return units[type] || '';
+    }
+
+    function truncateText(text, maxLength) {
+      if (!text) return '';
+      return text.length > maxLength ? text.substring(0, maxLength) + '...' : text;
+    }
+
+    function formatDateTime(dateStr) {
+      if (!dateStr) return '-';
+      return new Date(dateStr).toLocaleString('zh-CN');
+    }
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      const div = document.createElement('div');
+      div.textContent = str;
+      return div.innerHTML;
+    }
+
+    function showLoading() {
+      document.getElementById('loadingOverlay').classList.add('show');
+    }
+
+    function hideLoading() {
+      document.getElementById('loadingOverlay').classList.remove('show');
+    }
+
+    function showError(title, message) {
+      alert(`❌ ${title}\n${message}`);
+    }
+  </script>
+</body>
+</html>
+

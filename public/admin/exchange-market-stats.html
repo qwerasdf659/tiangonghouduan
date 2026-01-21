@@ -225,9 +225,7 @@
         <div class="card shadow-sm">
           <div class="card-body">
             <h6 class="border-bottom pb-2 mb-3"><i class="bi bi-pie-chart"></i> 订单状态分布</h6>
-            <div class="chart-container">
-              <canvas id="orderStatusChart"></canvas>
-            </div>
+            <div id="orderStatusChart" class="chart-container"></div>
           </div>
         </div>
       </div>
@@ -235,9 +233,7 @@
         <div class="card shadow-sm">
           <div class="card-body">
             <h6 class="border-bottom pb-2 mb-3"><i class="bi bi-bar-chart"></i> 收入来源分布</h6>
-            <div class="chart-container">
-              <canvas id="revenueChart"></canvas>
-            </div>
+            <div id="revenueChart" class="chart-container"></div>
           </div>
         </div>
       </div>
@@ -292,7 +288,8 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <!-- ✅ ECharts - 图表库（本地引用，符合规范要求） -->
+  <script src="/admin/js/lib/echarts.min.js"></script>
   <script src="/admin/js/admin-common.js"></script>
   <script src="/admin/js/pages/exchange-market-stats.js"></script>
 </body>

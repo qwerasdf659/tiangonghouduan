@@ -13,6 +13,13 @@
   
   <!-- ✅ 公共样式表 - 统一主题和响应式设计 -->
   <link href="/admin/css/common.css" rel="stylesheet">
+  
+  <style>
+    .chart-container {
+      position: relative;
+      height: 280px;
+    }
+  </style>
 </head>
 <body class="bg-light">
   <!-- 顶部导航 -->
@@ -72,6 +79,31 @@
       </div>
     </div>
     
+    <!-- ECharts 数据趋势图表 -->
+    <div class="row g-3 mb-4">
+      <div class="col-md-8">
+        <div class="card">
+          <div class="card-header bg-white d-flex justify-content-between align-items-center">
+            <h6 class="mb-0"><i class="bi bi-graph-up"></i> 7日抽奖趋势</h6>
+            <small class="text-muted">每分钟自动刷新</small>
+          </div>
+          <div class="card-body">
+            <div id="lotteryTrendChart" class="chart-container"></div>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="card">
+          <div class="card-header bg-white">
+            <h6 class="mb-0"><i class="bi bi-pie-chart"></i> 今日数据分布</h6>
+          </div>
+          <div class="card-body">
+            <div id="todayDistributionChart" class="chart-container"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
     <!-- 快速导航 -->
     <div class="row">
       <div class="col-12">
@@ -95,6 +127,36 @@
                 <div class="col-md-3 col-sm-6">
                   <a href="/admin/presets.html" class="btn btn-outline-warning w-100">
                     <i class="bi bi-stars"></i> 抽奖预设管理
+                  </a>
+                </div>
+                <div class="col-md-3 col-sm-6">
+                  <a href="/admin/campaigns.html" class="btn btn-outline-danger w-100">
+                    <i class="bi bi-gift"></i> 抽奖活动管理
+                  </a>
+                </div>
+                <div class="col-md-3 col-sm-6">
+                  <a href="/admin/lottery-strategy.html" class="btn btn-outline-success w-100">
+                    <i class="bi bi-sliders"></i> 策略引擎配置
+                  </a>
+                </div>
+                <div class="col-md-3 col-sm-6">
+                  <a href="/admin/debt-management.html" class="btn btn-outline-info w-100">
+                    <i class="bi bi-cash-stack"></i> 欠账管理
+                  </a>
+                </div>
+                <div class="col-md-3 col-sm-6">
+                  <a href="/admin/stores.html" class="btn btn-outline-secondary w-100">
+                    <i class="bi bi-shop"></i> 门店管理
+                  </a>
+                </div>
+                <div class="col-md-3 col-sm-6">
+                  <a href="/admin/store-staff.html" class="btn btn-outline-dark w-100">
+                    <i class="bi bi-person-badge"></i> 员工管理
+                  </a>
+                </div>
+                <div class="col-md-3 col-sm-6">
+                  <a href="/admin/risk-alerts.html" class="btn btn-danger w-100">
+                    <i class="bi bi-exclamation-triangle"></i> 风控告警
                   </a>
                 </div>
               </div>
@@ -155,6 +217,26 @@
                     <i class="bi bi-list-check"></i> 活动条件管理
                   </a>
                 </div>
+                <div class="col-md-3 col-sm-6">
+                  <a href="/admin/roles.html" class="btn btn-outline-primary w-100">
+                    <i class="bi bi-shield-check"></i> 角色管理
+                  </a>
+                </div>
+                <div class="col-md-3 col-sm-6">
+                  <a href="/admin/item-templates.html" class="btn btn-outline-warning w-100">
+                    <i class="bi bi-box"></i> 物品模板
+                  </a>
+                </div>
+                <div class="col-md-3 col-sm-6">
+                  <a href="/admin/dict-management.html" class="btn btn-outline-dark w-100">
+                    <i class="bi bi-book"></i> 字典管理
+                  </a>
+                </div>
+                <div class="col-md-3 col-sm-6">
+                  <a href="/admin/tier-matrix.html" class="btn btn-outline-secondary w-100">
+                    <i class="bi bi-grid-3x3"></i> BxPx矩阵配置
+                  </a>
+                </div>
               </div>
             </div>
             
@@ -177,6 +259,26 @@
                 <div class="col-md-3 col-sm-6">
                   <a href="/admin/settings.html" class="btn btn-outline-danger w-100">
                     <i class="bi bi-gear-fill"></i> 系统设置
+                  </a>
+                </div>
+                <div class="col-md-3 col-sm-6">
+                  <a href="/admin/lottery-metrics.html" class="btn btn-outline-info w-100">
+                    <i class="bi bi-speedometer2"></i> 抽奖监控
+                  </a>
+                </div>
+                <div class="col-md-3 col-sm-6">
+                  <a href="/admin/redemption-orders.html" class="btn btn-outline-warning w-100">
+                    <i class="bi bi-qr-code"></i> 核销码管理
+                  </a>
+                </div>
+                <div class="col-md-3 col-sm-6">
+                  <a href="/admin/pricing-config.html" class="btn btn-outline-secondary w-100">
+                    <i class="bi bi-currency-dollar"></i> 活动定价
+                  </a>
+                </div>
+                <div class="col-md-3 col-sm-6">
+                  <a href="/admin/sessions.html" class="btn btn-outline-dark w-100">
+                    <i class="bi bi-key"></i> 会话管理
                   </a>
                 </div>
               </div>
@@ -268,6 +370,9 @@
     </div>
   </div>
 
+  <!-- ✅ ECharts - 图表库（本地引用，符合规范要求） -->
+  <script src="/admin/js/lib/echarts.min.js"></script>
+  
   <!-- ✅ 引入通用工具库 -->
   <script src="/admin/js/admin-common.js"></script>
   

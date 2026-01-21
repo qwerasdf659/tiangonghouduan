@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>策略引擎配置 - 管理后台</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+  <link href="/admin/css/common.css" rel="stylesheet">
+  <style>
+    .strategy-card {
+      border-left: 4px solid #0d6efd;
+      transition: all 0.3s ease;
+    }
+    .strategy-card:hover {
+      border-left-color: #0056b3;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    }
+    .strategy-card.budget_tier { border-left-color: #28a745; }
+    .strategy-card.pity { border-left-color: #ffc107; }
+    .strategy-card.luck_debt { border-left-color: #dc3545; }
+    .strategy-card.anti_empty { border-left-color: #17a2b8; }
+    .config-value {
+      font-family: 'Consolas', monospace;
+      background: #f8f9fa;
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+    .group-header {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 15px 20px;
+      border-radius: 8px;
+      margin-bottom: 15px;
+    }
+  </style>
+</head>
+<body class="bg-light">
+  <nav class="navbar navbar-dark bg-primary">
+    <div class="container-fluid">
+      <a href="/admin/dashboard.html" class="navbar-brand">
+        <i class="bi bi-arrow-left me-2"></i>⚙️ 管理后台 - 策略引擎配置
+      </a>
+      <div>
+        <span class="text-light me-3" id="welcomeText">欢迎，管理员</span>
+        <button class="btn btn-outline-light btn-sm" id="logoutBtn">退出登录</button>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container-fluid mt-4">
+    <!-- 统计卡片 -->
+    <div class="row g-3 mb-4">
+      <div class="col-md-3">
+        <div class="card stat-card">
+          <div class="card-body text-center">
+            <i class="bi bi-sliders text-primary" style="font-size: 2rem;"></i>
+            <h6 class="text-muted mt-2">策略配置总数</h6>
+            <h2 id="totalStrategies" class="text-primary mb-0">-</h2>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="card stat-card">
+          <div class="card-body text-center">
+            <i class="bi bi-check-circle text-success" style="font-size: 2rem;"></i>
+            <h6 class="text-muted mt-2">已生效配置</h6>
+            <h2 id="activeStrategies" class="text-success mb-0">-</h2>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="card stat-card">
+          <div class="card-body text-center">
+            <i class="bi bi-grid-3x3 text-warning" style="font-size: 2rem;"></i>
+            <h6 class="text-muted mt-2">矩阵配置数</h6>
+            <h2 id="matrixCount" class="text-warning mb-0">-</h2>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="card stat-card">
+          <div class="card-body text-center">
+            <i class="bi bi-layers text-info" style="font-size: 2rem;"></i>
+            <h6 class="text-muted mt-2">档位规则数</h6>
+            <h2 id="tierRulesCount" class="text-info mb-0">-</h2>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 选项卡 -->
+    <ul class="nav nav-tabs mb-4" id="strategyTabs" role="tablist">
+      <li class="nav-item" role="presentation">
+        <button class="nav-link active" id="strategies-tab" data-bs-toggle="tab" data-bs-target="#strategies" type="button">
+          <i class="bi bi-sliders"></i> 策略参数
+        </button>
+      </li>
+      <li class="nav-item" role="presentation">
+        <button class="nav-link" id="matrix-tab" data-bs-toggle="tab" data-bs-target="#matrix" type="button">
+          <i class="bi bi-grid-3x3"></i> BxPx矩阵
+        </button>
+      </li>
+      <li class="nav-item" role="presentation">
+        <button class="nav-link" id="tiers-tab" data-bs-toggle="tab" data-bs-target="#tiers" type="button">
+          <i class="bi bi-layers"></i> 档位规则
+        </button>
+      </li>
+    </ul>
+
+    <div class="tab-content" id="strategyTabContent">
+      <!-- 策略参数配置 -->
+      <div class="tab-pane fade show active" id="strategies" role="tabpanel">
+        <div id="strategyGroups">
+          <!-- 动态生成策略分组 -->
+        </div>
+      </div>
+
+      <!-- BxPx矩阵配置 -->
+      <div class="tab-pane fade" id="matrix" role="tabpanel">
+        <div class="card">
+          <div class="card-header">
+            <i class="bi bi-grid-3x3"></i> BxPx矩阵配置 (Budget Tier × Pressure Tier)
+          </div>
+          <div class="card-body">
+            <div class="table-responsive">
+              <table class="table table-bordered text-center" id="matrixTable">
+                <thead class="table-dark">
+                  <tr>
+                    <th>Budget \ Pressure</th>
+                    <th>P1 (低压力)</th>
+                    <th>P2 (中压力)</th>
+                    <th>P3 (高压力)</th>
+                  </tr>
+                </thead>
+                <tbody id="matrixBody">
+                  <!-- 动态生成 -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 档位规则 -->
+      <div class="tab-pane fade" id="tiers" role="tabpanel">
+        <div class="card">
+          <div class="card-header">
+            <i class="bi bi-layers"></i> 抽奖档位规则
+          </div>
+          <div class="card-body">
+            <div class="table-responsive">
+              <table class="table table-hover">
+                <thead>
+                  <tr>
+                    <th>规则ID</th>
+                    <th>Segment Key</th>
+                    <th>Tier Name</th>
+                    <th>优先级</th>
+                    <th>描述</th>
+                    <th>状态</th>
+                  </tr>
+                </thead>
+                <tbody id="tierRulesList">
+                  <!-- 动态生成 -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 策略详情模态框 -->
+  <div class="modal fade" id="strategyDetailModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title"><i class="bi bi-gear"></i> 策略配置详情</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body" id="strategyDetailContent">
+          <!-- 动态填充 -->
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="loading-overlay" id="loadingOverlay">
+    <div class="spinner-border text-light" style="width: 3rem; height: 3rem;" role="status">
+      <span class="visually-hidden">加载中...</span>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="/admin/js/admin-common.js"></script>
+  <script src="/admin/js/api-config.js"></script>
+  <script>
+    let strategies = [];
+    let matrixConfigs = [];
+    let tierRules = [];
+
+    document.addEventListener('DOMContentLoaded', function() {
+      const userInfo = getCurrentUser();
+      if (userInfo && userInfo.nickname) {
+        document.getElementById('welcomeText').textContent = `欢迎，${userInfo.nickname}`;
+      }
+      document.getElementById('logoutBtn').addEventListener('click', logout);
+      
+      loadAllData();
+    });
+
+    async function loadAllData() {
+      showLoading();
+      try {
+        await Promise.all([
+          loadStrategies(),
+          loadMatrixConfigs(),
+          loadTierRules()
+        ]);
+        updateStats();
+      } catch (error) {
+        console.error('加载数据失败:', error);
+        showError('加载失败', error.message);
+      } finally {
+        hideLoading();
+      }
+    }
+
+    async function loadStrategies() {
+      const response = await apiRequest(API_ENDPOINTS.STRATEGY.LIST);
+      if (response && response.success) {
+        strategies = response.data.strategies || response.data || [];
+        renderStrategies(strategies);
+      }
+    }
+
+    async function loadMatrixConfigs() {
+      const response = await apiRequest(API_ENDPOINTS.MATRIX.LIST);
+      if (response && response.success) {
+        matrixConfigs = response.data.configs || response.data || [];
+        renderMatrixTable(matrixConfigs);
+      }
+    }
+
+    async function loadTierRules() {
+      const response = await apiRequest(API_ENDPOINTS.TIER_RULES.LIST);
+      if (response && response.success) {
+        tierRules = response.data.rules || response.data || [];
+        renderTierRules(tierRules);
+      }
+    }
+
+    function updateStats() {
+      document.getElementById('totalStrategies').textContent = strategies.length;
+      document.getElementById('activeStrategies').textContent = 
+        strategies.filter(s => !s.expires_at || new Date(s.expires_at) > new Date()).length;
+      document.getElementById('matrixCount').textContent = matrixConfigs.length;
+      document.getElementById('tierRulesCount').textContent = tierRules.length;
+    }
+
+    function renderStrategies(strategies) {
+      const container = document.getElementById('strategyGroups');
+      
+      // 按config_group分组
+      const groups = {};
+      strategies.forEach(s => {
+        const group = s.config_group || 'other';
+        if (!groups[group]) groups[group] = [];
+        groups[group].push(s);
+      });
+
+      const groupNames = {
+        'budget_tier': '预算档位配置',
+        'pity': '保底机制配置',
+        'luck_debt': '运气债务配置',
+        'anti_empty': '防空奖配置',
+        'other': '其他配置'
+      };
+
+      const groupIcons = {
+        'budget_tier': 'bi-cash-stack',
+        'pity': 'bi-shield-check',
+        'luck_debt': 'bi-graph-down-arrow',
+        'anti_empty': 'bi-shield-exclamation',
+        'other': 'bi-gear'
+      };
+
+      container.innerHTML = Object.entries(groups).map(([group, configs]) => `
+        <div class="mb-4">
+          <div class="group-header">
+            <i class="bi ${groupIcons[group] || 'bi-gear'} me-2"></i>
+            ${groupNames[group] || group} (${configs.length}项)
+          </div>
+          <div class="row g-3">
+            ${configs.map(config => `
+              <div class="col-md-6 col-lg-4">
+                <div class="card strategy-card ${group}">
+                  <div class="card-body">
+                    <h6 class="card-title">${escapeHtml(config.config_key)}</h6>
+                    <p class="text-muted small mb-2">${escapeHtml(config.description || '暂无描述')}</p>
+                    <div class="d-flex justify-content-between align-items-center">
+                      <span class="config-value">${config.config_value}</span>
+                      <button class="btn btn-sm btn-outline-primary" onclick="viewStrategyDetail(${config.config_id})">
+                        <i class="bi bi-eye"></i>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function renderMatrixTable(configs) {
+      const tbody = document.getElementById('matrixBody');
+      const budgetTiers = ['B1', 'B2', 'B3', 'B4'];
+      const pressureTiers = ['P1', 'P2', 'P3'];
+
+      // 创建映射
+      const configMap = {};
+      configs.forEach(c => {
+        configMap[`${c.budget_tier}_${c.pressure_tier}`] = c;
+      });
+
+      tbody.innerHTML = budgetTiers.map(bt => `
+        <tr>
+          <td class="table-secondary"><strong>${bt}</strong></td>
+          ${pressureTiers.map(pt => {
+            const config = configMap[`${bt}_${pt}`];
+            if (config) {
+              return `
+                <td>
+                  <div class="small">
+                    <div>Cap乘数: <span class="text-primary">${config.cap_multiplier}</span></div>
+                    <div>空奖权重: <span class="text-danger">${config.empty_weight_multiplier}</span></div>
+                  </div>
+                </td>
+              `;
+            }
+            return '<td class="text-muted">-</td>';
+          }).join('')}
+        </tr>
+      `).join('');
+    }
+
+    function renderTierRules(rules) {
+      const tbody = document.getElementById('tierRulesList');
+      
+      if (rules.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">暂无档位规则</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = rules.map(rule => `
+        <tr>
+          <td>${rule.rule_id}</td>
+          <td><code>${escapeHtml(rule.segment_key || '-')}</code></td>
+          <td><span class="badge bg-info">${escapeHtml(rule.tier_name || '-')}</span></td>
+          <td>${rule.priority || 0}</td>
+          <td>${escapeHtml(rule.description || '-')}</td>
+          <td>
+            <span class="badge ${rule.is_active ? 'bg-success' : 'bg-secondary'}">
+              ${rule.is_active ? '启用' : '禁用'}
+            </span>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    function viewStrategyDetail(configId) {
+      const config = strategies.find(s => s.config_id === configId);
+      if (!config) return;
+
+      document.getElementById('strategyDetailContent').innerHTML = `
+        <table class="table table-bordered">
+          <tr><th style="width:30%">配置ID</th><td>${config.config_id}</td></tr>
+          <tr><th>配置键</th><td><code>${escapeHtml(config.config_key)}</code></td></tr>
+          <tr><th>配置值</th><td><span class="config-value">${config.config_value}</span></td></tr>
+          <tr><th>数据类型</th><td>${config.value_type || 'string'}</td></tr>
+          <tr><th>配置分组</th><td>${config.config_group || '-'}</td></tr>
+          <tr><th>描述</th><td>${escapeHtml(config.description || '-')}</td></tr>
+          <tr><th>生效时间</th><td>${config.effective_at ? formatDateTime(config.effective_at) : '立即生效'}</td></tr>
+          <tr><th>过期时间</th><td>${config.expires_at ? formatDateTime(config.expires_at) : '永不过期'}</td></tr>
+          <tr><th>创建时间</th><td>${formatDateTime(config.created_at)}</td></tr>
+          <tr><th>更新时间</th><td>${formatDateTime(config.updated_at)}</td></tr>
+        </table>
+      `;
+
+      new bootstrap.Modal(document.getElementById('strategyDetailModal')).show();
+    }
+
+    function formatDateTime(dateStr) {
+      if (!dateStr) return '-';
+      return new Date(dateStr).toLocaleString('zh-CN');
+    }
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      const div = document.createElement('div');
+      div.textContent = str;
+      return div.innerHTML;
+    }
+
+    function showLoading() {
+      document.getElementById('loadingOverlay').classList.add('show');
+    }
+
+    function hideLoading() {
+      document.getElementById('loadingOverlay').classList.remove('show');
+    }
+
+    function showError(title, message) {
+      alert(`❌ ${title}\n${message}`);
+    }
+  </script>
+</body>
+</html>
+

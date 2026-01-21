@@ -1,8 +1,10 @@
 /**
  * 兑换市场统计分析页面
+ * 使用 ECharts 本地引用（符合规范要求）
+ *
  * @description 显示兑换市场的订单和收入统计
  * @author Admin
- * @created 2026-01-09
+ * @updated 2026-01-21 - 迁移至 ECharts
  */
 
 // ============================================
@@ -18,8 +20,15 @@ let revenueChart = null
 
 document.addEventListener('DOMContentLoaded', function () {
   checkAuth()
+  initCharts()
   loadStatistics()
   bindEvents()
+
+  // 监听窗口大小变化
+  window.addEventListener('resize', function () {
+    orderStatusChart && orderStatusChart.resize()
+    revenueChart && revenueChart.resize()
+  })
 })
 
 /**
@@ -36,6 +45,14 @@ function checkAuth() {
   if (userInfo && userInfo.nickname) {
     document.getElementById('welcomeText').textContent = `欢迎，${userInfo.nickname}`
   }
+}
+
+/**
+ * 初始化 ECharts 图表实例
+ */
+function initCharts() {
+  orderStatusChart = echarts.init(document.getElementById('orderStatusChart'))
+  revenueChart = echarts.init(document.getElementById('revenueChart'))
 }
 
 /**
@@ -117,120 +134,142 @@ function renderStatistics(stats) {
 }
 
 // ============================================
-// 图表渲染
+// 图表渲染 (ECharts)
 // ============================================
 
 /**
- * 渲染订单状态分布图
+ * 渲染订单状态分布图 (环形图)
  */
 function renderOrderStatusChart(orders) {
-  const ctx = document.getElementById('orderStatusChart')
-
-  if (orderStatusChart) {
-    orderStatusChart.destroy()
+  const option = {
+    tooltip: {
+      trigger: 'item',
+      formatter: function (params) {
+        const total = orders.pending + orders.completed + orders.shipped + orders.cancelled
+        const percentage = total > 0 ? Math.round((params.value / total) * 100) : 0
+        return `${params.name}: ${params.value} (${percentage}%)`
+      }
+    },
+    legend: {
+      orient: 'horizontal',
+      bottom: 0,
+      data: ['待处理', '已完成', '已发货', '已取消']
+    },
+    series: [
+      {
+        name: '订单状态',
+        type: 'pie',
+        radius: ['40%', '70%'],
+        avoidLabelOverlap: false,
+        label: {
+          show: false,
+          position: 'center'
+        },
+        emphasis: {
+          label: {
+            show: true,
+            fontSize: 16,
+            fontWeight: 'bold'
+          }
+        },
+        labelLine: {
+          show: false
+        },
+        data: [
+          {
+            value: orders.pending,
+            name: '待处理',
+            itemStyle: { color: 'rgba(255, 193, 7, 0.8)' }
+          },
+          {
+            value: orders.completed,
+            name: '已完成',
+            itemStyle: { color: 'rgba(13, 202, 240, 0.8)' }
+          },
+          {
+            value: orders.shipped,
+            name: '已发货',
+            itemStyle: { color: 'rgba(25, 135, 84, 0.8)' }
+          },
+          {
+            value: orders.cancelled,
+            name: '已取消',
+            itemStyle: { color: 'rgba(108, 117, 125, 0.8)' }
+          }
+        ]
+      }
+    ]
   }
 
-  orderStatusChart = new Chart(ctx, {
-    type: 'doughnut',
-    data: {
-      labels: ['待处理', '已完成', '已发货', '已取消'],
-      datasets: [
-        {
-          data: [orders.pending, orders.completed, orders.shipped, orders.cancelled],
-          backgroundColor: [
-            'rgba(255, 193, 7, 0.8)', // warning
-            'rgba(13, 202, 240, 0.8)', // info
-            'rgba(25, 135, 84, 0.8)', // success
-            'rgba(108, 117, 125, 0.8)' // secondary
-          ],
-          borderColor: [
-            'rgba(255, 193, 7, 1)',
-            'rgba(13, 202, 240, 1)',
-            'rgba(25, 135, 84, 1)',
-            'rgba(108, 117, 125, 1)'
-          ],
-          borderWidth: 2
-        }
-      ]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: {
-        legend: {
-          position: 'bottom'
-        },
-        tooltip: {
-          callbacks: {
-            label: function (context) {
-              const label = context.label || ''
-              const value = context.parsed || 0
-              const total = context.dataset.data.reduce((a, b) => a + b, 0)
-              const percentage = total > 0 ? Math.round((value / total) * 100) : 0
-              return `${label}: ${value} (${percentage}%)`
-            }
-          }
-        }
-      }
-    }
-  })
+  orderStatusChart.setOption(option)
 }
 
 /**
- * 渲染收入来源分布图
+ * 渲染收入来源分布图 (柱状图)
  */
 function renderRevenueChart(revenue) {
-  const ctx = document.getElementById('revenueChart')
-
-  if (revenueChart) {
-    revenueChart.destroy()
-  }
-
-  revenueChart = new Chart(ctx, {
-    type: 'bar',
-    data: {
-      labels: ['虚拟价值', '积分'],
-      datasets: [
-        {
-          label: '收入总额',
-          data: [revenue.total_virtual_value, revenue.total_points],
-          backgroundColor: [
-            'rgba(13, 202, 240, 0.8)', // info
-            'rgba(13, 110, 253, 0.8)' // primary
-          ],
-          borderColor: ['rgba(13, 202, 240, 1)', 'rgba(13, 110, 253, 1)'],
-          borderWidth: 2
-        }
-      ]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      scales: {
-        y: {
-          beginAtZero: true,
-          ticks: {
-            callback: function (value) {
-              return value.toLocaleString()
-            }
-          }
-        }
+  const option = {
+    tooltip: {
+      trigger: 'axis',
+      axisPointer: {
+        type: 'shadow'
       },
-      plugins: {
-        legend: {
-          display: false
-        },
-        tooltip: {
-          callbacks: {
-            label: function (context) {
-              const value = context.parsed.y || 0
-              return `收入: ${value.toLocaleString()}`
-            }
-          }
+      formatter: function (params) {
+        const p = params[0]
+        return `${p.name}: ${p.value.toLocaleString()}`
+      }
+    },
+    legend: {
+      show: false
+    },
+    grid: {
+      left: '3%',
+      right: '4%',
+      bottom: '3%',
+      containLabel: true
+    },
+    xAxis: {
+      type: 'category',
+      data: ['虚拟价值', '积分']
+    },
+    yAxis: {
+      type: 'value',
+      axisLabel: {
+        formatter: function (value) {
+          return value.toLocaleString()
         }
       }
-    }
-  })
+    },
+    series: [
+      {
+        name: '收入总额',
+        type: 'bar',
+        barWidth: '50%',
+        data: [
+          {
+            value: revenue.total_virtual_value,
+            itemStyle: {
+              color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                { offset: 0, color: 'rgba(13, 202, 240, 1)' },
+                { offset: 1, color: 'rgba(13, 202, 240, 0.6)' }
+              ])
+            }
+          },
+          {
+            value: revenue.total_points,
+            itemStyle: {
+              color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                { offset: 0, color: 'rgba(13, 110, 253, 1)' },
+                { offset: 1, color: 'rgba(13, 110, 253, 0.6)' }
+              ])
+            }
+          }
+        ]
+      }
+    ]
+  }
+
+  revenueChart.setOption(option)
 }
 
 // ============================================

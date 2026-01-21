@@ -48,12 +48,12 @@ describe('GET /api/v4/console/ - 管理员模块信息API', () => {
    * 验证返回的模块数量
    * 2026-01-21：API覆盖率补齐后新增多个模块（40个模块）
    */
-  test('应该返回40个已实现的模块', async () => {
+  test('应该返回42个已实现的模块', async () => {
     const response = await request(app).get('/api/v4/console/')
     const { modules } = response.body.data
 
     const moduleCount = Object.keys(modules).length
-    expect(moduleCount).toBe(40) // 实际挂载的路由数量（2026-01-21：API覆盖率补齐完成）
+    expect(moduleCount).toBe(42) // 实际挂载的路由数量（2026-01-21：会话管理功能补齐+API覆盖率完成）
 
     // 验证必需的模块是否存在（原有8个）
     expect(modules).toHaveProperty('auth')
@@ -76,6 +76,9 @@ describe('GET /api/v4/console/ - 管理员模块信息API', () => {
     // 验证新增的模块（2026-01-08）
     expect(modules).toHaveProperty('assets')
     expect(modules).toHaveProperty('images')
+
+    // 验证会话管理模块（2026-01-21 会话管理功能补齐）
+    expect(modules).toHaveProperty('sessions')
 
     // 验证新增的模块（2026-01-09）
     expect(modules).toHaveProperty('asset_adjustment')

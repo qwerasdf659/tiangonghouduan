@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>活动定价 - 管理后台</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+  <link href="/admin/css/common.css" rel="stylesheet">
+  <style>
+    .pricing-card {
+      border-radius: 12px;
+      transition: all 0.3s ease;
+    }
+    .pricing-card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+    }
+    .price-tag {
+      font-size: 2rem;
+      font-weight: bold;
+      color: #0d6efd;
+    }
+    .price-unit {
+      font-size: 0.9rem;
+      color: #6c757d;
+    }
+    .discount-badge {
+      position: absolute;
+      top: -10px;
+      right: -10px;
+      background: #dc3545;
+      color: white;
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 0.8rem;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body class="bg-light">
+  <nav class="navbar navbar-dark bg-primary">
+    <div class="container-fluid">
+      <a href="/admin/dashboard.html" class="navbar-brand">
+        <i class="bi bi-arrow-left me-2"></i>💰 管理后台 - 活动定价
+      </a>
+      <div>
+        <span class="text-light me-3" id="welcomeText">欢迎，管理员</span>
+        <button class="btn btn-outline-light btn-sm" id="logoutBtn">退出登录</button>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container-fluid mt-4">
+    <!-- 活动选择 -->
+    <div class="card mb-4">
+      <div class="card-body">
+        <div class="row align-items-center">
+          <div class="col-md-4">
+            <label class="form-label">选择活动</label>
+            <select class="form-select" id="campaignSelect" onchange="loadPricingConfig()">
+              <option value="">请选择活动</option>
+            </select>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">活动状态</label>
+            <input type="text" class="form-control" id="campaignStatus" readonly>
+          </div>
+          <div class="col-md-4 d-flex align-items-end">
+            <button class="btn btn-success" onclick="openAddPriceModal()">
+              <i class="bi bi-plus-lg"></i> 添加定价方案
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 定价方案列表 -->
+    <div class="row" id="pricingList">
+      <div class="col-12">
+        <div class="card">
+          <div class="card-body text-center py-5 text-muted">
+            <i class="bi bi-tag" style="font-size: 3rem;"></i>
+            <p class="mt-2">请选择活动查看定价方案</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 价格历史 -->
+    <div class="card mt-4">
+      <div class="card-header bg-white">
+        <h6 class="mb-0"><i class="bi bi-clock-history"></i> 价格调整历史</h6>
+      </div>
+      <div class="card-body">
+        <div class="table-responsive">
+          <table class="table table-sm">
+            <thead>
+              <tr>
+                <th>调整时间</th>
+                <th>操作人</th>
+                <th>定价方案</th>
+                <th>原价格</th>
+                <th>新价格</th>
+                <th>原因</th>
+              </tr>
+            </thead>
+            <tbody id="priceHistoryList">
+              <tr>
+                <td colspan="6" class="text-center text-muted">暂无历史记录</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 定价方案模态框 -->
+  <div class="modal fade" id="priceModal" tabindex="-1">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="priceModalTitle"><i class="bi bi-tag"></i> 添加定价方案</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <form id="priceForm">
+            <input type="hidden" id="priceId">
+            <div class="mb-3">
+              <label class="form-label">方案名称 <span class="text-danger">*</span></label>
+              <input type="text" class="form-control" id="priceName" required placeholder="如：单次抽奖、5次套餐">
+            </div>
+            <div class="mb-3">
+              <label class="form-label">方案类型</label>
+              <select class="form-select" id="priceType">
+                <option value="single">单次</option>
+                <option value="package">套餐</option>
+                <option value="subscription">订阅</option>
+              </select>
+            </div>
+            <div class="row mb-3">
+              <div class="col-md-6">
+                <label class="form-label">原价 (元)</label>
+                <input type="number" class="form-control" id="originalPrice" min="0" step="0.01">
+              </div>
+              <div class="col-md-6">
+                <label class="form-label">现价 (元) <span class="text-danger">*</span></label>
+                <input type="number" class="form-control" id="currentPrice" min="0" step="0.01" required>
+              </div>
+            </div>
+            <div class="mb-3">
+              <label class="form-label">抽奖次数</label>
+              <input type="number" class="form-control" id="drawCount" min="1" value="1">
+            </div>
+            <div class="row mb-3">
+              <div class="col-md-6">
+                <label class="form-label">生效时间</label>
+                <input type="datetime-local" class="form-control" id="priceStartTime">
+              </div>
+              <div class="col-md-6">
+                <label class="form-label">失效时间</label>
+                <input type="datetime-local" class="form-control" id="priceEndTime">
+              </div>
+            </div>
+            <div class="mb-3">
+              <label class="form-label">排序权重</label>
+              <input type="number" class="form-control" id="priceSort" min="0" value="0">
+            </div>
+            <div class="mb-3">
+              <label class="form-label">状态</label>
+              <select class="form-select" id="priceStatus">
+                <option value="active">启用</option>
+                <option value="inactive">禁用</option>
+              </select>
+            </div>
+            <div class="mb-3">
+              <label class="form-label">备注</label>
+              <textarea class="form-control" id="priceRemark" rows="2"></textarea>
+            </div>
+          </form>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+          <button type="button" class="btn btn-primary" onclick="submitPrice()">保存</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="loading-overlay" id="loadingOverlay">
+    <div class="spinner-border text-light" style="width: 3rem; height: 3rem;" role="status">
+      <span class="visually-hidden">加载中...</span>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="/admin/js/admin-common.js"></script>
+  <script src="/admin/js/api-config.js"></script>
+  <script>
+    let campaigns = [];
+    let pricingPlans = [];
+    let currentCampaignCode = null;
+
+    document.addEventListener('DOMContentLoaded', function() {
+      const userInfo = getCurrentUser();
+      if (userInfo && userInfo.nickname) {
+        document.getElementById('welcomeText').textContent = `欢迎，${userInfo.nickname}`;
+      }
+      document.getElementById('logoutBtn').addEventListener('click', logout);
+      
+      loadCampaigns();
+    });
+
+    async function loadCampaigns() {
+      try {
+        const response = await apiRequest(API_ENDPOINTS.CAMPAIGN.LIST);
+        if (response && response.success) {
+          campaigns = response.data.campaigns || response.data || [];
+          const select = document.getElementById('campaignSelect');
+          select.innerHTML = '<option value="">请选择活动</option>' +
+            campaigns.map(c => `<option value="${c.campaign_code}">${escapeHtml(c.name || c.campaign_name)} (${c.campaign_code})</option>`).join('');
+        }
+      } catch (error) {
+        console.error('加载活动失败:', error);
+      }
+    }
+
+    async function loadPricingConfig() {
+      const campaignCode = document.getElementById('campaignSelect').value;
+      currentCampaignCode = campaignCode;
+
+      if (!campaignCode) {
+        renderEmptyState();
+        return;
+      }
+
+      // 更新活动状态
+      const campaign = campaigns.find(c => c.campaign_code == campaignCode);
+      document.getElementById('campaignStatus').value = campaign ? getStatusLabel(campaign.status) : '-';
+
+      showLoading();
+      try {
+        const response = await apiRequest(API.buildURL(API_ENDPOINTS.PRICING.GET_BY_CAMPAIGN, { code: campaignCode }));
+        if (response && response.success) {
+          pricingPlans = response.data.pricing_plans || response.data || [];
+          renderPricingPlans(pricingPlans);
+          loadPriceHistory(campaignCode);
+        } else {
+          pricingPlans = [];
+          renderPricingPlans([]);
+        }
+      } catch (error) {
+        console.error('加载定价配置失败:', error);
+        renderPricingPlans([]);
+      } finally {
+        hideLoading();
+      }
+    }
+
+    function renderEmptyState() {
+      document.getElementById('pricingList').innerHTML = `
+        <div class="col-12">
+          <div class="card">
+            <div class="card-body text-center py-5 text-muted">
+              <i class="bi bi-tag" style="font-size: 3rem;"></i>
+              <p class="mt-2">请选择活动查看定价方案</p>
+            </div>
+          </div>
+        </div>
+      `;
+      document.getElementById('campaignStatus').value = '';
+    }
+
+    function renderPricingPlans(plans) {
+      const container = document.getElementById('pricingList');
+
+      if (!plans || plans.length === 0) {
+        container.innerHTML = `
+          <div class="col-12">
+            <div class="card">
+              <div class="card-body text-center py-5 text-muted">
+                <i class="bi bi-tag" style="font-size: 3rem;"></i>
+                <p class="mt-2">暂无定价方案</p>
+                <button class="btn btn-primary" onclick="openAddPriceModal()">
+                  <i class="bi bi-plus"></i> 添加定价方案
+                </button>
+              </div>
+            </div>
+          </div>
+        `;
+        return;
+      }
+
+      container.innerHTML = plans.map(plan => {
+        const discount = plan.original_price && plan.current_price < plan.original_price 
+          ? Math.round((1 - plan.current_price / plan.original_price) * 100) 
+          : 0;
+
+        return `
+          <div class="col-md-4 col-lg-3 mb-4">
+            <div class="card pricing-card h-100 position-relative">
+              ${discount > 0 ? `<span class="discount-badge">-${discount}%</span>` : ''}
+              <div class="card-body text-center">
+                <h5 class="card-title">${escapeHtml(plan.name || plan.plan_name)}</h5>
+                <span class="badge ${getTypeBadgeClass(plan.type)}">${getTypeLabel(plan.type)}</span>
+                <div class="my-3">
+                  ${plan.original_price && plan.original_price > plan.current_price ? 
+                    `<del class="text-muted">¥${plan.original_price}</del>` : ''}
+                  <div class="price-tag">¥${plan.current_price || 0}</div>
+                  <div class="price-unit">${plan.draw_count || 1}次抽奖</div>
+                </div>
+                <p class="text-muted small">${escapeHtml(plan.remark || '暂无描述')}</p>
+              </div>
+              <div class="card-footer bg-white d-flex justify-content-between">
+                <span class="badge ${plan.status === 'active' ? 'bg-success' : 'bg-secondary'}">
+                  ${plan.status === 'active' ? '启用' : '禁用'}
+                </span>
+                <div>
+                  <button class="btn btn-sm btn-outline-primary me-1" onclick="editPrice(${plan.pricing_id || plan.id})">
+                    <i class="bi bi-pencil"></i>
+                  </button>
+                  <button class="btn btn-sm btn-outline-danger" onclick="deletePrice(${plan.pricing_id || plan.id})">
+                    <i class="bi bi-trash"></i>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    async function loadPriceHistory(campaignCode) {
+      try {
+        // 使用 API_ENDPOINTS.PRICING.GET_VERSIONS 获取历史版本
+        const response = await apiRequest(API.buildURL(API_ENDPOINTS.PRICING.GET_VERSIONS, { code: campaignCode }));
+        if (response && response.success) {
+          const history = response.data.history || response.data.versions || response.data || [];
+          renderPriceHistory(history);
+        }
+      } catch (error) {
+        console.error('加载价格历史失败:', error);
+      }
+    }
+
+    function renderPriceHistory(history) {
+      const tbody = document.getElementById('priceHistoryList');
+      
+      if (!history || history.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">暂无历史记录</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = history.slice(0, 10).map(h => `
+        <tr>
+          <td>${formatDateTime(h.created_at)}</td>
+          <td>${escapeHtml(h.operator_name || h.operator_id || '-')}</td>
+          <td>${escapeHtml(h.plan_name || '-')}</td>
+          <td>¥${h.old_price || '-'}</td>
+          <td>¥${h.new_price || '-'}</td>
+          <td>${escapeHtml(h.reason || '-')}</td>
+        </tr>
+      `).join('');
+    }
+
+    function openAddPriceModal() {
+      if (!currentCampaignCode) {
+        alert('请先选择活动');
+        return;
+      }
+      document.getElementById('priceModalTitle').innerHTML = '<i class="bi bi-tag"></i> 添加定价方案';
+      document.getElementById('priceForm').reset();
+      document.getElementById('priceId').value = '';
+      new bootstrap.Modal(document.getElementById('priceModal')).show();
+    }
+
+    async function editPrice(priceId) {
+      const plan = pricingPlans.find(p => (p.pricing_id || p.id) === priceId);
+      if (!plan) return;
+
+      document.getElementById('priceModalTitle').innerHTML = '<i class="bi bi-pencil"></i> 编辑定价方案';
+      document.getElementById('priceId').value = priceId;
+      document.getElementById('priceName').value = plan.name || plan.plan_name || '';
+      document.getElementById('priceType').value = plan.type || 'single';
+      document.getElementById('originalPrice').value = plan.original_price || '';
+      document.getElementById('currentPrice').value = plan.current_price || '';
+      document.getElementById('drawCount').value = plan.draw_count || 1;
+      document.getElementById('priceStartTime').value = plan.start_time ? formatDateTimeForInput(plan.start_time) : '';
+      document.getElementById('priceEndTime').value = plan.end_time ? formatDateTimeForInput(plan.end_time) : '';
+      document.getElementById('priceSort').value = plan.sort_order || 0;
+      document.getElementById('priceStatus').value = plan.status || 'active';
+      document.getElementById('priceRemark').value = plan.remark || '';
+      
+      new bootstrap.Modal(document.getElementById('priceModal')).show();
+    }
+
+    async function submitPrice() {
+      const priceId = document.getElementById('priceId').value;
+      const data = {
+        name: document.getElementById('priceName').value,
+        type: document.getElementById('priceType').value,
+        original_price: parseFloat(document.getElementById('originalPrice').value) || null,
+        current_price: parseFloat(document.getElementById('currentPrice').value),
+        draw_count: parseInt(document.getElementById('drawCount').value) || 1,
+        start_time: document.getElementById('priceStartTime').value || null,
+        end_time: document.getElementById('priceEndTime').value || null,
+        sort_order: parseInt(document.getElementById('priceSort').value) || 0,
+        status: document.getElementById('priceStatus').value,
+        remark: document.getElementById('priceRemark').value
+      };
+
+      if (!data.name || !data.current_price) {
+        alert('请填写方案名称和现价');
+        return;
+      }
+
+      showLoading();
+      try {
+        // 使用 API_ENDPOINTS.PRICING 配置
+        const url = priceId
+          ? API.buildURL(API_ENDPOINTS.PRICING.UPDATE, { id: priceId })
+          : API.buildURL(API_ENDPOINTS.PRICING.CREATE, { code: currentCampaignCode });
+        const method = priceId ? 'PUT' : 'POST';
+
+        const response = await apiRequest(url, {
+          method: method,
+          body: JSON.stringify(data)
+        });
+
+        if (response && response.success) {
+          bootstrap.Modal.getInstance(document.getElementById('priceModal')).hide();
+          alert(`✅ ${priceId ? '更新' : '创建'}成功`);
+          loadPricingConfig();
+        } else {
+          showError('保存失败', response?.message || '操作失败');
+        }
+      } catch (error) {
+        console.error('保存定价失败:', error);
+        showError('保存失败', error.message);
+      } finally {
+        hideLoading();
+      }
+    }
+
+    async function deletePrice(priceId) {
+      if (!confirm('确定要删除此定价方案吗？')) return;
+
+      showLoading();
+      try {
+        // 使用 API_ENDPOINTS.PRICING 配置
+        const response = await apiRequest(
+          API.buildURL(API_ENDPOINTS.PRICING.DETAIL, { id: priceId }),
+          { method: 'DELETE' }
+        );
+
+        if (response && response.success) {
+          alert('✅ 删除成功');
+          loadPricingConfig();
+        } else {
+          showError('删除失败', response?.message || '操作失败');
+        }
+      } catch (error) {
+        console.error('删除定价失败:', error);
+        showError('删除失败', error.message);
+      } finally {
+        hideLoading();
+      }
+    }
+
+    function getStatusLabel(status) {
+      const labels = {
+        draft: '草稿',
+        active: '进行中',
+        paused: '已暂停',
+        ended: '已结束'
+      };
+      return labels[status] || status;
+    }
+
+    function getTypeBadgeClass(type) {
+      const classes = {
+        single: 'bg-info',
+        package: 'bg-success',
+        subscription: 'bg-warning text-dark'
+      };
+      return classes[type] || 'bg-secondary';
+    }
+
+    function getTypeLabel(type) {
+      const labels = {
+        single: '单次',
+        package: '套餐',
+        subscription: '订阅'
+      };
+      return labels[type] || type;
+    }
+
+    function formatDateTime(dateStr) {
+      if (!dateStr) return '-';
+      return new Date(dateStr).toLocaleString('zh-CN');
+    }
+
+    function formatDateTimeForInput(dateStr) {
+      if (!dateStr) return '';
+      const date = new Date(dateStr);
+      return date.toISOString().slice(0, 16);
+    }
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      const div = document.createElement('div');
+      div.textContent = str;
+      return div.innerHTML;
+    }
+
+    function showLoading() {
+      document.getElementById('loadingOverlay').classList.add('show');
+    }
+
+    function hideLoading() {
+      document.getElementById('loadingOverlay').classList.remove('show');
+    }
+
+    function showError(title, message) {
+      alert(`❌ ${title}\n${message}`);
+    }
+  </script>
+</body>
+</html>
+

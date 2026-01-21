@@ -212,7 +212,7 @@ function handlePaginationClick(e) {
  */
 async function loadAvailableRoles() {
   try {
-    const response = await apiRequest('/api/v4/console/user-management/roles')
+    const response = await apiRequest(API_ENDPOINTS.ROLE.LIST)
     if (response && response.success) {
       availableRoles = response.data.roles || response.data.list || []
     }
@@ -253,7 +253,7 @@ async function loadUsers(silent = false) {
       params.append('search', search)
     }
 
-    const response = await apiRequest(`/api/v4/console/user-management/users?${params.toString()}`)
+    const response = await apiRequest(API_ENDPOINTS.USER.LIST + '?' + params.toString())
 
     if (response && response.success) {
       renderUsers(response.data)
@@ -274,7 +274,7 @@ async function loadUsers(silent = false) {
  */
 async function loadDashboardStatistics() {
   try {
-    const response = await apiRequest('/api/v4/console/system/dashboard')
+    const response = await apiRequest(API_ENDPOINTS.SYSTEM.DASHBOARD)
     if (response && response.success && response.data) {
       const overview = response.data.overview || {}
       const today = response.data.today || {}
@@ -519,7 +519,7 @@ async function viewUserDetail(userId) {
   showLoading()
 
   try {
-    const response = await apiRequest(`/api/v4/console/user-management/users/${userId}`)
+    const response = await apiRequest(API.buildURL(API_ENDPOINTS.USER.DETAIL, { user_id: userId }))
 
     if (response && response.success) {
       const user = response.data.user || response.data
@@ -600,7 +600,7 @@ async function manageRoles(userId) {
   showLoading()
 
   try {
-    const response = await apiRequest(`/api/v4/console/user-management/users/${userId}`)
+    const response = await apiRequest(API.buildURL(API_ENDPOINTS.USER.DETAIL, { user_id: userId }))
 
     if (response && response.success) {
       const user = response.data.user || response.data
@@ -675,7 +675,7 @@ async function saveUserRoles() {
 
   try {
     const response = await apiRequest(
-      `/api/v4/console/user-management/users/${currentUserId}/role`,
+      API.buildURL(API_ENDPOINTS.USER.UPDATE_ROLE, { user_id: currentUserId }),
       {
         method: 'PUT',
         body: JSON.stringify({
@@ -712,7 +712,7 @@ async function banUser(userId) {
   showLoading()
 
   try {
-    const response = await apiRequest(`/api/v4/console/user-management/users/${userId}/status`, {
+    const response = await apiRequest(API.buildURL(API_ENDPOINTS.USER.UPDATE_STATUS, { user_id: userId }), {
       method: 'PUT',
       body: JSON.stringify({
         status: 'banned',
@@ -746,7 +746,7 @@ async function unbanUser(userId) {
   showLoading()
 
   try {
-    const response = await apiRequest(`/api/v4/console/user-management/users/${userId}/status`, {
+    const response = await apiRequest(API.buildURL(API_ENDPOINTS.USER.UPDATE_STATUS, { user_id: userId }), {
       method: 'PUT',
       body: JSON.stringify({
         status: 'active',
@@ -791,7 +791,7 @@ async function openProbabilityModal(userId, userMobile) {
  */
 async function loadPrizesForProbability() {
   try {
-    const response = await apiRequest('/api/v4/console/prize-pool/BASIC_LOTTERY')
+    const response = await apiRequest(API_ENDPOINTS.PRIZE.LIST + '?campaign_code=BASIC_LOTTERY')
 
     if (response && response.success) {
       const prizes = response.data.prizes || []
@@ -951,7 +951,7 @@ async function saveProbabilityAdjustment() {
   showLoading()
 
   try {
-    const response = await apiRequest('/api/v4/console/lottery-management/probability-adjust', {
+    const response = await apiRequest(API_ENDPOINTS.PROBABILITY.ADJUST, {
       method: 'POST',
       body: JSON.stringify(requestData)
     })

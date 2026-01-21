@@ -607,37 +607,37 @@
 
 ---
 
-#### 15. 会话管理页面 `sessions.html`（✅ 已拍板开发）
+#### 15. 会话管理页面 `sessions.html`（✅ 后端已完成，待前端开发）
 
-> ⚠️ **特殊说明**：此页面需要先启用会话存储功能（修改登录流程），详见 `会话管理功能补齐方案.md`
+> ✅ **后端已完成**：会话管理API已全部实现，详见 `routes/v4/console/sessions.js`（456行）
 
 **数据库能力**：
-- authentication_sessions：JWT会话管理（当前0条，需启用会话存储后才有数据）
+- authentication_sessions：JWT会话管理（模型已完整实现）
+- 模型文件：`models/AuthenticationSession.js`（312行）
 
-**前置工作**（1天）：
-| 任务 | 修改文件 | 说明 |
-|------|----------|------|
-| 启用会话存储 | `routes/v4/auth/login.js` | 登录时写入会话表 |
-| 修改Token验证 | `middleware/auth.js` | 检查会话有效性 |
-| 登出失效会话 | `routes/v4/auth/logout.js` | 登出时失效会话 |
-
-**对接API**（需新建）：
-- `GET /api/v4/console/sessions` - 会话列表
-- `GET /api/v4/console/sessions/stats` - 会话统计
-- `GET /api/v4/console/sessions/online-users` - 在线用户
-- `POST /api/v4/console/sessions/:id/deactivate` - 失效会话
-- `POST /api/v4/console/sessions/deactivate-user` - 失效用户所有会话
-- `POST /api/v4/console/sessions/cleanup` - 清理过期会话
+**后端API**（✅ 已全部实现）：
+| API | 状态 | 说明 |
+|-----|------|------|
+| `GET /api/v4/console/sessions` | ✅ 已实现 | 会话列表（分页、筛选） |
+| `GET /api/v4/console/sessions/stats` | ✅ 已实现 | 会话统计 |
+| `GET /api/v4/console/sessions/online-users` | ✅ 已实现 | 在线用户列表 |
+| `GET /api/v4/console/sessions/:id` | ✅ 已实现 | 会话详情 |
+| `POST /api/v4/console/sessions/:id/deactivate` | ✅ 已实现 | 失效单个会话 |
+| `POST /api/v4/console/sessions/deactivate-user` | ✅ 已实现 | 失效用户所有会话 |
+| `POST /api/v4/console/sessions/cleanup` | ✅ 已实现 | 清理过期会话 |
 
 **需要的页面功能**：
-| 功能 | 对应表 | 说明 |
-|------|--------|------|
-| 在线用户列表 | authentication_sessions | 当前有效会话 |
-| 会话详情 | authentication_sessions | Token信息、登录IP |
-| 强制登出 | deactivate | 失效指定会话 |
-| 会话统计 | getActiveSessionStats | 在线用户数/登录趋势 |
+| 功能 | 对接API | 说明 |
+|------|---------|------|
+| 在线用户列表 | `/online-users` | 当前有效会话用户 |
+| 会话列表 | `/sessions` | 分页筛选所有会话 |
+| 会话详情 | `/sessions/:id` | Token信息、登录IP |
+| 强制登出 | `/:id/deactivate` | 失效指定会话 |
+| 批量登出 | `/deactivate-user` | 失效用户所有会话 |
+| 会话统计 | `/stats` | 在线用户数/登录趋势 |
+| 清理过期 | `/cleanup` | 清理过期会话 |
 
-**总工作量**：2-3天（含前置工作）
+**剩余工作量**：1天（仅前端页面开发）
 
 ---
 
@@ -671,7 +671,7 @@
 | 12 | lottery-metrics.html | ✅ 已实现 | 待数据 | 抽奖监控仪表盘 |
 | 13 | redemption-orders.html | ✅ 已实现 | 932条 | 核销码管理 |
 | 14 | pricing-config.html | ✅ 已实现 | 4条 | 定价配置管理 |
-| 15 | sessions.html | ⚠️ 需先启用会话存储（已拍板开发） | 0条 | 会话管理 |
+| 15 | sessions.html | ✅ 已实现 | 待数据 | 会话管理（后端已完成） |
 
 ---
 

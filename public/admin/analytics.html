@@ -11,8 +11,8 @@
   <!-- Bootstrap Icons - 图标库 -->
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
 
-  <!-- Chart.js - 图表库 -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <!-- ECharts - 图表库（本地引用，符合规范要求） -->
+  <script src="/admin/js/lib/echarts.min.js"></script>
 
   <!-- 公共样式表 - 统一主题和响应式设计 -->
   <link href="/admin/css/common.css" rel="stylesheet">
@@ -151,9 +151,7 @@
             <h6 class="mb-0"><i class="bi bi-graph-up"></i> 用户活跃趋势</h6>
           </div>
           <div class="card-body">
-            <div class="chart-container">
-              <canvas id="userTrendChart"></canvas>
-            </div>
+            <div id="userTrendChart" class="chart-container"></div>
           </div>
         </div>
       </div>
@@ -165,9 +163,7 @@
             <h6 class="mb-0"><i class="bi bi-gift"></i> 抽奖活动趋势</h6>
           </div>
           <div class="card-body">
-            <div class="chart-container">
-              <canvas id="lotteryTrendChart"></canvas>
-            </div>
+            <div id="lotteryTrendChart" class="chart-container"></div>
           </div>
         </div>
       </div>
@@ -179,9 +175,7 @@
             <h6 class="mb-0"><i class="bi bi-star"></i> 积分流转分析</h6>
           </div>
           <div class="card-body">
-            <div class="chart-container">
-              <canvas id="pointsFlowChart"></canvas>
-            </div>
+            <div id="pointsFlowChart" class="chart-container"></div>
           </div>
         </div>
       </div>
@@ -193,9 +187,7 @@
             <h6 class="mb-0"><i class="bi bi-pie-chart"></i> 用户类型分布</h6>
           </div>
           <div class="card-body">
-            <div class="chart-container">
-              <canvas id="userSourceChart"></canvas>
-            </div>
+            <div id="userSourceChart" class="chart-container"></div>
           </div>
         </div>
       </div>

@@ -830,10 +830,222 @@ class UnifiedPageLoader {
   /**
    * 显示详情
    */
-  showDetail(pageConfig, row) {
-    // 可以打开详情模态框或跳转详情页
+  async showDetail(pageConfig, row) {
     console.log('显示详情:', row)
-    alert('详情功能待实现\n' + JSON.stringify(row, null, 2))
+
+    // 用户详情增强处理
+    if (pageConfig.pageId === 'user-list' && row.user_id) {
+      await this.showUserDetailEnhanced(row)
+      return
+    }
+
+    // 默认详情展示
+    this.showGenericDetail(pageConfig, row)
+  }
+
+  /**
+   * 增强版用户详情展示（P1第11项需求）
+   */
+  async showUserDetailEnhanced(user) {
+    const userId = user.user_id
+    const detailData = {
+      basic: user,
+      roles: [],
+      premium: null,
+      riskProfile: null,
+      error: null
+    }
+
+    // 并行加载用户相关数据
+    try {
+      const [rolesRes, premiumRes, riskRes] = await Promise.allSettled([
+        apiRequest(`/api/v4/console/system-data/user-roles?user_id=${userId}`),
+        apiRequest(`/api/v4/console/user-premium/${userId}`),
+        apiRequest(`/api/v4/console/risk-profiles/user/${userId}`)
+      ])
+
+      if (rolesRes.status === 'fulfilled' && rolesRes.value?.success) {
+        detailData.roles = rolesRes.value.data || []
+      }
+      if (premiumRes.status === 'fulfilled' && premiumRes.value?.success) {
+        detailData.premium = premiumRes.value.data
+      }
+      if (riskRes.status === 'fulfilled' && riskRes.value?.success) {
+        detailData.riskProfile = riskRes.value.data
+      }
+    } catch (error) {
+      console.error('加载用户扩展数据失败:', error)
+      detailData.error = error.message
+    }
+
+    // 生成详情HTML
+    const detailHtml = this.generateUserDetailHtml(detailData)
+    this.showDetailModal('用户详情', detailHtml)
+  }
+
+  /**
+   * 生成用户详情HTML
+   */
+  generateUserDetailHtml(data) {
+    const { basic, roles, premium, riskProfile } = data
+    const roleNames = roles.length > 0 
+      ? roles.map(r => `<span class="badge bg-primary me-1">${r.role_name || r.name || '角色'}</span>`).join('') 
+      : '<span class="text-muted">无角色分配</span>'
+
+    return `
+      <div class="row">
+        <!-- 基本信息 -->
+        <div class="col-md-6 mb-3">
+          <div class="card h-100">
+            <div class="card-header bg-primary text-white">
+              <i class="bi bi-person me-2"></i>基本信息
+            </div>
+            <div class="card-body">
+              <table class="table table-sm mb-0">
+                <tr><th width="120">用户ID</th><td>${basic.user_id}</td></tr>
+                <tr><th>昵称</th><td>${basic.nickname || '-'}</td></tr>
+                <tr><th>手机号</th><td>${basic.mobile || '-'}</td></tr>
+                <tr><th>状态</th><td><span class="badge ${basic.status === 'active' ? 'bg-success' : 'bg-danger'}">${basic.status === 'active' ? '正常' : '封禁'}</span></td></tr>
+                <tr><th>积分</th><td><span class="text-warning">${basic.points || 0}</span></td></tr>
+                <tr><th>注册时间</th><td>${basic.created_at ? new Date(basic.created_at).toLocaleString('zh-CN') : '-'}</td></tr>
+                <tr><th>最后登录</th><td>${basic.last_login ? new Date(basic.last_login).toLocaleString('zh-CN') : '-'}</td></tr>
+              </table>
+            </div>
+          </div>
+        </div>
+        
+        <!-- 角色信息 -->
+        <div class="col-md-6 mb-3">
+          <div class="card h-100">
+            <div class="card-header bg-info text-white">
+              <i class="bi bi-shield me-2"></i>角色权限
+            </div>
+            <div class="card-body">
+              <div class="mb-3">
+                <label class="form-label fw-bold">当前角色</label>
+                <div>${roleNames}</div>
+              </div>
+              ${premium ? `
+              <div class="mb-3">
+                <label class="form-label fw-bold">高级状态</label>
+                <div>
+                  <span class="badge ${premium.is_unlocked ? 'bg-success' : 'bg-secondary'}">
+                    ${premium.is_unlocked ? '已解锁' : '未解锁'}
+                  </span>
+                  ${premium.expire_time ? `<small class="text-muted ms-2">过期时间: ${new Date(premium.expire_time).toLocaleString('zh-CN')}</small>` : ''}
+                </div>
+              </div>
+              ` : '<div class="text-muted">高级状态信息不可用</div>'}
+            </div>
+          </div>
+        </div>
+        
+        <!-- 风控配置 -->
+        <div class="col-md-12 mb-3">
+          <div class="card">
+            <div class="card-header bg-warning text-dark">
+              <i class="bi bi-shield-exclamation me-2"></i>风控配置
+            </div>
+            <div class="card-body">
+              ${riskProfile ? `
+              <div class="row">
+                <div class="col-md-3">
+                  <div class="text-center p-3 bg-light rounded">
+                    <div class="fs-4 fw-bold text-primary">${riskProfile.daily_draw_limit || '无限制'}</div>
+                    <div class="text-muted small">日抽奖限次</div>
+                  </div>
+                </div>
+                <div class="col-md-3">
+                  <div class="text-center p-3 bg-light rounded">
+                    <div class="fs-4 fw-bold text-info">${riskProfile.daily_amount_limit || '无限制'}</div>
+                    <div class="text-muted small">日消费限额</div>
+                  </div>
+                </div>
+                <div class="col-md-3">
+                  <div class="text-center p-3 bg-light rounded">
+                    <div class="fs-4 fw-bold text-warning">${riskProfile.risk_level || '正常'}</div>
+                    <div class="text-muted small">风险等级</div>
+                  </div>
+                </div>
+                <div class="col-md-3">
+                  <div class="text-center p-3 bg-light rounded">
+                    <div class="fs-4 fw-bold ${riskProfile.is_blocked ? 'text-danger' : 'text-success'}">${riskProfile.is_blocked ? '已阻断' : '正常'}</div>
+                    <div class="text-muted small">阻断状态</div>
+                  </div>
+                </div>
+              </div>
+              ` : '<div class="text-muted text-center py-3">风控配置信息不可用</div>'}
+            </div>
+          </div>
+        </div>
+      </div>
+    `
+  }
+
+  /**
+   * 通用详情展示
+   */
+  showGenericDetail(pageConfig, row) {
+    const columns = pageConfig.columns || []
+    let html = '<table class="table table-sm">'
+    
+    columns.forEach(col => {
+      const value = row[col.key]
+      let displayValue = value
+      
+      if (col.type === 'datetime' && value) {
+        displayValue = new Date(value).toLocaleString('zh-CN')
+      } else if (col.type === 'status') {
+        displayValue = `<span class="badge bg-${value === 'active' ? 'success' : 'secondary'}">${value}</span>`
+      } else if (col.type === 'badge') {
+        displayValue = `<span class="badge bg-primary">${value}</span>`
+      } else if (col.type === 'currency') {
+        displayValue = `<span class="text-${col.color || 'primary'}">${value}</span>`
+      }
+      
+      html += `<tr><th width="150">${col.label}</th><td>${displayValue ?? '-'}</td></tr>`
+    })
+    
+    html += '</table>'
+    this.showDetailModal(pageConfig.title + ' 详情', html)
+  }
+
+  /**
+   * 显示详情模态框
+   */
+  showDetailModal(title, content) {
+    // 检查是否已存在详情模态框
+    let modal = document.getElementById('detailModal')
+    if (!modal) {
+      // 创建模态框
+      modal = document.createElement('div')
+      modal.id = 'detailModal'
+      modal.className = 'modal fade'
+      modal.tabIndex = -1
+      modal.innerHTML = `
+        <div class="modal-dialog modal-lg modal-dialog-scrollable">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h5 class="modal-title" id="detailModalTitle"></h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="detailModalBody"></div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+            </div>
+          </div>
+        </div>
+      `
+      document.body.appendChild(modal)
+    }
+
+    // 更新内容
+    document.getElementById('detailModalTitle').textContent = title
+    document.getElementById('detailModalBody').innerHTML = content
+
+    // 显示模态框
+    const bsModal = new bootstrap.Modal(modal)
+    bsModal.show()
   }
 
   /**

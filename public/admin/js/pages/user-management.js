@@ -228,9 +228,60 @@ const usersModule = {
   async viewDetail(userId) {
     showLoading(true)
     try {
-      const response = await apiRequest(`/api/v4/console/user-management/users/${userId}`)
-      if (response && response.success) {
-        const user = response.data.user || response.data
+      // 并行加载用户基本信息、高级状态、风控配置、抽奖状态
+      const [userRes, premiumRes, riskRes, globalStateRes] = await Promise.allSettled([
+        apiRequest(`/api/v4/console/user-management/users/${userId}`),
+        apiRequest(`/api/v4/console/user-premium/${userId}`),
+        apiRequest(`/api/v4/console/risk-profiles/user/${userId}`),
+        apiRequest(`/api/v4/console/lottery-monitoring/user-global-states/${userId}`)
+      ])
+
+      if (userRes.status === 'fulfilled' && userRes.value && userRes.value.success) {
+        const user = userRes.value.data.user || userRes.value.data
+
+        // 解析高级状态
+        let premiumHtml = '<span class="badge bg-secondary">未解锁</span>'
+        if (premiumRes.status === 'fulfilled' && premiumRes.value?.success && premiumRes.value.data) {
+          const premium = premiumRes.value.data
+          if (premium.is_unlocked) {
+            const expireDate = premium.expire_time ? this.formatDate(premium.expire_time) : '永久'
+            premiumHtml = `<span class="badge bg-warning">✨ 已解锁</span> <small class="text-muted">到期：${expireDate}</small>`
+          }
+        }
+
+        // 解析风控配置
+        let riskHtml = '-'
+        if (riskRes.status === 'fulfilled' && riskRes.value?.success && riskRes.value.data) {
+          const risk = riskRes.value.data
+          riskHtml = `
+            <small>
+              日限次：<span class="badge bg-info">${risk.daily_draw_limit || '无限'}</span>
+              日限额：<span class="badge bg-info">${risk.daily_amount_limit || '无限'}</span>
+              风险等级：<span class="badge ${risk.risk_level === 'high' ? 'bg-danger' : risk.risk_level === 'medium' ? 'bg-warning' : 'bg-success'}">${risk.risk_level || '正常'}</span>
+            </small>
+          `
+        }
+
+        // 解析全局运气状态
+        let luckHtml = '-'
+        if (globalStateRes.status === 'fulfilled' && globalStateRes.value?.success && globalStateRes.value.data) {
+          const luck = globalStateRes.value.data
+          const emptyRate = luck.historical_empty_rate ? (luck.historical_empty_rate * 100).toFixed(1) + '%' : '-'
+          luckHtml = `
+            <small>
+              历史空奖率：<span class="badge bg-secondary">${emptyRate}</span>
+              运气债务：<span class="badge ${luck.luck_debt > 0 ? 'bg-warning' : 'bg-success'}">${luck.luck_debt || 0}</span>
+              总抽奖次数：<span class="badge bg-primary">${luck.total_draws || 0}</span>
+            </small>
+          `
+        }
+
+        // 渲染角色标签
+        const rolesHtml =
+          user.roles && user.roles.length > 0
+            ? user.roles.map(r => `<span class="badge bg-info me-1">${r}</span>`).join('')
+            : '<span class="text-muted">无角色</span>'
+
         document.getElementById('userDetailBody').innerHTML = `
           <div class="row">
             <div class="col-md-4 text-center">
@@ -239,24 +290,52 @@ const usersModule = {
                    onerror="this.src='/admin/images/default-avatar.png'">
               <h5>${user.nickname || '未设置昵称'}</h5>
               <p class="text-muted">${user.mobile || '-'}</p>
+              <div class="mb-2">${rolesHtml}</div>
+              <div>${premiumHtml}</div>
             </div>
             <div class="col-md-8">
-              <table class="table table-sm">
-                <tr><td class="text-muted">用户ID</td><td>${user.user_id}</td></tr>
-                <tr><td class="text-muted">OpenID</td><td><code>${user.openid || '-'}</code></td></tr>
-                <tr><td class="text-muted">历史总积分</td><td>${user.history_total_points || 0}</td></tr>
-                <tr><td class="text-muted">角色等级</td><td>Lv.${user.role_level || 0}</td></tr>
-                <tr><td class="text-muted">角色</td><td>${user.roles && user.roles.length > 0 ? user.roles.join(', ') : '无'}</td></tr>
-                <tr><td class="text-muted">注册时间</td><td>${this.formatDate(user.created_at)}</td></tr>
-                <tr><td class="text-muted">最后登录</td><td>${this.formatDate(user.last_login)}</td></tr>
-                <tr><td class="text-muted">状态</td><td>${user.status === 'banned' ? '<span class="badge bg-danger">已封禁</span>' : '<span class="badge bg-success">正常</span>'}</td></tr>
-              </table>
+              <ul class="nav nav-tabs mb-3" id="userDetailTabs" role="tablist">
+                <li class="nav-item" role="presentation">
+                  <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#basicInfo" type="button">基本信息</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                  <button class="nav-link" data-bs-toggle="tab" data-bs-target="#riskInfo" type="button">风控配置</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                  <button class="nav-link" data-bs-toggle="tab" data-bs-target="#lotteryInfo" type="button">抽奖状态</button>
+                </li>
+              </ul>
+              <div class="tab-content">
+                <div class="tab-pane fade show active" id="basicInfo">
+                  <table class="table table-sm">
+                    <tr><td class="text-muted" width="120">用户ID</td><td>${user.user_id}</td></tr>
+                    <tr><td class="text-muted">OpenID</td><td><code class="small">${user.openid || '-'}</code></td></tr>
+                    <tr><td class="text-muted">历史总积分</td><td><span class="badge bg-primary">${user.history_total_points || 0}</span></td></tr>
+                    <tr><td class="text-muted">角色等级</td><td>Lv.${user.role_level || 0}</td></tr>
+                    <tr><td class="text-muted">注册时间</td><td>${this.formatDate(user.created_at)}</td></tr>
+                    <tr><td class="text-muted">最后登录</td><td>${this.formatDate(user.last_login)}</td></tr>
+                    <tr><td class="text-muted">状态</td><td>${user.status === 'banned' ? '<span class="badge bg-danger">已封禁</span>' : '<span class="badge bg-success">正常</span>'}</td></tr>
+                  </table>
+                </div>
+                <div class="tab-pane fade" id="riskInfo">
+                  <div class="card">
+                    <div class="card-header"><i class="bi bi-shield-exclamation"></i> 风控配置</div>
+                    <div class="card-body">${riskHtml}</div>
+                  </div>
+                </div>
+                <div class="tab-pane fade" id="lotteryInfo">
+                  <div class="card">
+                    <div class="card-header"><i class="bi bi-dice-5"></i> 全局运气状态</div>
+                    <div class="card-body">${luckHtml}</div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         `
         new bootstrap.Modal(document.getElementById('userDetailModal')).show()
       } else {
-        showErrorToast(response?.message || '获取用户详情失败')
+        showErrorToast(userRes.value?.message || '获取用户详情失败')
       }
     } catch (error) {
       showErrorToast(error.message || '网络错误')

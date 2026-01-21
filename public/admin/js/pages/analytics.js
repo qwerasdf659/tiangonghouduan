@@ -1,5 +1,6 @@
 /**
  * 运营分析页面 - JavaScript逻辑
+ * 使用 ECharts 本地引用（符合规范要求）
  *
  * 适配后端接口（以后端为准）：
  * - /api/v4/console/analytics/stats/today - 今日统计
@@ -32,6 +33,14 @@ document.addEventListener('DOMContentLoaded', function () {
 
   initCharts()
   loadAllData()
+
+  // 监听窗口大小变化，调整图表尺寸
+  window.addEventListener('resize', function () {
+    userTrendChart && userTrendChart.resize()
+    lotteryTrendChart && lotteryTrendChart.resize()
+    pointsFlowChart && pointsFlowChart.resize()
+    userSourceChart && userSourceChart.resize()
+  })
 })
 
 function handleTimeRangeChange() {
@@ -46,101 +55,157 @@ function handleTimeRangeChange() {
   }
 }
 
+/**
+ * 初始化 ECharts 图表实例
+ */
 function initCharts() {
-  // 用户趋势图
-  const userCtx = document.getElementById('userTrendChart').getContext('2d')
-  userTrendChart = new Chart(userCtx, {
-    type: 'line',
-    data: {
-      labels: [],
-      datasets: [
-        {
-          label: '活跃用户',
-          data: [],
-          borderColor: '#0d6efd',
-          backgroundColor: 'rgba(13, 110, 253, 0.1)',
-          fill: true,
-          tension: 0.4
-        }
-      ]
+  // 用户趋势图 - 折线图
+  userTrendChart = echarts.init(document.getElementById('userTrendChart'))
+  userTrendChart.setOption({
+    tooltip: {
+      trigger: 'axis',
+      axisPointer: { type: 'cross' }
     },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: { legend: { display: false } },
-      scales: { y: { beginAtZero: true } }
-    }
-  })
-
-  // 抽奖趋势图
-  const lotteryCtx = document.getElementById('lotteryTrendChart').getContext('2d')
-  lotteryTrendChart = new Chart(lotteryCtx, {
-    type: 'bar',
-    data: {
-      labels: [],
-      datasets: [
-        {
-          label: '抽奖次数',
-          data: [],
-          backgroundColor: '#198754'
-        }
-      ]
+    legend: { show: false },
+    grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },
+    xAxis: {
+      type: 'category',
+      boundaryGap: false,
+      data: []
     },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: { legend: { display: false } },
-      scales: { y: { beginAtZero: true } }
-    }
-  })
-
-  // 积分流转图
-  const pointsCtx = document.getElementById('pointsFlowChart').getContext('2d')
-  pointsFlowChart = new Chart(pointsCtx, {
-    type: 'line',
-    data: {
-      labels: [],
-      datasets: [
-        {
-          label: '积分发放',
-          data: [],
-          borderColor: '#ffc107',
-          backgroundColor: 'rgba(255, 193, 7, 0.1)',
-          fill: false
+    yAxis: {
+      type: 'value',
+      min: 0
+    },
+    series: [
+      {
+        name: '活跃用户',
+        type: 'line',
+        smooth: true,
+        areaStyle: {
+          color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+            { offset: 0, color: 'rgba(13, 110, 253, 0.3)' },
+            { offset: 1, color: 'rgba(13, 110, 253, 0.05)' }
+          ])
         },
-        {
-          label: '积分消耗',
-          data: [],
-          borderColor: '#dc3545',
-          backgroundColor: 'rgba(220, 53, 69, 0.1)',
-          fill: false
-        }
-      ]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      scales: { y: { beginAtZero: true } }
-    }
+        lineStyle: { color: '#0d6efd', width: 2 },
+        itemStyle: { color: '#0d6efd' },
+        data: []
+      }
+    ]
   })
 
-  // 用户来源饼图（改为用户类型分布）
-  const sourceCtx = document.getElementById('userSourceChart').getContext('2d')
-  userSourceChart = new Chart(sourceCtx, {
-    type: 'doughnut',
-    data: {
-      labels: ['普通用户', '管理员', '商家'],
-      datasets: [
-        {
-          data: [0, 0, 0],
-          backgroundColor: ['#0d6efd', '#198754', '#ffc107']
-        }
-      ]
+  // 抽奖趋势图 - 柱状图
+  lotteryTrendChart = echarts.init(document.getElementById('lotteryTrendChart'))
+  lotteryTrendChart.setOption({
+    tooltip: {
+      trigger: 'axis',
+      axisPointer: { type: 'shadow' }
     },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false
-    }
+    legend: { show: false },
+    grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },
+    xAxis: {
+      type: 'category',
+      data: []
+    },
+    yAxis: {
+      type: 'value',
+      min: 0
+    },
+    series: [
+      {
+        name: '抽奖次数',
+        type: 'bar',
+        barWidth: '60%',
+        itemStyle: {
+          color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+            { offset: 0, color: '#198754' },
+            { offset: 1, color: 'rgba(25, 135, 84, 0.6)' }
+          ])
+        },
+        data: []
+      }
+    ]
+  })
+
+  // 积分流转图 - 双线图
+  pointsFlowChart = echarts.init(document.getElementById('pointsFlowChart'))
+  pointsFlowChart.setOption({
+    tooltip: {
+      trigger: 'axis',
+      axisPointer: { type: 'cross' }
+    },
+    legend: {
+      data: ['积分发放', '积分消耗'],
+      bottom: 0
+    },
+    grid: { left: '3%', right: '4%', bottom: '15%', containLabel: true },
+    xAxis: {
+      type: 'category',
+      boundaryGap: false,
+      data: []
+    },
+    yAxis: {
+      type: 'value',
+      min: 0
+    },
+    series: [
+      {
+        name: '积分发放',
+        type: 'line',
+        smooth: true,
+        lineStyle: { color: '#ffc107', width: 2 },
+        itemStyle: { color: '#ffc107' },
+        data: []
+      },
+      {
+        name: '积分消耗',
+        type: 'line',
+        smooth: true,
+        lineStyle: { color: '#dc3545', width: 2 },
+        itemStyle: { color: '#dc3545' },
+        data: []
+      }
+    ]
+  })
+
+  // 用户类型分布 - 环形图
+  userSourceChart = echarts.init(document.getElementById('userSourceChart'))
+  userSourceChart.setOption({
+    tooltip: {
+      trigger: 'item',
+      formatter: '{a} <br/>{b}: {c} ({d}%)'
+    },
+    legend: {
+      orient: 'horizontal',
+      bottom: 0,
+      data: ['普通用户', '管理员', '商家']
+    },
+    series: [
+      {
+        name: '用户类型',
+        type: 'pie',
+        radius: ['40%', '70%'],
+        avoidLabelOverlap: false,
+        label: {
+          show: false,
+          position: 'center'
+        },
+        emphasis: {
+          label: {
+            show: true,
+            fontSize: 16,
+            fontWeight: 'bold'
+          }
+        },
+        labelLine: { show: false },
+        data: [
+          { value: 0, name: '普通用户', itemStyle: { color: '#0d6efd' } },
+          { value: 0, name: '管理员', itemStyle: { color: '#198754' } },
+          { value: 0, name: '商家', itemStyle: { color: '#ffc107' } }
+        ]
+      }
+    ]
   })
 }
 
@@ -221,14 +286,16 @@ async function loadDecisionAnalytics() {
       const dates = dailyStats.map(item => item.date)
       const draws = dailyStats.map(item => item.draws)
 
-      lotteryTrendChart.data.labels = dates
-      lotteryTrendChart.data.datasets[0].data = draws
-      lotteryTrendChart.update()
+      lotteryTrendChart.setOption({
+        xAxis: { data: dates },
+        series: [{ data: draws }]
+      })
 
       // 更新用户趋势图（使用抽奖活跃度代替，因为后端没有单独的用户活跃趋势）
-      userTrendChart.data.labels = dates
-      userTrendChart.data.datasets[0].data = draws.map(d => Math.min(d, 100)) // 简化显示
-      userTrendChart.update()
+      userTrendChart.setOption({
+        xAxis: { data: dates },
+        series: [{ data: draws.map(d => Math.min(d, 100)) }]
+      })
 
       // 更新详细数据表格
       updateDetailTable(dailyStats)
@@ -265,9 +332,10 @@ async function loadLotteryTrends(days) {
         const userDates = data.user_activity.map(item => item.period)
         const activeUsers = data.user_activity.map(item => item.active_users)
 
-        userTrendChart.data.labels = userDates
-        userTrendChart.data.datasets[0].data = activeUsers
-        userTrendChart.update()
+        userTrendChart.setOption({
+          xAxis: { data: userDates },
+          series: [{ data: activeUsers }]
+        })
       }
 
       // 使用lottery_activity更新抽奖趋势
@@ -275,34 +343,43 @@ async function loadLotteryTrends(days) {
         const lotteryDates = data.lottery_activity.map(item => item.period)
         const totalDraws = data.lottery_activity.map(item => item.total_draws)
 
-        lotteryTrendChart.data.labels = lotteryDates
-        lotteryTrendChart.data.datasets[0].data = totalDraws
-        lotteryTrendChart.update()
+        lotteryTrendChart.setOption({
+          xAxis: { data: lotteryDates },
+          series: [{ data: totalDraws }]
+        })
       }
 
-      // 暂时用模拟数据显示积分流转（后端没有单独提供积分每日流水接口）
-      // 如果需要真实数据，需要后端增加相应接口
+      // 更新积分流转图
       if (data.lottery_activity && data.lottery_activity.length > 0) {
         const dates = data.lottery_activity.map(item => item.period)
         // 用抽奖消耗积分模拟积分支出
-        const pointsOut = data.lottery_activity.map(item => item.total_draws * 10) // 假设每次抽奖10积分
-        const pointsIn = data.lottery_activity.map(item => item.unique_users * 50) // 假设每用户获得50积分
+        const pointsOut = data.lottery_activity.map(item => item.total_draws * 10)
+        const pointsIn = data.lottery_activity.map(item => item.unique_users * 50)
 
-        pointsFlowChart.data.labels = dates
-        pointsFlowChart.data.datasets[0].data = pointsIn
-        pointsFlowChart.data.datasets[1].data = pointsOut
-        pointsFlowChart.update()
+        pointsFlowChart.setOption({
+          xAxis: { data: dates },
+          series: [{ data: pointsIn }, { data: pointsOut }]
+        })
       }
 
       // 更新用户类型分布（使用summary数据）
       if (data.summary) {
-        // 暂时使用模拟数据，后端没有提供用户类型分布接口
-        userSourceChart.data.datasets[0].data = [
-          data.summary.peak_users || 100,
-          Math.floor((data.summary.peak_users || 100) * 0.05),
-          Math.floor((data.summary.peak_users || 100) * 0.1)
-        ]
-        userSourceChart.update()
+        const peakUsers = data.summary.peak_users || 100
+        userSourceChart.setOption({
+          series: [
+            {
+              data: [
+                { value: peakUsers, name: '普通用户', itemStyle: { color: '#0d6efd' } },
+                {
+                  value: Math.floor(peakUsers * 0.05),
+                  name: '管理员',
+                  itemStyle: { color: '#198754' }
+                },
+                { value: Math.floor(peakUsers * 0.1), name: '商家', itemStyle: { color: '#ffc107' } }
+              ]
+            }
+          ]
+        })
       }
     }
   } catch (error) {

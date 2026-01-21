@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>门店管理 - 管理后台</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+  <link href="/admin/css/common.css" rel="stylesheet">
+  <style>
+    .store-card {
+      transition: all 0.3s ease;
+      border-left: 4px solid #0d6efd;
+    }
+    .store-card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+    }
+    .store-card.inactive {
+      border-left-color: #6c757d;
+      opacity: 0.7;
+    }
+    .address-text {
+      font-size: 0.85rem;
+      color: #6c757d;
+    }
+  </style>
+</head>
+<body class="bg-light">
+  <nav class="navbar navbar-dark bg-primary">
+    <div class="container-fluid">
+      <a href="/admin/dashboard.html" class="navbar-brand">
+        <i class="bi bi-arrow-left me-2"></i>🏪 管理后台 - 门店管理
+      </a>
+      <div>
+        <span class="text-light me-3" id="welcomeText">欢迎，管理员</span>
+        <button class="btn btn-outline-light btn-sm" id="logoutBtn">退出登录</button>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container-fluid mt-4">
+    <!-- 统计卡片 -->
+    <div class="row g-3 mb-4">
+      <div class="col-md-3">
+        <div class="card stat-card">
+          <div class="card-body text-center">
+            <i class="bi bi-shop text-primary" style="font-size: 2rem;"></i>
+            <h6 class="text-muted mt-2">门店总数</h6>
+            <h2 id="totalStores" class="text-primary mb-0">-</h2>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="card stat-card">
+          <div class="card-body text-center">
+            <i class="bi bi-check-circle text-success" style="font-size: 2rem;"></i>
+            <h6 class="text-muted mt-2">营业中</h6>
+            <h2 id="activeStores" class="text-success mb-0">-</h2>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="card stat-card">
+          <div class="card-body text-center">
+            <i class="bi bi-people text-warning" style="font-size: 2rem;"></i>
+            <h6 class="text-muted mt-2">总员工数</h6>
+            <h2 id="totalStaff" class="text-warning mb-0">-</h2>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="card stat-card">
+          <div class="card-body text-center">
+            <i class="bi bi-geo-alt text-info" style="font-size: 2rem;"></i>
+            <h6 class="text-muted mt-2">覆盖城市</h6>
+            <h2 id="totalCities" class="text-info mb-0">-</h2>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 筛选和操作栏 -->
+    <div class="card mb-4">
+      <div class="card-body">
+        <div class="row g-3 align-items-center">
+          <div class="col-md-3">
+            <label class="form-label">门店状态</label>
+            <select class="form-select" id="statusFilter">
+              <option value="">全部状态</option>
+              <option value="active">营业中</option>
+              <option value="inactive">已停业</option>
+            </select>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">搜索</label>
+            <input type="text" class="form-control" id="searchInput" placeholder="搜索门店名称或地址...">
+          </div>
+          <div class="col-md-3 d-flex align-items-end">
+            <button class="btn btn-primary me-2" onclick="loadStores()">
+              <i class="bi bi-search"></i> 搜索
+            </button>
+            <button class="btn btn-success" onclick="openCreateModal()">
+              <i class="bi bi-plus-lg"></i> 新增门店
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 门店列表 -->
+    <div class="row" id="storeList">
+      <!-- 动态生成 -->
+    </div>
+
+    <!-- 空状态 -->
+    <div class="card d-none" id="emptyState">
+      <div class="card-body text-center py-5">
+        <i class="bi bi-shop text-muted" style="font-size: 4rem;"></i>
+        <h5 class="text-muted mt-3">暂无门店</h5>
+        <p class="text-muted">点击上方"新增门店"按钮添加</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- 门店表单模态框 -->
+  <div class="modal fade" id="storeModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="storeModalTitle"><i class="bi bi-shop"></i> 新增门店</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <form id="storeForm">
+            <input type="hidden" id="storeId">
+            <div class="row g-3">
+              <div class="col-md-6">
+                <label class="form-label">门店名称 <span class="text-danger">*</span></label>
+                <input type="text" class="form-control" id="storeName" required>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label">联系电话</label>
+                <input type="text" class="form-control" id="storePhone">
+              </div>
+              <div class="col-md-6">
+                <label class="form-label">省份 <span class="text-danger">*</span></label>
+                <select class="form-select" id="storeProvince" onchange="loadCities()" required>
+                  <option value="">请选择省份</option>
+                </select>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label">城市 <span class="text-danger">*</span></label>
+                <select class="form-select" id="storeCity" onchange="loadDistricts()" required>
+                  <option value="">请先选择省份</option>
+                </select>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label">区县</label>
+                <select class="form-select" id="storeDistrict" onchange="loadStreets()">
+                  <option value="">请先选择城市</option>
+                </select>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label">街道</label>
+                <select class="form-select" id="storeStreet">
+                  <option value="">请先选择区县</option>
+                </select>
+              </div>
+              <div class="col-12">
+                <label class="form-label">详细地址 <span class="text-danger">*</span></label>
+                <input type="text" class="form-control" id="storeAddress" required>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label">营业时间</label>
+                <input type="text" class="form-control" id="storeHours" placeholder="如：09:00-22:00">
+              </div>
+              <div class="col-md-6">
+                <label class="form-label">门店状态</label>
+                <select class="form-select" id="storeStatus">
+                  <option value="active">营业中</option>
+                  <option value="inactive">已停业</option>
+                </select>
+              </div>
+              <div class="col-12">
+                <label class="form-label">备注</label>
+                <textarea class="form-control" id="storeRemark" rows="2"></textarea>
+              </div>
+            </div>
+          </form>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+          <button type="button" class="btn btn-primary" onclick="submitStore()">保存</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 门店详情模态框 -->
+  <div class="modal fade" id="storeDetailModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title"><i class="bi bi-info-circle"></i> 门店详情</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body" id="storeDetailContent">
+          <!-- 动态填充 -->
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="loading-overlay" id="loadingOverlay">
+    <div class="spinner-border text-light" style="width: 3rem; height: 3rem;" role="status">
+      <span class="visually-hidden">加载中...</span>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="/admin/js/admin-common.js"></script>
+  <script src="/admin/js/api-config.js"></script>
+  <script>
+    let stores = [];
+    let provinces = [];
+
+    document.addEventListener('DOMContentLoaded', function() {
+      const userInfo = getCurrentUser();
+      if (userInfo && userInfo.nickname) {
+        document.getElementById('welcomeText').textContent = `欢迎，${userInfo.nickname}`;
+      }
+      document.getElementById('logoutBtn').addEventListener('click', logout);
+      
+      loadStores();
+      loadProvinces();
+    });
+
+    async function loadStores() {
+      showLoading();
+      try {
+        const status = document.getElementById('statusFilter').value;
+        const search = document.getElementById('searchInput').value;
+
+        const params = new URLSearchParams();
+        if (status) params.append('status', status);
+        if (search) params.append('search', search);
+
+        const url = API_ENDPOINTS.STORE.LIST + (params.toString() ? `?${params.toString()}` : '');
+        const response = await apiRequest(url);
+
+        if (response && response.success) {
+          stores = response.data.stores || response.data || [];
+          renderStores(stores);
+          updateStats(response.data.stats || {});
+        } else {
+          showError('加载失败', response?.message || '获取门店列表失败');
+        }
+      } catch (error) {
+        console.error('加载门店失败:', error);
+        showError('加载失败', error.message);
+      } finally {
+        hideLoading();
+      }
+    }
+
+    async function loadProvinces() {
+      try {
+        const response = await apiRequest(API_ENDPOINTS.REGION.PROVINCES);
+        if (response && response.success) {
+          provinces = response.data.provinces || response.data || [];
+          const select = document.getElementById('storeProvince');
+          select.innerHTML = '<option value="">请选择省份</option>' +
+            provinces.map(p => `<option value="${p.region_code}">${escapeHtml(p.region_name)}</option>`).join('');
+        }
+      } catch (error) {
+        console.error('加载省份失败:', error);
+      }
+    }
+
+    async function loadCities() {
+      const provinceCode = document.getElementById('storeProvince').value;
+      const citySelect = document.getElementById('storeCity');
+      const districtSelect = document.getElementById('storeDistrict');
+      const streetSelect = document.getElementById('storeStreet');
+
+      citySelect.innerHTML = '<option value="">请选择城市</option>';
+      districtSelect.innerHTML = '<option value="">请先选择城市</option>';
+      streetSelect.innerHTML = '<option value="">请先选择区县</option>';
+
+      if (!provinceCode) return;
+
+      try {
+        const response = await apiRequest(API.buildURL(API_ENDPOINTS.REGION.CHILDREN, { parent_code: provinceCode }));
+        if (response && response.success) {
+          const cities = response.data.children || response.data || [];
+          citySelect.innerHTML = '<option value="">请选择城市</option>' +
+            cities.map(c => `<option value="${c.region_code}">${escapeHtml(c.region_name)}</option>`).join('');
+        }
+      } catch (error) {
+        console.error('加载城市失败:', error);
+      }
+    }
+
+    async function loadDistricts() {
+      const cityCode = document.getElementById('storeCity').value;
+      const districtSelect = document.getElementById('storeDistrict');
+      const streetSelect = document.getElementById('storeStreet');
+
+      districtSelect.innerHTML = '<option value="">请选择区县</option>';
+      streetSelect.innerHTML = '<option value="">请先选择区县</option>';
+
+      if (!cityCode) return;
+
+      try {
+        const response = await apiRequest(API.buildURL(API_ENDPOINTS.REGION.CHILDREN, { parent_code: cityCode }));
+        if (response && response.success) {
+          const districts = response.data.children || response.data || [];
+          districtSelect.innerHTML = '<option value="">请选择区县</option>' +
+            districts.map(d => `<option value="${d.region_code}">${escapeHtml(d.region_name)}</option>`).join('');
+        }
+      } catch (error) {
+        console.error('加载区县失败:', error);
+      }
+    }
+
+    async function loadStreets() {
+      const districtCode = document.getElementById('storeDistrict').value;
+      const streetSelect = document.getElementById('storeStreet');
+
+      streetSelect.innerHTML = '<option value="">请选择街道</option>';
+
+      if (!districtCode) return;
+
+      try {
+        const response = await apiRequest(API.buildURL(API_ENDPOINTS.REGION.CHILDREN, { parent_code: districtCode }));
+        if (response && response.success) {
+          const streets = response.data.children || response.data || [];
+          streetSelect.innerHTML = '<option value="">请选择街道</option>' +
+            streets.map(s => `<option value="${s.region_code}">${escapeHtml(s.region_name)}</option>`).join('');
+        }
+      } catch (error) {
+        console.error('加载街道失败:', error);
+      }
+    }
+
+    function renderStores(stores) {
+      const container = document.getElementById('storeList');
+      const emptyState = document.getElementById('emptyState');
+
+      if (!stores || stores.length === 0) {
+        container.innerHTML = '';
+        emptyState.classList.remove('d-none');
+        return;
+      }
+
+      emptyState.classList.add('d-none');
+
+      container.innerHTML = stores.map(store => `
+        <div class="col-md-6 col-lg-4 mb-4">
+          <div class="card store-card h-100 ${store.status !== 'active' ? 'inactive' : ''}">
+            <div class="card-header d-flex justify-content-between align-items-center">
+              <h6 class="mb-0"><i class="bi bi-shop me-2"></i>${escapeHtml(store.name || '未命名门店')}</h6>
+              <span class="badge ${store.status === 'active' ? 'bg-success' : 'bg-secondary'}">
+                ${store.status === 'active' ? '营业中' : '已停业'}
+              </span>
+            </div>
+            <div class="card-body">
+              <p class="address-text mb-2">
+                <i class="bi bi-geo-alt"></i> 
+                ${escapeHtml(store.province_name || '')}${escapeHtml(store.city_name || '')}${escapeHtml(store.district_name || '')}
+              </p>
+              <p class="address-text mb-2">${escapeHtml(store.address || '-')}</p>
+              <p class="mb-2">
+                <i class="bi bi-telephone text-primary"></i> ${escapeHtml(store.phone || '-')}
+              </p>
+              <p class="mb-0">
+                <i class="bi bi-clock text-warning"></i> ${escapeHtml(store.business_hours || '-')}
+              </p>
+            </div>
+            <div class="card-footer bg-white">
+              <button class="btn btn-sm btn-outline-primary me-1" onclick="viewStoreDetail(${store.store_id})">
+                <i class="bi bi-eye"></i> 详情
+              </button>
+              <button class="btn btn-sm btn-outline-warning me-1" onclick="editStore(${store.store_id})">
+                <i class="bi bi-pencil"></i> 编辑
+              </button>
+              <button class="btn btn-sm btn-outline-${store.status === 'active' ? 'secondary' : 'success'}" 
+                      onclick="toggleStoreStatus(${store.store_id}, '${store.status}')">
+                <i class="bi bi-${store.status === 'active' ? 'pause' : 'play'}"></i> 
+                ${store.status === 'active' ? '停业' : '营业'}
+              </button>
+            </div>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function updateStats(stats) {
+      document.getElementById('totalStores').textContent = stats.total || stores.length;
+      document.getElementById('activeStores').textContent = stats.active || stores.filter(s => s.status === 'active').length;
+      document.getElementById('totalStaff').textContent = stats.total_staff || '-';
+      document.getElementById('totalCities').textContent = stats.cities || '-';
+    }
+
+    function openCreateModal() {
+      document.getElementById('storeModalTitle').innerHTML = '<i class="bi bi-shop"></i> 新增门店';
+      document.getElementById('storeForm').reset();
+      document.getElementById('storeId').value = '';
+      new bootstrap.Modal(document.getElementById('storeModal')).show();
+    }
+
+    async function editStore(storeId) {
+      showLoading();
+      try {
+        const response = await apiRequest(API.buildURL(API_ENDPOINTS.STORE.DETAIL, { store_id: storeId }));
+        if (response && response.success) {
+          const store = response.data;
+          document.getElementById('storeModalTitle').innerHTML = '<i class="bi bi-pencil"></i> 编辑门店';
+          document.getElementById('storeId').value = store.store_id;
+          document.getElementById('storeName').value = store.name || '';
+          document.getElementById('storePhone').value = store.phone || '';
+          document.getElementById('storeAddress').value = store.address || '';
+          document.getElementById('storeHours').value = store.business_hours || '';
+          document.getElementById('storeStatus').value = store.status || 'active';
+          document.getElementById('storeRemark').value = store.remark || '';
+          
+          // 设置地区选择（简化处理）
+          if (store.province_code) {
+            document.getElementById('storeProvince').value = store.province_code;
+            await loadCities();
+            if (store.city_code) {
+              document.getElementById('storeCity').value = store.city_code;
+              await loadDistricts();
+              if (store.district_code) {
+                document.getElementById('storeDistrict').value = store.district_code;
+                await loadStreets();
+                if (store.street_code) {
+                  document.getElementById('storeStreet').value = store.street_code;
+                }
+              }
+            }
+          }
+          
+          new bootstrap.Modal(document.getElementById('storeModal')).show();
+        } else {
+          showError('加载失败', response?.message || '获取门店详情失败');
+        }
+      } catch (error) {
+        console.error('加载门店详情失败:', error);
+        showError('加载失败', error.message);
+      } finally {
+        hideLoading();
+      }
+    }
+
+    async function submitStore() {
+      const storeId = document.getElementById('storeId').value;
+      const data = {
+        name: document.getElementById('storeName').value,
+        phone: document.getElementById('storePhone').value,
+        province_code: document.getElementById('storeProvince').value,
+        city_code: document.getElementById('storeCity').value,
+        district_code: document.getElementById('storeDistrict').value,
+        street_code: document.getElementById('storeStreet').value,
+        address: document.getElementById('storeAddress').value,
+        business_hours: document.getElementById('storeHours').value,
+        status: document.getElementById('storeStatus').value,
+        remark: document.getElementById('storeRemark').value
+      };
+
+      if (!data.name || !data.address) {
+        alert('请填写门店名称和详细地址');
+        return;
+      }
+
+      showLoading();
+      try {
+        const url = storeId 
+          ? API.buildURL(API_ENDPOINTS.STORE.UPDATE, { store_id: storeId })
+          : API_ENDPOINTS.STORE.CREATE;
+        const method = storeId ? 'PUT' : 'POST';
+
+        const response = await apiRequest(url, {
+          method: method,
+          body: JSON.stringify(data)
+        });
+
+        if (response && response.success) {
+          bootstrap.Modal.getInstance(document.getElementById('storeModal')).hide();
+          alert(`✅ ${storeId ? '更新' : '创建'}成功`);
+          loadStores();
+        } else {
+          showError('保存失败', response?.message || '操作失败');
+        }
+      } catch (error) {
+        console.error('保存门店失败:', error);
+        showError('保存失败', error.message);
+      } finally {
+        hideLoading();
+      }
+    }
+
+    async function viewStoreDetail(storeId) {
+      showLoading();
+      try {
+        const response = await apiRequest(API.buildURL(API_ENDPOINTS.STORE.DETAIL, { store_id: storeId }));
+        if (response && response.success) {
+          const store = response.data;
+          document.getElementById('storeDetailContent').innerHTML = `
+            <div class="row">
+              <div class="col-md-6">
+                <table class="table table-sm">
+                  <tr><th style="width:40%">门店ID</th><td>${store.store_id}</td></tr>
+                  <tr><th>门店名称</th><td>${escapeHtml(store.name || '-')}</td></tr>
+                  <tr><th>联系电话</th><td>${escapeHtml(store.phone || '-')}</td></tr>
+                  <tr><th>营业时间</th><td>${escapeHtml(store.business_hours || '-')}</td></tr>
+                  <tr><th>状态</th><td><span class="badge ${store.status === 'active' ? 'bg-success' : 'bg-secondary'}">${store.status === 'active' ? '营业中' : '已停业'}</span></td></tr>
+                </table>
+              </div>
+              <div class="col-md-6">
+                <table class="table table-sm">
+                  <tr><th style="width:40%">省份</th><td>${escapeHtml(store.province_name || '-')}</td></tr>
+                  <tr><th>城市</th><td>${escapeHtml(store.city_name || '-')}</td></tr>
+                  <tr><th>区县</th><td>${escapeHtml(store.district_name || '-')}</td></tr>
+                  <tr><th>街道</th><td>${escapeHtml(store.street_name || '-')}</td></tr>
+                  <tr><th>详细地址</th><td>${escapeHtml(store.address || '-')}</td></tr>
+                </table>
+              </div>
+            </div>
+            <div class="mt-3">
+              <h6>备注</h6>
+              <p class="text-muted">${escapeHtml(store.remark || '无')}</p>
+            </div>
+            <div class="row text-muted small">
+              <div class="col-6">创建时间：${formatDateTime(store.created_at)}</div>
+              <div class="col-6">更新时间：${formatDateTime(store.updated_at)}</div>
+            </div>
+          `;
+          new bootstrap.Modal(document.getElementById('storeDetailModal')).show();
+        } else {
+          showError('加载失败', response?.message || '获取门店详情失败');
+        }
+      } catch (error) {
+        console.error('加载门店详情失败:', error);
+        showError('加载失败', error.message);
+      } finally {
+        hideLoading();
+      }
+    }
+
+    async function toggleStoreStatus(storeId, currentStatus) {
+      const newStatus = currentStatus === 'active' ? 'inactive' : 'active';
+      const action = newStatus === 'active' ? '营业' : '停业';
+      
+      if (!confirm(`确定要将此门店设为${action}状态吗？`)) return;
+
+      showLoading();
+      try {
+        const url = newStatus === 'active'
+          ? API.buildURL(API_ENDPOINTS.STORE.ACTIVATE, { store_id: storeId })
+          : API.buildURL(API_ENDPOINTS.STORE.DEACTIVATE, { store_id: storeId });
+
+        const response = await apiRequest(url, { method: 'POST' });
+
+        if (response && response.success) {
+          alert(`✅ 门店已${action}`);
+          loadStores();
+        } else {
+          showError('操作失败', response?.message || '状态更新失败');
+        }
+      } catch (error) {
+        console.error('更新状态失败:', error);
+        showError('操作失败', error.message);
+      } finally {
+        hideLoading();
+      }
+    }
+
+    function formatDateTime(dateStr) {
+      if (!dateStr) return '-';
+      return new Date(dateStr).toLocaleString('zh-CN');
+    }
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      const div = document.createElement('div');
+      div.textContent = str;
+      return div.innerHTML;
+    }
+
+    function showLoading() {
+      document.getElementById('loadingOverlay').classList.add('show');
+    }
+
+    function hideLoading() {
+      document.getElementById('loadingOverlay').classList.remove('show');
+    }
+
+    function showError(title, message) {
+      alert(`❌ ${title}\n${message}`);
+    }
+  </script>
+</body>
+</html>
+

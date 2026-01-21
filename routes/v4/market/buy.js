@@ -24,6 +24,7 @@
 const express = require('express')
 const router = express.Router()
 const { authenticateToken } = require('../../../middleware/auth')
+const { requireValidSession } = require('../../../middleware/sensitiveOperation') // 🔐 会话管理功能（2026-01-21）
 const { validatePositiveInteger, handleServiceError } = require('../../../middleware/validation')
 const logger = require('../../../utils/logger').logger
 const TransactionManager = require('../../../utils/TransactionManager')
@@ -69,6 +70,7 @@ const marketRiskMiddleware = getMarketRiskControlMiddleware()
 router.post(
   '/listings/:listing_id/purchase',
   authenticateToken,
+  requireValidSession, // 🔐 市场购买属于敏感操作，需验证会话（2026-01-21 会话管理功能）
   marketRiskMiddleware.createBuyRiskMiddleware(),
   validatePositiveInteger('listing_id', 'params'),
   async (req, res) => {
