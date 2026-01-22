@@ -1,0 +1,1254 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title id="pageTitle">抽奖管理 - 管理后台</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+  <link href="/admin/css/common.css" rel="stylesheet">
+  <style>
+    .sub-nav { background: #f8f9fa; border-bottom: 1px solid #dee2e6; padding: 0.5rem 0; }
+    .sub-nav .nav-link { color: #495057; padding: 0.5rem 1rem; border-radius: 0.25rem; margin: 0 0.25rem; }
+    .sub-nav .nav-link:hover { background: #e9ecef; }
+    .sub-nav .nav-link.active { background: #0d6efd; color: white; }
+    [x-cloak] { display: none !important; }
+    .stat-card { border: none; box-shadow: 0 0.125rem 0.25rem rgba(0,0,0,.075); }
+    .campaign-card { border: 1px solid #dee2e6; border-radius: 0.5rem; transition: transform 0.2s; }
+    .campaign-card:hover { transform: translateY(-2px); box-shadow: 0 0.5rem 1rem rgba(0,0,0,.1); }
+    .prize-image { width: 60px; height: 60px; object-fit: cover; border-radius: 0.375rem; }
+    .matrix-cell { min-width: 100px; text-align: center; padding: 0.5rem; }
+    .matrix-cell.editable { cursor: pointer; }
+    .matrix-cell.editable:hover { background-color: #e9ecef; }
+  </style>
+
+  <!-- Alpine.js -->
+  <!-- ✅ Alpine.js Mixin 系统 -->
+  <script defer src="/admin/js/alpine/mixins-bundle.js"></script>
+  <script defer src="/admin/js/alpine/init.js"></script>
+  <script defer src="/admin/js/vendor/alpine.min.js"></script>
+</head>
+<body class="bg-light">
+  <nav class="navbar navbar-dark bg-primary">
+    <div class="container-fluid">
+      <a href="/admin/dashboard.html" class="navbar-brand">
+        <i class="bi bi-arrow-left me-2"></i>🎰 管理后台 - 抽奖管理
+      </a>
+      <div>
+        <span class="text-light me-3" x-data x-text="$store.auth.user?.nickname ? `欢迎，${$store.auth.user.nickname}` : '欢迎，管理员'">欢迎，管理员</span>
+        <button class="btn btn-outline-light btn-sm" onclick="logout()">退出登录</button>
+      </div>
+    </div>
+  </nav>
+
+  <!-- 子模块导航 -->
+  <div class="sub-nav" x-data="lotteryNavigation()" x-cloak>
+    <div class="container-fluid">
+      <ul class="nav nav-pills">
+        <template x-for="page in subPages" :key="page.id">
+          <li class="nav-item">
+            <a class="nav-link" :class="{ 'active': currentPage === page.id }" :href="'?page=' + page.id" @click.prevent="switchPage(page.id)">
+              <i class="bi me-1" :class="page.icon"></i><span x-text="page.title"></span>
+            </a>
+          </li>
+        </template>
+      </ul>
+    </div>
+  </div>
+
+  <!-- 主内容区域 -->
+  <div class="container-fluid mt-4" x-data="lotteryPageContent()" x-cloak>
+    
+    <!-- ==================== 活动管理 ==================== -->
+    <div x-show="currentPage === 'campaigns'" x-cloak>
+      <!-- 统计卡片 -->
+      <div class="row g-3 mb-4">
+        <div class="col-md-3">
+          <div class="card stat-card">
+            <div class="card-body text-center">
+              <i class="bi bi-gift text-primary" style="font-size: 2rem;"></i>
+              <h6 class="text-muted mt-2">总活动数</h6>
+              <h2 x-text="campaignStats.total" class="text-primary mb-0">-</h2>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-3">
+          <div class="card stat-card">
+            <div class="card-body text-center">
+              <i class="bi bi-play-circle text-success" style="font-size: 2rem;"></i>
+              <h6 class="text-muted mt-2">进行中</h6>
+              <h2 x-text="campaignStats.active" class="text-success mb-0">-</h2>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-3">
+          <div class="card stat-card">
+            <div class="card-body text-center">
+              <i class="bi bi-calendar2-check text-info" style="font-size: 2rem;"></i>
+              <h6 class="text-muted mt-2">今日参与</h6>
+              <h2 x-text="campaignStats.todayParticipants" class="text-info mb-0">-</h2>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-3">
+          <div class="card stat-card">
+            <div class="card-body text-center">
+              <i class="bi bi-trophy text-warning" style="font-size: 2rem;"></i>
+              <h6 class="text-muted mt-2">今日中奖</h6>
+              <h2 x-text="campaignStats.todayWinners" class="text-warning mb-0">-</h2>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header bg-white d-flex justify-content-between align-items-center">
+          <h5 class="mb-0"><i class="bi bi-gift"></i> 活动列表</h5>
+          <button class="btn btn-primary btn-sm" @click="openCreateCampaignModal()">
+            <i class="bi bi-plus"></i> 创建活动
+          </button>
+        </div>
+        <div class="card-body">
+          <!-- 筛选器 -->
+          <div class="row mb-3 g-2">
+            <div class="col-md-2">
+              <select class="form-select form-select-sm" x-model="campaignFilters.status" @change="loadCampaigns()">
+                <option value="">全部状态</option>
+                <option value="active">进行中</option>
+                <option value="inactive">已结束</option>
+                <option value="pending">待开始</option>
+              </select>
+            </div>
+            <div class="col-md-3">
+              <input type="text" class="form-control form-control-sm" placeholder="搜索活动名称..." x-model="campaignFilters.keyword">
+            </div>
+            <div class="col-md-2">
+              <button class="btn btn-primary btn-sm w-100" @click="loadCampaigns()">
+                <i class="bi bi-search"></i> 搜索
+              </button>
+            </div>
+          </div>
+
+          <!-- 活动列表 -->
+          <div class="row g-3">
+            <template x-if="campaigns.length === 0">
+              <div class="col-12 text-center text-muted py-5">暂无活动数据</div>
+            </template>
+            <template x-for="campaign in campaigns" :key="campaign.campaign_id">
+              <div class="col-md-4">
+                <div class="campaign-card p-3">
+                  <div class="d-flex justify-content-between align-items-start mb-2">
+                    <h6 class="mb-0" x-text="campaign.name"></h6>
+                    <span class="badge" :class="getCampaignStatusClass(campaign.status)" x-text="getCampaignStatusText(campaign.status)"></span>
+                  </div>
+                  <p class="text-muted small mb-2" x-text="campaign.description || '暂无描述'"></p>
+                  <div class="d-flex justify-content-between align-items-center text-muted small">
+                    <span><i class="bi bi-calendar"></i> <span x-text="formatDateSafe(campaign.start_time)"></span></span>
+                    <span><i class="bi bi-person"></i> <span x-text="campaign.participant_count || 0"></span></span>
+                  </div>
+                  <div class="mt-2 d-flex gap-1">
+                    <button class="btn btn-sm btn-outline-primary flex-fill" @click="editCampaign(campaign)">
+                      <i class="bi bi-pencil"></i> 编辑
+                    </button>
+                    <button class="btn btn-sm btn-outline-info" @click="viewCampaignDetail(campaign)">
+                      <i class="bi bi-eye"></i> 详情
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </template>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== 奖品管理 ==================== -->
+    <div x-show="currentPage === 'prizes'" x-cloak>
+      <div class="card">
+        <div class="card-header bg-white d-flex justify-content-between align-items-center">
+          <h5 class="mb-0"><i class="bi bi-trophy"></i> 奖品管理</h5>
+          <button class="btn btn-primary btn-sm" @click="openCreatePrizeModal()">
+            <i class="bi bi-plus"></i> 添加奖品
+          </button>
+        </div>
+        <div class="card-body">
+          <!-- 筛选器 -->
+          <div class="row mb-3 g-2">
+            <div class="col-md-2">
+              <select class="form-select form-select-sm" x-model="prizeFilters.type" @change="loadPrizes()">
+                <option value="">全部类型</option>
+                <option value="physical">实物奖品</option>
+                <option value="virtual">虚拟奖品</option>
+                <option value="coupon">优惠券</option>
+              </select>
+            </div>
+            <div class="col-md-2">
+              <select class="form-select form-select-sm" x-model="prizeFilters.status" @change="loadPrizes()">
+                <option value="">全部状态</option>
+                <option value="active">启用</option>
+                <option value="inactive">禁用</option>
+              </select>
+            </div>
+            <div class="col-md-3">
+              <input type="text" class="form-control form-control-sm" placeholder="搜索奖品名称..." x-model="prizeFilters.keyword">
+            </div>
+            <div class="col-md-2">
+              <button class="btn btn-primary btn-sm w-100" @click="loadPrizes()">
+                <i class="bi bi-search"></i> 搜索
+              </button>
+            </div>
+          </div>
+
+          <!-- 奖品表格 -->
+          <div class="table-responsive">
+            <table class="table table-hover">
+              <thead class="table-light">
+                <tr>
+                  <th>奖品</th>
+                  <th>类型</th>
+                  <th>概率</th>
+                  <th>库存</th>
+                  <th>状态</th>
+                  <th>操作</th>
+                </tr>
+              </thead>
+              <tbody>
+                <template x-if="prizes.length === 0">
+                  <tr><td colspan="6" class="text-center text-muted py-4">暂无奖品数据</td></tr>
+                </template>
+                <template x-for="prize in prizes" :key="prize.prize_id">
+                  <tr>
+                    <td>
+                      <div class="d-flex align-items-center">
+                        <img :src="prize.image_url || '/admin/images/placeholder.png'" :alt="prize.name" class="prize-image me-2">
+                        <div>
+                          <div class="fw-medium" x-text="prize.name"></div>
+                          <small class="text-muted" x-text="prize.prize_id"></small>
+                        </div>
+                      </div>
+                    </td>
+                    <td><span class="badge bg-info" x-text="getPrizeTypeText(prize.type)"></span></td>
+                    <td x-text="prize.probability + '%'"></td>
+                    <td x-text="prize.stock === -1 ? '无限' : prize.stock"></td>
+                    <td><span class="badge" :class="prize.is_active ? 'bg-success' : 'bg-secondary'" x-text="prize.is_active ? '启用' : '禁用'"></span></td>
+                    <td>
+                      <button class="btn btn-sm btn-outline-primary" @click="editPrize(prize)" title="编辑"><i class="bi bi-pencil"></i></button>
+                      <button class="btn btn-sm btn-outline-success" @click="openStockModal(prize)" title="补货"><i class="bi bi-box-seam"></i></button>
+                      <button class="btn btn-sm btn-outline-warning" @click="togglePrize(prize)" title="启用/禁用">
+                        <i :class="prize.is_active ? 'bi-eye-slash' : 'bi-eye'"></i>
+                      </button>
+                      <button class="btn btn-sm btn-outline-danger" @click="deletePrize(prize)" title="删除"><i class="bi bi-trash"></i></button>
+                    </td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== 策略配置 ==================== -->
+    <div x-show="currentPage === 'lottery-strategy'" x-cloak>
+      <div class="card">
+        <div class="card-header bg-white">
+          <h5 class="mb-0"><i class="bi bi-gear"></i> 策略配置</h5>
+        </div>
+        <div class="card-body">
+          <!-- 策略组列表 -->
+          <div class="row g-3">
+            <template x-for="(strategies, groupName) in strategyGroups" :key="groupName">
+              <div class="col-md-6">
+                <div class="card">
+                  <div class="card-header d-flex justify-content-between align-items-center">
+                    <h6 class="mb-0">
+                      <i class="bi" :class="getStrategyGroupIcon(groupName)"></i>
+                      <span x-text="getStrategyGroupName(groupName)"></span>
+                    </h6>
+                    <span class="badge bg-primary" x-text="strategies.length + ' 个策略'"></span>
+                  </div>
+                  <div class="list-group list-group-flush">
+                    <template x-for="strategy in strategies" :key="strategy.strategy_id">
+                      <div class="list-group-item d-flex justify-content-between align-items-center">
+                        <div>
+                          <div class="fw-medium" x-text="strategy.name"></div>
+                          <small class="text-muted" x-text="strategy.description || '暂无描述'"></small>
+                        </div>
+                        <div>
+                          <span class="badge" :class="strategy.is_active ? 'bg-success' : 'bg-secondary'" x-text="strategy.is_active ? '启用' : '禁用'"></span>
+                        </div>
+                      </div>
+                    </template>
+                  </div>
+                </div>
+              </div>
+            </template>
+          </div>
+
+          <!-- 层级矩阵配置 -->
+          <div class="card mt-4">
+            <div class="card-header">
+              <h6 class="mb-0"><i class="bi bi-grid-3x3"></i> 层级矩阵配置</h6>
+            </div>
+            <div class="card-body">
+              <div class="table-responsive">
+                <table class="table table-bordered text-center">
+                  <thead class="table-light">
+                    <tr>
+                      <th></th>
+                      <template x-for="pTier in pressureTiers" :key="pTier">
+                        <th x-text="pTier"></th>
+                      </template>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <template x-for="bTier in budgetTiers" :key="bTier">
+                      <tr>
+                        <th class="table-light" x-text="bTier"></th>
+                        <template x-for="pTier in pressureTiers" :key="bTier + '-' + pTier">
+                          <td class="matrix-cell editable" @click="editMatrixCell(bTier, pTier)">
+                            <template x-if="getMatrixConfig(bTier, pTier)">
+                              <div>
+                                <div><small>Cap:</small> <span x-text="getMatrixConfig(bTier, pTier).cap"></span></div>
+                                <div><small>Empty:</small> <span x-text="getMatrixConfig(bTier, pTier).empty_weight"></span></div>
+                              </div>
+                            </template>
+                            <template x-if="!getMatrixConfig(bTier, pTier)">
+                              <span class="text-muted">-</span>
+                            </template>
+                          </td>
+                        </template>
+                      </tr>
+                    </template>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== 配额管理 ==================== -->
+    <div x-show="currentPage === 'lottery-quota'" x-cloak>
+      <div class="card">
+        <div class="card-header bg-white d-flex justify-content-between align-items-center">
+          <h5 class="mb-0"><i class="bi bi-bar-chart-steps"></i> 配额管理</h5>
+          <button class="btn btn-primary btn-sm" @click="openCreateQuotaModal()">
+            <i class="bi bi-plus"></i> 新增配额
+          </button>
+        </div>
+        <div class="card-body">
+          <!-- 配额表格 -->
+          <div class="table-responsive">
+            <table class="table table-hover">
+              <thead class="table-light">
+                <tr>
+                  <th>配额ID</th>
+                  <th>活动</th>
+                  <th>奖品</th>
+                  <th>总配额</th>
+                  <th>已使用</th>
+                  <th>剩余</th>
+                  <th>使用率</th>
+                  <th>操作</th>
+                </tr>
+              </thead>
+              <tbody>
+                <template x-if="quotas.length === 0">
+                  <tr><td colspan="8" class="text-center text-muted py-4">暂无配额数据</td></tr>
+                </template>
+                <template x-for="quota in quotas" :key="quota.quota_id">
+                  <tr>
+                    <td><code x-text="quota.quota_id"></code></td>
+                    <td x-text="quota.campaign_name || quota.campaign_id"></td>
+                    <td x-text="quota.prize_name || quota.prize_id"></td>
+                    <td x-text="quota.total_quota"></td>
+                    <td x-text="quota.used_quota"></td>
+                    <td x-text="quota.total_quota - quota.used_quota"></td>
+                    <td>
+                      <div class="progress" style="height: 20px;">
+                        <div class="progress-bar" :style="'width: ' + (quota.used_quota / quota.total_quota * 100) + '%'" x-text="Math.round(quota.used_quota / quota.total_quota * 100) + '%'"></div>
+                      </div>
+                    </td>
+                    <td>
+                      <button class="btn btn-sm btn-outline-primary" @click="editQuota(quota)"><i class="bi bi-pencil"></i></button>
+                    </td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== 抽奖指标 ==================== -->
+    <div x-show="currentPage === 'lottery-metrics'" x-cloak>
+      <!-- 总体统计 -->
+      <div class="row g-3 mb-4">
+        <div class="col-md-3">
+          <div class="card stat-card">
+            <div class="card-body text-center">
+              <i class="bi bi-dice-5 text-primary" style="font-size: 2rem;"></i>
+              <h6 class="text-muted mt-2">总抽奖次数</h6>
+              <h2 x-text="lotteryMetrics.totalDraws" class="text-primary mb-0">-</h2>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-3">
+          <div class="card stat-card">
+            <div class="card-body text-center">
+              <i class="bi bi-trophy-fill text-success" style="font-size: 2rem;"></i>
+              <h6 class="text-muted mt-2">中奖次数</h6>
+              <h2 x-text="lotteryMetrics.totalWins" class="text-success mb-0">-</h2>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-3">
+          <div class="card stat-card">
+            <div class="card-body text-center">
+              <i class="bi bi-percent text-warning" style="font-size: 2rem;"></i>
+              <h6 class="text-muted mt-2">中奖率</h6>
+              <h2 x-text="lotteryMetrics.winRate + '%'" class="text-warning mb-0">-</h2>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-3">
+          <div class="card stat-card">
+            <div class="card-body text-center">
+              <i class="bi bi-people-fill text-info" style="font-size: 2rem;"></i>
+              <h6 class="text-muted mt-2">参与用户数</h6>
+              <h2 x-text="lotteryMetrics.totalUsers" class="text-info mb-0">-</h2>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header bg-white">
+          <h5 class="mb-0"><i class="bi bi-speedometer"></i> 抽奖指标详情</h5>
+        </div>
+        <div class="card-body">
+          <!-- 按活动统计 -->
+          <h6 class="mb-3">按活动统计</h6>
+          <div class="table-responsive">
+            <table class="table table-hover">
+              <thead class="table-light">
+                <tr>
+                  <th>活动名称</th>
+                  <th>抽奖次数</th>
+                  <th>中奖次数</th>
+                  <th>中奖率</th>
+                  <th>参与人数</th>
+                </tr>
+              </thead>
+              <tbody>
+                <template x-if="campaignMetrics.length === 0">
+                  <tr><td colspan="5" class="text-center text-muted py-4">暂无数据</td></tr>
+                </template>
+                <template x-for="metric in campaignMetrics" :key="metric.campaign_id">
+                  <tr>
+                    <td x-text="metric.campaign_name"></td>
+                    <td x-text="metric.total_draws"></td>
+                    <td x-text="metric.total_wins"></td>
+                    <td>
+                      <span class="text-success" x-text="(metric.win_rate * 100).toFixed(2) + '%'"></span>
+                    </td>
+                    <td x-text="metric.unique_users"></td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== 预算管理 ==================== -->
+    <div x-show="currentPage === 'campaign-budget'" x-cloak>
+      <!-- 预算汇总卡片 -->
+      <div class="row g-3 mb-4">
+        <div class="col-md-3">
+          <div class="card stat-card">
+            <div class="card-body text-center">
+              <i class="bi bi-cash-stack text-primary" style="font-size: 2rem;"></i>
+              <h6 class="text-muted mt-2">总预算</h6>
+              <h2 x-text="'¥' + (budgetSummary.totalBudget || 0).toLocaleString()" class="text-primary mb-0">-</h2>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-3">
+          <div class="card stat-card">
+            <div class="card-body text-center">
+              <i class="bi bi-wallet2 text-success" style="font-size: 2rem;"></i>
+              <h6 class="text-muted mt-2">已使用</h6>
+              <h2 x-text="'¥' + (budgetSummary.totalUsed || 0).toLocaleString()" class="text-success mb-0">-</h2>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-3">
+          <div class="card stat-card">
+            <div class="card-body text-center">
+              <i class="bi bi-piggy-bank text-warning" style="font-size: 2rem;"></i>
+              <h6 class="text-muted mt-2">剩余预算</h6>
+              <h2 x-text="'¥' + ((budgetSummary.totalBudget || 0) - (budgetSummary.totalUsed || 0)).toLocaleString()" class="text-warning mb-0">-</h2>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-3">
+          <div class="card stat-card">
+            <div class="card-body text-center">
+              <i class="bi bi-exclamation-triangle text-danger" style="font-size: 2rem;"></i>
+              <h6 class="text-muted mt-2">预警活动</h6>
+              <h2 x-text="budgetSummary.alertCount || 0" class="text-danger mb-0">-</h2>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header bg-white d-flex justify-content-between align-items-center">
+          <h5 class="mb-0"><i class="bi bi-cash-stack"></i> 活动预算列表</h5>
+        </div>
+        <div class="card-body">
+          <!-- 筛选器 -->
+          <div class="row mb-3 g-2">
+            <div class="col-md-2">
+              <select class="form-select form-select-sm" x-model="budgetFilters.mode" @change="loadBudgetData()">
+                <option value="">全部模式</option>
+                <option value="total">总预算</option>
+                <option value="daily">每日预算</option>
+                <option value="weekly">每周预算</option>
+                <option value="monthly">每月预算</option>
+              </select>
+            </div>
+            <div class="col-md-2">
+              <select class="form-select form-select-sm" x-model="budgetFilters.status" @change="loadBudgetData()">
+                <option value="">全部状态</option>
+                <option value="normal">正常</option>
+                <option value="alert">预警</option>
+                <option value="exceeded">超支</option>
+              </select>
+            </div>
+            <div class="col-md-3">
+              <input type="text" class="form-control form-control-sm" placeholder="搜索活动名称..." x-model="budgetFilters.keyword">
+            </div>
+            <div class="col-md-2">
+              <button class="btn btn-primary btn-sm w-100" @click="loadBudgetData()">
+                <i class="bi bi-search"></i> 搜索
+              </button>
+            </div>
+          </div>
+
+          <!-- 预算列表表格 -->
+          <div class="table-responsive">
+            <table class="table table-hover">
+              <thead class="table-light">
+                <tr>
+                  <th>活动名称</th>
+                  <th>预算模式</th>
+                  <th>预算金额</th>
+                  <th>已使用</th>
+                  <th>使用率</th>
+                  <th>预警阈值</th>
+                  <th>状态</th>
+                  <th>操作</th>
+                </tr>
+              </thead>
+              <tbody>
+                <template x-if="budgetCampaigns.length === 0">
+                  <tr><td colspan="8" class="text-center text-muted py-4">暂无预算数据</td></tr>
+                </template>
+                <template x-for="campaign in budgetCampaigns" :key="campaign.campaign_id">
+                  <tr>
+                    <td x-text="campaign.name"></td>
+                    <td><span class="badge bg-info" x-text="getBudgetModeText(campaign.budget_mode)"></span></td>
+                    <td x-text="'¥' + (campaign.budget_amount || 0).toLocaleString()"></td>
+                    <td x-text="'¥' + (campaign.used_amount || 0).toLocaleString()"></td>
+                    <td>
+                      <div class="progress" style="height: 20px;">
+                        <div class="progress-bar" 
+                             :class="getBudgetUsageClass(campaign)" 
+                             :style="'width: ' + getBudgetUsageRate(campaign) + '%'"
+                             x-text="getBudgetUsageRate(campaign) + '%'"></div>
+                      </div>
+                    </td>
+                    <td x-text="(campaign.alert_threshold || 80) + '%'"></td>
+                    <td>
+                      <span class="badge" 
+                            :class="getBudgetUsageRate(campaign) >= 100 ? 'bg-danger' : (getBudgetUsageRate(campaign) >= (campaign.alert_threshold || 80) ? 'bg-warning' : 'bg-success')">
+                        <span x-text="getBudgetUsageRate(campaign) >= 100 ? '超支' : (getBudgetUsageRate(campaign) >= (campaign.alert_threshold || 80) ? '预警' : '正常')"></span>
+                      </span>
+                    </td>
+                    <td>
+                      <button class="btn btn-sm btn-outline-primary" @click="openSetBudgetModal(campaign)" title="设置预算">
+                        <i class="bi bi-pencil"></i>
+                      </button>
+                    </td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== 核销码管理 ==================== -->
+    <div x-show="currentPage === 'redemption-codes'" x-cloak>
+      <!-- 统计卡片 -->
+      <div class="row g-3 mb-4">
+        <div class="col-md-3">
+          <div class="card stat-card">
+            <div class="card-body text-center">
+              <i class="bi bi-ticket-perforated text-primary" style="font-size: 2rem;"></i>
+              <h6 class="text-muted mt-2">核销码总数</h6>
+              <h2 x-text="redemptionStats.total" class="text-primary mb-0">-</h2>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-3">
+          <div class="card stat-card">
+            <div class="card-body text-center">
+              <i class="bi bi-hourglass-split text-warning" style="font-size: 2rem;"></i>
+              <h6 class="text-muted mt-2">待核销</h6>
+              <h2 x-text="redemptionStats.pending" class="text-warning mb-0">-</h2>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-3">
+          <div class="card stat-card">
+            <div class="card-body text-center">
+              <i class="bi bi-check-circle text-success" style="font-size: 2rem;"></i>
+              <h6 class="text-muted mt-2">已核销</h6>
+              <h2 x-text="redemptionStats.fulfilled" class="text-success mb-0">-</h2>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-3">
+          <div class="card stat-card">
+            <div class="card-body text-center">
+              <i class="bi bi-x-circle text-danger" style="font-size: 2rem;"></i>
+              <h6 class="text-muted mt-2">已过期</h6>
+              <h2 x-text="redemptionStats.expired" class="text-danger mb-0">-</h2>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 筛选和操作栏 -->
+      <div class="card mb-4">
+        <div class="card-body">
+          <div class="row g-3 align-items-center">
+            <div class="col-md-2">
+              <label class="form-label">状态</label>
+              <select class="form-select" x-model="redemptionFilters.status">
+                <option value="">全部状态</option>
+                <option value="pending">待核销</option>
+                <option value="fulfilled">已核销</option>
+                <option value="expired">已过期</option>
+                <option value="cancelled">已取消</option>
+              </select>
+            </div>
+            <div class="col-md-2">
+              <label class="form-label">奖品类型</label>
+              <select class="form-select" x-model="redemptionFilters.prizeType">
+                <option value="">全部类型</option>
+                <option value="physical">实物奖品</option>
+                <option value="virtual">虚拟奖品</option>
+                <option value="coupon">优惠券</option>
+              </select>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">核销码</label>
+              <input type="text" class="form-control" x-model="redemptionFilters.code" placeholder="输入核销码搜索..."
+                     @keyup.enter="searchRedemptionCodes()">
+            </div>
+            <div class="col-md-2">
+              <label class="form-label">用户ID</label>
+              <input type="number" class="form-control" x-model="redemptionFilters.userId" placeholder="输入用户ID..."
+                     @keyup.enter="searchRedemptionCodes()">
+            </div>
+            <div class="col-md-3 d-flex align-items-end gap-2">
+              <button class="btn btn-primary" @click="searchRedemptionCodes()">
+                <i class="bi bi-search"></i> 搜索
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 核销码列表 -->
+      <div class="card">
+        <div class="card-header bg-white d-flex justify-content-between align-items-center">
+          <h6 class="mb-0"><i class="bi bi-list-ul"></i> 核销码列表</h6>
+          <div>
+            <button class="btn btn-sm btn-outline-warning me-2" @click="batchExpireRedemption()" :disabled="redemptionSelectedIds.length === 0">
+              <i class="bi bi-clock-history"></i> 批量过期
+            </button>
+            <button class="btn btn-sm btn-outline-success" @click="exportRedemptionCodes()">
+              <i class="bi bi-download"></i> 导出
+            </button>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="table-responsive">
+            <table class="table table-hover">
+              <thead class="table-light">
+                <tr>
+                  <th>
+                    <input type="checkbox" :checked="isAllRedemptionSelected" @change="toggleRedemptionSelectAll()">
+                  </th>
+                  <th>核销码</th>
+                  <th>用户</th>
+                  <th>奖品</th>
+                  <th>活动</th>
+                  <th>状态</th>
+                  <th>创建时间</th>
+                  <th>有效期至</th>
+                  <th>操作</th>
+                </tr>
+              </thead>
+              <tbody>
+                <!-- 空数据 -->
+                <template x-if="redemptionCodes.length === 0">
+                  <tr>
+                    <td colspan="9" class="text-center text-muted py-4">暂无数据</td>
+                  </tr>
+                </template>
+
+                <!-- 数据列表 -->
+                <template x-for="c in redemptionCodes" :key="c.order_id">
+                  <tr :class="'status-' + c.status" style="border-left: 4px solid" :style="{'border-left-color': c.status === 'pending' ? '#ffc107' : c.status === 'fulfilled' || c.status === 'redeemed' ? '#198754' : c.status === 'expired' ? '#dc3545' : '#6c757d'}">
+                    <td>
+                      <input type="checkbox" :value="c.order_id" 
+                             :checked="redemptionSelectedIds.includes(c.order_id)"
+                             @change="toggleRedemptionSelect(c.order_id)">
+                    </td>
+                    <td>
+                      <code class="bg-light p-1 rounded" 
+                            :title="c.code_hash || ''" 
+                            x-text="getCodeDisplay(c.code_hash)"></code>
+                    </td>
+                    <td>
+                      <small x-text="c.redeemer_user_id || '-'"></small>
+                      <template x-if="getRedeemerName(c)">
+                        <br><small class="text-muted" x-text="getRedeemerName(c)"></small>
+                      </template>
+                    </td>
+                    <td x-text="getRedemptionPrizeName(c)"></td>
+                    <td x-text="getRedemptionCampaignName(c)"></td>
+                    <td>
+                      <span class="badge" :class="getRedemptionStatusClass(c.status)" x-text="getRedemptionStatusText(c.status)"></span>
+                    </td>
+                    <td><small x-text="formatDateSafe(c.created_at)"></small></td>
+                    <td><small x-text="formatDateSafe(c.expires_at)"></small></td>
+                    <td>
+                      <button class="btn btn-sm btn-outline-primary me-1" @click="viewRedemptionDetail(c.order_id)">
+                        <i class="bi bi-eye"></i>
+                      </button>
+                      <template x-if="c.status === 'pending'">
+                        <span>
+                          <button class="btn btn-sm btn-outline-success me-1" 
+                                  @click="openRedeemModal(c.order_id, getCodeDisplay(c.code_hash))">
+                            <i class="bi bi-check-lg"></i>
+                          </button>
+                          <button class="btn btn-sm btn-outline-danger" @click="cancelRedemptionCode(c.order_id)">
+                            <i class="bi bi-x-lg"></i>
+                          </button>
+                        </span>
+                      </template>
+                    </td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- 分页 -->
+          <nav aria-label="Page navigation" x-show="totalPages > 1">
+            <ul class="pagination justify-content-center">
+              <li class="page-item" :class="{ disabled: page === 1 }">
+                <a class="page-link" href="#" @click.prevent="loadRedemptionCodes(page - 1)">上一页</a>
+              </li>
+              <template x-for="p in Array.from({length: Math.min(5, totalPages)}, (_, i) => Math.max(1, page - 2) + i).filter(p => p <= totalPages)" :key="p">
+                <li class="page-item" :class="{ active: p === page }">
+                  <a class="page-link" href="#" @click.prevent="loadRedemptionCodes(p)" x-text="p"></a>
+                </li>
+              </template>
+              <li class="page-item" :class="{ disabled: page === totalPages }">
+                <a class="page-link" href="#" @click.prevent="loadRedemptionCodes(page + 1)">下一页</a>
+              </li>
+            </ul>
+          </nav>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- 活动表单 Modal -->
+  <div class="modal fade" id="campaignModal" tabindex="-1" x-ref="campaignModal">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-content" x-data="lotteryPageContent()">
+        <div class="modal-header">
+          <h5 class="modal-title"><i class="bi bi-gift"></i> <span x-text="isEditMode ? '编辑活动' : '创建活动'"></span></h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <form @submit.prevent="submitCampaignForm">
+          <div class="modal-body">
+            <div class="row g-3">
+              <div class="col-12">
+                <label class="form-label">活动名称 <span class="text-danger">*</span></label>
+                <input type="text" class="form-control" x-model="campaignForm.name" required>
+              </div>
+              <div class="col-12">
+                <label class="form-label">活动描述</label>
+                <textarea class="form-control" x-model="campaignForm.description" rows="3"></textarea>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label">开始时间 <span class="text-danger">*</span></label>
+                <input type="datetime-local" class="form-control" x-model="campaignForm.start_time" required>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label">结束时间 <span class="text-danger">*</span></label>
+                <input type="datetime-local" class="form-control" x-model="campaignForm.end_time" required>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label">状态</label>
+                <select class="form-select" x-model="campaignForm.status">
+                  <option value="pending">待开始</option>
+                  <option value="active">进行中</option>
+                  <option value="inactive">已结束</option>
+                </select>
+              </div>
+              <div class="col-12">
+                <label class="form-label">活动规则</label>
+                <textarea class="form-control" x-model="campaignForm.rules" rows="4" placeholder="请输入活动规则说明..."></textarea>
+              </div>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+            <button type="submit" class="btn btn-primary" :disabled="saving">
+              <span x-show="saving" class="spinner-border spinner-border-sm me-1"></span>
+              <span x-text="isEditMode ? '保存修改' : '创建活动'"></span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- 活动详情 Modal -->
+  <div class="modal fade" id="campaignDetailModal" tabindex="-1" x-ref="campaignDetailModal">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-content" x-data="lotteryPageContent()">
+        <div class="modal-header">
+          <h5 class="modal-title"><i class="bi bi-gift"></i> 活动详情</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <template x-if="selectedCampaign">
+            <div class="row g-3">
+              <div class="col-12">
+                <h4 x-text="selectedCampaign.name"></h4>
+                <span class="badge" :class="getCampaignStatusClass(selectedCampaign.status)" x-text="getCampaignStatusText(selectedCampaign.status)"></span>
+              </div>
+              <div class="col-12">
+                <strong>活动描述：</strong>
+                <p class="text-muted" x-text="selectedCampaign.description || '暂无描述'"></p>
+              </div>
+              <div class="col-md-6">
+                <strong>开始时间：</strong>
+                <span x-text="formatDateSafe(selectedCampaign.start_time)"></span>
+              </div>
+              <div class="col-md-6">
+                <strong>结束时间：</strong>
+                <span x-text="formatDateSafe(selectedCampaign.end_time)"></span>
+              </div>
+              <div class="col-md-6">
+                <strong>参与人数：</strong>
+                <span x-text="selectedCampaign.participant_count || 0"></span>
+              </div>
+              <div class="col-md-6">
+                <strong>中奖人数：</strong>
+                <span x-text="selectedCampaign.winner_count || 0"></span>
+              </div>
+              <div class="col-12" x-show="selectedCampaign.rules">
+                <strong>活动规则：</strong>
+                <pre class="bg-light p-2 rounded" x-text="selectedCampaign.rules"></pre>
+              </div>
+            </div>
+          </template>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+          <button type="button" class="btn btn-primary" @click="editCampaign(selectedCampaign); $refs.campaignDetailModal && bootstrap.Modal.getInstance($refs.campaignDetailModal)?.hide()">
+            <i class="bi bi-pencil"></i> 编辑
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 奖品表单 Modal -->
+  <div class="modal fade" id="prizeModal" tabindex="-1" x-ref="prizeModal">
+    <div class="modal-dialog">
+      <div class="modal-content" x-data="lotteryPageContent()">
+        <div class="modal-header">
+          <h5 class="modal-title"><i class="bi bi-trophy"></i> <span x-text="isEditMode ? '编辑奖品' : '添加奖品'"></span></h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <form @submit.prevent="submitPrizeForm">
+          <div class="modal-body">
+            <div class="mb-3">
+              <label class="form-label">奖品名称 <span class="text-danger">*</span></label>
+              <input type="text" class="form-control" x-model="prizeForm.name" required>
+            </div>
+            <div class="mb-3">
+              <label class="form-label">奖品类型</label>
+              <select class="form-select" x-model="prizeForm.type">
+                <option value="virtual">虚拟奖品</option>
+                <option value="physical">实物奖品</option>
+                <option value="coupon">优惠券</option>
+                <option value="points">积分</option>
+              </select>
+            </div>
+            <div class="row g-3">
+              <div class="col-md-6">
+                <label class="form-label">中奖概率 (%)</label>
+                <input type="number" class="form-control" x-model.number="prizeForm.probability" min="0" max="100" step="0.01">
+              </div>
+              <div class="col-md-6">
+                <label class="form-label">库存 (-1为无限)</label>
+                <input type="number" class="form-control" x-model.number="prizeForm.stock" min="-1">
+              </div>
+            </div>
+            <div class="mb-3">
+              <label class="form-label">奖品图片URL</label>
+              <input type="text" class="form-control" x-model="prizeForm.image_url">
+            </div>
+            <div class="mb-3">
+              <label class="form-label">奖品描述</label>
+              <textarea class="form-control" x-model="prizeForm.description" rows="2"></textarea>
+            </div>
+            <div class="mb-3">
+              <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" x-model="prizeForm.is_active" id="prizeActiveSwitch">
+                <label class="form-check-label" for="prizeActiveSwitch">启用奖品</label>
+              </div>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+            <button type="submit" class="btn btn-primary" :disabled="saving">
+              <span x-show="saving" class="spinner-border spinner-border-sm me-1"></span>
+              <span x-text="isEditMode ? '保存修改' : '添加奖品'"></span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- 矩阵编辑 Modal -->
+  <div class="modal fade" id="matrixEditModal" tabindex="-1" x-ref="matrixEditModal">
+    <div class="modal-dialog">
+      <div class="modal-content" x-data="lotteryPageContent()">
+        <div class="modal-header">
+          <h5 class="modal-title"><i class="bi bi-grid-3x3"></i> 编辑矩阵配置</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <form @submit.prevent="submitMatrixConfig">
+          <div class="modal-body">
+            <template x-if="editingMatrixCell">
+              <div>
+                <p class="alert alert-info">
+                  预算层级：<strong x-text="editingMatrixCell.budget_tier"></strong>
+                  / 压力层级：<strong x-text="editingMatrixCell.pressure_tier"></strong>
+                </p>
+                <div class="mb-3">
+                  <label class="form-label">Cap值</label>
+                  <input type="number" class="form-control" x-model.number="editingMatrixCell.cap" min="0" step="0.01">
+                  <small class="text-muted">中奖上限控制</small>
+                </div>
+                <div class="mb-3">
+                  <label class="form-label">Empty Weight</label>
+                  <input type="number" class="form-control" x-model.number="editingMatrixCell.empty_weight" min="0" step="0.01">
+                  <small class="text-muted">空奖权重</small>
+                </div>
+                <div class="mb-3">
+                  <label class="form-label">中奖概率调整</label>
+                  <input type="number" class="form-control" x-model.number="editingMatrixCell.win_probability" min="0" max="1" step="0.001">
+                  <small class="text-muted">概率调整因子 (0-1)</small>
+                </div>
+              </div>
+            </template>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+            <button type="submit" class="btn btn-primary" :disabled="saving">
+              <span x-show="saving" class="spinner-border spinner-border-sm me-1"></span>保存配置
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- 配额表单 Modal -->
+  <div class="modal fade" id="quotaModal" tabindex="-1" x-ref="quotaModal">
+    <div class="modal-dialog">
+      <div class="modal-content" x-data="lotteryPageContent()">
+        <div class="modal-header">
+          <h5 class="modal-title"><i class="bi bi-bar-chart-steps"></i> <span x-text="isEditQuota ? '编辑配额' : '新增配额'"></span></h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <form @submit.prevent="submitQuotaForm">
+          <div class="modal-body">
+            <div class="mb-3">
+              <label class="form-label">活动ID <span class="text-danger">*</span></label>
+              <input type="text" class="form-control" x-model="quotaForm.campaign_id" :disabled="isEditQuota" required>
+            </div>
+            <div class="mb-3">
+              <label class="form-label">奖品ID <span class="text-danger">*</span></label>
+              <input type="text" class="form-control" x-model="quotaForm.prize_id" :disabled="isEditQuota" required>
+            </div>
+            <div class="mb-3">
+              <label class="form-label">总配额 <span class="text-danger">*</span></label>
+              <input type="number" class="form-control" x-model.number="quotaForm.total_quota" min="1" required>
+            </div>
+            <div class="mb-3">
+              <label class="form-label">周期类型</label>
+              <select class="form-select" x-model="quotaForm.period_type">
+                <option value="daily">每日</option>
+                <option value="weekly">每周</option>
+                <option value="monthly">每月</option>
+                <option value="total">总量</option>
+              </select>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+            <button type="submit" class="btn btn-primary" :disabled="saving">
+              <span x-show="saving" class="spinner-border spinner-border-sm me-1"></span>
+              <span x-text="isEditQuota ? '保存修改' : '创建配额'"></span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- 核销码详情 Modal -->
+  <div class="modal fade" id="redemptionDetailModal" x-ref="redemptionDetailModal" tabindex="-1" x-data="lotteryPageContent()">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title"><i class="bi bi-info-circle"></i> 核销码详情</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body" x-show="redemptionDetail">
+          <div class="text-center mb-3">
+            <code class="bg-light p-2 rounded fs-5" :title="redemptionDetail?.code_hash || ''" 
+                 x-text="getCodeDisplay(redemptionDetail?.code_hash)"></code>
+            <br>
+            <small class="text-muted" x-text="'订单ID: ' + (redemptionDetail?.order_id || '-')"></small>
+          </div>
+          <table class="table table-sm">
+            <tr>
+              <th style="width:35%">状态</th>
+              <td>
+                <span class="badge" :class="getRedemptionStatusClass(redemptionDetail?.status)" 
+                      x-text="getRedemptionStatusText(redemptionDetail?.status)"></span>
+              </td>
+            </tr>
+            <tr>
+              <th>核销用户ID</th>
+              <td x-text="redemptionDetail?.redeemer_user_id || '-'"></td>
+            </tr>
+            <tr>
+              <th>核销用户</th>
+              <td x-text="getRedeemerName(redemptionDetail) || '-'"></td>
+            </tr>
+            <tr>
+              <th>物品类型</th>
+              <td x-text="redemptionDetail?.item_instance?.item_type || '-'"></td>
+            </tr>
+            <tr>
+              <th>奖品名称</th>
+              <td x-text="getRedemptionPrizeName(redemptionDetail)"></td>
+            </tr>
+            <tr>
+              <th>活动</th>
+              <td x-text="getRedemptionCampaignName(redemptionDetail)"></td>
+            </tr>
+            <tr>
+              <th>创建时间</th>
+              <td x-text="formatDateSafe(redemptionDetail?.created_at)"></td>
+            </tr>
+            <tr>
+              <th>有效期至</th>
+              <td x-text="formatDateSafe(redemptionDetail?.expires_at)"></td>
+            </tr>
+            <template x-if="redemptionDetail?.status === 'fulfilled' || redemptionDetail?.status === 'redeemed'">
+              <tr>
+                <th>核销时间</th>
+                <td x-text="formatDateSafe(redemptionDetail?.fulfilled_at)"></td>
+              </tr>
+            </template>
+          </table>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 手动核销 Modal -->
+  <div class="modal fade" id="redeemModal" x-ref="redeemModal" tabindex="-1" x-data="lotteryPageContent()">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title"><i class="bi bi-check-circle"></i> 手动核销</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <form @submit.prevent="submitRedeem()">
+            <div class="mb-3 text-center">
+              <code class="bg-light p-2 rounded fs-5" x-text="redeemForm.codeDisplay"></code>
+            </div>
+            <div class="mb-3">
+              <label class="form-label">核销门店</label>
+              <select class="form-select" x-model="redeemForm.storeId">
+                <option value="">请选择门店</option>
+                <template x-for="s in stores" :key="s.store_id">
+                  <option :value="s.store_id" x-text="s.store_name"></option>
+                </template>
+              </select>
+            </div>
+            <div class="mb-3">
+              <label class="form-label">备注</label>
+              <textarea class="form-control" x-model="redeemForm.remark" rows="2" placeholder="核销备注（选填）"></textarea>
+            </div>
+          </form>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+          <button type="button" class="btn btn-success" @click="submitRedeem()" :disabled="submitting">
+            <span x-show="submitting" class="spinner-border spinner-border-sm me-1"></span>
+            确认核销
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 奖品补货 Modal -->
+  <div class="modal fade" id="stockModal" x-ref="stockModal" tabindex="-1">
+    <div class="modal-dialog">
+      <div class="modal-content" x-data="lotteryPageContent()">
+        <div class="modal-header">
+          <h5 class="modal-title"><i class="bi bi-box-seam"></i> 奖品补货</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <form @submit.prevent="submitAddStock()">
+          <div class="modal-body">
+            <template x-if="stockForm.prize">
+              <div class="mb-3">
+                <label class="form-label">奖品名称</label>
+                <input type="text" class="form-control" :value="stockForm.prize?.name || ''" disabled>
+              </div>
+            </template>
+            <div class="mb-3">
+              <label class="form-label">当前库存</label>
+              <input type="text" class="form-control" :value="stockForm.currentStock === -1 ? '无限库存' : stockForm.currentStock" disabled>
+            </div>
+            <div class="mb-3">
+              <label class="form-label">补货数量 <span class="text-danger">*</span></label>
+              <input type="number" class="form-control" x-model.number="stockForm.addAmount" min="1" placeholder="请输入补货数量" required>
+              <small class="text-muted">增加的库存数量</small>
+            </div>
+            <div class="mb-3">
+              <label class="form-label">备注</label>
+              <textarea class="form-control" x-model="stockForm.remark" rows="2" placeholder="补货原因或备注（选填）"></textarea>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+            <button type="submit" class="btn btn-primary" :disabled="saving">
+              <span x-show="saving" class="spinner-border spinner-border-sm me-1"></span>确认补货
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- 预算设置 Modal -->
+  <div class="modal fade" id="budgetModal" x-ref="budgetModal" tabindex="-1">
+    <div class="modal-dialog">
+      <div class="modal-content" x-data="lotteryPageContent()">
+        <div class="modal-header">
+          <h5 class="modal-title"><i class="bi bi-cash-stack"></i> 设置预算</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <form @submit.prevent="submitBudget()">
+          <div class="modal-body">
+            <div class="mb-3">
+              <label class="form-label">活动名称</label>
+              <input type="text" class="form-control" :value="budgetForm.campaignName" disabled>
+            </div>
+            <div class="mb-3">
+              <label class="form-label">预算模式 <span class="text-danger">*</span></label>
+              <select class="form-select" x-model="budgetForm.budgetMode" required>
+                <option value="total">总预算</option>
+                <option value="daily">每日预算</option>
+                <option value="weekly">每周预算</option>
+                <option value="monthly">每月预算</option>
+              </select>
+            </div>
+            <div class="mb-3">
+              <label class="form-label">预算金额 (元) <span class="text-danger">*</span></label>
+              <input type="number" class="form-control" x-model.number="budgetForm.budgetAmount" min="0" step="0.01" placeholder="请输入预算金额" required>
+            </div>
+            <div class="mb-3">
+              <label class="form-label">预警阈值 (%)</label>
+              <input type="number" class="form-control" x-model.number="budgetForm.alertThreshold" min="0" max="100" step="1" value="80" placeholder="预算使用率达到此值时预警">
+              <small class="text-muted">默认80%，达到此使用率时发送预警</small>
+            </div>
+            <div class="mb-3">
+              <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" x-model="budgetForm.autoStop" id="autoStopSwitch">
+                <label class="form-check-label" for="autoStopSwitch">预算用完自动停止活动</label>
+              </div>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+            <button type="submit" class="btn btn-primary" :disabled="saving">
+              <span x-show="saving" class="spinner-border spinner-border-sm me-1"></span>保存预算
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- 加载遮罩 -->
+  <div class="loading-overlay" id="loadingOverlay">
+    <div class="spinner-border text-light" style="width: 3rem; height: 3rem;" role="status">
+      <span class="visually-hidden">处理中...</span>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="/admin/js/admin-common.js"></script>
+  <script src="/admin/js/api-config.js"></script>
+  <script src="/admin/js/pages/lottery-management.js"></script>
+</body>
+</html>
+

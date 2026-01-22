@@ -514,6 +514,91 @@ app.get('/api', (req, res) => {
  * 🌐 Web管理后台静态文件托管
  * ========================================
  */
+
+/**
+ * 旧页面重定向中间件
+ *
+ * 将旧的分散页面 URL 重定向到新的整合页面
+ * 这确保了 URL 书签和外部链接的兼容性
+ */
+const PAGE_REDIRECT_MAP = {
+  // 资产管理
+  '/admin/user-assets.html': '/admin/asset-management.html?page=user-assets',
+  '/admin/user-inventory.html': '/admin/asset-management.html?page=user-inventory',
+  '/admin/material-asset-types.html': '/admin/asset-management.html?page=material-types',
+  '/admin/asset-adjustment.html': '/admin/asset-management.html?page=asset-adjustment',
+  '/admin/orphan-frozen.html': '/admin/asset-management.html?page=orphan-frozen',
+  '/admin/material-balances.html': '/admin/asset-management.html?page=material-accounts',
+  '/admin/material-transactions.html': '/admin/asset-management.html?page=material-transactions',
+  // 用户管理
+  '/admin/users.html': '/admin/user-management.html?page=users',
+  '/admin/roles.html': '/admin/user-management.html?page=roles',
+  '/admin/sessions.html': '/admin/user-management.html?page=sessions',
+  // 内容管理
+  '/admin/announcements.html': '/admin/content-management.html?page=announcements',
+  '/admin/notifications.html': '/admin/content-management.html?page=notifications',
+  '/admin/popup-banners.html': '/admin/content-management.html?page=banners',
+  '/admin/image-resources.html': '/admin/content-management.html?page=images',
+  '/admin/feedbacks.html': '/admin/content-management.html?page=feedbacks',
+  // 抽奖管理
+  '/admin/prizes.html': '/admin/lottery-management.html?page=prizes',
+  '/admin/campaigns.html': '/admin/lottery-management.html?page=campaigns',
+  '/admin/lottery-strategy.html': '/admin/lottery-management.html?page=lottery-strategy',
+  '/admin/lottery-metrics.html': '/admin/lottery-management.html?page=lottery-metrics',
+  '/admin/lottery-quota.html': '/admin/lottery-management.html?page=lottery-quota',
+  '/admin/tier-matrix.html': '/admin/lottery-management.html?page=tier-matrix',
+  '/admin/presets.html': '/admin/lottery-management.html?page=presets',
+  '/admin/activity-conditions.html': '/admin/lottery-management.html?page=campaigns',
+  '/admin/campaign-budget.html': '/admin/lottery-management.html?page=campaigns',
+  '/admin/pricing-config.html': '/admin/lottery-management.html?page=campaigns',
+  // 门店管理
+  '/admin/stores.html': '/admin/store-management.html?page=store-list',
+  '/admin/store-staff.html': '/admin/store-management.html?page=store-staff',
+  '/admin/merchant-points.html': '/admin/store-management.html?page=merchant-points',
+  // 市场交易
+  '/admin/exchange-market-items.html': '/admin/market-management.html?page=exchange-items',
+  '/admin/exchange-market-orders.html': '/admin/market-management.html?page=exchange-orders',
+  '/admin/exchange-market-stats.html': '/admin/market-management.html?page=exchange-stats',
+  '/admin/trade-orders.html': '/admin/market-management.html?page=trade-orders',
+  '/admin/marketplace-stats.html': '/admin/market-management.html?page=marketplace-stats',
+  // 财务管理
+  '/admin/consumption.html': '/admin/finance-management.html?page=consumption-review',
+  '/admin/diamond-accounts.html': '/admin/finance-management.html?page=diamond-accounts',
+  '/admin/debt-management.html': '/admin/finance-management.html?page=debt-management',
+  '/admin/redemption-orders.html': '/admin/finance-management.html?page=redemption-orders',
+  // 系统设置
+  '/admin/settings.html': '/admin/system-settings.html?page=basic-settings',
+  '/admin/system-config.html': '/admin/system-settings.html?page=system-config',
+  '/admin/dict-management.html': '/admin/system-settings.html?page=dict-management',
+  '/admin/config-tools.html': '/admin/system-settings.html?page=config-tools',
+  '/admin/audit-logs.html': '/admin/system-settings.html?page=audit-logs',
+  '/admin/item-templates.html': '/admin/system-settings.html?page=item-templates',
+  // 旧 pages 目录
+  '/admin/pages/asset-management.html': '/admin/asset-management.html',
+  '/admin/pages/market-management.html': '/admin/market-management.html',
+  '/admin/pages/user-management.html': '/admin/user-management.html',
+  '/admin/pages/system-config.html': '/admin/system-settings.html'
+}
+
+app.use('/admin', (req, res, next) => {
+  // 检查是否有禁用重定向参数
+  if (req.query.no_redirect === '1') {
+    return next()
+  }
+
+  const redirectTo = PAGE_REDIRECT_MAP[req.path] || PAGE_REDIRECT_MAP['/admin' + req.path]
+  if (redirectTo) {
+    // 保留原始查询参数
+    const originalParams = new URLSearchParams(req.query)
+    originalParams.delete('no_redirect')
+    const extraParams = originalParams.toString()
+    const finalUrl = extraParams ? `${redirectTo}&${extraParams}` : redirectTo
+    appLogger.info(`🔄 页面重定向: ${req.path} → ${finalUrl}`)
+    return res.redirect(301, finalUrl)
+  }
+  next()
+})
+
 /**
  * 托管管理后台静态文件
  *

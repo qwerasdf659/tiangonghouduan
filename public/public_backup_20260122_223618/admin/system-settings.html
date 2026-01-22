@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title id="pageTitle">系统设置 - 管理后台</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+  <link href="/admin/css/common.css" rel="stylesheet">
+  <style>
+    .sub-nav { background: #f8f9fa; border-bottom: 1px solid #dee2e6; padding: 0.5rem 0; }
+    .sub-nav .nav-link { color: #495057; padding: 0.5rem 1rem; border-radius: 0.25rem; margin: 0 0.25rem; }
+    .sub-nav .nav-link:hover { background: #e9ecef; }
+    .sub-nav .nav-link.active { background: #0d6efd; color: white; }
+    [x-cloak] { display: none !important; }
+    .config-card { border: 1px solid #dee2e6; border-radius: 0.5rem; padding: 1rem; margin-bottom: 1rem; }
+    .config-card .config-title { font-weight: 600; margin-bottom: 0.5rem; }
+    .config-card .config-desc { color: #6c757d; font-size: 0.875rem; }
+    .dict-tag { background: #e9ecef; padding: 0.25rem 0.5rem; border-radius: 0.25rem; margin: 0.125rem; display: inline-block; font-size: 0.875rem; }
+  </style>
+
+  <!-- Alpine.js -->
+  <!-- ✅ Alpine.js Mixin 系统 -->
+  <script defer src="/admin/js/alpine/mixins-bundle.js"></script>
+  <script defer src="/admin/js/alpine/init.js"></script>
+  <script defer src="/admin/js/vendor/alpine.min.js"></script>
+</head>
+<body class="bg-light">
+  <nav class="navbar navbar-dark bg-primary">
+    <div class="container-fluid">
+      <a href="/admin/dashboard.html" class="navbar-brand">
+        <i class="bi bi-arrow-left me-2"></i>⚙️ 管理后台 - 系统设置
+      </a>
+      <div>
+        <span class="text-light me-3" x-data x-text="$store.auth.user?.nickname ? `欢迎，${$store.auth.user.nickname}` : '欢迎，管理员'">欢迎，管理员</span>
+        <button class="btn btn-outline-light btn-sm" onclick="logout()">退出登录</button>
+      </div>
+    </div>
+  </nav>
+
+  <!-- 子模块导航 -->
+  <div class="sub-nav" x-data="systemNavigation()" x-cloak>
+    <div class="container-fluid">
+      <ul class="nav nav-pills">
+        <template x-for="page in subPages" :key="page.id">
+          <li class="nav-item">
+            <a class="nav-link" :class="{ 'active': currentPage === page.id }" :href="'?page=' + page.id" @click.prevent="switchPage(page.id)">
+              <i class="bi me-1" :class="page.icon"></i><span x-text="page.title"></span>
+            </a>
+          </li>
+        </template>
+      </ul>
+    </div>
+  </div>
+
+  <!-- 主内容区域 -->
+  <div class="container-fluid mt-4" x-data="systemPageContent()" x-cloak>
+    
+    <!-- ==================== 系统配置 ==================== -->
+    <div x-show="currentPage === 'system-config'" x-cloak>
+      <div class="card">
+        <div class="card-header bg-white d-flex justify-content-between align-items-center">
+          <h5 class="mb-0"><i class="bi bi-gear"></i> 系统配置</h5>
+          <button class="btn btn-primary btn-sm" @click="saveAllConfigs()" :disabled="saving">
+            <span x-show="saving" class="spinner-border spinner-border-sm me-1"></span>
+            <i class="bi bi-save" x-show="!saving"></i> 保存配置
+          </button>
+        </div>
+        <div class="card-body">
+          <div class="row">
+            <!-- 基础配置 -->
+            <div class="col-md-6">
+              <div class="config-card">
+                <div class="config-title"><i class="bi bi-info-circle text-primary"></i> 基础配置</div>
+                <div class="config-desc">系统基本信息设置</div>
+                <div class="mt-3">
+                  <div class="mb-2">
+                    <label class="form-label small">系统名称</label>
+                    <input type="text" class="form-control form-control-sm" x-model="systemConfigs.site_name">
+                  </div>
+                  <div class="mb-2">
+                    <label class="form-label small">联系邮箱</label>
+                    <input type="email" class="form-control form-control-sm" x-model="systemConfigs.contact_email">
+                  </div>
+                  <div class="mb-2">
+                    <label class="form-label small">服务热线</label>
+                    <input type="text" class="form-control form-control-sm" x-model="systemConfigs.service_phone">
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 功能开关 -->
+            <div class="col-md-6">
+              <div class="config-card">
+                <div class="config-title"><i class="bi bi-toggle-on text-success"></i> 功能开关</div>
+                <div class="config-desc">控制系统功能启用状态</div>
+                <div class="mt-3">
+                  <div class="form-check mb-2">
+                    <input type="checkbox" class="form-check-input" id="enableLottery" x-model="systemConfigs.enable_lottery">
+                    <label class="form-check-label" for="enableLottery">启用抽奖功能</label>
+                  </div>
+                  <div class="form-check mb-2">
+                    <input type="checkbox" class="form-check-input" id="enableMarket" x-model="systemConfigs.enable_market">
+                    <label class="form-check-label" for="enableMarket">启用市场交易</label>
+                  </div>
+                  <div class="form-check mb-2">
+                    <input type="checkbox" class="form-check-input" id="enableNotification" x-model="systemConfigs.enable_notification">
+                    <label class="form-check-label" for="enableNotification">启用消息推送</label>
+                  </div>
+                  <div class="form-check mb-2">
+                    <input type="checkbox" class="form-check-input" id="maintenanceMode" x-model="systemConfigs.maintenance_mode">
+                    <label class="form-check-label text-danger" for="maintenanceMode">维护模式</label>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 抽奖配置 -->
+            <div class="col-md-6">
+              <div class="config-card">
+                <div class="config-title"><i class="bi bi-gift text-warning"></i> 抽奖配置</div>
+                <div class="config-desc">抽奖系统参数配置</div>
+                <div class="mt-3">
+                  <div class="mb-2">
+                    <label class="form-label small">每日抽奖次数上限</label>
+                    <input type="number" class="form-control form-control-sm" x-model.number="systemConfigs.daily_lottery_limit">
+                  </div>
+                  <div class="mb-2">
+                    <label class="form-label small">单次抽奖消耗积分</label>
+                    <input type="number" class="form-control form-control-sm" x-model.number="systemConfigs.lottery_cost">
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 安全配置 -->
+            <div class="col-md-6">
+              <div class="config-card">
+                <div class="config-title"><i class="bi bi-shield-lock text-danger"></i> 安全配置</div>
+                <div class="config-desc">系统安全相关设置</div>
+                <div class="mt-3">
+                  <div class="mb-2">
+                    <label class="form-label small">登录失败锁定次数</label>
+                    <input type="number" class="form-control form-control-sm" x-model.number="systemConfigs.max_login_attempts">
+                  </div>
+                  <div class="mb-2">
+                    <label class="form-label small">会话超时时间(分钟)</label>
+                    <input type="number" class="form-control form-control-sm" x-model.number="systemConfigs.session_timeout">
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== 字典管理 ==================== -->
+    <div x-show="currentPage === 'dict-management'" x-cloak>
+      <div class="card">
+        <div class="card-header bg-white d-flex justify-content-between align-items-center">
+          <h5 class="mb-0"><i class="bi bi-book"></i> 字典管理</h5>
+          <button class="btn btn-primary btn-sm" @click="openCreateDictModal()">
+            <i class="bi bi-plus"></i> 添加字典
+          </button>
+        </div>
+        <div class="card-body">
+          <div class="row">
+            <template x-for="dict in dictList" :key="dict.dict_code">
+              <div class="col-md-6 mb-3">
+                <div class="card h-100">
+                  <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                    <span>
+                      <strong x-text="dict.dict_name"></strong>
+                      <code class="ms-2 text-muted" x-text="dict.dict_code"></code>
+                    </span>
+                    <div>
+                      <button class="btn btn-sm btn-outline-primary" @click="editDict(dict)"><i class="bi bi-pencil"></i></button>
+                      <button class="btn btn-sm btn-outline-danger" @click="deleteDict(dict)"><i class="bi bi-trash"></i></button>
+                    </div>
+                  </div>
+                  <div class="card-body">
+                    <div class="d-flex flex-wrap">
+                      <template x-for="item in dict.items" :key="item.value">
+                        <span class="dict-tag" x-text="item.label + ' (' + item.value + ')'"></span>
+                      </template>
+                      <template x-if="!dict.items || dict.items.length === 0">
+                        <span class="text-muted">暂无字典项</span>
+                      </template>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </template>
+            <template x-if="dictList.length === 0">
+              <div class="col-12 text-center text-muted py-5">暂无字典数据</div>
+            </template>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== 审计日志 ==================== -->
+    <div x-show="currentPage === 'audit-logs'" x-cloak>
+      <div class="card">
+        <div class="card-header bg-white">
+          <h5 class="mb-0"><i class="bi bi-journal-text"></i> 审计日志</h5>
+        </div>
+        <div class="card-body">
+          <!-- 筛选器 -->
+          <div class="row mb-3 g-2">
+            <div class="col-md-2">
+              <select class="form-select form-select-sm" x-model="auditFilters.action" @change="loadAuditLogs()">
+                <option value="">全部操作</option>
+                <option value="create">创建</option>
+                <option value="update">更新</option>
+                <option value="delete">删除</option>
+                <option value="login">登录</option>
+                <option value="logout">登出</option>
+              </select>
+            </div>
+            <div class="col-md-2">
+              <input type="date" class="form-control form-control-sm" x-model="auditFilters.startDate">
+            </div>
+            <div class="col-md-2">
+              <input type="date" class="form-control form-control-sm" x-model="auditFilters.endDate">
+            </div>
+            <div class="col-md-3">
+              <input type="text" class="form-control form-control-sm" placeholder="操作用户/IP地址..." x-model="auditFilters.keyword">
+            </div>
+            <div class="col-md-2">
+              <button class="btn btn-primary btn-sm w-100" @click="loadAuditLogs()">
+                <i class="bi bi-search"></i> 搜索
+              </button>
+            </div>
+          </div>
+
+          <!-- 日志表格 -->
+          <div class="table-responsive">
+            <table class="table table-hover table-sm">
+              <thead class="table-light">
+                <tr>
+                  <th>时间</th>
+                  <th>操作者</th>
+                  <th>操作类型</th>
+                  <th>目标</th>
+                  <th>IP地址</th>
+                  <th>详情</th>
+                </tr>
+              </thead>
+              <tbody>
+                <template x-if="auditLogs.length === 0">
+                  <tr><td colspan="6" class="text-center text-muted py-4">暂无审计日志</td></tr>
+                </template>
+                <template x-for="log in auditLogs" :key="log.log_id">
+                  <tr>
+                    <td x-text="formatDateSafe(log.created_at)"></td>
+                    <td x-text="log.operator_name || log.operator_id"></td>
+                    <td><span class="badge" :class="getAuditActionClass(log.action)" x-text="getAuditActionText(log.action)"></span></td>
+                    <td x-text="log.target_type + '#' + log.target_id"></td>
+                    <td><code x-text="log.ip_address || '-'"></code></td>
+                    <td>
+                      <button class="btn btn-sm btn-outline-info" @click="viewAuditDetail(log)"><i class="bi bi-eye"></i></button>
+                    </td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- 分页 -->
+          <nav x-show="auditPagination.totalPages > 1">
+            <ul class="pagination pagination-sm justify-content-center">
+              <li class="page-item" :class="{ 'disabled': page <= 1 }">
+                <a class="page-link" href="#" @click.prevent="changeAuditPage(page - 1)">上一页</a>
+              </li>
+              <template x-for="p in Math.min(auditPagination.totalPages, 10)" :key="p">
+                <li class="page-item" :class="{ 'active': p === page }">
+                  <a class="page-link" href="#" @click.prevent="changeAuditPage(p)" x-text="p"></a>
+                </li>
+              </template>
+              <li class="page-item" :class="{ 'disabled': page >= auditPagination.totalPages }">
+                <a class="page-link" href="#" @click.prevent="changeAuditPage(page + 1)">下一页</a>
+              </li>
+            </ul>
+          </nav>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== 定价配置 ==================== -->
+    <div x-show="currentPage === 'pricing-config'" x-cloak>
+      <div class="card">
+        <div class="card-header bg-white d-flex justify-content-between align-items-center">
+          <h5 class="mb-0"><i class="bi bi-currency-dollar"></i> 定价配置</h5>
+          <button class="btn btn-primary btn-sm" @click="savePricingConfigs()" :disabled="saving">
+            <span x-show="saving" class="spinner-border spinner-border-sm me-1"></span>
+            <i class="bi bi-save" x-show="!saving"></i> 保存配置
+          </button>
+        </div>
+        <div class="card-body">
+          <div class="table-responsive">
+            <table class="table table-hover">
+              <thead class="table-light">
+                <tr>
+                  <th>配置项</th>
+                  <th>当前值</th>
+                  <th>单位</th>
+                  <th>说明</th>
+                  <th>操作</th>
+                </tr>
+              </thead>
+              <tbody>
+                <template x-if="pricingConfigs.length === 0">
+                  <tr><td colspan="5" class="text-center text-muted py-4">暂无定价配置</td></tr>
+                </template>
+                <template x-for="config in pricingConfigs" :key="config.config_key">
+                  <tr>
+                    <td>
+                      <strong x-text="config.config_name"></strong>
+                      <br><code class="small text-muted" x-text="config.config_key"></code>
+                    </td>
+                    <td>
+                      <input type="number" class="form-control form-control-sm" style="width: 120px;" x-model.number="config.config_value" step="0.01">
+                    </td>
+                    <td x-text="config.unit || '-'"></td>
+                    <td class="text-muted small" x-text="config.description || '-'"></td>
+                    <td>
+                      <button class="btn btn-sm btn-outline-warning" @click="resetPricing(config)"><i class="bi bi-arrow-counterclockwise"></i></button>
+                    </td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ==================== Modal 对话框 ==================== -->
+  
+  <!-- 审计日志详情 Modal -->
+  <div class="modal fade" id="auditDetailModal" tabindex="-1" x-ref="auditDetailModal">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-content" x-data="systemPageContent()">
+        <div class="modal-header">
+          <h5 class="modal-title"><i class="bi bi-journal-text"></i> 审计日志详情</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body" x-show="selectedAuditLog">
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label fw-bold">日志ID</label>
+              <p class="form-control-plaintext" x-text="selectedAuditLog?.log_id || '-'"></p>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-bold">操作时间</label>
+              <p class="form-control-plaintext" x-text="formatDateSafe(selectedAuditLog?.created_at)"></p>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-bold">操作者</label>
+              <p class="form-control-plaintext" x-text="selectedAuditLog?.operator_name || selectedAuditLog?.operator_id || '-'"></p>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-bold">操作类型</label>
+              <p class="form-control-plaintext">
+                <span class="badge" :class="getAuditActionClass(selectedAuditLog?.action)" x-text="getAuditActionText(selectedAuditLog?.action)"></span>
+              </p>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-bold">目标类型</label>
+              <p class="form-control-plaintext" x-text="selectedAuditLog?.target_type || '-'"></p>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-bold">目标ID</label>
+              <p class="form-control-plaintext" x-text="selectedAuditLog?.target_id || '-'"></p>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-bold">IP地址</label>
+              <p class="form-control-plaintext"><code x-text="selectedAuditLog?.ip_address || '-'"></code></p>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-bold">用户代理</label>
+              <p class="form-control-plaintext small text-break" x-text="selectedAuditLog?.user_agent || '-'"></p>
+            </div>
+            <div class="col-12">
+              <label class="form-label fw-bold">操作描述</label>
+              <p class="form-control-plaintext" x-text="selectedAuditLog?.description || '-'"></p>
+            </div>
+            <div class="col-12" x-show="selectedAuditLog?.old_value || selectedAuditLog?.new_value">
+              <label class="form-label fw-bold">变更详情</label>
+              <div class="row">
+                <div class="col-md-6" x-show="selectedAuditLog?.old_value">
+                  <div class="card bg-light">
+                    <div class="card-header py-2"><small class="text-muted">变更前</small></div>
+                    <div class="card-body py-2">
+                      <pre class="mb-0 small" x-text="typeof selectedAuditLog?.old_value === 'object' ? JSON.stringify(selectedAuditLog?.old_value, null, 2) : selectedAuditLog?.old_value"></pre>
+                    </div>
+                  </div>
+                </div>
+                <div class="col-md-6" x-show="selectedAuditLog?.new_value">
+                  <div class="card bg-light">
+                    <div class="card-header py-2"><small class="text-muted">变更后</small></div>
+                    <div class="card-body py-2">
+                      <pre class="mb-0 small" x-text="typeof selectedAuditLog?.new_value === 'object' ? JSON.stringify(selectedAuditLog?.new_value, null, 2) : selectedAuditLog?.new_value"></pre>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="col-12" x-show="selectedAuditLog?.extra_data">
+              <label class="form-label fw-bold">附加数据</label>
+              <pre class="bg-light p-2 rounded small" x-text="typeof selectedAuditLog?.extra_data === 'object' ? JSON.stringify(selectedAuditLog?.extra_data, null, 2) : selectedAuditLog?.extra_data"></pre>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 字典编辑 Modal -->
+  <div class="modal fade" id="dictModal" tabindex="-1" x-ref="dictModal">
+    <div class="modal-dialog">
+      <div class="modal-content" x-data="systemPageContent()">
+        <div class="modal-header">
+          <h5 class="modal-title" x-text="editingDictCode ? '编辑字典' : '添加字典'"></h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label">字典编码 <span class="text-danger">*</span></label>
+            <input type="text" class="form-control" x-model="dictForm.dict_code" :disabled="editingDictCode" placeholder="如：user_status">
+          </div>
+          <div class="mb-3">
+            <label class="form-label">字典名称 <span class="text-danger">*</span></label>
+            <input type="text" class="form-control" x-model="dictForm.dict_name" placeholder="如：用户状态">
+          </div>
+          <div class="mb-3">
+            <label class="form-label">字典项</label>
+            <div class="border rounded p-2">
+              <template x-for="(item, index) in dictForm.items" :key="index">
+                <div class="d-flex gap-2 mb-2">
+                  <input type="text" class="form-control form-control-sm" x-model="item.value" placeholder="值">
+                  <input type="text" class="form-control form-control-sm" x-model="item.label" placeholder="标签">
+                  <button type="button" class="btn btn-sm btn-outline-danger" @click="dictForm.items.splice(index, 1)">
+                    <i class="bi bi-x"></i>
+                  </button>
+                </div>
+              </template>
+              <button type="button" class="btn btn-sm btn-outline-primary w-100" @click="dictForm.items.push({ value: '', label: '' })">
+                <i class="bi bi-plus"></i> 添加字典项
+              </button>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+          <button type="button" class="btn btn-primary" @click="saveDict()" :disabled="saving">
+            <span x-show="saving" class="spinner-border spinner-border-sm me-1"></span>
+            保存
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 加载遮罩 -->
+  <div class="loading-overlay" id="loadingOverlay">
+    <div class="spinner-border text-light" style="width: 3rem; height: 3rem;" role="status">
+      <span class="visually-hidden">处理中...</span>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="/admin/js/admin-common.js"></script>
+  <script src="/admin/js/api-config.js"></script>
+  <script src="/admin/js/pages/system-settings.js"></script>
+</body>
+</html>
+

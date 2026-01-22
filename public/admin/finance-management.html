@@ -1,0 +1,658 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title id="pageTitle">财务管理 - 管理后台</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+  <link href="/admin/css/common.css" rel="stylesheet">
+  <style>
+    .sub-nav { background: #f8f9fa; border-bottom: 1px solid #dee2e6; padding: 0.5rem 0; }
+    .sub-nav .nav-link { color: #495057; padding: 0.5rem 1rem; border-radius: 0.25rem; margin: 0 0.25rem; }
+    .sub-nav .nav-link:hover { background: #e9ecef; }
+    .sub-nav .nav-link.active { background: #0d6efd; color: white; }
+    [x-cloak] { display: none !important; }
+    .stat-card { border: none; box-shadow: 0 0.125rem 0.25rem rgba(0,0,0,.075); }
+    .amount-positive { color: #198754; }
+    .amount-negative { color: #dc3545; }
+  </style>
+
+  <!-- Alpine.js -->
+  <!-- ✅ Alpine.js Mixin 系统 -->
+  <script defer src="/admin/js/alpine/mixins-bundle.js"></script>
+  <script defer src="/admin/js/alpine/init.js"></script>
+  <script defer src="/admin/js/vendor/alpine.min.js"></script>
+</head>
+<body class="bg-light">
+  <nav class="navbar navbar-dark bg-primary">
+    <div class="container-fluid">
+      <a href="/admin/dashboard.html" class="navbar-brand">
+        <i class="bi bi-arrow-left me-2"></i>💰 管理后台 - 财务管理
+      </a>
+      <div>
+        <span class="text-light me-3" x-data x-text="$store.auth.user?.nickname ? `欢迎，${$store.auth.user.nickname}` : '欢迎，管理员'">欢迎，管理员</span>
+        <button class="btn btn-outline-light btn-sm" onclick="logout()">退出登录</button>
+      </div>
+    </div>
+  </nav>
+
+  <!-- 子模块导航 -->
+  <div class="sub-nav" x-data="financeNavigation()" x-cloak>
+    <div class="container-fluid">
+      <ul class="nav nav-pills">
+        <template x-for="page in subPages" :key="page.id">
+          <li class="nav-item">
+            <a class="nav-link" :class="{ 'active': currentPage === page.id }" :href="'?page=' + page.id" @click.prevent="switchPage(page.id)">
+              <i class="bi me-1" :class="page.icon"></i><span x-text="page.title"></span>
+            </a>
+          </li>
+        </template>
+      </ul>
+    </div>
+  </div>
+
+  <!-- 主内容区域 -->
+  <div class="container-fluid mt-4" x-data="financePageContent()" x-cloak>
+    
+    <!-- ==================== 消费记录 ==================== -->
+    <div x-show="currentPage === 'consumption'" x-cloak>
+      <!-- 统计卡片 -->
+      <div class="row g-3 mb-4">
+        <div class="col-md-3">
+          <div class="card stat-card">
+            <div class="card-body text-center">
+              <i class="bi bi-receipt text-primary" style="font-size: 2rem;"></i>
+              <h6 class="text-muted mt-2">总消费笔数</h6>
+              <h2 x-text="consumptionStats.totalCount" class="text-primary mb-0">-</h2>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-3">
+          <div class="card stat-card">
+            <div class="card-body text-center">
+              <i class="bi bi-cash-stack text-success" style="font-size: 2rem;"></i>
+              <h6 class="text-muted mt-2">总消费金额</h6>
+              <h2 x-text="'¥' + consumptionStats.totalAmount" class="text-success mb-0">-</h2>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-3">
+          <div class="card stat-card">
+            <div class="card-body text-center">
+              <i class="bi bi-calendar-check text-info" style="font-size: 2rem;"></i>
+              <h6 class="text-muted mt-2">今日消费</h6>
+              <h2 x-text="'¥' + consumptionStats.todayAmount" class="text-info mb-0">-</h2>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-3">
+          <div class="card stat-card">
+            <div class="card-body text-center">
+              <i class="bi bi-calculator text-warning" style="font-size: 2rem;"></i>
+              <h6 class="text-muted mt-2">平均消费</h6>
+              <h2 x-text="'¥' + consumptionStats.avgAmount" class="text-warning mb-0">-</h2>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header bg-white">
+          <h5 class="mb-0"><i class="bi bi-receipt"></i> 消费记录</h5>
+        </div>
+        <div class="card-body">
+          <!-- 筛选器 -->
+          <div class="row mb-3 g-2">
+            <div class="col-md-2">
+              <input type="date" class="form-control form-control-sm" x-model="consumptionFilters.startDate">
+            </div>
+            <div class="col-md-2">
+              <input type="date" class="form-control form-control-sm" x-model="consumptionFilters.endDate">
+            </div>
+            <div class="col-md-3">
+              <input type="text" class="form-control form-control-sm" placeholder="用户ID/手机号..." x-model="consumptionFilters.keyword">
+            </div>
+            <div class="col-md-2">
+              <button class="btn btn-primary btn-sm w-100" @click="loadConsumption()">
+                <i class="bi bi-search"></i> 搜索
+              </button>
+            </div>
+          </div>
+
+          <!-- 消费记录表格 -->
+          <div class="table-responsive">
+            <table class="table table-hover">
+              <thead class="table-light">
+                <tr>
+                  <th>记录ID</th>
+                  <th>用户</th>
+                  <th>门店</th>
+                  <th>消费金额</th>
+                  <th>支付方式</th>
+                  <th>消费时间</th>
+                  <th>操作</th>
+                </tr>
+              </thead>
+              <tbody>
+                <template x-if="consumptionList.length === 0">
+                  <tr><td colspan="7" class="text-center text-muted py-4">暂无消费记录</td></tr>
+                </template>
+                <template x-for="record in consumptionList" :key="record.consumption_id">
+                  <tr>
+                    <td><code x-text="record.consumption_id"></code></td>
+                    <td x-text="record.user_nickname || record.user_id"></td>
+                    <td x-text="record.store_name || '-'"></td>
+                    <td class="amount-negative" x-text="'¥' + record.amount"></td>
+                    <td><span class="badge bg-info" x-text="getPaymentMethodText(record.payment_method)"></span></td>
+                    <td x-text="formatDateSafe(record.created_at)"></td>
+                    <td>
+                      <button class="btn btn-sm btn-outline-info" @click="viewConsumptionDetail(record)"><i class="bi bi-eye"></i></button>
+                    </td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== 钻石账户 ==================== -->
+    <div x-show="currentPage === 'diamond-accounts'" x-cloak>
+      <div class="card">
+        <div class="card-header bg-white d-flex justify-content-between align-items-center">
+          <h5 class="mb-0"><i class="bi bi-gem"></i> 钻石账户</h5>
+          <button class="btn btn-primary btn-sm" @click="openAdjustDiamondModal()">
+            <i class="bi bi-plus-minus"></i> 调整钻石
+          </button>
+        </div>
+        <div class="card-body">
+          <!-- 筛选器 -->
+          <div class="row mb-3 g-2">
+            <div class="col-md-3">
+              <input type="text" class="form-control form-control-sm" placeholder="用户ID/昵称..." x-model="diamondFilters.keyword">
+            </div>
+            <div class="col-md-2">
+              <select class="form-select form-select-sm" x-model="diamondFilters.balanceRange">
+                <option value="">全部余额</option>
+                <option value="0-100">0-100</option>
+                <option value="100-1000">100-1000</option>
+                <option value="1000+">1000+</option>
+              </select>
+            </div>
+            <div class="col-md-2">
+              <button class="btn btn-primary btn-sm w-100" @click="loadDiamondAccounts()">
+                <i class="bi bi-search"></i> 搜索
+              </button>
+            </div>
+          </div>
+
+          <!-- 钻石账户表格 -->
+          <div class="table-responsive">
+            <table class="table table-hover">
+              <thead class="table-light">
+                <tr>
+                  <th>用户</th>
+                  <th>钻石余额</th>
+                  <th>累计获得</th>
+                  <th>累计消费</th>
+                  <th>最后变动</th>
+                  <th>操作</th>
+                </tr>
+              </thead>
+              <tbody>
+                <template x-if="diamondAccounts.length === 0">
+                  <tr><td colspan="6" class="text-center text-muted py-4">暂无数据</td></tr>
+                </template>
+                <template x-for="account in diamondAccounts" :key="account.user_id">
+                  <tr>
+                    <td>
+                      <div>
+                        <div class="fw-medium" x-text="account.nickname || account.user_id"></div>
+                        <small class="text-muted" x-text="account.phone || '-'"></small>
+                      </div>
+                    </td>
+                    <td><span class="text-warning fw-bold" x-text="account.balance + ' 💎'"></span></td>
+                    <td class="amount-positive" x-text="'+' + (account.total_earned || 0)"></td>
+                    <td class="amount-negative" x-text="'-' + (account.total_spent || 0)"></td>
+                    <td x-text="formatDateSafe(account.updated_at)"></td>
+                    <td>
+                      <button class="btn btn-sm btn-outline-primary" @click="viewDiamondHistory(account)"><i class="bi bi-clock-history"></i></button>
+                      <button class="btn btn-sm btn-outline-warning" @click="adjustDiamond(account)"><i class="bi bi-plus-minus"></i></button>
+                    </td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== 商户积分 ==================== -->
+    <div x-show="currentPage === 'merchant-points'" x-cloak>
+      <div class="card">
+        <div class="card-header bg-white">
+          <h5 class="mb-0"><i class="bi bi-coin"></i> 商户积分</h5>
+        </div>
+        <div class="card-body">
+          <!-- 商户积分表格 -->
+          <div class="table-responsive">
+            <table class="table table-hover">
+              <thead class="table-light">
+                <tr>
+                  <th>商户</th>
+                  <th>积分余额</th>
+                  <th>累计获得</th>
+                  <th>累计使用</th>
+                  <th>状态</th>
+                  <th>操作</th>
+                </tr>
+              </thead>
+              <tbody>
+                <template x-if="merchantPoints.length === 0">
+                  <tr><td colspan="6" class="text-center text-muted py-4">暂无数据</td></tr>
+                </template>
+                <template x-for="merchant in merchantPoints" :key="merchant.merchant_id">
+                  <tr>
+                    <td x-text="merchant.name || merchant.merchant_id"></td>
+                    <td><span class="text-success fw-bold" x-text="merchant.balance + ' 积分'"></span></td>
+                    <td class="amount-positive" x-text="'+' + (merchant.total_earned || 0)"></td>
+                    <td class="amount-negative" x-text="'-' + (merchant.total_used || 0)"></td>
+                    <td><span class="badge" :class="merchant.is_active ? 'bg-success' : 'bg-secondary'" x-text="merchant.is_active ? '正常' : '冻结'"></span></td>
+                    <td>
+                      <button class="btn btn-sm btn-outline-info" @click="viewMerchantPointHistory(merchant)"><i class="bi bi-clock-history"></i></button>
+                    </td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== 债务管理 ==================== -->
+    <div x-show="currentPage === 'debt-management'" x-cloak>
+      <!-- 统计卡片 -->
+      <div class="row g-3 mb-4">
+        <div class="col-md-4">
+          <div class="card stat-card">
+            <div class="card-body text-center">
+              <i class="bi bi-exclamation-triangle text-danger" style="font-size: 2rem;"></i>
+              <h6 class="text-muted mt-2">待处理债务</h6>
+              <h2 x-text="debtStats.pendingCount" class="text-danger mb-0">-</h2>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <div class="card stat-card">
+            <div class="card-body text-center">
+              <i class="bi bi-cash-coin text-warning" style="font-size: 2rem;"></i>
+              <h6 class="text-muted mt-2">待回收金额</h6>
+              <h2 x-text="'¥' + debtStats.pendingAmount" class="text-warning mb-0">-</h2>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <div class="card stat-card">
+            <div class="card-body text-center">
+              <i class="bi bi-check-circle text-success" style="font-size: 2rem;"></i>
+              <h6 class="text-muted mt-2">已回收金额</h6>
+              <h2 x-text="'¥' + debtStats.recoveredAmount" class="text-success mb-0">-</h2>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header bg-white">
+          <h5 class="mb-0"><i class="bi bi-file-earmark-minus"></i> 债务记录</h5>
+        </div>
+        <div class="card-body">
+          <div class="table-responsive">
+            <table class="table table-hover">
+              <thead class="table-light">
+                <tr>
+                  <th>债务ID</th>
+                  <th>用户</th>
+                  <th>债务金额</th>
+                  <th>已还金额</th>
+                  <th>状态</th>
+                  <th>创建时间</th>
+                  <th>操作</th>
+                </tr>
+              </thead>
+              <tbody>
+                <template x-if="debtList.length === 0">
+                  <tr><td colspan="7" class="text-center text-muted py-4">暂无债务记录</td></tr>
+                </template>
+                <template x-for="debt in debtList" :key="debt.debt_id">
+                  <tr>
+                    <td><code x-text="debt.debt_id"></code></td>
+                    <td x-text="debt.user_nickname || debt.user_id"></td>
+                    <td class="amount-negative" x-text="'¥' + debt.amount"></td>
+                    <td class="amount-positive" x-text="'¥' + (debt.paid_amount || 0)"></td>
+                    <td><span class="badge" :class="getDebtStatusClass(debt.status)" x-text="getDebtStatusText(debt.status)"></span></td>
+                    <td x-text="formatDateSafe(debt.created_at)"></td>
+                    <td>
+                      <button class="btn btn-sm btn-outline-info" @click="viewDebtDetail(debt)"><i class="bi bi-eye"></i></button>
+                      <button class="btn btn-sm btn-outline-success" x-show="debt.status === 'pending'" @click="processDebt(debt)"><i class="bi bi-check-lg"></i></button>
+                    </td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== 活动预算 ==================== -->
+    <div x-show="currentPage === 'campaign-budget'" x-cloak>
+      <div class="card">
+        <div class="card-header bg-white d-flex justify-content-between align-items-center">
+          <h5 class="mb-0"><i class="bi bi-piggy-bank"></i> 活动预算</h5>
+          <button class="btn btn-primary btn-sm" @click="openCreateBudgetModal()">
+            <i class="bi bi-plus"></i> 新增预算
+          </button>
+        </div>
+        <div class="card-body">
+          <div class="table-responsive">
+            <table class="table table-hover">
+              <thead class="table-light">
+                <tr>
+                  <th>预算ID</th>
+                  <th>活动名称</th>
+                  <th>总预算</th>
+                  <th>已使用</th>
+                  <th>剩余</th>
+                  <th>使用率</th>
+                  <th>状态</th>
+                  <th>操作</th>
+                </tr>
+              </thead>
+              <tbody>
+                <template x-if="budgetList.length === 0">
+                  <tr><td colspan="8" class="text-center text-muted py-4">暂无预算记录</td></tr>
+                </template>
+                <template x-for="budget in budgetList" :key="budget.budget_id">
+                  <tr>
+                    <td><code x-text="budget.budget_id"></code></td>
+                    <td x-text="budget.campaign_name || budget.campaign_id"></td>
+                    <td x-text="'¥' + budget.total_budget"></td>
+                    <td class="amount-negative" x-text="'¥' + budget.used_budget"></td>
+                    <td class="amount-positive" x-text="'¥' + (budget.total_budget - budget.used_budget)"></td>
+                    <td>
+                      <div class="progress" style="height: 20px;">
+                        <div class="progress-bar" :class="getBudgetProgressClass(budget)" :style="'width: ' + getBudgetUsageRate(budget) + '%'" x-text="getBudgetUsageRate(budget) + '%'"></div>
+                      </div>
+                    </td>
+                    <td><span class="badge" :class="budget.is_active ? 'bg-success' : 'bg-secondary'" x-text="budget.is_active ? '生效中' : '已停用'"></span></td>
+                    <td>
+                      <button class="btn btn-sm btn-outline-primary" @click="editBudget(budget)"><i class="bi bi-pencil"></i></button>
+                    </td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- 消费详情 Modal -->
+  <div class="modal fade" id="consumptionDetailModal" x-ref="consumptionDetailModal" tabindex="-1">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title"><i class="bi bi-receipt"></i> 消费详情</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <template x-if="selectedConsumption">
+            <div class="row g-3">
+              <div class="col-6"><strong>记录ID：</strong><code x-text="selectedConsumption.consumption_id"></code></div>
+              <div class="col-6"><strong>用户：</strong><span x-text="selectedConsumption.user_nickname || selectedConsumption.user_id"></span></div>
+              <div class="col-6"><strong>门店：</strong><span x-text="selectedConsumption.store_name || '-'"></span></div>
+              <div class="col-6"><strong>消费金额：</strong><span class="amount-negative" x-text="'¥' + selectedConsumption.amount"></span></div>
+              <div class="col-6"><strong>支付方式：</strong><span class="badge bg-info" x-text="getPaymentMethodText(selectedConsumption.payment_method)"></span></div>
+              <div class="col-6"><strong>消费时间：</strong><span x-text="formatDateSafe(selectedConsumption.created_at)"></span></div>
+              <div class="col-12" x-show="selectedConsumption.remark"><strong>备注：</strong><span x-text="selectedConsumption.remark"></span></div>
+            </div>
+          </template>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 调整钻石 Modal -->
+  <div class="modal fade" id="adjustDiamondModal" x-ref="adjustDiamondModal" tabindex="-1">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title"><i class="bi bi-gem"></i> 调整钻石余额</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <form @submit.prevent="submitAdjustDiamond">
+          <div class="modal-body">
+            <p x-show="selectedAccount" class="alert alert-info">
+              用户：<strong x-text="selectedAccount?.nickname || selectedAccount?.user_id"></strong>
+              <br>当前余额：<span class="text-warning" x-text="(selectedAccount?.balance || 0) + ' 💎'"></span>
+            </p>
+            <div class="mb-3">
+              <label class="form-label">用户ID <span class="text-danger">*</span></label>
+              <input type="text" class="form-control" x-model="adjustDiamondForm.user_id" :disabled="!!selectedAccount" required>
+            </div>
+            <div class="mb-3">
+              <label class="form-label">调整类型 <span class="text-danger">*</span></label>
+              <select class="form-select" x-model="adjustDiamondForm.adjust_type">
+                <option value="increase">增加</option>
+                <option value="decrease">减少</option>
+              </select>
+            </div>
+            <div class="mb-3">
+              <label class="form-label">调整数量 <span class="text-danger">*</span></label>
+              <input type="number" class="form-control" x-model.number="adjustDiamondForm.amount" min="1" required>
+            </div>
+            <div class="mb-3">
+              <label class="form-label">调整原因 <span class="text-danger">*</span></label>
+              <textarea class="form-control" x-model="adjustDiamondForm.reason" rows="3" required></textarea>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+            <button type="submit" class="btn btn-primary" :disabled="saving">
+              <span x-show="saving" class="spinner-border spinner-border-sm me-1"></span>确认调整
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- 钻石变动历史 Modal -->
+  <div class="modal fade" id="diamondHistoryModal" x-ref="diamondHistoryModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title"><i class="bi bi-clock-history"></i> 钻石变动记录</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <p x-show="selectedAccount" class="mb-3">
+            用户：<strong x-text="selectedAccount?.nickname || selectedAccount?.user_id"></strong>
+          </p>
+          <div class="table-responsive">
+            <table class="table table-sm">
+              <thead class="table-light">
+                <tr>
+                  <th>时间</th>
+                  <th>类型</th>
+                  <th>变动</th>
+                  <th>余额</th>
+                  <th>说明</th>
+                </tr>
+              </thead>
+              <tbody>
+                <template x-if="diamondHistory.length === 0">
+                  <tr><td colspan="5" class="text-center text-muted py-3">暂无记录</td></tr>
+                </template>
+                <template x-for="tx in diamondHistory" :key="tx.tx_id">
+                  <tr>
+                    <td x-text="formatDateSafe(tx.created_at)"></td>
+                    <td><span class="badge" :class="tx.tx_type === 'increase' ? 'bg-success' : 'bg-danger'" x-text="tx.tx_type === 'increase' ? '收入' : '支出'"></span></td>
+                    <td :class="tx.tx_type === 'increase' ? 'amount-positive' : 'amount-negative'" x-text="(tx.tx_type === 'increase' ? '+' : '-') + tx.amount"></td>
+                    <td x-text="tx.balance_after || '-'"></td>
+                    <td x-text="tx.reason || tx.business_type || '-'"></td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 债务详情 Modal -->
+  <div class="modal fade" id="debtDetailModal" x-ref="debtDetailModal" tabindex="-1">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title"><i class="bi bi-file-earmark-minus"></i> 债务详情</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <template x-if="selectedDebt">
+            <div class="row g-3">
+              <div class="col-6"><strong>债务ID：</strong><code x-text="selectedDebt.debt_id"></code></div>
+              <div class="col-6"><strong>用户：</strong><span x-text="selectedDebt.user_nickname || selectedDebt.user_id"></span></div>
+              <div class="col-6"><strong>债务金额：</strong><span class="amount-negative" x-text="'¥' + selectedDebt.amount"></span></div>
+              <div class="col-6"><strong>已还金额：</strong><span class="amount-positive" x-text="'¥' + (selectedDebt.paid_amount || 0)"></span></div>
+              <div class="col-6"><strong>状态：</strong><span class="badge" :class="getDebtStatusClass(selectedDebt.status)" x-text="getDebtStatusText(selectedDebt.status)"></span></div>
+              <div class="col-6"><strong>创建时间：</strong><span x-text="formatDateSafe(selectedDebt.created_at)"></span></div>
+              <div class="col-12" x-show="selectedDebt.reason"><strong>原因：</strong><span x-text="selectedDebt.reason"></span></div>
+            </div>
+          </template>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 商户积分历史 Modal -->
+  <div class="modal fade" id="merchantPointHistoryModal" x-ref="merchantPointHistoryModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title"><i class="bi bi-clock-history"></i> 积分变动记录</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <p x-show="selectedMerchant" class="mb-3">
+            商户：<strong x-text="selectedMerchant?.name || selectedMerchant?.merchant_id"></strong>
+          </p>
+          <div class="table-responsive">
+            <table class="table table-sm">
+              <thead class="table-light">
+                <tr>
+                  <th>时间</th>
+                  <th>类型</th>
+                  <th>变动</th>
+                  <th>余额</th>
+                  <th>说明</th>
+                </tr>
+              </thead>
+              <tbody>
+                <template x-if="merchantPointHistory.length === 0">
+                  <tr><td colspan="5" class="text-center text-muted py-3">暂无记录</td></tr>
+                </template>
+                <template x-for="record in merchantPointHistory" :key="record.record_id || record.id">
+                  <tr>
+                    <td x-text="formatDateSafe(record.created_at)"></td>
+                    <td><span class="badge" :class="record.change_type === 'earn' ? 'bg-success' : 'bg-danger'" x-text="record.change_type === 'earn' ? '获得' : '使用'"></span></td>
+                    <td :class="record.change_type === 'earn' ? 'amount-positive' : 'amount-negative'" x-text="(record.change_type === 'earn' ? '+' : '-') + Math.abs(record.change_amount || record.amount)"></td>
+                    <td x-text="record.balance_after || '-'"></td>
+                    <td x-text="record.reason || record.remark || '-'"></td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 活动预算 Modal -->
+  <div class="modal fade" id="budgetModal" x-ref="budgetModal" tabindex="-1">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title"><i class="bi bi-piggy-bank"></i> <span x-text="isEditBudget ? '编辑预算' : '新增预算'"></span></h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <form @submit.prevent="submitBudgetForm">
+          <div class="modal-body">
+            <div class="mb-3">
+              <label class="form-label">活动ID <span class="text-danger">*</span></label>
+              <input type="text" class="form-control" x-model="budgetForm.campaign_id" :disabled="isEditBudget" required>
+              <small class="text-muted">关联的抽奖活动ID</small>
+            </div>
+            <div class="mb-3" x-show="isEditBudget">
+              <label class="form-label">活动名称</label>
+              <input type="text" class="form-control" x-model="budgetForm.campaign_name" disabled>
+            </div>
+            <div class="mb-3">
+              <label class="form-label">总预算金额 (元) <span class="text-danger">*</span></label>
+              <input type="number" class="form-control" x-model.number="budgetForm.total_budget" min="1" step="0.01" required>
+            </div>
+            <div class="mb-3">
+              <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" x-model="budgetForm.is_active" id="budgetActiveSwitch">
+                <label class="form-check-label" for="budgetActiveSwitch">启用预算控制</label>
+              </div>
+              <small class="text-muted">启用后，活动消耗将受预算限制</small>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+            <button type="submit" class="btn btn-primary" :disabled="saving">
+              <span x-show="saving" class="spinner-border spinner-border-sm me-1"></span>
+              <span x-text="isEditBudget ? '保存修改' : '创建预算'"></span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- 加载遮罩 -->
+  <div class="loading-overlay" id="loadingOverlay">
+    <div class="spinner-border text-light" style="width: 3rem; height: 3rem;" role="status">
+      <span class="visually-hidden">处理中...</span>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="/admin/js/admin-common.js"></script>
+  <script src="/admin/js/api-config.js"></script>
+  <script src="/admin/js/pages/finance-management.js"></script>
+</body>
+</html>
+
